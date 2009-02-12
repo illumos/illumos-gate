@@ -20,14 +20,12 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Transport Interface Library cooperating module - issue 2
@@ -662,7 +660,7 @@ timodrsrv(queue_t *q)
 
 	tp = (struct tim_tim *)q->q_ptr;
 	if (!tp)
-	    return;
+		return;
 
 	while ((mp = getq(q)) != NULL) {
 		if (timodrproc(q, mp)) {
@@ -852,9 +850,8 @@ timodrproc(queue_t *q, mblk_t *mp)
 				if (ntp->tim_peercred != NULL)
 					crfree(ntp->tim_peercred);
 				ntp->tim_peercred =
-				    DB_CRED(tp->tim_iocsave->b_cont);
-				ntp->tim_cpid =
-				    DB_CPID(tp->tim_iocsave->b_cont);
+				    msg_getcred(tp->tim_iocsave->b_cont,
+				    &ntp->tim_cpid);
 				if (ntp->tim_peercred != NULL)
 					crhold(ntp->tim_peercred);
 
@@ -922,7 +919,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 
 			if (((tp->tim_flags & WAITIOCACK) == 0) ||
 			    ((tp->tim_saved_prim != O_T_BIND_REQ) &&
-				(tp->tim_saved_prim != T_BIND_REQ))) {
+			    (tp->tim_saved_prim != T_BIND_REQ))) {
 				putnext(q, mp);
 				break;
 			}
@@ -970,7 +967,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 		}
 
 /* ONC_PLUS EXTRACT END */
-	    case T_OPTMGMT_ACK:
+		case T_OPTMGMT_ACK:
 
 		tilog("timodrproc: Got T_OPTMGMT_ACK\n", 0);
 
@@ -992,23 +989,23 @@ timodrproc(queue_t *q, mblk_t *mp)
 		break;
 
 		case T_INFO_ACK: {
-		    struct T_info_ack *tia = (struct T_info_ack *)pptr;
+		struct T_info_ack *tia = (struct T_info_ack *)pptr;
 
-		    /* Restore db_type - recover() might have changed it */
-		    mp->b_datap->db_type = M_PCPROTO;
+		/* Restore db_type - recover() might have changed it */
+		mp->b_datap->db_type = M_PCPROTO;
 
-		    if (blen < sizeof (*tia)) {
+		if (blen < sizeof (*tia)) {
 			putnext(q, mp);
 			break;
-		    }
+		}
 
-		    tilog("timodrproc: Got T_INFO_ACK, flags = %x\n",
-			tp->tim_flags);
+		tilog("timodrproc: Got T_INFO_ACK, flags = %x\n",
+		    tp->tim_flags);
 
-		    timodprocessinfo(q, tp, tia);
+		timodprocessinfo(q, tp, tia);
 
-		    TILOG("timodrproc: flags = %x\n", tp->tim_flags);
-		    if ((tp->tim_flags & WAITIOCACK) != 0) {
+		TILOG("timodrproc: flags = %x\n", tp->tim_flags);
+		if ((tp->tim_flags & WAITIOCACK) != 0) {
 			size_t	expected_ack_size;
 			ssize_t	deficit;
 			int	ioc_cmd;
@@ -1100,7 +1097,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 			}
 
 			expected_ack_size =
-				sizeof (struct T_info_ack); /* TI_GETINFO */
+			    sizeof (struct T_info_ack); /* TI_GETINFO */
 			if (iocbp->ioc_cmd == TI_SYNC) {
 				expected_ack_size = 2 * sizeof (uint32_t) +
 				    sizeof (struct ti_sync_ack);
@@ -1110,8 +1107,8 @@ timodrproc(queue_t *q, mblk_t *mp)
 			if (deficit != 0) {
 				if (mp->b_datap->db_lim - mp->b_wptr <
 				    deficit) {
-				    mblk_t *tmp = allocb(expected_ack_size,
-					BPRI_HI);
+					mblk_t *tmp = allocb(expected_ack_size,
+					    BPRI_HI);
 				    if (tmp == NULL) {
 					ASSERT(MBLKSIZE(mp) >=
 						sizeof (struct T_error_ack));
@@ -1121,7 +1118,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 
 					mp->b_rptr = mp->b_datap->db_base;
 					pptr = (union T_primitives *)
-						mp->b_rptr;
+					    mp->b_rptr;
 					pptr->error_ack.ERROR_prim = T_INFO_REQ;
 					pptr->error_ack.TLI_error = TSYSERR;
 					pptr->error_ack.UNIX_error = EAGAIN;
@@ -1190,7 +1187,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 			tp->tim_flags &= ~(WAITIOCACK | WAIT_IOCINFOACK |
 			    TI_CAP_RECVD | CAP_WANTS_INFO);
 			break;
-		    }
+		}
 	    }
 
 	    putnext(q, mp);
@@ -1233,10 +1230,9 @@ timodrproc(queue_t *q, mblk_t *mp)
 		mutex_enter(&tp->tim_mutex);
 		if (tp->tim_peercred != NULL)
 			crfree(tp->tim_peercred);
-		tp->tim_peercred = DB_CRED(mp);
+		tp->tim_peercred = msg_getcred(mp, &tp->tim_cpid);
 		if (tp->tim_peercred != NULL)
 			crhold(tp->tim_peercred);
-		tp->tim_cpid = DB_CPID(mp);
 		mutex_exit(&tp->tim_mutex);
 
 		tilog("timodrproc: Got T_CONN_CON\n", 0);
@@ -1261,23 +1257,23 @@ timodrproc(queue_t *q, mblk_t *mp)
 		disp = (struct T_discon_ind *)mp->b_rptr;
 
 		tilog("timodrproc: Got T_DISCON_IND Reason: %d\n",
-			disp->DISCON_reason);
+		    disp->DISCON_reason);
 
 		tp->tim_flags &= ~(CONNWAIT|LOCORDREL|REMORDREL);
 		tim_clear_peer(tp);
 		for (nbp = tp->tim_consave; nbp; nbp = nbp->b_next) {
-		    conp = (struct T_conn_ind *)nbp->b_rptr;
-		    if (conp->SEQ_number == disp->SEQ_number)
-			break;
-		    pbp = nbp;
+			conp = (struct T_conn_ind *)nbp->b_rptr;
+			if (conp->SEQ_number == disp->SEQ_number)
+				break;
+			pbp = nbp;
 		}
 		if (nbp) {
-		    if (pbp)
-			pbp->b_next = nbp->b_next;
-		    else
-			tp->tim_consave = nbp->b_next;
-		    nbp->b_next = NULL;
-		    freemsg(nbp);
+			if (pbp)
+				pbp->b_next = nbp->b_next;
+			else
+				tp->tim_consave = nbp->b_next;
+			nbp->b_next = NULL;
+			freemsg(nbp);
 		}
 		putnext(q, mp);
 		break;
@@ -1596,7 +1592,7 @@ timodwsrv(queue_t *q)
 
 	ASSERT(q != NULL);
 	if (q->q_ptr == NULL)
-	    return;
+		return;
 
 	while ((mp = getq(q)) != NULL) {
 		if (timodwproc(q, mp)) {
@@ -1688,7 +1684,7 @@ timodwproc(queue_t *q, mblk_t *mp)
 				if (cmp != NULL &&
 				    iocbp->ioc_flag == IOC_NATIVE &&
 				    (tp->tim_flags &
-					(CONNWAIT|LOCORDREL|REMORDREL)) == 0 &&
+				    (CONNWAIT|LOCORDREL|REMORDREL)) == 0 &&
 				    tp->tim_peercred != NULL &&
 				    DB_TYPE(cmp) == M_DATA &&
 				    MBLKL(cmp) == sizeof (k_peercred_t)) {
@@ -2675,9 +2671,9 @@ ti_expind_on_rdqueues(queue_t *rq)
 			 */
 			if ((bp->b_datap->db_type == M_PROTO) &&
 			    ((bp->b_wptr - bp->b_rptr) >=
-				sizeof (struct T_exdata_ind)) &&
+			    sizeof (struct T_exdata_ind)) &&
 			    (((struct T_exdata_ind *)bp->b_rptr)->PRIM_type
-				== T_EXDATA_IND)) {
+			    == T_EXDATA_IND)) {
 				/* bp is T_EXDATA_IND */
 				mutex_exit(QLOCK(rq));
 				releasestr(q); /* decrement sd_refcnt  */
@@ -3011,6 +3007,8 @@ tim_send_ioctl_tpi_msg(queue_t *q, mblk_t *mp, struct tim_tim *tp,
 
 	/* Verify credentials in STREAM */
 	ASSERT(iocb->ioc_cr == NULL || iocb->ioc_cr == DB_CRED(tmp));
+
+	ASSERT(DB_CRED(tmp) != NULL);
 
 	TILOG("timodwproc: sending down %d\n", tp->tim_saved_prim);
 	putnext(q, tmp);

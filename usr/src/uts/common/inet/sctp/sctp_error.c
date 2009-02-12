@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +193,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		return;
 
 	hmp = allocb_cred(sctps->sctps_wroff_xtra + ahlen,
-	    CONN_CRED(sctp->sctp_connp));
+	    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	if (hmp == NULL) {
 		/* XXX no resources */
 		return;
@@ -262,7 +262,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 
 	ipst = sctps->sctps_netstack->netstack_ip;
 	connp = sctp->sctp_connp;
-	if (is_system_labeled() && (cr = DB_CRED(inmp)) != NULL &&
+	if (is_system_labeled() && (cr = msg_getcred(inmp, NULL)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		int err;
 		boolean_t exempt = connp->conn_mac_exempt;

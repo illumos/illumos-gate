@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -589,7 +589,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		 * or things like snoop is running.
 		 */
 		nmp = allocb_cred(sctps->sctps_wroff_xtra + hdrlen + sacklen,
-		    CONN_CRED(sctp->sctp_connp));
+		    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 		if (nmp == NULL) {
 			if (error !=  NULL)
 				*error = ENOMEM;
@@ -601,7 +601,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		mp = nmp;
 	} else {
 		mp->b_rptr -= (hdrlen + sacklen);
-		mblk_setcred(mp, CONN_CRED(sctp->sctp_connp));
+		mblk_setcred(mp, CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	}
 	bcopy(hdr, mp->b_rptr, hdrlen);
 	if (sacklen) {
@@ -1381,7 +1381,8 @@ sctp_make_ftsn_chunk(sctp_t *sctp, sctp_faddr_t *fp, sctp_ftsn_set_t *sets,
 		xtralen = sctp->sctp_hdr_len + sctps->sctps_wroff_xtra;
 	else
 		xtralen = sctp->sctp_hdr6_len + sctps->sctps_wroff_xtra;
-	ftsn_mp = allocb_cred(xtralen + seglen, CONN_CRED(sctp->sctp_connp));
+	ftsn_mp = allocb_cred(xtralen + seglen, CONN_CRED(sctp->sctp_connp),
+	    sctp->sctp_cpid);
 	if (ftsn_mp == NULL)
 		return (NULL);
 	ftsn_mp->b_rptr += xtralen;

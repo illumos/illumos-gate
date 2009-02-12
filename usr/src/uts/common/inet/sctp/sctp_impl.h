@@ -935,6 +935,9 @@ typedef struct sctp_s {
 	int		sctp_pd_point;		/* Partial delivery point */
 	mblk_t		*sctp_err_chunks;	/* Error chunks */
 	uint32_t	sctp_err_len;		/* Total error chunks length */
+
+	pid_t		sctp_cpid;	/* Process id when this was opened */
+	uint64_t	sctp_open_time;	/* time when this was opened */
 } sctp_t;
 
 #define	SCTP_TXQ_LEN(sctp)	((sctp)->sctp_unsent + (sctp)->sctp_unacked)

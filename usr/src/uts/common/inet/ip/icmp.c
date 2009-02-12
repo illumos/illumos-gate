@@ -141,6 +141,7 @@ static int	icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
 static void	icmp_ud_err(queue_t *q, mblk_t *mp, t_scalar_t err);
 static void	icmp_tpi_unbind(queue_t *q, mblk_t *mp);
+static int	icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst);
 static void	icmp_wput(queue_t *q, mblk_t *mp);
 static void	icmp_wput_fallback(queue_t *q, mblk_t *mp);
 static int	raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp,
@@ -248,7 +249,7 @@ static icmpparam_t	icmp_param_arr[] = {
 
 static int rawip_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len);
 static int rawip_do_connect(conn_t *connp, const struct sockaddr *sa,
-    socklen_t len);
+    socklen_t len, cred_t *cr);
 static void rawip_post_ip_bind_connect(icmp_t *icmp, mblk_t *ire_mp, int error);
 
 /*
@@ -270,6 +271,21 @@ icmp_tpi_bind(queue_t *q, mblk_t *mp)
 	icmp_t		*icmp;
 	conn_t	*connp = Q_TO_CONN(q);
 	mblk_t *mp1;
+	cred_t *cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		icmp_err_ack(q, mp, TSYSERR, EINVAL);
+		return;
+	}
 
 	icmp = connp->conn_icmp;
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
@@ -579,6 +595,21 @@ icmp_tpi_connect(queue_t *q, mblk_t *mp)
 	struct sockaddr *sa;
 	socklen_t len;
 	int error;
+	cred_t *cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		icmp_err_ack(q, mp, TSYSERR, EINVAL);
+		return;
+	}
 
 	icmp = connp->conn_icmp;
 	tcr = (struct T_conn_req *)mp->b_rptr;
@@ -615,7 +646,7 @@ icmp_tpi_connect(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-	error = rawip_do_connect(connp, sa, len);
+	error = rawip_do_connect(connp, sa, len, cr);
 	if (error != 0) {
 		if (error < 0) {
 			icmp_err_ack(q, mp, -error, 0);
@@ -659,7 +690,8 @@ icmp_tpi_connect(queue_t *q, mblk_t *mp)
 }
 
 static int
-rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len)
+rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
+    cred_t *cr)
 {
 	icmp_t	*icmp;
 	sin_t	*sin;
@@ -779,12 +811,12 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len)
 		error = ip_proto_bind_connected_v6(connp, &ire_mp,
 		    icmp->icmp_proto, &icmp->icmp_v6src, 0,
 		    &icmp->icmp_v6dst.sin6_addr,
-		    NULL, sin6->sin6_port, B_TRUE, B_TRUE);
+		    NULL, sin6->sin6_port, B_TRUE, B_TRUE, cr);
 	} else {
 		error = ip_proto_bind_connected_v4(connp, &ire_mp,
 		    icmp->icmp_proto, &V4_PART_OF_V6(icmp->icmp_v6src), 0,
 		    V4_PART_OF_V6(icmp->icmp_v6dst.sin6_addr), sin->sin_port,
-		    B_TRUE, B_TRUE);
+		    B_TRUE, B_TRUE, cr);
 	}
 	rawip_post_ip_bind_connect(icmp, ire_mp, error);
 	return (error);
@@ -4370,7 +4402,6 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 		}
 	}
 
-	mblk_setcred(mp, connp->conn_cred);
 	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
 	return (0);
 }
@@ -4381,9 +4412,21 @@ icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 	int err;
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
 	icmp_stack_t		*is = icmp->icmp_is;
-	conn_t	*connp = icmp->icmp_connp;
+	conn_t			*connp = icmp->icmp_connp;
+	cred_t			*cr;
 
-	err = tsol_compute_label(DB_CREDDEF(mp, connp->conn_cred), dst,
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this message, hence we ASSERT.
+	 * On production kernels we return an error to be robust against
+	 * random streams modules sitting on top of us.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL)
+		return (EINVAL);
+
+	err = tsol_compute_label(cr, dst,
 	    opt_storage, connp->conn_mac_exempt,
 	    is->is_netstack->netstack_ip);
 	if (err == 0) {
@@ -4740,7 +4783,6 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 	}
 
 	BUMP_MIB(&is->is_rawip_mib, rawipOutDatagrams);
-	mblk_setcred(mp, connp->conn_cred);
 	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
 	return (0);
 }
@@ -4751,9 +4793,21 @@ icmp_update_label_v6(icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 	int err;
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 	icmp_stack_t		*is = icmp->icmp_is;
-	conn_t	*connp = icmp->icmp_connp;
+	conn_t			*connp = icmp->icmp_connp;
+	cred_t			*cr;
 
-	err = tsol_compute_label_v6(DB_CREDDEF(mp, connp->conn_cred), dst,
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this message, hence we ASSERT.
+	 * On production kernels we return an error to be robust against
+	 * random streams modules sitting on top of us.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL)
+		return (EINVAL);
+
+	err = tsol_compute_label_v6(cr, dst,
 	    opt_storage, connp->conn_mac_exempt,
 	    is->is_netstack->netstack_ip);
 	if (err == 0) {
@@ -5331,8 +5385,6 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 	icmp_stack_t *is = icmp->icmp_is;
 	cred_t *cr;
 
-	cr = DB_CREDDEF(mp, connp->conn_cred);
-
 	switch (mp->b_datap->db_type) {
 	case M_PROTO:
 	case M_PCPROTO:
@@ -5374,6 +5426,20 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 			return;
 
 		case T_SVR4_OPTMGMT_REQ:
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				icmp_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
+
 			if (!snmpcom_req(q, mp, icmp_snmp_set, ip_snmp_get,
 			    cr)) {
 				/* Only IP can return anything meaningful */
@@ -5383,6 +5449,19 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 			return;
 
 		case T_OPTMGMT_REQ:
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				icmp_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
 			/* Only IP can return anything meaningful */
 			(void) tpi_optcom_req(q, mp, cr, &icmp_opt_obj, B_TRUE);
 			return;
@@ -5568,7 +5647,6 @@ static int
 icmp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
     void *thisdg_attrs)
 {
-	conn_t	*connp = Q_TO_CONN(q);
 	struct T_unitdata_req *udreqp;
 	int is_absreq_failure;
 	cred_t *cr;
@@ -5576,7 +5654,17 @@ icmp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 	udreqp = (struct T_unitdata_req *)mp->b_rptr;
 	*errorp = 0;
 
-	cr = DB_CREDDEF(mp, connp->conn_cred);
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL)
+		return (-1);
 
 	*errorp = tpi_optcom_buf(q, mp, &udreqp->OPT_length,
 	    udreqp->OPT_offset, cr, &icmp_opt_obj,
@@ -5747,6 +5835,9 @@ rawip_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	conn_t  *connp = (conn_t *)proto_handle;
 	int error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	/* Binding to a NULL address really means unbind */
 	if (sa == NULL)
 		error = rawip_do_unbind(connp);
@@ -5820,6 +5911,9 @@ rawip_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 	int	error;
 	boolean_t did_bind = B_FALSE;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (sa == NULL) {
 		/*
 		 * Disconnect
@@ -5854,7 +5948,7 @@ rawip_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 	 */
 	icmp->icmp_dgram_errind = B_TRUE;
 
-	error = rawip_do_connect(connp, sa, len);
+	error = rawip_do_connect(connp, sa, len, cr);
 
 	if (error != 0 && did_bind) {
 		int unbind_err;
@@ -5927,9 +6021,9 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 
 	laddrlen = faddrlen = sizeof (sin6_t);
 	(void) rawip_getsockname((sock_lower_handle_t)connp,
-	    (struct sockaddr *)&laddr, &laddrlen, NULL);
+	    (struct sockaddr *)&laddr, &laddrlen, CRED());
 	error = rawip_getpeername((sock_lower_handle_t)connp,
-	    (struct sockaddr *)&faddr, &faddrlen, NULL);
+	    (struct sockaddr *)&faddr, &faddrlen, CRED());
 	if (error != 0)
 		faddrlen = 0;
 	opts = 0;
@@ -6037,6 +6131,9 @@ rawip_activate(sock_lower_handle_t proto_handle,
 	conn_t 			*connp = (conn_t *)proto_handle;
 	icmp_stack_t 		*is = connp->conn_icmp->icmp_is;
 	struct sock_proto_props sopp;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	connp->conn_upcalls = sock_upcalls;
 	connp->conn_upper_handle = sock_handle;
@@ -6169,6 +6266,9 @@ rawip_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	icmp_t  *icmp = connp->conn_icmp;
 	int	error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	ASSERT(icmp != NULL);
 
 	rw_enter(&icmp->icmp_rwlock, RW_READER);
@@ -6189,6 +6289,9 @@ rawip_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	icmp_t	*icmp = connp->conn_icmp;
 	int	error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	ASSERT(icmp != NULL);
 	rw_enter(&icmp->icmp_rwlock, RW_READER);
 
@@ -6206,6 +6309,9 @@ rawip_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	conn_t	*connp = (conn_t *)proto_handle;
 	icmp_t *icmp = connp->conn_icmp;
 	int error;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	error = proto_opt_check(level, option_name, optlen, NULL,
 	    icmp_opt_obj.odb_opt_des_arr,
@@ -6253,6 +6359,9 @@ rawip_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	void		*optvalp_buf;
 	int		len;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	error = proto_opt_check(level, option_name, *optlen, &max_optbuf_len,
 	    icmp_opt_obj.odb_opt_des_arr,
 	    icmp_opt_obj.odb_opt_arr_cnt,
@@ -6296,6 +6405,10 @@ int
 rawip_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	(void) rawip_do_close(connp);
 	return (0);
 }
@@ -6305,6 +6418,9 @@ int
 rawip_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
 {
 	conn_t  *connp = (conn_t *)proto_handle;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	/* shut down the send side */
 	if (how != SHUT_RD)
@@ -6334,6 +6450,9 @@ rawip_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 {
 	conn_t  	*connp = (conn_t *)proto_handle;
 	int		error;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	switch (cmd) {
 	case ND_SET:
@@ -6371,8 +6490,11 @@ rawip_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
-	if (is_system_labeled())
-		msg_setcredpid(mp, cr, curproc->p_pid);
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
+	/* If labeled then sockfs should have already set db_credp */
+	ASSERT(!is_system_labeled() || msg_getcred(mp, NULL) != NULL);
 
 	/* do an implicit bind if necessary */
 	if (icmp->icmp_state == TS_UNBND) {
@@ -6454,7 +6576,7 @@ rawip_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		if (msg->msg_controllen != 0) {
 			error = process_auxiliary_options(connp,
 			    msg->msg_control, msg->msg_controllen,
-			    ipp, &icmp_opt_obj, icmp_opt_set);
+			    ipp, &icmp_opt_obj, icmp_opt_set, cr);
 			if (error != 0) {
 				goto done_lock;
 			}
@@ -6524,7 +6646,7 @@ rawip_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		if (msg->msg_controllen != 0) {
 			error = process_auxiliary_options(connp,
 			    msg->msg_control, msg->msg_controllen,
-			    pktinfop, &icmp_opt_obj, icmp_opt_set);
+			    pktinfop, &icmp_opt_obj, icmp_opt_set, cr);
 			if (error != 0) {
 				goto done_lock;
 			}

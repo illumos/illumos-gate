@@ -2566,7 +2566,7 @@ strwriteable(struct stdata *stp, boolean_t eiohup, boolean_t sigpipeok)
 /*
  * Copyin and send data down a stream.
  * The caller will allocate and copyin any control part that precedes the
- * message and pass than in as mctl.
+ * message and pass that in as mctl.
  *
  * Caller should *not* hold sd_lock.
  * When EWOULDBLOCK is returned the caller has to redo the canputnext
@@ -2591,7 +2591,6 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 	queue_t *wqp = stp->sd_wrq;
 	int error = 0;
 	ssize_t count = *iosize;
-	cred_t *cr;
 
 	ASSERT(MUTEX_NOT_HELD(&stp->sd_lock));
 
@@ -2634,14 +2633,6 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 			else if (mp != NULL)
 				linkb(mctl, mp);
 			mp = mctl;
-			/*
-			 * Note that for interrupt thread, the CRED() is
-			 * NULL. Don't bother with the pid either.
-			 */
-			if ((cr = CRED()) != NULL) {
-				mblk_setcred(mp, cr);
-				DB_CPID(mp) = curproc->p_pid;
-			}
 		} else if (mp == NULL)
 			return (0);
 
@@ -2680,14 +2671,6 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 		else if (mp != NULL)
 			linkb(mctl, mp);
 		mp = mctl;
-		/*
-		 * Note that for interrupt thread, the CRED() is
-		 * NULL.  Don't bother with the pid either.
-		 */
-		if ((cr = CRED()) != NULL) {
-			mblk_setcred(mp, cr);
-			DB_CPID(mp) = curproc->p_pid;
-		}
 	} else if (mp == NULL) {
 		return (0);
 	}
@@ -5961,7 +5944,7 @@ strdoioctl(
 		return (EINVAL);
 
 	if ((bp = allocb_cred_wait(sizeof (union ioctypes), sigflag, &error,
-	    crp)) == NULL)
+	    crp, curproc->p_pid)) == NULL)
 			return (error);
 
 	bzero(bp->b_wptr, sizeof (union ioctypes));
@@ -5974,7 +5957,6 @@ strdoioctl(
 	crhold(crp);
 	iocbp->ioc_cr = crp;
 	DB_TYPE(bp) = M_IOCTL;
-	DB_CPID(bp) = curproc->p_pid;
 	bp->b_wptr += sizeof (struct iocblk);
 
 	if (flag & STR_NOERROR)
@@ -6320,8 +6302,7 @@ waitioc:
 		bp->b_wptr = bp->b_rptr + sizeof (struct copyresp);
 		bp->b_datap->db_type = M_IOCDATA;
 
-		mblk_setcred(bp, crp);
-		DB_CPID(bp) = curproc->p_pid;
+		mblk_setcred(bp, crp, curproc->p_pid);
 		resp = (struct copyresp *)bp->b_rptr;
 		resp->cp_rval = (caddr_t)(uintptr_t)error;
 		resp->cp_flag = (fflags & FMODELS);
@@ -6365,8 +6346,7 @@ waitioc:
 		bp->b_wptr = bp->b_rptr + sizeof (struct copyresp);
 		bp->b_datap->db_type = M_IOCDATA;
 
-		mblk_setcred(bp, crp);
-		DB_CPID(bp) = curproc->p_pid;
+		mblk_setcred(bp, crp, curproc->p_pid);
 		resp = (struct copyresp *)bp->b_rptr;
 		resp->cp_rval = (caddr_t)(uintptr_t)error;
 		resp->cp_flag = (fflags & FMODELS);
@@ -6421,7 +6401,8 @@ strdocmd(struct stdata *stp, struct strcmd *scp, cred_t *crp)
 	if (scp->sc_timeout > 0)
 		timeout = scp->sc_timeout * MILLISEC;
 
-	if ((mp = allocb_cred(sizeof (struct cmdblk), crp)) == NULL)
+	if ((mp = allocb_cred(sizeof (struct cmdblk), crp,
+	    curproc->p_pid)) == NULL)
 		return (ENOMEM);
 
 	crhold(crp);
@@ -6440,7 +6421,8 @@ strdocmd(struct stdata *stp, struct strcmd *scp, cred_t *crp)
 	 * Copy in the payload.
 	 */
 	if (cmdp->cb_len > 0) {
-		mp->b_cont = allocb_cred(sizeof (scp->sc_buf), crp);
+		mp->b_cont = allocb_cred(sizeof (scp->sc_buf), crp,
+		    curproc->p_pid);
 		if (mp->b_cont == NULL) {
 			error = ENOMEM;
 			goto out;

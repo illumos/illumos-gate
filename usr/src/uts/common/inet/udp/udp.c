@@ -241,7 +241,8 @@ int		udp_getsockname(sock_lower_handle_t,
     struct sockaddr *, socklen_t *, cred_t *);
 int		udp_getpeername(sock_lower_handle_t,
     struct sockaddr *, socklen_t *, cred_t *);
-static int	udp_do_connect(conn_t *, const struct sockaddr *, socklen_t);
+static int	udp_do_connect(conn_t *, const struct sockaddr *, socklen_t,
+    cred_t *cr);
 static int	udp_post_ip_bind_connect(udp_t *, mblk_t *, int);
 
 #define	UDP_RECV_HIWATER	(56 * 1024)
@@ -640,6 +641,21 @@ udp_tpi_bind(queue_t *q, mblk_t *mp)
 	udp_t		*udp;
 	int		error;
 	struct sockaddr	*sa;
+	cred_t		*cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		udp_err_ack(q, mp, TSYSERR, EINVAL);
+		return;
+	}
 
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
@@ -728,8 +744,6 @@ udp_tpi_bind(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-
-	cred_t *cr = DB_CREDDEF(mp, connp->conn_cred);
 	error = udp_do_bind(connp, sa, tbr->ADDR_length, cr,
 	    tbr->PRIM_type != O_T_BIND_REQ);
 
@@ -771,6 +785,21 @@ udp_tpi_connect(queue_t *q, mblk_t *mp)
 	socklen_t	len;
 	struct sockaddr		*sa;
 	struct T_conn_req	*tcr;
+	cred_t		*cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		udp_err_ack(q, mp, TSYSERR, EINVAL);
+		return;
+	}
 
 	udp = connp->conn_udp;
 	tcr = (struct T_conn_req *)mp->b_rptr;
@@ -842,7 +871,7 @@ udp_tpi_connect(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-	error = udp_do_connect(connp, sa, len);
+	error = udp_do_connect(connp, sa, len, cr);
 	if (error != 0) {
 		freeb(mp1);
 		if (error < 0)
@@ -2469,11 +2498,12 @@ udp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 				return (EINVAL);
 			if (!checkonly) {
 				mblk_t *mb;
+				pid_t  cpid;
 
 				if (attrs == NULL ||
 				    (mb = attrs->udpattr_mb) == NULL)
 					return (EINVAL);
-				if ((cr = DB_CRED(mb)) == NULL)
+				if ((cr = msg_getcred(mb, &cpid)) == NULL)
 					cr = udp->udp_connp->conn_cred;
 				ASSERT(cr != NULL);
 				if ((tsl = crgetlabel(cr)) == NULL)
@@ -2482,7 +2512,7 @@ udp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 				    tsl->tsl_doi, KM_NOSLEEP);
 				if (newcr == NULL)
 					return (ENOSR);
-				mblk_setcred(mb, newcr);
+				mblk_setcred(mb, newcr, cpid);
 				attrs->udpattr_credset = B_TRUE;
 				crfree(newcr);
 			}
@@ -3858,7 +3888,7 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 	}
 
 
-	/* Walk past the headers unless IP_RECVHDR was set. */
+	/* Walk past the headers unless UDP_RCVHDR was set. */
 	if (!udp_bits.udpb_rcvhdr) {
 		mp->b_rptr = rptr + hdr_length;
 		mp_len -= hdr_length;
@@ -3916,9 +3946,8 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 		}
 
 		if ((udp_bits.udpb_recvucred) &&
-		    (cr = DB_CRED(mp)) != NULL) {
+		    (cr = msg_getcred(mp, &cpid)) != NULL) {
 			udi_size += sizeof (struct T_opthdr) + ucredsize;
-			cpid = DB_CPID(mp);
 			UDP_STAT(us, udp_in_recvucred);
 		}
 
@@ -4191,9 +4220,8 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 
 		}
 		if ((udp_bits.udpb_recvucred) &&
-		    (cr = DB_CRED(mp)) != NULL) {
+		    (cr = msg_getcred(mp, &cpid)) != NULL) {
 			udi_size += sizeof (struct T_opthdr) + ucredsize;
-			cpid = DB_CPID(mp);
 			UDP_STAT(us, udp_in_recvucred);
 		}
 
@@ -4980,8 +5008,21 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst,
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
 	udp_t *udp = Q_TO_UDP(wq);
 	udp_stack_t	*us = udp->udp_us;
+	cred_t			*cr;
 
-	err = tsol_compute_label(DB_CREDDEF(mp, udp->udp_connp->conn_cred), dst,
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this message, hence we ASSERT.
+	 * On production kernels we return an error to be robust against
+	 * random streams modules sitting on top of us.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL)
+		return (EINVAL);
+
+	/* Note that we use the cred/label from the message to handle MLP */
+	err = tsol_compute_label(cr, dst,
 	    opt_storage, udp->udp_connp->conn_mac_exempt,
 	    us->us_netstack->netstack_ip);
 	if (err == 0) {
@@ -5049,7 +5090,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 			rw_enter(&udp->udp_rwlock, RW_WRITER);
 			*error = process_auxiliary_options(connp,
 			    msg->msg_control, msg->msg_controllen,
-			    &attrs, &udp_opt_obj, udp_opt_set);
+			    &attrs, &udp_opt_obj, udp_opt_set, cr);
 			rw_exit(&udp->udp_rwlock);
 			if (*error)
 				goto done;
@@ -5081,13 +5122,15 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	/*
 	 * Determine whether we need to mark the mblk with the user's
 	 * credentials.
+	 * If labeled then sockfs would have already done this.
 	 */
+	ASSERT(!is_system_labeled() || msg_getcred(mp, NULL) != NULL);
+
 	ire = connp->conn_ire_cache;
-	if (is_system_labeled() || CLASSD(v4dst) || (ire == NULL) ||
-	    (ire->ire_addr != v4dst) ||
+	if (CLASSD(v4dst) || (ire == NULL) || (ire->ire_addr != v4dst) ||
 	    (ire->ire_type & (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK))) {
-		if (cr != NULL && DB_CRED(mp) == NULL)
-			msg_setcredpid(mp, cr, pid);
+		if (cr != NULL && msg_getcred(mp, NULL) == NULL)
+			mblk_setcred(mp, cr, pid);
 	}
 
 	rw_enter(&udp->udp_rwlock, RW_READER);
@@ -5336,10 +5379,19 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	ASSERT(!lock_held);
 	/* Set UDP length and checksum */
 	*((uint32_t *)&udpha->uha_length) = ip_len;
-	if (DB_CRED(mp) != NULL)
-		mblk_setcred(mp1, DB_CRED(mp));
 
 	if (DB_TYPE(mp) != M_DATA) {
+		cred_t *cr;
+		pid_t cpid;
+
+		/* Move any cred from the T_UNITDATA_REQ to the packet */
+		cr = msg_extractcred(mp, &cpid);
+		if (cr != NULL) {
+			if (mp1->b_datap->db_credp != NULL)
+				crfree(mp1->b_datap->db_credp);
+			mp1->b_datap->db_credp = cr;
+			mp1->b_datap->db_cpid = cpid;
+		}
 		ASSERT(mp != mp1);
 		freeb(mp);
 	}
@@ -5446,12 +5498,12 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		if (CLASSD(dst)) {
 			ASSERT(ipif != NULL);
 			ire = ire_ctable_lookup(dst, 0, 0, ipif,
-			    connp->conn_zoneid, MBLK_GETLABEL(mp),
+			    connp->conn_zoneid, msg_getlabel(mp),
 			    MATCH_IRE_ILL, ipst);
 		} else {
 			ASSERT(ipif == NULL);
 			ire = ire_cache_lookup(dst, connp->conn_zoneid,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 		}
 
 		if (ire == NULL) {
@@ -5691,8 +5743,21 @@ udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst,
 	int err;
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 	udp_stack_t		*us = udp->udp_us;
+	cred_t			*cr;
 
-	err = tsol_compute_label_v6(DB_CREDDEF(mp, udp->udp_connp->conn_cred),
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this message, hence we ASSERT.
+	 * On production kernels we return an error to be robust against
+	 * random streams modules sitting on top of us.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL)
+		return (EINVAL);
+
+	/* Note that we use the cred/label from the message to handle MLP */
+	err = tsol_compute_label_v6(cr,
 	    dst, opt_storage, udp->udp_connp->conn_mac_exempt,
 	    us->us_netstack->netstack_ip);
 	if (err == 0) {
@@ -6065,7 +6130,7 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 			rw_enter(&udp->udp_rwlock, RW_WRITER);
 			*error = process_auxiliary_options(connp,
 			    msg->msg_control, msg->msg_controllen,
-			    &attrs, &udp_opt_obj, udp_opt_set);
+			    &attrs, &udp_opt_obj, udp_opt_set, cr);
 			rw_exit(&udp->udp_rwlock);
 			if (*error)
 				goto done;
@@ -6092,14 +6157,15 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 	/*
 	 * Determine whether we need to mark the mblk with the user's
 	 * credentials.
+	 * If labeled then sockfs would have already done this.
 	 */
+	ASSERT(!is_system_labeled() || msg_getcred(mp, NULL) != NULL);
 	ire = connp->conn_ire_cache;
-	if (is_system_labeled() || IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) ||
-	    (ire == NULL) ||
+	if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) || (ire == NULL) ||
 	    (!IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, &sin6->sin6_addr)) ||
 	    (ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK))) {
-		if (cr != NULL && DB_CRED(mp) == NULL)
-			msg_setcredpid(mp, cr, pid);
+		if (cr != NULL && msg_getcred(mp, NULL) == NULL)
+			mblk_setcred(mp, cr, pid);
 	}
 
 	rw_enter(&udp->udp_rwlock, RW_READER);
@@ -6653,10 +6719,20 @@ no_options:
 	ip_len = htons(ip_len);
 #endif
 	ip6h->ip6_plen = ip_len;
-	if (DB_CRED(mp) != NULL)
-		mblk_setcred(mp1, DB_CRED(mp));
 
 	if (DB_TYPE(mp) != M_DATA) {
+		cred_t *cr;
+		pid_t cpid;
+
+		/* Move any cred from the T_UNITDATA_REQ to the packet */
+		cr = msg_extractcred(mp, &cpid);
+		if (cr != NULL) {
+			if (mp1->b_datap->db_credp != NULL)
+				crfree(mp1->b_datap->db_credp);
+			mp1->b_datap->db_credp = cr;
+			mp1->b_datap->db_cpid = cpid;
+		}
+
 		ASSERT(mp != mp1);
 		freeb(mp);
 	}
@@ -6853,8 +6929,6 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 	us = udp->udp_us;
 	db = mp->b_datap;
 
-	cr = DB_CREDDEF(mp, connp->conn_cred);
-
 	switch (db->db_type) {
 	case M_CMD:
 		udp_wput_cmdblk(q, mp);
@@ -6911,6 +6985,19 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			    "udp_wput_other_end: q %p (%S)", q, "unbindreq");
 			return;
 		case T_SVR4_OPTMGMT_REQ:
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				udp_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
 			if (!snmpcom_req(q, mp, udp_snmp_set, ip_snmp_get,
 			    cr)) {
 				(void) svr4_optcom_req(q,
@@ -6921,6 +7008,19 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			return;
 
 		case T_OPTMGMT_REQ:
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				udp_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
 			(void) tpi_optcom_req(q, mp, cr, &udp_opt_obj, B_TRUE);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
 			    "udp_wput_other_end: q %p (%S)", q, "optmgmtreq");
@@ -7140,12 +7240,22 @@ udp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 	struct T_unitdata_req *udreqp;
 	int is_absreq_failure;
 	cred_t *cr;
-	conn_t	*connp = Q_TO_CONN(q);
 
 	ASSERT(((t_primp_t)mp->b_rptr)->type);
 
-	cr = DB_CREDDEF(mp, connp->conn_cred);
-
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we should ASSERT.
+	 * However, RPC (svc_clts_ksend) does this odd thing where it
+	 * passes the options from a T_UNITDATA_IND unchanged in a
+	 * T_UNITDATA_REQ. While that is the right thing to do for
+	 * some options, SCM_UCRED being the key one, this also makes it
+	 * pass down IP_RECVDSTADDR. Hence we can't ASSERT here.
+	 */
+	cr = msg_getcred(mp, NULL);
+	if (cr == NULL) {
+		cr = Q_TO_CONN(q)->conn_cred;
+	}
 	udreqp = (struct T_unitdata_req *)mp->b_rptr;
 
 	*errorp = tpi_optcom_buf(q, mp, &udreqp->OPT_length,
@@ -7882,6 +7992,9 @@ udp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 	udp_stack_t	*us = udp->udp_us;
 	struct sock_proto_props sopp;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	connp->conn_upcalls = sock_upcalls;
 	connp->conn_upper_handle = sock_handle;
 
@@ -7958,6 +8071,9 @@ int
 udp_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	udp_do_close(connp);
 	return (0);
@@ -8394,7 +8510,6 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	if (is_system_labeled() && (!connp->conn_anon_port ||
 	    connp->conn_anon_mlp)) {
 		uint16_t mlpport;
-		cred_t *cr = connp->conn_cred;
 		zone_t *zone;
 
 		zone = crgetzone(cr);
@@ -8520,6 +8635,9 @@ udp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	int		error;
 	conn_t		*connp;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	connp = (conn_t *)proto_handle;
 
 	if (sa == NULL)
@@ -8541,6 +8659,9 @@ static int
 udp_implicit_bind(conn_t *connp, cred_t *cr)
 {
 	int error;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	error = udp_do_bind(connp, NULL, 0, cr, B_FALSE);
 	return ((error < 0) ? proto_tlitosyserr(-error) : error);
@@ -8698,7 +8819,8 @@ udp_post_ip_bind_connect(udp_t *udp, mblk_t *ire_mp, int error)
  * It associates a default destination address with the stream.
  */
 static int
-udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len)
+udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
+    cred_t *cr)
 {
 	sin6_t		*sin6;
 	sin_t		*sin;
@@ -8897,11 +9019,11 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len)
 		error = ip_proto_bind_connected_v4(connp, &ire_mp, IPPROTO_UDP,
 		    &V4_PART_OF_V6(udp->udp_v6src), udp->udp_port,
 		    V4_PART_OF_V6(udp->udp_v6dst), udp->udp_dstport,
-		    B_TRUE, B_TRUE);
+		    B_TRUE, B_TRUE, cr);
 	} else {
 		error = ip_proto_bind_connected_v6(connp, &ire_mp, IPPROTO_UDP,
 		    &udp->udp_v6src, udp->udp_port, &udp->udp_v6dst,
-		    &udp->udp_sticky_ipp, udp->udp_dstport, B_TRUE, B_TRUE);
+		    &udp->udp_sticky_ipp, udp->udp_dstport, B_TRUE, B_TRUE, cr);
 	}
 
 	return (udp_post_ip_bind_connect(udp, ire_mp, error));
@@ -8916,6 +9038,9 @@ udp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 	udp_t	*udp = connp->conn_udp;
 	int	error;
 	boolean_t did_bind = B_FALSE;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (sa == NULL) {
 		/*
@@ -8950,7 +9075,7 @@ udp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 	 */
 	udp->udp_dgram_errind = B_TRUE;
 
-	error = udp_do_connect(connp, sa, len);
+	error = udp_do_connect(connp, sa, len, cr);
 
 	if (error != 0 && did_bind) {
 		int unbind_err;
@@ -8990,6 +9115,12 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	int		error = 0;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
+	/* If labeled then sockfs should have already set db_credp */
+	ASSERT(!is_system_labeled() || msg_getcred(mp, NULL) != NULL);
 
 	/*
 	 * If the socket is connected and no change in destination
@@ -9145,9 +9276,9 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 
 	laddrlen = faddrlen = sizeof (sin6_t);
 	(void) udp_getsockname((sock_lower_handle_t)connp,
-	    (struct sockaddr *)&laddr, &laddrlen, NULL);
+	    (struct sockaddr *)&laddr, &laddrlen, CRED());
 	error = udp_getpeername((sock_lower_handle_t)connp,
-	    (struct sockaddr *)&faddr, &faddrlen, NULL);
+	    (struct sockaddr *)&faddr, &faddrlen, CRED());
 	if (error != 0)
 		faddrlen = 0;
 
@@ -9241,6 +9372,9 @@ udp_getpeername(sock_lower_handle_t  proto_handle, struct sockaddr *sa,
 	udp_t	*udp = connp->conn_udp;
 	int error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	ASSERT(udp != NULL);
 
 	rw_enter(&udp->udp_rwlock, RW_READER);
@@ -9329,6 +9463,9 @@ udp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	udp_t	*udp = connp->conn_udp;
 	int error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	ASSERT(udp != NULL);
 	rw_enter(&udp->udp_rwlock, RW_READER);
 
@@ -9349,6 +9486,9 @@ udp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	t_uscalar_t	max_optbuf_len;
 	void		*optvalp_buf;
 	int		len;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	error = proto_opt_check(level, option_name, *optlen, &max_optbuf_len,
 	    udp_opt_obj.odb_opt_des_arr,
@@ -9393,6 +9533,9 @@ udp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	conn_t		*connp = (conn_t *)proto_handle;
 	udp_t		*udp = connp->conn_udp;
 	int		error;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	error = proto_opt_check(level, option_name, optlen, NULL,
 	    udp_opt_obj.odb_opt_des_arr,
@@ -9440,6 +9583,9 @@ udp_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	/* shut down the send side */
 	if (how != SHUT_RD)
 		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
@@ -9457,6 +9603,9 @@ udp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 {
 	conn_t  	*connp = (conn_t *)proto_handle;
 	int		error;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	switch (cmd) {
 		case ND_SET:

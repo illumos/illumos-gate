@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -684,6 +682,8 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 	const cipso_option_t *co;
 	const void	*src;
 	const ip6_t	*ip6h;
+	cred_t		*credp;
+	pid_t		cpid;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -824,33 +824,36 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 
 	/* Make sure no other thread is messing with this mblk */
 	ASSERT(DB_REF(mp) == 1);
-	if (DB_CRED(mp) == NULL) {
-		DB_CRED(mp) = newcred_from_bslabel(&sl, doi, KM_NOSLEEP);
-		if (DB_CRED(mp) == NULL)
+	/* Preserve db_cpid */
+	credp = msg_extractcred(mp, &cpid);
+	if (credp == NULL) {
+		credp = newcred_from_bslabel(&sl, doi, KM_NOSLEEP);
+		if (credp == NULL)
 			return (B_FALSE);
+		mblk_setcred(mp, credp, cpid);
 	} else {
 		cred_t	*newcr;
 
-		newcr = copycred_from_bslabel(DB_CRED(mp), &sl, doi,
+		newcr = copycred_from_bslabel(credp, &sl, doi,
 		    KM_NOSLEEP);
+		crfree(credp);
 		if (newcr == NULL)
 			return (B_FALSE);
-		crfree(DB_CRED(mp));
-		DB_CRED(mp) = newcr;
+		mblk_setcred(mp, newcr, cpid);
+		credp = newcr;
 	}
 
 	/*
 	 * If the source was unlabeled, then flag as such,
 	 * while remembering that CIPSO routers add headers.
 	 */
-	if (label_type == OPT_NONE)
-		crgetlabel(DB_CRED(mp))->tsl_flags |= TSLF_UNLABELED;
-	else if (label_type == OPT_CIPSO) {
+	if (label_type == OPT_NONE) {
+		crgetlabel(credp)->tsl_flags |= TSLF_UNLABELED;
+	} else if (label_type == OPT_CIPSO) {
 		if ((src_rhtp = find_tpc(src, version, B_FALSE)) == NULL)
 			return (B_FALSE);
 		if (src_rhtp->tpc_tp.host_type == UNLABELED)
-			crgetlabel(DB_CRED(mp))->tsl_flags |=
-			    TSLF_UNLABELED;
+			crgetlabel(credp)->tsl_flags |= TSLF_UNLABELED;
 		TPC_RELE(src_rhtp);
 	}
 
@@ -882,7 +885,7 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 	 * We trust that all valid paths in the code set the cred pointer when
 	 * needed.
 	 */
-	if ((credp = DB_CRED(mp)) == NULL)
+	if ((credp = msg_getcred(mp, NULL)) == NULL)
 		return (B_TRUE);
 
 	/*
@@ -1020,9 +1023,11 @@ tsol_can_accept_raw(mblk_t *mp, boolean_t check_host)
 	ts_label_t	*plabel = NULL;
 	tsol_tpc_t	*src_rhtp, *dst_rhtp;
 	boolean_t	retv;
+	cred_t		*credp;
 
-	if (DB_CRED(mp) != NULL)
-		plabel = crgetlabel(DB_CRED(mp));
+	credp = msg_getcred(mp, NULL);
+	if (credp != NULL)
+		plabel = crgetlabel(credp);
 
 	/* We are bootstrapping or the internal template was never deleted */
 	if (plabel == NULL)
@@ -1119,6 +1124,7 @@ tsol_can_reply_error(const mblk_t *mp)
 	const ip6_t	*ip6h;
 	boolean_t	retv;
 	bslabel_t	*pktbs;
+	cred_t		*credp;
 
 	/* Caller must pull up at least the IP header */
 	ASSERT(MBLKL(mp) >= (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION ?
@@ -1127,8 +1133,9 @@ tsol_can_reply_error(const mblk_t *mp)
 	if (!tsol_strict_error)
 		return (B_TRUE);
 
-	if (DB_CRED(mp) != NULL)
-		plabel = crgetlabel(DB_CRED(mp));
+	credp = msg_getcred(mp, NULL);
+	if (credp != NULL)
+		plabel = crgetlabel(credp);
 
 	/* We are bootstrapping or the internal template was never deleted */
 	if (plabel == NULL)
@@ -1196,7 +1203,7 @@ tsol_can_reply_error(const mblk_t *mp)
 zoneid_t
 tsol_packet_to_zoneid(const mblk_t *mp)
 {
-	cred_t *cr = DB_CRED(mp);
+	cred_t *cr = msg_getcred(mp, NULL);
 	zone_t *zone;
 	ts_label_t *label;
 
@@ -1471,6 +1478,7 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	boolean_t	need_tpc_rele = B_FALSE;
 	ipaddr_t	*gw;
 	ip_stack_t	*ipst = ire->ire_ipst;
+	cred_t		*credp;
 
 	ASSERT(ire != NULL && mp != NULL);
 	ASSERT(ire->ire_stq != NULL);
@@ -1517,7 +1525,7 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		off_link = !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6);
 	}
 
-	if ((tsl = MBLK_GETLABEL(mp)) == NULL)
+	if ((tsl = msg_getlabel(mp)) == NULL)
 		return (mp);
 
 	label_type = tsol_get_option(mp, &opt_ptr);
@@ -1669,10 +1677,12 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	    (!off_link || gw_rhtp->tpc_tp.host_type == UNLABELED))
 		goto keep_label;
 
+
+	credp = msg_getcred(mp, NULL);
 	if ((af == AF_INET &&
-	    tsol_check_label(DB_CRED(mp), &mp, B_FALSE, ipst) != 0) ||
+	    tsol_check_label(credp, &mp, B_FALSE, ipst) != 0) ||
 	    (af == AF_INET6 &&
-	    tsol_check_label_v6(DB_CRED(mp), &mp, B_FALSE, ipst) != 0)) {
+	    tsol_check_label_v6(credp, &mp, B_FALSE, ipst) != 0)) {
 		mp = NULL;
 		goto keep_label;
 	}

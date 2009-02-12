@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,15 +356,11 @@ typedef struct datab {
  */
 #define	DB_CPID(mp)		((mp)->b_datap->db_cpid)
 #define	DB_CRED(mp)		((mp)->b_datap->db_credp)
-#define	DB_CREDDEF(mp, cr)	(DB_CRED(mp) != NULL ? DB_CRED(mp) : (cr))
 #define	DB_FTHDR(mp)		((mp)->b_datap->db_fthdr)
 /*
  * Used by GLDv2 to store the TCI information.
  */
 #define	DB_TCI(mp)		((mp)->b_datap->db_struioun.cksum.pad)
-
-#define	MBLK_GETLABEL(mp) \
-	(DB_CRED(mp) != NULL ? crgetlabel(DB_CRED(mp)) : NULL)
 
 /*
  * Message block descriptor

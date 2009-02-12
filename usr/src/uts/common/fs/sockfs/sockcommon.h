@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SOCKCOMMON_H_
 #define	_SOCKCOMMON_H_
-
-#pragma ident	"@(#)sockcommon.h	1.1	07/06/14 SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -185,7 +183,8 @@ extern int	so_dequeue_msg(struct sonode *, mblk_t **, struct uio *,
     rval_t *, int);
 extern void	so_enqueue_msg(struct sonode *, mblk_t *, size_t);
 
-extern mblk_t	*socopyinuio(uio_t *, ssize_t, size_t, ssize_t, size_t, int *);
+extern mblk_t	*socopyinuio(uio_t *, ssize_t, size_t, ssize_t, size_t, int *,
+    cred_t *);
 extern mblk_t 	*socopyoutuio(mblk_t *, struct uio *, ssize_t, int *);
 
 extern boolean_t somsghasdata(mblk_t *);

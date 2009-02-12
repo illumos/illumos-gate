@@ -586,8 +586,10 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	 * added to cover this possibility.
 	 */
 	if (sctp->sctp_connp->conn_mlp_type != mlptSingle) {
-		initlabel = MBLK_GETLABEL(initmp);
-		if (initlabel == NULL) {
+		pid_t cpid;
+
+		cr = msg_getcred(initmp, &cpid);
+		if (cr == NULL || (initlabel = crgetlabel(cr)) == NULL) {
 			sctp_send_abort(sctp, sctp_init2vtag(ch),
 			    SCTP_ERR_UNKNOWN, NULL, 0, initmp, 0, B_FALSE);
 			return;
@@ -599,11 +601,12 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 			    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
 			return;
 		}
-		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra, cr);
+		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
+		    cr, cpid);
 		crfree(cr);
 	} else {
 		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
-		    CONN_CRED(sctp->sctp_connp));
+		    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	}
 	if (iackmp == NULL) {
 		sctp_send_abort(sctp, sctp_init2vtag(ch),
@@ -767,7 +770,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 	iackmp->b_cont = errmp;		/*  OK if NULL */
 
-	if (is_system_labeled() && (cr = DB_CRED(iackmp)) != NULL &&
+	if (is_system_labeled() && (cr = msg_getcred(iackmp, NULL)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		conn_t *connp = sctp->sctp_connp;
 		int err;
@@ -897,8 +900,8 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	else
 		hdrlen = sctp->sctp_hdr6_len;
 
-	cemp = allocb(sctps->sctps_wroff_xtra + hdrlen + ceclen + pad,
-	    BPRI_MED);
+	cemp = allocb_cred(sctps->sctps_wroff_xtra + hdrlen + ceclen + pad,
+	    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	if (cemp == NULL) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
 		    sctp->sctp_current->rto);

@@ -447,41 +447,180 @@ out:
 	return (mp);
 }
 
+/*
+ * Allocate an mblk taking db_credp and db_cpid from the template.
+ * Allow the cred to be NULL.
+ */
 mblk_t *
 allocb_tmpl(size_t size, const mblk_t *tmpl)
 {
 	mblk_t *mp = allocb(size, 0);
 
 	if (mp != NULL) {
-		cred_t *cr = DB_CRED(tmpl);
+		dblk_t *src = tmpl->b_datap;
+		dblk_t *dst = mp->b_datap;
+		cred_t *cr = src->db_credp;
+
 		if (cr != NULL)
-			crhold(mp->b_datap->db_credp = cr);
-		DB_CPID(mp) = DB_CPID(tmpl);
-		DB_TYPE(mp) = DB_TYPE(tmpl);
+			crhold(dst->db_credp = cr);
+		dst->db_cpid = src->db_cpid;
+		dst->db_type = src->db_type;
 	}
 	return (mp);
 }
 
 mblk_t *
-allocb_cred(size_t size, cred_t *cr)
+allocb_cred(size_t size, cred_t *cr, pid_t cpid)
 {
 	mblk_t *mp = allocb(size, 0);
 
-	if (mp != NULL && cr != NULL)
-		crhold(mp->b_datap->db_credp = cr);
+	ASSERT(cr != NULL);
+	if (mp != NULL) {
+		dblk_t *dbp = mp->b_datap;
 
+		crhold(dbp->db_credp = cr);
+		dbp->db_cpid = cpid;
+	}
 	return (mp);
 }
 
 mblk_t *
-allocb_cred_wait(size_t size, uint_t flags, int *error, cred_t *cr)
+allocb_cred_wait(size_t size, uint_t flags, int *error, cred_t *cr, pid_t cpid)
 {
 	mblk_t *mp = allocb_wait(size, 0, flags, error);
 
-	if (mp != NULL && cr != NULL)
-		crhold(mp->b_datap->db_credp = cr);
+	ASSERT(cr != NULL);
+	if (mp != NULL) {
+		dblk_t *dbp = mp->b_datap;
+
+		crhold(dbp->db_credp = cr);
+		dbp->db_cpid = cpid;
+	}
 
 	return (mp);
+}
+
+/*
+ * Extract the db_cred (and optionally db_cpid) from a message.
+ * We find the first mblk which has a non-NULL db_cred and use that.
+ * If none found we return NULL.
+ * Does NOT get a hold on the cred.
+ */
+cred_t *
+msg_getcred(const mblk_t *mp, pid_t *cpidp)
+{
+	cred_t *cr = NULL;
+	cred_t *cr2;
+
+	while (mp != NULL) {
+		dblk_t *dbp = mp->b_datap;
+
+		cr = dbp->db_credp;
+		if (cr == NULL) {
+			mp = mp->b_cont;
+			continue;
+		}
+		if (cpidp != NULL)
+			*cpidp = dbp->db_cpid;
+
+#ifdef DEBUG
+		/*
+		 * Normally there should at most one db_credp in a message.
+		 * But if there are multiple (as in the case of some M_IOC*
+		 * and some internal messages in TCP/IP bind logic) then
+		 * they must be identical in the normal case.
+		 * However, a socket can be shared between different uids
+		 * in which case data queued in TCP would be from different
+		 * creds. Thus we can only assert for the zoneid being the
+		 * same. Due to Multi-level Level Ports for TX, some
+		 * cred_t can have a NULL cr_zone, and we skip the comparison
+		 * in that case.
+		 */
+		cr2 = msg_getcred(mp->b_cont, NULL);
+		if (cr2 != NULL) {
+			DTRACE_PROBE2(msg__getcred,
+			    cred_t *, cr, cred_t *, cr2);
+			ASSERT(crgetzoneid(cr) == crgetzoneid(cr2) ||
+			    crgetzone(cr) == NULL ||
+			    crgetzone(cr2) == NULL);
+		}
+#endif
+		return (cr);
+	}
+	if (cpidp != NULL)
+		*cpidp = NOPID;
+	return (NULL);
+}
+
+/*
+ * Variant of msg_getcred which, when a cred is found
+ * 1. Returns with a hold on the cred
+ * 2. Clears the first cred in the mblk.
+ * This is more efficient to use than a msg_getcred() + crhold() when
+ * the message is freed after the cred has been extracted.
+ *
+ * The caller is responsible for ensuring that there is no other reference
+ * on the message since db_credp can not be cleared when there are other
+ * references.
+ */
+cred_t *
+msg_extractcred(mblk_t *mp, pid_t *cpidp)
+{
+	cred_t *cr = NULL;
+	cred_t *cr2;
+
+	while (mp != NULL) {
+		dblk_t *dbp = mp->b_datap;
+
+		cr = dbp->db_credp;
+		if (cr == NULL) {
+			mp = mp->b_cont;
+			continue;
+		}
+		ASSERT(dbp->db_ref == 1);
+		dbp->db_credp = NULL;
+		if (cpidp != NULL)
+			*cpidp = dbp->db_cpid;
+#ifdef DEBUG
+		/*
+		 * Normally there should at most one db_credp in a message.
+		 * But if there are multiple (as in the case of some M_IOC*
+		 * and some internal messages in TCP/IP bind logic) then
+		 * they must be identical in the normal case.
+		 * However, a socket can be shared between different uids
+		 * in which case data queued in TCP would be from different
+		 * creds. Thus we can only assert for the zoneid being the
+		 * same. Due to Multi-level Level Ports for TX, some
+		 * cred_t can have a NULL cr_zone, and we skip the comparison
+		 * in that case.
+		 */
+		cr2 = msg_getcred(mp->b_cont, NULL);
+		if (cr2 != NULL) {
+			DTRACE_PROBE2(msg__extractcred,
+			    cred_t *, cr, cred_t *, cr2);
+			ASSERT(crgetzoneid(cr) == crgetzoneid(cr2) ||
+			    crgetzone(cr) == NULL ||
+			    crgetzone(cr2) == NULL);
+		}
+#endif
+		return (cr);
+	}
+	return (NULL);
+}
+/*
+ * Get the label for a message. Uses the first mblk in the message
+ * which has a non-NULL db_credp.
+ * Returns NULL if there is no credp.
+ */
+extern struct ts_label_s *
+msg_getlabel(const mblk_t *mp)
+{
+	cred_t *cr = msg_getcred(mp, NULL);
+
+	if (cr == NULL)
+		return (NULL);
+
+	return (crgetlabel(cr));
 }
 
 void

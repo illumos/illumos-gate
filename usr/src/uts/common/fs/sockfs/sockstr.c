@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,13 +194,25 @@ so_sock2stream(struct sonode *so)
 				mblk_t	*newmp;
 				size_t	length;
 				cred_t	*cr;
+				pid_t	cpid;
+				int error;	/* Dummy - error not returned */
 
 				/*
 				 * Copy the message block because it is used
 				 * elsewhere, too.
+				 * Can't use copyb since we want to wait
+				 * yet allow for EINTR.
 				 */
-				length = MBLKL(mp);
-				newmp = soallocproto(length, _ALLOC_INTR);
+				/* Round up size for reuse */
+				length = MAX(MBLKL(mp), 64);
+				cr = msg_getcred(mp, &cpid);
+				if (cr != NULL) {
+					newmp = allocb_cred_wait(length, 0,
+					    &error, cr, cpid);
+				} else {
+					newmp = allocb_wait(length, 0, 0,
+					    &error);
+				}
 				if (newmp == NULL) {
 					error = EINTR;
 					goto exit;
@@ -208,10 +220,6 @@ so_sock2stream(struct sonode *so)
 				bcopy(mp->b_rptr, newmp->b_wptr, length);
 				newmp->b_wptr += length;
 				newmp->b_next = mp->b_next;
-				cr = DB_CRED(mp);
-				if (cr != NULL)
-					mblk_setcred(newmp, cr);
-				DB_CPID(newmp) = DB_CPID(mp);
 
 				/*
 				 * Link the new message block into the queue
@@ -395,7 +403,7 @@ so_basic_strinit(struct sonode *so)
 	sotpi_info_t *sti = SOTOTPI(so);
 
 	/* Preallocate an unbind_req message */
-	mp = soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP);
+	mp = soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP, CRED());
 	mutex_enter(&so->so_lock);
 	sti->sti_unbind_mp = mp;
 #ifdef DEBUG
@@ -634,7 +642,7 @@ do_tinfo(struct sonode *so)
 	tir.PRIM_type = T_INFO_REQ;
 	mp = soallocproto1(&tir, sizeof (tir),
 	    sizeof (struct T_info_req) + sizeof (struct T_info_ack),
-	    _ALLOC_INTR);
+	    _ALLOC_INTR, CRED());
 	if (mp == NULL) {
 		eprintsoline(so, ENOBUFS);
 		return (ENOBUFS);
@@ -697,7 +705,7 @@ do_tcapability(struct sonode *so, t_uscalar_t cap_bits1)
 	tcr.CAP_bits1 = cap_bits1;
 	mp = soallocproto1(&tcr, sizeof (tcr),
 	    sizeof (struct T_capability_req) + sizeof (struct T_capability_ack),
-	    _ALLOC_INTR);
+	    _ALLOC_INTR, CRED());
 	if (mp == NULL) {
 		eprintsoline(so, ENOBUFS);
 		return (ENOBUFS);
@@ -2264,8 +2272,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 		if (so->so_peercred != NULL)
 			crfree(so->so_peercred);
-		so->so_peercred = DB_CRED(mp);
-		so->so_cpid = DB_CPID(mp);
+		so->so_peercred = msg_getcred(mp, &so->so_cpid);
 		if (so->so_peercred != NULL)
 			crhold(so->so_peercred);
 

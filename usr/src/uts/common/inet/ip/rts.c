@@ -114,7 +114,7 @@ static rtsparam_t	lcl_param_arr[] = {
 static void 	rts_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error,
     int sys_error);
 static void	rts_input(void *, mblk_t *, void *);
-static mblk_t	*rts_ioctl_alloc(mblk_t *data, cred_t *cr);
+static mblk_t	*rts_ioctl_alloc(mblk_t *data);
 static int	rts_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t rts_param_register(IDP *ndp, rtsparam_t *rtspa, int cnt);
 static int	rts_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
@@ -159,17 +159,17 @@ struct streamtab rtsinfo = {
  * user data.
  */
 static mblk_t *
-rts_ioctl_alloc(mblk_t *data, cred_t *cr)
+rts_ioctl_alloc(mblk_t *data)
 {
 	mblk_t	*mp = NULL;
 	mblk_t	*mp1 = NULL;
 	ipllc_t	*ipllc;
 	struct iocblk	*ioc;
 
-	mp = allocb_cred(sizeof (ipllc_t), cr);
+	mp = allocb_tmpl(sizeof (ipllc_t), data);
 	if (mp == NULL)
 		return (NULL);
-	mp1 = allocb_cred(sizeof (struct iocblk), cr);
+	mp1 = allocb_tmpl(sizeof (struct iocblk), data);
 	if (mp1 == NULL) {
 		freeb(mp);
 		return (NULL);
@@ -1045,7 +1045,9 @@ rts_wput(queue_t *q, mblk_t *mp)
 	}
 
 
-	mp1 = rts_ioctl_alloc(mp, DB_CRED(mp));
+	ASSERT(msg_getcred(mp, NULL) != NULL);
+
+	mp1 = rts_ioctl_alloc(mp);
 	if (mp1 == NULL) {
 		ASSERT(rts != NULL);
 		freemsg(mp);
@@ -1076,8 +1078,6 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 
 	rtss = rts->rts_rtss;
 
-	cr = DB_CREDDEF(mp, connp->conn_cred);
-
 	switch (mp->b_datap->db_type) {
 	case M_PROTO:
 	case M_PCPROTO:
@@ -1104,11 +1104,28 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 			rts_info_req(q, mp);
 			return;
 		case T_SVR4_OPTMGMT_REQ:
-			(void) svr4_optcom_req(q, mp, cr, &rts_opt_obj,
-			    B_TRUE);
-			return;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, cr, &rts_opt_obj, B_TRUE);
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				rts_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
+			if (((union T_primitives *)rptr)->type ==
+			    T_SVR4_OPTMGMT_REQ) {
+				(void) svr4_optcom_req(q, mp, cr,
+				    &rts_opt_obj, B_TRUE);
+			} else {
+				(void) tpi_optcom_req(q, mp, cr,
+				    &rts_opt_obj, B_TRUE);
+			}
 			return;
 		case O_T_CONN_RES:
 		case T_CONN_RES:
@@ -1537,7 +1554,7 @@ rts_send(sock_lower_handle_t proto_handle, mblk_t *mp,
 	rtm = (rt_msghdr_t *)mp->b_rptr;
 	rtm->rtm_pid = curproc->p_pid;
 
-	mp1 = rts_ioctl_alloc(mp, DB_CRED(mp));
+	mp1 = rts_ioctl_alloc(mp);
 	if (mp1 == NULL) {
 		ASSERT(rts != NULL);
 		freemsg(mp);
@@ -1567,8 +1584,7 @@ rts_send(sock_lower_handle_t proto_handle, mblk_t *mp,
 
 	CONN_INC_REF(connp);
 
-	error = ip_rts_request_common(rts->rts_connp->conn_wq, mp1, connp,
-	    DB_CREDDEF(mp, connp->conn_cred));
+	error = ip_rts_request_common(rts->rts_connp->conn_wq, mp1, connp, cr);
 
 	mutex_enter(&rts->rts_send_mutex);
 	if (error == EINPROGRESS) {

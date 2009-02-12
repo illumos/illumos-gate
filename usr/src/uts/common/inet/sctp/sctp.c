@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +242,8 @@ sctp_create_eager(sctp_t *psctp)
 
 	connp->conn_allzones = pconnp->conn_allzones;
 	connp->conn_zoneid = pconnp->conn_zoneid;
+	sctp->sctp_cpid = psctp->sctp_cpid;
+	sctp->sctp_open_time = lbolt64;
 
 	sctp->sctp_mss = psctp->sctp_mss;
 	sctp->sctp_detached = B_TRUE;
@@ -1483,6 +1485,9 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 	} else {
 		sctp->sctp_zoneid = zoneid;
 	}
+
+	sctp->sctp_cpid = curproc->p_pid;
+	sctp->sctp_open_time = lbolt64;
 
 	sctp_connp->conn_cred = credp;
 	crhold(credp);

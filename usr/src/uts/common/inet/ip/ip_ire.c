@@ -32,6 +32,7 @@
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/strsun.h>
+#include <sys/strsubr.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
@@ -1255,12 +1256,12 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 		if (ire->ire_ipversion == IPV4_VERSION) {
 			ipha = (ipha_t *)data_mp->b_rptr;
 			dst_ire = ire_cache_lookup(ipha->ipha_dst,
-			    ire->ire_zoneid, MBLK_GETLABEL(mp), ipst);
+			    ire->ire_zoneid, msg_getlabel(mp), ipst);
 		} else {
 			ASSERT(ire->ire_ipversion == IPV6_VERSION);
 			ip6h = (ip6_t *)data_mp->b_rptr;
 			dst_ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
-			    ire->ire_zoneid, MBLK_GETLABEL(mp), ipst);
+			    ire->ire_zoneid, msg_getlabel(mp), ipst);
 		}
 		if (dst_ire != NULL) {
 			if (dst_ire->ire_flags & RTF_MULTIRT) {

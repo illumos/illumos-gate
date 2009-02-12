@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/errno.h>
 #include <sys/strlog.h>
 #include <sys/dlpi.h>
@@ -1259,6 +1260,11 @@ ar_cmd_dispatch(queue_t *q, mblk_t *mp_orig, boolean_t from_wput)
 		mp = mp->b_cont;
 		if (!mp)
 			return (ENOENT);
+	} else {
+		cr = msg_getcred(mp, NULL);
+		/* For initial messages beteen IP and ARP, cr can be NULL */
+		if (cr == NULL)
+			cr = ((ar_t *)q->q_ptr)->ar_credp;
 	}
 	len = MBLKL(mp);
 	if (len < sizeof (uint32_t) || !OK_32PTR(mp->b_rptr))
@@ -1281,9 +1287,6 @@ ar_cmd_dispatch(queue_t *q, mblk_t *mp_orig, boolean_t from_wput)
 	}
 	if (arct->arct_priv_req != OP_NP) {
 		int error;
-
-		if (cr == NULL)
-			cr = DB_CREDDEF(mp_orig, ((ar_t *)q->q_ptr)->ar_credp);
 
 		if ((error = secpolicy_ip(cr, arct->arct_priv_req,
 		    B_FALSE)) != 0)

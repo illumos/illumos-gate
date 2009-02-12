@@ -1241,12 +1241,15 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 
 		if (((mp = allocb(hdrsz, BPRI_MED)) != NULL) &&
 		    (mp_orig = dupmsg(mp_orig)) != NULL) {
+			cred_t *cr;
+
 			bcopy(mp_orig->b_rptr, mp->b_rptr, hdrsz);
 			mp->b_wptr += hdrsz;
 			mp->b_cont = mp_orig;
 			mp_orig->b_rptr += hdrsz;
-			if (is_system_labeled() && DB_CRED(mp_orig) != NULL)
-				mblk_setcred(mp, DB_CRED(mp_orig));
+			if (is_system_labeled() &&
+			    (cr = msg_getcred(mp_orig, NULL)) != NULL)
+				mblk_setcred(mp, cr, NOPID);
 			if (MBLKL(mp_orig) == 0) {
 				mp->b_cont = mp_orig->b_cont;
 				mp_orig->b_cont = NULL;

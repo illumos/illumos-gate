@@ -172,7 +172,7 @@ static void endpnt_reclaim(zoneid_t);
  * Request dipatching function.
  */
 static int clnt_clts_dispatch_send(queue_t *q, mblk_t *, struct netbuf *addr,
-					calllist_t *, uint_t);
+					calllist_t *, uint_t, cred_t *);
 
 /*
  * The size of the preserialized RPC header information.
@@ -582,7 +582,7 @@ call_again:
 	round_trip = lbolt;
 
 	error = clnt_clts_dispatch_send(p->cku_endpnt->e_wq, mp,
-	    &p->cku_addr, call, p->cku_xid);
+	    &p->cku_addr, call, p->cku_xid, p->cku_cred);
 
 	if (error != 0) {
 		freemsg(mp);
@@ -2058,7 +2058,7 @@ endpnt_repossess(void *a)
  */
 static int
 clnt_clts_dispatch_send(queue_t *q, mblk_t *mp, struct netbuf *addr,
-			calllist_t *cp,	uint_t xid)
+    calllist_t *cp, uint_t xid, cred_t *cr)
 {
 	mblk_t *bp;
 	int msgsz;
@@ -2082,7 +2082,11 @@ clnt_clts_dispatch_send(queue_t *q, mblk_t *mp, struct netbuf *addr,
 	 * Construct the datagram
 	 */
 	msgsz = (int)TUNITDATAREQSZ;
-	while (!(bp = allocb(msgsz + addr->len, BPRI_LO))) {
+	/*
+	 * Note: if the receiver uses SCM_UCRED/getpeerucred the pid will
+	 * appear as -1.
+	 */
+	while (!(bp = allocb_cred(msgsz + addr->len, cr, NOPID))) {
 		if (strwaitbuf(msgsz + addr->len, BPRI_LO))
 			return (ENOSR);
 	}

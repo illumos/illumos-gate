@@ -722,7 +722,8 @@ static void	ip_trash_ire_reclaim_stack(ip_stack_t *);
 
 static void	ip_wput_frag(ire_t *, mblk_t *, ip_pkt_t, uint32_t, uint32_t,
 		    zoneid_t, ip_stack_t *, conn_t *);
-static mblk_t	*ip_wput_frag_copyhdr(uchar_t *, int, int, ip_stack_t *);
+static mblk_t	*ip_wput_frag_copyhdr(uchar_t *, int, int, ip_stack_t *,
+		    mblk_t *);
 static void	ip_wput_local_options(ipha_t *, ip_stack_t *);
 static int	ip_wput_options(queue_t *, mblk_t *, ipha_t *, boolean_t,
 		    zoneid_t, ip_stack_t *);
@@ -2153,7 +2154,7 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 	if (nexthop_addr != INADDR_ANY) {
 		/* nexthop set */
 		first_ire = ire_ctable_lookup(ipha->ipha_dst,
-		    nexthop_addr, 0, NULL, ALL_ZONES, MBLK_GETLABEL(mp),
+		    nexthop_addr, 0, NULL, ALL_ZONES, msg_getlabel(mp),
 		    MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW, ipst);
 	} else {
 		/* nexthop not set */
@@ -3327,6 +3328,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		(void) adjmsg(mp, len_needed - msg_len);
 		msg_len = len_needed;
 	}
+	/* Make sure we propagate the cred/label for TX */
 	mp1 = allocb_tmpl(sizeof (icmp_ipha) + len, mp);
 	if (mp1 == NULL) {
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutErrors);
@@ -4050,7 +4052,7 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 			ipif->ipif_addr_ready = 1;
 			ipif_refrele(ipif);
 		}
-		ire = ire_cache_lookup(src, ALL_ZONES, MBLK_GETLABEL(mp), ipst);
+		ire = ire_cache_lookup(src, ALL_ZONES, msg_getlabel(mp), ipst);
 		if (ire != NULL) {
 			ire->ire_defense_count = 0;
 			ire_refrele(ire);
@@ -4212,6 +4214,24 @@ ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid,
 }
 
 /*
+ * Used to determine the most accurate cred_t to use for TX.
+ * First priority is SCM_UCRED having set the label in the message,
+ * which is used for MLP on UDP. Second priority is the peers label (aka
+ * conn_peercred), which is needed for MLP on TCP/SCTP. Last priority is the
+ * open credentials.
+ */
+cred_t *
+ip_best_cred(mblk_t *mp, conn_t *connp)
+{
+	cred_t *cr;
+
+	cr = msg_getcred(mp, NULL);
+	if (cr != NULL && crgetlabel(cr) != NULL)
+		return (cr);
+	return (CONN_CRED(connp));
+}
+
+/*
  * Latch in the IPsec state for a stream based on the ipsec_in_t passed in as
  * part of the bind request.
  */
@@ -4301,6 +4321,21 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	int		error = 0;
 	int		protocol;
 	ipa_conn_x_t	*acx;
+	cred_t		*cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		error = EINVAL;
+		goto bad_addr;
+	}
 
 	ASSERT(!connp->conn_af_isv6);
 	connp->conn_pkt_isv6 = B_FALSE;
@@ -4403,7 +4438,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		/* Always verify destination reachability. */
 		error = ip_bind_connected_v4(connp, &mp1, protocol,
 		    &ac->ac_laddr, ac->ac_lport, ac->ac_faddr, ac->ac_fport,
-		    B_TRUE, B_TRUE);
+		    B_TRUE, B_TRUE, cr);
 		break;
 
 	case sizeof (ipa_conn_x_t):
@@ -4415,7 +4450,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		error = ip_bind_connected_v4(connp, &mp1, protocol,
 		    &acx->acx_conn.ac_laddr, acx->acx_conn.ac_lport,
 		    acx->acx_conn.ac_faddr, acx->acx_conn.ac_fport,
-		    B_TRUE, (acx->acx_flags & ACX_VERIFY_DST) != 0);
+		    B_TRUE, (acx->acx_flags & ACX_VERIFY_DST) != 0, cr);
 		break;
 	}
 	ASSERT(error != EINPROGRESS);
@@ -4664,7 +4699,7 @@ ip_proto_bind_laddr_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
 int
 ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
     ipaddr_t *src_addrp, uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
-    boolean_t fanout_insert, boolean_t verify_dst)
+    boolean_t fanout_insert, boolean_t verify_dst, cred_t *cr)
 {
 
 	ire_t		*src_ire;
@@ -4688,8 +4723,9 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	if (mp != NULL) {
 		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
-		tsl = MBLK_GETLABEL(mp);
 	}
+	if (cr != NULL)
+		tsl = crgetlabel(cr);
 
 	src_ire = dst_ire = NULL;
 
@@ -4791,7 +4827,7 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	 */
 	if (dst_ire != NULL && is_system_labeled() &&
 	    !IPCL_IS_TCP(connp) &&
-	    tsol_compute_label(DB_CREDDEF(mp, connp->conn_cred), dst_addr, NULL,
+	    tsol_compute_label(cr, dst_addr, NULL,
 	    connp->conn_mac_exempt, ipst) != 0) {
 		error = EHOSTUNREACH;
 		if (ip_debug > 2) {
@@ -5142,7 +5178,7 @@ bad_addr:
 int
 ip_proto_bind_connected_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
     ipaddr_t *src_addrp, uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
-    boolean_t fanout_insert, boolean_t verify_dst)
+    boolean_t fanout_insert, boolean_t verify_dst, cred_t *cr)
 {
 	int error;
 	mblk_t	*mp = NULL;
@@ -5160,7 +5196,7 @@ ip_proto_bind_connected_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
 	if (lport == 0)
 		lport = connp->conn_lport;
 	error = ip_bind_connected_v4(connp, ire_mpp, protocol,
-	    src_addrp, lport, dst_addr, fport, fanout_insert, verify_dst);
+	    src_addrp, lport, dst_addr, fport, fanout_insert, verify_dst, cr);
 	if (error == 0) {
 		ip_bind_post_handling(connp, ire_mpp ? *ire_mpp : NULL,
 		    ire_requested);
@@ -7123,7 +7159,7 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 	unlabeled = B_FALSE;
 	if (is_system_labeled())
 		/* Cred cannot be null on IPv4 */
-		unlabeled = (crgetlabel(DB_CRED(mp))->tsl_flags &
+		unlabeled = (msg_getlabel(mp)->tsl_flags &
 		    TSLF_UNLABELED) != 0;
 	shared_addr = (zoneid == ALL_ZONES);
 	if (shared_addr) {
@@ -7851,14 +7887,14 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 		 * destination address via the specified nexthop.
 		 */
 		ire = ire_cache_lookup(nexthop_addr, zoneid,
-		    MBLK_GETLABEL(mp), ipst);
+		    msg_getlabel(mp), ipst);
 		if (ire != NULL) {
 			gw = nexthop_addr;
 			ire_marks |= IRE_MARK_PRIVATE_ADDR;
 		} else {
 			ire = ire_ftable_lookup(nexthop_addr, 0, 0,
 			    IRE_INTERFACE, NULL, NULL, zoneid, 0,
-			    MBLK_GETLABEL(mp),
+			    msg_getlabel(mp),
 			    MATCH_IRE_TYPE | MATCH_IRE_SECATTR,
 			    ipst);
 			if (ire != NULL) {
@@ -7867,7 +7903,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 		}
 	} else {
 		ire = ire_ftable_lookup(dst, 0, 0, 0,
-		    NULL, &sire, zoneid, 0, MBLK_GETLABEL(mp),
+		    NULL, &sire, zoneid, 0, msg_getlabel(mp),
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
 		    MATCH_IRE_RJ_BHOLE | MATCH_IRE_PARENT |
 		    MATCH_IRE_SECATTR | MATCH_IRE_COMPLETE,
@@ -7912,7 +7948,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 			ASSERT(sire != NULL);
 			multirt_is_resolvable =
 			    ire_multirt_lookup(&ire, &sire, multirt_flags,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 
 			ip3dbg(("ip_newroute: multirt_is_resolvable %d, "
 			    "ire %p, sire %p\n",
@@ -9189,7 +9225,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			if ((flags & RTF_MULTIRT) && (copy_mp != NULL)) {
 				boolean_t need_resolve =
 				    ire_multirt_need_resolve(ipha_dst,
-				    MBLK_GETLABEL(copy_mp), ipst);
+				    msg_getlabel(copy_mp), ipst);
 				if (!need_resolve) {
 					MULTIRT_DEBUG_UNTAG(copy_mp);
 					freemsg(copy_mp);
@@ -9373,7 +9409,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			if ((flags & RTF_MULTIRT) && (copy_mp != NULL)) {
 				boolean_t need_resolve =
 				    ire_multirt_need_resolve(ipha_dst,
-				    MBLK_GETLABEL(copy_mp), ipst);
+				    msg_getlabel(copy_mp), ipst);
 				if (!need_resolve) {
 					MULTIRT_DEBUG_UNTAG(copy_mp);
 					freemsg(copy_mp);
@@ -9838,8 +9874,23 @@ conn_restart_ipsec_waiter(conn_t *connp, void *arg)
 		mp = connp->conn_ipsec_opt_mp;
 		connp->conn_ipsec_opt_mp = NULL;
 		connp->conn_state_flags  &= ~CONN_IPSEC_LOAD_WAIT;
-		cr = DB_CREDDEF(mp, GET_QUEUE_CRED(CONNP_TO_WQ(connp)));
 		mutex_exit(&connp->conn_lock);
+
+		/*
+		 * All Solaris components should pass a db_credp
+		 * for this TPI message, hence we ASSERT.
+		 * But in case there is some other M_PROTO that looks
+		 * like a TPI message sent by some other kernel
+		 * component, we check and return an error.
+		 */
+		cr = msg_getcred(mp, NULL);
+		ASSERT(cr != NULL);
+		if (cr == NULL) {
+			mp = mi_tpi_err_ack_alloc(mp, TSYSERR, EINVAL);
+			if (mp != NULL)
+				qreply(connp->conn_wq, mp);
+			return;
+		}
 
 		ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
 
@@ -11328,7 +11379,7 @@ ip_fill_mtuinfo(struct in6_addr *in6, in_port_t port,
 
 /*
  * This routine gets socket options.  For MRT_VERSION and MRT_ASSERT, error
- * checking of GET_QUEUE_CRED(q) and that ip_g_mrouter is set should be done and
+ * checking of cred and that ip_g_mrouter is set should be done and
  * isn't.  This doesn't matter as the error checking is done properly for the
  * other MRT options coming in through ip_opt_set.
  */
@@ -13476,7 +13527,7 @@ ip_rput_noire(queue_t *q, mblk_t *mp, int ll_multicast, ipaddr_t dst)
 	DB_CKSUMFLAGS(mp) = 0;
 
 	ire = ire_forward(dst, &ret_action, NULL, NULL,
-	    MBLK_GETLABEL(mp), ipst);
+	    msg_getlabel(mp), ipst);
 
 	if (ire == NULL && ret_action == Forward_check_multirt) {
 		/* Let ip_newroute handle CGTP  */
@@ -15106,7 +15157,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		if (ire == NULL) {
 			ire = ire_cache_lookup(dst, ALL_ZONES,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 		}
 
 		if (ire != NULL && ire->ire_stq != NULL &&
@@ -15118,7 +15169,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			 */
 			ire_refrele(ire);
 			ire = ire_cache_lookup(dst, GLOBAL_ZONEID,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 		}
 
 		if (ire == NULL) {
@@ -15397,7 +15448,7 @@ ip_accept_tcp(ill_t *ill, ill_rx_ring_t *ip_ring, squeue_t *target_sqp,
 			ire = NULL;
 		}
 
-		ire = ire_cache_lookup(dst, ALL_ZONES, MBLK_GETLABEL(mp),
+		ire = ire_cache_lookup(dst, ALL_ZONES, msg_getlabel(mp),
 		    ipst);
 		if (ire == NULL || ire->ire_type == IRE_BROADCAST ||
 		    ire->ire_stq != NULL) {
@@ -16740,7 +16791,7 @@ ip_rput_forward_multicast(ipaddr_t dst, mblk_t *mp, ipif_t *ipif)
 	if (ipif->ipif_flags & IPIF_POINTOPOINT)
 		dst = ipif->ipif_pp_dst_addr;
 
-	ire = ire_ctable_lookup(dst, 0, 0, ipif, ALL_ZONES, MBLK_GETLABEL(mp),
+	ire = ire_ctable_lookup(dst, 0, 0, ipif, ALL_ZONES, msg_getlabel(mp),
 	    MATCH_IRE_ILL | MATCH_IRE_SECATTR, ipst);
 	if (ire == NULL) {
 		/*
@@ -17059,7 +17110,7 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 
 		if (ire == NULL) {
 			ire = ire_cache_lookup(dst, ii->ipsec_in_zoneid,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 			if (ire == NULL) {
 				if (ill_need_rele)
 					ill_refrele(ill);
@@ -18042,7 +18093,7 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 			if (optval == IPOPT_SSRR) {
 				ire = ire_ftable_lookup(dst, 0, 0,
 				    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0,
-				    MBLK_GETLABEL(mp),
+				    msg_getlabel(mp),
 				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, ipst);
 				if (ire == NULL) {
 					ip1dbg(("ip_rput_options: SSRR not "
@@ -20463,7 +20514,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 		 * address, SO_DONTROUTE and IP_NEXTHOP go through the
 		 * standard path.
 		 */
-		ire = ire_cache_lookup(dst, zoneid, MBLK_GETLABEL(mp), ipst);
+		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
 		if ((ire == NULL) || (ire->ire_type &
 		    (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK)) == 0) {
 			if (ire != NULL) {
@@ -20497,7 +20548,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	 */
 	if (IP_FLOW_CONTROLLED_ULP(connp->conn_ulp) &&
 	    !connp->conn_fully_bound) {
-		ire = ire_cache_lookup(dst, zoneid, MBLK_GETLABEL(mp), ipst);
+		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
 		if (ire == NULL)
 			goto noirefound;
 		TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
@@ -20534,7 +20585,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 			 */
 			multirt_need_resolve =
 			    ire_multirt_need_resolve(ire->ire_addr,
-			    MBLK_GETLABEL(first_mp), ipst);
+			    msg_getlabel(first_mp), ipst);
 			ip2dbg(("ip_wput[TCP]: ire %p, "
 			    "multirt_need_resolve %d, first_mp %p\n",
 			    (void *)ire, multirt_need_resolve,
@@ -20603,7 +20654,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 		if (ire != NULL && sctp_ire == NULL)
 			IRE_REFRELE_NOTR(ire);
 
-		ire = ire_cache_lookup(dst, zoneid, MBLK_GETLABEL(mp), ipst);
+		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
 		if (ire == NULL)
 			goto noirefound;
 		IRE_REFHOLD_NOTR(ire);
@@ -20662,7 +20713,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 		 * to initiate additional route resolutions.
 		 */
 		multirt_need_resolve = ire_multirt_need_resolve(ire->ire_addr,
-		    MBLK_GETLABEL(first_mp), ipst);
+		    msg_getlabel(first_mp), ipst);
 		ip2dbg(("ip_wput[not TCP]: ire %p, "
 		    "multirt_need_resolve %d, first_mp %p\n",
 		    (void *)ire, multirt_need_resolve, (void *)first_mp));
@@ -21167,7 +21218,7 @@ multicast:
 		ire = NULL;
 		if (xmit_ill == NULL) {
 			ire = ire_ctable_lookup(dst, 0, 0, ipif,
-			    zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
+			    zoneid, msg_getlabel(mp), match_flags, ipst);
 		}
 
 		if (ire == NULL) {
@@ -21228,7 +21279,7 @@ multicast:
 			}
 		}
 	} else {
-		ire = ire_cache_lookup(dst, zoneid, MBLK_GETLABEL(mp), ipst);
+		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
 		if ((ire != NULL) && (ire->ire_type &
 		    (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK))) {
 			ignore_dontroute = B_TRUE;
@@ -21326,7 +21377,7 @@ send_from_ill:
 			 */
 			match_flags |= MATCH_IRE_ILL | MATCH_IRE_SECATTR;
 			ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
-			    MBLK_GETLABEL(mp), match_flags, ipst);
+			    msg_getlabel(mp), match_flags, ipst);
 			/*
 			 * If an ire exists use it or else create
 			 * an ire but don't add it to the cache.
@@ -21358,9 +21409,9 @@ send_from_ill:
 			match_flags = MATCH_IRE_MARK_PRIVATE_ADDR |
 			    MATCH_IRE_GW;
 			ire = ire_ctable_lookup(dst, nexthop_addr, 0,
-			    NULL, zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
+			    NULL, zoneid, msg_getlabel(mp), match_flags, ipst);
 		} else {
-			ire = ire_cache_lookup(dst, zoneid, MBLK_GETLABEL(mp),
+			ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp),
 			    ipst);
 		}
 		if (!ire) {
@@ -21452,7 +21503,7 @@ noirefound:
 		 * to initiate additional route resolutions.
 		 */
 		multirt_need_resolve = ire_multirt_need_resolve(ire->ire_addr,
-		    MBLK_GETLABEL(first_mp), ipst);
+		    msg_getlabel(first_mp), ipst);
 		ip2dbg(("ip_wput[noirefound]: ire %p, "
 		    "multirt_need_resolve %d, first_mp %p\n",
 		    (void *)ire, multirt_need_resolve, (void *)first_mp));
@@ -24084,7 +24135,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	}
 
 	/* Get a copy of the header for the trailing frags */
-	hdr_mp = ip_wput_frag_copyhdr((uchar_t *)ipha, hdr_len, offset, ipst);
+	hdr_mp = ip_wput_frag_copyhdr((uchar_t *)ipha, hdr_len, offset, ipst,
+	    mp);
 	if (!hdr_mp) {
 		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
 		freemsg(mp);
@@ -24093,8 +24145,6 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		    "couldn't copy hdr");
 		return;
 	}
-	if (DB_CRED(mp) != NULL)
-		mblk_setcred(hdr_mp, DB_CRED(mp));
 
 	/* Store the starting offset, with the MoreFrags flag. */
 	i1 = offset | IPH_MF | frag_flag;
@@ -24309,8 +24359,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		 */
 		} else {
 			xmit_mp->b_cont = mp;
-			if (DB_CRED(mp) != NULL)
-				mblk_setcred(xmit_mp, DB_CRED(mp));
+
 			/*
 			 * Get priority marking, if any.
 			 * We propagate the CoS marking from the
@@ -24607,8 +24656,6 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			 */
 			} else if ((xmit_mp = copyb(ll_hdr_mp)) != NULL) {
 				xmit_mp->b_cont = mp;
-				if (DB_CRED(mp) != NULL)
-					mblk_setcred(xmit_mp, DB_CRED(mp));
 				/* Get priority marking, if any. */
 				if (DB_TYPE(xmit_mp) == M_DATA)
 					xmit_mp->b_band = mp->b_band;
@@ -24738,9 +24785,11 @@ drop_pkt:
 
 /*
  * Copy the header plus those options which have the copy bit set
+ * src is the template to make sure we preserve the cred for TX purposes.
  */
 static mblk_t *
-ip_wput_frag_copyhdr(uchar_t *rptr, int hdr_len, int offset, ip_stack_t *ipst)
+ip_wput_frag_copyhdr(uchar_t *rptr, int hdr_len, int offset, ip_stack_t *ipst,
+    mblk_t *src)
 {
 	mblk_t	*mp;
 	uchar_t	*up;
@@ -24749,7 +24798,7 @@ ip_wput_frag_copyhdr(uchar_t *rptr, int hdr_len, int offset, ip_stack_t *ipst)
 	 * Quick check if we need to look for options without the copy bit
 	 * set
 	 */
-	mp = allocb(ipst->ips_ip_wroff_extra + hdr_len, BPRI_HI);
+	mp = allocb_tmpl(ipst->ips_ip_wroff_extra + hdr_len, src);
 	if (!mp)
 		return (mp);
 	mp->b_rptr += ipst->ips_ip_wroff_extra;
@@ -25364,15 +25413,6 @@ ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc,
 			mp1->b_band = mp->b_band;
 			mp1->b_cont = mp;
 			/*
-			 * certain system generated traffic may not
-			 * have cred/label in ip header block. This
-			 * is true even for a labeled system. But for
-			 * labeled traffic, inherit the label in the
-			 * new header.
-			 */
-			if (DB_CRED(mp) != NULL)
-				mblk_setcred(mp1, DB_CRED(mp));
-			/*
 			 * XXX disable ICK_VALID and compute checksum
 			 * here; can happen if nce_fp_mp changes and
 			 * it can't be copied now due to insufficient
@@ -25392,15 +25432,6 @@ unlock_err:
 		}
 		UNLOCK_IRE_FP_MP(ire);
 		mp1->b_cont = mp;
-		/*
-		 * certain system generated traffic may not
-		 * have cred/label in ip header block. This
-		 * is true even for a labeled system. But for
-		 * labeled traffic, inherit the label in the
-		 * new header.
-		 */
-		if (DB_CRED(mp) != NULL)
-			mblk_setcred(mp1, DB_CRED(mp));
 		if (!qos_done && (proc != 0) && IPP_ENABLED(proc, ipst)) {
 			ip_process(proc, &mp1, ill_index);
 			if (mp1 == NULL)
@@ -25490,7 +25521,7 @@ ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
 			ire = ire_arg;
 		} else {
 			ire = ire_ctable_lookup_v6(v6dstp, 0, 0, ipif,
-			    zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
+			    zoneid, msg_getlabel(mp), match_flags, ipst);
 			ire_need_rele = B_TRUE;
 		}
 		if (ire != NULL) {
@@ -25771,7 +25802,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		 * an ire to send this downstream.
 		 */
 		ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
-		    MBLK_GETLABEL(mp), match_flags, ipst);
+		    msg_getlabel(mp), match_flags, ipst);
 		if (ire != NULL) {
 			ill_t *ill1;
 			/*
@@ -25820,7 +25851,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 			ire_need_rele = B_FALSE;
 		} else {
 			ire = ire_cache_lookup(dst, zoneid,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 		}
 		if (ire != NULL) {
 			goto send;
@@ -26634,6 +26665,7 @@ ip_restart_optmgmt(ipsq_t *dummy_sq, queue_t *q, mblk_t *first_mp, void *dummy)
 	opt_restart_t	*or;
 	int	err;
 	conn_t	*connp;
+	cred_t	*cr;
 
 	ASSERT(CONN_Q(q));
 	connp = Q_TO_CONN(q);
@@ -26641,16 +26673,18 @@ ip_restart_optmgmt(ipsq_t *dummy_sq, queue_t *q, mblk_t *first_mp, void *dummy)
 	ASSERT(first_mp->b_datap->db_type == M_CTL);
 	or = (opt_restart_t *)first_mp->b_rptr;
 	/*
-	 * We don't need to pass any credentials here since this is just
-	 * a restart. The credentials are passed in when svr4_optcom_req
-	 * is called the first time (from ip_wput_nondata).
+	 * We checked for a db_credp the first time svr4_optcom_req
+	 * was called (from ip_wput_nondata). So we can just ASSERT here.
 	 */
+	cr = msg_getcred(first_mp, NULL);
+	ASSERT(cr != NULL);
+
 	if (or->or_type == T_SVR4_OPTMGMT_REQ) {
-		err = svr4_optcom_req(q, first_mp, NULL,
+		err = svr4_optcom_req(q, first_mp, cr,
 		    &ip_opt_obj, B_FALSE);
 	} else {
 		ASSERT(or->or_type == T_OPTMGMT_REQ);
-		err = tpi_optcom_req(q, first_mp, NULL,
+		err = tpi_optcom_req(q, first_mp, cr,
 		    &ip_opt_obj, B_FALSE);
 	}
 	if (err != EINPROGRESS) {
@@ -26954,8 +26988,6 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		ipst = ILLQ_TO_IPST(q);
 	}
 
-	cr = DB_CREDDEF(mp, GET_QUEUE_CRED(q));
-
 	switch (DB_TYPE(mp)) {
 	case M_IOCTL:
 		/*
@@ -27233,6 +27265,22 @@ nak:
 				goto protonak;
 			}
 
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				mp = mi_tpi_err_ack_alloc(mp, TSYSERR, EINVAL);
+				if (mp != NULL)
+					qreply(q, mp);
+				return;
+			}
+
 			if (!snmpcom_req(q, mp, ip_snmp_set,
 			    ip_snmp_get, cr)) {
 				/*
@@ -27269,6 +27317,21 @@ nak:
 				goto protonak;
 			}
 
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				mp = mi_tpi_err_ack_alloc(mp, TSYSERR, EINVAL);
+				if (mp != NULL)
+					qreply(q, mp);
+				return;
+			}
 			ASSERT(ipsq == NULL);
 			/*
 			 * We don't come here for restart. ip_restart_optmgmt
@@ -27742,7 +27805,7 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 			if (optval == IPOPT_SSRR) {
 				ire = ire_ftable_lookup(dst, 0, 0,
 				    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0,
-				    MBLK_GETLABEL(mp),
+				    msg_getlabel(mp),
 				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, ipst);
 				if (ire == NULL) {
 					ip1dbg(("ip_wput_options: SSRR not"

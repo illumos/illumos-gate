@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -673,8 +673,6 @@ struct tl_endpt {
 #define		IS_COTS(x)	(((x)->te_flag & TL_TICLTS) == 0)
 #define		IS_COTSORD(x)	(((x)->te_flag & TL_TICOTSORD) != 0)
 #define		IS_SOCKET(x)	(((x)->te_flag & TL_SOCKET) != 0)
-
-#define	TLPID(mp, tep)	(DB_CPID(mp) == -1 ? (tep)->te_cpid : DB_CPID(mp))
 
 /*
  * Certain operations are always used together. These macros reduce the chance
@@ -2742,9 +2740,24 @@ tl_optmgmt(queue_t *wq, mblk_t *mp)
 	tl_endpt_t *tep;
 	mblk_t *ackmp;
 	union T_primitives *prim;
+	cred_t *cr;
 
 	tep = (tl_endpt_t *)wq->q_ptr;
 	prim = (union T_primitives *)mp->b_rptr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		tl_error_ack(wq, mp, TSYSERR, EINVAL, prim->type);
+		return;
+	}
 
 	/*  all states OK for AF_UNIX options ? */
 	if (!IS_SOCKET(tep) && tep->te_state != TS_IDLE &&
@@ -2776,11 +2789,11 @@ tl_optmgmt(queue_t *wq, mblk_t *mp)
 	 * call common option management routine from drv/ip
 	 */
 	if (prim->type == T_SVR4_OPTMGMT_REQ) {
-		(void) svr4_optcom_req(wq, mp, tep->te_credp, &tl_opt_obj,
+		(void) svr4_optcom_req(wq, mp, cr, &tl_opt_obj,
 		    B_FALSE);
 	} else {
 		ASSERT(prim->type == T_OPTMGMT_REQ);
-		(void) tpi_optcom_req(wq, mp, tep->te_credp, &tl_opt_obj,
+		(void) tpi_optcom_req(wq, mp, cr, &tl_opt_obj,
 		    B_FALSE);
 	}
 }
@@ -3199,8 +3212,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 
 	if (peer_tep != NULL && peer_tep->te_credp != NULL &&
 	    confmp != NULL) {
-		mblk_setcred(confmp, peer_tep->te_credp);
-		DB_CPID(confmp) = peer_tep->te_cpid;
+		mblk_setcred(confmp, peer_tep->te_credp, peer_tep->te_cpid);
 	}
 
 	tl_ok_ack(wq, ackmp, T_CONN_REQ);
@@ -3238,12 +3250,16 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	addr_startp = cimp->b_rptr + ci->SRC_offset;
 	bcopy(tep->te_abuf, addr_startp, tep->te_alen);
 	if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED)) {
+		cred_t *cr;
+		pid_t cpid;
+
 		ci->OPT_offset = (t_scalar_t)T_ALIGN(ci->SRC_offset +
 		    ci->SRC_length);
 		ci->OPT_length = olen; /* because only 1 option */
+		cr = msg_getcred(cimp, &cpid);
+		ASSERT(cr != NULL);
 		tl_fill_option(cimp->b_rptr + ci->OPT_offset,
-		    DB_CREDDEF(cimp, tep->te_credp),
-		    TLPID(cimp, tep),
+		    cr, cpid,
 		    peer_tep->te_flag, peer_tep->te_credp);
 	} else if (ooff != 0) {
 		/* Copy option from T_CONN_REQ */
@@ -3735,8 +3751,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		 * Forward the credential in the packet so it can be picked up
 		 * at the higher layers for more complete credential processing
 		 */
-		mblk_setcred(ccmp, acc_ep->te_credp);
-		DB_CPID(ccmp) = acc_ep->te_cpid;
+		mblk_setcred(ccmp, acc_ep->te_credp, acc_ep->te_cpid);
 	} else {
 		freemsg(respmp);
 		respmp = NULL;
@@ -5205,15 +5220,20 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		    (t_scalar_t)T_ALIGN(udind->SRC_offset + udind->SRC_length);
 		udind->OPT_length = olen;
 		if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED)) {
+			cred_t *cr;
+			pid_t cpid;
+
 			if (oldolen != 0) {
 				bcopy((void *)((uintptr_t)udreq + ooff),
 				    (void *)((uintptr_t)udind +
 				    udind->OPT_offset),
 				    oldolen);
 			}
+			cr = msg_getcred(mp, &cpid);
+			ASSERT(cr != NULL);
+
 			tl_fill_option(ui_mp->b_rptr + udind->OPT_offset +
-			    oldolen,
-			    DB_CREDDEF(mp, tep->te_credp), TLPID(mp, tep),
+			    oldolen, cr, cpid,
 			    peer_tep->te_flag, peer_tep->te_credp);
 		} else {
 			bcopy((void *)((uintptr_t)udreq + ooff),
@@ -5941,6 +5961,8 @@ tl_merror(queue_t *wq, mblk_t *mp, int error)
 static void
 tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag, cred_t *pcr)
 {
+	ASSERT(cr != NULL);
+
 	if (flag & TL_SETCRED) {
 		struct opthdr *opt = (struct opthdr *)buf;
 		tl_credopt_t *tlcred;

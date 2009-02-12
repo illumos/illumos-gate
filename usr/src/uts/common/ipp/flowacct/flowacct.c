@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -41,6 +39,7 @@
 #include <inet/ip6.h>
 #include <sys/ddi.h>
 #include <sys/strsun.h>
+#include <sys/strsubr.h>
 #include <ipp/flowacct/flowacct_impl.h>
 
 /*
@@ -212,10 +211,8 @@ flowacct_find_ids(mblk_t *mp, header_t *header)
 {
 	cred_t *cr;
 
-	while (DB_CRED(mp) == NULL && mp->b_cont != NULL)
-		mp = mp->b_cont;
-
-	if ((cr = DB_CRED(mp)) != NULL) {
+	cr = msg_getcred(mp, NULL);
+	if (cr != NULL) {
 		header->uid = crgetuid(cr);
 		header->projid = crgetprojid(cr);
 	} else {

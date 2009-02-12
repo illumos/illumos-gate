@@ -3052,6 +3052,21 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 	socklen_t	len;
 	sin_t	*sin;
 	sin6_t	*sin6;
+	cred_t		*cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		tcp_err_ack(tcp, mp, TSYSERR, EINVAL);
+		return;
+	}
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
@@ -3118,7 +3133,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 		return;
 	}
 
-	error = tcp_bind_check(connp, sa, len, DB_CRED(mp),
+	error = tcp_bind_check(connp, sa, len, cr,
 	    tbr->PRIM_type != O_T_BIND_REQ);
 	if (error == 0) {
 		if (tcp->tcp_family == AF_INET) {
@@ -3130,7 +3145,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 		}
 
 		if (backlog > 0) {
-			error = tcp_do_listen(connp, backlog, DB_CRED(mp));
+			error = tcp_do_listen(connp, backlog, cr);
 		}
 	}
 done:
@@ -4397,7 +4412,6 @@ tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
 	mblk_t	*mp;
 	char	*optp = NULL;
 	int	optlen = 0;
-	cred_t	*cr;
 
 	if (defermp != NULL)
 		*defermp = NULL;
@@ -4458,17 +4472,18 @@ tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
 	if (!mp)
 		return (B_FALSE);
 
-	if ((cr = DB_CRED(idmp)) != NULL) {
-		mblk_setcred(mp, cr);
-		DB_CPID(mp) = DB_CPID(idmp);
-	}
+	mblk_copycred(mp, idmp);
 
 	if (defermp == NULL) {
 		conn_t *connp = tcp->tcp_connp;
 		if (IPCL_IS_NONSTR(connp)) {
+			cred_t *cr;
+			pid_t cpid;
+
+			cr = msg_getcred(mp, &cpid);
 			(*connp->conn_upcalls->su_connected)
 			    (connp->conn_upper_handle, tcp->tcp_connid, cr,
-			    DB_CPID(mp));
+			    cpid);
 			freemsg(mp);
 		} else {
 			putnext(tcp->tcp_rq, mp);
@@ -4560,7 +4575,6 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	in6_addr_t 	v6dst;
 	int		err;
 	int		ifindex = 0;
-	cred_t		*cr;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (ipvers == IPV4_VERSION) {
@@ -4796,10 +4810,8 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	 * If the SYN contains a credential, it's a loopback packet; attach
 	 * the credential to the TPI message.
 	 */
-	if ((cr = DB_CRED(idmp)) != NULL) {
-		mblk_setcred(tpi_mp, cr);
-		DB_CPID(tpi_mp) = DB_CPID(idmp);
-	}
+	mblk_copycred(tpi_mp, idmp);
+
 	tcp->tcp_conn.tcp_eager_conn_ind = tpi_mp;
 
 	/* Inherit the listener's SSL protection state */
@@ -4827,7 +4839,6 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	sin_t		sin;
 	mblk_t		*tpi_mp = NULL;
 	int		err;
-	cred_t		*cr;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	sin = sin_null;
@@ -4923,10 +4934,8 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	 * If the SYN contains a credential, it's a loopback packet; attach
 	 * the credential to the TPI message.
 	 */
-	if ((cr = DB_CRED(idmp)) != NULL) {
-		mblk_setcred(tpi_mp, cr);
-		DB_CPID(tpi_mp) = DB_CPID(idmp);
-	}
+	mblk_copycred(tpi_mp, idmp);
+
 	tcp->tcp_conn.tcp_eager_conn_ind = tpi_mp;
 
 	/* Inherit the listener's SSL protection state */
@@ -5519,7 +5528,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		cred_t *cr;
 
 		if (connp->conn_mlp_type != mlptSingle) {
-			cr = econnp->conn_peercred = DB_CRED(mp);
+			cr = econnp->conn_peercred = msg_getcred(mp, NULL);
 			if (cr != NULL)
 				crhold(cr);
 			else
@@ -5708,8 +5717,17 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		goto error;
 	}
 
-	DB_CPID(mp1) = tcp->tcp_cpid;
-	mblk_setcred(mp1, CONN_CRED(eager->tcp_connp));
+	/*
+	 * Note that in theory this should use the current pid
+	 * so that getpeerucred on the client returns the actual listener
+	 * that does accept. But accept() hasn't been called yet. We could use
+	 * the pid of the process that did bind/listen on the server.
+	 * However, with common usage like inetd() the bind/listen can be done
+	 * by a different process than the accept().
+	 * Hence we do the simple thing of using the open pid here.
+	 * Note that db_credp is set later in tcp_send_data().
+	 */
+	mblk_setcred(mp1, credp, tcp->tcp_cpid);
 	eager->tcp_cpid = tcp->tcp_cpid;
 	eager->tcp_open_time = lbolt64;
 
@@ -5924,6 +5942,22 @@ tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 	struct sockaddr	*sa;
 	socklen_t	len;
 	int		error;
+	cred_t		*cr;
+	pid_t		cpid;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, &cpid);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		tcp_err_ack(tcp, mp, TSYSERR, EINVAL);
+		return;
+	}
 
 	tcr = (struct T_conn_req *)mp->b_rptr;
 
@@ -6103,8 +6137,7 @@ tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 	}
 
 	/* call the non-TPI version */
-	error = tcp_do_connect(tcp->tcp_connp, sa, len, DB_CRED(mp),
-	    DB_CPID(mp));
+	error = tcp_do_connect(tcp->tcp_connp, sa, len, cr, cpid);
 	if (error < 0) {
 		mp = mi_tpi_err_ack_alloc(mp, -error, 0);
 	} else if (error > 0) {
@@ -6255,7 +6288,7 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 	if (tcp->tcp_family == AF_INET) {
 		error = ip_proto_bind_connected_v4(tcp->tcp_connp, &mp,
 		    IPPROTO_TCP, &tcp->tcp_ipha->ipha_src, tcp->tcp_lport,
-		    tcp->tcp_remote, tcp->tcp_fport, B_TRUE, B_TRUE);
+		    tcp->tcp_remote, tcp->tcp_fport, B_TRUE, B_TRUE, cr);
 	} else {
 		in6_addr_t v6src;
 		if (tcp->tcp_ipversion == IPV4_VERSION) {
@@ -6265,7 +6298,7 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 		}
 		error = ip_proto_bind_connected_v6(tcp->tcp_connp, &mp,
 		    IPPROTO_TCP, &v6src, tcp->tcp_lport, &tcp->tcp_remote_v6,
-		    &tcp->tcp_sticky_ipp, tcp->tcp_fport, B_TRUE, B_TRUE);
+		    &tcp->tcp_sticky_ipp, tcp->tcp_fport, B_TRUE, B_TRUE, cr);
 	}
 	BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
 	tcp->tcp_active_open = 1;
@@ -6445,7 +6478,7 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 		}
 		error = ip_proto_bind_connected_v6(connp, &mp, IPPROTO_TCP,
 		    &v6src, tcp->tcp_lport, &tcp->tcp_remote_v6,
-		    &tcp->tcp_sticky_ipp, tcp->tcp_fport, B_TRUE, B_TRUE);
+		    &tcp->tcp_sticky_ipp, tcp->tcp_fport, B_TRUE, B_TRUE, cr);
 		BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
 		tcp->tcp_active_open = 1;
 
@@ -12713,6 +12746,11 @@ static void
 tcp_ulp_newconn(conn_t *lconnp, conn_t *econnp, mblk_t *mp)
 {
 	if (IPCL_IS_NONSTR(lconnp)) {
+		cred_t	*cr;
+		pid_t	cpid;
+
+		cr = msg_getcred(mp, &cpid);
+
 		ASSERT(econnp->conn_tcp->tcp_listener == lconnp->conn_tcp);
 		ASSERT(econnp->conn_tcp->tcp_saved_listener ==
 		    lconnp->conn_tcp);
@@ -12732,7 +12770,7 @@ tcp_ulp_newconn(conn_t *lconnp, conn_t *econnp, mblk_t *mp)
 		if ((*lconnp->conn_upcalls->su_newconn)
 		    (lconnp->conn_upper_handle,
 		    (sock_lower_handle_t)econnp,
-		    &sock_tcp_downcalls, DB_CRED(mp), DB_CPID(mp),
+		    &sock_tcp_downcalls, cr, cpid,
 		    &econnp->conn_upcalls) == NULL) {
 			/* Failed to allocate a socket */
 			BUMP_MIB(&lconnp->conn_tcp->tcp_tcps->tcps_mib,
@@ -13220,12 +13258,14 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 						/* Send up T_CONN_CON */
 						putnext(tcp->tcp_rq, mp1);
 					} else {
+						cred_t	*cr;
+						pid_t	cpid;
+
+						cr = msg_getcred(mp1, &cpid);
 						(*connp->conn_upcalls->
 						    su_connected)
 						    (connp->conn_upper_handle,
-						    tcp->tcp_connid,
-						    DB_CRED(mp1),
-						    DB_CPID(mp1));
+						    tcp->tcp_connid, cr, cpid);
 						freemsg(mp1);
 					}
 
@@ -13244,10 +13284,13 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 				if (!IPCL_IS_NONSTR(connp)) {
 					putnext(tcp->tcp_rq, mp1);
 				} else {
+					cred_t	*cr;
+					pid_t	cpid;
+
+					cr = msg_getcred(mp1, &cpid);
 					(*connp->conn_upcalls->su_connected)
 					    (connp->conn_upper_handle,
-					    tcp->tcp_connid, DB_CRED(mp1),
-					    DB_CPID(mp1));
+					    tcp->tcp_connid, cr, cpid);
 					freemsg(mp1);
 				}
 			}
@@ -13275,6 +13318,10 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		mp1 = tcp_xmit_mp(tcp, tcp->tcp_xmit_head, tcp->tcp_mss,
 		    NULL, NULL, tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 		if (mp1) {
+			/*
+			 * See comment in tcp_conn_request() for why we use
+			 * the open() time pid here.
+			 */
 			DB_CPID(mp1) = tcp->tcp_cpid;
 			tcp_send_data(tcp, tcp->tcp_wq, mp1);
 			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
@@ -17275,10 +17322,14 @@ tcp_timer(void *arg)
 	if (mp == NULL) {
 		return;
 	}
-	/* Attach credentials to retransmitted initial SYNs. */
+	/*
+	 * Attach credentials to retransmitted initial SYNs.
+	 * In theory we should use the credentials from the connect()
+	 * call to ensure that getpeerucred() on the peer will be correct.
+	 * But we assume that SYN's are not dropped for loopback connections.
+	 */
 	if (tcp->tcp_state == TCPS_SYN_SENT) {
-		mblk_setcred(mp, tcp->tcp_cred);
-		DB_CPID(mp) = tcp->tcp_cpid;
+		mblk_setcred(mp, tcp->tcp_cred, tcp->tcp_cpid);
 	}
 
 	tcp->tcp_csuna = tcp->tcp_snxt;
@@ -18486,9 +18537,25 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 	struct T_ok_ack *ok;
 	t_scalar_t PRIM_type;
 	conn_t *econnp;
+	cred_t *cr;
 
 	ASSERT(DB_TYPE(mp) == M_PROTO);
 
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		mp = mi_tpi_err_ack_alloc(mp, TSYSERR, EINVAL);
+		if (mp != NULL)
+			putnext(rq, mp);
+		return;
+	}
 	conn_res = (struct T_conn_res *)mp->b_rptr;
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (struct T_conn_res)) {
@@ -18535,7 +18602,7 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 		 */
 		eager->tcp_sodirect = SOD_QTOSODP(eager->tcp_rq);
 		if (tcp_accept_common(listener->tcp_connp,
-		    econnp, CRED()) < 0) {
+		    econnp, cr) < 0) {
 			mp = mi_tpi_err_ack_alloc(mp, TPROTO, 0);
 			if (mp != NULL)
 				putnext(rq, mp);
@@ -18769,7 +18836,20 @@ tcp_wput(queue_t *q, mblk_t *mp)
 			return;
 		}
 		if (type == T_SVR4_OPTMGMT_REQ) {
-			cred_t	*cr = DB_CREDDEF(mp, tcp->tcp_cred);
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cred_t	*cr = msg_getcred(mp, NULL);
+
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				tcp_err_ack(tcp, mp, TSYSERR, EINVAL);
+				return;
+			}
 			if (snmpcom_req(q, mp, tcp_snmp_set, ip_snmp_get,
 			    cr)) {
 				/*
@@ -19194,11 +19274,24 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	uint_t		ire_fp_mp_len;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	cred_t		*cr;
+	pid_t		cpid;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
-	if (is_system_labeled() && DB_CRED(mp) == NULL)
-		mblk_setcred(mp, CONN_CRED(tcp->tcp_connp));
+	/*
+	 * Here we need to handle the overloading of the cred_t for
+	 * both getpeerucred and TX.
+	 * If this is a SYN then the caller already set db_credp so
+	 * that getpeerucred will work. But if TX is in use we might have
+	 * a conn_peercred which is different, and we need to use that cred
+	 * to make TX use the correct label and label dependent route.
+	 */
+	if (is_system_labeled()) {
+		cr = msg_getcred(mp, &cpid);
+		if (cr == NULL || connp->conn_peercred != NULL)
+			mblk_setcred(mp, CONN_CRED(connp), cpid);
+	}
 
 	ipha = (ipha_t *)mp->b_rptr;
 	src = ipha->ipha_src;
@@ -22329,7 +22422,7 @@ tcp_wput_proto(void *arg, mblk_t *mp, void *arg2)
 	union T_primitives *tprim = (union T_primitives *)mp->b_rptr;
 	uchar_t *rptr;
 	t_scalar_t type;
-	cred_t *cr = DB_CREDDEF(mp, tcp->tcp_cred);
+	cred_t *cr;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -22417,29 +22510,41 @@ non_urgent_data:
 		tcp_info_req(tcp, mp);
 		break;
 	case T_SVR4_OPTMGMT_REQ:	/* manage options req */
+	case T_OPTMGMT_REQ:
+		/*
+		 * Note:  no support for snmpcom_req() through new
+		 * T_OPTMGMT_REQ. See comments in ip.c
+		 */
+
+		/*
+		 * All Solaris components should pass a db_credp
+		 * for this TPI message, hence we ASSERT.
+		 * But in case there is some other M_PROTO that looks
+		 * like a TPI message sent by some other kernel
+		 * component, we check and return an error.
+		 */
+		cr = msg_getcred(mp, NULL);
+		ASSERT(cr != NULL);
+		if (cr == NULL) {
+			tcp_err_ack(tcp, mp, TSYSERR, EINVAL);
+			return;
+		}
 		/*
 		 * If EINPROGRESS is returned, the request has been queued
 		 * for subsequent processing by ip_restart_optmgmt(), which
 		 * will do the CONN_DEC_REF().
 		 */
 		CONN_INC_REF(connp);
-		if (svr4_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
-		    B_TRUE) != EINPROGRESS) {
-			CONN_DEC_REF(connp);
-		}
-		break;
-	case T_OPTMGMT_REQ:
-		/*
-		 * Note:  no support for snmpcom_req() through new
-		 * T_OPTMGMT_REQ. See comments in ip.c
-		 *
-		 * see comments above in T_SVR4_OPTMGMT_REQ for conn
-		 * reference changes.
-		 */
-		CONN_INC_REF(connp);
-		if (tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
-		    B_TRUE) != EINPROGRESS) {
-			CONN_DEC_REF(connp);
+		if ((int)tprim->type == T_SVR4_OPTMGMT_REQ) {
+			if (svr4_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
+			    B_TRUE) != EINPROGRESS) {
+				CONN_DEC_REF(connp);
+			}
+		} else {
+			if (tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
+			    B_TRUE) != EINPROGRESS) {
+				CONN_DEC_REF(connp);
+			}
 		}
 		break;
 
@@ -22878,7 +22983,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	}
 
 	/* IP trusts us to set up labels when required. */
-	if (is_system_labeled() && (cr = DB_CRED(mp)) != NULL &&
+	if (is_system_labeled() && (cr = msg_getcred(mp, NULL)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		int err;
 
@@ -24344,7 +24449,17 @@ tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp, int *do_disconnectp,
 	struct T_conn_res *tcresp;
 	cred_t *cr;
 
-	cr = DB_CREDDEF(mp, tcp->tcp_cred);
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL)
+		return (-1);
 
 	prim_type = ((union T_primitives *)mp->b_rptr)->type;
 	ASSERT(prim_type == T_CONN_REQ || prim_type == O_T_CONN_RES ||
@@ -26648,8 +26763,7 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 				cr = tcp->tcp_cred;
 				pid = tcp->tcp_cpid;
 			}
-			mblk_setcred(syn_mp, cr);
-			DB_CPID(syn_mp) = pid;
+			mblk_setcred(syn_mp, cr, pid);
 			tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
 		}
 	after_syn_sent:
@@ -26914,10 +27028,9 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
     boolean_t bind_to_req_port_only)
 {
 	tcp_t	*tcp = connp->conn_tcp;
-
 	sin_t	*sin;
 	sin6_t  *sin6;
-	sin6_t		sin6addr;
+	sin6_t	sin6addr;
 	in_port_t requested_port;
 	ipaddr_t	v4addr;
 	in6_addr_t	v6addr;
@@ -27091,6 +27204,9 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	conn_t		*connp = (conn_t *)proto_handle;
 	squeue_t	*sqp = connp->conn_sqp;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	ASSERT(sqp != NULL);
 	ASSERT(connp->conn_upper_handle != NULL);
 
@@ -27259,6 +27375,9 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	error = proto_verify_ip_addr(tcp->tcp_family, sa, len);
 	if (error != 0) {
 		return (error);
@@ -27352,6 +27471,9 @@ tcp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 
 	ASSERT(connp->conn_upper_handle == NULL);
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	sopp.sopp_flags = SOCKOPT_RCVHIWAT | SOCKOPT_RCVLOWAT |
 	    SOCKOPT_MAXPSZ | SOCKOPT_MAXBLK | SOCKOPT_RCVTIMER |
 	    SOCKOPT_RCVTHRESH | SOCKOPT_MAXADDRLEN | SOCKOPT_MINPSZ;
@@ -27379,6 +27501,9 @@ tcp_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
 	conn_t *connp = (conn_t *)proto_handle;
 
 	ASSERT(connp->conn_upper_handle != NULL);
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	tcp_close_common(connp, flags);
 
@@ -27409,6 +27534,9 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	uint32_t	msize;
 	conn_t *connp = (conn_t *)proto_handle;
 	int32_t		tcpstate;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	ASSERT(connp->conn_ref >= 2);
 	ASSERT(connp->conn_upper_handle != NULL);
@@ -27516,6 +27644,9 @@ tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 	tcp_t	*tcp = connp->conn_tcp;
 
 	ASSERT(connp->conn_upper_handle != NULL);
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	ASSERT(tcp != NULL);
 
 	return (tcp_do_getpeername(tcp, addr, addrlenp));
@@ -27528,6 +27659,9 @@ tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 {
 	conn_t	*connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
@@ -27779,6 +27913,9 @@ tcp_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	/*
 	 * X/Open requires that we check the connected state.
 	 */
@@ -27819,6 +27956,9 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	error = squeue_synch_enter(sqp, connp, 0);
 	if (error != 0) {
 		/* failed to enter */
@@ -27847,6 +27987,9 @@ tcp_do_listen(conn_t *connp, int backlog, cred_t *cr)
 	sin6_t  	*sin6;
 	int		error = 0;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (tcp->tcp_state >= TCPS_BOUND) {
 		if ((tcp->tcp_state == TCPS_BOUND ||
@@ -27980,6 +28123,9 @@ tcp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 	int		error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	switch (cmd) {
 		case ND_SET:

@@ -32,7 +32,7 @@
  * $Id: smb_trantcp.c,v 1.39 2005/03/02 01:27:44 lindak Exp $
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +109,7 @@ nb_setsockopt_int(TIUSER *tiptr, int level, int name, int val)
 
 	mlen = (sizeof (struct T_optmgmt_req) +
 	    sizeof (struct opthdr) + sizeof (int));
-	if (!(mp = allocb_wait(mlen, BPRI_LO, STR_NOSIG, &error)))
+	if (!(mp = allocb_cred_wait(mlen, STR_NOSIG, &error, CRED(), NOPID)))
 		return (error);
 
 	mp->b_datap->db_type = M_PROTO;
@@ -347,7 +347,7 @@ nb_snddis(TIUSER *tiptr)
 	int error, fmode, mlen;
 
 	mlen = sizeof (struct T_discon_req);
-	if (!(mp = allocb_wait(mlen, BPRI_LO, STR_NOSIG, &error)))
+	if (!(mp = allocb_cred_wait(mlen, STR_NOSIG, &error, CRED(), NOPID)))
 		return (error);
 
 	mp->b_datap->db_type = M_PROTO;

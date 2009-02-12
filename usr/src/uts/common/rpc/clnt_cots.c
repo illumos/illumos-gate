@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -375,13 +375,13 @@ typedef struct cku_private_s {
 
 static struct cm_xprt *connmgr_wrapconnect(struct cm_xprt *,
 	const struct timeval *, struct netbuf *, int, struct netbuf *,
-	struct rpc_err *, bool_t, bool_t);
+	struct rpc_err *, bool_t, bool_t, cred_t *);
 
 static bool_t	connmgr_connect(struct cm_xprt *, queue_t *, struct netbuf *,
 				int, calllist_t *, int *, bool_t reconnect,
-				const struct timeval *, bool_t);
+				const struct timeval *, bool_t, cred_t *);
 
-static bool_t	connmgr_setopt(queue_t *, int, int, calllist_t *);
+static bool_t	connmgr_setopt(queue_t *, int, int, calllist_t *, cred_t *cr);
 static void	connmgr_sndrel(struct cm_xprt *);
 static void	connmgr_snddis(struct cm_xprt *);
 static void	connmgr_close(struct cm_xprt *);
@@ -391,7 +391,7 @@ static struct cm_xprt *connmgr_wrapget(struct netbuf *, const struct timeval *,
 
 static struct cm_xprt *connmgr_get(struct netbuf *, const struct timeval *,
 	struct netbuf *, int, struct netbuf *, struct rpc_err *, dev_t,
-	bool_t, int);
+	bool_t, int, cred_t *);
 
 static void connmgr_cancelconn(struct cm_xprt *);
 static enum clnt_stat connmgr_cwait(struct cm_xprt *, const struct timeval *,
@@ -1708,7 +1708,7 @@ connmgr_wrapget(
 
 	cm_entry = connmgr_get(retryaddr, waitp, &p->cku_addr, p->cku_addrfmly,
 	    &p->cku_srcaddr, &p->cku_err, p->cku_device,
-	    p->cku_client.cl_nosignal, p->cku_useresvport);
+	    p->cku_client.cl_nosignal, p->cku_useresvport, p->cku_cred);
 
 	if (cm_entry == NULL) {
 		/*
@@ -1745,7 +1745,8 @@ connmgr_get(
 	struct rpc_err	*rpcerr,
 	dev_t		device,
 	bool_t		nosignal,
-	int		useresvport)
+	int		useresvport,
+	cred_t		*cr)
 {
 	struct cm_xprt *cm_entry;
 	struct cm_xprt *lru_entry;
@@ -1840,7 +1841,7 @@ use_new_conn:
 					 */
 					return (connmgr_wrapconnect(cm_entry,
 					    waitp, destaddr, addrfmly, srcaddr,
-					    rpcerr, TRUE, nosignal));
+					    rpcerr, TRUE, nosignal, cr));
 				}
 				i++;
 				if (cm_entry->x_time - prev_time <= 0 ||
@@ -1941,7 +1942,7 @@ use_new_conn:
 			if (cm_entry->x_connected == FALSE) {
 				return (connmgr_wrapconnect(cm_entry,
 				    waitp, destaddr, addrfmly, NULL,
-				    rpcerr, TRUE, nosignal));
+				    rpcerr, TRUE, nosignal, cr));
 			} else {
 				CONN_HOLD(cm_entry);
 
@@ -2127,7 +2128,7 @@ use_new_conn:
 		 * This is a bound end-point so don't close it's stream.
 		 */
 		connected = connmgr_connect(cm_entry, wq, destaddr, addrfmly,
-		    &call, &tidu_size, FALSE, waitp, nosignal);
+		    &call, &tidu_size, FALSE, waitp, nosignal, cr);
 		*rpcerr = call.call_err;
 		cv_destroy(&call.call_cv);
 
@@ -2214,7 +2215,8 @@ connmgr_wrapconnect(
 	struct netbuf	*srcaddr,
 	struct rpc_err	*rpcerr,
 	bool_t		reconnect,
-	bool_t		nosignal)
+	bool_t		nosignal,
+	cred_t		*cr)
 {
 	ASSERT(MUTEX_HELD(&connmgr_lock));
 	/*
@@ -2261,7 +2263,7 @@ connmgr_wrapconnect(
 
 		connected = connmgr_connect(cm_entry, cm_entry->x_wq,
 		    destaddr, addrfmly, &call, &cm_entry->x_tidu_size,
-		    reconnect, waitp, nosignal);
+		    reconnect, waitp, nosignal, cr);
 
 		*rpcerr = call.call_err;
 		cv_destroy(&call.call_cv);
@@ -2484,7 +2486,8 @@ connmgr_connect(
 	int 			*tidu_ptr,
 	bool_t 			reconnect,
 	const struct timeval 	*waitp,
-	bool_t 			nosignal)
+	bool_t 			nosignal,
+	cred_t			*cr)
 {
 	mblk_t *mp;
 	struct T_conn_req *tcr;
@@ -2496,7 +2499,11 @@ connmgr_connect(
 	if (reconnect)
 		(void) putctl1(wq, M_FLUSH, FLUSHRW);
 
-	mp = allocb(sizeof (*tcr) + addr->len, BPRI_LO);
+	/*
+	 * Note: if the receiver uses SCM_UCRED/getpeerucred the pid will
+	 * appear as -1.
+	 */
+	mp = allocb_cred(sizeof (*tcr) + addr->len, cr, NOPID);
 	if (mp == NULL) {
 		/*
 		 * This is unfortunate, but we need to look up the stats for
@@ -2625,7 +2632,7 @@ connmgr_connect(
 	 * lots of retries and terrible performance.
 	 */
 	if (addrfmly == AF_INET || addrfmly == AF_INET6) {
-		(void) connmgr_setopt(wq, IPPROTO_TCP, TCP_NODELAY, e);
+		(void) connmgr_setopt(wq, IPPROTO_TCP, TCP_NODELAY, e, cr);
 		if (e->call_status == RPC_XPRTFAILED)
 			return (FALSE);
 	}
@@ -2673,7 +2680,7 @@ connmgr_connect(
  * Called by connmgr_connect to set an option on the new stream.
  */
 static bool_t
-connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e)
+connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e, cred_t *cr)
 {
 	mblk_t *mp;
 	struct opthdr *opt;
@@ -2681,8 +2688,8 @@ connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e)
 	struct timeval waitp;
 	int error;
 
-	mp = allocb(sizeof (struct T_optmgmt_req) + sizeof (struct opthdr) +
-	    sizeof (int), BPRI_LO);
+	mp = allocb_cred(sizeof (struct T_optmgmt_req) +
+	    sizeof (struct opthdr) + sizeof (int), cr, NOPID);
 	if (mp == NULL) {
 		RPCLOG0(1, "connmgr_setopt: cannot alloc mp for option "
 		    "request\n");

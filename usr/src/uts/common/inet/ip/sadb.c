@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/errno.h>
 #include <sys/ddi.h>
 #include <sys/debug.h>
@@ -6175,7 +6176,7 @@ sadb_t_bind_req(queue_t *q, int proto)
 	struct T_bind_req *tbr;
 	mblk_t *mp;
 
-	mp = allocb(sizeof (struct T_bind_req) + 1, BPRI_HI);
+	mp = allocb_cred(sizeof (struct T_bind_req) + 1, kcred, NOPID);
 	if (mp == NULL) {
 		/* cmn_err(CE_WARN, */
 		/* "sadb_t_bind_req(%d): couldn't allocate mblk\n", proto); */

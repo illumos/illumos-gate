@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * TLI-like function to send datagrams over a specified
@@ -131,8 +128,20 @@ t_ksndudata(TIUSER *tiptr, struct t_kunitdata *unitdata, frtn_t *frtn)
 	 */
 gotdp:
 	msgsz = (int)TUNITDATAREQSZ;
-	while (!(bp = allocb(msgsz + unitdata->addr.len + unitdata->opt.len,
-	    BPRI_LO))) {
+	/*
+	 * Usually sendto()s are performed with the credential of the caller;
+	 * in this particular case we specifically use the credential of
+	 * the opener as this call is typically done in the context of a user
+	 * process but on behalf of the kernel, e.g., a client connection
+	 * to a server which is later shared by different users.
+	 * At open time, we make sure to set fp->f_cred to kcred if such is
+	 * the case.
+	 *
+	 * Note: if the receiver uses SCM_UCRED/getpeerucred the pid will
+	 * appear as -1.
+	 */
+	while (!(bp = allocb_cred(msgsz + unitdata->addr.len +
+	    unitdata->opt.len, fp->f_cred, NOPID))) {
 		if (strwaitbuf(msgsz + unitdata->addr.len + unitdata->opt.len,
 		    BPRI_LO)) {
 			if (dbp && (dbp != unitdata->udata.udata_mp))

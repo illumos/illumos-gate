@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #ifndef	_INET_TUN_H
 #define	_INET_TUN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -202,6 +200,7 @@ typedef struct tun_s {
 	uint64_t tun_HCOutUcastPkts;	/* # Packets requested */
 	uint64_t tun_HCOutMulticastPkts; /* Multicast Packets requested */
 	netstack_t	*tun_netstack;
+	cred_t		*tun_cred;
 } tun_t;
 
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1357,23 +1357,38 @@ so_getopt_unix_close(void *opt, t_uscalar_t optlen)
  *	_ALLOC_SLEEP	sleep forever. Don't return NULL.
  */
 mblk_t *
-soallocproto(size_t size, int sleepflg)
+soallocproto(size_t size, int sleepflg, cred_t *cr)
 {
 	mblk_t	*mp;
 
 	/* Round up size for reuse */
 	size = MAX(size, 64);
-	mp = allocb(size, BPRI_MED);
+	if (cr != NULL)
+		mp = allocb_cred(size, cr, curproc->p_pid);
+	else
+		mp = allocb(size, BPRI_MED);
+
 	if (mp == NULL) {
 		int error;	/* Dummy - error not returned to caller */
 
 		switch (sleepflg) {
 		case _ALLOC_SLEEP:
-			mp = allocb_wait(size, BPRI_MED, STR_NOSIG, &error);
+			if (cr != NULL) {
+				mp = allocb_cred_wait(size, STR_NOSIG, &error,
+				    cr, curproc->p_pid);
+			} else {
+				mp = allocb_wait(size, BPRI_MED, STR_NOSIG,
+				    &error);
+			}
 			ASSERT(mp);
 			break;
 		case _ALLOC_INTR:
-			mp = allocb_wait(size, BPRI_MED, 0, &error);
+			if (cr != NULL) {
+				mp = allocb_cred_wait(size, 0, &error, cr,
+				    curproc->p_pid);
+			} else {
+				mp = allocb_wait(size, BPRI_MED, 0, &error);
+			}
 			if (mp == NULL) {
 				/* Caught signal while sleeping for memory */
 				eprintline(ENOBUFS);
@@ -1398,7 +1413,8 @@ soallocproto(size_t size, int sleepflg)
  * This results in a bzero'ed chunk being placed the message.
  */
 mblk_t *
-soallocproto1(const void *buf, ssize_t len, ssize_t size, int sleepflg)
+soallocproto1(const void *buf, ssize_t len, ssize_t size, int sleepflg,
+    cred_t *cr)
 {
 	mblk_t	*mp;
 
@@ -1408,7 +1424,7 @@ soallocproto1(const void *buf, ssize_t len, ssize_t size, int sleepflg)
 	ASSERT(size >= len);
 	/* Round up size for reuse */
 	size = MAX(size, 64);
-	mp = soallocproto(size, sleepflg);
+	mp = soallocproto(size, sleepflg, cr);
 	if (mp == NULL)
 		return (NULL);
 	mp->b_datap->db_type = M_PROTO;
@@ -1453,7 +1469,7 @@ soappendmsg(mblk_t *mp, const void *buf, ssize_t len)
  */
 mblk_t *
 soallocproto2(const void *buf1, ssize_t len1, const void *buf2, ssize_t len2,
-    ssize_t size, int sleepflg)
+    ssize_t size, int sleepflg, cred_t *cr)
 {
 	mblk_t *mp;
 
@@ -1461,7 +1477,7 @@ soallocproto2(const void *buf1, ssize_t len1, const void *buf2, ssize_t len2,
 		size = len1 + len2;
 	ASSERT(size >= len1 + len2);
 
-	mp = soallocproto1(buf1, len1, size, sleepflg);
+	mp = soallocproto1(buf1, len1, size, sleepflg, cr);
 	if (mp)
 		soappendmsg(mp, buf2, len2);
 	return (mp);
@@ -1475,7 +1491,7 @@ soallocproto2(const void *buf1, ssize_t len1, const void *buf2, ssize_t len2,
  */
 mblk_t *
 soallocproto3(const void *buf1, ssize_t len1, const void *buf2, ssize_t len2,
-    const void *buf3, ssize_t len3, ssize_t size, int sleepflg)
+    const void *buf3, ssize_t len3, ssize_t size, int sleepflg, cred_t *cr)
 {
 	mblk_t *mp;
 
@@ -1483,7 +1499,7 @@ soallocproto3(const void *buf1, ssize_t len1, const void *buf2, ssize_t len2,
 		size = len1 + len2 +len3;
 	ASSERT(size >= len1 + len2 + len3);
 
-	mp = soallocproto1(buf1, len1, size, sleepflg);
+	mp = soallocproto1(buf1, len1, size, sleepflg, cr);
 	if (mp != NULL) {
 		soappendmsg(mp, buf2, len2);
 		soappendmsg(mp, buf3, len3);

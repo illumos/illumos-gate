@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -210,6 +208,8 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 	boolean_t	compute_label = B_FALSE;
 	tsol_ire_gw_secattr_t *attrp;
 	zoneid_t	zoneid, ip_zoneid;
+
+	ASSERT(credp != NULL);
 
 	if (opt_storage != NULL)
 		opt_storage[IPOPT_OLEN] = 0;
@@ -674,8 +674,8 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 		copylen = MBLKL(mp);
 		if (copylen > 256)
 			copylen = 256;
-		new_mp = allocb_cred(hlen + copylen +
-		    (mp->b_rptr - mp->b_datap->db_base), DB_CRED(mp));
+		new_mp = allocb_tmpl(hlen + copylen +
+		    (mp->b_rptr - mp->b_datap->db_base), mp);
 		if (new_mp == NULL)
 			return (ENOMEM);
 
@@ -743,6 +743,8 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 	ire_t		*ire, *sire;
 	tsol_ire_gw_secattr_t *attrp;
 	boolean_t	compute_label;
+
+	ASSERT(credp != NULL);
 
 	if (ip6opt_ls == 0)
 		return (EINVAL);
@@ -1249,8 +1251,8 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 			copylen = 256;
 		if (copylen < hdr_len)
 			copylen = hdr_len;
-		new_mp = allocb_cred(hlen + copylen +
-		    (mp->b_rptr - mp->b_datap->db_base), DB_CRED(mp));
+		new_mp = allocb_tmpl(hlen + copylen +
+		    (mp->b_rptr - mp->b_datap->db_base), mp);
 		if (new_mp == NULL)
 			return (ENOMEM);
 

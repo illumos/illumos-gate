@@ -1299,7 +1299,7 @@ svc_getreq(
 	    "svc_getreq_start:");
 
 	ASSERT(clone_xprt->xp_master != NULL);
-	ASSERT(!is_system_labeled() || DB_CRED(mp) != NULL ||
+	ASSERT(!is_system_labeled() || msg_getcred(mp, NULL) != NULL ||
 	    mp->b_datap->db_type != M_DATA);
 
 	/*
@@ -1327,17 +1327,13 @@ svc_getreq(
 	 * get the label from the raw mblk data now.
 	 */
 	if (is_system_labeled()) {
-		mblk_t *lmp;
+		cred_t *cr;
 
 		r.rq_label = kmem_alloc(sizeof (bslabel_t), KM_SLEEP);
-		if (DB_CRED(mp) != NULL)
-			lmp = mp;
-		else {
-			ASSERT(mp->b_cont != NULL);
-			lmp = mp->b_cont;
-			ASSERT(DB_CRED(lmp) != NULL);
-		}
-		bcopy(label2bslabel(crgetlabel(DB_CRED(lmp))), r.rq_label,
+		cr = msg_getcred(mp, NULL);
+		ASSERT(cr != NULL);
+
+		bcopy(label2bslabel(crgetlabel(cr)), r.rq_label,
 		    sizeof (bslabel_t));
 	} else {
 		r.rq_label = NULL;
@@ -2381,7 +2377,7 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 
 	TRACE_0(TR_FAC_KRPC, TR_SVC_QUEUEREQ_START, "svc_queuereq_start");
 
-	ASSERT(!is_system_labeled() || DB_CRED(mp) != NULL ||
+	ASSERT(!is_system_labeled() || msg_getcred(mp, NULL) != NULL ||
 	    mp->b_datap->db_type != M_DATA);
 
 	/*

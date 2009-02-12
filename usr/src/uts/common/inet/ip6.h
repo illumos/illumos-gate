@@ -392,7 +392,7 @@ extern int	ip_proto_bind_laddr_v6(conn_t *, mblk_t **, uint8_t,
     const in6_addr_t *, uint16_t, boolean_t);
 extern int	ip_proto_bind_connected_v6(conn_t *, mblk_t **,
     uint8_t, in6_addr_t *, uint16_t, const in6_addr_t *, ip6_pkt_t *,
-    uint16_t, boolean_t, boolean_t);
+    uint16_t, boolean_t, boolean_t, cred_t *);
 
 #endif	/* _KERNEL */
 

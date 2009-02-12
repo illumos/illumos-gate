@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Solaris DDI STREAMS utility routines (PSARC/2003/648).
@@ -281,13 +278,12 @@ mcopyinuio(struct stdata *stp, uio_t *uiop, ssize_t iosize,
 		blocksize = MIN(iosize, maxblk);
 		ASSERT(blocksize >= 0);
 		if ((mp = allocb_cred(offset + blocksize + tail_len,
-		    CRED())) == NULL) {
+		    CRED(), curproc->p_pid)) == NULL) {
 			*errorp = ENOMEM;
 			return (head);
 		}
 		mp->b_rptr += offset;
 		mp->b_wptr = mp->b_rptr + blocksize;
-		DB_CPID(mp) = curproc->p_pid;
 
 		*tail = mp;
 		tail = &mp->b_cont;

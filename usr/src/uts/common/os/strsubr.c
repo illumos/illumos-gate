@@ -1464,8 +1464,8 @@ putiocd(mblk_t *bp, char *arg, int flag, cred_t *cr)
 	 */
 	ASSERT(count >= 0);
 
-	if ((tmp = allocb_cred_wait(count, (flag & STR_NOSIG), &error, cr)) ==
-	    NULL) {
+	if ((tmp = allocb_cred_wait(count, (flag & STR_NOSIG), &error, cr,
+	    curproc->p_pid)) == NULL) {
 		return (error);
 	}
 	error = strcopyin(arg, tmp->b_wptr, count, flag & (U_TO_K|K_TO_K));
@@ -2793,6 +2793,10 @@ strmakectl(
 	mblk_t *bp = NULL;
 	unsigned char msgtype;
 	int error = 0;
+	cred_t *cr = CRED();
+
+	/* We do not support interrupt threads using the stream head to send */
+	ASSERT(cr != NULL);
 
 	*mpp = NULL;
 	/*
@@ -2821,7 +2825,8 @@ strmakectl(
 		 * Range checking has already been done; simply try
 		 * to allocate a message block for the ctl part.
 		 */
-		while (!(bp = allocb(allocsz, BPRI_MED))) {
+		while ((bp = allocb_cred(allocsz, cr,
+		    curproc->p_pid)) == NULL) {
 			if (fflag & (FNDELAY|FNONBLOCK))
 				return (EAGAIN);
 			if (error = strwaitbuf(allocsz, BPRI_MED))
@@ -2864,11 +2869,15 @@ strmakedata(
 	int error = 0;
 	ssize_t maxblk;
 	ssize_t count = *iosize;
-	cred_t *cr = CRED();
+	cred_t *cr;
 
 	*mpp = NULL;
 	if (count < 0)
 		return (0);
+
+	/* We do not support interrupt threads using the stream head to send */
+	cr = CRED();
+	ASSERT(cr != NULL);
 
 	maxblk = stp->sd_maxblk;
 	if (maxblk == INFPSZ)
@@ -2885,7 +2894,8 @@ strmakedata(
 
 		size = MIN(count, maxblk);
 
-		while ((bp = allocb_cred(size + extra, cr)) == NULL) {
+		while ((bp = allocb_cred(size + extra, cr,
+		    curproc->p_pid)) == NULL) {
 			error = EAGAIN;
 			if ((uiop->uio_fmode & (FNDELAY|FNONBLOCK)) ||
 			    (error = strwaitbuf(size + extra, BPRI_MED)) != 0) {
@@ -8383,34 +8393,51 @@ stream_willservice(stdata_t *stp)
 
 /*
  * Replace the cred currently in the mblk with a different one.
+ * Also update db_cpid.
  */
 void
-mblk_setcred(mblk_t *mp, cred_t *cr)
+mblk_setcred(mblk_t *mp, cred_t *cr, pid_t cpid)
 {
-	cred_t *ocr = DB_CRED(mp);
+	dblk_t *dbp = mp->b_datap;
+	cred_t *ocr = dbp->db_credp;
 
 	ASSERT(cr != NULL);
 
 	if (cr != ocr) {
-		crhold(mp->b_datap->db_credp = cr);
+		crhold(dbp->db_credp = cr);
 		if (ocr != NULL)
 			crfree(ocr);
 	}
+	/* Don't overwrite with NOPID */
+	if (cpid != NOPID)
+		dbp->db_cpid = cpid;
 }
 
 /*
- * Set the cred and pid for each mblk in the message. It is assumed that
- * the message passed in does not already have a cred.
+ * If the src message has a cred, then replace the cred currently in the mblk
+ * with it.
+ * Also update db_cpid.
  */
 void
-msg_setcredpid(mblk_t *mp, cred_t *cr, pid_t pid)
+mblk_copycred(mblk_t *mp, const mblk_t *src)
 {
-	while (mp != NULL) {
-		ASSERT(DB_CRED(mp) == NULL);
-		mblk_setcred(mp, cr);
-		DB_CPID(mp) = pid;
-		mp = mp->b_cont;
+	dblk_t *dbp = mp->b_datap;
+	cred_t *cr, *ocr;
+	pid_t cpid;
+
+	cr = msg_getcred(src, &cpid);
+	if (cr == NULL)
+		return;
+
+	ocr = dbp->db_credp;
+	if (cr != ocr) {
+		crhold(dbp->db_credp = cr);
+		if (ocr != NULL)
+			crfree(ocr);
 	}
+	/* Don't overwrite with NOPID */
+	if (cpid != NOPID)
+		dbp->db_cpid = cpid;
 }
 
 int

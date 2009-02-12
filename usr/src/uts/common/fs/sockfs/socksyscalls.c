@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1945,7 +1945,13 @@ snf_async_read(snf_req_t *sr)
 		    SOTOTPI(so)->sti_kssl_ctx != NULL)
 			iosize = (int)MIN(iosize, maxblk);
 
-		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
+		if (is_system_labeled()) {
+			mp = allocb_cred(iosize + extra, CRED(),
+			    curproc->p_pid);
+		} else {
+			mp = allocb(iosize + extra, BPRI_MED);
+		}
+		if (mp == NULL) {
 			error = EAGAIN;
 			break;
 		}
@@ -2400,7 +2406,13 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		    SOTOTPI(so)->sti_kssl_ctx != NULL)
 			iosize = (int)MIN(iosize, maxblk);
 
-		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
+		if (is_system_labeled()) {
+			mp = allocb_cred(iosize + extra, CRED(),
+			    curproc->p_pid);
+		} else {
+			mp = allocb(iosize + extra, BPRI_MED);
+		}
+		if (mp == NULL) {
 			error = EAGAIN;
 			break;
 		}

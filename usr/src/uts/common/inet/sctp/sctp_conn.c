@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	aconnp = acceptor->sctp_connp;
 	lconnp = listener->sctp_connp;
 	if (lconnp->conn_mlp_type != mlptSingle) {
-		cr = aconnp->conn_peercred = DB_CRED(cr_pkt);
+		cr = aconnp->conn_peercred = msg_getcred(cr_pkt, NULL);
 		if (cr != NULL)
 			crhold(cr);
 	}
@@ -171,6 +171,8 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	conn_t	*connp, *econnp;
 	sctp_stack_t	*sctps;
 	struct sock_proto_props sopp;
+	cred_t		*cr;
+	pid_t		cpid;
 
 	/*
 	 * No need to check for duplicate as this is the listener
@@ -252,6 +254,9 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 		return (NULL);
 	}
 
+	/* Save for getpeerucred */
+	cr = msg_getcred(mp, &cpid);
+
 	err = sctp_accept_comm(sctp, eager, mp, ip_hdr_len, iack);
 	if (err) {
 		sctp_close_eager(eager);
@@ -294,7 +299,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 
 	/* Connection established, so send up the conn_ind */
 	if ((eager->sctp_ulpd = sctp->sctp_ulp_newconn(sctp->sctp_ulpd,
-	    (sock_lower_handle_t)eager, NULL, NULL, 0,
+	    (sock_lower_handle_t)eager, NULL, cr, cpid,
 	    &eager->sctp_upcalls)) == NULL) {
 		sctp_close_eager(eager);
 		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);

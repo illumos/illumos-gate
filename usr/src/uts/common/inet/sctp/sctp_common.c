@@ -342,7 +342,7 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 	}
 
 	mp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra + trailer,
-	    CONN_CRED(sctp->sctp_connp));
+	    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	if (mp == NULL) {
 		ip1dbg(("sctp_make_mp: error making mp..\n"));
 		return (NULL);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -244,6 +244,7 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	struct rpc_clts_server *stats = CLONE2STATS(clone_xprt);
 	union T_primitives *pptr;
 	int hdrsz;
+	cred_t *cr;
 
 	TRACE_0(TR_FAC_KRPC, TR_SVC_CLTS_KRECV_START,
 	    "svc_clts_krecv_start:");
@@ -322,6 +323,9 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	 * Save the first mblk which contains the T_unidata_ind in
 	 * ud_resp.  It will be used to generate the T_unitdata_req
 	 * during the reply.
+	 * We reuse any options in the T_unitdata_ind for the T_unitdata_req
+	 * since we must pass any SCM_UCRED across in order for TX to
+	 * work. We also make sure any cred_t is carried across.
 	 */
 	if (ud->ud_resp) {
 		if (ud->ud_resp->b_cont != NULL) {
@@ -331,6 +335,11 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 		}
 		freeb(ud->ud_resp);
 	}
+	/* Move any cred_t to the first mblk in the message */
+	cr = msg_getcred(mp, NULL);
+	if (cr != NULL)
+		mblk_setcred(mp, cr, NOPID);
+
 	ud->ud_resp = mp;
 	mp = mp->b_cont;
 	ud->ud_resp->b_cont = NULL;
@@ -479,10 +488,15 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 	 * Construct the T_unitdata_req.  We take advantage
 	 * of the fact that T_unitdata_ind looks just like
 	 * T_unitdata_req, except for the primitive type.
+	 * Reusing it means we preserve any options, and we must preserve
+	 * the SCM_UCRED option for TX to work.
+	 * This has the side effect of also passing certain receive-side
+	 * options like IP_RECVDSTADDR back down the send side. This
+	 * implies that we can not ASSERT on a non-NULL db_credp when
+	 * we have send-side options in UDP.
 	 */
 	udreq = (struct T_unitdata_req *)ud->ud_resp->b_rptr;
 	udreq->PRIM_type = T_UNITDATA_REQ;
-
 	put(clone_xprt->xp_wq, ud->ud_resp);
 	stat = TRUE;
 	ud->ud_resp = NULL;

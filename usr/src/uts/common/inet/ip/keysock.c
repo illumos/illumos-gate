@@ -912,10 +912,6 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			freemsg(mp);
 			return;
 		}
-		cr = zone_get_kcred(netstackid_to_zoneid(
-		    keystack->keystack_netstack->netstack_stackid));
-		ASSERT(cr != NULL);
-
 		switch (((union T_primitives *)mp->b_rptr)->type) {
 		case T_CAPABILITY_REQ:
 			keysock_capability_req(q, mp);
@@ -924,12 +920,28 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			keysock_info_req(q, mp);
 			break;
 		case T_SVR4_OPTMGMT_REQ:
-			(void) svr4_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &keysock_opt_obj, B_FALSE);
-			break;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &keysock_opt_obj, B_FALSE);
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				keysock_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
+			if (((union T_primitives *)mp->b_rptr)->type ==
+			    T_SVR4_OPTMGMT_REQ) {
+				(void) svr4_optcom_req(q, mp, cr,
+				    &keysock_opt_obj, B_FALSE);
+			} else {
+				(void) tpi_optcom_req(q, mp, cr,
+				    &keysock_opt_obj, B_FALSE);
+			}
 			break;
 		case T_DATA_REQ:
 		case T_EXDATA_REQ:
@@ -943,7 +955,6 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			keysock_err_ack(q, mp, TNOTSUPPORT, 0);
 			break;
 		}
-		crfree(cr);
 		return;
 	case M_IOCTL:
 		iocp = (struct iocblk *)mp->b_rptr;

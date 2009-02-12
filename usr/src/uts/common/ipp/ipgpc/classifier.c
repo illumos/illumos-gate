@@ -27,6 +27,7 @@
 #include <sys/kmem.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
+#include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <netinet/in.h>
 #include <ipp/ipgpc/classifier.h>
@@ -588,10 +589,8 @@ find_ids(ipgpc_packet_t *packet, mblk_t *mp)
 {
 	cred_t *cr;
 
-	while (DB_CRED(mp) == NULL && mp->b_cont != NULL)
-		mp = mp->b_cont;
-
-	if ((cr = DB_CRED(mp)) != NULL) {
+	cr = msg_getcred(mp, NULL);
+	if (cr != NULL) {
 		packet->uid = crgetuid(cr);
 		packet->projid = crgetprojid(cr);
 	} else {

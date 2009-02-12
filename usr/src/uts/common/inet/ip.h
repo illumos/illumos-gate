@@ -294,11 +294,6 @@ typedef struct ipoptp_s
 	CONN_DEC_REF(connp);					\
 }
 
-/* Get the credential of an IP queue of unknown type */
-#define	GET_QUEUE_CRED(wq)						\
-	((wq)->q_next ? (((ill_t *)(wq)->q_ptr)->ill_credp) \
-	    : ((Q_TO_CONN((wq)))->conn_cred))
-
 /*
  * Flags for the various ip_fanout_* routines.
  */
@@ -3224,6 +3219,7 @@ extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t, zoneid_t,
 extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t,
     ip_stack_t *);
 extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t, ip_stack_t *);
+cred_t		*ip_best_cred(mblk_t *, conn_t *);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
 extern	boolean_t ip_bind_ipsec_policy_set(conn_t *, mblk_t *);
 extern	int	ip_bind_laddr_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t,
@@ -3231,9 +3227,10 @@ extern	int	ip_bind_laddr_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t,
 extern	int	ip_proto_bind_laddr_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t,
     uint16_t, boolean_t);
 extern	int	ip_proto_bind_connected_v4(conn_t *, mblk_t **,
-    uint8_t, ipaddr_t *, uint16_t, ipaddr_t, uint16_t, boolean_t, boolean_t);
+    uint8_t, ipaddr_t *, uint16_t, ipaddr_t, uint16_t, boolean_t, boolean_t,
+    cred_t *);
 extern	int	ip_bind_connected_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t *,
-    uint16_t, ipaddr_t, uint16_t, boolean_t, boolean_t);
+    uint16_t, ipaddr_t, uint16_t, boolean_t, boolean_t, cred_t *);
 extern uint_t	ip_cksum(mblk_t *, int, uint32_t);
 extern int	ip_close(queue_t *, int);
 extern uint16_t	ip_csum_hdr(ipha_t *);

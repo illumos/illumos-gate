@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/debug.h>
@@ -160,7 +161,7 @@ log_wput(queue_t *q, mblk_t *mp)
 	log_t *lp = (log_t *)q->q_ptr;
 	struct iocblk *iocp;
 	mblk_t *mp2;
-	cred_t *cr = DB_CRED(mp);
+	cred_t *cr = msg_getcred(mp, NULL);
 	zoneid_t zoneid;
 
 	/*

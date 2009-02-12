@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,9 @@ ksocket_socket(ksocket_t *ksp, int domain, int type, int protocol, int flags,
 	int error = 0;
 	struct sonode *so;
 	*ksp = NULL;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (domain == AF_NCA || domain == AF_UNIX)
 		return (EAFNOSUPPORT);
@@ -99,6 +102,9 @@ ksocket_bind(ksocket_t ks, struct sockaddr *addr, socklen_t addrlen,
 {
 	int error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -110,6 +116,9 @@ ksocket_bind(ksocket_t ks, struct sockaddr *addr, socklen_t addrlen,
 int
 ksocket_listen(ksocket_t ks, int backlog, struct cred *cr)
 {
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -122,6 +131,9 @@ ksocket_accept(ksocket_t ks, struct sockaddr *addr,
 {
 	int error;
 	struct sonode *nso = NULL;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	*nks = NULL;
 
@@ -157,6 +169,9 @@ int
 ksocket_connect(ksocket_t ks, const struct sockaddr *addr, socklen_t addrlen,
     struct cred *cr)
 {
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -172,6 +187,9 @@ ksocket_send(ksocket_t ks, void *msg, size_t msglen, int flags,
 	struct nmsghdr msghdr;
 	struct uio auio;
 	struct iovec iov;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (!KSOCKET_VALID(ks)) {
 		if (sent != NULL)
@@ -222,6 +240,9 @@ ksocket_sendto(ksocket_t ks, void *msg, size_t msglen, int flags,
 	struct uio auio;
 	struct iovec iov;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks)) {
 		if (sent != NULL)
 			*sent = 0;
@@ -271,6 +292,9 @@ ksocket_sendmsg(ksocket_t ks, struct nmsghdr *msg, int flags,
 	ssize_t len;
 	int i;
 	struct uio auio;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (!KSOCKET_VALID(ks)) {
 		if (sent != NULL)
@@ -323,6 +347,9 @@ ksocket_recv(ksocket_t ks, void *msg, size_t msglen, int flags,
 	struct uio auio;
 	struct iovec iov;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks)) {
 		if (recv != NULL)
 			*recv = 0;
@@ -372,6 +399,9 @@ ksocket_recvfrom(ksocket_t ks, void *msg, size_t msglen, int flags,
 	struct nmsghdr msghdr;
 	struct uio auio;
 	struct iovec iov;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (!KSOCKET_VALID(ks)) {
 		if (recv != NULL)
@@ -425,6 +455,9 @@ ksocket_recvmsg(ksocket_t ks, struct nmsghdr *msg, int flags, size_t *recv,
 	int i;
 	struct uio auio;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks)) {
 		if (recv != NULL)
 			*recv = 0;
@@ -473,6 +506,9 @@ ksocket_shutdown(ksocket_t ks, int how, struct cred *cr)
 {
 	struct sonode *so;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -486,6 +522,9 @@ ksocket_close(ksocket_t ks, struct cred *cr)
 {
 	struct sonode *so;
 	so = KSTOSO(ks);
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	mutex_enter(&so->so_lock);
 
@@ -525,6 +564,9 @@ ksocket_getsockname(ksocket_t ks, struct sockaddr *addr, socklen_t *addrlen,
 {
 	struct sonode *so;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -542,6 +584,9 @@ ksocket_getpeername(ksocket_t ks, struct sockaddr *addr, socklen_t *addrlen,
 {
 	struct sonode *so;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -558,6 +603,9 @@ ksocket_getsockopt(ksocket_t ks, int level, int optname, void *optval,
     int *optlen, struct cred *cr)
 {
 	struct sonode *so;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
@@ -579,6 +627,9 @@ ksocket_setsockopt(ksocket_t ks, int level, int optname, const void *optval,
 {
 	struct sonode *so;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -597,6 +648,9 @@ ksocket_setcallbacks(ksocket_t ks, ksocket_callbacks_t *cb, void *arg,
     struct cred *cr)
 {
 	struct sonode *so;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
@@ -632,6 +686,9 @@ ksocket_ioctl(ksocket_t ks, int cmd, intptr_t arg, int *rvalp, struct cred *cr)
 {
 	struct sonode *so;
 	int rval;
+
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
 
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
@@ -670,6 +727,9 @@ ksocket_sendmblk(ksocket_t ks, struct nmsghdr *msg, int flags,
 	mblk_t		*mp = *mpp;
 	int		error;
 
+	/* All Solaris components should pass a cred for this operation. */
+	ASSERT(cr != NULL);
+
 	if (!KSOCKET_VALID(ks))
 		return (ENOTSOCK);
 
@@ -677,7 +737,7 @@ ksocket_sendmblk(ksocket_t ks, struct nmsghdr *msg, int flags,
 
 	if (flags & MSG_MBLK_QUICKRELE) {
 		error = socket_getsockopt(so, SOL_SOCKET, SO_SND_COPYAVOID,
-		    &i_val, &val_len, 0, CRED());
+		    &i_val, &val_len, 0, cr);
 		if (error != 0)
 			return (error);
 

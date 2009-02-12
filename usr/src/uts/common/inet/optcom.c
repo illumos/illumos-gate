@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -444,7 +444,7 @@ no_mem:;
 		 */
 		max_optbuf_len = optcom_max_optbuf_len(opt_arr,
 		    opt_arr_cnt);
-		mp1 = allocb_cred(max_optbuf_len, cr);
+		mp1 = allocb_tmpl(max_optbuf_len, mp);
 		if (!mp1)
 			goto no_mem;
 		/* Initialize the header. */
@@ -694,7 +694,7 @@ tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 	 * the operation.
 	 */
 
-	toa_mp = allocb_cred(toa_len, cr);
+	toa_mp = allocb_tmpl(toa_len, mp);
 	if (!toa_mp) {
 		optcom_err_ack(q, mp, TSYSERR, ENOMEM);
 		return (0);
@@ -2210,7 +2210,7 @@ optcom_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
 int
 process_auxiliary_options(conn_t *connp, void *control, t_uscalar_t controllen,
     void *optbuf, optdb_obj_t *dbobjp, int (*opt_set_fn)(conn_t *, uint_t, int,
-    int, uint_t, uchar_t *, uint_t *, uchar_t *, void *, cred_t *))
+    int, uint_t, uchar_t *, uint_t *, uchar_t *, void *, cred_t *), cred_t *cr)
 {
 	struct cmsghdr *cmsg;
 	opdes_t *optd;
@@ -2231,10 +2231,10 @@ process_auxiliary_options(conn_t *connp, void *control, t_uscalar_t controllen,
 		if (optd == NULL) {
 			return (EINVAL);
 		}
-		if (OA_READONLY_PERMISSION(optd, connp->conn_cred)) {
+		if (OA_READONLY_PERMISSION(optd, cr)) {
 			return (EACCES);
 		}
-		if (OA_MATCHED_PRIV(optd, connp->conn_cred)) {
+		if (OA_MATCHED_PRIV(optd, cr)) {
 			/*
 			 * For privileged options, we DO perform
 			 * access checks as is common sense
@@ -2254,8 +2254,7 @@ process_auxiliary_options(conn_t *connp, void *control, t_uscalar_t controllen,
 		}
 		error = opt_set_fn(connp, SETFN_UD_NEGOTIATE, optd->opdes_level,
 		    optd->opdes_name, len, (uchar_t *)CMSG_CONTENT(cmsg),
-		    &outlen, (uchar_t *)CMSG_CONTENT(cmsg), (void *)optbuf,
-		    connp->conn_cred);
+		    &outlen, (uchar_t *)CMSG_CONTENT(cmsg), (void *)optbuf, cr);
 		if (error > 0) {
 			return (error);
 		} else if (outlen > len) {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel TLI-like function to allow a trasnport endpoint to initiate a
@@ -85,8 +83,20 @@ t_kconnect(TIUSER *tiptr, struct t_call *sndcall, struct t_call *rcvcall)
 
 	fp = tiptr->fp;
 	msgsz = (int)TCONNREQSZ;
-	while (!(bp = allocb(msgsz + sndcall->addr.len + sndcall->opt.len,
-	    BPRI_LO))) {
+	/*
+	 * Usually connect()s are performed with the credential of the caller;
+	 * in this particular case we specifically use the credential of
+	 * the opener as this call is typically done in the context of a user
+	 * process but on behalf of the kernel, e.g., a client connection
+	 * to a server which is later shared by different users.
+	 * At open time, we make sure to set fp->f_cred to kcred if such is
+	 * the case.
+	 *
+	 * Note: if the receiver uses SCM_UCRED/getpeerucred the pid will
+	 * appear as -1.
+	 */
+	while (!(bp = allocb_cred(msgsz + sndcall->addr.len + sndcall->opt.len,
+	    fp->f_cred, NOPID))) {
 		if (strwaitbuf(msgsz + sndcall->addr.len + sndcall->opt.len,
 		    BPRI_LO))
 			return (ENOSR);

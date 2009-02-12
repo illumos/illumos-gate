@@ -321,7 +321,8 @@ ip_send_option_request(conn_t *connp, uint_t optset_context, int level,
 	mblk_t			*mp;
 
 	size = sizeof (struct T_optmgmt_req) + sizeof (struct opthdr) + optlen;
-	mp = allocb_cred(size, cr);
+	/* Not used to generate UCRED, thus don't need correct pid */
+	mp = allocb_cred(size, cr, NOPID);
 	if (mp == NULL)
 		return (ENOMEM);
 

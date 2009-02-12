@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -672,7 +672,8 @@ sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size, int wroff,
 		 * packets, each mblk will have the extra space before
 		 * data to accommodate what SCTP wants to put in there.
 		 */
-		while ((mp = allocb_cred(size + wroff, cr)) == NULL) {
+		while ((mp = allocb_cred(size + wroff, cr,
+		    curproc->p_pid)) == NULL) {
 			if ((uiop->uio_fmode & (FNDELAY|FNONBLOCK)) ||
 			    (flags & MSG_DONTWAIT)) {
 				return (EAGAIN);
@@ -1530,6 +1531,28 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		    (mode & (int)FKIOCTL)))
 			return (EFAULT);
 		return (0);
+	case _I_GETPEERCRED: {
+		int error = 0;
+
+		if ((mode & FKIOCTL) == 0)
+			return (EINVAL);
+
+		mutex_enter(&so->so_lock);
+		if ((so->so_mode & SM_CONNREQUIRED) == 0) {
+			error = ENOTSUP;
+		} else if ((so->so_state & SS_ISCONNECTED) == 0) {
+			error = ENOTCONN;
+		} else if (so->so_peercred != NULL) {
+			k_peercred_t *kp = (k_peercred_t *)arg;
+			kp->pc_cr = so->so_peercred;
+			kp->pc_cpid = so->so_cpid;
+			crhold(so->so_peercred);
+		} else {
+			error = EINVAL;
+		}
+		mutex_exit(&so->so_lock);
+		return (error);
+	}
 	case SIOCSCTPGOPT:
 		STRUCT_INIT(opt, mode);
 

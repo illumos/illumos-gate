@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/tihdr.h>
 #include <sys/timod.h>
 #include <sys/tiuser.h>
@@ -482,8 +483,8 @@ rmm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	/*
 	 * Allocate the required messages upfront.
 	 */
-	if ((bp = allocb(sizeof (struct T_info_req) +
-	    sizeof (struct T_info_ack), BPRI_LO)) == (mblk_t *)NULL) {
+	if ((bp = allocb_cred(sizeof (struct T_info_req) +
+	    sizeof (struct T_info_ack), crp, curproc->p_pid)) == NULL) {
 		return (ENOBUFS);
 	}
 

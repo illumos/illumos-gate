@@ -1676,7 +1676,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		match_flags = (MATCH_IRE_DSTONLY | MATCH_IRE_DEFAULT |
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_RJ_BHOLE);
 		ire = ire_route_lookup(dst,
-		    0, 0, 0, NULL, &sire, zoneid, MBLK_GETLABEL(mp),
+		    0, 0, 0, NULL, &sire, zoneid, msg_getlabel(mp),
 		    match_flags, ipst);
 	} else {
 		ipif_t *supplied_ipif;
@@ -1704,7 +1704,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		}
 
 		ire = ire_route_lookup(dst, 0, 0, 0, supplied_ipif,
-		    &sire, zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
+		    &sire, zoneid, msg_getlabel(mp), match_flags, ipst);
 		ipif_refrele(supplied_ipif);
 		ill_refrele(ill);
 	}
@@ -1763,7 +1763,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		 * to the ire cache table
 		 */
 		ire_cache = ire_forward(dst, &ret_action, ire, sire,
-		    MBLK_GETLABEL(mp), ipst);
+		    msg_getlabel(mp), ipst);
 		if (ire_cache == NULL) {
 			ip1dbg(("ipfil_sendpkt: failed to create the"
 			    " ire cache entry \n"));

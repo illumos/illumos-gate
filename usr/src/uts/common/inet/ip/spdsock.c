@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -591,10 +591,13 @@ spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, ipsec_tun_pol_t *itp,
 		spdsock_flush_one(iph, ns);
 		if (audit_active) {
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+			cred_t *cr;
+			pid_t cpid;
 
+			cr = msg_getcred(mp, &cpid);
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns,
-			    ITP_NAME(itp), active, 0, DB_CPID(mp));
+			audit_pf_policy(SPD_FLUSH, cr, ns,
+			    ITP_NAME(itp), active, 0, cpid);
 		}
 	} else {
 		active = (iph == ALL_ACTIVE_POLHEADS);
@@ -603,14 +606,23 @@ spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, ipsec_tun_pol_t *itp,
 		spdsock_flush_one(active ? ipsec_system_policy(ns) :
 		    ipsec_inactive_policy(ns), ns);
 		if (audit_active) {
-			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns, NULL,
-			    active, 0, DB_CPID(mp));
+			cred_t *cr;
+			pid_t cpid;
+
+			cr = msg_getcred(mp, &cpid);
+			audit_pf_policy(SPD_FLUSH, cr, ns, NULL,
+			    active, 0, cpid);
 		}
 		/* Then flush every tunnel's appropriate one. */
 		itp_walk(spdsock_flush_node, (void *)active, ns);
-		if (audit_active)
-			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns,
-			    "all tunnels", active, 0, DB_CPID(mp));
+		if (audit_active) {
+			cred_t *cr;
+			pid_t cpid;
+
+			cr = msg_getcred(mp, &cpid);
+			audit_pf_policy(SPD_FLUSH, cr, ns,
+			    "all tunnels", active, 0, cpid);
+		}
 	}
 
 	spd_echo(q, mp);
@@ -1014,11 +1026,14 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NO_RULE_EXT);
 		if (audit_active) {
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+			cred_t *cr;
+			pid_t cpid;
 
+			cr = msg_getcred(mp, &cpid);
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_ADDRULE, DB_CRED(mp),
+			audit_pf_policy(SPD_ADDRULE, cr,
 			    spds->spds_netstack, ITP_NAME(itp), active,
-			    SPD_DIAGNOSTIC_NO_RULE_EXT, DB_CPID(mp));
+			    SPD_DIAGNOSTIC_NO_RULE_EXT, cpid);
 		}
 		return;
 	}
@@ -1121,10 +1136,13 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 	spd_echo(q, mp);
 	if (audit_active) {
 		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+		cred_t *cr;
+		pid_t cpid;
 
+		cr = msg_getcred(mp, &cpid);
 		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-		audit_pf_policy(SPD_ADDRULE, DB_CRED(mp), spds->spds_netstack,
-		    ITP_NAME(itp), active, 0, DB_CPID(mp));
+		audit_pf_policy(SPD_ADDRULE, cr, spds->spds_netstack,
+		    ITP_NAME(itp), active, 0, cpid);
 	}
 	return;
 
@@ -1143,10 +1161,13 @@ fail2:
 	spdsock_error(q, mp, error, diag);
 	if (audit_active) {
 		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+		cred_t *cr;
+		pid_t cpid;
 
+		cr = msg_getcred(mp, &cpid);
 		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-		audit_pf_policy(SPD_ADDRULE, DB_CRED(mp), spds->spds_netstack,
-		    ITP_NAME(itp), active, error, DB_CPID(mp));
+		audit_pf_policy(SPD_ADDRULE, cr, spds->spds_netstack,
+		    ITP_NAME(itp), active, error, cpid);
 	}
 }
 
@@ -1165,11 +1186,14 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 		if (audit_active) {
 			boolean_t active;
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+			cred_t *cr;
+			pid_t cpid;
 
+			cr = msg_getcred(mp, &cpid);
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_DELETERULE, DB_CRED(mp), ns,
+			audit_pf_policy(SPD_DELETERULE, cr, ns,
 			    ITP_NAME(itp), active, SPD_DIAGNOSTIC_NO_RULE_EXT,
-			    DB_CPID(mp));
+			    cpid);
 		}
 		return;
 	}
@@ -1223,10 +1247,13 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 	if (audit_active) {
 		boolean_t active;
 		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+		cred_t *cr;
+		pid_t cpid;
 
+		cr = msg_getcred(mp, &cpid);
 		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp), ns, ITP_NAME(itp),
-		    active, 0, DB_CPID(mp));
+		audit_pf_policy(SPD_DELETERULE, cr, ns, ITP_NAME(itp),
+		    active, 0, cpid);
 	}
 	return;
 fail:
@@ -1236,10 +1263,13 @@ fail:
 	if (audit_active) {
 		boolean_t active;
 		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+		cred_t *cr;
+		pid_t cpid;
 
+		cr = msg_getcred(mp, &cpid);
 		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp), ns, ITP_NAME(itp),
-		    active, err, DB_CPID(mp));
+		audit_pf_policy(SPD_DELETERULE, cr, ns, ITP_NAME(itp),
+		    active, err, cpid);
 	}
 }
 
@@ -1270,19 +1300,25 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+				cred_t *cr;
+				pid_t cpid;
 
+				cr = msg_getcred(mp, &cpid);
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-				    ns, NULL, active, 0, DB_CPID(mp));
+				audit_pf_policy(SPD_FLIP, cr, ns,
+				    NULL, active, 0, cpid);
 			}
 			itp_walk(spdsock_flip_node, NULL, ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+				cred_t *cr;
+				pid_t cpid;
 
+				cr = msg_getcred(mp, &cpid);
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_FLIP, DB_CRED(mp), ns,
-				    "all tunnels", active, 0, DB_CPID(mp));
+				audit_pf_policy(SPD_FLIP, cr, ns,
+				    "all tunnels", active, 0, cpid);
 			}
 		} else {
 			itp = get_tunnel_policy(tname, ns);
@@ -1293,12 +1329,15 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					boolean_t active;
 					spd_msg_t *spmsg =
 					    (spd_msg_t *)mp->b_rptr;
+					cred_t *cr;
+					pid_t cpid;
 
+					cr = msg_getcred(mp, &cpid);
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
-					audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-					    ns, ITP_NAME(itp), active,
-					    ESRCH, DB_CPID(mp));
+					audit_pf_policy(SPD_FLIP, cr, ns,
+					    ITP_NAME(itp), active,
+					    ESRCH, cpid);
 				}
 				return;
 			}
@@ -1306,10 +1345,13 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+				cred_t *cr;
+				pid_t cpid;
 
+				cr = msg_getcred(mp, &cpid);
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_FLIP, DB_CRED(mp), ns,
-				    ITP_NAME(itp), active, 0, DB_CPID(mp));
+				audit_pf_policy(SPD_FLIP, cr, ns,
+				    ITP_NAME(itp), active, 0, cpid);
 			}
 			ITP_REFRELE(itp, ns);
 		}
@@ -1318,10 +1360,13 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 		if (audit_active) {
 			boolean_t active;
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+			cred_t *cr;
+			pid_t cpid;
 
+			cr = msg_getcred(mp, &cpid);
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_FLIP, DB_CRED(mp),
-			    ns, NULL, active, 0, DB_CPID(mp));
+			audit_pf_policy(SPD_FLIP, cr,
+			    ns, NULL, active, 0, cpid);
 		}
 	}
 	spd_echo(q, mp);
@@ -2059,10 +2104,13 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+				cred_t *cr;
+				pid_t cpid;
 
+				cr = msg_getcred(mp, &cpid);
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_CLONE, DB_CRED(mp), ns,
-				    NULL, active, error, DB_CPID(mp));
+				audit_pf_policy(SPD_CLONE, cr, ns,
+				    NULL, active, error, cpid);
 			}
 			if (error == 0) {
 				itp_walk(spdsock_clone_node, &error, ns);
@@ -2070,12 +2118,15 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					boolean_t active;
 					spd_msg_t *spmsg =
 					    (spd_msg_t *)mp->b_rptr;
+					cred_t *cr;
+					pid_t cpid;
 
+					cr = msg_getcred(mp, &cpid);
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
-					audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+					audit_pf_policy(SPD_CLONE, cr,
 					    ns, "all tunnels", active, 0,
-					    DB_CPID(mp));
+					    cpid);
 				}
 			}
 		} else {
@@ -2086,12 +2137,15 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					boolean_t active;
 					spd_msg_t *spmsg =
 					    (spd_msg_t *)mp->b_rptr;
+					cred_t *cr;
+					pid_t cpid;
 
+					cr = msg_getcred(mp, &cpid);
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
-					audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+					audit_pf_policy(SPD_CLONE, cr,
 					    ns, ITP_NAME(itp), active, ENOENT,
-					    DB_CPID(mp));
+					    cpid);
 				}
 				return;
 			}
@@ -2100,10 +2154,13 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+				cred_t *cr;
+				pid_t cpid;
 
+				cr = msg_getcred(mp, &cpid);
 				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-				audit_pf_policy(SPD_CLONE, DB_CRED(mp), ns,
-				    ITP_NAME(itp), active, error, DB_CPID(mp));
+				audit_pf_policy(SPD_CLONE, cr, ns,
+				    ITP_NAME(itp), active, error, cpid);
 			}
 		}
 	} else {
@@ -2111,10 +2168,13 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 		if (audit_active) {
 			boolean_t active;
 			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+			cred_t *cr;
+			pid_t cpid;
 
+			cr = msg_getcred(mp, &cpid);
 			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
-			audit_pf_policy(SPD_CLONE, DB_CRED(mp), ns, NULL,
-			    active, error, DB_CPID(mp));
+			audit_pf_policy(SPD_CLONE, cr, ns, NULL,
+			    active, error, cpid);
 		}
 	}
 
@@ -2658,10 +2718,15 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 		spds->spds_mp_algs = mp;
 		spds->spds_algs_pending = B_TRUE;
 		mutex_exit(&spds->spds_alg_lock);
-		if (audit_active)
-			audit_pf_policy(SPD_UPDATEALGS, DB_CRED(mp),
+		if (audit_active) {
+			cred_t *cr;
+			pid_t cpid;
+
+			cr = msg_getcred(mp, &cpid);
+			audit_pf_policy(SPD_UPDATEALGS, cr,
 			    spds->spds_netstack, NULL, B_TRUE, EAGAIN,
-			    DB_CPID(mp));
+			    cpid);
+		}
 		spd_echo(q, new_mp);
 	} else {
 		/*
@@ -2674,16 +2739,26 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 		mutex_exit(&spds->spds_alg_lock);
 		if (diag == -1) {
 			spd_echo(q, mp);
-		if (audit_active)
-			audit_pf_policy(SPD_UPDATEALGS, DB_CRED(mp),
-			    spds->spds_netstack, NULL, B_TRUE, 0,
-			    DB_CPID(mp));
+			if (audit_active) {
+				cred_t *cr;
+				pid_t cpid;
+
+				cr = msg_getcred(mp, &cpid);
+				audit_pf_policy(SPD_UPDATEALGS, cr,
+				    spds->spds_netstack, NULL, B_TRUE, 0,
+				    cpid);
+			}
 		} else {
 			spdsock_diag(q, mp, diag);
-		if (audit_active)
-			audit_pf_policy(SPD_UPDATEALGS, DB_CRED(mp),
-			    spds->spds_netstack, NULL, B_TRUE, diag,
-			    DB_CPID(mp));
+			if (audit_active) {
+				cred_t *cr;
+				pid_t cpid;
+
+				cr = msg_getcred(mp, &cpid);
+				audit_pf_policy(SPD_UPDATEALGS, cr,
+				    spds->spds_netstack, NULL, B_TRUE, diag,
+				    cpid);
+			}
 		}
 	}
 }
@@ -3228,10 +3303,6 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			freemsg(mp);
 			return;
 		}
-		cr = zone_get_kcred(netstackid_to_zoneid(
-		    spds->spds_netstack->netstack_stackid));
-		ASSERT(cr != NULL);
-
 		switch (((union T_primitives *)mp->b_rptr)->type) {
 		case T_CAPABILITY_REQ:
 			spdsock_capability_req(q, mp);
@@ -3240,12 +3311,28 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			spdsock_info_req(q, mp);
 			break;
 		case T_SVR4_OPTMGMT_REQ:
-			(void) svr4_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &spdsock_opt_obj, B_FALSE);
-			break;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &spdsock_opt_obj, B_FALSE);
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				spdsock_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
+			if (((union T_primitives *)mp->b_rptr)->type ==
+			    T_SVR4_OPTMGMT_REQ) {
+				(void) svr4_optcom_req(q, mp, cr,
+				    &spdsock_opt_obj, B_FALSE);
+			} else {
+				(void) tpi_optcom_req(q, mp, cr,
+				    &spdsock_opt_obj, B_FALSE);
+			}
 			break;
 		case T_DATA_REQ:
 		case T_EXDATA_REQ:
@@ -3259,7 +3346,6 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			spdsock_err_ack(q, mp, TNOTSUPPORT, 0);
 			break;
 		}
-		crfree(cr);
 		return;
 	case M_IOCTL:
 		iocp = (struct iocblk *)mp->b_rptr;

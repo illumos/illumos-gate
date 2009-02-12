@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,13 +71,13 @@ extern int	soflushconnind(struct sonode *, t_scalar_t);
 extern void	so_drain_discon_ind(struct sonode *);
 extern void	so_flush_discon_ind(struct sonode *);
 
-extern mblk_t	*soallocproto(size_t, int);
-extern mblk_t	*soallocproto1(const void *, ssize_t, ssize_t, int);
+extern mblk_t	*soallocproto(size_t, int, cred_t *);
+extern mblk_t	*soallocproto1(const void *, ssize_t, ssize_t, int, cred_t *);
 extern void	soappendmsg(mblk_t *, const void *, ssize_t);
 extern mblk_t	*soallocproto2(const void *, ssize_t, const void *, ssize_t,
-			ssize_t, int);
+			ssize_t, int, cred_t *);
 extern mblk_t	*soallocproto3(const void *, ssize_t, const void *, ssize_t,
-			const void *, ssize_t, ssize_t, int);
+			const void *, ssize_t, ssize_t, int, cred_t *);
 
 extern int	so_set_asyncsigs(vnode_t *, pid_t, int, int, cred_t *);
 extern int	so_flip_async(struct sonode *, vnode_t *, int, cred_t *);

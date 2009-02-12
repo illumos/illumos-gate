@@ -46,6 +46,7 @@
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/ddi.h>
+#include <sys/strsubr.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/policy.h>
@@ -233,7 +234,7 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 static void
 ip_rts_request_retry(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy)
 {
-	(void) ip_rts_request(q, mp, DB_CRED(mp));
+	(void) ip_rts_request(q, mp, msg_getcred(mp, NULL));
 }
 
 /*

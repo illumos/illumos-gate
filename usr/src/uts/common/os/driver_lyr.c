@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Layered driver support.
@@ -2169,6 +2167,13 @@ ldi_putmsg(ldi_handle_t lh, mblk_t *smp)
 		freemsg(smp);
 		return (ENOTSUP);
 	}
+
+	/*
+	 * If we don't have db_credp, set it. Note that we can not be called
+	 * from interrupt context.
+	 */
+	if (msg_getcred(smp, NULL) == NULL)
+		mblk_setcred(smp, CRED(), curproc->p_pid);
 
 	/* Send message while honoring flow control */
 	ret = kstrputmsg(handlep->lh_vp, smp, NULL, 0, 0,

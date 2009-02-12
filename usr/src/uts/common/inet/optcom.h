@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -222,7 +222,7 @@ extern int optcom_pkt_set(uchar_t *, uint_t, boolean_t, uchar_t **, uint_t *,
 
 extern int process_auxiliary_options(conn_t *, void *, t_uscalar_t,
     void *, optdb_obj_t *, int (*)(conn_t *, uint_t, int, int, uint_t,
-    uchar_t *, uint_t *, uchar_t *, void *, cred_t *));
+    uchar_t *, uint_t *, uchar_t *, void *, cred_t *), cred_t *);
 
 #endif	/* defined(_KERNEL) && defined(__STDC__) */
 

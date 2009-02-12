@@ -34,6 +34,7 @@
 #include <sys/stropts.h>
 #include <sys/strsun.h>
 #include <sys/sysmacros.h>
+#include <sys/strsubr.h>
 #include <sys/strlog.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -10220,7 +10221,9 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 	 * the framework; the caller of ioctl needs to hold the reference
 	 * for the duration of the call).
 	 */
-	cr = DB_CREDDEF(mp, iocp->ioc_cr);
+	cr = msg_getcred(mp, NULL);
+	if (cr == NULL)
+		cr = iocp->ioc_cr;
 
 	/* Make sure normal users don't send down privileged ioctls */
 	if ((ipip->ipi_flags & IPI_PRIV) &&
@@ -12952,7 +12955,9 @@ ip_wput_ioctl(queue_t *q, mblk_t *mp)
 	 * prefer credential from mblk over ioctl;
 	 * see ip_sioctl_copyin_setup
 	 */
-	cr = DB_CREDDEF(mp, iocp->ioc_cr);
+	cr = msg_getcred(mp, NULL);
+	if (cr == NULL)
+		cr = iocp->ioc_cr;
 
 	/*
 	 * Refhold the conn in case the request gets queued up in some lookup

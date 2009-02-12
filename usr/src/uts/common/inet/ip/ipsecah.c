@@ -3060,8 +3060,7 @@ ah_process_ip_options_v6(mblk_t *mp, ipsa_t *assoc, int *length_to_skip,
 			return (NULL);
 	}
 
-	if ((phdr_mp = allocb_cred(hdr_size + ah_data_sz,
-	    DB_CRED(mp))) == NULL) {
+	if ((phdr_mp = allocb_tmpl(hdr_size + ah_data_sz, mp)) == NULL) {
 		return (NULL);
 	}
 
@@ -3192,7 +3191,7 @@ ah_process_ip_options_v4(mblk_t *mp, ipsa_t *assoc, int *length_to_skip,
 		size += option_length;
 	}
 
-	if ((phdr_mp = allocb_cred(size, DB_CRED(mp))) == NULL) {
+	if ((phdr_mp = allocb_tmpl(size, mp)) == NULL) {
 		return (NULL);
 	}
 
@@ -4235,6 +4234,11 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		while (--dest >= mp->b_rptr)
 			*dest = *(dest - newpos);
 	}
+	/*
+	 * The db_credp should be in mp (if needed) and never in phdr_mp
+	 */
+	ASSERT(msg_getcred(phdr_mp, NULL) == NULL);
+
 	freeb(phdr_mp);
 	ipsec_in->b_cont = mp;
 	if (assoc->ipsa_state == IPSA_STATE_IDLE) {

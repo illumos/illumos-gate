@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/stream.h>
 #include <sys/dlpi.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/strlog.h>
 #include <sys/tihdr.h>
 #include <sys/tiuser.h>
@@ -396,6 +397,8 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	atp->tun_dev = *devp;
 	atp->tun_zoneid = zoneid;
 	atp->tun_netstack = ns;
+	atp->tun_cred = credp;
+	crhold(credp);
 
 	/*
 	 * Based on the lower version of IP, initialize stuff that
@@ -429,6 +432,7 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		atp->tun_ip6h.ip6_hops = IPV6_DEFAULT_HOPS;
 	} else {
 		netstack_rele(ns);
+		crfree(credp);
 		kmem_free(atp, sizeof (tun_t));
 		return (ENXIO);
 	}
@@ -449,6 +453,7 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		} else {
 			/* Error. */
 			netstack_rele(ns);
+			crfree(credp);
 			kmem_free(atp, sizeof (tun_t));
 			return (ENXIO);
 		}
@@ -463,6 +468,7 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		} else {
 			/* Error. */
 			netstack_rele(ns);
+			crfree(credp);
 			kmem_free(atp, sizeof (tun_t));
 			return (ENXIO);
 		}
@@ -500,6 +506,9 @@ tun_close(queue_t *q, int flag, cred_t *cred_p)
 	tun_cancel_rec_evs(q, &atp->tun_events);
 
 	qprocsoff(q);
+
+	crfree(atp->tun_cred);
+	atp->tun_cred = NULL;
 
 	/* NOTE:  tun_rem_ppa_list() may unlink tun_itp from its AVL tree. */
 	if (atp->tun_stats != NULL)
@@ -4734,8 +4743,7 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
 
-			nmp = allocb_cred(hdrlen + atp->tun_extra_offset,
-			    DB_CRED(mp));
+			nmp = allocb_tmpl(hdrlen + atp->tun_extra_offset, mp);
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -4779,8 +4787,7 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
-			nmp = allocb_cred(hdrlen + atp->tun_extra_offset,
-			    DB_CRED(mp));
+			nmp = allocb_tmpl(hdrlen + atp->tun_extra_offset, mp);
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -5257,8 +5264,8 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 		if ((mp->b_rptr - mp->b_datap->db_base) < sizeof (ipha_t)) {
 			/* no */
 
-			nmp = allocb_cred(sizeof (ipha_t) +
-			    atp->tun_extra_offset, DB_CRED(mp));
+			nmp = allocb_tmpl(sizeof (ipha_t) +
+			    atp->tun_extra_offset, mp);
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -5444,8 +5451,7 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
-			nmp = allocb_cred(hdrlen + atp->tun_extra_offset,
-			    DB_CRED(mp));
+			nmp = allocb_tmpl(hdrlen + atp->tun_extra_offset, mp);
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -5568,6 +5574,7 @@ tun_send_bind_req(queue_t *q)
 		freeb(mp);
 		return (ENOMEM);
 	}
+	mblk_setcred(mp, atp->tun_cred, NOPID);
 	mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
 	tbr = (struct T_bind_req *)mp->b_rptr;
 	tbr->CONIND_number = 0;

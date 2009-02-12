@@ -682,7 +682,8 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		dprintso(so, 1, ("sobind: allocating unbind_req\n"));
 		/* NOTE: holding so_lock while sleeping */
 		sti->sti_unbind_mp =
-		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP);
+		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP,
+		    cr);
 	}
 
 	if (flags & _SOBIND_REBIND) {
@@ -1094,7 +1095,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	bind_req.CONIND_number = backlog;
 	/* NOTE: holding so_lock while sleeping */
 	mp = soallocproto2(&bind_req, sizeof (bind_req),
-	    addr, addrlen, 0, _ALLOC_SLEEP);
+	    addr, addrlen, 0, _ALLOC_SLEEP, cr);
 	sti->sti_laddr_valid = 0;
 
 	/* Done using sti_laddr_sa - can drop the lock */
@@ -1478,7 +1479,7 @@ sotpi_unbind(struct sonode *so, int flags)
 
 	unbind_req.PRIM_type = T_UNBIND_REQ;
 	mp = soallocproto1(&unbind_req, sizeof (unbind_req),
-	    0, _ALLOC_SLEEP);
+	    0, _ALLOC_SLEEP, CRED());
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	mutex_enter(&so->so_lock);
@@ -1663,7 +1664,7 @@ sodisconnect(struct sonode *so, t_scalar_t seqno, int flags)
 	discon_req.PRIM_type = T_DISCON_REQ;
 	discon_req.SEQ_number = seqno;
 	mp = soallocproto1(&discon_req, sizeof (discon_req),
-	    0, _ALLOC_SLEEP);
+	    0, _ALLOC_SLEEP, CRED());
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	mutex_enter(&so->so_lock);
@@ -1781,7 +1782,7 @@ again:
 				 */
 				sti->sti_direct = 0;
 				(void) strioctl(SOTOV(so), _SIOCSOCKFALLBACK,
-				    0, 0, K_TO_K, CRED(), &rval);
+				    0, 0, K_TO_K, cr, &rval);
 			}
 			opt = NULL;
 			optlen = 0;
@@ -1881,19 +1882,25 @@ again:
 	bcopy(src, nsti->sti_faddr_sa, srclen);
 	nsti->sti_faddr_valid = 1;
 
+	/*
+	 * Record so_peercred and so_cpid from a cred in the T_CONN_IND.
+	 * Send down a T_CONN_RES without a cred.
+	 */
 	if ((DB_REF(mp) > 1) || MBLKSIZE(mp) <
 	    (sizeof (struct T_conn_res) + sizeof (intptr_t))) {
-		cred_t *cr;
+		cred_t	*cr;
+		pid_t	cpid;
 
-		if ((cr = DB_CRED(mp)) != NULL) {
+		cr = msg_getcred(mp, &cpid);
+		if (cr != NULL) {
 			crhold(cr);
 			nso->so_peercred = cr;
-			nso->so_cpid = DB_CPID(mp);
+			nso->so_cpid = cpid;
 		}
 		freemsg(mp);
 
 		mp = soallocproto1(NULL, sizeof (struct T_conn_res) +
-		    sizeof (intptr_t), 0, _ALLOC_INTR);
+		    sizeof (intptr_t), 0, _ALLOC_INTR, NULL);
 		if (mp == NULL) {
 			/*
 			 * Accept can not fail with ENOBUFS.
@@ -1905,9 +1912,12 @@ again:
 		}
 		conn_res = (struct T_conn_res *)mp->b_rptr;
 	} else {
-		nso->so_peercred = DB_CRED(mp);
-		nso->so_cpid = DB_CPID(mp);
-		DB_CRED(mp) = NULL;
+		/*
+		 * For efficency reasons we use msg_extractcred; no crhold
+		 * needed since db_credp is cleared (i.e., we move the cred
+		 * from the message to so_peercred.
+		 */
+		nso->so_peercred = msg_extractcred(mp, &nso->so_cpid);
 
 		mp->b_rptr = DB_BASE(mp);
 		conn_res = (struct T_conn_res *)mp->b_rptr;
@@ -1955,7 +1965,7 @@ again:
 	nsti->sti_faddr_noxlate = sti->sti_faddr_noxlate;
 
 	if (nso->so_pgrp != 0) {
-		if ((error = so_set_events(nso, nvp, CRED())) != 0) {
+		if ((error = so_set_events(nso, nvp, cr)) != 0) {
 			eprintsoline(nso, error);
 			error = 0;
 			nso->so_pgrp = 0;
@@ -2059,7 +2069,7 @@ again:
 				 */
 				mutex_exit(&nso->so_lock);
 				(void) VOP_CLOSE(nvp, 0, 1, (offset_t)0,
-				    CRED(), NULL);
+				    cr, NULL);
 				VN_RELE(nvp);
 				goto again;
 			}
@@ -2079,7 +2089,7 @@ again:
 			int	rval;
 
 			if ((error = strioctl(SOTOV(nso), _SIOCSOCKFALLBACK,
-			    0, 0, K_TO_K, CRED(), &rval)) != 0) {
+			    0, 0, K_TO_K, cr, &rval)) != 0) {
 				mutex_enter(&so->so_lock);
 				so_lock_single(so);
 				eprintsoline(so, error);
@@ -2207,7 +2217,7 @@ e_disc_unl:
 pr_disc_vp_unl:
 	eprintsoline(so, error);
 disconnect_vp_unlocked:
-	(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
+	(void) VOP_CLOSE(nvp, 0, 1, 0, cr, NULL);
 	VN_RELE(nvp);
 disconnect_unlocked:
 	(void) sodisconnect(so, SEQ_number, 0);
@@ -2219,7 +2229,7 @@ disconnect_vp:
 	(void) sodisconnect(so, SEQ_number, _SODISCONNECT_LOCK_HELD);
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
-	(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
+	(void) VOP_CLOSE(nvp, 0, 1, 0, cr, NULL);
 	VN_RELE(nvp);
 	return (error);
 
@@ -2268,7 +2278,8 @@ sotpi_connect(struct sonode *so,
 	 * exceed sti_faddr_maxlen).
 	 */
 	mp = soallocproto(sizeof (struct T_conn_req) +
-	    2 * sti->sti_faddr_maxlen + sizeof (struct T_opthdr), _ALLOC_INTR);
+	    2 * sti->sti_faddr_maxlen + sizeof (struct T_opthdr), _ALLOC_INTR,
+	    cr);
 	if (mp == NULL) {
 		/*
 		 * Connect can not fail with ENOBUFS. A signal was
@@ -2296,7 +2307,7 @@ sotpi_connect(struct sonode *so,
 		dprintso(so, 1, ("sotpi_connect: allocating unbind_req\n"));
 		/* NOTE: holding so_lock while sleeping */
 		sti->sti_unbind_mp =
-		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_INTR);
+		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_INTR, cr);
 		if (sti->sti_unbind_mp == NULL) {
 			error = EINTR;
 			goto done;
@@ -2820,7 +2831,7 @@ sotpi_shutdown(struct sonode *so, int how, struct cred *cr)
 
 		mutex_exit(&so->so_lock);
 		mp = soallocproto1(&ordrel_req, sizeof (ordrel_req),
-		    0, _ALLOC_SLEEP);
+		    0, _ALLOC_SLEEP, cr);
 		/*
 		 * Send down the T_ORDREL_REQ even if there is flow control.
 		 * This prevents shutdown from blocking.
@@ -2897,7 +2908,7 @@ so_unix_close(struct sonode *so)
 
 		/* NOTE: holding so_lock while sleeping */
 		mp = soallocproto2(&tdr, sizeof (tdr),
-		    &toh, sizeof (toh), 0, _ALLOC_SLEEP);
+		    &toh, sizeof (toh), 0, _ALLOC_SLEEP, CRED());
 	} else {
 		struct T_unitdata_req	tudr;
 		void			*addr;
@@ -2963,7 +2974,7 @@ so_unix_close(struct sonode *so)
 			size = tudr.OPT_offset + tudr.OPT_length;
 			/* NOTE: holding so_lock while sleeping */
 			mp = soallocproto2(&tudr, sizeof (tudr),
-			    addr, addrlen, size, _ALLOC_SLEEP);
+			    addr, addrlen, size, _ALLOC_SLEEP, CRED());
 			mp->b_wptr += (_TPI_ALIGN_TOPT(addrlen) - addrlen);
 			soappendmsg(mp, &toh, sizeof (toh));
 		} else {
@@ -2986,7 +2997,7 @@ so_unix_close(struct sonode *so)
 
 			/* NOTE: holding so_lock while sleeping */
 			mp = soallocproto2(&tudr, sizeof (tudr),
-			    addr, addrlen, size, _ALLOC_SLEEP);
+			    addr, addrlen, size, _ALLOC_SLEEP, CRED());
 			mp->b_wptr += _TPI_ALIGN_TOPT(addrlen) - addrlen;
 			soappendmsg(mp, &toh, sizeof (toh));
 			soappendmsg(mp, &toh2, sizeof (toh2));
@@ -3830,7 +3841,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 			return (error);
 		mp = fdbuf_allocmsg(size, fdbuf);
 	} else {
-		mp = soallocproto(size, _ALLOC_INTR);
+		mp = soallocproto(size, _ALLOC_INTR, CRED());
 		if (mp == NULL) {
 			/*
 			 * Caught a signal waiting for memory.
@@ -3963,7 +3974,7 @@ sosend_svccmsg(struct sonode *so, struct uio *uiop, int more, void *control,
 				return (error);
 			mp = fdbuf_allocmsg(size, fdbuf);
 		} else {
-			mp = soallocproto(size, _ALLOC_INTR);
+			mp = soallocproto(size, _ALLOC_INTR, CRED());
 			if (mp == NULL) {
 				/*
 				 * Caught a signal waiting for memory.
@@ -4108,7 +4119,7 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 		tudr.OPT_offset = 0;
 
 		mp = soallocproto2(&tudr, sizeof (tudr),
-		    addr, addrlen, 0, _ALLOC_INTR);
+		    addr, addrlen, 0, _ALLOC_INTR, CRED());
 		if (mp == NULL) {
 			/*
 			 * Caught a signal waiting for memory.
@@ -4137,7 +4148,7 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 
 		size = tudr.OPT_offset + tudr.OPT_length;
 		mp = soallocproto2(&tudr, sizeof (tudr),
-		    addr, addrlen, size, _ALLOC_INTR);
+		    addr, addrlen, size, _ALLOC_INTR, CRED());
 		if (mp == NULL) {
 			/*
 			 * Caught a signal waiting for memory.
@@ -4211,7 +4222,7 @@ sosend_svc(struct sonode *so, struct uio *uiop, t_scalar_t prim, int more,
 		}
 		dprintso(so, 1, ("sosend_svc: sending 0x%x %d, %ld bytes\n",
 		    prim, tdr.MORE_flag, iosize));
-		mp = soallocproto1(&tdr, sizeof (tdr), 0, _ALLOC_INTR);
+		mp = soallocproto1(&tdr, sizeof (tdr), 0, _ALLOC_INTR, CRED());
 		if (mp == NULL) {
 			/*
 			 * Caught a signal waiting for memory.
@@ -4711,7 +4722,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 		tudr.OPT_offset = 0;
 
 		mp = soallocproto2(&tudr, sizeof (tudr), addr, addrlen, 0,
-		    _ALLOC_INTR);
+		    _ALLOC_INTR, CRED());
 		if (mp == NULL) {
 			/*
 			 * Caught a signal waiting for memory.
@@ -5426,7 +5437,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	oh.len = maxlen;
 
 	mp = soallocproto3(&optmgmt_req, sizeof (optmgmt_req),
-	    &oh, sizeof (oh), NULL, maxlen, 0, _ALLOC_SLEEP);
+	    &oh, sizeof (oh), NULL, maxlen, 0, _ALLOC_SLEEP, cr);
 	/* Let option management work in the presence of data flow control */
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
@@ -5733,7 +5744,7 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	oh.len = optlen;
 
 	mp = soallocproto3(&optmgmt_req, sizeof (optmgmt_req),
-	    &oh, sizeof (oh), optval, optlen, 0, _ALLOC_SLEEP);
+	    &oh, sizeof (oh), optval, optlen, 0, _ALLOC_SLEEP, cr);
 	/* Let option management work in the presence of data flow control */
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
@@ -6297,7 +6308,7 @@ socktpi_plumbioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 			mutex_exit(&so->so_lock);
 
 			error = strioctl(vp, _SIOCSOCKFALLBACK, 0, 0, K_TO_K,
-			    CRED(), rvalp);
+			    cr, rvalp);
 
 			mutex_enter(&so->so_lock);
 			if (error == 0)

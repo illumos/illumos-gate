@@ -192,7 +192,7 @@ static void	icmp_pkt_v6(queue_t *, mblk_t *, void *, size_t,
 static void	icmp_redirect_v6(queue_t *, mblk_t *, ill_t *ill);
 static int	ip_bind_connected_v6(conn_t *, mblk_t **, uint8_t, in6_addr_t *,
     uint16_t, const in6_addr_t *, ip6_pkt_t *, uint16_t,
-    boolean_t, boolean_t);
+    boolean_t, boolean_t, cred_t *);
 static boolean_t ip_bind_get_ire_v6(mblk_t **, ire_t *, const in6_addr_t *,
     iulp_t *, ip_stack_t *);
 static void	ip_bind_post_handling_v6(conn_t *, mblk_t *, boolean_t,
@@ -1565,7 +1565,7 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		}
 		msg_len = len_needed;
 	}
-	mp1 = allocb_cred(IPV6_HDR_LEN + len, DB_CRED(mp));
+	mp1 = allocb_tmpl(IPV6_HDR_LEN + len, mp);
 	if (mp1 == NULL) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpOutErrors);
 		freemsg(ipsec_mp);
@@ -1992,6 +1992,21 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	ipa6_conn_x_t		*acx6;
 	boolean_t		verify_dst;
 	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
+	cred_t			*cr;
+
+	/*
+	 * All Solaris components should pass a db_credp
+	 * for this TPI message, hence we ASSERT.
+	 * But in case there is some other M_PROTO that looks
+	 * like a TPI message sent by some other kernel
+	 * component, we check and return an error.
+	 */
+	cr = msg_getcred(mp, NULL);
+	ASSERT(cr != NULL);
+	if (cr == NULL) {
+		error = EINVAL;
+		goto bad_addr;
+	}
 
 	ASSERT(connp->conn_af_isv6);
 	len = mp->b_wptr - mp->b_rptr;
@@ -2118,7 +2133,7 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 		    v6srcp, lport, tbr->ADDR_length != IPV6_ADDR_LEN);
 	} else {
 		error = ip_proto_bind_connected_v6(connp, &mp->b_cont, protocol,
-		    v6srcp, lport, v6dstp, ipp, fport, B_TRUE, verify_dst);
+		    v6srcp, lport, v6dstp, ipp, fport, B_TRUE, verify_dst, cr);
 	}
 
 	if (error == 0) {
@@ -2418,7 +2433,7 @@ int
 ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
     in6_addr_t *v6src, uint16_t lport, const in6_addr_t *v6dst,
     ip6_pkt_t *ipp, uint16_t fport, boolean_t fanout_insert,
-    boolean_t verify_dst)
+    boolean_t verify_dst, cred_t *cr)
 {
 	ire_t		*src_ire;
 	ire_t		*dst_ire;
@@ -2442,8 +2457,9 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	if (mp != NULL) {
 		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
-		tsl = MBLK_GETLABEL(mp);
 	}
+	if (cr != NULL)
+		tsl = crgetlabel(cr);
 
 	src_ire = dst_ire = NULL;
 	/*
@@ -2546,8 +2562,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	 */
 	if (dst_ire != NULL && is_system_labeled() &&
 	    !IPCL_IS_TCP(connp) &&
-	    tsol_compute_label_v6(DB_CREDDEF(mp, connp->conn_cred),
-	    v6dst, NULL, connp->conn_mac_exempt, ipst) != 0) {
+	    tsol_compute_label_v6(cr, v6dst, NULL,
+	    connp->conn_mac_exempt, ipst) != 0) {
 		error = EHOSTUNREACH;
 		if (ip_debug > 2) {
 			pr_addr_dbg("ip_bind_connected: no label for dst %s\n",
@@ -2874,7 +2890,7 @@ int
 ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
     in6_addr_t *v6srcp, uint16_t lport, const in6_addr_t *v6dstp,
     ip6_pkt_t *ipp, uint16_t fport, boolean_t fanout_insert,
-    boolean_t verify_dst)
+    boolean_t verify_dst, cred_t *cr)
 {
 	int error = 0;
 	boolean_t orig_pkt_isv6 = connp->conn_pkt_isv6;
@@ -2917,7 +2933,7 @@ ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 
 		/* Always verify destination reachability. */
 		error = ip_bind_connected_v4(connp, mpp, protocol, &v4src,
-		    lport, v4dst, fport, B_TRUE, B_TRUE);
+		    lport, v4dst, fport, B_TRUE, B_TRUE, cr);
 		if (error != 0)
 			goto bad_addr;
 		IN6_IPADDR_TO_V4MAPPED(v4src, v6srcp);
@@ -2928,7 +2944,7 @@ ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		goto bad_addr;
 	} else {
 		error = ip_bind_connected_v6(connp, mpp, protocol, v6srcp,
-		    lport, v6dstp, ipp, fport, B_TRUE, verify_dst);
+		    lport, v6dstp, ipp, fport, B_TRUE, verify_dst, cr);
 		if (error != 0)
 			goto bad_addr;
 		connp->conn_pkt_isv6 = B_TRUE;
@@ -4290,7 +4306,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
 		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR;
 		ire = ire_ftable_lookup_v6(v6dstp, 0, 0, 0,
-		    NULL, &sire, zoneid, 0, MBLK_GETLABEL(mp),
+		    NULL, &sire, zoneid, 0, msg_getlabel(mp),
 		    match_flags, ipst);
 	} else {
 		match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
@@ -4311,7 +4327,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		}
 
 		ire = ire_ftable_lookup_v6(v6dstp, NULL, NULL, 0, ill->ill_ipif,
-		    &sire, zoneid, 0, MBLK_GETLABEL(mp), match_flags, ipst);
+		    &sire, zoneid, 0, msg_getlabel(mp), match_flags, ipst);
 	}
 
 	ip3dbg(("ip_newroute_v6: ire_ftable_lookup_v6() "
@@ -4346,7 +4362,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			 * the destination contained in sire.
 			 */
 			multirt_is_resolvable = ire_multirt_lookup_v6(&ire,
-			    &sire, multirt_flags, MBLK_GETLABEL(mp), ipst);
+			    &sire, multirt_flags, msg_getlabel(mp), ipst);
 
 			ip3dbg(("ip_newroute_v6: multirt_is_resolvable %d, "
 			    "ire %p, sire %p\n",
@@ -5773,7 +5789,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			if (copy_mp != NULL) {
 				boolean_t need_resolve =
 				    ire_multirt_need_resolve_v6(v6dstp,
-				    MBLK_GETLABEL(copy_mp), ipst);
+				    msg_getlabel(copy_mp), ipst);
 				if (!need_resolve) {
 					MULTIRT_DEBUG_UNTAG(copy_mp);
 					freemsg(copy_mp);
@@ -5902,7 +5918,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				if (copy_mp != NULL) {
 					boolean_t need_resolve =
 					    ire_multirt_need_resolve_v6(v6dstp,
-					    MBLK_GETLABEL(copy_mp), ipst);
+					    msg_getlabel(copy_mp), ipst);
 					if (!need_resolve) {
 						MULTIRT_DEBUG_UNTAG(copy_mp);
 						freemsg(copy_mp);
@@ -5980,7 +5996,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				if (copy_mp != NULL) {
 					boolean_t need_resolve =
 					    ire_multirt_need_resolve_v6(v6dstp,
-					    MBLK_GETLABEL(copy_mp), ipst);
+					    msg_getlabel(copy_mp), ipst);
 					if (!need_resolve) {
 						MULTIRT_DEBUG_UNTAG(copy_mp);
 						freemsg(copy_mp);
@@ -7212,7 +7228,7 @@ drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		    MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
 	} else {
 		ire = ire_cache_lookup_v6(&ip6h->ip6_dst, ALL_ZONES,
-		    MBLK_GETLABEL(mp), ipst);
+		    msg_getlabel(mp), ipst);
 
 		if (ire != NULL && ire->ire_stq != NULL &&
 		    ire->ire_zoneid != GLOBAL_ZONEID &&
@@ -7223,7 +7239,7 @@ drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			 */
 			ire_refrele(ire);
 			ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
-			    GLOBAL_ZONEID, MBLK_GETLABEL(mp), ipst);
+			    GLOBAL_ZONEID, msg_getlabel(mp), ipst);
 		}
 	}
 
@@ -9229,13 +9245,14 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 
 	if (is_system_labeled() && DB_TYPE(mp) == M_DATA &&
 	    (connp == NULL || !connp->conn_ulp_labeled)) {
+		cred_t		*cr;
+
 		if (connp != NULL) {
 			ASSERT(CONN_CRED(connp) != NULL);
 			err = tsol_check_label_v6(BEST_CRED(mp, connp),
 			    &mp, connp->conn_mac_exempt, ipst);
-		} else if (DB_CRED(mp) != NULL) {
-			err = tsol_check_label_v6(DB_CRED(mp),
-			    &mp, B_FALSE, ipst);
+		} else if ((cr = msg_getcred(mp, NULL)) != NULL) {
+			err = tsol_check_label_v6(cr, &mp, B_FALSE, ipst);
 		}
 		if (mctl_present)
 			first_mp->b_cont = mp;
@@ -9452,7 +9469,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			}
 		}
 		if (ip6i->ip6i_flags & IP6I_VERIFY_SRC) {
-			cred_t *cr = DB_CREDDEF(mp, GET_QUEUE_CRED(q));
+			cred_t *cr = msg_getcred(mp, NULL);
 
 			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src));
 			if (secpolicy_net_rawaccess(cr) != 0) {
@@ -9570,7 +9587,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		 * as it does not really have a real destination to
 		 * talk to.
 		 */
-		ire = ire_cache_lookup_v6(v6dstp, zoneid, MBLK_GETLABEL(mp),
+		ire = ire_cache_lookup_v6(v6dstp, zoneid, msg_getlabel(mp),
 		    ipst);
 	} else {
 		/*
@@ -9598,7 +9615,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 				IRE_REFRELE_NOTR(ire);
 
 			ire = ire_cache_lookup_v6(v6dstp, zoneid,
-			    MBLK_GETLABEL(mp), ipst);
+			    msg_getlabel(mp), ipst);
 			if (ire != NULL) {
 				IRE_REFHOLD_NOTR(ire);
 
@@ -9677,7 +9694,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			 */
 			multirt_need_resolve =
 			    ire_multirt_need_resolve_v6(&ire->ire_addr_v6,
-			    MBLK_GETLABEL(first_mp), ipst);
+			    msg_getlabel(first_mp), ipst);
 			ip2dbg(("ip_wput_v6: ire %p, "
 			    "multirt_need_resolve %d, first_mp %p\n",
 			    (void *)ire, multirt_need_resolve,
@@ -10040,7 +10057,7 @@ discard:			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
 	 *	  It is used only when ire_cache_lookup is used above.
 	 */
 	ire = ire_ctable_lookup_v6(v6dstp, 0, 0, ill->ill_ipif,
-	    zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
+	    zoneid, msg_getlabel(mp), match_flags, ipst);
 	if (ire != NULL) {
 		/*
 		 * Check if the ire has the RTF_MULTIRT flag, inherited
@@ -10080,7 +10097,7 @@ discard:			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
 			 */
 			multirt_need_resolve =
 			    ire_multirt_need_resolve_v6(&ire->ire_addr_v6,
-			    MBLK_GETLABEL(first_mp), ipst);
+			    msg_getlabel(first_mp), ipst);
 			ip2dbg(("ip_wput_v6[send_from_ill]: ire %p, "
 			    "multirt_need_resolve %d, first_mp %p\n",
 			    (void *)ire, multirt_need_resolve,
@@ -11510,8 +11527,8 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	 * fragment header.  This (or a copy) will be used as the
 	 * first mblk for each fragment we send.
 	 */
-	hmp = allocb(unfragmentable_len + sizeof (ip6_frag_t) +
-	    ipst->ips_ip_wroff_extra, BPRI_HI);
+	hmp = allocb_tmpl(unfragmentable_len + sizeof (ip6_frag_t) +
+	    ipst->ips_ip_wroff_extra, mp);
 	if (hmp == NULL) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
 		freemsg(mp);

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)sockcommon_sops.c	1.1	07/06/14 SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -273,7 +271,7 @@ so_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		bind_req.ADDR_length = namelen;
 		bind_req.ADDR_offset = (t_scalar_t)sizeof (bind_req);
 		mp = soallocproto2(&bind_req, sizeof (bind_req),
-		    name, namelen, 0, _ALLOC_SLEEP);
+		    name, namelen, 0, _ALLOC_SLEEP, cr);
 
 		type = kssl_check_proxy(mp, so, &ent);
 		freemsg(mp);
@@ -472,7 +470,8 @@ so_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 			    so->so_proto_props.sopp_maxpsz,
 			    so->so_proto_props.sopp_wroff,
 			    so->so_proto_props.sopp_maxblk,
-			    so->so_proto_props.sopp_tail, &error)) == NULL) {
+			    so->so_proto_props.sopp_tail, &error,
+			    cr)) == NULL) {
 				break;
 			}
 			ASSERT(uiop->uio_resid >= 0);

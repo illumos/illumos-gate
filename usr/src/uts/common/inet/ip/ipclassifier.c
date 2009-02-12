@@ -672,10 +672,10 @@ ipcl_conn_destroy(conn_t *connp)
 
 	DTRACE_PROBE1(conn__destroy, conn_t *, connp);
 
-	if (connp->conn_peercred != NULL &&
-	    connp->conn_peercred != connp->conn_cred)
+	if (connp->conn_peercred != NULL) {
 		crfree(connp->conn_peercred);
-	connp->conn_peercred = NULL;
+		connp->conn_peercred = NULL;
+	}
 
 	if (connp->conn_cred != NULL) {
 		crfree(connp->conn_cred);
@@ -1568,9 +1568,12 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		lport = up[1];
 		unlabeled = B_FALSE;
 		/* Cred cannot be null on IPv4 */
-		if (is_system_labeled())
-			unlabeled = (crgetlabel(DB_CRED(mp))->tsl_flags &
+		if (is_system_labeled()) {
+			cred_t *cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			unlabeled = (crgetlabel(cr)->tsl_flags &
 			    TSLF_UNLABELED) != 0;
+		}
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
 			/*
@@ -1640,9 +1643,12 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		lport = up[1];
 		unlabeled = B_FALSE;
 		/* Cred cannot be null on IPv4 */
-		if (is_system_labeled())
-			unlabeled = (crgetlabel(DB_CRED(mp))->tsl_flags &
+		if (is_system_labeled()) {
+			cred_t *cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			unlabeled = (crgetlabel(cr)->tsl_flags &
 			    TSLF_UNLABELED) != 0;
+		}
 		shared_addr = (zoneid == ALL_ZONES);
 		if (shared_addr) {
 			/*
@@ -1761,7 +1767,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		unlabeled = B_FALSE;
 		/* Cred can be null on IPv6 */
 		if (is_system_labeled()) {
-			cred_t *cr = DB_CRED(mp);
+			cred_t *cr = msg_getcred(mp, NULL);
 
 			unlabeled = (cr != NULL &&
 			    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
@@ -1834,7 +1840,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		unlabeled = B_FALSE;
 		/* Cred can be null on IPv6 */
 		if (is_system_labeled()) {
-			cred_t *cr = DB_CRED(mp);
+			cred_t *cr = msg_getcred(mp, NULL);
 
 			unlabeled = (cr != NULL &&
 			    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
@@ -1951,7 +1957,7 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 	unlabeled = B_FALSE;
 	/* Cred can be null on IPv6 */
 	if (is_system_labeled()) {
-		cred_t *cr = DB_CRED(mp);
+		cred_t *cr = msg_getcred(mp, NULL);
 
 		unlabeled = (cr != NULL &&
 		    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;

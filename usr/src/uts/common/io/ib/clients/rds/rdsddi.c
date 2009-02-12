@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -608,12 +608,10 @@ rds_bind(queue_t *q, mblk_t *mp)
 static void
 rds_wput_other(queue_t *q, mblk_t *mp)
 {
-	rds_t *rds = (rds_t *)q->q_ptr;
 	uchar_t *rptr = mp->b_rptr;
 	struct datab *db;
 	cred_t *cr;
 
-	cr = DB_CREDDEF(mp, rds->rds_cred);
 	db = mp->b_datap;
 	switch (db->db_type) {
 	case M_DATA:
@@ -640,11 +638,28 @@ rds_wput_other(queue_t *q, mblk_t *mp)
 			rds_bind(q, mp);
 			return;
 		case T_SVR4_OPTMGMT_REQ:
-			(void) svr4_optcom_req(q, mp, cr, &rds_opt_obj,
-			    B_FALSE);
-			return;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, cr, &rds_opt_obj, B_FALSE);
+			/*
+			 * All Solaris components should pass a db_credp
+			 * for this TPI message, hence we ASSERT.
+			 * But in case there is some other M_PROTO that looks
+			 * like a TPI message sent by some other kernel
+			 * component, we check and return an error.
+			 */
+			cr = msg_getcred(mp, NULL);
+			ASSERT(cr != NULL);
+			if (cr == NULL) {
+				rds_err_ack(q, mp, TSYSERR, EINVAL);
+				return;
+			}
+			if (((union T_primitives *)(uintptr_t)rptr)->type ==
+			    T_SVR4_OPTMGMT_REQ) {
+				(void) svr4_optcom_req(q, mp, cr, &rds_opt_obj,
+				    B_FALSE);
+			} else {
+				(void) tpi_optcom_req(q, mp, cr, &rds_opt_obj,
+				    B_FALSE);
+			}
 			return;
 		case T_CONN_REQ:
 			/*
