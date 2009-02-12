@@ -408,7 +408,8 @@ static struct	pidlist {
 
 /*
  * The following structure contains a set of modes for /dev/syscon
- * and should match the default contents of /etc/ioctl.syscon.
+ * and should match the default contents of /etc/ioctl.syscon.  It should also
+ * be kept in-sync with base_termios in uts/common/io/ttcompat.c.
  */
 static struct termios	dflt_termios = {
 	BRKINT|ICRNL|IXON|IMAXBEL,			/* iflag */

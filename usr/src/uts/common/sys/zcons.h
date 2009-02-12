@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ZCONS_H
 #define	_SYS_ZCONS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -38,7 +35,6 @@ extern "C" {
 /*
  * Minor node name of the global zone side (often called the "master" side)
  * of the zcons driver.
- *
  */
 #define	ZCONS_MASTER_NAME	"masterconsole"
 
@@ -50,6 +46,25 @@ extern "C" {
  * links we create.
  */
 #define	ZCONS_SLAVE_NAME	"zoneconsole"
+
+/*
+ * ZC_IOC forms the base for all zcons ioctls.
+ */
+#define	ZC_IOC		(('Z' << 24) | ('o' << 16) | ('n' << 8))
+
+/*
+ * These ioctls instruct the master side of the console to hold or release
+ * a reference to the slave side's vnode.  They are meant to be issued by
+ * zoneadmd after the console device node is created and before it is destroyed
+ * so that the slave's STREAMS anchor, ptem, is preserved when ttymon starts
+ * popping STREAMS modules from within the associated zone.  This guarantees
+ * that the zone slave console will always have terminal semantics while the
+ * zone is running.
+ *
+ * A more detailed description can be found in uts/common/io/zcons.c.
+ */
+#define	ZC_HOLDSLAVE	(ZC_IOC | 0)	/* get and save slave side reference */
+#define	ZC_RELEASESLAVE	(ZC_IOC | 1)	/* release slave side reference */
 
 #ifdef	__cplusplus
 }

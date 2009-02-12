@@ -90,6 +90,7 @@
 #include <sys/dkio.h>
 #include <sys/dumpadm.h>
 #include <sys/mntio.h>
+#include <sys/zcons.h>
 
 #include "ramdata.h"
 #include "proto.h"
@@ -1099,6 +1100,10 @@ const struct ioc {
 	/* mntio ioctls - ('m' << 8) */
 	{ (uint_t)MNTIOC_GETMNTENT,	"MNTIOC_GETMNTENT",
 		"struct extmnttab"},
+
+	/* zcons ioctls */
+	{ (uint_t)ZC_HOLDSLAVE,		"ZC_HOLDSLAVE",		NULL },
+	{ (uint_t)ZC_RELEASESLAVE,	"ZC_RELEASESLAVE",	NULL },
 
 	{ (uint_t)0, NULL, NULL	}
 };

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -766,10 +766,6 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 
 	if (brand_prestatechg(zlogp, zstate, Z_BOOT) != 0)
 		return (-1);
-
-	if (init_console_slave(zlogp) != 0)
-		return (-1);
-	reset_slave_terminal(zlogp);
 
 	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
 		zerror(zlogp, B_TRUE, "unable to get zoneid");
@@ -1908,7 +1904,7 @@ main(int argc, char *argv[])
 	 * serve_console_sock() below gets called, and any pending
 	 * connection is accept()ed).
 	 */
-	if (!zonecfg_in_alt_root() && init_console(zlogp) == -1)
+	if (!zonecfg_in_alt_root() && init_console(zlogp) < 0)
 		goto child_out;
 
 	/*

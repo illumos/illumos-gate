@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Console support for zones requires a significant infrastructure.  The
@@ -63,7 +61,7 @@
  *                           |    zonename="myzone"   |
  *                           +------------------------+
  *
- * There are basically three major tasks which the console subsystem in
+ * There are basically two major tasks which the console subsystem in
  * zoneadmd accomplishes:
  *
  * - Setup and teardown of zcons driver instances.  One zcons instance
@@ -75,16 +73,6 @@
  *   zcons instances are associated with zones via their zonename device
  *   property.  This the console instance to persist across reboots,
  *   and while the zone is halted.
- *
- * - Initialization of the slave side of the console.  This is
- *   accomplished by pushing various STREAMS modules onto the console.
- *   The ptem(7M) module gets special treatment, and is anchored into
- *   place using the I_ANCHOR facility.  This is so that the zcons driver
- *   always has terminal semantics, as would a real hardware terminal.
- *   This means that ttymon(1M) works unmodified;  at boot time, ttymon
- *   will do its own plumbing of the console stream, and will even
- *   I_POP modules off.  Hence the anchor, which assures that ptem will
- *   never be I_POP'd.
  *
  * - Acting as a server for 'zlogin -C' instances.  When zlogin -C is
  *   run, zlogin connects to zoneadmd via unix domain socket.  zoneadmd
@@ -129,20 +117,9 @@
 
 #define	CONSOLE_SOCKPATH	ZONES_TMPDIR "/%s.console_sock"
 
-static int	slavefd = -1;	/* slave side of console */
 static int	serverfd = -1;	/* console server unix domain socket fd */
 char boot_args[BOOTARGS_MAX];
 char bad_boot_arg[BOOTARGS_MAX];
-
-static struct termios base_termios = {	/* from init.c */
-	BRKINT|ICRNL|IXON|IMAXBEL,			/* iflag */
-	OPOST|ONLCR|TAB3,				/* oflag */
-	CS8|CREAD|B9600,				/* cflag */
-	ISIG|ICANON|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE|IEXTEN,	/* lflag */
-	CINTR, CQUIT, CERASE, CKILL, CEOF, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0
-};
 
 /*
  * The eventstream is a simple one-directional flow of messages from the
@@ -284,8 +261,38 @@ destroy_cb(di_node_t node, void *arg)
 static int
 destroy_console_devs(zlog_t *zlogp)
 {
+	char conspath[MAXPATHLEN];
 	di_node_t root;
 	struct cb_data cb;
+	int masterfd;
+	int slavefd;
+
+	/*
+	 * Signal the master side to release its handle on the slave side by
+	 * issuing a ZC_RELEASESLAVE ioctl.
+	 */
+	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
+	    zone_name, ZCONS_MASTER_NAME);
+	if ((masterfd = open(conspath, O_RDWR | O_NOCTTY)) != -1) {
+		(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
+		    zone_name, ZCONS_SLAVE_NAME);
+		if ((slavefd = open(conspath, O_RDWR | O_NOCTTY)) != -1) {
+			if (ioctl(masterfd, ZC_RELEASESLAVE,
+			    (caddr_t)(intptr_t)slavefd) != 0)
+				zerror(zlogp, B_TRUE, "WARNING: error while "
+				    "releasing slave handle of zone console for"
+				    " %s", zone_name);
+			(void) close(slavefd);
+		} else {
+			zerror(zlogp, B_TRUE, "WARNING: could not open slave "
+			    "side of zone console for %s to release slave "
+			    "handle", zone_name);
+		}
+		(void) close(masterfd);
+	} else {
+		zerror(zlogp, B_TRUE, "WARNING: could not open master side of "
+		    "zone console for %s to release slave handle", zone_name);
+	}
 
 	bzero(&cb, sizeof (cb));
 	cb.zlogp = zlogp;
@@ -321,10 +328,15 @@ destroy_console_devs(zlog_t *zlogp)
 static int
 init_console_dev(zlog_t *zlogp)
 {
-	devctl_hdl_t bus_hdl = NULL, dev_hdl = NULL;
+	char conspath[MAXPATHLEN];
+	devctl_hdl_t bus_hdl = NULL;
+	devctl_hdl_t dev_hdl = NULL;
 	devctl_ddef_t ddef_hdl = NULL;
 	di_devlink_handle_t dl = NULL;
-	int rv = -1, ndevs;
+	int rv = -1;
+	int ndevs;
+	int masterfd;
+	int slavefd;
 
 	/*
 	 * Don't re-setup console if it is working and ready already; just
@@ -390,7 +402,34 @@ devlinks:
 		goto error;
 	}
 
-	rv = 0;
+	/*
+	 * Open the master side of the console and issue the ZC_HOLDSLAVE ioctl,
+	 * which will cause the master to retain a reference to the slave.
+	 * This prevents ttymon from blowing through the slave's STREAMS anchor.
+	 */
+	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
+	    zone_name, ZCONS_MASTER_NAME);
+	if ((masterfd = open(conspath, O_RDWR | O_NOCTTY)) == -1) {
+		zerror(zlogp, B_TRUE, "ERROR: could not open master side of "
+		    "zone console for %s to acquire slave handle", zone_name);
+		goto error;
+	}
+	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
+	    zone_name, ZCONS_SLAVE_NAME);
+	if ((slavefd = open(conspath, O_RDWR | O_NOCTTY)) == -1) {
+		zerror(zlogp, B_TRUE, "ERROR: could not open slave side of zone"
+		    " console for %s to acquire slave handle", zone_name);
+		(void) close(masterfd);
+		goto error;
+	}
+	if (ioctl(masterfd, ZC_HOLDSLAVE, (caddr_t)(intptr_t)slavefd) == 0)
+		rv = 0;
+	else
+		zerror(zlogp, B_TRUE, "ERROR: error while acquiring slave "
+		    "handle of zone console for %s", zone_name);
+	(void) close(slavefd);
+	(void) close(masterfd);
+
 error:
 	if (ddef_hdl)
 		devctl_ddef_free(ddef_hdl);
@@ -399,107 +438,6 @@ error:
 	if (dev_hdl)
 		devctl_release(dev_hdl);
 	return (rv);
-}
-
-/*
- * init_console_slave() sets up the console slave device; the device node
- * itself has already been set up in the device tree; the primary job
- * here is to do some STREAMS plumbing.
- *
- * The slave side of the console is opened and the appropriate STREAMS
- * modules are pushed on.  A wrinkle is that 'ptem' must be anchored
- * in place (see streamio(7i) since we always want the console to
- * have terminal semantics.)
- */
-int
-init_console_slave(zlog_t *zlogp)
-{
-	char zconspath[MAXPATHLEN];
-
-	if (slavefd != -1)
-		return (0);
-
-	(void) snprintf(zconspath, sizeof (zconspath),
-	    "/dev/zcons/%s/%s", zone_name, ZCONS_SLAVE_NAME);
-
-	if ((slavefd = open(zconspath, O_RDWR | O_NOCTTY)) < 0) {
-		zerror(zlogp, B_TRUE, "failed to open %s", zconspath);
-		goto error;
-	}
-
-	/*
-	 * Just to make sure the whole stream is pristine.
-	 */
-	(void) ioctl(slavefd, I_FLUSH, FLUSHRW);
-
-	/*
-	 * Push hardware emulation (ptem) module; we would rather not, but
-	 * are forced to push ldterm and ttcompat here.  Ultimately ttymon
-	 * will pop them off, so we ANCHOR only ptem.
-	 *
-	 * We need to use __I_PUSH_NOCTTY instead of I_PUSH here, otherwise
-	 * we'll end up having the slave device as *our* controling terminal.
-	 */
-	if (ioctl(slavefd, __I_PUSH_NOCTTY, "ptem") == -1) {
-		zerror(zlogp, B_TRUE, "failed to push ptem module");
-		goto error;
-	}
-
-	/*
-	 * Anchor the stream to prevent malicious or accidental I_POP of ptem.
-	 */
-	if (ioctl(slavefd, I_ANCHOR) == -1) {
-		zerror(zlogp, B_TRUE, "failed to set stream anchor");
-		goto error;
-	}
-
-	if (ioctl(slavefd, __I_PUSH_NOCTTY, "ldterm") == -1) {
-		zerror(zlogp, B_TRUE, "failed to push ldterm module");
-		goto error;
-	}
-	if (ioctl(slavefd, __I_PUSH_NOCTTY, "ttcompat") == -1) {
-		zerror(zlogp, B_TRUE, "failed to push ttcompat module");
-		goto error;
-	}
-
-	/*
-	 * Setup default terminal settings
-	 */
-	if (tcsetattr(slavefd, TCSAFLUSH, &base_termios) == -1) {
-		zerror(zlogp, B_TRUE, "failed to set base terminal settings");
-		goto error;
-	}
-
-	return (0);
-
-error:
-	if (slavefd != -1)
-		(void) close(slavefd);
-	slavefd = -1;
-	zerror(zlogp, B_FALSE, "could not initialize console slave");
-	return (-1);
-}
-
-void
-destroy_console_slave(void)
-{
-	(void) close(slavefd);
-	slavefd = -1;
-}
-
-/*
- * Restore initial terminal attributes to the zone console.
- */
-void
-reset_slave_terminal(zlog_t *zlogp)
-{
-	assert(slavefd != -1);
-
-	/* Probably not fatal, so we drive on if it fails */
-	if (tcsetattr(slavefd, TCSAFLUSH, &base_termios) == -1) {
-		zerror(zlogp, B_TRUE, "WARNING: failed to set terminal "
-		    "settings.");
-	}
 }
 
 static int

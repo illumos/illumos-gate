@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,106 @@
  * TODO: we may want to revisit the other direction; i.e. we may want
  * zoneadmd to be able to detect whether no zone processes are holding the
  * console open, an unusual situation.
+ *
+ *
+ *
+ * MASTER SIDE IOCTLS
+ *
+ * The ZC_HOLDSLAVE and ZC_RELEASESLAVE ioctls instruct the master side of the
+ * console to hold and release a reference to the slave side's vnode.  They are
+ * meant to be issued by zoneadmd after the console device node is created and
+ * before it is destroyed so that the slave's STREAMS anchor, ptem, is
+ * preserved when ttymon starts popping STREAMS modules from within the
+ * associated zone.  This guarantees that the zone console will always have
+ * terminal semantics while the zone is running.
+ *
+ * Here is the issue: the ptem module is anchored in the zone console
+ * (slave side) so that processes within the associated non-global zone will
+ * fail to pop it off, thus ensuring that the slave will retain terminal
+ * semantics.  When a process attempts to pop the anchor off of a stream, the
+ * STREAMS subsystem checks whether the calling process' zone is the same as
+ * that of the process that pushed the anchor onto the stream and cancels the
+ * pop if they differ.  zoneadmd used to hold an open file descriptor for the
+ * slave while the associated non-global zone ran, thus ensuring that the
+ * slave's STREAMS anchor would never be popped from within the non-global zone
+ * (because zoneadmd runs in the global zone).  However, this file descriptor
+ * was removed to make zone console management more robust.  sad(7D) is now
+ * used to automatically set up the slave's STREAMS modules when the zone
+ * console is freshly opened within the associated non-global zone.  However,
+ * when a process within the non-global zone freshly opens the zone console, the
+ * anchor is pushed from within the non-global zone, making it possible for
+ * processes within the non-global zone (e.g., ttymon) to pop the anchor and
+ * destroy the zone console's terminal semantics.
+ *
+ * One solution is to make the zcons device hold the slave open while the
+ * associated non-global zone runs so that the STREAMS anchor will always be
+ * associated with the global zone.  Unfortunately, the slave cannot be opened
+ * from within the zcons driver because the driver is not reentrant: it has
+ * an outer STREAMS perimeter.  Therefore, the next best option is for zcons to
+ * provide an ioctl interface to zoneadmd to manage holding and releasing
+ * the slave side of the console.  It is sufficient to hold the slave side's
+ * vnode and bump the associated snode's reference count to preserve the slave's
+ * STREAMS configuration while the associated zone runs, so that's what the
+ * ioctls do.
+ *
+ *
+ * ZC_HOLDSLAVE
+ *
+ * This ioctl takes a file descriptor as an argument.  It effectively gets a
+ * reference to the slave side's minor node's vnode and bumps the associated
+ * snode's reference count.  The vnode reference is stored in the zcons device
+ * node's soft state.  This ioctl succeeds if the given file descriptor refers
+ * to the slave side's minor node or if there is already a reference to the
+ * slave side's minor node's vnode in the device's soft state.
+ *
+ *
+ * ZC_RELEASESLAVE
+ *
+ * This ioctl takes a file descriptor as an argument.  It effectively releases
+ * the vnode reference stored in the zcons device node's soft state (which was
+ * previously acquired via ZC_HOLDSLAVE) and decrements the reference count of
+ * the snode associated with the vnode.  This ioctl succeeds if the given file
+ * descriptor refers to the slave side's minor node or if no reference to the
+ * slave side's minor node's vnode is stored in the device's soft state.
+ *
+ *
+ * Note that the file descriptor arguments for both ioctls must be cast to
+ * integers of pointer width.
+ *
+ * Here's how the dance between zcons and zoneadmd works:
+ *
+ *     Zone boot:
+ *     1.  While booting the zone, zoneadmd creates an instance of zcons.
+ *     2.  zoneadmd opens the master and slave sides of the new zone console
+ *         and issues the ZC_HOLDSLAVE ioctl on the master side, passing its
+ *         file descriptor for the slave side as the ioctl argument.
+ *     3.  zcons holds the slave side's vnode, bumps the snode's reference
+ *         count, and stores a pointer to the vnode in the device's soft
+ *         state.
+ *     4.  zoneadmd closes the master and slave sides and continues to boot
+ *         the zone.
+ *
+ *     Zone halt:
+ *     1.  While halting the zone, zoneadmd opens the master and slave sides
+ *         of the zone's console and issues the ZC_RELEASESLAVE ioctl on the
+ *         master side, passing its file descriptor for the slave side as the
+ *         ioctl argument.
+ *     2.  zcons decrements the slave side's snode's reference count, releases
+ *         the slave's vnode, and eliminates its reference to the vnode in the
+ *         device's soft state.
+ *     3.  zoneadmd closes the master and slave sides.
+ *     4.  zoneadmd destroys the zcons device and continues to halt the zone.
+ *
+ * It is necessary for zoneadmd to hold the slave open while issuing
+ * ZC_RELEASESLAVE because zcons might otherwise release the last reference to
+ * the slave's vnode.  If it does, then specfs will panic because it will expect
+ * that the STREAMS configuration for the vnode was destroyed, which VN_RELE
+ * doesn't do.  Forcing zoneadmd to hold the slave open guarantees that zcons
+ * won't release the vnode's last reference.  zoneadmd will properly destroy the
+ * vnode and the snode when it closes the file descriptor.
+ *
+ * Technically, any process that can access the master side can issue these
+ * ioctls, but they should be treated as private interfaces for zoneadmd.
  */
 
 #include <sys/types.h>
@@ -58,6 +158,7 @@
 #include <sys/devops.h>
 #include <sys/errno.h>
 #include <sys/file.h>
+#include <sys/kstr.h>
 #include <sys/modctl.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -69,6 +170,8 @@
 #include <sys/systm.h>
 #include <sys/types.h>
 #include <sys/zcons.h>
+#include <sys/vnode.h>
+#include <sys/fs/snode.h>
 
 static int zc_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int zc_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -85,11 +188,18 @@ static void zc_wsrv(queue_t *);
  * bit of the minor number is used to track the master vs. slave side of the
  * virtual console.  The rest of the bits in the minor number are the instance.
  */
-#define	ZC_MASTER_MINOR	0
-#define	ZC_SLAVE_MINOR	1
+#define	ZC_MASTER_MINOR		0
+#define	ZC_SLAVE_MINOR		1
 
-#define	ZC_INSTANCE(x)	(getminor((x)) >> 1)
-#define	ZC_NODE(x)	(getminor((x)) & 0x01)
+#define	ZC_INSTANCE(x)		(getminor((x)) >> 1)
+#define	ZC_NODE(x)		(getminor((x)) & 0x01)
+
+/*
+ * This macro converts a zc_state_t pointer to the associated slave minor node's
+ * dev_t.
+ */
+#define	ZC_STATE_TO_SLAVEDEV(x)	(makedevice(ddi_driver_major((x)->zc_devinfo), \
+	(minor_t)(ddi_get_instance((x)->zc_devinfo) << 1 | ZC_SLAVE_MINOR)))
 
 int zcons_debug = 0;
 #define	DBG(a)   if (zcons_debug) cmn_err(CE_NOTE, a)
@@ -163,6 +273,7 @@ typedef struct zc_state {
 	dev_info_t *zc_devinfo;
 	queue_t *zc_master_rdq;
 	queue_t *zc_slave_rdq;
+	vnode_t *zc_slave_vnode;
 	int zc_state;
 } zc_state_t;
 
@@ -170,6 +281,16 @@ typedef struct zc_state {
 #define	ZC_STATE_SOPEN	0x02
 
 static void *zc_soft_state;
+
+/*
+ * List of STREAMS modules that should be pushed onto every slave instance.
+ */
+static char *zcons_mods[] = {
+	"ptem",
+	"ldterm",
+	"ttcompat",
+	NULL
+};
 
 int
 _init(void)
@@ -207,11 +328,38 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+/*
+ * This is a convenience function that clears a device's autopush configuration.
+ * It is meant to be used on the slave side of the console.  Unlike calling
+ * kstr_autopush() directly, this function outputs a warning via cmn_err() if
+ * kstr_autopush() fails.  'dip' must be non-NULL in debug builds.  Both
+ * 'major' and 'minor' must be valid.
+ */
+static void
+zc_clearautopush(dev_info_t *dip, major_t major, minor_t minor)
+{
+	char *devicepathp;
+
+	if (kstr_autopush(CLR_AUTOPUSH, &major, &minor, NULL, NULL, NULL) !=
+	    0 && zcons_debug != 0) {
+		devicepathp = (char *)kmem_alloc(MAXPATHLEN * sizeof (char),
+		    KM_SLEEP);
+		(void) ddi_pathname(dip, devicepathp);
+		cmn_err(CE_NOTE, "zc_detach: could not clear sad configuration "
+		    "for device %s\n", devicepathp);
+		kmem_free(devicepathp, MAXPATHLEN * sizeof (char));
+	}
+}
+
 static int
 zc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	zc_state_t *zcs;
 	int instance;
+	major_t major;
+	minor_t minor;
+	minor_t lastminor;
+	uint_t anchorindex;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -220,23 +368,39 @@ zc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_soft_state_zalloc(zc_soft_state, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	if ((ddi_create_minor_node(dip, ZCONS_SLAVE_NAME, S_IFCHR,
-	    instance << 1 | ZC_SLAVE_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE) ||
+	/*
+	 * Set up sad(7D) so that the necessary STREAMS modules will be in place
+	 * when the slave is opened.  A wrinkle is that 'ptem' must be anchored
+	 * in place (see streamio(7i)) because we always want the console to
+	 * have terminal semantics.
+	 */
+	minor = instance << 1 | ZC_SLAVE_MINOR;
+	lastminor = 0;
+	major = ddi_driver_major(dip);
+	anchorindex = 1;
+	if (kstr_autopush(SET_AUTOPUSH, &major, &minor, &lastminor,
+	    &anchorindex, zcons_mods) != 0)
+		goto commonfail;
+
+	/*
+	 * Create the master and slave minor nodes.
+	 */
+	if ((ddi_create_minor_node(dip, ZCONS_SLAVE_NAME, S_IFCHR, minor,
+	    DDI_PSEUDO, 0) == DDI_FAILURE) ||
 	    (ddi_create_minor_node(dip, ZCONS_MASTER_NAME, S_IFCHR,
-	    instance << 1 | ZC_MASTER_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE)) {
-		ddi_remove_minor_node(dip, NULL);
-		ddi_soft_state_free(zc_soft_state, instance);
-		return (DDI_FAILURE);
-	}
+	    instance << 1 | ZC_MASTER_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE))
+		goto failwithautopush;
 
-	if ((zcs = ddi_get_soft_state(zc_soft_state, instance)) == NULL) {
-		ddi_remove_minor_node(dip, NULL);
-		ddi_soft_state_free(zc_soft_state, instance);
-		return (DDI_FAILURE);
-	}
+	VERIFY((zcs = ddi_get_soft_state(zc_soft_state, instance)) != NULL);
 	zcs->zc_devinfo = dip;
-
 	return (DDI_SUCCESS);
+
+failwithautopush:
+	zc_clearautopush(dip, major, minor);
+	ddi_remove_minor_node(dip, NULL);
+commonfail:
+	ddi_soft_state_free(zc_soft_state, instance);
+	return (DDI_FAILURE);
 }
 
 static int
@@ -257,6 +421,13 @@ zc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		DBG1("zc_detach: device (dip=%p) still open\n", (void *)dip);
 		return (DDI_FAILURE);
 	}
+
+	/*
+	 * Clear the sad configuration so that reattaching doesn't fail to
+	 * set up sad configuration.
+	 */
+	zc_clearautopush(dip, ddi_driver_major(dip), instance << 1 |
+	    ZC_SLAVE_MINOR);
 
 	ddi_remove_minor_node(dip, NULL);
 	ddi_soft_state_free(zc_soft_state, instance);
@@ -579,7 +750,8 @@ handle_mflush(queue_t *qp, mblk_t *mp)
 
 /*
  * wput(9E) is symmetric for master and slave sides, so this handles both
- * without splitting the codepath.
+ * without splitting the codepath.  (The only exception to this is the
+ * processing of zcons ioctls, which is restricted to the master side.)
  *
  * zc_wput() looks at the other side; if there is no process holding that
  * side open, it frees the message.  This prevents processes from hanging
@@ -592,10 +764,128 @@ static void
 zc_wput(queue_t *qp, mblk_t *mp)
 {
 	unsigned char type = mp->b_datap->db_type;
+	zc_state_t *zcs;
+	struct iocblk *iocbp;
+	file_t *slave_filep;
+	struct snode *slave_snodep;
+	int slave_fd;
 
 	ASSERT(qp->q_ptr);
 
 	DBG1("entering zc_wput, %s side", zc_side(qp));
+
+	/*
+	 * Process zcons ioctl messages if qp is the master console's write
+	 * queue.
+	 */
+	zcs = (zc_state_t *)qp->q_ptr;
+	if (zcs->zc_master_rdq != NULL && qp == WR(zcs->zc_master_rdq) &&
+	    type == M_IOCTL) {
+		iocbp = (struct iocblk *)(void *)mp->b_rptr;
+		switch (iocbp->ioc_cmd) {
+		case ZC_HOLDSLAVE:
+			/*
+			 * Hold the slave's vnode and increment the refcount
+			 * of the snode.  If the vnode is already held, then
+			 * indicate success.
+			 */
+			if (iocbp->ioc_count != TRANSPARENT) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+			if (zcs->zc_slave_vnode != NULL) {
+				miocack(qp, mp, 0, 0);
+				return;
+			}
+
+			/*
+			 * The calling process must pass a file descriptor for
+			 * the slave device.
+			 */
+			slave_fd =
+			    (int)(intptr_t)*(caddr_t *)(void *)mp->b_cont->
+			    b_rptr;
+			slave_filep = getf(slave_fd);
+			if (slave_filep == NULL) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+			if (ZC_STATE_TO_SLAVEDEV(zcs) !=
+			    slave_filep->f_vnode->v_rdev) {
+				releasef(slave_fd);
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			/*
+			 * Get a reference to the slave's vnode.  Also bump the
+			 * reference count on the associated snode.
+			 */
+			ASSERT(vn_matchops(slave_filep->f_vnode,
+			    spec_getvnodeops()));
+			zcs->zc_slave_vnode = slave_filep->f_vnode;
+			VN_HOLD(zcs->zc_slave_vnode);
+			slave_snodep = VTOCS(zcs->zc_slave_vnode);
+			mutex_enter(&slave_snodep->s_lock);
+			++slave_snodep->s_count;
+			mutex_exit(&slave_snodep->s_lock);
+			releasef(slave_fd);
+			miocack(qp, mp, 0, 0);
+			return;
+		case ZC_RELEASESLAVE:
+			/*
+			 * Release the master's handle on the slave's vnode.
+			 * If there isn't a handle for the vnode, then indicate
+			 * success.
+			 */
+			if (iocbp->ioc_count != TRANSPARENT) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+			if (zcs->zc_slave_vnode == NULL) {
+				miocack(qp, mp, 0, 0);
+				return;
+			}
+
+			/*
+			 * The process that passed the ioctl must have provided
+			 * a file descriptor for the slave device.  Make sure
+			 * this is correct.
+			 */
+			slave_fd =
+			    (int)(intptr_t)*(caddr_t *)(void *)mp->b_cont->
+			    b_rptr;
+			slave_filep = getf(slave_fd);
+			if (slave_filep == NULL) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+			if (zcs->zc_slave_vnode->v_rdev !=
+			    slave_filep->f_vnode->v_rdev) {
+				releasef(slave_fd);
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			/*
+			 * Decrement the snode's reference count and release the
+			 * vnode.
+			 */
+			ASSERT(vn_matchops(slave_filep->f_vnode,
+			    spec_getvnodeops()));
+			slave_snodep = VTOCS(zcs->zc_slave_vnode);
+			mutex_enter(&slave_snodep->s_lock);
+			--slave_snodep->s_count;
+			mutex_exit(&slave_snodep->s_lock);
+			VN_RELE(zcs->zc_slave_vnode);
+			zcs->zc_slave_vnode = NULL;
+			releasef(slave_fd);
+			miocack(qp, mp, 0, 0);
+			return;
+		default:
+			break;
+		}
+	}
 
 	if (zc_switch(RD(qp)) == NULL) {
 		DBG1("wput to %s side (no one listening)", zc_side(qp));

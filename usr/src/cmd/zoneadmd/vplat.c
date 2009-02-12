@@ -4598,10 +4598,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
-	/* destroy zconsole before umount /dev */
-	if (!unmount_cmd)
-		destroy_console_slave();
-
 	if (unmount_filesystems(zlogp, zoneid, unmount_cmd) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to unmount file systems in zone");

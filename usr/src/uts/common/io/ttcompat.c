@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Module to intercept old V7 and 4BSD "ioctl" calls.
  */
@@ -52,6 +49,7 @@
 #include <sys/cmn_err.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -158,6 +156,21 @@ static struct streamtab ttcoinfo = {
 	NULL
 };
 
+/*
+ * This is the termios structure that is used to reset terminal settings
+ * when the underlying device is an instance of zcons.  It came from
+ * cmd/init/init.c and should be kept in-sync with dflt_termios found therein.
+ */
+static const struct termios base_termios = {
+	BRKINT|ICRNL|IXON|IMAXBEL,				/* iflag */
+	OPOST|ONLCR|TAB3,					/* oflag */
+	CS8|CREAD|B9600,					/* cflag */
+	ISIG|ICANON|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE|IEXTEN,	/* lflag */
+	CINTR, CQUIT, CERASE, CKILL, CEOF, 0, 0, 0, 0, 0, 0, 0,	/* c_cc vals */
+	0, 0, 0, 0, 0, 0, 0
+};
+
+
 static void ttcompat_do_ioctl(ttcompat_state_t *, queue_t *, mblk_t *);
 static void ttcompat_ioctl_ack(queue_t *, mblk_t *);
 static void ttcopyout(queue_t *, mblk_t *);
@@ -173,6 +186,10 @@ static int
 ttcompatopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 {
 	ttcompat_state_t *tp;
+	mblk_t *mp;
+	mblk_t *datamp;
+	struct iocblk *iocb;
+	int error;
 
 	if (q->q_ptr != NULL)  {
 		tp = (ttcompat_state_t *)q->q_ptr;
@@ -213,7 +230,64 @@ ttcompatopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	q->q_ptr = tp;
 	WR(q)->q_ptr = tp;
 	qprocson(q);
-	return (0);
+
+	/*
+	 * Determine if the underlying device is a zcons instance.  If so,
+	 * then issue a termios ioctl to reset the terminal settings.
+	 */
+	if (getmajor(q->q_stream->sd_vnode->v_rdev) !=
+	    ddi_name_to_major("zcons"))
+		return (0);
+
+	/*
+	 * Create the ioctl message.
+	 */
+	if ((mp = mkiocb(TCSETSF)) == NULL) {
+		error = ENOMEM;
+		goto common_error;
+	}
+	if ((datamp = allocb(sizeof (struct termios), BPRI_HI)) == NULL) {
+		freemsg(mp);
+		error = ENOMEM;
+		goto common_error;
+	}
+	iocb = (struct iocblk *)mp->b_rptr;
+	iocb->ioc_count = sizeof (struct termios);
+	bcopy(&base_termios, datamp->b_rptr, sizeof (struct termios));
+	datamp->b_wptr += sizeof (struct termios);
+	mp->b_cont = datamp;
+
+	/*
+	 * Send the ioctl message on its merry way toward the driver.
+	 * Set some state beforehand so we can properly wait for
+	 * an acknowledgement.
+	 */
+	tp->t_state |= TS_IOCWAIT | TS_TIOCNAK;
+	tp->t_iocid = iocb->ioc_id;
+	tp->t_ioccmd = TCSETSF;
+	putnext(WR(q), mp);
+
+	/*
+	 * Wait for an acknowledgement.  A NAK is treated as an error.
+	 * The presence of the TS_TIOCNAK flag indicates that a NAK was
+	 * received.
+	 */
+	while (tp->t_state & TS_IOCWAIT) {
+		if (qwait_sig(q) == 0) {
+			error = EINTR;
+			goto common_error;
+		}
+	}
+	if (!(tp->t_state & TS_TIOCNAK))
+		return (0);
+	error = ENOTTY;
+
+common_error:
+	qprocsoff(q);
+	kmem_free(tp, sizeof (ttcompat_state_t));
+	q->q_ptr = NULL;
+	WR(q)->q_ptr = NULL;
+	return (error);
 }
 
 /* ARGSUSED1 */
@@ -961,6 +1035,15 @@ ttcompat_ioctl_ack(queue_t *q, 	mblk_t *mp)
 		iocp->ioc_cmd = TCSETS;
 		goto senddown;
 
+	case TCSETSF:
+		/*
+		 * We're acknowledging the terminal reset ioctl that we sent
+		 * when the module was opened.
+		 */
+		tp->t_state &= ~(TS_IOCWAIT | TS_TIOCNAK);
+		freemsg(mp);
+		return;
+
 	default:
 		cmn_err(CE_WARN, "ttcompat: Unexpected ioctl acknowledgment\n");
 	}
@@ -1068,7 +1151,7 @@ from_compat(compat_state_t *csp, struct termios *termiosp)
 		if (csp->t_ispeed > (CIBAUD >> IBSHIFT)) {
 			termiosp->c_cflag |= CIBAUDEXT |
 			    (((csp->t_ispeed - (CIBAUD >> IBSHIFT) - 1) <<
-				IBSHIFT) & CIBAUD);
+			    IBSHIFT) & CIBAUD);
 		} else {
 			termiosp->c_cflag |= (csp->t_ispeed << IBSHIFT) &
 			    CIBAUD;
