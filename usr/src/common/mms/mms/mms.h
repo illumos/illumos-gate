@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef	__MMS_H__
-#define	__MMS_H__
+#ifndef	_MMS_H_
+#define	_MMS_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <stdio.h>
 #include <errno.h>
@@ -44,4 +48,8 @@
 #include <mms_api_msg.h>
 #include <mms_dmd.h>
 
-#endif	/* __MMS_H__ */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _MMS_H_ */

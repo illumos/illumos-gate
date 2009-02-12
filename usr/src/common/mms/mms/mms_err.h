@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _MMS_ERR_H
-#define	_MMS_ERR_H
+#ifndef _MMS_ERR_H_
+#define	_MMS_ERR_H_
 
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 enum mms_err_type {
 	MMS_ERR_SYS = 1,	/* errno */
@@ -43,4 +47,8 @@ struct mms_err {
 void mms_get_error_string(mms_err_t *err, char *ebuf, int ebuflen);
 
 
-#endif /* _MMS_ERR_H */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* _MMS_ERR_H_ */

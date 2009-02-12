@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef	__MMS_DMD_H__
-#define	__MMS_DMD_H__
+#ifndef	_MMS_DMD_H_
+#define	_MMS_DMD_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 /* Begin: 32-bit align copyin() structs for amd64 only due to 32-bit x86 ABI */
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
@@ -117,4 +121,8 @@ typedef	struct	mms_scsi_err {
 #pragma pack()
 #endif
 
-#endif	/* __MMS_DMD_H__ */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _MMS_DMD_H_ */

@@ -38,8 +38,6 @@ SRCDIR =	../common
 
 SRCS =	$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-ROOTLIBDIR = 	$(ROOTMMSLIBDIR)
-
 LDLIBS +=	 -lc -luuid
 LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
 
@@ -61,3 +59,5 @@ lint: $(LINTLIB) lintcheck
 
 include $(SRC)/lib/Makefile.targ
 include ../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)

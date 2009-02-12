@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef	__MMS_SYM_H__
-#define	__MMS_SYM_H__
+#ifndef	_MMS_SYM_H_
+#define	_MMS_SYM_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 typedef	struct	mms_sym	{
 	char	*sym_token;
@@ -468,4 +472,8 @@ mms_sym_t	*mms_lookup_sym_token(char *mms_sym, mms_sym_t *tab, int num);
 mms_sym_t	*mms_lookup_sym_code(int code, mms_sym_t *tab, int num);
 mms_sym_t	*mms_lookup_sym_err_token(char *);
 
-#endif /* __MMS_SYM_H__ */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* _MMS_SYM_H_ */

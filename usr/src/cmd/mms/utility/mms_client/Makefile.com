@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -70,8 +70,6 @@ lint: $(lint_SRCS)
 
 %.ln: ../common/%.c
 	$(LINT.c) -c $<
-
-install_h:
 
 install: all $(ROOTBIN)/$(PROG)
 

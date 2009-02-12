@@ -29,7 +29,6 @@ VERS =
 OBJECTS =	dm_QUANTUM_SDLT600.o
 
 include $(SRC)/lib/Makefile.lib
-include ../../Makefile.defs
 
 LIBLINKS =
 
@@ -39,8 +38,6 @@ SRCDIR =	../common
 
 SRCS = 		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-ROOTLIBDIR = 	$(ROOTMMSDMLIBDIR)
-
 LDLIBS +=	-lc
 LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
 
@@ -49,10 +46,7 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-DMMS_OPENSSL
 CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
 CPPFLAGS +=	-I$(SRC)/cmd/mms/dm/common -I../../../mms/common
-CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dda
 CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dmd
-CPPFLAGS +=	-I$(SRC)/cmd/mms/wcr/common
-CPPFLAGS += 	-erroff=E_NON_CONST_INIT
 
 .KEEP_STATE:
 
@@ -60,5 +54,6 @@ all: $(LIBS)
 
 lint: $(LINTLIB) lintcheck
 
-include $(SRC)/lib/Makefile.targ
 include ../../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS)

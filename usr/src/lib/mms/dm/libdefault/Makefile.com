@@ -19,25 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY =	libdm_default.a
-VERS =		.1
+VERS =
 OBJECTS =	dm_default.o
 
 include $(SRC)/lib/Makefile.lib
-include ../../Makefile.defs
+
+LIBLINKS =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
 SRCS = 		$(OBJECTS:%.o=$(SRCDIR)/%.c)
-
-ROOTLIBDIR = 	$(ROOTMMSDMLIBDIR)
 
 LDLIBS +=	-lc
 LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
@@ -49,7 +48,6 @@ CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
 CPPFLAGS +=	-I$(SRC)/cmd/mms/dm/common -I../../../mms/common
 CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dda
 CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dmd
-CPPFLAGS +=	-I$(SRC)/cmd/mms/wcr/common
 CPPFLAGS += 	-erroff=E_NON_CONST_INIT
 
 .KEEP_STATE:
@@ -58,5 +56,7 @@ all: $(LIBS)
 
 lint: $(LINTLIB) lintcheck
 
-include $(SRC)/lib/Makefile.targ
+
 include ../../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS)

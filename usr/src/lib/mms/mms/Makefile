@@ -19,22 +19,37 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 include ../../Makefile.lib
 
-HDRS =		host_ident.h mms_mgmt.h mms_sock.h mms_cfg.h mms_par_impl.h \
-msg_sub.h mms_cores.h mms_scsi.h net_cfg_service.h mmsp_yacc.h cfg_yacc.h
-HDRDIR =	common
+HDRS =	mms.h           \
+	mms_api_msg.h   \
+	mms_err.h       \
+	mms_network.h   \
+	mms_strapp.h    \
+	mms_trace.h     \
+	mms_api.h       \
+	mms_cat.h       \
+	mms_dmd.h       \
+	mms_list.h      \
+	mms_parser.h    \
+	mms_sym.h
+
+
+HDRDIR =        $(SRC)/common/mms/mms
 SUBDIRS	=	$(MACH)
-#$(BUILD64)SUBDIRS += $(MACH64)
 
 POFILE = mms.po
 MSGFILES = common/mms_cat.i
 CLEANFILES += $(MSGFILES)
+
+ROOTLIBDIR =    $(ROOT)/usr/lib
+ROOTHDRDIR=     $(ROOT)/usr/include/mms
+ROOTDIRS =      $(ROOTLIBDIR) $(ROOTHDRDIR)
 
 # C preprocessor flags used to build message catalog:
 #	- Include message header file directories.
@@ -49,11 +64,16 @@ lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber lint: $(SUBDIRS)
 
-install_h:
+install: $(ROOTDIRS) $(SUBDIRS)
 
-check:
+install_h: $(ROOTHDRDIR) $(ROOTHDRS)
+
+check: $(CHECKHDR)
+
+$(ROOTDIRS):
+	$(INS.dir)
 
 $(POFILE): $(MSGFILES)
 	$(BUILDPO.msgfiles)

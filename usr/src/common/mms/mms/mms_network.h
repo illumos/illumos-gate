@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef	__MMS_NETWORK_H__
-#define	__MMS_NETWORK_H__
+#ifndef	_MMS_NETWORK_H_
+#define	_MMS_NETWORK_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <limits.h>
 #include <netdb.h>
@@ -94,4 +98,8 @@ int mms_mmconnect(mms_network_cfg_t *net,
 	char *tag);
 int mms_mmdisconnect(mms_t *conn);
 
-#endif	/* __MMS_NETWORK_H__ */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _MMS_NETWORK_H_ */

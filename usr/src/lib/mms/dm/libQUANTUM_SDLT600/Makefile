@@ -24,11 +24,7 @@
 #
 #
 
-include $(SRC)/lib/Makefile.lib
-include	../Makefile.defs
-
 SUBDIRS	=	$(MACH)
-#$(BUILD64)SUBDIRS += $(MACH64)
 
 all := 		TARGET = all
 clean :=	TARGET = clean
@@ -38,18 +34,9 @@ lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
-
-install: $(ROOTMMSDMLIBDIR) $(SUBDIRS)
-
-install_h:
-
-check:
+all clean clobber install lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-include ../Makefile.rootdirs
-include $(SRC)/lib/Makefile.targ

@@ -19,19 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 include $(SRC)/lib/Makefile.lib
-include	./Makefile.defs
+include ./Makefile.defs
 
-HDRS =		mgmt_acsls.h mgmt_library.h mgmt_media.h mgmt_sym.h \
-		mgmt_util.h mmp_defs.h mms_mgmt.h
-HDRDIR =	common
 SUBDIRS	=	$(MACH)
-#$(BUILD64)SUBDIRS += $(MACH64)
 
 all := 		TARGET = all
 clean :=	TARGET = clean
@@ -41,13 +37,7 @@ lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
-
-install: $(ROOTMMSLIBDIR) $(SUBDIRS)
-
-install_h:
-
-check:
+all clean clobber install lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

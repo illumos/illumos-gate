@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,10 @@
 
 #ifndef	_MMS_LIST_H_
 #define	_MMS_LIST_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <sys/types.h>
 #include <assert.h>
@@ -111,5 +115,9 @@ void *mms_list_next(mms_list_t *, void *);
 void *mms_list_prev(mms_list_t *, void *);
 void mms_list_create_like(mms_list_t *targ, mms_list_t *src);
 void mms_list_move(mms_list_t *targ, mms_list_t *src);
+
+#ifdef	__cplusplus
+}
+#endif
 
 #endif	/* _MMS_LIST_H_ */

@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef __MMS_API_H
-#define	__MMS_API_H
+#ifndef _MMS_API_H_
+#define	_MMS_API_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #define	MMS_API_VERSION	1000
 
@@ -258,4 +262,8 @@ extern char *mms_api[];
 #define	mms_state_failed(_sess) \
 	((mms_session_t *)(_sess))->mms_api_state != MMS_API_CONFIG
 
-#endif /* __MMS_API_H */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* _MMS_API_H_ */

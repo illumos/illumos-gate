@@ -19,31 +19,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY =	libL700_net.a
-VERS =		.1
+VERS =
 OBJS_COMMON =	lm_l700.o
 OBJS_SHARED =	lm_acs_common.o lm_acs_display.o lm_comm.o lm_lcom.o
 
 OBJECTS = 	$(OBJS_COMMON) $(OBJS_SHARED)
 
 include $(SRC)/lib/Makefile.lib
-include ../../Makefile.defs
+
+LIBLINKS =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
-LMDIR = $(SRC)/lib/mms/lm/libcommon
+LMDIR =		$(SRC)/lib/mms/lm/libcommon
 
-SRCS =	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
-	$(OBJS_SHARED:%.o=$(LMDIR)/%.c)
-
-ROOTLIBDIR = 	$(ROOTMMSLMLIBDIR)
+SRCS =		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
+		$(OBJS_SHARED:%.o=$(LMDIR)/%.c)
 
 LDLIBS +=	-lc
 LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
@@ -66,5 +65,6 @@ pics/%.o: $(LMDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-include $(SRC)/lib/Makefile.targ
 include ../../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS)

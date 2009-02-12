@@ -19,31 +19,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY =	libSTK_T9840C.a
-VERS =		.1
+VERS =
 OBJS_COMMON =	dm_STK_T9840C.o
 OBJS_SHARED =	dm_9x40_common.o
 
 OBJECTS = 	$(OBJS_COMMON) $(OBJS_SHARED)
 
 include $(SRC)/lib/Makefile.lib
-include ../../Makefile.defs
+
+LIBLINKS =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
-DMDIR = $(SRC)/lib/mms/dm/libcommon
+DMDIR =		$(SRC)/lib/mms/dm/libcommon
 
-SRCS =	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
-	$(OBJS_SHARED:%.o=$(DMDIR)/%.c)
-
-ROOTLIBDIR = 	$(ROOTMMSDMLIBDIR)
+SRCS =		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
+		$(OBJS_SHARED:%.o=$(DMDIR)/%.c)
 
 LDLIBS +=	-lc
 
@@ -52,9 +51,7 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-DMMS_OPENSSL
 CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
 CPPFLAGS +=	-I$(SRC)/cmd/mms/dm/common -I../../../mms/common
-CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dda
 CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dmd
-CPPFLAGS +=	-I$(SRC)/cmd/mms/wcr/common
 
 .KEEP_STATE:
 
@@ -66,5 +63,6 @@ pics/%.o: $(DMDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-include $(SRC)/lib/Makefile.targ
 include ../../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS)

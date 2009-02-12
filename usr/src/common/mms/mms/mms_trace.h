@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef _TRACE_H
-#define	_TRACE_H
+#ifndef _TRACE_H_
+#define	_TRACE_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <stdarg.h>
 #include <sys/types.h>
@@ -128,6 +132,8 @@ extern char 		*mms_trace_sev2str(mms_trace_sev_t severity);
 #define	MMS_LOGADM		"/usr/sbin/logadm"
 #define	MMS_LOGADM_CONF		"/var/log/mms/mms_logadm.conf"
 
+#ifdef	__cplusplus
+}
+#endif
 
-
-#endif /* _TRACE_H */
+#endif /* _TRACE_H_ */

@@ -19,10 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
+
+include $(SRC)/lib/Makefile.lib
+include ../Makefile.defs
 
 LIBRARY =	libmmsadm.a
 VERS =		.1
@@ -31,16 +34,11 @@ OBJECTS = 	mgmt_lib.o mgmt_media.o mgmt_dsk.o \
 		mgmt_mmp.o mgmt_mmsdb.o mgmt_probe.o \
 		mgmt_util.o mgmt_acsls.o mgmt_mm.o
 
-include $(SRC)/lib/Makefile.lib
-include ../Makefile.defs
-
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
 SRCS =	$(OBJECTS:%.o=$(SRCDIR)/%.c)
-
-ROOTLIBDIR = 	$(ROOTMMSLIBDIR)
 
 LDLIBS +=	-lsocket -lc
 LDLIBS +=	-lscf -lgen -lnvpair -lsecdb
@@ -74,3 +72,4 @@ FRC:
 include $(SRC)/lib/Makefile.targ
 include ../Makefile.rootdirs
 
+install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)

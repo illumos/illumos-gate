@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -460,6 +460,8 @@ PSARC 2006/715: RULE W3: usr/lib/smbsrv/sparcv9/libsmbrdr.so.1
 PSARC 2007/397: RULE W3: usr/lib/libndmp.so.1
 PSARC 2007/397: RULE W3: usr/lib/amd64/libndmp.so.1
 PSARC 2007/397: RULE W3: usr/lib/sparcv9/libndmp.so.1
+6788995: RULE W3: usr/lib/mms/libmmsadm.so.1
+6788995: RULE W3: usr/lib/mms/libpg.so.1
 
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 

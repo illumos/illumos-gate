@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -28,5 +28,13 @@
 # within the proto area.
 #
 
-$(ROOTMMSLMLIBDIR):
+include ../../Makefile.defs
+include $(SRC)/lib/Makefile.targ
+
+$(ROOTLIBDIR):
 	$(INS.dir)
+
+$(LMLIBLINKS): $(ROOTLIBDIR)
+	$(RM) $@
+	$(SYMLINK) $(DYNLIB) $@
+

@@ -467,6 +467,7 @@ HDRSUBDIRS=		\
 	libima		\
 	libsun_ima	\
 	mpapi		\
+	mms		\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \

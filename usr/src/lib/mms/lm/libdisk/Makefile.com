@@ -19,25 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY =	libDISK.a
-VERS =		.1
+VERS =
 OBJECTS =	lm_disk.o
 
 include $(SRC)/lib/Makefile.lib
-include ../../Makefile.defs
+
+LIBLINKS =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
 SRCS = 		$(OBJECTS:%.o=$(SRCDIR)/%.c)
-
-ROOTLIBDIR = 	$(ROOTMMSLMLIBDIR)
 
 LDLIBS +=	-lc
 LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
@@ -54,5 +53,6 @@ all: $(LIBS)
 
 lint:  $(LINTLIB) lintcheck
 
-include $(SRC)/lib/Makefile.targ
 include ../../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS)

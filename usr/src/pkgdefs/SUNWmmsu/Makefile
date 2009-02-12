@@ -20,35 +20,14 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.com
-
-MMSHDR = $(ROOT)/usr/include/mms
-
-FILES += $(MMSHDR)/mms.h
-FILES += $(MMSHDR)/mms_api.h
-FILES += $(MMSHDR)/mms_api_msg.h
-FILES += $(MMSHDR)/mms_cat.h
-FILES += $(MMSHDR)/mms_dmd.h
-FILES += $(MMSHDR)/mms_err.h
-FILES += $(MMSHDR)/mms_list.h
-FILES += $(MMSHDR)/mms_network.h
-FILES += $(MMSHDR)/mms_parser.h
-FILES += $(MMSHDR)/mms_strapp.h
-FILES += $(MMSHDR)/mms_sym.h
-FILES += $(MMSHDR)/mms_trace.h
 
 all: $(FILES) depend
 
 install: all pkg
 
 include ../Makefile.targ
-
-$(MMSHDR):
-	$(INS.dir)
-
-$(MMSHDR)/%: $(MMSHDR) $(SRC)/common/mms/mms/%
-	$(INS.file)

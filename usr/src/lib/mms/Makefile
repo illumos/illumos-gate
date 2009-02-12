@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -28,7 +28,6 @@
 include $(SRC)/lib/Makefile.lib
 
 SUBDIRS = \
-	mms .WAIT \
 	dm \
 	lm \
 	mgmt \
@@ -38,20 +37,22 @@ SUBDIRS = \
 
 .PARALLEL:
 
-all := TARGET += all
-check := TARGET += check
-clean := TARGET += clean
-clobber := TARGET += clobber
-install := TARGET += install
-install_h := TARGET += install_h
-lint := TARGET += lint
-_msg := TARGET += _msg
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+install_h := TARGET = install_h
+lint := TARGET = lint
+_msg := TARGET = _msg
+check := TARGET = check
 
-all check clean clobber install install_h lint: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
-_msg: mms
+install_h _msg check: mms
 
-$(SUBDIRS): FRC
+$(SUBDIRS): mms
+
+$(SUBDIRS) mms: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

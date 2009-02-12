@@ -19,46 +19,43 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY =	libIBM_ULTRIUM-TD1.a
-VERS =		.1
+VERS =
 OBJS_COMMON =	dm_IBM_ULTRIUM-TD1.o
 OBJS_SHARED =	dm_IBM_LTO_common.o
 
 OBJECTS = 	$(OBJS_COMMON) $(OBJS_SHARED)
 
 include $(SRC)/lib/Makefile.lib
-include ../../Makefile.defs
+
+LIBLINKS =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
-DMDIR = $(SRC)/lib/mms/dm/libcommon
+DMDIR =		$(SRC)/lib/mms/dm/libcommon
 
-SRCS =	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
-	$(OBJS_SHARED:%.o=$(DMDIR)/%.c)
-
-ROOTLIBDIR = 	$(ROOTMMSDMLIBDIR)
+SRCS =		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
+		$(OBJS_SHARED:%.o=$(DMDIR)/%.c)
 
 CFLAGS +=	$(CCVERBOSE)
-
-DMLIBDIR = $(ROOT)/usr/lib/mms/dm
 
 CPPFLAGS +=	-DMMS_OPENSSL
 CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
 CPPFLAGS +=	-I$(SRC)/cmd/mms/dm/common -I../../../mms/common
-CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dda
 CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dmd
-CPPFLAGS +=	-I$(SRC)/cmd/mms/wcr/common
 
 .KEEP_STATE:
 
 all: $(LIBS)
+
+DMLINKS =	libIBM_ULT3580-TD1.so libHP_Ultrium_1-SCSI.so
 
 lint: $(LINTLIB) lintcheck
 
@@ -66,10 +63,6 @@ pics/%.o: $(DMDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-$(DMLIBDIR)/libIBM_ULT3580-TD1.so:
-	$(RM) $@ ;\
-	$(SYMLINK) libIBM_ULTRIUM-TD1.so $@
-
-
-include $(SRC)/lib/Makefile.targ
 include ../../Makefile.rootdirs
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS) $(DMLIBLINKS)

@@ -122,8 +122,6 @@ lint: $(lint_SRCS)
 $(ROOTLIBSCSI)/%: %
 	$(INS.file)
 
-install_h:
-
 MMPATHS  = $(ROOT)/etc/mms/config
 MMTYPES = $(ROOT)/etc/mms/types
 SSLCONF = $(ROOT)/var/mms/ssl/ca

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -32,13 +32,15 @@ NOLINTSRC =	cfg_yacc.c mmsp_yacc.c cfg_lex.c mmsp_lex.c cfg_parse.c
 LIBSRCS = 	mms_list.c mmsp_common.c connect.c mms_mgmt.c msg_sub.c \
 		host_ident.c mms_par_util.c net_cfg.c mms_api.c mms_rw.c \
 		net_cfg_service.c mms_cat.c mms_scsi.c strapp.c mms_cfg.c \
-		mms_sock.c trace.c mms_client.c mms_ssl.c mms_cores.c mms_sym.c
+		mms_sock.c trace.c mms_client.c mms_ssl.c mms_cores.c \
+		mms_sym.c
 
 OBJECTS =	cfg_yacc.o mmsp_yacc.o cfg_lex.o mmsp_lex.o cfg_parse.o \
 		mms_list.o mmsp_common.o connect.o mms_mgmt.o msg_sub.o \
 		host_ident.o mms_par_util.o net_cfg.o mms_api.o mms_rw.o \
 		net_cfg_service.o mms_cat.o mms_scsi.o strapp.o mms_cfg.o \
-		mms_sock.o trace.o mms_client.o mms_ssl.o mms_cores.o mms_sym.o
+		mms_sock.o trace.o mms_client.o mms_ssl.o mms_cores.o \
+		mms_sym.o
 
 include $(SRC)/lib/Makefile.lib
 
@@ -105,13 +107,15 @@ $(SRCDIR)/mmsp_lex.c:	$(SRCDIR)/mmsp_lex.l
 
 $(LIBLINKS):    FRC
 	$(RM) $@; $(SYMLINK) $(DYNLIB) $@
-
+	
 $(ROOTLIBDIR):
 	$(INS.dir)
-
+	
 $(ROOTLIBDIR64):
 	$(INS.dir)
-
+	
 FRC: 
 
 include $(SRC)/lib/Makefile.targ
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)

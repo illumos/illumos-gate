@@ -18,13 +18,17 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#ifndef	__MMS_PARSER_H__
-#define	__MMS_PARSER_H__
+#ifndef	_MMS_PARSER_H_
+#define	_MMS_PARSER_H_
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <mms_list.h>
 
@@ -146,4 +150,8 @@ void	mms_mmsp_allow_quote();
 void	mms_cfg_scan_string(char *);
 void	mms_cfg_delete_buffer();
 
-#endif	/* __MMS_PARSER_H__ */
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _MMS_PARSER_H_ */
