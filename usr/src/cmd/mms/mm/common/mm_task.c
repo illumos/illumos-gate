@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1051,7 +1051,6 @@ tm_be_match_mount(mm_command_t *mnt_cmd, mm_command_t *end_cmd, mm_db_t *db) {
 	char			*cur_library = NULL;
 	char			*cur_dm = NULL;
 	char			*cur_drive = NULL;
-	char			*cur_pcl = NULL;
 
 	mm_command_t		*unmnt_cmd1 = NULL;
 	mm_command_t		*unmnt_cmd2 = NULL;
@@ -1153,8 +1152,9 @@ tm_be_match_mount(mm_command_t *mnt_cmd, mm_command_t *end_cmd, mm_db_t *db) {
 	if (mm_db_exec(HERE, db,
 		"select \"LibraryName\",\"DriveName\" "
 		"from \"DRIVE\" where \"DRIVE\"."
-		"\"CartridgePCL\" = '%s';",
-	    cur_pcl) != MM_DB_DATA) {
+		"\"CartridgePCL\" = (select \"CartridgePCL\" "
+		"from \"CARTRIDGE\" where \"CartridgeID\" = '%s');",
+	    mount_info->cmi_cartridge) != MM_DB_DATA) {
 		mms_trace(MMS_ERR,
 		    "tm_be_match_mount: "
 		    "db error getting drive info");
@@ -1165,8 +1165,8 @@ tm_be_match_mount(mm_command_t *mnt_cmd, mm_command_t *end_cmd, mm_db_t *db) {
 	if (PQntuples(db->mm_db_results) == 0) {
 		/* Cur cart is not loaded */
 		mms_trace(MMS_DEVP,
-		    "%s not found in a drive",
-		    cur_pcl);
+		    "cartid %s not found in a drive",
+		    mount_info->cmi_cartridge);
 	} else {
 		mms_trace(MMS_DEVP,
 		    "need to unmount %s, %s "

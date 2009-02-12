@@ -707,8 +707,8 @@ struct mm_range {
 
 /* MM routines */
 int mm_is_exiting(void);
-int mm_rm_mount(mm_command_t *cmd);
-int mm_rm_unmount(mm_command_t *cmd);
+int mm_rm_mount(mm_command_t *cmd, mm_db_t *db);
+int mm_rm_unmount(mm_command_t *cmd, mm_db_t *db);
 extern int mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
 	mm_command_t *cmd, mm_db_t *db, cmi_cart_list_t *cart);
 extern int mm_candidate_drive_ok(mm_wka_t *mm_wka,

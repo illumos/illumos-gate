@@ -562,10 +562,8 @@ mm_db_reconnect(mm_db_t *db)
 	/* Re-read password for db */
 	db_cfg->mm_db_passwd = mms_net_cfg_read_pass_file(MMS_NET_CFG_DB_FILE);
 
-	if (db->mm_db_conn != NULL) {
-		PQreset(db->mm_db_conn);
-		db->mm_db_conn = NULL;
-	} else if (mm_db_connect(db) != MM_DB_OK) {
+	mm_db_disconnect(db);
+	if (mm_db_connect(db) != MM_DB_OK) {
 		mms_trace(MMS_DEVP, "reconnect init failed");
 		return (MM_DB_ERROR);
 	}
@@ -580,7 +578,8 @@ mm_db_reconnect(mm_db_t *db)
 boolean_t
 mm_db_connected(mm_db_t *db)
 {
-	if (db->mm_db_conn != NULL &&
+	if (db != NULL &&
+	    db->mm_db_conn != NULL &&
 	    PQstatus(db->mm_db_conn) == CONNECTION_OK) {
 		return (B_TRUE);
 	}
