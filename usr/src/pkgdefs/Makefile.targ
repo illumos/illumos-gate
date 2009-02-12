@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 pkginfo: pkginfo.tmpl $(PKGDEFS)/awk_pkginfo
@@ -44,14 +42,28 @@ $(CHKINSTALL): $(PKGDEFS)/common_files/$(CHKINSTALLSRC)
 	$(RM) $(CHKINSTALL)
 	cp $(PKGDEFS)/common_files/$(CHKINSTALLSRC) $(CHKINSTALL)
 
+#
+# If the file is under SCM, then it should not be destroyed
+# by an install rule here.  This is a mistake in the package
+# makefile.
+#
+# These tests should return "true" if the file is NOT
+# under SCM, so that they can be followed by a logical OR
+# that will only be evaluated for the intended failure
+# case.
+#
+NOT_UNDER_mercurial= \
+	( hg locate --include . $@ > /dev/null ; [ $$? != 0 ] )
+NOT_UNDER_teamware=[ ! -f SCCS/s.$@ ]
+NOT_UNDER_SCM=${NOT_UNDER_${SCM_TYPE}}
 
 copyright: $(BUILDPKGCR) $(LICENSEFILES)
+	@${NOT_UNDER_SCM} || ( $(ECHO) "generated copyright file" \
+		"should not be under SCM">&2 && false )
 	@$(DO_BUILDPKGCR)
 
-# If the file is under SCCS, then it should not be destroyed
-# by an install rule here.  This is a mistake in package makefile.
 $(DATAFILES): $(PKGDEFS)/common_files/$$@
-	@[ ! -f SCCS/s.$@ ] || \
+	@${NOT_UNDER_SCM} || \
 		( $(ECHO) "DATAFILES list is incorrect for $@">&2 && false )
 	$(RM) $@; cp $(PKGDEFS)/common_files/$@ $@
 
