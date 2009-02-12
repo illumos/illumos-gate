@@ -251,7 +251,9 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	 * Fuse the endpoints; we perform further checks against both
 	 * tcp endpoints to ensure that a fusion is allowed to happen.
 	 * In particular we bail out for non-simple TCP/IP or if IPsec/
-	 * IPQoS policy/kernel SSL exists.
+	 * IPQoS policy/kernel SSL exists. We also need to check if
+	 * the connection is quiescent to cover the case when we are
+	 * trying to re-enable fusion after IPobservability is turned off.
 	 */
 	ns = tcps->tcps_netstack;
 	ipst = ns->netstack_ip;
@@ -260,6 +262,7 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	    !tcp_loopback_needs_ip(tcp, ns) &&
 	    !tcp_loopback_needs_ip(peer_tcp, ns) &&
 	    tcp->tcp_kssl_ent == NULL &&
+	    tcp->tcp_xmit_head == NULL && peer_tcp->tcp_xmit_head == NULL &&
 	    !IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst)) {
 		mblk_t *mp;
 		queue_t *peer_rq = peer_tcp->tcp_rq;
