@@ -2199,6 +2199,7 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 		staffer hg init $CODEMGR_WS
 		staffer echo "[paths]" > $CODEMGR_WS/.hg/hgrc
 		staffer echo "default=$BRINGOVER_WS" >> $CODEMGR_WS/.hg/hgrc
+		touch $TMPDIR/new_repository
 	fi
 
 	#
@@ -2216,6 +2217,7 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 		staffer hg init $CODEMGR_WS/usr/closed
 		staffer echo "[paths]" > $CODEMGR_WS/usr/closed/.hg/hgrc
 		staffer echo "default=$CLOSED_BRINGOVER_WS" >> $CODEMGR_WS/usr/closed/.hg/hgrc
+		touch $TMPDIR/new_closed
 		export CLOSED_IS_PRESENT=yes
 	fi
 
@@ -2263,7 +2265,25 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 	# 5. Dump the output, and any message from step 3 or 4.
 	#
 
-	staffer hg --cwd $CODEMGR_WS pull -u $BRINGOVER_WS \
+	typeset HG_SOURCE=$BRINGOVER_WS
+	if [ ! -f $TMPDIR/new_repository ]; then
+		HG_SOURCE=$TMPDIR/open_bundle.hg
+		staffer hg --cwd $CODEMGR_WS incoming --bundle $HG_SOURCE \
+		    -v $BRINGOVER_WS > $TMPDIR/incoming_open.out
+
+		#
+		# If there are no incoming changesets, then incoming will
+		# fail, and there will be no bundle file.  Reset the source,
+		# to allow the remaining logic to complete with no false
+		# negatives.  (Unlike incoming, pull will return success
+		# for the no-change case.)
+		#
+		if (( $? != 0 )); then
+			HG_SOURCE=$BRINGOVER_WS
+		fi
+	fi
+
+	staffer hg --cwd $CODEMGR_WS pull -u $HG_SOURCE \
 	    > $TMPDIR/pull_open.out 2>&1
 	if (( $? != 0 )); then
 		printf "%s: pull failed as follows:\n\n" "$CODEMGR_WS"
@@ -2307,8 +2327,27 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 	    -d $CODEMGR_WS/usr/closed/.hg && \
 	    -n $CLOSED_BRINGOVER_WS ]]; then
 
+		HG_SOURCE=$CLOSED_BRINGOVER_WS
+		if [ ! -f $TMPDIR/new_closed ]; then
+			HG_SOURCE=$TMPDIR/closed_bundle.hg
+			staffer hg --cwd $CODEMGR_WS/usr/closed incoming \
+			    --bundle $HG_SOURCE -v $CLOSED_BRINGOVER_WS \
+			    > $TMPDIR/incoming_closed.out
+
+			#
+			# If there are no incoming changesets, then incoming will
+			# fail, and there will be no bundle file.  Reset the source,
+			# to allow the remaining logic to complete with no false
+			# negatives.  (Unlike incoming, pull will return success
+			# for the no-change case.)
+			#
+			if (( $? != 0 )); then
+				HG_SOURCE=$CLOSED_BRINGOVER_WS
+			fi
+		fi
+
 		staffer hg --cwd $CODEMGR_WS/usr/closed pull -u \
-			$CLOSED_BRINGOVER_WS > $TMPDIR/pull_closed.out 2>&1
+			$HG_SOURCE > $TMPDIR/pull_closed.out 2>&1
 		if (( $? != 0 )); then
 			printf "closed pull failed as follows:\n\n"
 			cat $TMPDIR/pull_closed.out
@@ -2340,6 +2379,30 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 		if grep "^merging" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
 			printf "$mergepassmsg"
 		fi
+	fi
+
+	#
+	# Per-changeset output is neither useful nor manageable for a
+	# newly-created repository.
+	#
+	if [ -f $TMPDIR/new_repository ]; then
+		return
+	fi
+
+	printf "\nadded the following changesets to open repository:\n"
+	cat $TMPDIR/incoming_open.out
+
+	#
+	# The closed repository could have been newly created, even though
+	# the open one previously existed...
+	#
+	if [ -f $TMPDIR/new_closed ]; then
+		return
+	fi
+
+	if [ -f $TMPDIR/incoming_closed.out ]; then
+		printf "\nadded the following changesets to closed repository:\n"
+		cat $TMPDIR/incoming_closed.out
 	fi
 }
 
