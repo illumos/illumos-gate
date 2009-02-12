@@ -2197,6 +2197,8 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 	# If the repository doesn't exist yet, then we want to populate it.
 	if [[ ! -d $CODEMGR_WS/.hg ]]; then
 		staffer hg init $CODEMGR_WS
+		staffer echo "[paths]" > $CODEMGR_WS/.hg/hgrc
+		staffer echo "default=$BRINGOVER_WS" >> $CODEMGR_WS/.hg/hgrc
 	fi
 
 	#
@@ -2212,6 +2214,8 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 	    ! -d $CODEMGR_WS/usr/closed/.hg ]]; then
 		staffer mkdir -p $CODEMGR_WS/usr/closed
 		staffer hg init $CODEMGR_WS/usr/closed
+		staffer echo "[paths]" > $CODEMGR_WS/usr/closed/.hg/hgrc
+		staffer echo "default=$CLOSED_BRINGOVER_WS" >> $CODEMGR_WS/usr/closed/.hg/hgrc
 		export CLOSED_IS_PRESENT=yes
 	fi
 
