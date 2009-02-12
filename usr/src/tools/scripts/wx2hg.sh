@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -79,6 +77,8 @@ function clone_twins {
 		mkdir -p $ws/$dir
 		set -x
 		hg init $ws/$dir
+		echo "[paths]" > $ws/$dir/.hg/hgrc
+		echo "default=$primary_twin/$dir" >> $ws/$dir/.hg/hgrc
 	    	( cd $ws/$dir; hg pull -u -r $rev "$primary_twin"/$dir )
 		if (( $? != 0 )); then
 			warn "Unable to clone $primary_twin/$dir"
