@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -239,10 +239,16 @@ static void
 dtrace_nullop(void)
 {}
 
+static int
+dtrace_enable_nullop(void)
+{
+	return (0);
+}
+
 static dtrace_pops_t	dtrace_provider_ops = {
 	(void (*)(void *, const dtrace_probedesc_t *))dtrace_nullop,
 	(void (*)(void *, struct modctl *))dtrace_nullop,
-	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
+	(int (*)(void *, dtrace_id_t, void *))dtrace_enable_nullop,
 	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
 	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
 	(void (*)(void *, dtrace_id_t, void *))dtrace_nullop,
@@ -426,6 +432,7 @@ dtrace_load##bits(uintptr_t addr)					\
 #define	DTRACE_DYNHASH_SINK	1
 #define	DTRACE_DYNHASH_VALID	2
 
+#define	DTRACE_MATCH_FAIL	-1
 #define	DTRACE_MATCH_NEXT	0
 #define	DTRACE_MATCH_DONE	1
 #define	DTRACE_ANCHORED(probe)	((probe)->dtpr_func[0] != '\0')
@@ -6654,7 +6661,7 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 {
 	dtrace_probe_t template, *probe;
 	dtrace_hash_t *hash = NULL;
-	int len, best = INT_MAX, nmatched = 0;
+	int len, rc, best = INT_MAX, nmatched = 0;
 	dtrace_id_t i;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
@@ -6666,7 +6673,8 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 	if (pkp->dtpk_id != DTRACE_IDNONE) {
 		if ((probe = dtrace_probe_lookup_id(pkp->dtpk_id)) != NULL &&
 		    dtrace_match_probe(probe, pkp, priv, uid, zoneid) > 0) {
-			(void) (*matched)(probe, arg);
+			if ((*matched)(probe, arg) == DTRACE_MATCH_FAIL)
+				return (DTRACE_MATCH_FAIL);
 			nmatched++;
 		}
 		return (nmatched);
@@ -6713,8 +6721,12 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 
 			nmatched++;
 
-			if ((*matched)(probe, arg) != DTRACE_MATCH_NEXT)
+			if ((rc = (*matched)(probe, arg)) !=
+			    DTRACE_MATCH_NEXT) {
+				if (rc == DTRACE_MATCH_FAIL)
+					return (DTRACE_MATCH_FAIL);
 				break;
+			}
 		}
 
 		return (nmatched);
@@ -6733,8 +6745,11 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 
 		nmatched++;
 
-		if ((*matched)(probe, arg) != DTRACE_MATCH_NEXT)
+		if ((rc = (*matched)(probe, arg)) != DTRACE_MATCH_NEXT) {
+			if (rc == DTRACE_MATCH_FAIL)
+				return (DTRACE_MATCH_FAIL);
 			break;
+		}
 	}
 
 	return (nmatched);
@@ -6954,7 +6969,7 @@ dtrace_unregister(dtrace_provider_id_t id)
 	dtrace_probe_t *probe, *first = NULL;
 
 	if (old->dtpv_pops.dtps_enable ==
-	    (void (*)(void *, dtrace_id_t, void *))dtrace_nullop) {
+	    (int (*)(void *, dtrace_id_t, void *))dtrace_enable_nullop) {
 		/*
 		 * If DTrace itself is the provider, we're called with locks
 		 * already held.
@@ -7100,7 +7115,7 @@ dtrace_invalidate(dtrace_provider_id_t id)
 	dtrace_provider_t *pvp = (dtrace_provider_t *)id;
 
 	ASSERT(pvp->dtpv_pops.dtps_enable !=
-	    (void (*)(void *, dtrace_id_t, void *))dtrace_nullop);
+	    (int (*)(void *, dtrace_id_t, void *))dtrace_enable_nullop);
 
 	mutex_enter(&dtrace_provider_lock);
 	mutex_enter(&dtrace_lock);
@@ -7141,7 +7156,7 @@ dtrace_condense(dtrace_provider_id_t id)
 	 * Make sure this isn't the dtrace provider itself.
 	 */
 	ASSERT(prov->dtpv_pops.dtps_enable !=
-	    (void (*)(void *, dtrace_id_t, void *))dtrace_nullop);
+	    (int (*)(void *, dtrace_id_t, void *))dtrace_enable_nullop);
 
 	mutex_enter(&dtrace_provider_lock);
 	mutex_enter(&dtrace_lock);
@@ -9095,7 +9110,7 @@ dtrace_ecb_add(dtrace_state_t *state, dtrace_probe_t *probe)
 	return (ecb);
 }
 
-static void
+static int
 dtrace_ecb_enable(dtrace_ecb_t *ecb)
 {
 	dtrace_probe_t *probe = ecb->dte_probe;
@@ -9108,7 +9123,7 @@ dtrace_ecb_enable(dtrace_ecb_t *ecb)
 		/*
 		 * This is the NULL probe -- there's nothing to do.
 		 */
-		return;
+		return (0);
 	}
 
 	if (probe->dtpr_ecb == NULL) {
@@ -9122,8 +9137,8 @@ dtrace_ecb_enable(dtrace_ecb_t *ecb)
 		if (ecb->dte_predicate != NULL)
 			probe->dtpr_predcache = ecb->dte_predicate->dtp_cacheid;
 
-		prov->dtpv_pops.dtps_enable(prov->dtpv_arg,
-		    probe->dtpr_id, probe->dtpr_arg);
+		return (prov->dtpv_pops.dtps_enable(prov->dtpv_arg,
+		    probe->dtpr_id, probe->dtpr_arg));
 	} else {
 		/*
 		 * This probe is already active.  Swing the last pointer to
@@ -9136,6 +9151,7 @@ dtrace_ecb_enable(dtrace_ecb_t *ecb)
 		probe->dtpr_predcache = 0;
 
 		dtrace_sync();
+		return (0);
 	}
 }
 
@@ -9919,7 +9935,9 @@ dtrace_ecb_create_enable(dtrace_probe_t *probe, void *arg)
 	if ((ecb = dtrace_ecb_create(state, probe, enab)) == NULL)
 		return (DTRACE_MATCH_DONE);
 
-	dtrace_ecb_enable(ecb);
+	if (dtrace_ecb_enable(ecb) < 0)
+		return (DTRACE_MATCH_FAIL);
+
 	return (DTRACE_MATCH_NEXT);
 }
 
@@ -10714,7 +10732,7 @@ static int
 dtrace_enabling_match(dtrace_enabling_t *enab, int *nmatched)
 {
 	int i = 0;
-	int matched = 0;
+	int total_matched = 0, matched = 0;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(MUTEX_HELD(&dtrace_lock));
@@ -10725,7 +10743,14 @@ dtrace_enabling_match(dtrace_enabling_t *enab, int *nmatched)
 		enab->dten_current = ep;
 		enab->dten_error = 0;
 
-		matched += dtrace_probe_enable(&ep->dted_probe, enab);
+		/*
+		 * If a provider failed to enable a probe then get out and
+		 * let the consumer know we failed.
+		 */
+		if ((matched = dtrace_probe_enable(&ep->dted_probe, enab)) < 0)
+			return (EBUSY);
+
+		total_matched += matched;
 
 		if (enab->dten_error != 0) {
 			/*
@@ -10753,7 +10778,7 @@ dtrace_enabling_match(dtrace_enabling_t *enab, int *nmatched)
 
 	enab->dten_probegen = dtrace_probegen;
 	if (nmatched != NULL)
-		*nmatched = matched;
+		*nmatched = total_matched;
 
 	return (0);
 }

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DTRACE_H
 #define	_SYS_DTRACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1382,7 +1380,7 @@ typedef struct dof_helper {
  *   dtps_provide_module(); see "Arguments and Notes" for dtrace_register(),
  *   below.
  *
- * 1.4  void dtps_enable(void *arg, dtrace_id_t id, void *parg)
+ * 1.4  int dtps_enable(void *arg, dtrace_id_t id, void *parg)
  *
  * 1.4.1  Overview
  *
@@ -1403,7 +1401,8 @@ typedef struct dof_helper {
  *
  * 1.4.3  Return value
  *
- *   None.
+ *   On success, dtps_enable() should return 0. On failure, -1 should be
+ *   returned.
  *
  * 1.4.4  Caller's context
  *
@@ -1957,7 +1956,7 @@ typedef struct dof_helper {
 typedef struct dtrace_pops {
 	void (*dtps_provide)(void *arg, const dtrace_probedesc_t *spec);
 	void (*dtps_provide_module)(void *arg, struct modctl *mp);
-	void (*dtps_enable)(void *arg, dtrace_id_t id, void *parg);
+	int (*dtps_enable)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_disable)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_suspend)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_resume)(void *arg, dtrace_id_t id, void *parg);

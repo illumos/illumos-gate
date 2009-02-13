@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpu_module.h>
 #include <sys/lockstat.h>
@@ -326,6 +324,10 @@ tick_rtt(void)
 
 void
 pil14_interrupt(void)
+{ }
+
+void
+pil15_interrupt(void)
 { }
 
 /* ARGSUSED */

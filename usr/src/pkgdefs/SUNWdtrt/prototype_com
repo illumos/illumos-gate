@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 i pkginfo
@@ -320,6 +320,18 @@ f none SUNWdtrt/tst/common/clauses/tst.nopred.d 0444 root bin
 f none SUNWdtrt/tst/common/clauses/tst.pred.d 0444 root bin
 f none SUNWdtrt/tst/common/clauses/tst.predfirst.d 0444 root bin
 f none SUNWdtrt/tst/common/clauses/tst.predlast.d 0444 root bin
+d none SUNWdtrt/tst/common/cpc 0755 root bin
+f none SUNWdtrt/tst/common/cpc/tst.platformevent.ksh 0444 root bin
+f none SUNWdtrt/tst/common/cpc/tst.genericevent.d 0444 root bin
+f none SUNWdtrt/tst/common/cpc/tst.allcpus.ksh 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.toomanyenablings.d 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.D_PDESC_ZERO.nonexistentevent.d 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.D_PDESC_ZERO.lowfrequency.d 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.D_PDESC_ZERO.malformedoverflow.d 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.cputrackfailtostart.ksh 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.cputrackterminates.ksh 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.cpcvscpustatpart1.ksh 0444 root bin
+f none SUNWdtrt/tst/common/cpc/err.cpcvscpustatpart2.ksh 0444 root bin
 d none SUNWdtrt/tst/common/decls 0755 root bin
 f none SUNWdtrt/tst/common/decls/err.D_DECL_PROTO_NAME.VoidName.d 0444 root bin
 f none SUNWdtrt/tst/common/decls/err.D_DECL_PROTO_TYPE.Dyn.d 0444 root bin

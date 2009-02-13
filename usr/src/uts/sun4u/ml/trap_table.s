@@ -19,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
  
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(lint)
 #include "assym.h"
 #endif /* !lint */
@@ -940,6 +938,11 @@ tt_pil/**/level:			;\
 	mov	PIL_14, %g4			;\
 	.align	32
 
+#define        LEVEL15_INTERRUPT                       \
+       ba      pil15_interrupt                 ;\
+       mov     PIL_15, %g4                     ;\
+       .align  32
+
 #define	VECTOR_INTERRUPT				\
 	ldxa	[%g0]ASI_INTR_RECEIVE_STATUS, %g1	;\
 	btst	IRSR_BUSY, %g1				;\
@@ -1405,7 +1408,7 @@ trap_table0:
 	LEVEL_INTERRUPT(12);		/* 04C	interrupt level 12 */
 	LEVEL_INTERRUPT(13);		/* 04D	interrupt level 13 */
 	LEVEL14_INTERRUPT;		/* 04E	interrupt level 14 */
-	LEVEL_INTERRUPT(15);		/* 04F	interrupt level 15 */
+	LEVEL15_INTERRUPT;		/* 04F	interrupt level 15 */
 	NOT4; NOT4; NOT4; NOT4;		/* 050 - 05F reserved */
 	VECTOR_INTERRUPT;		/* 060	interrupt vector */
 	GOTO(kmdb_trap);		/* 061	PA watchpoint */
@@ -2926,6 +2929,13 @@ trace_dataprot:
 	nop
 
 #endif /* TRAPTRACE */
+
+       .align  32
+       .global pil15_epilogue
+pil15_epilogue:
+       ba      pil_interrupt_common
+       nop
+       .align  32
 
 /*
  * fast_trap_done, fast_trap_done_chk_intr:

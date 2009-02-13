@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <strings.h>
@@ -172,6 +170,9 @@ dtrace_program_exec(dtrace_hdl_t *dtp, dtrace_prog_t *pgp,
 			break;
 		case E2BIG:
 			err = EDT_DIFSIZE;
+			break;
+		case EBUSY:
+			err = EDT_ENABLING_ERR;
 			break;
 		default:
 			err = errno;

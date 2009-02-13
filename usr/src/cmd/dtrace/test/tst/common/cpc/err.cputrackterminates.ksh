@@ -1,3 +1,4 @@
+#!/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -18,24 +19,52 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+
 #
-i pkginfo
-i copyright
-i depend
+# This script ensures that cputrack(1) will terminate when the cpc provider
+# kicks into life.
 #
-# SUNWdtrp
+# The script will fail if:
+#	1) The system under test does not define the 'PAPI_tot_ins' event.
 #
-d none kernel 755 root sys
-d none kernel/drv 755 root sys
-f none kernel/drv/dtrace.conf 644 root sys
-f none kernel/drv/fasttrap.conf 644 root sys
-f none kernel/drv/fbt.conf 644 root sys
-f none kernel/drv/lockstat.conf 644 root sys
-f none kernel/drv/profile.conf 644 root sys
-f none kernel/drv/sdt.conf 644 root sys
-f none kernel/drv/systrace.conf 644 root sys
-f none kernel/drv/dcpc.conf 644 root sys
-d none kernel/dtrace 755 root sys
+
+script()
+{
+	$dtrace -s /dev/stdin <<EOF
+	#pragma D option bufsize=128k
+
+	cpc:::PAPI_tot_ins-all-10000
+	{
+		@[probename] = count();
+	}
+
+	tick-1s
+	/n++ > 10/
+	{
+		exit(0);
+	}
+EOF
+}
+
+if [ $# != 1 ]; then
+        echo expected one argument: '<'dtrace-path'>'
+        exit 2
+fi
+
+dtrace=$1
+
+cputrack -c PAPI_tot_ins sleep 20 &
+cputrack_pid=$!
+sleep 5
+script 2>/dev/null &
+
+wait $cputrack_pid
+status=$?
+
+rm $dtraceout
+
+exit $status

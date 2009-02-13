@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,24 +65,16 @@ static uint32_t kcpc_intrctx_count;    /* # overflows in an interrupt handler */
 static uint32_t kcpc_nullctx_count;    /* # overflows in a thread with no ctx */
 
 /*
- * Is misbehaviour (overflow in a thread with no context) fatal?
+ * By setting 'kcpc_nullctx_panic' to 1, any overflow interrupts in a thread
+ * with no valid context will result in a panic.
  */
-#ifdef DEBUG
-static int kcpc_nullctx_panic = 1;
-#else
 static int kcpc_nullctx_panic = 0;
-#endif
 
 static void kcpc_lwp_create(kthread_t *t, kthread_t *ct);
 static void kcpc_restore(kcpc_ctx_t *ctx);
 static void kcpc_save(kcpc_ctx_t *ctx);
 static void kcpc_free(kcpc_ctx_t *ctx, int isexec);
-static int kcpc_configure_reqs(kcpc_ctx_t *ctx, kcpc_set_t *set, int *subcode);
-static void kcpc_free_configs(kcpc_set_t *set);
-static kcpc_ctx_t *kcpc_ctx_alloc(void);
 static void kcpc_ctx_clone(kcpc_ctx_t *ctx, kcpc_ctx_t *cctx);
-static void kcpc_ctx_free(kcpc_ctx_t *ctx);
-static int kcpc_assign_reqs(kcpc_set_t *set, kcpc_ctx_t *ctx);
 static int kcpc_tryassign(kcpc_set_t *set, int starting_req, int *scratch);
 static kcpc_set_t *kcpc_dup_set(kcpc_set_t *set);
 
@@ -91,6 +83,18 @@ kcpc_register_pcbe(pcbe_ops_t *ops)
 {
 	pcbe_ops = ops;
 	cpc_ncounters = pcbe_ops->pcbe_ncounters();
+}
+
+void
+kcpc_register_dcpc(void (*func)(uint64_t))
+{
+	dtrace_cpc_fire = func;
+}
+
+void
+kcpc_unregister_dcpc(void)
+{
+	dtrace_cpc_fire = NULL;
 }
 
 int
@@ -272,7 +276,7 @@ kcpc_bind_thread(kcpc_set_t *set, kthread_t *t, int *subcode)
  * Walk through each request in the set and ask the PCBE to configure a
  * corresponding counter.
  */
-static int
+int
 kcpc_configure_reqs(kcpc_ctx_t *ctx, kcpc_set_t *set, int *subcode)
 {
 	int		i;
@@ -327,7 +331,7 @@ kcpc_configure_reqs(kcpc_ctx_t *ctx, kcpc_set_t *set, int *subcode)
 	return (0);
 }
 
-static void
+void
 kcpc_free_configs(kcpc_set_t *set)
 {
 	int i;
@@ -710,7 +714,7 @@ kcpc_next_config(void *token, void *current, uint64_t **data)
 }
 
 
-static kcpc_ctx_t *
+kcpc_ctx_t *
 kcpc_ctx_alloc(void)
 {
 	kcpc_ctx_t	*ctx;
@@ -790,7 +794,7 @@ kcpc_ctx_clone(kcpc_ctx_t *ctx, kcpc_ctx_t *cctx)
 }
 
 
-static void
+void
 kcpc_ctx_free(kcpc_ctx_t *ctx)
 {
 	kcpc_ctx_t	**loc;
@@ -881,9 +885,33 @@ kcpc_overflow_intr(caddr_t arg, uint64_t bitmap)
 		 * or something went terribly wrong i.e. we ended up
 		 * running a passivated interrupt thread, a kernel
 		 * thread or we interrupted idle, all of which are Very Bad.
+		 *
+		 * We also could end up here owing to an incredibly unlikely
+		 * race condition that exists on x86 based architectures when
+		 * the cpc provider is in use; overflow interrupts are directed
+		 * to the cpc provider if the 'dtrace_cpc_in_use' variable is
+		 * set when we enter the handler. This variable is unset after
+		 * overflow interrupts have been disabled on all CPUs and all
+		 * contexts have been torn down. To stop interrupts, the cpc
+		 * provider issues a xcall to the remote CPU before it tears
+		 * down that CPUs context. As high priority xcalls, on an x86
+		 * architecture, execute at a higher PIL than this handler, it
+		 * is possible (though extremely unlikely) that the xcall could
+		 * interrupt the overflow handler before the handler has
+		 * checked the 'dtrace_cpc_in_use' variable, stop the counters,
+		 * return to the cpc provider which could then rip down
+		 * contexts and unset 'dtrace_cpc_in_use' *before* the CPUs
+		 * overflow handler has had a chance to check the variable. In
+		 * that case, the handler would direct the overflow into this
+		 * code and no valid context will be found. The default behavior
+		 * when no valid context is found is now to shout a warning to
+		 * the console and bump the 'kcpc_nullctx_count' variable.
 		 */
 		if (kcpc_nullctx_panic)
 			panic("null cpc context, thread %p", (void *)t);
+
+		cmn_err(CE_WARN,
+		    "null cpc context found in overflow handler!\n");
 		atomic_add_32(&kcpc_nullctx_count, 1);
 	} else if ((ctx->kc_flags & KCPC_CTX_INVALID) == 0) {
 		/*
@@ -925,8 +953,9 @@ kcpc_overflow_intr(caddr_t arg, uint64_t bitmap)
 uint_t
 kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 {
-	kcpc_ctx_t	*ctx;
-	uint64_t	bitmap;
+	kcpc_ctx_t *ctx;
+	uint64_t bitmap;
+	uint8_t *state;
 
 	if (pcbe_ops == NULL ||
 	    (bitmap = pcbe_ops->pcbe_overflow_bitmap()) == 0)
@@ -937,8 +966,53 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 	 */
 	pcbe_ops->pcbe_allstop();
 
+	if (dtrace_cpc_in_use) {
+		state = &cpu_core[CPU->cpu_id].cpuc_dcpc_intr_state;
+
+		/*
+		 * Set the per-CPU state bit to indicate that we are currently
+		 * processing an interrupt if it is currently free. Drop the
+		 * interrupt if the state isn't free (i.e. a configuration
+		 * event is taking place).
+		 */
+		if (atomic_cas_8(state, DCPC_INTR_FREE,
+		    DCPC_INTR_PROCESSING) == DCPC_INTR_FREE) {
+			int i;
+			kcpc_request_t req;
+
+			ASSERT(dtrace_cpc_fire != NULL);
+
+			(*dtrace_cpc_fire)(bitmap);
+
+			ctx = curthread->t_cpu->cpu_cpc_ctx;
+
+			/* Reset any counters that have overflowed */
+			for (i = 0; i < ctx->kc_set->ks_nreqs; i++) {
+				req = ctx->kc_set->ks_req[i];
+
+				if (bitmap & (1 << req.kr_picnum)) {
+					pcbe_ops->pcbe_configure(req.kr_picnum,
+					    req.kr_event, req.kr_preset,
+					    req.kr_flags, req.kr_nattrs,
+					    req.kr_attr, &(req.kr_config),
+					    (void *)ctx);
+				}
+			}
+			pcbe_ops->pcbe_program(ctx);
+
+			/*
+			 * We've finished processing the interrupt so set
+			 * the state back to free.
+			 */
+			cpu_core[CPU->cpu_id].cpuc_dcpc_intr_state =
+			    DCPC_INTR_FREE;
+			membar_producer();
+		}
+		return (DDI_INTR_CLAIMED);
+	}
+
 	/*
-	 * Invoke the "generic" handler.
+	 * DTrace isn't involved so pass on accordingly.
 	 *
 	 * If the interrupt has occurred in the context of an lwp owning
 	 * the counters, then the handler posts an AST to the lwp to
@@ -1441,7 +1515,7 @@ kcpc_passivate(void)
  * Returns 0 if successful, -1 on failure.
  */
 /*ARGSUSED*/
-static int
+int
 kcpc_assign_reqs(kcpc_set_t *set, kcpc_ctx_t *ctx)
 {
 	int i;
@@ -1615,4 +1689,34 @@ kcpc_pcbe_tryload(const char *prefix, uint_t first, uint_t second, uint_t third)
 
 	return (modload_qualified("pcbe",
 	    "pcbe", prefix, ".", s, 3, NULL) < 0 ? -1 : 0);
+}
+
+char *
+kcpc_list_attrs(void)
+{
+	ASSERT(pcbe_ops != NULL);
+
+	return (pcbe_ops->pcbe_list_attrs());
+}
+
+char *
+kcpc_list_events(uint_t pic)
+{
+	ASSERT(pcbe_ops != NULL);
+
+	return (pcbe_ops->pcbe_list_events(pic));
+}
+
+uint_t
+kcpc_pcbe_capabilities(void)
+{
+	ASSERT(pcbe_ops != NULL);
+
+	return (pcbe_ops->pcbe_caps);
+}
+
+int
+kcpc_pcbe_loaded(void)
+{
+	return (pcbe_ops == NULL ? -1 : 0);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,7 @@ systrace_destroy(void *arg, dtrace_id_t id, void *parg)
 }
 
 /*ARGSUSED*/
-static void
+static int
 systrace_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	int sysnum = SYSTRACE_SYSNUM((uintptr_t)parg);
@@ -161,7 +161,7 @@ systrace_enable(void *arg, dtrace_id_t id, void *parg)
 
 	if (enabled) {
 		ASSERT(sysent[sysnum].sy_callc == dtrace_systrace_syscall);
-		return;
+		return (0);
 	}
 
 	(void) casptr(&sysent[sysnum].sy_callc,
@@ -172,6 +172,7 @@ systrace_enable(void *arg, dtrace_id_t id, void *parg)
 	    (void *)systrace_sysent32[sysnum].stsy_underlying,
 	    (void *)dtrace_systrace_syscall32);
 #endif
+	return (0);
 }
 
 /*ARGSUSED*/

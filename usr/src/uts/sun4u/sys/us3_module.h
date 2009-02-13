@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_US3_MODULE_H
 #define	_SYS_US3_MODULE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include <sys/async.h>
 
 #ifdef	__cplusplus
@@ -661,7 +660,7 @@ extern void *tt1_swtrap0;
 /*
  * Address of trap table level 15 interrupt handler in the trap table.
  */
-extern void *tt_pil15;
+extern void *pil15_epilogue;
 /*
  * D$ and I$ global parameters.
  */

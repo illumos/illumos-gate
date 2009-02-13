@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -291,4 +291,29 @@ kcpc_hw_lwp_hook(void)
 
 	mutex_exit(&cpu_lock);
 	return (0);
+}
+
+static int
+kcpc_remoteprogram_func(void)
+{
+	ASSERT(CPU->cpu_cpc_ctx != NULL);
+
+	pcbe_ops->pcbe_program(CPU->cpu_cpc_ctx);
+
+	return (0);
+}
+
+/*
+ * Ensure counters are enabled on the given processor.
+ */
+void
+kcpc_remote_program(cpu_t *cp)
+{
+	cpuset_t set;
+
+	CPUSET_ZERO(set);
+
+	CPUSET_ADD(set, cp->cpu_id);
+
+	xc_sync(0, 0, 0, X_CALL_HIPRI, set, (xc_func_t)kcpc_remoteprogram_func);
 }

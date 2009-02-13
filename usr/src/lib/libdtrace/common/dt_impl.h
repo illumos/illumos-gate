@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DT_IMPL_H
 #define	_DT_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/objfs.h>
@@ -498,7 +496,8 @@ enum {
 	EDT_BADSETOPT,		/* invalid setopt library action */
 	EDT_BADSTACKPC,		/* invalid stack program counter size */
 	EDT_BADAGGVAR,		/* invalid aggregation variable identifier */
-	EDT_OVERSION		/* client is requesting deprecated version */
+	EDT_OVERSION,		/* client is requesting deprecated version */
+	EDT_ENABLING_ERR	/* failed to enable probe */
 };
 
 /*

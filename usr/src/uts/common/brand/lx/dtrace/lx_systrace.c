@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +121,7 @@ lx_systrace_provide(void *arg, const dtrace_probedesc_t *desc)
 }
 
 /*ARGSUSED*/
-static void
+static int
 lx_systrace_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	int sysnum = LX_SYSTRACE_SYSNUM((uintptr_t)parg);
@@ -138,6 +138,7 @@ lx_systrace_enable(void *arg, dtrace_id_t id, void *parg)
 	} else {
 		lx_systrace_sysent[sysnum].lss_return = id;
 	}
+	return (0);
 }
 
 /*ARGSUSED*/

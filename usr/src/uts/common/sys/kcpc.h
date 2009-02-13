@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_KCPC_H
 #define	_SYS_KCPC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpc_impl.h>
 #include <sys/ksynch.h>
@@ -130,11 +128,24 @@ extern void kcpc_idle_restore(struct cpu *cp);
 extern krwlock_t	kcpc_cpuctx_lock;  /* lock for 'kcpc_cpuctx' below */
 extern int		kcpc_cpuctx;	   /* number of cpu-specific contexts */
 
+/*
+ * 'dtrace_cpc_in_use' contains the number of currently active cpc provider
+ * based enablings. See the block comment in uts/common/os/dtrace_subr.c for
+ * details of its actual usage.
+ */
+extern uint32_t		dtrace_cpc_in_use;
+extern void (*dtrace_cpc_fire)(uint64_t);
+
 extern void kcpc_free_set(kcpc_set_t *set);
 
 extern void *kcpc_next_config(void *token, void *current,
     uint64_t **data);
 extern void kcpc_invalidate_config(void *token);
+extern char *kcpc_list_attrs(void);
+extern char *kcpc_list_events(uint_t pic);
+extern void kcpc_free_configs(kcpc_set_t *set);
+extern uint_t kcpc_pcbe_capabilities(void);
+extern int kcpc_pcbe_loaded(void);
 
 /*
  * Called by a PCBE to determine if nonprivileged access to counters should be

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 !include prototype_com
 
@@ -35,6 +33,7 @@ f none kernel/drv/sparcv9/lockstat 755 root sys
 f none kernel/drv/sparcv9/profile 755 root sys
 f none kernel/drv/sparcv9/sdt 755 root sys
 f none kernel/drv/sparcv9/systrace 755 root sys
+f none kernel/drv/sparcv9/dcpc 755 root sys
 d none kernel/dtrace/sparcv9 755 root sys
 l none kernel/dtrace/sparcv9/fasttrap=../../../kernel/drv/sparcv9/fasttrap
 l none kernel/dtrace/sparcv9/fbt=../../../kernel/drv/sparcv9/fbt
@@ -42,3 +41,4 @@ l none kernel/dtrace/sparcv9/lockstat=../../../kernel/drv/sparcv9/lockstat
 l none kernel/dtrace/sparcv9/profile=../../../kernel/drv/sparcv9/profile
 l none kernel/dtrace/sparcv9/sdt=../../../kernel/drv/sparcv9/sdt
 l none kernel/dtrace/sparcv9/systrace=../../../kernel/drv/sparcv9/systrace
+l none kernel/dtrace/sparcv9/dcpc=../../../kernel/drv/sparcv9/dcpc

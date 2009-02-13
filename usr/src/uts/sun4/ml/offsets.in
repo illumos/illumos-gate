@@ -1,5 +1,5 @@
 \ offsets.in: input file to produce assym.h using the stabs program
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -67,8 +67,6 @@
 \ "\#define" escapes to add the offsets from the base structure/union
 \ and all of the nested structures/unions together.  See the many
 \ examples already in this file.
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_GENASSYM
 #define	_GENASSYM
@@ -365,6 +363,8 @@ cpu	CPUSIZE
 	cpu_ftrace.ftd_state		CPU_FTRACE_STATE
 	cpu_mstate
 	cpu_intracct
+	cpu_cpcprofile_pc
+	cpu_cpcprofile_upc
 	cpu_m				CPU_MCPU
 	cpu_m.divisor			CPU_DIVISOR
 	cpu_m.intrstat			CPU_INTRSTAT

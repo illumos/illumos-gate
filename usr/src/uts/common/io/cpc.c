@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * CPU Performance Counter system calls and device driver.
@@ -126,7 +125,7 @@ cpc(int cmd, id_t lwpid, void *udata1, void *udata2, void *udata3)
 		 */
 
 		rw_enter(&kcpc_cpuctx_lock, RW_READER);
-		if (kcpc_cpuctx) {
+		if (kcpc_cpuctx || dtrace_cpc_in_use) {
 			rw_exit(&kcpc_cpuctx_lock);
 			return (set_errno(EAGAIN));
 		}
@@ -486,6 +485,15 @@ kcpc_open(dev_t *dev, int flags, int otyp, cred_t *cr)
 	rw_enter(&kcpc_cpuctx_lock, RW_WRITER);
 	if (++kcpc_cpuctx == 1) {
 		ASSERT(kcpc_cpumap == NULL);
+
+		/*
+		 * Bail out if DTrace is already using the counters.
+		 */
+		if (dtrace_cpc_in_use) {
+			kcpc_cpuctx--;
+			rw_exit(&kcpc_cpuctx_lock);
+			return (EAGAIN);
+		}
 		kcpc_cpumap = kmem_zalloc(BT_SIZEOFMAP(max_cpuid + 1),
 		    KM_SLEEP);
 		/*

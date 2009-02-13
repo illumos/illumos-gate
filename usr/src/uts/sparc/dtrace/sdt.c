@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,7 +269,7 @@ sdt_destroy(void *arg, dtrace_id_t id, void *parg)
 }
 
 /*ARGSUSED*/
-static void
+static int
 sdt_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	sdt_probe_t *sdp = parg;
@@ -310,7 +310,7 @@ sdt_enable(void *arg, dtrace_id_t id, void *parg)
 	}
 
 err:
-	;
+	return (0);
 }
 
 /*ARGSUSED*/

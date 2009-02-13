@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,9 @@ typedef struct cpu {
 	uint64_t	cpu_curr_clock;		/* current clock freq in Hz */
 	char		*cpu_supp_freqs;	/* supported freqs in Hz */
 
+	uintptr_t	cpu_cpcprofile_pc;	/* kernel PC in cpc interrupt */
+	uintptr_t	cpu_cpcprofile_upc;	/* user PC in cpc interrupt */
+
 	/*
 	 * Interrupt load factor used by dispatcher & softcall
 	 */
@@ -240,12 +243,13 @@ typedef struct cpu {
  * is up to the platform to assure that this is performed properly.  Note that
  * the structure is sized to avoid false sharing.
  */
-#define	CPUC_SIZE		(sizeof (uint16_t) + sizeof (uintptr_t) + \
-				sizeof (kmutex_t))
+#define	CPUC_SIZE		(sizeof (uint16_t) + sizeof (uint8_t) + \
+				sizeof (uintptr_t) + sizeof (kmutex_t))
 #define	CPUC_PADSIZE		CPU_CACHE_COHERENCE_SIZE - CPUC_SIZE
 
 typedef struct cpu_core {
 	uint16_t	cpuc_dtrace_flags;	/* DTrace flags */
+	uint8_t		cpuc_dcpc_intr_state;	/* DCPC provider intr state */
 	uint8_t		cpuc_pad[CPUC_PADSIZE];	/* padding */
 	uintptr_t	cpuc_dtrace_illval;	/* DTrace illegal value */
 	kmutex_t	cpuc_pid_lock;		/* DTrace pid provider lock */
@@ -715,7 +719,8 @@ typedef enum {
 	CPU_ON,
 	CPU_OFF,
 	CPU_CPUPART_IN,
-	CPU_CPUPART_OUT
+	CPU_CPUPART_OUT,
+	CPU_SETUP
 } cpu_setup_t;
 
 typedef int cpu_setup_func_t(cpu_setup_t, int, void *);

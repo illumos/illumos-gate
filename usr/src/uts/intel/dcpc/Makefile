@@ -18,24 +18,50 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-i pkginfo
-i copyright
-i depend
-#
-# SUNWdtrp
-#
-d none kernel 755 root sys
-d none kernel/drv 755 root sys
-f none kernel/drv/dtrace.conf 644 root sys
-f none kernel/drv/fasttrap.conf 644 root sys
-f none kernel/drv/fbt.conf 644 root sys
-f none kernel/drv/lockstat.conf 644 root sys
-f none kernel/drv/profile.conf 644 root sys
-f none kernel/drv/sdt.conf 644 root sys
-f none kernel/drv/systrace.conf 644 root sys
-f none kernel/drv/dcpc.conf 644 root sys
-d none kernel/dtrace 755 root sys
+
+UTSBASE	= ../..
+
+MODULE		= dcpc
+OBJECTS		= $(DCPC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(DCPC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+ROOTLINK	= $(ROOT_DTRACE_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/common/dtrace
+
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+LINT_TARGET	= $(MODULE).lint
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
+
+INC_PATH	+= -I$(UTSBASE)/i86pc
+
+include $(UTSBASE)/intel/Makefile.intel
+
+LDFLAGS		+= -dy -Ndrv/dtrace -Ndrv/cpc
+
+.KEEP_STATE:
+
+def:		$(DEF_DEPS)
+
+all:		$(ALL_DEPS)
+
+clean:		$(CLEAN_DEPS)
+
+clobber:	$(CLOBBER_DEPS)
+
+lint:		$(LINT_DEPS)
+
+modlintlib:	$(MODLINTLIB_DEPS)
+
+clean.lint:	$(CLEAN_LINT_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+$(ROOTLINK):	$(ROOT_DTRACE_DIR) $(ROOTMODULE)
+	-$(RM) $@; ln $(ROOTMODULE) $@
+
+include $(UTSBASE)/intel/Makefile.targ

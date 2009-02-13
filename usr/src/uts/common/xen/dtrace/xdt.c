@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -782,7 +782,7 @@ xdt_set_trace_mask(uint32_t mask)
 }
 
 /*ARGSUSED*/
-static void
+static int
 xdt_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	xdt_probe_t *p = parg;
@@ -801,22 +801,15 @@ xdt_enable(void *arg, dtrace_id_t id, void *parg)
 	}
 
 	if (xdt_cyclic == CYCLIC_NONE) {
-		/*
-		 * DTrace doesn't have the notion of failing an enabling. It
-		 * works on the premise that, if you have advertised a probe
-		 * via the pops->dtps_provide() function, you can enable it.
-		 * Failure is not an option. In the case where we can't enable
-		 * Xen tracing the consumer will carry on regardless and
-		 * think all is OK except the probes will never fire.
-		 */
 		tbuf_op.cmd = XEN_SYSCTL_TBUFOP_enable;
 		if (xdt_sysctl_tbuf(&tbuf_op) != 0) {
 			cmn_err(CE_NOTE, "Couldn't enable hypervisor tracing.");
-			return;
+			return (-1);
 		}
 
 		xdt_cyclic_enable();
 	}
+	return (0);
 }
 
 /*ARGSUSED*/

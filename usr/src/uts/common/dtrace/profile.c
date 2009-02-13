@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -360,7 +360,7 @@ profile_offline(void *arg, cpu_t *cpu, void *oarg)
 }
 
 /*ARGSUSED*/
-static void
+static int
 profile_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	profile_probe_t *prof = parg;
@@ -390,6 +390,7 @@ profile_enable(void *arg, dtrace_id_t id, void *parg)
 	} else {
 		prof->prof_cyclic = cyclic_add_omni(&omni);
 	}
+	return (0);
 }
 
 /*ARGSUSED*/

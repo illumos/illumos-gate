@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4u common CPC subroutines.
@@ -48,8 +46,8 @@
 #include <sys/modctl.h>
 #include <sys/sdt.h>
 
-uint64_t		cpc_level15_inum;	/* used in interrupt.s */
-int			cpc_has_overflow_intr;	/* set in cheetah.c */
+uint64_t	cpc_level15_inum;	/* used in interrupt.s */
+int		cpc_has_overflow_intr;	/* set in cheetah.c */
 
 extern kcpc_ctx_t *kcpc_overflow_intr(caddr_t arg, uint64_t bitmap);
 extern int kcpc_counts_include_idle;
@@ -143,4 +141,22 @@ int
 kcpc_hw_lwp_hook(void)
 {
 	return (0);
+}
+
+/*ARGSUSED*/
+static void
+kcpc_remoteprogram_func(uint64_t arg1, uint64_t arg2)
+{
+	ASSERT(CPU->cpu_cpc_ctx != NULL);
+
+	pcbe_ops->pcbe_program(CPU->cpu_cpc_ctx);
+}
+
+/*
+ * Ensure counters are enabled on the given processor.
+ */
+void
+kcpc_remote_program(cpu_t *cp)
+{
+	xc_one(cp->cpu_id, kcpc_remoteprogram_func, 0, 0);
 }

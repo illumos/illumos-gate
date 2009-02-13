@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -868,6 +868,34 @@ pil14_interrupt(int level)
 	SET_SIZE(tick_rtt)
 
 #endif /* lint */
+
+#if defined(lint)
+
+/* ARGSUSED */
+void
+pil15_interrupt(int level)
+{}
+
+#else   /* lint */
+
+/*
+ * Level-15 interrupt prologue.
+ */
+       ENTRY_NP(pil15_interrupt)
+       CPU_ADDR(%g1, %g2)
+       rdpr    %tstate, %g6
+       rdpr    %tpc, %g5
+       btst    TSTATE_PRIV, %g6                ! trap from supervisor mode?
+       bnz,a,pt %xcc, 1f
+       stn     %g5, [%g1 + CPU_CPCPROFILE_PC]  ! if so, record kernel PC
+       stn     %g5, [%g1 + CPU_CPCPROFILE_UPC] ! if not, record user PC
+       ba      pil15_epilogue                  ! must be large-disp branch
+       stn     %g0, [%g1 + CPU_CPCPROFILE_PC]  ! zero kernel PC
+1:     ba      pil15_epilogue                  ! must be large-disp branch
+       stn     %g0, [%g1 + CPU_CPCPROFILE_UPC] ! zero user PC
+       SET_SIZE(pil15_interrupt)
+
+#endif  /* lint */
 
 #if defined(lint)
 /*

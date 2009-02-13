@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1405,6 +1405,10 @@ start_other_cpus(int cprboot)
 		}
 		if (start_cpu(who) != 0)
 			CPUSET_DEL(mp_cpus, who);
+
+		mutex_enter(&cpu_lock);
+		cpu_state_change_notify(who, CPU_SETUP);
+		mutex_exit(&cpu_lock);
 	}
 
 	/* Free the space allocated to hold the microcode file */

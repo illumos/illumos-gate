@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpuvar.h>
 #include <sys/regset.h>
@@ -121,9 +119,13 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		if (USERMODE(rp->r_cs)) {
 			cpu->cpu_profile_pc = 0;
 			cpu->cpu_profile_upc = rp->r_pc;
+			cpu->cpu_cpcprofile_pc = 0;
+			cpu->cpu_cpcprofile_upc = rp->r_pc;
 		} else {
 			cpu->cpu_profile_pc = rp->r_pc;
 			cpu->cpu_profile_upc = 0;
+			cpu->cpu_cpcprofile_pc = rp->r_pc;
+			cpu->cpu_cpcprofile_upc = 0;
 		}
 	}
 

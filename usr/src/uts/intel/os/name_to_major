@@ -130,6 +130,7 @@ domcaps 200
 balloon 201
 acpippm 202
 srn 203
+dcpc 204
 smbsrv 210
 did 239
 lx_ptm 240

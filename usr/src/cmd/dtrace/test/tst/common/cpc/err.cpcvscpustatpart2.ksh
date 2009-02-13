@@ -1,3 +1,4 @@
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -18,24 +19,52 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-i pkginfo
-i copyright
-i depend
+
+
 #
-# SUNWdtrp
+# This tests that enablings from the cpc provider will fail if cpustat(1) is
+# already master of the universe.
 #
-d none kernel 755 root sys
-d none kernel/drv 755 root sys
-f none kernel/drv/dtrace.conf 644 root sys
-f none kernel/drv/fasttrap.conf 644 root sys
-f none kernel/drv/fbt.conf 644 root sys
-f none kernel/drv/lockstat.conf 644 root sys
-f none kernel/drv/profile.conf 644 root sys
-f none kernel/drv/sdt.conf 644 root sys
-f none kernel/drv/systrace.conf 644 root sys
-f none kernel/drv/dcpc.conf 644 root sys
-d none kernel/dtrace 755 root sys
+# This script will fail if:
+#       1) The system under test does not define the 'PAPI_tot_ins'
+#       generic event.
+
+script()
+{
+        $dtrace -s /dev/stdin <<EOF
+        #pragma D option bufsize=128k
+
+        BEGIN
+        {
+                exit(0);
+        }
+
+        cpc:::PAPI_tot_ins-all-10000
+        {
+                @[probename] = count();
+        }
+EOF
+}
+
+if [ $# != 1 ]; then
+        echo expected one argument: '<'dtrace-path'>'
+        exit 2
+fi
+
+dtrace=$1
+dtraceout=/tmp/dtrace.out.$$
+
+cpustat -c PAPI_tot_ins 1 20 &
+pid=$!
+sleep 5
+script 2>/dev/null
+
+status=$?
+
+kill $pid
+exit $status

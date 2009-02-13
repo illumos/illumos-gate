@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1483,7 +1483,7 @@ fbt_destroy(void *arg, dtrace_id_t id, void *parg)
 }
 
 /*ARGSUSED*/
-static void
+static int
 fbt_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	fbt_probe_t *fbt = parg, *f;
@@ -1503,7 +1503,7 @@ fbt_enable(void *arg, dtrace_id_t id, void *parg)
 				    fbt->fbtp_name, ctl->mod_modname);
 			}
 
-			return;
+			return (0);
 		}
 	}
 
@@ -1518,7 +1518,7 @@ fbt_enable(void *arg, dtrace_id_t id, void *parg)
 			    fbt->fbtp_name, ctl->mod_modname);
 		}
 
-		return;
+		return (0);
 	}
 
 	/*
@@ -1533,11 +1533,13 @@ fbt_enable(void *arg, dtrace_id_t id, void *parg)
 			    fbt->fbtp_name, ctl->mod_modname);
 		}
 
-		return;
+		return (0);
 	}
 
 	for (; fbt != NULL; fbt = fbt->fbtp_next)
 		*fbt->fbtp_patchpoint = fbt->fbtp_patchval;
+
+	return (0);
 }
 
 /*ARGSUSED*/

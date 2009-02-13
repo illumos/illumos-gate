@@ -203,7 +203,7 @@ ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
 #
 DRV_KMODS	+= aggr arp bl bofi clone cn conskbd consms cpuid
 DRV_KMODS	+= crypto cryptoadm devinfo dump
-DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace
+DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace dcpc
 DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipnet ipsecah
 DRV_KMODS	+= ipsecesp iwscn keysock kmdb kstat ksyms llc1
 DRV_KMODS	+= lofi

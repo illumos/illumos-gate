@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CPC_IMPL_H
 #define	_SYS_CPC_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -181,6 +179,27 @@ typedef struct __cpc_args32 {
  */
 #define	KCPC_PIC_OVERFLOWED	0x1	/* pic overflowed & requested notify */
 
+/*
+ * The following flags are used by the DTrace CPU performance counter provider
+ * and the overflow handler. The 'DCPC_INTR_*' flags are used to synchronize
+ * performance counter configuration events performed by the cpc provider and
+ * interrupt processing carried out by the overflow handler.  The 'DCPC_?MASK'
+ * flags are used by the dcpc provider to indicate which type of mask attribute
+ * a platform supports.
+ */
+
+/* No configuration events or overflow interrupts are currently in process. */
+#define	DCPC_INTR_FREE 0
+
+/* An overflow interrupt is currently being processed. */
+#define	DCPC_INTR_PROCESSING 1
+
+/* The cpc subsystem is currently being configured by the dcpc provider. */
+#define	DCPC_INTR_CONFIG 2
+
+#define	DCPC_UMASK 1	/* The platform supports a "umask" attribute. */
+#define	DCPC_EMASK 2	/* The platform supports an "emask" attribute. */
+
 #ifdef __sparc
 extern uint64_t ultra_gettick(void);
 #define	KCPC_GET_TICK ultra_gettick
@@ -204,6 +223,14 @@ extern void kcpc_invalidate_all(void);
 extern void kcpc_passivate(void);
 extern void kcpc_remote_stop(struct cpu *cp);
 extern int kcpc_pcbe_tryload(const char *, uint_t, uint_t, uint_t);
+extern void kcpc_remote_program(struct cpu *cp);
+extern void kcpc_register_dcpc(void (*func)(uint64_t));
+extern void kcpc_unregister_dcpc(void);
+extern kcpc_ctx_t *kcpc_ctx_alloc(void);
+extern int kcpc_assign_reqs(struct _kcpc_set *, kcpc_ctx_t *);
+extern void kcpc_ctx_free(kcpc_ctx_t *);
+extern int kcpc_configure_reqs(kcpc_ctx_t *, struct _kcpc_set *, int *);
+extern void kcpc_free_configs(struct _kcpc_set *);
 
 #endif /* _KERNEL */
 

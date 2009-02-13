@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ static kmutex_t		lockstat_test;	/* for testing purposes only */
 static dtrace_provider_id_t lockstat_id;
 
 /*ARGSUSED*/
-static void
+static int
 lockstat_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	lockstat_probe_t *probe = parg;
@@ -102,6 +102,7 @@ lockstat_enable(void *arg, dtrace_id_t id, void *parg)
 	 */
 	mutex_enter(&lockstat_test);
 	mutex_exit(&lockstat_test);
+	return (0);
 }
 
 /*ARGSUSED*/

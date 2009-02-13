@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dtrace.h>
 #include <sys/cmn_err.h>
@@ -45,12 +43,27 @@ void (*dtrace_helpers_cleanup)(void);
 void (*dtrace_helpers_fork)(proc_t *, proc_t *);
 void (*dtrace_cpustart_init)(void);
 void (*dtrace_cpustart_fini)(void);
+void (*dtrace_cpc_fire)(uint64_t);
 
 void (*dtrace_debugger_init)(void);
 void (*dtrace_debugger_fini)(void);
 
 dtrace_vtime_state_t dtrace_vtime_active = 0;
 dtrace_cacheid_t dtrace_predcache_id = DTRACE_CACHEIDNONE + 1;
+
+/*
+ * dtrace_cpc_in_use usage statement: this global variable is used by the cpc
+ * hardware overflow interrupt handler and the kernel cpc framework to check
+ * whether or not the DTrace cpc provider is currently in use. The variable is
+ * set before counters are enabled with the first enabling and cleared when
+ * the last enabling is disabled. Its value at any given time indicates the
+ * number of active dcpc based enablings. The global 'kcpc_cpuctx_lock' rwlock
+ * is held during initial setting to protect races between kcpc_open() and the
+ * first enabling. The locking provided by the DTrace subsystem, the kernel
+ * cpc framework and the cpu management framework protect consumers from race
+ * conditions on enabling and disabling probes.
+ */
+uint32_t dtrace_cpc_in_use = 0;
 
 typedef struct dtrace_hrestime {
 	lock_t		dthr_lock;		/* lock for this element */

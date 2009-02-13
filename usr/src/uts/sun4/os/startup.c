@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2105,6 +2105,11 @@ startup_end(void)
 	 * and other devices get started.
 	 */
 	kern_setup1();
+
+	/*
+	 * Perform CPC initialization for this CPU.
+	 */
+	kcpc_hw_init();
 
 	/*
 	 * Intialize the VM arenas for allocating physically

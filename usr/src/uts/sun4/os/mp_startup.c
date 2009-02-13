@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -753,10 +753,8 @@ start_other_cpus(int flag)
 		cmn_err(CE_CONT, "!cpu%d initialization complete - online\n",
 		    cpuid);
 
-		/*
-		 * XXX: register_cpu_setup() callbacks should be called here
-		 * with a new setup code, CPU_BOOT (or something).
-		 */
+		cpu_state_change_notify(cpuid, CPU_SETUP);
+
 		if (dtrace_cpu_init != NULL)
 			(*dtrace_cpu_init)(cpuid);
 	}

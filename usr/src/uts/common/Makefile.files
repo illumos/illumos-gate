@@ -406,6 +406,8 @@ LOCKSTAT_OBJS += lockstat.o
 
 FASTTRAP_OBJS += fasttrap.o fasttrap_isa.o
 
+DCPC_OBJS += dcpc.o
+
 #
 #	Driver (pseudo-driver) Modules
 #
