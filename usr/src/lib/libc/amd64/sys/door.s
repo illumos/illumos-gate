@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,15 @@
  *	size_t			stack_size)
  */
 	ENTRY(__door_return)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$0x8, %rsp
+	/*
+	 * Save stack_base (arg4), since %rcx will be trashed if the syscall
+	 * returns via sysret
+	 */
+	movq	%rcx, -0x8(%rbp)
+
 door_restart:
 	movq	$DOOR_RETURN, %r9	/* subcode */
 	SYSTRAP_RVAL1(door)
@@ -129,17 +138,22 @@ door_restart:
 	movl	$EINTR, %eax
 3:
 	cmpl	$EINTR, %eax		/* interrupted while waiting? */
-	jne	__cerror		/* if not, return the error */
+	jne	4f			/* if not, return the error */
 
 	call	getpid			/* get current process id */
 	movq	_daref_(door_create_pid), %rdx
 	movl	0(%rdx), %edx
 	cmpl	%eax, %edx		/* same process? */
 	movl	$EINTR, %eax	/* if no, return EINTR (child of forkall) */
-	jne	__cerror
+	jne	4f
 
 	movq	$0, %rdi		/* clear arguments and restart */
 	movq	$0, %rsi
 	movq	$0, %rdx
+	movq	-0x8(%rbp), %rcx	/* Restore arg4 (stack_base) */
 	jmp	door_restart
+
+4:
+	leave
+	jmp	__cerror
 	SET_SIZE(__door_return)
