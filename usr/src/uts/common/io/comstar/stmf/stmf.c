@@ -1383,9 +1383,10 @@ stmf_lookup_lu(stmf_lu_t *lu)
 }
 
 /*
- * Given a pointer to stmf_lu_t, verifies if this lu is registered with the
- * framework and returns a pointer to framework private data for the lu.
- * Returns NULL if the lu was not found.
+ * Given a pointer to stmf_local_port_t, verifies if this lport is registered
+ * with the framework and returns a pointer to framework private data for
+ * the lport.
+ * Returns NULL if the lport was not found.
  */
 stmf_i_local_port_t *
 stmf_lookup_lport(stmf_local_port_t *lport)

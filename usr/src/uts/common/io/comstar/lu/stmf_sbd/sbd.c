@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,7 +125,7 @@ _init(void)
 	if (ret)
 		return (ret);
 	sbd_lp = (stmf_lu_provider_t *)stmf_alloc(STMF_STRUCT_LU_PROVIDER,
-							0, 0);
+	    0, 0);
 	sbd_lp->lp_lpif_rev = LPIF_REV_1;
 	sbd_lp->lp_instance = 0;
 	sbd_lp->lp_name = sbd_name;
@@ -134,7 +134,7 @@ _init(void)
 	if (stmf_register_lu_provider(sbd_lp) != STMF_SUCCESS) {
 		(void) mod_remove(&modlinkage);
 		stmf_free(sbd_lp);
-		return (DDI_FAILURE);
+		return (EINVAL);
 	}
 	mutex_init(&sbd_lock, NULL, MUTEX_DRIVER, NULL);
 	return (0);
@@ -539,7 +539,7 @@ sbd_lp_cb(stmf_lu_provider_t *lp, int cmd, void *arg, uint32_t flags)
 			}
 			rlc_size = sn + 32; /* Make it a little bigger */
 			rlc = (register_lu_cmd_t *)kmem_zalloc(rlc_size,
-								KM_SLEEP);
+			    KM_SLEEP);
 		}
 		bzero(rlc, rlc_size);
 		rlc->total_struct_size = rlc_size;
@@ -563,16 +563,16 @@ sbd_sst_alloc(uint32_t additional_size, uint32_t flags)
 	sbd_lu_t *slu;
 
 	total_as = GET_STRUCT_SIZE(sbd_store_t) + GET_STRUCT_SIZE(sbd_lu_t) +
-			((additional_size + 7) & ~7);
+	    ((additional_size + 7) & ~7);
 
 	lu = (stmf_lu_t *)stmf_alloc(STMF_STRUCT_STMF_LU, total_as, 0);
 	if (lu == NULL)
 		return (NULL);
 	sst = (sbd_store_t *)lu->lu_provider_private;
 	sst->sst_sbd_private = GET_BYTE_OFFSET(sst,
-				GET_STRUCT_SIZE(sbd_store_t));
+	    GET_STRUCT_SIZE(sbd_store_t));
 	sst->sst_store_private = GET_BYTE_OFFSET(sst->sst_sbd_private,
-					GET_STRUCT_SIZE(sbd_lu_t));
+	    GET_STRUCT_SIZE(sbd_lu_t));
 	slu = (sbd_lu_t *)sst->sst_sbd_private;
 	slu->sl_sst = sst;
 	slu->sl_lu = lu;
@@ -719,7 +719,7 @@ sbd_find_section_offset(sbd_store_t *sst, sm_section_hdr_t *sms)
 
 	if (slu->sl_sm.sm_magic != SBD_MAGIC) {
 		cmn_err(CE_PANIC, "sbd_find section called without reading the"
-				" header first.");
+		    " header first.");
 	}
 
 	ssize = slu->sl_meta_offset + sizeof (sbd_meta_start_t);
@@ -889,7 +889,7 @@ sbd_create_meta(sbd_store_t *sst, sst_init_data_t *sst_idata)
 
 	slu->sl_meta_offset = sbd_meta_offset;
 	slu->sl_sli = (sbd_lu_info_t *)kmem_zalloc(sizeof (sbd_lu_info_t),
-							KM_SLEEP);
+	    KM_SLEEP);
 	sli = slu->sl_sli;
 	h = &sli->sli_sms_header;
 	h->sms_offset = sbd_meta_offset + sizeof (sbd_meta_start_t);
@@ -904,7 +904,7 @@ sbd_create_meta(sbd_store_t *sst, sst_init_data_t *sst_idata)
 	sli->sli_data_order = SMS_DATA_ORDER;
 	sli->sli_lu_devid[3] = 16;
 	ret = stmf_scsilib_uniq_lu_id(COMPANY_ID_SUN, (scsi_devid_desc_t *)
-					&sli->sli_lu_devid[0]);
+	    &sli->sli_lu_devid[0]);
 
 	if (ret == STMF_SUCCESS) {
 		bcopy(&sli->sli_lu_devid[4], sst_idata->sst_guid, 16);
@@ -1047,8 +1047,7 @@ read_meta_header:
 	}
 	slu->sl_meta_offset = meta_offset;
 
-	sli = (sbd_lu_info_t *)kmem_zalloc(sizeof (sbd_lu_info_t),
-								KM_SLEEP);
+	sli = (sbd_lu_info_t *)kmem_zalloc(sizeof (sbd_lu_info_t), KM_SLEEP);
 	slu->sl_sli = sli;
 	sli->sli_sms_header.sms_size = sizeof (sbd_lu_info_t);
 	sli->sli_sms_header.sms_id = SMS_ID_LU_INFO;
@@ -1087,7 +1086,7 @@ read_meta_header:
 
 	if ((ret = stmf_register_lu(lu)) != STMF_SUCCESS) {
 		stmf_trace(0, "Failed to register with framework, ret=%llx",
-			ret);
+		    ret);
 		goto exit_store_online;
 	}
 
@@ -1123,7 +1122,7 @@ sbd_deregister_sst(sbd_store_t *sst)
 
 	mutex_enter(&sbd_lock);
 	for (ppslu = &sbd_lu_list; (*ppslu) != NULL;
-					ppslu = &((*ppslu)->sl_next)) {
+	    ppslu = &((*ppslu)->sl_next)) {
 		if ((*ppslu) == slu) {
 			*ppslu = (*ppslu)->sl_next;
 			sbd_lu_count--;

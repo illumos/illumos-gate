@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,7 +199,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if (len != task->task_expected_xfer_length) {
 		fast_path = 0;
 		len = (len > task->task_expected_xfer_length) ?
-			task->task_expected_xfer_length : len;
+		    task->task_expected_xfer_length : len;
 	} else {
 		fast_path = 1;
 	}
@@ -221,8 +221,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		} while ((initial_dbuf == NULL) && (old_minsize > minsize) &&
 		    (minsize >= 512));
 		if (initial_dbuf == NULL) {
-			stmf_abort(STMF_QUEUE_TASK_ABORT, task,
-			    STMF_ALLOC_FAILURE, NULL);
+			stmf_scsilib_send_status(task, STATUS_QFULL, 0);
 			return;
 		}
 	}
@@ -320,12 +319,12 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	}
 
 	laddr = scmd->addr + dbuf->db_relative_offset +
-				slu->sl_sli->sli_lu_data_offset;
+	    slu->sl_sli->sli_lu_data_offset;
 
 	for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
 	    (ndx < dbuf->db_sglist_length); ndx++) {
 		iolen = min(dbuf->db_data_size - buflen,
-					dbuf->db_sglist[ndx].seg_length);
+		    dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
 		if (sst->sst_data_write(sst, laddr, (uint64_t)iolen,
@@ -519,8 +518,7 @@ sbd_handle_short_read_transfers(scsi_task_t *task, stmf_data_buf_t *dbuf,
 		dbuf = stmf_alloc_dbuf(task, cmd_xfer_size, &minsize, 0);
 	}
 	if (dbuf == NULL) {
-		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
-		    STMF_ALLOC_FAILURE, NULL);
+		stmf_scsilib_send_status(task, STATUS_QFULL, 0);
 		return;
 	}
 
@@ -880,7 +878,7 @@ sbd_remove_it_handle(sbd_lu_t *slu, sbd_it_data_t *it)
 
 	mutex_enter(&slu->sl_it_list_lock);
 	for (ppit = &slu->sl_it_list; *ppit != NULL;
-					ppit = &((*ppit)->sbd_it_next)) {
+	    ppit = &((*ppit)->sbd_it_next)) {
 		if ((*ppit) == it) {
 			*ppit = it->sbd_it_next;
 			break;
@@ -905,7 +903,7 @@ sbd_check_and_clear_scsi2_reservation(sbd_lu_t *slu, sbd_it_data_t *it)
 		for (it = slu->sl_it_list; it != NULL; it = it->sbd_it_next) {
 			if (it->sbd_it_flags & SBD_IT_HAS_SCSI2_RESERVATION) {
 				ASSERT(it->sbd_it_session_id ==
-					slu->sl_rs_owner_session_id);
+				    slu->sl_rs_owner_session_id);
 				break;
 			}
 		}
@@ -1134,7 +1132,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if ((cdb0 == SCMD_RESERVE) || (cdb0 == SCMD_RELEASE)) {
 		if (cdb1) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-				STMF_SAA_INVALID_FIELD_IN_CDB);
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
 			return;
 		}
 		mutex_enter(&slu->sl_it_list_lock);
@@ -1147,7 +1145,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 				 */
 				mutex_exit(&slu->sl_it_list_lock);
 				stmf_scsilib_send_status(task,
-						STATUS_RESERVATION_CONFLICT, 0);
+				    STATUS_RESERVATION_CONFLICT, 0);
 				return;
 			}
 		}
@@ -1210,7 +1208,7 @@ void
 sbd_send_status_done(struct scsi_task *task)
 {
 	cmn_err(CE_PANIC,
-		"sbd_send_status_done: this should not have been called");
+	    "sbd_send_status_done: this should not have been called");
 }
 
 void
@@ -1248,7 +1246,7 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 
 	if (abort_cmd == STMF_LU_ITL_HANDLE_REMOVED) {
 		sbd_check_and_clear_scsi2_reservation(slu,
-					(sbd_it_data_t *)arg);
+		    (sbd_it_data_t *)arg);
 		sbd_remove_it_handle(slu, (sbd_it_data_t *)arg);
 		return (STMF_SUCCESS);
 	}
@@ -1276,9 +1274,9 @@ sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 	stmf_change_status_t st;
 
 	ASSERT((cmd == STMF_CMD_LU_ONLINE) ||
-		(cmd == STMF_CMD_LU_OFFLINE) ||
-		(cmd == STMF_ACK_LU_ONLINE_COMPLETE) ||
-		(cmd == STMF_ACK_LU_OFFLINE_COMPLETE));
+	    (cmd == STMF_CMD_LU_OFFLINE) ||
+	    (cmd == STMF_ACK_LU_ONLINE_COMPLETE) ||
+	    (cmd == STMF_ACK_LU_OFFLINE_COMPLETE));
 
 	st.st_completion_status = STMF_SUCCESS;
 	st.st_additional_info = NULL;
