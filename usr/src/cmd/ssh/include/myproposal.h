@@ -57,7 +57,7 @@ extern "C" {
  * list as well.
  */
 #define	KEX_DEFAULT_SERVER_ENCRYPT	"aes128-ctr,aes192-ctr,aes256-ctr," \
-					"arcfour"
+					"arcfour128,arcfour256,arcfour"
 
 #define	KEX_DEFAULT_CLIENT_ENCRYPT	KEX_DEFAULT_SERVER_ENCRYPT \
 					",aes128-cbc,aes192-cbc,aes256-cbc," \

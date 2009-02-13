@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -337,44 +337,45 @@ typedef struct PK11_CIPHER_st
 	enum pk11_cipher_id	id;
 	int			nid;
 	int			iv_len;
-	int			key_len;
+	int			min_key_len;
+	int			max_key_len;
 	CK_KEY_TYPE		key_type;
 	CK_MECHANISM_TYPE	mech_type;
 	} PK11_CIPHER;
 
 static PK11_CIPHER ciphers[] =
 	{
-	{ PK11_DES_CBC,		NID_des_cbc,		8,	8,
+	{ PK11_DES_CBC,		NID_des_cbc,		8,	 8,   8,
 		CKK_DES,	CKM_DES_CBC, },
-	{ PK11_DES3_CBC,	NID_des_ede3_cbc,	8,	24,
+	{ PK11_DES3_CBC,	NID_des_ede3_cbc,	8,	24,  24,
 		CKK_DES3,	CKM_DES3_CBC, },
-	{ PK11_DES_ECB,		NID_des_ecb,		0,	8,
+	{ PK11_DES_ECB,		NID_des_ecb,		0,	 8,   8,
 		CKK_DES,	CKM_DES_ECB, },
-	{ PK11_DES3_ECB,	NID_des_ede3_ecb,	0,	24,
+	{ PK11_DES3_ECB,	NID_des_ede3_ecb,	0,	24,  24,
 		CKK_DES3,	CKM_DES3_ECB, },
-	{ PK11_RC4,		NID_rc4,		0,	16,
+	{ PK11_RC4,		NID_rc4,		0,	16, 256,
 		CKK_RC4,	CKM_RC4, },
-	{ PK11_AES_128_CBC,	NID_aes_128_cbc,	16,	16,
+	{ PK11_AES_128_CBC,	NID_aes_128_cbc,	16,	16,  16,
 		CKK_AES,	CKM_AES_CBC, },
-	{ PK11_AES_192_CBC,	NID_aes_192_cbc,	16,	24,
+	{ PK11_AES_192_CBC,	NID_aes_192_cbc,	16,	24,  24,
 		CKK_AES,	CKM_AES_CBC, },
-	{ PK11_AES_256_CBC,	NID_aes_256_cbc,	16,	32,
+	{ PK11_AES_256_CBC,	NID_aes_256_cbc,	16,	32,  32,
 		CKK_AES,	CKM_AES_CBC, },
-	{ PK11_AES_128_ECB,	NID_aes_128_ecb,	0,	16,
+	{ PK11_AES_128_ECB,	NID_aes_128_ecb,	0,	16,  16,
 		CKK_AES,	CKM_AES_ECB, },
-	{ PK11_AES_192_ECB,	NID_aes_192_ecb,	0,	24,
+	{ PK11_AES_192_ECB,	NID_aes_192_ecb,	0,	24,  24,
 		CKK_AES,	CKM_AES_ECB, },
-	{ PK11_AES_256_ECB,	NID_aes_256_ecb,	0,	32,
+	{ PK11_AES_256_ECB,	NID_aes_256_ecb,	0,	32,  32,
 		CKK_AES,	CKM_AES_ECB, },
-	{ PK11_BLOWFISH_CBC,	NID_bf_cbc,		8,	16,
+	{ PK11_BLOWFISH_CBC,	NID_bf_cbc,		8,	16,  16,
 		CKK_BLOWFISH,	CKM_BLOWFISH_CBC, },
 #ifdef	SOLARIS_AES_CTR
 	/* we don't know the correct NIDs until the engine is initialized */
-	{ PK11_AES_128_CTR,	NID_undef,		16,	16,
+	{ PK11_AES_128_CTR,	NID_undef,		16,	16,  16,
 		CKK_AES,	CKM_AES_CTR, },
-	{ PK11_AES_192_CTR,	NID_undef,		16,	24,
+	{ PK11_AES_192_CTR,	NID_undef,		16,	24,  24,
 		CKK_AES,	CKM_AES_CTR, },
-	{ PK11_AES_256_CTR,	NID_undef,		16,	32,
+	{ PK11_AES_256_CTR,	NID_undef,		16,	32,  32,
 		CKK_AES,	CKM_AES_CTR, },
 #endif	/* SOLARIS_AES_CTR */
 	};
@@ -2259,9 +2260,11 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	/*
 	 * iv_len in the ctx->cipher structure is the maximum IV length for the
 	 * current cipher and it must be less or equal to the IV length in our
-	 * ciphers table. The key length must match precisely. Every application
-	 * can define its own EVP functions so this code serves as a sanity
-	 * check.
+	 * ciphers table. The key length must be in the allowed interval. From
+	 * all cipher modes that the PKCS#11 engine supports only RC4 allows a
+	 * key length to be in some range, all other NIDs have a precise key
+	 * length. Every application can define its own EVP functions so this
+	 * code serves as a sanity check.
 	 *
 	 * Note that the reason why the IV length in ctx->cipher might be
 	 * greater than the actual length is that OpenSSL uses BLOCK_CIPHER_defs
@@ -2269,11 +2272,11 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	 * modes. So, even ECB modes get 8 byte IV.
 	 */
 	if (ctx->cipher->iv_len < p_ciph_table_row->iv_len ||
-	    ctx->key_len != p_ciph_table_row->key_len)
-		{
+	    ctx->key_len < p_ciph_table_row->min_key_len ||
+	    ctx->key_len > p_ciph_table_row->max_key_len) {
 		PK11err(PK11_F_CIPHER_INIT, PK11_R_KEY_OR_IV_LEN_PROBLEM);
 		return (0);
-		}
+	}
 
 	if ((sp = pk11_get_session(OP_CIPHER)) == NULL)
 		return (0);
@@ -2284,7 +2287,7 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	mech.ulParameterLen = 0;
 
 	/* The key object is destroyed here if it is not the current key. */
-	(void) check_new_cipher_key(sp, key, p_ciph_table_row->key_len);
+	(void) check_new_cipher_key(sp, key, ctx->key_len);
 
 	/*
 	 * If the key is the same and the encryption is also the same, then
