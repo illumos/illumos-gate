@@ -178,6 +178,7 @@ extern const char *libzfs_error_action(libzfs_handle_t *);
 extern const char *libzfs_error_description(libzfs_handle_t *);
 extern void libzfs_mnttab_init(libzfs_handle_t *);
 extern void libzfs_mnttab_fini(libzfs_handle_t *);
+extern void libzfs_mnttab_cache(libzfs_handle_t *, boolean_t);
 extern int libzfs_mnttab_find(libzfs_handle_t *, const char *,
     struct mnttab *);
 extern void libzfs_mnttab_add(libzfs_handle_t *, const char *,

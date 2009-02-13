@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -575,6 +575,7 @@ libzfs_init(void)
 
 	zfs_prop_init();
 	zpool_prop_init();
+	libzfs_mnttab_init(hdl);
 
 	return (hdl);
 }
@@ -592,6 +593,7 @@ libzfs_fini(libzfs_handle_t *hdl)
 		(void) free(hdl->libzfs_log_str);
 	zpool_free_handles(hdl);
 	namespace_clear(hdl);
+	libzfs_mnttab_fini(hdl);
 	free(hdl);
 }
 

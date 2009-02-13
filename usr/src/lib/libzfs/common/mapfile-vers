@@ -44,6 +44,7 @@ SUNWprivate_1.1 {
 	libzfs_error_description;
 	libzfs_fini;
 	libzfs_init;
+	libzfs_mnttab_cache;
 	libzfs_print_on_error;
 	zfs_allocatable_devs;
 	zfs_build_perms;

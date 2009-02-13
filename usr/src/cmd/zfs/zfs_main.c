@@ -4197,6 +4197,7 @@ main(int argc, char **argv)
 		/*
 		 * Run the appropriate command.
 		 */
+		libzfs_mnttab_cache(g_zfs, B_TRUE);
 		if (find_command_idx(cmdname, &i) == 0) {
 			current_command = &command_table[i];
 			ret = command_table[i].func(argc - 1, argv + 1);
@@ -4209,6 +4210,7 @@ main(int argc, char **argv)
 			    "command '%s'\n"), cmdname);
 			usage(B_FALSE);
 		}
+		libzfs_mnttab_cache(g_zfs, B_FALSE);
 	}
 
 	(void) fclose(mnttab_file);
