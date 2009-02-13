@@ -1898,9 +1898,16 @@ use_new_conn:
 		 * Walk the list looking for a connection with a source address
 		 * that matches the retry address.
 		 */
+start_retry_loop:
 		cmp = &cm_hd;
 		while ((cm_entry = *cmp) != NULL) {
 			ASSERT(cm_entry != cm_entry->x_next);
+
+			/*
+			 * determine if this connection matches the passed
+			 * in retry address.  If it does not match, advance
+			 * to the next element on the list.
+			 */
 			if (zoneid != cm_entry->x_zoneid ||
 			    device != cm_entry->x_rdev ||
 			    retryaddr->len != cm_entry->x_src.len ||
@@ -1908,6 +1915,44 @@ use_new_conn:
 			    retryaddr->len) != 0) {
 				cmp = &cm_entry->x_next;
 				continue;
+			}
+			/*
+			 * Garbage collect conections that are marked
+			 * for needs disconnect.
+			 */
+			if (cm_entry->x_needdis) {
+				CONN_HOLD(cm_entry);
+				connmgr_dis_and_wait(cm_entry);
+				connmgr_release(cm_entry);
+				/*
+				 * connmgr_lock could have been
+				 * dropped for the disconnect
+				 * processing so start over.
+				 */
+				goto start_retry_loop;
+			}
+			/*
+			 * Garbage collect the dead connections that have
+			 * no threads working on them.
+			 */
+			if ((cm_entry->x_state_flags & (X_DEAD|X_THREAD)) ==
+			    X_DEAD) {
+				mutex_enter(&cm_entry->x_lock);
+				if (cm_entry->x_ref != 0) {
+					/*
+					 * Currently in use.
+					 * Cleanup later.
+					 */
+					cmp = &cm_entry->x_next;
+					mutex_exit(&cm_entry->x_lock);
+					continue;
+				}
+				mutex_exit(&cm_entry->x_lock);
+				*cmp = cm_entry->x_next;
+				mutex_exit(&connmgr_lock);
+				connmgr_close(cm_entry);
+				mutex_enter(&connmgr_lock);
+				goto start_retry_loop;
 			}
 
 			/*
