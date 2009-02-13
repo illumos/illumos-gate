@@ -4062,6 +4062,16 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 		/* No external v6 resolver has a contract to use this */
 		if (isv6)
 			break;
+		if (!ill->ill_arp_extend) {
+			(void) mac_colon_addr((uint8_t *)(arh + 1),
+			    arh->arh_hlen, hbuf, sizeof (hbuf));
+			(void) ip_dot_addr(src, sbuf);
+
+			cmn_err(CE_WARN,
+			    "node %s is using our IP address %s on %s",
+			    hbuf, sbuf, ill->ill_name);
+			break;
+		}
 		ill_refhold(ill);
 		qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP, B_FALSE);
 		return;

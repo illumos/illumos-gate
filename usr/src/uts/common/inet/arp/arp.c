@@ -265,6 +265,9 @@ static mblk_t	*ar_cmd_dequeue(arl_t *arl);
 static void	*arp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	arp_stack_fini(netstackid_t stackid, void *arg);
 static void	arp_stack_shutdown(netstackid_t stackid, void *arg);
+
+boolean_t arp_no_defense = B_FALSE;
+
 /*
  * All of these are alterable, within the min/max values given,
  * at run time. arp_publish_interval and arp_publish_count are
@@ -2867,7 +2870,7 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 * just bring the interface up immediately.
 		 */
 		ar->ar_on_ill_stream = (q->q_next->q_next != NULL);
-		if (!ar->ar_on_ill_stream)
+		if (!ar->ar_on_ill_stream || arp_no_defense)
 			return (0);
 		mp = allocb(sizeof (arc_t), BPRI_MED);
 		if (mp == NULL) {
