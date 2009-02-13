@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -2281,7 +2279,7 @@ read_chunk(int ifd, char *buffer, size_t datasize, data_in_t *data_in_info)
  *			file descriptor.
  */
 static int
-data_copy(int ifd, int ofd, int rw_sysattr, uint_t bytes,
+data_copy(int ifd, int ofd, int rw_sysattr, off_t bytes,
     size_t blocksize, data_in_t *data_in_info)
 {
 	char *buf;
