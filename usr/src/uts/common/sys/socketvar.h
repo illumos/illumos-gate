@@ -291,14 +291,12 @@ struct sonode {
 
 #define	SS_SODIRECT		0x00400000 /* transport supports sodirect */
 
-/*	unused			0x01000000 */	/* was SS_LADDR_VALID */
-/*	unused			0x02000000 */	/* was SS_FADDR_VALID */
+#define	SS_SENTLASTREADSIG	0x01000000 /* last rx signal has been sent */
+#define	SS_SENTLASTWRITESIG	0x02000000 /* last tx signal has been sent */
 
-#define	SS_SENTLASTREADSIG	0x10000000 /* last rx signal has been sent */
-#define	SS_SENTLASTWRITESIG	0x20000000 /* last tx signal has been sent */
-
-#define	SS_FALLBACK_PENDING	0x40000000
-#define	SS_FALLBACK_COMP	0x80000000
+#define	SS_FALLBACK_DRAIN	0x20000000 /* data was/is being drained */
+#define	SS_FALLBACK_PENDING	0x40000000 /* fallback is pending */
+#define	SS_FALLBACK_COMP	0x80000000 /* fallback has completed */
 
 
 /* Set of states when the socket can't be rebound */

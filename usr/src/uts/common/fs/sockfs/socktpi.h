@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,6 +252,12 @@ typedef struct sotpi_info {
 	kssl_endpt_type_t	sti_kssl_type;	/* is proxy/is proxied/none */
 	kssl_ent_t		sti_kssl_ent;	/* SSL config entry */
 	kssl_ctx_t		sti_kssl_ctx;	/* SSL session context */
+
+	/*
+	 * The mblks below are only allocated and used during fallback.
+	 */
+	mblk_t	*sti_exdata_mp;		/* T_EXDATA_IND or SIGURG */
+	mblk_t	*sti_urgmark_mp;	/* mark indication */
 } sotpi_info_t;
 
 struct T_capability_ack;
@@ -259,8 +265,9 @@ struct T_capability_ack;
 extern sonodeops_t sotpi_sonodeops;
 
 extern int	socktpi_init(void);
-extern queue_t	*sotpi_convert_sonode(struct sonode *, struct sockparams *,
-		    boolean_t *, struct cred *);
+extern int	sotpi_convert_sonode(struct sonode *, struct sockparams *,
+		    boolean_t *, queue_t **, struct cred *);
+extern void	sotpi_revert_sonode(struct sonode *, struct cred *);
 extern void	sotpi_update_state(struct sonode *, struct T_capability_ack *,
 		    struct sockaddr *, socklen_t, struct sockaddr *, socklen_t,
 		    short);

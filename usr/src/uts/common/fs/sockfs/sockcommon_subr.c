@@ -37,6 +37,7 @@
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/atomic.h>
+#include <sys/tihdr.h>
 
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/socktpi.h>
@@ -1515,8 +1516,75 @@ socket_ioctl_common(struct sonode *so, int cmd, intptr_t arg, int mode,
 }
 
 /*
- * Process STREAMS related ioctls. If a I_PUSH/POP operation is specified
- * then the socket will fall back to TPI.
+ * Handle the I_NREAD STREAM ioctl.
+ */
+static int
+so_strioc_nread(struct sonode *so, intptr_t arg, int mode, int32_t *rvalp)
+{
+	size_t size = 0;
+	int retval;
+	int count = 0;
+	mblk_t *mp;
+
+	if (so->so_downcalls == NULL ||
+	    so->so_downcalls->sd_recv_uio != NULL)
+		return (EINVAL);
+
+	mutex_enter(&so->so_lock);
+	/* Wait for reader to get out of the way. */
+	while (so->so_flag & SOREADLOCKED) {
+		/*
+		 * If reader is waiting for data, then there should be nothing
+		 * on the rcv queue.
+		 */
+		if (so->so_rcv_wakeup)
+			goto out;
+
+		so->so_flag |= SOWANT;
+		/* Do a timed sleep, in case the reader goes to sleep. */
+		(void) cv_timedwait(&so->so_state_cv, &so->so_lock,
+		    lbolt + drv_usectohz(10));
+	}
+
+	/*
+	 * Since we are holding so_lock no new reader will come in, and the
+	 * protocol will not be able to enqueue data. So it's safe to walk
+	 * both rcv queues.
+	 */
+	mp = so->so_rcv_q_head;
+	if (mp != NULL) {
+		size = msgdsize(so->so_rcv_q_head);
+		for (; mp != NULL; mp = mp->b_next)
+			count++;
+	} else {
+		/*
+		 * In case the processing list was empty, get the size of the
+		 * next msg in line.
+		 */
+		size = msgdsize(so->so_rcv_head);
+	}
+
+	for (mp = so->so_rcv_head; mp != NULL; mp = mp->b_next)
+		count++;
+out:
+	mutex_exit(&so->so_lock);
+
+	/*
+	 * Drop down from size_t to the "int" required by the
+	 * interface.  Cap at INT_MAX.
+	 */
+	retval = MIN(size, INT_MAX);
+	if (so_copyout(&retval, (void *)arg, sizeof (retval),
+	    (mode & (int)FKIOCTL))) {
+		return (EFAULT);
+	} else {
+		*rvalp = count;
+		return (0);
+	}
+}
+
+/*
+ * Process STREAM ioctls.
  *
  * Returns:
  *   < 0  - ioctl was not handle
@@ -1526,32 +1594,42 @@ int
 socket_strioc_common(struct sonode *so, int cmd, intptr_t arg, int mode,
     struct cred *cr, int32_t *rvalp)
 {
+	int retval;
+
+	/* Only STREAM iotcls are handled here */
+	if ((cmd & 0xffffff00U) != STR)
+		return (-1);
+
 	switch (cmd) {
-	case _I_INSERT:
-	case _I_REMOVE:
-	case I_FIND:
-	case I_LIST:
+	case I_CANPUT:
+		/*
+		 * We return an error for I_CANPUT so that isastream(3C) will
+		 * not report the socket as being a STREAM.
+		 */
 		return (EOPNOTSUPP);
-
-	case I_PUSH:
-	case I_POP: {
-		int retval;
-
-		if ((retval = so_tpi_fallback(so, cr)) == 0) {
-			/* Reissue the ioctl */
-			ASSERT(so->so_rcv_q_head == NULL);
-			return (SOP_IOCTL(so, cmd, arg, mode, cr, rvalp));
-		}
-		return (retval);
-	}
+	case I_NREAD:
+		/* Avoid doing a fallback for I_NREAD. */
+		return (so_strioc_nread(so, arg, mode, rvalp));
 	case I_LOOK:
+		/* Avoid doing a fallback for I_LOOK. */
 		if (so_copyout("sockmod", (void *)arg, strlen("sockmod") + 1,
 		    (mode & (int)FKIOCTL))) {
 			return (EFAULT);
 		}
 		return (0);
 	default:
-		return (-1);
+		break;
+	}
+
+	/*
+	 * Try to fall back to TPI, and if successful, reissue the ioctl.
+	 */
+	if ((retval = so_tpi_fallback(so, cr)) == 0) {
+		/* Reissue the ioctl */
+		ASSERT(so->so_rcv_q_head == NULL);
+		return (SOP_IOCTL(so, cmd, arg, mode, cr, rvalp));
+	} else {
+		return (retval);
 	}
 }
 
@@ -1851,7 +1929,7 @@ so_end_fallback(struct sonode *so)
 	ASSERT(RW_ISWRITER(&so->so_fallback_rwlock));
 
 	mutex_enter(&so->so_lock);
-	so->so_state &= ~SS_FALLBACK_PENDING;
+	so->so_state &= ~(SS_FALLBACK_PENDING|SS_FALLBACK_DRAIN);
 	mutex_exit(&so->so_lock);
 
 	rw_downgrade(&so->so_fallback_rwlock);
@@ -1867,8 +1945,6 @@ so_end_fallback(struct sonode *so)
  * is safe to synchronize the state. Data can also be moved without
  * risk for reordering.
  *
- * NOTE: urgent data is dropped on the floor.
- *
  * We do not need to hold so_lock, since there can be only one thread
  * operating on the sonode.
  */
@@ -1878,15 +1954,21 @@ so_quiesced_cb(sock_upper_handle_t sock_handle, queue_t *q,
     struct sockaddr *faddr, socklen_t faddrlen, short opts)
 {
 	struct sonode *so = (struct sonode *)sock_handle;
+	boolean_t atmark;
 
 	sotpi_update_state(so, tcap, laddr, laddrlen, faddr, faddrlen, opts);
 
+	/*
+	 * Some protocols do not quiece the data path during fallback. Once
+	 * we set the SS_FALLBACK_DRAIN flag any attempt to queue data will
+	 * fail and the protocol is responsible for saving the data for later
+	 * delivery (i.e., once the fallback has completed).
+	 */
 	mutex_enter(&so->so_lock);
+	so->so_state |= SS_FALLBACK_DRAIN;
 	SOCKET_TIMER_CANCEL(so);
 	mutex_exit(&so->so_lock);
-	/*
-	 * Move data to the STREAM head.
-	 */
+
 	if (so->so_rcv_head != NULL) {
 		if (so->so_rcv_q_last_head == NULL)
 			so->so_rcv_q_head = so->so_rcv_head;
@@ -1895,6 +1977,20 @@ so_quiesced_cb(sock_upper_handle_t sock_handle, queue_t *q,
 		so->so_rcv_q_last_head = so->so_rcv_last_head;
 	}
 
+	atmark = (so->so_state & SS_RCVATMARK) != 0;
+	/*
+	 * Clear any OOB state having to do with pending data. The TPI
+	 * code path will set the appropriate oob state when we move the
+	 * oob data to the STREAM head. We leave SS_HADOOBDATA since the oob
+	 * data has already been consumed.
+	 */
+	so->so_state &= ~(SS_RCVATMARK|SS_OOBPEND|SS_HAVEOOBDATA);
+
+	ASSERT(so->so_oobmsg != NULL || so->so_oobmark <= so->so_rcv_queued);
+
+	/*
+	 * Move data to the STREAM head.
+	 */
 	while (so->so_rcv_q_head != NULL) {
 		mblk_t *mp = so->so_rcv_q_head;
 		size_t mlen = msgdsize(mp);
@@ -1902,33 +1998,200 @@ so_quiesced_cb(sock_upper_handle_t sock_handle, queue_t *q,
 		so->so_rcv_q_head = mp->b_next;
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
+
+		/*
+		 * Send T_EXDATA_IND if we are at the oob mark.
+		 */
+		if (atmark) {
+			struct T_exdata_ind *tei;
+			mblk_t *mp1 = SOTOTPI(so)->sti_exdata_mp;
+
+			SOTOTPI(so)->sti_exdata_mp = NULL;
+			ASSERT(mp1 != NULL);
+			mp1->b_datap->db_type = M_PROTO;
+			tei = (struct T_exdata_ind *)mp1->b_rptr;
+			tei->PRIM_type = T_EXDATA_IND;
+			tei->MORE_flag = 0;
+			mp1->b_wptr = (uchar_t *)&tei[1];
+
+			if (IS_SO_OOB_INLINE(so)) {
+				mp1->b_cont = mp;
+			} else {
+				ASSERT(so->so_oobmsg != NULL);
+				mp1->b_cont = so->so_oobmsg;
+				so->so_oobmsg = NULL;
+
+				/* process current mp next time around */
+				mp->b_next = so->so_rcv_q_head;
+				so->so_rcv_q_head = mp;
+				mlen = 0;
+			}
+			mp = mp1;
+
+			/* we have consumed the oob mark */
+			atmark = B_FALSE;
+		} else if (so->so_oobmark > 0) {
+			/*
+			 * Check if the OOB mark is within the current
+			 * mblk chain. In that case we have to split it up.
+			 */
+			if (so->so_oobmark < mlen) {
+				mblk_t *urg_mp = mp;
+
+				atmark = B_TRUE;
+				mp = NULL;
+				mlen = so->so_oobmark;
+
+				/*
+				 * It is assumed that the OOB mark does
+				 * not land within a mblk.
+				 */
+				do {
+					so->so_oobmark -= MBLKL(urg_mp);
+					mp = urg_mp;
+					urg_mp = urg_mp->b_cont;
+				} while (so->so_oobmark > 0);
+				mp->b_cont = NULL;
+				if (urg_mp != NULL) {
+					urg_mp->b_next = so->so_rcv_q_head;
+					so->so_rcv_q_head = urg_mp;
+				}
+			} else {
+				so->so_oobmark -= mlen;
+				if (so->so_oobmark == 0)
+					atmark = B_TRUE;
+			}
+		}
+
+		/*
+		 * Queue data on the STREAM head.
+		 */
 		so->so_rcv_queued -= mlen;
 		putnext(q, mp);
 	}
-	ASSERT(so->so_rcv_queued == 0);
 	so->so_rcv_head = NULL;
 	so->so_rcv_last_head = NULL;
 	so->so_rcv_q_head = NULL;
 	so->so_rcv_q_last_head = NULL;
 
-#ifdef DEBUG
-	if (so->so_oobmsg != NULL || so->so_oobmark > 0) {
-		cmn_err(CE_NOTE, "losing oob data due to tpi fallback\n");
-	}
-#endif
-	if (so->so_oobmsg != NULL) {
-		freemsg(so->so_oobmsg);
-		so->so_oobmsg = NULL;
-	}
-	so->so_oobmark = 0;
+	/*
+	 * Check if the oob byte is at the end of the data stream, or if the
+	 * oob byte has not yet arrived. In the latter case we have to send a
+	 * SIGURG and a mark indicator to the STREAM head. The mark indicator
+	 * is needed to guarantee correct behavior for SIOCATMARK. See block
+	 * comment in socktpi.h for more details.
+	 */
+	if (atmark || so->so_oobmark > 0) {
+		mblk_t *mp;
 
+		if (atmark && so->so_oobmsg != NULL) {
+			struct T_exdata_ind *tei;
+
+			mp = SOTOTPI(so)->sti_exdata_mp;
+			SOTOTPI(so)->sti_exdata_mp = NULL;
+			ASSERT(mp != NULL);
+			mp->b_datap->db_type = M_PROTO;
+			tei = (struct T_exdata_ind *)mp->b_rptr;
+			tei->PRIM_type = T_EXDATA_IND;
+			tei->MORE_flag = 0;
+			mp->b_wptr = (uchar_t *)&tei[1];
+
+			mp->b_cont = so->so_oobmsg;
+			so->so_oobmsg = NULL;
+
+			putnext(q, mp);
+		} else {
+			/* Send up the signal */
+			mp = SOTOTPI(so)->sti_exdata_mp;
+			SOTOTPI(so)->sti_exdata_mp = NULL;
+			ASSERT(mp != NULL);
+			DB_TYPE(mp) = M_PCSIG;
+			*mp->b_wptr++ = (uchar_t)SIGURG;
+			putnext(q, mp);
+
+			/* Send up the mark indicator */
+			mp = SOTOTPI(so)->sti_urgmark_mp;
+			SOTOTPI(so)->sti_urgmark_mp = NULL;
+			mp->b_flag = atmark ? MSGMARKNEXT : MSGNOTMARKNEXT;
+			putnext(q, mp);
+
+			so->so_oobmark = 0;
+		}
+	}
+
+	if (SOTOTPI(so)->sti_exdata_mp != NULL) {
+		freeb(SOTOTPI(so)->sti_exdata_mp);
+		SOTOTPI(so)->sti_exdata_mp = NULL;
+	}
+
+	if (SOTOTPI(so)->sti_urgmark_mp != NULL) {
+		freeb(SOTOTPI(so)->sti_urgmark_mp);
+		SOTOTPI(so)->sti_urgmark_mp = NULL;
+	}
+
+	ASSERT(so->so_oobmark == 0);
 	ASSERT(so->so_rcv_queued == 0);
 }
+
+#ifdef DEBUG
+/*
+ * Do an integrity check of the sonode. This should be done if a
+ * fallback fails after sonode has initially been converted to use
+ * TPI and subsequently have to be reverted.
+ *
+ * Failure to pass the integrity check will panic the system.
+ */
+void
+so_integrity_check(struct sonode *cur, struct sonode *orig)
+{
+	VERIFY(cur->so_vnode == orig->so_vnode);
+	VERIFY(cur->so_ops == orig->so_ops);
+	/*
+	 * For so_state we can only VERIFY the state flags in CHECK_STATE.
+	 * The other state flags might be affected by a notification from the
+	 * protocol.
+	 */
+#define	CHECK_STATE	(SS_CANTRCVMORE|SS_CANTSENDMORE|SS_NDELAY|SS_NONBLOCK| \
+	SS_ASYNC|SS_ACCEPTCONN|SS_SAVEDEOR|SS_RCVATMARK|SS_OOBPEND| \
+	SS_HAVEOOBDATA|SS_HADOOBDATA|SS_SENTLASTREADSIG|SS_SENTLASTWRITESIG)
+	VERIFY((cur->so_state & (orig->so_state & CHECK_STATE)) ==
+	    (orig->so_state & CHECK_STATE));
+	VERIFY(cur->so_mode == orig->so_mode);
+	VERIFY(cur->so_flag == orig->so_flag);
+	VERIFY(cur->so_count == orig->so_count);
+	/* Cannot VERIFY so_proto_connid; proto can update it */
+	VERIFY(cur->so_sockparams == orig->so_sockparams);
+	/* an error might have been recorded, but it can not be lost */
+	VERIFY(cur->so_error != 0 || orig->so_error == 0);
+	VERIFY(cur->so_family == orig->so_family);
+	VERIFY(cur->so_type == orig->so_type);
+	VERIFY(cur->so_protocol == orig->so_protocol);
+	VERIFY(cur->so_version == orig->so_version);
+	/* New conns might have arrived, but none should have been lost */
+	VERIFY(cur->so_acceptq_len >= orig->so_acceptq_len);
+	VERIFY(cur->so_acceptq_head == orig->so_acceptq_head);
+	VERIFY(cur->so_backlog == orig->so_backlog);
+	/* New OOB migth have arrived, but mark should not have been lost */
+	VERIFY(cur->so_oobmark >= orig->so_oobmark);
+	/* Cannot VERIFY so_oobmsg; the proto might have sent up a new one */
+	VERIFY(cur->so_pgrp == orig->so_pgrp);
+	VERIFY(cur->so_peercred == orig->so_peercred);
+	VERIFY(cur->so_cpid == orig->so_cpid);
+	VERIFY(cur->so_zoneid == orig->so_zoneid);
+	/* New data migth have arrived, but none should have been lost */
+	VERIFY(cur->so_rcv_queued >= orig->so_rcv_queued);
+	VERIFY(cur->so_rcv_q_head == orig->so_rcv_q_head);
+	VERIFY(cur->so_rcv_head == orig->so_rcv_head);
+	VERIFY(cur->so_proto_handle == orig->so_proto_handle);
+	VERIFY(cur->so_downcalls == orig->so_downcalls);
+	/* Cannot VERIFY so_proto_props; they can be updated by proto */
+}
+#endif
 
 /*
  * so_tpi_fallback()
  *
- * This is fallback initation routine; things start here.
+ * This is the fallback initation routine; things start here.
  *
  * Basic strategy:
  *   o Block new socket operations from coming in
@@ -1944,10 +2207,13 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	int error;
 	queue_t *q;
 	struct sockparams *sp;
-	struct sockparams *newsp;
+	struct sockparams *newsp = NULL;
 	so_proto_fallback_func_t fbfunc;
 	boolean_t direct;
-
+	struct sonode *nso;
+#ifdef DEBUG
+	struct sonode origso;
+#endif
 	error = 0;
 	sp = so->so_sockparams;
 	fbfunc = sp->sp_smod_info->smod_proto_fallback_func;
@@ -1965,6 +2231,13 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	 */
 	if (!so_start_fallback(so))
 		return (EAGAIN);
+#ifdef DEBUG
+	/*
+	 * Make a copy of the sonode in case we need to make an integrity
+	 * check later on.
+	 */
+	bcopy(so, &origso, sizeof (*so));
+#endif
 
 	newsp = sockparams_hold_ephemeral_bydev(so->so_family, so->so_type,
 	    so->so_protocol, so->so_sockparams->sp_sdev_info.sd_devpath,
@@ -1983,29 +2256,47 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	}
 
 	/* Turn sonode into a TPI socket */
-	q = sotpi_convert_sonode(so, newsp, &direct, cr);
-	if (q == NULL) {
-		zcmn_err(getzoneid(), CE_WARN,
-		    "Failed to convert socket to TPI. Pid = %d\n",
-		    curproc->p_pid);
-		SOCKPARAMS_DEC_REF(newsp);
-		error = EINVAL;
+	error = sotpi_convert_sonode(so, newsp, &direct, &q, cr);
+	if (error != 0)
 		goto out;
-	}
+
 
 	/*
 	 * Now tell the protocol to start using TPI. so_quiesced_cb be
 	 * called once it's safe to synchronize state.
 	 */
 	DTRACE_PROBE1(proto__fallback__begin, struct sonode *, so);
-	/* FIXME assumes this cannot fail. TCP can fail to enter squeue */
-	(*fbfunc)(so->so_proto_handle, q, direct, so_quiesced_cb);
+	error = (*fbfunc)(so->so_proto_handle, q, direct, so_quiesced_cb);
 	DTRACE_PROBE1(proto__fallback__end, struct sonode *, so);
 
+	if (error != 0) {
+		/* protocol was unable to do a fallback, revert the sonode */
+		sotpi_revert_sonode(so, cr);
+		goto out;
+	}
+
 	/*
-	 * Free all pending connection indications, i.e., socket_accept() has
-	 * not yet pulled the connection of the queue. The transport sent
-	 * a T_CONN_IND message for each pending connection to the STREAM head.
+	 * Walk the accept queue and notify the proto that they should
+	 * fall back to TPI. The protocol will send up the T_CONN_IND.
+	 */
+	nso = so->so_acceptq_head;
+	while (nso != NULL) {
+		int rval;
+
+		DTRACE_PROBE1(proto__fallback__begin, struct sonode *, nso);
+		rval = (*fbfunc)(nso->so_proto_handle, NULL, direct, NULL);
+		DTRACE_PROBE1(proto__fallback__end, struct sonode *, nso);
+		if (rval != 0) {
+			zcmn_err(getzoneid(), CE_WARN,
+			    "Failed to convert socket in accept queue to TPI. "
+			    "Pid = %d\n", curproc->p_pid);
+		}
+		nso = nso->so_acceptq_next;
+	}
+
+	/*
+	 * Now flush the acceptq, this will destroy all sockets. They will
+	 * be recreated in sotpi_accept().
 	 */
 	so_acceptq_flush(so);
 
@@ -2020,10 +2311,6 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	so->so_ops = &sotpi_sonodeops;
 
 	/*
-	 * No longer a non streams socket
-	 */
-	so->so_not_str = B_FALSE;
-	/*
 	 * Wake up any threads stuck in poll. This is needed since the poll
 	 * head changes when the fallback happens (moves from the sonode to
 	 * the STREAMS head).
@@ -2031,6 +2318,17 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	pollwakeup(&so->so_poll_list, POLLERR);
 out:
 	so_end_fallback(so);
+
+	if (error != 0) {
+#ifdef DEBUG
+		so_integrity_check(so, &origso);
+#endif
+		zcmn_err(getzoneid(), CE_WARN,
+		    "Failed to convert socket to TPI (err=%d). Pid = %d\n",
+		    error, curproc->p_pid);
+		if (newsp != NULL)
+			SOCKPARAMS_DEC_REF(newsp);
+	}
 
 	return (error);
 }

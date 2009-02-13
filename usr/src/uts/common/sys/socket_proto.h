@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,7 +129,7 @@ typedef sock_lower_handle_t (*so_proto_create_func_t)(int, int, int,
 typedef void (*so_proto_quiesced_cb_t)(sock_upper_handle_t, queue_t *,
     struct T_capability_ack *, struct sockaddr *, socklen_t,
     struct sockaddr *, socklen_t, short);
-typedef void (*so_proto_fallback_func_t)(sock_lower_handle_t, queue_t *,
+typedef int (*so_proto_fallback_func_t)(sock_lower_handle_t, queue_t *,
     boolean_t, so_proto_quiesced_cb_t);
 
 /*

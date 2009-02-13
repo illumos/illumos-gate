@@ -805,6 +805,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		(*peer_tcp->tcp_connp->conn_upcalls->su_recv)(
 		    peer_tcp->tcp_connp->conn_upper_handle, mp, recv_size,
 		    flags, &error, &push);
+		ASSERT(error != EOPNOTSUPP);
 	} else {
 		if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
 		    (tcp->tcp_valid_bits & TCP_URG_VALID) &&

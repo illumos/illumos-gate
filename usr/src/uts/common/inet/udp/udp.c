@@ -227,6 +227,7 @@ static void	udp_xmit(queue_t *, mblk_t *, ire_t *ire, conn_t *, zoneid_t);
 
 static int	udp_send_connected(conn_t *, mblk_t *, struct nmsghdr *,
 		    cred_t *, pid_t);
+static void	udp_ulp_recv(conn_t *, mblk_t *);
 
 /* Common routine for TPI and socket module */
 static conn_t	*udp_do_open(cred_t *, boolean_t, int);
@@ -1206,7 +1207,7 @@ udp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
  */
 static void
 udp_icmp_error(conn_t *connp, mblk_t *mp)
-			    {
+{
 	icmph_t *icmph;
 	ipha_t	*ipha;
 	int	iph_hdr_length;
@@ -1286,7 +1287,6 @@ udp_icmp_error(conn_t *connp, mblk_t *mp)
 				if (sin.sin_port == udp->udp_dstport &&
 				    sin.sin_addr.s_addr ==
 				    V4_PART_OF_V6(udp->udp_v6dst)) {
-
 					rw_exit(&udp->udp_rwlock);
 					(*connp->conn_upcalls->su_set_error)
 					    (connp->conn_upper_handle, error);
@@ -1324,7 +1324,6 @@ udp_icmp_error(conn_t *connp, mblk_t *mp)
 			}
 			rw_exit(&udp->udp_rwlock);
 		} else {
-
 			mp1 = mi_tpi_uderror_ind((char *)&sin6, sizeof (sin6_t),
 			    NULL, 0, error);
 		}
@@ -1333,6 +1332,7 @@ udp_icmp_error(conn_t *connp, mblk_t *mp)
 	if (mp1 != NULL)
 		putnext(connp->conn_rq, mp1);
 done:
+	ASSERT(!RW_ISWRITER(&udp->udp_rwlock));
 	freemsg(mp);
 }
 
@@ -1444,13 +1444,8 @@ udp_icmp_error_ipv6(conn_t *connp, mblk_t *mp)
 		 * message.  Free it, then send our empty message.
 		 */
 		freemsg(mp);
-		if (!IPCL_IS_NONSTR(connp)) {
-			putnext(connp->conn_rq, newmp);
-		} else {
-			(*connp->conn_upcalls->su_recv)
-			    (connp->conn_upper_handle, newmp, 0, 0, &error,
-			    NULL);
-		}
+		udp_ulp_recv(connp, newmp);
+
 		return;
 	}
 	case ICMP6_TIME_EXCEEDED:
@@ -1508,8 +1503,8 @@ udp_icmp_error_ipv6(conn_t *connp, mblk_t *mp)
 		if (mp1 != NULL)
 			putnext(connp->conn_rq, mp1);
 	}
-
 done:
+	ASSERT(!RW_ISWRITER(&udp->udp_rwlock));
 	freemsg(mp);
 }
 
@@ -3689,7 +3684,7 @@ udp_save_ip_rcv_opt(udp_t *udp, void *opt, int opt_len)
 	}
 }
 
-static void
+static mblk_t *
 udp_queue_fallback(udp_t *udp, mblk_t *mp)
 {
 	ASSERT(MUTEX_HELD(&udp->udp_recv_lock));
@@ -3706,13 +3701,55 @@ udp_queue_fallback(udp_t *udp, mblk_t *mp)
 			udp->udp_fallback_queue_tail->b_next = mp;
 			udp->udp_fallback_queue_tail = mp;
 		}
-		mutex_exit(&udp->udp_recv_lock);
+		return (NULL);
 	} else {
 		/*
-		 * no more fallbacks possible, ok to drop lock.
+		 * Fallback completed, let the caller putnext() the mblk.
 		 */
-		mutex_exit(&udp->udp_recv_lock);
-		putnext(udp->udp_connp->conn_rq, mp);
+		return (mp);
+	}
+}
+
+/*
+ * Deliver data to ULP. In case we have a socket, and it's falling back to
+ * TPI, then we'll queue the mp for later processing.
+ */
+static void
+udp_ulp_recv(conn_t *connp, mblk_t *mp)
+{
+	if (IPCL_IS_NONSTR(connp)) {
+		udp_t *udp = connp->conn_udp;
+		int error;
+
+		if ((*connp->conn_upcalls->su_recv)
+		    (connp->conn_upper_handle, mp, msgdsize(mp), 0, &error,
+		    NULL) < 0) {
+			mutex_enter(&udp->udp_recv_lock);
+			if (error == ENOSPC) {
+				/*
+				 * let's confirm while holding the lock
+				 */
+				if ((*connp->conn_upcalls->su_recv)
+				    (connp->conn_upper_handle, NULL, 0, 0,
+				    &error, NULL) < 0) {
+					ASSERT(error == ENOSPC);
+					if (error == ENOSPC) {
+						connp->conn_flow_cntrld =
+						    B_TRUE;
+					}
+				}
+				mutex_exit(&udp->udp_recv_lock);
+			} else {
+				ASSERT(error == EOPNOTSUPP);
+				mp = udp_queue_fallback(udp, mp);
+				mutex_exit(&udp->udp_recv_lock);
+				if (mp != NULL)
+					putnext(connp->conn_rq, mp);
+			}
+		}
+		ASSERT(MUTEX_NOT_HELD(&udp->udp_recv_lock));
+	} else {
+		putnext(connp->conn_rq, mp);
 	}
 }
 
@@ -4463,37 +4500,8 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 	if (options_mp != NULL)
 		freeb(options_mp);
 
-	if (IPCL_IS_NONSTR(connp)) {
-		int error;
+	udp_ulp_recv(connp, mp);
 
-		if ((*connp->conn_upcalls->su_recv)
-		    (connp->conn_upper_handle, mp, msgdsize(mp), 0, &error,
-		    NULL) < 0) {
-			mutex_enter(&udp->udp_recv_lock);
-			if (error == ENOSPC) {
-				/*
-				 * let's confirm while holding the lock
-				 */
-				if ((*connp->conn_upcalls->su_recv)
-				    (connp->conn_upper_handle, NULL, 0, 0,
-				    &error, NULL) < 0) {
-					if (error == ENOSPC) {
-						connp->conn_flow_cntrld =
-						    B_TRUE;
-					} else {
-						ASSERT(error == EOPNOTSUPP);
-					}
-				}
-				mutex_exit(&udp->udp_recv_lock);
-			} else {
-				ASSERT(error == EOPNOTSUPP);
-				udp_queue_fallback(udp, mp);
-			}
-		}
-	} else {
-		putnext(connp->conn_rq, mp);
-	}
-	ASSERT(MUTEX_NOT_HELD(&udp->udp_recv_lock));
 	return;
 
 tossit:
@@ -5846,7 +5854,7 @@ udp_send_connected(conn_t *connp, mblk_t *mp, struct nmsghdr *msg, cred_t *cr,
 
 	/* M_DATA for connected socket */
 
-	ASSERT(udp->udp_issocket || IPCL_IS_NONSTR(connp));
+	ASSERT(udp->udp_issocket);
 	UDP_DBGSTAT(us, udp_data_conn);
 
 	mutex_enter(&connp->conn_lock);
@@ -7990,6 +7998,7 @@ udp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 	us = udp->udp_us;
 	ASSERT(us != NULL);
 
+	udp->udp_issocket = B_TRUE;
 	connp->conn_flags |= IPCL_NONSTR | IPCL_SOCKET;
 
 	/* Set flow control */
@@ -9272,7 +9281,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	return (udp->udp_dgram_errind ? error : 0);
 }
 
-void
+int
 udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
     boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
 {
@@ -9340,21 +9349,15 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	if (udp->udp_dontroute)
 		opts |= SO_DONTROUTE;
 
-	/*
-	 * Once we grab the drain lock, no data will be send up
-	 * to the socket. So we notify the socket that the endpoint
-	 * is quiescent and it's therefore safe move data from
-	 * the socket to the stream head.
-	 */
 	(*quiesced_cb)(connp->conn_upper_handle, q, &tca,
 	    (struct sockaddr *)&laddr, laddrlen,
 	    (struct sockaddr *)&faddr, faddrlen, opts);
 
-	/*
-	 * push up any packets that were queued in udp_t
-	 */
-
 	mutex_enter(&udp->udp_recv_lock);
+	/*
+	 * Attempts to send data up during fallback will result in it being
+	 * queued in udp_t. Now we push up any queued packets.
+	 */
 	while (udp->udp_fallback_queue_head != NULL) {
 		mblk_t *mp;
 		mp = udp->udp_fallback_queue_head;
@@ -9368,10 +9371,15 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	/*
 	 * No longer a streams less socket
 	 */
+	rw_enter(&udp->udp_rwlock, RW_WRITER);
 	connp->conn_flags &= ~IPCL_NONSTR;
+	rw_exit(&udp->udp_rwlock);
+
 	mutex_exit(&udp->udp_recv_lock);
 
 	ASSERT(connp->conn_ref >= 1);
+
+	return (0);
 }
 
 static int

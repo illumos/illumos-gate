@@ -151,6 +151,7 @@ static int	raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp,
 static void	icmp_wput_other(queue_t *q, mblk_t *mp);
 static void	icmp_wput_iocdata(queue_t *q, mblk_t *mp);
 static void	icmp_wput_restricted(queue_t *q, mblk_t *mp);
+static void	icmp_ulp_recv(conn_t *, mblk_t *);
 
 static void	*rawip_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	rawip_stack_fini(netstackid_t stackid, void *arg);
@@ -1131,6 +1132,7 @@ icmp_icmp_error(conn_t *connp, mblk_t *mp)
 	sin = sin_null;
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = ipha->ipha_dst;
+
 	if (IPCL_IS_NONSTR(connp)) {
 		rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 		if (icmp->icmp_state == TS_DATA_XFER) {
@@ -1147,13 +1149,13 @@ icmp_icmp_error(conn_t *connp, mblk_t *mp)
 		}
 		rw_exit(&icmp->icmp_rwlock);
 	} else {
-
 		mp1 = mi_tpi_uderror_ind((char *)&sin, sizeof (sin_t), NULL,
 		    0, error);
 		if (mp1 != NULL)
 			putnext(connp->conn_rq, mp1);
 	}
 done:
+	ASSERT(!RW_ISWRITER(&icmp->icmp_rwlock));
 	freemsg(mp);
 }
 
@@ -1264,14 +1266,8 @@ icmp_icmp_error_ipv6(conn_t *connp, mblk_t *mp)
 		 * message.  Free it, then send our empty message.
 		 */
 		freemsg(mp);
-		if (!IPCL_IS_NONSTR(connp)) {
-			putnext(connp->conn_rq, newmp);
-		} else {
-			(*connp->conn_upcalls->su_recv)
-			    (connp->conn_upper_handle, newmp, 0, 0, &error,
-			    NULL);
-			ASSERT(error == 0);
-		}
+		icmp_ulp_recv(connp, newmp);
+
 		return;
 	}
 	case ICMP6_TIME_EXCEEDED:
@@ -1322,13 +1318,13 @@ icmp_icmp_error_ipv6(conn_t *connp, mblk_t *mp)
 		}
 		rw_exit(&icmp->icmp_rwlock);
 	} else {
-
 		mp1 = mi_tpi_uderror_ind((char *)&sin6, sizeof (sin6_t),
 		    NULL, 0, error);
 		if (mp1 != NULL)
 			putnext(connp->conn_rq, mp1);
 	}
 done:
+	ASSERT(!RW_ISWRITER(&icmp->icmp_rwlock));
 	freemsg(mp);
 }
 
@@ -3339,7 +3335,8 @@ icmp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 	icmppa->icmp_param_value = new_value;
 	return (0);
 }
-static void
+
+static mblk_t *
 icmp_queue_fallback(icmp_t *icmp, mblk_t *mp)
 {
 	ASSERT(MUTEX_HELD(&icmp->icmp_recv_lock));
@@ -3356,13 +3353,56 @@ icmp_queue_fallback(icmp_t *icmp, mblk_t *mp)
 			icmp->icmp_fallback_queue_tail->b_next = mp;
 			icmp->icmp_fallback_queue_tail = mp;
 		}
-		mutex_exit(&icmp->icmp_recv_lock);
+		return (NULL);
 	} else {
 		/*
-		 * no more fallbacks possible, ok to drop lock.
+		 * Fallback completed, let the caller putnext() the mblk.
 		 */
-		mutex_exit(&icmp->icmp_recv_lock);
-		putnext(icmp->icmp_connp->conn_rq, mp);
+		return (mp);
+	}
+}
+
+/*
+ * Deliver data to ULP. In case we have a socket, and it's falling back to
+ * TPI, then we'll queue the mp for later processing.
+ */
+static void
+icmp_ulp_recv(conn_t *connp, mblk_t *mp)
+{
+
+	if (IPCL_IS_NONSTR(connp)) {
+		icmp_t *icmp = connp->conn_icmp;
+		int error;
+
+		if ((*connp->conn_upcalls->su_recv)
+		    (connp->conn_upper_handle, mp, msgdsize(mp), 0, &error,
+		    NULL) < 0) {
+			mutex_enter(&icmp->icmp_recv_lock);
+			if (error == ENOSPC) {
+				/*
+				 * let's confirm while holding the lock
+				 */
+				if ((*connp->conn_upcalls->su_recv)
+				    (connp->conn_upper_handle, NULL, 0, 0,
+				    &error, NULL) < 0) {
+					ASSERT(error == ENOSPC);
+					if (error == ENOSPC) {
+						connp->conn_flow_cntrld =
+						    B_TRUE;
+					}
+				}
+				mutex_exit(&icmp->icmp_recv_lock);
+			} else {
+				ASSERT(error == EOPNOTSUPP);
+				mp = icmp_queue_fallback(icmp, mp);
+				mutex_exit(&icmp->icmp_recv_lock);
+				if (mp != NULL)
+					putnext(connp->conn_rq, mp);
+			}
+		}
+		ASSERT(MUTEX_NOT_HELD(&icmp->icmp_recv_lock));
+	} else {
+		putnext(connp->conn_rq, mp);
 	}
 }
 
@@ -3391,7 +3431,6 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 	uint_t			icmp_opt = 0;
 	boolean_t		icmp_ipv6_recvhoplimit = B_FALSE;
 	uint_t			hopstrip;
-	int			error;
 
 	ASSERT(connp->conn_flags & IPCL_RAWIPCONN);
 
@@ -4038,35 +4077,8 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 	BUMP_MIB(&is->is_rawip_mib, rawipInDatagrams);
 
 deliver:
-	if (IPCL_IS_NONSTR(connp)) {
-		if ((*connp->conn_upcalls->su_recv)
-		    (connp->conn_upper_handle, mp, msgdsize(mp), 0, &error,
-		    NULL) < 0) {
-			mutex_enter(&icmp->icmp_recv_lock);
-			if (error == ENOSPC) {
-				/*
-				 * let's confirm while holding the lock
-				 */
-				if ((*connp->conn_upcalls->su_recv)
-				    (connp->conn_upper_handle, NULL, 0, 0,
-				    &error, NULL) < 0) {
-					if (error == ENOSPC) {
-						connp->conn_flow_cntrld =
-						    B_TRUE;
-					} else {
-						ASSERT(error == EOPNOTSUPP);
-					}
-				}
-				mutex_exit(&icmp->icmp_recv_lock);
-			} else {
-				ASSERT(error == EOPNOTSUPP);
-				icmp_queue_fallback(icmp, mp);
-			}
-		}
-	} else {
-		putnext(connp->conn_rq, mp);
-	}
-	ASSERT(MUTEX_NOT_HELD(&icmp->icmp_recv_lock));
+	icmp_ulp_recv(connp, mp);
+
 }
 
 /*
@@ -5968,7 +5980,7 @@ rawip_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 }
 
 /* ARGSUSED */
-void
+int
 rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
     boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
 {
@@ -6032,20 +6044,14 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	if (icmp->icmp_dontroute)
 		opts |= SO_DONTROUTE;
 
-	/*
-	 * Once we grab the drain lock, no data will be send up
-	 * to the socket. So we notify the socket that the endpoint
-	 * is quiescent and it's therefore safe move data from
-	 * the socket to the stream head.
-	 */
 	(*quiesced_cb)(connp->conn_upper_handle, q, &tca,
 	    (struct sockaddr *)&laddr, laddrlen,
 	    (struct sockaddr *)&faddr, faddrlen, opts);
 
 	/*
-	 * push up any packets that were queued in icmp_t
+	 * Attempts to send data up during fallback will result in it being
+	 * queued in udp_t. Now we push up any queued packets.
 	 */
-
 	mutex_enter(&icmp->icmp_recv_lock);
 	while (icmp->icmp_fallback_queue_head != NULL) {
 		mblk_t	*mp;
@@ -6058,15 +6064,22 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 		mutex_enter(&icmp->icmp_recv_lock);
 	}
 	icmp->icmp_fallback_queue_tail = icmp->icmp_fallback_queue_head;
+
 	/*
 	 * No longer a streams less socket
 	 */
+	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 	connp->conn_flags &= ~IPCL_NONSTR;
+	rw_exit(&icmp->icmp_rwlock);
+
 	mutex_exit(&icmp->icmp_recv_lock);
+
 	ASSERT(icmp->icmp_fallback_queue_head == NULL &&
 	    icmp->icmp_fallback_queue_tail == NULL);
 
 	ASSERT(connp->conn_ref >= 1);
+
+	return (0);
 }
 
 /* ARGSUSED */

@@ -1203,7 +1203,7 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 	}
 
 	mutex_enter(&so->so_lock);
-	if (so->so_state & (SS_FALLBACK_PENDING | SS_FALLBACK_COMP)) {
+	if (so->so_state & (SS_FALLBACK_DRAIN | SS_FALLBACK_COMP)) {
 		SOD_DISABLE(sodp);
 		mutex_exit(&so->so_lock);
 		*errorp = EOPNOTSUPP;

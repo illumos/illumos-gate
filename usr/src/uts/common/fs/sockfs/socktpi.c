@@ -6674,21 +6674,24 @@ socktpi_init(void)
  * Given a non-TPI sonode, allocate and prep it to be ready for TPI.
  *
  * Caller must still update state and mode using sotpi_update_state().
- *
- * Returns the STREAM queue that the protocol should use.
  */
-queue_t *
+int
 sotpi_convert_sonode(struct sonode *so, struct sockparams *newsp,
-    boolean_t *direct, struct cred *cr)
+    boolean_t *direct, queue_t **qp, struct cred *cr)
 {
 	sotpi_info_t *sti;
 	struct sockparams *origsp = so->so_sockparams;
 	sock_lower_handle_t handle = so->so_proto_handle;
-	uint_t old_state = so->so_state;
 	struct stdata *stp;
 	struct vnode *vp;
 	queue_t *q;
+	int error = 0;
 
+	ASSERT((so->so_state & (SS_FALLBACK_PENDING|SS_FALLBACK_COMP)) ==
+	    SS_FALLBACK_PENDING);
+	ASSERT(SOCK_IS_NONSTR(so));
+
+	*qp = NULL;
 	*direct = B_FALSE;
 	so->so_sockparams = newsp;
 	/*
@@ -6697,16 +6700,32 @@ sotpi_convert_sonode(struct sonode *so, struct sockparams *newsp,
 	(void) sotpi_info_create(so, KM_SLEEP);
 	sotpi_info_init(so);
 
-	if (sotpi_init(so, NULL, cr, SO_FALLBACK) != 0) {
+	if ((error = sotpi_init(so, NULL, cr, SO_FALLBACK)) != 0) {
 		sotpi_info_fini(so);
 		sotpi_info_destroy(so);
-		so->so_state = old_state;
-		return (NULL);
+		return (error);
 	}
 	ASSERT(handle == so->so_proto_handle);
 	sti = SOTOTPI(so);
 	if (sti->sti_direct != 0)
 		*direct = B_TRUE;
+
+	/*
+	 * When it comes to urgent data we have two cases to deal with;
+	 * (1) The oob byte has already arrived, or (2) the protocol has
+	 * notified that oob data is pending, but it has not yet arrived.
+	 *
+	 * For (1) all we need to do is send a T_EXDATA_IND to indicate were
+	 * in the byte stream the oob byte is. For (2) we have to send a
+	 * SIGURG (M_PCSIG), followed by a zero-length mblk indicating whether
+	 * the oob byte will be the next byte from the protocol.
+	 *
+	 * So in the worst case we need two mblks, one for the signal, another
+	 * for mark indication. In that case we use the exdata_mp for the sig.
+	 */
+	sti->sti_exdata_mp = allocb_wait(sizeof (struct T_exdata_ind), BPRI_MED,
+	    STR_NOSIG, NULL);
+	sti->sti_urgmark_mp = allocb_wait(0, BPRI_MED, STR_NOSIG, NULL);
 
 	/*
 	 * Keep the original sp around so we can properly dispose of the
@@ -6728,10 +6747,8 @@ sotpi_convert_sonode(struct sonode *so, struct sockparams *newsp,
 	 * connection indications.
 	 */
 	if (so->so_pgrp != 0) {
-		mutex_enter(&so->so_lock);
 		if (so_set_events(so, so->so_vnode, cr) != 0)
 			so->so_pgrp = 0;
-		mutex_exit(&so->so_lock);
 	}
 
 	/*
@@ -6748,9 +6765,52 @@ sotpi_convert_sonode(struct sonode *so, struct sockparams *newsp,
 	 */
 	while (q->q_next != NULL)
 		q = q->q_next;
-	q = _RD(q);
+	*qp = _RD(q);
 
-	return (q);
+	/* This is now a STREAMS sockets */
+	so->so_not_str = B_FALSE;
+
+	return (error);
+}
+
+/*
+ * Revert a TPI sonode. It is only allowed to revert the sonode during
+ * the fallback process.
+ */
+void
+sotpi_revert_sonode(struct sonode *so, struct cred *cr)
+{
+	vnode_t *vp = SOTOV(so);
+
+	ASSERT((so->so_state & (SS_FALLBACK_PENDING|SS_FALLBACK_COMP)) ==
+	    SS_FALLBACK_PENDING);
+	ASSERT(!SOCK_IS_NONSTR(so));
+	ASSERT(vp->v_stream != NULL);
+
+	if (SOTOTPI(so)->sti_exdata_mp != NULL) {
+		freeb(SOTOTPI(so)->sti_exdata_mp);
+		SOTOTPI(so)->sti_exdata_mp = NULL;
+	}
+
+	if (SOTOTPI(so)->sti_urgmark_mp != NULL) {
+		freeb(SOTOTPI(so)->sti_urgmark_mp);
+		SOTOTPI(so)->sti_urgmark_mp = NULL;
+	}
+
+	strclean(vp);
+	(void) strclose(vp, FREAD|FWRITE|SO_FALLBACK, cr);
+
+	/*
+	 * Restore the original sockparams. The caller is responsible for
+	 * dropping the ref to the new sp.
+	 */
+	so->so_sockparams = SOTOTPI(so)->sti_orig_sp;
+
+	sotpi_info_fini(so);
+	sotpi_info_destroy(so);
+
+	/* This is no longer a STREAMS sockets */
+	so->so_not_str = B_TRUE;
 }
 
 void
@@ -6815,8 +6875,7 @@ sotpi_sototpi(struct sonode *so)
 {
 	sotpi_info_t *sti;
 
-	if (so == NULL)
-		return (NULL);
+	ASSERT(so != NULL);
 
 	sti = (sotpi_info_t *)so->so_priv;
 
@@ -6845,6 +6904,9 @@ i_sotpi_info_constructor(sotpi_info_t *sti)
 	sti->sti_nl7c_uri	= NULL;
 	sti->sti_nl7c_rcv_mp	= NULL;
 
+	sti->sti_exdata_mp	= NULL;
+	sti->sti_urgmark_mp	= NULL;
+
 	mutex_init(&sti->sti_plumb_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sti->sti_ack_cv, NULL, CV_DEFAULT, NULL);
 
@@ -6869,6 +6931,9 @@ i_sotpi_info_destructor(sotpi_info_t *sti)
 	ASSERT(sti->sti_nl7c_flags == 0);
 	ASSERT(sti->sti_nl7c_uri == NULL);
 	ASSERT(sti->sti_nl7c_rcv_mp == NULL);
+
+	ASSERT(sti->sti_exdata_mp == NULL);
+	ASSERT(sti->sti_urgmark_mp == NULL);
 
 	mutex_destroy(&sti->sti_plumb_lock);
 	cv_destroy(&sti->sti_ack_cv);

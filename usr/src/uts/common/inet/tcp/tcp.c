@@ -14059,6 +14059,11 @@ ok:;
 				(*connp->conn_upcalls->su_recv)
 				    (connp->conn_upper_handle, mp, seg_len,
 				    MSG_OOB, &error, NULL);
+				/*
+				 * We should never be in middle of a
+				 * fallback, the squeue guarantees that.
+				 */
+				ASSERT(error != EOPNOTSUPP);
 				mp = NULL;
 				goto update_ack;
 			} else if (!tcp->tcp_urp_mp) {
@@ -15157,12 +15162,13 @@ update_ack:
 				if ((*connp->conn_upcalls->su_recv)
 				    (connp->conn_upper_handle, mp,
 				    seg_len, 0, &error, NULL) <= 0) {
-					if (error == ENOSPC) {
+					/*
+					 * We should never be in middle of a
+					 * fallback, the squeue guarantees that.
+					 */
+					ASSERT(error != EOPNOTSUPP);
+					if (error == ENOSPC)
 						tcp->tcp_rwnd -= seg_len;
-					} else if (error == EOPNOTSUPP) {
-						tcp_rcv_enqueue(tcp, mp,
-						    seg_len);
-					}
 				}
 			} else if (sodp != NULL) {
 				mutex_enter(sodp->sod_lockp);
@@ -15216,11 +15222,13 @@ update_ack:
 			if ((*connp->conn_upcalls->su_recv)(
 			    connp->conn_upper_handle,
 			    mp, seg_len, 0, &error, &push) <= 0) {
-				if (error == ENOSPC) {
+				/*
+				 * We should never be in middle of a
+				 * fallback, the squeue guarantees that.
+				 */
+				ASSERT(error != EOPNOTSUPP);
+				if (error == ENOSPC)
 					tcp->tcp_rwnd -= seg_len;
-				} else if (error == EOPNOTSUPP) {
-					tcp_rcv_enqueue(tcp, mp, seg_len);
-				}
 			} else if (push) {
 				/*
 				 * PUSH bit set and sockfs is not
@@ -18169,9 +18177,8 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 				    0, &error, &push);
 				if (space_left < 0) {
 					/*
-					 * At this point the eager is not
-					 * visible to anyone, so fallback
-					 * can not happen.
+					 * We should never be in middle of a
+					 * fallback, the squeue guarantees that.
 					 */
 					ASSERT(error != EOPNOTSUPP);
 				}
@@ -27700,72 +27707,34 @@ tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 /*
  * tcp_fallback
  *
- * A direct socket is falling back to using STREAMS. Hanging
- * off of the queue is a temporary tcp_t, which was created using
- * tcp_open(). The tcp_open() was called as part of the regular
- * sockfs create path, i.e., the SO_SOCKSTR flag is passed down,
- * and therefore the temporary tcp_t is marked to be a socket
- * (i.e., IPCL_SOCKET, tcp_issocket). So the optimizations
- * introduced by FireEngine will be used.
+ * A direct socket is falling back to using STREAMS. The queue
+ * that is being passed down was created using tcp_open() with
+ * the SO_FALLBACK flag set. As a result, the queue is not
+ * associated with a conn, and the q_ptrs instead contain the
+ * dev and minor area that should be used.
  *
- * The tcp_t associated with the socket falling back will
- * still be marked as a socket, although the direct socket flag
- * (IPCL_NONSTR) is removed. A fall back to true TPI semantics
- * will not take place until a _SIOCSOCKFALLBACK ioctl is issued.
- *
- * If the above mentioned behavior, i.e., the tmp tcp_t is created
- * as a STREAMS/TPI endpoint, then we will need to do more work here.
- * Such as inserting the direct socket into the acceptor hash.
+ * The 'direct_sockfs' flag indicates whether the FireEngine
+ * optimizations should be used. The common case would be that
+ * optimizations are enabled, and they might be subsequently
+ * disabled using the _SIOCSOCKFALLBACK ioctl.
+ */
+
+/*
+ * An active connection is falling back to TPI. Gather all the information
+ * required by the STREAM head and TPI sonode and send it up.
  */
 void
-tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
+tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
     boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
 {
-	tcp_t			*tcp, *eager;
-	conn_t 			*connp = (conn_t *)proto_handle;
-	int			error;
+	conn_t			*connp = tcp->tcp_connp;
+	struct stroptions	*stropt;
 	struct T_capability_ack tca;
 	struct sockaddr_in6	laddr, faddr;
 	socklen_t 		laddrlen, faddrlen;
 	short			opts;
-	struct stroptions	*stropt;
-	mblk_t			*stropt_mp;
+	int			error;
 	mblk_t			*mp;
-	mblk_t			*conn_ind_head = NULL;
-	mblk_t			*conn_ind_tail = NULL;
-	mblk_t			*ordrel_mp;
-	mblk_t			*fused_sigurp_mp;
-
-	tcp = connp->conn_tcp;
-	/*
-	 * No support for acceptor fallback
-	 */
-	ASSERT(q->q_qinfo != &tcp_acceptor_rinit);
-
-	stropt_mp = allocb_wait(sizeof (*stropt), BPRI_HI, STR_NOSIG, NULL);
-
-	/* Pre-allocate the T_ordrel_ind mblk. */
-	ASSERT(tcp->tcp_ordrel_mp == NULL);
-	ordrel_mp = allocb_wait(sizeof (struct T_ordrel_ind), BPRI_HI,
-	    STR_NOSIG, NULL);
-	ordrel_mp->b_datap->db_type = M_PROTO;
-	((struct T_ordrel_ind *)ordrel_mp->b_rptr)->PRIM_type = T_ORDREL_IND;
-	ordrel_mp->b_wptr += sizeof (struct T_ordrel_ind);
-
-	/* Pre-allocate the M_PCSIG anyway */
-	fused_sigurp_mp = allocb_wait(1, BPRI_HI, STR_NOSIG, NULL);
-
-	/*
-	 * Enter the squeue so that no new packets can come in
-	 */
-	error = squeue_synch_enter(connp->conn_sqp, connp, 0);
-	if (error != 0) {
-		/* failed to enter, free all the pre-allocated messages. */
-		freeb(stropt_mp);
-		freeb(ordrel_mp);
-		freeb(fused_sigurp_mp);
-		return;
-	}
 
 	/* Disable I/OAT during fallback */
 	tcp->tcp_sodirect = NULL;
@@ -27814,10 +27783,8 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	tcp_do_capability_ack(tcp, &tca, TC1_INFO|TC1_ACCEPTOR_ID);
 
 	laddrlen = faddrlen = sizeof (sin6_t);
-	(void) tcp_getsockname(proto_handle, (struct sockaddr *)&laddr,
-	    &laddrlen, CRED());
-	error = tcp_getpeername(proto_handle, (struct sockaddr *)&faddr,
-	    &faddrlen, CRED());
+	(void) tcp_do_getsockname(tcp, (struct sockaddr *)&laddr, &laddrlen);
+	error = tcp_do_getpeername(tcp, (struct sockaddr *)&faddr, &faddrlen);
 	if (error != 0)
 		faddrlen = 0;
 
@@ -27844,6 +27811,90 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	tcp->tcp_rcv_last_head = NULL;
 	tcp->tcp_rcv_last_tail = NULL;
 	tcp->tcp_rcv_cnt = 0;
+}
+
+/*
+ * An eager is falling back to TPI. All we have to do is send
+ * up a T_CONN_IND.
+ */
+void
+tcp_fallback_eager(tcp_t *eager, boolean_t direct_sockfs)
+{
+	tcp_t *listener = eager->tcp_listener;
+	mblk_t *mp = eager->tcp_conn.tcp_eager_conn_ind;
+
+	ASSERT(listener != NULL);
+	ASSERT(mp != NULL);
+
+	eager->tcp_conn.tcp_eager_conn_ind = NULL;
+
+	/*
+	 * TLI/XTI applications will get confused by
+	 * sending eager as an option since it violates
+	 * the option semantics. So remove the eager as
+	 * option since TLI/XTI app doesn't need it anyway.
+	 */
+	if (!direct_sockfs) {
+		struct T_conn_ind *conn_ind;
+
+		conn_ind = (struct T_conn_ind *)mp->b_rptr;
+		conn_ind->OPT_length = 0;
+		conn_ind->OPT_offset = 0;
+	}
+
+	/*
+	 * Sockfs guarantees that the listener will not be closed
+	 * during fallback. So we can safely use the listener's queue.
+	 */
+	putnext(listener->tcp_rq, mp);
+}
+
+int
+tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
+    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
+{
+	tcp_t			*tcp;
+	conn_t 			*connp = (conn_t *)proto_handle;
+	int			error;
+	mblk_t			*stropt_mp;
+	mblk_t			*ordrel_mp;
+	mblk_t			*fused_sigurp_mp;
+
+	tcp = connp->conn_tcp;
+
+	stropt_mp = allocb_wait(sizeof (struct stroptions), BPRI_HI, STR_NOSIG,
+	    NULL);
+
+	/* Pre-allocate the T_ordrel_ind mblk. */
+	ASSERT(tcp->tcp_ordrel_mp == NULL);
+	ordrel_mp = allocb_wait(sizeof (struct T_ordrel_ind), BPRI_HI,
+	    STR_NOSIG, NULL);
+	ordrel_mp->b_datap->db_type = M_PROTO;
+	((struct T_ordrel_ind *)ordrel_mp->b_rptr)->PRIM_type = T_ORDREL_IND;
+	ordrel_mp->b_wptr += sizeof (struct T_ordrel_ind);
+
+	/* Pre-allocate the M_PCSIG used by fusion */
+	fused_sigurp_mp = allocb_wait(1, BPRI_HI, STR_NOSIG, NULL);
+
+	/*
+	 * Enter the squeue so that no new packets can come in
+	 */
+	error = squeue_synch_enter(connp->conn_sqp, connp, 0);
+	if (error != 0) {
+		/* failed to enter, free all the pre-allocated messages. */
+		freeb(stropt_mp);
+		freeb(ordrel_mp);
+		freeb(fused_sigurp_mp);
+		/*
+		 * We cannot process the eager, so at least send out a
+		 * RST so the peer can reconnect.
+		 */
+		if (tcp->tcp_listener != NULL) {
+			(void) tcp_eager_blowoff(tcp->tcp_listener,
+			    tcp->tcp_conn_req_seqnum);
+		}
+		return (ENOMEM);
+	}
 
 	/*
 	 * No longer a direct socket
@@ -27859,45 +27910,13 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 		freeb(fused_sigurp_mp);
 	}
 
-	/*
-	 * Send T_CONN_IND messages for all ESTABLISHED connections.
-	 */
-	mutex_enter(&tcp->tcp_eager_lock);
-	for (eager = tcp->tcp_eager_next_q; eager != NULL;
-	    eager = eager->tcp_eager_next_q) {
-		mp = eager->tcp_conn.tcp_eager_conn_ind;
-
-		eager->tcp_conn.tcp_eager_conn_ind = NULL;
-		ASSERT(mp != NULL);
-		/*
-		 * TLI/XTI applications will get confused by
-		 * sending eager as an option since it violates
-		 * the option semantics. So remove the eager as
-		 * option since TLI/XTI app doesn't need it anyway.
-		 */
-		if (!TCP_IS_SOCKET(tcp)) {
-			struct T_conn_ind *conn_ind;
-
-			conn_ind = (struct T_conn_ind *)mp->b_rptr;
-			conn_ind->OPT_length = 0;
-			conn_ind->OPT_offset = 0;
-		}
-		if (conn_ind_head == NULL) {
-			conn_ind_head = mp;
-		} else {
-			conn_ind_tail->b_next = mp;
-		}
-		conn_ind_tail = mp;
-	}
-	mutex_exit(&tcp->tcp_eager_lock);
-
-	mp = conn_ind_head;
-	while (mp != NULL) {
-		mblk_t *nmp = mp->b_next;
-		mp->b_next = NULL;
-
-		putnext(tcp->tcp_rq, mp);
-		mp = nmp;
+	if (tcp->tcp_listener != NULL) {
+		/* The eager will deal with opts when accept() is called */
+		freeb(stropt_mp);
+		tcp_fallback_eager(tcp, direct_sockfs);
+	} else {
+		tcp_fallback_noneager(tcp, stropt_mp, q, direct_sockfs,
+		    quiesced_cb);
 	}
 
 	/*
@@ -27905,6 +27924,8 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	 */
 	ASSERT(connp->conn_ref >= 2);
 	squeue_synch_exit(connp->conn_sqp, connp);
+
+	return (0);
 }
 
 /* ARGSUSED */
