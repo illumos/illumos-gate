@@ -477,11 +477,15 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc = ddi_get_soft_state(iwk_soft_state_p,
 		    ddi_get_instance(dip));
 		ASSERT(sc != NULL);
+
+		mutex_enter(&sc->sc_glock);
+		sc->sc_flags &= ~IWK_F_SUSPEND;
+		mutex_exit(&sc->sc_glock);
+
 		if (sc->sc_flags & IWK_F_RUNNING)
 			(void) iwk_init(sc);
 
 		mutex_enter(&sc->sc_glock);
-		sc->sc_flags &= ~IWK_F_SUSPEND;
 		sc->sc_flags |= IWK_F_LAZY_RESUME;
 		mutex_exit(&sc->sc_glock);
 
@@ -2908,14 +2912,6 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 
 	oldmod = ic->ic_opmode;
 
-	mutex_enter(&sc->sc_glock);
-	if (sc->sc_flags & (IWK_F_SUSPEND | IWK_F_HW_ERR_RECOVER)) {
-		miocnak(wq, mp, 0, ENXIO);
-		mutex_exit(&sc->sc_glock);
-		return;
-	}
-	mutex_exit(&sc->sc_glock);
-
 	err = ieee80211_ioctl(ic, wq, mp);
 
 	/*
@@ -3079,13 +3075,6 @@ iwk_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	int		err;
 	iwk_sc_t	*sc = (iwk_sc_t *)arg;
 	ieee80211com_t	*ic = &sc->sc_ic;
-
-	mutex_enter(&sc->sc_glock);
-	if (sc->sc_flags & (IWK_F_SUSPEND | IWK_F_HW_ERR_RECOVER)) {
-		mutex_exit(&sc->sc_glock);
-		return (ENXIO);
-	}
-	mutex_exit(&sc->sc_glock);
 
 	err = ieee80211_setprop(ic, pr_name, wldp_pr_num, wldp_length,
 	    wldp_buf);
