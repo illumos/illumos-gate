@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,6 +193,10 @@ apic_send_EOI(uint32_t irq)
 	apic_reg_ops->apic_write(APIC_EOI_REG, 0);
 }
 
+/*
+ * Support for Directed EOI capability is available in both the xAPIC
+ * and x2APIC mode.
+ */
 void
 apic_send_directed_EOI(uint32_t irq)
 {
@@ -201,10 +205,16 @@ apic_send_directed_EOI(uint32_t irq)
 	apic_irq_t *apic_irq;
 	short intr_index;
 
-	ASSERT(apic_mode == LOCAL_X2APIC);
+	/*
+	 * Following the EOI to the local APIC unit, perform a directed
+	 * EOI to the IOxAPIC generating the interrupt by writing to its
+	 * EOI register.
+	 *
+	 * A broadcast EOI is not generated.
+	 */
+	apic_reg_ops->apic_write(APIC_EOI_REG, 0);
 
 	apic_irq = apic_irq_table[irq];
-
 	while (apic_irq) {
 		intr_index = apic_irq->airq_mps_intr_index;
 		if (intr_index == ACPI_INDEX || intr_index >= 0) {
