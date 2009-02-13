@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mount
@@ -254,9 +252,9 @@ main(int argc, char *argv[])
 	if (findopt(mnt.mnt_mntopts, "m"))
 		mflg++;
 	if ((gflg || findopt(mnt.mnt_mntopts, MNTOPT_GLOBAL)) &&
-			findopt(mnt.mnt_mntopts, MNTOPT_NBMAND)) {
+	    findopt(mnt.mnt_mntopts, MNTOPT_NBMAND)) {
 		(void) fprintf(stderr, gettext("NBMAND option not supported on"
-						" global filesystem\n"));
+		" global filesystem\n"));
 		exit(32);
 	}
 
@@ -283,7 +281,7 @@ reportlogerror(int ret, char *mp, char *special, char *cmd, fiolog_t *flp)
 	/* logging was not enabled/disabled */
 	if (ret == -1 || flp->error != FIOLOG_ENONE)
 		(void) fprintf(stderr, gettext("Could not %s logging"
-				" for %s on %s.\n"), cmd, mp, special);
+		" for %s on %s.\n"), cmd, mp, special);
 
 	/* ioctl returned error */
 	if (ret == -1)
@@ -294,51 +292,51 @@ reportlogerror(int ret, char *mp, char *special, char *cmd, fiolog_t *flp)
 	case FIOLOG_ENONE :
 		if (flp->nbytes_requested &&
 		    (flp->nbytes_requested != flp->nbytes_actual)) {
-		    (void) fprintf(stderr, gettext("The log has been resized"
-					" from %d bytes to %d bytes.\n"),
-					flp->nbytes_requested,
-					flp->nbytes_actual);
+			(void) fprintf(stderr, gettext("The log has been"
+			" resized from %d bytes to %d bytes.\n"),
+			    flp->nbytes_requested,
+			    flp->nbytes_actual);
 		}
 		return;
 	case FIOLOG_ETRANS :
 		(void) fprintf(stderr, gettext("Solaris Volume Manager logging"
-				" is already enabled.\n"));
+		" is already enabled.\n"));
 		(void) fprintf(stderr, gettext("Please see the"
-				" commands metadetach(1M)"
-				" or metaclear(1M).\n"));
+		" commands metadetach(1M)"
+		" or metaclear(1M).\n"));
 		break;
 	case FIOLOG_EROFS :
 		(void) fprintf(stderr, gettext("File system is mounted read "
-						"only.\n"));
+		"only.\n"));
 		(void) fprintf(stderr, gettext("Please see the remount "
-				"option described in mount_ufs(1M).\n"));
+		"option described in mount_ufs(1M).\n"));
 		break;
 	case FIOLOG_EULOCK :
 		(void) fprintf(stderr, gettext("File system is locked.\n"));
 		(void) fprintf(stderr, gettext("Please see the -u option "
-						"described in lockfs(1M).\n"));
+		"described in lockfs(1M).\n"));
 		break;
 	case FIOLOG_EWLOCK :
 		(void) fprintf(stderr, gettext("The file system could not be"
-					" write locked.\n"));
+		" write locked.\n"));
 		(void) fprintf(stderr, gettext("Please see the -w option "
-						"described in lockfs(1M).\n"));
+		"described in lockfs(1M).\n"));
 		break;
 	case FIOLOG_ECLEAN :
 		(void) fprintf(stderr, gettext("The file system may not be"
-					" stable.\n"));
+		" stable.\n"));
 		(void) fprintf(stderr, gettext("Please see the -n option"
-				" for fsck(1M).\n"));
+		" for fsck(1M).\n"));
 		break;
 	case FIOLOG_ENOULOCK :
 		(void) fprintf(stderr, gettext("The file system could not be"
-					" unlocked.\n"));
+		" unlocked.\n"));
 		(void) fprintf(stderr, gettext("Please see the -u option "
-						"described in lockfs(1M).\n"));
+		"described in lockfs(1M).\n"));
 		break;
 	default :
 		(void) fprintf(stderr, gettext("Unknown internal error"
-					" %d.\n"), flp->error);
+		" %d.\n"), flp->error);
 		break;
 	}
 }
@@ -534,7 +532,7 @@ mountfs(struct mnttab *mnt)
 	 * logging option if its not specified.
 	 */
 	if (gflg || findopt(mnt->mnt_mntopts, MNTOPT_GLOBAL)) {
-		if (!flags & MS_RDONLY) {
+		if (!(flags & MS_RDONLY)) {
 			if (mnt->mnt_mntopts != '\0')
 				(void) strcat(mnt->mnt_mntopts, ",");
 			(void) strcat(mnt->mnt_mntopts, MNTOPT_LOGGING);
@@ -552,7 +550,7 @@ mountfs(struct mnttab *mnt)
 	}
 
 again:	if (mount(mnt->mnt_special, mnt->mnt_mountp, flags, fstype,
-		&args, sizeof (args), mnt->mnt_mntopts, MAX_MNTOPT_STR) != 0) {
+	    &args, sizeof (args), mnt->mnt_mntopts, MAX_MNTOPT_STR) != 0) {
 		if (errno == EBUSY && !(flags & MS_OVERLAY)) {
 			/*
 			 * Because of bug 6176743, any attempt to mount any
@@ -692,14 +690,14 @@ usage(void)
 "ufs usage:\n"
 "mount [-F ufs] [generic options] [-o suboptions] {special | mount_point}\n"));
 	(void) fprintf(stdout, gettext(
-			"\tsuboptions are: \n"
-			"\t	ro,rw,nosuid,remount,f,m,\n"
-			"\t	global,noglobal,\n"
-			"\t	largefiles,nolargefiles,\n"
-			"\t	forcedirectio,noforcedirectio\n"
-			"\t	logging,nologging,\n"
-			"\t	nbmand,nonbmand,\n"
-			"\t	onerror[={panic | lock | umount}]\n"));
+	"\tsuboptions are: \n"
+	"\t	ro,rw,nosuid,remount,f,m,\n"
+	"\t	global,noglobal,\n"
+	"\t	largefiles,nolargefiles,\n"
+	"\t	forcedirectio,noforcedirectio\n"
+	"\t	logging,nologging,\n"
+	"\t	nbmand,nonbmand,\n"
+	"\t	onerror[={panic | lock | umount}]\n"));
 
 	exit(32);
 }
@@ -843,22 +841,22 @@ rpterr(char *bs, char *mp)
 		break;
 	case ENXIO:
 		(void) fprintf(stderr, gettext("%s: %s no such device\n"),
-								myname, bs);
+		    myname, bs);
 		break;
 	case ENOTDIR:
 		(void) fprintf(stderr,
-			gettext(
+		    gettext(
 	"%s: %s not a directory\n\tor a component of %s is not a directory\n"),
-			myname, mp, bs);
+		    myname, mp, bs);
 		break;
 	case ENOENT:
 		(void) fprintf(stderr, gettext(
-			"%s: %s or %s, no such file or directory\n"),
-			myname, bs, mp);
+		    "%s: %s or %s, no such file or directory\n"),
+		    myname, bs, mp);
 		break;
 	case EINVAL:
 		(void) fprintf(stderr, gettext("%s: %s is not this fstype\n"),
-			myname, bs);
+		    myname, bs);
 		break;
 	case EBUSY:
 		(void) fprintf(stderr,
@@ -867,29 +865,29 @@ rpterr(char *bs, char *mp)
 		break;
 	case ENOTBLK:
 		(void) fprintf(stderr, gettext(
-			"%s: %s not a block device\n"), myname, bs);
+		    "%s: %s not a block device\n"), myname, bs);
 		break;
 	case EROFS:
 		(void) fprintf(stderr, gettext("%s: %s write-protected\n"),
-			myname, bs);
+		    myname, bs);
 		break;
 	case ENOSPC:
 		(void) fprintf(stderr, gettext(
-			"%s: The state of %s is not okay\n"
-			"\tand it was attempted to be mounted read/write\n"),
-			myname, bs);
+		    "%s: The state of %s is not okay\n"
+		    "\tand it was attempted to be mounted read/write\n"),
+		    myname, bs);
 		(void) printf(gettext(
-			"mount: Please run fsck and try again\n"));
+		    "mount: Please run fsck and try again\n"));
 		break;
 	case EFBIG:
 		(void) fprintf(stderr, gettext(
-			"%s: Large files may be present on %s,\n"
-			"\tand it was attempted to be mounted nolargefiles\n"),
+		    "%s: Large files may be present on %s,\n"
+		    "\tand it was attempted to be mounted nolargefiles\n"),
 		    myname, bs);
 		break;
 	default:
 		perror(myname);
 		(void) fprintf(stderr, gettext("%s: Cannot mount %s\n"),
-				myname, bs);
+		    myname, bs);
 	}
 }
