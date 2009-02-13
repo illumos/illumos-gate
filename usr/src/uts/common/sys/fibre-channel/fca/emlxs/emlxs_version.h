@@ -32,14 +32,12 @@
 extern "C" {
 #endif
 
-#define	EMLXS_VERSION		"2.31q"
-#define	EMLXS_DATE_MINUTE	"00"	/* 00-59 */
-#define	EMLXS_DATE_HOUR		"10"	/* 00-23 */
-#define	EMLXS_DATE_DAY		"05"	/* 00-31 */
+#define	EMLXS_VERSION		"2.40f"
+#define	EMLXS_DATE_MINUTE	"30"	/* 00-59 */
+#define	EMLXS_DATE_HOUR		"16"	/* 00-23 */
+#define	EMLXS_DATE_DAY		"10"	/* 00-31 */
 #define	EMLXS_DATE_MONTH	"02"	/* 01-12 */
 #define	EMLXS_DATE_YEAR		"2009"	/* YYYY  */
-
-
 
 #define	EMLXS_REVISION		EMLXS_DATE_YEAR "." EMLXS_DATE_MONTH "." \
 				    EMLXS_DATE_DAY "." EMLXS_DATE_HOUR "." \
@@ -49,10 +47,9 @@ extern "C" {
 				    EMLXS_VERSION
 #define	EMLXS_LABEL		"Emulex-S s" VERSION "-" EMLXS_ARCH " " \
 				    MACH " v" EMLXS_VERSION
-char emlxs_revision[] = EMLXS_REVISION;
-char emlxs_version[] = EMLXS_VERSION;
-char emlxs_name[] = EMLXS_NAME;
-char emlxs_label[] = EMLXS_LABEL;
+#define	EMLXS_FW_NAME		"SunFC emlxs FCA-FW v" EMLXS_DATE_YEAR \
+				    EMLXS_DATE_MONTH EMLXS_DATE_DAY "-" \
+				    EMLXS_VERSION
 
 #ifdef	__cplusplus
 }

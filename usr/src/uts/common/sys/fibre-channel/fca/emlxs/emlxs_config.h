@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -35,18 +35,20 @@ extern "C" {
 #define	EMLXS_CFG_STR_SIZE	32
 #define	EMLXS_CFG_HELP_SIZE	80
 
-typedef struct emlxs_config {
-	char string[EMLXS_CFG_STR_SIZE];
-	uint32_t low;
-	uint32_t hi;
-	uint32_t def;
-	uint32_t current;
-	uint32_t flags;
-	char help[EMLXS_CFG_HELP_SIZE];
+typedef struct emlxs_config
+{
+	char		string[EMLXS_CFG_STR_SIZE];
+	uint32_t	low;
+	uint32_t	hi;
+	uint32_t	def;
+	uint32_t	current;
+	uint32_t	flags;
+	char		help[EMLXS_CFG_HELP_SIZE];
 } emlxs_config_t;
 
 
-typedef enum emlxs_cfg_parm {
+typedef enum emlxs_cfg_parm
+{
 	CFG_CONSOLE_NOTICES,	/* console-notices */
 	CFG_CONSOLE_WARNINGS,	/* console-warnings */
 	CFG_CONSOLE_ERRORS,	/* console-errors */
@@ -76,12 +78,17 @@ typedef enum emlxs_cfg_parm {
 	CFG_DISC_TIMEOUT,	/* discovery-timeout (hidden) */
 	CFG_LINKUP_TIMEOUT,	/* linkup-timeout (hidden) */
 	CFG_LINKUP_DELAY,	/* linkup-delay */
+	CFG_OFFLINE_TIMEOUT,	/* offline-timeout (hidden) */
 	CFG_LILP_ENABLE,	/* enable-lilp (hidden) */
 	CFG_PCI_MAX_READ,	/* pci-max-read */
 	CFG_HEARTBEAT_ENABLE,	/* heartbeat-enable (hidden) */
 	CFG_RESET_ENABLE,	/* reset-enable (hidden) */
 	CFG_TIMEOUT_ENABLE,	/* timeout-enable (hidden) */
 	CFG_NUM_IOTAGS,		/* num-iotags (hidden) */
+
+#ifdef FMA_SUPPORT
+	CFG_FM_CAPS,		/* fm-cap, fma capabilities (hidden) */
+#endif	/* FMA_SUPPORT */
 
 #ifdef MAX_RRDY_PATCH
 	CFG_MAX_RRDY,		/* max-rrdy (hidden) */
@@ -101,50 +108,42 @@ typedef enum emlxs_cfg_parm {
 #endif	/* SLI3_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
-	CFG_AUTH_ENABLE,	/* enable-auth */
+	CFG_AUTH_ENABLE, 	/* enable-auth */
 	CFG_AUTH_E2E,		/* auth-e2e */
 	CFG_AUTH_NPIV,		/* auth-npiv (hidden) */
-	CFG_AUTH_TMO,		/* auth-tmo (hidden) */
-	CFG_AUTH_MODE,		/* auth-mode (hidden) */
-	CFG_AUTH_BIDIR,		/* auth-bidir (hidden) */
-	CFG_AUTH_TYPE,		/* auth-type (hidden) */
-	CFG_AUTH_HASH,		/* auth-hash (hidden) */
-	CFG_AUTH_GROUP,		/* auth-group (hidden) */
-	CFG_AUTH_INTERVAL,	/* auth-interval (hidden) */
+	CFG_AUTH_TMO,    	/* auth-tmo (hidden) */
+	CFG_AUTH_MODE,   	/* auth-mode (hidden) */
+	CFG_AUTH_BIDIR, 	/* auth-bidir (hidden) */
+	CFG_AUTH_TYPE,   	/* auth-type (hidden) */
+	CFG_AUTH_HASH,   	/* auth-hash (hidden) */
+	CFG_AUTH_GROUP,  	/* auth-group (hidden) */
+	CFG_AUTH_INTERVAL,  	/* auth-interval (hidden) */
 #endif	/* DHCHAP_SUPPORT */
 
 #ifdef SFCT_SUPPORT
-	CFG_TARGET_MODE,	/* target-mode (hidden) */
-#endif	/* SFCT_SUPPORT */
-
-#ifdef MENLO_TEST
-	CFG_HORNET_FLOGI,	/* hornet-flogi (hidden) */
-	CFG_HORNET_ID,		/* hornet-id    (hidden) */
-	CFG_HORNET_PTYPES,	/* hornet-ptypes (hidden) */
-	CFG_HORNET_VPD,		/* hornet-vpd   (hidden) */
-#endif	/* MENLO_TEST */
+	CFG_TARGET_MODE,	/* target-mode */
+#endif /* SFCT_SUPPORT */
 
 	NUM_CFG_PARAM
 
 } emlxs_cfg_parm_t;
 
-#define	PARM_HIDDEN		0x80000000
+#define	PARM_HIDDEN	0x80000000
 
 
 
 #ifdef DEF_ICFG
 
 /*
- * The entries in this array must be in the exact order defined
- * in emlxs_cfg_parm_t
+ * The entries in this array must be in the exact order
+ * defined in emlxs_cfg_parm_t
  */
-emlxs_config_t emlxs_cfg[] = {
+emlxs_config_t  emlxs_cfg[] = {
 	/* CFG_CONSOLE_NOTICES */
 	{"console-notices",
 		0, 0xffffffff, 0, 0,
 		PARM_DYNAMIC | PARM_HEX,
 	"Verbose mask for notice messages to the console."},
-
 
 	/* CFG_CONSOLE_WARNINGS */
 	{"console-warnings",
@@ -265,8 +264,8 @@ emlxs_config_t emlxs_cfg[] = {
 	{"cr-count",
 		1, 255, 1, 0,
 		PARM_DYNAMIC_LINK,
-	"A count of I/O completions after which "
-		"an interrupt response is generated"},
+	"A count of I/O completions after "
+		"which an interrupt response is generated"},
 
 	/* CFG_ASSIGN_ALPA */
 	{"assign-alpa",
@@ -327,6 +326,12 @@ emlxs_config_t emlxs_cfg[] = {
 	"Sets the driver wait period (seconds) "
 		"for a linkup after initialization."},
 
+	/* CFG_OFFLINE_TIMEOUT */
+	{"offline-timeout",
+		0, 600, 45, 0,
+		PARM_DYNAMIC | PARM_HIDDEN,
+	"Sets the offline timeout period (seconds)."},
+
 	/* CFG_LILP_ENABLE */
 	{"enable-lilp",
 		0, 1, 1, 0,
@@ -360,13 +365,19 @@ emlxs_config_t emlxs_cfg[] = {
 	"Enables driver's ability to timeout commands. "
 		"[0=Disabled, 1=Enabled]"},
 
-
 	/* CFG_NUM_IOTAGS */
 	{"num-iotags",
 		512, 32768, 4096, 0,
 		PARM_DYNAMIC_RESET | PARM_HIDDEN,
 	"Sets maximum number of FCP IO's the driver can manage."},
 
+#ifdef FMA_SUPPORT
+	/* CFG_FM_CAPS */
+	{"fm-cap",
+		0, 0xF, 0xF, 0,
+		PARM_HIDDEN,
+	"Sets FMA capabilities."},
+#endif	/* FMA_SUPPORT */
 
 #ifdef MAX_RRDY_PATCH
 	/* CFG_MAX_RRDY */
@@ -490,38 +501,10 @@ emlxs_config_t emlxs_cfg[] = {
 		0, 1, 1, 0,
 #else
 		0, 1, 0, 0,
-#endif	/* SFCT_ENABLED */
-		PARM_BOOLEAN | PARM_HIDDEN,
+#endif /* SFCT_ENABLED */
+		PARM_BOOLEAN,
 	"Enables target mode support in driver. [0=Disabled, 1=Enabled]"},
-#endif	/* SFCT_SUPPORT */
-
-#ifdef MENLO_TEST
-	/* CFG_HORNET_FLOGI */
-	{"hornet-flogi",
-		0, 1, 1, 0,
-		PARM_BOOLEAN | PARM_HIDDEN,
-	"Enables FLOGI discovery at link-up on Hornet adapter. "
-		"[0=Disabled, 1=Enabled]"},
-
-	/* CFG_HORNET_ID */
-	{"hornet-id",
-		0, 1, 1, 0,
-		PARM_HIDDEN,
-	"Sets Hornet PCI device id. [0=0xFE00, 1=0xFE05]"},
-
-	/* CFG_HORNET_PTYPES */
-	{"hornet-ptypes",
-		0, 1, 1, 0,
-		PARM_HIDDEN,
-	"Sets default Hornet firmware program types. [0=0xFE00, 1=0xFE05]"},
-
-	/* CFG_HORNET_VPD */
-	{"hornet-vpd",
-		0, 1, 0, 0,
-		PARM_BOOLEAN | PARM_HIDDEN,
-	"Enables the reading of VPD data from Hornet adapters. "
-		"[0=Disabled, 1=Enabled]"},
-#endif	/* MENLO_TEST */
+#endif /* SFCT_SUPPORT */
 
 };
 

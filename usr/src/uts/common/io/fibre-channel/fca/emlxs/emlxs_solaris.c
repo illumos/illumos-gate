@@ -24,103 +24,103 @@
  * Use is subject to License terms.
  */
 
+#define	DEF_ICFG	1
 
-#define	DEF_ICFG  1
+#include <emlxs.h>
+#include <emlxs_version.h>
 
-#include "emlxs.h"
-#include "emlxs_version.h"
+char emlxs_revision[] = EMLXS_REVISION;
+char emlxs_version[] = EMLXS_VERSION;
+char emlxs_name[] = EMLXS_NAME;
+char emlxs_label[] = EMLXS_LABEL;
 
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_SOLARIS_C);
 
 #ifdef MENLO_SUPPORT
-static int32_t emlxs_send_menlo_cmd(emlxs_port_t *port, emlxs_buf_t *sbp);
-#endif	/* MENLO_SUPPORT */
+static int32_t  emlxs_send_menlo(emlxs_port_t *port, emlxs_buf_t *sbp);
+#endif /* MENLO_SUPPORT */
 
-static void emlxs_fca_attach(emlxs_hba_t *hba);
-static void emlxs_fca_detach(emlxs_hba_t *hba);
-static void emlxs_drv_banner(emlxs_hba_t *hba);
+static void	emlxs_fca_attach(emlxs_hba_t *hba);
+static void	emlxs_fca_detach(emlxs_hba_t *hba);
+static void	emlxs_drv_banner(emlxs_hba_t *hba);
 
-static int32_t emlxs_get_props(emlxs_hba_t *hba);
-static int32_t emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_sequence(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_get_props(emlxs_hba_t *hba);
+static int32_t	emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_fct_status(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_fct_abort(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp);
+static int32_t	emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp);
 static uint32_t emlxs_add_instance(int32_t ddiinst);
-static void emlxs_iodone(emlxs_buf_t *sbp);
-static int emlxs_pm_lower_power(dev_info_t *dip);
-static int emlxs_pm_raise_power(dev_info_t *dip);
-static void emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag,
-    uint32_t failed);
-static void emlxs_iodone_server(void *arg1, void *arg2, void *arg3);
-static uint32_t emlxs_integrity_check(emlxs_hba_t *hba);
-static uint32_t emlxs_test(emlxs_hba_t *hba, uint32_t test_code,
-    uint32_t args, uint32_t *arg);
+static void	emlxs_iodone(emlxs_buf_t *sbp);
+static int	emlxs_pm_lower_power(dev_info_t *dip);
+static int	emlxs_pm_raise_power(dev_info_t *dip);
+static void	emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag,
+		    uint32_t failed);
+static void	emlxs_iodone_server(void *arg1, void *arg2, void *arg3);
+static uint32_t	emlxs_integrity_check(emlxs_hba_t *hba);
+static uint32_t	emlxs_test(emlxs_hba_t *hba, uint32_t test_code,
+		    uint32_t args, uint32_t *arg);
 
 #ifdef SLI3_SUPPORT
-static uint32_t emlxs_sli3_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp);
-static void emlxs_read_vport_prop(emlxs_hba_t *hba);
+static void	emlxs_read_vport_prop(emlxs_hba_t *hba);
 #endif	/* SLI3_SUPPORT */
-
-static uint32_t emlxs_sli2_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp);
-static uint32_t emlxs_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp);
 
 
 /*
  * Driver Entry Routines.
  */
-static int32_t emlxs_detach(dev_info_t *, ddi_detach_cmd_t);
-static int32_t emlxs_attach(dev_info_t *, ddi_attach_cmd_t);
-static int32_t emlxs_open(dev_t *dev_p, int32_t flag, int32_t otyp,
-    cred_t *cred_p);
-static int32_t emlxs_close(dev_t dev_p, int32_t flag, int32_t otyp,
-    cred_t *cred_p);
-static int32_t emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
-    cred_t *cred_p, int32_t *rval_p);
-static int32_t emlxs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-    void **result);
+static int32_t	emlxs_detach(dev_info_t *, ddi_detach_cmd_t);
+static int32_t	emlxs_attach(dev_info_t *, ddi_attach_cmd_t);
+static int32_t	emlxs_open(dev_t *, int32_t, int32_t, cred_t *);
+static int32_t	emlxs_close(dev_t, int32_t, int32_t, cred_t *);
+static int32_t	emlxs_ioctl(dev_t, int32_t, intptr_t, int32_t,
+		    cred_t *, int32_t *);
+static int32_t	emlxs_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 
 
 /*
  * FC_AL Transport Functions.
  */
-static opaque_t emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
-    fc_fca_bind_info_t *bind_info);
-static void emlxs_unbind_port(opaque_t fca_port_handle);
-static void emlxs_initialize_pkt(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_get_cap(opaque_t fca_port_handle, char *cap, void *ptr);
-static int32_t emlxs_set_cap(opaque_t fca_port_handle, char *cap, void *ptr);
-static int32_t emlxs_get_map(opaque_t fca_port_handle, fc_lilpmap_t *mapbuf);
-static int32_t emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[],
-    uint32_t size, uint32_t *count, uint32_t type);
-static int32_t emlxs_ub_free(opaque_t fca_port_handle, uint32_t count,
-    uint64_t tokens[]);
+static opaque_t	emlxs_bind_port(dev_info_t *, fc_fca_port_info_t *,
+		    fc_fca_bind_info_t *);
+static void	emlxs_unbind_port(opaque_t);
+static void	emlxs_initialize_pkt(emlxs_port_t *, emlxs_buf_t *);
+static int32_t	emlxs_get_cap(opaque_t, char *, void *);
+static int32_t	emlxs_set_cap(opaque_t, char *, void *);
+static int32_t	emlxs_get_map(opaque_t, fc_lilpmap_t *);
+static int32_t	emlxs_ub_alloc(opaque_t, uint64_t *, uint32_t,
+		    uint32_t *, uint32_t);
+static int32_t	emlxs_ub_free(opaque_t, uint32_t, uint64_t *);
 
-static opaque_t emlxs_get_device(opaque_t fca_port_handle, fc_portid_t d_id);
-static int32_t emlxs_notify(opaque_t fca_port_handle, uint32_t cmd);
-static void emlxs_ub_els_reject(emlxs_port_t *port, fc_unsol_buf_t *ubp);
+static opaque_t	emlxs_get_device(opaque_t, fc_portid_t);
+static int32_t	emlxs_notify(opaque_t, uint32_t);
+static void	emlxs_ub_els_reject(emlxs_port_t *, fc_unsol_buf_t *);
 
 /*
  * Driver Internal Functions.
  */
 
-static void emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp);
-static int32_t emlxs_power(dev_info_t *dip, int32_t comp, int32_t level);
-static int32_t emlxs_hba_resume(dev_info_t *dip);
-static int32_t emlxs_hba_suspend(dev_info_t *dip);
-static int32_t emlxs_hba_detach(dev_info_t *dip);
-static int32_t emlxs_hba_attach(dev_info_t *dip);
-static void emlxs_lock_destroy(emlxs_hba_t *hba);
-static void emlxs_lock_init(emlxs_hba_t *hba);
-static ULP_BDE64 *emlxs_pkt_to_bpl(ULP_BDE64 *bpl, fc_packet_t *pkt,
-    uint32_t bpl_type, uint8_t bdeFlags);
+static void	emlxs_poll(emlxs_port_t *, emlxs_buf_t *);
+static int32_t	emlxs_power(dev_info_t *, int32_t, int32_t);
+#ifdef EMLXS_I386
+#ifdef S11
+static int32_t	emlxs_quiesce(dev_info_t *);
+#endif
+#endif
+static int32_t	emlxs_hba_resume(dev_info_t *);
+static int32_t	emlxs_hba_suspend(dev_info_t *);
+static int32_t	emlxs_hba_detach(dev_info_t *);
+static int32_t	emlxs_hba_attach(dev_info_t *);
+static void	emlxs_lock_destroy(emlxs_hba_t *);
+static void	emlxs_lock_init(emlxs_hba_t *);
+static ULP_BDE64 *emlxs_pkt_to_bpl(ULP_BDE64 *, fc_packet_t *,
+			uint32_t, uint8_t);
 
-char *emlxs_pm_components[] =
-{
+char *emlxs_pm_components[] = {
 	"NAME=emlxx000",
 	"0=Device D3 State",
 	"1=Device D0 State"
@@ -130,100 +130,91 @@ char *emlxs_pm_components[] =
 /*
  * Default emlx dma limits
  */
-ddi_dma_lim_t emlxs_dma_lim =
-{
-	(uint32_t)0,	/* dlim_addr_lo    */
-	(uint32_t)0xffffffff,	/* dlim_addr_hi    */
-	(uint_t)0x00ffffff,	/* dlim_cntr_max   */
+ddi_dma_lim_t emlxs_dma_lim = {
+	(uint32_t)0,				/* dlim_addr_lo */
+	(uint32_t)0xffffffff,			/* dlim_addr_hi */
+	(uint_t)0x00ffffff,			/* dlim_cntr_max */
 	DEFAULT_BURSTSIZE | BURST32 | BURST64,	/* dlim_burstsizes */
-	1,	/* dlim_minxfer    */
-	0x00ffffff	/* dlim_dmaspeed   */
+	1,					/* dlim_minxfer */
+	0x00ffffff				/* dlim_dmaspeed */
 };
 
 /*
  * Be careful when using these attributes; the defaults listed below are
- * (almost) the most general case, permitting allocation in almost any way
- * supported by the LightPulse family.  The sole exception is the alignment
- * specified as requiring memory allocation on a 4-byte boundary;
+ * (almost) the most general case, permitting allocation in almost any
+ * way supported by the LightPulse family.  The sole exception is the
+ * alignment specified as requiring memory allocation on a 4-byte boundary;
  * the Lightpulse can DMA memory on any byte boundary.
  *
  * The LightPulse family currently is limited to 16M transfers;
- * this restriction affects the dma_attr_count_max and
- * dma_attr_maxxfer fields.
+ * this restriction affects the dma_attr_count_max and dma_attr_maxxfer fields.
  */
-ddi_dma_attr_t emlxs_dma_attr =
-{
-	DMA_ATTR_V0,	/* dma_attr_version    */
-	(uint64_t)0,	/* dma_attr_addr_lo    */
-	(uint64_t)0xffffffffffffffff,	/* dma_attr_addr_hi    */
-	(uint64_t)0x00ffffff,	/* dma_attr_count_max  */
-	1,	/* dma_attr_align */
+ddi_dma_attr_t emlxs_dma_attr = {
+	DMA_ATTR_V0,				/* dma_attr_version */
+	(uint64_t)0,				/* dma_attr_addr_lo */
+	(uint64_t)0xffffffffffffffff,		/* dma_attr_addr_hi */
+	(uint64_t)0x00ffffff,			/* dma_attr_count_max */
+	1,					/* dma_attr_align */
 	DEFAULT_BURSTSIZE | BURST32 | BURST64,	/* dma_attr_burstsizes */
-	1,	/* dma_attr_minxfer    */
-	(uint64_t)0x00ffffff,	/* dma_attr_maxxfer */
-	(uint64_t)0xffffffff,	/* dma_attr_seg */
-	EMLXS_SGLLEN,	/* dma_attr_sgllen */
-	1,	/* dma_attr_granular */
-	0	/* dma_attr_flags */
-
+	1,					/* dma_attr_minxfer */
+	(uint64_t)0x00ffffff,			/* dma_attr_maxxfer */
+	(uint64_t)0xffffffff,			/* dma_attr_seg */
+	EMLXS_SGLLEN,				/* dma_attr_sgllen */
+	1,					/* dma_attr_granular */
+	0					/* dma_attr_flags */
 };
 
-ddi_dma_attr_t emlxs_dma_attr_ro =
-{
-	DMA_ATTR_V0,	/* dma_attr_version    */
-	(uint64_t)0,	/* dma_attr_addr_lo    */
-	(uint64_t)0xffffffffffffffff,	/* dma_attr_addr_hi    */
-	(uint64_t)0x00ffffff,	/* dma_attr_count_max  */
-	1,	/* dma_attr_align */
+ddi_dma_attr_t emlxs_dma_attr_ro = {
+	DMA_ATTR_V0,				/* dma_attr_version */
+	(uint64_t)0,				/* dma_attr_addr_lo */
+	(uint64_t)0xffffffffffffffff,		/* dma_attr_addr_hi */
+	(uint64_t)0x00ffffff,			/* dma_attr_count_max */
+	1,					/* dma_attr_align */
 	DEFAULT_BURSTSIZE | BURST32 | BURST64,	/* dma_attr_burstsizes */
-	1,	/* dma_attr_minxfer    */
-	(uint64_t)0x00ffffff,	/* dma_attr_maxxfer    */
-	(uint64_t)0xffffffff,	/* dma_attr_seg */
-	EMLXS_SGLLEN,	/* dma_attr_sgllen */
-	1,	/* dma_attr_granular */
-	DDI_DMA_RELAXED_ORDERING	/* dma_attr_flags */
-
+	1,					/* dma_attr_minxfer */
+	(uint64_t)0x00ffffff,			/* dma_attr_maxxfer */
+	(uint64_t)0xffffffff,			/* dma_attr_seg */
+	EMLXS_SGLLEN,				/* dma_attr_sgllen */
+	1,					/* dma_attr_granular */
+	DDI_DMA_RELAXED_ORDERING		/* dma_attr_flags */
 };
 
-ddi_dma_attr_t emlxs_dma_attr_1sg =
-{
-	DMA_ATTR_V0,	/* dma_attr_version    */
-	(uint64_t)0,	/* dma_attr_addr_lo    */
-	(uint64_t)0xffffffffffffffff,	/* dma_attr_addr_hi    */
-	(uint64_t)0x00ffffff,	/* dma_attr_count_max  */
-	1,	/* dma_attr_align */
+ddi_dma_attr_t emlxs_dma_attr_1sg = {
+	DMA_ATTR_V0,				/* dma_attr_version */
+	(uint64_t)0,				/* dma_attr_addr_lo */
+	(uint64_t)0xffffffffffffffff,		/* dma_attr_addr_hi */
+	(uint64_t)0x00ffffff,			/* dma_attr_count_max */
+	1,					/* dma_attr_align */
 	DEFAULT_BURSTSIZE | BURST32 | BURST64,	/* dma_attr_burstsizes */
-	1,	/* dma_attr_minxfer    */
-	(uint64_t)0x00ffffff,	/* dma_attr_maxxfer    */
-	(uint64_t)0xffffffff,	/* dma_attr_seg */
-	1,	/* dma_attr_sgllen */
-	1,	/* dma_attr_granular   */
-	0	/* dma_attr_flags */
+	1,					/* dma_attr_minxfer */
+	(uint64_t)0x00ffffff,			/* dma_attr_maxxfer */
+	(uint64_t)0xffffffff,			/* dma_attr_seg */
+	1,					/* dma_attr_sgllen */
+	1,					/* dma_attr_granular */
+	0					/* dma_attr_flags */
 };
 
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
-ddi_dma_attr_t emlxs_dma_attr_fcip_rsp =
-{
-	DMA_ATTR_V0,	/* dma_attr_version    */
-	(uint64_t)0,	/* dma_attr_addr_lo    */
-	(uint64_t)0xffffffffffffffff,	/* dma_attr_addr_hi    */
-	(uint64_t)0x00ffffff,	/* dma_attr_count_max  */
-	1,	/* dma_attr_align */
+ddi_dma_attr_t emlxs_dma_attr_fcip_rsp = {
+	DMA_ATTR_V0,				/* dma_attr_version */
+	(uint64_t)0,				/* dma_attr_addr_lo */
+	(uint64_t)0xffffffffffffffff,		/* dma_attr_addr_hi */
+	(uint64_t)0x00ffffff,			/* dma_attr_count_max */
+	1,					/* dma_attr_align */
 	DEFAULT_BURSTSIZE | BURST32 | BURST64,	/* dma_attr_burstsizes */
-	1,	/* dma_attr_minxfer    */
-	(uint64_t)0x00ffffff,	/* dma_attr_maxxfer    */
-	(uint64_t)0xffffffff,	/* dma_attr_seg */
-	EMLXS_SGLLEN,	/* dma_attr_sgllen */
-	1,	/* dma_attr_granular   */
-	0	/* dma_attr_flags */
+	1,					/* dma_attr_minxfer */
+	(uint64_t)0x00ffffff,			/* dma_attr_maxxfer */
+	(uint64_t)0xffffffff,			/* dma_attr_seg */
+	EMLXS_SGLLEN,				/* dma_attr_sgllen */
+	1,					/* dma_attr_granular */
+	0					/* dma_attr_flags */
 };
 #endif	/* >= EMLXS_MODREV3 */
 
 /*
  * DDI access attributes for device
  */
-ddi_device_acc_attr_t emlxs_dev_acc_attr =
-{
+ddi_device_acc_attr_t emlxs_dev_acc_attr = {
 	(uint16_t)DDI_DEVICE_ATTR_V0,	/* devacc_attr_version   */
 	(uint8_t)DDI_STRUCTURE_LE_ACC,	/* PCI is Little Endian  */
 	(uint8_t)DDI_STRICTORDER_ACC	/* devacc_attr_dataorder */
@@ -232,36 +223,34 @@ ddi_device_acc_attr_t emlxs_dev_acc_attr =
 /*
  * DDI access attributes for data
  */
-ddi_device_acc_attr_t emlxs_data_acc_attr =
-{
+ddi_device_acc_attr_t emlxs_data_acc_attr = {
 	DDI_DEVICE_ATTR_V0,	/* devacc_attr_version   */
 	DDI_NEVERSWAP_ACC,	/* don't swap for Data   */
 	DDI_STRICTORDER_ACC	/* devacc_attr_dataorder */
 };
 
 /*
- * Fill in the FC Transport structure, as defined in the Fibre Channel
- * Transport Programmming Guide.
+ * Fill in the FC Transport structure,
+ * as defined in the Fibre Channel Transport Programmming Guide.
  */
 #if (EMLXS_MODREV == EMLXS_MODREV5)
-static fc_fca_tran_t emlxs_fca_tran =
-{
-	FCTL_FCA_MODREV_5,	/* fca_version, with SUN NPIV support */
-	MAX_VPORTS,	/* fca numerb of ports */
-	sizeof (emlxs_buf_t),	/* fca pkt size */
-	2048,	/* fca cmd max */
-	&emlxs_dma_lim,	/* fca dma limits */
-	0,	/* fca iblock, to be filled in later */
-	&emlxs_dma_attr,	/* fca dma attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcp cmd attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcp rsp attributes */
-	&emlxs_dma_attr_ro,	/* fca dma fcp data attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcip cmd attributes */
+	static fc_fca_tran_t emlxs_fca_tran = {
+	FCTL_FCA_MODREV_5, 		/* fca_version, with SUN NPIV support */
+	MAX_VPORTS,			/* fca numerb of ports */
+	sizeof (emlxs_buf_t),		/* fca pkt size */
+	2048,				/* fca cmd max */
+	&emlxs_dma_lim,			/* fca dma limits */
+	0,				/* fca iblock, to be filled in later */
+	&emlxs_dma_attr,		/* fca dma attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcp cmd attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcp rsp attributes */
+	&emlxs_dma_attr_ro,		/* fca dma fcp data attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcip cmd attributes */
 	&emlxs_dma_attr_fcip_rsp,	/* fca dma fcip rsp attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcsm cmd attributes */
-	&emlxs_dma_attr,	/* fca dma fcsm rsp attributes */
-	&emlxs_data_acc_attr,	/* fca access atributes */
-	0,	/* fca_num_npivports */
+	&emlxs_dma_attr_1sg,		/* fca dma fcsm cmd attributes */
+	&emlxs_dma_attr,		/* fca dma fcsm rsp attributes */
+	&emlxs_data_acc_attr,   	/* fca access atributes */
+	0,				/* fca_num_npivports */
 	{0, 0, 0, 0, 0, 0, 0, 0},	/* Physical port WWPN */
 	emlxs_bind_port,
 	emlxs_unbind_port,
@@ -285,23 +274,22 @@ static fc_fca_tran_t emlxs_fca_tran =
 
 
 #if (EMLXS_MODREV == EMLXS_MODREV4)
-static fc_fca_tran_t emlxs_fca_tran =
-{
-	FCTL_FCA_MODREV_4,	/* fca_version */
-	MAX_VPORTS,	/* fca numerb of ports */
-	sizeof (emlxs_buf_t),	/* fca pkt size */
-	2048,	/* fca cmd max */
-	&emlxs_dma_lim,	/* fca dma limits */
-	0,	/* fca iblock, to be filled in later */
-	&emlxs_dma_attr,	/* fca dma attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcp cmd attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcp rsp attributes */
-	&emlxs_dma_attr_ro,	/* fca dma fcp data attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcip cmd attributes */
+static fc_fca_tran_t emlxs_fca_tran = {
+	FCTL_FCA_MODREV_4,		/* fca_version */
+	MAX_VPORTS,			/* fca numerb of ports */
+	sizeof (emlxs_buf_t),		/* fca pkt size */
+	2048,				/* fca cmd max */
+	&emlxs_dma_lim,			/* fca dma limits */
+	0,				/* fca iblock, to be filled in later */
+	&emlxs_dma_attr,		/* fca dma attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcp cmd attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcp rsp attributes */
+	&emlxs_dma_attr_ro,		/* fca dma fcp data attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcip cmd attributes */
 	&emlxs_dma_attr_fcip_rsp,	/* fca dma fcip rsp attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcsm cmd attributes */
-	&emlxs_dma_attr,	/* fca dma fcsm rsp attributes */
-	&emlxs_data_acc_attr,	/* fca access atributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcsm cmd attributes */
+	&emlxs_dma_attr,		/* fca dma fcsm rsp attributes */
+	&emlxs_data_acc_attr,		/* fca access atributes */
 	emlxs_bind_port,
 	emlxs_unbind_port,
 	emlxs_pkt_init,
@@ -324,23 +312,22 @@ static fc_fca_tran_t emlxs_fca_tran =
 
 
 #if (EMLXS_MODREV == EMLXS_MODREV3)
-static fc_fca_tran_t emlxs_fca_tran =
-{
-	FCTL_FCA_MODREV_3,	/* fca_version */
-	MAX_VPORTS,	/* fca numerb of ports */
-	sizeof (emlxs_buf_t),	/* fca pkt size */
-	2048,	/* fca cmd max */
-	&emlxs_dma_lim,	/* fca dma limits */
-	0,	/* fca iblock, to be filled in later */
-	&emlxs_dma_attr,	/* fca dma attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcp cmd attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcp rsp attributes */
-	&emlxs_dma_attr_ro,	/* fca dma fcp data attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcip cmd attributes */
+static fc_fca_tran_t emlxs_fca_tran = {
+	FCTL_FCA_MODREV_3,		/* fca_version */
+	MAX_VPORTS,			/* fca numerb of ports */
+	sizeof (emlxs_buf_t),		/* fca pkt size */
+	2048,				/* fca cmd max */
+	&emlxs_dma_lim,			/* fca dma limits */
+	0,				/* fca iblock, to be filled in later */
+	&emlxs_dma_attr,		/* fca dma attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcp cmd attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcp rsp attributes */
+	&emlxs_dma_attr_ro,		/* fca dma fcp data attributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcip cmd attributes */
 	&emlxs_dma_attr_fcip_rsp,	/* fca dma fcip rsp attributes */
-	&emlxs_dma_attr_1sg,	/* fca dma fcsm cmd attributes */
-	&emlxs_dma_attr,	/* fca dma fcsm rsp attributes */
-	&emlxs_data_acc_attr,	/* fca access atributes */
+	&emlxs_dma_attr_1sg,		/* fca dma fcsm cmd attributes */
+	&emlxs_dma_attr,		/* fca dma fcsm rsp attributes */
+	&emlxs_data_acc_attr,		/* fca access atributes */
 	emlxs_bind_port,
 	emlxs_unbind_port,
 	emlxs_pkt_init,
@@ -363,16 +350,15 @@ static fc_fca_tran_t emlxs_fca_tran =
 
 
 #if (EMLXS_MODREV == EMLXS_MODREV2)
-static fc_fca_tran_t emlxs_fca_tran =
-{
-	FCTL_FCA_MODREV_2,	/* fca_version */
-	MAX_VPORTS,	/* number of ports */
-	sizeof (emlxs_buf_t),	/* pkt size */
-	2048,	/* max cmds */
-	&emlxs_dma_lim,	/* DMA limits */
-	0,	/* iblock, to be filled in later */
-	&emlxs_dma_attr,	/* dma attributes */
-	&emlxs_data_acc_attr,	/* access atributes */
+static fc_fca_tran_t emlxs_fca_tran = {
+	FCTL_FCA_MODREV_2,		/* fca_version */
+	MAX_VPORTS,			/* number of ports */
+	sizeof (emlxs_buf_t),		/* pkt size */
+	2048,				/* max cmds */
+	&emlxs_dma_lim,			/* DMA limits */
+	0,				/* iblock, to be filled in later */
+	&emlxs_dma_attr,		/* dma attributes */
+	&emlxs_data_acc_attr,		/* access atributes */
 	emlxs_bind_port,
 	emlxs_unbind_port,
 	emlxs_pkt_init,
@@ -394,119 +380,118 @@ static fc_fca_tran_t emlxs_fca_tran =
 #endif	/* EMLXS_MODREV2 */
 
 /*
- * This is needed when the module gets loaded by the kernel so
- * ddi library calls get resolved.
+ * This is needed when the module gets loaded by the kernel
+ * so ddi library calls get resolved.
  */
-#ifdef S8S9
-#ifdef DHCHAP_SUPPORT
-char _depends_on[] = "misc/fctl drv/random";
-#else	/* DHCHAP_SUPPORT */
-char _depends_on[] = "misc/fctl";
-#endif	/* DHCHAP_SUPPORT */
-#else	/* S10S11 */
 #ifndef MODSYM_SUPPORT
-char _depends_on[] = "misc/fctl";
-#endif	/* MODSYM_SUPPORT */
-#endif	/* S8S9 */
-
+char   _depends_on[] = "misc/fctl";
+#endif /* MODSYM_SUPPORT */
 
 /*
- * state pointer which the implementation uses as a place to hang
- * a set of per-driver structures;
+ * state pointer which the implementation uses as a place to
+ * hang a set of per-driver structures;
+ *
  */
-void *emlxs_soft_state = NULL;
+void		*emlxs_soft_state = NULL;
 
 /*
  * Driver Global variables.
  */
-int32_t emlxs_scsi_reset_delay = 3000;	/* milliseconds */
+int32_t		emlxs_scsi_reset_delay = 3000;	/* milliseconds */
 
-emlxs_device_t emlxs_device;
+emlxs_device_t  emlxs_device;
 
-uint32_t emlxs_instance[MAX_FC_BRDS];	/* Protected by the emlxs_device.lock */
-uint32_t emlxs_instance_count = 0;	/* Protected by the emlxs_device.lock */
+uint32_t	emlxs_instance[MAX_FC_BRDS];	/* uses emlxs_device.lock */
+uint32_t	emlxs_instance_count = 0;	/* uses emlxs_device.lock */
 
 
 /*
- * Single private "global" lock used to gain access to the hba_list
- * and/or any other case where we want need to be single-threaded.
+ * Single private "global" lock used to gain access to
+ * the hba_list and/or any other case where we want need to be
+ * single-threaded.
  */
-uint32_t emlxs_diag_state;
+uint32_t	emlxs_diag_state;
 
 /*
  * CB ops vector.  Used for administration only.
  */
-static struct cb_ops emlxs_cb_ops =
-{
-	emlxs_open,	/* cb_open */
-	emlxs_close,	/* cb_close */
-	nodev,	/* cb_strategy */
-	nodev,	/* cb_print */
-	nodev,	/* cb_dump */
-	nodev,	/* cb_read */
-	nodev,	/* cb_write */
-	emlxs_ioctl,	/* cb_ioctl */
-	nodev,	/* cb_devmap */
-	nodev,	/* cb_mmap */
-	nodev,	/* cb_segmap */
-	nochpoll,	/* cb_chpoll */
-	ddi_prop_op,	/* cb_prop_op */
-	0,	/* cb_stream */
+static struct cb_ops emlxs_cb_ops = {
+	emlxs_open,	/* cb_open	*/
+	emlxs_close,	/* cb_close	*/
+	nodev,		/* cb_strategy	*/
+	nodev,		/* cb_print	*/
+	nodev,		/* cb_dump	*/
+	nodev,		/* cb_read	*/
+	nodev,		/* cb_write	*/
+	emlxs_ioctl,	/* cb_ioctl	*/
+	nodev,		/* cb_devmap	*/
+	nodev,		/* cb_mmap	*/
+	nodev,		/* cb_segmap	*/
+	nochpoll,	/* cb_chpoll	*/
+	ddi_prop_op,	/* cb_prop_op	*/
+	0,		/* cb_stream	*/
 #ifdef _LP64
 	D_64BIT | D_HOTPLUG | D_MP | D_NEW,	/* cb_flag */
 #else
-	D_HOTPLUG | D_MP | D_NEW,	/* cb_flag */
+	D_HOTPLUG | D_MP | D_NEW,		/* cb_flag */
 #endif
-	CB_REV,	/* rev */
-	nodev,	/* cb_aread */
-	nodev	/* cb_awrite */
+	CB_REV,		/* rev		*/
+	nodev,		/* cb_aread	*/
+	nodev		/* cb_awrite	*/
 };
 
 /* Generic bus ops */
-static struct bus_ops emlxs_bus_ops =
-{
+static struct bus_ops emlxs_bus_ops = {
 	BUSO_REV,
-	nullbusmap,	/* bus_map */
-	NULL,	/* bus_get_intrspec */
-	NULL,	/* bus_add_intrspec */
-	NULL,	/* bus_remove_intrspec */
-	i_ddi_map_fault,	/* bus_map_fault */
-	ddi_dma_map,	/* bus_dma_map */
-	ddi_dma_allochdl,	/* bus_dma_allochdl */
-	ddi_dma_freehdl,	/* bus_dma_freehdl */
-	ddi_dma_bindhdl,	/* bus_dma_bindhdl */
-	ddi_dma_unbindhdl,	/* bus_unbindhdl */
-	ddi_dma_flush,	/* bus_dma_flush */
-	ddi_dma_win,	/* bus_dma_win */
-	ddi_dma_mctl,	/* bus_dma_ctl */
-	ddi_ctlops,	/* bus_ctl */
-	ddi_bus_prop_op,	/* bus_prop_op */
+	nullbusmap,			/* bus_map */
+	NULL,				/* bus_get_intrspec */
+	NULL,				/* bus_add_intrspec */
+	NULL,				/* bus_remove_intrspec */
+	i_ddi_map_fault,		/* bus_map_fault */
+	ddi_dma_map,			/* bus_dma_map */
+	ddi_dma_allochdl,		/* bus_dma_allochdl */
+	ddi_dma_freehdl,		/* bus_dma_freehdl */
+	ddi_dma_bindhdl,		/* bus_dma_bindhdl */
+	ddi_dma_unbindhdl,		/* bus_unbindhdl */
+	ddi_dma_flush,			/* bus_dma_flush */
+	ddi_dma_win,			/* bus_dma_win */
+	ddi_dma_mctl,			/* bus_dma_ctl */
+	ddi_ctlops,			/* bus_ctl */
+	ddi_bus_prop_op,		/* bus_prop_op */
 };
 
-static struct dev_ops emlxs_ops =
-{
+static struct dev_ops emlxs_ops = {
 	DEVO_REV,	/* rev */
 	0,	/* refcnt */
-	emlxs_info,	/* getinfo */
-	nulldev,	/* identify */
-	nulldev,	/* probe */
-	emlxs_attach,	/* attach */
-	emlxs_detach,	/* detach */
-	nodev,	/* reset */
-	&emlxs_cb_ops,	/* devo_cb_ops */
-	&emlxs_bus_ops,	/* bus ops - Gets replaced by fctl_fca_busops in */
-			/* fc_fca_init */
-	emlxs_power	/* power ops */
+	emlxs_info,	/* getinfo	*/
+	nulldev,	/* identify	*/
+	nulldev,	/* probe	*/
+	emlxs_attach,	/* attach	*/
+	emlxs_detach,	/* detach	*/
+	nodev,		/* reset	*/
+	&emlxs_cb_ops,	/* devo_cb_ops	*/
+	&emlxs_bus_ops,	/* bus ops - Gets replaced by */
+			/* fctl_fca_busops in fc_fca_init */
+	emlxs_power,	/* power ops	*/
+#ifdef EMLXS_I386
+#ifdef S11
+	emlxs_quiesce,	/* quiesce	*/
+#endif
+#endif
 };
 
 #include <sys/modctl.h>
 extern struct mod_ops mod_driverops;
 
+#ifdef SAN_DIAG_SUPPORT
+extern kmutex_t		sd_bucket_mutex;
+extern sd_bucket_info_t	sd_bucket;
+#endif /* SAN_DIAG_SUPPORT */
+
 /*
  * Module linkage information for the kernel.
  */
-static struct modldrv emlxs_modldrv =
-{
+static struct modldrv emlxs_modldrv = {
 	&mod_driverops,	/* module type - driver */
 	emlxs_name,	/* module name */
 	&emlxs_ops,	/* driver ops */
@@ -525,169 +510,171 @@ static struct modlinkage emlxs_modlinkage = {
 
 /* We only need to add entries for non-default return codes. */
 /* Entries do not need to be in order. */
-/* Default: FC_PKT_TRAN_ERROR, FC_REASON_ABORTED, */
-/* FC_EXPLN_NONE, FC_ACTION_RETRYABLE}  */
-emlxs_xlat_err_t emlxs_iostat_tbl[] =
-{
-/* 	{f/w code, pkt_state, pkt_reason, */
-/* 	pkt_expln, pkt_action}, */
+/* Default:	FC_PKT_TRAN_ERROR,	FC_REASON_ABORTED, */
+/*		FC_EXPLN_NONE,		FC_ACTION_RETRYABLE */
+
+emlxs_xlat_err_t emlxs_iostat_tbl[] = {
+/* 	{f/w code, pkt_state, pkt_reason, 	*/
+/* 		pkt_expln, pkt_action}		*/
 
 	/* 0x00 - Do not remove */
 	{IOSTAT_SUCCESS, FC_PKT_SUCCESS, FC_REASON_NONE,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x01 - Do not remove */
 	{IOSTAT_FCP_RSP_ERROR, FC_PKT_SUCCESS, FC_REASON_NONE,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x02 */
 	{IOSTAT_REMOTE_STOP, FC_PKT_REMOTE_STOP, FC_REASON_ABTS,
-	FC_EXPLN_NONE, FC_ACTION_NON_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_NON_RETRYABLE},
 
 	/*
-	 * This is a default entry.  The real codes are written dynamically
-	 * in emlxs_els.c
+	 * This is a default entry.
+	 * The real codes are written dynamically in emlxs_els.c
 	 */
-	{IOSTAT_LS_RJT, FC_PKT_LS_RJT, FC_REASON_CMD_UNABLE,	/* 0x09 */
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	/* 0x09 */
+	{IOSTAT_LS_RJT, FC_PKT_LS_RJT, FC_REASON_CMD_UNABLE,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* Special error code */
 	/* 0x10 */
 	{IOSTAT_DATA_OVERRUN, FC_PKT_TRAN_ERROR, FC_REASON_OVERRUN,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* Special error code */
 	/* 0x11 */
 	{IOSTAT_DATA_UNDERRUN, FC_PKT_TRAN_ERROR, FC_REASON_ABORTED,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* CLASS 2 only */
 	/* 0x04 */
 	{IOSTAT_NPORT_RJT, FC_PKT_NPORT_RJT, FC_REASON_PROTOCOL_ERROR,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* CLASS 2 only */
 	/* 0x05 */
 	{IOSTAT_FABRIC_RJT, FC_PKT_FABRIC_RJT, FC_REASON_PROTOCOL_ERROR,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* CLASS 2 only */
 	/* 0x06 */
 	{IOSTAT_NPORT_BSY, FC_PKT_NPORT_BSY, FC_REASON_PHYSICAL_BUSY,
-	FC_EXPLN_NONE, FC_ACTION_SEQ_TERM_RETRY},
+		FC_EXPLN_NONE, FC_ACTION_SEQ_TERM_RETRY},
 
 	/* CLASS 2 only */
 	/* 0x07 */
 	{IOSTAT_FABRIC_BSY, FC_PKT_FABRIC_BSY, FC_REASON_FABRIC_BSY,
-	FC_EXPLN_NONE, FC_ACTION_SEQ_TERM_RETRY},
+		FC_EXPLN_NONE, FC_ACTION_SEQ_TERM_RETRY},
 };
-#define	IOSTAT_MAX    (sizeof (emlxs_iostat_tbl)/sizeof (emlxs_xlat_err_t))
+
+#define	IOSTAT_MAX (sizeof (emlxs_iostat_tbl)/sizeof (emlxs_xlat_err_t))
 
 
 /* We only need to add entries for non-default return codes. */
 /* Entries do not need to be in order. */
-/* Default: FC_PKT_TRAN_ERROR, FC_REASON_ABORTED, */
-/* FC_EXPLN_NONE, FC_ACTION_RETRYABLE}  */
-emlxs_xlat_err_t emlxs_ioerr_tbl[] =
-{
-/* 	{f/w code, pkt_state, pkt_reason, */
-/* 	pkt_expln, pkt_action}, */
+/* Default:	FC_PKT_TRAN_ERROR,	FC_REASON_ABORTED, */
+/*		FC_EXPLN_NONE,		FC_ACTION_RETRYABLE} */
+
+emlxs_xlat_err_t emlxs_ioerr_tbl[] = {
+/*	{f/w code, pkt_state, pkt_reason,	*/
+/*		pkt_expln, pkt_action}		*/
+
 	/* 0x01 */
 	{IOERR_MISSING_CONTINUE, FC_PKT_TRAN_ERROR, FC_REASON_OVERRUN,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x02 */
 	{IOERR_SEQUENCE_TIMEOUT, FC_PKT_TIMEOUT, FC_REASON_SEQ_TIMEOUT,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x04 */
 	{IOERR_INVALID_RPI, FC_PKT_PORT_OFFLINE, FC_REASON_OFFLINE,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x05 */
 	{IOERR_NO_XRI, FC_PKT_LOCAL_RJT, FC_REASON_XCHG_DROPPED,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x06 */
-	{IOERR_ILLEGAL_COMMAND, FC_PKT_LOCAL_RJT, FC_REASON_ILLEGAL_REQ,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_ILLEGAL_COMMAND,	FC_PKT_LOCAL_RJT, FC_REASON_ILLEGAL_REQ,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x07 */
-	{IOERR_XCHG_DROPPED, FC_PKT_LOCAL_RJT, FC_REASON_XCHG_DROPPED,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_XCHG_DROPPED, FC_PKT_LOCAL_RJT,	FC_REASON_XCHG_DROPPED,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x08 */
-	{IOERR_ILLEGAL_FIELD, FC_PKT_LOCAL_RJT, FC_REASON_ILLEGAL_REQ,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_ILLEGAL_FIELD, FC_PKT_LOCAL_RJT,	FC_REASON_ILLEGAL_REQ,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x0B */
 	{IOERR_RCV_BUFFER_WAITING, FC_PKT_LOCAL_RJT, FC_REASON_NOMEM,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x0D */
-	{IOERR_TX_DMA_FAILED, FC_PKT_LOCAL_RJT, FC_REASON_DMA_ERROR,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_TX_DMA_FAILED, FC_PKT_LOCAL_RJT,	FC_REASON_DMA_ERROR,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x0E */
-	{IOERR_RX_DMA_FAILED, FC_PKT_LOCAL_RJT, FC_REASON_DMA_ERROR,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_RX_DMA_FAILED, FC_PKT_LOCAL_RJT,	FC_REASON_DMA_ERROR,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x0F */
-	{IOERR_ILLEGAL_FRAME, FC_PKT_LOCAL_RJT, FC_REASON_ILLEGAL_FRAME,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_ILLEGAL_FRAME, FC_PKT_LOCAL_RJT,	FC_REASON_ILLEGAL_FRAME,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x11 */
-	{IOERR_NO_RESOURCES, FC_PKT_LOCAL_RJT, FC_REASON_NOMEM,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+	{IOERR_NO_RESOURCES, FC_PKT_LOCAL_RJT,	FC_REASON_NOMEM,
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x13 */
 	{IOERR_ILLEGAL_LENGTH, FC_PKT_LOCAL_RJT, FC_REASON_ILLEGAL_LENGTH,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x14 */
 	{IOERR_UNSUPPORTED_FEATURE, FC_PKT_LOCAL_RJT, FC_REASON_UNSUPPORTED,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x15 */
 	{IOERR_ABORT_IN_PROGRESS, FC_PKT_LOCAL_RJT, FC_REASON_ABORTED,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x16 */
 	{IOERR_ABORT_REQUESTED, FC_PKT_LOCAL_RJT, FC_REASON_ABORTED,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x17 */
 	{IOERR_RCV_BUFFER_TIMEOUT, FC_PKT_LOCAL_RJT, FC_REASON_RX_BUF_TIMEOUT,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x18 */
 	{IOERR_LOOP_OPEN_FAILURE, FC_PKT_LOCAL_RJT, FC_REASON_FCAL_OPN_FAIL,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x1A */
 	{IOERR_LINK_DOWN, FC_PKT_PORT_OFFLINE, FC_REASON_OFFLINE,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0x21 */
 	{IOERR_BAD_HOST_ADDRESS, FC_PKT_LOCAL_RJT, FC_REASON_BAD_SID,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* Occurs at link down */
 	/* 0x28 */
 	{IOERR_BUFFER_SHORTAGE, FC_PKT_PORT_OFFLINE, FC_REASON_OFFLINE,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 
 	/* 0xF0 */
 	{IOERR_ABORT_TIMEOUT, FC_PKT_TIMEOUT, FC_REASON_SEQ_TIMEOUT,
-	FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
-
+		FC_EXPLN_NONE, FC_ACTION_RETRYABLE},
 };
+
 #define	IOERR_MAX    (sizeof (emlxs_ioerr_tbl)/sizeof (emlxs_xlat_err_t))
 
 
 
-emlxs_table_t emlxs_error_table[] =
-{
+emlxs_table_t emlxs_error_table[] = {
 	{IOERR_SUCCESS, "No error."},
 	{IOERR_MISSING_CONTINUE, "Missing continue."},
 	{IOERR_SEQUENCE_TIMEOUT, "Sequence timeout."},
@@ -735,8 +722,7 @@ emlxs_table_t emlxs_error_table[] =
 };	/* emlxs_error_table */
 
 
-emlxs_table_t emlxs_state_table[] =
-{
+emlxs_table_t emlxs_state_table[] = {
 	{IOSTAT_SUCCESS, "Success."},
 	{IOSTAT_FCP_RSP_ERROR, "FCP response error."},
 	{IOSTAT_REMOTE_STOP, "Remote stop."},
@@ -747,75 +733,72 @@ emlxs_table_t emlxs_state_table[] =
 	{IOSTAT_FABRIC_BSY, "Fabric busy."},
 	{IOSTAT_INTERMED_RSP, "Intermediate response."},
 	{IOSTAT_LS_RJT, "LS reject."},
-	{IOSTAT_CMD_REJECT, "Cmd reject."},
+	{IOSTAT_CMD_REJECT,		"Cmd reject."},
 	{IOSTAT_FCP_TGT_LENCHK, "TGT length check."},
 	{IOSTAT_NEED_BUF_ENTRY, "Need buffer entry."},
 	{IOSTAT_ILLEGAL_FRAME_RCVD, "Illegal frame."},
 	{IOSTAT_DATA_UNDERRUN, "Data underrun."},
-	{IOSTAT_DATA_OVERRUN, "Data overrun."},
+	{IOSTAT_DATA_OVERRUN,  "Data overrun."},
 
 };	/* emlxs_state_table */
 
 
 #ifdef MENLO_SUPPORT
-emlxs_table_t emlxs_menlo_cmd_table[] =
-{
-	{MENLO_CMD_INITIALIZE, "MENLO_INIT"},
-	{MENLO_CMD_FW_DOWNLOAD, "MENLO_FW_DOWNLOAD"},
-	{MENLO_CMD_READ_MEMORY, "MENLO_READ_MEM"},
-	{MENLO_CMD_WRITE_MEMORY, "MENLO_WRITE_MEM"},
-	{MENLO_CMD_FTE_INSERT, "MENLO_FTE_INSERT"},
-	{MENLO_CMD_FTE_DELETE, "MENLO_FTE_DELETE"},
+emlxs_table_t emlxs_menlo_cmd_table[] = {
+	{MENLO_CMD_INITIALIZE,		"MENLO_INIT"},
+	{MENLO_CMD_FW_DOWNLOAD,		"MENLO_FW_DOWNLOAD"},
+	{MENLO_CMD_READ_MEMORY,		"MENLO_READ_MEM"},
+	{MENLO_CMD_WRITE_MEMORY,	"MENLO_WRITE_MEM"},
+	{MENLO_CMD_FTE_INSERT,		"MENLO_FTE_INSERT"},
+	{MENLO_CMD_FTE_DELETE,		"MENLO_FTE_DELETE"},
 
-	{MENLO_CMD_GET_INIT, "MENLO_GET_INIT"},
-	{MENLO_CMD_GET_CONFIG, "MENLO_GET_CONFIG"},
-	{MENLO_CMD_GET_PORT_STATS, "MENLO_GET_PORT_STATS"},
-	{MENLO_CMD_GET_LIF_STATS, "MENLO_GET_LIF_STATS"},
-	{MENLO_CMD_GET_ASIC_STATS, "MENLO_GET_ASIC_STATS"},
-	{MENLO_CMD_GET_LOG_CONFIG, "MENLO_GET_LOG_CFG"},
-	{MENLO_CMD_GET_LOG_DATA, "MENLO_GET_LOG_DATA"},
-	{MENLO_CMD_GET_PANIC_LOG, "MENLO_GET_PANIC_LOG"},
-	{MENLO_CMD_GET_LB_MODE, "MENLO_GET_LB_MODE"},
+	{MENLO_CMD_GET_INIT,		"MENLO_GET_INIT"},
+	{MENLO_CMD_GET_CONFIG,		"MENLO_GET_CONFIG"},
+	{MENLO_CMD_GET_PORT_STATS,	"MENLO_GET_PORT_STATS"},
+	{MENLO_CMD_GET_LIF_STATS,	"MENLO_GET_LIF_STATS"},
+	{MENLO_CMD_GET_ASIC_STATS,	"MENLO_GET_ASIC_STATS"},
+	{MENLO_CMD_GET_LOG_CONFIG,	"MENLO_GET_LOG_CFG"},
+	{MENLO_CMD_GET_LOG_DATA,	"MENLO_GET_LOG_DATA"},
+	{MENLO_CMD_GET_PANIC_LOG,	"MENLO_GET_PANIC_LOG"},
+	{MENLO_CMD_GET_LB_MODE,		"MENLO_GET_LB_MODE"},
 
-	{MENLO_CMD_SET_PAUSE, "MENLO_SET_PAUSE"},
-	{MENLO_CMD_SET_FCOE_COS, "MENLO_SET_FCOE_COS"},
-	{MENLO_CMD_SET_UIF_PORT_TYPE, "MENLO_SET_UIF_TYPE"},
+	{MENLO_CMD_SET_PAUSE,		"MENLO_SET_PAUSE"},
+	{MENLO_CMD_SET_FCOE_COS,	"MENLO_SET_FCOE_COS"},
+	{MENLO_CMD_SET_UIF_PORT_TYPE,	"MENLO_SET_UIF_TYPE"},
 
-	{MENLO_CMD_DIAGNOSTICS, "MENLO_DIAGNOSTICS"},
-	{MENLO_CMD_LOOPBACK, "MENLO_LOOPBACK"},
+	{MENLO_CMD_DIAGNOSTICS,		"MENLO_DIAGNOSTICS"},
+	{MENLO_CMD_LOOPBACK,		"MENLO_LOOPBACK"},
 
-	{MENLO_CMD_RESET, "MENLO_RESET"},
-	{MENLO_CMD_SET_MODE, "MENLO_SET_MODE"}
+	{MENLO_CMD_RESET,		"MENLO_RESET"},
+	{MENLO_CMD_SET_MODE,		"MENLO_SET_MODE"}
 
 };	/* emlxs_menlo_cmd_table */
 
-emlxs_table_t emlxs_menlo_rsp_table[] =
-{
-	{MENLO_RSP_SUCCESS, "SUCCESS"},
-	{MENLO_ERR_FAILED, "FAILED"},
-	{MENLO_ERR_INVALID_CMD, "INVALID_CMD"},
-	{MENLO_ERR_INVALID_CREDIT, "INVALID_CREDIT"},
-	{MENLO_ERR_INVALID_SIZE, "INVALID_SIZE"},
-	{MENLO_ERR_INVALID_ADDRESS, "INVALID_ADDRESS"},
-	{MENLO_ERR_INVALID_CONTEXT, "INVALID_CONTEXT"},
-	{MENLO_ERR_INVALID_LENGTH, "INVALID_LENGTH"},
-	{MENLO_ERR_INVALID_TYPE, "INVALID_TYPE"},
-	{MENLO_ERR_INVALID_DATA, "INVALID_DATA"},
-	{MENLO_ERR_INVALID_VALUE1, "INVALID_VALUE1"},
-	{MENLO_ERR_INVALID_VALUE2, "INVALID_VALUE2"},
-	{MENLO_ERR_INVALID_MASK, "INVALID_MASK"},
-	{MENLO_ERR_CHECKSUM, "CHECKSUM_ERROR"},
-	{MENLO_ERR_UNKNOWN_FCID, "UNKNOWN_FCID"},
-	{MENLO_ERR_UNKNOWN_WWN, "UNKNOWN_WWN"},
-	{MENLO_ERR_BUSY, "BUSY"},
+emlxs_table_t emlxs_menlo_rsp_table[] = {
+	{MENLO_RSP_SUCCESS,		"SUCCESS"},
+	{MENLO_ERR_FAILED,		"FAILED"},
+	{MENLO_ERR_INVALID_CMD,		"INVALID_CMD"},
+	{MENLO_ERR_INVALID_CREDIT,	"INVALID_CREDIT"},
+	{MENLO_ERR_INVALID_SIZE,	"INVALID_SIZE"},
+	{MENLO_ERR_INVALID_ADDRESS,	"INVALID_ADDRESS"},
+	{MENLO_ERR_INVALID_CONTEXT,	"INVALID_CONTEXT"},
+	{MENLO_ERR_INVALID_LENGTH,	"INVALID_LENGTH"},
+	{MENLO_ERR_INVALID_TYPE,	"INVALID_TYPE"},
+	{MENLO_ERR_INVALID_DATA,	"INVALID_DATA"},
+	{MENLO_ERR_INVALID_VALUE1,	"INVALID_VALUE1"},
+	{MENLO_ERR_INVALID_VALUE2,	"INVALID_VALUE2"},
+	{MENLO_ERR_INVALID_MASK,	"INVALID_MASK"},
+	{MENLO_ERR_CHECKSUM,		"CHECKSUM_ERROR"},
+	{MENLO_ERR_UNKNOWN_FCID,	"UNKNOWN_FCID"},
+	{MENLO_ERR_UNKNOWN_WWN,		"UNKNOWN_WWN"},
+	{MENLO_ERR_BUSY,		"BUSY"},
 
 };	/* emlxs_menlo_rsp_table */
 
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 
-emlxs_table_t emlxs_mscmd_table[] =
-{
+emlxs_table_t emlxs_mscmd_table[] = {
 	{SLI_CT_RESPONSE_FS_ACC, "CT_ACC"},
 	{SLI_CT_RESPONSE_FS_RJT, "CT_RJT"},
 	{MS_GTIN, "MS_GTIN"},
@@ -863,8 +846,7 @@ emlxs_table_t emlxs_mscmd_table[] =
 };	/* emlxs_mscmd_table */
 
 
-emlxs_table_t emlxs_ctcmd_table[] =
-{
+emlxs_table_t emlxs_ctcmd_table[] = {
 	{SLI_CT_RESPONSE_FS_ACC, "CT_ACC"},
 	{SLI_CT_RESPONSE_FS_RJT, "CT_RJT"},
 	{SLI_CTNS_GA_NXT, "GA_NXT"},
@@ -893,14 +875,13 @@ emlxs_table_t emlxs_ctcmd_table[] =
 	{SLI_CTNS_RIPA_NN, "RIPA_NN"},
 	{SLI_CTNS_RSNN_NN, "RSNN_NN"},
 	{SLI_CTNS_DA_ID, "DA_ID"},
-	{SLI_CT_LOOPBACK, "LOOPBACK"}	/* Driver special */
+	{SLI_CT_LOOPBACK, "LOOPBACK"} /* Driver special */
 
 };	/* emlxs_ctcmd_table */
 
 
 
-emlxs_table_t emlxs_rmcmd_table[] =
-{
+emlxs_table_t emlxs_rmcmd_table[] = {
 	{SLI_CT_RESPONSE_FS_ACC, "CT_ACC"},
 	{SLI_CT_RESPONSE_FS_RJT, "CT_RJT"},
 	{CT_OP_GSAT, "RM_GSAT"},
@@ -963,13 +944,12 @@ emlxs_table_t emlxs_rmcmd_table[] =
 	{CT_OP_GABS, "RM_GABS"},
 	{CT_OP_SABS, "RM_SABS"},
 	{CT_OP_RPR, "RM_RPR"},
-	{SLI_CT_LOOPBACK, "LOOPBACK"}	/* Driver special */
+	{SLI_CT_LOOPBACK, "LOOPBACK"} /* Driver special */
 
 };	/* emlxs_rmcmd_table */
 
 
-emlxs_table_t emlxs_elscmd_table[] =
-{
+emlxs_table_t emlxs_elscmd_table[] = {
 	{ELS_CMD_ACC, "ACC"},
 	{ELS_CMD_LS_RJT, "LS_RJT"},
 	{ELS_CMD_PLOGI, "PLOGI"},
@@ -1017,13 +997,13 @@ emlxs_table_t emlxs_elscmd_table[] =
 
 /*
  *
- *		  Device Driver Entry Routines
+ *	Device Driver Entry Routines
  *
  */
 
 #ifdef MODSYM_SUPPORT
 static void emlxs_fca_modclose();
-static int emlxs_fca_modopen();
+static int  emlxs_fca_modopen();
 emlxs_modsym_t emlxs_modsym;
 
 static int
@@ -1034,10 +1014,11 @@ emlxs_fca_modopen()
 	if (emlxs_modsym.mod_fctl) {
 		return (EEXIST);
 	}
+
 	/* Leadville (fctl) */
 	err = 0;
-	emlxs_modsym.mod_fctl = ddi_modopen("misc/fctl",
-	    KRTLD_MODE_FIRST, &err);
+	emlxs_modsym.mod_fctl =
+	    ddi_modopen("misc/fctl", KRTLD_MODE_FIRST, &err);
 	if (!emlxs_modsym.mod_fctl) {
 		cmn_err(CE_WARN,
 		    "?%s: misc/fctl: ddi_modopen misc/fctl failed: error=%d",
@@ -1045,33 +1026,39 @@ emlxs_fca_modopen()
 
 		goto failed;
 	}
+
 	err = 0;
 	/* Check if the fctl fc_fca_attach is present */
-	emlxs_modsym.fc_fca_attach = (int (*) ())
-	    ddi_modsym(emlxs_modsym.mod_fctl, "fc_fca_attach", &err);
-	if ((void *) emlxs_modsym.fc_fca_attach == NULL) {
+	emlxs_modsym.fc_fca_attach =
+	    (int (*)())ddi_modsym(emlxs_modsym.mod_fctl, "fc_fca_attach",
+	    &err);
+	if ((void *)emlxs_modsym.fc_fca_attach == NULL) {
 		cmn_err(CE_WARN,
 		    "?%s: misc/fctl: fc_fca_attach not present", DRIVER_NAME);
 		goto failed;
 	}
+
 	err = 0;
 	/* Check if the fctl fc_fca_detach is present */
-	emlxs_modsym.fc_fca_detach = (int (*) ())
-	    ddi_modsym(emlxs_modsym.mod_fctl, "fc_fca_detach", &err);
-	if ((void *) emlxs_modsym.fc_fca_detach == NULL) {
+	emlxs_modsym.fc_fca_detach =
+	    (int (*)())ddi_modsym(emlxs_modsym.mod_fctl, "fc_fca_detach",
+	    &err);
+	if ((void *)emlxs_modsym.fc_fca_detach == NULL) {
 		cmn_err(CE_WARN,
 		    "?%s: misc/fctl: fc_fca_detach not present", DRIVER_NAME);
 		goto failed;
 	}
+
 	err = 0;
 	/* Check if the fctl fc_fca_init is present */
-	emlxs_modsym.fc_fca_init = (int (*) ())
-	    ddi_modsym(emlxs_modsym.mod_fctl, "fc_fca_init", &err);
-	if ((void *) emlxs_modsym.fc_fca_init == NULL) {
+	emlxs_modsym.fc_fca_init =
+	    (int (*)())ddi_modsym(emlxs_modsym.mod_fctl, "fc_fca_init", &err);
+	if ((void *)emlxs_modsym.fc_fca_init == NULL) {
 		cmn_err(CE_WARN,
 		    "?%s: misc/fctl: fc_fca_init not present", DRIVER_NAME);
 		goto failed;
 	}
+
 	return (0);
 
 failed:
@@ -1091,15 +1078,16 @@ emlxs_fca_modclose()
 		(void) ddi_modclose(emlxs_modsym.mod_fctl);
 		emlxs_modsym.mod_fctl = 0;
 	}
+
 	emlxs_modsym.fc_fca_attach = NULL;
 	emlxs_modsym.fc_fca_detach = NULL;
-	emlxs_modsym.fc_fca_init = NULL;
+	emlxs_modsym.fc_fca_init   = NULL;
 
 	return;
 
 } /* emlxs_fca_modclose() */
 
-#endif	/* MODSYM_SUPPORT */
+#endif /* MODSYM_SUPPORT */
 
 
 
@@ -1113,14 +1101,14 @@ _init(void)
 	char buf[64];
 
 	/*
-	 * First init call for this driver, so initialize the emlxs_dev_ctl
-	 * structure.
+	 * First init call for this driver,
+	 * so initialize the emlxs_dev_ctl structure.
 	 */
 	bzero(&emlxs_device, sizeof (emlxs_device));
 
 #ifdef MODSYM_SUPPORT
 	bzero(&emlxs_modsym, sizeof (emlxs_modsym_t));
-#endif	/* MODSYM_SUPPORT */
+#endif /* MODSYM_SUPPORT */
 
 	(void) sprintf(buf, "%s_device mutex", DRIVER_NAME);
 	mutex_init(&emlxs_device.lock, buf, MUTEX_DRIVER, NULL);
@@ -1133,8 +1121,8 @@ _init(void)
 	}
 
 	/*
-	 * Provide for one ddiinst of the emlxs_dev_ctl structure for each
-	 * possible board in the system.
+	 * Provide for one ddiinst of the emlxs_dev_ctl structure
+	 * for each possible board in the system.
 	 */
 	if ((ret = ddi_soft_state_init(&emlxs_soft_state,
 	    sizeof (emlxs_hba_t), MAX_FC_BRDS)) != 0) {
@@ -1144,9 +1132,16 @@ _init(void)
 
 		return (ret);
 	}
+
 	if ((ret = mod_install(&emlxs_modlinkage)) != 0) {
 		(void) ddi_soft_state_fini(&emlxs_soft_state);
 	}
+
+#ifdef SAN_DIAG_SUPPORT
+	(void) sprintf(buf, "%s_sd_bucket mutex", DRIVER_NAME);
+	mutex_init(&sd_bucket_mutex, buf, MUTEX_DRIVER, NULL);
+#endif /* SAN_DIAG_SUPPORT */
+
 	return (ret);
 
 } /* _init() */
@@ -1161,10 +1156,6 @@ _fini(void)
 	int ret;
 
 	if ((ret = mod_remove(&emlxs_modlinkage)) != 0) {
-		/*
-		 * cmn_err(CE_WARN, "?%s: _fini: mod_remove failed. rval=%x",
-		 * DRIVER_NAME, ret);
-		 */
 		return (ret);
 	}
 #ifdef MODSYM_SUPPORT
@@ -1173,8 +1164,8 @@ _fini(void)
 #ifdef SFCT_SUPPORT
 	/* Close FCT */
 	emlxs_fct_modclose();
-#endif	/* SFCT_SUPPORT */
-#endif	/* MODSYM_SUPPORT */
+#endif /* SFCT_SUPPORT */
+#endif /* MODSYM_SUPPORT */
 
 	/*
 	 * Destroy the soft state structure
@@ -1183,6 +1174,10 @@ _fini(void)
 
 	/* Destroy the global device lock */
 	mutex_destroy(&emlxs_device.lock);
+
+#ifdef SAN_DIAG_SUPPORT
+	mutex_destroy(&sd_bucket_mutex);
+#endif /* SAN_DIAG_SUPPORT */
 
 	return (ret);
 
@@ -1200,29 +1195,29 @@ _info(struct modinfo *modinfop)
 
 
 /*
- * Attach an ddiinst of an emlx host adapter. Allocate data structures,
- * initialize the adapter and we're ready to fly.
+ * Attach an ddiinst of an emlx host adapter.
+ * Allocate data structures, initialize the adapter and we're ready to fly.
  */
 static int
 emlxs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	emlxs_hba_t *hba;
+	int ddiinst;
+	int emlxinst;
 	int rval;
 
 	switch (cmd) {
 	case DDI_ATTACH:
-
 		/* If successful this will set EMLXS_PM_IN_ATTACH */
 		rval = emlxs_hba_attach(dip);
 		break;
 
 	case DDI_PM_RESUME:
-
 		/* This will resume the driver */
 		rval = emlxs_pm_raise_power(dip);
 		break;
 
 	case DDI_RESUME:
-
 		/* This will resume the driver */
 		rval = emlxs_hba_resume(dip);
 		break;
@@ -1231,8 +1226,21 @@ emlxs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		rval = DDI_FAILURE;
 	}
 
-	return (rval);
+	if (rval == DDI_SUCCESS) {
+		ddiinst = ddi_get_instance(dip);
+		emlxinst = emlxs_get_instance(ddiinst);
+		hba = emlxs_device.hba[emlxinst];
 
+		if ((hba != NULL) && (hba != (emlxs_hba_t *)-1)) {
+
+			/* Enable driver dump feature */
+			mutex_enter(&EMLXS_PORT_LOCK);
+			hba->flag |= FC_DUMP_SAFE;
+			mutex_exit(&EMLXS_PORT_LOCK);
+		}
+	}
+
+	return (rval);
 
 } /* emlxs_attach() */
 
@@ -1258,14 +1266,31 @@ emlxs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		return (DDI_FAILURE);
 	}
+
 	if (hba == (emlxs_hba_t *)-1) {
 		cmn_err(CE_WARN, "?%s: Detach: Device attach failed.",
 		    DRIVER_NAME);
 
 		return (DDI_FAILURE);
 	}
+
 	port = &PPORT;
 	rval = DDI_SUCCESS;
+
+	/* Check driver dump */
+	mutex_enter(&EMLXS_PORT_LOCK);
+
+	if (hba->flag & FC_DUMP_ACTIVE) {
+		mutex_exit(&EMLXS_PORT_LOCK);
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
+		    "emlxs_detach: Driver busy. Driver dump active.");
+
+		return (DDI_FAILURE);
+	}
+
+	hba->flag &= ~FC_DUMP_SAFE;
+	mutex_exit(&EMLXS_PORT_LOCK);
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -1294,6 +1319,7 @@ emlxs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
 			    "Unable to lower power.");
 		}
+
 		break;
 
 
@@ -1316,6 +1342,13 @@ emlxs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		cmn_err(CE_WARN, "?%s: Detach: Unknown cmd received. cmd=%x",
 		    DRIVER_NAME, cmd);
 		rval = DDI_FAILURE;
+	}
+
+	if (rval == DDI_FAILURE) {
+		/* Re-Enable driver dump feature */
+		mutex_enter(&EMLXS_PORT_LOCK);
+		hba->flag |= FC_DUMP_SAFE;
+		mutex_exit(&EMLXS_PORT_LOCK);
 	}
 
 	return (rval);
@@ -1341,17 +1374,19 @@ emlxs_port_init(emlxs_port_t *port)
 
 	if (!(port->flag & EMLXS_PORT_ENABLE)) {
 		uint8_t dummy_wwn[8] =
-		    {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+		    { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 		bcopy((caddr_t)dummy_wwn, (caddr_t)&port->wwnn,
 		    sizeof (NAME_TYPE));
 		bcopy((caddr_t)dummy_wwn, (caddr_t)&port->wwpn,
 		    sizeof (NAME_TYPE));
 	}
+
 	if (!(port->flag & EMLXS_PORT_CONFIG)) {
 		(void) strncpy((caddr_t)port->snn, (caddr_t)hba->snn, 256);
 		(void) strncpy((caddr_t)port->spn, (caddr_t)hba->spn, 256);
 	}
+
 	bcopy((caddr_t)&hba->sparam, (caddr_t)&port->sparam,
 	    sizeof (SERV_PARM));
 	bcopy((caddr_t)&port->wwnn, (caddr_t)&port->sparam.nodeName,
@@ -1369,9 +1404,10 @@ emlxs_port_init(emlxs_port_t *port)
  * emlxs_bind_port
  *
  * Arguments:
+ *
  * dip: the dev_info pointer for the ddiinst
  * port_info: pointer to info handed back to the transport
- * bind info: pointer to info from the transport
+ * bind_info: pointer to info from the transport
  *
  * Return values: a port handle for this port, NULL for failure
  *
@@ -1390,7 +1426,6 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	char buffer[16];
 	uint32_t length;
 	uint32_t len;
-	/* char buf[64]; */
 	char topology[32];
 	char linkspeed[32];
 
@@ -1410,20 +1445,21 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		    !(bind_info->port_npiv) ||
 		    (bind_info->port_num > hba->vpi_max))
 #elif (EMLXS_MODREV >= EMLXS_MODREV3)
-			if (!(hba->flag & FC_NPIV_ENABLED) ||
-			    (bind_info->port_num > hba->vpi_high))
+		if (!(hba->flag & FC_NPIV_ENABLED) ||
+		    (bind_info->port_num > hba->vpi_high))
 #endif
-			{
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "emlxs_port_bind: Port %d not supported.",
-				    bind_info->port_num);
+		{
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "emlxs_port_bind: Port %d not supported.",
+			    bind_info->port_num);
 
-				mutex_exit(&EMLXS_PORT_LOCK);
+			mutex_exit(&EMLXS_PORT_LOCK);
 
-				port_info->pi_error = FC_OUTOFBOUNDS;
-				return (NULL);
-			}
+			port_info->pi_error = FC_OUTOFBOUNDS;
+			return (NULL);
+		}
 	}
+
 	/* Get true port pointer */
 	port = &VPORT(bind_info->port_num);
 
@@ -1437,6 +1473,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		port_info->pi_error = FC_OUTOFBOUNDS;
 		return (NULL);
 	}
+
 	if (!port->ini_mode) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "emlxs_port_bind: Port %d is not in initiator mode.",
@@ -1447,6 +1484,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		port_info->pi_error = FC_OUTOFBOUNDS;
 		return (NULL);
 	}
+
 	/* Make sure the port is not already bound to the transport */
 	if (port->flag & EMLXS_PORT_BOUND) {
 
@@ -1459,6 +1497,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		port_info->pi_error = FC_ALREADY;
 		return (NULL);
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "fca_bind_port: Port %d: port_info=%p bind_info=%p",
 	    bind_info->port_num, port_info, bind_info);
@@ -1473,35 +1512,32 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 			(void) strncpy((caddr_t)port->snn, (caddr_t)hba->snn,
 			    256);
 		}
+
 		if (port->spn[0] == 0) {
 			(void) sprintf((caddr_t)port->spn, "%s VPort-%d",
 			    (caddr_t)hba->spn, port->vpi);
 		}
 		port->flag |= (EMLXS_PORT_CONFIG | EMLXS_PORT_ENABLE);
-
-		if (cfg[CFG_VPORT_RESTRICTED].current) {
-			port->flag |= EMLXS_PORT_RESTRICTED;
-		}
 	}
-#endif	/* >= EMLXS_MODREV5 */
+#endif /* >= EMLXS_MODREV5 */
+
+	/*
+	 * Restricted login should apply both physical and
+	 * virtual ports.
+	 */
+	if (cfg[CFG_VPORT_RESTRICTED].current) {
+		port->flag |= EMLXS_PORT_RESTRICTED;
+	}
 
 	/* Perform generic port initialization */
 	emlxs_port_init(port);
 
 	/* Perform SFS specific initialization */
-	port->ulp_handle = bind_info->port_handle;
-	port->ulp_statec_cb = bind_info->port_statec_cb;
-	port->ulp_unsol_cb = bind_info->port_unsol_cb;
-	port->ub_count = EMLXS_UB_TOKEN_OFFSET;
-	port->ub_pool = NULL;
-
-#ifdef MENLO_TEST
-	if ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) &&
-	    (cfg[CFG_HORNET_FLOGI].current == 0)) {
-		hba->flag |= FC_MENLO_MODE;
-	}
-#endif	/* MENLO_TEST */
-
+	port->ulp_handle	= bind_info->port_handle;
+	port->ulp_statec_cb	= bind_info->port_statec_cb;
+	port->ulp_unsol_cb	= bind_info->port_unsol_cb;
+	port->ub_count		= EMLXS_UB_TOKEN_OFFSET;
+	port->ub_pool		= NULL;
 
 	/* Update the port info structure */
 
@@ -1517,7 +1553,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		port_info->pi_port_state = FC_STATE_OFFLINE;
 		port_info->pi_topology = FC_TOP_UNKNOWN;
 	}
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 	else {
 		/* Check for loop topology */
 		if (hba->topology == TOPOLOGY_LOOP) {
@@ -1587,9 +1623,9 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	port->ulp_statec = port_info->pi_port_state;
 
 	/*
-	 * The transport needs a copy of the common service parameters for
-	 * this port. The transport can get any updates throuth the getcap
-	 * entry point.
+	 * The transport needs a copy of the common service parameters
+	 * for this port. The transport can get any updates through
+	 * the getcap entry point.
 	 */
 	bcopy((void *) &port->sparam,
 	    (void *) &port_info->pi_login_params.common_service,
@@ -1597,9 +1633,9 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	/* Swap the service parameters for ULP */
-	emlxs_swap_service_params((SERV_PARM *)
-	    &port_info->pi_login_params.common_service);
-#endif	/* EMLXS_MODREV2X */
+	emlxs_swap_service_params((SERV_PARM *)&port_info->pi_login_params.
+	    common_service);
+#endif /* EMLXS_MODREV2X */
 
 	port_info->pi_login_params.common_service.btob_credit = 0xffff;
 
@@ -1612,14 +1648,16 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	    sizeof (NAME_TYPE));
 
 	/*
-	 * We need to turn off CLASS2 support. Otherwise, FC transport will
-	 * use CLASS2 as default class and never try with CLASS3.
+	 * We need to turn off CLASS2 support.
+	 * Otherwise, FC transport will use CLASS2 as default class
+	 * and never try with CLASS3.
 	 */
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
 #if (EMLXS_MODREVX >= EMLXS_MODREV3X)
 	if ((port_info->pi_login_params.class_1.class_opt) & 0x0080) {
 		port_info->pi_login_params.class_1.class_opt &= ~0x0080;
 	}
+
 	if ((port_info->pi_login_params.class_2.class_opt) & 0x0080) {
 		port_info->pi_login_params.class_2.class_opt &= ~0x0080;
 	}
@@ -1627,6 +1665,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	if ((port_info->pi_login_params.class_1.class_opt) & 0x8000) {
 		port_info->pi_login_params.class_1.class_opt &= ~0x8000;
 	}
+
 	if ((port_info->pi_login_params.class_2.class_opt) & 0x8000) {
 		port_info->pi_login_params.class_2.class_opt &= ~0x8000;
 	}
@@ -1638,6 +1677,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	if ((port_info->pi_login_params.class_1.data[0]) & 0x80) {
 		port_info->pi_login_params.class_1.data[0] &= ~0x80;
 	}
+
 	if ((port_info->pi_login_params.class_2.data[0]) & 0x80) {
 		port_info->pi_login_params.class_2.data[0] &= ~0x80;
 	}
@@ -1652,13 +1692,13 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	bzero(&port_info->pi_rnid_params, sizeof (port_info->pi_rnid_params));
 
 	(void) sprintf((char *)port_info->pi_rnid_params.params.global_id,
-	    "%01x%01x%02x%02x%02x%02x%02x%02x%02x",
-	    hba->wwpn.nameType, hba->wwpn.IEEEextMsn, hba->wwpn.IEEEextLsb,
-	    hba->wwpn.IEEE[0], hba->wwpn.IEEE[1], hba->wwpn.IEEE[2],
-	    hba->wwpn.IEEE[3], hba->wwpn.IEEE[4], hba->wwpn.IEEE[5]);
+	    "%01x%01x%02x%02x%02x%02x%02x%02x%02x", hba->wwpn.nameType,
+	    hba->wwpn.IEEEextMsn, hba->wwpn.IEEEextLsb, hba->wwpn.IEEE[0],
+	    hba->wwpn.IEEE[1], hba->wwpn.IEEE[2], hba->wwpn.IEEE[3],
+	    hba->wwpn.IEEE[4], hba->wwpn.IEEE[5]);
 
-	port_info->pi_rnid_params.params.unit_type = RNID_HBA;
-	port_info->pi_rnid_params.params.port_id = port->did;
+	port_info->pi_rnid_params.params.unit_type  = RNID_HBA;
+	port_info->pi_rnid_params.params.port_id    = port->did;
 	port_info->pi_rnid_params.params.ip_version = RNID_IPV4;
 
 	/* Initialize the port attributes */
@@ -1673,14 +1713,14 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	(void) sprintf(port_info->pi_attrs.firmware_version, "%s (%s)",
 	    vpd->fw_version, vpd->fw_label);
 
-#ifdef i386
-		(void) sprintf(port_info->pi_attrs.option_rom_version,
-		    "Boot:%s", vpd->boot_version);
-#else   /* sparc */
-		(void) sprintf(port_info->pi_attrs.option_rom_version,
-		    "Boot:%s Fcode:%s",
-		    vpd->boot_version, vpd->fcode_version);
-#endif  /* i386 */
+#ifdef EMLXS_I386
+	(void) sprintf(port_info->pi_attrs.option_rom_version,
+	    "Boot:%s", vpd->boot_version);
+#else	/* EMLXS_SPARC */
+	(void) sprintf(port_info->pi_attrs.option_rom_version,
+	    "Boot:%s Fcode:%s", vpd->boot_version, vpd->fcode_version);
+#endif	/* EMLXS_I386 */
+
 
 	(void) sprintf(port_info->pi_attrs.driver_version, "%s (%s)",
 	    emlxs_version, emlxs_revision);
@@ -1710,17 +1750,17 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 
 	port_info->pi_attrs.hba_fru_details.port_index = vpd->port_index;
 
-#endif	/* >= EMLXS_MODREV5 */
+#endif /* >= EMLXS_MODREV5 */
 
 #if ((EMLXS_MODREV == EMLXS_MODREV3) || (EMLX_MODREV == EMLXS_MODREV4))
 
 	port_info->pi_rnid_params.params.num_attached = 0;
 
 	if (hba->flag & FC_NPIV_ENABLED) {
-		uint8_t byte;
-		uint8_t *wwpn;
-		uint32_t i;
-		uint32_t j;
+		uint8_t		byte;
+		uint8_t		*wwpn;
+		uint32_t	i;
+		uint32_t	j;
 
 		/* Copy the WWPN as a string into the local buffer */
 		wwpn = (uint8_t *)&hba->wwpn;
@@ -1728,30 +1768,30 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 			byte = *wwpn++;
 			j = ((byte & 0xf0) >> 4);
 			if (j <= 9) {
-				buffer[i] = (char)((uint8_t)'0' +
-				    (uint8_t)j);
+				buffer[i] =
+				    (char)((uint8_t)'0' + (uint8_t)j);
 			} else {
-				buffer[i] = (char)((uint8_t)'A' +
-				    (uint8_t)(j - 10));
+				buffer[i] =
+				    (char)((uint8_t)'A' + (uint8_t)(j -
+				    10));
 			}
 
 			i++;
 			j = (byte & 0xf);
 			if (j <= 9) {
-				buffer[i] = (char)((uint8_t)'0' +
-				    (uint8_t)j);
+				buffer[i] =
+				    (char)((uint8_t)'0' + (uint8_t)j);
 			} else {
-				buffer[i] = (char)((uint8_t)'A' +
-				    (uint8_t)(j - 10));
+				buffer[i] =
+				    (char)((uint8_t)'A' + (uint8_t)(j -
+				    10));
 			}
-		}
+			}
 
 		port_info->pi_attrs.hba_fru_details.port_index = port->vpi;
 	} else {
-		/*
-		 * Copy the serial number string (right most 16 chars) into
-		 * the right justified local buffer
-		 */
+		/* Copy the serial number string (right most 16 chars) */
+		/* into the right justified local buffer */
 		bzero(buffer, sizeof (buffer));
 		length = strlen(vpd->serial_num);
 		len = (length > 16) ? 16 : length;
@@ -1762,7 +1802,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		    vpd->port_index;
 	}
 
-#endif	/* == EMLXS_MODREV3 || EMLXS_MODREV4 */
+#endif /* == EMLXS_MODREV3 || EMLXS_MODREV4 */
 
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
 
@@ -1790,7 +1830,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	port_info->pi_attrs.hba_fru_details.low =
 	    SWAP_DATA64(port_info->pi_attrs.hba_fru_details.low);
 
-#endif	/* >= EMLXS_MODREV3 */
+#endif /* >= EMLXS_MODREV3 */
 
 #if (EMLXS_MODREV >= EMLXS_MODREV4)
 	(void) strncpy((caddr_t)port_info->pi_attrs.sym_node_name,
@@ -1803,7 +1843,8 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 
 	/* Set the hba speed limit */
 	if (vpd->link_speed & LMT_10GB_CAPABLE) {
-		port_info->pi_attrs.supported_speed |= FC_HBA_PORTSPEED_10GBIT;
+		port_info->pi_attrs.supported_speed |=
+		    FC_HBA_PORTSPEED_10GBIT;
 	}
 	if (vpd->link_speed & LMT_8GB_CAPABLE) {
 		port_info->pi_attrs.supported_speed |= FC_HBA_PORTSPEED_8GBIT;
@@ -1817,6 +1858,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	if (vpd->link_speed & LMT_1GB_CAPABLE) {
 		port_info->pi_attrs.supported_speed |= FC_HBA_PORTSPEED_1GBIT;
 	}
+
 	/* Set the hba model info */
 	(void) strcpy(port_info->pi_attrs.model, hba->model_info.model);
 	(void) strcpy(port_info->pi_attrs.model_description,
@@ -1832,7 +1874,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 #if (EMLXS_MODREV >= EMLXS_MODREV5)
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 	    "Bind info: port_npiv          = %d", bind_info->port_npiv);
-#endif	/* >= EMLXS_MODREV5 */
+#endif /* >= EMLXS_MODREV5 */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 	    "Port info: pi_topology        = %x", port_info->pi_topology);
@@ -1889,8 +1931,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	    "Port info: serial_num         = %s",
 	    port_info->pi_attrs.serial_number);
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
-	    "Port info: model              = %s",
-	    port_info->pi_attrs.model);
+	    "Port info: model              = %s", port_info->pi_attrs.model);
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 	    "Port info: model_description  = %s",
 	    port_info->pi_attrs.model_description);
@@ -1960,9 +2001,6 @@ emlxs_unbind_port(opaque_t fca_port_handle)
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
 	emlxs_hba_t *hba = HBA;
 	uint32_t count;
-	/* uint32_t i; */
-	/* NODELIST *nlp; */
-	/* NODELIST *next; */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "fca_unbind_port: port=%p", port);
@@ -1990,8 +2028,10 @@ emlxs_unbind_port(opaque_t fca_port_handle)
 				emlxs_ub_destroy(port, port->ub_pool);
 			}
 		}
+
 		mutex_exit(&EMLXS_UB_LOCK);
 	}
+
 	/* Destroy & flush all port nodes, if they exist */
 	if (port->node_count) {
 		(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0, 0);
@@ -2009,6 +2049,7 @@ emlxs_unbind_port(opaque_t fca_port_handle)
 		mutex_exit(&EMLXS_PORT_LOCK);
 		return;
 	}
+
 	port->flag &= ~EMLXS_PORT_BOUND;
 	hba->num_of_ports--;
 
@@ -2029,16 +2070,18 @@ extern int
 emlxs_pkt_init(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
-	emlxs_buf_t *sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
+	emlxs_hba_t  *hba = HBA;
+	emlxs_buf_t  *sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
 
 	if (!sbp) {
 		return (FC_FAILURE);
 	}
-	bzero((void *) sbp, sizeof (emlxs_buf_t));
 
-	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *) hba->intr_arg);
-	sbp->pkt_flags = PACKET_VALID | PACKET_RETURNED;
+	bzero((void *)sbp, sizeof (emlxs_buf_t));
+
+	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *)hba->intr_arg);
+	sbp->pkt_flags =
+	    PACKET_VALID | PACKET_RETURNED;
 	sbp->port = port;
 	sbp->pkt = pkt;
 	sbp->iocbq.sbp = sbp;
@@ -2060,32 +2103,34 @@ emlxs_initialize_pkt(emlxs_port_t *port, emlxs_buf_t *sbp)
 	mutex_enter(&sbp->mtx);
 
 	/* Reinitialize */
-	sbp->pkt = pkt;
-	sbp->port = port;
-	sbp->bmp = NULL;
+	sbp->pkt   = pkt;
+	sbp->port  = port;
+	sbp->bmp   = NULL;
 	sbp->pkt_flags &= (PACKET_VALID | PACKET_ALLOCATED);
 	sbp->iotag = 0;
 	sbp->ticks = 0;
 	sbp->abort_attempts = 0;
-	sbp->fpkt = NULL;
+	sbp->fpkt  = NULL;
 	sbp->flush_count = 0;
-	sbp->next = NULL;
+	sbp->next  = NULL;
 
 	if (!port->tgt_mode) {
-		sbp->node = NULL;
-		sbp->did = 0;
-		sbp->lun = 0;
+		sbp->node  = NULL;
+		sbp->did   = 0;
+		sbp->lun   = 0;
 		sbp->class = 0;
-		sbp->ring = NULL;
+		sbp->ring  = NULL;
 		sbp->class = 0;
 	}
-	bzero((void *) &sbp->iocbq, sizeof (IOCBQ));
+
+	bzero((void *)&sbp->iocbq, sizeof (IOCBQ));
 	sbp->iocbq.sbp = sbp;
 
 	if ((pkt->pkt_tran_flags & FC_TRAN_NO_INTR) || !pkt->pkt_comp ||
 	    ddi_in_panic()) {
 		sbp->pkt_flags |= PACKET_POLLED;
 	}
+
 	/* Prepare the fc packet */
 	pkt->pkt_state = FC_PKT_SUCCESS;
 	pkt->pkt_reason = 0;
@@ -2101,6 +2146,7 @@ emlxs_initialize_pkt(emlxs_port_t *port, emlxs_buf_t *sbp)
 	} else if (pkt->pkt_timeout == 0 || pkt->pkt_timeout == 0xffffffff) {
 		pkt->pkt_timeout = 60;
 	}
+
 	/* Clear the response buffer */
 	if (pkt->pkt_rsplen) {
 		/* Check for FCP commands */
@@ -2110,9 +2156,10 @@ emlxs_initialize_pkt(emlxs_port_t *port, emlxs_buf_t *sbp)
 			iptr[2] = 0;
 			iptr[3] = 0;
 		} else {
-			bzero(pkt->pkt_resp, pkt->pkt_rsplen);
-		}
+		bzero(pkt->pkt_resp, pkt->pkt_rsplen);
 	}
+	}
+
 	mutex_exit(&sbp->mtx);
 
 	return;
@@ -2128,15 +2175,16 @@ emlxs_initialize_pkt(emlxs_port_t *port, emlxs_buf_t *sbp)
 extern int
 emlxs_pkt_uninit(opaque_t fca_port_handle, fc_packet_t *pkt)
 {
-	/* emlxs_port_t *port = (emlxs_port_t *)fca_port_handle; */
-	emlxs_buf_t *sbp = PKT2PRIV(pkt);
+	emlxs_buf_t  *sbp = PKT2PRIV(pkt);
 
 	if (!sbp) {
 		return (FC_FAILURE);
 	}
+
 	if (!(sbp->pkt_flags & PACKET_VALID)) {
 		return (FC_FAILURE);
 	}
+
 	sbp->pkt_flags &= ~PACKET_VALID;
 	mutex_destroy(&sbp->mtx);
 
@@ -2149,17 +2197,18 @@ static int
 emlxs_get_cap(opaque_t fca_port_handle, char *cap, void *ptr)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
+	emlxs_hba_t  *hba = HBA;
 	int32_t rval;
 
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		return (FC_CAP_ERROR);
 	}
+
 	if (strcmp(cap, FC_NODE_WWN) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_get_cap: FC_NODE_WWN");
 
-		bcopy((void *) &hba->wwnn, (void *) ptr, sizeof (NAME_TYPE));
+		bcopy((void *)&hba->wwnn, (void *)ptr, sizeof (NAME_TYPE));
 		rval = FC_CAP_FOUND;
 
 	} else if (strcmp(cap, FC_LOGIN_PARAMS) == 0) {
@@ -2167,19 +2216,19 @@ emlxs_get_cap(opaque_t fca_port_handle, char *cap, void *ptr)
 		    "fca_get_cap: FC_LOGIN_PARAMS");
 
 		/*
-		 * We need to turn off CLASS2 support. Otherwise, FC
-		 * transport will use CLASS2 as default class and never try
-		 * with CLASS3.
+		 * We need to turn off CLASS2 support.
+		 * Otherwise, FC transport will use CLASS2 as default class
+		 * and never try with CLASS3.
 		 */
 		hba->sparam.cls2.classValid = 0;
 
-		bcopy((void *) &hba->sparam, (void *) ptr, sizeof (SERV_PARM));
+		bcopy((void *)&hba->sparam, (void *)ptr, sizeof (SERV_PARM));
 
 		rval = FC_CAP_FOUND;
 
 	} else if (strcmp(cap, FC_CAP_UNSOL_BUF) == 0) {
-		int32_t *num_bufs;
-		emlxs_config_t *cfg = &CFG;
+		int32_t		*num_bufs;
+		emlxs_config_t	*cfg = &CFG;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_get_cap: FC_CAP_UNSOL_BUF (%d)",
@@ -2187,16 +2236,14 @@ emlxs_get_cap(opaque_t fca_port_handle, char *cap, void *ptr)
 
 		num_bufs = (int32_t *)ptr;
 
-		/*
-		 * We multiply by MAX_VPORTS because ULP uses a formula to
-		 * calculate ub bufs from this
-		 */
+		/* We multiply by MAX_VPORTS because ULP uses a */
+		/* formula to calculate ub bufs from this */
 		*num_bufs = (cfg[CFG_UB_BUFS].current * MAX_VPORTS);
 
 		rval = FC_CAP_FOUND;
 
 	} else if (strcmp(cap, FC_CAP_PAYLOAD_SIZE) == 0) {
-		int32_t *size;
+		int32_t		*size;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_get_cap: FC_CAP_PAYLOAD_SIZE");
@@ -2226,7 +2273,7 @@ emlxs_get_cap(opaque_t fca_port_handle, char *cap, void *ptr)
 		rval = FC_CAP_FOUND;
 
 	} else if (strcmp(cap, FC_CAP_FCP_DMA) == 0) {
-		fc_fcp_dma_t *fcp_dma;
+		fc_fcp_dma_t   *fcp_dma;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_get_cap: FC_CAP_FCP_DMA");
@@ -2253,7 +2300,6 @@ static int
 emlxs_set_cap(opaque_t fca_port_handle, char *cap, void *ptr)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	/* emlxs_hba_t *hba = HBA; */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "fca_set_cap: cap=[%s] arg=%p", cap, ptr);
@@ -2267,7 +2313,6 @@ static opaque_t
 emlxs_get_device(opaque_t fca_port_handle, fc_portid_t d_id)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	/* emlxs_hba_t *hba = HBA; */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "fca_get_device: did=%x", d_id);
@@ -2281,10 +2326,9 @@ static int32_t
 emlxs_notify(opaque_t fca_port_handle, uint32_t cmd)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	/* emlxs_hba_t *hba = HBA; */
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-	    "fca_notify: cmd=%x", cmd);
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg, "fca_notify: cmd=%x",
+	    cmd);
 
 	return (FC_SUCCESS);
 
@@ -2295,10 +2339,9 @@ emlxs_notify(opaque_t fca_port_handle, uint32_t cmd)
 static int
 emlxs_get_map(opaque_t fca_port_handle, fc_lilpmap_t *mapbuf)
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
-
-	uint32_t lilp_length;
+	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t	*hba = HBA;
+	uint32_t	lilp_length;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "fca_get_map: mapbuf=%p length=%d (%X,%X,%X,%X)", mapbuf,
@@ -2308,18 +2351,19 @@ emlxs_get_map(opaque_t fca_port_handle, fc_lilpmap_t *mapbuf)
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		return (FC_NOMAP);
 	}
+
 	if (hba->topology != TOPOLOGY_LOOP) {
 		return (FC_NOMAP);
 	}
+
 	/* Check if alpa map is available */
 	if (port->alpa_map[0] != 0) {
-		mapbuf->lilp_magic = MAGIC_LILP;
+		mapbuf->lilp_magic  = MAGIC_LILP;
 	} else {	/* No LILP map available */
-		/*
-		 * Set lilp_magic to MAGIC_LISA and this will trigger an ALPA
-		 * scan in ULP
-		 */
-		mapbuf->lilp_magic = MAGIC_LISA;
+
+		/* Set lilp_magic to MAGIC_LISA and this will */
+		/* trigger an ALPA scan in ULP */
+		mapbuf->lilp_magic  = MAGIC_LISA;
 	}
 
 	mapbuf->lilp_myalpa = port->did;
@@ -2332,11 +2376,10 @@ emlxs_get_map(opaque_t fca_port_handle, fc_lilpmap_t *mapbuf)
 	if (lilp_length > 128) {
 		lilp_length = 128;
 	}
-	/*
-	 * We start copying from the lilp_length field in order to get a word
-	 * aligned address
-	 */
-	bcopy((void *) &port->alpa_map, (void *) &mapbuf->lilp_length,
+
+	/* We start copying from the lilp_length field */
+	/* in order to get a word aligned address */
+	bcopy((void *)&port->alpa_map, (void *)&mapbuf->lilp_length,
 	    lilp_length);
 
 	return (FC_SUCCESS);
@@ -2348,11 +2391,11 @@ emlxs_get_map(opaque_t fca_port_handle, fc_lilpmap_t *mapbuf)
 extern int
 emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
-	emlxs_buf_t *sbp;
-	uint32_t rval;
-	uint32_t pkt_flags;
+	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t	*hba = HBA;
+	emlxs_buf_t	*sbp;
+	uint32_t	rval;
+	uint32_t	pkt_flags;
 
 	/* Make sure adapter is online */
 	if (!(hba->flag & FC_ONLINE_MODE)) {
@@ -2361,6 +2404,7 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 
 		return (FC_OFFLINE);
 	}
+
 	/* Validate packet */
 	sbp = PKT2PRIV(pkt);
 
@@ -2372,16 +2416,18 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 
 		return (FC_OFFLINE);
 	}
+
 	if (sbp->port != port) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_error_msg,
-		    "Invalid port handle. sbp=%p port=%p flags=%x",
-		    sbp, sbp->port, sbp->pkt_flags);
+		    "Invalid port handle. sbp=%p port=%p flags=%x", sbp,
+		    sbp->port, sbp->pkt_flags);
 		return (FC_BADPACKET);
 	}
+
 	if (!(sbp->pkt_flags & (PACKET_VALID | PACKET_RETURNED))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_error_msg,
-		    "Invalid packet flags. sbp=%p port=%p flags=%x",
-		    sbp, sbp->port, sbp->pkt_flags);
+		    "Invalid packet flags. sbp=%p port=%p flags=%x", sbp,
+		    sbp->port, sbp->pkt_flags);
 		return (FC_BADPACKET);
 	}
 #ifdef SFCT_SUPPORT
@@ -2391,7 +2437,7 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 		    "Packet blocked. Target mode.");
 		return (FC_TRANSPORT_ERROR);
 	}
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 #ifdef IDLE_TIMER
 	emlxs_pm_busy_component(hba);
@@ -2400,10 +2446,8 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 	/* Prepare the packet for transport */
 	emlxs_initialize_pkt(port, sbp);
 
-	/*
-	 * Save a copy of the pkt flags.  We will check the polling flag
-	 * later
-	 */
+	/* Save a copy of the pkt flags. */
+	/* We will check the polling flag later */
 	pkt_flags = sbp->pkt_flags;
 
 	/* Send the packet */
@@ -2430,9 +2474,9 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 
 #ifdef MENLO_SUPPORT
 		case EMLXS_MENLO_TYPE:
-			rval = emlxs_send_menlo_cmd(port, sbp);
+			rval = emlxs_send_menlo(port, sbp);
 			break;
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 		default:
 			rval = emlxs_send_els(port, sbp);
@@ -2443,18 +2487,22 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 		switch (pkt->pkt_cmd_fhdr.type) {
 #ifdef SFCT_SUPPORT
 		case FC_TYPE_SCSI_FCP:
-			rval = emlxs_send_fcp_status(port, sbp);
+			rval = emlxs_send_fct_status(port, sbp);
 			break;
-#endif	/* SFCT_SUPPORT */
+
+		case FC_TYPE_BASIC_LS:
+			rval = emlxs_send_fct_abort(port, sbp);
+			break;
+#endif /* SFCT_SUPPORT */
 
 		case FC_TYPE_FC_SERVICES:
 			rval = emlxs_send_ct_rsp(port, sbp);
 			break;
 #ifdef MENLO_SUPPORT
 		case EMLXS_MENLO_TYPE:
-			rval = emlxs_send_menlo_cmd(port, sbp);
+			rval = emlxs_send_menlo(port, sbp);
 			break;
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 		default:
 			rval = emlxs_send_els_rsp(port, sbp);
@@ -2477,18 +2525,15 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 
 		return (rval);
 	}
-	/*
-	 * Check if this packet should be polled for completion before
-	 * returning
-	 */
-	/*
-	 * This check must be done with a saved copy of the pkt_flags
-	 * because the packet itself could already be freed from memory
-	 * if it was not polled.
-	 */
+
+	/* Check if this packet should be polled for completion before */
+	/* returning. This check must be done with a saved copy of the */
+	/* pkt_flags because the packet itself could already be freed from */
+	/* memory if it was not polled. */
 	if (pkt_flags & PACKET_POLLED) {
 		emlxs_poll(port, sbp);
 	}
+
 	return (FC_SUCCESS);
 
 } /* emlxs_transport() */
@@ -2498,32 +2543,27 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 static void
 emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt = PRIV2PKT(sbp);
-	clock_t timeout;
-	clock_t time;
-	int32_t pkt_ret;
-	uint32_t att_bit;
-	emlxs_ring_t *rp;
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt = PRIV2PKT(sbp);
+	clock_t		timeout;
+	clock_t		time;
+	uint32_t	att_bit;
+	emlxs_ring_t	*rp;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	hba->io_poll_count++;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	/* Set thread timeout */
-	timeout = emlxs_timeout(hba, (pkt->pkt_timeout +
-	    (4 * hba->fc_ratov) + 60));
-
 	/* Check for panic situation */
 	if (ddi_in_panic()) {
 		/*
-		 * In panic situations there will be one thread with no
-		 * interrrupts (hard or soft) and no timers
+		 * In panic situations there will be one thread with
+		 * no interrrupts (hard or soft) and no timers
 		 */
 
 		/*
-		 * We must manually poll everything in this thread to keep
-		 * the driver going.
+		 * We must manually poll everything in this thread
+		 * to keep the driver going.
 		 */
 		rp = (emlxs_ring_t *)sbp->ring;
 		switch (rp->ringno) {
@@ -2545,40 +2585,31 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		/* Keep polling the chip until our IO is completed */
+		/* Driver's timer will not function during panics. */
+		/* Therefore, timer checks must be performed manually. */
 		(void) drv_getparm(LBOLT, &time);
-		while ((time < timeout) &&
-		    !(sbp->pkt_flags & PACKET_COMPLETED)) {
-			emlxs_poll_intr(hba, att_bit);
+		timeout = time + drv_usectohz(1000000);
+		while (!(sbp->pkt_flags & PACKET_COMPLETED)) {
+			emlxs_sli_poll_intr(hba, att_bit);
 			(void) drv_getparm(LBOLT, &time);
+
+			/* Trigger timer checks periodically */
+			if (time >= timeout) {
+				emlxs_timer_checks(hba);
+				timeout = time + drv_usectohz(1000000);
+			}
 		}
 	} else {
-		/* Wait for IO completion or pkt timeout */
+		/* Wait for IO completion */
+		/* The driver's timer will detect */
+		/* any timeout and abort the I/O. */
 		mutex_enter(&EMLXS_PKT_LOCK);
-		pkt_ret = 0;
-		while ((pkt_ret != -1) &&
-		    !(sbp->pkt_flags & PACKET_COMPLETED)) {
-			pkt_ret = cv_timedwait(&EMLXS_PKT_CV,
-			    &EMLXS_PKT_LOCK, timeout);
+		while (!(sbp->pkt_flags & PACKET_COMPLETED)) {
+			cv_wait(&EMLXS_PKT_CV, &EMLXS_PKT_LOCK);
 		}
 		mutex_exit(&EMLXS_PKT_LOCK);
 	}
 
-	/*
-	 * Check if timeout occured.  This is not good.  Something happened
-	 * to our IO.
-	 */
-	if (!(sbp->pkt_flags & PACKET_COMPLETED)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-		    "Polled I/O: sbp=%p tmo=%d", sbp, timeout);
-
-		mutex_enter(&sbp->mtx);
-		emlxs_set_pkt_state(sbp, IOSTAT_LOCAL_REJECT,
-		    IOERR_ABORT_TIMEOUT, 0);
-		sbp->pkt_flags |= (PACKET_IN_TIMEOUT | PACKET_IN_COMPLETION);
-		mutex_exit(&sbp->mtx);
-
-		(void) emlxs_unregister_pkt(sbp->ring, sbp->iotag, 1);
-	}
 	/* Check for fcp reset pkt */
 	if (sbp->pkt_flags & PACKET_FCP_RESET) {
 		if (sbp->pkt_flags & PACKET_FCP_TGT_RESET) {
@@ -2587,15 +2618,16 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 			    &hba->ring[FC_FCP_RING], sbp->node, sbp);
 		} else {
 			/* Flush the IO's on the chipq for this lun */
-			(void) emlxs_chipq_lun_flush(port, sbp->node, sbp->lun,
-			    sbp);
+			(void) emlxs_chipq_lun_flush(port,
+			    sbp->node, sbp->lun, sbp);
 		}
 
 		if (sbp->flush_count == 0) {
 			emlxs_node_open(port, sbp->node, FC_FCP_RING);
 			goto done;
 		}
-		/* Reset the timeout so the flush has time to complete */
+
+		/* Set the timeout so the flush has time to complete */
 		timeout = emlxs_timeout(hba, 60);
 		(void) drv_getparm(LBOLT, &time);
 		while ((time < timeout) && sbp->flush_count > 0) {
@@ -2607,8 +2639,10 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 			emlxs_node_open(port, sbp->node, FC_FCP_RING);
 			goto done;
 		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_flush_timeout_msg,
-		    "sbp=%p flush_count=%d. Waiting...", sbp, sbp->flush_count);
+		    "sbp=%p flush_count=%d. Waiting...", sbp,
+		    sbp->flush_count);
 
 		/* Let's try this one more time */
 
@@ -2618,8 +2652,8 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 			    &hba->ring[FC_FCP_RING], sbp->node, sbp);
 		} else {
 			/* Flush the IO's on the chipq for this lun */
-			(void) emlxs_chipq_lun_flush(port, sbp->node, sbp->lun,
-			    sbp);
+			(void) emlxs_chipq_lun_flush(port,
+			    sbp->node, sbp->lun, sbp);
 		}
 
 		/* Reset the timeout so the flush has time to complete */
@@ -2634,9 +2668,10 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 			emlxs_node_open(port, sbp->node, FC_FCP_RING);
 			goto done;
 		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_flush_timeout_msg,
-		    "sbp=%p flush_count=%d. Resetting link.",
-		    sbp, sbp->flush_count);
+		    "sbp=%p flush_count=%d. Resetting link.", sbp,
+		    sbp->flush_count);
 
 		/* Let's first try to reset the link */
 		(void) emlxs_reset(port, FC_FCA_LINK_RESET);
@@ -2644,19 +2679,22 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		if (sbp->flush_count == 0) {
 			goto done;
 		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_flush_timeout_msg,
-		    "sbp=%p flush_count=%d. Resetting HBA.",
-		    sbp, sbp->flush_count);
+		    "sbp=%p flush_count=%d. Resetting HBA.", sbp,
+		    sbp->flush_count);
 
 		/* If that doesn't work, reset the adapter */
 		(void) emlxs_reset(port, FC_FCA_RESET);
 
 		if (sbp->flush_count != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_flush_timeout_msg,
-			    "sbp=%p flush_count=%d. Giving up.",
-			    sbp, sbp->flush_count);
+			    "sbp=%p flush_count=%d. Giving up.", sbp,
+			    sbp->flush_count);
 		}
-	}	/* PACKET_FCP_RESET */
+
+	}
+	/* PACKET_FCP_RESET */
 done:
 
 	/* Packet has been declared completed and is now ready to be returned */
@@ -2677,6 +2715,7 @@ done:
 	if (pkt->pkt_comp) {
 		(*pkt->pkt_comp) (pkt);
 	}
+
 	return;
 
 } /* emlxs_poll() */
@@ -2686,22 +2725,19 @@ static int
 emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
     uint32_t *count, uint32_t type)
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
+	emlxs_port_t		*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t		*hba = HBA;
 
-	char *err = NULL;
-	emlxs_unsol_buf_t *pool;
-	emlxs_unsol_buf_t *new_pool;
-	/* emlxs_unsol_buf_t *prev_pool; */
-	int32_t i;
-	/* int32_t j; */
-	int result;
-	uint32_t free_resv;
-	uint32_t free;
-	emlxs_config_t *cfg = &CFG;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
-	/* RING *rp; */
+	char			*err = NULL;
+	emlxs_unsol_buf_t	*pool;
+	emlxs_unsol_buf_t	*new_pool;
+	int32_t			i;
+	int			result;
+	uint32_t		free_resv;
+	uint32_t		free;
+	emlxs_config_t		*cfg = &CFG;
+	fc_unsol_buf_t		*ubp;
+	emlxs_ub_priv_t		*ub_priv;
 
 	if (port->tgt_mode) {
 		if (tokens && count) {
@@ -2709,30 +2745,34 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		}
 		return (FC_SUCCESS);
 	}
+
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "ub_alloc failed: Port not bound! size=%x count=%d type=%x",
-		    size, *count, type);
+		    "ub_alloc failed: Port not bound!  size=%x count=%d "
+		    "type=%x", size, *count, type);
 
 		return (FC_FAILURE);
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "ub_alloc: size=%x count=%d type=%x", size, *count, type);
 
 	if (count && (*count > EMLXS_MAX_UBUFS)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-		    "ub_alloc failed: Too many unsolicted buffers"
-		    " requested. count=%x", *count);
+		    "ub_alloc failed: Too many unsolicted buffers requested. "
+		    "count=%x", *count);
 
 		return (FC_FAILURE);
 
 	}
+
 	if (tokens == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
 		    "ub_alloc failed: Token array is NULL.");
 
 		return (FC_FAILURE);
 	}
+
 	/* Clear the token array */
 	bzero(tokens, (sizeof (uint64_t) * (*count)));
 
@@ -2746,8 +2786,6 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		err = "EXTENDED_LS";
 		free = *count / 2;	/* Hold 50% for normal use */
 		free_resv = *count - free;	/* Reserve 50% for RSCN use */
-
-		/* rp = &hba->ring[FC_ELS_RING]; */
 		break;
 	case FC_TYPE_IS8802:
 		err = "IS8802";
@@ -2761,7 +2799,6 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 
 			return (FC_FAILURE);
 		}
-		/* rp = &hba->ring[FC_IP_RING]; */
 		break;
 	case FC_TYPE_SCSI_FCP:
 		err = "SCSI_FCP";
@@ -2786,43 +2823,41 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		break;
 	}
 
-
 	mutex_enter(&EMLXS_UB_LOCK);
 
 	/*
-	 * Walk through the list of the unsolicited buffers for this ddiinst
-	 * of emlx.
+	 * Walk through the list of the unsolicited buffers
+	 * for this ddiinst of emlx.
 	 */
 
-	/* prev_pool = NULL; */
 	pool = port->ub_pool;
 
 	/*
 	 * The emlxs_ub_alloc() can be called more than once with different
-	 * size. We will reject the call if there are duplicate size with the
-	 * same FC-4 type.
+	 * size. We will reject the call if there are
+	 * duplicate size with the same FC-4 type.
 	 */
 	while (pool) {
 		if ((pool->pool_type == type) &&
 		    (pool->pool_buf_size == size)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-			    "ub_alloc failed: Unsolicited buffer pool for"
-			    " %s of size 0x%x bytes already exists.",
-			    err, size);
+			    "ub_alloc failed: Unsolicited buffer pool for %s "
+			    "of size 0x%x bytes already exists.", err, size);
 
 			result = FC_FAILURE;
 			goto fail;
 		}
-		/* prev_pool = pool; */
+
 		pool = pool->pool_next;
 	}
 
-	new_pool = (emlxs_unsol_buf_t *)
-	    kmem_zalloc(sizeof (emlxs_unsol_buf_t), KM_SLEEP);
+	new_pool = (emlxs_unsol_buf_t *)kmem_zalloc(sizeof (emlxs_unsol_buf_t),
+	    KM_SLEEP);
 	if (new_pool == NULL) {
 		result = FC_FAILURE;
 		goto fail;
 	}
+
 	new_pool->pool_next = NULL;
 	new_pool->pool_type = type;
 	new_pool->pool_buf_size = size;
@@ -2838,27 +2873,30 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		result = FC_FAILURE;
 		goto fail;
 	}
+
 	new_pool->pool_first_token = port->ub_count;
 	new_pool->pool_last_token = port->ub_count + new_pool->pool_nentries;
 
 	for (i = 0; i < new_pool->pool_nentries; i++) {
 		ubp = (fc_unsol_buf_t *)&new_pool->fc_ubufs[i];
 		ubp->ub_port_handle = port->ulp_handle;
-		ubp->ub_token = (uint64_t)(unsigned long)ubp;
+		ubp->ub_token = (uint64_t)((unsigned long)ubp);
 		ubp->ub_bufsize = size;
 		ubp->ub_class = FC_TRAN_CLASS3;
 		ubp->ub_port_private = NULL;
-		ubp->ub_fca_private = (emlxs_ub_priv_t *)
-		    kmem_zalloc(sizeof (emlxs_ub_priv_t), KM_SLEEP);
+		ubp->ub_fca_private =
+		    (emlxs_ub_priv_t *)kmem_zalloc(sizeof (emlxs_ub_priv_t),
+		    KM_SLEEP);
 
 		if (ubp->ub_fca_private == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-			    "ub_alloc failed: Unable to allocate "
-			    "fca_private object.");
+			    "ub_alloc failed: Unable to allocate fca_private "
+			    "object.");
 
 			result = FC_FAILURE;
 			goto fail;
 		}
+
 		/*
 		 * Initialize emlxs_ub_priv_t
 		 */
@@ -2888,11 +2926,12 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 			result = FC_FAILURE;
 			goto fail;
 		}
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_detail_msg,
-		    "ub_alloc: buffer=%p token=%x size=%x type=%x ",
-		    ubp, ub_priv->token, ubp->ub_bufsize, type);
 
-		tokens[i] = (uint64_t)(unsigned long)ubp;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_detail_msg,
+		    "ub_alloc: buffer=%p token=%x size=%x type=%x ", ubp,
+		    ub_priv->token, ubp->ub_bufsize, type);
+
+		tokens[i] = (uint64_t)((unsigned long)ubp);
 		port->ub_count++;
 	}
 
@@ -2907,14 +2946,14 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 
 	/* Set the post counts */
 	if (type == FC_TYPE_IS8802_SNAP) {
-		MAILBOXQ *mbox;
+		MAILBOXQ	*mbox;
 
 		port->ub_post[FC_IP_RING] += new_pool->pool_nentries;
 
-		if ((mbox = (MAILBOXQ *)
-		    emlxs_mem_get(hba, MEM_MBOX | MEM_PRI))) {
-			emlxs_mb_config_farp(hba, (MAILBOX *) mbox);
-			if (emlxs_mb_issue_cmd(hba, (MAILBOX *)mbox,
+		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
+		    MEM_MBOX | MEM_PRI))) {
+			emlxs_mb_config_farp(hba, (MAILBOX *)mbox);
+			if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mbox,
 			    MBX_NOWAIT, 0) != MBX_BUSY) {
 				(void) emlxs_mem_put(hba, MEM_MBOX,
 				    (uint8_t *)mbox);
@@ -2926,6 +2965,7 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 	} else if (type == FC_TYPE_FC_SERVICES) {
 		port->ub_post[FC_CT_RING] += new_pool->pool_nentries;
 	}
+
 	mutex_exit(&EMLXS_UB_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
@@ -2939,7 +2979,7 @@ fail:
 	/* Clean the pool */
 	for (i = 0; tokens[i] != NULL; i++) {
 		/* Get the buffer object */
-		ubp = (fc_unsol_buf_t *)(unsigned long)tokens[i];
+		ubp = (fc_unsol_buf_t *)((unsigned long)tokens[i]);
 		ub_priv = (emlxs_ub_priv_t *)ubp->ub_fca_private;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_detail_msg,
@@ -2973,22 +3013,23 @@ fail:
 static void
 emlxs_ub_els_reject(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 {
-	emlxs_hba_t *hba = HBA;
-	emlxs_ub_priv_t *ub_priv;
-	fc_packet_t *pkt;
-	ELS_PKT *els;
-	/* uint32_t *word; */
-	uint32_t sid;
+	emlxs_hba_t	*hba = HBA;
+	emlxs_ub_priv_t	*ub_priv;
+	fc_packet_t	*pkt;
+	ELS_PKT		*els;
+	uint32_t	sid;
 
 	ub_priv = (emlxs_ub_priv_t *)ubp->ub_fca_private;
 
 	if (hba->state <= FC_LINK_DOWN) {
 		return;
 	}
-	if (!(pkt = emlxs_pkt_alloc(port, sizeof (uint32_t) + sizeof (LS_RJT),
-	    0, 0, KM_NOSLEEP))) {
+
+	if (!(pkt = emlxs_pkt_alloc(port, sizeof (uint32_t) +
+	    sizeof (LS_RJT), 0, 0, KM_NOSLEEP))) {
 		return;
 	}
+
 	sid = SWAP_DATA24_LO(ubp->ub_frame.s_id);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
@@ -3002,9 +3043,11 @@ emlxs_ub_els_reject(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 		pkt->pkt_tran_flags &= ~FC_TRAN_CLASS3;
 		pkt->pkt_tran_flags |= FC_TRAN_CLASS2;
 	}
+
 	/* Build the fc header */
 	pkt->pkt_cmd_fhdr.d_id = ubp->ub_frame.s_id;
-	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
+	pkt->pkt_cmd_fhdr.r_ctl =
+	    R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
 	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
 	pkt->pkt_cmd_fhdr.f_ctl =
@@ -3034,13 +3077,13 @@ emlxs_ub_els_reject(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 extern int
 emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
-	uint32_t i;
-	uint32_t time;
-	emlxs_unsol_buf_t *pool;
+	emlxs_port_t		*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t		*hba = HBA;
+	fc_unsol_buf_t		*ubp;
+	emlxs_ub_priv_t		*ub_priv;
+	uint32_t		i;
+	uint32_t		time;
+	emlxs_unsol_buf_t	*pool;
 
 	if (count == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -3048,6 +3091,7 @@ emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 
 		return (FC_SUCCESS);
 	}
+
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "ub_release failed: Port not bound. count=%d token[0]=%p",
@@ -3055,6 +3099,7 @@ emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 
 		return (FC_UNBOUND);
 	}
+
 	mutex_enter(&EMLXS_UB_LOCK);
 
 	if (!port->ub_pool) {
@@ -3065,17 +3110,19 @@ emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 		mutex_exit(&EMLXS_UB_LOCK);
 		return (FC_UB_BADTOKEN);
 	}
+
 	for (i = 0; i < count; i++) {
-		ubp = (fc_unsol_buf_t *)(unsigned long)tokens[i];
+		ubp = (fc_unsol_buf_t *)((unsigned long)tokens[i]);
 
 		if (!ubp) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "ub_release failed: count=%d tokens[%d]=0",
-			    count, i);
+			    "ub_release failed: count=%d tokens[%d]=0", count,
+			    i);
 
 			mutex_exit(&EMLXS_UB_LOCK);
 			return (FC_UB_BADTOKEN);
 		}
+
 		ub_priv = (emlxs_ub_priv_t *)ubp->ub_fca_private;
 
 		if (!ub_priv || (ub_priv == (emlxs_ub_priv_t *)DEAD_PTR)) {
@@ -3086,6 +3133,7 @@ emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 			mutex_exit(&EMLXS_UB_LOCK);
 			return (FC_UB_BADTOKEN);
 		}
+
 		if (ub_priv->flags == EMLXS_UB_FREE) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "ub_release: Buffer already free! ubp=%p token=%x",
@@ -3093,12 +3141,14 @@ emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 
 			continue;
 		}
+
 		/* Check for dropped els buffer */
 		/* ULP will do this sometimes without sending a reply */
 		if ((ubp->ub_frame.r_ctl == FC_ELS_REQ) &&
 		    !(ub_priv->flags & EMLXS_UB_REPLY)) {
 			emlxs_ub_els_reject(port, ubp);
 		}
+
 		/* Mark the buffer free */
 		ub_priv->flags = EMLXS_UB_FREE;
 		bzero(ubp->ub_buffer, ubp->ub_bufsize);
@@ -3139,51 +3189,56 @@ emlxs_ub_release(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 static int
 emlxs_ub_free(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	/* emlxs_hba_t *hba = HBA; */
-	emlxs_unsol_buf_t *pool;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
-	uint32_t i;
+	emlxs_port_t		*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_unsol_buf_t	*pool;
+	fc_unsol_buf_t		*ubp;
+	emlxs_ub_priv_t		*ub_priv;
+	uint32_t		i;
 
 	if (port->tgt_mode) {
 		return (FC_SUCCESS);
 	}
+
 	if (count == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "ub_free: Nothing to do. count=%d token[0]=%p",
-		    count, tokens[0]);
+		    "ub_free: Nothing to do. count=%d token[0]=%p", count,
+		    tokens[0]);
 
 		return (FC_SUCCESS);
 	}
+
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "ub_free: Port not bound. count=%d token[0]=%p",
-		    count, tokens[0]);
+		    "ub_free: Port not bound. count=%d token[0]=%p", count,
+		    tokens[0]);
 
 		return (FC_SUCCESS);
 	}
+
 	mutex_enter(&EMLXS_UB_LOCK);
 
 	if (!port->ub_pool) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "ub_free failed: No pools! count=%d token[0]=%p",
-		    count, tokens[0]);
+		    "ub_free failed: No pools! count=%d token[0]=%p", count,
+		    tokens[0]);
 
 		mutex_exit(&EMLXS_UB_LOCK);
 		return (FC_UB_BADTOKEN);
 	}
+
 	/* Process buffer list */
 	for (i = 0; i < count; i++) {
-		ubp = (fc_unsol_buf_t *)(unsigned long)tokens[i];
+		ubp = (fc_unsol_buf_t *)((unsigned long)tokens[i]);
 
 		if (!ubp) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "ub_free failed: count=%d tokens[%d]=0", count, i);
+			    "ub_free failed: count=%d tokens[%d]=0", count,
+			    i);
 
 			mutex_exit(&EMLXS_UB_LOCK);
 			return (FC_UB_BADTOKEN);
 		}
+
 		/* Mark buffer unavailable */
 		ub_priv = (emlxs_ub_priv_t *)ubp->ub_fca_private;
 
@@ -3194,14 +3249,15 @@ emlxs_ub_free(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 			mutex_exit(&EMLXS_UB_LOCK);
 			return (FC_UB_BADTOKEN);
 		}
+
 		ub_priv->available = 0;
 
 		/* Mark one less buffer available in the parent pool */
 		pool = ub_priv->pool;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_detail_msg,
-		    "ub_free: ubp=%p token=%x (%d,%d,%d,%d)",
-		    ubp, ub_priv->token, pool->pool_nentries,
+		    "ub_free: ubp=%p token=%x (%d,%d,%d,%d)", ubp,
+		    ub_priv->token, pool->pool_nentries,
 		    pool->pool_available - 1, pool->pool_free,
 		    pool->pool_free_resv);
 
@@ -3228,11 +3284,10 @@ emlxs_ub_free(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 extern void
 emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 {
-	/* emlxs_hba_t *hba = HBA; */
-	emlxs_unsol_buf_t *next;
-	emlxs_unsol_buf_t *prev;
-	fc_unsol_buf_t *ubp;
-	uint32_t i;
+	emlxs_unsol_buf_t	*next;
+	emlxs_unsol_buf_t	*prev;
+	fc_unsol_buf_t		*ubp;
+	uint32_t		i;
 
 	/* Remove the pool object from the pool list */
 	next = pool->pool_next;
@@ -3241,12 +3296,15 @@ emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 	if (port->ub_pool == pool) {
 		port->ub_pool = next;
 	}
+
 	if (prev) {
 		prev->pool_next = next;
 	}
+
 	if (next) {
 		next->pool_prev = prev;
 	}
+
 	pool->pool_prev = NULL;
 	pool->pool_next = NULL;
 
@@ -3267,8 +3325,8 @@ emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 
 	/* Now free the pool memory */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-	    "ub_destroy: pool=%p type=%d size=%d count=%d",
-	    pool, pool->pool_type, pool->pool_buf_size, pool->pool_nentries);
+	    "ub_destroy: pool=%p type=%d size=%d count=%d", pool,
+	    pool->pool_type, pool->pool_buf_size, pool->pool_nentries);
 
 	/* Process the array of buffer objects in the pool */
 	for (i = 0; i < pool->pool_nentries; i++) {
@@ -3284,7 +3342,7 @@ emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 
 	/* Free the array of buffer objects in the pool */
 	kmem_free((caddr_t)pool->fc_ubufs,
-	    (sizeof (fc_unsol_buf_t) * pool->pool_nentries));
+	    (sizeof (fc_unsol_buf_t)*pool->pool_nentries));
 
 	/* Free the pool object */
 	kmem_free((caddr_t)pool, sizeof (emlxs_unsol_buf_t));
@@ -3298,50 +3356,46 @@ emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 extern int
 emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
+	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t	*hba = HBA;
 
-	emlxs_buf_t *sbp;
-	NODELIST *nlp;
-	uint8_t ringno;
-	RING *rp;
-	clock_t timeout;
-	clock_t time;
-	int32_t pkt_ret;
-	IOCBQ *iocbq;
-	IOCBQ *next;
-	IOCBQ *prev;
-	uint32_t found;
-	uint32_t att_bit;
-	uint32_t pass = 0;
+	emlxs_buf_t	*sbp;
+	NODELIST	*nlp;
+	NODELIST	*prev_nlp;
+	uint8_t		ringno;
+	RING		*rp;
+	clock_t		timeout;
+	clock_t		time;
+	int32_t		pkt_ret;
+	IOCBQ		*iocbq;
+	IOCBQ		*next;
+	IOCBQ		*prev;
+	uint32_t	found;
+	uint32_t	att_bit;
+	uint32_t	pass = 0;
 
 	sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
 	iocbq = &sbp->iocbq;
-	nlp = (NODELIST *) sbp->node;
-	rp = (RING *) sbp->ring;
+	nlp = (NODELIST *)sbp->node;
+	rp = (RING *)sbp->ring;
 	ringno = (rp) ? rp->ringno : 0;
-
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg, "fca_pkt_abort:
-	 * pkt=%p sleep=%x", pkt, sleep);
-	 */
 
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
 		    "Port not bound.");
 		return (FC_UNBOUND);
 	}
+
 	if (!(hba->flag & FC_ONLINE_MODE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
 		    "Adapter offline.");
 		return (FC_OFFLINE);
 	}
-	/*
-	 * ULP requires the aborted pkt to be completed
-	 * back to ULP before returning from this call.
-	 * SUN knows of problems with this call so they suggested that we
-	 * always return a FC_FAILURE for this call, until it is worked out.
-	 */
+
+	/* ULP requires the aborted pkt to be completed */
+	/* back to ULP before returning from this call. */
+	/* SUN knows of problems with this call so they suggested that we */
+	/* always return a FC_FAILURE for this call, until it is worked out. */
 
 	/* Check if pkt is no good */
 	if (!(sbp->pkt_flags & PACKET_VALID) ||
@@ -3350,10 +3404,6 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 		    "Bad sbp. flags=%x", sbp->pkt_flags);
 		return (FC_FAILURE);
 	}
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_msg, "sbp=%p sleep=%x
-	 * flags=%x", sbp, sleep, sbp->pkt_flags);
-	 */
 
 	/* Tag this now */
 	/* This will prevent any thread except ours from completing it */
@@ -3367,26 +3417,29 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 		    "Bad sbp. flags=%x", sbp->pkt_flags);
 		return (FC_FAILURE);
 	}
+
 	/* Check if pkt is a real polled command */
 	if (!(sbp->pkt_flags & PACKET_IN_ABORT) &&
 	    (sbp->pkt_flags & PACKET_POLLED)) {
 		mutex_exit(&sbp->mtx);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
-		    "Attempting to abort a polled I/O. sbp=%p flags=%x",
-		    sbp, sbp->pkt_flags);
+		    "Attempting to abort a polled I/O. sbp=%p flags=%x", sbp,
+		    sbp->pkt_flags);
 		return (FC_FAILURE);
 	}
+
 	sbp->pkt_flags |= PACKET_POLLED;
 	sbp->pkt_flags |= PACKET_IN_ABORT;
 
-	if (sbp->pkt_flags &
-	    (PACKET_IN_COMPLETION | PACKET_IN_FLUSH | PACKET_IN_TIMEOUT)) {
+	if (sbp->pkt_flags & (PACKET_IN_COMPLETION | PACKET_IN_FLUSH |
+	    PACKET_IN_TIMEOUT)) {
 		mutex_exit(&sbp->mtx);
 
 		/* Do nothing, pkt already on its way out */
 		goto done;
 	}
+
 	mutex_exit(&sbp->mtx);
 
 begin:
@@ -3408,21 +3461,25 @@ begin:
 					if (prev) {
 						prev->next = iocbq->next;
 					}
+
 					if (nlp->nlp_ptx[ringno].q_last ==
-					    (void *) iocbq) {
+					    (void *)iocbq) {
 						nlp->nlp_ptx[ringno].q_last =
-						    (void *) prev;
+						    (void *)prev;
 					}
+
 					if (nlp->nlp_ptx[ringno].q_first ==
-					    (void *) iocbq) {
+					    (void *)iocbq) {
 						nlp->nlp_ptx[ringno].q_first =
-						    (void *) iocbq->next;
+						    (void *)iocbq->next;
 					}
+
 					nlp->nlp_ptx[ringno].q_cnt--;
 					iocbq->next = NULL;
 					found = 1;
 					break;
 				}
+
 				prev = next;
 				next = next->next;
 			}
@@ -3437,21 +3494,25 @@ begin:
 					if (prev) {
 						prev->next = iocbq->next;
 					}
+
 					if (nlp->nlp_tx[ringno].q_last ==
-					    (void *) iocbq) {
+					    (void *)iocbq) {
 						nlp->nlp_tx[ringno].q_last =
-						    (void *) prev;
+						    (void *)prev;
 					}
+
 					if (nlp->nlp_tx[ringno].q_first ==
-					    (void *) iocbq) {
+					    (void *)iocbq) {
 						nlp->nlp_tx[ringno].q_first =
-						    (void *) iocbq->next;
+						    (void *)iocbq->next;
 					}
+
 					nlp->nlp_tx[ringno].q_cnt--;
 					iocbq->next = NULL;
 					found = 1;
 					break;
 				}
+
 				prev = next;
 				next = (IOCBQ *) next->next;
 			}
@@ -3460,43 +3521,59 @@ begin:
 		if (!found) {
 			mutex_exit(&EMLXS_RINGTX_LOCK);
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
-			    "I/O not found in driver. sbp=%p flags=%x",
-			    sbp, sbp->pkt_flags);
+			    "I/O not found in driver. sbp=%p flags=%x", sbp,
+			    sbp->pkt_flags);
 			goto done;
 		}
+
 		/* Check if node still needs servicing */
 		if ((nlp->nlp_ptx[ringno].q_first) ||
 		    (nlp->nlp_tx[ringno].q_first &&
 		    !(nlp->nlp_flag[ringno] & NLP_CLOSED))) {
 
 			/*
-			 * If this is the base node, then don't shift the
-			 * pointers
+			 * If this is the base node,
+			 * then don't shift the pointers
 			 */
 			/* We want to drain the base node before moving on */
 			if (!nlp->nlp_base) {
-				/*
-				 * Just shift ring queue pointers to next
-				 * node
-				 */
+				/* Just shift ring queue */
+				/* pointers to next node */
 				rp->nodeq.q_last = (void *) nlp;
 				rp->nodeq.q_first = nlp->nlp_next[ringno];
 			}
 		} else {
 			/* Remove node from ring queue */
 
-			/* If this is the last node on list */
-			if (rp->nodeq.q_last == (void *) nlp) {
+			/* If this is the only node on list */
+			if (rp->nodeq.q_first == (void *)nlp &&
+			    rp->nodeq.q_last == (void *)nlp) {
 				rp->nodeq.q_last = NULL;
 				rp->nodeq.q_first = NULL;
 				rp->nodeq.q_cnt = 0;
-			} else {
-				/* Remove node from head */
+			} else if (rp->nodeq.q_first == (void *)nlp) {
 				rp->nodeq.q_first = nlp->nlp_next[ringno];
-				((NODELIST *)
-				    rp->nodeq.q_last)->nlp_next[ringno] =
-				    rp->nodeq.q_first;
+				((NODELIST *) rp->nodeq.q_last)->
+				    nlp_next[ringno] = rp->nodeq.q_first;
 				rp->nodeq.q_cnt--;
+			} else {
+				/*
+				 * This is a little more difficult find the
+				 * previous node in the circular ring queue
+				 */
+				prev_nlp = nlp;
+				while (prev_nlp->nlp_next[ringno] != nlp) {
+					prev_nlp = prev_nlp->nlp_next[ringno];
+				}
+
+				prev_nlp->nlp_next[ringno] =
+				    nlp->nlp_next[ringno];
+
+				if (rp->nodeq.q_last == (void *)nlp) {
+					rp->nodeq.q_last = (void *)prev_nlp;
+				}
+				rp->nodeq.q_cnt--;
+
 			}
 
 			/* Clear node */
@@ -3509,6 +3586,7 @@ begin:
 			sbp->pkt_flags &= ~PACKET_IN_TXQ;
 			hba->ring_tx_count[ringno]--;
 		}
+
 		mutex_exit(&sbp->mtx);
 
 		/* Free the ulpIoTag and the bmp */
@@ -3521,6 +3599,7 @@ begin:
 
 		goto done;
 	}
+
 	mutex_exit(&EMLXS_RINGTX_LOCK);
 
 
@@ -3533,16 +3612,19 @@ begin:
 
 		/* Create the abort IOCB */
 		if (hba->state >= FC_LINK_UP) {
-			iocbq = emlxs_create_abort_xri_cn(port, sbp->node,
+			iocbq =
+			    emlxs_create_abort_xri_cn(port, sbp->node,
 			    sbp->iotag, rp, sbp->class, ABORT_TYPE_ABTS);
 
 			mutex_enter(&sbp->mtx);
 			sbp->pkt_flags |= PACKET_XRI_CLOSED;
-			sbp->ticks = hba->timer_tics + (4 * hba->fc_ratov) + 10;
+			sbp->ticks =
+			    hba->timer_tics + (4 * hba->fc_ratov) + 10;
 			sbp->abort_attempts++;
 			mutex_exit(&sbp->mtx);
 		} else {
-			iocbq = emlxs_create_close_xri_cn(port, sbp->node,
+			iocbq =
+			    emlxs_create_close_xri_cn(port, sbp->node,
 			    sbp->iotag, rp);
 
 			mutex_enter(&sbp->mtx);
@@ -3556,33 +3638,40 @@ begin:
 
 		/* Send this iocbq */
 		if (iocbq) {
-			emlxs_issue_iocb_cmd(hba, rp, iocbq);
+			emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
 			iocbq = NULL;
 		}
+
 		goto done;
 	}
+
 	mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
 
 	/* Pkt was not on any queues */
 
 	/* Check again if we still own this */
 	if (!(sbp->pkt_flags & PACKET_VALID) ||
-	    (sbp->pkt_flags & (PACKET_RETURNED | PACKET_IN_COMPLETION |
+	    (sbp->pkt_flags &
+	    (PACKET_RETURNED | PACKET_IN_COMPLETION |
 	    PACKET_IN_FLUSH | PACKET_IN_TIMEOUT))) {
 		goto done;
 	}
+
 	/* Apparently the pkt was not found.  Let's delay and try again */
 	if (pass < 5) {
 		delay(drv_usectohz(5000000));	/* 5 seconds */
 
 		/* Check again if we still own this */
 		if (!(sbp->pkt_flags & PACKET_VALID) ||
-		    (sbp->pkt_flags & (PACKET_RETURNED | PACKET_IN_COMPLETION |
+		    (sbp->pkt_flags &
+		    (PACKET_RETURNED | PACKET_IN_COMPLETION |
 		    PACKET_IN_FLUSH | PACKET_IN_TIMEOUT))) {
 			goto done;
 		}
+
 		goto begin;
 	}
+
 force_it:
 
 	/* Force the completion now */
@@ -3591,7 +3680,8 @@ force_it:
 	(void) emlxs_unregister_pkt(rp, sbp->iotag, 1);
 
 	/* Now complete it */
-	emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, IOERR_ABORT_REQUESTED, 1);
+	emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, IOERR_ABORT_REQUESTED,
+	    1);
 
 done:
 
@@ -3604,13 +3694,13 @@ done:
 		if (ddi_in_panic()) {
 
 			/*
-			 * In panic situations there will be one thread with
-			 * no interrrupts (hard or soft) and no timers
+			 * In panic situations there will be one thread with no
+			 * interrrupts (hard or soft) and no timers
 			 */
 
 			/*
-			 * We must manually poll everything in this thread to
-			 * keep the driver going.
+			 * We must manually poll everything in this thread
+			 * to keep the driver going.
 			 */
 
 			rp = (emlxs_ring_t *)sbp->ring;
@@ -3636,7 +3726,7 @@ done:
 			(void) drv_getparm(LBOLT, &time);
 			while ((time < timeout) &&
 			    !(sbp->pkt_flags & PACKET_COMPLETED)) {
-				emlxs_poll_intr(hba, att_bit);
+				emlxs_sli_poll_intr(hba, att_bit);
 				(void) drv_getparm(LBOLT, &time);
 			}
 		} else {
@@ -3645,16 +3735,15 @@ done:
 			pkt_ret = 0;
 			while ((pkt_ret != -1) &&
 			    !(sbp->pkt_flags & PACKET_COMPLETED)) {
-				pkt_ret = cv_timedwait(&EMLXS_PKT_CV,
+				pkt_ret =
+				    cv_timedwait(&EMLXS_PKT_CV,
 				    &EMLXS_PKT_LOCK, timeout);
 			}
 			mutex_exit(&EMLXS_PKT_LOCK);
 		}
 
-		/*
-		 * Check if timeout occured.  This is not good.  Something
-		 * happened to our IO.
-		 */
+		/* Check if timeout occured. This is not good. */
+		/* Something happened to our IO. */
 		if (!(sbp->pkt_flags & PACKET_COMPLETED)) {
 			/* Force the completion now */
 			goto force_it;
@@ -3689,11 +3778,11 @@ done:
 extern int32_t
 emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	emlxs_hba_t *hba = HBA;
-	int rval;
-	int ret;
-	clock_t timeout;
+	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t	*hba = HBA;
+	int		rval;
+	int		ret;
+	clock_t		timeout;
 
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -3701,6 +3790,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 
 		return (FC_UNBOUND);
 	}
+
 	switch (cmd) {
 	case FC_FCA_LINK_RESET:
 
@@ -3708,6 +3798,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 		    (hba->state <= FC_LINK_DOWN)) {
 			return (FC_SUCCESS);
 		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_reset: Resetting Link.");
 
@@ -3722,12 +3813,14 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 
 			return (FC_FAILURE);
 		}
+
 		mutex_enter(&EMLXS_LINKUP_LOCK);
 		timeout = emlxs_timeout(hba, 60);
 		ret = 0;
 		while ((ret != -1) && (hba->linkup_wait_flag == TRUE)) {
-			ret = cv_timedwait(&EMLXS_LINKUP_CV,
-			    &EMLXS_LINKUP_LOCK, timeout);
+			ret =
+			    cv_timedwait(&EMLXS_LINKUP_CV, &EMLXS_LINKUP_LOCK,
+			    timeout);
 		}
 
 		hba->linkup_wait_flag = FALSE;
@@ -3736,19 +3829,31 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 		if (ret == -1) {
 			return (FC_FAILURE);
 		}
+
 		return (FC_SUCCESS);
+
+	case FC_FCA_CORE:
+#ifdef DUMP_SUPPORT
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_reset: Core dump.");
+
+		/* Schedule a USER dump */
+		emlxs_dump(hba, EMLXS_USER_DUMP, 0, 0);
+
+		/* Wait for dump to complete */
+		emlxs_dump_wait(hba);
+
+		return (FC_SUCCESS);
+#endif /* DUMP_SUPPORT */
 
 	case FC_FCA_RESET:
 	case FC_FCA_RESET_CORE:
-	case FC_FCA_CORE:
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_reset: Resetting Adapter.");
 
 		rval = FC_SUCCESS;
-		if (hba->flag & (FC_OFFLINE_MODE | FC_OFFLINING_MODE)) {
-			return (FC_SUCCESS);
-		}
+
 		if (emlxs_offline(hba) == 0) {
 			(void) emlxs_online(hba);
 		} else {
@@ -3772,17 +3877,17 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 } /* emlxs_reset() */
 
 
-extern uint32_t emlxs_core_dump(emlxs_hba_t *hba, char *buffer, uint32_t size);
+extern uint32_t	emlxs_core_dump(emlxs_hba_t *hba, char *buffer,
+			uint32_t size);
 extern uint32_t emlxs_core_size(emlxs_hba_t *hba);
 
 extern int
 emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 {
-	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
-	/* emlxs_port_t *vport; */
-	emlxs_hba_t *hba = HBA;
-	int32_t ret;
-	emlxs_vpd_t *vpd = &VPD;
+	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
+	emlxs_hba_t	*hba = HBA;
+	int32_t		ret;
+	emlxs_vpd_t	*vpd = &VPD;
 
 
 	ret = FC_SUCCESS;
@@ -3790,9 +3895,8 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		return (FC_UNBOUND);
 	}
-	if (!(hba->flag & FC_ONLINE_MODE)) {
-		return (FC_OFFLINE);
-	}
+
+
 #ifdef IDLE_TIMER
 	emlxs_pm_busy_component(hba);
 #endif	/* IDLE_TIMER */
@@ -3800,197 +3904,227 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 	switch (pm->pm_cmd_code) {
 
 	case FC_PORT_GET_FW_REV:
-		{
-			char buffer[128];
+	{
+		char buffer[128];
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_GET_FW_REV");
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_FW_REV");
 
-			(void) sprintf(buffer, "%s %s", hba->model_info.model,
-			    vpd->fw_version);
+		(void) sprintf(buffer, "%s %s", hba->model_info.model,
+		    vpd->fw_version);
 			bzero(pm->pm_data_buf, pm->pm_data_len);
 
-			if (pm->pm_data_len < strlen(buffer) + 1) {
-				ret = FC_NOMEM;
+		if (pm->pm_data_len < strlen(buffer) + 1) {
+			ret = FC_NOMEM;
 
-				break;
-			}
-			(void) strcpy(pm->pm_data_buf, buffer);
 			break;
 		}
+
+		(void) strcpy(pm->pm_data_buf, buffer);
+		break;
+	}
 
 	case FC_PORT_GET_FCODE_REV:
-		{
-			char buffer[128];
+	{
+		char buffer[128];
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_GET_FCODE_REV");
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_FCODE_REV");
 
-			/* Force update here just to be sure */
-			emlxs_get_fcode_version(hba);
+		/* Force update here just to be sure */
+		emlxs_get_fcode_version(hba);
 
-			(void) sprintf(buffer, "%s %s", hba->model_info.model,
-			    vpd->fcode_version);
-			bzero(pm->pm_data_buf, pm->pm_data_len);
+		(void) sprintf(buffer, "%s %s", hba->model_info.model,
+		    vpd->fcode_version);
+		bzero(pm->pm_data_buf, pm->pm_data_len);
 
-			if (pm->pm_data_len < strlen(buffer) + 1) {
-				ret = FC_NOMEM;
-				break;
-			}
-			(void) strcpy(pm->pm_data_buf, buffer);
+		if (pm->pm_data_len < strlen(buffer) + 1) {
+			ret = FC_NOMEM;
 			break;
 		}
+
+		(void) strcpy(pm->pm_data_buf, buffer);
+		break;
+	}
 
 	case FC_PORT_GET_DUMP_SIZE:
-		{
-			uint32_t dump_size;
+	{
+#ifdef DUMP_SUPPORT
+		uint32_t dump_size = 0;
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_GET_DUMP_SIZE");
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_DUMP_SIZE");
 
-			dump_size = emlxs_core_size(hba);
-
-			if (pm->pm_data_len < sizeof (uint32_t)) {
-				ret = FC_NOMEM;
-				break;
-			}
-			*((uint32_t *)pm->pm_data_buf) = dump_size;
-
+		if (pm->pm_data_len < sizeof (uint32_t)) {
+			ret = FC_NOMEM;
 			break;
 		}
+
+		(void) emlxs_get_dump(hba, NULL, &dump_size);
+
+		*((uint32_t *)pm->pm_data_buf) = dump_size;
+
+#else
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_DUMP_SIZE unsupported.");
+
+#endif /* DUMP_SUPPORT */
+
+		break;
+	}
 
 	case FC_PORT_GET_DUMP:
-		{
-			/* char *c; */
-			/* int32_t i; */
-			uint32_t dump_size;
+	{
+#ifdef DUMP_SUPPORT
+		uint32_t dump_size = 0;
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_GET_DUMP");
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_DUMP");
 
-			dump_size = emlxs_core_size(hba);
+		(void) emlxs_get_dump(hba, NULL, &dump_size);
 
-			if (pm->pm_data_len < dump_size) {
-				ret = FC_NOMEM;
-				break;
-			}
-			(void) emlxs_core_dump(hba, (char *)pm->pm_data_buf,
-			    pm->pm_data_len);
-
+		if (pm->pm_data_len < dump_size) {
+			ret = FC_NOMEM;
 			break;
 		}
+
+		(void) emlxs_get_dump(hba, (uint8_t *)pm->pm_data_buf,
+		    (uint32_t *)&dump_size);
+#else
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_DUMP unsupported.");
+
+#endif /* DUMP_SUPPORT */
+
+		break;
+	}
 
 	case FC_PORT_FORCE_DUMP:
-		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_FORCE_DUMP");
+	{
+#ifdef DUMP_SUPPORT
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_FORCE_DUMP");
 
-			/*
-			 * We don't do anything right now, just return
-			 * success
-			 */
-			break;
-		}
+		/* Schedule a USER dump */
+		emlxs_dump(hba, EMLXS_USER_DUMP, 0, 0);
+
+		/* Wait for dump to complete */
+		emlxs_dump_wait(hba);
+#else
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_FORCE_DUMP unsupported.");
+
+#endif /* DUMP_SUPPORT */
+		break;
+	}
 
 	case FC_PORT_LINK_STATE:
-		{
-			uint32_t *link_state;
+	{
+		uint32_t	*link_state;
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_LINK_STATE");
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_LINK_STATE");
 
-			if (pm->pm_stat_len != sizeof (*link_state)) {
-				ret = FC_NOMEM;
-				break;
-			}
-			if (pm->pm_cmd_buf != NULL) {
-
-				/*
-				 * Can't look beyond the FCA port.
-				 */
-				ret = FC_INVALID_REQUEST;
-				break;
-			}
-			link_state = (uint32_t *)pm->pm_stat_buf;
-
-			/* Set the state */
-			if (hba->state >= FC_LINK_UP) {
-				/* Check for loop topology */
-				if (hba->topology == TOPOLOGY_LOOP) {
-					*link_state = FC_STATE_LOOP;
-				} else {
-					*link_state = FC_STATE_ONLINE;
-				}
-
-				/* Set the link speed */
-				switch (hba->linkspeed) {
-				case LA_2GHZ_LINK:
-					*link_state |= FC_STATE_2GBIT_SPEED;
-					break;
-				case LA_4GHZ_LINK:
-					*link_state |= FC_STATE_4GBIT_SPEED;
-					break;
-				case LA_8GHZ_LINK:
-					*link_state |= FC_STATE_8GBIT_SPEED;
-					break;
-				case LA_10GHZ_LINK:
-					*link_state |= FC_STATE_10GBIT_SPEED;
-					break;
-				case LA_1GHZ_LINK:
-				default:
-					*link_state |= FC_STATE_1GBIT_SPEED;
-					break;
-				}
-			} else {
-				*link_state = FC_STATE_OFFLINE;
-			}
-
+		if (pm->pm_stat_len != sizeof (*link_state)) {
+			ret = FC_NOMEM;
 			break;
 		}
+
+		if (pm->pm_cmd_buf != NULL) {
+			/*
+			 * Can't look beyond the FCA port.
+			 */
+			ret = FC_INVALID_REQUEST;
+			break;
+		}
+
+		link_state = (uint32_t *)pm->pm_stat_buf;
+
+		/* Set the state */
+		if (hba->state >= FC_LINK_UP) {
+			/* Check for loop topology */
+			if (hba->topology == TOPOLOGY_LOOP) {
+				*link_state = FC_STATE_LOOP;
+			} else {
+				*link_state = FC_STATE_ONLINE;
+			}
+
+			/* Set the link speed */
+			switch (hba->linkspeed) {
+			case LA_2GHZ_LINK:
+				*link_state |= FC_STATE_2GBIT_SPEED;
+				break;
+			case LA_4GHZ_LINK:
+				*link_state |= FC_STATE_4GBIT_SPEED;
+				break;
+			case LA_8GHZ_LINK:
+				*link_state |= FC_STATE_8GBIT_SPEED;
+				break;
+			case LA_10GHZ_LINK:
+				*link_state |= FC_STATE_10GBIT_SPEED;
+				break;
+			case LA_1GHZ_LINK:
+			default:
+				*link_state |= FC_STATE_1GBIT_SPEED;
+				break;
+			}
+		} else {
+			*link_state = FC_STATE_OFFLINE;
+		}
+
+		break;
+	}
 
 
 	case FC_PORT_ERR_STATS:
 	case FC_PORT_RLS:
-		{
-			MAILBOX *mb;
-			fc_rls_acc_t *bp;
+	{
+		MAILBOX		*mb;
+		fc_rls_acc_t	*bp;
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_port_manage: FC_PORT_RLS / FC_PORT_ERR_STATS");
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
 
-			if (pm->pm_data_len < sizeof (fc_rls_acc_t)) {
-				ret = FC_NOMEM;
-				break;
-			}
-			if ((mb = (MAILBOX *)
-			    emlxs_mem_get(hba, MEM_MBOX | MEM_PRI)) == 0) {
-				ret = FC_NOMEM;
-				break;
-			}
-			emlxs_mb_read_lnk_stat(hba, mb);
-			if (emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0) !=
-			    MBX_SUCCESS) {
-				ret = FC_PBUSY;
-			} else {
-				bp = (fc_rls_acc_t *)pm->pm_data_buf;
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_RLS / FC_PORT_ERR_STATS");
 
-				bp->rls_link_fail =
-				    mb->un.varRdLnk.linkFailureCnt;
-				bp->rls_sync_loss = mb->un.varRdLnk.lossSyncCnt;
-				bp->rls_sig_loss =
-				    mb->un.varRdLnk.lossSignalCnt;
-				bp->rls_prim_seq_err =
-				    mb->un.varRdLnk.primSeqErrCnt;
-				bp->rls_invalid_word =
-				    mb->un.varRdLnk.invalidXmitWord;
-				bp->rls_invalid_crc = mb->un.varRdLnk.crcCnt;
-			}
-
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+		if (pm->pm_data_len < sizeof (fc_rls_acc_t)) {
+			ret = FC_NOMEM;
 			break;
 		}
 
+		if ((mb = (MAILBOX *)emlxs_mem_get(hba,
+		    MEM_MBOX | MEM_PRI)) == 0) {
+			ret = FC_NOMEM;
+			break;
+		}
+
+		emlxs_mb_read_lnk_stat(hba, mb);
+		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0)
+		    != MBX_SUCCESS) {
+			ret = FC_PBUSY;
+		} else {
+			bp = (fc_rls_acc_t *)pm->pm_data_buf;
+
+			bp->rls_link_fail = mb->un.varRdLnk.linkFailureCnt;
+			bp->rls_sync_loss = mb->un.varRdLnk.lossSyncCnt;
+			bp->rls_sig_loss = mb->un.varRdLnk.lossSignalCnt;
+			bp->rls_prim_seq_err = mb->un.varRdLnk.primSeqErrCnt;
+			bp->rls_invalid_word =
+			    mb->un.varRdLnk.invalidXmitWord;
+			bp->rls_invalid_crc = mb->un.varRdLnk.crcCnt;
+		}
+
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+		break;
+	}
+
 	case FC_PORT_DOWNLOAD_FW:
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_DOWNLOAD_FW");
 		ret = emlxs_fw_download(hba, pm->pm_data_buf,
@@ -3998,6 +4132,10 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		break;
 
 	case FC_PORT_DOWNLOAD_FCODE:
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_DOWNLOAD_FCODE");
 		ret = emlxs_fw_download(hba, pm->pm_data_buf,
@@ -4005,169 +4143,254 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		break;
 
 	case FC_PORT_DIAG:
+	{
+		uint32_t errno = 0;
+		uint32_t did = 0;
+		uint32_t pattern = 0;
+
+		switch (pm->pm_cmd_flags) {
+		case EMLXS_DIAG_BIU:
+
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_DIAG_BIU");
+
+			if (pm->pm_data_len) {
+				pattern = *((uint32_t *)pm->pm_data_buf);
+			}
+
+			errno = emlxs_diag_biu_run(hba, pattern);
+
+			if (pm->pm_stat_len == sizeof (errno)) {
+				*(int *)pm->pm_stat_buf = errno;
+			}
+
+			break;
+
+
+		case EMLXS_DIAG_POST:
+
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_DIAG_POST");
+
+			errno = emlxs_diag_post_run(hba);
+
+			if (pm->pm_stat_len == sizeof (errno)) {
+				*(int *)pm->pm_stat_buf = errno;
+			}
+
+			break;
+
+
+		case EMLXS_DIAG_ECHO:
+
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_DIAG_ECHO");
+
+			if (pm->pm_cmd_len != sizeof (uint32_t)) {
+				ret = FC_INVALID_REQUEST;
+				break;
+			}
+
+			did = *((uint32_t *)pm->pm_cmd_buf);
+
+			if (pm->pm_data_len) {
+				pattern = *((uint32_t *)pm->pm_data_buf);
+			}
+
+			errno = emlxs_diag_echo_run(port, did, pattern);
+
+			if (pm->pm_stat_len == sizeof (errno)) {
+				*(int *)pm->pm_stat_buf = errno;
+			}
+
+			break;
+
+
+		case EMLXS_PARM_GET_NUM:
 		{
-			uint32_t errno = 0;
-			uint32_t did = 0;
-			uint32_t pattern = 0;
+			uint32_t	*num;
+			emlxs_config_t	*cfg;
+			uint32_t	i;
+			uint32_t	count;
 
-			switch (pm->pm_cmd_flags) {
-			case EMLXS_DIAG_BIU:
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_DIAG_BIU");
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_PARM_GET_NUM");
 
-				if (pm->pm_data_len) {
-					pattern =
-					    *((uint32_t *)pm->pm_data_buf);
-				}
-				errno = emlxs_diag_biu_run(hba, pattern);
-
-				if (pm->pm_stat_len == sizeof (errno)) {
-					*(int *)pm->pm_stat_buf = errno;
-				}
+			if (pm->pm_stat_len < sizeof (uint32_t)) {
+				ret = FC_NOMEM;
 				break;
+			}
 
-
-			case EMLXS_DIAG_POST:
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_DIAG_POST");
-
-				errno = emlxs_diag_post_run(hba);
-
-				if (pm->pm_stat_len == sizeof (errno)) {
-					*(int *)pm->pm_stat_buf = errno;
+			num = (uint32_t *)pm->pm_stat_buf;
+			count = 0;
+			cfg = &CFG;
+			for (i = 0; i < NUM_CFG_PARAM; i++, cfg++) {
+				if (!(cfg->flags & PARM_HIDDEN)) {
+					count++;
 				}
+
+			}
+
+			*num = count;
+
+			break;
+		}
+
+		case EMLXS_PARM_GET_LIST:
+		{
+			emlxs_parm_t	*parm;
+			emlxs_config_t	*cfg;
+			uint32_t	i;
+			uint32_t	max_count;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_PARM_GET_LIST");
+
+			if (pm->pm_stat_len < sizeof (emlxs_parm_t)) {
+				ret = FC_NOMEM;
 				break;
+			}
 
+			max_count = pm->pm_stat_len / sizeof (emlxs_parm_t);
 
-			case EMLXS_DIAG_ECHO:
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_DIAG_ECHO");
+			parm = (emlxs_parm_t *)pm->pm_stat_buf;
+			cfg = &CFG;
+			for (i = 0; i < NUM_CFG_PARAM && max_count; i++,
+			    cfg++) {
+				if (!(cfg->flags & PARM_HIDDEN)) {
+					(void) strcpy(parm->label, cfg->string);
+					parm->min = cfg->low;
+					parm->max = cfg->hi;
+					parm->def = cfg->def;
+					parm->current = cfg->current;
+					parm->flags = cfg->flags;
+					(void) strcpy(parm->help, cfg->help);
+					parm++;
+					max_count--;
+				}
+			}
 
-				if (pm->pm_cmd_len != sizeof (uint32_t)) {
-					ret = FC_INVALID_REQUEST;
+			break;
+		}
+
+		case EMLXS_PARM_GET:
+		{
+			emlxs_parm_t	*parm_in;
+			emlxs_parm_t	*parm_out;
+			emlxs_config_t	*cfg;
+			uint32_t	i;
+			uint32_t	len;
+
+			if (pm->pm_cmd_len < sizeof (emlxs_parm_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_PARM_GET. "
+				    "inbuf too small.");
+
+				ret = FC_BADCMD;
+				break;
+			}
+
+			if (pm->pm_stat_len < sizeof (emlxs_parm_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_PARM_GET. "
+				    "outbuf too small");
+
+				ret = FC_BADCMD;
+				break;
+			}
+
+			parm_in = (emlxs_parm_t *)pm->pm_cmd_buf;
+			parm_out = (emlxs_parm_t *)pm->pm_stat_buf;
+			len = strlen(parm_in->label);
+			cfg = &CFG;
+			ret = FC_BADOBJECT;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_PARM_GET: %s",
+			    parm_in->label);
+
+			for (i = 0; i < NUM_CFG_PARAM; i++, cfg++) {
+				if (len == strlen(cfg->string) &&
+				    (strcmp(parm_in->label,
+				    cfg->string) == 0)) {
+					(void) strcpy(parm_out->label,
+					    cfg->string);
+					parm_out->min = cfg->low;
+					parm_out->max = cfg->hi;
+					parm_out->def = cfg->def;
+					parm_out->current = cfg->current;
+					parm_out->flags = cfg->flags;
+					(void) strcpy(parm_out->help,
+					    cfg->help);
+
+					ret = FC_SUCCESS;
 					break;
 				}
-				did = *((uint32_t *)pm->pm_cmd_buf);
+			}
 
-				if (pm->pm_data_len) {
-					pattern =
-					    *((uint32_t *)pm->pm_data_buf);
-				}
-				errno = emlxs_diag_echo_run(port, did, pattern);
+			break;
+		}
 
-				if (pm->pm_stat_len == sizeof (errno)) {
-					*(int *)pm->pm_stat_buf = errno;
-				}
+		case EMLXS_PARM_SET:
+		{
+			emlxs_parm_t	*parm_in;
+			emlxs_parm_t	*parm_out;
+			emlxs_config_t	*cfg;
+			uint32_t	i;
+			uint32_t	len;
+
+			if (pm->pm_cmd_len < sizeof (emlxs_parm_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_PARM_GET. "
+				    "inbuf too small.");
+
+				ret = FC_BADCMD;
 				break;
+			}
 
-
-			case EMLXS_PARM_GET_NUM:
-				{
-				uint32_t *num;
-				emlxs_config_t *cfg;
-				uint32_t i;
-				uint32_t count;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_PARM_GET_NUM");
-
-				if (pm->pm_stat_len < sizeof (uint32_t)) {
-					ret = FC_NOMEM;
-					break;
-				}
-				num = (uint32_t *)pm->pm_stat_buf;
-				count = 0;
-				cfg = &CFG;
-				for (i = 0; i < NUM_CFG_PARAM; i++, cfg++) {
-					if (!(cfg->flags & PARM_HIDDEN)) {
-						count++;
-					}
-				}
-
-				*num = count;
-
+			if (pm->pm_stat_len < sizeof (emlxs_parm_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_PARM_GET. "
+				    "outbuf too small");
+				ret = FC_BADCMD;
 				break;
-				}
+			}
 
-			case EMLXS_PARM_GET_LIST:
-				{
-				emlxs_parm_t *parm;
-				emlxs_config_t *cfg;
-				uint32_t i;
-				uint32_t max_count;
+			parm_in = (emlxs_parm_t *)pm->pm_cmd_buf;
+			parm_out = (emlxs_parm_t *)pm->pm_stat_buf;
+			len = strlen(parm_in->label);
+			cfg = &CFG;
+			ret = FC_BADOBJECT;
 
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_PARM_GET_LIST");
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_PARM_SET: %s=0x%x,%d",
+			    parm_in->label, parm_in->current,
+			    parm_in->current);
 
-				if (pm->pm_stat_len < sizeof (emlxs_parm_t)) {
-					ret = FC_NOMEM;
-					break;
-				}
-				max_count = pm->pm_stat_len /
-				    sizeof (emlxs_parm_t);
-
-				parm = (emlxs_parm_t *)pm->pm_stat_buf;
-				cfg = &CFG;
-				for (i = 0; i < NUM_CFG_PARAM && max_count;
-				    i++, cfg++) {
-					if (!(cfg->flags & PARM_HIDDEN)) {
-						(void) strcpy(parm->label,
-						    cfg->string);
-						parm->min = cfg->low;
-						parm->max = cfg->hi;
-						parm->def = cfg->def;
-						parm->current = cfg->current;
-						parm->flags = cfg->flags;
-						(void) strcpy(parm->help,
-						    cfg->help);
-						parm++;
-						max_count--;
-					}
-				}
-
-				break;
-				}
-
-			case EMLXS_PARM_GET:
-				{
-				emlxs_parm_t *parm_in;
-				emlxs_parm_t *parm_out;
-				emlxs_config_t *cfg;
-				uint32_t i;
-				uint32_t len;
-
-				if (pm->pm_cmd_len < sizeof (emlxs_parm_t)) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: EMLXS_PARM_GET. "
-					    "inbuf to small.");
-
-					ret = FC_BADCMD;
-					break;
-				}
-				if (pm->pm_stat_len < sizeof (emlxs_parm_t)) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: EMLXS_PARM_GET. "
-					    "outbuf to small");
-
-					ret = FC_BADCMD;
-					break;
-				}
-				parm_in = (emlxs_parm_t *)pm->pm_cmd_buf;
-				parm_out = (emlxs_parm_t *)pm->pm_stat_buf;
-				len = strlen(parm_in->label);
-				cfg = &CFG;
-				ret = FC_BADOBJECT;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_PARM_GET: %s",
-				    parm_in->label);
-
-				for (i = 0; i < NUM_CFG_PARAM; i++, cfg++) {
-					if (len == strlen(cfg->string) &&
-					    strcmp(parm_in->label,
-					    cfg->string) == 0) {
+			for (i = 0; i < NUM_CFG_PARAM; i++, cfg++) {
+				/* Find matching parameter string */
+				if (len == strlen(cfg->string) &&
+				    (strcmp(parm_in->label,
+				    cfg->string) == 0)) {
+					/* Attempt to update parameter */
+					if (emlxs_set_parm(hba, i,
+					    parm_in->current) == FC_SUCCESS) {
 						(void) strcpy(parm_out->label,
 						    cfg->string);
 						parm_out->min = cfg->low;
@@ -4180,381 +4403,334 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 						    cfg->help);
 
 						ret = FC_SUCCESS;
-						break;
 					}
-				}
 
-				break;
-				}
-
-			case EMLXS_PARM_SET:
-				{
-				emlxs_parm_t *parm_in;
-				emlxs_parm_t *parm_out;
-				emlxs_config_t *cfg;
-				uint32_t i;
-				uint32_t len;
-
-				if (pm->pm_cmd_len < sizeof (emlxs_parm_t)) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: EMLXS_PARM_GET. "
-					    "inbuf to small.");
-
-					ret = FC_BADCMD;
 					break;
 				}
-				if (pm->pm_stat_len < sizeof (emlxs_parm_t)) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: EMLXS_PARM_GET. "
-					    "outbuf to small");
-					ret = FC_BADCMD;
-					break;
-				}
-				parm_in = (emlxs_parm_t *)pm->pm_cmd_buf;
-				parm_out = (emlxs_parm_t *)pm->pm_stat_buf;
-				len = strlen(parm_in->label);
-				cfg = &CFG;
-				ret = FC_BADOBJECT;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_PARM_SET"
-				    ": %s=0x%x,%d", parm_in->label,
-				    parm_in->current, parm_in->current);
-
-				for (i = 0; i < NUM_CFG_PARAM; i++, cfg++) {
-					/*
-					 * Find matching parameter
-					 * string
-					 */
-					if (len == strlen(cfg->string) &&
-					    strcmp(parm_in->label,
-					    cfg->string) == 0) {
-						/*
-						 * Attempt to update
-						 * parameter
-						 */
-						if (emlxs_set_parm(hba,
-						    i, parm_in->current)
-						    == FC_SUCCESS) {
-							(void) strcpy(
-							    parm_out->label,
-							    cfg->string);
-							parm_out->min =
-							    cfg->low;
-							parm_out->max = cfg->hi;
-							parm_out->def =
-							    cfg->def;
-							parm_out->current =
-							    cfg->current;
-							parm_out->flags =
-							    cfg->flags;
-							(void) strcpy(
-							    parm_out->help,
-							    cfg->help);
-
-							ret = FC_SUCCESS;
-						}
-						break;
-					}
-				}
-
-				break;
-				}
-
-			case EMLXS_LOG_GET:
-				{
-				emlxs_log_req_t *req;
-				emlxs_log_resp_t *resp;
-				uint32_t len;
-
-				/* Check command size */
-				if (pm->pm_cmd_len < sizeof (emlxs_log_req_t)) {
-					ret = FC_BADCMD;
-					break;
-				}
-				/* Get the request */
-				req = (emlxs_log_req_t *)pm->pm_cmd_buf;
-
-				/*
-				 * Calculate the response length from
-				 * the request
-				 */
-				len = sizeof (emlxs_log_resp_t) +
-				    (req->count * MAX_LOG_MSG_LENGTH);
-
-				/* Check the response buffer length */
-				if (pm->pm_stat_len < len) {
-					ret = FC_BADCMD;
-					break;
-				}
-				/* Get the response pointer */
-				resp = (emlxs_log_resp_t *)pm->pm_stat_buf;
-
-				/* Get the request log enties */
-				(void) emlxs_msg_log_get(hba, req, resp);
-
-				ret = FC_SUCCESS;
-				break;
-				}
-
-			case EMLXS_GET_BOOT_REV:
-				{
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_GET_BOOT_REV");
-
-				if (pm->pm_stat_len <
-				    strlen(vpd->boot_version)) {
-					ret = FC_NOMEM;
-					break;
-				}
-				bzero(pm->pm_stat_buf, pm->pm_stat_len);
-				(void) sprintf(pm->pm_stat_buf, "%s %s",
-				    hba->model_info.model, vpd->boot_version);
-
-				break;
-				}
-
-			case EMLXS_DOWNLOAD_BOOT:
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_DOWNLOAD_BOOT");
-
-				ret = emlxs_fw_download(hba, pm->pm_data_buf,
-				    pm->pm_data_len, 1);
-				break;
-
-			case EMLXS_DOWNLOAD_CFL:
-				{
-				uint32_t *buffer;
-				uint32_t region;
-				uint32_t length;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_DOWNLOAD_CFL");
-
-				/*
-				 * Extract the region number from the
-				 * first word.
-				 */
-				buffer = (uint32_t *)pm->pm_data_buf;
-				region = *buffer++;
-
-				/*
-				 * Adjust the image length for the
-				 * header word
-				 */
-				length = pm->pm_data_len - 4;
-
-				ret = emlxs_cfl_download(hba, region,
-				    (caddr_t)buffer, length);
-				break;
-				}
-
-			case EMLXS_VPD_GET:
-				{
-				emlxs_vpd_desc_t *vpd_out;
-				/* char buffer[80]; */
-				/* uint32_t i; */
-				/* uint32_t found = 0; */
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_VPD_GET");
-
-				if (pm->pm_stat_len <
-				    sizeof (emlxs_vpd_desc_t)) {
-					ret = FC_BADCMD;
-					break;
-				}
-				vpd_out = (emlxs_vpd_desc_t *)pm->pm_stat_buf;
-				bzero(vpd_out, sizeof (emlxs_vpd_desc_t));
-
-				(void) strncpy(vpd_out->id, vpd->id,
-				    sizeof (vpd_out->id));
-				(void) strncpy(vpd_out->part_num, vpd->part_num,
-				    sizeof (vpd_out->part_num));
-				(void) strncpy(vpd_out->eng_change,
-				    vpd->eng_change,
-				    sizeof (vpd_out->eng_change));
-				(void) strncpy(vpd_out->manufacturer,
-				    vpd->manufacturer,
-				    sizeof (vpd_out->manufacturer));
-				(void) strncpy(vpd_out->serial_num,
-				    vpd->serial_num,
-				    sizeof (vpd_out->serial_num));
-				(void) strncpy(vpd_out->model, vpd->model,
-				    sizeof (vpd_out->model));
-				(void) strncpy(vpd_out->model_desc,
-				    vpd->model_desc,
-				    sizeof (vpd_out->model_desc));
-				(void) strncpy(vpd_out->port_num,
-				    vpd->port_num,
-				    sizeof (vpd_out->port_num));
-				(void) strncpy(vpd_out->prog_types,
-				    vpd->prog_types,
-				    sizeof (vpd_out->prog_types));
-
-				ret = FC_SUCCESS;
-
-				break;
-				}
-
-			case EMLXS_GET_FCIO_REV:
-				{
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_GET_FCIO_REV");
-
-				if (pm->pm_stat_len < sizeof (uint32_t)) {
-					ret = FC_NOMEM;
-					break;
-				}
-				bzero(pm->pm_stat_buf, pm->pm_stat_len);
-				*(uint32_t *)pm->pm_stat_buf = FCIO_REV;
-
-				break;
-				}
-
-			case EMLXS_GET_DFC_REV:
-				{
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_GET_DFC_REV");
-
-				if (pm->pm_stat_len < sizeof (uint32_t)) {
-					ret = FC_NOMEM;
-					break;
-				}
-				bzero(pm->pm_stat_buf, pm->pm_stat_len);
-				*(uint32_t *)pm->pm_stat_buf = DFC_REV;
-
-				break;
-				}
-
-			case EMLXS_SET_BOOT_STATE:
-			case EMLXS_SET_BOOT_STATE_old:
-				{
-				uint32_t state;
-
-				if (pm->pm_cmd_len < sizeof (uint32_t)) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: "
-					    "EMLXS_SET_BOOT_STATE");
-					ret = FC_BADCMD;
-					break;
-				}
-				state = *(uint32_t *)pm->pm_cmd_buf;
-
-				if (state == 0) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: "
-					    "EMLXS_SET_BOOT_STATE: Disable");
-					ret = emlxs_boot_code_disable(hba);
-				} else {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: "
-					    "EMLXS_SET_BOOT_STATE: Enable");
-					ret = emlxs_boot_code_enable(hba);
-				}
-
-				break;
-				}
-
-			case EMLXS_GET_BOOT_STATE:
-			case EMLXS_GET_BOOT_STATE_old:
-				{
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_GET_BOOT_STATE");
-
-				if (pm->pm_stat_len < sizeof (uint32_t)) {
-					ret = FC_NOMEM;
-					break;
-				}
-				bzero(pm->pm_stat_buf, pm->pm_stat_len);
-
-				ret = emlxs_boot_code_state(hba);
-
-				if (ret == FC_SUCCESS) {
-					*(uint32_t *)pm->pm_stat_buf = 1;
-					ret = FC_SUCCESS;
-				} else if (ret == FC_FAILURE) {
-					ret = FC_SUCCESS;
-				}
-				break;
-				}
-
-
-			case EMLXS_HW_ERROR_TEST:
-				{
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_HW_ERROR_TEST");
-
-				/* Trigger a mailbox timeout */
-				hba->mbox_timer = hba->timer_tics;
-
-				break;
-				}
-
-			case EMLXS_TEST_CODE:
-				{
-				uint32_t *cmd;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "fca_port_manage: EMLXS_TEST_CODE");
-
-				if (pm->pm_cmd_len < sizeof (uint32_t)) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_sfs_debug_msg,
-					    "fca_port_manage: EMLXS_TEST_CODE. "
-					    "inbuf to small.");
-
-					ret = FC_BADCMD;
-					break;
-				}
-				cmd = (uint32_t *)pm->pm_cmd_buf;
-
-				ret = emlxs_test(hba, cmd[0], (pm->pm_cmd_len /
-				    sizeof (uint32_t)), &cmd[1]);
-
-				break;
-				}
-
-
-			default:
-
-				ret = FC_INVALID_REQUEST;
-				break;
 			}
 
 			break;
-
 		}
 
+		case EMLXS_LOG_GET:
+		{
+			emlxs_log_req_t		*req;
+			emlxs_log_resp_t	*resp;
+			uint32_t		len;
+
+			/* Check command size */
+			if (pm->pm_cmd_len < sizeof (emlxs_log_req_t)) {
+				ret = FC_BADCMD;
+				break;
+			}
+
+			/* Get the request */
+			req = (emlxs_log_req_t *)pm->pm_cmd_buf;
+
+			/* Calculate the response length from the request */
+			len = sizeof (emlxs_log_resp_t) +
+			    (req->count * MAX_LOG_MSG_LENGTH);
+
+			/* Check the response buffer length */
+			if (pm->pm_stat_len < len) {
+				ret = FC_BADCMD;
+				break;
+			}
+
+			/* Get the response pointer */
+			resp = (emlxs_log_resp_t *)pm->pm_stat_buf;
+
+			/* Get the request log enties */
+			(void) emlxs_msg_log_get(hba, req, resp);
+
+			ret = FC_SUCCESS;
+			break;
+		}
+
+		case EMLXS_GET_BOOT_REV:
+		{
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_GET_BOOT_REV");
+
+			if (pm->pm_stat_len < strlen(vpd->boot_version)) {
+				ret = FC_NOMEM;
+				break;
+			}
+
+			bzero(pm->pm_stat_buf, pm->pm_stat_len);
+			(void) sprintf(pm->pm_stat_buf, "%s %s",
+			    hba->model_info.model, vpd->boot_version);
+
+			break;
+		}
+
+		case EMLXS_DOWNLOAD_BOOT:
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_DOWNLOAD_BOOT");
+
+			ret = emlxs_fw_download(hba, pm->pm_data_buf,
+			    pm->pm_data_len, 1);
+			break;
+
+		case EMLXS_DOWNLOAD_CFL:
+		{
+			uint32_t *buffer;
+			uint32_t region;
+			uint32_t length;
+
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_DOWNLOAD_CFL");
+
+			/* Extract the region number from the first word. */
+			buffer = (uint32_t *)pm->pm_data_buf;
+			region = *buffer++;
+
+			/* Adjust the image length for the header word */
+			length = pm->pm_data_len - 4;
+
+			ret =
+			    emlxs_cfl_download(hba, region, (caddr_t)buffer,
+			    length);
+			break;
+		}
+
+		case EMLXS_VPD_GET:
+		{
+			emlxs_vpd_desc_t	*vpd_out;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_VPD_GET");
+
+			if (pm->pm_stat_len < sizeof (emlxs_vpd_desc_t)) {
+				ret = FC_BADCMD;
+				break;
+			}
+
+			vpd_out = (emlxs_vpd_desc_t *)pm->pm_stat_buf;
+			bzero(vpd_out, sizeof (emlxs_vpd_desc_t));
+
+			(void) strncpy(vpd_out->id, vpd->id,
+			    sizeof (vpd_out->id));
+			(void) strncpy(vpd_out->part_num, vpd->part_num,
+			    sizeof (vpd_out->part_num));
+			(void) strncpy(vpd_out->eng_change, vpd->eng_change,
+			    sizeof (vpd_out->eng_change));
+			(void) strncpy(vpd_out->manufacturer, vpd->manufacturer,
+			    sizeof (vpd_out->manufacturer));
+			(void) strncpy(vpd_out->serial_num, vpd->serial_num,
+			    sizeof (vpd_out->serial_num));
+			(void) strncpy(vpd_out->model, vpd->model,
+			    sizeof (vpd_out->model));
+			(void) strncpy(vpd_out->model_desc, vpd->model_desc,
+			    sizeof (vpd_out->model_desc));
+			(void) strncpy(vpd_out->port_num, vpd->port_num,
+			    sizeof (vpd_out->port_num));
+			(void) strncpy(vpd_out->prog_types, vpd->prog_types,
+			    sizeof (vpd_out->prog_types));
+
+			ret = FC_SUCCESS;
+
+			break;
+		}
+
+		case EMLXS_GET_FCIO_REV:
+		{
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_GET_FCIO_REV");
+
+			if (pm->pm_stat_len < sizeof (uint32_t)) {
+				ret = FC_NOMEM;
+				break;
+			}
+
+			bzero(pm->pm_stat_buf, pm->pm_stat_len);
+			*(uint32_t *)pm->pm_stat_buf = FCIO_REV;
+
+			break;
+		}
+
+		case EMLXS_GET_DFC_REV:
+		{
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_GET_DFC_REV");
+
+			if (pm->pm_stat_len < sizeof (uint32_t)) {
+				ret = FC_NOMEM;
+				break;
+			}
+
+			bzero(pm->pm_stat_buf, pm->pm_stat_len);
+			*(uint32_t *)pm->pm_stat_buf = DFC_REV;
+
+			break;
+		}
+
+		case EMLXS_SET_BOOT_STATE:
+		case EMLXS_SET_BOOT_STATE_old:
+		{
+			uint32_t	state;
+
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			if (pm->pm_cmd_len < sizeof (uint32_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_SET_BOOT_STATE");
+				ret = FC_BADCMD;
+				break;
+			}
+
+			state = *(uint32_t *)pm->pm_cmd_buf;
+
+			if (state == 0) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_SET_BOOT_STATE: "
+				    "Disable");
+				ret = emlxs_boot_code_disable(hba);
+			} else {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_SET_BOOT_STATE: "
+				    "Enable");
+				ret = emlxs_boot_code_enable(hba);
+			}
+
+			break;
+		}
+
+		case EMLXS_GET_BOOT_STATE:
+		case EMLXS_GET_BOOT_STATE_old:
+		{
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_GET_BOOT_STATE");
+
+			if (pm->pm_stat_len < sizeof (uint32_t)) {
+				ret = FC_NOMEM;
+				break;
+			}
+			bzero(pm->pm_stat_buf, pm->pm_stat_len);
+
+			ret = emlxs_boot_code_state(hba);
+
+			if (ret == FC_SUCCESS) {
+				*(uint32_t *)pm->pm_stat_buf = 1;
+				ret = FC_SUCCESS;
+			} else if (ret == FC_FAILURE) {
+				ret = FC_SUCCESS;
+			}
+
+			break;
+		}
+
+		case EMLXS_HW_ERROR_TEST:
+		{
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_HW_ERROR_TEST");
+
+			/* Trigger a mailbox timeout */
+			hba->mbox_timer = hba->timer_tics;
+
+			break;
+		}
+
+		case EMLXS_TEST_CODE:
+		{
+			uint32_t *cmd;
+
+			if (!(hba->flag & FC_ONLINE_MODE)) {
+				return (FC_OFFLINE);
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_TEST_CODE");
+
+			if (pm->pm_cmd_len < sizeof (uint32_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "fca_port_manage: EMLXS_TEST_CODE. "
+				    "inbuf to small.");
+
+				ret = FC_BADCMD;
+				break;
+			}
+
+			cmd = (uint32_t *)pm->pm_cmd_buf;
+
+			ret = emlxs_test(hba, cmd[0],
+			    (pm->pm_cmd_len/sizeof (uint32_t)) - 1, &cmd[1]);
+
+			break;
+		}
+
+		default:
+
+			ret = FC_INVALID_REQUEST;
+			break;
+		}
+
+		break;
+
+	}
+
 	case FC_PORT_INITIALIZE:
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_INITIALIZE");
 		break;
 
 	case FC_PORT_LOOPBACK:
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_LOOPBACK");
 		break;
 
 	case FC_PORT_BYPASS:
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_BYPASS");
 		ret = FC_INVALID_REQUEST;
 		break;
 
 	case FC_PORT_UNBYPASS:
+		if (!(hba->flag & FC_ONLINE_MODE)) {
+			return (FC_OFFLINE);
+		}
+
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_UNBYPASS");
 		ret = FC_INVALID_REQUEST;
 		break;
 
 	case FC_PORT_GET_NODE_ID:
-		{
+	{
 		fc_rnid_t *rnid;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -4566,18 +4742,18 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			ret = FC_NOMEM;
 			break;
 		}
+
 		rnid = (fc_rnid_t *)pm->pm_data_buf;
 
 		(void) sprintf((char *)rnid->global_id,
 		    "%01x%01x%02x%02x%02x%02x%02x%02x%02x",
 		    hba->wwpn.nameType, hba->wwpn.IEEEextMsn,
-		    hba->wwpn.IEEEextLsb,
-		    hba->wwpn.IEEE[0], hba->wwpn.IEEE[1],
-		    hba->wwpn.IEEE[2], hba->wwpn.IEEE[3],
+		    hba->wwpn.IEEEextLsb, hba->wwpn.IEEE[0],
+		    hba->wwpn.IEEE[1], hba->wwpn.IEEE[2], hba->wwpn.IEEE[3],
 		    hba->wwpn.IEEE[4], hba->wwpn.IEEE[5]);
 
-		rnid->unit_type = RNID_HBA;
-		rnid->port_id = port->did;
+		rnid->unit_type  = RNID_HBA;
+		rnid->port_id    = port->did;
 		rnid->ip_version = RNID_IPV4;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -4595,17 +4771,16 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "GET_NODE_ID: ip_addr:    %s", rnid->ip_addr);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "GET_NODE_ID: resv:       0x%x",
-		    rnid->specific_id_resv);
+		    "GET_NODE_ID: resv:       0x%x", rnid->specific_id_resv);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "GET_NODE_ID: topo_flags: 0x%x", rnid->topo_flags);
 
 		ret = FC_SUCCESS;
 		break;
-		}
+	}
 
 	case FC_PORT_SET_NODE_ID:
-		{
+	{
 		fc_rnid_t *rnid;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -4615,6 +4790,7 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			ret = FC_NOMEM;
 			break;
 		}
+
 		rnid = (fc_rnid_t *)pm->pm_data_buf;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -4632,14 +4808,13 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "SET_NODE_ID: ip_addr:    %s", rnid->ip_addr);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-		    "SET_NODE_ID: resv:       0x%x",
-		    rnid->specific_id_resv);
+		    "SET_NODE_ID: resv:       0x%x", rnid->specific_id_resv);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "SET_NODE_ID: topo_flags: 0x%x", rnid->topo_flags);
 
 		ret = FC_SUCCESS;
 		break;
-		}
+	}
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -4656,25 +4831,20 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 
 /*ARGSUSED*/
 static uint32_t
-emlxs_test(emlxs_hba_t *hba, uint32_t test_code, uint32_t args, uint32_t *arg)
+emlxs_test(emlxs_hba_t *hba, uint32_t test_code, uint32_t args,
+    uint32_t *arg)
 {
 	uint32_t rval = 0;
-	emlxs_port_t *port = &PPORT;
+	emlxs_port_t   *port = &PPORT;
 
 	switch (test_code) {
 #ifdef TEST_SUPPORT
-	case 1:	/* SCSI underrun */
-		{
-		uint32_t count = 1;
-		if (args >= 1) {
-			if (*arg > 0 && *arg < 100) {
-				count = *arg;
-			}
-		}
-		hba->underrun_counter = count;
+	case 1: /* SCSI underrun */
+	{
+		hba->underrun_counter = (args)? arg[0]:1;
 		break;
-		}
-#endif	/* TEST_SUPPORT */
+	}
+#endif /* TEST_SUPPORT */
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -4689,8 +4859,8 @@ emlxs_test(emlxs_hba_t *hba, uint32_t test_code, uint32_t args, uint32_t *arg)
 
 /*
  * Given the device number, return the devinfo pointer or the ddiinst number.
- * Note: this routine must be successful on
- * DDI_INFO_DEVT2INSTANCE even before attach.
+ * Note: this routine must be successful on DDI_INFO_DEVT2INSTANCE even
+ * before attach.
  *
  * Translate "dev_t" to a pointer to the associated "dev_info_t".
  */
@@ -4698,8 +4868,8 @@ emlxs_test(emlxs_hba_t *hba, uint32_t test_code, uint32_t args, uint32_t *arg)
 static int
 emlxs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
-	emlxs_hba_t *hba;
-	int32_t ddiinst;
+	emlxs_hba_t	*hba;
+	int32_t		ddiinst;
 
 	ddiinst = getminor((dev_t)arg);
 
@@ -4713,7 +4883,7 @@ emlxs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		break;
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(unsigned long)ddiinst;
+		*result = (void *)((unsigned long)ddiinst);
 		break;
 
 	default:
@@ -4728,10 +4898,10 @@ emlxs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 static int32_t
 emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	int32_t ddiinst;
-	int rval = DDI_SUCCESS;
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int32_t		ddiinst;
+	int		rval = DDI_SUCCESS;
 
 	ddiinst = ddi_get_instance(dip);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -4743,6 +4913,7 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 	if (hba == NULL || comp != EMLXS_PM_ADAPTER) {
 		return (DDI_FAILURE);
 	}
+
 	mutex_enter(&hba->pm_lock);
 
 	/* If we are already at the proper level then return success */
@@ -4750,17 +4921,19 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 		mutex_exit(&hba->pm_lock);
 		return (DDI_SUCCESS);
 	}
+
 	switch (level) {
 	case EMLXS_PM_ADAPTER_UP:
 
 		/*
-		 * If we are already in emlxs_attach, let emlxs_hba_attach
-		 * take care of things
+		 * If we are already in emlxs_attach,
+		 * let emlxs_hba_attach take care of things
 		 */
 		if (hba->pm_state & EMLXS_PM_IN_ATTACH) {
 			hba->pm_level = EMLXS_PM_ADAPTER_UP;
 			break;
 		}
+
 		/* Check if adapter is suspended */
 		if (hba->pm_state & EMLXS_PM_SUSPENDED) {
 			hba->pm_level = EMLXS_PM_ADAPTER_UP;
@@ -4773,6 +4946,7 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 			}
 			break;
 		}
+
 		/* Set adapter up */
 		hba->pm_level = EMLXS_PM_ADAPTER_UP;
 		break;
@@ -4781,13 +4955,14 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 
 
 		/*
-		 * If we are already in emlxs_detach, let emlxs_hba_detach
-		 * take care of things
+		 * If we are already in emlxs_detach,
+		 * let emlxs_hba_detach take care of things
 		 */
 		if (hba->pm_state & EMLXS_PM_IN_DETACH) {
 			hba->pm_level = EMLXS_PM_ADAPTER_DOWN;
 			break;
 		}
+
 		/* Check if adapter is not suspended */
 		if (!(hba->pm_state & EMLXS_PM_SUSPENDED)) {
 			hba->pm_level = EMLXS_PM_ADAPTER_DOWN;
@@ -4798,8 +4973,10 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 			if (rval != DDI_SUCCESS) {
 				hba->pm_level = EMLXS_PM_ADAPTER_UP;
 			}
+
 			break;
 		}
+
 		/* Set adapter down */
 		hba->pm_level = EMLXS_PM_ADAPTER_DOWN;
 		break;
@@ -4817,13 +4994,52 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
 } /* emlxs_power() */
 
 
+#ifdef EMLXS_I386
+#ifdef S11
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-thread at hight PIL
+ * with preemption disabled. Therefore, this function must not be blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an eerror condition and should almost never happen.
+ */
+static int
+emlxs_quiesce(dev_info_t *dip)
+{
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int32_t		ddiinst;
+	int		rval = DDI_SUCCESS;
+
+	ddiinst = ddi_get_instance(dip);
+	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
+	port = &PPORT;
+
+	prom_printf("emlxs%d: emlxs_quiesce...\n ", ddiinst);
+
+	if (hba == NULL || port == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	if (emlxs_sli_hba_reset(hba, 0, 0) == 0) {
+		return (rval);
+	} else {
+		return (DDI_FAILURE);
+	}
+
+} /* emlxs_quiesce */
+#endif
+#endif /* EMLXS_I386 */
+
 
 static int
 emlxs_open(dev_t *dev_p, int32_t flag, int32_t otype, cred_t *cred_p)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	int ddiinst;
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int		ddiinst;
 
 	ddiinst = getminor(*dev_p);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -4831,6 +5047,7 @@ emlxs_open(dev_t *dev_p, int32_t flag, int32_t otype, cred_t *cred_p)
 	if (hba == NULL) {
 		return (ENXIO);
 	}
+
 	port = &PPORT;
 
 	if (hba->pm_state & EMLXS_PM_SUSPENDED) {
@@ -4838,30 +5055,31 @@ emlxs_open(dev_t *dev_p, int32_t flag, int32_t otype, cred_t *cred_p)
 		    "open failed: Driver suspended.");
 		return (ENXIO);
 	}
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ioctl_detail_msg, "open: flag=%x
-	 * otype=%x", flag, otype);
-	 */
 
 	if (otype != OTYP_CHR) {
 		return (EINVAL);
 	}
+
 	if (drv_priv(cred_p)) {
 		return (EPERM);
 	}
+
 	mutex_enter(&EMLXS_IOCTL_LOCK);
 
 	if (hba->ioctl_flags & EMLXS_OPEN_EXCLUSIVE) {
 		mutex_exit(&EMLXS_IOCTL_LOCK);
 		return (EBUSY);
 	}
+
 	if (flag & FEXCL) {
 		if (hba->ioctl_flags & EMLXS_OPEN) {
 			mutex_exit(&EMLXS_IOCTL_LOCK);
 			return (EBUSY);
 		}
+
 		hba->ioctl_flags |= EMLXS_OPEN_EXCLUSIVE;
 	}
+
 	hba->ioctl_flags |= EMLXS_OPEN;
 
 	mutex_exit(&EMLXS_IOCTL_LOCK);
@@ -4871,14 +5089,12 @@ emlxs_open(dev_t *dev_p, int32_t flag, int32_t otype, cred_t *cred_p)
 } /* emlxs_open() */
 
 
-
 /*ARGSUSED*/
 static int
 emlxs_close(dev_t dev, int32_t flag, int32_t otype, cred_t *cred_p)
 {
-	emlxs_hba_t *hba;
-	/* emlxs_port_t *port; */
-	int ddiinst;
+	emlxs_hba_t	*hba;
+	int		ddiinst;
 
 	ddiinst = getminor(dev);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -4886,22 +5102,18 @@ emlxs_close(dev_t dev, int32_t flag, int32_t otype, cred_t *cred_p)
 	if (hba == NULL) {
 		return (ENXIO);
 	}
-	/* port = &PPORT; */
-
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ioctl_detail_msg,
-	 * "close: flag=%x otype=%x", flag, otype);
-	 */
 
 	if (otype != OTYP_CHR) {
 		return (EINVAL);
 	}
+
 	mutex_enter(&EMLXS_IOCTL_LOCK);
 
 	if (!(hba->ioctl_flags & EMLXS_OPEN)) {
 		mutex_exit(&EMLXS_IOCTL_LOCK);
 		return (ENODEV);
 	}
+
 	hba->ioctl_flags &= ~EMLXS_OPEN;
 	hba->ioctl_flags &= ~EMLXS_OPEN_EXCLUSIVE;
 
@@ -4912,16 +5124,15 @@ emlxs_close(dev_t dev, int32_t flag, int32_t otype, cred_t *cred_p)
 } /* emlxs_close() */
 
 
-
 /*ARGSUSED*/
 static int
 emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
     cred_t *cred_p, int32_t *rval_p)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	int rval = 0;	/* return code */
-	int ddiinst;
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int		rval = 0;	/* return code */
+	int		ddiinst;
 
 	ddiinst = getminor(dev);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -4929,6 +5140,7 @@ emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
 	if (hba == NULL) {
 		return (ENXIO);
 	}
+
 	port = &PPORT;
 
 	if (hba->pm_state & EMLXS_PM_SUSPENDED) {
@@ -4937,10 +5149,6 @@ emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
 
 		return (ENXIO);
 	}
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ioctl_detail_msg, "ioctl: cmd=%x
-	 * arg=%llx mode=%x busy=%x", cmd, arg, mode, hba->pm_busy);
-	 */
 
 	mutex_enter(&EMLXS_IOCTL_LOCK);
 	if (!(hba->ioctl_flags & EMLXS_OPEN)) {
@@ -4956,7 +5164,7 @@ emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
 	switch (cmd) {
 #ifdef DFC_SUPPORT
 	case EMLXS_DFC_COMMAND:
-		rval = emlxs_dfc_manage(hba, (void *) arg, mode);
+		rval = emlxs_dfc_manage(hba, (void *)arg, mode);
 		break;
 #endif	/* DFC_SUPPORT */
 
@@ -4975,7 +5183,7 @@ done:
 
 /*
  *
- *		  Device Driver Common Routines
+ *	Device Driver Common Routines
  *
  */
 
@@ -4983,9 +5191,9 @@ done:
 static int
 emlxs_hba_resume(dev_info_t *dip)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	int ddiinst;
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int		ddiinst;
 
 	ddiinst = ddi_get_instance(dip);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -4996,6 +5204,7 @@ emlxs_hba_resume(dev_info_t *dip)
 	if (!(hba->pm_state & EMLXS_PM_SUSPENDED)) {
 		return (DDI_SUCCESS);
 	}
+
 	hba->pm_state &= ~EMLXS_PM_SUSPENDED;
 
 	/* Take the adapter online */
@@ -5007,6 +5216,7 @@ emlxs_hba_resume(dev_info_t *dip)
 
 		return (DDI_FAILURE);
 	}
+
 	return (DDI_SUCCESS);
 
 } /* emlxs_hba_resume() */
@@ -5016,11 +5226,9 @@ emlxs_hba_resume(dev_info_t *dip)
 static int
 emlxs_hba_suspend(dev_info_t *dip)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	int ddiinst;
-	/* int ringno; */
-	/* RING *rp; */
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int		ddiinst;
 
 	ddiinst = ddi_get_instance(dip);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -5031,6 +5239,7 @@ emlxs_hba_suspend(dev_info_t *dip)
 	if (hba->pm_state & EMLXS_PM_SUSPENDED) {
 		return (DDI_SUCCESS);
 	}
+
 	hba->pm_state |= EMLXS_PM_SUSPENDED;
 
 	/* Take the adapter offline */
@@ -5042,6 +5251,7 @@ emlxs_hba_suspend(dev_info_t *dip)
 
 		return (DDI_FAILURE);
 	}
+
 	return (DDI_SUCCESS);
 
 } /* emlxs_hba_suspend() */
@@ -5051,10 +5261,10 @@ emlxs_hba_suspend(dev_info_t *dip)
 static void
 emlxs_lock_init(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	int32_t ddiinst;
-	char buf[64];
-	uint32_t i;
+	emlxs_port_t	*port = &PPORT;
+	int32_t		ddiinst;
+	char		buf[64];
+	uint32_t	i;
 
 	ddiinst = hba->ddiinst;
 
@@ -5063,16 +5273,19 @@ emlxs_lock_init(emlxs_hba_t *hba)
 	mutex_init(&hba->pm_lock, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_adap_lock mutex", DRIVER_NAME, ddiinst);
-	mutex_init(&EMLXS_TIMER_LOCK, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
+	mutex_init(&EMLXS_TIMER_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_adap_lock cv", DRIVER_NAME, ddiinst);
 	cv_init(&hba->timer_lock_cv, buf, CV_DRIVER, NULL);
 
 	(void) sprintf(buf, "%s%d_port_lock mutex", DRIVER_NAME, ddiinst);
-	mutex_init(&EMLXS_PORT_LOCK, buf, MUTEX_DRIVER, (void *) hba->intr_arg);
+	mutex_init(&EMLXS_PORT_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_mbox_lock mutex", DRIVER_NAME, ddiinst);
-	mutex_init(&EMLXS_MBOX_LOCK, buf, MUTEX_DRIVER, (void *) hba->intr_arg);
+	mutex_init(&EMLXS_MBOX_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_mbox_lock cv", DRIVER_NAME, ddiinst);
 	cv_init(&EMLXS_MBOX_CV, buf, CV_DRIVER, NULL);
@@ -5089,13 +5302,13 @@ emlxs_lock_init(emlxs_hba_t *hba)
 	    (void *)hba->intr_arg);
 
 	for (i = 0; i < MAX_RINGS; i++) {
-		(void) sprintf(buf, "%s%d_cmd_ring%d_lock mutex",
-		    DRIVER_NAME, ddiinst, i);
+		(void) sprintf(buf, "%s%d_cmd_ring%d_lock mutex", DRIVER_NAME,
+		    ddiinst, i);
 		mutex_init(&EMLXS_CMD_RING_LOCK(i), buf, MUTEX_DRIVER,
 		    (void *)hba->intr_arg);
 
-		(void) sprintf(buf, "%s%d_fctab%d_lock mutex",
-		    DRIVER_NAME, ddiinst, i);
+		(void) sprintf(buf, "%s%d_fctab%d_lock mutex", DRIVER_NAME,
+		    ddiinst, i);
 		mutex_init(&EMLXS_FCTAB_LOCK(i), buf, MUTEX_DRIVER,
 		    (void *)hba->intr_arg);
 	}
@@ -5109,7 +5322,14 @@ emlxs_lock_init(emlxs_hba_t *hba)
 	    (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_ioctl_lock mutex", DRIVER_NAME, ddiinst);
-	mutex_init(&EMLXS_IOCTL_LOCK, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
+	mutex_init(&EMLXS_IOCTL_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
+
+#ifdef DUMP_SUPPORT
+	(void) sprintf(buf, "%s%d_dump mutex", DRIVER_NAME, ddiinst);
+	mutex_init(&EMLXS_DUMP_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
+#endif /* DUMP_SUPPORT */
 
 	/* Create per port locks */
 	for (i = 0; i < MAX_VPORTS; i++) {
@@ -5118,33 +5338,33 @@ emlxs_lock_init(emlxs_hba_t *hba)
 		rw_init(&port->node_rwlock, NULL, RW_DRIVER, NULL);
 
 		if (i == 0) {
-			(void) sprintf(buf, "%s%d_pkt_lock mutex",
-			    DRIVER_NAME, ddiinst);
+			(void) sprintf(buf, "%s%d_pkt_lock mutex", DRIVER_NAME,
+			    ddiinst);
 			mutex_init(&EMLXS_PKT_LOCK, buf, MUTEX_DRIVER,
-			    (void *) hba->intr_arg);
+			    (void *)hba->intr_arg);
 
-			(void) sprintf(buf, "%s%d_pkt_lock cv",
-			    DRIVER_NAME, ddiinst);
+			(void) sprintf(buf, "%s%d_pkt_lock cv", DRIVER_NAME,
+			    ddiinst);
 			cv_init(&EMLXS_PKT_CV, buf, CV_DRIVER, NULL);
 
-			(void) sprintf(buf, "%s%d_ub_lock mutex",
-			    DRIVER_NAME, ddiinst);
+			(void) sprintf(buf, "%s%d_ub_lock mutex", DRIVER_NAME,
+			    ddiinst);
 			mutex_init(&EMLXS_UB_LOCK, buf, MUTEX_DRIVER,
-			    (void *) hba->intr_arg);
+			    (void *)hba->intr_arg);
 		} else {
 			(void) sprintf(buf, "%s%d.%d_pkt_lock mutex",
 			    DRIVER_NAME, ddiinst, port->vpi);
 			mutex_init(&EMLXS_PKT_LOCK, buf, MUTEX_DRIVER,
-			    (void *) hba->intr_arg);
+			    (void *)hba->intr_arg);
 
-			(void) sprintf(buf, "%s%d.%d_pkt_lock cv",
-			    DRIVER_NAME, ddiinst, port->vpi);
+			(void) sprintf(buf, "%s%d.%d_pkt_lock cv", DRIVER_NAME,
+			    ddiinst, port->vpi);
 			cv_init(&EMLXS_PKT_CV, buf, CV_DRIVER, NULL);
 
 			(void) sprintf(buf, "%s%d.%d_ub_lock mutex",
 			    DRIVER_NAME, ddiinst, port->vpi);
 			mutex_init(&EMLXS_UB_LOCK, buf, MUTEX_DRIVER,
-			    (void *) hba->intr_arg);
+			    (void *)hba->intr_arg);
 		}
 	}
 
@@ -5157,8 +5377,8 @@ emlxs_lock_init(emlxs_hba_t *hba)
 static void
 emlxs_lock_destroy(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t i;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	i;
 
 	mutex_destroy(&EMLXS_TIMER_LOCK);
 	cv_destroy(&hba->timer_lock_cv);
@@ -5183,6 +5403,10 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 	mutex_destroy(&EMLXS_IOCTL_LOCK);
 	mutex_destroy(&hba->pm_lock);
 
+#ifdef DUMP_SUPPORT
+	mutex_destroy(&EMLXS_DUMP_LOCK);
+#endif /* DUMP_SUPPORT */
+
 	/* Destroy per port locks */
 	for (i = 0; i < MAX_VPORTS; i++) {
 		port = &VPORT(i);
@@ -5202,7 +5426,7 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 #define	ATTACH_FCA_TRAN		0x00000002
 #define	ATTACH_HBA		0x00000004
 #define	ATTACH_LOG		0x00000008
-#define	ATTACH_MAP		0x00000010
+#define	ATTACH_MAP_BUS		0x00000010
 #define	ATTACH_INTR_INIT	0x00000020
 #define	ATTACH_PROP		0x00000040
 #define	ATTACH_LOCK		0x00000080
@@ -5214,12 +5438,14 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 #define	ATTACH_FCA		0x00002000
 #define	ATTACH_KSTAT		0x00004000
 #define	ATTACH_DHCHAP		0x00008000
+#define	ATTACH_FM		0x00010000
+#define	ATTACH_MAP_SLI		0x00020000
 
 static void
 emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 {
-	emlxs_hba_t *hba = NULL;
-	int ddiinst;
+	emlxs_hba_t	*hba = NULL;
+	int		ddiinst;
 
 	ddiinst = ddi_get_instance(dip);
 
@@ -5229,6 +5455,7 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 		if (init_flag & ATTACH_ONLINE) {
 			(void) emlxs_offline(hba);
 		}
+
 		if (init_flag & ATTACH_INTR_ADD) {
 			(void) EMLXS_INTR_REMOVE(hba);
 		}
@@ -5236,55 +5463,84 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 		if (init_flag & ATTACH_FCT) {
 			emlxs_fct_detach(hba);
 		}
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 		if (init_flag & ATTACH_DHCHAP) {
 			emlxs_dhc_detach(hba);
 		}
-#endif	/* DHCHAP_SUPPORT */
+#endif /* DHCHAP_SUPPORT */
 
 		if (init_flag & ATTACH_KSTAT) {
 			kstat_delete(hba->kstat);
 		}
+
 		if (init_flag & ATTACH_FCA) {
 			emlxs_fca_detach(hba);
 		}
+
 		if (init_flag & ATTACH_NODE) {
 			(void) ddi_remove_minor_node(hba->dip, "devctl");
 		}
+
 		if (init_flag & ATTACH_THREAD) {
 			emlxs_thread_destroy(&hba->iodone_thread);
 		}
+
 		if (init_flag & ATTACH_PROP) {
 			(void) ddi_prop_remove_all(hba->dip);
 		}
+
 		if (init_flag & ATTACH_LOCK) {
 			emlxs_lock_destroy(hba);
 		}
+
 		if (init_flag & ATTACH_INTR_INIT) {
 			(void) EMLXS_INTR_UNINIT(hba);
 		}
-		if (init_flag & ATTACH_MAP) {
-			emlxs_unmapmem(hba);
+
+		if (init_flag & ATTACH_MAP_BUS) {
+			emlxs_unmap_bus(hba);
 		}
+
+		if (init_flag & ATTACH_MAP_SLI) {
+			emlxs_sli_unmap_hdw(hba);
+		}
+
+#ifdef FMA_SUPPORT
+		if (init_flag & ATTACH_FM) {
+			emlxs_fm_fini(hba);
+		}
+#endif	/* FMA_SUPPORT */
+
 		if (init_flag & ATTACH_LOG) {
 			(void) emlxs_msg_log_destroy(hba);
 		}
+
 		if (init_flag & ATTACH_FCA_TRAN) {
 			(void) ddi_set_driver_private(hba->dip, NULL);
 			kmem_free(hba->fca_tran, sizeof (fc_fca_tran_t));
 			hba->fca_tran = NULL;
 		}
+
 		if (init_flag & ATTACH_HBA) {
 			emlxs_device.log[hba->emlxinst] = 0;
 			emlxs_device.hba[hba->emlxinst] =
-			    (emlxs_hba_t *)(unsigned long)((failed) ? -1 : 0);
+			    (emlxs_hba_t *)((unsigned long)((failed) ? -1 : 0));
+
+#ifdef DUMP_SUPPORT
+			emlxs_device.dump_txtfile[hba->emlxinst] = 0;
+			emlxs_device.dump_dmpfile[hba->emlxinst] = 0;
+			emlxs_device.dump_ceefile[hba->emlxinst] = 0;
+#endif /* DUMP_SUPPORT */
+
 		}
 	}
+
 	if (init_flag & ATTACH_SOFT_STATE) {
 		(void) ddi_soft_state_free(emlxs_soft_state, ddiinst);
 	}
+
 	return;
 
 } /* emlxs_driver_remove() */
@@ -5295,9 +5551,9 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 static void
 emlxs_fca_init(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_port_t *vport;
-	uint32_t i;
+	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*vport;
+	uint32_t	i;
 
 	if (!hba->ini_mode) {
 		return;
@@ -5305,17 +5561,18 @@ emlxs_fca_init(emlxs_hba_t *hba)
 #ifdef MODSYM_SUPPORT
 	/* Open SFS */
 	(void) emlxs_fca_modopen();
-#endif	/* MODSYM_SUPPORT */
+#endif /* MODSYM_SUPPORT */
 
 	/* Check if SFS present */
-	if (((void *) MODSYM(fc_fca_init) == NULL) ||
-	    ((void *) MODSYM(fc_fca_attach) == NULL)) {
+	if (((void *)MODSYM(fc_fca_init) == NULL) ||
+	    ((void *)MODSYM(fc_fca_attach) == NULL)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 		    "SFS not present. Initiator mode disabled.");
 		goto failed;
 	}
+
 	/* Setup devops for SFS */
-	MODSYM(fc_fca_init) (&emlxs_ops);
+	MODSYM(fc_fca_init)(&emlxs_ops);
 
 	/* Check if our SFS driver interface matches the current SFS stack */
 	if (MODSYM(fc_fca_attach) (hba->dip, hba->fca_tran) != DDI_SUCCESS) {
@@ -5327,6 +5584,7 @@ emlxs_fca_init(emlxs_hba_t *hba)
 
 		goto failed;
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 	    "SFS present. Initiator mode enabled.");
 
@@ -5349,11 +5607,10 @@ failed:
 static void
 emlxs_set_mode(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_port_t *vport;
-	uint32_t i;
-	/* char string[256]; */
-	uint32_t tgt_mode = 0;
+	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*vport;
+	uint32_t	i;
+	uint32_t	tgt_mode = 0;
 
 #ifdef SFCT_SUPPORT
 	emlxs_config_t *cfg;
@@ -5362,18 +5619,18 @@ emlxs_set_mode(emlxs_hba_t *hba)
 	tgt_mode = cfg->current;
 
 	port->fct_flags = 0;
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 	/* Initialize physical port  */
 	if (tgt_mode) {
-		hba->tgt_mode = 1;
-		hba->ini_mode = 0;
+		hba->tgt_mode  = 1;
+		hba->ini_mode  = 0;
 
 		port->tgt_mode = 1;
 		port->ini_mode = 0;
 	} else {
-		hba->tgt_mode = 0;
-		hba->ini_mode = 1;
+		hba->tgt_mode  = 0;
+		hba->ini_mode  = 1;
 
 		port->tgt_mode = 0;
 		port->ini_mode = 1;
@@ -5386,7 +5643,7 @@ emlxs_set_mode(emlxs_hba_t *hba)
 
 #ifdef SFCT_SUPPORT
 		vport->fct_flags = 0;
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 		vport->ini_mode = port->ini_mode;
 		vport->tgt_mode = port->tgt_mode;
@@ -5408,7 +5665,7 @@ emlxs_set_mode(emlxs_hba_t *hba)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 		    "Target mode not enabled.");
 	}
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 	return;
 
@@ -5419,20 +5676,14 @@ emlxs_set_mode(emlxs_hba_t *hba)
 static void
 emlxs_fca_attach(emlxs_hba_t *hba)
 {
-#if (EMLXS_MODREV >= EMLXS_MODREV5)
-	emlxs_config_t *cfg = &CFG;
-#endif	/* >= EMLXS_MODREV5 */
-
 	/* Update our transport structure */
-	hba->fca_tran->fca_iblock = (ddi_iblock_cookie_t *)&hba->intr_arg;
+	hba->fca_tran->fca_iblock  = (ddi_iblock_cookie_t *)&hba->intr_arg;
 	hba->fca_tran->fca_cmd_max = hba->io_throttle;
 
 #if (EMLXS_MODREV >= EMLXS_MODREV5)
-	hba->fca_tran->fca_num_npivports =
-	    (cfg[CFG_NPIV_ENABLE].current) ? hba->vpi_max : 0;
 	bcopy((caddr_t)&hba->wwpn, (caddr_t)&hba->fca_tran->fca_perm_pwwn,
 	    sizeof (NAME_TYPE));
-#endif	/* >= EMLXS_MODREV5 */
+#endif /* >= EMLXS_MODREV5 */
 
 	return;
 
@@ -5442,20 +5693,22 @@ emlxs_fca_attach(emlxs_hba_t *hba)
 static void
 emlxs_fca_detach(emlxs_hba_t *hba)
 {
-	uint32_t i;
-	emlxs_port_t *vport;
+	uint32_t	i;
+	emlxs_port_t	*vport;
 
 	if (hba->ini_mode) {
-		if ((void *) MODSYM(fc_fca_detach) != NULL) {
-			MODSYM(fc_fca_detach) (hba->dip);
+		if ((void *)MODSYM(fc_fca_detach) != NULL) {
+			MODSYM(fc_fca_detach)(hba->dip);
 		}
+
 		hba->ini_mode = 0;
 
 		for (i = 0; i < MAX_VPORTS; i++) {
 			vport = &VPORT(i);
-			vport->ini_mode = 0;
+			vport->ini_mode  = 0;
 		}
 	}
+
 	return;
 
 } /* emlxs_fca_detach() */
@@ -5465,25 +5718,22 @@ emlxs_fca_detach(emlxs_hba_t *hba)
 static void
 emlxs_drv_banner(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	/* emlxs_port_t *vport; */
-	uint32_t i;
-	char msi_mode[16];
-	char npiv_mode[16];
-	emlxs_vpd_t *vpd = &VPD;
-	emlxs_config_t *cfg = &CFG;
-	uint8_t *wwpn;
-	uint8_t *wwnn;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	i;
+	char		msi_mode[16];
+	char		npiv_mode[16];
+	emlxs_vpd_t	*vpd = &VPD;
+	emlxs_config_t	*cfg = &CFG;
+	uint8_t		*wwpn;
+	uint8_t		*wwnn;
 
 	/* Display firmware library one time */
-	if (hba->emlxinst == 0) {
-		for (i = 0; emlxs_fw_image[i].id; i++) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_library_msg,
-			    "%s", emlxs_fw_image[i].label);
-		}
+	if (emlxs_instance_count == 1) {
+		emlxs_fw_show(hba);
 	}
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg, "%s (%s)",
-	    emlxs_label, emlxs_revision);
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg, "%s (%s)", emlxs_label,
+	    emlxs_revision);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
 	    "%s Dev_id:%x Sub_id:%x Id:%d", hba->model_info.model,
@@ -5493,8 +5743,8 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 #ifdef EMLXS_I386
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-	    "Firmware:%s (%s) Boot:%s", vpd->fw_version,
-	    vpd->fw_label, vpd->boot_version);
+	    "Firmware:%s (%s) Boot:%s", vpd->fw_version, vpd->fw_label,
+	    vpd->boot_version);
 
 #else	/* EMLXS_SPARC */
 
@@ -5537,17 +5787,16 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg, "SLI:%d%s%s%s%s",
 	    hba->sli_mode, msi_mode, npiv_mode,
-	    ((hba->ini_mode) ? " FCA" : ""), ((hba->tgt_mode) ? " FCT" : ""));
+	    ((hba->ini_mode)? " FCA":""), ((hba->tgt_mode)? " FCT":""));
 
 	wwpn = (uint8_t *)&hba->wwpn;
 	wwnn = (uint8_t *)&hba->wwnn;
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
 	    "WWPN:%02X%02X%02X%02X%02X%02X%02X%02X "
 	    "WWNN:%02X%02X%02X%02X%02X%02X%02X%02X",
-	    wwpn[0], wwpn[1], wwpn[2], wwpn[3],
-	    wwpn[4], wwpn[5], wwpn[6], wwpn[7],
-	    wwnn[0], wwnn[1], wwnn[2], wwnn[3],
-	    wwnn[4], wwnn[5], wwnn[6], wwnn[7]);
+	    wwpn[0], wwpn[1], wwpn[2], wwpn[3], wwpn[4], wwpn[5], wwpn[6],
+	    wwpn[7], wwnn[0], wwnn[1], wwnn[2], wwnn[3], wwnn[4], wwnn[5],
+	    wwnn[6], wwnn[7]);
 
 #ifdef SLI3_SUPPORT
 	for (i = 0; i < MAX_VPORTS; i++) {
@@ -5556,32 +5805,35 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 		if (!(port->flag & EMLXS_PORT_CONFIG)) {
 			continue;
 		}
+
 		wwpn = (uint8_t *)&port->wwpn;
 		wwnn = (uint8_t *)&port->wwnn;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
 		    "WWPN:%02X%02X%02X%02X%02X%02X%02X%02X "
 		    "WWNN:%02X%02X%02X%02X%02X%02X%02X%02X",
-		    wwpn[0], wwpn[1], wwpn[2], wwpn[3],
-		    wwpn[4], wwpn[5], wwpn[6], wwpn[7],
-		    wwnn[0], wwnn[1], wwnn[2], wwnn[3],
+		    wwpn[0], wwpn[1], wwpn[2], wwpn[3], wwpn[4], wwpn[5],
+		    wwpn[6], wwpn[7], wwnn[0], wwnn[1], wwnn[2], wwnn[3],
 		    wwnn[4], wwnn[5], wwnn[6], wwnn[7]);
 	}
 	port = &PPORT;
 
 #ifdef NPIV_SUPPORT
-	if (cfg[CFG_NPIV_ENABLE].current && cfg[CFG_VPORT_RESTRICTED].current) {
+	/*
+	 * No dependency for Restricted login parameter.
+	 */
+	if ((cfg[CFG_VPORT_RESTRICTED].current) && (port->ini_mode)) {
 		port->flag |= EMLXS_PORT_RESTRICTED;
 	} else {
 		port->flag &= ~EMLXS_PORT_RESTRICTED;
 	}
-#endif	/* NPIV_SUPPORT */
+#endif /* NPIV_SUPPORT */
 
-#endif	/* SLI3_SUPPORT */
+#endif /* SLI3_SUPPORT */
 
 	/*
-	 * Announce the device: ddi_report_dev() prints a banner at boot
-	 * time, announcing the device pointed to by dip.
+	 * Announce the device: ddi_report_dev() prints a banner at boot time,
+	 * announcing the device pointed to by dip.
 	 */
 	(void) ddi_report_dev(hba->dip);
 
@@ -5593,20 +5845,19 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 extern void
 emlxs_get_fcode_version(emlxs_hba_t *hba)
 {
-	/* emlxs_port_t *port = &PPORT; */
-	emlxs_vpd_t *vpd = &VPD;
-	/* emlxs_config_t *cfg = &CFG; */
-	char *prop_str;
-	int status;
+	emlxs_vpd_t	*vpd = &VPD;
+	char		*prop_str;
+	int		status;
 
 	/* Setup fcode version property */
 	prop_str = NULL;
-	status = ddi_prop_lookup_string(DDI_DEV_T_ANY, (dev_info_t *)hba->dip,
-	    0, "fcode-version", (char **)&prop_str);
+	status =
+	    ddi_prop_lookup_string(DDI_DEV_T_ANY, (dev_info_t *)hba->dip, 0,
+	    "fcode-version", (char **)&prop_str);
 
 	if (status == DDI_PROP_SUCCESS) {
 		bcopy(prop_str, vpd->fcode_version, strlen(prop_str));
-		(void) ddi_prop_free((void *) prop_str);
+		(void) ddi_prop_free((void *)prop_str);
 	} else {
 		(void) strcpy(vpd->fcode_version, "none");
 	}
@@ -5619,66 +5870,73 @@ emlxs_get_fcode_version(emlxs_hba_t *hba)
 static int
 emlxs_hba_attach(dev_info_t *dip)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	/* emlxs_port_t *vport; */
-	emlxs_config_t *cfg;
-	char *prop_str;
-	/* emlxs_vpd_t *vpd; */
-	int ddiinst;
-	int32_t emlxinst;
-	int status;
-	/* uint_t rnumber; */
-	uint32_t rval;
-	/* uint32_t i; */
-	/* uint32_t device_id_valid; */
-	uint32_t init_flag = 0;
-	char local_pm_components[32];
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	emlxs_config_t	*cfg;
+	char		*prop_str;
+	int		ddiinst;
+	int32_t		emlxinst;
+	int		status;
+	uint32_t	rval;
+	uint32_t	init_flag = 0;
+	char		local_pm_components[32];
 #ifdef EMLXS_I386
-	uint32_t i;
+	uint32_t	i;
 #endif	/* EMLXS_I386 */
 
 	ddiinst = ddi_get_instance(dip);
 	emlxinst = emlxs_add_instance(ddiinst);
 
 	if (emlxinst >= MAX_FC_BRDS) {
-		cmn_err(CE_WARN, "?%s: fca_hba_attach failed. "
-		    "Too many driver ddiinsts. inst=%x", DRIVER_NAME, ddiinst);
+		cmn_err(CE_WARN,
+		    "?%s: fca_hba_attach failed. Too many driver ddiinsts. "
+		    "inst=%x", DRIVER_NAME, ddiinst);
 		return (DDI_FAILURE);
 	}
+
 	if (emlxs_device.hba[emlxinst] == (emlxs_hba_t *)-1) {
 		return (DDI_FAILURE);
 	}
+
 	if (emlxs_device.hba[emlxinst]) {
 		return (DDI_SUCCESS);
 	}
-	/*
-	 * An adapter can accidentally be plugged into a slave-only PCI
-	 * slot... not good.
-	 */
+
+	/* An adapter can accidentally be plugged into a slave-only PCI slot */
 	if (ddi_slaveonly(dip) == DDI_SUCCESS) {
-		cmn_err(CE_WARN, "?%s%d: fca_hba_attach failed. "
-		    "Device in slave-only slot.", DRIVER_NAME, ddiinst);
+		cmn_err(CE_WARN,
+		    "?%s%d: fca_hba_attach failed. Device in slave-only slot.",
+		    DRIVER_NAME, ddiinst);
 		return (DDI_FAILURE);
 	}
+
 	/* Allocate emlxs_dev_ctl structure. */
 	if (ddi_soft_state_zalloc(emlxs_soft_state, ddiinst) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "?%s%d: fca_hba_attach failed. "
-		    "Unable to allocate soft state.", DRIVER_NAME, ddiinst);
+		cmn_err(CE_WARN,
+		    "?%s%d: fca_hba_attach failed. Unable to allocate soft "
+		    "state.", DRIVER_NAME, ddiinst);
 		return (DDI_FAILURE);
 	}
 	init_flag |= ATTACH_SOFT_STATE;
 
-	if ((hba = (emlxs_hba_t *)
-	    ddi_get_soft_state(emlxs_soft_state, ddiinst)) == NULL) {
-		cmn_err(CE_WARN, "?%s%d: fca_hba_attach failed. "
-		    "Unable to get soft state.", DRIVER_NAME, ddiinst);
+	if ((hba = (emlxs_hba_t *)ddi_get_soft_state(emlxs_soft_state,
+	    ddiinst)) == NULL) {
+		cmn_err(CE_WARN,
+		    "?%s%d: fca_hba_attach failed. Unable to get soft state.",
+		    DRIVER_NAME, ddiinst);
 		goto failed;
 	}
 	bzero((char *)hba, sizeof (emlxs_hba_t));
 
 	emlxs_device.hba[emlxinst] = hba;
 	emlxs_device.log[emlxinst] = &hba->log;
+
+#ifdef DUMP_SUPPORT
+	emlxs_device.dump_txtfile[emlxinst] = &hba->dump_txtfile;
+	emlxs_device.dump_dmpfile[emlxinst] = &hba->dump_dmpfile;
+	emlxs_device.dump_ceefile[emlxinst] = &hba->dump_ceefile;
+#endif /* DUMP_SUPPORT */
+
 	hba->dip = dip;
 	hba->emlxinst = emlxinst;
 	hba->ddiinst = ddiinst;
@@ -5695,12 +5953,12 @@ emlxs_hba_attach(dev_info_t *dip)
 	port->flag |= EMLXS_PORT_ENABLE;
 
 	/* Allocate a transport structure */
-	hba->fca_tran = (fc_fca_tran_t *)
-	    kmem_zalloc(sizeof (fc_fca_tran_t), KM_NOSLEEP);
+	hba->fca_tran =
+	    (fc_fca_tran_t *)kmem_zalloc(sizeof (fc_fca_tran_t), KM_NOSLEEP);
 	if (hba->fca_tran == NULL) {
-		cmn_err(CE_WARN, "?%s%d: fca_hba_attach failed. "
-		    "Unable to allocate fca_tran memory.",
-		    DRIVER_NAME, ddiinst);
+		cmn_err(CE_WARN,
+		    "?%s%d: fca_hba_attach failed. Unable to allocate fca_tran "
+		    "memory.", DRIVER_NAME, ddiinst);
 		goto failed;
 	}
 	bcopy((caddr_t)&emlxs_fca_tran, (caddr_t)hba->fca_tran,
@@ -5715,26 +5973,27 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* Perform driver integrity check */
 	rval = emlxs_integrity_check(hba);
 	if (rval) {
-		cmn_err(CE_WARN, "?%s%d: fca_hba_attach failed. "
-		    "Driver integrity check failed. %d error(s) found.",
-		    DRIVER_NAME, ddiinst, rval);
+		cmn_err(CE_WARN,
+		    "?%s%d: fca_hba_attach failed. Driver integrity check "
+		    "failed. %d error(s) found.", DRIVER_NAME, ddiinst, rval);
 		goto failed;
 	}
-	/* vpd = &VPD; */
+
 	cfg = &CFG;
 
 	bcopy((uint8_t *)&emlxs_cfg, (uint8_t *)cfg, sizeof (emlxs_cfg));
-
 #ifdef MSI_SUPPORT
-	if ((void *) &ddi_intr_get_supported_types != NULL) {
+	if ((void *)&ddi_intr_get_supported_types != NULL) {
 		hba->intr_flags |= EMLXS_MSI_ENABLED;
 	}
 #endif	/* MSI_SUPPORT */
 
+
 	/* Create the msg log file */
 	if (emlxs_msg_log_create(hba) == 0) {
-		cmn_err(CE_WARN, "?%s%d: fca_hba_attach failed. "
-		    "Unable to create message log", DRIVER_NAME, ddiinst);
+		cmn_err(CE_WARN,
+		    "?%s%d: fca_hba_attach failed. Unable to create message "
+		    "log", DRIVER_NAME, ddiinst);
 		goto failed;
 
 	}
@@ -5743,37 +6002,25 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* We can begin to use EMLXS_MSGF from this point on */
 
 	/*
-	 * Find the I/O bus type If it is not a SBUS card, then it is a PCI
-	 * card. Default is PCI_FC (0).
+	 * Find the I/O bus type If it is not a SBUS card,
+	 * then it is a PCI card. Default is PCI_FC (0).
 	 */
 	prop_str = NULL;
-	status = ddi_prop_lookup_string(DDI_DEV_T_ANY, (dev_info_t *)dip,
-	    0, "name", (char **)&prop_str);
+	status = ddi_prop_lookup_string(DDI_DEV_T_ANY,
+	    (dev_info_t *)dip, 0, "name", (char **)&prop_str);
 
 	if (status == DDI_PROP_SUCCESS) {
 		if (strncmp(prop_str, "lpfs", 4) == 0) {
 			hba->bus_type = SBUS_FC;
 		}
-		(void) ddi_prop_free((void *) prop_str);
+
+		(void) ddi_prop_free((void *)prop_str);
 	}
-	if (emlxs_mapmem(hba)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
-		    "Unable to map memory");
-		goto failed;
-
-	}
-	init_flag |= ATTACH_MAP;
-
-	/*
-	 * Copy DDS from the config method and update configuration
-	 * parameters
-	 */
-	(void) emlxs_get_props(hba);
-
 #ifdef EMLXS_I386
 	/* Update BPL size based on max_xfer_size */
 	i = cfg[CFG_MAX_XFER_SIZE].current;
-	if (i > 688128) {	/* 688128 = (((2048 / 12) - 2) * 4096) */
+	if (i > 688128) {
+		/* 688128 = (((2048 / 12) - 2) * 4096) */
 		hba->mem_bpl_size = 4096;
 	} else if (i > 339968) {
 		/* 339968 = (((1024 / 12) - 2) * 4096) */
@@ -5787,27 +6034,58 @@ emlxs_hba_attach(dev_info_t *dip)
 	emlxs_dma_attr.dma_attr_sgllen = i;
 	emlxs_dma_attr_ro.dma_attr_sgllen = i;
 	emlxs_dma_attr_fcip_rsp.dma_attr_sgllen = i;
-#endif	/* EMLXS_I386 */
+#endif /* EMLXS_I386 */
+
+	/*
+	 * Copy DDS from the config method and update configuration parameters
+	 */
+	(void) emlxs_get_props(hba);
+
+#ifdef FMA_SUPPORT
+	hba->fm_caps = cfg[CFG_FM_CAPS].current;
+
+	emlxs_fm_init(hba);
+
+	init_flag |= ATTACH_FM;
+#endif	/* FMA_SUPPORT */
+
+	if (emlxs_map_bus(hba)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
+		    "Unable to map memory");
+		goto failed;
+
+	}
+	init_flag |= ATTACH_MAP_BUS;
 
 	/* Attempt to identify the adapter */
 	rval = emlxs_init_adapter_info(hba);
 
 	if (rval == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
-		    "Unable to get adapter info.  Id:%d  Device id:0x%x "
-		    " Model:%s", hba->model_info.id,
+		    "Unable to get adapter info. Id:%d  Device id:0x%x "
+		    "Model:%s", hba->model_info.id,
 		    hba->model_info.device_id, hba->model_info.model);
 		goto failed;
 	}
+
 	/* Check if adapter is not supported */
 	if (hba->model_info.flags & EMLXS_NOT_SUPPORTED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
-		    "Unsupported adapter found.  Id:%d  Device id:0x%x  "
+		    "Unsupported adapter found. Id:%d  Device id:0x%x "
 		    "SSDID:0x%x  Model:%s", hba->model_info.id,
-		    hba->model_info.device_id, hba->model_info.ssdid,
-		    hba->model_info.model);
+		    hba->model_info.device_id,
+		    hba->model_info.ssdid, hba->model_info.model);
 		goto failed;
 	}
+
+	if (emlxs_sli_map_hdw(hba)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
+		    "Unable to map memory");
+		goto failed;
+
+	}
+	init_flag |= ATTACH_MAP_SLI;
+
 	/* Initialize the interrupts. But don't add them yet */
 	status = EMLXS_INTR_INIT(hba, 0);
 	if (status != DDI_SUCCESS) {
@@ -5843,15 +6121,17 @@ emlxs_hba_attach(dev_info_t *dip)
 		if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
 		    "pm-components", emlxs_pm_components,
 		    sizeof (emlxs_pm_components) /
-		    sizeof (emlxs_pm_components[0])) != DDI_PROP_SUCCESS) {
+		    sizeof (emlxs_pm_components[0])) !=
+		    DDI_PROP_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
 			    "Unable to create pm components.");
 			goto failed;
 		}
 	}
+
 	/* Needed for suspend and resume support */
-	(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
-	    "pm-hardware-state", "needs-suspend-resume");
+	(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, "pm-hardware-state",
+	    "needs-suspend-resume");
 	init_flag |= ATTACH_PROP;
 
 	emlxs_thread_create(hba, &hba->iodone_thread);
@@ -5860,17 +6140,16 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* Setup initiator / target ports */
 	emlxs_set_mode(hba);
 
-	/*
-	 * If driver did not attach to either stack, then driver attach
-	 * failed
-	 */
+	/* If driver did not attach to either stack, */
+	/* then driver attach failed */
 	if (!hba->tgt_mode && !hba->ini_mode) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
 		    "Driver interfaces not enabled.");
 		goto failed;
 	}
+
 	/*
-	 *	Initialize HBA
+	 * Initialize HBA
 	 */
 
 	/* Set initial state */
@@ -5906,15 +6185,16 @@ emlxs_hba_attach(dev_info_t *dip)
 	init_flag |= ATTACH_FCA;
 
 	/* Initialize kstat information */
-	hba->kstat = kstat_create(DRIVER_NAME, ddiinst, "statistics",
-	    "controller", KSTAT_TYPE_RAW, sizeof (emlxs_stats_t),
+	hba->kstat = kstat_create(DRIVER_NAME,
+	    ddiinst, "statistics", "controller",
+	    KSTAT_TYPE_RAW, sizeof (emlxs_stats_t),
 	    KSTAT_FLAG_VIRTUAL);
 
 	if (hba->kstat == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
 		    "kstat_create failed.");
 	} else {
-		hba->kstat->ks_data = (void *) &hba->stats;
+		hba->kstat->ks_data = (void *)&hba->stats;
 		kstat_install(hba->kstat);
 		init_flag |= ATTACH_KSTAT;
 	}
@@ -5936,8 +6216,8 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* Raise the power level */
 
 	/*
-	 * This will not execute emlxs_hba_resume because EMLXS_PM_IN_ATTACH
-	 * is set
+	 * This will not execute emlxs_hba_resume because
+	 * EMLXS_PM_IN_ATTACH is set
 	 */
 	if (emlxs_pm_raise_power(dip) != DDI_SUCCESS) {
 		/* Set power up anyway. This should not happen! */
@@ -5955,7 +6235,7 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* Do this last */
 	emlxs_fct_attach(hba);
 	init_flag |= ATTACH_FCT;
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 	return (DDI_SUCCESS);
 
@@ -5971,10 +6251,10 @@ failed:
 static int
 emlxs_hba_detach(dev_info_t *dip)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	int ddiinst;
-	uint32_t init_flag = (uint32_t)-1;
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	int		ddiinst;
+	uint32_t	init_flag = (uint32_t)-1;
 
 	ddiinst = ddi_get_instance(dip);
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
@@ -5988,8 +6268,8 @@ emlxs_hba_detach(dev_info_t *dip)
 
 	/* Lower the power level */
 	/*
-	 * This will not suspend the driver since the EMLXS_PM_IN_DETACH has
-	 * been set
+	 * This will not suspend the driver since the
+	 * EMLXS_PM_IN_DETACH has been set
 	 */
 	if (emlxs_pm_lower_power(dip) != DDI_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
@@ -6001,6 +6281,7 @@ emlxs_hba_detach(dev_info_t *dip)
 
 		return (DDI_FAILURE);
 	}
+
 	/* Take the adapter offline first, if not already */
 	if (emlxs_offline(hba) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
@@ -6025,13 +6306,12 @@ emlxs_hba_detach(dev_info_t *dip)
 
 
 extern int
-emlxs_mapmem(emlxs_hba_t *hba)
+emlxs_map_bus(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	dev_info_t *dip;
-	ddi_device_acc_attr_t dev_attr;
-	int status;
-	/* int32_t rc; */
+	emlxs_port_t		*port = &PPORT;
+	dev_info_t		*dip;
+	ddi_device_acc_attr_t	dev_attr;
+	int			status;
 
 	dip = (dev_info_t *)hba->dip;
 	dev_attr = emlxs_dev_acc_attr;
@@ -6045,95 +6325,38 @@ emlxs_mapmem(emlxs_hba_t *hba)
 			if (status != DDI_SUCCESS) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup "
-				    "PCI failed. status=%x", status);
+				    "(SBUS) ddi_regs_map_setup PCI failed. "
+				    "status=%x", status);
 				goto failed;
 			}
 		}
-		if (hba->slim_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, SBUS_DFLY_SLIM_RINDEX,
-			    (caddr_t *)&hba->slim_addr, 0, 0,
-			    &dev_attr, &hba->slim_acc_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup SLIM failed."
-				    " status=%x", status);
-				goto failed;
-			}
-		}
-		if (hba->csr_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, SBUS_DFLY_CSR_RINDEX,
-			    (caddr_t *)&hba->csr_addr, 0, 0,
-			    &dev_attr, &hba->csr_acc_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup "
-				    "DFLY CSR failed. status=%x", status);
-				goto failed;
-			}
-		}
-		if (hba->sbus_flash_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, SBUS_FLASH_RDWR,
-			    (caddr_t *)&hba->sbus_flash_addr, 0, 0,
-			    &dev_attr, &hba->sbus_flash_acc_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup "
-				    "Fcode Flash failed. status=%x", status);
-				goto failed;
-			}
-		}
-		if (hba->sbus_core_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, SBUS_TITAN_CORE_RINDEX,
-			    (caddr_t *)&hba->sbus_core_addr, 0, 0,
-			    &dev_attr, &hba->sbus_core_acc_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup "
-				    "TITAN CORE failed. status=%x", status);
-				goto failed;
-			}
-		}
+
 		if (hba->sbus_pci_handle == 0) {
 			status = ddi_regs_map_setup(dip,
 			    SBUS_TITAN_PCI_CFG_RINDEX,
-			    (caddr_t *)&hba->sbus_pci_addr, 0, 0,
-			    &dev_attr, &hba->sbus_pci_handle);
+			    (caddr_t *)&hba->sbus_pci_addr,
+			    0, 0, &dev_attr, &hba->sbus_pci_handle);
 			if (status != DDI_SUCCESS) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup "
-				    "TITAN PCI failed. status=%x", status);
+				    "(SBUS) ddi_regs_map_setup TITAN PCI "
+				    "failed. status=%x", status);
 				goto failed;
 			}
 		}
-		if (hba->sbus_csr_handle == 0) {
-			status = ddi_regs_map_setup(dip, SBUS_TITAN_CSR_RINDEX,
-			    (caddr_t *)&hba->sbus_csr_addr, 0, 0,
-			    &dev_attr, &hba->sbus_csr_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "(SBUS) ddi_regs_map_setup "
-				    "TITAN CSR failed. status=%x", status);
-				goto failed;
-			}
-		}
+
 	} else {	/* ****** PCI ****** */
 
 		if (hba->pci_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, PCI_CFG_RINDEX,
-			    (caddr_t *)&hba->pci_addr, 0, 0,
-			    &emlxs_dev_acc_attr, &hba->pci_acc_handle);
+			status = ddi_regs_map_setup(dip,
+			    PCI_CFG_RINDEX,
+			    (caddr_t *)&hba->pci_addr,
+			    0, 0, &emlxs_dev_acc_attr, &hba->pci_acc_handle);
 			if (status != DDI_SUCCESS) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_failed_msg,
-				    "(PCI) ddi_regs_map_setup "
-				    "PCI failed. status=%x", status);
+				    "(PCI) ddi_regs_map_setup PCI failed. "
+				    "status=%x", status);
 				goto failed;
 			}
 		}
@@ -6144,174 +6367,65 @@ emlxs_mapmem(emlxs_hba_t *hba)
 		    CMD_CFG_VALUE | CMD_IO_ENBL);
 #endif	/* EMLXS_I386 */
 
-		if (hba->slim_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, PCI_SLIM_RINDEX,
-			    (caddr_t *)&hba->slim_addr, 0, 0,
-			    &dev_attr, &hba->slim_acc_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "(PCI) ddi_regs_map_setup SLIM failed. "
-				    "stat=%d mem=%p attr=%p hdl=%p",
-				    status, &hba->slim_addr, &dev_attr,
-				    &hba->slim_acc_handle);
-				goto failed;
-			}
-		}
-		/*
-		 * Map in control registers, using memory-mapped version of
-		 * the registers rather than the I/O space-mapped registers.
-		 */
-		if (hba->csr_acc_handle == 0) {
-			status = ddi_regs_map_setup(dip, PCI_CSR_RINDEX,
-			    (caddr_t *)&hba->csr_addr, 0, 0,
-			    &dev_attr, &hba->csr_acc_handle);
-			if (status != DDI_SUCCESS) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_attach_failed_msg,
-				    "ddi_regs_map_setup CSR failed. "
-				    "status=%x", status);
-				goto failed;
-			}
-		}
-	}
-
-	if (hba->slim2.virt == 0) {
-		MBUF_INFO *buf_info;
-		MBUF_INFO bufinfo;
-
-		buf_info = &bufinfo;
-
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = SLI_SLIM2_SIZE;
-		buf_info->flags = FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
-		buf_info->align = ddi_ptob(dip, 1L);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-
-		if (buf_info->virt == NULL) {
-			goto failed;
-		}
-		hba->slim2.virt = (uint8_t *)buf_info->virt;
-		hba->slim2.phys = buf_info->phys;
-		hba->slim2.size = SLI_SLIM2_SIZE;
-		hba->slim2.data_handle = buf_info->data_handle;
-		hba->slim2.dma_handle = buf_info->dma_handle;
-		bzero((char *)hba->slim2.virt, SLI_SLIM2_SIZE);
-	}
-	/* offset from beginning of register space */
-	hba->ha_reg_addr = (sizeof (uint32_t) * HA_REG_OFFSET);
-	hba->ca_reg_addr = (sizeof (uint32_t) * CA_REG_OFFSET);
-	hba->hs_reg_addr = (sizeof (uint32_t) * HS_REG_OFFSET);
-	hba->hc_reg_addr = (sizeof (uint32_t) * HC_REG_OFFSET);
-	hba->bc_reg_addr = (sizeof (uint32_t) * BC_REG_OFFSET);
-
-	if (hba->bus_type == SBUS_FC) {
-		/*
-		 * offset from beginning of register space for TITAN
-		 * registers
-		 */
-		hba->shc_reg_addr = (sizeof (uint32_t) * SBUS_CTRL_REG_OFFSET);
-		hba->shs_reg_addr = (sizeof (uint32_t) * SBUS_STAT_REG_OFFSET);
-		hba->shu_reg_addr = (sizeof (uint32_t) *
-		    SBUS_UPDATE_REG_OFFSET);
 	}
 	return (0);
 
 failed:
 
-	emlxs_unmapmem(hba);
+	emlxs_unmap_bus(hba);
 	return (ENOMEM);
 
-} /* emlxs_mapmem() */
+} /* emlxs_map_bus() */
 
 
 extern void
-emlxs_unmapmem(emlxs_hba_t *hba)
+emlxs_unmap_bus(emlxs_hba_t *hba)
 {
-	/* emlxs_port_t *port = &PPORT; */
-	MBUF_INFO bufinfo;
-	MBUF_INFO *buf_info = &bufinfo;
-
 	if (hba->pci_acc_handle) {
 		(void) ddi_regs_map_free(&hba->pci_acc_handle);
 		hba->pci_acc_handle = 0;
 	}
-	if (hba->csr_acc_handle) {
-		(void) ddi_regs_map_free(&hba->csr_acc_handle);
-		hba->csr_acc_handle = 0;
-	}
-	if (hba->slim_acc_handle) {
-		(void) ddi_regs_map_free(&hba->slim_acc_handle);
-		hba->slim_acc_handle = 0;
-	}
-	if (hba->sbus_flash_acc_handle) {
-		(void) ddi_regs_map_free(&hba->sbus_flash_acc_handle);
-		hba->sbus_flash_acc_handle = 0;
-	}
-	if (hba->sbus_core_acc_handle) {
-		(void) ddi_regs_map_free(&hba->sbus_core_acc_handle);
-		hba->sbus_core_acc_handle = 0;
-	}
+
 	if (hba->sbus_pci_handle) {
 		(void) ddi_regs_map_free(&hba->sbus_pci_handle);
 		hba->sbus_pci_handle = 0;
 	}
-	if (hba->sbus_csr_handle) {
-		(void) ddi_regs_map_free(&hba->sbus_csr_handle);
-		hba->sbus_csr_handle = 0;
-	}
-	if (hba->slim2.virt) {
-		bzero(buf_info, sizeof (MBUF_INFO));
 
-		if (hba->slim2.phys) {
-			buf_info->phys = hba->slim2.phys;
-			buf_info->data_handle = hba->slim2.data_handle;
-			buf_info->dma_handle = hba->slim2.dma_handle;
-			buf_info->flags = FC_MBUF_DMA;
-		}
-		buf_info->virt = (uint32_t *)hba->slim2.virt;
-		buf_info->size = hba->slim2.size;
-		emlxs_mem_free(hba, buf_info);
-
-		hba->slim2.virt = 0;
-	}
 	return;
 
-} /* emlxs_unmapmem() */
+} /* emlxs_unmap_bus() */
 
 
 static int
 emlxs_get_props(emlxs_hba_t *hba)
 {
-	/* emlxs_port_t *port = &PPORT; */
-	emlxs_config_t *cfg;
-	uint32_t i;
-	char string[256];
-	uint32_t new_value;
+	emlxs_config_t	*cfg;
+	uint32_t	i;
+	char		string[256];
+	uint32_t	new_value;
 
 	/* Initialize each parameter */
 	for (i = 0; i < NUM_CFG_PARAM; i++) {
 		cfg = &hba->config[i];
 
 		/* Ensure strings are terminated */
-		cfg->string[(EMLXS_CFG_STR_SIZE - 1)] = 0;
-		cfg->help[(EMLXS_CFG_HELP_SIZE - 1)] = 0;
+		cfg->string[(EMLXS_CFG_STR_SIZE-1)] = 0;
+		cfg->help[(EMLXS_CFG_HELP_SIZE-1)]  = 0;
 
 		/* Set the current value to the default value */
 		new_value = cfg->def;
 
 		/* First check for the global setting */
 		new_value = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		    (void *)hba->dip, DDI_PROP_DONTPASS, cfg->string,
-		    new_value);
+		    (void *)hba->dip, DDI_PROP_DONTPASS,
+		    cfg->string, new_value);
 
 		/* Now check for the per adapter ddiinst setting */
-		(void) sprintf(string, "%s%d-%s", DRIVER_NAME,
-		    hba->ddiinst, cfg->string);
+		(void) sprintf(string, "%s%d-%s", DRIVER_NAME, hba->ddiinst,
+		    cfg->string);
 
 		new_value = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		    (void *) hba->dip, DDI_PROP_DONTPASS, string, new_value);
+		    (void *)hba->dip, DDI_PROP_DONTPASS, string, new_value);
 
 		/* Now check the parameter */
 		cfg->current = emlxs_check_parm(hba, i, new_value);
@@ -6325,10 +6439,10 @@ emlxs_get_props(emlxs_hba_t *hba)
 extern uint32_t
 emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t i;
-	emlxs_config_t *cfg;
-	emlxs_vpd_t *vpd = &VPD;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	i;
+	emlxs_config_t	*cfg;
+	emlxs_vpd_t	*vpd = &VPD;
 
 	if (index > NUM_CFG_PARAM) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -6336,6 +6450,7 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 		return (new_value);
 	}
+
 	cfg = &hba->config[index];
 
 	if (new_value > cfg->hi) {
@@ -6343,6 +6458,7 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 	} else if (new_value < cfg->low) {
 		new_value = cfg->def;
 	}
+
 	/* Perform additional checks */
 	switch (index) {
 #ifdef NPIV_SUPPORT
@@ -6355,7 +6471,7 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 			new_value = 0;
 		}
 		break;
-#endif	/* NPIV_SUPPORT */
+#endif /* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 	case CFG_AUTH_ENABLE:
@@ -6367,7 +6483,7 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 			new_value = 0;
 		}
 		break;
-#endif	/* DHCHAP_SUPPORT */
+#endif /* DHCHAP_SUPPORT */
 
 	case CFG_NUM_NODES:
 		switch (new_value) {
@@ -6393,9 +6509,9 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_msg,
-					    "link-speed: 1Gb not supported by "
-					    "adapter. "
-					    "Switching to auto detect.");
+					    "link-speed: 1Gb not supported "
+					    "by adapter. Switching to auto "
+					    "detect.");
 				}
 				break;
 
@@ -6406,8 +6522,8 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_msg,
 					    "link-speed: 2Gb not supported "
-					    "by adapter. "
-					    "Switching to auto detect.");
+					    "by adapter. Switching to auto "
+					    "detect.");
 				}
 				break;
 			case 4:
@@ -6417,8 +6533,8 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_msg,
 					    "link-speed: 4Gb not supported "
-					    "by adapter. "
-					    "Switching to auto detect.");
+					    "by adapter. Switching to auto "
+					    "detect.");
 				}
 				break;
 
@@ -6429,8 +6545,8 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_msg,
 					    "link-speed: 8Gb not supported "
-					    "by adapter. "
-					    "Switching to auto detect.");
+					    "by adapter. Switching to auto "
+					    "detect.");
 				}
 				break;
 
@@ -6441,20 +6557,21 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_msg,
 					    "link-speed: 10Gb not supported "
-					    "by adapter. "
-					    "Switching to auto detect.");
+					    "by adapter. Switching to auto "
+					    "detect.");
 				}
 				break;
 
 			default:
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_msg,
-				    "link-speed: Invalid value=%d "
-				    "provided. Switching to "
-				    "auto detect.", new_value);
+				    "link-speed: Invalid value=%d provided. "
+				    "Switching to auto detect.",
+				    new_value);
 
 				new_value = 0;
 			}
 		} else {	/* Perform basic validity check */
+
 			/* Perform additional check on link speed */
 			switch (new_value) {
 			case 0:
@@ -6489,61 +6606,62 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 #ifdef DHCHAP_SUPPORT
 	case CFG_AUTH_TYPE:
-		{
-			uint32_t shift;
-			uint32_t mask;
+	{
+		uint32_t shift;
+		uint32_t mask;
 
-			/* Perform additional check on auth type */
-			shift = 12;
-			mask = 0xF000;
-			for (i = 0; i < 4; i++) {
-				if (((new_value & mask) >> shift) >
-				    DFC_AUTH_TYPE_MAX) {
-					return (cfg->def);
-				}
-				shift -= 4;
-				mask >>= 4;
+		/* Perform additional check on auth type */
+		shift = 12;
+		mask  = 0xF000;
+		for (i = 0; i < 4; i++) {
+			if (((new_value & mask) >> shift) > DFC_AUTH_TYPE_MAX) {
+				return (cfg->def);
 			}
-			break;
+
+			shift -= 4;
+			mask >>= 4;
 		}
+		break;
+	}
 
 	case CFG_AUTH_HASH:
-		{
-			uint32_t shift;
-			uint32_t mask;
+	{
+		uint32_t shift;
+		uint32_t mask;
 
-			/* Perform additional check on auth hash */
-			shift = 12;
-			mask = 0xF000;
-			for (i = 0; i < 4; i++) {
-				if (((new_value & mask) >> shift) >
-				    DFC_AUTH_HASH_MAX) {
-					return (cfg->def);
-				}
-				shift -= 4;
-				mask >>= 4;
+		/* Perform additional check on auth hash */
+		shift = 12;
+		mask  = 0xF000;
+		for (i = 0; i < 4; i++) {
+			if (((new_value & mask) >> shift) > DFC_AUTH_HASH_MAX) {
+				return (cfg->def);
 			}
-			break;
+
+			shift -= 4;
+			mask >>= 4;
 		}
+		break;
+	}
 
 	case CFG_AUTH_GROUP:
-		{
-			uint32_t shift;
-			uint32_t mask;
+	{
+		uint32_t shift;
+		uint32_t mask;
 
-			/* Perform additional check on auth group */
-			shift = 28;
-			mask = 0xF0000000;
-			for (i = 0; i < 8; i++) {
-				if (((new_value & mask) >> shift) >
-				    DFC_AUTH_GROUP_MAX) {
-					return (cfg->def);
-				}
-				shift -= 4;
-				mask >>= 4;
+		/* Perform additional check on auth group */
+		shift = 28;
+		mask  = 0xF0000000;
+		for (i = 0; i < 8; i++) {
+			if (((new_value & mask) >> shift) >
+			    DFC_AUTH_GROUP_MAX) {
+				return (cfg->def);
 			}
-			break;
+
+			shift -= 4;
+			mask >>= 4;
 		}
+		break;
+	}
 
 	case CFG_AUTH_INTERVAL:
 		if (new_value < 10) {
@@ -6552,9 +6670,9 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 		break;
 
 
-#endif	/* DHCHAP_SUPPORT */
+#endif /* DHCHAP_SUPPORT */
 
-	}	/* switch */
+	} /* switch */
 
 	return (new_value);
 
@@ -6564,12 +6682,11 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 extern uint32_t
 emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_port_t *vport;
-	uint32_t vpi;
-	/* uint32_t i; */
-	emlxs_config_t *cfg;
-	uint32_t old_value;
+	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*vport;
+	uint32_t	vpi;
+	emlxs_config_t	*cfg;
+	uint32_t	old_value;
 
 	if (index > NUM_CFG_PARAM) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -6577,6 +6694,7 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 		return ((uint32_t)FC_FAILURE);
 	}
+
 	cfg = &hba->config[index];
 
 	if (!(cfg->flags & PARM_DYNAMIC)) {
@@ -6585,6 +6703,7 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 		return ((uint32_t)FC_FAILURE);
 	}
+
 	/* Check new value */
 	old_value = new_value;
 	new_value = emlxs_check_parm(hba, index, new_value);
@@ -6594,10 +6713,12 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 		    "emlxs_set_parm: %s invalid. 0x%x --> 0x%x",
 		    cfg->string, old_value, new_value);
 	}
+
 	/* Return now if no actual change */
 	if (new_value == cfg->current) {
 		return (FC_SUCCESS);
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "emlxs_set_parm: %s changing. 0x%x --> 0x%x",
 	    cfg->string, cfg->current, new_value);
@@ -6626,10 +6747,10 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_sfs_debug_msg,
-					    "emlxs_set_parm failed. %s: "
-					    "vpi=%d still enabled. "
-					    "Value restored to 0x%x.",
-					    cfg->string, vpi, old_value);
+					    "emlxs_set_parm failed. %s: vpi=%d "
+					    "still enabled. Value restored to "
+					    "0x%x.", cfg->string, vpi,
+					    old_value);
 
 					return (2);
 				}
@@ -6651,31 +6772,34 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_sfs_debug_msg,
-					    "emlxs_set_parm failed. "
-					    "%s: vpi=%d still enabled. "
-					    "Value restored to 0x%x.",
-					    cfg->string, vpi, old_value);
+					    "emlxs_set_parm failed. %s: vpi=%d "
+					    "still enabled. Value restored to "
+					    "0x%x.", cfg->string, vpi,
+					    old_value);
 
 					return (2);
 				}
 			}
 		}
+
 		/* Trigger adapter reset */
-		/* emlxs_reset(port, FC_FCA_RESET); */
+		/* (void) emlxs_reset(port, FC_FCA_RESET); */
 
 		break;
 
 
 	case CFG_VPORT_RESTRICTED:
-		for (vpi = 1; vpi < MAX_VPORTS; vpi++) {
+		for (vpi = 0; vpi < MAX_VPORTS; vpi++) {
 			vport = &VPORT(vpi);
 
 			if (!(vport->flag & EMLXS_PORT_CONFIG)) {
 				continue;
 			}
+
 			if (vport->options & EMLXS_OPT_RESTRICT_MASK) {
 				continue;
 			}
+
 			if (new_value) {
 				vport->flag |= EMLXS_PORT_RESTRICTED;
 			} else {
@@ -6716,9 +6840,10 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 		break;
 
 	case CFG_AUTH_HASH:
-		hba->auth_cfg.hash_priority[0] = (cfg->current & 0xF000) >> 12;
-		hba->auth_cfg.hash_priority[1] = (cfg->current & 0x0F00) >> 8;
-		hba->auth_cfg.hash_priority[2] = (cfg->current & 0x00F0) >> 4;
+		hba->auth_cfg.hash_priority[0] =
+		    (cfg->current & 0xF000) >> 12;
+		hba->auth_cfg.hash_priority[1] = (cfg->current & 0x0F00)>>8;
+		hba->auth_cfg.hash_priority[2] = (cfg->current & 0x00F0)>>4;
 		hba->auth_cfg.hash_priority[3] = (cfg->current & 0x000F);
 		break;
 
@@ -6744,7 +6869,7 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 	case CFG_AUTH_INTERVAL:
 		hba->auth_cfg.reauthenticate_time_interval = cfg->current;
 		break;
-#endif	/* DHCAHP_SUPPORT */
+#endif /* DHCAHP_SUPPORT */
 
 	}
 
@@ -6758,30 +6883,30 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
  *
  * The buf_info->flags field describes the memory operation requested.
  *
- * FC_MBUF_PHYSONLY set  requests a supplied virtual address be mapped for
- * DMA Virtual address is supplied in buf_info->virt DMA
- * mapping flag is in buf_info->align (DMA_READ_ONLY, DMA_WRITE_ONLY,
- * DMA_READ_WRITE) The mapped physical address is returned * buf_info->phys
- *
- * FC_MBUF_PHYSONLY cleared requests memory be allocated for driver use
- * and if FC_MBUF_DMA is set the memory is also mapped for DMA
- * The byte alignment of the memory request is supplied in
- * buf_info->align The byte size of the memory request is supplied
- * in buf_info->size The virtual address is returned buf_info->virt
+ * FC_MBUF_PHYSONLY set  requests a supplied virtual address be mapped for DMA
+ * Virtual address is supplied in buf_info->virt
+ * DMA mapping flag is in buf_info->align
+ * (DMA_READ_ONLY, DMA_WRITE_ONLY, DMA_READ_WRITE)
  * The mapped physical address is returned buf_info->phys
- * (for FC_MBUF_DMA)
+ *
+ * FC_MBUF_PHYSONLY cleared requests memory be allocated for driver use and
+ * if FC_MBUF_DMA is set the memory is also mapped for DMA
+ * The byte alignment of the memory request is supplied in buf_info->align
+ * The byte size of the memory request is supplied in buf_info->size
+ * The virtual address is returned buf_info->virt
+ * The mapped physical address is returned buf_info->phys (for FC_MBUF_DMA)
  */
 extern uint8_t *
 emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 {
-	emlxs_port_t *port = &PPORT;
-	ddi_dma_attr_t dma_attr;
-	ddi_device_acc_attr_t dev_attr;
-	uint_t cookie_count;
-	size_t dma_reallen;
-	ddi_dma_cookie_t dma_cookie;
-	uint_t dma_flag;
-	int status;
+	emlxs_port_t		*port = &PPORT;
+	ddi_dma_attr_t		dma_attr;
+	ddi_device_acc_attr_t	dev_attr;
+	uint_t			cookie_count;
+	size_t			dma_reallen;
+	ddi_dma_cookie_t	dma_cookie;
+	uint_t			dma_flag;
+	int			status;
 
 	dma_attr = emlxs_dma_attr_1sg;
 	dev_attr = emlxs_data_acc_attr;
@@ -6790,17 +6915,20 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		buf_info->flags &= ~FC_MBUF_SNGLSG;
 		dma_attr.dma_attr_sgllen = 1;
 	}
+
 	if (buf_info->flags & FC_MBUF_DMA32) {
 		buf_info->flags &= ~FC_MBUF_DMA32;
 		dma_attr.dma_attr_addr_hi = (uint64_t)0xffffffff;
 	}
+
 	buf_info->flags &= ~(FC_MBUF_UNLOCK | FC_MBUF_IOCTL);
 
 	switch (buf_info->flags) {
 	case 0:	/* allocate host memory */
 
-		buf_info->virt = (uint32_t *)
-		    kmem_zalloc((size_t)buf_info->size, KM_NOSLEEP);
+		buf_info->virt =
+		    (uint32_t *)kmem_zalloc((size_t)buf_info->size,
+		    KM_NOSLEEP);
 		buf_info->phys = 0;
 		buf_info->data_handle = 0;
 		buf_info->dma_handle = 0;
@@ -6821,19 +6949,20 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		/*
 		 * Allocate the DMA handle for this DMA object
 		 */
-		status = ddi_dma_alloc_handle((void *) hba->dip, &dma_attr,
-		    DDI_DMA_DONTWAIT, NULL,
-		    (ddi_dma_handle_t *)&buf_info->dma_handle);
+		status = ddi_dma_alloc_handle((void *)hba->dip,
+		    &dma_attr, DDI_DMA_DONTWAIT,
+		    NULL, (ddi_dma_handle_t *)&buf_info->dma_handle);
 		if (status != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "ddi_dma_alloc_handle failed: "
-			    "size=%x align=%x flags=%x",
-			    buf_info->size, buf_info->align, buf_info->flags);
+			    "ddi_dma_alloc_handle failed: size=%x align=%x "
+			    "flags=%x", buf_info->size, buf_info->align,
+			    buf_info->flags);
 
 			buf_info->phys = 0;
 			buf_info->dma_handle = 0;
 			break;
 		}
+
 		switch (buf_info->align) {
 		case DMA_READ_WRITE:
 			dma_flag = (DDI_DMA_RDWR | DDI_DMA_CONSISTENT);
@@ -6855,30 +6984,32 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 		if (status != DDI_DMA_MAPPED || (cookie_count > 1)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "ddi_dma_addr_bind_handle failed: "
-			    "status=%x count=%x flags=%x",
-			    status, cookie_count, buf_info->flags);
+			    "ddi_dma_addr_bind_handle failed: status=%x "
+			    "count=%x flags=%x", status, cookie_count,
+			    buf_info->flags);
 
-			(void) ddi_dma_free_handle((ddi_dma_handle_t *)
-			    &buf_info->dma_handle);
+			(void) ddi_dma_free_handle(
+			    (ddi_dma_handle_t *)&buf_info->dma_handle);
 			buf_info->phys = 0;
 			buf_info->dma_handle = 0;
 			break;
 		}
+
 		if (hba->bus_type == SBUS_FC) {
 
 			int32_t burstsizes_limit = 0xff;
 			int32_t ret_burst;
 
-			ret_burst = ddi_dma_burstsizes(buf_info->dma_handle)
-			    &burstsizes_limit;
-			if (ddi_dma_set_sbus64(buf_info->dma_handle, ret_burst)
-			    == DDI_FAILURE) {
+			ret_burst = ddi_dma_burstsizes(
+			    buf_info->dma_handle) & burstsizes_limit;
+			if (ddi_dma_set_sbus64(buf_info->dma_handle,
+			    ret_burst) == DDI_FAILURE) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_mem_alloc_failed_msg,
 				    "ddi_dma_set_sbus64 failed.");
 			}
 		}
+
 		/* Save Physical address */
 		buf_info->phys = dma_cookie.dmac_laddress;
 
@@ -6902,9 +7033,9 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		    (ddi_dma_handle_t *)&buf_info->dma_handle);
 		if (status != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "ddi_dma_alloc_handle failed: "
-			    "size=%x align=%x flags=%x",
-			    buf_info->size, buf_info->align, buf_info->flags);
+			    "ddi_dma_alloc_handle failed: size=%x align=%x "
+			    "flags=%x", buf_info->size, buf_info->align,
+			    buf_info->flags);
 
 			buf_info->virt = 0;
 			buf_info->phys = 0;
@@ -6912,6 +7043,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->dma_handle = 0;
 			break;
 		}
+
 		status = ddi_dma_mem_alloc(
 		    (ddi_dma_handle_t)buf_info->dma_handle,
 		    (size_t)buf_info->size, &dev_attr, DDI_DMA_CONSISTENT,
@@ -6920,9 +7052,9 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 		if ((status != DDI_SUCCESS) || (buf_info->size > dma_reallen)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "ddi_dma_mem_alloc failed: "
-			    "size=%x align=%x flags=%x",
-			    buf_info->size, buf_info->align, buf_info->flags);
+			    "ddi_dma_mem_alloc failed: size=%x align=%x "
+			    "flags=%x", buf_info->size, buf_info->align,
+			    buf_info->flags);
 
 			(void) ddi_dma_free_handle(
 			    (ddi_dma_handle_t *)&buf_info->dma_handle);
@@ -6933,24 +7065,25 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->dma_handle = 0;
 			break;
 		}
+
 		/* Map this page of memory */
 		status = ddi_dma_addr_bind_handle(
 		    (ddi_dma_handle_t)buf_info->dma_handle, NULL,
 		    (caddr_t)buf_info->virt, (size_t)buf_info->size,
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT,
-		    NULL, &dma_cookie, &cookie_count);
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+		    &dma_cookie, &cookie_count);
 
 		if (status != DDI_DMA_MAPPED || (cookie_count > 1)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "ddi_dma_addr_bind_handle failed: "
-			    "status=%x count=%d: size=%x align=%x flags=%x",
-			    status, cookie_count, buf_info->size,
-			    buf_info->align, buf_info->flags);
+			    "ddi_dma_addr_bind_handle failed: status=%x "
+			    "count=%d size=%x align=%x flags=%x", status,
+			    cookie_count, buf_info->size, buf_info->align,
+			    buf_info->flags);
 
-			(void) ddi_dma_mem_free((ddi_acc_handle_t *)
-			    &buf_info->data_handle);
-			(void) ddi_dma_free_handle((ddi_dma_handle_t *)
-			    &buf_info->dma_handle);
+			(void) ddi_dma_mem_free(
+			    (ddi_acc_handle_t *)&buf_info->data_handle);
+			(void) ddi_dma_free_handle(
+			    (ddi_dma_handle_t *)&buf_info->dma_handle);
 
 			buf_info->virt = 0;
 			buf_info->phys = 0;
@@ -6958,19 +7091,22 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->data_handle = 0;
 			break;
 		}
+
 		if (hba->bus_type == SBUS_FC) {
 			int32_t burstsizes_limit = 0xff;
 			int32_t ret_burst;
 
-			ret_burst = ddi_dma_burstsizes(buf_info->dma_handle)
-			    &burstsizes_limit;
-			if (ddi_dma_set_sbus64(buf_info->dma_handle, ret_burst)
-			    == DDI_FAILURE) {
+			ret_burst =
+			    ddi_dma_burstsizes(buf_info->
+			    dma_handle) & burstsizes_limit;
+			if (ddi_dma_set_sbus64(buf_info->dma_handle,
+			    ret_burst) == DDI_FAILURE) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_mem_alloc_failed_msg,
 				    "ddi_dma_set_sbus64 failed.");
 			}
 		}
+
 		/* Save Physical address */
 		buf_info->phys = dma_cookie.dmac_laddress;
 
@@ -6983,30 +7119,29 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 	return ((uint8_t *)buf_info->virt);
 
-
 } /* emlxs_mem_alloc() */
 
 
 
 /*
- * emlxs_mem_free:  OS specific routine for memory de-allocation / unmapping
+ * emlxs_mem_free:
+ *
+ * OS specific routine for memory de-allocation / unmapping
  *
  * The buf_info->flags field describes the memory operation requested.
  *
  * FC_MBUF_PHYSONLY set  requests a supplied virtual address be unmapped
- * for DMA, but not freed. The mapped physical address to be
- * unmapped is in buf_info->phys
+ * for DMA, but not freed. The mapped physical address to be unmapped is in
+ * buf_info->phys
  *
- * FC_MBUF_PHYSONLY cleared requests memory be freed and unmapped for
- * DMA only if FC_MBUF_DMA is set. The mapped physical address
- * to be unmapped is in buf_info->phys The virtual address to be
- * freed is in buf_info->virt
+ * FC_MBUF_PHYSONLY cleared requests memory be freed and unmapped for DMA only
+ * if FC_MBUF_DMA is set. The mapped physical address to be unmapped is in
+ * buf_info->phys. The virtual address to be freed is in buf_info->virt
  */
 /*ARGSUSED*/
 extern void
 emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 {
-	/* emlxs_port_t *port = &PPORT; */
 	buf_info->flags &= ~(FC_MBUF_UNLOCK | FC_MBUF_IOCTL);
 
 	switch (buf_info->flags) {
@@ -7016,6 +7151,7 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			kmem_free(buf_info->virt, (size_t)buf_info->size);
 			buf_info->virt = NULL;
 		}
+
 		break;
 
 	case FC_MBUF_PHYSONLY:
@@ -7023,10 +7159,11 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 		if (buf_info->dma_handle) {
 			(void) ddi_dma_unbind_handle(buf_info->dma_handle);
-			(void) ddi_dma_free_handle((ddi_dma_handle_t *)
-			    &buf_info->dma_handle);
+			(void) ddi_dma_free_handle(
+			    (ddi_dma_handle_t *)&buf_info->dma_handle);
 			buf_info->dma_handle = NULL;
 		}
+
 		break;
 
 	case FC_MBUF_DMA:	/* unmap free DMA-able memory */
@@ -7034,435 +7171,38 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 		if (buf_info->dma_handle) {
 			(void) ddi_dma_unbind_handle(buf_info->dma_handle);
-			(void) ddi_dma_mem_free((ddi_acc_handle_t *)
-			    &buf_info->data_handle);
-			(void) ddi_dma_free_handle((ddi_dma_handle_t *)
-			    &buf_info->dma_handle);
+			(void) ddi_dma_mem_free(
+			    (ddi_acc_handle_t *)&buf_info->data_handle);
+			(void) ddi_dma_free_handle(
+			    (ddi_dma_handle_t *)&buf_info->dma_handle);
 			buf_info->dma_handle = NULL;
 			buf_info->data_handle = NULL;
 		}
+
 		break;
 	}
 
 } /* emlxs_mem_free() */
 
 
-#define	BPL_CMD   0
-#define	BPL_RESP  1
-#define	BPL_DATA  2
-
-static ULP_BDE64 *
-emlxs_pkt_to_bpl(ULP_BDE64 *bpl, fc_packet_t *pkt, uint32_t bpl_type,
-    uint8_t bdeFlags)
-{
-	ddi_dma_cookie_t *cp;
-	uint_t i;
-	int32_t size;
-	uint_t cookie_cnt;
-
-#if (EMLXS_MODREV >= EMLXS_MODREV3)
-	switch (bpl_type) {
-	case BPL_CMD:
-		cp = pkt->pkt_cmd_cookie;
-		cookie_cnt = pkt->pkt_cmd_cookie_cnt;
-		size = (int32_t)pkt->pkt_cmdlen;
-		break;
-
-	case BPL_RESP:
-		cp = pkt->pkt_resp_cookie;
-		cookie_cnt = pkt->pkt_resp_cookie_cnt;
-		size = (int32_t)pkt->pkt_rsplen;
-		break;
-
-
-	case BPL_DATA:
-		cp = pkt->pkt_data_cookie;
-		cookie_cnt = pkt->pkt_data_cookie_cnt;
-		size = (int32_t)pkt->pkt_datalen;
-		break;
-	}
-
-#else
-	switch (bpl_type) {
-	case BPL_CMD:
-		cp = &pkt->pkt_cmd_cookie;
-		cookie_cnt = 1;
-		size = (int32_t)pkt->pkt_cmdlen;
-		break;
-
-	case BPL_RESP:
-		cp = &pkt->pkt_resp_cookie;
-		cookie_cnt = 1;
-		size = (int32_t)pkt->pkt_rsplen;
-		break;
-
-
-	case BPL_DATA:
-		cp = &pkt->pkt_data_cookie;
-		cookie_cnt = 1;
-		size = (int32_t)pkt->pkt_datalen;
-		break;
-	}
-#endif	/* >= EMLXS_MODREV3 */
-
-	for (i = 0; i < cookie_cnt && size > 0; i++, cp++) {
-		bpl->addrHigh = PCIMEM_LONG((uint32_t)
-		    putPaddrHigh(cp->dmac_laddress));
-		bpl->addrLow = PCIMEM_LONG((uint32_t)
-		    putPaddrLow(cp->dmac_laddress));
-		bpl->tus.f.bdeSize = MIN(size, cp->dmac_size);
-		bpl->tus.f.bdeFlags = bdeFlags;
-		bpl->tus.w = PCIMEM_LONG(bpl->tus.w);
-
-		bpl++;
-		size -= cp->dmac_size;
-	}
-
-	return (bpl);
-
-} /* emlxs_pkt_to_bpl */
-
-
-
-static uint32_t
-emlxs_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
-{
-	uint32_t rval;
-
-#ifdef SLI3_SUPPORT
-	emlxs_hba_t *hba = HBA;
-
-	if (hba->sli_mode < 3) {
-		rval = emlxs_sli2_bde_setup(port, sbp);
-	} else {
-#if (EMLXS_MODREV >= EMLXS_MODREV3)
-		fc_packet_t *pkt = PRIV2PKT(sbp);
-
-		if ((pkt->pkt_cmd_cookie_cnt > 1) ||
-		    (pkt->pkt_resp_cookie_cnt > 1) ||
-		    ((pkt->pkt_cmd_cookie_cnt + pkt->pkt_resp_cookie_cnt +
-		    pkt->pkt_data_cookie_cnt) > SLI3_MAX_BDE)) {
-			rval = emlxs_sli2_bde_setup(port, sbp);
-		} else {
-			rval = emlxs_sli3_bde_setup(port, sbp);
-		}
-
-#else
-		rval = emlxs_sli3_bde_setup(port, sbp);
-#endif	/* >= EMLXS_MODREV3 */
-
-	}
-
-#else	/* !SLI3_SUPPORT */
-	rval = emlxs_sli2_bde_setup(port, sbp);
-#endif	/* SLI3_SUPPORT */
-
-	return (rval);
-
-} /* emlxs_bde_setup() */
-
-
-static uint32_t
-emlxs_sli2_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
-{
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	MATCHMAP *bmp;
-	ULP_BDE64 *bpl;
-	uint64_t bp;
-	uint8_t bdeFlag;
-	IOCB *iocb;
-	RING *rp;
-	uint32_t cmd_cookie_cnt;
-	uint32_t resp_cookie_cnt;
-	uint32_t data_cookie_cnt;
-	uint32_t cookie_cnt;
-
-	rp = sbp->ring;
-	iocb = (IOCB *) & sbp->iocbq;
-	pkt = PRIV2PKT(sbp);
-
-#ifdef EMLXS_SPARC
-	if (rp->ringno == FC_FCP_RING) {
-		/* Use FCP MEM_BPL table to get BPL buffer */
-		bmp = &hba->fcp_bpl_table[sbp->iotag];
-	} else {
-		/* Use MEM_BPL pool to get BPL buffer */
-		bmp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BPL);
-	}
-
-#else
-	/* Use MEM_BPL pool to get BPL buffer */
-	bmp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BPL);
-
-#endif	/* EMLXS_SPARC */
-
-	if (!bmp) {
-		return (1);
-	}
-	sbp->bmp = bmp;
-	bpl = (ULP_BDE64 *) bmp->virt;
-	bp = bmp->phys;
-	cookie_cnt = 0;
-
-#if (EMLXS_MODREV >= EMLXS_MODREV3)
-	cmd_cookie_cnt = pkt->pkt_cmd_cookie_cnt;
-	resp_cookie_cnt = pkt->pkt_resp_cookie_cnt;
-	data_cookie_cnt = pkt->pkt_data_cookie_cnt;
-#else
-	cmd_cookie_cnt = 1;
-	resp_cookie_cnt = 1;
-	data_cookie_cnt = 1;
-#endif	/* >= EMLXS_MODREV3 */
-
-	switch (rp->ringno) {
-	case FC_FCP_RING:
-
-		/* CMD payload */
-		bpl = emlxs_pkt_to_bpl(bpl, pkt, BPL_CMD, 0);
-		cookie_cnt = cmd_cookie_cnt;
-
-		if (pkt->pkt_tran_type != FC_PKT_OUTBOUND) {
-			/* RSP payload */
-			bpl = emlxs_pkt_to_bpl(bpl, pkt, BPL_RESP,
-			    BUFF_USE_RCV);
-			cookie_cnt += resp_cookie_cnt;
-
-			/* DATA payload */
-			if (pkt->pkt_datalen != 0) {
-				bdeFlag = (pkt->pkt_tran_type ==
-				    FC_PKT_FCP_READ) ? BUFF_USE_RCV : 0;
-				bpl = emlxs_pkt_to_bpl(bpl, pkt,
-				    BPL_DATA, bdeFlag);
-				cookie_cnt += data_cookie_cnt;
-			}
-		}
-		break;
-
-	case FC_IP_RING:
-
-		/* CMD payload */
-		bpl = emlxs_pkt_to_bpl(bpl, pkt, BPL_CMD, 0);
-		cookie_cnt = cmd_cookie_cnt;
-
-		break;
-
-	case FC_ELS_RING:
-
-		/* CMD payload */
-		bpl = emlxs_pkt_to_bpl(bpl, pkt, BPL_CMD, 0);
-		cookie_cnt = cmd_cookie_cnt;
-
-		/* RSP payload */
-		if (pkt->pkt_tran_type != FC_PKT_OUTBOUND) {
-			bpl = emlxs_pkt_to_bpl(bpl, pkt,
-			    BPL_RESP, BUFF_USE_RCV);
-			cookie_cnt += resp_cookie_cnt;
-		}
-		break;
-
-
-	case FC_CT_RING:
-
-		/* CMD payload */
-		bpl = emlxs_pkt_to_bpl(bpl, pkt, BPL_CMD, 0);
-		cookie_cnt = cmd_cookie_cnt;
-
-		if ((pkt->pkt_tran_type != FC_PKT_OUTBOUND) ||
-		    (pkt->pkt_cmd_fhdr.type == EMLXS_MENLO_TYPE)) {
-			/* RSP payload */
-			bpl = emlxs_pkt_to_bpl(bpl, pkt,
-			    BPL_RESP, BUFF_USE_RCV);
-			cookie_cnt += resp_cookie_cnt;
-		}
-		break;
-
-	}
-
-	iocb->un.genreq64.bdl.bdeFlags = BUFF_TYPE_BDL;
-	iocb->un.genreq64.bdl.addrHigh = (uint32_t)putPaddrHigh(bp);
-	iocb->un.genreq64.bdl.addrLow = (uint32_t)putPaddrLow(bp);
-	iocb->un.genreq64.bdl.bdeSize = cookie_cnt * sizeof (ULP_BDE64);
-
-	iocb->ulpBdeCount = 1;
-	iocb->ulpLe = 1;
-
-	return (0);
-
-} /* emlxs_sli2_bde_setup */
-
-
-#ifdef SLI3_SUPPORT
-/*ARGSUSED*/
-static uint32_t
-emlxs_sli3_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
-{
-	ddi_dma_cookie_t *cp_cmd;
-	ddi_dma_cookie_t *cp_resp;
-	ddi_dma_cookie_t *cp_data;
-	fc_packet_t *pkt;
-	ULP_BDE64 *bde;
-	/* uint16_t iotag; */
-	/* uint32_t did; */
-	int data_cookie_cnt;
-	int i;
-	IOCB *iocb;
-	RING *rp;
-
-	rp = sbp->ring;
-	iocb = (IOCB *) & sbp->iocbq;
-	pkt = PRIV2PKT(sbp);
-	/* did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id); */
-
-#if (EMLXS_MODREV >= EMLXS_MODREV3)
-	cp_cmd = pkt->pkt_cmd_cookie;
-	cp_resp = pkt->pkt_resp_cookie;
-	cp_data = pkt->pkt_data_cookie;
-	data_cookie_cnt = pkt->pkt_data_cookie_cnt;
-#else
-	cp_cmd = &pkt->pkt_cmd_cookie;
-	cp_resp = &pkt->pkt_resp_cookie;
-	cp_data = &pkt->pkt_data_cookie;
-	data_cookie_cnt = 1;
-#endif	/* >= EMLXS_MODREV3 */
-
-	iocb->unsli3.ext_iocb.ebde_count = 0;
-
-	switch (rp->ringno) {
-	case FC_FCP_RING:
-
-		/* CMD payload */
-		iocb->un.fcpi64.bdl.addrHigh =
-		    putPaddrHigh(cp_cmd->dmac_laddress);
-		iocb->un.fcpi64.bdl.addrLow =
-		    putPaddrLow(cp_cmd->dmac_laddress);
-		iocb->un.fcpi64.bdl.bdeSize = pkt->pkt_cmdlen;
-		iocb->un.fcpi64.bdl.bdeFlags = 0;
-
-		if (pkt->pkt_tran_type != FC_PKT_OUTBOUND) {
-			/* RSP payload */
-			iocb->unsli3.ext_iocb.ebde1.addrHigh =
-			    putPaddrHigh(cp_resp->dmac_laddress);
-			iocb->unsli3.ext_iocb.ebde1.addrLow =
-			    putPaddrLow(cp_resp->dmac_laddress);
-			iocb->unsli3.ext_iocb.ebde1.tus.f.bdeSize =
-			    pkt->pkt_rsplen;
-			iocb->unsli3.ext_iocb.ebde1.tus.f.bdeFlags = 0;
-			iocb->unsli3.ext_iocb.ebde_count = 1;
-
-			/* DATA payload */
-			if (pkt->pkt_datalen != 0) {
-				bde = (ULP_BDE64 *)&iocb->unsli3.ext_iocb.ebde2;
-				for (i = 0; i < data_cookie_cnt; i++) {
-					bde->addrHigh = putPaddrHigh(
-					    cp_data->dmac_laddress);
-					bde->addrLow = putPaddrLow(
-					    cp_data->dmac_laddress);
-					bde->tus.f.bdeSize = cp_data->dmac_size;
-					bde->tus.f.bdeFlags = 0;
-					cp_data++;
-					bde++;
-				}
-				iocb->unsli3.ext_iocb.ebde_count +=
-				    data_cookie_cnt;
-			}
-		}
-		break;
-
-	case FC_IP_RING:
-
-		/* CMD payload */
-		iocb->un.xseq64.bdl.addrHigh =
-		    putPaddrHigh(cp_cmd->dmac_laddress);
-		iocb->un.xseq64.bdl.addrLow =
-		    putPaddrLow(cp_cmd->dmac_laddress);
-		iocb->un.xseq64.bdl.bdeSize = pkt->pkt_cmdlen;
-		iocb->un.xseq64.bdl.bdeFlags = 0;
-
-		break;
-
-	case FC_ELS_RING:
-
-		/* CMD payload */
-		iocb->un.elsreq64.bdl.addrHigh =
-		    putPaddrHigh(cp_cmd->dmac_laddress);
-		iocb->un.elsreq64.bdl.addrLow =
-		    putPaddrLow(cp_cmd->dmac_laddress);
-		iocb->un.elsreq64.bdl.bdeSize = pkt->pkt_cmdlen;
-		iocb->un.elsreq64.bdl.bdeFlags = 0;
-
-		/* RSP payload */
-		if (pkt->pkt_tran_type != FC_PKT_OUTBOUND) {
-			iocb->unsli3.ext_iocb.ebde1.addrHigh =
-			    putPaddrHigh(cp_resp->dmac_laddress);
-			iocb->unsli3.ext_iocb.ebde1.addrLow =
-			    putPaddrLow(cp_resp->dmac_laddress);
-			iocb->unsli3.ext_iocb.ebde1.tus.f.bdeSize =
-			    pkt->pkt_rsplen;
-			iocb->unsli3.ext_iocb.ebde1.tus.f.bdeFlags =
-			    BUFF_USE_RCV;
-			iocb->unsli3.ext_iocb.ebde_count = 1;
-		}
-		break;
-
-	case FC_CT_RING:
-
-		/* CMD payload */
-		iocb->un.genreq64.bdl.addrHigh =
-		    putPaddrHigh(cp_cmd->dmac_laddress);
-		iocb->un.genreq64.bdl.addrLow =
-		    putPaddrLow(cp_cmd->dmac_laddress);
-		iocb->un.genreq64.bdl.bdeSize = pkt->pkt_cmdlen;
-		iocb->un.genreq64.bdl.bdeFlags = 0;
-
-		if ((pkt->pkt_tran_type != FC_PKT_OUTBOUND) ||
-		    (pkt->pkt_cmd_fhdr.type == EMLXS_MENLO_TYPE)) {
-			/* RSP payload */
-			iocb->unsli3.ext_iocb.ebde1.addrHigh =
-			    putPaddrHigh(cp_resp->dmac_laddress);
-			iocb->unsli3.ext_iocb.ebde1.addrLow =
-			    putPaddrLow(cp_resp->dmac_laddress);
-			iocb->unsli3.ext_iocb.ebde1.tus.f.bdeSize =
-			    pkt->pkt_rsplen;
-			iocb->unsli3.ext_iocb.ebde1.tus.f.bdeFlags =
-			    BUFF_USE_RCV;
-			iocb->unsli3.ext_iocb.ebde_count = 1;
-		}
-		break;
-	}
-
-	iocb->ulpBdeCount = 0;
-	iocb->ulpLe = 0;
-
-	return (0);
-
-} /* emlxs_sli3_bde_setup */
-#endif	/* SLI3_SUPPORT */
-
 static int32_t
 emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	NODELIST *ndlp;
-	/* int i; */
-	char *cmd;
-	uint16_t lun;
-	uint16_t iotag;
-	FCP_CMND *fcp_cmd;
-	uint32_t did;
-	/* fcp_rsp_t *rsp; */
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	RING		*rp;
+	NODELIST	*ndlp;
+	char		*cmd;
+	uint16_t	lun;
+	FCP_CMND	*fcp_cmd;
+	uint32_t	did;
 
 	pkt = PRIV2PKT(sbp);
-	fcp_cmd = (FCP_CMND *) pkt->pkt_cmd;
+	fcp_cmd = (FCP_CMND *)pkt->pkt_cmd;
 	rp = &hba->ring[FC_FCP_RING];
 	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
-
-	iocbq = &sbp->iocbq;
-	iocb = &iocbq->iocb;
 
 	/* Find target node object */
 	ndlp = emlxs_node_find_did(port, did);
@@ -7473,32 +7213,15 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_BADPACKET);
 	}
+
 	/* If gate is closed */
 	if (ndlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
 
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag: did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	/* Point of no return */
+#ifdef SAN_DIAG_SUPPORT
+	sbp->sd_start_time = gethrtime();
+#endif /* SAN_DIAG_SUPPORT */
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_fcp_pkt(sbp);
@@ -7507,46 +7230,13 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 	if (fcp_cmd->fcpCntl1 == FCP_QTYPE_UNTAGGED) {
 		fcp_cmd->fcpCntl1 = FCP_QTYPE_SIMPLE;
 	}
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) rp;
 
-	/* Initalize iocb */
-	iocb->ulpContext = ndlp->nlp_Rpi;
-	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
+	iocbq = &sbp->iocbq;
+	iocb = &iocbq->iocb;
 
-	switch (FC_TRAN_CLASS(pkt->pkt_tran_flags)) {
-	case FC_TRAN_CLASS1:
-		iocb->ulpClass = CLASS1;
-		break;
-	case FC_TRAN_CLASS2:
-		iocb->ulpClass = CLASS2;
-		/* iocb->ulpClass = CLASS3; */
-		break;
-	case FC_TRAN_CLASS3:
-	default:
-		iocb->ulpClass = CLASS3;
-		break;
-	}
-
-	/*
-	 * if device is FCP-2 device, set the following bit that says to run
-	 * the FC-TAPE protocol.
-	 */
-	if (ndlp->nlp_fcp_info & NLP_FCP_2_DEVICE) {
-		iocb->ulpFCP2Rcvy = 1;
-	}
-	if (pkt->pkt_datalen == 0) {
-		iocb->ulpCommand = CMD_FCP_ICMND64_CR;
-	} else if (pkt->pkt_tran_type == FC_PKT_FCP_READ) {
-		iocb->ulpCommand = CMD_FCP_IREAD64_CR;
-		iocb->ulpPU = PARM_READ_CHECK;
-		iocb->un.fcpi64.fcpi_parm = pkt->pkt_datalen;
-	} else {
-		iocb->ulpCommand = CMD_FCP_IWRITE64_CR;
+	iocbq->node = (void *)ndlp;
+	if (emlxs_sli_prep_fcp_iocb(port, sbp) != FC_SUCCESS) {
+		return (FC_TRAN_BUSY);
 	}
 
 	/* Snoop for target or lun resets */
@@ -7561,6 +7251,11 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 		sbp->pkt_flags |= PACKET_POLLED;
 		mutex_exit(&sbp->mtx);
 
+#ifdef SAN_DIAG_SUPPORT
+		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_TGTRESET,
+		    (HBA_WWN *)&ndlp->nlp_portname, -1);
+#endif
+
 		iocbq->flag |= IOCB_PRIORITY;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
@@ -7572,12 +7267,18 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 		/* Flush the IO's on the tx queues */
 		(void) emlxs_tx_node_flush(port, ndlp, rp, 0, sbp);
 	}
+
 	/* Check for lun reset */
 	else if (cmd[10] & 0x10) {
 		mutex_enter(&sbp->mtx);
 		sbp->pkt_flags |= PACKET_FCP_LUN_RESET;
 		sbp->pkt_flags |= PACKET_POLLED;
 		mutex_exit(&sbp->mtx);
+
+#ifdef SAN_DIAG_SUPPORT
+		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_LUNRESET,
+		    (HBA_WWN *)&ndlp->nlp_portname, lun);
+#endif
 
 		iocbq->flag |= IOCB_PRIORITY;
 
@@ -7587,11 +7288,12 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 		/* Flush the IO's on the tx queues for this lun */
 		(void) emlxs_tx_lun_flush(port, ndlp, lun, sbp);
 	}
+
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
-	sbp->node = (void *) ndlp;
+	sbp->node = (void *)ndlp;
 	sbp->lun = lun;
 	sbp->class = iocb->ulpClass;
 	sbp->did = ndlp->nlp_DID;
@@ -7601,13 +7303,15 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	if (pkt->pkt_datalen && pkt->pkt_tran_type == FC_PKT_FCP_WRITE) {
-		emlxs_mpdata_sync(pkt->pkt_data_dma, 0,
-		    pkt->pkt_datalen, DDI_DMA_SYNC_FORDEV);
+		emlxs_mpdata_sync(pkt->pkt_data_dma, 0, pkt->pkt_datalen,
+		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	HBASTATS.FcpIssued++;
 
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_FCP_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_FCP_RING], iocbq);
 
 	return (FC_SUCCESS);
 
@@ -7616,17 +7320,16 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 #ifdef SFCT_SUPPORT
 static int32_t
-emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp)
+emlxs_send_fct_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	NODELIST *ndlp;
-	uint16_t iotag;
-	uint32_t did;
-	/* emlxs_buf_t *cmd_sbp; */
-	ddi_dma_cookie_t *cp_cmd;
+	emlxs_hba_t		*hba = HBA;
+	fc_packet_t		*pkt;
+	IOCBQ			*iocbq;
+	IOCB			*iocb;
+	NODELIST		*ndlp;
+	uint16_t		iotag;
+	uint32_t		did;
+	ddi_dma_cookie_t	*cp_cmd;
 
 	pkt = PRIV2PKT(sbp);
 
@@ -7643,10 +7346,12 @@ emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_BADPACKET);
 	}
+
 	/* If gate is closed */
 	if (ndlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
+
 	/* Get the iotag by registering the packet */
 	iotag = emlxs_register_pkt(sbp->ring, sbp);
 
@@ -7657,12 +7362,13 @@ emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_TRAN_BUSY);
 	}
+
 	/* Point of no return */
 
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
 	cp_cmd = pkt->pkt_cmd_cookie;
 #else
-	cp_cmd = &pkt->pkt_cmd_cookie;
+	cp_cmd  = &pkt->pkt_cmd_cookie;
 #endif	/* >= EMLXS_MODREV3 */
 
 	iocb->un.fcpt64.bdl.addrHigh = putPaddrHigh(cp_cmd->dmac_laddress);
@@ -7674,20 +7380,22 @@ emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 		iocb->ulpBdeCount = 1;
 		iocb->ulpLe = 1;
 	} else {	/* SLI3 */
+
 		iocb->ulpBdeCount = 0;
 		iocb->ulpLe = 0;
 		iocb->unsli3.ext_iocb.ebde_count = 0;
 	}
 
 	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) sbp->ring;
+	iocbq->port = (void *)port;
+	iocbq->node = (void *)ndlp;
+	iocbq->ring = (void *)sbp->ring;
 
 	/* Initalize iocb */
 	iocb->ulpContext = (uint16_t)pkt->pkt_cmd_fhdr.rx_id;
 	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
+	iocb->ulpRsvdByte =
+	    ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
 	iocb->ulpOwner = OWN_CHIP;
 	iocb->ulpClass = sbp->class;
 	iocb->ulpCommand = CMD_FCP_TRSP64_CX;
@@ -7697,153 +7405,120 @@ emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0,
-		    pkt->pkt_cmdlen, DDI_DMA_SYNC_FORDEV);
+		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	HBASTATS.FcpIssued++;
 
-	emlxs_issue_iocb_cmd(hba, sbp->ring, iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, sbp->ring, iocbq);
 
 	return (FC_SUCCESS);
 
-} /* emlxs_send_fcp_status() */
-#endif	/* SFCT_SUPPORT */
+}  /* emlxs_send_fct_status() */
+
 
 static int32_t
-emlxs_send_sequence(emlxs_port_t *port, emlxs_buf_t *sbp)
+emlxs_send_fct_abort(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	/* uint32_t i; */
-	NODELIST *ndlp;
-	/* ddi_dma_cookie_t *cp; */
-	uint16_t iotag;
-	uint32_t did;
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	NODELIST	*ndlp;
+	uint16_t	iotag;
+	uint32_t	did;
 
 	pkt = PRIV2PKT(sbp);
-	rp = &hba->ring[FC_CT_RING];
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+
+	did = sbp->did;
+	ndlp = sbp->node;
+
 
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
 
-	/* Currently this routine is only used for loopback sequences */
-
-	ndlp = emlxs_node_find_did(port, did);
-
-	if (!ndlp || !ndlp->nlp_active) {
+	/* Make sure node is still active */
+	if ((ndlp == NULL) || (!ndlp->nlp_active)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_failed_msg,
-		    "Node not found. did=0x%x", did);
+		    "*Node not found. did=%x", did);
 
 		return (FC_BADPACKET);
 	}
-	/* Check if gate is temporarily closed */
-	if (ndlp->nlp_flag[FC_CT_RING] & NLP_CLOSED) {
+
+	/* If gate is closed */
+	if (ndlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
-	/* Check if an exchange has been created */
-	if ((ndlp->nlp_Xri == 0)) {
-		/* No exchange.  Try creating one */
-		(void) emlxs_create_xri(port, rp, ndlp);
 
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Exchange not found. did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
 	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
+	iotag = emlxs_register_pkt(sbp->ring, sbp);
 
 	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
+		/* No more command slots available, retry later */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag: did=0x%x", did);
+		    "*Adapter Busy. Unable to allocate iotag: did=0x%x", did);
 
 		return (FC_TRAN_BUSY);
 	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
 
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
 	/* Point of no return */
+	iocbq->port = (void *)port;
+	iocbq->node = (void *)ndlp;
+	iocbq->ring = (void *)sbp->ring;
+	/*
+	 * Don't give the abort priority, we want the IOCB
+	 * we are aborting to be processed first.
+	 */
+	iocbq->flag |= IOCB_SPECIAL;
 
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) rp;
-
-	/* Initalize iocb */
-
-	/* Setup fibre channel header information */
-	iocb->un.xseq64.w5.hcsw.Fctl = LA;
-
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_LAST_SEQ) {
-		iocb->un.xseq64.w5.hcsw.Fctl |= LSEQ;
-	}
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_SEQ_INITIATIVE) {
-		iocb->un.xseq64.w5.hcsw.Fctl |= SI;
-	}
-	iocb->un.xseq64.w5.hcsw.Dfctl = pkt->pkt_cmd_fhdr.df_ctl;
-	iocb->un.xseq64.w5.hcsw.Rctl = pkt->pkt_cmd_fhdr.r_ctl;
-	iocb->un.xseq64.w5.hcsw.Type = pkt->pkt_cmd_fhdr.type;
-
+	iocb->ulpContext = pkt->pkt_cmd_fhdr.rx_id;
 	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
+	iocb->ulpLe = 1;
+	iocb->ulpClass = sbp->class;
 	iocb->ulpOwner = OWN_CHIP;
-	iocb->ulpClass = CLASS3;
-	iocb->ulpCommand = CMD_XMIT_SEQUENCE64_CX;
-	iocb->ulpContext = ndlp->nlp_Xri;
 
-	/* Initalize sbp */
-	mutex_enter(&sbp->mtx);
+	if (hba->state >= FC_LINK_UP) {
+		/* Create the abort IOCB */
+		iocb->un.acxri.abortType = ABORT_TYPE_ABTS;
+		iocb->ulpCommand = CMD_ABORT_XRI_CX;
+
+	} else {
+		/* Create the close IOCB */
+		iocb->ulpCommand = CMD_CLOSE_XRI_CX;
+
+	}
+
+	iocb->ulpRsvdByte =
+	    ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
+	/* Set the pkt timer */
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
-	sbp->node = (void *) ndlp;
-	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
-	sbp->did = did;
-	mutex_exit(&sbp->mtx);
 
-	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0,
-		    pkt->pkt_cmdlen, DDI_DMA_SYNC_FORDEV);
-	}
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, sbp->ring, iocbq);
 
 	return (FC_SUCCESS);
 
-} /* emlxs_send_sequence() */
+}  /* emlxs_send_fct_abort() */
+
+#endif /* SFCT_SUPPORT */
 
 
 static int32_t
 emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	uint32_t i;
-	NODELIST *ndlp;
-	uint16_t iotag;
-	uint32_t did;
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	RING		*rp;
+	uint32_t	i;
+	NODELIST	*ndlp;
+	uint32_t	did;
 
 	pkt = PRIV2PKT(sbp);
 	rp = &hba->ring[FC_IP_RING];
 	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
-
-	iocbq = &sbp->iocbq;
-	iocb = &iocbq->iocb;
 
 	/* Check if node exists */
 	/* Broadcast did is always a success */
@@ -7855,10 +7530,12 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_BADPACKET);
 	}
+
 	/* Check if gate is temporarily closed */
 	if (ndlp->nlp_flag[FC_IP_RING] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
+
 	/* Check if an exchange has been created */
 	if ((ndlp->nlp_Xri == 0) && (did != Bcast_DID)) {
 		/* No exchange.  Try creating one */
@@ -7869,22 +7546,9 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_TRAN_BUSY);
 	}
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
 
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag: did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	/*
-	 * ULP PATCH: pkt_cmdlen was found to be set to zero on BROADCAST
-	 * commands
-	 */
+	/* ULP PATCH: pkt_cmdlen was found to be set to zero */
+	/* on BROADCAST commands */
 	if (pkt->pkt_cmdlen == 0) {
 		/* Set the pkt_cmdlen to the cookie size */
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
@@ -7896,90 +7560,31 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 #endif	/* >= EMLXS_MODREV3 */
 
 	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
 
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
+	iocbq = &sbp->iocbq;
+	iocb = &iocbq->iocb;
 
+	iocbq->node = (void *)ndlp;
+	if (emlxs_sli_prep_ip_iocb(port, sbp) != FC_SUCCESS) {
 		return (FC_TRAN_BUSY);
-	}
-	/* Point of no return */
-
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) rp;
-
-	/* Initalize iocb */
-	iocb->un.xseq64.w5.hcsw.Fctl = 0;
-
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_FIRST_SEQ) {
-		iocb->un.xseq64.w5.hcsw.Fctl |= FSEQ;
-	}
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_SEQ_INITIATIVE) {
-		iocb->un.xseq64.w5.hcsw.Fctl |= SI;
-	}
-	/* network headers */
-	iocb->un.xseq64.w5.hcsw.Dfctl = pkt->pkt_cmd_fhdr.df_ctl;
-	iocb->un.xseq64.w5.hcsw.Rctl = pkt->pkt_cmd_fhdr.r_ctl;
-	iocb->un.xseq64.w5.hcsw.Type = pkt->pkt_cmd_fhdr.type;
-
-	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
-
-	if (pkt->pkt_tran_type == FC_PKT_BROADCAST) {
-		HBASTATS.IpBcastIssued++;
-
-		iocb->ulpCommand = CMD_XMIT_BCAST64_CN;
-		iocb->ulpContext = 0;
-
-#ifdef SLI3_SUPPORT
-		if (hba->sli_mode >= 3) {
-			if (hba->topology != TOPOLOGY_LOOP) {
-				iocb->ulpCT = 0x1;
-			}
-			iocb->ulpContext = port->vpi;
-		}
-#endif	/* SLI3_SUPPORT */
-
-	} else {
-		HBASTATS.IpSeqIssued++;
-
-		iocb->ulpCommand = CMD_XMIT_SEQUENCE64_CX;
-		iocb->ulpContext = ndlp->nlp_Xri;
-	}
-
-	switch (FC_TRAN_CLASS(pkt->pkt_tran_flags)) {
-	case FC_TRAN_CLASS1:
-		iocb->ulpClass = CLASS1;
-		break;
-	case FC_TRAN_CLASS2:
-		iocb->ulpClass = CLASS2;
-		break;
-	case FC_TRAN_CLASS3:
-	default:
-		iocb->ulpClass = CLASS3;
-		break;
 	}
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
-	sbp->node = (void *) ndlp;
+	sbp->node = (void *)ndlp;
 	sbp->lun = 0;
 	sbp->class = iocb->ulpClass;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0,
-		    pkt->pkt_cmdlen, DDI_DMA_SYNC_FORDEV);
+		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		    DDI_DMA_SYNC_FORDEV);
 	}
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_IP_RING], iocbq);
+
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_IP_RING], iocbq);
 
 	return (FC_SUCCESS);
 
@@ -7989,50 +7594,26 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 static int32_t
 emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	emlxs_port_t *vport;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	uint32_t cmd;
-	int i;
-	ELS_PKT *els_pkt;
-	NODELIST *ndlp;
-	uint16_t iotag;
-	uint32_t did;
-	char fcsp_msg[32];
+	emlxs_hba_t	*hba = HBA;
+	emlxs_port_t	*vport;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	uint32_t	cmd;
+	int		i;
+	ELS_PKT		*els_pkt;
+	NODELIST	*ndlp;
+	uint32_t	did;
+	char		fcsp_msg[32];
 
 	fcsp_msg[0] = 0;
 	pkt = PRIV2PKT(sbp);
-	els_pkt = (ELS_PKT *) pkt->pkt_cmd;
-	rp = &hba->ring[FC_ELS_RING];
+	els_pkt = (ELS_PKT *)pkt->pkt_cmd;
 	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
 
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
-
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag: did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_els_pkt(sbp);
 #endif	/* EMLXS_MODREV2X */
@@ -8054,6 +7635,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		if (hba->flag & FC_NPIV_DELAY_REQUIRED) {
 			sbp->pkt_flags |= PACKET_DELAY_REQUIRED;
 		}
+
 		/* We will process these cmds at the bottom of this routine */
 		break;
 
@@ -8065,10 +7647,8 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 			if (!(vport->flag & EMLXS_PORT_BOUND)) {
 				continue;
 			}
-			if (did == vport->did) {
-				/* Unregister the packet */
-				(void) emlxs_unregister_pkt(rp, iotag, 0);
 
+			if (did == vport->did) {
 				pkt->pkt_state = FC_PKT_NPORT_RJT;
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
@@ -8081,12 +7661,10 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		ndlp = NULL;
 
-		/*
-		 * Check if this is the first PLOGI after a PT_TO_PT
-		 * connection
-		 */
+		/* Check if this is the first PLOGI */
+		/* after a PT_TO_PT connection */
 		if ((hba->flag & FC_PT_TO_PT) && (port->did == 0)) {
-			MAILBOXQ *mbox;
+			MAILBOXQ	*mbox;
 
 			/* ULP bug fix */
 			if (pkt->pkt_cmd_fhdr.s_id == 0) {
@@ -8098,41 +7676,42 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 				    pkt->pkt_cmd_fhdr.s_id,
 				    pkt->pkt_cmd_fhdr.d_id);
 			}
+
 			mutex_enter(&EMLXS_PORT_LOCK);
 			port->did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.s_id);
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			/* Update our service parms */
-			if ((mbox = (MAILBOXQ *)
-			    emlxs_mem_get(hba, MEM_MBOX | MEM_PRI))) {
+			if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
+			    MEM_MBOX | MEM_PRI))) {
 				emlxs_mb_config_link(hba, (MAILBOX *) mbox);
 
-				if (emlxs_mb_issue_cmd(hba, (MAILBOX *) mbox,
-				    MBX_NOWAIT, 0) != MBX_BUSY) {
+				if (emlxs_sli_issue_mbox_cmd(hba,
+				    (MAILBOX *)mbox, MBX_NOWAIT, 0)
+				    != MBX_BUSY) {
 					(void) emlxs_mem_put(hba, MEM_MBOX,
 					    (uint8_t *)mbox);
 				}
+
 			}
 		}
+
 		/* We will process these cmds at the bottom of this routine */
 		break;
 
 	default:
 		ndlp = emlxs_node_find_did(port, did);
 
-		/*
-		 * If an ADISC is being sent and we have no node, then we
-		 * must fail the ADISC now
-		 */
-		if (!ndlp && (cmd == ELS_CMD_ADISC)) {
-			/* Unregister the packet */
-			(void) emlxs_unregister_pkt(rp, iotag, 0);
+		/* If an ADISC is being sent and we have no node, */
+		/* then we must fail the ADISC now */
+		if (!ndlp && (cmd == ELS_CMD_ADISC) && !port->tgt_mode) {
 
 			/* Build the LS_RJT response */
-			els_pkt = (ELS_PKT *) pkt->pkt_resp;
+			els_pkt = (ELS_PKT *)pkt->pkt_resp;
 			els_pkt->elsCode = 0x01;
 			els_pkt->un.lsRjt.un.b.lsRjtRsvd0 = 0;
-			els_pkt->un.lsRjt.un.b.lsRjtRsnCode = LSRJT_LOGICAL_ERR;
+			els_pkt->un.lsRjt.un.b.lsRjtRsnCode =
+			    LSRJT_LOGICAL_ERR;
 			els_pkt->un.lsRjt.un.b.lsRjtRsnCodeExp =
 			    LSEXP_NOTHING_MORE;
 			els_pkt->un.lsRjt.un.b.vendorUnique = 0x03;
@@ -8147,66 +7726,30 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 	}
 
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) rp;
-
-	/* Initalize iocb */
-
-	/*
-	 * DID == Bcast_DID is special case to indicate that RPI is being
-	 * passed in seq_id field
-	 */
+	/* DID == Bcast_DID is special case to indicate that */
+	/* RPI is being passed in seq_id field */
 	/* This is used by emlxs_send_logo() for target mode */
-	iocb->un.elsreq64.remoteID = (did == Bcast_DID) ? 0 : did;
-	iocb->ulpContext = (did == Bcast_DID) ? pkt->pkt_cmd_fhdr.seq_id : 0;
 
-	iocb->ulpCommand = CMD_ELS_REQUEST64_CR;
-	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
-
-	switch (FC_TRAN_CLASS(pkt->pkt_tran_flags)) {
-	case FC_TRAN_CLASS1:
-		iocb->ulpClass = CLASS1;
-		break;
-	case FC_TRAN_CLASS2:
-		iocb->ulpClass = CLASS2;
-		break;
-	case FC_TRAN_CLASS3:
-	default:
-		iocb->ulpClass = CLASS3;
-		break;
+	/* Initalize iocbq */
+	iocbq->node = (void *)ndlp;
+	if (emlxs_sli_prep_els_iocb(port, sbp) != FC_SUCCESS) {
+		return (FC_TRAN_BUSY);
 	}
-
-#ifdef SLI3_SUPPORT
-	if (hba->sli_mode >= 3) {
-		if (hba->topology != TOPOLOGY_LOOP) {
-			if ((cmd == ELS_CMD_FLOGI) || (cmd == ELS_CMD_FDISC)) {
-				iocb->ulpCT = 0x2;
-			} else {
-				iocb->ulpCT = 0x1;
-			}
-		}
-		iocb->ulpContext = port->vpi;
-	}
-#endif	/* SLI3_SUPPORT */
 
 	/* Check cmd */
 	switch (cmd) {
 	case ELS_CMD_PRLI:
 		{
-			/*
-			 * if our firmware version is 3.20 or later, set the
-			 * following bits for FC-TAPE support.
-			 */
+		/*
+		 * if our firmware version is 3.20 or later,
+		 * set the following bits for FC-TAPE support.
+		 */
 
-			if (port->ini_mode && hba->vpd.feaLevelHigh >= 0x02) {
+		if (port->ini_mode && hba->vpd.feaLevelHigh >= 0x02) {
 				els_pkt->un.prli.ConfmComplAllowed = 1;
 				els_pkt->un.prli.Retry = 1;
 				els_pkt->un.prli.TaskRetryIdReq = 1;
-			} else {
+		} else {
 				els_pkt->un.prli.ConfmComplAllowed = 0;
 				els_pkt->un.prli.Retry = 0;
 				els_pkt->un.prli.TaskRetryIdReq = 0;
@@ -8218,9 +7761,8 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		/* This is a patch for the ULP stack. */
 
 		/*
-		 * ULP only reads our service paramters once during
-		 * bind_port, but the service parameters change due to
-		 * topology.
+		 * ULP only reads our service paramters once during bind_port,
+		 * but the service parameters change due to topology.
 		 */
 	case ELS_CMD_FLOGI:
 	case ELS_CMD_FDISC:
@@ -8229,24 +7771,24 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		{
 			/* Copy latest service parameters to payload */
 			bcopy((void *) &port->sparam,
-			    (void *) &els_pkt->un.logi, sizeof (SERV_PARM));
+			    (void *)&els_pkt->un.logi, sizeof (SERV_PARM));
 
 #ifdef NPIV_SUPPORT
 			if ((hba->flag & FC_NPIV_ENABLED) &&
 			    (hba->flag & FC_NPIV_SUPPORTED) &&
 			    (cmd == ELS_CMD_PLOGI)) {
-				SERV_PARM *sp;
-				emlxs_vvl_fmt_t *vvl;
+				SERV_PARM	*sp;
+				emlxs_vvl_fmt_t	*vvl;
 
-				sp = (SERV_PARM *) & els_pkt->un.logi;
+				sp = (SERV_PARM *)&els_pkt->un.logi;
 				sp->valid_vendor_version = 1;
 				vvl = (emlxs_vvl_fmt_t *)&sp->vendorVersion[0];
 				vvl->un0.w0.oui = 0x0000C9;
 				vvl->un0.word0 = SWAP_DATA32(vvl->un0.word0);
-				vvl->un1.w1.vport = (port->vpi > 0) ? 1 : 0;
+				vvl->un1.w1.vport =  (port->vpi > 0) ? 1 : 0;
 				vvl->un1.word1 = SWAP_DATA32(vvl->un1.word1);
 			}
-#endif	/* NPIV_SUPPORT */
+#endif /* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 			emlxs_dhc_init_sp(port, did,
@@ -8262,7 +7804,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	mutex_enter(&sbp->mtx);
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
-	sbp->node = (void *) ndlp;
+	sbp->node = (void *)ndlp;
 	sbp->lun = 0;
 	sbp->class = iocb->ulpClass;
 	sbp->did = did;
@@ -8275,22 +7817,19 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	/* Check node */
 	switch (cmd) {
 	case ELS_CMD_FLOGI:
 		if (port->ini_mode) {
 			/* Make sure fabric node is destroyed */
 			/* It should already have been destroyed at link down */
-			/*
-			 * Unregister the fabric did and attempt a deferred
-			 * iocb send
-			 */
-			if (emlxs_mb_unreg_did(port, Fabric_DID, NULL,
-			    NULL, iocbq) == 0) {
-				/*
-				 * Deferring iocb tx until completion of
-				 * unreg
-				 */
+			/* Unregister the fabric did and attempt a deferred */
+			/* iocb send */
+			if (emlxs_mb_unreg_did(port, Fabric_DID, NULL, NULL,
+			    iocbq) == 0) {
+				/* Deferring iocb tx until */
+				/* completion of unreg */
 				return (FC_SUCCESS);
 			}
 		}
@@ -8313,6 +7852,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 			/* Flush chip queues */
 			(void) emlxs_chipq_node_flush(port, 0, ndlp, 0);
 		}
+
 		break;
 
 	case ELS_CMD_PRLI:
@@ -8332,13 +7872,14 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 			(void) emlxs_chipq_node_flush(port,
 			    &hba->ring[FC_FCP_RING], ndlp, 0);
 		}
+
 		break;
 
 	}
 
 	HBASTATS.ElsCmdIssued++;
 
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_ELS_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_ELS_RING], iocbq);
 
 	return (FC_SUCCESS);
 
@@ -8350,28 +7891,24 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 static int32_t
 emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	NODELIST *ndlp;
-	int i;
-	uint32_t cmd;
-	uint32_t ucmd;
-	ELS_PKT *els_pkt;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
-	uint16_t iotag;
-	uint32_t did;
-	char fcsp_msg[32];
-	uint8_t *ub_buffer;
-
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	NODELIST	*ndlp;
+	int		i;
+	uint32_t	cmd;
+	uint32_t	ucmd;
+	ELS_PKT		*els_pkt;
+	fc_unsol_buf_t	*ubp;
+	emlxs_ub_priv_t	*ub_priv;
+	uint32_t	did;
+	char		fcsp_msg[32];
+	uint8_t		*ub_buffer;
 
 	fcsp_msg[0] = 0;
 	pkt = PRIV2PKT(sbp);
-	els_pkt = (ELS_PKT *) pkt->pkt_cmd;
-	rp = &hba->ring[FC_ELS_RING];
+	els_pkt = (ELS_PKT *)pkt->pkt_cmd;
 	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	iocbq = &sbp->iocbq;
@@ -8391,7 +7928,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 			    (fct_els_t *)sbp->fct_cmd->cmd_specific;
 			ub_buffer = (uint8_t *)els->els_req_payload;
 		}
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 	} else {
 		/* Find the ub buffer that goes with this reply */
@@ -8401,6 +7938,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 			    pkt->pkt_cmd_fhdr.ox_id);
 			return (FC_BADPACKET);
 		}
+
 		ub_buffer = (uint8_t *)ubp->ub_buffer;
 		ub_priv = ubp->ub_fca_private;
 		ucmd = ub_priv->cmd;
@@ -8408,10 +7946,8 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 		ub_priv->flags |= EMLXS_UB_REPLY;
 
 		/* Reset oxid to ELS command */
-		/*
-		 * We do this because the ub is only valid until we return
-		 * from this thread
-		 */
+		/* We do this because the ub is only valid */
+		/* until we return from this thread */
 		pkt->pkt_cmd_fhdr.ox_id = (ucmd >> ELS_CMD_SHIFT) & 0xff;
 	}
 
@@ -8428,13 +7964,14 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
 
 				/*
-				 * Since we replied to this already, we won't
-				 * need to send this now
+				 * Since we replied to this already,
+				 * we won't need to send this now
 				 */
 				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
 				return (FC_SUCCESS);
 			}
+
 			break;
 		}
 #endif
@@ -8446,13 +7983,14 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
 
 				/*
-				 * Since we replied to this already, we won't
-				 * need to send this now
+				 * Since we replied to this already,
+				 * we won't need to send this now
 				 */
 				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
 				return (FC_SUCCESS);
 			}
+
 			break;
 		}
 #endif
@@ -8464,13 +8002,14 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 			/* Check if this was generated by ULP and not us */
 			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
 				/*
-				 * Since we replied to this already, we won't
-				 * need to send this now
+				 * Since we replied to this already,
+				 * we won't need to send this now
 				 */
 				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
 				return (FC_SUCCESS);
 			}
+
 			break;
 		}
 #endif
@@ -8485,20 +8024,20 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				cmd &= ELS_CMD_MASK;
 
 				/*
-				 * If ULP is accepting this, then close
-				 * affected node
+				 * If ULP is accepting this,
+				 * then close affected node
 				 */
-				if (port->ini_mode &&
-				    ub_buffer && cmd == ELS_CMD_ACC) {
-					fc_rscn_t *rscn;
-					uint32_t count;
-					uint32_t *lp;
+				if (port->ini_mode && ub_buffer && cmd
+				    == ELS_CMD_ACC) {
+					fc_rscn_t	*rscn;
+					uint32_t	count;
+					uint32_t	*lp;
 
 					/*
 					 * Only the Leadville code path will
-					 * come thru here. The RSCN data is
-					 * NOT swapped properly for the
-					 * Comstar code path.
+					 * come thru here. The RSCN data is NOT
+					 * swapped properly for the Comstar code
+					 * path.
 					 */
 					lp = (uint32_t *)ub_buffer;
 					rscn = (fc_rscn_t *)lp++;
@@ -8511,6 +8050,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 						    *lp);
 					}
 				}
+
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_reply_msg,
 				    "RSCN %s: did=%x oxid=%x rxid=%x. "
 				    "Intercepted.", emlxs_elscmd_xlate(cmd),
@@ -8518,13 +8058,14 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				    pkt->pkt_cmd_fhdr.rx_id);
 
 				/*
-				 * Since we generated this RSCN, we won't
-				 * need to send this reply
+				 * Since we generated this RSCN,
+				 * we won't need to send this reply
 				 */
 				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
 				return (FC_SUCCESS);
 			}
+
 			break;
 		}
 #endif
@@ -8544,40 +8085,18 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				    pkt->pkt_cmd_fhdr.rx_id);
 
 				/*
-				 * Since we generated this PLOGI, we won't
-				 * need to send this reply
+				 * Since we generated this PLOGI,
+				 * we won't need to send this reply
 				 */
 				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
 				return (FC_SUCCESS);
 			}
+
 			break;
 		}
 
 	}
-
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
-
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag. did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	/* Point of no return */
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_els_pkt(sbp);
@@ -8605,6 +8124,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				els_pkt->un.prli.TaskRetryIdReq = 0;
 			}
 		}
+
 		break;
 
 	case ELS_CMD_FLOGI:
@@ -8616,14 +8136,14 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 			/* This is a patch for the ULP stack. */
 
 			/*
-			 * ULP only reads our service parameters once during
-			 * bind_port,
+			 * ULP only reads our service parameters
+			 * once during bind_port, but the service
+			 * parameters change due to topology.
 			 */
-			/* but the service parameters change due to topology. */
 
 			/* Copy latest service parameters to payload */
-			bcopy((void *) &port->sparam,
-			    (void *) &els_pkt->un.logi, sizeof (SERV_PARM));
+			bcopy((void *)&port->sparam,
+			    (void *)&els_pkt->un.logi, sizeof (SERV_PARM));
 
 #ifdef DHCHAP_SUPPORT
 			emlxs_dhc_init_sp(port, did,
@@ -8631,33 +8151,15 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 #endif	/* DHCHAP_SUPPORT */
 
 		}
+
 		break;
 
 	}
 
 	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) NULL;
-	iocbq->ring = (void *) rp;
-
-	/* Initalize iocb */
-	iocb->ulpContext = (volatile uint16_t) pkt->pkt_cmd_fhdr.rx_id;
-	iocb->ulpCommand = CMD_XMIT_ELS_RSP64_CX;
-	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
-
-	switch (FC_TRAN_CLASS(pkt->pkt_tran_flags)) {
-	case FC_TRAN_CLASS1:
-		iocb->ulpClass = CLASS1;
-		break;
-	case FC_TRAN_CLASS2:
-		iocb->ulpClass = CLASS2;
-		break;
-	case FC_TRAN_CLASS3:
-	default:
-		iocb->ulpClass = CLASS3;
-		break;
+	iocbq->node = (void *)NULL;
+	if (emlxs_sli_prep_els_iocb(port, sbp) != FC_SUCCESS) {
+		return (FC_TRAN_BUSY);
 	}
 
 	/* Initalize sbp */
@@ -8680,14 +8182,14 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	case ELS_CMD_RSCN:
 		{
 			if (port->ini_mode && ub_buffer && cmd == ELS_CMD_ACC) {
-				fc_rscn_t *rscn;
-				uint32_t count;
-				uint32_t *lp = NULL;
+				fc_rscn_t	*rscn;
+				uint32_t	count;
+				uint32_t	*lp = NULL;
 
 				/*
-				 * Only the Leadville code path will come
-				 * thru here. The RSCN data is NOT swapped
-				 * properly for the Comstar code path.
+				 * Only the Leadville code path will come thru
+				 * here. The RSCN data is NOT swapped properly
+				 * for the Comstar code path.
 				 */
 				lp = (uint32_t *)ub_buffer;
 				rscn = (fc_rscn_t *)lp++;
@@ -8719,6 +8221,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				(void) emlxs_chipq_node_flush(port, 0, ndlp, 0);
 			}
 		}
+
 		break;
 
 	case ELS_CMD_PRLI:
@@ -8740,6 +8243,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				    &hba->ring[FC_FCP_RING], ndlp, 0);
 			}
 		}
+
 		break;
 
 	case ELS_CMD_PRLO:
@@ -8760,6 +8264,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				    &hba->ring[FC_FCP_RING], ndlp, 0);
 			}
 		}
+
 		break;
 
 	case ELS_CMD_LOGO:
@@ -8779,6 +8284,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 				(void) emlxs_chipq_node_flush(port, 0, ndlp, 0);
 			}
 		}
+
 		break;
 	}
 
@@ -8786,9 +8292,10 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	HBASTATS.ElsRspIssued++;
 
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_ELS_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_ELS_RING], iocbq);
 
 	return (FC_SUCCESS);
 
@@ -8797,22 +8304,18 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 #ifdef MENLO_SUPPORT
 static int32_t
-emlxs_send_menlo_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
+emlxs_send_menlo(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	NODELIST *ndlp;
-	/* int i; */
-	uint16_t iotag;
-	uint32_t did;
-	uint32_t *lp;
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	NODELIST	*ndlp;
+	uint32_t	did;
+	uint32_t	*lp;
 
 	pkt = PRIV2PKT(sbp);
 	did = EMLXS_MENLO_DID;
-	rp = &hba->ring[FC_CT_RING];
 	lp = (uint32_t *)pkt->pkt_cmd;
 
 	iocbq = &sbp->iocbq;
@@ -8826,72 +8329,31 @@ emlxs_send_menlo_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_BADPACKET);
 	}
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
 
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag. did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	/* Point of no return */
-
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
 	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) rp;
-
-	/* Fill in rest of iocb */
-	iocb->un.genreq64.w5.hcsw.Fctl = LA;
-
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_LAST_SEQ) {
-		iocb->un.genreq64.w5.hcsw.Fctl |= LSEQ;
+	if (emlxs_sli_prep_ct_iocb(port, sbp) != FC_SUCCESS) {
+		return (FC_TRAN_BUSY);
 	}
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_SEQ_INITIATIVE) {
-		iocb->un.genreq64.w5.hcsw.Fctl |= SI;
-	}
-	iocb->un.genreq64.w5.hcsw.Dfctl = 0;
-	iocb->un.genreq64.w5.hcsw.Rctl = pkt->pkt_cmd_fhdr.r_ctl;
-	iocb->un.genreq64.w5.hcsw.Type = pkt->pkt_cmd_fhdr.type;
-
-	iocb->ulpIoTag = iotag;
-	iocb->ulpClass = CLASS3;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
 
 	if (pkt->pkt_tran_type == FC_PKT_EXCHANGE) {
 		/* Cmd phase */
 
 		/* Initalize iocb */
-		iocb->ulpCommand = CMD_GEN_REQUEST64_CR;
 		iocb->un.genreq64.param = pkt->pkt_cmd_fhdr.d_id;
 		iocb->ulpContext = 0;
 		iocb->ulpPU = 3;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: [%08x,%08x,%08x,%08x]",
-		    emlxs_menlo_cmd_xlate(SWAP_LONG(lp[0])),
-		    SWAP_LONG(lp[1]), SWAP_LONG(lp[2]),
-		    SWAP_LONG(lp[3]), SWAP_LONG(lp[4]));
+		    emlxs_menlo_cmd_xlate(SWAP_LONG(lp[0])), SWAP_LONG(lp[1]),
+		    SWAP_LONG(lp[2]), SWAP_LONG(lp[3]), SWAP_LONG(lp[4]));
 
 	} else {	/* FC_PKT_OUTBOUND */
+
 		/* MENLO_CMD_FW_DOWNLOAD Data Phase */
+		iocb->ulpCommand = CMD_GEN_REQUEST64_CX;
 
 		/* Initalize iocb */
-		iocb->ulpCommand = CMD_GEN_REQUEST64_CX;
 		iocb->un.genreq64.param = 0;
 		iocb->ulpContext = pkt->pkt_cmd_fhdr.rx_id;
 		iocb->ulpPU = 1;
@@ -8917,30 +8379,26 @@ emlxs_send_menlo_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	HBASTATS.CtCmdIssued++;
 
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
 
 	return (FC_SUCCESS);
 
-} /* emlxs_send_menlo_cmd() */
-#endif	/* MENLO_SUPPORT */
+} /* emlxs_send_menlo() */
+#endif /* MENLO_SUPPORT */
 
 
 static int32_t
 emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	NODELIST *ndlp;
-	/* int i; */
-	uint16_t iotag;
-	uint32_t did;
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	NODELIST	*ndlp;
+	uint32_t	did;
 
 	pkt = PRIV2PKT(sbp);
 	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
-	rp = &hba->ring[FC_CT_RING];
 
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
@@ -8953,130 +8411,77 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		return (FC_BADPACKET);
 	}
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
-
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag. did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	/* Point of no return */
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_ct_pkt(sbp);
 #endif	/* EMLXS_MODREV2X */
 
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) ndlp;
-	iocbq->ring = (void *) rp;
-
-	/* Fill in rest of iocb */
-	iocb->un.genreq64.w5.hcsw.Fctl = LA;
-
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_LAST_SEQ) {
-		iocb->un.genreq64.w5.hcsw.Fctl |= LSEQ;
-	}
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_SEQ_INITIATIVE) {
-		iocb->un.genreq64.w5.hcsw.Fctl |= SI;
-	}
-	iocb->un.genreq64.w5.hcsw.Dfctl = 0;
-	iocb->un.genreq64.w5.hcsw.Rctl = pkt->pkt_cmd_fhdr.r_ctl;
-	iocb->un.genreq64.w5.hcsw.Type = pkt->pkt_cmd_fhdr.type;
-
-	/* Initalize iocb */
-	iocb->ulpCommand = CMD_GEN_REQUEST64_CR;
-	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
-	iocb->ulpContext = ndlp->nlp_Rpi;
-
-	switch (FC_TRAN_CLASS(pkt->pkt_tran_flags)) {
-	case FC_TRAN_CLASS1:
-		iocb->ulpClass = CLASS1;
-		break;
-	case FC_TRAN_CLASS2:
-		iocb->ulpClass = CLASS2;
-		break;
-	case FC_TRAN_CLASS3:
-	default:
-		iocb->ulpClass = CLASS3;
-		break;
+	iocbq->node = (void *)ndlp;
+	if (emlxs_sli_prep_ct_iocb(port, sbp) != FC_SUCCESS) {
+		return (FC_TRAN_BUSY);
 	}
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
-	sbp->node = (void *) ndlp;
+	sbp->node = (void *)ndlp;
 	sbp->lun = 0;
 	sbp->class = iocb->ulpClass;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
 	if (did == NameServer_DID) {
-		SLI_CT_REQUEST *CtCmd;
-		uint32_t *lp0;
+		SLI_CT_REQUEST	*CtCmd;
+		uint32_t	*lp0;
 
-		CtCmd = (SLI_CT_REQUEST *) pkt->pkt_cmd;
+		CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
 		lp0 = (uint32_t *)pkt->pkt_cmd;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: did=%x [%08x,%08x]",
 		    emlxs_ctcmd_xlate(
-		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)), did,
-		    SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
+		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
+		    did, SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
 
 		if (hba->flag & FC_NPIV_DELAY_REQUIRED) {
 			sbp->pkt_flags |= PACKET_DELAY_REQUIRED;
 		}
-	} else if (did == FDMI_DID) {
-		SLI_CT_REQUEST *CtCmd;
-		uint32_t *lp0;
 
-		CtCmd = (SLI_CT_REQUEST *) pkt->pkt_cmd;
+	} else if (did == FDMI_DID) {
+		SLI_CT_REQUEST	*CtCmd;
+		uint32_t	*lp0;
+
+		CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
 		lp0 = (uint32_t *)pkt->pkt_cmd;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: did=%x [%08x,%08x]",
 		    emlxs_mscmd_xlate(
-		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)), did,
-		    SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
+		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
+		    did, SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
 	} else {
-		SLI_CT_REQUEST *CtCmd;
-		uint32_t *lp0;
+		SLI_CT_REQUEST	*CtCmd;
+		uint32_t	*lp0;
 
-		CtCmd = (SLI_CT_REQUEST *) pkt->pkt_cmd;
+		CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
 		lp0 = (uint32_t *)pkt->pkt_cmd;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: did=%x [%08x,%08x]",
 		    emlxs_rmcmd_xlate(
-		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)), did,
-		    SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
+		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
+		    did, SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
 	}
 
 	if (pkt->pkt_cmdlen) {
 		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	HBASTATS.CtCmdIssued++;
 
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
 
 	return (FC_SUCCESS);
 
@@ -9086,91 +8491,29 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 static int32_t
 emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_packet_t *pkt;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	RING *rp;
-	/* NODELIST *ndlp; */
-	/* int i; */
-	uint16_t iotag;
-	uint32_t did;
-	uint32_t *cmd;
-	SLI_CT_REQUEST *CtCmd;
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	IOCBQ		*iocbq;
+	IOCB		*iocb;
+	uint32_t	did;
+	uint32_t	*cmd;
+	SLI_CT_REQUEST	*CtCmd;
 
 	pkt = PRIV2PKT(sbp);
-	rp = &hba->ring[FC_CT_RING];
 	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
-	CtCmd = (SLI_CT_REQUEST *) pkt->pkt_cmd;
+	CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
 	cmd = (uint32_t *)pkt->pkt_cmd;
 
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
 
-	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
-
-	if (!iotag) {
-		/*
-		 * No more command slots available, retry later
-		 */
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to allocate iotag. did=0x%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	if (emlxs_bde_setup(port, sbp)) {
-		/* Unregister the packet */
-		(void) emlxs_unregister_pkt(rp, iotag, 0);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Adapter Busy. Unable to setup buffer list. did=%x", did);
-
-		return (FC_TRAN_BUSY);
-	}
-	/* Point of no return */
-
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_ct_pkt(sbp);
 #endif	/* EMLXS_MODREV2X */
 
-	/* Initalize iocbq */
-	iocbq->port = (void *) port;
-	iocbq->node = (void *) NULL;
-	iocbq->ring = (void *) rp;
-
-	/* Initalize iocb */
-	iocb->ulpCommand = CMD_XMIT_SEQUENCE64_CX;
-	iocb->ulpIoTag = iotag;
-
-	/* Fill in rest of iocb */
-	iocb->un.xseq64.w5.hcsw.Fctl = LA;
-
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_LAST_SEQ) {
-		iocb->un.xseq64.w5.hcsw.Fctl |= LSEQ;
-	}
-	if (pkt->pkt_cmd_fhdr.f_ctl & F_CTL_SEQ_INITIATIVE) {
-		iocb->un.xseq64.w5.hcsw.Fctl |= SI;
-	}
-	iocb->un.xseq64.w5.hcsw.Dfctl = pkt->pkt_cmd_fhdr.df_ctl;
-	iocb->un.xseq64.w5.hcsw.Rctl = pkt->pkt_cmd_fhdr.r_ctl;
-	iocb->un.xseq64.w5.hcsw.Type = pkt->pkt_cmd_fhdr.type;
-
-	iocb->ulpRsvdByte = ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpContext = pkt->pkt_cmd_fhdr.rx_id;
-	iocb->ulpOwner = OWN_CHIP;
-
-	switch (FC_TRAN_CLASS(pkt->pkt_tran_flags)) {
-	case FC_TRAN_CLASS1:
-		iocb->ulpClass = CLASS1;
-		break;
-	case FC_TRAN_CLASS2:
-		iocb->ulpClass = CLASS2;
-		break;
-	case FC_TRAN_CLASS3:
-	default:
-		iocb->ulpClass = CLASS3;
-		break;
+	iocbq->node = (void *)NULL;
+	if (emlxs_sli_prep_ct_iocb(port, sbp) != FC_SUCCESS) {
+		return (FC_TRAN_BUSY);
 	}
 
 	/* Initalize sbp */
@@ -9185,17 +8528,20 @@ emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_reply_msg,
 	    "%s: Rsn=%x Exp=%x [%08x,%08x] rxid=%x ",
-	    emlxs_rmcmd_xlate(SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
-	    CtCmd->ReasonCode, CtCmd->Explanation, SWAP_DATA32(cmd[4]),
-	    SWAP_DATA32(cmd[5]), pkt->pkt_cmd_fhdr.rx_id);
+	    emlxs_rmcmd_xlate(SWAP_DATA16(
+	    CtCmd->CommandResponse.bits.CmdRsp)),
+	    CtCmd->ReasonCode, CtCmd->Explanation,
+	    SWAP_DATA32(cmd[4]), SWAP_DATA32(cmd[5]),
+	    pkt->pkt_cmd_fhdr.rx_id);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0,
-		    pkt->pkt_cmdlen, DDI_DMA_SYNC_FORDEV);
+		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		    DDI_DMA_SYNC_FORDEV);
 	}
+
 	HBASTATS.CtRspIssued++;
 
-	emlxs_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
 
 	return (FC_SUCCESS);
 
@@ -9203,8 +8549,8 @@ emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 
 /*
- * emlxs_get_instance() Given a ddi ddiinst, return a
- * Fibre Channel (emlx) ddiinst.
+ * emlxs_get_instance()
+ * Given a ddi ddiinst, return a Fibre Channel (emlx) ddiinst.
  */
 extern uint32_t
 emlxs_get_instance(int32_t ddiinst)
@@ -9230,9 +8576,9 @@ emlxs_get_instance(int32_t ddiinst)
 
 
 /*
- * emlxs_add_instance() Given a ddi ddiinst, create a Fibre Channel
- * (emlx) ddiinst. emlx ddiinsts are the order that
- * emlxs_attach gets called, starting at 0.
+ * emlxs_add_instance()
+ * Given a ddi ddiinst, create a Fibre Channel (emlx) ddiinst.
+ * emlx ddiinsts are the order that emlxs_attach gets called, starting at 0.
  */
 static uint32_t
 emlxs_add_instance(int32_t ddiinst)
@@ -9256,6 +8602,7 @@ emlxs_add_instance(int32_t ddiinst)
 			emlxs_device.hba_count = emlxs_instance_count;
 		}
 	}
+
 	mutex_exit(&emlxs_device.lock);
 
 	return (i);
@@ -9268,9 +8615,9 @@ extern void
 emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
     uint32_t doneq)
 {
-	emlxs_hba_t *hba;
-	emlxs_port_t *port;
-	emlxs_buf_t *fpkt;
+	emlxs_hba_t	*hba;
+	emlxs_port_t	*port;
+	emlxs_buf_t	*fpkt;
 
 	port = sbp->port;
 
@@ -9280,6 +8627,7 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 
 		return;
 	}
+
 	hba = HBA;
 
 	mutex_enter(&sbp->mtx);
@@ -9291,37 +8639,49 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 		if (sbp->pkt_flags & PACKET_RETURNED) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
-			    "Packet already returned. sbp=%p flags=%x",
-			    sbp, sbp->pkt_flags);
-		} else if (sbp->pkt_flags & PACKET_COMPLETED) {
+			    "Packet already returned. sbp=%p flags=%x", sbp,
+			    sbp->pkt_flags);
+		}
+
+		else if (sbp->pkt_flags & PACKET_COMPLETED) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
-			    "Packet already completed. sbp=%p flags=%x",
-			    sbp, sbp->pkt_flags);
-		} else if (sbp->pkt_flags & PACKET_IN_DONEQ) {
+			    "Packet already completed. sbp=%p flags=%x", sbp,
+			    sbp->pkt_flags);
+		}
+
+		else if (sbp->pkt_flags & PACKET_IN_DONEQ) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
-			    "Pkt already on done queue. sbp=%p flags=%x",
-			    sbp, sbp->pkt_flags);
-		} else if (sbp->pkt_flags & PACKET_IN_COMPLETION) {
+			    "Pkt already on done queue. sbp=%p flags=%x", sbp,
+			    sbp->pkt_flags);
+		}
+
+		else if (sbp->pkt_flags & PACKET_IN_COMPLETION) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
 			    "Packet already in completion. sbp=%p flags=%x",
 			    sbp, sbp->pkt_flags);
-		} else if (sbp->pkt_flags & PACKET_IN_CHIPQ) {
+		}
+
+		else if (sbp->pkt_flags & PACKET_IN_CHIPQ) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
 			    "Packet still on chip queue. sbp=%p flags=%x",
 			    sbp, sbp->pkt_flags);
-		} else if (sbp->pkt_flags & PACKET_IN_TXQ) {
+		}
+
+		else if (sbp->pkt_flags & PACKET_IN_TXQ) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
-			    "Packet still on tx queue. sbp=%p flags=%x",
-			    sbp, sbp->pkt_flags);
+			    "Packet still on tx queue. sbp=%p flags=%x", sbp,
+			    sbp->pkt_flags);
 		}
+
 		mutex_exit(&sbp->mtx);
 		return;
 	}
+
 	/* Packet is now in completion */
 	sbp->pkt_flags |= PACKET_IN_COMPLETION;
 
@@ -9329,13 +8689,14 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 	if (!(sbp->pkt_flags & PACKET_STATE_VALID)) {
 		emlxs_set_pkt_state(sbp, iostat, localstat, 0);
 	}
+
 	/* Check for parent flush packet */
 	/* If pkt has a parent flush packet then adjust its count now */
 	fpkt = sbp->fpkt;
 	if (fpkt) {
 		/*
-		 * We will try to NULL sbp->fpkt inside the fpkt's mutex if
-		 * possible
+		 * We will try to NULL sbp->fpkt inside the
+		 * fpkt's mutex if possible
 		 */
 
 		if (!(fpkt->pkt_flags & PACKET_RETURNED)) {
@@ -9346,15 +8707,15 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 			sbp->fpkt = NULL;
 			mutex_exit(&fpkt->mtx);
 		} else {	/* fpkt has been returned already */
+
 			sbp->fpkt = NULL;
 		}
 	}
+
 	/* If pkt is polled, then wake up sleeping thread */
 	if (sbp->pkt_flags & PACKET_POLLED) {
-		/*
-		 * Don't set the PACKET_RETURNED flag here because the
-		 * polling thread will do it
-		 */
+		/* Don't set the PACKET_RETURNED flag here */
+		/* because the polling thread will do it */
 		sbp->pkt_flags |= PACKET_COMPLETED;
 		mutex_exit(&sbp->mtx);
 
@@ -9363,19 +8724,17 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 		cv_broadcast(&EMLXS_PKT_CV);
 		mutex_exit(&EMLXS_PKT_LOCK);
 	}
-	/*
-	 * If packet was generated by our driver, then complete it
-	 * immediately
-	 */
+
+	/* If packet was generated by our driver, */
+	/* then complete it immediately */
 	else if (sbp->pkt_flags & PACKET_ALLOCATED) {
 		mutex_exit(&sbp->mtx);
 
 		emlxs_iodone(sbp);
 	}
-	/*
-	 * Put the pkt on the done queue for callback completion in another
-	 * thread
-	 */
+
+	/* Put the pkt on the done queue for callback */
+	/* completion in another thread */
 	else {
 		sbp->pkt_flags |= PACKET_IN_DONEQ;
 		sbp->next = NULL;
@@ -9394,13 +8753,63 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 		mutex_exit(&EMLXS_PORT_LOCK);
 
 		/* Trigger a thread to service the doneq */
-		emlxs_thread_trigger1(&hba->iodone_thread, emlxs_iodone_server);
+		emlxs_thread_trigger1(&hba->iodone_thread,
+		    emlxs_iodone_server);
 	}
 
 	return;
 
 } /* emlxs_pkt_complete() */
 
+
+#ifdef SAN_DIAG_SUPPORT
+/*
+ * This routine is called with EMLXS_PORT_LOCK held so we can just increment
+ * normally. Don't have to use atomic operations.
+ */
+extern void
+emlxs_update_sd_bucket(emlxs_buf_t *sbp)
+{
+	emlxs_port_t	*vport;
+	fc_packet_t	*pkt;
+	uint32_t	did;
+	hrtime_t	t;
+	hrtime_t	delta_time;
+	int		i;
+	NODELIST	*ndlp;
+
+	vport = sbp->port;
+
+	if ((sd_bucket.search_type == 0) ||
+	    (vport->sd_io_latency_state != SD_COLLECTING))
+		return;
+
+	/* Compute the iolatency time in microseconds */
+	t = gethrtime();
+	delta_time = t - sbp->sd_start_time;
+	pkt = PRIV2PKT(sbp);
+	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	ndlp = emlxs_node_find_did(vport, did);
+
+	if (ndlp) {
+		if (delta_time >=
+		    sd_bucket.values[SD_IO_LATENCY_MAX_BUCKETS - 1])
+			ndlp->sd_dev_bucket[SD_IO_LATENCY_MAX_BUCKETS - 1].
+			    count++;
+		else if (delta_time <= sd_bucket.values[0])
+			ndlp->sd_dev_bucket[0].count++;
+		else {
+			for (i = 1; i < SD_IO_LATENCY_MAX_BUCKETS; i++) {
+				if ((delta_time > sd_bucket.values[i-1]) &&
+				    (delta_time <= sd_bucket.values[i])) {
+					ndlp->sd_dev_bucket[i].count++;
+					break;
+				}
+			}
+		}
+	}
+}
+#endif /* SAN_DIAG_SUPPORT */
 
 /*ARGSUSED*/
 static void
@@ -9445,11 +8854,8 @@ emlxs_iodone_server(void *arg1, void *arg2, void *arg3)
 static void
 emlxs_iodone(emlxs_buf_t *sbp)
 {
-	fc_packet_t *pkt;
-	/* emlxs_hba_t *hba; */
-	/* emlxs_port_t *port; */
+	fc_packet_t	*pkt;
 
-	/* port = sbp->port; */
 	pkt = PRIV2PKT(sbp);
 
 	/* Check one more time that the  pkt has not already been returned */
@@ -9467,6 +8873,7 @@ emlxs_iodone(emlxs_buf_t *sbp)
 	if (pkt->pkt_comp) {
 		(*pkt->pkt_comp) (pkt);
 	}
+
 	return;
 
 } /* emlxs_iodone() */
@@ -9476,15 +8883,15 @@ emlxs_iodone(emlxs_buf_t *sbp)
 extern fc_unsol_buf_t *
 emlxs_ub_find(emlxs_port_t *port, uint32_t token)
 {
-	/* emlxs_hba_t *hba = HBA; */
-	emlxs_unsol_buf_t *pool;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
+	emlxs_unsol_buf_t	*pool;
+	fc_unsol_buf_t		*ubp;
+	emlxs_ub_priv_t		*ub_priv;
 
 	/* Check if this is a valid ub token */
 	if (token < EMLXS_UB_TOKEN_OFFSET) {
 		return (NULL);
 	}
+
 	mutex_enter(&EMLXS_UB_LOCK);
 
 	pool = port->ub_pool;
@@ -9492,27 +8899,33 @@ emlxs_ub_find(emlxs_port_t *port, uint32_t token)
 		/* Find a pool with the proper token range */
 		if (token >= pool->pool_first_token &&
 		    token <= pool->pool_last_token) {
-			ubp = (fc_unsol_buf_t *)
-			    &pool->fc_ubufs[(token - pool->pool_first_token)];
+			ubp = (fc_unsol_buf_t *)&pool->fc_ubufs[(token -
+			    pool->pool_first_token)];
 			ub_priv = ubp->ub_fca_private;
 
 			if (ub_priv->token != token) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "ub_find: Invalid token=%x", ubp,
-				    token, ub_priv->token);
-
-				ubp = NULL;
-			} else if (!(ub_priv->flags & EMLXS_UB_IN_USE)) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-				    "ub_find: Buffer not in use. "
-				    "buffer=%p token=%x", ubp, token);
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "ub_find: Invalid token=%x", ubp, token,
+				    ub_priv->token);
 
 				ubp = NULL;
 			}
+
+			else if (!(ub_priv->flags & EMLXS_UB_IN_USE)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_sfs_debug_msg,
+				    "ub_find: Buffer not in use. buffer=%p "
+				    "token=%x", ubp, token);
+
+				ubp = NULL;
+			}
+
 			mutex_exit(&EMLXS_UB_LOCK);
 
 			return (ubp);
 		}
+
 		pool = pool->pool_next;
 	}
 
@@ -9525,16 +8938,17 @@ emlxs_ub_find(emlxs_port_t *port, uint32_t token)
 
 
 extern fc_unsol_buf_t *
-emlxs_ub_get(emlxs_port_t *port, uint32_t size, uint32_t type, uint32_t reserve)
+emlxs_ub_get(emlxs_port_t *port, uint32_t size, uint32_t type,
+    uint32_t reserve)
 {
-	emlxs_hba_t *hba = HBA;
-	emlxs_unsol_buf_t *pool;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
-	uint32_t i;
-	uint32_t resv_flag;
-	uint32_t pool_free;
-	uint32_t pool_free_resv;
+	emlxs_hba_t		*hba = HBA;
+	emlxs_unsol_buf_t	*pool;
+	fc_unsol_buf_t		*ubp;
+	emlxs_ub_priv_t		*ub_priv;
+	uint32_t		i;
+	uint32_t		resv_flag;
+	uint32_t		pool_free;
+	uint32_t		pool_free_resv;
 
 	mutex_enter(&EMLXS_UB_LOCK);
 
@@ -9546,11 +8960,14 @@ emlxs_ub_get(emlxs_port_t *port, uint32_t size, uint32_t type, uint32_t reserve)
 		    (pool->pool_buf_size < size)) {
 			goto next_pool;
 		}
+
+
 		/* Adjust free counts based on availablity    */
 		/* The free reserve count gets first priority */
 		pool_free_resv =
 		    min(pool->pool_free_resv, pool->pool_available);
-		pool_free = min(pool->pool_free,
+		pool_free =
+		    min(pool->pool_free,
 		    (pool->pool_available - pool_free_resv));
 
 		/* Initialize reserve flag */
@@ -9566,6 +8983,7 @@ emlxs_ub_get(emlxs_port_t *port, uint32_t size, uint32_t type, uint32_t reserve)
 		} else if (pool_free == 0) {
 			goto next_pool;
 		}
+
 		/* Find next available free buffer in this pool */
 		for (i = 0; i < pool->pool_nentries; i++) {
 			ubp = (fc_unsol_buf_t *)&pool->fc_ubufs[i];
@@ -9575,8 +8993,12 @@ emlxs_ub_get(emlxs_port_t *port, uint32_t size, uint32_t type, uint32_t reserve)
 			    ub_priv->flags != EMLXS_UB_FREE) {
 				continue;
 			}
+
 			ub_priv->time = hba->timer_tics;
-			ub_priv->timeout = (5 * 60);	/* Timeout in 5 mins */
+
+			/* Timeout in 5 minutes */
+			ub_priv->timeout = (5 * 60);
+
 			ub_priv->flags = EMLXS_UB_IN_USE;
 
 			/* Alloc the buffer from the pool */
@@ -9588,8 +9010,8 @@ emlxs_ub_get(emlxs_port_t *port, uint32_t size, uint32_t type, uint32_t reserve)
 			}
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_detail_msg,
-			    "ub_get: ubp=%p token=%x (%d,%d,%d,%d)",
-			    ubp, ub_priv->token, pool->pool_nentries,
+			    "ub_get: ubp=%p token=%x (%d,%d,%d,%d)", ubp,
+			    ub_priv->token, pool->pool_nentries,
 			    pool->pool_available, pool->pool_free,
 			    pool->pool_free_resv);
 
@@ -9614,13 +9036,11 @@ extern void
 emlxs_set_pkt_state(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
     uint32_t lock)
 {
-	/* emlxs_port_t *port = sbp->port; */
-	/* emlxs_hba_t *hba = HBA; */
-	fc_packet_t *pkt;
-	fcp_rsp_t *fcp_rsp;
-	uint32_t i;
-	emlxs_xlat_err_t *tptr;
-	emlxs_xlat_err_t *entry;
+	fc_packet_t		*pkt;
+	fcp_rsp_t		*fcp_rsp;
+	uint32_t		i;
+	emlxs_xlat_err_t	*tptr;
+	emlxs_xlat_err_t	*entry;
 
 
 	pkt = PRIV2PKT(sbp);
@@ -9628,6 +9048,7 @@ emlxs_set_pkt_state(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 	if (lock) {
 		mutex_enter(&sbp->mtx);
 	}
+
 	if (!(sbp->pkt_flags & PACKET_STATE_VALID)) {
 		sbp->pkt_flags |= PACKET_STATE_VALID;
 
@@ -9639,28 +9060,29 @@ emlxs_set_pkt_state(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 				if (iostat == tptr->emlxs_status) {
 					entry = tptr;
 					break;
-				}
+		}
 			}
 		} else {	/* iostate == IOSTAT_LOCAL_REJECT */
+
 			tptr = emlxs_ioerr_tbl;
 			for (i = 0; i < IOERR_MAX; i++, tptr++) {
 				if (localstat == tptr->emlxs_status) {
 					entry = tptr;
 					break;
-				}
+		}
 			}
 		}
 
 		if (entry) {
-			pkt->pkt_state = entry->pkt_state;
+			pkt->pkt_state  = entry->pkt_state;
 			pkt->pkt_reason = entry->pkt_reason;
-			pkt->pkt_expln = entry->pkt_expln;
+			pkt->pkt_expln  = entry->pkt_expln;
 			pkt->pkt_action = entry->pkt_action;
 		} else {
 			/* Set defaults */
-			pkt->pkt_state = FC_PKT_TRAN_ERROR;
+			pkt->pkt_state  = FC_PKT_TRAN_ERROR;
 			pkt->pkt_reason = FC_REASON_ABORTED;
-			pkt->pkt_expln = FC_EXPLN_NONE;
+			pkt->pkt_expln  = FC_EXPLN_NONE;
 			pkt->pkt_action = FC_ACTION_RETRYABLE;
 		}
 
@@ -9676,27 +9098,27 @@ emlxs_set_pkt_state(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 				pkt->pkt_data_resid = 0;
 
 				if ((pkt->pkt_cmd_fhdr.type ==
-				    FC_TYPE_SCSI_FCP) &&
-				    pkt->pkt_rsplen && pkt->pkt_resp) {
+				    FC_TYPE_SCSI_FCP) && pkt->pkt_rsplen &&
+				    pkt->pkt_resp) {
 					fcp_rsp = (fcp_rsp_t *)pkt->pkt_resp;
 
-					fcp_rsp->fcp_u.fcp_status.rsp_len_set =
-					    1;
+					fcp_rsp->fcp_u.fcp_status.
+					    rsp_len_set = 1;
 					fcp_rsp->fcp_response_len = 8;
 				}
 			} else {
-				/*
-				 * Otherwise assume no data and no response
-				 * received
-				 */
+				/* Otherwise assume no data */
+				/* and no response received */
 				pkt->pkt_data_resid = pkt->pkt_datalen;
 				pkt->pkt_resp_resid = pkt->pkt_rsplen;
 			}
 		}
 	}
+
 	if (lock) {
 		mutex_exit(&sbp->mtx);
 	}
+
 	return;
 
 } /* emlxs_set_pkt_state() */
@@ -9707,9 +9129,9 @@ emlxs_set_pkt_state(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 extern void
 emlxs_swap_service_params(SERV_PARM *sp)
 {
-	uint16_t *p;
-	int size;
-	int i;
+	uint16_t	*p;
+	int		size;
+	int		i;
 
 	size = (sizeof (CSP) - 4) / 2;
 	p = (uint16_t *)&sp->cmn;
@@ -9751,22 +9173,27 @@ emlxs_unswap_pkt(emlxs_buf_t *sbp)
 {
 	if (sbp->pkt_flags & PACKET_FCP_SWAPPED) {
 		emlxs_swap_fcp_pkt(sbp);
-	} else if (sbp->pkt_flags & PACKET_ELS_SWAPPED) {
+	}
+
+	else if (sbp->pkt_flags & PACKET_ELS_SWAPPED) {
 		emlxs_swap_els_pkt(sbp);
-	} else if (sbp->pkt_flags & PACKET_CT_SWAPPED) {
+	}
+
+	else if (sbp->pkt_flags & PACKET_CT_SWAPPED) {
 		emlxs_swap_ct_pkt(sbp);
 	}
+
 } /* emlxs_unswap_pkt() */
 
 
 extern void
 emlxs_swap_fcp_pkt(emlxs_buf_t *sbp)
 {
-	fc_packet_t *pkt;
-	FCP_CMND *cmd;
-	fcp_rsp_t *rsp;
-	uint16_t *lunp;
-	uint32_t i;
+	fc_packet_t	*pkt;
+	FCP_CMND	*cmd;
+	fcp_rsp_t	*rsp;
+	uint16_t	*lunp;
+	uint32_t	i;
 
 	mutex_enter(&sbp->mtx);
 
@@ -9774,6 +9201,7 @@ emlxs_swap_fcp_pkt(emlxs_buf_t *sbp)
 		mutex_exit(&sbp->mtx);
 		return;
 	}
+
 	if (sbp->pkt_flags & PACKET_FCP_SWAPPED) {
 		sbp->pkt_flags &= ~PACKET_FCP_SWAPPED;
 	} else {
@@ -9784,8 +9212,9 @@ emlxs_swap_fcp_pkt(emlxs_buf_t *sbp)
 
 	pkt = PRIV2PKT(sbp);
 
-	cmd = (FCP_CMND *) pkt->pkt_cmd;
-	rsp = (pkt->pkt_rsplen && (sbp->pkt_flags & PACKET_FCP_RSP_VALID)) ?
+	cmd = (FCP_CMND *)pkt->pkt_cmd;
+	rsp = (pkt->pkt_rsplen &&
+	    (sbp->pkt_flags & PACKET_FCP_RSP_VALID)) ?
 	    (fcp_rsp_t *)pkt->pkt_resp : NULL;
 
 	/* The size of data buffer needs to be swapped. */
@@ -9804,6 +9233,7 @@ emlxs_swap_fcp_pkt(emlxs_buf_t *sbp)
 		rsp->fcp_sense_len = SWAP_DATA32(rsp->fcp_sense_len);
 		rsp->fcp_response_len = SWAP_DATA32(rsp->fcp_response_len);
 	}
+
 	return;
 
 } /* emlxs_swap_fcp_pkt() */
@@ -9812,13 +9242,13 @@ emlxs_swap_fcp_pkt(emlxs_buf_t *sbp)
 extern void
 emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 {
-	fc_packet_t *pkt;
-	uint32_t *cmd;
-	uint32_t *rsp;
-	uint32_t command;
-	uint16_t *c;
-	uint32_t i;
-	uint32_t swapped;
+	fc_packet_t	*pkt;
+	uint32_t	*cmd;
+	uint32_t	*rsp;
+	uint32_t	command;
+	uint16_t	*c;
+	uint32_t	i;
+	uint32_t	swapped;
 
 	mutex_enter(&sbp->mtx);
 
@@ -9826,6 +9256,7 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 		mutex_exit(&sbp->mtx);
 		return;
 	}
+
 	if (sbp->pkt_flags & PACKET_ELS_SWAPPED) {
 		sbp->pkt_flags &= ~PACKET_ELS_SWAPPED;
 		swapped = 1;
@@ -9839,7 +9270,8 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 	pkt = PRIV2PKT(sbp);
 
 	cmd = (uint32_t *)pkt->pkt_cmd;
-	rsp = (pkt->pkt_rsplen && (sbp->pkt_flags & PACKET_ELS_RSP_VALID)) ?
+	rsp = (pkt->pkt_rsplen &&
+	    (sbp->pkt_flags & PACKET_ELS_RSP_VALID)) ?
 	    (uint32_t *)pkt->pkt_resp : NULL;
 
 	if (!swapped) {
@@ -9853,6 +9285,7 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 	if (rsp) {
 		rsp[0] = SWAP_DATA32(rsp[0]);
 	}
+
 	switch (command) {
 	case ELS_CMD_ACC:
 		if (sbp->ucmd == ELS_CMD_ADISC) {
@@ -9920,12 +9353,12 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 extern void
 emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 {
-	fc_packet_t *pkt;
-	uint32_t *cmd;
-	uint32_t *rsp;
-	uint32_t command;
-	uint32_t i;
-	uint32_t swapped;
+	fc_packet_t	*pkt;
+	uint32_t	*cmd;
+	uint32_t	*rsp;
+	uint32_t	command;
+	uint32_t	i;
+	uint32_t	swapped;
 
 	mutex_enter(&sbp->mtx);
 
@@ -9933,6 +9366,7 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 		mutex_exit(&sbp->mtx);
 		return;
 	}
+
 	if (sbp->pkt_flags & PACKET_CT_SWAPPED) {
 		sbp->pkt_flags &= ~PACKET_CT_SWAPPED;
 		swapped = 1;
@@ -9946,13 +9380,15 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 	pkt = PRIV2PKT(sbp);
 
 	cmd = (uint32_t *)pkt->pkt_cmd;
-	rsp = (pkt->pkt_rsplen && (sbp->pkt_flags & PACKET_CT_RSP_VALID)) ?
+	rsp = (pkt->pkt_rsplen &&
+	    (sbp->pkt_flags & PACKET_CT_RSP_VALID)) ?
 	    (uint32_t *)pkt->pkt_resp : NULL;
 
 	if (!swapped) {
 		cmd[0] = 0x01000000;
 		command = cmd[2];
 	}
+
 	cmd[0] = SWAP_DATA32(cmd[0]);
 	cmd[1] = SWAP_DATA32(cmd[1]);
 	cmd[2] = SWAP_DATA32(cmd[2]);
@@ -9961,6 +9397,7 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 	if (swapped) {
 		command = cmd[2];
 	}
+
 	switch ((command >> 16)) {
 	case SLI_CTNS_GA_NXT:
 		cmd[4] = SWAP_DATA32(cmd[4]);
@@ -10029,12 +9466,12 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 extern void
 emlxs_swap_els_ub(fc_unsol_buf_t *ubp)
 {
-	emlxs_ub_priv_t *ub_priv;
-	fc_rscn_t *rscn;
-	uint32_t count;
-	uint32_t i;
-	uint32_t *lp;
-	la_els_logi_t *logi;
+	emlxs_ub_priv_t	*ub_priv;
+	fc_rscn_t	*rscn;
+	uint32_t	count;
+	uint32_t	i;
+	uint32_t	*lp;
+	la_els_logi_t	*logi;
 
 	ub_priv = ubp->ub_fca_private;
 
@@ -10057,7 +9494,8 @@ emlxs_swap_els_ub(fc_unsol_buf_t *ubp)
 	case ELS_CMD_FDISC:
 	case ELS_CMD_PDISC:
 		logi = (la_els_logi_t *)ubp->ub_buffer;
-		emlxs_swap_service_params((SERV_PARM *) & logi->common_service);
+		emlxs_swap_service_params(
+		    (SERV_PARM *)&logi->common_service);
 		break;
 
 		/* ULP handles this */
@@ -10080,9 +9518,9 @@ emlxs_swap_els_ub(fc_unsol_buf_t *ubp)
 extern char *
 emlxs_elscmd_xlate(uint32_t elscmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_elscmd_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10100,9 +9538,9 @@ emlxs_elscmd_xlate(uint32_t elscmd)
 extern char *
 emlxs_ctcmd_xlate(uint32_t ctcmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_ctcmd_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10121,9 +9559,9 @@ emlxs_ctcmd_xlate(uint32_t ctcmd)
 extern char *
 emlxs_menlo_cmd_xlate(uint32_t cmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_menlo_cmd_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10140,9 +9578,9 @@ emlxs_menlo_cmd_xlate(uint32_t cmd)
 extern char *
 emlxs_menlo_rsp_xlate(uint32_t rsp)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_menlo_rsp_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10156,15 +9594,15 @@ emlxs_menlo_rsp_xlate(uint32_t rsp)
 
 } /* emlxs_menlo_rsp_xlate() */
 
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 
 extern char *
 emlxs_rmcmd_xlate(uint32_t rmcmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_rmcmd_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10183,9 +9621,9 @@ emlxs_rmcmd_xlate(uint32_t rmcmd)
 extern char *
 emlxs_mscmd_xlate(uint16_t mscmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_mscmd_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10203,9 +9641,9 @@ emlxs_mscmd_xlate(uint16_t mscmd)
 extern char *
 emlxs_state_xlate(uint8_t state)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_state_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10223,9 +9661,9 @@ emlxs_state_xlate(uint8_t state)
 extern char *
 emlxs_error_xlate(uint8_t errno)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_error_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -10243,11 +9681,11 @@ emlxs_error_xlate(uint8_t errno)
 static int
 emlxs_pm_lower_power(dev_info_t *dip)
 {
-	int ddiinst;
-	int emlxinst;
-	emlxs_config_t *cfg;
-	int32_t rval;
-	emlxs_hba_t *hba;
+	int		ddiinst;
+	int		emlxinst;
+	emlxs_config_t	*cfg;
+	int32_t		rval;
+	emlxs_hba_t	*hba;
 
 	ddiinst = ddi_get_instance(dip);
 	emlxinst = emlxs_get_instance(ddiinst);
@@ -10258,13 +9696,14 @@ emlxs_pm_lower_power(dev_info_t *dip)
 
 	/* Lower the power level */
 	if (cfg[CFG_PM_SUPPORT].current) {
-		rval = pm_lower_power(dip, EMLXS_PM_ADAPTER,
+		rval =
+		    pm_lower_power(dip, EMLXS_PM_ADAPTER,
 		    EMLXS_PM_ADAPTER_DOWN);
 	} else {
 		/* We do not have kernel support of power management enabled */
 		/* therefore, call our power management routine directly */
-		rval = emlxs_power(dip, EMLXS_PM_ADAPTER,
-		    EMLXS_PM_ADAPTER_DOWN);
+		rval =
+		    emlxs_power(dip, EMLXS_PM_ADAPTER, EMLXS_PM_ADAPTER_DOWN);
 	}
 
 	return (rval);
@@ -10275,11 +9714,11 @@ emlxs_pm_lower_power(dev_info_t *dip)
 static int
 emlxs_pm_raise_power(dev_info_t *dip)
 {
-	int ddiinst;
-	int emlxinst;
-	emlxs_config_t *cfg;
-	int32_t rval;
-	emlxs_hba_t *hba;
+	int		ddiinst;
+	int		emlxinst;
+	emlxs_config_t	*cfg;
+	int32_t		rval;
+	emlxs_hba_t	*hba;
 
 	ddiinst = ddi_get_instance(dip);
 	emlxinst = emlxs_get_instance(ddiinst);
@@ -10288,12 +9727,14 @@ emlxs_pm_raise_power(dev_info_t *dip)
 
 	/* Raise the power level */
 	if (cfg[CFG_PM_SUPPORT].current) {
-		rval = pm_raise_power(dip, EMLXS_PM_ADAPTER,
+		rval =
+		    pm_raise_power(dip, EMLXS_PM_ADAPTER,
 		    EMLXS_PM_ADAPTER_UP);
 	} else {
 		/* We do not have kernel support of power management enabled */
 		/* therefore, call our power management routine directly */
-		rval = emlxs_power(dip, EMLXS_PM_ADAPTER, EMLXS_PM_ADAPTER_UP);
+		rval =
+		    emlxs_power(dip, EMLXS_PM_ADAPTER, EMLXS_PM_ADAPTER_UP);
 	}
 
 	return (rval);
@@ -10306,14 +9747,15 @@ emlxs_pm_raise_power(dev_info_t *dip)
 extern int
 emlxs_pm_busy_component(emlxs_hba_t *hba)
 {
-	emlxs_config_t *cfg = &CFG;
-	int rval;
+	emlxs_config_t	*cfg = &CFG;
+	int		rval;
 
 	hba->pm_active = 1;
 
 	if (hba->pm_busy) {
 		return (DDI_SUCCESS);
 	}
+
 	mutex_enter(&hba->pm_lock);
 
 	if (hba->pm_busy) {
@@ -10343,6 +9785,7 @@ emlxs_pm_busy_component(emlxs_hba_t *hba)
 			return (rval);
 		}
 	}
+
 	return (DDI_SUCCESS);
 
 } /* emlxs_pm_busy_component() */
@@ -10351,12 +9794,13 @@ emlxs_pm_busy_component(emlxs_hba_t *hba)
 extern int
 emlxs_pm_idle_component(emlxs_hba_t *hba)
 {
-	emlxs_config_t *cfg = &CFG;
-	int rval;
+	emlxs_config_t	*cfg = &CFG;
+	int		rval;
 
 	if (!hba->pm_busy) {
 		return (DDI_SUCCESS);
 	}
+
 	mutex_enter(&hba->pm_lock);
 
 	if (!hba->pm_busy) {
@@ -10377,10 +9821,8 @@ emlxs_pm_idle_component(emlxs_hba_t *hba)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "pm_idle_component failed. ret=%d", rval);
 
-			/*
-			 * If this attempt failed then reset our flags for
-			 * another attempt
-			 */
+			/* If this attempt failed then */
+			/* reset our flags for another attempt */
 			mutex_enter(&hba->pm_lock);
 			hba->pm_busy = 1;
 			mutex_exit(&hba->pm_lock);
@@ -10388,6 +9830,7 @@ emlxs_pm_idle_component(emlxs_hba_t *hba)
 			return (rval);
 		}
 	}
+
 	return (DDI_SUCCESS);
 
 } /* emlxs_pm_idle_component() */
@@ -10398,19 +9841,15 @@ emlxs_pm_idle_timer(emlxs_hba_t *hba)
 {
 	emlxs_config_t *cfg = &CFG;
 
-	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-	 * "emlxs_pm_idle_timer. timer=%x active=%x busy=%x",
-	 * hba->pm_idle_timer, hba->pm_active, hba->pm_busy);
-	 */
-
 	if (hba->pm_active) {
 		/* Clear active flag and reset idle timer */
 		mutex_enter(&hba->pm_lock);
 		hba->pm_active = 0;
-		hba->pm_idle_timer = hba->timer_tics + cfg[CFG_PM_IDLE].current;
+		hba->pm_idle_timer =
+		    hba->timer_tics + cfg[CFG_PM_IDLE].current;
 		mutex_exit(&hba->pm_lock);
 	}
+
 	/* Check for idle timeout */
 	else if (hba->timer_tics >= hba->pm_idle_timer) {
 		if (emlxs_pm_idle_component(hba) == DDI_SUCCESS) {
@@ -10420,6 +9859,7 @@ emlxs_pm_idle_timer(emlxs_hba_t *hba)
 			mutex_exit(&hba->pm_lock);
 		}
 	}
+
 	return;
 
 } /* emlxs_pm_idle_timer() */
@@ -10431,44 +9871,45 @@ emlxs_pm_idle_timer(emlxs_hba_t *hba)
 static void
 emlxs_read_vport_prop(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_config_t *cfg = &CFG;
-	char **arrayp;
-	uint8_t *s, *np;
-	/* uint8_t *str; */
-	NAME_TYPE pwwpn;
-	NAME_TYPE wwnn;
-	NAME_TYPE wwpn;
-	/* uint32_t ddiinst; */
-	uint32_t vpi;
-	uint32_t cnt;
-	uint32_t rval;
-	uint32_t i;
-	uint32_t j;
-	uint32_t c1;
-	uint32_t sum;
-	uint32_t errors;
-	/* uint8_t *wwn1; */
-	/* uint8_t *wwn2; */
-	char buffer[64];
+	emlxs_port_t	*port = &PPORT;
+	emlxs_config_t	*cfg = &CFG;
+	char		**arrayp;
+	uint8_t		*s;
+	uint8_t		*np;
+	NAME_TYPE	pwwpn;
+	NAME_TYPE	wwnn;
+	NAME_TYPE	wwpn;
+	uint32_t	vpi;
+	uint32_t	cnt;
+	uint32_t	rval;
+	uint32_t	i;
+	uint32_t	j;
+	uint32_t	c1;
+	uint32_t	sum;
+	uint32_t	errors;
+	char		buffer[64];
 
 	/* Check for the per adapter vport setting */
 	(void) sprintf(buffer, "%s%d-vport", DRIVER_NAME, hba->ddiinst);
 	cnt = 0;
 	arrayp = NULL;
-	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
+	rval =
+	    ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
 	    (DDI_PROP_DONTPASS), buffer, &arrayp, &cnt);
 
 	if ((rval != DDI_PROP_SUCCESS) || !cnt || !arrayp) {
 		/* Check for the global vport setting */
 		cnt = 0;
 		arrayp = NULL;
-		rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
+		rval =
+		    ddi_prop_lookup_string_array(DDI_DEV_T_ANY, hba->dip,
 		    (DDI_PROP_DONTPASS), "vport", &arrayp, &cnt);
 	}
+
 	if ((rval != DDI_PROP_SUCCESS) || !cnt || !arrayp) {
 		return;
 	}
+
 	for (i = 0; i < cnt; i++) {
 		errors = 0;
 		s = (uint8_t *)arrayp[i];
@@ -10476,6 +9917,7 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 		if (!s) {
 			break;
 		}
+
 		np = (uint8_t *)&pwwpn;
 		for (j = 0; j < sizeof (NAME_TYPE); j++) {
 			c1 = *s++;
@@ -10489,7 +9931,8 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_debug_msg,
 				    "Config error: Invalid PWWPN found. "
-				    "entry=%d byte=%d hi_nibble=%c", i, j, c1);
+				    "entry=%d byte=%d hi_nibble=%c",
+				    i, j, c1);
 				errors++;
 			}
 
@@ -10504,7 +9947,8 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_debug_msg,
 				    "Config error: Invalid PWWPN found. "
-				    "entry=%d byte=%d lo_nibble=%c", i, j, c1);
+				    "entry=%d byte=%d lo_nibble=%c",
+				    i, j, c1);
 				errors++;
 			}
 
@@ -10517,6 +9961,7 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 			    "entry=%d", i);
 			goto out;
 		}
+
 		np = (uint8_t *)&wwnn;
 		for (j = 0; j < sizeof (NAME_TYPE); j++) {
 			c1 = *s++;
@@ -10530,7 +9975,8 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_debug_msg,
 				    "Config error: Invalid WWNN found. "
-				    "entry=%d byte=%d hi_nibble=%c", i, j, c1);
+				    "entry=%d byte=%d hi_nibble=%c",
+				    i, j, c1);
 				errors++;
 			}
 
@@ -10545,7 +9991,8 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_debug_msg,
 				    "Config error: Invalid WWNN found. "
-				    "entry=%d byte=%d lo_nibble=%c", i, j, c1);
+				    "entry=%d byte=%d lo_nibble=%c",
+				    i, j, c1);
 				errors++;
 			}
 
@@ -10558,6 +10005,7 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 			    "entry=%d", i);
 			goto out;
 		}
+
 		np = (uint8_t *)&wwpn;
 		for (j = 0; j < sizeof (NAME_TYPE); j++) {
 			c1 = *s++;
@@ -10571,7 +10019,8 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_debug_msg,
 				    "Config error: Invalid WWPN found. "
-				    "entry=%d byte=%d hi_nibble=%c", i, j, c1);
+				    "entry=%d byte=%d hi_nibble=%c",
+				    i, j, c1);
 
 				errors++;
 			}
@@ -10587,7 +10036,8 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_attach_debug_msg,
 				    "Config error: Invalid WWPN found. "
-				    "entry=%d byte=%d lo_nibble=%c", i, j, c1);
+				    "entry=%d byte=%d lo_nibble=%c",
+				    i, j, c1);
 
 				errors++;
 			}
@@ -10602,6 +10052,7 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 
 			goto out;
 		}
+
 		sum = 0;
 		do {
 			c1 = *s++;
@@ -10613,6 +10064,7 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 
 				goto out;
 			}
+
 			sum = (sum * 10) + (c1 - '0');
 
 		} while (*s != 0);
@@ -10622,27 +10074,30 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 		if (errors) {
 			continue;
 		}
+
 		/* Entry has been read */
 
-		/*
-		 * Check if the physical port wwpn matches our physical port
-		 * wwpn
-		 */
+		/* Check if the physical port wwpn */
+		/* matches our physical port wwpn */
 		if (bcmp((caddr_t)&hba->wwpn, (caddr_t)&pwwpn, 8)) {
 			continue;
 		}
+
 		/* Check vpi range */
 		if ((vpi == 0) || (vpi >= MAX_VPORTS)) {
 			continue;
 		}
+
 		/* Check if port has already been configured */
 		if (hba->port[vpi].flag & EMLXS_PORT_CONFIG) {
 			continue;
 		}
+
 		/* Set the highest configured vpi */
 		if (vpi >= hba->vpi_high) {
 			hba->vpi_high = vpi;
 		}
+
 		bcopy((caddr_t)&wwnn, (caddr_t)&hba->port[vpi].wwnn,
 		    sizeof (NAME_TYPE));
 		bcopy((caddr_t)&wwpn, (caddr_t)&hba->port[vpi].wwpn,
@@ -10652,28 +10107,21 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 			(void) strncpy((caddr_t)hba->port[vpi].snn,
 			    (caddr_t)hba->snn, 256);
 		}
+
 		if (hba->port[vpi].spn[0] == 0) {
 			(void) sprintf((caddr_t)hba->port[vpi].spn,
-			    "%s VPort-%d", (caddr_t)hba->spn, vpi);
+			    "%s VPort-%d",
+			    (caddr_t)hba->spn, vpi);
 		}
-		hba->port[vpi].flag |= (EMLXS_PORT_CONFIG | EMLXS_PORT_ENABLE);
+
+		hba->port[vpi].flag |=
+		    (EMLXS_PORT_CONFIG | EMLXS_PORT_ENABLE);
 
 #ifdef NPIV_SUPPORT
 		if (cfg[CFG_VPORT_RESTRICTED].current) {
 			hba->port[vpi].flag |= EMLXS_PORT_RESTRICTED;
 		}
-#endif	/* NPIV_SUPPORT */
-
-		/*
-		 * wwn1 = (uint8_t*)&wwpn; wwn2 = (uint8_t*)&wwnn;
-		 *
-		 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_debug_msg,
-		 * "vport[%d]: WWPN:%02X%02X%02X%02X%02X%02X%02X%02X
-		 * WWNN:%02X%02X%02X%02X%02X%02X%02X%02X", vpi, wwn1[0],
-		 * wwn1[1], wwn1[2], wwn1[3], wwn1[4], wwn1[5], wwn1[6],
-		 * wwn1[7], wwn2[0], wwn2[1], wwn2[2], wwn2[3], wwn2[4],
-		 * wwn2[5], wwn2[6], wwn2[7]);
-		 */
+#endif /* NPIV_SUPPORT */
 	}
 
 out:
@@ -10703,15 +10151,16 @@ emlxs_wwn_xlate(char *buffer, uint8_t *wwn)
 extern void
 emlxs_ub_flush(emlxs_port_t *port)
 {
-	emlxs_hba_t *hba = HBA;
-	fc_unsol_buf_t *ubp;
-	emlxs_ub_priv_t *ub_priv;
-	emlxs_ub_priv_t *next;
+	emlxs_hba_t	*hba = HBA;
+	fc_unsol_buf_t	*ubp;
+	emlxs_ub_priv_t	*ub_priv;
+	emlxs_ub_priv_t	*next;
 
 	/* Return if nothing to do */
 	if (!port->ub_wait_head) {
 		return;
 	}
+
 	mutex_enter(&EMLXS_PORT_LOCK);
 	ub_priv = port->ub_wait_head;
 	port->ub_wait_head = NULL;
@@ -10729,6 +10178,7 @@ emlxs_ub_flush(emlxs_port_t *port)
 			port->ulp_unsol_cb(port->ulp_handle, ubp,
 			    ubp->ub_frame.type);
 		} else {	/* Drop the buffer */
+
 			(void) emlxs_ub_release(port, 1, &ubp->ub_token);
 		}
 
@@ -10744,8 +10194,8 @@ emlxs_ub_flush(emlxs_port_t *port)
 extern void
 emlxs_ub_callback(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 {
-	emlxs_hba_t *hba = HBA;
-	emlxs_ub_priv_t *ub_priv;
+	emlxs_hba_t	*hba = HBA;
+	emlxs_ub_priv_t	*ub_priv;
 
 	ub_priv = ubp->ub_fca_private;
 
@@ -10760,6 +10210,7 @@ emlxs_ub_callback(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 
 		return;
 	} else {	/* ULP offline */
+
 		if (hba->state >= FC_LINK_UP) {
 			/* Add buffer to queue tail */
 			mutex_enter(&EMLXS_PORT_LOCK);
@@ -10772,6 +10223,7 @@ emlxs_ub_callback(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 			if (!port->ub_wait_head) {
 				port->ub_wait_head = ub_priv;
 			}
+
 			mutex_exit(&EMLXS_PORT_LOCK);
 		} else {
 			(void) emlxs_ub_release(port, 1, &ubp->ub_token);
@@ -10786,7 +10238,6 @@ emlxs_ub_callback(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 static uint32_t
 emlxs_integrity_check(emlxs_hba_t *hba)
 {
-	/* emlxs_port_t *port = &PPORT; */
 	uint32_t size;
 	uint32_t errors = 0;
 	int ddiinst = hba->ddiinst;
@@ -10920,3 +10371,124 @@ emlxs_integrity_check(emlxs_hba_t *hba)
 	return (errors);
 
 } /* emlxs_integrity_check() */
+
+
+#ifdef FMA_SUPPORT
+/*
+ * FMA support
+ */
+
+extern void
+emlxs_fm_init(emlxs_hba_t *hba)
+{
+	ddi_iblock_cookie_t iblk;
+
+	if (hba->fm_caps) {
+		emlxs_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		emlxs_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		emlxs_dma_attr_ro.dma_attr_flags = DDI_DMA_FLAGERR;
+		emlxs_dma_attr_1sg.dma_attr_flags = DDI_DMA_FLAGERR;
+		emlxs_dma_attr_fcip_rsp.dma_attr_flags = DDI_DMA_FLAGERR;
+
+		ddi_fm_init(hba->dip, &hba->fm_caps, &iblk);
+
+		if (DDI_FM_EREPORT_CAP(hba->fm_caps) ||
+		    DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+			pci_ereport_setup(hba->dip);
+		}
+
+		if (DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+			ddi_fm_handler_register(hba->dip, emlxs_fm_error_cb,
+			    (void *)hba);
+		}
+	}
+}  /* emlxs_fm_init() */
+
+
+extern void
+emlxs_fm_fini(emlxs_hba_t *hba)
+{
+	if (hba->fm_caps) {
+		if (DDI_FM_EREPORT_CAP(hba->fm_caps) ||
+		    DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+			pci_ereport_teardown(hba->dip);
+		}
+
+		if (DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+			ddi_fm_handler_unregister(hba->dip);
+		}
+
+		(void) ddi_fm_fini(hba->dip);
+	}
+}  /* emlxs_fm_fini() */
+
+
+int
+emlxs_fm_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t fe;
+	int rval = DDI_FM_OK;
+
+	/* Some S10 versions do not define the ahi_err structure */
+	if (((ddi_acc_impl_t *)handle)->ahi_err != NULL) {
+		(void) ddi_fm_acc_err_get(handle, &fe, DDI_FME_VERSION);
+
+		/*
+		 * Some S10 versions do not define the
+		 * ddi_fm_acc_err_clear function
+		 */
+		if ((void *)&ddi_fm_acc_err_clear != NULL) {
+			(void) ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+		}
+
+		rval = fe.fme_status;
+	}
+
+	return (rval);
+
+}  /* emlxs_fm_check_acc_handle() */
+
+
+int
+emlxs_fm_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t fe;
+
+	(void) ddi_fm_dma_err_get(handle, &fe, DDI_FME_VERSION);
+
+	return (fe.fme_status);
+
+}  /* emlxs_fm_check_dma_handle() */
+
+
+void
+emlxs_fm_ereport(emlxs_hba_t *hba, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(hba->fm_caps)) {
+		(void) ddi_fm_ereport_post(hba->dip, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+	}
+}  /* emlxs_fm_ereport() */
+
+/*
+ * The I/O fault service error handling callback function
+ */
+/*ARGSUSED*/
+extern int
+emlxs_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
+    const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error
+	 * in any dma or access handle, we can just return
+	 * the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}  /* emlxs_fm_error_cb() */
+#endif	/* FMA_SUPPORT */

@@ -20,13 +20,16 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
-#include "emlxs_mdb.h"
-#include "emlxs_msg.h"
-#include "emlxs_device.h"
+#define	DUMP_SUPPORT
+
+#include <emlxs_mdb.h>
+#include <emlxs_msg.h>
+#include <emlxs_dump.h>
+#include <emlxs_device.h>
 
 /*
  * MDB module linkage information:
@@ -34,9 +37,10 @@
 
 static const mdb_dcmd_t dcmds[] =
 {
-	{ "emlxs_msgbuf", "<instance>",
-	"dumps the emlxs driver internal message buffer",
-	emlxs_msgbuf, emlxs_msgbuf_help},
+	{ "emlxs_msgbuf", "<instance>", "dumps the emlxs driver internal " \
+	    "message buffer", emlxs_msgbuf, emlxs_msgbuf_help},
+	{ "emlxs_dump", "<type> <instance>", "dumps the emlxs driver " \
+	    "firmware core", emlxs_dump, emlxs_dump_help},
 	{ NULL }
 };
 
@@ -61,10 +65,9 @@ void
 emlxs_msgbuf_help()
 {
 
-	mdb_printf("Usage:   ::%s_msgbuf <instance (in hex)>\n\n", DRIVER_NAME);
-	mdb_printf(
-	"         <instance>  This is the %s driver instance number in hex.\n",
-	    DRIVER_NAME);
+	mdb_printf("Usage:   ::%s_msgbuf  <instance(hex)>\n\n", DRIVER_NAME);
+	mdb_printf("         <instance>   This is the %s driver instance " \
+	    "number in hex.\n", DRIVER_NAME);
 	mdb_printf("                      (e.g. 0, 1,..., e, f, etc.)\n");
 
 } /* emlxs_msgbuf_help() */
@@ -95,9 +98,8 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 	int32_t instance_count;
 	uint32_t ddiinst;
 
-
 	if (argc != 1) {
-		mdb_printf("Usage:   ::%s_msgbuf  <instance (in hex)>\n",
+		mdb_printf("Usage:   ::%s_msgbuf  <instance(hex)>\n",
 		    DRIVER_NAME);
 		mdb_printf("mdb: try \"::help %s_msgbuf\" for more information",
 		    DRIVER_NAME);
@@ -298,3 +300,347 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 	return (0);
 
 } /* emlxs_msgbuf() */
+
+
+void
+emlxs_dump_help()
+{
+	mdb_printf("Usage:   ::%s_dump all <instance(hex)>\n", DRIVER_NAME);
+	mdb_printf("         ::%s_dump txt <instance(hex)>\n", DRIVER_NAME);
+	mdb_printf("         ::%s_dump dmp <instance(hex)>\n", DRIVER_NAME);
+	mdb_printf("         ::%s_dump cee <instance(hex)>\n", DRIVER_NAME);
+	mdb_printf("\n");
+	mdb_printf("                txt   Display firmware text summary " \
+	    "file.\n");
+	mdb_printf("                dmp   Display firmware dmp binary file.\n");
+	mdb_printf("                cee   Display firmware cee binary file. " \
+	    "(FCOE adapters only)\n");
+	mdb_printf("                all   Display all firmware core files.\n");
+	mdb_printf("         <instance>   This is the %s driver instance " \
+	    "number in hex.\n", DRIVER_NAME);
+	mdb_printf("                      (e.g. 0, 1,..., e, f, etc.)\n");
+
+} /* emlxs_dump_help() */
+
+
+/*ARGSUSED*/
+int
+emlxs_dump(uintptr_t base_addr, uint_t flags, int argc,
+				const mdb_arg_t *argv)
+{
+	uintptr_t  addr;
+	emlxs_device_t device;
+	uint32_t brd_no;
+	uint32_t i;
+	char buffer[256];
+	char buffer2[256];
+	int32_t instance[MAX_FC_BRDS];
+	int32_t instance_count;
+	uint32_t ddiinst;
+	uint8_t *bptr;
+	char *cptr;
+	emlxs_file_t dump_txtfile;
+	emlxs_file_t dump_dmpfile;
+	emlxs_file_t dump_ceefile;
+	uint32_t size;
+	uint32_t file;
+
+	if (argc != 2) {
+		goto usage;
+	}
+
+	if ((strcmp(argv[0].a_un.a_str, "all") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "ALL") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "All") == 0)) {
+		file = 0;
+	} else if ((strcmp(argv[0].a_un.a_str, "txt") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "TXT") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "Txt") == 0)) {
+		file = 1;
+	} else if ((strcmp(argv[0].a_un.a_str, "dmp") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "DMP") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "Dmp") == 0)) {
+		file = 2;
+	} else if ((strcmp(argv[0].a_un.a_str, "cee") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "CEE") == 0) ||
+	    (strcmp(argv[0].a_un.a_str, "Cee") == 0)) {
+		file = 3;
+	} else {
+		goto usage;
+	}
+
+	/* Get the device address */
+	mdb_snprintf(buffer, sizeof (buffer), "%s_device", DRIVER_NAME);
+	if (mdb_readvar(&device, buffer) == -1) {
+		mdb_snprintf(buffer2, sizeof (buffer2),
+		    "%s not found.\n", buffer);
+		mdb_warn(buffer2);
+
+		mdb_snprintf(buffer2, sizeof (buffer2),
+		    "Is the %s driver loaded ?\n", DRIVER_NAME);
+		mdb_warn(buffer2);
+		return (DCMD_ERR);
+	}
+
+	/* Get the device instance table */
+	mdb_snprintf(buffer, sizeof (buffer), "%s_instance", DRIVER_NAME);
+	if (mdb_readvar(&instance, buffer) == -1) {
+		mdb_snprintf(buffer2, sizeof (buffer2), "%s not found.\n",
+		    buffer);
+		mdb_warn(buffer2);
+
+		mdb_snprintf(buffer2, sizeof (buffer2),
+		    "Is the %s driver loaded ?\n", DRIVER_NAME);
+		mdb_warn(buffer2);
+		return (DCMD_ERR);
+	}
+
+	/* Get the device instance count */
+	mdb_snprintf(buffer, sizeof (buffer), "%s_instance_count", DRIVER_NAME);
+	if (mdb_readvar(&instance_count, buffer) == -1) {
+		mdb_snprintf(buffer2, sizeof (buffer2), "%s not found.\n",
+		    buffer);
+		mdb_warn(buffer2);
+
+		mdb_snprintf(buffer2, sizeof (buffer2),
+		    "Is the %s driver loaded ?\n", DRIVER_NAME);
+		mdb_warn(buffer2);
+		return (DCMD_ERR);
+	}
+
+	ddiinst = (uint32_t)mdb_strtoull(argv[1].a_un.a_str);
+
+	for (brd_no = 0; brd_no < instance_count; brd_no++) {
+		if (instance[brd_no] == ddiinst) {
+			break;
+		}
+	}
+
+	if (brd_no == instance_count) {
+		mdb_warn("Device instance not found. ddinst=%d\n", ddiinst);
+		return (DCMD_ERR);
+	}
+
+	if (file == 0 || file == 1) {
+
+		addr = (uintptr_t)device.dump_txtfile[brd_no];
+		if (addr == 0) {
+			mdb_warn("TXT file: Device instance not found. " \
+			    "ddinst=%d\n", ddiinst);
+			goto dmp_file;
+		}
+
+		if (mdb_vread(&dump_txtfile, sizeof (dump_txtfile), addr)
+		    != sizeof (dump_txtfile)) {
+			mdb_warn("TXT file: Unable to read %d bytes @ %llx.\n",
+			    sizeof (dump_txtfile), addr);
+			goto dmp_file;
+		}
+
+		size = (uintptr_t)dump_txtfile.ptr -
+		    (uintptr_t)dump_txtfile.buffer;
+
+		if (size == 0) {
+			mdb_printf("TXT file: Not available.\n");
+			goto dmp_file;
+		}
+		bptr  = (uint8_t *)mdb_zalloc(size, UM_SLEEP|UM_GC);
+
+		if (bptr == 0) {
+			mdb_warn("TXT file: Unable to allocate file buffer. " \
+			    "ddinst=%d size=%d\n", ddiinst, size);
+			goto dmp_file;
+		}
+
+		if (mdb_vread(bptr, size, (uintptr_t)dump_txtfile.buffer)
+		    != size) {
+			mdb_warn("TXT file: Unable to read %d bytes @ %llx.\n",
+			    size, dump_txtfile.buffer);
+			goto dmp_file;
+		}
+
+		mdb_printf("<TXT File Start>\n");
+		mdb_printf("\n");
+		mdb_printf("%s", bptr);
+		mdb_printf("\n");
+		mdb_printf("<TXT File End>\n");
+	}
+
+dmp_file:
+
+	if (file == 0 || file == 2) {
+		addr = (uintptr_t)device.dump_dmpfile[brd_no];
+		if (addr == 0) {
+			mdb_warn("DMP file: Device instance not found. " \
+			    "ddinst=%d\n", ddiinst);
+			goto cee_file;
+		}
+
+		if (mdb_vread(&dump_dmpfile, sizeof (dump_dmpfile), addr)
+		    != sizeof (dump_dmpfile)) {
+			mdb_warn("DMP file: Unable to read %d bytes @ %llx.\n",
+			    sizeof (dump_dmpfile), addr);
+			goto cee_file;
+		}
+
+		size = (uintptr_t)dump_dmpfile.ptr -
+		    (uintptr_t)dump_dmpfile.buffer;
+
+		if (size == 0) {
+			mdb_printf("DMP file: Not available.\n");
+			goto cee_file;
+		}
+
+		bptr  = (uint8_t *)mdb_zalloc(size, UM_SLEEP|UM_GC);
+
+		if (bptr == 0) {
+			mdb_warn("DMP file: Unable to allocate file buffer. " \
+			    "ddinst=%d size=%d\n", ddiinst, size);
+			goto cee_file;
+		}
+
+		if (mdb_vread(bptr, size, (uintptr_t)dump_dmpfile.buffer)
+		    != size) {
+			mdb_warn("DMP file: Unable to read %d bytes @ %llx.\n",
+			    size, dump_dmpfile.buffer);
+			goto cee_file;
+		}
+
+		mdb_printf("<DMP File Start>\n");
+		mdb_printf("\n");
+
+		bzero(buffer2, sizeof (buffer2));
+		cptr = buffer2;
+		for (i = 0; i < size; i++) {
+			if (i && !(i % 16)) {
+				mdb_printf(" %s\n", buffer2);
+				bzero(buffer2, sizeof (buffer2));
+				cptr = buffer2;
+			}
+
+			if (!(i % 16)) {
+				mdb_printf("%08X: ", i);
+			}
+
+			if (!(i % 4)) {
+				mdb_printf(" ");
+			}
+
+			if ((*bptr >= 32) && (*bptr <= 126)) {
+				*cptr++ = *bptr;
+			} else {
+				*cptr++ = '.';
+			}
+
+			mdb_printf("%02X ", *bptr++);
+		}
+
+		size = 16 - (i % 16);
+		for (i = 0; size < 16 && i < size; i++) {
+			if (!(i % 4)) {
+				mdb_printf(" ");
+			}
+
+			mdb_printf("   ");
+		}
+		mdb_printf(" %s\n", buffer2);
+		mdb_printf("\n");
+		mdb_printf("<DMP File End>\n");
+	}
+
+cee_file:
+
+	if (file == 0 || file == 3) {
+
+		addr = (uintptr_t)device.dump_ceefile[brd_no];
+		if (addr == 0) {
+			mdb_warn("CEE file: Device instance not found. " \
+			    "ddinst=%d\n", ddiinst);
+			goto done;
+		}
+
+		if (mdb_vread(&dump_ceefile, sizeof (dump_ceefile), addr)
+		    != sizeof (dump_ceefile)) {
+			mdb_warn("CEE file: Unable to read %d bytes @ %llx.\n",
+			    sizeof (dump_ceefile), addr);
+			goto done;
+		}
+
+		size = (uintptr_t)dump_ceefile.ptr -
+		    (uintptr_t)dump_ceefile.buffer;
+
+		if (size == 0) {
+			mdb_printf("CEE file: Not available.\n");
+			goto done;
+		}
+
+		bptr  = (uint8_t *)mdb_zalloc(size, UM_SLEEP|UM_GC);
+
+		if (bptr == 0) {
+			mdb_warn("CEE file: Unable to allocate file buffer. " \
+			    "ddinst=%d size=%d\n", ddiinst, size);
+			goto done;
+		}
+
+		if (mdb_vread(bptr, size, (uintptr_t)dump_ceefile.buffer)
+		    != size) {
+			mdb_warn("CEE file: Unable to read %d bytes @ %llx.\n",
+			    size, dump_ceefile.buffer);
+			goto done;
+		}
+
+		mdb_printf("<CEE File Start>\n");
+		mdb_printf("\n");
+
+		bzero(buffer2, sizeof (buffer2));
+		cptr = buffer2;
+		for (i = 0; i < size; i++) {
+			if (i && !(i % 16)) {
+				mdb_printf(" %s\n", buffer2);
+				bzero(buffer2, sizeof (buffer2));
+				cptr = buffer2;
+			}
+
+			if (!(i % 16)) {
+				mdb_printf("%08X: ", i);
+			}
+
+			if (!(i % 4)) {
+				mdb_printf(" ");
+			}
+
+			if ((*bptr >= 32) && (*bptr <= 126)) {
+				*cptr++ = *bptr;
+			} else {
+				*cptr++ = '.';
+			}
+
+			mdb_printf("%02X ", *bptr++);
+		}
+
+		size = 16 - (i % 16);
+		for (i = 0; size < 16 && i < size; i++) {
+			if (!(i % 4)) {
+				mdb_printf(" ");
+			}
+
+			mdb_printf("   ");
+		}
+		mdb_printf(" %s\n", buffer2);
+		mdb_printf("\n");
+		mdb_printf("<CEE File End>\n");
+	}
+done:
+
+	mdb_printf("\n");
+	return (0);
+
+usage:
+	mdb_printf("Usage:   ::%s_dump <file> <instance (hex)>\n",
+	    DRIVER_NAME);
+	mdb_printf("mdb: try \"::help %s_dump\" for more information",
+	    DRIVER_NAME);
+
+	return (DCMD_ERR);
+
+} /* emlxs_dump() */

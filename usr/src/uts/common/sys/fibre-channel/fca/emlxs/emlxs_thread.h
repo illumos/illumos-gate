@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -33,54 +33,54 @@ extern "C" {
 #endif
 
 
-#define	EMLXS_MAX_TASKQ_THREADS    4
+#define	EMLXS_MAX_TASKQ_THREADS	4
 
-typedef struct emlxs_thread {
-	struct emlxs_hba *hba;
+typedef struct emlxs_thread
+{
+	struct emlxs_hba	*hba;
 
-	kthread_t *thread;
-	uint32_t flags;
+	kthread_t		*thread;
+	uint32_t		flags;
 
-	void (*func) (void *);
-	void *arg1;
-	void *arg2;
+	void			(*func) (void *);
+	void			*arg1;
+	void			*arg2;
 
-	kmutex_t lock;
-	kcondvar_t cv_flag;
-
+	kmutex_t		lock;
+	kcondvar_t		cv_flag;
 } emlxs_thread_t;
 
 
-typedef struct emlxs_taskq_thread {
-	struct emlxs_taskq_thread *next;
-	struct emlxs_taskq *taskq;
+typedef struct emlxs_taskq_thread
+{
+	struct emlxs_taskq_thread	*next;
+	struct emlxs_taskq		*taskq;
 
-	kthread_t *thread;
-	uint32_t flags;
+	kthread_t			*thread;
+	uint32_t			flags;
 
-	void (*func) (void *);
-	void *arg;
+	void				(*func) (void *);
+	void				*arg;
 
-	kmutex_t lock;
-	kcondvar_t cv_flag;
-
+	kmutex_t			lock;
+	kcondvar_t			cv_flag;
 } emlxs_taskq_thread_t;
 
 
-typedef struct emlxs_taskq {
-	emlxs_taskq_thread_t thread_list[EMLXS_MAX_TASKQ_THREADS];
+typedef struct emlxs_taskq
+{
+	emlxs_taskq_thread_t	thread_list[EMLXS_MAX_TASKQ_THREADS];
 
-	void *hba;
+	void			*hba;
 
-	emlxs_taskq_thread_t *get_head;
-	uint32_t get_count;
-	uint32_t open;
-	kmutex_t get_lock;
+	emlxs_taskq_thread_t	*get_head;
+	uint32_t		get_count;
+	uint32_t		open;
+	kmutex_t		get_lock;
 
-	emlxs_taskq_thread_t *put_head;
-	uint32_t put_count;
-	kmutex_t put_lock;
-
+	emlxs_taskq_thread_t	*put_head;
+	uint32_t		put_count;
+	kmutex_t		put_lock;
 } emlxs_taskq_t;
 
 /* flags */

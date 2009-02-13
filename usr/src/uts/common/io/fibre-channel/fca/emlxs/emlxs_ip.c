@@ -20,12 +20,11 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
-
-#include "emlxs.h"
+#include <emlxs.h>
 
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_IP_C);
@@ -55,16 +54,18 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		return (EIO);
 	}
+
 	if (rp->ringno != FC_IP_RING) {
 		HBASTATS.IpStray++;
 
 		return (0);
 	}
+
 	port = sbp->iocbq.port;
 
 	switch (cmd->ulpCommand) {
 		/*
-		 *  Error:  Abnormal BCAST (Local error)
+		 * Error: Abnormal BCAST command completion  (Local error)
 		 */
 	case CMD_XMIT_BCAST_CN:
 	case CMD_XMIT_BCAST64_CN:
@@ -83,7 +84,8 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		break;
 
 		/*
-		 *  Error:  Abnormal XMIT SEQUENCE (Local error)
+		 * Error: Abnormal XMIT SEQUENCE command completion
+		 * (Local error)
 		 */
 	case CMD_XMIT_SEQUENCE_CR:
 	case CMD_XMIT_SEQUENCE64_CR:
@@ -92,9 +94,9 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.IpSeqError++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
-		    "XMIT SEQUENCE CR completion error: "
-		    "cmd=%x status=0x%x [%08x,%08x]", cmd->ulpCommand,
-		    cmd->ulpStatus, cmd->un.ulpWord[4], cmd->un.ulpWord[5]);
+		    "XMIT SEQUENCE CR completion error: cmd=%x status=0x%x "
+		    "[%08x,%08x]", cmd->ulpCommand, cmd->ulpStatus,
+		    cmd->un.ulpWord[4], cmd->un.ulpWord[5]);
 
 		emlxs_pkt_complete(sbp, cmd->ulpStatus,
 		    cmd->un.grsp.perr.statLocalError, 1);
@@ -129,7 +131,7 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.IpSeqCompleted++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
-		    "XMIT SEQUENCE CR completion: cmd=%x status=0x%x "
+		    "XMIT SEQUENCE CR completion: cmd=%x status=0x%x"
 		    "[%08x,%08x]", cmd->ulpCommand, cmd->ulpStatus,
 		    cmd->un.ulpWord[4], cmd->un.ulpWord[5]);
 
@@ -138,7 +140,7 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 			if ((cmd->ulpStatus == IOSTAT_LOCAL_REJECT) &&
 			    ((cmd->un.ulpWord[4] & 0xff) == IOERR_NO_XRI)) {
-				ndlp = (NODELIST *) sbp->node;
+				ndlp = (NODELIST *)sbp->node;
 				if ((cmd->ulpContext == ndlp->nlp_Xri) &&
 				    !(ndlp->nlp_flag[FC_IP_RING] &
 				    NLP_RPI_XRI)) {
@@ -169,7 +171,7 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	return (0);
 
-} /* emlxs_ip_handle_event() */
+}  /* emlxs_ip_handle_event() */
 
 
 extern int32_t
@@ -199,16 +201,15 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 		    !(port->flag & EMLXS_PORT_IP_UP)) {
 			continue;
 		}
-		ubp = (fc_unsol_buf_t *)
-		    emlxs_ub_get(port, size, FC_TYPE_IS8802_SNAP, 0);
+
+		ubp =
+		    (fc_unsol_buf_t *)emlxs_ub_get(port, size,
+		    FC_TYPE_IS8802_SNAP, 0);
 
 		if (!ubp) {
-
 			/* Theoretically we should never get here. */
-			/*
-			 * There should be one DMA buffer for every ub
-			 * buffer.  If we are out of ub buffers
-			 */
+			/* There should be one DMA buffer for every ub */
+			/* buffer. If we are out of ub buffers */
 			/* then some how this matching has been corrupted */
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ip_dropped_msg,
@@ -218,10 +219,11 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 			continue;
 		}
+
 		bcopy(mp->virt, ubp->ub_buffer, size);
 
 		ub_priv = ubp->ub_fca_private;
-		nd = (NETHDR *) ubp->ub_buffer;
+		nd = (NETHDR *)ubp->ub_buffer;
 		mac = nd->fc_srcname.IEEE;
 		ndlp = emlxs_node_find_mac(port, mac);
 
@@ -233,17 +235,18 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 				(void) emlxs_create_xri(port, rp, ndlp);
 			}
 		}
+
 		/*
-		 * If no node is found, then check if this is a broadcast
-		 * frame
+		 * If no node is found, then check if this is a
+		 * broadcast frame
 		 */
 		else if (cmd->un.xrseq.w5.hcsw.Fctl & BC) {
 			sid = cmd->un.ulpWord[4] & 0x00ffffff;
-		} else {
-			/*
-			 * We have to drop this frame because we do not have
-			 * the S_ID of the request
-			 */
+		}
+
+		else {
+			/* We have to drop this frame because we do not have */
+			/* the S_ID of the request */
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ip_dropped_msg,
 			    "Node not found. mac=%02x%02x%02x%02x%02x%02x",
 			    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -280,15 +283,18 @@ out:
 	if (IpDropped) {
 		HBASTATS.IpDropped++;
 	}
+
 	if (IpBcastReceived) {
 		HBASTATS.IpBcastReceived++;
 	}
+
 	if (IpSeqReceived) {
 		HBASTATS.IpSeqReceived++;
 	}
+
 	return (0);
 
-} /* emlxs_ip_handle_unsol_req() */
+}  /* emlxs_ip_handle_unsol_req() */
 
 
 extern int32_t
@@ -302,7 +308,7 @@ emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	HBQE_t *hbqE;
 	uint32_t hbq_id;
 	uint32_t hbqe_tag;
-#endif	/* SLI3_SUPPORT */
+#endif /* SLI3_SUPPORT */
 
 	/*
 	 * No action required for now.
@@ -337,11 +343,12 @@ emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			mp = hba->hbq_table[hbq_id].HBQ_PostBufs[hbqe_tag];
 		}
 	} else
-#endif	/* SLI3_SUPPORT */
+#endif /* SLI3_SUPPORT */
 	{
 		/* Check for valid buffer */
 		if (!(cmd->un.cont64[0].tus.f.bdeFlags & BUFF_TYPE_INVALID)) {
-			bdeAddr = getPaddr(cmd->un.cont64[0].addrHigh,
+			bdeAddr =
+			    getPaddr(cmd->un.cont64[0].addrHigh,
 			    cmd->un.cont64[0].addrLow);
 			mp = emlxs_mem_get_vaddr(hba, rp, bdeAddr);
 		}
@@ -353,7 +360,7 @@ out:
 	if (hba->flag & FC_HBQ_ENABLED) {
 		emlxs_update_HBQ_index(hba, hbq_id);
 	} else
-#endif	/* SLI3_SUPPORT */
+#endif /* SLI3_SUPPORT */
 	{
 		if (mp) {
 			(void) emlxs_mem_put(hba, MEM_IPBUF, (uint8_t *)mp);
@@ -365,7 +372,7 @@ out:
 
 	return (0);
 
-} /* emlxs_ip_handle_rcv_seq_list() */
+}  /* emlxs_ip_handle_rcv_seq_list() */
 
 
 
@@ -393,6 +400,7 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		return (EIO);
 	}
+
 	/* check for first xmit completion in sequence */
 	ndlp = (NODELIST *)sbp->node;
 
@@ -408,6 +416,7 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		return (EIO);
 	}
+
 	mutex_enter(&EMLXS_RINGTX_LOCK);
 	ndlp->nlp_Xri = cmd->ulpContext;
 	ndlp->nlp_flag[rp->ringno] &= ~NLP_RPI_XRI;
@@ -422,12 +431,12 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	return (0);
 
-} /* emlxs_handle_create_xri()  */
+}  /* emlxs_handle_create_xri()  */
 
 
 /*
- * Issue an iocb command to create an exchange with
- * the remote Nport specified by the NODELIST entry.
+ * Issue an iocb command to create an exchange with the remote Nport
+ * specified by the NODELIST entry.
  */
 extern int32_t
 emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
@@ -455,6 +464,7 @@ emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
 
 		goto fail;
 	}
+
 	sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
 	iocbq = &sbp->iocbq;
 
@@ -473,6 +483,7 @@ emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
 
 		goto fail;
 	}
+
 	icmd = &iocbq->iocb;
 	icmd->ulpIoTag = iotag;
 	icmd->ulpContext = ndlp->nlp_Rpi;
@@ -491,10 +502,10 @@ emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
 	mutex_exit(&sbp->mtx);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
-	    "create_xri sent: DID=0x%x Xri=0x%x iotag=0x%x",
-	    ndlp->nlp_DID, ndlp->nlp_Xri, iotag);
+	    "create_xri sent: DID=0x%x Xri=0x%x iotag=0x%x", ndlp->nlp_DID,
+	    ndlp->nlp_Xri, iotag);
 
-	emlxs_issue_iocb_cmd(hba, rp, iocbq);
+	emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
 
 	return (0);
 
@@ -507,4 +518,4 @@ fail:
 
 	return (1);
 
-} /* emlxs_create_xri() */
+}  /* emlxs_create_xri() */

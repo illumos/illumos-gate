@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -41,14 +41,21 @@ typedef struct emlxs_hba emlxs_hba_t;
 #endif
 
 /* This structure must match the one in ./mdb/msgblib.c */
-typedef struct emlxs_device {
+typedef struct emlxs_device
+{
 	uint32_t hba_count;
 	emlxs_hba_t *hba[MAX_FC_BRDS];
 	kmutex_t lock;
 
 	time_t drv_timestamp;
-	clock_t log_timestamp;	/* Common base timestamp for all log entries */
-	emlxs_msg_log_t *log[MAX_FC_BRDS];   /* Message log pointers for mdb */
+	clock_t	log_timestamp;
+	emlxs_msg_log_t *log[MAX_FC_BRDS];
+
+#ifdef DUMP_SUPPORT
+	emlxs_file_t *dump_txtfile[MAX_FC_BRDS];
+	emlxs_file_t *dump_dmpfile[MAX_FC_BRDS];
+	emlxs_file_t *dump_ceefile[MAX_FC_BRDS];
+#endif /* DUMP_SUPPORT */
 
 } emlxs_device_t;
 

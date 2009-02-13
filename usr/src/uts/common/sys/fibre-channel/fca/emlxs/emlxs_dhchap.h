@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -37,27 +37,27 @@ extern "C" {
 
 
 /* emlxs_auth_cfg_t */
-#define	PASSWORD_TYPE_ASCII		1
-#define	PASSWORD_TYPE_BINARY		2
-#define	PASSWORD_TYPE_IGNORE		3
+#define	PASSWORD_TYPE_ASCII	1
+#define	PASSWORD_TYPE_BINARY	2
+#define	PASSWORD_TYPE_IGNORE	3
 
-#define	AUTH_MODE_DISABLED		1
-#define	AUTH_MODE_ACTIVE		2
-#define	AUTH_MODE_PASSIVE		3
+#define	AUTH_MODE_DISABLED	1
+#define	AUTH_MODE_ACTIVE	2
+#define	AUTH_MODE_PASSIVE	3
 
-#define	ELX_DHCHAP			0x01	/* Only one supported */
-#define	ELX_FCAP			0x02
-#define	ELX_FCPAP			0x03
-#define	ELX_KERBEROS			0x04
+#define	ELX_DHCHAP		0x01	/* Only one currently supported */
+#define	ELX_FCAP		0x02
+#define	ELX_FCPAP		0x03
+#define	ELX_KERBEROS		0x04
 
-#define	ELX_MD5				0x01
-#define	ELX_SHA1			0x02
+#define	ELX_MD5			0x01
+#define	ELX_SHA1		0x02
 
-#define	ELX_GROUP_NULL			0x01
-#define	ELX_GROUP_1024			0x02
-#define	ELX_GROUP_1280			0x03
-#define	ELX_GROUP_1536			0x04
-#define	ELX_GROUP_2048			0x05
+#define	ELX_GROUP_NULL		0x01
+#define	ELX_GROUP_1024		0x02
+#define	ELX_GROUP_1280		0x03
+#define	ELX_GROUP_1536		0x04
+#define	ELX_GROUP_2048		0x05
 
 
 /* AUTH_ELS Code */
@@ -153,16 +153,16 @@ extern "C" {
 #define	LSRJT_AUTH_NOT_LOGGED_IN	0x09
 
 /* AUTH_Reject Reason Code Explanations */
-#define	AUTHEXP_MECH_UNUSABLE		0x01	/* AUTHRJT_LOGIC_ERR */
-#define	AUTHEXP_DHGROUP_UNUSABLE	0x02	/* AUTHRJT_LOGIC_ERR */
-#define	AUTHEXP_HASHFUNC_UNUSABLE	0x03	/* AUTHRJT_LOGIC_ERR */
-#define	AUTHEXP_AUTHTRAN_STARTED	0x04	/* AUTHRJT_LOGIC_ERR */
-#define	AUTHEXP_AUTH_FAILED		0x05	/* AUTHRJT_FAILURE */
-#define	AUTHEXP_BAD_PAYLOAD		0x06	/* AUTHRJT_FAILURE */
-#define	AUTHEXP_BAD_PROTOCOL		0x07	/* AUTHRJT_FAILURE */
-#define	AUTHEXP_RESTART_AUTH		0x08	/* AUTHRJT_LOGIC_ERR */
-#define	AUTHEXP_CONCAT_UNSUPP		0x09	/* AUTHRJT_LOGIC_ERR */
-#define	AUTHEXP_BAD_PROTOVERS		0x0A	/* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_MECH_UNUSABLE		0x01 /* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_DHGROUP_UNUSABLE	0x02 /* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_HASHFUNC_UNUSABLE	0x03 /* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_AUTHTRAN_STARTED	0x04 /* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_AUTH_FAILED		0x05 /* AUTHRJT_FAILURE */
+#define	AUTHEXP_BAD_PAYLOAD		0x06 /* AUTHRJT_FAILURE */
+#define	AUTHEXP_BAD_PROTOCOL		0x07 /* AUTHRJT_FAILURE */
+#define	AUTHEXP_RESTART_AUTH		0x08 /* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_CONCAT_UNSUPP		0x09 /* AUTHRJT_LOGIC_ERR */
+#define	AUTHEXP_BAD_PROTOVERS		0x0A /* AUTHRJT_LOGIC_ERR */
 
 /* LS_RJT Reason Code Explanations for AUTH_ELS */
 #define	LSEXP_AUTH_REQUIRED		0x48
@@ -223,7 +223,7 @@ extern "C" {
 #define	ESC_EMLXS_09	"ESC_emlxs_rcv_auth_msg_auth_negotiate_rcv"
 #define	ESC_EMLXS_10	"ESC_emlxs_cmpl_auth_msg_auth_negotiate_rcv"
 
-#define	ESC_EMLXS_11	"ESC_emlxs_cmpl_cmpl_dhchap_reply_issue"
+#define	ESC_EMLXS_11 	"ESC_emlxs_cmpl_cmpl_dhchap_reply_issue"
 #define	ESC_EMLXS_12	"ESC_emlxs_cmpl_dhchap_reply_issue"
 #define	ESC_EMLXS_13	"ESC_emlxs_cmpl_auth_msg_dhchap_reply_issue"
 
@@ -236,7 +236,8 @@ extern "C" {
 
 #define	ESC_EMLXS_18	"ESC_emlxs_rcv_auth_msg_dhchap_reply_issue"
 
-#define	ESC_EMLXS_19	"ESC_emlxs_cmpl_auth_msg_dhchap_challenge_cmpl_wait4nxt"
+#define	ESC_EMLXS_19 \
+	"ESC_emlxs_cmpl_auth_msg_dhchap_challenge_cmpl_wait4next"
 
 #define	ESC_EMLXS_20	"ESC_emlxs_rcv_auth_msg_dhchap_reply_cmpl_wait4next"
 #define	ESC_EMLXS_21	"ESC_emlxs_cmpl_dhchap_success_issue"
@@ -266,70 +267,78 @@ extern "C" {
 
 
 /* From HBAnyware dfc lib FC-SP */
-typedef struct emlxs_auth_cfg {
-	NAME_TYPE local_entity;		/* host hba wwpn (NPIV support) */
-	NAME_TYPE remote_entity;	/* switch or target wwpn */
-	uint32_t authentication_timeout;
-	uint32_t authentication_mode;
-	uint32_t bidirectional:1;
-	uint32_t reserved:31;
-	uint32_t authentication_type_priority[4];
-	uint32_t hash_priority[4];
-	uint32_t dh_group_priority[8];
-	uint32_t reauthenticate_time_interval;
+typedef struct emlxs_auth_cfg
+{
+	NAME_TYPE		local_entity;	/* host wwpn (NPIV support) */
+	NAME_TYPE		remote_entity;	/* switch or target wwpn */
+	uint32_t		authentication_timeout;
+	uint32_t		authentication_mode;
+	uint32_t		bidirectional:1;
+	uint32_t		reserved:31;
+	uint32_t		authentication_type_priority[4];
+	uint32_t		hash_priority[4];
+	uint32_t		dh_group_priority[8];
+	uint32_t		reauthenticate_time_interval;
 
-	dfc_auth_status_t auth_status;
-	time_t auth_time;
-	struct emlxs_node *node;
+	dfc_auth_status_t	auth_status;
+	time_t			auth_time;
+	struct emlxs_node	*node;
 
-	struct emlxs_auth_cfg *prev;
-	struct emlxs_auth_cfg *next;
-
+	struct emlxs_auth_cfg	*prev;
+	struct emlxs_auth_cfg	*next;
 } emlxs_auth_cfg_t;
 
 
-typedef struct emlxs_auth_key {
-	NAME_TYPE local_entity;	/* host hba wwpn (NPIV support) */
-	NAME_TYPE remote_entity;	/* switch or target wwpn */
-	uint16_t local_password_length;
-	uint16_t local_password_type;
-	uint8_t local_password[128];	/* hba authenticates to switch  */
-	uint16_t remote_password_length;
-	uint16_t remote_password_type;
-	uint8_t remote_password[128];	/* hba authenticates to switch  */
+typedef struct emlxs_auth_key
+{
+	NAME_TYPE		local_entity;		/* host wwpn */
+							/* (NPIV support) */
+	NAME_TYPE		remote_entity;		/* switch or target */
+							/* wwpn */
+	uint16_t		local_password_length;
+	uint16_t		local_password_type;
+	uint8_t			local_password[128];	/* hba authenticates */
+							/* to switch  */
+	uint16_t		remote_password_length;
+	uint16_t		remote_password_type;
+	uint8_t			remote_password[128];	/* hba authenticates */
+							/* to switch  */
 
-	struct emlxs_node *node;
+	struct emlxs_node	*node;
 
-	struct emlxs_auth_key *prev;
-	struct emlxs_auth_key *next;
-
+	struct emlxs_auth_key	*prev;
+	struct emlxs_auth_key	*next;
 } emlxs_auth_key_t;
 
 
-typedef struct emlxs_auth_misc {
-
-	uint8_t bi_cval[20];	/* our challenge for bi-dir auth in reply as */
-				/* initiator */
-	uint32_t bi_cval_len;	/* 16 for MD5, 20 for SHA1 */
-	uint8_t pub_key[512];	/* max is 512 bytes value of (g^y mod p) */
-	uint32_t pubkey_len;	/* real length of the pub key */
-	uint8_t ses_key[512];	/* session key: value of (g^xy mod p) */
-	uint32_t seskey_len;	/* real length of the session key */
+typedef struct emlxs_auth_misc
+{
+	uint8_t		bi_cval[20];		/* our challenge for bi-dir */
+						/* auth in reply as initiator */
+	uint32_t	bi_cval_len;		/* 16 for MD5, 20 for SHA1 */
+	uint8_t		pub_key[512];		/* max is 512 bytes value of */
+						/* (g^y mod p) */
+	uint32_t	pubkey_len;		/* real length of the pub key */
+	uint8_t		ses_key[512];		/* session key: value of */
+						/* (g^xy mod p) */
+	uint32_t	seskey_len;		/* real length of the session */
+						/* key */
 
 	/* The following are parameters when host is the responder */
-	uint8_t hrsp_cval[20];	/* challenge value from host as responder */
-	uint32_t hrsp_cval_len;	/* host as the responder: challenge value len */
-	uint8_t hrsp_priv_key[20];	/* the private key generated in host */
-					/* as responder */
-	uint8_t hrsp_pub_key[512];	/* public key calculated when host as */
-					/* responder */
-	uint32_t hrsp_pubkey_len;	/* public key length when host as */
-					/* responder */
-	uint8_t hrsp_ses_key[512];	/* session key computed when host is */
-					/* responder */
-	uint32_t hrsp_seskey_len;	/* session key length when host is */
-					/* responder */
-
+	uint8_t		hrsp_cval[20];		/* challenge value from host */
+						/* as responder */
+	uint32_t	hrsp_cval_len;		/* host as the responder its */
+						/* challenge value len */
+	uint8_t		hrsp_priv_key[20];	/* the private key generated */
+						/* in host as responder */
+	uint8_t		hrsp_pub_key[512];	/* public key calculated when */
+						/* host as responder */
+	uint32_t	hrsp_pubkey_len;	/* public key length when */
+						/* host is responder */
+	uint8_t		hrsp_ses_key[512];	/* session key computed when */
+						/* host is responder */
+	uint32_t	hrsp_seskey_len;	/* session key length when */
+						/* host is responder */
 } emlxs_auth_misc_t;
 
 
@@ -340,9 +349,10 @@ typedef struct emlxs_auth_misc {
  * They are from EMLXSHBA_t in emlxs driver.
  *
  */
-typedef struct emlxs_port_dhc {
+typedef struct emlxs_port_dhc
+{
 
-	int32_t state;
+	int32_t			state;
 #define	ELX_FABRIC_STATE_UNKNOWN	0x00
 #define	ELX_FABRIC_AUTH_DISABLED	0x01
 #define	ELX_FABRIC_AUTH_FAILED		0x02
@@ -350,55 +360,30 @@ typedef struct emlxs_port_dhc {
 #define	ELX_FABRIC_IN_AUTH		0x04
 #define	ELX_FABRIC_IN_REAUTH		0x05
 
-	dfc_auth_status_t auth_status;	/* Fabric auth status */
-	time_t auth_time;
+	dfc_auth_status_t	auth_status;  /* Fabric auth status */
+	time_t			auth_time;
 
 } emlxs_port_dhc_t;
 
 
 /* Node Events */
-#define	NODE_EVENT_DEVICE_RM		0x0	/* Auth response timeout */
-						/* & fail */
-#define	NODE_EVENT_DEVICE_RECOVERY	0x1	/* Auth response timeout */
-						/* & recovery */
+#define	NODE_EVENT_DEVICE_RM		0x0	/* Auth response timeout and */
+						/* fail */
+#define	NODE_EVENT_DEVICE_RECOVERY	0x1	/* Auth response timeout and */
+						/* recovery */
 #define	NODE_EVENT_RCV_AUTH_MSG		0x2	/* Unsolicited Auth received */
 #define	NODE_EVENT_CMPL_AUTH_MSG	0x3
 #define	NODE_EVENT_MAX_EVENT		0x4
-
-#if 0	/* old node events */
-#define	NODE_EVENT_RCV_PLOGI		0x0	/* Rcv'd an ELS PLOGI command */
-#define	NODE_EVENT_RCV_PRLI		0x1	/* Rcv'd an ELS PRLI command */
-#define	NODE_EVENT_RCV_LOGO		0x2	/* Rcv'd an ELS LOGO command */
-#define	NODE_EVENT_RCV_ADISC		0x3	/* Rcv'd an ELS ADISC command */
-#define	NODE_EVENT_RCV_PDISC		0x4	/* Rcv'd an ELS PDISC command */
-#define	NODE_EVENT_RCV_PRLO		0x5	/* Rcv'd an ELS PRLO command */
-#define	NODE_EVENT_CMPL_PLOGI		0x6	/* ELS PLOGI command */
-						/* completed */
-#define	NODE_EVENT_CMPL_PRLI		0x7	/* ELS PRLI  command */
-						/* completed */
-#define	NODE_EVENT_CMPL_LOGO		0x8	/* ELS LOGO  command */
-						/* completed */
-#define	NODE_EVENT_CMPL_ADISC		0x9	/* ELS ADISC command */
-						/* completed */
-#define	NODE_EVENT_CMPL_REG_LOGIN	0xa	/* REGLOGIN mbox cmd */
-						/* completed */
-#define	NODE_EVENT_DEVICE_RM		0xb	/* Device not found in NS / */
-						/* ALPAmap */
-#define	NODE_EVENT_DEVICE_RECOVERY	0xc	/* Device is in recovery */
-#define	NODE_EVENT_RCV_AUTH_MSG		0xd
-#define	NODE_EVENT_CMPL_AUTH_MSG	0xe
-#define	NODE_EVENT_MAX_EVENT		0xf
-#endif	/* 0 */
-
 
 /*
  * emlxs_node_dhc struct to be used in emlxs_node_t.
  * They are from emlxs_nodelist_t in emlxs driver.
  */
-typedef struct emlxs_node_dhc {
-	uint16_t state;	/* used for state machine */
+typedef struct emlxs_node_dhc
+{
+	uint16_t		state;		/* used for state machine */
 #define	NODE_STATE_UNKNOWN				0x00
-#define	NODE_STATE_AUTH_DISABLED			0x01
+#define	NODE_STATE_AUTH_DISABLED 			0x01
 #define	NODE_STATE_AUTH_FAILED				0x02
 #define	NODE_STATE_AUTH_SUCCESS				0x03
 #define	NODE_STATE_AUTH_NEGOTIATE_ISSUE			0x04
@@ -413,360 +398,369 @@ typedef struct emlxs_node_dhc {
 #define	NODE_STATE_DHCHAP_SUCCESS_CMPL_WAIT4NEXT	0x0D
 #define	NODE_STATE_NOCHANGE				0xFFFFFFFF
 
-	uint16_t prev_state;	/* for info only */
+	uint16_t		prev_state;  /* for info only */
 
-	uint32_t disc_refcnt;
+	uint32_t		disc_refcnt;
 
-	emlxs_auth_cfg_t auth_cfg;
-	emlxs_auth_key_t auth_key;
+	emlxs_auth_cfg_t	auth_cfg;
+	emlxs_auth_key_t	auth_key;
 
-	uint32_t nlp_authrsp_tmo;	/* Response timeout */
-	uint32_t nlp_authrsp_tmocnt;
+	uint32_t		nlp_authrsp_tmo;	/* Response timeout */
+	uint32_t		nlp_authrsp_tmocnt;
 
-	uint32_t nlp_auth_tranid_ini;	/* tran_id when this node is the */
-					/* initiator */
-	uint32_t nlp_auth_tranid_rsp;	/* tran_id when this node is the */
-					/* responder */
+	uint32_t		nlp_auth_tranid_ini;	/* tran_id when this */
+							/* node is initiator */
+	uint32_t		nlp_auth_tranid_rsp;	/* tran_id when this */
+							/* node is responder */
 
-	uint32_t nlp_auth_flag;	/* 1:initiator, 2: responder */
-	uint32_t nlp_auth_limit;	/* 1: NULL DHCHAP only, 2: full group */
-					/* support */
+	uint32_t		nlp_auth_flag;		/* 1:initiator */
+							/* 2:responder */
+	uint32_t		nlp_auth_limit;		/* 1: NULL DHCHAP */
+							/* 2: full support */
 
 	/* information in DHCHAP_Challenge as the auth responder */
-	uint32_t nlp_auth_hashid;
-	uint32_t nlp_auth_dhgpid;
-	uint32_t nlp_auth_bidir;
-	NAME_TYPE nlp_auth_wwn;
+	uint32_t		nlp_auth_hashid;
+	uint32_t		nlp_auth_dhgpid;
+	uint32_t		nlp_auth_bidir;
+	NAME_TYPE		nlp_auth_wwn;
 
-	emlxs_auth_misc_t nlp_auth_misc;
+	emlxs_auth_misc_t	nlp_auth_misc;
 
-	uint32_t nlp_reauth_tmo;
-	uint16_t nlp_reauth_status;
+	uint32_t		nlp_reauth_tmo;
+	uint16_t		nlp_reauth_status;
 #define	NLP_HOST_REAUTH_DISABLED	0x0
 #define	NLP_HOST_REAUTH_ENABLED		0x1
 #define	NLP_HOST_REAUTH_IN_PROGRESS	0x2
 
-	uint32_t nlp_fb_vendor;
-#define	NLP_FABRIC_CISCO		0x1
-#define	NLP_FABRIC_OTHERS		0x2
+	uint32_t		nlp_fb_vendor;
+#define	NLP_FABRIC_CISCO	0x1
+#define	NLP_FABRIC_OTHERS	0x2
 
-	uint32_t fc_dhchap_success_expected;
+	uint32_t		fc_dhchap_success_expected;
 
 	/* hash_id, dhgp_id are set from responder, host is the initiator */
-	uint32_t hash_id;	/* 0x05 for MD5, 0x06 for SHA-1 */
-	uint32_t dhgp_id;	/* DH group identifier */
+	uint32_t		hash_id;		/* 0x05 for MD5 */
+							/* 0x06 for SHA-1 */
+	uint32_t		dhgp_id;		/* DH grp identifier */
 
-	uint8_t bi_cval[20];	/* our challenge for bi-dir auth in reply as */
-				/* initiator */
-	uint32_t bi_cval_len;	/* 16 for MD5, 20 for SHA1 */
-	uint8_t pub_key[512];	/* max is 512 bytes value of (g^y mod p) */
-	uint32_t pubkey_len;	/* real length of the pub key */
-	uint8_t ses_key[512];	/* session key: value of (g^xy mod p) */
-	uint32_t seskey_len;	/* real length of the session key */
+	uint8_t			bi_cval[20];		/* our challenge for */
+							/* bi-dir auth in */
+							/* reply as initiator */
+	uint32_t		bi_cval_len;		/* 16 for MD5 */
+							/* 20 for SHA1 */
+	uint8_t			pub_key[512];		/* max is 512 bytes */
+							/* value (g^y mod p) */
+	uint32_t		pubkey_len;		/* real length of the */
+							/* pub key */
+	uint8_t			ses_key[512];		/* session key: */
+							/* value (g^xy mod p) */
+	uint32_t		seskey_len;		/* real length of the */
+							/* session key */
 
 	/* The following are parameters when host is the responder */
 
-	uint8_t hrsp_cval[20];	/* challenge value from host as responder */
-	uint32_t hrsp_cval_len;	/* host as the responder: challenge value len */
-	uint8_t hrsp_priv_key[20];	/* the private key generated in host */
-					/* as responder */
-	uint8_t hrsp_pub_key[512];	/* public key calculated when host as */
-					/* responder */
-	uint32_t hrsp_pubkey_len;	/* public key length when host as */
-					/* responder */
-	uint8_t hrsp_ses_key[512];	/* session key computed when host is */
-					/* responder */
-	uint32_t hrsp_seskey_len;	/* session key length when host is */
-					/* responder */
+	uint8_t			hrsp_cval[20];		/* challenge value */
+	uint32_t		hrsp_cval_len;		/* challenge value */
+							/* length */
+	uint8_t			hrsp_priv_key[20];	/* private key */
+							/* generated */
+	uint8_t			hrsp_pub_key[512];	/* public key */
+							/* computed */
+	uint32_t		hrsp_pubkey_len;	/* public key length */
+	uint8_t			hrsp_ses_key[512];	/* session key */
+							/* computed */
+	uint32_t		hrsp_seskey_len;	/* session key length */
 
-	uint8_t *deferred_sbp;	/* Pending IO for auth completion */
-	uint8_t *deferred_ubp;
+	uint8_t			*deferred_sbp;		/* Pending IO for */
+							/* auth completion */
+	uint8_t			*deferred_ubp;
 
-	uint32_t flag;
+	uint32_t		flag;
 #define	NLP_REMOTE_AUTH			0x00000001
 #define	NLP_SET_REAUTH_TIME		0x00000002
 
-	emlxs_auth_cfg_t *parent_auth_cfg;	/* Original auth_cfg table */
-						/* entry */
-	emlxs_auth_key_t *parent_auth_key;	/* Original auth_key table */
-						/* entry */
-
+	emlxs_auth_cfg_t	*parent_auth_cfg;	/* Original auth_cfg */
+							/* table entry */
+	emlxs_auth_key_t	*parent_auth_key;	/* Original auth_key */
+							/* table entry */
 } emlxs_node_dhc_t;
 
 
 /* For NULL DHCHAP with MD5 and SHA-1 */
-typedef struct _AUTH_NEGOT_PARAMS_1 {
-	uint16_t name_tag;	/* set to 0x0001 */
-	uint16_t name_len;	/* set to 0x0008 */
-	NAME_TYPE nodeName;	/* WWPN */
-	uint32_t proto_num;	/* set to 0x5 */
-	uint32_t para_len;	/* set to 0x28 i.e., 40 bytes */
-	uint32_t proto_id;	/* set to HDCHAP */
-	uint16_t HashList_tag;	/* set to 0x0001 */
-	uint16_t HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
-	uint32_t HashList_value1;	/* set to MD5 or SHA1 ID 0x00000005,6 */
-	uint16_t DHgIDList_tag;	/* set to 0x0002 */
-	uint16_t DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
-	uint32_t DHgIDList_g0;	/* set to 0x0000 0000 */
-	uint32_t DHgIDList_g1;	/* set to 0x0000 0001 */
-	uint32_t DHgIDList_g2;	/* set to 0x0000 0002 */
-	uint32_t DHgIDList_g3;	/* set to 0x0000 0003 */
-	uint32_t DHgIDList_g4;	/* set to 0x0000 0004 */
-
+typedef struct _AUTH_NEGOT_PARAMS_1
+{
+	uint16_t  name_tag;		/* set to 0x0001 */
+	uint16_t  name_len;		/* set to 0x0008 */
+	NAME_TYPE nodeName;		/* WWPN */
+	uint32_t  proto_num;		/* set to 0x5 */
+	uint32_t  para_len;		/* set to 0x28 i.e., 40 bytes */
+	uint32_t  proto_id;		/* set to HDCHAP */
+	uint16_t  HashList_tag;		/* set to 0x0001 */
+	uint16_t  HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
+	uint32_t  HashList_value1;	/* set to MD5 or SHA1 ID 0x00000005,6 */
+	uint16_t  DHgIDList_tag;	/* set to 0x0002 */
+	uint16_t  DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
+	uint32_t  DHgIDList_g0;		/* set to 0x0000 0000 */
+	uint32_t  DHgIDList_g1;		/* set to 0x0000 0001 */
+	uint32_t  DHgIDList_g2;		/* set to 0x0000 0002 */
+	uint32_t  DHgIDList_g3;		/* set to 0x0000 0003 */
+	uint32_t  DHgIDList_g4;		/* set to 0x0000 0004 */
 } AUTH_NEGOT_PARAMS_1;
 
 
-typedef struct _AUTH_NEGOT_PARAMS_2 {
-	uint16_t name_tag;	/* set to 0x0001 */
-	uint16_t name_len;	/* set to 0x0008 */
-	NAME_TYPE nodeName;	/* WWPN */
-	uint32_t proto_num;	/* set to 0x5 */
-	uint32_t para_len;	/* set to 0x28 i.e., 40 bytes */
-	uint32_t proto_id;	/* set to HDCHAP */
-	uint16_t HashList_tag;	/* set to 0x0001 */
-	uint16_t HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
-	uint32_t HashList_value1;	/* set to MD5's   ID 0x00000005 */
-	uint32_t HashList_value2;	/* set to SHA-1's ID 0x00000006 */
-	uint16_t DHgIDList_tag;	/* set to 0x0002 */
-	uint16_t DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
-	uint32_t DHgIDList_g0;	/* set to 0x0000 0000 */
-	uint32_t DHgIDList_g1;	/* set to 0x0000 0001 */
-	uint32_t DHgIDList_g2;	/* set to 0x0000 0002 */
-	uint32_t DHgIDList_g3;	/* set to 0x0000 0003 */
-	uint32_t DHgIDList_g4;	/* set to 0x0000 0004 */
-
+typedef struct _AUTH_NEGOT_PARAMS_2
+{
+	uint16_t  name_tag;		/* set to 0x0001 */
+	uint16_t  name_len;		/* set to 0x0008 */
+	NAME_TYPE nodeName;		/* WWPN */
+	uint32_t  proto_num;		/* set to 0x5 */
+	uint32_t  para_len;		/* set to 0x28 i.e., 40 bytes */
+	uint32_t  proto_id;		/* set to HDCHAP */
+	uint16_t  HashList_tag;		/* set to 0x0001 */
+	uint16_t  HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
+	uint32_t  HashList_value1;	/* set to MD5's   ID 0x00000005 */
+	uint32_t  HashList_value2;	/* set to SHA-1's ID 0x00000006 */
+	uint16_t  DHgIDList_tag;	/* set to 0x0002 */
+	uint16_t  DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
+	uint32_t  DHgIDList_g0;		/* set to 0x0000 0000 */
+	uint32_t  DHgIDList_g1;		/* set to 0x0000 0001 */
+	uint32_t  DHgIDList_g2;		/* set to 0x0000 0002 */
+	uint32_t  DHgIDList_g3;		/* set to 0x0000 0003 */
+	uint32_t  DHgIDList_g4;		/* set to 0x0000 0004 */
 } AUTH_NEGOT_PARAMS_2;
 
 
 /* For NULL DHCHAP with MD5 and SHA-1 */
-typedef struct _AUTH_NEGOT_PARAMS {
-	uint16_t name_tag;	/* set to 0x0001 */
-	uint16_t name_len;	/* set to 0x0008 */
-	NAME_TYPE nodeName;	/* WWPN */
-	uint32_t proto_num;	/* set to 0x5 */
-	uint32_t para_len;	/* set to 0x28 i.e., 40 bytes */
-	uint32_t proto_id;	/* set to HDCHAP */
-	uint16_t HashList_tag;	/* set to 0x0001 */
-	uint16_t HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
-	uint32_t HashList_value1;	/* set to MD5's   ID 0x00000005 */
-	uint32_t HashList_value2;	/* set to SHA-1's ID 0x00000006 */
-	uint16_t DHgIDList_tag;	/* set to 0x0002 */
-	uint16_t DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
-	uint32_t DHgIDList_g0;	/* set to 0x0000 0000 */
-	uint32_t DHgIDList_g1;	/* set to 0x0000 0001 */
-	uint32_t DHgIDList_g2;	/* set to 0x0000 0002 */
-	uint32_t DHgIDList_g3;	/* set to 0x0000 0003 */
-	uint32_t DHgIDList_g4;	/* set to 0x0000 0004 */
-
+typedef struct _AUTH_NEGOT_PARAMS
+{
+	uint16_t  name_tag;		/* set to 0x0001 */
+	uint16_t  name_len;		/* set to 0x0008 */
+	NAME_TYPE nodeName;		/* WWPN */
+	uint32_t  proto_num;		/* set to 0x5 */
+	uint32_t  para_len;		/* set to 0x28 i.e., 40 bytes */
+	uint32_t  proto_id;		/* set to HDCHAP */
+	uint16_t  HashList_tag;		/* set to 0x0001 */
+	uint16_t  HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
+	uint32_t  HashList_value1;	/* set to MD5's   ID 0x00000005 */
+	uint32_t  HashList_value2;	/* set to SHA-1's ID 0x00000006 */
+	uint16_t  DHgIDList_tag;	/* set to 0x0002 */
+	uint16_t  DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
+	uint32_t  DHgIDList_g0;		/* set to 0x0000 0000 */
+	uint32_t  DHgIDList_g1;		/* set to 0x0000 0001 */
+	uint32_t  DHgIDList_g2;		/* set to 0x0000 0002 */
+	uint32_t  DHgIDList_g3;		/* set to 0x0000 0003 */
+	uint32_t  DHgIDList_g4;		/* set to 0x0000 0004 */
 } AUTH_NEGOT_PARAMS;
 
-typedef struct _AUTH_NEGOT_PARAMS_NULL_1 {
-	uint16_t name_tag;	/* set to 0x0001 */
-	uint16_t name_len;	/* set to 0x0008 */
-	NAME_TYPE nodeName;	/* WWPN */
-	uint32_t proto_num;	/* set to 0x5 */
-	uint32_t para_len;	/* set to 0x28 i.e., 40 bytes */
-	uint32_t proto_id;	/* set to HDCHAP */
-	uint16_t HashList_tag;	/* set to 0x0001 */
-	uint16_t HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
-	uint32_t HashList_value1;	/* set to MD5's   ID 0x00000005 */
-	uint16_t DHgIDList_tag;	/* set to 0x0002 */
-	uint16_t DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
-	uint32_t DHgIDList_g0;	/* set to 0x0000 0000 */
-
+typedef struct _AUTH_NEGOT_PARAMS_NULL_1
+{
+	uint16_t  name_tag;		/* set to 0x0001 */
+	uint16_t  name_len;		/* set to 0x0008 */
+	NAME_TYPE nodeName;		/* WWPN */
+	uint32_t  proto_num;		/* set to 0x5 */
+	uint32_t  para_len;		/* set to 0x28 i.e., 40 bytes */
+	uint32_t  proto_id;		/* set to HDCHAP */
+	uint16_t  HashList_tag;		/* set to 0x0001 */
+	uint16_t  HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
+	uint32_t  HashList_value1;	/* set to MD5's   ID 0x00000005 */
+	uint16_t  DHgIDList_tag;	/* set to 0x0002 */
+	uint16_t  DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
+	uint32_t  DHgIDList_g0;		/* set to 0x0000 0000 */
 } AUTH_NEGOT_PARAMS_NULL_1;
 
-typedef struct _AUTH_NEGOT_PARAMS_NULL_2 {
-	uint16_t name_tag;	/* set to 0x0001 */
-	uint16_t name_len;	/* set to 0x0008 */
-	NAME_TYPE nodeName;	/* WWPN */
-	uint32_t proto_num;	/* set to 0x5 */
-	uint32_t para_len;	/* set to 0x28 i.e., 40 bytes */
-	uint32_t proto_id;	/* set to HDCHAP */
-	uint16_t HashList_tag;	/* set to 0x0001 */
-	uint16_t HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
-	uint32_t HashList_value1;	/* set to MD5's   ID 0x00000005 */
-	uint32_t HashList_value2;
-	uint16_t DHgIDList_tag;	/* set to 0x0002 */
-	uint16_t DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
-	uint32_t DHgIDList_g0;	/* set to 0x0000 0000 */
-
+typedef struct _AUTH_NEGOT_PARAMS_NULL_2
+{
+	uint16_t  name_tag;		/* set to 0x0001 */
+	uint16_t  name_len;		/* set to 0x0008 */
+	NAME_TYPE nodeName;		/* WWPN */
+	uint32_t  proto_num;		/* set to 0x5 */
+	uint32_t  para_len;		/* set to 0x28 i.e., 40 bytes */
+	uint32_t  proto_id;		/* set to HDCHAP */
+	uint16_t  HashList_tag;		/* set to 0x0001 */
+	uint16_t  HashList_wcnt;	/* set to 0x0002 i.e. MD5 and SHA-1 */
+	uint32_t  HashList_value1;	/* set to MD5's   ID 0x00000005 */
+	uint32_t  HashList_value2;
+	uint16_t  DHgIDList_tag;	/* set to 0x0002 */
+	uint16_t  DHgIDList_wnt;	/* set to 0x0005 i.e., Full DH groups */
+	uint32_t  DHgIDList_g0;		/* set to 0x0000 0000 */
 } AUTH_NEGOT_PARAMS_NULL_2;
 
 
 /* Generic AUTH ELS Header */
-typedef struct _AUTH_MSG_HDR {
+typedef struct _AUTH_MSG_HDR
+{
 	/* 20 bytes in total */
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
-	uint32_t msg_len;	/* size of msg payload in byte */
-	uint32_t tran_id;
-	uint16_t name_tag;	/* set to 0x0001 */
-	uint16_t name_len;	/* set to 0x0008 */
-	NAME_TYPE nodeName;	/* WWPN */
-
+	uint8_t		auth_els_code;	/* always 0x90h */
+	uint8_t		auth_els_flags;
+	uint8_t		auth_msg_code;	/* see above */
+	uint8_t		proto_version;
+	uint32_t	msg_len;	/* size of msg payload in byte */
+	uint32_t	tran_id;
+	uint16_t	name_tag;	/* set to 0x0001 */
+	uint16_t	name_len;	/* set to 0x0008 */
+	NAME_TYPE	nodeName;	/* WWPN */
 } AUTH_MSG_HDR;
 
 
-typedef struct _SHA1_CVAL {
+typedef struct _SHA1_CVAL
+{
 	uint8_t val[20];
 } SHA1_CVAL;
 
 
-typedef struct _MD5_CVAL {
-	uint8_t val[16];
+typedef struct _MD5_CVAL
+{
+	uint8_t	val[16];
 } MD5_CVAL;
 
 
-union challenge_val {
-	SHA1_CVAL sha1;
-	MD5_CVAL md5;
+union challenge_val
+{
+	SHA1_CVAL	sha1;
+	MD5_CVAL	md5;
 };
 
 
 /* DHCHAP_Replay */
-typedef struct _DHCHAP_REPLY_HDR {
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
+typedef struct _DHCHAP_REPLY_HDR
+{
+	uint8_t  auth_els_code;	/* always 0x90h */
+	uint8_t  auth_els_flags;
+	uint8_t  auth_msg_code;	/* see above */
+	uint8_t  proto_version;
 	uint32_t msg_len;	/* size of msg payload in byte */
 	uint32_t tran_id;	/* transaction id */
-
 } DHCHAP_REPLY_HDR;
 
 
 /* DHCHAP_Challenge */
-typedef struct _DHCHAP_CHALL_NULL {
-	AUTH_MSG_HDR msg_hdr;
-	uint32_t hash_id;
-	uint32_t dhgp_id;
-	uint32_t cval_len;
-#if 0
-	union {
-		SHA1_CVAL cvalue_sha1;
-		MD5_CVAL cvalue_md5;
-	} un_cval;
-	uint32_t dhval_len;
-#endif	/* 0 */
-
+typedef struct _DHCHAP_CHALL_NULL
+{
+	AUTH_MSG_HDR	msg_hdr;
+	uint32_t	hash_id;
+	uint32_t	dhgp_id;
+	uint32_t	cval_len;
 } DHCHAP_CHALL_NULL;
 
-typedef struct _DHCHAP_CHALL {
-	DHCHAP_CHALL_NULL cnul;
-	uint8_t *dhval;
+typedef struct _DHCHAP_CHALL
+{
+	DHCHAP_CHALL_NULL	cnul;
+	uint8_t			*dhval;
 } DHCHAP_CHALL;
 
 /*
- * size of msg_payload is variable based on the different
- * protocol parameters supported in the driver. For DHCHAP we plan to
- * support NULL, group 1, 2, 3, 4. To support all
+ * size of msg_payload is variable based on the different protocol
+ * parameters supported in the driver.
+ *
+ * For DHCHAP we plan to support NULL, group 1, 2, 3, 4.
  *
  * For NULL DHCHAP protocol only: of these protocol identifiers,
- * we need name_tag	= 2 bytes name_len_size	= 2 bytes name_len
- * = 8 bytes number of usable auth proto = 4 bytes
+ * we need name_tag = 2 bytes name_len_size = 2 bytes name_len = 8 bytes
+ * number of usable auth proto = 4 bytes
  *
  * --------- for example for NULL DHCAHP only --------------------
- * auth proto #1 len = 4 bytes #1 ID  = 4 bytes #1 params = 4 + 16
- * bytes. ------ Total for NULL DHCHAP = (16 + 12 + 16 ) = 44 bytes.
+ * auth proto #1 len = 4 bytes #1 ID  = 4 bytes #1 params = 4 + 16 bytes.
+ * ------ Total for NULL DHCHAP = (16 + 12 + 16 ) = 44 bytes.
  *
- * If number of usable auth proto is 5, then we should have 5 auth
- * proto params. assume we are using name_tag 0x0001, then auth
- * name in total = 12 bytes.
+ * If number of usable auth proto is 5, then we should have 5 auth proto params.
+ * assume we are using name_tag 0x0001, then auth name in total = 12 bytes.
  *
  * 12 bytes + 4 bytes = 16 bytes. 4 + 4 + 4 = 12 bytes
- * (num of usable auth proto size	= 4 auth proto params #1 len size
- * = 4 auth prot ID for #1 size 	= 4
+ * (num of usable auth proto size = 4
+ * auth proto params #1 len size = 4
+ * auth prot ID for #1 size  = 4
  *
- * For DHCHAP param: HashList	     2 param tag size
- * (set to 0x0001 as HashList) 2 param word cnt size (set to 0x0002 as
- * two hash funcs) 8 for hash ids: MD5 and SHA-1 DHgIDList
- * 2 param tag size  (set to 0x0002 as DHgIDList) 2 param
- * word cnt size (set to 0x0005 as NULL and 1/2/3/4 groups) 20 for 5 groups
- * 0x0000 0000 0x0000 0001 0x0000 0002 0x0000 0003
- * 0x0000 0004 Total for FULL group support (16 + 12 + 12 + 24 ) = 64 bytes.
+ * For DHCHAP param: HashList	2 param tag size (set to 0x0001 as HashList)
+ * 2 param word cnt size (set to 0x0002 as two hash funcs)
+ * 8 for hash ids: MD5 and SHA-1 DHgIDList
+ * 2 param tag size (set to 0x0002 as DHgIDList)
+ * 2 param word cnt size (set to 0x0005 as NULL and 1/2/3/4 groups) 20 for
+ * 5 groups 0x0000 0000 0x0000 0001 0x0000 0002 0x0000 0003 0x0000 0004
+ * Total for FULL group support (16 + 12 + 12 + 24 ) = 64 bytes.
  *
  */
 
-typedef struct _AUTH_MSG_NEGOT_1 {	/* in Big Endian format */
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
-	uint32_t msg_len;	/* size of msg payload in byte */
-	uint32_t tran_id;	/* transaction identifier */
+typedef struct _AUTH_MSG_NEGOT_1 { /* in Big Endian format */
+	uint8_t			auth_els_code;  /* always 0x90h */
+	uint8_t			auth_els_flags;
+	uint8_t			auth_msg_code;  /* see above */
+	uint8_t			proto_version;
+	uint32_t		msg_len;	/* size of msg payload */
+						/* in byte */
+	uint32_t		tran_id;	/* transaction identifier */
 
 	/* anything else is variable in size (bytes) */
 	/* uint8_t   msg_payload[MAX_AUTH_MSG_SIZE]; */
-	AUTH_NEGOT_PARAMS_1 params;
-
+	AUTH_NEGOT_PARAMS_1	params;
 } AUTH_MSG_NEGOT_1, *PAUTH_MSG_NEGOT_1;
 
 
-typedef struct _AUTH_MSG_NEGOT_2 {	/* in Big Endian format */
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
-	uint32_t msg_len;	/* size of msg payload in byte */
-	uint32_t tran_id;	/* transaction identifier */
+typedef struct _AUTH_MSG_NEGOT_2 { /* in Big Endian format */
+	uint8_t			auth_els_code;  /* always 0x90h */
+	uint8_t			auth_els_flags;
+	uint8_t			auth_msg_code;  /* see above */
+	uint8_t			proto_version;
+	uint32_t		msg_len;	/* size of msg payload */
+						/* in byte */
+	uint32_t		tran_id;	/* transaction identifier */
 
 	/* anything else is variable in size (bytes) */
 	/* uint8_t   msg_payload[MAX_AUTH_MSG_SIZE]; */
-	AUTH_NEGOT_PARAMS_2 params;
-
+	AUTH_NEGOT_PARAMS_2	params;
 } AUTH_MSG_NEGOT_2, *PAUTH_MSG_NEGOT_2;
 
 
-typedef struct _AUTH_MSG_NEGOT {	/* in Big Endian format */
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
-	uint32_t msg_len;	/* size of msg payload in byte */
-	uint32_t tran_id;	/* transaction identifier */
+typedef struct _AUTH_MSG_NEGOT
+{
+	/* in Big Endian format */
+	uint8_t			auth_els_code;	/* always 0x90h */
+	uint8_t			auth_els_flags;
+	uint8_t			auth_msg_code;	/* see above */
+	uint8_t			proto_version;
+	uint32_t		msg_len;	/* size of msg payload */
+						/* in byte */
+	uint32_t		tran_id;	/* transaction identifier */
 
 	/* anything else is variable in size (bytes) */
 	/* uint8_t	msg_payload[MAX_AUTH_MSG_SIZE]; */
-	AUTH_NEGOT_PARAMS params;
-
+	AUTH_NEGOT_PARAMS	params;
 } AUTH_MSG_NEGOT, *PAUTH_MSG_NEGOT;
 
 
 /* AUTH_Negotiate msg for NULL DH support only */
-typedef struct _AUTH_MSG_NEGOT_NULL {
-	uint8_t auth_els_code;
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;
-	uint8_t proto_version;
+typedef struct _AUTH_MSG_NEGOT_NULL
+{
+	uint8_t  auth_els_code;
+	uint8_t  auth_els_flags;
+	uint8_t  auth_msg_code;
+	uint8_t  proto_version;
 	uint32_t msg_len;
 	uint32_t tran_id;
-
 } AUTH_MSG_NEGOT_NULL, *PAUTH_MSG_NEGOT_NULL;
 
-typedef struct _AUTH_MSG_NEGOT_NULL_1 {
-	uint8_t auth_els_code;
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;
-	uint8_t proto_version;
-	uint32_t msg_len;
-	uint32_t tran_id;
+typedef struct _AUTH_MSG_NEGOT_NULL_1
+{
+	uint8_t				auth_els_code;
+	uint8_t				auth_els_flags;
+	uint8_t				auth_msg_code;
+	uint8_t				proto_version;
+	uint32_t			msg_len;
+	uint32_t			tran_id;
 
-	AUTH_NEGOT_PARAMS_NULL_1 params;
+	AUTH_NEGOT_PARAMS_NULL_1	params;
 
 } AUTH_MSG_NEGOT_NULL_1, *PAUTH_MSG_NEGOT_NULL_1;
 
-typedef struct _AUTH_MSG_NEGOT_NULL_2 {
-	uint8_t auth_els_code;
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;
-	uint8_t proto_version;
-	uint32_t msg_len;
-	uint32_t tran_id;
+typedef struct _AUTH_MSG_NEGOT_NULL_2
+{
+	uint8_t				auth_els_code;
+	uint8_t				auth_els_flags;
+	uint8_t				auth_msg_code;
+	uint8_t				proto_version;
+	uint32_t			msg_len;
+	uint32_t			tran_id;
 
-	AUTH_NEGOT_PARAMS_NULL_2 params;
+	AUTH_NEGOT_PARAMS_NULL_2	params;
 
 } AUTH_MSG_NEGOT_NULL_2, *PAUTH_MSG_NEGOT_NULL_2;
 
@@ -775,86 +769,47 @@ typedef struct _AUTH_MSG_NEGOT_NULL_2 {
 #define	AUTH_ELS_FLAGS_MASK	0x0f;
 
 
-typedef struct _AUTH_RJT {
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
+typedef struct _AUTH_RJT
+{
+	uint8_t  auth_els_code;	/* always 0x90h */
+	uint8_t  auth_els_flags;
+	uint8_t  auth_msg_code;	/* see above */
+	uint8_t  proto_version;
 	uint32_t msg_len;	/* size of msg payload in byte */
 	uint32_t tran_id;	/* transaction identifier */
 
-	uint8_t ReasonCode;
-	uint8_t ReasonCodeExplanation;
+	uint8_t  ReasonCode;
+	uint8_t  ReasonCodeExplanation;
 	uint16_t Reserved;
-
 } AUTH_RJT, *PAUTH_RJT;
 
-typedef struct _DHCHAP_SUCCESS_HDR {
-	uint8_t auth_els_code;	/* always 0x90h */
-	uint8_t auth_els_flags;
-	uint8_t auth_msg_code;	/* see above */
-	uint8_t proto_version;
+typedef struct _DHCHAP_SUCCESS_HDR
+{
+	uint8_t  auth_els_code;	/* always 0x90h */
+	uint8_t  auth_els_flags;
+	uint8_t  auth_msg_code;	/* see above */
+	uint8_t  proto_version;
 	uint32_t msg_len;	/* size of msg payload in byte */
 	uint32_t tran_id;	/* transaction identifier */
 
 	uint32_t RspVal_len;
-
 } DHCHAP_SUCCESS_HDR, *PDHCHAP_SUCCESS_HDR;
 
 
-typedef struct dh_group_st {
-	unsigned long groupid;
-	unsigned long length;
-	unsigned char value[256];
-
+typedef struct dh_group_st
+{
+	unsigned long   groupid;
+	unsigned long   length;
+	unsigned char   value[256];
 } DH_GROUP, *PDH_GROUP;
 
-#if 0
-unsigned char dhgp1_pVal[] =
-
-	{0xEE, 0xAF, 0x0A, 0xB9, 0xAD, 0xB3, 0x8D, 0xD6, 0x9C, 0x33, 0xF8,
-		0x0A, 0xFA, 0x8F, 0xC5, 0xE8,
-	0x60, 0x72, 0x61, 0x87, 0x75, 0xFF, 0x3C, 0x0B, 0x9E, 0xA2, 0x31,
-		0x4C, 0x9C, 0x25, 0x65, 0x76,
-	0xD6, 0x74, 0xDF, 0x74, 0x96, 0xEA, 0x81, 0xD3, 0x38, 0x3B, 0x48,
-		0x13, 0xD6, 0x92, 0xC6, 0xE0,
-	0xE0, 0xD5, 0xD8, 0xE2, 0x50, 0xB9, 0x8B, 0xE4, 0x8E, 0x49, 0x5C,
-		0x1D, 0x60, 0x89, 0xDA, 0xD1,
-	0x5D, 0xC7, 0xD7, 0xB4, 0x61, 0x54, 0xD6, 0xB6, 0xCE, 0x8E, 0xF4,
-		0xAD, 0x69, 0xB1, 0x5D, 0x49,
-	0x82, 0x55, 0x9B, 0x29, 0x7B, 0xCF, 0x18, 0x85, 0xC5, 0x29, 0xF5,
-		0x66, 0x66, 0x0E, 0x57, 0xEC,
-	0x68, 0xED, 0xBC, 0x3C, 0x05, 0x72, 0x6C, 0xC0, 0x2F, 0xD4, 0xCB,
-		0xF4, 0x97, 0x6E, 0xAA, 0x9A,
-	0xFD, 0x51, 0x38, 0xFE, 0x83, 0x76, 0x43, 0x5B, 0x9F, 0xC6, 0x1D,
-		0x2F, 0xC0, 0xEB, 0x06, 0xE3,
-};
-#endif	/* 0 */
-
-static char *emlxs_local_pwd = "11223344556677881122334455667788";
+static char *emlxs_local_pwd  = "11223344556677881122334455667788";
 static char *emlxs_remote_pwd = "aabbccddeeffgghhaabbccddeeffgghh";
 
-static uint8_t emlxs_null_wwn[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-static uint8_t emlxs_fabric_wwn[8] = {0xff, 0xff, 0xff, 0xff, 0xff,
-					0xff, 0xff, 0xff};
-
-#if 0
-void
-emlxs_dhc_authrsp_timeout(emlxs_hba_t *phba, void *arg1, void *arg2);
-
-uint32_t *
-emlxs_hash_rsp(emlxs_port_t *, emlxs_port_dhc_t *, NODELIST *,
-		uint32_t, union challenge_val, uint8_t *, uint32_t);
-uint32_t *
-emlxs_hash_vrf(emlxs_port_t *, emlxs_port_dhc_t *, NODELIST *,
-		uint32_t, union challenge_val);
-void emlxs_md5_digest_to_hex(const uint8_t digest[MD5_LEN], char *output);
-void emlxs_sha1_digest_to_hex(const uint8_t digest[SHA1_LEN], char *output);
-
-/* for sysevent log */
-static int emlxs_generate_event(emlxs_port_t *);
-extern void emlxs_log_auth_event(emlxs_port_t *, char *subclass, char *info);
-#endif	/* 0 */
+static uint8_t emlxs_null_wwn[8] =
+	{0, 0, 0, 0, 0, 0, 0, 0};
+static uint8_t emlxs_fabric_wwn[8] =
+	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 #pragma weak random_get_pseudo_bytes
 

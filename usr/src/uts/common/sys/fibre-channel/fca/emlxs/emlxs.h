@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -31,6 +31,8 @@
 #include <emlxs_os.h>
 #include <emlxs_fcio.h>
 #include <emlxs_hw.h>
+#include <emlxs_fw.h>
+#include <emlxs_adapters.h>
 #include <emlxs_msg.h>
 #include <emlxs_thread.h>
 #include <emlxs_config.h>
@@ -38,21 +40,28 @@
 
 #ifdef DHCHAP_SUPPORT
 #include <emlxs_dhchap.h>
-#endif	/* DHCHAP_SUPPORT */
+#endif /* DHCHAP_SUPPORT */
 
 #ifdef SFCT_SUPPORT
 #include <emlxs_fct.h>
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
+
+#ifdef SAN_DIAG_SUPPORT
+#include <emlxs_sdapi.h>
+#endif /* SAN_DIAG_SUPPORT */
+
+#ifdef DUMP_SUPPORT
+#include <emlxs_dump.h>
+#endif /* DUMP_SUPPORT */
 
 #include <emlxs_fc.h>
 #include <emlxs_device.h>
 #include <emlxs_dfc.h>
 #include <emlxs_fcio.h>
-#include <emlxs_adapters.h>
 
 #ifdef MENLO_SUPPORT
 #include <emlxs_menlo.h>
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 #include <emlxs_extern.h>
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -54,58 +54,70 @@ extern "C" {
 #define	EMLXS_DFC_C		15
 #define	EMLXS_DHCHAP_C		16
 #define	EMLXS_FCT_C		17
+#define	EMLXS_DUMP_C		18
+#define	EMLXS_SLI_C		19
 
 
 #define	EMLXS_CONTEXT		port, _FILENO_, __LINE__, 0, 0
 #define	EMLXS_CONTEXT_BP	port, _FILENO_, __LINE__
 
-#define	EMLXS_MSGF emlxs_msg_printf
+#define	EMLXS_MSGF		emlxs_msg_printf
 
 #ifdef EMLXS_DBG
-#define	EMLXS_DEBUGF emlxs_msg_printf
+#define	EMLXS_DEBUGF		emlxs_msg_printf
 #else	/* EMLXS_DBG */
 #define	EMLXS_DEBUGF
 #endif	/* EMLXS_DBG */
 
 #define	MAX_LOG_INFO_LENGTH	96
 
-typedef struct emlxs_msg_entry {
-	uint32_t id;	/* entry id  */
-	clock_t time;	/* timestamp */
+typedef struct emlxs_msg_entry
+{
+	uint32_t	id;				/* entry id  */
+	clock_t		time;				/* timestamp */
 
-	emlxs_msg_t *msg;	/* Msg pointer */
+	emlxs_msg_t	*msg;				/* Msg pointer */
 
-	uint32_t vpi;
-	uint32_t instance;	/* Adapter instance */
-	uint32_t fileno;	/* File number */
-	uint32_t line;	/* Line number */
+	uint32_t	vpi;
+	uint32_t	instance;			/* Adapter instance */
+	uint32_t	fileno;				/* File number */
+	uint32_t	line;				/* Line number */
 
-	void *bp;	/* Context buffer pointer */
-	uint32_t size;	/* Context buffer size */
+	void		*bp;				/* Context buffer */
+							/* pointer */
+	uint32_t	size;				/* Context buffer */
+							/* size */
+	uint32_t	flag;
+#define	EMLX_EVENT_DONE	0x00000001			/* Data has been */
+							/* retrieved */
 
-	char buffer[MAX_LOG_INFO_LENGTH];	/* Additional info buffer */
-
+	char		buffer[MAX_LOG_INFO_LENGTH];	/* Additional info */
+							/* buffer */
 } emlxs_msg_entry_t;
 
 
-typedef struct emlxs_msg_log {
-	kmutex_t lock;
-	kcondvar_t lock_cv;	/* used for events */
+typedef struct emlxs_msg_log
+{
+	kmutex_t		lock;
+	kcondvar_t		lock_cv;	/* used for events */
 
-	clock_t start_time;
-	uint32_t instance;
-	uint32_t flags;
+	clock_t			start_time;
+	uint32_t		instance;
+	uint32_t		flags;
 
-	uint32_t size;	/* Maximum entries in circular buffer */
-	uint32_t count;	/* Total number of entries recorded */
-	uint32_t next;	/* Next index into circular buffer */
+	uint32_t		size;		/* Maximum entries in */
+						/* circular buffer */
+	uint32_t		count;		/* Total number of entries */
+						/* recorded */
+	uint32_t		next;		/* Next index into circular */
+						/* buffer */
 
-	uint32_t repeat;	/* repeat counter */
+	uint32_t		repeat;		/* repeat counter */
 
-	uint32_t event_id[32];	/* Last id logged for an event */
+	uint32_t		event_id[32];	/* Last id logged for an */
+						/* event */
 
-	emlxs_msg_entry_t *entry;	/* pointer to entry buffer */
-
+	emlxs_msg_entry_t	*entry;		/* pointer to entry buffer */
 } emlxs_msg_log_t;
 
 #ifdef	__cplusplus

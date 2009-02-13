@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -32,18 +32,18 @@
 extern "C" {
 #endif
 
-#define	EMLXS_MODREV2	2	/* Old Solaris 8 & 9 interface */
-#define	EMLXS_MODREV3	3	/* New Solaris 10 & 11 interface */
-#define	EMLXS_MODREV4	4	/* Sun FC packet change */
-/* Symbolic Node Name interface */
-#define	EMLXS_MODREV5	5	/* New Sun NPIV Interface */
+#define	EMLXS_MODREV2    2	/* Old Solaris 8 & 9 interface */
+#define	EMLXS_MODREV3    3	/* New Solaris 10 & 11 interface */
+#define	EMLXS_MODREV4    4	/* Sun FC packet change */
+				/* Symbolic Node Name interface */
+#define	EMLXS_MODREV5    5	/* New Sun NPIV Interface */
 
-#define	EMLXS_MODREV2X	2	/* Old Solaris 8 & 9 x86 interface */
-#define	EMLXS_MODREV3X	3	/* New Solaris 10 & 11 x86 interface */
+#define	EMLXS_MODREV2X   2	/* Old Solaris 8 & 9 x86 interface */
+#define	EMLXS_MODREV3X   3	/* New Solaris 10 & 11 x86 interface */
 
 
 /*
- *  DRIVER LEVEL FEATURES
+ * DRIVER LEVEL FEATURES
  */
 #define	DFC_SUPPORT		/* 2.20 driver */
 #define	DHCHAP_SUPPORT		/* 2.21 driver */
@@ -51,102 +51,80 @@ extern "C" {
 #define	SATURN_MSI_SUPPORT	/* 2.30 driver */
 
 #define	MENLO_SUPPORT		/* 2.30 driver */
-#define	MENLO_TEST		/* 2.30 driver - Supports hornet test params */
 
 #define	MBOX_EXT_SUPPORT	/* 2.30 driver */
 #define	SLI3_SUPPORT		/* 2.30 driver - Required for NPIV */
 
-/* #define IDLE_TIMER		Not yet - untested */
+#define	DUMP_SUPPORT		/* 2.40 driver */
+#define	SAN_DIAG_SUPPORT	/* 2.40 driver */
+/* #define FMA_SUPPORT		2.40 driver - Not yet */
 
+/* #define	IDLE_TIMER	 Not yet - untested */
 
 /*
- *   OS LEVEL FEATURES
+ * OS LEVEL FEATURES
  */
-
-#ifdef S8
-#define	EMLXS_MODREV EMLXS_MODREV2
-
-#ifdef EMLXS_I386
-#define	EMLXS_MODREVXEMLXS_MODREV2X
-#endif	/* EMLXS_I386 */
-#endif	/* S8 */
-
-
-#ifdef S9
-#define	EMLXS_MODREV EMLXS_MODREV2
-#define	MSI_SUPPORT
-
-#ifdef EMLXS_I386
-#define	EMLXS_MODREVX EMLXS_MODREV2X
-#endif	/* EMLXS_I386 */
-#endif	/* S9 */
-
-
 #ifdef S10
-#define	EMLXS_MODREV EMLXS_MODREV3
-#define	MSI_SUPPORT
+#define	 EMLXS_MODREV EMLXS_MODREV3
+#define	 MSI_SUPPORT
 
 #ifdef SLI3_SUPPORT
 #define	NPIV_SUPPORT
 #endif	/* SLI3_SUPPORT */
 
 #ifdef EMLXS_I386
-#define	EMLXS_MODREVX EMLXS_MODREV2X
+#define	 EMLXS_MODREVX EMLXS_MODREV2X
 #endif	/* EMLXS_I386 */
 #endif	/* S10 */
 
 
 #ifdef S11
 #define	MSI_SUPPORT
-#define	SFCT_SUPPORT	/* COMSTAR Support */
+#define	SFCT_SUPPORT  /* COMSTAR Support */
+#define	MODFW_SUPPORT /* Dynamic firmware module support */
 
 #ifdef SLI3_SUPPORT
 #define	NPIV_SUPPORT
 
 #ifdef NPIV_SUPPORT
-#define	SUN_NPIV_SUPPORT	/* Nevada Build 91+ */
-#endif	/* NPIV_SUPPORT */
+#define	SUN_NPIV_SUPPORT  /* Nevada Build 92+ */
+#endif /* NPIV_SUPPORT */
 #endif	/* SLI3_SUPPORT */
 
 #ifdef SUN_NPIV_SUPPORT
-#define	EMLXS_MODREV EMLXS_MODREV5	/* Sun NPIV Enhancement */
+#define	 EMLXS_MODREV EMLXS_MODREV5		/* Sun NPIV Enhancement */
 #else
-#define	EMLXS_MODREV EMLXS_MODREV4
-#endif	/* SUN_NPIV_SUPPORT */
+define	EMLXS_MODREV	EMLXS_MODREV4
+#endif /* SUN_NPIV_SUPPORT */
 
 #ifdef EMLXS_I386
-#define	EMLXS_MODREVX EMLXS_MODREV2X
+#define	 EMLXS_MODREVX EMLXS_MODREV2X
 #endif	/* EMLXS_I386 */
 #endif	/* S11 */
 
 /*
- *    SUBFEATURES
+ * SUBFEATURES
  */
 #ifdef SFCT_SUPPORT
-#define	MODSYM_SUPPORT	/* Dynamic Module Loading Support */
-#define	FCIO_SUPPORT	/* FCIO IOCTL support */
-#endif	/* SFCT_SUPPORT */
+#define	MODSYM_SUPPORT		/* Dynamic Module Loading Support */
+#define	FCIO_SUPPORT		/* FCIO IOCTL support */
+#endif /* SFCT_SUPPORT */
 
 
 #ifndef EMLXS_MODREV
 #define	EMLXS_MODREV			0
-#endif	/* EMLXS_MODREV */
+#endif /* EMLXS_MODREV */
 
 #ifndef EMLXS_MODREVX
 #define	EMLXS_MODREVX			0
-#endif	/* EMLXS_MODREVX */
+#endif /* EMLXS_MODREVX */
 
 /* Create combined definition */
 #if defined(S10) || defined(S11)
 #define	S10S11
-#endif	/* S10 or S11 */
+#endif /* S10 or S11 */
 
-#if defined(S8) || defined(S9)
-#define	S8S9
-#endif	/* S8 or S9 */
-
-
-#define	DRIVER_NAME "emlxs"
+#define	DRIVER_NAME   "emlxs"
 
 #include <sys/types.h>
 #include <sys/varargs.h>
@@ -194,6 +172,12 @@ extern "C" {
 
 #include <emlxs_hbaapi.h>
 
+#ifdef FMA_SUPPORT
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#endif	/* FMA_SUPPORT */
+#include <sys/fm/io/ddi.h>
 
 #ifdef S11
 
@@ -223,7 +207,6 @@ extern "C" {
 
 #endif	/* S11 */
 
-
 #ifndef FC_HBA_PORTSPEED_8GBIT
 #define	FC_HBA_PORTSPEED_8GBIT		16
 #endif	/* FC_HBA_PORTSPEED_8GBIT */
@@ -251,47 +234,24 @@ extern "C" {
 #pragma weak ddi_intr_block_enable
 #pragma weak ddi_intr_block_disable
 extern int ddi_intr_get_supported_types();
-
-#ifdef S9
-/* Obtained from /usr/include/sys/ddi_intr.h */
-#ifndef ddi_intr_handle_t
-typedef void *ddi_intr_handle_t;
-#endif	/* ddi_intr_handle_t */
-
-#ifndef DDI_INTR_TYPE_FIXED
-#define	DDI_INTR_TYPE_FIXED	0x1
-#endif
-
-#ifndef DDI_INTR_TYPE_MSI
-#define	DDI_INTR_TYPE_MSI	0x2
-#endif
-
-#ifndef DDI_INTR_TYPE_MSIX
-#define	DDI_INTR_TYPE_MSIX	0x4
-#endif
-
-#ifndef DDI_INTR_ALLOC_NORMAL
-#define	DDI_INTR_ALLOC_NORMAL	0	/* Non-strict alloc */
-#endif
-
-#ifndef DDI_INTR_FLAG_BLOCK
-#define	DDI_INTR_FLAG_BLOCK	0x0100	/* (RO) requires block enable */
-#endif
-#endif	/* S9 */
-
 #endif	/* MSI_SUPPORT */
 
 #ifndef MODSYM_SUPPORT
 #pragma weak fc_fca_init
 #pragma weak fc_fca_attach
 #pragma weak fc_fca_detach
-#endif	/* MODSYM_SUPPORT */
+#endif /* MODSYM_SUPPORT */
 
 /* S11 flag for dma_attr_flags for ddi_dma_attr_t */
 #ifndef DDI_DMA_RELAXED_ORDERING
 #define	DDI_DMA_RELAXED_ORDERING	0x400
 #endif	/* DDI_DMA_RELAXED_ORDERING */
 
+#ifdef FMA_SUPPORT
+/* FMA Support */
+extern void ddi_fm_acc_err_clear(ddi_acc_handle_t, int);
+#pragma weak ddi_fm_acc_err_clear
+#endif	/* FMA_SUPPORT */
 
 #ifdef EMLXS_SPARC
 #define	EMLXS_BIG_ENDIAN
@@ -304,13 +264,13 @@ typedef void *ddi_intr_handle_t;
 
 /* Solaris 8 does not define this */
 #ifndef TASKQ_DYNAMIC
-#define	TASKQ_DYNAMIC			0x0004
+#define	TASKQ_DYNAMIC	0x0004
 #endif	/* TASKQ_DYNAMIC */
 
 #ifdef _LP64
-#define	DEAD_PTR 0xdeadbeefdeadbeef
+#define	DEAD_PTR   0xdeadbeefdeadbeef
 #else
-#define	DEAD_PTR 0xdeadbeef
+#define	DEAD_PTR   0xdeadbeef
 #endif	/* _LP64 */
 
 #ifndef FC_STATE_8GBIT_SPEED
@@ -322,25 +282,27 @@ typedef void *ddi_intr_handle_t;
 
 #ifndef BURSTSIZE
 #define	BURSTSIZE
-#define	BURST1				0x01
-#define	BURST2				0x02
-#define	BURST4				0x04
-#define	BURST8				0x08
-#define	BURST16				0x10
-#define	BURST32				0x20
-#define	BURST64				0x40
+#define	BURST1			0x01
+#define	BURST2			0x02
+#define	BURST4			0x04
+#define	BURST8			0x08
+#define	BURST16			0x10
+#define	BURST32			0x20
+#define	BURST64			0x40
 #ifdef _LP64
-#define	BURSTSIZE_MASK			0x7f
+#define	BURSTSIZE_MASK		0x7f
 #else
-#define	BURSTSIZE_MASK			0x3f
+#define	BURSTSIZE_MASK		0x3f
 #endif	/* _LP64 */
 #define	DEFAULT_BURSTSIZE	(BURSTSIZE_MASK)	/* all burst sizes */
 #endif	/* BURSTSIZE */
 
-#define	putPaddrLow(addr) 	((uint32_t)((uint64_t)(addr) & 0xffffffff))
-#define	putPaddrHigh(addr)	((uint32_t)((uint64_t)(addr) >> 32))
-#define	getPaddr(high, low) 	((uint64_t)(((uint64_t)(high) << 32) | \
-					((uint64_t)(low) & 0xffffffff)))
+#define	putPaddrLow(addr)	((uint32_t)(((unsigned long)(addr)) \
+					& 0xffffffff))
+#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(unsigned long)(addr))  \
+					>> 32))
+#define	getPaddr(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
+					| (((uint64_t)(low)) & 0xffffffff)))
 
 #ifndef TRUE
 #define	TRUE	1
@@ -350,22 +312,39 @@ typedef void *ddi_intr_handle_t;
 #define	FALSE	0
 #endif	/* FALSE */
 
-#define	DMA_READ_WRITE	0
-#define	DMA_READ_ONLY 	1
-#define	DMA_WRITE_ONLY	2
+#define	DMA_READ_WRITE		0
+#define	DMA_READ_ONLY		1
+#define	DMA_WRITE_ONLY		2
 
-#define	DMA_SUCC	1
+#define	DMA_SUCC		1
 
-#define	MAX_FC_BRDS 	256	/* Maximum # boards per system */
+#define	MAX_FC_BRDS		256	/* Maximum # boards per system */
 
 #define	DELAYMS(ms)		drv_usecwait((ms*1000))
 #define	DELAYUS(us)		drv_usecwait(us)
 
-#define	emlxs_mpdata_sync(h, a, b, c)	\
-	if (h) {\
-		(void) ddi_dma_sync((ddi_dma_handle_t)(h),\
-		    (off_t)(a), (size_t)(b), (uint_t)c);\
+#ifdef FMA_SUPPORT
+#define	emlxs_mpdata_sync(h, a, b, c)  \
+	if (h)  { \
+		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
+			(off_t)(a), (size_t)(b), (uint_t)c); \
+		if (hba->fm_caps & DDI_FM_DMACHK_CAPABLE) { \
+			if (emlxs_fm_check_dma_handle(h) != DDI_SUCCESS) { \
+				EMLXS_MSGF(EMLXS_CONTEXT, \
+				    &emlxs_invalid_dma_handle_msg, \
+				    "ddi_dma_sync hdl=%p off=%x " \
+				    "size=%d dir=%x ", \
+				    h, a, b, c); \
+			} \
+		} \
 	}
+#else	/* !FMA_SUPPORT */
+#define	emlxs_mpdata_sync(h, a, b, c)  \
+	if (h)  { \
+		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
+			(off_t)(a), (size_t)(b), (uint_t)c); \
+	}
+#endif	/* FMA_SUPPORT */
 
 
 
@@ -378,46 +357,51 @@ typedef void *ddi_intr_handle_t;
 #define	EMLXS_DMA_ALIGN		BURST16
 
 /*
- *   Register indices in PCI configuration space.
+ * Register indices in PCI configuration space.
  */
-#define	SBUS_FLASH_RD		0	/* FCODE-Flash Read only index */
-#define	SBUS_FLASH_RDWR		1	/* FCODE-Flash Read/Write index */
-#define	SBUS_DFLY_SLIM_RINDEX	2	/* DragonFly SLIM regs index */
-#define	SBUS_DFLY_CSR_RINDEX	3	/* DragonFly I/O regs index */
-#define	SBUS_TITAN_CORE_RINDEX	4	/* TITAN Core register index */
-#define	SBUS_DFLY_PCI_CFG_RINDEX 5	/* DragonFly PCI ConfigSpace regs */
-					/* index */
-#define	SBUS_TITAN_PCI_CFG_RINDEX 6	/* TITAN PCI ConfigSpace regs index */
-#define	SBUS_TITAN_CSR_RINDEX	7	/* TITAN Control/Status regs index */
+#define	SBUS_FLASH_RD			0	/* FCODE-Flash Read only */
+						/* index */
+#define	SBUS_FLASH_RDWR			1	/* FCODE-Flash Read/Write */
+						/* index */
+#define	SBUS_DFLY_SLIM_RINDEX	  2	/* DragonFly SLIM regs index */
+#define	SBUS_DFLY_CSR_RINDEX	  3	/* DragonFly I/O regs index */
+#define	SBUS_TITAN_CORE_RINDEX	  4	/* TITAN Core register index */
+#define	SBUS_DFLY_PCI_CFG_RINDEX	5	/* DragonFly PCI ConfigSpace */
+						/* regs index */
+#define	SBUS_TITAN_PCI_CFG_RINDEX	6	/* TITAN PCI ConfigSpace regs */
+						/* index */
+#define	SBUS_TITAN_CSR_RINDEX		7	/* TITAN Control/Status regs */
+						/* index */
 
-#define	PCI_CFG_RINDEX		0
-#define	PCI_SLIM_RINDEX		1
-#define	PCI_CSR_RINDEX		2
+#define	PCI_CFG_RINDEX		  0
+#define	PCI_SLIM_RINDEX		  1
+#define	PCI_CSR_RINDEX		  2
 
 #define	EMLXS_MAX_UBUFS		65535
 
 /* Tokens < EMLXS_UB_TOKEN_OFFSET are reserved for ELS response oxids */
-#define	EMLXS_UB_TOKEN_OFFSET 0x100
+#define	EMLXS_UB_TOKEN_OFFSET	0x100
 
-typedef struct emlxs_ub_priv {
-	fc_unsol_buf_t *ubp;
-	void *port;
+typedef struct emlxs_ub_priv
+{
+	fc_unsol_buf_t	*ubp;
+	void		*port;
 
-	uint32_t bpl_size;
-	uint8_t *bpl_virt;	/* virtual address ptr */
-	uint64_t bpl_phys;	/* mapped address */
-	void *bpl_data_handle;
-	void *bpl_dma_handle;
+	uint32_t	bpl_size;
+	uint8_t		*bpl_virt;	/* virtual address ptr */
+	uint64_t	bpl_phys;	/* mapped address */
+	void		*bpl_data_handle;
+	void		*bpl_dma_handle;
 
-	uint32_t ip_ub_size;
-	uint8_t *ip_ub_virt;	/* virtual address ptr */
+	uint32_t	ip_ub_size;
+	uint8_t		*ip_ub_virt;	/* virtual address ptr */
 	ddi_dma_cookie_t ip_ub_dma_cookies[64];
 	ddi_acc_handle_t ip_ub_data_handle;
 	ddi_dma_handle_t ip_ub_dma_handle;
-	uint32_t ip_ub_cookie_cnt;
-	uint32_t FC4type;
+	uint32_t	ip_ub_cookie_cnt;
+	uint32_t	FC4type;
 
-	uint16_t flags;
+	uint16_t	flags;
 #define	EMLXS_UB_FREE		0x0000
 #define	EMLXS_UB_IN_USE		0x0001
 #define	EMLXS_UB_REPLY		0x0002
@@ -425,70 +409,78 @@ typedef struct emlxs_ub_priv {
 #define	EMLXS_UB_TIMEOUT	0x0008
 #define	EMLXS_UB_INTERCEPT	0x0010
 
-	uint16_t available;
+	uint16_t	available;
 
-	uint32_t timeout;	/* Timeout period in seconds */
-	uint32_t time;		/* EMLXS_UB_IN_USE timestamp */
-	uint32_t cmd;
-	uint32_t token;
+	uint32_t	timeout;	/* Timeout period in seconds */
+	uint32_t	time;	/* EMLXS_UB_IN_USE timestamp */
+	uint32_t	cmd;
+	uint32_t	token;
 
 	struct emlxs_unsol_buf *pool;
-
 	struct emlxs_ub_priv *next;
-
 } emlxs_ub_priv_t;
 
 
-typedef struct emlxs_unsol_buf {
-	struct emlxs_unsol_buf *pool_prev;	/* ptr to prev type of */
-						/* unsol_buf_header */
-	struct emlxs_unsol_buf *pool_next;	/* ptr to next type of */
-						/* unsol_buf_header */
+typedef struct emlxs_unsol_buf
+{
+	struct emlxs_unsol_buf	*pool_prev;		/* ptr to prev type */
+							/* of unsol_buf hdr */
+	struct emlxs_unsol_buf	*pool_next;		/* ptr to next type */
+							/* of unsol_buf hdr */
 
-	uint32_t pool_type;	/* FC-4 type */
-	uint32_t pool_buf_size;	/* buffer size for this pool */
+	uint32_t		pool_type;		/* FC-4 type */
+	uint32_t		pool_buf_size;		/* buffer size for */
+							/* this pool */
 
-	uint32_t pool_nentries;		/* no.of bufs in pool */
-	uint32_t pool_available;	/* no.of bufs avail in pool */
+	uint32_t		pool_nentries;		/* no. of bufs in */
+							/* pool */
+	uint32_t		pool_available;		/* no. of bufs avail */
+							/* in pool */
 
-	uint32_t pool_flags;
-#define	POOL_DESTROY	0x00000001	/* Pool is marked for destruction */
+	uint32_t		pool_flags;
+#define	POOL_DESTROY		0x00000001		/* Pool is marked for */
+							/* destruction */
 
-	uint32_t pool_free;		/* Number of free buffers */
-	uint32_t pool_free_resv;	/* Number of free reserved buffers */
+	uint32_t		pool_free;		/* Number of free */
+							/* buffers */
+	uint32_t		pool_free_resv;		/* Number of free */
+							/* reserved buffers */
 
-	uint32_t pool_first_token;	/* First ub_priv->token in pool */
-	uint32_t pool_last_token;	/* Last  ub_priv->token in pool */
+	uint32_t		pool_first_token;	/* First token */
+							/* in pool */
+	uint32_t		pool_last_token;	/* Last token */
+							/* in pool */
 
-	fc_unsol_buf_t *fc_ubufs;	/* array of unsol buf structs */
-
+	fc_unsol_buf_t		*fc_ubufs;		/* array of unsol buf */
+							/* structs */
 } emlxs_unsol_buf_t;
 
 
 #ifndef FC_REASON_NONE
 #define	FC_REASON_NONE			0
-#endif	/* FC_REASON_NONE */
+#endif /* FC_REASON_NONE */
 
 #ifndef FC_ACTION_NONE
 #define	FC_ACTION_NONE			0
-#endif	/* FC_ACTION_NONE */
+#endif /* FC_ACTION_NONE */
 
 /*
  * emlx status translation table
  */
-typedef struct emlxs_xlat_err {
-	uint32_t emlxs_status;
-	uint32_t pkt_state;
-	uint32_t pkt_reason;
-	uint32_t pkt_expln;
-	uint32_t pkt_action;
+typedef struct emlxs_xlat_err
+{
+	uint32_t	emlxs_status;
+	uint32_t	pkt_state;
+	uint32_t	pkt_reason;
+	uint32_t	pkt_expln;
+	uint32_t	pkt_action;
 } emlxs_xlat_err_t;
 
 
-typedef struct emlxs_table {
-	uint32_t code;
-	char string[32];
-
+typedef struct emlxs_table
+{
+	uint32_t	code;
+	char		string[32];
 } emlxs_table_t;
 
 #ifdef	__cplusplus

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -42,5 +42,7 @@ i i.emlxsconf
 #
 d none kernel					0755 root sys
 d none kernel/drv				0755 root sys
+d none kernel/misc				0755 root sys
+d none kernel/misc/emlxs			0755 root sys
 e emlxsconf kernel/drv/emlxs.conf		0644 root sys
 d none kernel/kmdb				0755 root sys

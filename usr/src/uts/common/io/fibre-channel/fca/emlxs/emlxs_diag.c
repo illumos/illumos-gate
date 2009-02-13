@@ -20,19 +20,17 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
-
-#include "emlxs.h"
+#include <emlxs.h>
 
 
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_DIAG_C);
 
-uint32_t emlxs_diag_pattern[256] =
-{
+uint32_t emlxs_diag_pattern[256] = {
 	/* Walking ones */
 	0x80000000, 0x40000000, 0x20000000, 0x10000000,
 	0x08000000, 0x04000000, 0x02000000, 0x01000000,
@@ -129,8 +127,7 @@ emlxs_diag_pkt_callback(fc_packet_t *pkt)
 
 	return;
 
-} /* emlxs_diag_pkt_callback() */
-
+}  /* emlxs_diag_pkt_callback() */
 
 
 extern uint32_t
@@ -154,6 +151,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 	if (did == 0) {
 		did = port->did;
 	}
+
 	/* Check if device is ready */
 	if ((hba->state < FC_LINK_UP) || (port->did == 0)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
@@ -161,6 +159,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 
 		return (FC_TRAN_BUSY);
 	}
+
 	/* Check for the host node */
 	ndlp = emlxs_node_find_did(port, port->did);
 
@@ -170,6 +169,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 
 		return (FC_TRAN_BUSY);
 	}
+
 	length = 124;
 
 	/* Prepare ECHO pkt */
@@ -181,6 +181,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 
 		return (FC_NOMEM);
 	}
+
 	/* pkt initialization */
 	pkt->pkt_tran_type = FC_PKT_EXCHANGE;
 	pkt->pkt_timeout = 60;
@@ -190,8 +191,8 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_EXTENDED_SVC | R_CTL_UNSOL_CONTROL;
 	pkt->pkt_cmd_fhdr.s_id = port->did;
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
-	pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_SEQ_INITIATIVE |
-	    F_CTL_END_SEQ;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_FIRST_SEQ | F_CTL_SEQ_INITIATIVE | F_CTL_END_SEQ;
 	pkt->pkt_cmd_fhdr.seq_id = 0;
 	pkt->pkt_cmd_fhdr.df_ctl = 0;
 	pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -201,7 +202,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 	pkt->pkt_comp = emlxs_diag_pkt_callback;
 
 	/* Build the command */
-	els = (ELS_PKT *)pkt->pkt_cmd;
+	els = (ELS_PKT *) pkt->pkt_cmd;
 	els->elsCode = 0x10;
 	pattern_buffer = (char *)els->un.pad;
 
@@ -215,9 +216,9 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 	} else {
 		/* Program the default echo pattern */
 		bzero(pattern_buffer, length);
-		(void) sprintf(pattern_buffer, "Emulex. We network storage."
-		    " Emulex. We network storage. Emulex. We network storage."
-		    " Emulex. We network storage.");
+		(void) sprintf(pattern_buffer, "Emulex. We network storage. "
+		    "Emulex. We network storage. Emulex. We network storage. "
+		    "Emulex. We network storage.");
 	}
 
 	/* Send ECHO pkt */
@@ -227,12 +228,14 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 
 		goto done;
 	}
+
 	/* Wait for ECHO completion */
 	mutex_enter(&EMLXS_PKT_LOCK);
 	timeout = emlxs_timeout(hba, (pkt->pkt_timeout + 15));
 	pkt_ret = 0;
 	while ((pkt_ret != -1) && !(pkt->pkt_tran_flags & FC_TRAN_COMPLETED)) {
-		pkt_ret = cv_timedwait(&EMLXS_PKT_CV, &EMLXS_PKT_LOCK, timeout);
+		pkt_ret =
+		    cv_timedwait(&EMLXS_PKT_CV, &EMLXS_PKT_LOCK, timeout);
 
 	}
 	mutex_exit(&EMLXS_PKT_LOCK);
@@ -243,6 +246,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 
 		return (FC_ABORTED);
 	}
+
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_echo_failed_msg,
 		    "Transport error.");
@@ -250,6 +254,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 		rval = FC_TRANSPORT_ERROR;
 		goto done;
 	}
+
 	/* Check response payload */
 	pkt_resp = (uint8_t *)pkt->pkt_resp + 4;
 	pat = (uint8_t *)pattern_buffer;
@@ -259,8 +264,8 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 		if (*pkt_resp != *pat) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_echo_failed_msg,
 			    "Data miscompare. did=%06x length=%d. Offset %d "
-			    "value %02x should be %02x.",
-			    did, length, i, *pkt_resp, *pat);
+			    "value %02x should be %02x.", did, length, i,
+			    *pkt_resp, *pat);
 
 			rval = EMLXS_TEST_FAILED;
 
@@ -275,6 +280,7 @@ emlxs_diag_echo_run(emlxs_port_t *port, uint32_t did, uint32_t pattern)
 		    pattern_buffer[1] & 0xff, pattern_buffer[2] & 0xff,
 		    pattern_buffer[3] & 0xff);
 	}
+
 done:
 
 	/* Free the echo pkt */
@@ -282,7 +288,7 @@ done:
 
 	return (rval);
 
-} /* emlxs_diag_echo_run() */
+}  /* emlxs_diag_echo_run() */
 
 
 extern uint32_t
@@ -308,6 +314,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 
 		return (FC_TRAN_BUSY);
 	}
+
 	/*
 	 * Get a buffer which will be used for the mailbox command
 	 */
@@ -318,17 +325,19 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 		rval = FC_NOMEM;
 		goto done;
 	}
+
 	/*
 	 * Setup and issue mailbox RUN BIU DIAG command Setup test buffers
 	 */
-	if (((mp = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF | MEM_PRI)) == 0) ||
-	    ((mp1 = (MATCHMAP *)emlxs_mem_get(hba, MEM_BUF | MEM_PRI)) == 0)) {
+	if (((mp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF | MEM_PRI)) == 0) ||
+	    ((mp1 = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF | MEM_PRI)) == 0)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
 		    "BIU: Buffer allocation failed.");
 
 		rval = FC_NOMEM;
 		goto done;
 	}
+
 	if (pattern) {
 		/* Fill the transmit buffer with the pattern */
 		lptr = (uint32_t *)mp->virt;
@@ -351,7 +360,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	/* Create the biu diag request */
 	(void) emlxs_mb_run_biu_diag(hba, mb, mp->phys, mp1->phys);
 
-	rval = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 60);
+	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 60);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_biu_failed_msg,
@@ -360,6 +369,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 		rval = EMLXS_TEST_FAILED;
 		goto done;
 	}
+
 	emlxs_mpdata_sync(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
 	    DDI_DMA_SYNC_FORKERNEL);
 
@@ -369,9 +379,8 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	for (i = 0; i < MEM_ELSBUF_SIZE; i++, outptr++, inptr++) {
 		if (*outptr != *inptr) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_biu_failed_msg,
-			    "Data miscompare. Offset %d value %02x "
-			    "should be %02x.",
-			    i, *inptr, *outptr);
+			    "Data miscompare. Offset %d value %02x should "
+			    "be %02x.", i, *inptr, *outptr);
 
 			rval = EMLXS_TEST_FAILED;
 			goto done;
@@ -386,17 +395,19 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 
 done:
 
-	if (mp)
+	if (mp) {
 		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp);
-	if (mp1)
+	}
+	if (mp1) {
 		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
-	if (mb)
+	}
+	if (mb) {
 		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+	}
 
 	return (rval);
 
-} /* emlxs_diag_biu_run() */
-
+}  /* emlxs_diag_biu_run() */
 
 
 extern uint32_t
@@ -411,6 +422,7 @@ emlxs_diag_post_run(emlxs_hba_t *hba)
 
 		return (FC_TRAN_BUSY);
 	}
+
 	/* Take board offline */
 	if ((rval = emlxs_offline(hba))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_post_failed_msg,
@@ -418,8 +430,9 @@ emlxs_diag_post_run(emlxs_hba_t *hba)
 
 		rval = FC_RESETFAIL;
 	}
+
 	/* Restart the adapter */
-	rval = emlxs_hba_reset(hba, 1, 1);
+	rval = emlxs_sli_hba_reset(hba, 1, 1);
 
 	switch (rval) {
 	case 0:
@@ -456,16 +469,19 @@ emlxs_diag_post_run(emlxs_hba_t *hba)
 
 	return (rval);
 
-} /* emlxs_diag_post_run() */
+}  /* emlxs_diag_post_run() */
 
 
 /* ARGSUSED */
 extern uint32_t
 emlxs_core_size(emlxs_hba_t *hba)
 {
+
 	return (256);
 
-} /* emlxs_core_size() */
+
+
+}  /* emlxs_core_size() */
 
 
 /* ARGSUSED */
@@ -482,4 +498,6 @@ emlxs_core_dump(emlxs_hba_t *hba, char *buffer, uint32_t size)
 	}
 	return (FC_SUCCESS);
 
-} /* emlxs_core_dump() */
+
+
+}  /* emlxs_core_dump() */

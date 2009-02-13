@@ -20,18 +20,21 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
-
-#include "emlxs.h"
+#include <emlxs.h>
 
 #ifdef DHCHAP_SUPPORT
 
 #include <md5.h>
 #include <sha1.h>
+#ifdef S10
+#include <sha1_consts.h>
+#else
 #include <sys/sha1_consts.h>
+#endif /* S10 */
 #include <bignum.h>
 #include <sys/time.h>
 
@@ -2251,7 +2254,7 @@ emlxs_issue_dhchap_challenge(
 	if (hba->rdn_flag == 1) {
 		emlxs_get_random_bytes(ndlp, random_number, 20);
 	} else {
-		(void) random_get_pseudo_bytes(random_number,
+		random_get_pseudo_bytes(random_number,
 		    SWAP_DATA32(chal->cnul.cval_len));
 	}
 
@@ -2325,7 +2328,7 @@ emlxs_issue_dhchap_challenge(
 		if (hba->rdn_flag == 1) {
 			emlxs_get_random_bytes(ndlp, random_number, 20);
 		} else {
-			(void) random_get_pseudo_bytes(random_number,
+			random_get_pseudo_bytes(random_number,
 			    SWAP_DATA32(chal->cnul.cval_len));
 		}
 
@@ -3030,7 +3033,7 @@ uint32_t evt)
 		if (hba->rdn_flag == 1) {
 			emlxs_get_random_bytes(ndlp, random_number, 20);
 		} else {
-			(void) random_get_pseudo_bytes(random_number, arg2len);
+			random_get_pseudo_bytes(random_number, arg2len);
 		}
 
 		/* cache it for later verification usage */
@@ -3237,6 +3240,7 @@ uint32_t evt)
 	union challenge_val un_cval;
 	uint8_t ReasonCode;
 	uint8_t ReasonCodeExplanation;
+	char info[64];
 
 	bp = mp->virt;
 	lp = (uint32_t *)bp;
@@ -3429,7 +3433,14 @@ AUTH_Reject:
 	    ReasonCodeExplanation);
 	emlxs_dhc_auth_complete(port, ndlp, 1);
 
+	return (node_dhc->state);
 out:
+	(void) sprintf(info,
+	    "Auth Failed: ReasonCode=0x%x, ReasonCodeExplanation=0x%x",
+	    ReasonCode, ReasonCodeExplanation);
+
+	emlxs_log_auth_event(port, ndlp, ESC_EMLXS_20, info);
+	emlxs_dhc_auth_complete(port, ndlp, 1);
 
 	return (node_dhc->state);
 
@@ -5825,7 +5836,7 @@ emlxs_BIGNUM_get_pubkey(
 	if (hba->rdn_flag == 1) {
 		emlxs_get_random_bytes(ndlp, random_number, 20);
 	} else {
-		(void) random_get_pseudo_bytes(random_number, hash_size);
+		random_get_pseudo_bytes(random_number, hash_size);
 	}
 
 	/* e: y */
@@ -7551,10 +7562,6 @@ emlxs_dhc_attach(emlxs_hba_t *hba)
 
 	emlxs_auth_key_init(hba);
 
-#ifdef S8S9
-	random_add_entropy(random_number, sizeof (random_number), 0);
-#endif	/* S8S9 */
-
 	hba->rdn_flag = 1;
 
 	return;
@@ -7597,10 +7604,11 @@ emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp, char **msg)
 		    sizeof ("fcsp:Disabled (0)"));
 		return;
 	}
+
 	if (port->vpi != 0 && cfg[CFG_AUTH_NPIV].current == 0) {
 		sp->cmn.fcsp_support = 0;
 		bcopy("fcsp:Disabled (npiv)", (void *) &msg[0],
-		    sizeof ("fcsp:Disabled (0)"));
+		    sizeof ("fcsp:Disabled (npiv)"));
 		return;
 	}
 	if (!fabric_switch && fabric) {
@@ -7630,9 +7638,7 @@ emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp, char **msg)
 			mutex_exit(&hba->auth_lock);
 			return;
 		}
-
 	}
-
 	mutex_exit(&hba->auth_lock);
 
 	sp->cmn.fcsp_support = 1;
@@ -9476,7 +9482,7 @@ emlxs_dhc_add_auth_cfg(
 
 			mutex_exit(&hba->auth_lock);
 
-			return (DFC_AUTH_PASSWORD_INVALID);
+			return (DFC_AUTH_COMPARE_FAILED);
 		}
 	}
 	/* Create entry */
@@ -9600,7 +9606,7 @@ emlxs_dhc_delete_auth_cfg(
 
 			mutex_exit(&hba->auth_lock);
 
-			return (DFC_AUTH_PASSWORD_INVALID);
+			return (DFC_AUTH_COMPARE_FAILED);
 		}
 	}
 	auth_cfg = emlxs_auth_cfg_get(hba,
@@ -9717,6 +9723,24 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 
 		return (DFC_AUTH_AUTHENTICATION_DISABLED);
 	}
+
+	/* Check to make sure localpwd does not equal to remotepwd */
+	/* if they are given in the same time, if not, see below  */
+	if ((dfc_pwd->lpw_new.type == PASSWORD_TYPE_ASCII ||
+	    dfc_pwd->lpw_new.type == PASSWORD_TYPE_BINARY) &&
+	    (dfc_pwd->rpw_new.type == PASSWORD_TYPE_ASCII ||
+	    dfc_pwd->rpw_new.type == PASSWORD_TYPE_BINARY)) {
+		if (bcmp(dfc_pwd->lpw_new.password,
+		    dfc_pwd->rpw_new.password,
+		    dfc_pwd->lpw_new.length) == 0) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_fcsp_debug_msg,
+			    "emlxs_dhc_set_auth_key. nlpwd==nrpwd");
+
+			return (DFC_AUTH_LOCAL_REMOTE_PWD_EQUAL);
+		}
+	}
+
 	mutex_enter(&hba->auth_lock);
 
 	auth_key = emlxs_auth_key_get(hba,
@@ -9739,6 +9763,7 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 			return (DFC_SYSRES_ERROR);
 		}
 	}
+
 	/* Check if a new local password is provided */
 	if (dfc_pwd->lpw_new.type == PASSWORD_TYPE_ASCII ||
 	    dfc_pwd->lpw_new.type == PASSWORD_TYPE_BINARY) {
@@ -9760,6 +9785,27 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 				mutex_exit(&hba->auth_lock);
 
 				return (DFC_AUTH_COMPARE_FAILED);
+			}
+		}
+
+		/*
+		 * Make sure the new local pwd is not equal to the current
+		 * remote pwd if any
+		 */
+		if (auth_key->remote_password_type == PASSWORD_TYPE_ASCII ||
+		    auth_key->remote_password_type == PASSWORD_TYPE_BINARY) {
+			if ((auth_key->remote_password_length ==
+			    dfc_pwd->lpw_new.length) &&
+			    (bcmp(dfc_pwd->lpw_new.password,
+			    auth_key->remote_password,
+			    dfc_pwd->lpw_new.length) == 0)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "emlxs_dhc_set_auth_key: nlpwd==crpwd");
+
+				mutex_exit(&hba->auth_lock);
+
+				return (DFC_AUTH_LOCAL_REMOTE_PWD_EQUAL);
 			}
 		}
 		/* Update local entry */
@@ -9793,6 +9839,27 @@ emlxs_dhc_set_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_pwd)
 				mutex_exit(&hba->auth_lock);
 
 				return (DFC_AUTH_COMPARE_FAILED);
+			}
+		}
+
+		/*
+		 * Make sure the new remote pwd is not equal to the current
+		 * local pwd if any
+		 */
+		if (auth_key->local_password_type == PASSWORD_TYPE_ASCII ||
+		    auth_key->local_password_type == PASSWORD_TYPE_BINARY) {
+			if ((auth_key->local_password_length ==
+			    dfc_pwd->rpw_new.length) &&
+			    (bcmp(dfc_pwd->rpw_new.password,
+			    auth_key->local_password,
+			    dfc_pwd->rpw_new.length) == 0)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "emlxs_dhc_set_auth_key: nrpwd==clpwd");
+
+				mutex_exit(&hba->auth_lock);
+
+				return (DFC_AUTH_LOCAL_REMOTE_PWD_EQUAL);
 			}
 		}
 		/* Update remote entry */

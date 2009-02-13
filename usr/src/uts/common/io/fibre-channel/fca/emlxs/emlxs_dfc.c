@@ -20,131 +20,142 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
-
-#include "emlxs.h"
-
-#define	PRIV_LILP_POSIT(port_dev)	port_dev->dev_did.priv_lilp_posit
-#define	HARD_ADDR(port_dev)		port_dev->dev_hard_addr.hard_addr
-#define	HBA_10GBIT	HBA_PORTSPEED_10GBIT
+#include <emlxs.h>
 
 #ifdef DFC_SUPPORT
 
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_DFC_C);
 
-static int32_t emlxs_dfc_get_rev(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_hbainfo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_hbastats(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_drvstats(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_set_diag(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_send_mbox(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_read_pci(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_write_pci(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_cfg(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_set_cfg(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_send_menlo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_send_ct(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_write_flash(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_read_flash(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_send_els(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_loopback_test(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_dump_region(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_loopback_mode(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_ioinfo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_linkinfo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_read_mem(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_write_mem(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_write_ctlreg(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_read_ctlreg(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_event(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_set_event(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_eventinfo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_get_rev(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_drvstats(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_cfg(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_set_cfg(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_ioinfo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_write_ctlreg(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
 
 #ifdef SFCT_SUPPORT
-static int32_t emlxs_dfc_get_fctstat(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-#endif	/* SFCT_SUPPORT */
+static int32_t		emlxs_dfc_get_fctstat(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+#endif /* SFCT_SUPPORT */
 #ifdef NPIV_SUPPORT
-static int32_t emlxs_dfc_create_vport(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_destroy_vport(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_vportinfo(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_npiv_resource(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_npiv_test(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static emlxs_port_t *emlxs_vport_find_wwpn(emlxs_hba_t *hba,
-	uint8_t *wwpn);
+static int32_t		emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_vportinfo(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_npiv_resource(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static emlxs_port_t 	*emlxs_vport_find_wwpn(emlxs_hba_t *hba, uint8_t *wwpn);
 #endif	/* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
-static int32_t emlxs_dfc_init_auth(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_auth_cfg(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_auth_pwd(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_set_auth_pwd(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_auth_status(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
-static int32_t emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_init_auth(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_set_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_auth_status(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba,
+				dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba,
+				dfc_t *dfc, int32_t mode);
 #endif	/* DHCHAP_SUPPORT */
 
-static int32_t emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
+#ifdef SAN_DIAG_SUPPORT
+static int32_t		emlxs_dfc_sd_set_bucket(dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_sd_destroy_bucket(dfc_t *dfc);
+static int32_t		emlxs_dfc_sd_get_bucket(dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_sd_start_collection(emlxs_hba_t *hba,
+				dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_sd_stop_collection(emlxs_hba_t *hba,
+				dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_sd_reset_collection(emlxs_hba_t *hba,
+				dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_dfc_sd_get_data(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_sd_set_event(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+static int32_t		emlxs_dfc_sd_get_event(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
+#endif
+
+static int32_t		emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
 #ifdef FCIO_SUPPORT
-static int32_t emlxs_fcio_manage(emlxs_hba_t *hba,
-	dfc_t *dfc, int32_t mode);
+static int32_t		emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc,
+				int32_t mode);
 #endif	/* FCIO_SUPPORT */
 
 
-uint32_t emlxs_loopback_tmo = 60;
+uint32_t	emlxs_loopback_tmo = 60;
 
-emlxs_table_t emlxs_dfc_table[] =
-{
+emlxs_table_t emlxs_dfc_table[] = {
 	{EMLXS_GET_HBAINFO, "GET_HBAINFO"},
 	{EMLXS_GET_REV, "GET_REV"},
 	{EMLXS_SET_DIAG, "SET_DIAG"},
@@ -194,24 +205,29 @@ emlxs_table_t emlxs_dfc_table[] =
 };	/* emlxs_dfc_table */
 
 
-emlxs_table_t emlxs_dfc_event_table[] =
-{
-	{FC_REG_LINK_EVENT, "LINK_EVENT"},
-	{FC_REG_RSCN_EVENT, "RSCN_EVENT"},
-	{FC_REG_CT_EVENT, "CT_EVENT"},
-	{FC_REG_DUMP_EVENT, "DUMP_EVENT"},
-	{FC_REG_TEMP_EVENT, "TEMP_EVENT"},
-	{FC_REG_FCOE_EVENT, "FCOE_EVENT"},
+emlxs_table_t emlxs_dfc_event_table[] = {
+	{FC_REG_LINK_EVENT,		"LINK_EVENT"},
+	{FC_REG_RSCN_EVENT,		"RSCN_EVENT"},
+	{FC_REG_CT_EVENT,		"CT_EVENT"},
+	{FC_REG_DUMP_EVENT,		"DUMP_EVENT"},
+	{FC_REG_TEMP_EVENT,		"TEMP_EVENT"},
+	{FC_REG_VPORTRSCN_EVENT,	"VPORTRSCN_EVENT"},
+	{FC_REG_FCOE_EVENT,		"FCOE_EVENT"},
 
 };	/* emlxs_dfc_event_table */
 
 
-extern char *
+#ifdef SAN_DIAG_SUPPORT
+kmutex_t		sd_bucket_mutex;
+sd_bucket_info_t	sd_bucket;
+#endif
+
+extern char    *
 emlxs_dfc_xlate(uint16_t cmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_dfc_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -226,12 +242,12 @@ emlxs_dfc_xlate(uint16_t cmd)
 } /* emlxs_dfc_xlate() */
 
 
-extern char *
+extern char    *
 emlxs_dfc_event_xlate(uint32_t event)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_dfc_event_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -250,9 +266,9 @@ emlxs_dfc_event_xlate(uint32_t event)
 extern int32_t
 emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	int rval = 0;
-	dfc_t *dfc;
+	emlxs_port_t	*port = &PPORT;
+	int		rval = 0;
+	dfc_t		*dfc;
 
 	if (!(dfc = (dfc_t *)kmem_zalloc(sizeof (dfc_t), KM_SLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -265,7 +281,7 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 	switch (ddi_model_convert_from(mode & FMODELS)) {
 	case DDI_MODEL_ILP32:
 		{
-			dfc32_t dfc32;
+			dfc32_t		dfc32;
 
 			if (ddi_copyin((void *)arg, (void *)&dfc32,
 			    sizeof (dfc32_t), mode)) {
@@ -276,18 +292,19 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 				rval = DFC_COPYIN_ERROR;
 				break;
 			}
+
 			dfc->cmd = dfc32.cmd;
 			dfc->flag = dfc32.flag;
-			dfc->buf1 = (void *)(unsigned long)dfc32.buf1;
+			dfc->buf1 = (void *)((unsigned long)dfc32.buf1);
 			dfc->buf1_size = dfc32.buf1_size;
 			dfc->data1 = dfc32.data1;
-			dfc->buf2 = (void *)(unsigned long)dfc32.buf2;
+			dfc->buf2 = (void *)((unsigned long)dfc32.buf2);
 			dfc->buf2_size = dfc32.buf2_size;
 			dfc->data2 = dfc32.data2;
-			dfc->buf3 = (void *)(unsigned long)dfc32.buf3;
+			dfc->buf3 = (void *)((unsigned long)dfc32.buf3);
 			dfc->buf3_size = dfc32.buf3_size;
 			dfc->data3 = dfc32.data3;
-			dfc->buf4 = (void *)(unsigned long)dfc32.buf4;
+			dfc->buf4 = (void *)((unsigned long)dfc32.buf4);
 			dfc->buf4_size = dfc32.buf4_size;
 			dfc->data4 = dfc32.data4;
 
@@ -295,8 +312,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 		}
 
 	case DDI_MODEL_NONE:
-		if (ddi_copyin((void *)arg, (void *)dfc,
-		    sizeof (dfc_t), mode)) {
+		if (ddi_copyin((void *)arg, (void *)dfc, sizeof (dfc_t),
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: ddi_copyin failed.",
 			    emlxs_dfc_xlate(dfc->cmd));
@@ -306,10 +323,9 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 		break;
 	}
 #else	/* _MULTI_DATAMODEL */
-	if (ddi_copyin((void *) arg, (void *) dfc, sizeof (dfc_t), mode)) {
+	if (ddi_copyin((void *)arg, (void *)dfc, sizeof (dfc_t), mode)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 	}
@@ -351,9 +367,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_SET_DIAG:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_set_diag(hba, dfc, mode);
 
@@ -383,9 +398,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_GET_CFG:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_get_cfg(hba, dfc, mode);
 
@@ -394,9 +408,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_SET_CFG:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_set_cfg(hba, dfc, mode);
 
@@ -424,13 +437,12 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 			break;
 		}
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 	case EMLXS_WRITE_FLASH:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_write_flash(hba, dfc, mode);
 
@@ -439,9 +451,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_READ_FLASH:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_read_flash(hba, dfc, mode);
 
@@ -450,9 +461,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_SEND_ELS:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_send_els(hba, dfc, mode);
 
@@ -483,9 +493,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_GET_IOINFO:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_get_ioinfo(hba, dfc, mode);
 
@@ -494,9 +503,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_GET_LINKINFO:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_get_linkinfo(hba, dfc, mode);
 
@@ -506,21 +514,19 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 #ifdef SFCT_SUPPORT
 	case EMLXS_GET_FCTSTAT:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_get_fctstat(hba, dfc, mode);
 
 			break;
 		}
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 	case EMLXS_READ_MEM:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_read_mem(hba, dfc, mode);
 
@@ -529,9 +535,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_WRITE_MEM:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_write_mem(hba, dfc, mode);
 
@@ -540,9 +545,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_WRITE_CTLREG:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_write_ctlreg(hba, dfc, mode);
 
@@ -551,9 +555,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_READ_CTLREG:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 
 			rval = emlxs_dfc_read_ctlreg(hba, dfc, mode);
 
@@ -591,10 +594,8 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 	case EMLXS_SEND_SCSI:
 		{
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-			    "%s requested.",
-			    emlxs_dfc_xlate(dfc->cmd));
-
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+		    "%s requested.", emlxs_dfc_xlate(dfc->cmd));
 			rval = emlxs_dfc_send_scsi_fcp(hba, dfc, mode);
 			break;
 		}
@@ -700,12 +701,49 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 	case EMLXS_FCIO_CMD:
 		rval = emlxs_fcio_manage(hba, dfc, mode);
 		break;
-#endif	/* FCIO_SUPPORT */
+#endif /* FCIO_SUPPORT */
+
+#ifdef SAN_DIAG_SUPPORT
+	case EMLXS_SD_SET_BUCKET:
+		rval = emlxs_dfc_sd_set_bucket(dfc, mode);
+		break;
+
+	case EMLXS_SD_DESTROY_BUCKET:
+		rval = emlxs_dfc_sd_destroy_bucket(dfc);
+		break;
+
+	case EMLXS_SD_GET_BUCKET:
+		rval = emlxs_dfc_sd_get_bucket(dfc, mode);
+		break;
+
+	case EMLXS_SD_START_DATA_COLLECTION:
+		rval = emlxs_dfc_sd_start_collection(hba, dfc, mode);
+		break;
+
+	case EMLXS_SD_STOP_DATA_COLLECTION:
+		rval = emlxs_dfc_sd_stop_collection(hba, dfc, mode);
+		break;
+
+	case EMLXS_SD_RESET_DATA_COLLECTION:
+		rval = emlxs_dfc_sd_reset_collection(hba, dfc, mode);
+		break;
+
+	case EMLXS_SD_GET_DATA:
+		rval = emlxs_dfc_sd_get_data(hba, dfc, mode);
+		break;
+
+	case EMLXS_SD_SET_EVENT:
+		rval = emlxs_dfc_sd_set_event(hba, dfc, mode);
+		break;
+
+	case EMLXS_SD_GET_EVENT:
+		rval = emlxs_dfc_sd_get_event(hba, dfc, mode);
+		break;
+#endif
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-		    "Unknown command received. (0x%x)",
-		    dfc->cmd);
+		    "Unknown command received. (0x%x)", dfc->cmd);
 		rval = DFC_ARG_INVALID;
 
 	}	/* switch() */
@@ -718,8 +756,7 @@ emlxs_dfc_manage(emlxs_hba_t *hba, void *arg, int32_t mode)
 
 #ifdef FCIO_SUPPORT
 
-emlxs_table_t emlxs_fcio_table[] =
-{
+emlxs_table_t emlxs_fcio_table[] = {
 	{FCIO_GET_NUM_DEVS, "GET_NUM_DEVS"},
 	{FCIO_GET_DEV_LIST, "GET_DEV_LIST"},
 	{FCIO_GET_SYM_PNAME, "GET_SYM_PNAME"},
@@ -755,16 +792,15 @@ emlxs_table_t emlxs_fcio_table[] =
 	{FCIO_GET_DISCOVERED_PORT_ATTRIBUTES, "GET_DISCOVERED_PORT_ATTRIBUTES"},
 	{FCIO_GET_PORT_ATTRIBUTES, "GET_PORT_ATTRIBUTES"},
 	{FCIO_GET_ADAPTER_PORT_STATS, "GET_ADAPTER_PORT_STATS"},
-
 };	/* emlxs_fcio_table */
 
 
-extern char *
+extern char    *
 emlxs_fcio_xlate(uint16_t cmd)
 {
-	static char buffer[32];
-	uint32_t i;
-	uint32_t count;
+	static char	buffer[32];
+	uint32_t	i;
+	uint32_t	count;
 
 	count = sizeof (emlxs_fcio_table) / sizeof (emlxs_table_t);
 	for (i = 0; i < count; i++) {
@@ -782,291 +818,772 @@ emlxs_fcio_xlate(uint16_t cmd)
 static int32_t
 emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_config_t *cfg = &CFG;
-	int rval = 0;
-	fcio_t local_fcio;
-	fcio_t *fcio = &local_fcio;
-	emlxs_vpd_t *vpd = &VPD;
-	fc_hba_port_attributes_t *port_attrs;
-	emlxs_node_t *ndlp;
-	uint8_t *wwpn;
+	emlxs_port_t			*port = &PPORT;
+	emlxs_config_t			*cfg  = &CFG;
+	int				rval = 0;
+	fcio_t				local_fcio;
+	fcio_t				*fcio = &local_fcio;
+	emlxs_vpd_t			*vpd = &VPD;
+	fc_hba_port_attributes_t	*port_attrs;
+	emlxs_node_t			*ndlp;
+	uint8_t				*wwpn;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: %s: requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s: %s: requested.",
 	    emlxs_dfc_xlate(dfc->cmd), emlxs_fcio_xlate(dfc->data1));
 
 	if (!dfc->buf4 || !dfc->buf4_size) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s: Null buffer4 found.",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_fcio_xlate(dfc->data1));
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: %s: Null buffer4 found.",
+		    emlxs_dfc_xlate(dfc->cmd), emlxs_fcio_xlate(dfc->data1));
 
 		return (EFAULT);
 	}
+
 	if (dfc->buf4_size < sizeof (uint32_t)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg,
 		    "%s: %s: Buffer4 too small. (size=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), emlxs_fcio_xlate(dfc->data1),
 		    dfc->buf4_size);
 
 		return (EFAULT);
 	}
+
 	/* Map DFC to FCIO */
 	bzero(fcio, sizeof (fcio_t));
-	fcio->fcio_flags = dfc->flag;
-	fcio->fcio_cmd = dfc->data1;
-	fcio->fcio_cmd_flags = dfc->data2;
-	fcio->fcio_xfer = dfc->data3;
-	fcio->fcio_errno = FC_FAILURE;	/* dfc->buf4 on return */
+	fcio->fcio_flags	= dfc->flag;
+	fcio->fcio_cmd		= dfc->data1;
+	fcio->fcio_cmd_flags	= dfc->data2;
+	fcio->fcio_xfer		= dfc->data3;
+	fcio->fcio_errno	= 0; /* dfc->buf4 on return */
 
 	if (dfc->buf1_size && dfc->buf1) {
 		fcio->fcio_ilen = dfc->buf1_size;
 		fcio->fcio_ibuf = kmem_zalloc(dfc->buf1_size, KM_SLEEP);
 
 		if (!fcio->fcio_ibuf) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
 			    "%s: %s: Unable to allocate ibuf. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_ilen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_ilen);
 
 			rval = EFAULT;
 			goto done;
 		}
-		if (ddi_copyin(dfc->buf1, fcio->fcio_ibuf,
-		    fcio->fcio_ilen, mode)) {
+
+		if (ddi_copyin(dfc->buf1, fcio->fcio_ibuf, fcio->fcio_ilen,
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: %s: ddi_copyin failed. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_ilen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_ilen);
 
 			rval = EFAULT;
 			goto done;
 		}
 	}
+
 	if (dfc->buf2_size && dfc->buf2) {
 		fcio->fcio_olen = dfc->buf2_size;
 		fcio->fcio_obuf = kmem_zalloc(dfc->buf2_size, KM_SLEEP);
 
 		if (!fcio->fcio_obuf) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
 			    "%s: %s: Unable to allocate obuf. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_olen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_olen);
 
 			rval = EFAULT;
 			goto done;
 		}
-		if (ddi_copyin(dfc->buf2, fcio->fcio_obuf,
-		    fcio->fcio_olen, mode)) {
+
+		if (ddi_copyin(dfc->buf2, fcio->fcio_obuf, fcio->fcio_olen,
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: %s: ddi_copyin failed. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_olen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_olen);
 
 			rval = EFAULT;
 			goto done;
 		}
 	}
+
 	if (dfc->buf3_size && dfc->buf3) {
 		fcio->fcio_alen = dfc->buf3_size;
 		fcio->fcio_abuf = kmem_zalloc(dfc->buf3_size, KM_SLEEP);
 
 		if (!fcio->fcio_abuf) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
 			    "%s: %s: Unable to allocate abuf. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_alen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_alen);
 
 			rval = EFAULT;
 			goto done;
 		}
-		if (ddi_copyin(dfc->buf3, fcio->fcio_abuf,
-		    fcio->fcio_alen, mode)) {
+
+		if (ddi_copyin(dfc->buf3, fcio->fcio_abuf, fcio->fcio_alen,
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: %s: ddi_copyin failed. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_alen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_alen);
 
 			rval = EFAULT;
 			goto done;
 		}
 	}
+
 	/* FCIO command */
 	switch (fcio->fcio_cmd) {
 	case FCIO_DIAG:
-		{
-			fc_fca_pm_t pm;
-			/* uint32_t ret; */
+	{
+		fc_fca_pm_t pm;
 
-			bzero((caddr_t)&pm, sizeof (fc_fca_pm_t));
+		bzero((caddr_t)&pm, sizeof (fc_fca_pm_t));
 
-			pm.pm_cmd_len = fcio->fcio_ilen;
-			pm.pm_cmd_buf = fcio->fcio_ibuf;
-			pm.pm_data_len = fcio->fcio_alen;
-			pm.pm_data_buf = fcio->fcio_abuf;
-			pm.pm_stat_len = fcio->fcio_olen;
-			pm.pm_stat_buf = fcio->fcio_obuf;
-			pm.pm_cmd_code = FC_PORT_DIAG;
-			pm.pm_cmd_flags = fcio->fcio_cmd_flags;
+		pm.pm_cmd_len   = fcio->fcio_ilen;
+		pm.pm_cmd_buf   = fcio->fcio_ibuf;
+		pm.pm_data_len  = fcio->fcio_alen;
+		pm.pm_data_buf  = fcio->fcio_abuf;
+		pm.pm_stat_len  = fcio->fcio_olen;
+		pm.pm_stat_buf  = fcio->fcio_obuf;
+		pm.pm_cmd_code  = FC_PORT_DIAG;
+		pm.pm_cmd_flags = fcio->fcio_cmd_flags;
 
-			rval = emlxs_port_manage(port, &pm);
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+
+			if (rval == FC_INVALID_REQUEST) {
+				rval = ENOTTY;
+			} else {
+				rval = EIO;
+			}
+		}
+
+		break;
+	}
+
+	case FCIO_GET_HOST_PARAMS:
+	{
+		fc_port_dev_t *port_dev;
+		uint32_t i;
+
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen != sizeof (fc_port_dev_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
+		port_dev->dev_did.port_id		= port->did;
+		port_dev->dev_hard_addr.hard_addr	=
+		    cfg[CFG_ASSIGN_ALPA].current;
+		port_dev->dev_state			= port->ulp_statec;
+		bcopy((caddr_t)&port->wwpn, (caddr_t)&port_dev->dev_pwwn,
+		    8);
+		bcopy((caddr_t)&port->wwnn, (caddr_t)&port_dev->dev_nwwn,
+		    8);
+
+		if (hba->topology == TOPOLOGY_LOOP) {
+			for (i = 0; i < port->alpa_map[0]; i++) {
+				if (port->alpa_map[i + 1] == port->did) {
+					port_dev->dev_did.priv_lilp_posit =
+					    (uint8_t)(i & 0xff);
+					break;
+				}
+			}
+		}
+
+		port_dev->dev_type[0] = SWAP_DATA32(0x00000120);
+		port_dev->dev_type[1] = SWAP_DATA32(0x00000001);
+
+		break;
+	}
+
+	case FCIO_RESET_LINK:
+	{
+		uint8_t null_wwn[8];
+
+		if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
+		    fcio->fcio_ilen != 8) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero(null_wwn, 8);
+
+		if (bcmp((uint8_t *)fcio->fcio_ibuf, null_wwn, 8) == 0) {
+			rval = emlxs_reset(port, FC_FCA_LINK_RESET);
 
 			if (rval != FC_SUCCESS) {
 				fcio->fcio_errno = rval;
-
-				if (rval == FC_INVALID_REQUEST) {
-					rval = ENOTTY;
-				} else {
-					rval = EIO;
-				}
+				rval = EIO;
 			}
-			break;
+		} else {
+			rval = ENOTSUP;
 		}
-
-	case FCIO_GET_HOST_PARAMS:
-		{
-			fc_port_dev_t *port_dev;
-			uint32_t i;
-
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen != sizeof (fc_port_dev_t)) {
-				rval = EINVAL;
-				break;
-			}
-			port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
-			port_dev->dev_did.port_id = port->did;
-			port_dev->dev_hard_addr.hard_addr =
-			    cfg[CFG_ASSIGN_ALPA].current;
-			port_dev->dev_state = port->ulp_statec;
-			bcopy((caddr_t)&port->wwpn,
-			    (caddr_t)&port_dev->dev_pwwn, 8);
-			bcopy((caddr_t)&port->wwnn,
-			    (caddr_t)&port_dev->dev_nwwn, 8);
-
-			if (hba->topology == TOPOLOGY_LOOP) {
-				for (i = 0; i < port->alpa_map[0]; i++) {
-					if (port->alpa_map[i+1] == port->did) {
-						PRIV_LILP_POSIT(port_dev) =
-						    (uint8_t)(i & 0xff);
-						break;
-					}
-				}
-			}
-			port_dev->dev_type[0] = SWAP_DATA32(0x00000120);
-			port_dev->dev_type[1] = SWAP_DATA32(0x00000001);
-
-			break;
-		}
-
-	case FCIO_RESET_LINK:
-		{
-			uint8_t null_wwn[8];
-
-			if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
-			    fcio->fcio_ilen != 8) {
-				rval = EINVAL;
-				break;
-			}
-			bzero(null_wwn, 8);
-
-			if (bcmp((uint8_t *)fcio->fcio_ibuf,
-			    null_wwn, 8) == 0) {
-				rval = emlxs_reset(port, FC_FCA_LINK_RESET);
-
-				if (rval != FC_SUCCESS) {
-					fcio->fcio_errno = rval;
-					rval = EIO;
-				}
-			} else {
-				rval = ENOTSUP;
-			}
-			break;
-		}
+		break;
+	}
 
 	case FCIO_RESET_HARD:
 	case FCIO_RESET_HARD_CORE:
-		{
-			rval = emlxs_reset(port, FC_FCA_RESET);
+	{
+		rval = emlxs_reset(port, FC_FCA_RESET);
 
-			if (rval != FC_SUCCESS) {
-				fcio->fcio_errno = rval;
-				rval = EIO;
-			}
-			break;
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
 		}
+		break;
+	}
 
 	case FCIO_DOWNLOAD_FW:
-		{
-			fc_fca_pm_t pm;
+	{
+		fc_fca_pm_t	pm;
 
-			if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
-			    fcio->fcio_ilen <= 0) {
-				rval = EINVAL;
-				break;
-			}
-			bzero((caddr_t)&pm, sizeof (pm));
-
-			pm.pm_cmd_flags = FC_FCA_PM_WRITE;
-			pm.pm_cmd_code = FC_PORT_DOWNLOAD_FW;
-			pm.pm_data_len = fcio->fcio_ilen;
-			pm.pm_data_buf = fcio->fcio_ibuf;
-
-			rval = emlxs_port_manage(port, &pm);
-
-			if (rval != FC_SUCCESS) {
-				fcio->fcio_errno = rval;
-				rval = EIO;
-			}
+		if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
+		    fcio->fcio_ilen <= 0) {
+			rval = EINVAL;
 			break;
 		}
+
+		bzero((caddr_t)&pm, sizeof (pm));
+
+		pm.pm_cmd_flags = FC_FCA_PM_WRITE;
+		pm.pm_cmd_code  = FC_PORT_DOWNLOAD_FW;
+		pm.pm_data_len  = fcio->fcio_ilen;
+		pm.pm_data_buf  = fcio->fcio_ibuf;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+		}
+		break;
+	}
 
 	case FCIO_GET_FW_REV:
-		{
-			fc_fca_pm_t pm;
+	{
+		fc_fca_pm_t	pm;
 
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen < FC_FW_REV_SIZE) {
-				rval = EINVAL;
-				break;
-			}
-			bzero((caddr_t)&pm, sizeof (pm));
-
-			pm.pm_cmd_flags = FC_FCA_PM_READ;
-			pm.pm_cmd_code = FC_PORT_GET_FW_REV;
-			pm.pm_data_len = fcio->fcio_olen;
-			pm.pm_data_buf = fcio->fcio_obuf;
-
-			rval = emlxs_port_manage(port, &pm);
-
-			if (rval != FC_SUCCESS) {
-				fcio->fcio_errno = rval;
-				rval = EIO;
-			}
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen < FC_FW_REV_SIZE) {
+			rval = EINVAL;
 			break;
 		}
+
+		bzero((caddr_t)&pm, sizeof (pm));
+
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+		pm.pm_cmd_code  = FC_PORT_GET_FW_REV;
+		pm.pm_data_len  = fcio->fcio_olen;
+		pm.pm_data_buf  = fcio->fcio_obuf;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+		}
+		break;
+	}
 
 	case FCIO_GET_FCODE_REV:
-		{
-			fc_fca_pm_t pm;
+	{
+		fc_fca_pm_t	pm;
 
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen < FC_FCODE_REV_SIZE) {
-				rval = EINVAL;
-				break;
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen < FC_FCODE_REV_SIZE) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (pm));
+
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+		pm.pm_cmd_code  = FC_PORT_GET_FCODE_REV;
+		pm.pm_data_len  = fcio->fcio_olen;
+		pm.pm_data_buf  = fcio->fcio_obuf;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+		}
+		break;
+	}
+
+	case FCIO_DOWNLOAD_FCODE:
+	{
+		fc_fca_pm_t	pm;
+
+		if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
+		    fcio->fcio_ilen <= 0) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (pm));
+
+		pm.pm_cmd_flags = FC_FCA_PM_WRITE;
+		pm.pm_cmd_code  = FC_PORT_DOWNLOAD_FCODE;
+		pm.pm_data_len  = fcio->fcio_ilen;
+		pm.pm_data_buf  = fcio->fcio_ibuf;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+		}
+		break;
+	}
+
+	case FCIO_GET_ADAPTER_ATTRIBUTES:
+	{
+		fc_hba_adapter_attributes_t	*hba_attrs;
+
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen < sizeof (fc_hba_adapter_attributes_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		hba_attrs = (fc_hba_adapter_attributes_t *)fcio->fcio_obuf;
+
+		hba_attrs->version = FC_HBA_ADAPTER_ATTRIBUTES_VERSION;
+		(void) strncpy(hba_attrs->Manufacturer, "Emulex",
+		    sizeof (hba_attrs->Manufacturer));
+		(void) strncpy(hba_attrs->SerialNumber, vpd->serial_num,
+		    sizeof (hba_attrs->SerialNumber));
+		(void) strncpy(hba_attrs->Model, hba->model_info.model,
+		    sizeof (hba_attrs->Model));
+		(void) strncpy(hba_attrs->ModelDescription,
+		    hba->model_info.model_desc,
+		    sizeof (hba_attrs->ModelDescription));
+		bcopy((caddr_t)&port->wwnn, (caddr_t)&hba_attrs->NodeWWN,
+		    8);
+		(void) strncpy((caddr_t)hba_attrs->NodeSymbolicName,
+		    (caddr_t)port->snn,
+		    sizeof (hba_attrs->NodeSymbolicName));
+		(void) sprintf(hba_attrs->HardwareVersion, "%x", vpd->biuRev);
+		(void) sprintf(hba_attrs->DriverVersion, "%s (%s)",
+		    emlxs_version, emlxs_revision);
+		(void) strncpy(hba_attrs->OptionROMVersion, vpd->fcode_version,
+		    sizeof (hba_attrs->OptionROMVersion));
+		(void) sprintf(hba_attrs->FirmwareVersion, "%s (%s)",
+		    vpd->fw_version, vpd->fw_label);
+		(void) strncpy(hba_attrs->DriverName, DRIVER_NAME,
+		    sizeof (hba_attrs->DriverName));
+		hba_attrs->VendorSpecificID =
+		    ((hba->model_info.device_id << 16) | PCI_VENDOR_ID_EMULEX);
+		hba_attrs->NumberOfPorts = hba->num_of_ports;
+
+		break;
+	}
+
+	case FCIO_GET_ADAPTER_PORT_ATTRIBUTES:
+	{
+		fc_hba_port_attributes_t  *port_attrs;
+		uint32_t value1;
+		uint32_t value2;
+
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen < sizeof (fc_hba_port_attributes_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		port_attrs = (fc_hba_port_attributes_t *)fcio->fcio_obuf;
+
+		port_attrs->version    = FC_HBA_PORT_ATTRIBUTES_VERSION;
+		port_attrs->lastChange = 0;
+		port_attrs->fp_minor   = 0;
+		bcopy((caddr_t)&port->wwnn, (caddr_t)&port_attrs->NodeWWN,
+		    8);
+		bcopy((caddr_t)&port->wwpn, (caddr_t)&port_attrs->PortWWN,
+		    8);
+
+		if (hba->state <= FC_LINK_DOWN) {
+			/* port_attrs->PortFcId   */
+		    /* port_attrs->PortType   */
+			/* port_attrs->PortSpeed  */
+			/* port_attrs->FabricName */
+			port_attrs->PortState = FC_HBA_PORTSTATE_OFFLINE;
+		} else {
+			port_attrs->PortFcId  = port->did;
+			port_attrs->PortState = FC_HBA_PORTSTATE_ONLINE;
+
+			if (hba->topology == TOPOLOGY_LOOP) {
+				port_attrs->PortType = FC_HBA_PORTTYPE_LPORT;
+			} else {
+				port_attrs->PortType = FC_HBA_PORTTYPE_NPORT;
 			}
+
+			ndlp = emlxs_node_find_did(port, Fabric_DID);
+
+			if (ndlp) {
+				bcopy(&ndlp->nlp_portname,
+				    (caddr_t)&port_attrs->FabricName,
+				    sizeof (port_attrs->FabricName));
+			}
+
+			switch (hba->linkspeed) {
+			case 0:
+				port_attrs->PortSpeed = HBA_PORTSPEED_1GBIT;
+				break;
+			case LA_1GHZ_LINK:
+				port_attrs->PortSpeed = HBA_PORTSPEED_1GBIT;
+				break;
+			case LA_2GHZ_LINK:
+				port_attrs->PortSpeed = HBA_PORTSPEED_2GBIT;
+				break;
+			case LA_4GHZ_LINK:
+				port_attrs->PortSpeed = HBA_PORTSPEED_4GBIT;
+				break;
+			case LA_8GHZ_LINK:
+				port_attrs->PortSpeed = HBA_PORTSPEED_8GBIT;
+				break;
+			case LA_10GHZ_LINK:
+				port_attrs->PortSpeed = HBA_PORTSPEED_10GBIT;
+				break;
+			default:
+				port_attrs->PortSpeed = HBA_PORTSPEED_UNKNOWN;
+
+			}
+		}
+
+		port_attrs->PortSupportedClassofService =
+		    SWAP_DATA32(FC_NS_CLASS3);
+		(void) strncpy((caddr_t)port_attrs->PortSymbolicName,
+		    (caddr_t)port->spn,
+		    sizeof (port_attrs->PortSymbolicName));
+
+		/* Set the hba speed limit */
+		if (vpd->link_speed & LMT_10GB_CAPABLE) {
+			port_attrs->PortSupportedSpeed |=
+			    FC_HBA_PORTSPEED_10GBIT;
+		}
+		if (vpd->link_speed & LMT_8GB_CAPABLE) {
+			port_attrs->PortSupportedSpeed |=
+			    FC_HBA_PORTSPEED_8GBIT;
+		}
+		if (vpd->link_speed & LMT_4GB_CAPABLE) {
+			port_attrs->PortSupportedSpeed |=
+			    FC_HBA_PORTSPEED_4GBIT;
+		}
+		if (vpd->link_speed & LMT_2GB_CAPABLE) {
+			port_attrs->PortSupportedSpeed |=
+			    FC_HBA_PORTSPEED_2GBIT;
+		}
+		if (vpd->link_speed & LMT_1GB_CAPABLE) {
+			port_attrs->PortSupportedSpeed |=
+			    FC_HBA_PORTSPEED_1GBIT;
+		}
+
+		value1 = 0x00000120;
+		value2 = 0x00000001;
+
+		bcopy((caddr_t)&value1,
+		    (caddr_t)&port_attrs->PortSupportedFc4Types[0], 4);
+		bcopy((caddr_t)&value2,
+		    (caddr_t)&port_attrs->PortSupportedFc4Types[4], 4);
+
+		bcopy((caddr_t)&value1,
+		    (caddr_t)&port_attrs->PortActiveFc4Types[0], 4);
+		bcopy((caddr_t)&value2,
+		    (caddr_t)&port_attrs->PortActiveFc4Types[4], 4);
+
+		port_attrs->PortMaxFrameSize = FF_FRAME_SIZE;
+		port_attrs->NumberofDiscoveredPorts = emlxs_nport_count(port);
+
+		break;
+	}
+
+	case FCIO_GET_NODE_ID:
+	{
+		fc_fca_pm_t	pm;
+
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen < sizeof (fc_rnid_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (pm));
+
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+		pm.pm_cmd_code  = FC_PORT_GET_NODE_ID;
+		pm.pm_data_len  = fcio->fcio_olen;
+		pm.pm_data_buf  = fcio->fcio_obuf;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+		}
+		break;
+	}
+
+	case FCIO_SET_NODE_ID:
+	{
+		fc_fca_pm_t	pm;
+
+		if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
+		    fcio->fcio_ilen < sizeof (fc_rnid_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (pm));
+
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+		pm.pm_cmd_code  = FC_PORT_SET_NODE_ID;
+		pm.pm_data_len  = fcio->fcio_ilen;
+		pm.pm_data_buf  = fcio->fcio_ibuf;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+		}
+		break;
+	}
+
+	case FCIO_GET_NUM_DEVS:
+	{
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_olen < sizeof (uint32_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		*(uint32_t *)fcio->fcio_obuf = emlxs_nport_count(port);
+
+		break;
+	}
+
+	case FCIO_GET_DEV_LIST:
+	{
+		fc_port_dev_t *port_dev;
+		uint32_t max_count;
+		uint32_t i;
+		uint32_t j;
+		emlxs_node_t *nlp;
+		uint32_t nport_count;
+
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_alen < sizeof (uint32_t)) {
+			rval = EINVAL;
+			break;
+		}
+
+		port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
+		max_count = fcio->fcio_olen / sizeof (fc_port_dev_t);
+
+		rw_enter(&port->node_rwlock, RW_READER);
+
+		nport_count = emlxs_nport_count(port);
+		*(uint32_t *)fcio->fcio_abuf = nport_count;
+
+		if (nport_count == 0) {
+			rw_exit(&port->node_rwlock);
+
+			fcio->fcio_errno = FC_NO_MAP;
+			rval = EIO;
+			break;
+		}
+
+		if (nport_count > max_count) {
+			rw_exit(&port->node_rwlock);
+
+			fcio->fcio_errno = FC_TOOMANY;
+			rval = EIO;
+			break;
+		}
+
+		for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+			nlp = port->node_table[i];
+			while (nlp != NULL) {
+				if ((nlp->nlp_DID & 0xFFF000) != 0xFFF000) {
+					port_dev->dev_dtype = 0;
+					port_dev->dev_type[0] =
+					    SWAP_LONG(0x00000100);
+					port_dev->dev_state =
+					    PORT_DEVICE_LOGGED_IN;
+					port_dev->dev_did.port_id =
+					    nlp->nlp_DID;
+					port_dev->dev_did.priv_lilp_posit = 0;
+					port_dev->dev_hard_addr.hard_addr = 0;
+
+					if (hba->topology == TOPOLOGY_LOOP) {
+	for (j = 1; j < port->alpa_map[0]; j++) {
+		if (nlp->nlp_DID == port->alpa_map[j]) {
+			port_dev->dev_did.priv_lilp_posit = j-1;
+			break;
+		}
+	}
+
+						port_dev->dev_hard_addr.
+						    hard_addr = nlp->nlp_DID;
+					}
+
+					bcopy((caddr_t)&nlp->nlp_portname,
+					    (caddr_t)&port_dev->dev_pwwn, 8);
+					bcopy((caddr_t)&nlp->nlp_nodename,
+					    (caddr_t)&port_dev->dev_nwwn, 8);
+					port_dev++;
+				}
+
+				nlp = (NODELIST *) nlp->nlp_list_next;
+			}
+		}
+		rw_exit(&port->node_rwlock);
+
+		break;
+	}
+
+	case FCIO_GET_LOGI_PARAMS:
+	{
+		uint8_t null_wwn[8];
+
+		if (fcio->fcio_ilen != sizeof (la_wwn_t) ||
+		    (fcio->fcio_xfer & FCIO_XFER_READ) == 0 ||
+		    (fcio->fcio_xfer & FCIO_XFER_WRITE) == 0) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero(null_wwn, 8);
+		wwpn = (uint8_t *)fcio->fcio_ibuf;
+
+		if ((bcmp((caddr_t)wwpn, (caddr_t)null_wwn, 8) == 0) ||
+		    (bcmp((caddr_t)wwpn, (caddr_t)&port->wwpn, 8) == 0)) {
+			bcopy((caddr_t)&port->sparam,
+			    (caddr_t)fcio->fcio_obuf, fcio->fcio_olen);
+		} else {
+			ndlp = emlxs_node_find_wwpn(port, wwpn);
+
+			if (ndlp) {
+				bcopy((caddr_t)&ndlp->sparm,
+				    (caddr_t)fcio->fcio_obuf,
+				    fcio->fcio_olen);
+			} else {
+				rval = ENXIO;
+			}
+		}
+
+		break;
+	}
+
+	case FCIO_GET_STATE:
+	{
+		uint8_t null_wwn[8];
+		uint32_t *statep;
+
+		if (fcio->fcio_ilen != 8 ||
+		    fcio->fcio_olen != 4 ||
+		    (fcio->fcio_xfer & FCIO_XFER_WRITE) == 0 ||
+		    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero(null_wwn, 8);
+		wwpn   = (uint8_t *)fcio->fcio_ibuf;
+		statep = (uint32_t *)fcio->fcio_obuf;
+
+		if ((bcmp((caddr_t)wwpn, (caddr_t)null_wwn, 8) == 0) ||
+		    (bcmp((caddr_t)wwpn, (caddr_t)&port->wwpn, 8) == 0)) {
+			*statep = PORT_DEVICE_VALID;
+		} else {
+			ndlp = emlxs_node_find_wwpn(port, wwpn);
+
+			if (ndlp) {
+				*statep = PORT_DEVICE_VALID;
+			} else {
+				*statep = PORT_DEVICE_INVALID;
+			}
+		}
+
+		break;
+	}
+
+	case FCIO_GET_TOPOLOGY:
+	{
+		uint32_t *tp;
+
+		if (fcio->fcio_olen != 4 ||
+		    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
+			rval = EINVAL;
+			break;
+		}
+
+		tp = (uint32_t *)fcio->fcio_obuf;
+
+		if (hba->state <= FC_LINK_DOWN) {
+			*tp = FC_TOP_UNKNOWN;
+		} else {
+			ndlp = emlxs_node_find_did(port, Fabric_DID);
+
+			if (hba->topology == TOPOLOGY_LOOP) {
+				if (ndlp) {
+					*tp = FC_TOP_PUBLIC_LOOP;
+				} else {
+					*tp = FC_TOP_PRIVATE_LOOP;
+				}
+			} else {
+				if (ndlp) {
+					*tp = FC_TOP_FABRIC;
+				} else {
+					*tp = FC_TOP_PT_PT;
+				}
+			}
+		}
+
+		break;
+	}
+
+	case FCIO_LINK_STATUS:
+	{
+		fc_portid_t	*portid;
+		fc_rls_acc_t	*rls;
+		fc_fca_pm_t	pm;
+
+		if (fcio->fcio_ilen != sizeof (fc_portid_t) ||
+		    fcio->fcio_olen != sizeof (fc_rls_acc_t) ||
+		    fcio->fcio_xfer != FCIO_XFER_RW) {
+			rval = EINVAL;
+			break;
+		}
+
+		if ((fcio->fcio_cmd_flags != FCIO_CFLAGS_RLS_DEST_FPORT) &&
+		    (fcio->fcio_cmd_flags != FCIO_CFLAGS_RLS_DEST_NPORT)) {
+			rval = EINVAL;
+			break;
+		}
+
+		portid = (fc_portid_t *)fcio->fcio_ibuf;
+		rls    = (fc_rls_acc_t *)fcio->fcio_obuf;
+
+		if (portid->port_id == 0 || portid->port_id == port->did) {
 			bzero((caddr_t)&pm, sizeof (pm));
 
 			pm.pm_cmd_flags = FC_FCA_PM_READ;
-			pm.pm_cmd_code = FC_PORT_GET_FCODE_REV;
-			pm.pm_data_len = fcio->fcio_olen;
-			pm.pm_data_buf = fcio->fcio_obuf;
+			pm.pm_cmd_code  = FC_PORT_RLS;
+			pm.pm_data_len  = sizeof (fc_rls_acc_t);
+			pm.pm_data_buf  = (caddr_t)rls;
 
 			rval = emlxs_port_manage(port, &pm);
 
@@ -1074,131 +1591,122 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 				fcio->fcio_errno = rval;
 				rval = EIO;
 			}
+		} else {
+			rval = ENOTSUP;
+		}
+		break;
+	}
+
+	case FCIO_GET_OTHER_ADAPTER_PORTS:
+	{
+		uint32_t	index;
+		char		*path;
+
+		if (fcio->fcio_olen < MAXPATHLEN ||
+		    fcio->fcio_ilen != sizeof (uint32_t)) {
+			rval = EINVAL;
 			break;
 		}
 
-	case FCIO_DOWNLOAD_FCODE:
-		{
-			fc_fca_pm_t pm;
+		index = *(uint32_t *)fcio->fcio_ibuf;
+		path  = (char *)fcio->fcio_obuf;
 
-			if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
-			    fcio->fcio_ilen <= 0) {
-				rval = EINVAL;
-				break;
-			}
-			bzero((caddr_t)&pm, sizeof (pm));
-
-			pm.pm_cmd_flags = FC_FCA_PM_WRITE;
-			pm.pm_cmd_code = FC_PORT_DOWNLOAD_FCODE;
-			pm.pm_data_len = fcio->fcio_ilen;
-			pm.pm_data_buf = fcio->fcio_ibuf;
-
-			rval = emlxs_port_manage(port, &pm);
-
-			if (rval != FC_SUCCESS) {
-				fcio->fcio_errno = rval;
-				rval = EIO;
-			}
+		if (index > hba->vpi_max - 1) {
+			fcio->fcio_errno = FC_BADPORT;
+			rval = EFAULT;
 			break;
 		}
 
-	case FCIO_GET_ADAPTER_ATTRIBUTES:
-		{
-			fc_hba_adapter_attributes_t *hba_attrs;
+		(void) ddi_pathname(hba->dip, path);
 
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen <
-			    sizeof (fc_hba_adapter_attributes_t)) {
-				rval = EINVAL;
-				break;
-			}
-			hba_attrs =
-			    (fc_hba_adapter_attributes_t *)fcio->fcio_obuf;
+		break;
+	}
 
-			hba_attrs->version = FC_HBA_ADAPTER_ATTRIBUTES_VERSION;
-			(void) strncpy(hba_attrs->Manufacturer,
-			    "Emulex", sizeof (hba_attrs->Manufacturer));
-			(void) strncpy(hba_attrs->SerialNumber, vpd->serial_num,
-			    sizeof (hba_attrs->SerialNumber));
-			(void) strncpy(hba_attrs->Model, hba->model_info.model,
-			    sizeof (hba_attrs->Model));
-			(void) strncpy(hba_attrs->ModelDescription,
-			    hba->model_info.model_desc,
-			    sizeof (hba_attrs->ModelDescription));
-			bcopy((caddr_t)&port->wwnn,
-			    (caddr_t)&hba_attrs->NodeWWN, 8);
-			(void) strncpy((caddr_t)hba_attrs->NodeSymbolicName,
-			    (caddr_t)port->snn,
-			    sizeof (hba_attrs->NodeSymbolicName));
-			(void) sprintf(hba_attrs->HardwareVersion, "%x",
-			    vpd->biuRev);
-			(void) sprintf(hba_attrs->DriverVersion, "%s (%s)",
-			    emlxs_version, emlxs_revision);
-			(void) strncpy(hba_attrs->OptionROMVersion,
-			    vpd->fcode_version,
-			    sizeof (hba_attrs->OptionROMVersion));
-			(void) sprintf(hba_attrs->FirmwareVersion, "%s (%s)",
-			    vpd->fw_version, vpd->fw_label);
-			(void) strncpy(hba_attrs->DriverName, DRIVER_NAME,
-			    sizeof (hba_attrs->DriverName));
-			hba_attrs->VendorSpecificID =
-			    ((hba->model_info.device_id << 16) |
-			    PCI_VENDOR_ID_EMULEX);
-			hba_attrs->NumberOfPorts = hba->num_of_ports;
+	case FCIO_GET_DISCOVERED_PORT_ATTRIBUTES:
+	{
+		uint32_t index;
 
+		if (fcio->fcio_xfer != FCIO_XFER_READ ||
+		    fcio->fcio_ilen < sizeof (uint32_t) ||
+		    fcio->fcio_olen < sizeof (fc_hba_port_attributes_t)) {
+			rval = EINVAL;
 			break;
 		}
 
-	case FCIO_GET_ADAPTER_PORT_ATTRIBUTES:
-		{
-			fc_hba_port_attributes_t *port_attrs;
-			uint32_t value1;
-			uint32_t value2;
+		index = *(uint32_t *)fcio->fcio_ibuf;
+		ndlp  = emlxs_node_find_index(port, index, 1);
 
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen <
-			    sizeof (fc_hba_port_attributes_t)) {
-				rval = EINVAL;
-				break;
-			}
-			port_attrs =
-			    (fc_hba_port_attributes_t *)fcio->fcio_obuf;
+		if (!ndlp) {
+			fcio->fcio_errno = FC_OUTOFBOUNDS;
+			rval = EINVAL;
+			break;
+		}
 
-			port_attrs->version = FC_HBA_PORT_ATTRIBUTES_VERSION;
-			port_attrs->lastChange = 0;
-			port_attrs->fp_minor = 0;
-			bcopy((caddr_t)&port->wwnn,
-			    (caddr_t)&port_attrs->NodeWWN, 8);
-			bcopy((caddr_t)&port->wwpn,
-			    (caddr_t)&port_attrs->PortWWN, 8);
+		goto get_node_attrs;
+	}
 
-			if (hba->state <= FC_LINK_DOWN) {
-				/* port_attrs->PortFcId   */
-				/* port_attrs->PortType   */
-				/* port_attrs->PortSpeed  */
-				/* port_attrs->FabricName */
-				port_attrs->PortState =
-				    FC_HBA_PORTSTATE_OFFLINE;
-			} else {
-				port_attrs->PortFcId = port->did;
-				port_attrs->PortState =
-				    FC_HBA_PORTSTATE_ONLINE;
+	/* Same as FCIO_GET_DISCOVERED_PORT_ATTRIBUTES */
+	/* except WWPN is used instead of index */
+	case FCIO_GET_PORT_ATTRIBUTES:
+	{
+		emlxs_node_t *ndlp2;
 
+		if ((fcio->fcio_xfer != FCIO_XFER_READ) ||
+		    (fcio->fcio_ilen < 8) ||
+		    (fcio->fcio_olen < sizeof (fc_hba_port_attributes_t))) {
+			rval = EINVAL;
+			break;
+		}
+
+		wwpn  = (uint8_t *)fcio->fcio_ibuf;
+		ndlp  = emlxs_node_find_wwpn(port, wwpn);
+
+		if (!ndlp) {
+			fcio->fcio_errno = FC_NOMAP;
+			rval = EINVAL;
+			break;
+		}
+
+		/* Filter fabric ports */
+		if ((ndlp->nlp_DID & 0xFFF000) == 0xFFF000) {
+			fcio->fcio_errno = FC_NOMAP;
+			rval = EINVAL;
+			break;
+		}
+
+get_node_attrs:
+
+		port_attrs = (fc_hba_port_attributes_t *)fcio->fcio_obuf;
+
+		port_attrs->version    = FC_HBA_PORT_ATTRIBUTES_VERSION;
+		/* port_attrs->lastChange */
+		/* port_attrs->fp_minor   */
+		bcopy((caddr_t)&ndlp->nlp_nodename,
+		    (caddr_t)&port_attrs->NodeWWN, 8);
+		bcopy((caddr_t)&ndlp->nlp_portname,
+		    (caddr_t)&port_attrs->PortWWN, 8);
+
+		port_attrs->PortSpeed = HBA_PORTSPEED_UNKNOWN;
+		port_attrs->PortType  = FC_HBA_PORTTYPE_UNKNOWN;
+		port_attrs->PortState = FC_HBA_PORTSTATE_OFFLINE;
+
+		if (hba->state > FC_LINK_UP) {
+			ndlp2 = emlxs_node_find_did(port, Fabric_DID);
+
+			port_attrs->PortFcId  = ndlp->nlp_DID;
+			port_attrs->PortState = FC_HBA_PORTSTATE_ONLINE;
+
+			/* no switch */
+			if (!ndlp2) {
 				if (hba->topology == TOPOLOGY_LOOP) {
 					port_attrs->PortType =
 					    FC_HBA_PORTTYPE_LPORT;
 				} else {
 					port_attrs->PortType =
-					    FC_HBA_PORTTYPE_NPORT;
+					    FC_HBA_PORTTYPE_PTP;
 				}
 
-				ndlp = emlxs_node_find_did(port, Fabric_DID);
-
-				if (ndlp) {
-					bcopy(&ndlp->nlp_portname, (caddr_t)
-					    &port_attrs->FabricName,
-					    sizeof (port_attrs->FabricName));
-				}
+				/* We share a common speed */
 				switch (hba->linkspeed) {
 				case 0:
 					port_attrs->PortSpeed =
@@ -1224,469 +1732,15 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 					port_attrs->PortSpeed =
 					    HBA_PORTSPEED_10GBIT;
 					break;
-				default:
-					port_attrs->PortSpeed =
-					    HBA_PORTSPEED_UNKNOWN;
-
 				}
 			}
-
-			port_attrs->PortSupportedClassofService =
-			    SWAP_DATA32(FC_NS_CLASS3);
-			(void) strncpy((caddr_t)port_attrs->PortSymbolicName,
-			    (caddr_t)port->spn,
-			    sizeof (port_attrs->PortSymbolicName));
-
-			/* Set the hba speed limit */
-			if (vpd->link_speed & LMT_10GB_CAPABLE) {
-				port_attrs->PortSupportedSpeed |=
-				    FC_HBA_PORTSPEED_10GBIT;
-			}
-			if (vpd->link_speed & LMT_8GB_CAPABLE) {
-				port_attrs->PortSupportedSpeed |=
-				    FC_HBA_PORTSPEED_8GBIT;
-			}
-			if (vpd->link_speed & LMT_4GB_CAPABLE) {
-				port_attrs->PortSupportedSpeed |=
-				    FC_HBA_PORTSPEED_4GBIT;
-			}
-			if (vpd->link_speed & LMT_2GB_CAPABLE) {
-				port_attrs->PortSupportedSpeed |=
-				    FC_HBA_PORTSPEED_2GBIT;
-			}
-			if (vpd->link_speed & LMT_1GB_CAPABLE) {
-				port_attrs->PortSupportedSpeed |=
-				    FC_HBA_PORTSPEED_1GBIT;
-			}
-			value1 = 0x00000120;
-			value2 = 0x00000001;
-
-			bcopy((caddr_t)&value1,
-			    (caddr_t)&port_attrs->PortSupportedFc4Types[0],
-			    4);
-			bcopy((caddr_t)&value2,
-			    (caddr_t)&port_attrs->PortSupportedFc4Types[4],
-			    4);
-
-			bcopy((caddr_t)&value1,
-			    (caddr_t)&port_attrs->PortActiveFc4Types[0], 4);
-			bcopy((caddr_t)&value2,
-			    (caddr_t)&port_attrs->PortActiveFc4Types[4], 4);
-
-			port_attrs->PortMaxFrameSize = FF_FRAME_SIZE;
-			port_attrs->NumberofDiscoveredPorts =
-			    emlxs_nport_count(port);
-
-			break;
-		}
-
-	case FCIO_GET_NODE_ID:
-		{
-			fc_fca_pm_t pm;
-
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen < sizeof (fc_rnid_t)) {
-				rval = EINVAL;
-				break;
-			}
-			bzero((caddr_t)&pm, sizeof (pm));
-
-			pm.pm_cmd_flags = FC_FCA_PM_READ;
-			pm.pm_cmd_code = FC_PORT_GET_NODE_ID;
-			pm.pm_data_len = fcio->fcio_olen;
-			pm.pm_data_buf = fcio->fcio_obuf;
-
-			rval = emlxs_port_manage(port, &pm);
-
-			if (rval != FC_SUCCESS) {
-				fcio->fcio_errno = rval;
-				rval = EIO;
-			}
-			break;
-		}
-
-	case FCIO_SET_NODE_ID:
-		{
-			fc_fca_pm_t pm;
-
-			if (fcio->fcio_xfer != FCIO_XFER_WRITE ||
-			    fcio->fcio_ilen < sizeof (fc_rnid_t)) {
-				rval = EINVAL;
-				break;
-			}
-			bzero((caddr_t)&pm, sizeof (pm));
-
-			pm.pm_cmd_flags = FC_FCA_PM_READ;
-			pm.pm_cmd_code = FC_PORT_SET_NODE_ID;
-			pm.pm_data_len = fcio->fcio_ilen;
-			pm.pm_data_buf = fcio->fcio_ibuf;
-
-			rval = emlxs_port_manage(port, &pm);
-
-			if (rval != FC_SUCCESS) {
-				fcio->fcio_errno = rval;
-				rval = EIO;
-			}
-			break;
-		}
-
-	case FCIO_GET_NUM_DEVS:
-		{
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_olen < sizeof (uint32_t)) {
-				rval = EINVAL;
-				break;
-			}
-			*(uint32_t *)fcio->fcio_obuf = emlxs_nport_count(port);
-
-			break;
-		}
-
-	case FCIO_GET_DEV_LIST:
-		{
-			fc_port_dev_t *port_dev;
-			uint32_t max_count;
-			uint32_t i;
-			uint32_t j;
-			emlxs_node_t *nlp;
-			uint32_t nport_count;
-			caddr_t np;
-			caddr_t wp;
-
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_alen < sizeof (uint32_t)) {
-				rval = EINVAL;
-				break;
-			}
-			port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
-			max_count = fcio->fcio_olen / sizeof (fc_port_dev_t);
-
-			rw_enter(&port->node_rwlock, RW_READER);
-
-			nport_count = emlxs_nport_count(port);
-			*(uint32_t *)fcio->fcio_abuf = nport_count;
-
-			if (nport_count == 0) {
-				rw_exit(&port->node_rwlock);
-
-				fcio->fcio_errno = FC_NO_MAP;
-				rval = EIO;
-				break;
-			}
-			if (nport_count > max_count) {
-				rw_exit(&port->node_rwlock);
-
-				fcio->fcio_errno = FC_TOOMANY;
-				rval = EIO;
-				break;
-			}
-
-#define	TOP_LOOP()	for (j = 1; j < port->alpa_map[0]; j++) { \
-				if (nlp->nlp_DID == port->alpa_map[j]) { \
-					PRIV_LILP_POSIT(port_dev) = j - 1; \
-					break; \
-				} \
-			}
-
-
-			for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
-				nlp = port->node_table[i];
-				while (nlp != NULL) {
-					if ((nlp->nlp_DID & 0xFFF000) !=
-					    0xFFF000) {
-						port_dev->dev_dtype = 0;
-						port_dev->dev_type[0] =
-						    SWAP_LONG(0x00000100);
-						port_dev->dev_state =
-						    PORT_DEVICE_LOGGED_IN;
-						port_dev->dev_did.port_id =
-						    nlp->nlp_DID;
-						PRIV_LILP_POSIT(port_dev) = 0;
-						HARD_ADDR(port_dev) = 0;
-
-						if (hba->topology ==
-						    TOPOLOGY_LOOP) {
-
-	for (j = 1; j < port->alpa_map[0]; j++) {
-		if (nlp->nlp_DID == port->alpa_map[j]) {
-			PRIV_LILP_POSIT(port_dev) = j - 1;
-			break;
-		}
-	}
-							HARD_ADDR(port_dev) =
-							    nlp->nlp_DID;
-
-						}
-
-						np = (caddr_t)
-						    &nlp->nlp_portname;
-						wp = (caddr_t)
-						    &port_dev->dev_pwwn;
-						bcopy(np, wp, 8);
-
-						np = (caddr_t)
-						    &nlp->nlp_nodename;
-						wp = (caddr_t)
-						    &port_dev->dev_nwwn;
-						bcopy(np, wp, 8);
-						port_dev++;
-					}
-					nlp = (NODELIST *) nlp->nlp_list_next;
-				}
-			}
-			rw_exit(&port->node_rwlock);
-
-			break;
-		}
-
-	case FCIO_GET_LOGI_PARAMS:
-		{
-			uint8_t null_wwn[8];
-
-			if (fcio->fcio_ilen != sizeof (la_wwn_t) ||
-			    (fcio->fcio_xfer & FCIO_XFER_READ) == 0 ||
-			    (fcio->fcio_xfer & FCIO_XFER_WRITE) == 0) {
-				rval = EINVAL;
-				break;
-			}
-			bzero(null_wwn, 8);
-			wwpn = (uint8_t *)fcio->fcio_ibuf;
-
-			if ((bcmp((caddr_t)wwpn, (caddr_t)null_wwn, 8) == 0) ||
-			    (bcmp((caddr_t)wwpn,
-			    (caddr_t)&port->wwpn, 8) == 0)) {
-				bcopy((caddr_t)&port->sparam,
-				    (caddr_t)fcio->fcio_obuf, fcio->fcio_olen);
-			} else {
-				ndlp = emlxs_node_find_wwpn(port, wwpn);
-
-				if (ndlp) {
-					bcopy((caddr_t)&ndlp->sparm,
-					    (caddr_t)fcio->fcio_obuf,
-					    fcio->fcio_olen);
-				} else {
-					rval = ENXIO;
-				}
-			}
-
-			break;
-		}
-
-	case FCIO_GET_STATE:
-		{
-			uint8_t null_wwn[8];
-			uint32_t *statep;
-
-			if (fcio->fcio_ilen != 8 ||
-			    fcio->fcio_olen != 4 ||
-			    (fcio->fcio_xfer & FCIO_XFER_WRITE) == 0 ||
-			    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
-				rval = EINVAL;
-				break;
-			}
-			bzero(null_wwn, 8);
-			wwpn = (uint8_t *)fcio->fcio_ibuf;
-			statep = (uint32_t *)fcio->fcio_obuf;
-
-			if ((bcmp((caddr_t)wwpn, (caddr_t)null_wwn, 8) == 0) ||
-			    (bcmp((caddr_t)wwpn,
-			    (caddr_t)&port->wwpn, 8) == 0)) {
-				*statep = PORT_DEVICE_VALID;
-			} else {
-				ndlp = emlxs_node_find_wwpn(port, wwpn);
-
-				if (ndlp) {
-					*statep = PORT_DEVICE_VALID;
-				} else {
-					*statep = PORT_DEVICE_INVALID;
-				}
-			}
-
-			break;
-		}
-
-	case FCIO_GET_TOPOLOGY:
-		{
-			uint32_t *tp;
-
-			if (fcio->fcio_olen != 4 ||
-			    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
-				rval = EINVAL;
-				break;
-			}
-			tp = (uint32_t *)fcio->fcio_obuf;
-
-			if (hba->state <= FC_LINK_DOWN) {
-				*tp = FC_TOP_UNKNOWN;
-			} else {
-				ndlp = emlxs_node_find_did(port, Fabric_DID);
-
-				if (hba->topology == TOPOLOGY_LOOP) {
-					if (ndlp) {
-						*tp = FC_TOP_PUBLIC_LOOP;
-					} else {
-						*tp = FC_TOP_PRIVATE_LOOP;
-					}
-				} else {
-					if (ndlp) {
-						*tp = FC_TOP_FABRIC;
-					} else {
-						*tp = FC_TOP_PT_PT;
-					}
-				}
-			}
-
-			break;
-		}
-
-	case FCIO_LINK_STATUS:
-		{
-			fc_portid_t *portid;
-			fc_rls_acc_t *rls;
-			fc_fca_pm_t pm;
-
-			if (fcio->fcio_ilen != sizeof (fc_portid_t) ||
-			    fcio->fcio_olen != sizeof (fc_rls_acc_t) ||
-			    fcio->fcio_xfer != FCIO_XFER_RW) {
-				rval = EINVAL;
-				break;
-			}
-			if ((fcio->fcio_cmd_flags !=
-			    FCIO_CFLAGS_RLS_DEST_FPORT) &&
-			    (fcio->fcio_cmd_flags !=
-			    FCIO_CFLAGS_RLS_DEST_NPORT)) {
-				rval = EINVAL;
-				break;
-			}
-			portid = (fc_portid_t *)fcio->fcio_ibuf;
-			rls = (fc_rls_acc_t *)fcio->fcio_obuf;
-
-			if (portid->port_id == 0 ||
-			    portid->port_id == port->did) {
-				bzero((caddr_t)&pm, sizeof (pm));
-
-				pm.pm_cmd_flags = FC_FCA_PM_READ;
-				pm.pm_cmd_code = FC_PORT_RLS;
-				pm.pm_data_len = sizeof (fc_rls_acc_t);
-				pm.pm_data_buf = (caddr_t)rls;
-
-				rval = emlxs_port_manage(port, &pm);
-
-				if (rval != FC_SUCCESS) {
-					fcio->fcio_errno = rval;
-					rval = EIO;
-				}
-			} else {
-				rval = ENOTSUP;
-			}
-			break;
-		}
-
-	case FCIO_GET_OTHER_ADAPTER_PORTS:
-		{
-			uint32_t index;
-			char *path;
-
-			if (fcio->fcio_olen < MAXPATHLEN ||
-			    fcio->fcio_ilen != sizeof (uint32_t)) {
-				rval = EINVAL;
-				break;
-			}
-			index = *(uint32_t *)fcio->fcio_ibuf;
-			path = (char *)fcio->fcio_obuf;
-
-			if (index > hba->vpi_max - 1) {
-				fcio->fcio_errno = FC_BADPORT;
-				rval = EFAULT;
-				break;
-			}
-			(void) ddi_pathname(hba->dip, path);
-
-			break;
-		}
-
-	case FCIO_GET_DISCOVERED_PORT_ATTRIBUTES:
-		{
-			uint32_t index;
-
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_ilen < sizeof (uint32_t) ||
-			    fcio->fcio_olen <
-			    sizeof (fc_hba_port_attributes_t)) {
-				rval = EINVAL;
-				break;
-			}
-			index = *(uint32_t *)fcio->fcio_ibuf;
-			ndlp = emlxs_node_find_index(port, index, 1);
-
-			if (!ndlp) {
-				fcio->fcio_errno = FC_OUTOFBOUNDS;
-				rval = EINVAL;
-				break;
-			}
-			goto get_node_attrs;
-		}
-
-		/* Same as FCIO_GET_DISCOVERED_PORT_ATTRIBUTES */
-		/* except WWPN is used instead of index */
-	case FCIO_GET_PORT_ATTRIBUTES:
-		{
-			emlxs_node_t *ndlp2;
-			/* uint32_t value1; */
-
-			if (fcio->fcio_xfer != FCIO_XFER_READ ||
-			    fcio->fcio_ilen < 8 ||
-			    fcio->fcio_olen <
-			    sizeof (fc_hba_port_attributes_t)) {
-				rval = EINVAL;
-				break;
-			}
-			wwpn = (uint8_t *)fcio->fcio_ibuf;
-			ndlp = emlxs_node_find_wwpn(port, wwpn);
-
-			if (!ndlp) {
-				fcio->fcio_errno = FC_NOMAP;
-				rval = EINVAL;
-				break;
-			}
-			/* Filter fabric ports */
-			if ((ndlp->nlp_DID & 0xFFF000) == 0xFFF000) {
-				fcio->fcio_errno = FC_NOMAP;
-				rval = EINVAL;
-				break;
-			}
-	get_node_attrs:
-
-			port_attrs =
-			    (fc_hba_port_attributes_t *)fcio->fcio_obuf;
-
-			port_attrs->version = FC_HBA_PORT_ATTRIBUTES_VERSION;
-			/* port_attrs->lastChange */
-			/* port_attrs->fp_minor   */
-			bcopy((caddr_t)&ndlp->nlp_nodename,
-			    (caddr_t)&port_attrs->NodeWWN, 8);
-			bcopy((caddr_t)&ndlp->nlp_portname,
-			    (caddr_t)&port_attrs->PortWWN, 8);
-
-			port_attrs->PortSpeed = HBA_PORTSPEED_UNKNOWN;
-			port_attrs->PortType = FC_HBA_PORTTYPE_UNKNOWN;
-			port_attrs->PortState = FC_HBA_PORTSTATE_OFFLINE;
-
-			if (hba->state > FC_LINK_UP) {
-				ndlp2 = emlxs_node_find_did(port, Fabric_DID);
-
-				port_attrs->PortFcId = ndlp->nlp_DID;
-				port_attrs->PortState = FC_HBA_PORTSTATE_ONLINE;
-
-				/* no switch */
-				if (!ndlp2) {
-					if (hba->topology == TOPOLOGY_LOOP) {
-						port_attrs->PortType =
-						    FC_HBA_PORTTYPE_LPORT;
-					} else {
-						port_attrs->PortType =
-						    FC_HBA_PORTTYPE_PTP;
-					}
+			/* public loop */
+			else if (hba->topology == TOPOLOGY_LOOP) {
+				/* Check for common area and domain */
+				if ((ndlp->nlp_DID & 0xFFFF00) ==
+				    (port->did & 0xFFFF00)) {
+					port_attrs->PortType =
+					    FC_HBA_PORTTYPE_NLPORT;
 
 					/* We share a common speed */
 					switch (hba->linkspeed) {
@@ -1716,90 +1770,155 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 						break;
 					}
 				}
-				/* public loop */
-				else if (hba->topology == TOPOLOGY_LOOP) {
-					/* Check for common area and domain */
-					if ((ndlp->nlp_DID & 0xFFFF00) ==
-					    (port->did & 0xFFFF00)) {
-						port_attrs->PortType =
-						    FC_HBA_PORTTYPE_NLPORT;
-
-						/* We share a common speed */
-						switch (hba->linkspeed) {
-						case 0:
-							port_attrs->PortSpeed =
-							    HBA_PORTSPEED_1GBIT;
-							break;
-						case LA_1GHZ_LINK:
-							port_attrs->PortSpeed =
-							    HBA_PORTSPEED_1GBIT;
-							break;
-						case LA_2GHZ_LINK:
-							port_attrs->PortSpeed =
-							    HBA_PORTSPEED_2GBIT;
-							break;
-						case LA_4GHZ_LINK:
-							port_attrs->PortSpeed =
-							    HBA_PORTSPEED_4GBIT;
-							break;
-						case LA_8GHZ_LINK:
-							port_attrs->PortSpeed =
-							    HBA_PORTSPEED_8GBIT;
-							break;
-						case LA_10GHZ_LINK:
-							port_attrs->PortSpeed =
-							    HBA_10GBIT;
-							break;
-						}
-					}
-				}
 			}
-			port_attrs->PortSupportedClassofService =
-			    SWAP_DATA32(FC_NS_CLASS3);
-			/* port_attrs->PortSymbolicName		*/
-			/* port_attrs->PortSupportedSpeed	*/
-			/* port_attrs->PortSupportedFc4Types	*/
-			/* port_attrs->PortActiveFc4Types	*/
-			/* port_attrs->PortMaxFrameSize		*/
-			/* port_attrs->NumberofDiscoveredPorts	*/
-
-			break;
 		}
+
+		port_attrs->PortSupportedClassofService =
+		    SWAP_DATA32(FC_NS_CLASS3);
+		/* port_attrs->PortSymbolicName		*/
+		/* port_attrs->PortSupportedSpeed	*/
+		/* port_attrs->PortSupportedFc4Types	*/
+		/* port_attrs->PortActiveFc4Types	*/
+		/* port_attrs->PortMaxFrameSize		*/
+		/* port_attrs->NumberofDiscoveredPorts	*/
+
+		break;
+	}
 
 	case FCIO_GET_SYM_PNAME:
-		{
-			if (fcio->fcio_olen < (strlen(port->spn) + 1) ||
-			    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
-				rval = EINVAL;
-				break;
-			}
-			(void) strcpy((caddr_t)fcio->fcio_obuf,
-			    (caddr_t)port->spn);
-
+	{
+		if (fcio->fcio_olen < (strlen(port->spn)+1) ||
+		    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
+			rval = EINVAL;
 			break;
 		}
+
+		(void) strcpy((caddr_t)fcio->fcio_obuf, (caddr_t)port->spn);
+
+		break;
+	}
 
 	case FCIO_GET_SYM_NNAME:
-		{
-			if (fcio->fcio_olen < (strlen(port->snn) + 1) ||
-			    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
-				rval = EINVAL;
-				break;
-			}
-			(void) strcpy((caddr_t)fcio->fcio_obuf,
-			    (caddr_t)port->snn);
-
+	{
+		if (fcio->fcio_olen < (strlen(port->snn)+1) ||
+		    (fcio->fcio_xfer & FCIO_XFER_READ) == 0) {
+			rval = EINVAL;
 			break;
 		}
+
+		(void) strcpy((caddr_t)fcio->fcio_obuf, (caddr_t)port->snn);
+
+		break;
+	}
+
+	case FCIO_FORCE_DUMP:
+	{
+		rval = emlxs_reset(port, FC_FCA_CORE);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+			rval = EIO;
+			break;
+		}
+
+		break;
+	}
+
+	case FCIO_GET_DUMP_SIZE:
+	{
+		fc_fca_pm_t pm;
+
+		if (fcio->fcio_olen != sizeof (uint32_t) ||
+		    fcio->fcio_xfer != FCIO_XFER_READ) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (fc_fca_pm_t));
+
+		pm.pm_data_len  = fcio->fcio_olen;
+		pm.pm_data_buf  = fcio->fcio_obuf;
+		pm.pm_cmd_code  = FC_PORT_GET_DUMP_SIZE;
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+
+			if (rval == FC_INVALID_REQUEST) {
+				rval = ENOTTY;
+			} else {
+				rval = EIO;
+			}
+		}
+
+		break;
+	}
+
+	case FCIO_GET_DUMP:
+	{
+		fc_fca_pm_t pm;
+		uint32_t dump_size;
+
+		if (fcio->fcio_xfer != FCIO_XFER_READ) {
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (fc_fca_pm_t));
+
+		pm.pm_data_len  = sizeof (uint32_t);
+		pm.pm_data_buf  = (caddr_t)&dump_size;
+		pm.pm_cmd_code  = FC_PORT_GET_DUMP_SIZE;
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+
+			if (rval == FC_INVALID_REQUEST) {
+				rval = ENOTTY;
+			} else {
+				rval = EIO;
+			}
+			break;
+		}
+
+		if (fcio->fcio_olen != dump_size) {
+			fcio->fcio_errno = FC_NOMEM;
+			rval = EINVAL;
+			break;
+		}
+
+		bzero((caddr_t)&pm, sizeof (fc_fca_pm_t));
+
+		pm.pm_data_len  = fcio->fcio_olen;
+		pm.pm_data_buf  = fcio->fcio_obuf;
+		pm.pm_cmd_code  = FC_PORT_GET_DUMP;
+		pm.pm_cmd_flags = FC_FCA_PM_READ;
+
+		rval = emlxs_port_manage(port, &pm);
+
+		if (rval != FC_SUCCESS) {
+			fcio->fcio_errno = rval;
+
+			if (rval == FC_INVALID_REQUEST) {
+				rval = ENOTTY;
+			} else {
+				rval = EIO;
+			}
+		}
+
+		break;
+	}
 
 	case FCIO_SET_SYM_PNAME:
 	case FCIO_SET_SYM_NNAME:
 	case FCIO_DEV_LOGIN:
 	case FCIO_DEV_LOGOUT:
 	case FCIO_DEV_REMOVE:
-	case FCIO_GET_DUMP_SIZE:
-	case FCIO_FORCE_DUMP:
-	case FCIO_GET_DUMP:
 	case FCIO_NS:
 	case FCIO_SEND_NODE_ID:
 	case FCIO_GET_ADAPTER_PORT_STATS:
@@ -1811,71 +1930,74 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-		    "Unknown FCIO command. (0x%x)",
-		    fcio->fcio_cmd);
+		    "Unknown FCIO command. (0x%x)", fcio->fcio_cmd);
 		rval = EFAULT;
 
 	}	/* switch() */
 
 done:
 
-	if (rval == 0) {
-		fcio->fcio_errno = 0;
+	if (rval != 0 && fcio->fcio_errno == 0) {
+		fcio->fcio_errno = FC_FAILURE;
 	}
+
 	if (fcio->fcio_ibuf) {
-		if (ddi_copyout(fcio->fcio_ibuf, dfc->buf1,
-		    fcio->fcio_ilen, mode)) {
+		if (ddi_copyout(fcio->fcio_ibuf, dfc->buf1, fcio->fcio_ilen,
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: %s: ddi_copyout failed. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_ilen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_ilen);
 
 			rval = EFAULT;
 		}
+
 		kmem_free(fcio->fcio_ibuf, fcio->fcio_ilen);
 	}
+
 	if (fcio->fcio_obuf) {
-		if (ddi_copyout(fcio->fcio_obuf, dfc->buf2,
-		    fcio->fcio_olen, mode)) {
+		if (ddi_copyout(fcio->fcio_obuf, dfc->buf2, fcio->fcio_olen,
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: %s: ddi_copyout failed. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_olen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_olen);
 
 			rval = EFAULT;
 		}
+
 		kmem_free(fcio->fcio_obuf, fcio->fcio_olen);
 	}
+
 	if (fcio->fcio_abuf) {
-		if (ddi_copyout(fcio->fcio_abuf, dfc->buf3,
-		    fcio->fcio_alen, mode)) {
+		if (ddi_copyout(fcio->fcio_abuf, dfc->buf3, fcio->fcio_alen,
+		    mode)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: %s: ddi_copyout failed. (size=%d)",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_fcio_xlate(dfc->data1),
-			    fcio->fcio_alen);
+			    emlxs_fcio_xlate(dfc->data1), fcio->fcio_alen);
 
 			rval = EFAULT;
 		}
+
 		kmem_free(fcio->fcio_abuf, fcio->fcio_alen);
 	}
+
 	if (ddi_copyout((void *)&fcio->fcio_errno, (void *)dfc->buf4,
 	    dfc->buf4_size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: %s: ddi_copyout failed. (size=%d)",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_fcio_xlate(dfc->data1),
+		    emlxs_dfc_xlate(dfc->cmd), emlxs_fcio_xlate(dfc->data1),
 		    dfc->buf4_size);
 
-		rval = EFAULT;
+			rval = EFAULT;
 	}
+
 	return (rval);
 
 } /* emlxs_fcio_manage() */
 
-#endif	/* FCIO_SUPPORT */
+#endif /* FCIO_SUPPORT */
 
 
 
@@ -1884,28 +2006,27 @@ done:
 static int32_t
 emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_config_t *cfg = &CFG;
-	emlxs_port_t *vport;
-	dfc_vportinfo_t dfc_vport;
-	uint32_t vpi;
-	uint32_t options;
-	char name[256];
-	uint8_t wwn[8];
+	emlxs_port_t	*port = &PPORT;
+	emlxs_config_t	*cfg = &CFG;
+	emlxs_port_t	*vport;
+	dfc_vportinfo_t	dfc_vport;
+	uint32_t	vpi;
+	uint32_t	options;
+	char		name[256];
+	uint8_t		wwn[8];
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	options = dfc->data1;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_vportinfo_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -1913,15 +2034,16 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	/* Read the dfc_vport object */
 	if (ddi_copyin((void *)dfc->buf1, (void *)&dfc_vport,
 	    sizeof (dfc_vportinfo_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	if (!(options & VPORT_OPT_AUTORETRY)) {
 		if (!(hba->flag & FC_NPIV_ENABLED)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -1930,6 +2052,7 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			return (DFC_NPIV_DISABLED);
 		}
+
 		if (!(hba->flag & FC_NPIV_SUPPORTED)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: NPIV currently not supported.",
@@ -1938,6 +2061,7 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			return (DFC_NPIV_UNSUPPORTED);
 		}
 	}
+
 	/*
 	 * Only the same WWNN and WWPN can be re-created
 	 */
@@ -1964,7 +2088,9 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 				}
 			}
 		}
-	}	/* else auto assign */
+	}
+
+	/* else auto assign */
 	/* Acquire a VPI */
 	if (dfc_vport.vpi == 0) {
 		/* Auto Assign VPI */
@@ -1983,16 +2109,19 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			return (DFC_DRVRES_ERROR);
 		}
+
 		dfc_vport.vpi = vpi;
 	}
+
 	/* Establish a WWPN */
 	bzero(wwn, 8);
-	if (bcmp(wwn, dfc_vport.wwpn, 8) == 0) {
+	if (!(bcmp(wwn, dfc_vport.wwpn, 8))) {
 		/* Generate new WWPN */
 		bcopy((caddr_t)&hba->wwpn, (caddr_t)dfc_vport.wwpn, 8);
 		dfc_vport.wwpn[0] = 0x20;
 		dfc_vport.wwpn[1] = vpi;
 	} else {	/* use one provided */
+
 		/* Make sure WWPN is unique */
 		if (emlxs_vport_find_wwpn(hba, dfc_vport.wwpn)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -2005,7 +2134,7 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	/* Establish a WWNN */
 	bzero(wwn, 8);
-	if (bcmp(wwn, dfc_vport.wwnn, 8) == 0) {
+	if (!(bcmp(wwn, dfc_vport.wwnn, 8))) {
 		/* Generate new WWNN */
 		bcopy((caddr_t)&hba->wwnn, (caddr_t)dfc_vport.wwnn, 8);
 		dfc_vport.wwnn[0] = 0x28;
@@ -2024,8 +2153,8 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	/* Generate the symbolic port name */
 	if (dfc_vport.spn[0]) {
 		(void) strcpy(name, dfc_vport.spn);
-		(void) sprintf(dfc_vport.spn, "%s VPort-%d VName-%s",
-		    hba->spn, vpi, name);
+		(void) sprintf(dfc_vport.spn, "%s VPort-%d VName-%s", hba->spn,
+		    vpi, name);
 	} else {
 		(void) sprintf(dfc_vport.spn, "%s VPort-%d", hba->spn, vpi);
 	}
@@ -2038,6 +2167,7 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (dfc_vport.vpi >= hba->vpi_high) {
 		hba->vpi_high = dfc_vport.vpi;
 	}
+
 	/* Configure the port object */
 	bcopy((caddr_t)dfc_vport.wwnn, (caddr_t)&vport->wwnn, 8);
 	bcopy((caddr_t)dfc_vport.wwpn, (caddr_t)&vport->wwpn, 8);
@@ -2062,23 +2192,24 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (vport->tgt_mode) {
 		emlxs_fct_bind_port(vport);
 	}
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 	if (ddi_copyout((void *)&dfc_vport, (void *)dfc->buf1,
 	    sizeof (dfc_vportinfo_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	if (vport->flag & EMLXS_PORT_BOUND) {
 		/*
-		 * The same WWNN, WWPN and VPI has been re-created. Bring up
-		 * the vport now!
+		 * The same WWNN, WWPN and VPI has been re-created.
+		 * Bring up the vport now!
 		 */
 		emlxs_port_online(vport);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_create_vport() */
@@ -2087,26 +2218,25 @@ emlxs_dfc_create_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_port_t *vport;
-	uint8_t wwpn[8];
-	fc_packet_t *pkt = NULL;
-	uint32_t rval = 0;
-	ELS_PKT *els;
-	char buffer[256];
+	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*vport;
+	uint8_t		wwpn[8];
+	fc_packet_t	*pkt = NULL;
+	uint32_t	rval = 0;
+	ELS_PKT		*els;
+	char		buffer[256];
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (dfc->buf1_size < 8) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -2115,27 +2245,29 @@ emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
+
 	/* Read the wwn object */
 	if (ddi_copyin((void *)dfc->buf1, (void *)wwpn, 8, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	/* Make sure WWPN is unique */
 	vport = emlxs_vport_find_wwpn(hba, wwpn);
 
-	if (!vport) {
+	/* Physical does not have EMLXS_PORT_CONFIG set */
+	if (!vport || !(vport->flag & EMLXS_PORT_CONFIG)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: WWPN does not exists. %s",
-		    emlxs_dfc_xlate(dfc->cmd),
+		    "%s: WWPN does not exists. %s", emlxs_dfc_xlate(dfc->cmd),
 		    emlxs_wwn_xlate(buffer, wwpn));
 
 		rval = DFC_ARG_INVALID;
 		goto done;
 	}
+
 	if (vport->did) {
 		/* Fabric Logout */
 		if (!(pkt = emlxs_pkt_alloc(vport,
@@ -2148,6 +2280,7 @@ emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_SYSRES_ERROR;
 			goto done;
 		}
+
 		/* Make this a polled IO */
 		pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 		pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -2161,8 +2294,8 @@ emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		pkt->pkt_cmd_fhdr.r_ctl = R_CTL_ELS_REQ;
 		pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(vport->did);
 		pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
-		pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
-		    F_CTL_SEQ_INITIATIVE;
+		pkt->pkt_cmd_fhdr.f_ctl =
+		    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
 		pkt->pkt_cmd_fhdr.seq_id = 0;
 		pkt->pkt_cmd_fhdr.df_ctl = 0;
 		pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -2177,8 +2310,8 @@ emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		bcopy(&vport->wwpn, &els->un.logo.portName, 8);
 
 		/*
-		 * Just send LOGO. Don't worry about result. This is just a
-		 * courtesy anyway.
+		 * Just send LOGO. Don't worry about result.
+		 * This is just a courtesy anyway.
 		 */
 		(void) emlxs_pkt_send(pkt, 1);
 
@@ -2186,6 +2319,7 @@ emlxs_dfc_destroy_vport(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		/* Take the port offline */
 		(void) emlxs_port_offline(vport, 0xffffffff);
 	}
+
 	vport->flag &= ~(EMLXS_PORT_CONFIG | EMLXS_PORT_ENABLE);
 
 	rval = 0;
@@ -2195,6 +2329,7 @@ done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_destroy_vport() */
@@ -2203,37 +2338,36 @@ done:
 static int32_t
 emlxs_dfc_get_vportinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_port_t *vport;
-	dfc_vportinfo_t *dfc_vport;
-	dfc_vportinfo_t *dfc_vport_list = NULL;
-	uint32_t i;
-	/* uint32_t j; */
-	uint32_t size;
-	uint32_t max_count;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*vport;
+	dfc_vportinfo_t	*dfc_vport;
+	dfc_vportinfo_t	*dfc_vport_list = NULL;
+	uint32_t	i;
+	uint32_t	size;
+	uint32_t	max_count;
+	uint32_t	rval = DFC_SUCCESS;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	size = (sizeof (dfc_vportinfo_t) * MAX_VPORTS);
 
-	if (!(dfc_vport_list = (dfc_vportinfo_t *)
-	    kmem_zalloc(size, KM_NOSLEEP))) {
+	if (!(dfc_vport_list =
+	    (dfc_vportinfo_t *)kmem_zalloc(size, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate memory.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_SYSRES_ERROR);
 	}
+
 	max_count = 0;
 	for (i = 0; i <= hba->vpi_max; i++) {
 		vport = &VPORT(i);
@@ -2242,6 +2376,7 @@ emlxs_dfc_get_vportinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (!(vport->flag & EMLXS_PORT_CONFIG)) {
 			continue;
 		}
+
 		bcopy(vport->snn, dfc_vport->snn, 256);
 		bcopy(vport->spn, dfc_vport->spn, 256);
 		bcopy(&vport->wwpn, dfc_vport->wwpn, 8);
@@ -2254,15 +2389,19 @@ emlxs_dfc_get_vportinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (vport->flag & EMLXS_PORT_ENABLE) {
 			dfc_vport->flags |= VPORT_ENABLED;
 		}
+
 		if (vport->flag & EMLXS_PORT_BOUND) {
 			dfc_vport->flags |= VPORT_BOUND;
 		}
+
 		if (vport->flag & EMLXS_PORT_IP_UP) {
 			dfc_vport->flags |= VPORT_IP;
 		}
+
 		if (vport->flag & EMLXS_PORT_RESTRICTED) {
 			dfc_vport->flags |= VPORT_RESTRICTED;
 		}
+
 		max_count++;
 	}
 
@@ -2271,26 +2410,27 @@ emlxs_dfc_get_vportinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (max_count > dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (%d > %d)",
-		    emlxs_dfc_xlate(dfc->cmd), max_count,
-		    dfc->buf1_size);
+		    emlxs_dfc_xlate(dfc->cmd), max_count, dfc->buf1_size);
 
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
+
 	if (ddi_copyout((void *)dfc_vport_list, (void *)dfc->buf1,
 	    dfc->buf1_size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 done:
 
 	if (dfc_vport_list) {
 		kmem_free(dfc_vport_list, size);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_get_vportinfo() */
@@ -2299,20 +2439,18 @@ done:
 static emlxs_port_t *
 emlxs_vport_find_wwpn(emlxs_hba_t *hba, uint8_t *wwpn)
 {
-	emlxs_port_t *port;
-	NODELIST *nlp;
-	int i, j;
+	emlxs_port_t	*port;
+	NODELIST	*nlp;
+	int		i, j;
 
 	for (i = 0; i <= hba->vpi_max; i++) {
 		port = &VPORT(i);
 
-		if (!(port->flag & EMLXS_PORT_CONFIG)) {
-			continue;
-		}
-		/* Check Local N-port */
+		/* Check Local N-port, including physical port */
 		if (bcmp(&port->wwpn, wwpn, 8) == 0) {
 			return (port);
 		}
+
 		/* Check Remote N-port */
 		rw_enter(&port->node_rwlock, RW_READER);
 		for (j = 0; j < EMLXS_NUM_HASH_QUES; j++) {
@@ -2338,19 +2476,19 @@ emlxs_vport_find_wwpn(emlxs_hba_t *hba, uint8_t *wwpn)
 static int32_t
 emlxs_dfc_npiv_resource(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_vport_resource_t vres;
-	MAILBOXQ *mbq = NULL;
-	MAILBOX *mb;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t		*port = &PPORT;
+	dfc_vport_resource_t	vres;
+	MAILBOXQ		*mbq = NULL;
+	MAILBOX			*mb;
+	uint32_t		rval = DFC_SUCCESS;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_vport_resource_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -2358,18 +2496,21 @@ emlxs_dfc_npiv_resource(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
-	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
+
+	if ((mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate mailbox buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_SYSRES_ERROR);
 	}
-	mb = (MAILBOX *)mbq;
+
+	mb = (MAILBOX *) mbq;
 
 	emlxs_mb_read_config(hba, mb);
 
-	rval = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
+	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -2379,42 +2520,44 @@ emlxs_dfc_npiv_resource(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_TIMEOUT;
 		goto done;
 	}
+
 	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. status=%x",
-		    emlxs_dfc_xlate(dfc->cmd),
+		    "%s: %s failed. status=%x", emlxs_dfc_xlate(dfc->cmd),
 		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	bzero(&vres, sizeof (dfc_vport_resource_t));
 	vres.vpi_max = mb->un.varRdConfig.max_vpi;
-	vres.vpi_inuse = (mb->un.varRdConfig.max_vpi <=
-	    mb->un.varRdConfig.avail_vpi) ? 0 :
-	    mb->un.varRdConfig.max_vpi -
+	vres.vpi_inuse =
+	    (mb->un.varRdConfig.max_vpi <=
+	    mb->un.varRdConfig.avail_vpi) ? 0 : mb->un.varRdConfig.max_vpi -
 	    mb->un.varRdConfig.avail_vpi;
 
 	vres.rpi_max = mb->un.varRdConfig.max_rpi;
-	vres.rpi_inuse = (mb->un.varRdConfig.max_rpi <=
-	    mb->un.varRdConfig.avail_rpi) ? 0 :
-	    mb->un.varRdConfig.max_rpi -
+	vres.rpi_inuse =
+	    (mb->un.varRdConfig.max_rpi <=
+	    mb->un.varRdConfig.avail_rpi) ? 0 : mb->un.varRdConfig.max_rpi -
 	    mb->un.varRdConfig.avail_rpi;
 
 	if (ddi_copyout((void *)&vres, (void *)dfc->buf1,
 	    sizeof (dfc_vport_resource_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYOUT_ERROR;
 	}
+
 done:
 
 	/* Free allocated mbox memory */
 	if (mbq) {
 		kmem_free(mbq, sizeof (MAILBOXQ));
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_npiv_resource() */
@@ -2423,27 +2566,27 @@ done:
 static int32_t
 emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_port_t *vport = &VPORT(hba->vpi_max);
-	emlxs_config_t *cfg = &CFG;
-	fc_packet_t *pkt = NULL;
-	fc_packet_t *pkt1 = NULL;
-	ELS_PKT *els;
-	/* SERV_PARM *sp; */
-	LS_RJT *lsrjt;
-	uint32_t checklist = 0;
-	uint32_t rval = DFC_SUCCESS;
-	uint8_t wwn[8];
-	emlxs_vpd_t *vpd = &VPD;
-	int i;
+	emlxs_port_t	*port = &PPORT;
+	emlxs_port_t	*vport = &VPORT(hba->vpi_max);
+	emlxs_config_t	*cfg = &CFG;
+	fc_packet_t	*pkt = NULL;
+	fc_packet_t	*pkt1 = NULL;
+	ELS_PKT		*els;
+	LS_RJT		*lsrjt;
+	uint32_t	checklist = 0;
+	uint32_t	mask = 0;
+	uint32_t	rval = DFC_SUCCESS;
+	uint8_t		wwn[8];
+	emlxs_vpd_t	*vpd = &VPD;
+	int		i;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -2451,66 +2594,81 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (cfg[CFG_NPIV_ENABLE].current) {
 		checklist |= CL_NPIV_PARM_ENABLE;
 	}
+
 	if (hba->sli_mode >= 3) {
 		checklist |= CL_SLI3_ENABLE;
 	}
+
+
 	if (vpd->feaLevelHigh >= 0x09) {
 		checklist |= CL_HBA_SUPPORT_NPIV;
 	}
+
+
 	if (hba->num_of_ports <= hba->vpi_max) {
 		checklist |= CL_HBA_HAS_RESOURCES;
 	}
+
 	if (hba->state < FC_LINK_UP) {
 		goto done;
 	}
+
 	checklist |= CL_HBA_LINKUP;
 
 	if (hba->topology == TOPOLOGY_LOOP) {
 		goto done;
 	}
+
 	if (!(hba->flag & FC_FABRIC_ATTACHED)) {
 		goto done;
 	}
+
 	checklist |= CL_P2P_TOPOLOGY;
 
 	if (!(hba->flag & FC_NPIV_SUPPORTED)) {
 		goto done;
 	}
+
 	checklist |= CL_FABRIC_SUPPORTS_NPIV;
 
-	/* Does fabric have resources? */
+	mask =
+	    (CL_NPIV_PARM_ENABLE | CL_SLI3_ENABLE | CL_HBA_SUPPORT_NPIV |
+	    CL_HBA_HAS_RESOURCES);
 
-	/* Check if we have resources */
-	if (!(checklist & CL_HBA_HAS_RESOURCES)) {
+	/*
+	 * Check if those four conditions are met
+	 */
+	if ((checklist & mask) != mask) {
 		/*
-		 * If we're out of resources then it doesn't matter if fabric
-		 * has resources
+		 * One or more conditions are not met
 		 */
 		goto done;
-	} else {
+	}
+
 		/* Now check if fabric have resources */
-		for (i = 1; i <= hba->vpi_max; i++) {
+	for (i = 1; i <= hba->vpi_max; i++) {
 			vport = &VPORT(i);
-			if (vport->did) {
+		if (vport->did) {
 				checklist |= CL_FABRIC_HAS_RESOURCES;
 				goto done;
 			}
 		}
-	}
 
 	vport->vpi = hba->vpi_max;
 	vport->hba = hba;
 
 	if (!(pkt = emlxs_pkt_alloc(vport,
-	    sizeof (uint32_t) + sizeof (SERV_PARM),
-	    sizeof (FCP_RSP), 0, KM_NOSLEEP))) {
+	    sizeof (uint32_t) + sizeof (SERV_PARM), sizeof (FCP_RSP),
+	    0, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "Unable to allocate packet.");
 		goto done;
 	}
+
 	/* Build (FDISC) the fc header */
 	pkt->pkt_cmd_fhdr.d_id = SWAP_DATA24_LO(Fabric_DID);
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_EXTENDED_SVC | R_CTL_UNSOL_CONTROL;
@@ -2525,7 +2683,7 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.ro = 0;
 
 	/* Build the command (FDISC) */
-	els = (ELS_PKT *)pkt->pkt_cmd;
+	els = (ELS_PKT *) pkt->pkt_cmd;
 	els->elsCode = 0x04;	/* FLOGI - This will be changed automatically */
 				/* by the drive (See emlxs_send_els()) */
 
@@ -2585,19 +2743,20 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Unable to send packet.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Unable to send packet.", emlxs_dfc_xlate(dfc->cmd));
 
 		goto done;
 	}
+
 	if (pkt->pkt_state == FC_PKT_SUCCESS) {
 		if (!(pkt1 = emlxs_pkt_alloc(vport,
-		    sizeof (uint32_t) + sizeof (LOGO),
-		    sizeof (FCP_RSP), 0, KM_NOSLEEP))) {
+		    sizeof (uint32_t) + sizeof (LOGO), sizeof (FCP_RSP),
+		    0, KM_NOSLEEP))) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "Unable to allocate LOGO packet.");
 			goto free_resc;
 		}
+
 		/* Make this a polled IO */
 		pkt1->pkt_tran_flags &= ~FC_TRAN_INTR;
 		pkt1->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -2612,8 +2771,8 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		pkt1->pkt_cmd_fhdr.s_id =
 		    SWAP_DATA24_LO(pkt->pkt_resp_fhdr.d_id);
 		pkt1->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
-		pkt1->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
-		    F_CTL_SEQ_INITIATIVE;
+		pkt1->pkt_cmd_fhdr.f_ctl =
+		    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
 		pkt1->pkt_cmd_fhdr.seq_id = 0;
 		pkt1->pkt_cmd_fhdr.df_ctl = 0;
 		pkt1->pkt_cmd_fhdr.seq_cnt = 0;
@@ -2622,7 +2781,7 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		pkt1->pkt_cmd_fhdr.ro = 0;
 
 		/* Build the command (LOGO) */
-		els = (ELS_PKT *)pkt1->pkt_cmd;
+		els = (ELS_PKT *) pkt1->pkt_cmd;
 		els->elsCode = 0x05;	/* LOGO */
 		els->un.logo.un.nPortId32 =
 		    SWAP_DATA32(pkt->pkt_resp_fhdr.d_id);
@@ -2638,19 +2797,23 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			goto free_resc;
 		}
+
 		if (pkt1->pkt_state != FC_PKT_SUCCESS) {
 			if (pkt1->pkt_state == FC_PKT_TIMEOUT) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
 				    "%s: Pkt Transport error. Pkt Timeout.",
 				    emlxs_dfc_xlate(dfc->cmd));
 			} else {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
 				    "%s: Pkt Transport error. state=%x",
 				    emlxs_dfc_xlate(dfc->cmd),
 				    pkt1->pkt_state);
 			}
 			goto free_resc;
 		}
+
 		checklist |= CL_FABRIC_HAS_RESOURCES;
 	} else if (pkt->pkt_state == FC_PKT_LS_RJT) {
 		lsrjt = (LS_RJT *) pkt->pkt_resp;
@@ -2658,6 +2821,7 @@ emlxs_dfc_npiv_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			checklist |= CL_FABRIC_HAS_RESOURCES;
 		}
 	}
+
 	/*
 	 * Free up default RPIs and VPI
 	 */
@@ -2669,18 +2833,20 @@ done:
 	if (ddi_copyout((void *)&checklist, (void *)dfc->buf1,
 	    sizeof (uint32_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 		rval = DFC_COPYOUT_ERROR;
 	}
+
 	if (pkt) {
 		/* Free the pkt */
 		emlxs_pkt_free(pkt);
 	}
+
 	if (pkt1) {
 		/* Free the pkt */
 		emlxs_pkt_free(pkt1);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_npiv_test() */
@@ -2692,20 +2858,19 @@ done:
 static int32_t
 emlxs_dfc_get_rev(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t rev;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	rev;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -2713,16 +2878,17 @@ emlxs_dfc_get_rev(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	rev = DFC_REV;
 
-	if (ddi_copyout((void *)&rev, (void *)dfc->buf1,
-	    sizeof (uint32_t), mode) != 0) {
+	if (ddi_copyout((void *)&rev, (void *)dfc->buf1, sizeof (uint32_t),
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_rev() */
@@ -2731,32 +2897,32 @@ emlxs_dfc_get_rev(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_vpd_t *vpd = &VPD;
-	emlxs_config_t *cfg = &CFG;
-	dfc_hbainfo_t hbainfo;
-	NODELIST *ndlp;
-	char pathname[256];
+	emlxs_port_t	*port = &PPORT;
+	emlxs_vpd_t	*vpd = &VPD;
+	emlxs_config_t	*cfg = &CFG;
+	dfc_hbainfo_t	hbainfo;
+	NODELIST	*ndlp;
+	char		pathname[256];
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_hbainfo_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer1 too small. (size = %d)",
+		    "%s: Buffer1 too small. (size=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), dfc->buf1_size);
 
 		return (DFC_ARG_TOOSMALL);
 	}
-	bzero((void *)&hbainfo, sizeof (dfc_hbainfo_t));
+
+	bzero((void *) &hbainfo, sizeof (dfc_hbainfo_t));
 
 	(void) strncpy(hbainfo.vpd_serial_num, vpd->serial_num,
 	    sizeof (hbainfo.vpd_serial_num));
@@ -2777,7 +2943,8 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	(void) strncpy(hbainfo.vpd_id, vpd->id, sizeof (hbainfo.vpd_id));
 
 	hbainfo.device_id = hba->model_info.device_id;
-	hbainfo.vendor_id = ddi_get32(hba->pci_acc_handle,
+	hbainfo.vendor_id =
+	    ddi_get32(hba->pci_acc_handle,
 	    (uint32_t *)(hba->pci_addr + PCI_VENDOR_ID_REGISTER)) & 0xffff;
 
 	hbainfo.ports = hba->num_of_ports;
@@ -2824,7 +2991,7 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	    sizeof (hbainfo.sli4_name));
 
 	hbainfo.sli_mode = hba->sli_mode;
-	hbainfo.vpi_max = hba->vpi_max;
+	hbainfo.vpi_max  = hba->vpi_max;
 	hbainfo.vpi_high = hba->vpi_high;
 	hbainfo.flags = 0;
 
@@ -2842,6 +3009,13 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		hbainfo.flags |= HBA_FLAG_E2E_AUTH;
 	}
 #endif	/* DHCHAP_SUPPORT */
+
+#ifdef SFCT_SUPPORT
+	hbainfo.flags |= HBA_FLAG_TARGET_MODE;
+	if (hba->tgt_mode) {
+		hbainfo.flags |= HBA_FLAG_TARGET_MODE_ENA;
+	}
+#endif /* SFCT_SUPPORT */
 
 	(void) strncpy(hbainfo.fcode_version, vpd->fcode_version,
 	    sizeof (hbainfo.fcode_version));
@@ -2868,15 +3042,16 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (hba->flag & (FC_OFFLINE_MODE | FC_OFFLINING_MODE)) {
 		hbainfo.flags |= HBA_FLAG_OFFLINE;
 	}
+
 	hbainfo.drv_instance = hba->ddiinst;
 	hbainfo.port_id = port->did;
 	hbainfo.port_type = HBA_PORTTYPE_UNKNOWN;
 
 #ifdef MENLO_SUPPORT
 	if (hba->flag & FC_MENLO_MODE) {
-		hbainfo.topology = LNK_MENLO_MAINTENANCE;
+		hbainfo.topology  = LNK_MENLO_MAINTENANCE;
 	} else
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 	if (hba->state >= FC_LINK_UP) {
 		ndlp = emlxs_node_find_did(port, Fabric_DID);
@@ -2909,6 +3084,7 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			bcopy(&ndlp->nlp_portname, hbainfo.fabric_wwpn,
 			    sizeof (hbainfo.fabric_wwpn));
 		}
+
 		if (hba->linkspeed == LA_2GHZ_LINK) {
 			hbainfo.port_speed = HBA_PORTSPEED_2GBIT;
 		} else if (hba->linkspeed == LA_4GHZ_LINK) {
@@ -2923,6 +3099,7 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		hbainfo.node_count = port->node_count;
 	}
+
 	hbainfo.hard_alpa = cfg[CFG_ASSIGN_ALPA].current;
 	hbainfo.supported_cos = SWAP_DATA32((FC_NS_CLASS3 | FC_NS_CLASS2));
 
@@ -2935,6 +3112,7 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (!cfg[CFG_NETWORK_ON].current) {
 		hbainfo.active_types[0] &= ~(SWAP_DATA32(0x00000020));
 	}
+
 	if (vpd->link_speed & LMT_10GB_CAPABLE) {
 		hbainfo.supported_speeds |= FC_HBA_PORTSPEED_10GBIT;
 	}
@@ -2950,11 +3128,13 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (vpd->link_speed & LMT_1GB_CAPABLE) {
 		hbainfo.supported_speeds |= FC_HBA_PORTSPEED_1GBIT;
 	}
+
 	hbainfo.max_frame_size = FF_FRAME_SIZE;
 
 	if (hba->bus_type == SBUS_FC) {
 		hbainfo.flags |= HBA_FLAG_SBUS;
 	}
+
 	if (hba->flag & (FC_ONLINING_MODE | FC_OFFLINING_MODE)) {
 		hbainfo.flags |= HBA_FLAG_OFFLINE;
 		hbainfo.port_state = HBA_PORTSTATE_UNKNOWN;
@@ -2968,7 +3148,7 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		else if (hba->flag & FC_MENLO_MODE) {
 			hbainfo.port_state = HBA_PORTSTATE_LINKDOWN;
 		}
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 		else {
 			hbainfo.port_state = HBA_PORTSTATE_ONLINE;
 		}
@@ -2985,11 +3165,11 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (ddi_copyout((void *)&hbainfo, (void *)dfc->buf1,
 	    sizeof (dfc_hbainfo_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_hbainfo() */
@@ -2999,23 +3179,22 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_hbastats_t stats;
-	MAILBOX *mb = NULL;
-	MAILBOXQ *mbq = NULL;
-	uint32_t rval = 0;
+	emlxs_port_t	*port = &PPORT;
+	dfc_hbastats_t	stats;
+	MAILBOX		*mb = NULL;
+	MAILBOXQ	*mbq = NULL;
+	uint32_t	rval = 0;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_hbastats_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -3023,18 +3202,21 @@ emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
-	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
+
+	if ((mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate mailbox buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_SYSRES_ERROR);
 	}
-	mb = (MAILBOX *) mbq;
+
+	mb = (MAILBOX *)mbq;
 
 	emlxs_mb_read_status(hba, mb);
 
-	rval = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
+	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3044,17 +3226,17 @@ emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_TIMEOUT;
 		goto done;
 	}
+
 	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. status=%x",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_mb_cmd_xlate(mb->mbxCommand),
-		    rval);
+		    "%s: %s failed. status=%x", emlxs_dfc_xlate(dfc->cmd),
+		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
-	bzero((void *)&stats, sizeof (dfc_hbastats_t));
+
+	bzero((void *) &stats, sizeof (dfc_hbastats_t));
 
 	stats.tx_frame_cnt = mb->un.varRdStatus.xmitFrameCnt;
 	stats.rx_frame_cnt = mb->un.varRdStatus.rcvFrameCnt;
@@ -3069,7 +3251,7 @@ emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	emlxs_mb_read_lnk_stat(hba, mb);
 
-	rval = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
+	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3079,16 +3261,16 @@ emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_TIMEOUT;
 		goto done;
 	}
+
 	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. status=%x",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_mb_cmd_xlate(mb->mbxCommand),
-		    rval);
+		    "%s: %s failed. status=%x", emlxs_dfc_xlate(dfc->cmd),
+		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	stats.link_failure_cnt = mb->un.varRdLnk.linkFailureCnt;
 	stats.loss_sync_cnt = mb->un.varRdLnk.lossSyncCnt;
 	stats.loss_signal_cnt = mb->un.varRdLnk.lossSignalCnt;
@@ -3114,7 +3296,7 @@ emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (hba->flag & FC_MENLO_MODE) {
 		stats.topology = LNK_MENLO_MAINTENANCE;
 	} else
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 	if (hba->state >= FC_LINK_UP) {
 		if (hba->topology == TOPOLOGY_LOOP) {
@@ -3147,20 +3329,22 @@ emlxs_dfc_get_hbastats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			stats.link_speed = HBA_PORTSPEED_1GBIT;
 		}
 	}
+
 	if (ddi_copyout((void *)&stats, (void *)dfc->buf1,
 	    sizeof (dfc_hbastats_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 done:
 
 	/* Free allocated mbox memory */
 	if (mbq) {
 		kmem_free(mbq, sizeof (MAILBOXQ));
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_get_hbastats() */
@@ -3170,22 +3354,21 @@ done:
 static int32_t
 emlxs_dfc_get_drvstats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_drvstats_t stats;
-	uint32_t rval = 0;
+	emlxs_port_t	*port = &PPORT;
+	dfc_drvstats_t	stats;
+	uint32_t	rval = 0;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
-	bzero((void *)&stats, sizeof (dfc_drvstats_t));
+
+	bzero((void *) &stats, sizeof (dfc_drvstats_t));
 
 	stats.LinkUp = hba->stats.LinkUp;
 	stats.LinkDown = hba->stats.LinkDown;
@@ -3299,46 +3482,28 @@ emlxs_dfc_get_drvstats(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	stats.CtUbPosted = hba->stats.CtUbPosted;
 
 #if (DFC_REV >= 2)
-	stats.IocbThrottled = hba->stats.IocbThrottled;
+	stats.IocbThrottled   = hba->stats.IocbThrottled;
 	stats.ElsAuthReceived = hba->stats.ElsAuthReceived;
 #endif
 
-	if (ddi_copyout((void *)&stats, (void *)dfc->buf1,
-	    dfc->buf1_size, mode) != 0) {
+	if (ddi_copyout((void *)&stats, (void *)dfc->buf1, dfc->buf1_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_get_drvstats() */
 
 
-static int32_t
-emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+extern uint32_t
+emlxs_set_hba_mode(emlxs_hba_t *hba, uint32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	int32_t rval = 0;
-	uint32_t flag;
-	uint32_t i;
-
-	if (!dfc->buf1 || !dfc->buf1_size) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
-
-		return (DFC_ARG_NULL);
-	}
-	if (dfc->buf1_size < sizeof (uint32_t)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer1 too small. (size=%d)",
-		    emlxs_dfc_xlate(dfc->cmd), dfc->buf1_size);
-
-		return (DFC_ARG_TOOSMALL);
-	}
-	flag = (uint32_t)dfc->flag;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	i;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
@@ -3348,12 +3513,13 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (i++ > 30) {
 			break;
 		}
+
 		mutex_exit(&EMLXS_PORT_LOCK);
 		delay(drv_usectohz(1000000));
 		mutex_enter(&EMLXS_PORT_LOCK);
 	}
 
-	switch (flag) {
+	switch (mode) {
 	case DDI_SHOW:
 		break;
 
@@ -3374,17 +3540,18 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			(void) emlxs_offline(hba);
 
 			/* Reset with restart */
-			(void) emlxs_hba_reset(hba, 1, 1);
+			emlxs_sli_hba_reset(hba, 1, 1);
 
 			mutex_enter(&EMLXS_PORT_LOCK);
 		} else if (hba->state < FC_INIT_START) {
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			/* Reset with restart */
-			(void) emlxs_hba_reset(hba, 1, 1);
+			emlxs_sli_hba_reset(hba, 1, 1);
 
 			mutex_enter(&EMLXS_PORT_LOCK);
 		}
+
 		break;
 
 		/* Killed + Reset state */
@@ -3395,17 +3562,18 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			(void) emlxs_offline(hba);
 
 			/* Reset with no restart */
-			(void) emlxs_hba_reset(hba, 0, 0);
+			emlxs_sli_hba_reset(hba, 0, 0);
 
 			mutex_enter(&EMLXS_PORT_LOCK);
 		} else if (hba->state != FC_WARM_START) {
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			/* Reset with no restart */
-			(void) emlxs_hba_reset(hba, 0, 0);
+			emlxs_sli_hba_reset(hba, 0, 0);
 
 			mutex_enter(&EMLXS_PORT_LOCK);
 		}
+
 		break;
 
 		/* Killed */
@@ -3419,18 +3587,16 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		} else if (hba->state != FC_KILLED) {
 			mutex_exit(&EMLXS_PORT_LOCK);
 
-			(void) emlxs_interlock(hba);
+			emlxs_sli_offline(hba);
 
 			mutex_enter(&EMLXS_PORT_LOCK);
 		}
+
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Invalid flag. flag=%x",
-		    emlxs_dfc_xlate(dfc->cmd), flag);
-
-		rval = DFC_ARG_INVALID;
+		    "emlxs_set_hba_mode: Invalid mode. mode%x", mode);
 	}
 
 	/* Wait if adapter is in transition */
@@ -3439,6 +3605,7 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (i++ > 30) {
 			break;
 		}
+
 		mutex_exit(&EMLXS_PORT_LOCK);
 		delay(drv_usectohz(1000000));
 		mutex_enter(&EMLXS_PORT_LOCK);
@@ -3446,25 +3613,54 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	/* Return current state */
 	if (hba->flag & FC_ONLINE_MODE) {
-		flag = DDI_ONDI;
+		mode = DDI_ONDI;
 	} else if (hba->state == FC_KILLED) {
-		flag = DDI_DIAGDI;
+		mode = DDI_DIAGDI;
 	} else if (hba->state == FC_WARM_START) {
-		flag = DDI_WARMDI;
+		mode = DDI_WARMDI;
 	} else {
-		flag = DDI_OFFDI;
+		mode = DDI_OFFDI;
 	}
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	if (ddi_copyout((void *)&flag, (void *)dfc->buf1,
-	    sizeof (uint32_t), mode) != 0) {
+	return (mode);
+
+} /* emlxs_set_hba_mode() */
+
+
+static int32_t
+emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t	*port = &PPORT;
+	int32_t		rval = 0;
+	int32_t		flag;
+
+	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
+
+		return (DFC_ARG_NULL);
+	}
+
+	if (dfc->buf1_size < sizeof (uint32_t)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Buffer1 too small. (size=%d)",
+		    emlxs_dfc_xlate(dfc->cmd), dfc->buf1_size);
+
+		return (DFC_ARG_TOOSMALL);
+	}
+
+	flag = emlxs_set_hba_mode(hba, dfc->flag);
+
+	if (ddi_copyout((void *)&flag, (void *)dfc->buf1, sizeof (uint32_t),
+	    mode) != 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_set_diag() */
@@ -3474,34 +3670,34 @@ emlxs_dfc_set_diag(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	MAILBOX *mb = NULL;
-	MAILBOXQ *mbq = NULL;
-	uint32_t size = 0;
-	MATCHMAP *rx_mp = NULL;
-	MATCHMAP *tx_mp = NULL;
-	uintptr_t lptr;
-	int32_t rval = 0;
-	int32_t mbxstatus = 0;
-	NODELIST *ndlp;
-	uint32_t did;
-	uint32_t extsize = 0;
-	uint8_t *extbuf = NULL;
+	emlxs_port_t	*port  = &PPORT;
+	MAILBOX		*mb    = NULL;
+	MAILBOXQ	*mbq   = NULL;
+	uint32_t	size  = 0;
+	MATCHMAP	*rx_mp = NULL;
+	MATCHMAP	*tx_mp = NULL;
+	uintptr_t	lptr;
+	int32_t		rval  = 0;
+	int32_t		mbxstatus = 0;
+	NODELIST	*ndlp;
+	uint32_t	did;
+	uint32_t	extsize = 0;
+	uint8_t		*extbuf  = NULL;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (!dfc->buf2 || !dfc->buf2_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size > MAILBOX_CMD_BSIZE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too large. (size=%d)",
@@ -3518,6 +3714,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			return (DFC_ARG_NULL);
 		}
+
 		if (dfc->buf3_size > MBOX_EXTENSION_SIZE) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: buffer3 too large. (size=%d)",
@@ -3525,6 +3722,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			return (DFC_ARG_TOOBIG);
 		}
+
 		if (dfc->buf4_size && !dfc->buf4) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: Null buffer4 found.",
@@ -3532,6 +3730,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			return (DFC_ARG_NULL);
 		}
+
 		if (dfc->buf4_size > MBOX_EXTENSION_SIZE) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: buffer4 too large. (size=%d)",
@@ -3539,33 +3738,36 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			return (DFC_ARG_TOOBIG);
 		}
-		extsize = (dfc->buf3_size > dfc->buf4_size)
-		    ? dfc->buf3_size : dfc->buf4_size;
-		if ((extbuf = (uint8_t *)
-		    kmem_zalloc(extsize, KM_SLEEP)) == 0) {
+
+		extsize =
+		    (dfc->buf3_size >
+		    dfc->buf4_size) ? dfc->buf3_size : dfc->buf4_size;
+		if ((extbuf =
+		    (uint8_t *)kmem_zalloc(extsize, KM_SLEEP)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate mailbox"
-			    " extension buffer.",
+			    "%s: Unable to allocate mailbox extension buffer.",
 			    emlxs_dfc_xlate(dfc->cmd));
 
 			return (DFC_SYSRES_ERROR);
 		}
+
 		if (dfc->buf3_size) {
 			if (ddi_copyin((void *)dfc->buf3, (void *)extbuf,
 			    dfc->buf3_size, mode) != 0) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: ddi_copyin mbox extension"
-				    " data failed.",
-				    emlxs_dfc_xlate(dfc->cmd));
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "%s: ddi_copyin mbox extension data "
+				    "failed.", emlxs_dfc_xlate(dfc->cmd));
 
 				rval = DFC_COPYIN_ERROR;
 				goto done;
 			}
 		}
 	}
-#endif	/* MBOX_EXT_SUPPORT */
+#endif /* MBOX_EXT_SUPPORT */
 
-	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
+	if ((mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate mailbox buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -3573,15 +3775,15 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_SYSRES_ERROR;
 		goto done;
 	}
+
 	mb = (MAILBOX *) mbq;
 
 	bzero((void *) mb, MAILBOX_CMD_BSIZE);
 
-	if (ddi_copyin((void *)dfc->buf1, (void *)mb,
-	    dfc->buf1_size, mode) != 0) {
+	if (ddi_copyin((void *)dfc->buf1, (void *)mb, dfc->buf1_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
@@ -3594,9 +3796,8 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	    (mb->mbxCommand == MBX_RUN_BIU_DIAG)) {
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Invalid mailbox command."
-		    " Must use 64bit version. cmd = %x",
-		    emlxs_dfc_xlate(dfc->cmd), mb->mbxCommand);
+		    "%s: Invalid mailbox command. Must use 64bit version. "
+		    "cmd=%x", emlxs_dfc_xlate(dfc->cmd), mb->mbxCommand);
 
 		/* Must use 64 bit versions of these mbox cmds */
 		rval = DFC_ARG_INVALID;
@@ -3607,14 +3808,14 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	lptr = 0;
 	size = 0;
 	switch (mb->mbxCommand) {
-		/* Offline only */
+	/* Offline only */
 	case MBX_CONFIG_LINK:	/* 0x07 */
-	case MBX_PART_SLIM:	/* 0x08 */
+	case MBX_PART_SLIM:	    /* 0x08 */
 	case MBX_CONFIG_RING:	/* 0x09 */
 	case MBX_DUMP_CONTEXT:	/* 0x18 */
-	case MBX_RUN_DIAGS:	/* 0x19 */
-	case MBX_RESTART:	/* 0x1A */
-	case MBX_SET_MASK:	/* 0x20 */
+	case MBX_RUN_DIAGS:	    /* 0x19 */
+	case MBX_RESTART:	    /* 0x1A */
+	case MBX_SET_MASK:	    /* 0x20 */
 	case MBX_FLASH_WR_ULA:	/* 0x98 */
 		if (!(hba->flag & FC_OFFLINE_MODE)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3626,7 +3827,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		}
 		break;
 
-		/* Online / Offline */
+	/* Online / Offline */
 	case MBX_UNREG_LOGIN:	/* 0x14 */
 		ndlp = emlxs_node_find_rpi(port, mb->un.varUnregLogin.rpi);
 
@@ -3637,8 +3838,8 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			emlxs_node_rm(port, ndlp);
 
 			/*
-			 * If we just unregistered the host node then clear
-			 * the host DID
+			 * If we just unregistered the host node then
+			 * clear the host DID
 			 */
 			if (did == port->did) {
 				port->did = 0;
@@ -3669,10 +3870,12 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		if (did == 0xffffffff) {
 			emlxs_node_destroy_all(port);
 			break;
 		}
+
 		/* Check for base node */
 		if (did == Bcast_DID) {
 			/* just flush base node */
@@ -3685,6 +3888,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = 0;
 			goto done;
 		}
+
 		/* Make sure the node does already exist */
 		ndlp = emlxs_node_find_did(port, did);
 
@@ -3693,8 +3897,8 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			emlxs_node_rm(port, ndlp);
 
 			/*
-			 * If we just unregistered the host node then clear
-			 * the host DID
+			 * If we just unregistered the host node then
+			 * clear the host DID
 			 */
 			if (did == port->did) {
 				port->did = 0;
@@ -3713,9 +3917,10 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		/* Send it */
 		break;
 
-		/* Online / Offline - with DMA */
+	/* Online / Offline - with DMA */
 	case MBX_READ_EVENT_LOG:	/* 0x38 */
-		lptr = (uintptr_t)getPaddr(mb->un.varRdEvtLog.un.sp64.addrHigh,
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varRdEvtLog.un.sp64.addrHigh,
 		    mb->un.varRdEvtLog.un.sp64.addrLow);
 		size = (int)mb->un.varRdEvtLog.un.sp64.tus.f.bdeSize;
 
@@ -3727,6 +3932,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate receive buffer */
 		if ((rx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3736,17 +3942,17 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
-		mb->un.varRdEvtLog.un.sp64.addrHigh =
-		    (uint32_t)putPaddrHigh(rx_mp->phys);
-		mb->un.varRdEvtLog.un.sp64.addrLow =
-		    (uint32_t)putPaddrLow(rx_mp->phys);
+
+		mb->un.varRdEvtLog.un.sp64.addrHigh = putPaddrHigh(rx_mp->phys);
+		mb->un.varRdEvtLog.un.sp64.addrLow = putPaddrLow(rx_mp->phys);
 		mb->un.varRdEvtLog.un.sp64.tus.f.bdeFlags = 0;
 
 		break;
 
 	case MBX_READ_SPARM:	/* 0x0D */
 	case MBX_READ_SPARM64:	/* 0x8D */
-		lptr = (uintptr_t)getPaddr(mb->un.varRdSparm.un.sp64.addrHigh,
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varRdSparm.un.sp64.addrHigh,
 		    mb->un.varRdSparm.un.sp64.addrLow);
 		size = (int)mb->un.varRdSparm.un.sp64.tus.f.bdeSize;
 
@@ -3758,6 +3964,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate receive buffer */
 		if ((rx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3767,17 +3974,17 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
-		mb->un.varRdSparm.un.sp64.addrHigh =
-		    (uint32_t)putPaddrHigh(rx_mp->phys);
-		mb->un.varRdSparm.un.sp64.addrLow =
-		    (uint32_t)putPaddrLow(rx_mp->phys);
+
+		mb->un.varRdSparm.un.sp64.addrHigh = putPaddrHigh(rx_mp->phys);
+		mb->un.varRdSparm.un.sp64.addrLow = putPaddrLow(rx_mp->phys);
 		mb->un.varRdSparm.un.sp64.tus.f.bdeFlags = 0;
 
 		break;
 
 	case MBX_READ_RPI:	/* 0x0F */
 	case MBX_READ_RPI64:	/* 0x8F */
-		lptr = (uintptr_t)getPaddr(mb->un.varRdRPI.un.sp64.addrHigh,
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varRdRPI.un.sp64.addrHigh,
 		    mb->un.varRdRPI.un.sp64.addrLow);
 		size = (int)mb->un.varRdRPI.un.sp64.tus.f.bdeSize;
 
@@ -3789,6 +3996,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate receive buffer */
 		if ((rx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3798,19 +4006,18 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
-		mb->un.varRdRPI.un.sp64.addrHigh =
-		    (uint32_t)putPaddrHigh(rx_mp->phys);
-		mb->un.varRdRPI.un.sp64.addrLow =
-		    (uint32_t)putPaddrLow(rx_mp->phys);
+
+		mb->un.varRdRPI.un.sp64.addrHigh = putPaddrHigh(rx_mp->phys);
+		mb->un.varRdRPI.un.sp64.addrLow = putPaddrLow(rx_mp->phys);
 		mb->un.varRdRPI.un.sp64.tus.f.bdeFlags = 0;
 
 		break;
 
-	case MBX_RUN_BIU_DIAG:	/* 0x04 */
-	case MBX_RUN_BIU_DIAG64:	/* 0x84 */
-		lptr = (uintptr_t)
-		    getPaddr(mb->un.varBIUdiag.un.s2.xmit_bde64.addrHigh,
-		    mb->un.varBIUdiag.un.s2.xmit_bde64.addrLow);
+	case MBX_RUN_BIU_DIAG:	 /* 0x04 */
+	case MBX_RUN_BIU_DIAG64: /* 0x84 */
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varBIUdiag.un.s2.xmit_bde64.
+		    addrHigh, mb->un.varBIUdiag.un.s2.xmit_bde64.addrLow);
 		size = (int)mb->un.varBIUdiag.un.s2.xmit_bde64.tus.f.bdeSize;
 
 		if (!lptr || !size || (size > MEM_BUF_SIZE)) {
@@ -3821,6 +4028,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate xmit buffer */
 		if ((tx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3830,9 +4038,10 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
+
 		/* Initialize the xmit buffer */
-		if (ddi_copyin((void *)lptr, (void *)tx_mp->virt,
-		    size, mode) != 0) {
+		if (ddi_copyin((void *)lptr, (void *)tx_mp->virt, size,
+		    mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: ddi_copyin failed. cmd=%x",
 			    emlxs_dfc_xlate(dfc->cmd), mb->mbxCommand);
@@ -3840,19 +4049,19 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_COPYIN_ERROR;
 			goto done;
 		}
-		emlxs_mpdata_sync(tx_mp->dma_handle, 0,
-		    size, DDI_DMA_SYNC_FORDEV);
+		emlxs_mpdata_sync(tx_mp->dma_handle, 0, size,
+		    DDI_DMA_SYNC_FORDEV);
 
 		mb->un.varBIUdiag.un.s2.xmit_bde64.addrHigh =
-		    (uint32_t)putPaddrHigh(tx_mp->phys);
+		    putPaddrHigh(tx_mp->phys);
 		mb->un.varBIUdiag.un.s2.xmit_bde64.addrLow =
-		    (uint32_t)putPaddrLow(tx_mp->phys);
+		    putPaddrLow(tx_mp->phys);
 		mb->un.varBIUdiag.un.s2.xmit_bde64.tus.f.bdeFlags = 0;
 
 		/* Initialize the receive buffer */
-		lptr = (uintptr_t)
-		    getPaddr(mb->un.varBIUdiag.un.s2.rcv_bde64.addrHigh,
-		    mb->un.varBIUdiag.un.s2.rcv_bde64.addrLow);
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varBIUdiag.un.s2.rcv_bde64.
+		    addrHigh, mb->un.varBIUdiag.un.s2.rcv_bde64.addrLow);
 		size = (int)mb->un.varBIUdiag.un.s2.rcv_bde64.tus.f.bdeSize;
 
 		if (!lptr || !size || (size > MEM_BUF_SIZE)) {
@@ -3863,6 +4072,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate receive buffer */
 		if ((rx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3872,10 +4082,11 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
+
 		mb->un.varBIUdiag.un.s2.rcv_bde64.addrHigh =
-		    (uint32_t)putPaddrHigh(rx_mp->phys);
+		    putPaddrHigh(rx_mp->phys);
 		mb->un.varBIUdiag.un.s2.rcv_bde64.addrLow =
-		    (uint32_t)putPaddrLow(rx_mp->phys);
+		    putPaddrLow(rx_mp->phys);
 		mb->un.varBIUdiag.un.s2.rcv_bde64.tus.f.bdeFlags = 0;
 
 		break;
@@ -3894,6 +4105,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Check if the node limit has been reached */
 		if (port->node_count >= hba->max_nodes) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3903,7 +4115,9 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_HBARES_ERROR;
 			goto done;
 		}
-		lptr = (uintptr_t)getPaddr(mb->un.varRegLogin.un.sp64.addrHigh,
+
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varRegLogin.un.sp64.addrHigh,
 		    mb->un.varRegLogin.un.sp64.addrLow);
 		size = (int)mb->un.varRegLogin.un.sp64.tus.f.bdeSize;
 
@@ -3915,6 +4129,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate xmit buffer */
 		if ((tx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3924,9 +4139,10 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
+
 		/* Initialize the xmit buffer */
-		if (ddi_copyin((void *)lptr, (void *)tx_mp->virt,
-		    size, mode) != 0) {
+		if (ddi_copyin((void *)lptr, (void *)tx_mp->virt, size,
+		    mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: Unable to allocate xmit buffer. cmd=%x",
 			    emlxs_dfc_xlate(dfc->cmd), mb->mbxCommand);
@@ -3934,22 +4150,20 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_COPYIN_ERROR;
 			goto done;
 		}
-		emlxs_mpdata_sync(tx_mp->dma_handle, 0,
-		    size, DDI_DMA_SYNC_FORDEV);
+		emlxs_mpdata_sync(tx_mp->dma_handle, 0, size,
+		    DDI_DMA_SYNC_FORDEV);
 
-		mb->un.varRegLogin.un.sp64.addrHigh =
-		    (uint32_t)putPaddrHigh(tx_mp->phys);
-		mb->un.varRegLogin.un.sp64.addrLow =
-		    (uint32_t)putPaddrLow(tx_mp->phys);
+		mb->un.varRegLogin.un.sp64.addrHigh = putPaddrHigh(tx_mp->phys);
+		mb->un.varRegLogin.un.sp64.addrLow = putPaddrLow(tx_mp->phys);
 		mb->un.varRegLogin.un.sp64.tus.f.bdeFlags = 0;
 
 		break;
 
 	case MBX_READ_LA:	/* 0x15 */
 	case MBX_READ_LA64:	/* 0x95 */
-		lptr = (uintptr_t)
-		    getPaddr(mb->un.varReadLA.un.lilpBde64.addrHigh,
-		    mb->un.varReadLA.un.lilpBde64.addrLow);
+		lptr =
+		    (uintptr_t)getPaddr(mb->un.varReadLA.un.lilpBde64.
+		    addrHigh, mb->un.varReadLA.un.lilpBde64.addrLow);
 		size = (int)mb->un.varReadLA.un.lilpBde64.tus.f.bdeSize;
 
 		if (!lptr || !size || (size > MEM_BUF_SIZE)) {
@@ -3960,6 +4174,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
+
 		/* Allocate receive buffer */
 		if ((rx_mp = (MATCHMAP *)emlxs_mem_buf_alloc(hba)) == 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -3969,10 +4184,11 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_DRVRES_ERROR;
 			goto done;
 		}
+
 		mb->un.varReadLA.un.lilpBde64.addrHigh =
-		    (uint32_t)putPaddrHigh(rx_mp->phys);
+		    putPaddrHigh(rx_mp->phys);
 		mb->un.varReadLA.un.lilpBde64.addrLow =
-		    (uint32_t)putPaddrLow(rx_mp->phys);
+		    putPaddrLow(rx_mp->phys);
 		mb->un.varReadLA.un.lilpBde64.tus.f.bdeFlags = 0;
 
 		break;
@@ -3988,7 +4204,7 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		goto done;
 
 
-		/* Online / Offline */
+	/* Online / Offline */
 	default:
 		break;
 
@@ -4009,33 +4225,29 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 #ifdef MBOX_EXT_SUPPORT
 	if (extbuf) {
-		mbq->extbuf = extbuf;
+		mbq->extbuf  = extbuf;
 		mbq->extsize = extsize;
 	}
-#endif	/* MBOX_EXT_SUPPORT */
+#endif /* MBOX_EXT_SUPPORT */
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: %s sent.  (%x %x %x %x)",
-	    emlxs_dfc_xlate(dfc->cmd),
-	    emlxs_mb_cmd_xlate(mb->mbxCommand),
-	    mb->un.varWords[0],
-	    mb->un.varWords[1],
-	    mb->un.varWords[2],
-	    mb->un.varWords[3]);
+	    "%s: %s sent.  (%x %x %x %x)", emlxs_dfc_xlate(dfc->cmd),
+	    emlxs_mb_cmd_xlate(mb->mbxCommand), mb->un.varWords[0],
+	    mb->un.varWords[1], mb->un.varWords[2], mb->un.varWords[3]);
 
 	/* issue the mbox cmd to the sli */
-	mbxstatus = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
+	mbxstatus = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
 
 	if (mbxstatus) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: %s failed. mbxstatus=0x%x",
 		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_mb_cmd_xlate(mb->mbxCommand),
-		    mbxstatus);
+		    emlxs_mb_cmd_xlate(mb->mbxCommand), mbxstatus);
 
 	}
-	if (ddi_copyout((void *)mb, (void *)dfc->buf2,
-	    dfc->buf2_size, mode) != 0) {
+
+	if (ddi_copyout((void *)mb, (void *)dfc->buf2, dfc->buf2_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: ddi_copyout failed. cmd=%x",
 		    emlxs_dfc_xlate(dfc->cmd), mb->mbxCommand);
@@ -4043,37 +4255,35 @@ emlxs_dfc_send_mbox(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	if (rx_mp) {
 		emlxs_mpdata_sync(rx_mp->dma_handle, 0, size,
 		    DDI_DMA_SYNC_FORKERNEL);
 
-		if (ddi_copyout((void *)rx_mp->virt, (void *)lptr,
-		    size, mode) != 0) {
+		if (ddi_copyout((void *)rx_mp->virt, (void *)lptr, size,
+		    mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: ddi_copyout failed for receive buffer."
-			    " cmd = %x",
-			    emlxs_dfc_xlate(dfc->cmd),
-			    mb->mbxCommand);
+			    "%s: ddi_copyout failed for receive buffer. cmd=%x",
+			    emlxs_dfc_xlate(dfc->cmd), mb->mbxCommand);
 
 			rval = DFC_COPYOUT_ERROR;
 			goto done;
 		}
 	}
 #ifdef MBOX_EXT_SUPPORT
-	/* Any data needs to copy to mbox extension area */
+	/*  Any data needs to copy to mbox extension area */
 	if (dfc->buf4_size) {
 		if (ddi_copyout((void *)extbuf, (void *)dfc->buf4,
 		    dfc->buf4_size, mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: ddi_copyout failed for mbox"
-			    " extension data.",
+			    "%s: ddi_copyout failed for mbox extension data.",
 			    emlxs_dfc_xlate(dfc->cmd));
 
 			rval = DFC_COPYIN_ERROR;
 			goto done;
 		}
 	}
-#endif	/* MBOX_EXT_SUPPORT */
+#endif /* MBOX_EXT_SUPPORT */
 
 	rval = 0;
 
@@ -4083,17 +4293,21 @@ done:
 	if (extbuf) {
 		kmem_free(extbuf, extsize);
 	}
+
 	/* Free allocated mbox memory */
 	if (mbq) {
 		kmem_free(mbq, sizeof (MAILBOXQ));
 	}
+
 	/* Free allocated mbuf memory */
 	if (rx_mp) {
 		(void) emlxs_mem_buf_free(hba, (uint8_t *)rx_mp);
 	}
+
 	if (tx_mp) {
 		(void) emlxs_mem_buf_free(hba, (uint8_t *)tx_mp);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_send_mbox() */
@@ -4102,32 +4316,31 @@ done:
 static int32_t
 emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t cnt;
-	uint32_t outsz;
-	uint32_t i;
-	uint32_t *buffer;
-	uint32_t *bptr;
-	uint32_t value;
-	uint32_t size;
-	uint32_t max = 4096;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	cnt;
+	uint32_t	outsz;
+	uint32_t	i;
+	uint32_t	*buffer;
+	uint32_t	*bptr;
+	uint32_t	value;
+	uint32_t	size;
+	uint32_t	max = 4096;
 
 	offset = dfc->data1;
 	cnt = dfc->data2;
 	outsz = dfc->buf1_size;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: offset=%x count=%d",
-	    emlxs_dfc_xlate(dfc->cmd), offset, cnt);
+	    "%s: offset=%x count=%d", emlxs_dfc_xlate(dfc->cmd), offset, cnt);
 
 	if (!dfc->buf1_size || !dfc->buf1) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (offset & 0x3) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Offset misaligned. (offset=%d)",
@@ -4135,6 +4348,7 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (cnt & 0x3) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Count misaligned. (count=%d)",
@@ -4142,6 +4356,7 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (outsz & 0x3) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Output size misaligned. (size=%d)",
@@ -4149,6 +4364,7 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	/* Get max PCI config range */
 	if (hba->model_info.chip <= EMLXS_HELIOS_CHIP) {
 		max = 256;
@@ -4158,19 +4374,20 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	if ((cnt + offset) > max) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Offset+Count too large."
-		    " (offset=%d count=%d max=%d)",
-		    emlxs_dfc_xlate(dfc->cmd), offset,
-		    cnt, max);
+		    "%s: Offset+Count too large. (offset=%d count=%d max=%d)",
+		    emlxs_dfc_xlate(dfc->cmd), offset, cnt, max);
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if (outsz > max) {
 		outsz = max;
 	}
+
 	if (cnt > outsz) {
 		cnt = outsz;
 	}
+
 	size = cnt;
 
 	if (!(buffer = (uint32_t *)kmem_zalloc(size, KM_NOSLEEP))) {
@@ -4180,22 +4397,23 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
+
 	bptr = buffer;
 	for (i = offset; i < (offset + cnt); i += 4) {
-		value = ddi_get32(hba->pci_acc_handle,
+		value =
+		    ddi_get32(hba->pci_acc_handle,
 		    (uint32_t *)(hba->pci_addr + i));
 		*bptr++ = PCIMEM_LONG(value);
 	}
 
-	if (ddi_copyout((void *)buffer, (void *)dfc->buf1,
-	    outsz, mode) != 0) {
+	if (ddi_copyout((void *)buffer, (void *)dfc->buf1, outsz, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(buffer, size);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	kmem_free(buffer, size);
 	return (0);
 
@@ -4205,39 +4423,38 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t cnt;
-	/* uint32_t outsz; */
-	uint32_t value;
-	uint32_t i;
-	uint32_t max;
-	uint8_t buffer[256];
-	uint32_t *bptr;
-	uint16_t word0;
-	uint16_t word1;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	cnt;
+	uint32_t	value;
+	uint32_t	i;
+	uint32_t	max;
+	uint8_t		buffer[256];
+	uint32_t	*bptr;
+	uint16_t	word0;
+	uint16_t	word1;
 
 	offset = dfc->data1;
 	cnt = dfc->data2;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: offset = %x count = %d",
-	    emlxs_dfc_xlate(dfc->cmd), offset, cnt);
+	    "%s: offset=%x count=%d", emlxs_dfc_xlate(dfc->cmd), offset, cnt);
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (offset & 0x3) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Offset misaligned. (offset = %d)",
+		    "%s: Offset misaligned. (offset=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), offset);
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (cnt > dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Count too large. (count=%d)",
@@ -4245,13 +4462,15 @@ emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if (cnt & 0x3) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Count misaligned. (count = %d)",
+		    "%s: Count misaligned. (count=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), cnt);
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	/* Get max PCI config range */
 	if (hba->model_info.chip <= EMLXS_HELIOS_CHIP) {
 		max = 256;
@@ -4261,21 +4480,21 @@ emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	if ((cnt + offset) > max) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Count+Offset too large."
-		    " (offset = %d count = %d max = %d)",
+		    "%s: Count+Offset too large. (offset=%d count=%d max=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), offset, cnt, max);
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	bzero(buffer, sizeof (buffer));
 
 	if (ddi_copyin((void *)dfc->buf1, (void *)buffer, cnt, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	bptr = (uint32_t *)buffer;
 	for (i = offset; i < (offset + cnt); i += 4) {
 		value = *bptr++;
@@ -4285,18 +4504,17 @@ emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		word1 = value >> 16;
 
 		/*
-		 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg, "%s:
-		 * Writing. offset=%x cnt=%d value=%08x %04x %04x",
+		 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
+		 * "%s: Writing. offset=%x cnt=%d value=%08x %04x %04x",
 		 * emlxs_dfc_xlate(dfc->cmd), i, value, word0, word1);
 		 */
 
 		/* word0 = PCIMEM_SHORT(word0); */
-		(void) ddi_put16(hba->pci_acc_handle,
-		    (uint16_t *)(hba->pci_addr + i),
-		    (uint16_t)word0);
+		ddi_put16(hba->pci_acc_handle,
+		    (uint16_t *)(hba->pci_addr + i), (uint16_t)word0);
 
 		/* word1 = PCIMEM_SHORT(word1); */
-		(void) ddi_put16(hba->pci_acc_handle,
+		ddi_put16(hba->pci_acc_handle,
 		    (uint16_t *)(hba->pci_addr + i + 2), (uint16_t)word1);
 	}
 
@@ -4308,29 +4526,31 @@ emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_cfgparam_t *cfgparam;
-	uint32_t size;
-	uint32_t count;
-	uint32_t i;
-	int32_t rval = 0;
-	emlxs_config_t *cfg;
+	emlxs_port_t	*port = &PPORT;
+	dfc_cfgparam_t	*cfgparam;
+	uint32_t	size;
+	uint32_t	count;
+	uint32_t	i;
+	int32_t		rval = 0;
+	emlxs_config_t	*cfg;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	count = dfc->buf1_size / sizeof (dfc_cfgparam_t);
 
 	if (count > MAX_CFG_PARAM) {
 		count = MAX_CFG_PARAM;
 	}
+
 	if (count > NUM_CFG_PARAM) {
 		count = NUM_CFG_PARAM;
 	}
+
 	size = count * sizeof (dfc_cfgparam_t);
 
 	if (!(cfgparam = (dfc_cfgparam_t *)kmem_zalloc(size, KM_NOSLEEP))) {
@@ -4340,6 +4560,7 @@ emlxs_dfc_get_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
+
 	cfg = &CFG;
 	for (i = 0; i < count; i++) {
 		(void) strncpy(cfgparam[i].a_string, cfg[i].string,
@@ -4352,10 +4573,14 @@ emlxs_dfc_get_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (!(cfg[i].flags & PARM_HIDDEN)) {
 			cfgparam[i].a_flag |= CFG_EXPORT;
 		}
+
 		if ((cfg[i].flags & PARM_DYNAMIC)) {
 			if ((cfg[i].flags & PARM_DYNAMIC_RESET) ==
 			    PARM_DYNAMIC_RESET) {
 				cfgparam[i].a_changestate = CFG_RESTART;
+			} else if ((cfg[i].flags & PARM_DYNAMIC_LINK) ==
+			    PARM_DYNAMIC_LINK) {
+				cfgparam[i].a_changestate = CFG_LINKRESET;
 			} else {
 				cfgparam[i].a_changestate = CFG_DYMANIC;
 			}
@@ -4367,14 +4592,13 @@ emlxs_dfc_get_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		    sizeof (cfgparam[i].a_help));
 	}
 
-	if (ddi_copyout((void *)cfgparam, (void *)dfc->buf1,
-	    size, mode) != 0) {
+	if (ddi_copyout((void *)cfgparam, (void *)dfc->buf1, size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYOUT_ERROR;
 	}
+
 	rval = 0;
 
 	kmem_free(cfgparam, size);
@@ -4384,14 +4608,14 @@ emlxs_dfc_get_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 } /* emlxs_dfc_get_cfg() */
 
 
-/*ARGSUSED*/
+/* ARGSUSED */
 static int32_t
 emlxs_dfc_set_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t index;
-	uint32_t new_value;
-	uint32_t rc;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	index;
+	uint32_t	new_value;
+	uint32_t	rc;
 
 	index = dfc->data1;
 	new_value = dfc->data2;
@@ -4411,6 +4635,7 @@ emlxs_dfc_set_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			return (DFC_ARG_INVALID);
 		}
 	}
+
 	return (0);
 
 } /* emlxs_dfc_set_cfg() */
@@ -4419,18 +4644,18 @@ emlxs_dfc_set_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t *rsp_buf;
-	uint8_t *cmd_buf;
-	uint32_t did;
-	uint32_t rsp_size;
-	uint32_t cmd_size;
-	uint32_t timeout;
-	fc_packet_t *pkt = NULL;
-	uint32_t rval = 0;
-	dfc_destid_t destid;
-	NODELIST *nlp;
-	char buffer[128];
+	emlxs_port_t	*port = &PPORT;
+	uint8_t		*rsp_buf;
+	uint8_t		*cmd_buf;
+	uint32_t	did;
+	uint32_t	rsp_size;
+	uint32_t	cmd_size;
+	uint32_t	timeout;
+	fc_packet_t	*pkt = NULL;
+	uint32_t	rval = 0;
+	dfc_destid_t	destid;
+	NODELIST	*nlp;
+	char		buffer[128];
 
 	cmd_buf = dfc->buf1;
 	cmd_size = dfc->buf1_size;
@@ -4441,43 +4666,44 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (timeout < (2 * hba->fc_ratov)) {
 		timeout = 2 * hba->fc_ratov;
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: csize=%d rsize=%d",
-	    emlxs_dfc_xlate(dfc->cmd), cmd_size, rsp_size);
+	    "%s: csize=%d rsize=%d", emlxs_dfc_xlate(dfc->cmd), cmd_size,
+	    rsp_size);
 
 
 	if (!cmd_size || !cmd_buf) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!rsp_size || !rsp_buf) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!dfc->buf3 || !dfc->buf3_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer3 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer3 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!dfc->buf4 || !dfc->buf4_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer4 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer4 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (rsp_size > MAX_CT_PAYLOAD) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer2 too large. size=%d",
@@ -4486,6 +4712,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOBIG;
 		goto done;
 	}
+
 	if (cmd_size > MAX_CT_PAYLOAD) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too large. size=%d",
@@ -4494,6 +4721,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOBIG;
 		goto done;
 	}
+
 	if (dfc->buf3_size < sizeof (dfc_destid_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer3 too small. (size=%d)",
@@ -4502,6 +4730,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
+
 	if (dfc->buf4_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer4 too small. (size=%d)",
@@ -4510,6 +4739,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
+
 	if (ddi_copyin((void *)dfc->buf3, (void *)&destid,
 	    sizeof (dfc_destid_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -4519,12 +4749,13 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	if (destid.idType == 0) {
 		if ((nlp = emlxs_node_find_wwpn(port, destid.wwpn)) == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: WWPN does not exists. %s",
-			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_wwn_xlate(buffer, destid.wwpn));
+			    emlxs_dfc_xlate(dfc->cmd), emlxs_wwn_xlate(buffer,
+			    destid.wwpn));
 
 			rval = DFC_ARG_INVALID;
 			goto done;
@@ -4545,6 +4776,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (did == 0) {
 		did = port->did;
 	}
+
 	if (!(pkt = emlxs_pkt_alloc(port, cmd_size, rsp_size, 0, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate packet.",
@@ -4553,6 +4785,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_SYSRES_ERROR;
 		goto done;
 	}
+
 	/* Make this a polled IO */
 	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -4566,8 +4799,8 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_UNSOL_CONTROL;
 	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_FC_SERVICES;
-	pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
-	    F_CTL_SEQ_INITIATIVE;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
 	pkt->pkt_cmd_fhdr.seq_id = 0;
 	pkt->pkt_cmd_fhdr.df_ctl = 0;
 	pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -4576,8 +4809,8 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.ro = 0;
 
 	/* Copy in the command buffer */
-	if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd,
-	    cmd_size, mode) != 0) {
+	if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd, cmd_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to read command buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -4585,14 +4818,15 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Unable to send packet.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Unable to send packet.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	if ((pkt->pkt_state != FC_PKT_SUCCESS) &&
 	    (pkt->pkt_state != FC_PKT_FS_RJT)) {
 		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
@@ -4601,14 +4835,14 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_TIMEOUT;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "Pkt Transport error. state=%x",
-			    pkt->pkt_state);
+			    "Pkt Transport error. state=%x", pkt->pkt_state);
 			rval = DFC_IO_ERROR;
 		}
 		goto done;
 	}
-	if (ddi_copyout((void *)pkt->pkt_resp, (void *)rsp_buf,
-	    rsp_size, mode) != 0) {
+
+	if (ddi_copyout((void *)pkt->pkt_resp, (void *)rsp_buf, rsp_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to read response.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -4616,9 +4850,10 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	rsp_size -= pkt->pkt_resp_resid;
-	if (ddi_copyout((void *)&rsp_size, (void *)dfc->buf4,
-	    dfc->buf4_size, mode) != 0) {
+	if (ddi_copyout((void *)&rsp_size, (void *)dfc->buf4, dfc->buf4_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to write response.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -4626,6 +4861,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	rval = 0;
 
 done:
@@ -4633,6 +4869,7 @@ done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_send_ct() */
@@ -4641,32 +4878,30 @@ done:
 static int32_t
 emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t *cmd_buf;
-	uint32_t rx_id;
-	uint32_t cmd_size;
-	uint32_t timeout;
-	fc_packet_t *pkt = NULL;
-	uint32_t rval = 0;
-	/* dfc_destid_t destid; */
+	emlxs_port_t	*port = &PPORT;
+	uint8_t		*cmd_buf;
+	uint32_t	rx_id;
+	uint32_t	cmd_size;
+	uint32_t	timeout;
+	fc_packet_t	*pkt = NULL;
+	uint32_t	rval = 0;
 
 	cmd_buf = dfc->buf1;
 	cmd_size = dfc->buf1_size;
 	rx_id = dfc->flag;
 	timeout = 2 * hba->fc_ratov;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: csize=%d",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s: csize=%d",
 	    emlxs_dfc_xlate(dfc->cmd), cmd_size);
 
 	if (!cmd_size || !cmd_buf) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!(pkt = emlxs_pkt_alloc(port, cmd_size, 0, 0, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate packet.",
@@ -4675,6 +4910,7 @@ emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_SYSRES_ERROR;
 		goto done;
 	}
+
 	/* Make this a polled IO */
 	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -4688,8 +4924,8 @@ emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_SOLICITED_CONTROL;
 	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_FC_SERVICES;
-	pkt->pkt_cmd_fhdr.f_ctl = F_CTL_LAST_SEQ | F_CTL_END_SEQ |
-	    F_CTL_XCHG_CONTEXT;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_LAST_SEQ | F_CTL_END_SEQ | F_CTL_XCHG_CONTEXT;
 	pkt->pkt_cmd_fhdr.seq_id = 0;
 	pkt->pkt_cmd_fhdr.df_ctl = 0;
 	pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -4698,8 +4934,8 @@ emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.ro = 0;
 
 	/* Copy in the command buffer */
-	if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd,
-	    cmd_size, mode) != 0) {
+	if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd, cmd_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to read command buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -4707,14 +4943,15 @@ emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Unable to send packet.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Unable to send packet.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -4722,12 +4959,12 @@ emlxs_dfc_send_ct_rsp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_TIMEOUT;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "Pkt Transport error. state=%x",
-			    pkt->pkt_state);
+			    "Pkt Transport error. state=%x", pkt->pkt_state);
 			rval = DFC_IO_ERROR;
 		}
 		goto done;
 	}
+
 	rval = 0;
 
 done:
@@ -4735,6 +4972,7 @@ done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_send_ct_rsp() */
@@ -4745,40 +4983,16 @@ done:
 static int32_t
 emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t *rsp_buf;
-	uint8_t *cmd_buf;
-	uint8_t *data_buf;
-	/* uint32_t did; */
-	uint32_t rsp_size;
-	uint32_t cmd_size;
-	uint32_t data_size;
-	fc_packet_t *pkt = NULL;
-	uint32_t rval = 0;
-	/* char buffer[128]; */
-	menlo_set_cmd_t set_cmd;
-	menlo_reset_cmd_t reset_cmd;
-	uint32_t rsp_code;
-	uint32_t mm_mode;
-	uint32_t cmd_code;
-	clock_t timeout;
-	MAILBOXQ *mbq = NULL;
-	MAILBOX *mb;
-	uint32_t addr;
-	uint32_t value;
-	uint32_t mbxstatus;
-
-	cmd_buf = dfc->buf1;
-	cmd_size = dfc->buf1_size;
-	rsp_buf = dfc->buf2;
-	rsp_size = dfc->buf2_size;
-	data_buf = NULL;
-	data_size = 0;
-	mm_mode = 0;
+	emlxs_port_t	*port = &PPORT;
+	uint8_t		*rsp_buf = NULL;
+	uint8_t		*cmd_buf = NULL;
+	uint32_t	rsp_size = 0;
+	uint32_t	cmd_size = 0;
+	uint32_t	rval = 0;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: csize=%d rsize=%d",
-	    emlxs_dfc_xlate(dfc->cmd), cmd_size, rsp_size);
+	    "%s: csize=%d rsize=%d", emlxs_dfc_xlate(dfc->cmd), dfc->buf1_size,
+	    dfc->buf2_size);
 
 	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -4789,30 +5003,31 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_INVALID_ADAPTER;
 		goto done;
 	}
-	if (!cmd_size || !cmd_buf) {
+
+	if (!dfc->buf1_size || !dfc->buf1) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
-	if (!rsp_size || !rsp_buf) {
+
+	if (!dfc->buf2_size || !dfc->buf2) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!dfc->buf3 || !dfc->buf3_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer3 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer3 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (dfc->buf3_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer3 too small. %d < %d",
@@ -4822,170 +5037,48 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
-	/* Read the command code first */
-	if (ddi_copyin((void *)cmd_buf, (void *)&cmd_code,
-	    sizeof (uint32_t), mode) != 0) {
+
+	cmd_size  = dfc->buf1_size;
+	if ((cmd_buf = (uint8_t *)kmem_zalloc(cmd_size,
+	    KM_SLEEP)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Unable to read command code.",
+		    "%s: Unable to allocate command buffer.",
+		    emlxs_dfc_xlate(dfc->cmd));
+
+		rval = DFC_SYSRES_ERROR;
+		goto done;
+	}
+
+	rsp_size  = dfc->buf2_size;
+	if ((rsp_buf = (uint8_t *)kmem_zalloc(rsp_size,
+	    KM_SLEEP)) == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to allocate response buffer.",
+		    emlxs_dfc_xlate(dfc->cmd));
+
+		rval = DFC_SYSRES_ERROR;
+		goto done;
+	}
+
+	/* Read the command buffer */
+	if (ddi_copyin((void *)dfc->buf1, (void *)cmd_buf,
+	    cmd_size, mode) != 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg,
+		    "%s: Unable to read command buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
-	cmd_code = SWAP_LONG(cmd_code);
 
-	/* Look for Zephyr specific commands */
-	if (cmd_code & 0x80000000) {
-		bzero((uint8_t *)&reset_cmd, sizeof (menlo_reset_cmd_t));
-		bzero((uint8_t *)&set_cmd, sizeof (menlo_set_cmd_t));
-		bzero((uint8_t *)&rsp_code, sizeof (uint32_t));
+	/* Send the command */
+	rval = emlxs_send_menlo_cmd(hba, cmd_buf, cmd_size,
+	    rsp_buf, &rsp_size);
 
-		/* Validate response buffer */
-		if (rsp_size < sizeof (uint32_t)) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Response overrun.",
-			    emlxs_dfc_xlate(dfc->cmd));
-			rval = DFC_RSP_BUF_OVERRUN;
-			goto done;
-		}
-		/* All of these responses will be 4 bytes only */
-		rsp_size = sizeof (uint32_t);
-		rsp_code = 0;
-
-		/* Validate command buffer */
-		switch (cmd_code) {
-		case MENLO_CMD_RESET:
-			if (cmd_size < sizeof (menlo_reset_cmd_t)) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Invalid command size. %d < %d",
-				    emlxs_dfc_xlate(dfc->cmd), cmd_size,
-				    sizeof (menlo_reset_cmd_t));
-				rval = DFC_ARG_INVALID;
-				goto done;
-			}
-			cmd_size = sizeof (menlo_reset_cmd_t);
-
-			/* Read the command buffer */
-			if (ddi_copyin((void *)cmd_buf, (void *)&reset_cmd,
-			    cmd_size, mode) != 0) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Unable to read command buffer.",
-				    emlxs_dfc_xlate(dfc->cmd));
-
-				rval = DFC_COPYIN_ERROR;
-				goto done;
-			}
-			if (reset_cmd.firmware) {
-				/* MENLO_FW_GOLDEN */
-				value = 1;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-				    "%s: Reset with Golden"
-				    " firmware requested.",
-				    emlxs_dfc_xlate(dfc->cmd));
-
-			} else {
-				/* MENLO_FW_OPERATIONAL */
-				value = 0;
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-				    "%s: Reset with Operational"
-				    " firmware requested.",
-				    emlxs_dfc_xlate(dfc->cmd));
-			}
-
-			addr = 0x103007;
-
-			break;
-
-		case MENLO_CMD_SET_MODE:
-			if (cmd_size < sizeof (menlo_set_cmd_t)) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Invalid command size. %d < %d",
-				    emlxs_dfc_xlate(dfc->cmd), cmd_size,
-				    sizeof (menlo_set_cmd_t));
-				rval = DFC_ARG_INVALID;
-				goto done;
-			}
-			cmd_size = sizeof (menlo_set_cmd_t);
-
-			/* Read the command buffer */
-			if (ddi_copyin((void *)cmd_buf, (void *)&set_cmd,
-			    cmd_size, mode) != 0) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Unable to read command buffer.",
-				    emlxs_dfc_xlate(dfc->cmd));
-
-				rval = DFC_COPYIN_ERROR;
-				goto done;
-			}
-			if (set_cmd.value1) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-				    "%s: Maintenance mode"
-				    " enable requested.",
-				    emlxs_dfc_xlate(dfc->cmd));
-
-				/* Make sure the mode flag is cleared */
-				if (hba->flag & FC_MENLO_MODE) {
-					mutex_enter(&EMLXS_PORT_LOCK);
-					hba->flag &= ~FC_MENLO_MODE;
-					mutex_exit(&EMLXS_PORT_LOCK);
-				}
-				mm_mode = 1;
-			} else {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-				    "%s: Maintenance mode"
-				    " disable requested.",
-				    emlxs_dfc_xlate(dfc->cmd));
-			}
-
-			addr = 0x103107;
-			value = mm_mode;
-
-			break;
-
-		default:
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Invalid command. cmd=%x",
-			    emlxs_dfc_xlate(dfc->cmd), cmd_code);
-			rval = DFC_ARG_INVALID;
-			goto done;
-		}
-
-		if ((mbq = (MAILBOXQ *)
-		    kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate mailbox buffer.",
-			    emlxs_dfc_xlate(dfc->cmd));
-
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
-		mb = (MAILBOX *)mbq;
-
-		/* Create the set_variable mailbox request */
-		emlxs_mb_set_var(hba, mb, addr, value);
-
-		mbq->flag |= MBQ_PASSTHRU;
-
-		/* issue the mbox cmd to the sli */
-		mbxstatus = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
-
-		if (mbxstatus) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: %s failed. mbxstatus=0x%x",
-			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_mb_cmd_xlate(mb->mbxCommand),
-			    mbxstatus);
-
-			if (mbxstatus == MBX_TIMEOUT) {
-				rval = DFC_TIMEOUT;
-			} else {
-				rval = DFC_IO_ERROR;
-			}
-			goto done;
-		}
-		if (ddi_copyout((void *)&rsp_code, (void *)rsp_buf,
+	if (rval == 0) {
+		/* Return the response */
+		if (ddi_copyout((void *)rsp_buf, (void *)dfc->buf2,
 		    rsp_size, mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: Unable to write response.",
@@ -4994,6 +5087,8 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_COPYOUT_ERROR;
 			goto done;
 		}
+
+		/* Return the response size */
 		if (ddi_copyout((void *)&rsp_size, (void *)dfc->buf3,
 		    dfc->buf3_size, mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -5003,6 +5098,191 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_COPYOUT_ERROR;
 			goto done;
 		}
+	}
+
+done:
+
+	if (cmd_buf) {
+		kmem_free(cmd_buf, dfc->buf1_size);
+	}
+
+	if (rsp_buf) {
+		kmem_free(rsp_buf, dfc->buf2_size);
+	}
+
+	return (rval);
+
+} /* emlxs_dfc_send_menlo() */
+
+
+extern int32_t
+emlxs_send_menlo_cmd(emlxs_hba_t *hba, uint8_t *cmd_buf, uint32_t cmd_size,
+    uint8_t *rsp_buf, uint32_t *rsp_size)
+{
+	emlxs_port_t		*port = &PPORT;
+	uint8_t			*data_buf = NULL;
+	uint32_t		data_size = 0;
+	fc_packet_t		*pkt = NULL;
+	uint32_t		rval = 0;
+	menlo_set_cmd_t		set_cmd;
+	menlo_reset_cmd_t	reset_cmd;
+	uint32_t		rsp_code;
+	uint32_t		mm_mode = 0;
+	uint32_t		cmd_code;
+	clock_t			timeout;
+	MAILBOXQ		*mbq = NULL;
+	MAILBOX			*mb;
+	uint32_t		addr;
+	uint32_t		value;
+	uint32_t		mbxstatus;
+
+	cmd_code = *(uint32_t *)cmd_buf;
+	cmd_code = SWAP_LONG(cmd_code);
+
+	/* Look for Zephyr specific commands */
+	if (cmd_code & 0x80000000) {
+		bzero((uint8_t *)&reset_cmd, sizeof (menlo_reset_cmd_t));
+		bzero((uint8_t *)&set_cmd, sizeof (menlo_set_cmd_t));
+		bzero((uint8_t *)&rsp_code, sizeof (uint32_t));
+
+		/* Validate response buffer */
+		if (*rsp_size < sizeof (uint32_t)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "emlxs_send_menlo_cmd: Response overrun.");
+			rval = DFC_RSP_BUF_OVERRUN;
+			goto done;
+		}
+
+		/* All of these responses will be 4 bytes only */
+		*rsp_size = sizeof (uint32_t);
+		rsp_code = 0;
+
+		/* Validate command buffer */
+		switch (cmd_code) {
+		case MENLO_CMD_RESET:
+			if (cmd_size < sizeof (menlo_reset_cmd_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Invalid command size. %d < %d",
+				    cmd_size,
+				    sizeof (menlo_reset_cmd_t));
+				rval = DFC_ARG_INVALID;
+				goto done;
+			}
+			cmd_size = sizeof (menlo_reset_cmd_t);
+
+			/* Read the command buffer */
+			bcopy((void *)cmd_buf, (void *)&reset_cmd, cmd_size);
+
+			if (reset_cmd.firmware) {
+				/* MENLO_FW_GOLDEN */
+				value = 1;
+
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_detail_msg,
+				    "emlxs_send_menlo_cmd: Reset with Golden "
+				    "firmware requested.");
+
+			} else {
+				/* MENLO_FW_OPERATIONAL */
+				value = 0;
+
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_detail_msg,
+				    "emlxs_send_menlo_cmd: Reset with "
+				    "Operational firmware requested.");
+			}
+
+			addr  = 0x103007;
+
+			break;
+
+		case MENLO_CMD_SET_MODE:
+			if (cmd_size < sizeof (menlo_set_cmd_t)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Invalid command size. %d < %d",
+				    cmd_size,
+				    sizeof (menlo_set_cmd_t));
+				rval = DFC_ARG_INVALID;
+				goto done;
+			}
+			cmd_size = sizeof (menlo_set_cmd_t);
+
+			/* Read the command buffer */
+			bcopy((void *)cmd_buf, (void *)&set_cmd, cmd_size);
+
+			if (set_cmd.value1) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_detail_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Maintenance mode enable requested.");
+
+				/* Make sure the mode flag is cleared */
+				if (hba->flag & FC_MENLO_MODE) {
+					mutex_enter(&EMLXS_PORT_LOCK);
+					hba->flag &= ~FC_MENLO_MODE;
+					mutex_exit(&EMLXS_PORT_LOCK);
+				}
+
+				mm_mode = 1;
+			} else {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_detail_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Maintenance mode disable requested.");
+			}
+
+			addr  = 0x103107;
+			value = mm_mode;
+
+			break;
+
+		default:
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "emlxs_send_menlo_cmd: "
+			    "Invalid command. cmd=%x", cmd_code);
+			rval = DFC_ARG_INVALID;
+			goto done;
+		}
+
+		if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
+		    KM_SLEEP)) == 0) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "emlxs_send_menlo_cmd: "
+			    "Unable to allocate mailbox buffer.");
+
+			rval = DFC_SYSRES_ERROR;
+			goto done;
+		}
+
+		mb = (MAILBOX *) mbq;
+
+		/* Create the set_variable mailbox request */
+		emlxs_mb_set_var(hba, mb, addr, value);
+
+		mbq->flag |= MBQ_PASSTHRU;
+
+		/* issue the mbox cmd to the sli */
+		mbxstatus = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
+
+		if (mbxstatus) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "emlxs_send_menlo_cmd: %s failed. mbxstatus=0x%x",
+			    emlxs_mb_cmd_xlate(mb->mbxCommand), mbxstatus);
+
+			if (mbxstatus == MBX_TIMEOUT) {
+				rval = DFC_TIMEOUT;
+			} else {
+				rval = DFC_IO_ERROR;
+			}
+			goto done;
+		}
+
+		bcopy((void *)&rsp_code, (void *)rsp_buf, *rsp_size);
+
 		/* Check if we need to wait for maintenance mode */
 		if (mm_mode && !(hba->flag & FC_MENLO_MODE)) {
 			/* Wait for link to come up in maintenance mode */
@@ -5012,60 +5292,64 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			rval = 0;
 			while ((rval != -1) && !(hba->flag & FC_MENLO_MODE)) {
-				rval = cv_timedwait(&EMLXS_LINKUP_CV,
+				rval =
+				    cv_timedwait(&EMLXS_LINKUP_CV,
 				    &EMLXS_LINKUP_LOCK, timeout);
 			}
 
 			mutex_exit(&EMLXS_LINKUP_LOCK);
 
 			if (rval == -1) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Menlo maintenance mode"
-				    " error. Timeout.",
-				    emlxs_dfc_xlate(dfc->cmd));
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Menlo maintenance mode error. Timeout.");
 
 				rval = DFC_TIMEOUT;
 				goto done;
 			}
 		}
 	} else {	/* Standard commands */
+
 		if (hba->state <= FC_LINK_DOWN) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Adapter link down.",
-			    emlxs_dfc_xlate(dfc->cmd));
+			    "emlxs_send_menlo_cmd: Adapter link down.");
 
 			rval = DFC_LINKDOWN_ERROR;
 			goto done;
 		}
+
 		if (cmd_code == MENLO_CMD_FW_DOWNLOAD) {
 			/* Check cmd size */
-			/*
-			 * Must be at least 12 bytes of command plus 4 bytes
-			 * of data
-			 */
+			/* Must be at least 12 bytes of command */
+			/* plus 4 bytes of data */
 			if (cmd_size < (12 + 4)) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Invalid command size. %d < %d",
-				    emlxs_dfc_xlate(dfc->cmd), cmd_size,
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Invalid command size. %d < %d",
+				    cmd_size,
 				    (12 + 4));
 
 				rval = DFC_ARG_INVALID;
 				goto done;
 			}
+
 			/* Extract data buffer from command buffer */
-			data_buf = cmd_buf + 12;
-			data_size = cmd_size - 12;
-			cmd_size = 12;
+			data_buf    = cmd_buf  + 12;
+			data_size   = cmd_size - 12;
+			cmd_size    = 12;
 		}
-		if (!(pkt = emlxs_pkt_alloc(port, cmd_size,
-		    rsp_size, 0, KM_NOSLEEP))) {
+
+		if (!(pkt = emlxs_pkt_alloc(port, cmd_size, *rsp_size, 0,
+		    KM_NOSLEEP))) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate packet.",
-			    emlxs_dfc_xlate(dfc->cmd));
+			    "emlxs_send_menlo_cmd: Unable to allocate packet.");
 
 			rval = DFC_SYSRES_ERROR;
 			goto done;
 		}
+
 		/* Make this a polled IO */
 		pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 		pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -5078,8 +5362,8 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		pkt->pkt_cmd_fhdr.r_ctl = R_CTL_COMMAND;
 		pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
 		pkt->pkt_cmd_fhdr.type = EMLXS_MENLO_TYPE;
-		pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
-		    F_CTL_SEQ_INITIATIVE;
+		pkt->pkt_cmd_fhdr.f_ctl =
+		    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
 		pkt->pkt_cmd_fhdr.seq_id = 0;
 		pkt->pkt_cmd_fhdr.df_ctl = 0;
 		pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -5088,45 +5372,41 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		pkt->pkt_cmd_fhdr.ro = 0;
 
 		/* Copy in the command buffer */
-		if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd,
-		    cmd_size, mode) != 0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to read command buffer.",
-			    emlxs_dfc_xlate(dfc->cmd));
+		bcopy((void *)cmd_buf, (void *)pkt->pkt_cmd, cmd_size);
 
-			rval = DFC_COPYIN_ERROR;
-			goto done;
-		}
 		if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to send packet.",
-			    emlxs_dfc_xlate(dfc->cmd));
+			    "emlxs_send_menlo_cmd: Unable to send packet.");
 
 			rval = DFC_IO_ERROR;
 			goto done;
 		}
+
 		if (pkt->pkt_state != FC_PKT_SUCCESS) {
 			if (pkt->pkt_state == FC_PKT_TIMEOUT) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Pkt Transport error. Pkt Timeout.",
-				    emlxs_dfc_xlate(dfc->cmd));
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Pkt Transport error. Pkt Timeout.");
 				rval = DFC_TIMEOUT;
 			} else if ((pkt->pkt_state == FC_PKT_LOCAL_RJT) &&
 			    (pkt->pkt_reason == FC_REASON_OVERRUN)) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Pkt Transport error."
-				    " Response overrun.",
-				    emlxs_dfc_xlate(dfc->cmd));
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Pkt Transport error. Response overrun.");
 				rval = DFC_RSP_BUF_OVERRUN;
 			} else {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: Pkt Transport error. state=%x",
-				    emlxs_dfc_xlate(dfc->cmd),
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "emlxs_send_menlo_cmd: "
+				    "Pkt Transport error. state=%x",
 				    pkt->pkt_state);
 				rval = DFC_IO_ERROR;
 			}
 			goto done;
 		}
+
 		if (cmd_code == MENLO_CMD_FW_DOWNLOAD) {
 			uint32_t *rsp;
 
@@ -5146,16 +5426,17 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 				/* Allocate data pkt */
 				if (!(pkt = emlxs_pkt_alloc(port, data_size,
-				    rsp_size, 0, KM_NOSLEEP))) {
+				    *rsp_size, 0, KM_NOSLEEP))) {
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_dfc_error_msg,
-					    "%s: Unable to allocate"
-					    " data packet.",
-					    emlxs_dfc_xlate(dfc->cmd));
+					    "emlxs_send_menlo_cmd: "
+					    "Unable to allocate data "
+					    "packet.");
 
 					rval = DFC_SYSRES_ERROR;
 					goto done;
 				}
+
 				/* Make this a polled IO */
 				pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 				pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -5170,8 +5451,9 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 				pkt->pkt_cmd_fhdr.s_id =
 				    SWAP_DATA24_LO(port->did);
 				pkt->pkt_cmd_fhdr.type = EMLXS_MENLO_TYPE;
-				pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ |
-				    F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
+				pkt->pkt_cmd_fhdr.f_ctl =
+				    F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
+				    F_CTL_SEQ_INITIATIVE;
 				pkt->pkt_cmd_fhdr.seq_id = 0;
 				pkt->pkt_cmd_fhdr.df_ctl = 0;
 				pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -5180,33 +5462,26 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 				pkt->pkt_cmd_fhdr.ro = 0;
 
 				/* Copy in the data buffer */
-				if (ddi_copyin((void *)data_buf,
-				    (void *)pkt->pkt_cmd, data_size,
-				    mode) != 0) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_dfc_error_msg,
-					    "%s: Unable to read data buffer.",
-					    emlxs_dfc_xlate(dfc->cmd));
+				bcopy((void *)data_buf, (void *)pkt->pkt_cmd,
+				    data_size);
 
-					rval = DFC_COPYIN_ERROR;
-					goto done;
-				}
 				if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_dfc_error_msg,
-					    "%s: Unable to send data packet.",
-					    emlxs_dfc_xlate(dfc->cmd));
+					    "emlxs_send_menlo_cmd: "
+					    "Unable to send data packet.");
 
 					rval = DFC_IO_ERROR;
 					goto done;
 				}
+
 				if (pkt->pkt_state != FC_PKT_SUCCESS) {
 					if (pkt->pkt_state == FC_PKT_TIMEOUT) {
 						EMLXS_MSGF(EMLXS_CONTEXT,
 						    &emlxs_dfc_error_msg,
-						    "%s: Data Pkt Transport"
-						    " error. Pkt Timeout.",
-						    emlxs_dfc_xlate(dfc->cmd));
+						    "emlxs_send_menlo_cmd: "
+						    "Data Pkt Transport "
+						    "error. Pkt Timeout.");
 						rval = DFC_TIMEOUT;
 					} else if ((pkt->pkt_state ==
 					    FC_PKT_LOCAL_RJT) &&
@@ -5214,16 +5489,16 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 					    FC_REASON_OVERRUN)) {
 						EMLXS_MSGF(EMLXS_CONTEXT,
 						    &emlxs_dfc_error_msg,
-						    "%s: Data Pkt Transport "
-						    "error. Response overrun.",
-						    emlxs_dfc_xlate(dfc->cmd));
+						    "emlxs_send_menlo_cmd: "
+						    "Data Pkt Transport "
+						    "error. Response overrun.");
 						rval = DFC_RSP_BUF_OVERRUN;
 					} else {
 						EMLXS_MSGF(EMLXS_CONTEXT,
 						    &emlxs_dfc_error_msg,
-						    "%s: Data Pkt Transport "
+						    "emlxs_send_menlo_cmd: "
+						    "Data Pkt Transport "
 						    "error. state=%x",
-						    emlxs_dfc_xlate(dfc->cmd),
 						    pkt->pkt_state);
 						rval = DFC_IO_ERROR;
 					}
@@ -5231,25 +5506,9 @@ emlxs_dfc_send_menlo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 				}
 			}
 		}
-		if (ddi_copyout((void *)pkt->pkt_resp, (void *)rsp_buf,
-		    rsp_size, mode) != 0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to write response.",
-			    emlxs_dfc_xlate(dfc->cmd));
 
-			rval = DFC_COPYOUT_ERROR;
-			goto done;
-		}
-		rsp_size -= pkt->pkt_resp_resid;
-		if (ddi_copyout((void *)&rsp_size, (void *)dfc->buf3,
-		    dfc->buf3_size, mode) != 0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to write response size.",
-			    emlxs_dfc_xlate(dfc->cmd));
-
-			rval = DFC_COPYOUT_ERROR;
-			goto done;
-		}
+		bcopy((void *)pkt->pkt_resp, (void *)rsp_buf, *rsp_size);
+		*rsp_size = *rsp_size - pkt->pkt_resp_resid;
 	}
 
 	rval = 0;
@@ -5259,23 +5518,26 @@ done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	if (mbq) {
 		kmem_free(mbq, sizeof (MAILBOXQ));
 	}
+
 	return (rval);
 
-} /* emlxs_dfc_send_menlo() */
+} /* emlxs_send_menlo_cmd() */
+
 
 
 
 extern void
 emlxs_fcoe_attention_thread(void *arg)
 {
-	emlxs_hba_t *hba = (emlxs_hba_t *)arg;
-	emlxs_port_t *port = &PPORT;
-	menlo_init_rsp_t *rsp;
-	menlo_get_cmd_t *cmd;
-	fc_packet_t *pkt = NULL;
+	emlxs_hba_t		*hba = (emlxs_hba_t *)arg;
+	emlxs_port_t		*port = &PPORT;
+	menlo_init_rsp_t	*rsp;
+	menlo_get_cmd_t		*cmd;
+	fc_packet_t		*pkt = NULL;
 
 	if (!(pkt = emlxs_pkt_alloc(port, sizeof (menlo_get_cmd_t),
 	    sizeof (menlo_init_rsp_t), 0, KM_NOSLEEP))) {
@@ -5284,6 +5546,7 @@ emlxs_fcoe_attention_thread(void *arg)
 
 		return;
 	}
+
 	/* Make this a polled IO */
 	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -5296,8 +5559,8 @@ emlxs_fcoe_attention_thread(void *arg)
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_COMMAND;
 	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = EMLXS_MENLO_TYPE;
-	pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
-	    F_CTL_SEQ_INITIATIVE;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
 	pkt->pkt_cmd_fhdr.seq_id = 0;
 	pkt->pkt_cmd_fhdr.df_ctl = 0;
 	pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -5320,6 +5583,7 @@ emlxs_fcoe_attention_thread(void *arg)
 
 		goto done;
 	}
+
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "FCoE attention: Pkt Transport error. state=%x",
@@ -5327,17 +5591,18 @@ emlxs_fcoe_attention_thread(void *arg)
 
 		goto done;
 	}
+
 	/* Check response code */
 	rsp = (menlo_init_rsp_t *)pkt->pkt_resp;
 	rsp->code = SWAP_LONG(rsp->code);
 
 	if (rsp->code != MENLO_RSP_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "FCoE attention: FCOE Response error =%x",
-		    rsp->code);
+		    "FCoE attention: FCOE Response error =%x", rsp->code);
 
 		goto done;
 	}
+
 	/* Little Endian Swap */
 	rsp->bb_credit = SWAP_LONG(rsp->bb_credit);
 	rsp->frame_size = SWAP_LONG(rsp->frame_size);
@@ -5368,20 +5633,21 @@ emlxs_fcoe_attention_thread(void *arg)
 	/* Perform attention checks */
 	if (rsp->fru_data_valid == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_adapter_error_msg,
-		    "Invalid FRU data found on adapter."
-		    " Return adapter to Emulex for repair.");
+		    "Invalid FRU data found on adapter. "
+		    "Return adapter to Emulex for repair.");
 	}
+
 	switch (rsp->fw_type) {
 	case MENLO_FW_TYPE_GOLDEN:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_adapter_warning_msg,
-		    "FCoE chip is running Golden firmware."
-		    " Update FCoE firmware immediately.");
+		    "FCoE chip is running Golden firmware. "
+		    "Update FCoE firmware immediately.");
 		break;
 
 	case MENLO_FW_TYPE_DIAG:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_adapter_notice_msg,
-		    "FCoE chip is running Diagnostic firmware."
-		    " Operational use of the adapter is suspended.");
+		    "FCoE chip is running Diagnostic firmware. "
+		    "Operational use of the adapter is suspended.");
 		break;
 	}
 
@@ -5390,22 +5656,23 @@ done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return;
 
 } /* emlxs_fcoe_attention_thread() */
 
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 
 
 static int32_t
 emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t cnt;
-	uint8_t *buffer;
-	uint8_t *bptr;
-	uint32_t i;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	cnt;
+	uint8_t		*buffer;
+	uint8_t		*bptr;
+	uint32_t	i;
 
 	if (hba->bus_type != SBUS_FC) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -5414,20 +5681,21 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_INVALID);
 	}
+
 	if (!(hba->flag & FC_OFFLINE_MODE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Adapter not offline.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Adapter not offline.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ONLINE_ERROR);
 	}
+
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	offset = dfc->data1;
 	cnt = dfc->data2;
 
@@ -5438,6 +5706,7 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if (cnt > dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Count too large. (count=%d)",
@@ -5445,6 +5714,7 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if ((cnt + offset) > (64 * 1024)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Count+Offset too large. (count=%d offset=%d)",
@@ -5452,9 +5722,11 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if (cnt == 0) {
 		return (0);
 	}
+
 	if ((buffer = (uint8_t *)kmem_zalloc(cnt, KM_NOSLEEP)) == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate buffer.",
@@ -5462,18 +5734,20 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
-	if (ddi_copyin((void *)dfc->buf1, (void *)buffer,
-	    cnt, mode) != 0) {
+
+	if (ddi_copyin((void *)dfc->buf1, (void *)buffer, cnt, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(buffer, cnt);
 		return (DFC_COPYIN_ERROR);
 	}
+
 	bptr = buffer;
 	for (i = 0; i < cnt; i++) {
-		SBUS_WRITE_FLASH_COPY(hba, offset++, (unsigned long)bptr++);
+		SBUS_WRITE_FLASH_COPY(hba, offset, *bptr);
+		offset++;
+		bptr++;
 	}
 
 	kmem_free(buffer, cnt);
@@ -5486,13 +5760,13 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t count;
-	uint32_t outsz;
-	uint8_t *buffer;
-	uint8_t *bptr;
-	uint32_t i;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	count;
+	uint32_t	outsz;
+	uint8_t		*buffer;
+	uint8_t		*bptr;
+	uint32_t	i;
 
 	if (hba->bus_type != SBUS_FC) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -5501,20 +5775,21 @@ emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_INVALID);
 	}
+
 	if (!(hba->flag & FC_OFFLINE_MODE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Adapter not offline.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Adapter not offline.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ONLINE_ERROR);
 	}
+
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	offset = dfc->data1;
 	count = dfc->data2;
 	outsz = dfc->buf1_size;
@@ -5526,16 +5801,19 @@ emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if ((count + offset) > (64 * 1024)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Count+Offset too large. (count = %d offset = %d)",
+		    "%s: Count+Offset too large. (count=%d offset=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), count, offset);
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if (count < outsz) {
 		outsz = count;
 	}
+
 	if ((buffer = (uint8_t *)kmem_zalloc(outsz, KM_NOSLEEP)) == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate buffer.",
@@ -5543,20 +5821,20 @@ emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
+
 	bptr = buffer;
 	for (i = 0; i < outsz; i++) {
 		*bptr++ = SBUS_READ_FLASH_COPY(hba, offset++);
 	}
 
-	if (ddi_copyout((void *)buffer, (void *)dfc->buf1,
-	    outsz, mode) != 0) {
+	if (ddi_copyout((void *)buffer, (void *)dfc->buf1, outsz, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(buffer, outsz);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	kmem_free(buffer, outsz);
 
 	return (0);
@@ -5567,18 +5845,18 @@ emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t *rsp_buf;
-	uint8_t *cmd_buf;
-	dfc_destid_t destid;
-	uint32_t rsp_size;
-	uint32_t cmd_size;
-	uint32_t timeout;
-	fc_packet_t *pkt = NULL;
-	NODELIST *ndlp;
-	uint32_t did;
-	uint32_t rval = 0;
-	char buffer[128];
+	emlxs_port_t	*port = &PPORT;
+	uint8_t		*rsp_buf;
+	uint8_t		*cmd_buf;
+	dfc_destid_t	destid;
+	uint32_t	rsp_size;
+	uint32_t	cmd_size;
+	uint32_t	timeout;
+	fc_packet_t	*pkt = NULL;
+	NODELIST	*ndlp;
+	uint32_t	did;
+	uint32_t	rval = 0;
+	char		buffer[128];
 
 	cmd_buf = dfc->buf1;
 	cmd_size = dfc->buf1_size;
@@ -5589,28 +5867,28 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	if (!cmd_size || !cmd_buf) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!rsp_buf || !rsp_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!dfc->buf3 || !dfc->buf3_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer3 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer3 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (dfc->buf3_size < sizeof (dfc_destid_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer3 too small. (size=%d)",
@@ -5619,14 +5897,15 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
+
 	if (!dfc->buf4 || !dfc->buf4_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer4 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer4 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (dfc->buf4_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer4 too small. (size=%d)",
@@ -5635,21 +5914,22 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOSMALL;
 		goto done;
 	}
+
 	if (ddi_copyin((void *)dfc->buf3, (void *)&destid,
 	    sizeof (dfc_destid_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	if (destid.idType == 0) {
 		if ((ndlp = emlxs_node_find_wwpn(port, destid.wwpn)) == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: WWPN does not exists. %s",
-			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_wwn_xlate(buffer, destid.wwpn));
+			    emlxs_dfc_xlate(dfc->cmd), emlxs_wwn_xlate(buffer,
+			    destid.wwpn));
 
 			rval = DFC_ARG_INVALID;
 			goto done;
@@ -5670,6 +5950,7 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (did == 0) {
 		did = port->did;
 	}
+
 	if (!(pkt = emlxs_pkt_alloc(port, cmd_size, rsp_size, 0, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate packet.",
@@ -5678,6 +5959,7 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_SYSRES_ERROR;
 		goto done;
 	}
+
 	/* Make this a polled IO */
 	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -5691,8 +5973,8 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_ELS_REQ;
 	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
-	pkt->pkt_cmd_fhdr.f_ctl = F_CTL_FIRST_SEQ | F_CTL_END_SEQ |
-	    F_CTL_SEQ_INITIATIVE;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
 	pkt->pkt_cmd_fhdr.seq_id = 0;
 	pkt->pkt_cmd_fhdr.df_ctl = 0;
 	pkt->pkt_cmd_fhdr.seq_cnt = 0;
@@ -5701,19 +5983,20 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	pkt->pkt_cmd_fhdr.ro = 0;
 
 	/* Copy in the command buffer */
-	if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd,
-	    cmd_size, mode) != 0) {
+	if (ddi_copyin((void *)cmd_buf, (void *)pkt->pkt_cmd, cmd_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -5721,15 +6004,15 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_TIMEOUT;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "Pkt Transport error. state=%x",
-			    pkt->pkt_state);
+			    "Pkt Transport error. state=%x", pkt->pkt_state);
 			rval = DFC_IO_ERROR;
 		}
 		goto done;
 	}
+
 	rsp_size -= pkt->pkt_resp_resid;
-	if (ddi_copyout((void *)pkt->pkt_resp, (void *)rsp_buf,
-	    rsp_size, mode) != 0) {
+	if (ddi_copyout((void *)pkt->pkt_resp, (void *)rsp_buf, rsp_size,
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: rsp_buf ddi_copyout failed.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -5737,6 +6020,7 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	if (ddi_copyout((void *)&rsp_size, (void *)dfc->buf4,
 	    sizeof (uint32_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -5746,12 +6030,14 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	rval = 0;
 
 done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_send_els() */
@@ -5760,17 +6046,17 @@ done:
 static int32_t
 emlxs_dfc_get_ioinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_ioinfo_t ioinfo;
-	uint32_t i;
+	emlxs_port_t	*port = &PPORT;
+	dfc_ioinfo_t	ioinfo;
+	uint32_t	i;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_ioinfo_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -5778,6 +6064,7 @@ emlxs_dfc_get_ioinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	bzero(&ioinfo, sizeof (dfc_ioinfo_t));
 
 	ioinfo.a_mboxCmd = HBASTATS.MboxIssued;
@@ -5789,29 +6076,25 @@ emlxs_dfc_get_ioinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		ioinfo.a_iocbRsp += HBASTATS.IocbReceived[i];
 	}
 
-	ioinfo.a_adapterIntr =
-	    HBASTATS.IntrEvent[0] + HBASTATS.IntrEvent[1] +
+	ioinfo.a_adapterIntr = HBASTATS.IntrEvent[0] + HBASTATS.IntrEvent[1] +
 	    HBASTATS.IntrEvent[2] + HBASTATS.IntrEvent[3] +
 	    HBASTATS.IntrEvent[4] + HBASTATS.IntrEvent[5] +
 	    HBASTATS.IntrEvent[6] + HBASTATS.IntrEvent[7];
 
 	ioinfo.a_fcpCmd = HBASTATS.FcpIssued;
 	ioinfo.a_fcpCmpl = HBASTATS.FcpCompleted;
-	ioinfo.a_fcpErr =
-	    HBASTATS.FcpCompleted - HBASTATS.FcpGood;
+	ioinfo.a_fcpErr = HBASTATS.FcpCompleted - HBASTATS.FcpGood;
 
 	ioinfo.a_seqXmit = HBASTATS.IpSeqIssued;
 	ioinfo.a_seqRcv = HBASTATS.IpSeqReceived;
-	ioinfo.a_seqXmitErr =
-	    HBASTATS.IpSeqCompleted - HBASTATS.IpSeqGood;
+	ioinfo.a_seqXmitErr = HBASTATS.IpSeqCompleted - HBASTATS.IpSeqGood;
 
 	ioinfo.a_bcastXmit = HBASTATS.IpBcastIssued;
 	ioinfo.a_bcastRcv = HBASTATS.IpBcastReceived;
 
 	ioinfo.a_elsXmit = HBASTATS.ElsCmdIssued;
 	ioinfo.a_elsRcv = HBASTATS.ElsCmdReceived;
-	ioinfo.a_elsXmitErr =
-	    HBASTATS.ElsCmdCompleted - HBASTATS.ElsCmdGood;
+	ioinfo.a_elsXmitErr = HBASTATS.ElsCmdCompleted - HBASTATS.ElsCmdGood;
 
 	ioinfo.a_RSCNRcv = HBASTATS.ElsRscnReceived;
 
@@ -5826,11 +6109,11 @@ emlxs_dfc_get_ioinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (ddi_copyout((void *)&ioinfo, (void *)dfc->buf1,
 	    sizeof (dfc_ioinfo_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_ioinfo() */
@@ -5839,16 +6122,16 @@ emlxs_dfc_get_ioinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_linkinfo_t linkinfo;
+	emlxs_port_t	*port = &PPORT;
+	dfc_linkinfo_t	linkinfo;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_linkinfo_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -5856,6 +6139,7 @@ emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	bzero(&linkinfo, sizeof (dfc_linkinfo_t));
 
 	linkinfo.a_linkEventTag = hba->link_event_tag;
@@ -5871,10 +6155,10 @@ emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 #ifdef MENLO_SUPPORT
 	else if (hba->flag & FC_MENLO_MODE) {
 		linkinfo.a_linkState = LNK_DOWN;
-		linkinfo.a_topology = LNK_MENLO_MAINTENANCE;
+		linkinfo.a_topology  = LNK_MENLO_MAINTENANCE;
 
 	}
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 	else if (hba->state < FC_READY) {
 		linkinfo.a_linkState = LNK_DISCOVERY;
 	} else {
@@ -5895,6 +6179,7 @@ emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			if (linkinfo.a_alpaCnt > 127) {
 				linkinfo.a_alpaCnt = 127;
 			}
+
 			bcopy((void *)&port->alpa_map[1], linkinfo.a_alpaMap,
 			    linkinfo.a_alpaCnt);
 		} else {
@@ -5905,17 +6190,18 @@ emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			}
 		}
 	}
+
 	bcopy(&hba->wwpn, linkinfo.a_wwpName, 8);
 	bcopy(&hba->wwnn, linkinfo.a_wwnName, 8);
 
 	if (ddi_copyout((void *)&linkinfo, (void *)dfc->buf1,
 	    sizeof (dfc_linkinfo_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_linkinfo() */
@@ -5924,17 +6210,17 @@ emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_fctstat(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	emlxs_tgtport_stat_t *statp = &TGTPORTSTAT;
-	dfc_tgtport_stat_t dfcstat;
+	emlxs_port_t		*port = &PPORT;
+	emlxs_tgtport_stat_t	*statp = &TGTPORTSTAT;
+	dfc_tgtport_stat_t	dfcstat;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (emlxs_tgtport_stat_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -5942,13 +6228,15 @@ emlxs_dfc_get_fctstat(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	bzero(&dfcstat, sizeof (dfcstat));
+
+	dfcstat.Version = DFC_TGTPORT_STAT_VERSION;
 
 	dfcstat.FctRcvDropped = statp->FctRcvDropped;
 	dfcstat.FctOverQDepth = statp->FctOverQDepth;
 	dfcstat.FctOutstandingIO = statp->FctOutstandingIO;
-	dfcstat.FctFailedPortRegister =
-	    statp->FctFailedPortRegister;
+	dfcstat.FctFailedPortRegister = statp->FctFailedPortRegister;
 	dfcstat.FctPortRegister = statp->FctPortRegister;
 	dfcstat.FctPortDeregister = statp->FctPortDeregister;
 
@@ -5992,7 +6280,7 @@ emlxs_dfc_get_fctstat(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	else if (hba->flag & FC_MENLO_MODE) {
 		dfcstat.FctLinkState = LNK_DOWN;
 	}
-#endif	/* MENLO_SUPPORT */
+#endif /* MENLO_SUPPORT */
 	else if (hba->state < FC_READY) {
 		dfcstat.FctLinkState = LNK_DISCOVERY;
 	} else {
@@ -6002,41 +6290,40 @@ emlxs_dfc_get_fctstat(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (ddi_copyout((void *)&dfcstat, (void *)dfc->buf1,
 	    sizeof (dfc_tgtport_stat_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_fctstat() */
-#endif	/* SFCT_SUPPORT */
+#endif /* SFCT_SUPPORT */
 
 static int32_t
 emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port;
-	emlxs_config_t *cfg = &CFG;
-	dfc_node_t *dfc_node;
-	dfc_node_t *dnp;
-	uint32_t node_count;
-	NODELIST *nlp;
-	uint32_t size;
-	uint32_t i;
+	emlxs_port_t	*port;
+	emlxs_config_t	*cfg = &CFG;
+	dfc_node_t	*dfc_node;
+	dfc_node_t	*dnp;
+	uint32_t	node_count;
+	NODELIST	*nlp;
+	uint32_t	size;
+	uint32_t	i;
 
 	port = &VPORT(dfc->data1);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: NULL buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: NULL buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < (sizeof (dfc_node_t) * MAX_NODES)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -6044,13 +6331,14 @@ emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (!dfc->buf2 || !dfc->buf2_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: NULL buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: NULL buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf2_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer2 too small. (size=%d)",
@@ -6058,14 +6346,17 @@ emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	node_count = port->node_count;
 
 	if (node_count == 0) {
 		return (0);
 	}
+
 	if (node_count > MAX_NODES) {
 		node_count = MAX_NODES;
 	}
+
 	size = node_count * sizeof (dfc_node_t);
 
 	if (!(dfc_node = (dfc_node_t *)kmem_zalloc(size, KM_NOSLEEP))) {
@@ -6075,6 +6366,7 @@ emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
+
 	dnp = dfc_node;
 
 	rw_enter(&port->node_rwlock, RW_READER);
@@ -6101,30 +6393,33 @@ emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			if (cfg[CFG_NETWORK_ON].current && nlp->nlp_Xri) {
 				dnp->flags |= PORT_FLAG_IP;
 			}
+			if (nlp->nlp_fcp_info & NLP_EMLX_VPORT) {
+				dnp->flags |= PORT_FLAG_VPORT;
+			}
+
 			dnp++;
 			nlp = (NODELIST *) nlp->nlp_list_next;
 		}
 	}
 	rw_exit(&port->node_rwlock);
 
-	if (ddi_copyout((void *)dfc_node, (void *)dfc->buf1,
-	    size, mode) != 0) {
+	if (ddi_copyout((void *)dfc_node, (void *)dfc->buf1, size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(dfc_node, size);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	if (ddi_copyout((void *)&node_count, (void *)dfc->buf2,
 	    sizeof (uint32_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(dfc_node, size);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	kmem_free(dfc_node, size);
 
 	return (0);
@@ -6135,26 +6430,27 @@ emlxs_dfc_get_nodeinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t size;
-	uint32_t max_size;
-	uint8_t *buffer;
-	uint8_t *slim;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	size;
+	uint32_t	max_size;
+	uint8_t		*buffer;
+	uint8_t		*slim;
 
 	offset = dfc->data1;
 	size = dfc->data2;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (size > dfc->buf1_size) {
 		size = dfc->buf1_size;
 	}
+
 	if (offset % 4) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Offset misaligned. (offset=%d)",
@@ -6162,6 +6458,7 @@ emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (size % 4) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Size misaligned. (size=%d)",
@@ -6169,6 +6466,7 @@ emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (hba->flag & FC_SLIM2_MODE) {
 		max_size = SLI2_SLIM2_SIZE;
 	} else {
@@ -6182,9 +6480,11 @@ emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if ((size + offset) > max_size) {
 		size = (max_size - offset);
 	}
+
 	if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate buffer.",
@@ -6192,25 +6492,25 @@ emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
+
 	if (hba->flag & FC_SLIM2_MODE) {
 		slim = (uint8_t *)hba->slim2.virt + offset;
 		emlxs_pcimem_bcopy((uint32_t *)slim, (uint32_t *)buffer,
 		    size);
 	} else {
 		slim = (uint8_t *)hba->slim_addr + offset;
-		READ_SLIM_COPY(hba, (uint32_t *)buffer,
-		    (uint32_t *)slim, (size / 4));
+		READ_SLIM_COPY(hba, (uint32_t *)buffer, (uint32_t *)slim,
+		    (size / 4));
 	}
 
-	if (ddi_copyout((void *)buffer, (void *)dfc->buf1,
-	    size, mode) != 0) {
+	if (ddi_copyout((void *)buffer, (void *)dfc->buf1, size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(buffer, size);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	kmem_free(buffer, size);
 
 	return (0);
@@ -6221,26 +6521,27 @@ emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t size;
-	uint32_t max_size;
-	uint8_t *buffer;
-	uint8_t *slim;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	size;
+	uint32_t	max_size;
+	uint8_t		*buffer;
+	uint8_t		*slim;
 
 	offset = dfc->data1;
 	size = dfc->data2;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (size > dfc->buf1_size) {
 		size = dfc->buf1_size;
 	}
+
 	if (offset % 4) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Offset misaligned. (offset=%d)",
@@ -6248,6 +6549,7 @@ emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (size % 4) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Size misaligned. (szie=%d)",
@@ -6255,6 +6557,7 @@ emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (hba->flag & FC_SLIM2_MODE) {
 		max_size = SLI2_SLIM2_SIZE;
 	} else {
@@ -6268,9 +6571,11 @@ emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if ((size + offset) > max_size) {
 		size = (max_size - offset);
 	}
+
 	if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate buffer.",
@@ -6278,15 +6583,15 @@ emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
-	if (ddi_copyin((void *)dfc->buf1, (void *)buffer,
-	    size, mode) != 0) {
+
+	if (ddi_copyin((void *)dfc->buf1, (void *)buffer, size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(buffer, size);
 		return (DFC_COPYIN_ERROR);
 	}
+
 	if (hba->flag & FC_SLIM2_MODE) {
 		slim = (uint8_t *)hba->slim2.virt + offset;
 		emlxs_pcimem_bcopy((uint32_t *)buffer, (uint32_t *)slim,
@@ -6304,24 +6609,24 @@ emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 } /* emlxs_dfc_write_mem() */
 
 
-/*ARGSUSED*/
+/* ARGSUSED */
 static int32_t
 emlxs_dfc_write_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t value;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	value;
 
 	offset = dfc->data1;
 	value = dfc->data2;
 
 	if (!(hba->flag & FC_OFFLINE_MODE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Adapter not offline.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Adapter not offline.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ONLINE_ERROR);
 	}
+
 	if (offset % 4) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Offset misaligned. (offset=%d)",
@@ -6329,6 +6634,7 @@ emlxs_dfc_write_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (offset > 255) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Offset too large. (offset=%d)",
@@ -6336,6 +6642,7 @@ emlxs_dfc_write_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	WRITE_CSR_REG(hba, (hba->csr_addr + offset), value);
 
 	return (0);
@@ -6346,9 +6653,9 @@ emlxs_dfc_write_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t offset;
-	uint32_t value;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	offset;
+	uint32_t	value;
 
 	offset = dfc->data1;
 
@@ -6359,6 +6666,7 @@ emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_MISALIGNED);
 	}
+
 	if (offset > 255) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Offset too large. (offset=%d)",
@@ -6366,13 +6674,14 @@ emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOBIG);
 	}
+
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -6380,16 +6689,17 @@ emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	value = READ_CSR_REG(hba, (hba->csr_addr + offset));
 
-	if (ddi_copyout((void *)&value, (void *)dfc->buf1,
-	    sizeof (uint32_t), mode) != 0) {
+	if (ddi_copyout((void *)&value, (void *)dfc->buf1, sizeof (uint32_t),
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_read_ctlreg() */
@@ -6398,21 +6708,20 @@ emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t event;
-	uint32_t enable;
-	uint32_t pid;
-	uint32_t count;
-	uint32_t i;
-	emlxs_dfc_event_t *dfc_event;
+	emlxs_port_t		*port = &PPORT;
+	uint32_t		event;
+	uint32_t		enable;
+	uint32_t		pid;
+	uint32_t		count;
+	uint32_t		i;
+	emlxs_dfc_event_t	*dfc_event;
 
 	event = dfc->data1;
 	pid = dfc->data2;
 	enable = dfc->flag;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: %s. pid=%d enable=%d",
-	    emlxs_dfc_xlate(dfc->cmd),
+	    "%s: %s. pid=%d enable=%d", emlxs_dfc_xlate(dfc->cmd),
 	    emlxs_dfc_event_xlate(event), pid, enable);
 
 	switch (event) {
@@ -6421,6 +6730,7 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	case FC_REG_CT_EVENT:
 	case FC_REG_DUMP_EVENT:
 	case FC_REG_TEMP_EVENT:
+	case FC_REG_VPORTRSCN_EVENT:
 	case FC_REG_FCOE_EVENT:
 		break;
 
@@ -6428,8 +6738,8 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: %s. Invalid event. pid=%d enable=%d",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_dfc_event_xlate(event), pid, enable);
+		    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event),
+		    pid, enable);
 
 		return (DFC_ARG_INVALID);
 	}
@@ -6440,6 +6750,7 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		} else if (!dfc->buf1) {
 			dfc->buf1_size = 0;
 		}
+
 		/* Make sure this pid/event is not already registered */
 		dfc_event = NULL;
 		for (i = 0; i < MAX_DFC_EVENTS; i++) {
@@ -6463,16 +6774,18 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 			/* Return if all event objects are busy */
 			if (i == MAX_DFC_EVENTS) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: %s. Too many events registered."
-				    " pid=%d enable=%d",
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
+				    "%s: %s. Too many events registered. "
+				    "pid=%d enable=%d",
 				    emlxs_dfc_xlate(dfc->cmd),
-				    emlxs_dfc_event_xlate(event),
-				    pid, enable);
+				    emlxs_dfc_event_xlate(event), pid,
+				    enable);
 
 				return (DFC_DRVRES_ERROR);
 			}
 		}
+
 		/* Initialize */
 		dfc_event->pid = pid;
 		dfc_event->event = event;
@@ -6484,23 +6797,26 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		(void) emlxs_get_dfc_event(port, dfc_event, 0);
 
 		if (dfc->buf1) {
-			if (ddi_copyout((void *)&dfc_event->last_id, dfc->buf1,
-			    sizeof (uint32_t), mode) != 0) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			if (ddi_copyout((void *)&dfc_event->last_id,
+			    dfc->buf1, sizeof (uint32_t), mode) != 0) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_dfc_error_msg,
 				    "%s: ddi_copyout failed.",
 				    emlxs_dfc_xlate(dfc->cmd));
 
 				return (DFC_COPYOUT_ERROR);
 			}
 		}
+
 		/*
-		 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg, "%s: %s.
-		 * Enabled. pid=%d id=%d", emlxs_dfc_xlate(dfc->cmd),
+		 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
+		 * "%s: %s. Enabled. pid=%d id=%d", emlxs_dfc_xlate(dfc->cmd),
 		 * emlxs_dfc_event_xlate(event), pid, dfc_event->last_id);
 		 */
 
 		hba->log_events |= event;
 	} else {	/* Disable */
+
 		/* Find the event entry */
 		dfc_event = NULL;
 		for (i = 0; i < MAX_DFC_EVENTS; i++) {
@@ -6514,14 +6830,13 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (i == MAX_DFC_EVENTS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: %s. Event not registered."
-			    " pid=%d enable=%d",
+			    "%s: %s. Event not registered. pid=%d enable=%d",
 			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_dfc_event_xlate(event),
-			    pid, enable);
+			    emlxs_dfc_event_xlate(event), pid, enable);
 
 			return (DFC_ARG_INVALID);
 		}
+
 		/* Kill the event thread if it is sleeping */
 		(void) emlxs_kill_dfc_event(port, dfc_event);
 
@@ -6535,10 +6850,8 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			}
 		}
 
-		/*
-		 * If no more pids need this event, then disable logging for
-		 * this event
-		 */
+		/* If no more pids need this event, */
+		/* then disable logging for this event */
 		if (count == 0) {
 			hba->log_events &= ~event;
 		}
@@ -6552,21 +6865,20 @@ emlxs_dfc_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t size;
-	/* uint32_t i; */
-	int32_t rval = 0;
-	HBA_EVENTINFO *event_buffer = NULL;
-	uint32_t event_count = 0;
-	uint32_t missed = 0;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	size;
+	int32_t		rval = 0;
+	HBA_EVENTINFO 	*event_buffer = NULL;
+	uint32_t	event_count = 0;
+	uint32_t	missed = 0;
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 buffer.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 buffer.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	event_count = dfc->buf1_size / sizeof (HBA_EVENTINFO);
 
 	if (!event_count) {
@@ -6576,13 +6888,14 @@ emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (!dfc->buf2 || !dfc->buf2_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 buffer.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 buffer.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf2_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer2 too small. (size=%d)",
@@ -6590,13 +6903,14 @@ emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (!dfc->buf3 || !dfc->buf3_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer3 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer3 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf3_size < sizeof (uint32_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer3 too small. (size=%d)",
@@ -6604,8 +6918,8 @@ emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s called. max=%d",
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s called. max=%d",
 	    emlxs_dfc_xlate(dfc->cmd), event_count);
 
 	size = (event_count * sizeof (HBA_EVENTINFO));
@@ -6616,8 +6930,9 @@ emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_SYSRES_ERROR);
 	}
-	if (emlxs_get_dfc_eventinfo(port, event_buffer,
-	    &event_count, &missed) != 0) {
+
+	if (emlxs_get_dfc_eventinfo(port, event_buffer, &event_count,
+	    &missed) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: emlxs_get_dfc_eventinfo failed.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -6625,6 +6940,7 @@ emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_DRV_ERROR;
 		goto done;
 	}
+
 	if (event_count) {
 		if (ddi_copyout((void *)event_buffer, dfc->buf1,
 		    (event_count * sizeof (HBA_EVENTINFO)), mode) != 0) {
@@ -6636,35 +6952,36 @@ emlxs_dfc_get_eventinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			goto done;
 		}
 	}
-	if (ddi_copyout((void *)&event_count, dfc->buf2,
-	    sizeof (uint32_t), mode) != 0) {
+
+	if (ddi_copyout((void *)&event_count, dfc->buf2, sizeof (uint32_t),
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
-	if (ddi_copyout((void *)&missed, dfc->buf3,
-	    sizeof (uint32_t), mode) != 0) {
+
+	if (ddi_copyout((void *)&missed, dfc->buf3, sizeof (uint32_t),
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
 	    "%s: events=%d missed=%d new=%d last_id=%d",
-	    emlxs_dfc_xlate(dfc->cmd), event_count,
-	    hba->hba_event.missed, hba->hba_event.new,
-	    hba->hba_event.last_id);
+	    emlxs_dfc_xlate(dfc->cmd), event_count, hba->hba_event.missed,
+	    hba->hba_event.new, hba->hba_event.last_id);
 
 done:
 
 	if (event_buffer) {
 		kmem_free(event_buffer, size);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_get_eventinfo() */
@@ -6673,14 +6990,13 @@ done:
 static int32_t
 emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t event;
-	uint32_t pid;
-	uint32_t sleep;
-	uint32_t i;
-	int32_t rval = DFC_SUCCESS;
-	/* char *bp; */
-	emlxs_dfc_event_t *dfc_event;
+	emlxs_port_t		*port = &PPORT;
+	uint32_t		event;
+	uint32_t		pid;
+	uint32_t		sleep;
+	uint32_t		i;
+	int32_t			rval = DFC_SUCCESS;
+	emlxs_dfc_event_t	*dfc_event;
 
 	event = dfc->data1;
 	pid = dfc->data2;
@@ -6690,21 +7006,23 @@ emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	} else if (!dfc->buf1) {
 		dfc->buf1_size = 0;
 	}
+
 	if (dfc->buf2_size < sizeof (uint32_t)) {
 		dfc->buf2 = NULL;
 	} else if (!dfc->buf2) {
 		dfc->buf2_size = 0;
 	}
+
 	if (dfc->buf3_size < sizeof (uint32_t)) {
 		dfc->buf3 = NULL;
 	} else if (!dfc->buf3) {
 		dfc->buf3_size = 0;
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
 	    "%s: %s. pid=%d size=%d,%p rcv_size=%d,%p id=%d",
-	    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event),
-	    pid, dfc->buf1_size, dfc->buf1, dfc->buf2_size, dfc->buf2,
-	    dfc->data3);
+	    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event), pid,
+	    dfc->buf1_size, dfc->buf1, dfc->buf2_size, dfc->buf2, dfc->data3);
 
 	/* Find the event entry */
 	dfc_event = NULL;
@@ -6719,19 +7037,21 @@ emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (i == MAX_DFC_EVENTS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: %s. Event not registered. pid=%d",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_dfc_event_xlate(event), pid);
+		    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event),
+		    pid);
 
 		return (DFC_ARG_INVALID);
 	}
+
 	if (!(hba->log_events & dfc_event->event)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: %s. Event not registered. pid=%d",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_dfc_event_xlate(event), pid);
+		    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event),
+		    pid);
 
 		return (DFC_ARG_INVALID);
 	}
+
 	/* Initialize event buffer pointers */
 	dfc_event->dataout = dfc->buf1;
 	dfc_event->size = dfc->buf1_size;
@@ -6743,12 +7063,12 @@ emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if ((rval = emlxs_get_dfc_event(port, dfc_event, sleep))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
 		    "%s: %s. Exiting. pid=%d rsize=%d id=%d rval=%d",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_dfc_event_xlate(event), pid,
-		    dfc_event->size, dfc_event->last_id, rval);
+		    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event),
+		    pid, dfc_event->size, dfc_event->last_id, rval);
 
 		return (rval);
 	}
+
 	if (dfc->buf2) {
 		if (ddi_copyout((void *)&dfc_event->size, dfc->buf2,
 		    sizeof (uint32_t), mode) != 0) {
@@ -6759,6 +7079,7 @@ emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			return (DFC_COPYOUT_ERROR);
 		}
 	}
+
 	if (dfc->buf3) {
 		if (ddi_copyout((void *)&dfc_event->last_id, dfc->buf3,
 		    sizeof (uint32_t), mode) != 0) {
@@ -6769,10 +7090,10 @@ emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			return (DFC_COPYOUT_ERROR);
 		}
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
 	    "%s: %s. Completed. pid=%d rsize=%d id=%d",
-	    emlxs_dfc_xlate(dfc->cmd),
-	    emlxs_dfc_event_xlate(event), pid,
+	    emlxs_dfc_xlate(dfc->cmd), emlxs_dfc_event_xlate(event), pid,
 	    dfc_event->size, dfc_event->last_id);
 
 	return (rval);
@@ -6780,77 +7101,47 @@ emlxs_dfc_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 } /* emlxs_dfc_get_event() */
 
 
-
-static int32_t
-emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+extern uint32_t
+emlxs_get_dump_region(emlxs_hba_t *hba, uint32_t region,
+    uint8_t *buffer, uint32_t *psize)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t size;
-	uint32_t size_only;
-	uint32_t rval = 0;
-	uint8_t *buffer = NULL;
-	uint8_t *memptr;
-	uint32_t *wptr;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	size;
+	uint32_t	size_only;
+	uint32_t	rval = 0;
+	uint8_t		*memptr;
+	uint32_t	*wptr;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s: region=%d size=%d",
-	    emlxs_dfc_xlate(dfc->cmd),
-	    dfc->data1, dfc->buf1_size);
-
-	if (!dfc->buf1 || !dfc->buf1_size) {
+	if (!buffer || !(*psize)) {
 		size_only = 1;
-		size = (uint32_t)-1;
+		size = 0xffffffff;
 	} else {
 		size_only = 0;
-		size = dfc->buf1_size;
+		size = *psize;
 	}
 
-	if (!dfc->buf2 || !dfc->buf2_size) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
-
-		return (DFC_ARG_NULL);
-	}
-	if (dfc->buf2_size < sizeof (uint32_t)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer2 too small. (size=%d)",
-		    emlxs_dfc_xlate(dfc->cmd), dfc->buf2_size);
-
-		return (DFC_ARG_TOOSMALL);
-	}
-	switch (dfc->data1) {
+	switch (region) {
 	case 0:	/* SLI Registers */
 
 		if (size < (4 * sizeof (uint32_t))) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(SLI Registers: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = (4 * sizeof (uint32_t));
 
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
 		wptr = (uint32_t *)buffer;
-
 		wptr[0] = READ_CSR_REG(hba, FC_HA_REG(hba, hba->csr_addr));
-
 		wptr[1] = READ_CSR_REG(hba, FC_CA_REG(hba, hba->csr_addr));
-
 		wptr[2] = READ_CSR_REG(hba, FC_HS_REG(hba, hba->csr_addr));
-
 		wptr[3] = READ_CSR_REG(hba, FC_HC_REG(hba, hba->csr_addr));
 
 		break;
@@ -6866,14 +7157,7 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
 		if (hba->flag & FC_SLIM2_MODE) {
 			memptr = (uint8_t *)hba->slim2.virt;
 			emlxs_pcimem_bcopy((uint32_t *)memptr,
@@ -6890,28 +7174,22 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (size < sizeof (PCB)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(PCB: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = sizeof (PCB);
 
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
 		memptr = (uint8_t *)&(((SLIM2 *)hba->slim2.virt)->pcb);
-		emlxs_pcimem_bcopy((uint32_t *)memptr,
-		    (uint32_t *)buffer, size);
+		emlxs_pcimem_bcopy((uint32_t *)memptr, (uint32_t *)buffer,
+		    size);
 
 		break;
 
@@ -6919,25 +7197,19 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (size < MAILBOX_CMD_BSIZE) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(Mailbox: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = MAILBOX_CMD_BSIZE;
 
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
 		if (hba->flag & FC_SLIM2_MODE) {
 			memptr = (uint8_t *)hba->slim2.virt;
 			emlxs_pcimem_bcopy((uint32_t *)memptr,
@@ -6954,27 +7226,22 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (size < MAX_RINGS * sizeof (HGP)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(HGP: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = MAX_RINGS * sizeof (HGP);
 
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		} {
-			memptr = (uint8_t *)hba->slim_addr +
-			    hba->hgp_ring_offset;
+		{
+			memptr =
+			    (uint8_t *)hba->slim_addr + hba->hgp_ring_offset;
 			READ_SLIM_COPY(hba, (uint32_t *)buffer,
 			    (uint32_t *)memptr, (size / 4));
 		}
@@ -6985,28 +7252,23 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (size < MAX_RINGS * sizeof (PGP)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(PGP: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = MAX_RINGS * sizeof (PGP);
 
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
-		memptr = (uint8_t *)((SLIM2 *)hba->slim2.virt)->mbx.us.s2.port;
-		emlxs_pcimem_bcopy((uint32_t *)memptr,
-		    (uint32_t *)buffer, size);
+		memptr =
+		    (uint8_t *)((SLIM2 *)hba->slim2.virt)->mbx.us.s2.port;
+		emlxs_pcimem_bcopy((uint32_t *)memptr, (uint32_t *)buffer,
+		    size);
 
 		break;
 
@@ -7014,28 +7276,22 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (size < SLI_IOCB_MAX_SIZE) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(Rings: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = SLI_IOCB_MAX_SIZE;
 
 		if (size_only) {
 			break;
 		}
-		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Unable to allocate buffer. size=%d",
-			    emlxs_dfc_xlate(dfc->cmd), size);
 
-			rval = DFC_SYSRES_ERROR;
-			goto done;
-		}
 		memptr = (uint8_t *)((SLIM2 *)hba->slim2.virt)->IOCBs;
-		emlxs_pcimem_bcopy((uint32_t *)memptr,
-		    (uint32_t *)buffer, size);
+		emlxs_pcimem_bcopy((uint32_t *)memptr, (uint32_t *)buffer,
+		    size);
 
 		break;
 
@@ -7043,17 +7299,91 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		if (size < sizeof (emlxs_hba_t)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Buffer1 too small. (size=%d)",
-			    emlxs_dfc_xlate(dfc->cmd), size);
+			    "emlxs_get_dump_region: Buffer too small. "
+			    "(Driver: size=%d)", size);
 
 			rval = DFC_ARG_TOOSMALL;
 			goto done;
 		}
+
 		size = sizeof (emlxs_hba_t);
 
 		if (size_only) {
 			break;
 		}
+
+		memptr = (uint8_t *)hba;
+		bcopy((void *)memptr, (void *)buffer, size);
+
+		break;
+
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "emlxs_get_dump_region: Invalid region. (id=%d)", region);
+
+		rval = DFC_ARG_INVALID;
+	}
+
+done:
+
+	*psize = size;
+
+	return (rval);
+
+} /* emlxs_get_dump_region() */
+
+
+
+static int32_t
+emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	size;
+	uint32_t	size_only = 0;
+	uint32_t	rval = 0;
+	uint8_t		*buffer = NULL;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
+	    "%s: region=%d size=%d",
+	    emlxs_dfc_xlate(dfc->cmd), dfc->data1, dfc->buf1_size);
+
+	if (!dfc->buf1 || !dfc->buf1_size) {
+		size_only = 1;
+	}
+
+	if (!dfc->buf2 || !dfc->buf2_size) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
+
+		return (DFC_ARG_NULL);
+	}
+
+	if (dfc->buf2_size < sizeof (uint32_t)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Buffer2 too small. (size=%d)",
+		    emlxs_dfc_xlate(dfc->cmd), dfc->buf2_size);
+
+		return (DFC_ARG_TOOSMALL);
+	}
+
+	/* First get region size only */
+	size = 0;
+	rval = emlxs_get_dump_region(hba, dfc->data1, NULL, &size);
+
+	if (rval != 0) {
+		goto done;
+	}
+
+	if (!size_only) {
+		if (dfc->buf1_size < size) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "%s: Buffer1 too small. (size: %d < %d)",
+			    emlxs_dfc_xlate(dfc->cmd), dfc->buf1_size, size);
+
+			rval = DFC_ARG_TOOSMALL;
+			goto done;
+		}
+
 		if (!(buffer = (uint8_t *)kmem_zalloc(size, KM_SLEEP))) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: Unable to allocate buffer. size=%d",
@@ -7062,33 +7392,17 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_SYSRES_ERROR;
 			goto done;
 		}
-		memptr = (uint8_t *)hba;
-		bcopy((void *)memptr, (void *)buffer, size);
 
-		break;
+		/* Get the region data */
+		rval = emlxs_get_dump_region(hba, dfc->data1, buffer, &size);
 
-	default:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Invalid id.  id=%d",
-		    emlxs_dfc_xlate(dfc->cmd), dfc->data1);
-
-		rval = DFC_ARG_INVALID;
-	}
-
-	if (rval == 0) {
-		if (buffer) {
-			if (ddi_copyout((void *)buffer, (void *)dfc->buf1,
-			    size, mode) != 0) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-				    "%s: ddi_copyout failed.",
-				    emlxs_dfc_xlate(dfc->cmd));
-
-				rval = DFC_COPYOUT_ERROR;
-				goto done;
-			}
+		if (rval != 0) {
+			goto done;
 		}
-		if (ddi_copyout((void *)&size, (void *)dfc->buf2,
-		    sizeof (uint32_t), mode) != 0) {
+
+		/* Return the region data */
+		if (ddi_copyout((void *)buffer, (void *) dfc->buf1,
+		    size, mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: ddi_copyout failed.",
 			    emlxs_dfc_xlate(dfc->cmd));
@@ -7097,57 +7411,414 @@ emlxs_dfc_get_dump_region(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			goto done;
 		}
 	}
+
+	/* Return the region size */
+	if (ddi_copyout((void *) &size, (void *) dfc->buf2,
+	    sizeof (uint32_t), mode) != 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
+
+		rval = DFC_COPYOUT_ERROR;
+		goto done;
+	}
+
 done:
 
 	if (buffer) {
 		kmem_free(buffer, size);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_get_dump_region() */
 
 
 
-/*ARGSUSED*/
+#ifdef MENLO_SUPPORT
 static int32_t
-emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+emlxs_dfc_menlo_port_offset(emlxs_hba_t *hba)
+{
+	uint32_t	cnt;
+	char		pathname[256];
+
+	(void) ddi_pathname(hba->dip, pathname);
+	cnt = strlen(pathname);
+	if ((cnt < 4) || (strcmp(&pathname[cnt-3], "0,1") != 0))
+		return (0);
+	return (1);
+}
+
+static int32_t
+emlxs_dfc_set_menlo_loopback(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 	MAILBOXQ *mbq = NULL;
 	MAILBOX *mb = NULL;
-	uint32_t rval = DFC_SUCCESS;
+	fc_packet_t *pkt = NULL;
+	uint32_t mbxstatus;
 	uint32_t i;
-	uint32_t timeout;
-	uint32_t topology;
-	uint32_t new_mode;
-	NODELIST *ndlp;
+	uint32_t offset;
+	uint32_t rval = 0;
+	menlo_cmd_t *cmd;
+
+	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
+	    KM_SLEEP)) == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to allocate mailbox buffer.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_SYSRES_ERROR;
+		goto done;
+	}
+
+	mb = (MAILBOX *)mbq;
+
+	/* SET MENLO maint mode */
+	/* Create the set_variable mailbox request */
+	emlxs_mb_set_var(hba, mb, 0x103107, 1);
+
+	mbq->flag |= MBQ_PASSTHRU;
+
+	/* issue the mbox cmd to the sli */
+	mbxstatus = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
+
+	if (mbxstatus) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: %s failed. mbxstatus=0x%x",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE),
+		    emlxs_mb_cmd_xlate(mb->mbxCommand), mbxstatus);
+
+		rval = DFC_IO_ERROR;
+		if (mbxstatus == MBX_TIMEOUT)
+			rval = DFC_TIMEOUT;
+		goto done;
+	}
+
+
+	/* Wait 30 sec for maint mode */
+	i = 0;
+	do {
+		if (i++ > 300) {
+			break;
+		}
+
+		delay(drv_usectohz(100000));
+
+	} while (!(hba->flag & FC_MENLO_MODE));
+
+	if (!(hba->flag & FC_MENLO_MODE)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to enter maint mode.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_DRV_ERROR;
+		goto done;
+	}
+
+	offset = emlxs_dfc_menlo_port_offset(hba);
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+	    "%s: Entered maint mode. Port offset: %d",
+	    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE), offset);
+
+
+	/* Issue Menlo loopback command */
+	if (!(pkt = emlxs_pkt_alloc(port, sizeof (menlo_cmd_t),
+	    sizeof (uint32_t), 0, KM_NOSLEEP))) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to allocate packet.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_SYSRES_ERROR;
+		goto done;
+	}
+
+	/* Make this a polled IO */
+	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
+	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
+	pkt->pkt_comp = NULL;
+	pkt->pkt_tran_type = FC_PKT_EXCHANGE;
+	pkt->pkt_timeout = 30;
+
+	/* Build the fc header */
+	pkt->pkt_cmd_fhdr.d_id = SWAP_DATA24_LO(EMLXS_MENLO_DID);
+	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_COMMAND;
+	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_cmd_fhdr.type = EMLXS_MENLO_TYPE;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
+	pkt->pkt_cmd_fhdr.seq_id = 0;
+	pkt->pkt_cmd_fhdr.df_ctl = 0;
+	pkt->pkt_cmd_fhdr.seq_cnt = 0;
+	pkt->pkt_cmd_fhdr.ox_id = 0xFFFF;
+	pkt->pkt_cmd_fhdr.rx_id = 0xFFFF;
+	pkt->pkt_cmd_fhdr.ro = 0;
+
+	cmd = (menlo_cmd_t *)pkt->pkt_cmd;
+	cmd->code = SWAP_LONG(MENLO_CMD_LOOPBACK);
+	cmd->lb.context = SWAP_LONG(offset);
+	cmd->lb.type = SWAP_LONG(MENLO_LOOPBACK_ENABLE);
+
+	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to send packet.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_IO_ERROR;
+		goto done;
+	}
+
+	if (pkt->pkt_state != FC_PKT_SUCCESS) {
+		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "%s: Pkt Transport error. Pkt Timeout.",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+			rval = DFC_TIMEOUT;
+		} else if ((pkt->pkt_state == FC_PKT_LOCAL_RJT) &&
+		    (pkt->pkt_reason == FC_REASON_OVERRUN)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "%s: Pkt Transport error. Rsp overrun.",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+			rval = DFC_RSP_BUF_OVERRUN;
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "%s: Pkt Transport error. state=%x",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE),
+			    pkt->pkt_state);
+			rval = DFC_IO_ERROR;
+		}
+		goto done;
+	}
+
+
+	/* CLEAR MENLO maint mode */
+	/* Create the set_variable mailbox request */
+	emlxs_mb_set_var(hba, mb, 0x103107, 0);
+
+	mbq->flag |= MBQ_PASSTHRU;
+
+	/* issue the mbox cmd to the sli */
+	mbxstatus = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
+
+	if (mbxstatus) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: %s failed. mbxstatus=0x%x",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE),
+		    emlxs_mb_cmd_xlate(mb->mbxCommand), mbxstatus);
+
+		rval = DFC_IO_ERROR;
+		if (mbxstatus == MBX_TIMEOUT)
+			rval = DFC_TIMEOUT;
+	}
+
+	delay(drv_usectohz(1000000));
+	i = 0;
+	while ((hba->state < FC_LINK_UP) && (hba->state != FC_ERROR)) {
+		delay(drv_usectohz(100000));
+		i++;
+
+		if (i == 300) {
+			rval = DFC_TIMEOUT;
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+			    "%s: Linkup timeout.",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+			goto done;
+		}
+	}
+
+done:
+	/* Free allocated mbox memory */
+	if (mbq) {
+		kmem_free(mbq, sizeof (MAILBOXQ));
+	}
+	if (pkt) {
+		emlxs_pkt_free(pkt);
+	}
+	return (rval);
+}
+
+static int32_t
+emlxs_dfc_set_menlo_fte(emlxs_hba_t *hba)
+{
+	emlxs_port_t *port = &PPORT;
+	fc_packet_t *pkt = NULL;
+	uint32_t rval = 0;
+	menlo_cmd_t *cmd;
+
+
+	/* Issue Menlo loopback command */
+	if (!(pkt = emlxs_pkt_alloc(port, sizeof (menlo_cmd_t),
+	    sizeof (uint32_t), 0, KM_NOSLEEP))) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to allocate packet.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_SYSRES_ERROR;
+		goto done;
+	}
+
+	/* Make this a polled IO */
+	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
+	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
+	pkt->pkt_comp = NULL;
+	pkt->pkt_tran_type = FC_PKT_EXCHANGE;
+	pkt->pkt_timeout = 30;
+
+	/* Build the fc header */
+	pkt->pkt_cmd_fhdr.d_id = SWAP_DATA24_LO(EMLXS_MENLO_DID);
+	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_COMMAND;
+	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_cmd_fhdr.type = EMLXS_MENLO_TYPE;
+	pkt->pkt_cmd_fhdr.f_ctl =
+	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
+	pkt->pkt_cmd_fhdr.seq_id = 0;
+	pkt->pkt_cmd_fhdr.df_ctl = 0;
+	pkt->pkt_cmd_fhdr.seq_cnt = 0;
+	pkt->pkt_cmd_fhdr.ox_id = 0xFFFF;
+	pkt->pkt_cmd_fhdr.rx_id = 0xFFFF;
+	pkt->pkt_cmd_fhdr.ro = 0;
+
+	cmd = (menlo_cmd_t *)pkt->pkt_cmd;
+	cmd->code = SWAP_LONG(MENLO_CMD_FTE_INSERT);
+	cmd->fte_insert.fcid = SWAP_LONG(0);
+	bcopy((caddr_t)&port->wwpn, (caddr_t)cmd->fte_insert.wwpn, 8);
+
+	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to send packet.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_IO_ERROR;
+		goto done;
+	}
+
+	if (pkt->pkt_state != FC_PKT_SUCCESS) {
+		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "%s: Pkt Transport error. Pkt Timeout.",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+			rval = DFC_TIMEOUT;
+		} else if ((pkt->pkt_state == FC_PKT_LOCAL_RJT) &&
+		    (pkt->pkt_reason == FC_REASON_OVERRUN)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "%s: Pkt Transport error. Rsp overrun.",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+			rval = DFC_RSP_BUF_OVERRUN;
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_dfc_error_msg,
+			    "%s: Pkt Transport error. state=%x",
+			    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE),
+			    pkt->pkt_state);
+			rval = DFC_IO_ERROR;
+		}
+		goto done;
+	}
+
+
+done:
+	if (pkt) {
+		emlxs_pkt_free(pkt);
+	}
+	return (rval);
+}
+
+static int32_t
+emlxs_dfc_reset_menlo(emlxs_hba_t *hba)
+{
+	emlxs_port_t *port = &PPORT;
+	MAILBOXQ *mbq = NULL;
+	MAILBOX *mb = NULL;
+	uint32_t mbxstatus;
+	uint32_t rval = 0;
+
+	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
+	    KM_SLEEP)) == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Unable to allocate mailbox buffer.",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE));
+
+		rval = DFC_SYSRES_ERROR;
+		goto done;
+	}
+
+	mb = (MAILBOX *)mbq;
+
+	/* RESET MENLO */
+	/* Create the set_variable mailbox request */
+	emlxs_mb_set_var(hba, mb, 0x103007, 0);
+
+	mbq->flag |= MBQ_PASSTHRU;
+
+	/* issue the mbox cmd to the sli */
+	mbxstatus = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
+
+	if (mbxstatus) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: %s failed. mbxstatus=0x%x",
+		    emlxs_dfc_xlate(EMLXS_LOOPBACK_MODE),
+		    emlxs_mb_cmd_xlate(mb->mbxCommand), mbxstatus);
+
+		rval = DFC_IO_ERROR;
+		if (mbxstatus == MBX_TIMEOUT)
+			rval = DFC_TIMEOUT;
+		goto done;
+	}
+done:
+	/* Free allocated mbox memory */
+	if (mbq) {
+		kmem_free(mbq, sizeof (MAILBOXQ));
+	}
+	return (rval);
+}
+
+#endif /* MENLO_SUPPORT */
+
+/* ARGSUSED */
+static int32_t
+emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t	*port = &PPORT;
+	emlxs_config_t	*cfg = &CFG;
+	MAILBOXQ	*mbq = NULL;
+	MAILBOX		*mb = NULL;
+	uint32_t	rval = DFC_SUCCESS;
+	uint32_t	i;
+	uint32_t	timeout;
+	uint32_t	topology;
+	uint32_t	speed;
+	uint32_t	new_mode;
+	NODELIST	*ndlp;
 
 	/* Reinitialize the link */
 	switch (dfc->flag) {
 	case 0:	/* Disable */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
-		    "%s: Disabling Loopback.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Disabling Loopback.", emlxs_dfc_xlate(dfc->cmd));
 
 		if (!(hba->flag & FC_LOOPBACK_MODE)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
 			    "%s: Loopback already disabled.",
 			    emlxs_dfc_xlate(dfc->cmd));
 
-			return (0);
+			return (rval);
 		}
-		(void) emlxs_reset(port, FC_FCA_LINK_RESET);
-
-		return (0);
+		goto resetdone;
 
 	case 1:	/* Internal loopback */
 		new_mode = FC_ILB_MODE;
 		topology = FLAGS_LOCAL_LB;
+		speed = 0;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
-		    "%s: Enabling ILB.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Enabling ILB.", emlxs_dfc_xlate(dfc->cmd));
 
 		/* Check if mode already set */
 		if ((hba->flag & FC_ILB_MODE)) {
@@ -7155,17 +7826,18 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			    "%s: ILB mode already enabled.",
 			    emlxs_dfc_xlate(dfc->cmd));
 
-			return (0);
+			return (rval);
 		}
+
 		break;
 
 	case 2:	/* External loopback */
 		new_mode = FC_ELB_MODE;
 		topology = FLAGS_TOPOLOGY_MODE_LOOP;
+		speed = cfg[CFG_LINK_SPEED].current;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
-		    "%s: Enabling ELB.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Enabling ELB.", emlxs_dfc_xlate(dfc->cmd));
 
 		/* Check if mode already set */
 		if ((hba->flag & FC_ELB_MODE)) {
@@ -7173,8 +7845,9 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			    "%s: ELB mode already enabled.",
 			    emlxs_dfc_xlate(dfc->cmd));
 
-			return (0);
+			return (rval);
 		}
+
 		break;
 
 	default:
@@ -7193,19 +7866,37 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_OFFLINE_ERROR);
 	}
-	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
+
+#ifdef MENLO_SUPPORT
+	if (hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Menlo support detected: mode:x%x",
+		    emlxs_dfc_xlate(dfc->cmd), new_mode);
+
+		if (new_mode == FC_ILB_MODE) {
+			rval = emlxs_dfc_set_menlo_loopback(hba);
+			if (rval)
+				goto done;
+		}
+	}
+#endif /* MENLO_SUPPORT */
+
+	if ((mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
+	    KM_SLEEP)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate mailbox buffer.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
-		return (DFC_SYSRES_ERROR);
+		rval = DFC_SYSRES_ERROR;
+		goto done;
 	}
-	mb = (MAILBOX *)mbq;
+
+	mb = (MAILBOX *) mbq;
 
 	/* Take the link down */
 	emlxs_mb_down_link(hba, mb);
 
-	rval = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
+	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -7215,17 +7906,18 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_TIMEOUT;
 		goto done;
 	}
+
 	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. status=%x",
-		    emlxs_dfc_xlate(dfc->cmd),
+		    "%s: %s failed. status=%x", emlxs_dfc_xlate(dfc->cmd),
 		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	/* Reinitialize the link */
-	emlxs_mb_init_link(hba, mb, topology, 0);
+	emlxs_mb_init_link(hba, mb, topology, speed);
 
 	/* Set the loopback mode and timer */
 	mutex_enter(&EMLXS_PORT_LOCK);
@@ -7233,7 +7925,7 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	hba->loopback_tics = hba->timer_tics + emlxs_loopback_tmo;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	rval = emlxs_mb_issue_cmd(hba, mb, MBX_WAIT, 0);
+	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -7243,20 +7935,27 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_TIMEOUT;
 		goto done;
 	}
+
 	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: %s failed. status=%x",
-		    emlxs_dfc_xlate(dfc->cmd),
+		    "%s: %s failed. status=%x", emlxs_dfc_xlate(dfc->cmd),
 		    emlxs_mb_cmd_xlate(mb->mbxCommand), rval);
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
-	/* Wait for adapter to come online */
+
+	/*
+	 * Wait for adapter to come online.
+	 * Need *2 since we wait 1/2 sec in while loop.
+	 */
 	timeout = dfc->data1;
 	if (!timeout) {
-		timeout = 60;
+		timeout = 60 * 2;
+	} else {
+		timeout = timeout * 2;
 	}
+
 	i = 0;
 	while ((hba->state < FC_LINK_UP) && (hba->state != FC_ERROR)) {
 		delay(drv_usectohz(500000));
@@ -7266,13 +7965,11 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_TIMEOUT;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "%s: Linkup timeout.",
-			    emlxs_dfc_xlate(dfc->cmd));
+			    "%s: Linkup timeout.", emlxs_dfc_xlate(dfc->cmd));
 
 			goto done;
 		}
 	}
-
 
 	/* Create host node */
 	if (emlxs_mb_reg_did(port, port->did, (SERV_PARM *)&hba->sparam,
@@ -7284,11 +7981,13 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_DRV_ERROR;
 		goto done;
 	}
+
 	i = 0;
 	do {
 		if (i++ > 300) {
 			break;
 		}
+
 		delay(drv_usectohz(100000));
 
 	} while (!(ndlp = emlxs_node_find_did(port, port->did)));
@@ -7301,10 +8000,21 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_DRV_ERROR;
 		goto done;
 	}
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
-	    "%s: Node created. node=%p",
-	    emlxs_dfc_xlate(dfc->cmd), ndlp);
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
+	    "%s: Node created. node=%p", emlxs_dfc_xlate(dfc->cmd), ndlp);
+
+#ifdef MENLO_SUPPORT
+	if (hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
+		    "%s: Menlo support detected: mode:x%x",
+		    emlxs_dfc_xlate(dfc->cmd), new_mode);
+
+		rval = emlxs_dfc_set_menlo_fte(hba);
+		if (rval)
+			goto done;
+	}
+#endif /* MENLO_SUPPORT */
 
 	/* Create host XRI */
 	(void) emlxs_create_xri(port, &hba->ring[FC_CT_RING], ndlp);
@@ -7314,50 +8024,60 @@ emlxs_dfc_loopback_mode(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		if (i++ > 300) {
 			break;
 		}
+
 		delay(drv_usectohz(100000));
 
 	} while (!ndlp->nlp_Xri);
 
 	if (!ndlp->nlp_Xri) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Unable to create XRI.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Unable to create XRI.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_DRV_ERROR;
 		goto done;
 	}
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
-	    "%s: XRI created. xri=%x",
-	    emlxs_dfc_xlate(dfc->cmd), ndlp->nlp_Xri);
-
-
+	    "%s: XRI created. xri=%x", emlxs_dfc_xlate(dfc->cmd),
+	    ndlp->nlp_Xri);
 done:
-
 	/* Free allocated mbox memory */
 	if (mbq) {
 		kmem_free(mbq, sizeof (MAILBOXQ));
 	}
-	if (rval) {
-		/* Reset the adapter */
-		(void) emlxs_reset(port, FC_FCA_RESET);
-	}
-	return (rval);
 
+	if (rval) {
+resetdone:
+		/* Reset the adapter */
+#ifdef MENLO_SUPPORT
+		if (hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) {
+
+			rval = emlxs_dfc_reset_menlo(hba);
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
+			    "%s: Menlo reset: rval:x%x",
+			    emlxs_dfc_xlate(dfc->cmd), rval);
+	}
+#endif /* MENLO_SUPPORT */
+
+		/* Reset link whether we are bound to ULP or not */
+		(void) emlxs_reset_link(hba, 1);
+	}
+
+	return (rval);
 } /* emlxs_dfc_loopback_mode() */
 
 
 static int32_t
 emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint32_t rval = 0;
-	/* uint32_t i; */
-	NODELIST *ndlp;
-	clock_t timeout;
-	/* uint32_t tics_timeout; */
-	fc_packet_t *pkt = NULL;
-	SLI_CT_REQUEST *CtCmd;
-	uint16_t CtRsp;
+	emlxs_port_t	*port = &PPORT;
+	uint32_t	rval = 0;
+	NODELIST	*ndlp;
+	clock_t		timeout;
+	fc_packet_t	*pkt = NULL;
+	SLI_CT_REQUEST	*CtCmd;
+	uint16_t	CtRsp;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	if (!(hba->flag & FC_LOOPBACK_MODE)) {
@@ -7375,36 +8095,36 @@ emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	if (!(hba->flag & FC_ONLINE_MODE)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Adapter offline.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Adapter offline.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_OFFLINE_ERROR;
 		goto done;
 	}
+
 	if (hba->state < FC_LINK_UP) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Link not up.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Link not up.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_OFFLINE_ERROR;
 		goto done;
 	}
+
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: NULL buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: NULL buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (!dfc->buf2 || !dfc->buf2_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: NULL buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: NULL buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	if (dfc->buf1_size > MAX_CT_PAYLOAD) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too large. (size=%d)",
@@ -7413,47 +8133,48 @@ emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_ARG_TOOBIG;
 		goto done;
 	}
+
 	/* Check if we have a node for ourselves */
 	ndlp = emlxs_node_find_did(port, port->did);
 
 	if (!ndlp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Host node not found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Host node not found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_INVALID;
 		goto done;
 	}
+
 	if (!ndlp->nlp_Xri) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Host XRI not found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Host XRI not found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_DRV_ERROR;
 		goto done;
 	}
+
 	if (!(pkt = emlxs_pkt_alloc(port, dfc->buf1_size + 16,
 	    dfc->buf2_size + 16, 0, KM_SLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Unable to allocate pkt.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Unable to allocate pkt.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_SYSRES_ERROR;
 		goto done;
 	}
-	CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
+
+	CtCmd = (SLI_CT_REQUEST*)pkt->pkt_cmd;
 	CtRsp = SLI_CT_LOOPBACK;
 	CtCmd->CommandResponse.bits.CmdRsp = SWAP_DATA16(CtRsp);
 
 	if (ddi_copyin((void *)dfc->buf1, (void *)&CtCmd->un.data,
 	    dfc->buf1_size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	pkt->pkt_tran_type = FC_PKT_OUTBOUND;
 	pkt->pkt_timeout = 2 * hba->fc_ratov;
 	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -7477,7 +8198,8 @@ emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (hba->loopback_pkt) {
 		rval = 0;
 		while ((rval != -1) && hba->loopback_pkt) {
-			rval = cv_timedwait(&EMLXS_PKT_CV, &EMLXS_PKT_LOCK,
+			rval =
+			    cv_timedwait(&EMLXS_PKT_CV, &EMLXS_PKT_LOCK,
 			    timeout);
 		}
 
@@ -7490,18 +8212,19 @@ emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			goto done;
 		}
 	}
-	hba->loopback_pkt = (void *)pkt;
+	hba->loopback_pkt = (void *) pkt;
 	mutex_exit(&EMLXS_PKT_LOCK);
 
 	/* Send polled command */
 	if ((rval = emlxs_pkt_send(pkt, 1)) != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "Pkt Transport error. ret=%x state=%x",
-		    rval, pkt->pkt_state);
+		    "Pkt Transport error. ret=%x state=%x", rval,
+		    pkt->pkt_state);
 
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -7509,12 +8232,12 @@ emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_TIMEOUT;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "Pkt Transport error. state=%x",
-			    pkt->pkt_state);
+			    "Pkt Transport error. state=%x", pkt->pkt_state);
 			rval = DFC_IO_ERROR;
 		}
 		goto done;
 	}
+
 	/* Wait for sequence completion */
 	mutex_enter(&EMLXS_PKT_LOCK);
 	rval = 0;
@@ -7530,21 +8253,21 @@ emlxs_dfc_loopback_test(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_TIMEOUT;
 		goto done;
 	}
-	CtCmd = (SLI_CT_REQUEST *)pkt->pkt_resp;
+
+	CtCmd = (SLI_CT_REQUEST*)pkt->pkt_resp;
 
 	if (ddi_copyout((void *)&CtCmd->un.data, (void *)dfc->buf2,
 	    dfc->buf2_size, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	rval = 0;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
-	    "%s: Test completed.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg, "%s: Test completed.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 done:
@@ -7559,21 +8282,22 @@ done:
 		/* Reset the adapter */
 		(void) emlxs_reset(port, FC_FCA_LINK_RESET);
 	}
+
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_loopback_test() */
 
 
 extern int32_t
-emlxs_dfc_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ * iocbq)
+emlxs_dfc_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 {
-	emlxs_port_t *port = &PPORT;
-	IOCB *cmd;
-	emlxs_buf_t *sbp;
-	/* NODELIST *ndlp; */
+	emlxs_port_t	*port = &PPORT;
+	IOCB		*cmd;
+	emlxs_buf_t	*sbp;
 
 	cmd = &iocbq->iocb;
 
@@ -7585,23 +8309,24 @@ emlxs_dfc_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ * iocbq)
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "Stray interrupt. cmd=0x%x iotag=0x%x"
-		    " status=0x%x perr=0x%x",
-		    (uint32_t)cmd->ulpCommand,
-		    (uint32_t)cmd->ulpIoTag,
-		    cmd->ulpStatus, cmd->un.ulpWord[4]);
+		    "Stray interrupt. cmd=0x%x iotag=0x%x status=0x%x "
+		    "perr=0x%x", (uint32_t)cmd->ulpCommand,
+		    (uint32_t)cmd->ulpIoTag, cmd->ulpStatus,
+		    cmd->un.ulpWord[4]);
 
 		return (DFC_ARG_INVALID);
 	}
+
 	if (rp->ringno != FC_CT_RING) {
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "CT Event: Invalid ring: ring=%d iocbq=%p",
-		    rp->ringno, iocbq);
+		    "CT Event: Invalid ring: ring=%d iocbq=%p", rp->ringno,
+		    iocbq);
 
 		return (DFC_ARG_INVALID);
 	}
+
 	switch (cmd->ulpCommand) {
 	case CMD_XMIT_SEQUENCE_CR:
 	case CMD_XMIT_SEQUENCE64_CR:
@@ -7635,8 +8360,7 @@ emlxs_dfc_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ * iocbq)
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "Invalid iocb: cmd=0x%x",
-		    cmd->ulpCommand);
+		    "Invalid iocb: cmd=0x%x", cmd->ulpCommand);
 
 		emlxs_pkt_complete(sbp, cmd->ulpStatus,
 		    cmd->un.grsp.perr.statLocalError, 1);
@@ -7650,16 +8374,15 @@ emlxs_dfc_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ * iocbq)
 } /* emlxs_dfc_handle_event() */
 
 
-/*ARGSUSED*/
+/* ARGSUSED */
 extern int
-emlxs_dfc_handle_unsol_req(emlxs_port_t *port, RING *rp,
-	IOCBQ *iocbq, MATCHMAP *mp, uint32_t size)
+emlxs_dfc_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+    MATCHMAP *mp, uint32_t size)
 {
-	emlxs_hba_t *hba = HBA;
-	IOCB *iocb;
-	uint8_t *bp;
-	/* dfc_t *dfc; */
-	fc_packet_t *pkt;
+	emlxs_hba_t	*hba = HBA;
+	IOCB		*iocb;
+	uint8_t		*bp;
+	fc_packet_t	*pkt;
 
 	iocb = &iocbq->iocb;
 	bp = (uint8_t *)mp->virt;
@@ -7669,9 +8392,9 @@ emlxs_dfc_handle_unsol_req(emlxs_port_t *port, RING *rp,
 	    iocb->ulpCommand, iocb->ulpStatus);
 
 	/*
-	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg, "CT Receive:
-	 * payload=%p size=%d [%02x,%02x, %02x, %02x]", bp, size, bp[0],
-	 * bp[1], bp[2],bp[3]);
+	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_debug_msg,
+	 * "CT Receive: payload=%p size=%d [%02x,%02x, %02x, %02x]", bp,
+	 * size, bp[0], bp[1], bp[2],bp[3]);
 	 */
 
 	/* Return payload */
@@ -7698,27 +8421,21 @@ emlxs_dfc_handle_unsol_req(emlxs_port_t *port, RING *rp,
 static int32_t
 emlxs_dfc_init_auth(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	uint8_t lwwpn[8];
-	uint8_t rwwpn[8];
-	int32_t rval = 0;
+	emlxs_port_t	*port = &PPORT;
+	uint8_t		lwwpn[8];
+	uint8_t		rwwpn[8];
+	int32_t		rval = 0;
 
-	/*
-	 * dfc.cmd = EMLXS_INIT_AUTH; dfc.buf1_size = 8; dfc.buf1
-	 * = lwwpn; dfc.buf2_size = 8; dfc.buf2 = rwwpn;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < 8) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -7726,13 +8443,14 @@ emlxs_dfc_init_auth(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (!dfc->buf2 || !dfc->buf2_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf2_size < 8) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer2 too small. (size=%d)",
@@ -7740,24 +8458,23 @@ emlxs_dfc_init_auth(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	/* Read the lwwpn */
-	if (ddi_copyin((void *)dfc->buf1, (void *)&lwwpn,
-	    8, mode) != 0) {
+	if (ddi_copyin((void *)dfc->buf1, (void *)&lwwpn, 8, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	/* Read the rwwpn */
-	if (ddi_copyin((void *)dfc->buf2, (void *)&rwwpn,
-	    8, mode) != 0) {
+	if (ddi_copyin((void *)dfc->buf2, (void *)&rwwpn, 8, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	/* Initiate authentication here */
 	rval = emlxs_dhc_init_auth(hba, lwwpn, rwwpn);
 
@@ -7769,26 +8486,20 @@ emlxs_dfc_init_auth(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_fcsp_config_t fcsp_config;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t		*port = &PPORT;
+	dfc_fcsp_config_t	fcsp_config;
+	uint32_t		rval = DFC_SUCCESS;
 
-	/*
-	 * dfc.cmd = EMLXS_GET_AUTH_CFG; dfc.buf1_size =
-	 * sizeof(dfc_fcsp_config_t); dfc.buf1 = config;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_fcsp_config_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -7796,25 +8507,28 @@ emlxs_dfc_get_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	/* Read the fcsp_config */
 	if (ddi_copyin((void *)dfc->buf1, (void *)&fcsp_config,
 	    sizeof (dfc_fcsp_config_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	if ((rval = emlxs_dhc_get_auth_cfg(hba, &fcsp_config)) != 0) {
 		return (rval);
 	}
+
 	if (ddi_copyout((void *)&fcsp_config, (void *)dfc->buf1,
 	    sizeof (dfc_fcsp_config_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
+		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_auth_cfg() */
@@ -7824,30 +8538,21 @@ emlxs_dfc_get_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_fcsp_config_t fcsp_config;
-	dfc_password_t dfc_pwd;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t		*port = &PPORT;
+	dfc_fcsp_config_t	fcsp_config;
+	dfc_password_t		dfc_pwd;
+	uint32_t		rval = DFC_SUCCESS;
 
-
-	/*
-	 * dfc.cmd = EMLXS_SET_AUTH_CFG; dfc.flag =
-	 * EMLXS_AUTH_CFG_ADD; dfc.buf1_size = sizeof(dfc_fcsp_config_t);
-	 * dfc.buf1 = config; dfc.buf2_size = sizeof(dfc_password_t);
-	 * dfc.buf2 = password;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_fcsp_config_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -7855,13 +8560,14 @@ emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (!dfc->buf2 || !dfc->buf2_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf2_size < sizeof (dfc_password_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer2 too small. (size=%d)",
@@ -7869,24 +8575,25 @@ emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	/* Read the fcsp_config */
 	if (ddi_copyin((void *)dfc->buf1, (void *)&fcsp_config,
 	    sizeof (dfc_fcsp_config_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	/* Read the password */
 	if (ddi_copyin((void *)dfc->buf2, (void *)&dfc_pwd,
 	    sizeof (dfc_password_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	switch (dfc->flag) {
 	case EMLXS_AUTH_CFG_ADD:
 		rval = emlxs_dhc_add_auth_cfg(hba, &fcsp_config, &dfc_pwd);
@@ -7900,14 +8607,15 @@ emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	if (rval) {
 		return (rval);
 	}
+
 	if (ddi_copyout((void *)&fcsp_config, (void *)dfc->buf1,
 	    sizeof (dfc_fcsp_config_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_set_auth_cfg() */
@@ -7917,27 +8625,20 @@ emlxs_dfc_set_auth_cfg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_auth_password_t dfc_pwd;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t		*port = &PPORT;
+	dfc_auth_password_t	dfc_pwd;
+	uint32_t		rval = DFC_SUCCESS;
 
-
-	/*
-	 * dfc.cmd = EMLXS_GET_AUTH_PASSWORD; dfc.buf1_size =
-	 * sizeof(dfc_auth_password_t); dfc.buf1 = auth_password;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_auth_password_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -7945,26 +8646,29 @@ emlxs_dfc_get_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
+
 	/* Read the auth password */
 	if (ddi_copyin((void *)dfc->buf1, (void *)&dfc_pwd,
 	    sizeof (dfc_auth_password_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	if ((rval = emlxs_dhc_get_auth_key(hba, &dfc_pwd)) != 0) {
 		return (rval);
 	}
+
 	if (ddi_copyout((void *)&dfc_pwd, (void *)dfc->buf1,
 	    sizeof (dfc_auth_password_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_auth_pwd() */
@@ -7973,26 +8677,20 @@ emlxs_dfc_get_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_set_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_auth_password_t dfc_pwd;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t		*port = &PPORT;
+	dfc_auth_password_t	dfc_pwd;
+	uint32_t		rval = DFC_SUCCESS;
 
-	/*
-	 * dfc.cmd = EMLXS_SET_AUTH_PASSWORD; dfc.buf1_size =
-	 * sizeof(dfc_auth_password_t); dfc.buf1 = auth_password;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_auth_password_t)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Buffer1 too small. (size=%d)",
@@ -8000,26 +8698,28 @@ emlxs_dfc_set_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	/* Read the auth password */
 	if (ddi_copyin((void *)dfc->buf1, (void *)&dfc_pwd,
 	    sizeof (dfc_auth_password_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	if ((rval = emlxs_dhc_set_auth_key(hba, &dfc_pwd))) {
 		return (rval);
 	}
+
 	if (ddi_copyout((void *)&dfc_pwd, (void *)dfc->buf1,
 	    sizeof (dfc_auth_password_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_set_auth_pwd() */
@@ -8028,53 +8728,51 @@ emlxs_dfc_set_auth_pwd(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_auth_status(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_auth_status_t fcsp_status;
-	uint32_t rval = DFC_SUCCESS;
+	emlxs_port_t		*port = &PPORT;
+	dfc_auth_status_t	fcsp_status;
+	uint32_t		rval = DFC_SUCCESS;
 
-	/*
-	 * dfc.cmd = EMLXS_GET_AUTH_STATUS; dfc.buf1_size =
-	 * sizeof(dfc_auth_status_t); dfc.buf1 = status;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	if (!dfc->buf1 || !dfc->buf1_size) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Null buffer1 found.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf1_size < sizeof (dfc_auth_status_t)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer too small. (size=%d)",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Buffer too small. (size=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), dfc->buf1_size);
 
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	/* Read the fcsp_config */
-	if (ddi_copyin((void *)dfc->buf1, (void *)&fcsp_status,
+	if (ddi_copyin((void *) dfc->buf1, (void *) &fcsp_status,
 	    sizeof (dfc_auth_status_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYIN_ERROR);
 	}
+
 	if ((rval = emlxs_dhc_get_auth_status(hba, &fcsp_status)) != 0) {
 		return (rval);
 	}
-	if (ddi_copyout((void *)&fcsp_status, (void *)dfc->buf1,
+
+	if (ddi_copyout((void *) &fcsp_status, (void *) dfc->buf1,
 	    sizeof (dfc_auth_status_t), mode) != 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: ddi_copyout failed.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	return (0);
 
 } /* emlxs_dfc_get_auth_status() */
@@ -8083,21 +8781,13 @@ emlxs_dfc_get_auth_status(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_fcsp_config_t *fcsp_cfg;
-	uint32_t count;
-	uint32_t size;
-	uint32_t rval = DFC_SUCCESS;
-	/* uint32_t count_sent = 0; */
+	emlxs_port_t		*port = &PPORT;
+	dfc_fcsp_config_t	*fcsp_cfg;
+	uint32_t		count;
+	uint32_t		size;
+	uint32_t		rval = DFC_SUCCESS;
 
-	/*
-	 * dfc.cmd = EMLXS_GET_AUTH_CFG_TABLE; dfc.buf1_size = size;
-	 * dfc.buf1 = fcsp_cfg; dfc.buf2_size = sizeof(uint32_t);
-	 * dfc.buf2 = &count;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	/* Lock cfg table while we do this */
@@ -8105,21 +8795,23 @@ emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	mutex_enter(&hba->auth_lock);
 
 	if (!dfc->buf2 || !dfc->buf2_size) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Null buffer2 found.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		mutex_exit(&hba->auth_lock);
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf2_size < sizeof (uint32_t)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer2 too small. (size=%d)",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Buffer2 too small. (size=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), dfc->buf2_size);
 
 		mutex_exit(&hba->auth_lock);
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (ddi_copyout((void *)&hba->auth_cfg_count, (void *)dfc->buf2,
 	    sizeof (uint32_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -8129,21 +8821,23 @@ emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		mutex_exit(&hba->auth_lock);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		mutex_exit(&hba->auth_lock);
 		return (DFC_SUCCESS);
 	}
+
 	/* Check table size */
 	count = dfc->buf1_size / sizeof (dfc_fcsp_config_t);
 	if (count < hba->auth_cfg_count) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer1 too small. (%d < %d)",
-		    emlxs_dfc_xlate(dfc->cmd), count,
-		    hba->auth_cfg_count);
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Buffer1 too small. (%d < %d)",
+		    emlxs_dfc_xlate(dfc->cmd), count, hba->auth_cfg_count);
 
 		mutex_exit(&hba->auth_lock);
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	size = hba->auth_cfg_count * sizeof (dfc_fcsp_config_t);
 	if (!(fcsp_cfg = (dfc_fcsp_config_t *)kmem_zalloc(size, KM_SLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -8153,22 +8847,24 @@ emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		mutex_exit(&hba->auth_lock);
 		return (DFC_SYSRES_ERROR);
 	}
+
 	if ((rval = emlxs_dhc_get_auth_cfg_table(hba, fcsp_cfg)) != 0) {
 		mutex_exit(&hba->auth_lock);
 		kmem_free(fcsp_cfg, size);
 		return (rval);
 	}
+
 	mutex_exit(&hba->auth_lock);
 
-	if (ddi_copyout((void *)fcsp_cfg, (void *)dfc->buf1,
-	    size, mode) != 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
+	if (ddi_copyout((void *)fcsp_cfg, (void *)dfc->buf1, size, mode) != 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: ddi_copyout failed.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(fcsp_cfg, size);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	kmem_free(fcsp_cfg, size);
 	return (0);
 
@@ -8178,21 +8874,13 @@ emlxs_dfc_get_auth_cfg_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 static int32_t
 emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	dfc_auth_password_t *auth_pwd;
-	uint32_t count;
-	uint32_t size;
-	uint32_t rval = DFC_SUCCESS;
-	/* uint32_t count_sent = 0; */
+	emlxs_port_t		*port = &PPORT;
+	dfc_auth_password_t	*auth_pwd;
+	uint32_t		count;
+	uint32_t		size;
+	uint32_t		rval = DFC_SUCCESS;
 
-	/*
-	 * dfc.cmd = EMLXS_GET_AUTH_KEY_TABLE; dfc.buf1_size = size;
-	 * dfc.buf1 = auth_pwd; dfc.buf2_size = sizeof(uint32_t);
-	 * dfc.buf2 = &count;
-	 */
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg,
-	    "%s requested.",
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s requested.",
 	    emlxs_dfc_xlate(dfc->cmd));
 
 	/* Lock cfg table while we do this */
@@ -8200,21 +8888,23 @@ emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	mutex_enter(&hba->auth_lock);
 
 	if (!dfc->buf2 || !dfc->buf2_size) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Null buffer2 found.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		mutex_exit(&hba->auth_lock);
 		return (DFC_ARG_NULL);
 	}
+
 	if (dfc->buf2_size < sizeof (uint32_t)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer2 too small. (size=%d)",
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Buffer2 too small. (size=%d)",
 		    emlxs_dfc_xlate(dfc->cmd), dfc->buf2_size);
 
 		mutex_exit(&hba->auth_lock);
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	if (ddi_copyout((void *)&hba->auth_key_count, (void *)dfc->buf2,
 	    sizeof (uint32_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -8224,21 +8914,23 @@ emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		mutex_exit(&hba->auth_lock);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	if (!dfc->buf1 || !dfc->buf1_size) {
 		mutex_exit(&hba->auth_lock);
 		return (DFC_SUCCESS);
 	}
+
 	/* Check table size */
 	count = dfc->buf1_size / sizeof (dfc_auth_password_t);
 	if (count < hba->auth_key_count) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Buffer1 too small. (%d < %d)",
-		    emlxs_dfc_xlate(dfc->cmd), count,
-		    hba->auth_key_count);
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: Buffer1 too small. (%d < %d)",
+		    emlxs_dfc_xlate(dfc->cmd), count, hba->auth_key_count);
 
 		mutex_exit(&hba->auth_lock);
 		return (DFC_ARG_TOOSMALL);
 	}
+
 	size = hba->auth_key_count * sizeof (dfc_auth_password_t);
 	if (!(auth_pwd = (dfc_auth_password_t *)kmem_zalloc(size, KM_SLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -8248,22 +8940,24 @@ emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		mutex_exit(&hba->auth_lock);
 		return (DFC_SYSRES_ERROR);
 	}
+
 	if ((rval = emlxs_dhc_get_auth_key_table(hba, auth_pwd)) != 0) {
 		mutex_exit(&hba->auth_lock);
 		kmem_free(auth_pwd, size);
 		return (rval);
 	}
+
 	mutex_exit(&hba->auth_lock);
 
-	if (ddi_copyout((void *)auth_pwd, (void *)dfc->buf1,
-	    size, mode) != 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyout failed.",
+	if (ddi_copyout((void *)auth_pwd, (void *)dfc->buf1, size, mode) != 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_dfc_error_msg, "%s: ddi_copyout failed.",
 		    emlxs_dfc_xlate(dfc->cmd));
 
 		kmem_free(auth_pwd, size);
 		return (DFC_COPYOUT_ERROR);
 	}
+
 	kmem_free(auth_pwd, size);
 	return (0);
 
@@ -8273,93 +8967,619 @@ emlxs_dfc_get_auth_key_table(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 #endif	/* DHCHAP_SUPPORT */
 
+#ifdef SAN_DIAG_SUPPORT
+static int32_t
+emlxs_dfc_sd_set_bucket(dfc_t *dfc, int32_t mode)
+{
+	uint32_t	type, search_type;
+	uint16_t	state;
+	int32_t		rval = DFC_SD_OK;
+
+	type = dfc->data1;
+	search_type = dfc->data2;
+
+	mutex_enter(&sd_bucket_mutex);
+	state = sd_bucket.state;
+	mutex_exit(&sd_bucket_mutex);
+
+	if (state == SD_COLLECTING)
+		rval = DFC_SD_ERROR_DATA_COLLECTION_ACTIVE;
+	else if ((search_type < SD_SEARCH_LINEAR) ||
+	    (search_type > SD_SEARCH_POWER_2))
+		rval = DFC_SD_ERROR_INVALID_ARG;
+	else if (type != SD_SCSI_IO_LATENCY_TYPE)
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+	else {
+		(void) ddi_copyin(dfc->buf3, (void *) &sd_bucket,
+		    sizeof (sd_bucket_info_t), mode);
+		mutex_enter(&sd_bucket_mutex);
+		sd_bucket.state = SD_STOPPED;
+		mutex_exit(&sd_bucket_mutex);
+	}
+
+set_bucket_exit:
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_destroy_bucket(dfc_t *dfc)
+{
+	uint32_t	type;
+	int32_t 	rval = DFC_SD_OK;
+
+	type = dfc->data1;
+
+	mutex_enter(&sd_bucket_mutex);
+
+	if (sd_bucket.search_type == 0)
+		rval = DFC_SD_ERROR_BUCKET_NOT_SET;
+	else if (sd_bucket.state == SD_COLLECTING)
+		rval = DFC_SD_ERROR_DATA_COLLECTION_ACTIVE;
+	else if (type != SD_SCSI_IO_LATENCY_TYPE)
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+	else
+		bzero((uint8_t *)&sd_bucket, sizeof (sd_bucket_info_t));
+
+destroy_bucket_exit:
+	mutex_exit(&sd_bucket_mutex);
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_get_bucket(dfc_t *dfc, int32_t mode)
+{
+	uint32_t	type;
+	int32_t		rval = DFC_SD_OK;
+
+	type = dfc->data1;
+
+	if (sd_bucket.search_type == 0)
+		rval = DFC_SD_ERROR_BUCKET_NOT_SET;
+	else if (type != SD_SCSI_IO_LATENCY_TYPE)
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+	else
+		(void) ddi_copyout(&sd_bucket, dfc->buf3,
+		    sizeof (sd_bucket_info_t), mode);
+
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_start_collection(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t	*vport;
+	NODELIST	*nlp;
+	uint8_t		wwpn[8];
+	int32_t		rval = DFC_SD_OK;
+	int		i;
+
+	if (dfc->data1 != SD_SCSI_IO_LATENCY_TYPE) {
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+		goto start_collect_exit;
+	}
+
+	if (sd_bucket.search_type == 0) {
+		rval = DFC_SD_ERROR_BUCKET_NOT_SET;
+		goto start_collect_exit;
+	}
+
+	/* Read the wwn object */
+	(void) ddi_copyin((void *)dfc->buf3, (void *)wwpn, 8, mode);
+
+	/* Make sure WWPN is unique */
+	vport = emlxs_vport_find_wwpn(hba, wwpn);
+
+	if (!vport) {
+		rval = DFC_SD_ERROR_INVALID_PORT;
+		goto start_collect_exit;
+	}
+
+	/* traverse list of nodes for this vport and reset counter */
+	rw_enter(&vport->node_rwlock, RW_READER);
+	if (vport->sd_io_latency_state == SD_COLLECTING) {
+		rval = DFC_SD_ERROR_DATA_COLLECTION_ACTIVE;
+		rw_exit(&vport->node_rwlock);
+		goto start_collect_exit;
+	}
+
+	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+		nlp = vport->node_table[i];
+		while (nlp != NULL) {
+			bzero((void *)&nlp->sd_dev_bucket[0],
+			    sizeof (struct SD_time_stats_v0) *
+			    SD_IO_LATENCY_MAX_BUCKETS);
+
+			nlp = nlp->nlp_list_next;
+		}
+	}
+
+	vport->sd_io_latency_state = SD_COLLECTING;
+	rw_exit(&vport->node_rwlock);
+
+	mutex_enter(&sd_bucket_mutex);
+	sd_bucket.state = SD_COLLECTING;
+	mutex_exit(&sd_bucket_mutex);
+
+start_collect_exit:
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_stop_collection(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t	*vport;
+	emlxs_hba_t	*temp_hba;
+	uint8_t		wwpn[8];
+	int32_t		rval = DFC_SD_OK;
+	int		i, j;
+
+	if (dfc->data1 != SD_SCSI_IO_LATENCY_TYPE) {
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+		goto stop_collect_exit;
+	}
+
+	if (sd_bucket.search_type == 0) {
+		rval = DFC_SD_ERROR_BUCKET_NOT_SET;
+		goto stop_collect_exit;
+	}
+
+	/* Read the wwn object */
+	(void) ddi_copyin((void *)dfc->buf3, (void *)wwpn, 8, mode);
+
+	/* Make sure WWPN is unique */
+	vport = emlxs_vport_find_wwpn(hba, wwpn);
+
+	if (!vport) {
+		rval = DFC_SD_ERROR_INVALID_PORT;
+		goto stop_collect_exit;
+	}
+
+	rw_enter(&vport->node_rwlock, RW_READER);
+	if (vport->sd_io_latency_state != SD_COLLECTING) {
+		rval = DFC_SD_ERROR_DATA_COLLECTION_NOT_ACTIVE;
+		rw_exit(&vport->node_rwlock);
+		goto stop_collect_exit;
+	}
+	vport->sd_io_latency_state = SD_STOPPED;
+	rw_exit(&vport->node_rwlock);
+
+	/* see if any other port is collecting io latency */
+	for (i = 0; i < emlxs_device.hba_count; i++) {
+		temp_hba = emlxs_device.hba[i];
+		for (j = 0; j < temp_hba->num_of_ports; j++) {
+			vport = &temp_hba->port[j];
+			if (vport->sd_io_latency_state == SD_COLLECTING)
+				goto stop_collect_exit;
+		}
+	}
+
+	/*
+	 * if we get here, that means no one else is collecting
+	 * io latency data.
+	 */
+	mutex_enter(&sd_bucket_mutex);
+	sd_bucket.state = SD_STOPPED;
+	mutex_exit(&sd_bucket_mutex);
+
+stop_collect_exit:
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_reset_collection(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t   *vport;
+	NODELIST	*nlp;
+	uint8_t		wwpn[8];
+	int32_t 	rval = DFC_SD_OK;
+	int		i;
+
+	if (dfc->data1 != SD_SCSI_IO_LATENCY_TYPE) {
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+		goto reset_collect_exit;
+	}
+
+	if (sd_bucket.search_type == 0) {
+		rval = DFC_SD_ERROR_BUCKET_NOT_SET;
+		goto reset_collect_exit;
+	}
+
+	/* Read the wwn object */
+	(void) ddi_copyin((void *)dfc->buf3, (void *)wwpn, 8, mode);
+
+	/* Make sure WWPN is unique */
+	vport = emlxs_vport_find_wwpn(hba, wwpn);
+
+	if (!vport) {
+		rval = DFC_SD_ERROR_INVALID_PORT;
+		goto reset_collect_exit;
+	}
+
+	/* traverse list of nodes for this vport and reset counter */
+	rw_enter(&vport->node_rwlock, RW_READER);
+	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+		nlp = vport->node_table[i];
+		while (nlp != NULL) {
+			bzero((void *)&nlp->sd_dev_bucket[0],
+			    sizeof (struct SD_time_stats_v0) *
+			    SD_IO_LATENCY_MAX_BUCKETS);
+
+			nlp = nlp->nlp_list_next;
+		}
+	}
+	rw_exit(&vport->node_rwlock);
+
+reset_collect_exit:
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_get_data(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t   *vport;
+	uint8_t		wwpn[8];
+	int		i, skip_bytes;
+	uint16_t	count;
+	uint32_t	bufsize, size_needed;
+	NODELIST	*nlp;
+	int32_t 	rval = DFC_SD_OK;
+
+	if (dfc->data1 != SD_SCSI_IO_LATENCY_TYPE) {
+		rval = DFC_SD_ERROR_NOT_SUPPORTED;
+		goto get_data_exit;
+	}
+
+	if (sd_bucket.search_type == 0) {
+		rval = DFC_SD_ERROR_BUCKET_NOT_SET;
+		goto get_data_exit;
+	}
+
+	/* Read the wwn object */
+	(void) ddi_copyin((void *)dfc->buf3, (void *)wwpn, 8, mode);
+
+	/* Make sure WWPN is unique */
+	vport = emlxs_vport_find_wwpn(hba, wwpn);
+
+	if (!vport) {
+		rval = DFC_SD_ERROR_INVALID_PORT;
+		goto get_data_exit;
+	}
+
+	bufsize = dfc->buf4_size;
+
+	/*
+	 * count # of targets to see if buffer is big enough
+	 */
+	count = 0;
+	rw_enter(&vport->node_rwlock, RW_READER);
+	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+		nlp = vport->node_table[i];
+		while (nlp != NULL) {
+			count++;
+			nlp = nlp->nlp_list_next;
+		}
+	}
+	rw_exit(&vport->node_rwlock);
+
+	size_needed = count * (sizeof (HBA_WWN) +
+	    sizeof (struct SD_time_stats_v0) * SD_IO_LATENCY_MAX_BUCKETS);
+
+	if (bufsize < size_needed) {
+		rval = DFC_SD_ERROR_MORE_DATA_AVAIL;
+		goto update_count;	/* not enough space, return */
+	}
+
+	/*
+	 * return data collected, reset counter.
+	 */
+	count = 0;
+	skip_bytes = 0;
+	rw_enter(&vport->node_rwlock, RW_READER);
+	for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+		nlp = vport->node_table[i];
+		while (nlp != NULL) {
+			/* copy port name */
+			(void) ddi_copyout((void *)&nlp->nlp_portname,
+			    (void *)((char *)dfc->buf4 + skip_bytes),
+			    sizeof (HBA_WWN), mode);
+			skip_bytes += sizeof (HBA_WWN);
+
+			/* copy bucket data */
+			(void) ddi_copyout((void *)&nlp->sd_dev_bucket[0],
+			    (void *)((char *)dfc->buf4 + skip_bytes),
+			    sizeof (struct SD_time_stats_v0) *
+			    SD_IO_LATENCY_MAX_BUCKETS, mode);
+			skip_bytes += sizeof (struct SD_time_stats_v0) *
+			    SD_IO_LATENCY_MAX_BUCKETS;
+
+			bzero((void *)&nlp->sd_dev_bucket[0],
+			    sizeof (struct SD_time_stats_v0) *
+			    SD_IO_LATENCY_MAX_BUCKETS);
+
+			count++;
+			bufsize -= sizeof (struct SD_IO_Latency_Response);
+
+			nlp = nlp->nlp_list_next;
+		}
+	}
+	rw_exit(&vport->node_rwlock);
+
+update_count:
+	(void) ddi_copyout((void *)&count, (void *)dfc->buf2,
+	    sizeof (uint16_t), mode);
+
+get_data_exit:
+	return (rval);
+}
+
+
+static int32_t
+emlxs_dfc_sd_set_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t		*vport;
+	uint8_t			wwpn[8];
+	uint32_t		event, pid, enable;
+	int32_t 		rval = DFC_SD_OK;
+	int			i, count;
+	emlxs_dfc_event_t	*dfc_event;
+
+	/*
+	 * The value of "event" has been shifted left based on
+	 * the category that the application gave to libdfc.
+	 *
+	 * This is so the old Event handling code won't mistakenly
+	 * grab an SD Event.
+	 */
+	event = dfc->data1;
+	pid = dfc->data3;
+	enable = dfc->flag;
+
+	/* Read the wwn object */
+	(void) ddi_copyin((void *)dfc->buf3, (void *)wwpn, 8, mode);
+
+	/* Make sure WWPN is unique */
+	vport = emlxs_vport_find_wwpn(hba, wwpn);
+
+	if (!vport) {
+		rval = DFC_SD_ERROR_INVALID_PORT;
+		goto set_sd_event_exit;
+	}
+
+	if (enable) {
+		/* Find next available event object */
+		for (i = 0; i < MAX_DFC_EVENTS; i++) {
+			dfc_event = &vport->sd_events[i];
+
+			if (!dfc_event->pid && !dfc_event->event)
+				break;
+		}
+
+		/* Return if all event objects are busy */
+		if (i == MAX_DFC_EVENTS) {
+			rval = DFC_SD_ERROR_OUT_OF_HANDLES;
+			goto set_sd_event_exit;
+		}
+
+		/* Initialize */
+		/* TODO: Should we add SUBCAT in dfc_event ??? */
+		dfc_event->pid = pid;
+		dfc_event->event = event;
+		dfc_event->last_id = (uint32_t)-1;
+		dfc_event->dataout = NULL;
+		dfc_event->size = 0;
+		dfc_event->mode = 0;
+
+		(void) emlxs_get_sd_event(vport, dfc_event, 0);
+
+		if (dfc->buf1)
+			(void) ddi_copyout((void *) &dfc_event->last_id,
+			    dfc->buf1, sizeof (uint32_t), mode);
+
+		vport->sd_reg_events |= event;
+	} else { /* Disable */
+		/* find event entry */
+		for (i = 0; i < MAX_DFC_EVENTS; i++) {
+			dfc_event = &vport->sd_events[i];
+
+			if (dfc_event->pid  == pid && dfc_event->event == event)
+				break;
+		}
+
+		/* Return if not found */
+		if (i == MAX_DFC_EVENTS) {
+			rval = DFC_SD_ERROR_INVALID_ARG;
+			goto set_sd_event_exit;
+		}
+
+		/* Kill the event thread if it is sleeping */
+		(void) emlxs_kill_dfc_event(vport, dfc_event);
+
+		/* Count the number of pids still registered for this event */
+		count = 0;
+		for (i = 0; i < MAX_DFC_EVENTS; i++) {
+			dfc_event = &vport->sd_events[i];
+
+			if (dfc_event->event == event)
+				count++;
+		}
+
+		/*
+		 * If no more pids need this event,
+		 * then disable logging for this event
+		 */
+		if (count == 0)
+			vport->sd_reg_events &= ~event;
+	}
+
+set_sd_event_exit:
+	return (rval);
+} /* emlxs_dfc_sd_set_event */
+
+
+static int32_t
+emlxs_dfc_sd_get_event(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
+{
+	emlxs_port_t   *vport;
+	uint8_t		wwpn[8];
+	uint32_t	event, pid, sleep, i;
+	int32_t		rval = DFC_SD_OK;
+	emlxs_dfc_event_t *dfc_event;
+
+	event = dfc->data1;
+	pid = dfc->data2;
+
+	/* Read the wwn object */
+	(void) ddi_copyin((void *)dfc->buf4, (void *)wwpn, 8, mode);
+
+	/* Make sure WWPN is unique */
+	vport = emlxs_vport_find_wwpn(hba, wwpn);
+
+	if (!vport) {
+		rval = DFC_SD_ERROR_INVALID_PORT;
+		goto get_sd_event_exit;
+	}
+
+	/* Find the event entry */
+	dfc_event = NULL;
+	for (i = 0; i < MAX_DFC_EVENTS; i++) {
+		dfc_event = &vport->sd_events[i];
+
+		if (dfc_event->pid == pid && dfc_event->event == event)
+			break;
+	}
+
+	if (i == MAX_DFC_EVENTS) {
+		rval = DFC_SD_ERROR_GENERIC;
+		goto get_sd_event_exit;
+	}
+
+	if (!(vport->sd_reg_events & dfc_event->event)) {
+		rval = DFC_SD_ERROR_GENERIC;
+		goto get_sd_event_exit;
+	}
+
+	/* Initialize event buffer pointers */
+	dfc_event->dataout = dfc->buf1;
+	dfc_event->size = dfc->buf1_size;
+	dfc_event->last_id = dfc->data3;
+	dfc_event->mode = mode;
+
+	sleep = (dfc->flag & 0x01) ? 1 : 0;
+
+	if (emlxs_get_sd_event(vport, dfc_event, sleep))
+		return (DFC_SD_ERROR_GENERIC);
+
+	/*
+	 * update rcv_size.
+	 */
+	if (dfc->buf2)
+		(void) ddi_copyout((void *) &dfc_event->size, dfc->buf2,
+		    sizeof (uint32_t), mode);
+
+	/*
+	 * update index
+	 */
+	if (dfc->buf3)
+		(void) ddi_copyout((void *) &dfc_event->last_id, dfc->buf3,
+		    sizeof (uint32_t), mode);
+
+get_sd_event_exit:
+	return (rval);
+} /* emlxs_dfc_sd_get_event */
+#endif
+
 static int32_t
 emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 {
-	emlxs_port_t *port = &PPORT;
-	fc_packet_t *pkt = NULL;
-	NODELIST *ndlp;
-	FCP_CMND *fcp_cmd;
-	FCP_RSP *fcp_rsp;
-	/* emlxs_xlat_err_t *entry; */
-	void *ptr;
-	char buffer[64];
-	dfc_send_scsi_fcp_cmd_info_t cmdinfo;
-	uint32_t rval = 0;
+	emlxs_port_t			*port = &PPORT;
+	fc_packet_t			*pkt = NULL;
+	NODELIST			*ndlp;
+	FCP_CMND			*fcp_cmd;
+	FCP_RSP				*fcp_rsp;
+	void				*ptr;
+	char				buffer[64];
+	dfc_send_scsi_fcp_cmd_info_t	cmdinfo;
+	uint32_t			rval = 0;
 
 	/* cmd info */
 	if (!dfc->buf1 ||
 	    (dfc->buf1_size != sizeof (dfc_send_scsi_fcp_cmd_info_t))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer1 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer1 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	/* reqBuffer info */
 	if (!dfc->buf2 || (dfc->buf2_size != sizeof (FCP_CMND))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer2 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer2 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	/* rspBuffer info, could be 0 for SCSI commands like TUR */
 	if (!dfc->buf3 && dfc->buf3_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer3 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer3 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
+
 	/* senseBuffer info */
 	if (!dfc->buf4 || !dfc->buf4_size) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: Null buffer4 found.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: Null buffer4 found.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_ARG_NULL;
 		goto done;
 	}
-	if (ddi_copyin((void *)dfc->buf1, (void *)&cmdinfo,
+
+	if (ddi_copyin((void *) dfc->buf1, (void *) &cmdinfo,
 	    sizeof (dfc_send_scsi_fcp_cmd_info_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+#ifdef NPIV_SUPPORT
 	if (cmdinfo.ver == DFC_SEND_SCSI_FCP_V2) {
-		port = emlxs_vport_find_wwpn(hba,
-		    (uint8_t *)&cmdinfo.src_wwn);
+		port =
+		    emlxs_vport_find_wwpn(hba, (uint8_t *)&cmdinfo.src_wwn);
 		if (port == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: WWPN does not exists. %s",
-			    emlxs_dfc_xlate(dfc->cmd),
-			    emlxs_wwn_xlate(buffer,
+			    emlxs_dfc_xlate(dfc->cmd), emlxs_wwn_xlate(buffer,
 			    (uint8_t *)&cmdinfo.src_wwn));
 
 			rval = DFC_ARG_INVALID;
 			goto done;
 		}
 	}
+#endif /* NPIV_SUPPORT */
+
 	if ((ndlp = emlxs_node_find_wwpn(port,
 	    (uint8_t *)&cmdinfo.dst_wwn)) == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: WWPN does not exists. %s",
-		    emlxs_dfc_xlate(dfc->cmd),
-		    emlxs_wwn_xlate(buffer,
-		    (uint8_t *)&cmdinfo.dst_wwn));
+		    "%s: WWPN does not exists. %s", emlxs_dfc_xlate(dfc->cmd),
+		    emlxs_wwn_xlate(buffer, (uint8_t *)&cmdinfo.dst_wwn));
 
 		rval = DFC_ARG_INVALID;
 		goto done;
 	}
-	if (!(pkt = emlxs_pkt_alloc(port, sizeof (FCP_CMND),
-	    sizeof (FCP_RSP), dfc->buf3_size, KM_NOSLEEP))) {
+
+	if (!(pkt = emlxs_pkt_alloc(port, sizeof (FCP_CMND), sizeof (FCP_RSP),
+	    dfc->buf3_size, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: Unable to allocate packet.",
 		    emlxs_dfc_xlate(dfc->cmd));
@@ -8367,17 +9587,17 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_SYSRES_ERROR;
 		goto done;
 	}
-	fcp_cmd = (FCP_CMND *)pkt->pkt_cmd;
+	fcp_cmd = (FCP_CMND *) pkt->pkt_cmd;
 	/* Copy in the command buffer */
-	if (ddi_copyin((void *)dfc->buf2, (void *)fcp_cmd,
-	    sizeof (FCP_CMND), mode) != 0) {
+	if (ddi_copyin((void *)dfc->buf2, (void *)fcp_cmd, sizeof (FCP_CMND),
+	    mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "%s: ddi_copyin failed.",
-		    emlxs_dfc_xlate(dfc->cmd));
+		    "%s: ddi_copyin failed.", emlxs_dfc_xlate(dfc->cmd));
 
 		rval = DFC_COPYIN_ERROR;
 		goto done;
 	}
+
 	/* Make this a polled IO */
 	pkt->pkt_tran_flags &= ~FC_TRAN_INTR;
 	pkt->pkt_tran_flags |= FC_TRAN_NO_INTR;
@@ -8416,6 +9636,7 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_IO_ERROR;
 		goto done;
 	}
+
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		if (pkt->pkt_state == FC_PKT_TIMEOUT) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
@@ -8423,24 +9644,25 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			rval = DFC_TIMEOUT;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-			    "Pkt Transport error. state=%x",
-			    pkt->pkt_state);
+			    "Pkt Transport error. state=%x", pkt->pkt_state);
 			rval = DFC_IO_ERROR;
 		}
 		goto done;
 	}
+
 	if (pkt->pkt_data_resid) {
 		if (pkt->pkt_data_resid < dfc->buf3_size)
 			dfc->buf3_size -= pkt->pkt_data_resid;
 		else
 			dfc->buf3_size = 0;
 	}
+
 	SCSI_RSP_CNT(cmdinfo) = dfc->buf3_size;
 
-	fcp_rsp = (FCP_RSP *)pkt->pkt_resp;
+	fcp_rsp = (FCP_RSP *) pkt->pkt_resp;
 	/*
-	 * This is sense count for flag = 0. It is fcp response size for flag
-	 * = 1.
+	 * This is sense count for flag = 0.
+	 * It is fcp response size for flag = 1.
 	 */
 	if (dfc->flag) {
 		SCSI_SNS_CNT(cmdinfo) = 24 + SWAP_DATA32(fcp_rsp->rspSnsLen) +
@@ -8451,7 +9673,7 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		ptr = (void *)&fcp_rsp->rspSnsInfo[0];
 	}
 
-	if (ddi_copyout((void *)&cmdinfo, (void *)dfc->buf1,
+	if (ddi_copyout((void *) &cmdinfo, (void *) dfc->buf1,
 	    sizeof (dfc_send_scsi_fcp_cmd_info_t), mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: rsp_buf ddi_copyout failed.",
@@ -8460,9 +9682,10 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		rval = DFC_COPYOUT_ERROR;
 		goto done;
 	}
+
 	if (SCSI_SNS_CNT(cmdinfo)) {
-		if (ddi_copyout(ptr, (void *)dfc->buf4,
-		    SCSI_SNS_CNT(cmdinfo), mode) != 0) {
+		if (ddi_copyout(ptr, (void *)dfc->buf4, SCSI_SNS_CNT(cmdinfo),
+		    mode) != 0) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: rsp_size ddi_copyout failed.",
 			    emlxs_dfc_xlate(dfc->cmd));
@@ -8471,6 +9694,7 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			goto done;
 		}
 	}
+
 	if (SCSI_RSP_CNT(cmdinfo)) {
 		if (ddi_copyout((void *)pkt->pkt_data, (void *)dfc->buf3,
 		    SCSI_RSP_CNT(cmdinfo), mode) != 0) {
@@ -8482,12 +9706,15 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			goto done;
 		}
 	}
+
+
 	rval = 0;
 
 done:
 	if (pkt) {
 		emlxs_pkt_free(pkt);
 	}
+
 	return (rval);
 
 } /* emlxs_dfc_send_scsi_fcp() */

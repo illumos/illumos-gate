@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -33,7 +33,8 @@ extern "C" {
 #endif
 
 /* Unique id for each adapter model */
-typedef enum emlxs_adapter {
+typedef enum emlxs_adapter
+{
 	UNKNOWN_ADAPTER = 0,
 
 	/* Dragon Fly (1) */
@@ -83,23 +84,41 @@ typedef enum emlxs_adapter {
 	LPe11020_S,
 	LPeA11002_S,
 	LPe11000_SP,
-	LPe11002_SP,
+	LP2105,
+	LP2105_CI,
 	LPe1105_SP,
 	LPem11002E_S,
 	LPe11004_M4,
+	LPe11002_SP1,
+	LPe11002_SP2,
+	LPe11002_SP3,
 
+	/* Hornet (44) */
 	LP21000_M,
 	LP21002_M,
 	LP21000_C,
 	LP21002_C,
+	LP21000_M_E,
+	LP21002_M_E,
+	LP21000_C_E,
+	LP21002_C_E,
+	LP21000_M_HP,
+	LP21002_M_HP,
+	LP21000_C_HP,
+	LP21002_C_HP,
+	LP21000_U_HP,
+	LP21002_U_HP,
+	LP21002_SP1,
+	LP21002_SP2,
+	LP21002_SP3,
 
-	/* Neptune (44) */
+	/* Neptune (61) */
 	LPe1000_F4,
 	LPe1002_F4,
 	LPe1000_SP,
 	LPe1002_SP,
 
-	/* Saturn (48) */
+	/* Saturn (65) */
 	LPe12000_M8,
 	LPe12002_M8,
 	LPe12000_S,
@@ -107,7 +126,8 @@ typedef enum emlxs_adapter {
 	LPe12020_S,
 	LPem12002_M8,
 	LPem12002_S,
-	LPe1205_BC,
+	LPem12002E_S,
+	LPe1205_CIOv,
 	LPe1205_BU,
 	LPe1205_M8,
 	LPe1205_N,
@@ -115,76 +135,91 @@ typedef enum emlxs_adapter {
 	BX900_FC82E,
 	LPe12000_SP,
 	LPe12002_SP,
-	LPe1205_SP1,
+	LPe12002_SP1,
+	LPe12002_SP2,
+	LPe12002_SP3,
+	LPe1205_HI,
 	LPe1205_SP2,
-	LPe1205_SP3
+	LPe1205_SP3,
+
+	/* Proteus (87) */
+	LPemv12002_S,
+	LPev12000_M8,
+	LPev12002_M8,
+	LPev12000M_M8,
+	LPev12002M_M8,
+	LPev12054_HP,
+	LPev12054E_HP
 
 } emlxs_adapter_t;
-
-/* Unique id for each firmware image */
-/* These will match the generic adapter id */
-typedef enum emlxs_firmware {
-	FW_NOT_PROVIDED = 0,
-	LP10000_FW = LP10000,
-	LP11000_FW = LP11000,
-	LP11002_FW = LP11002,
-	LPe11000_FW = LPe11000_M4,
-	LPe11002_FW = LPe11002_M4,
-	LPe12000_FW = LPe12000_M8
-
-} emlxs_firmware_t;
 
 
 #define	PCI_VENDOR_ID_EMULEX		0x10df
 
 /* PCI Device IDs */
+#define	PCI_DEVICE_ID_LPev12000_M8	0xe180
+#define	PCI_DEVICE_ID_LPev12000M_M8	0xe100	/* Identified by VPD PN */
+#define	PCI_DEVICE_ID_LPev12002_M8	0xe180	/* Identified by cache_line */
+						/* reg */
+#define	PCI_DEVICE_ID_LPev12002M_M8	0xe100	/* Identified by VPD PN and */
+						/* cache_line reg */
+#define	PCI_DEVICE_ID_LPev12054E_HP	0xe100	/* Identified by SSDID */
+#define	PCI_DEVICE_ID_LPev12054_HP	0xe100	/* Identified by SSDID */
+#define	PCI_SSDID_LPev12000_M8		0xe180
+#define	PCI_SSDID_LPev12000M_M8		0xe100
+#define	PCI_SSDID_LPev12002_M8		0xe180
+#define	PCI_SSDID_LPev12002M_M8		0xe100
+#define	PCI_SSDID_LPev12054_HP		0x323a
+#define	PCI_SSDID_LPev12054E_HP		0x323c
+
 #define	PCI_DEVICE_ID_LP8000		0xf800
 #define	PCI_DEVICE_ID_LP8000DC		0xf800	/* Identified by VPD PN */
-#define	  PCI_SSDID_LP8000		0xf800
-#define	  PCI_SSDID_LP8000DC		0xf800
+#define	PCI_SSDID_LP8000		0xf800
+#define	PCI_SSDID_LP8000DC		0xf800
 
 #define	PCI_DEVICE_ID_LP8000S		0xf085	/* Identified by "lpfs" */
 						/* driver alias */
-#define	  PCI_SSDID_LP8000S		0xf085
+#define	PCI_SSDID_LP8000S		0xf085
 
 #define	PCI_DEVICE_ID_LP9002L		0xf900
 #define	PCI_DEVICE_ID_LP9002DC		0xf900	/* Identified by VPD PN */
 #define	PCI_DEVICE_ID_LP9002C		0xf900	/* Identified by VPD PN */
 #define	PCI_DEVICE_ID_LP9402DC		0xf900	/* Identified by VPD PN */
-#define	  PCI_SSDID_LP9002L		0xf900
-#define	  PCI_SSDID_LP9002DC		0xf900
-#define	  PCI_SSDID_LP9002C		0xf900
-#define	  PCI_SSDID_LP9402DC		0xf900
+#define	PCI_SSDID_LP9002L		0xf900
+#define	PCI_SSDID_LP9002DC		0xf900
+#define	PCI_SSDID_LP9002C		0xf900
+#define	PCI_SSDID_LP9402DC		0xf900
 
 #define	PCI_DEVICE_ID_LP9002S		0xf095	/* Identified by "lpfs" */
 						/* driver alias */
-#define	  PCI_SSDID_LP9002S		0xf095
+#define	PCI_SSDID_LP9002S		0xf095
 
 #define	PCI_DEVICE_ID_LP9802		0xf980
 #define	PCI_DEVICE_ID_LP9802DC		0xf980	/* Identified by RAM size */
-#define	  PCI_SSDID_LP9802		0xf980
-#define	  PCI_SSDID_LP9802DC		0xf980
+#define	PCI_SSDID_LP9802		0xf980
+#define	PCI_SSDID_LP9802DC		0xf980
 
 #define	PCI_DEVICE_ID_LP10000		0xfa00
 #define	PCI_DEVICE_ID_LP10000DC		0xfa00	/* Identified by VPD PN and */
 						/* cache_line reg */
 #define	PCI_DEVICE_ID_LP10000ExDC	0xfa00	/* Identified by VPD PN and */
 						/* cache_line reg */
-#define	  PCI_SSDID_LP10000		0xfa00
-#define	  PCI_SSDID_LP10000DC		0xfa00
-#define	  PCI_SSDID_LP10000ExDC		0xfa00
+#define	PCI_SSDID_LP10000		0xfa00
+#define	PCI_SSDID_LP10000DC		0xfa00
+#define	PCI_SSDID_LP10000ExDC		0xfa00
 
 #define	PCI_DEVICE_ID_BLADE_2G		0xf0a5
-#define	  PCI_SSDID_BLADE_2G		0xf0a5
+#define	PCI_SSDID_BLADE_2G		0xf0a5
 
 #define	PCI_DEVICE_ID_LP11000		0xfd00
 #define	PCI_DEVICE_ID_LP11002		0xfd00	/* Identified by cache_line */
 						/* reg */
-#define	  PCI_SSDID_LP11000		0xfd00
-#define	  PCI_SSDID_LP11002		0xfd00
+#define	PCI_SSDID_LP11000		0xfd00
+#define	PCI_SSDID_LP11002		0xfd00
 
 #define	PCI_DEVICE_ID_LPe11000_M4	0xfe00
-#define	PCI_DEVICE_ID_LPe11002_M4	0xfe00	/* Identified cache_line reg */
+#define	PCI_DEVICE_ID_LPe11002_M4	0xfe00	/* Identified by cache_line */
+						/* reg */
 #define	PCI_DEVICE_ID_LPe11004_M4	0xfe00	/* Unable to differentiate */
 						/* from LPe11002 */
 #define	PCI_DEVICE_ID_LPe1105_HP	0xfe00	/* Identified by SSDID and */
@@ -197,14 +232,22 @@ typedef enum emlxs_firmware {
 						/* cache_line reg */
 #define	PCI_DEVICE_ID_LPem11002_M4	0xfe00	/* Identified by SSDID and */
 						/* cache_line reg */
-#define	  PCI_SSDID_LPe11000_M4		0xfe00
-#define	  PCI_SSDID_LPe11002_M4		0xfe00
-#define	  PCI_SSDID_LPe11004_M4		0xfe00
-#define	  PCI_SSDID_LPe1105_HP		0x1708
-#define	  PCI_SSDID_LPe1105_M		0xfe22
-#define	  PCI_SSDID_BX600_FC42E		0xfe23
-#define	  PCI_SSDID_LPe1105_M4		0xfe24
-#define	  PCI_SSDID_LPem11002_M4	0xfe2e
+#define	PCI_SSDID_LPe11000_M4		0xfe00
+#define	PCI_SSDID_LPe11002_M4		0xfe00
+#define	PCI_SSDID_LPe11004_M4		0xfe00
+#define	PCI_SSDID_LPe1105_HP		0x1708
+#define	PCI_SSDID_LPe1105_M		0xfe22
+#define	PCI_SSDID_BX600_FC42E		0xfe23
+#define	PCI_SSDID_LPe1105_M4		0xfe24
+#define	PCI_SSDID_LPem11002_M4		0xfe2e
+
+#define	PCI_DEVICE_ID_LPe11002_SP1	0xfe00
+#define	PCI_DEVICE_ID_LPe11002_SP2	0xfe00
+#define	PCI_DEVICE_ID_LPe11002_SP3	0xfe00
+#define	PCI_SSDID_LPe11002_SP1		0xfe2b
+#define	PCI_SSDID_LPe11002_SP2		0xfe2c
+#define	PCI_SSDID_LPe11002_SP3		0xfe2d
+
 
 #define	PCI_DEVICE_ID_LP21000_M		0xfe05
 #define	PCI_DEVICE_ID_LP21002_M		0xfe05	/* Identified by SSDID and */
@@ -213,22 +256,63 @@ typedef enum emlxs_firmware {
 						/* from LP21000_M */
 #define	PCI_DEVICE_ID_LP21002_C		0xfe05	/* Unable to differentiate */
 						/* from LP21002_M */
-#define	  PCI_SSDID_LP21000_M		0xfe05
-#define	  PCI_SSDID_LP21002_M		0xfe05
-#define	  PCI_SSDID_LP21000_C		0xfe05
-#define	  PCI_SSDID_LP21002_C		0xfe05
+#define	PCI_DEVICE_ID_LP21000_M_E	0xfe05	/* Unable to differentiate */
+						/* from LP21000_M */
+#define	PCI_DEVICE_ID_LP21002_M_E	0xfe05	/* Unable to differentiate */
+						/* from LP21002_M */
+#define	PCI_DEVICE_ID_LP21000_C_E	0xfe05	/* Unable to differentiate */
+						/* from LP21000_M */
+#define	PCI_DEVICE_ID_LP21002_C_E	0xfe05	/* Unable to differentiate */
+						/* from LP21002_M */
+#define	PCI_SSDID_LP21000_M		0xfe05
+#define	PCI_SSDID_LP21002_M		0xfe05
+#define	PCI_SSDID_LP21000_C		0xfe05
+#define	PCI_SSDID_LP21002_C		0xfe05
+#define	PCI_SSDID_LP21000_M_E		0xfe05
+#define	PCI_SSDID_LP21002_M_E		0xfe05
+#define	PCI_SSDID_LP21000_C_E		0xfe05
+#define	PCI_SSDID_LP21002_C_E		0xfe05
+
+
+#define	PCI_DEVICE_ID_LP21000_M_HP	0xfe05
+#define	PCI_DEVICE_ID_LP21002_M_HP	0xfe05	/* Identified by SSDID and */
+						/* cache_line reg */
+#define	PCI_DEVICE_ID_LP21000_C_HP	0xfe05	/* Unable to differentiate */
+						/* from LP21000_M_HP */
+#define	PCI_DEVICE_ID_LP21002_C_HP	0xfe05	/* Unable to differentiate */
+						/* from LP21002_M_HP */
+#define	PCI_DEVICE_ID_LP21000_U_HP	0xfe05	/* Unable to differentiate */
+						/* from LP21000_M_HP */
+#define	PCI_DEVICE_ID_LP21002_U_HP	0xfe05	/* Unable to differentiate */
+						/* from LP21002_M_HP */
+#define	PCI_SSDID_LP21000_M_HP		0x3252
+#define	PCI_SSDID_LP21002_M_HP		0x3252
+#define	PCI_SSDID_LP21000_C_HP		0x3252
+#define	PCI_SSDID_LP21002_C_HP		0x3252
+#define	PCI_SSDID_LP21000_U_HP		0x3252
+#define	PCI_SSDID_LP21002_U_HP		0x3252
+
+
+#define	PCI_DEVICE_ID_LP21002_SP1	0xfe05
+#define	PCI_DEVICE_ID_LP21002_SP2	0xfe05
+#define	PCI_DEVICE_ID_LP21002_SP3	0xfe05	/* Identified by SSDID and */
+						/* cache_line reg */
+#define	PCI_SSDID_LP21002_SP1		0xfe28
+#define	PCI_SSDID_LP21002_SP2		0xfe29
+#define	PCI_SSDID_LP21002_SP3		0xfe2a
 
 #define	PCI_DEVICE_ID_LPe1000_F4	0xf0f5
 #define	PCI_DEVICE_ID_LPe1002_F4	0xf0f5	/* Identified by cache_line */
 						/* reg */
-#define	  PCI_SSDID_LPe1000_F4		0xf0f5
-#define	  PCI_SSDID_LPe1002_F4		0xf0f5
+#define	PCI_SSDID_LPe1000_F4		0xf0f5
+#define	PCI_SSDID_LPe1002_F4		0xf0f5
 
 #define	PCI_DEVICE_ID_LPe12000_M8	0xf100
-#define	PCI_DEVICE_ID_LPe12002_M8	0xf100	/* Identified cache_line reg */
+#define	PCI_DEVICE_ID_LPe12002_M8	0xf100	/* Identified by cache_line */
+						/* reg */
 #define	PCI_DEVICE_ID_LPem12002_M8	0xf100	/* Identified by SSDID and */
 						/* cache_line reg */
-#define	PCI_DEVICE_ID_LPe1205_BC	0xf100	/* Identified by SSDID and */
+#define	PCI_DEVICE_ID_LPe1205_CIOv	0xf100	/* Identified by SSDID and */
 						/* cache_line reg */
 #define	PCI_DEVICE_ID_LPe1205_BU	0xf100	/* Identified by SSDID and */
 						/* cache_line reg */
@@ -240,29 +324,33 @@ typedef enum emlxs_firmware {
 						/* cache_line reg */
 #define	PCI_DEVICE_ID_BX900_FC82E	0xf100	/* Identified by SSDID and */
 						/* cache_line reg */
-#define	  PCI_SSDID_LPe12000_M8		0xf100
-#define	  PCI_SSDID_LPe12002_M8		0xf100
-#define	  PCI_SSDID_LPem12002_M8	0xf12e
-#define	  PCI_SSDID_LPe1205_BC		0xf124
-#define	  PCI_SSDID_LPe1205_BU		0xf125
-#define	  PCI_SSDID_LPe1205_M8		0xf126
-#define	  PCI_SSDID_LPe1205_N		0xf127
-#define	  PCI_SSDID_LPe1205_HP		0x1719
-#define	  PCI_SSDID_BX900_FC82E		0x113c
+#define	PCI_SSDID_LPe12000_M8		0xf100
+#define	PCI_SSDID_LPe12002_M8		0xf100
+#define	PCI_SSDID_LPem12002_M8		0xf12e
+#define	PCI_SSDID_LPe1205_CIOv		0xf124
+#define	PCI_SSDID_LPe1205_BU		0xf125
+#define	PCI_SSDID_LPe1205_M8		0xf126
+#define	PCI_SSDID_LPe1205_N		0xf127
+#define	PCI_SSDID_LPe1205_HP		0x1719
+#define	PCI_SSDID_BX900_FC82E		0x113c
 
+#define	PCI_DEVICE_ID_LP2105		0xfe12
+#define	PCI_DEVICE_ID_LP2105_CI		0xfe12
+#define	PCI_SSDID_LP2105		0xfe12
+#define	PCI_SSDID_LP2105_CI		0x004b
 
 /* Sun branded adapters */
 #define	PCI_DEVICE_ID_LP10000_S		0xfc00
 #define	PCI_DEVICE_ID_LP10000DC_S	0xfc00	/* Identified by cache_line */
 						/* reg */
-#define	  PCI_SSDID_LP10000_S		0xfc00
-#define	  PCI_SSDID_LP10000DC_S		0xfc00
+#define	PCI_SSDID_LP10000_S		0xfc00
+#define	PCI_SSDID_LP10000DC_S		0xfc00
 
 #define	PCI_DEVICE_ID_LP11000_S		0xfc10
 #define	PCI_DEVICE_ID_LP11002_S		0xfc10	/* Identified by SSDID and */
 						/* cache_line reg */
-#define	  PCI_SSDID_LP11000_S		0xfc11
-#define	  PCI_SSDID_LP11002_S		0xfc12
+#define	PCI_SSDID_LP11000_S		0xfc11
+#define	PCI_SSDID_LP11002_S		0xfc12
 
 #define	PCI_DEVICE_ID_LPe11000_S	0xfc20
 #define	PCI_DEVICE_ID_LPe11002_S	0xfc20	/* Identified by SSDID and */
@@ -275,271 +363,158 @@ typedef enum emlxs_firmware {
 						/* cache_line reg */
 #define	PCI_DEVICE_ID_LPem11002E_S	0xfc20	/* Identified by SSDID and */
 						/* cache_line reg */
-#define	  PCI_SSDID_LPe11000_S		0xfc21
-#define	  PCI_SSDID_LPe11002_S		0xfc22
-#define	  PCI_SSDID_LPem11002E_S	0xfc23
-#define	  PCI_SSDID_LPe11020_S		0xfc2a
-#define	  PCI_SSDID_LPeA11002_S		0xfc2d
-#define	  PCI_SSDID_LPem11002_S		0xfc2e
+#define	PCI_SSDID_LPe11000_S		0xfc21
+#define	PCI_SSDID_LPe11002_S		0xfc22
+#define	PCI_SSDID_LPem11002E_S		0xfc23
+#define	PCI_SSDID_LPe11020_S		0xfc2a
+#define	PCI_SSDID_LPeA11002_S		0xfc2d
+#define	PCI_SSDID_LPem11002_S		0xfc2e
 
 #define	PCI_DEVICE_ID_LPe12000_S	0xfc40
-#define	PCI_DEVICE_ID_LPe12002_S	0xfc40	/* Identified cache_line reg */
+#define	PCI_DEVICE_ID_LPe12002_S	0xfc40	/* Identified by cache_line */
+						/* reg */
 #define	PCI_DEVICE_ID_LPem12002_S	0xfc40	/* Identified by SSDID and */
+						/* cache_line reg */
+#define	PCI_DEVICE_ID_LPem12002E_S	0xfc40	/* Identified by SSDID and */
 						/* cache_line reg */
 #define	PCI_DEVICE_ID_LPe12020_S	0xfc40	/* Identified by SSDID and */
 						/* cache_line reg */
-#define	  PCI_SSDID_LPe12000_S		0xfc41
-#define	  PCI_SSDID_LPe12002_S		0xfc42
-#define	  PCI_SSDID_LPe12020_S		0xfc4a
-#define	  PCI_SSDID_LPem12002_S		0xfc4e
+#define	PCI_SSDID_LPe12000_S		0xfc41
+#define	PCI_SSDID_LPe12002_S		0xfc42
+#define	PCI_SSDID_LPe12020_S		0xfc4a
+#define	PCI_SSDID_LPem12002_S		0xfc4e
+#define	PCI_SSDID_LPem12002E_S		0xfc43
 
+#define	PCI_DEVICE_ID_LPemv12002_S	0xfc50
+#define	PCI_SSDID_LPemv12002_S		0xfc5e
 
 /* Spare IDs */
 #define	PCI_DEVICE_ID_LPe1000_SP	0xf0f6
-#define	  PCI_SSDID_LPe1000_SP		0xf0f6
+#define	PCI_SSDID_LPe1000_SP		0xf0f6
 
 #define	PCI_DEVICE_ID_LPe1002_SP	0xf0f7
-#define	  PCI_SSDID_LPe1002_SP		0xf0f7
+#define	PCI_SSDID_LPe1002_SP		0xf0f7
 
 #define	PCI_DEVICE_ID_LP11000_SP	0xfd11
-#define	  PCI_SSDID_LP11000_SP		0xfd11
+#define	PCI_SSDID_LP11000_SP		0xfd11
 
 #define	PCI_DEVICE_ID_LP11002_SP	0xfd12
-#define	  PCI_SSDID_LP11002_SP		0xfd12
+#define	PCI_SSDID_LP11002_SP		0xfd12
 
 #define	PCI_DEVICE_ID_LPe1105_SP	0xfe25
-#define	  PCI_SSDID_LPe1105_SP		0xfe25
+#define	PCI_SSDID_LPe1105_SP		0xfe25
 
 #define	PCI_DEVICE_ID_LPe11000_SP	0xfe11
-#define	  PCI_SSDID_LPe11000_SP		0xfe11
-
-#define	PCI_DEVICE_ID_LPe11002_SP	0xfe12
-#define	  PCI_SSDID_LPe11002_SP		0xfe12
+#define	PCI_SSDID_LPe11000_SP		0xfe11
 
 #define	PCI_DEVICE_ID_LPe12000_SP	0xf111
 #define	PCI_DEVICE_ID_LPe12002_SP	0xf112
-#define	  PCI_SSDID_LPe12000_SP		0xf111
-#define	  PCI_SSDID_LPe12002_SP		0xf112
+#define	PCI_SSDID_LPe12000_SP		0xf111
+#define	PCI_SSDID_LPe12002_SP		0xf112
 
-#define	PCI_DEVICE_ID_LPe1205_SP1	0xf100
+#define	PCI_DEVICE_ID_LPe12002_SP1	0xf100
+#define	PCI_DEVICE_ID_LPe12002_SP2	0xf100
+#define	PCI_DEVICE_ID_LPe12002_SP3	0xf100
+#define	PCI_SSDID_LPe12002_SP1		0xf121
+#define	PCI_SSDID_LPe12002_SP2		0xf122
+#define	PCI_SSDID_LPe12002_SP3		0xf123
+
+#define	PCI_DEVICE_ID_LPe1205_HI	0xf100
 #define	PCI_DEVICE_ID_LPe1205_SP2	0xf100
 #define	PCI_DEVICE_ID_LPe1205_SP3	0xf100
-#define	  PCI_SSDID_LPe1205_SP1		0xf12a
-#define	  PCI_SSDID_LPe1205_SP2		0xf12b
-#define	  PCI_SSDID_LPe1205_SP3		0xf12c
+#define	PCI_SSDID_LPe1205_HI		0xf12a
+#define	PCI_SSDID_LPe1205_SP2		0xf12b
+#define	PCI_SSDID_LPe1205_SP3		0xf12c
 
 
 /* JEDEC codes */
-#define	FIREFLY_JEDEC_ID		0x1ACC
-#define	SUPERFLY_JEDEC_ID		0x0020
-#define	DRAGONFLY_JEDEC_ID		0x0021
-#define	DRAGONFLY_V2_JEDEC_ID		0x0025
-#define	CENTAUR_2G_JEDEC_ID		0x0026
-#define	CENTAUR_1G_JEDEC_ID		0x0028
-#define	HELIOS_4G_JEDEC_ID		0x0364
-#define	ZEPHYR_4G_JEDEC_ID		0x0577
-#define	NEPTUNE_4G_JEDEC_ID		0x0510
-#define	SATURN_8G_JEDEC_ID		0x1004
-#define	JEDEC_ID_MASK			0x0FFFF000
-#define	JEDEC_ID_SHIFT			12
-#define	FC_JEDEC_ID(id)			((id & JEDEC_ID_MASK) >> JEDEC_ID_SHIFT)
+#define	FIREFLY_JEDEC_ID	0x1ACC
+#define	SUPERFLY_JEDEC_ID	0x0020
+#define	DRAGONFLY_JEDEC_ID	0x0021
+#define	DRAGONFLY_V2_JEDEC_ID	0x0025
+#define	CENTAUR_2G_JEDEC_ID	0x0026
+#define	CENTAUR_1G_JEDEC_ID	0x0028
+#define	HELIOS_4G_JEDEC_ID	0x0364
+#define	ZEPHYR_4G_JEDEC_ID	0x0577
+#define	NEPTUNE_4G_JEDEC_ID	0x0510
+#define	SATURN_8G_JEDEC_ID	0x1004
+#define	PROTEUS_8G_JEDEC_ID	0x2634
+#define	JEDEC_ID_MASK		0x0FFFF000
+#define	JEDEC_ID_SHIFT		12
+#define	FC_JEDEC_ID(id)		((id & JEDEC_ID_MASK) >> JEDEC_ID_SHIFT)
 
 
-
-typedef struct emlxs_model {
+typedef struct emlxs_model
+{
 	emlxs_adapter_t id;
-	uint16_t device_id;
-	uint16_t ssdid;
+	uint16_t	device_id;
+	uint16_t	ssdid;
 
-	char model[32];
-	char model_desc[80];
-	char manufacturer[80];
-	uint32_t flags;
+	char		model[32];
+	char		model_desc[80];
+	char		manufacturer[80];
+	uint32_t	flags;
 
 	/* flags */
-#define	EMLXS_INTX_SUPPORTED		0x00000001
-#define	EMLXS_MSI_SUPPORTED		0x00000002
-#define	EMLXS_MSIX_SUPPORTED		0x00000004
-#define	EMLXS_E2E_SUPPORTED		0x00000010 /* End-to-end auth */
-#define	EMLXS_SUN_BRANDED		0x10000000
-#define	EMLXS_NOT_SUPPORTED		0x80000000
+#define	EMLXS_INTX_SUPPORTED	0x00000001
+#define	EMLXS_MSI_SUPPORTED	0x00000002
+#define	EMLXS_MSIX_SUPPORTED	0x00000004
+#define	EMLXS_E2E_SUPPORTED	0x00000010 /* End-to-end authentication */
+#define	EMLXS_SUN_BRANDED	0x10000000
+#define	EMLXS_NOT_SUPPORTED	0x80000000
 
-	uint32_t chip;
+	uint32_t	chip;
 
 	/* chip */
-#define	EMLXS_UNKNOWN_CHIP		0x00000000
-#define	EMLXS_DRAGONFLY_CHIP		0x00000001
-#define	EMLXS_CENTAUR_CHIP		0x00000002
-#define	EMLXS_PEGASUS_CHIP		0x00000004
-#define	EMLXS_THOR_CHIP			0x00000008
-#define	EMLXS_HELIOS_CHIP		0x00000010
-#define	EMLXS_ZEPHYR_CHIP		0x00000020
-#define	EMLXS_NEPTUNE_CHIP		0x00000040
-#define	EMLXS_SATURN_CHIP		0x00000080
+#define	EMLXS_UNKNOWN_CHIP	0x00000000
+#define	EMLXS_DRAGONFLY_CHIP	0x00000001
+#define	EMLXS_CENTAUR_CHIP	0x00000002
+#define	EMLXS_PEGASUS_CHIP	0x00000004
+#define	EMLXS_THOR_CHIP		0x00000008
+#define	EMLXS_HELIOS_CHIP	0x00000010
+#define	EMLXS_ZEPHYR_CHIP	0x00000020
+#define	EMLXS_NEPTUNE_CHIP	0x00000040
+#define	EMLXS_SATURN_CHIP	0x00000080
+#define	EMLXS_PROTEUS_CHIP	0x00000100
+#define	EMLXS_TIGERSHARK_CHIP	0x00000200
 
-	emlxs_firmware_t fwid;
-	uint32_t intr_limit;
+	emlxs_fwid_t	fwid;
+	uint32_t	intr_limit;
 
-#define	EMLXS_INTR_NO_LIMIT		0x00000000
-#define	EMLXS_INTR_LIMIT1		0x00000001
-#define	EMLXS_INTR_LIMIT2		0x00000002
-#define	EMLXS_INTR_LIMIT4		0x00000004
-#define	EMLXS_INTR_LIMIT8		0x00000008
-#define	EMLXS_INTR_LIMIT16		0x00000010
+#define	EMLXS_INTR_NO_LIMIT	0x00000000
+#define	EMLXS_INTR_LIMIT1	0x00000001
+#define	EMLXS_INTR_LIMIT2	0x00000002
+#define	EMLXS_INTR_LIMIT4	0x00000004
+#define	EMLXS_INTR_LIMIT8	0x00000008
+#define	EMLXS_INTR_LIMIT16	0x00000010
 
-	uint32_t channels;
-	uint8_t pt_2[8];
-	uint8_t pt_3[8];
-	uint8_t pt_6[8];
-	uint8_t pt_7[8];
-	uint8_t pt_A[8];
-	uint8_t pt_B[8];
-	uint8_t pt_E[8];
-	uint8_t pt_FF[8];
+	uint32_t	sli_mask;
+
+#define	EMLXS_SLI0_MASK		0x00000000
+#define	EMLXS_SLI2_MASK		0x00000002
+#define	EMLXS_SLI3_MASK		0x00000004
+#define	EMLXS_SLI4_MASK		0x00000008
+
+#define	EMLXS_SLI_MASK(_mode)  ((_mode < 2) ? 0 : (1 << _mode))
+
+	uint32_t	channels;	/* 1-single channel, 2-multi channels */
+	uint8_t		pt_2[8];
+	uint8_t		pt_3[8];
+	uint8_t		pt_6[8];
+	uint8_t		pt_7[8];
+	uint8_t		pt_A[8];
+	uint8_t		pt_B[8];
+	uint8_t		pt_E[8];
+	uint8_t		pt_FF[8];
+	uint8_t		pt_20[8];
 
 } emlxs_model_t;
 
-typedef struct emlxs_image {
-	emlxs_firmware_t id;
-	char *label;
-	uint8_t *buffer;
-	uint32_t size;
-	uint32_t kern;
-	uint32_t stub;
-	uint32_t sli1;
-	uint32_t sli2;
-	uint32_t sli3;
-	uint32_t sli4;
-
-} emlxs_image_t;
-
-extern emlxs_image_t emlxs_fw_image[];
-
-
 #ifdef EMLXS_MODEL_DEF
 
-/* Define the firmware image database */
-#include <fw_lp10000.h>
-#include <fw_lp11000.h>
-#include <fw_lp11002.h>
-
-#ifdef S10S11
-#include <fw_lpe11000.h>
-#include <fw_lpe11002.h>
-#include <fw_lpe12000.h>
-#endif	/* S10S11 */
-
-emlxs_image_t emlxs_fw_image[] = {
-
-	/* LP10000 */
-	{
-		LP10000_FW,
-		emlxs_lp10000_fw,
-		emlxs_lp10000_image,
-		emlxs_lp10000_size,
-		emlxs_lp10000_kern,
-		emlxs_lp10000_stub,
-		emlxs_lp10000_sli1,
-		emlxs_lp10000_sli2,
-		emlxs_lp10000_sli3,
-		0
-	},
-
-	/* LP11000 */
-	{
-		LP11000_FW,
-		emlxs_lp11000_fw,
-		emlxs_lp11000_image,
-		emlxs_lp11000_size,
-		emlxs_lp11000_kern,
-		emlxs_lp11000_stub,
-		emlxs_lp11000_sli1,
-		emlxs_lp11000_sli2,
-		emlxs_lp11000_sli3,
-		0
-	},
-
-	/* LP11002 */
-	{
-		LP11002_FW,
-		emlxs_lp11002_fw,
-		emlxs_lp11002_image,
-		emlxs_lp11002_size,
-		emlxs_lp11002_kern,
-		emlxs_lp11002_stub,
-		emlxs_lp11002_sli1,
-		emlxs_lp11002_sli2,
-		emlxs_lp11002_sli3,
-		0
-	},
-
-#ifdef S10S11
-	/* LPe11000 */
-	{
-		LPe11000_FW,
-		emlxs_lpe11000_fw,
-		emlxs_lpe11000_image,
-		emlxs_lpe11000_size,
-		emlxs_lpe11000_kern,
-		emlxs_lpe11000_stub,
-		emlxs_lpe11000_sli1,
-		emlxs_lpe11000_sli2,
-		emlxs_lpe11000_sli3,
-		0
-	},
-
-	/* LPe11002 */
-	{
-		LPe11002_FW,
-		emlxs_lpe11002_fw,
-		emlxs_lpe11002_image,
-		emlxs_lpe11002_size,
-		emlxs_lpe11002_kern,
-		emlxs_lpe11002_stub,
-		emlxs_lpe11002_sli1,
-		emlxs_lpe11002_sli2,
-		emlxs_lpe11002_sli3,
-		0
-	},
-
-	/* LPe12000 */
-	{
-		LPe12000_FW,
-		emlxs_lpe12000_fw,
-		emlxs_lpe12000_image,
-		emlxs_lpe12000_size,
-		emlxs_lpe12000_kern,
-		emlxs_lpe12000_stub,
-		emlxs_lpe12000_sli1,
-		emlxs_lpe12000_sli2,
-		emlxs_lpe12000_sli3,
-		0
-	},
-#endif	/* S10S11 */
-
-	/* NULL Terminated list */
-	{
-		UNKNOWN_ADAPTER,
-		NULL,
-		NULL,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0,
-		0
-	},
-
-}; /* emlxs_fw_image[] */
-
-#define	EMLXS_IMAGE_COUNT \
-	((sizeof (emlxs_fw_image) / sizeof (emlxs_image_t)) - 1)
-
-
-
 /* Define the SBUS adapter database */
-emlxs_model_t emlxs_sbus_model[] = {
+emlxs_model_t   emlxs_sbus_model[] =
+{
 
 	/* Unknown */
 	{
@@ -553,6 +528,7 @@ emlxs_model_t emlxs_sbus_model[] = {
 		EMLXS_UNKNOWN_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		0,
 		{0},
 		{0},
@@ -562,6 +538,7 @@ emlxs_model_t emlxs_sbus_model[] = {
 		{0},
 		{0},
 		{0},
+		{0}, /* T20 */
 	},
 
 	/* Dragonfly midrange (QFLY) */
@@ -576,6 +553,7 @@ emlxs_model_t emlxs_sbus_model[] = {
 		EMLXS_DRAGONFLY_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		1,
 		{0x21, 0xB0, 0},
 		{0},
@@ -585,6 +563,7 @@ emlxs_model_t emlxs_sbus_model[] = {
 		{0},
 		{0},
 		{0x30, 0},
+		{0}, /* T20 */
 	},
 
 	/* Centaur mid-range (RFLY, Rtaur) */
@@ -599,6 +578,7 @@ emlxs_model_t emlxs_sbus_model[] = {
 		EMLXS_CENTAUR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		1,
 		{0x41, 0xD0, 0},
 		{0},
@@ -608,8 +588,8 @@ emlxs_model_t emlxs_sbus_model[] = {
 		{0},
 		{0},
 		{0x50, 0},
+		{0}, /* T20 */
 	},
-
 
 };	/* emlxs_sbus_model[] */
 
@@ -618,8 +598,8 @@ emlxs_model_t emlxs_sbus_model[] = {
 
 
 /* Define the PCI adapter database */
-emlxs_model_t emlxs_pci_model[] = {
-
+emlxs_model_t   emlxs_pci_model[] =
+{
 	/* Unknown */
 	{
 		UNKNOWN_ADAPTER,
@@ -632,6 +612,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_UNKNOWN_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		0,
 		{0},
 		{0},
@@ -641,6 +622,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0},
+		{0}, /* T20 */
 	},
 
 	/* Dragonfly */
@@ -655,6 +637,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_DRAGONFLY_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		1,
 		{0x21, 0x22, 0x23, 0xA0, 0},
 		{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0},
@@ -664,6 +647,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0x20, 0},
+		{0}, /* T20 */
 	},
 
 	/* Dragonfly DC */
@@ -679,6 +663,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_DRAGONFLY_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		2,
 		{0x21, 0x22, 0x23, 0xA0, 0},
 		{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0},
@@ -688,6 +673,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0x20, 0},
+		{0}, /* T20 */
 	},
 
 	/* Centaur PCI */
@@ -702,6 +688,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_CENTAUR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		1,
 		{0x41, 0x43, 0xC0, 0},
 		{0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0},
@@ -711,6 +698,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0x40, 0},
+		{0}, /* T20 */
 	},
 
 	/* Centaur cPCI */
@@ -725,6 +713,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_CENTAUR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		1,
 		{0x41, 0x43, 0xC0, 0},
 		{0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0},
@@ -734,6 +723,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0x40, 0},
+		{0}, /* T20 */
 	},
 
 	/* Centaur DC PCI */
@@ -749,6 +739,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_CENTAUR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		2,
 		{0x41, 0x43, 0xC0, 0},
 		{0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0},
@@ -758,6 +749,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0x40, 0},
+		{0}, /* T20 */
 	},
 
 	/* Centaur DC PCI-X */
@@ -773,6 +765,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_CENTAUR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		2,
 		{0x41, 0x43, 0xC0, 0},
 		{0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0},
@@ -782,6 +775,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0},
 		{0},
 		{0x40, 0},
+		{0}, /* T20 */
 	},
 
 	/* Pegasus */
@@ -796,6 +790,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_PEGASUS_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		1,
 		{0x63, 0xE0, 0},
 		{0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0},
@@ -805,6 +800,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x63, 0},
 		{0},
 		{0x60, 0},
+		{0}, /* T20 */
 	},
 
 	/* Pegasus DC */
@@ -820,6 +816,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_PEGASUS_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK,
 		2,
 		{0x61, 0xE0, 0},
 		{0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0},
@@ -829,6 +826,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x61, 0},
 		{0},
 		{0x60, 0},
+		{0}, /* T20 */
 	},
 
 	/* Thor */
@@ -843,6 +841,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_THOR_CHIP,
 		LP10000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x81, 0x83, 0x88, 0},
 		{0x81, 0x82, 0x83, 0x85, 0x86, 0x87, 0},
@@ -852,6 +851,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x81, 0x83, 0},
 		{0},
 		{0x80, 0},
+		{0}, /* T20 */
 	},
 
 	/* Thor DC */
@@ -867,6 +867,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_THOR_CHIP,
 		LP10000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x81, 0x83, 0x88, 0},
 		{0x81, 0x82, 0x83, 0x85, 0x86, 0x87, 0},
@@ -876,6 +877,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x81, 0x83, 0},
 		{0},
 		{0x80, 0},
+		{0}, /* T20 */
 	},
 
 	/* Thor DC express */
@@ -887,14 +889,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LP10000ExDC",
 		"Emulex LP10000ExDC 2Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_THOR_CHIP,
 		LP10000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x81, 0x83, 0x88, 0},
 		{0x81, 0x82, 0x83, 0x85, 0x86, 0x87, 0},
@@ -904,6 +903,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x81, 0x83, 0},
 		{0},
 		{0x80, 0},
+		{0}, /* T20 */
 	},
 
 	/* Thor (Sun Rainbow-E1) */
@@ -918,6 +918,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_THOR_CHIP,
 		LP10000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x83, 0x88, 0},
 		{0x82, 0x84, 0},
@@ -927,6 +928,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x83, 0},
 		{0},
 		{0x80, 0},
+		{0}, /* T20 */
 	},
 
 	/* Thor DC (Sun Rainbow-E2) */
@@ -942,6 +944,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_THOR_CHIP,
 		LP10000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x83, 0x88, 0},
 		{0x82, 0x84, 0},
@@ -951,6 +954,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x83, 0},
 		{0},
 		{0x80, 0},
+		{0}, /* T20 */
 	},
 
 	/* Thor mid-range (MiniThor) */
@@ -965,6 +969,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_THOR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x98, 0},
 		{0x91, 0x92, 0x93, 0x95, 0x96, 0x97, 0},
@@ -974,6 +979,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x91, 0},
 		{0},
 		{0x90, 0},
+		{0}, /* T20 */
 	},
 
 	/* Helios */
@@ -988,6 +994,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_HELIOS_CHIP,
 		LP11000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0xC3, 0xC8, 0},
 		{0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0},
@@ -997,6 +1004,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xC3, 0},
 		{0},
 		{0xC0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Helios DC */
@@ -1012,6 +1020,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_HELIOS_CHIP,
 		LP11002_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xC1, 0xC8, 0},
 		{0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0},
@@ -1021,6 +1030,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xC1, 0},
 		{0},
 		{0xC0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Helios (Sun Pyramid-E1) */
@@ -1035,6 +1045,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_HELIOS_CHIP,
 		LP11000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0xC3, 0xC8, 0},
 		{0xC4, 0},
@@ -1044,6 +1055,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xC3, 0},
 		{0},
 		{0xC0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Helios DC (Sun Pyramid-E2) */
@@ -1059,6 +1071,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_HELIOS_CHIP,
 		LP11002_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xC1, 0xC8, 0},
 		{0xC4, 0},
@@ -1068,6 +1081,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xC1, 0},
 		{0},
 		{0xC0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr  */
@@ -1078,14 +1092,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe11000-M4",
 		"Emulex LPe11000-M4 4Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0xE3, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1095,6 +1106,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE3, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr DC */
@@ -1106,14 +1118,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe11002-M4",
 		"Emulex LPe11002-M4 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1123,6 +1132,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 
@@ -1135,14 +1145,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1105-M",
 		"Emulex LPe1105-M 2Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1152,6 +1159,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 
@@ -1164,14 +1172,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"BX600-FC42E",
 		"Emulex BX600-FC42E 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1181,6 +1186,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* HP Zephyr DC Blade */
@@ -1192,14 +1198,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1105-HP",
 		"Emulex LPe1105-HP 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1209,6 +1212,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 
@@ -1221,14 +1225,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1105-M4",
 		"Dell LPe1105-M4 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1238,6 +1239,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr Express Module */
@@ -1249,14 +1251,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPem11002-M4",
 		"Emulex LPem11002-M4 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -1266,6 +1265,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr (Hornet) */
@@ -1276,14 +1276,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LP21000-M",
 		"Emulex LP21000_M 10GE 1-port PCIe FCoE HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x50, 0},
 		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
@@ -1293,6 +1290,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x53, 0},
 		{0},
 		{0x58, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr (Hornet Copper) */
@@ -1303,14 +1301,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LP21000-C",
 		"Emulex LP21000_C 10GE 1-port PCIe FCoE HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x50, 0},
 		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
@@ -1320,6 +1315,57 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x53, 0},
 		{0},
 		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr (Enterprise Hornet M_E) */
+	{
+		LP21000_M_E,
+		PCI_DEVICE_ID_LP21000_M_E,
+		PCI_SSDID_LP21000_M_E,
+		"LP21002-M-E",
+		"Emulex LP21000_M_E 10GE 1-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		1,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr (Enterprise Hornet Copper) */
+	{
+		LP21000_C_E,
+		PCI_DEVICE_ID_LP21000_C_E,
+		PCI_SSDID_LP21000_C_E,
+		"LP21000-C-E",
+		"Emulex LP21000_C_E 10GE 1-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		1,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr DC (Hornet) */
@@ -1330,14 +1376,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LP21002-M",
 		"Emulex LP21002_M 10GE 2-port PCIe FCoE HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x50, 0},
 		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
@@ -1347,6 +1390,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x59, 0},
 		{0},
 		{0x58, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr DC (Hornet Copper) */
@@ -1357,14 +1401,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LP21002-C",
 		"Emulex LP21002_C 10GE 2-port PCIe FCoE HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x50, 0},
 		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
@@ -1374,6 +1415,282 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x59, 0},
 		{0},
 		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Enterprise Hornet M_E) */
+	{
+		LP21002_M_E,
+		PCI_DEVICE_ID_LP21002_M_E,
+		PCI_SSDID_LP21002_M_E,
+		"LP21002-M-E",
+		"Emulex LP21002_M_E 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Enterprise Hornet Copper) */
+	{
+		LP21002_C_E,
+		PCI_DEVICE_ID_LP21002_C_E,
+		PCI_SSDID_LP21002_C_E,
+		"LP21002-C-E",
+		"Emulex LP21002_C_E 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr (Boxster Hornet M_HP) */
+	{
+		LP21000_M_HP,
+		PCI_DEVICE_ID_LP21000_M_HP,
+		PCI_SSDID_LP21000_M_HP,
+		"LP21000-M-HP",
+		"Emulex LP21000_M_HP 10GE 1-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		1,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr (Boxster Hornet Copper) */
+	{
+		LP21000_C_HP,
+		PCI_DEVICE_ID_LP21000_C_HP,
+		PCI_SSDID_LP21000_C_HP,
+		"LP21000-C-HP",
+		"Emulex LP21000_C_HP 10GE 1-port PCIe FCoE HBA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		1,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr (Enterprise Hornet U_HP) */
+	{
+		LP21000_U_HP,
+		PCI_DEVICE_ID_LP21000_U_HP,
+		PCI_SSDID_LP21000_U_HP,
+		"LP21000-U-HP",
+		"Emulex LP21000_U_HP 10GE 1-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		1,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Boxster Hornet M_HP) */
+	{
+		LP21002_M_HP,
+		PCI_DEVICE_ID_LP21002_M_HP,
+		PCI_SSDID_LP21002_M_HP,
+		"LP21002-M-HP",
+		"Emulex LP21002_M_HP 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Boxstar Hornet Copper) */
+	{
+		LP21002_C_HP,
+		PCI_DEVICE_ID_LP21002_C_HP,
+		PCI_SSDID_LP21002_C_HP,
+		"LP21002-C-HP",
+		"Emulex LP21002_C_HP 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Enterprise Hornet U_HP) */
+	{
+		LP21002_U_HP,
+		PCI_DEVICE_ID_LP21002_U_HP,
+		PCI_SSDID_LP21002_U_HP,
+		"LP21002-U-HP",
+		"Emulex LP21002_U_HP 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Hornet Spare ID 1) */
+	{
+		LP21002_SP1,
+		PCI_DEVICE_ID_LP21002_SP1,
+		PCI_SSDID_LP21002_SP1,
+		"LP21002-SP1",
+		"Emulex LP21002_SP1 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Hornet Spare ID 2) */
+	{
+		LP21002_SP1,
+		PCI_DEVICE_ID_LP21002_SP2,
+		PCI_SSDID_LP21002_SP2,
+		"LP21002-SP2",
+		"Emulex LP21002_SP1 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Hornet Spare ID 3) */
+	{
+		LP21002_SP1,
+		PCI_DEVICE_ID_LP21002_SP3,
+		PCI_SSDID_LP21002_SP3,
+		"LP21002-SP3",
+		"Emulex LP21002_SP1 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x50, 0},
+		{0x59, 0x5A, 0x5B, 0x5D, 0x5E, 0x5F, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x59, 0},
+		{0},
+		{0x58, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr (Sun Summit-E1) */
@@ -1384,14 +1701,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe11000-S",
 		"Emulex LPe11000-S 4Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0xE3, 0xE8, 0},
 		{0xE4, 0},
@@ -1401,6 +1715,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE3, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr DC (Sun Summit-E2) */
@@ -1412,14 +1727,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe11002-S",
 		"Emulex LPe11002-S 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE4, 0},
@@ -1429,6 +1741,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr NEM (Sun Janus) */
@@ -1440,14 +1753,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe11020-S",
 		"Emulex LPe11020-S 4Gb 20-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE4, 0},
@@ -1457,6 +1767,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr Express Module (Sun TitanE) */
@@ -1468,14 +1779,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPem11002-S",
 		"Emulex LPem11002-S 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE4, 0},
@@ -1485,6 +1793,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr Express Module (Sun Elara) */
@@ -1496,14 +1805,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPem11002E-S",
 		"Emulex LPem11002E-S 4Gb 2-port FC & 2-port 1GE PCIe HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE4, 0},
@@ -1513,6 +1819,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr AMC (Sun Helene/Dione) */
@@ -1524,14 +1831,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPeA11002-S",
 		"Emulex LPeA11002-S 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE4, 0},
@@ -1541,6 +1845,57 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Eagle)  */
+	{
+		LP2105,
+		PCI_DEVICE_ID_LP2105,
+		PCI_SSDID_LP2105,
+		"LP2105",
+		"Emulex LP2105 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		LPe11002_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0xE1, 0xE8, 0},
+		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
+		{0xE1, 0},
+		{0xE1, 0},
+		{0},
+		{0xE1, 0},
+		{0},
+		{0xE0, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr DC (Eagle Blade) */
+	{
+		LP2105_CI,
+		PCI_DEVICE_ID_LP2105_CI,
+		PCI_SSDID_LP2105_CI,
+		"LP2105-CI",
+		"Emulex LP2105_CI 10GE 2-port PCIe FCoE CNA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		LPe11002_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0xE1, 0xE8, 0},
+		{0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0},
+		{0xE1, 0},
+		{0xE1, 0},
+		{0},
+		{0xE1, 0},
+		{0},
+		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Neptune  */
@@ -1551,15 +1906,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1000-F4",
 		"Emulex LPe1000 4Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_NEPTUNE_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x38, 0},
 		{0x39, 0x3A, 0x3B, 0x3D, 0x3E, 0x3F, 0},
@@ -1569,6 +1921,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x32, 0},
 		{0},
 		{0x38, 0},
+		{0}, /* T20 */
 	},
 
 	/* Neptune DC  */
@@ -1579,15 +1932,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1002-F4",
 		"Emulex LPe1002-F4 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_NEPTUNE_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x38, 0},
 		{0x39, 0x3A, 0x3B, 0x3D, 0x3E, 0x3F, 0},
@@ -1597,6 +1947,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x32, 0},
 		{0},
 		{0x38, 0},
+		{0}, /* T20 */
 	},
 
 	/* Saturn */
@@ -1607,15 +1958,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe12000-M8",
 		"Emulex LPe12000-M8 8Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1625,6 +1973,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x73, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* Saturn DC */
@@ -1635,15 +1984,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe12002-M8",
 		"Emulex LPe12002-M8 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1653,6 +1999,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x73, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* Saturn Express Module */
@@ -1663,15 +2010,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPem12002-M8",
 		"Emulex LPem12002-M8 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1681,26 +2025,24 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x73, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 
 	/* IBM Saturn Blade (CFF) */
 	{
-		LPe1205_BC,
-		PCI_DEVICE_ID_LPe1205_BC,
-		PCI_SSDID_LPe1205_BC,
-		"LPe1205-BC",
-		"IBM LPe1205-BC 8Gb 2-port PCIe FC HBA",
+		LPe1205_CIOv,
+		PCI_DEVICE_ID_LPe1205_CIOv,
+		PCI_SSDID_LPe1205_CIOv,
+		"LPe1205-CIOv",
+		"IBM LPe1205-CIOv 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1710,6 +2052,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x79, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* Saturn Blade Universal (CFF) */
@@ -1720,15 +2063,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1205-BU",
 		"Emulex LPe1205-BU 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1738,6 +2078,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x79, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* Dell Saturn Blade DC */
@@ -1748,15 +2089,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1205-M8",
 		"Dell LPe1205-M8 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1766,6 +2104,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x79, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* NEC Saturn Blade DC */
@@ -1776,15 +2115,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1205-N",
 		"NEC LPe1205-N 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1794,6 +2130,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x79, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* HP Saturn Blade DC */
@@ -1804,15 +2141,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1205-HP",
 		"HP LPe1205-HP 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1822,6 +2156,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x79, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 	/* FSC Saturn Blade DC */
@@ -1832,15 +2167,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"BX900-FC82E",
 		"FSC BX900-FC82E 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -1850,9 +2182,10 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x79, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
-	/* Saturn (Sun Pallene) */
+	/* Saturn (Sun) */
 	{
 		LPe12000_S,
 		PCI_DEVICE_ID_LPe12000_S,
@@ -1860,15 +2193,13 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe12000-S",
 		"Emulex LPe12000-S 8Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
-		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
-			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
+		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED |
+			EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x78, 0},
 		{0x7C, 0},
@@ -1878,9 +2209,10 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x73, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
-	/* Saturn DC (Sun Pallene) */
+	/* Saturn DC (Sun) */
 	{
 		LPe12002_S,
 		PCI_DEVICE_ID_LPe12002_S,
@@ -1888,15 +2220,13 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe12002-S",
 		"Emulex LPe12002-S 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
-		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
-			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
+		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED |
+			EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x7C, 0},
@@ -1906,9 +2236,10 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x73, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
 	},
 
-	/* Saturn Express Module (Sun Pallene) */
+	/* Saturn Express Module (Sun) */
 	{
 		LPem12002_S,
 		PCI_DEVICE_ID_LPem12002_S,
@@ -1916,15 +2247,13 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPem12002-S",
 		"Emulex LPem12002-S 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
-		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
-			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
+		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED |
+			EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x7C, 0},
@@ -1934,14 +2263,224 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x73, 0},
 		{0},
 		{0x78, 0},
+		{0}, /* T20 */
+	},
+
+	/* Saturn Express Module (Sun Metis) */
+	{
+		LPem12002E_S,
+		PCI_DEVICE_ID_LPem12002E_S,
+		PCI_SSDID_LPem12002E_S,
+		"LPem12002E-S",
+		"Emulex LPem12002E-S 8Gb 2-port PCIe FC HBA",
+		"Emulex",
+		EMLXS_SUN_BRANDED | EMLXS_INTX_SUPPORTED |
+			EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_SATURN_CHIP,
+		LPe12000_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x78, 0},
+		{0x7C, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x78, 0},
+		{0}, /* T20 */
 	},
 
 
+	/* Proteus (Sun Aerion Express Module SR DC) */
+	{
+		LPemv12002_S,
+		PCI_DEVICE_ID_LPemv12002_S,
+		PCI_SSDID_LPemv12002_S,
+		"LPemv12002-S",
+		"Sun LPemv12002-S 8Gb 2-port PCIe SR-IOV FC HBA",
+		"Emulex",
+		EMLXS_SUN_BRANDED | EMLXS_MSI_SUPPORTED |
+			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		2,
+		{0xA1, 0},
+		{0xA4, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
+	/* Proteus (Balius SR) */
+	{
+		LPev12000_M8,
+		PCI_DEVICE_ID_LPev12000_M8,
+		PCI_SSDID_LPev12000_M8,
+		"LPev12000",
+		"Emulex LPev12000 8Gb 1-port PCIe SR-IOV FC HBA",
+		"Emulex",
+		EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		1,
+		{0xA1, 0},
+		{0xA1, 0xA2, 0xA3, 0xA5, 0xA6, 0xA7, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
+	/* Proteus (Xanthus MR) */
+	{
+		LPev12000M_M8,
+		PCI_DEVICE_ID_LPev12000M_M8,
+		PCI_SSDID_LPev12000M_M8,
+		"LPev12000M",
+		"Emulex LPev12000 8Gb 1-port PCIe MR-IOV FC HBA",
+		"Emulex",
+		EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		1,
+		{0xA1, 0},
+		{0xA1, 0xA2, 0xA3, 0xA5, 0xA6, 0xA7, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
+	/* Proteus (Balius SR DC) */
+	{
+		LPev12002_M8,
+		PCI_DEVICE_ID_LPev12002_M8,
+		PCI_SSDID_LPev12002_M8,
+		"LPev12002",
+		"Emulex LPev12002 8Gb 2-port PCIe SR-IOV FC HBA",
+		"Emulex",
+		EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		2,
+		{0xA1, 0},
+		{0xA1, 0xA2, 0xA3, 0xA5, 0xA6, 0xA7, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
+	/* Proteus (Xanthus MR DC) */
+	{
+		LPev12002M_M8,
+		PCI_DEVICE_ID_LPev12002M_M8,
+		PCI_SSDID_LPev12002M_M8,
+		"LPev12002M",
+		"Emulex LPev12002M 8Gb 2-port PCIe MR-IOV FC HBA",
+		"Emulex",
+		EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		2,
+		{0xA1, 0},
+		{0xA1, 0xA2, 0xA3, 0xA5, 0xA6, 0xA7, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
+	/* Proteus (Autobahn HP Ethernet) */
+	{
+		LPev12054E_HP,
+		PCI_DEVICE_ID_LPev12054E_HP,
+		PCI_SSDID_LPev12054E_HP,
+		"LPev12054E-HP",
+		"HP LPev12054E-HP 8Gb 2-port PCIe IOV FC HBA",
+		"Emulex",
+		EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		2,
+		{0xA1, 0},
+		{0xA1, 0xA2, 0xA3, 0xA5, 0xA6, 0xA7, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
+	/* Proteus (Autobahn HP) */
+	{
+		LPev12054_HP,
+		PCI_DEVICE_ID_LPev12054_HP,
+		PCI_SSDID_LPev12054_HP,
+		"LPev12054-HP",
+		"HP LPev12054-HP 8Gb 4-port PCIe IOV FC HBA",
+		"Emulex",
+		EMLXS_MSI_SUPPORTED | EMLXS_MSIX_SUPPORTED |
+			EMLXS_E2E_SUPPORTED,
+		EMLXS_PROTEUS_CHIP,
+		FW_NOT_PROVIDED,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI3_MASK,
+		2,
+		{0xA1, 0},
+		{0xA1, 0xA2, 0xA3, 0xA5, 0xA6, 0xA7, 0},
+		{0},
+		{0},
+		{0},
+		{0xA1, 0},
+		{0},
+		{0xA0, 0},
+		{1, 0}, /* T20 */
+	},
+
 	/*
 	 * ************************************ SPARE IDs
-	 *
-	 * Helios Enterprise Spare Id
 	 */
+
+	/* Helios Enterprise Spare Id */
 	{
 		LP11000_SP,
 		PCI_DEVICE_ID_LP11000_SP,
@@ -1953,6 +2492,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_HELIOS_CHIP,
 		LP11000_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0xC3, 0xC8, 0},
 		{0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0},
@@ -1976,6 +2516,7 @@ emlxs_model_t emlxs_pci_model[] = {
 		EMLXS_HELIOS_CHIP,
 		LP11002_FW,
 		EMLXS_INTR_LIMIT1,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xC1, 0xC8, 0},
 		{0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0},
@@ -1995,14 +2536,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe11000-SP",
 		"Emulex LPe11000-SP 4Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0xE3, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -2014,22 +2552,19 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE0, 0},
 	},
 
-	/* Zephyr DC Enterprise Spare Id  */
+	/* Zephyr Enterprise Dual Channel Spare Id 1  */
 	{
-		LPe11002_SP,
-		PCI_DEVICE_ID_LPe11002_SP,
-		PCI_SSDID_LPe11002_SP,
-		"LPe11002-SP",
-		"Emulex LPe11002-SP 4Gb 2-port PCIe FC HBA",
+		LPe11002_SP1,
+		PCI_DEVICE_ID_LPe11002_SP1,
+		PCI_SSDID_LPe11002_SP1,
+		"LPe11002-SP1",
+		"Emulex LPe11002-SP1 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -2039,6 +2574,57 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0xE1, 0},
 		{0},
 		{0xE0, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr Enterprise Dual Channel Spare Id 2  */
+	{
+		LPe11002_SP2,
+		PCI_DEVICE_ID_LPe11002_SP2,
+		PCI_SSDID_LPe11002_SP2,
+		"LPe11002-SP2",
+		"Emulex LPe11002-SP2 4Gb 2-port PCIe FC HBA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		LPe11002_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0xE1, 0xE8, 0},
+		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
+		{0xE1, 0},
+		{0xE1, 0},
+		{0},
+		{0xE1, 0},
+		{0},
+		{0xE0, 0},
+		{0}, /* T20 */
+	},
+
+	/* Zephyr Enterprise Dual Channel Spare Id 3  */
+	{
+		LPe11002_SP3,
+		PCI_DEVICE_ID_LPe11002_SP3,
+		PCI_SSDID_LPe11002_SP3,
+		"LPe11002-SP3",
+		"Emulex LPe11002-SP3 4Gb 2-port PCIe FC HBA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
+		EMLXS_ZEPHYR_CHIP,
+		LPe11002_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0xE1, 0xE8, 0},
+		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
+		{0xE1, 0},
+		{0xE1, 0},
+		{0},
+		{0xE1, 0},
+		{0},
+		{0xE0, 0},
+		{0}, /* T20 */
 	},
 
 	/* Zephyr DC Blade (Spare) */
@@ -2049,14 +2635,11 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1105-SP",
 		"Emulex LPe1105-SP 2Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_ZEPHYR_CHIP,
 		LPe11002_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0xE1, 0xE8, 0},
 		{0xE1, 0xE2, 0xE3, 0xE5, 0xE6, 0xE7, 0},
@@ -2076,15 +2659,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1000-SP",
 		"Emulex LPe1000-SP 4Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_NEPTUNE_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x38, 0},
 		{0x39, 0x3A, 0x3B, 0x3D, 0x3E, 0x3F, 0},
@@ -2104,15 +2684,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1002-SP",
 		"Emulex LPe1002-SP 4Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_NEPTUNE_CHIP,
 		FW_NOT_PROVIDED,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x38, 0},
 		{0x39, 0x3A, 0x3B, 0x3D, 0x3E, 0x3F, 0},
@@ -2132,16 +2709,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe12000-SP",
 		"Emulex LPe12000-SP 8Gb 1-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
-			EMLXS_MSIX_SUPPORTED |
-		EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
+			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		1,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -2161,16 +2734,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe12002-SP",
 		"Emulex LPe12002-SP 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
-			EMLXS_MSIX_SUPPORTED |
-		EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
+			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -2182,23 +2751,95 @@ emlxs_model_t emlxs_pci_model[] = {
 		{0x78, 0},
 	},
 
-	/* Saturn Blade 1 */
+	/* Saturn DC spare 1 */
 	{
-		LPe1205_SP1,
-		PCI_DEVICE_ID_LPe1205_SP1,
-		PCI_SSDID_LPe1205_SP1,
-		"LPe1205-SP1",
-		"Emulex LPe1205-SP1 8Gb 2-port PCIe FC HBA",
+		LPe12002_SP1,
+		PCI_DEVICE_ID_LPe12002_SP1,
+		PCI_SSDID_LPe12002_SP1,
+		"LPe12002-SP1",
+		"Emulex LPe12002-SP1 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x78, 0},
+		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x78, 0},
+	},
+
+	/* Saturn DC spare 2 */
+	{
+		LPe12002_SP2,
+		PCI_DEVICE_ID_LPe12002_SP2,
+		PCI_SSDID_LPe12002_SP2,
+		"LPe12002-SP2",
+		"Emulex LPe12002-SP2 8Gb 2-port PCIe FC HBA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
+			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
+		EMLXS_SATURN_CHIP,
+		LPe12000_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x78, 0},
+		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x78, 0},
+	},
+
+	/* Saturn DC spare 3 */
+	{
+		LPe12002_SP3,
+		PCI_DEVICE_ID_LPe12002_SP3,
+		PCI_SSDID_LPe12002_SP3,
+		"LPe12002-SP3",
+		"Emulex LPe12002-SP3 8Gb 2-port PCIe FC HBA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
+			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
+		EMLXS_SATURN_CHIP,
+		LPe12000_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
+		2,
+		{0x78, 0},
+		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x73, 0},
+		{0},
+		{0x78, 0},
+	},
+
+	/* Saturn Blade Hitachi */
+	{
+		LPe1205_HI,
+		PCI_DEVICE_ID_LPe1205_HI,
+		PCI_SSDID_LPe1205_HI,
+		"LPe1205-HI",
+		"Emulex LPe1205-HI 8Gb 2-port PCIe FC HBA",
+		"Emulex",
+		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
+			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
+		EMLXS_SATURN_CHIP,
+		LPe12000_FW,
+		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -2218,15 +2859,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1205-SP2",
 		"Emulex LPe1205-SP2 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},
@@ -2246,15 +2884,12 @@ emlxs_model_t emlxs_pci_model[] = {
 		"LPe1205-SP3",
 		"Emulex LPe1205-SP3 8Gb 2-port PCIe FC HBA",
 		"Emulex",
-#ifdef S10S11
 		EMLXS_INTX_SUPPORTED | EMLXS_MSI_SUPPORTED |
 			EMLXS_MSIX_SUPPORTED | EMLXS_E2E_SUPPORTED,
-#else
-		EMLXS_NOT_SUPPORTED,
-#endif	/* S10S11 */
 		EMLXS_SATURN_CHIP,
 		LPe12000_FW,
 		EMLXS_INTR_NO_LIMIT,
+		EMLXS_SLI2_MASK | EMLXS_SLI3_MASK,
 		2,
 		{0x78, 0},
 		{0x79, 0x7A, 0x7B, 0x7D, 0x7E, 0x7F, 0},

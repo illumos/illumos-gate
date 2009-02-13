@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -47,6 +47,9 @@
 f none kernel/drv/emlxs				0755 root sys
 d none kernel/drv/amd64				0755 root sys
 f none kernel/drv/amd64/emlxs			0755 root sys
+d none kernel/misc/emlxs/amd64			0755 root sys
+f none kernel/misc/emlxs/emlxs_fw		0755 root sys
+f none kernel/misc/emlxs/amd64/emlxs_fw		0755 root sys
 d none kernel/kmdb/amd64			0755 root sys
 f none kernel/kmdb/amd64/emlxs			0555 root sys
 f none kernel/kmdb/emlxs			0555 root sys

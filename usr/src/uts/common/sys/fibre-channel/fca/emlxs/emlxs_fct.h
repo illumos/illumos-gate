@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -44,13 +44,13 @@ extern "C" {
 
 #ifdef	NS_RSNN_NN
 #undef	NS_RSNN_NN
-#endif	/* NS_RSNN_NN */
+#endif /* NS_RSNN_NN */
 
 #include <stmf_defines.h>
 
 #ifdef FC_WELL_KNOWN_ADDR
 #undef FC_WELL_KNOWN_ADDR
-#endif	/* FC_WELL_KNOWN_ADDR */
+#endif /* FC_WELL_KNOWN_ADDR */
 
 #include <fct_defines.h>
 #include <stmf.h>
@@ -58,12 +58,12 @@ extern "C" {
 #include <fct.h>
 
 #ifndef LINK_SPEED_8G
-#define	LINK_SPEED_8G	5
-#endif	/* LINK_SPEED_8G */
+#define	LINK_SPEED_8G		5
+#endif /* LINK_SPEED_8G */
 
 #ifndef LINK_SPEED_10G
-#define	LINK_SPEED_10G	6
-#endif	/* LINK_SPEED_10G */
+#define	LINK_SPEED_10G		6
+#endif /* LINK_SPEED_10G */
 
 #ifndef MODSYM_SUPPORT
 #pragma weak fct_alloc
@@ -74,6 +74,7 @@ extern "C" {
 #pragma weak fct_handle_event
 #pragma weak fct_post_rcvd_cmd
 #pragma weak fct_ctl
+#pragma weak fct_queue_cmd_for_termination
 #pragma weak fct_send_response_done
 #pragma weak fct_send_cmd_done
 #pragma weak fct_scsi_data_xfer_done
@@ -84,31 +85,31 @@ extern "C" {
 #pragma weak stmf_free
 #pragma weak stmf_alloc
 #pragma weak stmf_register_port_provider
-extern void *stmf_alloc();
-extern void *fct_alloc();
-#endif	/* MODSYM_SUPPORT */
+extern void* stmf_alloc();
+extern void* fct_alloc();
+#endif /* MODSYM_SUPPORT */
 
 struct emlxs_fct_dmem_bucket;
-typedef struct emlxs_fct_dmem_bctl {
-	struct emlxs_fct_dmem_bucket *bctl_bucket;
-	struct emlxs_fct_dmem_bctl *bctl_next;
-	uint64_t bctl_dev_addr;
-	stmf_data_buf_t *bctl_buf;
-
+typedef struct emlxs_fct_dmem_bctl
+{
+	struct emlxs_fct_dmem_bucket	*bctl_bucket;
+	struct emlxs_fct_dmem_bctl	*bctl_next;
+	uint64_t			bctl_dev_addr;
+	stmf_data_buf_t			*bctl_buf;
 } emlxs_fct_dmem_bctl_t;
 
-typedef struct emlxs_fct_dmem_bucket {
-	uint32_t dmem_buf_size;
-	uint32_t dmem_nbufs;
-	uint32_t dmem_nbufs_free;
-	uint8_t *dmem_host_addr;
-	uint64_t dmem_dev_addr;
-	ddi_dma_handle_t dmem_dma_handle;
-	ddi_acc_handle_t dmem_acc_handle;
-	emlxs_fct_dmem_bctl_t *dmem_bctl_free_list;
-	void *dmem_bctls_mem;
-	kmutex_t dmem_lock;
-
+typedef struct emlxs_fct_dmem_bucket
+{
+	uint32_t		dmem_buf_size;
+	uint32_t		dmem_nbufs;
+	uint32_t		dmem_nbufs_free;
+	uint8_t			*dmem_host_addr;
+	uint64_t		dmem_dev_addr;
+	ddi_dma_handle_t	dmem_dma_handle;
+	ddi_acc_handle_t	dmem_acc_handle;
+	emlxs_fct_dmem_bctl_t	*dmem_bctl_free_list;
+	void			*dmem_bctls_mem;
+	kmutex_t		dmem_lock;
 } emlxs_fct_dmem_bucket_t;
 
 

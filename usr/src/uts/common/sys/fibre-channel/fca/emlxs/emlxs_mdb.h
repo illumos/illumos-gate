@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -44,6 +44,11 @@ extern "C" {
 void emlxs_msgbuf_help();
 
 int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
+				const mdb_arg_t *argv);
+
+void emlxs_dump_help();
+
+int emlxs_dump(uintptr_t base_addr, uint_t flags, int argc,
 				const mdb_arg_t *argv);
 
 #ifdef	__cplusplus
