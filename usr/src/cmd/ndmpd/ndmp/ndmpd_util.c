@@ -49,7 +49,6 @@
 #include <unistd.h>
 #include <strings.h>
 #include <time.h>
-#include <libgen.h>
 #include "ndmpd.h"
 #include <bitmap.h>
 #include <sys/queue.h>
@@ -1368,6 +1367,7 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 		cmd.uscsi_bufaddr = request->dataout.dataout_val;
 		cmd.uscsi_buflen = request->dataout.dataout_len;
 	} else {
+		cmd.uscsi_flags = USCSI_RQENABLE;
 		cmd.uscsi_bufaddr = 0;
 		cmd.uscsi_buflen = 0;
 		cmd.uscsi_rqlen = sizeof (rq_buf);
@@ -1411,7 +1411,7 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 	if (ioctl(fd, USCSICMD, &cmd) < 0) {
 		NDMP_LOG(LOG_ERR, "Failed to send command to device: %m");
 		NDMP_LOG(LOG_DEBUG, "ioctl(USCSICMD) error: %m");
-		if (cmd.uscsi_status == 0)
+		if (cmd.uscsi_status != 0)
 			reply.error = NDMP_IO_ERR;
 	}
 
@@ -2548,7 +2548,7 @@ is_tape_unit_ready(char *adptnm, int dev_id)
 	int fd = 0;
 
 	try = TUR_MAX_TRY;
-	if (dev_id == 0)
+	if (dev_id <= 0)
 		fd = open(adptnm, O_RDONLY | O_NDELAY);
 	else
 		fd = dev_id;
@@ -2556,7 +2556,7 @@ is_tape_unit_ready(char *adptnm, int dev_id)
 		if (scsi_test_unit_ready(fd) >= 0) {
 			NDMP_LOG(LOG_DEBUG, "Unit is ready");
 
-			if (dev_id == 0)
+			if (dev_id <= 0)
 				(void) close(fd);
 
 			return (TRUE);
@@ -2567,7 +2567,7 @@ is_tape_unit_ready(char *adptnm, int dev_id)
 
 	} while (--try > 0);
 
-	if (dev_id == 0)
+	if (dev_id <= 0)
 		(void) close(fd);
 
 	NDMP_LOG(LOG_DEBUG, "Unit didn't get ready");
@@ -2625,8 +2625,6 @@ scsi_test_unit_ready(int dev_id)
 void
 ndmp_load_params(void)
 {
-	struct stat64 st;
-
 	ndmp_dump_path_node = ndmpd_get_prop_yorn(NDMP_DUMP_PATHNODE_ENV) ?
 	    TRUE : FALSE;
 	ndmp_tar_path_node = ndmpd_get_prop_yorn(NDMP_TAR_PATHNODE_ENV) ?
@@ -2644,16 +2642,6 @@ ndmp_load_params(void)
 
 	/* Get the value from ndmp SMF property. */
 	ndmp_dar_support = ndmpd_get_prop_yorn(NDMP_DAR_SUPPORT);
-
-	ndmp_log_path = ndmpd_get_prop(NDMP_DEBUG_PATH);
-	if ((ndmp_log_path == NULL) || (*ndmp_log_path == NULL))
-		ndmp_log_path = "/var/ndmp";
-
-	if (lstat64(ndmp_log_path, &st) < 0) {
-		if (mkdirp(ndmp_log_path, 0755) < 0)
-			NDMP_LOG(LOG_ERR, "Could not create log path %s: %m.",
-			    ndmp_log_path);
-	}
 
 	if ((ndmp_ver = atoi(ndmpd_get_prop(NDMP_VERSION_ENV))) == 0)
 		ndmp_ver = NDMPVER;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -649,7 +649,6 @@ extern int ndmp_full_restore_path;
 extern int ndmp_dar_support;
 extern int ndmp_port;
 extern ndmp_stat_t ndstat;
-extern char *ndmp_log_path;
 
 extern void ndmpd_main(void);
 extern void connection_handler(ndmp_connection_t *);

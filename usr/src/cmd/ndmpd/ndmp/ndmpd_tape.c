@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1049,7 +1049,7 @@ ndmpd_tape_get_state_v4(ndmp_connection_t *connection, void *body)
 		return;
 	}
 
-	reply.flags = 0;
+	reply.flags = NDMP_TAPE_NOREWIND;
 
 	reply.file_num = mtstatus.mt_fileno;
 	reply.soft_errors = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <pthread.h>
 #include <errno.h>
 #include "ndmpd_log.h"
@@ -92,16 +93,12 @@ static char *priority_str[] = {
  * Append the NDMP working directory path to the specified file
  */
 static char *
-mk_pathname(char *fname, int idx)
+mk_pathname(char *fname, char *path, int idx)
 {
 	static char buf[PATH_MAX];
 	static char name[NAME_MAX];
-	char *path, *fmt;
+	char *fmt;
 	int len;
-
-	path = ndmpd_get_prop(NDMP_DEBUG_PATH);
-	if (!path || *path == 0)
-		return (NULL);
 
 	len = strlen(path);
 	fmt = (path[len - 1] == '/') ? "%s%s" : "%s/%s";
@@ -202,8 +199,22 @@ ndmp_log_open_file(void)
 {
 	char *fname, *mode;
 	char oldfname[PATH_MAX];
-	struct stat st;
+	char *lpath;
+	struct stat64 st;
 	int i;
+
+	/* Create the debug path if doesn't exist */
+	lpath = ndmpd_get_prop(NDMP_DEBUG_PATH);
+	if ((lpath == NULL) || (*lpath == NULL))
+		lpath = "/var/ndmp";
+
+	if (stat64(lpath, &st) < 0) {
+		if (mkdirp(lpath, 0755) < 0) {
+			NDMP_LOG(LOG_ERR, "Could not create log path %s: %m.",
+			    lpath);
+			lpath = "/var";
+		}
+	}
 
 	/*
 	 * NDMP log file name will be {logfilename}.0 to {logfilename}.5, where
@@ -216,14 +227,14 @@ ndmp_log_open_file(void)
 	if (get_debug_level()) {
 		i = LOG_FILE_CNT - 1;
 		while (i >= 0) {
-			fname = mk_pathname(LOG_FNAME, i);
+			fname = mk_pathname(LOG_FNAME, lpath, i);
 			(void) strncpy(oldfname, fname, PATH_MAX);
-			if (stat(oldfname, &st) == -1) {
+			if (stat64(oldfname, &st) == -1) {
 				i--;
 				continue;
 			}
 
-			fname = mk_pathname(LOG_FNAME, i + 1);
+			fname = mk_pathname(LOG_FNAME, lpath, i + 1);
 			if (rename(oldfname, fname))
 				syslog(LOG_DEBUG,
 				    "Could not rename from %s to %s",
@@ -232,7 +243,7 @@ ndmp_log_open_file(void)
 		}
 	}
 
-	fname = mk_pathname(LOG_FNAME, 0);
+	fname = mk_pathname(LOG_FNAME, lpath, 0);
 
 	/*
 	 * Append only if debug is not enable.

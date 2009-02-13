@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -326,7 +326,6 @@ main(int argc, char *argv[])
 	mod_fini();
 	ndmp_door_fini();
 	daemonize_fini();
-	free(ndmp_log_path);
 	return (SMF_EXIT_OK);
 }
 

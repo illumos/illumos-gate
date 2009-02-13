@@ -159,6 +159,7 @@ dtree_push(cstack_t *stp, char *nmp, tlm_acls_t *acls)
 
 	(void) strlcpy(sp->se_name, nmp, len);
 	(void) memcpy(&sp->se_acls, acls, sizeof (*acls));
+	(void) memset(acls, 0, sizeof (tlm_acls_t));
 
 	return (cstack_push(stp, (void *)sp, sizeof (*sp)));
 }
@@ -446,20 +447,24 @@ tar_getdir(tlm_commands_t *commands,
 			 */
 			if (tar_hdr->th_linkflag != LF_MULTIVOL &&
 			    tar_hdr->th_linkflag != LF_VOLHDR) {
-				acls->acl_attr.st_mode =
-				    oct_atoi(tar_hdr->th_mode);
-				acls->acl_attr.st_size =
-				    oct_atoi(tar_hdr->th_size);
-				acls->acl_attr.st_uid =
-				    oct_atoi(tar_hdr->th_uid);
-				acls->acl_attr.st_gid =
-				    oct_atoi(tar_hdr->th_gid);
-				acls->acl_attr.st_mtime =
-				    oct_atoi(tar_hdr->th_mtime);
-				(void) strlcpy(acls->uname, tar_hdr->th_uname,
-				    sizeof (acls->uname));
-				(void) strlcpy(acls->gname, tar_hdr->th_gname,
-				    sizeof (acls->gname));
+				if (tar_hdr->th_linkflag != LF_HUMONGUS) {
+					acls->acl_attr.st_mode =
+					    oct_atoi(tar_hdr->th_mode);
+					acls->acl_attr.st_size =
+					    oct_atoi(tar_hdr->th_size);
+					acls->acl_attr.st_uid =
+					    oct_atoi(tar_hdr->th_uid);
+					acls->acl_attr.st_gid =
+					    oct_atoi(tar_hdr->th_gid);
+					acls->acl_attr.st_mtime =
+					    oct_atoi(tar_hdr->th_mtime);
+					(void) strlcpy(acls->uname,
+					    tar_hdr->th_uname,
+					    sizeof (acls->uname));
+					(void) strlcpy(acls->gname,
+					    tar_hdr->th_gname,
+					    sizeof (acls->gname));
+				}
 				file_size = oct_atoi(tar_hdr->th_size);
 				acl_spot = 0;
 				last_action = tar_hdr->th_linkflag;
@@ -474,10 +479,9 @@ tar_getdir(tlm_commands_t *commands,
 
 		/*
 		 * If the restore is running using DAR we should check for
-		 * ACL and extended attribute entries
+		 * extended attribute entries
 		 */
 		if (dar_recovered &&
-		    tar_hdr->th_linkflag != LF_ACL &&
 		    tar_hdr->th_linkflag != LF_XATTR)
 			break;
 
@@ -1838,6 +1842,8 @@ create_sym_link(char *dst, char *target, tlm_acls_t *acls,
 		job_satats->js_errors++;
 		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) softlink [%s] to [%s]",
 		    erc, errno, dst, target);
+	} else {
+		set_acl(dst, acls);
 	}
 
 	return (erc);
@@ -1980,7 +1986,7 @@ set_attr(char *name, tlm_acls_t *acls)
 		gid = grp->gr_gid;
 	}
 
-	if (chown(name, uid, gid))
+	if (lchown(name, uid, gid))
 		NDMP_LOG(LOG_ERR,
 		    "Could not set uid or/and gid for file %s.", name);
 

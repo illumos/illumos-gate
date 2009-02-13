@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +68,6 @@ int ndmp_ver = 0;
  * The NDMP listening port number
  */
 int ndmp_port = 0;
-
-char *ndmp_log_path = NULL;
 
 /*
  * Restore path mechanism definition
@@ -789,9 +787,13 @@ void
 ndmpd_main(void)
 {
 	char *propval;
-	(void) ndmp_log_open_file();
 
 	ndmp_load_params();
+	if (ndmp_log_open_file() != 0) {
+		NDMP_LOG(LOG_ERR,
+		    "Could not open log file properly.");
+	}
+
 	/*
 	 * Find ndmp port number to be used. If ndmpd is run as command line
 	 * and port number is supplied, use that port number. If port number is

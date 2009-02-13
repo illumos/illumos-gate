@@ -1174,6 +1174,7 @@ zfs_put_prop_cb(int prop, void *pp)
 	char buf[ZFS_MAXNAMELEN];
 	char sbuf[ZFS_MAXNAMELEN];
 	zprop_source_t stype;
+	char *sourcestr;
 
 	if (pp == NULL)
 		return (ZPROP_INVAL);
@@ -1185,10 +1186,25 @@ zfs_put_prop_cb(int prop, void *pp)
 	(void) zfs_prop_get(mhp->nh_handle,
 	    prop, buf, sizeof (buf), &stype, sbuf, sizeof (sbuf), FALSE);
 	(void) strlcpy(mpp->mp_value, buf, NAME_MAX);
-	if (stype == ZPROP_SRC_LOCAL)
-		(void) strlcpy(mpp->mp_source, mhp->nh_dataset, NAME_MAX);
-	else
-		(void) strlcpy(mpp->mp_source, sbuf, NAME_MAX);
+
+	switch (stype) {
+	case ZPROP_SRC_NONE:
+		sourcestr = "none";
+		break;
+	case ZPROP_SRC_LOCAL:
+		sourcestr = mhp->nh_dataset;
+		break;
+	case ZPROP_SRC_TEMPORARY:
+		sourcestr = "temporary";
+		break;
+	case ZPROP_SRC_DEFAULT:
+		sourcestr = "default";
+		break;
+	default:
+		sourcestr = sbuf;
+		break;
+	}
+	(void) strlcpy(mpp->mp_source, sourcestr, NAME_MAX);
 
 	return (ZPROP_CONT);
 }

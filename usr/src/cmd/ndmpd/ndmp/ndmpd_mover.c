@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2882,7 +2882,7 @@ mover_socket_writer(ndmpd_session_t *session)
 			 * The buffer is not full, wait for the producer
 			 * thread to fill it.
 			 */
-			tlm_buffer_in_buf_wait(bufs);
+			tlm_buffer_in_buf_timed_wait(bufs, 100);
 		}
 	}
 
