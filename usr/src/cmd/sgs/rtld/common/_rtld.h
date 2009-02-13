@@ -145,7 +145,7 @@ struct fct {
 #define	AL_CNT_DEPCLCT	10		/* load_finish() */
 #define	AL_CNT_RTLDINFO	1		/* RTLDINFO() */
 #define	AL_CNT_FPNODE	4		/* FPNODE() */
-#define	AL_CNT_LMLISTS	8		/* lm_lists */
+#define	AL_CNT_LMLISTS	20		/* lm_lists */
 #define	AL_CNT_LMNOW	8		/* lm_now */
 #define	AL_CNT_RELBIND	20		/* relocation binding */
 #define	AL_CNT_ACTAUDIT	2		/* lm_actaudit */
@@ -159,7 +159,6 @@ struct fct {
 #define	AL_CNT_FREELIST	80		/* free_alp */
 #define	AL_CNT_HWCAP	10		/* hwcap candidate */
 #define	AL_CNT_SPATH	4		/* search path */
-
 
 /*
  * Size of buffer for building error messages.
@@ -644,8 +643,7 @@ extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t,
 extern int		hdl_initialize(Grp_hdl *, Rt_map *, int, int);
 extern int		hwcap_check(Xword, Rej_desc *);
 extern int 		hwcap_filtees(Alist **, Aliste, const char *, Aliste,
-			    Lm_cntl *, Rt_map *, const char *, int, uint_t,
-			    int *);
+			    Rt_map *, const char *, int, uint_t, int *);
 extern void		is_dep_init(Rt_map *, Rt_map *);
 extern int		is_move_data(caddr_t);
 extern int		is_path_secure(char *, Rt_map *, uint_t, uint_t);
@@ -686,8 +684,7 @@ extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *,
 extern int		relocate_finish(Rt_map *, APlist *, int);
 extern void		remove_cntl(Lm_list *, Aliste);
 extern int		remove_hdl(Grp_hdl *, Rt_map *, int *);
-extern void		remove_lmc(Lm_list *, Rt_map *, Lm_cntl *, Aliste,
-			    const char *);
+extern void		remove_lmc(Lm_list *, Rt_map *, Aliste, const char *);
 extern void		remove_lml(Lm_list *);
 extern void		remove_plist(Alist **, int);
 extern void		remove_so(Lm_list *, Rt_map *);

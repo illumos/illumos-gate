@@ -723,12 +723,11 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	}
 
 	/*
-	 * If this lazyload has failed, and we've created a new link-map
-	 * control list to which this request has added objects, then remove
-	 * all the objects that have been associated to this request.
+	 * If the dlopen has failed, clean up any objects that might have been
+	 * loaded successfully on this new link-map control list.
 	 */
-	if ((nlmp == NULL) && olmco && lmc->lc_head)
-		remove_lmc(lml, clmp, lmc, olmco, path);
+	if ((nlmp == NULL) && olmco)
+		remove_lmc(lml, clmp, olmco, path);
 
 	/*
 	 * Finally, remove any link-map control list that was created.

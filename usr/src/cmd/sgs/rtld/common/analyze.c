@@ -522,7 +522,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp,
 		 */
 		lret = _relocate_lmc(lml, nlmco, nlmp, &relocated, in_nfavl);
 		if ((lret == 0) && (nlmco != ALIST_OFF_DATA))
-			remove_lmc(lml, clmp, nlmc, nlmco, NAME(nlmp));
+			remove_lmc(lml, clmp, nlmco, NAME(nlmp));
 	}
 
 	/*

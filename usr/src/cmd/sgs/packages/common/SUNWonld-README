@@ -1439,3 +1439,5 @@ Bugid   Risk Synopsis
 	information (D)
 	PSARC/2009/054 dlinfo(3c) - segment mapping retrieval
 6800388 shstrtab can be sized incorrectly when -z ignore is used
+6805009 ld.so.1: link map control list tear down leaves dangling pointer -
+	pfinstall does it again.

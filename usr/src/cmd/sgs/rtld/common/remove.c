@@ -839,13 +839,22 @@ free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
  * successfully loaded families.
  */
 void
-remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
-    const char *name)
+remove_lmc(Lm_list *lml, Rt_map *clmp, Aliste lmco, const char *name)
 {
 	Grp_hdl		*ghp;
 	Grp_desc	*gdp;
 	Aliste		idx;
+	Lm_cntl		*lmc;
 	Rt_map		*lmp;
+
+	/*
+	 * Determine the link-map control list, and whether any object has been
+	 * added to this list.
+	 */
+	/* LINTED */
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
+	if (lmc->lc_head == NULL)
+		return;
 
 	DBG_CALL(Dbg_file_cleanup(lml, name, lmco));
 

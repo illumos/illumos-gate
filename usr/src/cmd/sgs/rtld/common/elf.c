@@ -361,7 +361,6 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	uint_t		flags = 0;
 	const char	*name;
 	Lm_list		*lml = LIST(clmp);
-	Lm_cntl		*lmc;
 	Aliste		lmco;
 
 	/*
@@ -420,16 +419,16 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 */
 	hlmp = lml->lm_head;
 	if (FLAGS(hlmp) & FLG_RT_RELOCED) {
+		Lm_cntl	*lmc;
+
 		if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
 		    AL_CNT_LMLISTS)) == NULL) {
 			remove_plist(&palp, 1);
 			return (NULL);
 		}
 		lmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
-	} else {
-		lmc = 0;
+	} else
 		lmco = ALIST_OFF_DATA;
-	}
 
 	/*
 	 * Load the associated object.
@@ -460,13 +459,13 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * control list to which this request has added objects, then remove
 	 * all the objects that have been associated to this request.
 	 */
-	if ((nlmp == NULL) && lmc && lmc->lc_head)
-		remove_lmc(lml, clmp, lmc, lmco, name);
+	if ((nlmp == NULL) && (lmco != ALIST_OFF_DATA))
+		remove_lmc(lml, clmp, lmco, name);
 
 	/*
 	 * Finally, remove any link-map control list that was created.
 	 */
-	if (lmc)
+	if (lmco != ALIST_OFF_DATA)
 		remove_cntl(lml, lmco);
 
 	/*
@@ -644,13 +643,13 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 	/*
 	 * Process each shared object on needed list.
 	 */
-	if (DYN(clmp) == 0)
+	if (DYN(clmp) == NULL)
 		return (1);
 
 	for (dyn = (Dyn *)DYN(clmp), pdyn = NULL; dyn->d_tag != DT_NULL;
 	    pdyn = dyn++, ndx++) {
 		Dyninfo	*dip = &DYNINFO(clmp)[ndx];
-		Rt_map	*nlmp = 0;
+		Rt_map	*nlmp = NULL;
 		char	*name;
 		int	silent = 0;
 
@@ -756,7 +755,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		    ((nlmp = load_one(lml, lmco, palp, clmp, MODE(clmp),
 		    flags, 0, in_nfavl)) == NULL) ||
 		    (bind_one(clmp, nlmp, BND_NEEDED) == 0))
-			nlmp = 0;
+			nlmp = NULL;
 
 		/*
 		 * Clean up any infrastructure, including the removal of the
@@ -768,7 +767,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		if (silent)
 			rtld_flags &= ~RT_FL_SILENCERR;
 
-		if ((dip->di_info = (void *)nlmp) == 0) {
+		if ((dip->di_info = (void *)nlmp) == NULL) {
 			/*
 			 * If the object could not be mapped, continue if error
 			 * suppression is established or we're here with ldd(1).
@@ -893,12 +892,12 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 * expansion is also completed at this point (i.e., $PLATFORM).
 	 */
 	filtees = (char *)STRTAB(ilmp) + DYN(ilmp)[ndx].d_un.d_val;
-	if (dip->di_info == 0) {
+	if (dip->di_info == NULL) {
 		if (rtld_flags2 & RT_FL2_FLTCFG)
 			elf_config_flt(lml, PATHNAME(ilmp), filtees,
 			    (Alist **)&dip->di_info, AL_CNT_FILTEES);
 
-		if (dip->di_info == 0) {
+		if (dip->di_info == NULL) {
 			DBG_CALL(Dbg_file_filter(lml, NAME(ilmp), filtees, 0));
 			if ((lml->lm_flags &
 			    (LML_FLG_TRC_VERBOSE | LML_FLG_TRC_SEARCH)) &&
@@ -922,7 +921,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	for (ALIST_TRAVERSE((Alist *)dip->di_info, idx, pdp)) {
 		int	mode;
 		Grp_hdl	*ghp;
-		Rt_map	*nlmp = 0;
+		Rt_map	*nlmp = NULL;
 
 		if (pdp->pd_plen == 0)
 			continue;
@@ -949,21 +948,20 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		 * link-map control list from which to analyze any newly added
 		 * objects.
 		 */
-		if ((pdp->pd_info == 0) && (pdp->pd_flags & PD_TKN_HWCAP)) {
+		if ((pdp->pd_info == NULL) && (pdp->pd_flags & PD_TKN_HWCAP)) {
 			const char	*dir = pdp->pd_pname;
-			Lm_cntl		*lmc;
 			Aliste		lmco;
 
 			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
+				Lm_cntl	*lmc;
+
 				if ((lmc = alist_append(&lml->lm_lists, 0,
 				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == NULL)
 					return (NULL);
 				lmco = (Aliste)((char *)lmc -
 				    (char *)lml->lm_lists);
-			} else {
-				lmc = 0;
+			} else
 				lmco = ALIST_OFF_DATA;
-			}
 
 			/*
 			 * Determine the hardware capability filtees.  If none
@@ -971,7 +969,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			 */
 			DBG_CALL(Dbg_cap_hw_filter(lml, dir, ilmp));
 			if (hwcap_filtees((Alist **)&dip->di_info, idx, dir,
-			    lmco, lmc, ilmp, filtees, mode,
+			    lmco, ilmp, filtees, mode,
 			    (FLG_RT_HANDLE | FLG_RT_HWCAP), in_nfavl) == 0) {
 				if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
 				    (dip->di_flags & FLG_DI_AUXFLTR) &&
@@ -1000,7 +998,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			 * Now that any hardware capability objects have been
 			 * processed, remove any link-map control list.
 			 */
-			if (lmc)
+			if (lmco != ALIST_OFF_DATA)
 				remove_cntl(lml, lmco);
 		}
 
@@ -1010,13 +1008,13 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		/*
 		 * Process an individual filtee.
 		 */
-		if (pdp->pd_info == 0) {
+		if (pdp->pd_info == NULL) {
 			const char	*filtee = pdp->pd_pname;
 			int		audit = 0;
 
 			DBG_CALL(Dbg_file_filtee(lml, NAME(ilmp), filtee, 0));
 
-			ghp = 0;
+			ghp = NULL;
 
 			/*
 			 * Determine if the reference link map is already
@@ -1041,8 +1039,9 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				nlmp = lml_rtld.lm_head;
 				if ((ghp = hdl_create(&lml_rtld, nlmp, ilmp,
 				    (GPH_LDSO | GPH_FIRST | GPH_FILTEE),
-				    (GPD_DLSYM | GPD_RELOC), GPD_PARENT)) == 0)
-					nlmp = 0;
+				    (GPD_DLSYM | GPD_RELOC), GPD_PARENT)) ==
+				    NULL)
+					nlmp = NULL;
 
 				/*
 				 * Establish the filter handle to prevent any
@@ -1065,7 +1064,6 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			} else {
 				Rej_desc	rej = { 0 };
 				Fdesc		fd = { 0 };
-				Lm_cntl		*lmc;
 				Aliste		lmco;
 
 				/*
@@ -1081,6 +1079,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * which to analyze any newly added objects.
 				 */
 				if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
+					Lm_cntl	*lmc;
+
 					if ((lmc =
 					    alist_append(&lml->lm_lists, 0,
 					    sizeof (Lm_cntl),
@@ -1088,10 +1088,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 						return (NULL);
 					lmco = (Aliste)((char *)lmc -
 					    (char *)lml->lm_lists);
-				} else {
-					lmc = 0;
+				} else
 					lmco = ALIST_OFF_DATA;
-				}
 
 				/*
 				 * Locate and load the filtee.
@@ -1125,7 +1123,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					if (audit_objfilter(ilmp, filtees,
 					    nlmp, 0) == 0) {
 						audit = 1;
-						nlmp = 0;
+						nlmp = NULL;
 					}
 				}
 
@@ -1140,7 +1138,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				    lmco, nlmp, in_nfavl)) == NULL) ||
 				    (relocate_lmc(lml, lmco, ilmp, nlmp,
 				    in_nfavl) == 0)))
-					nlmp = 0;
+					nlmp = NULL;
 
 				/*
 				 * If the filtee has been successfully
@@ -1153,13 +1151,13 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
 				if (nlmp && ghp &&
 				    (hdl_add(ghp, ilmp, GPD_FILTER) == 0))
-					nlmp = 0;
+					nlmp = NULL;
 
 				/*
 				 * Generate a diagnostic if the filtee couldn't
 				 * be loaded.
 				 */
-				if (nlmp == 0)
+				if (nlmp == NULL)
 					DBG_CALL(Dbg_file_filtee(lml, 0, filtee,
 					    audit));
 
@@ -1170,14 +1168,14 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * all the objects that have been associated to
 				 * this request.
 				 */
-				if ((nlmp == 0) && lmc && lmc->lc_head)
-					remove_lmc(lml, clmp, lmc, lmco, name);
+				if ((nlmp == NULL) && (lmco != ALIST_OFF_DATA))
+					remove_lmc(lml, clmp, lmco, name);
 
 				/*
 				 * Remove any link-map control list that was
 				 * created.
 				 */
-				if (lmc)
+				if (lmco != ALIST_OFF_DATA)
 					remove_cntl(lml, lmco);
 			}
 
@@ -1187,7 +1185,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			 * Otherwise, the group handle is retained for future
 			 * symbol searches.
 			 */
-			if (nlmp == 0) {
+			if (nlmp == NULL) {
 				pdp->pd_info = NULL;
 				pdp->pd_plen = 0;
 				continue;
@@ -1230,7 +1228,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					continue;
 
 				if (((sym = SYMINTP(sl.sl_imap)(&sl, dlmp,
-				    binfo, in_nfavl)) != 0) ||
+				    binfo, in_nfavl)) != NULL) ||
 				    (ghp->gh_flags & GPH_FIRST))
 					break;
 			}
@@ -1256,7 +1254,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	/*
 	 * If we're just here to trigger filtee loading then we're done.
 	 */
-	if (name == 0)
+	if (name == NULL)
 		return (NULL);
 
 	/*
@@ -1388,7 +1386,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	if ((slp->sl_flags & LKUP_SYMNDX) == 0)
 		DBG_CALL(Dbg_syms_lookup(ilmp, name, MSG_ORIG(MSG_STR_ELF)));
 
-	if (HASH(ilmp) == 0)
+	if (HASH(ilmp) == NULL)
 		return (NULL);
 
 	buckets = HASH(ilmp)[0];
@@ -1492,7 +1490,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * We've found a match.  Determine if the defining object contains
 	 * symbol binding information.
 	 */
-	if ((sip = SYMINFO(ilmp)) != 0)
+	if ((sip = SYMINFO(ilmp)) != NULL)
 		sip += ndx;
 
 	/*
@@ -1592,7 +1590,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			 * catch any object filtering that may be available.
 			 */
 			if ((fsym = elf_lookup_filtee(slp, dlmp, binfo,
-			    sip->si_boundto, in_nfavl)) != 0)
+			    sip->si_boundto, in_nfavl)) != NULL)
 				return (fsym);
 			if (sip->si_flags & SYMINFO_FLG_FILTER)
 				return (NULL);
@@ -1614,7 +1612,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			 * within the filter itself.
 			 */
 			if ((fsym = elf_lookup_filtee(slp, dlmp, binfo,
-			    OBJFLTRNDX(ilmp), in_nfavl)) != 0)
+			    OBJFLTRNDX(ilmp), in_nfavl)) != NULL)
 				return (fsym);
 		}
 
@@ -1987,7 +1985,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				 * list is empty.  (see setup()).
 				 */
 				if (dyn->d_un.d_val & DF_1_GLOBAUDIT) {
-					if (lml_main.lm_head == 0)
+					if (lml_main.lm_head == NULL)
 						FLAGS1(lmp) |= FL1_RT_GLOBAUD;
 					else
 						DBG_CALL(Dbg_audit_ignore(lmp));
@@ -2067,7 +2065,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 
 		if (PLTPAD(lmp)) {
 			if (pltpadsz == (Xword)0)
-				PLTPAD(lmp) = 0;
+				PLTPAD(lmp) = NULL;
 			else
 				PLTPADEND(lmp) = (void *)((Addr)PLTPAD(lmp) +
 				    pltpadsz);
@@ -2112,7 +2110,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 	 * setting is used first, but if this image was generated via crle(1)
 	 * then a default configuration file is a fall-back.
 	 */
-	if ((!(rtld_flags & RT_FL_NOCFG)) && (config->c_name == 0)) {
+	if ((!(rtld_flags & RT_FL_NOCFG)) && (config->c_name == NULL)) {
 		if (cfile)
 			config->c_name = (const char *)(cfile +
 			    (char *)STRTAB(lmp));
@@ -2345,7 +2343,7 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 		 * If we don't have a .hash table there are no symbols
 		 * to look at.
 		 */
-		if (HASH(lmp) == 0)
+		if (HASH(lmp) == NULL)
 			return;
 		cnt = HASH(lmp)[1];
 	} else {
@@ -2607,7 +2605,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 			 * skipped.
 			 */
 			if ((nlmp = elf_lazy_load(lmp, &sl, cnt,
-			    name, in_nfavl)) == 0)
+			    name, in_nfavl)) == NULL)
 				continue;
 
 			/*
@@ -2675,7 +2673,7 @@ elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
 			name = (char *)(STRTAB(lmp) + symref->st_name);
 	}
 
-	if (name == 0)
+	if (name == NULL)
 		name = MSG_INTL(MSG_STR_UNKNOWN);
 
 	if (trace) {
@@ -2706,7 +2704,7 @@ elf_static_tls(Rt_map *lmp, Sym *sym, void *rel, uchar_t rtype, char *name,
 	 * however individual relocations are tested in case the dynamic flag
 	 * had not been set when this object was built.
 	 */
-	if (PTTLS(lmp) == 0) {
+	if (PTTLS(lmp) == NULL) {
 		DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH,
 		    M_REL_SHT_TYPE, rel, NULL, name));
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLS),

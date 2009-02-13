@@ -228,8 +228,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *dname, Rt_map *clmp,
 
 int
 hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
-    Lm_cntl *nlmc, Rt_map *flmp, const char *ref, int mode, uint_t flags,
-    int *in_nfavl)
+    Rt_map *flmp, const char *ref, int mode, uint_t flags, int *in_nfavl)
 {
 	Alist		*fdalp = NULL;
 	Aliste		idx;
@@ -247,7 +246,7 @@ hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 	 */
 	for (ALIST_TRAVERSE(fdalp, idx, fdp)) {
 		Rt_map	*nlmp;
-		Grp_hdl	*ghp = 0;
+		Grp_hdl	*ghp = NULL;
 		Pdesc	*pdp;
 		int	audit = 0;
 
@@ -264,19 +263,18 @@ hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 
 		nlmp = load_path(lml, nlmco, flmp, mode,
 		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej, in_nfavl);
-		if (nlmp == 0)
+		if (nlmp == NULL)
 			continue;
 
 		/*
 		 * Create a new pathname descriptor to represent this filtee,
 		 * and insert this descriptor in the Alist following the
 		 * hardware descriptor that seeded this processing.
-		 * capability directory).
 		 */
 		if ((pdp = alist_insert(alpp, 0, sizeof (Pdesc),
 		    AL_CNT_FILTEES, ++oidx)) == NULL) {
 			if (ghp)
-				remove_lmc(lml, flmp, nlmc, nlmco, NAME(nlmp));
+				remove_lmc(lml, flmp, nlmco, NAME(nlmp));
 			return (0);
 		}
 
@@ -299,7 +297,7 @@ hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 		    LML_TFLG_AUD_OBJFILTER) {
 			if (audit_objfilter(flmp, ref, nlmp, 0) == 0) {
 				audit = 1;
-				nlmp = 0;
+				nlmp = NULL;
 			}
 		}
 
@@ -341,12 +339,11 @@ hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 			 * added objects, then remove all the objects that
 			 * have been associated to this request.
 			 */
-			if (nlmc && nlmc->lc_head)
-				remove_lmc(lml, flmp, nlmc, nlmco,
-				    pdp->pd_pname);
+			if (nlmco != ALIST_OFF_DATA)
+				remove_lmc(lml, flmp, nlmco, pdp->pd_pname);
 
 			pdp->pd_plen = 0;
-			pdp->pd_info = 0;
+			pdp->pd_info = NULL;
 		}
 	}
 
@@ -365,7 +362,7 @@ load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
 	Aliste	idx;
 	Fdesc	*fdp;
 	int	found = 0;
-	Rt_map	*lmp = 0;
+	Rt_map	*lmp = NULL;
 
 	/*
 	 * Obtain the sorted list of hardware capabilities objects available.
@@ -381,7 +378,7 @@ load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
 		Fdesc	fd = *fdp;
 
 		if ((found == 0) && ((lmp = load_path(lml, lmco, clmp, mode,
-		    flags, hdl, &fd, rej, in_nfavl)) != 0))
+		    flags, hdl, &fd, rej, in_nfavl)) != NULL))
 			found++;
 	}
 
