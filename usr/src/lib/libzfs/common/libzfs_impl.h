@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@ struct zfs_handle {
 	nvlist_t *zfs_user_props;
 	boolean_t zfs_mntcheck;
 	char *zfs_mntopts;
+	uint8_t *zfs_props_table;
 };
 
 /*

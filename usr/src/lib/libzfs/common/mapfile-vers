@@ -102,6 +102,7 @@ SUNWprivate_1.1 {
 	zfs_prop_user;
 	zfs_prop_valid_for_type;
 	zfs_prop_values;
+	zfs_prune_proplist;
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_rename;
