@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 extern "C" {
 #endif
 
+#define	MAX_TARGETS	32	/* maximum targets that may be created */
 #define	MAX_TPGT	256
 #define	CFG_TPGTLIST	"tpgt-list"
 
@@ -184,7 +185,8 @@ it_config_free(it_config_t *cfg);
  * Return Values:
  *    0			Success
  *    ENOMEM		Could not allocate resources
- *    EINVAL		Invalid parameter
+ *    EINVAL		Invalid parameter or creating would create too many
+ *			targets.
  *    EEXIST		The requested target node name is already configured
  *    EFAULT		Invalid iSCSI target name
  */

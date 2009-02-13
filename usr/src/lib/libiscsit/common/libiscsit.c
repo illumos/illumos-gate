@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -487,6 +487,7 @@ it_config_free(it_config_t *cfg)
  *    ENOMEM		Could not allocated resources
  *    EINVAL		Invalid parameter
  *    EFAULT		Invalid iSCSI name specified
+ *    E2BIG		Too many already exist
  */
 int
 it_tgt_create(it_config_t *cfg, it_tgt_t **tgt, char *tgt_name)
@@ -515,6 +516,12 @@ it_tgt_create(it_config_t *cfg, it_tgt_t **tgt, char *tgt_name)
 			return (EFAULT);
 		}
 	}
+
+	/* Too many targets? */
+	if (cfg->config_tgt_count >= MAX_TARGETS) {
+		return (E2BIG);
+	}
+
 
 	/* make sure this name isn't already on the list */
 	cfgtgt = cfg->config_tgt_list;
@@ -1867,6 +1874,21 @@ validate_iscsi_name(char *in_name)
 		i = atoi(month);
 		if ((i < 0) || (i > 12)) {
 			return (B_FALSE);
+		}
+
+		/*
+		 * RFC 3722: if using only ASCII chars, only the following
+		 * chars are allowed: dash, dot, colon, lower case a-z, 0-9.
+		 * We allow upper case names, which should be folded
+		 * to lower case names later.
+		 */
+		for (i = 12; i < in_len; i++) {
+			char c = in_name[i];
+
+			if ((c != '-') && (c != '.') && (c != ':') &&
+			    !isalpha(c) && !isdigit(c)) {
+				return (B_FALSE);
+			}
 		}
 
 		/* Finally, validate the overall length, in wide chars */

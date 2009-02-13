@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <stdlib.h>
@@ -464,6 +464,26 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (newargc > 1) {
+		switch ((itadm_sub_t)idx) {
+		case MODIFY_TGT:
+		case DELETE_TGT:
+		case LIST_TGT:
+		case DELETE_TPG:
+		case LIST_TPG:
+		case CREATE_INI:
+		case MODIFY_INI:
+		case LIST_INI:
+		case DELETE_INI:
+			/* These subcommands should have at most one operand */
+			ret = 1;
+			goto usage_error;
+
+		default:
+			break;
+		}
+	}
+
 	/*
 	 * XXX - this should probably get pushed down to the library
 	 * depending on the decision to allow/disallow configuratoin
@@ -621,6 +641,10 @@ create_target(char *tgt, nvlist_t *proplist)
 			(void) fprintf(stderr,
 			    gettext("iSCSI target %s already configured"),
 			    tgt);
+		} else if (ret == E2BIG) {
+			(void) fprintf(stderr,
+			    gettext("Maximum of %d iSCSI targets"),
+			    MAX_TARGETS);
 		} else {
 			(void) fprintf(stderr,
 			    gettext("Error creating target: %d"), ret);
@@ -982,14 +1006,14 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	int		ret;
 	it_config_t	*cfg = NULL;
 	it_tgt_t	*ptr = NULL;
-	it_tgt_t	*tgtp;
+	it_tgt_t	*tgtp = NULL;
 	char		**tags = NULL;
 	uint32_t	count = 0;
 	nvlist_t	*errlist = NULL;
 	int		i;
 	it_tpg_t	*tpg = NULL;
 	uint16_t	tagid;
-	it_tpgt_t	*tpgt;
+	it_tpgt_t	*tpgt = NULL;
 	char		*sec = "solaris.smf.modify.stmf";
 
 	ITADM_CHKAUTH(sec);
@@ -1225,6 +1249,7 @@ create_tpg(char *tpg, int addrc, char **addrs)
 	int		count = 0;
 	it_portal_t	*ptl;
 	char		*sec = "solaris.smf.modify.stmf";
+	int 		i = 0;
 
 	ITADM_CHKAUTH(sec);
 
@@ -1268,6 +1293,21 @@ create_tpg(char *tpg, int addrc, char **addrs)
 			return (1);
 		}
 		tpgp = tpgp->tpg_next;
+	}
+
+	/*
+	 * Ensure that the addrs don't contain commas.
+	 */
+	for (i = 0; i < addrc; i++) {
+		if (strchr(addrs[i], ',')) {
+			(void) fprintf(stderr,
+			    gettext("Bad portal name %s"),
+			    addrs[i]);
+			(void) fprintf(stderr, "\n");
+
+			it_config_free(cfg);
+			return (EINVAL);
+		}
 	}
 
 	/*
