@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -410,6 +410,18 @@ main(int argc, char *argv[])
 
 	lookup_daemon_properties();
 
+	/*
+	 * The dladm handle *must* be opened before privileges are dropped
+	 * by nwamd.  The device privilege requirements from
+	 * /etc/security/device_policy may not be loaded yet.  These are
+	 * loaded by svc:/system/filesystem/root, which comes online after
+	 * svc:/network/physical.
+	 */
+	if (dladm_open(&dld_handle) != DLADM_STATUS_OK) {
+		syslog(LOG_ERR, "failed to open dladm handle");
+		exit(EXIT_FAILURE);
+	}
+
 	change_user_set_privs();
 
 	if (!fg)
@@ -424,12 +436,6 @@ main(int argc, char *argv[])
 	lookup_zonename(zonename, sizeof (zonename));
 
 	init_machine_mutex();
-
-	/* open the dladm handle */
-	if (dladm_open(&dld_handle) != DLADM_STATUS_OK) {
-		syslog(LOG_ERR, "failed to open dladm handle");
-		exit(EXIT_FAILURE);
-	}
 
 	initialize_interfaces();
 
