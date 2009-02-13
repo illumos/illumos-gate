@@ -89,6 +89,7 @@ static struct subshell
 	int		coutpipe;
 	int		cpipe;
 	int		nofork;
+	char		subshare;
 } *subshell_data;
 
 static int subenv;
@@ -477,7 +478,9 @@ Sfio_t *sh_subshell(Shnode_t *t, int flags, int comsub)
 	sp->bckpid = shp->bckpid;
 	if(comsub)
 		sh_stats(STAT_COMSUB);
-	if(!comsub || (comsub==1 && !sh_isoption(SH_SUBSHARE)))
+	sp->subshare = shp->subshare;
+	shp->subshare = comsub==2 ||  (comsub==1 && sh_isoption(SH_SUBSHARE));
+	if(!comsub || !shp->subshare)
 	{
 		sp->shpwd = shp->pwd;
 		sp->pwd = (shp->pwd?strdup(shp->pwd):0);
@@ -677,6 +680,7 @@ Sfio_t *sh_subshell(Shnode_t *t, int flags, int comsub)
 		shp->cpipe[1] = sp->cpipe;
 		shp->coutpipe = sp->coutpipe;
 	}
+	shp->subshare = sp->subshare;
 	if(shp->subshell)
 		SH_SUBSHELLNOD->nvalue.s = --shp->subshell;
 	if(sp->sig)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -133,6 +133,7 @@ f none usr/demo/ksh/tests/sun_solaris_cr_6753538_subshell_leaks_umask.sh 644 roo
 f none usr/demo/ksh/tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_cr_6766246_pattern_matching_bug.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_getconf.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_local_compound_nameref001.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_staticvariables.sh 644 root bin

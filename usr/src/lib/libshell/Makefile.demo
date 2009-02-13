@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -102,6 +102,7 @@ DEMOFILES= \
 	tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh \
 	tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh \
 	tests/sun_solaris_cr_6766246_pattern_matching_bug.sh \
+	tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh \
 	tests/sun_solaris_getconf.sh \
 	tests/sun_solaris_local_compound_nameref001.sh \
 	tests/sun_solaris_staticvariables.sh \

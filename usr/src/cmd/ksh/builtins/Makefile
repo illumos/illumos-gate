@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -63,14 +63,41 @@ all: $(PROG)
 $(ROOTBIN)/%: $(ROOTBIN)/alias
 	$(INS.link)
 
-# In the future we should replace the "cat" with a call to
-# "shcomp" to compile the script (for better performance).
-$(PROG): alias.sh
-	cat "alias.sh" >"$@"
+include ../../Makefile.cmd
 
-install: all $(ROOTALIASPROG)
+.KEEP_STATE:
+
+# Set common AST build flags (e.g., needed to support the math stuff).
+include ../../../Makefile.ast
+
+OBJECTS= \
+        alias.o
+
+SRCS=	$(OBJECTS:%.o=%.c)
+
+GROUP= bin
+LDLIBS += -lshell -last
+
+CPPFLAGS = \
+	$(DTEXTDOM) $(DTS_ERRNO) \
+	-I$(ROOT)/usr/include/ast
+
+CFLAGS += \
+	$(ASTCFLAGS)
+CFLAGS64 += \
+	$(ASTCFLAGS64)
+
+ROOTCMDDIR=$(ROOT)/usr/bin
+
+# .WAIT is needed to get the hardlinks properly done
+install: all $(ROOTCMD) .WAIT $(ROOTALIASPROG)
+
+$(PROG):	$(OBJECTS)
+	$(RM) alias
+	$(LINK.c) $(OBJECTS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 clean clobber:
-	rm -f $(PROG)
+	rm -f $(PROG) $(OBJECTS)
 
-lint:
+lint _msg:

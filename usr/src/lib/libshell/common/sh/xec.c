@@ -1406,7 +1406,12 @@ int sh_exec(register const Shnode_t *t, int flags)
 			pid_t	savepgid = job.curpgid;
 			job.curpgid = 0;
 			if(shp->subshell)
-				sh_subtmpfile(1);
+			{
+				if(shp->subshare)
+					sh_subtmpfile(0);
+				else
+					sh_subfork();
+			}
 			shp->inpipe = pvo;
 			shp->outpipe = pvn;
 			pvo[1] = -1;
