@@ -279,6 +279,11 @@ typedef struct devinfo_intr {
 	uint_t		devi_intr_curr_type;	/* Interrupt type being used */
 	uint_t		devi_intr_sup_nintrs;	/* #intr supported */
 	uint_t		devi_intr_curr_nintrs;	/* #intr currently being used */
+	/*
+	 * #intr currently being enabled
+	 * (for MSI block enable, the valuse is either 1 or 0.)
+	 */
+	uint_t		devi_intr_curr_nenables;
 
 	ddi_intr_handle_t *devi_intr_handle_p;	/* Hdl for legacy intr APIs */
 
@@ -315,6 +320,8 @@ uint_t	i_ddi_intr_get_supported_nintrs(dev_info_t *dip, int intr_type);
 void	i_ddi_intr_set_supported_nintrs(dev_info_t *dip, int nintrs);
 uint_t	i_ddi_intr_get_current_nintrs(dev_info_t *dip);
 void	i_ddi_intr_set_current_nintrs(dev_info_t *dip, int nintrs);
+uint_t	i_ddi_intr_get_current_nenables(dev_info_t *dip);
+void	i_ddi_intr_set_current_nenables(dev_info_t *dip, int nintrs);
 uint_t	i_ddi_intr_get_current_navail(dev_info_t *dip, int intr_type);
 
 ddi_irm_pool_t	*i_ddi_intr_get_pool(dev_info_t *dip, int intr_type);

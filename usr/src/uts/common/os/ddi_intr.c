@@ -763,8 +763,11 @@ ddi_intr_enable(ddi_intr_handle_t h)
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_ENABLE, hdlp, NULL);
 
-	if (ret == DDI_SUCCESS)
+	if (ret == DDI_SUCCESS) {
 		hdlp->ih_state = DDI_IHDL_STATE_ENABLE;
+		i_ddi_intr_set_current_nenables(hdlp->ih_dip,
+		    i_ddi_intr_get_current_nenables(hdlp->ih_dip) + 1);
+	}
 
 	rw_exit(&hdlp->ih_rwlock);
 	return (ret);
@@ -795,8 +798,11 @@ ddi_intr_disable(ddi_intr_handle_t h)
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_DISABLE, hdlp, NULL);
 
-	if (ret == DDI_SUCCESS)
+	if (ret == DDI_SUCCESS) {
 		hdlp->ih_state = DDI_IHDL_STATE_ADDED;
+		i_ddi_intr_set_current_nenables(hdlp->ih_dip,
+		    i_ddi_intr_get_current_nenables(hdlp->ih_dip) - 1);
+	}
 
 	rw_exit(&hdlp->ih_rwlock);
 	return (ret);
@@ -844,6 +850,7 @@ ddi_intr_block_enable(ddi_intr_handle_t *h_array, int count)
 			hdlp->ih_state = DDI_IHDL_STATE_ENABLE;
 			rw_exit(&hdlp->ih_rwlock);
 		}
+		i_ddi_intr_set_current_nenables(hdlp->ih_dip, 1);
 	}
 
 	return (ret);
@@ -890,6 +897,7 @@ ddi_intr_block_disable(ddi_intr_handle_t *h_array, int count)
 			hdlp->ih_state = DDI_IHDL_STATE_ADDED;
 			rw_exit(&hdlp->ih_rwlock);
 		}
+		i_ddi_intr_set_current_nenables(hdlp->ih_dip, 0);
 	}
 
 	return (ret);

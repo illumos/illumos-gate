@@ -202,6 +202,23 @@ i_ddi_intr_set_current_nintrs(dev_info_t *dip, int nintrs)
 }
 
 uint_t
+i_ddi_intr_get_current_nenables(dev_info_t *dip)
+{
+	devinfo_intr_t *intr_p = DEVI(dip)->devi_intr_p;
+
+	return (intr_p ? intr_p->devi_intr_curr_nenables : 0);
+}
+
+void
+i_ddi_intr_set_current_nenables(dev_info_t *dip, int nintrs)
+{
+	devinfo_intr_t *intr_p = DEVI(dip)->devi_intr_p;
+
+	if (intr_p)
+		intr_p->devi_intr_curr_nenables = nintrs;
+}
+
+uint_t
 i_ddi_intr_get_current_navail(dev_info_t *dip, int type)
 {
 	ddi_intr_handle_impl_t	hdl;

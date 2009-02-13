@@ -429,7 +429,7 @@ pci_msi_disable_mode(dev_info_t *rdip, int type, uint_t flags)
 	 * still active.
 	 */
 	if ((flags != DDI_INTR_FLAG_BLOCK) &&
-	    ((i_ddi_intr_get_current_nintrs(rdip) - 1) > 0))
+	    (i_ddi_intr_get_current_nenables(rdip) > 1))
 		return (DDI_SUCCESS);
 
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,

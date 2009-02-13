@@ -1650,7 +1650,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		 * Make sure we only disable on the last
 		 * of the multi-MSI support
 		 */
-		if (i_ddi_intr_get_current_nintrs(irqptr->airq_dip) == 1) {
+		if (i_ddi_intr_get_current_nenables(irqptr->airq_dip) == 1) {
 			apic_pci_msi_unconfigure(irqptr->airq_dip,
 			    DDI_INTR_TYPE_MSI, irqptr->airq_ioapicindex);
 
@@ -1667,7 +1667,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		/*
 		 * Make sure we only disable on the last MSI-X
 		 */
-		if (i_ddi_intr_get_current_nintrs(irqptr->airq_dip) == 1) {
+		if (i_ddi_intr_get_current_nenables(irqptr->airq_dip) == 1) {
 			apic_pci_msi_disable_mode(irqptr->airq_dip,
 			    DDI_INTR_TYPE_MSIX);
 		}

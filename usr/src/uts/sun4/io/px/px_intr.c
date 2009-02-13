@@ -595,7 +595,6 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 		break;
 	case DDI_INTROP_FREE:
-		(void) pci_msi_disable_mode(rdip, hdlp->ih_type, NULL);
 		(void) pci_msi_unconfigure(rdip, hdlp->ih_type, hdlp->ih_inum);
 
 		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
@@ -712,6 +711,10 @@ msi_free:
 		break;
 	case DDI_INTROP_DISABLE:
 		msi_num = hdlp->ih_vector;
+
+		if ((ret = pci_msi_disable_mode(rdip, hdlp->ih_type,
+		    hdlp->ih_cap & DDI_INTR_FLAG_BLOCK)) != DDI_SUCCESS)
+			return (ret);
 
 		if ((ret = pci_msi_set_mask(rdip, hdlp->ih_type,
 		    hdlp->ih_inum)) != DDI_SUCCESS)
