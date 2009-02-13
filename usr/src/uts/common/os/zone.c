@@ -3556,6 +3556,13 @@ zone_is_nested(const char *rootpath)
 
 	ASSERT(MUTEX_HELD(&zonehash_lock));
 
+	/*
+	 * zone_set_root() appended '/' and '\0' at the end of rootpath
+	 */
+	if ((rootpathlen <= 3) && (rootpath[0] == '/') &&
+	    (rootpath[1] == '/') && (rootpath[2] == '\0'))
+		return (B_TRUE);
+
 	for (zone = list_head(&zone_active); zone != NULL;
 	    zone = list_next(&zone_active, zone)) {
 		if (zone == global_zone)
