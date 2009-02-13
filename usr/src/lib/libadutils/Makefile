@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -27,6 +27,10 @@ include $(SRC)/lib/Makefile.lib
 
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
+
+# Both MACH and MACH64 subdirs invoke rpcgen on the same file,
+# so to prevent collisions, we turn off parallelism.
+.NO_PARALLEL:	$(SUBDIRS)
 
 all := 		TARGET = all
 clean :=	TARGET = clean

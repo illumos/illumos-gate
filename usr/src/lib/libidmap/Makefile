@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/lib/Makefile.lib
@@ -32,6 +30,10 @@ HDRDIR =	common
 
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
+
+# Both MACH and MACH64 subdirs invoke rpcgen on the same file,
+# so to prevent collisions, we turn off parallelism.
+.NO_PARALLEL:	$(SUBDIRS)
 
 POFILE =	libidmap.po
 MSGFILES =	`$(GREP) -l gettext common/*.[ch]`
