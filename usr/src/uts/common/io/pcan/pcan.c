@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,8 +124,14 @@ mac_callbacks_t pcan_m_callbacks = {
 
 static char *pcan_name_str = "pcan";
 
+#ifdef	__sparc
+#define	pcan_quiesce	ddi_quiesce_not_supported
+#else
+static int pcan_quiesce(dev_info_t *);
+#endif
+
 DDI_DEFINE_STREAM_OPS(pcan_dev_ops, nulldev, pcan_probe, pcan_attach,
-    pcan_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    pcan_detach, nodev, NULL, D_MP, NULL, pcan_quiesce);
 
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {
@@ -4515,3 +4521,30 @@ pcan_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	return (err);
 }
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+#ifndef __sparc
+static int
+pcan_quiesce(dev_info_t *dip)
+{
+	pcan_maci_t *pcan_p;
+
+	pcan_p = ddi_get_soft_state(pcan_soft_state_p, ddi_get_instance(dip));
+	if (pcan_p == NULL)
+		return (DDI_FAILURE);
+
+	if (pcan_p->pcan_flag & PCAN_CARD_READY)
+		pcan_stop_locked(pcan_p);
+
+	return (DDI_SUCCESS);
+}
+#endif

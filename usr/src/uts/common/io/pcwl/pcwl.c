@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,8 +106,14 @@ mac_callbacks_t pcwl_m_callbacks = {
 
 static char *pcwl_name_str = "pcwl";
 
+#ifdef	__sparc
+#define	pcwl_quiesce	ddi_quiesce_not_supported
+#else
+static int pcwl_quiesce(dev_info_t *);
+#endif
+
 DDI_DEFINE_STREAM_OPS(pcwl_dev_ops, nulldev, pcwl_probe, pcwl_attach,
-    pcwl_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    pcwl_detach, nodev, NULL, D_MP, NULL, pcwl_quiesce);
 
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {
@@ -4390,3 +4396,30 @@ pcwl_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	return (err);
 }
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+#ifndef __sparc
+static int
+pcwl_quiesce(dev_info_t *dip)
+{
+	pcwl_maci_t *pcwl_p;
+
+	pcwl_p = ddi_get_soft_state(pcwl_soft_state_p, ddi_get_instance(dip));
+	if (pcwl_p == NULL)
+		return (DDI_FAILURE);
+
+	if (pcwl_p->pcwl_flag & PCWL_CARD_READY)
+		pcwl_stop_locked(pcwl_p);
+
+	return (DDI_SUCCESS);
+}
+#endif
