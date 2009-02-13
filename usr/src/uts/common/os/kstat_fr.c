@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel statistics framework
@@ -816,6 +815,9 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 	int myncpus = ncpus;
 	int *loadavgp = &avenrun[0];
 	int loadavg[LOADAVG_NSTATS];
+	time_t zone_boot_time;
+	clock_t zone_lbolt;
+	hrtime_t zone_hrtime;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
@@ -841,16 +843,30 @@ system_misc_kstat_update(kstat_t *ksp, int rw)
 		mutex_exit(&cpu_lock);
 	}
 
+	if (curproc->p_zone->zone_id == 0) {
+		zone_boot_time = boot_time;
+		zone_lbolt = lbolt;
+	} else {
+		struct timeval tvp;
+		hrt2tv(curproc->p_zone->zone_zsched->p_mstart, &tvp);
+		zone_boot_time = tvp.tv_sec;
+
+		zone_hrtime = gethrtime();
+		zone_lbolt = (clock_t)(NSEC_TO_TICK(zone_hrtime) -
+		    NSEC_TO_TICK(curproc->p_zone->zone_zsched->p_mstart));
+	}
+
 	system_misc_kstat.ncpus.value.ui32		= (uint32_t)myncpus;
-	system_misc_kstat.lbolt.value.ui32		= (uint32_t)lbolt;
+	system_misc_kstat.lbolt.value.ui32		= (uint32_t)zone_lbolt;
 	system_misc_kstat.deficit.value.ui32		= (uint32_t)deficit;
-	system_misc_kstat.clk_intr.value.ui32		= (uint32_t)lbolt;
+	system_misc_kstat.clk_intr.value.ui32		= (uint32_t)zone_lbolt;
 	system_misc_kstat.vac.value.ui32		= (uint32_t)vac;
 	system_misc_kstat.nproc.value.ui32		= (uint32_t)nproc;
 	system_misc_kstat.avenrun_1min.value.ui32	= (uint32_t)loadavgp[0];
 	system_misc_kstat.avenrun_5min.value.ui32	= (uint32_t)loadavgp[1];
 	system_misc_kstat.avenrun_15min.value.ui32	= (uint32_t)loadavgp[2];
-	system_misc_kstat.boot_time.value.ui32		= (uint32_t)boot_time;
+	system_misc_kstat.boot_time.value.ui32		= (uint32_t)
+	    zone_boot_time;
 	return (0);
 }
 
