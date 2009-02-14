@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,13 @@ typedef enum ScopeType {
 #define	NS_LDAP_NOT_CVT_DN	0x2000
 
 /*
+ * NS_LDAP_UPDATE_SHADOW is for a privileged caller of the
+ * __ns_ldap_repAttr() to update the shadow database on the
+ * LDAP server.
+ */
+#define	NS_LDAP_UPDATE_SHADOW	0x4000
+
+/*
  * Authentication Information
  */
 typedef enum CredLevel {
@@ -125,6 +132,11 @@ typedef enum PrefOnly {
 	NS_LDAP_PREF_FALSE	= 0,
 	NS_LDAP_PREF_TRUE	= 1
 } PrefOnly_t;
+
+typedef enum enableShadowUpdate {
+	NS_LDAP_ENABLE_SHADOW_UPDATE_FALSE	= 0,
+	NS_LDAP_ENABLE_SHADOW_UPDATE_TRUE	= 1
+} enableShadowUpdate_t;
 
 typedef struct UnixCred {
 	char	*userID;	/* Unix ID number */
@@ -199,12 +211,15 @@ typedef enum {
 	NS_LDAP_SERVICE_AUTH_METHOD_P	= 25,
 	NS_LDAP_SERVICE_CRED_LEVEL_P	= 26,
 	NS_LDAP_HOST_CERTPATH_P		= 27,
+	NS_LDAP_ENABLE_SHADOW_UPDATE_P	= 28,
+	NS_LDAP_ADMIN_BINDDN_P		= 29,
+	NS_LDAP_ADMIN_BINDPASSWD_P	= 30,
 /*
  * The following entry (max ParamIndexType) is an internal
  * placeholder.  It must be the last (and highest value)
  * entry in this eNum.  Please update accordingly.
  */
-	NS_LDAP_MAX_PIT_P		= 28
+	NS_LDAP_MAX_PIT_P		= 31
 
 } ParamIndexType;
 
@@ -483,6 +498,11 @@ typedef struct ns_ldap_objectclass_map {
 	char		*origOC;	/* original objectclass */
 	char		*mappedOC;	/* mapped objectclass */
 } ns_ldap_objectclass_map_t;
+
+/*
+ * Value of the userPassword attribute representing NO Unix password
+ */
+#define	NS_LDAP_NO_UNIX_PASSWORD	"<NO UNIX PASSWORD>"
 
 /* Opaque handle for batch API */
 typedef struct ns_ldap_list_batch ns_ldap_list_batch_t;
@@ -872,6 +892,9 @@ int __ns_ldap_getParamType(
 int __ns_ldap_getAcctMgmt(
 	const char *user,
 	AcctUsableResponse_t *acctResp);
+
+boolean_t __ns_ldap_is_shadow_update_enabled();
+
 void
 __ns_ldap_self_gssapi_only_set(
 	int flag);

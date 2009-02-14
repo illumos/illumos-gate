@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3119,7 +3119,6 @@ static void
 dump_passwd(ns_ldap_result_t *res)
 {
 	char    **value = NULL;
-	char	pnam[256];
 
 	value = __ns_ldap_getAttr(res->entry, "uid");
 	if (value == NULL)
@@ -3127,15 +3126,13 @@ dump_passwd(ns_ldap_result_t *res)
 	else
 		(void) fprintf(stdout, "%s:", value[0]);
 	value = __ns_ldap_getAttr(res->entry, "userPassword");
-	if (value == NULL)
-		(void) fprintf(stdout, "*:");
-	else {
-		(void) strcpy(pnam, value[0]);
-		if (strncasecmp(value[0], "{crypt}", 7) == 0)
-		(void) fprintf(stdout, "%s:", (pnam+7));
-		else
-			(void) fprintf(stdout, "*:");
-	}
+
+	/*
+	 * Don't print the encrypted password, Use x to
+	 * indicate it is in the shadow database.
+	 */
+	(void) fprintf(stdout, "x:");
+
 	value = __ns_ldap_getAttr(res->entry, "uidNumber");
 	if (value && value[0])
 		(void) fprintf(stdout, "%s:", value[0]);
@@ -3315,8 +3312,16 @@ genent_shadow(char *line, int (*cback)())
 		(void) snprintf(pname, sizeof (pname), "{crypt}%s",
 		    ecol[1].ec_value.ec_value_val);
 		data.sp_pwdp = strdup(pname);
-	} else
-		data.sp_pwdp = NULL;
+	} else {
+		/*
+		 * no password (e.g., deleted by "passwd -d"):
+		 * use the special value NS_LDAP_NO_UNIX_PASSWORD
+		 * instead.
+		 */
+		(void) snprintf(pname, sizeof (pname), "{crypt}%s",
+		    NS_LDAP_NO_UNIX_PASSWORD);
+		data.sp_pwdp = strdup(pname);
+	}
 
 	if (ecol[2].ec_value.ec_value_val != NULL &&
 	    ecol[2].ec_value.ec_value_val[0] != '\0') {
@@ -3450,9 +3455,12 @@ dump_shadow(ns_ldap_result_t *res)
 		(void) fprintf(stdout, "*:");
 	else {
 		(void) strcpy(pnam, value[0]);
-		if (strncasecmp(value[0], "{crypt}", 7) == 0)
-		(void) fprintf(stdout, "%s:", (pnam+7));
-		else
+		if (strncasecmp(value[0], "{crypt}", 7) == 0) {
+			if (strcmp(pnam + 7, NS_LDAP_NO_UNIX_PASSWORD) == 0)
+				(void) fprintf(stdout, ":");
+			else
+				(void) fprintf(stdout, "%s:", (pnam+7));
+		} else
 			(void) fprintf(stdout, "*:");
 	}
 	value = __ns_ldap_getAttr(res->entry, "shadowLastChange");
@@ -3471,11 +3479,30 @@ dump_shadow(ns_ldap_result_t *res)
 	else
 		(void) fprintf(stdout, "%s:", value[0]);
 
-	/* ignore shadowWarning, shadowInactive, shadowExpire, shadowFlag */
-	(void) fprintf(stdout, ":::\n");
+	value = __ns_ldap_getAttr(res->entry, "shadowWarning");
+	if (value == NULL)
+		(void) fprintf(stdout, ":");
+	else
+		(void) fprintf(stdout, "%s:", value[0]);
 
+	value = __ns_ldap_getAttr(res->entry, "shadowInactive");
+	if (value == NULL)
+		(void) fprintf(stdout, ":");
+	else
+		(void) fprintf(stdout, "%s:", value[0]);
+
+	value = __ns_ldap_getAttr(res->entry, "shadowExpire");
+	if (value == NULL)
+		(void) fprintf(stdout, ":");
+	else
+		(void) fprintf(stdout, "%s:", value[0]);
+
+	value = __ns_ldap_getAttr(res->entry, "shadowFlag");
+	if (value == NULL || value[0] == NULL || strcmp(value[0], "0") == 0)
+		(void) fprintf(stdout, "\n");
+	else
+		(void) fprintf(stdout, "%s\n", value[0]);
 }
-
 
 static int
 genent_bootparams(char *line, int (*cback)())

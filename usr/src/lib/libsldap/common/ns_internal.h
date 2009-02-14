@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #ifndef	_NS_INTERNAL_H
 #define	_NS_INTERNAL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -118,6 +116,11 @@ extern "C" {
 /* max rdn length in conversion routines used by __ns_ldap_addTypedEntry() */
 #define	RDNSIZE			256
 
+/*
+ * special service used by ldap_cachemgr to indicate a shadow update
+ * is to be done with the credential of the administrator identity
+ */
+#define	NS_ADMIN_SHADOW_UPDATE	"shadow__admin_update"
 
 /* Phase 1 profile information */
 #define	_PROFILE1_OBJECTCLASS	"SolarisNamingProfile"
@@ -316,6 +319,7 @@ typedef struct ns_enum_map {
 #define	INT2SECENUM(x)		((TlsType_t)(x))
 #define	INT2PREFONLYENUM(x)	((PrefOnly_t)(x))
 #define	INT2CREDLEVELENUM(x)	((CredLevel_t)(x))
+#define	INT2SHADOWUPDATENUM(x)	((enableShadowUpdate_t)(x))
 
 #define	INT2LDAPRETURN(x)	((ns_ldap_return_code)(x))
 #define	INT2CONFIGRETURN(x)	((ns_ldap_config_return_code)(x))
@@ -736,6 +740,7 @@ char *__s_get_security_name(ns_config_t *ptr, TlsType_t type);
 char *__s_get_scope_name(ns_config_t *ptr, ScopeType_t type);
 char *__s_get_pref_name(PrefOnly_t type);
 char *__s_get_searchref_name(ns_config_t *ptr, SearchRef_t type);
+char *__s_get_shadowupdate_name(enableShadowUpdate_t type);
 char *__s_get_hostcertpath(void);
 void __s_api_free_sessionPool();
 int __s_api_requestServer(const char *request, const char *server,

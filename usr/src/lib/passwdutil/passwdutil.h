@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,6 +166,7 @@ int get_ns(pwu_repository_t *, int);
 struct passwd *getpwnam_from(const char *, pwu_repository_t *, int);
 struct passwd *getpwuid_from(uid_t, pwu_repository_t *, int);
 struct spwd *getspnam_from(const char *, pwu_repository_t *, int);
+int name_to_int(char *);
 
 /*
  * __set_authtok_attr.c

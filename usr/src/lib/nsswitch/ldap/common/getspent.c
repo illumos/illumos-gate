@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <shadow.h>
 #include <stdlib.h>
@@ -31,6 +30,12 @@
 /* shadow attributes filters */
 #define	_S_UID			"uid"
 #define	_S_USERPASSWORD		"userpassword"
+#define	_S_LASTCHANGE		"shadowlastchange"
+#define	_S_MIN			"shadowmin"
+#define	_S_MAX			"shadowmax"
+#define	_S_WARNING		"shadowwarning"
+#define	_S_INACTIVE		"shadowinactive"
+#define	_S_EXPIRE		"shadowexpire"
 #define	_S_FLAG			"shadowflag"
 
 #define	_F_GETSPNAM		"(&(objectClass=shadowAccount)(uid=%s))"
@@ -39,6 +44,12 @@
 static const char *sp_attrs[] = {
 	_S_UID,
 	_S_USERPASSWORD,
+	_S_LASTCHANGE,
+	_S_MIN,
+	_S_MAX,
+	_S_WARNING,
+	_S_INACTIVE,
+	_S_EXPIRE,
 	_S_FLAG,
 	(char *)NULL
 };
@@ -59,11 +70,15 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
 	int		nss_result;
 	int		buflen = 0;
+	int		shadow_update_enabled;
 	unsigned long	len = 0L;
 	char		*tmp, *buffer = NULL;
 	char		*pw_passwd = NULL;
 	ns_ldap_result_t	*result = be->result;
-	char		**uid, **passwd, **flag, *flag_str;
+	char		**uid, **passwd, **last, **smin, **smax;
+	char		**warning, **inactive, **expire, **flag;
+	char		*last_str, *min_str, *max_str, *warning_str;
+	char		*inactive_str, *expire_str, *flag_str;
 
 	if (result == NULL)
 		return (NSS_STR_PARSE_PARSE);
@@ -94,11 +109,15 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		goto result_spd2str;
 	} else {
 		if ((tmp = strstr(passwd[0], "{crypt}")) != NULL ||
-			(tmp = strstr(passwd[0], "{CRYPT}")) != NULL) {
+		    (tmp = strstr(passwd[0], "{CRYPT}")) != NULL) {
 			if (tmp != passwd[0])
 				pw_passwd = NOPWDRTR;
-			else
+			else {
 				pw_passwd = tmp + strlen("{crypt}");
+				if (strcmp(pw_passwd,
+				    NS_LDAP_NO_UNIX_PASSWORD) == 0)
+					*pw_passwd = '\0';
+			}
 		} else {
 		/* mark password as not retrievable */
 			pw_passwd = NOPWDRTR;
@@ -107,19 +126,66 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	len += strlen(pw_passwd);
 
 	/*
-	 * Ignore the following password aging related attributes:
+	 * If shadow update is not enabled, ignore the following
+	 * password aging related attributes:
 	 * -- shadowlastchange
 	 * -- shadowmin
 	 * -- shadowmax
 	 * -- shadowwarning
 	 * -- shadowinactive
 	 * -- shadowexpire
-	 * This is because the LDAP naming service does not
-	 * really support the password aging fields defined
-	 * in the shadow structure. These fields, sp_lstchg,
+	 * When shadow update is not enabled, the LDAP naming
+	 * service does not support the password aging fields
+	 * defined in the shadow structure. These fields, sp_lstchg,
 	 * sp_min, sp_max, sp_warn, sp_inact, and sp_expire,
 	 * will be set to -1 by the front end marshaller.
 	 */
+
+	shadow_update_enabled = __ns_ldap_is_shadow_update_enabled();
+	if (shadow_update_enabled) {
+		last = __ns_ldap_getAttr(result->entry, _S_LASTCHANGE);
+		if (last == NULL || last[0] == NULL)
+			last_str = _NO_VALUE;
+		else
+			last_str = last[0];
+		len += strlen(last_str);
+
+		smin = __ns_ldap_getAttr(result->entry, _S_MIN);
+		if (smin == NULL || smin[0] == NULL)
+			min_str = _NO_VALUE;
+		else
+			min_str = smin[0];
+		len += strlen(min_str);
+
+		smax = __ns_ldap_getAttr(result->entry, _S_MAX);
+		if (smax == NULL || smax[0] == NULL)
+			max_str = _NO_VALUE;
+		else
+			max_str = smax[0];
+		len += strlen(max_str);
+
+		warning = __ns_ldap_getAttr(result->entry, _S_WARNING);
+		if (warning == NULL || warning[0] == NULL)
+			warning_str = _NO_VALUE;
+		else
+			warning_str = warning[0];
+		len += strlen(warning_str);
+
+		inactive = __ns_ldap_getAttr(result->entry, _S_INACTIVE);
+		if (inactive == NULL || inactive[0] == NULL)
+			inactive_str = _NO_VALUE;
+		else
+			inactive_str = inactive[0];
+		len += strlen(inactive_str);
+
+		expire = __ns_ldap_getAttr(result->entry, _S_EXPIRE);
+		if (expire == NULL || expire[0] == NULL)
+			expire_str = _NO_VALUE;
+		else
+			expire_str = expire[0];
+		len += strlen(expire_str);
+	}
+
 	flag = __ns_ldap_getAttr(result->entry, _S_FLAG);
 	if (flag == NULL || flag[0] == NULL)
 		flag_str = _NO_VALUE;
@@ -144,8 +210,14 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	} else
 		buffer = argp->buf.buffer;
 
-	(void) snprintf(buffer, len, "%s:%s:::::::%s",
-			uid[0], pw_passwd, flag_str);
+	if (shadow_update_enabled) {
+		(void) snprintf(buffer, len, "%s:%s:%s:%s:%s:%s:%s:%s:%s",
+		    uid[0], pw_passwd, last_str, min_str, max_str, warning_str,
+		    inactive_str, expire_str, flag_str);
+	} else {
+		(void) snprintf(buffer, len, "%s:%s:::::::%s",
+		    uid[0], pw_passwd, flag_str);
+	}
 
 	/* The front end marhsaller doesn't need the trailing null */
 	if (argp->buf.result != NULL)
@@ -185,7 +257,7 @@ getbynam(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	return (_nss_ldap_lookup(be, argp, _SHADOW, searchfilter, NULL,
-		_merge_SSD_filter, userdata));
+	    _merge_SSD_filter, userdata));
 }
 
 static ldap_backend_op_t sp_ops[] = {
@@ -210,6 +282,6 @@ _nss_ldap_shadow_constr(const char *dummy1, const char *dummy2,
 {
 
 	return ((nss_backend_t *)_nss_ldap_constr(sp_ops,
-		sizeof (sp_ops)/sizeof (sp_ops[0]),
-		_SHADOW, sp_attrs, _nss_ldap_shadow2str));
+	    sizeof (sp_ops)/sizeof (sp_ops[0]),
+	    _SHADOW, sp_attrs, _nss_ldap_shadow2str));
 }

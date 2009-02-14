@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* libsldap - cachemgr side configuration components */
 
@@ -332,6 +330,15 @@ __s_api_create_config_door_str(char *config, ns_ldap_error_t **errorp)
 					__s_api_destroy_config(configStruct);
 					return (NULL);
 				}
+			} else if (strcasecmp(attrVal,
+			    _PROFILE1_OBJECTCLASS) == 0) {
+				if (__ns_ldap_setParamValue(configStruct,
+				    NS_LDAP_FILE_VERSION_P,
+				    NS_LDAP_VERSION_1,
+				    errorp) != NS_LDAP_SUCCESS) {
+					__s_api_destroy_config(configStruct);
+					return (NULL);
+				}
 			}
 			continue;
 		}
@@ -490,6 +497,10 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname, ns_config_t *new)
 	}
 	(void) memset((char *)configinfo, 0, sizeof (LineBuf));
 	for (i = 0; i <= NS_LDAP_MAX_PIT_P; i++) {
+		/* the credential for shadow update is not to be exposed */
+		if (i == NS_LDAP_ADMIN_BINDDN_P ||
+		    i == NS_LDAP_ADMIN_BINDPASSWD_P)
+			continue;
 		str = __s_api_strValue(ptr, string, sizeof (string), i,
 		    NS_DOOR_FMT);
 		if (str == NULL)
@@ -628,10 +639,15 @@ __ns_ldap_DumpLdif(char *filename)
 		if (str == NULL)
 			continue;
 		/*
-		 * don't dump binddn, bind password, or cert path as they
-		 * are not part of version 2 profiles
+		 * don't dump binddn, bind password, admin binddn, admin
+		 * bind password, enableShadowUpdate flag, or cert path
+		 * as they are not part of version 2 profiles
 		 */
-		if ((i != NS_LDAP_BINDDN_P) && (i != NS_LDAP_BINDPASSWD_P) &&
+		if ((i != NS_LDAP_BINDDN_P) &&
+		    (i != NS_LDAP_BINDPASSWD_P) &&
+		    (i != NS_LDAP_ADMIN_BINDDN_P) &&
+		    (i != NS_LDAP_ADMIN_BINDPASSWD_P) &&
+		    (i != NS_LDAP_ENABLE_SHADOW_UPDATE_P) &&
 		    (i != NS_LDAP_HOST_CERTPATH_P))
 			(void) fprintf(fp, "%s\n", str);
 		if (str != (char *)&string[0]) {
@@ -922,6 +938,7 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 		}
 	}
 	if (ptr->version != NS_LDAP_V1) {
+		ParamIndexType i;
 		if (curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_ptype == CHARPTR) {
 			(void) __ns_ldap_setParamValue(ptr, NS_LDAP_BINDDN_P,
 			    curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_pc,
@@ -932,6 +949,28 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 			(void) __ns_ldap_setParamValue(ptr,
 			    NS_LDAP_BINDPASSWD_P,
 			    curr_ptr->paramList[NS_LDAP_BINDPASSWD_P].ns_pc,
+			    &error);
+		}
+		i = NS_LDAP_ENABLE_SHADOW_UPDATE_P;
+		if (curr_ptr->paramList[i].ns_ptype == INT) {
+			char *val;
+			val = __s_get_shadowupdate_name(
+			    curr_ptr->paramList[i].ns_i);
+			(void) __ns_ldap_setParamValue(ptr, i, val, &error);
+		}
+		if (curr_ptr->paramList[NS_LDAP_ADMIN_BINDDN_P].ns_ptype ==
+		    CHARPTR) {
+			(void) __ns_ldap_setParamValue(ptr,
+			    NS_LDAP_ADMIN_BINDDN_P,
+			    curr_ptr->paramList[NS_LDAP_ADMIN_BINDDN_P].ns_pc,
+			    &error);
+		}
+		if (curr_ptr->paramList[NS_LDAP_ADMIN_BINDPASSWD_P].ns_ptype ==
+		    CHARPTR) {
+			(void) __ns_ldap_setParamValue(ptr,
+			    NS_LDAP_ADMIN_BINDPASSWD_P,
+			    curr_ptr->
+			    paramList[NS_LDAP_ADMIN_BINDPASSWD_P].ns_pc,
 			    &error);
 		}
 		if (curr_ptr->paramList[NS_LDAP_HOST_CERTPATH_P].ns_ptype ==
@@ -1063,6 +1102,11 @@ __ns_ldap_print_config(int verbose)
 			 * we don't store it in the ldap_client_file.
 			 */
 		if ((i == NS_LDAP_CACHETTL_P) && (ptr->version == NS_LDAP_V1))
+			continue;
+
+		/* the credential for shadow update is not to be exposed */
+		if (i == NS_LDAP_ADMIN_BINDDN_P ||
+		    i == NS_LDAP_ADMIN_BINDPASSWD_P)
 			continue;
 
 		str = __s_api_strValue(ptr, string, BUFSIZ, i, NS_FILE_FMT);

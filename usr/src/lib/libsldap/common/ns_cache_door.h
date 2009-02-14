@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_NS_CACHE_DOOR_H
 #define	_NS_CACHE_DOOR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definitions for client side of doors-based ldap caching
@@ -96,6 +94,13 @@ typedef struct ldap_config_out {
 	char 		config_str[sizeof (int)]; /* real size is data_size */
 } ldap_config_out_t;
 
+typedef struct ldap_admin_mod_result {
+	uint32_t	ns_err;		/* ns_ldap error code */
+	uint32_t	status;		/* error status */
+	uint32_t	msg_size;	/* length of error message */
+	char 		msg[sizeof (int)]; /* real size is msg_size */
+} ldap_admin_mod_result_t;
+
 /*
  * structure returned by server for all calls
  */
@@ -116,6 +121,7 @@ typedef struct {
 		ldap_strlist_t	strlist;
 		ldap_config_out_t config_str;
 		ldap_get_change_out_t changes;
+		ldap_admin_mod_result_t admin_result;
 	} ldap_u;
 
 } ldap_return_t;
@@ -187,6 +193,8 @@ typedef union {
 #define	GETCACHESTAT	24
 	/* Configuration change or server status change notification */
 #define	GETSTATUSCHANGE	25
+	/* perform admin modify via ldap_cachemgr */
+#define	ADMINMODIFY	26
 
 /*
  * GETLDAPSERVER request flags

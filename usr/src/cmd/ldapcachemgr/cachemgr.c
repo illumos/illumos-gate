@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Simple doors ldap cache daemon
@@ -55,6 +53,8 @@
 
 #include <alloca.h>
 #include <ucontext.h>
+#include <stddef.h>	/* offsetof */
+#include <priv.h>
 
 #include "getxby_door.h"
 #include "cachemgr.h"
@@ -72,6 +72,8 @@ static int setadmin(ldap_call_t *ptr);
 static  int client_setadmin(admin_t *ptr);
 static int client_showstats(admin_t *ptr);
 static int is_root(int free_uc, char *dc_str, ucred_t **uc);
+static int is_root_or_all_privs(char *dc_str, ucred_t **ucp);
+static void admin_modify(LineBuf *config_info, ldap_call_t *in);
 
 #ifdef SLP
 int			use_slp = 0;
@@ -833,6 +835,11 @@ switcher(void *cookie, char *argp, size_t arg_size,
 				ucred_free(uc);
 			state = ALLOCATE;
 			break;
+		case ADMINMODIFY:
+			admin_modify(&configInfo, ptr);
+
+			state = GETSIZE;
+			break;
 		case GETSTATUSCHANGE:
 			/*
 			 * Process the request and proceed with the default
@@ -1354,16 +1361,18 @@ is_root(int free_uc, char *dc_str, ucred_t **ucp)
 
 		if (current_admin.debug_level >= DBG_CANT_FIND)
 			logit("%s call failed(cred): caller pid %ld, uid %u, "
-			    "euid %u\n", dc_str, ucred_getpid(*ucp),
-			    ucred_getruid(*ucp), ucred_geteuid(*ucp));
+			    "euid %u (if uid or euid is %u, it may be "
+			    "unavailable)\n", dc_str, ucred_getpid(*ucp),
+			    ucred_getruid(*ucp), ucred_geteuid(*ucp), -1);
 
 		rc = 0;
 	} else {
 
 		if (current_admin.debug_level >= DBG_ALL)
-			logit("ldap_cachemgr received %s call from pid %ld, "
-			    "uid %u, euid %u\n", dc_str, ucred_getpid(*ucp),
-			    ucred_getruid(*ucp), ucred_geteuid(*ucp));
+			logit("received %s call from pid %ld, uid %u, euid %u "
+			    "(if uid or euid is %u, it may be unavailable)\n",
+			    dc_str, ucred_getpid(*ucp), ucred_getruid(*ucp),
+			    ucred_geteuid(*ucp), -1);
 		rc = 1;
 	}
 
@@ -1457,4 +1466,377 @@ try_again:
 
 	return (match);
 
+}
+
+/*
+ * new_attr(name, value)
+ *
+ * create a new LDAP attribute to be sent to the server
+ */
+static ns_ldap_attr_t *
+new_attr(char *name, char *value)
+{
+	ns_ldap_attr_t *tmp;
+
+	tmp = malloc(sizeof (*tmp));
+	if (tmp != NULL) {
+		tmp->attrname = name;
+		tmp->attrvalue = (char **)calloc(2, sizeof (char *));
+		if (tmp->attrvalue == NULL) {
+			free(tmp);
+			return (NULL);
+		}
+		tmp->attrvalue[0] = value;
+		tmp->value_count = 1;
+	}
+
+	return (tmp);
+}
+
+/*
+ * Convert the flatten ldap attributes in a ns_ldap_attr_t back
+ * to an ns_ldap_attr_t array.
+ *
+ * strlist->ldap_offsets[] contains offsets to strings:
+ * "dn", <dn value>, <attr 1>, <attrval 1>, ... <attr n>, <attrval n>
+ * where n is (strlist->ldap_count/2 -1).
+ * The output ns_ldap_attr_t array has a size of (strlist->ldap_count/2)
+ * the first (strlist->ldap_count/2 -1) contains all the attribute data,
+ * the last one is a NULL pointer. DN will be extracted out and pointed
+ * to by *dn.
+ */
+static ns_ldap_attr_t **
+str2attrs(ldap_strlist_t *strlist, char **dn)
+{
+	int		c;
+	int		i;
+	int		j;
+	ns_ldap_attr_t	**ret;
+
+	c = strlist->ldap_count;
+	ret = calloc(c/2, sizeof (ns_ldap_attr_t *));
+	if (ret == NULL)
+		return (NULL);
+	*dn = (char *)strlist + strlist->ldap_offsets[1];
+
+	/*
+	 * skip the first 'dn'/<dn value> pair, for all other attr type/value
+	 * pairs, get pointers to the attr type (offset [i]) and attr value
+	 * (offset [i+1]) and put in ns_ldap_attr_t at ret[j]
+	 */
+	for (i = 2, j = 0; i < c; i = i + 2, j++) {
+		ret[j] = new_attr((char *)strlist + strlist->ldap_offsets[i],
+		    (char *)strlist + strlist->ldap_offsets[i + 1]);
+	}
+	return (ret);
+}
+
+static int
+get_admin_dn(ns_cred_t *credp, int *status, ns_ldap_error_t **errorp)
+{
+	void	**paramVal = NULL;
+	int	rc;
+
+	/* get bind DN for shadow update */
+	rc = __ns_ldap_getParam(NS_LDAP_ADMIN_BINDDN_P,
+	    &paramVal, errorp);
+	if (rc != NS_LDAP_SUCCESS)
+		return (rc);
+
+	if (paramVal == NULL || *paramVal == NULL) {
+		rc = NS_LDAP_CONFIG;
+		*status = NS_CONFIG_NOTALLOW;
+		if (paramVal != NULL)
+			(void) __ns_ldap_freeParam(&paramVal);
+		return (rc);
+	}
+	credp->cred.unix_cred.userID = strdup((char *)*paramVal);
+	(void) __ns_ldap_freeParam(&paramVal);
+	if (credp->cred.unix_cred.userID == NULL)
+		return (NS_LDAP_MEMORY);
+
+	return (NS_LDAP_SUCCESS);
+}
+
+/*
+ * admin_modify() does a privileged modify within the ldap_cachemgr daemon
+ * process using the admin DN/password configured with parameters
+ * NS_LDAP_ADMIN_BINDDN and NS_LDAP_ADMIN_BINDPASSWD. It will only
+ * be done if NS_LDAP_ENABLE_SHADOW_UPDATE is set to TRUE.
+ *
+ * The input ldap_call_t (*in) contains LDAP shadowAccount attributes to
+ * be modified. The data is a flatten ns_ldap_attr_t arrary stored in
+ * the strlist element of the input ldap_call_t.
+ * The output will be in LineBuf (*config_info), an ldap_admin_mod_result_t
+ * structure that contains error code, error status, and error message.
+ */
+static void
+admin_modify(LineBuf *config_info, ldap_call_t *in)
+{
+	int		rc = NS_LDAP_SUCCESS;
+	int		authstried = 0;
+	int		shadow_enabled = 0;
+	char		*dn = NULL;
+	char		**certpath = NULL;
+	char		**enable_shadow = NULL;
+	ns_auth_t	**app;
+	ns_auth_t	**authpp = NULL;
+	ns_auth_t	*authp = NULL;
+	ns_cred_t	*credp = NULL;
+	char		buffer[MAXERROR];
+	const int	rlen = offsetof(ldap_admin_mod_result_t, msg);
+	int		mlen = 0;
+	const int	msgmax = MAXERROR - rlen;
+	int		status = 0;
+	ucred_t		*uc = NULL;
+	ldap_strlist_t	*strlist;
+	ns_ldap_attr_t	**attrs = NULL;
+	ns_ldap_error_t *error = NULL;
+	ldap_admin_mod_result_t *result;
+
+	(void) memset((char *)config_info, 0, sizeof (LineBuf));
+
+	/* only root or an ALL privs user can do admin modify */
+	if (is_root_or_all_privs("ADMINMODIFY", &uc) == 0) {
+		mlen = snprintf(buffer, msgmax, "%s",
+		    gettext("shadow update by a non-root and no ALL privilege "
+		    "user not allowed"));
+		rc = NS_LDAP_CONFIG;
+		goto out;
+	}
+
+	/* check to see if shadow update is enabled */
+	rc = __ns_ldap_getParam(NS_LDAP_ENABLE_SHADOW_UPDATE_P,
+	    (void ***)&enable_shadow, &error);
+	if (rc != NS_LDAP_SUCCESS)
+		goto out;
+	if (enable_shadow != NULL && *enable_shadow != NULL) {
+		shadow_enabled = (*(int *)enable_shadow[0] ==
+		    NS_LDAP_ENABLE_SHADOW_UPDATE_TRUE);
+	}
+	if (enable_shadow != NULL)
+		(void) __ns_ldap_freeParam((void ***)&enable_shadow);
+	if (shadow_enabled == 0) {
+		rc = NS_LDAP_CONFIG;
+		status = NS_CONFIG_NOTALLOW;
+		mlen = snprintf(buffer, msgmax, "%s",
+		    gettext("shadow update not enabled"));
+		goto out;
+	}
+
+	/* convert attributes in string buffer into an ldap attribute array */
+	strlist = &in->ldap_u.strlist;
+	attrs = str2attrs(strlist, &dn);
+	if (attrs == NULL || *attrs == NULL || dn == NULL || *dn == '\0') {
+		rc = NS_LDAP_INVALID_PARAM;
+		goto out;
+	}
+
+	if ((credp = (ns_cred_t *)calloc(1, sizeof (ns_cred_t))) == NULL) {
+		rc = NS_LDAP_MEMORY;
+		goto out;
+	}
+
+	/* get host certificate path, if one is configured */
+	rc = __ns_ldap_getParam(NS_LDAP_HOST_CERTPATH_P,
+	    (void ***)&certpath, &error);
+	if (rc != NS_LDAP_SUCCESS)
+		goto out;
+	if (certpath != NULL && *certpath != NULL) {
+		credp->hostcertpath = strdup(*certpath);
+		if (credp->hostcertpath == NULL)
+			rc = NS_LDAP_MEMORY;
+	}
+	if (certpath != NULL)
+		(void) __ns_ldap_freeParam((void ***)&certpath);
+	if (rc != NS_LDAP_SUCCESS)
+		goto out;
+
+	/* Load the service specific authentication method */
+	rc = __ns_ldap_getServiceAuthMethods("passwd-cmd", &authpp,
+	    &error);
+	if (rc != NS_LDAP_SUCCESS) {
+		if (credp->hostcertpath != NULL)
+			free(credp->hostcertpath);
+		goto out;
+	}
+
+	/*
+	 * if authpp is null, there is no serviceAuthenticationMethod
+	 * try default authenticationMethod
+	 */
+	if (authpp == NULL) {
+		rc = __ns_ldap_getParam(NS_LDAP_AUTH_P, (void ***)&authpp,
+		    &error);
+		if (rc != NS_LDAP_SUCCESS)
+			goto out;
+	}
+
+	/*
+	 * if authpp is still null, then can not authenticate, syslog
+	 * error message and return error
+	 */
+	if (authpp == NULL) {
+		rc = NS_LDAP_CONFIG;
+		mlen = snprintf(buffer, msgmax, "%s",
+		    gettext("No legal LDAP authentication method configured"));
+		goto out;
+	}
+
+	/*
+	 * Walk the array and try all authentication methods in order except
+	 * for "none".
+	 */
+	for (app = authpp; *app; app++) {
+		authp = *app;
+		if (authp->type == NS_LDAP_AUTH_NONE)
+			continue;
+		authstried++;
+		credp->auth.type = authp->type;
+		credp->auth.tlstype = authp->tlstype;
+		credp->auth.saslmech = authp->saslmech;
+		credp->auth.saslopt = authp->saslopt;
+
+		/*
+		 * For GSSAPI, host credential will be used. No admin
+		 * DN is needed. For other authentication methods,
+		 * we need to set admin.
+		 */
+		if (credp->auth.saslmech != NS_LDAP_SASL_GSSAPI) {
+			if ((rc = get_admin_dn(credp, &status,
+			    &error)) != NS_LDAP_SUCCESS) {
+				if (error != NULL)
+					goto out;
+				if (status == NS_CONFIG_NOTALLOW) {
+					mlen = snprintf(buffer, msgmax, "%s",
+					    gettext("Admin bind DN not "
+					    "configured"));
+					goto out;
+				}
+			}
+		}
+
+		rc = __ns_ldap_repAttr(NS_ADMIN_SHADOW_UPDATE, dn,
+		    (const ns_ldap_attr_t * const *)attrs,
+		    credp, 0, &error);
+		if (rc == NS_LDAP_SUCCESS)
+			goto out;
+
+		/*
+		 * Other errors might need to be added to this list, for
+		 * the current supported mechanisms this is sufficient.
+		 */
+		if (rc == NS_LDAP_INTERNAL &&
+		    error->pwd_mgmt.status == NS_PASSWD_GOOD &&
+		    (error->status == LDAP_INAPPROPRIATE_AUTH ||
+		    error->status == LDAP_INVALID_CREDENTIALS))
+			goto out;
+
+		/*
+		 * If there is error related to password policy,
+		 * return it to caller.
+		 */
+		if (rc == NS_LDAP_INTERNAL &&
+		    error->pwd_mgmt.status != NS_PASSWD_GOOD) {
+			rc = NS_LDAP_CONFIG;
+			status = NS_CONFIG_NOTALLOW;
+			(void) __ns_ldap_freeError(&error);
+			mlen = snprintf(buffer, msgmax, "%s",
+			    gettext("update failed due to "
+			    "password policy on server (%d)"),
+			    error->pwd_mgmt.status);
+			goto out;
+		}
+
+		/* we don't really care about the error, just clean it up */
+		if (error)
+			(void) __ns_ldap_freeError(&error);
+	}
+	if (authstried == 0) {
+		rc = NS_LDAP_CONFIG;
+		mlen = snprintf(buffer, msgmax, "%s",
+		    gettext("No legal LDAP authentication method configured"));
+		goto out;
+	}
+
+	rc = NS_LDAP_OP_FAILED;
+
+out:
+	if (credp != NULL)
+		(void) __ns_ldap_freeCred(&credp);
+
+	if (authpp != NULL)
+		(void) __ns_ldap_freeParam((void ***)&authpp);
+
+	if (error != NULL) {
+		mlen = snprintf(buffer, msgmax, "%s", error->message);
+		status = error->status;
+		(void) __ns_ldap_freeError(&error);
+	}
+
+	if (attrs != NULL) {
+		int i;
+		for (i = 0; attrs[i]; i++) {
+			free(attrs[i]->attrvalue);
+			free(attrs[i]);
+		}
+	}
+
+	config_info->len = rlen + mlen + 1;
+	config_info->str = malloc(config_info->len);
+	if (config_info->str == NULL) {
+		config_info->len = 0;
+		return;
+	}
+	result = (ldap_admin_mod_result_t *)config_info->str;
+	result->ns_err = rc;
+	result->status = status;
+	if (mlen != 0) {
+		result->msg_size = mlen + 1;
+		(void) strcpy(config_info->str + rlen, buffer);
+	}
+}
+
+/*
+ * Check to see if the door client's euid is 0 or if it has ALL zone privilege.
+ * return - 0 No or error
+ *          1 Yes
+ */
+static int
+is_root_or_all_privs(char *dc_str, ucred_t **ucp)
+{
+	const priv_set_t *ps;	/* door client */
+	priv_set_t *zs;		/* zone */
+	int rc = 0;
+
+	*ucp = NULL;
+
+	/* no more to do if door client's euid is 0 */
+	if (is_root(0, dc_str, ucp) == 1) {
+		ucred_free(*ucp);
+		return (1);
+	}
+
+	/* error if couldn't get the ucred_t */
+	if (*ucp == NULL)
+		return (0);
+
+	if ((ps = ucred_getprivset(*ucp, PRIV_EFFECTIVE)) != NULL) {
+		zs = priv_str_to_set("zone", ",", NULL);
+		if (priv_isequalset(ps, zs))
+			rc = 1; /* has all zone privs */
+		else {
+			if (current_admin.debug_level >= DBG_CANT_FIND)
+				logit("%s call failed (no all zone privs): "
+				    "caller pid %ld, uid %u, euid %u "
+				    "(if uid or euid is %u, it may "
+				    "be unavailable)\n", dc_str,
+				    ucred_getpid(*ucp), ucred_getruid(*ucp),
+				    ucred_geteuid(*ucp), -1);
+		}
+		priv_freeset(zs);
+	}
+
+	ucred_free(*ucp);
+	return (rc);
 }

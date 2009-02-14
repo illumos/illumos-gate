@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -38,10 +36,13 @@
 #include <lber.h>
 #include <ldap.h>
 #include <syslog.h>
+#include <stddef.h>
+#include <sys/mman.h>
 
 #include "ns_sldap.h"
 #include "ns_internal.h"
 #include "ns_connmgmt.h"
+#include "ns_cache_door.h"
 
 /* Additional headers for addTypedEntry Conversion routines */
 #include <pwd.h>
@@ -60,7 +61,8 @@
 #include <sys/tsol/tndb.h>
 #include <tsol/label.h>
 
-
+static int send_to_cachemgr(const char *,
+    ns_ldap_attr_t **, ns_ldap_error_t **);
 /*
  * If the rdn is a mapped attr:
  * 	return NS_LDAP_SUCCESS and a new_dn.
@@ -1038,8 +1040,8 @@ write_state_machine(
 				errmsg = NULL;
 			}
 
-			(void) sprintf(errstr,
-			    gettext(ldap_err2string(Errno)));
+			(void) snprintf(errstr, sizeof (errstr),
+			    "%s", ldap_err2string(Errno));
 			err = strdup(errstr);
 			if (pwd_status != NS_PASSWD_GOOD) {
 				MKERROR_PWD_MGMT(*errorp, Errno, err,
@@ -1157,6 +1159,89 @@ __ns_ldap_delAttr(
 	return (rc);
 }
 
+/* Retrieve the admin bind password from the configuration, if allowed. */
+static int
+get_admin_passwd(ns_cred_t *cred, ns_ldap_error_t **errorp)
+{
+	void	**paramVal = NULL;
+	int	rc, ldaprc;
+	char	*modparamVal = NULL;
+
+	/*
+	 * For GSSAPI/Kerberos, host credential is used, no need to get
+	 * admin bind password
+	 */
+	if (cred->auth.saslmech == NS_LDAP_SASL_GSSAPI)
+		return (NS_LDAP_SUCCESS);
+
+	/*
+	 * Retrieve admin bind password.
+	 * The admin bind password is available
+	 * only in the ldap_cachemgr process as
+	 * they are not exposed outside of that
+	 * process.
+	 */
+	paramVal = NULL;
+	if ((ldaprc = __ns_ldap_getParam(NS_LDAP_ADMIN_BINDPASSWD_P,
+	    &paramVal, errorp)) != NS_LDAP_SUCCESS)
+		return (ldaprc);
+	if (paramVal == NULL || *paramVal == NULL) {
+		rc = NS_LDAP_CONFIG;
+		*errorp = __s_api_make_error(NS_CONFIG_NODEFAULT,
+		    gettext("Admin bind password not configured"));
+		if (*errorp == NULL)
+			rc = NS_LDAP_MEMORY;
+		return (rc);
+	}
+	modparamVal = dvalue((char *)*paramVal);
+	(void) memset(*paramVal, 0, strlen((char *)*paramVal));
+	(void) __ns_ldap_freeParam(&paramVal);
+	if (modparamVal == NULL || *((char *)modparamVal) == '\0') {
+		if (modparamVal != NULL)
+			free(modparamVal);
+		rc = NS_LDAP_CONFIG;
+		*errorp = __s_api_make_error(NS_CONFIG_SYNTAX,
+		    gettext("bind password not valid"));
+		if (*errorp == NULL)
+			rc = NS_LDAP_MEMORY;
+		return (rc);
+	}
+
+	cred->cred.unix_cred.passwd = modparamVal;
+	return (NS_LDAP_SUCCESS);
+}
+
+boolean_t
+__ns_ldap_is_shadow_update_enabled() {
+
+	int **enable_shadow = NULL;
+
+	if (__ns_ldap_getParam(NS_LDAP_ENABLE_SHADOW_UPDATE_P,
+	    (void ***)&enable_shadow, NULL) != NS_LDAP_SUCCESS) {
+		return (B_FALSE);
+	}
+	if ((enable_shadow != NULL && *enable_shadow != NULL) &&
+	    (*enable_shadow[0] == NS_LDAP_ENABLE_SHADOW_UPDATE_TRUE)) {
+		(void) __ns_ldap_freeParam((void ***)&enable_shadow);
+		return (B_TRUE);
+	}
+	if (enable_shadow != NULL)
+		(void) __ns_ldap_freeParam((void ***)&enable_shadow);
+	return (B_FALSE);
+}
+
+/*
+ * __ns_ldap_repAttr modifies ldap attributes of the 'dn' entry stored
+ * on the LDAP server. 'service' indicates the type of database entries
+ * to modify. When the Native LDAP client is configured with 'shadow update
+ * enabled', Shadowshadow(4) entries can only be modified by privileged users.
+ * Such users use the NS_LDAP_UPDATE_SHADOW flag to indicate the call is
+ * for such a shadow(4) update, which would be forwarded to ldap_cachemgr
+ * for performing the LDAP modify operation. ldap_cachemgr would call
+ * this function again and use the special service NS_ADMIN_SHADOW_UPDATE
+ * to identify itself, so that admin credential would be obtained and
+ * the actual LDAP modify operation be done.
+ */
 /*ARGSUSED*/
 int
 __ns_ldap_repAttr(
@@ -1169,6 +1254,8 @@ __ns_ldap_repAttr(
 {
 	LDAPMod		**mods;
 	int		rc = 0;
+	boolean_t	priv;
+	boolean_t	shadow_update_enabled = B_FALSE;
 
 #ifdef DEBUG
 	(void) fprintf(stderr, "__ns_ldap_repAttr START\n");
@@ -1176,13 +1263,59 @@ __ns_ldap_repAttr(
 	*errorp = NULL;
 
 	/* Sanity check */
-	if ((attr == NULL) || (*attr == NULL) ||
-	    (dn == NULL) || (cred == NULL))
+	if (attr == NULL || *attr == NULL || dn == NULL)
 		return (NS_LDAP_INVALID_PARAM);
-	mods = __s_api_makeModList(service, attr, LDAP_MOD_REPLACE, flags);
-	if (mods == NULL) {
-		return (NS_LDAP_MEMORY);
+
+	/* Privileged shadow modify? */
+	if ((flags & NS_LDAP_UPDATE_SHADOW) != 0 &&
+	    strcmp(service, "shadow") == 0) {
+
+		/* Shadow update enabled ? If not, error out */
+		shadow_update_enabled = __ns_ldap_is_shadow_update_enabled();
+		if (!shadow_update_enabled) {
+			*errorp = __s_api_make_error(NS_CONFIG_NOTALLOW,
+			    gettext("Shadow Update is not enabled"));
+			return (NS_LDAP_CONFIG);
+		}
+
+		/* privileged shadow modify requires euid 0 or all zone privs */
+		priv = (geteuid() == 0);
+		if (!priv) {
+			priv_set_t *ps = priv_allocset();	/* caller */
+			priv_set_t *zs;				/* zone */
+
+			(void) getppriv(PRIV_EFFECTIVE, ps);
+			zs = priv_str_to_set("zone", ",", NULL);
+			priv = priv_isequalset(ps, zs);
+			priv_freeset(ps);
+			priv_freeset(zs);
+		}
+		if (!priv)
+			return (NS_LDAP_OP_FAILED);
+
+		rc = send_to_cachemgr(dn, (ns_ldap_attr_t **)attr, errorp);
+		return (rc);
 	}
+
+	if (cred == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+
+	/*
+	 * If service is NS_ADMIN_SHADOW_UPDATE, the caller should be
+	 * ldap_cachemgr. We need to get the admin cred to do work.
+	 * If the caller is not ldap_cachemgr, but use the service
+	 * NS_ADMIN_SHADOW_UPDATE, get_admin_passwd() will fail,
+	 * as the admin cred is not available to the caller.
+	 */
+	if (strcmp(service, NS_ADMIN_SHADOW_UPDATE) == 0) {
+		if ((rc = get_admin_passwd((ns_cred_t *)cred, errorp)) !=
+		    NS_LDAP_SUCCESS)
+			return (rc);
+	}
+
+	mods = __s_api_makeModList(service, attr, LDAP_MOD_REPLACE, flags);
+	if (mods == NULL)
+		return (NS_LDAP_MEMORY);
 
 	rc = write_state_machine(LDAP_REQ_MODIFY,
 	    (char *)dn, mods, cred, flags, errorp);
@@ -1190,7 +1323,6 @@ __ns_ldap_repAttr(
 	freeModList(mods);
 	return (rc);
 }
-
 
 /*ARGSUSED*/
 int
@@ -3792,4 +3924,158 @@ __s_api_append_default_basedn(
 
 	(void) __ns_ldap_freeParam(&param);
 	return (NS_LDAP_SUCCESS);
+}
+
+/*
+ * Flatten the input ns_ldap_attr_t list, 'attr', and convert it into an
+ * ldap_strlist_t structure in buffer 'buf', to be used by ldap_cachemgr.
+ * The output contains a count, a list of offsets, which show where the
+ * corresponding copied attribute type and attribute value are located.
+ * For example, for dn=aaaa, userpassword=bbbb, shadowlastchange=cccc,
+ * the output is the ldap_strlist_t structure with: ldap_count = 6,
+ * (buf + ldap_offsets[0]) -> "dn"
+ * (buf + ldap_offsets[1]) -> "aaaa"
+ * (buf + ldap_offsets[2]) -> "userPassword"
+ * (buf + ldap_offsets[3]) -> "bbbb"
+ * (buf + ldap_offsets[4]) -> "shadowlastchange"
+ * (buf + ldap_offsets[5]) -> "cccc"
+ * and all the string data shown above copied into the buffer after
+ * the offset array. The total length of the data will be the return
+ * value, or -1 if error.
+ */
+static int
+attr2list(const char *dn, ns_ldap_attr_t **attr,
+    char *buf, int bufsize)
+{
+	int		c = 0;
+	char		*ap;
+	int		ao;
+	ldap_strlist_t	*al = (ldap_strlist_t *)buf;
+	ns_ldap_attr_t	*a = (ns_ldap_attr_t *)*attr;
+	ns_ldap_attr_t	**aptr = (ns_ldap_attr_t **)attr;
+
+	/* bufsize > strlen(dn) + strlen("dn") + 1 ('\0') */
+	if ((strlen(dn) + 2 + 1) >= bufsize)
+		return (-1);
+
+	/* count number of attributes */
+	while (*aptr++)
+		c++;
+	al->ldap_count = 2 + c * 2;
+	ao = sizeof (al->ldap_count) + sizeof (al->ldap_offsets[0]) *
+	    al->ldap_count;
+	if (ao > bufsize)
+		return (-1);
+	al->ldap_offsets[0] = ao;
+	ap = buf + ao;
+	ao += 3;
+
+	/* copy entry DN */
+	if (ao > bufsize)
+		return (-1);
+	(void) strlcpy(ap, "dn", bufsize);
+	ap += 3;
+
+	al->ldap_offsets[1] = ao;
+	ao += strlen(dn) + 1;
+	if (ao > bufsize)
+		return (-1);
+	(void) strlcpy(ap, dn, bufsize);
+	ap = buf + ao;
+
+	aptr = attr;
+	for (c = 2; c < al->ldap_count; c++, aptr++) {
+		a = *aptr;
+		if (a->attrname == NULL || a->attrvalue == NULL ||
+		    a->value_count != 1 || a->attrvalue[0] == NULL)
+			return (-1);
+		al->ldap_offsets[c] = ao;
+		ao += strlen(a->attrname) + 1;
+		if (ao > bufsize)
+			return (-1);
+		(void) strlcpy(ap, a->attrname, bufsize);
+		ap = buf + ao;
+
+		c++;
+		al->ldap_offsets[c] = ao;
+		ao += strlen(a->attrvalue[0]) + 1;
+		(void) strlcpy(ap, a->attrvalue[0], bufsize);
+		ap = buf + ao;
+	};
+
+	return (ao);
+}
+
+/*
+ * Send a modify request to the ldap_cachemgr daemon
+ * which will use the admin credential to perform the
+ * operation.
+ */
+
+static int
+send_to_cachemgr(
+	const char *dn,
+	ns_ldap_attr_t **attr,
+	ns_ldap_error_t **errorp)
+{
+	union {
+		ldap_data_t	s_d;
+		char		s_b[DOORBUFFERSIZE];
+	} space;
+
+	ldap_data_t		*sptr;
+	int			ndata;
+	int			adata;
+	int			len;
+	int			rc;
+	char			errstr[MAXERROR];
+	ldap_admin_mod_result_t	*admin_result;
+
+	*errorp = NULL;
+	(void) memset(space.s_b, 0, DOORBUFFERSIZE);
+	len = attr2list(dn, attr, (char *)&space.s_d.ldap_call.ldap_u.strlist,
+	    sizeof (space) - offsetof(ldap_return_t, ldap_u));
+	if (len <= 0)
+		return (NS_LDAP_INVALID_PARAM);
+
+	adata = sizeof (ldap_call_t) + len;
+	ndata = sizeof (space);
+	space.s_d.ldap_call.ldap_callnumber = ADMINMODIFY;
+	sptr = &space.s_d;
+
+	switch (__ns_ldap_trydoorcall(&sptr, &ndata, &adata)) {
+	case NS_CACHE_SUCCESS:
+		break;
+	case NS_CACHE_NOTFOUND:
+		(void) snprintf(errstr, sizeof (errstr),
+		    gettext("Door call ADMINMODIFY to "
+		    "ldap_cachemgr failed - error: %d"),
+		    space.s_d.ldap_ret.ldap_errno);
+		MKERROR(LOG_WARNING, *errorp, NS_CONFIG_CACHEMGR,
+		    strdup(errstr), NULL);
+		return (NS_LDAP_OP_FAILED);
+		break;
+	default:
+		return (NS_LDAP_OP_FAILED);
+	}
+
+	admin_result = &sptr->ldap_ret.ldap_u.admin_result;
+	if (admin_result->ns_err == NS_LDAP_SUCCESS)
+		rc = NS_LDAP_SUCCESS;
+	else {
+		rc = admin_result->ns_err;
+		if (admin_result->msg_size == 0)
+			*errorp = __s_api_make_error(admin_result->status,
+			    NULL);
+		else
+			*errorp = __s_api_make_error(admin_result->status,
+			    admin_result->msg);
+	}
+
+	/* clean up the door call */
+	if (sptr != &space.s_d) {
+		(void) munmap((char *)sptr, ndata);
+	}
+
+	return (rc);
 }

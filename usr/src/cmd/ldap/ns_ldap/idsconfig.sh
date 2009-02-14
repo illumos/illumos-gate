@@ -1,7 +1,5 @@
 #!/bin/sh
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -24,7 +22,7 @@
 #
 # idsconfig -- script to setup iDS 5.x/6.x for Native LDAP II.
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -150,7 +148,8 @@ EOF
  16  Search Time Limit             : $LDAP_SEARCH_TIME_LIMIT
  17  Profile Time to Live          : $LDAP_PROFILE_TTL
  18  Bind Limit                    : $LDAP_BIND_LIMIT
- 19  Service Search Descriptors Menu
+ 19  Enable shadow update          : $LDAP_ENABLE_SHADOW_UPDATE
+ 20  Service Search Descriptors Menu
 
 EOF
     ;;
@@ -468,6 +467,43 @@ HELP - No valid suffixes (naming contexts) are available on server
        ${IDS_SERVER}:${IDS_PORT}.
        You must set an LDAP Base DN that can be contained in 
        an existing suffix.
+
+EOF
+    ;;
+    enable_shadow_update_help) cat <<EOF
+
+HELP - Enter 'y' to set up the LDAP server for shadow update.
+       The setup will add an administrator identity/credential
+       and modify the necessary access controls for the client
+       to update shadow(4) data on the LDAP server. If sasl/GSSAPI
+       is in use, the Kerberos host principal will be used as the
+       administrator identity.
+
+       Shadow data is used for password aging and account locking.
+       Please refer to the shadow(4) manual page for details.
+
+EOF
+    ;;
+    add_admin_cred_help) cat <<EOF
+
+HELP - Start the setup to add an administrator identity/credential
+       and to modify access controls for the client to update
+       shadow(4) data on the LDAP server.
+
+       Shadow data is used for password aging and account locking.
+       Please refer to the shadow(4) manual page for details.
+
+EOF
+    ;;
+    use_host_principal_help) cat <<EOF
+
+HELP - A profile with a 'sasl/GSSAPI' authentication method and a 'self'
+       credential level is detected, enter 'y' to modify the necessary
+       access controls for allowing the client to update shadow(4) data
+       on the LDAP server.
+
+       Shadow data is used for password aging and account locking.
+       Please refer to the shadow(4) manual page for details.
 
 EOF
     ;;
@@ -942,6 +978,7 @@ init()
     BACKUP=no_ldap	# backup suffix
     HOST=""		# NULL or <hostname>
     NAWK="/usr/bin/nawk"
+    RM="/usr/bin/rm"
 
     DOM=""              # Set to NULL
     # If DNS domain (resolv.conf) exists use that, otherwise use domainname.
@@ -963,8 +1000,13 @@ init()
     # idsconfig specific variables.
     INPUT_FILE=""
     OUTPUT_FILE=""
-    NEED_PROXY=0        # 0 = No Proxy, 1 = Create Proxy.
+    LDAP_ENABLE_SHADOW_UPDATE="FALSE"
+    NEED_PROXY=0        # 0 = No Proxy,    1 = Create Proxy.
+    NEED_ADMIN=0        # 0 = No Admin,    1 = Create Admin.
+    NEED_HOSTACL=0      # 0 = No Host ACL, 1 = Create Host ACL.
+    EXISTING_PROFILE=0
     LDAP_PROXYAGENT=""
+    LDAP_ADMINDN=""
     LDAP_SUFFIX=""
     LDAP_DOMAIN=$DOM	# domainname on Server (default value)
     GEN_CMD=""
@@ -1037,6 +1079,8 @@ init()
     export LDAP_BASEDN LDAP_ROOTPWF
     export LDAP_DOMAIN LDAP_SUFFIX LDAP_PROXYAGENT LDAP_PROXYAGENT_CRED
     export NEED_PROXY
+    export LDAP_ENABLE_SHADOW_UPDATE LDAP_ADMINDN LDAP_ADMIN_CRED
+    export NEED_ADMIN NEED_HOSTACL EXISTING_PROFILE
     export LDAP_PROFILE_NAME LDAP_BASEDN LDAP_SERVER_LIST 
     export LDAP_AUTHMETHOD LDAP_FOLLOWREF LDAP_SEARCH_SCOPE LDAP_SEARCH_TIME_LIMIT
     export LDAP_PREF_SRVLIST LDAP_PROFILE_TTL LDAP_CRED_LEVEL LDAP_BIND_LIMIT
@@ -1079,12 +1123,21 @@ disp_full_debug()
     [ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_SEARCH_TIME_LIMIT = $LDAP_SEARCH_TIME_LIMIT"
     [ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_PROFILE_TTL = $LDAP_PROFILE_TTL"
     [ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_BIND_LIMIT = $LDAP_BIND_LIMIT"
+    [ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_ENABLE_SHADOW_UPDATE = $LDAP_ENABLE_SHADOW_UPDATE"
 
     # Only display proxy stuff if needed.
+    [ $DEBUG -eq 1 ] && ${ECHO} "  NEED_PROXY = $NEED_PROXY"
     if [ $NEED_PROXY -eq  1 ]; then
 	[ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_PROXYAGENT = $LDAP_PROXYAGENT"
 	[ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_PROXYAGENT_CRED = $LDAP_PROXYAGENT_CRED"
-	[ $DEBUG -eq 1 ] && ${ECHO} "  NEED_PROXY = $NEED_PROXY"
+    fi
+
+    # Only display admin credential if needed.
+    [ $DEBUG -eq 1 ] && ${ECHO} "  NEED_ADMIN = $NEED_ADMIN"
+    [ $DEBUG -eq 1 ] && ${ECHO} "  NEED_HOSTACL = $NEED_HOSTACL"
+    if [ $NEED_ADMIN -eq  1 ]; then
+	[ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_ADMINDN = $LDAP_ADMINDN"
+	[ $DEBUG -eq 1 ] && ${ECHO} "  LDAP_ADMIN_CRED = $LDAP_ADMIN_CRED"
     fi
 
     # Service Search Descriptors are a special case.
@@ -1351,6 +1404,20 @@ get_basedn()
     done
 }
 
+#
+# get_want_shadow_update(): Ask user if want to enable shadow update?
+#
+get_want_shadow_update()
+{
+    MSG="Do you want to enable shadow update (y/n/h)?"
+    get_confirm "$MSG" "n" "enable_shadow_update_help"
+    if [ $? -eq 1 ]; then
+	LDAP_ENABLE_SHADOW_UPDATE="TRUE"
+    else
+	LDAP_ENABLE_SHADOW_UPDATE="FALSE"
+    fi
+}
+
 get_krb_realm() {
 
     # To upper cases
@@ -1612,8 +1679,11 @@ EOF
 #
 gssapi_setup() {
 
+	# assume sasl/GSSAPI is supported by the ldap server and may be used
+	GSSAPI_AUTH_MAY_BE_USED=1
 	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"\" -s base \"objectclass=*\" supportedSASLMechanisms | ${GREP} GSSAPI ${VERB}"
 	if [ $? -ne 0 ]; then
+		GSSAPI_AUTH_MAY_BE_USED=0
 		${ECHO} "  sasl/GSSAPI is not supported by this LDAP server"
 		return
 	fi
@@ -1622,7 +1692,7 @@ gssapi_setup() {
 	if [ $? -eq 0 ]; then
 		${ECHO}
 		${ECHO} "GSSAPI is not set up."
-		${ECHO} "sasl/GSSAPI bind may not workif it's not set up before."
+		${ECHO} "sasl/GSSAPI bind may not work if it's not set up first."
 	else
 		get_krb_realm
 		add_id_mapping_rules
@@ -1647,6 +1717,7 @@ EOF
 
 }
 gssapi_setup_auto() {
+	GSSAPI_AUTH_MAY_BE_USED=0
 	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"\" -s base \"objectclass=*\" supportedSASLMechanisms | ${GREP} GSSAPI ${VERB}"
 	if [ $? -ne 0 ]; then
 		${ECHO}
@@ -1661,6 +1732,7 @@ gssapi_setup_auto() {
 		${ECHO}
 		return
 	fi
+	GSSAPI_AUTH_MAY_BE_USED=1
 	if [ -z "${LDAP_GSSAPI_PROFILE}" ]; then
 		${ECHO}
 		${ECHO} "LDAP_GSSAPI_PROFILE is not set. Default is gssapi_${LDAP_KRB_REALM}"
@@ -1694,7 +1766,30 @@ get_profile_name()
 	# Search to see if profile name already exists.
 	eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=${ANS},ou=profile,${LDAP_BASEDN}\" -s base \"objectclass=*\" ${VERB}"
 	if [ $? -eq 0 ]; then
-	    get_confirm_nodef "Are you sure you want to overwire profile cn=${ANS}?"
+
+	    cat << EOF
+
+Profile '${ANS}' already exists, it is possible to enable
+shadow update now. idsconfig will exit after shadow update
+is enabled. You can also continue to overwrite the profile 
+or create a new one and be given the chance to enable
+shadow update later.
+
+EOF
+
+	    MSG="Just enable shadow update (y/n/h)?"
+	    get_confirm "$MSG" "n" "enable_shadow_update_help"
+	    if [ $? -eq 1 ]; then
+	        [ $DEBUG -eq 1 ] && ${ECHO} "set up shadow update"
+	        LDAP_ENABLE_SHADOW_UPDATE=TRUE
+		# display alternate messages
+		EXISTING_PROFILE=1
+	        # Set Profile Name.
+	        LDAP_PROFILE_NAME=$ANS
+	        return 0  # set up credentials for shadow update.
+	    fi
+
+	    get_confirm_nodef "Are you sure you want to overwrite profile cn=${ANS}?"
 	    if [ $? -eq 1 ]; then
 		DEL_OLD_PROFILE=1
 		return 0  # Replace old profile name.
@@ -2423,6 +2518,248 @@ ssd_2_profile()
     GEN_CMD="${GEN_CMD} `cat ${GEN_TMPFILE}`"
 }
 
+#
+# get_adminDN(): Get the admin DN.
+#
+get_adminDN()
+{
+    LDAP_ADMINDN="cn=admin,ou=profile,${LDAP_BASEDN}"  # default
+    get_ans "Enter DN for the administrator:" "$LDAP_ADMINDN"
+    LDAP_ADMINDN=$ANS
+    [ $DEBUG -eq 1 ] && ${ECHO} "LDAP_ADMINDN = $LDAP_ADMINDN"
+}
+
+#
+# get_admin_pw(): Get the admin passwd.
+#
+get_admin_pw()
+{
+    get_passwd "Enter passwd for the administrator:"
+    LDAP_ADMIN_CRED=$ANS
+    [ $DEBUG -eq 1 ] && ${ECHO} "LDAP_ADMIN_CRED = $LDAP_ADMIN_CRED"
+}
+
+#
+# add_admin(): Add an admin entry for nameservice for updating shadow data.
+#
+add_admin()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In add_admin()"
+
+    # Check if the admin user already exists.
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_ADMINDN}\" -s base \"objectclass=*\" ${VERB}"
+    if [ $? -eq 0 ]; then
+	MSG="Administrator ${LDAP_ADMINDN} already exists."
+	if [ $EXISTING_PROFILE -eq 1 ]; then
+	    ${ECHO} "  NOT ADDED: $MSG"
+	else
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`	
+	fi
+	return 0
+    fi
+
+    # Get cn and sn names from LDAP_ADMINDN.
+    cn_tmp=`${ECHO} ${LDAP_ADMINDN} | cut -f1 -d, | cut -f2 -d=`
+
+    # Create the tmp file to add.
+    ( cat <<EOF
+dn: ${LDAP_ADMINDN}
+cn: ${cn_tmp}
+sn: ${cn_tmp}
+objectclass: top
+objectclass: person
+userpassword: ${LDAP_ADMIN_CRED}
+EOF
+) > ${TMPDIR}/admin
+    
+    # Add the entry.
+    ${EVAL} "${LDAPMODIFY} -a ${LDAP_ARGS} -f ${TMPDIR}/admin ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "  ERROR: Adding administrator identity failed!"
+	cleanup
+	exit 1
+    fi
+
+    ${RM} -f ${TMPDIR}/admin
+
+    # Display message that the administrator identity is added.
+    MSG="Administrator identity ${LDAP_ADMINDN}"
+    if [ $EXISTING_PROFILE -eq 1 ]; then
+	${ECHO} "  ADDED: $MSG."
+    else
+	${ECHO} "  ${STEP}. $MSG added."
+	STEP=`expr $STEP + 1`
+    fi
+}
+
+#
+# allow_admin_write_shadow(): Give Admin write permission for shadow data.
+#
+allow_admin_write_shadow()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In allow_admin_write_shadow()"
+
+    # Set ACI Name
+    ADMIN_ACI_NAME="LDAP_Naming_Services_admin_shadow_write"
+
+    # Search for ACI_NAME
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" \
+    -s base objectclass=* aci > ${TMPDIR}/chk_adminwrite_aci 2>&1"
+    ${GREP} "${ADMIN_ACI_NAME}" ${TMPDIR}/chk_adminwrite_aci > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+	MSG="Admin ACI ${ADMIN_ACI_NAME} already exists for ${LDAP_BASEDN}."
+	if [ $EXISTING_PROFILE -eq 1 ]; then
+	    ${ECHO} "  NOT SET: $MSG"
+	else
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`	
+	fi
+	return 0
+    fi
+
+    # Create the tmp file to add.
+    ( cat <<EOF
+dn: ${LDAP_BASEDN}
+changetype: modify
+add: aci
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||userPassword||loginShell||homeDirectory||gecos")(version 3.0; acl ${ADMIN_ACI_NAME}; allow (write) userdn = "ldap:///${LDAP_ADMINDN}";)
+EOF
+) > ${TMPDIR}/admin_write
+    
+    # Add the entry.
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/admin_write ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "  ERROR: Allow ${LDAP_ADMINDN} to write shadow data failed!"
+	cleanup
+	exit 1
+    fi
+
+    ${RM} -f ${TMPDIR}/admin_write
+    # Display message that the administrator ACL is set.
+    MSG="Give ${LDAP_ADMINDN} write permission for shadow."
+    if [ $EXISTING_PROFILE -eq 1 ]; then
+	${ECHO} "  ACI SET: $MSG"
+    else
+	${ECHO} "  ${STEP}. $MSG"
+	STEP=`expr $STEP + 1`
+    fi
+}
+
+#
+# allow_host_write_shadow(): Give host principal write permission
+# for shadow data.
+#
+allow_host_write_shadow()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In allow_host_write_shadow()"
+
+    # Set ACI Name
+    HOST_ACI_NAME="LDAP_Naming_Services_host_shadow_write"
+
+    # Search for ACI_NAME
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" -s base objectclass=* aci > ${TMPDIR}/chk_hostwrite_aci 2>&1"
+    ${GREP} "${HOST_ACI_NAME}" ${TMPDIR}/chk_hostwrite_aci > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+	MSG="Host ACI ${HOST_ACI_NAME} already exists for ${LDAP_BASEDN}."
+	if [ $EXISTING_PROFILE -eq 1 ]; then
+	    ${ECHO} "  NOT ADDED: $MSG"
+	else
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`
+	fi
+	return 0
+    fi
+
+    # Create the tmp file to add.
+    ( cat <<EOF
+dn: ${LDAP_BASEDN}
+changetype: modify
+add: aci
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||userPassword||loginShell||homeDirectory||gecos")(version 3.0; acl ${HOST_ACI_NAME}; allow (read, write) authmethod="sasl GSSAPI" and userdn = "ldap:///cn=*+ipHostNumber=*,ou=Hosts,${LDAP_BASEDN}";)
+EOF
+) > ${TMPDIR}/host_write
+    
+    # Add the entry.
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/host_write ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "  ERROR: Allow Host Principal to write shadow data failed!"
+	cleanup
+	exit 1
+    fi
+
+    ${RM} -f ${TMPDIR}/host_write
+    MSG="Give host principal write permission for shadow."
+    if [ $EXISTING_PROFILE -eq 1 ]; then
+	${ECHO} "  ACI SET: $MSG"
+    else
+	${ECHO} "  ${STEP}. $MSG"
+	STEP=`expr $STEP + 1`
+    fi
+}
+
+#
+# Set up shadow update
+#
+setup_shadow_update() {
+    [ $DEBUG -eq 1 ] && ${ECHO} "In setup_shadow_update()"
+
+    # get content of the profile
+    PROFILE_OUT=${TMPDIR}/prof_tmpfile
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=${LDAP_PROFILE_NAME},ou=profile,${LDAP_BASEDN}\" -s base \"objectclass=*\" > $PROFILE_OUT 2>&1"
+    ${GREP} -i cn $PROFILE_OUT >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+	[ $DEBUG -eq 1 ] && ${ECHO} "Profile ${LDAP_PROFILE_NAME} does not exist"
+	${RM} ${PROFILE_OUT}
+	return
+    fi
+
+    # Search to see if authenticationMethod has 'GSSAPI' and
+    # credentialLevel has 'self'. If so, ask to use the
+    # host principal for shadow update
+    if [ $GSSAPI_AUTH_MAY_BE_USED -eq 1 ]; then
+	if ${GREP} authenticationMethod $PROFILE_OUT | ${GREP} GSSAPI >/dev/null 2>&1
+	then
+	    if ${GREP} credentialLevel $PROFILE_OUT | ${GREP} self >/dev/null 2>&1
+	    then
+		NEED_HOSTACL=1
+	    fi
+	fi
+	${RM} ${PROFILE_OUT}
+	[ $DEBUG -eq 1 ] && ${ECHO} "NEED_HOSTACL = $NEED_HOSTACL"
+
+	if [ $NEED_HOSTACL -eq 1 ]; then
+	    MSG="Use host principal for shadow data update (y/n/h)?"
+	    get_confirm "$MSG" "y" "use_host_principal_help"
+	    if [ $? -eq 1 ]; then
+		allow_host_write_shadow
+		modify_top_aci
+	        ${ECHO} ""
+		${ECHO} "  Shadow update has been enabled."
+	    else
+	        ${ECHO} ""
+    		${ECHO} "  Shadow update may not work."
+	    fi
+	    return
+	fi
+    fi
+
+    MSG="Add the administrator identity (y/n/h)?"
+    get_confirm "$MSG" "y" "add_admin_cred_help"
+    if [ $? -eq 1 ]; then
+	get_adminDN
+	get_admin_pw
+	add_admin
+	allow_admin_write_shadow
+	modify_top_aci
+        ${ECHO} ""
+	${ECHO} "  Shadow update has been enabled."
+	return
+    fi
+
+    ${ECHO} "  No administrator identity specified, shadow update may not work."
+}
+
 
 #
 # prompt_config_info(): This function prompts the user for the config
@@ -2459,6 +2796,12 @@ prompt_config_info()
     gssapi_setup
 
     get_profile_name
+
+    if [ "$LDAP_ENABLE_SHADOW_UPDATE" = "TRUE" ];then
+	setup_shadow_update
+	exit 0
+    fi
+
     get_srv_list
     get_pref_srv
     get_search_scope
@@ -2509,6 +2852,9 @@ prompt_config_info()
     get_prof_ttl
     get_bind_limit
 
+    # Ask whether to enable shadow update
+    get_want_shadow_update
+
     # Reset the sdd_file and prompt user for SSD.  Will use menus
     # to build an SSD File.
     reset_ssd_file
@@ -2547,7 +2893,6 @@ get_proxy_pw()
     LDAP_PROXYAGENT_CRED=$ANS
 }
 
-
 #
 # display_summary(): Display a summary of values entered and let the 
 #                    user modify values at will.
@@ -2565,18 +2910,19 @@ display_summary()
     TBL5="get_timelimit get_sizelimit get_want_crypt"
     TBL6="get_srv_authMethod_pam get_srv_authMethod_key get_srv_authMethod_cmd"
     TBL7="get_srch_time get_prof_ttl get_bind_limit"
-    TBL8="prompt_ssd"
-    FUNC_TBL="$TBL1 $TBL2 $TBL3 $TBL4 $TBL5 $TBL6 $TBL7 $TBL8"
+    TBL8="get_want_shadow_update"
+    TBL9="prompt_ssd"
+    FUNC_TBL="$TBL1 $TBL2 $TBL3 $TBL4 $TBL5 $TBL6 $TBL7 $TBL8 $TBL9"
 
     # Since menu prompt string is long, set here.
-    _MENU_PROMPT="Enter config value to change: (1-19 0=commit changes)"
+    _MENU_PROMPT="Enter config value to change: (1-20 0=commit changes)"
 
     # Infinite loop.  Test for 0, and break in loop.
     while :
     do
 	# Display menu and get value in range.
 	display_msg summary_menu
-	get_menu_choice "${_MENU_PROMPT}" "0" "19" "0"
+	get_menu_choice "${_MENU_PROMPT}" "0" "20" "0"
 	_CH=$MN_CH
 	
 	# Make sure where not exiting.
@@ -2601,6 +2947,23 @@ display_summary()
 	    ${ECHO} "WARNING: Since Authentication method is 'none'."
 	    ${ECHO} "         Credential level will be set to 'anonymous'."
 	    LDAP_CRED_LEVEL="anonymous"
+	fi
+    fi
+
+    # If shadow update is enabled, set up administrator credential
+    if [ "$LDAP_ENABLE_SHADOW_UPDATE" = "TRUE" ]; then
+	NEED_ADMIN=1
+	if ${ECHO} "$LDAP_CRED_LEVEL" | ${GREP} "self" > /dev/null 2>&1; then
+	    if ${ECHO} "$LDAP_AUTHMETHOD" | ${GREP} "GSSAPI" > /dev/null 2>&1; then
+		NEED_HOSTACL=1
+		NEED_ADMIN=0
+	    fi
+	fi
+        [ $DEBUG -eq 1 ] && ${ECHO} "NEED_HOSTACL = $NEED_HOSTACL"
+        [ $DEBUG -eq 1 ] && ${ECHO} "NEED_ADMIN   = $NEED_ADMIN"
+	if [ $NEED_ADMIN -eq 1 ]; then
+	    get_adminDN
+	    get_admin_pw
 	fi
     fi
 
@@ -2656,6 +3019,9 @@ NEED_PROXY=$NEED_PROXY
 NEED_TIME=$NEED_TIME
 NEED_SIZE=$NEED_SIZE
 NEED_CRYPT=$NEED_CRYPT
+NEED_ADMIN=$NEED_ADMIN
+NEED_HOSTACL=$NEED_HOSTACL
+EXISTING_PROFILE=$EXISTING_PROFILE
 
 # LDAP PROFILE related defaults
 LDAP_PROFILE_NAME="$LDAP_PROFILE_NAME"
@@ -2681,10 +3047,17 @@ LDAP_BIND_LIMIT=$LDAP_BIND_LIMIT
 LDAP_PROXYAGENT="$LDAP_PROXYAGENT"
 LDAP_PROXYAGENT_CRED=$LDAP_PROXYAGENT_CRED
 
+# enableShadowUpdate flag and Administrator credential
+LDAP_ENABLE_SHADOW_UPDATE=$LDAP_ENABLE_SHADOW_UPDATE
+LDAP_ADMINDN="$LDAP_ADMINDN"
+LDAP_ADMIN_CRED=$LDAP_ADMIN_CRED
+
 # Export all the variables (just in case)
 export IDS_HOME IDS_PORT LDAP_ROOTDN LDAP_ROOTPWD LDAP_SERVER_LIST LDAP_BASEDN
 export LDAP_DOMAIN LDAP_SUFFIX LDAP_PROXYAGENT LDAP_PROXYAGENT_CRED
 export NEED_PROXY
+export LDAP_ENABLE_SHADOW_UPDATE LDAP_ADMINDN LDAP_ADMIN_CRED
+export NEED_ADMIN NEED_HOSTACL EXISTING_PROFILE
 export LDAP_PROFILE_NAME LDAP_BASEDN LDAP_SERVER_LIST 
 export LDAP_AUTHMETHOD LDAP_FOLLOWREF LDAP_SEARCH_SCOPE LDAP_SEARCH_TIME_LIMIT
 export LDAP_PREF_SRVLIST LDAP_PROFILE_TTL LDAP_CRED_LEVEL LDAP_BIND_LIMIT
@@ -4113,11 +4486,38 @@ modify_top_aci()
 	cleanup
 	exit 1
     fi
+
+    # Display "already exists" message if necessary. For shadow update,
+    # check also if the deny self-write to userPassword has been done.
+    # If not, more to do, don't display the message.
+    MSG="Top level ACI ${ACI_NAME} already exists for ${LDAP_BASEDN}."
     ${GREP} "${ACI_NAME}" ${TMPDIR}/chk_top_aci > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-	${ECHO} "  ${STEP}. Top level ACI ${ACI_NAME} already exists for ${LDAP_BASEDN}."
-	STEP=`expr $STEP + 1`
-	return 0
+	if [ "$LDAP_ENABLE_SHADOW_UPDATE" != "TRUE" ];then
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`
+	    return 0
+	else
+	    ${GREP} "${ACI_NAME}" ${TMPDIR}/chk_top_aci | ${GREP} -i  \
+	    userPassword > /dev/null 2>&1
+	    if [ $? -eq 0 ]; then
+		# userPassword is already on the deny list, no more to do
+		if [ $EXISTING_PROFILE -eq 1 ];then
+		    ${ECHO} "  NOT SET: $MSG"
+		else
+		    ${ECHO} "  ${STEP}. $MSG"
+		    STEP=`expr $STEP + 1`
+		fi
+	        return 0
+	    fi
+	fi
+    fi
+
+    # if shadow update is enabled, also deny self-write to userPassword
+    if [ "$LDAP_ENABLE_SHADOW_UPDATE" = "TRUE" ];then
+	PWD_SELF_CHANGE="userPassword||"
+    else
+	PWD_SELF_CHANGE=""
     fi
 
     # Crate LDIF for top level ACI.
@@ -4125,7 +4525,7 @@ modify_top_aci()
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (targetattr = "cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAuditAlways||SolarisAuditNever||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
+aci: (targetattr = "${PWD_SELF_CHANGE}cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAuditAlways||SolarisAuditNever||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
 -
 EOF
 ) > ${TMPDIR}/top_aci
@@ -4139,10 +4539,14 @@ EOF
     fi
 
     # Display message that schema is updated.
-    ${ECHO} "  ${STEP}. ACI for ${LDAP_BASEDN} modified to disable self modify."
-    STEP=`expr $STEP + 1`
+    MSG="ACI for ${LDAP_BASEDN} modified to disable self modify."
+    if [ $EXISTING_PROFILE -eq 1 ];then
+	${ECHO} "  ACI SET: $MSG"
+    else
+	${ECHO} "  ${STEP}. $MSG"
+	STEP=`expr $STEP + 1`
+    fi
 }
-
 
 #
 # add_vlv_aci(): Add access control information (aci) for VLV.
@@ -4516,7 +4920,6 @@ EOF
     STEP=`expr $STEP + 1`
 }
 
-
 #
 # allow_proxy_read_pw(): Give Proxy Agent read permission for password.
 #
@@ -4557,7 +4960,6 @@ EOF
     ${ECHO} "  ${STEP}. Give ${LDAP_PROXYAGENT} read permission for password."
     STEP=`expr $STEP + 1`
 }
-
 
 #
 # add_profile(): Add client profile to server.
@@ -4755,6 +5157,18 @@ add_vlv_aci
 if [ $NEED_PROXY -eq 1 ]; then
     add_proxyagent
     allow_proxy_read_pw
+fi
+
+# If admin needed for shadow update, Add the administrator identity and
+# give write permission for shadow.
+if [ $NEED_ADMIN -eq 1 ]; then
+    add_admin
+    allow_admin_write_shadow
+fi
+
+# if use host principal for shadow update, give write permission for shadow.
+if [ $NEED_HOSTACL -eq 1 ]; then
+    allow_host_write_shadow
 fi
 
 # Generate client profile and add it to the server.

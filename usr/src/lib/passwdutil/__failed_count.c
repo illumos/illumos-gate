@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <syslog.h>
@@ -35,23 +33,31 @@ __incr_failed_count(char *username, char *repname, int max_failures)
 	int ret;
 	void *buf;
 	attrlist items[1];
-	repops_t *ops = rops[REP_FILES];
+	int repnum = name_to_int(repname);
+	repops_t *ops;
 
-	/* account locking only defined for files */
-	if (strcmp(repname, "files") != 0)
+	/* account locking only defined for files and ldap */
+	if ((repnum != REP_FILES) &&
+	    (repnum != REP_LDAP)) {
 		return (PWU_SUCCESS);
+	}
 
-	if ((ret = ops->lock()) != PWU_SUCCESS)
+	ops = rops[repnum];
+	if ((ops->lock != NULL) &&
+	    (ret = ops->lock()) != PWU_SUCCESS) {
 		return (ret);
+	}
 
 	items[0].type = ATTR_INCR_FAILED_LOGINS;
 	items[0].next = NULL;
-	if ((ret = ops->getpwnam(username, items, NULL, &buf)) != PWU_SUCCESS)
+	if ((ret = ops->getpwnam(username, items, NULL, &buf)) != PWU_SUCCESS) {
 		goto out;
+	}
 
 	/* We increment the failed count by one */
-	if ((ret = ops->update(items, NULL, buf)) != PWU_SUCCESS)
+	if ((ret = ops->update(items, NULL, buf)) != PWU_SUCCESS) {
 		goto out;
+	}
 
 	/* Did we just exceed "max_failures" ? */
 	if (items[0].data.val_i >= max_failures) {
@@ -69,7 +75,9 @@ __incr_failed_count(char *username, char *repname, int max_failures)
 		ret = PWU_ACCOUNT_LOCKED;
 
 out:
-	ops->unlock();
+	if (ops->unlock != NULL) {
+		ops->unlock();
+	}
 
 	return (ret);
 }
@@ -84,14 +92,20 @@ __rst_failed_count(char *username, char *repname)
 	int ret;
 	void *buf;
 	attrlist items[1];
-	repops_t *ops = rops[REP_FILES];
+	int repnum = name_to_int(repname);
+	repops_t *ops;
 
-	/* account locking only defined for files */
-	if (strcmp(repname, "files") != 0)
+	/* account locking only defined for files and ldap */
+	if ((repnum != REP_FILES) &&
+	    (repnum != REP_LDAP)) {
 		return (PWU_SUCCESS);
+	}
 
-	if ((ret = ops->lock()) != PWU_SUCCESS)
+	ops = rops[repnum];
+	if ((ops->lock != NULL) &&
+	    (ret = ops->lock()) != PWU_SUCCESS) {
 		return (ret);
+	}
 
 	items[0].type = ATTR_RST_FAILED_LOGINS;
 	items[0].next = NULL;
@@ -101,7 +115,9 @@ __rst_failed_count(char *username, char *repname)
 		goto out;
 	ret = ops->putpwnam(username, NULL, NULL, NULL, buf);
 out:
-	ops->unlock();
+	if (ops->unlock != NULL) {
+		ops->unlock();
+	}
 
 	return (ret != PWU_SUCCESS ? ret : items[0].data.val_i);
 }

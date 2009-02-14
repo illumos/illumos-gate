@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * libsldap - library side configuration components
@@ -199,6 +197,12 @@ static ns_enum_map ns_scope_enum_v2[] = {
 static ns_enum_map ns_pref_enum[] = {
 	{ ENUM2INT(NS_LDAP_PREF_FALSE), "NS_LDAP_FALSE" },
 	{ ENUM2INT(NS_LDAP_PREF_TRUE), "NS_LDAP_TRUE" },
+	{ -1, NULL },
+};
+
+static ns_enum_map ns_shadow_update_enum[] = {
+	{ ENUM2INT(NS_LDAP_ENABLE_SHADOW_UPDATE_FALSE), "FALSE" },
+	{ ENUM2INT(NS_LDAP_ENABLE_SHADOW_UPDATE_TRUE), "TRUE" },
 	{ -1, NULL },
 };
 
@@ -392,11 +396,31 @@ static ns_default_config defconfig[] = {
 		NULL,	/* not defined in the Profile */
 		{ CHARPTR, 0, NULL },
 		__s_val_binddn, NULL },
+
 	{"NS_LDAP_BINDPASSWD", NS_LDAP_BINDPASSWD_P,
 		CREDCONFIG,	CHARPTR,	TRUE,	NS_LDAP_V2,
 		NULL,	/* not defined in the Profile */
 		{ CHARPTR, 0, NULL },
 		__s_val_bindpw, NULL },
+
+	{"NS_LDAP_ENABLE_SHADOW_UPDATE", NS_LDAP_ENABLE_SHADOW_UPDATE_P,
+		CREDCONFIG,	INT,	TRUE,	NS_LDAP_V2,
+		NULL,	/* not defined in the Profile */
+		{ INT, 0, INT2VOIDPTR(NS_LDAP_ENABLE_SHADOW_UPDATE_FALSE) },
+		NULL, ns_shadow_update_enum },
+
+	{"NS_LDAP_ADMIN_BINDDN", NS_LDAP_ADMIN_BINDDN_P,
+		CREDCONFIG,	CHARPTR,	TRUE,	NS_LDAP_V2,
+		NULL,	/* not defined in the Profile */
+		{ CHARPTR, 0, NULL },
+		__s_val_binddn, NULL },
+
+	{"NS_LDAP_ADMIN_BINDPASSWD", NS_LDAP_ADMIN_BINDPASSWD_P,
+		CREDCONFIG,	CHARPTR,	TRUE,	NS_LDAP_V2,
+		NULL,	/* not defined in the Profile */
+		{ CHARPTR, 0, NULL },
+		__s_val_bindpw, NULL },
+
 	{"NS_LDAP_EXP", NS_LDAP_EXP_P,
 		SERVERCONFIG,	TIMET,		TRUE,	NS_LDAP_V2,
 		NULL,	/* initialized by code to time+NS_LDAP_CACHETTL */
@@ -601,6 +625,9 @@ __s_get_enum_value(ns_config_t *ptr, char *value, ParamIndexType i)
 	case NS_LDAP_PREF_ONLY_P:
 		mapp = &ns_pref_enum[0];
 		break;
+	case NS_LDAP_ENABLE_SHADOW_UPDATE_P:
+		mapp = &ns_shadow_update_enum[0];
+		break;
 	case NS_LDAP_CREDENTIAL_LEVEL_P:
 		if (ptr->version == NS_LDAP_V1)
 			return (-1);
@@ -711,6 +738,21 @@ __s_get_searchref_name(ns_config_t *ptr, SearchRef_t type)
 		}
 	}
 	return ("Unknown SearchRef_t type specified");
+}
+
+char *
+__s_get_shadowupdate_name(enableShadowUpdate_t type)
+{
+	register ns_enum_map	*mapp;
+
+	mapp = &ns_shadow_update_enum[0];
+
+	for (; mapp->name != NULL; mapp++) {
+		if (type == INT2SHADOWUPDATENUM(mapp->value)) {
+			return (mapp->name);
+		}
+	}
+	return ("Unknown enableShadowUpdate_t type specified");
 }
 
 static char *
@@ -1486,6 +1528,8 @@ verify_value(ns_config_t *cfg, char *name, char *value, char *errstr)
 	case NS_LDAP_CERT_NICKNAME_P:
 	case NS_LDAP_BINDDN_P:
 	case NS_LDAP_BINDPASSWD_P:
+	case NS_LDAP_ADMIN_BINDDN_P:
+	case NS_LDAP_ADMIN_BINDPASSWD_P:
 	case NS_LDAP_DOMAIN_P:
 	case NS_LDAP_SEARCH_BASEDN_P:
 	case NS_LDAP_SEARCH_TIME_P:
@@ -1648,6 +1692,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		case NS_LDAP_PREF_ONLY_P:
 		case NS_LDAP_SEARCH_REF_P:
 		case NS_LDAP_SEARCH_SCOPE_P:
+		case NS_LDAP_ENABLE_SHADOW_UPDATE_P:
 			i = __s_get_enum_value(ptr, cp, def->index);
 			if (i < 0) {
 				(void) snprintf(errstr, sizeof (errstr),
@@ -2615,7 +2660,8 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 	 *
 	 * Init NS_LDAP_EXP_P here when CACHETTL is updated
 	 */
-	if (type == NS_LDAP_BINDPASSWD_P) {
+	if (type == NS_LDAP_BINDPASSWD_P ||
+	    type == NS_LDAP_ADMIN_BINDPASSWD_P) {
 		cp = conf.ns_pc;
 		cp2 = evalue((char *)cp);
 		conf.ns_pc = cp2;
@@ -3219,6 +3265,11 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 			    __s_get_scope_name(cfg,
 			    (ScopeType_t)ptr->ns_i));
 			break;
+		case NS_LDAP_ENABLE_SHADOW_UPDATE_P:
+			(void) strlcat(buf,
+			    __s_get_shadowupdate_name(
+			    (enableShadowUpdate_t)ptr->ns_i), bufsz);
+			break;
 		default:
 			(void) snprintf(ibuf, sizeof (ibuf),
 			    "%d", ptr->ns_i);
@@ -3730,15 +3781,21 @@ static int
 __s_val_binddn(ParamIndexType i, ns_default_config *def,
 		ns_param_t *param, char *errbuf)
 {
+	char *dntype;
+
 	if (param && param->ns_ptype == CHARPTR &&
-	    i == NS_LDAP_BINDDN_P &&
+	    (i == NS_LDAP_BINDDN_P || i == NS_LDAP_ADMIN_BINDDN_P) &&
 	    ((param->ns_pc == NULL) ||
 	    ((*(param->ns_pc) != '\0') &&
 	    (strchr(param->ns_pc, '=') != NULL)))) {
 		return (NS_SUCCESS);
 	}
+	if (i == NS_LDAP_BINDDN_P)
+		dntype = "proxy";
+	else
+		dntype = "update";
 	(void) snprintf(errbuf, MAXERROR,
-	    gettext("NULL or invalid proxy bind DN"));
+	    gettext("NULL or invalid %s bind DN"), dntype);
 	return (NS_PARSE_ERR);
 }
 
@@ -3751,14 +3808,20 @@ static int
 __s_val_bindpw(ParamIndexType i, ns_default_config *def,
 		ns_param_t *param, char *errbuf)
 {
+	char *pwtype;
+
 	if (param && param->ns_ptype == CHARPTR &&
-	    i == NS_LDAP_BINDPASSWD_P &&
+	    (i == NS_LDAP_BINDPASSWD_P || i == NS_LDAP_ADMIN_BINDPASSWD_P) &&
 	    ((param->ns_pc == NULL) ||
 	    (*(param->ns_pc) != '\0'))) {
 		return (NS_SUCCESS);
 	}
+	if (i == NS_LDAP_BINDPASSWD_P)
+		pwtype = "proxy";
+	else
+		pwtype = "admin";
 	(void) snprintf(errbuf, MAXERROR,
-	    gettext("NULL proxy bind password"));
+	    gettext("NULL %s bind password"), pwtype);
 	return (NS_PARSE_ERR);
 }
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +28,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * passwd is a program whose sole purpose is to manage
@@ -207,7 +204,7 @@ static	int		ckarg(int argc, char **argv, attrlist **attributes);
 
 static	int		get_namelist(pwu_repository_t, char ***, int *);
 static	int		get_namelist_files(char ***, int *);
-static	int		get_namelist_nisplus(char ***, int *);
+static	int		get_namelist_local(char ***, int *);
 static	int		get_attr(char *, pwu_repository_t *, attrlist **);
 static	void		display_attr(char *, attrlist *);
 static	void		free_attr(attrlist *);
@@ -318,7 +315,7 @@ main(int argc, char *argv[])
 
 		if (num_user == 0) {
 			(void) fprintf(stderr, "%s: %s\n", prognamep,
-					gettext(MSG_FF));
+			    gettext(MSG_FF));
 			passwd_exit(FATAL);
 		}
 		i = 0;
@@ -737,11 +734,13 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Delete the password - only privileged processes
-			 * can execute this for FILES
+			 * can execute this for FILES or LDAP
 			 */
-			if (IS_FILES(repository) == FALSE) {
+			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-				    "-d only applies to files repository\n"));
+				    "-d only applies to files "
+				    "or ldap repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -767,9 +766,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-N only applies to files or nisplus repository\n"));
+				    "-N only applies to files, ldap or  "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADOPT;
 				return (FAIL);
@@ -777,10 +778,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged processes can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag & (MUTEXFLAG|NONAGEFLAG)) {
 				rusage();	/* exit */
@@ -798,9 +799,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-l only applies to files or nisplus repository\n"));
+				    "-l only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADOPT;
 				return (FAIL);
@@ -808,10 +811,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged processes can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag & (MUTEXFLAG|NONAGEFLAG)) {
 				rusage();	/* exit */
@@ -829,9 +832,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-u only applies to files or nisplus repository\n"));
+				    "-u only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADOPT;
 				return (FAIL);
@@ -839,10 +844,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged processes can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag & (MUTEXFLAG|NONAGEFLAG)) {
 				rusage();	/* exit */
@@ -861,9 +866,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-x only applies to files or nisplus repository\n"));
+				    "-x only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -871,9 +878,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged process can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) && (ckuid() != SUCCESS)) {
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    (ckuid() != SUCCESS)) {
 				retval = NOPERM;
 				return (FAIL);
 			}
@@ -886,7 +894,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
 			    (maxdate = strtol(optarg, &char_p, 10)) < -1 ||
 			    *char_p != '\0') {
 				(void) fprintf(stderr, "%s: %s -x\n",
-					prognamep, gettext(MSG_NV));
+				    prognamep, gettext(MSG_NV));
 				retval = BADSYN;
 				return (FAIL);
 			}
@@ -900,9 +908,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-n only applies to files or nisplus repository\n"));
+				    "-n only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -910,10 +920,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged process can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag & (SAFLAG|NFLAG|NONAGEFLAG)) {
 				retval = BADOPT;
@@ -924,7 +934,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
 			    (strtol(optarg, &char_p, 10)) < 0 ||
 			    *char_p != '\0') {
 				(void) fprintf(stderr, "%s: %s -n\n",
-					prognamep, gettext(MSG_NV));
+				    prognamep, gettext(MSG_NV));
 				retval = BADSYN;
 				return (FAIL);
 			}
@@ -938,9 +948,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-w only applies to files or nisplus repository\n"));
+				    "-w only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -948,9 +960,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged process can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) && (ckuid() != SUCCESS)) {
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    (ckuid() != SUCCESS)) {
 				retval = NOPERM;
 				return (FAIL);
 			}
@@ -963,7 +976,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
 			    (strtol(optarg, &char_p, 10)) < 0 ||
 			    *char_p != '\0') {
 				(void) fprintf(stderr, "%s: %s -w\n",
-					prognamep, gettext(MSG_NV));
+				    prognamep, gettext(MSG_NV));
 				retval = BADSYN;
 				return (FAIL);
 			}
@@ -979,9 +992,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/* display password attributes */
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-s only applies to files or nisplus repository\n"));
+				    "-s only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -989,10 +1004,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged process can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag && (flag != AFLAG)) {
 				retval = BADOPT;
@@ -1008,9 +1023,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-a only applies to files or nisplus repository\n"));
+				    "-a only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -1018,10 +1035,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged process can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag && (flag != SFLAG)) {
 				retval = BADOPT;
@@ -1037,9 +1054,11 @@ ckarg(int argc, char **argv, attrlist **attributes)
 				repository = __REPFILES;
 
 			if (IS_FILES(repository) == FALSE &&
+			    IS_LDAP(repository) == FALSE &&
 			    IS_NISPLUS(repository) == FALSE) {
 				(void) fprintf(stderr, gettext(
-			"-f only applies to files or nisplus repository\n"));
+				    "-f only applies to files, ldap or "
+				    "nisplus repository\n"));
 				rusage();	/* exit */
 				retval = BADSYN;
 				return (FAIL);
@@ -1047,10 +1066,10 @@ ckarg(int argc, char **argv, attrlist **attributes)
 
 			/*
 			 * Only privileged process can execute this
-			 * for FILES
+			 * for FILES or LDAP
 			 */
-			if (IS_FILES(repository) &&
-				((retval = ckuid()) != SUCCESS))
+			if ((IS_FILES(repository) || IS_LDAP(repository)) &&
+			    ((retval = ckuid()) != SUCCESS))
 				return (FAIL);
 			if (flag & (SAFLAG|FFLAG|NONAGEFLAG)) {
 				retval = BADOPT;
@@ -1208,7 +1227,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
 	 */
 	if ((maxdate == -1) && (flag & NFLAG)) {
 		(void) fprintf(stderr, "%s: %s -n\n",
-				prognamep, gettext(MSG_NV));
+		    prognamep, gettext(MSG_NV));
 		retval = BADOPT;
 		return (FAIL);
 	}
@@ -1400,47 +1419,49 @@ get_namelist_files(char ***namelist_p, int *num_user)
 }
 
 /*
- * get_namelist_nisplus
+ * get_namelist_local
  *
  */
 
 /*
- * Our private version of the switch frontend for getspent.  We want to
- * search just the nisplus sp file, so we want to bypass normal nsswitch.conf
- * based processing.  This implementation compatible with version 2 of the
- * name service switch.
+ * Our private version of the switch frontend for getspent.  We want
+ * to search just the nisplus or ldap sp file, so we want to bypass
+ * normal nsswitch.conf based processing.  This implementation
+ * compatible with version 2 of the name service switch.
  */
 #define	NSS_NISPLUS_ONLY	"nisplus"
+#define	NSS_LDAP_ONLY		"ldap"
 
 extern int str2spwd(const char *, int, void *, char *, int);
 
 static DEFINE_NSS_DB_ROOT(db_root);
 static DEFINE_NSS_GETENT(context);
 
+static char *local_config;
 static void
-_np_nss_initf_shadow(nss_db_params_t *p)
+_lc_nss_initf_shadow(nss_db_params_t *p)
 {
 	p->name	= NSS_DBNAM_SHADOW;
 	p->config_name    = NSS_DBNAM_PASSWD;	/* Use config for "passwd" */
-	p->default_config = NSS_NISPLUS_ONLY;   /* Use nisplus only */
+	p->default_config = local_config;   	/* Use ldap or nisplus only */
 	p->flags = NSS_USE_DEFAULT_CONFIG;
 }
 
 static void
-_np_setspent(void)
+_lc_setspent(void)
 {
-	nss_setent(&db_root, _np_nss_initf_shadow, &context);
+	nss_setent(&db_root, _lc_nss_initf_shadow, &context);
 }
 
 static void
-_np_endspent(void)
+_lc_endspent(void)
 {
-	nss_endent(&db_root, _np_nss_initf_shadow, &context);
+	nss_endent(&db_root, _lc_nss_initf_shadow, &context);
 	nss_delete(&db_root);
 }
 
 static struct spwd *
-_np_getspent_r(struct spwd *result, char *buffer, int buflen)
+_lc_getspent_r(struct spwd *result, char *buffer, int buflen)
 {
 	nss_XbyY_args_t arg;
 	char		*nam;
@@ -1450,11 +1471,11 @@ _np_getspent_r(struct spwd *result, char *buffer, int buflen)
 	do {
 		NSS_XbyY_INIT(&arg, result, buffer, buflen, str2spwd);
 			/* No key to fill in */
-		(void) nss_getent(&db_root, _np_nss_initf_shadow, &context,
+		(void) nss_getent(&db_root, _lc_nss_initf_shadow, &context,
 		    &arg);
 	} while (arg.returnval != 0 &&
-			(nam = ((struct spwd *)arg.returnval)->sp_namp) != 0 &&
-			(*nam == '+' || *nam == '-'));
+	    (nam = ((struct spwd *)arg.returnval)->sp_namp) != 0 &&
+	    (*nam == '+' || *nam == '-'));
 
 	return (struct spwd *)NSS_XbyY_FINI(&arg);
 }
@@ -1462,17 +1483,17 @@ _np_getspent_r(struct spwd *result, char *buffer, int buflen)
 static nss_XbyY_buf_t *buffer;
 
 static struct spwd *
-_np_getspent(void)
+_lc_getspent(void)
 {
 	nss_XbyY_buf_t	*b;
 
 	b = NSS_XbyY_ALLOC(&buffer, sizeof (struct spwd), NSS_BUFLEN_SHADOW);
 
-	return (b == 0 ? 0 : _np_getspent_r(b->result, b->buffer, b->buflen));
+	return (b == 0 ? 0 : _lc_getspent_r(b->result, b->buffer, b->buflen));
 }
 
 int
-get_namelist_nisplus(char ***namelist_p, int *num_user)
+get_namelist_local(char ***namelist_p, int *num_user)
 {
 	int nuser = 0;
 	int alloced = 100;
@@ -1483,22 +1504,22 @@ get_namelist_nisplus(char ***namelist_p, int *num_user)
 	if ((nl = calloc(alloced, sizeof (*nl))) == NULL)
 		return (FMERR);
 
-	(void) _np_setspent();
-	while ((p = _np_getspent()) != NULL) {
+	(void) _lc_setspent();
+	while ((p = _lc_getspent()) != NULL) {
 		if ((nl[nuser] = strdup(p->sp_namp)) == NULL) {
-			_np_endspent();
+			_lc_endspent();
 			return (FMERR);
 		}
 		if (++nuser == alloced) {
 			alloced += 100;
 			nl = realloc(nl, alloced * (sizeof (*nl)));
 			if (nl == NULL) {
-				_np_endspent();
+				_lc_endspent();
 				return (FMERR);
 			}
 		}
 	}
-	(void) _np_endspent();
+	(void) _lc_endspent();
 	nl[nuser] = NULL;
 
 	*namelist_p = nl;
@@ -1510,9 +1531,13 @@ get_namelist_nisplus(char ***namelist_p, int *num_user)
 int
 get_namelist(pwu_repository_t repository, char ***namelist, int *num_user)
 {
-	if (IS_NISPLUS(repository))
-		return (get_namelist_nisplus(namelist, num_user));
-	else if (IS_FILES(repository))
+	if (IS_LDAP(repository)) {
+		local_config = NSS_LDAP_ONLY;
+		return (get_namelist_local(namelist, num_user));
+	} else if (IS_NISPLUS(repository)) {
+		local_config = NSS_NISPLUS_ONLY;
+		return (get_namelist_local(namelist, num_user));
+	} else if (IS_FILES(repository))
 		return (get_namelist_files(namelist, num_user));
 
 	rusage();
@@ -1607,7 +1632,7 @@ passwd_conv(int num_msg, struct pam_message **msg,
 		return (PAM_CONV_ERR);
 
 	*response = (struct pam_response *)calloc(num_msg,
-						sizeof (struct pam_response));
+	    sizeof (struct pam_response));
 	if (*response == NULL)
 		return (PAM_BUF_ERR);
 
@@ -1644,7 +1669,7 @@ passwd_conv(int num_msg, struct pam_message **msg,
 				(void) fputs(m->msg, stdout);
 			}
 			r->resp = (char *)calloc(PAM_MAX_RESP_SIZE,
-							sizeof (char));
+			    sizeof (char));
 			if (r->resp == NULL) {
 				/* free responses */
 				r = *response;
@@ -1793,5 +1818,9 @@ rusage(void)
 	    "[-w warn]\n");
 	MSG("\t\t[-x max] name\n");
 	MSG("\tpasswd -r ldap [-egh] [name]\n");
+	MSG("\tpasswd -r ldap -sa\n");
+	MSG("\tpasswd -r ldap -s [name]\n");
+	MSG("\tpasswd -r ldap [-l|-N|-u] [-f] [-n min] [-w warn] "
+	    "[-x max] name\n");
 #undef MSG
 }

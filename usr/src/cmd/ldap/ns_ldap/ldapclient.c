@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ldapclient command. To make (initiailize) or uninitialize a machines as
@@ -87,6 +85,12 @@
  *	proxyPassword
  *		Client password not needed for authentication "none".
  *		(formerly -w)
+ *	adminDN
+ *		Administrator DN for updating naming data.
+ *	adminPassword
+ *		Administrator password
+ *	enableShadowUpdate
+ *		Allow Administrator to change shadow data in LDAP
  *	searchTimeLimit
  *		Timeout value. (formerly -o)
  *	serviceSearchDescriptor
@@ -274,6 +278,9 @@ typedef struct {
 	char		*profileTTL;
 	char		*proxyDN;
 	char		*proxyPassword;
+	char		*enableShadowUpdate;
+	char		*adminDN;
+	char		*adminPassword;
 	char		*bindDN;
 	char		*bindPasswd;
 	char		*defaultSearchScope;
@@ -294,6 +301,7 @@ extern int __ns_ldap_download(const char *, char *, char *, ns_ldap_error_t **);
 static void usage(void);
 
 static int credCheck(clientopts_t *arglist);
+static int adminCredCheck(clientopts_t *arglist);
 static int clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal);
 static int parseParam(char *param, char **paramVal);
 static void dumpargs(clientopts_t *arglist);
@@ -369,7 +377,7 @@ main(int argc, char **argv)
 
 	optind = 1;
 	while (optind < argc) {
-		option = getopt(argc, argv, "vqa:ID:w:j:y:");
+		option = getopt(argc, argv, "vqa:ID:w:j:y:z:");
 
 		switch (option) {
 		case 'v':
@@ -395,6 +403,14 @@ main(int argc, char **argv)
 				    gettext("The -a proxyPassword option is "
 				    "mutually exclusive of -y. "
 				    "-a proxyPassword is ignored.\n"));
+				break;
+			}
+			if (paramFlag == NS_LDAP_ADMIN_BINDPASSWD_P &&
+			    optlist->adminPassword != NULL) {
+				(void) fprintf(stderr,
+				    gettext("The -a adminPassword option is "
+				    "mutually exclusive of -z. "
+				    "-a adminPassword is ignored.\n"));
 				break;
 			}
 			retcode = clientSetParam(optlist, paramFlag, attrVal);
@@ -444,10 +460,21 @@ main(int argc, char **argv)
 				    gettext("The -a proxyPassword option is "
 				    "mutually exclusive of -y. "
 				    "-a proxyPassword is ignored.\n"));
-				free(optlist->proxyPassword);
 			}
 			optlist->proxyPassword = readPwd(optarg);
 			if (optlist->proxyPassword == NULL) {
+				exit(CLIENT_ERR_FAIL);
+			}
+			break;
+		case 'z':
+			if (optlist->adminPassword != NULL) {
+				(void) fprintf(stderr,
+				    gettext("The -a adminPassword option is "
+				    "mutually exclusive of -z. "
+				    "-a adminPassword is ignored.\n"));
+			}
+			optlist->adminPassword = readPwd(optarg);
+			if (optlist->adminPassword == NULL) {
 				exit(CLIENT_ERR_FAIL);
 			}
 			break;
@@ -524,6 +551,23 @@ main(int argc, char **argv)
 		CLIENT_FPUTS(
 		    gettext("ldapclient: Missing required attrName "
 		    "defaultSearchBase\n"),
+		    stderr);
+		usage();
+		clientopts_free(optlist);
+		exit(CLIENT_ERR_FAIL);
+	}
+
+/*
+ * if init or manual, and if adminDN is specified then enableShadowUpdate
+ * must be set to TRUE.
+ */
+	if ((op_init || op_manual) &&
+	    (!optlist->enableShadowUpdate ||
+	    strcasecmp(optlist->enableShadowUpdate, "TRUE") != 0) &&
+	    (optlist->adminDN || optlist->adminPassword)) {
+		CLIENT_FPUTS(
+		    gettext("ldapclient: adminDN and adminPassword must not "
+		    "be specified if enableShadowUpdate is not set to TRUE \n"),
 		    stderr);
 		usage();
 		clientopts_free(optlist);
@@ -807,6 +851,9 @@ client_manual(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->defaultSearchBase, NS_LDAP_SEARCH_BASEDN_P);
 	LDAP_SET_PARAM(arglist->credentialLevel, NS_LDAP_CREDENTIAL_LEVEL_P);
 	LDAP_SET_PARAM(arglist->proxyDN, NS_LDAP_BINDDN_P);
+	LDAP_SET_PARAM(arglist->enableShadowUpdate,
+	    NS_LDAP_ENABLE_SHADOW_UPDATE_P);
+	LDAP_SET_PARAM(arglist->adminDN, NS_LDAP_ADMIN_BINDDN_P);
 	LDAP_SET_PARAM(arglist->searchTimeLimit, NS_LDAP_SEARCH_TIME_P);
 	LDAP_SET_PARAM(arglist->preferredServerList, NS_LDAP_SERVER_PREF_P);
 	LDAP_SET_PARAM(arglist->profileName, NS_LDAP_PROFILE_P);
@@ -814,6 +861,7 @@ client_manual(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->defaultSearchScope, NS_LDAP_SEARCH_SCOPE_P);
 	LDAP_SET_PARAM(arglist->bindTimeLimit, NS_LDAP_BIND_TIME_P);
 	LDAP_SET_PARAM(arglist->proxyPassword, NS_LDAP_BINDPASSWD_P);
+	LDAP_SET_PARAM(arglist->adminPassword, NS_LDAP_ADMIN_BINDPASSWD_P);
 	LDAP_SET_PARAM(arglist->defaultServerList, NS_LDAP_SERVERS_P);
 	LDAP_SET_PARAM(arglist->certificatePath, NS_LDAP_HOST_CERTPATH_P);
 
@@ -854,6 +902,8 @@ client_manual(clientopts_t *arglist)
 	}
 
 	retcode = credCheck(arglist);
+	if (retcode == CLIENT_SUCCESS)
+		retcode = adminCredCheck(arglist);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
 		    gettext("Error in setting up credentials\n"),
@@ -1091,6 +1141,7 @@ client_mod(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->defaultSearchBase, NS_LDAP_SEARCH_BASEDN_P);
 	LDAP_SET_PARAM(arglist->credentialLevel, NS_LDAP_CREDENTIAL_LEVEL_P);
 	LDAP_SET_PARAM(arglist->proxyDN, NS_LDAP_BINDDN_P);
+	LDAP_SET_PARAM(arglist->adminDN, NS_LDAP_ADMIN_BINDDN_P);
 	LDAP_SET_PARAM(arglist->profileTTL, NS_LDAP_CACHETTL_P);
 	LDAP_SET_PARAM(arglist->searchTimeLimit, NS_LDAP_SEARCH_TIME_P);
 	LDAP_SET_PARAM(arglist->preferredServerList, NS_LDAP_SERVER_PREF_P);
@@ -1099,7 +1150,10 @@ client_mod(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->defaultSearchScope, NS_LDAP_SEARCH_SCOPE_P);
 	LDAP_SET_PARAM(arglist->bindTimeLimit, NS_LDAP_BIND_TIME_P);
 	LDAP_SET_PARAM(arglist->proxyPassword, NS_LDAP_BINDPASSWD_P);
+	LDAP_SET_PARAM(arglist->adminPassword, NS_LDAP_ADMIN_BINDPASSWD_P);
 	LDAP_SET_PARAM(arglist->defaultServerList, NS_LDAP_SERVERS_P);
+	LDAP_SET_PARAM(arglist->enableShadowUpdate,
+	    NS_LDAP_ENABLE_SHADOW_UPDATE_P);
 	LDAP_SET_PARAM(arglist->certificatePath, NS_LDAP_HOST_CERTPATH_P);
 
 	for (counter = 0;
@@ -1144,6 +1198,8 @@ client_mod(clientopts_t *arglist)
 	}
 
 	retcode = credCheck(arglist);
+	if (retcode == CLIENT_SUCCESS)
+		retcode = adminCredCheck(arglist);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
 		    gettext("Error in setting up credentials\n"),
@@ -1300,6 +1356,10 @@ client_genProfile(clientopts_t *arglist)
 	/* *** Check for invalid args *** */
 	LDAP_CHECK_INVALID(arglist->proxyDN, "proxyDN");
 	LDAP_CHECK_INVALID(arglist->proxyPassword, "proxyPassword");
+	LDAP_CHECK_INVALID(arglist->enableShadowUpdate,
+	    "enableShadowUpdate");
+	LDAP_CHECK_INVALID(arglist->adminDN, "adminDN");
+	LDAP_CHECK_INVALID(arglist->adminPassword, "adminPassword");
 	LDAP_CHECK_INVALID(arglist->certificatePath, "certificatePath");
 	LDAP_CHECK_INVALID(arglist->domainName, "domainName");
 	LDAP_CHECK_INVALID(arglist->bindDN, "bind DN");
@@ -1472,7 +1532,7 @@ client_init(clientopts_t *arglist)
 		cfg.SA_CRED = "proxy";
 		/*
 		 * We don't want to force users to always specify authentication
-		 * method when we can infer it. If users wants SSL, he/she would
+		 * method when we can infer it. If users want SSL, he/she would
 		 * have to specify appropriate -a though.
 		 */
 		auth.type = NS_LDAP_AUTH_SIMPLE;
@@ -1552,6 +1612,43 @@ client_init(clientopts_t *arglist)
 		    arglist->proxyPassword, &errorp) != NS_LDAP_SUCCESS) {
 			if (errorp != NULL) {
 				CLIENT_FPRINTF(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+			return (CLIENT_ERR_CREDENTIAL);
+		}
+	}
+
+	if (arglist->enableShadowUpdate != NULL) {
+		LDAP_SET_PARAM(arglist->enableShadowUpdate,
+		    NS_LDAP_ENABLE_SHADOW_UPDATE_P);
+	}
+
+	if (arglist->enableShadowUpdate &&
+	    strcasecmp(arglist->enableShadowUpdate, "TRUE") == 0 &&
+	    arglist->adminDN != NULL && arglist->adminPassword == NULL) {
+		arglist->adminPassword = getpassphrase("admin Bind Password:");
+		if (arglist->adminPassword == NULL) {
+			CLIENT_FPUTS(gettext("Get password failed\n"), stderr);
+
+			if (gStartLdap == START_RESET)
+				(void) start_service(LDAP_FMRI, B_TRUE);
+
+			return (CLIENT_ERR_CREDENTIAL);
+		}
+	}
+	if (arglist->adminDN != NULL && arglist->adminPassword != NULL) {
+		if (__ns_ldap_setParam(NS_LDAP_ADMIN_BINDDN_P,
+		    arglist->adminDN, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s\n", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+			return (CLIENT_ERR_CREDENTIAL);
+		}
+		if (__ns_ldap_setParam(NS_LDAP_ADMIN_BINDPASSWD_P,
+		    arglist->adminPassword, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s\n", errorp->message);
 				(void) __ns_ldap_freeError(&errorp);
 			}
 			return (CLIENT_ERR_CREDENTIAL);
@@ -1641,6 +1738,8 @@ client_init(clientopts_t *arglist)
 	}
 
 	retcode = credCheck(arglist);
+	if (retcode == CLIENT_SUCCESS)
+		retcode = adminCredCheck(arglist);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
 		    gettext("Error in setting up credentials\n"), stderr);
@@ -1850,7 +1949,8 @@ usage(void)
 		CLIENT_FPRINTF(stderr,
 		    gettext("\n       %s [-v | -q] [-a authenticationMethod]"
 		    " [-D bindDN]\n\t[-w bindPassword] [-j passswdFile]"
-		    " [-y proxyPasswordFile] init [<args>]\n"),
+		    " [-y proxyPasswordFile]\n\t"
+		    "[-z adminPasswordFile] init [<args>]\n"),
 		    cmd);
 
 		CLIENT_FPUTS(
@@ -2316,6 +2416,189 @@ credCheck(clientopts_t *arglist)
 	}
 
 	return (CLIENT_SUCCESS);
+}
+
+/*
+ * adminCredCheck is called to check if the admin credential is required
+ * for this configuration. This means that if enableShadowUpdate is set
+ * to TRUE then credential info is required (adminDN and adminPassword).
+ * One exception is that if there is a 'self' credentialLevel and
+ * 'sasl/GSSAPI' authenticationMethod (i.e., possibly using Kerberos
+ * host credential) then adminDN and adminPassword are not required.
+ */
+static int
+adminCredCheck(clientopts_t *arglist)
+{
+	int counter;
+	int **enabled = NULL;
+	int **credLevel = NULL;
+	char **adminDN = NULL;
+	char **adminPassword = NULL;
+	ns_auth_t **authMethod = NULL;
+	ns_ldap_error_t *errorp = NULL;
+	int credSelf, authSASLgss;
+	int retcode, rc;
+
+	/* If shadow update not enabled, then no need to check */
+	retcode = __ns_ldap_getParam(NS_LDAP_ENABLE_SHADOW_UPDATE_P,
+	    (void ***)&enabled, &errorp);
+	if (retcode != 0) {
+		CLIENT_FPRINTF(stderr,
+		    gettext("Error %d while trying to retrieve "
+		    "enableShadowUpdate\n"), retcode);
+		rc = CLIENT_ERR_FAIL;
+		goto out;
+	}
+	if (enabled == NULL ||
+	    *enabled[0] != NS_LDAP_ENABLE_SHADOW_UPDATE_TRUE) {
+		if (mode_verbose)
+			CLIENT_FPUTS(
+			    gettext("Shadow Update is not enabled, "
+			    "no adminDN/adminPassword is required.\n"), stderr);
+		rc = CLIENT_SUCCESS;
+		goto out;
+	}
+
+	/* get credentialLevel */
+	retcode = __ns_ldap_getParam(NS_LDAP_CREDENTIAL_LEVEL_P,
+	    (void ***)&credLevel, &errorp);
+	if (retcode != 0) {
+		CLIENT_FPRINTF(stderr,
+		    gettext("Error %d while trying to retrieve credLevel\n"),
+		    retcode);
+		rc = CLIENT_ERR_FAIL;
+		goto out;
+	}
+
+	/* get AuthenticationMethod */
+	retcode = __ns_ldap_getParam(NS_LDAP_AUTH_P,
+	    (void ***)&authMethod, &errorp);
+	if (retcode != 0) {
+		CLIENT_FPRINTF(stderr,
+		    gettext("Error %d while trying to retrieve authMethod\n"),
+		    retcode);
+		rc = CLIENT_ERR_FAIL;
+		goto out;
+	}
+
+	/* get adminDN */
+	retcode = __ns_ldap_getParam(NS_LDAP_ADMIN_BINDDN_P,
+	    (void ***)&adminDN, &errorp);
+	if (retcode != 0) {
+		CLIENT_FPRINTF(stderr,
+		    gettext("Error %d while trying to retrieve adminDN\n"),
+		    retcode);
+		rc = CLIENT_ERR_FAIL;
+		goto out;
+	}
+
+	/* get adminPassword */
+	retcode = __ns_ldap_getParam(NS_LDAP_ADMIN_BINDPASSWD_P,
+	    (void ***)&adminPassword, &errorp);
+	if (retcode != 0) {
+		CLIENT_FPRINTF(stderr,
+		    gettext("Error %d while trying to retrieve "
+		    "adminPassword\n"), retcode);
+		rc = CLIENT_ERR_FAIL;
+		goto out;
+	}
+
+	if (mode_verbose) {
+		CLIENT_FPRINTF(stderr,
+		    gettext("admin DN: %s\n"),
+		    (adminDN && adminDN[0]) ? adminDN[0] : "NULL");
+		CLIENT_FPRINTF(stderr,
+		    gettext("admin password: %s\n"),
+		    (adminPassword && adminPassword[0]) ?
+		    adminPassword[0] : "NULL");
+	}
+
+	credSelf = 0;	/* flag to indicate if we have a credLevel of self */
+	for (counter = 0; credLevel && credLevel[counter] != NULL; counter++) {
+		if (mode_verbose)
+			CLIENT_FPRINTF(stderr,
+			    gettext("Credential level: %d\n"),
+			    *credLevel[counter]);
+		if (*credLevel[counter] == NS_LDAP_CRED_SELF) {
+			credSelf = 1;
+			break;
+		}
+	}
+
+	authSASLgss = 0;	/* flag for authMethod of SASL/gssapi */
+	for (counter = 0;
+	    authMethod && authMethod[counter] != NULL;
+	    counter++) {
+
+		if (mode_verbose)
+			CLIENT_FPRINTF(stderr,
+			    gettext("Authentication sasl mechanism: %d\n"),
+			    authMethod[counter]->saslmech);
+		if (authMethod[counter]->saslmech == NS_LDAP_SASL_GSSAPI) {
+			authSASLgss = 1;
+			break;
+		}
+	}
+
+	/* First, if we don't need adminDN/adminPassword then just return ok */
+	if (credSelf && authSASLgss) {
+		if (mode_verbose)
+			CLIENT_FPUTS(
+			    gettext("A credential Level of self and an "
+			    "authentication method of sasl/GSSAPI is "
+			    "configured, no adminDN/adminPassword "
+			    "is required.\n"), stderr);
+		rc = CLIENT_SUCCESS;
+		goto out;
+	}
+
+	/* Now let's check if we have the cred stuff we need */
+	if (adminDN == NULL || adminDN[0] == '\0') {
+		CLIENT_FPUTS(
+		    gettext("Shadow Update is enabled, but "
+		    "no adminDN is configured.\n"), stderr);
+		rc = CLIENT_ERR_CREDENTIAL;
+		goto out;
+	}
+
+	/* If we need adminPassword (prompt) */
+	if (adminPassword == NULL || adminPassword[0] == '\0') {
+		CLIENT_FPUTS(
+		    gettext("Shadow Update requires adminPassword\n"),
+		    stderr);
+		arglist->adminPassword = getpassphrase("admin Password:");
+		if (arglist->adminPassword == NULL) {
+			CLIENT_FPUTS(gettext("Unable to get admin password\n"),
+			    stderr);
+			rc = CLIENT_ERR_CREDENTIAL;
+			goto out;
+		}
+		LDAP_SET_PARAM(arglist->adminPassword,
+		    NS_LDAP_ADMIN_BINDPASSWD_P);
+		if (retcode != 0) {
+			CLIENT_FPUTS(
+			    gettext("setParam adminPassword failed.\n"),
+			    stderr);
+			rc = CLIENT_ERR_CREDENTIAL;
+			goto out;
+		}
+	}
+
+	rc = CLIENT_SUCCESS;
+
+	out:
+	if (enabled != NULL)
+		(void) __ns_ldap_freeParam((void ***)&enabled);
+	if (credLevel != NULL)
+		(void) __ns_ldap_freeParam((void ***)&credLevel);
+	if (authMethod != NULL)
+		(void) __ns_ldap_freeParam((void ***)&authMethod);
+	if (adminDN != NULL)
+		(void) __ns_ldap_freeParam((void ***)&adminDN);
+	if (adminPassword != NULL)
+		(void) __ns_ldap_freeParam((void ***)&adminPassword);
+
+	return (rc);
 }
 
 /*
@@ -3043,6 +3326,8 @@ num_args(clientopts_t *list)
 	arg_count += list->serviceCredentialLevel->count;
 	arg_count += list->domainName ? 1 : 0;
 	arg_count += list->proxyDN ? 1 : 0;
+	arg_count += list->enableShadowUpdate ? 1 : 0;
+	arg_count += list->adminDN ? 1 : 0;
 	arg_count += list->profileTTL ? 1 : 0;
 	arg_count += list->objectclassMap->count;
 	arg_count += list->searchTimeLimit ? 1 : 0;
@@ -3054,6 +3339,7 @@ num_args(clientopts_t *list)
 	arg_count += list->serviceSearchDescriptor->count;
 	arg_count += list->bindTimeLimit ? 1 : 0;
 	arg_count += list->proxyPassword ? 1 : 0;
+	arg_count += list->adminPassword ? 1 : 0;
 	arg_count += list->defaultServerList ? 1 : 0;
 	arg_count += list->certificatePath ? 1 : 0;
 
@@ -3075,6 +3361,8 @@ dumpargs(clientopts_t *list)
 	    list->serviceCredentialLevel);
 	CLIENT_PRINT("\tdomainName: ", list->domainName);
 	CLIENT_PRINT("\tproxyDN: ", list->proxyDN);
+	CLIENT_PRINT("\tadminDN: ", list->adminDN);
+	CLIENT_PRINT("\tenableShadowUpdate: ", list->enableShadowUpdate);
 	CLIENT_PRINT("\tprofileTTL: ", list->profileTTL);
 	multival_list("\tobjectclassMap: ", list->objectclassMap);
 	CLIENT_PRINT("\tsearchTimeLimit: ", list->searchTimeLimit);
@@ -3087,6 +3375,7 @@ dumpargs(clientopts_t *list)
 	    list->serviceSearchDescriptor);
 	CLIENT_PRINT("\tbindTimeLimit: ", list->bindTimeLimit);
 	CLIENT_PRINT("\tproxyPassword: ", list->proxyPassword);
+	CLIENT_PRINT("\tadminPassword: ", list->adminPassword);
 	CLIENT_PRINT("\tdefaultServerList: ", list->defaultServerList);
 	CLIENT_PRINT("\tcertificatePath: ", list->certificatePath);
 }
@@ -3119,6 +3408,9 @@ static struct param paramArray[] = {
 	{"serviceAuthenticationMethod", NS_LDAP_SERVICE_AUTH_METHOD_P},
 	{"serviceCredentialLevel", NS_LDAP_SERVICE_CRED_LEVEL_P},
 	{"domainName", LOCAL_DOMAIN_P},
+	{"enableShadowUpdate", NS_LDAP_ENABLE_SHADOW_UPDATE_P},
+	{"adminDN", NS_LDAP_ADMIN_BINDDN_P},
+	{"adminPassword", NS_LDAP_ADMIN_BINDPASSWD_P},
 	{NULL, 0}
 };
 
@@ -3229,6 +3521,16 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 		optlist->proxyDN = attrVal;
 		break;
 
+	case NS_LDAP_ENABLE_SHADOW_UPDATE_P:
+		CLIENT_OPT_CHECK(paramFlag, optlist->enableShadowUpdate);
+		optlist->enableShadowUpdate = attrVal;
+		break;
+
+	case NS_LDAP_ADMIN_BINDDN_P:
+		CLIENT_OPT_CHECK(paramFlag, optlist->adminDN);
+		optlist->adminDN = attrVal;
+		break;
+
 	case NS_LDAP_CACHETTL_P:
 		CLIENT_OPT_CHECK(paramFlag, optlist->profileTTL);
 		optlist->profileTTL = attrVal;
@@ -3317,6 +3619,11 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 	case NS_LDAP_BINDPASSWD_P:
 		CLIENT_OPT_CHECK(paramFlag, optlist->proxyPassword);
 		optlist->proxyPassword = attrVal;
+		break;
+
+	case NS_LDAP_ADMIN_BINDPASSWD_P:
+		CLIENT_OPT_CHECK(paramFlag, optlist->adminPassword);
+		optlist->adminPassword = attrVal;
 		break;
 
 	case NS_LDAP_HOST_CERTPATH_P:
