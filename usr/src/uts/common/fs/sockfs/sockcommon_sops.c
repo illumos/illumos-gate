@@ -1056,11 +1056,18 @@ so_newconn(sock_upper_handle_t parenthandle,
 		nso->so_cpid = peer_cpid;
 	}
 
+	/*
+	 * The new socket (nso), proto_handle and sock_upcallsp are all
+	 * valid at this point. But as soon as nso is placed in the accept
+	 * queue that can no longer be assumed (since an accept() thread may
+	 * pull it off the queue and close the socket).
+	 */
+	*sock_upcallsp = &so_upcalls;
+
 	(void) so_acceptq_enqueue(so, nso);
+
 	mutex_enter(&so->so_lock);
 	so_notify_newconn(so);
-
-	*sock_upcallsp = &so_upcalls;
 
 	return ((sock_upper_handle_t)nso);
 }
