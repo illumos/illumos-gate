@@ -337,15 +337,15 @@ typedef union sf_region_map_u {
 }
 
 /*
- * Returns 1 if map1 and map2 are equal.
+ * Returns 1 if region map1 and map2 are equal.
  */
-#define	SF_RGNMAP_EQUAL(map1, map2, rval)	{		\
+#define	SF_RGNMAP_EQUAL(map1, map2, words, rval)	{	\
 	int _i;							\
-	for (_i = 0; _i < SFMMU_RGNMAP_WORDS; _i++) {		\
+	for (_i = 0; _i < words; _i++) {			\
 		if ((map1)->bitmap[_i] != (map2)->bitmap[_i])	\
 			break;					\
 	}							\
-	if (_i < SFMMU_RGNMAP_WORDS)				\
+	if (_i < words)					\
 		rval = 0;					\
 	else							\
 		rval = 1;					\
@@ -613,6 +613,9 @@ extern uint_t		nctxs;
 
 extern void	sfmmu_cpu_init(cpu_t *);
 extern void	sfmmu_cpu_cleanup(cpu_t *);
+extern void	sfmmu_invalidate_ctx(sfmmu_t *);
+extern hatlock_t *sfmmu_hat_enter(sfmmu_t *);
+extern void	sfmmu_hat_exit(hatlock_t *);
 
 /*
  * The following structure is used to get MMU context domain information for
@@ -648,7 +651,6 @@ typedef struct sfmmu_ctx {
 	uint64_t	gnum:48;
 	uint64_t	cnum:16;
 } sfmmu_ctx_t;
-
 
 /*
  * The platform dependent hat structure.
@@ -711,7 +713,11 @@ struct hat {
 	sf_rgn_link_t	*sfmmu_hmeregion_links[SFMMU_L1_HMERLINKS];
 	sf_rgn_link_t	sfmmu_scd_link;	/* link to scd or pending queue */
 #ifdef sun4v
+	/* ttecnt for Rock pagesize register management */
+	ulong_t		sfmmu_mmuttecnt[MMU_PAGE_SIZES];
 	struct hv_tsb_block sfmmu_hvblock;
+	struct hv_pgsz_order sfmmu_pgsz_order; /*  pagesize search order */
+	uint8_t		sfmmu_pgsz_map; /* bit map to control shared pgsz use */
 #endif
 	/*
 	 * sfmmu_ctxs is a variable length array of max_mmu_ctxdoms # of
@@ -757,6 +763,8 @@ struct sf_scd {
 
 extern int disable_shctx;
 extern int shctx_on;
+extern int pgsz_search_on;
+extern int disable_pgsz_search;
 
 /*
  * bit mask for managing vac conflicts on large pages.
@@ -870,6 +878,7 @@ struct ctx_trace {
 #define	HAT_CTX1_FLAG   	0x100 /* ISM imap hatflag for ctx1 */
 #define	HAT_JOIN_SCD		0x200 /* region is joining scd */
 #define	HAT_ALLCTX_INVALID	0x400 /* all per-MMU ctxs are invalidated */
+#define	HAT_ISMNOTINSCD		0x800 /* Not all ISM segs are in the SCD */
 
 #define	SFMMU_LGPGS_INUSE(sfmmup)					\
 	(((sfmmup)->sfmmu_tteflags | (sfmmup)->sfmmu_rtteflags) ||	\
@@ -1813,7 +1822,8 @@ struct tsbmiss {
 	uintptr_t		scratch[3];
 	ulong_t		shmermap[SFMMU_HMERGNMAP_WORDS];	/* 8 bytes */
 	ulong_t		scd_shmermap[SFMMU_HMERGNMAP_WORDS];	/* 8 bytes */
-	uint8_t		pad[48];			/* pad to 64 bytes */
+	uint8_t		pgsz_bitmap;		 /* limits ctx1 page sizes */
+	uint8_t		pad[47];		 /* pad to 64 bytes */
 };
 
 /*
@@ -2344,11 +2354,17 @@ extern struct hme_blk *sfmmu_hmetohblk(struct sf_hment *);
 #pragma weak mmu_large_pages_disabled
 #pragma weak mmu_set_ctx_page_sizes
 #pragma weak mmu_check_page_sizes
+#pragma weak mmu_set_pgsz_order
+#pragma weak sfmmu_init_pgsz_hv
+#pragma weak mmu_enable_pgsz_search
 
 extern void mmu_init_scd(sf_scd_t *);
 extern uint_t mmu_large_pages_disabled(uint_t);
 extern void mmu_set_ctx_page_sizes(sfmmu_t *);
 extern void mmu_check_page_sizes(sfmmu_t *, uint64_t *);
+extern void mmu_set_pgsz_order(sfmmu_t *, int);
+extern void sfmmu_init_pgsz_hv(sfmmu_t *);
+extern void mmu_enable_pgsz_search();
 
 extern sfmmu_t 		*ksfmmup;
 extern caddr_t		ktsb_base;
@@ -2390,12 +2406,15 @@ extern uint_t		disable_large_pages;
 extern uint_t		disable_ism_large_pages;
 extern uint_t		disable_auto_data_large_pages;
 extern uint_t		disable_auto_text_large_pages;
+extern uint_t		disable_shctx_large_pages;
+
+extern void		sfmmu_patch_shctx(void);
+extern void		sfmmu_patch_pgsz_reg(void);
 
 /* kpm externals */
 extern pfn_t		sfmmu_kpm_vatopfn(caddr_t);
 extern void		sfmmu_kpm_patch_tlbm(void);
 extern void		sfmmu_kpm_patch_tsbm(void);
-extern void		sfmmu_patch_shctx(void);
 extern void		sfmmu_kpm_load_tsb(caddr_t, tte_t *, int);
 extern void		sfmmu_kpm_unload_tsb(caddr_t, int);
 extern void		sfmmu_kpm_tsbmtl(short *, uint_t *, int);

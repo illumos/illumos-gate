@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MMU_H
 #define	_SYS_MMU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -157,6 +155,18 @@ extern "C" {
  */
 #define	MIN_NSHCONTEXTS			1
 #define	MIN_NTSBS			4
+
+/*
+ * The number of shared contexts supported in search list entries for the
+ * pagesize register.
+ */
+#define	NSEARCH_SHCONTEXTS		1
+
+/*
+ * The maximum number of entries allowed in a search list for the pagesize
+ * register.
+ */
+#define	MAX_PGSZ_SEARCH_ORDER		8
 
 #ifdef	__cplusplus
 }

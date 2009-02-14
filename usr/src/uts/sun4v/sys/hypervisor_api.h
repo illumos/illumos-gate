@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,6 +199,12 @@ extern "C" {
 #define	MAP_DTLB		0x1
 #define	MAP_ITLB		0x2
 
+/*
+ * Definitions for TLB Search Order functions
+ */
+#define	TLB_SO_DATA		0x1
+#define	TLB_SO_INS 		0x2
+#define	TLB_SO_ID 		TLB_SO_DATA | TLB_SO_INS
 
 /*
  * Interrupt state manipulation definitions.

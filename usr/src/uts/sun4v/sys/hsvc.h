@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,8 @@ extern "C" {
 #define	HSVC_GROUP_NIU			0x0204
 #define	HSVC_GROUP_VFALLS_CPU		0x0205
 #define	HSVC_GROUP_RKPERF		0x0206
+#define	HSVC_GROUP_RKMMU_EXT		0x0207
+#define	HSVC_GROUP_RKCPU		0x0208
 #define	HSVC_GROUP_DIAG			0x0300
 
 #ifndef _ASM

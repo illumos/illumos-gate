@@ -563,6 +563,10 @@ sfmmu_panic9:
 	.global	sfmmu_panic10
 sfmmu_panic10:
 	.asciz	"sfmmu_asm: valid SCD with no 3rd scd TSB"
+
+	.global	sfmmu_panic11
+sfmmu_panic11:
+	.asciz	"sfmmu_asm: ktsb_phys must not be 0 on a sun4v platform"
 	
         ENTRY(sfmmu_disable_intrs)
         rdpr    %pstate, %o0
@@ -942,6 +946,11 @@ sfmmu_patch_shctx(void)
 {
 }
 
+void
+sfmmu_patch_pgsz_reg(void)
+{
+}
+
 /* ARGSUSED */
 void
 sfmmu_load_tsbe(struct tsbe *tsbep, uint64_t vaddr, tte_t *ttep, int phys)
@@ -1134,8 +1143,31 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	 */
 	ENTRY_NP(sfmmu_patch_mmu_asi)
 	mov	%o7, %o4			! save return pc in %o4
-	movrnz	%o0, ASI_QUAD_LDD_PHYS, %o3
+	mov	ASI_QUAD_LDD_PHYS, %o3		! set QUAD_LDD_PHYS by default
+
+#ifdef sun4v
+
+	/*
+	 * Check ktsb_phys. It must be non-zero for sun4v, panic if not.
+	 */
+
+	brnz,pt %o0, do_patch
+	nop
+
+	sethi	%hi(sfmmu_panic11), %o0
+	call	panic
+	  or	%o0, %lo(sfmmu_panic11), %o0
+do_patch:
+
+#else /* sun4v */
+	/*
+	 * Some non-sun4v platforms deploy virtual ktsb (ktsb_phys==0).
+	 * Note that ASI_NQUAD_LD is not defined/used for sun4v
+	 */
 	movrz	%o0, ASI_NQUAD_LD, %o3
+
+#endif /* sun4v */
+
 	sll	%o3, 5, %o1			! imm_asi offset
 	mov	6, %o3				! number of instructions
 	sethi	%hi(dktsb), %o0			! to search
@@ -1157,6 +1189,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	retl
 	nop
 	SET_SIZE(sfmmu_patch_mmu_asi)
+
 
 	ENTRY_NP(sfmmu_patch_ktsb)
 	/*
@@ -1407,6 +1440,19 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	flush	%o0
 #endif /* sun4u */
 	SET_SIZE(sfmmu_patch_shctx)
+
+	ENTRY_NP(sfmmu_patch_pgsz_reg)
+#ifdef sun4u
+	retl
+	  nop
+#else /* sun4u */
+	set	sfmmu_pgsz_load_mmustate_patch, %o0
+	MAKE_NOP_INSTR(%o1)
+	st	%o1, [%o0]
+	retl
+	flush	%o0
+#endif /* sun4u */
+	SET_SIZE(sfmmu_patch_pgsz_reg)
 
 	/*
 	 * Routine that loads an entry into a tsb using virtual addresses.
@@ -2362,6 +2408,13 @@ label/**/4:								;\
 	ba,a,pt	%xcc, label/**/8					;\
 label/**/6:								;\
 	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hatid, hmemisc)		;\
+	/*                                  				;\
+	 * hmemisc is set to 1 if this is a shared mapping. It will	;\
+	 * be cleared by CHECK_SHARED_PGSZ if this pagesize is not	;\
+	 * allowed, in order to limit the number of entries in the	;\
+	 * pagesize register.						;\
+	 */								;\
+	CHECK_SHARED_PGSZ(tsbarea, tte, hatid, hmemisc, label/**/9)	;\
 	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hatid 	;\
 label/**/7:								;\
 	set	TTE_SUSPEND, hatid					;\
@@ -3242,7 +3295,36 @@ tsb_shme_checktte:
 	stub    %g1, [%g6 + TSBMISS_URTTEFLAGS]
 
 	SAVE_CTX1(%g7, %g2, %g1, tsb_shmel)	
+	ba	tsb_validtte
 #endif /* sun4u && !UTSB_PHYS */
+
+tsb_ism_validtte:
+#ifdef sun4v
+	/*
+	 * Check pagesize against bitmap for Rock page size register,
+	 * for ism mappings.
+	 *
+	 * %g1, %g2 = scratch
+	 * %g3 = tte
+	 * g4 = tte pa
+	 * g5 = tte va
+	 * g6 = tsbmiss area
+	 * %g7 = tt
+	 */
+	ldub    [%g6 + TSBMISS_URTTEFLAGS], %g1
+	and     %g1, HAT_CHKCTX1_FLAG, %g2
+	/*
+	 * Clear the HAT_CHKCTX1_FLAG in %g2 if this shared pagesize is not allowed
+	 * to limit the number of entries in the pagesize search register.
+	 */
+	CHECK_SHARED_PGSZ(%g6, %g3, %g7, %g2, ism_chk_pgsz)
+	andn	%g1, HAT_CHKCTX1_FLAG, %g1
+	or      %g1, %g2, %g1
+	stub    %g1, [%g6 + TSBMISS_URTTEFLAGS]
+	brz     %g2, tsb_validtte
+	  rdpr  %tt, %g7
+	SAVE_CTX1(%g7, %g1, %g2, tsb_shctxl)
+#endif /* sun4v */
 
 tsb_validtte:
 	/*
@@ -3576,10 +3658,7 @@ tsb_ism:
 	ldub    [%g6 + TSBMISS_URTTEFLAGS], %g5
 	or      %g5, HAT_CHKCTX1_FLAG, %g5
 	stub    %g5, [%g6 + TSBMISS_URTTEFLAGS]
-	rdpr    %tt, %g5
-	SAVE_CTX1(%g5, %g3, %g1, tsb_shctxl)
 #endif /* defined(sun4v) || defined(UTSB_PHYS) */
-
 	/*
 	 * ISM pages are always locked down.
 	 * If we can't find the tte then pagefault
@@ -3611,7 +3690,7 @@ tsb_ism_32M:
 	/* NOT REACHED */
 	
 tsb_ism_32M_found:
-	brlz,a,pt %g3, tsb_validtte
+	brlz,a,pt %g3, tsb_ism_validtte
 	  rdpr	%tt, %g7
 	ba,pt	%xcc, tsb_ism_4M
 	  nop
@@ -3629,7 +3708,7 @@ tsb_ism_256M:
 	    tsb_ism_4M)
 
 tsb_ism_256M_found:
-	brlz,a,pt %g3, tsb_validtte
+	brlz,a,pt %g3, tsb_ism_validtte
 	  rdpr	%tt, %g7
 
 tsb_ism_4M:
@@ -3642,7 +3721,7 @@ tsb_ism_4M:
 	/* NOT REACHED */
 
 tsb_ism_4M_found:
-	brlz,a,pt %g3, tsb_validtte
+	brlz,a,pt %g3, tsb_ism_validtte
 	  rdpr	%tt, %g7
 
 tsb_ism_8K:
@@ -3656,7 +3735,7 @@ tsb_ism_8K:
 	/* NOT REACHED */
 
 tsb_ism_8K_found:
-	brlz,a,pt %g3, tsb_validtte
+	brlz,a,pt %g3, tsb_ism_validtte
 	  rdpr	%tt, %g7
 
 tsb_pagefault:

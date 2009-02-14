@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MACHSYSTM_H
 #define	_SYS_MACHSYSTM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Numerous platform-dependent interfaces that don't seem to belong
@@ -251,6 +249,7 @@ extern uint64_t cbe_level14_inum;
 extern void *contig_mem_alloc(size_t);
 extern void *contig_mem_alloc_align(size_t, size_t);
 extern void contig_mem_free(void *, size_t);
+extern void *contig_mem_alloc_align_sleep(size_t, size_t);
 
 /*
  * Caches

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/vmsystm.h>
 #include <sys/bitmap.h>
 #include <vm/rm.h>
+#include <vm/vm_dep.h>
 #include <sys/t_lock.h>
 #include <sys/vm_machparam.h>
 #include <sys/promif.h>
@@ -479,4 +480,23 @@ sfmmu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 void
 sfmmu_cache_flushall()
 {
+}
+
+/*
+ * Initialise the real address field in sfmmu_pgsz_order.
+ */
+void
+sfmmu_init_pgsz_hv(sfmmu_t *sfmmup)
+{
+	int i;
+
+	/*
+	 * Initialize mmu counts for pagesize register programming.
+	 */
+	for (i = 0; i < max_mmu_page_sizes; i++) {
+		sfmmup->sfmmu_mmuttecnt[i] = 0;
+	}
+
+	sfmmup->sfmmu_pgsz_order.hv_pgsz_order_pa =
+	    va_to_pa(&sfmmup->sfmmu_pgsz_order.hv_pgsz_order);
 }

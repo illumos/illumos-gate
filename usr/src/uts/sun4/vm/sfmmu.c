@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <vm/hat.h>
@@ -199,6 +197,10 @@ hat_kern_setup(void)
 
 	if (!shctx_on) {
 		sfmmu_patch_shctx();
+	}
+
+	if (&mmu_enable_pgsz_search) {
+		mmu_enable_pgsz_search();
 	}
 
 	/*

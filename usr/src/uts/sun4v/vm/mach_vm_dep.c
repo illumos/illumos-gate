@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,6 +150,7 @@ static	vmem_t		*contig_mem_slab_arena;
 static	vmem_t		*contig_mem_arena;
 static	vmem_t		*contig_mem_reloc_arena;
 static	kmutex_t	contig_mem_lock;
+static	kmutex_t	contig_mem_sleep_lock;
 #define	CONTIG_MEM_ARENA_QUANTUM	64
 #define	CONTIG_MEM_SLAB_ARENA_QUANTUM	MMU_PAGESIZE64K
 
@@ -617,14 +618,15 @@ contig_mem_alloc(size_t size)
 }
 
 /*
- * contig_mem_alloc_align allocates real contiguous memory with the specified
- * alignment up to contig_mem_import_size_max. The alignment must be a
- * power of 2 and no greater than contig_mem_import_size_max. We assert
+ * contig_mem_alloc_align_flag allocates real contiguous memory with the
+ * specified alignment up to contig_mem_import_size_max. The alignment must
+ * be a power of 2 and no greater than contig_mem_import_size_max. We assert
  * the aligment is a power of 2. For non-debug, vmem_xalloc will panic
  * for non power of 2 alignments.
  */
-void *
-contig_mem_alloc_align(size_t size, size_t align)
+static	void *
+contig_mem_alloc_align_flag(size_t size, size_t align, int flag,
+    kmutex_t *lockp)
 {
 	void *buf;
 
@@ -641,27 +643,48 @@ contig_mem_alloc_align(size_t size, size_t align)
 	 * allocations that don't require new span allocations
 	 * are serialized by vmem_xalloc. Serializing span
 	 * allocations also prevents us from trying to allocate
-	 * more spans that necessary.
+	 * more spans than necessary.
 	 */
-	mutex_enter(&contig_mem_lock);
+	mutex_enter(lockp);
 
 	buf = vmem_xalloc(contig_mem_arena, size, align, 0, 0,
-	    NULL, NULL, VM_NOSLEEP | VM_NORELOC);
+	    NULL, NULL, flag | VM_NORELOC);
 
 	if ((buf == NULL) && (size <= MMU_PAGESIZE)) {
-		mutex_exit(&contig_mem_lock);
+		mutex_exit(lockp);
 		return (vmem_xalloc(static_alloc_arena, size, align, 0, 0,
-		    NULL, NULL, VM_NOSLEEP));
+		    NULL, NULL, flag));
 	}
 
 	if (buf == NULL) {
 		buf = vmem_xalloc(contig_mem_reloc_arena, size, align, 0, 0,
-		    NULL, NULL, VM_NOSLEEP);
+		    NULL, NULL, flag);
 	}
 
-	mutex_exit(&contig_mem_lock);
+	mutex_exit(lockp);
 
 	return (buf);
+}
+
+void *
+contig_mem_alloc_align(size_t size, size_t align)
+{
+	return (contig_mem_alloc_align_flag
+	    (size, align, VM_NOSLEEP, &contig_mem_lock));
+}
+
+/*
+ * This function is provided for callers that need physically contiguous
+ * allocations but can sleep. We use the contig_mem_sleep_lock so that we
+ * don't interfere with contig_mem_alloc_align calls that should never sleep.
+ * Similarly to contig_mem_alloc_align, we use a lock to prevent allocating
+ * unnecessary spans when called in parallel.
+ */
+void *
+contig_mem_alloc_align_sleep(size_t size, size_t align)
+{
+	return (contig_mem_alloc_align_flag
+	    (size, align, VM_SLEEP, &contig_mem_sleep_lock));
 }
 
 void
@@ -687,6 +710,7 @@ void
 contig_mem_init(void)
 {
 	mutex_init(&contig_mem_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&contig_mem_sleep_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	contig_mem_slab_arena = vmem_xcreate("contig_mem_slab_arena", NULL, 0,
 	    CONTIG_MEM_SLAB_ARENA_QUANTUM, contig_vmem_xalloc_aligned_wrapper,

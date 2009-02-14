@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +68,9 @@
  */
 #define	FPUSED_FLAG	1
 #define	TRAMP_FLAG	2
-#define	MASK_FLAGS	3
+#define	KCOPY_FLAG	4
+#define	FPSAVED_FLAG	8
+#define	MASK_FLAGS	0xf
 
 /*
  * LOFAULT_SET : Flag set by kzero and kcopy to indicate that t_lofault
@@ -305,82 +307,52 @@ kcopy(const void *from, void *to, size_t count)
 
 	ENTRY(kcopy)
 
-	cmp	%o2, VIS_COPY_THRESHOLD		! check for leaf rtn case
-	bleu,pt	%ncc, .kcopy_small		! go to larger cases
-	  xor	%o0, %o1, %o3			! are src, dst alignable?
-	btst	7, %o3				!
-	bz,pt	%ncc, .kcopy_8			! check for longword alignment
-	  nop
-	btst	1, %o3				! 
-	bz,pt	%ncc, .kcopy_2			! check for half-word
-	  nop
-	sethi	%hi(hw_copy_limit_1), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_1)], %o3
-	tst	%o3
-	bz,pn	%icc, .kcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .kcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .kcopy_more		! otherwise go to large copy
-	  nop
-.kcopy_2:
-	btst	3, %o3				!
-	bz,pt	%ncc, .kcopy_4			! check for word alignment
-	  nop
-	sethi	%hi(hw_copy_limit_2), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_2)], %o3
-	tst	%o3
-	bz,pn	%icc, .kcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .kcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .kcopy_more		! otherwise go to large copy
-	  nop
-.kcopy_4:
-	! already checked longword, must be word aligned
-	sethi	%hi(hw_copy_limit_4), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_4)], %o3
-	tst	%o3
-	bz,pn	%icc, .kcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .kcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .kcopy_more		! otherwise go to large copy
-	  nop
-.kcopy_8:
-	sethi	%hi(hw_copy_limit_8), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_8)], %o3
-	tst	%o3
-	bz,pn	%icc, .kcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .kcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .kcopy_more		! otherwise go to large copy
-	  nop
-
-.kcopy_small:
-	sethi	%hi(.sm_copyerr), %o5		! sm_copyerr is lofault value
-	or	%o5, %lo(.sm_copyerr), %o5
-	ldn	[THREAD_REG + T_LOFAULT], %o4	! save existing handler
+	sethi	%hi(.copyerr_no_fp_used), %o4
+	or	%o4, %lo(.copyerr_fp_used), %o4
+	stn	%o4, [THREAD_REG + T_LOFAULT]	! set t_lofault
+	ldn	[THREAD_REG + T_LOFAULT], %o5	! save existing handler
+	or	%o5, KCOPY_FLAG, %o5
 	membar	#Sync				! sync error barrier
-	ba,pt	%ncc, .sm_do_copy		! common code
-	 stn	%o5, [THREAD_REG + T_LOFAULT]	! set t_lofault
-
-.kcopy_more:
-	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
-	sethi	%hi(.copyerr), %l7		! copyerr is lofault value
-	or	%l7, %lo(.copyerr), %l7
-	ldn	[THREAD_REG + T_LOFAULT], %l6	! save existing handler
-	membar	#Sync				! sync error barrier
-	ba,pt	%ncc, .do_copy			! common code
-	  stn	%l7, [THREAD_REG + T_LOFAULT]	! set t_lofault
+	ba,pt	%ncc, .forcpy			! common code
+	 nop
 
 
 /*
- * We got here because of a fault during bcopy_more, called from kcopy or bcopy.
- * Errno value is in %g1.  bcopy_more uses fp quadrants 3 and 4.
+ * We got here because of a fault in .copyerr_fp_used.  We can't safely
+ * restore fp state, so we panic.
  */
-.copyerr:
+fp_panic_msg:
+	.asciz	"Unable to restore fp state after copy operation"
+
+	.align	4
+.copyerr2:
+	set	fp_panic_msg, %o0
+	call	panic
+	  nop
+
+/*
+ * We got here because of a fault during a small kcopy or bcopy.
+ * No floating point registers were used in this copy.
+ * Errno value is in %g1.
+ */
+.copyerr_no_fp_used:
+	btst	TRAMP_FLAG, %o5
+	membar	#Sync
+	andn	%o5, TRAMP_FLAG, %o5
+	bnz,pn	%ncc, 3f
+	  stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+	retl
+	  mov	%g1, %o0
+3:
+	jmp	%o5				! goto real handler
+	  mov	%g0, %o0			! 
+
+/*
+ * We got here because of a fault during a small kcopy or bcopy.
+ * floating point registers were used in this copy.
+ * Errno value is in %g1.
+ */
+.copyerr_fp_used:
 	set	.copyerr2, %l0
 	membar	#Sync				! sync error barrier
 	stn	%l0, [THREAD_REG + T_LOFAULT]	! set t_lofault
@@ -392,10 +364,9 @@ kcopy(const void *from, void *to, size_t count)
 	wr	%o2, 0, %gsr
 
 	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
-	! No need to save regs if either FEF or DU are clear
-    	and	%o3, FPRS_FEF|FPRS_DU, %o2
-	xorcc   %o2, FPRS_FEF|FPRS_DU, %g0
-	bnz,pt  %icc, 4f
+	! No need to restore regs if they were not saved
+	btst	FPSAVED_FLAG, %l6
+	bz	%ncc, 4f
 	  nop
 
 	BLD_FPQ3Q4_FROMSTACK(%o2)
@@ -437,45 +408,18 @@ kcopy(const void *from, void *to, size_t count)
 	jmp	%l6				! goto real handler
 	  restore	%g0, 0, %o0		! dispose of copy window
 
-/*
- * We got here because of a fault in .copyerr.  We can't safely restore fp
- * state, so we panic.
- */
-fp_panic_msg:
-	.asciz	"Unable to restore fp state after copy operation"
-
-	.align	4
-.copyerr2:
-	set	fp_panic_msg, %o0
-	call	panic
-	  nop
-
-/*
- * We got here because of a fault during a small kcopy or bcopy.
- * No floating point registers are used by the small copies.
- * Errno value is in %g1.
- */
-.sm_copyerr:
-1:
-	btst	TRAMP_FLAG, %o4
-	membar	#Sync
-	andn	%o4, TRAMP_FLAG, %o4
-	bnz,pn	%ncc, 3f
-	  stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
-	retl
-	  mov	%g1, %o0
-3:
-	jmp	%o4				! goto real handler
-	  mov	%g0, %o0			! 
-
 	SET_SIZE(kcopy)
 #endif	/* lint */
 
-
+#define	ALIGN8(X)	(((X) + 7) & ~7)
+#define	ICACHE_LINE_SIZE	64
+#define	PF_FAR		2048
+#define	PF_NEAR		1024
+#define	SMALL_MAX	39
 /*
  * Copy a block of storage - must not overlap (from + len <= to).
  * Registers: l6 - saved t_lofault
- * (for short copies, o4 - saved t_lofault)
+ * (for short copies, o5 - saved t_lofault)
  *
  * Copy a page of memory.
  * Assumes double word alignment and a count >= 256.
@@ -486,431 +430,181 @@ fp_panic_msg:
 void
 bcopy(const void *from, void *to, size_t count)
 {}
-
 #else	/* lint */
 
+	.align ICACHE_LINE_SIZE
 	ENTRY(bcopy)
-
-	cmp	%o2, VIS_COPY_THRESHOLD		! check for leaf rtn case
-	bleu,pt	%ncc, .bcopy_small		! go to larger cases
-	  xor	%o0, %o1, %o3			! are src, dst alignable?
-	btst	7, %o3				!
-	bz,pt	%ncc, .bcopy_8			! check for longword alignment
+	ENTRY(__align_cpy_1)
+	ldn	[THREAD_REG + T_LOFAULT], %o5	! save t_lofault
+	tst	%o5
+	bz,pt	%icc, .forcpy
 	  nop
-	btst	1, %o3				!
-	bz,pt	%ncc, .bcopy_2			! check for half-word
-	  nop
-	sethi	%hi(hw_copy_limit_1), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_1)], %o3
-	tst	%o3
-	bz,pn	%icc, .bcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .bcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .bcopy_more		! otherwise go to large copy
-	  nop
-.bcopy_2:
-	btst	3, %o3				!
-	bz,pt	%ncc, .bcopy_4			! check for word alignment
-	  nop
-	sethi	%hi(hw_copy_limit_2), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_2)], %o3
-	tst	%o3
-	bz,pn	%icc, .bcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .bcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .bcopy_more		! otherwise go to large copy
-	  nop
-.bcopy_4:
-	! already checked longword, must be word aligned
-	sethi	%hi(hw_copy_limit_4), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_4)], %o3
-	tst	%o3
-	bz,pn	%icc, .bcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .bcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .bcopy_more		! otherwise go to large copy
-	  nop
-.bcopy_8:
-	sethi	%hi(hw_copy_limit_8), %o3	! Check copy limit
-	ld	[%o3 + %lo(hw_copy_limit_8)], %o3
-	tst	%o3
-	bz,pn	%icc, .bcopy_small		! if zero, disable HW copy
-	  cmp	%o2, %o3			! if length <= limit
-	bleu,pt	%ncc, .bcopy_small		! go to small copy
-	  nop
-	ba,pt	%ncc, .bcopy_more		! otherwise go to large copy
-	  nop
-
-	.align	16
-.bcopy_small:
-	ldn	[THREAD_REG + T_LOFAULT], %o4	! save t_lofault
-	tst	%o4
-	bz,pt	%icc, .sm_do_copy
-	  nop
-	sethi	%hi(.sm_copyerr), %o5
-	or	%o5, %lo(.sm_copyerr), %o5
+	sethi	%hi(.copyerr_no_fp_used), %o4
+	or	%o4, %lo(.copyerr_no_fp_used), %o4
 	membar	#Sync				! sync error barrier
-	stn	%o5, [THREAD_REG + T_LOFAULT]	! install new vector
-	or	%o4, TRAMP_FLAG, %o4		! error should trampoline
-.sm_do_copy:
+	stn	%o4, [THREAD_REG + T_LOFAULT]	! install new vector
+	or	%o5, TRAMP_FLAG, %o5		! error should trampoline
+.forcpy:
+	cmp	%o2, SMALL_MAX		! check for not small case
+	bgu,pn	%ncc, .medium_bcopy		! go to larger cases
 	cmp	%o2, SHORTCOPY		! check for really short case
-	bleu,pt	%ncc, .bc_sm_left	!
-	  cmp	%o2, CHKSIZE		! check for medium length cases
-	bgu,pn	%ncc, .bc_med		!
-	  or	%o0, %o1, %o3		! prepare alignment check
+	ble,pt	%ncc, .smallleft_bcopy	!
+	or	%o1, %o0, %o3		! prepare alignment check
 	andcc	%o3, 0x3, %g0		! test for alignment
-	bz,pt	%ncc, .bc_sm_word	! branch to word aligned case
-.bc_sm_movebytes:
-	  sub	%o2, 3, %o2		! adjust count to allow cc zero test
-.bc_sm_notalign4:
+	bz,pt	%ncc, .smallword_bcopy	! branch to word aligned case
+	sub	%o2, 3, %o2		! adjust count to allow cc zero test
+.smallnotalign4_bcopy:
 	ldub	[%o0], %o3		! read byte
-	stb	%o3, [%o1]		! write byte
 	subcc	%o2, 4, %o2		! reduce count by 4
-	ldub	[%o0 + 1], %o3		! repeat for a total of 4 bytes
+	stb	%o3, [%o1]		! write byte
+	ldub	[%o0+1], %o3		! repeat for a total of 4 bytes
 	add	%o0, 4, %o0		! advance SRC by 4
-	stb	%o3, [%o1 + 1]
-	ldub	[%o0 - 2], %o3
+	stb	%o3, [%o1+1]
+	ldub	[%o0-2], %o3
 	add	%o1, 4, %o1		! advance DST by 4
-	stb	%o3, [%o1 - 2]
-	ldub	[%o0 - 1], %o3
-	bgt,pt	%ncc, .bc_sm_notalign4	! loop til 3 or fewer bytes remain
-	  stb	%o3, [%o1 - 1]
+	stb	%o3, [%o1-2]
+	ldub	[%o0-1], %o3
+	bgu,pt	%ncc, .smallnotalign4_bcopy	! loop til 3 or fewer bytes remain
+	stb	%o3, [%o1-1]
 	add	%o2, 3, %o2		! restore count
-.bc_sm_left:
+.smallleft_bcopy:
 	tst	%o2
-	bz,pt	%ncc, .bc_sm_exit	! check for zero length
-	  deccc	%o2			! reduce count for cc test
-	ldub	[%o0], %o3		! move one byte
-	bz,pt	%ncc, .bc_sm_exit
-	  stb	%o3, [%o1]
-	ldub	[%o0 + 1], %o3		! move another byte
-	deccc	%o2			! check for more
-	bz,pt	%ncc, .bc_sm_exit
-	  stb	%o3, [%o1 + 1]
-	ldub	[%o0 + 2], %o3		! move final byte
-	stb	%o3, [%o1 + 2]
+	bz,pt	%ncc, .smallexit_bcopy
+	nop
+.smallleft3_bcopy:				! 1, 2, or 3 bytes remain
+	ldub	[%o0], %o3		! load one byte
+	deccc	%o2			! reduce count for cc test
+	bz,pt	%ncc, .smallexit_bcopy
+	stb	%o3, [%o1]		! store one byte
+	ldub	[%o0+1], %o3		! load second byte
+	deccc	%o2
+	bz,pt	%ncc, .smallexit_bcopy
+	stb	%o3, [%o1+1]		! store second byte
+	ldub	[%o0+2], %o3		! load third byte
+	stb	%o3, [%o1+2]		! store third byte
 	membar	#Sync				! sync error barrier
-	andn	%o4, TRAMP_FLAG, %o4
-	stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+	andn	%o5, TRAMP_FLAG, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	retl
-	  mov	%g0, %o0		! return 0
+	clr	%o0
+
 	.align	16
-	nop				! instruction alignment
-					! see discussion at start of file
-.bc_sm_words:
+	nop				! affects loop icache alignment
+.smallwords_bcopy:
 	lduw	[%o0], %o3		! read word
-.bc_sm_wordx:
+.smallwordx_bcopy:
 	subcc	%o2, 8, %o2		! update count
 	stw	%o3, [%o1]		! write word
 	add	%o0, 8, %o0		! update SRC
-	lduw	[%o0 - 4], %o3		! read word
+	lduw	[%o0-4], %o3		! read word
 	add	%o1, 8, %o1		! update DST
-	bgt,pt	%ncc, .bc_sm_words	! loop til done
-	  stw	%o3, [%o1 - 4]		! write word
+	bgu,pt	%ncc, .smallwords_bcopy	! loop until done
+	stw	%o3, [%o1-4]		! write word
 	addcc	%o2, 7, %o2		! restore count
-	bz,pt	%ncc, .bc_sm_exit
-	  deccc	%o2
-	bz,pt	%ncc, .bc_sm_byte
-.bc_sm_half:
-	  subcc	%o2, 2, %o2		! reduce count by 2
-	add	%o0, 2, %o0		! advance SRC by 2
-	lduh	[%o0 - 2], %o3		! read half word
-	add	%o1, 2, %o1		! advance DST by 2
-	bgt,pt	%ncc, .bc_sm_half	! loop til done
-	  sth	%o3, [%o1 - 2]		! write half word
-	addcc	%o2, 1, %o2		! restore count
-	bz,pt	%ncc, .bc_sm_exit
-	  nop
-.bc_sm_byte:
-	ldub	[%o0], %o3
-	stb	%o3, [%o1]
+	bz,pt	%ncc, .smallexit_bcopy	! check for completion
+	nop
+	cmp	%o2, 4			! check for 4 or more bytes left
+	blt	.smallleft3_bcopy		! if not, go to finish up
+	nop
+	lduw	[%o0], %o3
+	add	%o0, 4, %o0
+	subcc	%o2, 4, %o2
+	stw	%o3, [%o1]
+	add	%o1, 4, %o1
+	bnz,pt	%ncc, .smallleft3_bcopy
+	nop
 	membar	#Sync				! sync error barrier
-	andn	%o4, TRAMP_FLAG, %o4
-	stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+	andn	%o5, TRAMP_FLAG, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	retl
-	  mov	%g0, %o0		! return 0
+	clr	%o0
 
-.bc_sm_word:
+.smallword_bcopy:
 	subcc	%o2, 4, %o2		! update count
-	bgt,pt	%ncc, .bc_sm_wordx
-	  lduw	[%o0], %o3		! read word
+	bgu,pt	%ncc, .smallwordx_bcopy
+	lduw	[%o0], %o3		! read word
 	addcc	%o2, 3, %o2		! restore count
-	bz,pt	%ncc, .bc_sm_exit
-	  stw	%o3, [%o1]		! write word
+	bz,pt	%ncc, .smallexit_bcopy
+	stw	%o3, [%o1]		! write word
 	deccc	%o2			! reduce count for cc test
-	ldub	[%o0 + 4], %o3		! load one byte
-	bz,pt	%ncc, .bc_sm_exit
-	  stb	%o3, [%o1 + 4]		! store one byte
-	ldub	[%o0 + 5], %o3		! load second byte
+	ldub	[%o0+4], %o3		! load one byte
+	bz,pt	%ncc, .smallexit_bcopy
+	stb	%o3, [%o1+4]		! store one byte
+	ldub	[%o0+5], %o3		! load second byte
 	deccc	%o2
-	bz,pt	%ncc, .bc_sm_exit
-	  stb	%o3, [%o1 + 5]		! store second byte
-	ldub	[%o0 + 6], %o3		! load third byte
-	stb	%o3, [%o1 + 6]		! store third byte
-.bc_sm_exit:
+	bz,pt	%ncc, .smallexit_bcopy
+	stb	%o3, [%o1+5]		! store second byte
+	ldub	[%o0+6], %o3		! load third byte
+	stb	%o3, [%o1+6]		! store third byte
+.smallexit_bcopy:
 	membar	#Sync				! sync error barrier
-	andn	%o4, TRAMP_FLAG, %o4
-	stn	%o4, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+	andn	%o5, TRAMP_FLAG, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	retl
-	  mov	%g0, %o0		! return 0
-
+	clr	%o0
 	.align 16
-.bc_med:
-	xor	%o0, %o1, %o3		! setup alignment check
-	btst	1, %o3
-	bnz,pt	%ncc, .bc_sm_movebytes	! unaligned
-	  nop
-	btst	3, %o3
-	bnz,pt	%ncc, .bc_med_half	! halfword aligned
-	  nop
-	btst	7, %o3
-	bnz,pt	%ncc, .bc_med_word	! word aligned
-	  nop
-.bc_med_long:
-	btst	3, %o0			! check for
-	bz,pt	%ncc, .bc_med_long1	! word alignment
-	  nop
-.bc_med_long0:
-	ldub	[%o0], %o3		! load one byte
+.medium_bcopy:
+	neg	%o1, %g5
+	neg	%o0, %o3	
+	andcc	%g5, 7, %g5	! bytes till DST 8 byte aligned
+	and	%o3, 7, %o3	! bytes till SRC 8 byte aligned
+	cmp	%g5, %o3
+	bne	%ncc, continue
+	sub	%g5, %o3, %o3	! -(bytes till SRC aligned after DST aligned)
+				! o3={-7, -6, ... 7}  o3>0 => SRC overaligned
+	! src and dst are aligned.
+	mov	%o3, %g1		! save %o3
+	andcc	%o0, 7, %o3		! is src buf  aligned on a 8 byte bound
+	brz,pt	%o3, src_dst_aligned_on_8		
+	nop
+	mov	%o3, %g5
+	mov	8, %o4
+	sub 	%o4, %o3, %o3
+	cmp	%o3, %o2
+	bg,a,pn	%ncc, 1f
+	mov	%o2, %o3	
+1:
+	! %o3 has the bytes to be written in partial store.
+	sub	%o2, %o3, %o2
+	prefetch	[%o0],2
+7:
+	deccc	%o3			! byte clearing loop
+	ldub	[%o0], %o4		! load one byte
+	stb	%o4, [%o1]
+	inc	%o1			! increment dst
+	bgu,pt	%ncc, 7b
+	inc	%o0			! increment src
+	mov	%g1, %o3		! restore %o3
+src_dst_aligned_on_8:
+	! check  if we are copying 1k or more bytes
+	cmp	%o2, 511
+	bgu,pt	%ncc, copying_ge_512
+	nop
+	ba	.medlword_bcopy
+	nop
+
+continue:
+	andcc	%g5, 7, %g5	! bytes till DST 8 byte aligned
+	bz	%ncc, 2f
+	nop
+
+	sub	%o2, %g5, %o2	! update count
+
+1:
+	ldub	[%o0], %o4
+	deccc	%g5
 	inc	%o0
-	stb	%o3,[%o1]		! store byte
+	stb	%o4, [%o1]
+	bgu,pt	%ncc, 1b
 	inc	%o1
-	btst	3, %o0
-	bnz,pt	%ncc, .bc_med_long0
-	  dec	%o2
-.bc_med_long1:			! word aligned
-	btst	7, %o0			! check for long word
-	bz,pt	%ncc, .bc_med_long2
-	  nop
-	lduw	[%o0], %o3		! load word
-	add	%o0, 4, %o0		! advance SRC by 4
-	stw	%o3, [%o1]		! store word
-	add	%o1, 4, %o1		! advance DST by 4
-	sub	%o2, 4, %o2		! reduce count by 4
-!
-!  Now long word aligned and have at least 32 bytes to move
-!
-.bc_med_long2:
-	sub	%o2, 31, %o2		! adjust count to allow cc zero test
-.bc_med_lmove:
-	ldx	[%o0], %o3		! read long word
-	stx	%o3, [%o1]		! write long word
-	subcc	%o2, 32, %o2		! reduce count by 32
-	ldx	[%o0 + 8], %o3		! repeat for a total for 4 long words
-	add	%o0, 32, %o0		! advance SRC by 32
-	stx	%o3, [%o1 + 8]
-	ldx	[%o0 - 16], %o3
-	add	%o1, 32, %o1		! advance DST by 32
-	stx	%o3, [%o1 - 16]
-	ldx	[%o0 - 8], %o3
-	bgt,pt	%ncc, .bc_med_lmove	! loop til 31 or fewer bytes left
-	  stx	%o3, [%o1 - 8]
-	addcc	%o2, 24, %o2		! restore count to long word offset
-	ble,pt	%ncc, .bc_med_lextra	! check for more long words to move
-	  nop
-.bc_med_lword:
-	ldx	[%o0], %o3		! read long word
-	subcc	%o2, 8, %o2		! reduce count by 8
-	stx	%o3, [%o1]		! write long word
-	add	%o0, 8, %o0		! advance SRC by 8
-	bgt,pt	%ncc, .bc_med_lword	! loop til 7 or fewer bytes left
-	  add	%o1, 8, %o1		! advance DST by 8
-.bc_med_lextra:
-	addcc	%o2, 7, %o2		! restore rest of count
-	bz,pt	%ncc, .bc_sm_exit	! if zero, then done
-	  deccc	%o2
-	bz,pt	%ncc, .bc_sm_byte
-	  nop
-	ba,pt	%ncc, .bc_sm_half
-	  nop
 
-	.align 16
-.bc_med_word:
-	btst	3, %o0			! check for
-	bz,pt	%ncc, .bc_med_word1	! word alignment
-	  nop
-.bc_med_word0:
-	ldub	[%o0], %o3		! load one byte
-	inc	%o0
-	stb	%o3,[%o1]		! store byte
-	inc	%o1
-	btst	3, %o0
-	bnz,pt	%ncc, .bc_med_word0
-	  dec	%o2
-!
-!  Now word aligned and have at least 36 bytes to move
-!
-.bc_med_word1:
-	sub	%o2, 15, %o2		! adjust count to allow cc zero test
-.bc_med_wmove:
-	lduw	[%o0], %o3		! read word
-	stw	%o3, [%o1]		! write word
-	subcc	%o2, 16, %o2		! reduce count by 16
-	lduw	[%o0 + 4], %o3		! repeat for a total for 4 words
-	add	%o0, 16, %o0		! advance SRC by 16
-	stw	%o3, [%o1 + 4]
-	lduw	[%o0 - 8], %o3
-	add	%o1, 16, %o1		! advance DST by 16
-	stw	%o3, [%o1 - 8]
-	lduw	[%o0 - 4], %o3
-	bgt,pt	%ncc, .bc_med_wmove	! loop til 15 or fewer bytes left
-	  stw	%o3, [%o1 - 4]
-	addcc	%o2, 12, %o2		! restore count to word offset
-	ble,pt	%ncc, .bc_med_wextra	! check for more words to move
-	  nop
-.bc_med_word2:
-	lduw	[%o0], %o3		! read word
-	subcc	%o2, 4, %o2		! reduce count by 4
-	stw	%o3, [%o1]		! write word
-	add	%o0, 4, %o0		! advance SRC by 4
-	bgt,pt	%ncc, .bc_med_word2	! loop til 3 or fewer bytes left
-	  add	%o1, 4, %o1		! advance DST by 4
-.bc_med_wextra:
-	addcc	%o2, 3, %o2		! restore rest of count
-	bz,pt	%ncc, .bc_sm_exit	! if zero, then done
-	  deccc	%o2
-	bz,pt	%ncc, .bc_sm_byte
-	  nop
-	ba,pt	%ncc, .bc_sm_half
-	  nop
+	! Now DST is 8-byte aligned.  dst, from, o2 are current.
 
-	.align 16
-.bc_med_half:
-	btst	1, %o0			! check for
-	bz,pt	%ncc, .bc_med_half1	! half word alignment
-	  nop
-	ldub	[%o0], %o3		! load one byte
-	inc	%o0
-	stb	%o3,[%o1]		! store byte
-	inc	%o1
-	dec	%o2
-!
-!  Now half word aligned and have at least 38 bytes to move
-!
-.bc_med_half1:
-	sub	%o2, 7, %o2		! adjust count to allow cc zero test
-.bc_med_hmove:
-	lduh	[%o0], %o3		! read half word
-	sth	%o3, [%o1]		! write half word
-	subcc	%o2, 8, %o2		! reduce count by 8
-	lduh	[%o0 + 2], %o3		! repeat for a total for 4 halfwords
-	add	%o0, 8, %o0		! advance SRC by 8
-	sth	%o3, [%o1 + 2]
-	lduh	[%o0 - 4], %o3
-	add	%o1, 8, %o1		! advance DST by 8
-	sth	%o3, [%o1 - 4]
-	lduh	[%o0 - 2], %o3
-	bgt,pt	%ncc, .bc_med_hmove	! loop til 7 or fewer bytes left
-	  sth	%o3, [%o1 - 2]
-	addcc	%o2, 7, %o2		! restore count
-	bz,pt	%ncc, .bc_sm_exit
-	  deccc	%o2
-	bz,pt	%ncc, .bc_sm_byte
-	  nop
-	ba,pt	%ncc, .bc_sm_half
-	  nop
-
-	SET_SIZE(bcopy)
-
-/*
- * The _more entry points are not intended to be used directly by
- * any caller from outside this file.  They are provided to allow
- * profiling and dtrace of the portions of the copy code that uses
- * the floating point registers.
- * This entry is particularly important as DTRACE (at least as of
- * 4/2004) does not support leaf functions.
- */
-
-	ENTRY(bcopy_more)
-.bcopy_more:
-	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
-	ldn	[THREAD_REG + T_LOFAULT], %l6	! save t_lofault
-	tst	%l6
-	bz,pt	%ncc, .do_copy
-	  nop
-	sethi	%hi(.copyerr), %o2
-	or	%o2, %lo(.copyerr), %o2
-	membar	#Sync				! sync error barrier
-	stn	%o2, [THREAD_REG + T_LOFAULT]	! install new vector
-	!
-	! We've already captured whether t_lofault was zero on entry.
-	! We need to mark ourselves as being from bcopy since both
-	! kcopy and bcopy use the same code path. If TRAMP_FLAG is set
-	! and the saved lofault was zero, we won't reset lofault on
-	! returning.
-	!
-	or	%l6, TRAMP_FLAG, %l6
-
-/*
- * Copies that reach here are larger than VIS_COPY_THRESHOLD bytes
- * Also, use of FP registers has been tested to be enabled
- */
-.do_copy:
-	FP_NOMIGRATE(6, 7)
-
-	mov	%i1, %g5		! save dest addr start
-	mov	%i2, %g2		! save size
-
-	rd	%fprs, %o2		! check for unused fp
-	st	%o2, [%fp + STACK_BIAS - SAVED_FPRS_OFFSET] ! save orig %fprs
-
-	! FPU enabled ?  If not, enable it.
-	btst	FPRS_FEF, %o2
-	bz,a,pt	%icc, .do_blockcopy
-	  wr	%g0, FPRS_FEF, %fprs
-
-	! FPU enabled, but is Q3Q4 dirty ?  If yes, save them.
-	btst	FPRS_DU, %o2
-	bz,pn	%icc, .do_blockcopy
-	  nop
-
-	BST_FPQ3Q4_TOSTACK(%o2)
-
-.do_blockcopy:
-	rd	%gsr, %o2
-	stx	%o2, [%fp + STACK_BIAS - SAVED_GSR_OFFSET]	! save gsr
-	or	%l6, FPUSED_FLAG, %l6
-	ba,a,pt	%xcc, .medium
-	  nop
-
-#define	REALSRC	%i0
-#define	DST	%i1
-#define	CNT	%i2
-#define	SRC	%i3
-#define	TMP	%i5
-
-	.align 16
-.medium:
-	neg	DST, TMP
-	neg	REALSRC, SRC
-	andcc	TMP, 7, TMP	! bytes till DST 8 byte aligned
-	and	SRC, 7, SRC	! bytes till REALSRC 8 byte aligned
-	
-	bz	%ncc, .med2
-	  sub	TMP, SRC, SRC
-		! -(bytes till REALSRC aligned after DST aligned)
-		! SRC = {-7, -6, ... 7} SRC > 0 => REALSRC overaligned
-
-	sub	CNT, TMP, CNT	! update count
-
-.med1:
-	ldub	[REALSRC], %i4
-	deccc	TMP
-	inc	REALSRC
-	stb	%i4, [DST]
-	bgu,pt	%ncc, .med1
-	  inc	DST
-
-	! Now DST is 8-byte aligned.  DST, REALSRC, CNT are current.
-
-.med2:
-	andcc	REALSRC, 0x3, %g0	! test alignment
-	bnz,pt	%ncc, .mediumsetup	! branch to skip aligned cases
+2:
+	andcc	%o0, 0x3, %g0		! test alignment
+	bnz,pt	%ncc, .mediumsetup_bcopy	! branch to skip aligned cases
 					! if src, dst not aligned
-	  prefetch [REALSRC + (1 * VIS_BLOCKSIZE)], #n_reads
+	prefetch [%o0 + (1 * VIS_BLOCKSIZE)], #n_reads
 
 /*
  * Handle all cases where src and dest are aligned on word
@@ -919,515 +613,375 @@ bcopy(const void *from, void *to, size_t count)
  * move when source and destination is in cache for medium
  * to short data moves.
  */
-	andcc	REALSRC, 0x7, %g0	! test word alignment
-	bz,pt	%ncc, .medlword		! branch to long word aligned case
-	  prefetch [REALSRC + (2 * VIS_BLOCKSIZE)], #n_reads
-	cmp	CNT, MED_WMAX		! limit to store buffer size
-	bgu,pt	%ncc, .mediumrejoin	! otherwise rejoin main loop
-	  nop
-	subcc	CNT, 15, CNT		! adjust length to allow cc test
+	andcc	%o0, 0x7, %g0		! test word alignment
+	bz,pt	%ncc, src_dst_lword_aligned	! branch to long word aligned case
+	prefetch [%o0 + (2 * VIS_BLOCKSIZE)], #n_reads
+	cmp	%o2, MED_WMAX		! limit to store buffer size
+	bgu,pt	%ncc, .mediumrejoin_bcopy	! otherwise rejoin main loop
+	nop
+	subcc	%o2, 15, %o2		! adjust length to allow cc test
 					! for end of loop
-	ble,pt	%ncc, .medw15		! skip big loop if less than 16
-	  prefetch [REALSRC + (3 * VIS_BLOCKSIZE)], #n_reads
+	ble,pt	%ncc, .medw15_bcopy		! skip big loop if less than 16
+	prefetch [%o0 + (3 * VIS_BLOCKSIZE)], #n_reads
 /*
  * no need to put prefetch in loop as prefetches have
  * already been issued for maximum loop size
  */
-.medw16:
-	ld	[REALSRC], %i4		! load
-	subcc	CNT, 16, CNT		! decrement length count
-	stw	%i4, [DST]		! and store
-	ld	[REALSRC+4], SRC	! a block of 16 bytes
-	add	REALSRC, 16, REALSRC	! increase src ptr by 16
-	stw	SRC, [DST+4]
-	ld	[REALSRC-8], %i4
-	add	DST, 16, DST		! increase dst ptr by 16
-	stw	%i4, [DST-8]
-	ld	[REALSRC-4], SRC
-	bgu,pt	%ncc, .medw16		! repeat if at least 16 bytes left
-	  stw	SRC, [DST-4]
-.medw15:
-	addcc	CNT, 15, CNT		! restore count
-	bz,pt	%ncc, .bcb_exit		! exit if finished
-	  nop
-	cmp	CNT, 8
-	blt,pt	%ncc, .medw7		! skip if 7 or fewer bytes left
-	  nop				!
-	ld	[REALSRC], %i4		! load 4 bytes
-	subcc	CNT, 8, CNT		! decrease count by 8
-	stw	%i4, [DST]		! and store 4 bytes
-	add	REALSRC, 8, REALSRC	! increase src ptr by 8
-	ld	[REALSRC-4], SRC	! load 4 bytes
-	add	DST, 8, DST		! increase dst ptr by 8
-	stw	SRC, [DST-4]		! and store 4 bytes
-	bz	%ncc, .bcb_exit		! exit if finished
-	  nop
-.medw7:					! count is ge 1, less than 8
-	cmp	CNT, 3			! check for 4 bytes left
-	ble,pt	%ncc, .medw3		! skip if 3 or fewer bytes left
-	  nop				!
-	ld	[REALSRC], %i4		! load 4 bytes
-	sub	CNT, 4, CNT		! decrease count by 4
-	add	REALSRC, 4, REALSRC	! increase src ptr by 4
-	stw	%i4, [DST]		! and store 4 bytes
-	add	DST, 4, DST		! increase dst ptr by 4
-	tst	CNT			! check for zero bytes left
-	bz	%ncc, .bcb_exit		! exit if finished
-	  nop
-.medw3:					! count is known to be 1, 2, or 3
-	deccc	CNT			! reduce count by one
-	ldub	[REALSRC], SRC		! load one byte
-	bz,pt	%ncc, .bcb_exit		! exit if last byte
-	  stb	SRC, [DST]		! store one byte
-	ldub	[REALSRC+1], SRC	! load second byte
-	deccc	CNT			! reduce count by one
-	bz,pt	%ncc, .bcb_exit		! exit if last byte
-	  stb	SRC, [DST+1]		! store second byte
-	ldub	[REALSRC+2], SRC	! load third byte
-	stb	SRC, [DST+2]		! store third byte
-	ba,a,pt	%ncc, .bcb_exit		! exit
-	  nop
-
+.medw16_bcopy:
+	ld	[%o0], %o4		! load
+	subcc	%o2, 16, %o2		! decrement length count
+	stw	%o4, [%o1]		! and store
+	ld	[%o0+4], %o3		! a block of 16 bytes
+	add	%o0, 16, %o0		! increase src ptr by 16
+	stw	%o3, [%o1+4]
+	ld	[%o0-8], %o4
+	add	%o1, 16, %o1		! increase dst ptr by 16
+	stw	%o4, [%o1-8]
+	ld	[%o0-4], %o3
+	bgu,pt	%ncc, .medw16_bcopy		! repeat if at least 16 bytes left
+	stw	%o3, [%o1-4]
+.medw15_bcopy:
+	addcc	%o2, 15, %o2		! restore count
+	bz,pt	%ncc, .medwexit_bcopy		! exit if finished
+	nop
+	cmp	%o2, 8
+	blt,pt	%ncc, .medw7_bcopy		! skip if 7 or fewer bytes left
+	nop				!
+	ld	[%o0], %o4		! load 4 bytes
+	subcc	%o2, 8, %o2		! decrease count by 8
+	stw	%o4, [%o1]		! and store 4 bytes
+	add	%o0, 8, %o0		! increase src ptr by 8
+	ld	[%o0-4], %o3		! load 4 bytes
+	add	%o1, 8, %o1		! increase dst ptr by 8
+	stw	%o3, [%o1-4]		! and store 4 bytes
+	bz	%ncc, .medwexit_bcopy		! exit if finished
+	nop
+.medw7_bcopy:					! count is ge 1, less than 8
+	cmp	%o2, 3			! check for 4 bytes left
+	ble,pt	%ncc, .medw3_bcopy		! skip if 3 or fewer bytes left
+	nop				!
+	ld	[%o0], %o4		! load 4 bytes
+	sub	%o2, 4, %o2		! decrease count by 4
+	add	%o0, 4, %o0		! increase src ptr by 4
+	stw	%o4, [%o1]		! and store 4 bytes
+	add	%o1, 4, %o1		! increase dst ptr by 4
+	tst	%o2			! check for zero bytes left
+	bz	%ncc, .medwexit_bcopy		! exit if finished
+	nop
+.medw3_bcopy:					! count is known to be 1, 2, or 3
+	deccc	%o2			! reduce count by one
+	ldub	[%o0], %o3		! load one byte
+	bz,pt	%ncc, .medwexit_bcopy		! exit if last byte
+	stb	%o3, [%o1]		! store one byte
+	ldub	[%o0+1], %o3		! load second byte
+	deccc	%o2			! reduce count by one
+	bz,pt	%ncc, .medwexit_bcopy		! exit if last byte
+	stb	%o3, [%o1+1]		! store second byte
+	ldub	[%o0+2], %o3		! load third byte
+	stb	%o3, [%o1+2]		! store third byte
+.medwexit_bcopy:
+	membar	#Sync				! sync error barrier
+	andn	%o5, TRAMP_FLAG, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+	retl
+	clr	%o0
+	
 /*
  * Special case for handling when src and dest are both long word aligned
  * and total data to move is between SMALL_MAX and MED_MAX bytes
  */
+
 	.align 16
 	nop
-.medlword:				! long word aligned
-					! length > SMALL_MAX
-	cmp	CNT, MED_MAX		! limit to store buffer size
-	bgu,pt	%ncc, .mediumrejoin	! otherwise rejoin main loop
-	  nop
-	subcc	CNT, 31, CNT		! adjust length to allow cc test
+src_dst_lword_aligned:
+.medlword_bcopy:				! long word aligned
+	cmp	%o2, MED_MAX		! limit to store buffer size
+	bgu,pt	%ncc, .mediumrejoin_bcopy	! otherwise rejoin main loop
+	nop
+	subcc	%o2, 31, %o2		! adjust length to allow cc test
 					! for end of loop
-	ble,pt	%ncc, .medl31		! skip big loop if less than 32
-	  prefetch [REALSRC + (3 * VIS_BLOCKSIZE)], #n_reads
+	ble,pt	%ncc, .medl31_bcopy		! skip big loop if less than 32
+	prefetch [%o0 + (3 * VIS_BLOCKSIZE)], #n_reads ! into the l2 cache
 /*
  * no need to put prefetch in loop as prefetches have
  * already been issued for maximum loop size
  */
-.medl32:
-	ldx	[REALSRC], %i4		! load
-	subcc	CNT, 32, CNT		! decrement length count
-	stx	%i4, [DST]		! and store
-	ldx	[REALSRC+8], SRC	! a block of 32 bytes
-	add	REALSRC, 32, REALSRC	! increase src ptr by 32
-	stx	SRC, [DST+8]
-	ldx	[REALSRC-16], %i4
-	add	DST, 32, DST		! increase dst ptr by 32
-	stx	%i4, [DST-16]
-	ldx	[REALSRC-8], SRC
-	bgu,pt	%ncc, .medl32		! repeat if at least 32 bytes left
-	  stx	SRC, [DST-8]
-.medl31:
-	addcc	CNT, 16, CNT		! adjust remaining count
-	ble,pt	%ncc, .medl15		! skip if 15 or fewer bytes left
-	  nop				!
-	ldx	[REALSRC], %i4		! load and store 16 bytes
-	add	REALSRC, 16, REALSRC	! increase src ptr by 16
-	stx	%i4, [DST]		!
-	sub	CNT, 16, CNT		! decrease count by 16
-	ldx	[REALSRC-8], SRC	!
-	add	DST, 16, DST		! increase dst ptr by 16
-	stx	SRC, [DST-8]
-.medl15:
-	addcc	CNT, 15, CNT		! restore count
-	bz,pt	%ncc, .bcb_exit		! exit if finished
-	  nop
-	cmp	CNT, 8
-	blt,pt	%ncc, .medw7		! skip if 7 or fewer bytes left
-	  nop
-	ldx	[REALSRC], %i4		! load 8 bytes
-	add	REALSRC, 8, REALSRC	! increase src ptr by 8
-	stx	%i4, [DST]		! and store 8 bytes
-	subcc	CNT, 8, CNT		! decrease count by 8
-	bz	%ncc, .bcb_exit		! exit if finished
-	  add	DST, 8, DST		! increase dst ptr by 8
-	ba	.medw7
-	  nop
+.medl32_bcopy:
+	ldx	[%o0], %o4		! load
+	subcc	%o2, 32, %o2		! decrement length count
+	stx	%o4, [%o1]		! and store
+	ldx	[%o0+8], %o3		! a block of 32 bytes
+	add	%o0, 32, %o0		! increase src ptr by 32
+	stx	%o3, [%o1+8]
+	ldx	[%o0-16], %o4
+	add	%o1, 32, %o1		! increase dst ptr by 32
+	stx	%o4, [%o1-16]
+	ldx	[%o0-8], %o3
+	bgu,pt	%ncc, .medl32_bcopy		! repeat if at least 32 bytes left
+	stx	%o3, [%o1-8]
+.medl31_bcopy:
+	addcc	%o2, 16, %o2		! adjust remaining count
+	ble,pt	%ncc, .medl15_bcopy		! skip if 15 or fewer bytes left
+	nop				!
+	ldx	[%o0], %o4		! load and store 16 bytes
+	add	%o0, 16, %o0		! increase src ptr by 16
+	stx	%o4, [%o1]		!
+	sub	%o2, 16, %o2		! decrease count by 16
+	ldx	[%o0-8], %o3		!
+	add	%o1, 16, %o1		! increase dst ptr by 16
+	stx	%o3, [%o1-8]
+.medl15_bcopy:
+	addcc	%o2, 15, %o2		! restore count
+	bz,pt	%ncc, .medwexit_bcopy		! exit if finished
+	nop
+	cmp	%o2, 8
+	blt,pt	%ncc, .medw7_bcopy		! skip if 7 or fewer bytes left
+	nop
+	ldx	[%o0], %o4		! load 8 bytes
+	add	%o0, 8, %o0		! increase src ptr by 8
+	stx	%o4, [%o1]		! and store 8 bytes
+	subcc	%o2, 8, %o2		! decrease count by 8
+	bz	%ncc, .medwexit_bcopy		! exit if finished
+	add	%o1, 8, %o1		! increase dst ptr by 8
+	ba	.medw7_bcopy
+	nop
 
 	.align 16
 	nop
 	nop
 	nop
-.mediumsetup:
-	prefetch [REALSRC + (2 * VIS_BLOCKSIZE)], #one_read
-.mediumrejoin:
-	add	REALSRC, 8, REALSRC	! prepare to round REALSRC upward
-	sethi	%hi(0x1234567f), TMP	! For GSR.MASK 
-	or	TMP, 0x67f, TMP
+unaligned_src_dst:
 
-	cmp	CNT, MEDIUM_MAX
-	bmask	TMP, %g0, %g0
+.mediumsetup_bcopy:
+	prefetch [%o0 + (2 * VIS_BLOCKSIZE)], #one_read
+.mediumrejoin_bcopy:
+	! %o5 has the saved T_LOFAULT when we come here.
+	! We set a new error handler if the T_LOFAULT was set earlier OR
+	! KCOPY_FLAG is set.
+	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+	mov	%i5, %l6
+	andn	%l6, TRAMP_FLAG, %o2
+	brz,pt	%o2, 1f
+	  nop
+	! We enter here if KCOPY_FLAG was set OR
+	! T_LOFAULT was set earlier.
+	! We only change the error handler pointer here.
+	! The flags TRAMP_FLAG or KCOPY_FLAG is left as it is in %l6.
+	sethi	%hi(.copyerr_fp_used), %o2
+	or	%o2, %lo(.copyerr_fp_used), %o2
+	membar	#Sync				! sync error barrier
+	stn	%o2, [THREAD_REG + T_LOFAULT]	! install new vector
+1:
+	FP_NOMIGRATE(6, 7)
+	mov	%i0, %o0
+	mov	%i1, %o1
+	mov	%i2, %o2
+	mov	%i3, %o3
+	mov	%i5, %o5
+	rd	%fprs, %o4		! check for unused fp
+	st	%o4, [%fp + STACK_BIAS - SAVED_FPRS_OFFSET] ! save orig %fprs
 
-	! Compute TMP (no of bytes that need copying using the main loop).
+	! FPU enabled ?  If not, enable it.
+	btst	FPRS_FEF, %o4
+	bz,a,pt	%icc, continue_bcopy
+	  wr	%g0, FPRS_FEF, %fprs
+
+	! save the FP registers even if DU is not set.
+
+	BST_FPQ3Q4_TOSTACK(%o4)
+	or	%l6, FPSAVED_FLAG, %l6
+	
+continue_bcopy:
+	rd	%gsr, %o4
+	stx	%o4, [%fp + STACK_BIAS - SAVED_GSR_OFFSET]	! save gsr
+	or	%l6, FPUSED_FLAG, %l6
+
+	add	%o0, 8, %o0		! prepare to round SRC upward
+
+	sethi	%hi(0x1234567f), %o5	! For GSR.MASK 
+	or	%o5, 0x67f, %o5
+
+	cmp	%o2, MEDIUM_MAX
+	bmask	%o5, %g0, %g0
+
+	! Compute o5 (number of bytes that need copying using the main loop).
 	! First, compute for the medium case.
-	! Then, if large case, TMP is replaced by count for block alignment.
-	! Be careful not to read past end of REALSRC
-	! Currently, CNT is the actual count remaining
-	!            SRC is how much sooner we'll cross the alignment
-	!            boundary in REALSRC compared to in DST
+	! Then, if large case, o5 is replaced by count for block alignment.
+	! Be careful not to read past end of SRC
+	! Currently, o2 is the actual count remaining
+	!	    o3 is how much sooner we'll cross the alignment boundary
+	!		in SRC compared to in DST
 	!
 	! Examples:  Let # denote bytes that should not be accessed
-	!            Let x denote a byte already copied to align DST
-	!            Let . and - denote bytes not yet copied
-	!            Let | denote double alignment boundaries
+	!	    Let x denote a byte already copied to align DST
+	!	    Let . and - denote bytes not yet copied
+	!	    Let | denote double alignment boundaries
 	!
-	!            DST:  ######xx|........|--------|..######   CNT = 18
-	!                          i1
+	!	    DST:  ######xx|........|--------|..######   o2 = 18
+	!			  dst
 	!
-	!  SRC = -3:  REALSRC:  ###xx...|.....---|-----..#|########   TMP = 8
-	!                          i0
+	!  o3 = -3:  SRC:  ###xx...|.....---|-----..#|########   o5 = 8
+	!			  from
 	!
-	!  SRC =  0:  REALSRC:  ######xx|........|--------|..######   TMP = 16-8 = 8
-	!                                   i0
+	!  o3 =  0:  SRC:  ######xx|........|--------|..######   o5 = 16-8 = 8
+	!				   from
 	!
-	!  SRC = +1:  REALSRC:  #######x|x.......|.-------|-..#####   TMP = 16-8 = 8
-	!                                   i0
+	!  o3 = +1:  SRC:  #######x|x.......|.-------|-..#####   o5 = 16-8 = 8
+	!				   from
 
+	mov	%asi, %g1		! save curr %asi
 	wr	%g0, ASI_CACHE_SPARING_P, %asi
 
-	or	%g0, -8, TMP
-	alignaddr REALSRC, %g0, REALSRC	! set GSR.ALIGN and align REALSRC
+	or	%g0, -8, %o5
+	alignaddr %o0, %g0, %o0		! set GSR.ALIGN and align from
 
-	movrlz	SRC, %g0, TMP		! subtract 8 from i2+i3 only if i3>=0
-	add	TMP, CNT, TMP
-	add	TMP, SRC, TMP
+	movrlz	%o3, %g0, %o5		! subtract 8 from o2+o3 only if o3>=0
+	add	%o5, %o2, %o5
+	add	%o5, %o3, %o5
 
-	bleu	%ncc, .med4
-	  andn	TMP, 7, TMP		! 8 byte aligned count
-	neg	DST, TMP		! 'large' case
-	and	TMP, VIS_BLOCKSIZE-1, TMP  ! bytes till DST block aligned
-.med4:
-	brgez,a	SRC, .beginmedloop
-	  ldda	[REALSRC-8]%asi, %d32
+	bleu	%ncc, 4f
+	andn	%o5, 7, %o5		! 8 byte aligned count
+	neg	%o1, %o5		! 'large' case
+	and	%o5, VIS_BLOCKSIZE-1, %o5  ! bytes till DST block aligned
+4:	
+	brgez,a	%o3, .beginmedloop_bcopy
+	ldda	[%o0-8]%asi, %d32
 
-	add	REALSRC, SRC, REALSRC	! back up REALSRC
-.med5:
-	ldda	[REALSRC]ASI_FL8_P, %d34
-	inc	REALSRC
-	andcc	REALSRC, 7, %g0
-	bnz	%ncc, .med5
-	  bshuffle %d32, %d34, %d32 ! shifts d32 left 1 byte and or's in d34
+	add	%o0, %o3, %o0		! back up from
+5:
+	ldda	[%o0]ASI_FL8_P, %d34
+	inc	%o0
+	andcc	%o0, 7, %g0
+	bnz	%ncc, 5b
+	bshuffle %d32, %d34, %d32		! shifts d32 left 1 byte and or's in d34
 
-.beginmedloop:
-	tst	TMP
-	bz	%ncc, .endmedloop
-	  sub	CNT, TMP, CNT		! update count for later
+.beginmedloop_bcopy:
+	tst	%o5
+	bz	%ncc, .endmedloop_bcopy
+	sub	%o2, %o5, %o2		! update count for later
 
-	! Main loop to write out doubles.  Note: TMP & 7 == 0
+	! Main loop to write out doubles.  Note: o5 & 7 == 0
+	
+	ldx	[%o0], %d34
+	subcc	%o5, 8, %o5		! update local count
+	bz,pn	%ncc, 1f
+	add	%o0, 8, %o0		! update SRC
 
-	ldd	[REALSRC], %d34
-	subcc	TMP, 8, TMP		! update local count
-	bz,pn	%ncc, .medloop1
-	add	REALSRC, 8, REALSRC	! update REALSRC
-
-.medloop:
+.medloop_bcopy:
 	faligndata %d32, %d34, %d36
-	ldda	[REALSRC]%asi, %d32
-	subcc	TMP, 8, TMP		! update local count
-	add	REALSRC, 16, REALSRC	! update REALSRC
-	std	%d36, [DST]
-	bz,pn	%ncc, .medloop2
+	ldda	[%o0]%asi, %d32
+	subcc	%o5, 8, %o5		! update local count
+	add	%o0, 16, %o0		! update SRC
+	std	%d36, [%o1]
+	bz,pn	%ncc, 2f
 	faligndata %d34, %d32, %d38
-	ldda	[REALSRC - 8]%asi, %d34
-	subcc	TMP, 8, TMP		! update local count
-	std	%d38, [DST + 8]
-	bnz,pt	%ncc, .medloop
-	add	DST, 16, DST		! update DST
+	ldda	[%o0 - 8]%asi, %d34
+	subcc	%o5, 8, %o5		! update local count
+	std	%d38, [%o1 + 8]
+	bnz,pt	%ncc, .medloop_bcopy
+	add	%o1, 16, %o1		! update DST
 
-.medloop1:
+1:	
 	faligndata %d32, %d34, %d36
-	fsrc1	%d34, %d32
-	std	%d36, [DST]
-	ba	.endmedloop
-	add	DST, 8, DST
+	fmovd	%d34, %d32
+	std	%d36, [%o1]
+	ba	.endmedloop_bcopy
+	add	%o1, 8, %o1
+	
+2:
+	std	%d38, [%o1 + 8]
+	sub	%o0, 8, %o0
+	add	%o1, 16, %o1
+	
 
-.medloop2:
-	std	%d38, [DST + 8]
-	sub	REALSRC, 8, REALSRC
-	add	DST, 16, DST
-
-
-.endmedloop:
-	! Currently, i0 is pointing to the next double-aligned byte in REALSRC
-	! The 8 bytes starting at [REALSRC-8] are available in d32
+.endmedloop_bcopy:
+	! Currently, from is pointing to the next double-aligned byte in SRC
+	! The 8 bytes starting at [from-8] are available in d32
 	! At least one, and possibly all, of these need to be written.
 
-	cmp	CNT, VIS_BLOCKSIZE
-	bgu	%ncc, .large		! otherwise, less than 16 bytes left
+	cmp	%o2, VIS_BLOCKSIZE	
+	bgu	%ncc, .large_bcopy		! otherwise, less than 16 bytes left
+	
+#if 1
 
-	andcc	SRC, 7, TMP		! Number of bytes needed to completely
+	/* This code will use partial stores.  */
+
+	mov	%g0, %o5
+	and	%o3, 7, %o3		! Number of bytes needed to completely
 					! fill %d32 with good (unwritten) data.
-	bz	%ncc, .medpst2
-	  sub	TMP, 8, SRC		! -(number of good bytes in %d32)
-	cmp	CNT, 8
-	bl,a	%ncc, .medpst3		! Not enough bytes to fill %d32
-	add	REALSRC, SRC, REALSRC 	! Back up REALSRC
 
-.medpst1:
-	deccc	TMP
-	ldda	[REALSRC]ASI_FL8_P, %d34
-	inc	REALSRC
-	bgu	%ncc, .medpst1
-	  bshuffle %d32, %d34, %d32 ! shifts d32 left 1 byte and or's in d34
+	subcc	%o2, 8, %o2		! update count (maybe too much)
+	movl	%ncc, %o2, %o5		
+	addcc	%o3, %o5, %o5		! extra bytes we can stuff into %d32
+	sub	%o3, %o5, %o3		! update o3 (# bad bytes in %d32)
 
-.medpst2:
-	subcc	CNT, 8, CNT
-	std	%d32, [DST]
-	bz	%ncc, .mediumexit
-	  add	DST, 8, DST
+	bz	%ncc, 2f
+	alignaddr %o3, %g0, %g0		! set GSR.ALIGN
+	
+1:
+	deccc	%o5
+	ldda	[%o0]ASI_FL8_P, %d34
+	inc	%o0
+	bgu	%ncc, 1b
+	bshuffle %d32, %d34, %d32		! shifts d32 left 1 byte and or's in d34
 
-.medpst3:
-	ldub	[REALSRC], SRC
-	deccc	CNT
-	inc	REALSRC
-	stb	SRC, [DST]
-	bgu	%ncc, .medpst3
-	  inc	DST
+2:
+	not     %o3
+	faligndata %d32, %d32, %d32	! shift bytes to the left
+	and	%o3, 7, %o3		! last byte to be stored in [%o1+%o3]
+	edge8n	%g0, %o3, %o5
+	stda	%d32, [%o1]%o5, ASI_PST8_P
+	brlez	%o2, exit_bcopy		
+	add	%o1, %o3, %o1		! update DST to last stored byte
+3:	
+	inc	%o1
+	deccc	%o2
+	ldub	[%o0], %o3
+	stb	%o3, [%o1]
+	bgu	%ncc, 3b
+	inc	%o0
 
-.mediumexit:
-	ba,pt	%ncc, .bcb_exit
-	  nop
+#else
 
-	.align	ICACHE_LINE_SIZE
-.large:
-	! The following test for BSTORE_SIZE is used to decide whether
-	! to store data with a block store or with individual stores.
-	! The block store wins when the amount of data is so large
-	! that it is causes other application data to be moved out
-	! of the L1 or L2 cache.
-	! On a Panther, block store can lose more often because block
-	! store forces the stored data to be removed from the L3 cache.
-	!
-	sethi   %hi(BSTORE_SIZE), TMP
-	or      TMP, %lo(BSTORE_SIZE), TMP
-	cmp     CNT, TMP
-	bgu     %ncc, .xlarge
+	andcc	%o3, 7, %o5		! Number of bytes needed to completely
+					! fill %d32 with good (unwritten) data.
+	bz	%ncc, 2f
+	sub	%o5, 8, %o3		! -(number of good bytes in %d32)
+	cmp	%o2, 8
+	bl,a	%ncc, 3f		! Not enough bytes to fill %d32
+	add	%o0, %o3, %o0 		! Back up %o0
 
-	! DST     I/O Destination is 64-byte aligned
-	! REALSRC I/O Source is 8-byte aligned (and we've set GSR.ALIGN)
-	! %d32     I/O Already loaded with Source data from [REALSRC-8]
-	! CNT     I/O Count (number of bytes that need to be written)
-	! SRC     I   Not written. If zero, then REALSRC is double aligned.
-	! TMP     O   The number of doubles that remain to be written.
+1:
+	deccc	%o5
+	ldda	[%o0]ASI_FL8_P, %d34
+	inc	%o0
+	bgu	%ncc, 1b
+	bshuffle %d32, %d34, %d32		! shifts d32 left 1 byte and or's in d34
 
-	! Load the rest of the current block
-	! Recall that REALSRC is further into source buffer
-	! than DST is into the destination buffer.
+2:	
+	subcc	%o2, 8, %o2
+	std	%d32, [%o1]
+	bz	%ncc, exit_bcopy
+	add	%o1, 8, %o1
+3:	
+	ldub	[%o0], %o3
+	deccc	%o2
+	inc	%o0
+	stb	%o3, [%o1]
+	bgu	%ncc, 3b
+	inc	%o1
+#endif	
 
-	prefetch [DST + (0 * VIS_BLOCKSIZE)], #n_writes
-	prefetch [DST + (1 * VIS_BLOCKSIZE)], #n_writes
-	prefetch [DST + (2 * VIS_BLOCKSIZE)], #n_writes
-	ldda	[REALSRC]%asi, %d34
-	prefetch [REALSRC + (3 * VIS_BLOCKSIZE)], #one_read
-	ldda	[REALSRC + 0x08]%asi, %d36
-	faligndata %d32, %d34, %d48
-	ldda	[REALSRC + 0x10]%asi, %d38
-	faligndata %d34, %d36, %d50
-	ldda	[REALSRC + 0x18]%asi, %d40
-	faligndata %d36, %d38, %d52
-	ldda	[REALSRC + 0x20]%asi, %d42
-	or	%g0, -8, TMP	! if SRC >=0, TMP = -8
-	prefetch [REALSRC + (4 * VIS_BLOCKSIZE)], #one_read
-	faligndata %d38, %d40, %d54
-	ldda	[REALSRC + 0x28]%asi, %d44
-	movrlz	SRC, %g0, TMP	! if SRC < 0, TMP = 0  (needed later)
-	faligndata %d40, %d42, %d56
-	ldda	[REALSRC + 0x30]%asi, %d46
-	faligndata %d42, %d44, %d58
-	ldda	[REALSRC + 0x38]%asi, %d32
-	sub	CNT, VIS_BLOCKSIZE, CNT
-	prefetch [REALSRC + (5 * VIS_BLOCKSIZE)], #one_read
-	add	REALSRC, VIS_BLOCKSIZE, REALSRC	! update REALSRC
-
-	! Main loop.  Write previous block.  Load rest of current block.
-	! Some bytes will be loaded that won't yet be written.
-.large1:
-	ldda	[REALSRC]%asi, %d34
-	faligndata %d44, %d46, %d60
-	ldda	[REALSRC + 0x08]%asi, %d36
-	faligndata %d46, %d32, %d62
-	std     %d48, [DST]
-	std     %d50, [DST+8]
-	std     %d52, [DST+16]
-	std     %d54, [DST+24]
-	std     %d56, [DST+32]
-	std     %d58, [DST+40]
-	std     %d60, [DST+48]
-	std     %d62, [DST+56]
-	sub     CNT, VIS_BLOCKSIZE, CNT		! update count
-	prefetch [DST + (6 * VIS_BLOCKSIZE)], #n_writes
-	prefetch [DST + (3 * VIS_BLOCKSIZE)], #n_writes
-	add     DST, VIS_BLOCKSIZE, DST		! update DST
-	ldda	[REALSRC + 0x10]%asi, %d38
-	faligndata %d32, %d34, %d48
-	ldda	[REALSRC + 0x18]%asi, %d40
-	faligndata %d34, %d36, %d50
-	ldda	[REALSRC + 0x20]%asi, %d42
-	faligndata %d36, %d38, %d52
-	ldda	[REALSRC + 0x28]%asi, %d44
-	faligndata %d38, %d40, %d54
-	ldda	[REALSRC + 0x30]%asi, %d46
-	faligndata %d40, %d42, %d56
-	ldda	[REALSRC + 0x38]%asi, %d32
-	faligndata %d42, %d44, %d58
-	cmp	CNT, VIS_BLOCKSIZE + 8
-	prefetch [REALSRC + (5 * VIS_BLOCKSIZE)], #one_read
-	bgu,pt	%ncc, .large1
-	  add	REALSRC, VIS_BLOCKSIZE, REALSRC
-
-	faligndata %d44, %d46, %d60
-	faligndata %d46, %d32, %d62
-	stda	%d48, [DST]ASI_BLK_P	! store 64 bytes, bypass cache
-	cmp	CNT, VIS_BLOCKSIZE
-	bne	%ncc, .large2		! exactly 1 blk remaining?
-	  add	DST, VIS_BLOCKSIZE, DST	! update DST
-
-	brz,a	SRC, .large3		! is SRC double aligned ?
-	  ldd	[REALSRC], %d34
-
-.large2:
-	add	TMP, CNT, TMP		! TMP was already set to 0 or -8
-	add	TMP, SRC, TMP
-
-	ba	.beginmedloop
-	  andn	TMP, 7, TMP
-
-.large3:
-	ldd	[REALSRC + 0x08], %d36
-	ldd	[REALSRC + 0x10], %d38
-	ldd	[REALSRC + 0x18], %d40
-	ldd	[REALSRC + 0x20], %d42
-	ldd	[REALSRC + 0x28], %d44
-	ldd	[REALSRC + 0x30], %d46
-	! Don't need to load [REALSRC + 0x38] since we were
-	! already 8 bytes ahead in REALSRC to start with.
-	stda	%d32, [DST]ASI_BLK_P
-
-	ba,a,pt	%ncc, .bcb_exit
-	  nop
-
-	.align 16
-	! two nops here causes loop starting at .xlarge1 below to be
-	! on a cache line boundary, improving performance
-	nop
-	nop
-.xlarge:
-	! DST     I/O Destination is 64-byte aligned
-	! REALSRC I/O Source is 8-byte aligned (and we've set GSR.ALIGN)
-	! %d32     I/O Already loaded with Source data from [REALSRC-8]
-	! CNT     I/O Count (number of bytes that need to be written)
-	! SRC     I   Not written. If zero, then REALSRC is double aligned.
-	! TMP     O   The number of doubles that remain to be written.
-
-	! Load the rest of the current block
-	! Recall that REALSRC is further into source buffer
-	! than DST is into the destination buffer.
-
-	! prefetch [REALSRC + (3 * VIS_BLOCKSIZE)], #one_read
-	! executed in delay slot for branch to .xlarge
-	prefetch [REALSRC + (4 * VIS_BLOCKSIZE)], #one_read
-	prefetch [REALSRC + (5 * VIS_BLOCKSIZE)], #one_read
-	ldda    [REALSRC]%asi, %d34
-	prefetch [REALSRC + (6 * VIS_BLOCKSIZE)], #one_read
-	ldda    [REALSRC + 0x8]%asi, %d36
-	faligndata %d32, %d34, %d48
-	ldda    [REALSRC + 0x10]%asi, %d38
-	faligndata %d34, %d36, %d50
-	ldda    [REALSRC + 0x18]%asi, %d40
-	faligndata %d36, %d38, %d52
-	ldda    [REALSRC + 0x20]%asi, %d42
-	or      %g0, -8, TMP            ! if SRC >= 0, TMP = -8
-	faligndata %d38, %d40, %d54
-	ldda    [REALSRC + 0x28]%asi, %d44
-	movrlz  SRC, %g0, TMP           ! if SRC < 0, TMP = 0  (needed later)
-	faligndata %d40, %d42, %d56
-	ldda    [REALSRC + 0x30]%asi, %d46
-	faligndata %d42, %d44, %d58
-	ldda    [REALSRC + 0x38]%asi, %d32
-	sub     CNT, VIS_BLOCKSIZE, CNT    ! update count
-	prefetch [REALSRC + (7 * VIS_BLOCKSIZE)], #one_read
-	add     REALSRC, VIS_BLOCKSIZE, REALSRC    ! update REALSRC
-
-	! This point is 32-byte aligned since 24 instructions appear since
-	! the previous alignment directive.
-
-
-	! Main loop.  Write previous block.  Load rest of current block.
-	! Some bytes will be loaded that won't yet be written.
-.xlarge1:
-	ldda    [REALSRC]%asi, %d34
-	faligndata %d44, %d46, %d60
-	ldda    [REALSRC + 0x8]%asi, %d36
-	faligndata %d46, %d32, %d62
-	stda    %d48, [DST]ASI_BLK_P
-	sub     CNT, VIS_BLOCKSIZE, CNT            ! update count
-	ldda    [REALSRC + 0x10]%asi, %d38
-	faligndata %d32, %d34, %d48
-	ldda    [REALSRC + 0x18]%asi, %d40
-	faligndata %d34, %d36, %d50
-	ldda    [REALSRC + 0x20]%asi, %d42
-	faligndata %d36, %d38, %d52
-	ldda    [REALSRC + 0x28]%asi, %d44
-	faligndata %d38, %d40, %d54
-	ldda    [REALSRC + 0x30]%asi, %d46
-	faligndata %d40, %d42, %d56
-	ldda    [REALSRC + 0x38]%asi, %d32
-	faligndata %d42, %d44, %d58
-	! offset of 8*BLK+8 bytes works best over range of (src-dst) mod 1K
-	prefetch [REALSRC + (8 * VIS_BLOCKSIZE) + 8], #one_read
-	add     DST, VIS_BLOCKSIZE, DST            ! update DST
-	cmp     CNT, VIS_BLOCKSIZE + 8
-	! second prefetch important to correct for occasional dropped
-	! initial prefetches, 5*BLK works best over range of (src-dst) mod 1K
-	! strong prefetch prevents drops on Panther, but Jaguar and earlier
-	! US-III models treat strong prefetches as weak prefetchs
-	! to avoid regressions on customer hardware, we retain the prefetch
-	prefetch [REALSRC + (5 * VIS_BLOCKSIZE)], #one_read
-	bgu,pt	%ncc, .xlarge1
-	  add	REALSRC, VIS_BLOCKSIZE, REALSRC	! update REALSRC
-	faligndata %d44, %d46, %d60
-	faligndata %d46, %d32, %d62
-	stda	%d48, [DST]ASI_BLK_P	! store 64 bytes, bypass cache
-	cmp	CNT, VIS_BLOCKSIZE
-	bne	%ncc, .xlarge2		! exactly 1 block remaining?
-	  add	DST, VIS_BLOCKSIZE, DST	! update DST
-	brz,a	SRC, .xlarge3		! is SRC double aligned?
-	  ldd	[REALSRC], %d34
-.xlarge2:
-	add	TMP, CNT, TMP		! TMP was already set to 0 or -8
-	add	TMP, SRC, TMP
-
-	ba	.beginmedloop
-	  andn	TMP, 7, TMP		! 8 byte aligned count
-
- 
-	! This is when there is exactly 1 block remaining
-	! and Source is aligned
-.xlarge3:
-	ldd     [REALSRC + 0x08], %d36
-	ldd     [REALSRC + 0x10], %d38
-	ldd     [REALSRC + 0x18], %d40
-	ldd     [REALSRC + 0x20], %d42
-	ldd     [REALSRC + 0x28], %d44
-	ldd     [REALSRC + 0x30], %d46
-	! Don't need to load [REALSRC + 0x38] since we were
-	! already 8 bytes ahead in REALSRC to start with.
-	stda    %d32, [DST]ASI_BLK_P
-
-.bcb_exit:
+exit_bcopy:
 	membar	#Sync
 
 	ldx	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o2	! restore gsr
 	wr	%o2, 0, %gsr
 
 	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
-	! No need to save regs if either FEF or DU are clear
-    	and	%o3, FPRS_FEF|FPRS_DU, %o2
-	xorcc   %o2, FPRS_FEF|FPRS_DU, %g0
-	bnz,pt  %icc, 4f
+	! No need to restore regs if they were not saved
+	btst	FPSAVED_FLAG, %l6
+	bz	%ncc, 4f
 	  nop
 
 	BLD_FPQ3Q4_FROMSTACK(%o2)
@@ -1438,20 +992,900 @@ bcopy(const void *from, void *to, size_t count)
 	FZEROQ3Q4
 	wr	%o3, 0, %fprs		! restore fprs
 5:
-	mov	%g5, %o0		! copy dest address
-	call	rock_sync_icache
-	mov	%g2, %o1		! saved size
-
 	membar	#Sync				! sync error barrier
 	andn	%l6, MASK_FLAGS, %l6
 	stn	%l6, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
-	FP_ALLOWMIGRATE(5, 6)
+
+	mov	%g1, %asi		! restore %asi
+	FP_ALLOWMIGRATE(6, 7)
 	ret
 	  restore	%g0, 0, %o0
 
-	SET_SIZE(bcopy_more)
 
+	.align ICACHE_LINE_SIZE
+.large_bcopy:
+	! The following test for BSTORE_SIZE is used to decide whether
+	! to store data with a block store or with individual stores.
+	! The block store wins when the amount of data is so large
+	! that it is causes other application data to be moved out
+	! of the L1 or L2 cache.
+	! On a Panther, block store can lose more often because block
+	! store forces the stored data to be removed from the L3 cache.
+	!
+	sethi	%hi(BSTORE_SIZE),%o5
+	or	%o5,%lo(BSTORE_SIZE),%o5
+	cmp	%o2, %o5
+	bgu	%ncc, .xlarge_bcopy		
+
+	! %o1 I/O DST is 64-byte aligned
+	! %o0 I/O 8-byte aligned (and we've set GSR.ALIGN)
+	! %d32 I/O already loaded with SRC data from [%o0-8]
+	! %o2 I/O count (number of bytes that need to be written)
+	! %o3 I   Not written.  If zero, then SRC is double aligned.
+	! %o4 I   Not written.  Holds fprs.
+	! %o5   O The number of doubles that remain to be written.
+
+	! Load the rest of the current block 
+	! Recall that %o0 is further into SRC than %o1 is into DST
+
+	prefetch [%o1 + (0 * VIS_BLOCKSIZE)], #n_writes
+	prefetch [%o1 + (1 * VIS_BLOCKSIZE)], #n_writes
+	prefetch [%o1 + (2 * VIS_BLOCKSIZE)], #n_writes
+	ldda	[%o0]%asi, %d34
+	prefetch [%o0 + (3 * VIS_BLOCKSIZE)], #one_read
+	ldda	[%o0 + 0x8]%asi, %d36
+	faligndata %d32, %d34, %d48
+	ldda	[%o0 + 0x10]%asi, %d38
+	faligndata %d34, %d36, %d50
+	ldda	[%o0 + 0x18]%asi, %d40
+	faligndata %d36, %d38, %d52
+	ldda	[%o0 + 0x20]%asi, %d42
+	or	%g0, -8, %o5		! if %o3 >= 0, %o5 = -8
+	prefetch [%o0 + (4 * VIS_BLOCKSIZE)], #one_read
+	faligndata %d38, %d40, %d54
+	ldda	[%o0 + 0x28]%asi, %d44
+	movrlz	%o3, %g0, %o5		! if %o3 < 0, %o5 = 0  (needed lter)
+	faligndata %d40, %d42, %d56
+	ldda	[%o0 + 0x30]%asi, %d46
+	faligndata %d42, %d44, %d58
+	ldda	[%o0 + 0x38]%asi, %d32
+	sub	%o2, VIS_BLOCKSIZE, %o2	! update count
+	prefetch [%o0 + (5 * VIS_BLOCKSIZE)], #one_read
+	add	%o0, VIS_BLOCKSIZE, %o0		! update SRC
+
+	! Main loop.  Write previous block.  Load rest of current block.
+	! Some bytes will be loaded that won't yet be written.
+1:	
+	ldda	[%o0]%asi, %d34
+	faligndata %d44, %d46, %d60
+	ldda	[%o0 + 0x8]%asi, %d36
+	faligndata %d46, %d32, %d62
+	std	%d48, [%o1]
+	std	%d50, [%o1+8]
+	std	%d52, [%o1+16]
+	std	%d54, [%o1+24]
+	std	%d56, [%o1+32]
+	std	%d58, [%o1+40]
+	std	%d60, [%o1+48]
+	std	%d62, [%o1+56]
+	sub	%o2, VIS_BLOCKSIZE, %o2		! update count
+	prefetch [%o1 + (6 * VIS_BLOCKSIZE)], #n_writes
+	prefetch [%o1 + (3 * VIS_BLOCKSIZE)], #n_writes
+	add	%o1, VIS_BLOCKSIZE, %o1		! update DST
+	ldda	[%o0 + 0x10]%asi, %d38
+	faligndata %d32, %d34, %d48
+	ldda	[%o0 + 0x18]%asi, %d40
+	faligndata %d34, %d36, %d50
+	ldda	[%o0 + 0x20]%asi, %d42
+	faligndata %d36, %d38, %d52
+	ldda	[%o0 + 0x28]%asi, %d44
+	faligndata %d38, %d40, %d54
+	ldda	[%o0 + 0x30]%asi, %d46
+	faligndata %d40, %d42, %d56
+	ldda	[%o0 + 0x38]%asi, %d32
+	faligndata %d42, %d44, %d58
+	cmp	%o2, VIS_BLOCKSIZE + 8
+	prefetch [%o0 + (5 * VIS_BLOCKSIZE)], #one_read
+	bgu,pt	%ncc, 1b
+	add	%o0, VIS_BLOCKSIZE, %o0	! update SRC
+	faligndata %d44, %d46, %d60
+	faligndata %d46, %d32, %d62
+	stda	%d48, [%o1]ASI_BLK_P	! store 64 bytes, bypass cache
+	cmp	%o2, VIS_BLOCKSIZE
+	bne	%ncc, 2f		! exactly 1 block remaining?
+	add	%o1, VIS_BLOCKSIZE, %o1	! update DST
+	brz,a	%o3, 3f			! is SRC double aligned?
+	ldd	[%o0], %d34
+
+2:	
+	add	%o5, %o2, %o5		! %o5 was already set to 0 or -8 
+	add	%o5, %o3, %o5
+
+	ba	.beginmedloop_bcopy
+	andn	%o5, 7, %o5		! 8 byte aligned count
+
+	! This is when there is exactly 1 block remaining and SRC is aligned
+3:
+	!  %d32 was loaded in the last iteration of the loop above, and
+	!  %d34 was loaded in the branch delay slot that got us here.
+	ldd	[%o0 + 0x08], %d36
+	ldd	[%o0 + 0x10], %d38
+	ldd	[%o0 + 0x18], %d40
+	ldd	[%o0 + 0x20], %d42
+	ldd	[%o0 + 0x28], %d44
+	ldd	[%o0 + 0x30], %d46
+	stda	%d32, [%o1]ASI_BLK_P
+
+	ba	exit_bcopy
+	nop
+
+	.align 16
+	! two nops here causes loop starting at 1f below to be
+	! on a cache line boundary, improving performance
+	nop
+	nop
+xlarge:
+.xlarge_bcopy:
+	/*
+	set	4096, %l2
+	subcc	%o2, %l2, %g0
+	bge	%ncc, size_ge_4k
+	nop
+	*/
+	! %o1 I/O DST is 64-byte aligned
+	! %o0 I/O 8-byte aligned (and we've set GSR.ALIGN)
+	! %d32 I/O already loaded with SRC data from [%o0-8]
+	! %o2 I/O count (number of bytes that need to be written)
+	! %o3 I   Not written.  If zero, then SRC is double aligned.
+	! %o4 I   Not written.  Holds fprs.
+	! %o5   O The number of doubles that remain to be written.
+
+	! Load the rest of the current block 
+	! Recall that %o0 is further into SRC than %o1 is into DST
+
+	! prefetch [%o0 + (3 * VIS_BLOCKSIZE)], #one_read
+	! executed in delay slot for branch to .xlarge
+	prefetch [%o0 + (4 * VIS_BLOCKSIZE)], #one_read
+	prefetch [%o0 + (5 * VIS_BLOCKSIZE)], #one_read
+	ldda	[%o0]%asi, %d34
+	prefetch [%o0 + (6 * VIS_BLOCKSIZE)], #one_read
+	ldda	[%o0 + 0x8]%asi, %d36
+	faligndata %d32, %d34, %d48
+	ldda	[%o0 + 0x10]%asi, %d38
+	faligndata %d34, %d36, %d50
+	ldda	[%o0 + 0x18]%asi, %d40
+	faligndata %d36, %d38, %d52
+	ldda	[%o0 + 0x20]%asi, %d42
+	or	%g0, -8, %o5		! if %o3 >= 0, %o5 = -8
+	faligndata %d38, %d40, %d54
+	ldda	[%o0 + 0x28]%asi, %d44
+	movrlz	%o3, %g0, %o5		! if %o3 < 0, %o5 = 0  (needed later)
+	faligndata %d40, %d42, %d56
+	ldda	[%o0 + 0x30]%asi, %d46
+	faligndata %d42, %d44, %d58
+	ldda	[%o0 + 0x38]%asi, %d32
+	sub	%o2, VIS_BLOCKSIZE, %o2	! update count
+	prefetch [%o0 + (7 * VIS_BLOCKSIZE)], #one_read
+	add	%o0, VIS_BLOCKSIZE, %o0	! update SRC
+
+	! This point is 32-byte aligned since 24 instructions appear since
+	! the previous alignment directive.
+	
+
+	! Main loop.  Write previous block.  Load rest of current block.
+	! Some bytes will be loaded that won't yet be written.
+1:
+	ldda	[%o0]%asi, %d34
+	faligndata %d44, %d46, %d60
+	ldda	[%o0 + 0x8]%asi, %d36
+	faligndata %d46, %d32, %d62
+	stda	%d48, [%o1]ASI_BLK_P
+	sub	%o2, VIS_BLOCKSIZE, %o2		! update count
+	ldda	[%o0 + 0x10]%asi, %d38
+	faligndata %d32, %d34, %d48
+	ldda	[%o0 + 0x18]%asi, %d40
+	faligndata %d34, %d36, %d50
+	ldda	[%o0 + 0x20]%asi, %d42
+	faligndata %d36, %d38, %d52
+	ldda	[%o0 + 0x28]%asi, %d44
+	faligndata %d38, %d40, %d54
+	ldda	[%o0 + 0x30]%asi, %d46
+	faligndata %d40, %d42, %d56
+	ldda	[%o0 + 0x38]%asi, %d32
+	faligndata %d42, %d44, %d58
+	! offset of 8*BLK+8 bytes works best over range of (src-dst) mod 1K
+	prefetch [%o0 + (8 * VIS_BLOCKSIZE) + 8], #one_read
+	add	%o1, VIS_BLOCKSIZE, %o1		! update DST
+	cmp	%o2, VIS_BLOCKSIZE + 8
+	! second prefetch important to correct for occasional dropped
+	! initial prefetches, 5*BLK works best over range of (src-dst) mod 1K
+	! strong prefetch prevents drops on Panther, but Jaguar and earlier
+	! US-III models treat strong prefetches as weak prefetchs
+	! to avoid regressions on customer hardware, we retain the prefetch
+	prefetch [%o0 + (5 * VIS_BLOCKSIZE)], #one_read
+	bgu,pt	%ncc, 1b
+	add	%o0, VIS_BLOCKSIZE, %o0	! update SRC
+
+	faligndata %d44, %d46, %d60
+	faligndata %d46, %d32, %d62
+	stda	%d48, [%o1]ASI_BLK_P	! store 64 bytes, bypass cache
+	cmp	%o2, VIS_BLOCKSIZE		
+	bne	%ncc, 2f		! exactly 1 block remaining?
+	add	%o1, VIS_BLOCKSIZE, %o1	! update DST
+	brz,a	%o3, 3f			! is SRC double aligned?
+	ldd	[%o0], %d34
+
+2:	
+	add	%o5, %o2, %o5		! %o5 was already set to 0 or -8 
+	add	%o5, %o3, %o5
+
+
+	ba	.beginmedloop_bcopy
+	andn	%o5, 7, %o5		! 8 byte aligned count
+
+
+	! This is when there is exactly 1 block remaining and SRC is aligned
+3:
+	!  %d32 was loaded in the last iteration of the loop above, and
+	!  %d34 was loaded in the branch delay slot that got us here.
+	ldd	[%o0 + 0x08], %d36
+	ldd	[%o0 + 0x10], %d38
+	ldd	[%o0 + 0x18], %d40
+	ldd	[%o0 + 0x20], %d42
+	ldd	[%o0 + 0x28], %d44
+	ldd	[%o0 + 0x30], %d46
+	stda	%d32, [%o1]ASI_BLK_P
+
+	ba	exit_bcopy
+	nop
+
+copying_ge_512:
+	! both src and dst are aligned to 8 byte boundary
+	! and the number of bytes to copy is 512 or more.
+	! %o5 has the saved T_LOFAULT when we come here.
+	! We set a new error handler if the T_LOFAULT was set earlier OR
+	! KCOPY_FLAG is set.
+	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+	mov	%i5, %l6
+	andn	%l6, TRAMP_FLAG, %o2
+	brz,pt	%o2, 1f
+	  nop
+	! We enter here if KCOPY_FLAG was set OR
+	! T_LOFAULT was set earlier.
+	! We only change the error handler pointer here.
+	! The flags TRAMP_FLAG or KCOPY_FLAG is left as it is in %l6.
+	sethi	%hi(.copyerr_fp_used), %o2
+	or	%o2, %lo(.copyerr_fp_used), %o2
+	membar	#Sync				! sync error barrier
+	stn	%o2, [THREAD_REG + T_LOFAULT]	! install new vector
+1:
+	FP_NOMIGRATE(6, 7)
+	mov	%i0, %o0
+	mov	%i1, %o1
+	mov	%i2, %o2
+	mov	%i3, %o3
+	mov	%i5, %o5
+	rd	%fprs, %o5		! check for unused fp
+	st	%o5, [%fp + STACK_BIAS - SAVED_FPRS_OFFSET] ! save orig %fprs
+
+	! FPU enabled ?  If not, enable it.
+	btst	FPRS_FEF, %o5
+	bz,a,pt	%icc, 1f
+	  wr	%g0, FPRS_FEF, %fprs
+
+
+	! save the FP registers even if DU is not set.
+
+	BST_FPQ3Q4_TOSTACK(%o5)
+	or	%l6, FPSAVED_FLAG, %l6
+1:
+	rd	%gsr, %o5
+	stx	%o5, [%fp + STACK_BIAS - SAVED_GSR_OFFSET]	! save gsr
+	or	%l6, FPUSED_FLAG, %l6
+	!prefetch 256 bytes from nearest 128 byte aligned src buf
+	sub     %o0,1,%o3
+	andn    %o3,0x7f,%l1
+	add     %l1,128,%l1
+	prefetch [%l1],2
+	prefetch [%l1+64],2
+	prefetch [%l1+(2*64)],2
+	prefetch [%l1+(3*64)],2
+	!prefetch 256 bytes from nearest 128 byte aligned dst buf
+	sub     %o1,1,%o3
+	andn    %o3,0x7f,%l1
+	add     %l1,128,%l1
+	prefetch [%l1],2
+	prefetch [%l1+64],2
+	prefetch [%l1+(2*64)],2
+	prefetch [%l1+(3*64)],2
+
+	andcc   %o1,0x7f,%o3	    !Check if buffers are 128 byte aligned
+	brz,pn  %o3,aligned_on_128
+	sub     %o3,128,%o3
+
+	add     %o2,%o3,%o2
+align_to_128:
+	ldxa	[%o0]ASI_CACHE_SPARING_P, %o4
+	add     %o0,8,%o0		! increment src pointer
+	stxa    %o4,[%o1]ASI_CACHE_SPARING_P
+	addcc   %o3,8,%o3
+	bl,pt   %ncc,align_to_128
+	add     %o1,8,%o1		! increment dst pointer
+
+aligned_on_128:
+	andcc	%o1,0x1ff,%o3	!Check if buffers are 512 byte aligned.
+	brnz,pn	%o3, 4f
+	mov	%o2,%l4		!l4=number of bytes to copy
+	! buffers are now 512 byte aligned.
+	! if we have 4096 or more bytes to copy we will use the
+	! stingray_optimized_copy
+	set	4096, %l2
+	subcc	%o2, %l2, %g0
+	bge,pn	%ncc, stingray_optimized_copy
+	nop
+4:
+	! determine how many bytes are left to be copied after the buffers
+	! are aligned to 512 byte boundary.
+	! if we have 4096 or more then we can perform stingray_optimized_copy
+	! register l4 will contain the number of bytes to copy after buffers\
+	! are aligned to 512 byte boundary. l4 is set to 0 if we have less than
+	! 4096 bytes to  copy after aligning buffers to 512 byte.
+	sub	%o1,8,%o5	! should be in current 512 chunk
+	andn 	%o5,0x1ff,%o3	! %o3=aligned 512b addr
+	add 	%o3,0x200,%o3	! %o3=next aligned 512b addr
+	sub 	%o3,%o1,%o3	! %o3=how many bytes to copy for 512 byte
+				! alignment
+	sub	%o2,%o3,%l4	! l4=bytes to copy after aligning buffers to 512
+	! if l4 is < 4096 do interleave128_copy only.
+	set	4096, %l2
+	subcc	%l4, %l2, %g0
+	bge,pn	%ncc,6f
+	nop
+	mov	%g0, %l4
+	add	%o1, %o2, %l1
+	ba	interleave128_copy
+	nop
+6:
+	mov	%o3, %o2
+	subcc 	%o3,256,%g0	!use interleave128_copy if 256 or more
+	bl,pn	%ncc,copy_word	!o.w use copy_word to finish the 512 byte alignment.
+	!%o2=new count i.e how many bytes to write
+	add     %o1,%o2,%l1	     !cal the last byte to write %l1
+	ba	interleave128_copy
+	nop
+
+	.align	64
+interleave128_copy:
+	! %l1 has the addr of the dest. buffer at or beyond which no write
+	! is to be done.
+	! %l4 has the number of bytes to zero using stingray_optimized_bzero
+	!prefetch src 
+
+	add	%o0, 256, %o3
+	prefetch [%o3], 2	!1st 64 byte line of next 256 byte block
+	add	%o0, 384, %o3
+	prefetch [%o3], 2	!3rd 64 byte line of next 256 byte block
+	add	%o0, 320, %o3
+	prefetch [%o3], 2	!2nd 64 byte line of next 256 byte block
+	add	%o0, 448, %o3
+	prefetch [%o3], 2	!4th 64 byte line of next 256 byte block
+
+	!prefetch dst 
+
+	add	%o1, 256, %o3
+	prefetch [%o3], 2	!1st 64 byte line of next 256 byte block
+	add	%o1, 384, %o3
+	prefetch [%o3], 2	!3rd 64 byte line of next 256 byte block
+	add	%o1, 320, %o3
+	prefetch [%o3], 2	!2nd 64 byte line of next 256 byte block
+	add	%o1, 448, %o3
+	prefetch [%o3], 2	!4th 64 byte line of next 256 byte block
+
+	ldxa	[%o0]ASI_CACHE_SPARING_P, %o4
+	stxa     %o4,[%o1]ASI_CACHE_SPARING_P
+	add	%o0, 128, %o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, 128, %o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (1 * 8), %o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add	%o1, (1 * 8), %o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (1 * 8 + 128), %o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (1 * 8 + 128), %o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (2 * 8),%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (2 * 8),%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (2 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (2 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (3 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (3 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (3 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (3 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (4 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (4 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (4 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (4 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (5 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (5 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (5 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (5 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (6 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (6 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (6 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (6 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (7 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (7 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (7 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (7 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (8 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (8 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (8 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (8 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (9 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (9 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (9 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (9 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (10 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (10 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (10 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (10 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (11 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (11 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (11 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (11 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (12 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (12 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (12 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (12 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (13 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (13 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (13 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (13 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (14 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (14 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (14 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (14 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (15 * 8) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (15 * 8) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add     %o0, (15 * 8 + 128) ,%o3
+	ldxa	[%o3]ASI_CACHE_SPARING_P, %o4
+	add     %o1, (15 * 8 + 128) ,%o3
+	stxa    %o4,[%o3]ASI_CACHE_SPARING_P	
+	add	%o0, 256, %o0
+
+	! check if the next 256 byte copy will not exceed the number of
+	! bytes remaining to be copied.
+	! %l2 points to the dest buffer after copying 256 bytes more.
+	! %l1 points to dest. buffer at or beyond which no writes should be done.
+	add     %o1,512,%l2
+	subcc   %l1,%l2,%g0
+	bge,pt  %ncc,interleave128_copy
+	add     %o1,256,%o1
+
+copy_word:
+	and     %o2,255,%o3
+	and     %o3,7,%o2
+
+	! Set the remaining doubles
+	subcc   %o3, 8, %o3		! Can we store any doubles?
+	bl,pn  %ncc, 6f
+	and	%o2, 7, %o2		! calc bytes left after doubles
+
+	!prefetch src 
+
+	mov	%o0, %o4
+	prefetch [%o4], 2	!1st 64 byte line of next 256 byte block
+	add	%o0, 128, %o4
+	prefetch [%o4], 2	!3rd 64 byte line of next 256 byte block
+	add	%o0, 64, %o4
+	prefetch [%o4], 2	!2nd 64 byte line of next 256 byte block
+	add	%o0, 192, %o4
+	prefetch [%o4], 2	!4th 64 byte line of next 256 byte block
+
+	!prefetch dst 
+
+	mov	%o1, %o4
+	prefetch [%o4], 2	!1st 64 byte line of next 256 byte block
+	add	%o1, 128, %o4
+	prefetch [%o4], 2	!3rd 64 byte line of next 256 byte block
+	add	%o1, 64, %o4
+	prefetch [%o4], 2	!2nd 64 byte line of next 256 byte block
+	add	%o1, 192, %o4
+	prefetch [%o4], 2	!4th 64 byte line of next 256 byte block
+
+5:	
+	ldxa	[%o0]ASI_CACHE_SPARING_P, %o4
+	add     %o0, 8, %o0      
+	stxa	%o4, [%o1]ASI_CACHE_SPARING_P
+	subcc   %o3, 8, %o3
+	bge,pt	%ncc, 5b
+	add     %o1, 8, %o1      
+6:
+	! Set the remaining bytes
+	brz	%o2,  can_we_do_stingray_optimized_copy
+	nop
+	
+7:
+	deccc	%o2			! byte clearing loop
+	ldub	[%o0], %o4		! load one byte
+	stb	%o4, [%o1]
+	inc	%o1			! increment dst
+	bgu,pt	%ncc, 7b
+	inc	%o0			! increment src
+
+can_we_do_stingray_optimized_copy:
+	! %l4 contains the number of bytes to be copied
+	mov	%l4, %o2
+	brnz,pn	%o2, stingray_optimized_copy
+	nop
+	
+exit:	
+	membar	#Sync
+
+	ldx	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o5	! restore gsr
+	wr	%o5, 0, %gsr
+
+	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
+	! No need to restore regs if they were not saved
+	btst	FPSAVED_FLAG, %l6
+	bz	%ncc, 4f
+	  nop
+
+	BLD_FPQ3Q4_FROMSTACK(%o5)
+
+	ba,pt	%ncc, 5f
+	  wr	%o3, 0, %fprs		! restore fprs
+4:
+	FZEROQ3Q4
+	wr	%o3, 0, %fprs		! restore fprs
+5:
+	membar	#Sync				! sync error barrier
+	andn	%l6, MASK_FLAGS, %l6
+	stn	%l6, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+	FP_ALLOWMIGRATE(6, 7)
+	ret
+	  restore	%g0, 0, %o0
+
+
+stingray_optimized_copy:
+	 ! This code tries to maximize bandwidth by being clever about
+	 ! accessing the two cache lines that are BUDDY PAIRS in the L3 cache.  
+	 ! THIS VERSION IS OPTIMIZED FOR THE CASE OF SWAPPING PA BITS 6 and 9. 
+	 ! To keep this code simple, we assume the addresses given are aligned
+	 ! at least on a 128-byte boundary, and the length is assumed to be
+	 ! a multiple of 4k bytes.
+	 ! THIS VERSION USES BLKSTORES, AND PREFETCHES BOTH SOURCE AND
+	 ! DESTINATION DATA.
+
+	add	%o1, %l4, %o2
+
+	!save original value of %o0 so we can restore it.
+	or      %g0,%o0,%l2
+	
+	wr      %g0,ASI_BLK_P,%asi
+
+	prefetch [%o0+0],2
+	prefetch [%o0+(64*1)],2
+	prefetch [%o0+(64*2)],2
+	prefetch [%o0+(64*3)],2
+	prefetch [%o0+(64*4)],2
+	prefetch [%o0+(64*5)],2
+	prefetch [%o0+(64*6)],2
+	prefetch [%o0+(64*7)],2
+	prefetch [%o0+(64*8)],2
+	prefetch [%o0+(64*9)],2
+	prefetch [%o0+(64*10)],2
+	prefetch [%o0+(64*11)],2
+	prefetch [%o0+(64*12)],2
+	prefetch [%o0+(64*13)],2
+	prefetch [%o0+(64*14)],2
+	prefetch [%o0+(64*15)],2
+
+	prefetch [%o1+0],2
+	prefetch [%o1+(64*1)],2
+	prefetch [%o1+(64*2)],2
+	prefetch [%o1+(64*3)],2
+	prefetch [%o1+(64*4)],2
+	prefetch [%o1+(64*5)],2
+	prefetch [%o1+(64*6)],2
+	prefetch [%o1+(64*7)],2
+	prefetch [%o1+(64*8)],2
+	prefetch [%o1+(64*9)],2
+	prefetch [%o1+(64*10)],2
+	prefetch [%o1+(64*11)],2
+	prefetch [%o1+(64*12)],2
+	prefetch [%o1+(64*13)],2
+	prefetch [%o1+(64*14)],2
+	prefetch [%o1+(64*15)],2
+	
+	ba      stingray_optimized_4k_copy_loop
+	srl	%l4, 12, %l4
+	
+	! Local register usage:
+	! %l1   address at short distance ahead of current src buf for prefetching
+	!	into L1 cache. 
+	! %l2   address at far ahead of current src buf for prefetching
+	!	into L2 cache.
+	! %l3   save %o1 at start of inner loop. 
+	! %l4	Number of 4k blocks to copy
+	! %g1   save src buf pointer at start of inner loop. 
+	! %l5   iteration counter to make buddy loop execute 2 times. 
+	! %o5   iteration counter to make inner loop execute 4 times. 
+	! %l7   address at far ahead of current dst buf for prefetching dest
+	!	into L2 cache.
+	       
+	.align 64
+stingray_optimized_4k_copy_loop:
+	set      2, %l5		! %l5 is the loop count for the buddy loop
+	add      %o1, 0, %l3 
+	add      %o0, 0, %g1 
+buddyloop_bcopy:
+	set      PF_FAR, %g5
+	add      %o0, %g5, %l2	! Set %l2 to far ahead of src buffer to prefetch
+	!  For prefetching into L1 D$, set %l1 a little ahead of src buffer
+	add      %o0, PF_NEAR, %l1
+	add      %o1, %g5, %l7	! Set %l7 to far ahead of dst buffer to prefetch
+
+	add      %l2, %g5, %g5	! %g5 is now double far ahead of the src buffer
+	prefetch [%g5+%g0],2	! Prefetch ahead to get TLB entry in advance.
+	set      2*PF_FAR, %g5
+	add      %o1, %g5, %g5	! %g5 is now double far ahead of the dst buffer
+	prefetch [%g5+%g0],2	! Prefetch ahead to get TLB entry in advance.
+
+	set      4,%o5		! %o5 = loop count for the inner loop
+	set      0, %g5
+	
+	! Each iteration of the inner loop below copies 8 sequential lines.
+	! This loop is iterated 4 times, to move a total of 32 lines, all of
+	! which have the same value of PA[9], so we increment the base 
+	! address by 1024 bytes in each iteration, which varies PA[10].
+innerloop_bcopy:	  
+	! copy line 1 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 2 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 3 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 4 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 5 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 6 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 7 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+	add     %g5, 64, %g5
+	add     %o1, 64, %o1
+	add     %o0, 64, %o0
+
+	! copy line 8 of 8
+	prefetch [%l2+%g5],2
+	prefetch [%l7+%g5],2
+	prefetch [%l1+%g5],1
+
+	ldd     [%o0],%d32
+	ldd     [%o0+8],%d34
+	ldd     [%o0+16],%d36
+	ldd     [%o0+24],%d38
+	ldd     [%o0+32],%d40
+	ldd     [%o0+40],%d42
+	ldd     [%o0+48],%d44
+	ldd     [%o0+56],%d46
+	stda    %d32,[%o1+0] %asi
+
+	subcc   %o5,1,%o5	! Decrement the inner loop counter.
+	
+	! Now increment by 64 + 512 so we don't toggle PA[9]
+
+	add     %g5, 576, %g5
+	add     %o1, 576, %o1	! increment dst buffer
+
+	bg,pt   %icc,innerloop_bcopy
+	add     %o0, 576, %o0	! increment src buffer
+	! END OF INNER LOOP
+
+
+	subcc   %l5,1,%l5
+	add     %l3, 512, %o1	! increment dst buf to the first buddy line
+	bg,pt   %icc,buddyloop_bcopy
+	add     %g1, 512 ,%o0	! increment src buf to the first buddy lines. */
+
+	subcc   %l4, 1, %l4
+	add     %o1, 3584, %o1	! Advance src and dst buffers by 4k
+	add     %o0, 3584, %o0	! They were already incremented by 512,
+				! so just add 3584.
+
+	bg,pt   %icc,stingray_optimized_4k_copy_loop
+	nop
+
+	! End of stingray_optimized_copy
+	! if we have 256 or more bytes to copy we use interleave128_copy
+	! else we use copy_word
+
+	sub	%o2,%o1,%o2	! bytes remaining to be copied
+	brz,pn	%o2,exit
+	mov	%g0,%l4
+	add     %o1,%o2,%l1	!cal the last byte to write %l1
+	subcc	%o2,256,%g0
+	bge,pt	%ncc,interleave128_copy
+	mov	%g0, %l4
+	
+	ba	copy_word
+	nop
+	
+	SET_SIZE(bcopy)
+	SET_SIZE(__align_cpy_1)
 #endif	/* lint */
+
+#define	REALSRC	%i0
+#define	DST	%i1
+#define	CNT	%i2
+#define	SRC	%i3
+#define	TMP	%i5
 
 /*
  * Block copy with possibly overlapped operands.
@@ -1542,10 +1976,7 @@ hwblkpagecopy(const void *src, void *dst)
 	bz,a,pt	%icc, 1f
 	  wr	%g0, FPRS_FEF, %fprs
 
-	! FPU enabled, but is Q3Q4 dirty ?  If yes, save them.
-	btst	FPRS_DU, %l0
-	bz,pn	%icc, 1f
-	  nop
+	! save the FP registers even if DU is not set.
 
 	BST_FPQ3Q4_TOSTACK(%l1)
 
@@ -1637,7 +2068,7 @@ hwblkpagecopy(const void *src, void *dst)
 
 	membar	#Sync
 
-	btst	FPRS_DU, %l0
+	btst	FPRS_FEF, %l0
 	bz,pt	%icc, 2f
 	  nop
 
@@ -1754,7 +2185,7 @@ hwblkpagecopy(const void *src, void *dst)
 	wr	%o2, 0, %gsr    	! restore gsr
 
 	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
-	btst	FPRS_DU, %o3
+	btst	FPRS_FEF, %o3
 	bz,pt	%icc, 4f
 	  nop
 
@@ -2201,10 +2632,7 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	bz,a,pt	%icc, .do_blockcopyout
 	  wr	%g0, FPRS_FEF, %fprs
 
-	! FPU enabled, but is Q3Q4 dirty ?  If yes, save them.
-	btst	FPRS_DU, %o2
-	bz,pn	%icc, .do_blockcopyout
-	  nop
+	! save the FP registers even if DU is not set.
 
 	BST_FPQ3Q4_TOSTACK(%o2)
 
@@ -2371,7 +2799,7 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	wr	%o2, 0, %gsr		! restore gsr
 
 	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
-	btst	FPRS_DU, %o3
+	btst	FPRS_FEF, %o3
 	bz,pt	%icc, 4f
 	  nop
 
@@ -2984,10 +3412,7 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	bz,a,pt	%icc, .do_blockcopyin
 	  wr	%g0, FPRS_FEF, %fprs
 
-	! FPU enabled, but is Q3Q4 dirty ?  If yes, save them.
-	btst	FPRS_DU, %o2
-	bz,pn	%icc, .do_blockcopyin
-	  nop
+	! save the FP registers even if DU is not set.
 
 	BST_FPQ3Q4_TOSTACK(%o2)
 
@@ -3154,7 +3579,7 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	wr	%o2, 0, %gsr
 
 	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
-	btst	FPRS_DU, %o3
+	btst	FPRS_FEF, %o3
 	bz,pt	%icc, 4f
 	  nop
 
@@ -3624,12 +4049,8 @@ hwblkclr(void *addr, size_t len)
 	bz,a,pt	%icc, 1f
 	  wr	%g0, FPRS_FEF, %fprs
 
-	! FPU enabled, but is Q3Q4 dirty ?  If yes, save them.
-	btst	FPRS_DU, %l0
-	bz,pn	%icc, 1f
-	  nop
+	! save the FP registers even if DU is not set.
 
-	! save in-use fpregs on stack
 	membar	#Sync
 	add	%fp, STACK_BIAS - 65, %l1
 	and	%l1, -VIS_BLOCKSIZE, %l1
@@ -3855,8 +4276,8 @@ bzero(void *addr, size_t count)
 #else	/* lint */
 
 	ENTRY(bzero)
-	wr	%g0, ASI_P, %asi
 
+	wr	%g0, ASI_P, %asi
 	ldn	[THREAD_REG + T_LOFAULT], %o5	! save old vector
 	tst	%o5
 	bz,pt	%ncc, .do_zero
@@ -3866,160 +4287,501 @@ bzero(void *addr, size_t count)
 	stn	%o2, [THREAD_REG + T_LOFAULT]	! install new vector
 
 .do_zero:
-	cmp	%o1, 7
-	blu,pn	%ncc, .byteclr
+	/*
+	 * If 0 bytes to xfer return
+	 */
+	brnz	%o1, continue_bzero
+	nop
+	ba	.bzero_exit
+	nop
+continue_bzero:
+	prefetch	[%o0],2
+	cmp	%o1, 8
+	bge,pt	%ncc, xfer_8_or_more
 	nop
 
-	cmp	%o1, 15
-	blu,pn	%ncc, .wdalign
+.byteclr:
+	deccc	%o1			! byte clearing loop
+	stba	%g0, [%o0]%asi
+	bgu,pt	%ncc, .byteclr
+	inc	%o0
+	ba	.bzero_exit
 	nop
 
+xfer_8_or_more:
 	andcc	%o0, 7, %o3		! is add aligned on a 8 byte bound
-	bz,pt	%ncc, .blkalign		! already double aligned
+	brz,pt	%o3, blkchk		
 	sub	%o3, 8, %o3		! -(bytes till double aligned)
 	add	%o1, %o3, %o1		! update o1 with new count
-
 1:
 	stba	%g0, [%o0]%asi
 	inccc	%o3
 	bl,pt	%ncc, 1b
 	inc	%o0
 
-	! Now address is double aligned
-.blkalign:
-	cmp	%o1, 0x80		! check if there are 128 bytes to set
-	blu,pn	%ncc, .bzero_small
-	mov	%o1, %o3
-
-	andcc	%o0, 0x3f, %o3		! is block aligned?
-	bz,pt	%ncc, .bzero_blk
-	sub	%o3, 0x40, %o3		! -(bytes till block aligned)
-	add	%o1, %o3, %o1		! o1 is the remainder
-	
-	! Clear -(%o3) bytes till block aligned
-1:
+	! Now addr is double word aligned
+blkchk:
+	cmp     %o1, 767		! if large count use Block ld/st
+	bg,pt	%ncc,blkwr
+	nop
+	and	%o1, 24, %o3		! o3 is {0, 8, 16, 24}
+	brz	%o3, skip_dw_loop
+	nop
+1:	subcc	%o3, 8, %o3		! double-word loop
 	stxa	%g0, [%o0]%asi
-	addcc	%o3, 8, %o3
-	bl,pt	%ncc, 1b
+	bgu,pt %ncc, 1b
 	add	%o0, 8, %o0
-
-.bzero_blk:
-	and	%o1, 0x3f, %o3		! calc bytes left after blk clear
-	andn	%o1, 0x3f, %o4		! calc size of blocks in bytes
-
-	cmp	%o4, 0x100		! 256 bytes or more
-	blu,pn	%ncc, 3f
+skip_dw_loop:
+	andncc	%o1, 31, %o4		! o4 has 32 byte aligned count
+	brz,pn	%o4, 3f
+	nop
+	ba	loop_32byte
 	nop
 
-2:
-	stxa	%g0, [%o0+0x0]%asi
-	stxa	%g0, [%o0+0x40]%asi
-	stxa	%g0, [%o0+0x80]%asi
-	stxa	%g0, [%o0+0xc0]%asi
+	.align	ICACHE_LINE_SIZE
 
-	stxa	%g0, [%o0+0x8]%asi
-	stxa	%g0, [%o0+0x10]%asi
-	stxa	%g0, [%o0+0x18]%asi
-	stxa	%g0, [%o0+0x20]%asi
-	stxa	%g0, [%o0+0x28]%asi
-	stxa	%g0, [%o0+0x30]%asi
-	stxa	%g0, [%o0+0x38]%asi
-
-	stxa	%g0, [%o0+0x48]%asi
-	stxa	%g0, [%o0+0x50]%asi
-	stxa	%g0, [%o0+0x58]%asi
-	stxa	%g0, [%o0+0x60]%asi
-	stxa	%g0, [%o0+0x68]%asi
-	stxa	%g0, [%o0+0x70]%asi
-	stxa	%g0, [%o0+0x78]%asi
-
-	stxa	%g0, [%o0+0x88]%asi
-	stxa	%g0, [%o0+0x90]%asi
-	stxa	%g0, [%o0+0x98]%asi
-	stxa	%g0, [%o0+0xa0]%asi
-	stxa	%g0, [%o0+0xa8]%asi
-	stxa	%g0, [%o0+0xb0]%asi
-	stxa	%g0, [%o0+0xb8]%asi
-
-	stxa	%g0, [%o0+0xc8]%asi
-	stxa	%g0, [%o0+0xd0]%asi
-	stxa	%g0, [%o0+0xd8]%asi
-	stxa	%g0, [%o0+0xe0]%asi
-	stxa	%g0, [%o0+0xe8]%asi
-	stxa	%g0, [%o0+0xf0]%asi
-	stxa	%g0, [%o0+0xf8]%asi
-
-	sub	%o4, 0x100, %o4
-	cmp	%o4, 0x100
-	bgu,pt	%ncc, 2b
-	add	%o0, 0x100, %o0
-
-3:
-	! ... check if 64 bytes to set
-	cmp	%o4, 0x40
-	blu	%ncc, .bzero_blk_done
+loop_32byte:
+	subcc	%o4, 32, %o4		! main loop, 32 bytes per iteration
+	stxa	%g0, [%o0]%asi
+	stxa	%g0, [%o0 + 8]%asi
+	stxa	%g0, [%o0 + 16]%asi
+	stxa	%g0, [%o0 + 24]%asi
+	bne,pt  %ncc, loop_32byte
+	add	%o0, 32, %o0
+3:	
+	and	%o1, 7, %o1		! o1 has the remaining bytes (<8)
+	brnz	%o1, .byteclr
 	nop
+	ba	.bzero_exit
+	nop
+blkwr:
+	sub     %o0,1,%o3
+	andn    %o3,0x7f,%o4
+	add     %o4,128,%o4
+	prefetch [%o4],2		!prefetch next 128b
+	prefetch [%o4+64],2
+	prefetch [%o4+(2*64)],2	
+	prefetch [%o4+(3*64)],2
 
+	andcc   %o0,0x7f,%o3	    !o3=0 , means it is already 128 align
+	brz,pn  %o3,aligned_on_128_bzero
+	sub     %o3,128,%o3
+
+	add     %o1,%o3,%o1
+align_to_128_bzero:
+	stxa    %g0,[%o0]%asi
+	addcc   %o3,8,%o3
+	bl,pt   %ncc,align_to_128_bzero
+	add     %o0,8,%o0
+
+
+
+aligned_on_128_bzero:
+	! if the addr is 512 byte aligned and bytes to zero
+	! are greater than or equal to 4096 do a stingray_optimized_bzero
+	andcc	%o0,0x1ff,%o3	! Is addr 512 byte aligned ?
+	brnz,pn	%o3, 4f
+	mov	%o1,%g5
+	set	4096, %g4
+	subcc	%o1, %g4, %g0
+	bge,pn	%ncc, stingray_optimized_bzero
+	nop
 4:
-	stxa	%g0, [%o0+0x0]%asi
-	stxa	%g0, [%o0+0x8]%asi
-	stxa	%g0, [%o0+0x10]%asi
-	stxa	%g0, [%o0+0x18]%asi
-	stxa	%g0, [%o0+0x20]%asi
-	stxa	%g0, [%o0+0x28]%asi
-	stxa	%g0, [%o0+0x30]%asi
-	stxa	%g0, [%o0+0x38]%asi
+	! addr(dest. buffer) is not aligned to 512 byte
+	! if the number of bytes to zero are less than 4096 after
+	! aligning the addr to 512 byte then do interleave128_bzero.
 
-	subcc	%o4, 0x40, %o4
-	bgu,pt	%ncc, 3b
-	add	%o0, 0x40, %o0
+	sub	%o0,8,%o4
+	andn 	%o4,0x1ff,%o3
+	add 	%o3,0x200,%o3	!o3 = addr aligned to 512 byte.
+	sub 	%o3,%o0,%o3	!o3 = number of bytes to zero to align addr to 512
+	sub	%o1,%o3,%g5	!g5 = bytes to zero from 512 byte aligned addr
+	set	4096, %g4
+	subcc	%g5, %g4, %g0
+	bge,pn	%ncc,6f
+	nop
+	! clear %g5 to indicate that there is no need to do
+	! stingray_optimized_bzero
+	mov	%g0, %g5
+	add	%o0, %o1, %o4
+	ba	interleave128_bzero
+	nop
+6:
+	! %g5 contains the number of bytes to zero after 512 byte alignment
+	! We zero the bytes in dest. buffer until it is 512 byte aligned
+	! and call stingray_optimized_bzero
+	! if the nuber of bytes to zero(until 512 alignment) is less than 256
+	! we call bzero_word, else we call interleave128_bzero
+	mov	%o3, %o1
+	subcc 	%o3,256,%g0
+	bl,pn	%ncc,bzero_word
+	add     %o0,%o1,%o4	     !cal the last byte to write %o4
+	ba	interleave128_bzero
+	nop
 
-.bzero_blk_done:
-	membar	#Sync
+	.align	64
+interleave128_bzero:
+	! %o0 has the dest. buffer addr
+	! %o1 has the number of bytes to zero
+	! %o4 has the addr of the dest. buffer at or beyond which no write
+	! is to be done.
+	! %g5 has the number of bytes to zero using stingray_optimized_bzero
 
-.bzero_small:
+	add	%o0, 256, %o3
+	prefetch [%o3], 2	!1st 64 byte line of next 256 byte block
+	add	%o0, 384, %o3
+	prefetch [%o3], 2	!3rd 64 byte line of next 256 byte block
+	add	%o0, 320, %o3
+	prefetch [%o3], 2	!2nd 64 byte line of next 256 byte block
+	add	%o0, 448, %o3
+	prefetch [%o3], 2	!4th 64 byte line of next 256 byte block
+	mov	%o0, %o3
+	stxa     %g0,[%o3]%asi	!1st 64 byte line
+	add     %o0,128,%o3
+	stxa     %g0,[%o3]%asi	!3rd 64 byte line
+	add     %o0,8,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(2 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128 ,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(3 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(4 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(5 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(6 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(7 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(8 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(9 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(10 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(11 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(12 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(13 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(14 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(15 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	! check if the next 256 byte copy will not exceed the number of
+	! bytes remaining to be copied.
+	! %g4 points to the dest buffer after copying 256 bytes more.
+	! %o4 points to dest. buffer at or beyond which no writes should be done.
+	add     %o0,512,%g4
+	subcc   %o4,%g4,%g0
+	bge,pt  %ncc,interleave128_bzero
+	add     %o0,256,%o0
+
+bzero_word:
+	and     %o1,255,%o3
+	and     %o3,7,%o1
+
 	! Set the remaining doubles
-	subcc	%o3, 8, %o3		! Can we store any doubles?
-	blu,pn	%ncc, .byteclr
+	subcc   %o3, 8, %o3		! Can we store any doubles?
+	bl,pn  %ncc, 6f
 	and	%o1, 7, %o1		! calc bytes left after doubles
 
-.dbclr:
-	stxa	%g0, [%o0]%asi		! Clear the doubles
-	subcc	%o3, 8, %o3
-	bgeu,pt	%ncc, .dbclr
-	add	%o0, 8, %o0
-
-	ba	.byteclr
-	nop
-
-.wdalign:			
-	andcc	%o0, 3, %o3		! is add aligned on a word boundary
-	bz,pn	%ncc, .wdclr
-	andn	%o1, 3, %o3		! create word sized count in %o3
-
-	dec	%o1			! decrement count
-	stba	%g0, [%o0]%asi		! clear a byte
-	ba	.wdalign
-	inc	%o0			! next byte
-
-.wdclr:
-	sta	%g0, [%o0]%asi		! 4-byte clearing loop
-	subcc	%o3, 4, %o3
-	bnz,pt	%ncc, .wdclr
-	inc	4, %o0
-
-	and	%o1, 3, %o1		! leftover count, if any
-
-.byteclr:
-	! Set the leftover bytes
-	brz	%o1, .bzero_exit
-	nop
-
+5:	
+	stxa	%g0, [%o0]%asi
+	subcc   %o3, 8, %o3
+	bge,pt	%ncc, 5b
+	add     %o0, 8, %o0      
+6:
+	! Set the remaining bytes
+	brz	%o1,  can_we_do_stingray_optimized_bzero
+	
 7:
 	deccc	%o1			! byte clearing loop
 	stba	%g0, [%o0]%asi
 	bgu,pt	%ncc, 7b
 	inc	%o0
+can_we_do_stingray_optimized_bzero:
+	mov	%g5, %o1
+	brnz,pn	%o1, stingray_optimized_bzero
+	nop
+	
+	ba	.bzero_exit
+	nop
+
+stingray_optimized_bzero:
+	save	%sp, -SA(MINFRAME), %sp
+	mov	%i0, %o0
+	mov	%i1, %o1
+	mov	%i2, %o2
+	mov	%i3, %o3
+	mov	%i5, %o5
+init:
+	set     4096,%o2
+
+	prefetch [%o0+0],2
+	prefetch [%o0+(64*1)],2
+	prefetch [%o0+(64*2)],2
+	prefetch [%o0+(64*3)],2
+	prefetch [%o0+(64*4)],2
+	prefetch [%o0+(64*5)],2
+	prefetch [%o0+(64*6)],2
+	prefetch [%o0+(64*7)],2
+	prefetch [%o0+(64*8)],2
+	prefetch [%o0+(64*9)],2
+	prefetch [%o0+(64*10)],2
+	prefetch [%o0+(64*11)],2
+	prefetch [%o0+(64*12)],2
+	prefetch [%o0+(64*13)],2
+	prefetch [%o0+(64*14)],2
+	prefetch [%o0+(64*15)],2
+	ba      stingray_optimized_4k_zero_loop
+	add     %o0,%g5,%g5
+	! Local register usage:
+	! prefetching into L1 cache.
+	! %l3   dest. buffer at start of inner loop.
+	! %l5   iteration counter to make buddy loop execute 2 times.
+	! %l6   iteration counter to make inner loop execute 4 times.
+	! %l7   address at far ahead of current dest. buffer for prefetching
+	!	into L2 cache.
+
+	.align 64
+stingray_optimized_4k_zero_loop:
+	set      2,%l5
+	add      %o0, 0, %l3
+bzero_buddyloop:
+	set      PF_FAR, %g4
+	add      %o0, %g4, %l7
+
+	!  Prefetch ahead by 2 pages to get TLB entry in advance.
+	set      2*PF_FAR, %g4
+	add      %o0, %g4, %g4
+	prefetch [%g4+%g0],2
+
+	set      4,%l6
+	set      0, %g4
+
+	! Each iteration of the inner loop below writes 8 sequential lines.
+	! This loop is iterated 4 times, to move a total of 32 lines, all of
+	! which have the same value of PA[9], so we increment the base 
+	! address by 1024 bytes in each iteration, which varies PA[10].
+bzero_innerloop:
+	add	%o0, PF_FAR, %o3
+	prefetch [%o3],2
+	add	%o3, 64, %o3
+	prefetch [%o3],2
+	add	%o3, 64, %o3
+	prefetch [%o3],2
+	add	%o3, 64, %o3
+	prefetch [%o3],2
+	add	%o3, 64, %o3
+	prefetch [%o3],2
+	add	%o3, 64, %o3
+	prefetch [%o3],2 
+	add	%o3, 64, %o3
+	prefetch [%o3],2
+	add	%o3, 64, %o3
+	prefetch [%o3],2
+
+	mov	%o0, %o3
+	stxa     %g0,[%o3]%asi	!1st 64 byte line
+	add     %o0,128,%o3
+	stxa     %g0,[%o3]%asi	!3rd 64 byte line
+	add     %o0,8,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(2 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128 ,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(3 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(4 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(5 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(6 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(7 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(8 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(9 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(10 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(11 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(12 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(13 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(14 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(15 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+
+	add     %o0,256,%o0
+
+	mov	%o0, %o3
+	stxa     %g0,[%o3]%asi	!1st 64 byte line
+	add     %o0,128,%o3
+	stxa     %g0,[%o3]%asi	!3rd 64 byte line
+	add     %o0,8,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(2 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128 ,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(3 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(4 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(5 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(6 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(7 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(8 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(9 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(10 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(11 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(12 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(13 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(14 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+	add     %o0,(15 * 8),%o3
+	stxa     %g0,[%o3]%asi
+	add     %o3,128,%o3
+	stxa     %g0,[%o3]%asi
+
+	subcc   %l6,1,%l6	! Decrement the inner loop counter.
+
+	! Now increment by 256 + 512 so we don't toggle PA[9]
+	add     %o0, 768, %o0
+
+	bg,pt   %ncc,bzero_innerloop
+	nop
+	! END OF INNER LOOP
+
+	subcc   %l5,1,%l5
+	add     %l3, 512, %o0	! increment %o0 to first buddy line of dest.
+	bg,pt   %ncc, bzero_buddyloop
+	nop
+	add     %o0, 3584, %o0	! Advance both base addresses by 4k
+	add %o0,%o2,%i5
+	subcc %g5,%i5,%g0
+	bge,pt   %ncc,stingray_optimized_4k_zero_loop
+	nop
+
+	! stingray_optimized_bzero_ends_here
+
+	mov	%o0, %i0
+	mov	%o1, %i1
+	mov	%o2, %i2
+	mov	%o3, %i3
+	mov	%o5, %i5
+	restore
+	sub	%g5,%o0,%o1	!how many byte left
+	brz,pn	%o1,.bzero_exit
+	mov	%g0,%g5
+	add     %o0,%o1,%o4	!cal the last byte to write %o4
+	subcc	%o1,256,%g0
+	bge,pt	%ncc,interleave128_bzero
+	mov	%g0,%g5
+	
+	ba	bzero_word
+	nop
 
 .bzero_exit:
 	!
@@ -4074,19 +4836,14 @@ page_hwblkclr(void *addr, size_t len)
 
 	! %i0 address
 	! %i1 len
-        
+	
 	rd      %fprs, %l0
 	mov     %g0, %l2		! clear flag to say fp regs not saved
 
 	! FPU enabled ?  If not, enable it.
 	btst    FPRS_FEF, %l0
 	bz,a,pt   %icc, 1f
-          wr      %g0, FPRS_FEF, %fprs
-
-	! FPU enabled, but is Q3Q4 dirty ?  If yes, save them.
-        btst    FPRS_DU, %l0
-        bz,pn   %icc, 1f
-          nop
+	  wr      %g0, FPRS_FEF, %fprs
 
         ! save in-use fpregs on stack
 
@@ -4177,6 +4934,7 @@ uint_t hw_copy_limit_8 = 0x400;
 	.word	0x400
 	DGDEF(hw_copy_limit_8)
 	.word	0x400
+
 
 	.align	64
 	.section ".text"

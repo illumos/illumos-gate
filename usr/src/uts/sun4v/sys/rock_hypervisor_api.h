@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Function numbers for managing the Rock TLB page size register.
+ */
+#define	MMU_GET_NONPRIV_SEARCH		0x13b
+#define	MMU_SET_NONPRIV_SEARCH		0x13c
+#define	MMU_GET_PRIV_SEARCH		0x13d
+#define	MMU_SET_PRIV_SEARCH		0x13e
 
 /*
  * Function numbers for performance counters

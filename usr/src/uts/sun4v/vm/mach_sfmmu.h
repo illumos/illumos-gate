@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 
 #include <sys/x_call.h>
 #include <sys/hypervisor_api.h>
+#include <sys/mmu.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,7 +61,28 @@ struct hv_tsb_block {
 	hv_tsb_info_t	hv_tsb_info[NHV_TSB_INFO]; /* hypervisor TSB info */
 };
 
+/*
+ * Defines for hypervisor pagesize search API.
+ */
+
+#define	TLB_PGSZ_ENABLE_SHIFT	15
+#define	TLB_PGSZ_CTX_SHIFT	7
+#define	TLB_PGSZ_ENABLE		(1<<TLB_PGSZ_ENABLE_SHIFT)
+#define	TLB_PGSZ_CONTEXT1	(1<<TLB_PGSZ_CTX_SHIFT)
+#define	TLB_PGSZ_CONTEXT1_ENABLE (TLB_PGSZ_ENABLE|TLB_PGSZ_CONTEXT1)
+
+struct hv_pgsz_order {
+	uint64_t hv_pgsz_order_pa;	/* hypervisor pagesize order PA */
+					/* hypervisor pagesize order */
+	uint16_t hv_pgsz_order[MAX_PGSZ_SEARCH_ORDER];
+};
+
+#define	sfmmu_pgsz_order_hv sfmmu_pgsz_order.hv_pgsz_order
+
 #endif /* _ASM */
+
+/* value for sfmmu_pgsz_map if all shared pagesizes are allowed */
+#define	TLB_ALL_SHARED_PGSZ	0xff
 
 #ifdef _ASM
 
@@ -573,6 +595,27 @@ label/**/1:								\
 	  stx	ctx1, [tmp + MMFSA_I_CTX]				;\
 	stx	ctx1, [tmp + MMFSA_D_CTX]				;\
 label:
+	/* END CSTYLED */
+
+/*
+ * For shared context mappings, check against the page size bitmap in the
+ * tsbmiss area to decide if we should use private mappings instead to reduce
+ * the number of shared page size searches on Rock based platforms.
+ * In:
+ *   tsbarea (not clobbered)
+ *   tte (not clobbered)
+ *   tmp (clobbered)
+ * Out:
+ *   use_shctx - changed to 0 if page size bit is not set in mask.
+ */
+#define	CHECK_SHARED_PGSZ(tsbarea, tte, tmp, use_shctx, label)  \
+	/* BEGIN CSTYLED */					     \
+	brz     use_shctx, label/**/1				    ;\
+	 and    tte, TTE_SZ_BITS, tmp			    	    ;\
+	ldub    [tsbarea + TSBMISS_PGSZ_BITMAP], use_shctx	    ;\
+	srlx    use_shctx, tmp, use_shctx			    ;\
+	and     use_shctx, 0x1, use_shctx			    ;\
+label/**/1:
 	/* END CSTYLED */
 
 #endif /* _ASM */

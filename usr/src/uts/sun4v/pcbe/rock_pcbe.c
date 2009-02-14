@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -41,7 +41,7 @@
 #define	NT_END			0xFF
 
 /* Counter Types */
-#define	NUM_PCBE_COUNTERS	7
+#define	NUM_PCBE_COUNTERS	6
 #define	RK_PERF_CYC		0x0100
 #define	RK_PERF_INSTR		0x0200
 #define	RK_PERF_L2		0x0400
@@ -126,21 +126,19 @@
 
 /* Synthetic counter types */
 #define	L2_GROUP_DS		ID_TO_GROUP(0)
-#define	DS_DRAM		0x0
-#define	DS_L3		0x1
-#define	DS_OTHER_L2	0x2
-#define	DS_LOCAL_L2	0x3
-#define	DS_MISS		0x4
+#define	DS_DRAM		0x0	/* From PRM */
+#define	DS_L3		0x1	/*   ditto  */
+#define	DS_OTHER_L2	0x2	/*   ditto  */
+#define	DS_LOCAL_L2	0x3	/*   ditto  */
 
 #define	L2_DS_DRAM		(SYN_BIT | L2_GROUP_DS | DS_DRAM)
 #define	L2_DS_L3		(SYN_BIT | L2_GROUP_DS | DS_L3)
 #define	L2_DS_OTHER_L2		(SYN_BIT | L2_GROUP_DS | DS_OTHER_L2)
 #define	L2_DS_LOCAL_L2		(SYN_BIT | L2_GROUP_DS | DS_LOCAL_L2)
-#define	L2_DS_MISS		(SYN_BIT | L2_GROUP_DS | DS_MISS)
 
-#define	TXN_LD			0x3
-#define	TXN_ST			0x18
 #define	L2_GROUP_TXN_MISS	ID_TO_GROUP(1)
+#define	TXN_LD			0x3	/* From PRM */
+#define	TXN_ST			0x18	/*   ditto  */
 #define	L2_TXN_LD_MISS		(SYN_BIT | L2_GROUP_TXN_MISS | TXN_LD)
 #define	L2_TXN_ST_MISS		(SYN_BIT | L2_GROUP_TXN_MISS | TXN_ST)
 
@@ -149,10 +147,15 @@
 #define	L2_TXN_ST_HIT		(SYN_BIT | L2_GROUP_TXN_HIT | TXN_ST)
 
 #define	L2_GROUP_EVT		ID_TO_GROUP(3)
-#define	EVT_L2_NOEVENTS		0
-#define	EVT_L2_PEND_ST		2
-#define	EVT_L2_HIT		0
-#define	L2_EVT_HIT		(SYN_BIT | L2_GROUP_EVT | EVT_L2_HIT)
+#define	EVT_L2_MISS		0x8	/* From PRM */
+#define	EVT_L2_PEND_ST		0x2	/*   ditto  */
+#define	EVT_L2_PRIOR_MISS	0x1	/*   ditto  */
+#define	EVT_L2_NOEVENTS		0x0	/*   ditto  */
+#define	L2_HIT			0
+#define	L2_MISS			1
+
+#define	L2_EVT_HIT		(SYN_BIT | L2_GROUP_EVT | L2_HIT)
+#define	L2_EVT_MISS		(SYN_BIT | L2_GROUP_EVT | L2_MISS)
 
 /* Instruction types. Corresponds to ASI_PERF_IS_INFO.TYP */
 #define	I_GROUP_TYPE		ID_TO_GROUP(0)
@@ -232,20 +235,17 @@
 #define	MMU_SAM_MAX_FREQ	0xFFFF	/* 16 bits */
 
 /* Minimum frequencies that should be configured to prevent DOS */
-#define	INSTR_SAM_MIN_FREQ	50
+#define	INSTR_SAM_MIN_FREQ	100
 #define	L2_SAM_MIN_FREQ		250
 #define	MMU_SAM_MIN_FREQ	250
 
 /* Default frequencies that are configured */
-#define	INSTR_MODE_FREQ		100
-#define	L2_DS_FREQ		10000
-#define	L2_LOAD_FRM_OTH_L2_FREQ	1000
-#define	L2_MISS_FREQ		1000
-#define	L2_HIT_FREQ		5000
+#define	INSTR_SAM_DEF_FREQ	250
+#define	L2_SAM_DEF_FREQ		1000
 
 /* Number of bits in the hardware for the counter */
-#define	CYC_COUNTER_BITS	39
-#define	INSTR_COUNTER_BITS	39
+#define	CYC_COUNTER_BITS	18
+#define	INSTR_COUNTER_BITS	18
 #define	L2_COUNTER_BITS		48
 #define	MMU_COUNTER_BITS	48
 #define	YANK_COUNTER_BITS	64
@@ -268,27 +268,27 @@
 #define	MIN_RINGBUF_ENTRIES	100
 
 #define	RINGBUF_GET_HEAD(RB)		\
-	(RB->head == RB->tail) ? NULL : \
 	(uint64_t *)((uint64_t)(&RB->va_values) + RB->head);
 
-#define	RINGBUF_SET_HEAD(RB)			\
-	RB->hwm = RB->tail + (RB->size >> 1);	\
-	if (RB->hwm >= RB->size)		\
-		RB->hwm -= RB->size;		\
-	RB->head = RB->tail;
+#define	RINGBUF_GET_TAIL(RB)		\
+	(uint64_t *)((uint64_t)(&RB->va_values) + RB->tail);
+
+#define	RINGBUF_SET_HEAD(RB, PTR)					\
+	RB->head = (uint64_t)PTR - (uint64_t)(&RB->va_values);		\
+	RB->hwm = RB->head + (RB->size >> 1);				\
+	if (RB->hwm >= RB->size)					\
+		RB->hwm -= RB->size;
 
 #define	RINGBUF_MOVE_HEAD(RB, PTR, SAMPLE_SZ)				\
 	PTR = (uint64_t *)((uint64_t)PTR + SAMPLE_SZ);			\
 	if (PTR >= (uint64_t *)((uint64_t)(&RB->va_values) + RB->size))	\
-		PTR = (uint64_t *)&RB->va_values;			\
-	if (PTR == (uint64_t *)((uint64_t)(&RB->va_values) + RB->tail))	\
-		PTR = NULL;
+		PTR = (uint64_t *)&RB->va_values;
 
 #define	MAKE_MASK(NBITS, SHIFT)	(((unsigned long)(1<<(NBITS))-1)<<SHIFT)
 
 #define	COUNTER_MAX(_p)	((int64_t)((1ULL << (_p->counter_bits - 1)) - 1))
 #define	COUNTER_MIN(_p)	((int64_t)-(COUNTER_MAX(_p)))
-#define	COUNTER_MASK(_p)	((1ULL << _p->counter_bits) - 1)
+#define	COUNTER_MASK(_p)	(bitmask(_p->counter_bits))
 
 /* Global Structures and typedefs */
 struct	_rk_pcbe_ringbuf {	/*	  INIT-ER	WRITTER	  READER */
@@ -313,13 +313,13 @@ typedef	struct _sampler {
 } sampler_t;
 
 typedef struct _rk_pcbe_config {
-	uint8_t		pcbe_picno;	/* 0:cyc, 1:instr, 2:l2, 3:mmu */
+	uint8_t		pcbe_picno;	/* 0-6:instr,l2,mmu,yank,siblk,lvlk */
 	uint8_t		counter_bits;	/* Number of counter bits */
 	uint8_t		counter_type;	/* Normal or Synthetic */
 	uint8_t		toe;		/* Trap on Enable */
 	uint32_t	counter;	/* Counter name */
 	uint32_t	src_type;	/* Strand, Strands, SIU, MMU */
-	uint32_t	flags;		/* cyc,instr counter:priv. l2,mmu:Xn */
+	uint32_t	flags;		/* instr counter:priv. l2,mmu:Xn */
 	uint64_t	pcbe_pic;	/* PIC counter value */
 	uint8_t		inuse;		/* pic in use or not */
 	uint8_t		state;		/* Current state of the pic */
@@ -376,14 +376,8 @@ struct nametable {
 	const char	*name;
 };
 
-/* Cycle Counter. picno: 0 */
+/* Instruction Counter. picno: 0 */
 static const struct nametable Rock_names0[] = {
-	{0x1, "Cycles"},
-	{NT_END, ""}
-};
-
-/* Instruction Counter. picno: 1 */
-static const struct nametable Rock_names1[] = {
 	{0x1, "Instr_All"},
 	/* Synthetic counters */
 	{INSTR_MODE_NOR, "Instr_Normal"},
@@ -414,8 +408,8 @@ static const struct nametable Rock_names1[] = {
 	{NT_END, ""}
 };
 
-/* L2 Counters. picno: 2 */
-static const struct nametable Rock_names2[] = {
+/* L2 Counters. picno: 1 */
+static const struct nametable Rock_names1[] = {
 	{0x1,			"L2_Icache_Load"},
 	{0x2,			"L2_Dcache_Load"},
 	{0x4,			"L2_Instr_Prefetch"},
@@ -427,7 +421,6 @@ static const struct nametable Rock_names2[] = {
 	{L2_DS_L3,		"L2_Load_From_L3"},
 	{L2_DS_DRAM,		"L2_Load_From_Dram"},
 	{L2_DS_OTHER_L2,	"L2_Load_From_Other_L2"},
-	{L2_DS_MISS,		"L2_Miss"},
 
 	{L2_TXN_LD_MISS,	"L2_Load_Miss"},
 	{L2_TXN_ST_MISS,	"L2_Store_Miss"},
@@ -435,11 +428,12 @@ static const struct nametable Rock_names2[] = {
 	{L2_TXN_ST_HIT,		"L2_Store_Hit"},
 
 	{L2_EVT_HIT,		"L2_Hit"},
+	{L2_EVT_MISS,		"L2_Miss"},
 	{NT_END, ""}
 };
 
-/* MMU Counters. picno: 3 */
-static const struct nametable Rock_names3[] = {
+/* MMU Counters. picno: 2 */
+static const struct nametable Rock_names2[] = {
 	{MMU_ALL_TXNS,			"MMU_All"},
 	{MMU_ITLB_MISS,			"MMU_Itlb_Miss"},
 	{MMU_DTLB_MISS,			"MMU_Dtlb_Miss"},
@@ -452,20 +446,20 @@ static const struct nametable Rock_names3[] = {
 	{NT_END, ""}
 };
 
-/* YANK Counter. picno: 4 */
-static const struct nametable Rock_names4[] = {
+/* YANK Counter. picno: 3 */
+static const struct nametable Rock_names3[] = {
 	{MCCDESR_YANK,			"Yank"},
 	{NT_END, ""}
 };
 
-/* SIBLK Counter. picno: 5 */
-static const struct nametable Rock_names5[] = {
+/* SIBLK Counter. picno: 4 */
+static const struct nametable Rock_names4[] = {
 	{MCCDESR_SIBLK,			"Siblk"},
 	{NT_END, ""}
 };
 
-/* LVLK Counter. picno: 6 */
-static const struct nametable Rock_names6[] = {
+/* LVLK Counter. picno: 5 */
+static const struct nametable Rock_names5[] = {
 	{MCCDESR_LVLK,			"Lvlk"},
 	{NT_END, ""}
 };
@@ -476,12 +470,11 @@ static const struct nametable *Rock_names[NUM_PCBE_COUNTERS] = {
 	Rock_names2,
 	Rock_names3,
 	Rock_names4,
-	Rock_names5,
-	Rock_names6
+	Rock_names5
 };
 
 extern	char	cpu_module_name[];
-uint32_t num_ringbuf_entries = 256; /* Should be a EVEN # */
+uint32_t num_ringbuf_entries = 500; /* Should be a EVEN # */
 static const struct nametable **events;
 static char *pic_events[NUM_PCBE_COUNTERS];
 static rk_pcbe_config_t *active_pics[NUM_PCBE_COUNTERS][NCPU];
@@ -527,12 +520,13 @@ static int sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp);
 static int sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp);
 static int sample_mccdesr(rk_pcbe_config_t *pic, int64_t *diffp);
 
-static void alloc_ringbuffer(rk_pcbe_config_t *pic, uint32_t size,
+static int alloc_ringbuffer(rk_pcbe_config_t *pic, uint32_t size,
 							uint32_t num_samples);
 static void free_ringbuffer(rk_pcbe_config_t *pic);
 static void print_hv_error(uint64_t rc, int *cntp, char *funcname,
 					rk_pcbe_config_t *pic);
 static	void set_string_constants(void);
+static	uint64_t bitmask(uint8_t);
 
 #ifdef	RKPCBE_DBG
 static void print_pic(rk_pcbe_config_t *pic, char *heading);
@@ -729,6 +723,8 @@ rk_pcbe_overflow_bitmap(void)
 		if (pic->counter_type == NORMAL_COUNTER) {
 			hv_rk_perf_count_overflow((uint64_t)(pic->counter |
 			    pic->src_type), &ovf_cnt);
+			if (ovf_cnt > 0)
+				pic->pcbe_pic += (0x1ULL << pic->counter_bits);
 		} else {
 		/*
 		 * Synthetic counters don't overflow, so we must have gotten
@@ -812,17 +808,12 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 #define	PRIV_BIT1_MASK	0x2
 #define	PRIV_BIT2_MASK	0x4
 
-		case 0:	/* Cycle counter */
-			pic->counter = RK_PERF_CYC;
-			pic->counter_bits = CYC_COUNTER_BITS;
-			/* FALLTHROUGH */
-		case 1:	/* Instruction Counter */
-			if (pic->counter == 0) {
-				pic->counter = RK_PERF_INSTR;
-				pic->counter_bits = INSTR_COUNTER_BITS;
-			}
+		case 0:	/* Instruction Counter */
+			pic->counter = RK_PERF_INSTR;
+			pic->counter_bits = INSTR_COUNTER_BITS;
 
-			freq = INSTR_MODE_FREQ;
+			freq = INSTR_SAM_DEF_FREQ; /* Default Frequency */
+
 			for (i = 0; i < nattrs; i++) {
 				if ((strcmp(attrs[i].ka_name, "freq") == 0)) {
 					if ((bits & SYN_BIT) == 0 &&
@@ -906,7 +897,7 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 			    ((*flagsp & PRIV_BIT2_MASK) >> 2) |
 			    (*flagsp & PRIV_BIT1_MASK);
 			break;
-		case 2:	/* L2 counter */
+		case 1:	/* L2 counter */
 			/*
 			 * nouser and sys are also invalid attributes for L2
 			 * and MMU counters. If user has not specified any
@@ -959,34 +950,7 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 				 * Synthetic Counter
 				 */
 				pic->sampler.syn_counter = bits;
-				/*
-				 * Load default frequency and if freq attribute
-				 * is specified, over write with that value
-				 */
-				switch (pic->sampler.syn_counter) {
-					case L2_DS_DRAM:
-						/* FALLTHROUGH */
-					case L2_DS_L3:
-						/* FALLTHROUGH */
-					case L2_DS_MISS:
-						freq = L2_DS_FREQ;
-						break;
-					case L2_DS_OTHER_L2:
-						freq = L2_LOAD_FRM_OTH_L2_FREQ;
-						break;
-					case L2_TXN_LD_MISS:
-						/* FALLTHROUGH */
-					case L2_TXN_ST_MISS:
-						freq = L2_MISS_FREQ;
-						break;
-					case L2_TXN_LD_HIT:
-						/* FALLTHROUGH */
-					case L2_TXN_ST_HIT:
-						/* FALLTHROUGH */
-					case L2_EVT_HIT:
-						freq = L2_HIT_FREQ;
-						break;
-				}
+				freq = L2_SAM_DEF_FREQ;	/* Default Frequency */
 				/*
 				 * Find the attibutes for L2 Sampler.
 				 */
@@ -1041,7 +1005,7 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 			}
 			pic->counter = RK_PERF_L2;
 			break;
-		case 3:	/* MMU Counter */
+		case 2:	/* MMU Counter */
 			if (*flagsp != CPC_COUNT_USER)
 				return (CPC_INVALID_ATTRIBUTE);
 
@@ -1077,17 +1041,17 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 
 			pic->counter = RK_PERF_MMU;
 			break;
-		case 4: /* YANK Counter */
+		case 3: /* YANK Counter */
 			pic->counter = RK_PERF_YANK;
 			pic->counter_bits = YANK_COUNTER_BITS;
 			/* FALLTHROUGH */
-		case 5: /* SIBLK Counter */
+		case 4: /* SIBLK Counter */
 			if (pic->counter == 0) {
 				pic->counter = RK_PERF_SIBLK;
 				pic->counter_bits = SIBLK_COUNTER_BITS;
 			}
 			/* FALLTHROUGH */
-		case 6: /* LVLK Counter */
+		case 5: /* LVLK Counter */
 			if (pic->counter == 0) {
 				pic->counter = RK_PERF_LVLK;
 				pic->counter_bits = LVLK_COUNTER_BITS;
@@ -1237,11 +1201,10 @@ rk_pcbe_program(void *token)
 		if (curthread->t_cpc_ctx) {
 			/*
 			 * If in thread context, pic should get an exclusive
-			 * lock. If it cannot then make the current thread
-			 * passive.
+			 * lock. If it cannot then invalidate the pic.
 			 */
 			if (rc != H_EOK) {
-				kcpc_passivate();
+				kcpc_invalidate_config(token);
 				continue;
 			}
 		} else {
@@ -1363,11 +1326,23 @@ rk_pcbe_sample(void *token)
 			rc = (int)hv_rk_perf_count_get((uint64_t)(pic->counter |
 			    pic->src_type), &counter_value);
 			if (rc == H_EOK) {
+				counter_value &= COUNTER_MASK(pic);
 				diff = counter_value - pic->pcbe_pic;
-				pic->pcbe_pic = counter_value &
-				    COUNTER_MASK(pic);
-				if (diff < 0)
-					diff += (0x1UL << pic->counter_bits);
+				/*
+				 * When counter overflows the overflow handler
+				 * (rk_pcbe_overflow_bitmap) would have added
+				 * MAX count value to pic->pcbe_pic. Therefore
+				 * -ve implies that the counter has overflowed.
+				 * The actual count amounts to,
+				 * (counter_value - (pic->pcbe_pic - MAX)) + MAX
+				 * => counter_value - pic->pcbe_pic + (2 * MAX)
+				 * => diff + (2 * MAX)
+				 */
+				if (diff < 0) {
+					diff +=
+					    (0x1ULL << (pic->counter_bits + 1));
+				}
+				pic->pcbe_pic = counter_value;
 			}
 		} else {
 			/*
@@ -1445,19 +1420,11 @@ rk_pcbe_program_normal(rk_pcbe_config_t *pic)
 {
 	uint64_t		counter;
 	uint64_t		config_value;
-	uint64_t		rc;
+	uint64_t		rc = H_EOK;
 
 	ASSERT(pic->inuse == B_TRUE);
 
 	counter = (uint64_t)(pic->counter | pic->src_type);
-
-	rc = (int)hv_rk_perf_count_init(counter);
-	if (rc != H_EOK) {
-		cmn_err(CE_WARN, "{%d} Pic %d cntr %X not started",
-		    CPU->cpu_id, pic->pcbe_picno, pic->counter);
-		PRINT_PIC(pic, "Init counter failed");
-		return ((int)rc);
-	}
 
 	/* Preset the counter value if non zero */
 	if (pic->pcbe_pic > 0)  {
@@ -1625,8 +1592,10 @@ program_l2_sampler(rk_pcbe_config_t *pic)
 	counter = (uint64_t)(pic->counter | pic->src_type);
 
 	if (pic->sampler.ring_buffer == NULL) {
-		alloc_ringbuffer(pic, sizeof (l2_load_valist),
+		rc = alloc_ringbuffer(pic, sizeof (l2_load_valist),
 		    num_ringbuf_entries);
+		if (rc != 0)
+			return ((int)rc);
 		pic->sampler.sample_size = sizeof (l2_load_valist);
 		pic->flags = L2_ALL_TXNS; /* For L2 counter */
 		PRINT_PIC(pic, "After Configuration (S)");
@@ -1678,7 +1647,8 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 
 	rk_pcbe_ringbuf_t	*ringbuf = pic->sampler.ring_buffer;
 	uint32_t	value, target;
-	uint64_t	total_count, hit_count = 0, *head, ovf_count, rc;
+	uint64_t	total_count = 0, hit_count = 0, ovf_count, rc;
+	uint64_t	*head, *tail;
 	uint32_t	sample_count = 0, sample_hit_count = 0;
 	uint32_t	size = pic->sampler.sample_size;
 	int		hv_call_cnt = 1, ret = 0;
@@ -1686,70 +1656,70 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	uint8_t		ds, evt;
 
 	head =  RINGBUF_GET_HEAD(ringbuf);
-	if (head == NULL) {
-		DBG_PRINT(("CPU-%d: Head is NULL to start with\n",
+	tail =  RINGBUF_GET_TAIL(ringbuf);
+
+	if (head == tail) {
+		DBG_PRINT(("CPU-%d: HEAD eq TAIL to start with\n",
 		    CPU->cpu_id));
 	}
 
-	while (head) {
-		if (*head != 0) {
-			uint64_t rawvalue = *head;
-			DBG_PRINT(("CPU-%d: rawvalue=0x%lX\n",
-			    CPU->cpu_id, rawvalue));
-			target = TYPE(pic->sampler.syn_counter);
+	/* Consume samples */
+	while (head != tail) {
+		uint64_t rawvalue = *head;
+		DBG_PRINT(("CPU-%d: rawvalue=0x%lX\n", CPU->cpu_id, rawvalue));
+		target = TYPE(pic->sampler.syn_counter);
 
-			switch (GROUP(pic->sampler.syn_counter)) {
-			case L2_GROUP_DS:
-				value = (rawvalue >> DS_SHIFT) & DS_MASK;
-				DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X\n",
-				    CPU->cpu_id, value, target));
-				switch (target) {
-				case DS_DRAM: /* FALLTHROUGH */
-				case DS_L3: /* FALLTHROUGH */
-				case DS_OTHER_L2: /* FALLTHROUGH */
-					if (value == target)
-						sample_hit_count++;
-					break;
-				case DS_MISS:
-					if (value != DS_LOCAL_L2)
-						sample_hit_count++;
-					break;
-				}
-				break;
-			case L2_GROUP_TXN_MISS:
-				value = (rawvalue >> TXN_SHIFT) & TXN_MASK;
-				ds = (uint8_t)((rawvalue >> DS_SHIFT)
-				    & DS_MASK);
-				DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X, "
-				    "ds: 0x%X\n", CPU->cpu_id, value,
-				    target, ds));
-				if (((value & target) != 0) && ds !=
-				    DS_LOCAL_L2)
+		switch (GROUP(pic->sampler.syn_counter)) {
+		case L2_GROUP_DS:
+			value = (rawvalue >> DS_SHIFT) & DS_MASK;
+			DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X\n",
+			    CPU->cpu_id, value, target));
+			switch (target) {
+			case DS_DRAM: /* FALLTHROUGH */
+			case DS_L3: /* FALLTHROUGH */
+			case DS_OTHER_L2: /* FALLTHROUGH */
+				if (value == target)
 					sample_hit_count++;
 				break;
-			case L2_GROUP_TXN_HIT:
-				value = (rawvalue >> TXN_SHIFT) & TXN_MASK;
-				ds = (uint8_t)((rawvalue >> DS_SHIFT)
-				    & DS_MASK);
-				evt = (uint8_t)((rawvalue >> EVT_SHIFT)
-				    & EVT_MASK);
-				DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X, "
-				    "ds: 0x%X, evt: 0x%X\n", CPU->cpu_id,
-				    value, target, ds, evt));
-				if (((value & target) != 0) && (evt ==
-				    EVT_L2_NOEVENTS || evt == EVT_L2_PEND_ST) &&
-				    (ds == DS_LOCAL_L2))
-					sample_hit_count++;
-				break;
-			case L2_GROUP_EVT:
-				value = (rawvalue >> EVT_SHIFT) & EVT_MASK;
-				ds = (uint8_t)((rawvalue >> DS_SHIFT)
-				    & DS_MASK);
-				DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X, "
-				    "ds: 0x%X\n", CPU->cpu_id, value,
-				    target, ds));
-				if ((value == EVT_L2_NOEVENTS || value ==
+			}
+			break;
+		case L2_GROUP_TXN_MISS:
+			value = (rawvalue >> TXN_SHIFT) & TXN_MASK;
+			ds = (uint8_t)((rawvalue >> DS_SHIFT) & DS_MASK);
+			evt = (uint8_t)((rawvalue >> EVT_SHIFT) & EVT_MASK);
+			DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X, "
+			    " ds: 0x%X, evt: 0x%X\n", CPU->cpu_id, value,
+			    target, ds, evt));
+			if (((value & target) != 0) && (evt == EVT_L2_MISS ||
+			    evt == EVT_L2_PRIOR_MISS) && (ds != DS_LOCAL_L2))
+				sample_hit_count++;
+			break;
+		case L2_GROUP_TXN_HIT:
+			value = (rawvalue >> TXN_SHIFT) & TXN_MASK;
+			ds = (uint8_t)((rawvalue >> DS_SHIFT) & DS_MASK);
+			evt = (uint8_t)((rawvalue >> EVT_SHIFT) & EVT_MASK);
+			DBG_PRINT(("CPU-%d: value=0x%X, target=0x%X, "
+			    " ds: 0x%X, evt: 0x%X\n", CPU->cpu_id, value,
+			    target, ds, evt));
+			if (((value & target) != 0) && (evt == EVT_L2_PEND_ST ||
+			    evt == EVT_L2_NOEVENTS) && (ds == DS_LOCAL_L2))
+				sample_hit_count++;
+			break;
+		case L2_GROUP_EVT:
+			evt = (rawvalue >> EVT_SHIFT) & EVT_MASK;
+			ds = (uint8_t)((rawvalue >> DS_SHIFT) & DS_MASK);
+			DBG_PRINT(("CPU-%d: evt=0x%X, target=0x%X, "
+			    "ds: 0x%X\n", CPU->cpu_id, evt, target, ds));
+
+			switch (target) {
+			case L2_HIT:
+				if ((evt == EVT_L2_NOEVENTS || evt ==
 				    EVT_L2_PEND_ST) && ds == DS_LOCAL_L2)
+					sample_hit_count++;
+				break;
+			case L2_MISS:
+				if ((evt == EVT_L2_MISS || evt ==
+				    EVT_L2_PRIOR_MISS) && ds == DS_LOCAL_L2)
 					sample_hit_count++;
 				break;
 			}
@@ -1757,7 +1727,7 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 		sample_count++;
 		RINGBUF_MOVE_HEAD(ringbuf, head, size);
 	}
-	RINGBUF_SET_HEAD(ringbuf);
+	RINGBUF_SET_HEAD(ringbuf, head);
 
 	/*
 	 * Since ring buffer is consumed, clear pending sample count.
@@ -1767,11 +1737,6 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	    pic->src_type), &total_count);
 	ret |= (int)rc;
 	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	if (sample_count != total_count) {
-		cmn_err(CE_WARN, "CPU-%d: Sample cnt mismatch:sol=%u, hv=%lu\n",
-		    CPU->cpu_id, sample_count, total_count);
-	}
 
 	/* Check if the counter overflowed */
 	rc = hv_rk_perf_count_overflow((uint64_t)(pic->counter |
@@ -1788,8 +1753,10 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	print_hv_error(rc, &hv_call_cnt, funcname, pic);
 	DBG_PRINT(("CPU-%d: Total Count: %lu\n", CPU->cpu_id, total_count));
 
-	if (rc != 0)
+	if (rc != H_EOK)
 		total_count = 0;
+
+	total_count &= COUNTER_MASK(pic);
 
 	/*
 	 * Reset it to zero so that we need not maintain old value
@@ -1798,17 +1765,13 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	ret |= (int)rc;
 	print_hv_error(rc, &hv_call_cnt, funcname, pic);
 
-	if (ovf_count > 0) {
-		DBG_PRINT(("CPU-%d: L2 counter overflowed: ovf_count: %lu\n",
-		    CPU->cpu_id, ovf_count));
-		/*
-		 * ovf_count > 0 means, counter has hit max, ovf_count times
-		 * before counting total_count of l2 transactions. Therefore
-		 * add total_count to ovf_count times max count value.
-		 */
-		while (ovf_count--)
-			total_count += (0x1UL << pic->counter_bits);
-	}
+	/*
+	 * ovf_count > 0 means, counter has hit max, ovf_count times
+	 * before counting total_count of l2 transactions. Therefore
+	 * add total_count to ovf_count times max count value.
+	 */
+	while (ovf_count--)
+		total_count += (0x1ULL << pic->counter_bits);
 
 	if (sample_count > 0)
 		hit_count = (sample_hit_count * total_count) / sample_count;
@@ -1850,8 +1813,10 @@ program_instr_sampler(rk_pcbe_config_t *pic)
 	counter = (uint64_t)(pic->counter | pic->src_type);
 
 	if (pic->sampler.ring_buffer == NULL) {
-		alloc_ringbuffer(pic, sizeof (instr_sampler_valist),
+		rc = alloc_ringbuffer(pic, sizeof (instr_sampler_valist),
 		    num_ringbuf_entries);
+		if (rc != 0)
+			return ((int)rc);
 		pic->sampler.sample_size = sizeof (instr_sampler_valist);
 		PRINT_PIC(pic, "After Configuration (S)");
 	}
@@ -1927,7 +1892,8 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	uint32_t	size = pic->sampler.sample_size;
 	uint32_t	value, target, shift, mask;
 	uint32_t	sample_count = 0, sample_hit_count = 0;
-	uint64_t	total_count, hit_count = 0, *head, ovf_count, rc;
+	uint64_t	total_count = 0, hit_count = 0, ovf_count, rc;
+	uint64_t	*head, *tail;
 	int		hv_call_cnt = 1, ret = 0;
 	char		*funcname = "sample_instr_sampler";
 
@@ -1951,13 +1917,15 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	}
 
 	head =  RINGBUF_GET_HEAD(ringbuf);
+	tail =  RINGBUF_GET_TAIL(ringbuf);
 
-	if (head == NULL) {
-		DBG_PRINT(("CPU-%d: Head is NULL to start with\n",
+	if (head == tail) {
+		DBG_PRINT(("CPU-%d: HEAD eq TAIL to start with\n",
 		    CPU->cpu_id));
 	}
 
-	while (head) {
+	/* Consume samples */
+	while (head != tail) {
 		uint64_t	rawvalue = *head;
 		uint64_t	context = *(head + 1);
 		uint8_t		tl = (uint8_t)((context >> 2) & 7);
@@ -2051,12 +2019,9 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 			}
 		}
 		sample_count++;
-		DBG_PRINT(("CPU-%d: Target %X, sample_count: %d\n",
-		    CPU->cpu_id, sample_count, target));
 		RINGBUF_MOVE_HEAD(ringbuf, head, size);
 	}
-
-	RINGBUF_SET_HEAD(ringbuf);
+	RINGBUF_SET_HEAD(ringbuf, head);
 
 	/*
 	 * Since ring buffer is consumed, clear pending sample count.
@@ -2066,11 +2031,6 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	    pic->src_type), &total_count);
 	ret |= (int)rc;
 	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	if (sample_count != total_count) {
-		cmn_err(CE_WARN, "CPU-%d: Sample cnt mismatch:sol=%u, hv=%lu\n",
-		    CPU->cpu_id, sample_count, total_count);
-	}
 
 	/* Check if the counter overflowed */
 	rc = hv_rk_perf_count_overflow((uint64_t)(pic->counter |
@@ -2089,6 +2049,8 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	if (rc != H_EOK)
 		total_count = 0;
 
+	total_count &= COUNTER_MASK(pic);
+
 	/*
 	 * Reset it to zero so that we need not maintain old value
 	 */
@@ -2096,15 +2058,13 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	ret |= (int)rc;
 	print_hv_error(rc, &hv_call_cnt, funcname, pic);
 
-	if (ovf_count > 0) {
-		/*
-		 * ovf_count > 0 means, counter has hit max, ovf_count times
-		 * before counting total_count of instructions. Therefore
-		 * add total_count to ovf_count times max count value.
-		 */
-		while (ovf_count--)
-			total_count += (0x1UL << pic->counter_bits);
-	}
+	/*
+	 * ovf_count > 0 means, counter has hit max, ovf_count times
+	 * before counting total_count of instructions. Therefore
+	 * add total_count to ovf_count times max count value.
+	 */
+	while (ovf_count--)
+		total_count += (0x1ULL << pic->counter_bits);
 
 	if (sample_count > 0)
 		hit_count = (sample_hit_count * total_count) / sample_count;
@@ -2132,8 +2092,9 @@ sample_mccdesr(rk_pcbe_config_t *pic, int64_t *diffp)
 	rc = hv_rk_perf_count_get((uint64_t)(pic->counter |
 	    pic->src_type), &counter_value);
 	if (rc == H_EOK) {
+		counter_value &= COUNTER_MASK(pic);
 		*diffp = counter_value - pic->pcbe_pic;
-		pic->pcbe_pic = counter_value & COUNTER_MASK(pic);
+		pic->pcbe_pic = counter_value;
 		if (*diffp < 0) {
 			cmn_err(CE_WARN, "CPU-%d: Pic-%d, counter: %X overflow",
 			    CPU->cpu_id, pic->pcbe_picno, pic->counter);
@@ -2145,21 +2106,33 @@ sample_mccdesr(rk_pcbe_config_t *pic, int64_t *diffp)
 	return ((int)rc);
 }
 
-static void
+static int
 alloc_ringbuffer(rk_pcbe_config_t *pic, uint32_t size,
 						uint32_t num_samples)
 {
 	uint32_t	ringbuf_size;
+	uint32_t	asize = 2;
 	rk_pcbe_ringbuf_t	*ringbuf;
 	ASSERT(!(num_samples & 1)); /* Assert number of samples is even */
 
 	ringbuf_size = sizeof (rk_pcbe_ringbuf_t) + (size * num_samples);
-	ringbuf = (void *)kmem_alloc(ringbuf_size, KM_SLEEP);
+
+	/* Size should be a power of 2 */
+	while ((ringbuf_size & (asize - 1)) != ringbuf_size)
+		asize <<= 1;
+
+	ringbuf = contig_mem_alloc_align_sleep(asize, 0);
+	if (ringbuf == NULL) {
+		cmn_err(CE_WARN, "CPU-%d: Ringbuffer memory allocation failed!",
+		    CPU->cpu_id);
+		return (-1);
+	}
 	pic->sampler.ring_buffer = ringbuf;
 	ringbuf->head = NULL;
 	ringbuf->tail = NULL;
 	ringbuf->size = size * num_samples;
 	ringbuf->hwm = ringbuf->size >> 1;
+	return (0);
 }
 
 static void
@@ -2172,16 +2145,18 @@ free_ringbuffer(rk_pcbe_config_t *pic)
 	 * were already configured. This results in calling this routine with
 	 * NULL ringbuf, since ringbuf is allocated when the first sample is
 	 * taken. To protect against this condition, we need do the following
-	 * check before calling kmem_free since it uses ringbuf->size.
+	 * check before calling contig_mem_free since it uses ringbuf->size.
 	 */
 	if (ringbuf) {
+		uint32_t	ringbuf_size;
+		uint32_t	asize = 2;
 		DBG_PRINT(("CPU-%d: free_ringbuffer freeing %d bytes\n",
 		    CPU->cpu_id,
 		    (int)(sizeof (rk_pcbe_ringbuf_t) + ringbuf->size)));
-		kmem_free(ringbuf, sizeof (rk_pcbe_ringbuf_t) + ringbuf->size);
-	} else {
-		DBG_PRINT(("CPU-%d: free_ringbuffer: Ringbuffer not "
-		    "configured\n", CPU->cpu_id));
+		ringbuf_size = sizeof (rk_pcbe_ringbuf_t) + ringbuf->size;
+		while ((ringbuf_size & (asize - 1)) != ringbuf_size)
+			asize <<= 1;
+		contig_mem_free(ringbuf, asize);
 	}
 }
 
@@ -2211,6 +2186,14 @@ set_string_constants(void)
 	(void) strcat(pcbe_module_name, cpu_module_name);
 }
 
+static	uint64_t
+bitmask(uint8_t bits)
+{
+	if (bits < 64)
+		return ((1ULL << bits) - 1);
+	return (-1);
+}
+
 #ifdef RKPCBE_DBG
 static	void
 set_pic_name(rk_pcbe_config_t *pic)
@@ -2219,14 +2202,8 @@ set_pic_name(rk_pcbe_config_t *pic)
 	const struct nametable	*n;
 
 	/*
-	 * For normal cycle and instruction counters, the 'bits' value
-	 * is not saved.
+	 * For normal instruction counter, the 'bits' value is not saved.
 	 */
-	if (pic->counter == RK_PERF_CYC) {
-		(void) strcpy(pic->name, "Cycles");
-		return;
-	}
-
 	if (pic->counter_type == NORMAL_COUNTER) {
 		if (pic->counter == RK_PERF_INSTR) {
 			(void) strcpy(pic->name, "Instr_All");
@@ -2264,7 +2241,7 @@ print_pic(rk_pcbe_config_t *pic, char *heading)
 	printf("counter      : 0x%X\n", pic->counter);
 	printf("src_type     : 0x%X\n", pic->src_type);
 	printf("flags        : 0x%X\n", pic->flags);
-	printf("pcbe_pic     : %d\n", (int)pic->pcbe_pic);
+	printf("pcbe_pic     : %ld\n", pic->pcbe_pic);
 	printf("inuse        : %d\n", pic->inuse);
 	printf("state        : 0x%X\n", pic->state);
 	printf("cpu          : %d\n", pic->cpu);
