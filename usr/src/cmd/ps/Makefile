@@ -18,22 +18,25 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/ps/Makefile
 #
 
 PROG= ps
+OBJS=ps.o ucbps.o
+SRCS=$(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 
 XGETFLAGS += -a -x ps.xcl
 
 DCFILE= $(PROG).dc
+
+ROOTUCBPROG = $(ROOT)/usr/ucb/$(PROG)
+ROOTUCBPROG32 = $(ROOT)/usr/ucb/$(MACH32)/$(PROG)
+ROOTUCBPROG64 = $(ROOT)/usr/ucb/$(MACH64)/$(PROG)
 
 $(64ONLY)SUBDIRS= $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
@@ -53,6 +56,12 @@ clean clobber lint:	$(SUBDIRS)
 install:	$(SUBDIRS)
 	-$(RM) $(ROOTPROG)
 	-$(LN) $(ISAEXEC) $(ROOTPROG)
+	-$(RM) $(ROOTUCBPROG)
+	-$(LN) $(ISAEXEC) $(ROOTUCBPROG)
+	$(64ONLY)-$(RM) $(ROOTUCBPROG32)
+	$(64ONLY)-$(LN) $(ROOTPROG32) $(ROOTUCBPROG32)
+	$(BUILD64)-$(RM) $(ROOTUCBPROG64)
+	$(BUILD64)-$(LN) $(ROOTPROG64) $(ROOTUCBPROG64)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

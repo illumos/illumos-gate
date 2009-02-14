@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,6 +292,8 @@ static size_t	lpbufsize;
  */
 #define	PTHRESHOLD	40
 
+#define	UCB_OPTS	"-aceglnrtuvwxSU"
+
 static	void	usage(void);
 static	char	*getarg(char **);
 static	char	*parse_format(char *);
@@ -320,8 +322,47 @@ static	int	str2uid(const char *,  uid_t *, unsigned long, unsigned long);
 static	void	*Realloc(void *, size_t);
 static	int	pidcmp(const void *p1, const void *p2);
 
+extern	int	ucbmain(int, char **);
+static	int	stdmain(int, char **);
+
 int
 main(int argc, char **argv)
+{
+	const char *me;
+
+	/*
+	 * The original two ps'es are linked in a single binary;
+	 * their main()s are renamed to stdmain for /usr/bin/ps and
+	 * ucbmain for /usr/ucb/ps.
+	 * We try to figure out which instance of ps the user wants to run.
+	 * Traditionally, the UCB variant doesn't require the flag argument
+	 * start with a "-".  If the first argument doesn't start with a
+	 * "-", we call "ucbmain".
+	 * If there's a first argument and it starts with a "-", we check
+	 * whether any of the options isn't acceptable to "ucbmain"; in that
+	 * case we run "stdmain".
+	 * If we can't tell from the options which main to call, we check
+	 * the binary we are running.  We default to "stdmain" but
+	 * any mention in the executable name of "ucb" causes us to call
+	 * ucbmain.
+	 */
+	if (argv[1] != NULL) {
+		if (argv[1][0] != '-')
+			return (ucbmain(argc, argv));
+		else if (argv[1][strspn(argv[1], UCB_OPTS)] != '\0')
+			return (stdmain(argc, argv));
+	}
+
+	me = getexecname();
+
+	if (me != NULL && strstr(me, "ucb") != NULL)
+		return (ucbmain(argc, argv));
+	else
+		return (stdmain(argc, argv));
+}
+
+static int
+stdmain(int argc, char **argv)
 {
 	char	*p;
 	char	*p1;
@@ -773,22 +814,24 @@ main(int argc, char **argv)
 			(void) printf("\n");
 		}
 	} else {	/* print standard header */
+		/*
+		 * All fields before 'PID' are printed with a trailing space
+		 * as a separator and that is how we print the headers too.
+		 */
 		if (lflg) {
 			if (yflg)
-				(void) printf(" S");
+				(void) printf("S ");
 			else
-				(void) printf(" F S");
+				(void) printf(" F S ");
 		}
 		if (Zflg)
-			(void) printf("    ZONE");
+			(void) printf("    ZONE ");
 		if (fflg) {
-			if (lflg)
-				(void) printf(" ");
-			(void) printf("     UID");
+			(void) printf("     UID ");
 		} else if (lflg)
-			(void) printf("    UID");
+			(void) printf("   UID ");
 
-		(void) printf(" %*s", pidwidth,  "PID");
+		(void) printf("%*s", pidwidth,  "PID");
 		if (lflg || fflg)
 			(void) printf(" %*s", pidwidth, "PPID");
 		if (jflg)
@@ -1302,7 +1345,7 @@ prcom(psinfo_t *psinfo, char *ttyp)
 
 	/*
 	 * All fields before 'PID' are printed with a trailing space as a
-	 * spearator, rather than keeping track of which column is first.  All
+	 * separator, rather than keeping track of which column is first.  All
 	 * other fields are printed with a leading space.
 	 */
 	if (lflg) {
@@ -1314,7 +1357,7 @@ prcom(psinfo_t *psinfo, char *ttyp)
 	if (Zflg) {						/* ZONE */
 		if (getzonenamebyid(psinfo->pr_zoneid, zonename,
 		    sizeof (zonename)) < 0) {
-			(void) printf("%7.7d ", ((int)psinfo->pr_zoneid));
+			(void) printf(" %7.7d ", ((int)psinfo->pr_zoneid));
 		} else {
 			(void) printf("%8.8s ", zonename);
 		}
@@ -1324,7 +1367,7 @@ prcom(psinfo_t *psinfo, char *ttyp)
 		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
 			(void) printf("%8.8s ", pwd->pw_name);
 		else
-			(void) printf("%7.7u ", psinfo->pr_euid);
+			(void) printf(" %7.7u ", psinfo->pr_euid);
 	} else if (lflg) {
 		(void) printf("%6u ", psinfo->pr_euid);
 	}
@@ -2095,7 +2138,7 @@ przom(psinfo_t *psinfo)
 	if (Zflg) {
 		if (getzonenamebyid(psinfo->pr_zoneid, zonename,
 		    sizeof (zonename)) < 0) {
-			(void) printf("%7.7d ", ((int)psinfo->pr_zoneid));
+			(void) printf(" %7.7d ", ((int)psinfo->pr_zoneid));
 		} else {
 			(void) printf("%8.8s ", zonename);
 		}

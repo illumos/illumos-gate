@@ -213,6 +213,10 @@ i386_ROOT.BIN= \
 sparc_ROOT.BIN= \
 	/usr/lib/ldoms
 
+sparc_64ONLY= $(POUND_SIGN)
+64ONLY=  $($(MACH)_64ONLY)
+
+$(64ONLY) MACH32_ROOT.UCB=/usr/ucb/$(MACH32)
 ROOT.BIN= \
 	$($(MACH)_ROOT.BIN) \
 	/etc/dbus-1 \
@@ -323,7 +327,7 @@ ROOT.BIN= \
 	/usr/share/man \
 	/usr/share/man/man1m \
 	/usr/ucb \
-	/usr/ucb/$(MACH32) \
+	$(MACH32_ROOT.UCB) \
 	/usr/ucblib \
 	/usr/xpg4 \
 	/usr/xpg4/bin \

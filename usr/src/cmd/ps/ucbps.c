@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ps -- print things about processes.
@@ -144,7 +141,7 @@ static	char	*err_string(int);
 extern int	scrwidth(wchar_t);	/* header file? */
 
 int
-main(int argc, char **argv)
+ucbmain(int argc, char **argv)
 {
 	psinfo_t info;		/* process information structure from /proc */
 	char *psargs = NULL;	/* pointer to buffer for -w and -ww options */
@@ -496,7 +493,7 @@ retry:
 		if (nent >= entsize) {
 			entsize *= 2;
 			psent = (struct psent *)realloc((char *)psent,
-				entsize * sizeof (struct psent));
+			    entsize * sizeof (struct psent));
 			if (psent == NULL) {
 				(void) fprintf(stderr, "ps: no memory\n");
 				exit(1);
@@ -946,7 +943,7 @@ prcom(int found, psinfo_t *psinfo, char *psargs)
 			(void) printf("         ");
 		} else if (psinfo->pr_lwp.pr_wchan) {
 			(void) printf(" %+8.8lx",
-				(ulong_t)psinfo->pr_lwp.pr_wchan);
+			    (ulong_t)psinfo->pr_lwp.pr_wchan);
 		} else {
 			(void) printf("        ?");
 		}
@@ -1046,10 +1043,10 @@ prtime(timestruc_t st)
 	starttime = st.tv_sec;
 	if (tim - starttime > 24*60*60) {
 		(void) strftime(sttim, sizeof (sttim), "%b %d",
-						localtime(&starttime));
+		    localtime(&starttime));
 	} else {
 		(void) strftime(sttim, sizeof (sttim), "%H:%M:%S",
-						localtime(&starttime));
+		    localtime(&starttime));
 	}
 	(void) printf("%9.9s", sttim);
 }

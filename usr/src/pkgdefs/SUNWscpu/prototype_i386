@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -49,9 +47,9 @@
 # SUNWscpu
 #
 d none usr/ucb/i86 755 root bin
-f none usr/ucb/i86/ps 0555 root sys
+l none usr/ucb/i86/ps=../../bin/i86/ps
 d none usr/ucb/amd64 755 root bin
-f none usr/ucb/amd64/ps 0555 root sys
+l none usr/ucb/amd64/ps=../../bin/amd64/ps
 d none usr/ucblib/amd64 755 root bin
 s none usr/ucblib/64=amd64
 s none usr/ucblib/amd64/libcurses.so=./libcurses.so.1
