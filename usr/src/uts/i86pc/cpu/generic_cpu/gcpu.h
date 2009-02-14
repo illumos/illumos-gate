@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,7 +157,6 @@ typedef struct gcpu_mca {
 	uint32_t gcpu_mca_nextpoll_idx;	/* logout area for next poll */
 	struct gcpu_bios_cfg gcpu_mca_bioscfg;
 	uint_t gcpu_mca_nbanks;
-	uint32_t gcpu_actv_banks;	/* MCA banks we initialized */
 	size_t gcpu_mca_lgsz;		/* size of gcpu_mca_logout structs */
 	uint_t gcpu_mca_flags;		/* GCPU_MCA_F_* */
 	hrtime_t gcpu_mca_lastpoll;

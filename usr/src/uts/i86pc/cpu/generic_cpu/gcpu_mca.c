@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1011,6 +1011,8 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	gcpu_mca_t *mca = &gcpu->gcpu_mca;
 	int mcg_ctl_present;
 	uint_t nbanks;
+	uint32_t ctl_skip_mask = 0;
+	uint32_t status_skip_mask = 0;
 	size_t mslsz;
 	int i;
 #ifndef __xpv
@@ -1145,30 +1147,45 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 * code we will only read those banks which we initialize here.
 	 */
 	for (i = 0; i < nbanks; i++) {
-		/*
-		 * On AMD family 6 we must not enable machine check from
-		 * bank 0 detectors - reports are that enabling bank 0
-		 * (DC) produces spurious machine checks.
-		 *
-		 * For Intel we let model-specific support choose to skip
-		 * a bank if model-specific support is present;
-		 * otherwise we skip bank 0 for family 6
-		 */
-		if (i == 0 &&
-		    (((vendor == X86_VENDOR_Intel && !cms_present(hdl)) ||
-		    vendor == X86_VENDOR_AMD) && family == 6))
+		boolean_t skipctl = cms_bankctl_skipinit(hdl, i);
+		boolean_t skipstatus = cms_bankstatus_skipinit(hdl, i);
+
+		if (!cms_present(hdl)) {
+			/*
+			 * Model-specific support is not present, try to use
+			 * sane defaults.
+			 *
+			 * On AMD family 6 processors, reports about spurious
+			 * machine checks indicate that bank 0 should be
+			 * skipped.
+			 *
+			 * On Intel family 6 processors, the documentation tells
+			 * us not to write to MC0_CTL.
+			 *
+			 */
+			if (i == 0 && family == 6) {
+				switch (vendor) {
+				case X86_VENDOR_AMD:
+					skipstatus = B_TRUE;
+					/*FALLTHRU*/
+				case X86_VENDOR_Intel:
+					skipctl = B_TRUE;
+					break;
+				}
+			}
+		}
+
+		ctl_skip_mask |= skipctl << i;
+		status_skip_mask |= skipstatus << i;
+
+		if (skipctl && skipstatus)
 			continue;
 
-		if (cms_bankctl_skipinit(hdl, i))
-			continue;
-
 		/*
-		 * Record which MCA banks were enabled, both from the
-		 * point of view of this core and accumulating for the
-		 * whole chip (if some cores share a bank we must be
+		 * Record which MCA banks were enabled, from the point of view
+		 * of the whole chip (if some cores share a bank we must be
 		 * sure either can logout from it).
 		 */
-		mca->gcpu_actv_banks |= 1 << i;
 		atomic_or_32(&gcpu->gcpu_shared->gcpus_actv_banks, 1 << i);
 
 #ifndef __xpv
@@ -1272,13 +1289,12 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		 */
 		bcfgp->bios_bank_misc = 0;
 
-		if (!(mca->gcpu_actv_banks & 1 << i))
-			continue;
+		if (!(ctl_skip_mask & (1 << i))) {
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC(i, CTL),
+			    cms_bankctl_val(hdl, i, -1ULL));
+		}
 
-		(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC(i, CTL),
-		    cms_bankctl_val(hdl, i, -1ULL));
-
-		if (!cms_bankstatus_skipinit(hdl, i)) {
+		if (!(status_skip_mask & (1 << i))) {
 			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC(i, STATUS),
 			    cms_bankstatus_val(hdl, i, 0ULL));
 		}
