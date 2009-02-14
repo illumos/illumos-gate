@@ -1,12 +1,22 @@
 #!/sbin/sh
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
+
+#
+#  For ipfilter method. Normal start method will 'ignore' this information.
+#
+port=`$SERVINFO -p -s ntp 2>/dev/null`
+if [ "$1" = "ipfilter" ]; then
+	FMRI=$2
+	out=`fmri_to_file $FMRI $IPF_SUFFIX`
+else
+	out=`fmri_to_file $SMF_FMRI $IPF_SUFFIX`
+fi
 
 if [ ! -f /etc/inet/ntp.conf ]; then
 	echo "Error: Configuration file '/etc/inet/ntp.conf' not found." \
@@ -26,13 +36,17 @@ ARGS=`/usr/bin/nawk '
 		first = 0
 		printf("-s -m")
 	    }
-	    if (NF == 1)
+	    if (NF == 1) {
 		printf(" 224.0.1.1")
-	    else
+		printf("pass in log quick from any to 224.0.1.1\n") > file
+	    } else {
 		printf(" %s", $2)
+		printf("pass in log quick from any to %s\n", $2) > file
+	    }
 	    next
 	}
 	/^server 127.127/ {
+	    printf("pass in log quick from any to 224.0.1.1\n") > file
 	    next
 	}
 	/^server[ \t]+|^peer[ \t]+/ {
@@ -41,9 +55,31 @@ ARGS=`/usr/bin/nawk '
 		printf("-s")
 	    }
 	    printf(" %s", $2)
+	    printf("pass in quick from %s to any port = %d\n", $2, port) > file
 	    next
 	}
-	' /etc/inet/ntp.conf`
+	' port="$port" file="$out" /etc/inet/ntp.conf`
+
+#
+# Create ipfilter rules 
+#
+if [ -n "$1" -a "$1" = "ipfilter" ]; then
+	policy=`get_policy $FMRI`
+
+	echo "# $FMRI server rules" >>$out
+	tport=`$SERVINFO -p -t -s "ntp" 2>/dev/null`
+	if [ -n "$tport" ]; then
+		generate_rules $FMRI $policy "tcp" "any" $tport $out
+	fi
+
+	uport=`$SERVINFO -p -u -s "ntp" 2>/dev/null`
+	if [ -n "$uport" ]; then
+		generate_rules $FMRI $policy "udp" "any" $uport $out
+	fi
+
+	exit $SMF_EXIT_OK
+fi
+
 # Run ntpdate to sync system to peer before starting xntpd
 [ -n "$ARGS" ] && /usr/sbin/ntpdate $ARGS
 /usr/lib/inet/xntpd

@@ -25,13 +25,10 @@
 #
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
 
 PATH=${PATH}:/usr/sbin:/usr/lib/ipf
 PIDFILE=/var/run/ipmon.pid
-IPFILCONF=/etc/ipf/ipf.conf
-IP6FILCONF=/etc/ipf/ipf6.conf
-IPNATCONF=/etc/ipf/ipnat.conf
-IPPOOLCONF=/etc/ipf/ippool.conf
 PFILCHECKED=no
 
 zone=`smf_zonename`
@@ -50,13 +47,19 @@ logmsg()
 
 load_ipf() {
 	bad=0
-	if [ -r ${IPFILCONF} ]; then
-		ipf -IFa -f ${IPFILCONF}
-		if [ $? != 0 ]; then
-			echo "$0: load of ${IPFILCONF} into alternate set failed"
-			bad=1
+	ipf -IFa
+
+	for file in $IPFILOVRCONF $CONF_FILES $IPFILCONF; do
+		if [ -r ${file} ]; then
+			ipf -I -f ${file}
+			if [ $? != 0 ]; then
+				echo "$0: load of ${file} into alternate" \
+				    "set failed"
+				bad=1
+			fi
 		fi
-	fi
+	done
+
 	if [ -r ${IP6FILCONF} ]; then
 		ipf -6IFa -f ${IP6FILCONF}
 		if [ $? != 0 ]; then
@@ -75,18 +78,18 @@ load_ipf() {
 
 
 load_ipnat() {
-	if [ -r ${IPNATCONF} ]; then
-		ipnat -CF -f ${IPNATCONF}
-		if [ $? != 0 ]; then
-			echo "$0: load of ${IPNATCONF} failed"
-			return 1
-		else
-			ipf -y
-			return 0
-		fi
-	else
-		return 0
-	fi
+	ipnat -CF
+	for nfile in $NAT_FILES $IPNATCONF; do
+		if [ -r ${nfile} ]; then
+			ipnat -f ${nfile}
+			if [ $? != 0 ]; then
+				echo "$0: load of ${nfile} failed"
+				return 1
+			else
+				ipf -y
+			fi
+		fi			
+	done
 }
 
 
@@ -105,21 +108,105 @@ load_ippool() {
 	fi
 }
 
+#
+# Get current configuration version, fails if property doesn't exist.
+# 
+config_get_version()
+{
+        ver=`svcprop -p $FW_CONFIG_DEF_PG/version $SMF_FMRI 2>/dev/null`
+        [ $? -ne 0 -o -z "$ver" ] && return 1
 
+        echo "$ver"
+}
+
+#
+# Version 1 configuration migration - if there's an existing ipf.conf file, set
+# the default system-wide policy to "custom" and set the custom file value to
+# "/etc/ipf/ipf.conf". Do this migration once and set the 'version' property
+# to the current version value.
+#
+upgrade_config()
+{
+	old_ipfconf="/etc/ipf/ipf.conf"
+
+	if [ -f ${old_ipfconf} ]; then
+		grep '^[ \t]*[^# \t]' ${old_ipfconf} >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			svccfg -s $SMF_FMRI setprop \
+			    $FW_CONFIG_DEF_PG/$POLICY_PROP = astring: \
+			    "custom" >/dev/null 2>&1
+			svccfg -s $SMF_FMRI setprop \
+			    $FW_CONFIG_DEF_PG/$CUSTOM_FILE_PROP = astring: \
+			    "$old_ipfconf" >/dev/null 2>&1
+		fi
+	fi
+
+	svccfg -s $SMF_FMRI setprop $FW_CONFIG_DEF_PG/version = count: \
+	    "$CURRENT_VERSION" >/dev/null 2>&1
+	svcadm refresh $SMF_FMRI >/dev/null 2>&1
+}
+
+configure_firewall()
+{
+	create_global_rules || exit $SMF_EXIT_ERR_CONFIG
+	create_global_ovr_rules || exit $SMF_EXIT_ERR_CONFIG
+	create_services_rules || exit $SMF_EXIT_ERR_CONFIG
+
+	[ ! -f ${IPFILCONF} -a ! -f ${IPNATCONF} ] && exit 0
+	ipf -E
+	load_ippool || exit $SMF_EXIT_ERR_CONFIG
+	load_ipf || exit $SMF_EXIT_ERR_CONFIG
+	load_ipnat || exit $SMF_EXIT_ERR_CONFIG
+}
+
+#
+# We handle configuration migration as well as a model change (transient to
+# contract based service) in the start, stop, and refresh methods.
+#
+# Configuration migration is straightforward, the start method will do the
+# upgrade if the repository version value is not the same as the version
+# defined in ipf_include.sh However, there are two problems. First, ipfilter
+# can start in parallel with manifest-import, thus the new configuration
+# properties and service definition may not be available to the start method
+# on the first reboot after an upgrade. Second, a transient to contract based
+# model change isn't well supported for an online service.
+#
+# - If the start method finds the property missing (manifest-import hasn't
+# completed), it will allow the still transient network/ipfilter to stay
+# 'online' and wait for manifest-import. Once manifest-import completes, the
+# refresh method will run svcadm restart if the version value is not
+# up-to-date and the subsequent start method will perform the upgrade. 
+#
+# - Since the start method allows the service to stay online as a transient
+# service (no contract), the svcadm restart invoked by refresh (described
+# above) will result in a call to the stop method with no existing contract
+# property. The ipfilter manifest cannot include contract/restarter token in
+# its stop method definition since startd will fail to expand that token and
+# place the service in maintenance. Thus, the stop method has to explicitly
+# get the contract id before calling smf_kill_contract.
+#
 case "$1" in
 	start)
-		[ ! -f ${IPFILCONF} -a ! -f ${IPNATCONF} ] && exit 0
-		ipf -E
-		[ -n "$pid" ] && kill -TERM $pid
-		if load_ippool && load_ipf && load_ipnat ; then
-			/usr/sbin/ipmon -Ds
-		else
-			exit $SMF_EXIT_ERR_CONFIG
+		ver=`config_get_version`
+		if [ $? -eq 1 ]; then
+			echo "Warning: firewall properties are not available"
+			exit $SMF_EXIT_OK
 		fi
+
+		[ "$ver" -ne "$CURRENT_VERSION" ] && upgrade_config
+
+		configure_firewall
+
+		/lib/svc/bin/svc.ipfd
+		/usr/sbin/ipmon -Ds
 		;;
 
 	stop)
-		[ -n "$pid" ] && kill -TERM $pid
+		ctid=`svcprop -p restarter/contract $SMF_FMRI`
+		if [ -n "$ctid" ]; then
+			smf_kill_contract $ctid TERM 1
+		fi
+
 		ipf -D
 		[ -n "$ipfid" ] && modunload -i $ipfid
 		;;
@@ -149,9 +236,18 @@ case "$1" in
 		;;
 
 	reload)
-		load_ippool
-		load_ipf
-		load_ipnat
+		ver=`config_get_version`
+		if [ $? -eq 1 ]; then
+			echo "Warning: firewall properties are not available"
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+
+		if [ "$ver" -ne "$CURRENT_VERSION" ]; then
+			svcadm restart $SMF_FMRI
+			exit $SMF_EXIT_OK
+		fi
+
+		configure_firewall
 		;;
 
 	reipf)
@@ -160,6 +256,19 @@ case "$1" in
 
 	reipnat)
 		load_ipnat
+		;;
+
+	fw_update)
+		#
+		# The second argument is the fmri of the service to be updated.
+		# If it's the network/ipfilter, we want to repopulate firewall
+		# configuration for the entire system.
+		#
+		if [ "$2" = "$SMF_FMRI" ]; then
+			configure_firewall
+		else
+			service_update $2 || exit 1
+		fi
 		;;
 
 	*)

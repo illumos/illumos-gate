@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -518,6 +518,13 @@ char *_scf_read_tmpl_prop_type_as_string(const scf_prop_tmpl_t *);
  * retrives an astring value from pg/pn.
  */
 char *_scf_read_single_astring_from_pg(scf_propertygroup_t *, const char *);
+
+/*
+ * scf_instance_delete_prop()
+ * Given instance, property group, and property, delete the property.
+ */
+int
+scf_instance_delete_prop(scf_instance_t *, const char *, const char *);
 
 #ifdef	__cplusplus
 }

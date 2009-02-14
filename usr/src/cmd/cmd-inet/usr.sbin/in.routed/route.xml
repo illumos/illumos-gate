@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-        ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -136,6 +134,20 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.routing' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='name' type='astring' value='route' />
+		<propval name='ipf_method' type='astring'
+			value='/lib/svc/method/svc-route ipfilter' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
 	</property_group>
 
 	<template>

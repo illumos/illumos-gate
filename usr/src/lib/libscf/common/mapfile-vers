@@ -312,6 +312,7 @@ SUNWprivate_1.1 {
 	scf_read_propvec;
 	scf_write_propvec;
 	scf_clean_propvec;
+	scf_instance_delete_prop;
     local:
 	*;
 };

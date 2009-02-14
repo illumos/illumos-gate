@@ -21,10 +21,8 @@
 
  CDDL HEADER END
 
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
-
- ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -86,6 +84,11 @@
 			value='solaris.print.admin' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.print.admin' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='ipf_method' type='astring'
+			value='/lib/svc/method/print-svc ipfilter svc:/application/print/server:default' />
 	</property_group>
 
 	<stability value='Unstable' />

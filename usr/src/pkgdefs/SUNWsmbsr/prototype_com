@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # packaging files
 i copyright
@@ -43,3 +41,7 @@ d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/network 0755 root sys
 d none var/svc/manifest/network/smb 0755 root sys
 f manifest var/svc/manifest/network/smb/server.xml 0444 root sys
+d none lib 755 root bin
+d none lib/svc 0755 root bin
+d none lib/svc/method 0755 root bin
+f none lib/svc/method/svc-smbd 0555 root bin

@@ -2294,14 +2294,6 @@ EOF
 		smf_enable network/rpc/bootparams
 	fi
 
-	# To handle the transition from pre-smf ipfilter to smf-aware ipfilter,
-	# check if ipfilter had been enabled with at least one rule, and if so
-	# enable the smf instance.
-	if grep '^[ \t]*[^# \t]' $rootprefix/etc/ipf/ipf.conf >/dev/null 2>&1 &&
-	    [[ $zone = global ]]; then
-		smf_enable network/ipfilter
-	fi
-
 	touch $rootprefix/var/svc/profile/.upgrade_prophist
 
 	cat >> $rootprefix/var/svc/profile/upgrade <<EOF

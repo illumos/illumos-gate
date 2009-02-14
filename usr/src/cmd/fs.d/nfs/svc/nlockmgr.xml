@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -85,6 +83,13 @@
 	    name='stop'
 	    exec=':kill'
 	    timeout_seconds='60' />
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='isrpc' type='boolean' value='true' />
+		<propval name='name' type='astring' value='nlockmgr' />
+		<propval name='ipf_method' type='astring'
+			value='/lib/svc/method/nfs-server ipfilter' />
+	</property_group>
 
 	<property_group name='application' type='framework'>
 		<stability value='Evolving' />

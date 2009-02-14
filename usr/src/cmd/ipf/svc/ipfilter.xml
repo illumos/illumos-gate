@@ -38,17 +38,7 @@
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='false' />
-
 	<single_instance />
-
-	<dependency 
-	    name='config'
-	    grouping='require_all'
-	    restart_on='restart'
-	    type='path'>
-		<service_fmri value='file://localhost/etc/ipf/ipf.conf' />
-	</dependency>
 
 	<dependency
 	    name='filesystem'
@@ -74,6 +64,14 @@
 		<service_fmri value='svc:/system/identity:node' />
 	</dependency>
 
+	<dependency
+	    name='domain'
+	    grouping='require_all'
+	    restart_on='restart'
+	    type='service'>
+		<service_fmri value='svc:/system/identity:domain' />
+	</dependency>
+
 	<dependent
 	    name='network'
 	    grouping='optional_all'
@@ -84,14 +82,14 @@
 	<exec_method
 		type='method'
 		name='stop'
-		exec='/lib/svc/method/ipfilter stop'
+		exec='/lib/svc/method/ipfilter %m'
 		timeout_seconds='60' >
 	</exec_method>
 
 	<exec_method
 		type='method'
 		name='start'
-		exec='/lib/svc/method/ipfilter start'
+		exec='/lib/svc/method/ipfilter %m'
 		timeout_seconds='30' >
 	</exec_method>
 
@@ -102,11 +100,27 @@
 		timeout_seconds='30' >
 	</exec_method>
 
-	<property_group
-		name='startd'
-		type='framework'>
-		<propval name='duration' type='astring' value='transient' />
-	</property_group>
+	<instance name='default' enabled='false'>
+		<property_group name='firewall_config_default'
+			type='com.sun,fw_configuration'>
+			<propval name='policy' type='astring' value='none' />
+			<propval name='custom_policy_file' type='astring' value='' />
+			<propval name='apply_to' type='astring' value='' />
+			<propval name='exceptions' type='astring' value='' />
+			<propval name='open_ports' type='astring' value='' />
+			<propval name='version' type='count' value='0' />
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.value.firewall.config' />
+		</property_group>
+
+		<property_group name='firewall_config_override'
+			type='com.sun,fw_configuration'>
+			<propval name='policy' type='astring' value='none' />
+			<propval name='apply_to' type='astring' value='' />
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.value.firewall.config' />
+		</property_group>
+	</instance>
 
 	<stability value='Unstable' />
 
@@ -123,6 +137,197 @@
 			<manpage title='ipfilter' section='5'
 				manpath='/usr/share/man' />
 		</documentation>
+
+		<pg_pattern name='firewall_config_default'
+		    type='com.sun,fw_configuration' target='this'
+		    required='false'>
+			<common_name>
+				<loctext xml:lang='C'>
+Global Default firewall
+				</loctext>
+			</common_name>
+			<description>
+				<loctext xml:lang='C'>
+The default system-wide firewall policy.
+				</loctext>
+			</description>
+			<prop_pattern name='policy' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+Global Default policy 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Firewall policy.
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name='none'>
+						<description>
+							<loctext xml:lang='C'>
+No firewall (allow all), this is the default value. 
+							</loctext>
+
+						</description>
+					</value>
+					<value name='deny'>
+						<description>
+							<loctext xml:lang='C'>
+Deny access to entities specified in 'apply_to' property.
+							</loctext>
+						</description>
+					</value>
+					<value name='allow'>
+						<description>
+							<loctext xml:lang='C'>
+Allow access to entities specified in 'apply_to' property.
+							</loctext>
+						</description>
+					</value>
+					<value name='custom'>
+						<description>
+							<loctext xml:lang='C'>
+Apply the custom ipfilter configuration stored in a custom file (custom file property must be set).
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name="apply_to" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Apply policy to
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang="C">
+The host and network IPs, network interfaces, and ippools to deny if the policy is set to deny, or accept if the policy is set to accept.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name="exceptions" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Make exceptions to
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang="C">
+The host and network IPs, network interfaces, and ippools which will be exempted from the set policy, accept if the policy is set to deny, or deny if the policy is set to accept.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name="custom_policy_file" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Custom policy IPfilter file
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The file containing a custom ipfilter configuration to use if a custom policy is enforced.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name="open_ports" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Open ports
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+A set of ports to leave open regardless of firewall policy.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name="upgraded" type="boolean"
+			    required="false">
+				<visibility value='hidden'/>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='firewall_config_override'
+		    type='com.sun,fw_configuration' target='this'
+		    required='false'>
+			<common_name>
+				<loctext xml:lang='C'>
+Global Override firewall
+				</loctext>
+			</common_name>
+			<description>
+				<loctext xml:lang='C'>
+The system-wide firewall policy that overrides default system-wide and all services' policies.
+				</loctext>
+			</description>
+			<prop_pattern name='policy' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+Global Override policy 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Firewall policy.
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name='none'>
+						<description>
+							<loctext xml:lang='C'>
+No firewall (allow all), this is the default value. 
+							</loctext>
+						</description>
+					</value>
+					<value name='deny'>
+						<description>
+							<loctext xml:lang='C'>
+Deny access to entities specified in 'apply_to' property.
+							</loctext>
+						</description>
+					</value>
+					<value name='allow'>
+						<description>
+							<loctext xml:lang='C'>
+Allow access to entities specified in 'apply_to' property.
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name="apply_to" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Apply policy to
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang="C">
+The host and network IPs, network interfaces, and ippools to deny if the
+policy is set to deny, or accept if the policy is set to accept.
+					</loctext>
+				</description>
+			</prop_pattern>
+		</pg_pattern>
+
 	</template>
 </service>
 

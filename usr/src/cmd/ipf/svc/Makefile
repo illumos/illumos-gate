@@ -19,22 +19,35 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+PROG=		svc.ipfd
+SRCS =          ipfd.c
 
 MANIFEST=	ipfilter.xml
 SVCMETHOD=	ipfilter
 
 include $(SRC)/cmd/Makefile.cmd
 
+LDLIBS +=       -lscf -lumem
+
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
+ROOTCMDDIR=		$(ROOT)/lib/svc/bin
 
-all clean lint:
+all: $(PROG)
 
-install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
+$(PROG): $(SRCS)
+	$(LINK.c) -o $@ $(LDLIBS) $(SRCS) $(CTFMERGE_HOOK)
+	$(POST_PROCESS)
+
+clean:
+	$(RM) $(PROG)
+
+lint: lint_SRCS
+
+install:	all $(ROOTCMD) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:		$(CHKMANIFEST)
 

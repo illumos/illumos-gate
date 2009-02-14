@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -18,39 +19,38 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROG =		svcadm
-OBJS =		svcadm.o synch.o
-SRCS =		$(OBJS:%.o=%.c)
-POFILES = 	$(OBJS:.o=.po)
+# Scripts that generate IPfilter rules for SMB server
 
-include ../../Makefile.cmd
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
 
-POFILE = 	$(PROG)_all.po
-LDLIBS +=	-lscf -luutil -lcontract
+create_ipf_rules()
+{
+	FMRI=$1
+	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+	ip=any
+	policy=`get_policy ${FMRI}`
+	iana_names="microsoft-ds netbios-ns netbios-dgm netbios-ssn"
 
-lint := LINTFLAGS = -ux
+	#
+	# Enforce policy on each port
+	#
+	echo "# $FMRI" >$file
+	for name in $iana_names; do
+		port=`$SERVINFO -p -s $name 2>/dev/null`
+		if [ -z "$port" ]; then
+			continue;
+		fi
+		generate_rules $FMRI $policy "tcp" $ip $port $file
+		generate_rules $FMRI $policy "udp" $ip $port $file
+	done
+}
 
-.KEEP_STATE:
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-$(POFILE): $(POFILES)
-	cat $(POFILES) > $(POFILE)
-
-install: all $(ROOTUSRSBINPROG)
-
-clean:
-	$(RM) $(OBJS)
-
-lint: lint_SRCS
-
-include ../../Makefile.targ
+if [ "$1" = "ipfilter" ]; then
+	create_ipf_rules $2
+fi
+exit 0

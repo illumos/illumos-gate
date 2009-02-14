@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../Makefile.cmd
 
@@ -31,6 +30,7 @@ FILEMODE = 0444
 
 SRCS = \
 	fs_include.sh \
+	ipf_include.sh \
 	net_include.sh \
 	routing_include.sh \
 	smf_include.sh

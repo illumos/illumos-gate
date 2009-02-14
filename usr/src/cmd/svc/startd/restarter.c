@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * restarter.c - service manipulation
@@ -1197,7 +1195,7 @@ unmaintain_instance(scf_handle_t *h, restarter_inst_t *rip,
 	    "%s.\n", rip->ri_i.i_fmri, cp);
 
 	(void) restarter_instance_update_states(h, rip, RESTARTER_STATE_UNINIT,
-	    RESTARTER_STATE_NONE, RERR_RESTART, NULL);
+	    RESTARTER_STATE_NONE, RERR_RESTART, "none");
 
 	/*
 	 * If we did ADMIN_MAINT_ON_IMMEDIATE, then there might still be
@@ -1407,7 +1405,7 @@ start_instance(scf_handle_t *local_handle, restarter_inst_t *inst)
 	log_framework(LOG_DEBUG, "%s: starting instance.\n", inst->ri_i.i_fmri);
 
 	(void) restarter_instance_update_states(local_handle, inst,
-	    inst->ri_i.i_state, RESTARTER_STATE_ONLINE, RERR_NONE, NULL);
+	    inst->ri_i.i_state, RESTARTER_STATE_ONLINE, RERR_NONE, "none");
 
 	info = startd_zalloc(sizeof (fork_info_t));
 
@@ -1417,11 +1415,27 @@ start_instance(scf_handle_t *local_handle, restarter_inst_t *inst)
 	inst->ri_method_thread = startd_thread_create(method_thread, info);
 }
 
+static int
+event_from_tty(scf_handle_t *h, restarter_inst_t *rip)
+{
+	scf_instance_t *inst;
+	int ret = 0;
+
+	if (libscf_fmri_get_instance(h, rip->ri_i.i_fmri, &inst))
+		return (-1);
+
+	ret = restarter_inst_ractions_from_tty(inst);
+
+	scf_instance_destroy(inst);
+	return (ret);
+}
+
 static void
 maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
     const char *aux)
 {
 	fork_info_t *info;
+	scf_instance_t *scf_inst = NULL;
 
 	assert(PTHREAD_MUTEX_HELD(&rip->ri_lock));
 	assert(aux != NULL);
@@ -1437,6 +1451,31 @@ maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
 		    "%s: maintain_instance -> is already in maintenance\n",
 		    rip->ri_i.i_fmri);
 		return;
+	}
+
+	/*
+	 * If aux state is "service_request" and
+	 * restarter_actions/auxiliary_fmri property is set with a valid fmri,
+	 * copy the fmri to restarter/auxiliary_fmri so svcs -x can use.
+	 */
+	if (strcmp(aux, "service_request") == 0 && libscf_fmri_get_instance(h,
+	    rip->ri_i.i_fmri, &scf_inst) == 0) {
+		if (restarter_inst_validate_ractions_aux_fmri(scf_inst) == 0) {
+			if (restarter_inst_set_aux_fmri(scf_inst))
+				log_framework(LOG_DEBUG, "%s: "
+				    "restarter_inst_set_aux_fmri failed: ",
+				    rip->ri_i.i_fmri);
+		} else {
+			log_framework(LOG_DEBUG, "%s: "
+			    "restarter_inst_validate_ractions_aux_fmri "
+			    "failed: ", rip->ri_i.i_fmri);
+
+			if (restarter_inst_reset_aux_fmri(scf_inst))
+				log_framework(LOG_DEBUG, "%s: "
+				    "restarter_inst_reset_aux_fmri failed: ",
+				    rip->ri_i.i_fmri);
+		}
+		scf_instance_destroy(scf_inst);
 	}
 
 	if (immediate || !instance_started(rip)) {
@@ -1629,11 +1668,21 @@ again:
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON:
-			maintain_instance(h, inst, 0, "administrative_request");
+			if (event_from_tty(h, inst) == 0)
+				maintain_instance(h, inst, 0,
+				    "service_request");
+			else
+				maintain_instance(h, inst, 0,
+				    "administrative_request");
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON_IMMEDIATE:
-			maintain_instance(h, inst, 1, "administrative_request");
+			if (event_from_tty(h, inst) == 0)
+				maintain_instance(h, inst, 1,
+				    "service_request");
+			else
+				maintain_instance(h, inst, 1,
+				    "administrative_request");
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_OFF:

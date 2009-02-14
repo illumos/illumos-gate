@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <librestart.h>
 #include <librestart_priv.h>
@@ -729,7 +727,6 @@ _restarter_commit_states(scf_handle_t *h, instance_data_t *id,
 	int ret = 0, r;
 	struct timeval now;
 	ssize_t sz;
-	char *default_aux = "none";
 
 	scf_transaction_t *t = NULL;
 	scf_transaction_entry_t *t_state = NULL, *t_state_next = NULL;
@@ -740,10 +737,6 @@ _restarter_commit_states(scf_handle_t *h, instance_data_t *id,
 	scf_propertygroup_t *pg = NULL;
 
 	assert(new_state != RESTARTER_STATE_NONE);
-
-	/* If aux state is unset, set aux to a default string. */
-	if (aux == NULL)
-		aux = default_aux;
 
 	if ((s_inst = scf_instance_create(h)) == NULL ||
 	    (pg = scf_pg_create(h)) == NULL ||
@@ -801,9 +794,13 @@ _restarter_commit_states(scf_handle_t *h, instance_data_t *id,
 
 
 	if (scf_value_set_astring(v_state, str_new_state) != 0 ||
-	    scf_value_set_astring(v_state_next, str_new_state_next) != 0 ||
-	    scf_value_set_astring(v_aux, aux) != 0)
+	    scf_value_set_astring(v_state_next, str_new_state_next) != 0)
 		bad_fail("scf_value_set_astring", scf_error());
+
+	if (aux) {
+		if (scf_value_set_astring(v_aux, aux) != 0)
+			bad_fail("scf_value_set_astring", scf_error());
+	}
 
 	if (scf_value_set_time(v_stime, now.tv_sec, now.tv_usec * 1000) != 0)
 		bad_fail("scf_value_set_time", scf_error());
@@ -863,8 +860,6 @@ add_pg:
 		    SCF_TYPE_ASTRING, v_state)) != 0 ||
 		    (r = tx_set_value(t, t_state_next, SCF_PROPERTY_NEXT_STATE,
 		    SCF_TYPE_ASTRING, v_state_next)) != 0 ||
-		    (r = tx_set_value(t, t_aux, SCF_PROPERTY_AUX_STATE,
-		    SCF_TYPE_ASTRING, v_aux)) != 0 ||
 		    (r = tx_set_value(t, t_stime, SCF_PROPERTY_STATE_TIMESTAMP,
 		    SCF_TYPE_TIME, v_stime)) != 0) {
 			switch (r) {
@@ -878,6 +873,24 @@ add_pg:
 
 			default:
 				bad_fail("tx_set_value", r);
+			}
+		}
+
+		if (aux) {
+			if ((r = tx_set_value(t, t_aux, SCF_PROPERTY_AUX_STATE,
+			    SCF_TYPE_ASTRING, v_aux)) != 0) {
+				switch (r) {
+				case ECONNABORTED:
+					ret = ECONNABORTED;
+					goto out;
+
+				case ECANCELED:
+					scf_transaction_reset(t);
+					goto add_pg;
+
+				default:
+					bad_fail("tx_set_value", r);
+				}
 			}
 		}
 
@@ -1566,7 +1579,6 @@ restarter_rm_libs_loadable()
 	return (1);
 }
 
-
 static int
 get_astring_val(scf_propertygroup_t *pg, const char *name, char *buf,
     size_t bufsz, scf_property_t *prop, scf_value_t *val)
@@ -1588,6 +1600,28 @@ get_astring_val(scf_propertygroup_t *pg, const char *name, char *buf,
 	szret = scf_value_get_astring(val, buf, bufsz);
 
 	return (szret >= 0 ? 0 : -1);
+}
+
+static int
+get_boolean_val(scf_propertygroup_t *pg, const char *name, uint8_t *b,
+    scf_property_t *prop, scf_value_t *val)
+{
+	if (scf_pg_get_property(pg, name, prop) != SCF_SUCCESS) {
+		if (scf_error() == SCF_ERROR_CONNECTION_BROKEN)
+			uu_die(rcbroken);
+		return (-1);
+	}
+
+	if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+		if (scf_error() == SCF_ERROR_CONNECTION_BROKEN)
+			uu_die(rcbroken);
+		return (-1);
+	}
+
+	if (scf_value_get_boolean(val, b))
+		return (-1);
+
+	return (0);
 }
 
 /*
@@ -2980,4 +3014,210 @@ restarter_event_get_seq(restarter_event_t *e)
 void
 restarter_event_get_time(restarter_event_t *e, hrtime_t *time)
 {
+}
+
+/*
+ * Check for and validate fmri specified in restarter_actions/auxiliary_fmri
+ * 0 - Success
+ * 1 - Failure
+ */
+int
+restarter_inst_validate_ractions_aux_fmri(scf_instance_t *inst)
+{
+	scf_handle_t *h;
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *val;
+	char *aux_fmri;
+	size_t size = scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH);
+	int ret = 1;
+
+	if ((aux_fmri = malloc(size)) == NULL)
+		return (1);
+
+	h = scf_instance_handle(inst);
+
+	pg = scf_pg_create(h);
+	prop = scf_property_create(h);
+	val = scf_value_create(h);
+	if (pg == NULL || prop == NULL || val == NULL)
+		goto out;
+
+	if (instance_get_or_add_pg(inst, SCF_PG_RESTARTER_ACTIONS,
+	    SCF_PG_RESTARTER_ACTIONS_TYPE, SCF_PG_RESTARTER_ACTIONS_FLAGS,
+	    pg) != SCF_SUCCESS)
+		goto out;
+
+	if (get_astring_val(pg, SCF_PROPERTY_AUX_FMRI, aux_fmri, size,
+	    prop, val) != SCF_SUCCESS)
+		goto out;
+
+	if (scf_parse_fmri(aux_fmri, NULL, NULL, NULL, NULL, NULL,
+	    NULL) != SCF_SUCCESS)
+		goto out;
+
+	ret = 0;
+
+out:
+	free(aux_fmri);
+	scf_value_destroy(val);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	return (ret);
+}
+
+/*
+ * Get instance's boolean value in restarter_actions/auxiliary_tty
+ * Return -1 on failure
+ */
+int
+restarter_inst_ractions_from_tty(scf_instance_t *inst)
+{
+	scf_handle_t *h;
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *val;
+	uint8_t	has_tty;
+	int ret = -1;
+
+	h = scf_instance_handle(inst);
+	pg = scf_pg_create(h);
+	prop = scf_property_create(h);
+	val = scf_value_create(h);
+	if (pg == NULL || prop == NULL || val == NULL)
+		goto out;
+
+	if (instance_get_or_add_pg(inst, SCF_PG_RESTARTER_ACTIONS,
+	    SCF_PG_RESTARTER_ACTIONS_TYPE, SCF_PG_RESTARTER_ACTIONS_FLAGS,
+	    pg) != SCF_SUCCESS)
+		goto out;
+
+	if (get_boolean_val(pg, SCF_PROPERTY_AUX_TTY, &has_tty, prop,
+	    val) != SCF_SUCCESS)
+		goto out;
+
+	ret = has_tty;
+
+out:
+	scf_value_destroy(val);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	return (ret);
+}
+
+static int
+restarter_inst_set_astring_prop(scf_instance_t *inst, const char *pgname,
+    const char *pgtype, uint32_t pgflags, const char *pname, const char *str)
+{
+	scf_handle_t *h;
+	scf_propertygroup_t *pg;
+	scf_transaction_t *t;
+	scf_transaction_entry_t *e;
+	scf_value_t *v;
+	int ret = 1, r;
+
+	h = scf_instance_handle(inst);
+
+	pg = scf_pg_create(h);
+	t = scf_transaction_create(h);
+	e = scf_entry_create(h);
+	v = scf_value_create(h);
+	if (pg == NULL || t == NULL || e == NULL || v == NULL)
+		goto out;
+
+	if (instance_get_or_add_pg(inst, pgname, pgtype, pgflags, pg))
+		goto out;
+
+	if (scf_value_set_astring(v, str) != SCF_SUCCESS)
+		goto out;
+
+	for (;;) {
+		if (scf_transaction_start(t, pg) != 0)
+			goto out;
+
+		if (tx_set_value(t, e, pname, SCF_TYPE_ASTRING, v) != 0)
+			goto out;
+
+		if ((r = scf_transaction_commit(t)) == 1)
+			break;
+
+		if (r == -1)
+			goto out;
+
+		scf_transaction_reset(t);
+		if (scf_pg_update(pg) == -1)
+			goto out;
+	}
+	ret = 0;
+
+out:
+	scf_transaction_destroy(t);
+	scf_entry_destroy(e);
+	scf_value_destroy(v);
+	scf_pg_destroy(pg);
+
+	return (ret);
+}
+
+int
+restarter_inst_set_aux_fmri(scf_instance_t *inst)
+{
+	scf_handle_t *h;
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *val;
+	char *aux_fmri;
+	size_t size = scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH);
+	int ret = 1;
+
+	if ((aux_fmri = malloc(size)) == NULL)
+		return (1);
+
+	h = scf_instance_handle(inst);
+
+	pg = scf_pg_create(h);
+	prop = scf_property_create(h);
+	val = scf_value_create(h);
+	if (pg == NULL || prop == NULL || val == NULL)
+		goto out;
+
+	/*
+	 * Get auxiliary_fmri value from restarter_actions pg
+	 */
+	if (instance_get_or_add_pg(inst, SCF_PG_RESTARTER_ACTIONS,
+	    SCF_PG_RESTARTER_ACTIONS_TYPE, SCF_PG_RESTARTER_ACTIONS_FLAGS,
+	    pg) != SCF_SUCCESS)
+		goto out;
+
+	if (get_astring_val(pg, SCF_PROPERTY_AUX_FMRI, aux_fmri, size,
+	    prop, val) != SCF_SUCCESS)
+		goto out;
+
+	/*
+	 * Populate restarter/auxiliary_fmri with the obtained fmri.
+	 */
+	ret = restarter_inst_set_astring_prop(inst, SCF_PG_RESTARTER,
+	    SCF_PG_RESTARTER_TYPE, SCF_PG_RESTARTER_FLAGS,
+	    SCF_PROPERTY_AUX_FMRI, aux_fmri);
+
+out:
+	free(aux_fmri);
+	scf_value_destroy(val);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	return (ret);
+}
+
+int
+restarter_inst_reset_aux_fmri(scf_instance_t *inst)
+{
+	return (scf_instance_delete_prop(inst,
+	    SCF_PG_RESTARTER, SCF_PROPERTY_AUX_FMRI));
+}
+
+int
+restarter_inst_reset_ractions_aux_fmri(scf_instance_t *inst)
+{
+	return (scf_instance_delete_prop(inst,
+	    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_FMRI));
 }

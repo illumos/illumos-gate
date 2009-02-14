@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3771,7 +3771,7 @@ lookup:
 
 	MUTEX_LOCK(&dgraph_lock);
 
-	r = libscf_inst_delete_prop(inst, SCF_PG_OPTIONS_OVR,
+	r = scf_instance_delete_prop(inst, SCF_PG_OPTIONS_OVR,
 	    SCF_PROPERTY_MILESTONE);
 	switch (r) {
 	case 0:
@@ -3791,7 +3791,7 @@ lookup:
 		break;
 
 	default:
-		bad_error("libscf_inst_delete_prop", r);
+		bad_error("scf_instance_delete_prop", r);
 	}
 
 	MUTEX_UNLOCK(&dgraph_lock);

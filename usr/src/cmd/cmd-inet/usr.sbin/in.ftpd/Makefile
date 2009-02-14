@@ -1,13 +1,12 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG=		in.ftpd ftpcount ftpshut ftprestart privatepw
 SCRIPTS=	ftpaddhost ftpconfig
 MANIFEST=	ftp.xml
+SVCMETHOD=	svc-ftp
 
 include		../../../Makefile.cmd
 
@@ -106,7 +105,7 @@ $(ROOTFTPWHO):	$(ROOTFTPCOUNT)
 		$(LN) $(ROOTFTPCOUNT) $@
 
 install:	all $(ROOTUSRSBINPROG) $(ROOTFTPWHO) $(ROOTUSRSBINSCRIPTS) \
-		$(ETCFTPDFILES) $(ROOTMANIFEST)
+		$(ETCFTPDFILES) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:		$(CHKMANIFEST)
 

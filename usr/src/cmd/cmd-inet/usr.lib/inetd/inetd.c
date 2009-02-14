@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,6 +285,51 @@ instance_stopped(const instance_t *inst)
 }
 
 /*
+ * Given the instance fmri, obtain the corresonding scf_instance.
+ * Caller is responsible for freeing the returned scf_instance and
+ * its scf_handle.
+ */
+static int
+fmri_to_instance(char *fmri, scf_instance_t **scf_instp)
+{
+	int retries, ret = 1;
+	scf_handle_t	*h;
+	scf_instance_t *scf_inst;
+
+	if ((h = scf_handle_create(SCF_VERSION)) == NULL) {
+		error_msg(gettext("Failed to get instance for %s"), fmri);
+		return (1);
+	}
+
+	if ((scf_inst = scf_instance_create(h)) == NULL)
+		goto out;
+
+	for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
+		if (make_handle_bound(h) == -1)
+			break;
+
+		if (scf_handle_decode_fmri(h, fmri, NULL, NULL, scf_inst,
+		    NULL, NULL, SCF_DECODE_FMRI_EXACT) == 0) {
+			ret = 0;
+			*scf_instp = scf_inst;
+			break;
+		}
+
+		if (scf_error() != SCF_ERROR_CONNECTION_BROKEN)
+			break;
+	}
+
+out:
+	if (ret != 0) {
+		error_msg(gettext("Failed to get instance for %s"), fmri);
+		scf_instance_destroy(scf_inst);
+		scf_handle_destroy(h);
+	}
+
+	return (ret);
+}
+
+/*
  * Updates the current and next repository states of instance 'inst'. If
  * any errors occur an error message is output.
  */
@@ -294,8 +339,10 @@ update_instance_states(instance_t *inst, internal_inst_state_t new_cur_state,
 {
 	internal_inst_state_t	old_cur = inst->cur_istate;
 	internal_inst_state_t	old_next = inst->next_istate;
+	scf_instance_t		*scf_inst = NULL;
 	scf_error_t		sret;
 	int			ret;
+	char			*aux = "none";
 
 	/* update the repository/cached internal state */
 	inst->cur_istate = new_cur_state;
@@ -312,14 +359,46 @@ update_instance_states(instance_t *inst, internal_inst_state_t new_cur_state,
 		error_msg(gettext("Failed to update state of instance %s in "
 		    "repository: %s"), inst->fmri, scf_strerror(sret));
 
+	if (fmri_to_instance(inst->fmri, &scf_inst) == 0) {
+		/*
+		 * If transitioning to maintenance, check auxiliary_tty set
+		 * by svcadm and assign appropriate value to auxiliary_state.
+		 * If the maintenance event comes from a service request,
+		 * validate auxiliary_fmri and copy it to
+		 * restarter/auxiliary_fmri.
+		 */
+		if (new_cur_state == IIS_MAINTENANCE) {
+			if (restarter_inst_ractions_from_tty(scf_inst) == 0)
+				aux = "service_request";
+			else
+				aux = "administrative_request";
+		}
+
+		if (strcmp(aux, "service_request") == 0) {
+			if (restarter_inst_validate_ractions_aux_fmri(
+			    scf_inst) == 0) {
+				if (restarter_inst_set_aux_fmri(scf_inst))
+					error_msg(gettext("Could not set "
+					    "auxiliary_fmri property for %s"),
+					    inst->fmri);
+			} else {
+				if (restarter_inst_reset_aux_fmri(scf_inst))
+					error_msg(gettext("Could not reset "
+					    "auxiliary_fmri property for %s"),
+					    inst->fmri);
+			}
+		}
+		scf_handle_destroy(scf_instance_handle(scf_inst));
+		scf_instance_destroy(scf_inst);
+	}
+
 	/* update the repository SMF state */
 	if ((ret = restarter_set_states(rst_event_handle, inst->fmri,
 	    states[old_cur].smf_state, states[new_cur_state].smf_state,
 	    states[old_next].smf_state, states[new_next_state].smf_state,
-	    err, 0)) != 0)
+	    err, aux)) != 0)
 		error_msg(gettext("Failed to update state of instance %s in "
 		    "repository: %s"), inst->fmri, strerror(ret));
-
 }
 
 void

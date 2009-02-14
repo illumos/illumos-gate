@@ -20,15 +20,31 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/routing_include.sh
+. /lib/svc/share/ipf_include.sh
 
 smf_configure_ip || exit $SMF_EXIT_OK
+
+create_ipf_rules()
+{
+	FMRI=$1
+	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+
+	#
+	# Allow incoming icmp from routers for successful discovery.
+	echo "# $FMRI" >$file
+	gen_IRDP_rules $file
+}
+
+if [ -n "$1" -a "$1" = "ipfilter" ]; then
+	create_ipf_rules $2
+	exit "$SMF_EXIT_OK"
+fi
 
 daemon_args=`get_daemon_args $SMF_FMRI`
 options="afsp:T:r"

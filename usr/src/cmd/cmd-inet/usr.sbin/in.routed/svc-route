@@ -20,15 +20,49 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/routing_include.sh
+. /lib/svc/share/ipf_include.sh
 
 smf_configure_ip || exit $SMF_EXIT_OK
+
+create_ipf_rules()
+{
+	FMRI=$1
+	file=`fmri_to_file ${FMRI} $IPF_SUFFIX`
+
+	#
+	# route:default is enabled iff route discovery is required. Allow
+	# incoming icmp from routers for successful discovery.
+	echo "# $FMRI" >$file
+	gen_IRDP_rules $file
+
+	#
+	# A potential router so apply policy to RIP, 520 udp 
+	#
+	policy=`get_policy $FMRI`
+	iana_name=`svcprop -p $FW_CONTEXT_PG/name ${FMRI} 2>/dev/null`
+
+	tport=`$SERVINFO -p -t -s $iana_name 2>/dev/null`
+	uport=`$SERVINFO -p -u -s $iana_name 2>/dev/null`
+
+	if [ -n "$tport" ]; then
+		generate_rules $FMRI $policy "tcp" "any" $tport $file
+	fi
+
+	if [ -n "$uport" ]; then
+		generate_rules $FMRI $policy "udp" "any" $uport $file
+	fi
+}
+
+if [ -n "$1" -a "$1" = "ipfilter" ]; then
+	create_ipf_rules $2
+	exit "$SMF_EXIT_OK"
+fi
 
 daemon_args=`get_daemon_args $SMF_FMRI`
 options="AdghmnqsStvVzT:F:P:"

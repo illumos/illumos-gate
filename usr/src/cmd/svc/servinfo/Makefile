@@ -23,60 +23,31 @@
 # Use is subject to license terms.
 #
 
-
-PROG=	smbd
-SRCS=				\
-	smbd_door_ops.c		\
-	smbd_doorsvc.c		\
-	smbd_join.c		\
-	smbd_logon.c		\
-	smbd_main.c		\
-	smbd_net.c		\
-	smbd_opipe_doorsvc.c	\
-	smbd_share_doorsvc.c	\
-	smbd_vss.c
+PROG =		servinfo
+OBJS =		servinfo.o
+SRCS =		$(OBJS:%.o=%.c)
+POFILES = 	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
+include ../Makefile.ctf
 
-MANIFEST=	server.xml
-SVCMETHOD=	svc-smbd
+LDLIBS +=	-lnsl -lsocket
 
-ROOTMANIFESTDIR	= $(ROOTSVCSMB)
-$(ROOTMANIFEST):= FILEMODE = 0444
+lint := LINTFLAGS = -ux
 
-$(ROOTSVCMETHOD):= FILEMODE = 0555
+.KEEP_STATE:
 
-include ../Makefile.smbsrv.defs
+all: $(PROG)
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lsmb \
-	-lzfs -lbsm -lnsl -lumem
-LDFLAGS += -R/usr/lib/smbsrv
-
-ROOTSMBDDIR = $(ROOTLIB)/smbsrv
-ROOTSMBDFILE = $(PROG:%=$(ROOTSMBDDIR)/%)
-
-FILEMODE = 0444
-$(ROOTSMBDFILE):= FILEMODE = 0555
-
-$(ROOTSMBDDIR)/%: %
-	$(INS.file)
-
-all:		$(PROG)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:		lint_SRCS
-
-$(PROG):	$(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
-check:		$(CHKMANIFEST)
+install: all $(ROOTLIBPROG)
 
-_msg:
+clean:
+	$(RM) $(OBJS) $(POFILES) $(PROG)
+
+lint: lint_SRCS
 
 include ../../Makefile.targ
-
-install: all .WAIT $(ROOTETCDEFAULTFILES) $(ROOTMANIFEST) \
-		$(ROOTSMBDFILE) ${ROOTSVCMETHOD}

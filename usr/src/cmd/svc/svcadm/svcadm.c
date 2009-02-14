@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svcadm - request adminstrative actions for service instances
@@ -33,12 +31,17 @@
 #include <libintl.h>
 #include <libscf.h>
 #include <libscf_priv.h>
+#include <libcontract.h>
+#include <libcontract_priv.h>
+#include <sys/contract/process.h>
 #include <libuutil.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <procfs.h>
 #include <assert.h>
 #include <errno.h>
 
@@ -96,6 +99,8 @@ static struct ht_elt **visited;
 
 void do_scfdie(int lineno) __NORETURN;
 static void usage_milestone(void) __NORETURN;
+static void set_astring_prop(const char *, const char *, const char *,
+    uint32_t, const char *, const char *);
 
 /*
  * Visitors from synch.c, needed for enable -s and disable -s.
@@ -416,126 +421,11 @@ get_astring_prop(const scf_propertygroup_t *pg, const char *propname,
 }
 
 /*
- * Returns
- *   0 - success
- *   ECANCELED - pg was deleted
- *   EPERM - permission denied
- *   EACCES - access denied
- *   EROFS - readonly
- */
-static int
-delete_prop(scf_propertygroup_t *pg, const char *propname)
-{
-	scf_transaction_t *tx;
-	scf_transaction_entry_t *ent;
-	int ret = 0, r;
-
-	if ((tx = scf_transaction_create(h)) == NULL ||
-	    (ent = scf_entry_create(h)) == NULL)
-		scfdie();
-
-	for (;;) {
-		if (scf_transaction_start(tx, pg) == -1) {
-			switch (scf_error()) {
-			case SCF_ERROR_DELETED:
-				ret = ECANCELED;
-				goto out;
-
-			case SCF_ERROR_PERMISSION_DENIED:
-				ret = EPERM;
-				goto out;
-
-			case SCF_ERROR_BACKEND_ACCESS:
-				ret = EACCES;
-				goto out;
-
-			case SCF_ERROR_BACKEND_READONLY:
-				ret = EROFS;
-				goto out;
-
-			case SCF_ERROR_CONNECTION_BROKEN:
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_NOT_BOUND:
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_IN_USE:
-			default:
-				scfdie();
-			}
-		}
-
-		if (scf_transaction_property_delete(tx, ent, propname) == -1)
-			switch (scf_error()) {
-			case SCF_ERROR_DELETED:
-				ret = ECANCELED;
-				goto out;
-
-			case SCF_ERROR_NOT_FOUND:
-				ret = 0;
-				goto out;
-
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_NOT_BOUND:
-			case SCF_ERROR_CONNECTION_BROKEN:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_NOT_SET:
-			default:
-				scfdie();
-			}
-
-		r = scf_transaction_commit(tx);
-		if (r == 1)
-			break;
-
-		scf_transaction_reset(tx);
-
-		if (r != 0) {
-			switch (scf_error()) {
-			case SCF_ERROR_DELETED:
-				ret = ECANCELED;
-				goto out;
-
-			case SCF_ERROR_PERMISSION_DENIED:
-				ret = EPERM;
-				goto out;
-
-			case SCF_ERROR_BACKEND_ACCESS:
-				ret = EACCES;
-				goto out;
-
-			case SCF_ERROR_BACKEND_READONLY:
-				ret = EROFS;
-				goto out;
-
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_NOT_BOUND:
-			case SCF_ERROR_CONNECTION_BROKEN:
-			default:
-				scfdie();
-			}
-		}
-
-		if (scf_pg_update(pg) == -1) {
-			if (scf_error() != SCF_ERROR_DELETED)
-				scfdie();
-
-			ret = ECANCELED;
-			goto out;
-		}
-	}
-
-out:
-	scf_transaction_destroy(tx);
-	scf_entry_destroy(ent);
-	return (ret);
-}
-
-/*
  * Returns 0 or EPERM.
  */
 static int
-pg_get_or_add(scf_instance_t *inst, const char *pgname, const char *pgtype,
-    uint32_t pgflags, scf_propertygroup_t *pg)
+pg_get_or_add(const scf_instance_t *inst, const char *pgname,
+    const char *pgtype, uint32_t pgflags, scf_propertygroup_t *pg)
 {
 again:
 	if (scf_instance_get_pg(inst, pgname, pg) == 0)
@@ -560,6 +450,94 @@ again:
 	}
 }
 
+static int
+my_ct_name(char *out, size_t len)
+{
+	ct_stathdl_t st;
+	char *ct_fmri;
+	ctid_t ct;
+	int fd, errno, ret;
+
+	if ((ct = getctid()) == -1)
+		uu_die(gettext("Could not get contract id for process"));
+
+	fd = contract_open(ct, "process", "status", O_RDONLY);
+
+	if ((errno = ct_status_read(fd, CTD_ALL, &st)) != 0)
+		uu_warn(gettext("Could not read status of contract "
+		    "%ld: %s.\n"), ct, strerror(errno));
+
+	if ((errno = ct_pr_status_get_svc_fmri(st, &ct_fmri)) != 0)
+		uu_warn(gettext("Could not get svc_fmri for contract "
+		    "%ld: %s.\n"), ct, strerror(errno));
+
+	ret = strlcpy(out, ct_fmri, len);
+
+	ct_status_free(st);
+	(void) close(fd);
+
+	return (ret);
+}
+
+/*
+ * Set auxiliary_tty and auxiliary_fmri properties in restarter_actions pg to
+ * communicate whether the action is requested from a tty and the fmri of the
+ * responsible process.
+ */
+static int
+restarter_setup(const char *fmri, const scf_instance_t *inst)
+{
+	boolean_t b = B_FALSE;
+	scf_propertygroup_t *pg = NULL;
+
+	if ((pg = scf_pg_create(h)) == NULL)
+		scfdie();
+
+	if (pg_get_or_add(inst, SCF_PG_RESTARTER_ACTIONS,
+	    SCF_PG_RESTARTER_ACTIONS_TYPE, SCF_PG_RESTARTER_ACTIONS_FLAGS,
+	    pg) != 0)
+		scfdie();
+
+	/* Set auxiliary_tty property */
+	if (isatty(STDIN_FILENO))
+		b = B_TRUE;
+
+	/* Create and set state to disabled */
+	switch (set_bool_prop(pg, SCF_PROPERTY_AUX_TTY, b) != 0) {
+	case 0:
+		break;
+
+	case EPERM:
+		uu_warn(gettext("Could not set %s/%s "
+		    "property of %s: permission denied.\n"),
+		    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_TTY, fmri);
+		break;
+
+	case EROFS:
+		uu_warn(gettext("%s: Could not set %s/%s "
+		    "(repository read-only).\n"), fmri,
+		    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_TTY);
+		break;
+
+	default:
+		scfdie();
+	}
+
+	if (my_ct_name(scratch_fmri, max_scf_fmri_sz) > 0) {
+		set_astring_prop(fmri, SCF_PG_RESTARTER_ACTIONS,
+		    SCF_PG_RESTARTER_ACTIONS_TYPE,
+		    SCF_PG_RESTARTER_ACTIONS_FLAGS,
+		    SCF_PROPERTY_AUX_FMRI, scratch_fmri);
+	} else {
+		uu_warn(gettext("%s: Could not set %s/%s: "
+		    "my_ct_name failed.\n"), fmri,
+		    SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_AUX_FMRI);
+	}
+
+	scf_pg_destroy(pg);
+	return (0);
+}
+
 /*
  * Enable or disable inst, per enable.  If temp is true, set
  * general_ovr/enabled.  Otherwise set general/enabled and delete
@@ -578,6 +556,10 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 	pg = scf_pg_create(h);
 	if (pg == NULL)
 		scfdie();
+
+	if (restarter_setup(fmri, inst))
+		uu_warn(gettext("Unable to record FMRI with request. svcs -l "
+		    "output may be incomplete.\n"));
 
 	/*
 	 * An instance's configuration is incomplete if general/enabled
@@ -707,53 +689,33 @@ again:
 		}
 
 		pgname = SCF_PG_GENERAL_OVR;
-		if (scf_instance_get_pg(inst, pgname, pg) == 0) {
-			r = delete_prop(pg, SCF_PROPERTY_ENABLED);
-			switch (r) {
-			case 0:
-				break;
+		r = scf_instance_delete_prop(inst, pgname,
+		    SCF_PROPERTY_ENABLED);
+		switch (r) {
+		case 0:
+			break;
 
-			case ECANCELED:
-				uu_warn(emsg_no_service, fmri);
-				goto out;
+		case ECANCELED:
+			uu_warn(emsg_no_service, fmri);
+			goto out;
 
-			case EPERM:
-				goto eperm;
+		case EPERM:
+			goto eperm;
 
-			case EACCES:
-				uu_warn(gettext("Could not delete %s/%s "
-				    "property of %s: backend access denied.\n"),
-				    pgname, SCF_PROPERTY_ENABLED, fmri);
-				goto out;
+		case EACCES:
+			uu_warn(gettext("Could not delete %s/%s "
+			    "property of %s: backend access denied.\n"),
+			    pgname, SCF_PROPERTY_ENABLED, fmri);
+			goto out;
 
-			case EROFS:
-				uu_warn(gettext("Could not delete %s/%s "
-				    "property of %s: backend is read-only.\n"),
-				    pgname, SCF_PROPERTY_ENABLED, fmri);
-				goto out;
+		case EROFS:
+			uu_warn(gettext("Could not delete %s/%s "
+			    "property of %s: backend is read-only.\n"),
+			    pgname, SCF_PROPERTY_ENABLED, fmri);
+			goto out;
 
-			default:
-				bad_error("delete_prop", r);
-			}
-		} else {
-			switch (scf_error()) {
-			case SCF_ERROR_DELETED:
-				/* Print something? */
-
-			case SCF_ERROR_NOT_FOUND:
-				break;
-
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_NOT_SET:
-				assert(0);
-				abort();
-				/* NOTREACHED */
-
-			case SCF_ERROR_CONNECTION_BROKEN:
-			default:
-				scfdie();
-			}
+		default:
+			bad_error("scf_instance_delete_prop", r);
 		}
 
 		if (verbose)
@@ -1347,6 +1309,10 @@ set_inst_action(const char *fmri, const scf_instance_t *inst,
 	    (tx = scf_transaction_create(h)) == NULL ||
 	    (ent = scf_entry_create(h)) == NULL)
 		scfdie();
+
+	if (restarter_setup(fmri, inst))
+		uu_warn(gettext("Failed to process %s: restarter_setup() "
+		    "failed\n"), fmri);
 
 	if (scf_instance_get_pg(inst, scf_pg_restarter_actions, pg) == -1) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)
@@ -1970,59 +1936,40 @@ set_milestone(const char *fmri, boolean_t temporary)
 	    SCF_PG_OPTIONS_TYPE, SCF_PG_OPTIONS_FLAGS, SCF_PROPERTY_MILESTONE,
 	    fmri);
 
-	if (scf_instance_get_pg(inst, SCF_PG_OPTIONS_OVR, pg) == 0) {
-		r = delete_prop(pg, SCF_PROPERTY_MILESTONE);
-		switch (r) {
-		case 0:
-			break;
+	r = scf_instance_delete_prop(inst, SCF_PG_OPTIONS_OVR,
+	    SCF_PROPERTY_MILESTONE);
+	switch (r) {
+	case 0:
+		break;
 
-		case ECANCELED:
-			uu_warn(emsg_no_service, fmri);
-			exit_status = 1;
-			goto out;
+	case ECANCELED:
+		uu_warn(emsg_no_service, fmri);
+		exit_status = 1;
+		goto out;
 
-		case EPERM:
-			uu_warn(gettext("Could not delete %s/%s property of "
-			    "%s: permission denied.\n"), SCF_PG_OPTIONS_OVR,
-			    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
-			exit_status = 1;
-			goto out;
+	case EPERM:
+		uu_warn(gettext("Could not delete %s/%s property of "
+		    "%s: permission denied.\n"), SCF_PG_OPTIONS_OVR,
+		    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
+		exit_status = 1;
+		goto out;
 
-		case EACCES:
-			uu_warn(gettext("Could not delete %s/%s property of "
-			    "%s: access denied.\n"), SCF_PG_OPTIONS_OVR,
-			    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
-			exit_status = 1;
-			goto out;
+	case EACCES:
+		uu_warn(gettext("Could not delete %s/%s property of "
+		    "%s: access denied.\n"), SCF_PG_OPTIONS_OVR,
+		    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
+		exit_status = 1;
+		goto out;
 
-		case EROFS:
-			uu_warn(gettext("Could not delete %s/%s property of "
-			    "%s: backend read-only.\n"), SCF_PG_OPTIONS_OVR,
-			    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
-			exit_status = 1;
-			goto out;
+	case EROFS:
+		uu_warn(gettext("Could not delete %s/%s property of "
+		    "%s: backend read-only.\n"), SCF_PG_OPTIONS_OVR,
+		    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
+		exit_status = 1;
+		goto out;
 
-		default:
-			bad_error("delete_prop", r);
-		}
-	} else {
-		switch (scf_error()) {
-		case SCF_ERROR_NOT_FOUND:
-			break;
-
-		case SCF_ERROR_DELETED:
-			uu_warn(emsg_no_service, fmri);
-			exit_status = 1;
-			goto out;
-
-		case SCF_ERROR_CONNECTION_BROKEN:
-		case SCF_ERROR_HANDLE_MISMATCH:
-		case SCF_ERROR_NOT_BOUND:
-		case SCF_ERROR_INVALID_ARGUMENT:
-		case SCF_ERROR_NOT_SET:
-		default:
-			scfdie();
-		}
+	default:
+		bad_error("scf_instance_delete_prop", r);
 	}
 
 out:

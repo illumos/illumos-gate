@@ -20,10 +20,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# IPfilter's firewall
+#
+# routed and its siblings use ICMP Router Discovery protocol, simply allow
+# these packets so the client portion of routed can work.
+#
+gen_IRDP_rules()
+{
+	# Allow incoming icmp from routers for successful discovery.
+	# IRDP - ICMP type 9 and 10, advertisement and solicitation, respectively.
+	#
+	echo "pass in log quick proto icmp from any to any icmp-type 10" >>${1}
+	echo "pass in log quick proto icmp from any to any icmp-type 9" >>${1}
+}
 
 #
 # These functions are used to help map daemon arguments to appropriate

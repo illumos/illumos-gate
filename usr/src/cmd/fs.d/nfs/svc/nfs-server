@@ -20,15 +20,46 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # Start/stop processes required for server NFS
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
 zone=`smf_zonename`
+
+#
+# Handling a corner case here. If we were in offline state due to an
+# unsatisfied dependency, the ipf_method process wouldn't have generated
+# the ipfilter configuration. When we transition to online because the
+# dependency is satisfied, the start method will have to generate the
+# ipfilter configuration. To avoid all possible deadlock scenarios,
+# we restart ipfilter which will regenerate the ipfilter configuration
+# for the entire system.
+#
+# The ipf_method process signals that it didn't generate ipf rules by
+# removing the service's ipf file. Thus we only restart network/ipfilter
+# when the file is missing.
+#
+configure_ipfilter()
+{
+	ipfile=`fmri_to_file $SMF_FMRI $IPF_SUFFIX`
+	[ -f "$ipfile" ] && return 0
+
+        #
+	# Nothing to do if:
+        # - ipfilter isn't online 
+	# - global policy is 'custom'
+	# - service's policy is 'use_global'
+        #
+        service_check_state $IPF_FMRI $SMF_ONLINE || return 0
+        [ "`get_global_def_policy`" = "custom" ] && return 0
+	[ "`get_policy $SMF_FMRI`" = "use_global" ] && return 0
+
+	svcadm restart $IPF_FMRI
+}
 
 case "$1" in
 'start')
@@ -81,6 +112,8 @@ case "$1" in
 			sleep 5 &
 			exit $SMF_EXIT_ERR_FATAL
 		fi
+
+		configure_ipfilter
 	else
 		/usr/sbin/svcadm disable -t svc:/network/nfs/server
 		echo "No NFS filesystems are shared"
@@ -123,6 +156,125 @@ case "$1" in
 	# Kill any processes left in service contract
 	smf_kill_contract $2 TERM 1
 	[ $? -ne 0 ] && exit 1
+	;;
+
+'ipfilter')
+	#
+	# NFS related services are RPC. nfs/server has nfsd which has
+	# well-defined port number but mountd is an RPC daemon.
+	#
+	# Essentially, we generate rules for the following "services"
+	#  - nfs/server which has nfsd and mountd
+	#  - nfs/rquota
+	#
+	# The following services are enabled for both nfs client and
+	# server so we'll treat them as client services and simply
+	# allow incoming traffic.
+	#  - nfs/status
+	#  - nfs/nlockmgr
+	#  - nfs/cbd
+	#
+	NFS_FMRI="svc:/network/nfs/server:default"
+	RQUOTA_FMRI="svc:/network/nfs/rquota:default"
+	FMRI=$2
+
+	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+	echo "# $FMRI" >$file
+	policy=`get_policy $NFS_FMRI`
+	ip="any"
+
+	#
+	# nfs/server configuration is processed in the start method.
+	#
+	if [ "$FMRI" = "$NFS_FMRI" ]; then
+		service_check_state $FMRI $SMF_ONLINE
+		if [ $? -ne 0 ]; then
+			rm  $file
+			exit $SMF_EXIT_OK
+		fi
+
+		nfs_name=`svcprop -p $FW_CONTEXT_PG/name $FMRI 2>/dev/null`
+		tport=`$SERVINFO -p -t -s $nfs_name 2>/dev/null`
+		if [ -n "$tport" ]; then
+			generate_rules $FMRI $policy "tcp" $ip $tport $file
+		fi
+
+		uport=`$SERVINFO -p -u -s $nfs_name 2>/dev/null`
+		if [ -n "$uport" ]; then
+			generate_rules $FMRI $policy "udp" $ip $uport $file
+		fi
+
+		tports=`$SERVINFO -R -p -t -s "mountd" 2>/dev/null`
+		if [ -n "$tports" ]; then
+			for tport in $tports; do
+				generate_rules $FMRI $policy "tcp" $ip \
+				    $tport $file
+			done
+		fi
+
+		uports=`$SERVINFO -R -p -u -s "mountd" 2>/dev/null`
+		if [ -n "$uports" ]; then
+			for uport in $uports; do
+				generate_rules $FMRI $policy "udp" $ip \
+				    $uport $file
+			done
+		fi
+
+	elif [ "$FMRI" = "$RQUOTA_FMRI" ]; then
+		iana_name=`svcprop -p inetd/name $FMRI`
+
+		tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
+		if [ -n "$tports" ]; then
+			for tport in $tports; do
+				generate_rules $NFS_FMRI $policy "tcp" \
+				    $ip $tport $file
+			done
+		fi
+
+		uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
+		if [ -n "$uports" ]; then
+			for uport in $uports; do
+				generate_rules $NFS_FMRI $policy "udp" \
+				    $ip $uport $file
+			done
+		fi
+	else
+		#
+		# Handle the client services here
+		#
+		restarter=`svcprop -p general/restarter $FMRI 2>/dev/null`
+		if [ "$restarter" = "$INETDFMRI" ]; then
+			iana_name=`svcprop -p inetd/name $FMRI`
+			isrpc=`svcprop -p inetd/isrpc $FMRI`
+		else
+			iana_name=`svcprop -p $FW_CONTEXT_PG/name $FMRI`
+			isrpc=`svcprop -p $FW_CONTEXT_PG/isrpc $FMRI`
+		fi
+
+		if [ "$isrpc" = "true" ]; then
+			tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
+			uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
+		else
+			tports=`$SERVINFO -p -t -s $iana_name 2>/dev/null`
+			uports=`$SERVINFO -p -u -s $iana_name 2>/dev/null`
+		fi
+
+		if [ -n "$tports" ]; then
+			for tport in $tports; do
+				echo "pass in log quick proto tcp from any" \
+				    "to any port = ${tport} flags S " \
+				    "keep state" >>${file}
+			done
+		fi
+
+		if [ -n "$uports" ]; then
+			for uport in $uports; do
+				echo "pass in log quick proto udp from any" \
+				    "to any port = ${uport}" >>${file}
+			done
+		fi
+	fi
+
 	;;
 
 *)

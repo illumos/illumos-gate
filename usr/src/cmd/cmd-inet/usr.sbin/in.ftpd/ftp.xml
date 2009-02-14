@@ -2,10 +2,8 @@
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 
 <!--
-	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -52,6 +50,19 @@
 		<propval name='proto' type='astring' value='tcp6' />
 		<propval name='wait' type='boolean' value='false' />
 		<propval name='isrpc' type='boolean' value='false' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='ipf_method' type='astring'
+		    value='/lib/svc/method/svc-ftp ipfilter' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
 	</property_group>
 
 	<stability value='Unstable' />

@@ -116,6 +116,19 @@ file.
 			value='solaris.smf.manage.smb' />
 	</property_group>
 
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='ipf_method' type='astring'
+		    value='/lib/svc/method/svc-smbd ipfilter' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
+	</property_group>
+
 	<property_group name='read' type='application'>
 		<!-- To read protected parameters -->
 		<propval name='read_authorization' type='astring'

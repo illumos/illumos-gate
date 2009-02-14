@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBRESTART_H
 #define	_LIBRESTART_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libsysevent.h>
 #include <libcontract.h>
@@ -58,6 +56,11 @@ extern "C" {
  *	We offer functions to tease apart the event rather than generic
  *	nvpair interfaces. This is because each event type has a well-
  *	defined set of fields.
+ */
+
+/*
+ * Some of the functions have external contracted consumers, review contracts
+ * when making incompatible changes.
  */
 
 typedef struct restarter_event_handle restarter_event_handle_t;
@@ -146,7 +149,6 @@ typedef enum {
 	RERR_RESTART,			/* transition due to restart */
 	RERR_REFRESH			/* transition due to refresh */
 } restarter_error_t;
-
 /*
  * restarter_store_contract() and restarter_remove_contract() types
  */
@@ -188,6 +190,16 @@ int restarter_event_get_current_states(restarter_event_t *,
 
 /*
  * Functions for updating the repository.
+ */
+
+/*
+ * When setting state to "maintenance", callers of restarter_set_states() can
+ * set aux_state to "service_request" to communicate that another service has
+ * requested maintenance state for the target service.
+ *
+ * Callers should use restarter_inst_validate_aux_fmri() to validate the fmri
+ * of the requested service and pass "service_request" for aux_state when
+ * calling restarter_set_states(). See inetd and startd for examples.
  */
 int restarter_set_states(restarter_event_handle_t *, const char *,
     restarter_instance_state_t, restarter_instance_state_t,
@@ -239,6 +251,24 @@ void restarter_free_method_context(struct method_context *);
 int restarter_is_null_method(const char *);
 int restarter_is_kill_method(const char *);
 int restarter_is_kill_proc_method(const char *);
+
+/* Validate the inst fmri specified in  restarter_actions/auxiliary_fmri */
+int restarter_inst_validate_ractions_aux_fmri(scf_instance_t *);
+
+/* Delete instance's restarter_actions/auxiliary_fmri property */
+int restarter_inst_reset_ractions_aux_fmri(scf_instance_t *);
+
+/* Get boolean value from instance's restarter_actions/auxiliary_tty */
+int restarter_inst_ractions_from_tty(scf_instance_t *);
+
+/* Delete instance's restarter/auxiliary_fmri property */
+int restarter_inst_reset_aux_fmri(scf_instance_t *);
+
+/*
+ * Set instance's restarter/auxiliary_fmri, value come from
+ * restarter_actions/auxliary_fmri
+ */
+int restarter_inst_set_aux_fmri(scf_instance_t *);
 
 #ifdef	__cplusplus
 }

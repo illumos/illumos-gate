@@ -342,6 +342,7 @@ f none lib/svc/bin/prophist 0555 root sys
 f none lib/svc/bin/restore_repository 0555 root sys
 f none lib/svc/bin/sqlite 0555 root sys
 f none lib/svc/bin/svc.configd 0555 root sys
+f none lib/svc/bin/svc.ipfd 0555 root sys
 f none lib/svc/bin/svc.startd 0555 root sys
 d none lib/svc/capture 0755 root bin
 d none lib/svc/method 0755 root bin
@@ -386,6 +387,7 @@ f none lib/svc/seed/nonglobal.db 0444 root sys
 d none lib/svc/share 0755 root bin
 f none lib/svc/share/README 0444 root bin
 f none lib/svc/share/fs_include.sh 0444 root bin
+f none lib/svc/share/ipf_include.sh 0444 root bin
 f none lib/svc/share/net_include.sh 0444 root bin
 f none lib/svc/share/routing_include.sh 0444 root bin
 f none lib/svc/share/smf_include.sh 0444 root bin

@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,14 +20,90 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
 
 YPDIR=/usr/lib/netsvc/yp
+
+create_client_ipf_rules()
+{
+	FMRI=$1
+	file=`fmri_to_file $FMRI $IPF_SUFFIX`
+	iana_name=`svcprop -p $FW_CONTEXT_PG/name $FMRI`
+	domain=`domainname`
+
+	if [ -z "$domain" ]; then
+		return 0
+	fi
+
+	if [ ! -d /var/yp/binding/$domain ]; then
+		return
+	fi
+	echo "# $FMRI" >$file
+
+	ypfile="/var/yp/binding/$domain/ypservers"
+	if [ -f $ypfile ]; then
+		tports=`$SERVINFO -R -p -t -s $iana_name 2>/dev/null`
+		uports=`$SERVINFO -R -p -u -s $iana_name 2>/dev/null`
+
+		server_addrs=""
+		for ypsvr in `grep -v '^[ ]*#' $ypfile`; do
+			#
+			# Get corresponding IPv4 address in /etc/hosts
+			#
+			servers=`grep -v '^[ ]*#' /etc/hosts | awk ' {
+			    if ($1 !~/:/) {
+				for (i=2; i<=NF; i++) {
+				    if (s == $i) printf("%s ", $1);
+				} }
+			    }' s="$ypsvr"`
+
+			[ -z "$servers"  ] && continue
+			server_addrs="$server_addrs $servers"
+		done
+
+		[ -z "$server_addrs"  ] && return 0
+		for s in $server_addrs; do
+			if [ -n "$tports" ]; then
+				for tport in $tports; do
+					echo "pass in log quick proto tcp" \
+					    "from $s to any port = $tport" >>$file
+				done
+			fi
+
+			if [ -n "$uports" ]; then
+				for uport in $uports; do
+					echo "pass in log quick proto udp" \
+					    "from $s to any port = $uport" >>$file
+				done
+			fi
+		done
+	else
+		#
+		# How do we handle the client broadcast case? Server replies
+		# to the outgoing port that sent the broadcast, but there's
+		# no way the client know a packet is the reply.
+		#
+		# Nis server should be specified and clients shouldn't be
+		# doing broadcasts but if it does, no choice but to allow
+		# all traffic.
+		#
+		echo "pass in log quick proto udp from any to any" \
+		    "port > 32768" >>$file
+	fi
+}
+
+#
+# Ipfilter method
+#
+if [ -n "$1" -a "$1" = "ipfilter" ]; then
+	create_client_ipf_rules $2
+	exit $SMF_EXIT_OK
+fi
 
 case $SMF_FMRI in
 	'svc:/network/nis/client:default')

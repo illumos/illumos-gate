@@ -4,27 +4,25 @@
 
  CDDL HEADER START
 
-	The contents of this file are subject to the terms of the
-	Common Development and Distribution License (the "License").
-	You may not use this file except in compliance with the License.
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
 
-	You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-	or http://www.opensolaris.org/os/licensing.
-	See the License for the specific language governing permissions
-	and limitations under the License.
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
 
-	When distributing Covered Code, include this CDDL HEADER in each
-	file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-	If applicable, add the following below this CDDL HEADER, with the
-	fields enclosed by brackets "[]" replaced with your own identifying
-	information: Portions Copyright [yyyy] [name of copyright owner]
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
 
-	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -142,6 +140,20 @@
 	<property_group name='application' type='framework'>
 		<stability value='Evolving' />
 		<propval name='auto_enable' type='boolean' value='true' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='name' type='astring' value='nfsd' />
+		<propval name='ipf_method' type='astring'
+		    value='/lib/svc/method/nfs-server ipfilter' />
+	</property_group>
+ 
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
 	</property_group>
 
 	<stability value='Stable' />

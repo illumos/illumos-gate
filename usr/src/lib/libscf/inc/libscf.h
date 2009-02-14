@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,6 +280,8 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
  * Standard property names
  */
 #define	SCF_PROPERTY_AUX_STATE		((const char *)"auxiliary_state")
+#define	SCF_PROPERTY_AUX_FMRI		((const char *)"auxiliary_fmri")
+#define	SCF_PROPERTY_AUX_TTY		((const char *)"auxiliary_tty")
 #define	SCF_PROPERTY_CONTRACT		((const char *)"contract")
 #define	SCF_PROPERTY_COREFILE_PATTERN	((const char *)"corefile_pattern")
 #define	SCF_PROPERTY_DEGRADED		((const char *)"degraded")

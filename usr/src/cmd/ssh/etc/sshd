@@ -1,9 +1,10 @@
 #!/sbin/sh
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/ipf_include.sh
 
 SSHDIR=/etc/ssh
 KEYGEN="/usr/bin/ssh-keygen -q"
@@ -28,6 +29,24 @@ create_key()
 	return 0
 }
 
+create_ipf_rules()
+{
+	FMRI=$1
+	ipf_file=`fmri_to_file ${FMRI} $IPF_SUFFIX`
+	policy=`get_policy ${FMRI}`
+
+	#
+	# Get port from /etc/ssh/sshd_config
+	#
+	tports=`grep "^Port" /etc/ssh/sshd_config 2>/dev/null | \
+	    awk '{print $2}'`
+
+	echo "# $FMRI" >$ipf_file
+	for port in $tports; do
+		generate_rules $FMRI $policy "tcp" "any" $port $ipf_file
+	done
+}
+
 # This script is being used for two purposes: as part of an SMF
 # start/stop/refresh method, and as a sysidconfig(1M)/sys-unconfig(1M)
 # application.
@@ -49,6 +68,11 @@ case $1 in
 	;;
 
 	# SMF arguments (start and restart [really "refresh"])
+
+'ipfilter')
+	create_ipf_rules $2
+	;;
+
 'start')
 	/usr/lib/ssh/sshd
 	;;

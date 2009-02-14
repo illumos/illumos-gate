@@ -20,7 +20,7 @@
    
     CDDL HEADER END
    
-    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     NOTE:  This service manifest is not editable; its contents will
@@ -132,6 +132,18 @@
 		<!-- authorization to modify the configuration properties -->
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.system-log' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='name' type='astring' value='syslog' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
 	</property_group>
 
 	<stability value='Unstable' />

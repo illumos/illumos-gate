@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -28,7 +28,6 @@
     operating system upgrade.  Make customizations in a different
     file.
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <service_bundle type='manifest' name='SUNWdsdr:multicast'>
@@ -120,6 +119,18 @@
 			</property>
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.mdns' />
+		</property_group>
+
+		<property_group name='firewall_context' type='com.sun,fw_definition'>
+			<propval name='name' type='astring' value='mdns' />
+		</property_group>
+
+		<property_group name='firewall_config' type='com.sun,fw_configuration'>
+			<propval name='policy' type='astring' value='use_global' />
+			<propval name='apply_to' type='astring' value='' />
+			<propval name='exceptions' type='astring' value='' />
+			<propval name='value_authorization' type='astring'
+			    value='solaris.smf.value.firewall.config' />
 		</property_group>
 	
 	</instance>

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -635,7 +635,6 @@ depgroup_type_t depgroup_read_grouping(scf_handle_t *, scf_propertygroup_t *);
 restarter_error_t depgroup_read_restart(scf_handle_t *, scf_propertygroup_t *);
 int libscf_set_enable_ovr(scf_instance_t *, int);
 int libscf_set_deathrow(scf_instance_t *, int);
-int libscf_inst_delete_prop(scf_instance_t *, const char *, const char *);
 int libscf_delete_enable_ovr(scf_instance_t *);
 int libscf_get_milestone(scf_instance_t *, scf_property_t *, scf_value_t *,
     char *, size_t);

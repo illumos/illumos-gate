@@ -21,10 +21,8 @@ CDDL HEADER END
 -->
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
-
-    pragma ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <service_bundle type='manifest' name='SUNWipplr:ipp-listener'>
@@ -61,6 +59,11 @@ CDDL HEADER END
 			value='solaris.print.admin' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.print.admin' />
+	</property_group>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='ipf_method' type='astring'
+			value='/lib/svc/method/print-svc ipfilter svc:/application/print/server:default' />
 	</property_group>
 
 	<stability value='Unstable' />

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@
 #define	DC_UNINIT	"SMF-8000-4D"
 #define	DC_RSTRDEAD	"SMF-8000-5H"
 #define	DC_ADMINMAINT	"SMF-8000-63"
+#define	DC_SVCREQMAINT	"SMF-8000-R4"
 #define	DC_REPTFAIL	"SMF-8000-7Y"
 #define	DC_METHFAIL	"SMF-8000-8Q"
 #define	DC_NONE		"SMF-8000-9C"
@@ -106,6 +107,7 @@
 
 #define	DEFAULT_MAN_PATH	"/usr/share/man"
 
+#define	AUX_STATE_INVALID	"invalid_aux_state"
 
 #define	uu_list_append(lst, e)	uu_list_insert_before(lst, NULL, e)
 
@@ -128,6 +130,7 @@ typedef struct {
 	char next_state[MAX_SCF_STATE_STRING_SZ];
 	struct timeval stime;
 	const char *aux_state;
+	const char *aux_fmri;
 	int64_t start_method_waitstatus;
 
 	uint8_t enabled;
@@ -463,13 +466,20 @@ add_instance(const char *svcname, const char *instname, scf_instance_t *inst)
 	    SCF_TYPE_TIME, &instp->stime, 0, 0) != 0)
 		return;
 
+	/* restarter may not set aux_state, allow to continue in that case */
 	if (pg_get_single_val(g_pg, SCF_PROPERTY_AUX_STATE, SCF_TYPE_ASTRING,
-	    g_fmri, g_fmri_sz, 0) != 0)
-		return;
-	instp->aux_state = safe_strdup(g_fmri);
+	    g_fmri, g_fmri_sz, 0) == 0)
+		instp->aux_state = safe_strdup(g_fmri);
+	else
+		instp->aux_state = safe_strdup(AUX_STATE_INVALID);
 
 	(void) pg_get_single_val(g_pg, SCF_PROPERTY_START_METHOD_WAITSTATUS,
 	    SCF_TYPE_INTEGER, &instp->start_method_waitstatus, 0, 0);
+
+	/* Get the optional auxiliary_fmri */
+	if (pg_get_single_val(g_pg, SCF_PROPERTY_AUX_FMRI, SCF_TYPE_ASTRING,
+	    g_fmri, g_fmri_sz, 0) == 0)
+		instp->aux_fmri = safe_strdup(g_fmri);
 
 	if (scf_instance_get_pg(inst, SCF_PG_GENERAL_OVR, g_pg) == 0) {
 		if (pg_get_single_val(g_pg, SCF_PROPERTY_ENABLED,
@@ -1653,6 +1663,35 @@ print_dependency_reasons(const inst_t *svcp, int verbose)
 }
 
 static void
+print_logs(scf_instance_t *inst)
+{
+	if (scf_instance_get_pg(inst, SCF_PG_RESTARTER, g_pg) != 0)
+		return;
+
+	if (pg_get_single_val(g_pg, SCF_PROPERTY_ALT_LOGFILE,
+	    SCF_TYPE_ASTRING, (void *)g_value, g_value_sz, 0) == 0)
+		(void) printf(gettext("   See: %s\n"), g_value);
+
+	if (pg_get_single_val(g_pg, SCF_PROPERTY_LOGFILE,
+	    SCF_TYPE_ASTRING, (void *)g_value, g_value_sz, 0) == 0)
+		(void) printf(gettext("   See: %s\n"), g_value);
+}
+
+static void
+print_aux_fmri_logs(const char *fmri)
+{
+	scf_instance_t *scf_inst = scf_instance_create(h);
+	if (scf_inst == NULL)
+		return;
+
+	if (scf_handle_decode_fmri(h, fmri, NULL, NULL, scf_inst,
+	    NULL, NULL, SCF_DECODE_FMRI_EXACT) == 0)
+		print_logs(scf_inst);
+
+	scf_instance_destroy(scf_inst);
+}
+
+static void
 print_reasons(const inst_t *svcp, int verbose)
 {
 	int r;
@@ -1723,6 +1762,16 @@ print_reasons(const inst_t *svcp, int verbose)
 		} else if (strcmp(svcp->aux_state, "fault_threshold_reached") ==
 		    0) {
 			print_method_failure(svcp, &dc);
+		} else if (strcmp(svcp->aux_state, "service_request") == 0) {
+			if (svcp->aux_fmri) {
+				(void) printf(gettext("Reason: Maintenance "
+				    "requested by \"%s\"\n"), svcp->aux_fmri);
+				print_aux_fmri_logs(svcp->aux_fmri);
+			} else {
+				(void) puts(gettext("Reason: Maintenance "
+				    "requested by another service."));
+			}
+			dc = DC_SVCREQMAINT;
 		} else if (strcmp(svcp->aux_state, "invalid_dependency") == 0) {
 			(void) puts(gettext("Reason: Has invalid dependency."));
 			dc = DC_INVALIDDEP;
@@ -1899,21 +1948,6 @@ print_docs(scf_instance_t *inst, int verbose)
 		}
 	}
 	return (0);
-}
-
-static void
-print_logs(scf_instance_t *inst)
-{
-	if (scf_instance_get_pg(inst, SCF_PG_RESTARTER, g_pg) != 0)
-		return;
-
-	if (pg_get_single_val(g_pg, SCF_PROPERTY_ALT_LOGFILE,
-	    SCF_TYPE_ASTRING, (void *)g_value, g_value_sz, 0) == 0)
-		(void) printf(gettext("   See: %s\n"), g_value);
-
-	if (pg_get_single_val(g_pg, SCF_PROPERTY_LOGFILE,
-	    SCF_TYPE_ASTRING, (void *)g_value, g_value_sz, 0) == 0)
-		(void) printf(gettext("   See: %s\n"), g_value);
 }
 
 static int first = 1;

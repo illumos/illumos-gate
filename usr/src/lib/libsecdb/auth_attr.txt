@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # /etc/security/auth_attr
@@ -153,6 +153,7 @@ solaris.smf.value.discovery.printers.snmp:::Manage Network Attached Device Disco
 solaris.smf.value.extended-accounting.flow:::Change Values of Flow Extended Accounting Service Properties::help=SmfValueExAcctFlow.html
 solaris.smf.value.extended-accounting.process:::Change Values of Process Extended Accounting Service Properties::help=SmfValueExAcctProcess.html
 solaris.smf.value.extended-accounting.task:::Change Values of Task Extended Accounting Service Properties::help=SmfValueExAcctTask.html
+solaris.smf.value.firewall.config:::Change Service Firewall Config::help=SmfValueFirewall.html
 solaris.smf.value.idmap:::Change Values of SMF Identity Mapping Service Properties::help=SmfValueIdmap.html
 solaris.smf.value.inetd:::Change values of SMF Inetd configuration paramaters::help=SmfValueInted.html
 solaris.smf.value.ipsec:::Change Values of SMF IPsec Properties::help=SmfValueIPsec.html

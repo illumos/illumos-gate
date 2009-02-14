@@ -20,10 +20,8 @@
    
     CDDL HEADER END
    
-    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
-
-    ident	"%Z%%M%	%I%	%E% SMI"
 
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
@@ -79,6 +77,18 @@
 	    type='service'>
 		<service_fmri value='svc:/system/system-log' />
 	</dependency>
+
+	<property_group name='firewall_context' type='com.sun,fw_definition'>
+		<propval name='name' type='astring' value='smtp' />
+	</property_group>
+
+	<property_group name='firewall_config' type='com.sun,fw_configuration'>
+		<propval name='policy' type='astring' value='use_global' />
+		<propval name='apply_to' type='astring' value='' />
+		<propval name='exceptions' type='astring' value='' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.firewall.config' />
+	</property_group>
 
 	<instance name='sendmail' enabled='false'>
 

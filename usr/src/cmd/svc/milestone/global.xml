@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -615,6 +615,147 @@ method executable, identifies an entry in exec_attr(4).
 					</loctext>
 				</description>
 				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='firewall_context'
+		    type='com.sun,fw_definition' target='all' required='false'>
+			<common_name>
+				<loctext xml:lang='C'>
+Static definition
+				</loctext>
+			</common_name>
+			<description>
+				<loctext xml:lang='C'>
+Service static network and firewall definition.
+				</loctext>
+			</description>
+			<prop_pattern name='name' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+Service name
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+IANA name or RPC name for non-inetd service, equivalent to inetd/name property. For RPC services, the value of this property is not an IANA name but is either an RPC program number or name, see rpc(4).
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name='isrpc' type='boolean'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+RPC service
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+A boolean property where a "true" value indicates an RPC service, equivalent to inetd/isrpc property.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name='ipf_method' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+Custom firewall script 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+A script that generates ipf rules for a service. Services that require custom IPfilter configuration can use this mechanism to generate and supply their own ipf rules.  The firewall framework does not generate rules for services that has this property definition but expect these services to provide their own rules.
+					</loctext>
+				</description>
+			</prop_pattern> </pg_pattern>
+
+		<pg_pattern name='firewall_config'
+		    type='com.sun,fw_configuration' target='all'
+		    required='false'>
+			<common_name>
+				<loctext xml:lang='C'>
+Firewall configuration
+				</loctext>
+			</common_name>
+			<description>
+				<loctext xml:lang='C'>
+Service firewall configuration.
+				</loctext>
+			</description>
+			<prop_pattern name='policy' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+Firewall policy
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Service firewall policy.
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name='use_global'>
+						<description>
+							<loctext xml:lang='C'>
+Apply Global Default policy, specified in network/ipfilter for the service. This is the default value.
+							</loctext>
+						</description>
+					</value>
+					<value name='none'>
+						<description>
+							<loctext xml:lang='C'>
+No firewall (allow all).
+							</loctext>
+						</description>
+					</value>
+					<value name='deny'>
+						<description>
+							<loctext xml:lang='C'>
+Deny access to entities specified in 'apply_to' property.
+							</loctext>
+						</description>
+					</value>
+					<value name='allow'>
+						<description>
+							<loctext xml:lang='C'>
+Allow access to entities specified in 'apply_to' property.
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name="apply_to" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Apply policy to
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang="C">
+The host and network IPs, network interfaces, and ippools to deny if the policy is set to deny, or accept if the policy is set to accept.
+					</loctext>
+				</description>
+			</prop_pattern>
+			<prop_pattern name="exceptions" type="astring"
+			    required="false">
+				<common_name>
+					<loctext xml:lang='C'>
+Make exceptions to
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang="C">
+The host and network IPs, network interfaces, and ippools to exempt from the set policy. That is, those to accept if the policy is set to deny, or to deny if the policy is set to accept.
+					</loctext>
+				</description>
 			</prop_pattern>
 		</pg_pattern>
 

@@ -20,14 +20,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/ipf_include.sh
 
 # SERVICE = parent service name
 SERVICE=`echo $SMF_FMRI | /usr/bin/cut -f1,2 -d":"`
@@ -115,6 +114,49 @@ fi
 	[ -f /usr/lib/lp/local/lpshut ] || exit $SMF_EXIT_ERR_CONFIG
 
 	/usr/lib/lp/local/lpshut
+	;;
+
+'ipfilter')
+	FMRI=$2
+	IPP_FMRI="svc:/application/print/ipp-listener:default"
+	RFC1179_FMRI="svc:/application/print/rfc1179:default"
+	IPP_CONF=/etc/apache/httpd-standalone-ipp.conf
+	ip="any"
+
+	policy=`get_policy $FMRI`
+
+	file=`fmri_to_file $RFC1179_FMRI $IPF_SUFFIX`
+	echo "# $RFC1179_FMRI" >$file
+        service_is_enabled ${RFC1179_FMRI}
+        if [ $? -eq 0 ]; then
+		rfc_name=`svcprop -p inetd/name ${RFC1179_FMRI} 2>/dev/null`
+		rfc_proto=`svcprop -p inetd/proto ${RFC1179_FMRI} 2>/dev/null | \
+		    sed 's/6/ /'`
+		rfc_port=`$SERVINFO -p -t -s $rfc_name`
+		generate_rules $FMRI $policy $rfc_proto $ip $rfc_port $file
+        fi
+
+	file=`fmri_to_file $IPP_FMRI $IPF_SUFFIX`
+	echo "# $IPP_FMRI" >$file
+        service_is_enabled ${IPP_FMRI}
+        if [ $? -eq 0 ]; then
+		#
+		# If Listen directives are used, it's possibie to listen on 
+		# more than one ports. Process the Port directives only when Listen
+		# directives don't exist.
+		#
+		ipp_ports=`grep '^[ \t]*[^# ]*Listen' ${IPP_CONF} | awk '{print $2}'`
+
+		if [ -z "$ipp_ports" ]; then
+			ipp_ports=`grep '^[ \t]*[^# ]*Port' ${IPP_CONF} | \
+			    awk '{print $2}' | tail -1`
+		fi
+
+		for port in $ipp_ports; do
+			generate_rules $FMRI $policy "tcp" $ip $port $file
+		done
+	fi
+
 	;;
 
 *)

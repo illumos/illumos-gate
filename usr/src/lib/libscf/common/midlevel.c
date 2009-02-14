@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2871,4 +2871,119 @@ out:
 	}
 
 	return (SCF_SUCCESS);
+}
+
+/*
+ * Returns
+ *   0 - success
+ *   ECONNABORTED - repository connection broken
+ *   ECANCELED - inst was deleted
+ *   EPERM
+ *   EACCES
+ *   EROFS
+ *   ENOMEM
+ */
+int
+scf_instance_delete_prop(scf_instance_t *inst, const char *pgname,
+    const char *pname)
+{
+	scf_handle_t *h;
+	scf_propertygroup_t *pg;
+	scf_transaction_t *tx;
+	scf_transaction_entry_t *e;
+	int error = 0, ret = 1, r;
+
+	h = scf_instance_handle(inst);
+
+	if ((pg = scf_pg_create(h)) == NULL) {
+		return (ENOMEM);
+	}
+
+	if (scf_instance_get_pg(inst, pgname, pg) != 0) {
+		error = scf_error();
+		scf_pg_destroy(pg);
+		switch (error) {
+		case SCF_ERROR_NOT_FOUND:
+			return (SCF_SUCCESS);
+
+		case SCF_ERROR_DELETED:
+			return (ECANCELED);
+
+		case SCF_ERROR_CONNECTION_BROKEN:
+		default:
+			return (ECONNABORTED);
+
+		case SCF_ERROR_NOT_SET:
+			bad_error("scf_instance_get_pg", scf_error());
+		}
+	}
+
+	tx = scf_transaction_create(h);
+	e = scf_entry_create(h);
+	if (tx == NULL || e == NULL) {
+		ret = ENOMEM;
+		goto out;
+	}
+
+	for (;;) {
+		if (scf_transaction_start(tx, pg) != 0) {
+			goto scferror;
+		}
+
+		if (scf_transaction_property_delete(tx, e, pname) != 0) {
+			goto scferror;
+		}
+
+		if ((r = scf_transaction_commit(tx)) == 1) {
+			ret = 0;
+			goto out;
+		}
+
+		if (r == -1) {
+			goto scferror;
+		}
+
+		scf_transaction_reset(tx);
+		if (scf_pg_update(pg) == -1) {
+			goto scferror;
+		}
+	}
+
+scferror:
+	switch (scf_error()) {
+	case SCF_ERROR_DELETED:
+	case SCF_ERROR_NOT_FOUND:
+		ret = 0;
+		break;
+
+	case SCF_ERROR_PERMISSION_DENIED:
+		ret = EPERM;
+		break;
+
+	case SCF_ERROR_BACKEND_ACCESS:
+		ret = EACCES;
+		break;
+
+	case SCF_ERROR_BACKEND_READONLY:
+		ret = EROFS;
+		break;
+
+	case SCF_ERROR_CONNECTION_BROKEN:
+	default:
+		ret = ECONNABORTED;
+		break;
+
+	case SCF_ERROR_HANDLE_MISMATCH:
+	case SCF_ERROR_INVALID_ARGUMENT:
+	case SCF_ERROR_NOT_BOUND:
+	case SCF_ERROR_NOT_SET:
+		bad_error("scf_instance_delete_prop", scf_error());
+	}
+
+out:
+	scf_transaction_destroy(tx);
+	scf_entry_destroy(e);
+	scf_pg_destroy(pg);
+
+	return (ret);
 }
