@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include "mgmt_media.h"
 #include "mms_cfg.h"
 
+static	char	*_SrcFile = __FILE__;
 extern char *optarg;
 extern int optind, opterr, optopt;
 
@@ -272,6 +273,7 @@ main(int argc, char **argv)
 	(void) mms_trace_open("/var/log/mms/mmsadm.log", MMS_ID_CLI,
 	    MMS_SEV_INFO, 5 * MEGA, 0, 0);
 
+	mms_trace(MMS_INFO, "mmsadm start ***********************************");
 	/* see if this host has been initialized.  If not, fail. */
 	st =  mms_cfg_getvar(MMS_CFG_CONFIG_TYPE, buf);
 	if (st != 0) {

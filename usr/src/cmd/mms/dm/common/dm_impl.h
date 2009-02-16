@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,10 +134,9 @@ typedef	struct	dm_wka {
 #define	DM_PREEMPT_RSV		(1LL << 7)
 #define	DM_ASK_PREEMPT_RSV	(1LL << 8)	/* ask if DM_PREEMPT_RSV */
 #define	DM_RESERVE_DRIVE	(1LL << 9)	/* Issue reserve drive */
-#define	DM_USE_PRSV		(1LL << 10)	/* Use persistent reserve out */
-#define	DM_DEV_LIB_LOADED	(1LL << 11)	/* device lib loaded */
-#define	DM_DFLT_LIB_LOADED	(1LL << 12)	/* default lib loaded */
-#define	DM_EXIT_NORESTART	(1LL << 13)	/* DM is terminating */
+#define	DM_DEV_LIB_LOADED	(1LL << 10)	/* device lib loaded */
+#define	DM_DFLT_LIB_LOADED	(1LL << 11)	/* default lib loaded */
+#define	DM_EXIT_NORESTART	(1LL << 12)	/* DM is terminating */
 
 
 typedef	struct	dm_command	{

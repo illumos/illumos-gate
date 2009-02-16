@@ -43,6 +43,7 @@ SUNWprivate_1.1 {
 		drv_density;
 		drv_drive_type;
 		drv_get_capacity;
+		drv_init_dev;
 		drv_prsv_supported;
 		drv_shape;
 		drv_shape_den;

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2761,7 +2761,7 @@ dm_activate_release(dm_command_t *cmd)
 		 * If there is any problem, let
 		 * activate reserve take care of it.
 		 */
-		if (wka->dm_flags & DM_USE_PRSV) {
+		if (drv->drv_flags & DRV_USE_PRSV) {
 			/* Do persistent release */
 			if (DRV_CALL(drv_prsv_register, ()) ||
 			    DRV_CALL(drv_prsv_release, ())) {

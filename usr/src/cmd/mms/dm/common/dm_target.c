@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,7 +558,7 @@ dm_reserve_target(void)
 {
 	int		rc = 0;
 
-	if (wka->dm_flags & DM_USE_PRSV) {
+	if (drv->drv_flags & DRV_USE_PRSV) {
 		for (;;) {
 			rc = dm_reserve_target_prsv();
 			if (rc == 0) {	/* drive reserved */
@@ -756,7 +756,7 @@ dm_reserve_target_rsv(void)
 int
 dm_release_target(void)
 {
-	if ((wka->dm_flags & DM_USE_PRSV) == 0) {
+	if ((drv->drv_flags & DRV_USE_PRSV) == 0) {
 		/* Using reserve/release */
 		DRV_CALL(drv_release, ());
 		return (0);

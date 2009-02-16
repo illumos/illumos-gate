@@ -226,9 +226,9 @@ dm_init_dev_lib(void *hdl, int init)
 	if (drv->drv_prsv_supported != NULL) {
 		if (*(drv->drv_prsv_supported) == 1) {
 			/* persistent reservation supported */
-			wka->dm_flags |= DM_USE_PRSV;
+			drv->drv_flags |= DRV_USE_PRSV;
 		} else {
-			wka->dm_flags &= ~DM_USE_PRSV;
+			drv->drv_flags &= ~DRV_USE_PRSV;
 		}
 	}
 

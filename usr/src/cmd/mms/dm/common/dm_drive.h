@@ -492,6 +492,7 @@ typedef	struct	drv_drive {
 #define	DRV_WRITEPROTECTED	(1LL << 38)	/* Cart is writeprotected */
 #define	DRV_CREAT		(1LL << 39)	/* Create new file */
 #define	DRV_APPEND		(1LL << 40)	/* append file */
+#define	DRV_USE_PRSV		(1LL << 41)	/* Use persistent reservation */
 
 #define	drv_capacity		drv_cap.mms_max
 #define	drv_avail		drv_cap.mms_avail

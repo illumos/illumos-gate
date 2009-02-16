@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -384,6 +384,7 @@ acs_display_info(
 	/* LINTED [E_SEC_PRINTF_VAR_FMT] */
 	len = snprintf(cmd.xml_data, sizeof (cmd.xml_data),
 	    acs_query_cmdresp_tbl[query_type].xmlreq, s);
+	mms_trace(MMS_INFO, "DISPLAY cmd:\n%s", cmd.xml_data);
 	cmd.length = strlen(cmd.xml_data);
 
 	if (len > MAX_XML_DATA_SIZE) {
@@ -430,6 +431,8 @@ parse_drv_resp(
 	char			*ptr1, *ptr2;
 	mms_drive_t		*drive;
 	char			junkbuf[1024];
+	char			xml_buf[MAX_MESSAGE_SIZE + 1];
+	int			len;
 
 	if ((buf == NULL) || (drive_list == NULL)) {
 		return (MMS_MGMT_NOARG);
@@ -440,14 +443,18 @@ parse_drv_resp(
 		return (MMS_MGMT_ERR_ACSLS_RSP);
 	}
 
-	ptr1 = &res->display_xml_data.xml_data[0];
+	len = res->display_xml_data.length;
+	(void) strncpy(xml_buf, res->display_xml_data.xml_data,
+	    len);
+	xml_buf[len] = '\0';
+	mms_trace(MMS_INFO, "Display DRV response len = %d :\n%s",
+	    len, xml_buf);
+	ptr1 = xml_buf;
 
 	ptr2 = strstr(ptr1, "</data></display></response>");
 	if (ptr2 != NULL) {
 		*ptr2 = NULL;
 	};
-
-	mms_trace(MMS_DEBUG, "Display ACS response: %s", ptr1);
 
 	/*
 	 * <r> marks the start of a drive entry, <f> marks the start of a field
@@ -537,6 +544,8 @@ parse_vol_resp(void *buf, mms_list_t *vol_list)
 	char			*ptr1, *ptr2;
 	mms_acscart_t		*vol;
 	char			junkbuf[1024];
+	char			xml_buf[MAX_MESSAGE_SIZE + 1];
+	int			len;
 
 	if ((buf == NULL) || (vol_list == NULL)) {
 		return (MMS_MGMT_NOARG);
@@ -547,15 +556,18 @@ parse_vol_resp(void *buf, mms_list_t *vol_list)
 		return (MMS_MGMT_ERR_ACSLS_RSP);
 	}
 
-	ptr1 = &res->display_xml_data.xml_data[0];
+	len = res->display_xml_data.length;
+	(void) strncpy(xml_buf, res->display_xml_data.xml_data,
+	    len);
+	xml_buf[len] = '\0';
+	mms_trace(MMS_INFO, "Display VOL response len = %d :\n%s",
+	    len, xml_buf);
+	ptr1 = xml_buf;
 
 	ptr2 = strstr(ptr1, "</data></display></response>");
 	if (ptr2 != NULL) {
 		*ptr2 = NULL;
 	};
-
-	mms_trace(MMS_DEBUG, "Display ACS response: %s", ptr1);
-
 	if ((ptr2 = strstr(ptr1, "<data>")) != NULL) {
 
 		/* only create the list if it's the first time through */
@@ -624,6 +636,8 @@ parse_lsm_resp(
 	mms_acslib_t		*lsm;
 	char			status[1024];
 	char			state[1024];
+	char			xml_buf[MAX_MESSAGE_SIZE + 1];
+	int			len;
 
 	if ((buf == NULL) || (lsm_list == NULL)) {
 		return (MMS_MGMT_NOARG);
@@ -634,14 +648,18 @@ parse_lsm_resp(
 		return (MMS_MGMT_ERR_ACSLS_RSP);
 	}
 
-	ptr1 = &res->display_xml_data.xml_data[0];
+	len = res->display_xml_data.length;
+	(void) strncpy(xml_buf, res->display_xml_data.xml_data,
+	    len);
+	xml_buf[len] = '\0';
+	mms_trace(MMS_INFO, "Display LSM response len = %d :\n%s",
+	    len, xml_buf);
+	ptr1 = xml_buf;
 
 	ptr2 = strstr(ptr1, "</data></display></response>");
 	if (ptr2 != NULL) {
 		*ptr2 = NULL;
 	};
-
-	mms_trace(MMS_DEBUG, "Display response: %s", ptr1);
 
 	if ((ptr2 = strstr(ptr1, "<data>")) != NULL) {
 		if (lsm_list->list_size == 0) {
@@ -741,7 +759,7 @@ parse_f_int(char *f, uint32_t *i)
 		}
 		buf[j] = *ptr;
 	}
-
+	buf[j] = '\0';
 	ptr2 = strchr(ptr, '>');
 	if (ptr2 == NULL) {
 		return (0);

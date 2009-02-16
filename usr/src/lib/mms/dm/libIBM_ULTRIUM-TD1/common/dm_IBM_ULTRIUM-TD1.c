@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,13 +26,13 @@
 #include <sys/types.h>
 #include <sys/scsi/impl/uscsi.h>
 #include <errno.h>
+#include <strings.h>
 #include <mms_dmd.h>
 #include <mms_trace.h>
 #include <dmd_impl.h>
 #include <dm_drive.h>
 #include <mms_sym.h>
 
-/* LINTED: static not used */
 static	char *_SrcFile = __FILE__;
 
 /*
@@ -117,3 +117,18 @@ drv_shape_density_t	drv_shape_den[] = {
 	 */
 	NULL				/* Must be last entry */
 };
+
+#define	DRV_ULT1	"Ultrium 1-SCSI"
+
+int
+drv_init_dev(void)
+{
+	/* Turn off persistent reservation if HP ULTRUIM 1 drives */
+	if (strncmp(drv->drv_vend, "HP", 2) == 0) {
+		if (strncmp(drv->drv_prod, DRV_ULT1, strlen(DRV_ULT1)) == 0) {
+			drv->drv_flags &= ~DRV_USE_PRSV;
+			TRACE((MMS_DEBUG, "Turned off persistent reservation"));
+		}
+	}
+	return (0);
+}

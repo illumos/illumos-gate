@@ -44,6 +44,8 @@ DMDIR =		$(SRC)/lib/mms/dm/libcommon
 SRCS =		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 		$(OBJS_SHARED:%.o=$(DMDIR)/%.c)
 
+LDLIBS +=	-lc
+
 CFLAGS +=	$(CCVERBOSE)
 
 CPPFLAGS +=	-DMMS_OPENSSL
