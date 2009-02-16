@@ -20,70 +20,117 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PATH="/usr/bin:/usr/sbin:${PATH}"
-export PATH
+# Function: check_add_drv()
+#
+# This function will check if the module has an entry in etc/name_to_major
+# If not simply calls add_drv with the arguments given. If there is
+# such an entry in name_to_major file, it adds entries in driver_aliases
+# driver_classes and minor_perm if necessary.
+# The syntax of this function is the same as add_drv. 
 
-#
-# Driver name 
-#
-DRV=bnx
-
-#
-# Driver support device list
-#
-DRVALIAS="\"pci14e4,164a\" \
-	\"pci14e4,16aa\" \
-	\"pci14e4,164c\" \
-	\"pci14e4,16ac\" \
-	\"pci14e4,1639\" \
-	\"pci14e4,163a\" \
-	\"pci14e4,163b\""
-
-#
-# Select the correct add_drv options to execute.
-#
-if [ "${BASEDIR}" = "" ]
-then
-	BASEDIR=/
-fi
-if [ "${BASEDIR}" = "/" ]; then
-        #
-        # Irrespective of whether hardware exists
-        # or not don't attempt to attach driver
-        # to the hardware. This is to avoid problems
-        # with installing a 32 bit driver on a 64 bit
-        # running system.
-	#
-	# Note: don't use '-b' under this situation.
-	#	See add_drv(1M) for more info.
-        #
-        ADD_DRV="add_drv -n"
-else
-        #
-        # On a client,
-        # modify the system files and touch/reconfigure
-        # for reconfigure reboot
-        #
-        ADD_DRV="add_drv -b ${BASEDIR}"
-fi
-
-#
-# Make sure the driver has *not* been previously installed
-# before attempting to add the driver.
-#
-grep -w "${DRV}" ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
-if [ $? -eq 1 ]; then
-	${ADD_DRV} -m '* 0644 root sys' -i "${DRVALIAS}" ${DRV}
-	if [ $? -ne 0 ]; then
-		echo "\nFailed add_drv!\n" >&2
-		exit 1
+check_add_drv()
+{
+	if [ "$BASEDIR" = "" ]
+	then
+		BASEDIR=/  
 	fi
-else
-	echo "${DRV} is already installed!"
-fi
+	alias=""
+	class=""
+	ADD_ALIAS=0
+	ADD_CLASS=0
+	ADD_MINOR=0
+	OPTIND=1
+	IS_NET_DRIVER=0
 
-exit 0
+	cmd="add_drv"
+
+	NO_CMD=
+	while getopts i:b:m:c:N  opt
+	do
+		case $opt in
+			N )	NO_CMD=1;;
+			i )	ADD_ALIAS=1	
+				alias=$OPTARG
+				cmd=$cmd" -i '$alias'"
+				;;
+			m )	ADD_MINOR=1
+				minor=$OPTARG
+				cmd=$cmd" -m '$minor'"
+				;;
+			c)	ADD_CLASS=1
+				class=$OPTARG
+				cmd=$cmd" -c $class"
+				;;
+			b)	BASEDIR=$OPTARG
+				cmd=$cmd" -b $BASEDIR"
+				;;
+			\?) 	echo "check_add_drv can not handle this option"
+				return
+				;;
+			esac
+	done 
+	shift `/usr/bin/expr $OPTIND - 1`
+	
+	drvname=$1
+
+	cmd=$cmd" "$drvname
+
+	drvname=`echo $drvname | /usr/bin/sed 's;.*/;;g'`
+
+	/usr/bin/grep "^$drvname[ 	]" $BASEDIR/etc/name_to_major >  /dev/null 2>&1
+
+	if [ "$NO_CMD" = "" -a $? -ne 0 ] 
+	then
+		eval $cmd
+	else	
+		# entry already in name_to_major, add alias, class, minorperm
+		# if necessary
+		if [ $ADD_ALIAS = 1 ]	
+		then
+			for i in $alias
+			do
+				/usr/bin/egrep "^$drvname[ 	]+$i" $BASEDIR/etc/driver_aliases>/dev/null 2>&1
+				if [ $? -ne 0 ]
+				then
+					echo "$drvname $i" >> $BASEDIR/etc/driver_aliases	
+				fi
+			done
+		fi
+
+		if [ $ADD_CLASS = 1 ]
+		then
+			/usr/bin/egrep "^$drvname[ 	]+$class( |	|$)" $BASEDIR/etc/driver_classes > /dev/null 2>&1
+			if [ $? -ne 0 ]
+			then 
+				echo "$drvname\t$class" >> $BASEDIR/etc/driver_classes
+			fi
+		fi
+
+		if [ $ADD_MINOR = 1 ]
+		then
+			/usr/bin/grep "^$drvname:" $BASEDIR/etc/minor_perm > /dev/null 2>&1
+			if [ $? -ne 0 ]
+			then 
+				minorentry="$drvname:$minor"
+				echo $minorentry >> $BASEDIR/etc/minor_perm
+			fi
+		fi
+
+	fi
+
+
+}
+
+check_add_drv -i \
+	'"pci14e4,164a"
+	"pci14e4,16aa"
+	"pci14e4,164c"
+	"pci14e4,16ac"
+	"pci14e4,1639"
+	"pci14e4,163a"
+	"pci14e4,163b"' \
+	-m '* 0644 root sys' -b "$BASEDIR" bnx
