@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,6 +379,7 @@ struct visinfo_kstat {
 	struct kstat_named		vis_fexpand;
 	struct kstat_named		vis_fpmerge;
 	struct kstat_named		vis_pdist;
+	struct kstat_named		vis_pdistn;
 	struct kstat_named		vis_bshuffle;
 };
 

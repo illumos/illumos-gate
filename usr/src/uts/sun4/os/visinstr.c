@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* VIS floating point instruction simulator for Sparc FPU simulator. */
 
@@ -64,7 +62,8 @@ static enum ftt_type vis_fcmp(fp_simd_type *, vis_inst_type, struct regs *,
 static enum ftt_type vis_fmul(fp_simd_type *, vis_inst_type);
 static enum ftt_type vis_fpixel(fp_simd_type *, vis_inst_type, kfpu_t *);
 static enum ftt_type vis_fpaddsub(fp_simd_type *, vis_inst_type);
-static enum ftt_type vis_pdist(fp_simd_type *, fp_inst_type);
+static enum ftt_type vis_pdist(fp_simd_type *, fp_inst_type, struct regs *,
+				void *, uint_t);
 static enum ftt_type vis_prtl_fst(fp_simd_type *, vis_inst_type, struct regs *,
 				void *, uint_t);
 static enum ftt_type vis_short_fls(fp_simd_type *, vis_inst_type,
@@ -162,7 +161,8 @@ vis_fpu_simulator(
 		ftt = vis_fpixel(pfpsd, f.inst, fp);
 		break;
 	case pdist:
-		ftt = vis_pdist(pfpsd, pinst);
+	case pdistn:
+		ftt = vis_pdist(pfpsd, pinst, pregs, prw, f.inst.opf);
 		break;
 	case faligndata:
 		ftt = vis_faligndata(pfpsd, pinst, fp);
@@ -1185,7 +1185,10 @@ vis_fpixel(
 enum ftt_type
 vis_pdist(
 	fp_simd_type	*pfpsd,	/* FPU simulator data. */
-	fp_inst_type	pinst)	/* FPU instruction to simulate. */
+	fp_inst_type	pinst,	/* FPU instruction to simulate. */
+	struct regs	*pregs,	/* Pointer to PCB image of registers. */
+	void		*prw,	/* Pointer to locals and ins. */
+	uint_t		op)	/* Opcode pdist or pdistn */
 {
 	uint_t	nrs1, nrs2, nrd;	/* Register number fields. */
 	int	i;
@@ -1198,7 +1201,7 @@ vis_pdist(
 	nrs1 = pinst.rs1;
 	nrs2 = pinst.rs2;
 	nrd = pinst.rd;
-	VISINFO_KSTAT(vis_pdist);
+
 	if ((nrs1 & 1) == 1) 		/* fix register encoding */
 		nrs1 = (nrs1 & 0x1e) | 0x20;
 	if ((nrs2 & 1) == 1)
@@ -1208,7 +1211,15 @@ vis_pdist(
 
 	_fp_unpack_extword(pfpsd, &lrs1.ll, nrs1);
 	_fp_unpack_extword(pfpsd, &lrs2.ll, nrs2);
-	_fp_unpack_extword(pfpsd, &lrd.ll, nrd);
+
+	if (op == pdist) {
+		VISINFO_KSTAT(vis_pdist);
+		_fp_unpack_extword(pfpsd, &lrd.ll, nrd);
+	} else {
+		/* pdistn */
+		VISINFO_KSTAT(vis_pdistn);
+		lrd.ll = 0;
+	}
 
 	for (i = 0; i <= 7; i++) {
 		s = (short)(lrs1.c[i] - lrs2.c[i]);
@@ -1217,7 +1228,11 @@ vis_pdist(
 		lrd.ll += s;
 	}
 
-	_fp_pack_extword(pfpsd, &lrd.ll, nrd);
+	if (op == pdist)
+		_fp_pack_extword(pfpsd, &lrd.ll, nrd);
+	else
+		/* pdistn */
+		(void) write_iureg(pfpsd, nrd, pregs, prw, &lrd.ll);
 	return (ftt_none);
 }
 
