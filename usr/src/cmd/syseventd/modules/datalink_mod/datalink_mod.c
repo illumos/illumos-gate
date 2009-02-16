@@ -37,7 +37,62 @@
 #include <librcm.h>
 #include <libsysevent.h>
 
+extern void syseventd_err_print(char *, ...);
+
+struct event_list {
+	nvlist_t *ev;
+	struct event_list *next;
+};
+
 static rcm_handle_t *rcm_hdl = NULL;
+static boolean_t dl_exiting;
+static thread_t dl_notify_tid;
+static mutex_t dl_mx;
+static cond_t dl_cv;
+static struct event_list *dl_events;
+
+/* ARGSUSED */
+static void *
+datalink_notify_thread(void *arg)
+{
+	struct event_list *tmp_events, *ep;
+
+	(void) mutex_lock(&dl_mx);
+
+	while (! dl_exiting || dl_events != NULL) {
+		if (dl_events == NULL) {
+			(void) cond_wait(&dl_cv, &dl_mx);
+			continue;
+		}
+
+		tmp_events = dl_events;
+		dl_events = NULL;
+
+		(void) mutex_unlock(&dl_mx);
+
+		while (tmp_events != NULL) {
+			/*
+			 * Send the PHYSLINK_NEW event to network_rcm to update
+			 * the network devices cache accordingly.
+			 */
+			if (rcm_notify_event(rcm_hdl, RCM_RESOURCE_PHYSLINK_NEW,
+			    0, tmp_events->ev, NULL) != RCM_SUCCESS)
+				syseventd_err_print("datalink_mod: Can not"
+				    "notify event: %s\n", strerror(errno));
+
+			ep = tmp_events;
+			tmp_events = tmp_events->next;
+			nvlist_free(ep->ev);
+			free(ep);
+		}
+
+		(void) mutex_lock(&dl_mx);
+	}
+
+	(void) mutex_unlock(&dl_mx);
+
+	return (NULL);
+}
 
 /*ARGSUSED*/
 static int
@@ -46,7 +101,7 @@ datalink_deliver_event(sysevent_t *ev, int unused)
 	const char *class = sysevent_get_class_name(ev);
 	const char *subclass = sysevent_get_subclass_name(ev);
 	nvlist_t *nvl;
-	int err = 0;
+	struct event_list *newp, **elpp;
 
 	if (strcmp(class, EC_DATALINK) != 0 ||
 	    strcmp(subclass, ESC_DATALINK_PHYS_ADD) != 0) {
@@ -57,16 +112,28 @@ datalink_deliver_event(sysevent_t *ev, int unused)
 		return (EINVAL);
 
 	/*
-	 * Send the PHYSLINK_NEW event to network_rcm to update the network
-	 * devices cache accordingly.
+	 * rcm_notify_event() needs to be called asynchronously otherwise when
+	 * sysevent queue is full, deadlock will happen.
 	 */
-	if ((rcm_notify_event(rcm_hdl, RCM_RESOURCE_PHYSLINK_NEW, 0,
-	    nvl, NULL) != RCM_SUCCESS)) {
-		err = EINVAL;
-	}
+	if ((newp = malloc(sizeof (struct event_list))) == NULL)
+		return (ENOMEM);
 
-	nvlist_free(nvl);
-	return (err);
+	newp->ev = nvl;
+	newp->next = NULL;
+
+	/*
+	 * queue up at the end of the event list and signal notify_thread to
+	 * process it.
+	 */
+	(void) mutex_lock(&dl_mx);
+	elpp = &dl_events;
+	while (*elpp !=  NULL)
+		elpp = &(*elpp)->next;
+	*elpp = newp;
+	(void) cond_signal(&dl_cv);
+	(void) mutex_unlock(&dl_mx);
+
+	return (0);
 }
 
 static struct slm_mod_ops datalink_mod_ops = {
@@ -79,8 +146,20 @@ static struct slm_mod_ops datalink_mod_ops = {
 struct slm_mod_ops *
 slm_init()
 {
+	dl_events = NULL;
+	dl_exiting = B_FALSE;
+
 	if (rcm_alloc_handle(NULL, 0, NULL, &rcm_hdl) != RCM_SUCCESS)
 		return (NULL);
+
+	if (thr_create(NULL, 0,  datalink_notify_thread, NULL, 0,
+	    &dl_notify_tid) != 0) {
+		(void) rcm_free_handle(rcm_hdl);
+		return (NULL);
+	}
+
+	(void) mutex_init(&dl_mx, USYNC_THREAD, NULL);
+	(void) cond_init(&dl_cv, USYNC_THREAD, NULL);
 
 	return (&datalink_mod_ops);
 }
@@ -88,6 +167,14 @@ slm_init()
 void
 slm_fini()
 {
+	(void) mutex_lock(&dl_mx);
+	dl_exiting = B_TRUE;
+	(void) cond_signal(&dl_cv);
+	(void) mutex_unlock(&dl_mx);
+	(void) thr_join(dl_notify_tid, NULL, NULL);
+
+	(void) mutex_destroy(&dl_mx);
+	(void) cond_destroy(&dl_cv);
 	(void) rcm_free_handle(rcm_hdl);
 	rcm_hdl = NULL;
 }
