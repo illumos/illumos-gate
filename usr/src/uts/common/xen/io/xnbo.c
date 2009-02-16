@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -384,10 +384,14 @@ xnbo_close_mac(xnbo_t *xnbop)
 	}
 
 	if (xnbop->o_promiscuous) {
-		(void) mac_promisc_remove(xnbop->o_mphp);
+		if (xnbop->o_mphp != NULL) {
+			(void) mac_promisc_remove(xnbop->o_mphp);
+			xnbop->o_mphp = NULL;
+		}
 		xnbop->o_promiscuous = B_FALSE;
 	} else {
-		mac_rx_clear(xnbop->o_mch);
+		if (xnbop->o_mch != NULL)
+			mac_rx_clear(xnbop->o_mch);
 	}
 
 	if (xnbop->o_mah != NULL) {
