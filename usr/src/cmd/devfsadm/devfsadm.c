@@ -516,11 +516,15 @@ parse_args(int argc, char *argv[])
 	int num_aliases = 0;
 	int len;
 	int retval;
-	int add_bind = FALSE;
+	int config = TRUE;
+	int bind = FALSE;
+	int force_flag = FALSE;
 	struct aliases *ap = NULL;
 	struct aliases *a_head = NULL;
 	struct aliases *a_tail = NULL;
 	struct modconfig mc;
+
+	(void) bzero(&mc, sizeof (mc));
 
 	if (strcmp(prog, DISKS) == 0) {
 		compat_class = "disk";
@@ -596,7 +600,7 @@ parse_args(int argc, char *argv[])
 		build_dev = FALSE;
 
 		while ((opt =
-		    getopt(argc, argv, "a:bdc:i:m:np:R:r:svV:")) != EOF) {
+		    getopt(argc, argv, "a:bcd:fi:m:np:R:r:suvV:")) != EOF) {
 			switch (opt) {
 			case 'a':
 				ap = calloc(sizeof (struct aliases), 1);
@@ -616,10 +620,10 @@ parse_args(int argc, char *argv[])
 				}
 				a_tail = ap;
 				num_aliases++;
-				add_bind = TRUE;
+				bind = TRUE;
 				break;
 			case 'b':
-				add_bind = TRUE;
+				bind = TRUE;
 				break;
 			case 'c':
 				(void) strcpy(mc.drvclass, optarg);
@@ -629,6 +633,9 @@ parse_args(int argc, char *argv[])
 				 * need to keep for compatibility, but
 				 * do nothing.
 				 */
+				break;
+			case 'f':
+				force_flag = TRUE;
 				break;
 			case 'i':
 				single_drv = TRUE;
@@ -672,6 +679,14 @@ parse_args(int argc, char *argv[])
 				file_mods = FALSE;
 				flush_path_to_inst_enable = FALSE;
 				break;
+			case 'u':
+				/*
+				 * Invoked via update_drv(1m) to update
+				 * the kernel's driver/alias binding
+				 * when removing one or more aliases.
+				 */
+				config = FALSE;
+				break;
 			case 'v':
 				/* documented verbose flag */
 				add_verbose_id(VERBOSE_MID);
@@ -689,18 +704,20 @@ parse_args(int argc, char *argv[])
 			usage();
 		}
 
-		if ((add_bind == TRUE) && (mc.major == -1 ||
-		    mc.drvname[0] == NULL)) {
-			err_print(MAJOR_AND_B_FLAG);
-			devfsadm_exit(1);
-			/*NOTREACHED*/
-		}
-		if (add_bind == TRUE) {
+		if (bind == TRUE) {
+			if ((mc.major == -1) || (mc.drvname[0] == NULL)) {
+				err_print(MAJOR_AND_B_FLAG);
+				devfsadm_exit(1);
+				/*NOTREACHED*/
+			}
+			mc.flags = (force_flag) ? MOD_UNBIND_OVERRIDE : 0;
 			mc.num_aliases = num_aliases;
 			mc.ap = a_head;
-			retval =  modctl(MODADDMAJBIND, NULL, (caddr_t)&mc);
+			retval =  modctl((config == TRUE) ? MODADDMAJBIND :
+			    MODREMDRVALIAS, NULL, (caddr_t)&mc);
 			if (retval < 0) {
-				err_print(MODCTL_ADDMAJBIND);
+				err_print((config == TRUE) ? MODCTL_ADDMAJBIND :
+				    MODCTL_REMMAJBIND);
 			}
 			devfsadm_exit(retval);
 			/*NOTREACHED*/

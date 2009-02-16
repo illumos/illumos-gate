@@ -4273,44 +4273,150 @@ i_ddi_bind_devs(void)
 	ddi_walk_devs(top_devinfo, bind_dip, (void *)NULL);
 }
 
-static int
-unbind_children(dev_info_t *dip, void *arg)
-{
-	int circ;
-	dev_info_t *cdip;
-	major_t major = (major_t)(uintptr_t)arg;
+/* callback data for unbind_children_by_alias() */
+typedef struct unbind_data {
+	major_t	drv_major;
+	char	*drv_alias;
+	int	ndevs_bound;
+	int	unbind_errors;
+} unbind_data_t;
 
-	ndi_devi_enter(dip, &circ);
-	cdip = ddi_get_child(dip);
+/*
+ * A utility function provided for testing and support convenience
+ * Called for each device during an upgrade_drv -d bound to the alias
+ * that cannot be unbound due to device in use.
+ */
+static void
+unbind_alias_dev_in_use(dev_info_t *dip, char *alias)
+{
+	if (moddebug & MODDEBUG_BINDING) {
+		cmn_err(CE_CONT, "%s%d: state %d: bound to %s\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    i_ddi_node_state(dip), alias);
+	}
+}
+
+/*
+ * walkdevs callback for unbind devices bound to specific driver
+ * and alias.  Invoked within the context of update_drv -d <alias>.
+ */
+static int
+unbind_children_by_alias(dev_info_t *dip, void *arg)
+{
+	int		circ;
+	dev_info_t	*cdip;
+	dev_info_t	*next;
+	unbind_data_t	*ub = (unbind_data_t *)(uintptr_t)arg;
+	int		rv;
+
 	/*
-	 * We are called either from rem_drv or update_drv.
-	 * In both cases, we unbind persistent nodes and destroy
-	 * .conf nodes. In the case of rem_drv, this will be the
-	 * final state. In the case of update_drv, i_ddi_bind_devs()
-	 * will be invoked later to reenumerate (new) driver.conf
-	 * rebind persistent nodes.
+	 * We are called from update_drv to try to unbind a specific
+	 * set of aliases for a driver.  Unbind what persistent nodes
+	 * we can, and return the number of nodes which cannot be unbound.
+	 * If not all nodes can be unbound, update_drv leaves the
+	 * state of the driver binding files unchanged, except in
+	 * the case of -f.
 	 */
-	while (cdip) {
-		dev_info_t *next = ddi_get_next_sibling(cdip);
-		if ((i_ddi_node_state(cdip) > DS_INITIALIZED) ||
-		    (ddi_driver_major(cdip) != major)) {
-			cdip = next;
+	ndi_devi_enter(dip, &circ);
+	for (cdip = ddi_get_child(dip); cdip; cdip = next) {
+		next = ddi_get_next_sibling(cdip);
+		if ((ddi_driver_major(cdip) != ub->drv_major) ||
+		    (strcmp(DEVI(cdip)->devi_node_name, ub->drv_alias) != 0))
 			continue;
+		if (i_ddi_node_state(cdip) >= DS_BOUND) {
+			rv = ndi_devi_unbind_driver(cdip);
+			if (rv != DDI_SUCCESS ||
+			    (i_ddi_node_state(cdip) >= DS_BOUND)) {
+				unbind_alias_dev_in_use(cdip, ub->drv_alias);
+				ub->ndevs_bound++;
+				continue;
+			}
+			if (ndi_dev_is_persistent_node(cdip) == 0)
+				(void) ddi_remove_child(cdip, 0);
 		}
-		(void) ndi_devi_unbind_driver(cdip);
-		if (ndi_dev_is_persistent_node(cdip) == 0)
-			(void) ddi_remove_child(cdip, 0);
-		cdip = next;
 	}
 	ndi_devi_exit(dip, circ);
 
 	return (DDI_WALK_CONTINUE);
 }
 
+/*
+ * Unbind devices by driver & alias
+ * Context: update_drv [-f] -d -i <alias> <driver>
+ */
+int
+i_ddi_unbind_devs_by_alias(major_t major, char *alias)
+{
+	unbind_data_t	*ub;
+	int		rv;
+
+	ub = kmem_zalloc(sizeof (*ub), KM_SLEEP);
+	ub->drv_major = major;
+	ub->drv_alias = alias;
+	ub->ndevs_bound = 0;
+	ub->unbind_errors = 0;
+
+	/* flush devfs so that ndi_devi_unbind_driver will work when possible */
+	devfs_clean(top_devinfo, NULL, 0);
+	ddi_walk_devs(top_devinfo, unbind_children_by_alias,
+	    (void *)(uintptr_t)ub);
+
+	/* return the number of devices remaining bound to the alias */
+	rv = ub->ndevs_bound + ub->unbind_errors;
+	kmem_free(ub, sizeof (*ub));
+	return (rv);
+}
+
+/*
+ * walkdevs callback for unbind devices by driver
+ */
+static int
+unbind_children_by_driver(dev_info_t *dip, void *arg)
+{
+	int		circ;
+	dev_info_t	*cdip;
+	dev_info_t	*next;
+	major_t		major = (major_t)(uintptr_t)arg;
+	int		rv;
+
+	/*
+	 * We are called either from rem_drv or update_drv when reloading
+	 * a driver.conf file. In either case, we unbind persistent nodes
+	 * and destroy .conf nodes. In the case of rem_drv, this will be
+	 * the final state. In the case of update_drv,  i_ddi_bind_devs()
+	 * may be invoked later to re-enumerate (new) driver.conf rebind
+	 * persistent nodes.
+	 */
+	ndi_devi_enter(dip, &circ);
+	for (cdip = ddi_get_child(dip); cdip; cdip = next) {
+		next = ddi_get_next_sibling(cdip);
+		if (ddi_driver_major(cdip) != major)
+			continue;
+		if (i_ddi_node_state(cdip) >= DS_BOUND) {
+			rv = ndi_devi_unbind_driver(cdip);
+			if (rv == DDI_FAILURE ||
+			    (i_ddi_node_state(cdip) >= DS_BOUND))
+				continue;
+			if (ndi_dev_is_persistent_node(cdip) == 0)
+				(void) ddi_remove_child(cdip, 0);
+		}
+	}
+	ndi_devi_exit(dip, circ);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Unbind devices by driver
+ * Context: rem_drv or unload driver.conf
+ */
 void
 i_ddi_unbind_devs(major_t major)
 {
-	ddi_walk_devs(top_devinfo, unbind_children, (void *)(uintptr_t)major);
+	/* flush devfs so that ndi_devi_unbind_driver will work when possible */
+	devfs_clean(top_devinfo, NULL, 0);
+	ddi_walk_devs(top_devinfo, unbind_children_by_driver,
+	    (void *)(uintptr_t)major);
 }
 
 /*

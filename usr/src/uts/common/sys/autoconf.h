@@ -43,6 +43,7 @@ extern "C" {
 #include <sys/thread.h>
 #include <sys/obpdefs.h>
 #include <sys/systm.h>
+#include <sys/hwconf.h>
 
 struct devnames {
 	char		*dn_name;	/* Name of this driver */
@@ -234,9 +235,9 @@ extern krwlock_t devinfo_tree_lock;		/* obsolete */
 extern void impl_rem_dev_props(dev_info_t *);
 extern void add_class(char *, char *);
 
-struct bind;
 extern int make_mbind(char *, int, char *, struct bind **);
 extern void delete_mbind(char *, struct bind **);
+extern void purge_mbind(int, struct bind **);
 
 extern void configure(void);
 #if defined(__sparc)

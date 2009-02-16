@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,9 @@ gettext("must specify major number and driver name when using the -b flag\n")
 
 #define	MODCTL_ADDMAJBIND \
 gettext("modctl failed to add major number binding.\n")
+
+#define	MODCTL_REMMAJBIND \
+gettext("modctl failed to remove major number binding.\n")
 
 #define	DRIVER_FAILURE gettext("driver failed to attach: %s\n")
 

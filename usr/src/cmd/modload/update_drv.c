@@ -343,11 +343,11 @@ main(int argc, char *argv[])
 				return (error);
 			}
 
-			/* paranoia - if we crash whilst configuring */
-			sync();
 
 			/* optionally update the running system - not -b */
 			if (update_conf) {
+				/* paranoia - if we crash whilst configuring */
+				sync();
 				cleanup_flag |= CLEAN_DRV_ALIAS;
 				if (config_driver(driver_name, major_num,
 				    aliases2, NULL, cleanup_flag,
@@ -420,12 +420,63 @@ done:
 		}
 
 		if (i_flag) {
-			if ((error = delete_entry(driver_aliases,
-			    driver_name, ":", aliases)) != NOERR) {
+			found = get_major_no(driver_name, name_to_major);
+			if (found == ERROR) {
+				(void) fprintf(stderr, gettext(ERR_MAX_MAJOR),
+				    name_to_major);
+				err_exit();
+			}
+
+			if (found == UNIQUE) {
+				(void) fprintf(stderr,
+				    gettext(ERR_NOT_INSTALLED), driver_name);
+				err_exit();
+			}
+
+			major_num = (major_t)found;
+
+			/*
+			 * verify that the aliases to be deleted exist
+			 * before removal.  With -f, failing to
+			 * remove an alias is not an error so we
+			 * can continue on to update the kernel.
+			 */
+			error = NOERR;
+			rval = aliases_exist(driver_name, aliases);
+			if (rval == ERROR && (force_flag == 0)) {
+				(void) fprintf(stderr,
+				    gettext(ERR_ALIAS_NOT_BOUND),
+				    driver_name);
+				if (err != NOERR)
+					err = rval;
+			}
+			if (rval == NOERR)
+				error = delete_entry(driver_aliases,
+				    driver_name, ":", aliases);
+			if (error != NOERR && (force_flag == 0)) {
 				(void) fprintf(stderr, gettext(ERR_NO_ENTRY),
 				    driver_name, driver_aliases);
 				if (err != NOERR)
 					err = error;
+			}
+
+			/*
+			 * optionally update the running system - not -b.
+			 * Unless -f is specified, error if one or more
+			 * devices remain bound to the alias.
+			 */
+			if (err == NOERR && update_conf) {
+				/* paranoia - if we crash whilst configuring */
+				sync();
+				error = unconfig_driver(driver_name, major_num,
+				    aliases, verbose_flag, force_flag);
+				if (error == ERROR && force_flag == 0) {
+					(void) fprintf(stderr,
+					    gettext(ERR_DEV_IN_USE),
+					    driver_name);
+					if (err != NOERR)
+						err = error;
+				}
 			}
 		}
 

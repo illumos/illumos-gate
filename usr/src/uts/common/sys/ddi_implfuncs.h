@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,6 +234,7 @@ void i_ddi_set_node_state(dev_info_t *, ddi_node_state_t);
 int i_ddi_detach_installed_driver(major_t, int);
 void i_ddi_set_binding_name(dev_info_t *, char *);
 void i_ddi_bind_devs();
+int i_ddi_unbind_devs_by_alias(major_t, char *);
 void i_ddi_unbind_devs(major_t);
 ddi_prop_list_t *i_ddi_prop_list_create(ddi_prop_t *);
 struct devnames;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,7 +153,6 @@ static char	sysbind[] = SYSBINDFILE;
 static uint_t	mod_autounload_key;	/* for module autounload detection */
 
 extern int obpdebug;
-extern int make_mbind(char *, int, char *, struct bind **);
 
 #define	DEBUGGER_PRESENT	((boothowto & RB_DEBUG) || (obpdebug != 0))
 
@@ -478,16 +477,38 @@ modctl_modreserve(modid_t id, int *data)
 	return (0);
 }
 
-static int
-modctl_add_major(int *data)
+/* to be removed when Ed introduces these */
+static char *
+ddi_strdup(const char *str, int flag)
 {
-	struct modconfig mc;
-	int i, rv;
-	struct aliases alias;
-	struct aliases *ap;
-	char name[MAXMODCONFNAME];
-	char cname[MAXMODCONFNAME];
-	char *drvname;
+	char	*rv;
+	int	n = strlen(str) + 1;
+	rv = kmem_alloc(n, flag);
+	bcopy(str, rv, n);
+	return (rv);
+}
+static void
+strfree(char *str)
+{
+	kmem_free(str, strlen(str)+1);
+}
+
+/* Add/Remove driver and binding aliases */
+static int
+modctl_update_driver_aliases(int add, int *data)
+{
+	struct modconfig	mc;
+	int			i, n, rv = 0;
+	struct aliases		alias;
+	struct aliases		*ap;
+	char			name[MAXMODCONFNAME];
+	char			cname[MAXMODCONFNAME];
+	char			*drvname;
+	int			resid;
+	struct alias_info {
+		char	*alias_name;
+		int	alias_resid;
+	} *aliases, *aip;
 
 	bzero(&mc, sizeof (struct modconfig));
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
@@ -497,7 +518,6 @@ modctl_add_major(int *data)
 #ifdef _SYSCALL32_IMPL
 	else {
 		struct modconfig32 modc32;
-
 		if (copyin(data, &modc32, sizeof (struct modconfig32)) != 0)
 			return (EFAULT);
 		else {
@@ -506,6 +526,7 @@ modctl_add_major(int *data)
 			bcopy(modc32.drvclass, mc.drvclass,
 			    sizeof (modc32.drvclass));
 			mc.major = modc32.major;
+			mc.flags = modc32.flags;
 			mc.num_aliases = modc32.num_aliases;
 			mc.ap = (struct aliases *)(uintptr_t)modc32.ap;
 		}
@@ -517,71 +538,170 @@ modctl_add_major(int *data)
 	 * doesn't match that driver's name, fail.  Otherwise, pass, since
 	 * we may be adding aliases.
 	 */
-	if ((drvname = mod_major_to_name(mc.major)) != NULL &&
-	    strcmp(drvname, mc.drvname) != 0)
+	drvname = mod_major_to_name(mc.major);
+	if ((drvname != NULL) && strcmp(drvname, mc.drvname) != 0)
 		return (EINVAL);
 
 	/*
-	 * Add each supplied driver alias to mb_hashtab
+	 * Precede alias removal by unbinding as many devices as possible.
+	 */
+	if (add == 0) {
+		(void) i_ddi_unload_drvconf(mc.major);
+		i_ddi_unbind_devs(mc.major);
+	}
+
+	/*
+	 * Add/remove each supplied driver alias to/from mb_hashtab
 	 */
 	ap = mc.ap;
+	if (mc.num_aliases > 0)
+		aliases = kmem_zalloc(
+		    mc.num_aliases * sizeof (struct alias_info), KM_SLEEP);
+	aip = aliases;
 	for (i = 0; i < mc.num_aliases; i++) {
 		bzero(&alias, sizeof (struct aliases));
-
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			if (copyin(ap, &alias, sizeof (struct aliases)) != 0)
-				return (EFAULT);
-
-			if (alias.a_len > MAXMODCONFNAME)
-				return (EINVAL);
-
-			if (copyin(alias.a_name, name, alias.a_len) != 0)
-				return (EFAULT);
-
-			if (name[alias.a_len - 1] != '\0')
-				return (EINVAL);
+			if (copyin(ap, &alias, sizeof (struct aliases)) != 0) {
+				rv = EFAULT;
+				goto error;
+			}
+			if (alias.a_len > MAXMODCONFNAME) {
+				rv = EINVAL;
+				goto error;
+			}
+			if (copyin(alias.a_name, name, alias.a_len) != 0) {
+				rv = EFAULT;
+				goto error;
+			}
+			if (name[alias.a_len - 1] != '\0') {
+				rv = EINVAL;
+				goto error;
+			}
 		}
 #ifdef _SYSCALL32_IMPL
 		else {
 			struct aliases32 al32;
-
 			bzero(&al32, sizeof (struct aliases32));
-			if (copyin(ap, &al32, sizeof (struct aliases32)) != 0)
-				return (EFAULT);
-
-			if (al32.a_len > MAXMODCONFNAME)
-				return (EINVAL);
-
+			if (copyin(ap, &al32, sizeof (struct aliases32)) != 0) {
+				rv = EFAULT;
+				goto error;
+			}
+			if (al32.a_len > MAXMODCONFNAME) {
+				rv = EINVAL;
+				goto error;
+			}
 			if (copyin((void *)(uintptr_t)al32.a_name,
-			    name, al32.a_len) != 0)
-				return (EFAULT);
-
-			if (name[al32.a_len - 1] != '\0')
-				return (EINVAL);
-
+			    name, al32.a_len) != 0) {
+				rv = EFAULT;
+				goto error;
+			}
+			if (name[al32.a_len - 1] != '\0') {
+				rv = EINVAL;
+				goto error;
+			}
 			alias.a_next = (void *)(uintptr_t)al32.a_next;
 		}
 #endif
 		check_esc_sequences(name, cname);
-		(void) make_mbind(cname, mc.major, NULL, mb_hashtab);
+		aip->alias_name = ddi_strdup(cname, KM_SLEEP);
 		ap = alias.a_next;
+		aip++;
 	}
 
-	/*
-	 * Try to establish an mbinding for mc.drvname, and add it to devnames.
-	 * Add class if any after establishing the major number
-	 */
-	(void) make_mbind(mc.drvname, mc.major, NULL, mb_hashtab);
-	rv = make_devname(mc.drvname, mc.major);
+	if (add == 0) {
+		ap = mc.ap;
+		resid = 0;
+		aip = aliases;
+		/* attempt to unbind all devices bound to each alias */
+		for (i = 0; i < mc.num_aliases; i++) {
+			n = i_ddi_unbind_devs_by_alias(
+			    mc.major, aip->alias_name);
+			resid += n;
+			aip->alias_resid = n;
+		}
 
-	if (rv == 0) {
+		/*
+		 * If some device bound to an alias remains in use,
+		 * and override wasn't specified, no change is made to
+		 * the binding state and we fail the operation.
+		 */
+		if (resid > 0 && ((mc.flags & MOD_UNBIND_OVERRIDE) == 0)) {
+			rv = EBUSY;
+			goto error;
+		}
+
+		/*
+		 * No device remains bound of any of the aliases,
+		 * or force was requested.  Mark each alias as
+		 * inactive via delete_mbind so no future binds
+		 * to this alias take place and that a new
+		 * binding can be established.
+		 */
+		aip = aliases;
+		for (i = 0; i < mc.num_aliases; i++) {
+			if (moddebug & MODDEBUG_BINDING)
+				cmn_err(CE_CONT, "Removing binding for %s "
+				    "(%d active references)\n",
+				    aip->alias_name, aip->alias_resid);
+			delete_mbind(aip->alias_name, mb_hashtab);
+			aip++;
+		}
+		rv = 0;
+	} else {
+		aip = aliases;
+		for (i = 0; i < mc.num_aliases; i++) {
+			if (moddebug & MODDEBUG_BINDING)
+				cmn_err(CE_NOTE, "Adding binding for '%s'\n",
+				    aip->alias_name);
+			(void) make_mbind(aip->alias_name,
+			    mc.major, NULL, mb_hashtab);
+			aip++;
+		}
+		/*
+		 * Try to establish an mbinding for mc.drvname, and add it to
+		 * devnames. Add class if any after establishing the major
+		 * number.
+		 */
+		(void) make_mbind(mc.drvname, mc.major, NULL, mb_hashtab);
+		if ((rv = make_devname(mc.drvname, mc.major)) != 0)
+			goto error;
+
 		if (mc.drvclass[0] != '\0')
 			add_class(mc.drvname, mc.drvclass);
 		(void) i_ddi_load_drvconf(mc.major);
-		i_ddi_bind_devs();
-		i_ddi_di_cache_invalidate(KM_SLEEP);
+	}
+
+	/*
+	 * Ensure that all nodes are bound to the most appropriate driver
+	 * possible, attempting demotion and rebind when a more appropriate
+	 * driver now exists.
+	 */
+	i_ddi_bind_devs();
+	i_ddi_di_cache_invalidate(KM_SLEEP);
+
+error:
+	if (mc.num_aliases > 0) {
+		aip = aliases;
+		for (i = 0; i < mc.num_aliases; i++) {
+			if (aip->alias_name != NULL)
+				strfree(aip->alias_name);
+			aip++;
+		}
+		kmem_free(aliases, mc.num_aliases * sizeof (struct alias_info));
 	}
 	return (rv);
+}
+
+static int
+modctl_add_driver_aliases(int *data)
+{
+	return (modctl_update_driver_aliases(1, data));
+}
+
+static int
+modctl_remove_driver_aliases(int *data)
+{
+	return (modctl_update_driver_aliases(0, data));
 }
 
 static int
@@ -606,7 +726,11 @@ modctl_rem_major(major_t major)
 
 	(void) i_ddi_unload_drvconf(major);
 	i_ddi_unbind_devs(major);
+	i_ddi_bind_devs();
 	i_ddi_di_cache_invalidate(KM_SLEEP);
+
+	/* purge all the bindings to this driver */
+	purge_mbind(major, mb_hashtab);
 	return (0);
 }
 
@@ -707,6 +831,10 @@ modctl_load_drvconf(major_t major)
 	return (0);
 }
 
+/*
+ * Unload driver.conf file and follow up by attempting
+ * to rebind devices to more appropriate driver.
+ */
 static int
 modctl_unload_drvconf(major_t major)
 {
@@ -719,6 +847,7 @@ modctl_unload_drvconf(major_t major)
 	if (ret != 0)
 		return (ret);
 	(void) i_ddi_unbind_devs(major);
+	i_ddi_bind_devs();
 
 	return (0);
 }
@@ -2190,8 +2319,8 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 		error = 0;
 		break;
 
-	case MODADDMAJBIND:	/* read major binding file */
-		error = modctl_add_major((int *)a2);
+	case MODADDMAJBIND:	/* add major / driver alias bindings */
+		error = modctl_add_driver_aliases((int *)a2);
 		break;
 
 	case MODGETPATHLEN:	/* get modpath length */
@@ -2337,6 +2466,10 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 
 	case MODREMMAJBIND:	/* remove a major binding */
 		error = modctl_rem_major((major_t)a1);
+		break;
+
+	case MODREMDRVALIAS:	/* remove a major/alias binding */
+		error = modctl_remove_driver_aliases((int *)a2);
 		break;
 
 	case MODDEVID2PATHS:	/* get paths given devid */

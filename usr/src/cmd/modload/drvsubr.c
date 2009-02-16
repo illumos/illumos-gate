@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1005,19 +1005,19 @@ exec_command(char *path, char *cmdline[MAX_CMD_LINE])
 }
 
 /*
- * check that major_num doesn't exceed maximum on this machine
- * do this here to support add_drv on server for diskless clients
+ * Exec devfsadm to perform driver config/unconfig operation,
+ * adding or removing aliases.
  */
-int
-config_driver(
+static int
+exec_devfsadm(
+	boolean_t config,
 	char *driver_name,
 	major_t major_num,
 	char *aliases,
 	char *classes,
-	int cleanup_flag,
-	int verbose_flag)
+	int verbose_flag,
+	int force_flag)
 {
-	int max_dev;
 	int n = 0;
 	char *cmdline[MAX_CMD_LINE];
 	char maj_num[128];
@@ -1025,23 +1025,15 @@ config_driver(
 	char *current;
 	int exec_status;
 	int len;
-
-	if (modctl(MODRESERVED, NULL, &max_dev) < 0) {
-		perror(NULL);
-		(void) fprintf(stderr, gettext(ERR_MAX_MAJOR));
-		return (ERROR);
-	}
-
-	if (major_num >= max_dev) {
-		(void) fprintf(stderr, gettext(ERR_MAX_EXCEEDS),
-		    major_num, max_dev);
-		return (ERROR);
-	}
-
-	/* bind major number and driver name */
+	int rv;
 
 	/* build command line */
 	cmdline[n++] = DRVCONFIG;
+	if (config == B_FALSE) {
+		cmdline[n++] = "-u";		/* unconfigure */
+		if (force_flag)
+			cmdline[n++] = "-f";	/* force if currently in use */
+	}
 	if (verbose_flag) {
 		cmdline[n++] = "-v";
 	}
@@ -1076,9 +1068,57 @@ config_driver(
 	}
 	cmdline[n] = (char *)0;
 
-	exec_status = exec_command(DRVCONFIG_PATH, cmdline);
+	rv = exec_command(DRVCONFIG_PATH, cmdline);
+	if (rv == NOERR)
+		return (NOERR);
+	return (ERROR);
+}
 
-	if (exec_status == NOERR)
+int
+unconfig_driver(
+	char *driver_name,
+	major_t major_num,
+	char *aliases,
+	int verbose_flag,
+	int force_flag)
+{
+	return (exec_devfsadm(B_FALSE, driver_name, major_num,
+	    aliases, NULL, verbose_flag, force_flag));
+}
+
+/*
+ * check that major_num doesn't exceed maximum on this machine
+ * do this here to support add_drv on server for diskless clients
+ */
+int
+config_driver(
+	char *driver_name,
+	major_t major_num,
+	char *aliases,
+	char *classes,
+	int cleanup_flag,
+	int verbose_flag)
+{
+	int	max_dev;
+	int	rv;
+
+	if (modctl(MODRESERVED, NULL, &max_dev) < 0) {
+		perror(NULL);
+		(void) fprintf(stderr, gettext(ERR_MAX_MAJOR));
+		return (ERROR);
+	}
+
+	if (major_num >= max_dev) {
+		(void) fprintf(stderr, gettext(ERR_MAX_EXCEEDS),
+		    major_num, max_dev);
+		return (ERROR);
+	}
+
+	/* bind major number and driver name */
+	rv = exec_devfsadm(B_TRUE, driver_name, major_num,
+	    aliases, classes, verbose_flag, 0);
+
+	if (rv == NOERR)
 		return (NOERR);
 	perror(NULL);
 	remove_entry(cleanup_flag, driver_name);
@@ -1499,8 +1539,9 @@ aliases_unique(char *aliases)
 	char *current_head;
 	char *previous_head;
 	char *one_entry;
-	int i, len;
+	int len;
 	int is_unique;
+	int err;
 
 	len = strlen(aliases);
 
@@ -1513,43 +1554,91 @@ aliases_unique(char *aliases)
 	previous_head = aliases;
 
 	do {
-		for (i = 0; i <= len; i++)
-			one_entry[i] = 0;
-
+		bzero(one_entry, len+1);
 		current_head = get_entry(previous_head, one_entry, ' ', 1);
 		previous_head = current_head;
 
 		if ((unique_driver_name(one_entry, name_to_major,
-		    &is_unique)) == ERROR) {
-			free(one_entry);
-			return (ERROR);
-		}
+		    &is_unique)) == ERROR)
+			goto err_out;
 
 		if (is_unique != UNIQUE) {
 			(void) fprintf(stderr, gettext(ERR_ALIAS_IN_NAM_MAJ),
 			    one_entry);
-			free(one_entry);
-			return (ERROR);
+			goto err_out;
 		}
 
-		if (unique_drv_alias(one_entry) != NOERR) {
-			free(one_entry);
-			return (ERROR);
+		if ((err = unique_drv_alias(one_entry)) != UNIQUE) {
+			if (err == NOT_UNIQUE) {
+				(void) fprintf(stderr,
+				    gettext(ERR_ALIAS_IN_USE), one_entry);
+			}
+			goto err_out;
 		}
 
 		if (!is_token(one_entry)) {
 			(void) fprintf(stderr, gettext(ERR_BAD_TOK),
 			    "-i", one_entry);
-			free(one_entry);
-			return (ERROR);
+			goto err_out;
 		}
 
 	} while (*current_head != '\0');
 
 	free(one_entry);
-
 	return (NOERR);
 
+err_out:
+	free(one_entry);
+	return (ERROR);
+}
+
+/*
+ * verify each alias :
+ *	alias list members separated by white space and quoted
+ *	exist as alias name in /etc/driver_aliases
+ */
+int
+aliases_exist(char *drvname, char *aliases)
+{
+	char *current_head;
+	char *previous_head;
+	char *one_entry;
+	int len;
+	int is_unique;
+	int err;
+
+	len = strlen(aliases);
+
+	one_entry = calloc(len + 1, 1);
+	if (one_entry == NULL) {
+		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		return (ERROR);
+	}
+
+	previous_head = aliases;
+
+	do {
+		bzero(one_entry, len+1);
+		current_head = get_entry(previous_head, one_entry, ' ', 1);
+		previous_head = current_head;
+
+		if ((err = unique_drv_alias(one_entry)) != NOT_UNIQUE)
+			goto err_out;
+
+		if (!is_token(one_entry)) {
+			(void) fprintf(stderr, gettext(ERR_BAD_TOK),
+			    "-i", one_entry);
+			goto err_out;
+		}
+
+	} while (*current_head != '\0');
+
+	free(one_entry);
+	return (NOERR);
+
+err_out:
+	free(one_entry);
+	return (ERROR);
 }
 
 
@@ -1616,6 +1705,14 @@ update_driver_aliases(
 }
 
 
+/*
+ * Return:
+ *	ERROR in case of memory or read error
+ *	UNIQUE if there is no existing match to the supplied alias
+ *	NOT_UNIQUE if there is a match
+ * An error message is emitted in the case of ERROR,
+ * up to the caller otherwise.
+ */
 int
 unique_drv_alias(char *drv_alias)
 {
@@ -1624,13 +1721,13 @@ unique_drv_alias(char *drv_alias)
 	char line[MAX_N2M_ALIAS_LINE + 1], *cp;
 	char alias[FILENAME_MAX + 1];
 	char *a;
-	int status = NOERR;
+	int status = UNIQUE;
 
 	fp = fopen(driver_aliases, "r");
 
 	if (fp != NULL) {
 		while ((fgets(line, sizeof (line), fp) != 0) &&
-		    status != ERROR) {
+		    status == UNIQUE) {
 			/* cut off comments starting with '#' */
 			if ((cp = strchr(line, '#')) != NULL)
 				*cp = '\0';
@@ -1652,10 +1749,8 @@ unique_drv_alias(char *drv_alias)
 
 			if ((strcmp(drv_alias, drv) == 0) ||
 			    (strcmp(drv_alias, a) == 0)) {
-				(void) fprintf(stderr,
-				    gettext(ERR_ALIAS_IN_USE),
-				    drv_alias);
-				status = ERROR;
+				status = NOT_UNIQUE;
+				break;
 			}
 		}
 		(void) fclose(fp);
@@ -1670,24 +1765,26 @@ unique_drv_alias(char *drv_alias)
 
 /*
  * search for driver_name in first field of file file_name
- * searching name_to_major and driver_aliases: name separated from rest of
- * line by blank
- * if there return
- * else return
+ * searching name_to_major and driver_aliases: name separated
+ * from the remainder of the line by white space.
  */
 int
 unique_driver_name(char *driver_name, char *file_name,
 	int *is_unique)
 {
-	int ret;
+	int ret, err;
 
 	if ((ret = get_major_no(driver_name, file_name)) == ERROR) {
 		(void) fprintf(stderr, gettext(ERR_CANT_ACCESS_FILE),
 		    file_name);
 	} else {
-		/* XXX */
 		/* check alias file for name collision */
-		if (unique_drv_alias(driver_name) == ERROR) {
+		if ((err = unique_drv_alias(driver_name)) != UNIQUE) {
+			if (err == NOT_UNIQUE) {
+				(void) fprintf(stderr,
+				    gettext(ERR_ALIAS_IN_USE),
+				    driver_name);
+			}
 			ret = ERROR;
 		} else {
 			if (ret != UNIQUE)

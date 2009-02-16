@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/modctl.h>
@@ -483,18 +481,23 @@ clear_binding_hash(struct bind **bhash)
 	}
 }
 
+/* Find an mbind by name match (caller can ask for deleted match) */
 static struct bind *
-find_mbind(char *name, struct bind **hashtab)
+find_mbind(char *name, struct bind **hashtab, int deleted)
 {
-	int hashndx;
-	struct bind *mb;
+	struct bind	*mb;
 
-	hashndx = nm_hash(name);
-	for (mb = hashtab[hashndx]; mb; mb = mb->b_next) {
-		if (strcmp(name, mb->b_name) == 0)
+	for (mb = hashtab[nm_hash(name)]; mb; mb = mb->b_next) {
+		if (deleted && (mb->b_num >= 0))
+			continue;			/* skip active */
+		if (!deleted && (mb->b_num < 0))
+			continue;			/* skip deleted */
+
+		/* return if name matches */
+		if (strcmp(name, mb->b_name) == 0) {
 			break;
+		}
 	}
-
 	return (mb);
 }
 
@@ -507,85 +510,110 @@ find_mbind(char *name, struct bind **hashtab)
  * externally provided locking.
  */
 int
-make_mbind(char *name, int major, char *bind_name, struct bind **hashtab)
+make_mbind(char *name, int num, char *bind_name, struct bind **hashtab)
 {
-	struct bind *bp;
-	int hashndx;
+	struct bind	*mb;
+	struct bind	**pmb;
 
 	ASSERT(hashtab != NULL);
+	ASSERT(num >= 0);
 
-	/*
-	 * Fail if the key being added is already in the hash table
-	 */
-	if (find_mbind(name, hashtab) != NULL)
+	/* Fail if the key being added is already established */
+	if (find_mbind(name, hashtab, 0) != NULL)
 		return (-1);
 
-	bp = kmem_zalloc(sizeof (struct bind), KM_SLEEP);
-	bp->b_name = kmem_alloc(strlen(name) + 1, KM_SLEEP);
-	(void) strcpy(bp->b_name, name);
-	bp->b_num = major;
-	if (bind_name != NULL) {
-		bp->b_bind_name = kmem_alloc(strlen(bind_name) + 1, KM_SLEEP);
-		(void) strcpy(bp->b_bind_name, bind_name);
-	}
-	hashndx = nm_hash(name);
-	bp->b_next = hashtab[hashndx];
-	hashtab[hashndx] = bp;
+	/* Allocate new mbind */
+	mb = kmem_zalloc(sizeof (struct bind), KM_SLEEP);
+	mb->b_name = i_ddi_strdup(name, KM_SLEEP);
+	mb->b_num = num;
+	if (bind_name != NULL)
+		mb->b_bind_name = i_ddi_strdup(bind_name, KM_SLEEP);
 
+	/* Insert at head of hash */
+	pmb = &hashtab[nm_hash(name)];
+	mb->b_next = *pmb;
+	*pmb = mb;
 	return (0);
 }
 
 /*
- * Delete a binding from a binding-hash.
- *
- * Does not provide synchronization, so use only during boot or with
- * externally provided locking.
+ * Delete a binding from a binding-hash. Since there is no locking we
+ * delete an mbind by making its b_num negative. We also support find_mbind
+ * of deleted entries, so we still need deleted items on the list.
  */
 void
 delete_mbind(char *name, struct bind **hashtab)
 {
-	int hashndx;
-	struct bind *b, *bparent = NULL;
-	struct bind *t = NULL;		/* target to delete */
+	struct bind	*mb;
 
-	hashndx = nm_hash(name);
-
-	if (hashtab[hashndx] == NULL)
-		return;
-
-	b = hashtab[hashndx];
-	if (strcmp(name, b->b_name) == 0) {	/* special case first elem. */
-		hashtab[hashndx] = b->b_next;
-		t = b;
-	} else {
-		for (b = hashtab[hashndx]; b; b = b->b_next) {
-			if (strcmp(name, b->b_name) == 0) {
-				ASSERT(bparent);
-				t = b;
-				bparent->b_next = b->b_next;
-				break;
+	for (mb = hashtab[nm_hash(name)]; mb; mb = mb->b_next) {
+		if ((mb->b_num >= 0) && (strcmp(name, mb->b_name) == 0)) {
+			/* delete by making b_num negative */
+			if (moddebug & MODDEBUG_BINDING) {
+				cmn_err(CE_CONT, "mbind: %s %d deleted\n",
+				    name, mb->b_num);
 			}
-			bparent = b;
+			mb->b_num = -mb->b_num;
+			break;
 		}
-	}
-
-	if (t != NULL) {	/* delete the target */
-		ASSERT(t->b_name);
-		kmem_free(t->b_name, strlen(t->b_name) + 1);
-		if (t->b_bind_name)
-			kmem_free(t->b_bind_name, strlen(t->b_bind_name) + 1);
-		kmem_free(t, sizeof (struct bind));
 	}
 }
 
+/*
+ * Delete all items in an mbind associated with specified num.
+ * An example would be rem_drv deleting all aliases associated with a
+ * driver major number.
+ */
+void
+purge_mbind(int num, struct bind **hashtab)
+{
+	int		i;
+	struct bind	*mb;
+
+	/* search all hash lists for items that associated with 'num' */
+	for (i = 0; i < MOD_BIND_HASHSIZE; i++) {
+		for (mb = hashtab[i]; mb; mb = mb->b_next) {
+			if (mb->b_num == num) {
+				if (moddebug & MODDEBUG_BINDING)
+					cmn_err(CE_CONT,
+					    "mbind: %s %d purged\n",
+					    mb->b_name, num);
+				/* purge by changing the sign */
+				mb->b_num = -num;
+			}
+		}
+	}
+}
 
 major_t
 mod_name_to_major(char *name)
 {
-	struct bind *mbind;
+	struct bind	*mbind;
+	major_t		maj;
 
-	if ((mbind = find_mbind(name, mb_hashtab)) != NULL)
+	/* Search for non-deleted match. */
+	if ((mbind = find_mbind(name, mb_hashtab, 0)) != NULL) {
+		if (moddebug & MODDEBUG_BINDING) {
+			if (find_mbind(name, mb_hashtab, 1))
+				cmn_err(CE_CONT,
+				    "'%s' has deleted match too\n", name);
+		}
 		return ((major_t)mbind->b_num);
+	}
+
+	/*
+	 * Search for deleted match: We may find that we have dependencies
+	 * on drivers that have been deleted (but the old driver may still
+	 * be bound to a node). These callers should be converted to use
+	 * ddi_driver_major(i.e. devi_major).
+	 */
+	if (moddebug & MODDEBUG_BINDING) {
+		if ((mbind = find_mbind(name, mb_hashtab, 1)) != NULL) {
+			maj = (major_t)(-(mbind->b_num));
+			cmn_err(CE_CONT, "Reference to deleted alias '%s' %d\n",
+			    name, maj);
+		}
+	}
 
 	return (DDI_MAJOR_T_NONE);
 }
@@ -742,7 +770,7 @@ mod_getsysnum(char *name)
 {
 	struct bind *mbind;
 
-	if ((mbind = find_mbind(name, sb_hashtab)) != NULL)
+	if ((mbind = find_mbind(name, sb_hashtab, 0)) != NULL)
 		return (mbind->b_num);
 
 	return (-1);
