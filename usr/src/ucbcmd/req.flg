@@ -21,14 +21,11 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI" 
-
 echo_file usr/src/ucbcmd/Makefile.ucbcmd
-echo_file usr/src/ucbcmd/Makefile.ucbcmd.64
 echo_file usr/src/ucbcmd/Makefile.ucbtarg
 echo_file usr/src/cmd/Makefile.targ
 find_files "s.*" usr/src/common/mapfiles
