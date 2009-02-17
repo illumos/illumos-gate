@@ -5793,7 +5793,7 @@ fr_info_t *fin;
 
 	if (nat != NULL) {
 		ifs->ifs_nat_stats.ns_uncreate[fin->fin_out][0]++;
-		nat_delete(nat, NL_DESTROY, ifs);
+		(void) nat_delete(nat, NL_DESTROY, ifs);
 	} else {
 		ifs->ifs_nat_stats.ns_uncreate[fin->fin_out][1]++;
 	}
