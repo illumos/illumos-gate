@@ -33,7 +33,7 @@ SRCS = \
 	net_include.sh \
 	routing_include.sh \
 	sendmail_include.sh \
-=	smf_include.sh
+	smf_include.sh
 
 SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)
 
