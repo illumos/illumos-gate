@@ -20,7 +20,6 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 
 include ../../Makefile.cmd
 
@@ -33,7 +32,8 @@ SRCS = \
 	ipf_include.sh \
 	net_include.sh \
 	routing_include.sh \
-	smf_include.sh
+	sendmail_include.sh \
+=	smf_include.sh
 
 SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)
 

@@ -20,7 +20,7 @@
    
     CDDL HEADER END
    
-    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     Default service profile, containing a typical set of active service
@@ -123,6 +123,9 @@
   </service>
   <service name='network/smtp' version='1' type='service'>
     <instance name='sendmail' enabled='true'/>
+  </service>
+  <service name='network/sendmail-client' version='1' type='service'>
+    <instance name='default' enabled='true'/>
   </service>
   <service name='network/inetd' version='1' type='restarter'>
     <instance name='default' enabled='true'/>

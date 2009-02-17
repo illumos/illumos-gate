@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -161,7 +159,10 @@ e sendmail etc/mail/trusted-users 644 root bin
 d none lib 0755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
+f none lib/svc/method/sendmail-client 0555 root bin
 f none lib/svc/method/smtp-sendmail 0555 root bin
+d none lib/svc/share 0755 root bin
+f none lib/svc/share/sendmail_include.sh 0444 root bin
 d none var 755 root sys
 d none var/adm 775 root sys
 d none var/adm/sm.bin 755 root sys
@@ -171,4 +172,5 @@ d none var/spool/clientmqueue 770 smmsp smmsp
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/network 0755 root sys
+f manifest var/svc/manifest/network/sendmail-client.xml 0444 root sys
 f manifest var/svc/manifest/network/smtp-sendmail.xml 0444 root sys

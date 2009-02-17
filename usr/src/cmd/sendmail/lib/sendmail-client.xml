@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+    CDDL HEADER START
+   
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+   
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+   
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+   
+    CDDL HEADER END
+   
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='SUNWsndmr:sendmail'>
+
+<service
+	name='network/sendmail-client'
+	type='service'
+	version='1'>
+
+	<single_instance />
+
+	<dependency
+	    name='fs-local'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<dependency
+	    name='network-service'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/service' />
+	</dependency>
+
+	<dependency
+	    name='name-services'
+	    grouping='require_all'
+	    restart_on='refresh'
+	    type='service'>
+		<service_fmri value='svc:/milestone/name-services' />
+	</dependency>
+
+	<dependency
+	    name='identity'
+	    grouping='optional_all'
+	    restart_on='refresh'
+	    type='service'>
+		<service_fmri value='svc:/system/identity:domain' />
+	</dependency>
+
+	<dependency
+	    name='system-log'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/system/system-log' />
+	</dependency>
+
+	<instance name='default' enabled='true'>
+
+		<dependency
+		    name='config-file'
+		    grouping='require_all'
+		    restart_on='refresh'
+		    type='path'>
+			<service_fmri
+			    value='file://localhost/etc/mail/submit.cf' />
+		</dependency>
+
+		<!--
+		Sendmail is hard-coded to sleep for 60 seconds if it cannot
+		determine the FQHN, so the timeout for start must be longer
+		than that.  For details, see
+		http://www.sendmail.org/vendor/sun/differences.html#3.2
+		-->
+
+		<exec_method
+			type='method'
+			name='start'
+			exec='/lib/svc/method/sendmail-client start'
+			timeout_seconds='120' />
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec='/lib/svc/method/sendmail-client stop %{restarter/contract}'
+			timeout_seconds='60' />
+
+		<exec_method
+			type='method'
+			name='refresh'
+			exec='/lib/svc/method/sendmail-client refresh'
+			timeout_seconds='60' />
+
+		<property_group name='general' type='framework'>
+			<propval name='action_authorization' type='astring'
+				value='solaris.smf.manage.sendmail' />
+		</property_group>
+
+		<property_group name='config' type='application'>
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.value.sendmail' />
+		</property_group>
+			
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+				sendmail SMTP client queue runner
+				</loctext>
+			</common_name>
+			<documentation>
+				<manpage title='sendmail' section='1M'
+				    manpath='/usr/share/man' />
+			</documentation>
+		</template>
+
+	</instance>
+
+	<stability value='Unstable' />
+
+</service>
+
+</service_bundle>
