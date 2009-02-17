@@ -1452,19 +1452,34 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 	char clone2name[100];
 	char snap3name[100];
 	char osname[MAXNAMELEN];
-	static uint64_t uniq = 0;
 	uint64_t curval;
 
-	curval = atomic_add_64_nv(&uniq, 5) - 5;
+	curval = za->za_instance;
 
 	(void) rw_rdlock(&ztest_shared->zs_name_lock);
 
 	dmu_objset_name(os, osname);
-	(void) snprintf(snap1name, 100, "%s@s1_%llu", osname, curval++);
-	(void) snprintf(clone1name, 100, "%s/c1_%llu", osname, curval++);
-	(void) snprintf(snap2name, 100, "%s@s2_%llu", clone1name, curval++);
-	(void) snprintf(clone2name, 100, "%s/c2_%llu", osname, curval++);
-	(void) snprintf(snap3name, 100, "%s@s3_%llu", clone1name, curval++);
+	(void) snprintf(snap1name, 100, "%s@s1_%llu", osname, curval);
+	(void) snprintf(clone1name, 100, "%s/c1_%llu", osname, curval);
+	(void) snprintf(snap2name, 100, "%s@s2_%llu", clone1name, curval);
+	(void) snprintf(clone2name, 100, "%s/c2_%llu", osname, curval);
+	(void) snprintf(snap3name, 100, "%s@s3_%llu", clone1name, curval);
+
+	error = dmu_objset_destroy(clone2name);
+	if (error != 0 && error != ENOENT)
+		fatal(0, "dmu_objset_destroy() = %d", error);
+	error = dmu_objset_destroy(snap3name);
+	if (error != 0 && error != ENOENT)
+		fatal(0, "dmu_objset_destroy() = %d", error);
+	error = dmu_objset_destroy(snap2name);
+	if (error != 0 && error != ENOENT)
+		fatal(0, "dmu_objset_destroy() = %d", error);
+	error = dmu_objset_destroy(clone1name);
+	if (error != 0 && error != ENOENT)
+		fatal(0, "dmu_objset_destroy() = %d", error);
+	error = dmu_objset_destroy(snap1name);
+	if (error != 0 && error != ENOENT)
+		fatal(0, "dmu_objset_destroy() = %d", error);
 
 	error = dmu_objset_snapshot(osname, strchr(snap1name, '@')+1, FALSE);
 	if (error == ENOSPC)
@@ -1508,7 +1523,7 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 		fatal(0, "dmu_objset_create(%s) = %d", clone2name, error);
 	dmu_objset_close(clone);
 
-	error = dsl_dataset_own(snap1name, 0, FTAG, &ds);
+	error = dsl_dataset_own(snap1name, DS_MODE_READONLY, FTAG, &ds);
 	if (error)
 		fatal(0, "dsl_dataset_own(%s) = %d", snap1name, error);
 	error = dsl_dataset_promote(clone2name);
@@ -1523,7 +1538,7 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 
 	error = dmu_objset_destroy(snap3name);
 	if (error)
-		fatal(0, "dmu_objset_destroy(%s) = %d", snap2name, error);
+		fatal(0, "dmu_objset_destroy(%s) = %d", snap3name, error);
 
 	error = dmu_objset_destroy(snap2name);
 	if (error)
