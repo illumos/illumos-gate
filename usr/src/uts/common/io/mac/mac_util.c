@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,10 @@
 #include <sys/vtrace.h>
 #include <sys/dlpi.h>
 #include <sys/sunndi.h>
+#include <inet/ipsec_impl.h>
+#include <inet/sadb.h>
+#include <inet/ipsecesp.h>
+#include <inet/ipsecah.h>
 
 /*
  * Copy an mblk, preserving its hardware checksum flags.
@@ -820,4 +824,193 @@ mac_get_devinfo(mac_handle_t mh)
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 
 	return ((void *)mip->mi_dip);
+}
+
+#define	PKT_HASH_4BYTES(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3])
+#define	PKT_HASH_MAC(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3] ^ (x)[4] ^ (x)[5])
+
+uint64_t
+mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
+{
+	struct ether_header *ehp;
+	uint64_t hash = 0;
+	uint16_t sap;
+	uint_t skip_len;
+	uint8_t proto;
+
+	/*
+	 * We may want to have one of these per MAC type plugin in the
+	 * future. For now supports only ethernet.
+	 */
+	if (media != DL_ETHER)
+		return (0L);
+
+	/* for now we support only outbound packets */
+	ASSERT(is_outbound);
+	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
+	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
+
+	/* compute L2 hash */
+
+	ehp = (struct ether_header *)mp->b_rptr;
+
+	if ((policy & MAC_PKT_HASH_L2) != 0) {
+		uchar_t *mac_src = ehp->ether_shost.ether_addr_octet;
+		uchar_t *mac_dst = ehp->ether_dhost.ether_addr_octet;
+		hash = PKT_HASH_MAC(mac_src) ^ PKT_HASH_MAC(mac_dst);
+		policy &= ~MAC_PKT_HASH_L2;
+	}
+
+	if (policy == 0)
+		goto done;
+
+	/* skip ethernet header */
+
+	sap = ntohs(ehp->ether_type);
+	if (sap == ETHERTYPE_VLAN) {
+		struct ether_vlan_header *evhp;
+		mblk_t *newmp = NULL;
+
+		skip_len = sizeof (struct ether_vlan_header);
+		if (MBLKL(mp) < skip_len) {
+			/* the vlan tag is the payload, pull up first */
+			newmp = msgpullup(mp, -1);
+			if ((newmp == NULL) || (MBLKL(newmp) < skip_len)) {
+				goto done;
+			}
+			evhp = (struct ether_vlan_header *)newmp->b_rptr;
+		} else {
+			evhp = (struct ether_vlan_header *)mp->b_rptr;
+		}
+
+		sap = ntohs(evhp->ether_type);
+		freemsg(newmp);
+	} else {
+		skip_len = sizeof (struct ether_header);
+	}
+
+	/* if ethernet header is in its own mblk, skip it */
+	if (MBLKL(mp) <= skip_len) {
+		skip_len -= MBLKL(mp);
+		mp = mp->b_cont;
+		if (mp == NULL)
+			goto done;
+	}
+
+	sap = (sap < ETHERTYPE_802_MIN) ? 0 : sap;
+
+	/* compute IP src/dst addresses hash and skip IPv{4,6} header */
+
+	switch (sap) {
+	case ETHERTYPE_IP: {
+		ipha_t *iphp;
+
+		/*
+		 * If the header is not aligned or the header doesn't fit
+		 * in the mblk, bail now. Note that this may cause packets
+		 * reordering.
+		 */
+		iphp = (ipha_t *)(mp->b_rptr + skip_len);
+		if (((unsigned char *)iphp + sizeof (ipha_t) > mp->b_wptr) ||
+		    !OK_32PTR((char *)iphp))
+			goto done;
+
+		proto = iphp->ipha_protocol;
+		skip_len += IPH_HDR_LENGTH(iphp);
+
+		if ((policy & MAC_PKT_HASH_L3) != 0) {
+			uint8_t *ip_src = (uint8_t *)&(iphp->ipha_src);
+			uint8_t *ip_dst = (uint8_t *)&(iphp->ipha_dst);
+
+			hash ^= (PKT_HASH_4BYTES(ip_src) ^
+			    PKT_HASH_4BYTES(ip_dst));
+			policy &= ~MAC_PKT_HASH_L3;
+		}
+		break;
+	}
+	case ETHERTYPE_IPV6: {
+		ip6_t *ip6hp;
+		uint16_t hdr_length;
+
+		/*
+		 * If the header is not aligned or the header doesn't fit
+		 * in the mblk, bail now. Note that this may cause packets
+		 * reordering.
+		 */
+
+		ip6hp = (ip6_t *)(mp->b_rptr + skip_len);
+		if (((unsigned char *)ip6hp + IPV6_HDR_LEN > mp->b_wptr) ||
+		    !OK_32PTR((char *)ip6hp))
+			goto done;
+
+		if (!mac_ip_hdr_length_v6(mp, ip6hp, &hdr_length, &proto))
+			goto done;
+		skip_len += hdr_length;
+
+		if ((policy & MAC_PKT_HASH_L3) != 0) {
+			uint8_t *ip_src = &(ip6hp->ip6_src.s6_addr8[12]);
+			uint8_t *ip_dst = &(ip6hp->ip6_dst.s6_addr8[12]);
+
+			hash ^= (PKT_HASH_4BYTES(ip_src) ^
+			    PKT_HASH_4BYTES(ip_dst));
+			policy &= ~MAC_PKT_HASH_L3;
+		}
+		break;
+	}
+	default:
+		goto done;
+	}
+
+	if (policy == 0)
+		goto done;
+
+	/* if ip header is in its own mblk, skip it */
+	if (MBLKL(mp) <= skip_len) {
+		skip_len -= MBLKL(mp);
+		mp = mp->b_cont;
+		if (mp == NULL)
+			goto done;
+	}
+
+	/* parse ULP header */
+again:
+	switch (proto) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+	case IPPROTO_ESP:
+	case IPPROTO_SCTP:
+		/*
+		 * These Internet Protocols are intentionally designed
+		 * for hashing from the git-go.  Port numbers are in the first
+		 * word for transports, SPI is first for ESP.
+		 */
+		if (mp->b_rptr + skip_len + 4 > mp->b_wptr)
+			goto done;
+		hash ^= PKT_HASH_4BYTES((mp->b_rptr + skip_len));
+		break;
+
+	case IPPROTO_AH: {
+		ah_t *ah = (ah_t *)(mp->b_rptr + skip_len);
+		uint_t ah_length = AH_TOTAL_LEN(ah);
+
+		if ((unsigned char *)ah + sizeof (ah_t) > mp->b_wptr)
+			goto done;
+
+		proto = ah->ah_nexthdr;
+		skip_len += ah_length;
+
+		/* if AH header is in its own mblk, skip it */
+		if (MBLKL(mp) <= skip_len) {
+			skip_len -= MBLKL(mp);
+			mp = mp->b_cont;
+			if (mp == NULL)
+				goto done;
+		}
+
+		goto again;
+	}
+	}
+
+done:
+	return (hash);
 }

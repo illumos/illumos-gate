@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -565,20 +565,27 @@ extern void			mac_margin_get(mac_handle_t, uint32_t *);
 extern int			mac_margin_remove(mac_handle_t, uint32_t);
 extern int			mac_margin_add(mac_handle_t, uint32_t *,
 				    boolean_t);
-extern void			mac_init_ops(struct dev_ops *, const char *);
-extern void			mac_fini_ops(struct dev_ops *);
-extern uint32_t			mac_no_notification(mac_handle_t);
 
 extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
 extern int			mactype_register(mactype_register_t *);
 extern int			mactype_unregister(const char *);
-extern void			mac_set_ring(void *, void *);
 
 extern void			mac_start_logusage(mac_logtype_t, uint_t);
 extern void			mac_stop_logusage(mac_logtype_t);
 
 extern mac_handle_t		mac_get_lower_mac_handle(mac_handle_t);
+
+/*
+ * Packet hashing for distribution to multiple ports and rings.
+ */
+
+#define	MAC_PKT_HASH_L2		0x01
+#define	MAC_PKT_HASH_L3		0x02
+#define	MAC_PKT_HASH_L4		0x04
+
+extern uint64_t			mac_pkt_hash(uint_t, mblk_t *, uint8_t,
+				    boolean_t);
 
 #endif	/* _KERNEL */
 

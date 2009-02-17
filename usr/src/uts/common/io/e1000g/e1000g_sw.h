@@ -198,6 +198,8 @@ extern "C" {
 #define	E1000G_RX_SW_STOP		0x2
 #define	E1000G_RX_SW_DETACH		0x3
 
+#define	E1000G_CHAIN_NO_LIMIT		0
+
 /*
  * definitions for smartspeed workaround
  */
@@ -786,9 +788,6 @@ typedef struct _e1000g_rx_ring {
 	mac_ring_handle_t mrh;
 	mac_ring_handle_t mrh_init;
 	uint64_t ring_gen_num;
-	mblk_t *poll_list_head;
-	mblk_t *poll_list_tail;
-	uint_t poll_list_sz;
 	boolean_t poll_flag;
 
 	/*
@@ -998,7 +997,7 @@ void e1000g_free_tx_swpkt(p_tx_sw_packet_t packet);
 void e1000g_tx_freemsg(e1000g_tx_ring_t *tx_ring);
 uint_t e1000g_tx_softint_worker(caddr_t arg1, caddr_t arg2);
 mblk_t *e1000g_m_tx(void *arg, mblk_t *mp);
-mblk_t *e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz);
+mblk_t *e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz);
 void e1000g_rxfree_func(p_rx_sw_packet_t packet);
 
 int e1000g_m_stat(void *arg, uint_t stat, uint64_t *val);

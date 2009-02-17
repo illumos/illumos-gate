@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -515,25 +515,27 @@ static void
 mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 {
 	struct ether_header		*ehp;
-	uint16_t			etype;
+	struct ether_vlan_header	*evhp;
+	uint32_t			sap;
 	ipha_t				*ipha;
-	mac_soft_ring_t			*softring;
-	size_t				ether_hlen;
+	uint8_t				*dstaddr;
+	size_t				hdrsize;
 	mblk_t				*mp;
 	mblk_t				*headmp[MAX_SR_TYPES];
 	mblk_t				*tailmp[MAX_SR_TYPES];
 	int				cnt[MAX_SR_TYPES];
 	size_t				sz[MAX_SR_TYPES];
 	size_t				sz1;
-	boolean_t			bw_ctl = B_FALSE;
+	boolean_t			bw_ctl;
 	boolean_t			hw_classified;
-	boolean_t			dls_bypass = B_TRUE;
-	enum				pkt_type type;
+	boolean_t			dls_bypass;
+	boolean_t			is_ether;
+	boolean_t			is_unicast;
+	enum pkt_type			type;
 	mac_client_impl_t		*mcip = mac_srs->srs_mcip;
-	struct ether_vlan_header	*evhp;
 
-	if (mac_srs->srs_type & SRST_BW_CONTROL)
-		bw_ctl = B_TRUE;
+	is_ether = (mcip->mci_mip->mi_info.mi_nativemedia == DL_ETHER);
+	bw_ctl = ((mac_srs->srs_type & SRST_BW_CONTROL) != 0);
 
 	/*
 	 * If we don't have a Rx ring, S/W classification would have done
@@ -550,8 +552,7 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	 * processing in the Rx path. SRST_DLS_BYPASS will be clear for
 	 * such SRSs.
 	 */
-	if (!(mac_srs->srs_type & SRST_DLS_BYPASS))
-		dls_bypass = B_FALSE;
+	dls_bypass = ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0);
 
 	bzero(headmp, MAX_SR_TYPES * sizeof (mblk_t *));
 	bzero(tailmp, MAX_SR_TYPES * sizeof (mblk_t *));
@@ -570,68 +571,62 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		mp->b_next = NULL;
 
 		type = OTH;
-		sz1 = msgdsize(mp);
+		sz1 = (mp->b_cont == NULL) ? MBLKL(mp) : msgdsize(mp);
 
-		if (!dls_bypass) {
-			mac_impl_t	*mip = mcip->mci_mip;
-
+		if (is_ether) {
+			/*
+			 * At this point we can be sure the packet at least
+			 * has an ether header.
+			 */
+			if (sz1 < sizeof (struct ether_header)) {
+				mac_rx_drop_pkt(mac_srs, mp);
+				continue;
+			}
 			ehp = (struct ether_header *)mp->b_rptr;
 
 			/*
-			 * For VLAN packets, if the VLAN id doesn't belong
-			 * to this client, we drop the packet.
+			 * Determine if this is a VLAN or non-VLAN packet.
 			 */
-			if (mip->mi_info.mi_nativemedia == DL_ETHER &&
-			    ntohs(ehp->ether_type) == VLAN_TPID) {
+			if ((sap = ntohs(ehp->ether_type)) == VLAN_TPID) {
+				evhp = (struct ether_vlan_header *)mp->b_rptr;
+				sap = ntohs(evhp->ether_type);
+				hdrsize = sizeof (struct ether_vlan_header);
 				/*
-				 * LINTED: cast may result in improper
-				 * alignment
+				 * Check if the VID of the packet, if any,
+				 * belongs to this client.
 				 */
-				evhp = (struct ether_vlan_header *)ehp;
 				if (!mac_client_check_flow_vid(mcip,
 				    VLAN_ID(ntohs(evhp->ether_tci)))) {
 					mac_rx_drop_pkt(mac_srs, mp);
 					continue;
 				}
+			} else {
+				hdrsize = sizeof (struct ether_header);
 			}
+			is_unicast =
+			    ((((uint8_t *)&ehp->ether_dhost)[0] & 0x01) == 0);
+			dstaddr = (uint8_t *)&ehp->ether_dhost;
+		} else {
+			mac_header_info_t		mhi;
+
+			if (mac_header_info((mac_handle_t)mcip->mci_mip,
+			    mp, &mhi) != 0) {
+				mac_rx_drop_pkt(mac_srs, mp);
+				continue;
+			}
+			hdrsize = mhi.mhi_hdrsize;
+			sap = mhi.mhi_bindsap;
+			is_unicast = (mhi.mhi_dsttype == MAC_ADDRTYPE_UNICAST);
+			dstaddr = (uint8_t *)mhi.mhi_daddr;
+		}
+
+		if (!dls_bypass) {
 			FANOUT_ENQUEUE_MP(headmp[type], tailmp[type],
 			    cnt[type], bw_ctl, sz[type], sz1, mp);
 			continue;
 		}
 
-		/*
-		 * At this point we can be sure the packet at least
-		 * has an ether header.
-		 */
-		if (sz1 < sizeof (struct ether_header)) {
-			mac_rx_drop_pkt(mac_srs, mp);
-			continue;
-		}
-		/* LINTED: cast may result in improper alignment */
-		ehp = (struct ether_header *)mp->b_rptr;
-
-		/*
-		 * Determine if this is a VLAN or non-VLAN packet.
-		 */
-		if ((etype = ntohs(ehp->ether_type)) == VLAN_TPID) {
-			/* LINTED: cast may result in improper alignment */
-			evhp = (struct ether_vlan_header *)mp->b_rptr;
-			etype = ntohs(evhp->ether_type);
-			ether_hlen = sizeof (struct ether_vlan_header);
-			/*
-			 * Check if the VID of the packet, if any, belongs
-			 * to this client.
-			 */
-			if (!mac_client_check_flow_vid(mcip,
-			    VLAN_ID(ntohs(evhp->ether_tci)))) {
-				mac_rx_drop_pkt(mac_srs, mp);
-				continue;
-			}
-		} else {
-			ether_hlen = sizeof (struct ether_header);
-		}
-
-		if (etype == ETHERTYPE_IP) {
+		if (sap == ETHERTYPE_IP) {
 			/*
 			 * If we are H/W classified, but we have promisc
 			 * on, then we need to check for the unicast address.
@@ -641,12 +636,11 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 
 				rw_enter(&mcip->mci_rw_lock, RW_READER);
 				map = mcip->mci_unicast;
-				if (bcmp(&ehp->ether_dhost, map->ma_addr,
+				if (bcmp(dstaddr, map->ma_addr,
 				    map->ma_len) == 0)
 					type = UNDEF;
 				rw_exit(&mcip->mci_rw_lock);
-			} else if (((((uint8_t *)&ehp->ether_dhost)[0] &
-			    0x01) == 0)) {
+			} else if (is_unicast) {
 				type = UNDEF;
 			}
 		}
@@ -665,8 +659,7 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		 * the 'OTH' type path without DLS bypass.
 		 */
 
-		/* LINTED: cast may result in improper alignment */
-		ipha = (ipha_t *)(mp->b_rptr + ether_hlen);
+		ipha = (ipha_t *)(mp->b_rptr + hdrsize);
 		if ((type != OTH) && MBLK_RX_FANOUT_SLOWPATH(mp, ipha))
 			type = OTH;
 
@@ -686,18 +679,16 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		switch (ipha->ipha_protocol) {
 		case IPPROTO_TCP:
 			type = V4_TCP;
-			mp->b_rptr += ether_hlen;
+			mp->b_rptr += hdrsize;
 			break;
 		case IPPROTO_UDP:
 			type = V4_UDP;
-			mp->b_rptr += ether_hlen;
+			mp->b_rptr += hdrsize;
 			break;
 		default:
 			type = OTH;
 			break;
 		}
-
-		ASSERT(type != UNDEF);
 
 		FANOUT_ENQUEUE_MP(headmp[type], tailmp[type], cnt[type],
 		    bw_ctl, sz[type], sz1, mp);
@@ -705,6 +696,8 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 
 	for (type = V4_TCP; type < UNDEF; type++) {
 		if (headmp[type] != NULL) {
+			mac_soft_ring_t			*softring;
+
 			ASSERT(tailmp[type]->b_next == NULL);
 			switch (type) {
 			case V4_TCP:
@@ -716,7 +709,7 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			case OTH:
 				softring = mac_srs->srs_oth_soft_rings[0];
 			}
-			mac_rx_soft_ring_process(mac_srs->srs_mcip, softring,
+			mac_rx_soft_ring_process(mcip, softring,
 			    headmp[type], tailmp[type], cnt[type], sz[type]);
 		}
 	}
@@ -731,7 +724,7 @@ int	fanout_unalligned = 0;
  */
 static int
 mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
-    uint16_t etype, enum pkt_type *type, uint_t *indx)
+    uint32_t sap, size_t hdrsize, enum pkt_type *type, uint_t *indx)
 {
 	ip6_t		*ip6h;
 	uint8_t		*whereptr;
@@ -740,18 +733,18 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 	uint8_t		nexthdr;
 	uint16_t	hdr_len;
 
-	if (etype == ETHERTYPE_IPV6) {
+	if (sap == ETHERTYPE_IPV6) {
 		boolean_t	modifiable = B_TRUE;
 
-		ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
+		ASSERT(MBLKL(mp) >= hdrsize);
 
-		ip6h = (ip6_t *)(mp->b_rptr + sizeof (struct ether_header));
+		ip6h = (ip6_t *)(mp->b_rptr + hdrsize);
 		if ((unsigned char *)ip6h == mp->b_wptr) {
 			/*
-			 * The first mblk_t only includes the ethernet header.
+			 * The first mblk_t only includes the mac header.
 			 * Note that it is safe to change the mp pointer here,
 			 * as the subsequent operation does not assume mp
-			 * points to the start of the ethernet header.
+			 * points to the start of the mac header.
 			 */
 			mp = mp->b_cont;
 
@@ -900,32 +893,32 @@ static void
 mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 {
 	struct ether_header		*ehp;
-	uint16_t			etype;
+	struct ether_vlan_header	*evhp;
+	uint32_t			sap;
 	ipha_t				*ipha;
+	uint8_t				*dstaddr;
 	uint_t				indx;
-	int				ports_offset = -1;
-	int				ipha_len;
+	size_t				ports_offset;
+	size_t				ipha_len;
+	size_t				hdrsize;
 	uint_t				hash;
-	mac_soft_ring_t			*softring;
-	size_t				ether_hlen;
-	uint16_t			frag_offset_flags;
 	mblk_t				*mp;
 	mblk_t				*headmp[MAX_SR_TYPES][MAX_SR_FANOUT];
 	mblk_t				*tailmp[MAX_SR_TYPES][MAX_SR_FANOUT];
 	int				cnt[MAX_SR_TYPES][MAX_SR_FANOUT];
 	size_t				sz[MAX_SR_TYPES][MAX_SR_FANOUT];
 	size_t				sz1;
-	boolean_t			bw_ctl = B_FALSE;
+	boolean_t			bw_ctl;
 	boolean_t			hw_classified;
-	boolean_t			dls_bypass = B_TRUE;
-	int				i;
+	boolean_t			dls_bypass;
+	boolean_t			is_ether;
+	boolean_t			is_unicast;
 	int				fanout_cnt;
-	enum 				pkt_type type;
+	enum pkt_type			type;
 	mac_client_impl_t		*mcip = mac_srs->srs_mcip;
-	struct ether_vlan_header	*evhp;
 
-	if (mac_srs->srs_type & SRST_BW_CONTROL)
-		bw_ctl = B_TRUE;
+	is_ether = (mcip->mci_mip->mi_info.mi_nativemedia == DL_ETHER);
+	bw_ctl = ((mac_srs->srs_type & SRST_BW_CONTROL) != 0);
 
 	/*
 	 * If we don't have a Rx ring, S/W classification would have done
@@ -942,8 +935,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	 * processing in the Rx path. SRST_DLS_BYPASS will be clear for
 	 * such SRSs.
 	 */
-	if (!(mac_srs->srs_type & SRST_DLS_BYPASS))
-		dls_bypass = B_FALSE;
+	dls_bypass = ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0);
 
 	/*
 	 * Since the softrings are never destroyed and we always
@@ -972,37 +964,60 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		mp->b_next = NULL;
 
 		type = OTH;
-		sz1 = msgdsize(mp);
+		sz1 = (mp->b_cont == NULL) ? MBLKL(mp) : msgdsize(mp);
 
-		if (!dls_bypass) {
-			mac_impl_t	*mip = mcip->mci_mip;
+		if (is_ether) {
+			/*
+			 * At this point we can be sure the packet at least
+			 * has an ether header.
+			 */
+			if (sz1 < sizeof (struct ether_header)) {
+				mac_rx_drop_pkt(mac_srs, mp);
+				continue;
+			}
+			ehp = (struct ether_header *)mp->b_rptr;
 
-			indx = 0;
-			if (mip->mi_info.mi_nativemedia == DL_ETHER) {
-				ehp = (struct ether_header *)mp->b_rptr;
-				etype = ntohs(ehp->ether_type);
+			/*
+			 * Determine if this is a VLAN or non-VLAN packet.
+			 */
+			if ((sap = ntohs(ehp->ether_type)) == VLAN_TPID) {
+				evhp = (struct ether_vlan_header *)mp->b_rptr;
+				sap = ntohs(evhp->ether_type);
+				hdrsize = sizeof (struct ether_vlan_header);
 				/*
-				 * For VLAN packets, if the VLAN id doesn't
-				 * belong to this client, we drop the packet.
+				 * Check if the VID of the packet, if any,
+				 * belongs to this client.
 				 */
-				if (etype == VLAN_TPID) {
-					/*
-					 * LINTED: cast may result in improper
-					 * alignment
-					 */
-					evhp = (struct ether_vlan_header *)
-					    mp->b_rptr;
-					if (!mac_client_check_flow_vid(mcip,
-					    VLAN_ID(ntohs(evhp->ether_tci)))) {
-						mac_rx_drop_pkt(mac_srs, mp);
-						continue;
-					}
-				}
-				if (mac_rx_srs_long_fanout(mac_srs, mp, etype,
-				    &type, &indx) == -1) {
+				if (!mac_client_check_flow_vid(mcip,
+				    VLAN_ID(ntohs(evhp->ether_tci)))) {
 					mac_rx_drop_pkt(mac_srs, mp);
 					continue;
 				}
+			} else {
+				hdrsize = sizeof (struct ether_header);
+			}
+			is_unicast =
+			    ((((uint8_t *)&ehp->ether_dhost)[0] & 0x01) == 0);
+			dstaddr = (uint8_t *)&ehp->ether_dhost;
+		} else {
+			mac_header_info_t		mhi;
+
+			if (mac_header_info((mac_handle_t)mcip->mci_mip,
+			    mp, &mhi) != 0) {
+				mac_rx_drop_pkt(mac_srs, mp);
+				continue;
+			}
+			hdrsize = mhi.mhi_hdrsize;
+			sap = mhi.mhi_bindsap;
+			is_unicast = (mhi.mhi_dsttype == MAC_ADDRTYPE_UNICAST);
+			dstaddr = (uint8_t *)mhi.mhi_daddr;
+		}
+
+		if (!dls_bypass) {
+			if (mac_rx_srs_long_fanout(mac_srs, mp, sap,
+			    hdrsize, &type, &indx) == -1) {
+				mac_rx_drop_pkt(mac_srs, mp);
+				continue;
 			}
 
 			FANOUT_ENQUEUE_MP(headmp[type][indx],
@@ -1011,47 +1026,13 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			continue;
 		}
 
-		/*
-		 * At this point we can be sure the packet at least
-		 * has an ether header. On the outbound side, GLD/stack
-		 * ensure this. On the inbound side, the driver needs
-		 * to ensure this.
-		 */
-		if (sz1 < sizeof (struct ether_header)) {
-			mac_rx_drop_pkt(mac_srs, mp);
-			continue;
-		}
-		/* LINTED: cast may result in improper alignment */
-		ehp = (struct ether_header *)mp->b_rptr;
-
-		/*
-		 * Determine if this is a VLAN or non-VLAN packet.
-		 */
-		if ((etype = ntohs(ehp->ether_type)) == VLAN_TPID) {
-			/* LINTED: cast may result in improper alignment */
-			evhp = (struct ether_vlan_header *)mp->b_rptr;
-			etype = ntohs(evhp->ether_type);
-			ether_hlen = sizeof (struct ether_vlan_header);
-			/*
-			 * Check if the VID of the packet, if any, belongs
-			 * to this client.
-			 */
-			if (!mac_client_check_flow_vid(mcip,
-			    VLAN_ID(ntohs(evhp->ether_tci)))) {
-				mac_rx_drop_pkt(mac_srs, mp);
-				continue;
-			}
-		} else {
-			ether_hlen = sizeof (struct ether_header);
-		}
-
 
 		/*
 		 * If we are using the default Rx ring where H/W or S/W
 		 * classification has not happened, we need to verify if
 		 * this unicast packet really belongs to us.
 		 */
-		if (etype == ETHERTYPE_IP) {
+		if (sap == ETHERTYPE_IP) {
 			/*
 			 * If we are H/W classified, but we have promisc
 			 * on, then we need to check for the unicast address.
@@ -1061,12 +1042,11 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 
 				rw_enter(&mcip->mci_rw_lock, RW_READER);
 				map = mcip->mci_unicast;
-				if (bcmp(&ehp->ether_dhost, map->ma_addr,
+				if (bcmp(dstaddr, map->ma_addr,
 				    map->ma_len) == 0)
 					type = UNDEF;
 				rw_exit(&mcip->mci_rw_lock);
-			} else if (((((uint8_t *)&ehp->ether_dhost)[0] &
-			    0x01) == 0)) {
+			} else if (is_unicast) {
 				type = UNDEF;
 			}
 		}
@@ -1076,14 +1056,15 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		 * the fast path.
 		 */
 
-		/* LINTED: cast may result in improper alignment */
-		ipha = (ipha_t *)(mp->b_rptr + ether_hlen);
+		ipha = (ipha_t *)(mp->b_rptr + hdrsize);
 		if ((type != OTH) && MBLK_RX_FANOUT_SLOWPATH(mp, ipha)) {
 			type = OTH;
 			fanout_oth1++;
 		}
 
 		if (type != OTH) {
+			uint16_t	frag_offset_flags;
+
 			switch (ipha->ipha_protocol) {
 			case IPPROTO_TCP:
 			case IPPROTO_UDP:
@@ -1103,7 +1084,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 					fanout_oth3++;
 					break;
 				}
-				ports_offset = ether_hlen + ipha_len;
+				ports_offset = hdrsize + ipha_len;
 				break;
 			default:
 				type = OTH;
@@ -1113,8 +1094,8 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 		}
 
 		if (type == OTH) {
-			if (mac_rx_srs_long_fanout(mac_srs, mp, etype,
-			    &type, &indx) == -1) {
+			if (mac_rx_srs_long_fanout(mac_srs, mp, sap,
+			    hdrsize, &type, &indx) == -1) {
 				mac_rx_drop_pkt(mac_srs, mp);
 				continue;
 			}
@@ -1146,7 +1127,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 			    *(uint32_t *)(mp->b_rptr + ports_offset));
 			indx = COMPUTE_INDEX(hash, mac_srs->srs_tcp_ring_count);
 			type = V4_TCP;
-			mp->b_rptr += ether_hlen;
+			mp->b_rptr += hdrsize;
 			break;
 		case IPPROTO_UDP:
 		case IPPROTO_SCTP:
@@ -1162,19 +1143,24 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 				mac_srs->srs_ind++;
 			}
 			type = V4_UDP;
-			mp->b_rptr += ether_hlen;
+			mp->b_rptr += hdrsize;
 			break;
+		default:
+			indx = 0;
+			type = OTH;
 		}
-
-		ASSERT(type != UNDEF);
 
 		FANOUT_ENQUEUE_MP(headmp[type][indx], tailmp[type][indx],
 		    cnt[type][indx], bw_ctl, sz[type][indx], sz1, mp);
 	}
 
 	for (type = V4_TCP; type < UNDEF; type++) {
+		int	i;
+
 		for (i = 0; i < fanout_cnt; i++) {
 			if (headmp[type][i] != NULL) {
+				mac_soft_ring_t	*softring;
+
 				ASSERT(tailmp[type][i]->b_next == NULL);
 				switch (type) {
 				case V4_TCP:
@@ -1190,7 +1176,7 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 					    mac_srs->srs_oth_soft_rings[i];
 					break;
 				}
-				mac_rx_soft_ring_process(mac_srs->srs_mcip,
+				mac_rx_soft_ring_process(mcip,
 				    softring, headmp[type][i], tailmp[type][i],
 				    cnt[type][i], sz[type][i]);
 			}
@@ -1373,46 +1359,39 @@ check_again:
 		    (mac_srs->srs_first != NULL)) {
 			/*
 			 * We have packets to process and worker thread
-			 * is not running.  Check to see if poll thread is
-			 * allowed to process. Let it do processing only if it
-			 * picked up some packets from the NIC otherwise
-			 * wakeup the worker thread.
+			 * is not running. Check to see if poll thread is
+			 * allowed to process.
 			 */
-			if ((mac_srs->srs_state & SRS_LATENCY_OPT) &&
-			    (head != NULL)) {
+			if (mac_srs->srs_state & SRS_LATENCY_OPT) {
 				mac_srs->srs_drain_func(mac_srs, SRS_POLL_PROC);
 				if (srs_rx->sr_poll_pkt_cnt <=
 				    srs_rx->sr_lowat) {
 					srs_rx->sr_poll_again++;
 					goto check_again;
-				} else {
-					/*
-					 * We are already above low water mark
-					 * so stay in the polling mode but no
-					 * need to poll. Once we dip below
-					 * the polling threshold, the processing
-					 * thread (soft ring) will signal us
-					 * to poll again (MAC_UPDATE_SRS_COUNT)
-					 */
-					srs_rx->sr_poll_drain_no_poll++;
-					mac_srs->srs_state &=
-					    ~(SRS_PROC|SRS_GET_PKTS);
-					/*
-					 * In B/W control case, its possible
-					 * that the backlog built up due to
-					 * B/W limit being reached and packets
-					 * are queued only in SRS. In this case,
-					 * we should schedule worker thread
-					 * since no one else will wake us up.
-					 */
-					if ((mac_srs->srs_type &
-					    SRST_BW_CONTROL) &&
-					    (mac_srs->srs_tid == NULL)) {
-						mac_srs->srs_tid =
-						    timeout(mac_srs_fire,
-						    mac_srs, 1);
-						srs_rx->sr_poll_worker_wakeup++;
-					}
+				}
+				/*
+				 * We are already above low water mark
+				 * so stay in the polling mode but no
+				 * need to poll. Once we dip below
+				 * the polling threshold, the processing
+				 * thread (soft ring) will signal us
+				 * to poll again (MAC_UPDATE_SRS_COUNT)
+				 */
+				srs_rx->sr_poll_drain_no_poll++;
+				mac_srs->srs_state &= ~(SRS_PROC|SRS_GET_PKTS);
+				/*
+				 * In B/W control case, its possible
+				 * that the backlog built up due to
+				 * B/W limit being reached and packets
+				 * are queued only in SRS. In this case,
+				 * we should schedule worker thread
+				 * since no one else will wake us up.
+				 */
+				if ((mac_srs->srs_type & SRST_BW_CONTROL) &&
+				    (mac_srs->srs_tid == NULL)) {
+					mac_srs->srs_tid =
+					    timeout(mac_srs_fire, mac_srs, 1);
+					srs_rx->sr_poll_worker_wakeup++;
 				}
 			} else {
 				/*
@@ -1598,7 +1577,7 @@ mac_rx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 
 	ASSERT(MUTEX_HELD(&mac_srs->srs_lock));
 	ASSERT(!(mac_srs->srs_type & SRST_BW_CONTROL));
-again:
+
 	/* If we are blanked i.e. can't do upcalls, then we are done */
 	if (mac_srs->srs_state & (SRS_BLANK | SRS_PAUSE)) {
 		ASSERT((mac_srs->srs_type & SRST_NO_SOFT_RINGS) ||
@@ -1609,6 +1588,26 @@ again:
 	if (mac_srs->srs_first == NULL)
 		goto out;
 
+	if (!(mac_srs->srs_state & SRS_LATENCY_OPT) &&
+	    (srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_lowat)) {
+		/*
+		 * In the normal case, the SRS worker thread does no
+		 * work and we wait for a backlog to build up before
+		 * we switch into polling mode. In case we are
+		 * optimizing for throughput, we use the worker thread
+		 * as well. The goal is to let worker thread process
+		 * the queue and poll thread to feed packets into
+		 * the queue. As such, we should signal the poll
+		 * thread to try and get more packets.
+		 *
+		 * We could have pulled this check in the POLL_RING
+		 * macro itself but keeping it explicit here makes
+		 * the architecture more human understandable.
+		 */
+		MAC_SRS_POLL_RING(mac_srs);
+	}
+
+again:
 	head = mac_srs->srs_first;
 	mac_srs->srs_first = NULL;
 	tail = mac_srs->srs_last;
@@ -1624,10 +1623,7 @@ again:
 
 	mac_srs->srs_state |= (SRS_PROC|proc_type);
 
-	/* Switch to polling mode */
-	MAC_SRS_WORKER_POLLING_ON(mac_srs);
-	if (srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_lowat)
-		MAC_SRS_POLL_RING(mac_srs);
+
 	/*
 	 * mcip is NULL for broadcast and multicast flows. The promisc
 	 * callbacks for broadcast and multicast packets are delivered from
@@ -1696,37 +1692,27 @@ again:
 		mutex_enter(&mac_srs->srs_lock);
 	}
 
-	/*
-	 * Send the poll thread to pick up any packets arrived
-	 * so far. This also serves as the last check in case
-	 * nothing else is queued in the SRS. The poll thread
-	 * is signalled only in the case the drain was done
-	 * by the worker thread and SRS_WORKER is set. The
-	 * worker thread can run in parallel as long as the
-	 * SRS_WORKER flag is set. We we have nothing else to
-	 * process, we can exit while leaving SRS_PROC set
-	 * which gives the poll thread control to process and
-	 * cleanup once it returns from the NIC.
-	 *
-	 * If we have nothing else to process, we need to
-	 * ensure that we keep holding the srs_lock till
-	 * all the checks below are done and control is
-	 * handed to the poll thread if it was running.
-	 */
-	if (mac_srs->srs_first != NULL) {
-		if (proc_type == SRS_WORKER) {
-			if (srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_lowat)
-				MAC_SRS_POLL_RING(mac_srs);
+	if (!(mac_srs->srs_state & (SRS_LATENCY_OPT|SRS_BLANK|SRS_PAUSE))) {
+		/*
+		 * In case we are optimizing for throughput, we
+		 * should try and keep the worker thread running
+		 * as much as possible. Send the poll thread down
+		 * to check one more time if something else
+		 * arrived. In the meanwhile, if poll thread had
+		 * collected something due to earlier signal,
+		 * process it now.
+		 */
+		if (srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_lowat) {
+			srs_rx->sr_drain_poll_sig++;
+			MAC_SRS_POLL_RING(mac_srs);
+		}
+		if (mac_srs->srs_first != NULL) {
 			srs_rx->sr_drain_again++;
 			goto again;
-		} else {
-			srs_rx->sr_drain_worker_sig++;
-			cv_signal(&mac_srs->srs_async);
 		}
 	}
 
 out:
-
 	if (mac_srs->srs_state & SRS_GET_PKTS) {
 		/*
 		 * Poll thread is already running. Leave the
@@ -1884,12 +1870,6 @@ again:
 	} else {
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
 	}
-
-	/*
-	 * We can continue processing the queue.
-	 * We need to figure out if there is a fanout needed or
-	 * we can just process this here.
-	 */
 
 	if ((tid = mac_srs->srs_tid) != 0)
 		mac_srs->srs_tid = 0;
@@ -2405,8 +2385,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 		 * optimizing for latency, we should signal the
 		 * worker thread.
 		 */
-		if (loopback || ((count > 1) &&
-		    !(mac_srs->srs_state & SRS_LATENCY_OPT))) {
+		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT)) {
 			/*
 			 * For loopback, We need to let the worker take
 			 * over as we don't want to continue in the same
@@ -2501,6 +2480,12 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	int cnt, sz;
 	mblk_t *tail;
 	boolean_t wakeup_worker = B_TRUE;
+
+	/*
+	 * Ignore fanout hint if we don't have multiple tx rings.
+	 */
+	if (!TX_MULTI_RING_MODE(mac_srs))
+		fanout_hint = 0;
 
 	if (mac_srs->srs_first != NULL)
 		wakeup_worker = B_FALSE;
@@ -2753,18 +2738,89 @@ mac_tx_serializer_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
  * the soft ring associated with that Tx ring. The srs itself will not
  * queue any packets.
  */
+
+#define	MAC_TX_SOFT_RING_PROCESS(chain) {		       		\
+	index = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count),	\
+	softring = mac_srs->srs_oth_soft_rings[index];			\
+	cookie = mac_tx_soft_ring_process(softring, chain, flag, ret_mp); \
+	DTRACE_PROBE2(tx__fanout, uint64_t, hash, uint_t, index);	\
+}
+
 static mac_tx_cookie_t
 mac_tx_fanout_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
     uintptr_t fanout_hint, uint16_t flag, mblk_t **ret_mp)
 {
 	mac_soft_ring_t		*softring;
-	uint_t			indx, hash;
+	uint64_t		hash;
+	uint_t			index;
+	mac_tx_cookie_t		cookie = NULL;
 
 	ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_FANOUT);
-	hash = HASH_HINT(fanout_hint);
-	indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);
-	softring = mac_srs->srs_oth_soft_rings[indx];
-	return (mac_tx_soft_ring_process(softring, mp_chain, flag, ret_mp));
+	if (fanout_hint != 0) {
+		/*
+		 * The hint is specified by the caller, simply pass the
+		 * whole chain to the soft ring.
+		 */
+		hash = HASH_HINT(fanout_hint);
+		MAC_TX_SOFT_RING_PROCESS(mp_chain);
+	} else {
+		mblk_t *last_mp, *cur_mp, *sub_chain;
+		uint64_t last_hash = 0;
+		uint_t media = mac_srs->srs_mcip->mci_mip->mi_info.mi_media;
+
+		/*
+		 * Compute the hash from the contents (headers) of the
+		 * packets of the mblk chain. Split the chains into
+		 * subchains of the same conversation.
+		 *
+		 * Since there may be more than one ring used for
+		 * sub-chains of the same call, and since the caller
+		 * does not maintain per conversation state since it
+		 * passed a zero hint, unsent subchains will be
+		 * dropped.
+		 */
+
+		flag |= MAC_DROP_ON_NO_DESC;
+		ret_mp = NULL;
+
+		ASSERT(ret_mp == NULL);
+
+		sub_chain = NULL;
+		last_mp = NULL;
+
+		for (cur_mp = mp_chain; cur_mp != NULL;
+		    cur_mp = cur_mp->b_next) {
+			hash = mac_pkt_hash(media, cur_mp, MAC_PKT_HASH_L4,
+			    B_TRUE);
+			if (last_hash != 0 && hash != last_hash) {
+				/*
+				 * Starting a different subchain, send current
+				 * chain out.
+				 */
+				ASSERT(last_mp != NULL);
+				last_mp->b_next = NULL;
+				MAC_TX_SOFT_RING_PROCESS(sub_chain);
+				sub_chain = NULL;
+			}
+
+			/* add packet to subchain */
+			if (sub_chain == NULL)
+				sub_chain = cur_mp;
+			last_mp = cur_mp;
+			last_hash = hash;
+		}
+
+		if (sub_chain != NULL) {
+			/* send last subchain */
+			ASSERT(last_mp != NULL);
+			last_mp->b_next = NULL;
+			MAC_TX_SOFT_RING_PROCESS(sub_chain);
+		}
+
+		cookie = NULL;
+	}
+
+	return (cookie);
 }
 
 /*
@@ -2788,8 +2844,17 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	ASSERT(mac_srs->srs_type & SRST_BW_CONTROL);
 	mutex_enter(&mac_srs->srs_lock);
 	if (mac_srs->srs_bw->mac_bw_limit == 0) {
-		/* zero bandwidth: drop all */
-		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
+		/*
+		 * zero bandwidth, no traffic is sent: drop the packets,
+		 * or return the whole chain if the caller requests all
+		 * unsent packets back.
+		 */
+		if (flag & MAC_TX_NO_ENQUEUE) {
+			cookie = (mac_tx_cookie_t)mac_srs;
+			*ret_mp = mp_chain;
+		} else {
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
+		}
 		mutex_exit(&mac_srs->srs_lock);
 		return (cookie);
 	} else if ((mac_srs->srs_first != NULL) ||
@@ -3223,9 +3288,6 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 	DTRACE_PROBE3(slowpath, mac_client_impl_t *,
 	    src_mcip, int, mip->mi_nclients, mblk_t *, mp_chain);
 
-	if (mip->mi_promisc_list != NULL)
-		mac_promisc_dispatch(mip, mp_chain, src_mcip);
-
 	mp = mp_chain;
 	while (mp != NULL) {
 		flow_entry_t *dst_flow_ent;
@@ -3239,6 +3301,12 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 		pkt_size = (mp->b_cont == NULL ? MBLKL(mp) : msgdsize(mp));
 		obytes += pkt_size;
 		CHECK_VID_AND_ADD_TAG(mp);
+
+		/*
+		 * Check if there are promiscuous mode callbacks defined.
+		 */
+		if (mip->mi_promisc_list != NULL)
+			mac_promisc_dispatch(mip, mp, src_mcip);
 
 		/*
 		 * Find the destination.
@@ -3516,9 +3584,8 @@ mac_rx_soft_ring_process(mac_client_impl_t *mcip, mac_soft_ring_t *ringp,
 
 	mutex_enter(&ringp->s_ring_lock);
 	ringp->s_ring_total_inpkt += cnt;
-	if ((ringp->s_ring_type & ST_RING_ANY) ||
-	    ((mac_srs->srs_rx.sr_poll_pkt_cnt <= 1) &&
-	    !mac_srs->srs_rx.sr_enqueue_always)) {
+	if ((mac_srs->srs_rx.sr_poll_pkt_cnt <= 1) &&
+	    !(ringp->s_ring_type & ST_RING_WORKER_ONLY)) {
 		/* If on processor or blanking on, then enqueue and return */
 		if (ringp->s_ring_state & S_RING_BLANK ||
 		    ringp->s_ring_state & S_RING_PROC) {
@@ -3526,7 +3593,6 @@ mac_rx_soft_ring_process(mac_client_impl_t *mcip, mac_soft_ring_t *ringp,
 			mutex_exit(&ringp->s_ring_lock);
 			return;
 		}
-
 		proc = ringp->s_ring_rx_func;
 		arg1 = ringp->s_ring_rx_arg1;
 		arg2 = ringp->s_ring_rx_arg2;

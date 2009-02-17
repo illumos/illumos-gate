@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
 #include	<sys/atomic.h>
 
 static kmem_cache_t	*i_dls_link_cachep;
-static mod_hash_t	*i_dls_link_hash;
+mod_hash_t		*i_dls_link_hash;
 static uint_t		i_dls_link_count;
 
 #define		LINK_HASHSZ	67	/* prime */

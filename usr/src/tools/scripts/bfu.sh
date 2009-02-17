@@ -4708,8 +4708,31 @@ then
 	if [[ ! -f $root/sbin/flowadm ]] && \
 	    archive_file_exists generic.sbin "sbin/flowadm"; then
 		flowadm_status="new"
-		host_ifs=`ls -1 $rootprefix/etc | egrep -e \
-	  	  '^hostname.|^hostname6.|^dhcp.'|  cut -d . -f2 | sort -u` 
+
+		for iftype in hostname hostname6 dhcp
+		do
+			interface_names="`echo /etc/$iftype.*[0-9] 2>/dev/null`"
+			if [ "$interface_names" != "/etc/iftype.*[0-9]" ]; then
+				ORIGIFS="$IFS"
+				IFS="$IFS."
+				set -- $interface_names
+				IFS="$ORIGIFS"
+				while [ $# -ge 2 ]; do
+					shift
+					if [ $# -gt 1 -a \
+					    "$2" != "/etc/$iftype" ]; then
+						while [ $# -gt 1 -a \
+						    "$1" != "/etc/$iftype" ]; do
+							shift
+						done
+					else
+						host_ifs="$host_ifs $1"
+						shift
+					fi
+				done
+			fi
+		done
+
 		zones=`zoneadm list -c | grep -v global`
 		for zone in $zones
 		do

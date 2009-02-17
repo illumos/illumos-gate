@@ -313,12 +313,12 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 		link_state_changed = B_TRUE;
 	}
 
-	aggr_grp_multicst_port(port, B_TRUE);
-
 	/*
 	 * Update port's state.
 	 */
 	port->lp_state = AGGR_PORT_STATE_ATTACHED;
+
+	aggr_grp_multicst_port(port, B_TRUE);
 
 	/*
 	 * Set port's receive callback
@@ -2028,8 +2028,10 @@ aggr_remmac(void *arg, const uint8_t *mac_addr)
 /*
  * Add or remove the multicast addresses that are defined for the group
  * to or from the specified port.
- * This function is called before stopping a port, before a port
- * is detached from a group, and when attaching a port to a group.
+ *
+ * Note that aggr_grp_multicst_port(..., B_TRUE) is called when the port
+ * is started and attached, and aggr_grp_multicst_port(..., B_FALSE) is
+ * called when the port is either stopped or detached.
  */
 void
 aggr_grp_multicst_port(aggr_port_t *port, boolean_t add)
@@ -2039,7 +2041,7 @@ aggr_grp_multicst_port(aggr_port_t *port, boolean_t add)
 	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
-	if (!port->lp_started)
+	if (!port->lp_started || port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return;
 
 	mac_multicast_refresh(grp->lg_mh, aggr_port_multicst, port, add);
@@ -2055,8 +2057,10 @@ aggr_m_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 
 	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
+		if (port->lp_state != AGGR_PORT_STATE_ATTACHED ||
+		    !port->lp_started) {
 			continue;
+		}
 		cerr = aggr_port_multicst(port, add, addrp);
 		if (cerr != 0 && err == 0)
 			err = cerr;

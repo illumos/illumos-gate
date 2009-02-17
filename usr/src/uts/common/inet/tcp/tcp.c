@@ -86,6 +86,7 @@
 #include <inet/kstatcom.h>
 #include <inet/tcp.h>
 #include <inet/tcp_impl.h>
+#include <inet/udp_impl.h>
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipdrop.h>
@@ -19431,7 +19432,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 			    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
 		}
 
-		ILL_SEND_TX(ill, ire, connp, mp, 0);
+		ILL_SEND_TX(ill, ire, connp, mp, 0, NULL);
 	}
 
 	IRE_REFRELE(ire);
@@ -21418,7 +21419,7 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 			    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
 		}
 
-		ILL_SEND_TX(ill, ire, tcp->tcp_connp, mp, 0);
+		ILL_SEND_TX(ill, ire, tcp->tcp_connp, mp, 0, NULL);
 	}
 }
 

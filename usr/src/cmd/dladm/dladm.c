@@ -252,6 +252,7 @@ typedef struct show_usage_state_s {
 	boolean_t	us_parseable;
 	boolean_t	us_printheader;
 	boolean_t	us_first;
+	boolean_t	us_showall;
 	print_state_t	us_print;
 } show_usage_state_t;
 
@@ -392,7 +393,7 @@ static cmd_t	cmds[] = {
 	{ "show-etherstub",	do_show_etherstub,
 	    "    show-etherstub   [-t] [<link>]\n"			},
 	{ "show-usage",		do_show_usage,
-	    "    show-usage       [-d|-p -F <format>] "
+	    "    show-usage       [-a] [-d | -F <format>] "
 	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
 	    "\t\t     [-e <DD/MM/YYYY,HH:MM:SS>] -f <logfile> [<link>]"	}
 };
@@ -480,6 +481,14 @@ static const struct option etherstub_lopts[] = {
 	{ 0, 0, 0, 0 }
 };
 
+static const struct option usage_opts[] = {
+	{"file",	required_argument,	0, 'f'	},
+	{"format",	required_argument,	0, 'F'	},
+	{"start",	required_argument,	0, 's'	},
+	{"stop",	required_argument,	0, 'e'	},
+	{ 0, 0, 0, 0 }
+};
+
 /*
  * structures for 'dladm show-ether'
  */
@@ -527,26 +536,33 @@ typedef struct print_ether_state {
  * structures for 'dladm show-link -s' (print statistics)
  */
 typedef enum {
-	DEVS_LINK,
-	DEVS_IPKTS,
-	DEVS_RBYTES,
-	DEVS_IERRORS,
-	DEVS_OPKTS,
-	DEVS_OBYTES,
-	DEVS_OERRORS
-} devs_field_index_t;
+	LINK_S_LINK,
+	LINK_S_IPKTS,
+	LINK_S_RBYTES,
+	LINK_S_IERRORS,
+	LINK_S_OPKTS,
+	LINK_S_OBYTES,
+	LINK_S_OERRORS
+} link_s_field_index_t;
 
-static print_field_t devs_fields[] = {
+static print_field_t link_s_fields[] = {
 /* name,	header,		field width,	index,		cmdtype	*/
-{ "link",	"LINK",			15,	DEVS_LINK,	CMD_TYPE_ANY},
-{ "ipackets",	"IPACKETS",		10,	DEVS_IPKTS,	CMD_TYPE_ANY},
-{ "rbytes",	"RBYTES",		8,	DEVS_RBYTES,	CMD_TYPE_ANY},
-{ "ierrors",	"IERRORS",		10,	DEVS_IERRORS,	CMD_TYPE_ANY},
-{ "opackets",	"OPACKETS",		12,	DEVS_OPKTS,	CMD_TYPE_ANY},
-{ "obytes",	"OBYTES",		12,	DEVS_OBYTES,	CMD_TYPE_ANY},
-{ "oerrors",	"OERRORS",		8,	DEVS_OERRORS,	CMD_TYPE_ANY}}
+{ "link",	"LINK",			15,	LINK_S_LINK,	CMD_TYPE_ANY},
+{ "ipackets",	"IPACKETS",		10,	LINK_S_IPKTS,	CMD_TYPE_ANY},
+{ "rbytes",	"RBYTES",		8,	LINK_S_RBYTES,	CMD_TYPE_ANY},
+{ "ierrors",	"IERRORS",		10,	LINK_S_IERRORS,	CMD_TYPE_ANY},
+{ "opackets",	"OPACKETS",		12,	LINK_S_OPKTS,	CMD_TYPE_ANY},
+{ "obytes",	"OBYTES",		12,	LINK_S_OBYTES,	CMD_TYPE_ANY},
+{ "oerrors",	"OERRORS",		8,	LINK_S_OERRORS,	CMD_TYPE_ANY}}
 ;
-#define	DEVS_MAX_FIELDS	(sizeof (devs_fields) / sizeof (print_field_t))
+#define	LINK_S_MAX_FIELDS \
+	(sizeof (link_s_fields) / sizeof (print_field_t))
+
+typedef struct link_args_s {
+	char		*link_s_link;
+	pktsum_t	*link_s_psum;
+} link_args_t;
+static char *print_link_stats(print_field_t *, void *);
 
 /*
  * buffer used by print functions for show-{link,phys,vlan} commands.
@@ -925,7 +941,7 @@ static print_field_t vnic_fields[] = {
     offsetof(vnic_fields_buf_t, vnic_over),		CMD_TYPE_ANY},
 { "speed",		"SPEED",	6,
     offsetof(vnic_fields_buf_t, vnic_speed),		CMD_TYPE_ANY},
-{ "macaddr",		"MACADDRESS",	20,
+{ "macaddress",		"MACADDRESS",	20,
     offsetof(vnic_fields_buf_t, vnic_macaddr),		CMD_TYPE_ANY},
 { "macaddrtype",	"MACADDRTYPE",	19,
     offsetof(vnic_fields_buf_t, vnic_macaddrtype),	CMD_TYPE_ANY},
@@ -1077,9 +1093,24 @@ main(int argc, char *argv[])
 static int
 show_usage_date(dladm_usage_t *usage, void *arg)
 {
+	show_usage_state_t	*state = (show_usage_state_t *)arg;
+	time_t			stime;
+	char			timebuf[20];
+	dladm_status_t		status;
+	uint32_t		flags;
 
-	time_t	stime;
-	char	timebuf[20];
+	/*
+	 * Only show usage information for existing links unless '-a'
+	 * is specified.
+	 */
+	if (!state->us_showall) {
+		if ((status = dladm_name2info(handle, usage->du_name,
+		    NULL, &flags, NULL, NULL)) != DLADM_STATUS_OK) {
+			return (status);
+		}
+		if ((flags & DLADM_OPT_ACTIVE) == 0)
+			return (DLADM_STATUS_LINKINVAL);
+	}
 
 	stime = usage->du_stime;
 	(void) strftime(timebuf, sizeof (timebuf), "%m/%d/%Y",
@@ -1097,6 +1128,21 @@ show_usage_time(dladm_usage_t *usage, void *arg)
 	usage_l_fields_buf_t 	ubuf;
 	time_t			time;
 	double			bw;
+	dladm_status_t		status;
+	uint32_t		flags;
+
+	/*
+	 * Only show usage information for existing links unless '-a'
+	 * is specified.
+	 */
+	if (!state->us_showall) {
+		if ((status = dladm_name2info(handle, usage->du_name,
+		    NULL, &flags, NULL, NULL)) != DLADM_STATUS_OK) {
+			return (status);
+		}
+		if ((flags & DLADM_OPT_ACTIVE) == 0)
+			return (DLADM_STATUS_LINKINVAL);
+	}
 
 	if (state->us_plot) {
 		if (!state->us_printheader) {
@@ -1164,6 +1210,21 @@ show_usage_res(dladm_usage_t *usage, void *arg)
 	show_usage_state_t	*state = (show_usage_state_t *)arg;
 	char			buf[DLADM_STRSIZE];
 	usage_fields_buf_t	ubuf;
+	dladm_status_t		status;
+	uint32_t		flags;
+
+	/*
+	 * Only show usage information for existing links unless '-a'
+	 * is specified.
+	 */
+	if (!state->us_showall) {
+		if ((status = dladm_name2info(handle, usage->du_name,
+		    NULL, &flags, NULL, NULL)) != DLADM_STATUS_OK) {
+			return (status);
+		}
+		if ((flags & DLADM_OPT_ACTIVE) == 0)
+			return (DLADM_STATUS_LINKINVAL);
+	}
 
 	bzero(&ubuf, sizeof (ubuf));
 
@@ -1210,7 +1271,6 @@ do_show_usage(int argc, char *argv[], const char *use)
 	int			opt;
 	dladm_status_t		status;
 	boolean_t		d_arg = B_FALSE;
-	boolean_t		p_arg = B_FALSE;
 	char			*stime = NULL;
 	char			*etime = NULL;
 	char			*resource = NULL;
@@ -1232,13 +1292,14 @@ do_show_usage(int argc, char *argv[], const char *use)
 	state.us_plot = B_FALSE;
 	state.us_first = B_TRUE;
 
-	while ((opt = getopt(argc, argv, "dps:e:o:f:F:")) != -1) {
+	while ((opt = getopt_long(argc, argv, "das:e:o:f:F:",
+	    usage_opts, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
 			d_arg = B_TRUE;
 			break;
-		case 'p':
-			state.us_plot = p_arg = B_TRUE;
+		case 'a':
+			state.us_showall = B_TRUE;
 			break;
 		case 'f':
 			file = optarg;
@@ -1254,7 +1315,7 @@ do_show_usage(int argc, char *argv[], const char *use)
 			fields_str = optarg;
 			break;
 		case 'F':
-			F_arg = B_TRUE;
+			state.us_plot = F_arg = B_TRUE;
 			formatspec_str = optarg;
 			break;
 		default:
@@ -1267,7 +1328,15 @@ do_show_usage(int argc, char *argv[], const char *use)
 		die("show-usage requires a file");
 
 	if (optind == (argc-1)) {
+		uint32_t 	flags;
+
 		resource = argv[optind];
+		if (!state.us_showall &&
+		    (((status = dladm_name2info(handle, resource, NULL, &flags,
+		    NULL, NULL)) != DLADM_STATUS_OK) ||
+		    ((flags & DLADM_OPT_ACTIVE) == 0))) {
+			die("invalid link: '%s'", resource);
+		}
 	}
 
 	if (resource == NULL && stime == NULL && etime == NULL) {
@@ -1289,11 +1358,8 @@ do_show_usage(int argc, char *argv[], const char *use)
 	state.us_print.ps_fields = fields;
 	state.us_print.ps_nfields = nfields;
 
-	if (p_arg && d_arg)
-		die("plot and date options are incompatible");
-
-	if (p_arg && !F_arg)
-		die("specify format speicifier: -F <format>");
+	if (F_arg && d_arg)
+		die("incompatible -d and -F options");
 
 	if (F_arg && valid_formatspec(formatspec_str) == B_FALSE)
 		die("Format specifier %s not supported", formatspec_str);
@@ -1303,7 +1369,7 @@ do_show_usage(int argc, char *argv[], const char *use)
 		status = dladm_usage_dates(show_usage_date,
 		    DLADM_LOGTYPE_LINK, file, resource, &state);
 	} else if (resource == NULL && stime == NULL && etime == NULL &&
-	    !p_arg) {
+	    !F_arg) {
 		/* Print summary */
 		status = dladm_usage_summary(show_usage_res,
 		    DLADM_LOGTYPE_LINK, file, &state);
@@ -2320,6 +2386,48 @@ done:
 	return (DLADM_WALK_CONTINUE);
 }
 
+static char *
+print_link_stats(print_field_t *pf, void *arg)
+{
+	link_args_t *largs = arg;
+	pktsum_t *diff_stats = largs->link_s_psum;
+	static char buf[DLADM_STRSIZE];
+
+	switch (pf->pf_index) {
+	case LINK_S_LINK:
+		(void) snprintf(buf, sizeof (buf), "%s", largs->link_s_link);
+		break;
+	case LINK_S_IPKTS:
+		(void) snprintf(buf, sizeof (buf), "%llu",
+		    diff_stats->ipackets);
+		break;
+	case LINK_S_RBYTES:
+		(void) snprintf(buf, sizeof (buf), "%llu",
+		    diff_stats->rbytes);
+		break;
+	case LINK_S_IERRORS:
+		(void) snprintf(buf, sizeof (buf), "%u",
+		    diff_stats->ierrors);
+		break;
+	case LINK_S_OPKTS:
+		(void) snprintf(buf, sizeof (buf), "%llu",
+		    diff_stats->opackets);
+		break;
+	case LINK_S_OBYTES:
+		(void) snprintf(buf, sizeof (buf), "%llu",
+		    diff_stats->obytes);
+		break;
+	case LINK_S_OERRORS:
+		(void) snprintf(buf, sizeof (buf), "%u",
+		    diff_stats->oerrors);
+		break;
+	default:
+		die("invalid input");
+		break;
+	}
+	return (buf);
+}
+
 static int
 show_link_stats(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 {
@@ -2328,6 +2436,7 @@ show_link_stats(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 	show_state_t		*state = (show_state_t *)arg;
 	pktsum_t		stats, diff_stats;
 	dladm_phys_attr_t	dpa;
+	link_args_t		largs;
 
 	if (state->ls_firstonly) {
 		if (state->ls_donefirst)
@@ -2356,13 +2465,10 @@ show_link_stats(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 	}
 	dladm_stats_diff(&diff_stats, &stats, &state->ls_prevstats);
 
-	(void) printf("%-12s", link);
-	(void) printf("%-10llu", diff_stats.ipackets);
-	(void) printf("%-12llu", diff_stats.rbytes);
-	(void) printf("%-8llu", diff_stats.ierrors);
-	(void) printf("%-10llu", diff_stats.opackets);
-	(void) printf("%-12llu", diff_stats.obytes);
-	(void) printf("%-8llu\n", diff_stats.oerrors);
+	largs.link_s_link = link;
+	largs.link_s_psum = &diff_stats;
+	dladm_print_output(&state->ls_print, state->ls_parseable,
+	    print_link_stats, &largs);
 
 	state->ls_prevstats = stats;
 	return (DLADM_WALK_CONTINUE);
@@ -4200,7 +4306,7 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	int			pfmax;
 	uint_t			nfields;
 	char			*all_fields =
-	    "link,over,speed,macaddr,macaddrtype,vid";
+	    "link,over,speed,macaddress,macaddrtype,vid";
 	char			*all_e_fields =
 	    "link";
 
@@ -4408,8 +4514,8 @@ link_stats(datalink_id_t linkid, uint_t interval, char *fields_str,
 	print_field_t	**fields;
 	uint_t		nfields;
 
-	fields = parse_output_fields(fields_str, devs_fields, DEVS_MAX_FIELDS,
-	    CMD_TYPE_ANY, &nfields);
+	fields = parse_output_fields(fields_str, link_s_fields,
+	    LINK_S_MAX_FIELDS, CMD_TYPE_ANY, &nfields);
 	if (fields == NULL) {
 		die("invalid field(s) specified");
 		return;

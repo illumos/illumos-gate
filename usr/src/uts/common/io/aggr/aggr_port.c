@@ -493,9 +493,11 @@ aggr_port_start(aggr_port_t *port)
 {
 	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 
-	if (!port->lp_started)
-		port->lp_started = B_TRUE;
+	if (port->lp_started)
+		return (0);
 
+	port->lp_started = B_TRUE;
+	aggr_grp_multicst_port(port, B_TRUE);
 	return (0);
 }
 
@@ -507,8 +509,7 @@ aggr_port_stop(aggr_port_t *port)
 	if (!port->lp_started)
 		return;
 
-	if (port->lp_state == AGGR_PORT_STATE_ATTACHED)
-		aggr_grp_multicst_port(port, B_FALSE);
+	aggr_grp_multicst_port(port, B_FALSE);
 
 	/* update the port state */
 	port->lp_started = B_FALSE;

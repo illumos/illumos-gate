@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1334,25 +1334,14 @@ dld_capab_direct(dld_str_t *dsp, void *data, uint_t flags)
 	case DLD_ENABLE:
 		dls_rx_set(dsp, (dls_rx_t)direct->di_rx_cf,
 		    direct->di_rx_ch);
-		/*
-		 * TODO: XXXGopi
-		 *
-		 * Direct pointer to functions in the MAC layer
-		 * should be passed here:
-		 *
-		 * 1) pass mac_tx() and mac_client_handle instead
-		 * of str_mdata_fastpath_put() and dld_str_t. But
-		 * not done presently because of some VLAN
-		 * processing stuff in str_mdata_fastpath_put().
-		 *
-		 * 2) pass a MAC layer callback instead of
-		 * dld_flow_ctl_callb().
-		 */
+
 		direct->di_tx_df = (uintptr_t)str_mdata_fastpath_put;
 		direct->di_tx_dh = dsp;
-
 		direct->di_tx_cb_df = (uintptr_t)mac_client_tx_notify;
 		direct->di_tx_cb_dh = dsp->ds_mch;
+		direct->di_tx_fctl_df = (uintptr_t)mac_tx_is_flow_blocked;
+		direct->di_tx_fctl_dh = dsp->ds_mch;
+
 		dsp->ds_direct = B_TRUE;
 
 		return (0);

@@ -451,29 +451,115 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * policy change may affect them.
  *
  * IP Flow control notes:
+ * ---------------------
+ * Non-TCP streams are flow controlled by IP. The way this is accomplished
+ * differs when ILL_CAPAB_DLD_DIRECT is enabled for that IP instance. When
+ * ILL_DIRECT_CAPABLE(ill) is TRUE, IP can do direct function calls into
+ * GLDv3. Otherwise packets are sent down to lower layers using STREAMS
+ * functions.
  *
- * Non-TCP streams are flow controlled by IP. On the send side, if the packet
- * cannot be sent down to the driver by IP, because of a canput failure, IP
- * does a putq on the conn_wq. This will cause ip_wsrv to run on the conn_wq.
- * ip_wsrv in turn, inserts the conn in a list of conn's that need to be drained
- * when the flowcontrol condition subsides. Ultimately STREAMS backenables the
- * ip_wsrv on the IP module, which in turn does a qenable of the conn_wq of the
- * first conn in the list of conn's to be drained. ip_wsrv on this conn drains
- * the queued messages, and removes the conn from the drain list, if all
- * messages were drained. It also qenables the next conn in the drain list to
- * continue the drain process.
+ * Per Tx ring udp flow control:
+ * This is applicable only when ILL_CAPAB_DLD_DIRECT capability is set in
+ * the ill (i.e. ILL_DIRECT_CAPABLE(ill) is true).
+ *
+ * The underlying link can expose multiple Tx rings to the GLDv3 mac layer.
+ * To achieve best performance, outgoing traffic need to be fanned out among
+ * these Tx ring. mac_tx() is called (via str_mdata_fastpath_put()) to send
+ * traffic out of the NIC and it takes a fanout hint. UDP connections pass
+ * the address of connp as fanout hint to mac_tx(). Under flow controlled
+ * condition, mac_tx() returns a non-NULL cookie (ip_mac_tx_cookie_t). This
+ * cookie points to a specific Tx ring that is blocked. The cookie is used to
+ * hash into an idl_tx_list[] entry in idl_tx_list[] array. Each idl_tx_list_t
+ * point to drain_lists (idl_t's). These drain list will store the blocked UDP
+ * connp's. The drain list is not a single list but a configurable number of
+ * lists.
+ *
+ * The diagram below shows idl_tx_list_t's and their drain_lists. ip_stack_t
+ * has an array of idl_tx_list_t. The size of the array is TX_FANOUT_SIZE
+ * which is equal to 128. This array in turn contains a pointer to idl_t[],
+ * the ip drain list. The idl_t[] array size is MIN(max_ncpus, 8). The drain
+ * list will point to the list of connp's that are flow controlled.
+ *
+ *                      ---------------   -------   -------   -------
+ *                   |->|drain_list[0]|-->|connp|-->|connp|-->|connp|-->
+ *                   |  ---------------   -------   -------   -------
+ *                   |  ---------------   -------   -------   -------
+ *                   |->|drain_list[1]|-->|connp|-->|connp|-->|connp|-->
+ * ----------------  |  ---------------   -------   -------   -------
+ * |idl_tx_list[0]|->|  ---------------   -------   -------   -------
+ * ----------------  |->|drain_list[2]|-->|connp|-->|connp|-->|connp|-->
+ *                   |  ---------------   -------   -------   -------
+ *                   .        .              .         .         .
+ *                   |  ---------------   -------   -------   -------
+ *                   |->|drain_list[n]|-->|connp|-->|connp|-->|connp|-->
+ *                      ---------------   -------   -------   -------
+ *                      ---------------   -------   -------   -------
+ *                   |->|drain_list[0]|-->|connp|-->|connp|-->|connp|-->
+ *                   |  ---------------   -------   -------   -------
+ *                   |  ---------------   -------   -------   -------
+ * ----------------  |->|drain_list[1]|-->|connp|-->|connp|-->|connp|-->
+ * |idl_tx_list[1]|->|  ---------------   -------   -------   -------
+ * ----------------  |        .              .         .         .
+ *                   |  ---------------   -------   -------   -------
+ *                   |->|drain_list[n]|-->|connp|-->|connp|-->|connp|-->
+ *                      ---------------   -------   -------   -------
+ *     .....
+ * ----------------
+ * |idl_tx_list[n]|-> ...
+ * ----------------
+ *
+ * When mac_tx() returns a cookie, the cookie is used to hash into a
+ * idl_tx_list in ips_idl_tx_list[] array. Then conn_drain_insert() is
+ * called passing idl_tx_list. The connp gets inserted in a drain list
+ * pointed to by idl_tx_list. conn_drain_list() asserts flow control for
+ * the sockets (non stream based) and sets QFULL condition for conn_wq.
+ * connp->conn_direct_blocked will be set to indicate the blocked
+ * condition.
+ *
+ * GLDv3 mac layer calls ill_flow_enable() when flow control is relieved.
+ * A cookie is passed in the call to ill_flow_enable() that identifies the
+ * blocked Tx ring. This cookie is used to get to the idl_tx_list that
+ * contains the blocked connp's. conn_walk_drain() uses the idl_tx_list_t
+ * and goes through each of the drain list (q)enabling the conn_wq of the
+ * first conn in each of the drain list. This causes ip_wsrv to run for the
+ * conn. ip_wsrv drains the queued messages, and removes the conn from the
+ * drain list, if all messages were drained. It also qenables the next conn
+ * in the drain list to continue the drain process.
  *
  * In reality the drain list is not a single list, but a configurable number
- * of lists. The ip_wsrv on the IP module, qenables the first conn in each
- * list. If the ip_wsrv of the next qenabled conn does not run, because the
+ * of lists. conn_drain_walk() in the IP module, qenables the first conn in
+ * each list. If the ip_wsrv of the next qenabled conn does not run, because
+ * the stream closes, ip_close takes responsibility to qenable the next conn
+ * in the drain list. conn_drain_insert and conn_drain_tail are the only
+ * functions that manipulate this drain list. conn_drain_insert is called in
+ * ip_wput context itself (as opposed to from ip_wsrv context for STREAMS
+ * case -- see below). The synchronization between drain insertion and flow
+ * control wakeup is handled by using idl_txl->txl_lock.
+ *
+ * Flow control using STREAMS:
+ * When ILL_DIRECT_CAPABLE() is not TRUE, STREAMS flow control mechanism
+ * is used. On the send side, if the packet cannot be sent down to the
+ * driver by IP, because of a canput failure, IP does a putq on the conn_wq.
+ * This will cause ip_wsrv to run on the conn_wq. ip_wsrv in turn, inserts
+ * the conn in a list of conn's that need to be drained when the flow
+ * control condition subsides. The blocked connps are put in first member
+ * of ips_idl_tx_list[] array. Ultimately STREAMS backenables the ip_wsrv
+ * on the IP module. It calls conn_walk_drain() passing ips_idl_tx_list[0].
+ * ips_idl_tx_list[0] contains the drain lists of blocked conns. The
+ * conn_wq of the first conn in the drain lists is (q)enabled to run.
+ * ip_wsrv on this conn drains the queued messages, and removes the conn
+ * from the drain list, if all messages were drained. It also qenables the
+ * next conn in the drain list to continue the drain process.
+ *
+ * If the ip_wsrv of the next qenabled conn does not run, because the
  * stream closes, ip_close takes responsibility to qenable the next conn in
  * the drain list. The directly called ip_wput path always does a putq, if
  * it cannot putnext. Thus synchronization problems are handled between
  * ip_wsrv and ip_close. conn_drain_insert and conn_drain_tail are the only
  * functions that manipulate this drain list. Furthermore conn_drain_insert
- * is called only from ip_wsrv, and there can be only 1 instance of ip_wsrv
- * running on a queue at any time. conn_drain_tail can be simultaneously called
- * from both ip_wsrv and ip_close.
+ * is called only from ip_wsrv for the STREAMS case, and there can be only 1
+ * instance of ip_wsrv running on a queue at any time. conn_drain_tail can
+ * be simultaneously called from both ip_wsrv and ip_close.
  *
  * IPQOS notes:
  *
@@ -732,9 +818,11 @@ static void	conn_drain_init(ip_stack_t *);
 static void	conn_drain_fini(ip_stack_t *);
 static void	conn_drain_tail(conn_t *connp, boolean_t closing);
 
-static void	conn_walk_drain(ip_stack_t *);
+static void	conn_walk_drain(ip_stack_t *, idl_tx_list_t *);
 static void	conn_walk_fanout_table(connf_t *, uint_t, pfv_t, void *,
     zoneid_t);
+static void	conn_setqfull(conn_t *);
+static void	conn_clrqfull(conn_t *);
 
 static void	*ip_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ip_stack_shutdown(netstackid_t stackid, void *arg);
@@ -5372,6 +5460,7 @@ ip_modclose(ill_t *ill)
 	ipif_t	*ipif;
 	queue_t	*q = ill->ill_rq;
 	ip_stack_t	*ipst = ill->ill_ipst;
+	int	i;
 
 	/*
 	 * The punlink prior to this may have initiated a capability
@@ -5463,7 +5552,9 @@ ip_modclose(ill_t *ill)
 	 * get unblocked.
 	 */
 	ip1dbg(("ip_wsrv: walking\n"));
-	conn_walk_drain(ipst);
+	for (i = 0; i < TX_FANOUT_SIZE; i++) {
+		conn_walk_drain(ipst, &ipst->ips_idl_tx_list[i]);
+	}
 
 	mutex_enter(&ipst->ips_ip_mi_lock);
 	mi_close_unlink(&ipst->ips_ip_g_head, (IDP)ill);
@@ -13908,8 +13999,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
 			    ALL_ZONES, ill, IPV4_VERSION, hlen, ipst);
 		}
-
-		ILL_SEND_TX(stq_ill, ire, dst, mp, IP_DROP_ON_NO_DESC);
+		ILL_SEND_TX(stq_ill, ire, dst, mp, IP_DROP_ON_NO_DESC, NULL);
 	}
 	return (ire);
 
@@ -22341,8 +22431,13 @@ another:;
 	if (!IP_FLOW_CONTROLLED_ULP(PROTO)) {
 		queue_t *dev_q = stq->q_next;
 
-		/* flow controlled */
-		if (DEV_Q_FLOW_BLOCKED(dev_q))
+		/*
+		 * For DIRECT_CAPABLE, we do flow control at
+		 * the time of sending the packet. See
+		 * ILL_SEND_TX().
+		 */
+		if (!ILL_DIRECT_CAPABLE((ill_t *)stq->q_ptr) &&
+		    (DEV_Q_FLOW_BLOCKED(dev_q)))
 			goto blocked;
 
 		if ((PROTO == IPPROTO_UDP) &&
@@ -22765,7 +22860,8 @@ broadcast:
 		} else {
 			queue_t	*dev_q = stq->q_next;
 
-			if (DEV_Q_FLOW_BLOCKED(dev_q)) {
+			if (!ILL_DIRECT_CAPABLE((ill_t *)stq->q_ptr) &&
+			    (DEV_Q_FLOW_BLOCKED(dev_q))) {
 blocked:
 				ipha->ipha_ident = ip_hdr_included;
 				/*
@@ -22780,10 +22876,15 @@ blocked:
 				    connp != NULL &&
 				    caller != IRE_SEND) {
 					if (caller == IP_WSRV) {
+						idl_tx_list_t *idl_txl;
+
+						idl_txl =
+						    &ipst->ips_idl_tx_list[0];
 						connp->conn_did_putbq = 1;
 						(void) putbq(connp->conn_wq,
 						    first_mp);
-						conn_drain_insert(connp);
+						conn_drain_insert(connp,
+						    idl_txl);
 						/*
 						 * This is the service thread,
 						 * and the queue is already
@@ -24401,7 +24502,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
 			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
 
-			ILL_SEND_TX(out_ill, ire, connp, xmit_mp, 0);
+			ILL_SEND_TX(out_ill, ire, connp, xmit_mp, 0, connp);
 
 			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
 			UPDATE_MIB(out_ill->ill_ip_mib,
@@ -24708,7 +24809,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				    __dtrace_ipsr_ill_t *, out_ill, ipha_t *,
 				    ipha, ip6_t *, NULL, int, 0);
 
-				ILL_SEND_TX(out_ill, ire, connp, xmit_mp, 0);
+				ILL_SEND_TX(out_ill, ire, connp,
+				    xmit_mp, 0, connp);
 
 				BUMP_MIB(out_ill->ill_ip_mib,
 				    ipIfStatsHCOutTransmits);
@@ -27921,7 +28023,8 @@ bad_src_route:
 static void
 conn_drain_init(ip_stack_t *ipst)
 {
-	int i;
+	int i, j;
+	idl_tx_list_t *itl_tx;
 
 	ipst->ips_conn_drain_list_cnt = conn_drain_nthreads;
 
@@ -27937,12 +28040,19 @@ conn_drain_init(ip_stack_t *ipst)
 			ipst->ips_conn_drain_list_cnt = MIN(max_ncpus, 8);
 	}
 
-	ipst->ips_conn_drain_list = kmem_zalloc(ipst->ips_conn_drain_list_cnt *
-	    sizeof (idl_t), KM_SLEEP);
-
-	for (i = 0; i < ipst->ips_conn_drain_list_cnt; i++) {
-		mutex_init(&ipst->ips_conn_drain_list[i].idl_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
+	ipst->ips_idl_tx_list =
+	    kmem_zalloc(TX_FANOUT_SIZE * sizeof (idl_tx_list_t), KM_SLEEP);
+	for (i = 0; i < TX_FANOUT_SIZE; i++) {
+		itl_tx =  &ipst->ips_idl_tx_list[i];
+		itl_tx->txl_drain_list =
+		    kmem_zalloc(ipst->ips_conn_drain_list_cnt *
+		    sizeof (idl_t), KM_SLEEP);
+		mutex_init(&itl_tx->txl_lock, NULL, MUTEX_DEFAULT, NULL);
+		for (j = 0; j < ipst->ips_conn_drain_list_cnt; j++) {
+			mutex_init(&itl_tx->txl_drain_list[j].idl_lock, NULL,
+			    MUTEX_DEFAULT, NULL);
+			itl_tx->txl_drain_list[j].idl_itl = itl_tx;
+		}
 	}
 }
 
@@ -27950,12 +28060,16 @@ static void
 conn_drain_fini(ip_stack_t *ipst)
 {
 	int i;
+	idl_tx_list_t *itl_tx;
 
-	for (i = 0; i < ipst->ips_conn_drain_list_cnt; i++)
-		mutex_destroy(&ipst->ips_conn_drain_list[i].idl_lock);
-	kmem_free(ipst->ips_conn_drain_list,
-	    ipst->ips_conn_drain_list_cnt * sizeof (idl_t));
-	ipst->ips_conn_drain_list = NULL;
+	for (i = 0; i < TX_FANOUT_SIZE; i++) {
+		itl_tx =  &ipst->ips_idl_tx_list[i];
+		kmem_free(itl_tx->txl_drain_list,
+		    ipst->ips_conn_drain_list_cnt * sizeof (idl_t));
+	}
+	kmem_free(ipst->ips_idl_tx_list,
+	    TX_FANOUT_SIZE * sizeof (idl_tx_list_t));
+	ipst->ips_idl_tx_list = NULL;
 }
 
 /*
@@ -27968,16 +28082,11 @@ conn_drain_fini(ip_stack_t *ipst)
  * the first conn in each of these drain lists. Each of these qenabled conns
  * in turn enables the next in the list, after it runs, or when it closes,
  * thus sustaining the drain process.
- *
- * The only possible calling sequence is ip_wsrv (on conn) -> ip_wput ->
- * conn_drain_insert. Thus there can be only 1 instance of conn_drain_insert
- * running at any time, on a given conn, since there can be only 1 service proc
- * running on a queue at any time.
  */
 void
-conn_drain_insert(conn_t *connp)
+conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
 {
-	idl_t	*idl;
+	idl_t	*idl = tx_list->txl_drain_list;
 	uint_t	index;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
@@ -27996,13 +28105,13 @@ conn_drain_insert(conn_t *connp)
 		 * Atomicity of load/stores is enough to make sure that
 		 * conn_drain_list_index is always within bounds.
 		 */
-		index = ipst->ips_conn_drain_list_index;
+		index = tx_list->txl_drain_index;
 		ASSERT(index < ipst->ips_conn_drain_list_cnt);
-		connp->conn_idl = &ipst->ips_conn_drain_list[index];
+		connp->conn_idl = &tx_list->txl_drain_list[index];
 		index++;
 		if (index == ipst->ips_conn_drain_list_cnt)
 			index = 0;
-		ipst->ips_conn_drain_list_index = index;
+		tx_list->txl_drain_index = index;
 	}
 	mutex_exit(&connp->conn_lock);
 
@@ -28044,8 +28153,12 @@ conn_drain_insert(conn_t *connp)
 	 * For non streams based sockets assert flow control.
 	 */
 	if (IPCL_IS_NONSTR(connp)) {
+		DTRACE_PROBE1(su__txq__full, conn_t *, connp);
 		(*connp->conn_upcalls->su_txq_full)
 		    (connp->conn_upper_handle, B_TRUE);
+	} else {
+		conn_setqfull(connp);
+		noenable(connp->conn_wq);
 	}
 	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
 }
@@ -28167,6 +28280,9 @@ conn_drain_tail(conn_t *connp, boolean_t closing)
 		if (IPCL_IS_NONSTR(connp)) {
 			(*connp->conn_upcalls->su_txq_full)
 			    (connp->conn_upper_handle, B_FALSE);
+		} else {
+			conn_clrqfull(connp);
+			enableok(connp->conn_wq);
 		}
 	}
 
@@ -28194,6 +28310,8 @@ ip_wsrv(queue_t *q)
 	if (q->q_next) {
 		ill = (ill_t *)q->q_ptr;
 		if (ill->ill_state_flags == 0) {
+			ip_stack_t *ipst = ill->ill_ipst;
+
 			/*
 			 * The device flow control has opened up.
 			 * Walk through conn drain lists and qenable the
@@ -28202,7 +28320,7 @@ ip_wsrv(queue_t *q)
 			 * Hence the if check above.
 			 */
 			ip1dbg(("ip_wsrv: walking\n"));
-			conn_walk_drain(ill->ill_ipst);
+			conn_walk_drain(ipst, &ipst->ips_idl_tx_list[0]);
 		}
 		return;
 	}
@@ -28229,12 +28347,14 @@ ip_wsrv(queue_t *q)
 	 *    (causing an infinite loop).
 	 */
 	ASSERT(!connp->conn_did_putbq);
+
 	while ((q->q_first != NULL) && !connp->conn_did_putbq) {
 		connp->conn_draining = 1;
 		noenable(q);
 		while ((mp = getq(q)) != NULL) {
 			ASSERT(CONN_Q(q));
 
+			DTRACE_PROBE1(ip__wsrv__ip__output, conn_t *, connp);
 			ip_output(Q_TO_CONN(q), mp, q, IP_WSRV);
 			if (connp->conn_did_putbq) {
 				/* ip_wput did a putbq */
@@ -28253,11 +28373,22 @@ ip_wsrv(queue_t *q)
 		 */
 		connp->conn_draining = 0;
 		enableok(q);
-
 	}
 
 	/* Enable the next conn for draining */
 	conn_drain_tail(connp, B_FALSE);
+
+	/*
+	 * conn_direct_blocked is used to indicate blocked
+	 * condition for direct path (ILL_DIRECT_CAPABLE()).
+	 * This is the only place where it is set without
+	 * checking for ILL_DIRECT_CAPABLE() and setting it
+	 * to 0 is ok even if it is not ILL_DIRECT_CAPABLE().
+	 */
+	if (!connp->conn_did_putbq && connp->conn_direct_blocked) {
+		DTRACE_PROBE1(ip__wsrv__direct__blocked, conn_t *, connp);
+		connp->conn_direct_blocked = B_FALSE;
+	}
 
 	connp->conn_did_putbq = 0;
 }
@@ -28274,11 +28405,18 @@ ip_wsrv(queue_t *q)
  * function and wakes up corresponding mac worker threads, which in turn
  * calls this callback function, and disables flow control.
  */
-/* ARGSUSED */
 void
-ill_flow_enable(void *ill, ip_mac_tx_cookie_t cookie)
+ill_flow_enable(void *arg, ip_mac_tx_cookie_t cookie)
 {
-	qenable(((ill_t *)ill)->ill_wq);
+	ill_t *ill = (ill_t *)arg;
+	ip_stack_t *ipst = ill->ill_ipst;
+	idl_tx_list_t *idl_txl;
+
+	idl_txl = &ipst->ips_idl_tx_list[IDLHASHINDEX(cookie)];
+	mutex_enter(&idl_txl->txl_lock);
+	/* add code to to set a flag to indicate idl_txl is enabled */
+	conn_walk_drain(ipst, idl_txl);
+	mutex_exit(&idl_txl->txl_lock);
 }
 
 /*
@@ -28315,7 +28453,7 @@ conn_walk_fanout(pfv_t func, void *arg, zoneid_t zoneid, ip_stack_t *ipst)
  * in turn qenable the next conn, when it is done/blocked/closing.
  */
 static void
-conn_walk_drain(ip_stack_t *ipst)
+conn_walk_drain(ip_stack_t *ipst, idl_tx_list_t *tx_list)
 {
 	int i;
 	idl_t *idl;
@@ -28323,7 +28461,7 @@ conn_walk_drain(ip_stack_t *ipst)
 	IP_STAT(ipst, ip_conn_walk_drain);
 
 	for (i = 0; i < ipst->ips_conn_drain_list_cnt; i++) {
-		idl = &ipst->ips_conn_drain_list[i];
+		idl = &tx_list->txl_drain_list[i];
 		mutex_enter(&idl->idl_lock);
 		if (idl->idl_conn == NULL) {
 			mutex_exit(&idl->idl_lock);
@@ -28519,6 +28657,41 @@ conn_wantpacket(conn_t *connp, ill_t *ill, ipha_t *ipha, int fanout_flags,
 	found = (ilg_lookup_ill_withsrc(connp, dst, src, ill) != NULL);
 	mutex_exit(&connp->conn_lock);
 	return (found);
+}
+
+static void
+conn_setqfull(conn_t *connp)
+{
+	queue_t *q = connp->conn_wq;
+
+	if (!(q->q_flag & QFULL)) {
+		mutex_enter(QLOCK(q));
+		if (!(q->q_flag & QFULL)) {
+			/* still need to set QFULL */
+			q->q_flag |= QFULL;
+			mutex_exit(QLOCK(q));
+		} else {
+			mutex_exit(QLOCK(q));
+		}
+	}
+}
+
+static void
+conn_clrqfull(conn_t *connp)
+{
+	queue_t *q = connp->conn_wq;
+
+	if (q->q_flag & QFULL) {
+		mutex_enter(QLOCK(q));
+		if (q->q_flag & QFULL) {
+			q->q_flag &= ~QFULL;
+			mutex_exit(QLOCK(q));
+			if (q->q_flag & QWANTW)
+				qbackenable(q, 0);
+		} else {
+			mutex_exit(QLOCK(q));
+		}
+	}
 }
 
 /*
@@ -29666,7 +29839,7 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io,
 					    0);
 
 					ILL_SEND_TX(out_ill,
-					    ire, connp, first_mp, 0);
+					    ire, connp, first_mp, 0, connp);
 				} else {
 					BUMP_MIB(out_ill->ill_ip_mib,
 					    ipIfStatsOutDiscards);

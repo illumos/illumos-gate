@@ -5604,6 +5604,7 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	udp_stack_t	*us = udp->udp_us;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 	boolean_t	ll_multicast = B_FALSE;
+	boolean_t	direct_send;
 
 	dev_q = ire->ire_stq->q_next;
 	ASSERT(dev_q != NULL);
@@ -5611,16 +5612,24 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	ill = ire_to_ill(ire);
 	ASSERT(ill != NULL);
 
+	/*
+	 * For the direct send case, if resetting of conn_direct_blocked
+	 * was missed, it is still ok because the putq() would enable
+	 * the queue and write service will drain it out.
+	 */
+	direct_send = ILL_DIRECT_CAPABLE(ill);
+
 	/* is queue flow controlled? */
-	if (q->q_first != NULL || connp->conn_draining ||
-	    DEV_Q_FLOW_BLOCKED(dev_q)) {
+	if ((!direct_send) && (q->q_first != NULL || connp->conn_draining ||
+	    DEV_Q_FLOW_BLOCKED(dev_q))) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsHCOutRequests);
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-
-		if (ipst->ips_ip_output_queue)
+		if (ipst->ips_ip_output_queue) {
+			DTRACE_PROBE1(udp__xmit__putq, conn_t *, connp);
 			(void) putq(connp->conn_wq, mp);
-		else
+		} else {
 			freemsg(mp);
+		}
 		ire_refrele(ire);
 		return;
 	}
@@ -5718,20 +5727,60 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 		    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
 	}
 
-	if (mp != NULL) {
-		DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
-		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,
-		    ipha_t *, ipha, ip6_t *, NULL, int, 0);
+	if (mp == NULL)
+		goto bail;
 
-		if (ILL_DIRECT_CAPABLE(ill)) {
-			ill_dld_direct_t *idd = &ill->ill_dld_capab->idc_direct;
+	DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
+	    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,
+	    ipha_t *, ipha, ip6_t *, NULL, int, 0);
 
-			(void) idd->idd_tx_df(idd->idd_tx_dh, mp,
-			    (uintptr_t)connp, 0);
-		} else {
-			putnext(ire->ire_stq, mp);
+	if (direct_send) {
+		uintptr_t cookie;
+		ill_dld_direct_t *idd = &ill->ill_dld_capab->idc_direct;
+
+		cookie = idd->idd_tx_df(idd->idd_tx_dh, mp,
+		    (uintptr_t)connp, 0);
+		if (cookie != NULL) {
+			idl_tx_list_t *idl_txl;
+
+			/*
+			 * Flow controlled.
+			 */
+			DTRACE_PROBE2(non__null__cookie, uintptr_t,
+			    cookie, conn_t *, connp);
+			idl_txl = &ipst->ips_idl_tx_list[IDLHASHINDEX(cookie)];
+			mutex_enter(&idl_txl->txl_lock);
+			/*
+			 * Check again after holding txl_lock to see if Tx
+			 * ring is still blocked and only then insert the
+			 * connp into the drain list.
+			 */
+			if (connp->conn_direct_blocked ||
+			    (idd->idd_tx_fctl_df(idd->idd_tx_fctl_dh,
+			    cookie) == 0)) {
+				mutex_exit(&idl_txl->txl_lock);
+				goto bail;
+			}
+			if (idl_txl->txl_cookie != NULL &&
+			    idl_txl->txl_cookie != cookie) {
+				DTRACE_PROBE2(udp__xmit__collision,
+				    uintptr_t, cookie,
+				    uintptr_t, idl_txl->txl_cookie);
+				UDP_STAT(us, udp_cookie_coll);
+			} else {
+				connp->conn_direct_blocked = B_TRUE;
+				idl_txl->txl_cookie = cookie;
+				conn_drain_insert(connp, idl_txl);
+				DTRACE_PROBE1(udp__xmit__insert,
+				    conn_t *, connp);
+			}
+			mutex_exit(&idl_txl->txl_lock);
 		}
+	} else {
+		DTRACE_PROBE1(udp__xmit__putnext, mblk_t *, mp);
+		putnext(ire->ire_stq, mp);
 	}
+bail:
 	IRE_REFRELE(ire);
 }
 

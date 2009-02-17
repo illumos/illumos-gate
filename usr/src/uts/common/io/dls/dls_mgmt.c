@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,10 +60,15 @@ boolean_t		devnet_need_rebuild;
 /* Upcall door handle */
 static door_handle_t	dls_mgmt_dh = NULL;
 
-#define	DD_CONDEMNED	0x1
+#define	DD_CONDEMNED		0x1
+#define	DD_KSTAT_CHANGING	0x2
 
 /*
  * This structure is used to keep the <linkid, macname> mapping.
+ * This structure itself is not protected by the mac perimeter, but is
+ * protected by the dd_mutex and i_dls_devnet_lock. Thus most of the
+ * functions manipulating this structure such as dls_devnet_set/unset etc.
+ * may be called while not holding the mac perimeter.
  */
 typedef struct dls_devnet_s {
 	datalink_id_t	dd_linkid;
@@ -614,6 +619,11 @@ dls_devnet_rele_link(dls_dl_handle_t dlh, dls_link_t *dlp)
 
 /*
  * Query the "link" kstats.
+ *
+ * We may be called from the kstat subsystem in an arbitrary context.
+ * If the caller is the stack, the context could be an upcall data
+ * thread. Hence we can't acquire the mac perimeter in this function
+ * for fear of deadlock.
  */
 static int
 dls_devnet_stat_update(kstat_t *ksp, int rw)
@@ -621,21 +631,34 @@ dls_devnet_stat_update(kstat_t *ksp, int rw)
 	dls_devnet_t	*ddp = ksp->ks_private;
 	dls_link_t	*dlp;
 	int		err;
-	mac_perim_handle_t	mph;
 
-	err = mac_perim_enter_by_macname(ddp->dd_mac, &mph);
-	if (err != 0)
-		return (err);
+	/*
+	 * Check the link is being renamed or if the link is going away
+	 * before incrementing dd_tref which in turn prevents the link
+	 * from being renamed or deleted until we finish.
+	 */
+	mutex_enter(&ddp->dd_mutex);
+	if (ddp->dd_flags & (DD_CONDEMNED | DD_KSTAT_CHANGING)) {
+		mutex_exit(&ddp->dd_mutex);
+		return (ENOENT);
+	}
+	ddp->dd_tref++;
+	mutex_exit(&ddp->dd_mutex);
 
-	err = dls_link_hold(ddp->dd_mac, &dlp);
-	if (err != 0) {
-		mac_perim_exit(mph);
-		return (err);
+	/*
+	 * If a device detach happens at this time, it will block in
+	 * dls_devnet_unset since the dd_tref has been bumped up above. So the
+	 * access to 'dlp' is safe even though we don't hold the mac perimeter.
+	 */
+	if (mod_hash_find(i_dls_link_hash, (mod_hash_key_t)ddp->dd_mac,
+	    (mod_hash_val_t *)&dlp) != 0) {
+		dls_devnet_rele_tmp(ddp);
+		return (ENOENT);
 	}
 
 	err = dls_stat_update(ksp, dlp, rw);
-	dls_link_rele(dlp);
-	mac_perim_exit(mph);
+
+	dls_devnet_rele_tmp(ddp);
 	return (err);
 }
 
@@ -707,6 +730,7 @@ dls_devnet_set(const char *macname, datalink_id_t linkid, dls_devnet_t **ddpp)
 	dls_devnet_t		*ddp = NULL;
 	datalink_class_t	class;
 	int			err;
+	boolean_t		stat_create = B_FALSE;
 
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_devnet_hash,
@@ -748,8 +772,7 @@ newphys:
 		    (mod_hash_key_t)(uintptr_t)linkid,
 		    (mod_hash_val_t)ddp) == 0);
 		devnet_need_rebuild = B_TRUE;
-		dls_devnet_stat_create(ddp);
-
+		stat_create = B_TRUE;
 		mutex_enter(&ddp->dd_mutex);
 		if (!ddp->dd_prop_loaded && (ddp->dd_prop_taskid == NULL)) {
 			ddp->dd_prop_taskid = taskq_dispatch(system_taskq,
@@ -761,6 +784,20 @@ newphys:
 	err = 0;
 done:
 	rw_exit(&i_dls_devnet_lock);
+	/*
+	 * It is safe to drop the i_dls_devnet_lock at this point. In the case
+	 * of physical devices, the softmac framework will fail the device
+	 * detach based on the smac_state or smac_hold_cnt. Other cases like
+	 * vnic and aggr use their own scheme to serialize creates and deletes
+	 * and ensure that *ddp is valid.
+	 *
+	 * The kstat subsystem holds its own locks (rather perimeter) before
+	 * calling the ks_update (dls_devnet_stat_update) entry point which
+	 * in turn grabs the i_dls_devnet_lock. So the lock hierarchy is
+	 * kstat locks -> i_dls_devnet_lock.
+	 */
+	if (stat_create)
+		dls_devnet_stat_create(ddp);
 	if (err == 0 && ddpp != NULL)
 		*ddpp = ddp;
 	return (err);
@@ -815,7 +852,6 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 		VERIFY(mod_hash_remove(i_dls_devnet_id_hash,
 		    (mod_hash_key_t)(uintptr_t)ddp->dd_linkid, &val) == 0);
 
-		dls_devnet_stat_destroy(ddp);
 		devnet_need_rebuild = B_TRUE;
 	}
 	rw_exit(&i_dls_devnet_lock);
@@ -829,6 +865,9 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 	} else {
 		ASSERT(ddp->dd_tref == 0 && ddp->dd_prop_taskid == NULL);
 	}
+
+	if (ddp->dd_linkid != DATALINK_INVALID_LINKID)
+		dls_devnet_stat_destroy(ddp);
 
 	ddp->dd_prop_loaded = B_FALSE;
 	ddp->dd_linkid = DATALINK_INVALID_LINKID;
@@ -1112,6 +1151,7 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	mac_perim_handle_t	mph = NULL;
 	mac_handle_t		mh;
 	mod_hash_val_t		val;
+	boolean_t		clear_dd_flag = B_FALSE;
 
 	/*
 	 * In the second case, id2 must be a REMOVED physical link.
@@ -1134,8 +1174,10 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	 * mac perimeter, hence enter the perimeter first. This also waits
 	 * for the property loading to finish.
 	 */
-	if ((err = mac_perim_enter_by_linkid(id1, &mph)) != 0)
-		goto done;
+	if ((err = mac_perim_enter_by_linkid(id1, &mph)) != 0) {
+		softmac_rele_device(ddh);
+		return (err);
+	}
 
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
@@ -1146,12 +1188,21 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	}
 
 	/*
-	 * Return EBUSY if any applications have this link open.
+	 * Return EBUSY if any applications have this link open or if any
+	 * thread is currently accessing the link kstats. Then set the
+	 * DD_KSTAT_CHANGING flag to prevent any access to the kstats
+	 * while we delete and recreate kstats below.
 	 */
+	mutex_enter(&ddp->dd_mutex);
 	if (ddp->dd_ref > 1) {
+		mutex_exit(&ddp->dd_mutex);
 		err = EBUSY;
 		goto done;
 	}
+
+	ddp->dd_flags |= DD_KSTAT_CHANGING;
+	clear_dd_flag = B_TRUE;
+	mutex_exit(&ddp->dd_mutex);
 
 	if (id2 == DATALINK_INVALID_LINKID) {
 		(void) strlcpy(linkname, link, sizeof (linkname));
@@ -1225,11 +1276,21 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 done:
 	/*
 	 * Change the name of the kstat based on the new link name.
+	 * We can't hold the i_dls_devnet_lock across calls to the kstat
+	 * subsystem. Instead the DD_KSTAT_CHANGING flag set above in this
+	 * function prevents any access to the dd_ksp while we delete and
+	 * recreate it below.
 	 */
+	rw_exit(&i_dls_devnet_lock);
 	if (err == 0)
 		dls_devnet_stat_rename(ddp, linkname);
 
-	rw_exit(&i_dls_devnet_lock);
+	if (clear_dd_flag) {
+		mutex_enter(&ddp->dd_mutex);
+		ddp->dd_flags &= ~DD_KSTAT_CHANGING;
+		mutex_exit(&ddp->dd_mutex);
+	}
+
 	if (mph != NULL)
 		mac_perim_exit(mph);
 	softmac_rele_device(ddh);
@@ -1388,6 +1449,11 @@ dls_devnet_create(mac_handle_t mh, datalink_id_t linkid)
 	int		err;
 	mac_perim_handle_t mph;
 
+	/*
+	 * Holding the mac perimeter ensures that the downcall from the
+	 * dlmgmt daemon which does the property loading does not proceed
+	 * until we relinquish the perimeter.
+	 */
 	mac_perim_enter_by_mh(mh, &mph);
 
 	/*
@@ -1400,8 +1466,8 @@ dls_devnet_create(mac_handle_t mh, datalink_id_t linkid)
 		return (err);
 	}
 	if ((err = dls_link_hold_create(mac_name(mh), &dlp)) != 0) {
-		(void) dls_devnet_unset(mac_name(mh), &linkid, B_TRUE);
 		mac_perim_exit(mph);
+		(void) dls_devnet_unset(mac_name(mh), &linkid, B_TRUE);
 		return (err);
 	}
 	mac_perim_exit(mph);

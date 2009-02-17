@@ -131,6 +131,9 @@ typedef struct ire_stats {
 	uint64_t ire_stats_deleted;	/* # of ires deleted from the bucket */
 } ire_stats_t;
 
+#define	TX_FANOUT_SIZE	128
+#define	IDLHASHINDEX(X)	\
+	((((uintptr_t)(X) >> 2) + ((uintptr_t)(X) >> 9)) & (TX_FANOUT_SIZE - 1))
 
 /*
  * IP stack instances
@@ -348,9 +351,9 @@ struct ip_stack {
 
 	kstat_t		*ips_loopback_ksp;
 
-	struct idl_s	*ips_conn_drain_list;	/* Array of conn drain lists */
+	/* Array of conn drain lists */
+	struct idl_tx_list_s	*ips_idl_tx_list;
 	uint_t		ips_conn_drain_list_cnt; /* Count of conn_drain_list */
-	int		ips_conn_drain_list_index; /* Next drain_list */
 
 	/*
 	 * ID used to assign next free one.

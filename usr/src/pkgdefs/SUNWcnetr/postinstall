@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -109,9 +109,31 @@ if [ -f "${ORIG}" ]; then
 	removef -f $PKGINST > /dev/null 2>&1
 fi
 
-# Convert hostname.xxx and zonecfg vlan entries
-host_ifs=`ls -1 $rootprefix/etc | egrep -e '^hostname.|^hostname6.|^dhcp.'| \
-    cut -d . -f2 | sort -u` 
+# Convert (hostname|hostname6|dhcp).xxx and zonecfg vlan entries
+
+for iftype in hostname hostname6 dhcp
+do
+	interface_names="`echo $rootprefix/etc/$iftype.*[0-9] 2>/dev/null`"
+	if [ "$interface_names" != "$rootprefix/etc/$iftype.*[0-9]" ]; then
+		ORIGIFS="$IFS"
+		IFS="$IFS."
+		set -- $interface_names
+		IFS="$ORIGIFS"
+		while [ $# -ge 2 ]; do
+			shift
+			if [ $# -gt 1 -a \
+			    "$2" != "$rootprefix/etc/$iftype" ]; then
+				while [ $# -gt 1 -a \
+				    "$1" != "$rootprefix/etc/$iftype" ]; do
+					shift
+				done
+			else
+				host_ifs="$host_ifs $1"
+				shift
+			fi
+		done
+	fi
+done
 
 zones=`zoneadm list -c | grep -v global`
 for zone in $zones

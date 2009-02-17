@@ -1042,17 +1042,26 @@ softmac_mac_recreate(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		return (MH_WALK_CONTINUE);
 	}
 
+	/*
+	 * Bumping up the smac_hold_cnt allows us to drop the lock. It also
+	 * makes softmac_destroy() return failure on an attempted device detach.
+	 * We don't want to hold the lock across calls to other subsystems
+	 * like kstats, which will happen in the call to dls_devnet_recreate
+	 */
+	softmac->smac_hold_cnt++;
+	mutex_exit(&softmac->smac_mutex);
+
 	if (dls_mgmt_create(softmac->smac_devname,
 	    makedevice(softmac->smac_umajor, softmac->smac_uppa + 1),
 	    DATALINK_CLASS_PHYS, softmac->smac_media, B_TRUE, &linkid) != 0) {
-		mutex_exit(&softmac->smac_mutex);
+		softmac_rele_device((dls_dev_handle_t)softmac);
 		return (MH_WALK_CONTINUE);
 	}
 
 	if ((err = softmac_update_info(softmac, &linkid)) != 0) {
 		cmn_err(CE_WARN, "softmac: softmac_update_info() for %s "
 		    "failed (%d)", softmac->smac_devname, err);
-		mutex_exit(&softmac->smac_mutex);
+		softmac_rele_device((dls_dev_handle_t)softmac);
 		return (MH_WALK_CONTINUE);
 	}
 
@@ -1069,7 +1078,10 @@ softmac_mac_recreate(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		}
 	}
 
+	mutex_enter(&softmac->smac_mutex);
 	softmac->smac_flags &= ~SOFTMAC_NEED_RECREATE;
+	ASSERT(softmac->smac_hold_cnt != 0);
+	softmac->smac_hold_cnt--;
 	mutex_exit(&softmac->smac_mutex);
 
 	return (MH_WALK_CONTINUE);

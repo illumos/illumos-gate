@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,16 +73,24 @@ kmem_cache_t *mac_soft_ring_cache;
  * The duration in msec we wait before signalling the soft ring
  * worker thread in case packets get queued.
  */
-static uint32_t mac_soft_ring_worker_wait = 0;
+uint32_t mac_soft_ring_worker_wait = 0;
+
+/*
+ * A global tunable for turning polling on/off. By default, dynamic
+ * polling is always on and is always very beneficial. It should be
+ * turned off with absolute care and for the rare workload (very
+ * low latency sensitive traffic).
+ */
+int mac_poll_enable = B_TRUE;
 
 /*
  * Need to set mac_soft_ring_max_q_cnt based on bandwidth and perhaps latency.
  * Large values could end up in consuming lot of system memory and cause
  * system hang.
  */
-static int mac_soft_ring_max_q_cnt = 1024;
-static int mac_soft_ring_min_q_cnt = 256;
-static int mac_soft_ring_poll_thres = 16;
+int mac_soft_ring_max_q_cnt = 1024;
+int mac_soft_ring_min_q_cnt = 256;
+int mac_soft_ring_poll_thres = 16;
 
 /*
  * Default value of number of TX rings to be assigned to a MAC client.
@@ -91,8 +99,8 @@ static int mac_soft_ring_poll_thres = 16;
  * If no TX rings are available, then MAC client(s) will be assigned the
  * default Tx ring. Default Tx ring can be shared among multiple MAC clients.
  */
-static uint32_t mac_tx_ring_count = 8;
-static boolean_t mac_tx_serialize = B_FALSE;
+uint32_t mac_tx_ring_count = 8;
+boolean_t mac_tx_serialize = B_FALSE;
 
 /*
  * mac_tx_srs_hiwat is the queue depth threshold at which callers of
@@ -105,8 +113,8 @@ static boolean_t mac_tx_serialize = B_FALSE;
  * Note that mac_tx_srs_hiwat is always be lesser than
  * mac_tx_srs_max_q_cnt.
  */
-static uint32_t mac_tx_srs_max_q_cnt = 100000;
-static uint32_t mac_tx_srs_hiwat = 1000;
+uint32_t mac_tx_srs_max_q_cnt = 100000;
+uint32_t mac_tx_srs_hiwat = 1000;
 
 /*
  * mac_rx_soft_ring_count, mac_soft_ring_10gig_count:
@@ -131,8 +139,8 @@ static uint32_t mac_tx_srs_hiwat = 1000;
  * rings is based on specified bandwidth, CPU speed and number of CPUs in
  * the system.
  */
-static uint_t mac_rx_soft_ring_count = 8;
-static uint_t mac_rx_soft_ring_10gig_count = 8;
+uint_t mac_rx_soft_ring_count = 8;
+uint_t mac_rx_soft_ring_10gig_count = 8;
 
 /*
  * Every Tx and Rx mac_soft_ring_set_t (mac_srs) created gets added
@@ -146,18 +154,12 @@ static krwlock_t mac_srs_g_lock;
 /*
  * Whether the SRS threads should be bound, or not.
  */
-static boolean_t mac_srs_thread_bind = B_TRUE;
+boolean_t mac_srs_thread_bind = B_TRUE;
 
 /*
  * CPU to fallback to, used by mac_next_bind_cpu().
  */
-static processorid_t srs_bind_cpu = 0;
-
-/*
- * Possible setting for soft_ring_process_flag is
- * 0 or ST_RING_WORKER_ONLY.
- */
-static int soft_ring_process_flag = ST_RING_WORKER_ONLY;
+processorid_t srs_bind_cpu = 0;
 
 /*
  * If cpu bindings are specified by user, then Tx SRS and its soft
@@ -503,7 +505,7 @@ mac_srs_poll_state_change(mac_soft_ring_set_t *mac_srs,
 	    (ring->mr_classify_type == MAC_HW_CLASSIFIER)) {
 		if (turn_off_poll_capab)
 			mac_srs->srs_state &= ~SRS_POLLING_CAPAB;
-		else
+		else if (mac_poll_enable)
 			mac_srs->srs_state |= SRS_POLLING_CAPAB;
 	}
 	srs_rx->sr_lower_proc = rx_func;
@@ -1498,7 +1500,7 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
     mac_soft_ring_set_t *mac_tx_srs)
 {
 	mac_soft_ring_t *softring;
-	uint32_t soft_ring_flag = soft_ring_process_flag;
+	uint32_t soft_ring_flag = 0;
 	processorid_t cpuid = -1;
 	boolean_t user_specified;
 	int i, srings_present, new_fanout_cnt;
@@ -1606,7 +1608,7 @@ mac_srs_fanout_init(mac_client_impl_t *mcip, flow_entry_t *flent,
 {
 	int		i;
 	processorid_t	cpuid, worker_cpuid, poll_cpuid;
-	uint32_t	soft_ring_flag = soft_ring_process_flag;
+	uint32_t	soft_ring_flag = 0;
 	int soft_ring_cnt;
 	boolean_t user_specified = B_FALSE;
 	mac_cpus_t *srs_cpu = &mac_rx_srs->srs_cpu;
@@ -1917,7 +1919,8 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		    (srs_rx->sr_lowat >> 1) ? mac_soft_ring_poll_thres :
 		    (srs_rx->sr_lowat >> 1);
 		if (mac_latency_optimize)
-			mac_srs->srs_state |= SRS_LATENCY_OPT;
+			mac_srs->srs_state |=
+			    (SRS_LATENCY_OPT|SRS_SOFTRING_QUEUE);
 	}
 
 	mac_srs->srs_worker = thread_create(NULL, 0,
@@ -1956,12 +1959,21 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		ring->mr_classify_type = MAC_HW_CLASSIFIER;
 		ring->mr_flag |= MR_INCIPIENT;
 
-		if (FLOW_TAB_EMPTY(mcip->mci_subflow_tab))
+		if (FLOW_TAB_EMPTY(mcip->mci_subflow_tab) && mac_poll_enable)
 			mac_srs->srs_state |= SRS_POLLING_CAPAB;
 
 		mac_srs->srs_poll_thr = thread_create(NULL, 0,
 		    mac_rx_srs_poll_ring, mac_srs, 0, &p0, TS_RUN,
 		    mac_srs->srs_pri);
+		/*
+		 * Some drivers require serialization and don't send
+		 * packet chains in interrupt context. For such
+		 * drivers, we should always queue in soft ring
+		 * so that we get a chance to switch into a polling
+		 * mode under backlog.
+		 */
+		if (mcip->mci_mip->mi_v12n_level & MAC_VIRT_SERIALIZE)
+			mac_srs->srs_state |= SRS_SOFTRING_QUEUE;
 	}
 	return (mac_srs);
 }
@@ -2131,10 +2143,6 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 				mac_srs = mac_srs_create(mcip, flent,
 				    fanout_type | link_type,
 				    mac_rx_deliver, mcip, NULL, ring);
-				if (mip->mi_v12n_level & MAC_VIRT_SERIALIZE) {
-					mac_srs->srs_rx.sr_enqueue_always =
-					    B_TRUE;
-				}
 				break;
 			default:
 				cmn_err(CE_PANIC, "srs_setup: mcip = %p "
@@ -2706,6 +2714,7 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 			mac_srs_group_setup(grp_only_mcip,
 			    grp_only_mcip->mci_flent,
 			    default_group, SRST_LINK);
+			mac_rx_group_unmark(default_group, MR_INCIPIENT);
 		}
 	}
 }
@@ -3173,7 +3182,7 @@ mac_tx_srs_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 {
 	mac_impl_t *mip = mcip->mci_mip;
 	mac_soft_ring_set_t *tx_srs;
-	int i, tx_ring_count = 0, tx_rings_reserved;
+	int i, tx_ring_count = 0, tx_rings_reserved = 0;
 	mac_ring_handle_t *tx_ring = NULL;
 	uint32_t soft_ring_type;
 	mac_group_t *grp = NULL;

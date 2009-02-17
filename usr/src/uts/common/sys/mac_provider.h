@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -414,10 +414,6 @@ typedef struct mac_register_s {
  */
 extern void			mac_sdu_get(mac_handle_t, uint_t *, uint_t *);
 extern int			mac_maxsdu_update(mac_handle_t, uint_t);
-extern int			mac_set_prop(mac_handle_t, mac_prop_t *,
-				    void *, uint_t);
-extern int			mac_get_prop(mac_handle_t, mac_prop_t *,
-				    void *, uint_t, uint_t *);
 
 extern mac_register_t		*mac_alloc(uint_t);
 extern void			mac_free(mac_register_t *);
@@ -452,18 +448,14 @@ extern int			mac_margin_add(mac_handle_t, uint32_t *,
 				    boolean_t);
 extern void			mac_init_ops(struct dev_ops *, const char *);
 extern void			mac_fini_ops(struct dev_ops *);
-extern uint32_t			mac_no_notification(mac_handle_t);
 
 extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
 extern int			mactype_register(mactype_register_t *);
 extern int			mactype_unregister(const char *);
-extern void			mac_set_ring(void *, void *);
 
 extern boolean_t		mac_unicst_verify(mac_handle_t,
 				    const uint8_t *, uint_t);
-
-extern boolean_t		mac_is_vnic(mac_handle_t);
 
 extern int			mac_group_add_ring(mac_group_handle_t, int);
 extern void			mac_group_rem_ring(mac_group_handle_t,

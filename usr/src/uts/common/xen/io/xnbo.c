@@ -312,7 +312,8 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 		mac_rx_set(xnbop->o_mch, rx_fn, xnbp);
 	} else {
 		err = mac_promisc_add(xnbop->o_mch, MAC_CLIENT_PROMISC_ALL,
-		    rx_fn, xnbp, &xnbop->o_mphp, MAC_PROMISC_FLAGS_NO_TX_LOOP);
+		    rx_fn, xnbp, &xnbop->o_mphp, MAC_PROMISC_FLAGS_NO_TX_LOOP |
+		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
 		if (err != 0) {
 			cmn_err(CE_WARN, "xnbo_open_mac: "
 			    "cannot enable promiscuous mode of %s: %d",

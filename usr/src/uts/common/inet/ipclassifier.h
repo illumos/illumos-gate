@@ -245,6 +245,7 @@ struct conn_s {
 
 	unsigned int
 		conn_lso_ok : 1;		/* LSO is usable */
+	boolean_t conn_direct_blocked;		/* conn is flow-controlled */
 
 	squeue_t	*conn_initial_sqp;	/* Squeue at open time */
 	squeue_t	*conn_final_sqp;	/* Squeue after connect */

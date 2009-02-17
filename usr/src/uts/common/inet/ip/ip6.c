@@ -10807,9 +10807,12 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			if (ipst->ips_ip_output_queue && connp != NULL &&
 			    !mctl_present && caller != IRE_SEND) {
 				if (caller == IP_WSRV) {
+					idl_tx_list_t *idl_txl;
+
+					idl_txl = &ipst->ips_idl_tx_list[0];
 					connp->conn_did_putbq = 1;
 					(void) putbq(connp->conn_wq, mp);
-					conn_drain_insert(connp);
+					conn_drain_insert(connp, idl_txl);
 					/*
 					 * caller == IP_WSRV implies we are
 					 * the service thread, and the

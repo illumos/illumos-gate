@@ -19,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#include <sys/mac_provider.h>
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_hio.h>
 #include <npi_tx_wr64.h>
@@ -31,6 +32,9 @@
 #include <netinet/tcp.h>
 #include <inet/ip_impl.h>
 #include <inet/tcp.h>
+
+extern uint64_t mac_pkt_hash(uint_t, mblk_t *mp, uint8_t policy,
+    boolean_t is_outbound);
 
 static mblk_t *nxge_lso_eliminate(mblk_t *);
 static mblk_t *nxge_do_softlso(mblk_t *mp, uint32_t mss);
@@ -121,8 +125,17 @@ nxge_tx_ring_send(void *arg, mblk_t *mp)
 #if defined(sun4v)
 
 /*
+ * Hashing policy for load balancing over the set of TX rings
+ * available to the driver.
+ */
+static uint8_t nxge_tx_hash_policy = MAC_PKT_HASH_L4;
+
+/*
  * nxge_m_tx() is needed for Hybrid I/O operation of the vnet in
  *	the guest domain.  See CR 6778758 for long term solution.
+ *
+ *	The guest domain driver will for now hash the packet
+ *	to pick a DMA channel from the only group it has group 0.
  */
 
 mblk_t *
@@ -130,15 +143,23 @@ nxge_m_tx(void *arg, mblk_t *mp)
 {
 	p_nxge_t		nxgep = (p_nxge_t)arg;
 	mblk_t			*next;
+	uint64_t		rindex;
 	p_tx_ring_t		tx_ring_p;
 	int			status;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_m_tx"));
 
 	/*
-	 * Get the default ring handle.
+	 * Hash to pick a ring from Group 0, the only TX group
+	 * for a guest domain driver.
 	 */
-	tx_ring_p = nxgep->tx_rings->rings[0];
+	rindex = mac_pkt_hash(DL_ETHER, mp, nxge_tx_hash_policy, B_TRUE);
+	rindex = rindex % nxgep->pt_config.tdc_grps[0].max_tdcs;
+
+	/*
+	 * Get the ring handle.
+	 */
+	tx_ring_p = nxgep->tx_rings->rings[rindex];
 
 	while (mp != NULL) {
 		next = mp->b_next;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,6 +424,7 @@ struct mac_impl_s {
 	/* list of MAC clients which opened this MAC */
 	struct mac_client_impl_s *mi_clients_list;	/* mi_rw_lock */
 	uint_t			mi_nclients;		/* mi_rw_lock */
+	struct mac_client_impl_s *mi_single_active_client; /* mi_rw_lock */
 
 	uint32_t		mi_margin;		/* mi_rw_lock */
 	uint_t			mi_sdu_min;		/* mi_rw_lock */

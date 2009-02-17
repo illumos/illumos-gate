@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,8 +98,9 @@ typedef enum {
 #define	MAC_CLOSE_FLAGS_IS_AGGR_PORT	0x0004
 
 /* flags passed to mac_promisc_add() */
-#define	MAC_PROMISC_FLAGS_NO_TX_LOOP	0x0001
-#define	MAC_PROMISC_FLAGS_NO_PHYS	0x0002
+#define	MAC_PROMISC_FLAGS_NO_TX_LOOP		0x0001
+#define	MAC_PROMISC_FLAGS_NO_PHYS		0x0002
+#define	MAC_PROMISC_FLAGS_VLAN_TAG_STRIP	0x0004
 
 /* flags passed to mac_tx() */
 #define	MAC_DROP_ON_NO_DESC	0x01 /* freemsg() if no tx descs */
@@ -174,6 +175,12 @@ extern int mac_set_mtu(mac_handle_t, uint_t, uint_t *);
 extern uint_t mac_hwgrp_num(mac_handle_t);
 extern void mac_get_hwgrp_info(mac_handle_t, int, uint_t *, uint_t *,
     uint_t *, uint_t *, char *);
+
+extern uint32_t mac_no_notification(mac_handle_t);
+extern int mac_set_prop(mac_handle_t, mac_prop_t *, void *, uint_t);
+extern int mac_get_prop(mac_handle_t, mac_prop_t *, void *, uint_t, uint_t *);
+
+extern boolean_t mac_is_vnic(mac_handle_t);
 
 #endif	/* _KERNEL */
 

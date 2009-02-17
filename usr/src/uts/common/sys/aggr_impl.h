@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,7 @@ typedef struct aggr_grp_s {
 	aggr_port_t	**lg_tx_ports;		/* array of tx ports */
 	uint_t		lg_tx_ports_size;	/* size of lg_tx_ports */
 	uint32_t	lg_tx_policy;		/* outbound policy */
+	uint8_t		lg_mac_tx_policy;
 	uint64_t	lg_ifspeed;
 	link_state_t	lg_link_state;
 	link_duplex_t	lg_link_duplex;

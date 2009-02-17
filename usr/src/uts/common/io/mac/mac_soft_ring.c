@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,6 +207,8 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
 		ringp->s_ring_rx_func = rx_func;
 		ringp->s_ring_rx_arg1 = x_arg1;
 		ringp->s_ring_rx_arg2 = x_arg2;
+		if (mac_srs->srs_state & SRS_SOFTRING_QUEUE)
+			ringp->s_ring_type |= ST_RING_WORKER_ONLY;
 	}
 	if (cpuid != -1)
 		(void) mac_soft_ring_bind(ringp, cpuid);

@@ -1618,7 +1618,6 @@ static mblk_t *e1000g_poll_ring(void *arg, int bytes_to_pickup)
 	e1000g_rx_ring_t	*rx_ring = (e1000g_rx_ring_t *)arg;
 	mblk_t			*mp = NULL;
 	mblk_t			*tail;
-	uint_t			sz = 0;
 	struct e1000g 		*adapter;
 
 	adapter = rx_ring->adapter;
@@ -1631,68 +1630,7 @@ static mblk_t *e1000g_poll_ring(void *arg, int bytes_to_pickup)
 	}
 
 	mutex_enter(&rx_ring->rx_lock);
-	ASSERT(rx_ring->poll_flag);
-
-	/*
-	 * Get any packets that have arrived. Works only if we
-	 * actually disable the physical adapter/rx_ring interrupt.
-	 * (e1000g_poll_mode == 1). In case e1000g_poll_mode == 0,
-	 * packets will have already been added to the poll list
-	 * by the interrupt (see e1000g_intr_work()).
-	 */
-	if (adapter->poll_mode) {
-		mp = e1000g_receive(rx_ring, &tail, &sz);
-		if (mp != NULL) {
-			if (rx_ring->poll_list_head == NULL)
-				rx_ring->poll_list_head = mp;
-			else
-				rx_ring->poll_list_tail->b_next = mp;
-			rx_ring->poll_list_tail = tail;
-			rx_ring->poll_list_sz += sz;
-		}
-	}
-
-	mp = rx_ring->poll_list_head;
-	if (mp == NULL) {
-		mutex_exit(&rx_ring->rx_lock);
-		rw_exit(&adapter->chip_lock);
-		return (NULL);
-	}
-
-	/* Check if we can sendup the entire chain */
-	if (bytes_to_pickup >= rx_ring->poll_list_sz) {
-		mp = rx_ring->poll_list_head;
-		rx_ring->poll_list_head = NULL;
-		rx_ring->poll_list_tail = NULL;
-		rx_ring->poll_list_sz = 0;
-		mutex_exit(&rx_ring->rx_lock);
-		rw_exit(&adapter->chip_lock);
-		return (mp);
-	}
-
-	/*
-	 * We need to find out how much chain we can send up. We
-	 * are guaranteed that atleast one packet will go up since
-	 * we already checked that.
-	 */
-	tail = mp;
-	sz = 0;
-	while (mp != NULL) {
-		sz += MBLKL(mp);
-		if (sz > bytes_to_pickup) {
-			sz -= MBLKL(mp);
-			break;
-		}
-		tail = mp;
-		mp = mp->b_next;
-	}
-
-	mp = rx_ring->poll_list_head;
-	rx_ring->poll_list_head = tail->b_next;
-	if (rx_ring->poll_list_head == NULL)
-		rx_ring->poll_list_tail = NULL;
-	rx_ring->poll_list_sz -= sz;
-	tail->b_next = NULL;
+	mp = e1000g_receive(rx_ring, &tail, bytes_to_pickup);
 	mutex_exit(&rx_ring->rx_lock);
 	rw_exit(&adapter->chip_lock);
 	return (mp);
@@ -2118,79 +2056,26 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 	}
 
 	if (icr & E1000_ICR_RXT0) {
-		mblk_t			*mp;
-		uint_t			sz = 0;
-		mblk_t			*tmp, *tail = NULL;
+		mblk_t			*mp = NULL;
+		mblk_t			*tail = NULL;
 		e1000g_rx_ring_t	*rx_ring;
 
 		rx_ring = Adapter->rx_ring;
 		mutex_enter(&rx_ring->rx_lock);
-
 		/*
-		 * If the real interrupt for the Rx ring was
-		 * not disabled (e1000g_poll_mode == 0), then
-		 * we still pick up the packets and queue them
-		 * on Rx ring if we were in polling mode. this
-		 * enables the polling thread to pick up packets
-		 * really fast in polling mode and helps improve
-		 * latency.
+		 * Sometimes with legacy interrupts, it possible that
+		 * there is a single interrupt for Rx/Tx. In which
+		 * case, if poll flag is set, we shouldn't really
+		 * be doing Rx processing.
 		 */
-		mp = e1000g_receive(rx_ring, &tail, &sz);
+		if (!rx_ring->poll_flag)
+			mp = e1000g_receive(rx_ring, &tail,
+			    E1000G_CHAIN_NO_LIMIT);
+		mutex_exit(&rx_ring->rx_lock);
 		rw_exit(&Adapter->chip_lock);
-
-		if (mp != NULL) {
-			ASSERT(tail != NULL);
-			if (!rx_ring->poll_flag) {
-				/*
-				 * If not polling, see if something was
-				 * already queued. Take care not to
-				 * reorder packets.
-				 */
-				if (rx_ring->poll_list_head == NULL) {
-					mutex_exit(&rx_ring->rx_lock);
-					mac_rx_ring(Adapter->mh, rx_ring->mrh,
-					    mp, rx_ring->ring_gen_num);
-				} else {
-					tmp = rx_ring->poll_list_head;
-					rx_ring->poll_list_head = NULL;
-					rx_ring->poll_list_tail->b_next = mp;
-					rx_ring->poll_list_tail = NULL;
-					rx_ring->poll_list_sz = 0;
-					mutex_exit(&rx_ring->rx_lock);
-					mac_rx_ring(Adapter->mh, rx_ring->mrh,
-					    tmp, rx_ring->ring_gen_num);
-				}
-			} else {
-				/*
-				 * We are in a polling mode. Put the
-				 * processed packets on the poll list.
-				 */
-				if (rx_ring->poll_list_head == NULL)
-					rx_ring->poll_list_head = mp;
-				else
-					rx_ring->poll_list_tail->b_next = mp;
-				rx_ring->poll_list_tail = tail;
-				rx_ring->poll_list_sz += sz;
-				mutex_exit(&rx_ring->rx_lock);
-			}
-		} else if (!rx_ring->poll_flag &&
-		    rx_ring->poll_list_head != NULL) {
-			/*
-			 * Nothing new has arrived (then why
-			 * was the interrupt raised??). Check
-			 * if something queued from the last
-			 * time.
-			 */
-			tmp = rx_ring->poll_list_head;
-			rx_ring->poll_list_head = NULL;
-			rx_ring->poll_list_tail = NULL;
-			rx_ring->poll_list_sz = 0;
-			mutex_exit(&rx_ring->rx_lock);
+		if (mp != NULL)
 			mac_rx_ring(Adapter->mh, rx_ring->mrh,
-			    tmp, rx_ring->ring_gen_num);
-		} else {
-			mutex_exit(&rx_ring->rx_lock);
-		}
+			    mp, rx_ring->ring_gen_num);
 	} else
 		rw_exit(&Adapter->chip_lock);
 
@@ -2698,7 +2583,6 @@ e1000g_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	struct e1000g 		*adapter = rx_ring->adapter;
 	struct e1000_hw 	*hw = &adapter->shared;
 	uint32_t		intr_mask;
-	boolean_t		poll_mode;
 
 	rw_enter(&adapter->chip_lock, RW_READER);
 
@@ -2709,20 +2593,17 @@ e1000g_rx_ring_intr_enable(mac_intr_handle_t intrh)
 
 	mutex_enter(&rx_ring->rx_lock);
 	rx_ring->poll_flag = 0;
-	poll_mode = adapter->poll_mode;
 	mutex_exit(&rx_ring->rx_lock);
 
-	if (poll_mode) {
-		/* Rx interrupt enabling for MSI and legacy */
-		intr_mask = E1000_READ_REG(hw, E1000_IMS);
-		intr_mask |= E1000_IMS_RXT0;
-		E1000_WRITE_REG(hw, E1000_IMS, intr_mask);
-		E1000_WRITE_FLUSH(hw);
+	/* Rx interrupt enabling for MSI and legacy */
+	intr_mask = E1000_READ_REG(hw, E1000_IMS);
+	intr_mask |= E1000_IMS_RXT0;
+	E1000_WRITE_REG(hw, E1000_IMS, intr_mask);
+	E1000_WRITE_FLUSH(hw);
 
-		/* Trigger a Rx interrupt to check Rx ring */
-		E1000_WRITE_REG(hw, E1000_ICS, E1000_IMS_RXT0);
-		E1000_WRITE_FLUSH(hw);
-	}
+	/* Trigger a Rx interrupt to check Rx ring */
+	E1000_WRITE_REG(hw, E1000_ICS, E1000_IMS_RXT0);
+	E1000_WRITE_FLUSH(hw);
 
 	rw_exit(&adapter->chip_lock);
 	return (0);
@@ -2734,7 +2615,6 @@ e1000g_rx_ring_intr_disable(mac_intr_handle_t intrh)
 	e1000g_rx_ring_t	*rx_ring = (e1000g_rx_ring_t *)intrh;
 	struct e1000g 		*adapter = rx_ring->adapter;
 	struct e1000_hw 	*hw = &adapter->shared;
-	boolean_t		poll_mode;
 
 	rw_enter(&adapter->chip_lock, RW_READER);
 
@@ -2742,22 +2622,13 @@ e1000g_rx_ring_intr_disable(mac_intr_handle_t intrh)
 		rw_exit(&adapter->chip_lock);
 		return (0);
 	}
-
-	/*
-	 * Once the adapter can support per Rx ring interrupt,
-	 * we should disable the real interrupt instead of just setting
-	 * the flag.
-	 */
 	mutex_enter(&rx_ring->rx_lock);
 	rx_ring->poll_flag = 1;
-	poll_mode = adapter->poll_mode;
 	mutex_exit(&rx_ring->rx_lock);
 
-	if (poll_mode) {
-		/* Rx interrupt disabling for MSI and legacy */
-		E1000_WRITE_REG(hw, E1000_IMC, E1000_IMS_RXT0);
-		E1000_WRITE_FLUSH(hw);
-	}
+	/* Rx interrupt disabling for MSI and legacy */
+	E1000_WRITE_REG(hw, E1000_IMC, E1000_IMS_RXT0);
+	E1000_WRITE_FLUSH(hw);
 
 	rw_exit(&adapter->chip_lock);
 	return (0);

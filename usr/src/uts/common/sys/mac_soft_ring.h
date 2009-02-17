@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,7 +181,6 @@ typedef struct mac_srs_rx_s {
 	void			*sr_arg1;	/* srs_lock */
 	mac_resource_handle_t 	sr_arg2;	/* srs_lock */
 	mac_rx_func_t		sr_lower_proc;	/* Atomically changed */
-	boolean_t		sr_enqueue_always; /* enqueue at soft ring */
 	uint32_t		sr_poll_pkt_cnt;
 	uint32_t		sr_poll_thres;
 
@@ -233,7 +232,7 @@ typedef struct mac_srs_rx_s {
 	/* Worker thread goes back to draining the queue */
 	uint32_t		sr_drain_again;
 	/* More Packets in queue so signal the worker thread to drain */
-	uint32_t		sr_drain_worker_sig;
+	uint32_t		sr_drain_poll_sig;
 	/* Poll thread is already running so worker has nothing to do */
 	uint32_t		sr_drain_poll_running;
 	/* We have packets already queued so keep polling */
@@ -485,6 +484,7 @@ struct mac_soft_ring_set_s {
 
 #define	SRS_QUIESCE_PERM	0x10000000
 #define	SRS_LATENCY_OPT		0x20000000
+#define	SRS_SOFTRING_QUEUE	0x40000000
 
 #define	SRS_QUIESCED(srs)	(srs->srs_state & SRS_QUIESCE_DONE)
 

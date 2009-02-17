@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -580,12 +580,8 @@ update_pe(net_plot_entry_t *pe, net_stat_t *nns, int nentries,
 	int	count;
 
 	for (count = 0; count < nentries; count++) {
-		if ((strlen(nns->net_stat_name) ==
-		    strlen(pe[count].net_pe_name)) &&
-		    (strncmp(pe[count].net_pe_name, nns->net_stat_name,
-		    strlen(nns->net_stat_name)) == 0)) {
+		if (strcmp(pe[count].net_pe_name, nns->net_stat_name) == 0)
 			break;
-		}
 	}
 	if (count == nentries)
 		return;
@@ -638,10 +634,8 @@ get_ne_from_table(net_table_t *net_table, char *name)
 
 	for (count = 0; count < net_table->net_entries; count++) {
 		nd = ne->net_entry_desc;
-		if ((strlen(name) == strlen(nd->net_desc_name)) &&
-		    (strncmp(name, nd->net_desc_name, strlen(name)) == 0)) {
+		if (strcmp(name, nd->net_desc_name) == 0)
 			return (ne);
-		}
 		ne = ne->net_entry_next;
 	}
 	return (NULL);
@@ -657,13 +651,8 @@ get_ndesc(net_table_t *net_table, net_desc_t *nd)
 
 	for (count = 0; count < net_table->net_entries; count++) {
 		nd1 = ne->net_entry_desc;
-		if (strlen(nd1->net_desc_name) == strlen(nd->net_desc_name) &&
-		    strlen(nd1->net_desc_devname) ==
-		    strlen(nd->net_desc_devname) &&
-		    strncmp(nd1->net_desc_name, nd->net_desc_name,
-		    strlen(nd1->net_desc_name)) == 0 &&
-		    strncmp(nd1->net_desc_devname, nd->net_desc_devname,
-		    strlen(nd1->net_desc_devname)) == 0 &&
+		if (strcmp(nd1->net_desc_name, nd->net_desc_name) == 0 &&
+		    strcmp(nd1->net_desc_devname, nd->net_desc_devname) == 0 &&
 		    bcmp(nd1->net_desc_ehost, nd->net_desc_ehost,
 		    ETHERADDRL) == 0 &&
 		    bcmp(nd1->net_desc_edest, nd->net_desc_edest,
@@ -841,10 +830,8 @@ addto_time_list(net_table_t *net_table, net_time_entry_t *nt,
 			    NET_DATE_GREATER) {
 				break;
 			}
-			if ((strlen(ns1->net_stat_name) ==
-			    strlen(ns->net_stat_name)) &&
-			    (strncmp(ns1->net_stat_name, ns->net_stat_name,
-			    strlen(ns1->net_stat_name)) == 0)) {
+			if (strcmp(ns1->net_stat_name, ns->net_stat_name) ==
+			    0) {
 				ntc->net_time_entry_next =
 				    end->net_time_entry_next;
 				if (end->net_time_entry_next != NULL) {
@@ -1084,9 +1071,7 @@ dladm_walk_usage_res(int (*fn)(dladm_usage_t *, void *), int logtype,
 		nns = start->my_time_stat;
 
 		/* Get to the resource we are interested in */
-		if ((strlen(resource) != strlen(nns->net_stat_name)) ||
-		    (strncmp(resource, nns->net_stat_name,
-		    strlen(nns->net_stat_name)) != 0)) {
+		if (strcmp(resource, nns->net_stat_name) != 0) {
 			start = start->net_time_entry_next;
 			continue;
 		}
@@ -1400,9 +1385,7 @@ dladm_usage_dates(int (*fn)(dladm_usage_t *, void *), int logtype,
 
 		/* get to the resource we are interested in */
 		if (resource != NULL) {
-			if ((strlen(resource) != strlen(nns->net_stat_name)) ||
-			    (strncmp(resource, nns->net_stat_name,
-			    strlen(nns->net_stat_name)) != 0)) {
+			if (strcmp(resource, nns->net_stat_name) != 0) {
 				start = start->net_time_entry_next;
 				continue;
 			}
@@ -1422,6 +1405,8 @@ dladm_usage_dates(int (*fn)(dladm_usage_t *, void *), int logtype,
 		    compare_date(&nns->net_stat_time, lasttime) ==
 		    NET_DATE_GREATER) {
 			bzero(&usage, sizeof (dladm_usage_t));
+			(void) strlcpy(usage.du_name, nns->net_stat_name,
+			    sizeof (usage.du_name));
 			bcopy(&nns->net_stat_ctime, &usage.du_stime,
 			    sizeof (usage.du_stime));
 			fn(&usage, arg);

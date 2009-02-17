@@ -1128,7 +1128,7 @@ typedef struct iulp_s {
 extern const iulp_t ire_uinfo_null;
 
 /*
- * The conn drain list structure.
+ * The conn drain list structure (idl_t).
  * The list is protected by idl_lock. Each conn_t inserted in the list
  * points back at this idl_t using conn_idl. IP primes the draining of the
  * conns queued in these lists, by qenabling the 1st conn of each list. This
@@ -1137,8 +1137,27 @@ extern const iulp_t ire_uinfo_null;
  * idl_lock protects all other members of idl_t and conn_drain_next
  * and conn_drain_prev of conn_t. The conn_lock protects IPCF_DRAIN_DISABLED
  * flag of the conn_t and conn_idl.
+ *
+ * The conn drain list, idl_t, itself is part of tx cookie list structure.
+ * A tx cookie list points to a blocked Tx ring and contains the list of
+ * all conn's that are blocked due to the flow-controlled Tx ring (via
+ * the idl drain list). Note that a link can have multiple Tx rings. The
+ * drain list will store the conn's blocked due to Tx ring being flow
+ * controlled.
  */
-typedef struct idl_s {
+
+typedef uintptr_t ip_mac_tx_cookie_t;
+typedef	struct idl_s idl_t;
+typedef	struct idl_tx_list_s idl_tx_list_t;
+
+struct idl_tx_list_s {
+	ip_mac_tx_cookie_t	txl_cookie;
+	kmutex_t		txl_lock;	/* Lock for this list */
+	idl_t			*txl_drain_list;
+	int			txl_drain_index;
+};
+
+struct idl_s {
 	conn_t		*idl_conn;		/* Head of drain list */
 	kmutex_t	idl_lock;		/* Lock for this list */
 	conn_t		*idl_conn_draining;	/* conn that is draining */
@@ -1146,7 +1165,8 @@ typedef struct idl_s {
 		idl_repeat : 1,			/* Last conn must re-enable */
 						/* drain list again */
 		idl_unused : 31;
-} idl_t;
+	idl_tx_list_t	*idl_itl;
+};
 
 #define	CONN_DRAIN_LIST_LOCK(connp)	(&((connp)->conn_idl->idl_lock))
 /*
@@ -3336,8 +3356,8 @@ extern ill_t	*ipmp_ipif_hold_bound_ill(const ipif_t *);
 extern boolean_t ipmp_ipif_is_dataaddr(const ipif_t *);
 extern boolean_t ipmp_ipif_is_stubaddr(const ipif_t *);
 
-extern void	conn_drain_insert(conn_t *connp);
-extern int	conn_ipsec_length(conn_t *connp);
+extern void	conn_drain_insert(conn_t *, idl_tx_list_t *);
+extern int	conn_ipsec_length(conn_t *);
 extern void	ip_wput_ipsec_out(queue_t *, mblk_t *, ipha_t *, ill_t *,
     ire_t *);
 extern ipaddr_t	ip_get_dst(ipha_t *);
@@ -3587,13 +3607,16 @@ typedef enum {
  * we need to duplicate the definitions here because we cannot
  * include mac/dls header files here.
  */
-typedef void	*ip_mac_tx_cookie_t;
-typedef void	(*ip_mac_intr_disable_t)(void *);
-typedef void	(*ip_mac_intr_enable_t)(void *);
-typedef void	*(*ip_dld_tx_t)(void *, mblk_t *, uint64_t, uint16_t);
-typedef	void	(*ip_flow_enable_t)(void *, ip_mac_tx_cookie_t);
-typedef void	*(*ip_dld_callb_t)(void *, ip_flow_enable_t, void *);
-typedef int	(*ip_capab_func_t)(void *, uint_t, void *, uint_t);
+typedef void			(*ip_mac_intr_disable_t)(void *);
+typedef void			(*ip_mac_intr_enable_t)(void *);
+typedef ip_mac_tx_cookie_t	(*ip_dld_tx_t)(void *, mblk_t *,
+    uint64_t, uint16_t);
+typedef	void			(*ip_flow_enable_t)(void *, ip_mac_tx_cookie_t);
+typedef void			*(*ip_dld_callb_t)(void *,
+    ip_flow_enable_t, void *);
+typedef boolean_t		(*ip_dld_fctl_t)(void *, ip_mac_tx_cookie_t);
+typedef int			(*ip_capab_func_t)(void *, uint_t,
+    void *, uint_t);
 
 /*
  * POLLING README
@@ -3640,6 +3663,8 @@ typedef struct ill_dld_direct_s {		/* DLD provided driver Tx */
 	void			*idd_tx_dh;	/* dld_str_t *dsp */
 	ip_dld_callb_t		idd_tx_cb_df;	/* mac_tx_srs_notify */
 	void			*idd_tx_cb_dh;	/* mac_client_handle_t *mch */
+	ip_dld_fctl_t		idd_tx_fctl_df;	/* mac_tx_is_flow_blocked */
+	void			*idd_tx_fctl_dh;	/* mac_client_handle */
 } ill_dld_direct_t;
 
 /* IP - DLD polling capability */

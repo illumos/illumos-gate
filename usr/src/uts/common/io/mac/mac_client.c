@@ -1159,18 +1159,6 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 		 */
 
 		mcip = mac_vnic_lower(mip);
-		/*
-		 * If there are multiple MAC clients of the VNIC, they
-		 * all share the same underlying MAC client handle.
-		 */
-		if ((flags & MAC_OPEN_FLAGS_TAG_DISABLE) != 0)
-			mcip->mci_state_flags |= MCIS_TAG_DISABLE;
-
-		if ((flags & MAC_OPEN_FLAGS_STRIP_DISABLE) != 0)
-			mcip->mci_state_flags |= MCIS_STRIP_DISABLE;
-
-		if ((flags & MAC_OPEN_FLAGS_DISABLE_TX_VID_CHECK) != 0)
-			mcip->mci_state_flags |= MCIS_DISABLE_TX_VID_CHECK;
 
 		/*
 		 * Note that multiple mac clients share the same mcip in
@@ -1328,13 +1316,6 @@ mac_client_close(mac_client_handle_t mch, uint16_t flags)
 		 * when the VNIC is deleted.
 		 */
 
-		/*
-		 * Clear the flags set when the upper client initiated
-		 * open.
-		 */
-		mcip->mci_state_flags &= ~(MCIS_TAG_DISABLE |
-		    MCIS_STRIP_DISABLE | MCIS_DISABLE_TX_VID_CHECK);
-
 		i_mac_perim_exit(mip);
 		return;
 	}
@@ -1377,12 +1358,11 @@ mac_rx_bypass_set(mac_client_handle_t mch, mac_direct_rx_t rx_fn, void *arg1)
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
 	/*
-	 * If the mac_client is a VLAN or native media is non ethernet, we
-	 * should not do DLS bypass and instead let the packets go via the
-	 * default mac_rx_deliver route so vlan header can be stripped etc.
+	 * If the mac_client is a VLAN, we should not do DLS bypass and
+	 * instead let the packets come up via mac_rx_deliver so the vlan
+	 * header can be stripped.
 	 */
-	if (mcip->mci_nvids > 0 ||
-	    mip->mi_info.mi_nativemedia != DL_ETHER)
+	if (mcip->mci_nvids > 0)
 		return (B_FALSE);
 
 	/*
@@ -1606,6 +1586,37 @@ mac_client_update_mcast(void *arg, boolean_t add, const uint8_t *addrp)
 	}
 }
 
+static void
+mac_update_single_active_client(mac_impl_t *mip)
+{
+	mac_client_impl_t *client = NULL;
+
+	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
+
+	rw_enter(&mip->mi_rw_lock, RW_WRITER);
+	if (mip->mi_nactiveclients == 1) {
+		/*
+		 * Find the one active MAC client from the list of MAC
+		 * clients. The active MAC client has at least one
+		 * unicast address.
+		 */
+		for (client = mip->mi_clients_list; client != NULL;
+		    client = client->mci_client_next) {
+			if (client->mci_unicast_list != NULL)
+				break;
+		}
+		ASSERT(client != NULL);
+	}
+
+	/*
+	 * mi_single_active_client is protected by the MAC impl's read/writer
+	 * lock, which allows mac_rx() to check the value of that pointer
+	 * as a reader.
+	 */
+	mip->mi_single_active_client = client;
+	rw_exit(&mip->mi_rw_lock);
+}
+
 /*
  * Add a new unicast address to the MAC client.
  *
@@ -1712,11 +1723,13 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		mip->mi_state_flags |= MIS_EXCLUSIVE;
 
 	bzero(&mrp, sizeof (mac_resource_props_t));
-	if (is_primary && !(mcip->mci_state_flags & MCIS_IS_VNIC)) {
+	if (is_primary && !(mcip->mci_state_flags & (MCIS_IS_VNIC |
+	    MCIS_IS_AGGR_PORT))) {
 		/*
 		 * Apply the property cached in the mac_impl_t to the primary
-		 * mac client. If the mac client is a VNIC, its property were
-		 * already set in the mcip when the VNIC was created.
+		 * mac client. If the mac client is a VNIC or an aggregation
+		 * port, its property should be set in the mcip when the
+		 * VNIC/aggr was created.
 		 */
 		mac_get_resources((mac_handle_t)mip, &mrp);
 		(void) mac_client_set_resources(mch, &mrp);
@@ -1781,8 +1794,13 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 			goto bail;
 		bcast_added = B_TRUE;
 	}
-	flent = mcip->mci_flent;
-	ASSERT(flent != NULL);
+
+	/*
+	 * If this is the first unicast address addition for this
+	 * client, reuse the pre-allocated larval flow entry associated with
+	 * the MAC client.
+	 */
+	flent = (mcip->mci_nflents == 0) ? mcip->mci_flent : NULL;
 
 	/* We are configuring the unicast flow now */
 	if (!MCIP_DATAPATH_SETUP(mcip)) {
@@ -1806,6 +1824,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 
 		mip->mi_nactiveclients++;
 		nactiveclients_added = B_TRUE;
+
 		/*
 		 * This will allocate the RX ring group if possible for the
 		 * flow and program the software classifier as needed.
@@ -1817,6 +1836,12 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 * The unicast MAC address must have been added successfully.
 		 */
 		ASSERT(mcip->mci_unicast != NULL);
+		/*
+		 * Push down the sub-flows that were defined on this link
+		 * hitherto. The flows are added to the active flow table
+		 * and SRS, softrings etc. are created as needed.
+		 */
+		mac_link_init_flows(mch);
 	} else {
 		mac_address_t *map = mcip->mci_unicast;
 
@@ -1871,6 +1896,9 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	mcip->mci_unicast_list = muip;
 	rw_exit(&mcip->mci_rw_lock);
 
+	if (nactiveclients_added)
+		mac_update_single_active_client(mip);
+
 	*mah = (mac_unicast_handle_t)muip;
 
 	/* add it to the flow list of this mcip */
@@ -1906,8 +1934,11 @@ bail:
 	if (mac_started)
 		mac_stop(mip);
 
-	if (nactiveclients_added)
+	if (nactiveclients_added) {
 		mip->mi_nactiveclients--;
+		mac_update_single_active_client(mip);
+	}
+
 	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
@@ -1983,9 +2014,9 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	 * Remove the VID from the list of client's VIDs.
 	 */
 	pre = mcip->mci_unicast_list;
-	if (muip == pre)
+	if (muip == pre) {
 		mcip->mci_unicast_list = muip->mui_next;
-	else {
+	} else {
 		while ((pre->mui_next != NULL) && (pre->mui_next != muip))
 			pre = pre->mui_next;
 		ASSERT(pre->mui_next == muip);
@@ -1997,14 +2028,16 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PRIMARY) && muip->mui_vid == 0)
 		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PRIMARY;
 
-	/*
-	 * This MAC client is shared, so we will just remove the flent
-	 * corresponding to the address being removed. We don't invoke
-	 * mac_rx_classify_flow_rem() since the additional flow is
-	 * not associated with its own separate set of SRS and rings,
-	 * and these constructs are still needed for the remaining flows.
-	 */
 	if (!mac_client_single_rcvr(mcip)) {
+		/*
+		 * This MAC client is shared by more than one unicast
+		 * addresses, so we will just remove the flent
+		 * corresponding to the address being removed. We don't invoke
+		 * mac_rx_classify_flow_rem() since the additional flow is
+		 * not associated with its own separate set of SRS and rings,
+		 * and these constructs are still needed for the remaining
+		 * flows.
+		 */
 		flent = mac_client_get_flow(mcip, muip);
 		ASSERT(flent != NULL);
 
@@ -2037,7 +2070,20 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 		return (0);
 	}
 
+	/*
+	 * We would have initialized subflows etc. only if we brought up
+	 * the primary client and set the unicast unicast address etc.
+	 * Deactivate the flows. The flow entry will be removed from the
+	 * active flow tables, and the associated SRS, softrings etc will
+	 * be deleted. But the flow entry itself won't be destroyed, instead
+	 * it will continue to be archived off the  the global flow hash
+	 * list, for a possible future activation when say IP is plumbed
+	 * again.
+	 */
+	mac_link_release_flows(mch);
+
 	mip->mi_nactiveclients--;
+	mac_update_single_active_client(mip);
 
 	/* Tear down the Data path */
 	mac_datapath_teardown(mcip, mcip->mci_flent, SRST_LINK);
@@ -2252,6 +2298,8 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mpip->mpi_mcip = mcip;
 	mpip->mpi_no_tx_loop = ((flags & MAC_PROMISC_FLAGS_NO_TX_LOOP) != 0);
 	mpip->mpi_no_phys = ((flags & MAC_PROMISC_FLAGS_NO_PHYS) != 0);
+	mpip->mpi_strip_vlan_tag =
+	    ((flags & MAC_PROMISC_FLAGS_VLAN_TAG_STRIP) != 0);
 
 	mcbi = &mip->mi_promisc_cb_info;
 	mutex_enter(mcbi->mcbi_lockp);
@@ -2503,44 +2551,65 @@ done:
  * mac_tx_is_blocked
  *
  * Given a cookie, it returns if the ring identified by the cookie is
- * flow-controlled or not (this is not implemented yet). If NULL is
- * passed in place of a cookie, then it finds out if any of the
- * underlying rings belonging to the SRS is flow controlled or not
- * and returns that status.
+ * flow-controlled or not. If NULL is passed in place of a cookie,
+ * then it finds out if any of the underlying rings belonging to the
+ * SRS is flow controlled or not and returns that status.
  */
 /* ARGSUSED */
 boolean_t
 mac_tx_is_flow_blocked(mac_client_handle_t mch, mac_tx_cookie_t cookie)
 {
 	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_soft_ring_set_t *mac_srs = MCIP_TX_SRS(mcip);
+	mac_soft_ring_set_t *mac_srs;
 	mac_soft_ring_t *sringp;
 	boolean_t blocked = B_FALSE;
+	mac_tx_percpu_t *mytx;
+	int err;
 	int i;
 
 	/*
-	 * On etherstubs, there won't be a Tx SRS or an Rx
-	 * SRS. Infact there won't even be a flow_entry.
+	 * Bump the reference count so that mac_srs won't be deleted.
+	 * If the client is currently quiesced and we failed to bump
+	 * the reference, return B_TRUE so that flow control stays
+	 * as enabled.
+	 *
+	 * Flow control will then be disabled once the client is no
+	 * longer quiesced.
 	 */
-	if (mac_srs == NULL)
+	MAC_TX_TRY_HOLD(mcip, mytx, err);
+	if (err != 0)
+		return (B_TRUE);
+
+	if ((mac_srs = MCIP_TX_SRS(mcip)) == NULL) {
+		MAC_TX_RELE(mcip, mytx);
 		return (B_FALSE);
+	}
 
 	mutex_enter(&mac_srs->srs_lock);
 	if (mac_srs->srs_tx.st_mode == SRS_TX_FANOUT) {
-		for (i = 0; i < mac_srs->srs_oth_ring_count; i++) {
-			sringp = mac_srs->srs_oth_soft_rings[i];
+		if (cookie != NULL) {
+			sringp = (mac_soft_ring_t *)cookie;
 			mutex_enter(&sringp->s_ring_lock);
-			if (sringp->s_ring_state & S_RING_TX_HIWAT) {
+			if (sringp->s_ring_state & S_RING_TX_HIWAT)
 				blocked = B_TRUE;
-				mutex_exit(&sringp->s_ring_lock);
-				break;
-			}
 			mutex_exit(&sringp->s_ring_lock);
+		} else {
+			for (i = 0; i < mac_srs->srs_oth_ring_count; i++) {
+				sringp = mac_srs->srs_oth_soft_rings[i];
+				mutex_enter(&sringp->s_ring_lock);
+				if (sringp->s_ring_state & S_RING_TX_HIWAT) {
+					blocked = B_TRUE;
+					mutex_exit(&sringp->s_ring_lock);
+					break;
+				}
+				mutex_exit(&sringp->s_ring_lock);
+			}
 		}
 	} else {
 		blocked = (mac_srs->srs_state & SRS_TX_HIWAT);
 	}
 	mutex_exit(&mac_srs->srs_lock);
+	MAC_TX_RELE(mcip, mytx);
 	return (blocked);
 }
 
@@ -2846,6 +2915,10 @@ mac_promisc_dispatch_one(mac_promisc_impl_t *mpip, mblk_t *mp,
 		return;
 	mp_copy->b_next = NULL;
 
+	if (mpip->mpi_strip_vlan_tag) {
+		if ((mp_copy = mac_strip_vlan_tag_chain(mp_copy)) == NULL)
+			return;
+	}
 	mpip->mpi_fn(mpip->mpi_arg, NULL, mp_copy, loopback);
 }
 
@@ -3218,7 +3291,7 @@ i_mac_set_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 	 */
 	bcopy(mrp, &tmrp, sizeof (mac_resource_props_t));
 	mcip = mac_primary_client_handle(mip);
-	if (mcip != NULL) {
+	if (mcip != NULL && (mcip->mci_state_flags & MCIS_IS_AGGR_PORT) == 0) {
 		err =
 		    mac_client_set_resources((mac_client_handle_t)mcip, &tmrp);
 	}

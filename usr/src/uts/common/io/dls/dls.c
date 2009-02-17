@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -607,14 +607,6 @@ dls_mac_active_set(dls_link_t *dlp)
 		 * Set the function to start receiving packets.
 		 */
 		mac_rx_set(dlp->dl_mch, i_dls_link_rx, dlp);
-
-		/*
-		 * We've got a MAC client for this link now.
-		 * Push down the flows that were defined on this link
-		 * hitherto. The flows are added to the active flow table
-		 * and SRS, softrings etc. are created as needed.
-		 */
-		mac_link_init_flows(dlp->dl_mch);
 	}
 	dlp->dl_nactive++;
 	return (0);
@@ -625,20 +617,6 @@ dls_mac_active_clear(dls_link_t *dlp)
 {
 	if (--dlp->dl_nactive == 0) {
 		ASSERT(dlp->dl_mah != NULL);
-		/*
-		 * We would have initialized subflows etc. only if we
-		 * brought up the primary client and set the unicast
-		 * unicast address etc. Deactivate the flows. The flow
-		 * entry will be removed from the active flow tables,
-		 * and the associated SRS, softrings etc will be
-		 * deleted. But the flow entry itself won't be
-		 * destroyed, instead it will continue to be
-		 * archived off the  the global flow hash list, for a
-		 * possible future activation when say
-		 * IP is plumbed again
-		 */
-
-		mac_link_release_flows(dlp->dl_mch);
 		(void) mac_unicast_remove(dlp->dl_mch, dlp->dl_mah);
 		dlp->dl_mah = NULL;
 		mac_rx_clear(dlp->dl_mch);

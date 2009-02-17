@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,10 +192,7 @@ typedef struct udp_stat {			/* Class "net" kstats */
 	kstat_named_t	udp_in_recvtclass;
 	kstat_named_t	udp_in_timestamp;
 	kstat_named_t	udp_ip_rcvpktinfo;
-	kstat_named_t	udp_direct_send;
-	kstat_named_t	udp_bwsq_send;
-	kstat_named_t	udp_connected_direct_send;
-	kstat_named_t	udp_connected_bwsq_send;
+	kstat_named_t	udp_cookie_coll;
 #ifdef DEBUG
 	kstat_named_t	udp_data_conn;
 	kstat_named_t	udp_data_notconn;

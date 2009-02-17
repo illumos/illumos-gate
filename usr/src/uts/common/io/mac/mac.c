@@ -504,6 +504,7 @@ i_mac_destructor(void *buf, void *arg)
 	ASSERT(mip->mi_kstat_count == 0);
 	ASSERT(mip->mi_nclients == 0);
 	ASSERT(mip->mi_nactiveclients == 0);
+	ASSERT(mip->mi_single_active_client == NULL);
 	ASSERT(mip->mi_state_flags == 0);
 	ASSERT(mip->mi_factory_addr == NULL);
 	ASSERT(mip->mi_factory_addr_num == 0);
@@ -1712,6 +1713,12 @@ mac_tx_client_unblock(mac_client_impl_t *mcip)
 	mac_tx_lock_all(mcip);
 	mcip->mci_tx_flag &= ~MCI_TX_QUIESCE;
 	mac_tx_unlock_all(mcip);
+	/*
+	 * We may fail to disable flow control for the last MAC_NOTE_TX
+	 * notification because the MAC client is quiesced. Send the
+	 * notification again.
+	 */
+	i_mac_notify(mcip->mci_mip, MAC_NOTE_TX);
 }
 
 /*
@@ -2350,10 +2357,8 @@ i_mac_tx_srs_notify(mac_impl_t *mip, mac_ring_handle_t ring)
 	    cclient = cclient->mci_client_next) {
 		if ((mac_srs = MCIP_TX_SRS(cclient)) != NULL)
 			mac_tx_srs_wakeup(mac_srs, ring);
-		if (!FLOW_TAB_EMPTY(cclient->mci_subflow_tab)) {
-			(void) mac_flow_walk_nolock(cclient->mci_subflow_tab,
-			    mac_tx_flow_srs_wakeup, ring);
-		}
+		(void) mac_flow_walk(cclient->mci_subflow_tab,
+		    mac_tx_flow_srs_wakeup, ring);
 	}
 	rw_exit(&mip->mi_rw_lock);
 	rw_exit(&i_mac_impl_lock);
@@ -4107,8 +4112,13 @@ mac_fini_macaddr(mac_impl_t *mip)
 {
 	mac_address_t *map = mip->mi_addresses;
 
-	/* there should be exactly one entry left on the list */
-	ASSERT(map != NULL);
+	if (map == NULL)
+		return;
+
+	/*
+	 * If mi_addresses is initialized, there should be exactly one
+	 * entry left on the list with no users.
+	 */
 	ASSERT(map->ma_nusers == 0);
 	ASSERT(map->ma_next == NULL);
 

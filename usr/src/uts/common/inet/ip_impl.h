@@ -503,24 +503,72 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 #define	ILL_DIRECT_CAPABLE(ill)						\
 	(((ill)->ill_capabilities & ILL_CAPAB_DLD_DIRECT) != 0)
 
-#define	ILL_SEND_TX(ill, ire, hint, mp, flag) {			\
-	if (ILL_DIRECT_CAPABLE(ill) && DB_TYPE(mp) == M_DATA) {	\
-		ill_dld_direct_t *idd;				\
-								\
-		idd = &(ill)->ill_dld_capab->idc_direct;	\
-		/*						\
-		 * Send the packet directly to DLD, where it	\
-		 * may be queued depending on the availability	\
-		 * of transmit resources at the media layer.	\
-		 * Ignore the returned value for the time being \
-		 * In future, we may want to take this into	\
-		 * account and flow control the TCP.		\
-		 */						\
-		(void) idd->idd_tx_df(idd->idd_tx_dh, mp,	\
-		    (uintptr_t)(hint), flag);			\
-	} else {						\
-		putnext((ire)->ire_stq, mp);			\
-	}							\
+#define	ILL_SEND_TX(ill, ire, hint, mp, flag, connp) {			\
+	if (ILL_DIRECT_CAPABLE(ill) && DB_TYPE(mp) == M_DATA) {		\
+		ill_dld_direct_t *idd;					\
+		uintptr_t	cookie;					\
+		conn_t		*udp_connp = (conn_t *)connp;		\
+									\
+		idd = &(ill)->ill_dld_capab->idc_direct;		\
+		/*							\
+		 * Send the packet directly to DLD, where it		\
+		 * may be queued depending on the availability		\
+		 * of transmit resources at the media layer.		\
+		 * Ignore the returned value for the time being 	\
+		 * In future, we may want to take this into		\
+		 * account and flow control the TCP.			\
+		 */							\
+		cookie = idd->idd_tx_df(idd->idd_tx_dh, mp,		\
+		    (uintptr_t)(hint), flag);				\
+									\
+		/*							\
+		 * non-NULL cookie indicates flow control situation	\
+		 * and the cookie itself identifies this specific	\
+		 * Tx ring that is blocked. This cookie is used to	\
+		 * block the UDP conn that is sending packets over	\
+		 * this specific Tx ring.				\
+		 */							\
+		if ((cookie != NULL) && (udp_connp != NULL) &&		\
+		    (udp_connp->conn_ulp == IPPROTO_UDP)) {		\
+			idl_tx_list_t *idl_txl;				\
+			ip_stack_t *ipst;				\
+									\
+			/*						\
+			 * Flow controlled.				\
+			 */						\
+			DTRACE_PROBE2(ill__send__tx__cookie,		\
+			    uintptr_t, cookie, conn_t *, udp_connp);	\
+			ipst = udp_connp->conn_netstack->netstack_ip;	\
+			idl_txl =					\
+			    &ipst->ips_idl_tx_list[IDLHASHINDEX(cookie)];\
+			mutex_enter(&idl_txl->txl_lock);		\
+			if (udp_connp->conn_direct_blocked ||		\
+			    (idd->idd_tx_fctl_df(idd->idd_tx_fctl_dh,	\
+			    cookie) == 0)) {				\
+				DTRACE_PROBE1(ill__tx__not__blocked,	\
+				    boolean,				\
+				    udp_connp->conn_direct_blocked);	\
+			} else if (idl_txl->txl_cookie != NULL &&	\
+			    idl_txl->txl_cookie != cookie) {		\
+				udp_t *udp = udp_connp->conn_udp;	\
+				udp_stack_t *us = udp->udp_us;		\
+									\
+				DTRACE_PROBE2(ill__send__tx__collision,	\
+				    uintptr_t, cookie,			\
+				    uintptr_t, idl_txl->txl_cookie);	\
+				UDP_STAT(us, udp_cookie_coll);		\
+			} else {					\
+				udp_connp->conn_direct_blocked = B_TRUE;\
+				idl_txl->txl_cookie = cookie;		\
+				conn_drain_insert(udp_connp, idl_txl);	\
+				DTRACE_PROBE1(ill__send__tx__insert,	\
+				    conn_t *, udp_connp);		\
+			}						\
+			mutex_exit(&idl_txl->txl_lock);			\
+		}							\
+	} else {							\
+		putnext((ire)->ire_stq, mp);				\
+	}								\
 }
 
 #define	MBLK_RX_FANOUT_SLOWPATH(mp, ipha)				\

@@ -372,6 +372,10 @@ typedef struct dld_capab_direct_s {
 	/* flow control notification callback */
 	uintptr_t	di_tx_cb_df; /* callback registration/de-registration */
 	void		*di_tx_cb_dh;
+
+	/* flow control "can I put on a ring" callback */
+	uintptr_t	di_tx_fctl_df; /* canput-like callback */
+	void		*di_tx_fctl_dh;
 } dld_capab_direct_t;
 
 /*

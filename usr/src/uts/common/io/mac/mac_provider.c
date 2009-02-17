@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -668,6 +668,24 @@ mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 			return;
 		}
 		/* We'll fall through to software classification */
+	} else {
+		flow_entry_t *flent;
+		int err;
+
+		rw_enter(&mip->mi_rw_lock, RW_READER);
+		if (mip->mi_single_active_client != NULL) {
+			flent = mip->mi_single_active_client->mci_flent_list;
+			FLOW_TRY_REFHOLD(flent, err);
+			rw_exit(&mip->mi_rw_lock);
+			if (err == 0) {
+				(flent->fe_cb_fn)(flent->fe_cb_arg1,
+				    flent->fe_cb_arg2, mp_chain, B_FALSE);
+				FLOW_REFRELE(flent);
+				return;
+			}
+		} else {
+			rw_exit(&mip->mi_rw_lock);
+		}
 	}
 
 	if (!FLOW_TAB_EMPTY(mip->mi_flow_tab)) {

@@ -452,7 +452,7 @@ e1000g_get_buf(e1000g_rx_ring_t *rx_ring)
  * This routine will process packets received in an interrupt
  */
 mblk_t *
-e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz)
+e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 {
 	struct e1000_hw *hw;
 	mblk_t *nmp;
@@ -471,13 +471,13 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz)
 	struct e1000g *Adapter;
 	dma_buffer_t *rx_buf;
 	uint16_t cksumflags;
+	uint_t chain_sz = 0;
 
 	ret_mp = NULL;
 	ret_nmp = NULL;
 	pkt_count = 0;
 	desc_count = 0;
 	cksumflags = 0;
-	*sz = 0;
 
 	Adapter = rx_ring->adapter;
 	hw = &Adapter->shared;
@@ -505,7 +505,8 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz)
 	 * descriptor owned by the hardware that begins a packet.
 	 */
 	while ((current_desc->status & E1000_RXD_STAT_DD) &&
-	    (pkt_count < Adapter->rx_limit_onintr)) {
+	    (pkt_count < Adapter->rx_limit_onintr) &&
+	    ((sz == E1000G_CHAIN_NO_LIMIT) || (chain_sz <= sz))) {
 
 		desc_count++;
 		/*
@@ -832,7 +833,7 @@ rx_end_of_packet:
 		}
 		ret_nmp->b_next = NULL;
 		*tail = ret_nmp;
-		*sz += length;
+		chain_sz += length;
 
 		rx_ring->rx_mblk = NULL;
 		rx_ring->rx_mblk_tail = NULL;

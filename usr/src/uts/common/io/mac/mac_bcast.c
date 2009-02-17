@@ -124,14 +124,6 @@ mac_bcast_grp_free(void *bcast_grp)
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	if (grp->mbg_addrtype == MAC_ADDRTYPE_MULTICAST) {
-		/*
-		 * The address is a multicast address, have the
-		 * underlying NIC leave the multicast group.
-		 */
-		(void) mip->mi_multicst(mip->mi_driver, B_FALSE, grp->mbg_addr);
-	}
-
 	ASSERT(grp->mbg_addr != NULL);
 	kmem_free(grp->mbg_addr, mip->mi_type->mt_addr_length);
 	kmem_free(grp->mbg_clients,
@@ -271,14 +263,68 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 	size_t			addr_len = mip->mi_type->mt_addr_length;
 	int			rc = 0;
 	int			i, index = -1;
-	mac_mcast_addrs_t	*mci_maddr = NULL;
-	mac_mcast_addrs_t	*mi_maddr = NULL;
-	mac_mcast_addrs_t	**last_maddr;
+	mac_mcast_addrs_t	**prev_mi_addr = NULL;
+	mac_mcast_addrs_t	**prev_mci_addr = NULL;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
 	ASSERT(addrtype == MAC_ADDRTYPE_MULTICAST ||
 	    addrtype == MAC_ADDRTYPE_BROADCAST);
+
+	/*
+	 * Add the MAC client to the list of MAC clients associated
+	 * with the group.
+	 */
+	if (addrtype == MAC_ADDRTYPE_MULTICAST) {
+		mac_mcast_addrs_t	*maddr;
+
+		/*
+		 * In case of a driver (say aggr), we need this information
+		 * on a per MAC instance basis.
+		 */
+		prev_mi_addr = &mip->mi_mcast_addrs;
+		for (maddr = *prev_mi_addr; maddr != NULL;
+		    prev_mi_addr = &maddr->mma_next, maddr = maddr->mma_next) {
+			if (bcmp(maddr->mma_addr, addr, addr_len) == 0)
+				break;
+		}
+		if (maddr == NULL) {
+			/*
+			 * For multicast addresses, have the underlying MAC
+			 * join the corresponding multicast group.
+			 */
+			rc = mip->mi_multicst(mip->mi_driver, B_TRUE, addr);
+			if (rc != 0)
+				return (rc);
+			maddr = kmem_zalloc(sizeof (mac_mcast_addrs_t),
+			    KM_SLEEP);
+			bcopy(addr, maddr->mma_addr, addr_len);
+			*prev_mi_addr = maddr;
+		} else {
+			prev_mi_addr = NULL;
+		}
+		maddr->mma_ref++;
+
+		/*
+		 * We maintain a separate list for each MAC client. Get
+		 * the entry or add, if it is not present.
+		 */
+		prev_mci_addr = &mcip->mci_mcast_addrs;
+		for (maddr = *prev_mci_addr; maddr != NULL;
+		    prev_mci_addr = &maddr->mma_next, maddr = maddr->mma_next) {
+			if (bcmp(maddr->mma_addr, addr, addr_len) == 0)
+				break;
+		}
+		if (maddr == NULL) {
+			maddr = kmem_zalloc(sizeof (mac_mcast_addrs_t),
+			    KM_SLEEP);
+			bcopy(addr, maddr->mma_addr, addr_len);
+			*prev_mci_addr = maddr;
+		} else {
+			prev_mci_addr = NULL;
+		}
+		maddr->mma_ref++;
+	}
 
 	/* The list is protected by the perimeter */
 	last_grp = &mip->mi_bcast_grp;
@@ -331,7 +377,7 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 		if (rc != 0) {
 			kmem_free(grp->mbg_addr, addr_len);
 			kmem_cache_free(mac_bcast_grp_cache, grp);
-			return (rc);
+			goto fail;
 		}
 		grp->mbg_flow_ent->fe_mbg = grp;
 		mip->mi_bcast_ngrps++;
@@ -366,23 +412,7 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 		rc = mac_flow_add(mip->mi_flow_tab, grp->mbg_flow_ent);
 		if (rc != 0) {
 			FLOW_FINAL_REFRELE(grp->mbg_flow_ent);
-			return (rc);
-		}
-
-		/*
-		 * For multicast addresses, have the underlying MAC
-		 * join the corresponsing multicast group.
-		 */
-		if (addrtype == MAC_ADDRTYPE_MULTICAST) {
-			rc = mip->mi_multicst(mip->mi_driver, B_TRUE, addr);
-			if (rc != 0) {
-				mac_flow_remove(mip->mi_flow_tab,
-				    grp->mbg_flow_ent, B_FALSE);
-				mac_flow_wait(grp->mbg_flow_ent,
-				    FLOW_DRIVER_UPCALL);
-				FLOW_FINAL_REFRELE(grp->mbg_flow_ent);
-				return (rc);
-			}
+			goto fail;
 		}
 
 		*last_grp = grp;
@@ -395,45 +425,6 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 	 * with the group.
 	 */
 	rw_enter(&mip->mi_rw_lock, RW_WRITER);
-	if (addrtype == MAC_ADDRTYPE_MULTICAST) {
-		/*
-		 * We maintain a separate list for each MAC client. Get
-		 * the entry or add, if it is not present.
-		 */
-		last_maddr = &mcip->mci_mcast_addrs;
-		for (mci_maddr = *last_maddr; mci_maddr != NULL;
-		    last_maddr = &mci_maddr->mma_next,
-		    mci_maddr = mci_maddr->mma_next) {
-			if (bcmp(mci_maddr->mma_addr, addr, addr_len) == 0)
-				break;
-		}
-		if (mci_maddr == NULL) {
-			mci_maddr = kmem_zalloc(sizeof (mac_mcast_addrs_t),
-			    KM_SLEEP);
-			bcopy(addr, mci_maddr->mma_addr, addr_len);
-			*last_maddr = mci_maddr;
-		}
-		mci_maddr->mma_ref++;
-
-		/*
-		 * In case of a driver (say aggr), we also need this
-		 * information on a per MAC instance basis.
-		 */
-		last_maddr = &mip->mi_mcast_addrs;
-		for (mi_maddr = *last_maddr; mi_maddr != NULL;
-		    last_maddr = &mi_maddr->mma_next,
-		    mi_maddr = mi_maddr->mma_next) {
-			if (bcmp(mi_maddr->mma_addr, addr, addr_len) == 0)
-				break;
-		}
-		if (mi_maddr == NULL) {
-			mi_maddr = kmem_zalloc(sizeof (mac_mcast_addrs_t),
-			    KM_SLEEP);
-			bcopy(addr, mi_maddr->mma_addr, addr_len);
-			*last_maddr = mi_maddr;
-		}
-		mi_maddr->mma_ref++;
-	}
 	for (i = 0; i < grp->mbg_nclients_alloc; i++) {
 		/*
 		 * The MAC client was already added, say when we have
@@ -442,7 +433,8 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 		 */
 		if (grp->mbg_clients[i].mgb_client == mcip) {
 			grp->mbg_clients[i].mgb_client_ref++;
-			goto add_done;
+			rw_exit(&mip->mi_rw_lock);
+			return (0);
 		} else if (grp->mbg_clients[i].mgb_client == NULL &&
 		    index == -1) {
 			index = i;
@@ -478,10 +470,20 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 	 * to detect that condition after re-acquiring the lock.
 	 */
 	grp->mbg_clients_gen++;
-add_done:
 	rw_exit(&mip->mi_rw_lock);
-
 	return (0);
+
+fail:
+	if (prev_mi_addr != NULL) {
+		kmem_free(*prev_mi_addr, sizeof (mac_mcast_addrs_t));
+		*prev_mi_addr = NULL;
+		(void) mip->mi_multicst(mip->mi_driver, B_FALSE, addr);
+	}
+	if (prev_mci_addr != NULL) {
+		kmem_free(*prev_mci_addr, sizeof (mac_mcast_addrs_t));
+		*prev_mci_addr = NULL;
+	}
+	return (rc);
 }
 
 /*
@@ -559,6 +561,8 @@ mac_bcast_delete(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid)
 		*prev = grp->mbg_next;
 	}
 update_maddr:
+	rw_exit(&mip->mi_rw_lock);
+
 	if (grp->mbg_addrtype == MAC_ADDRTYPE_MULTICAST) {
 		mprev = &mcip->mci_mcast_addrs;
 		for (maddr = mcip->mci_mcast_addrs; maddr != NULL;
@@ -583,12 +587,12 @@ update_maddr:
 		}
 		ASSERT(maddr != NULL);
 		if (--maddr->mma_ref == 0) {
+			(void) mip->mi_multicst(mip->mi_driver, B_FALSE, addr);
 			*mprev = maddr->mma_next;
 			maddr->mma_next = NULL;
 			kmem_free(maddr, sizeof (mac_mcast_addrs_t));
 		}
 	}
-	rw_exit(&mip->mi_rw_lock);
 
 	/*
 	 * If the group itself is being removed, remove the

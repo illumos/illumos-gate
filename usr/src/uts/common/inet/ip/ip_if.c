@@ -3083,6 +3083,8 @@ ill_capability_direct_enable(ill_t *ill)
 		idd->idd_tx_dh = direct.di_tx_dh;
 		idd->idd_tx_cb_df = (ip_dld_callb_t)direct.di_tx_cb_df;
 		idd->idd_tx_cb_dh = direct.di_tx_cb_dh;
+		idd->idd_tx_fctl_df = (ip_dld_fctl_t)direct.di_tx_fctl_df;
+		idd->idd_tx_fctl_dh = direct.di_tx_fctl_dh;
 		/*
 		 * One time registration of flow enable callback function
 		 */

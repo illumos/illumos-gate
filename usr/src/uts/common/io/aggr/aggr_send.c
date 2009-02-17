@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/vlan.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
+#include <sys/dlpi.h>
 
 #include <inet/common.h>
 #include <inet/led.h>
@@ -42,174 +43,9 @@
 #include <inet/ip6.h>
 #include <inet/tcp.h>
 #include <netinet/udp.h>
-#include <inet/ipsec_impl.h>
-#include <inet/sadb.h>
-#include <inet/ipsecesp.h>
-#include <inet/ipsecah.h>
 
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
-
-#define	HASH_4BYTES(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3])
-#define	HASH_MAC(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3] ^ (x)[4] ^ (x)[5])
-
-static uint16_t aggr_send_ip6_hdr_len(mblk_t *, ip6_t *);
-
-static uint64_t
-aggr_send_hash(aggr_grp_t *grp, mblk_t *mp)
-{
-	struct ether_header *ehp;
-	uint16_t sap;
-	uint_t skip_len;
-	uint8_t proto;
-	uint32_t policy = grp->lg_tx_policy;
-	uint64_t hash = 0;
-
-	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
-	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
-	ASSERT(RW_READ_HELD(&grp->lg_tx_lock));
-
-	/* compute MAC hash */
-
-	ehp = (struct ether_header *)mp->b_rptr;
-
-	if (policy & AGGR_POLICY_L2) {
-		uchar_t *mac_src = ehp->ether_shost.ether_addr_octet;
-		uchar_t *mac_dst = ehp->ether_dhost.ether_addr_octet;
-		hash = HASH_MAC(mac_src) ^ HASH_MAC(mac_dst);
-		policy &= ~AGGR_POLICY_L2;
-	}
-
-	if (policy == 0)
-		goto done;
-
-	/* skip ethernet header */
-
-	if (ntohs(ehp->ether_type) == ETHERTYPE_VLAN) {
-		struct ether_vlan_header *evhp;
-		mblk_t *newmp = NULL;
-
-		skip_len = sizeof (struct ether_vlan_header);
-		if (MBLKL(mp) < skip_len) {
-			/* the vlan tag is the payload, pull up first */
-			newmp = msgpullup(mp, -1);
-			if ((newmp == NULL) || (MBLKL(newmp) < skip_len)) {
-				goto done;
-			}
-			evhp = (struct ether_vlan_header *)newmp->b_rptr;
-		} else {
-			evhp = (struct ether_vlan_header *)mp->b_rptr;
-		}
-
-		sap = ntohs(evhp->ether_type);
-		freemsg(newmp);
-	} else {
-		sap = ntohs(ehp->ether_type);
-		skip_len = sizeof (struct ether_header);
-	}
-
-	/* if ethernet header is in its own mblk, skip it */
-	if (MBLKL(mp) <= skip_len) {
-		skip_len -= MBLKL(mp);
-		mp = mp->b_cont;
-	}
-
-	sap = (sap < ETHERTYPE_802_MIN) ? 0 : sap;
-
-	/* compute IP src/dst addresses hash and skip IPv{4,6} header */
-
-	switch (sap) {
-	case ETHERTYPE_IP: {
-		ipha_t *iphp;
-
-		if (MBLKL(mp) < (skip_len + sizeof (ipha_t)))
-			goto done;
-
-		iphp = (ipha_t *)(mp->b_rptr + skip_len);
-		proto = iphp->ipha_protocol;
-		skip_len += IPH_HDR_LENGTH(iphp);
-
-		if (policy & AGGR_POLICY_L3) {
-			uint8_t *ip_src = (uint8_t *)&(iphp->ipha_src);
-			uint8_t *ip_dst = (uint8_t *)&(iphp->ipha_dst);
-
-			hash ^= (HASH_4BYTES(ip_src) ^ HASH_4BYTES(ip_dst));
-			policy &= ~AGGR_POLICY_L3;
-		}
-		break;
-	}
-	case ETHERTYPE_IPV6: {
-		ip6_t *ip6hp;
-
-		/*
-		 * if ipv6 packet has options, the proto will not be one of the
-		 * ones handled by the ULP processor below, and will return 0
-		 * as the index
-		 */
-		if (MBLKL(mp) < (skip_len + sizeof (ip6_t)))
-			goto done;
-
-		ip6hp = (ip6_t *)(mp->b_rptr + skip_len);
-		proto = ip6hp->ip6_nxt;
-		skip_len += aggr_send_ip6_hdr_len(mp, ip6hp);
-
-		if (policy & AGGR_POLICY_L3) {
-			uint8_t *ip_src = &(ip6hp->ip6_src.s6_addr8[12]);
-			uint8_t *ip_dst = &(ip6hp->ip6_dst.s6_addr8[12]);
-
-			hash ^= (HASH_4BYTES(ip_src) ^ HASH_4BYTES(ip_dst));
-			policy &= ~AGGR_POLICY_L3;
-		}
-		break;
-	}
-	default:
-		goto done;
-	}
-
-	if (!(policy & AGGR_POLICY_L4))
-		goto done;
-
-	/* if ip header is in its own mblk, skip it */
-	if (MBLKL(mp) <= skip_len) {
-		skip_len -= MBLKL(mp);
-		mp = mp->b_cont;
-	}
-
-	/* parse ULP header */
-again:
-	switch (proto) {
-	case IPPROTO_TCP:
-	case IPPROTO_UDP:
-	case IPPROTO_ESP:
-	case IPPROTO_SCTP:
-		/*
-		 * These Internet Protocols are intentionally designed
-		 * for hashing from the git-go.  Port numbers are in the first
-		 * word for transports, SPI is first for ESP.
-		 */
-		hash ^= HASH_4BYTES((mp->b_rptr + skip_len));
-		break;
-
-	case IPPROTO_AH: {
-		ah_t *ah = (ah_t *)(mp->b_rptr + skip_len);
-
-		uint_t ah_length = AH_TOTAL_LEN(ah);
-		proto = ah->ah_nexthdr;
-		skip_len += ah_length;
-
-		/* if ip header is in its own mblk, skip it */
-		if (MBLKL(mp) <= skip_len) {
-			skip_len -= MBLKL(mp);
-			mp = mp->b_cont;
-		}
-
-		goto again;
-	}
-	}
-
-done:
-	return (hash);
-}
 
 /*
  * Update the TX load balancing policy of the specified group.
@@ -217,9 +53,19 @@ done:
 void
 aggr_send_update_policy(aggr_grp_t *grp, uint32_t policy)
 {
+	uint8_t mac_policy = 0;
+
 	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
+	if ((policy & AGGR_POLICY_L2) != 0)
+		mac_policy |= MAC_PKT_HASH_L2;
+	if ((policy & AGGR_POLICY_L3) != 0)
+		mac_policy |= MAC_PKT_HASH_L3;
+	if ((policy & AGGR_POLICY_L4) != 0)
+		mac_policy |= MAC_PKT_HASH_L4;
+
 	grp->lg_tx_policy = policy;
+	grp->lg_mac_tx_policy = mac_policy;
 }
 
 /*
@@ -250,7 +96,8 @@ aggr_m_tx(void *arg, mblk_t *mp)
 		nextp = mp->b_next;
 		mp->b_next = NULL;
 
-		hash = aggr_send_hash(grp, mp);
+		hash = mac_pkt_hash(DL_ETHER, mp, grp->lg_mac_tx_policy,
+		    B_TRUE);
 		port = grp->lg_tx_ports[hash % grp->lg_ntx_ports];
 
 		/*
@@ -266,7 +113,7 @@ aggr_m_tx(void *arg, mblk_t *mp)
 			 */
 			freemsg(mp);
 		} else {
-			mblk_t	*ret_mp;
+			mblk_t	*ret_mp = NULL;
 
 			/*
 			 * It is fine that the port state changes now.
@@ -384,52 +231,4 @@ aggr_send_port_disable(aggr_port_t *port)
 	rw_exit(&grp->lg_tx_lock);
 
 	port->lp_tx_enabled = B_FALSE;
-}
-
-static uint16_t
-aggr_send_ip6_hdr_len(mblk_t *mp, ip6_t *ip6h)
-{
-	uint16_t length;
-	uint_t	ehdrlen;
-	uint8_t	*nexthdrp;
-	uint8_t *whereptr;
-	uint8_t *endptr;
-	ip6_dest_t *desthdr;
-	ip6_rthdr_t *rthdr;
-	ip6_frag_t *fraghdr;
-
-	length = IPV6_HDR_LEN;
-	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
-	endptr = mp->b_wptr;
-
-	nexthdrp = &ip6h->ip6_nxt;
-	while (whereptr < endptr) {
-		switch (*nexthdrp) {
-		case IPPROTO_HOPOPTS:
-		case IPPROTO_DSTOPTS:
-			/* Assumes the headers are identical for hbh and dst */
-			desthdr = (ip6_dest_t *)whereptr;
-			ehdrlen = 8 * (desthdr->ip6d_len + 1);
-			nexthdrp = &desthdr->ip6d_nxt;
-			break;
-		case IPPROTO_ROUTING:
-			rthdr = (ip6_rthdr_t *)whereptr;
-			ehdrlen =  8 * (rthdr->ip6r_len + 1);
-			nexthdrp = &rthdr->ip6r_nxt;
-			break;
-		case IPPROTO_FRAGMENT:
-			fraghdr = (ip6_frag_t *)whereptr;
-			ehdrlen = sizeof (ip6_frag_t);
-			nexthdrp = &fraghdr->ip6f_nxt;
-			break;
-		case IPPROTO_NONE:
-			/* No next header means we're finished */
-		default:
-			return (length);
-		}
-		length += ehdrlen;
-		whereptr += ehdrlen;
-	}
-
-	return (length);
 }
