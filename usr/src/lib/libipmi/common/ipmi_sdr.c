@@ -506,7 +506,7 @@ ipmi_sdr_get(ipmi_handle_t *ihp, uint16_t id, uint16_t *next)
 	 * interface.  Therefore we break up the process of reading in an entire
 	 * SDR into multiple smaller reads.
 	 */
-	while (count < sdr_sz && i < ihp->ih_retries) {
+	while (count < sdr_sz) {
 		req.ic_gs_offset = offset;
 		if (chunksz > (sdr_sz - count))
 			chunksz = sdr_sz - count;
@@ -521,7 +521,8 @@ ipmi_sdr_get(ipmi_handle_t *ihp, uint16_t id, uint16_t *next)
 			offset += chunksz;
 			i = 0;
 		} else if (ipmi_errno(ihp) == EIPMI_INVALID_RESERVATION) {
-			if (ipmi_sdr_reserve_repository(ihp) != 0) {
+			if (i >= ihp->ih_retries ||
+			    ipmi_sdr_reserve_repository(ihp) != 0) {
 				free(buf);
 				return (NULL);
 			}
