@@ -1,3 +1,4 @@
+#! /usr/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -18,46 +19,13 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-MANIFEST = ssh.xml
-SVCMETHOD = sshd
-
-include ../../Makefile.cmd
-include ../Makefile.ssh-common
-
-SSHASKPASS=	$(ROOTLIBSSH)/ssh-askpass
-ETCSSHDIR=	$(ROOTETC)/ssh
-DIRS=		$(ETCSSHDIR) $(ROOTLIBSSH)
-
-FILES= sshd_config ssh_config moduli
-
-ETCSSHFILES=	$(FILES:%=$(ETCSSHDIR)/%)
-
-$(ETCSSHFILES) := FILEMODE=	644
-$(ETCSSHFILES) := OWNER=		root
-$(ETCSSHFILES) := GROUP=		sys
-
-ROOTMANIFESTDIR = $(ROOTSVCNETWORK)
-
-$(ETCSSHDIR)/% : %
-	$(INS.file)
-
-$(DIRS):
-	$(INS.dir)
-
-$(ROOTLIBSSH)/%: %
-	$(INS.file)
-
-$(POFILE):
-
-all lint clean clobber _msg:
-
-install: all $(DIRS) $(ETCSSHFILES) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
-	$(SSHASKPASS)
-
-check: $(CHKMANIFEST)
-
-include ../../Makefile.targ
+prompt=$(echo $1 | sed s/_/__/g)
+ICON=/usr/share/pixmaps/blueprint-keyring.png
+exec /usr/bin/zenity --entry --title "ssh-askpass" \
+    --text="$prompt" --hide-text --window-icon=$ICON
