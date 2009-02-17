@@ -27,14 +27,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _I915_DRM_H
 #define _I915_DRM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Please note that modifications to all structs defined here are
  * subject to backwards-compatibility constraints.
@@ -84,6 +82,7 @@ typedef struct _drm_i915_sarea {
 	int pf_current_page;	/* which buffer is being displayed? */
 	int perf_boxes;		/* performance boxes to be displayed */
 	int width, height;      /* screen size in pixels */
+	int pad0;
 
 	drm_handle_t front_handle;
 	int front_offset;
@@ -114,14 +113,21 @@ typedef struct _drm_i915_sarea {
 	unsigned int rotated_tiled;
 	unsigned int rotated2_tiled;
 
-	int pipeA_x;
-	int pipeA_y;
-	int pipeA_w;
-	int pipeA_h;
-	int pipeB_x;
-	int pipeB_y;
-	int pipeB_w;
-	int pipeB_h;
+	int planeA_x;
+	int planeA_y;
+	int planeA_w;
+	int planeA_h;
+	int planeB_x;
+	int planeB_y;
+	int planeB_w;
+	int planeB_h;
+
+	/* Triple buffering */
+	drm_handle_t third_handle;
+	int third_offset;
+	int third_size;
+	unsigned int third_tiled;
+
 } drm_i915_sarea_t;
 
 /* Driver specific fence types and classes.
@@ -158,6 +164,9 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_INIT_HEAP	0x0a
 #define DRM_I915_CMDBUFFER	0x0b
 #define DRM_I915_DESTROY_HEAP	0x0c
+#define DRM_I915_SET_VBLANK_PIPE	0x0d
+#define DRM_I915_GET_VBLANK_PIPE	0x0e
+#define DRM_I915_VBLANK_SWAP	0x0f
 #define	DRM_I915_HWS_ADDR	0x11
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
@@ -173,6 +182,21 @@ typedef struct _drm_i915_sarea {
 #define DRM_IOCTL_I915_INIT_HEAP        DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT_HEAP, drm_i915_mem_init_heap_t)
 #define DRM_IOCTL_I915_CMDBUFFER	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_CMDBUFFER, drm_i915_cmdbuffer_t)
 #define DRM_IOCTL_I915_DESTROY_HEAP	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_DESTROY_HEAP, drm_i915_mem_destroy_heap_t)
+#define DRM_IOCTL_I915_SET_VBLANK_PIPE	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_SET_VBLANK_PIPE, drm_i915_vblank_pipe_t)
+#define DRM_IOCTL_I915_GET_VBLANK_PIPE	DRM_IOR( DRM_COMMAND_BASE + DRM_I915_GET_VBLANK_PIPE, drm_i915_vblank_pipe_t)
+#define DRM_IOCTL_I915_VBLANK_SWAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_VBLANK_SWAP, drm_i915_vblank_swap_t)
+
+/* Asynchronous page flipping:
+ */
+typedef struct drm_i915_flip {
+	/*
+	 * This is really talking about planes, and we could rename it
+	 * except for the fact that some of the duplicated i915_drm.h files
+	 * out there check for HAVE_I915_FLIP and so might pick up this
+	 * version.
+	 */
+	int pipes;
+} drm_i915_flip_t;
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.
@@ -235,6 +259,7 @@ typedef struct drm_i915_irq_wait {
 #define I915_PARAM_IRQ_ACTIVE            1
 #define I915_PARAM_ALLOW_BATCHBUFFER     2
 #define I915_PARAM_LAST_DISPATCH         3
+#define I915_PARAM_CHIPSET_ID            4
 
 typedef struct drm_i915_getparam {
 	int param;

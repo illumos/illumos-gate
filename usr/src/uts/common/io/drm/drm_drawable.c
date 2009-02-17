@@ -32,11 +32,9 @@
  *
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 
@@ -65,4 +63,12 @@ drm_rmdraw(DRM_IOCTL_ARGS)
 drm_drawable_info_t *
 drm_get_drawable_info(drm_device_t *dev, drm_drawable_t id) {
 	return (NULL);
+}
+
+/*ARGSUSED*/
+int
+drm_update_draw(DRM_IOCTL_ARGS)
+{
+	DRM_DEBUG("drm_update_draw\n");
+	return (0);
 }

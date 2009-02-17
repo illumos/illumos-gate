@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_DRM_IO32_H_
 #define	_DRM_IO32_H_
@@ -163,14 +161,14 @@ typedef struct drm_ctx_res_32 {
 
 struct drm_wait_vblank_request_32 {
 	drm_vblank_seq_type_t type;
-	unsigned int sequence;
-	unsigned long signal;
+	uint32_t sequence;
+	uint32_t signal;
 };
 struct drm_wait_vblank_reply_32 {
 	drm_vblank_seq_type_t type;
-	unsigned int sequence;
-	long tval_sec;
-	long tval_usec;
+	uint32_t sequence;
+	int32_t tval_sec;
+	int32_t tval_usec;
 };
 
 /*

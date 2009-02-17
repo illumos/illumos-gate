@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@
  * 1.4: Fix cmdbuffer path, add heap destroy
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		4
+#define DRIVER_MINOR		5	
 #define DRIVER_PATCHLEVEL	0
 
 #if defined(__linux__)
@@ -68,8 +68,6 @@
 
 typedef struct _drm_i915_ring_buffer {
 	int tail_mask;
-	unsigned long Start;
-	unsigned long End;
 	unsigned long Size;
 	u8 *virtual_start;
 	int head;
@@ -89,8 +87,9 @@ struct mem_block {
 typedef struct _drm_i915_vbl_swap {
 	struct list_head head;
 	drm_drawable_t drw_id;
-	unsigned int pipe;
+	unsigned int plane;
 	unsigned int sequence;
+	int flip;
 } drm_i915_vbl_swap_t;
 
 typedef struct s3_i915_private {
@@ -187,6 +186,8 @@ typedef struct s3_i915_private {
 } s3_i915_private_t;
 
 typedef struct drm_i915_private {
+	struct drm_device *dev;
+
 	drm_local_map_t *sarea;
 	drm_local_map_t *mmio_map;
 
@@ -201,15 +202,9 @@ typedef struct drm_i915_private {
 	drm_local_map_t hws_map;
 
 	unsigned int cpp;
-	int back_offset;
-	int front_offset;
-	int current_page;
-	int page_flipping;
-	int use_mi_batchbuffer_start;
 
 	wait_queue_head_t irq_queue;
 	atomic_t irq_received;
-	atomic_t irq_emitted;
 
 	int tex_lru_log_granularity;
 	int allow_batchbuffer;
@@ -219,7 +214,7 @@ typedef struct drm_i915_private {
 	spinlock_t user_irq_lock;
         int user_irq_refcount;
         int fence_irq_on;
-        uint32_t irq_enable_reg;
+        uint32_t irq_mask_reg;
         int irq_enabled;
 
 #ifdef I915_HAVE_FENCE
@@ -256,22 +251,31 @@ extern void i915_driver_preclose(drm_device_t * dev, drm_file_t *filp);
 extern int i915_driver_device_is_agp(drm_device_t * dev);
 extern long i915_compat_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);
-extern int i915_emit_mi_flush(drm_device_t *dev, uint32_t flush);
+extern int i915_emit_box(struct drm_device *dev,
+			struct drm_clip_rect __user *boxes,
+			int i, int DR1, int DR4);
+extern void i915_emit_breadcrumb(struct drm_device *dev);
+extern void i915_dispatch_flip(struct drm_device * dev, int pipes, int sync);
+extern void i915_emit_mi_flush(drm_device_t *dev, uint32_t flush);
 
 
 /* i915_irq.c */
 extern int i915_irq_emit(DRM_IOCTL_ARGS);
 extern int i915_irq_wait(DRM_IOCTL_ARGS);
 
-extern int i915_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence);
-extern int i915_driver_vblank_wait2(drm_device_t *dev, unsigned int *sequence);
+extern int i915_enable_vblank(struct drm_device *dev, int crtc);
+extern void i915_disable_vblank(struct drm_device *dev, int crtc);
+extern u32 i915_get_vblank_counter(struct drm_device *dev, int crtc);
 extern irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS);
 extern void i915_driver_irq_preinstall(drm_device_t * dev);
 extern void i915_driver_irq_postinstall(drm_device_t * dev);
 extern void i915_driver_irq_uninstall(drm_device_t * dev);
 extern int i915_emit_irq(drm_device_t * dev);
+extern int i915_vblank_swap(DRM_IOCTL_ARGS);
 extern void i915_user_irq_on(drm_i915_private_t *dev_priv);
 extern void i915_user_irq_off(drm_i915_private_t *dev_priv);
+extern int i915_vblank_pipe_set(DRM_IOCTL_ARGS);
+extern int i915_vblank_pipe_get(DRM_IOCTL_ARGS);
 
 /* i915_mem.c */
 extern int i915_mem_alloc(DRM_IOCTL_ARGS);
@@ -321,10 +325,23 @@ extern int i915_move(drm_buffer_object_t *bo, int evict,
 #define	S3_WRITE(reg, val) \
 	*(uint32_t volatile *)((uintptr_t)s3_priv->saveAddr + (reg)) = (val)
 
+#define I915_VERBOSE 0
+#define I915_RING_VALIDATE 0
+
+#if I915_RING_VALIDATE
+void i915_ring_validate(struct drm_device *dev, const char *func, int line);
+#define I915_RING_DO_VALIDATE(dev) i915_ring_validate(dev, __FUNCTION__, __LINE__)
+#else
+#define I915_RING_DO_VALIDATE(dev)
+#endif
+
 #define RING_LOCALS	unsigned int outring, ringmask, outcount; \
                         volatile unsigned char *virt;
 
+#if I915_VERBOSE
 #define BEGIN_LP_RING(n) do {				\
+	DRM_DEBUG("BEGIN_LP_RING(%d)\n", (n));		\
+	I915_RING_DO_VALIDATE(dev);			\
 	if (dev_priv->ring.space < (n)*4)			\
 		(void) i915_wait_ring(dev, (n)*4, __FUNCTION__);		\
 	outcount = 0;					\
@@ -332,19 +349,51 @@ extern int i915_move(drm_buffer_object_t *bo, int evict,
 	ringmask = dev_priv->ring.tail_mask;		\
 	virt = dev_priv->ring.virtual_start;		\
 } while (*"\0")
+#else
+#define BEGIN_LP_RING(n) do {				\
+	I915_RING_DO_VALIDATE(dev);			\
+	if (dev_priv->ring.space < (n)*4)			\
+		(void) i915_wait_ring(dev, (n)*4, __FUNCTION__);		\
+	outcount = 0;					\
+	outring = dev_priv->ring.tail;			\
+	ringmask = dev_priv->ring.tail_mask;		\
+	virt = dev_priv->ring.virtual_start;		\
+} while (*"\0")
+#endif
 
+#if I915_VERBOSE
+#define OUT_RING(n) do {					\
+	DRM_DEBUG("   OUT_RING %x\n", (int)(n));	\
+	*(volatile unsigned int *)(void *)(virt + outring) = (n);		\
+        outcount++;						\
+	outring += 4;						\
+	outring &= ringmask;					\
+} while (*"\0")
+#else
 #define OUT_RING(n) do {					\
 	*(volatile unsigned int *)(void *)(virt + outring) = (n);		\
         outcount++;						\
 	outring += 4;						\
 	outring &= ringmask;					\
 } while (*"\0")
+#endif
 
+#if I915_VERBOSE
 #define ADVANCE_LP_RING() do {						\
+	DRM_DEBUG("ADVANCE_LP_RING %x\n", outring);	\
+	I915_RING_DO_VALIDATE(dev);					\
 	dev_priv->ring.tail = outring;					\
 	dev_priv->ring.space -= outcount * 4;				\
-	I915_WRITE(LP_RING + RING_TAIL, outring);			\
+	I915_WRITE(PRB0_TAIL, outring);			\
 } while (*"\0")
+#else
+#define ADVANCE_LP_RING() do {						\
+	I915_RING_DO_VALIDATE(dev);					\
+	dev_priv->ring.tail = outring;					\
+	dev_priv->ring.space -= outcount * 4;				\
+	I915_WRITE(PRB0_TAIL, outring);			\
+} while (*"\0")
+#endif
 
 extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
@@ -403,10 +452,14 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define INST_OP_FLUSH        0x02000000
 #define INST_FLUSH_MAP_CACHE 0x00000001
 
-#define CMD_MI_FLUSH         (0x04 << 23)
+#define MI_INSTR(opcode, flags) (((opcode) << 23) | (flags))
+#define MI_USER_INTERRUPT       MI_INSTR(2, (0 << 29))
+#define MI_FLUSH         (0x04 << 23)
 #define MI_NO_WRITE_FLUSH    (1 << 2)
 #define MI_READ_FLUSH        (1 << 0)
 #define MI_EXE_FLUSH         (1 << 1)
+#define MI_STORE_DWORD_INDEX   MI_INSTR(0x21, 1)
+#define	MI_STORE_DWORD_INDEX_SHIFT 2
 
 #define BB1_START_ADDR_MASK   (~0x7)
 #define BB1_PROTECTED         (1<<0)
@@ -414,16 +467,18 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define BB2_END_ADDR_MASK     (~0x7)
 
 #define	I915REG_PGTBL_CTRL	0x2020
-#define I915REG_HWSTAM		0x02098
-#define I915REG_INT_IDENTITY_R	0x020a4
-#define I915REG_INT_MASK_R 	0x020a8
-#define I915REG_INT_ENABLE_R	0x020a0
-#define I915REG_INSTPM	        0x020c0
+#define HWSTAM			0x02098
+#define IIR			0x020a4
+#define IMR		 	0x020a8
+#define IER			0x020a0
+#define INSTPM	      		0x020c0
+#define ACTHD			0x020c8
+#define PIPEASTAT		0x70024
+#define PIPEBSTAT		0x71024
+#define ACTHD_I965		0x02074
+#define HWS_PGA			0x02080
 
-#define I915REG_PIPEASTAT	0x70024
-#define I915REG_PIPEBSTAT	0x71024
-
-#define I915_VBLANK_INTERRUPT_ENABLE	(1UL<<17)
+#define PIPE_VBLANK_INTERRUPT_ENABLE	(1UL<<17)
 #define I915_VBLANK_CLEAR		(1UL<<1)
 
 #define SRX_INDEX		0x3c4
@@ -454,9 +509,7 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define NOPID                   0x2094
 #define LP_RING     		0x2030
 #define HP_RING     		0x2040
-#define RING_TAIL      		0x00
 #define TAIL_ADDR		0x001FFFF8
-#define RING_HEAD      		0x04
 #define HEAD_WRAP_COUNT     	0xFFE00000
 #define HEAD_WRAP_ONE       	0x00200000
 #define HEAD_ADDR           	0x001FFFFC
@@ -471,7 +524,9 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define RING_VALID_MASK     	0x00000001
 #define RING_VALID          	0x00000001
 #define RING_INVALID        	0x00000000
-
+#define PRB0_TAIL              0x02030
+#define PRB0_HEAD              0x02034
+#define PRB0_CTL               0x0203c
 #define GFX_OP_SCISSOR         ((0x3<<29)|(0x1c<<24)|(0x10<<19))
 #define SC_UPDATE_SCISSOR       (0x1<<1)
 #define SC_ENABLE_MASK          (0x1<<0)
@@ -497,13 +552,18 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define XY_SRC_COPY_BLT_CMD		((2<<29)|(0x53<<22)|6)
 #define XY_SRC_COPY_BLT_WRITE_ALPHA	(1<<21)
 #define XY_SRC_COPY_BLT_WRITE_RGB	(1<<20)
+#define XY_SRC_COPY_BLT_SRC_TILED	(1<<15)
+#define XY_SRC_COPY_BLT_DST_TILED	(1<<11)
 
 #define MI_BATCH_BUFFER 	((0x30<<23)|1)
 #define MI_BATCH_BUFFER_START 	(0x31<<23)
 #define MI_BATCH_BUFFER_END 	(0xA<<23)
 #define MI_BATCH_NON_SECURE	(1)
 
+#define MI_BATCH_NON_SECURE_I965 (1<<8)
+
 #define MI_WAIT_FOR_EVENT       ((0x3<<23))
+#define MI_WAIT_FOR_PLANE_B_FLIP      (1<<6)
 #define MI_WAIT_FOR_PLANE_A_FLIP      (1<<2)
 #define MI_WAIT_FOR_PLANE_A_SCANLINES (1<<1)
 
@@ -511,11 +571,15 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
 #define CMD_OP_DISPLAYBUFFER_INFO ((0x0<<29)|(0x14<<23)|2)
 #define ASYNC_FLIP                (1<<22)
+#define DISPLAY_PLANE_A           (0<<20)
+#define DISPLAY_PLANE_B           (1<<20)
 
 #define CMD_OP_DESTBUFFER_INFO	 ((0x3<<29)|(0x1d<<24)|(0x8e<<16)|1)
 
-#define BREADCRUMB_OFFSET          32  /* dword offset 20h */
-#define READ_BREADCRUMB(dev_priv)  (((volatile u32*)(dev_priv->hw_status_page))[BREADCRUMB_OFFSET])
+#define BREADCRUMB_BITS 31
+#define BREADCRUMB_MASK ((1U << BREADCRUMB_BITS) - 1)
+
+#define READ_BREADCRUMB(dev_priv)  (((volatile u32*)(dev_priv->hw_status_page))[5])
 #define READ_HWSP(dev_priv, reg)  (((volatile u32*)(dev_priv->hw_status_page))[reg])
 
 /*
@@ -731,7 +795,7 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define DSPBTILEOFF             0x711A4
 
 #define PIPEACONF 0x70008
-#define PIPEACONF_ENABLE        (1<<31)
+#define PIPEACONF_ENABLE        (1UL<<31)
 #define PIPEACONF_DISABLE       0
 #define PIPEACONF_DOUBLE_WIDE   (1<<30)
 #define I965_PIPECONF_ACTIVE    (1<<30)
@@ -746,7 +810,7 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define PIPECONF_INTERLACE_FIELD_0_ONLY         (7 << 21)
 
 #define PIPEBCONF 0x71008
-#define PIPEBCONF_ENABLE        (1<<31)
+#define PIPEBCONF_ENABLE        (1UL<<31)
 #define PIPEBCONF_DISABLE       0
 #define PIPEBCONF_DOUBLE_WIDE   (1<<30)
 #define PIPEBCONF_DISABLE       0
@@ -820,6 +884,61 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
 #define	DSPARB                  0x70030
 
+#define PIPEAFRAMEHIGH          0x70040
+#define PIPEBFRAMEHIGH		0x71040
+#define PIPE_FRAME_HIGH_MASK    0x0000ffff
+#define PIPE_FRAME_HIGH_SHIFT   0
+#define PIPEAFRAMEPIXEL         0x70044
+#define PIPEBFRAMEPIXEL		0x71044
+
+#define PIPE_FRAME_LOW_MASK     0xff000000
+#define PIPE_FRAME_LOW_SHIFT    24
+
+/* Interrupt bits:
+ */
+#define I915_PIPE_CONTROL_NOTIFY_INTERRUPT		(1<<18)
+#define I915_DISPLAY_PORT_INTERRUPT			(1<<17)
+#define I915_RENDER_COMMAND_PARSER_ERROR_INTERRUPT	(1<<15)
+#define I915_GMCH_THERMAL_SENSOR_EVENT_INTERRUPT	(1<<14)
+#define I915_HWB_OOM_INTERRUPT				(1<<13) /* binner out of memory */
+#define I915_SYNC_STATUS_INTERRUPT			(1<<12)
+#define I915_DISPLAY_PLANE_A_FLIP_PENDING_INTERRUPT	(1<<11)
+#define I915_DISPLAY_PLANE_B_FLIP_PENDING_INTERRUPT	(1<<10)
+#define I915_OVERLAY_PLANE_FLIP_PENDING_INTERRUPT	(1<<9)
+#define I915_DISPLAY_PLANE_C_FLIP_PENDING_INTERRUPT	(1<<8)
+#define I915_DISPLAY_PIPE_A_VBLANK_INTERRUPT		(1<<7)
+#define I915_DISPLAY_PIPE_A_EVENT_INTERRUPT		(1<<6)
+#define I915_DISPLAY_PIPE_B_VBLANK_INTERRUPT		(1<<5)
+#define I915_DISPLAY_PIPE_B_EVENT_INTERRUPT		(1<<4)
+#define I915_DEBUG_INTERRUPT				(1<<2)
+#define I915_USER_INTERRUPT				(1<<1)
+
+#define I915_FIFO_UNDERRUN_STATUS		(1UL<<31)
+#define I915_CRC_ERROR_ENABLE			(1UL<<29)
+#define I915_CRC_DONE_ENABLE			(1UL<<28)
+#define I915_GMBUS_EVENT_ENABLE			(1UL<<27)
+#define I915_VSYNC_INTERRUPT_ENABLE		(1UL<<25)
+#define I915_DISPLAY_LINE_COMPARE_ENABLE	(1UL<<24)
+#define I915_DPST_EVENT_ENABLE			(1UL<<23)
+#define I915_LEGACY_BLC_EVENT_ENABLE		(1UL<<22)
+#define I915_ODD_FIELD_INTERRUPT_ENABLE		(1UL<<21)
+#define I915_EVEN_FIELD_INTERRUPT_ENABLE	(1UL<<20)
+#define PIPE_START_VBLANK_INTERRUPT_ENABLE	(1UL<<18)	/* 965 or later */
+#define I915_VBLANK_INTERRUPT_ENABLE		(1UL<<17)
+#define I915_OVERLAY_UPDATED_ENABLE		(1UL<<16)
+#define I915_CRC_ERROR_INTERRUPT_STATUS		(1UL<<13)
+#define I915_CRC_DONE_INTERRUPT_STATUS		(1UL<<12)
+#define I915_GMBUS_INTERRUPT_STATUS		(1UL<<11)
+#define I915_VSYNC_INTERRUPT_STATUS		(1UL<<9)
+#define I915_DISPLAY_LINE_COMPARE_STATUS	(1UL<<8)
+#define I915_DPST_EVENT_STATUS			(1UL<<7)
+#define I915_LEGACY_BLC_EVENT_STATUS		(1UL<<6)
+#define I915_ODD_FIELD_INTERRUPT_STATUS		(1UL<<5)
+#define I915_EVEN_FIELD_INTERRUPT_STATUS	(1UL<<4)
+#define PIPE_START_VBLANK_INTERRUPT_STATUS	(1UL<<2)	/* 965 or later */
+#define PIPE_VBLANK_INTERRUPT_STATUS		(1UL<<1)
+#define I915_OVERLAY_UPDATED_STATUS		(1UL<<0)
+
 /*
  * Some BIOS scratch area registers.  The 845 (and 830?) store the amount
  * of video memory available to the BIOS in SWF1.
@@ -856,6 +975,7 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define	PCI_DEVICE_ID_INTEL_EL_IG	0x2e02
 #define	PCI_DEVICE_ID_INTEL_82Q45_IG	0x2e12
 #define	PCI_DEVICE_ID_INTEL_82G45_IG	0x2e22
+#define	PCI_DEVICE_ID_INTEL_82G41_IG	0x2e32
 
 
 #define IS_I830(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82830_CGC)
@@ -879,7 +999,8 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_CANTIGA_IG || \
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_EL_IG || \
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q45_IG || \
-                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G45_IG)
+                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G45_IG || \
+			(dev)->pci_device == PCI_DEVICE_ID_INTEL_82G41_IG)
 
 #define IS_I965GM(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_GM965_IG)
 
@@ -887,7 +1008,8 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
 #define IS_G4X(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_EL_IG || \
                      (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q45_IG || \
-                     (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G45_IG)
+                     (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G45_IG || \
+                     (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G41_IG)
 
 #define IS_G33(dev)    ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82G33_IG ||  \
                         (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q35_IG || \

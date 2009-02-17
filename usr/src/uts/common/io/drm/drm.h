@@ -58,14 +58,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DRM_H_
 #define _DRM_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types32.h>
 
@@ -357,7 +355,8 @@ typedef enum drm_map_flags {
 	_DRM_KERNEL = 0x08,	     /**< kernel requires access */
 	_DRM_WRITE_COMBINING = 0x10, /**< use write-combining if available */
 	_DRM_CONTAINS_LOCK = 0x20,   /**< SHM page that contains lock */
-	_DRM_REMOVABLE = 0x40	     /**< Removable mapping */
+	_DRM_REMOVABLE = 0x40,	     /**< Removable mapping */
+	_DRM_DRIVER = 0x80	     /**< Managed by driver */
 } drm_map_flags_t;
 
 typedef struct drm_ctx_priv_map {
@@ -633,6 +632,7 @@ typedef struct drm_irq_busid {
 typedef enum {
 	_DRM_VBLANK_ABSOLUTE = 0x0,	/**< Wait for specific vblank sequence number */
 	_DRM_VBLANK_RELATIVE = 0x1,	/**< Wait for given number of vblanks */
+	_DRM_VBLANK_FLIP = 0x8000000,	/**< Scheduled buffer swap should flip */
 	_DRM_VBLANK_NEXTONMISS = 0x10000000,    /**< If missed, wait for next vblank */
 	_DRM_VBLANK_SECONDARY = 0x20000000,     /**< Secondary display controller */
 	_DRM_VBLANK_SIGNAL = 0x40000000	/**< Send signal instead of blocking */
@@ -802,6 +802,7 @@ typedef struct drm_set_version {
 
 #define DRM_IOCTL_WAIT_VBLANK		DRM_IOWR(0x3a, drm_wait_vblank_t)
 
+#define DRM_IOCTL_UPDATE_DRAW           DRM_IOW(0x3f, drm_update_draw_t)
 /*@}*/
 
 /**

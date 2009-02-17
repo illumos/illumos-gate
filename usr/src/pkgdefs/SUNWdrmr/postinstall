@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SUNWdrmr postinstall script
@@ -150,7 +150,6 @@ else
 	ADD_DRV="check_add_drv -b ${BASEDIR}"
 fi
 
-${ADD_DRV} -m "${DRVPERM}" -i "${IGFX_ALIAS}" i915 && \
-${ADD_DRV} -m "${DRVPERM}" -i "${RADEON_ALIAS}" radeon || EXIT=1
+${ADD_DRV} -m "${DRVPERM}" -i "${IGFX_ALIAS}" i915 || EXIT=1
 
 exit ${EXIT}

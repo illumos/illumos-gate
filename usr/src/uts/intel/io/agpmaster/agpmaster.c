@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,8 @@ int agpm_debug = 0;
 /* Intel G4X series */
 #define	IS_INTEL_G4X(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_EL) || \
 	(agpmaster->agpm_id == INTEL_IGD_Q45) || \
-	(agpmaster->agpm_id == INTEL_IGD_G45))
+	(agpmaster->agpm_id == INTEL_IGD_G45) || \
+	(agpmaster->agpm_id == INTEL_IGD_G41))
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces"
@@ -648,6 +649,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_EL:
 	case INTEL_IGD_Q45:
 	case INTEL_IGD_G45:
+	case INTEL_IGD_G41:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */

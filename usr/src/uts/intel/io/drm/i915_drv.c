@@ -34,7 +34,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -641,7 +641,7 @@ i915_suspend(struct drm_device *dev)
 		s3_priv->saveDSPATILEOFF = S3_READ(DSPATILEOFF);
 	}
 	i915_save_palette(dev, PIPE_A);
-	s3_priv->savePIPEASTAT = S3_READ(I915REG_PIPEASTAT);
+	s3_priv->savePIPEASTAT = S3_READ(PIPEASTAT);
 
 	/*
 	 * Pipe & plane B info
@@ -671,7 +671,7 @@ i915_suspend(struct drm_device *dev)
 		s3_priv->saveDSPBTILEOFF = S3_READ(DSPBTILEOFF);
 	}
 	i915_save_palette(dev, PIPE_B);
-	s3_priv->savePIPEBSTAT = S3_READ(I915REG_PIPEBSTAT);
+	s3_priv->savePIPEBSTAT = S3_READ(PIPEBSTAT);
 
 	/*
 	 * CRT state
@@ -703,9 +703,9 @@ i915_suspend(struct drm_device *dev)
 	s3_priv->saveFBC_CONTROL = S3_READ(FBC_CONTROL);
 
 	/* Interrupt state */
-	s3_priv->saveIIR = S3_READ(I915REG_INT_IDENTITY_R);
-	s3_priv->saveIER = S3_READ(I915REG_INT_ENABLE_R);
-	s3_priv->saveIMR = S3_READ(I915REG_INT_MASK_R);
+	s3_priv->saveIIR = S3_READ(IIR);
+	s3_priv->saveIER = S3_READ(IER);
+	s3_priv->saveIMR = S3_READ(IMR);
 
 	/* VGA state */
 	s3_priv->saveVCLK_DIVISOR_VGA0 = S3_READ(VCLK_DIVISOR_VGA0);
@@ -962,8 +962,9 @@ static void i915_configure(drm_driver_t *driver)
 	driver->preclose	=	i915_driver_preclose;
 	driver->lastclose	=	i915_driver_lastclose;
 	driver->device_is_agp	=	i915_driver_device_is_agp;
-	driver->vblank_wait		=	i915_driver_vblank_wait;
-	driver->vblank_wait2		=	i915_driver_vblank_wait2;
+	driver->get_vblank_counter	= i915_get_vblank_counter;
+	driver->enable_vblank	= 	i915_enable_vblank;
+	driver->disable_vblank	= 	i915_disable_vblank;
 	driver->irq_preinstall	=	i915_driver_irq_preinstall;
 	driver->irq_postinstall	=	i915_driver_irq_postinstall;
 	driver->irq_uninstall	=	i915_driver_irq_uninstall;
@@ -982,6 +983,4 @@ static void i915_configure(drm_driver_t *driver)
 	driver->use_agp	=	1;
 	driver->require_agp	=	1;
 	driver->use_irq	=	1;
-	driver->use_vbl_irq	=	1;
-	driver->use_vbl_irq2	=	1;
 }

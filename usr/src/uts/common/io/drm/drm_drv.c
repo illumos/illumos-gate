@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,6 +137,8 @@ drm_ioctl_desc_t drm_ioctls[DRIVER_IOCTL_COUNT] = {
 	    {drm_sg_free, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY},
 	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)] =
 	    {drm_wait_vblank, 0},
+	[DRM_IOCTL_NR(DRM_IOCTL_UPDATE_DRAW)] =
+	    {drm_update_draw, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY},
 };
 
 const char *
@@ -308,9 +310,13 @@ drm_load(drm_device_t *dev)
 
 	cv_init(&(dev->lock.lock_cv), NULL, CV_DRIVER, NULL);
 	mutex_init(&(dev->lock.lock_mutex), NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&(dev->dev_lock), NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&dev->drw_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&(dev->dev_lock), "drmdev", MUTEX_DRIVER, NULL);
+	mutex_init(&dev->irq_lock, "drmirq", MUTEX_DRIVER,
+	    (void *)dev->intr_block);
+	mutex_init(&dev->drw_lock, "drmdrw", MUTEX_DRIVER, NULL);
+	mutex_init(&dev->tasklet_lock, "drmtsk", MUTEX_DRIVER, NULL);
 
+	dev->irq = pci_get_irq(dev);
 	dev->pci_vendor = pci_get_vendor(dev);
 	dev->pci_device = pci_get_device(dev);
 
@@ -351,8 +357,10 @@ error:
 	DRM_UNLOCK();
 	cv_destroy(&(dev->lock.lock_cv));
 	mutex_destroy(&(dev->lock.lock_mutex));
+	mutex_destroy(&dev->irq_lock);
 	mutex_destroy(&(dev->dev_lock));
 	mutex_destroy(&dev->drw_lock);
+	mutex_destroy(&dev->tasklet_lock);
 
 	return (retcode);
 }
@@ -379,8 +387,10 @@ drm_unload(drm_device_t *dev)
 	drm_mem_uninit();
 	cv_destroy(&dev->lock.lock_cv);
 	mutex_destroy(&dev->lock.lock_mutex);
+	mutex_destroy(&dev->irq_lock);
 	mutex_destroy(&dev->dev_lock);
 	mutex_destroy(&dev->drw_lock);
+	mutex_destroy(&dev->tasklet_lock);
 }
 
 

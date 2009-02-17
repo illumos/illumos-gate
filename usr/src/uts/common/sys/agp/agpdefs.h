@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,7 @@ extern "C" {
 #define	INTEL_BR_EL			0x2e008086
 #define	INTEL_BR_Q45			0x2e108086
 #define	INTEL_BR_G45			0x2e208086
+#define	INTEL_BR_G41			0x2e308086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -170,6 +171,7 @@ extern "C" {
 #define	INTEL_IGD_EL			0x2e028086
 #define	INTEL_IGD_Q45			0x2e128086
 #define	INTEL_IGD_G45			0x2e228086
+#define	INTEL_IGD_G41			0x2e328086
 
 /* register offsets in PCI config space */
 #define	I8XX_CONF_GMADR			0x10 /* GMADR of i8xx series */

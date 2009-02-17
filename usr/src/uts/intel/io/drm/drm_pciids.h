@@ -3,7 +3,7 @@
  * Please contact dri-devel@lists.sf.net to add new cards to this list
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,6 +206,7 @@ extern "C" {
 	{0x8086, 0x2E02, CHIP_I9XX|CHIP_I965, "Intel EL"}, \
 	{0x8086, 0x2E12, CHIP_I9XX|CHIP_I965, "Intel Q45"}, \
 	{0x8086, 0x2E22, CHIP_I9XX|CHIP_I965, "Intel G45"}, \
+	{0x8086, 0x2E32, CHIP_I9XX|CHIP_I965, "Intel G41"}, \
 	{0, 0, 0, NULL}
 
 #ifdef	__cplusplus

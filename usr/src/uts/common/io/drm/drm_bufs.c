@@ -33,11 +33,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 #include <gfx_private.h>
@@ -87,9 +85,6 @@ int drm_addmap(drm_device_t *dev, unsigned long offset,
 	drm_local_map_t *map;
 	caddr_t		kva;
 	int		retval;
-
-	if (!(dev->flags & (FREAD|FWRITE)))
-		return (EACCES); /* Require read/write */
 
 	/*
 	 * Only allow shared memory to be removable since we only keep
@@ -212,9 +207,6 @@ drm_addmap_ioctl(DRM_IOCTL_ARGS)
 	drm_local_map_t *map;
 	int err;
 	DRM_DEVICE;
-
-	if (!(dev->flags & (FREAD|FWRITE)))
-		return (EACCES); /* Require read/write */
 
 #ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {

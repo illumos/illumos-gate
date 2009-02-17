@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,7 +454,6 @@ typedef struct drm_dma_handle {
 	uint_t		cookie_num;
 	uintptr_t		vaddr;   /* virtual addr */
 	uintptr_t		paddr;   /* physical addr */
-	size_t		req_sz;  /* required size of memory */
 	size_t		real_sz; /* real size of memory */
 } drm_dma_handle_t;
 
@@ -518,8 +517,6 @@ typedef struct ati_pcigart_info {
 	drm_local_map_t mapping;
 } drm_ati_pcigart_info;
 
-
-
 /* DRM device structure */
 struct drm_device;
 struct drm_driver_info {
@@ -554,6 +551,10 @@ struct drm_driver_info {
 	uint_t (*irq_handler)(DRM_IRQ_ARGS);
 	int (*vblank_wait)(struct drm_device *, unsigned int *);
 	int (*vblank_wait2)(struct drm_device *, unsigned int *);
+	/* added for intel minimized vblank */
+	u32 (*get_vblank_counter)(struct drm_device *dev, int crtc);
+	int (*enable_vblank)(struct drm_device *dev, int crtc);
+	void (*disable_vblank)(struct drm_device *dev, int crtc);
 
 	drm_ioctl_desc_t *driver_ioctls;
 	int	max_driver_ioctl;
@@ -577,7 +578,6 @@ struct drm_driver_info {
 	unsigned use_vbl_irq2 :1;
 	unsigned use_mtrr :1;
 };
-
 
 /*
  * hardware-specific code needs to initialize mutexes which
@@ -607,6 +607,7 @@ struct drm_device {
 	int		flags;	/* Flags to open(2)		   */
 
 	/* Locks */
+	kmutex_t	  vbl_lock;	/* protects vblank operations */
 	kmutex_t	  dma_lock;	/* protects dev->dma */
 	kmutex_t	  irq_lock;	/* protects irq condition checks */
 	kmutex_t	  dev_lock;	/* protects everything else */
@@ -644,12 +645,38 @@ struct drm_device {
 	atomic_t	  context_flag;	/* Context swapping flag	   */
 	int		  last_context;	/* Last current context		   */
 
+	/* Only used for Radeon */
 	atomic_t	vbl_received;
 	atomic_t	vbl_received2;
+
 	drm_vbl_sig_list_t vbl_sig_list;
 	drm_vbl_sig_list_t vbl_sig_list2;
-	wait_queue_head_t	vbl_queue;	/* vbl wait channel */
 
+	wait_queue_head_t	vbl_queue;	/* vbl wait channel */
+	/* vbl wait channel array */
+	wait_queue_head_t	*vbl_queues;
+
+	/* number of VBLANK interrupts */
+	/* (driver must alloc the right number of counters) */
+	atomic_t	  *_vblank_count;
+	/* signal list to send on VBLANK */
+	struct drm_vbl_sig_list *vbl_sigs;
+
+	/* number of signals pending on all crtcs */
+	atomic_t	  vbl_signal_pending;
+	/* number of users of vblank interrupts per crtc */
+	atomic_t	  *vblank_refcount;
+	/* protected by dev->vbl_lock, used for wraparound handling */
+	u32		  *last_vblank;
+	/* so we don't call enable more than */
+	atomic_t	  *vblank_enabled;
+	/* for compensation of spurious wraparounds */
+	u32		  *vblank_premodeset;
+	/* Don't wait while crtc is likely disabled */
+	int		  *vblank_suspend;
+	/* size of vblank counter register */
+	u32		  max_vblank_count;
+	int		  num_crtcs;
 	kmutex_t	tasklet_lock;
 	void (*locked_tasklet_func)(struct drm_device *dev);
 
@@ -669,7 +696,6 @@ struct drm_device {
 	u32 *drw_bitfield;
 	unsigned int drw_info_length;
 	drm_drawable_info_t **drw_info;
-
 	/*
 	 * Saving S3 context
 	 */
@@ -704,7 +730,7 @@ int	drm_ctxbitmap_next(drm_device_t *);
 /* Locking IOCTL support (drm_lock.c) */
 int	drm_lock_take(drm_lock_data_t *, unsigned int);
 int	drm_lock_transfer(drm_device_t *,
-			volatile unsigned int *, unsigned int);
+			drm_lock_data_t *, unsigned int);
 int	drm_lock_free(drm_device_t *,
 		    volatile unsigned int *, unsigned int);
 
@@ -734,6 +760,11 @@ void	drm_driver_irq_postinstall(drm_device_t *);
 void	drm_driver_irq_uninstall(drm_device_t *);
 int	drm_vblank_wait(drm_device_t *, unsigned int *);
 void	drm_vbl_send_signals(drm_device_t *);
+void    drm_handle_vblank(struct drm_device *dev, int crtc);
+u32	drm_vblank_count(struct drm_device *dev, int crtc);
+int	drm_vblank_get(struct drm_device *dev, int crtc);
+void	drm_vblank_put(struct drm_device *dev, int crtc);
+int	drm_vblank_init(struct drm_device *dev, int num_crtcs);
 void    drm_locked_tasklet(drm_device_t *, void(*func)(drm_device_t *));
 
 /* AGP/GART support (drm_agpsupport.c) */
@@ -787,6 +818,7 @@ int	drm_getsareactx(DRM_IOCTL_ARGS);
 /* Drawable IOCTL support (drm_drawable.c) */
 int	drm_adddraw(DRM_IOCTL_ARGS);
 int	drm_rmdraw(DRM_IOCTL_ARGS);
+int	drm_update_draw(DRM_IOCTL_ARGS);
 
 /* Authentication IOCTL support (drm_auth.c) */
 int	drm_getmagic(DRM_IOCTL_ARGS);
@@ -862,9 +894,8 @@ extern int pci_get_irq(drm_device_t *);
 extern int pci_get_vendor(drm_device_t *);
 extern int pci_get_device(drm_device_t *);
 
-extern drm_drawable_info_t *drm_get_drawable_info(drm_device_t *,
-	drm_drawable_t);
-
+extern struct drm_drawable_info *drm_get_drawable_info(drm_device_t *,
+							drm_drawable_t);
 /* File Operations helpers (drm_fops.c) */
 extern drm_file_t *drm_find_file_by_proc(drm_device_t *, cred_t *);
 extern drm_cminor_t *drm_find_file_by_minor(drm_device_t *, int);
