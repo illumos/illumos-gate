@@ -27,7 +27,7 @@
 
 <topology name='psu' scheme='hc'>
 
-  <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2|Sun-Fire-X4240|Sun-Fire-X4440|Sun-Fire-X4600|Sun-Fire-X4600-M2'>
+  <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440|Sun-Fire-X4600|Sun-Fire-X4600-M2'>
     <range name='psu' min='0' max='100'>
         <facility name='sys.psfail.led' type='indicator' provider='fac_prov_ipmi' >
               <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >

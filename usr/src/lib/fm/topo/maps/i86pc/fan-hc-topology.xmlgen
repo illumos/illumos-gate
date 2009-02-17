@@ -160,6 +160,39 @@ my @platforms = (
     },
 
     #
+    # Fan Module/Fan topology for Durado 1U.
+    #
+    # There are two fan boards, which are FRU's.  The first fanboard has 4
+    # fanmodules (which are also FRU's).  The second fan board has 3 fan
+    # modules.  Each fanmodule contains two fans.
+    #
+    {
+	set => "Sun-Fire-X4140",
+	topology => [
+	    {
+		count => 2,
+		label => "FANBD%d",
+		fru => "self",
+	    }, {
+		fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		label => "FANBD%d FM%d",
+		count => 4,
+		fru => "self",
+		fm_service_indctr=> "fb%d.fm%d.led",
+		entity_ref_nparams => 2
+	    }, {
+		fac_enum => 1,
+		provider => "fac_prov_ipmi",
+		count => 2,
+		fru => "parent",
+		entity_ref => "fb%d.fm%d.f%d.speed",
+		entity_ref_nparams => 3
+	    }
+
+	]
+    },
+    #
     # Fan Module/Fan topology for Duradi 1U.
     #
     # There are two fan boards, which are FRU's.  The first fanboard has 4
@@ -246,11 +279,12 @@ sub process_topology
 
 	for (my $i = 0; $i < $level->{count}; $i++) {
 		#
-		# Special case code for Duradi 1U, which has an assymetric fan
-		# topology
+		# Special case code for the 1U version of Durado and Duradi,
+		# both of which have an assymetric fan topology
 		#
-		last if (($set eq "SUN-FIRE-X4150") && ($type eq "fanmodule") &&
-		    ($#indices == 0) && ($indices[0] == 1) && ($i == 3));
+		last if ((($set eq "SUN-FIRE-X4150") || ($set eq "Sun-Fire-X4140"))
+		    && ($type eq "fanmodule") && ($#indices == 0)
+		    && ($indices[0] == 1) && ($i == 3));
 
 		push @indices, $i;
 
@@ -274,7 +308,7 @@ sub process_topology
 			    "name-stability='Private' data-stability='Private' >\n",
 			    $indent+4, "");
 			printf("%*s<propval name='type' type='uint32' ".
-			    "value='1' />\n", $indent+6, "");
+			    "value='0' />\n", $indent+6, "");
 			printf("%*s<propmethod name='ipmi_entity' version='0' ".
 			    "propname='entity_ref' proptype='string' >\n",
 			    $indent+6, "");
