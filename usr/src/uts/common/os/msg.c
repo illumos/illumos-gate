@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Inter-Process Communication Message Facility.
@@ -265,6 +263,20 @@ static struct modlsys modlsys32 = {
  *			   on the copyout queue.
  *		d) If the message type is not found then we wakeup the next
  *		   process on the copyout queue.
+ *   7) If a msgsnd is unable to complete for of any of the following reasons
+ *	  a) the msgq has no space for the message
+ *	  b) the maximum number of messages allowed has been reached
+ *      then one of two things happen:
+ *	  1) If the passed in msg_flag has IPC_NOWAIT set, then
+ *	     an error is returned.
+ *	  2) The IPC_NOWAIT bit is not set in msg_flag, then the
+ *	     the thread is placed to sleep until the request can be
+ *	     serviced.
+ *   8) When waking a thread waiting to send a message, a check is done to
+ *      verify that the operation being asked for by the thread will complete.
+ *      This decision making process is done in a loop where the oldest request
+ *      is checked first. The search will continue until there is no more
+ *	room on the msgq or we have checked all the waiters.
  */
 
 static uint_t msg_type_hash(long);
@@ -274,6 +286,7 @@ static int msg_rcvq_sleep(list_t *, msgq_wakeup_t *, kmutex_t **,
 static int msg_copyout(kmsqid_t *, long, kmutex_t **, size_t *, size_t,
     struct msg *, struct ipcmsgbuf *, int);
 static void msg_rcvq_wakeup_all(list_t *);
+static void msg_wakeup_senders(kmsqid_t *);
 static void msg_wakeup_rdr(kmsqid_t *, msg_select_t **, long);
 static msgq_wakeup_t *msg_fnd_any_snd(kmsqid_t *, int, long);
 static msgq_wakeup_t *msg_fnd_any_rdr(kmsqid_t *, int, long);
@@ -300,7 +313,7 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-
+#define	MSG_SMALL_INIT (size_t)-1
 int
 _init(void)
 {
@@ -345,10 +358,12 @@ msg_dtor(kipc_perm_t *perm)
 		list_destroy(&qp->msg_wait_snd_ngt[ii]);
 	}
 	ASSERT(list_is_empty(&qp->msg_cpy_block));
+	ASSERT(list_is_empty(&qp->msg_wait_rcv));
 	list_destroy(&qp->msg_cpy_block);
 	ASSERT(qp->msg_snd_cnt == 0);
 	ASSERT(qp->msg_cbytes == 0);
 	list_destroy(&qp->msg_list);
+	list_destroy(&qp->msg_wait_rcv);
 }
 
 
@@ -384,8 +399,7 @@ msgunlink(kmsqid_t *qp, struct msg *mp)
 	msg_rele(mp);
 
 	/* Wake up waiting writers */
-	if (qp->msg_snd_cnt)
-		cv_broadcast(&qp->msg_snd_cv);
+	msg_wakeup_senders(qp);
 }
 
 static void
@@ -409,8 +423,7 @@ msg_rmid(kipc_perm_t *perm)
 		msg_rcvq_wakeup_all(&qp->msg_wait_snd_ngt[ii]);
 	}
 	msg_rcvq_wakeup_all(&qp->msg_cpy_block);
-	if (qp->msg_snd_cnt)
-		cv_broadcast(&qp->msg_snd_cv);
+	msg_rcvq_wakeup_all(&qp->msg_wait_rcv);
 }
 
 /*
@@ -615,14 +628,18 @@ top:
 		 * when the first send happens, the lowest type will be set
 		 * properly.
 		 */
-		qp->msg_lowest_type = LONG_MAX;
+		qp->msg_lowest_type = MSG_SMALL_INIT;
 		list_create(&qp->msg_cpy_block,
+		    sizeof (msgq_wakeup_t),
+		    offsetof(msgq_wakeup_t, msgw_list));
+		list_create(&qp->msg_wait_rcv,
 		    sizeof (msgq_wakeup_t),
 		    offsetof(msgq_wakeup_t, msgw_list));
 		qp->msg_fnd_sndr = &msg_fnd_sndr[0];
 		qp->msg_fnd_rdr = &msg_fnd_rdr[0];
 		qp->msg_rcv_cnt = 0;
 		qp->msg_snd_cnt = 0;
+		qp->msg_snd_smallest = MSG_SMALL_INIT;
 
 		if (error = ipc_commit_begin(msq_svc, key, msgflg,
 		    (kipc_perm_t *)qp)) {
@@ -1078,7 +1095,8 @@ msgsnd(int msqid, struct ipcmsgbuf *msgp, size_t msgsz, int msgflg)
 	kmutex_t	*lock = NULL;
 	struct msg	*mp = NULL;
 	long		type;
-	int		error = 0;
+	int		error = 0, wait_wakeup = 0;
+	msgq_wakeup_t   msg_entry;
 	model_t		mdl = get_udatamodel();
 	STRUCT_HANDLE(ipcmsgbuf, umsgp);
 
@@ -1153,14 +1171,24 @@ top:
 			goto msgsnd_out;
 		}
 
+		wait_wakeup = 0;
 		qp->msg_snd_cnt++;
-		cvres = cv_wait_sig(&qp->msg_snd_cv, lock);
+		msg_entry.msgw_snd_size = msgsz;
+		msg_entry.msgw_thrd = curthread;
+		msg_entry.msgw_type = type;
+		cv_init(&msg_entry.msgw_wake_cv, NULL, 0, NULL);
+		list_insert_tail(&qp->msg_wait_rcv, &msg_entry);
+		if (qp->msg_snd_smallest > msgsz)
+			qp->msg_snd_smallest = msgsz;
+		cvres = cv_wait_sig(&msg_entry.msgw_wake_cv, lock);
 		lock = ipc_relock(msq_svc, qp->msg_perm.ipc_id, lock);
 		qp->msg_snd_cnt--;
-
+		if (list_link_active(&msg_entry.msgw_list))
+			list_remove(&qp->msg_wait_rcv, &msg_entry);
 		if (error = msgq_check_err(qp, cvres)) {
 			goto msgsnd_out;
 		}
+		wait_wakeup = 1;
 	}
 
 	if (mp == NULL) {
@@ -1204,6 +1232,16 @@ top:
 	msg_wakeup_rdr(qp, &qp->msg_fnd_sndr, type);
 
 msgsnd_out:
+	/*
+	 * We were woken up from the send wait list, but an
+	 * an error occured on placing the message onto the
+	 * msg queue.  Given that, we need to do the wakeup
+	 * dance again.
+	 */
+
+	if (wait_wakeup && error) {
+		msg_wakeup_senders(qp);
+	}
 	if (lock)
 		ipc_rele(msq_svc, (kipc_perm_t *)qp);	/* drops lock */
 
@@ -1433,6 +1471,72 @@ msgsys(int opcode, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 	}
 
 	return (error);
+}
+
+/*
+ * Determine if a writer who is waiting can process its message.  If so
+ * wake it up.
+ */
+static void
+msg_wakeup_senders(kmsqid_t *qp)
+
+{
+	struct msgq_wakeup *ptr, *optr;
+	size_t avail, smallest;
+	int msgs_out;
+
+	/*
+	 * Is there a writer waiting, and if so, can it be serviced? If
+	 * not return back to the caller.
+	 */
+	if (IPC_FREE(&qp->msg_perm) || qp->msg_qnum >= qp->msg_qmax)
+		return;
+
+	avail = qp->msg_qbytes - qp->msg_cbytes;
+	if (avail < qp->msg_snd_smallest)
+		return;
+
+	ptr = list_head(&qp->msg_wait_rcv);
+	if (ptr == NULL) {
+		qp->msg_snd_smallest = MSG_SMALL_INIT;
+		return;
+	}
+	optr = ptr;
+
+	/*
+	 * smallest:	minimum message size of all queued writers
+	 *
+	 * avail:	amount of space left on the msgq
+	 *		if all the writers we have woken up are successful.
+	 *
+	 * msgs_out:	is the number of messages on the message queue if
+	 *		all the writers we have woken up are successful.
+	 */
+
+	smallest = MSG_SMALL_INIT;
+	msgs_out = qp->msg_qnum;
+	while (ptr) {
+		ptr = list_next(&qp->msg_wait_rcv, ptr);
+		if (optr->msgw_snd_size <= avail) {
+			list_remove(&qp->msg_wait_rcv, optr);
+			avail -= optr->msgw_snd_size;
+			cv_signal(&optr->msgw_wake_cv);
+			msgs_out++;
+			if (msgs_out == qp->msg_qmax ||
+			    avail < qp->msg_snd_smallest)
+				break;
+		} else {
+			if (smallest > optr->msgw_snd_size)
+				smallest = optr->msgw_snd_size;
+		}
+		optr = ptr;
+	}
+
+	/*
+	 * Reset the smallest message size if the entire list has been visited
+	 */
+	if (ptr == NULL && smallest != MSG_SMALL_INIT)
+		qp->msg_snd_smallest = smallest;
 }
 
 #ifdef	_SYSCALL32_IMPL

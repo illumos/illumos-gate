@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MSG_IMPL_H
 #define	_SYS_MSG_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ipc_impl.h>
 #if defined(_KERNEL) || defined(_KMEMUSER)
@@ -56,6 +54,7 @@ typedef struct  msgq_wakeup {
 	list_node_t	msgw_list;
 	long		msgw_type;	/* Message type request. */
 	long		msgw_snd_wake;	/* Type of msg from msgsnd */
+	size_t		msgw_snd_size;	/* Designates size of the msg sending */
 	kthread_t	*msgw_thrd;	/* Thread waiting */
 	kcondvar_t	msgw_wake_cv;	/* waiting on this */
 } msgq_wakeup_t;
@@ -132,11 +131,15 @@ typedef struct kmsqid {
 	 *		    List of receiving threads whose type specifier is
 	 *		    negative message type but are blocked because
 	 *		    there are no types that qualify.
+	 * msg_wait_rcv:    List of sending threads that are blocked because
+	 *		    there is no room left on the message queue.
 	 */
 	kcondvar_t	msg_snd_cv;
 	list_t		msg_cpy_block;
 	list_t		msg_wait_snd[MSG_MAX_QNUM_CV];
 	list_t		msg_wait_snd_ngt[MSG_MAX_QNUM_CV];
+	list_t		msg_wait_rcv;
+	size_t		msg_snd_smallest; /* Smallest msg on send wait list */
 	int		msg_ngt_cnt;	/* # of negative receivers blocked */
 	char		msg_neg_copy;	/* Neg type copy underway */
 } kmsqid_t;

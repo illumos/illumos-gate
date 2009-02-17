@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -125,9 +123,10 @@ ipcperm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 
+#define	MSG_SND_SIZE 0x1
 static int
-msgq_check_for_rwaiters(list_t *walk_this, int min, int max,
-	int copy_wait, uintptr_t addr)
+msgq_check_for_waiters(list_t *walk_this, int min, int max,
+	int copy_wait, uintptr_t addr, int flag)
 
 {
 	int found = 0;
@@ -146,13 +145,23 @@ msgq_check_for_rwaiters(list_t *walk_this, int min, int max,
 				    (uintptr_t)walker) == -1) {
 					mdb_warn(
 					    "Failed to read message queue\n");
-					return (0);
+					return (found);
 				}
-				mdb_printf("%15lx\t%6d\t%15lx\t%15s\n",
-				    next.msgw_thrd, next.msgw_type,
-				    walker + (uintptr_t)
-				    OFFSETOF(msgq_wakeup_t, msgw_wake_cv),
-				    (copy_wait ? "yes":"no"));
+
+				if (flag & MSG_SND_SIZE) {
+					mdb_printf("%15lx\t%6d\t%15lx\t%15d\n",
+					    next.msgw_thrd, next.msgw_type,
+					    walker + (uintptr_t)
+					    OFFSETOF(msgq_wakeup_t,
+					    msgw_wake_cv), next.msgw_snd_size);
+				} else {
+					mdb_printf("%15lx\t%6d\t%15lx\t%15s\n",
+					    next.msgw_thrd, next.msgw_type,
+					    walker + (uintptr_t)
+					    OFFSETOF(msgq_wakeup_t,
+					    msgw_wake_cv),
+					    (copy_wait ? "yes":"no"));
+				}
 				found++;
 				walker =
 				    (msgq_wakeup_t *)next.msgw_list.list_next;
@@ -182,13 +191,20 @@ msq_print(kmsqid_t *msqid, uintptr_t addr)
 	mdb_printf("Blocked recievers\n");
 	mdb_printf("%15s\t%6s\t%15s\t%15s\n", "Thread Addr",
 	    "Type", "cv addr", "copyout-wait?");
-	total += msgq_check_for_rwaiters(&msqid->msg_cpy_block,
-	    0, 1, 1, addr + OFFSETOF(kmsqid_t, msg_cpy_block));
-	total += msgq_check_for_rwaiters(msqid->msg_wait_snd,
-	    0, MSG_MAX_QNUM + 1, 0, addr + OFFSETOF(kmsqid_t, msg_wait_snd));
-	total += msgq_check_for_rwaiters(msqid->msg_wait_snd_ngt,
+	total += msgq_check_for_waiters(&msqid->msg_cpy_block,
+	    0, 1, 1, addr + OFFSETOF(kmsqid_t, msg_cpy_block), 0);
+	total += msgq_check_for_waiters(msqid->msg_wait_snd_ngt,
 	    0, MSG_MAX_QNUM + 1, 0,
-	    addr + OFFSETOF(kmsqid_t, msg_wait_snd_ngt));
+	    addr + OFFSETOF(kmsqid_t, msg_wait_snd_ngt), 0);
+	mdb_printf("Blocked senders\n");
+	total += msgq_check_for_waiters(&msqid->msg_wait_rcv,
+	    0, 1, 1, addr + OFFSETOF(kmsqid_t, msg_wait_rcv),
+	    MSG_SND_SIZE);
+	mdb_printf("%15s\t%6s\t%15s\t%15s\n", "Thread Addr",
+	    "Type", "cv addr", "Msg Size");
+	total += msgq_check_for_waiters(msqid->msg_wait_snd,
+	    0, MSG_MAX_QNUM + 1, 0, addr + OFFSETOF(kmsqid_t,
+	    msg_wait_snd), 0);
 	mdb_printf("Total number of waiters: %d\n", total);
 }
 
