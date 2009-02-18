@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/sdt.h>
@@ -55,6 +53,8 @@ uint32_t nfs4_drc_max = 8 * 1024;
  * replies into.. do not change this on the fly.
  */
 uint32_t nfs4_drc_hash = 541;
+
+static void rfs4_resource_err(struct svc_req *req, COMPOUND4args *argsp);
 
 /*
  * Initialize a duplicate request cache.
@@ -428,7 +428,7 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 		switch (dr_stat) {
 
 		case NFS4_DUP_ERROR:
-			svcerr_systemerr(xprt);
+			rfs4_resource_err(req, cap);
 			return (1);
 			/* NOTREACHED */
 
@@ -561,4 +561,52 @@ rfs4_minorvers_mismatch(struct svc_req *req, SVCXPRT *xprt, void *args)
 	}
 	rfs4_compound_free(resp);
 	return (TRUE);
+}
+
+void
+rfs4_resource_err(struct svc_req *req, COMPOUND4args *argsp)
+{
+	COMPOUND4res res_buf, *rbp;
+	nfs_resop4 *resop;
+	PUTFH4res *resp;
+
+	rbp = &res_buf;
+
+	/*
+	 * Form a reply tag by copying over the request tag.
+	 */
+	rbp->tag.utf8string_val =
+	    kmem_alloc(argsp->tag.utf8string_len, KM_SLEEP);
+	rbp->tag.utf8string_len = argsp->tag.utf8string_len;
+	bcopy(argsp->tag.utf8string_val, rbp->tag.utf8string_val,
+	    rbp->tag.utf8string_len);
+
+	rbp->array_len = 1;
+	rbp->array = kmem_zalloc(rbp->array_len * sizeof (nfs_resop4),
+	    KM_SLEEP);
+	resop = &rbp->array[0];
+	resop->resop = argsp->array[0].argop;	/* copy first op over */
+
+	/* Any op will do, just need to access status field */
+	resp = &resop->nfs_resop4_u.opputfh;
+
+	/*
+	 * NFS4ERR_RESOURCE is allowed for all ops, except OP_ILLEGAL.
+	 * Note that all op numbers in the compound array were already
+	 * validated by the XDR decoder (xdr_COMPOUND4args_srv()).
+	 */
+	resp->status = (resop->resop == OP_ILLEGAL ?
+	    NFS4ERR_OP_ILLEGAL : NFS4ERR_RESOURCE);
+
+	/* compound status is same as first op status */
+	rbp->status = resp->status;
+
+	if (!svc_sendreply(req->rq_xprt, xdr_COMPOUND4res_srv, (char *)rbp)) {
+		DTRACE_PROBE2(nfss__rsrc_err__sendfail,
+		    struct svc_req *, req->rq_xprt, char *, rbp);
+		svcerr_systemerr(req->rq_xprt);
+	}
+
+	UTF8STRING_FREE(rbp->tag);
+	kmem_free(rbp->array, rbp->array_len * sizeof (nfs_resop4));
 }
