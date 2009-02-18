@@ -386,10 +386,11 @@ ipf_remove_lock()
 custom_set_symlink()
 {
 	#
-	# Nothing to do if the input file doesn't exist or
-	# if the input file is the "/etc/ipf/ipf.conf" file.
+	# Nothing to do if the input file doesn't exist.
 	#
 	[ ! -f "$1" ] && return 0
+
+	check_ipf_dir || return 1
 
 	rm $IPFILCONF >/dev/null 2>&1
 	ln -s $1 $IPFILCONF >/dev/null 2>&1
@@ -411,6 +412,7 @@ replace_file()
 		touch $orig
 	fi
 
+	check_ipf_dir || return 1
 	mv $new $orig && return 0 || return 1
 }
 

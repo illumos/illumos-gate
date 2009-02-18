@@ -52,9 +52,6 @@ d none lib 755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
 f none lib/svc/method/ipfilter 0555 root bin
-d none usr 755 root sys
-d none usr/lib 0755 root bin
-f none usr/lib/servinfo 0555 root bin
 d none var 755 root sys
 d none var/db 755 root sys
 d none var/db/ipf 755 root sys
