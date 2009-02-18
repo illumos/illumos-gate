@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -35,6 +35,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/note.h>
+#include <sys/atomic.h>
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
@@ -68,6 +69,7 @@ static int ec_wait_obf_set(int sc_addr);
  * EC softstate
  */
 struct ec_softstate {
+	uint8_t	 ec_ok;		/* != 0 when EC handler is attached */
 	uint16_t ec_base;	/* base of EC I/O port - data */
 	uint16_t ec_sc;		/*  EC status/command */
 	ACPI_HANDLE ec_obj;	/* handle to ACPI object for EC */
@@ -87,6 +89,14 @@ typedef struct io_port_des {
 } io_port_des_t;
 
 /*
+ * Patchable timeout values for EC input-buffer-full-clear
+ * and output-buffer-full-set. These are in 10uS units and
+ * default to 1 second.
+ */
+int ibf_clear_timeout = 100000;
+int obf_set_timeout = 100000;
+
+/*
  * ACPI CA address space handler interface functions
  */
 /*ARGSUSED*/
@@ -97,6 +107,9 @@ ec_setup(ACPI_HANDLE reg, UINT32 func, void *context, void **ret)
 	return (AE_OK);
 }
 
+/*
+ * Only called from ec_handler(), which validates ec_ok
+ */
 static int
 ec_rd(int addr)
 {
@@ -143,6 +156,9 @@ ec_rd(int addr)
 	return (rv);
 }
 
+/*
+ * Only called from ec_handler(), which validates ec_ok
+ */
 static int
 ec_wr(int addr, uint8_t *val)
 {
@@ -190,6 +206,9 @@ ec_wr(int addr, uint8_t *val)
 	return (0);
 }
 
+/*
+ * Only called from ec_gpe_callback(), which validates ec_ok
+ */
 static int
 ec_query(void)
 {
@@ -224,18 +243,16 @@ ec_handler(UINT32 func, ACPI_PHYSICAL_ADDRESS addr, UINT32 width,
 	_NOTE(ARGUNUSED(context, regcontext))
 	int tmp;
 
+	/* Guard against unexpected invocation */
+	if (ec.ec_ok == 0)
+		return (AE_ERROR);
+
 	/*
 	 * Add safety checks for BIOSes not strictly compliant
 	 * with ACPI spec
 	 */
-	if ((width % 8) != 0) {
-		cmn_err(CE_NOTE, "!ec_handler: width %d not multiple of 8",
-		    width);
-		return (AE_ERROR);
-	}
-
-	if (width > 8) {
-		cmn_err(CE_NOTE, "!ec_handler: width %d greater than 8", width);
+	if (((width % 8) != 0) || (width > 8)) {
+		cmn_err(CE_NOTE, "!ec_handler: invalid width %d", width);
 		return (AE_ERROR);
 	}
 
@@ -269,6 +286,11 @@ ec_gpe_callback(void *ctx)
 	if (!(inb(ec.ec_sc) & EC_SCI))
 		return;
 
+	if (ec.ec_ok == 0) {
+		cmn_err(CE_WARN, "!ec_gpe_callback: EC handler unavailable");
+		return;
+	}
+
 	query = ec_query();
 	if (query >= 0) {
 		(void) snprintf(query_str, 5, "_Q%02X", (uint8_t)query);
@@ -295,13 +317,11 @@ ec_wait_ibf_clear(int sc_addr)
 {
 	int	cnt;
 
-	cnt = 0;
+	cnt = ibf_clear_timeout;
 	while (inb(sc_addr) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
+		if (cnt-- <= 0)
 			return (-1);
-		}
+		drv_usecwait(10);
 	}
 	return (0);
 }
@@ -315,13 +335,11 @@ ec_wait_obf_set(int sc_addr)
 {
 	int	cnt;
 
-	cnt = 0;
+	cnt = obf_set_timeout;
 	while (!(inb(sc_addr) & EC_OBF)) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
+		if (cnt-- <= 0)
 			return (-1);
-		}
+		drv_usecwait(10);
 	}
 	return (0);
 }
@@ -405,27 +423,45 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 	 */
 	if (ACPI_FAILURE(AcpiEvaluateObjectTyped(obj, "_GPE", NULL, &buf,
 	    ACPI_TYPE_INTEGER))) {
+		/* emit a warning but ignore the error */
 		cmn_err(CE_WARN, "!acpica_install_ec: _GPE object evaluate"
 		    "failed");
-		return (AE_OK);
+		gpe = -1;
+	} else {
+		gpe = ((ACPI_OBJECT *)buf.Pointer)->Integer.Value;
+		AcpiOsFree(buf.Pointer);
 	}
-	gpe = ((ACPI_OBJECT *)buf.Pointer)->Integer.Value;
-	AcpiOsFree(buf.Pointer);
 
 	/*
 	 * Initialize EC mutex here
 	 */
 	mutex_init(&ec.ec_mutex, NULL, MUTEX_DRIVER, NULL);
 
+	/*
+	 * Assume the EC handler is available now; the next attempt
+	 * to install the address space handler may actually need
+	 * to use the EC handler to install it (chicken/egg)
+	 */
+	ec.ec_ok = 1;
+
 	if (AcpiInstallAddressSpaceHandler(obj,
 	    ACPI_ADR_SPACE_EC, &ec_handler, &ec_setup, NULL) != AE_OK) {
 		cmn_err(CE_WARN, "!acpica: failed to add EC handler\n");
+		ec.ec_ok = 0;	/* EC handler failed to install */
+		membar_producer(); /* force ec_ok store before mutex_destroy */
 		mutex_destroy(&ec.ec_mutex);
 		return (AE_ERROR);
 	}
 
 	/*
-	 * Enable EC GPE
+	 * In case the EC handler was successfully installed but no
+	 * GPE was found, return sucess; a warning was emitted above
+	 */
+	if (gpe < 0)
+		return (AE_OK);
+
+	/*
+	 * Have a valid EC GPE; enable it
 	 */
 	if ((status = AcpiInstallGpeHandler(NULL, gpe, ACPI_GPE_EDGE_TRIGGERED,
 	    ec_gpe_handler, NULL)) != AE_OK) {
@@ -501,6 +537,9 @@ acpica_ec_init(void)
 	 */
 	acpica_probe_ecdt();
 #endif	/* NOTYET */
+
+	/* EC handler defaults to not available */
+	ec.ec_ok = 0;
 
 	/*
 	 * General model is: use GetDevices callback to install
