@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1513,7 +1513,7 @@ vhci_recovery_reset(scsi_vhci_lun_t *vlun, struct scsi_address *ap,
 static int
 vhci_scsi_reset_target(struct scsi_address *ap, int level, uint8_t select_path)
 {
-	dev_info_t		*vdip, *pdip, *cdip = ADDR2DIP(ap);
+	dev_info_t		*vdip, *pdip, *cdip;
 	mdi_pathinfo_t		*pip = NULL;
 	mdi_pathinfo_t		*npip = NULL;
 	int			rval = -1;
@@ -1533,6 +1533,7 @@ vhci_scsi_reset_target(struct scsi_address *ap, int level, uint8_t select_path)
 		return (scsi_reset(ap, level));
 	}
 
+	cdip = ADDR2DIP(ap);
 	ASSERT(cdip != NULL);
 	vdip = ddi_get_parent(cdip);
 	ASSERT(vdip != NULL);
