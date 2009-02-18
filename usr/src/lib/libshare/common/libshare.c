@@ -3840,11 +3840,12 @@ sa_remove_resource(sa_resource_t resource)
 	} else {
 		ret = sa_zfs_update((sa_share_t)group);
 	}
+
 	return (ret);
 }
 
 /*
- * proto_resource_rename(handle, group, resource, newname)
+ * proto_rename_resource(handle, group, resource, newname)
  *
  * Helper function for sa_rename_resource that notifies the protocol
  * of a resource name change prior to a config repository update.

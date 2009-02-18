@@ -187,7 +187,7 @@ extern int zfs_init_libshare(libzfs_handle_t *, int);
 extern void zfs_uninit_libshare(libzfs_handle_t *);
 extern int zfs_parse_options(char *, zfs_share_proto_t);
 
-extern int zfs_unshare_proto(zfs_handle_t *zhp,
+extern int zfs_unshare_proto(zfs_handle_t *,
     const char *, zfs_share_proto_t *);
 #ifdef	__cplusplus
 }

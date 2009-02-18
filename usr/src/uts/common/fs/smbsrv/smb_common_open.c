@@ -740,14 +740,13 @@ smb_open_subr(smb_request_t *sr)
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
 				rw_exit(&node->n_share_lock);
+				smb_rwx_rwexit(&dnode->n_lock);
 				SMB_DEL_NEWOBJ(op->fqi);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				return (status);
 			}
-
-
 		} else {
 			op->dattr |= FILE_ATTRIBUTE_DIRECTORY;
 			new_attr.sa_vattr.va_type = VDIR;

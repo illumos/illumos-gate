@@ -820,18 +820,24 @@ typedef struct smb_tree {
 	char			t_typename[SMB_TYPENAMELEN];
 	char			t_volume[SMB_VOLNAMELEN];
 	acl_type_t		t_acltype;
+	uint32_t		t_access;
 } smb_tree_t;
 
 #define	SMB_TREE_VFS(tree)	((tree)->t_snode->vp->v_vfsp)
 #define	SMB_TREE_FSID(tree)	((tree)->t_snode->vp->v_vfsp->vfs_fsid)
 
-#define	SMB_TREE_IS_READONLY(sr)                                        \
-	(((sr) && (sr)->tid_tree) ?                                     \
-	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_READONLY) : 0)
+#define	SMB_TREE_IS_READONLY(sr)					\
+	((sr) != NULL && (sr)->tid_tree != NULL &&			\
+	!((sr)->tid_tree->t_access & ACE_ALL_WRITE_PERMS))
 
 #define	SMB_TREE_IS_CASEINSENSITIVE(sr)                                 \
 	(((sr) && (sr)->tid_tree) ?                                     \
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_CASEINSENSITIVE) : 0)
+
+#define	SMB_TREE_HAS_ACCESS(sr, acemask)				\
+	((sr) == NULL ? ACE_ALL_PERMS : (				\
+	(((sr) && (sr)->tid_tree) ?					\
+	(((sr)->tid_tree->t_access) & (acemask)) : 0)))
 
 /*
  * SMB_TREE_CONTAINS_NODE is used to check that a node is in the same

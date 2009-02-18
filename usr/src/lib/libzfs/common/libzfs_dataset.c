@@ -2012,6 +2012,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 		goto error;
 
 	ret = zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc);
+
 	if (ret != 0) {
 		switch (errno) {
 
@@ -4452,18 +4453,20 @@ zfs_iscsi_perm_check(libzfs_handle_t *hdl, char *dataset, ucred_t *cred)
 
 int
 zfs_deleg_share_nfs(libzfs_handle_t *hdl, char *dataset, char *path,
-    void *export, void *sharetab, int sharemax, zfs_share_op_t operation)
+    char *resource, void *export, void *sharetab,
+    int sharemax, zfs_share_op_t operation)
 {
 	zfs_cmd_t zc = { 0 };
 	int error;
 
 	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, path, sizeof (zc.zc_value));
+	if (resource)
+		(void) strlcpy(zc.zc_string, resource, sizeof (zc.zc_string));
 	zc.zc_share.z_sharedata = (uint64_t)(uintptr_t)sharetab;
 	zc.zc_share.z_exportdata = (uint64_t)(uintptr_t)export;
 	zc.zc_share.z_sharetype = operation;
 	zc.zc_share.z_sharemax = sharemax;
-
 	error = ioctl(hdl->libzfs_fd, ZFS_IOC_SHARE, &zc);
 	return (error);
 }
@@ -4490,4 +4493,86 @@ zfs_prune_proplist(zfs_handle_t *zhp, uint8_t *props)
 			    nvpair_name(curr), nvpair_type(curr));
 		curr = next;
 	}
+}
+
+static int
+zfs_smb_acl_mgmt(libzfs_handle_t *hdl, char *dataset, char *path,
+    zfs_smb_acl_op_t cmd, char *resource1, char *resource2)
+{
+	zfs_cmd_t zc = { 0 };
+	nvlist_t *nvlist = NULL;
+	int error;
+
+	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_value, path, sizeof (zc.zc_value));
+	zc.zc_cookie = (uint64_t)cmd;
+
+	if (cmd == ZFS_SMB_ACL_RENAME) {
+		if (nvlist_alloc(&nvlist, NV_UNIQUE_NAME, 0) != 0) {
+			(void) no_memory(hdl);
+			return (NULL);
+		}
+	}
+
+	switch (cmd) {
+	case ZFS_SMB_ACL_ADD:
+	case ZFS_SMB_ACL_REMOVE:
+		(void) strlcpy(zc.zc_string, resource1, sizeof (zc.zc_string));
+		break;
+	case ZFS_SMB_ACL_RENAME:
+		if (nvlist_add_string(nvlist, ZFS_SMB_ACL_SRC,
+		    resource1) != 0) {
+				(void) no_memory(hdl);
+				return (-1);
+		}
+		if (nvlist_add_string(nvlist, ZFS_SMB_ACL_TARGET,
+		    resource2) != 0) {
+				(void) no_memory(hdl);
+				return (-1);
+		}
+		if (zcmd_write_src_nvlist(hdl, &zc, nvlist) != 0) {
+			nvlist_free(nvlist);
+			return (-1);
+		}
+		break;
+	case ZFS_SMB_ACL_PURGE:
+		break;
+	default:
+		return (-1);
+	}
+	error = ioctl(hdl->libzfs_fd, ZFS_IOC_SMB_ACL, &zc);
+	if (nvlist)
+		nvlist_free(nvlist);
+	return (error);
+}
+
+int
+zfs_smb_acl_add(libzfs_handle_t *hdl, char *dataset,
+    char *path, char *resource)
+{
+	return (zfs_smb_acl_mgmt(hdl, dataset, path, ZFS_SMB_ACL_ADD,
+	    resource, NULL));
+}
+
+int
+zfs_smb_acl_remove(libzfs_handle_t *hdl, char *dataset,
+    char *path, char *resource)
+{
+	return (zfs_smb_acl_mgmt(hdl, dataset, path, ZFS_SMB_ACL_REMOVE,
+	    resource, NULL));
+}
+
+int
+zfs_smb_acl_purge(libzfs_handle_t *hdl, char *dataset, char *path)
+{
+	return (zfs_smb_acl_mgmt(hdl, dataset, path, ZFS_SMB_ACL_PURGE,
+	    NULL, NULL));
+}
+
+int
+zfs_smb_acl_rename(libzfs_handle_t *hdl, char *dataset, char *path,
+    char *oldname, char *newname)
+{
+	return (zfs_smb_acl_mgmt(hdl, dataset, path, ZFS_SMB_ACL_RENAME,
+	    oldname, newname));
 }

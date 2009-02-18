@@ -389,6 +389,30 @@ zfs_secpolicy_send(zfs_cmd_t *zc, cred_t *cr)
 	    ZFS_DELEG_PERM_SEND, cr));
 }
 
+static int
+zfs_secpolicy_deleg_share(zfs_cmd_t *zc, cred_t *cr)
+{
+	vnode_t *vp;
+	int error;
+
+	if ((error = lookupname(zc->zc_value, UIO_SYSSPACE,
+	    NO_FOLLOW, NULL, &vp)) != 0)
+		return (error);
+
+	/* Now make sure mntpnt and dataset are ZFS */
+
+	if (vp->v_vfsp->vfs_fstype != zfsfstype ||
+	    (strcmp((char *)refstr_value(vp->v_vfsp->vfs_resource),
+	    zc->zc_name) != 0)) {
+		VN_RELE(vp);
+		return (EPERM);
+	}
+
+	VN_RELE(vp);
+	return (dsl_deleg_access(zc->zc_name,
+	    ZFS_DELEG_PERM_SHARE, cr));
+}
+
 int
 zfs_secpolicy_share(zfs_cmd_t *zc, cred_t *cr)
 {
@@ -398,25 +422,20 @@ zfs_secpolicy_share(zfs_cmd_t *zc, cred_t *cr)
 	if (secpolicy_nfs(cr) == 0) {
 		return (0);
 	} else {
-		vnode_t *vp;
-		int error;
+		return (zfs_secpolicy_deleg_share(zc, cr));
+	}
+}
 
-		if ((error = lookupname(zc->zc_value, UIO_SYSSPACE,
-		    NO_FOLLOW, NULL, &vp)) != 0)
-			return (error);
+int
+zfs_secpolicy_smb_acl(zfs_cmd_t *zc, cred_t *cr)
+{
+	if (!INGLOBALZONE(curproc))
+		return (EPERM);
 
-		/* Now make sure mntpnt and dataset are ZFS */
-
-		if (vp->v_vfsp->vfs_fstype != zfsfstype ||
-		    (strcmp((char *)refstr_value(vp->v_vfsp->vfs_resource),
-		    zc->zc_name) != 0)) {
-			VN_RELE(vp);
-			return (EPERM);
-		}
-
-		VN_RELE(vp);
-		return (dsl_deleg_access(zc->zc_name,
-		    ZFS_DELEG_PERM_SHARE, cr));
+	if (secpolicy_smb(cr) == 0) {
+		return (0);
+	} else {
+		return (zfs_secpolicy_deleg_share(zc, cr));
 	}
 }
 
@@ -2912,7 +2931,7 @@ zfs_ioc_share(zfs_cmd_t *zc)
 		if (error = zsmbexport_fs((void *)
 		    (uintptr_t)zc->zc_share.z_exportdata,
 		    zc->zc_share.z_sharetype == ZFS_SHARE_SMB ?
-		    B_TRUE : B_FALSE)) {
+		    B_TRUE: B_FALSE)) {
 			return (error);
 		}
 		break;
@@ -2931,6 +2950,129 @@ zfs_ioc_share(zfs_cmd_t *zc)
 
 	return (error);
 
+}
+
+ace_t full_access[] = {
+	{(uid_t)-1, ACE_ALL_PERMS, ACE_EVERYONE, 0}
+};
+
+/*
+ * Remove all ACL files in shares dir
+ */
+static int
+zfs_smb_acl_purge(znode_t *dzp)
+{
+	zap_cursor_t	zc;
+	zap_attribute_t	zap;
+	zfsvfs_t *zfsvfs = dzp->z_zfsvfs;
+	int error;
+
+	for (zap_cursor_init(&zc, zfsvfs->z_os, dzp->z_id);
+	    (error = zap_cursor_retrieve(&zc, &zap)) == 0;
+	    zap_cursor_advance(&zc)) {
+		if ((error = VOP_REMOVE(ZTOV(dzp), zap.za_name, kcred,
+		    NULL, 0)) != 0)
+			break;
+	}
+	zap_cursor_fini(&zc);
+	return (error);
+}
+
+static int
+zfs_ioc_smb_acl(zfs_cmd_t *zc)
+{
+	vnode_t *vp;
+	znode_t *dzp;
+	vnode_t *resourcevp = NULL;
+	znode_t *sharedir;
+	zfsvfs_t *zfsvfs;
+	nvlist_t *nvlist;
+	char *src, *target;
+	vattr_t vattr;
+	vsecattr_t vsec;
+	int error = 0;
+
+	if ((error = lookupname(zc->zc_value, UIO_SYSSPACE,
+	    NO_FOLLOW, NULL, &vp)) != 0)
+		return (error);
+
+	/* Now make sure mntpnt and dataset are ZFS */
+
+	if (vp->v_vfsp->vfs_fstype != zfsfstype ||
+	    (strcmp((char *)refstr_value(vp->v_vfsp->vfs_resource),
+	    zc->zc_name) != 0)) {
+		VN_RELE(vp);
+		return (EINVAL);
+	}
+
+	dzp = VTOZ(vp);
+	zfsvfs = dzp->z_zfsvfs;
+
+	ZFS_ENTER(zfsvfs);
+
+	if ((error = zfs_zget(zfsvfs, zfsvfs->z_shares_dir, &sharedir)) != 0) {
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
+
+	switch (zc->zc_cookie) {
+	case ZFS_SMB_ACL_ADD:
+		vattr.va_mask = AT_MODE|AT_UID|AT_GID|AT_TYPE;
+		vattr.va_type = VREG;
+		vattr.va_mode = S_IFREG|0777;
+		vattr.va_uid = 0;
+		vattr.va_gid = 0;
+
+		vsec.vsa_mask = VSA_ACE;
+		vsec.vsa_aclentp = &full_access;
+		vsec.vsa_aclentsz = sizeof (full_access);
+		vsec.vsa_aclcnt = 1;
+
+		error = VOP_CREATE(ZTOV(sharedir), zc->zc_string,
+		    &vattr, EXCL, 0, &resourcevp, kcred, 0, NULL, &vsec);
+		if (resourcevp)
+			VN_RELE(resourcevp);
+		break;
+
+	case ZFS_SMB_ACL_REMOVE:
+		error = VOP_REMOVE(ZTOV(sharedir), zc->zc_string, kcred,
+		    NULL, 0);
+		break;
+
+	case ZFS_SMB_ACL_RENAME:
+		if ((error = get_nvlist(zc->zc_nvlist_src,
+		    zc->zc_nvlist_src_size, &nvlist)) != 0) {
+			VN_RELE(vp);
+			ZFS_EXIT(zfsvfs);
+			return (error);
+		}
+		if (nvlist_lookup_string(nvlist, ZFS_SMB_ACL_SRC, &src) ||
+		    nvlist_lookup_string(nvlist, ZFS_SMB_ACL_TARGET,
+		    &target)) {
+			VN_RELE(vp);
+			ZFS_EXIT(zfsvfs);
+			return (error);
+		}
+		error = VOP_RENAME(ZTOV(sharedir), src, ZTOV(sharedir), target,
+		    kcred, NULL, 0);
+		nvlist_free(nvlist);
+		break;
+
+	case ZFS_SMB_ACL_PURGE:
+		error = zfs_smb_acl_purge(sharedir);
+		break;
+
+	default:
+		error = EINVAL;
+		break;
+	}
+
+	VN_RELE(vp);
+	VN_RELE(ZTOV(sharedir));
+
+	ZFS_EXIT(zfsvfs);
+
+	return (error);
 }
 
 /*
@@ -2989,6 +3131,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	    DATASET_NAME, B_FALSE },
 	{ zfs_ioc_share, zfs_secpolicy_share, DATASET_NAME, B_FALSE },
 	{ zfs_ioc_inherit_prop, zfs_secpolicy_inherit, DATASET_NAME, B_TRUE },
+	{ zfs_ioc_smb_acl, zfs_secpolicy_smb_acl, DATASET_NAME, B_FALSE }
 };
 
 static int

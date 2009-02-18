@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,7 @@ struct zfsvfs {
 	boolean_t	z_replay;	/* set during ZIL replay */
 	kmutex_t	z_online_recv_lock; /* recv in prog grabs as WRITER */
 	uint64_t	z_version;	/* ZPL version */
+	uint64_t	z_shares_dir;	/* hidden shares dir */
 #define	ZFS_OBJ_MTX_SZ	64
 	kmutex_t	z_hold_mtx[ZFS_OBJ_MTX_SZ];	/* znode hold locks */
 };

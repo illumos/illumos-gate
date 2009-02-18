@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,6 +213,9 @@ typedef enum {
 #define	ZFS_DELEG_PERM_GID	"gid"
 #define	ZFS_DELEG_PERM_GROUPS	"groups"
 
+#define	ZFS_SMB_ACL_SRC		"src"
+#define	ZFS_SMB_ACL_TARGET	"target"
+
 typedef enum {
 	ZFS_CANMOUNT_OFF = 0,
 	ZFS_CANMOUNT_ON = 1,
@@ -225,6 +228,13 @@ typedef enum zfs_share_op {
 	ZFS_SHARE_SMB = 2,
 	ZFS_UNSHARE_SMB = 3
 } zfs_share_op_t;
+
+typedef enum zfs_smb_acl_op {
+	ZFS_SMB_ACL_ADD,
+	ZFS_SMB_ACL_REMOVE,
+	ZFS_SMB_ACL_RENAME,
+	ZFS_SMB_ACL_PURGE
+} zfs_smb_acl_op_t;
 
 typedef enum zfs_cache_type {
 	ZFS_CACHE_NONE = 0,
@@ -560,7 +570,8 @@ typedef enum zfs_ioc {
 	ZFS_IOC_GET_FSACL,
 	ZFS_IOC_ISCSI_PERM_CHECK,
 	ZFS_IOC_SHARE,
-	ZFS_IOC_INHERIT_PROP
+	ZFS_IOC_INHERIT_PROP,
+	ZFS_IOC_SMB_ACL
 } zfs_ioc_t;
 
 /*

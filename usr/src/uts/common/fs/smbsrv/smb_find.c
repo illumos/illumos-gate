@@ -327,11 +327,15 @@ smb_com_search(smb_request_t *sr)
 		if (smb_is_dot_or_dotdot(fileinfo.fi_name))
 			continue;
 
-		if (*fileinfo.fi_shortname == NULL) {
-			(void) strlcpy(fileinfo.fi_shortname,
-			    fileinfo.fi_name, SMB_SHORTNAMELEN - 1);
+		(void) memset(name, ' ', sizeof (name));
+		if (*fileinfo.fi_shortname == '\0') {
+			(void) strlcpy(name, fileinfo.fi_name,
+			    SMB_SHORTNAMELEN - 1);
 			if (to_upper)
-				(void) utf8_strupr(fileinfo.fi_shortname);
+				(void) utf8_strupr(name);
+		} else {
+			(void) strlcpy(name, fileinfo.fi_shortname,
+			    SMB_SHORTNAMELEN - 1);
 		}
 
 		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
@@ -341,7 +345,7 @@ smb_com_search(smb_request_t *sr)
 		    fileinfo.fi_dosattr & 0xff,
 		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
-		    fileinfo.fi_shortname);
+		    name);
 
 		smb_odir_save_cookie(od, index, fileinfo.fi_cookie);
 
@@ -396,6 +400,7 @@ smb_com_find(smb_request_t *sr)
 	uint16_t		sattr, odid;
 	uint16_t		key_len;
 	uint32_t		client_key;
+	char			name[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	boolean_t		eos;
@@ -457,9 +462,13 @@ smb_com_find(smb_request_t *sr)
 		if ((rc != 0 || (eos == B_TRUE)))
 			break;
 
-		if (*fileinfo.fi_shortname == NULL) {
-			(void) strlcpy(fileinfo.fi_shortname,
-			    fileinfo.fi_name, SMB_SHORTNAMELEN - 1);
+		(void) memset(name, ' ', sizeof (name));
+		if (*fileinfo.fi_shortname == '\0') {
+			(void) strlcpy(name, fileinfo.fi_name,
+			    SMB_SHORTNAMELEN - 1);
+		} else {
+			(void) strlcpy(name, fileinfo.fi_shortname,
+			    SMB_SHORTNAMELEN - 1);
 		}
 
 		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
@@ -469,7 +478,7 @@ smb_com_find(smb_request_t *sr)
 		    fileinfo.fi_dosattr & 0xff,
 		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
-		    fileinfo.fi_shortname);
+		    name);
 
 		smb_odir_save_cookie(od, index, fileinfo.fi_cookie);
 
@@ -591,6 +600,7 @@ smb_com_find_unique(struct smb_request *sr)
 	char			*path;
 	unsigned char		resume_char = '\0';
 	uint32_t		client_key = 0;
+	char			name[SMB_SHORTNAMELEN];
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	boolean_t		eos;
@@ -627,9 +637,13 @@ smb_com_find_unique(struct smb_request *sr)
 		if ((rc != 0 || (eos == B_TRUE)))
 			break;
 
-		if (*fileinfo.fi_shortname == NULL) {
-			(void) strlcpy(fileinfo.fi_shortname,
-			    fileinfo.fi_name, SMB_SHORTNAMELEN - 1);
+		(void) memset(name, ' ', sizeof (name));
+		if (*fileinfo.fi_shortname == '\0') {
+			(void) strlcpy(name, fileinfo.fi_name,
+			    SMB_SHORTNAMELEN - 1);
+		} else {
+			(void) strlcpy(name, fileinfo.fi_shortname,
+			    SMB_SHORTNAMELEN - 1);
 		}
 
 		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
@@ -639,7 +653,7 @@ smb_com_find_unique(struct smb_request *sr)
 		    fileinfo.fi_dosattr & 0xff,
 		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
-		    fileinfo.fi_shortname);
+		    name);
 
 		count++;
 		index++;

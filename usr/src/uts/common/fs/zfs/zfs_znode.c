@@ -339,6 +339,7 @@ struct vnodeops *zfs_fvnodeops;
 struct vnodeops *zfs_symvnodeops;
 struct vnodeops *zfs_xdvnodeops;
 struct vnodeops *zfs_evnodeops;
+struct vnodeops *zfs_sharevnodeops;
 
 void
 zfs_remove_op_tables()
@@ -363,12 +364,15 @@ zfs_remove_op_tables()
 		vn_freevnodeops(zfs_xdvnodeops);
 	if (zfs_evnodeops)
 		vn_freevnodeops(zfs_evnodeops);
+	if (zfs_sharevnodeops)
+		vn_freevnodeops(zfs_sharevnodeops);
 
 	zfs_dvnodeops = NULL;
 	zfs_fvnodeops = NULL;
 	zfs_symvnodeops = NULL;
 	zfs_xdvnodeops = NULL;
 	zfs_evnodeops = NULL;
+	zfs_sharevnodeops = NULL;
 }
 
 extern const fs_operation_def_t zfs_dvnodeops_template[];
@@ -376,6 +380,7 @@ extern const fs_operation_def_t zfs_fvnodeops_template[];
 extern const fs_operation_def_t zfs_xdvnodeops_template[];
 extern const fs_operation_def_t zfs_symvnodeops_template[];
 extern const fs_operation_def_t zfs_evnodeops_template[];
+extern const fs_operation_def_t zfs_sharevnodeops_template[];
 
 int
 zfs_create_op_tables()
@@ -412,6 +417,52 @@ zfs_create_op_tables()
 
 	error = vn_make_ops(MNTTYPE_ZFS, zfs_evnodeops_template,
 	    &zfs_evnodeops);
+	if (error)
+		return (error);
+
+	error = vn_make_ops(MNTTYPE_ZFS, zfs_sharevnodeops_template,
+	    &zfs_sharevnodeops);
+
+	return (error);
+}
+
+static int
+zfs_create_share_dir(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
+{
+	vattr_t vattr;
+	znode_t *sharezp;
+	vnode_t *vp;
+	znode_t *zp;
+	int error;
+
+	vattr.va_mask = AT_MODE|AT_UID|AT_GID|AT_TYPE;
+	vattr.va_type = VDIR;
+	vattr.va_mode = S_IFDIR|0555;
+	vattr.va_uid = crgetuid(kcred);
+	vattr.va_gid = crgetgid(kcred);
+
+	sharezp = kmem_cache_alloc(znode_cache, KM_SLEEP);
+	sharezp->z_unlinked = 0;
+	sharezp->z_atime_dirty = 0;
+	sharezp->z_zfsvfs = zfsvfs;
+
+	vp = ZTOV(sharezp);
+	vn_reinit(vp);
+	vp->v_type = VDIR;
+
+	zfs_mknode(sharezp, &vattr, tx, kcred, IS_ROOT_NODE,
+	    &zp, 0, NULL, NULL);
+	ASSERT3P(zp, ==, sharezp);
+	ASSERT(!vn_in_dnlc(ZTOV(sharezp))); /* not valid to move */
+	POINTER_INVALIDATE(&sharezp->z_zfsvfs);
+	error = zap_add(zfsvfs->z_os, MASTER_NODE_OBJ,
+	    ZFS_SHARES_DIR, 8, 1, &sharezp->z_id, tx);
+	zfsvfs->z_shares_dir = sharezp->z_id;
+
+	ZTOV(sharezp)->v_count = 0;
+	dmu_buf_rele(sharezp->z_dbuf, NULL);
+	sharezp->z_dbuf = NULL;
+	kmem_cache_free(znode_cache, sharezp);
 
 	return (error);
 }
@@ -508,7 +559,28 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp)
 	if (error == ENOENT)
 		error = 0;
 
-	return (0);
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_SHARES_DIR, 8, 1,
+	    &zfsvfs->z_shares_dir);
+	if (error == ENOENT) {
+		dmu_tx_t *tx;
+
+		if (!dmu_objset_is_snapshot(zfsvfs->z_os)) {
+			tx = dmu_tx_create(zfsvfs->z_os);
+			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, TRUE,
+			    ZFS_SHARES_DIR);
+			dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
+			error = dmu_tx_assign(tx, TXG_WAIT);
+			if (error) {
+				dmu_tx_abort(tx);
+			} else {
+				error = zfs_create_share_dir(zfsvfs, tx);
+				dmu_tx_commit(tx);
+			}
+		} else { /* Don't create directory on older snapshots */
+			error = 0;
+		}
+	}
+	return (error);
 }
 
 /*
@@ -676,7 +748,10 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz)
 		break;
 	case VREG:
 		vp->v_flag |= VMODSORT;
-		vn_setops(vp, zfs_fvnodeops);
+		if (zp->z_phys->zp_parent == zfsvfs->z_shares_dir)
+			vn_setops(vp, zfs_sharevnodeops);
+		else
+			vn_setops(vp, zfs_fvnodeops);
 		break;
 	case VLNK:
 		vn_setops(vp, zfs_symvnodeops);
@@ -1586,6 +1661,13 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	dmu_buf_rele(rootzp->z_dbuf, NULL);
 	rootzp->z_dbuf = NULL;
 	kmem_cache_free(znode_cache, rootzp);
+
+	/*
+	 * Create shares directory
+	 */
+
+	error = zfs_create_share_dir(&zfsvfs, tx);
+	ASSERT(error == 0);
 }
 
 #endif /* _KERNEL */

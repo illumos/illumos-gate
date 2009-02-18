@@ -114,6 +114,10 @@ SUNWprivate_1.1 {
 	zfs_share_nfs;
 	zfs_share_smb;
 	zfs_share_iscsi;
+	zfs_smb_acl_add;
+	zfs_smb_acl_purge;
+	zfs_smb_acl_remove;
+	zfs_smb_acl_rename;
 	zfs_snapshot;
 	zfs_spa_version;
 	zfs_type_to_name;

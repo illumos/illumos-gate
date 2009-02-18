@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1911,7 +1911,7 @@ nfs_enable_share(sa_share_t share)
 			ea.uex = &export;
 
 			sa_sharetab_fill_zfs(share, &sh, "nfs");
-			err = sa_share_zfs(share, path, &sh,
+			err = sa_share_zfs(share, NULL, path, &sh,
 			    &ea, ZFS_SHARE_NFS);
 			sa_emptyshare(&sh);
 		}
@@ -2026,7 +2026,7 @@ nfs_disable_share(sa_share_t share, char *path)
 		sh.sh_path = path;
 		sh.sh_fstype = "nfs";
 
-		err = sa_share_zfs(share, path, &sh,
+		err = sa_share_zfs(share, NULL, path, &sh,
 		    &ea, ZFS_UNSHARE_NFS);
 	} else {
 		err = exportfs(path, NULL);

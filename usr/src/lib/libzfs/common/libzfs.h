@@ -538,7 +538,7 @@ extern boolean_t zfs_is_shared_iscsi(zfs_handle_t *);
 extern int zfs_share_iscsi(zfs_handle_t *);
 extern int zfs_unshare_iscsi(zfs_handle_t *);
 extern int zfs_iscsi_perm_check(libzfs_handle_t *, char *, ucred_t *);
-extern int zfs_deleg_share_nfs(libzfs_handle_t *, char *, char *,
+extern int zfs_deleg_share_nfs(libzfs_handle_t *, char *, char *, char *,
     void *, void *, int, zfs_share_op_t);
 
 /*
@@ -575,6 +575,15 @@ extern int zpool_remove_zvol_links(zpool_handle_t *);
 
 /* is this zvol valid for use as a dump device? */
 extern int zvol_check_dump_config(char *);
+
+/*
+ * Management interfaces for SMB ACL files
+ */
+
+int zfs_smb_acl_add(libzfs_handle_t *, char *, char *, char *);
+int zfs_smb_acl_remove(libzfs_handle_t *, char *, char *, char *);
+int zfs_smb_acl_purge(libzfs_handle_t *, char *, char *);
+int zfs_smb_acl_rename(libzfs_handle_t *, char *, char *, char *, char *);
 
 /*
  * Enable and disable datasets within a pool by mounting/unmounting and

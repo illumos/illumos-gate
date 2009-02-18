@@ -197,12 +197,16 @@ smb_fsop_create_with_sd(
 			vsap = NULL;
 		}
 
+		/* The tree ACEs may prevent a create */
+		rc = EACCES;
 		if (is_dir) {
-			rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp,
-			    flags, cr, vsap);
+			if (SMB_TREE_HAS_ACCESS(sr, ACE_ADD_SUBDIRECTORY) != 0)
+				rc = smb_vop_mkdir(dir_snode->vp, name, attr,
+				    &vp, flags, cr, vsap);
 		} else {
-			rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
-			    flags, cr, vsap);
+			if (SMB_TREE_HAS_ACCESS(sr, ACE_ADD_FILE) != 0)
+				rc = smb_vop_create(dir_snode->vp, name, attr,
+				    &vp, flags, cr, vsap);
 		}
 
 		if (vsap != NULL)
@@ -300,7 +304,6 @@ smb_fsop_create_with_sd(
  * *ret_snode is returned with a reference upon success.  No reference is
  * taken if an error is returned.
  */
-
 int
 smb_fsop_create(
     smb_request_t	*sr,
@@ -678,7 +681,8 @@ smb_fsop_remove(
 	ASSERT(dir_snode);
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0 ||
+	    SMB_TREE_HAS_ACCESS(sr, ACE_DELETE) == 0)
 		return (EACCES);
 
 	if (SMB_TREE_IS_READONLY(sr))
@@ -867,7 +871,8 @@ smb_fsop_rmdir(
 	ASSERT(dir_snode);
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0 ||
+	    SMB_TREE_HAS_ACCESS(sr, ACE_DELETE_CHILD) == 0)
 		return (EACCES);
 
 	if (SMB_TREE_IS_READONLY(sr))
@@ -944,7 +949,8 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, snode) == 0 ||
+	    SMB_TREE_HAS_ACCESS(sr, ACE_READ_ATTRIBUTES) == 0)
 		return (EACCES);
 
 	if (sr->fid_ofile) {
@@ -1005,6 +1011,7 @@ smb_fsop_rename(
 	vnode_t *from_vp;
 	int flags = 0;
 	int rc;
+	boolean_t isdir;
 
 	ASSERT(cr);
 	ASSERT(from_dir_snode);
@@ -1048,6 +1055,15 @@ smb_fsop_rename(
 
 	if (rc != 0)
 		return (rc);
+
+	isdir = from_vp->v_type == VDIR;
+
+	if ((isdir && SMB_TREE_HAS_ACCESS(sr,
+	    ACE_DELETE_CHILD | ACE_ADD_SUBDIRECTORY) !=
+	    (ACE_DELETE_CHILD | ACE_ADD_SUBDIRECTORY)) ||
+	    (!isdir && SMB_TREE_HAS_ACCESS(sr, ACE_DELETE | ACE_ADD_FILE) !=
+	    (ACE_DELETE | ACE_ADD_FILE)))
+		return (EACCES);
 
 	rc = smb_vop_rename(from_dir_snode->vp, from_name, to_dir_snode->vp,
 	    to_name, flags, cr);
@@ -1108,6 +1124,10 @@ smb_fsop_setattr(
 
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+
+	if (SMB_TREE_HAS_ACCESS(sr,
+	    ACE_WRITE_ATTRIBUTES | ACE_WRITE_NAMED_ATTRS) == 0)
+		return (EACCES);
 
 	if (sr && (set_attr->sa_mask & SMB_AT_SIZE)) {
 		if (sr->fid_ofile) {
@@ -1203,6 +1223,9 @@ smb_fsop_read(
 	ASSERT(sr);
 	ASSERT(sr->fid_ofile);
 
+	if (SMB_TREE_HAS_ACCESS(sr, ACE_READ_DATA) == 0)
+		return (EACCES);
+
 	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_READ_DATA);
 	if (rc != NT_STATUS_SUCCESS) {
 		rc = smb_ofile_access(sr->fid_ofile, cr, FILE_EXECUTE);
@@ -1294,7 +1317,8 @@ smb_fsop_write(
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
+	if (SMB_OFILE_IS_READONLY(sr->fid_ofile) ||
+	    SMB_TREE_HAS_ACCESS(sr, ACE_WRITE_DATA | ACE_APPEND_DATA) == 0)
 		return (EACCES);
 
 	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_WRITE_DATA);
@@ -1457,6 +1481,14 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if ((!smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS)) ||
 	    (snode->attr.sa_vattr.va_type == VLNK))
 		acl_check = B_FALSE;
+
+	/*
+	 * Use the most restrictive parts of both faccess and the
+	 * share access.  An AND of the two value masks gives us that
+	 * since we've already converted to a mask of what we "can"
+	 * do.
+	 */
+	faccess &= sr->tid_tree->t_access;
 
 	if (acl_check) {
 		dir_vp = (snode->dir_snode) ? snode->dir_snode->vp : NULL;
@@ -1824,6 +1856,9 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	ASSERT(cr);
 
+	if (SMB_TREE_HAS_ACCESS(sr, ACE_READ_ACL) == 0)
+		return (EACCES);
+
 	if (sr->fid_ofile) {
 		if (fs_sd->sd_secinfo & SMB_DACL_SECINFO)
 			access = READ_CONTROL;
@@ -1891,6 +1926,9 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(sr->tid_tree);
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+
+	if (SMB_TREE_HAS_ACCESS(sr, ACE_WRITE_ACL) == 0)
+		return (EACCES);
 
 	if (sr->fid_ofile) {
 		if (fs_sd->sd_secinfo & SMB_DACL_SECINFO)
@@ -2323,6 +2361,7 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	 * FS doesn't understand 32-bit mask
 	 */
 	smb_vop_eaccess(snode->vp, &access, 0, NULL, cr);
+	access &= sr->tid_tree->t_access;
 
 	*eaccess = READ_CONTROL | FILE_READ_EA | FILE_READ_ATTRIBUTES;
 

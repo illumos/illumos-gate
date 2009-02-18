@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
 
 #ifndef _LIBSHARE_IMPL_H
 #define	_LIBSHARE_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libshare.h>
 #include <libscf.h>
@@ -60,7 +58,7 @@ struct sa_plugin_ops {
 	int	(*sa_init)();
 	void	(*sa_fini)();
 	int	(*sa_share)(sa_share_t);	/* start sharing */
-	int	(*sa_unshare)(sa_share_t, char *);	/* stop sharing */
+	int	(*sa_unshare)(sa_share_t, char *); /* stop sharing */
 	int	(*sa_valid_prop)(sa_handle_t, sa_property_t,
 	    sa_optionset_t); /* validate */
 	int	(*sa_valid_space)(char *);	/* is name valid optionspace? */
@@ -146,7 +144,8 @@ extern void sa_emptyshare(struct share *sh);
 /* ZFS functions */
 extern int sa_get_zfs_shares(sa_handle_t, char *);
 extern int sa_zfs_update(sa_share_t);
-extern int sa_share_zfs(sa_share_t, char *, share_t *, void *, zfs_share_op_t);
+extern int sa_share_zfs(sa_share_t, sa_resource_t, char *, share_t *,
+    void *, zfs_share_op_t);
 extern int sa_sharetab_fill_zfs(sa_share_t share, struct share *sh,
     char *proto);
 

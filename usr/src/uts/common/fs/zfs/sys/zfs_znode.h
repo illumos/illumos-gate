@@ -99,6 +99,7 @@ extern "C" {
 #define	ZFS_ROOT_OBJ		"ROOT"
 #define	ZPL_VERSION_STR		"VERSION"
 #define	ZFS_FUID_TABLES		"FUID"
+#define	ZFS_SHARES_DIR		"SHARES"
 
 #define	ZFS_MAX_BLOCKSIZE	(SPA_MAXBLOCKSIZE)
 

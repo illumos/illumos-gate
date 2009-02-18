@@ -174,13 +174,14 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_share.h>
+#include <sys/pathname.h>
 
 int smb_tcon_mute = 0;
 
 static smb_tree_t *smb_tree_connect_disk(smb_request_t *, const char *);
 static smb_tree_t *smb_tree_connect_ipc(smb_request_t *, const char *);
 static smb_tree_t *smb_tree_alloc(smb_user_t *, const char *, const char *,
-    int32_t, smb_node_t *);
+    int32_t, smb_node_t *, uint32_t);
 static void smb_tree_dealloc(smb_tree_t *);
 static boolean_t smb_tree_is_connected(smb_tree_t *);
 static boolean_t smb_tree_is_disconnected(smb_tree_t *);
@@ -346,11 +347,73 @@ smb_tree_has_feature(smb_tree_t *tree, uint32_t flags)
 	return ((tree->t_flags & flags) == flags);
 }
 
+
 /* *************************** Static Functions ***************************** */
+#define	SHARES_DIR	".zfs/shares/"
+static void
+smb_tree_acl_access(cred_t *cred, const char *sharename, vnode_t *pathvp,
+		    uint32_t *access)
+{
+	int rc;
+	vfs_t *vfsp;
+	vnode_t *root = NULL;
+	vnode_t *sharevp = NULL;
+	char *sharepath;
+	struct pathname pnp;
+	size_t size;
+
+	*access = ACE_ALL_PERMS; /* default to full "UNIX" access */
+
+	/*
+	 * Using the vnode of the share path, we then find the root
+	 * directory of the mounted file system. We will then look to
+	 * see if there is a .zfs/shares directory and if there is,
+	 * get the access information from the ACL/ACES values and
+	 * check against the cred.
+	 */
+	vfsp = pathvp->v_vfsp;
+	if (vfsp != NULL)
+		rc = VFS_ROOT(vfsp, &root);
+	else
+		rc = ENOENT;
+
+	if (rc != 0)
+		return;
+
+
+	/*
+	 * Find the share object, if there is one. Need to construct
+	 * the path to the .zfs/shares/<sharename> object and look it
+	 * up.  root is called held but will be released by
+	 * lookuppnvp().
+	 */
+
+	size = sizeof (SHARES_DIR) + strlen(sharename) + 1;
+	sharepath = kmem_alloc(size, KM_SLEEP);
+	(void) sprintf(sharepath, "%s%s", SHARES_DIR, sharename);
+
+	pn_alloc(&pnp);
+	(void) pn_set(&pnp, sharepath);
+	rc = lookuppnvp(&pnp, NULL, NO_FOLLOW, NULL,
+	    &sharevp, rootdir, root, kcred);
+	pn_free(&pnp);
+
+	kmem_free(sharepath, size);
+
+	/*
+	 * Now get the effective access value based on cred and ACL
+	 * values.
+	 */
+
+	if (rc == 0)
+		smb_vop_eaccess(sharevp, (int *)access, V_ACE_MASK, NULL, cred);
+
+}
 
 /*
  * Connect a share for use with files and directories.
  */
+
 static smb_tree_t *
 smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 {
@@ -364,7 +427,8 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	cred_t			*u_cred;
 	int			rc;
 	uint32_t		access = 0; /* read/write is assumed */
-	uint32_t		hostaccess;
+	uint32_t		hostaccess = ACE_ALL_PERMS;
+	uint32_t		aclaccess;
 
 	ASSERT(user);
 	u_cred = user->u_cred;
@@ -424,11 +488,11 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		break;
 	}
 
-	hostaccess = si->shr_access_value & SMB_SHRF_ACC_ALL;
+	access = si->shr_access_value & SMB_SHRF_ACC_ALL;
 
-	if (hostaccess == SMB_SHRF_ACC_RO) {
-		access = SMB_TREE_READONLY;
-	} else if (hostaccess == SMB_SHRF_ACC_NONE) {
+	if (access == SMB_SHRF_ACC_RO) {
+		hostaccess &= ~ACE_ALL_WRITE_PERMS;
+	} else if (access == SMB_SHRF_ACC_NONE) {
 		kmem_free(si, sizeof (smb_share_t));
 		smb_tree_log(sr, sharename, "access denied: host access");
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
@@ -458,13 +522,38 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		return (NULL);
 	}
 
+	/*
+	 * Find share level ACL if it exists in the designated
+	 * location. Needs to be done after finding a valid path but
+	 * before the tree is allocated.
+	 */
+	smb_tree_acl_access(u_cred, sharename, snode->vp, &aclaccess);
+	/* if an error, then no share file -- default to no ACL */
+	if (rc == 0) {
+		/*
+		 * There need to be some permissions in order to have
+		 * any access.
+		 */
+		if ((aclaccess & ACE_ALL_PERMS) == 0) {
+			smb_tree_log(sr, sharename, "access denied: share ACL");
+			smbsr_error(sr, 0, ERRSRV, ERRaccess);
+			kmem_free(si, sizeof (smb_share_t));
+			smb_node_release(snode);
+			return (NULL);
+		}
+	}
+
+	/*
+	 * Set tree ACL access to the minimum ACL permissions based on
+	 * hostaccess (those allowed by host based access) and
+	 * aclaccess (those from the ACL object for the share). This
+	 * is done during the alloc.
+	 */
 	tree = smb_tree_alloc(user, sharename, si->shr_path, STYPE_DISKTREE,
-	    snode);
+	    snode, hostaccess & aclaccess);
 
 	if (tree == NULL)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
-	else
-		tree->t_flags |= access;
 
 	smb_node_release(snode);
 	kmem_free(si, sizeof (smb_share_t));
@@ -491,7 +580,7 @@ smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 
 	sr->arg.tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
 
-	tree = smb_tree_alloc(user, name, name, STYPE_IPC, NULL);
+	tree = smb_tree_alloc(user, name, name, STYPE_IPC, NULL, ACE_ALL_PERMS);
 	if (tree == NULL) {
 		smb_tree_log(sr, name, "access denied");
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
@@ -509,7 +598,8 @@ smb_tree_alloc(
     const char		*sharename,
     const char		*resource,
     int32_t		stype,
-    smb_node_t		*snode)
+    smb_node_t		*snode,
+    uint32_t access)
 {
 	smb_tree_t	*tree;
 	uint16_t	tid;
@@ -561,6 +651,11 @@ smb_tree_alloc(
 	tree->t_res_type = stype;
 	tree->t_state = SMB_TREE_STATE_CONNECTED;
 	tree->t_magic = SMB_TREE_MAGIC;
+	tree->t_access = access;
+
+	/* if FS is readonly, enforce that here */
+	if (tree->t_flags & SMB_TREE_READONLY)
+		tree->t_access &= ~ACE_ALL_WRITE_PERMS;
 
 	if (STYPE_ISDSK(stype)) {
 		smb_node_ref(snode);

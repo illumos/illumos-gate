@@ -4489,6 +4489,22 @@ const fs_operation_def_t zfs_symvnodeops_template[] = {
 };
 
 /*
+ * special share hidden files vnode operations template
+ */
+vnodeops_t *zfs_sharevnodeops;
+const fs_operation_def_t zfs_sharevnodeops_template[] = {
+	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
+	VOPNAME_ACCESS,		{ .vop_access = zfs_access },
+	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = zfs_fid },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = zfs_getsecattr },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = zfs_setsecattr },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
+};
+
+/*
  * Extended attribute directory vnode operations template
  *	This template is identical to the directory vnodes
  *	operation template except for restricted operations:

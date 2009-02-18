@@ -681,12 +681,12 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 			bcopy(&sin, &session->local_ipaddr.a_ip, slen);
 			(void) ksocket_getpeername(new_so,
 			    (struct sockaddr *)&sin, &slen, CRED());
-			bcopy(&sin6, &session->ipaddr.a_ip, slen);
+			bcopy(&sin, &session->ipaddr.a_ip, slen);
 		} else {
 			slen = sizeof (sin6);
 			(void) ksocket_getsockname(new_so,
 			    (struct sockaddr *)&sin6, &slen, CRED());
-			bcopy(&sin, &session->local_ipaddr.a_ip, slen);
+			bcopy(&sin6, &session->local_ipaddr.a_ip, slen);
 			(void) ksocket_getpeername(new_so,
 			    (struct sockaddr *)&sin6, &slen, CRED());
 			bcopy(&sin6, &session->ipaddr.a_ip, slen);

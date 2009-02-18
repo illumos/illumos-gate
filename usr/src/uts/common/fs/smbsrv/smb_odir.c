@@ -319,7 +319,8 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 	ASSERT(unode);
 	ASSERT(unode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, unode) == 0) {
+	if (SMB_TREE_CONTAINS_NODE(sr, unode) == 0 ||
+	    SMB_TREE_HAS_ACCESS(sr, ACE_LIST_DIRECTORY) == 0) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (0);

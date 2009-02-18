@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,10 +223,12 @@ mountpoint_compare(const void *a, const void *b)
 }
 
 /*
- * return legacy mountpoint.  Caller provides space for mountpoint.
+ * return legacy mountpoint.  Caller provides space for mountpoint and
+ * dataset.
  */
 int
-get_legacy_mountpoint(char *path, char *mountpoint, size_t len)
+get_legacy_mountpoint(char *path, char *dataset, size_t dlen,
+    char *mountpoint, size_t mlen)
 {
 	FILE *fp;
 	struct mnttab entry;
@@ -242,9 +244,13 @@ get_legacy_mountpoint(char *path, char *mountpoint, size_t len)
 			continue;
 
 		if (strcmp(entry.mnt_mountp, path) == 0) {
-			(void) strlcpy(mountpoint, entry.mnt_special, len);
-			(void) fclose(fp);
-			return (0);
+			if (mlen > 0)
+				(void) strlcpy(mountpoint, entry.mnt_mountp,
+				    mlen);
+			if (dlen > 0)
+				(void) strlcpy(dataset, entry.mnt_special,
+				    dlen);
+			break;
 		}
 	}
 	(void) fclose(fp);
@@ -283,12 +289,12 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path,
 		if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
 		    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0) {
 			/*
-			 * Search mmttab for mountpoint
+			 * Search mmttab for mountpoint and get dataset.
 			 */
 
 			if (search_mnttab == B_TRUE &&
 			    get_legacy_mountpoint(path, mountpoint,
-			    sizeof (mountpoint)) == 0) {
+			    sizeof (mountpoint), NULL, 0) == 0) {
 				dataset = mountpoint;
 				break;
 			}
@@ -1242,7 +1248,7 @@ sa_sharetab_fill_zfs(sa_share_t share, share_t *sh, char *proto)
 	}
 
 int
-sa_share_zfs(sa_share_t share, char *path, share_t *sh,
+sa_share_zfs(sa_share_t share, sa_resource_t resource, char *path, share_t *sh,
     void *exportdata, zfs_share_op_t operation)
 {
 	libzfs_handle_t *libhandle;
@@ -1305,6 +1311,7 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 
 	libhandle = libzfs_init();
 	if (libhandle != NULL) {
+		char *resource_name;
 
 		i = (sh->sh_path ? strlen(sh->sh_path) : 0);
 		sh->sh_size = i;
@@ -1324,10 +1331,16 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 		j = (sh->sh_descr ? strlen(sh->sh_descr) : 0);
 		sh->sh_size += j;
 		SMAX(i, j);
+
+		resource_name = sa_get_resource_attr(resource, "name");
+
 		err = zfs_deleg_share_nfs(libhandle, dataset, path,
-		    exportdata, sh, i, operation);
+		    resource_name, exportdata, sh, i, operation);
 		if (err == SA_OK)
 			sa_update_sharetab_ts(sahandle);
+		if (resource_name)
+			sa_free_attr_string(resource_name);
+
 		libzfs_fini(libhandle);
 	}
 	free(dataset);
@@ -1348,4 +1361,84 @@ sa_get_zfs_handle(sa_handle_t handle)
 	sa_handle_impl_t implhandle = (sa_handle_impl_t)handle;
 
 	return (implhandle->zfs_libhandle);
+}
+
+/*
+ * sa_get_zfs_info(libzfs, path, mountpoint, dataset)
+ *
+ * Find the ZFS dataset and mountpoint for a given path
+ */
+int
+sa_zfs_get_info(libzfs_handle_t *libzfs, char *path, char *mountpointp,
+    char *datasetp)
+{
+	get_all_cbdata_t cb = { 0 };
+	int i;
+	char mountpoint[ZFS_MAXPROPLEN];
+	char dataset[ZFS_MAXPROPLEN];
+	char canmount[ZFS_MAXPROPLEN];
+	char *dp;
+	int count;
+	int ret = 0;
+
+	cb.cb_types = ZFS_TYPE_FILESYSTEM;
+
+	if (libzfs == NULL)
+		return (0);
+
+	(void) zfs_iter_root(libzfs, get_one_filesystem, &cb);
+	count = cb.cb_used;
+
+	qsort(cb.cb_handles, count, sizeof (void *), mountpoint_compare);
+	for (i = 0; i < count; i++) {
+		/* must have a mountpoint */
+		if (zfs_prop_get(cb.cb_handles[i], ZFS_PROP_MOUNTPOINT,
+		    mountpoint, sizeof (mountpoint),
+		    NULL, NULL, 0, B_FALSE) != 0) {
+			/* no mountpoint */
+			continue;
+		}
+
+		/* mountpoint must be a path */
+		if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
+		    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0) {
+			/*
+			 * Search mmttab for mountpoint
+			 */
+
+			if (get_legacy_mountpoint(path, dataset,
+			    ZFS_MAXPROPLEN, mountpoint,
+			    ZFS_MAXPROPLEN) == 0) {
+				ret = 1;
+				break;
+			}
+			continue;
+		}
+
+		/* canmount must be set */
+		canmount[0] = '\0';
+		if (zfs_prop_get(cb.cb_handles[i], ZFS_PROP_CANMOUNT, canmount,
+		    sizeof (canmount), NULL, NULL, 0, B_FALSE) != 0 ||
+		    strcmp(canmount, "off") == 0)
+			continue;
+
+		/*
+		 * have a mountable handle but want to skip those marked none
+		 * and legacy
+		 */
+		if (strcmp(mountpoint, path) == 0) {
+			dp = (char *)zfs_get_name(cb.cb_handles[i]);
+			if (dp != NULL) {
+				if (datasetp != NULL)
+					(void) strcpy(datasetp, dp);
+				if (mountpointp != NULL)
+					(void) strcpy(mountpointp, mountpoint);
+				ret = 1;
+			}
+			break;
+		}
+
+	}
+
+	return (ret);
 }
