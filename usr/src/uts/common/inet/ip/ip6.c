@@ -8835,6 +8835,49 @@ reass_done:
 }
 
 /*
+ * Given an mblk and a ptr, find the destination address in an IPv6 routing
+ * header.
+ */
+static in6_addr_t
+pluck_out_dst(mblk_t *mp, uint8_t *whereptr, in6_addr_t oldrv)
+{
+	ip6_rthdr0_t *rt0;
+	int segleft, numaddr;
+	in6_addr_t *ap, rv = oldrv;
+
+	rt0 = (ip6_rthdr0_t *)whereptr;
+	if (rt0->ip6r0_type != 0 && rt0->ip6r0_type != 2) {
+		DTRACE_PROBE2(pluck_out_dst_unknown_type, mblk_t *, mp,
+		    uint8_t *, whereptr);
+		return (rv);
+	}
+	segleft = rt0->ip6r0_segleft;
+	numaddr = rt0->ip6r0_len / 2;
+
+	if ((rt0->ip6r0_len & 0x1) ||
+	    whereptr + (rt0->ip6r0_len + 1) * 8 > mp->b_wptr ||
+	    (segleft > rt0->ip6r0_len / 2)) {
+		/*
+		 * Corrupt packet.  Either the routing header length is odd
+		 * (can't happen) or mismatched compared to the packet, or the
+		 * number of addresses is.  Return what we can.  This will
+		 * only be a problem on forwarded packets that get squeezed
+		 * through an outbound tunnel enforcing IPsec Tunnel Mode.
+		 */
+		DTRACE_PROBE2(pluck_out_dst_badpkt, mblk_t *, mp, uint8_t *,
+		    whereptr);
+		return (rv);
+	}
+
+	if (segleft != 0) {
+		ap = (in6_addr_t *)((char *)rt0 + sizeof (*rt0));
+		rv = ap[numaddr - 1];
+	}
+
+	return (rv);
+}
+
+/*
  * Walk through the options to see if there is a routing header.
  * If present get the destination which is the last address of
  * the option.
@@ -8845,115 +8888,55 @@ ip_get_dst_v6(ip6_t *ip6h, mblk_t *mp, boolean_t *is_fragment)
 	mblk_t *current_mp = mp;
 	uint8_t nexthdr;
 	uint8_t *whereptr;
-	ip6_hbh_t *hbhhdr;
-	ip6_dest_t *dsthdr;
-	ip6_rthdr0_t *rthdr;
-	ip6_frag_t *fraghdr;
 	int ehdrlen;
-	int left;
-	in6_addr_t *ap, rv;
-
-	rv = ip6h->ip6_dst;
-
-	if (is_fragment != NULL)
-		*is_fragment = B_FALSE;
-
-	if ((uint8_t *)ip6h >= current_mp->b_wptr ||
-	    (uint8_t *)ip6h < current_mp->b_rptr) {
-		/* Bad packet.  Return what we can. */
-		DTRACE_PROBE2(ip_get_dst_v6_badpkt1, mblk_t *, mp, ip6_t *,
-		    ip6h);
-		goto done;
-	}
-
-	nexthdr = ip6h->ip6_nxt;
+	in6_addr_t rv;
 
 	whereptr = (uint8_t *)ip6h;
 	ehdrlen = sizeof (ip6_t);
 
-	for (;;) {
+	/* We assume at least the IPv6 base header is within one mblk. */
+	ASSERT(mp->b_rptr <= whereptr && mp->b_wptr >= whereptr + ehdrlen);
+
+	rv = ip6h->ip6_dst;
+	nexthdr = ip6h->ip6_nxt;
+	if (is_fragment != NULL)
+		*is_fragment = B_FALSE;
+
+	/*
+	 * We also assume (thanks to ipsec_tun_outbound()'s pullup) that
+	 * no extension headers will be split across mblks.
+	 */
+
+	while (nexthdr == IPPROTO_HOPOPTS || nexthdr == IPPROTO_DSTOPTS ||
+	    nexthdr == IPPROTO_ROUTING) {
+		if (nexthdr == IPPROTO_ROUTING)
+			rv = pluck_out_dst(current_mp, whereptr, rv);
+
+		/*
+		 * All IPv6 extension headers have the next-header in byte
+		 * 0, and the (length - 8) in 8-byte-words.
+		 */
 		while (whereptr + ehdrlen >= current_mp->b_wptr) {
 			ehdrlen -= (current_mp->b_wptr - whereptr);
 			current_mp = current_mp->b_cont;
 			if (current_mp == NULL) {
 				/* Bad packet.  Return what we can. */
-				DTRACE_PROBE3(ip_get_dst_v6_badpkt2,
-				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
-				    ip6h);
+				DTRACE_PROBE3(ip_get_dst_v6_badpkt, mblk_t *,
+				    mp, mblk_t *, current_mp, ip6_t *, ip6h);
 				goto done;
 			}
 			whereptr = current_mp->b_rptr;
 		}
 		whereptr += ehdrlen;
 
-		/* Enough room for next-header and length (2 bytes)? */
-		if (whereptr + 2 > current_mp->b_wptr) {
-			whereptr -= (uintptr_t)current_mp->b_rptr;
-			/* Grumble -- eat the pullup. */
-			if (!pullupmsg(current_mp, -1)) {
-				DTRACE_PROBE3(ip_get_dst_v6_pullup_failed,
-				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
-				    ip6h);
-				goto done;
-			}
-			whereptr += (uintptr_t)current_mp->b_rptr;
-			if (whereptr + 2 > current_mp->b_wptr) {
-				/* Bad packet.  Return what we can. */
-				DTRACE_PROBE3(ip_get_dst_v6_badpkt3,
-				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
-				    ip6h);
-				goto done;
-			}
-		}
-
-		ASSERT(nexthdr != IPPROTO_RAW);
-		switch (nexthdr) {
-		case IPPROTO_HOPOPTS:
-			hbhhdr = (ip6_hbh_t *)whereptr;
-			nexthdr = hbhhdr->ip6h_nxt;
-			ehdrlen = 8 * (hbhhdr->ip6h_len + 1);
-			break;
-		case IPPROTO_DSTOPTS:
-			dsthdr = (ip6_dest_t *)whereptr;
-			nexthdr = dsthdr->ip6d_nxt;
-			ehdrlen = 8 * (dsthdr->ip6d_len + 1);
-			break;
-		case IPPROTO_ROUTING:
-			rthdr = (ip6_rthdr0_t *)whereptr;
-			nexthdr = rthdr->ip6r0_nxt;
-			ehdrlen = 8 * (rthdr->ip6r0_len + 1);
-			if (nexthdr + ehdrlen > (uintptr_t)current_mp->b_wptr) {
-				/* Bad packet.  Return what we can. */
-				DTRACE_PROBE3(ip_get_dst_v6_badpkt4,
-				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
-				    ip6h);
-				goto done;
-			}
-
-			left = rthdr->ip6r0_segleft;
-			ap = (in6_addr_t *)((char *)rthdr + sizeof (*rthdr));
-			rv = *(ap + left - 1);
-			/*
-			 * If the caller doesn't care whether the packet
-			 * is a fragment or not, we can stop here since
-			 * we have our destination.
-			 */
-			if (is_fragment == NULL)
-				goto done;
-			break;
-		case IPPROTO_FRAGMENT:
-			fraghdr = (ip6_frag_t *)whereptr;
-			nexthdr = fraghdr->ip6f_nxt;
-			ehdrlen = sizeof (ip6_frag_t);
-			if (is_fragment != NULL)
-				*is_fragment = B_TRUE;
-			/* FALLTHRU */
-		default:
-			goto done;
-		}
+		nexthdr = *whereptr;
+		ASSERT(whereptr + 1 < current_mp->b_wptr);
+		ehdrlen = (*(whereptr + 1) + 1) * 8;
 	}
 
 done:
+	if (nexthdr == IPPROTO_FRAGMENT && is_fragment != NULL)
+		*is_fragment = B_TRUE;
 	return (rv);
 }
 
