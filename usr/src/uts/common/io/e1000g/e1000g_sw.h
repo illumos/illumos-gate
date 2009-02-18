@@ -177,6 +177,10 @@ extern "C" {
 #define	DEFAULT_MEM_WORKAROUND_82546	1	/* 82546 memory workaround */
 
 #define	TX_DRAIN_TIME		(200)	/* # milliseconds xmit drain */
+#define	RX_DRAIN_TIME		(200)	/* # milliseconds recv drain */
+
+#define	TX_STALL_TIME_2S		(200)	/* in unit of tick */
+#define	TX_STALL_TIME_8S		(800)	/* in unit of tick */
 
 /*
  * The size of the receive/transmite buffers
@@ -193,10 +197,8 @@ extern "C" {
 
 #define	E1000_TX_BUFFER_OEVRRUN_THRESHOLD	(2015)
 
-#define	E1000G_RX_SW_FREE		0x0
-#define	E1000G_RX_SW_SENDUP		0x1
-#define	E1000G_RX_SW_STOP		0x2
-#define	E1000G_RX_SW_DETACH		0x3
+#define	E1000G_RX_NORMAL		0x0
+#define	E1000G_RX_STOPPED		0x1
 
 #define	E1000G_CHAIN_NO_LIMIT		0
 
@@ -474,7 +476,9 @@ typedef struct {
  */
 typedef struct _private_devi_list {
 	dev_info_t *priv_dip;
-	uint16_t flag;
+	uint32_t flag;
+	uint32_t pending_rx_count;
+	struct _private_devi_list *prev;
 	struct _private_devi_list *next;
 } private_devi_list_t;
 
@@ -540,6 +544,7 @@ typedef struct _tx_sw_packet {
 	ddi_dma_handle_t tx_dma_handle;
 	dma_buffer_t tx_buf[1];
 	sw_desc_t desc[MAX_TX_DESC_PER_PACKET];
+	int64_t tickstamp;
 } tx_sw_packet_t, *p_tx_sw_packet_t;
 
 /*
@@ -553,9 +558,9 @@ typedef struct _rx_sw_packet {
 	/* Link to the next rx_sw_packet_t in the list */
 	SINGLE_LIST_LINK Link;
 	struct _rx_sw_packet *next;
-	uint16_t flag;
+	uint32_t ref_cnt;
 	mblk_t *mp;
-	caddr_t rx_ring;
+	caddr_t rx_data;
 	dma_type_t dma_type;
 	frtn_t free_rtn;
 	dma_buffer_t rx_buf[1];
@@ -595,7 +600,6 @@ typedef struct _e1000g_stat {
 	kstat_named_t reset_count;	/* Reset Count */
 
 	kstat_named_t rx_error;		/* Rx Error in Packet */
-	kstat_named_t rx_esballoc_fail;	/* Rx Desballoc Failure */
 	kstat_named_t rx_allocb_fail;	/* Rx Allocb Failure */
 
 	kstat_named_t tx_no_desc;	/* Tx No Desc */
@@ -723,8 +727,6 @@ typedef struct _e1000g_tx_ring {
 	 */
 	boolean_t resched_needed;
 	clock_t resched_timestamp;
-	uint32_t stall_watchdog;
-	uint32_t recycle_fail;
 	mblk_list_t mblks;
 	/*
 	 * Statistics
@@ -756,8 +758,7 @@ typedef struct _e1000g_tx_ring {
 	struct e1000g *adapter;
 } e1000g_tx_ring_t, *pe1000g_tx_ring_t;
 
-typedef struct _e1000g_rx_ring {
-	kmutex_t rx_lock;
+typedef struct _e1000g_rx_data {
 	kmutex_t freelist_lock;
 	kmutex_t recycle_lock;
 	/*
@@ -777,14 +778,24 @@ typedef struct _e1000g_rx_ring {
 	LIST_DESCRIBER recv_list;
 	LIST_DESCRIBER free_list;
 	LIST_DESCRIBER recycle_list;
+	uint32_t flag;
 
-	p_rx_sw_packet_t pending_list;
 	uint32_t pending_count;
 	uint32_t avail_freepkt;
 	uint32_t recycle_freepkt;
 	uint32_t rx_mblk_len;
 	mblk_t *rx_mblk;
 	mblk_t *rx_mblk_tail;
+
+	private_devi_list_t *priv_devi_node;
+	struct _e1000g_rx_ring *rx_ring;
+} e1000g_rx_data_t;
+
+typedef struct _e1000g_rx_ring {
+	e1000g_rx_data_t *rx_data;
+
+	kmutex_t rx_lock;
+
 	mac_ring_handle_t mrh;
 	mac_ring_handle_t mrh_init;
 	uint64_t ring_gen_num;
@@ -794,7 +805,6 @@ typedef struct _e1000g_rx_ring {
 	 * Statistics
 	 */
 	uint32_t stat_error;
-	uint32_t stat_esballoc_fail;
 	uint32_t stat_allocb_fail;
 	uint32_t stat_exceed_pkt;
 #ifdef E1000G_DEBUG
@@ -812,6 +822,7 @@ typedef struct e1000g {
 	int instance;
 	dev_info_t *dip;
 	dev_info_t *priv_dip;
+	private_devi_list_t *priv_devi_node;
 	mac_handle_t mh;
 	mac_resource_handle_t mrh;
 	struct e1000_hw shared;
@@ -829,8 +840,12 @@ typedef struct e1000g {
 	uint32_t smartspeed;	/* smartspeed w/a counter */
 	uint32_t init_count;
 	uint32_t reset_count;
+	boolean_t reset_flag;
+	uint32_t stall_threshold;
+	boolean_t stall_flag;
 	uint32_t attach_progress;	/* attach tracking */
 	uint32_t loopback_mode;
+	uint32_t pending_rx_count;
 
 	uint32_t tx_desc_num;
 	uint32_t tx_freelist_num;
@@ -985,9 +1000,12 @@ typedef struct e1000g {
 /*
  * Function prototypes
  */
+void e1000g_free_priv_devi_node(private_devi_list_t *devi_node);
+void e1000g_free_rx_pending_buffers(e1000g_rx_data_t *rx_data);
+void e1000g_free_rx_data(e1000g_rx_data_t *rx_data);
 int e1000g_alloc_dma_resources(struct e1000g *Adapter);
 void e1000g_release_dma_resources(struct e1000g *Adapter);
-void e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet);
+void e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet, boolean_t full_release);
 void e1000g_tx_setup(struct e1000g *Adapter);
 void e1000g_rx_setup(struct e1000g *Adapter);
 void e1000g_setup_multicast(struct e1000g *Adapter);
@@ -1023,7 +1041,7 @@ int e1000g_reset_link(struct e1000g *Adapter);
  */
 extern boolean_t e1000g_force_detach;
 extern uint32_t e1000g_mblks_pending;
-extern krwlock_t e1000g_rx_detach_lock;
+extern kmutex_t e1000g_rx_detach_lock;
 extern private_devi_list_t *e1000g_private_devi_list;
 extern int e1000g_poll_mode;
 

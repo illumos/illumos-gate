@@ -42,9 +42,8 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static p_rx_sw_packet_t e1000g_get_buf(e1000g_rx_ring_t *rx_ring);
+static p_rx_sw_packet_t e1000g_get_buf(e1000g_rx_data_t *rx_data);
 #pragma	inline(e1000g_get_buf)
-static void e1000g_priv_devi_list_clean();
 
 /*
  * e1000g_rxfree_func - the call-back function to reclaim rx buffer
@@ -56,94 +55,37 @@ static void e1000g_priv_devi_list_clean();
 void
 e1000g_rxfree_func(p_rx_sw_packet_t packet)
 {
-	e1000g_rx_ring_t *rx_ring;
+	e1000g_rx_data_t *rx_data;
+	private_devi_list_t *devi_node;
+	struct e1000g *Adapter;
+	uint32_t ring_cnt;
+	uint32_t ref_cnt;
+	unsigned char *address;
 
-	rx_ring = (e1000g_rx_ring_t *)(uintptr_t)packet->rx_ring;
-
-	/*
-	 * Here the rx recycling processes different rx packets in different
-	 * threads, so we protect it with RW_READER to ensure it won't block
-	 * other rx recycling threads.
-	 */
-	rw_enter(&e1000g_rx_detach_lock, RW_READER);
-
-	if (packet->flag == E1000G_RX_SW_FREE) {
-		rw_exit(&e1000g_rx_detach_lock);
+	if (packet->ref_cnt == 0) {
+		/*
+		 * This case only happens when rx buffers are being freed
+		 * in e1000g_stop() and freemsg() is called.
+		 */
 		return;
 	}
 
-	if (packet->flag == E1000G_RX_SW_STOP) {
-		packet->flag = E1000G_RX_SW_FREE;
-		rw_exit(&e1000g_rx_detach_lock);
-
-		rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
-		rx_ring->pending_count--;
-		e1000g_mblks_pending--;
-
-		if (rx_ring->pending_count == 0) {
-			while (rx_ring->pending_list != NULL) {
-				packet = rx_ring->pending_list;
-				rx_ring->pending_list =
-				    rx_ring->pending_list->next;
-
-				ASSERT(packet->mp == NULL);
-				e1000g_free_rx_sw_packet(packet);
-			}
-		}
-
-		/*
-		 * If e1000g_force_detach is enabled, we need to clean up
-		 * the idle priv_dip entries in the private dip list while
-		 * e1000g_mblks_pending is zero.
-		 */
-		if (e1000g_force_detach && (e1000g_mblks_pending == 0))
-			e1000g_priv_devi_list_clean();
-		rw_exit(&e1000g_rx_detach_lock);
-		return;
-	}
-
-	if (packet->flag == E1000G_RX_SW_DETACH) {
-		packet->flag = E1000G_RX_SW_FREE;
-		rw_exit(&e1000g_rx_detach_lock);
-
-		ASSERT(packet->mp == NULL);
-		e1000g_free_rx_sw_packet(packet);
-
-		/*
-		 * Here the e1000g_mblks_pending may be modified by different
-		 * rx recycling threads simultaneously, so we need to protect
-		 * it with RW_WRITER.
-		 */
-		rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
-		e1000g_mblks_pending--;
-
-		/*
-		 * If e1000g_force_detach is enabled, we need to clean up
-		 * the idle priv_dip entries in the private dip list while
-		 * e1000g_mblks_pending is zero.
-		 */
-		if (e1000g_force_detach && (e1000g_mblks_pending == 0))
-			e1000g_priv_devi_list_clean();
-		rw_exit(&e1000g_rx_detach_lock);
-		return;
-	}
-
-	packet->flag = E1000G_RX_SW_FREE;
+	rx_data = (e1000g_rx_data_t *)(uintptr_t)packet->rx_data;
 
 	if (packet->mp == NULL) {
 		/*
 		 * Allocate a mblk that binds to the data buffer
 		 */
-		packet->mp = desballoc((unsigned char *)
-		    packet->rx_buf->address - E1000G_IPALIGNROOM,
-		    packet->rx_buf->size + E1000G_IPALIGNROOM,
-		    BPRI_MED, &packet->free_rtn);
-
+		address = (unsigned char *)packet->rx_buf->address;
+		if (address != NULL) {
+			packet->mp = desballoc((unsigned char *)
+			    address - E1000G_IPALIGNROOM,
+			    packet->rx_buf->size + E1000G_IPALIGNROOM,
+			    BPRI_MED, &packet->free_rtn);
+		}
 		if (packet->mp != NULL) {
 			packet->mp->b_rptr += E1000G_IPALIGNROOM;
 			packet->mp->b_wptr += E1000G_IPALIGNROOM;
-		} else {
-			E1000G_STAT(rx_ring->stat_esballoc_fail);
 		}
 	}
 
@@ -153,51 +95,42 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 	 * to freelist. This helps in avoiding per packet mutex contention
 	 * around freelist.
 	 */
-	mutex_enter(&rx_ring->recycle_lock);
-	QUEUE_PUSH_TAIL(&rx_ring->recycle_list, &packet->Link);
-	rx_ring->recycle_freepkt++;
-	mutex_exit(&rx_ring->recycle_lock);
+	mutex_enter(&rx_data->recycle_lock);
+	QUEUE_PUSH_TAIL(&rx_data->recycle_list, &packet->Link);
+	rx_data->recycle_freepkt++;
+	mutex_exit(&rx_data->recycle_lock);
 
-	rw_exit(&e1000g_rx_detach_lock);
-}
+	ref_cnt = atomic_dec_32_nv(&packet->ref_cnt);
+	if (ref_cnt == 0) {
+		e1000g_free_rx_sw_packet(packet, B_FALSE);
 
-/*
- * e1000g_priv_devi_list_clean - clean up e1000g_private_devi_list
- *
- * We will walk the e1000g_private_devi_list to free the entry marked
- * with the E1000G_PRIV_DEVI_DETACH flag.
- */
-static void
-e1000g_priv_devi_list_clean()
-{
-	private_devi_list_t *devi_node, *devi_del;
+		mutex_enter(&e1000g_rx_detach_lock);
+		atomic_dec_32(&rx_data->pending_count);
+		atomic_dec_32(&e1000g_mblks_pending);
 
-	if (e1000g_private_devi_list == NULL)
-		return;
+		if ((rx_data->pending_count == 0) &&
+		    (rx_data->flag & E1000G_RX_STOPPED)) {
+			devi_node = rx_data->priv_devi_node;
 
-	devi_node = e1000g_private_devi_list;
-	while ((devi_node != NULL) &&
-	    (devi_node->flag == E1000G_PRIV_DEVI_DETACH)) {
-		e1000g_private_devi_list = devi_node->next;
-		kmem_free(devi_node->priv_dip,
-		    sizeof (struct dev_info));
-		kmem_free(devi_node,
-		    sizeof (private_devi_list_t));
-		devi_node = e1000g_private_devi_list;
-	}
-	if (e1000g_private_devi_list == NULL)
-		return;
-	while (devi_node->next != NULL) {
-		if (devi_node->next->flag == E1000G_PRIV_DEVI_DETACH) {
-			devi_del = devi_node->next;
-			devi_node->next = devi_del->next;
-			kmem_free(devi_del->priv_dip,
-			    sizeof (struct dev_info));
-			kmem_free(devi_del,
-			    sizeof (private_devi_list_t));
-		} else {
-			devi_node = devi_node->next;
+			e1000g_free_rx_pending_buffers(rx_data);
+			e1000g_free_rx_data(rx_data);
+
+			if (devi_node != NULL) {
+				ring_cnt = atomic_dec_32_nv(
+				    &devi_node->pending_rx_count);
+				if ((ring_cnt == 0) &&
+				    (devi_node->flag &
+				    E1000G_PRIV_DEVI_DETACH)) {
+					e1000g_free_priv_devi_node(
+					    devi_node);
+				}
+			} else {
+				Adapter = rx_data->rx_ring->adapter;
+				atomic_dec_32(
+				    &Adapter->pending_rx_count);
+			}
 		}
+		mutex_exit(&e1000g_rx_detach_lock);
 	}
 }
 
@@ -223,33 +156,33 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	uint32_t ert;
 	int i;
 	int size;
-	e1000g_rx_ring_t *rx_ring;
+	e1000g_rx_data_t *rx_data;
 
 	hw = &Adapter->shared;
-	rx_ring = Adapter->rx_ring;
+	rx_data = Adapter->rx_ring->rx_data;
 
 	/*
 	 * zero out all of the receive buffer descriptor memory
 	 * assures any previous data or status is erased
 	 */
-	bzero(rx_ring->rbd_area,
+	bzero(rx_data->rbd_area,
 	    sizeof (struct e1000_rx_desc) * Adapter->rx_desc_num);
 
 	if (!Adapter->rx_buffer_setup) {
 		/* Init the list of "Receive Buffer" */
-		QUEUE_INIT_LIST(&rx_ring->recv_list);
+		QUEUE_INIT_LIST(&rx_data->recv_list);
 
 		/* Init the list of "Free Receive Buffer" */
-		QUEUE_INIT_LIST(&rx_ring->free_list);
+		QUEUE_INIT_LIST(&rx_data->free_list);
 
 		/* Init the list of "Free Receive Buffer" */
-		QUEUE_INIT_LIST(&rx_ring->recycle_list);
+		QUEUE_INIT_LIST(&rx_data->recycle_list);
 		/*
 		 * Setup Receive list and the Free list. Note that
 		 * the both were allocated in one packet area.
 		 */
-		packet = rx_ring->packet_area;
-		descriptor = rx_ring->rbd_first;
+		packet = rx_data->packet_area;
+		descriptor = rx_data->rbd_first;
 
 		for (i = 0; i < Adapter->rx_desc_num;
 		    i++, packet = packet->next, descriptor++) {
@@ -259,7 +192,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 			    packet->rx_buf->dma_address;
 
 			/* Add this rx_sw_packet to the receive list */
-			QUEUE_PUSH_TAIL(&rx_ring->recv_list,
+			QUEUE_PUSH_TAIL(&rx_data->recv_list,
 			    &packet->Link);
 		}
 
@@ -267,18 +200,18 @@ e1000g_rx_setup(struct e1000g *Adapter)
 		    i++, packet = packet->next) {
 			ASSERT(packet != NULL);
 			/* Add this rx_sw_packet to the free list */
-			QUEUE_PUSH_TAIL(&rx_ring->free_list,
+			QUEUE_PUSH_TAIL(&rx_data->free_list,
 			    &packet->Link);
 		}
-		rx_ring->avail_freepkt = Adapter->rx_freelist_num;
-		rx_ring->recycle_freepkt = 0;
+		rx_data->avail_freepkt = Adapter->rx_freelist_num;
+		rx_data->recycle_freepkt = 0;
 
 		Adapter->rx_buffer_setup = B_TRUE;
 	} else {
 		/* Setup the initial pointer to the first rx descriptor */
 		packet = (p_rx_sw_packet_t)
-		    QUEUE_GET_HEAD(&rx_ring->recv_list);
-		descriptor = rx_ring->rbd_first;
+		    QUEUE_GET_HEAD(&rx_data->recv_list);
+		descriptor = rx_data->rbd_first;
 
 		for (i = 0; i < Adapter->rx_desc_num; i++) {
 			ASSERT(packet != NULL);
@@ -288,7 +221,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 
 			/* Get next rx_sw_packet */
 			packet = (p_rx_sw_packet_t)
-			    QUEUE_GET_NEXT(&rx_ring->recv_list, &packet->Link);
+			    QUEUE_GET_NEXT(&rx_data->recv_list, &packet->Link);
 			descriptor++;
 		}
 	}
@@ -306,16 +239,16 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	/*
 	 * Setup our descriptor pointers
 	 */
-	rx_ring->rbd_next = rx_ring->rbd_first;
+	rx_data->rbd_next = rx_data->rbd_first;
 
 	size = Adapter->rx_desc_num * sizeof (struct e1000_rx_desc);
 	E1000_WRITE_REG(hw, E1000_RDLEN(0), size);
 	size = E1000_READ_REG(hw, E1000_RDLEN(0));
 
 	/* To get lower order bits */
-	buf_low = (uint32_t)rx_ring->rbd_dma_addr;
+	buf_low = (uint32_t)rx_data->rbd_dma_addr;
 	/* To get the higher order bits */
-	buf_high = (uint32_t)(rx_ring->rbd_dma_addr >> 32);
+	buf_high = (uint32_t)(rx_data->rbd_dma_addr >> 32);
 
 	E1000_WRITE_REG(hw, E1000_RDBAH(0), buf_high);
 	E1000_WRITE_REG(hw, E1000_RDBAL(0), buf_low);
@@ -324,7 +257,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	 * Setup our HW Rx Head & Tail descriptor pointers
 	 */
 	E1000_WRITE_REG(hw, E1000_RDT(0),
-	    (uint32_t)(rx_ring->rbd_last - rx_ring->rbd_first));
+	    (uint32_t)(rx_data->rbd_last - rx_data->rbd_first));
 	E1000_WRITE_REG(hw, E1000_RDH(0), 0);
 
 	/*
@@ -417,31 +350,31 @@ e1000g_rx_setup(struct e1000g *Adapter)
  * e1000g_get_buf - get an rx sw packet from the free_list
  */
 static p_rx_sw_packet_t
-e1000g_get_buf(e1000g_rx_ring_t *rx_ring)
+e1000g_get_buf(e1000g_rx_data_t *rx_data)
 {
 	p_rx_sw_packet_t packet;
 
-	mutex_enter(&rx_ring->freelist_lock);
+	mutex_enter(&rx_data->freelist_lock);
 	packet = (p_rx_sw_packet_t)
-	    QUEUE_POP_HEAD(&rx_ring->free_list);
+	    QUEUE_POP_HEAD(&rx_data->free_list);
 	if (packet != NULL) {
-		rx_ring->avail_freepkt--;
+		rx_data->avail_freepkt--;
 	} else {
 		/*
 		 * If the freelist has no packets, check the recycle list
 		 * to see if there are any available descriptor there.
 		 */
-		mutex_enter(&rx_ring->recycle_lock);
-		QUEUE_SWITCH(&rx_ring->free_list, &rx_ring->recycle_list);
-		rx_ring->avail_freepkt = rx_ring->recycle_freepkt;
-		rx_ring->recycle_freepkt = 0;
-		mutex_exit(&rx_ring->recycle_lock);
+		mutex_enter(&rx_data->recycle_lock);
+		QUEUE_SWITCH(&rx_data->free_list, &rx_data->recycle_list);
+		rx_data->avail_freepkt = rx_data->recycle_freepkt;
+		rx_data->recycle_freepkt = 0;
+		mutex_exit(&rx_data->recycle_lock);
 		packet = (p_rx_sw_packet_t)
-		    QUEUE_POP_HEAD(&rx_ring->free_list);
+		    QUEUE_POP_HEAD(&rx_data->free_list);
 		if (packet != NULL)
-			rx_ring->avail_freepkt--;
+			rx_data->avail_freepkt--;
 	}
-	mutex_exit(&rx_ring->freelist_lock);
+	mutex_exit(&rx_data->freelist_lock);
 
 	return (packet);
 }
@@ -472,6 +405,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 	dma_buffer_t *rx_buf;
 	uint16_t cksumflags;
 	uint_t chain_sz = 0;
+	e1000g_rx_data_t *rx_data;
 
 	ret_mp = NULL;
 	ret_nmp = NULL;
@@ -480,18 +414,19 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 	cksumflags = 0;
 
 	Adapter = rx_ring->adapter;
+	rx_data = rx_ring->rx_data;
 	hw = &Adapter->shared;
 
 	/* Sync the Rx descriptor DMA buffers */
-	(void) ddi_dma_sync(rx_ring->rbd_dma_handle,
+	(void) ddi_dma_sync(rx_data->rbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORKERNEL);
 
-	if (e1000g_check_dma_handle(rx_ring->rbd_dma_handle) != DDI_FM_OK) {
+	if (e1000g_check_dma_handle(rx_data->rbd_dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 		Adapter->e1000g_state |= E1000G_ERROR;
 	}
 
-	current_desc = rx_ring->rbd_next;
+	current_desc = rx_data->rbd_next;
 	if (!(current_desc->status & E1000_RXD_STAT_DD)) {
 		/*
 		 * don't send anything up. just clear the RFD
@@ -531,7 +466,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 		 * Buffer Address.
 		 */
 		packet =
-		    (p_rx_sw_packet_t)QUEUE_GET_HEAD(&rx_ring->recv_list);
+		    (p_rx_sw_packet_t)QUEUE_GET_HEAD(&rx_data->recv_list);
 		ASSERT(packet != NULL);
 
 		rx_buf = packet->rx_buf;
@@ -622,13 +557,13 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 				 * drop this fragment, do the processing of
 				 * the end of the packet.
 				 */
-				ASSERT(rx_ring->rx_mblk_tail != NULL);
-				rx_ring->rx_mblk_tail->b_wptr -=
+				ASSERT(rx_data->rx_mblk_tail != NULL);
+				rx_data->rx_mblk_tail->b_wptr -=
 				    ETHERFCSL - length;
-				rx_ring->rx_mblk_len -=
+				rx_data->rx_mblk_len -=
 				    ETHERFCSL - length;
 
-				QUEUE_POP_HEAD(&rx_ring->recv_list);
+				QUEUE_POP_HEAD(&rx_data->recv_list);
 
 				goto rx_end_of_packet;
 			}
@@ -652,8 +587,6 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 			if (packet->mp != NULL) {
 				packet->mp->b_rptr += E1000G_IPALIGNROOM;
 				packet->mp->b_wptr += E1000G_IPALIGNROOM;
-			} else {
-				E1000G_STAT(rx_ring->stat_esballoc_fail);
 			}
 		}
 
@@ -672,7 +605,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 			 * content to our newly allocated buffer(mp). Don't
 			 * disturb the desriptor buffer address. (note copying)
 			 */
-			newpkt = e1000g_get_buf(rx_ring);
+			newpkt = e1000g_get_buf(rx_data);
 
 			if (newpkt != NULL) {
 				/*
@@ -681,7 +614,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 				 */
 				nmp = packet->mp;
 				packet->mp = NULL;
-				packet->flag = E1000G_RX_SW_SENDUP;
+				atomic_inc_32(&packet->ref_cnt);
 
 				/*
 				 * Now replace old buffer with the new
@@ -740,12 +673,12 @@ rx_copy:
 		 * routine will get called from the interrupt context
 		 * and try to put this packet on the free list
 		 */
-		(p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_ring->recv_list);
+		(p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->recv_list);
 
 		ASSERT(nmp != NULL);
 		nmp->b_wptr += length;
 
-		if (rx_ring->rx_mblk == NULL) {
+		if (rx_data->rx_mblk == NULL) {
 			/*
 			 *  TCP/UDP checksum offload and
 			 *  IP checksum offload
@@ -776,20 +709,20 @@ rx_copy:
 		 * Adapter structure, for the Rx processing can end
 		 * with a fragment that has no EOP set.
 		 */
-		if (rx_ring->rx_mblk == NULL) {
+		if (rx_data->rx_mblk == NULL) {
 			/* Get the head of the message chain */
-			rx_ring->rx_mblk = nmp;
-			rx_ring->rx_mblk_tail = nmp;
-			rx_ring->rx_mblk_len = length;
+			rx_data->rx_mblk = nmp;
+			rx_data->rx_mblk_tail = nmp;
+			rx_data->rx_mblk_len = length;
 		} else {	/* Not the first packet */
 			/* Continue adding buffers */
-			rx_ring->rx_mblk_tail->b_cont = nmp;
-			rx_ring->rx_mblk_tail = nmp;
-			rx_ring->rx_mblk_len += length;
+			rx_data->rx_mblk_tail->b_cont = nmp;
+			rx_data->rx_mblk_tail = nmp;
+			rx_data->rx_mblk_len += length;
 		}
-		ASSERT(rx_ring->rx_mblk != NULL);
-		ASSERT(rx_ring->rx_mblk_tail != NULL);
-		ASSERT(rx_ring->rx_mblk_tail->b_cont == NULL);
+		ASSERT(rx_data->rx_mblk != NULL);
+		ASSERT(rx_data->rx_mblk_tail != NULL);
+		ASSERT(rx_data->rx_mblk_tail->b_cont == NULL);
 
 		/*
 		 * Now this MP is ready to travel upwards but some more
@@ -811,7 +744,7 @@ rx_end_of_packet:
 		 * Process the last fragment.
 		 */
 		if (cksumflags != 0) {
-			(void) hcksum_assoc(rx_ring->rx_mblk,
+			(void) hcksum_assoc(rx_data->rx_mblk,
 			    NULL, NULL, 0, 0, 0, 0, cksumflags, 0);
 			cksumflags = 0;
 		}
@@ -820,24 +753,24 @@ rx_end_of_packet:
 		 * Count packets that span multi-descriptors
 		 */
 		E1000G_DEBUG_STAT_COND(rx_ring->stat_multi_desc,
-		    (rx_ring->rx_mblk->b_cont != NULL));
+		    (rx_data->rx_mblk->b_cont != NULL));
 
 		/*
 		 * Append to list to send upstream
 		 */
 		if (ret_mp == NULL) {
-			ret_mp = ret_nmp = rx_ring->rx_mblk;
+			ret_mp = ret_nmp = rx_data->rx_mblk;
 		} else {
-			ret_nmp->b_next = rx_ring->rx_mblk;
-			ret_nmp = rx_ring->rx_mblk;
+			ret_nmp->b_next = rx_data->rx_mblk;
+			ret_nmp = rx_data->rx_mblk;
 		}
 		ret_nmp->b_next = NULL;
 		*tail = ret_nmp;
 		chain_sz += length;
 
-		rx_ring->rx_mblk = NULL;
-		rx_ring->rx_mblk_tail = NULL;
-		rx_ring->rx_mblk_len = 0;
+		rx_data->rx_mblk = NULL;
+		rx_data->rx_mblk_tail = NULL;
+		rx_data->rx_mblk_len = 0;
 
 		pkt_count++;
 
@@ -847,31 +780,31 @@ rx_next_desc:
 		 */
 		current_desc->status = 0;
 
-		if (current_desc == rx_ring->rbd_last)
-			rx_ring->rbd_next = rx_ring->rbd_first;
+		if (current_desc == rx_data->rbd_last)
+			rx_data->rbd_next = rx_data->rbd_first;
 		else
-			rx_ring->rbd_next++;
+			rx_data->rbd_next++;
 
 		last_desc = current_desc;
-		current_desc = rx_ring->rbd_next;
+		current_desc = rx_data->rbd_next;
 
 		/*
 		 * Put the buffer that we just indicated back
 		 * at the end of our list
 		 */
-		QUEUE_PUSH_TAIL(&rx_ring->recv_list,
+		QUEUE_PUSH_TAIL(&rx_data->recv_list,
 		    &packet->Link);
 	}	/* while loop */
 
 	/* Sync the Rx descriptor DMA buffers */
-	(void) ddi_dma_sync(rx_ring->rbd_dma_handle,
+	(void) ddi_dma_sync(rx_data->rbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORDEV);
 
 	/*
 	 * Advance the E1000's Receive Queue #0 "Tail Pointer".
 	 */
 	E1000_WRITE_REG(hw, E1000_RDT(0),
-	    (uint32_t)(last_desc - rx_ring->rbd_first));
+	    (uint32_t)(last_desc - rx_data->rbd_first));
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
@@ -889,34 +822,34 @@ rx_drop:
 	current_desc->status = 0;
 
 	/* Sync the Rx descriptor DMA buffers */
-	(void) ddi_dma_sync(rx_ring->rbd_dma_handle,
+	(void) ddi_dma_sync(rx_data->rbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORDEV);
 
-	if (current_desc == rx_ring->rbd_last)
-		rx_ring->rbd_next = rx_ring->rbd_first;
+	if (current_desc == rx_data->rbd_last)
+		rx_data->rbd_next = rx_data->rbd_first;
 	else
-		rx_ring->rbd_next++;
+		rx_data->rbd_next++;
 
 	last_desc = current_desc;
 
-	(p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_ring->recv_list);
+	(p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->recv_list);
 
-	QUEUE_PUSH_TAIL(&rx_ring->recv_list, &packet->Link);
+	QUEUE_PUSH_TAIL(&rx_data->recv_list, &packet->Link);
 	/*
 	 * Reclaim all old buffers already allocated during
 	 * Jumbo receives.....for incomplete reception
 	 */
-	if (rx_ring->rx_mblk != NULL) {
-		freemsg(rx_ring->rx_mblk);
-		rx_ring->rx_mblk = NULL;
-		rx_ring->rx_mblk_tail = NULL;
-		rx_ring->rx_mblk_len = 0;
+	if (rx_data->rx_mblk != NULL) {
+		freemsg(rx_data->rx_mblk);
+		rx_data->rx_mblk = NULL;
+		rx_data->rx_mblk_tail = NULL;
+		rx_data->rx_mblk_len = 0;
 	}
 	/*
 	 * Advance the E1000's Receive Queue #0 "Tail Pointer".
 	 */
 	E1000_WRITE_REG(hw, E1000_RDT(0),
-	    (uint32_t)(last_desc - rx_ring->rbd_first));
+	    (uint32_t)(last_desc - rx_data->rbd_first));
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);

@@ -637,3 +637,10 @@ Notes on packaging:
 ======
   This version has the following fix:
    6791863 sync up flow control code with Intel latest shared code
+
+5.3.4
+======
+  This version has the following fix:
+   6699662 global e1000g rwlock prevents scaling on multiple interfaces
+   6781905 super slow throughput on e1000g 82541 and 82547 chips
+   6786783 e1000g needs to have a new tx stall detection mechanism to cover 82546 errata No.18

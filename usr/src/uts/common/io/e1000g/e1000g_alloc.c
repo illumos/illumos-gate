@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -42,13 +42,13 @@
 	(sizeof (tx_sw_packet_t) * Adapter->tx_freelist_num)
 
 static int e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *);
-static int e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *);
+static int e1000g_alloc_rx_descriptors(e1000g_rx_data_t *);
 static void e1000g_free_tx_descriptors(e1000g_tx_ring_t *);
-static void e1000g_free_rx_descriptors(e1000g_rx_ring_t *);
+static void e1000g_free_rx_descriptors(e1000g_rx_data_t *);
 static int e1000g_alloc_tx_packets(e1000g_tx_ring_t *);
-static int e1000g_alloc_rx_packets(e1000g_rx_ring_t *);
+static int e1000g_alloc_rx_packets(e1000g_rx_data_t *);
 static void e1000g_free_tx_packets(e1000g_tx_ring_t *);
-static void e1000g_free_rx_packets(e1000g_rx_ring_t *);
+static void e1000g_free_rx_packets(e1000g_rx_data_t *);
 static int e1000g_alloc_dma_buffer(struct e1000g *,
     dma_buffer_t *, size_t, ddi_dma_attr_t *p_dma_attr);
 
@@ -72,7 +72,7 @@ static int e1000g_alloc_descriptors(struct e1000g *Adapter);
 static void e1000g_free_descriptors(struct e1000g *Adapter);
 static int e1000g_alloc_packets(struct e1000g *Adapter);
 static void e1000g_free_packets(struct e1000g *Adapter);
-static p_rx_sw_packet_t e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *,
+static p_rx_sw_packet_t e1000g_alloc_rx_sw_packet(e1000g_rx_data_t *,
     ddi_dma_attr_t *p_dma_attr);
 
 /* DMA access attributes for descriptors <Little Endian> */
@@ -223,7 +223,7 @@ e1000g_alloc_descriptors(struct e1000g *Adapter)
 {
 	int result;
 	e1000g_tx_ring_t *tx_ring;
-	e1000g_rx_ring_t *rx_ring;
+	e1000g_rx_data_t *rx_data;
 
 	if (Adapter->mem_workaround_82546 &&
 	    ((Adapter->shared.mac.type == e1000_82545) ||
@@ -242,9 +242,9 @@ e1000g_alloc_descriptors(struct e1000g *Adapter)
 	if (result != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	rx_ring = Adapter->rx_ring;
+	rx_data = Adapter->rx_ring->rx_data;
 
-	result = e1000g_alloc_rx_descriptors(rx_ring);
+	result = e1000g_alloc_rx_descriptors(rx_data);
 	if (result != DDI_SUCCESS) {
 		e1000g_free_tx_descriptors(tx_ring);
 		return (DDI_FAILURE);
@@ -257,13 +257,13 @@ static void
 e1000g_free_descriptors(struct e1000g *Adapter)
 {
 	e1000g_tx_ring_t *tx_ring;
-	e1000g_rx_ring_t *rx_ring;
+	e1000g_rx_data_t *rx_data;
 
 	tx_ring = Adapter->tx_ring;
-	rx_ring = Adapter->rx_ring;
+	rx_data = Adapter->rx_ring->rx_data;
 
 	e1000g_free_tx_descriptors(tx_ring);
-	e1000g_free_rx_descriptors(rx_ring);
+	e1000g_free_rx_descriptors(rx_data);
 }
 
 static int
@@ -472,7 +472,7 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 }
 
 static int
-e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
+e1000g_alloc_rx_descriptors(e1000g_rx_data_t *rx_data)
 {
 	int mystat;
 	boolean_t alloc_flag;
@@ -485,7 +485,7 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	struct e1000g *Adapter;
 	ddi_dma_attr_t dma_attr;
 
-	Adapter = rx_ring->adapter;
+	Adapter = rx_data->rx_ring->adapter;
 	devinfo = Adapter->dip;
 
 	alloc_flag = B_FALSE;
@@ -507,39 +507,39 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	 */
 	mystat = ddi_dma_alloc_handle(devinfo, &dma_attr,
 	    DDI_DMA_DONTWAIT, 0,
-	    &rx_ring->rbd_dma_handle);
+	    &rx_data->rbd_dma_handle);
 
 	if (mystat != DDI_SUCCESS) {
 		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate rbd dma handle: %d", mystat);
-		rx_ring->rbd_dma_handle = NULL;
+		rx_data->rbd_dma_handle = NULL;
 		return (DDI_FAILURE);
 	}
 	/*
 	 * Allocate memory to DMA data to and from the receive
 	 * descriptors.
 	 */
-	mystat = ddi_dma_mem_alloc(rx_ring->rbd_dma_handle,
+	mystat = ddi_dma_mem_alloc(rx_data->rbd_dma_handle,
 	    size,
 	    &e1000g_desc_acc_attr, DDI_DMA_CONSISTENT,
 	    DDI_DMA_DONTWAIT, 0,
-	    (caddr_t *)&rx_ring->rbd_area,
-	    &len, &rx_ring->rbd_acc_handle);
+	    (caddr_t *)&rx_data->rbd_area,
+	    &len, &rx_data->rbd_acc_handle);
 
 	/*
 	 * Check if memory allocation succeeded and also if the
 	 * allocated memory is aligned correctly.
 	 */
 	if ((mystat != DDI_SUCCESS) ||
-	    ((uintptr_t)rx_ring->rbd_area & (Adapter->desc_align - 1))) {
+	    ((uintptr_t)rx_data->rbd_area & (Adapter->desc_align - 1))) {
 		if (mystat == DDI_SUCCESS) {
-			ddi_dma_mem_free(&rx_ring->rbd_acc_handle);
-			rx_ring->rbd_acc_handle = NULL;
-			rx_ring->rbd_area = NULL;
+			ddi_dma_mem_free(&rx_data->rbd_acc_handle);
+			rx_data->rbd_acc_handle = NULL;
+			rx_data->rbd_area = NULL;
 		}
-		if (rx_ring->rbd_dma_handle != NULL) {
-			ddi_dma_free_handle(&rx_ring->rbd_dma_handle);
-			rx_ring->rbd_dma_handle = NULL;
+		if (rx_data->rbd_dma_handle != NULL) {
+			ddi_dma_free_handle(&rx_data->rbd_dma_handle);
+			rx_data->rbd_dma_handle = NULL;
 		}
 		alloc_flag = B_FALSE;
 	} else
@@ -549,7 +549,7 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	 * Initialize the allocated receive descriptor memory to zero.
 	 */
 	if (alloc_flag)
-		bzero((caddr_t)rx_ring->rbd_area, len);
+		bzero((caddr_t)rx_data->rbd_area, len);
 
 	/*
 	 * If memory allocation did not succeed, do the alignment ourselves
@@ -563,33 +563,33 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 		 */
 		mystat = ddi_dma_alloc_handle(devinfo, &dma_attr,
 		    DDI_DMA_DONTWAIT, 0,
-		    &rx_ring->rbd_dma_handle);
+		    &rx_data->rbd_dma_handle);
 
 		if (mystat != DDI_SUCCESS) {
 			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not re-allocate rbd dma handle: %d", mystat);
-			rx_ring->rbd_dma_handle = NULL;
+			rx_data->rbd_dma_handle = NULL;
 			return (DDI_FAILURE);
 		}
 		/*
 		 * Allocate memory to DMA data to and from the receive
 		 * descriptors.
 		 */
-		mystat = ddi_dma_mem_alloc(rx_ring->rbd_dma_handle,
+		mystat = ddi_dma_mem_alloc(rx_data->rbd_dma_handle,
 		    size,
 		    &e1000g_desc_acc_attr, DDI_DMA_CONSISTENT,
 		    DDI_DMA_DONTWAIT, 0,
-		    (caddr_t *)&rx_ring->rbd_area,
-		    &len, &rx_ring->rbd_acc_handle);
+		    (caddr_t *)&rx_data->rbd_area,
+		    &len, &rx_data->rbd_acc_handle);
 
 		if (mystat != DDI_SUCCESS) {
 			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not allocate rbd dma memory: %d", mystat);
-			rx_ring->rbd_acc_handle = NULL;
-			rx_ring->rbd_area = NULL;
-			if (rx_ring->rbd_dma_handle != NULL) {
-				ddi_dma_free_handle(&rx_ring->rbd_dma_handle);
-				rx_ring->rbd_dma_handle = NULL;
+			rx_data->rbd_acc_handle = NULL;
+			rx_data->rbd_area = NULL;
+			if (rx_data->rbd_dma_handle != NULL) {
+				ddi_dma_free_handle(&rx_data->rbd_dma_handle);
+				rx_data->rbd_dma_handle = NULL;
 			}
 			return (DDI_FAILURE);
 		} else
@@ -598,12 +598,12 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 		/*
 		 * Initialize the allocated receive descriptor memory to zero.
 		 */
-		bzero((caddr_t)rx_ring->rbd_area, len);
-		templong = P2NPHASE((uintptr_t)rx_ring->rbd_area,
+		bzero((caddr_t)rx_data->rbd_area, len);
+		templong = P2NPHASE((uintptr_t)rx_data->rbd_area,
 		    Adapter->desc_align);
 		len = size - templong;
-		templong += (uintptr_t)rx_ring->rbd_area;
-		rx_ring->rbd_area = (struct e1000_rx_desc *)templong;
+		templong += (uintptr_t)rx_data->rbd_area;
+		rx_data->rbd_area = (struct e1000_rx_desc *)templong;
 	}	/* alignment workaround */
 
 	/*
@@ -615,22 +615,22 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	 * Allocates DMA resources for the memory that was allocated by
 	 * the ddi_dma_mem_alloc call.
 	 */
-	mystat = ddi_dma_addr_bind_handle(rx_ring->rbd_dma_handle,
-	    (struct as *)NULL, (caddr_t)rx_ring->rbd_area,
+	mystat = ddi_dma_addr_bind_handle(rx_data->rbd_dma_handle,
+	    (struct as *)NULL, (caddr_t)rx_data->rbd_area,
 	    len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    DDI_DMA_DONTWAIT, 0, &cookie, &cookie_count);
 
 	if (mystat != DDI_SUCCESS) {
 		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind rbd dma resource: %d", mystat);
-		if (rx_ring->rbd_acc_handle != NULL) {
-			ddi_dma_mem_free(&rx_ring->rbd_acc_handle);
-			rx_ring->rbd_acc_handle = NULL;
-			rx_ring->rbd_area = NULL;
+		if (rx_data->rbd_acc_handle != NULL) {
+			ddi_dma_mem_free(&rx_data->rbd_acc_handle);
+			rx_data->rbd_acc_handle = NULL;
+			rx_data->rbd_area = NULL;
 		}
-		if (rx_ring->rbd_dma_handle != NULL) {
-			ddi_dma_free_handle(&rx_ring->rbd_dma_handle);
-			rx_ring->rbd_dma_handle = NULL;
+		if (rx_data->rbd_dma_handle != NULL) {
+			ddi_dma_free_handle(&rx_data->rbd_dma_handle);
+			rx_data->rbd_dma_handle = NULL;
 		}
 		return (DDI_FAILURE);
 	}
@@ -640,36 +640,36 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 		E1000G_DEBUGLOG_2(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind rbd dma resource in a single frag. "
 		    "Count - %d Len - %d", cookie_count, len);
-		e1000g_free_rx_descriptors(rx_ring);
+		e1000g_free_rx_descriptors(rx_data);
 		return (DDI_FAILURE);
 	}
 
-	rx_ring->rbd_dma_addr = cookie.dmac_laddress;
-	rx_ring->rbd_first = rx_ring->rbd_area;
-	rx_ring->rbd_last = rx_ring->rbd_first +
+	rx_data->rbd_dma_addr = cookie.dmac_laddress;
+	rx_data->rbd_first = rx_data->rbd_area;
+	rx_data->rbd_last = rx_data->rbd_first +
 	    (Adapter->rx_desc_num - 1);
 
 	return (DDI_SUCCESS);
 }
 
 static void
-e1000g_free_rx_descriptors(e1000g_rx_ring_t *rx_ring)
+e1000g_free_rx_descriptors(e1000g_rx_data_t *rx_data)
 {
-	if (rx_ring->rbd_dma_handle != NULL) {
-		(void) ddi_dma_unbind_handle(rx_ring->rbd_dma_handle);
+	if (rx_data->rbd_dma_handle != NULL) {
+		(void) ddi_dma_unbind_handle(rx_data->rbd_dma_handle);
 	}
-	if (rx_ring->rbd_acc_handle != NULL) {
-		ddi_dma_mem_free(&rx_ring->rbd_acc_handle);
-		rx_ring->rbd_acc_handle = NULL;
-		rx_ring->rbd_area = NULL;
+	if (rx_data->rbd_acc_handle != NULL) {
+		ddi_dma_mem_free(&rx_data->rbd_acc_handle);
+		rx_data->rbd_acc_handle = NULL;
+		rx_data->rbd_area = NULL;
 	}
-	if (rx_ring->rbd_dma_handle != NULL) {
-		ddi_dma_free_handle(&rx_ring->rbd_dma_handle);
-		rx_ring->rbd_dma_handle = NULL;
+	if (rx_data->rbd_dma_handle != NULL) {
+		ddi_dma_free_handle(&rx_data->rbd_dma_handle);
+		rx_data->rbd_dma_handle = NULL;
 	}
-	rx_ring->rbd_dma_addr = NULL;
-	rx_ring->rbd_first = NULL;
-	rx_ring->rbd_last = NULL;
+	rx_data->rbd_dma_addr = NULL;
+	rx_data->rbd_first = NULL;
+	rx_data->rbd_last = NULL;
 }
 
 static void
@@ -708,10 +708,10 @@ e1000g_alloc_packets(struct e1000g *Adapter)
 {
 	int result;
 	e1000g_tx_ring_t *tx_ring;
-	e1000g_rx_ring_t *rx_ring;
+	e1000g_rx_data_t *rx_data;
 
 	tx_ring = Adapter->tx_ring;
-	rx_ring = Adapter->rx_ring;
+	rx_data = Adapter->rx_ring->rx_data;
 
 again:
 	rw_enter(&e1000g_dma_type_lock, RW_READER);
@@ -737,7 +737,7 @@ again:
 		return (DDI_FAILURE);
 	}
 
-	result = e1000g_alloc_rx_packets(rx_ring);
+	result = e1000g_alloc_rx_packets(rx_data);
 	if (result != DDI_SUCCESS) {
 		e1000g_free_tx_packets(tx_ring);
 		if (e1000g_dma_type == USE_DVMA) {
@@ -768,13 +768,13 @@ static void
 e1000g_free_packets(struct e1000g *Adapter)
 {
 	e1000g_tx_ring_t *tx_ring;
-	e1000g_rx_ring_t *rx_ring;
+	e1000g_rx_data_t *rx_data;
 
 	tx_ring = Adapter->tx_ring;
-	rx_ring = Adapter->rx_ring;
+	rx_data = Adapter->rx_ring->rx_data;
 
 	e1000g_free_tx_packets(tx_ring);
-	e1000g_free_rx_packets(rx_ring);
+	e1000g_free_rx_packets(rx_data);
 }
 
 #ifdef __sparc
@@ -1245,7 +1245,7 @@ tx_pkt_fail:
 }
 
 static int
-e1000g_alloc_rx_packets(e1000g_rx_ring_t *rx_ring)
+e1000g_alloc_rx_packets(e1000g_rx_data_t *rx_data)
 {
 	int i;
 	p_rx_sw_packet_t packet;
@@ -1253,7 +1253,7 @@ e1000g_alloc_rx_packets(e1000g_rx_ring_t *rx_ring)
 	uint32_t packet_num;
 	ddi_dma_attr_t dma_attr;
 
-	Adapter = rx_ring->adapter;
+	Adapter = rx_data->rx_ring->adapter;
 	dma_attr = e1000g_buf_dma_attr;
 	dma_attr.dma_attr_align = Adapter->rx_buf_align;
 
@@ -1262,38 +1262,38 @@ e1000g_alloc_rx_packets(e1000g_rx_ring_t *rx_ring)
 	 * structures will contain a virtual and physical address to an actual
 	 * receive buffer in host memory. Since we use one rx_sw_packet per
 	 * received packet, the maximum number of rx_sw_packet that we'll
-	 * need is equal to the number of receive descriptors that we've
-	 * allocated.
+	 * need is equal to the number of receive descriptors plus the freelist
+	 * size.
 	 */
 	packet_num = Adapter->rx_desc_num + Adapter->rx_freelist_num;
-	rx_ring->packet_area = NULL;
+	rx_data->packet_area = NULL;
 
 	for (i = 0; i < packet_num; i++) {
-		packet = e1000g_alloc_rx_sw_packet(rx_ring, &dma_attr);
+		packet = e1000g_alloc_rx_sw_packet(rx_data, &dma_attr);
 		if (packet == NULL)
 			goto rx_pkt_fail;
 
-		packet->next = rx_ring->packet_area;
-		rx_ring->packet_area = packet;
+		packet->next = rx_data->packet_area;
+		rx_data->packet_area = packet;
 	}
 
 	return (DDI_SUCCESS);
 
 rx_pkt_fail:
-	e1000g_free_rx_packets(rx_ring);
+	e1000g_free_rx_packets(rx_data);
 
 	return (DDI_FAILURE);
 }
 
 static p_rx_sw_packet_t
-e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring, ddi_dma_attr_t *p_dma_attr)
+e1000g_alloc_rx_sw_packet(e1000g_rx_data_t *rx_data, ddi_dma_attr_t *p_dma_attr)
 {
 	int mystat;
 	p_rx_sw_packet_t packet;
 	dma_buffer_t *rx_buf;
 	struct e1000g *Adapter;
 
-	Adapter = rx_ring->adapter;
+	Adapter = rx_data->rx_ring->adapter;
 
 	packet = kmem_zalloc(sizeof (rx_sw_packet_t), KM_NOSLEEP);
 	if (packet == NULL) {
@@ -1341,7 +1341,7 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring, ddi_dma_attr_t *p_dma_attr)
 	rx_buf->address += E1000G_IPALIGNROOM;
 	rx_buf->dma_address += E1000G_IPALIGNROOM;
 
-	packet->rx_ring = (caddr_t)rx_ring;
+	packet->rx_data = (caddr_t)rx_data;
 	packet->free_rtn.free_func = e1000g_rxfree_func;
 	packet->free_rtn.free_arg = (char *)packet;
 	/*
@@ -1360,12 +1360,13 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring, ddi_dma_attr_t *p_dma_attr)
 	}
 
 	packet->dma_type = e1000g_dma_type;
+	packet->ref_cnt = 1;
 
 	return (packet);
 }
 
 void
-e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet)
+e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet, boolean_t full_release)
 {
 	dma_buffer_t *rx_buf;
 
@@ -1375,14 +1376,14 @@ e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet)
 	}
 
 	rx_buf = packet->rx_buf;
-	ASSERT(rx_buf->dma_handle != NULL);
-
-	rx_buf->size += E1000G_IPALIGNROOM;
-	rx_buf->address -= E1000G_IPALIGNROOM;
 
 	switch (packet->dma_type) {
 #ifdef __sparc
 	case USE_DVMA:
+		if (rx_buf->address != NULL) {
+			rx_buf->size += E1000G_IPALIGNROOM;
+			rx_buf->address -= E1000G_IPALIGNROOM;
+		}
 		e1000g_free_dvma_buffer(rx_buf);
 		break;
 #endif
@@ -1390,50 +1391,43 @@ e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet)
 		e1000g_free_dma_buffer(rx_buf);
 		break;
 	default:
-		ASSERT(B_FALSE);
 		break;
 	}
 
 	packet->dma_type = USE_NONE;
 
+	if (!full_release)
+		return;
+
 	kmem_free(packet, sizeof (rx_sw_packet_t));
 }
 
 static void
-e1000g_free_rx_packets(e1000g_rx_ring_t *rx_ring)
+e1000g_free_rx_packets(e1000g_rx_data_t *rx_data)
 {
-	p_rx_sw_packet_t packet, next_packet, free_list;
+	p_rx_sw_packet_t packet, next_packet;
+	uint32_t ref_cnt;
 
-	rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
+	mutex_enter(&e1000g_rx_detach_lock);
 
-	free_list = NULL;
-	packet = rx_ring->packet_area;
-	for (; packet != NULL; packet = next_packet) {
+	packet = rx_data->packet_area;
+	while (packet != NULL) {
 		next_packet = packet->next;
 
-		if (packet->flag == E1000G_RX_SW_SENDUP) {
-			rx_ring->pending_count++;
-			e1000g_mblks_pending++;
-			packet->flag = E1000G_RX_SW_STOP;
-			packet->next = rx_ring->pending_list;
-			rx_ring->pending_list = packet;
+		ref_cnt = atomic_dec_32_nv(&packet->ref_cnt);
+		if (ref_cnt > 0) {
+			atomic_inc_32(&rx_data->pending_count);
+			atomic_inc_32(&e1000g_mblks_pending);
 		} else {
-			packet->next = free_list;
-			free_list = packet;
+			e1000g_free_rx_sw_packet(packet, B_FALSE);
 		}
+
+		packet = next_packet;
 	}
-	rx_ring->packet_area = NULL;
 
-	rw_exit(&e1000g_rx_detach_lock);
-
-	packet = free_list;
-	for (; packet != NULL; packet = next_packet) {
-		next_packet = packet->next;
-
-		ASSERT(packet->flag == E1000G_RX_SW_FREE);
-		e1000g_free_rx_sw_packet(packet);
-	}
+	mutex_exit(&e1000g_rx_detach_lock);
 }
+
 
 static void
 e1000g_free_tx_packets(e1000g_tx_ring_t *tx_ring)
