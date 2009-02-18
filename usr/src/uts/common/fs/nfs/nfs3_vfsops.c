@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,8 +27,6 @@
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -202,10 +200,9 @@ nfs3_free_args(struct nfs_args *nargs, nfs_fhandle *fh)
 
 	if (nargs->knconf) {
 		if (nargs->knconf->knc_protofmly)
-			kmem_free(nargs->knconf->knc_protofmly,
-				KNC_STRSIZE);
-	if (nargs->knconf->knc_proto)
-		kmem_free(nargs->knconf->knc_proto, KNC_STRSIZE);
+			kmem_free(nargs->knconf->knc_protofmly, KNC_STRSIZE);
+		if (nargs->knconf->knc_proto)
+			kmem_free(nargs->knconf->knc_proto, KNC_STRSIZE);
 		kmem_free(nargs->knconf, sizeof (*nargs->knconf));
 		nargs->knconf = NULL;
 	}
@@ -299,7 +296,7 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 	knconf = kmem_zalloc(sizeof (*knconf), KM_SLEEP);
 	STRUCT_INIT(knconf_tmp, get_udatamodel());
 	if (copyin(STRUCT_FGETP(args, knconf), STRUCT_BUF(knconf_tmp),
-		STRUCT_SIZE(knconf_tmp))) {
+	    STRUCT_SIZE(knconf_tmp))) {
 		kmem_free(knconf, sizeof (*knconf));
 		return (EFAULT);
 	}
@@ -341,9 +338,9 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 	 */
 	STRUCT_INIT(addr_tmp, get_udatamodel());
 	if (copyin(STRUCT_FGETP(args, addr), STRUCT_BUF(addr_tmp),
-	STRUCT_SIZE(addr_tmp))) {
-	error = EFAULT;
-	goto errout;
+	    STRUCT_SIZE(addr_tmp))) {
+		error = EFAULT;
+		goto errout;
 	}
 
 	nargs->addr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
@@ -372,8 +369,8 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 	 * Get server's hostname
 	 */
 	if (flags & NFSMNT_HOSTNAME) {
-		error = copyinstr(STRUCT_FGETP(args, hostname),
-			netname, sizeof (netname), &hlen);
+		error = copyinstr(STRUCT_FGETP(args, hostname), netname,
+		    sizeof (netname), &hlen);
 	if (error)
 		goto errout;
 	nargs->hostname = kmem_zalloc(hlen, KM_SLEEP);
@@ -397,7 +394,7 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 		/* get syncaddr */
 		STRUCT_INIT(addr_tmp, get_udatamodel());
 		if (copyin(STRUCT_FGETP(args, syncaddr), STRUCT_BUF(addr_tmp),
-			STRUCT_SIZE(addr_tmp))) {
+		    STRUCT_SIZE(addr_tmp))) {
 			error = EINVAL;
 			goto errout;
 		}
@@ -417,7 +414,7 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 		ASSERT(STRUCT_FGETP(args, netname));
 
 		if (copyinstr(STRUCT_FGETP(args, netname), netname,
-			sizeof (netname), &nlen)) {
+		    sizeof (netname), &nlen)) {
 			error = EFAULT;
 			goto errout;
 		}
@@ -434,18 +431,18 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 	if (flags & NFSMNT_NEWARGS) {
 		nargs->nfs_args_ext = STRUCT_FGET(args, nfs_args_ext);
 		if (nargs->nfs_args_ext == NFS_ARGS_EXTA ||
-			nargs->nfs_args_ext == NFS_ARGS_EXTB) {
+		    nargs->nfs_args_ext == NFS_ARGS_EXTB) {
 			/*
 			 * Indicating the application is using the new
 			 * sec_data structure to pass in the security
 			 * data.
 			 */
 			if (STRUCT_FGETP(args,
-				nfs_ext_u.nfs_extA.secdata) != NULL) {
+			    nfs_ext_u.nfs_extA.secdata) != NULL) {
 				error = sec_clnt_loadinfo(
-					(struct sec_data *)STRUCT_FGETP(args,
-					nfs_ext_u.nfs_extA.secdata),
-					&secdata, get_udatamodel());
+				    (struct sec_data *)STRUCT_FGETP(args,
+				    nfs_ext_u.nfs_extA.secdata), &secdata,
+				    get_udatamodel());
 			}
 			nargs->nfs_ext_u.nfs_extA.secdata = secdata;
 		}
@@ -464,7 +461,7 @@ nfs3_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
 	 */
 	if (nargs->nfs_args_ext == NFS_ARGS_EXTB)
 		nargs->nfs_ext_u.nfs_extB.next =
-			STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next);
+		    STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next);
 
 errout:
 	if (error)
@@ -613,7 +610,7 @@ more:
 	}
 
 	if ((strlen(args->knconf->knc_protofmly) >= KNC_STRSIZE) ||
-		(strlen(args->knconf->knc_proto) >= KNC_STRSIZE)) {
+	    (strlen(args->knconf->knc_proto) >= KNC_STRSIZE)) {
 		if (!(uap->flags & MS_SYSSPACE)) {
 			nfs3_free_args(args, fhandle);
 			kmem_free(args, sizeof (*args));
@@ -702,7 +699,7 @@ more:
 			addr_type = AF_INET6;
 
 		if (rdma_reachable(addr_type, &svp->sv_addr,
-			&rdma_knconf) == 0) {
+		    &rdma_knconf) == 0) {
 			/*
 			 * If successful, hijack the orignal knconf and
 			 * replace with a new one, depending on the flags.
@@ -729,12 +726,10 @@ more:
 				 * Check if more servers are specified;
 				 * Failover case, otherwise bail out of mount.
 				 */
-				if (args->nfs_args_ext ==
-				    NFS_ARGS_EXTB &&
-					args->nfs_ext_u.nfs_extB.next
-					!= NULL) {
+				if (args->nfs_args_ext == NFS_ARGS_EXTB &&
+				    args->nfs_ext_u.nfs_extB.next != NULL) {
 					data = (char *)
-						args->nfs_ext_u.nfs_extB.next;
+					    args->nfs_ext_u.nfs_extB.next;
 					if (uap->flags & MS_RDONLY &&
 					    !(flags & NFSMNT_SOFT)) {
 						if (svp_head->sv_next == NULL) {
@@ -811,8 +806,7 @@ more:
 				case AUTH_LOOPBACK:
 				case AUTH_DES:
 				case RPCSEC_GSS:
-					args->nfs_ext_u.nfs_extA.secdata =
-						NULL;
+					args->nfs_ext_u.nfs_extA.secdata = NULL;
 					break;
 				default:
 					error = EINVAL;
@@ -845,7 +839,7 @@ more:
 				secdata->flags |= AUTH_F_RPCTIMESYNC;
 			data = kmem_alloc(sizeof (*data), KM_SLEEP);
 			bcopy(args->syncaddr, &data->syncaddr,
-				sizeof (*args->syncaddr));
+			    sizeof (*args->syncaddr));
 
 			/*
 			 * duplicate the knconf information for the
@@ -969,12 +963,16 @@ proceed:
 	error = nfs_setopts(rtvp, DATAMODEL_NATIVE, args);
 
 errout:
-	if (error) {
-		if (rtvp != NULL) {
+	if (rtvp != NULL) {
+		if (error) {
 			rp = VTOR(rtvp);
 			if (rp->r_flags & RHASHED)
 				rp_rmhash(rp);
 		}
+		VN_RELE(rtvp);
+	}
+
+	if (error) {
 		sv_free(svp_head);
 		if (mi != NULL) {
 			nfs_async_stop(vfsp);
@@ -997,14 +995,11 @@ errout:
 		kmem_free(args, sizeof (*args));
 	}
 
-	if (rtvp != NULL)
-		VN_RELE(rtvp);
-
 	if (mntzone != NULL)
 		zone_rele(mntzone);
 
 	return (error);
-	}
+}
 
 static int nfs3_dynamic = 0;	/* global variable to enable dynamic retrans. */
 static ushort_t nfs3_max_threads = 8;	/* max number of active async threads */
@@ -1197,8 +1192,9 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 				error = EINVAL;
 				goto bad;
 			} else {
-				if (rtvp->v_type != VNON &&
-		rtvp->v_type != nf3_to_vt[res.resok.obj_attributes.attr.type]) {
+				if (rtvp->v_type != VNON && rtvp->v_type !=
+				    nf3_to_vt[res.resok.obj_attributes.attr.
+				    type]) {
 #ifdef DEBUG
 					zcmn_err(getzoneid(), CE_WARN,
 		"NFS3 server %s returned a different file type for root",
@@ -1212,7 +1208,8 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 					goto bad;
 				}
 				rtvp->v_type =
-				nf3_to_vt[res.resok.obj_attributes.attr.type];
+				    nf3_to_vt[res.resok.obj_attributes.attr.
+				    type];
 			}
 		}
 
@@ -1220,10 +1217,10 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 			mi->mi_tsize = MIN(res.resok.rtmax, mi->mi_tsize);
 			if (res.resok.rtpref != 0) {
 				mi->mi_curread = MIN(res.resok.rtpref,
-						    mi->mi_curread);
+				    mi->mi_curread);
 			} else {
 				mi->mi_curread = MIN(res.resok.rtmax,
-						    mi->mi_curread);
+				    mi->mi_curread);
 			}
 		} else if (res.resok.rtpref != 0) {
 			mi->mi_tsize = MIN(res.resok.rtpref, mi->mi_tsize);
@@ -1245,15 +1242,15 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 			mi->mi_stsize = MIN(res.resok.wtmax, mi->mi_stsize);
 			if (res.resok.wtpref != 0) {
 				mi->mi_curwrite = MIN(res.resok.wtpref,
-						    mi->mi_curwrite);
+				    mi->mi_curwrite);
 			} else {
 				mi->mi_curwrite = MIN(res.resok.wtmax,
-						    mi->mi_curwrite);
+				    mi->mi_curwrite);
 			}
 		} else if (res.resok.wtpref != 0) {
 			mi->mi_stsize = MIN(res.resok.wtpref, mi->mi_stsize);
 			mi->mi_curwrite = MIN(res.resok.wtpref,
-					    mi->mi_curwrite);
+			    mi->mi_curwrite);
 		} else {
 #ifdef DEBUG
 			zcmn_err(getzoneid(), CE_WARN,
@@ -1283,7 +1280,7 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 		if (res.resok.maxfilesize) {
 			if (mi->mi_maxfilesize) {
 				mi->mi_maxfilesize = MIN(mi->mi_maxfilesize,
-							res.resok.maxfilesize);
+				    res.resok.maxfilesize);
 			} else
 				mi->mi_maxfilesize = res.resok.maxfilesize;
 		}
@@ -1301,7 +1298,7 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 	 */
 	VFS_HOLD(vfsp);	/* add reference for thread */
 	mi->mi_manager_thread = zthread_create(NULL, 0, nfs_async_manager,
-					vfsp, 0, minclsyspri);
+	    vfsp, 0, minclsyspri);
 	ASSERT(mi->mi_manager_thread != NULL);
 
 	/*
