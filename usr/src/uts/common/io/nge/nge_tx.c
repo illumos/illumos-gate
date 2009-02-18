@@ -244,11 +244,11 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 
 	for (dme = dmah.head; dme != NULL; dme = dme->next)
 		(void) ddi_dma_unbind_handle(dme->hndl);
-
-	mutex_enter(&srp->dmah_lock);
-	nge_tx_dmah_push(&dmah, &srp->dmah_free);
-	mutex_exit(&srp->dmah_lock);
-
+	if (dmah.head != NULL) {
+		mutex_enter(&srp->dmah_lock);
+		nge_tx_dmah_push(&dmah, &srp->dmah_free);
+		mutex_exit(&srp->dmah_lock);
+	}
 	freemsgchain(mp);
 
 	/*
@@ -601,8 +601,8 @@ nge_send(nge_t *ngep, mblk_t *mp)
 		freemsg(mp);
 		return (B_TRUE);
 	}
-
 	if ((mblen > ngep->param_txbcopy_threshold) &&
+	    (frags <= NGE_MAP_FRAGS) &&
 	    (srp->tx_free > frags * NGE_MAX_COOKIES)) {
 		status = nge_send_mapped(ngep, mp, frags);
 		if (status == SEND_MAP_FAIL)

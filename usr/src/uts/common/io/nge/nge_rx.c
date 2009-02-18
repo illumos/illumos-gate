@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -387,7 +387,7 @@ nge_recv_ring(nge_t *ngep)
 			mp = NULL;
 		}
 		rrp->prod_index = NEXT(end_index, rrp->desc.nslots);
-		if (ngep->recv_count > ngep->param_recv_max_packet)
+		if (ngep->recv_count >= ngep->param_recv_max_packet)
 			break;
 	}
 
