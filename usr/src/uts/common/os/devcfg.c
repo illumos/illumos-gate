@@ -1327,6 +1327,13 @@ detach_node(dev_info_t *dip, uint_t flag)
 	dacf_clr_rsrvs(dip, DACF_OPID_PREDETACH);
 	mutex_exit(&dacf_lock);
 
+	/* remove any additional flavors that were added */
+	if (DEVI(dip)->devi_flavorv_n > 1 && DEVI(dip)->devi_flavorv != NULL) {
+		kmem_free(DEVI(dip)->devi_flavorv,
+		    (DEVI(dip)->devi_flavorv_n - 1) * sizeof (void *));
+		DEVI(dip)->devi_flavorv = NULL;
+	}
+
 	/* Remove properties and minor nodes in case driver forgots */
 	ddi_remove_minor_node(dip, NULL);
 	ddi_prop_remove_all(dip);

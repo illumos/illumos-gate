@@ -605,8 +605,10 @@ scsi_hba_tran_alloc(
 {
 	scsi_hba_tran_t		*tran;
 
-	SCSI_HBA_LOG((_LOG(TRACE, NC), self, NULL, "scsi_hba_tran_alloc"));
+	/* allocate SCSA flavors for self */
+	ndi_flavorv_alloc(self, SCSA_NFLAVORS);
 
+	SCSI_HBA_LOG((_LOG(TRACE, NC), self, NULL, "scsi_hba_tran_alloc"));
 	tran = kmem_zalloc(sizeof (scsi_hba_tran_t),
 	    (flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP);
 
@@ -978,6 +980,44 @@ scsi_hba_fini(struct modlinkage *modlp)
 	hba_dev_ops->devo_bus_ops = (struct bus_ops *)NULL;
 }
 
+/*
+ * SAS specific functions
+ */
+/*ARGSUSED*/
+sas_hba_tran_t *
+sas_hba_tran_alloc(
+	dev_info_t		*self,
+	int			flags)
+{
+	/* allocate SCSA flavors for self */
+	ndi_flavorv_alloc(self, SCSA_NFLAVORS);
+	return (kmem_zalloc(sizeof (sas_hba_tran_t), KM_SLEEP));
+}
+
+void
+sas_hba_tran_free(
+	sas_hba_tran_t		*tran)
+{
+	kmem_free(tran, sizeof (sas_hba_tran_t));
+}
+
+int
+sas_hba_attach_setup(
+	dev_info_t		*self,
+	sas_hba_tran_t		*tran)
+{
+	/*
+	 * The owner of the this devinfo_t was responsible
+	 * for informing the framework already about
+	 * additional flavors.
+	 */
+	ndi_flavorv_set(self, SCSA_FLAVOR_SMP, tran);
+	return (DDI_SUCCESS);
+}
+/*
+ * SMP child flavored functions
+ */
+
 static int
 smp_busctl_reportdev(dev_info_t *child)
 {
@@ -1002,34 +1042,16 @@ static int
 smp_busctl_initchild(dev_info_t *child)
 {
 	dev_info_t		*self = ddi_get_parent(child);
-	scsi_hba_tran_t		*tran = ddi_get_driver_private(self);
+	sas_hba_tran_t		*tran = ndi_flavorv_get(self, SCSA_FLAVOR_SMP);
 	struct smp_device	*smp;
 	char			addr[SCSI_MAXNAMELEN];
 	dev_info_t		*ndip;
-	char			*smp_wwn;
+	char			*smp_wwn = NULL;
 	uint64_t		wwn;
 
 	ASSERT(tran);
 	if (tran == NULL)
 		return (DDI_FAILURE);
-
-	/*
-	 * Clone transport structure if requested, so the HBA can maintain
-	 * target-specific info, if necessary.
-	 *
-	 * NOTE: when mpt is converted to SCSI_HBA_ADDR_COMPLEX (and
-	 * smp_hba_private is added to struct smp_device) then
-	 * smp support of SCSI_HBA_TRAN_CLONE can be removed (i.e.
-	 * we can ASSERT that drivers with smp children must be
-	 * SCSI_HBA_ADDR_COMPLEX).
-	 */
-	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
-		scsi_hba_tran_t	*clone =
-		    kmem_alloc(sizeof (scsi_hba_tran_t), KM_SLEEP);
-
-		bcopy(tran, clone, sizeof (scsi_hba_tran_t));
-		tran = clone;
-	}
 
 	smp = kmem_zalloc(sizeof (struct smp_device), KM_SLEEP);
 	smp->dip = child;
@@ -1038,7 +1060,7 @@ smp_busctl_initchild(dev_info_t *child)
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SMP_WWN, &smp_wwn) != DDI_SUCCESS) {
-		return (DDI_FAILURE);
+		goto failure;
 	}
 
 	if (ddi_devid_str_to_wwn(smp_wwn, &wwn)) {
@@ -1061,10 +1083,9 @@ smp_busctl_initchild(dev_info_t *child)
 
 failure:
 	kmem_free(smp, sizeof (struct smp_device));
-	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
-		kmem_free(tran, sizeof (scsi_hba_tran_t));
+	if (smp_wwn) {
+		ddi_prop_free(smp_wwn);
 	}
-	ddi_prop_free(smp_wwn);
 	return (DDI_FAILURE);
 }
 
@@ -1073,18 +1094,11 @@ smp_busctl_uninitchild(dev_info_t *child)
 {
 	dev_info_t		*self = ddi_get_parent(child);
 	struct smp_device	*smp = ddi_get_driver_private(child);
-	scsi_hba_tran_t		*tran = ddi_get_driver_private(self);
 
-	ASSERT(smp && tran);
-	if ((smp == NULL) || (tran == NULL))
+	ASSERT(smp);
+	if (smp == NULL)
 		return (DDI_FAILURE);
-
-	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
-		tran = smp->smp_addr.a_hba_tran;
-		kmem_free(tran, sizeof (scsi_hba_tran_t));
-	}
 	kmem_free(smp, sizeof (*smp));
-
 	ddi_set_driver_private(child, NULL);
 	ddi_set_name_addr(child, NULL);
 	return (DDI_SUCCESS);
@@ -1501,9 +1515,7 @@ scsi_hba_bus_ctl(
 		child = (dev_info_t *)arg;
 
 	/* Determine the flavor of the child: smp .vs. scsi */
-	if (ddi_prop_exists(DDI_DEV_T_ANY, child,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, SMP_PROP))
-		child_flavor_smp = 1;
+	child_flavor_smp = (ndi_flavor_get(child) == SCSA_FLAVOR_SMP);
 
 	switch (op) {
 	case DDI_CTLOPS_INITCHILD:

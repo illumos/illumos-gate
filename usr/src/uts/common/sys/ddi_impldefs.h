@@ -115,6 +115,7 @@ typedef struct devi_bus_priv {
 
 struct iommulib_unit;
 typedef struct iommulib_unit *iommulib_handle_t;
+typedef uint8_t	ndi_flavor_t;
 
 struct dev_info  {
 
@@ -258,6 +259,11 @@ struct dev_info  {
 
 	/* Generic callback mechanism */
 	ddi_cb_t	*devi_cb_p;
+
+	/* ndi 'flavors' */
+	ndi_flavor_t	devi_flavor;		/* flavor assigned by parent */
+	ndi_flavor_t	devi_flavorv_n;		/* number of child-flavors */
+	void		**devi_flavorv;		/* child-flavor specific data */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

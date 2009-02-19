@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SCSI_IMPL_SAS_TRANSPORT_H
 #define	_SYS_SCSI_IMPL_SAS_TRANSPORT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/scsi/impl/usmp.h>
@@ -42,7 +40,7 @@ extern "C" {
  * Properties for smp device
  */
 #define	SMP_PROP		"smp-device"
-#define	SMP_WWN		"smp-wwn"
+#define	SMP_WWN			"smp-wwn"
 
 /*
  * Common Capability Strings Array for SAS
@@ -56,9 +54,11 @@ extern "C" {
 #define	SAS_CAP_ASCII		{					\
 		"smp-crc", NULL }
 
+typedef struct sas_hba_tran	sas_hba_tran_t;
+
 typedef struct sas_addr {
 	uint8_t		a_wwn[SAS_WWN_BYTE_SIZE];	/* expander wwn */
-	struct scsi_hba_tran	*a_hba_tran;	/* Transport vectors */
+	sas_hba_tran_t	*a_hba_tran;			/* Transport vector */
 } sas_addr_t;
 
 typedef struct smp_pkt {
@@ -67,26 +67,31 @@ typedef struct smp_pkt {
 	size_t		pkt_reqsize;
 	size_t		pkt_rspsize;
 	int		pkt_timeout;
-	uchar_t		pkt_reason;
-	struct sas_addr *pkt_address;
+	uchar_t		pkt_reason;	/* code from errno.h */
+	sas_addr_t	*pkt_address;
 } smp_pkt_t;
 
 typedef struct smp_device {
 	dev_info_t	*dip;
-	struct sas_addr smp_addr;
+	sas_addr_t	smp_addr;
 } smp_device_t;
 
-typedef struct sas_hba_tran_ext	sas_hba_tran_ext_t;
 
-struct sas_hba_tran_ext {
+struct sas_hba_tran {
+	void		*tran_hba_private;
+
 	int		(*tran_sas_getcap)(
-				struct sas_addr		*ap,
+				sas_addr_t		*ap,
 				char			*cap);
 
 	int		(*tran_smp_start)(
 				struct smp_pkt		*pkt);
 
 };
+
+extern sas_hba_tran_t *sas_hba_tran_alloc(dev_info_t *dip, int flags);
+extern int	sas_hba_attach_setup(dev_info_t *dip, sas_hba_tran_t *smp);
+extern void	sas_hba_tran_free(sas_hba_tran_t *smp);
 
 extern int	sas_smp_transport(struct smp_pkt *pkt);
 extern int	sas_ifgetcap(struct sas_addr *ap, char *cap);

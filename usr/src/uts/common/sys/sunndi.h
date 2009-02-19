@@ -753,6 +753,47 @@ void ndi_clr_dma_fault(ddi_dma_handle_t dh);
 int ndi_merge_node(dev_info_t *, int (*)(dev_info_t *, char *, int));
 void ndi_merge_wildcard_node(dev_info_t *);
 
+/*
+ * Ndi 'flavor' support: These interfaces are to support a nexus driver
+ * with multiple 'flavors' of children (devi_flavor of child), coupled
+ * with a child flavor-specifc private data mechanism (via devi_flavor_v
+ * of parent). This is provided as an extension to ddi_[sg]et_driver_private,
+ * where the vanilla 'flavor' is what is stored or retrieved via
+ * ddi_[sg]et_driver_private.
+ *
+ * Flavors are indexed with a small integer. The first flavor, flavor
+ * zero, is always present and reserved as the 'vanilla' flavor.
+ * Space for extra flavors can be allocated and private pointers
+ * with respect to each flavor set and retrieved.
+ *
+ * NOTE:For a nexus driver, if the need to support multiple flavors of
+ *	children is understood from the begining, then a private 'flavor'
+ *	mechanism can be implemented via ddi_[sg]et_driver_private.
+ *
+ *	With SCSA, the need to support multiple flavors of children was not
+ *	anticipated, and ddi_get_driver_private(9F) of an initiator port
+ *	devinfo node was publicly defined in the DDI to return a
+ *	scsi_device(9S) child-flavor specific value: a pointer to
+ *	scsi_hba_tran(9S).  Over the years, each time the need to support
+ *	a new flavor of child has occurred, a new form of overload/kludge
+ *	has been devised. The ndi 'flavors' interfaces provide a simple way
+ *	to address this issue that can be used by both SCSA nexus support,
+ *	and by other nexus drivers.
+ */
+
+/*
+ * Interfaces to maintain flavor-specific private data for children of self
+ */
+#define	NDI_FLAVOR_VANILLA	0
+
+void	ndi_flavorv_alloc(dev_info_t *self, int nflavors);
+void	ndi_flavorv_set(dev_info_t *self, ndi_flavor_t child_flavor, void *);
+void	*ndi_flavorv_get(dev_info_t *self, ndi_flavor_t child_flavor);
+
+/* Interfaces for 'self' nexus driver to get/set flavor of child */
+void		ndi_flavor_set(dev_info_t *child, ndi_flavor_t child_flavor);
+ndi_flavor_t	ndi_flavor_get(dev_info_t *child);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

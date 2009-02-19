@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi.h>
 
@@ -38,10 +36,8 @@ static void sas_gen_smp_crc(uint32_t *frame, size_t len);
 int
 sas_ifgetcap(struct sas_addr *ap, char *cap)
 {
-	struct sas_hba_tran_ext *hba_tran_ext;
-	hba_tran_ext = (sas_hba_tran_ext_t *)(ap->a_hba_tran->tran_extension);
-	if (hba_tran_ext->tran_sas_getcap)
-		return (hba_tran_ext->tran_sas_getcap(ap, cap));
+	if (ap->a_hba_tran && ap->a_hba_tran->tran_sas_getcap)
+		return (ap->a_hba_tran->tran_sas_getcap(ap, cap));
 	return (EINVAL);
 }
 
@@ -49,16 +45,10 @@ int
 sas_smp_transport(struct smp_pkt *pkt)
 {
 	struct sas_addr *ap = pkt->pkt_address;
-	struct sas_hba_tran_ext *hba_tran_ext;
-
-	hba_tran_ext = (sas_hba_tran_ext_t *)(ap->a_hba_tran->tran_extension);
-
 	if (sas_ifgetcap(ap, "smp-crc") != 0) {
-		sas_gen_smp_crc((uint32_t *)(pkt->pkt_req),
-		    pkt->pkt_reqsize);
+		sas_gen_smp_crc((uint32_t *)(pkt->pkt_req), pkt->pkt_reqsize);
 	}
-
-	return (hba_tran_ext->tran_smp_start(pkt));
+	return (ap->a_hba_tran->tran_smp_start(pkt));
 }
 
 int
@@ -129,6 +119,6 @@ static void
 sas_gen_smp_crc(uint32_t *frame, size_t len)
 {
 /*
- * Leave this function here for future using.
+ * Leave this function here for future use.
  */
 }

@@ -485,6 +485,14 @@ void		scsi_hba_pkt_comp(
 #define	SCSI_HBA_CANSLEEP	0x01		/* can sleep */
 
 /*
+ * Support extra flavors for SCSA children
+ */
+#define	SCSA_FLAVOR_SCSI_DEVICE	NDI_FLAVOR_VANILLA
+#define	SCSA_FLAVOR_IPORT	1
+#define	SCSA_FLAVOR_SMP		2
+#define	SCSA_NFLAVORS		3
+
+/*
  * For minor nodes created by the SCSA framework, minor numbers are
  * formed by left-shifting instance by INST_MINOR_SHIFT and OR in a
  * number less than 64.
