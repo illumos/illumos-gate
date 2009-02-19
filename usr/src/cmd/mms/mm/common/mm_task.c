@@ -1359,6 +1359,25 @@ void tm_be_add_mounts(mm_command_t *cmd) {
 	}
 }
 
+void
+mm_be_order_mount_cmds(mm_command_t *cmd)
+{
+	mm_command_t		*be_cmd;
+	mm_command_t		*next_cmd;
+
+	/* Put mount commands with already loaded cartridges on */
+	/* front of begin end mount list. */
+
+	for (be_cmd = mms_list_head(&cmd->cmd_beginend_list);
+	    be_cmd != NULL;
+	    be_cmd = next_cmd) {
+		next_cmd = mms_list_next(&cmd->cmd_beginend_list, be_cmd);
+		if (mm_mount_candidate_loaded(be_cmd)) {
+			mms_list_remove(&cmd->cmd_beginend_list, be_cmd);
+			mms_list_insert_head(&cmd->cmd_beginend_list, be_cmd);
+		}
+	}
+}
 
 int
 tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
@@ -1488,6 +1507,9 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 
 
 	}
+
+
+	mm_be_order_mount_cmds(cmd);
 
 	/* All mounts are either ok or retry */
 	/* Determine which error to return/block */
