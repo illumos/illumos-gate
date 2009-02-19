@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1453,6 +1453,39 @@ printSessionProps(stmfSessionList *sessionList)
 	}
 }
 
+static int
+getStmfState(stmfState *state)
+{
+	int ret;
+
+	ret = stmfGetState(state);
+	switch (ret) {
+		case STMF_STATUS_SUCCESS:
+			break;
+		case STMF_ERROR_PERM:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("permission denied"));
+			break;
+		case STMF_ERROR_SERVICE_NOT_FOUND:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("STMF service not found"));
+			break;
+		case STMF_ERROR_BUSY:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("resource busy"));
+			break;
+		case STMF_ERROR_SERVICE_DATA_VERSION:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("STMF service version incorrect"));
+			break;
+		default:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("unknown error"));
+			break;
+	}
+	return (ret);
+}
+
 /*
  * listStateFunc
  *
@@ -1467,35 +1500,8 @@ listStateFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	int ret;
 	stmfState state;
 
-	if ((ret = stmfGetState(&state)) != STMF_STATUS_SUCCESS) {
-		switch (ret) {
-			case STMF_ERROR_PERM:
-				(void) fprintf(stderr, "%s: %s\n", cmdName,
-				    gettext("permission denied"));
-				ret++;
-				break;
-			case STMF_ERROR_SERVICE_NOT_FOUND:
-				(void) fprintf(stderr, "%s: %s\n", cmdName,
-				    gettext("STMF service not found"));
-				ret++;
-				break;
-			case STMF_ERROR_BUSY:
-				(void) fprintf(stderr, "%s: %s\n", cmdName,
-				    gettext("resource busy"));
-				break;
-			case STMF_ERROR_SERVICE_DATA_VERSION:
-				(void) fprintf(stderr, "%s: %s\n", cmdName,
-				    gettext("STMF service version incorrect"));
-				ret++;
-				break;
-			default:
-				(void) fprintf(stderr, "%s: %s\n", cmdName,
-				    gettext("unknown error"));
-				ret++;
-				break;
-		}
-		return (1);
-	}
+	if ((ret = getStmfState(&state)) != STMF_STATUS_SUCCESS)
+		return (ret);
 
 	(void) printf("%-18s: ", "Operational Status");
 	switch (state.operationalState) {
@@ -1898,6 +1904,18 @@ static int
 onlineLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
     void *args)
 {
+	int ret;
+	stmfState state;
+
+	ret = getStmfState(&state);
+	if (ret != STMF_STATUS_SUCCESS)
+		return (ret);
+	if (state.operationalState == STMF_SERVICE_STATE_OFFLINE ||
+	    state.operationalState == STMF_SERVICE_STATE_OFFLINING) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("STMF service is offline"));
+		return (1);
+	}
 	return (onlineOfflineLu(operands[0], ONLINE_LU));
 }
 
@@ -1979,6 +1997,18 @@ static int
 onlineTargetFunc(int operandLen, char *operands[], cmdOptions_t *options,
     void *args)
 {
+	int ret;
+	stmfState state;
+
+	ret = getStmfState(&state);
+	if (ret != STMF_STATUS_SUCCESS)
+		return (ret);
+	if (state.operationalState == STMF_SERVICE_STATE_OFFLINE ||
+	    state.operationalState == STMF_SERVICE_STATE_OFFLINING) {
+		(void) fprintf(stderr, "%s: %s\n", cmdName,
+		    gettext("STMF service is offline"));
+		return (1);
+	}
 	return (onlineOfflineTarget(operands[0], ONLINE_TARGET));
 }
 

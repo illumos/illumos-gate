@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/scsi/impl/scsi_reset_notify.h>
 #include <sys/byteorder.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #include <stmf.h>
 #include <lpif.h>
@@ -88,7 +89,7 @@ filedisk_data_read(struct sbd_store *sst, uint64_t offset, uint64_t size,
 	ssize_t resid;
 
 	if (((offset + size) > sfd->sfd_lun_size) ||
-				((sfd->sfd_flags & SFD_OPENED) == 0)) {
+	    ((sfd->sfd_flags & SFD_OPENED) == 0)) {
 		return (STMF_FAILURE);
 	}
 
@@ -103,9 +104,18 @@ filedisk_data_read(struct sbd_store *sst, uint64_t offset, uint64_t size,
 		bzero(buf + store_end, size - store_end);
 		size = store_end;
 	}
+
+	DTRACE_PROBE4(backing__store__read__start, sbd_store_t *, sst,
+	    uint8_t *, buf, uint64_t, size, uint64_t, offset);
+
 	ret = vn_rdwr(UIO_READ, sfd->sfd_vp, (caddr_t)buf, (ssize_t)size,
-			(offset_t)offset, UIO_SYSSPACE, 0,
-				RLIM64_INFINITY, CRED(), &resid);
+	    (offset_t)offset, UIO_SYSSPACE, 0,
+	    RLIM64_INFINITY, CRED(), &resid);
+
+	DTRACE_PROBE5(backing__store__read__end, sbd_store_t *, sst,
+	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
+	    int, ret);
+
 	if (ret || resid) {
 		stmf_trace(0, "UIO_READ failed, ret %d, resid %d", ret, resid);
 		return (STMF_FAILURE);
@@ -123,13 +133,22 @@ filedisk_data_write(struct sbd_store *sst, uint64_t offset, uint64_t size,
 	ssize_t resid;
 
 	if (((offset + size) > sfd->sfd_lun_size) ||
-				((sfd->sfd_flags & SFD_OPENED) == 0)) {
+	    ((sfd->sfd_flags & SFD_OPENED) == 0)) {
 		return (STMF_FAILURE);
 	}
 
+
+	DTRACE_PROBE4(backing__store__write__start, sbd_store_t *, sst,
+	    uint8_t *, buf, uint64_t, size, uint64_t, offset);
+
 	ret = vn_rdwr(UIO_WRITE, sfd->sfd_vp, (caddr_t)buf,
-		(ssize_t)size, (offset_t)offset, UIO_SYSSPACE, 0,
-				RLIM64_INFINITY, CRED(), &resid);
+	    (ssize_t)size, (offset_t)offset, UIO_SYSSPACE, 0,
+	    RLIM64_INFINITY, CRED(), &resid);
+
+	DTRACE_PROBE5(backing__store__write__end, sbd_store_t *, sst,
+	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
+	    int, ret);
+
 	if (ret || resid) {
 		stmf_trace(0, "UIO_WRITE failed, ret %d, resid %d", ret, resid);
 		return (STMF_FAILURE);
@@ -245,7 +264,7 @@ filedisk_register_lu(register_lu_cmd_t *rlc)
 			supported_size = (((uint64_t)1) << nbits) - 1;
 			if (file_size > supported_size) {
 				rlc->return_code =
-					RLC_RET_SIZE_NOT_SUPPORTED_BY_FS;
+				    RLC_RET_SIZE_NOT_SUPPORTED_BY_FS;
 				rlc->filesize_nbits = (uint32_t)nbits;
 				ret = SBD_FAILURE;
 				goto closeout;
@@ -316,7 +335,7 @@ filedisk_register_lu(register_lu_cmd_t *rlc)
 			bcopy(sid.sst_guid, rlc->guid, 16);
 			if (ret == STMF_ALREADY) {
 				rlc->return_code =
-					RLC_RET_GUID_ALREADY_REGISTERED;
+				    RLC_RET_GUID_ALREADY_REGISTERED;
 			} else if (ret == STMF_INVALID_ARG) {
 				rlc->return_code = RLC_RET_LU_NOT_INITIALIZED;
 			} else {
@@ -337,7 +356,7 @@ filedisk_register_lu(register_lu_cmd_t *rlc)
 				(void) sbd_deregister_sst(sst);
 				sbd_sst_free(sst);
 				rlc->return_code =
-					RLC_RET_SIZE_NOT_SUPPORTED_BY_FS;
+				    RLC_RET_SIZE_NOT_SUPPORTED_BY_FS;
 				rlc->filesize_nbits = (uint32_t)nbits;
 				ret = SBD_FAILURE;
 				goto closeout;
@@ -428,7 +447,7 @@ filedisk_modify_lu(sbd_store_t *sst, modify_lu_cmd_t *mlc)
 		supported_size = (((uint64_t)1) << nbits) - 1;
 		if (file_size > supported_size) {
 			mlc->return_code =
-				RLC_RET_SIZE_NOT_SUPPORTED_BY_FS;
+			    RLC_RET_SIZE_NOT_SUPPORTED_BY_FS;
 			mlc->filesize_nbits = (uint32_t)nbits;
 			ret = SBD_FAILURE;
 			goto closeout;
@@ -493,7 +512,7 @@ filedisk_online(sbd_store_t *sst)
 	sfd = (sbd_filedisk_t *)sst->sst_store_private;
 	ASSERT((sfd->sfd_flags & SFD_OPENED) == 0);
 	error = lookupname(sfd->sfd_filename, UIO_SYSSPACE, FOLLOW,
-				NULLVPP, &sfd->sfd_vp);
+	    NULLVPP, &sfd->sfd_vp);
 	if (error) {
 		return (SBD_FILEIO_FAILURE | error);
 	}
@@ -501,7 +520,7 @@ filedisk_online(sbd_store_t *sst)
 
 	flag = FREAD | FWRITE | FOFFMAX | FEXCL;
 	error = vn_open(sfd->sfd_filename, UIO_SYSSPACE, flag, 0,
-							&sfd->sfd_vp, 0, 0);
+	    &sfd->sfd_vp, 0, 0);
 	if (error) {
 		return (SBD_FILEIO_FAILURE | error);
 	}

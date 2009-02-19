@@ -34,6 +34,7 @@
 #include <sys/disp.h>
 #include <sys/byteorder.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #include <stmf.h>
 #include <lpif.h>
@@ -885,6 +886,10 @@ sbd_remove_it_handle(sbd_lu_t *slu, sbd_it_data_t *it)
 		}
 	}
 	mutex_exit(&slu->sl_it_list_lock);
+
+	DTRACE_PROBE2(itl__nexus__end, stmf_lu_t *, slu->sl_lu,
+	    sbd_it_data_t *, it);
+
 	kmem_free(it, sizeof (*it));
 }
 
@@ -971,6 +976,9 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		it->sbd_it_next = slu->sl_it_list;
 		slu->sl_it_list = it;
 		mutex_exit(&slu->sl_it_list_lock);
+
+		DTRACE_PROBE1(itl__nexus__start, scsi_task *, task);
+
 		if (stmf_register_itl_handle(task->task_lu, task->task_lun_no,
 		    task->task_session, it->sbd_it_session_id, it)
 		    != STMF_SUCCESS) {

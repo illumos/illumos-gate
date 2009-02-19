@@ -2002,6 +2002,8 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	iss->iss_creation_time = ddi_get_time();
 	ss->ss_session_id = atomic_add_64_nv(&stmf_session_counter, 1);
 	iss->iss_flags &= ~ISS_BEING_CREATED;
+	DTRACE_PROBE2(session__online, stmf_local_port_t *, lport,
+	    stmf_scsi_session_t *, ss);
 	return (STMF_SUCCESS);
 }
 
@@ -2012,6 +2014,9 @@ stmf_deregister_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	    lport->lport_stmf_private;
 	stmf_i_scsi_session_t *iss, **ppss;
 	int found = 0;
+
+	DTRACE_PROBE2(session__offline, stmf_local_port_t *, lport,
+	    stmf_scsi_session_t *, ss);
 
 	iss = (stmf_i_scsi_session_t *)ss->ss_stmf_private;
 	if (ss->ss_rport_alias) {
@@ -2748,6 +2753,7 @@ stmf_task_free(scsi_task_t *task)
 	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)
 	    task->task_stmf_private;
 
+	DTRACE_PROBE1(stmf__task__end, scsi_task_t *, task);
 	stmf_free_task_bufs(itask, lport);
 	if (itask->itask_itl_datap) {
 		if (atomic_add_32_nv(&itask->itask_itl_datap->itl_counter,
@@ -2902,6 +2908,8 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 stmf_status_t
 stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 {
+	stmf_status_t ret;
+
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 
@@ -2923,7 +2931,12 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 			return (STMF_SUCCESS);
 	}
 #endif
-	return (task->task_lport->lport_xfer_data(task, dbuf, ioflags));
+	DTRACE_PROBE2(scsi__xfer__start, scsi_task_t *, task,
+	    stmf_data_buf_t *, dbuf);
+	ret = task->task_lport->lport_xfer_data(task, dbuf, ioflags);
+	DTRACE_PROBE2(scsi__xfer__end, scsi_task_t *, task,
+	    stmf_data_buf_t *, dbuf);
+	return (ret);
 }
 
 void
@@ -3006,6 +3019,8 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 stmf_status_t
 stmf_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 {
+	DTRACE_PROBE1(scsi__send__status, scsi_task_t *, task);
+
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	if (ioflags & STMF_IOF_LU_DONE) {
@@ -3207,6 +3222,9 @@ stmf_abort(int abort_cmd, scsi_task_t *task, stmf_status_t s, void *arg)
 {
 	stmf_i_scsi_task_t *itask = NULL;
 	uint32_t old, new, f, rf;
+
+	DTRACE_PROBE2(scsi__task__abort, scsi_task_t *, task,
+	    stmf_status_t, s);
 
 	switch (abort_cmd) {
 	case STMF_QUEUE_ABORT_LU:
@@ -3491,11 +3509,17 @@ stmf_ctl(int cmd, void *obj, void *arg)
 		if (ilu == NULL) {
 			goto stmf_ctl_lock_exit;
 		}
+		DTRACE_PROBE3(lu__state__change,
+		    stmf_lu_t *, ilu->ilu_lu,
+		    int, cmd, stmf_state_change_info_t *, ssci);
 	} else if (cmd & STMF_CMD_LPORT_OP) {
 		ilport = stmf_lookup_lport((stmf_local_port_t *)obj);
 		if (ilport == NULL) {
 			goto stmf_ctl_lock_exit;
 		}
+		DTRACE_PROBE3(lport__state__change,
+		    stmf_local_port_t *, ilport->ilport_lport,
+		    int, cmd, stmf_state_change_info_t *, ssci);
 	} else {
 		goto stmf_ctl_lock_exit;
 	}
@@ -4399,6 +4423,7 @@ out_itask_flag_loop:
 				}
 			}
 #endif
+			DTRACE_PROBE1(scsi__task__start, scsi_task_t *, task);
 			lu->lu_new_task(task, dbuf);
 			break;
 		case ITASK_CMD_DATA_XFER_DONE:
