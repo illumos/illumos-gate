@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1745,7 +1745,8 @@ obj_scan_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (SUCCESS);
 
 	type = raid_obj_get_type(raid_tab, obj_id);
-	if (type < OBJ_TYPE_SYSTEM || type > OBJ_TYPE_ALL)
+	/* type less than OBJ_TYPE_SYSTEM means error */
+	if (type < OBJ_TYPE_SYSTEM)
 		return (ERR_DEVICE_INVALID);
 
 	for (obj_type_cnt = OBJ_SYSTEM; obj_type_cnt < OBJ_TYPE_ALL;
