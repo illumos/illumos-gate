@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1570,14 +1570,17 @@ get_node_op(
 				if (uid != 0) {
 					/* we found a portal group */
 					lc2.curr_uid = uid;
-					/* pass ip addr from cb_get_pg_info. */
-					lc3.data[0].ip = lc2.data[1].ip;
-					/* pass port num from cb_get_pg_info. */
-					lc3.data[1].ui = lc2.data[2].ui;
-					/* pass pgt from cb_get_pg_info. */
-					lc3.id[2] = lc2.id[2];
-					ret = cache_lookup(&lc3, &uid,
-					    cb_get_portal_info);
+					/* it is a null pg if pgt is zero. */
+					if (lc2.id[2] != 0) {
+						/* pass ip addr */
+						lc3.data[0].ip = lc2.data[1].ip;
+						/* pass port num */
+						lc3.data[1].ui = lc2.data[2].ui;
+						/* pass pgt */
+						lc3.id[2] = lc2.id[2];
+						ret = cache_lookup(&lc3, &uid,
+						    cb_get_portal_info);
+					}
 				} else {
 					/*
 					 * no more portal group which is
@@ -2233,7 +2236,8 @@ delete_dd_ddset_op(
 		    /* unlock the cache and no need to sync data */
 		    (void) cache_unlock_nosync();
 		    /* set an error and continue. */
-		    ret = ERR_MATCHING_DD_NOT_FOUND;
+		    ret = (lc_type == OBJ_DD) ?  ERR_MATCHING_DD_NOT_FOUND :
+			ERR_MATCHING_DDSET_NOT_FOUND;
 		}
 
 		if (ret != 0) {
