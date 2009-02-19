@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * raidctl.c is the entry file of RAID configuration utility.
@@ -2014,8 +2014,8 @@ print_disk_table(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle)
 	}
 
 	/* Print header */
-	(void) fprintf(stdout, gettext("Disk\tVendor\tProduct\t\tFirmware\t"
-	    "Capacity\tStatus\tHSP"));
+	(void) fprintf(stdout, gettext("Disk\tVendor   Product          "
+	    "Firmware\tCapacity\tStatus\tHSP"));
 	(void) fprintf(stdout, "\n");
 	(void) fprintf(stdout, "--------------------------------------");
 	(void) fprintf(stdout, "--------------------------------------");
@@ -2241,8 +2241,8 @@ static int
 print_disk_attr(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle,
 	raidcfg_disk_t *attrp)
 {
-	char vendor[DISK_VENDER_LEN];
-	char product[DISK_PRODUCT_LEN];
+	char vendor[DISK_VENDER_LEN + 1];
+	char product[DISK_PRODUCT_LEN + 1];
 	char revision[DISK_REV_LEN + 1];
 	char capacity[16];
 	char hsp[16];
@@ -2257,13 +2257,16 @@ print_disk_attr(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle,
 		return (FAILURE);
 	}
 
-	(void) snprintf(vendor, sizeof (vendor), "%s", attrp->vendorid);
-	(void) printf("%s\t", vendor);
+	(void) memccpy(vendor, attrp->vendorid, '\0', DISK_VENDER_LEN);
+	vendor[DISK_VENDER_LEN] = '\0';
+	(void) printf("%-9s", vendor);
 
-	(void) snprintf(product, sizeof (product), "%s", attrp->productid);
-	(void) printf("%s\t", product);
+	(void) memccpy(product, attrp->productid, '\0', DISK_PRODUCT_LEN);
+	product[DISK_PRODUCT_LEN] = '\0';
+	(void) printf("%-17s", product);
 
-	(void) snprintf(revision, sizeof (revision), "%s", attrp->revision);
+	(void) memccpy(revision, attrp->revision, '\0', DISK_REV_LEN);
+	revision[DISK_REV_LEN] = '\0';
 	(void) printf("%s\t\t", revision);
 
 	if (attrp->capacity != MAX64BIT) {

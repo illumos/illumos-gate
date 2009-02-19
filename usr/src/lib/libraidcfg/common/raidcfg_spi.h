@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,6 +293,8 @@ typedef struct {
 	uint32_t	state;
 	disk_tag_t	tag;
 	uint64_t	capacity;
+
+	/* ASCII data not terminated by null */
 	char		vendorid[DISK_VENDER_LEN];
 	char		productid[DISK_PRODUCT_LEN];
 	char		revision[DISK_REV_LEN];
