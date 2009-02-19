@@ -67,6 +67,9 @@ pt_error(char *format, ...)
 	int 	err = errno;
 	va_list alist;
 
+	if (!dump)
+		return;
+
 	if (progname != NULL)
 		(void) fprintf(stderr, PROG_FMT, progname);
 
