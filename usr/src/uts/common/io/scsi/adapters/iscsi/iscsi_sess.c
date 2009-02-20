@@ -1646,6 +1646,7 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	uint32_t		lun_start	= 0;
 	uint32_t		lun_total	= 0;
 	int			retries		= 0;
+	iscsi_lun_t		*ilp_next;
 	iscsi_lun_t		*ilp		= NULL;
 	replun_data_t		*saved_replun_ptr = NULL;
 
@@ -1751,7 +1752,9 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	 */
 	lun_start = 0;
 	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
-	for (ilp = isp->sess_lun_list; ilp; ilp = ilp->lun_next) {
+	for (ilp = isp->sess_lun_list; ilp; ilp = ilp_next) {
+		ilp_next = ilp->lun_next;
+
 		for (lun_count = lun_start;
 		    lun_count < lun_total; lun_count++) {
 		/*
