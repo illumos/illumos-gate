@@ -861,9 +861,10 @@ udp_tpi_connect(queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * ok_ack for T_CONN_REQ
+	 * Allocate the largest primitive we need to send back
+	 * T_error_ack is > than T_ok_ack
 	 */
-	mp = mi_tpi_ok_ack_alloc(mp);
+	mp = reallocb(mp, sizeof (struct T_error_ack), 1);
 	if (mp == NULL) {
 		/* Unable to reuse the T_CONN_REQ for the ack. */
 		freemsg(mp1);
@@ -879,6 +880,8 @@ udp_tpi_connect(queue_t *q, mblk_t *mp)
 		else
 			udp_err_ack(q, mp, TSYSERR, error);
 	} else {
+		mp = mi_tpi_ok_ack_alloc(mp);
+		ASSERT(mp != NULL);
 		putnext(connp->conn_rq, mp);
 		putnext(connp->conn_rq, mp1);
 	}
