@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -232,6 +232,7 @@ LDLIBS +=	-lc -lsocket -lnsl
 MAPFILES =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
+OPENSSL_SRC =	../../../../common/openssl
 SRCDIR =	$(OPENSSL_SRC)/crypto
 
 $(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)

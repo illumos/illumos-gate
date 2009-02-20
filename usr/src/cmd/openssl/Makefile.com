@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 PROG =	openssl
@@ -70,6 +70,7 @@ OBJS =	\
 	version.o \
 	x509.o
 
+OPENSSL_SRC =	../../../common/openssl
 SRCDIR =	$(OPENSSL_SRC)/apps
 
 ROOTCMDDIR =	$(ROOTBIN)

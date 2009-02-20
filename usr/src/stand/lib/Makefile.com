@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -104,6 +104,7 @@ LINTFLAGS = -nmsF -erroff=E_BAD_PTR_CAST_ALIGN \
 # may be repeats from OPENSSL_NO_XXX but they are explicit here because
 # we are not just excluding for legal reasons but for size as well.
 #
+OPENSSL_SRC = ../../../common/openssl
 OPENSSL_BUILD_CPPFLAGS_sparc = -DB_ENDIAN
 OPENSSL_BUILD_CPPFLAGS = $(OPENSSL_NO_XXX) -DOPENSSL_NO_HW \
 			-DOPENSSL_NO_MD2 -DOPENSSL_NO_MD4 -DOPENSSL_NO_MDC2 \

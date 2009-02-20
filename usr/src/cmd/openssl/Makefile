@@ -20,12 +20,11 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# we need this for OPENSSL_VERSION, OPENSSL_DATE,
-# and for OPENSSL_SRC (src/common directory location)
+# we need this for OPENSSL_VERSION, OPENSSL_DATE
 include $(SRC)/lib/openssl/Makefile.openssl
 
 SUBDIRS =		$(MACH)
@@ -40,6 +39,7 @@ MANDIRS =		man$(MS1) man$(MS3) man$(MS5) man$(MS7)
 ROOTMANDIRS =		$(MANDIRS:%=$(ROOTMAN)/%)
 
 POD2MAN =		/usr/perl5/bin/pod2man
+OPENSSL_SRC =		../../common/openssl
 EXTRACT_NAMES=		$(OPENSSL_SRC)/doc/extract-names.pl
 
 # we need to explicitly specify these 3 manual pages since their sections

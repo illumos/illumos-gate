@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # OpenSSL source is common between lib and stand (for wanboot).
@@ -29,11 +29,11 @@
 OPENSSL_VERSION =	0.9.8
 OPENSSL_DATE =		"Oct 11 2005"
 
-# OPENSSL_SRC, OPENSSL_ETCDIR, OPENSSL_NO_XX, OPENSSL_BUILD_CPPFLAGS are
+# OPENSSL_ETCDIR, OPENSSL_NO_XX, OPENSSL_BUILD_CPPFLAGS are
 # for use only for building OpenSSL, they are here because we built it in
-# two different places.
-#
-OPENSSL_SRC =		$(SRC)/common/openssl
+# two different places. OPENSSL_SRC is set invidually for each library
+# as to suppress using absolute paths for source files which leads to
+# the workspace paths being embedded into the binaries.
 
 OPENSSL_ETCDIR =	/etc/openssl
 
