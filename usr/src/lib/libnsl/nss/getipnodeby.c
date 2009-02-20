@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file defines and implements the re-entrant getipnodebyname(),
@@ -30,8 +29,6 @@
  *
  * lib/libnsl/nss/getipnodeby.c
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <stdlib.h>
@@ -110,7 +107,7 @@ _uncached_getipnodebyname(const char *nam, struct hostent *result,
 	char *buffer, int buflen, int af_family, int flags, int *h_errnop)
 {
 	return (_switch_getipnodebyname_r(nam, result, buffer, buflen,
-					af_family, flags, h_errnop));
+	    af_family, flags, h_errnop));
 }
 
 struct hostent *
@@ -119,10 +116,10 @@ _uncached_getipnodebyaddr(const char *addr, int length, int type,
 {
 	if (type == AF_INET)
 		return (_switch_gethostbyaddr_r(addr, length, type,
-					result, buffer, buflen, h_errnop));
+		    result, buffer, buflen, h_errnop));
 	else if (type == AF_INET6)
 		return (_switch_getipnodebyaddr_r(addr, length, type,
-					result, buffer, buflen, h_errnop));
+		    result, buffer, buflen, h_errnop));
 	return (NULL);
 }
 #endif
@@ -450,8 +447,8 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 	 * Step 1: IPv4-mapped address  or IPv4 Compat
 	 */
 	if ((type == AF_INET6 && len == 16) &&
-		((IN6_IS_ADDR_V4MAPPED(addr6)) ||
-		(IN6_IS_ADDR_V4COMPAT(addr6)))) {
+	    ((IN6_IS_ADDR_V4MAPPED(addr6)) ||
+	    (IN6_IS_ADDR_V4COMPAT(addr6)))) {
 		if ((buf = __IPv6_alloc(NSS_BUFLEN_IPNODES)) == 0) {
 			*error_num = NO_RECOVERY;
 			return (NULL);
@@ -484,14 +481,14 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		 * nc_nlookups.
 		 */
 		neterr =
-			_get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
+		    _get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
 
 		(void) freenetconfigent(nconf);
 		if (neterr != ND_OK) {
 			/* Failover case, try hosts db for v4 address */
 			if (!gethostbyaddr_r(((char *)addr6) + 12,
-				sizeof (in_addr_t), AF_INET, buf->result,
-				buf->buffer, buf->buflen, error_num)) {
+			    sizeof (in_addr_t), AF_INET, buf->result,
+			    buf->buffer, buf->buflen, error_num)) {
 				__IPv6_cleanup(buf);
 				return (NULL);
 			}
@@ -504,7 +501,7 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 			/* Convert IPv4 to mapped/compat address w/name */
 			hp = res->result;
 			(void) __mapv4tov6(buf->result, 0, res,
-						IN6_IS_ADDR_V4MAPPED(addr6));
+			    IN6_IS_ADDR_V4MAPPED(addr6));
 			__IPv6_cleanup(buf);
 			free(res);
 			return (hp);
@@ -561,14 +558,14 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		 * nc_nlookups.
 		 */
 		neterr =
-			_get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
+		    _get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
 
 		(void) freenetconfigent(nconf);
 		if (neterr != ND_OK) {
 			/* Failover case, try hosts db for v4 address */
 			hp = buf->result;
 			if (!gethostbyaddr_r(src, len, type, buf->result,
-					buf->buffer, buf->buflen, error_num)) {
+			    buf->buffer, buf->buflen, error_num)) {
 				__IPv6_cleanup(buf);
 				return (NULL);
 			}
@@ -611,7 +608,7 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		 * nc_nlookups.
 		 */
 		neterr =
-			_get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
+		    _get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
 
 		(void) freenetconfigent(nconf);
 		if (neterr != ND_OK) {
@@ -727,7 +724,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 	buff_locp = (char *)ROUND_DOWN(limit, sizeof (struct in6_addr));
 	host->h_addr_list = (char **)ROUND_UP(buffer, sizeof (char **));
 	if ((char *)host->h_addr_list >= limit ||
-		buff_locp <= (char *)host->h_addr_list) {
+	    buff_locp <= (char *)host->h_addr_list) {
 		return (NULL);
 	}
 	if (he6 == NULL) {
@@ -741,7 +738,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		for (i = 0; he4->h_addr_list[i] != NULL; i++) {
 			buff_locp -= sizeof (struct in6_addr);
 			if (buff_locp <=
-				(char *)&(host->h_addr_list[count + 1])) {
+			    (char *)&(host->h_addr_list[count + 1])) {
 			/*
 			 * Has to be room for the pointer to the address we're
 			 * about to add, as well as the final NULL ptr.
@@ -757,7 +754,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 				addr6p->s6_addr[11] = 0xff;
 			}
 			bcopy((char *)he4->h_addr_list[i],
-				&addr6p->s6_addr[12], sizeof (struct in_addr));
+			    &addr6p->s6_addr[12], sizeof (struct in_addr));
 			++count;
 		}
 		/*
@@ -773,7 +770,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		 */
 			char	tmpstr[128];
 			(void) inet_ntop(AF_INET6, host->h_addr_list[0], tmpstr,
-							sizeof (tmpstr));
+			    sizeof (tmpstr));
 			buff_locp -= (len = strlen(tmpstr) + 1);
 			h_namep = tmpstr;
 			if (buff_locp <= (char *)(host->h_aliases))
@@ -800,7 +797,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		for (i = 0; he4->h_aliases[i] != NULL; i++) {
 			buff_locp -= (len = strlen(he4->h_aliases[i]) + 1);
 			if (buff_locp <=
-					(char *)&(host->h_aliases[count + 1])) {
+			    (char *)&(host->h_aliases[count + 1])) {
 			/*
 			 * Has to be room for the pointer to the address we're
 			 * about to add, as well as the final NULL ptr.
@@ -825,7 +822,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		for (i = 0; he6->h_addr_list[i] != NULL; i++) {
 			buff_locp -= sizeof (struct in6_addr);
 			if (buff_locp <=
-				(char *)&(host->h_addr_list[count + 1])) {
+			    (char *)&(host->h_addr_list[count + 1])) {
 			/*
 			 * Has to be room for the pointer to the address we're
 			 * about to add, as well as the final NULL ptr.
@@ -834,7 +831,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 			}
 			host->h_addr_list[count] = buff_locp;
 			bcopy((char *)he6->h_addr_list[i], buff_locp,
-						sizeof (struct in6_addr));
+			    sizeof (struct in6_addr));
 			++count;
 		}
 		/*
@@ -843,7 +840,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		for (i = 0; he4->h_addr_list[i] != NULL; i++) {
 			buff_locp -= sizeof (struct in6_addr);
 			if (buff_locp <=
-				(char *)&(host->h_addr_list[count + 1])) {
+			    (char *)&(host->h_addr_list[count + 1])) {
 			/*
 			 * Has to be room for the pointer to the address we're
 			 * about to add, as well as the final NULL ptr.
@@ -857,7 +854,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 			addr6p->s6_addr[10] = 0xff;
 			addr6p->s6_addr[11] = 0xff;
 			bcopy(he4->h_addr_list[i], &addr6p->s6_addr[12],
-						sizeof (struct in_addr));
+			    sizeof (struct in_addr));
 			++count;
 		}
 		/*
@@ -877,7 +874,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		for (i = 0; he6->h_aliases[i] != NULL; i++) {
 			buff_locp -= (len = strlen(he6->h_aliases[i]) + 1);
 			if (buff_locp <=
-					(char *)&(host->h_aliases[count + 1])) {
+			    (char *)&(host->h_aliases[count + 1])) {
 			/*
 			 * Has to be room for the pointer to the address we're
 			 * about to add, as well as the final NULL ptr.
@@ -894,7 +891,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		for (i = 0; he4->h_aliases[i] != NULL; i++) {
 			buff_locp -= (len = strlen(he4->h_aliases[i]) + 1);
 			if (buff_locp <=
-					(char *)&(host->h_aliases[count + 1])) {
+			    (char *)&(host->h_aliases[count + 1])) {
 			/*
 			 * Has to be room for the pointer to the address we're
 			 * about to add, as well as the final NULL ptr.
@@ -970,7 +967,7 @@ __mappedtov4(struct hostent *he, int *extract_error)
 	buff_locp = (char *)ROUND_DOWN(limit, sizeof (struct in_addr));
 	host->h_addr_list = (char **)ROUND_UP(buffer, sizeof (char **));
 	if ((char *)host->h_addr_list >= limit ||
-		buff_locp <= (char *)host->h_addr_list)
+	    buff_locp <= (char *)host->h_addr_list)
 		goto cleanup;
 	/*
 	 * "Unmap" the v4 mapped address(es) into a v4 hostent format.
@@ -979,46 +976,46 @@ __mappedtov4(struct hostent *he, int *extract_error)
 	 * addresses. This could also be a literal address string,
 	 * which is why there is a inet_addr() call.
 	 */
-		for (i = 0; he->h_addr_list[i] != NULL; i++) {
-			/* LINTED pointer cast */
-			if (!IN6_IS_ADDR_V4MAPPED((struct in6_addr *)
-							he->h_addr_list[i]))
+	for (i = 0; he->h_addr_list[i] != NULL; i++) {
+		/* LINTED pointer cast */
+		if (!IN6_IS_ADDR_V4MAPPED((struct in6_addr *)
+		    he->h_addr_list[i]))
 			continue;
-			buff_locp -= sizeof (struct in6_addr);
-			/*
-			 * Has to be room for the pointer to the address we're
-			 * about to add, as well as the final NULL ptr.
-			 */
-			if (buff_locp <=
-				(char *)&(host->h_addr_list[count + 1]))
-				goto cleanup;
-			/* LINTED pointer cast */
-			addr4p = (struct in_addr *)buff_locp;
-			host->h_addr_list[count] = (char *)addr4p;
-			bzero((char *)&addr4p->s_addr,
-						sizeof (struct in_addr));
-			/* LINTED pointer cast */
-			IN6_V4MAPPED_TO_INADDR(
-					(struct in6_addr *)he->h_addr_list[i],
-					addr4p);
-			++count;
-		}
+		buff_locp -= sizeof (struct in6_addr);
 		/*
-		 * Set last array element to NULL and add cname as first alias
+		 * Has to be room for the pointer to the address we're
+		 * about to add, as well as the final NULL ptr.
 		 */
-		host->h_addr_list[count] = NULL;
-		host->h_aliases = host->h_addr_list + count + 1;
-		count = 0;
-		/* Copy official host name */
-		buff_locp -= (len = strlen(he->h_name) + 1);
-		h_namep = he->h_name;
-		if (buff_locp <= (char *)(host->h_aliases))
+		if (buff_locp <=
+		    (char *)&(host->h_addr_list[count + 1]))
 			goto cleanup;
-		bcopy(h_namep, buff_locp, len);
-		host->h_name = buff_locp;
-		/*
-		 * Pass 2 (IPv4 aliases):
-		 */
+		/* LINTED pointer cast */
+		addr4p = (struct in_addr *)buff_locp;
+		host->h_addr_list[count] = (char *)addr4p;
+		bzero((char *)&addr4p->s_addr,
+		    sizeof (struct in_addr));
+		/* LINTED pointer cast */
+		IN6_V4MAPPED_TO_INADDR(
+		    (struct in6_addr *)he->h_addr_list[i], addr4p);
+		++count;
+	}
+	/*
+	 * Set last array element to NULL and add cname as first alias
+	 */
+	host->h_addr_list[count] = NULL;
+	host->h_aliases = host->h_addr_list + count + 1;
+	count = 0;
+	/* Copy official host name */
+	buff_locp -= (len = strlen(he->h_name) + 1);
+	h_namep = he->h_name;
+	if (buff_locp <= (char *)(host->h_aliases))
+		goto cleanup;
+	bcopy(h_namep, buff_locp, len);
+	host->h_name = buff_locp;
+	/*
+	 * Pass 2 (IPv4 aliases):
+	 */
+	if (he->h_aliases != NULL) {
 		for (i = 0; he->h_aliases[i] != NULL; i++) {
 			buff_locp -= (len = strlen(he->h_aliases[i]) + 1);
 			/*
@@ -1026,17 +1023,18 @@ __mappedtov4(struct hostent *he, int *extract_error)
 			 * about to add, as well as the final NULL ptr.
 			 */
 			if (buff_locp <=
-					(char *)&(host->h_aliases[count + 1]))
+			    (char *)&(host->h_aliases[count + 1]))
 				goto cleanup;
 			host->h_aliases[count] = buff_locp;
 			bcopy((char *)he->h_aliases[i], buff_locp, len);
 			++count;
 		}
-		host->h_aliases[count] = NULL;
-		host->h_length = sizeof (struct in_addr);
-		host->h_addrtype = AF_INET;
-		free(res);
-		return (host);
+	}
+	host->h_aliases[count] = NULL;
+	host->h_length = sizeof (struct in_addr);
+	host->h_addrtype = AF_INET;
+	free(res);
+	return (host);
 cleanup:
 	*extract_error = NO_RECOVERY;
 	(void) __IPv6_cleanup(res);
