@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,7 +296,7 @@ auth_chap_select_alg(iscsit_conn_t *ict, nvpair_t *nvp,
 	while (alg_choice != NULL) {
 		nvrc = nvpair_value_string(alg_choice, &alg_string);
 		ASSERT(nvrc == 0);
-		rc = idm_strtoull(alg_string, NULL, 0, (u_longlong_t *)&alg);
+		rc = ddi_strtoull(alg_string, NULL, 0, (u_longlong_t *)&alg);
 		if (rc == 0 && alg == 5) {
 			/* only MD5 is supported */
 			text = alg_string;

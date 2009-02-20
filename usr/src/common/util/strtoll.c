@@ -20,57 +20,54 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#if	defined(_KERNEL) && !defined(_BOOT)
+#include <sys/errno.h>
+#else	/* _KERNEL && !_BOOT */
+#if	!defined(_BOOT) && !defined(_KMDB)
 #include "lint.h"
+#endif	/* !_BOOT && !_KMDB */
 #include <errno.h>
 #include <ctype.h>
 #include <limits.h>
-#include <sys/types.h>
 #include <stdlib.h>
+#endif	/* _KERNEL && !_BOOT */
+#include "strtolctype.h"
+#include <sys/types.h>
 
-#define	DIGIT(x)	\
-	(isdigit(x) ? (x) - '0' : islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
-
-#define	MBASE	('z' - 'a' + 1 + 10)
-
-
-/*
- * The following macro is a local version of isalnum() which limits
- * alphabetic characters to the ranges a-z and A-Z; locale dependent
- * characters will not return 1. The members of a-z and A-Z are
- * assumed to be in ascending order and contiguous
- */
-#define	lisalnum(x)	\
-	(isdigit(x) || ((x) >= 'a' && (x) <= 'z') || ((x) >= 'A' && (x) <= 'Z'))
-
-u_longlong_t
-strtoull(const char *str, char **nptr, int base)
+#if	defined(_KERNEL) && !defined(_BOOT)
+int
+ddi_strtoll(const char *str, char **nptr, int base, longlong_t *result)
+#else	/* _KERNEL && !_BOOT */
+longlong_t
+strtoll(const char *str, char **nptr, int base)
+#endif	/* _KERNEL && !_BOOT */
 {
-	u_longlong_t val;
+	longlong_t val;
 	int c;
 	int xx;
-	u_longlong_t	multmax;
-	u_longlong_t	ullong_max;
 	int neg = 0;
-	const char 	**ptr = (const char **)nptr;
-	const unsigned char	*ustr = (const unsigned char *)str;
+	longlong_t multmin;
+	longlong_t limit;
+	const char **ptr = (const char **)nptr;
+	const unsigned char *ustr = (const unsigned char *)str;
 
 	if (ptr != (const char **)0)
 		*ptr = (char *)ustr; /* in case no number is formed */
-
-	ullong_max = ULLONG_MAX;   /* from a local version of limits.h */
-
 	if (base < 0 || base > MBASE || base == 1) {
+		/* base is invalid -- should be a fatal error */
+#if	defined(_KERNEL) && !defined(_BOOT)
+		return (EINVAL);
+#else	/* _KERNEL && !_BOOT */
 		errno = EINVAL;
-		return (0); /* base is invalid -- should be a fatal error */
+		return (0);
+#endif	/* _KERNEL && !_BOOT */
 	}
 	if (!isalnum(c = *ustr)) {
 		while (isspace(c))
@@ -94,32 +91,53 @@ strtoull(const char *str, char **nptr, int base)
 	 * for any base > 10, the digits incrementally following
 	 *	9 are assumed to be "abc...z" or "ABC...Z"
 	 */
-	if (!lisalnum(c) || (xx = DIGIT(c)) >= base)
-		return (0); /* no number formed */
+	if (!lisalnum(c) || (xx = DIGIT(c)) >= base) {
+		/* no number formed */
+#if	defined(_KERNEL) && !defined(_BOOT)
+		return (EINVAL);
+#else	/* _KERNEL && !_BOOT */
+		return (0);
+#endif	/* _KERNEL && !_BOOT */
+	}
 	if (base == 16 && c == '0' && (ustr[1] == 'x' || ustr[1] == 'X') &&
 	    isxdigit(ustr[2]))
 		c = *(ustr += 2); /* skip over leading "0x" or "0X" */
 
-	multmax = ullong_max / (u_longlong_t)base;
-	val = DIGIT(c);
+	/* this code assumes that abs(LLONG_MIN) >= abs(LLONG_MAX) */
+	if (neg)
+		limit = LLONG_MIN;
+	else
+		limit = -LLONG_MAX;
+	multmin = limit / (longlong_t)base;
+	val = -DIGIT(c);
 	for (c = *++ustr; lisalnum(c) && (xx = DIGIT(c)) < base; ) {
-		if (val > multmax)
+		/* accumulate neg avoids surprises near LLONG_MAX */
+		if (val < multmin)
 			goto overflow;
 		val *= base;
-		if (ullong_max - val < xx)
+		if (val < limit + xx)
 			goto overflow;
-		val += xx;
+		val -= xx;
 		c = *++ustr;
 	}
 	if (ptr != (const char **)0)
 		*ptr = (char *)ustr;
-	return (neg ? -val : val);
+#if	defined(_KERNEL) && !defined(_BOOT)
+	*result = neg ? val : -val;
+	return (0);
+#else	/* _KERNEL && !_BOOT */
+	return (neg ? val : -val);
+#endif	/* _KERNEL && !_BOOT */
 
 overflow:
 	for (c = *++ustr; lisalnum(c) && (xx = DIGIT(c)) < base; (c = *++ustr))
 		;
 	if (ptr != (const char **)0)
 		*ptr = (char *)ustr;
+#if	defined(_KERNEL) && !defined(_BOOT)
+	return (ERANGE);
+#else	/* _KERNEL && !_BOOT */
 	errno = ERANGE;
-	return (ullong_max);
+	return (neg ? LLONG_MIN : LLONG_MAX);
+#endif	/* _KERNEL && !_BOOT */
 }

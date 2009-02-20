@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _IDM_TEXT_H_
@@ -186,10 +186,6 @@ idm_pdu_init_text_data(idm_pdu_t *pdu, void *arg,
 
 void
 idm_itextbuf_free(void *arg);
-
-int
-idm_strtoull(const char *str, char **nptr, int base,
-    unsigned long long *result);
 
 #ifdef	__cplusplus
 }

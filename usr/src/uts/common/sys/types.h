@@ -577,6 +577,13 @@ typedef	unsigned long	ulong;
 #define	ULONG_MAX	4294967295UL	/* max of "unsigned long int" */
 #endif
 
+#define	LLONG_MIN	(-9223372036854775807LL-1LL)
+					/* min of "long long int" */
+#define	LLONG_MAX	9223372036854775807LL
+					/* max of "long long int" */
+#define	ULLONG_MAX	18446744073709551615ULL
+					/* max of "unsigned long long int" */
+
 #endif	/* defined(_KERNEL) */
 
 #define	P_MYPID	((pid_t)0)

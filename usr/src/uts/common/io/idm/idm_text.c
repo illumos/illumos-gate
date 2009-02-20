@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -541,7 +541,7 @@ idm_nvlist_add_binary(nvlist_t *nvl,
 		 * as a hex or base64 value.  Therefore we'll convert it
 		 * to an array of bytes.
 		 */
-		if ((rc = idm_strtoull(value, NULL, 0,
+		if ((rc = ddi_strtoull(value, NULL, 0,
 		    (u_longlong_t *)&uint64_value)) != 0)
 			return (rc);
 
@@ -582,7 +582,7 @@ idm_nvlist_add_numerical(nvlist_t *nvl,
 	 * This shouldn't happen with real-world values for the current
 	 * iSCSI parameters of "numerical" type.
 	 */
-	rc = idm_strtoull(value, NULL, 0, (u_longlong_t *)&uint64_value);
+	rc = ddi_strtoull(value, NULL, 0, (u_longlong_t *)&uint64_value);
 	if (rc == 0) {
 		rc = nvlist_add_uint64(nvl, ikvx->ik_key_name, uint64_value);
 	}
@@ -628,7 +628,7 @@ idm_nvlist_add_numeric_range(nvlist_t *nvl,
 	 * Start value
 	 */
 	*(val_scan + val_len + 1) = '\0';
-	rc = idm_strtoull(val_scan, NULL, 0, (u_longlong_t *)&start_val);
+	rc = ddi_strtoull(val_scan, NULL, 0, (u_longlong_t *)&start_val);
 	if (rc == 0) {
 		rc = nvlist_add_uint64(range_nvl, "start", start_val);
 	}
@@ -641,7 +641,7 @@ idm_nvlist_add_numeric_range(nvlist_t *nvl,
 	 * End value
 	 */
 	val_scan += val_len + 1;
-	rc = idm_strtoull(val_scan, NULL, 0, (u_longlong_t *)&end_val);
+	rc = ddi_strtoull(val_scan, NULL, 0, (u_longlong_t *)&end_val);
 	if (rc == 0) {
 		rc = nvlist_add_uint64(range_nvl, "start", end_val);
 	}
@@ -1615,107 +1615,4 @@ cleanup:
 	 * that make up this request.
 	 */
 	return (ret);
-}
-
-/*
- * idm_strtoull
- *
- * Since the kernel only provides ddi_strtoul (not the ddi_strtoull that we
- * would like to use) we need our own conversion function to convert
- * string integer representations to 64-bit integers.  ddi_strtoul doesn't
- * work well for us on 32-bit systems.  This code is shamelessly ripped
- * from ddi_strtol.c.  Eventually we should push this back into the DDI
- * so that we don't need our own version anymore.
- */
-
-#define	isalnum(ch)	(isalpha(ch) || isdigit(ch))
-#define	isalpha(ch)	(isupper(ch) || islower(ch))
-#define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
-#define	islower(ch)	((ch) >= 'a' && (ch) <= 'z')
-#define	isspace(ch)	(((ch) == ' ') || ((ch) == '\r') || ((ch) == '\n') || \
-			((ch) == '\t') || ((ch) == '\f'))
-#define	isupper(ch)	((ch) >= 'A' && (ch) <= 'Z')
-#define	isxdigit(ch)	(isdigit(ch) || ((ch) >= 'a' && (ch) <= 'f') || \
-			((ch) >= 'A' && (ch) <= 'F'))
-
-#define	DIGIT(x)	\
-	(isdigit(x) ? (x) - '0' : islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
-
-#define	MBASE	('z' - 'a' + 1 + 10)
-
-#define	lisalnum(x)	\
-	(isdigit(x) || ((x) >= 'a' && (x) <= 'z') || ((x) >= 'A' && (x) <= 'Z'))
-
-#ifndef ULLONG_MAX
-#define	ULLONG_MAX	18446744073709551615ULL
-#endif
-
-int
-idm_strtoull(const char *str, char **nptr, int base,
-    unsigned long long *result)
-{
-	unsigned long long val;
-	int c;
-	int xx;
-	unsigned long long multmax;
-	int neg = 0;
-	const char **ptr = (const char **)nptr;
-	const unsigned char	*ustr = (const unsigned char *)str;
-
-	if (ptr != (const char **)0)
-		*ptr = (char *)ustr; /* in case no number is formed */
-	if (base < 0 || base > MBASE || base == 1) {
-		/* base is invalid -- should be a fatal error */
-		return (EINVAL);
-	}
-	if (!isalnum(c = *ustr)) {
-		while (isspace(c))
-			c = *++ustr;
-		switch (c) {
-		case '-':
-			neg++;
-			/* FALLTHROUGH */
-		case '+':
-			c = *++ustr;
-		}
-	}
-	if (base == 0)
-		if (c != '0')
-			base = 10;
-		else if (ustr[1] == 'x' || ustr[1] == 'X')
-			base = 16;
-		else
-			base = 8;
-	/*
-	 * for any base > 10, the digits incrementally following
-	 *	9 are assumed to be "abc...z" or "ABC...Z"
-	 */
-	if (!lisalnum(c) || (xx = DIGIT(c)) >= base)
-		return (EINVAL); /* no number formed */
-	if (base == 16 && c == '0' && (ustr[1] == 'x' || ustr[1] == 'X') &&
-	    isxdigit(ustr[2]))
-		c = *(ustr += 2); /* skip over leading "0x" or "0X" */
-
-	multmax = ULLONG_MAX / (unsigned long long)base;
-	val = DIGIT(c);
-	for (c = *++ustr; lisalnum(c) && (xx = DIGIT(c)) < base; ) {
-		if (val > multmax)
-			goto overflow;
-		val *= base;
-		if (ULONG_MAX - val < xx)
-			goto overflow;
-		val += xx;
-		c = *++ustr;
-	}
-	if (ptr != (const char **)0)
-		*ptr = (char *)ustr;
-	*result = neg ? -val : val;
-	return (0);
-
-overflow:
-	for (c = *++ustr; lisalnum(c) && (xx = DIGIT(c)) < base; )
-		c = *++ustr;
-	if (ptr != (const char **)0)
-		*ptr = (char *)ustr;
-	return (ERANGE);
 }

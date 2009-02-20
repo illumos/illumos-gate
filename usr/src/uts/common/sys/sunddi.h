@@ -402,8 +402,6 @@ extern int physio(int (*)(struct buf *), struct buf *, dev_t,
 	int, void (*)(struct buf *), struct uio *);
 extern void disksort(struct diskhd *, struct buf *);
 
-extern long strtol(const char *, char **, int);
-extern unsigned long strtoul(const char *, char **, int);
 extern size_t strlen(const char *) __PURE;
 extern size_t strnlen(const char *, size_t) __PURE;
 extern char *strcpy(char *, const char *);
@@ -456,6 +454,8 @@ extern void *memchr(const void *, int, size_t);
 
 extern int ddi_strtol(const char *, char **, int, long *);
 extern int ddi_strtoul(const char *, char **, int, unsigned long *);
+extern int ddi_strtoll(const char *, char **, int, longlong_t *);
+extern int ddi_strtoull(const char *, char **, int, u_longlong_t *);
 
 /*
  * kiconv functions and their macros.

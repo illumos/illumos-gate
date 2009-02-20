@@ -114,7 +114,9 @@ COMOBJS=			\
 	memccpy.o		\
 	qsort.o			\
 	strtol.o		\
-	strtoul.o
+	strtoul.o		\
+	strtoll.o		\
+	strtoull.o
 
 DTRACEOBJS=			\
 	dtrace_data.o
@@ -602,8 +604,6 @@ PORTGEN=			\
 	strtoimax.o		\
 	strtok.o		\
 	strtok_r.o		\
-	strtoll.o		\
-	strtoull.o		\
 	strtoumax.o		\
 	swab.o			\
 	swapctl.o		\

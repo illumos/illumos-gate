@@ -64,6 +64,10 @@ COMMON_CORE_OBJS +=		\
 		seg_kmem.o	\
 		softint.o	\
 		string.o	\
+		strtol.o	\
+		strtoul.o	\
+		strtoll.o	\
+		strtoull.o	\
 		thread_intr.o	\
 		vm_page.o	\
 		vm_pagelist.o	\
@@ -121,7 +125,6 @@ GENUNIX_OBJS +=	\
 		ddi_intr_impl.o	\
 		ddi_intr_irm.o	\
 		ddi_nodeid.o	\
-		ddi_strtol.o	\
 		ddi_timer.o	\
 		devcfg.o	\
 		devcache.o	\
