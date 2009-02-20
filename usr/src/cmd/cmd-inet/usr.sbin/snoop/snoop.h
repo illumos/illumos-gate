@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,8 +179,8 @@ extern void cap_open_read(const char *);
 extern void cap_open_write(const char *);
 extern void cap_read(int, int, int, void (*)(), int);
 extern void cap_close(void);
-extern boolean_t check_device(dlpi_handle_t *, char **);
-extern void initdevice(dlpi_handle_t, ulong_t, ulong_t, struct timeval *,
+extern boolean_t open_datalink(dlpi_handle_t *, const char *);
+extern void init_datalink(dlpi_handle_t, ulong_t, ulong_t, struct timeval *,
     struct Pf_ext_packetfilt *);
 extern void net_read(dlpi_handle_t, size_t, int, void (*)(), int);
 extern void click(int);
@@ -293,12 +293,8 @@ typedef struct interface {
 } interface_t;
 
 extern interface_t INTERFACES[], *interface;
-extern char *device;
-
 extern char *dlc_header;
-
 extern char *src_name, *dst_name;
-
 extern char *prot_prefix;
 extern char *prot_nest_prefix;
 extern char *prot_title;

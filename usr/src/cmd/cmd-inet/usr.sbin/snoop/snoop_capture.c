@@ -25,6 +25,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <setjmp.h>
@@ -33,15 +34,11 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <net/if.h>
-#include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/pfmod.h>
-#include <netinet/if_ether.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/stropts.h>
 #include <sys/bufmod.h>
 
 #include <unistd.h>
@@ -50,7 +47,6 @@
 #include <ctype.h>
 #include <values.h>
 #include <libdlpi.h>
-#include <sys/dlpi.h>
 
 #include "snoop.h"
 
@@ -78,84 +74,78 @@ static char *bufp;	/* pointer to read buffer */
 
 static int strioctl(int, int, int, int, void *);
 
-/*
- * Open up the device in raw mode and passive mode
- * (see dlpi_open(3DLPI)) and start finding out something about it,
- * especially stuff about the data link headers. We need that information
- * to build the proper packet filters.
- */
-boolean_t
-check_device(dlpi_handle_t *dhp, char **devicep)
+enum { DWA_NONE, DWA_EXISTS, DWA_PLUMBED };
+
+typedef struct dlpi_walk_arg {
+	char	dwa_linkname[MAXLINKNAMELEN];
+	int	dwa_type;	/* preference type above */
+	int	dwa_s4;		/* IPv4 socket */
+	int	dwa_s6;		/* IPv6 socket */
+} dlpi_walk_arg_t;
+
+static boolean_t
+select_datalink(const char *linkname, void *arg)
 {
-	int	retval;
-	int	flags = DLPI_PASSIVE | DLPI_RAW;
+	struct lifreq lifr;
+	dlpi_walk_arg_t *dwap = arg;
+	int s4 = dwap->dwa_s4;
+	int s6 = dwap->dwa_s6;
+
+	(void) strlcpy(dwap->dwa_linkname, linkname, MAXLINKNAMELEN);
+	dwap->dwa_type = DWA_EXISTS;
 
 	/*
-	 * Determine which network device
-	 * to use if none given.
-	 * Should get back a value like "le0".
+	 * See if it's plumbed by IP.  We prefer such links because they're
+	 * more likely to have interesting traffic.
 	 */
-	if (*devicep == NULL) {
-		char *cbuf;
-		static struct ifconf ifc;
-		static struct ifreq *ifr;
-		int s;
-		int n;
-		int numifs;
-		unsigned bufsize;
+	bzero(&lifr, sizeof (lifr));
+	(void) strlcpy(lifr.lifr_name, linkname, LIFNAMSIZ);
+	if ((s4 != -1 && ioctl(s4, SIOCGLIFFLAGS, &lifr) != -1) ||
+	    (s6 != -1 && ioctl(s6, SIOCGLIFFLAGS, &lifr) != -1)) {
+		dwap->dwa_type = DWA_PLUMBED;
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
 
-		if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-			pr_err("socket");
+/*
+ * Open `linkname' in raw/passive mode (see dlpi_open(3DLPI)).  If `linkname'
+ * is NULL, pick a datalink as per snoop(1M).  Also gather some information
+ * about the datalink useful for building the proper packet filters.
+ */
+boolean_t
+open_datalink(dlpi_handle_t *dhp, const char *linkname)
+{
+	int retval;
+	int flags = DLPI_PASSIVE | DLPI_RAW;
+	dlpi_walk_arg_t dwa;
 
-		if (ioctl(s, SIOCGIFNUM, (char *)&numifs) < 0) {
-			pr_err("check_device: ioctl SIOCGIFNUM");
-			(void) close(s);
-			s = -1;
-			return (B_FALSE);
+	if (linkname == NULL) {
+		/*
+		 * Select a datalink to use by default.  Prefer datalinks that
+		 * are plumbed by IP.
+		 */
+		bzero(&dwa, sizeof (dwa));
+		dwa.dwa_s4 = socket(AF_INET, SOCK_DGRAM, 0);
+		dwa.dwa_s6 = socket(AF_INET6, SOCK_DGRAM, 0);
+		dlpi_walk(select_datalink, &dwa, 0);
+		(void) close(dwa.dwa_s4);
+		(void) close(dwa.dwa_s6);
+
+		if (dwa.dwa_type == DWA_NONE)
+			pr_err("no datalinks found");
+		if (dwa.dwa_type == DWA_EXISTS) {
+			(void) fprintf(stderr, "snoop: WARNING: "
+			    "no datalinks plumbed for IP traffic\n");
 		}
-
-		bufsize = numifs * sizeof (struct ifreq);
-		cbuf = (char *)malloc(bufsize);
-		if (cbuf == NULL) {
-			pr_err("out of memory\n");
-			(void) close(s);
-			s = -1;
-			return (B_FALSE);
-		}
-		ifc.ifc_len = bufsize;
-		ifc.ifc_buf = cbuf;
-		if (ioctl(s, SIOCGIFCONF, (char *)&ifc) < 0) {
-			pr_err("check_device: ioctl SIOCGIFCONF");
-			(void) close(s);
-			s = -1;
-			(void) free(cbuf);
-			return (B_FALSE);
-		}
-		n = ifc.ifc_len / sizeof (struct ifreq);
-		ifr = ifc.ifc_req;
-		for (; n > 0; n--, ifr++) {
-			if (strchr(ifr->ifr_name, ':') != NULL)
-				continue;
-			if (ioctl(s, SIOCGIFFLAGS, (char *)ifr) < 0)
-				pr_err("ioctl SIOCGIFFLAGS");
-			if ((ifr->ifr_flags &
-			    (IFF_VIRTUAL|IFF_IPMP|IFF_UP|
-			    IFF_RUNNING)) == (IFF_UP|IFF_RUNNING))
-				break;
-		}
-
-		if (n == 0)
-			pr_err("No network interface devices found");
-
-		*devicep = ifr->ifr_name;
-		(void) close(s);
+		linkname = dwa.dwa_linkname;
 	}
 	if (Iflg)
 		flags |= DLPI_DEVIPNET;
-	if (Iflg || strcmp(*devicep, "lo0") == 0)
+	if (Iflg || strcmp(linkname, "lo0") == 0)
 		flags |= DLPI_IPNETINFO;
-	if ((retval = dlpi_open(*devicep, dhp, flags)) != DLPI_SUCCESS) {
-		pr_err("cannot open \"%s\": %s", *devicep,
+	if ((retval = dlpi_open(linkname, dhp, flags)) != DLPI_SUCCESS) {
+		pr_err("cannot open \"%s\": %s", linkname,
 		    dlpi_strerror(retval));
 	}
 
@@ -180,18 +170,14 @@ check_device(dlpi_handle_t *dhp, char **devicep)
 }
 
 /*
- * Do whatever is necessary to initialize the interface
- * for packet capture. Bind the device opened in check_device(), set
- * promiscuous mode, push the streams buffer module and packet filter
- * module, set various buffer parameters.
+ * Initialize `dh' for packet capture using the provided arguments.
  */
 void
-initdevice(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
+init_datalink(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
     struct timeval *timeout, struct Pf_ext_packetfilt *fp)
 {
 	int 	retv;
 	int 	netfd;
-	int	val = 1;
 
 	retv = dlpi_bind(dh, DLPI_ANY_SAP, NULL);
 	if (retv != DLPI_SUCCESS)
@@ -266,7 +252,7 @@ initdevice(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
 }
 
 /*
- * Read packets from the network.  Initdevice is called in
+ * Read packets from the network.  init_datalink() is called in
  * here to set up the network interface for reading of
  * raw ethernet packets in promiscuous mode into a buffer.
  * Packets are read and either written directly to a file

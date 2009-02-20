@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,6 @@
 #include "snoop.h"
 
 static int snaplen;
-char *device = NULL;
 
 /* Global error recovery variables */
 sigjmp_buf jmp_env, ojmp_env;		/* error recovery jmp buf */
@@ -122,6 +121,7 @@ main(int argc, char **argv)
 	stack_t sigstk;
 	char *output_area;
 	int nbytes;
+	char *datalink = NULL;
 	dlpi_handle_t dh;
 
 	names[0] = '\0';
@@ -252,10 +252,10 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'I':
-			if (device != NULL)
+			if (datalink != NULL)
 				usage();
 			Iflg = B_TRUE;
-			device = optarg;
+			datalink = optarg;
 			break;
 		case 'P':
 			Pflg = B_TRUE;
@@ -285,7 +285,7 @@ main(int argc, char **argv)
 		case 'd':
 			if (Iflg)
 				usage();
-			device = optarg;
+			datalink = optarg;
 			break;
 		case 'v':
 			flags &= ~(F_SUM);
@@ -366,13 +366,13 @@ main(int argc, char **argv)
 	/*
 	 * Need to know before we decide on filtering method some things
 	 * about the interface.  So, go ahead and do part of the initialization
-	 * now so we have that data.  Note that if no device is specified,
-	 * check_device selects one and returns it.  In an ideal world,
+	 * now so we have that data.  Note that if no datalink is specified,
+	 * open_datalink() selects one and returns it.  In an ideal world,
 	 * it might be nice if the "correct" interface for the filter
 	 * requested was chosen, but that's too hard.
 	 */
 	if (!icapfile) {
-		use_kern_pf = check_device(&dh, &device);
+		use_kern_pf = open_datalink(&dh, datalink);
 	} else {
 		use_kern_pf = B_FALSE;
 		cap_open_read(icapfile);
@@ -494,7 +494,7 @@ main(int argc, char **argv)
 			timeout.tv_usec = 0;
 		}
 
-		initdevice(dh, snaplen, chunksize, &timeout, fp);
+		init_datalink(dh, snaplen, chunksize, &timeout, fp);
 		if (! qflg && ocapfile)
 			show_count();
 		resetperm();
