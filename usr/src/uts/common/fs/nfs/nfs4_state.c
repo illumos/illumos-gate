@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/kmem.h>
@@ -2341,6 +2339,11 @@ rfs4_findfile_withlock(vnode_t *vp, nfs_fh4 *fh, bool_t *create)
 				rfs4_dbe_hold(fp->dbe);
 				rfs4_dbe_unlock(fp->dbe);
 				rw_enter(&fp->file_rwlock, RW_WRITER);
+				if (fp->vp == NULL) {
+					rw_exit(&fp->file_rwlock);
+					rfs4_file_rele(fp);
+					fp = NULL;
+				}
 			}
 		}
 	} else {

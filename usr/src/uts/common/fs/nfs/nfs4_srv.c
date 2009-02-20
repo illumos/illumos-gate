@@ -4130,6 +4130,13 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		if (nm != name)
 			kmem_free(name, MAXPATHLEN + 1);
 		kmem_free(nm, len);
+		if (in_crit)
+			nbl_end_crit(vp);
+		VN_RELE(vp);
+		if (fp) {
+			rfs4_clear_dont_grant(fp);
+			rfs4_file_rele(fp);
+		}
 		goto out;
 	}
 	NFS4_SET_FATTR4_CHANGE(resp->cinfo.before, bdva.va_ctime)
