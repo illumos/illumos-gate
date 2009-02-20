@@ -70,6 +70,7 @@ extern "C" {
 #include <netinet/icmp6.h>
 #include <net/route.h>
 #include <net/if_dl.h>
+#include <tiuser.h>
 
 #include <inet/ip.h>
 #include <libintl.h>

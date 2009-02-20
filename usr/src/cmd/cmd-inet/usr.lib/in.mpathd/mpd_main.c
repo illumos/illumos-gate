@@ -29,11 +29,20 @@
 int debug = 0;				/* Debug flag */
 static int pollfd_num = 0;		/* Num. of poll descriptors */
 static struct pollfd *pollfds = NULL;	/* Array of poll descriptors */
-
 					/* All times below in ms */
 int	user_failure_detection_time;	/* user specified failure detection */
 					/* time (fdt) */
 int	user_probe_interval;		/* derived from user specified fdt */
+
+/*
+ * Structure to store mib2 information returned by the kernel.
+ * This is used to process routing table information.
+ */
+typedef struct mib_item_s {
+	struct mib_item_s	*mi_next;
+	struct opthdr		mi_opthdr;
+	void			*mi_valp;
+} mib_item_t;
 
 static int	rtsock_v4;		/* AF_INET routing socket */
 static int	rtsock_v6;		/* AF_INET6 routing socket */
@@ -47,12 +56,17 @@ static boolean_t force_mcast = _B_FALSE; /* Only for test purposes */
 static uint_t	last_initifs_time;	/* Time when initifs was last run */
 static	char **argv0;			/* Saved for re-exec on SIGHUP */
 boolean_t handle_link_notifications = _B_TRUE;
+static int	ipRouteEntrySize;	/* Size of IPv4 route entry */
+static int	ipv6RouteEntrySize;	/* Size of IPv6 route entry */
 
 static void	initlog(void);
 static void	run_timeouts(void);
 static void	initifs(void);
 static void	check_if_removed(struct phyint_instance *pii);
 static void	select_test_ifs(void);
+static void	update_router_list(mib_item_t *item);
+static void	mib_get_constants(mib_item_t *item);
+static int	mibwalk(void (*proc)(mib_item_t *));
 static void	ire_process_v4(mib2_ipRouteEntry_t *buf, size_t len);
 static void	ire_process_v6(mib2_ipv6RouteEntry_t *buf, size_t len);
 static void	router_add_common(int af, char *ifname,
@@ -1518,187 +1532,27 @@ check_if_removed(struct phyint_instance *pii)
 }
 
 /*
- * Send down a T_OPTMGMT_REQ to ip asking for all data in the various
- * tables defined by mib2.h. Parse the returned data and extract
- * the 'routing' information table. Process the 'routing' table
- * to get the list of known onlink routers, and update our database.
- * These onlink routers will serve as our probe targets.
- * Returns false, if any system calls resulted in errors, true otherwise.
+ * Parse the supplied mib2 information to extract the routing information
+ * table. Process the routing table to get the list of known onlink routers
+ * and update our database. These onlink routers will serve as probe
+ * targets.
  */
-static boolean_t
-update_router_list(int fd)
+static void
+update_router_list(mib_item_t *item)
 {
-	union {
-		char	ubuf[1024];
-		union T_primitives uprim;
-	} buf;
-
-	int			flags;
-	struct strbuf		ctlbuf;
-	struct strbuf		databuf;
-	struct T_optmgmt_req	*tor;
-	struct T_optmgmt_ack	*toa;
-	struct T_error_ack	*tea;
-	struct opthdr		*optp;
-	struct opthdr		*req;
-	int			status;
-	t_scalar_t		prim;
-
-	tor = (struct T_optmgmt_req *)&buf;
-	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
-	tor->OPT_offset = sizeof (struct T_optmgmt_req);
-	tor->OPT_length = sizeof (struct opthdr);
-	tor->MGMT_flags = T_CURRENT;
-
-	/*
-	 * Note: we use the special level value below so that IP will return
-	 * us information concerning IRE_MARK_TESTHIDDEN routes.
-	 */
-	req = (struct opthdr *)&tor[1];
-	req->level = EXPER_IP_AND_TESTHIDDEN;
-	req->name  = 0;
-	req->len   = 0;
-
-	ctlbuf.buf = (char *)&buf;
-	ctlbuf.len = tor->OPT_length + tor->OPT_offset;
-	ctlbuf.maxlen = sizeof (buf);
-	if (putmsg(fd, &ctlbuf, NULL, 0) == -1) {
-		logperror("update_router_list: putmsg(ctl)");
-		return (_B_FALSE);
-	}
-
-	/*
-	 * The response consists of multiple T_OPTMGMT_ACK msgs, 1 msg for
-	 * each table defined in mib2.h.  Each T_OPTMGMT_ACK msg contains
-	 * a control and data part. The control part contains a struct
-	 * T_optmgmt_ack followed by a struct opthdr. The 'opthdr' identifies
-	 * the level, name and length of the data in the data part. The
-	 * data part contains the actual table data. The last message
-	 * is an end-of-data (EOD), consisting of a T_OPTMGMT_ACK and a
-	 * single option with zero optlen.
-	 */
-
-	for (;;) {
-		/*
-		 * Go around this loop once for each table. Ignore
-		 * all tables except the routing information table.
-		 */
-		flags = 0;
-		status = getmsg(fd, &ctlbuf, NULL, &flags);
-		if (status < 0) {
-			if (errno == EINTR)
-				continue;
-			logperror("update_router_list: getmsg(ctl)");
-			return (_B_FALSE);
-		}
-		if (ctlbuf.len < sizeof (t_scalar_t)) {
-			logerr("update_router_list: ctlbuf.len %d\n",
-			    ctlbuf.len);
-			return (_B_FALSE);
-		}
-
-		prim = buf.uprim.type;
-
-		switch (prim) {
-
-		case T_ERROR_ACK:
-			tea = &buf.uprim.error_ack;
-			if (ctlbuf.len < sizeof (struct T_error_ack)) {
-				logerr("update_router_list: T_ERROR_ACK"
-				    " ctlbuf.len %d\n", ctlbuf.len);
-				return (_B_FALSE);
-			}
-			logerr("update_router_list: T_ERROR_ACK:"
-			    " TLI_error = 0x%lx, UNIX_error = 0x%lx\n",
-			    tea->TLI_error, tea->UNIX_error);
-			return (_B_FALSE);
-
-		case T_OPTMGMT_ACK:
-			toa = &buf.uprim.optmgmt_ack;
-			optp = (struct opthdr *)&toa[1];
-			if (ctlbuf.len < (sizeof (struct T_optmgmt_ack) +
-			    sizeof (struct opthdr))) {
-				logerr("update_router_list: ctlbuf.len %d\n",
-				    ctlbuf.len);
-				return (_B_FALSE);
-			}
-			if (toa->MGMT_flags != T_SUCCESS) {
-				logerr("update_router_list: MGMT_flags 0x%lx\n",
-				    toa->MGMT_flags);
-				return (_B_FALSE);
-			}
-			break;
-
-		default:
-			logerr("update_router_list: unknown primitive %ld\n",
-			    prim);
-			return (_B_FALSE);
-		}
-
-		/* Process the T_OPTMGMT_ACK below */
-		assert(prim == T_OPTMGMT_ACK);
-
-		switch (status) {
-		case 0:
-			/*
-			 * We have reached the end of this T_OPTMGMT_ACK
-			 * message. If this is the last message i.e EOD,
-			 * return, else process the next T_OPTMGMT_ACK msg.
-			 */
-			if (optp->len == 0 && optp->name == 0 &&
-			    optp->level == 0) {
-				/*
-				 * This is the EOD message. Return
-				 */
-				return (_B_TRUE);
-			}
+	for (; item != NULL; item = item->mi_next) {
+		if (item->mi_opthdr.name == 0)
 			continue;
-
-		case MORECTL:
-		case MORECTL | MOREDATA:
-			/*
-			 * This should not happen. We should be able to read
-			 * the control portion in a single getmsg.
-			 */
-			logerr("update_router_list: MORECTL\n");
-			return (_B_FALSE);
-
-		case MOREDATA:
-			databuf.maxlen = optp->len;
-			/* malloc of 0 bytes is ok */
-			databuf.buf = malloc((size_t)optp->len);
-			if (databuf.maxlen != 0 && databuf.buf == NULL) {
-				logperror("update_router_list: malloc");
-				return (_B_FALSE);
-			}
-			databuf.len = 0;
-			flags = 0;
-			for (;;) {
-				if (getmsg(fd, NULL, &databuf, &flags) >= 0)
-					break;
-				if (errno == EINTR)
-					continue;
-
-				logperror("update_router_list: getmsg(data)");
-				free(databuf.buf);
-				return (_B_FALSE);
-			}
-
-			if (optp->level == MIB2_IP &&
-			    optp->name == MIB2_IP_ROUTE) {
-				/* LINTED */
-				ire_process_v4((mib2_ipRouteEntry_t *)
-				    databuf.buf, databuf.len);
-			} else if (optp->level == MIB2_IP6 &&
-			    optp->name == MIB2_IP6_ROUTE) {
-				/* LINTED */
-				ire_process_v6((mib2_ipv6RouteEntry_t *)
-				    databuf.buf, databuf.len);
-			}
-			free(databuf.buf);
+		if (item->mi_opthdr.level == MIB2_IP &&
+		    item->mi_opthdr.name == MIB2_IP_ROUTE) {
+			ire_process_v4((mib2_ipRouteEntry_t *)item->mi_valp,
+			    item->mi_opthdr.len);
+		} else if (item->mi_opthdr.level == MIB2_IP6 &&
+		    item->mi_opthdr.name == MIB2_IP6_ROUTE) {
+			ire_process_v6((mib2_ipv6RouteEntry_t *)item->mi_valp,
+			    item->mi_opthdr.len);
 		}
 	}
-	/* NOTREACHED */
 }
 
 
@@ -1731,11 +1585,14 @@ ire_process_v4(mib2_ipRouteEntry_t *buf, size_t len)
 	struct in_addr		nexthop_v4;
 	struct in6_addr		nexthop;
 
+	if (debug & D_TARGET)
+		logdebug("ire_process_v4(len %d)\n", len);
+
 	if (len == 0)
 		return;
-	assert((len % sizeof (mib2_ipRouteEntry_t)) == 0);
 
-	endp = buf + (len / sizeof (mib2_ipRouteEntry_t));
+	assert((len % ipRouteEntrySize) == 0);
+	endp = buf + (len / ipRouteEntrySize);
 
 	/*
 	 * Scan the routing table entries for any IRE_OFFSUBNET entries, and
@@ -1830,8 +1687,8 @@ ire_process_v6(mib2_ipv6RouteEntry_t *buf, size_t len)
 	if (len == 0)
 		return;
 
-	assert((len % sizeof (mib2_ipv6RouteEntry_t)) == 0);
-	endp = buf + (len / sizeof (mib2_ipv6RouteEntry_t));
+	assert((len % ipv6RouteEntrySize) == 0);
+	endp = buf + (len / ipv6RouteEntrySize);
 
 	/*
 	 * Scan the routing table entries for any IRE_OFFSUBNET entries, and
@@ -1906,18 +1763,8 @@ init_router_targets(void)
 			tg->tg_in_use = 0;
 	}
 
-	if (mibfd < 0) {
-		mibfd = open("/dev/ip", O_RDWR);
-		if (mibfd < 0) {
-			logperror("mibopen: ip open");
-			exit(1);
-		}
-	}
-
-	if (!update_router_list(mibfd)) {
-		(void) close(mibfd);
-		mibfd = -1;
-	}
+	if (mibwalk(update_router_list) == -1)
+		exit(1);
 
 	for (pii = phyint_instances; pii != NULL; pii = pii->pii_next) {
 		pi = pii->pii_phyint;
@@ -2211,9 +2058,10 @@ main(int argc, char *argv[])
 	 * 4. phyint_init() - Initialize physical interface state
 	 *    (in mpd_tables.c).  Must be done before creating interfaces,
 	 *    which timer_init() does indirectly.
-	 * 5. timer_init()  - Initialize timer related stuff
-	 * 6. initifs() - Initialize our database of all known interfaces
-	 * 7. init_router_targets() - Initialize our database of all known
+	 * 5. Query kernel for route entry sizes (v4 and v6).
+	 * 6. timer_init()  - Initialize timer related stuff
+	 * 7. initifs() - Initialize our database of all known interfaces
+	 * 8. init_router_targets() - Initialize our database of all known
 	 *    router targets.
 	 */
 	ifsock_v4 = socket(AF_INET, SOCK_DGRAM, 0);
@@ -2237,6 +2085,9 @@ main(int argc, char *argv[])
 		logerr("cannot initialize physical interface structures");
 		exit(1);
 	}
+
+	if (mibwalk(mib_get_constants) == -1)
+		exit(1);
 
 	timer_init();
 
@@ -2961,4 +2812,209 @@ addrlist_free(addrlist_t **addrsp)
 		free(addrp);
 	}
 	*addrsp = NULL;
+}
+
+/*
+ * Send down a T_OPTMGMT_REQ to ip asking for all data in the various
+ * tables defined by mib2.h. Pass the table information returned to the
+ * supplied function.
+ */
+static int
+mibwalk(void (*proc)(mib_item_t *))
+{
+	mib_item_t		*head_item = NULL;
+	mib_item_t		*last_item = NULL;
+	mib_item_t		*tmp;
+	struct strbuf		ctlbuf, databuf;
+	int			flags;
+	int			rval;
+	uintptr_t		buf[512 / sizeof (uintptr_t)];
+	struct T_optmgmt_req	*tor = (struct T_optmgmt_req *)buf;
+	struct T_optmgmt_ack	*toa = (struct T_optmgmt_ack *)buf;
+	struct T_error_ack	*tea = (struct T_error_ack *)buf;
+	struct opthdr		*req, *optp;
+	int			status = -1;
+
+	if (mibfd == -1) {
+		if ((mibfd = open("/dev/ip", O_RDWR)) < 0) {
+			logperror("mibwalk(): ip open");
+			return (status);
+		}
+	}
+
+	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
+	tor->OPT_offset = sizeof (struct T_optmgmt_req);
+	tor->OPT_length = sizeof (struct opthdr);
+	tor->MGMT_flags = T_CURRENT;
+
+	/*
+	 * Note: we use the special level value below so that IP will return
+	 * us information concerning IRE_MARK_TESTHIDDEN routes.
+	 */
+	req = (struct opthdr *)&tor[1];
+	req->level = EXPER_IP_AND_TESTHIDDEN;
+	req->name  = 0;
+	req->len   = 0;
+
+	ctlbuf.buf = (char *)&buf;
+	ctlbuf.len = tor->OPT_length + tor->OPT_offset;
+
+	if (putmsg(mibfd, &ctlbuf, NULL, 0) == -1) {
+		logperror("mibwalk(): putmsg(ctl)");
+		return (status);
+	}
+
+	/*
+	 * The response consists of multiple T_OPTMGMT_ACK msgs, 1 msg for
+	 * each table defined in mib2.h.  Each T_OPTMGMT_ACK msg contains
+	 * a control and data part. The control part contains a struct
+	 * T_optmgmt_ack followed by a struct opthdr. The 'opthdr' identifies
+	 * the level, name and length of the data in the data part. The
+	 * data part contains the actual table data. The last message
+	 * is an end-of-data (EOD), consisting of a T_OPTMGMT_ACK and a
+	 * single option with zero optlen.
+	 */
+	for (;;) {
+		errno = flags = 0;
+		ctlbuf.maxlen = sizeof (buf);
+		rval = getmsg(mibfd, &ctlbuf, NULL, &flags);
+		if (rval & MORECTL || rval < 0) {
+			if (errno == EINTR)
+				continue;
+			logerr("mibwalk(): getmsg(ctl) ret: %d err: %d\n",
+			    rval, errno);
+			goto error;
+		}
+		if (ctlbuf.len < sizeof (t_scalar_t)) {
+			logerr("mibwalk(): ctlbuf.len %d\n", ctlbuf.len);
+			goto error;
+		}
+
+		switch (toa->PRIM_type) {
+		case T_ERROR_ACK:
+			if (ctlbuf.len < sizeof (struct T_error_ack)) {
+				logerr("mibwalk(): T_ERROR_ACK ctlbuf "
+				    "too short: %d\n", ctlbuf.len);
+				goto error;
+			}
+			logerr("mibwalk(): T_ERROR_ACK: TLI_err = 0x%lx: %s\n"
+			    " UNIX_err = 0x%lx\n", tea->TLI_error,
+			    t_strerror(tea->TLI_error), tea->UNIX_error);
+			goto error;
+
+		case T_OPTMGMT_ACK:
+			optp = (struct opthdr *)&toa[1];
+			if (ctlbuf.len < (sizeof (struct T_optmgmt_ack) +
+			    sizeof (struct opthdr))) {
+				logerr("mibwalk(): T_OPTMGMT_ACK ctlbuf too "
+				    "short: %d\n", ctlbuf.len);
+				goto error;
+			}
+			if (toa->MGMT_flags != T_SUCCESS) {
+				logerr("mibwalk(): MGMT_flags != T_SUCCESS: "
+				    "0x%lx\n", toa->MGMT_flags);
+				goto error;
+			}
+			break;
+
+		default:
+			goto error;
+		}
+		/* The following assert also implies MGMT_flags == T_SUCCESS */
+		assert(toa->PRIM_type == T_OPTMGMT_ACK);
+
+		/*
+		 * We have reached the end of this T_OPTMGMT_ACK
+		 * message. If this is the last message i.e EOD,
+		 * break, else process the next T_OPTMGMT_ACK msg.
+		 */
+		if (rval == 0) {
+			if (optp->len == 0 && optp->name == 0 &&
+			    optp->level == 0) {
+				/* This is the EOD message. */
+				break;
+			}
+			/* Not EOD but no data to retrieve */
+			continue;
+		}
+
+		/*
+		 * We should only be here if MOREDATA was set.
+		 * Allocate an empty mib_item_t and link into the list
+		 * of MIB items.
+		 */
+		if ((tmp = malloc(sizeof (*tmp))) == NULL) {
+			logperror("mibwalk(): malloc() failed.");
+			goto error;
+		}
+		if (last_item != NULL)
+			last_item->mi_next = tmp;
+		else
+			head_item = tmp;
+		last_item = tmp;
+		last_item->mi_next = NULL;
+		last_item->mi_opthdr = *optp;
+		last_item->mi_valp = malloc(optp->len);
+		if (last_item->mi_valp == NULL) {
+			logperror("mibwalk(): malloc() failed.");
+			goto error;
+		}
+
+		databuf.maxlen = last_item->mi_opthdr.len;
+		databuf.buf = (char *)last_item->mi_valp;
+		databuf.len = 0;
+
+		/* Retrieve the actual MIB data */
+		for (;;) {
+			flags = 0;
+			if ((rval = getmsg(mibfd, NULL, &databuf,
+			    &flags)) != 0) {
+				if (rval < 0 && errno == EINTR)
+					continue;
+				/*
+				 * We shouldn't get MOREDATA here so treat that
+				 * as an error.
+				 */
+				logperror("mibwalk(): getmsg(data)");
+				goto error;
+			}
+			break;
+		}
+	}
+	status = 0;
+	/* Pass the accumulated MIB data to the supplied function pointer */
+	(*proc)(head_item);
+error:
+	while (head_item != NULL) {
+		tmp = head_item;
+		head_item = tmp->mi_next;
+		free(tmp->mi_valp);
+		free(tmp);
+	}
+	return (status);
+}
+
+/*
+ * Parse the supplied mib2 information to get the size of routing table
+ * entries. This is needed when running in a branded zone where the
+ * Solaris application environment and the Solaris kernel may not be the
+ * the same release version.
+ */
+static void
+mib_get_constants(mib_item_t *item)
+{
+	mib2_ip_t		*ipv4;
+	mib2_ipv6IfStatsEntry_t	*ipv6;
+
+	for (; item != NULL; item = item->mi_next) {
+		if (item->mi_opthdr.name != 0)
+			continue;
+		if (item->mi_opthdr.level == MIB2_IP) {
+			ipv4 = (mib2_ip_t *)item->mi_valp;
+			ipRouteEntrySize = ipv4->ipRouteEntrySize;
+		} else if (item->mi_opthdr.level == MIB2_IP6) {
+			ipv6 = (mib2_ipv6IfStatsEntry_t *)item->mi_valp;
+			ipv6RouteEntrySize = ipv6->ipv6RouteEntrySize;
+		}
+	}
 }
