@@ -1089,10 +1089,10 @@ failure:
 	return (DDI_FAILURE);
 }
 
+/*ARGSUSED*/
 static int
 smp_busctl_uninitchild(dev_info_t *child)
 {
-	dev_info_t		*self = ddi_get_parent(child);
 	struct smp_device	*smp = ddi_get_driver_private(child);
 
 	ASSERT(smp);
