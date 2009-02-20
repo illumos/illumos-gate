@@ -1730,129 +1730,104 @@ smb_shr_publisher_flush(list_t *lst)
 }
 
 /*
- * Management functions for .zfs/shares/<share> object
- */
-
-static void
-smb_shr_get_dataset(smb_share_t *si, char *dataset, size_t len)
-{
-	char tmppath[MAXPATHLEN];
-	char *cp;
-	FILE *fp;
-	struct mnttab mnttab;
-	struct mnttab mntpref;
-
-	(void) strlcpy(tmppath, si->shr_path, MAXPATHLEN);
-	fp = fopen(MNTTAB, "r");
-	if (fp == NULL)
-		return;
-	(void) memset(&mnttab, '\0', sizeof (mnttab));
-	cp = tmppath;
-
-	while (*cp != '\0') {
-		resetmnttab(fp);
-		(void) memset(&mntpref, '\0', sizeof (mntpref));
-		mntpref.mnt_mountp = tmppath;
-		if (getmntany(fp, &mnttab, &mntpref) == 0) {
-			(void) strlcpy(dataset, mnttab.mnt_special, len);
-			break;
-		}
-		/* strip last component off if there is one */
-		cp = strrchr(cp, '/');
-		if (cp != NULL) {
-			*cp = '\0';
-			if (tmppath[0] == '\0')
-				(void) strcpy(tmppath, "/");
-		}
-		cp = tmppath;
-	}
-	(void) fclose(fp);
-}
-
-
-/*
- * If the share/path refers to a ZFS file system, add the
+ * If the share path refers to a ZFS file system, add the
  * .zfs/shares/<share> object.
  */
 
 static void
 smb_shr_zfs_add(smb_share_t *si)
 {
-	libzfs_handle_t *libhandle;
-	zfs_handle_t *handle = NULL;
-	int ret = 0;
+	libzfs_handle_t *libhd;
+	zfs_handle_t *zfshd;
+	int ret;
 	char dataset[MAXPATHLEN];
 
-	if (sa_path_is_zfs(si->shr_path)) {
-		libhandle = libzfs_init();
-		smb_shr_get_dataset(si, dataset, MAXPATHLEN);
-		handle = zfs_open(libhandle, dataset, ZFS_TYPE_FILESYSTEM);
-		ret = zfs_smb_acl_add(libhandle, dataset,
-		    si->shr_path, si->shr_name);
-		if (ret != 0 && errno != EAGAIN && errno != EEXIST)
-			syslog(LOG_INFO,
-			    "share: failed to add ACL object: %s: %s\n",
-			    si->shr_name, strerror(errno));
-		if (handle != NULL)
-			zfs_close(handle);
-		libzfs_fini(libhandle);
+	if (smb_getdataset(si->shr_path, dataset, MAXPATHLEN) != 0)
+		return;
+
+	if ((libhd = libzfs_init()) == NULL)
+		return;
+
+	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_FILESYSTEM)) == NULL) {
+		libzfs_fini(libhd);
+		return;
 	}
+
+	errno = 0;
+	ret = zfs_smb_acl_add(libhd, dataset, si->shr_path, si->shr_name);
+	if (ret != 0 && errno != EAGAIN && errno != EEXIST)
+		syslog(LOG_INFO, "share: failed to add ACL object: %s: %s\n",
+		    si->shr_name, strerror(errno));
+
+	zfs_close(zfshd);
+	libzfs_fini(libhd);
 }
 
 /*
- * If the share/path refers to a ZFS file system, remove the
+ * If the share path refers to a ZFS file system, remove the
  * .zfs/shares/<share> object.
  */
 
 static void
 smb_shr_zfs_remove(smb_share_t *si)
 {
-	libzfs_handle_t *libhandle;
-	zfs_handle_t *handle = NULL;
-	int ret = 0;
+	libzfs_handle_t *libhd;
+	zfs_handle_t *zfshd;
+	int ret;
 	char dataset[MAXPATHLEN];
 
-	if (sa_path_is_zfs(si->shr_path)) {
-		libhandle = libzfs_init();
-		smb_shr_get_dataset(si, dataset, MAXPATHLEN);
-		handle = zfs_open(libhandle, dataset, ZFS_TYPE_FILESYSTEM);
-		ret = zfs_smb_acl_remove(libhandle, dataset,
-		    si->shr_path, si->shr_name);
-		if (ret != 0 && errno != EAGAIN)
-			syslog(LOG_INFO,
-			    "share: failed to remove ACL object: %s\n",
-			    si->shr_name);
-		if (handle != NULL)
-			zfs_close(handle);
-		libzfs_fini(libhandle);
+	if (smb_getdataset(si->shr_path, dataset, MAXPATHLEN) != 0)
+		return;
+
+	if ((libhd = libzfs_init()) == NULL)
+		return;
+
+	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_FILESYSTEM)) == NULL) {
+		libzfs_fini(libhd);
+		return;
 	}
+
+	errno = 0;
+	ret = zfs_smb_acl_remove(libhd, dataset, si->shr_path, si->shr_name);
+	if (ret != 0 && errno != EAGAIN)
+		syslog(LOG_INFO, "share: failed to remove ACL object: %s: %s\n",
+		    si->shr_name, strerror(errno));
+
+	zfs_close(zfshd);
+	libzfs_fini(libhd);
 }
 
 /*
- * If the share/path refers to a ZFS file system, rename the
+ * If the share path refers to a ZFS file system, rename the
  * .zfs/shares/<share> object.
  */
 
 static void
 smb_shr_zfs_rename(smb_share_t *from, smb_share_t *to)
 {
-	libzfs_handle_t *libhandle;
-	zfs_handle_t *handle = NULL;
-	int ret = 0;
+	libzfs_handle_t *libhd;
+	zfs_handle_t *zfshd;
+	int ret;
 	char dataset[MAXPATHLEN];
 
-	if (sa_path_is_zfs(from->shr_path)) {
-		libhandle = libzfs_init();
-		smb_shr_get_dataset(from, dataset, MAXPATHLEN);
-		handle = zfs_open(libhandle, dataset, ZFS_TYPE_FILESYSTEM);
-		ret = zfs_smb_acl_rename(libhandle, dataset,
-		    from->shr_path, from->shr_name, to->shr_name);
-		if (ret != 0 && errno != EAGAIN)
-			syslog(LOG_INFO,
-			    "share: failed to rename ACL object: %s\n",
-			    from->shr_name);
-		if (handle != NULL)
-			zfs_close(handle);
-		libzfs_fini(libhandle);
+	if (smb_getdataset(from->shr_path, dataset, MAXPATHLEN) != 0)
+		return;
+
+	if ((libhd = libzfs_init()) == NULL)
+		return;
+
+	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_FILESYSTEM)) == NULL) {
+		libzfs_fini(libhd);
+		return;
 	}
+
+	errno = 0;
+	ret = zfs_smb_acl_rename(libhd, dataset, from->shr_path,
+	    from->shr_name, to->shr_name);
+	if (ret != 0 && errno != EAGAIN)
+		syslog(LOG_INFO, "share: failed to rename ACL object: %s: %s\n",
+		    from->shr_name, strerror(errno));
+
+	zfs_close(zfshd);
+	libzfs_fini(libhd);
 }

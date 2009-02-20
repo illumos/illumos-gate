@@ -181,6 +181,7 @@ SUNWprivate {
 	smb_dr_ulist_free;
 	smb_get_dcinfo;
 	smb_get_nameservers;
+	smb_getdataset;
 	smb_getdomainname;
 	smb_getdomainsid;
 	smb_getfqdomainname;

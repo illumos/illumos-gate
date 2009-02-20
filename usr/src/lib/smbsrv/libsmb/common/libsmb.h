@@ -165,6 +165,9 @@ extern int smb_smf_create_service_pgroup(smb_scfhandle_t *, char *);
 extern int smb_smf_restart_service(void);
 extern int smb_smf_maintenance_mode(void);
 
+/* ZFS interface */
+int smb_getdataset(const char *, char *, size_t);
+
 /* Configuration management functions  */
 extern int smb_config_get(smb_cfg_id_t, char *, int);
 extern char *smb_config_getname(smb_cfg_id_t);

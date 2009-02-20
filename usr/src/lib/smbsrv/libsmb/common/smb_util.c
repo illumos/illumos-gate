@@ -30,13 +30,15 @@
 #include <pthread.h>
 #include <sys/varargs.h>
 #include <sys/types.h>
-#include <smbsrv/string.h>
-#include <smbsrv/libsmb.h>
+#include <sys/mnttab.h>
 #include <tiuser.h>
 #include <netconfig.h>
 #include <netdir.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
+#include <libzfs.h>
+#include <smbsrv/string.h>
+#include <smbsrv/libsmb.h>
 
 static uint_t smb_make_mask(char *, uint_t);
 static boolean_t smb_netmatch(struct netbuf *, char *);
@@ -684,4 +686,56 @@ smb_netgroup_match(struct nd_hostservlist *clnames, char  *glist, int grc)
 
 	free(grl);
 	return (belong ? response : B_FALSE);
+}
+
+/*
+ * Resolve the ZFS dataset from a path.
+ */
+int
+smb_getdataset(const char *path, char *dataset, size_t len)
+{
+	char tmppath[MAXPATHLEN];
+	char *cp;
+	FILE *fp;
+	struct mnttab mnttab;
+	struct mnttab mntpref;
+	int rc = -1;
+
+	if ((fp = fopen(MNTTAB, "r")) == NULL)
+		return (-1);
+
+	(void) memset(&mnttab, '\0', sizeof (mnttab));
+	(void) strlcpy(tmppath, path, MAXPATHLEN);
+	cp = tmppath;
+
+	while (*cp != '\0') {
+		resetmnttab(fp);
+		(void) memset(&mntpref, '\0', sizeof (mntpref));
+		mntpref.mnt_mountp = tmppath;
+		mntpref.mnt_fstype = "zfs";
+
+		if (getmntany(fp, &mnttab, &mntpref) == 0) {
+			/*
+			 * Ensure that there are no leading slashes
+			 * (required for zfs_open).
+			 */
+			cp = mnttab.mnt_special;
+			cp += strspn(cp, "/");
+			(void) strlcpy(dataset, cp, len);
+			rc = 0;
+			break;
+		}
+
+		/* strip last component off if there is one */
+		if ((cp = strrchr(cp, '/')) != NULL) {
+			*cp = '\0';
+			if (tmppath[0] == '\0')
+				(void) strcpy(tmppath, "/");
+		}
+
+		cp = tmppath;
+	}
+
+	(void) fclose(fp);
+	return (rc);
 }

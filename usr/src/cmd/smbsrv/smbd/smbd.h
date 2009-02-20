@@ -54,10 +54,10 @@ extern uint32_t smbd_join(smb_joininfo_t *);
 extern int smbd_ioctl(int, smb_io_t *);
 extern void smbd_set_secmode(int);
 
-extern int smbd_vss_get_count(char *, uint32_t *);
-extern void smbd_vss_get_snapshots(char *, uint32_t, uint32_t *, uint32_t *,
-    char **);
-extern int smbd_vss_map_gmttoken(char *, char *, char *);
+extern int smbd_vss_get_count(const char *, uint32_t *);
+extern void smbd_vss_get_snapshots(const char *, uint32_t, uint32_t *,
+    uint32_t *, char **);
+extern int smbd_vss_map_gmttoken(const char *, char *, char *);
 
 typedef struct smbd {
 	const char	*s_version;	/* smbd version string */
