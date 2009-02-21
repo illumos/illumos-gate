@@ -95,6 +95,7 @@ HTMLENTS = \
 	SmfValueExAcctProcess.html \
 	SmfValueExAcctTask.html \
 	SmfValueExAcctNet.html \
+	SmfValueFirewall.html \
 	SmfVtStates.html \
 	SmfValueHeader.html \
 	SmfValueInetd.html \

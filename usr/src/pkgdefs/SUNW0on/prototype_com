@@ -271,6 +271,7 @@ f none usr/lib/help/auths/locale/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctProcess.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctTask.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctNet.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueFirewall.html 444 root bin
 f none usr/lib/help/auths/locale/SmfVtStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueInetd.html 444 root bin
