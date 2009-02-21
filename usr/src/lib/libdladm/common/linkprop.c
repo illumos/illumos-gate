@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,7 +132,8 @@ static pd_getf_t	do_get_zone, do_get_autopush, do_get_rate_mod,
 			i_dladm_duplex_get, i_dladm_status_get,
 			i_dladm_binary_get, i_dladm_uint32_get,
 			i_dladm_flowctl_get, i_dladm_maxbw_get,
-			i_dladm_cpus_get, i_dladm_priority_get;
+			i_dladm_cpus_get, i_dladm_priority_get,
+			i_dladm_tagmode_get;
 
 static pd_setf_t	do_set_zone, do_set_rate_prop,
 			do_set_powermode_prop, do_set_radio_prop,
@@ -318,6 +319,8 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_BIND_CPU,	sizeof (mac_resource_props_t),	"cpus"},
 
+	{ MAC_PROP_TAGMODE,	sizeof (link_tagmode_t),	"tagmode"},
+
 	{ MAC_PROP_PRIVATE,	0,			"driver-private"}
 
 };
@@ -344,6 +347,11 @@ static  val_desc_t	link_priority_vals[] = {
 	{ "low",	MPL_LOW	},
 	{ "medium",	MPL_MEDIUM	},
 	{ "high",	MPL_HIGH	}
+};
+
+static val_desc_t	link_tagmode_vals[] = {
+	{ "normal",	LINK_TAGMODE_NORMAL	},
+	{ "vlanonly",	LINK_TAGMODE_VLANONLY	}
 };
 
 static val_desc_t	dladm_wlan_radio_vals[] = {
@@ -492,6 +500,13 @@ static prop_desc_t	prop_table[] = {
 	    link_priority_vals, VALCNT(link_priority_vals), do_set_res, NULL,
 	    i_dladm_priority_get, do_check_priority, PD_CHECK_ALLOC,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
+
+	{ "tagmode", { "vlanonly", LINK_TAGMODE_VLANONLY },
+	    link_tagmode_vals, VALCNT(link_tagmode_vals),
+	    i_dladm_set_public_prop, NULL, i_dladm_tagmode_get,
+	    NULL, 0,
+	    DATALINK_CLASS_PHYS | DATALINK_CLASS_AGGR | DATALINK_CLASS_VNIC,
+	    DL_ETHER }
 };
 
 #define	DLADM_MAX_PROPS	(sizeof (prop_table) / sizeof (prop_desc_t))
@@ -2489,6 +2504,37 @@ i_dladm_uint32_get(dladm_handle_t handle, prop_desc_t *pdp,
 	(void) memcpy(&v, cp, sizeof (v));
 	(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%ld", v);
 	free(dip);
+	*val_cnt = 1;
+	return (DLADM_STATUS_OK);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+i_dladm_tagmode_get(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+{
+	dld_ioc_macprop_t	*dip;
+	link_tagmode_t		mode;
+	dladm_status_t		status;
+
+	dip = i_dladm_get_public_prop(handle, linkid, pdp->pd_name, flags,
+	    &status, perm_flags);
+	if (dip == NULL)
+		return (status);
+	(void) memcpy(&mode, dip->pr_val, sizeof (mode));
+	free(dip);
+
+	switch (mode) {
+	case LINK_TAGMODE_NORMAL:
+		(void) strlcpy(*prop_val, "normal", DLADM_PROP_VAL_MAX);
+		break;
+	case LINK_TAGMODE_VLANONLY:
+		(void) strlcpy(*prop_val, "vlanonly", DLADM_PROP_VAL_MAX);
+		break;
+	default:
+		(void) strlcpy(*prop_val, "unknown", DLADM_PROP_VAL_MAX);
+	}
 	*val_cnt = 1;
 	return (DLADM_STATUS_OK);
 }

@@ -250,35 +250,39 @@ proto_info_req(dld_str_t *dsp, mblk_t *mp)
 		dlp->dl_brdcst_addr_length = addr_length;
 	}
 
-	dlp->dl_qos_range_offset = (uintptr_t)rangep - (uintptr_t)dlp;
-	dlp->dl_qos_range_length = sizeof (dl_qos_cl_range1_t);
+	/* Only VLAN links and links that have a normal tag mode support QOS. */
+	if (mac_client_vid(dsp->ds_mch) != VLAN_ID_NONE ||
+	    dsp->ds_dlp->dl_tagmode == LINK_TAGMODE_NORMAL) {
+		dlp->dl_qos_range_offset = (uintptr_t)rangep - (uintptr_t)dlp;
+		dlp->dl_qos_range_length = sizeof (dl_qos_cl_range1_t);
 
-	rangep->dl_qos_type = DL_QOS_CL_RANGE1;
-	rangep->dl_trans_delay.dl_target_value = DL_UNKNOWN;
-	rangep->dl_trans_delay.dl_accept_value = DL_UNKNOWN;
-	rangep->dl_protection.dl_min = DL_UNKNOWN;
-	rangep->dl_protection.dl_max = DL_UNKNOWN;
-	rangep->dl_residual_error = DL_UNKNOWN;
+		rangep->dl_qos_type = DL_QOS_CL_RANGE1;
+		rangep->dl_trans_delay.dl_target_value = DL_UNKNOWN;
+		rangep->dl_trans_delay.dl_accept_value = DL_UNKNOWN;
+		rangep->dl_protection.dl_min = DL_UNKNOWN;
+		rangep->dl_protection.dl_max = DL_UNKNOWN;
+		rangep->dl_residual_error = DL_UNKNOWN;
 
-	/*
-	 * Specify the supported range of priorities.
-	 */
-	rangep->dl_priority.dl_min = 0;
-	rangep->dl_priority.dl_max = (1 << VLAN_PRI_SIZE) - 1;
+		/*
+		 * Specify the supported range of priorities.
+		 */
+		rangep->dl_priority.dl_min = 0;
+		rangep->dl_priority.dl_max = (1 << VLAN_PRI_SIZE) - 1;
 
-	dlp->dl_qos_offset = (uintptr_t)selp - (uintptr_t)dlp;
-	dlp->dl_qos_length = sizeof (dl_qos_cl_sel1_t);
+		dlp->dl_qos_offset = (uintptr_t)selp - (uintptr_t)dlp;
+		dlp->dl_qos_length = sizeof (dl_qos_cl_sel1_t);
 
-	selp->dl_qos_type = DL_QOS_CL_SEL1;
-	selp->dl_trans_delay = DL_UNKNOWN;
-	selp->dl_protection = DL_UNKNOWN;
-	selp->dl_residual_error = DL_UNKNOWN;
+		selp->dl_qos_type = DL_QOS_CL_SEL1;
+		selp->dl_trans_delay = DL_UNKNOWN;
+		selp->dl_protection = DL_UNKNOWN;
+		selp->dl_residual_error = DL_UNKNOWN;
 
-	/*
-	 * Specify the current priority (which can be changed by
-	 * the DL_UDQOS_REQ primitive).
-	 */
-	selp->dl_priority = dsp->ds_pri;
+		/*
+		 * Specify the current priority (which can be changed by
+		 * the DL_UDQOS_REQ primitive).
+		 */
+		selp->dl_priority = dsp->ds_pri;
+	}
 
 	dlp->dl_addr_length = addr_length + sizeof (uint16_t);
 	if (dsp->ds_dlstate == DL_IDLE) {

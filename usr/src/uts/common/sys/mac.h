@@ -91,6 +91,11 @@ typedef enum {
 	LINK_FLOWCTRL_BI
 } link_flowctrl_t;
 
+typedef enum {
+	LINK_TAGMODE_VLANONLY = 0,
+	LINK_TAGMODE_NORMAL
+} link_tagmode_t;
+
 /*
  * Maximum MAC address length
  */
@@ -162,6 +167,7 @@ typedef enum {
 	MAC_PROP_MAXBW,
 	MAC_PROP_PRIO,
 	MAC_PROP_BIND_CPU,
+	MAC_PROP_TAGMODE,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 

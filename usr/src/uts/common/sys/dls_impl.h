@@ -59,6 +59,7 @@ struct dls_link_s {				/* Protected by */
 	uint32_t		dl_unknowns;		/* atomic */
 	zoneid_t		dl_zid;
 	uint_t			dl_zone_ref;
+	link_tagmode_t		dl_tagmode;		/* atomic */
 };
 
 typedef struct dls_head_s {

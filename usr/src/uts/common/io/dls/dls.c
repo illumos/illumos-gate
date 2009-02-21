@@ -401,18 +401,19 @@ dls_header(dld_str_t *dsp, const uint8_t *addr, uint16_t sap, uint_t pri,
 	payload = (payloadp == NULL) ? NULL : (*payloadp);
 
 	/*
-	 * If the following conditions are satisfied:
-	 *	- This is not a ETHERTYPE_VLAN listener; and
-	 *	- This is either a VLAN stream or this is a physical stream
-	 *	  but the priority is not 0.
+	 * In the case of Ethernet, we need to tell mac_header() if we need
+	 * extra room beyond the Ethernet header for a VLAN header.  We'll
+	 * need to add a VLAN header if this isn't an ETHERTYPE_VLAN listener
+	 * (because such streams will be handling VLAN headers on their own)
+	 * and one of the following conditions is satisfied:
 	 *
-	 * then we know ahead of time that we'll need to fill in additional
-	 * VLAN information in the link-layer header. We will tell the MAC
-	 * layer to pre-allocate some space at the end of the Ethernet
-	 * header for us.
+	 * - This is a VLAN stream
+	 * - This is a physical stream, the priority is not 0, and user
+	 *   priority tagging is allowed.
 	 */
 	if (is_ethernet && sap != ETHERTYPE_VLAN &&
-	    (vid != VLAN_ID_NONE || pri != 0)) {
+	    (vid != VLAN_ID_NONE ||
+	    (pri != 0 && dsp->ds_dlp->dl_tagmode != LINK_TAGMODE_VLANONLY))) {
 		extra_len = sizeof (struct ether_vlan_header) -
 		    sizeof (struct ether_header);
 		mac_sap = ETHERTYPE_VLAN;
@@ -425,7 +426,8 @@ dls_header(dld_str_t *dsp, const uint8_t *addr, uint16_t sap, uint_t pri,
 	if (mp == NULL)
 		return (NULL);
 
-	if ((vid == VLAN_ID_NONE && pri == 0) || !is_ethernet)
+	if ((vid == VLAN_ID_NONE && (pri == 0 ||
+	    dsp->ds_dlp->dl_tagmode == LINK_TAGMODE_VLANONLY)) || !is_ethernet)
 		return (mp);
 
 	/*

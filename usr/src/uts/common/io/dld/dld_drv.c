@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -557,56 +557,65 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		goto done;
 	}
 
+	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
+		goto done;
+
 	switch (kprop->pr_num) {
-	case MAC_PROP_ZONE: {
+	case MAC_PROP_ZONE:
 		if (set) {
-			dld_ioc_zid_t	*dzp = (dld_ioc_zid_t *)kprop->pr_val;
+			dld_ioc_zid_t *dzp = (dld_ioc_zid_t *)kprop->pr_val;
 
 			err = dls_devnet_setzid(dzp->diz_link, dzp->diz_zid);
-			goto done;
 		} else {
 			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 			err = dls_devnet_getzid(linkid,
 			    (zoneid_t *)kprop->pr_val);
-			goto done;
 		}
-	}
+		break;
 	case MAC_PROP_AUTOPUSH: {
-		struct dlautopush	*dlap =
-		    (struct dlautopush *)kprop->pr_val;
+		struct dlautopush *dlap = (struct dlautopush *)kprop->pr_val;
 
 		if (set) {
-			if (kprop->pr_valsize != 0) {
+			if (kprop->pr_valsize != 0)
 				err = drv_ioc_setap(linkid, dlap);
-				goto done;
-			} else {
+			else
 				err = drv_ioc_clrap(linkid);
-				goto done;
-			}
 		} else {
 			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 			err = drv_ioc_getap(linkid, dlap);
-			goto done;
 		}
-	}
-	default:
 		break;
 	}
+	case MAC_PROP_TAGMODE:
+		if (set) {
+			link_tagmode_t mode = *(link_tagmode_t *)kprop->pr_val;
 
-	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
-		goto done;
+			if (mode != LINK_TAGMODE_VLANONLY &&
+			    mode != LINK_TAGMODE_NORMAL) {
+				err = EINVAL;
+			} else {
+				dlp->dl_tagmode = mode;
+				err = 0;
+			}
+		} else {
+			*(link_tagmode_t *)kprop->pr_val = dlp->dl_tagmode;
+			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
+			err = 0;
+		}
+		break;
+	default:
+		macprop.mp_name = kprop->pr_name;
+		macprop.mp_id = kprop->pr_num;
+		macprop.mp_flags = kprop->pr_flags;
 
-	macprop.mp_name = kprop->pr_name;
-	macprop.mp_id = kprop->pr_num;
-	macprop.mp_flags = kprop->pr_flags;
-
-	if (set) {
-		err = mac_set_prop(dlp->dl_mh, &macprop, kprop->pr_val,
-		    kprop->pr_valsize);
-	} else {
-		kprop->pr_perm_flags = MAC_PROP_PERM_RW;
-		err = mac_get_prop(dlp->dl_mh, &macprop, kprop->pr_val,
-		    kprop->pr_valsize, &kprop->pr_perm_flags);
+		if (set) {
+			err = mac_set_prop(dlp->dl_mh, &macprop, kprop->pr_val,
+			    kprop->pr_valsize);
+		} else {
+			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
+			err = mac_get_prop(dlp->dl_mh, &macprop, kprop->pr_val,
+			    kprop->pr_valsize, &kprop->pr_perm_flags);
+		}
 	}
 
 done:
