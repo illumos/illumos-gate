@@ -17,31 +17,16 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_VDEV_IMPL_H
 #define	_SYS_VDEV_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#define	VDEV_SKIP_SIZE		(8 << 10)
-#define	VDEV_BOOT_HEADER_SIZE	(8 << 10)
+#define	VDEV_SKIP_SIZE		(16 << 10)
 #define	VDEV_PHYS_SIZE		(112 << 10)
 #define	VDEV_UBERBLOCK_RING	(128 << 10)
-
-/* ZFS boot block */
-#define	VDEV_BOOT_MAGIC		0x2f5b007b10cULL
-#define	VDEV_BOOT_VERSION	1		/* version number	*/
-
-typedef struct vdev_boot_header {
-	uint64_t	vb_magic;		/* VDEV_BOOT_MAGIC	*/
-	uint64_t	vb_version;		/* VDEV_BOOT_VERSION	*/
-	uint64_t	vb_offset;		/* start offset	(bytes) */
-	uint64_t	vb_size;		/* size (bytes)		*/
-	char		vb_pad[VDEV_BOOT_HEADER_SIZE - 4 * sizeof (uint64_t)];
-} vdev_boot_header_t;
 
 typedef struct vdev_phys {
 	char		vp_nvlist[VDEV_PHYS_SIZE - sizeof (zio_block_tail_t)];
@@ -49,8 +34,7 @@ typedef struct vdev_phys {
 } vdev_phys_t;
 
 typedef struct vdev_label {
-	char		vl_pad[VDEV_SKIP_SIZE];			/*   8K	*/
-	vdev_boot_header_t vl_boot_header;			/*   8K	*/
+	char		vl_pad[VDEV_SKIP_SIZE];			/*  16K	*/
 	vdev_phys_t	vl_vdev_phys;				/* 112K	*/
 	char		vl_uberblock[VDEV_UBERBLOCK_RING];	/* 128K	*/
 } vdev_label_t;							/* 256K total */

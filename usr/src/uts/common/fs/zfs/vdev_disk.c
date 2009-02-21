@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -493,8 +493,7 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 		/* read vdev label */
 		offset = vdev_label_offset(size, l, 0);
 		if (vdev_disk_physio(vd_lh, (caddr_t)label,
-		    VDEV_SKIP_SIZE + VDEV_BOOT_HEADER_SIZE +
-		    VDEV_PHYS_SIZE, offset, B_READ) != 0)
+		    VDEV_SKIP_SIZE + VDEV_PHYS_SIZE, offset, B_READ) != 0)
 			continue;
 
 		if (nvlist_unpack(label->vl_vdev_phys.vp_nvlist,

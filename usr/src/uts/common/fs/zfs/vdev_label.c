@@ -488,7 +488,6 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	spa_t *spa = vd->vdev_spa;
 	nvlist_t *label;
 	vdev_phys_t *vp;
-	vdev_boot_header_t *vb;
 	uberblock_t *ub;
 	zio_t *zio;
 	char *buf;
@@ -630,16 +629,6 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	}
 
 	/*
-	 * Initialize boot block header.
-	 */
-	vb = zio_buf_alloc(sizeof (vdev_boot_header_t));
-	bzero(vb, sizeof (vdev_boot_header_t));
-	vb->vb_magic = VDEV_BOOT_MAGIC;
-	vb->vb_version = VDEV_BOOT_VERSION;
-	vb->vb_offset = VDEV_BOOT_OFFSET;
-	vb->vb_size = VDEV_BOOT_SIZE;
-
-	/*
 	 * Initialize uberblock template.
 	 */
 	ub = zio_buf_alloc(VDEV_UBERBLOCK_SIZE(vd));
@@ -658,10 +647,6 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		    offsetof(vdev_label_t, vl_vdev_phys),
 		    sizeof (vdev_phys_t), NULL, NULL, flags);
 
-		vdev_label_write(zio, vd, l, vb,
-		    offsetof(vdev_label_t, vl_boot_header),
-		    sizeof (vdev_boot_header_t), NULL, NULL, flags);
-
 		for (int n = 0; n < VDEV_UBERBLOCK_COUNT(vd); n++) {
 			vdev_label_write(zio, vd, l, ub,
 			    VDEV_UBERBLOCK_OFFSET(vd, n),
@@ -673,7 +658,6 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 
 	nvlist_free(label);
 	zio_buf_free(ub, VDEV_UBERBLOCK_SIZE(vd));
-	zio_buf_free(vb, sizeof (vdev_boot_header_t));
 	zio_buf_free(vp, sizeof (vdev_phys_t));
 
 	/*

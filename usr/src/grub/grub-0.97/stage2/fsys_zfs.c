@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1216,8 +1216,8 @@ check_pool_label(int label, char *stack, char *outdevid, char *outpath)
 	uint64_t diskguid;
 	uint64_t version;
 
-	sector = (label * sizeof (vdev_label_t) + VDEV_SKIP_SIZE +
-	    VDEV_BOOT_HEADER_SIZE) >> SPA_MINBLOCKSHIFT;
+	sector = (label * sizeof (vdev_label_t) + VDEV_SKIP_SIZE)
+	    >> SPA_MINBLOCKSHIFT;
 
 	/* Read in the vdev name-value pair list (112K). */
 	if (devread(sector, 0, VDEV_PHYS_SIZE, stack) == 0)
@@ -1278,7 +1278,6 @@ zfs_mount(void)
 	char *stack;
 	int label = 0;
 	uberblock_phys_t *ub_array, *ubbest = NULL;
-	vdev_boot_header_t *bh;
 	objset_phys_t *osp;
 	char tmp_bootpath[MAXNAMELEN];
 	char tmp_devid[MAXNAMELEN];
@@ -1292,25 +1291,13 @@ zfs_mount(void)
 	ub_array = (uberblock_phys_t *)stack;
 	stack += VDEV_UBERBLOCK_RING;
 
-	bh = (vdev_boot_header_t *)stack;
-	stack += VDEV_BOOT_HEADER_SIZE;
-
 	osp = (objset_phys_t *)stack;
 	stack += sizeof (objset_phys_t);
 
 	/* XXX add back labels support? */
 	for (label = 0; ubbest == NULL && label < (VDEV_LABELS/2); label++) {
 		uint64_t sector = (label * sizeof (vdev_label_t) +
-		    VDEV_SKIP_SIZE) >> SPA_MINBLOCKSHIFT;
-		if (devread(sector, 0, VDEV_BOOT_HEADER_SIZE,
-		    (char *)bh) == 0)
-			continue;
-		if ((bh->vb_magic != VDEV_BOOT_MAGIC) ||
-		    (bh->vb_version != VDEV_BOOT_VERSION)) {
-			continue;
-		}
-		sector += (VDEV_BOOT_HEADER_SIZE +
-		    VDEV_PHYS_SIZE) >> SPA_MINBLOCKSHIFT;
+		    VDEV_SKIP_SIZE + VDEV_PHYS_SIZE) >> SPA_MINBLOCKSHIFT;
 
 		/* Read in the uberblock ring (128K). */
 		if (devread(sector, 0, VDEV_UBERBLOCK_RING,
