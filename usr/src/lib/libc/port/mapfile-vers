@@ -135,6 +135,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	posix_fallocate;
 	posix_madvise;
 	posix_memalign;
+	posix_spawn_file_actions_addclosefrom_np;
 	posix_spawnattr_getsigignore_np;
 	posix_spawnattr_setsigignore_np;
 	pthread_key_create_once_np;
@@ -182,9 +183,9 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	uconv_u8tou16;
 	uconv_u8tou32;
 	vasprintf;
-	vforkx;
 	verr;
 	verrx;
+	vforkx;
 	vwarn;
 	vwarnx;
 	warn;

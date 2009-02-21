@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,6 +154,10 @@ extern int posix_spawnattr_getsigdefault(
  */
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 
+extern int posix_spawn_file_actions_addclosefrom_np(
+	posix_spawn_file_actions_t *file_actions,
+	int lowfiledes);
+
 extern int posix_spawnattr_setsigignore_np(
 	posix_spawnattr_t *_RESTRICT_KYWD attr,
 	const sigset_t *_RESTRICT_KYWD sigignore);
@@ -194,6 +198,7 @@ extern int posix_spawnattr_getschedpolicy();
 extern int posix_spawnattr_setsigdefault();
 extern int posix_spawnattr_getsigdefault();
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int posix_spawn_file_actions_addclosefrom_np();
 extern int posix_spawnattr_setsigignore_np();
 extern int posix_spawnattr_getsigignore_np();
 #endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */

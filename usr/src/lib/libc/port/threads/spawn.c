@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <sys/libc_kernel.h>
 #include <sys/procset.h>
 #include <sys/fork.h>
+#include <dirent.h>
 #include <alloca.h>
 #include <spawn.h>
 
@@ -57,9 +58,10 @@ typedef struct {
 typedef struct file_attr {
 	struct file_attr *fa_next;	/* circular list of file actions */
 	struct file_attr *fa_prev;
-	enum {FA_OPEN, FA_CLOSE, FA_DUP2} fa_type;
-	uint_t		fa_pathsize;	/* size of fa_path[] array */
+	enum {FA_OPEN, FA_CLOSE, FA_DUP2, FA_CLOSEFROM} fa_type;
+	int		fa_need_dirbuf;	/* only consulted in the head action */
 	char		*fa_path;	/* copied pathname for open() */
+	uint_t		fa_pathsize;	/* size of fa_path[] array */
 	int		fa_oflag;	/* oflag for open() */
 	mode_t		fa_mode;	/* mode for open() */
 	int		fa_filedes;	/* file descriptor for open()/close() */
@@ -68,6 +70,74 @@ typedef struct file_attr {
 
 extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
 extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
+
+#if defined(_LP64)
+#define	__open64	__open
+#define	getdents64	getdents
+#define	dirent64_t	dirent_t
+#else
+extern int __open64(const char *, int, ...);
+extern int getdents64(int, dirent64_t *, size_t);
+#endif
+
+/*
+ * Support function:
+ * Close all open file descriptors greater than or equal to lowfd.
+ * This is executed in the child of vfork(), so we must not call
+ * opendir() / readdir() because that would alter the parent's
+ * address space.  We use the low-level getdents64() system call.
+ * Return non-zero on error.
+ */
+static int
+spawn_closefrom(int lowfd, void *buf)
+{
+	int procfd;
+	int fd;
+	int buflen;
+	dirent64_t *dp;
+	dirent64_t *dpend;
+
+	if (lowfd <  0)
+		lowfd = 0;
+
+	/*
+	 * Close lowfd right away as a hedge against failing
+	 * to open the /proc file descriptor directory due
+	 * all file descriptors being currently used up.
+	 */
+	(void) __close(lowfd++);
+
+	if ((procfd = __open64("/proc/self/fd", O_RDONLY, 0)) < 0) {
+		/*
+		 * We could not open the /proc file descriptor directory.
+		 * Just fail and be done with it.
+		 */
+		return (-1);
+	}
+
+	for (;;) {
+		/*
+		 * Collect a bunch of open file descriptors and close them.
+		 * Repeat until the directory is exhausted.
+		 */
+		dp = (dirent64_t *)buf;
+		if ((buflen = getdents64(procfd, dp, DIRBUF)) <= 0) {
+			(void) __close(procfd);
+			break;
+		}
+		dpend = (dirent64_t *)((uintptr_t)buf + buflen);
+		do {
+			/* skip '.', '..' and procfd */
+			if (dp->d_name[0] != '.' &&
+			    (fd = atoi(dp->d_name)) != procfd &&
+			    fd >= lowfd)
+				(void) __close(fd);
+			dp = (dirent64_t *)((uintptr_t)dp + dp->d_reclen);
+		} while (dp < dpend);
+	}
+
+	return (0);
+}
 
 static int
 perform_flag_actions(spawn_attr_t *sap)
@@ -120,7 +190,7 @@ perform_flag_actions(spawn_attr_t *sap)
 }
 
 static int
-perform_file_actions(file_attr_t *fap)
+perform_file_actions(file_attr_t *fap, void *dirbuf)
 {
 	file_attr_t *froot = fap;
 	int fd;
@@ -139,13 +209,18 @@ perform_file_actions(file_attr_t *fap)
 			}
 			break;
 		case FA_CLOSE:
-			if (__close(fap->fa_filedes) == -1)
+			if (__close(fap->fa_filedes) == -1 &&
+			    errno != EBADF)	/* already closed, no error */
 				return (errno);
 			break;
 		case FA_DUP2:
 			fd = __fcntl(fap->fa_filedes, F_DUP2FD,
 			    fap->fa_newfiledes);
 			if (fd < 0)
+				return (errno);
+			break;
+		case FA_CLOSEFROM:
+			if (spawn_closefrom(fap->fa_filedes, dirbuf))
 				return (errno);
 			break;
 		}
@@ -208,16 +283,28 @@ posix_spawn(
 {
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
+	void *dirbuf = NULL;
 	int error;		/* this will be set by the child */
 	pid_t pid;
 
 	if (attrp != NULL && sap == NULL)
 		return (EINVAL);
 
+	if (fap != NULL && fap->fa_need_dirbuf) {
+		/*
+		 * Preallocate the buffer for the call to getdents64() in
+		 * spawn_closefrom() since we can't do it in the vfork() child.
+		 */
+		if ((dirbuf = lmalloc(DIRBUF)) == NULL)
+			return (ENOMEM);
+	}
+
 	switch (pid = vforkx(forkflags(sap))) {
 	case 0:			/* child */
 		break;
 	case -1:		/* parent, failure */
+		if (dirbuf)
+			lfree(dirbuf, DIRBUF);
 		return (errno);
 	default:		/* parent, success */
 		/*
@@ -225,6 +312,8 @@ posix_spawn(
 		 */
 		if (pidp != NULL && get_error(&error) == 0)
 			*pidp = pid;
+		if (dirbuf)
+			lfree(dirbuf, DIRBUF);
 		return (get_error(&error));
 	}
 
@@ -233,7 +322,7 @@ posix_spawn(
 			_exit(_EVAPORATE);
 
 	if (fap != NULL)
-		if (set_error(&error, perform_file_actions(fap)) != 0)
+		if (set_error(&error, perform_file_actions(fap, dirbuf)) != 0)
 			_exit(_EVAPORATE);
 
 	(void) set_error(&error, 0);
@@ -288,6 +377,7 @@ posix_spawnp(
 {
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
+	void *dirbuf = NULL;
 	const char *pathstr = (strchr(file, '/') == NULL)? getenv("PATH") : "";
 	int xpg4 = libc__xpg4;
 	int error = 0;		/* this will be set by the child */
@@ -307,6 +397,15 @@ posix_spawnp(
 	if (*file == '\0')
 		return (EACCES);
 
+	if (fap != NULL && fap->fa_need_dirbuf) {
+		/*
+		 * Preallocate the buffer for the call to getdents64() in
+		 * spawn_closefrom() since we can't do it in the vfork() child.
+		 */
+		if ((dirbuf = lmalloc(DIRBUF)) == NULL)
+			return (ENOMEM);
+	}
+
 	/*
 	 * We may need to invoke the shell with a slightly modified
 	 * argv[] array.  To do this we need to preallocate the array.
@@ -321,6 +420,8 @@ posix_spawnp(
 	case 0:			/* child */
 		break;
 	case -1:		/* parent, failure */
+		if (dirbuf)
+			lfree(dirbuf, DIRBUF);
 		return (errno);
 	default:		/* parent, success */
 		/*
@@ -328,6 +429,8 @@ posix_spawnp(
 		 */
 		if (pidp != NULL && get_error(&error) == 0)
 			*pidp = pid;
+		if (dirbuf)
+			lfree(dirbuf, DIRBUF);
 		return (get_error(&error));
 	}
 
@@ -336,7 +439,7 @@ posix_spawnp(
 			_exit(_EVAPORATE);
 
 	if (fap != NULL)
-		if (set_error(&error, perform_file_actions(fap)) != 0)
+		if (set_error(&error, perform_file_actions(fap, dirbuf)) != 0)
 			_exit(_EVAPORATE);
 
 	if (pathstr == NULL) {
@@ -428,7 +531,7 @@ posix_spawn_file_actions_destroy(
 	if ((fap = froot) != NULL) {
 		do {
 			next = fap->fa_next;
-			if (fap-> fa_type == FA_OPEN)
+			if (fap->fa_type == FA_OPEN)
 				lfree(fap->fa_path, fap->fa_pathsize);
 			lfree(fap, sizeof (*fap));
 		} while ((fap = next) != froot);
@@ -444,13 +547,20 @@ add_file_attr(posix_spawn_file_actions_t *file_actions, file_attr_t *fap)
 
 	if (froot == NULL) {
 		fap->fa_next = fap->fa_prev = fap;
-		file_actions->__file_attrp = fap;
+		file_actions->__file_attrp = froot = fap;
 	} else {
 		fap->fa_next = froot;
 		fap->fa_prev = froot->fa_prev;
 		froot->fa_prev->fa_next = fap;
 		froot->fa_prev = fap;
 	}
+
+	/*
+	 * Once set, __file_attrp no longer changes, so this assignment
+	 * always goes into the first element in the list, as required.
+	 */
+	if (fap->fa_type == FA_CLOSEFROM)
+		froot->fa_need_dirbuf = 1;
 }
 
 int
@@ -519,6 +629,24 @@ posix_spawn_file_actions_adddup2(
 	fap->fa_type = FA_DUP2;
 	fap->fa_filedes = filedes;
 	fap->fa_newfiledes = newfiledes;
+	add_file_attr(file_actions, fap);
+
+	return (0);
+}
+
+int
+posix_spawn_file_actions_addclosefrom_np(
+	posix_spawn_file_actions_t *file_actions,
+	int lowfiledes)
+{
+	file_attr_t *fap;
+
+	if (lowfiledes < 0)
+		return (EBADF);
+	if ((fap = lmalloc(sizeof (*fap))) == NULL)
+		return (ENOMEM);
+	fap->fa_type = FA_CLOSEFROM;
+	fap->fa_filedes = lowfiledes;
 	add_file_attr(file_actions, fap);
 
 	return (0);
