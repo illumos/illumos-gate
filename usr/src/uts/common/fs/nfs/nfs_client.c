@@ -19,12 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -872,8 +874,10 @@ nfs_getattr_otw(vnode_t *vp, struct vattr *vap, cred_t *cr)
 
 	t = gethrtime();
 
-	error = rfs2call(mi, RFS_GETATTR, xdr_fhandle, (caddr_t)VTOFH(vp),
-	    xdr_attrstat, (caddr_t)&ns, cr, &douprintf, &ns.ns_status, 0, &fi);
+	error = rfs2call(mi, RFS_GETATTR,
+			xdr_fhandle, (caddr_t)VTOFH(vp),
+			xdr_attrstat, (caddr_t)&ns, cr,
+			&douprintf, &ns.ns_status, 0, &fi);
 
 	if (!error) {
 		error = geterrno(ns.ns_status);
@@ -1130,13 +1134,13 @@ fattr3_to_vattr(vnode_t *vp, fattr3 *na, struct vattr *vap)
 	switch (na->type) {
 	case NF3BLK:
 		vap->va_rdev = makedevice(na->rdev.specdata1,
-		    na->rdev.specdata2);
+					na->rdev.specdata2);
 		vap->va_blksize = DEV_BSIZE;
 		vap->va_nblocks = 0;
 		break;
 	case NF3CHR:
 		vap->va_rdev = makedevice(na->rdev.specdata1,
-		    na->rdev.specdata2);
+					na->rdev.specdata2);
 		vap->va_blksize = MAXBSIZE;
 		vap->va_nblocks = 0;
 		break;
@@ -1222,7 +1226,7 @@ nfs_async_manager(vfs_t *vfsp)
 	mi = VFTOMI(vfsp);
 
 	CALLB_CPR_INIT(&cprinfo, &mi->mi_async_lock, callb_generic_cpr,
-	    "nfs_async_manager");
+		    "nfs_async_manager");
 
 	mutex_enter(&mi->mi_async_lock);
 	/*
@@ -1231,7 +1235,7 @@ nfs_async_manager(vfs_t *vfsp)
 	 * part of the zone/mount going away.
 	 *
 	 * We want to be able to create at least one thread to handle
-	 * asynchronous inactive calls.
+	 * asyncrhonous inactive calls.
 	 */
 	max_threads = MAX(mi->mi_max_threads, 1);
 	mutex_enter(&mi->mi_lock);
@@ -1254,6 +1258,9 @@ nfs_async_manager(vfs_t *vfsp)
 	while (!(mi->mi_flags & MI_ASYNC_MGR_STOP) ||
 	    mi->mi_async_req_count > 0) {
 		mutex_exit(&mi->mi_lock);
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		cv_wait(&mi->mi_async_reqs_cv, &mi->mi_async_lock);
+		CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
 		while (mi->mi_async_req_count > 0) {
 			/*
 			 * Paranoia: If the mount started out having
@@ -1286,9 +1293,6 @@ nfs_async_manager(vfs_t *vfsp)
 			ASSERT(mi->mi_async_req_count != 0);
 			mi->mi_async_req_count--;
 		}
-		CALLB_CPR_SAFE_BEGIN(&cprinfo);
-		cv_wait(&mi->mi_async_reqs_cv, &mi->mi_async_lock);
-		CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
 		mutex_enter(&mi->mi_lock);
 	}
 	mutex_exit(&mi->mi_lock);
@@ -2058,7 +2062,7 @@ nfs_async_start(struct vfs *vfsp)
 		if (*mi->mi_async_curr == NULL ||
 		    --mi->mi_async_clusters[args->a_io] == 0) {
 			mi->mi_async_clusters[args->a_io] =
-			    mi->mi_async_init_clusters;
+						mi->mi_async_init_clusters;
 			mi->mi_async_curr++;
 			if (mi->mi_async_curr ==
 			    &mi->mi_async_reqs[NFS_ASYNC_TYPES])
@@ -2078,22 +2082,25 @@ nfs_async_start(struct vfs *vfsp)
 		 */
 		if (args->a_io == NFS_READ_AHEAD && mi->mi_max_threads > 0) {
 			(*args->a_nfs_readahead)(args->a_vp, args->a_nfs_blkoff,
-			    args->a_nfs_addr, args->a_nfs_seg, args->a_cred);
+					args->a_nfs_addr, args->a_nfs_seg,
+					args->a_cred);
 		} else if (args->a_io == NFS_PUTAPAGE) {
 			(void) (*args->a_nfs_putapage)(args->a_vp,
-			    args->a_nfs_pp, args->a_nfs_off, args->a_nfs_len,
-			    args->a_nfs_flags, args->a_cred);
+					args->a_nfs_pp, args->a_nfs_off,
+					args->a_nfs_len, args->a_nfs_flags,
+					args->a_cred);
 		} else if (args->a_io == NFS_PAGEIO) {
-			(void) (*args->a_nfs_pageio)(args->a_vp, args->a_nfs_pp,
-			    args->a_nfs_off, args->a_nfs_len, args->a_nfs_flags,
-			    args->a_cred);
+			(void) (*args->a_nfs_pageio)(args->a_vp,
+					args->a_nfs_pp, args->a_nfs_off,
+					args->a_nfs_len, args->a_nfs_flags,
+					args->a_cred);
 		} else if (args->a_io == NFS_READDIR) {
 			(void) ((*args->a_nfs_readdir)(args->a_vp,
-			    args->a_nfs_rdc, args->a_cred));
+					args->a_nfs_rdc, args->a_cred));
 		} else if (args->a_io == NFS_COMMIT) {
 			(*args->a_nfs_commit)(args->a_vp, args->a_nfs_plist,
-			    args->a_nfs_offset, args->a_nfs_count,
-			    args->a_cred);
+					args->a_nfs_offset, args->a_nfs_count,
+					args->a_cred);
 		} else if (args->a_io == NFS_INACTIVE) {
 			(*args->a_nfs_inactive)(args->a_vp, args->a_cred, NULL);
 		}
@@ -2217,8 +2224,8 @@ writerp(rnode_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 		 * created and mapped at base.
 		 */
 		pagecreate = pgcreated ||
-		    ((offset & PAGEOFFSET) == 0 &&
-		    (n == PAGESIZE || ((offset + n) >= rp->r_size)));
+			((offset & PAGEOFFSET) == 0 &&
+			(n == PAGESIZE || ((offset + n) >= rp->r_size)));
 
 		mutex_exit(&rp->r_statelock);
 		if (!vpm_enable && pagecreate) {
@@ -2236,7 +2243,7 @@ writerp(rnode_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 			 */
 			if (pgcreated == 0)
 				(void) segmap_pagecreate(segkmap, base,
-				    (uint_t)n, 1);
+							(uint_t)n, 1);
 			saved_base = base;
 			saved_n = n;
 		}
@@ -2263,8 +2270,8 @@ writerp(rnode_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 			 * the page that is not written will be initizliazed
 			 * with zeros.
 			 */
-			error = vpm_data_copy(vp, offset, n, uio, !pagecreate,
-			    NULL, 0, S_WRITE);
+			error = vpm_data_copy(vp, offset, n, uio,
+				!pagecreate, NULL, 0, S_WRITE);
 		} else {
 			error = uiomove(base, n, UIO_WRITE, uio);
 		}
@@ -2313,7 +2320,8 @@ writerp(rnode_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 				 * segmap_pagecreate().
 				 */
 				sm_error = segmap_fault(kas.a_hat, segkmap,
-				    saved_base, saved_n, F_SOFTUNLOCK, S_WRITE);
+					saved_base, saved_n,
+					F_SOFTUNLOCK, S_WRITE);
 				if (error == 0)
 					error = sm_error;
 			}
@@ -2390,7 +2398,8 @@ nfs_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 		 * Search the entire vp list for pages >= off, and flush
 		 * the dirty pages.
 		 */
-		error = pvn_vplist_dirty(vp, off, rp->r_putapage, flags, cr);
+		error = pvn_vplist_dirty(vp, off, rp->r_putapage,
+					flags, cr);
 
 		/*
 		 * If an error occurred and the file was marked as dirty
@@ -2473,7 +2482,7 @@ nfs_invalidate_pages(vnode_t *vp, u_offset_t off, cred_t *cr)
 	rp->r_truncaddr = off;
 	mutex_exit(&rp->r_statelock);
 	(void) pvn_vplist_dirty(vp, off, rp->r_putapage,
-	    B_INVAL | B_TRUNC, cr);
+		B_INVAL | B_TRUNC, cr);
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags &= ~RTRUNCATE;
 	cv_broadcast(&rp->r_cv);
@@ -2827,7 +2836,7 @@ nfs_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *cr)
 		ld.l_start = 0;
 		ld.l_len = 0;		/* do entire file */
 		ret = VOP_FRLOCK(vp, F_SETLK, &ld, flag, offset, NULL, cr,
-		    NULL);
+			NULL);
 
 		if (ret != 0) {
 			/*
@@ -3112,7 +3121,7 @@ nfs_remove_locking_id(vnode_t *vp, int type, char *id, char *rid, int *rlen)
 		 * Count the number of things left on r_lmpl after the remove.
 		 */
 		for (cur = rp->r_lmpl; cur != (lmpl_t *)NULL;
-		    cur = cur->lmpl_next) {
+				cur = cur->lmpl_next) {
 			nitems++;
 			if (cur->lmpl_type == RLMPL_PID) {
 				npids++;
@@ -3120,14 +3129,17 @@ nfs_remove_locking_id(vnode_t *vp, int type, char *id, char *rid, int *rlen)
 				nowners++;
 			} else {
 				cmn_err(CE_PANIC,
-				    "nrli: unrecognized lmpl_type %d",
-				    cur->lmpl_type);
+					"nrli: unrecognized lmpl_type %d",
+					cur->lmpl_type);
 			}
 		}
 
 		cmn_err(CE_CONT,
-		    "nrli(%s): %d PIDs + %d OWNs = %d items left on r_lmpl\n",
-		    (type == RLMPL_PID) ? "P" : "O", npids, nowners, nitems);
+		"nrli(%s): %d PIDs + %d OWNs = %d items left on r_lmpl\n",
+			(type == RLMPL_PID) ? "P" : "O",
+			npids,
+			nowners,
+			nitems);
 	}
 #endif
 

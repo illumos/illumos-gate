@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1127,7 +1127,7 @@ nfs4_async_manager(vfs_t *vfsp)
 	 * part of the zone/mount going away.
 	 *
 	 * We want to be able to create at least one thread to handle
-	 * asynchronous inactive calls.
+	 * asyncrhonous inactive calls.
 	 */
 	max_threads = MAX(mi->mi_max_threads, 1);
 	mutex_enter(&mi->mi_lock);
@@ -1150,6 +1150,9 @@ nfs4_async_manager(vfs_t *vfsp)
 	while (!(mi->mi_flags & MI4_ASYNC_MGR_STOP) ||
 	    mi->mi_async_req_count > 0) {
 		mutex_exit(&mi->mi_lock);
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		cv_wait(&mi->mi_async_reqs_cv, &mi->mi_async_lock);
+		CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
 		while (mi->mi_async_req_count > 0) {
 			/*
 			 * Paranoia: If the mount started out having
@@ -1183,9 +1186,6 @@ nfs4_async_manager(vfs_t *vfsp)
 			ASSERT(mi->mi_async_req_count != 0);
 			mi->mi_async_req_count--;
 		}
-		CALLB_CPR_SAFE_BEGIN(&cprinfo);
-		cv_wait(&mi->mi_async_reqs_cv, &mi->mi_async_lock);
-		CALLB_CPR_SAFE_END(&cprinfo, &mi->mi_async_lock);
 		mutex_enter(&mi->mi_lock);
 	}
 	mutex_exit(&mi->mi_lock);
