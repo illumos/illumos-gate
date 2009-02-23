@@ -1441,3 +1441,5 @@ Bugid   Risk Synopsis
 6800388 shstrtab can be sized incorrectly when -z ignore is used
 6805009 ld.so.1: link map control list tear down leaves dangling pointer -
 	pfinstall does it again.
+6807050 GNU linkonce sections can create duplicate and incompatible
+	eh_frame FDE entries

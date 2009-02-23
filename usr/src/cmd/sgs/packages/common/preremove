@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -46,14 +44,16 @@ fi
 #
 # Restore previous SGSTOOLS
 #
-if [ -d $BASEDIR/$SGSBACKUPDIR ]; then
+if [ \( -d $BASEDIR/$SGSBACKUPDIR \) -a \
+     \( -f $BASEDIR/${SGSBACKUPDIR}.origfiles \) ]; then
 	prev_bindnow=$LD_BIND_NOW
 	LD_BIND_NOW=1
 	export LD_BIND_NOW
 	echo "Restoring SGSTOOLS from $BASEDIR$SGSBACKUPDIR"
 	cd $BASEDIR/$SGSBACKUPDIR
-	find . -depth -print | cpio -pdmu $BASEDIR
+	cpio -pdmu $BASEDIR < $BASEDIR/${SGSBACKUPDIR}.origfiles
 	rm -rf *
+	rm $BASEDIR/${SGSBACKUPDIR}.origfiles
 	LD_BIND_NOW=$prev_bindnow
 fi
 

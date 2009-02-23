@@ -129,13 +129,25 @@ typedef struct {
 
 /*
  * The link-editor caches the results of sloppy relocation processing
- * in a variable of this type. Symbols come for processing in sorted
- * order, so a 1 element cache suffices to eliminate duplicate lookups.
+ * in a variable of type Rlxrel_cache. Symbols come for processing in sorted
+ * order, so a single item cache suffices to eliminate duplicate lookups.
+ *
+ * When sloppy relocation processing fails, the Rlxrel_rej enum reports
+ * the underlying reason.
  */
+typedef enum {
+	RLXREL_REJ_NONE = 0,	/* Replacement symbol was found */
+	RLXREL_REJ_TARGET,	/* Target sec disallows relaxed relocations */
+	RLXREL_REJ_SECTION,	/* Either there is no replacement section, */
+				/* 	or its attributes are incompatible */
+	RLXREL_REJ_SYMBOL,	/* Replacement symbol not found */
+} Rlxrel_rej;
+
 typedef struct sreloc_cache {
 	Sym_desc	*sr_osdp;	/* Original symbol */
 	Sym_desc	*sr_rsdp;	/* Replacement symbol */
-} Sreloc_cache;
+	Rlxrel_rej	sr_rej;		/* Reason for failure if NULL sr_rsdp */
+} Rlxrel_cache;
 
 /*
  * Output file processing structure
@@ -289,7 +301,7 @@ struct ofl_desc {
 	Xword		ofl_sfcap_1;	/* software capabilities */
 	Lm_list		*ofl_lml;	/* runtime link-map list */
 	Gottable	*ofl_gottable;	/* debugging got information */
-	Sreloc_cache	ofl_sr_cache;	/* Cache last result from */
+	Rlxrel_cache	ofl_sr_cache;	/* Cache last result from */
 					/*	sloppy_comdat_reloc() */
 };
 

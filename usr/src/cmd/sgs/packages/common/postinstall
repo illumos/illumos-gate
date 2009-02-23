@@ -19,14 +19,11 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 ONLDCPIO=/tmp/SUNWonld.cpio.$$
-LINKERALIAS=linker_install@eng.sun.com
 
 
 #
@@ -54,7 +51,8 @@ build_liblist ()
 	# Build '/lib' file list for backing up
 	#
 	cd $BASEDIR/$SGSDIR/lib
-	find . \( -type f -o -type l \) -print | while read file
+	find . \( -type f -o -type l \) -print | sed 's/^\.\///'g |
+	while read file
 	do
 		if [ \( -f $BASEDIR/$LIBBASE/$file \)  -o \
 		    \( -h $BASEDIR/$LIBBASE/$file \) ]; then
@@ -85,7 +83,7 @@ build_newitemsfile ()
 	# Build a list of files/directories that this package is going
 	# add to the system that do not already exist.
 	cd $BASEDIR/$SGSDIR/lib
-	find . -depth -print | while read file
+	find . -depth -print | sed 's/^\.\///'g | while read file
 	do
 		# Built in /bin/sh test lacks -e
 		/usr/bin/test \! -e "$BASEDIR/$LIBBASE/$file"
@@ -109,24 +107,27 @@ build_newitemsfile ()
 # These items will need to be explicitly removed at uninstall.
 build_newitemsfile
 
+# Generate a file containing the names of the original files backed
+# up from the system. These items will be moved back at uninstall.
+LIBLIST=`build_liblist`
+FILELIST=`build_filelist`
+for file in $LIBLIST $FILELIST $ETCLIST
+do
+	echo $file
+done > ${SGSBACKUPDIR}.origfiles
 
 #
 # backup all existing SGStools.
 #
-LIBLIST=`build_liblist`
-FILELIST=`build_filelist`
 echo "Backup up existing SGS tools to $SGSBACKUPDIR..."
 cd $BASEDIR
-for file in $LIBLIST $FILELIST $ETCLIST
-do
-	echo $file
-done  | cpio -pdm $BASEDIR/$SGSBACKUPDIR
+cpio -pdm $BASEDIR/$SGSBACKUPDIR < ${SGSBACKUPDIR}.origfiles
 
 
 #
 # Overwrite SGSTOOLS onto existing system.  We use CPIO
-# because rm's a file and then installs a new one
-# instead of copying over a existing file.  This is
+# because it unlinks a file and then creates a new one
+# instead of copying over an existing inode.  This is
 # required when updating libraries (and the run-time linker)
 # which are currently being used.
 #
@@ -170,32 +171,3 @@ if [ "${ETCLIST}x" != "x" ]; then
 fi
 
 LD_BIND_NOW=$prev_bindnow
-
-####
-#### E-mail sent to track installations of SUNWonld package.
-#### purely for statistical purposes.
-####
-###if [ -f /usr/lib/sendmail ]
-###then
-###	HOSTINFO=`uname -a`
-###	DATE=`date`
-###	ENVLIST=`env`
-###	/usr/lib/sendmail $LINKERALIAS << EOF
-###To: $LINKERALIAS
-###Subject: SUNWonld Linker Package Installation: $PRODVERS
-###Content-type: text/plain
-###Precedence: junk
-###--------
-###
-###Package Installation
-###uname: $HOSTINFO
-###date: $DATE
-###VERSION: $VERSION
-###ENV:
-###$ENVLIST
-###$ENV
-###
-###.
-###EOF
-###fi
-

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	ELF_TARGET_AMD64
 
@@ -292,6 +291,16 @@
  * The job of this function is to determine how much space
  * will be required for the final table.  We'll build
  * it later.
+ *
+ * When GNU linkonce processing is in effect, we can end up in a situation
+ * where the FDEs related to discarded sections remain in the eh_frame
+ * section. Ideally, we would remove these dead entries from eh_frame.
+ * However, that optimization has not yet been implemented. In the current
+ * implementation, the number of dead FDEs cannot be determined until
+ * active relocations are processed, and that processing follows the
+ * call to this function. This means that we are unable to detect dead FDEs
+ * here, and the section created by this routine is sized for maximum case
+ * where all FDEs are valid.
  */
 uintptr_t
 make_amd64_unwindhdr(Ofl_desc *ofl)
@@ -306,7 +315,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 
 	/*
 	 * we only build a unwind header if we have
-	 * sum unwind information in the file.
+	 * some unwind information in the file.
 	 */
 	if (ofl->ofl_unwind.head == NULL)
 		return (1);
@@ -637,23 +646,34 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 				uint64_t    initloc;
 				uint64_t    fdeaddr;
 
-				bintabndx = fde_count * 2;
-				fde_count++;
-
-				/*
-				 * FDEaddr is adjusted
-				 * to account for the length & id which
-				 * have already been consumed.
-				 */
-				fdeaddr = shdr->sh_addr + off;
-
 				initloc = dwarf_ehe_extract(&data[off],
 				    &ndx, cieRflag, ofl->ofl_dehdr->e_ident,
 				    shdr->sh_addr + off + ndx);
-				binarytable[bintabndx] =
-				    (uint_t)(initloc - hdraddr);
-				binarytable[bintabndx + 1] =
-				    (uint_t)(fdeaddr - hdraddr);
+
+				/*
+				 * Ignore FDEs with initloc set to 0.
+				 * initloc will not be 0 unless this FDE was
+				 * abandoned due to GNU linkonce processing.
+				 * The 0 value occurs because we don't resolve
+				 * sloppy relocations for unwind header target
+				 * sections.
+				 */
+				if (initloc != 0) {
+					bintabndx = fde_count * 2;
+					fde_count++;
+
+					/*
+					 * FDEaddr is adjusted
+					 * to account for the length & id which
+					 * have already been consumed.
+					 */
+					fdeaddr = shdr->sh_addr + off;
+
+					binarytable[bintabndx] =
+					    (uint_t)(initloc - hdraddr);
+					binarytable[bintabndx + 1] =
+					    (uint_t)(fdeaddr - hdraddr);
+				}
 			}
 
 			/*
@@ -700,6 +720,27 @@ done:
 	*uint_ptr = fde_count;
 	if (bswap)
 		*uint_ptr = ld_bswap_Word(*uint_ptr);
+
+	/*
+	 * If relaxed relocations are active, then there is a chance
+	 * that we didn't use all the space reserved for this section.
+	 * For details, see the note at head of make_amd64_unwindhdr() above.
+	 *
+	 * Find the PT_SUNW_UNWIND program header, and change the size values
+	 * to the size of the subset of the section that was actually used.
+	 */
+	if (ofl->ofl_flags1 & FLG_OF1_RLXREL) {
+		Word	phnum = ofl->ofl_nehdr->e_phnum;
+		Phdr	*phdr = ofl->ofl_phdr;
+
+		for (; phnum-- > 0; phdr++) {
+			if (phdr->p_type == PT_SUNW_UNWIND) {
+				phdr->p_memsz = 12 + (8 * fde_count);
+				phdr->p_filesz = phdr->p_memsz;
+				break;
+			}
+		}
+	}
 
 	return (1);
 }

@@ -1364,12 +1364,18 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  * entry:
  *	reld - Relocation
  *	sdp - Symbol to be replaced. Must be a local symbol (STB_LOCAL).
+ *	reject - Address of variable to receive rejection code
+ *		if no replacement symbol is found.
  *
  * exit:
  *	Returns address of replacement symbol descriptor if one was
  *	found, and NULL otherwise. The result is also cached in
  *	ofl->ofl_sr_cache as an optimization to speed following calls
  *	for the same value of sdp.
+ *
+ *	On success (non-NULL result), *reject is set to RLXREL_REJ_NONE.
+ *	On failure (NULL result), *reject is filled in with a code
+ *	describing the underlying reason.
  *
  * note:
  *	The word "COMDAT" is used to refer to actual COMDAT sections, COMDAT
@@ -1401,7 +1407,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  *	processing allows us to interoperate.
  */
 static Sym_desc *
-sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
+sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp,
+    Rlxrel_rej *reject)
 {
 	Is_desc		*rep_isp;
 	Sym		*sym, *rep_sym;
@@ -1410,13 +1417,37 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	Conv_inv_buf_t	inv_buf;
 	Word		scnndx, symscnt;
 	Sym_desc	**oldndx, *rep_sdp;
+	const char	*is_name;
+
+
+	/*
+	 * Sloppy relocations are never applied to .eh_frame or
+	 * .gcc_except_table sections. The entries in these sections
+	 * for discarded sections are better left uninitialized.
+	 *
+	 * We match these sections by name, because on most platforms they
+	 * are SHT_PROGBITS, and cannot be identified otherwise. On amd64
+	 * architectures, .eh_frame is SHT_AMD64_UNWIND, but that is ambiguous
+	 * (.eh_frame_hdr is also SHT_AMD64_UNWIND), so we still match it by
+	 * name.
+	 */
+	is_name = reld->rel_isdesc->is_name;
+	if (((is_name[1] == 'e') &&
+	    (strcmp(is_name, MSG_ORIG(MSG_SCN_EHFRAME)) == 0)) ||
+	    ((is_name[1] == 'g') &&
+	    (strcmp(is_name, MSG_ORIG(MSG_SCN_GCC_X_TBL)) == 0))) {
+		*reject = RLXREL_REJ_TARGET;
+		return (NULL);
+	}
 
 	/*
 	 * If we looked up the same symbol on the previous call, we can
 	 * return the cached value.
 	 */
-	if (sdp == ofl->ofl_sr_cache.sr_osdp)
+	if (sdp == ofl->ofl_sr_cache.sr_osdp) {
+		*reject = ofl->ofl_sr_cache.sr_rej;
 		return (ofl->ofl_sr_cache.sr_rsdp);
+	}
 
 	ofl->ofl_sr_cache.sr_osdp = sdp;
 	sym = sdp->sd_sym;
@@ -1446,8 +1477,10 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	    (isp->is_indata->d_size != rep_isp->is_indata->d_size) ||
 	    (isp->is_shdr->sh_type != rep_isp->is_shdr->sh_type) ||
 	    ((isp->is_shdr->sh_flags & SHF_GROUP) !=
-	    (rep_isp->is_shdr->sh_flags & SHF_GROUP)))
+	    (rep_isp->is_shdr->sh_flags & SHF_GROUP))) {
+		*reject = ofl->ofl_sr_cache.sr_rej = RLXREL_REJ_SECTION;
 		return (ofl->ofl_sr_cache.sr_rsdp = NULL);
+	}
 
 	/*
 	 * We found the kept COMDAT section. Now, look at all of the
@@ -1503,10 +1536,12 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 		}
 		DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml,
 		    isp->is_name, rep_sdp));
+		*reject = ofl->ofl_sr_cache.sr_rej = RLXREL_REJ_NONE;
 		return (ofl->ofl_sr_cache.sr_rsdp = rep_sdp);
 	}
 
 	/* If didn't return above, we didn't find it */
+	*reject = ofl->ofl_sr_cache.sr_rej = RLXREL_REJ_SYMBOL;
 	return (ofl->ofl_sr_cache.sr_rsdp = NULL);
 }
 
@@ -1684,7 +1719,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 * definition.
 	 */
 	if (sdp->sd_flags & FLG_SY_ISDISC) {
-		Sym_desc *nsdp = NULL;
+		Sym_desc	*nsdp = NULL;
+		Rlxrel_rej	reject;
 
 		if (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL) {
 			/*
@@ -1698,7 +1734,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 			    sdp->sd_isc->is_osdesc &&
 			    (sdp->sd_isc->is_flags & FLG_IS_COMDAT) &&
 			    ((nsdp = sloppy_comdat_reloc(ofl, reld,
-			    sdp)) == NULL)) {
+			    sdp, &reject)) == NULL)) {
 				Shdr	*is_shdr = reld->rel_isdesc->is_shdr;
 
 				/*
@@ -1713,41 +1749,20 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 				 *	  The GNU ld tests for these by name,
 				 *	  but we are willing to extend it to
 				 *	  any non-allocable section.
-				 *	- Target section is .eh_frame.
-				 *	  Note that on amd64 architectures,
-				 *	  these sections are SHT_AMD64_UNWIND.
-				 *	  However, we test it by name: On other
-				 *	  architectures it is PROGBITS, and on
-				 *	  amd64, .eh_frame_hdr is also
-				 *	  SHT_AMD64_UNWIND.
-				 *	- The target section is
-				 *	  .gcc_except_table, which is PROGBITS,
-				 *	  and must be tested by name
+				 *	- The target section is excluded from
+				 *	  sloppy relocations by policy.
 				 */
-				if ((ofl->ofl_flags & FLG_OF_VERBOSE) == 0) {
-					const char *is_name;
-
-					if (!(is_shdr->sh_flags & SHF_ALLOC))
-						return (1);
-
-					is_name = reld->rel_isdesc->is_name;
-					if ((is_name[1] == 'e') &&
-					    (strcmp(is_name,
-					    MSG_ORIG(MSG_SCN_EHFRAME)) == 0))
-						return (1);
-					if ((is_name[1] == 'g') &&
-					    (strcmp(is_name,
-					    MSG_ORIG(MSG_SCN_GCC_X_TBL)) == 0))
-						return (1);
-				}
-
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_REL_SLOPCDATNOSYM),
-				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-				    reld->rel_rtype, 0, &inv_buf),
-				    ifl->ifl_name, isp->is_name,
-				    demangle(reld->rel_sname),
-				    sdp->sd_isc->is_name);
+				if (((ofl->ofl_flags & FLG_OF_VERBOSE) != 0) ||
+				    ((is_shdr->sh_flags & SHF_ALLOC) &&
+				    (reject != RLXREL_REJ_TARGET)))
+					eprintf(ofl->ofl_lml, ERR_WARNING,
+					    MSG_INTL(MSG_REL_SLOPCDATNOSYM),
+					    conv_reloc_type(
+					    ifl->ifl_ehdr->e_machine,
+					    reld->rel_rtype, 0, &inv_buf),
+					    ifl->ifl_name, isp->is_name,
+					    demangle(reld->rel_sname),
+					    sdp->sd_isc->is_name);
 				return (1);
 			}
 		} else if (reld->rel_sname == sdp->sd_name)
