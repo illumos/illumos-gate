@@ -1,9 +1,7 @@
 /*
- * Copyright 1996, 1999, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* config.h.  Generated automatically by configure.  */
 /* config.h.in.  Generated automatically from configure.in by autoheader.  */
@@ -273,7 +271,7 @@
 #define HAVE_SIGNALED_IO 1
 
 /* can we use SIGPOLL for UDP? */
-#define USE_UDP_SIGPOLL 1
+/* #define USE_UDP_SIGPOLL 1 */
 
 /* can we use SIGPOLL for tty IO? */
 #define USE_TTY_SIGPOLL 1
