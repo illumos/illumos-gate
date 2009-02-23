@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +119,11 @@ dlmgmt_door_init()
 		    strerror(err));
 		return (err);
 	}
+	/*
+	 * fdetach first in case a previous daemon instance exited
+	 * ungracefully.
+	 */
+	(void) fdetach(DLMGMT_DOOR);
 	if (fattach(dlmgmt_door_fd, DLMGMT_DOOR) != 0) {
 		err = errno;
 		dlmgmt_log(LOG_ERR, "fattach(%s) failed: %s",
