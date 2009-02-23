@@ -406,8 +406,13 @@ extern "C" {
 /* Define on *nto-qnx systems */
 /* #undef MISSING_FD_MASK */
 
-/* Use libedit for sftp */
+/*
+ * Use libedit or libtecla for sftp
+ * If both USE_LIBEDIT and USE_LIBTECLA are defined, then USE_LIBEDIT will
+ * have higher precedence.
+ */
 #undef USE_LIBEDIT
+#define	USE_LIBTECLA	1
 
 /* Define if you want to use OpenSSL's internally seeded PRNG only */
 #define	OPENSSL_PRNG_ONLY 1

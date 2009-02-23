@@ -16,8 +16,6 @@
 
 /* $OpenBSD: sftp.c,v 1.96 2007/01/03 04:09:15 stevesk Exp $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "includes.h"
 
 #include <sys/types.h>
@@ -34,11 +32,17 @@
 #ifdef HAVE_PATHS_H
 # include <paths.h>
 #endif
+
 #ifdef USE_LIBEDIT
 #include <histedit.h>
 #else
-typedef void EditLine;
-#endif
+#ifdef USE_LIBTECLA
+#include <libtecla.h>
+#define	MAX_LINE_LEN	2048
+#define	MAX_CMD_HIST	10000
+#endif /* USE_LIBTECLA */
+#endif /* USE_LIBEDIT */
+
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -1264,7 +1268,19 @@ prompt(EditLine *el)
 {
 	return ("sftp> ");
 }
-#endif
+#else
+#ifdef USE_LIBTECLA
+/*
+ * Disable default TAB completion for filenames, because it displays local
+ * files for every commands, which is not desirable.
+ */
+static
+CPL_MATCH_FN(nomatch)
+{
+	return (0);
+}
+#endif /* USE_LIBTECLA */
+#endif /* USE_LIBEDIT */
 
 int
 interactive_loop(int fd_in, int fd_out, char *file1, char *file2)
@@ -1274,13 +1290,15 @@ interactive_loop(int fd_in, int fd_out, char *file1, char *file2)
 	char cmd[2048];
 	struct sftp_conn *conn;
 	int err, interactive;
-	EditLine *el = NULL;
+	void *il = NULL;
+
 #ifdef USE_LIBEDIT
+        EditLine *el = NULL;
 	History *hl = NULL;
 	HistEvent hev;
 
 	if (!batchmode && isatty(STDIN_FILENO)) {
-		if ((el = el_init(__progname, stdin, stdout, stderr)) == NULL)
+		if ((il = el = el_init(__progname, stdin, stdout, stderr)) == NULL)
 			fatal("Couldn't initialise editline");
 		if ((hl = history_init()) == NULL)
 			fatal("Couldn't initialise editline history");
@@ -1293,6 +1311,19 @@ interactive_loop(int fd_in, int fd_out, char *file1, char *file2)
 		el_set(el, EL_SIGNAL, 1);
 		el_source(el, NULL);
 	}
+#else
+#ifdef USE_LIBTECLA
+	GetLine *gl = NULL;
+
+	if (!batchmode && isatty(STDIN_FILENO)) {
+		if ((il = gl = new_GetLine(MAX_LINE_LEN, MAX_CMD_HIST)) == NULL)
+			fatal("Couldn't initialize GetLine");
+		if (gl_customize_completion(gl, NULL, nomatch) != 0) {
+			(void) del_GetLine(gl);
+			fatal("Couldn't register completion function");
+		}
+	}
+#endif /* USE_LIBTECLA */
 #endif /* USE_LIBEDIT */
 
 	conn = do_init(fd_in, fd_out, copy_buffer_len, num_requests);
@@ -1347,7 +1378,7 @@ interactive_loop(int fd_in, int fd_out, char *file1, char *file2)
 
 		signal(SIGINT, SIG_IGN);
 
-		if (el == NULL) {
+		if (il == NULL) {
 			if (interactive)
 				printf("sftp> ");
 			if (fgets(cmd, sizeof(cmd), infile) == NULL) {
@@ -1377,6 +1408,35 @@ interactive_loop(int fd_in, int fd_out, char *file1, char *file2)
 				continue;
 			}
 		}
+#else
+#ifdef USE_LIBTECLA
+		else {
+			const char *line;
+
+			line = gl_get_line(gl, "sftp> ", NULL, -1);
+			if (line != NULL) {
+				if (strlcpy(cmd, line, sizeof(cmd)) >=
+				    sizeof(cmd)) {
+					fprintf(stderr, gettext(
+					    "Error: input line too long\n"));
+					continue;
+				}
+			} else {
+				GlReturnStatus rtn;
+
+				rtn = gl_return_status(gl);
+				if (rtn == GLR_SIGNAL) {
+					gl_abandon_line(gl);
+					continue;
+				} else if (rtn == GLR_ERROR) {
+					fprintf(stderr, gettext(
+					    "Error reading terminal: %s/\n"),
+					    gl_error_message(gl, NULL, 0));
+				}
+				break;
+			}
+		}
+#endif /* USE_LIBTECLA */
 #endif /* USE_LIBEDIT */
 
 		cp = strrchr(cmd, '\n');
@@ -1397,6 +1457,11 @@ interactive_loop(int fd_in, int fd_out, char *file1, char *file2)
 #ifdef USE_LIBEDIT
 	if (el != NULL)
 		el_end(el);
+#else
+#ifdef USE_LIBTECLA
+	if (gl != NULL)
+		(void) del_GetLine(gl);
+#endif /* USE_LIBTECLA */
 #endif /* USE_LIBEDIT */
 
 	/* err == 1 signifies normal "quit" exit */
