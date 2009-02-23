@@ -1443,3 +1443,4 @@ Bugid   Risk Synopsis
 	pfinstall does it again.
 6807050 GNU linkonce sections can create duplicate and incompatible
 	eh_frame FDE entries
+6807864	ld.so.1 is susceptible to a fatal dlsym()/setlocale() race

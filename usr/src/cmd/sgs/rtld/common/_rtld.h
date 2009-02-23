@@ -579,7 +579,8 @@ extern const char	*profile_lib;	/* audit library to perform profile */
 extern Dl_argsinfo	argsinfo;	/* process argument, environment and */
 					/*	auxv information */
 
-extern const char	*err_strs[];	/* diagnostic error string headers */
+extern const char	*err_strs[ERR_NUM];
+					/* diagnostic error string headers */
 extern const char	*nosym_str;	/* MSG_GEN_NOSYM message cache */
 
 extern ulong_t		hwcap;		/* hardware capabilities */
@@ -634,7 +635,6 @@ extern Rt_map		*fpavl_recorded(Lm_list *, const char *, uint_t,
 			    avl_index_t *);
 extern void		fpavl_remove(Rt_map *);
 extern size_t		fullpath(Rt_map *, Fdesc *);
-extern void		get_lcinterface(Rt_map *, Lc_interface *);
 extern Lmid_t		get_linkmap_id(Lm_list *);
 extern Pdesc		*get_next_dir(Spath_desc *, Rt_map *, uint_t);
 extern int		hdl_add(Grp_hdl *, Rt_map *, uint_t);

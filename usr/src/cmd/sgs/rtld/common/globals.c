@@ -179,7 +179,7 @@ Dl_argsinfo	argsinfo = { 0 };	/* process argument, environment and */
  * Frequently used messages are cached here to reduce _dgettext() overhead and
  * also provide for resetting should the locale change (see _ld_libc()).
  */
-const char	*err_strs[ERR_NUM] = { 0 };
+const char	*err_strs[ERR_NUM] = { NULL };
 const char	*nosym_str = NULL;
 
 

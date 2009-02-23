@@ -963,14 +963,12 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 		}
 
 		/*
-		 * If we are not running in the environment where
-		 * libc/libthread are merged, we hold on to rtld lock
-		 * upon leave() function.
-		 *
-		 * There is a possibility that libc is not mapped in yet.
-		 * We may later find out that we will be running in
-		 * libc/libthread merged enviornment. Refer to:
-		 *	get_lcinterface() in mutex.c.
+		 * Prior to the Unified Process Model (UPM) environment, an
+		 * rtld lock had to be held upon leave().  However, even within
+		 * a UPM environment, an old auditor, that has a lazy dependency
+		 * on libc, is still a possibility.  As libc isn't loaded, we
+		 * don't know the process model, and will determine this later.
+		 * Refer to external.c:get_lcinterface().
 		 */
 		if ((rtld_flags2 & RT_FL2_UNIFPROC) == 0)
 			LIST(lmp)->lm_flags |= LML_FLG_HOLDLOCK;

@@ -28,9 +28,10 @@
  * Implementation of all external interfaces between ld.so.1 and libc.
  *
  * This file started as a set of routines that provided synchronization and
- * locking operations using calls to libthread.  libthread has merged with libc,
- * and things have gotten a little simpler.  This file continues to establish
- * and redirect various events within ld.so.1 to interfaces within libc.
+ * locking operations using calls to libthread.  libthread has merged with libc
+ * under the Unified Process Model (UPM), and things have gotten a lot simpler.
+ * This file continues to establish and redirect various events within ld.so.1
+ * to interfaces within libc.
  *
  * Until libc is loaded and relocated, any external interfaces are captured
  * locally.  Each link-map list maintains its own set of external vectors, as
@@ -177,19 +178,36 @@
 
 /*
  * This interface provides the unified process model communication between
- * ld.so.1 and libc.  This interface is supplied through RTLDINFO.
+ * ld.so.1 and libc.  This interface can be called a number of times:
+ *
+ *   -	Initially, this interface is called to process RTLDINFO.  This data
+ *	structure is typically provided by libc, and contains the address of
+ *	libc interfaces that must be called to initialize threads information.
+ *
+ *   -	_ld_libc(), this interface can also be called by libc at process
+ *	initialization, after libc has been loaded and relocated, but before
+ *	control has been passed to any user code (.init's or main()).  This
+ *	call provides additional libc interface information that ld.so.1 must
+ *	call during process execution.
+ *
+ *   -	_ld_libc() can also be called by libc during process execution to
+ * 	re-establish interfaces such as the locale.
  */
-void
+static void
 get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 {
-	int		threaded = 0;
-	int		version;
-	int		tag;
+	int		threaded = 0, entry = 0, tag;
 	Lm_list		*lml;
 	Lc_desc		*lcp;
 
-	if ((lmp == 0) || (funcs == 0))
+	if ((lmp == NULL) || (funcs == NULL))
 		return;
+
+	/*
+	 * Once the process is active, ensure we grab a lock.
+	 */
+	if (rtld_flags & RT_FL_APPLIC)
+		entry = enter(0);
 
 	lml = LIST(lmp);
 	lcp = &lml->lm_lcs[0];
@@ -243,7 +261,7 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 			 * on the primrary link-map may change this locale.
 			 */
 			if ((lml->lm_flags & LML_FLG_BASELM) &&
-			    ((gptr == 0) || (strcmp(gptr, lptr) != 0))) {
+			    ((gptr == NULL) || (strcmp(gptr, lptr) != 0))) {
 				/*
 				 * If we've obtained a message locale (typically
 				 * supplied via libc's setlocale()), then
@@ -260,12 +278,8 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 				/*
 				 * Clear any cached messages.
 				 */
-				err_strs[ERR_NONE] = 0;
-				err_strs[ERR_WARNING] = 0;
-				err_strs[ERR_FATAL] = 0;
-				err_strs[ERR_ELF] = 0;
-
-				nosym_str = 0;
+				bzero(err_strs, sizeof (err_strs));
+				nosym_str = NULL;
 			}
 			break;
 
@@ -276,7 +290,7 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 			 * If the global vector is unset, or this is the primary
 			 * link-map, set the global vector.
 			 */
-			if ((gptr == 0) || (lml->lm_flags & LML_FLG_BASELM))
+			if ((gptr == NULL) || (lml->lm_flags & LML_FLG_BASELM))
 				glcs[tag].lc_un.lc_ptr = lptr;
 
 			/* FALLTHROUGH */
@@ -290,6 +304,10 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 
 		case CI_VERSION:
 			if ((rtld_flags2 & RT_FL2_RTLDSEEN) == 0) {
+				Listnode	*lnp;
+				Lm_list		*lml2;
+				int		version;
+
 				rtld_flags2 |= RT_FL2_RTLDSEEN;
 
 				version = funcs->ci_un.ci_val;
@@ -299,36 +317,30 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 					thr_flg_reenter = THR_FLG_REENTER;
 				}
 #endif
-				if (version >= CI_V_FOUR) {
-					Listnode	*lnp;
-					Lm_list		*lml2;
-
-					rtld_flags2 |= RT_FL2_UNIFPROC;
-
-					/*
-					 * We might have seen auditor which is
-					 * not dependent on libc.  Such an
-					 * auditor's link map list has
-					 * LML_FLG_HOLDLOCK set.  This lock
-					 * needs to be dropped.  Refer to
-					 * audit_setup() in audit.c.
-					 */
-					if ((rtld_flags2 & RT_FL2_HASAUDIT) ==
-					    0)
+				if (version < CI_V_FOUR)
 					break;
 
-					/*
-					 * Yes, we did. Take care of them.
-					 */
-					for (LIST_TRAVERSE(&dynlm_list, lnp,
-					    lml2)) {
-						Rt_map *map =
-						    (Rt_map *)lml2->lm_head;
+				rtld_flags2 |= RT_FL2_UNIFPROC;
 
-						if (FLAGS(map) & FLG_RT_AUDIT) {
-							lml2->lm_flags &=
-							    ~LML_FLG_HOLDLOCK;
-						}
+				/*
+				 * We might have seen an auditor which is not
+				 * dependent on libc.  Such an auditor's link
+				 * map list has LML_FLG_HOLDLOCK set.  This
+				 * lock needs to be dropped.  Refer to
+				 * audit_setup() in audit.c.
+				 */
+				if ((rtld_flags2 & RT_FL2_HASAUDIT) == 0)
+					break;
+
+				/*
+				 * Yes, we did. Take care of them.
+				 */
+				for (LIST_TRAVERSE(&dynlm_list, lnp, lml2)) {
+					Rt_map *map = (Rt_map *)lml2->lm_head;
+
+					if (FLAGS(map) & FLG_RT_AUDIT) {
+						lml2->lm_flags &=
+						    ~LML_FLG_HOLDLOCK;
 					}
 				}
 			}
@@ -339,26 +351,28 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 		}
 	}
 
-	if (threaded == 0)
-		return;
+	if (threaded) {
+		/*
+		 * If a version of libc gives us only a subset of the TLS
+		 * interfaces, it's confused and we discard the whole lot.
+		 */
+		if ((lcp[CI_TLS_MODADD].lc_un.lc_func &&
+		    lcp[CI_TLS_MODREM].lc_un.lc_func &&
+		    lcp[CI_TLS_STATMOD].lc_un.lc_func) == NULL) {
+			lcp[CI_TLS_MODADD].lc_un.lc_func = NULL;
+			lcp[CI_TLS_MODREM].lc_un.lc_func = NULL;
+			lcp[CI_TLS_STATMOD].lc_un.lc_func = NULL;
+		}
 
-	/*
-	 * If a version of libc gives us only a subset of the TLS interfaces -
-	 * it's confused and we discard the whole lot.
-	 */
-	if ((lcp[CI_TLS_MODADD].lc_un.lc_func &&
-	    lcp[CI_TLS_MODREM].lc_un.lc_func &&
-	    lcp[CI_TLS_STATMOD].lc_un.lc_func) == 0) {
-		lcp[CI_TLS_MODADD].lc_un.lc_func = 0;
-		lcp[CI_TLS_MODREM].lc_un.lc_func = 0;
-		lcp[CI_TLS_STATMOD].lc_un.lc_func = 0;
+		/*
+		 * Indicate that we're now thread capable.
+		 */
+		if ((lml->lm_flags & LML_FLG_RTLDLM) == 0)
+			rtld_flags |= RT_FL_THREADS;
 	}
 
-	/*
-	 * Indicate that we're now thread capable.
-	 */
-	if ((lml->lm_flags & LML_FLG_RTLDLM) == 0)
-		rtld_flags |= RT_FL_THREADS;
+	if (entry)
+		leave(lml, 0);
 }
 
 /*
@@ -384,12 +398,23 @@ rt_get_extern(Lm_list *lml, Rt_map *lmp)
 	 * Perform some sanity checks.  If we have TLS requirements we better
 	 * have the associated external interfaces.
 	 */
-	if (lml->lm_tls && (lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func == 0)) {
+	if (lml->lm_tls &&
+	    (lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func == NULL)) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_TLS_NOSUPPORT),
 		    NAME(lmp));
 		return (0);
 	}
 	return (1);
+}
+
+/*
+ * Provide an interface for libc to communicate additional interface
+ * information.
+ */
+void
+_ld_libc(void *ptr)
+{
+	get_lcinterface(_caller(caller(), CL_EXECDEF), (Lc_interface *)ptr);
 }
 
 static int	bindmask = 0;
@@ -440,8 +465,9 @@ rt_thr_init(Lm_list *lml)
 {
 	void	(*fptr)(void);
 
-	if ((fptr = (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != 0) {
-		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = 0;
+	if ((fptr =
+	    (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != NULL) {
+		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = NULL;
 		leave(NULL, thr_flg_reenter);
 		(*fptr)();
 		(void) enter(thr_flg_reenter);

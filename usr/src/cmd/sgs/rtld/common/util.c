@@ -328,7 +328,7 @@ rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
 	/*
 	 * Make sure an object file has been specified.
 	 */
-	if (argv[ndx] == 0)
+	if (argv[ndx] == NULL)
 		return (1);
 
 	/*
@@ -432,7 +432,7 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 		 * We better not get a hit now, we do not want duplicates in
 		 * the tree.
 		 */
-		ASSERT(_lmp == 0);
+		ASSERT(_lmp == NULL);
 	}
 
 	/*
@@ -595,7 +595,7 @@ spavl_insert(const char *name)
 	/*
 	 * Insert new node in tree.
 	 */
-	if ((pnp = calloc(sizeof (PathNode), 1)) != 0) {
+	if ((pnp = calloc(sizeof (PathNode), 1)) != NULL) {
 		pnp->pn_name = strdup(buffer);
 		pnp->pn_hash = sgs_str_hash(buffer);
 		avl_insert(spavl, pnp, where);
@@ -963,7 +963,7 @@ atexit_fini()
 	/*
 	 * Reverse topologically sort the main link-map for .fini execution.
 	 */
-	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != 0) &&
+	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
 	    (tobj != (Rt_map **)S_ERROR))
 		call_fini(lml, tobj);
 
@@ -997,7 +997,7 @@ atexit_fini()
 		if (lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM))
 			continue;
 
-		if ((lmp = (Rt_map *)lml->lm_head) == 0)
+		if ((lmp = (Rt_map *)lml->lm_head) == NULL)
 			continue;
 
 		lml->lm_flags |= LML_FLG_ATEXIT;
@@ -1006,7 +1006,7 @@ atexit_fini()
 		/*
 		 * Reverse topologically sort the link-map for .fini execution.
 		 */
-		if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != 0) &&
+		if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
 		    (tobj != (Rt_map **)S_ERROR))
 			call_fini(lml, tobj);
 
@@ -1022,7 +1022,7 @@ atexit_fini()
 	lml->lm_flags &= ~LML_FLG_INTRPOSETSORT;
 	lmp = (Rt_map *)lml->lm_head;
 
-	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != 0) &&
+	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != NULL) &&
 	    (tobj != (Rt_map **)S_ERROR))
 		call_fini(lml, tobj);
 
@@ -1038,7 +1038,7 @@ atexit_fini()
 void
 load_completion(Rt_map *nlmp)
 {
-	Rt_map	**tobj = 0;
+	Rt_map	**tobj = NULL;
 	Lm_list	*nlml;
 
 	/*
@@ -1066,7 +1066,7 @@ load_completion(Rt_map *nlmp)
 	    (rtld_flags2 & (RT_FL2_PLMSETUP | RT_FL2_NOPLM)))) {
 		if ((tobj = tsort(nlmp, nlml->lm_init,
 		    RT_SORT_REV)) == (Rt_map **)S_ERROR)
-			tobj = 0;
+			tobj = NULL;
 	}
 
 	/*
@@ -1455,10 +1455,10 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
  * from a configuration file.  The latter provides a fallback if no user
  * environment setting is found, and can take two forms:
  *
- *  .	a replaceable definition - this will be used if no user environment
+ *  -	a replaceable definition - this will be used if no user environment
  *	setting has been seen, or
  *
- *  .	an permanent definition - this will be used no matter what user
+ *  -	an permanent definition - this will be used no matter what user
  *	environment setting is seen.  In the case of list variables it will be
  *	appended to any process environment setting seen.
  *
@@ -2060,7 +2060,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			if (s2)
 				rpl_debug = MSG_ORIG(MSG_TKN_BINDINGS);
 			else
-				rpl_debug = 0;
+				rpl_debug = NULL;
 		} else if (variable == ENV_FLG_CONFGEN) {
 			if (s2) {
 				rtld_flags |= RT_FL_CONFGEN;
@@ -2203,7 +2203,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 		if (estr) {
 			nlen = estr - nstr;
 			if ((*++estr == '\0') || (*estr == ','))
-				estr = 0;
+				estr = NULL;
 		} else
 			nlen = sstr - nstr;
 
@@ -2230,7 +2230,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 			return (0);
 
 		nstr = sstr + 1;
-		estr = 0;
+		estr = NULL;
 	}
 	return (0);
 }
@@ -2315,10 +2315,10 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 		 */
 		if ((s2 = strchr(s1, '=')) == NULL) {
 			len = strlen(s1);
-			s2 = 0;
+			s2 = NULL;
 		} else if (*++s2 == '\0') {
 			len = strlen(s1) - 1;
-			s2 = 0;
+			s2 = NULL;
 		} else {
 			len = s2 - s1 - 1;
 			while (isspace(*s2))
@@ -2395,11 +2395,11 @@ readenv_user(const char **envp, Word *lmflags, Word *lmtflags, int aout)
 	 * generic handling of message files does).  Duplicate the string so
 	 * that new locale setting can generically cleanup any previous locales.
 	 */
-	if ((locale = glcs[CI_LCMESSAGES].lc_un.lc_ptr) != 0) {
+	if ((locale = glcs[CI_LCMESSAGES].lc_un.lc_ptr) != NULL) {
 		if (((*locale == 'C') && (*(locale + 1) == '\0')) ||
 		    (strcmp(locale, MSG_ORIG(MSG_TKN_POSIX)) == 0) ||
 		    (strstr(locale, MSG_ORIG(MSG_TKN_DOTDOT)) != NULL))
-			glcs[CI_LCMESSAGES].lc_un.lc_ptr = 0;
+			glcs[CI_LCMESSAGES].lc_un.lc_ptr = NULL;
 		else
 			glcs[CI_LCMESSAGES].lc_un.lc_ptr = strdup(locale);
 	}
@@ -2812,7 +2812,7 @@ printf(const char *format, ...)
 	return (dowrite(&prf));
 }
 
-static char	errbuf[ERRSIZE], *nextptr = errbuf, *prevptr = 0;
+static char	errbuf[ERRSIZE], *nextptr = errbuf, *prevptr = NULL;
 
 /*
  * All error messages go through eprintf().  During process initialization,
@@ -2863,14 +2863,14 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 		if ((error == ERR_FATAL) && (rtld_flags2 & RT_FL2_FTL2WARN))
 			error = ERR_WARNING;
 		if (error == ERR_WARNING) {
-			if (err_strs[ERR_WARNING] == 0)
+			if (err_strs[ERR_WARNING] == NULL)
 				err_strs[ERR_WARNING] =
 				    MSG_INTL(MSG_ERR_WARNING);
 		} else if (error == ERR_FATAL) {
-			if (err_strs[ERR_FATAL] == 0)
+			if (err_strs[ERR_FATAL] == NULL)
 				err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
 		} else if (error == ERR_ELF) {
-			if (err_strs[ERR_ELF] == 0)
+			if (err_strs[ERR_ELF] == NULL)
 				err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
 		}
 		if (procname) {
@@ -2907,16 +2907,17 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 
 		if (NEXT(lmp) && (elfeno == 0)) {
 			if (((elfemg = (const char *(*)())dlsym_intn(RTLD_NEXT,
-			    MSG_ORIG(MSG_SYM_ELFERRMSG), lmp, &dlmp)) == 0) ||
+			    MSG_ORIG(MSG_SYM_ELFERRMSG),
+			    lmp, &dlmp)) == NULL) ||
 			    ((elfeno = (int (*)())dlsym_intn(RTLD_NEXT,
-			    MSG_ORIG(MSG_SYM_ELFERRNO), lmp, &dlmp)) == 0))
+			    MSG_ORIG(MSG_SYM_ELFERRNO), lmp, &dlmp)) == NULL))
 				elfeno = 0;
 		}
 
 		/*
 		 * Lookup the message; equivalent to elf_errmsg(elf_errno()).
 		 */
-		if (elfeno && ((emsg = (* elfemg)((* elfeno)())) != 0)) {
+		if (elfeno && ((emsg = (* elfemg)((* elfeno)())) != NULL)) {
 			prf.pr_cur--;
 			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR2),
 			    emsg) == 0)
@@ -2985,7 +2986,7 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 		 * created to prevent any duplication clutter.
 		 */
 		if ((rtld_flags & RT_FL_APPLIC) &&
-		    ((prevptr == 0) || (strcmp(prevptr, nextptr) != 0))) {
+		    ((prevptr == NULL) || (strcmp(prevptr, nextptr) != 0))) {
 			prevptr = nextptr;
 			nextptr = prf.pr_cur;
 			*nextptr = '\0';
@@ -3336,7 +3337,7 @@ leave(Lm_list *lml, int flags)
 	 * Reinitialize error message pointer, and any overflow indication.
 	 */
 	nextptr = errbuf;
-	prevptr = 0;
+	prevptr = NULL;
 
 	/*
 	 * Defragment any freed memory.
@@ -3349,9 +3350,8 @@ leave(Lm_list *lml, int flags)
 	 * there's little point in doing so since we are single-threaded.
 	 *
 	 * LML_FLG_HOLDLOCK is set for:
-	 *	*) The ld.so.1's link-map list.
-	 *	*) The auditor's link-map if the environment is
-	 *	   libc/libthread un-unified.
+	 *  -	 The ld.so.1's link-map list.
+	 *  -	 The auditor's link-map if the environment is pre-UPM.
 	 */
 	if (lml && (lml->lm_flags & LML_FLG_HOLDLOCK))
 		return;
@@ -3457,13 +3457,13 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
  *
  * This routine is called after a relocation() pass, and thus provides for:
  *
- *  o	setting environ on the main link-map after the initial application and
+ *  -	setting environ on the main link-map after the initial application and
  *	its dependencies have been established.  Typically environ lives in the
  *	application (provided by its crt), but in older applications it might
  *	be in libc.  Who knows what's expected of applications not built on
  *	Solaris.
  *
- *  o	after loading a new shared object.  We can add shared objects to various
+ *  -	after loading a new shared object.  We can add shared objects to various
  *	link-maps, and any link-map dependencies requiring getopt() require
  *	their own environ.  In addition, lazy loading might bring in the
  *	supplier of environ (libc used to be a lazy loading candidate) after
@@ -3503,9 +3503,9 @@ set_environ(Lm_list *lml)
  * can be passed to us via the aux vector, however if these values are -1
  * then use the appropriate system call to obtain them.
  *
- *  o	If the user is the root they can do anything
+ *  -	If the user is the root they can do anything
  *
- *  o	If the real and effective uid's don't match, or the real and
+ *  -	If the real and effective uid's don't match, or the real and
  *	effective gid's don't match then this is determined to be a `secure'
  *	application.
  *
@@ -3571,17 +3571,6 @@ ___errno()
 }
 
 /*
- * The interface with the c library which is supplied through libdl.so.1.
- * A non-null argument allows a function pointer array to be passed to us which
- * is used to re-initialize the linker libc table.
- */
-void
-_ld_libc(void * ptr)
-{
-	get_lcinterface(_caller(caller(), CL_EXECDEF), (Lc_interface *)ptr);
-}
-
-/*
  * Determine whether a symbol name should be demangled.
  */
 const char *
@@ -3592,7 +3581,6 @@ demangle(const char *name)
 	else
 		return (name);
 }
-
 
 #ifndef _LP64
 /*
