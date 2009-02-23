@@ -234,9 +234,10 @@ ndi_irm_destroy(ddi_irm_pool_t *pool_p)
 	    (pool_p->ipool_flags & DDI_IRM_FLAG_ACTIVE)) {
 		pool_p->ipool_flags |= DDI_IRM_FLAG_EXIT;
 		cv_signal(&pool_p->ipool_cv);
+		mutex_exit(&pool_p->ipool_lock);
 		thread_join(pool_p->ipool_thread->t_did);
-	}
-	mutex_exit(&pool_p->ipool_lock);
+	} else
+		mutex_exit(&pool_p->ipool_lock);
 
 	/* Destroy the pool */
 	cv_destroy(&pool_p->ipool_cv);
