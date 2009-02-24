@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,9 +74,6 @@ extern int nl7c_sendfilev(struct sonode *, u_offset_t *, struct sendfilevec *,
 extern int snf_segmap(file_t *, vnode_t *, u_offset_t, u_offset_t, ssize_t *,
 		boolean_t);
 extern sotpi_info_t *sotpi_sototpi(struct sonode *);
-
-#define	readflg	(V_WRITELOCK_FALSE)
-#define	rwflag	(V_WRITELOCK_TRUE)
 
 #define	SEND_MAX_CHUNK	16
 
@@ -201,16 +198,36 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 			}
 
 			/*
+			 * Optimize the regular file over
+			 * the socket case.
+			 */
+			if (vp->v_type == VSOCK) {
+				error = sosendfile64(fp, ffp, sfv, count);
+				if (error)
+					return (error);
+				sfv++;
+				continue;
+			}
+
+			/*
 			 * Note: we assume readvp != vp. "vp" is already
 			 * locked, and "readvp" must not be.
 			 */
-			(void) VOP_RWLOCK(readvp, readflg, NULL);
+			if (readvp < vp) {
+				VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+				(void) VOP_RWLOCK(readvp, V_WRITELOCK_FALSE,
+				    NULL);
+				(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+			} else {
+				(void) VOP_RWLOCK(readvp, V_WRITELOCK_FALSE,
+				    NULL);
+			}
 
 			/*
 			 * Same checks as in pread64.
 			 */
 			if (sfv_off > MAXOFFSET_T) {
-				VOP_RWUNLOCK(readvp, readflg, NULL);
+				VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
 				releasef(sfv->sfv_fd);
 				return (EINVAL);
 			}
@@ -222,7 +239,12 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 			size = MIN(vp->v_vfsp->vfs_bsize,
 			    readvp->v_vfsp->vfs_bsize);
 			size = sfv_len < size ? sfv_len : size;
-			ptr = kmem_alloc(size, KM_SLEEP);
+			ptr = kmem_alloc(size, KM_NOSLEEP);
+			if (ptr == NULL) {
+				VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
+				releasef(sfv->sfv_fd);
+				return (ENOMEM);
+			}
 
 			while (sfv_len > 0) {
 				size_t	iov_len;
@@ -250,7 +272,8 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 				    fp->f_cred, NULL);
 				if (error) {
 					kmem_free(ptr, size);
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					return (error);
 				}
@@ -268,7 +291,8 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 					 * data.
 					 */
 					kmem_free(ptr, size);
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					return (EINVAL);
 				}
@@ -303,12 +327,13 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 				*count += cnt;
 				if (error != 0) {
 					kmem_free(ptr, size);
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					return (error);
 				}
 			}
-			VOP_RWUNLOCK(readvp, readflg, NULL);
+			VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
 			releasef(sfv->sfv_fd);
 			kmem_free(ptr, size);
 		}
@@ -330,7 +355,7 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 	ssize32_t count = 0;
 
 	vp = fp->f_vnode;
-	(void) VOP_RWLOCK(vp, rwflag, NULL);
+	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
 	copy_vec = vec;
 	fileoff = fp->f_offset;
@@ -343,34 +368,6 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 			break;
 		}
 
-		/*
-		 * Optimize the regular file over
-		 * the socket case.
-		 */
-		if (vp->v_type == VSOCK && sfv->sfv_fd != SFV_FD_SELF) {
-			file_t *rfp;
-			vnode_t *rvp;
-
-			if ((rfp = getf(sfv->sfv_fd)) == NULL) {
-				error = EBADF;
-				break;
-			}
-			if ((rfp->f_flag & FREAD) == 0) {
-				releasef(sfv->sfv_fd);
-				error = EBADF;
-				break;
-			}
-			rvp = rfp->f_vnode;
-			if (rvp->v_type == VREG) {
-				error = sosendfile64(fp, rfp, sfv, &count);
-				if (error)
-					break;
-				copy_vec++;
-				sfvcnt--;
-				continue;
-			}
-			releasef(sfv->sfv_fd);
-		}
 		error = sendvec_chunk64(fp, &fileoff, sfv, copy_cnt, &count);
 		if (error != 0)
 			break;
@@ -382,7 +379,7 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 	if (vp->v_type == VREG)
 		fp->f_offset += count;
 
-	VOP_RWUNLOCK(vp, rwflag, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 	if (copyout(&count, xferred, sizeof (count)))
 		error = EFAULT;
 	releasef(fildes);
@@ -567,11 +564,19 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			 * locked, and "readvp" must not be.
 			 */
 
-			(void) VOP_RWLOCK(readvp, readflg, NULL);
+			if (readvp < vp) {
+				VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+				(void) VOP_RWLOCK(readvp, V_WRITELOCK_FALSE,
+				    NULL);
+				(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+			} else {
+				(void) VOP_RWLOCK(readvp, V_WRITELOCK_FALSE,
+				    NULL);
+			}
 
 			/* Same checks as in pread */
 			if (sfv_off > maxoff) {
-				VOP_RWUNLOCK(readvp, readflg, NULL);
+				VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
 				releasef(sfv->sfv_fd);
 				freemsg(head);
 				return (EINVAL);
@@ -589,8 +594,8 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					iov_len = MIN(buf_left, sfv_len);
 					dmp = allocb(buf_left + extra, BPRI_HI);
 					if (dmp == NULL) {
-						VOP_RWUNLOCK(readvp, readflg,
-						    NULL);
+						VOP_RWUNLOCK(readvp,
+						    V_WRITELOCK_FALSE, NULL);
 						releasef(sfv->sfv_fd);
 						freemsg(head);
 						return (ENOMEM);
@@ -627,7 +632,8 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					 * not implemented), we may now loose
 					 * data.
 					 */
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					freemsg(head);
 					return (error);
@@ -640,7 +646,8 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				 */
 				cnt = iov_len - auio.uio_resid;
 				if (cnt == 0) {
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					freemsg(head);
 					return (EINVAL);
@@ -652,7 +659,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 
 				dmp->b_wptr += cnt;
 			}
-			VOP_RWUNLOCK(readvp, readflg, NULL);
+			VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
 			releasef(sfv->sfv_fd);
 		}
 		sfv++;
@@ -880,11 +887,19 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			 * Note: we assume readvp != vp. "vp" is already
 			 * locked, and "readvp" must not be.
 			 */
-			(void) VOP_RWLOCK(readvp, readflg, NULL);
+			if (readvp < vp) {
+				VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+				(void) VOP_RWLOCK(readvp, V_WRITELOCK_FALSE,
+				    NULL);
+				(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+			} else {
+				(void) VOP_RWLOCK(readvp, V_WRITELOCK_FALSE,
+				    NULL);
+			}
 
 			/* Same checks as in pread */
 			if (sfv_off > maxoff) {
-				VOP_RWUNLOCK(readvp, readflg, NULL);
+				VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
 				releasef(sfv->sfv_fd);
 				return (EINVAL);
 			}
@@ -901,7 +916,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				segmapit = 0;
 				buf = kmem_alloc(size, KM_NOSLEEP);
 				if (buf == NULL) {
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					return (ENOMEM);
 				}
@@ -957,8 +973,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				if (vp->v_type == VSOCK) {
 					dmp = allocb(iov_len + extra, BPRI_HI);
 					if (dmp == NULL) {
-						VOP_RWUNLOCK(readvp, readflg,
-						    NULL);
+						VOP_RWUNLOCK(readvp,
+						    V_WRITELOCK_FALSE, NULL);
 						releasef(sfv->sfv_fd);
 						return (ENOMEM);
 					}
@@ -999,7 +1015,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 						freeb(dmp);
 					else
 						kmem_free(buf, size);
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					return (error);
 				}
@@ -1015,7 +1032,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 						freeb(dmp);
 					else
 						kmem_free(buf, size);
-					VOP_RWUNLOCK(readvp, readflg, NULL);
+					VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE,
+					    NULL);
 					releasef(sfv->sfv_fd);
 					return (EINVAL);
 				}
@@ -1031,8 +1049,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					if (error != 0) {
 						if (dmp != NULL)
 							freeb(dmp);
-						VOP_RWUNLOCK(readvp, readflg,
-						    NULL);
+						VOP_RWUNLOCK(readvp,
+						    V_WRITELOCK_FALSE, NULL);
 						releasef(sfv->sfv_fd);
 						return (error);
 					}
@@ -1071,8 +1089,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					*count += cnt;
 					if (error != 0) {
 						kmem_free(buf, size);
-						VOP_RWUNLOCK(readvp, readflg,
-						    NULL);
+						VOP_RWUNLOCK(readvp,
+						    V_WRITELOCK_FALSE, NULL);
 						releasef(sfv->sfv_fd);
 						return (error);
 					}
@@ -1082,7 +1100,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				kmem_free(buf, size);
 				buf = NULL;
 			}
-			VOP_RWUNLOCK(readvp, readflg, NULL);
+			VOP_RWUNLOCK(readvp, V_WRITELOCK_FALSE, NULL);
 			releasef(sfv->sfv_fd);
 		}
 		sfv++;
