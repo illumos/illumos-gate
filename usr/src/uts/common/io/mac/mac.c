@@ -1012,11 +1012,12 @@ mac_rele(mac_impl_t *mip)
 }
 
 /*
- * This function is called only by mac_client_open.
+ * Private GLDv3 function to start a MAC instance.
  */
 int
-mac_start(mac_impl_t *mip)
+mac_start(mac_handle_t mh)
 {
+	mac_impl_t	*mip = (mac_impl_t *)mh;
 	int		err = 0;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
@@ -1077,11 +1078,13 @@ mac_start(mac_impl_t *mip)
 }
 
 /*
- * This function is called only by mac_client_close.
+ * Private GLDv3 function to stop a MAC instance.
  */
 void
-mac_stop(mac_impl_t *mip)
+mac_stop(mac_handle_t mh)
 {
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
 	ASSERT(mip->mi_stop != NULL);
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 

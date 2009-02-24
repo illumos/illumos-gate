@@ -56,6 +56,9 @@ extern boolean_t mac_info_get(const char *, mac_info_t *);
 extern int mac_promisc_set(mac_handle_t, boolean_t, mac_promisc_type_t);
 extern boolean_t mac_promisc_get(mac_handle_t, mac_promisc_type_t);
 
+extern int mac_start(mac_handle_t);
+extern void mac_stop(mac_handle_t);
+
 extern void mac_ioctl(mac_handle_t, queue_t *, mblk_t *);
 extern link_state_t mac_link_get(mac_handle_t);
 extern void mac_resource_set(mac_client_handle_t, mac_resource_add_t, void *);

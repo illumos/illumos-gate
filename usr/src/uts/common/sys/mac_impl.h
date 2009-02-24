@@ -658,8 +658,6 @@ extern void mac_rele(mac_impl_t *);
 extern int i_mac_disable(mac_impl_t *);
 extern void i_mac_notify(mac_impl_t *, mac_notify_type_t);
 extern void i_mac_notify_exit(mac_impl_t *);
-extern int mac_start(mac_impl_t *);
-extern void mac_stop(mac_impl_t *);
 extern void mac_rx_group_unmark(mac_group_t *, uint_t);
 extern void mac_tx_client_flush(mac_client_impl_t *);
 extern void mac_tx_client_block(mac_client_impl_t *);

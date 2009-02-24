@@ -1781,7 +1781,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		goto bail;
 	}
 
-	if ((err = mac_start(mip)) != 0)
+	if ((err = mac_start((mac_handle_t)mip)) != 0)
 		goto bail;
 
 	mac_started = B_TRUE;
@@ -1932,7 +1932,7 @@ bail:
 	if (bcast_added)
 		mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr, vid);
 	if (mac_started)
-		mac_stop(mip);
+		mac_stop((mac_handle_t)mip);
 
 	if (nactiveclients_added) {
 		mip->mi_nactiveclients--;
@@ -2064,7 +2064,7 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 			mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr,
 			    muip->mui_vid);
 		}
-		mac_stop(mip);
+		mac_stop((mac_handle_t)mip);
 		FLOW_FINAL_REFRELE(flent);
 		i_mac_perim_exit(mip);
 		return (0);
@@ -2151,7 +2151,7 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
 	mcip->mci_state_flags &= ~MCIS_UNICAST_HW;
 
-	mac_stop(mip);
+	mac_stop((mac_handle_t)mip);
 
 	i_mac_perim_exit(mip);
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
@@ -2257,7 +2257,7 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 
 	i_mac_perim_enter(mip);
 
-	if ((rc = mac_start(mip)) != 0) {
+	if ((rc = mac_start((mac_handle_t)mip)) != 0) {
 		i_mac_perim_exit(mip);
 		return (rc);
 	}
@@ -2284,7 +2284,7 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	if ((flags & MAC_PROMISC_FLAGS_NO_PHYS) == 0) {
 		if ((rc = i_mac_promisc_set(mip, B_TRUE, MAC_DEVPROMISC))
 		    != 0) {
-			mac_stop(mip);
+			mac_stop((mac_handle_t)mip);
 			i_mac_perim_exit(mip);
 			return (rc);
 		}
@@ -2352,7 +2352,7 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 		mac_callback_remove_wait(&mip->mi_promisc_cb_info);
 	}
 	mutex_exit(mcbi->mcbi_lockp);
-	mac_stop(mip);
+	mac_stop((mac_handle_t)mip);
 
 done:
 	i_mac_perim_exit(mip);

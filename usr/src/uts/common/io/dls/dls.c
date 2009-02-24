@@ -30,12 +30,14 @@
 #include	<sys/strsun.h>
 #include	<sys/vlan.h>
 #include	<sys/dld_impl.h>
+#include	<sys/mac_client_priv.h>
 
 int
 dls_open(dls_link_t *dlp, dls_dl_handle_t ddh, dld_str_t *dsp)
 {
 	zoneid_t	zid = getzoneid();
 	boolean_t	local;
+	int		err;
 
 	/*
 	 * Check whether this client belongs to the zone of this dlp. Note that
@@ -43,6 +45,9 @@ dls_open(dls_link_t *dlp, dls_dl_handle_t ddh, dld_str_t *dsp)
 	 */
 	if (zid != GLOBAL_ZONEID && dlp->dl_zid != zid)
 		return (ENOENT);
+
+	if ((err = mac_start(dlp->dl_mh)) != 0)
+		return (err);
 
 	local = (zid == dlp->dl_zid);
 	dlp->dl_zone_ref += (local ? 1 : 0);
@@ -120,6 +125,8 @@ dls_close(dld_str_t *dsp)
 	dsp->ds_rx_arg = NULL;
 
 	dsp->ds_dlp = NULL;
+
+	mac_stop(dsp->ds_mh);
 
 	/*
 	 * Release our reference to the dls_link_t allowing that to be
