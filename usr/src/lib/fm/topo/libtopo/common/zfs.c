@@ -89,8 +89,10 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 void
 zfs_fini(topo_mod_t *mod)
 {
-	libzfs_fini(g_zfs);
-	g_zfs = NULL;
+	if (g_zfs) {
+		libzfs_fini(g_zfs);
+		g_zfs = NULL;
+	}
 	topo_mod_unregister(mod);
 }
 
