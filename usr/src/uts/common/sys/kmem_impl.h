@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_KMEM_IMPL_H
 #define	_SYS_KMEM_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/kmem.h>
 #include <sys/vmem.h>
@@ -172,8 +170,26 @@ typedef struct kmem_buftag_lite {
 #define	KMEM_SLAB(cp, buf)		\
 	((kmem_slab_t *)P2END((uintptr_t)(buf), (cp)->cache_slabsize) - 1)
 
-#define	KMEM_CPU_CACHE(cp)		\
-	(kmem_cpu_cache_t *)((char *)cp + CPU->cpu_cache_offset)
+/*
+ * The "CPU" macro loads a cpu_t that refers to the cpu that the current
+ * thread is running on at the time the macro is executed.  A context switch
+ * may occur immediately after loading this data structure, leaving this
+ * thread pointing at the cpu_t for the previous cpu.  This is not a problem;
+ * we'd just end up checking the previous cpu's per-cpu cache, and then check
+ * the other layers of the kmem cache if need be.
+ *
+ * It's not even a problem if the old cpu gets DR'ed out during the context
+ * switch.  The cpu-remove DR operation bzero()s the cpu_t, but doesn't free
+ * it.  So the cpu_t's cpu_cache_offset would read as 0, causing us to use
+ * cpu 0's per-cpu cache.
+ *
+ * So, there is no need to disable kernel preemption while using the CPU macro
+ * below since if we have been context switched, there will not be any
+ * correctness problem, just a momentary use of a different per-cpu cache.
+ */
+
+#define	KMEM_CPU_CACHE(cp)						\
+	(kmem_cpu_cache_t *)((char *)(&cp->cache_cpu) + CPU->cpu_cache_offset)
 
 #define	KMEM_MAGAZINE_VALID(cp, mp)	\
 	(((kmem_slab_t *)P2END((uintptr_t)(mp), PAGESIZE) - 1)->slab_cache == \
@@ -234,6 +250,11 @@ typedef struct kmem_magtype {
 	2 * sizeof (uint64_t) - 2 * sizeof (void *) - 4 * sizeof (int))
 #define	KMEM_CACHE_SIZE(ncpus)	\
 	((size_t)(&((kmem_cache_t *)0)->cache_cpu[ncpus]))
+
+/* Offset from kmem_cache->cache_cpu for per cpu caches */
+#define	KMEM_CPU_CACHE_OFFSET(cpuid)					\
+	((size_t)(&((kmem_cache_t *)0)->cache_cpu[cpuid]) -		\
+	(size_t)(&((kmem_cache_t *)0)->cache_cpu))
 
 typedef struct kmem_cpu_cache {
 	kmutex_t	cc_lock;	/* protects this cpu's local cache */

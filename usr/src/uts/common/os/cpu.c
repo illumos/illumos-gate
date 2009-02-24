@@ -1696,7 +1696,7 @@ cpu_list_init(cpu_t *cp)
 	 */
 	cpu_seq = &cpu_list;
 
-	cp->cpu_cache_offset = KMEM_CACHE_SIZE(cp->cpu_seqid);
+	cp->cpu_cache_offset = KMEM_CPU_CACHE_OFFSET(cp->cpu_seqid);
 	cp_default.cp_cpulist = cp;
 	cp_default.cp_ncpus = 1;
 	cp->cpu_next_part = cp;
@@ -1752,7 +1752,7 @@ cpu_add_unit(cpu_t *cp)
 	cp->cpu_seqid = seqid;
 	ASSERT(ncpus < max_ncpus);
 	ncpus++;
-	cp->cpu_cache_offset = KMEM_CACHE_SIZE(cp->cpu_seqid);
+	cp->cpu_cache_offset = KMEM_CPU_CACHE_OFFSET(cp->cpu_seqid);
 	cpu[cp->cpu_id] = cp;
 	CPUSET_ADD(cpu_available, cp->cpu_id);
 	cpu_seq[cp->cpu_seqid] = cp;

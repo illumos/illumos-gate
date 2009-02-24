@@ -5787,8 +5787,17 @@ page_numtopp_nolock(pfn_t pfnum)
 {
 	struct memseg *seg;
 	page_t *pp;
-	vm_cpu_data_t *vc = CPU->cpu_vm_data;
+	vm_cpu_data_t *vc;
 
+	/*
+	 * We need to disable kernel preemption while referencing the
+	 * cpu_vm_data field in order to prevent us from being switched to
+	 * another cpu and trying to reference it after it has been freed.
+	 * This will keep us on cpu and prevent it from being removed while
+	 * we are still on it.
+	 */
+	kpreempt_disable();
+	vc = CPU->cpu_vm_data;
 	ASSERT(vc != NULL);
 
 	MEMSEG_STAT_INCR(nsearch);
@@ -5798,8 +5807,10 @@ page_numtopp_nolock(pfn_t pfnum)
 	    (pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
 		MEMSEG_STAT_INCR(nlastwon);
 		pp = seg->pages + (pfnum - seg->pages_base);
-		if (pp->p_pagenum == pfnum)
+		if (pp->p_pagenum == pfnum) {
+			kpreempt_enable();
 			return ((page_t *)pp);
+		}
 	}
 
 	/* Else Try hash */
@@ -5808,8 +5819,10 @@ page_numtopp_nolock(pfn_t pfnum)
 		MEMSEG_STAT_INCR(nhashwon);
 		vc->vc_pnum_memseg = seg;
 		pp = seg->pages + (pfnum - seg->pages_base);
-		if (pp->p_pagenum == pfnum)
+		if (pp->p_pagenum == pfnum) {
+			kpreempt_enable();
 			return ((page_t *)pp);
+		}
 	}
 
 	/* Else Brute force */
@@ -5817,10 +5830,12 @@ page_numtopp_nolock(pfn_t pfnum)
 		if (pfnum >= seg->pages_base && pfnum < seg->pages_end) {
 			vc->vc_pnum_memseg = seg;
 			pp = seg->pages + (pfnum - seg->pages_base);
+			kpreempt_enable();
 			return ((page_t *)pp);
 		}
 	}
 	vc->vc_pnum_memseg = NULL;
+	kpreempt_enable();
 	MEMSEG_STAT_INCR(nnotfound);
 	return ((page_t *)NULL);
 
@@ -5862,7 +5877,17 @@ page_nextn(page_t *pp, ulong_t n)
 {
 	struct memseg *seg;
 	page_t *ppn;
-	vm_cpu_data_t *vc = (vm_cpu_data_t *)CPU->cpu_vm_data;
+	vm_cpu_data_t *vc;
+
+	/*
+	 * We need to disable kernel preemption while referencing the
+	 * cpu_vm_data field in order to prevent us from being switched to
+	 * another cpu and trying to reference it after it has been freed.
+	 * This will keep us on cpu and prevent it from being removed while
+	 * we are still on it.
+	 */
+	kpreempt_disable();
+	vc = (vm_cpu_data_t *)CPU->cpu_vm_data;
 
 	ASSERT(vc != NULL);
 
@@ -5892,6 +5917,7 @@ page_nextn(page_t *pp, ulong_t n)
 		pp = seg->pages;
 	}
 	vc->vc_pnext_memseg = seg;
+	kpreempt_enable();
 	return (ppn);
 }
 
