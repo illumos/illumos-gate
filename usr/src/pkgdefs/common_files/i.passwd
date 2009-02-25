@@ -19,12 +19,14 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
+
+TEMPF="/tmp/d.$$"
 
 while read src dest
 do
@@ -42,17 +44,17 @@ do
 		    -e '/^smtp:/d' \
 		    -e '/^nobody:/s/:Nobody:/:NFS Anonymous Access User:/' \
 		    -e '/^nobody4:/s/:SunOS\ 4\.x\ Nobody:/:SunOS 4.x NFS Anonymous Access User:/;' \
-		    $dest > /tmp/d.$$
-		cp /tmp/d.$$ $dest
-		rm -f /tmp/d.$$
+		    $dest > $TEMPF
+		cp $TEMPF $dest
+		rm -f $TEMPF
 
 		#
 		# s10 is changing root's group back to 0:
 		#
 		sed -e 's/^root:\([^:]*\):0:1:/root:\1:0:0:/' \
-			$dest > /tmp/d.$$
-		cp /tmp/d.$$ $dest
-		rm -f /tmp/d.$$
+			$dest > $TEMPF
+		cp $TEMPF $dest
+		rm -f $TEMPF
 
 		#
 		# Add the 'nobody' user from 4.x so that people don't
@@ -62,8 +64,9 @@ do
 		if grep "^nobody4:" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^noaccess:x\na\n%s\n.\nw\nq\n' \
-				"$NOBODY4_LINE" | ed -s $dest > /dev/null
+			sed '/^noaccess:x/ a\
+'"$NOBODY4_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -73,8 +76,9 @@ do
 		if grep "$SMMSP_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^nobody4:x\na\n%s\n.\nw\nq\n' \
-				"$SMMSP_LIN" | ed -s $dest > /dev/null
+			sed '/^nobody4:x/ a\
+'"$SMMSP_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 		
 		#
@@ -88,8 +92,9 @@ do
 		elif grep "$GDM_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^listen:x\na\n%s\n.\nw\nq\n' \
-				"$GDM_LINE" | ed -s $dest > /dev/null
+			sed '/^listen:x/ a\
+'"$GDM_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -103,8 +108,9 @@ do
 		elif grep "$WEBSERVD_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^gdm:x\na\n%s\n.\nw\nq\n' \
-				"$WEBSERVD_LIN" | ed -s $dest > /dev/null
+			sed '/^gdm:x/ a\
+'"$WEBSERVD_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -122,8 +128,9 @@ do
 		elif grep "$POSTGRES_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^webservd:x\na\n%s\n.\nw\nq\n' \
-			    "$POSTGRES_LIN" | ed -s $dest > /dev/null
+			sed '/^webservd:x/ a\
+'"$POSTGRES_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
                 #
@@ -141,8 +148,9 @@ do
                 elif grep "$MYSQL_LIN" $dest 2>&1 >/dev/null; then
                         :
                 else
-                        printf '/^postgres:x\na\n%s\n.\nw\nq\n' \
-                            "$MYSQL_LIN" | ed -s $dest > /dev/null
+                        sed '/^postgres:x/ a\
+'"$MYSQL_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
                 fi
 
 		#
@@ -160,8 +168,9 @@ do
 		elif grep "$SVCTAG_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^postgres:x\na\n%s\n.\nw\nq\n' \
-			    "$SVCTAG_LIN" | ed -s $dest > /dev/null
+			sed '/^postgres:x/ a\
+'"$SVCTAG_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -175,8 +184,9 @@ do
 		elif grep "$DLADM_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^nuucp:x\na\n%s\n.\nw\nq\n' \
-				"$DLADM_LIN" | ed -s $dest > /dev/null
+			sed '/^nuucp:x/ a\
+'"$DLADM_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -194,8 +204,9 @@ do
 		elif grep "$XVM_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^gdm:x\na\n%s\n.\nw\nq\n' \
-			    "$XVM_LIN" | ed -s $dest > /dev/null
+			sed '/^gdm:x/ a\
+'"$XVM_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 		#
 		# Add the 'openldap' user if it doesn't exist.
@@ -212,8 +223,9 @@ do
 		elif grep "$OPENLDAP_LIN" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^mysql:x\na\n%s\n.\nw\nq\n' \
-			    "$OPENLDAP_LIN" | ed -s $dest > /dev/null
+			sed '/^mysql:x/ a\
+'"$OPENLDAP_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -231,8 +243,9 @@ do
 		elif grep "$ZSNAP_LIN" $dest 2>&1 > /dev/null; then
 			:
 		else
-			printf '/^gdm:x\na\n%s\n.\nw\nq\n' \
-			    "$ZSNAP_LIN" | ed -s $dest > /dev/null
+			sed '/^gdm:x/ a\
+'"$ZSNAP_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 	fi
 done

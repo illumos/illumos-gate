@@ -19,12 +19,14 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
-export PATH
+export PATH	
+	
+TEMPF="/tmp/g.$$"
 
 while read src dest
 do
@@ -64,8 +66,10 @@ do
 		if grep "$NOGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^noaccess::60002:\na\n%s\n.\nw\nq\n' \
-				"$NOGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^noaccess::60002:/ a\
+'"$NOGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
+				
 		fi
 
 		# Remove redundant /etc/group entries that overlap with
@@ -100,9 +104,9 @@ do
 			/^smmsp:/s/:smmsp$/:/;
 			/^lp:/s/\([:,]\)lp,/\1/;
 			/^lp:/s/,lp$//;
-			/^lp:/s/:lp$/:/' $dest > /tmp/g.$$ && 
-		cp /tmp/g.$$ $dest
-		rm -f /tmp/g.$$
+			/^lp:/s/:lp$/:/' $dest > $TEMPF && 
+		cp $TEMPF $dest
+		rm -f $TEMPF
 
 		#add 'root' to user-list of group1
 		# line 1,2: skip any line with root in the user field
@@ -114,10 +118,10 @@ do
 			/[:,]root$/b
 			s/:1:\([^:][^:]*\)$/:1:root,\1/;
 			s/:1:$/:1:root/;
-		' $dest > /tmp/g.$$ &&
+		' $dest > $TEMPF &&
 
-		cp /tmp/g.$$ $dest
-		rm -f /tmp/g.$$
+		cp $TEMPF $dest
+		rm -f $TEMPF
 
 		#
 		# Add the 'smmsp' group for sendmail 8.12
@@ -126,8 +130,9 @@ do
 		if grep "$SMMSPGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^nogroup::65534:\na\n%s\n.\nw\nq\n' \
-				"$SMMSPGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^nogroup::65534:/ a\
+'"$SMMSPGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 		#
 		# Add the 'gdm' group if it doesn't already exist.
@@ -140,8 +145,9 @@ do
 		elif grep "$GDMGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^smmsp::25:\na\n%s\n.\nw\nq\n' \
-				"$GDMGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^smmsp::25:/ a\
+'"$GDMGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 		#
 		# Add the 'webservd' group if it doesn't already exist.
@@ -154,8 +160,9 @@ do
 		elif grep "$WEBSERVDGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^gdm::50:\na\n%s\n.\nw\nq\n' \
-				"$WEBSERVDGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^gdm::50: a\
+'"$WEBSERVDGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 
 		#
@@ -173,8 +180,9 @@ do
 		elif grep "$POSTGRESGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^webservd::80:\na\n%s\n.\nw\nq\n' \
-			    "$POSTGRESGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^webservd::80:/ a\
+'"$POSTGRESGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
    	        #	
 		# Add the 'mysql' group if it doesn't already exist.
@@ -191,8 +199,9 @@ do
                 elif grep "$MYSQLGROUP_LINE" $dest 2>&1 >/dev/null; then
                         :
                 else
-                        printf '/^postgres::90:\na\n%s\n.\nw\nq\n' \
-                            "$MYSQLGROUP_LINE" | ed -s $dest > /dev/null
+                        sed '/^postgres::90:/ a\
+'"$MYSQLGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
                 fi
                 #
 		# Add the 'games' group if it doesn't already exist.
@@ -209,8 +218,9 @@ do
 		elif grep "$GAMESGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^smmsp::25:\ni\n%s\n.\nw\nq\n' \
-			"$GAMESGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^smmsp::25:/ a\
+'"$GAMESGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
 		#
 		# Add the 'xvm' group if it doesn't already exist.
@@ -227,8 +237,9 @@ do
 		elif grep "$XVMGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			printf '/^mysql::70:\ni\n%s\n.\nw\nq\n' \
-                            "$XVMGROUP_LINE" | ed -s $dest > /dev/null
+			sed '/^mysql::70:/ a\
+'"$XVMGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		fi
                 #
                 # Add the 'slocate' group if it doesn't already exist.
@@ -245,8 +256,9 @@ do
                 elif grep "$SLOCATEGROUP_LINE" $dest 2>&1 >/dev/null; then
                         :
                 else
-                        printf '/^postgres::90:\na\n%s\n.\nw\nq\n' \
-                            "$SLOCATEGROUP_LINE" | ed -s $dest > /dev/null
+                        sed '/^postgres::90:/ a\
+'"$SLOCATEGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
                 fi
    	        #	
 		# Add the 'openldap' group if it doesn't already exist.
@@ -263,8 +275,9 @@ do
                 elif grep "$OPENLDAPGROUP_LINE" $dest 2>&1 >/dev/null; then
                         :
                 else
-                        printf '/^mysql::70:\na\n%s\n.\nw\nq\n' \
-                            "$OPENLDAPGROUP_LINE" | ed -s $dest > /dev/null
+                        sed '/^mysql::70:/ a\
+'"$OPENLDAPGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
                 fi
 	fi
 done
