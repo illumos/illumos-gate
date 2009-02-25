@@ -9454,6 +9454,14 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		if (ip6i->ip6i_flags & IP6I_VERIFY_SRC) {
 			cred_t *cr = msg_getcred(mp, NULL);
 
+			/* rpcmod doesn't send down db_credp for UDP packets */
+			if (cr == NULL) {
+				if (connp != NULL)
+					cr = connp->conn_cred;
+				else
+					cr = ill->ill_credp;
+			}
+
 			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src));
 			if (secpolicy_net_rawaccess(cr) != 0) {
 				/*
