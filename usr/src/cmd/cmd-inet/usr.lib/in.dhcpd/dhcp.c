@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -653,22 +653,45 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 
 		if (serverid.s_addr != ifp->addr.s_addr) {
 			/*
-			 * Someone else was selected. See if we made an
-			 * offer, and clear it if we did. If offer expired
-			 * before client responded, then no need to do
-			 * anything.
+			 * Another server address was selected.
+			 *
+			 * If the server address is handled by another
+			 * thread of our process, do nothing in the
+			 * hope that the other thread will eventually
+			 * receive a REQUEST with its server address.
+			 *
+			 * If a server address was selected which is
+			 * not handled by this process, see if we made
+			 * an offer, and clear it if we did. If offer
+			 * expired before client responded, then no
+			 * need to do anything.
 			 */
-			purge_offer(pcd, B_FALSE, B_TRUE);
-			if (verbose) {
-				dhcpmsg(LOG_INFO,
-				    "Client: %1$s chose %2$s from server: %3$s,"
-				    " not %4$s\n", pcd->cidbuf,
-				    inet_ntop(AF_INET, &nreqaddr, ntoaa,
-				    sizeof (ntoaa)),
-				    inet_ntop(AF_INET, &serverid, ntoab,
-				    sizeof (ntoab)),
-				    inet_ntop(AF_INET, &ifp->addr, ntoac,
-				    sizeof (ntoac)));
+			if (is_our_address(serverid.s_addr)) {
+				if (verbose) {
+					dhcpmsg(LOG_INFO,
+					    "Client: %1$s chose %2$s from "
+					    "server: %3$s, which is being "
+					    "handled by another thread\n",
+					    pcd->cidbuf,
+					    inet_ntop(AF_INET, &nreqaddr, ntoaa,
+					    sizeof (ntoaa)),
+					    inet_ntop(AF_INET, &serverid, ntoab,
+					    sizeof (ntoab)));
+				}
+			} else {
+				purge_offer(pcd, B_FALSE, B_TRUE);
+				if (verbose) {
+					dhcpmsg(LOG_INFO,
+					    "Client: %1$s chose %2$s from "
+					    "server: %3$s, not %4$s\n",
+					    pcd->cidbuf,
+					    inet_ntop(AF_INET, &nreqaddr, ntoaa,
+					    sizeof (ntoaa)),
+					    inet_ntop(AF_INET, &serverid, ntoab,
+					    sizeof (ntoab)),
+					    inet_ntop(AF_INET, &ifp->addr,
+					    ntoac, sizeof (ntoac)));
+				}
 			}
 			goto leave_ack;
 		}
@@ -1846,6 +1869,15 @@ check_offer(dsvc_dnet_t *pnd, struct in_addr *reservep)
  * by offer address in the itable hash table, which is used to reserve the
  * ip address. Lease time is expected to be set by caller.
  * Will update existing OFFER if already provided.
+ *
+ * This implementation does not consider the fact that an offer can be
+ * sent out via more than one interface, so dsvc_clnt_t.ifp should
+ * really be a list or the itable's entries should be lists of
+ * dsvc_clnt_ts. As long as we don't change this, we assume that the
+ * client will eventually REQUEST the last offer we have sent out
+ * because when we receive the same DISCOVER via multiple interfaces,
+ * we always update the same offer cache entry so its ifp is always
+ * the interface we received the last DISCOVER on.
  *
  * pcd - per client data struct.
  * dnlp - pointer to current container entry. Performance: caching reduces

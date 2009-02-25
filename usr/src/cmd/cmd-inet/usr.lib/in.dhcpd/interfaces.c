@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1442,4 +1440,22 @@ free_pktlist(dsvc_clnt_t *pcd)
 		pcd->pending--;
 	}
 	pcd->pkthead = NULL;
+}
+
+/* Check if address is one of the addresses we are listening on */
+boolean_t
+is_our_address(in_addr_t addr)
+{
+	IF		*ifp;
+	boolean_t	found = B_FALSE;
+
+	(void) mutex_lock(&if_head_mtx);
+	for (ifp = if_head; ifp != NULL; ifp = ifp->next) {
+		if (ifp->addr.s_addr == addr) {
+			found = B_TRUE;
+			break;
+		}
+	}
+	(void) mutex_unlock(&if_head_mtx);
+	return (found);
 }
