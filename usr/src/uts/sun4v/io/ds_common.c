@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1456,6 +1456,7 @@ ds_handle_unreg_ack(ds_port_t *port, caddr_t buf, size_t len)
 	DS_DBG_PRCL(CE_NOTE, "ds@%lx: <unreg_ack: hdl=0x%llx" DS_EOL,
 	    PORTID(port), (u_longlong_t)ack->svc_handle);
 
+#ifdef DEBUG
 	mutex_enter(&ds_svcs.lock);
 
 	/*
@@ -1465,11 +1466,12 @@ ds_handle_unreg_ack(ds_port_t *port, caddr_t buf, size_t len)
 	 * is appropriate.
 	 */
 	if (ds_get_svc(ack->svc_handle) != NULL) {
-		cmn_err(CE_WARN, "ds@%lx: <unreg_ack: handle 0x%llx in use"
+		DS_DBG_PRCL(CE_NOTE, "ds@%lx: <unreg_ack: handle 0x%llx in use"
 		    DS_EOL, PORTID(port), (u_longlong_t)ack->svc_handle);
 	}
 
 	mutex_exit(&ds_svcs.lock);
+#endif	/* DEBUG */
 }
 
 static void
@@ -1491,6 +1493,7 @@ ds_handle_unreg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	DS_DBG_PRCL(CE_NOTE, "ds@%lx: <unreg_nack: hdl=0x%llx" DS_EOL,
 	    PORTID(port), (u_longlong_t)nack->svc_handle);
 
+#ifdef DEBUG
 	mutex_enter(&ds_svcs.lock);
 
 	/*
@@ -1500,11 +1503,12 @@ ds_handle_unreg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	 * is appropriate.
 	 */
 	if (ds_get_svc(nack->svc_handle) != NULL) {
-		cmn_err(CE_WARN, "ds@%lx: <unreg_nack: handle 0x%llx in use"
+		DS_DBG_PRCL(CE_NOTE, "ds@%lx: <unreg_nack: handle 0x%llx in use"
 		    DS_EOL, PORTID(port), (u_longlong_t)nack->svc_handle);
 	}
 
 	mutex_exit(&ds_svcs.lock);
+#endif	/* DEBUG */
 }
 
 static void
