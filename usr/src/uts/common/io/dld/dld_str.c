@@ -333,25 +333,28 @@ dld_wput(queue_t *wq, mblk_t *mp)
 	switch (DB_TYPE(mp)) {
 	case M_DATA:
 		mutex_enter(&dsp->ds_lock);
-		if (dsp->ds_dlstate == DL_IDLE) {
-			mode = dsp->ds_mode;
-			if (mode == DLD_FASTPATH || mode == DLD_RAW) {
-				DLD_DATATHR_INC(dsp);
-				mutex_exit(&dsp->ds_lock);
-				if (mode == DLD_FASTPATH) {
-					(void) str_mdata_fastpath_put(dsp, mp,
-					    0, 0);
-				} else {
-					str_mdata_raw_put(dsp, mp);
-				}
-				DLD_DATATHR_DCR(dsp);
-				break;
-			}
+		mode = dsp->ds_mode;
+		if ((dsp->ds_dlstate != DL_IDLE) ||
+		    (mode != DLD_FASTPATH && mode != DLD_RAW)) {
+			mutex_exit(&dsp->ds_lock);
+			freemsg(mp);
+			break;
 		}
-		mutex_exit(&dsp->ds_lock);
-		freemsg(mp);
-		break;
 
+		DLD_DATATHR_INC(dsp);
+		mutex_exit(&dsp->ds_lock);
+		if (mode == DLD_FASTPATH) {
+			if (dsp->ds_mip->mi_media == DL_ETHER &&
+			    (MBLKL(mp) < sizeof (struct ether_header))) {
+				freemsg(mp);
+			} else {
+				(void) str_mdata_fastpath_put(dsp, mp, 0, 0);
+			}
+		} else {
+			str_mdata_raw_put(dsp, mp);
+		}
+		DLD_DATATHR_DCR(dsp);
+		break;
 	case M_PROTO:
 	case M_PCPROTO: {
 		t_uscalar_t	prim;
@@ -711,7 +714,6 @@ i_dld_ether_header_update_tag(mblk_t *mp, uint_t pri, uint16_t vid,
 		/*
 		 * Tagged packet, update the priority bits.
 		 */
-		old_tci = ntohs(evhp->ether_tci);
 		len = sizeof (struct ether_vlan_header);
 
 		if ((DB_REF(mp) > 1) || (MBLKL(mp) < len)) {
@@ -731,6 +733,7 @@ i_dld_ether_header_update_tag(mblk_t *mp, uint_t pri, uint16_t vid,
 		}
 
 		evhp = (struct ether_vlan_header *)mp->b_rptr;
+		old_tci = ntohs(evhp->ether_tci);
 	} else {
 		/*
 		 * Untagged packet.  Two factors will cause us to insert a
