@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -25,8 +25,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * In-core structures:
@@ -389,8 +387,8 @@ checkfilesys(char *filesys)
 
 		if (preen)
 			pfatal("CAN'T CHECK FILE SYSTEM.");
-		if ((exitstat == 0) && (mflag))
-			exitstat = EXUMNTCHK;
+		if (exitstat == 0)
+			exitstat = mflag ? EXUMNTCHK : EXERRFATAL;
 		exit(exitstat);
 	} else {
 		devname = devstr;
