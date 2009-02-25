@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,11 +39,8 @@ extern "C" {
 #include <sys/memnode.h>
 
 #define	GETTICK()	gettick()
-/*
- * Do not use this function for obtaining clock tick.  This
- * is called by callers who do not need to have a guarenteed
- * correct tick value.  The proper routine to use is tsc_read().
- */
+
+/* #define for keeping code architecturally neutral */
 #define	randtick()	gettick()
 
 /*
