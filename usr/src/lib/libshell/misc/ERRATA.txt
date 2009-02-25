@@ -308,4 +308,27 @@ Index: src/lib/libshell/common/sh/xec.c
  			shp->outpipe = pvn;
  			pvo[1] = -1;
 -- snip --
+
+
+######## Errata #005: ########
+A fix was backported for CR #6807179 to cure an unneccesary
+|libc::getpwnam()| lookup when the shell encountered a
+"~(modifer)pattern"-shell pattern (the leading '~' triggered a
+(unneccesary) tilde expansion).
+The following files have been changed:
+-- snip --
+--- src/lib/libshell/common/sh/macro.c    Wed Feb 18 11:53:56 2009 +0800
++++ src/lib/libshell/common/sh/macro.c    Wed Feb 18 21:45:00 2009 +0100
+@@ -439,7 +439,7 @@
+ 	mp->sp = NIL(Sfio_t*);
+ 	mp->quote = newquote;
+ 	first = cp = fcseek(0);
+-	if(!mp->quote && *cp=='~')
++	if(!mp->quote && *cp=='~' && cp[1]!=LPAREN)
+ 		tilde = stktell(stkp);
+ 	/* handle // operator specially */
+ 	if(mp->pattern==2 && *cp=='/')
+
+-- snip --
+
 #EOF.

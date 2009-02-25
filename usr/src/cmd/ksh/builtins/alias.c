@@ -38,8 +38,7 @@
 /* Builtin script, original derived from alias.sh */
 static const char *script = "\n"
 /* Get name of builtin */
-"builtin basename\n"
-"typeset cmd=\"$(basename \"$0\")\"\n"
+"typeset cmd=\"${0##*/}\"\n"
 /*
  * If the requested command is not an alias load it explicitly
  * to make sure it is not bound to a path (those built-ins which
@@ -53,13 +52,13 @@ static const char *script = "\n"
  */
 "if [[ \"${cmd}\" != ~(Elr)(alias|unalias|command) ]] && "
 	"! alias \"${cmd}\" >/dev/null 2>&1 ; then\n"
-"        builtin \"${cmd}\"\n"
+	"builtin \"${cmd}\"\n"
 "fi\n"
 /* command is a keyword and needs to be handled separately */
 "if [[ \"${cmd}\" == \"command\" ]] ; then\n"
-"        command \"$@\"\n"
+	"command \"$@\"\n"
 "else\n"
-"        \"${cmd}\" \"$@\"\n"
+	"\"${cmd}\" \"$@\"\n"
 "fi\n"
 "exitval=$?";
 

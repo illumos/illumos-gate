@@ -103,6 +103,7 @@ DEMOFILES= \
 	tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh \
 	tests/sun_solaris_cr_6766246_pattern_matching_bug.sh \
 	tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh \
+	tests/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.sh \
 	tests/sun_solaris_getconf.sh \
 	tests/sun_solaris_local_compound_nameref001.sh \
 	tests/sun_solaris_staticvariables.sh \

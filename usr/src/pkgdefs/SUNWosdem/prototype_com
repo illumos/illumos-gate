@@ -134,6 +134,7 @@ f none usr/demo/ksh/tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.
 f none usr/demo/ksh/tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_cr_6766246_pattern_matching_bug.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_getconf.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_local_compound_nameref001.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_staticvariables.sh 644 root bin
