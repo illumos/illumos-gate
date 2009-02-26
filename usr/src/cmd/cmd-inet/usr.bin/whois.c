@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ main(int argc, char *argv[])
 		argc--;
 	}
 	if (argc != 1) {
-		fprintf(stderr, "usage: whois [ -h host ] name\n");
+		(void) fprintf(stderr, "usage: whois [ -h host ] name\n");
 		exit(1);
 	}
 
@@ -76,8 +76,8 @@ main(int argc, char *argv[])
 	hints.ai_flags = AI_ADDRCONFIG;
 	rv = getaddrinfo(host, "whois", &hints, &ai_head);
 	if (rv != 0) {
-		fprintf(stderr, "whois: %s: %s\n", host, gai_strerror(rv));
-		freeaddrinfo(ai_head);
+		(void) fprintf(stderr, "whois: %s: %s\n", host,
+		    gai_strerror(rv));
 		exit(1);
 	}
 
@@ -86,12 +86,13 @@ main(int argc, char *argv[])
 		if (s >= 0) {
 			rv = connect(s, ai->ai_addr, ai->ai_addrlen);
 			if (rv < 0)
-				close(s);
+				(void) close(s);
 			else
 				break;
 		}
 	}
-	freeaddrinfo(ai_head);
+	if (ai_head != NULL)
+		freeaddrinfo(ai_head);
 
 	if (s < 0) {
 		perror("whois: socket");
@@ -105,12 +106,12 @@ main(int argc, char *argv[])
 	sfo = fdopen(s, "w");
 	if (sfi == NULL || sfo == NULL) {
 		perror("fdopen");
-		close(s);
+		(void) close(s);
 		exit(1);
 	}
-	fprintf(sfo, "%s\r\n", *argv);
-	fflush(sfo);
+	(void) fprintf(sfo, "%s\r\n", *argv);
+	(void) fflush(sfo);
 	while ((c = getc(sfi)) != EOF)
-		putchar(c);
+		(void) putchar(c);
 	return (0);
 }
