@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/kmem.h>
 #include <sys/errno.h>
@@ -89,12 +87,6 @@ brand_register(brand_t *brand)
 
 	if (brand == NULL)
 		return (EINVAL);
-
-	if (is_system_labeled()) {
-		cmn_err(CE_WARN,
-		    "Branded zones are not allowed on labeled systems.");
-		return (EINVAL);
-	}
 
 	if (brand->b_version != SUPPORTED_BRAND_VERSION) {
 		if (brand->b_version < SUPPORTED_BRAND_VERSION) {

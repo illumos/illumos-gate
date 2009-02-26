@@ -106,6 +106,7 @@ char *zone_name;	/* zone which we are managing */
 char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;
 boolean_t zone_iscluster;
+boolean_t zone_islabeled;
 static zoneid_t zone_id;
 dladm_handle_t dld_handle = NULL;
 
@@ -1175,7 +1176,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_FORCEMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			if (!zone_isnative && !zone_iscluster) {
+			if (!zone_isnative && !zone_iscluster &&
+			    !zone_islabeled) {
 				/*
 				 * -U mounts the zone without lofs mounting
 				 * zone file systems back into the scratch
@@ -1711,6 +1713,7 @@ main(int argc, char *argv[])
 	}
 	zone_isnative = brand_is_native(bh);
 	zone_iscluster = (strcmp(brand_name, CLUSTER_BRAND_NAME) == 0);
+	zone_islabeled = (strcmp(brand_name, LABELED_BRAND_NAME) == 0);
 
 	/* Get state change brand hooks. */
 	if (brand_callback_init(bh, zone_name) == -1) {

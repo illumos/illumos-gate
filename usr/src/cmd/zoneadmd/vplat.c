@@ -4240,6 +4240,14 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 			goto error;
 		}
 
+		if (!is_system_labeled() &&
+		    (strcmp(attr.ba_brandname, LABELED_BRAND_NAME) == 0)) {
+			brand_close(bh);
+			zerror(zlogp, B_FALSE,
+			    "cannot boot labeled zone on unlabeled system");
+			goto error;
+		}
+
 		/*
 		 * If this brand requires any kernel support, now is the time to
 		 * get it loaded and initialized.

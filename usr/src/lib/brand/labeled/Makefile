@@ -18,39 +18,26 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
-#
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+BRAND=		labeled
+PROGS=		pkgcreatezone
+XMLDOCS=	config.xml platform.xml
 
-i386_SUBDIRS= lx
-i386_MSGSUBDIRS= lx
+all:	$(PROGS)
 
-SUBDIRS= sn1 labeled native $($(MACH)_SUBDIRS)
-MSGSUBDIRS= $($(MACH)_MSGSUBDIRS)
+include ../Makefile.brand
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+lint:
 
-.KEEP_STATE:
+clean:
+	-$(RM) $(PROGS)
 
-all install clean clobber lint: $(SUBDIRS)
+install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS)
 
-_msg: $(MSGSUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+clobber: clean
+	-$(RM) $(ROOTPROGS) $(ROOTXMLDOCS)

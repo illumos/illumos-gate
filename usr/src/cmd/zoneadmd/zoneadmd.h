@@ -57,6 +57,7 @@ extern "C" {
 #define	EXEC_LEN	(strlen(EXEC_PREFIX))
 
 #define	CLUSTER_BRAND_NAME	"cluster"
+#define	LABELED_BRAND_NAME	"labeled"
 
 /* 0755 is the default directory mode. */
 #define	DEFAULT_DIR_MODE \

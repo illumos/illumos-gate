@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -89,6 +87,14 @@ f none usr/demo/tsol/getmounts.sh 555 root bin
 f none usr/demo/tsol/runinzone.ksh 555 root bin
 f none usr/demo/tsol/runwlabel.ksh 555 root bin
 f none usr/demo/tsol/waitforzone.ksh 555 root bin
+#
+# Labeled Brand files
+#
+d none usr/lib/brand 755 root bin
+d none usr/lib/brand/labeled 755 root sys
+f none usr/lib/brand/labeled/config.xml 444 root bin
+f none usr/lib/brand/labeled/platform.xml 444 root bin
+f none usr/lib/brand/labeled/pkgcreatezone 755 root bin
 #
 # Share and unshare scripts for zone exports
 #

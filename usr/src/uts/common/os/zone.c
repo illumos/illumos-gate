@@ -2132,13 +2132,6 @@ zone_set_brand(zone_t *zone, const char *brand)
 		return (EINVAL);
 	}
 
-	if (is_system_labeled() &&
-	    strncmp(attrp->ba_brandname, NATIVE_BRAND_NAME, MAXNAMELEN) != 0) {
-		mutex_exit(&zone_status_lock);
-		brand_unregister_zone(bp);
-		return (EPERM);
-	}
-
 	/* set up the brand specific data */
 	zone->zone_brand = bp;
 	ZBROP(zone)->b_init_brand_data(zone);

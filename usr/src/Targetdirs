@@ -264,6 +264,7 @@ ROOT.BIN= \
 	/usr/lib \
 	/usr/lib/abi \
 	/usr/lib/brand \
+	/usr/lib/brand/labeled \
 	/usr/lib/brand/native \
 	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
