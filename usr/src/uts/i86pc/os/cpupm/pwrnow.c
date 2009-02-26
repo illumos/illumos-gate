@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,21 +28,20 @@
 #include <sys/x_call.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
-#include <sys/cpudrv_mach.h>
 #include <sys/pwrnow.h>
 #include <sys/cpu_acpi.h>
 #include <sys/cpupm.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 
-static int pwrnow_init(cpudrv_devstate_t *);
-static void pwrnow_fini(cpudrv_devstate_t *);
-static int pwrnow_power(cpudrv_devstate_t *, uint32_t);
+static int pwrnow_init(cpu_t *);
+static void pwrnow_fini(cpu_t *);
+static void pwrnow_power(cpuset_t, uint32_t);
 
 /*
  * Interfaces for modules implementing AMD's PowerNow!.
  */
-cpudrv_pstate_ops_t pwrnow_ops = {
+cpupm_state_ops_t pwrnow_ops = {
 	"PowerNow! Technology",
 	pwrnow_init,
 	pwrnow_fini,
@@ -81,12 +80,11 @@ volatile int pwrnow_debug = 0;
 /*
  * Write the ctrl register.
  */
-static int
+static void
 write_ctrl(cpu_acpi_handle_t handle, uint32_t ctrl)
 {
 	cpu_acpi_pct_t *pct_ctrl;
 	uint64_t reg;
-	int ret = 0;
 
 	pct_ctrl = CPU_ACPI_PCT_CTRL(handle);
 
@@ -94,35 +92,32 @@ write_ctrl(cpu_acpi_handle_t handle, uint32_t ctrl)
 	case ACPI_ADR_SPACE_FIXED_HARDWARE:
 		reg = ctrl;
 		wrmsr(PWRNOW_PERF_CTL_MSR, reg);
-		ret = 0;
 		break;
 
 	default:
 		DTRACE_PROBE1(pwrnow_ctrl_unsupported_type, uint8_t,
 		    pct_ctrl->cr_addrspace_id);
-		return (-1);
+		return;
 	}
 
 	DTRACE_PROBE1(pwrnow_ctrl_write, uint32_t, ctrl);
-	DTRACE_PROBE1(pwrnow_ctrl_write_err, int, ret);
-
-	return (ret);
 }
 
 /*
  * Transition the current processor to the requested state.
  */
 static void
-pwrnow_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
-    uint32_t req_state)
+pwrnow_pstate_transition(uint32_t req_state)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)CPU->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pstate_t *req_pstate;
 	uint32_t ctrl;
 
 	req_pstate = (cpu_acpi_pstate_t *)CPU_ACPI_PSTATES(handle);
 	req_pstate += req_state;
+
 	DTRACE_PROBE1(pwrnow_transition_freq, uint32_t,
 	    CPU_ACPI_FREQ(req_pstate));
 
@@ -130,40 +125,30 @@ pwrnow_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	 * Initiate the processor p-state change.
 	 */
 	ctrl = CPU_ACPI_PSTATE_CTRL(req_pstate);
-	if (write_ctrl(handle, ctrl) != 0) {
-		*ret = PWRNOW_RET_UNSUP_STATE;
-		return;
-	}
+	write_ctrl(handle, ctrl);
 
-	mach_state->pstate = req_state;
-	CPU->cpu_curr_clock = ((uint64_t)
-	    CPU_ACPI_FREQ(req_pstate) * 1000000);
-
-	*ret = PWRNOW_RET_SUCCESS;
+	mach_state->ms_pstate.cma_state.pstate = req_state;
+	cpu_set_curr_clock((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000);
 }
 
-static int
-pwrnow_power(cpudrv_devstate_t *cpudsp, uint32_t req_state)
+static void
+pwrnow_power(cpuset_t set, uint32_t req_state)
 {
-	cpuset_t cpus;
-	int ret;
-
 	/*
 	 * If thread is already running on target CPU then just
 	 * make the transition request. Otherwise, we'll need to
 	 * make a cross-call.
 	 */
 	kpreempt_disable();
-	if (cpudsp->cpu_id == CPU->cpu_id) {
-		pwrnow_pstate_transition(&ret, cpudsp, req_state);
-	} else {
-		CPUSET_ONLY(cpus, cpudsp->cpu_id);
-		xc_call((xc_arg_t)&ret, (xc_arg_t)cpudsp, (xc_arg_t)req_state,
-		    X_CALL_HIPRI, cpus, (xc_func_t)pwrnow_pstate_transition);
+	if (CPU_IN_SET(set, CPU->cpu_id)) {
+		pwrnow_pstate_transition(req_state);
+		CPUSET_DEL(set, CPU->cpu_id);
+	}
+	if (!CPUSET_ISNULL(set)) {
+		xc_call((xc_arg_t)req_state, NULL, NULL, X_CALL_HIPRI,
+		    set, (xc_func_t)pwrnow_pstate_transition);
 	}
 	kpreempt_enable();
-
-	return (ret);
 }
 
 /*
@@ -171,23 +156,21 @@ pwrnow_power(cpudrv_devstate_t *cpudsp, uint32_t req_state)
  * get the P-state data from ACPI and cache it.
  */
 static int
-pwrnow_init(cpudrv_devstate_t *cpudsp)
+pwrnow_init(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pct_t *pct_stat;
-	cpu_t *cp;
-	int domain;
 
-	PWRNOW_DEBUG(("pwrnow_init: instance %d\n",
-	    ddi_get_instance(cpudsp->dip)));
+	PWRNOW_DEBUG(("pwrnow_init: processor %d\n", cp->cpu_id));
 
 	/*
 	 * Cache the P-state specific ACPI data.
 	 */
 	if (cpu_acpi_cache_pstate_data(handle) != 0) {
 		PWRNOW_DEBUG(("Failed to cache ACPI data\n"));
-		pwrnow_fini(cpudsp);
+		pwrnow_fini(cp);
 		return (PWRNOW_RET_NO_PM);
 	}
 
@@ -200,20 +183,13 @@ pwrnow_init(cpudrv_devstate_t *cpudsp)
 		cmn_err(CE_WARN, "!_PCT configured for unsupported "
 		    "addrspace = %d.", pct_stat->cr_addrspace_id);
 		cmn_err(CE_NOTE, "!CPU power management will not function.");
-		pwrnow_fini(cpudsp);
+		pwrnow_fini(cp);
 		return (PWRNOW_RET_NO_PM);
 	}
 
-	if (CPU_ACPI_IS_OBJ_CACHED(handle, CPU_ACPI_PSD_CACHED))
-		domain = CPU_ACPI_PSD(handle).sd_domain;
-	else {
-		cp = cpu[CPU->cpu_id];
-		domain = cpuid_get_chipid(cp);
-	}
-	cpupm_add_cpu2dependency(cpudsp->dip, domain);
+	cpupm_alloc_domains(cp, CPUPM_P_STATES);
 
-	PWRNOW_DEBUG(("Instance %d succeeded.\n",
-	    ddi_get_instance(cpudsp->dip)));
+	PWRNOW_DEBUG(("Processor %d succeeded.\n", cp->cpu_id))
 	return (PWRNOW_RET_SUCCESS);
 }
 
@@ -221,12 +197,13 @@ pwrnow_init(cpudrv_devstate_t *cpudsp)
  * Free resources allocated by pwrnow_init().
  */
 static void
-pwrnow_fini(cpudrv_devstate_t *cpudsp)
+pwrnow_fini(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 
-	cpupm_free_cpu_dependencies();
+	cpupm_free_domains(&cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
 }
 

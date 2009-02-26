@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -294,6 +294,8 @@ mlsetup(struct regs *rp)
 	 * Initialize lists of available and active CPUs.
 	 */
 	cpu_list_init(CPU);
+
+	pg_cpu_bootstrap(CPU);
 
 	/*
 	 * Now that we have taken over the GDT, IDT and have initialized

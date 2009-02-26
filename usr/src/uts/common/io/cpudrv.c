@@ -43,7 +43,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sdt.h>
-
+#include <sys/epm.h>
 #include <sys/machsystm.h>
 #include <sys/x_call.h>
 #include <sys/cpudrv_mach.h>
@@ -110,23 +110,25 @@ static struct modlinkage modlinkage = {
 /*
  * Function prototypes
  */
-static int cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp);
-static void cpudrv_pm_free(cpudrv_devstate_t *cpudsp);
-static int cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp);
-static void cpudrv_pm_monitor_disp(void *arg);
-static void cpudrv_pm_monitor(void *arg);
+static int cpudrv_init(cpudrv_devstate_t *cpudsp);
+static void cpudrv_free(cpudrv_devstate_t *cpudsp);
+static int cpudrv_comp_create(cpudrv_devstate_t *cpudsp);
+static void cpudrv_monitor_disp(void *arg);
+static void cpudrv_monitor(void *arg);
 
 /*
  * Driver global variables
  */
 uint_t cpudrv_debug = 0;
 void *cpudrv_state;
-static uint_t cpudrv_pm_idle_hwm = CPUDRV_PM_IDLE_HWM;
-static uint_t cpudrv_pm_idle_lwm = CPUDRV_PM_IDLE_LWM;
-static uint_t cpudrv_pm_idle_buf_zone = CPUDRV_PM_IDLE_BUF_ZONE;
-static uint_t cpudrv_pm_idle_bhwm_cnt_max = CPUDRV_PM_IDLE_BHWM_CNT_MAX;
-static uint_t cpudrv_pm_idle_blwm_cnt_max = CPUDRV_PM_IDLE_BLWM_CNT_MAX;
-static uint_t cpudrv_pm_user_hwm = CPUDRV_PM_USER_HWM;
+static uint_t cpudrv_idle_hwm = CPUDRV_IDLE_HWM;
+static uint_t cpudrv_idle_lwm = CPUDRV_IDLE_LWM;
+static uint_t cpudrv_idle_buf_zone = CPUDRV_IDLE_BUF_ZONE;
+static uint_t cpudrv_idle_bhwm_cnt_max = CPUDRV_IDLE_BHWM_CNT_MAX;
+static uint_t cpudrv_idle_blwm_cnt_max = CPUDRV_IDLE_BLWM_CNT_MAX;
+static uint_t cpudrv_user_hwm = CPUDRV_USER_HWM;
+
+boolean_t cpudrv_enabled = B_TRUE;
 
 /*
  * cpudrv_direct_pm allows user applications to directly control the
@@ -154,13 +156,13 @@ int cpudrv_direct_pm = 0;
  * Arranges for the handler function to be called at the interval suitable
  * for current speed.
  */
-#define	CPUDRV_PM_MONITOR_INIT(cpudsp) { \
-	if (CPUDRV_PM_POWER_ENABLED(cpudsp)) { \
+#define	CPUDRV_MONITOR_INIT(cpudsp) { \
+    if (cpudrv_is_enabled(cpudsp)) {	      \
 		ASSERT(mutex_owned(&(cpudsp)->lock)); \
 		(cpudsp)->cpudrv_pm.timeout_id = \
-		    timeout(cpudrv_pm_monitor_disp, \
+		    timeout(cpudrv_monitor_disp, \
 		    (cpudsp), (((cpudsp)->cpudrv_pm.cur_spd == NULL) ? \
-		    CPUDRV_PM_QUANT_CNT_OTHR : \
+		    CPUDRV_QUANT_CNT_OTHR : \
 		    (cpudsp)->cpudrv_pm.cur_spd->quant_cnt)); \
 	} \
 }
@@ -168,7 +170,7 @@ int cpudrv_direct_pm = 0;
 /*
  * Arranges for the handler function not to be called back.
  */
-#define	CPUDRV_PM_MONITOR_FINI(cpudsp) { \
+#define	CPUDRV_MONITOR_FINI(cpudsp) { \
 	timeout_id_t tmp_tid; \
 	ASSERT(mutex_owned(&(cpudsp)->lock)); \
 	tmp_tid = (cpudsp)->cpudrv_pm.timeout_id; \
@@ -203,7 +205,7 @@ _init(void)
 	/*
 	 * Callbacks used by the PPM driver.
 	 */
-	CPUDRV_PM_SET_PPM_CALLBACKS();
+	CPUDRV_SET_PPM_CALLBACKS();
 	return (error);
 }
 
@@ -242,13 +244,13 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		DPRINTF(D_ATTACH, ("cpudrv_attach: instance %d: "
 		    "DDI_ATTACH called\n", instance));
-		if (CPUDRV_PM_DISABLED())
+		if (!cpudrv_is_enabled(NULL))
 			return (DDI_FAILURE);
 		if (ddi_soft_state_zalloc(cpudrv_state, instance) !=
 		    DDI_SUCCESS) {
 			cmn_err(CE_WARN, "cpudrv_attach: instance %d: "
 			    "can't allocate state", instance);
-			CPUDRV_PM_DISABLE();
+			cpudrv_enabled = B_FALSE;
 			return (DDI_FAILURE);
 		}
 		if ((cpudsp = ddi_get_soft_state(cpudrv_state, instance)) ==
@@ -256,7 +258,7 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			cmn_err(CE_WARN, "cpudrv_attach: instance %d: "
 			    "can't get state", instance);
 			ddi_soft_state_free(cpudrv_state, instance);
-			CPUDRV_PM_DISABLE();
+			cpudrv_enabled = B_FALSE;
 			return (DDI_FAILURE);
 		}
 		cpudsp->dip = dip;
@@ -264,36 +266,36 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/*
 		 * Find CPU number for this dev_info node.
 		 */
-		if (!cpudrv_pm_get_cpu_id(dip, &(cpudsp->cpu_id))) {
+		if (!cpudrv_get_cpu_id(dip, &(cpudsp->cpu_id))) {
 			cmn_err(CE_WARN, "cpudrv_attach: instance %d: "
 			    "can't convert dip to cpu_id", instance);
 			ddi_soft_state_free(cpudrv_state, instance);
-			CPUDRV_PM_DISABLE();
+			cpudrv_enabled = B_FALSE;
 			return (DDI_FAILURE);
 		}
-		if (!cpudrv_mach_pm_init(cpudsp)) {
-			ddi_soft_state_free(cpudrv_state, instance);
-			CPUDRV_PM_DISABLE();
+		if (!cpudrv_mach_init(cpudsp)) {
+			cpudrv_enabled = B_FALSE;
 			return (DDI_FAILURE);
 		}
+
 		mutex_init(&cpudsp->lock, NULL, MUTEX_DRIVER, NULL);
-		if (CPUDRV_PM_POWER_ENABLED(cpudsp)) {
-			if (cpudrv_pm_init_power(cpudsp) != DDI_SUCCESS) {
-				CPUDRV_PM_DISABLE();
-				cpudrv_pm_free(cpudsp);
+		if (cpudrv_is_enabled(cpudsp)) {
+			if (cpudrv_init(cpudsp) != DDI_SUCCESS) {
+				cpudrv_enabled = B_FALSE;
+				cpudrv_free(cpudsp);
 				ddi_soft_state_free(cpudrv_state, instance);
 				return (DDI_FAILURE);
 			}
-			if (cpudrv_pm_comp_create(cpudsp) != DDI_SUCCESS) {
-				CPUDRV_PM_DISABLE();
-				cpudrv_pm_free(cpudsp);
+			if (cpudrv_comp_create(cpudsp) != DDI_SUCCESS) {
+				cpudrv_enabled = B_FALSE;
+				cpudrv_free(cpudsp);
 				ddi_soft_state_free(cpudrv_state, instance);
 				return (DDI_FAILURE);
 			}
 			if (ddi_prop_update_string(DDI_DEV_T_NONE,
 			    dip, "pm-class", "CPU") != DDI_PROP_SUCCESS) {
-				CPUDRV_PM_DISABLE();
-				cpudrv_pm_free(cpudsp);
+				cpudrv_enabled = B_FALSE;
+				cpudrv_free(cpudsp);
 				ddi_soft_state_free(cpudrv_state, instance);
 				return (DDI_FAILURE);
 			}
@@ -303,10 +305,10 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * activities.
 			 */
 			cpudsp->cpudrv_pm.tq = taskq_create_instance(
-			    "cpudrv_pm_monitor",
-			    ddi_get_instance(dip), CPUDRV_PM_TASKQ_THREADS,
-			    (maxclsyspri - 1), CPUDRV_PM_TASKQ_MIN,
-			    CPUDRV_PM_TASKQ_MAX,
+			    "cpudrv_monitor",
+			    ddi_get_instance(dip), CPUDRV_TASKQ_THREADS,
+			    (maxclsyspri - 1), CPUDRV_TASKQ_MIN,
+			    CPUDRV_TASKQ_MAX,
 			    TASKQ_PREPOPULATE|TASKQ_CPR_SAFE);
 
 			mutex_init(&cpudsp->cpudrv_pm.timeout_lock, NULL,
@@ -321,7 +323,7 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * is full speed for us.
 			 */
 			/*
-			 * We need to take the lock because cpudrv_pm_monitor()
+			 * We need to take the lock because cpudrv_monitor()
 			 * will start running in parallel with attach().
 			 */
 			mutex_enter(&cpudsp->lock);
@@ -335,12 +337,12 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * unknown speed and moves CPU to top speed when it
 			 * has been initialized.
 			 */
-			CPUDRV_PM_MONITOR_INIT(cpudsp);
+			CPUDRV_MONITOR_INIT(cpudsp);
 			mutex_exit(&cpudsp->lock);
 
 		}
 
-		CPUDRV_PM_INSTALL_MAX_CHANGE_HANDLER(cpudsp, dip);
+		CPUDRV_INSTALL_MAX_CHANGE_HANDLER(cpudsp);
 
 		ddi_report_dev(dip);
 		return (DDI_SUCCESS);
@@ -355,7 +357,7 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/*
 		 * Nothing to do for resume, if not doing active PM.
 		 */
-		if (!CPUDRV_PM_POWER_ENABLED(cpudsp))
+		if (!cpudrv_is_enabled(cpudsp))
 			return (DDI_SUCCESS);
 
 		mutex_enter(&cpudsp->lock);
@@ -365,9 +367,9 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * that the needed speed is full speed for us.
 		 */
 		cpudsp->cpudrv_pm.cur_spd = NULL;
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
+		CPUDRV_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
-		CPUDRV_PM_REDEFINE_TOPSPEED(dip);
+		CPUDRV_REDEFINE_TOPSPEED(dip);
 		return (DDI_SUCCESS);
 
 	default:
@@ -409,7 +411,7 @@ cpudrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/*
 		 * Nothing to do for suspend, if not doing active PM.
 		 */
-		if (!CPUDRV_PM_POWER_ENABLED(cpudsp))
+		if (!cpudrv_is_enabled(cpudsp))
 			return (DDI_SUCCESS);
 
 		/*
@@ -427,18 +429,18 @@ cpudrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		DPRINTF(D_DETACH, ("cpudrv_detach: instance %d: DDI_SUSPEND - "
 		    "cur_spd %d, topspeed %d\n", instance,
 		    cpupm->cur_spd->pm_level,
-		    CPUDRV_PM_TOPSPEED(cpupm)->pm_level));
+		    CPUDRV_TOPSPEED(cpupm)->pm_level));
 
-		CPUDRV_PM_MONITOR_FINI(cpudsp);
+		CPUDRV_MONITOR_FINI(cpudsp);
 
 		if (!cpudrv_direct_pm && (cpupm->cur_spd !=
-		    CPUDRV_PM_TOPSPEED(cpupm))) {
+		    CPUDRV_TOPSPEED(cpupm))) {
 			if (cpupm->pm_busycnt < 1) {
-				if ((pm_busy_component(dip, CPUDRV_PM_COMP_NUM)
+				if ((pm_busy_component(dip, CPUDRV_COMP_NUM)
 				    == DDI_SUCCESS)) {
 					cpupm->pm_busycnt++;
 				} else {
-					CPUDRV_PM_MONITOR_INIT(cpudsp);
+					CPUDRV_MONITOR_INIT(cpudsp);
 					mutex_exit(&cpudsp->lock);
 					cmn_err(CE_WARN, "cpudrv_detach: "
 					    "instance %d: can't busy CPU "
@@ -447,16 +449,16 @@ cpudrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 				}
 			}
 			mutex_exit(&cpudsp->lock);
-			if (pm_raise_power(dip, CPUDRV_PM_COMP_NUM,
-			    CPUDRV_PM_TOPSPEED(cpupm)->pm_level) !=
+			if (pm_raise_power(dip, CPUDRV_COMP_NUM,
+			    CPUDRV_TOPSPEED(cpupm)->pm_level) !=
 			    DDI_SUCCESS) {
 				mutex_enter(&cpudsp->lock);
-				CPUDRV_PM_MONITOR_INIT(cpudsp);
+				CPUDRV_MONITOR_INIT(cpudsp);
 				mutex_exit(&cpudsp->lock);
 				cmn_err(CE_WARN, "cpudrv_detach: instance %d: "
 				    "can't raise CPU power level to %d",
 				    instance,
-				    CPUDRV_PM_TOPSPEED(cpupm)->pm_level);
+				    CPUDRV_TOPSPEED(cpupm)->pm_level);
 				return (DDI_FAILURE);
 			} else {
 				return (DDI_SUCCESS);
@@ -483,7 +485,7 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 {
 	int			instance;
 	cpudrv_devstate_t	*cpudsp;
-	cpudrv_pm_t 		*cpupm;
+	cpudrv_pm_t 		*cpudrvpm;
 	cpudrv_pm_spd_t		*new_spd;
 	boolean_t		is_ready;
 	int			ret;
@@ -492,14 +494,15 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 
 	DPRINTF(D_POWER, ("cpudrv_power: instance %d: level %d\n",
 	    instance, level));
+
 	if ((cpudsp = ddi_get_soft_state(cpudrv_state, instance)) == NULL) {
-		cmn_err(CE_WARN, "cpudrv_power: instance %d: can't get state",
-		    instance);
+		cmn_err(CE_WARN, "cpudrv_power: instance %d: can't "
+		    "get state", instance);
 		return (DDI_FAILURE);
 	}
 
 	mutex_enter(&cpudsp->lock);
-	cpupm = &(cpudsp->cpudrv_pm);
+	cpudrvpm = &(cpudsp->cpudrv_pm);
 
 	/*
 	 * In normal operation, we fail if we are busy and request is
@@ -507,21 +510,22 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 	 * is in special direct pm mode. On x86, we also let this through
 	 * if the change is due to a request to govern the max speed.
 	 */
-	if (!cpudrv_direct_pm && (cpupm->pm_busycnt >= 1) &&
-	    !cpudrv_pm_is_governor_thread(cpupm)) {
-		if ((cpupm->cur_spd != NULL) &&
-		    (level < cpupm->cur_spd->pm_level)) {
+	if (!cpudrv_direct_pm && (cpudrvpm->pm_busycnt >= 1) &&
+	    !cpudrv_is_governor_thread(cpudrvpm)) {
+		if ((cpudrvpm->cur_spd != NULL) &&
+		    (level < cpudrvpm->cur_spd->pm_level)) {
 			mutex_exit(&cpudsp->lock);
 			return (DDI_FAILURE);
 		}
 	}
 
-	for (new_spd = cpupm->head_spd; new_spd; new_spd = new_spd->down_spd) {
+	for (new_spd = cpudrvpm->head_spd; new_spd; new_spd =
+	    new_spd->down_spd) {
 		if (new_spd->pm_level == level)
 			break;
 	}
 	if (!new_spd) {
-		CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm);
+		CPUDRV_RESET_GOVERNOR_THREAD(cpudrvpm);
 		mutex_exit(&cpudsp->lock);
 		cmn_err(CE_WARN, "cpudrv_power: instance %d: "
 		    "can't locate new CPU speed", instance);
@@ -538,105 +542,66 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 	 * That's because we don't know what the CPU domains look like
 	 * until all instances have been initialized.
 	 */
-	is_ready = CPUDRV_PM_XCALL_IS_READY(cpudsp->cpu_id);
+	is_ready = CPUDRV_XCALL_IS_READY(cpudsp->cpu_id);
 	if (!is_ready) {
 		DPRINTF(D_POWER, ("cpudrv_power: instance %d: "
 		    "CPU not ready for x-calls\n", instance));
-	} else if (!(is_ready = cpudrv_pm_power_ready())) {
+	} else if (!(is_ready = cpudrv_power_ready())) {
 		DPRINTF(D_POWER, ("cpudrv_power: instance %d: "
-		    "waiting for all CPUs to be power manageable\n", instance));
+		    "waiting for all CPUs to be power manageable\n",
+		    instance));
 	}
 	if (!is_ready) {
-		CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm);
+		CPUDRV_RESET_GOVERNOR_THREAD(cpudrvpm);
 		mutex_exit(&cpudsp->lock);
 		return (DDI_FAILURE);
 	}
 
 	/*
-	 * Execute CPU specific routine on the requested CPU to change its
-	 * speed to normal-speed/divisor.
+	 * Execute CPU specific routine on the requested CPU to
+	 * change its speed to normal-speed/divisor.
 	 */
-	if ((ret = cpudrv_pm_change_speed(cpudsp, new_spd)) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "cpudrv_power: cpudrv_pm_change_speed() "
-		    "return = %d", ret);
+	if ((ret = cpudrv_change_speed(cpudsp, new_spd)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "cpudrv_power: "
+		    "cpudrv_change_speed() return = %d", ret);
 		mutex_exit(&cpudsp->lock);
 		return (DDI_FAILURE);
 	}
-
-	/*
-	 * DTrace probe point for CPU speed change transition
-	 */
-	DTRACE_PROBE3(cpu__change__speed, cpudrv_devstate_t *, cpudsp,
-	    cpudrv_pm_t *, cpupm, cpudrv_pm_spd_t *, new_spd);
 
 	/*
 	 * Reset idle threshold time for the new power level.
 	 */
-	if ((cpupm->cur_spd != NULL) && (level < cpupm->cur_spd->pm_level)) {
-		if (pm_idle_component(dip, CPUDRV_PM_COMP_NUM) ==
+	if ((cpudrvpm->cur_spd != NULL) && (level <
+	    cpudrvpm->cur_spd->pm_level)) {
+		if (pm_idle_component(dip, CPUDRV_COMP_NUM) ==
 		    DDI_SUCCESS) {
-			if (cpupm->pm_busycnt >= 1)
-				cpupm->pm_busycnt--;
-		} else
-			cmn_err(CE_WARN, "cpudrv_power: instance %d: can't "
-			    "idle CPU component", ddi_get_instance(dip));
+			if (cpudrvpm->pm_busycnt >= 1)
+				cpudrvpm->pm_busycnt--;
+		} else {
+			cmn_err(CE_WARN, "cpudrv_power: instance %d: "
+			    "can't idle CPU component",
+			    ddi_get_instance(dip));
+		}
 	}
 	/*
 	 * Reset various parameters because we are now running at new speed.
 	 */
-	cpupm->lastquan_mstate[CMS_IDLE] = 0;
-	cpupm->lastquan_mstate[CMS_SYSTEM] = 0;
-	cpupm->lastquan_mstate[CMS_USER] = 0;
-	cpupm->lastquan_ticks = 0;
-	cpupm->cur_spd = new_spd;
-	CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm);
+	cpudrvpm->lastquan_mstate[CMS_IDLE] = 0;
+	cpudrvpm->lastquan_mstate[CMS_SYSTEM] = 0;
+	cpudrvpm->lastquan_mstate[CMS_USER] = 0;
+	cpudrvpm->lastquan_ticks = 0;
+	cpudrvpm->cur_spd = new_spd;
+	CPUDRV_RESET_GOVERNOR_THREAD(cpudrvpm);
 	mutex_exit(&cpudsp->lock);
 
 	return (DDI_SUCCESS);
 }
 
 /*
- * Initialize the field that will be used for reporting
- * the supported_frequencies_Hz cpu_info kstat.
- */
-static void
-set_supp_freqs(cpu_t *cp, cpudrv_pm_t *cpupm)
-{
-	char		*supp_freqs;
-	char		*sfptr;
-	uint64_t	*speeds;
-	cpudrv_pm_spd_t	*spd;
-	int		i;
-#define	UINT64_MAX_STRING (sizeof ("18446744073709551615"))
-
-	speeds = kmem_zalloc(cpupm->num_spd * sizeof (uint64_t), KM_SLEEP);
-	for (i = cpupm->num_spd - 1, spd = cpupm->head_spd; spd;
-	    i--, spd = spd->down_spd) {
-		speeds[i] =
-		    CPUDRV_PM_SPEED_HZ(cp->cpu_type_info.pi_clock, spd->speed);
-	}
-
-	supp_freqs = kmem_zalloc((UINT64_MAX_STRING * cpupm->num_spd),
-	    KM_SLEEP);
-	sfptr = supp_freqs;
-	for (i = 0; i < cpupm->num_spd; i++) {
-		if (i == cpupm->num_spd - 1) {
-			(void) sprintf(sfptr, "%"PRIu64, speeds[i]);
-		} else {
-			(void) sprintf(sfptr, "%"PRIu64":", speeds[i]);
-			sfptr = supp_freqs + strlen(supp_freqs);
-		}
-	}
-	cpu_set_supp_freqs(cp, supp_freqs);
-	kmem_free(supp_freqs, (UINT64_MAX_STRING * cpupm->num_spd));
-	kmem_free(speeds, cpupm->num_spd * sizeof (uint64_t));
-}
-
-/*
  * Initialize power management data.
  */
 static int
-cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
+cpudrv_init(cpudrv_devstate_t *cpudsp)
 {
 	cpudrv_pm_t 	*cpupm = &(cpudsp->cpudrv_pm);
 	cpudrv_pm_spd_t	*cur_spd;
@@ -647,10 +612,10 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 	int		user_cnt_percent;
 	int		i;
 
-	CPUDRV_PM_GET_SPEEDS(cpudsp, speeds, nspeeds);
+	CPUDRV_GET_SPEEDS(cpudsp, speeds, nspeeds);
 	if (nspeeds < 2) {
 		/* Need at least two speeds to power manage */
-		CPUDRV_PM_FREE_SPEEDS(speeds, nspeeds);
+		CPUDRV_FREE_SPEEDS(speeds, nspeeds);
 		return (DDI_FAILURE);
 	}
 	cpupm->num_spd = nspeeds;
@@ -685,15 +650,15 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 		cur_spd->speed = speeds[i];
 		if (i == 0) {	/* normal speed */
 			cpupm->head_spd = cur_spd;
-			CPUDRV_PM_TOPSPEED(cpupm) = cur_spd;
-			cur_spd->quant_cnt = CPUDRV_PM_QUANT_CNT_NORMAL;
+			CPUDRV_TOPSPEED(cpupm) = cur_spd;
+			cur_spd->quant_cnt = CPUDRV_QUANT_CNT_NORMAL;
 			cur_spd->idle_hwm =
-			    (cpudrv_pm_idle_hwm * cur_spd->quant_cnt) / 100;
+			    (cpudrv_idle_hwm * cur_spd->quant_cnt) / 100;
 			/* can't speed anymore */
 			cur_spd->idle_lwm = 0;
 			cur_spd->user_hwm = UINT_MAX;
 		} else {
-			cur_spd->quant_cnt = CPUDRV_PM_QUANT_CNT_OTHR;
+			cur_spd->quant_cnt = CPUDRV_QUANT_CNT_OTHR;
 			ASSERT(prev_spd != NULL);
 			prev_spd->down_spd = cur_spd;
 			cur_spd->up_spd = cpupm->head_spd;
@@ -711,14 +676,14 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 			 * that there is at least a buffer zone seperation
 			 * between the idle_lwm and idle_hwm values.
 			 */
-			idle_cnt_percent = CPUDRV_PM_IDLE_CNT_PERCENT(
-			    cpudrv_pm_idle_hwm, speeds, i);
+			idle_cnt_percent = CPUDRV_IDLE_CNT_PERCENT(
+			    cpudrv_idle_hwm, speeds, i);
 			idle_cnt_percent = max(idle_cnt_percent,
-			    (cpudrv_pm_idle_lwm + cpudrv_pm_idle_buf_zone));
+			    (cpudrv_idle_lwm + cpudrv_idle_buf_zone));
 			cur_spd->idle_hwm =
 			    (idle_cnt_percent * cur_spd->quant_cnt) / 100;
 			cur_spd->idle_lwm =
-			    (cpudrv_pm_idle_lwm * cur_spd->quant_cnt) / 100;
+			    (cpudrv_idle_lwm * cur_spd->quant_cnt) / 100;
 
 			/*
 			 * The lwm for user threads are determined such that
@@ -727,10 +692,10 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 			 * user_hwm in the new speed.  This is to prevent
 			 * the quick jump back up to higher speed.
 			 */
-			cur_spd->user_hwm = (cpudrv_pm_user_hwm *
+			cur_spd->user_hwm = (cpudrv_user_hwm *
 			    cur_spd->quant_cnt) / 100;
-			user_cnt_percent = CPUDRV_PM_USER_CNT_PERCENT(
-			    cpudrv_pm_user_hwm, speeds, i);
+			user_cnt_percent = CPUDRV_USER_CNT_PERCENT(
+			    cpudrv_user_hwm, speeds, i);
 			prev_spd->user_lwm =
 			    (user_cnt_percent * prev_spd->quant_cnt) / 100;
 		}
@@ -740,11 +705,11 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 	cur_spd->idle_hwm = UINT_MAX;
 	cur_spd->user_lwm = -1;
 #ifdef	DEBUG
-	DPRINTF(D_PM_INIT, ("cpudrv_pm_init: instance %d: head_spd spd %d, "
+	DPRINTF(D_PM_INIT, ("cpudrv_init: instance %d: head_spd spd %d, "
 	    "num_spd %d\n", ddi_get_instance(cpudsp->dip),
 	    cpupm->head_spd->speed, cpupm->num_spd));
 	for (cur_spd = cpupm->head_spd; cur_spd; cur_spd = cur_spd->down_spd) {
-		DPRINTF(D_PM_INIT, ("cpudrv_pm_init: instance %d: speed %d, "
+		DPRINTF(D_PM_INIT, ("cpudrv_init: instance %d: speed %d, "
 		    "down_spd spd %d, idle_hwm %d, user_lwm %d, "
 		    "up_spd spd %d, idle_lwm %d, user_hwm %d, "
 		    "quant_cnt %d\n", ddi_get_instance(cpudsp->dip),
@@ -756,7 +721,7 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 		    cur_spd->quant_cnt));
 	}
 #endif	/* DEBUG */
-	CPUDRV_PM_FREE_SPEEDS(speeds, nspeeds);
+	CPUDRV_FREE_SPEEDS(speeds, nspeeds);
 	return (DDI_SUCCESS);
 }
 
@@ -764,7 +729,7 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
  * Free CPU power management data.
  */
 static void
-cpudrv_pm_free(cpudrv_devstate_t *cpudsp)
+cpudrv_free(cpudrv_devstate_t *cpudsp)
 {
 	cpudrv_pm_t 	*cpupm = &(cpudsp->cpudrv_pm);
 	cpudrv_pm_spd_t	*cur_spd, *next_spd;
@@ -776,14 +741,13 @@ cpudrv_pm_free(cpudrv_devstate_t *cpudsp)
 		cur_spd = next_spd;
 	}
 	bzero(cpupm, sizeof (cpudrv_pm_t));
-	cpudrv_mach_pm_free(cpudsp);
 }
 
 /*
  * Create pm-components property.
  */
 static int
-cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
+cpudrv_comp_create(cpudrv_devstate_t *cpudsp)
 {
 	cpudrv_pm_t 	*cpupm = &(cpudsp->cpudrv_pm);
 	cpudrv_pm_spd_t	*cur_spd;
@@ -795,9 +759,9 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 	int		result = DDI_FAILURE;
 
 	pmc = kmem_zalloc((cpupm->num_spd + 1) * sizeof (char *), KM_SLEEP);
-	size = CPUDRV_PM_COMP_SIZE();
-	if (cpupm->num_spd > CPUDRV_PM_COMP_MAX_VAL) {
-		cmn_err(CE_WARN, "cpudrv_pm_comp_create: instance %d: "
+	size = CPUDRV_COMP_SIZE();
+	if (cpupm->num_spd > CPUDRV_COMP_MAX_VAL) {
+		cmn_err(CE_WARN, "cpudrv_comp_create: instance %d: "
 		    "number of speeds exceeded limits",
 		    ddi_get_instance(cpudsp->dip));
 		kmem_free(pmc, (cpupm->num_spd + 1) * sizeof (char *));
@@ -808,9 +772,9 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 	    i--, cur_spd = cur_spd->down_spd) {
 		cur_spd->pm_level = i;
 		pmc[i] = kmem_zalloc((size * sizeof (char)), KM_SLEEP);
-		comp_spd = CPUDRV_PM_COMP_SPEED(cpupm, cur_spd);
-		if (comp_spd > CPUDRV_PM_COMP_MAX_VAL) {
-			cmn_err(CE_WARN, "cpudrv_pm_comp_create: "
+		comp_spd = CPUDRV_COMP_SPEED(cpupm, cur_spd);
+		if (comp_spd > CPUDRV_COMP_MAX_VAL) {
+			cmn_err(CE_WARN, "cpudrv_comp_create: "
 			    "instance %d: speed exceeded limits",
 			    ddi_get_instance(cpudsp->dip));
 			for (j = cpupm->num_spd; j >= i; j--) {
@@ -820,14 +784,14 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 			    sizeof (char *));
 			return (result);
 		}
-		CPUDRV_PM_COMP_SPRINT(pmc[i], cpupm, cur_spd, comp_spd)
-		DPRINTF(D_PM_COMP_CREATE, ("cpudrv_pm_comp_create: "
+		CPUDRV_COMP_SPRINT(pmc[i], cpupm, cur_spd, comp_spd)
+		DPRINTF(D_PM_COMP_CREATE, ("cpudrv_comp_create: "
 		    "instance %d: pm-components power level %d string '%s'\n",
 		    ddi_get_instance(cpudsp->dip), i, pmc[i]));
 	}
 	pmc[0] = kmem_zalloc(sizeof (name), KM_SLEEP);
 	(void) strcat(pmc[0], name);
-	DPRINTF(D_PM_COMP_CREATE, ("cpudrv_pm_comp_create: instance %d: "
+	DPRINTF(D_PM_COMP_CREATE, ("cpudrv_comp_create: instance %d: "
 	    "pm-components component name '%s'\n",
 	    ddi_get_instance(cpudsp->dip), pmc[0]));
 
@@ -835,7 +799,7 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 	    "pm-components", pmc, cpupm->num_spd + 1) == DDI_PROP_SUCCESS) {
 		result = DDI_SUCCESS;
 	} else {
-		cmn_err(CE_WARN, "cpudrv_pm_comp_create: instance %d: "
+		cmn_err(CE_WARN, "cpudrv_comp_create: instance %d: "
 		    "can't create pm-components property",
 		    ddi_get_instance(cpudsp->dip));
 	}
@@ -851,16 +815,16 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 /*
  * Mark a component idle.
  */
-#define	CPUDRV_PM_MONITOR_PM_IDLE_COMP(dip, cpupm) { \
+#define	CPUDRV_MONITOR_PM_IDLE_COMP(dip, cpupm) { \
 	if ((cpupm)->pm_busycnt >= 1) { \
-		if (pm_idle_component((dip), CPUDRV_PM_COMP_NUM) == \
+		if (pm_idle_component((dip), CPUDRV_COMP_NUM) == \
 		    DDI_SUCCESS) { \
-			DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: " \
+			DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: " \
 			    "instance %d: pm_idle_component called\n", \
 			    ddi_get_instance((dip)))); \
 			(cpupm)->pm_busycnt--; \
 		} else { \
-			cmn_err(CE_WARN, "cpudrv_pm_monitor: instance %d: " \
+			cmn_err(CE_WARN, "cpudrv_monitor: instance %d: " \
 			    "can't idle CPU component", \
 			    ddi_get_instance((dip))); \
 		} \
@@ -870,16 +834,16 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 /*
  * Marks a component busy in both PM framework and driver state structure.
  */
-#define	CPUDRV_PM_MONITOR_PM_BUSY_COMP(dip, cpupm) { \
+#define	CPUDRV_MONITOR_PM_BUSY_COMP(dip, cpupm) { \
 	if ((cpupm)->pm_busycnt < 1) { \
-		if (pm_busy_component((dip), CPUDRV_PM_COMP_NUM) == \
+		if (pm_busy_component((dip), CPUDRV_COMP_NUM) == \
 		    DDI_SUCCESS) { \
-			DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: " \
+			DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: " \
 			    "instance %d: pm_busy_component called\n", \
 			    ddi_get_instance((dip)))); \
 			(cpupm)->pm_busycnt++; \
 		} else { \
-			cmn_err(CE_WARN, "cpudrv_pm_monitor: instance %d: " \
+			cmn_err(CE_WARN, "cpudrv_monitor: instance %d: " \
 			    "can't busy CPU component", \
 			    ddi_get_instance((dip))); \
 		} \
@@ -889,19 +853,19 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
 /*
  * Marks a component busy and calls pm_raise_power().
  */
-#define	CPUDRV_PM_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm, new_level) { \
+#define	CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm, new_level) { \
 	/* \
 	 * Mark driver and PM framework busy first so framework doesn't try \
 	 * to bring CPU to lower speed when we need to be at higher speed. \
 	 */ \
-	CPUDRV_PM_MONITOR_PM_BUSY_COMP((dip), (cpupm)); \
+	CPUDRV_MONITOR_PM_BUSY_COMP((dip), (cpupm)); \
 	mutex_exit(&(cpudsp)->lock); \
-	DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: " \
+	DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: instance %d: " \
 	    "pm_raise_power called to %d\n", ddi_get_instance((dip)), \
 		(new_level))); \
-	if (pm_raise_power((dip), CPUDRV_PM_COMP_NUM, (new_level)) != \
+	if (pm_raise_power((dip), CPUDRV_COMP_NUM, (new_level)) != \
 	    DDI_SUCCESS) { \
-		cmn_err(CE_WARN, "cpudrv_pm_monitor: instance %d: can't " \
+		cmn_err(CE_WARN, "cpudrv_monitor: instance %d: can't " \
 		    "raise CPU power level", ddi_get_instance((dip))); \
 	} \
 	mutex_enter(&(cpudsp)->lock); \
@@ -913,7 +877,7 @@ cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp)
  * We dispatch a taskq to do that job.
  */
 static void
-cpudrv_pm_monitor_disp(void *arg)
+cpudrv_monitor_disp(void *arg)
 {
 	cpudrv_devstate_t	*cpudsp = (cpudrv_devstate_t *)arg;
 
@@ -922,13 +886,13 @@ cpudrv_pm_monitor_disp(void *arg)
 	 * The queue should be empty at this time.
 	 */
 	mutex_enter(&cpudsp->cpudrv_pm.timeout_lock);
-	if (!taskq_dispatch(cpudsp->cpudrv_pm.tq, cpudrv_pm_monitor, arg,
+	if (!taskq_dispatch(cpudsp->cpudrv_pm.tq, cpudrv_monitor, arg,
 	    TQ_NOSLEEP)) {
 		mutex_exit(&cpudsp->cpudrv_pm.timeout_lock);
-		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor_disp: failed to "
-		    "dispatch the cpudrv_pm_monitor taskq\n"));
+		DPRINTF(D_PM_MONITOR, ("cpudrv_monitor_disp: failed to "
+		    "dispatch the cpudrv_monitor taskq\n"));
 		mutex_enter(&cpudsp->lock);
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
+		CPUDRV_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
 		return;
 	}
@@ -940,17 +904,16 @@ cpudrv_pm_monitor_disp(void *arg)
  * Monitors each CPU for the amount of time idle thread was running in the
  * last quantum and arranges for the CPU to go to the lower or higher speed.
  * Called at the time interval appropriate for the current speed. The
- * time interval for normal speed is CPUDRV_PM_QUANT_CNT_NORMAL. The time
+ * time interval for normal speed is CPUDRV_QUANT_CNT_NORMAL. The time
  * interval for other speeds (including unknown speed) is
- * CPUDRV_PM_QUANT_CNT_OTHR.
+ * CPUDRV_QUANT_CNT_OTHR.
  */
 static void
-cpudrv_pm_monitor(void *arg)
+cpudrv_monitor(void *arg)
 {
 	cpudrv_devstate_t	*cpudsp = (cpudrv_devstate_t *)arg;
 	cpudrv_pm_t		*cpupm;
 	cpudrv_pm_spd_t		*cur_spd, *new_spd;
-	cpu_t			*cp;
 	dev_info_t		*dip;
 	uint_t			idle_cnt, user_cnt, system_cnt;
 	clock_t			ticks;
@@ -984,12 +947,12 @@ cpudrv_pm_monitor(void *arg)
 	 * That's because we don't know what the CPU domains look like
 	 * until all instances have been initialized.
 	 */
-	is_ready = CPUDRV_PM_XCALL_IS_READY(cpudsp->cpu_id);
+	is_ready = CPUDRV_XCALL_IS_READY(cpudsp->cpu_id);
 	if (!is_ready) {
-		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: "
+		DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: instance %d: "
 		    "CPU not ready for x-calls\n", ddi_get_instance(dip)));
-	} else if (!(is_ready = cpudrv_pm_power_ready())) {
-		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: "
+	} else if (!(is_ready = cpudrv_power_ready())) {
+		DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: instance %d: "
 		    "waiting for all CPUs to be power manageable\n",
 		    ddi_get_instance(dip)));
 	}
@@ -998,8 +961,8 @@ cpudrv_pm_monitor(void *arg)
 		 * Make sure that we are busy so that framework doesn't
 		 * try to bring us down in this situation.
 		 */
-		CPUDRV_PM_MONITOR_PM_BUSY_COMP(dip, cpupm);
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
+		CPUDRV_MONITOR_PM_BUSY_COMP(dip, cpupm);
+		CPUDRV_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
 		goto do_return;
 	}
@@ -1008,35 +971,36 @@ cpudrv_pm_monitor(void *arg)
 	 * Make sure that we are still not at unknown power level.
 	 */
 	if (cur_spd == NULL) {
-		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: "
+		DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: instance %d: "
 		    "cur_spd is unknown\n", ddi_get_instance(dip)));
-		CPUDRV_PM_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
-		    CPUDRV_PM_TOPSPEED(cpupm)->pm_level);
+		CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
+		    CPUDRV_TOPSPEED(cpupm)->pm_level);
 		/*
 		 * We just changed the speed. Wait till at least next
 		 * call to this routine before proceeding ahead.
 		 */
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
+		CPUDRV_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
 		goto do_return;
 	}
 
 	mutex_enter(&cpu_lock);
-	if ((cp = cpu_get(cpudsp->cpu_id)) == NULL) {
+	if (cpudsp->cp == NULL &&
+	    (cpudsp->cp = cpu_get(cpudsp->cpu_id)) == NULL) {
 		mutex_exit(&cpu_lock);
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
+		CPUDRV_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
-		cmn_err(CE_WARN, "cpudrv_pm_monitor: instance %d: can't get "
+		cmn_err(CE_WARN, "cpudrv_monitor: instance %d: can't get "
 		    "cpu_t", ddi_get_instance(dip));
 		goto do_return;
 	}
 
 	if (!cpupm->pm_started) {
 		cpupm->pm_started = B_TRUE;
-		set_supp_freqs(cp, cpupm);
+		cpudrv_set_supp_freqs(cpudsp);
 	}
 
-	get_cpu_mstate(cp, msnsecs);
+	get_cpu_mstate(cpudsp->cp, msnsecs);
 	GET_CPU_MSTATE_CNT(CMS_IDLE, idle_cnt);
 	GET_CPU_MSTATE_CNT(CMS_USER, user_cnt);
 	GET_CPU_MSTATE_CNT(CMS_SYSTEM, system_cnt);
@@ -1048,7 +1012,7 @@ cpudrv_pm_monitor(void *arg)
 	if (cpupm->lastquan_ticks == 0) {
 		cpupm->lastquan_ticks = NSEC_TO_TICK(gethrtime());
 		mutex_exit(&cpu_lock);
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
+		CPUDRV_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
 		goto do_return;
 	}
@@ -1071,10 +1035,10 @@ cpudrv_pm_monitor(void *arg)
 	 * Time taken between recording the current counts and
 	 * arranging the next call of this routine is an error in our
 	 * calculation. We minimize the error by calling
-	 * CPUDRV_PM_MONITOR_INIT() here instead of end of this routine.
+	 * CPUDRV_MONITOR_INIT() here instead of end of this routine.
 	 */
-	CPUDRV_PM_MONITOR_INIT(cpudsp);
-	DPRINTF(D_PM_MONITOR_VERBOSE, ("cpudrv_pm_monitor: instance %d: "
+	CPUDRV_MONITOR_INIT(cpudsp);
+	DPRINTF(D_PM_MONITOR_VERBOSE, ("cpudrv_monitor: instance %d: "
 	    "idle count %d, user count %d, system count %d, pm_level %d, "
 	    "pm_busycnt %d\n", ddi_get_instance(dip), idle_cnt, user_cnt,
 	    system_cnt, cur_spd->pm_level, cpupm->pm_busycnt));
@@ -1089,7 +1053,7 @@ cpudrv_pm_monitor(void *arg)
 	 * DPRINTFs changes the timing.
 	 */
 	if (tick_cnt > cur_spd->quant_cnt) {
-		DPRINTF(D_PM_MONITOR_DELAY, ("cpudrv_pm_monitor: instance %d: "
+		DPRINTF(D_PM_MONITOR_DELAY, ("cpudrv_monitor: instance %d: "
 		    "tick count %d > quantum_count %u\n",
 		    ddi_get_instance(dip), tick_cnt, cur_spd->quant_cnt));
 	}
@@ -1102,7 +1066,7 @@ cpudrv_pm_monitor(void *arg)
 	user_cnt = (user_cnt * cur_spd->quant_cnt) / tick_cnt;
 
 	if ((user_cnt > cur_spd->user_hwm) || (idle_cnt < cur_spd->idle_lwm &&
-	    cur_spd->idle_blwm_cnt >= cpudrv_pm_idle_blwm_cnt_max)) {
+	    cur_spd->idle_blwm_cnt >= cpudrv_idle_blwm_cnt_max)) {
 		cur_spd->idle_blwm_cnt = 0;
 		cur_spd->idle_bhwm_cnt = 0;
 		/*
@@ -1111,21 +1075,21 @@ cpudrv_pm_monitor(void *arg)
 		 * at the current speed.
 		 */
 		if (cur_spd == cur_spd->up_spd || cpudrv_direct_pm) {
-			CPUDRV_PM_MONITOR_PM_BUSY_COMP(dip, cpupm);
+			CPUDRV_MONITOR_PM_BUSY_COMP(dip, cpupm);
 		} else {
 			new_spd = cur_spd->up_spd;
-			CPUDRV_PM_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
+			CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
 			    new_spd->pm_level);
 		}
 	} else if ((user_cnt <= cur_spd->user_lwm) &&
-	    (idle_cnt >= cur_spd->idle_hwm) || !CPU_ACTIVE(cp)) {
+	    (idle_cnt >= cur_spd->idle_hwm) || !CPU_ACTIVE(cpudsp->cp)) {
 		cur_spd->idle_blwm_cnt = 0;
 		cur_spd->idle_bhwm_cnt = 0;
 		/*
 		 * Arrange to go to next lower speed by informing our idle
 		 * status to the power management framework.
 		 */
-		CPUDRV_PM_MONITOR_PM_IDLE_COMP(dip, cpupm);
+		CPUDRV_MONITOR_PM_IDLE_COMP(dip, cpupm);
 	} else {
 		/*
 		 * If we are between the idle water marks and have not
@@ -1134,7 +1098,7 @@ cpudrv_pm_monitor(void *arg)
 		 */
 		if ((idle_cnt < cur_spd->idle_hwm) &&
 		    (idle_cnt >= cur_spd->idle_lwm) &&
-		    (cur_spd->idle_bhwm_cnt < cpudrv_pm_idle_bhwm_cnt_max)) {
+		    (cur_spd->idle_bhwm_cnt < cpudrv_idle_bhwm_cnt_max)) {
 			cur_spd->idle_blwm_cnt = 0;
 			cur_spd->idle_bhwm_cnt++;
 			mutex_exit(&cpudsp->lock);
@@ -1147,7 +1111,7 @@ cpudrv_pm_monitor(void *arg)
 		/*
 		 * Arranges to stay at the current speed.
 		 */
-		CPUDRV_PM_MONITOR_PM_BUSY_COMP(dip, cpupm);
+		CPUDRV_MONITOR_PM_BUSY_COMP(dip, cpupm);
 	}
 	mutex_exit(&cpudsp->lock);
 do_return:

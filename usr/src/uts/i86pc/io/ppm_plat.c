@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Platform Power Management master pseudo driver platform support.
@@ -49,14 +47,17 @@ void
 ppm_rebuild_cpu_domains(void)
 {
 	char *str = "ppm_rebuild_cpu_domains";
-	cpupm_cpu_dependency_t *dep;
-	cpupm_cpu_dependency_t *dep_next;
-	cpupm_cpu_node_t *cpu_next;
+	cpupm_state_domains_t *dep;
+	cpupm_state_domains_t *dep_next;
 	struct ppm_domit *domit_p;
 	ppm_domain_t *domp_old;
 	ppm_domain_t *domp;
 	ppm_dev_t *devp;
 	ppm_db_t *dbp;
+	uint_t cpu_id;
+	cpuset_t dom_cpu_set;
+	int result;
+	dev_info_t *cpu_dip;
 
 	/*
 	 * Get the CPU domain data
@@ -100,7 +101,7 @@ ppm_rebuild_cpu_domains(void)
 	 * leave the domain as it is (which is unmanageable since
 	 * PPM_CPU_READY is off).
 	 */
-	dep = cpupm_get_cpu_dependencies();
+	dep = cpupm_pstate_domains;
 	if (dep == NULL) {
 		PPMD(D_CPU, ("%s: No CPU dependency info!\n", str));
 		return;
@@ -112,11 +113,11 @@ ppm_rebuild_cpu_domains(void)
 	 */
 	mutex_enter(&domp_old->lock);
 	domp_old->dflags |= PPMD_OFFLINE;
-	for (dep_next = dep; dep_next; dep_next = dep_next->cd_next) {
+	for (dep_next = dep; dep_next; dep_next = dep_next->pm_next) {
 		domp = kmem_zalloc(sizeof (*domp), KM_SLEEP);
 		domp->name =  kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 		(void) snprintf(domp->name, MAXNAMELEN, "acpi_cpu_domain_%d",
-		    dep_next->cd_dependency_id);
+		    dep_next->pm_domain);
 		mutex_init(&domp->lock, NULL, MUTEX_DRIVER, NULL);
 		mutex_enter(&domp->lock);
 		domp->dflags = domit_p->dflags | PPMD_CPU_READY;
@@ -135,18 +136,27 @@ ppm_rebuild_cpu_domains(void)
 		 * build the "conflist" for the domain. But conveniently, the
 		 * "conflist" data is easily obtainable from the "devlist".
 		 */
-		for (cpu_next = dep_next->cd_cpu; cpu_next;
-		    cpu_next = cpu_next->cn_next) {
-			devp = PPM_GET_PRIVATE(cpu_next->cn_dip);
+		dom_cpu_set = dep_next->pm_cpus;
+		do {
+			CPUSET_FIND(dom_cpu_set, cpu_id);
+			if (cpu_id == CPUSET_NOTINSET)
+				break;
+
+			ASSERT(cpu_id < NCPU);
+			cpu_dip = ((cpupm_mach_state_t *)
+			    (cpu[cpu_id]->cpu_m.mcpu_pm_mach_state))->ms_dip;
+			devp = PPM_GET_PRIVATE(cpu_dip);
 			ASSERT(devp && devp->domp == domp_old);
-			devp = ppm_add_dev(cpu_next->cn_dip, domp);
+			devp = ppm_add_dev(cpu_dip, domp);
 			dbp = kmem_zalloc(sizeof (struct ppm_db), KM_SLEEP);
 			dbp->name = kmem_zalloc((strlen(devp->path) + 1),
 			    KM_SLEEP);
 			(void) strcpy(dbp->name, devp->path);
 			dbp->next = domp->conflist;
 			domp->conflist = dbp;
-		}
+
+			CPUSET_ATOMIC_XDEL(dom_cpu_set, cpu_id, result);
+		} while (result == 0);
 
 		/*
 		 * Note that we do not bother creating a "dc" list as there
@@ -165,7 +175,6 @@ ppm_rebuild_cpu_domains(void)
 		mutex_exit(&domp->lock);
 	}
 	mutex_exit(&domp_old->lock);
-	cpupm_free_cpu_dependencies();
 }
 
 /*
@@ -176,7 +185,7 @@ void
 ppm_set_topspeed(ppm_dev_t *cpup, int speed)
 {
 	for (cpup = cpup->domp->devlist; cpup != NULL; cpup = cpup->next)
-		(*cpupm_set_topspeed)(cpup->dip, speed);
+		(*cpupm_set_topspeed_callb)(cpup->dip, speed);
 }
 
 /*
@@ -197,7 +206,8 @@ ppm_redefine_topspeed(void *ctx)
 
 	cpup = PPM_GET_PRIVATE((dev_info_t *)ctx);
 
-	if (cpupm_get_topspeed == NULL || cpupm_set_topspeed == NULL) {
+	if (cpupm_get_topspeed_callb == NULL ||
+	    cpupm_set_topspeed_callb == NULL) {
 		cmn_err(CE_WARN, "%s: Cannot process request for instance %d "
 		    "since cpupm interfaces are not initialized", str,
 		    ddi_get_instance(cpup->dip));
@@ -215,7 +225,7 @@ ppm_redefine_topspeed(void *ctx)
 	 * Process each CPU in the domain.
 	 */
 	for (ncpup = cpup->domp->devlist; ncpup != NULL; ncpup = ncpup->next) {
-		topspeed = (*cpupm_get_topspeed)(ncpup->dip);
+		topspeed = (*cpupm_get_topspeed_callb)(ncpup->dip);
 		if (newspeed == -1 || topspeed < newspeed)
 			newspeed = topspeed;
 	}

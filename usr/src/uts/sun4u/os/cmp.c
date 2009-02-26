@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/machsystm.h>
@@ -224,10 +222,16 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 	}
 }
 
-int
-pg_plat_hw_level(pghw_type_t hw)
+/*
+ * Rank the relative importance of optimizing for hw1 or hw2
+ */
+pghw_type_t
+pg_plat_hw_rank(pghw_type_t hw1, pghw_type_t hw2)
 {
 	int i;
+	int rank1 = 0;
+	int rank2 = 0;
+
 	static pghw_type_t hw_hier[] = {
 		PGHW_IPIPE,
 		PGHW_CHIP,
@@ -236,40 +240,28 @@ pg_plat_hw_level(pghw_type_t hw)
 	};
 
 	for (i = 0; hw_hier[i] != PGHW_NUM_COMPONENTS; i++) {
-		if (hw_hier[i] == hw)
-			return (i);
+		if (hw_hier[i] == hw1)
+			rank1 = i;
+		if (hw_hier[i] == hw2)
+			rank2 = i;
 	}
-	return (-1);
+
+	if (rank1 > rank2)
+		return (hw1);
+	else
+		return (hw2);
 }
 
 /*
- * Return 1 if CMT load balancing policies should be
- * implemented across instances of the specified hardware
- * sharing relationship.
+ * Override the default CMT dispatcher policy for the specified
+ * hardware sharing relationship
  */
-int
-pg_plat_cmt_load_bal_hw(pghw_type_t hw)
+/* ARGSUSED */
+pg_cmt_policy_t
+pg_plat_cmt_policy(pghw_type_t hw)
 {
-	if (hw == PGHW_IPIPE ||
-	    hw == PGHW_FPU ||
-	    hw == PGHW_CHIP)
-		return (1);
-	else
-		return (0);
-}
-
-
-/*
- * Return 1 if thread affinity polices should be implemented
- * for instances of the specifed hardware sharing relationship.
- */
-int
-pg_plat_cmt_affinity_hw(pghw_type_t hw)
-{
-	if (hw == PGHW_CACHE)
-		return (1);
-	else
-		return (0);
+	/* Accept the default polices */
+	return (CMT_NO_POLICY);
 }
 
 id_t

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,18 @@ extern "C" {
 #if (defined(_KERNEL) || defined(_KMEMUSER))
 #include <sys/group.h>
 #include <sys/pghw.h>
+#include <sys/lgrp.h>
 #include <sys/types.h>
+
+/*
+ * CMT related dispatcher policies
+ */
+#define	CMT_NO_POLICY	0x0
+#define	CMT_BALANCE	0x1
+#define	CMT_COALESCE	0x2
+#define	CMT_AFFINITY	0x4
+
+typedef uint_t pg_cmt_policy_t;
 
 /*
  * CMT pg structure
@@ -47,25 +58,66 @@ typedef struct pg_cmt {
 	struct group	*cmt_siblings;		/* CMT PGs to balance with */
 	struct pg_cmt	*cmt_parent;		/* Parent CMT PG */
 	struct group	*cmt_children;		/* Active children CMT PGs */
+	pg_cmt_policy_t	cmt_policy;		/* Dispatcher policies to use */
+	uint32_t	cmt_utilization;	/* Group's utilization */
 	int		cmt_nchildren;		/* # of children CMT PGs */
-	uint32_t	cmt_nrunning;		/* # of running threads */
+	int		cmt_hint;		/* hint for balancing */
 	struct group	cmt_cpus_actv;
 	struct bitset	cmt_cpus_actv_set;	/* bitset of active CPUs */
 } pg_cmt_t;
 
 /*
+ * CMT lgroup structure
+ */
+typedef struct cmt_lgrp {
+	group_t		cl_pgs;		/* Top level group of active CMT PGs */
+	int		cl_npgs;	/* # of top level PGs in the lgroup */
+	lgrp_handle_t	cl_hand;	/* lgroup's platform handle */
+	struct cmt_lgrp	*cl_next;	/* next cmt_lgrp */
+} cmt_lgrp_t;
+
+/*
  * Change the number of running threads on the pg
  */
-#define	PG_NRUN_UPDATE(cp, n)	(pg_cmt_load((cp), (n)))
+#define	PG_NRUN_UPDATE(cp, n)		(pg_cmt_load((cp), (n)))
+
+/*
+ * Indicate that the given logical CPU is (or isn't) currently utilized
+ */
+#define	CMT_CPU_UTILIZED(cp)		(pg_cmt_load((cp), 1))
+#define	CMT_CPU_NOT_UTILIZED(cp)	(pg_cmt_load((cp), -1))
+
+/*
+ * CMT PG's capacity
+ *
+ * Currently, this is defined to be the number of active
+ * logical CPUs in the group.
+ *
+ * This will be used in conjunction with the utilization, which is defined
+ * to be the number of threads actively running on CPUs in the group.
+ */
+#define	CMT_CAPACITY(pg)	(GROUP_SIZE(&((pg_cmt_t *)pg)->cmt_cpus_actv))
 
 void		pg_cmt_load(cpu_t *, int);
 void		pg_cmt_cpu_startup(cpu_t *);
 int		pg_cmt_can_migrate(cpu_t *, cpu_t *);
 
-int		pg_plat_cmt_load_bal_hw(pghw_type_t);
-int		pg_plat_cmt_affinity_hw(pghw_type_t);
+/*
+ * CMT platform interfaces
+ */
+pg_cmt_policy_t	pg_plat_cmt_policy(pghw_type_t);
+int		pg_plat_cmt_rank(pg_cmt_t *, pg_cmt_t *);
 
+/*
+ * CMT dispatcher policy
+ */
 cpu_t		*cmt_balance(kthread_t *, cpu_t *);
+
+/*
+ * Power Aware Dispatcher Interfaces
+ */
+int		cmt_pad_enable(pghw_type_t);
+int		cmt_pad_disable(pghw_type_t);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

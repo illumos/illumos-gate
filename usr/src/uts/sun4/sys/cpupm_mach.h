@@ -23,21 +23,20 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_PWRNOW_H
-#define	_PWRNOW_H
-
-#include <sys/cpupm.h>
+#ifndef	_CPUPM_MACH_H
+#define	_CPUPM_MACH_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern boolean_t pwrnow_supported();
-
-extern cpupm_state_ops_t pwrnow_ops;
+/*
+ * Convert speed to Hz.
+ */
+#define	CPUPM_SPEED_HZ(mhz, divisor) (((uint64_t)mhz * 1000000) / divisor)
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _PWRNOW_H */
+#endif	/* _CPUPM_MACH_H */

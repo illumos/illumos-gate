@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -35,6 +33,7 @@
 #include <sys/group.h>
 #include <sys/pg.h>
 #include <sys/pghw.h>
+#include <sys/cpu_pm.h>
 
 /*
  * Processor Groups: Hardware sharing relationship layer
@@ -99,17 +98,12 @@
  * (the CPU's chip, cache, lgroup, etc.).
  *
  * The hwsets are created dynamically as new hardware sharing relationship types
- * are instantiated. They are never destroyed, as once a given relathionship
+ * are instantiated. They are never destroyed, as once a given relationship
  * type appears in the system, it is quite likely that at least one instance of
  * that relationship will always persist as long as the system is running.
  */
 
 static group_t		*pg_hw;		/* top level pg hw group */
-
-/*
- * Lookup table mapping hardware sharing relationships with hierarchy levels
- */
-static int		pghw_level_table[PGHW_NUM_COMPONENTS];
 
 /*
  * Physical PG kstats
@@ -120,12 +114,14 @@ struct pghw_kstat {
 	kstat_named_t	pg_ncpus;
 	kstat_named_t	pg_instance_id;
 	kstat_named_t	pg_hw;
+	kstat_named_t	pg_policy;
 } pghw_kstat = {
 	{ "id",			KSTAT_DATA_UINT64 },
 	{ "pg_class",		KSTAT_DATA_STRING },
 	{ "ncpus",		KSTAT_DATA_UINT64 },
 	{ "instance_id",	KSTAT_DATA_UINT64 },
 	{ "hardware",		KSTAT_DATA_STRING },
+	{ "policy",		KSTAT_DATA_STRING },
 };
 
 kmutex_t		pghw_kstat_lock;
@@ -138,7 +134,7 @@ static void		pghw_set_add(group_t *, pghw_t *);
 static void		pghw_set_remove(group_t *, pghw_t *);
 
 /*
- * Initialize the physical portion of a physical PG
+ * Initialize the physical portion of a hardware PG
  */
 void
 pghw_init(pghw_t *pg, cpu_t *cp, pghw_type_t hw)
@@ -157,6 +153,22 @@ pghw_init(pghw_t *pg, cpu_t *cp, pghw_type_t hw)
 	pg->pghw_instance =
 	    pg_plat_hw_instance_id(cp, hw);
 	pghw_kstat_create(pg);
+
+	/*
+	 * Hardware sharing relationship specific initialization
+	 */
+	switch (pg->pghw_hw) {
+	case PGHW_POW_ACTIVE:
+		pg->pghw_handle =
+		    (pghw_handle_t)cpupm_domain_init(cp, CPUPM_DTYPE_ACTIVE);
+		break;
+	case PGHW_POW_IDLE:
+		pg->pghw_handle =
+		    (pghw_handle_t)cpupm_domain_init(cp, CPUPM_DTYPE_IDLE);
+		break;
+	default:
+		pg->pghw_handle = (pghw_handle_t)NULL;
+	}
 }
 
 /*
@@ -262,16 +274,6 @@ pghw_physid_destroy(cpu_t *cp)
 }
 
 /*
- * Return a sequential level identifier for the specified
- * hardware sharing relationship
- */
-int
-pghw_level(pghw_type_t hw)
-{
-	return (pg_plat_hw_level(hw));
-}
-
-/*
  * Create a new, empty hwset.
  * This routine may block, and must not be called from any
  * paused CPU context.
@@ -302,13 +304,6 @@ pghw_set_create(pghw_type_t hw)
 
 	ret = group_add_at(pg_hw, g, (uint_t)hw);
 	ASSERT(ret == 0);
-
-	/*
-	 * Update the table that maps hardware sharing relationships
-	 * to hierarchy levels
-	 */
-	ASSERT(pghw_level_table[hw] == NULL);
-	pghw_level_table[hw] = pg_plat_hw_level(hw);
 
 	return (g);
 }
@@ -353,24 +348,26 @@ pghw_set_remove(group_t *hwset, pghw_t *pg)
 /*
  * Return a string name given a pg_hw sharing type
  */
-#define	PGHW_TYPE_NAME_MAX	8
-
 static char *
 pghw_type_string(pghw_type_t hw)
 {
 	switch (hw) {
 	case PGHW_IPIPE:
-		return ("ipipe");
+		return ("Integer Pipeline");
 	case PGHW_CACHE:
-		return ("cache");
+		return ("Cache");
 	case PGHW_FPU:
-		return ("fpu");
+		return ("Floating Point Unit");
 	case PGHW_MPIPE:
-		return ("mpipe");
+		return ("Data Pipe to memory");
 	case PGHW_CHIP:
-		return ("chip");
+		return ("Socket");
 	case PGHW_MEMORY:
-		return ("memory");
+		return ("Memory");
+	case PGHW_POW_ACTIVE:
+		return ("CPU PM Active Power Domain");
+	case PGHW_POW_IDLE:
+		return ("CPU PM Idle Power Domain");
 	default:
 		return ("unknown");
 	}
@@ -393,8 +390,10 @@ pghw_kstat_create(pghw_t *pg)
 	    "pg", "pg", KSTAT_TYPE_NAMED,
 	    sizeof (pghw_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL)) != NULL) {
+		/* Class string, hw string, and policy string */
 		pg->pghw_kstat->ks_data_size += PG_CLASS_NAME_MAX;
-		pg->pghw_kstat->ks_data_size += PGHW_TYPE_NAME_MAX;
+		pg->pghw_kstat->ks_data_size += PGHW_KSTAT_STR_LEN_MAX;
+		pg->pghw_kstat->ks_data_size += PGHW_KSTAT_STR_LEN_MAX;
 		pg->pghw_kstat->ks_lock = &pghw_kstat_lock;
 		pg->pghw_kstat->ks_data = &pghw_kstat;
 		pg->pghw_kstat->ks_update = pghw_kstat_update;
@@ -417,6 +416,6 @@ pghw_kstat_update(kstat_t *ksp, int rw)
 	pgsp->pg_instance_id.value.ui64 = (uint64_t)pg->pghw_instance;
 	kstat_named_setstr(&pgsp->pg_class, ((pg_t *)pg)->pg_class->pgc_name);
 	kstat_named_setstr(&pgsp->pg_hw, pghw_type_string(pg->pghw_hw));
-
+	kstat_named_setstr(&pgsp->pg_policy, pg_policy_name((pg_t *)pg));
 	return (0);
 }

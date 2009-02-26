@@ -41,8 +41,10 @@ COMMON_CORE_OBJS +=		\
 		brand.o		\
 		cpucaps.o	\
 		cmt.o		\
+		cmt_policy.o	\
 		cpu.o		\
 		cpu_intr.o	\
+		cpu_pm.o	\
 		cpupart.o	\
 		disp.o		\
 		group.o		\

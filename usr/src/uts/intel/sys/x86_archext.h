@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -357,6 +357,11 @@ extern "C" {
 	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
 
 /*
+ * Intel Deep C-State invariant TSC in leaf 0x80000007.
+ */
+#define	CPUID_TSC_CSTATE_INVARIANCE	(0x100)
+
+/*
  * x86_type is a legacy concept; this is supplanted
  * for most purposes by x86_feature; modern CPUs
  * should be X86_TYPE_OTHER
@@ -605,6 +610,7 @@ extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
 #if !defined(__xpv)
 extern uint32_t *cpuid_mwait_alloc(struct cpu *);
 extern void cpuid_mwait_free(struct cpu *);
+extern int cpuid_deep_cstates_supported(void);
 #endif
 
 struct cpu_ucode_info;

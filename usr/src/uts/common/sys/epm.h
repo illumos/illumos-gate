@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,7 +227,8 @@ typedef enum pm_canblock
 typedef enum pm_cpupm
 {
 	PM_CPUPM_NOTSET,	/* no specific treatment of CPU devices */
-	PM_CPUPM_ENABLE,	/* power manage CPU devices */
+	PM_CPUPM_POLLING,	/* CPUPM enabled: polling mode */
+	PM_CPUPM_EVENT,		/* CPUPM enabled: event driven mode */
 	PM_CPUPM_DISABLE	/* do not power manage CPU devices */
 } pm_cpupm_t;
 
@@ -609,9 +610,19 @@ typedef struct pm_thresh_rec {
 #define	PM_ISCPU(dip) (DEVI(dip)->devi_pm_flags & PMC_CPU_DEVICE)
 
 /*
- * Returns true if cpupm is enabled.
+ * Returns true if cpupm is enabled in event driven mode.
  */
-#define	PM_CPUPM_ENABLED (cpupm == PM_CPUPM_ENABLE)
+#define	PM_EVENT_CPUPM (cpupm == PM_CPUPM_EVENT)
+
+/*
+ * Returns true if cpupm is enabled in polling mode.
+ */
+#define	PM_POLLING_CPUPM (cpupm == PM_CPUPM_POLLING)
+
+/*
+ * Returns true if cpupm operating using the default mode.
+ */
+#define	PM_DEFAULT_CPUPM (cpupm == cpupm_default_mode)
 
 /*
  * Returns true if is disabled.
@@ -619,12 +630,14 @@ typedef struct pm_thresh_rec {
 #define	PM_CPUPM_DISABLED (cpupm == PM_CPUPM_DISABLE)
 
 /*
- * If (autopm is enabled and
- *      (CPUs are not disabled, or it isn't a cpu)) OR
- *    (CPUs are enabled and it is one)
+ * If ((autopm is enabled and
+ *	(CPUPM is not disabled and we're not in event mode, or it isn't a cpu))
+ *	  OR
+ *	(CPUPM are enabled and it is one))
  */
 #define	PM_SCANABLE(dip) ((autopm_enabled && \
-(!PM_CPUPM_DISABLED || !PM_ISCPU(dip))) || (PM_CPUPM_ENABLED && PM_ISCPU(dip)))
+	((!PM_CPUPM_DISABLED && !PM_EVENT_CPUPM) || !PM_ISCPU(dip))) || \
+	(PM_POLLING_CPUPM && PM_ISCPU(dip)))
 
 #define	PM_NOT_ALL_LOWEST	0x0	/* not all components are at lowest */
 #define	PM_ALL_LOWEST		0x1	/* all components are at lowest lvl */

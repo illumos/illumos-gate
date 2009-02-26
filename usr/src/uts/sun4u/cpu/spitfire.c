@@ -2904,8 +2904,7 @@ cpu_change_speed(uint64_t new_divisor, uint64_t arg2)
 		CHANGE_REFRESH_COUNT(HB_SPEED_UP, cur_divisor, new_divisor);
 	}
 	CPU->cpu_m.divisor = (uchar_t)new_divisor;
-	CPU->cpu_curr_clock =
-	    (((uint64_t)pi->pi_clock * 1000000) / new_divisor);
+	cpu_set_curr_clock(((uint64_t)pi->pi_clock * 1000000) / new_divisor);
 #endif
 }
 

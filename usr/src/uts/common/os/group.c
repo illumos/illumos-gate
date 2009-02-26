@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -61,6 +59,21 @@ group_destroy(group_t *g)
 		g->grp_capacity = 0;
 	}
 	g->grp_set = NULL;
+}
+
+/*
+ * Empty a group_t
+ * Capacity is preserved.
+ */
+void
+group_empty(group_t *g)
+{
+	int	i;
+	int	sz = g->grp_size;
+
+	g->grp_size = 0;
+	for (i = 0; i < sz; i++)
+		g->grp_set[i] = NULL;
 }
 
 /*
@@ -312,11 +325,27 @@ group_add_at(group_t *g, void *e, uint_t idx)
 }
 
 /*
- * Remove the entry at the specified index
+ * Remove the element at the specified index
  */
 void
 group_remove_at(group_t *g, uint_t idx)
 {
 	ASSERT(idx < g->grp_capacity);
 	g->grp_set[idx] = NULL;
+}
+
+/*
+ * Find an element in the group, and return its index
+ * Returns -1 if the element could not be found.
+ */
+uint_t
+group_find(group_t *g, void *e)
+{
+	uint_t	idx;
+
+	for (idx = 0; idx < g->grp_capacity; idx++) {
+		if (g->grp_set[idx] == e)
+			return (idx);
+	}
+	return ((uint_t)-1);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -474,8 +474,16 @@ ACPI_CPU_FLAGS
 AcpiOsAcquireLock(ACPI_HANDLE Handle)
 {
 
-	mutex_enter((kmutex_t *)Handle);
-	return (0);
+
+	if (Handle == NULL)
+		return (AE_BAD_PARAMETER);
+
+	if (curthread == CPU->cpu_idle_thread) {
+		while (!mutex_tryenter((kmutex_t *)Handle))
+			/* spin */;
+	} else
+		mutex_enter((kmutex_t *)Handle);
+	return (AE_OK);
 }
 
 void
@@ -1365,24 +1373,8 @@ acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
  * Return the ACPI device node matching the CPU dev_info node.
  */
 ACPI_STATUS
-acpica_get_handle_cpu(dev_info_t *dip, ACPI_HANDLE *rh)
+acpica_get_handle_cpu(int cpu_id, ACPI_HANDLE *rh)
 {
-	char	*device_type_prop;
-	int	cpu_id;
-
-	/*
-	 * if "device_type" != "cpu", error
-	 */
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
-	    "device_type", &device_type_prop) != DDI_PROP_SUCCESS)
-		return (AE_ERROR);
-
-	if (strcmp("cpu", device_type_prop) != 0) {
-		ddi_prop_free(device_type_prop);
-		return (AE_ERROR);
-	}
-	ddi_prop_free(device_type_prop);
-
 	/*
 	 * if cpu_map itself is NULL, we're a uppc system and
 	 * acpica_build_processor_map() hasn't been called yet.
@@ -1394,19 +1386,10 @@ acpica_get_handle_cpu(dev_info_t *dip, ACPI_HANDLE *rh)
 			return (AE_ERROR);
 	}
 
-	/*
-	 * get 'reg' and get obj from cpu_map
-	 */
-	cpu_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "reg", -1);
 	if ((cpu_id < 0) || (cpu_map[cpu_id] == NULL) ||
 	    (cpu_map[cpu_id]->obj == NULL))
 		return (AE_ERROR);
 
-	/*
-	 * tag devinfo and obj
-	 */
-	(void) acpica_tag_devinfo(dip, cpu_map[cpu_id]->obj);
 	*rh = cpu_map[cpu_id]->obj;
 	return (AE_OK);
 }
@@ -1689,7 +1672,7 @@ acpica_get_handle(dev_info_t *dip, ACPI_HANDLE *rh)
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "acpi-namespace", &acpiname) != DDI_PROP_SUCCESS) {
-		return (acpica_get_handle_cpu(dip, rh));
+		return (AE_ERROR);
 	}
 
 	status = AcpiGetHandle(NULL, acpiname, rh);
@@ -1792,4 +1775,10 @@ acpica_build_processor_map()
 	    &rv);
 	ASSERT(status == AE_OK);
 	cpu_map_built = 1;
+}
+
+void
+acpica_get_global_FADT(ACPI_TABLE_FADT **gbl_FADT)
+{
+	*gbl_FADT = &AcpiGbl_FADT;
 }

@@ -711,6 +711,7 @@ f none usr/include/sys/cpr.h 644 root bin
 f none usr/include/sys/cpu.h 644 root bin
 f none usr/include/sys/cpupart.h 644 root bin
 f none usr/include/sys/cpuvar.h 644 root bin
+f none usr/include/sys/cpu_pm.h 644 root bin
 f none usr/include/sys/crc32.h 644 root bin
 f none usr/include/sys/cred.h 644 root bin
 f none usr/include/sys/cred_impl.h 644 root bin

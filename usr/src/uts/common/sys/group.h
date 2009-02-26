@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_GROUP_H
 #define	_GROUP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Group Abstraction
@@ -79,13 +77,14 @@ void		group_expand(group_t *, uint_t);
  * Group element iteration
  */
 void		group_iter_init(group_iter_t *);
-void		*group_iterate(group_t *, uint_t *);
+void		*group_iterate(group_t *, group_iter_t *);
 
 /*
- * Add / remove an element from the group
+ * Add / remove an element (or elements) from the group
  */
 int		group_add(group_t *, void *, int);
 int		group_remove(group_t *, void *, int);
+void		group_empty(group_t *);
 
 /*
  * Add / remove / access an element at a specified index.
@@ -94,6 +93,13 @@ int		group_remove(group_t *, void *, int);
  */
 int		group_add_at(group_t *, void *, uint_t);
 void		group_remove_at(group_t *, uint_t);
+
+/*
+ * Search for an element in a group.
+ * Returns an index that may be used with the *_at()
+ * routines above to add or remove the element.
+ */
+uint_t		group_find(group_t *, void *);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

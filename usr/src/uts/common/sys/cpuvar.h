@@ -366,7 +366,6 @@ extern cpu_core_t cpu_core[];
 #define	CPU_DISP_DONTSTEAL	0x01	/* CPU undergoing context swtch */
 #define	CPU_DISP_HALTED		0x02	/* CPU halted waiting for interrupt */
 
-
 #endif /* _KERNEL || _KMEMUSER */
 
 #if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
@@ -673,6 +672,7 @@ int	cpu_get_state(cpu_t *);		/* get current cpu state */
 const char *cpu_get_state_str(cpu_t *);	/* get current cpu state as string */
 
 
+void	cpu_set_curr_clock(uint64_t);	/* indicate the current CPU's freq */
 void	cpu_set_supp_freqs(cpu_t *, const char *); /* set the CPU supported */
 						/* frequencies */
 

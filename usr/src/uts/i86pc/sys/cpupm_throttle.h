@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_PWRNOW_H
-#define	_PWRNOW_H
+#ifndef	_CPUPM_THROTTLE_H
+#define	_CPUPM_THROTTLE_H
 
 #include <sys/cpupm.h>
 
@@ -32,12 +32,12 @@
 extern "C" {
 #endif
 
-extern boolean_t pwrnow_supported();
+cpupm_state_ops_t cpupm_throttle_ops;
 
-extern cpupm_state_ops_t pwrnow_ops;
+extern void cpupm_throttle_manage_notification(void *);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _PWRNOW_H */
+#endif	/* _CPUPM_THROTTLE_H */

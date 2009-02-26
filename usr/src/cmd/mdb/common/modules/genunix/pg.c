@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Display processor group information
@@ -34,6 +32,7 @@
 
 #include <mdb/mdb_modapi.h>
 #include <sys/pghw.h>
+#include <sys/cmt.h>
 
 /*
  * PG hardware types indexed by hardware ID
@@ -46,6 +45,8 @@ char *pg_hw_names[] = {
 	"mpipe",
 	"chip",
 	"memory",
+	"active_pwr",
+	"idle_pwr",
 };
 
 #define	A_CNT(arr)	(sizeof (arr) / sizeof (arr[0]))
@@ -70,8 +71,10 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	pg_t		pg;
 	pghw_t		pghw;
+	pg_cmt_t	pg_cmt;
 	pg_class_t	pg_class;
 	int		opt_q = 0; /* display only address. */
+	int		is_cmt = 0; /* This is CMT pg */
 
 	/* Should provide an address */
 	if (! (flags & DCMD_ADDRSPEC))
@@ -86,13 +89,14 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		opt_q = B_TRUE;
 
 	if (DCMD_HDRSPEC(flags) && !opt_q) {
-		mdb_printf("%6s %?s %6s %7s %9s %5s\n",
+		mdb_printf("%6s %?s %6s %7s %11s %5s %5s\n",
 		    "PGID",
 		    "ADDR",
 		    "PHYSID",
 		    "CLASS",
 		    "HARDWARE",
-		    "#CPUs");
+		    "#CPUs",
+		    "LOAD");
 	}
 
 	/*
@@ -111,6 +115,14 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
+	if (strcmp(pg_class.pgc_name, "cmt") == 0) {
+		if (mdb_vread(&pg_cmt, sizeof (pg_cmt_t), addr) == -1) {
+			mdb_warn("unable to read 'cmt pg' at %p", addr);
+			return (DCMD_ERR);
+		}
+		is_cmt = 1;
+	}
+
 	if (mdb_vread(&pg_class, sizeof (struct pg_class),
 	    (uintptr_t)pg.pg_class) == -1) {
 		mdb_warn("unable to read 'pg_class' at %p", pg.pg_class);
@@ -125,10 +137,11 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		/*
 		 * Display the physical PG info.
 		 */
-		mdb_printf("%6d %?p %6d %7s %9s %5d\n",
+		mdb_printf("%6d %?p %6d %7s %11s %5d %5d\n",
 		    pg.pg_id, addr, pghw.pghw_instance,
 		    pg_class.pgc_name, pg_hw_name(pghw.pghw_hw),
-		    pg.pg_cpus.grp_size);
+		    pg.pg_cpus.grp_size,
+		    is_cmt ? pg_cmt.cmt_utilization : 0);
 	} else {
 		/*
 		 * Display the basic PG info.

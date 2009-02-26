@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PMCONFIG_H
 #define	_PMCONFIG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -126,6 +124,7 @@ extern int autoS3(void);
 extern int autopm(void);
 extern int autosd(void);
 extern int cpupm(void);
+extern int cpuidle(void);
 extern int cputhr(void);
 extern int ddprop(void);
 extern int devdep(void);

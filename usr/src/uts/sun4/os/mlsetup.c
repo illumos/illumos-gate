@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -215,6 +213,8 @@ mlsetup(struct regs *rp, kfpu_t *fp)
 	cpu_list_init(CPU);
 
 	cpu_vm_data_init(CPU);
+
+	pg_cpu_bootstrap(CPU);
 
 	(void) prom_set_preprom(kern_splr_preprom);
 	(void) prom_set_postprom(kern_splx_postprom);

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This Makefile defines all file modules for the directory uts/sun4
 #	and it's children. These are the source files which are common 
@@ -38,6 +36,7 @@ CORE_OBJS +=	bus_func.o
 CORE_OBJS +=	cbe.o
 CORE_OBJS +=	confunix.o
 CORE_OBJS +=	copy.o
+CORE_OBJS +=	cpupm_mach.o
 CORE_OBJS +=	cpu_states.o
 CORE_OBJS +=	ddi_impl.o
 CORE_OBJS +=	dmv.o

@@ -570,8 +570,8 @@ cpu_change_speed(uint64_t divisor, uint64_t arg2)
 		reg |= bceclk->mask;
 		set_safari_config(reg);
 		CPU->cpu_m.divisor = (uchar_t)divisor;
-		CPU->cpu_curr_clock =
-		    (((uint64_t)pi->pi_clock * 1000000) / divisor);
+		cpu_set_curr_clock(((uint64_t)pi->pi_clock * 1000000) /
+		    divisor);
 		return;
 	}
 	/*

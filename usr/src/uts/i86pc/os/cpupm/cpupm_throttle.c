@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,19 +27,19 @@
 #include <sys/machsystm.h>
 #include <sys/x_call.h>
 #include <sys/cpu_acpi.h>
-#include <sys/cpudrv_throttle.h>
+#include <sys/cpupm_throttle.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 
-static int cpudrv_throttle_init(cpudrv_devstate_t *);
-static void cpudrv_throttle_fini(cpudrv_devstate_t *);
-static int cpudrv_throttle(cpudrv_devstate_t *,  uint32_t);
+static int cpupm_throttle_init(cpu_t *);
+static void cpupm_throttle_fini(cpu_t *);
+static void cpupm_throttle(cpuset_t,  uint32_t);
 
-cpudrv_tstate_ops_t cpudrv_throttle_ops = {
+cpupm_state_ops_t cpupm_throttle_ops = {
 	"Generic ACPI T-state Support",
-	cpudrv_throttle_init,
-	cpudrv_throttle_fini,
-	cpudrv_throttle
+	cpupm_throttle_init,
+	cpupm_throttle_fini,
+	cpupm_throttle
 };
 
 /*
@@ -61,89 +61,11 @@ cpudrv_tstate_ops_t cpudrv_throttle_ops = {
  * Debugging support
  */
 #ifdef  DEBUG
-volatile int cpudrv_throttle_debug = 0;
-#define	CTDEBUG(arglist) if (cpudrv_throttle_debug) printf arglist;
+volatile int cpupm_throttle_debug = 0;
+#define	CTDEBUG(arglist) if (cpupm_throttle_debug) printf arglist;
 #else
 #define	CTDEBUG(arglist)
 #endif
-
-cpudrv_tstate_domain_t *cpudrv_tstate_domains = NULL;
-
-/*
- * Allocate a new domain node.
- */
-static void
-cpudrv_alloc_tstate_domain(cpudrv_devstate_t *cpudsp)
-{
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
-	cpudrv_tstate_domain_t *dptr;
-	cpudrv_tstate_domain_node_t *nptr;
-	uint32_t domain;
-	uint32_t type;
-	cpu_t *cp;
-
-	if (CPU_ACPI_IS_OBJ_CACHED(handle, CPU_ACPI_TSD_CACHED)) {
-		domain = CPU_ACPI_TSD(handle).sd_domain;
-		type = CPU_ACPI_TSD(handle).sd_type;
-	} else {
-		mutex_enter(&cpu_lock);
-		cp = cpu[CPU->cpu_id];
-		domain = cpuid_get_chipid(cp);
-		mutex_exit(&cpu_lock);
-		type = CPU_ACPI_SW_ALL;
-	}
-
-	for (dptr = cpudrv_tstate_domains; dptr != NULL;
-	    dptr = dptr->td_next) {
-		if (dptr->td_domain == domain)
-			break;
-	}
-
-	/* new domain is created and linked at the head */
-	if (dptr == NULL) {
-		dptr = kmem_zalloc(sizeof (cpudrv_tstate_domain_t), KM_SLEEP);
-		dptr->td_domain = domain;
-		dptr->td_type = type;
-		dptr->td_next = cpudrv_tstate_domains;
-		mutex_init(&dptr->td_lock, NULL, MUTEX_DRIVER, NULL);
-		cpudrv_tstate_domains = dptr;
-	}
-
-	/* new domain node is created and linked at the head of the domain */
-	nptr = kmem_zalloc(sizeof (cpudrv_tstate_domain_node_t), KM_SLEEP);
-	nptr->tdn_cpudsp = cpudsp;
-	nptr->tdn_domain = dptr;
-	nptr->tdn_next = dptr->td_node;
-	dptr->td_node = nptr;
-	mach_state->tstate_domain_node = nptr;
-}
-
-static void
-cpudrv_free_tstate_domains()
-{
-	cpudrv_tstate_domain_t *this_domain, *next_domain;
-	cpudrv_tstate_domain_node_t *this_node, *next_node;
-
-	this_domain = cpudrv_tstate_domains;
-	while (this_domain != NULL) {
-		next_domain = this_domain->td_next;
-
-		/* discard CPU node chain */
-		this_node = this_domain->td_node;
-		while (this_node != NULL) {
-			next_node = this_node->tdn_next;
-			kmem_free((void *)this_node,
-			    sizeof (cpudrv_tstate_domain_node_t));
-			this_node = next_node;
-		}
-		mutex_destroy(&this_domain->td_lock);
-		kmem_free((void *)this_domain,
-		    sizeof (cpudrv_tstate_domain_t));
-		this_domain = next_domain;
-	}
-	cpudrv_tstate_domains = NULL;
-}
 
 /*
  * Write the _PTC ctrl register. How it is written, depends upon the _PTC
@@ -230,11 +152,11 @@ read_status(cpu_acpi_handle_t handle, uint32_t *stat)
  * Transition the current processor to the requested throttling state.
  */
 static void
-cpudrv_tstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
-    uint32_t req_state)
+cpupm_tstate_transition(uint32_t req_state)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)CPU->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_tstate_t *req_tstate;
 	uint32_t ctrl;
 	uint32_t stat;
@@ -250,7 +172,6 @@ cpudrv_tstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	 */
 	ctrl = CPU_ACPI_TSTATE_CTRL(req_tstate);
 	if (write_ctrl(handle, ctrl) != 0) {
-		*ret = THROTTLE_RET_UNSUP_STATE;
 		return;
 	}
 
@@ -259,7 +180,6 @@ cpudrv_tstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	 * no status value comparison is required.
 	 */
 	if (CPU_ACPI_TSTATE_STAT(req_tstate) == 0) {
-		*ret = THROTTLE_RET_SUCCESS;
 		return;
 	}
 
@@ -274,46 +194,40 @@ cpudrv_tstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 
 	if (CPU_ACPI_TSTATE_STAT(req_tstate) != stat) {
 		DTRACE_PROBE(throttle_transition_incomplete);
-		*ret = THROTTLE_RET_TRANS_INCOMPLETE;
-	} else {
-		*ret = THROTTLE_RET_SUCCESS;
 	}
 }
 
-static int
-cpudrv_throttle(cpudrv_devstate_t *cpudsp,  uint32_t throtl_lvl)
+static void
+cpupm_throttle(cpuset_t set,  uint32_t throtl_lvl)
 {
-	cpuset_t cpus;
-	int ret;
-
 	/*
 	 * If thread is already running on target CPU then just
 	 * make the transition request. Otherwise, we'll need to
 	 * make a cross-call.
 	 */
 	kpreempt_disable();
-	if (cpudsp->cpu_id == CPU->cpu_id) {
-		cpudrv_tstate_transition(&ret, cpudsp, throtl_lvl);
-	} else {
-		CPUSET_ONLY(cpus, cpudsp->cpu_id);
-		xc_call((xc_arg_t)&ret, (xc_arg_t)cpudsp, (xc_arg_t)throtl_lvl,
-		    X_CALL_HIPRI, cpus, (xc_func_t)cpudrv_tstate_transition);
+	if (CPU_IN_SET(set, CPU->cpu_id)) {
+		cpupm_tstate_transition(throtl_lvl);
+		CPUSET_DEL(set, CPU->cpu_id);
+	}
+	if (!CPUSET_ISNULL(set)) {
+		xc_call((xc_arg_t)throtl_lvl, NULL, NULL, X_CALL_HIPRI,
+		    set, (xc_func_t)cpupm_tstate_transition);
 	}
 	kpreempt_enable();
-
-	return (ret);
 }
 
 static int
-cpudrv_throttle_init(cpudrv_devstate_t *cpudsp)
+cpupm_throttle_init(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_ptc_t *ptc_stat;
 
 	if (cpu_acpi_cache_tstate_data(handle) != 0) {
 		CTDEBUG(("Failed to cache T-state ACPI data\n"));
-		cpudrv_throttle_fini(cpudsp);
+		cpupm_throttle_fini(cp);
 		return (THROTTLE_RET_INCOMPLETE_DATA);
 	}
 
@@ -334,17 +248,98 @@ cpudrv_throttle_init(cpudrv_devstate_t *cpudsp)
 		return (THROTTLE_RET_INCOMPLETE_DATA);
 	}
 
-	cpudrv_alloc_tstate_domain(cpudsp);
+	cpupm_alloc_domains(cp, CPUPM_T_STATES);
 
 	return (THROTTLE_RET_SUCCESS);
 }
 
 static void
-cpudrv_throttle_fini(cpudrv_devstate_t *cpudsp)
+cpupm_throttle_fini(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 
-	cpudrv_free_tstate_domains();
+	cpupm_free_domains(&cpupm_tstate_domains);
 	cpu_acpi_free_tstate_data(handle);
+}
+
+/*
+ * This routine reads the ACPI _TPC object. It's accessed as a callback
+ * by the cpu driver whenever a _TPC change notification is received.
+ */
+static int
+cpupm_throttle_get_max(processorid_t cpu_id)
+{
+	cpu_t			*cp = cpu[cpu_id];
+	cpupm_mach_state_t 	*mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	cpu_acpi_handle_t	handle;
+	int			throtl_level;
+	int			max_throttle_lvl;
+	uint_t			num_throtl;
+
+	if (mach_state == NULL) {
+		return (-1);
+	}
+
+	handle = mach_state->ms_acpi_handle;
+	ASSERT(handle != NULL);
+
+	cpu_acpi_cache_tpc(handle);
+	throtl_level = CPU_ACPI_TPC(handle);
+
+	num_throtl = CPU_ACPI_TSTATES_COUNT(handle);
+
+	max_throttle_lvl = num_throtl - 1;
+	if ((throtl_level < 0) || (throtl_level > max_throttle_lvl)) {
+		cmn_err(CE_NOTE, "!cpupm_throttle_get_max: CPU %d: "
+		    "_TPC out of range %d", cp->cpu_id, throtl_level);
+		throtl_level = 0;
+	}
+
+	return (throtl_level);
+}
+
+/*
+ * Take care of CPU throttling when _TPC notification arrives
+ */
+void
+cpupm_throttle_manage_notification(void *ctx)
+{
+	cpu_t			*cp = ctx;
+	processorid_t		cpu_id = cp->cpu_id;
+	cpupm_mach_state_t	*mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	boolean_t		is_ready;
+	int			new_level;
+
+	if (mach_state == NULL) {
+		return;
+	}
+
+	/*
+	 * We currently refuse to power-manage if the CPU is not ready to
+	 * take cross calls (cross calls fail silently if CPU is not ready
+	 * for it).
+	 *
+	 * Additionally, for x86 platforms we cannot power-manage
+	 * any one instance, until all instances have been initialized.
+	 * That's because we don't know what the CPU domains look like
+	 * until all instances have been initialized.
+	 */
+	is_ready = CPUPM_XCALL_IS_READY(cpu_id) && cpupm_throttle_ready();
+	if (!is_ready)
+		return;
+
+	if (!(mach_state->ms_caps & CPUPM_T_STATES))
+		return;
+	ASSERT(mach_state->ms_tstate.cma_ops != NULL);
+
+	/*
+	 * Get the new T-State support level
+	 */
+	new_level = cpupm_throttle_get_max(cpu_id);
+
+	cpupm_state_change(cp, new_level, CPUPM_T_STATES);
 }

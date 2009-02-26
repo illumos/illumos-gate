@@ -120,11 +120,6 @@ init_cpu_info(struct cpu *cp)
 	 */
 	cp->cpu_curr_clock = cpu_freq_hz;
 
-	/*
-	 * Supported frequencies.
-	 */
-	cpu_set_supp_freqs(cp, NULL);
-
 	(void) strcpy(pi->pi_processor_type, "i386");
 	if (fpu_exists)
 		(void) strcpy(pi->pi_fputypes, "i387 compatible");
@@ -236,8 +231,10 @@ mp_startup_init(int cpun)
 	proc_t *procp;
 #if !defined(__xpv)
 	extern int idle_cpu_prefer_mwait;
+	extern void cpu_idle_mwait();
 #endif
 	extern void idle();
+	extern void cpu_idle();
 
 #ifdef TRAPTRACE
 	trap_trace_ctl_t *ttc = &trap_trace_ctl[cpun];
@@ -247,9 +244,12 @@ mp_startup_init(int cpun)
 
 	cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
 #if !defined(__xpv)
-	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait)
+	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
 		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
+		cp->cpu_m.mcpu_idle_cpu = cpu_idle_mwait;
+	} else
 #endif
+		cp->cpu_m.mcpu_idle_cpu = cpu_idle;
 
 	procp = curthread->t_procp;
 
@@ -1463,6 +1463,9 @@ mp_startup(void)
 {
 	struct cpu *cp = CPU;
 	uint_t new_x86_feature;
+#ifndef __xpv
+	extern void cpupm_init(cpu_t *);
+#endif
 
 	/*
 	 * We need to get TSC on this proc synced (i.e., any delta
@@ -1558,14 +1561,6 @@ mp_startup(void)
 	init_cpu_info(cp);
 
 	mutex_enter(&cpu_lock);
-	/*
-	 * Processor group initialization for this CPU is dependent on the
-	 * cpuid probing, which must be done in the context of the current
-	 * CPU.
-	 */
-	pghw_physid_create(cp);
-	pg_cpu_init(cp);
-	pg_cmt_cpu_startup(cp);
 
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_EXISTS;
 
@@ -1597,14 +1592,29 @@ mp_startup(void)
 	ASSERT(cp->cpu_base_spl == ipltospl(LOCK_LEVEL));
 	set_base_spl();		/* Restore the spl to its proper value */
 
+#ifndef __xpv
+	cpupm_init(cp);
+#endif
+	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
+
+	/*
+	 * Processor group initialization for this CPU is dependent on the
+	 * cpuid probing, which must be done in the context of the current
+	 * CPU, as well as the CPU's device node initialization (for ACPI).
+	 */
+	mutex_enter(&cpu_lock);
+	pghw_physid_create(cp);
+	pg_cpu_init(cp);
+	pg_cmt_cpu_startup(cp);
+	mutex_exit(&cpu_lock);
+
 	/* Enable interrupts */
 	(void) spl0();
+
 	mutex_enter(&cpu_lock);
 	cpu_enable_intr(cp);
 	cpu_add_active(cp);
 	mutex_exit(&cpu_lock);
-
-	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
 
 #ifndef __xpv
 	{

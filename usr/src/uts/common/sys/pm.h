@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PM_H
 #define	_SYS_PM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -92,6 +90,8 @@ typedef enum {
 	PM_GET_DEFAULT_SYSTEM_THRESHOLD,
 	PM_ADD_DEPENDENT_PROPERTY,
 	PM_START_CPUPM,
+	PM_START_CPUPM_EV,
+	PM_START_CPUPM_POLL,
 	PM_STOP_CPUPM,
 	PM_GET_CPU_THRESHOLD,
 	PM_SET_CPU_THRESHOLD,
@@ -104,7 +104,10 @@ typedef enum {
 	PM_SEARCH_LIST,		/* search S3 enable/disable list */
 	PM_GET_AUTOS3_STATE,
 	PM_GET_S3_SUPPORT_STATE,
-	PM_GET_CMD_NAME
+	PM_GET_CMD_NAME,
+	PM_DISABLE_CPU_DEEP_IDLE,
+	PM_ENABLE_CPU_DEEP_IDLE,
+	PM_DEFAULT_CPU_DEEP_IDLE
 } pm_cmds;
 
 /*

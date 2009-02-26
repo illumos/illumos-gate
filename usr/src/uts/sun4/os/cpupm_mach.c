@@ -23,21 +23,29 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_PWRNOW_H
-#define	_PWRNOW_H
+#include <sys/cpu_pm.h>
 
-#include <sys/cpupm.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern boolean_t pwrnow_supported();
-
-extern cpupm_state_ops_t pwrnow_ops;
-
-#ifdef __cplusplus
+/*
+ * CPU PM interfaces exposed to the CPU power manager
+ */
+/*ARGSUSED*/
+id_t
+cpupm_plat_domain_id(struct cpu *cp, cpupm_dtype_t type)
+{
+	return (CPUPM_NO_DOMAIN);
 }
-#endif
 
-#endif	/* _PWRNOW_H */
+/*ARGSUSED*/
+uint_t
+cpupm_plat_state_enumerate(struct cpu *cp, cpupm_dtype_t type,
+    cpupm_state_t *states)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+cpupm_plat_change_state(struct cpu *cp, cpupm_state_t *state)
+{
+	return (-1);
+}

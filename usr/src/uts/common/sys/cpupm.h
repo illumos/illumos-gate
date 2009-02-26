@@ -19,23 +19,25 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_CPUDRV_THROTTLE_H
-#define	_CPUDRV_THROTTLE_H
+#ifndef	_CPUPM_H
+#define	_CPUPM_H
 
-#include <sys/cpudrv_mach.h>
+#include <sys/types.h>
+#include <sys/cpuvar.h>
+#include <sys/cpupm_mach.h>
 
-#ifdef __cplusplus
+#ifdef	__cplusplus
 extern "C" {
 #endif
 
-cpudrv_tstate_ops_t cpudrv_throttle_ops;
+extern void cpupm_set_supp_freqs(cpu_t *, int *, uint_t);
 
-#ifdef __cplusplus
+#ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _CPUDRV_THROTTLE_H */
+#endif /* _CPUPM_H */

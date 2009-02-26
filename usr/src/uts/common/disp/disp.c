@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -890,11 +890,10 @@ swtch()
 		cp->cpu_disp_flags &= ~CPU_DISP_DONTSTEAL;
 
 		if (next != t) {
-			if (t == cp->cpu_idle_thread) {
-				PG_NRUN_UPDATE(cp, 1);
-			} else if (next == cp->cpu_idle_thread) {
-				PG_NRUN_UPDATE(cp, -1);
-			}
+			hrtime_t now;
+
+			now = gethrtime_unscaled();
+			pg_ev_thread_swtch(cp, now, t, next);
 
 			/*
 			 * If t was previously in the TS_ONPROC state,
@@ -904,7 +903,7 @@ swtch()
 			 * queue.
 			 */
 			if ((t->t_state == TS_RUN) && (t->t_waitrq == 0)) {
-				t->t_waitrq = gethrtime_unscaled();
+				t->t_waitrq = now;
 			}
 
 			/*
@@ -928,6 +927,8 @@ swtch()
 		} else {
 			if (t->t_flag & T_INTR_THREAD)
 				cpu_intr_swtch_exit(t);
+
+			pg_ev_thread_remain(cp, t);
 
 			DTRACE_SCHED(remain__cpu);
 			TRACE_0(TR_FAC_DISP, TR_SWTCH_END, "swtch_end");
@@ -960,8 +961,7 @@ swtch_from_zombie()
 	ASSERT(next != curthread);
 	TRACE_0(TR_FAC_DISP, TR_RESUME_START, "resume_start");
 
-	if (next == cpu->cpu_idle_thread)
-		PG_NRUN_UPDATE(cpu, -1);
+	pg_ev_thread_swtch(cpu, gethrtime_unscaled(), curthread, next);
 
 	restore_mstate(next);
 
@@ -1055,6 +1055,7 @@ void
 swtch_to(kthread_t *next)
 {
 	cpu_t			*cp = CPU;
+	hrtime_t		now;
 
 	TRACE_0(TR_FAC_DISP, TR_SWTCH_START, "swtch_start");
 
@@ -1065,8 +1066,8 @@ swtch_to(kthread_t *next)
 
 	TRACE_0(TR_FAC_DISP, TR_RESUME_START, "resume_start");
 
-	if (curthread == cp->cpu_idle_thread)
-		PG_NRUN_UPDATE(cp, 1);
+	now = gethrtime_unscaled();
+	pg_ev_thread_swtch(cp, now, curthread, next);
 
 	/* OK to steal anything left on run queue */
 	cp->cpu_disp_flags &= ~CPU_DISP_DONTSTEAL;
@@ -1081,7 +1082,7 @@ swtch_to(kthread_t *next)
 	 * queue.
 	 */
 	if ((curthread->t_state == TS_RUN) && (curthread->t_waitrq == 0)) {
-		curthread->t_waitrq = gethrtime_unscaled();
+		curthread->t_waitrq = now;
 	}
 
 	/* restore next thread to previously running microstate */
@@ -1097,8 +1098,6 @@ swtch_to(kthread_t *next)
 	 * return here
 	 */
 }
-
-
 
 #define	CPU_IDLING(pri)	((pri) == -1)
 

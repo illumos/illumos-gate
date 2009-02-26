@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PGHW_H
 #define	_PGHW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -48,19 +45,38 @@ extern "C" {
  */
 typedef enum pghw_type {
 	PGHW_START,
-	PGHW_IPIPE,
-	PGHW_CACHE,
-	PGHW_FPU,
-	PGHW_MPIPE,
-	PGHW_CHIP,
+	PGHW_IPIPE,	/* Instruction Pipeline */
+	PGHW_CACHE,	/* Cache (generally last level) */
+	PGHW_FPU,	/* Floating Point Unit / Pipeline */
+	PGHW_MPIPE,	/* Pipe to Memory */
+	PGHW_CHIP,	/* Socket */
 	PGHW_MEMORY,
+	PGHW_POW_ACTIVE,	/* Active Power Management Domain */
+	PGHW_POW_IDLE,		/* Idle Power Management Domain */
 	PGHW_NUM_COMPONENTS
 } pghw_type_t;
+
+/*
+ * Returns true if the hardware is a type of power management domain
+ */
+#define	PGHW_IS_PM_DOMAIN(hw)	\
+	(hw == PGHW_POW_ACTIVE || hw == PGHW_POW_IDLE)
 
 /*
  * Anonymous instance id
  */
 #define	PGHW_INSTANCE_ANON ((id_t)0xdecafbad)
+
+/*
+ * Max length of PGHW kstat strings
+ */
+#define	PGHW_KSTAT_STR_LEN_MAX	32
+
+
+/*
+ * Platform specific handle
+ */
+typedef uintptr_t pghw_handle_t;
 
 /*
  * Processor Group (physical sharing relationship)
@@ -69,6 +85,7 @@ typedef struct pghw {
 	pg_t		pghw_pg;	/* processor group */
 	pghw_type_t	pghw_hw;	/* HW sharing relationship */
 	id_t		pghw_instance;	/* sharing instance identifier */
+	pghw_handle_t	pghw_handle;	/* hw specific opaque handle */
 	kstat_t		*pghw_kstat;	/* physical kstats exported */
 } pghw_t;
 
@@ -102,16 +119,14 @@ pghw_t		*pghw_find_pg(cpu_t *, pghw_type_t);
 pghw_t		*pghw_find_by_instance(id_t, pghw_type_t);
 group_t		*pghw_set_lookup(pghw_type_t);
 
-int		pghw_level(pghw_type_t);
-
 void		pghw_kstat_create(pghw_t *);
 int		pghw_kstat_update(kstat_t *, int);
 
 /* Hardware sharing relationship platform interfaces */
 int		pg_plat_hw_shared(cpu_t *, pghw_type_t);
 int		pg_plat_cpus_share(cpu_t *, cpu_t *, pghw_type_t);
-int		pg_plat_hw_level(pghw_type_t);
 id_t		pg_plat_hw_instance_id(cpu_t *, pghw_type_t);
+pghw_type_t	pg_plat_hw_rank(pghw_type_t, pghw_type_t);
 
 /*
  * What comprises a "core" may vary across processor implementations,

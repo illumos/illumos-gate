@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,14 +28,14 @@
  */
 
 #include <sys/x86_archext.h>
-#include <sys/cpudrv_mach.h>
 #include <sys/cpu_acpi.h>
 #include <sys/pwrnow.h>
 
 boolean_t
-cpudrv_amd_init(cpudrv_devstate_t *cpudsp)
+cpupm_amd_init(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 
 	/* AMD? */
 	if (x86_vendor != X86_VENDOR_AMD)
@@ -43,9 +43,10 @@ cpudrv_amd_init(cpudrv_devstate_t *cpudsp)
 
 	/*
 	 * If we support PowerNow! on this processor, then set the
-	 * correct pstate_ops for the processor.
+	 * correct cma_ops for the processor.
 	 */
-	mach_state->cpupm_pstate_ops = pwrnow_supported() ? &pwrnow_ops : NULL;
+	mach_state->ms_pstate.cma_ops = pwrnow_supported() ?
+	    &pwrnow_ops : NULL;
 
 	return (B_TRUE);
 }

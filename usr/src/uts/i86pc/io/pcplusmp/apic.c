@@ -68,6 +68,7 @@
 #include <sys/sunddi.h>
 #include <sys/x_call.h>
 #include <sys/reboot.h>
+#include <sys/hpet.h>
 
 /*
  *	Local Function Prototypes
@@ -1650,6 +1651,8 @@ apic_shutdown(int cmd, int fcn)
 	uchar_t	byte;
 	ulong_t iflag;
 
+	hpet_acpi_fini();
+
 	/* Send NMI to all CPUs except self to do per processor shutdown */
 	iflag = intr_clear();
 #ifdef	DEBUG
@@ -2039,6 +2042,41 @@ apic_timer_disable(void)
 	    (apic_clkvect + APIC_BASE_VECT) | AV_MASK);
 }
 
+/*
+ * Set timer far into the future and return timer
+ * current Count in nanoseconds.
+ */
+hrtime_t
+apic_timer_stop_count(void)
+{
+	hrtime_t	ns_val;
+	int		enable_val, count_val;
+
+	/*
+	 * Should be called with interrupts disabled.
+	 */
+	ASSERT(!interrupts_enabled());
+
+	enable_val = apic_reg_ops->apic_read(APIC_LOCAL_TIMER);
+	if ((enable_val & AV_MASK) == AV_MASK)
+		return ((hrtime_t)-1);		/* timer is disabled */
+
+	count_val = apic_reg_ops->apic_read(APIC_CURR_COUNT);
+	ns_val = APIC_TICKS_TO_NSECS(count_val);
+
+	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
+
+	return (ns_val);
+}
+
+/*
+ * Reprogram timer after Deep C-State.
+ */
+void
+apic_timer_restart(hrtime_t time)
+{
+	apic_timer_reprogram(time);
+}
 
 ddi_periodic_t apic_periodic_id;
 

@@ -94,6 +94,7 @@ extern void memseg_remap_init(void);
 extern void mach_kpm_init(void);
 extern void pcf_init();
 extern int size_pse_array(pgcnt_t, int);
+extern void pg_init();
 
 /*
  * External Data:
@@ -2221,6 +2222,8 @@ post_startup(void)
 	mach_fpras();
 
 	maxmem = freemem;
+
+	pg_init();
 
 #ifdef	PTL1_PANIC_DEBUG
 	init_ptl1_thread();

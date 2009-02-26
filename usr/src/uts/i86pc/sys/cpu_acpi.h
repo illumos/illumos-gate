@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CPU_ACPI_H
 #define	_CPU_ACPI_H
 
+#include <sys/cpuvar.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpi/acresrc.h>
 #include <sys/acpi/acglobal.h>
@@ -66,15 +67,25 @@ extern "C" {
 #define	CPU_ACPI_TSTATE_CTRL(tstate)	tstate->ts_ctrl
 #define	CPU_ACPI_TSTATE_STAT(tstate)	tstate->ts_state
 
-#define	CPU_ACPI_NONE_CACHED		0x00
-#define	CPU_ACPI_PCT_CACHED		0x01
-#define	CPU_ACPI_PSS_CACHED		0x02
-#define	CPU_ACPI_PSD_CACHED		0x04
-#define	CPU_ACPI_PPC_CACHED		0x08
-#define	CPU_ACPI_PTC_CACHED		0x10
-#define	CPU_ACPI_TSS_CACHED		0x20
-#define	CPU_ACPI_TSD_CACHED		0x40
-#define	CPU_ACPI_TPC_CACHED		0x80
+/*
+ * C-state realted macros
+ */
+#define	CPU_ACPI_CSD(sp)		sp->cs_csd
+#define	CPU_ACPI_BM_INFO(sp)		sp->bm_info
+#define	CPU_ACPI_CSTATES(sp)		sp->cs_cstates.ss_states
+#define	CPU_ACPI_CSTATES_COUNT(sp)	sp->cs_cstates.ss_count
+
+#define	CPU_ACPI_NONE_CACHED		0x0000
+#define	CPU_ACPI_PCT_CACHED		0x0001
+#define	CPU_ACPI_PSS_CACHED		0x0002
+#define	CPU_ACPI_PSD_CACHED		0x0004
+#define	CPU_ACPI_PPC_CACHED		0x0008
+#define	CPU_ACPI_PTC_CACHED		0x0010
+#define	CPU_ACPI_TSS_CACHED		0x0020
+#define	CPU_ACPI_TSD_CACHED		0x0040
+#define	CPU_ACPI_TPC_CACHED		0x0080
+#define	CPU_ACPI_CST_CACHED		0x0100
+#define	CPU_ACPI_CSD_CACHED		0x0200
 
 #define	CPU_ACPI_IS_OBJ_CACHED(sp, obj)	(sp->cpu_acpi_cached & obj)
 #define	CPU_ACPI_OBJ_IS_CACHED(sp, obj)	(sp->cpu_acpi_cached |= obj)
@@ -84,7 +95,8 @@ extern "C" {
 #define	CPU_ACPI_PSS_CNT (sizeof (cpu_acpi_pstate_t) / sizeof (uint32_t))
 #define	CPU_ACPI_TSTATES_SIZE(cnt) (cnt * sizeof (cpu_acpi_tstate_t))
 #define	CPU_ACPI_TSS_CNT (sizeof (cpu_acpi_tstate_t) / sizeof (uint32_t))
-
+#define	CPU_ACPI_CSTATES_SIZE(cnt) (cnt * sizeof (cpu_acpi_cstate_t))
+#define	CPU_ACPI_CST_CNT (sizeof (cpu_acpi_cstate_t) / sizeof (uint32_t))
 /*
  * CPU Domain Coordination Types
  */
@@ -102,10 +114,12 @@ typedef struct cpu_acpi_state_dependency
 	uint32_t sd_domain;
 	uint32_t sd_type;
 	uint32_t sd_num;
+	uint32_t sd_index;
 } cpu_acpi_state_dependency_t;
 
 typedef cpu_acpi_state_dependency_t cpu_acpi_psd_t;
 typedef cpu_acpi_state_dependency_t cpu_acpi_tsd_t;
+typedef cpu_acpi_state_dependency_t cpu_acpi_csd_t;
 
 /*
  * Container for ACPI processor control register information
@@ -148,6 +162,21 @@ typedef struct cpu_acpi_tstate
 
 } cpu_acpi_tstate_t;
 
+/*
+ * Container for _CST information
+ */
+typedef struct cpu_acpi_cstate
+{
+	uint32_t cs_addrspace_id;
+	uint32_t cs_address;
+	uint32_t cs_type;
+	uint32_t cs_latency;
+	uint32_t cs_power;
+	uint32_t promotion;
+	uint32_t demotion;
+	kstat_t	*cs_ksp;
+} cpu_acpi_cstate_t;
+
 typedef struct cpu_acpi_supported_states {
 	void *ss_states;
 	uint32_t ss_count;
@@ -155,6 +184,7 @@ typedef struct cpu_acpi_supported_states {
 
 typedef cpu_acpi_supported_states_t cpu_acpi_pstates_t;
 typedef cpu_acpi_supported_states_t cpu_acpi_tstates_t;
+typedef cpu_acpi_supported_states_t cpu_acpi_cstates_t;
 
 typedef int cpu_acpi_present_capabilities_t;
 typedef int cpu_acpi_ppc_t;
@@ -165,7 +195,7 @@ typedef int cpu_acpi_tpc_t;
  */
 typedef struct cpu_acpi_state {
 	ACPI_HANDLE cs_handle;
-	dev_info_t *cs_dip;
+	int cs_id;
 	uint_t cpu_acpi_cached;
 	cpu_acpi_pstates_t cs_pstates;
 	cpu_acpi_pct_t cs_pct[2];
@@ -175,6 +205,9 @@ typedef struct cpu_acpi_state {
 	cpu_acpi_ptc_t cs_ptc[2];
 	cpu_acpi_tsd_t cs_tsd;
 	cpu_acpi_tpc_t cs_tpc;
+	cpu_acpi_cstates_t cs_cstates;
+	cpu_acpi_csd_t cs_csd;
+	uint_t bm_info;
 } cpu_acpi_state_t;
 
 typedef cpu_acpi_state_t *cpu_acpi_handle_t;
@@ -185,15 +218,22 @@ extern int cpu_acpi_cache_pstate_data(cpu_acpi_handle_t);
 extern void cpu_acpi_free_pstate_data(cpu_acpi_handle_t);
 extern int cpu_acpi_cache_tstate_data(cpu_acpi_handle_t);
 extern void cpu_acpi_free_tstate_data(cpu_acpi_handle_t);
+extern int cpu_acpi_cache_cstate_data(cpu_acpi_handle_t);
+extern void cpu_acpi_free_cstate_data(cpu_acpi_handle_t);
 extern void cpu_acpi_install_notify_handler(cpu_acpi_handle_t,
-    ACPI_NOTIFY_HANDLER, dev_info_t *);
+    ACPI_NOTIFY_HANDLER, void *);
+extern void cpu_acpi_remove_notify_handler(cpu_acpi_handle_t,
+    ACPI_NOTIFY_HANDLER);
 extern int cpu_acpi_write_pdc(cpu_acpi_handle_t, uint32_t, uint32_t,
     uint32_t *);
 extern int cpu_acpi_write_port(ACPI_IO_ADDRESS, uint32_t, uint32_t);
 extern int cpu_acpi_read_port(ACPI_IO_ADDRESS, uint32_t *, uint32_t);
+extern void cpu_acpi_set_register(uint32_t, uint32_t);
+extern void cpu_acpi_get_register(uint32_t, uint32_t *);
 extern uint_t cpu_acpi_get_speeds(cpu_acpi_handle_t, int **);
+extern uint_t cpu_acpi_get_max_cstates(cpu_acpi_handle_t);
 extern void cpu_acpi_free_speeds(int *, uint_t);
-extern cpu_acpi_handle_t cpu_acpi_init(dev_info_t *);
+extern cpu_acpi_handle_t cpu_acpi_init(cpu_t *);
 extern void cpu_acpi_fini(cpu_acpi_handle_t);
 
 #ifdef __cplusplus

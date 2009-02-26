@@ -40,9 +40,15 @@ CORE_OBJS +=			\
 	cmi_hw.o		\
 	cms.o			\
 	confunix.o		\
+	cpu_idle.o		\
 	cpuid.o			\
 	cpuid_subr.o		\
 	cpupm.o			\
+	cpupm_mach.o		\
+	cpupm_amd.o		\
+	cpupm_intel.o		\
+	cpupm_throttle.o	\
+	cpu_acpi.o		\
 	dis_tables.o		\
 	ddi_impl.o		\
 	dtrace_subr.o		\
@@ -93,6 +99,8 @@ CORE_OBJS +=			\
 	pci_orion.o		\
 	pmem.o			\
 	ppage.o			\
+	pwrnow.o		\
+	speedstep.o		\
 	startup.o		\
 	timestamp.o		\
 	todpc_subr.o		\
@@ -169,19 +177,14 @@ PCI_E_MISC_OBJS += pcie.o pcie_fault.o
 PCI_E_NEXUS_OBJS += npe.o npe_misc.o
 PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
-PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o mp_platform_common.o
+PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o	\
+			mp_platform_common.o hpet_acpi.o
 
 ACPI_DRV_OBJS	+= acpi_drv.o acpi_video.o
 
 CPUDRV_OBJS	+= \
 	cpudrv.o \
-	cpudrv_amd.o \
-	cpudrv_intel.o \
-	cpudrv_mach.o \
-	cpudrv_throttle.o \
-	cpu_acpi.o \
-	speedstep.o \
-	pwrnow.o
+	cpudrv_mach.o
 
 PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 

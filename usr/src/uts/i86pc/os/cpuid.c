@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1022,6 +1022,22 @@ cpuid_pass1(cpu_t *cpu)
 			break;
 		default:
 			cpi->cpi_ncore_per_chip = 1;
+			break;
+		}
+
+		/*
+		 * Get CPUID data about TSC Invariance in Deep C-State.
+		 */
+		switch (cpi->cpi_vendor) {
+		case X86_VENDOR_Intel:
+			if (cpi->cpi_maxeax >= 7) {
+				cp = &cpi->cpi_extd[7];
+				cp->cp_eax = 0x80000007;
+				cp->cp_ecx = 0;
+				(void) __cpuid_insn(cp);
+			}
+			break;
+		default:
 			break;
 		}
 	} else {
@@ -3844,6 +3860,36 @@ patch_tsc_read(int flag)
 		break;
 	default:
 		break;
+	}
+}
+
+int
+cpuid_deep_cstates_supported(void)
+{
+	struct cpuid_info *cpi;
+	struct cpuid_regs regs;
+
+	ASSERT(cpuid_checkpass(CPU, 1));
+
+	cpi = CPU->cpu_m.mcpu_cpi;
+
+	if (!(x86_feature & X86_CPUID))
+		return (0);
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		if (cpi->cpi_xmaxeax < 0x80000007)
+			return (0);
+
+		/*
+		 * TSC run at a constant rate in all ACPI C-states?
+		 */
+		regs.cp_eax = 0x80000007;
+		(void) __cpuid_insn(&regs);
+		return (regs.cp_edx & CPUID_TSC_CSTATE_INVARIANCE);
+
+	default:
+		return (0);
 	}
 }
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory uts/sun4u
@@ -36,6 +36,7 @@ CORE_OBJS +=	bootops.o
 CORE_OBJS +=	cmp.o
 CORE_OBJS +=	cpc_hwreg.o
 CORE_OBJS +=	cpc_subr.o
+CORE_OBJS +=	cpupm.o
 CORE_OBJS +=	mach_cpu_states.o
 CORE_OBJS +=	mach_ddi_impl.o
 CORE_OBJS +=	ecc.o

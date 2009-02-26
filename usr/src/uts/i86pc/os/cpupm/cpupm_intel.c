@@ -28,31 +28,34 @@
  */
 
 #include <sys/x86_archext.h>
-#include <sys/cpudrv_mach.h>
 #include <sys/cpu_acpi.h>
 #include <sys/speedstep.h>
-#include <sys/cpudrv_throttle.h>
+#include <sys/cpupm_throttle.h>
+#include <sys/cpu_idle.h>
 
 /*
  * The Intel Processor Driver Capabilities (_PDC).
  * See Intel Processor Vendor-Specific ACPI Interface Specification
  * for details.
  */
-#define	CPUDRV_INTEL_PDC_REVISION	0x1
-#define	CPUDRV_INTEL_PDC_PS_MSR		0x0001
-#define	CPUDRV_INTEL_PDC_C1_HALT	0x0002
-#define	CPUDRV_INTEL_PDC_TS_MSR		0x0004
-#define	CPUDRV_INTEL_PDC_MP		0x0008
-#define	CPUDRV_INTEL_PDC_SW_PSD		0x0020
-#define	CPUDRV_INTEL_PDC_TSD		0x0080
-#define	CPUDRV_INTEL_PDC_HW_PSD		0x0800
+#define	CPUPM_INTEL_PDC_REVISION	0x1
+#define	CPUPM_INTEL_PDC_PS_MSR		0x0001
+#define	CPUPM_INTEL_PDC_C1_HALT		0x0002
+#define	CPUPM_INTEL_PDC_TS_MSR		0x0004
+#define	CPUPM_INTEL_PDC_MP		0x0008
+#define	CPUPM_INTEL_PDC_C2C3_MP		0x0010
+#define	CPUPM_INTEL_PDC_SW_PSD		0x0020
+#define	CPUPM_INTEL_PDC_TSD		0x0080
+#define	CPUPM_INTEL_PDC_C1_FFH		0x0100
+#define	CPUPM_INTEL_PDC_HW_PSD		0x0800
 
-static uint32_t cpudrv_intel_pdccap = 0;
+static uint32_t cpupm_intel_pdccap = 0;
 
 boolean_t
-cpudrv_intel_init(cpudrv_devstate_t *cpudsp)
+cpupm_intel_init(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 	uint_t family;
 	uint_t model;
 
@@ -62,34 +65,45 @@ cpudrv_intel_init(cpudrv_devstate_t *cpudsp)
 	family = cpuid_getfamily(CPU);
 	model = cpuid_getmodel(CPU);
 
+	cpupm_intel_pdccap = CPUPM_INTEL_PDC_MP;
+
 	/*
 	 * If we support SpeedStep on this processor, then set the
-	 * correct pstate_ops for the processor and enable appropriate
+	 * correct cma_ops for the processor and enable appropriate
 	 * _PDC bits.
 	 */
 	if (speedstep_supported(family, model)) {
-		mach_state->cpupm_pstate_ops = &speedstep_ops;
-		cpudrv_intel_pdccap = CPUDRV_INTEL_PDC_PS_MSR |
-		    CPUDRV_INTEL_PDC_C1_HALT | CPUDRV_INTEL_PDC_MP |
-		    CPUDRV_INTEL_PDC_SW_PSD | CPUDRV_INTEL_PDC_HW_PSD;
+		mach_state->ms_pstate.cma_ops = &speedstep_ops;
+		cpupm_intel_pdccap |= CPUPM_INTEL_PDC_PS_MSR |
+		    CPUPM_INTEL_PDC_C1_HALT | CPUPM_INTEL_PDC_SW_PSD |
+		    CPUPM_INTEL_PDC_HW_PSD;
 	} else {
-		mach_state->cpupm_pstate_ops = NULL;
+		mach_state->ms_pstate.cma_ops = NULL;
 	}
 
 	/*
 	 * Set the correct tstate_ops for the processor and
 	 * enable appropriate _PDC bits.
 	 */
-	mach_state->cpupm_tstate_ops = &cpudrv_throttle_ops;
-	cpudrv_intel_pdccap |= CPUDRV_INTEL_PDC_TS_MSR |
-	    CPUDRV_INTEL_PDC_TSD;
+	mach_state->ms_tstate.cma_ops = &cpupm_throttle_ops;
+	cpupm_intel_pdccap |= CPUPM_INTEL_PDC_TS_MSR |
+	    CPUPM_INTEL_PDC_TSD;
+
+	/*
+	 * If we support deep cstates on this processor, then set the
+	 * correct cstate_ops for the processor and enable appropriate
+	 * _PDC bits.
+	 */
+	mach_state->ms_cstate.cma_ops = &cpu_idle_ops;
+	cpupm_intel_pdccap |= CPUPM_INTEL_PDC_C1_HALT |
+	    CPUPM_INTEL_PDC_C2C3_MP | CPUPM_INTEL_PDC_C1_FFH;
 
 	/*
 	 * _PDC support is optional and the driver should
 	 * function even if the _PDC write fails.
 	 */
-	(void) cpu_acpi_write_pdc(mach_state->acpi_handle,
-	    CPUDRV_INTEL_PDC_REVISION, 1, &cpudrv_intel_pdccap);
+	(void) cpu_acpi_write_pdc(mach_state->ms_acpi_handle,
+	    CPUPM_INTEL_PDC_REVISION, 1, &cpupm_intel_pdccap);
 
 	return (B_TRUE);
 }

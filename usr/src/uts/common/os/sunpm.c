@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -346,6 +346,13 @@ int		autopm_enabled;
  * autopm. Protected by pm_scan_lock.
  */
 pm_cpupm_t	cpupm = PM_CPUPM_NOTSET;
+
+/*
+ * Defines the default mode of operation for CPU power management,
+ * either the polling implementation, or the event based dispatcher driven
+ * implementation.
+ */
+pm_cpupm_t	cpupm_default_mode = PM_CPUPM_EVENT;
 
 /*
  * AutoS3 depends on autopm being enabled, and must be enabled by
@@ -2568,7 +2575,7 @@ pm_lower_power(dev_info_t *dip, int comp, int level)
 		PMD(PMD_FAIL, ("%s: %s@%s(%s#%d) %s%s%s%s\n",
 		    pmf, PM_DEVICE(dip),
 		    !autopm_enabled ? "!autopm_enabled " : "",
-		    !PM_CPUPM_ENABLED ? "!cpupm_enabled " : "",
+		    !PM_POLLING_CPUPM ? "!cpupm_polling " : "",
 		    PM_CPUPM_DISABLED ? "cpupm_disabled " : "",
 		    pm_noinvol(dip) ? "pm_noinvol()" : ""))
 		return (DDI_SUCCESS);

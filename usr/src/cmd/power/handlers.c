@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "pmconfig.h"
 #include <sys/mkdev.h>
@@ -120,25 +118,41 @@ do_ioctl(int ioctl_cmd, char *keyword, char *behavior, int suppress)
 int
 cpupm(void)
 {
-	struct btoc {
+	struct bmtoc {
 		char *behavior;
+		char *mode;
 		int cmd;
 		int Errno;
 	};
-	static struct btoc blist[] = {
-		"disable",	PM_STOP_CPUPM, EINVAL,
-		"enable",	PM_START_CPUPM, EBUSY,
-		NULL,		0, 0
-	};
-	struct btoc *bp;
-	char *behavior;
 
-	for (behavior = LINEARG(1), bp = blist; bp->cmd; bp++) {
-		if (strcmp(behavior, bp->behavior) == 0)
+	static struct bmtoc bmlist[] = {
+		"disable",	"\0",		PM_STOP_CPUPM,		EINVAL,
+		"enable",	"poll-mode",	PM_START_CPUPM_POLL,	EBUSY,
+		"enable",	"event-mode",	PM_START_CPUPM_EV,	EBUSY,
+		"enable",	"\0",		PM_START_CPUPM,		EBUSY,
+		NULL,		0,		0,			0
+	};
+	struct bmtoc *bp;
+	char *behavior;
+	char *mode;
+
+	behavior = LINEARG(1);
+	if ((mode = LINEARG(2)) == NULL)
+		mode = "\0";
+
+	for (bp = bmlist; bp->cmd; bp++) {
+		if (strcmp(behavior, bp->behavior) == 0 &&
+		    strcmp(mode, bp->mode) == 0) {
 			break;
+		}
 	}
 	if (bp->cmd == 0) {
-		mesg(MERR, "invalid cpupm behavior \"%s\"\n", behavior);
+		if (LINEARG(2) == NULL) {
+			mesg(MERR, "invalid cpupm behavior \"%s\"\n", behavior);
+		} else {
+			mesg(MERR, "invalid cpupm behavior \"%s %s\"\n",
+			    behavior, mode);
+		}
 		return (NOUP);
 	}
 	if (ioctl(pm_fd, bp->cmd, NULL) == -1 && errno != bp->Errno) {
@@ -149,6 +163,41 @@ cpupm(void)
 	return (OKUP);
 }
 
+/*
+ * Check for valid cpu_deep_idle option and communicate it to the kernel.
+ */
+int
+cpuidle(void)
+{
+	struct btoc {
+		char *behavior;
+		int cmd;
+		int Errno;
+	};
+	static struct btoc blist[] = {
+		"disable",	PM_DISABLE_CPU_DEEP_IDLE, EINVAL,
+		"enable",	PM_ENABLE_CPU_DEEP_IDLE, EBUSY,
+		"default",	PM_DEFAULT_CPU_DEEP_IDLE, EBUSY,
+		NULL,		0, 0
+	};
+	struct btoc *bp;
+	char *behavior;
+
+	for (behavior = LINEARG(1), bp = blist; bp->cmd; bp++) {
+		if (strcmp(behavior, bp->behavior) == 0)
+			break;
+	}
+	if (bp->cmd == 0) {
+		mesg(MERR, "invalid cpu_deep_idle behavior \"%s\"\n", behavior);
+		return (NOUP);
+	}
+	if (ioctl(pm_fd, bp->cmd, NULL) == -1 && errno != bp->Errno) {
+		mesg(MERR, "cpu_deep_idle %s failed, %s\n",
+		    behavior, strerror(errno));
+		return (NOUP);
+	}
+	return (OKUP);
+}
 
 /*
  * Two decisions are identical except for the list names and ioctl commands

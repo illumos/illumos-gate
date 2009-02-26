@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,8 @@ typedef enum cpu_acpi_obj {
 	PTC_OBJ,
 	TSS_OBJ,
 	TSD_OBJ,
-	TPC_OBJ
+	TPC_OBJ,
+	CSD_OBJ,
 } cpu_acpi_obj_t;
 
 /*
@@ -61,7 +62,8 @@ static cpu_acpi_obj_attr_t cpu_acpi_obj_attrs[] = {
 	{"_PTC"},
 	{"_TSS"},
 	{"_TSD"},
-	{"_TPC"}
+	{"_TPC"},
+	{"_CSD"}
 };
 
 /*
@@ -199,8 +201,14 @@ cpu_acpi_cache_state_dependencies(cpu_acpi_handle_t handle,
 {
 	ACPI_BUFFER abuf;
 	ACPI_OBJECT *pkg, *elements;
+	int number;
 	int ret = -1;
 
+	if (objtype == CSD_OBJ) {
+		number = 6;
+	} else {
+		number = 5;
+	}
 	/*
 	 * Fetch the dependencies (if present) for the CPU node.
 	 * Since they are optional, non-existence is not a failure
@@ -215,21 +223,29 @@ cpu_acpi_cache_state_dependencies(cpu_acpi_handle_t handle,
 	}
 
 	pkg = abuf.Pointer;
-	if (pkg->Package.Count != 1) {
+
+	if (((objtype != CSD_OBJ) && (pkg->Package.Count != 1)) ||
+	    ((objtype == CSD_OBJ) && (pkg->Package.Count != 1) &&
+	    (pkg->Package.Count != 2))) {
 		cmn_err(CE_NOTE, "!cpu_acpi: %s unsupported package "
 		    "count %d.", cpu_acpi_obj_attrs[objtype].name,
 		    pkg->Package.Count);
 		goto out;
 	}
 
+	/*
+	 * For C-state domain, we assume C2 and C3 have the same
+	 * domain information
+	 */
 	if (pkg->Package.Elements[0].Type != ACPI_TYPE_PACKAGE ||
-	    pkg->Package.Elements[0].Package.Count != 5) {
+	    pkg->Package.Elements[0].Package.Count != number) {
 		cmn_err(CE_NOTE, "!cpu_acpi: Unexpected data in %s package.",
 		    cpu_acpi_obj_attrs[objtype].name);
 		goto out;
 	}
 	elements = pkg->Package.Elements[0].Package.Elements;
-	if (elements[0].Integer.Value != 5 || elements[1].Integer.Value != 0) {
+	if (elements[0].Integer.Value != number ||
+	    elements[1].Integer.Value != 0) {
 		cmn_err(CE_NOTE, "!cpu_acpi: Unexpected %s revision.",
 		    cpu_acpi_obj_attrs[objtype].name);
 		goto out;
@@ -240,6 +256,9 @@ cpu_acpi_cache_state_dependencies(cpu_acpi_handle_t handle,
 	sd->sd_domain = elements[2].Integer.Value;
 	sd->sd_type = elements[3].Integer.Value;
 	sd->sd_num = elements[4].Integer.Value;
+	if (objtype == CSD_OBJ) {
+		sd->sd_index = elements[5].Integer.Value;
+	}
 
 	ret = 0;
 out:
@@ -281,6 +300,25 @@ cpu_acpi_cache_tsd(cpu_acpi_handle_t handle)
 	ret = cpu_acpi_cache_state_dependencies(handle, TSD_OBJ, tsd);
 	if (ret == 0)
 		CPU_ACPI_OBJ_IS_CACHED(handle, CPU_ACPI_TSD_CACHED);
+	return (ret);
+
+}
+
+/*
+ * Cache the ACPI _CSD data. The _CSD data defines C-state CPU dependencies
+ * (think CPU domains).
+ */
+static int
+cpu_acpi_cache_csd(cpu_acpi_handle_t handle)
+{
+	cpu_acpi_csd_t *csd;
+	int ret;
+
+	CPU_ACPI_OBJ_IS_NOT_CACHED(handle, CPU_ACPI_CSD_CACHED);
+	csd = &CPU_ACPI_CSD(handle);
+	ret = cpu_acpi_cache_state_dependencies(handle, CSD_OBJ, csd);
+	if (ret == 0)
+		CPU_ACPI_OBJ_IS_CACHED(handle, CPU_ACPI_CSD_CACHED);
 	return (ret);
 
 }
@@ -567,6 +605,126 @@ cpu_acpi_cache_tpc(cpu_acpi_handle_t handle)
 		CPU_ACPI_OBJ_IS_CACHED(handle, CPU_ACPI_TPC_CACHED);
 }
 
+int
+cpu_acpi_verify_cstate(cpu_acpi_cstate_t *cstate)
+{
+	uint32_t addrspaceid = cstate->cs_addrspace_id;
+
+	if ((addrspaceid != ACPI_ADR_SPACE_FIXED_HARDWARE) &&
+	    (addrspaceid != ACPI_ADR_SPACE_SYSTEM_IO)) {
+		cmn_err(CE_WARN, "!_CST: unsupported address space id"
+		    ":C%d, type: %d\n", cstate->cs_type, addrspaceid);
+		return (1);
+	}
+	return (0);
+}
+
+int
+cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
+{
+	ACPI_BUFFER abuf;
+	ACPI_OBJECT *obj;
+	ACPI_INTEGER cnt;
+	cpu_acpi_cstate_t *cstate, *p;
+	int i, count;
+
+	CPU_ACPI_OBJ_IS_NOT_CACHED(handle, CPU_ACPI_CST_CACHED);
+
+	abuf.Length = ACPI_ALLOCATE_BUFFER;
+	abuf.Pointer = NULL;
+
+	if (ACPI_FAILURE(AcpiEvaluateObject(handle->cs_handle, "_CST",
+	    NULL, &abuf))) {
+		cmn_err(CE_NOTE, "!cpu_acpi: _CST evaluate failure");
+		return (-1);
+	}
+	obj = (ACPI_OBJECT *)abuf.Pointer;
+	if (obj->Package.Count < 2) {
+		cmn_err(CE_NOTE, "!cpu_acpi: _CST package bad count %d.",
+		    obj->Package.Count);
+		AcpiOsFree(abuf.Pointer);
+		return (-1);
+	}
+
+	/*
+	 * Does the package look coherent?
+	 */
+	cnt = obj->Package.Elements[0].Integer.Value;
+	if (cnt < 1 || cnt != obj->Package.Count - 1) {
+		cmn_err(CE_NOTE, "!cpu_acpi: _CST invalid element count %d != "
+		    "Package count %d\n",
+		    (int)cnt, (int)obj->Package.Count - 1);
+		AcpiOsFree(abuf.Pointer);
+		return (-1);
+	}
+
+	CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)cnt;
+	CPU_ACPI_CSTATES(handle) = kmem_zalloc(CPU_ACPI_CSTATES_SIZE(cnt),
+	    KM_SLEEP);
+	CPU_ACPI_BM_INFO(handle) = 0;
+	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
+	p = cstate;
+
+	for (i = 1, count = 1; i <= cnt; i++) {
+		ACPI_OBJECT *pkg;
+		AML_RESOURCE_GENERIC_REGISTER *reg;
+		ACPI_OBJECT *element;
+
+		pkg = &(obj->Package.Elements[i]);
+		reg = (AML_RESOURCE_GENERIC_REGISTER *)
+		    pkg->Package.Elements[0].Buffer.Pointer;
+		cstate->cs_addrspace_id = reg->AddressSpaceId;
+		cstate->cs_address = reg->Address;
+		element = &(pkg->Package.Elements[1]);
+		cstate->cs_type = element->Integer.Value;
+		element = &(pkg->Package.Elements[2]);
+		cstate->cs_latency = element->Integer.Value;
+		element = &(pkg->Package.Elements[3]);
+		cstate->cs_power = element->Integer.Value;
+
+		if (cpu_acpi_verify_cstate(cstate)) {
+			/*
+			 * ignore this entry if it's not valid
+			 */
+			continue;
+		}
+		if (cstate == p) {
+			cstate++;
+		} else if (p->cs_type == cstate->cs_type) {
+			/*
+			 * if there are duplicate entries, we keep the
+			 * last one. This fixes:
+			 * 1) some buggy BIOS have total duplicate entries.
+			 * 2) ACPI Spec allows the same cstate entry with
+			 *    different power and latency, we use the one
+			 *    with more power saving.
+			 */
+			(void) memcpy(p, cstate, sizeof (cpu_acpi_cstate_t));
+		} else {
+			/*
+			 * we got a valid entry, cache it to the
+			 * cstate structure
+			 */
+			p = cstate++;
+			count++;
+		}
+	}
+
+	if (count < 2) {
+		cmn_err(CE_NOTE, "!cpu_acpi: _CST invalid count %d < 2\n",
+		    count);
+		AcpiOsFree(abuf.Pointer);
+		return (-1);
+	}
+
+	if (count != cnt)
+		CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)count;
+
+	AcpiOsFree(abuf.Pointer);
+	CPU_ACPI_OBJ_IS_CACHED(handle, CPU_ACPI_CST_CACHED);
+	return (0);
+}
+
 /*
  * Cache the _PCT, _PSS, _PSD and _PPC data.
  */
@@ -575,19 +733,19 @@ cpu_acpi_cache_pstate_data(cpu_acpi_handle_t handle)
 {
 	if (cpu_acpi_cache_pct(handle) < 0) {
 		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PCT for "
-		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
+		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_pstates(handle) != 0) {
 		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PSS for "
-		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
+		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_psd(handle) < 0) {
 		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PSD for "
-		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
+		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
@@ -617,19 +775,19 @@ cpu_acpi_cache_tstate_data(cpu_acpi_handle_t handle)
 {
 	if (cpu_acpi_cache_ptc(handle) < 0) {
 		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PTC for "
-		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
+		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_tstates(handle) != 0) {
 		cmn_err(CE_WARN, "!cpu_acpi: error parsing _TSS for "
-		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
+		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_tsd(handle) < 0) {
 		cmn_err(CE_WARN, "!cpu_acpi: error parsing _TSD for "
-		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
+		    "CPU %d", handle->cs_id);
 		return (-1);
 	}
 
@@ -652,17 +810,63 @@ cpu_acpi_free_tstate_data(cpu_acpi_handle_t handle)
 }
 
 /*
+ * Cache the _CST data.
+ */
+int
+cpu_acpi_cache_cstate_data(cpu_acpi_handle_t handle)
+{
+	if (cpu_acpi_cache_cst(handle) < 0) {
+		cmn_err(CE_WARN, "!cpu_acpi: error parsing _CST for "
+		    "CPU %d", handle->cs_id);
+		return (-1);
+	}
+
+	if (cpu_acpi_cache_csd(handle) < 0) {
+		cmn_err(CE_WARN, "!cpu_acpi: error parsing _CSD for "
+		    "CPU %d", handle->cs_id);
+		return (-1);
+	}
+
+	return (0);
+}
+
+void
+cpu_acpi_free_cstate_data(cpu_acpi_handle_t handle)
+{
+	if (handle != NULL) {
+		if (CPU_ACPI_CSTATES(handle)) {
+			kmem_free(CPU_ACPI_CSTATES(handle),
+			    CPU_ACPI_CSTATES_SIZE(
+			    CPU_ACPI_CSTATES_COUNT(handle)));
+			CPU_ACPI_CSTATES(handle) = NULL;
+		}
+	}
+}
+
+/*
  * Register a handler for processor change notifications.
  */
 void
 cpu_acpi_install_notify_handler(cpu_acpi_handle_t handle,
-    ACPI_NOTIFY_HANDLER handler, dev_info_t *dip)
+    ACPI_NOTIFY_HANDLER handler, void *ctx)
 {
-	char path[MAXNAMELEN];
 	if (ACPI_FAILURE(AcpiInstallNotifyHandler(handle->cs_handle,
-	    ACPI_DEVICE_NOTIFY, handler, dip)))
+	    ACPI_DEVICE_NOTIFY, handler, ctx)))
 		cmn_err(CE_NOTE, "!cpu_acpi: Unable to register "
-		    "notify handler for %s", ddi_pathname(dip, path));
+		    "notify handler for CPU");
+}
+
+/*
+ * Remove a handler for processor change notifications.
+ */
+void
+cpu_acpi_remove_notify_handler(cpu_acpi_handle_t handle,
+    ACPI_NOTIFY_HANDLER handler)
+{
+	if (ACPI_FAILURE(AcpiRemoveNotifyHandler(handle->cs_handle,
+	    ACPI_DEVICE_NOTIFY, handler)))
+		cmn_err(CE_NOTE, "!cpu_acpi: Unable to remove "
+		    "notify handler for CPU");
 }
 
 /*
@@ -763,21 +967,43 @@ cpu_acpi_free_speeds(int *speeds, uint_t nspeeds)
 	kmem_free(speeds, nspeeds * sizeof (int));
 }
 
+uint_t
+cpu_acpi_get_max_cstates(cpu_acpi_handle_t handle)
+{
+	if (CPU_ACPI_CSTATES(handle))
+		return (CPU_ACPI_CSTATES_COUNT(handle));
+	else
+		return (1);
+}
+
+void
+cpu_acpi_set_register(uint32_t bitreg, uint32_t value)
+{
+	AcpiSetRegister(bitreg, value);
+}
+
+void
+cpu_acpi_get_register(uint32_t bitreg, uint32_t *value)
+{
+	AcpiGetRegister(bitreg, value);
+}
+
 /*
  * Map the dip to an ACPI handle for the device.
  */
 cpu_acpi_handle_t
-cpu_acpi_init(dev_info_t *dip)
+cpu_acpi_init(cpu_t *cp)
 {
 	cpu_acpi_handle_t handle;
 
 	handle = kmem_zalloc(sizeof (cpu_acpi_state_t), KM_SLEEP);
 
-	if (ACPI_FAILURE(acpica_get_handle(dip, &handle->cs_handle))) {
+	if (ACPI_FAILURE(acpica_get_handle_cpu(cp->cpu_id,
+	    &handle->cs_handle))) {
 		kmem_free(handle, sizeof (cpu_acpi_state_t));
 		return (NULL);
 	}
-	handle->cs_dip = dip;
+	handle->cs_id = cp->cpu_id;
 	return (handle);
 }
 

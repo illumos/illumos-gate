@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * pm	This driver now only handles the ioctl interface.  The scanning
@@ -33,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/modctl.h>
+#include <sys/callb.h>		/* callback registration for cpu_deep_idle */
 #include <sys/conf.h>		/* driver flags and functions */
 #include <sys/open.h>		/* OTYP_CHR definition */
 #include <sys/stat.h>		/* S_IFCHR definition */
@@ -53,6 +53,7 @@
 #include <sys/note.h>
 #include <sys/taskq.h>
 #include <sys/policy.h>
+#include <sys/cpu_pm.h>
 
 /*
  * Minor number is instance<<8 + clone minor from range 1-254; (0 reserved
@@ -73,6 +74,7 @@ extern kmutex_t	pm_scan_lock;	/* protects autopm_enable, pm_scans_disabled */
 extern kmutex_t	pm_clone_lock;	/* protects pm_clones array */
 extern int	autopm_enabled;
 extern pm_cpupm_t cpupm;
+extern pm_cpupm_t cpupm_default_mode;
 extern int	pm_default_idle_threshold;
 extern int	pm_system_idle_threshold;
 extern int	pm_cpu_idle_threshold;
@@ -444,6 +446,10 @@ static struct pm_cmd_info pmci[] = {
 	{PM_ADD_DEPENDENT_PROPERTY, "PM_ADD_DEPENDENT_PROPERTY", 1, PM_REQ,
 	    INWHO | INDATASTRING, NODIP, DEP, SU},
 	{PM_START_CPUPM, "PM_START_CPUPM", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_START_CPUPM_EV, "PM_START_CPUPM_EV", 1, NOSTRUCT, 0,
+	    0, 0, SU},
+	{PM_START_CPUPM_POLL, "PM_START_CPUPM_POLL", 1, NOSTRUCT, 0,
+	    0, 0, SU},
 	{PM_STOP_CPUPM, "PM_STOP_CPUPM", 1, NOSTRUCT, 0, 0, 0, SU},
 	{PM_GET_CPU_THRESHOLD, "PM_GET_CPU_THRESHOLD", 1, NOSTRUCT},
 	{PM_SET_CPU_THRESHOLD, "PM_SET_CPU_THRESHOLD", 1, NOSTRUCT,
@@ -457,6 +463,12 @@ static struct pm_cmd_info pmci[] = {
 	{PM_SEARCH_LIST, "PM_SEARCH_LIST", 1, PM_SRCH, 0, 0, 0, SU},
 	{PM_GET_CMD_NAME, "PM_GET_CMD_NAME", 1, PM_REQ, INDATAOUT, NODIP,
 	    NODEP, 0},
+	{PM_DISABLE_CPU_DEEP_IDLE, "PM_DISABLE_CPU_DEEP_IDLE", 1, NOSTRUCT, 0,
+	    0, 0, SU},
+	{PM_ENABLE_CPU_DEEP_IDLE, "PM_START_CPU_DEEP_IDLE", 1, NOSTRUCT, 0,
+	    0, 0, SU},
+	{PM_DEFAULT_CPU_DEEP_IDLE, "PM_DFLT_CPU_DEEP_IDLE", 1, NOSTRUCT, 0,
+	    0, 0, SU},
 	{0, NULL}
 };
 
@@ -500,16 +512,17 @@ pm_start_pm_walk(dev_info_t *dip, void *arg)
 
 	switch (cmd) {
 	case PM_START_CPUPM:
+	case PM_START_CPUPM_POLL:
 		if (!PM_ISCPU(dip))
 			return (DDI_WALK_CONTINUE);
 		mutex_enter(&pm_scan_lock);
-		if (!PM_CPUPM_DISABLED)
+		if (!PM_CPUPM_DISABLED && !PM_EVENT_CPUPM)
 			pm_scan_init(dip);
 		mutex_exit(&pm_scan_lock);
 		break;
 	case PM_START_PM:
 		mutex_enter(&pm_scan_lock);
-		if (PM_ISCPU(dip) && PM_CPUPM_DISABLED) {
+		if (PM_ISCPU(dip) && (PM_CPUPM_DISABLED || PM_EVENT_CPUPM)) {
 			mutex_exit(&pm_scan_lock);
 			return (DDI_WALK_CONTINUE);
 		}
@@ -552,7 +565,7 @@ pm_stop_pm_walk(dev_info_t *dip, void *arg)
 		 * stop them as part of PM_STOP_PM. Only stop them as part of
 		 * PM_STOP_CPUPM and PM_RESET_PM.
 		 */
-		if (PM_ISCPU(dip) && PM_CPUPM_ENABLED)
+		if (PM_ISCPU(dip) && PM_POLLING_CPUPM)
 			return (DDI_WALK_CONTINUE);
 		break;
 	case PM_STOP_CPUPM:
@@ -2662,22 +2675,74 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		switch (cmd) {
 		case PM_START_PM:
 		case PM_START_CPUPM:
+		case PM_START_CPUPM_EV:
+		case PM_START_CPUPM_POLL:
 		{
+			pm_cpupm_t	new_mode = PM_CPUPM_NOTSET;
+			pm_cpupm_t	old_mode = PM_CPUPM_NOTSET;
+			int		r;
+
 			mutex_enter(&pm_scan_lock);
 			if ((cmd == PM_START_PM && autopm_enabled) ||
-			    (cmd == PM_START_CPUPM && PM_CPUPM_ENABLED)) {
+			    (cmd == PM_START_CPUPM && PM_DEFAULT_CPUPM) ||
+			    (cmd == PM_START_CPUPM_EV && PM_EVENT_CPUPM) ||
+			    (cmd == PM_START_CPUPM_POLL && PM_POLLING_CPUPM)) {
 				mutex_exit(&pm_scan_lock);
-				PMD(PMD_ERROR, ("ioctl: %s: EBUSY\n",
-				    cmdstr))
+				PMD(PMD_ERROR, ("ioctl: %s: EBUSY\n", cmdstr))
 				ret = EBUSY;
 				break;
 			}
-			if (cmd == PM_START_PM)
+
+			if (cmd == PM_START_PM) {
 				autopm_enabled = 1;
-			else
-				cpupm = PM_CPUPM_ENABLE;
+			} else if (cmd == PM_START_CPUPM) {
+				old_mode = cpupm;
+				new_mode = cpupm = cpupm_default_mode;
+			} else if (cmd == PM_START_CPUPM_EV) {
+				old_mode = cpupm;
+				new_mode = cpupm = PM_CPUPM_EVENT;
+			} else if (cmd == PM_START_CPUPM_POLL) {
+				old_mode = cpupm;
+				new_mode = cpupm = PM_CPUPM_POLLING;
+			}
+
 			mutex_exit(&pm_scan_lock);
-			ddi_walk_devs(ddi_root_node(), pm_start_pm_walk, &cmd);
+
+			/*
+			 * If we are changing CPUPM modes, and it is active,
+			 * then stop it from operating in the old mode.
+			 */
+			if (old_mode == PM_CPUPM_POLLING) {
+				int c = PM_STOP_CPUPM;
+				ddi_walk_devs(ddi_root_node(), pm_stop_pm_walk,
+				    &c);
+			} else if (old_mode == PM_CPUPM_EVENT) {
+				r = cpupm_set_policy(CPUPM_POLICY_DISABLED);
+
+				/*
+				 * Disabling CPUPM policy should always
+				 * succeed
+				 */
+				ASSERT(r == 0);
+			}
+
+			/*
+			 * If we are changing to event based CPUPM, enable it.
+			 * In the event it's not supported, fall back to
+			 * polling based CPUPM.
+			 */
+			if (new_mode == PM_CPUPM_EVENT &&
+			    cpupm_set_policy(CPUPM_POLICY_ELASTIC) < 0) {
+				mutex_enter(&pm_scan_lock);
+				new_mode = cpupm = PM_CPUPM_POLLING;
+				cmd = PM_START_CPUPM_POLL;
+				mutex_exit(&pm_scan_lock);
+			}
+			if (new_mode == PM_CPUPM_POLLING ||
+			    cmd == PM_START_PM) {
+				ddi_walk_devs(ddi_root_node(), pm_start_pm_walk,
+				    &cmd);
+			}
 			ret = 0;
 			break;
 		}
@@ -2687,6 +2752,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		case PM_STOP_CPUPM:
 		{
 			extern void pm_discard_thresholds(void);
+			pm_cpupm_t old_mode = PM_CPUPM_NOTSET;
 
 			mutex_enter(&pm_scan_lock);
 			if ((cmd == PM_STOP_PM && !autopm_enabled) ||
@@ -2697,22 +2763,30 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				ret = EINVAL;
 				break;
 			}
+
 			if (cmd == PM_STOP_PM) {
 				autopm_enabled = 0;
 				pm_S3_enabled = 0;
 				autoS3_enabled = 0;
 			} else if (cmd == PM_STOP_CPUPM) {
+				old_mode = cpupm;
 				cpupm = PM_CPUPM_DISABLE;
 			} else {
 				autopm_enabled = 0;
 				autoS3_enabled = 0;
+				old_mode = cpupm;
 				cpupm = PM_CPUPM_NOTSET;
 			}
 			mutex_exit(&pm_scan_lock);
 
 			/*
 			 * bring devices to full power level, stop scan
+			 * If CPUPM was operating in event driven mode, disable
+			 * that.
 			 */
+			if (old_mode == PM_CPUPM_EVENT) {
+				(void) cpupm_set_policy(CPUPM_POLICY_DISABLED);
+			}
 			ddi_walk_devs(ddi_root_node(), pm_stop_pm_walk, &cmd);
 			ret = 0;
 			if (cmd == PM_STOP_PM || cmd == PM_STOP_CPUPM)
@@ -2796,7 +2870,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 
 		case PM_GET_CPUPM_STATE:
 		{
-			if (PM_CPUPM_ENABLED)
+			if (PM_POLLING_CPUPM || PM_EVENT_CPUPM)
 				*rval_p = PM_CPU_PM_ENABLED;
 			else if (PM_CPUPM_DISABLED)
 				*rval_p = PM_CPU_PM_DISABLED;
@@ -2881,6 +2955,34 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			break;
 		}
 
+		case PM_ENABLE_CPU_DEEP_IDLE:
+		{
+			if (callb_execute_class(CB_CL_CPU_DEEP_IDLE,
+			    PM_ENABLE_CPU_DEEP_IDLE) == NULL)
+				ret = 0;
+			else
+				ret = EBUSY;
+			break;
+		}
+		case PM_DISABLE_CPU_DEEP_IDLE:
+		{
+			if (callb_execute_class(CB_CL_CPU_DEEP_IDLE,
+			    PM_DISABLE_CPU_DEEP_IDLE) == NULL)
+				ret = 0;
+			else
+				ret = EINVAL;
+			break;
+		}
+		case PM_DEFAULT_CPU_DEEP_IDLE:
+		{
+			if (callb_execute_class(CB_CL_CPU_DEEP_IDLE,
+			    PM_DEFAULT_CPU_DEEP_IDLE) == NULL)
+				ret = 0;
+			else
+				ret = EBUSY;
+			break;
+		}
+
 		default:
 			/*
 			 * Internal error, invalid ioctl description
@@ -2896,7 +2998,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		break;
 	}
 
-	default:
+default:
 		/*
 		 * Internal error, invalid ioctl description
 		 * force debug entry even if pm_debug not set

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,16 +28,15 @@
  */
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/cpupm.h>
 #include <sys/cpudrv_mach.h>
 #include <sys/machsystm.h>
-
-boolean_t cpudrv_enabled = B_TRUE;
 
 /*
  * Change CPU speed.
  */
 int
-cpudrv_pm_change_speed(cpudrv_devstate_t *cpudsp, cpudrv_pm_spd_t *new_spd)
+cpudrv_change_speed(cpudrv_devstate_t *cpudsp, cpudrv_pm_spd_t *new_spd)
 {
 	xc_one(cpudsp->cpu_id, (xcfunc_t *)cpu_change_speed, \
 	    (uint64_t)new_spd->speed, 0);
@@ -48,7 +47,7 @@ cpudrv_pm_change_speed(cpudrv_devstate_t *cpudsp, cpudrv_pm_spd_t *new_spd)
  * Determine the cpu_id for the CPU device.
  */
 boolean_t
-cpudrv_pm_get_cpu_id(dev_info_t *dip,  processorid_t *cpu_id)
+cpudrv_get_cpu_id(dev_info_t *dip,  processorid_t *cpu_id)
 {
 	return (dip_to_cpu_id(dip, cpu_id) == DDI_SUCCESS);
 }
@@ -57,7 +56,7 @@ cpudrv_pm_get_cpu_id(dev_info_t *dip,  processorid_t *cpu_id)
  * A noop for this machine type.
  */
 boolean_t
-cpudrv_pm_power_ready(void)
+cpudrv_power_ready(void)
 {
 	return (B_TRUE);
 }
@@ -67,7 +66,7 @@ cpudrv_pm_power_ready(void)
  */
 /* ARGSUSED */
 boolean_t
-cpudrv_pm_is_governor_thread(cpudrv_pm_t *cpupm)
+cpudrv_is_governor_thread(cpudrv_pm_t *cpupm)
 {
 	return (B_FALSE);
 }
@@ -77,26 +76,31 @@ cpudrv_pm_is_governor_thread(cpudrv_pm_t *cpupm)
  */
 /*ARGSUSED*/
 boolean_t
-cpudrv_mach_pm_init(cpudrv_devstate_t *cpudsp)
+cpudrv_mach_init(cpudrv_devstate_t *cpudsp)
 {
 	return (B_TRUE);
-}
-
-/*
- * A noop for this machine type.
- */
-/*ARGSUSED*/
-void
-cpudrv_mach_pm_free(cpudrv_devstate_t *cpudsp)
-{
 }
 
 /*
  * On SPARC all instances support power management unless attach fails.
- * In the case of attach failure, cpupm_enabled will be false.
+ * In the case of attach failure, cpudrv_enabled will be false.
  */
+/*ARGSUSED*/
 boolean_t
-cpudrv_pm_enabled()
+cpudrv_is_enabled(cpudrv_devstate_t *cpudsp)
 {
-	return (B_TRUE);
+	return (cpudrv_enabled);
+}
+
+void
+cpudrv_set_supp_freqs(cpudrv_devstate_t *cpudsp)
+{
+	int		*speeds;
+	uint_t		nspeeds;
+
+	CPUDRV_GET_SPEEDS(cpudsp, speeds, nspeeds);
+	if (nspeeds == 0)
+		return;
+	cpupm_set_supp_freqs(cpudsp->cp, speeds, nspeeds);
+	CPUDRV_FREE_SPEEDS(speeds, nspeeds);
 }

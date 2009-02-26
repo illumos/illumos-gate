@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,7 +270,7 @@ cpu_wakeup(cpu_t *cpu, int bound)
 }
 
 void
-mach_cpu_halt_idle()
+mach_cpu_halt_idle(void)
 {
 	if (enable_halt_idle_cpus) {
 		idle_cpu = cpu_halt;

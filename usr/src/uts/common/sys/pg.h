@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PG_H
 #define	_PG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Processor Groups
@@ -48,6 +46,8 @@ extern "C" {
 typedef uint_t		pgid_t;		/* processor group id */
 typedef uint_t		pg_cid_t;	/* processor group class id */
 
+struct pg;
+
 /*
  * Nature of CPU relationships
  */
@@ -57,13 +57,26 @@ typedef enum pg_relation {
 } pg_relation_t;
 
 /*
+ * Processor Group callbacks ops vector
+ * These provide a mechanism allowing per PG routines to invoked
+ * in response to events.
+ */
+typedef struct pg_cb_ops {
+	void		(*thread_swtch)(struct pg *, struct cpu *, hrtime_t,
+			    kthread_t *, kthread_t *);
+	void		(*thread_remain)(struct pg *, struct cpu *,
+			    kthread_t *);
+} pg_cb_ops_t;
+
+/*
  * Processor group structure
  */
 typedef struct pg {
-	pgid_t		pg_id;		/* seq id */
-	pg_relation_t	pg_relation;	/* grouping relationship */
-	struct pg_class	*pg_class;	/* pg class */
-	struct group	pg_cpus;	/* group of CPUs */
+	pgid_t			pg_id;		/* seq id */
+	pg_relation_t		pg_relation;	/* grouping relationship */
+	struct pg_class		*pg_class;	/* pg class */
+	struct group		pg_cpus;	/* group of CPUs */
+	pg_cb_ops_t		pg_cb;		/* pg events ops vector */
 } pg_t;
 
 /*
@@ -81,6 +94,7 @@ struct pg_ops {
 	void		(*cpupart_move)(struct cpu *, struct cpupart *,
 			    struct cpupart *);
 	int		(*cpu_belongs)(struct pg *, struct cpu *);
+	char		*(*policy_name)(struct pg *);
 };
 
 #define	PG_CLASS_NAME_MAX 32
@@ -130,6 +144,12 @@ typedef struct	pg_cpu_itr {
 	    GROUP_ACCESS(&((pg_t *)pgrp)->pg_cpus, 0) : NULL)
 
 /*
+ * Return the number of CPUs in a PG
+ */
+#define	PG_NUM_CPUS(pgrp)			\
+	(GROUP_SIZE(&(pgrp)->pg_cpus))
+
+/*
  * Framework routines
  */
 void		pg_init(void);
@@ -162,7 +182,19 @@ void		pg_cpu_add(pg_t *, cpu_t *);
 void		pg_cpu_delete(pg_t *, cpu_t *);
 pg_t		*pg_cpu_find_pg(cpu_t *, group_t *);
 cpu_t		*pg_cpu_next(pg_cpu_itr_t *);
+boolean_t	pg_cpu_find(pg_t *, cpu_t *);
 
+/*
+ * PG Event callbacks
+ */
+void		pg_callback_set_defaults(pg_t *);
+void		pg_ev_thread_swtch(cpu_t *, hrtime_t, kthread_t *, kthread_t *);
+void		pg_ev_thread_remain(cpu_t *, kthread_t *);
+
+/*
+ * PG Observability interfaces
+ */
+char		*pg_policy_name(pg_t *);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

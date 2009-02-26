@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -99,6 +97,7 @@
 
 static pg_t		*pg_alloc_default(pg_class_t);
 static void		pg_free_default(pg_t *);
+static void		pg_null_op();
 
 /*
  * Bootstrap CPU specific PG data
@@ -127,6 +126,12 @@ static struct pg_ops pg_ops_default = {
 	NULL,			/* cpupart_out */
 	NULL,			/* cpupart_move */
 	NULL,			/* cpu_belongs */
+	NULL,			/* policy_name */
+};
+
+static struct pg_cb_ops pg_cb_ops_default = {
+	pg_null_op,		/* thread_swtch */
+	pg_null_op,		/* thread_remain */
 };
 
 /*
@@ -142,6 +147,13 @@ static struct pg_ops pg_ops_default = {
 	    (pg)->pg_class->pgc_ops->free(pg) :				\
 	    pg_classes[pg_default_cid].pgc_ops->free(pg))		\
 
+
+/*
+ * Class specific PG policy name
+ */
+#define	PG_POLICY_NAME(pg)						\
+	((pg)->pg_class->pgc_ops->policy_name ?				\
+	    (pg)->pg_class->pgc_ops->policy_name(pg) : NULL)		\
 
 /*
  * Class specific membership test callback
@@ -206,13 +218,22 @@ static int		pg_nclasses;
 static pg_cid_t		pg_default_cid;
 
 /*
- * Initialze common PG subsystem. Perform CPU 0 initialization
+ * Initialze common PG subsystem.
  */
 void
 pg_init(void)
 {
+	extern void pg_cmt_class_init();
+
 	pg_default_cid =
 	    pg_class_register("default", &pg_ops_default, PGR_LOGICAL);
+
+	/*
+	 * Initialize classes to allow them to register with the framework
+	 */
+	pg_cmt_class_init();
+
+	pg_cpu0_init();
 }
 
 /*
@@ -282,7 +303,7 @@ pg_class_register(char *name, struct pg_ops *ops, pg_relation_t relation)
 		classes_old = pg_classes;
 		pg_classes =
 		    kmem_zalloc(sizeof (pg_class_t) * (pg_nclasses + 1),
-			KM_SLEEP);
+		    KM_SLEEP);
 		(void) kcopy(classes_old, pg_classes,
 		    sizeof (pg_class_t) * pg_nclasses);
 		kmem_free(classes_old, sizeof (pg_class_t) * pg_nclasses);
@@ -339,6 +360,27 @@ pg_cpu_next(pg_cpu_itr_t *itr)
 }
 
 /*
+ * Test if a given PG contains a given CPU
+ */
+boolean_t
+pg_cpu_find(pg_t *pg, cpu_t *cp)
+{
+	if (group_find(&pg->pg_cpus, cp) == (uint_t)-1)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Set the PGs callbacks to the default
+ */
+void
+pg_callback_set_defaults(pg_t *pg)
+{
+	bcopy(&pg_cb_ops_default, &pg->pg_cb, sizeof (struct pg_cb_ops));
+}
+
+/*
  * Create a PG of a given class.
  * This routine may block.
  */
@@ -373,6 +415,11 @@ pg_create(pg_cid_t cid)
 	 * Create the PG's CPU group
 	 */
 	group_create(&pg->pg_cpus);
+
+	/*
+	 * Initialize the events ops vector
+	 */
+	pg_callback_set_defaults(pg);
 
 	return (pg);
 }
@@ -620,6 +667,20 @@ pg_cpupart_move(cpu_t *cp, cpupart_t *oldpp, cpupart_t *newpp)
 }
 
 /*
+ * Return a class specific string describing a policy implemented
+ * across this PG
+ */
+char *
+pg_policy_name(pg_t *pg)
+{
+	char *str;
+	if ((str = PG_POLICY_NAME(pg)) != NULL)
+		return (str);
+
+	return ("N/A");
+}
+
+/*
  * Provide the specified CPU a bootstrap pg
  * This is needed to allow sane behaviour if any PG consuming
  * code needs to deal with a partially initialized CPU
@@ -642,4 +703,53 @@ static void
 pg_free_default(struct pg *pg)
 {
 	kmem_free(pg, sizeof (pg_t));
+}
+
+static void
+pg_null_op()
+{
+}
+
+/*
+ * Invoke the "thread switch" callback for each of the CPU's PGs
+ * This is invoked from the dispatcher swtch() routine, which is called
+ * when a thread running an a CPU should switch to another thread.
+ * "cp" is the CPU on which the thread switch is happening
+ * "now" is an unscaled hrtime_t timestamp taken in swtch()
+ * "old" and "new" are the outgoing and incoming threads, respectively.
+ */
+void
+pg_ev_thread_swtch(struct cpu *cp, hrtime_t now, kthread_t *old, kthread_t *new)
+{
+	int	i, sz;
+	group_t	*grp;
+	pg_t	*pg;
+
+	grp = &cp->cpu_pg->pgs;
+	sz = GROUP_SIZE(grp);
+	for (i = 0; i < sz; i++) {
+		pg = GROUP_ACCESS(grp, i);
+		pg->pg_cb.thread_swtch(pg, cp, now, old, new);
+	}
+}
+
+/*
+ * Invoke the "thread remain" callback for each of the CPU's PGs.
+ * This is called from the dispatcher's swtch() routine when a thread
+ * running on the CPU "cp" is switching to itself, which can happen as an
+ * artifact of the thread's timeslice expiring.
+ */
+void
+pg_ev_thread_remain(struct cpu *cp, kthread_t *t)
+{
+	int	i, sz;
+	group_t	*grp;
+	pg_t	*pg;
+
+	grp = &cp->cpu_pg->pgs;
+	sz = GROUP_SIZE(grp);
+	for (i = 0; i < sz; i++) {
+		pg = GROUP_ACCESS(grp, i);
+		pg->pg_cb.thread_remain(pg, cp, t);
+	}
 }

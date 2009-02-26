@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "pmconfig.h"
 #include <deflt.h>
@@ -58,7 +56,8 @@ static cinfo_t conftab[] = {
 	"autopm",		autopm,  &pm_status,	NULL,	2, 0, 1,
 	"autoshutdown",		autosd,  &cpr_status,	as_cmt,	5, 0, 1,
 	"cpu-threshold",	cputhr,  &pm_status,	NULL,	2, 0, 1,
-	"cpupm",		cpupm,   &pm_status,	NULL,	2, 0, 1,
+	"cpu_deep_idle",	cpuidle, &pm_status,	NULL,	2, 0, 1,
+	"cpupm",		cpupm,   &pm_status,	NULL,	2, 1, 1,
 	"device-dependency-property",
 				ddprop,  &pm_status,	NULL,	3, 1, 1,
 	"device-dependency",	devdep,  &pm_status,	NULL,	3, 1, 1,

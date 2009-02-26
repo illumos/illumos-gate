@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MACHCPUVAR_H
 #define	_SYS_MACHCPUVAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -128,14 +126,21 @@ struct	machcpu {
 	struct xen_evt_data *mcpu_evt_pend; /* hypervisor: pending events */
 
 	volatile uint32_t *mcpu_mwait;	/* MONITOR/MWAIT buffer */
+	void (*mcpu_idle_cpu)(void);	/* idle function */
+	uint16_t mcpu_idle_type;	/* CPU next idle type */
+	uint16_t max_cstates;		/* supported max cstates */
+	uint32_t curr_cstate;		/* current cstate */
 
 	struct cpu_ucode_info	*mcpu_ucode_info;
+
+	void		*mcpu_pm_mach_state;
 };
 
 #define	NINTR_THREADS	(LOCK_LEVEL-1)	/* number of interrupt threads */
 #define	MWAIT_HALTED	(1)		/* mcpu_mwait set when halting */
 #define	MWAIT_RUNNING	(0)		/* mcpu_mwait set to wakeup */
-#define	MWAIT_WAKEUP(cpu)	(*((cpu)->cpu_m.mcpu_mwait) = MWAIT_RUNNING);
+#define	MWAIT_WAKEUP_IPI	(2)	/* need IPI to wakeup */
+#define	MWAIT_WAKEUP(cpu)	(*((cpu)->cpu_m.mcpu_mwait) = MWAIT_RUNNING)
 
 #endif	/* _ASM */
 

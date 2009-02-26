@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,21 +28,20 @@
 #include <sys/x_call.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
-#include <sys/cpudrv_mach.h>
 #include <sys/speedstep.h>
 #include <sys/cpu_acpi.h>
 #include <sys/cpupm.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 
-static int speedstep_init(cpudrv_devstate_t *);
-static void speedstep_fini(cpudrv_devstate_t *);
-static int speedstep_power(cpudrv_devstate_t *, uint32_t);
+static int speedstep_init(cpu_t *);
+static void speedstep_fini(cpu_t *);
+static void speedstep_power(cpuset_t, uint32_t);
 
 /*
  * Interfaces for modules implementing Intel's Enhanced SpeedStep.
  */
-cpudrv_pstate_ops_t speedstep_ops = {
+cpupm_state_ops_t speedstep_ops = {
 	"Enhanced SpeedStep Technology",
 	speedstep_init,
 	speedstep_fini,
@@ -80,12 +79,11 @@ volatile int ess_debug = 0;
  * Write the ctrl register. How it is written, depends upon the _PCT
  * APCI object value.
  */
-static int
+static void
 write_ctrl(cpu_acpi_handle_t handle, uint32_t ctrl)
 {
 	cpu_acpi_pct_t *pct_ctrl;
 	uint64_t reg;
-	int ret = 0;
 
 	pct_ctrl = CPU_ACPI_PCT_CTRL(handle);
 
@@ -99,79 +97,67 @@ write_ctrl(cpu_acpi_handle_t handle, uint32_t ctrl)
 		reg &= ~((uint64_t)0xFFFF);
 		reg |= ctrl;
 		wrmsr(IA32_PERF_CTL_MSR, reg);
-		ret = 0;
 		break;
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
-		ret = cpu_acpi_write_port(pct_ctrl->cr_address, ctrl,
+		(void) cpu_acpi_write_port(pct_ctrl->cr_address, ctrl,
 		    pct_ctrl->cr_width);
 		break;
 
 	default:
 		DTRACE_PROBE1(ess_ctrl_unsupported_type, uint8_t,
 		    pct_ctrl->cr_addrspace_id);
-		return (-1);
+		return;
 	}
 
 	DTRACE_PROBE1(ess_ctrl_write, uint32_t, ctrl);
-	DTRACE_PROBE1(ess_ctrl_write_err, int, ret);
-
-	return (ret);
 }
 
 /*
  * Transition the current processor to the requested state.
  */
 void
-speedstep_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
-    uint32_t req_state)
+speedstep_pstate_transition(uint32_t req_state)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)CPU->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pstate_t *req_pstate;
 	uint32_t ctrl;
 
 	req_pstate = (cpu_acpi_pstate_t *)CPU_ACPI_PSTATES(handle);
 	req_pstate += req_state;
+
 	DTRACE_PROBE1(ess_transition, uint32_t, CPU_ACPI_FREQ(req_pstate));
 
 	/*
 	 * Initiate the processor p-state change.
 	 */
 	ctrl = CPU_ACPI_PSTATE_CTRL(req_pstate);
-	if (write_ctrl(handle, ctrl) != 0) {
-		*ret = ESS_RET_UNSUP_STATE;
-		return;
-	}
+	write_ctrl(handle, ctrl);
 
-	mach_state->pstate = req_state;
-	CPU->cpu_curr_clock =
-	    (((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000));
-	*ret = ESS_RET_SUCCESS;
+	mach_state->ms_pstate.cma_state.pstate = req_state;
+	cpu_set_curr_clock(((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000));
 }
 
-static int
-speedstep_power(cpudrv_devstate_t *cpudsp, uint32_t req_state)
+static void
+speedstep_power(cpuset_t set, uint32_t req_state)
 {
-	cpuset_t cpus;
-	int ret;
-
 	/*
 	 * If thread is already running on target CPU then just
 	 * make the transition request. Otherwise, we'll need to
 	 * make a cross-call.
 	 */
 	kpreempt_disable();
-	if (cpudsp->cpu_id == CPU->cpu_id) {
-		speedstep_pstate_transition(&ret, cpudsp, req_state);
-	} else {
-		CPUSET_ONLY(cpus, cpudsp->cpu_id);
-		xc_call((xc_arg_t)&ret, (xc_arg_t)cpudsp, (xc_arg_t)req_state,
-		    X_CALL_HIPRI, cpus, (xc_func_t)speedstep_pstate_transition);
+	if (CPU_IN_SET(set, CPU->cpu_id)) {
+		speedstep_pstate_transition(req_state);
+		CPUSET_DEL(set, CPU->cpu_id);
+	}
+	if (!CPUSET_ISNULL(set)) {
+		xc_call((xc_arg_t)req_state, NULL, NULL, X_CALL_HIPRI, set,
+		    (xc_func_t)speedstep_pstate_transition);
 	}
 	kpreempt_enable();
-
-	return (ret);
 }
 
 /*
@@ -179,23 +165,21 @@ speedstep_power(cpudrv_devstate_t *cpudsp, uint32_t req_state)
  * get the P-state data from ACPI and cache it.
  */
 static int
-speedstep_init(cpudrv_devstate_t *cpudsp)
+speedstep_init(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_pct_t *pct_stat;
-	cpu_t *cp;
-	int dependency;
 
-	ESSDEBUG(("speedstep_init: instance %d\n",
-	    ddi_get_instance(cpudsp->dip)));
+	ESSDEBUG(("speedstep_init: processor %d\n", cp->cpu_id));
 
 	/*
 	 * Cache the P-state specific ACPI data.
 	 */
 	if (cpu_acpi_cache_pstate_data(handle) != 0) {
 		ESSDEBUG(("Failed to cache ACPI data\n"));
-		speedstep_fini(cpudsp);
+		speedstep_fini(cp);
 		return (ESS_RET_NO_PM);
 	}
 
@@ -211,21 +195,13 @@ speedstep_init(cpudrv_devstate_t *cpudsp)
 		cmn_err(CE_WARN, "!_PCT conifgured for unsupported "
 		    "addrspace = %d.", pct_stat->cr_addrspace_id);
 		cmn_err(CE_NOTE, "!CPU power management will not function.");
-		speedstep_fini(cpudsp);
+		speedstep_fini(cp);
 		return (ESS_RET_NO_PM);
 	}
 
-	if (CPU_ACPI_IS_OBJ_CACHED(handle, CPU_ACPI_PSD_CACHED))
-		dependency = CPU_ACPI_PSD(handle).sd_domain;
-	else {
-		mutex_enter(&cpu_lock);
-		cp = cpu[CPU->cpu_id];
-		dependency = cpuid_get_chipid(cp);
-		mutex_exit(&cpu_lock);
-	}
-	cpupm_add_cpu2dependency(cpudsp->dip, dependency);
+	cpupm_alloc_domains(cp, CPUPM_P_STATES);
 
-	ESSDEBUG(("Instance %d succeeded.\n", ddi_get_instance(cpudsp->dip)));
+	ESSDEBUG(("Processor %d succeeded.\n", cp->cpu_id))
 	return (ESS_RET_SUCCESS);
 }
 
@@ -233,12 +209,13 @@ speedstep_init(cpudrv_devstate_t *cpudsp)
  * Free resources allocated by speedstep_init().
  */
 static void
-speedstep_fini(cpudrv_devstate_t *cpudsp)
+speedstep_fini(cpu_t *cp)
 {
-	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
-	cpu_acpi_handle_t handle = mach_state->acpi_handle;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 
-	cpupm_free_cpu_dependencies();
+	cpupm_free_domains(&cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
 }
 
@@ -246,7 +223,6 @@ boolean_t
 speedstep_supported(uint_t family, uint_t model)
 {
 	struct cpuid_regs cpu_regs;
-	uint64_t reg;
 
 	/* Required features */
 	if (!(x86_feature & X86_CPUID) ||
@@ -269,17 +245,6 @@ speedstep_supported(uint_t family, uint_t model)
 	cpu_regs.cp_eax = 0x1;
 	(void) __cpuid_insn(&cpu_regs);
 	if (!(cpu_regs.cp_ecx & CPUID_INTC_ECX_EST)) {
-		return (B_FALSE);
-	}
-
-	/*
-	 * If Enhanced SpeedStep has not been enabled on the system,
-	 * then we probably should not override the BIOS setting.
-	 */
-	reg = rdmsr(IA32_MISC_ENABLE_MSR);
-	if (! (reg & IA32_MISC_ENABLE_EST)) {
-		cmn_err(CE_NOTE, "!Enhanced Intel SpeedStep not enabled.");
-		cmn_err(CE_NOTE, "!CPU power management will not function.");
 		return (B_FALSE);
 	}
 

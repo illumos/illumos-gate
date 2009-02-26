@@ -45,6 +45,7 @@
 #include <sys/memlist.h>
 #include <sys/param.h>
 #include <sys/promif.h>
+#include <sys/cpu_pm.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #endif
@@ -52,6 +53,7 @@
 #include <vm/hat_i86.h>
 #include <sys/kdi_machimpl.h>
 #include <sys/sdt.h>
+#include <sys/hpet.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -76,10 +78,10 @@ static int mach_intr_ops(dev_info_t *, ddi_intr_handle_impl_t *,
 static void mach_notify_error(int level, char *errmsg);
 static hrtime_t dummy_hrtime(void);
 static void dummy_scalehrtime(hrtime_t *);
-static void cpu_idle(void);
+void cpu_idle(void);
 static void cpu_wakeup(cpu_t *, int);
 #ifndef __xpv
-static void cpu_idle_mwait(void);
+void cpu_idle_mwait(void);
 static void cpu_wakeup_mwait(cpu_t *, int);
 #endif
 /*
@@ -184,7 +186,23 @@ int	idle_cpu_prefer_mwait = 1;
  */
 int	idle_cpu_assert_cflush_monitor = 1;
 
-#endif
+/*
+ * If non-zero, idle cpus will not use power saving Deep C-States idle loop.
+ */
+int	idle_cpu_no_deep_c = 0;
+/*
+ * Non-power saving idle loop and wakeup pointers.
+ * Allows user to toggle Deep Idle power saving feature on/off.
+ */
+void	(*non_deep_idle_cpu)() = cpu_idle;
+void	(*non_deep_idle_disp_enq_thread)(cpu_t *, int);
+
+/*
+ * Object for the kernel to access the HPET.
+ */
+hpet_t hpet;
+
+#endif	/* ifndef __xpv */
 
 /*ARGSUSED*/
 int
@@ -207,6 +225,16 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 			return (0);
 	case PGHW_CACHE:
 		if (cpuid_get_ncpu_sharing_last_cache(cp) > 1)
+			return (1);
+		else
+			return (0);
+	case PGHW_POW_ACTIVE:
+		if (cpupm_domain_id(cp, CPUPM_DTYPE_ACTIVE) != (id_t)-1)
+			return (1);
+		else
+			return (0);
+	case PGHW_POW_IDLE:
+		if (cpupm_domain_id(cp, CPUPM_DTYPE_IDLE) != (id_t)-1)
 			return (1);
 		else
 			return (0);
@@ -247,58 +275,63 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 		return (cpuid_get_last_lvl_cacheid(cpu));
 	case PGHW_CHIP:
 		return (cpuid_get_chipid(cpu));
+	case PGHW_POW_ACTIVE:
+		return (cpupm_domain_id(cpu, CPUPM_DTYPE_ACTIVE));
+	case PGHW_POW_IDLE:
+		return (cpupm_domain_id(cpu, CPUPM_DTYPE_IDLE));
 	default:
 		return (-1);
 	}
 }
 
-int
-pg_plat_hw_level(pghw_type_t hw)
+/*
+ * Express preference for optimizing for sharing relationship
+ * hw1 vs hw2
+ */
+pghw_type_t
+pg_plat_hw_rank(pghw_type_t hw1, pghw_type_t hw2)
 {
-	int i;
+	int i, rank1, rank2;
+
 	static pghw_type_t hw_hier[] = {
 		PGHW_IPIPE,
 		PGHW_CACHE,
 		PGHW_CHIP,
+		PGHW_POW_IDLE,
+		PGHW_POW_ACTIVE,
 		PGHW_NUM_COMPONENTS
 	};
 
 	for (i = 0; hw_hier[i] != PGHW_NUM_COMPONENTS; i++) {
-		if (hw_hier[i] == hw)
-			return (i);
+		if (hw_hier[i] == hw1)
+			rank1 = i;
+		if (hw_hier[i] == hw2)
+			rank2 = i;
 	}
-	return (-1);
+
+	if (rank1 > rank2)
+		return (hw1);
+	else
+		return (hw2);
 }
 
 /*
- * Return 1 if CMT load balancing policies should be
- * implemented across instances of the specified hardware
- * sharing relationship.
+ * Override the default CMT dispatcher policy for the specified
+ * hardware sharing relationship
  */
-int
-pg_plat_cmt_load_bal_hw(pghw_type_t hw)
+pg_cmt_policy_t
+pg_plat_cmt_policy(pghw_type_t hw)
 {
-	if (hw == PGHW_IPIPE ||
-	    hw == PGHW_FPU ||
-	    hw == PGHW_CHIP ||
-	    hw == PGHW_CACHE)
-		return (1);
-	else
-		return (0);
-}
-
-
-/*
- * Return 1 if thread affinity polices should be implemented
- * for instances of the specifed hardware sharing relationship.
- */
-int
-pg_plat_cmt_affinity_hw(pghw_type_t hw)
-{
-	if (hw == PGHW_CACHE)
-		return (1);
-	else
-		return (0);
+	/*
+	 * For shared caches, also load balance across them to
+	 * maximize aggregate cache capacity
+	 */
+	switch (hw) {
+	case PGHW_CACHE:
+		return (CMT_BALANCE|CMT_AFFINITY);
+	default:
+		return (CMT_NO_POLICY);
+	}
 }
 
 id_t
@@ -329,9 +362,28 @@ dummy_scalehrtime(hrtime_t *ticks)
 {}
 
 /*
+ * Supports Deep C-State power saving idle loop.
+ */
+void
+cpu_idle_adaptive(void)
+{
+	(*CPU->cpu_m.mcpu_idle_cpu)();
+}
+
+void
+cpu_dtrace_idle_probe(uint_t cstate)
+{
+	cpu_t		*cpup = CPU;
+	struct machcpu	*mcpu = &(cpup->cpu_m);
+
+	mcpu->curr_cstate = cstate;
+	DTRACE_PROBE1(idle__state__transition, uint_t, cstate);
+}
+
+/*
  * Idle the present CPU until awoken via an interrupt
  */
-static void
+void
 cpu_idle(void)
 {
 	cpu_t		*cpup = CPU;
@@ -427,11 +479,11 @@ cpu_idle(void)
 		return;
 	}
 
-	DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C1);
+	cpu_dtrace_idle_probe(IDLE_STATE_C1);
 
 	mach_cpu_idle();
 
-	DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C0);
+	cpu_dtrace_idle_probe(IDLE_STATE_C0);
 
 	/*
 	 * We're no longer halted
@@ -510,7 +562,7 @@ cpu_wakeup(cpu_t *cpu, int bound)
 /*
  * Idle the present CPU until awoken via touching its monitored line
  */
-static void
+void
 cpu_idle_mwait(void)
 {
 	volatile uint32_t	*mcpu_mwait = CPU->cpu_m.mcpu_mwait;
@@ -520,7 +572,7 @@ cpu_idle_mwait(void)
 	int			hset_update = 1;
 
 	/*
-	 * Set our mcpu_mwait here, so we can tell if anyone trys to
+	 * Set our mcpu_mwait here, so we can tell if anyone tries to
 	 * wake us between now and when we call mwait.  No other cpu will
 	 * attempt to set our mcpu_mwait until we add ourself to the halted
 	 * CPU bitmap.
@@ -529,7 +581,7 @@ cpu_idle_mwait(void)
 
 	/*
 	 * If this CPU is online, and there's multiple CPUs
-	 * in the system, then we should notate our halting
+	 * in the system, then we should note our halting
 	 * by adding ourselves to the partition's halted CPU
 	 * bitmap. This allows other CPUs to find/awaken us when
 	 * work becomes available.
@@ -543,7 +595,7 @@ cpu_idle_mwait(void)
 	 *
 	 * When a thread becomes runnable, it is placed on the queue
 	 * and then the halted CPU bitmap is checked to determine who
-	 * (if anyone) should be awoken. We therefore need to first
+	 * (if anyone) should be awakened. We therefore need to first
 	 * add ourselves to the bitmap, and and then check if there
 	 * is any work available.
 	 *
@@ -580,13 +632,13 @@ cpu_idle_mwait(void)
 	 */
 	i86_monitor(mcpu_mwait, 0, 0);
 	if (*mcpu_mwait == MWAIT_HALTED) {
-		DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C1);
+		cpu_dtrace_idle_probe(IDLE_STATE_C1);
 
 		tlb_going_idle();
 		i86_mwait(0, 0);
 		tlb_service();
 
-		DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C0);
+		cpu_dtrace_idle_probe(IDLE_STATE_C0);
 	}
 
 	/*
@@ -858,14 +910,23 @@ mach_init()
 	(*pops->psm_softinit)();
 
 	/*
-	 * Initialize the dispatcher's function hooks
-	 * to enable CPU halting when idle.
+	 * Initialize the dispatcher's function hooks to enable CPU halting
+	 * when idle.  Set both the deep-idle and non-deep-idle hooks.
+	 *
+	 * Assume we can use power saving deep-idle loop cpu_idle_adaptive.
+	 * Platform deep-idle driver will reset our idle loop to
+	 * non_deep_idle_cpu if power saving deep-idle feature is not available.
+	 *
 	 * Do not use monitor/mwait if idle_cpu_use_hlt is not set(spin idle)
 	 * or idle_cpu_prefer_mwait is not set.
 	 * Allocate monitor/mwait buffer for cpu0.
 	 */
+#ifndef __xpv
+	non_deep_idle_disp_enq_thread = disp_enq_thread;
+#endif
 	if (idle_cpu_use_hlt) {
-		idle_cpu = cpu_idle;
+		idle_cpu = cpu_idle_adaptive;
+		CPU->cpu_m.mcpu_idle_cpu = cpu_idle;
 #ifndef __xpv
 		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
 			CPU->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
@@ -878,12 +939,20 @@ mach_init()
 				    "handle cpu 0 mwait size.");
 #endif
 				idle_cpu_prefer_mwait = 0;
-				idle_cpu = cpu_idle;
+				CPU->cpu_m.mcpu_idle_cpu = cpu_idle;
 			} else {
-				idle_cpu = cpu_idle_mwait;
+				CPU->cpu_m.mcpu_idle_cpu = cpu_idle_mwait;
 			}
 		} else {
-			idle_cpu = cpu_idle;
+			CPU->cpu_m.mcpu_idle_cpu = cpu_idle;
+		}
+		non_deep_idle_cpu = CPU->cpu_m.mcpu_idle_cpu;
+
+		/*
+		 * Disable power saving deep idle loop?
+		 */
+		if (idle_cpu_no_deep_c) {
+			idle_cpu = non_deep_idle_cpu;
 		}
 #endif
 	}
@@ -970,6 +1039,7 @@ mach_smpinit(void)
 #ifndef __xpv
 		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait)
 			disp_enq_thread = cpu_wakeup_mwait;
+		non_deep_idle_disp_enq_thread = disp_enq_thread;
 #endif
 	}
 

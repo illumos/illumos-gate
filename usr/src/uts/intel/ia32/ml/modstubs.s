@@ -1315,6 +1315,26 @@ fcnname/**/_info:							\
 	END_MODULE(dcopy);
 #endif
 
+/*
+ * Stubs for acpica
+ */
+#ifndef ACPICA_MODULE
+	MODULE(acpica,misc);
+	NO_UNLOAD_STUB(acpica, AcpiOsReadPort, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiOsWritePort, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiInstallNotifyHandler, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiRemoveNotifyHandler, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiEvaluateObject, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiEvaluateObjectTyped, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiSetRegister, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiGetRegister, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, AcpiOsFree, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, acpica_get_handle_cpu, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, acpica_get_global_FADT, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, __acpi_wbinvd, nomod_minus_one) ;
+	END_MODULE(acpica);
+#endif
+
 #ifndef IPNET_MODULE
 	MODULE(ipnet,drv);
 	STUB(ipnet, ipnet_if_getdev, nomod_zero);

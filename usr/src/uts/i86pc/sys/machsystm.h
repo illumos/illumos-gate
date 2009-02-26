@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,14 @@ extern void trap(struct regs *, caddr_t, processorid_t);
 
 extern void do_interrupt(struct regs *, trap_trace_rec_t *);
 extern void memscrub_disable(void);
+
+/*
+ * Dispatcher hooks.
+ */
+void    (*idle_cpu)();
+void    (*non_deep_idle_cpu)();
+void    (*disp_enq_thread)(cpu_t *, int);
+void    (*non_deep_idle_disp_enq_thread)(cpu_t *, int);
 
 #ifndef __xpv
 extern unsigned int microdata;
