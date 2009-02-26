@@ -1118,6 +1118,7 @@ proto_notify_req(dld_str_t *dsp, mblk_t *mp)
 	    DL_NOTE_LINK_UP |
 	    DL_NOTE_LINK_DOWN |
 	    DL_NOTE_CAPAB_RENEG |
+	    DL_NOTE_FASTPATH_FLUSH |
 	    DL_NOTE_SPEED;
 
 	if (MBLKL(mp) < sizeof (dl_notify_req_t)) {
