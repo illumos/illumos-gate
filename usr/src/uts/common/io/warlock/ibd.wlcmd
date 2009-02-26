@@ -18,29 +18,26 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one	ibd_state_s
 
-### Async thread start up routine
+### Async thread
 root	ibd_async_work
 
-### GLD callback routines
-root	ibd_send
-root	ibd_reset
-root	ibd_intr
-root	ibd_get_stats
-root	ibd_set_promiscuous
-root	ibd_set_multicast
-root	ibd_set_mac_addr
-root	ibd_start
-root	ibd_stop
-root	ibd_mdt_txone
-root	ibd_mdt_pre
-root	ibd_mdt_post
+### GLDv3 callback routines
+root	ibd_m_stat
+root	ibd_m_start
+root	ibd_m_stop
+root	ibd_m_promisc
+root	ibd_m_multicst
+root	ibd_m_unicst
+root	ibd_m_tx
+root	ibd_m_getcapab
 
 ### IBTF callback routines
 root	ibd_rcq_handler

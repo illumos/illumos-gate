@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -39,7 +40,7 @@
 #include <sys/dlpi.h>
 #include <sys/mac_provider.h>
 
-#include <sys/pattr.h>		/* for HCK_PARTIALCKSUM */
+#include <sys/pattr.h>		/* for HCK_FULLCKSUM */
 #include <sys/sysmacros.h>	/* for offsetof */
 #include <sys/disp.h>		/* for async thread pri */
 #include <sys/atomic.h>		/* for atomic_add*() */
@@ -51,6 +52,7 @@
 #include <inet/ip.h>		/* for ipha_t */
 #include <inet/ip_if.h>		/* for IP6_DL_SAP */
 #include <inet/ip6.h>		/* for ip6_t */
+#include <inet/tcp.h>		/* for tcph_t */
 #include <netinet/icmp6.h>	/* for icmp6_t */
 #include <sys/callb.h>
 #include <sys/modhash.h>
@@ -58,197 +60,357 @@
 #include <sys/ib/clients/ibd/ibd.h>
 #include <sys/ib/mgt/sm_attr.h>	/* for SM_INIT_TYPE_* */
 #include <sys/note.h>
-#include <sys/pattr.h>
 #include <sys/multidata.h>
 
 #include <sys/ib/mgt/ibmf/ibmf.h>	/* for ibd_get_portspeed */
 
 /*
- * Modes of hardware/driver/software checksum, useful for debugging
- * and performance studies.
+ * Per-interface tunables
  *
- * none: h/w (Tavor) and driver does not do checksum, IP software must.
- * partial: driver does data checksum, IP must provide psuedo header.
- * perf_partial: driver uses IP provided psuedo cksum as data checksum
- *		 (thus, real checksumming is not done).
- */
-typedef enum {
-	IBD_CSUM_NONE,
-	IBD_CSUM_PARTIAL,
-	IBD_CSUM_PERF_PARTIAL
-} ibd_csum_type_t;
-
-typedef enum {IBD_LINK_DOWN, IBD_LINK_UP, IBD_LINK_UP_ABSENT} ibd_link_op_t;
-
-/*
- * Per interface tunable parameters.
- */
-uint_t ibd_rx_threshold = 16;
-uint_t ibd_tx_current_copy_threshold = 0x10000000;
-/* should less than max Tavor CQsize and be 2^n - 1 */
-uint_t ibd_num_rwqe = 511;
-uint_t ibd_num_swqe = 511;
-uint_t ibd_num_ah = 16;
-uint_t ibd_hash_size = 16;
-uint_t ibd_srv_fifos = 0x0;
-uint_t ibd_fifo_depth = 0;
-ibd_csum_type_t ibd_csum_send = IBD_CSUM_NONE;
-ibd_csum_type_t ibd_csum_recv = IBD_CSUM_NONE;
-
-/*
- * The driver can use separate CQs for send and receive queueus.
- * While using separate CQs, it is possible to put the send CQ
- * in polling mode, ie not to enable notifications on that CQ.
- * If both CQs are interrupt driven, currently it is not possible
- * for their handlers to be invoked concurrently (since Tavor ties
- * both interrupts to the same PCI intr line); but the handlers
- * are not coded with a single interrupt cpu assumption (eg
- * id_num_intrs is incremented atomically).
+ * ibd_tx_copy_thresh
+ *     This sets the threshold at which ibd will attempt to do a bcopy of the
+ *     outgoing data into a pre-mapped buffer. The IPoIB driver's send behavior
+ *     is restricted by various parameters, so setting of this value must be
+ *     made after careful considerations only.  For instance, IB HCAs currently
+ *     impose a relatively small limit (when compared to ethernet NICs) on the
+ *     length of the SGL for transmit. On the other hand, the ip stack could
+ *     send down mp chains that are quite long when LSO is enabled.
  *
- * The driver private struct uses id_scq_hdl to track the separate
- * CQ being used for send; the id_rcq_hdl tracks the receive CQ
- * if using separate CQs, or it tracks the single CQ when using
- * combined CQ. The id_wcs completion array is used in the combined
- * CQ case, and for fetching Rx completions in the separate CQs case;
- * the id_txwcs is used to fetch Tx completions in the separate CQs
- * case.
+ * ibd_num_swqe
+ *     Number of "send WQE" elements that will be allocated and used by ibd.
+ *     When tuning this parameter, the size of pre-allocated, pre-mapped copy
+ *     buffer in each of these send wqes must be taken into account. This
+ *     copy buffer size is determined by the value of IBD_TX_BUF_SZ (this is
+ *     currently set to the same value of ibd_tx_copy_thresh, but may be
+ *     changed independently if needed).
+ *
+ * ibd_num_rwqe
+ *     Number of "receive WQE" elements that will be allocated and used by
+ *     ibd. This parameter is limited by the maximum channel size of the HCA.
+ *     Each buffer in the receive wqe will be of MTU size.
+ *
+ * ibd_num_lso_bufs
+ *     Number of "larger-than-MTU" copy buffers to use for cases when the
+ *     outgoing mblk chain is too fragmented to be used with ibt_map_mem_iov()
+ *     and too large to be used with regular MTU-sized copy buffers. It is
+ *     not recommended to tune this variable without understanding the
+ *     application environment and/or memory resources. The size of each of
+ *     these lso buffers is determined by the value of IBD_LSO_BUFSZ.
+ *
+ * ibd_num_ah
+ *     Number of AH cache entries to allocate
+ *
+ * ibd_hash_size
+ *     Hash table size for the active AH list
+ *
+ * ibd_separate_cqs
+ * ibd_txcomp_poll
+ *     These boolean variables (1 or 0) may be used to tune the behavior of
+ *     ibd in managing the send and receive completion queues and in deciding
+ *     whether or not transmit completions should be polled or interrupt
+ *     driven (when the completion queues are separate). If both the completion
+ *     queues are interrupt driven, it may not be possible for the handlers to
+ *     be invoked concurrently, depending on how the interrupts are tied on
+ *     the PCI intr line.  Note that some combination of these two parameters
+ *     may not be meaningful (and therefore not allowed).
+ *
+ * ibd_tx_softintr
+ * ibd_rx_softintr
+ *     The softintr mechanism allows ibd to avoid event queue overflows if
+ *     the receive/completion handlers are to be expensive. These are enabled
+ *     by default.
+ *
+ * ibd_log_sz
+ *     This specifies the size of the ibd log buffer in bytes. The buffer is
+ *     allocated and logging is enabled only when IBD_LOGGING is defined.
+ *
  */
+uint_t ibd_tx_copy_thresh = 0x1000;
+uint_t ibd_num_swqe = 4000;
+uint_t ibd_num_rwqe = 4000;
+uint_t ibd_num_lso_bufs = 0x400;
+uint_t ibd_num_ah = 64;
+uint_t ibd_hash_size = 32;
 uint_t ibd_separate_cqs = 1;
 uint_t ibd_txcomp_poll = 0;
-
-/*
- * the softintr is introduced to avoid Event Queue overflow. It
- * should not have heavy load in CQ event handle function.
- * If service fifos is enabled, this is not required, because
- * mac_rx() will be called by service threads.
- */
 uint_t ibd_rx_softintr = 1;
 uint_t ibd_tx_softintr = 1;
+#ifdef IBD_LOGGING
+uint_t ibd_log_sz = 0x20000;
+#endif
+
+#define	IBD_TX_COPY_THRESH		ibd_tx_copy_thresh
+#define	IBD_TX_BUF_SZ			ibd_tx_copy_thresh
+#define	IBD_NUM_SWQE			ibd_num_swqe
+#define	IBD_NUM_RWQE			ibd_num_rwqe
+#define	IBD_NUM_LSO_BUFS		ibd_num_lso_bufs
+#define	IBD_NUM_AH			ibd_num_ah
+#define	IBD_HASH_SIZE			ibd_hash_size
+#ifdef IBD_LOGGING
+#define	IBD_LOG_SZ			ibd_log_sz
+#endif
 
 /*
- * Initial number of IBA resources allocated.
+ * Receive CQ moderation parameters: NOT tunables
  */
-#define	IBD_NUM_RWQE	ibd_num_rwqe
-#define	IBD_NUM_SWQE	ibd_num_swqe
-#define	IBD_NUM_AH	ibd_num_ah
-
-/* when <= threshold, it's faster to copy to a premapped buffer */
-#define	IBD_TX_COPY_THRESHOLD	ibd_tx_current_copy_threshold
+static uint_t ibd_rxcomp_count = 4;
+static uint_t ibd_rxcomp_usec = 10;
 
 /*
- * When the number of WQEs on the rxlist < IBD_RX_THRESHOLD, ibd will
- * allocate a new WQE to put on the the rxlist. This value must be <=
- * IBD_NUM_RWQE/id_num_rwqe.
+ * Thresholds
+ *
+ * When waiting for resources (swqes or lso buffers) to become available,
+ * the first two thresholds below determine how long to wait before informing
+ * the network layer to start sending packets again. The IBD_TX_POLL_THRESH
+ * determines how low the available swqes should go before we start polling
+ * the completion queue.
  */
-#define	IBD_RX_THRESHOLD	ibd_rx_threshold
+#define	IBD_FREE_LSOS_THRESH		8
+#define	IBD_FREE_SWQES_THRESH		20
+#define	IBD_TX_POLL_THRESH		80
 
 /*
- * Hash table size for the active AH list.
+ * When doing multiple-send-wr or multiple-recv-wr posts, this value
+ * determines how many to do at a time (in a single ibt_post_send/recv).
  */
-#define	IBD_HASH_SIZE	ibd_hash_size
-
-#define	IBD_TXPOLL_THRESHOLD 64
-/*
- * PAD routine called during send/recv context
- */
-#define	IBD_SEND	0
-#define	IBD_RECV	1
+#define	IBD_MAX_POST_MULTIPLE		4
 
 /*
- * fill / clear in <scope> and <p_key> in multicast/broadcast address.
+ * Maximum length for returning chained mps back to crossbow
  */
-#define	IBD_FILL_SCOPE_PKEY(maddr, scope, pkey)			\
-	{							\
-		*(uint32_t *)((char *)(maddr) + 4) |=		\
-		    htonl((uint32_t)(scope) << 16);		\
-		*(uint32_t *)((char *)(maddr) + 8) |=		\
-		    htonl((uint32_t)(pkey) << 16);		\
-	}
-
-#define	IBD_CLEAR_SCOPE_PKEY(maddr)				\
-	{							\
-		*(uint32_t *)((char *)(maddr) + 4) &=		\
-		    htonl(~((uint32_t)0xF << 16));		\
-		*(uint32_t *)((char *)(maddr) + 8) &=		\
-		    htonl(~((uint32_t)0xFFFF << 16));		\
-	}
+#define	IBD_MAX_RX_MP_LEN		16
 
 /*
- * when free tx wqes >= threshold and reschedule flag is set,
- * ibd will call mac_tx_update to re-enable Tx.
+ * LSO parameters
  */
-#define	IBD_TX_UPDATE_THRESHOLD 1
+#define	IBD_LSO_MAXLEN			65536
+#define	IBD_LSO_BUFSZ			8192
+#define	IBD_PROP_LSO_POLICY		"lso-policy"
 
-/* Driver State Pointer */
+/*
+ * Completion queue polling control
+ */
+#define	IBD_RX_CQ_POLLING		0x1
+#define	IBD_TX_CQ_POLLING		0x2
+#define	IBD_REDO_RX_CQ_POLLING		0x4
+#define	IBD_REDO_TX_CQ_POLLING		0x8
+
+/*
+ * Flag bits for resources to reap
+ */
+#define	IBD_RSRC_SWQE			0x1
+#define	IBD_RSRC_LSOBUF			0x2
+
+/*
+ * Async operation types
+ */
+#define	IBD_ASYNC_GETAH			1
+#define	IBD_ASYNC_JOIN			2
+#define	IBD_ASYNC_LEAVE			3
+#define	IBD_ASYNC_PROMON		4
+#define	IBD_ASYNC_PROMOFF		5
+#define	IBD_ASYNC_REAP			6
+#define	IBD_ASYNC_TRAP			7
+#define	IBD_ASYNC_SCHED			8
+#define	IBD_ASYNC_LINK			9
+#define	IBD_ASYNC_EXIT			10
+
+/*
+ * Async operation states
+ */
+#define	IBD_OP_NOTSTARTED		0
+#define	IBD_OP_ONGOING			1
+#define	IBD_OP_COMPLETED		2
+#define	IBD_OP_ERRORED			3
+#define	IBD_OP_ROUTERED			4
+
+/*
+ * Miscellaneous constants
+ */
+#define	IBD_SEND			0
+#define	IBD_RECV			1
+#define	IB_MGID_IPV4_LOWGRP_MASK	0xFFFFFFFF
+#ifdef IBD_LOGGING
+#define	IBD_DMAX_LINE			100
+#endif
+
+/*
+ * Enumerations for link states
+ */
+typedef enum {
+	IBD_LINK_DOWN,
+	IBD_LINK_UP,
+	IBD_LINK_UP_ABSENT
+} ibd_link_op_t;
+
+/*
+ * Driver State Pointer
+ */
 void *ibd_list;
 
-/* Required system entry points */
+/*
+ * Logging
+ */
+#ifdef IBD_LOGGING
+kmutex_t ibd_lbuf_lock;
+uint8_t *ibd_lbuf;
+uint32_t ibd_lbuf_ndx;
+#endif
+
+/*
+ * Required system entry points
+ */
 static int ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int ibd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
-/* Required driver entry points for GLDv3 */
+/*
+ * Required driver entry points for GLDv3
+ */
+static int ibd_m_stat(void *, uint_t, uint64_t *);
 static int ibd_m_start(void *);
 static void ibd_m_stop(void *);
-static int ibd_m_unicst(void *, const uint8_t *);
-static int ibd_m_multicst(void *, boolean_t, const uint8_t *);
 static int ibd_m_promisc(void *, boolean_t);
-static int ibd_m_stat(void *, uint_t, uint64_t *);
-static boolean_t ibd_m_getcapab(void *, mac_capab_t, void *);
+static int ibd_m_multicst(void *, boolean_t, const uint8_t *);
+static int ibd_m_unicst(void *, const uint8_t *);
 static mblk_t *ibd_m_tx(void *, mblk_t *);
+static boolean_t ibd_m_getcapab(void *, mac_capab_t, void *);
 
-/* Private driver entry points for GLDv3 */
-static boolean_t ibd_send(ibd_state_t *, mblk_t *);
+/*
+ * Private driver entry points for GLDv3
+ */
+
+/*
+ * Initialization
+ */
+static int ibd_state_init(ibd_state_t *, dev_info_t *);
+static int ibd_drv_init(ibd_state_t *);
+static int ibd_init_txlist(ibd_state_t *);
+static int ibd_init_rxlist(ibd_state_t *);
+static int ibd_acache_init(ibd_state_t *);
+#ifdef IBD_LOGGING
+static void ibd_log_init(void);
+#endif
+
+/*
+ * Termination/cleanup
+ */
+static void ibd_state_fini(ibd_state_t *);
+static void ibd_drv_fini(ibd_state_t *);
+static void ibd_fini_txlist(ibd_state_t *);
+static void ibd_fini_rxlist(ibd_state_t *);
+static void ibd_tx_cleanup(ibd_state_t *, ibd_swqe_t *);
+static void ibd_acache_fini(ibd_state_t *);
+#ifdef IBD_LOGGING
+static void ibd_log_fini(void);
+#endif
+
+/*
+ * Allocation/acquire/map routines
+ */
+static int ibd_alloc_swqe(ibd_state_t *, ibd_swqe_t **, int, ibt_lkey_t);
+static int ibd_alloc_rwqe(ibd_state_t *, ibd_rwqe_t **);
+static int ibd_alloc_tx_copybufs(ibd_state_t *);
+static int ibd_alloc_tx_lsobufs(ibd_state_t *);
+static int ibd_acquire_swqe(ibd_state_t *, ibd_swqe_t **);
+static int ibd_acquire_lsobufs(ibd_state_t *, uint_t, ibt_wr_ds_t *,
+    uint32_t *);
+
+/*
+ * Free/release/unmap routines
+ */
+static void ibd_free_swqe(ibd_state_t *, ibd_swqe_t *);
+static void ibd_free_rwqe(ibd_state_t *, ibd_rwqe_t *);
+static void ibd_delete_rwqe(ibd_state_t *, ibd_rwqe_t *);
+static void ibd_free_tx_copybufs(ibd_state_t *);
+static void ibd_free_tx_lsobufs(ibd_state_t *);
+static void ibd_release_swqe(ibd_state_t *, ibd_swqe_t *);
+static void ibd_release_lsobufs(ibd_state_t *, ibt_wr_ds_t *, uint32_t);
+static void ibd_free_lsohdr(ibd_swqe_t *, mblk_t *);
+static void ibd_unmap_mem(ibd_state_t *, ibd_swqe_t *);
+
+/*
+ * Handlers/callback routines
+ */
 static uint_t ibd_intr(char *);
 static uint_t ibd_tx_recycle(char *);
-static int ibd_state_init(ibd_state_t *, dev_info_t *);
-static void ibd_state_fini(ibd_state_t *);
-static int ibd_drv_init(ibd_state_t *);
-static void ibd_drv_fini(ibd_state_t *);
 static void ibd_rcq_handler(ibt_cq_hdl_t, void *);
 static void ibd_scq_handler(ibt_cq_hdl_t, void *);
-static void ibd_snet_notices_handler(void *, ib_gid_t,
-    ibt_subnet_event_code_t, ibt_subnet_event_t *);
-static int ibd_init_txlist(ibd_state_t *);
-static void ibd_fini_txlist(ibd_state_t *);
-static int ibd_init_rxlist(ibd_state_t *);
-static void ibd_fini_rxlist(ibd_state_t *);
+static void ibd_poll_compq(ibd_state_t *, ibt_cq_hdl_t);
+static uint_t ibd_drain_cq(ibd_state_t *, ibt_cq_hdl_t, ibt_wc_t *, uint_t);
 static void ibd_freemsg_cb(char *);
-static void ibd_tx_cleanup(ibd_state_t *, ibd_swqe_t *);
-static void ibd_process_rx(ibd_state_t *, ibd_rwqe_t *, ibt_wc_t *);
-static int ibd_alloc_swqe(ibd_state_t *, ibd_swqe_t **);
-static void ibd_free_swqe(ibd_state_t *, ibd_swqe_t *);
-static int ibd_alloc_rwqe(ibd_state_t *, ibd_rwqe_t **);
-static void ibd_free_rwqe(ibd_state_t *, ibd_rwqe_t *);
 static void ibd_async_handler(void *, ibt_hca_hdl_t, ibt_async_code_t,
     ibt_async_event_t *);
-static int ibd_acache_init(ibd_state_t *);
-static void ibd_acache_fini(ibd_state_t *);
-static ibd_mce_t *ibd_join_group(ibd_state_t *, ib_gid_t, uint8_t);
-static void ibd_async_reap_group(ibd_state_t *, ibd_mce_t *, ib_gid_t, uint8_t);
-static void ibd_async_unsetprom(ibd_state_t *);
-static void ibd_async_setprom(ibd_state_t *);
-static void ibd_async_multicast(ibd_state_t *, ib_gid_t, int);
-static void ibd_async_acache(ibd_state_t *, ipoib_mac_t *);
-static void ibd_async_txsched(ibd_state_t *);
-static void ibd_async_trap(ibd_state_t *, ibd_req_t *);
-static void ibd_async_work(ibd_state_t *);
-static void ibd_async_link(ibd_state_t *, ibd_req_t *);
-static ibd_mce_t *ibd_mcache_find(ib_gid_t, struct list *);
-static int ibd_post_rwqe(ibd_state_t *, ibd_rwqe_t *, boolean_t);
-static boolean_t ibd_get_allroutergroup(ibd_state_t *, ipoib_mac_t *,
-    ipoib_mac_t *);
-static void ibd_poll_compq(ibd_state_t *, ibt_cq_hdl_t);
-static void ibd_deregister_mr(ibd_state_t *, ibd_swqe_t *);
-static void ibd_reacquire_group(ibd_state_t *, ibd_mce_t *);
-static void ibd_leave_group(ibd_state_t *, ib_gid_t, uint8_t);
-static uint64_t ibd_get_portspeed(ibd_state_t *);
+static void ibd_snet_notices_handler(void *, ib_gid_t,
+    ibt_subnet_event_code_t, ibt_subnet_event_t *);
 
-#ifdef RUN_PERFORMANCE
-static void ibd_perf(ibd_state_t *);
+/*
+ * Send/receive routines
+ */
+static boolean_t ibd_send(ibd_state_t *, mblk_t *);
+static void ibd_post_send(ibd_state_t *, ibd_swqe_t *);
+static int ibd_post_rwqe(ibd_state_t *, ibd_rwqe_t *, boolean_t);
+static void ibd_process_rx(ibd_state_t *, ibd_rwqe_t *, ibt_wc_t *);
+static void ibd_flush_rx(ibd_state_t *, mblk_t *);
+
+/*
+ * Threads
+ */
+static void ibd_async_work(ibd_state_t *);
+
+/*
+ * Async tasks
+ */
+static void ibd_async_acache(ibd_state_t *, ipoib_mac_t *);
+static void ibd_async_multicast(ibd_state_t *, ib_gid_t, int);
+static void ibd_async_setprom(ibd_state_t *);
+static void ibd_async_unsetprom(ibd_state_t *);
+static void ibd_async_reap_group(ibd_state_t *, ibd_mce_t *, ib_gid_t, uint8_t);
+static void ibd_async_trap(ibd_state_t *, ibd_req_t *);
+static void ibd_async_txsched(ibd_state_t *);
+static void ibd_async_link(ibd_state_t *, ibd_req_t *);
+
+/*
+ * Async task helpers
+ */
+static ibd_mce_t *ibd_async_mcache(ibd_state_t *, ipoib_mac_t *, boolean_t *);
+static ibd_mce_t *ibd_join_group(ibd_state_t *, ib_gid_t, uint8_t);
+static ibd_mce_t *ibd_mcache_find(ib_gid_t, struct list *);
+static boolean_t ibd_get_allroutergroup(ibd_state_t *,
+    ipoib_mac_t *, ipoib_mac_t *);
+static void ibd_leave_group(ibd_state_t *, ib_gid_t, uint8_t);
+static void ibd_reacquire_group(ibd_state_t *, ibd_mce_t *);
+static ibt_status_t ibd_iba_join(ibd_state_t *, ib_gid_t, ibd_mce_t *);
+static ibt_status_t ibd_find_bgroup(ibd_state_t *);
+static void ibd_n2h_gid(ipoib_mac_t *, ib_gid_t *);
+static void ibd_h2n_mac(ipoib_mac_t *, ib_qpn_t, ib_sn_prefix_t, ib_guid_t);
+static uint64_t ibd_get_portspeed(ibd_state_t *);
+static int ibd_get_portpkey(ibd_state_t *, ib_guid_t *);
+static boolean_t ibd_async_safe(ibd_state_t *);
+static void ibd_async_done(ibd_state_t *);
+static ibd_ace_t *ibd_acache_find(ibd_state_t *, ipoib_mac_t *, boolean_t, int);
+static ibd_ace_t *ibd_acache_lookup(ibd_state_t *, ipoib_mac_t *, int *, int);
+static ibd_ace_t *ibd_acache_get_unref(ibd_state_t *);
+static boolean_t ibd_acache_recycle(ibd_state_t *, ipoib_mac_t *, boolean_t);
+static void ibd_link_mod(ibd_state_t *, ibt_async_code_t);
+
+/*
+ * Miscellaneous helpers
+ */
+static int ibd_sched_poll(ibd_state_t *, int, int);
+static void ibd_queue_work_slot(ibd_state_t *, ibd_req_t *, int);
+static int ibd_resume_transmission(ibd_state_t *);
+static int ibd_setup_lso(ibd_swqe_t *, mblk_t *, uint32_t, ibt_ud_dest_hdl_t);
+static int ibd_prepare_sgl(ibd_state_t *, mblk_t *, ibd_swqe_t *, uint_t);
+static void *list_get_head(list_t *);
+static int ibd_hash_key_cmp(mod_hash_key_t, mod_hash_key_t);
+static uint_t ibd_hash_by_id(void *, mod_hash_key_t);
+static void ibd_print_warn(ibd_state_t *, char *, ...);
+#ifdef IBD_LOGGING
+static void ibd_log(const char *, ...);
 #endif
 
 DDI_DEFINE_STREAM_OPS(ibd_dev_ops, nulldev, nulldev, ibd_attach, ibd_detach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_needed);
 
 /* Module Driver Info */
 static struct modldrv ibd_modldrv = {
@@ -263,9 +425,7 @@ static struct modlinkage ibd_modlinkage = {
 };
 
 /*
- * Module Info passed to IBTL during IBT_ATTACH.
- *   NOTE:  This data must be static (i.e. IBTL just keeps a pointer to this
- *	    data).
+ * Module (static) info passed to IBTL during ibt_attach
  */
 static struct ibt_clnt_modinfo_s ibd_clnt_modinfo = {
 	IBTI_V_CURR,
@@ -276,30 +436,8 @@ static struct ibt_clnt_modinfo_s ibd_clnt_modinfo = {
 };
 
 /*
- * Async operation types.
+ * GLDv3 entry points
  */
-#define	ASYNC_GETAH	1
-#define	ASYNC_JOIN	2
-#define	ASYNC_LEAVE	3
-#define	ASYNC_PROMON	4
-#define	ASYNC_PROMOFF	5
-#define	ASYNC_REAP	6
-#define	ASYNC_TRAP	8
-#define	ASYNC_SCHED	9
-#define	ASYNC_LINK	10
-#define	ASYNC_EXIT	11
-
-/*
- * Async operation states
- */
-#define	NOTSTARTED	0
-#define	ONGOING		1
-#define	COMPLETED	2
-#define	ERRORED		3
-#define	ROUTERED	4
-
-#define	IB_MCGID_IPV4_LOW_GROUP_MASK 0xFFFFFFFF
-
 #define	IBD_M_CALLBACK_FLAGS	(MC_GETCAPAB)
 static mac_callbacks_t ib_m_callbacks = {
 	IBD_M_CALLBACK_FLAGS,
@@ -314,9 +452,29 @@ static mac_callbacks_t ib_m_callbacks = {
 	ibd_m_getcapab
 };
 
-#ifdef DEBUG
+/*
+ * Fill/clear <scope> and <p_key> in multicast/broadcast address
+ */
+#define	IBD_FILL_SCOPE_PKEY(maddr, scope, pkey)		\
+{							\
+	*(uint32_t *)((char *)(maddr) + 4) |=		\
+	    htonl((uint32_t)(scope) << 16);		\
+	*(uint32_t *)((char *)(maddr) + 8) |=		\
+	    htonl((uint32_t)(pkey) << 16);		\
+}
 
-static int rxpack = 1, txpack = 1;
+#define	IBD_CLEAR_SCOPE_PKEY(maddr)			\
+{							\
+	*(uint32_t *)((char *)(maddr) + 4) &=		\
+	    htonl(~((uint32_t)0xF << 16));		\
+	*(uint32_t *)((char *)(maddr) + 8) &=		\
+	    htonl(~((uint32_t)0xFFFF << 16));		\
+}
+
+/*
+ * Rudimentary debugging support
+ */
+#ifdef DEBUG
 int ibd_debuglevel = 100;
 static void
 debug_print(int l, char *fmt, ...)
@@ -329,17 +487,10 @@ debug_print(int l, char *fmt, ...)
 	vcmn_err(CE_CONT, fmt, ap);
 	va_end(ap);
 }
-#define	INCRXPACK	(rxpack++)
-#define	INCTXPACK	(txpack++)
 #define	DPRINT		debug_print
-
-#else /* DEBUG */
-
-#define	INCRXPACK	0
-#define	INCTXPACK	0
+#else
 #define	DPRINT
-
-#endif /* DEBUG */
+#endif
 
 /*
  * Common routine to print warning messages; adds in hca guid, port number
@@ -366,57 +517,180 @@ ibd_print_warn(ibd_state_t *state, char *fmt, ...)
 	va_end(ap);
 }
 
-/* warlock directives */
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_ac_mutex, 
-    ibd_state_t::id_ah_active))
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_ac_mutex, ibd_state_t::id_ah_free))
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock, 
-    ibd_state_t::id_req_list))
+/*
+ * Warlock directives
+ */
+
+/*
+ * id_lso_lock
+ *
+ * state->id_lso->bkt_nfree may be accessed without a lock to
+ * determine the threshold at which we have to ask the nw layer
+ * to resume transmission (see ibd_resume_transmission()).
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_lso_lock,
+    ibd_state_t::id_lso))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ibd_state_t::id_lso))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ibd_lsobkt_t::bkt_nfree))
+
+/*
+ * id_cq_poll_lock
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_cq_poll_lock,
+    ibd_state_t::id_cq_poll_busy))
+
+/*
+ * id_txpost_lock
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_txpost_lock,
+    ibd_state_t::id_tx_head))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_txpost_lock,
+    ibd_state_t::id_tx_busy))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_txpost_lock,
+    ibd_state_t::id_tx_tailp))
+
+/*
+ * id_rxpost_lock
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_rxpost_lock,
+    ibd_state_t::id_rx_head))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_rxpost_lock,
+    ibd_state_t::id_rx_busy))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_rxpost_lock,
+    ibd_state_t::id_rx_tailp))
+
+/*
+ * id_acache_req_lock
+ */
 _NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock, 
     ibd_state_t::id_acache_req_cv))
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_mc_mutex, 
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock, 
+    ibd_state_t::id_req_list))
+
+/*
+ * id_ac_mutex
+ *
+ * This mutex is actually supposed to protect id_ah_op as well,
+ * but this path of the code isn't clean (see update of id_ah_op
+ * in ibd_async_acache(), immediately after the call to
+ * ibd_async_mcache()). For now, we'll skip this check by
+ * declaring that id_ah_op is protected by some internal scheme
+ * that warlock isn't aware of.
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_ac_mutex,
+    ibd_state_t::id_ah_active))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_ac_mutex,
+    ibd_state_t::id_ah_free))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_ac_mutex,
+    ibd_state_t::id_ah_addr))
+_NOTE(SCHEME_PROTECTS_DATA("ac mutex should protect this",
+    ibd_state_t::id_ah_op))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_ac_mutex,
+    ibd_state_t::id_ah_error))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ibd_state_t::id_ah_error))
+
+/*
+ * id_mc_mutex
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_mc_mutex,
     ibd_state_t::id_mc_full))
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_mc_mutex, 
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_mc_mutex,
     ibd_state_t::id_mc_non))
+
+/*
+ * id_trap_lock
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_trap_lock,
+    ibd_state_t::id_trap_cv))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_trap_lock,
+    ibd_state_t::id_trap_stop))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_trap_lock,
+    ibd_state_t::id_trap_inprog))
+
+/*
+ * id_prom_op
+ */
+_NOTE(SCHEME_PROTECTS_DATA("only by async thread",
+    ibd_state_t::id_prom_op))
+
+/*
+ * id_sched_lock
+ */
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_sched_lock,
+    ibd_state_t::id_sched_needed))
+
+/*
+ * id_link_mutex
+ */
 _NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_link_mutex, 
     ibd_state_t::id_link_state))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ibd_state_t::id_link_state))
+_NOTE(SCHEME_PROTECTS_DATA("only async thr and drv init",
+    ibd_state_t::id_link_speed))
+
+/*
+ * id_tx_list.dl_mutex
+ */
 _NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_tx_list.dl_mutex, 
-    ibd_state_s::id_tx_list))
+    ibd_state_t::id_tx_list.dl_head))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_tx_list.dl_mutex, 
+    ibd_state_t::id_tx_list.dl_tail))
+_NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
+    ibd_state_t::id_tx_list.dl_pending_sends))
+_NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
+    ibd_state_t::id_tx_list.dl_cnt))
+
+/*
+ * id_rx_list.dl_mutex
+ */
 _NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_rx_list.dl_mutex, 
-    ibd_state_s::id_rx_list))
+    ibd_state_t::id_rx_list.dl_head))
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_rx_list.dl_mutex, 
+    ibd_state_t::id_rx_list.dl_tail))
+_NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
+    ibd_state_t::id_rx_list.dl_bufs_outstanding))
+_NOTE(SCHEME_PROTECTS_DATA("atomic or dl mutex or single thr",
+    ibd_state_t::id_rx_list.dl_cnt))
 
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_ah_error))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_ah_op))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_num_intrs))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_prom_op))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_rx_short))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_rx_list))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_state_s::id_tx_list))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_acache_rq::rq_op))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_acache_rq::rq_gid))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_acache_rq::rq_ptr))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_acache_s::ac_mce))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_acache_s::ac_ref))
 
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_wqe_s))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_rwqe_s))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_swqe_s))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ipoib_mac))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ipoib_pgrh))
+/*
+ * Items protected by atomic updates
+ */
+_NOTE(SCHEME_PROTECTS_DATA("atomic update only",
+    ibd_state_s::id_brd_rcv
+    ibd_state_s::id_brd_xmt
+    ibd_state_s::id_multi_rcv
+    ibd_state_s::id_multi_xmt
+    ibd_state_s::id_num_intrs
+    ibd_state_s::id_rcv_bytes
+    ibd_state_s::id_rcv_pkt
+    ibd_state_s::id_tx_short
+    ibd_state_s::id_xmt_bytes
+    ibd_state_s::id_xmt_pkt))
 
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ib_gid_s))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_mce_t::mc_req))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_mce_t::mc_fullreap))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", ibd_mce_t::mc_jstate))
-
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", msgb::b_rptr))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", msgb::b_wptr))
-_NOTE(SCHEME_PROTECTS_DATA("Protected by Scheme", callb_cpr::cc_id))
-
-#ifdef DEBUG
-_NOTE(SCHEME_PROTECTS_DATA("Protected_by_Scheme", rxpack))
-_NOTE(SCHEME_PROTECTS_DATA("Protected_by_Scheme", txpack))
-#endif
+/*
+ * Non-mutex protection schemes for data elements. Almost all of
+ * these are non-shared items.
+ */
+_NOTE(SCHEME_PROTECTS_DATA("unshared or single-threaded",
+    callb_cpr
+    ib_gid_s
+    ib_header_info
+    ibd_acache_rq
+    ibd_acache_s::ac_mce
+    ibd_mcache::mc_fullreap
+    ibd_mcache::mc_jstate
+    ibd_mcache::mc_req
+    ibd_rwqe_s
+    ibd_swqe_s
+    ibd_wqe_s
+    ibt_wr_ds_s::ds_va
+    ibt_wr_lso_s
+    ipoib_mac::ipoib_qpn
+    mac_capab_lso_s
+    msgb::b_next
+    msgb::b_rptr
+    msgb::b_wptr))
 
 int
 _init()
@@ -448,6 +722,9 @@ _init()
 		return (status);
 	}
 
+#ifdef IBD_LOGGING
+	ibd_log_init();
+#endif
 	return (0);
 }
 
@@ -468,6 +745,9 @@ _fini()
 
 	mac_fini_ops(&ibd_dev_ops);
 	ddi_soft_state_fini(&ibd_list);
+#ifdef IBD_LOGGING
+	ibd_log_fini();
+#endif
 	return (0);
 }
 
@@ -542,96 +822,6 @@ ibd_get_allroutergroup(ibd_state_t *state, ipoib_mac_t *mcmac,
 }
 
 /*
- * Implementation of various (software) flavors of send and receive side
- * checksumming.
- */
-#define	IBD_CKSUM_SEND(mp) {						\
-	uint32_t start, stuff, end, value, flags;			\
-	uint32_t cksum, sum;						\
-	uchar_t *dp, *buf;						\
-	uint16_t *up;							\
-									\
-	if (ibd_csum_send == IBD_CSUM_NONE)				\
-		goto punt_send;						\
-									\
-	/*								\
-	 * Query IP whether Tx cksum needs to be done.			\
-	 */								\
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end,		\
-	    &value, &flags);						\
-									\
-	if (flags == HCK_PARTIALCKSUM)	{				\
-		dp = ((uchar_t *)mp->b_rptr + IPOIB_HDRSIZE);		\
-		up =  (uint16_t *)(dp + stuff);				\
-		if (ibd_csum_send == IBD_CSUM_PARTIAL) {		\
-			end = ((uchar_t *)mp->b_wptr - dp - start);	\
-			cksum = *up;					\
-			*up = 0;					\
-			/*						\
-			 * Does NOT handle chained mblks/more than one	\
-			 * SGL. Applicable only for a single SGL	\
-			 * entry/mblk, where the stuff offset is	\
-			 * within the range of buf.			\
-			 */						\
-			buf = (dp + start);				\
-			sum = IP_BCSUM_PARTIAL(buf, end, cksum);	\
-		} else {						\
-			sum = *up;					\
-		}							\
-		DPRINT(10, "strt %d stff %d end %d sum: %x csm %x \n",	\
-		    start, stuff, end, sum, cksum);			\
-		sum = ~(sum);						\
-		*(up) = (uint16_t)((sum) ? (sum) : ~(sum));		\
-	}								\
-punt_send:								\
-	;								\
-}
-
-#define	IBD_CKSUM_RECV(mp) {						\
-	uchar_t *dp, *buf;						\
-	uint32_t start, end, value, stuff, flags;			\
-	uint16_t *up, frag;						\
-	ipha_t *iphp;							\
-	ipoib_hdr_t *ipibh;						\
-									\
-	if (ibd_csum_recv == IBD_CSUM_NONE)				\
-		goto punt_recv;					 	\
-									\
-	ipibh = (ipoib_hdr_t *)((uchar_t *)mp->b_rptr + IPOIB_GRH_SIZE);\
-	if (ntohs(ipibh->ipoib_type) != ETHERTYPE_IP)		 	\
-		goto punt_recv;						\
-									\
-	dp = ((uchar_t *)ipibh + IPOIB_HDRSIZE);			\
-	iphp = (ipha_t *)dp;						\
-	frag = ntohs(iphp->ipha_fragment_offset_and_flags);		\
-	if ((frag) & (~IPH_DF))						\
-		goto punt_recv;						\
-	start = IPH_HDR_LENGTH(iphp);					\
-	if (iphp->ipha_protocol == IPPROTO_TCP)				\
-		stuff = start + 16;					\
-	else if (iphp->ipha_protocol == IPPROTO_UDP)			\
-		stuff = start + 6;					\
-	else								\
-		goto punt_recv;						\
-									\
-	flags = HCK_PARTIALCKSUM;					\
-	end = ntohs(iphp->ipha_length);					\
-	up = (uint16_t *)(dp + stuff);					\
-									\
-	if (ibd_csum_recv == IBD_CSUM_PARTIAL) {			\
-		buf = (dp + start);					\
-		value = IP_BCSUM_PARTIAL(buf, end - start, 0);		\
-	} else {							\
-		value = (*up);						\
-	}								\
-	if (hcksum_assoc(mp, NULL, NULL, start, stuff, end,		\
-	    value, flags, 0) != 0)					\
-		DPRINT(10, "cksum_recv: value: %x\n", value);		\
-punt_recv:								\
-	;								\
-}
-
-/*
  * Padding for nd6 Neighbor Solicitation and Advertisement needs to be at
  * front of optional src/tgt link layer address. Right now Solaris inserts
  * padding by default at the end. The routine which is doing is nce_xmit()
@@ -665,7 +855,7 @@ punt_recv:								\
 		    + IPV6_HDR_LEN + sizeof (nd_neighbor_advert_t));	\
 		ASSERT(opt != NULL);					\
 		nd_lla_ptr = (uchar_t *)&opt[1];			\
-		if (type == 0) {					\
+		if (type == IBD_SEND) {					\
 			for (i = IPOIB_ADDRL; i > 0; i--)		\
 				*(nd_lla_ptr + i + 1) =			\
 				    *(nd_lla_ptr + i - 1);		\
@@ -677,365 +867,6 @@ punt_recv:								\
 		*(nd_lla_ptr + i) = 0;					\
 		*(nd_lla_ptr + i + 1) = 0;				\
 	}								\
-}
-
-/*
- * The service fifo code is copied verbatim from Cassini. This can be
- * enhanced by doing a cpu_bind_thread() to bind each fifo to a cpu.
- */
-
-typedef caddr_t fifo_obj_t, *p_fifo_obj_t;
-
-typedef struct _srv_fifo_t {
-	kmutex_t fifo_lock;
-	kcondvar_t fifo_cv;
-	size_t size;
-	uint_t max_index;
-	uint_t rd_index;
-	uint_t wr_index;
-	uint_t objs_pending;
-	p_fifo_obj_t fifo_objs;
-	kthread_t *fifo_thread;
-	void (*drain_func)(caddr_t drain_func_arg);
-	caddr_t drain_func_arg;
-	boolean_t running;
-	callb_cpr_t cprinfo;
-} srv_fifo_t, *p_srv_fifo_t;
-_NOTE(MUTEX_PROTECTS_DATA(_srv_fifo_t::fifo_lock, _srv_fifo_t::fifo_cv))
-_NOTE(MUTEX_PROTECTS_DATA(_srv_fifo_t::fifo_lock, _srv_fifo_t::cprinfo))
-
-static int
-_ddi_srv_fifo_create(p_srv_fifo_t *handle, size_t size,
-			void (*drain_func)(), caddr_t drain_func_arg)
-{
-	int status;
-	p_srv_fifo_t srv_fifo;
-
-	status = DDI_SUCCESS;
-	srv_fifo = (p_srv_fifo_t)kmem_zalloc(sizeof (srv_fifo_t), KM_SLEEP);
-	srv_fifo->size = size;
-	srv_fifo->max_index = size - 1;
-	srv_fifo->fifo_objs = (p_fifo_obj_t)kmem_zalloc(
-	    size * sizeof (fifo_obj_t), KM_SLEEP);
-	mutex_init(&srv_fifo->fifo_lock, "srv_fifo", MUTEX_DRIVER, NULL);
-	cv_init(&srv_fifo->fifo_cv, "srv_fifo", CV_DRIVER, NULL);
-	srv_fifo->drain_func = drain_func;
-	srv_fifo->drain_func_arg = drain_func_arg;
-	srv_fifo->running = DDI_SUCCESS;
-	srv_fifo->fifo_thread = thread_create(NULL, 0, drain_func,
-	    (caddr_t)srv_fifo, 0, &p0, TS_RUN, 60);
-	if (srv_fifo->fifo_thread == NULL) {
-		cv_destroy(&srv_fifo->fifo_cv);
-		mutex_destroy(&srv_fifo->fifo_lock);
-		kmem_free(srv_fifo->fifo_objs, size * sizeof (fifo_obj_t));
-		kmem_free(srv_fifo, sizeof (srv_fifo_t));
-		srv_fifo = NULL;
-		status = DDI_FAILURE;
-	} else
-		*handle = srv_fifo;
-	return (status);
-}
-
-static void
-_ddi_srv_fifo_destroy(p_srv_fifo_t handle)
-{
-	kt_did_t tid = handle->fifo_thread->t_did;
-
-	mutex_enter(&handle->fifo_lock);
-	handle->running = DDI_FAILURE;
-	cv_signal(&handle->fifo_cv);
-	while (handle->running == DDI_FAILURE)
-		cv_wait(&handle->fifo_cv, &handle->fifo_lock);
-	mutex_exit(&handle->fifo_lock);
-	if (handle->objs_pending != 0)
-		cmn_err(CE_NOTE, "!Thread Exit with work undone.");
-	cv_destroy(&handle->fifo_cv);
-	mutex_destroy(&handle->fifo_lock);
-	kmem_free(handle->fifo_objs, handle->size * sizeof (fifo_obj_t));
-	kmem_free(handle, sizeof (srv_fifo_t));
-	thread_join(tid);
-}
-
-static caddr_t
-_ddi_srv_fifo_begin(p_srv_fifo_t handle)
-{
-#ifndef __lock_lint
-	CALLB_CPR_INIT(&handle->cprinfo, &handle->fifo_lock,
-	    callb_generic_cpr, "srv_fifo");
-#endif /* ! _lock_lint */
-	return (handle->drain_func_arg);
-}
-
-static void
-_ddi_srv_fifo_end(p_srv_fifo_t handle)
-{
-	callb_cpr_t cprinfo;
-
-	mutex_enter(&handle->fifo_lock);
-	cprinfo = handle->cprinfo;
-	handle->running = DDI_SUCCESS;
-	cv_signal(&handle->fifo_cv);
-#ifndef __lock_lint
-	CALLB_CPR_EXIT(&cprinfo);
-#endif /* ! _lock_lint */
-	thread_exit();
-	_NOTE(NOT_REACHED)
-}
-
-static int
-_ddi_put_fifo(p_srv_fifo_t handle, fifo_obj_t ptr, boolean_t signal)
-{
-	int status;
-
-	mutex_enter(&handle->fifo_lock);
-	status = handle->running;
-	if (status == DDI_SUCCESS) {
-		if (ptr) {
-			if (handle->objs_pending < handle->size) {
-				if (handle->wr_index == handle->max_index)
-					handle->wr_index = 0;
-				else
-					handle->wr_index++;
-				handle->fifo_objs[handle->wr_index] = ptr;
-				handle->objs_pending++;
-			} else
-				status = DDI_FAILURE;
-			if (signal)
-				cv_signal(&handle->fifo_cv);
-		} else {
-			if (signal && (handle->objs_pending > 0))
-				cv_signal(&handle->fifo_cv);
-		}
-	}
-	mutex_exit(&handle->fifo_lock);
-	return (status);
-}
-
-static int
-_ddi_get_fifo(p_srv_fifo_t handle, p_fifo_obj_t ptr)
-{
-	int status;
-
-	mutex_enter(&handle->fifo_lock);
-	status = handle->running;
-	if (status == DDI_SUCCESS) {
-		if (handle->objs_pending == 0) {
-#ifndef __lock_lint
-			CALLB_CPR_SAFE_BEGIN(&handle->cprinfo);
-			cv_wait(&handle->fifo_cv, &handle->fifo_lock);
-			CALLB_CPR_SAFE_END(&handle->cprinfo,
-			    &handle->fifo_lock);
-#endif /* !_lock_lint */
-			*ptr = NULL;
-		}
-		if (handle->objs_pending > 0) {
-			if (handle->rd_index == handle->max_index)
-				handle->rd_index = 0;
-			else
-				handle->rd_index++;
-			*ptr = handle->fifo_objs[handle->rd_index];
-			handle->objs_pending--;
-		}
-		status = handle->running;
-	} else {
-		if (handle->objs_pending) {
-			if (handle->rd_index == handle->max_index)
-				handle->rd_index = 0;
-			else
-				handle->rd_index++;
-			*ptr = handle->fifo_objs[handle->rd_index];
-			handle->objs_pending--;
-			status = DDI_SUCCESS;
-		} else
-			status = DDI_FAILURE;
-	}
-	mutex_exit(&handle->fifo_lock);
-	return (status);
-}
-
-/*
- * [un]map_rx_srv_fifos has been modified from its CE version.
- */
-static void
-drain_fifo(p_srv_fifo_t handle)
-{
-	ibd_state_t *state;
-	mblk_t *mp;
-
-	state = (ibd_state_t *)_ddi_srv_fifo_begin(handle);
-	while (_ddi_get_fifo(handle, (p_fifo_obj_t)&mp) == DDI_SUCCESS) {
-		/*
-		 * Hand off to GLDv3.
-		 */
-		IBD_CKSUM_RECV(mp);
-		mac_rx(state->id_mh, NULL, mp);
-	}
-	_ddi_srv_fifo_end(handle);
-}
-
-static p_srv_fifo_t *
-map_rx_srv_fifos(int *nfifos, void *private)
-{
-	p_srv_fifo_t *srv_fifos;
-	int i, inst_taskqs, depth;
-
-	/*
-	 * Default behavior on both sparc and amd cpus in terms of
-	 * of worker thread is as follows: (N) indicates worker thread
-	 * not enabled , (Y) indicates worker thread enabled. Default of
-	 * ibd_srv_fifo is set to 0xffff. The default behavior can be
-	 * overridden by setting ibd_srv_fifos to 0 or 1 as shown below.
-	 * Worker thread model assigns lower priority to network
-	 * processing making system more usable at higher network
-	 * loads.
-	 *  ________________________________________________________
-	 * |Value of ibd_srv_fifo | 0 | 1 | 0xffff| 0 | 1 | 0xfffff |
-	 * |----------------------|---|---|-------|---|---|---------|
-	 * |			  |   Sparc	  |   	x86	    |
-	 * |----------------------|---|---|-------|---|---|---------|
-	 * | Single CPU		  |N  | Y | N	  | N | Y | N	    |
-	 * |----------------------|---|---|-------|---|---|---------|
-	 * | Multi CPU		  |N  | Y | Y	  | N | Y | Y	    |
-	 * |______________________|___|___|_______|___|___|_________|
-	 */
-	if ((((inst_taskqs = ncpus) == 1) && (ibd_srv_fifos != 1)) ||
-	    (ibd_srv_fifos == 0)) {
-		*nfifos = 0;
-		return ((p_srv_fifo_t *)1);
-	}
-
-	*nfifos = inst_taskqs;
-	srv_fifos = kmem_zalloc(inst_taskqs * sizeof (p_srv_fifo_t),
-	    KM_SLEEP);
-
-	/*
-	 * If the administrator has specified a fifo depth, use
-	 * that, else just decide what should be the depth.
-	 */
-	if (ibd_fifo_depth == 0)
-		depth = (IBD_NUM_RWQE / inst_taskqs) + 16;
-	else
-		depth = ibd_fifo_depth;
-
-	for (i = 0; i < inst_taskqs; i++)
-		if (_ddi_srv_fifo_create(&srv_fifos[i],
-		    depth, drain_fifo,
-		    (caddr_t)private) != DDI_SUCCESS)
-			break;
-
-	if (i < inst_taskqs)
-		goto map_rx_srv_fifos_fail1;
-
-	goto map_rx_srv_fifos_exit;
-
-map_rx_srv_fifos_fail1:
-	i--;
-	for (; i >= 0; i--) {
-		_ddi_srv_fifo_destroy(srv_fifos[i]);
-	}
-	kmem_free(srv_fifos, inst_taskqs * sizeof (p_srv_fifo_t));
-	srv_fifos = NULL;
-
-map_rx_srv_fifos_exit:
-	return (srv_fifos);
-}
-
-static void
-unmap_rx_srv_fifos(int inst_taskqs, p_srv_fifo_t *srv_fifos)
-{
-	int i;
-
-	/*
-	 * If this interface was not using service fifos, quickly return.
-	 */
-	if (inst_taskqs == 0)
-		return;
-
-	for (i = 0; i < inst_taskqs; i++) {
-		_ddi_srv_fifo_destroy(srv_fifos[i]);
-	}
-	kmem_free(srv_fifos, inst_taskqs * sizeof (p_srv_fifo_t));
-}
-
-/*
- * Choose between sending up the packet directly and handing off
- * to a service thread.
- */
-static void
-ibd_send_up(ibd_state_t *state, mblk_t *mp)
-{
-	p_srv_fifo_t *srvfifo;
-	ipoib_hdr_t *lhdr;
-	struct ip *ip_hdr;
-	struct udphdr *tran_hdr;
-	uchar_t prot;
-	int tnum = -1, nfifos = state->id_nfifos;
-
-	/*
-	 * Quick path if the interface is not using service fifos.
-	 */
-	if (nfifos == 0) {
-hand_off:
-		IBD_CKSUM_RECV(mp);
-		mac_rx(state->id_mh, NULL, mp);
-		return;
-	}
-
-	/*
-	 * Is the packet big enough to look at the IPoIB header
-	 * and basic IP header to determine whether it is an
-	 * IPv4 packet?
-	 */
-	if (MBLKL(mp) >= (IPOIB_GRH_SIZE + IPOIB_HDRSIZE +
-	    sizeof (struct ip))) {
-
-		lhdr = (ipoib_hdr_t *)(mp->b_rptr + IPOIB_GRH_SIZE);
-
-		/*
-		 * Is the packet an IP(v4) packet?
-		 */
-		if (ntohs(lhdr->ipoib_type) == ETHERTYPE_IP) {
-
-			ip_hdr = (struct ip *)(mp->b_rptr + IPOIB_GRH_SIZE +
-			    IPOIB_HDRSIZE);
-			prot = ip_hdr->ip_p;
-
-			/*
-			 * TCP or UDP packet? We use the UDP header, since
-			 * the first few words of both headers are laid out
-			 * similarly (src/dest ports).
-			 */
-			if ((prot == IPPROTO_TCP) || (prot == IPPROTO_UDP)) {
-
-				tran_hdr = (struct udphdr *)(
-				    (uint8_t *)ip_hdr + (ip_hdr->ip_hl << 2));
-
-				/*
-				 * Are we within limits of this packet? If
-				 * so, use the destination port to hash to
-				 * a service thread.
-				 */
-				if (mp->b_wptr >= ((uchar_t *)tran_hdr +
-				    sizeof (*tran_hdr)))
-					tnum = (ntohs(tran_hdr->uh_dport) +
-					    ntohs(tran_hdr->uh_sport)) %
-					    nfifos;
-			}
-		}
-	}
-
-	/*
-	 * For non TCP/UDP traffic (eg SunCluster heartbeat), we hand the
-	 * packet up in interrupt context, reducing latency.
-	 */
-	if (tnum == -1) {
-		goto hand_off;
-	}
-
-	srvfifo = (p_srv_fifo_t *)state->id_fifos;
-	if (_ddi_put_fifo(srvfifo[tnum], (fifo_obj_t)mp,
-	    B_TRUE) != DDI_SUCCESS)
-		freemsg(mp);
 }
 
 /*
@@ -1306,6 +1137,7 @@ ibd_async_work(ibd_state_t *state)
 	mutex_enter(&state->id_acache_req_lock);
 	CALLB_CPR_INIT(&cprinfo, &state->id_acache_req_lock,
 	    callb_generic_cpr, "ibd_async_work");
+
 	for (;;) {
 		ptr = list_get_head(&state->id_req_list);
 		if (ptr != NULL) {
@@ -1314,15 +1146,27 @@ ibd_async_work(ibd_state_t *state)
 			/*
 			 * Once we have done the operation, there is no
 			 * guarantee the request slot is going to be valid,
-			 * it might be freed up (as in ASYNC_LEAVE,REAP,TRAP).
+			 * it might be freed up (as in IBD_ASYNC_LEAVE, REAP,
+			 * TRAP).
+			 *
+			 * Perform the request.
 			 */
-
-			/* Perform the request */
 			switch (ptr->rq_op) {
-				case ASYNC_GETAH:
+				case IBD_ASYNC_GETAH:
 					ibd_async_acache(state, &ptr->rq_mac);
 					break;
-				case ASYNC_REAP:
+				case IBD_ASYNC_JOIN:
+				case IBD_ASYNC_LEAVE:
+					ibd_async_multicast(state,
+					    ptr->rq_gid, ptr->rq_op);
+					break;
+				case IBD_ASYNC_PROMON:
+					ibd_async_setprom(state);
+					break;
+				case IBD_ASYNC_PROMOFF:
+					ibd_async_unsetprom(state);
+					break;
+				case IBD_ASYNC_REAP:
 					ibd_async_reap_group(state,
 					    ptr->rq_ptr, ptr->rq_gid,
 					    IB_MC_JSTATE_FULL);
@@ -1333,31 +1177,22 @@ ibd_async_work(ibd_state_t *state)
 					 */
 					ptr = NULL;
 					break;
-				case ASYNC_LEAVE:
-				case ASYNC_JOIN:
-					ibd_async_multicast(state,
-					    ptr->rq_gid, ptr->rq_op);
-					break;
-				case ASYNC_PROMON:
-					ibd_async_setprom(state);
-					break;
-				case ASYNC_PROMOFF:
-					ibd_async_unsetprom(state);
-					break;
-				case ASYNC_TRAP:
+				case IBD_ASYNC_TRAP:
 					ibd_async_trap(state, ptr);
 					break;
-				case ASYNC_SCHED:
+				case IBD_ASYNC_SCHED:
 					ibd_async_txsched(state);
 					break;
-				case ASYNC_LINK:
+				case IBD_ASYNC_LINK:
 					ibd_async_link(state, ptr);
 					break;
-				case ASYNC_EXIT:
+				case IBD_ASYNC_EXIT:
 					mutex_enter(&state->id_acache_req_lock);
-#ifndef	__lock_lint
+#ifndef __lock_lint
 					CALLB_CPR_EXIT(&cprinfo);
-#endif /* !__lock_lint */
+#else
+					mutex_exit(&state->id_acache_req_lock);
+#endif
 					return;
 			}
 			if (ptr != NULL)
@@ -1365,18 +1200,19 @@ ibd_async_work(ibd_state_t *state)
 
 			mutex_enter(&state->id_acache_req_lock);
 		} else {
+#ifndef __lock_lint
 			/*
 			 * Nothing to do: wait till new request arrives.
 			 */
-#ifndef __lock_lint
 			CALLB_CPR_SAFE_BEGIN(&cprinfo);
 			cv_wait(&state->id_acache_req_cv,
 			    &state->id_acache_req_lock);
 			CALLB_CPR_SAFE_END(&cprinfo,
 			    &state->id_acache_req_lock);
-#endif /* !_lock_lint */
+#endif
 		}
 	}
+
 	/*NOTREACHED*/
 	_NOTE(NOT_REACHED)
 }
@@ -1461,6 +1297,7 @@ ibd_acache_init(ibd_state_t *state)
 
 	mutex_init(&state->id_acache_req_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&state->id_acache_req_cv, NULL, CV_DEFAULT, NULL);
+
 	mutex_init(&state->id_ac_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&state->id_mc_mutex, NULL, MUTEX_DRIVER, NULL);
 	list_create(&state->id_ah_free, sizeof (ibd_ace_t),
@@ -1563,12 +1400,13 @@ ibd_acache_lookup(ibd_state_t *state, ipoib_mac_t *mac, int *err, int numwqe)
 	 * Only attempt to print when we can; in the mdt pattr case, the
 	 * address is not aligned properly.
 	 */
-	if (((ulong_t)mac & 3) == 0)
+	if (((ulong_t)mac & 3) == 0) {
 		DPRINT(4,
 		    "ibd_acache_lookup : lookup for %08X:%08X:%08X:%08X:%08X",
 		    htonl(mac->ipoib_qpn), htonl(mac->ipoib_gidpref[0]),
 		    htonl(mac->ipoib_gidpref[1]), htonl(mac->ipoib_gidsuff[0]),
 		    htonl(mac->ipoib_gidsuff[1]));
+	}
 
 	mutex_enter(&state->id_ac_mutex);
 
@@ -1590,7 +1428,7 @@ ibd_acache_lookup(ibd_state_t *state, ipoib_mac_t *mac, int *err, int numwqe)
 	 * back here.
 	 */
 	*err = EAGAIN;
-	if (state->id_ah_op == NOTSTARTED) {
+	if (state->id_ah_op == IBD_OP_NOTSTARTED) {
 		req = kmem_cache_alloc(state->id_req_kmc, KM_NOSLEEP);
 		if (req != NULL) {
 			/*
@@ -1598,22 +1436,22 @@ ibd_acache_lookup(ibd_state_t *state, ipoib_mac_t *mac, int *err, int numwqe)
 			 * for it.
 			 */
 			bcopy(mac, &(req->rq_mac), IPOIB_ADDRL);
-			ibd_queue_work_slot(state, req, ASYNC_GETAH);
-			state->id_ah_op = ONGOING;
+			ibd_queue_work_slot(state, req, IBD_ASYNC_GETAH);
+			state->id_ah_op = IBD_OP_ONGOING;
 			bcopy(mac, &state->id_ah_addr, IPOIB_ADDRL);
 		}
-	} else if ((state->id_ah_op != ONGOING) &&
+	} else if ((state->id_ah_op != IBD_OP_ONGOING) &&
 	    (bcmp(&state->id_ah_addr, mac, IPOIB_ADDRL) == 0)) {
 		/*
 		 * Check the status of the pathrecord lookup request
 		 * we had queued before.
 		 */
-		if (state->id_ah_op == ERRORED) {
+		if (state->id_ah_op == IBD_OP_ERRORED) {
 			*err = EFAULT;
 			state->id_ah_error++;
 		} else {
 			/*
-			 * ROUTERED case: We need to send to the
+			 * IBD_OP_ROUTERED case: We need to send to the
 			 * all-router MCG. If we can find the AH for
 			 * the mcg, the Tx will be attempted. If we
 			 * do not find the AH, we return NORESOURCES
@@ -1625,15 +1463,15 @@ ibd_acache_lookup(ibd_state_t *state, ipoib_mac_t *mac, int *err, int numwqe)
 			ptr = ibd_acache_find(state, &routermac, B_TRUE,
 			    numwqe);
 		}
-		state->id_ah_op = NOTSTARTED;
-	} else if ((state->id_ah_op != ONGOING) &&
+		state->id_ah_op = IBD_OP_NOTSTARTED;
+	} else if ((state->id_ah_op != IBD_OP_ONGOING) &&
 	    (bcmp(&state->id_ah_addr, mac, IPOIB_ADDRL) != 0)) {
 		/*
 		 * This case can happen when we get a higher band
 		 * packet. The easiest way is to reset the state machine
 		 * to accommodate the higher priority packet.
 		 */
-		state->id_ah_op = NOTSTARTED;
+		state->id_ah_op = IBD_OP_NOTSTARTED;
 	}
 	mutex_exit(&state->id_ac_mutex);
 
@@ -1822,7 +1660,7 @@ ibd_async_acache(ibd_state_t *state, ipoib_mac_t *mac)
 	ibt_path_attr_t path_attr;
 	ibt_path_info_t path_info;
 	ib_gid_t destgid;
-	int ret = NOTSTARTED;
+	int ret = IBD_OP_NOTSTARTED;
 
 	DPRINT(4, "ibd_async_acache :  %08X:%08X:%08X:%08X:%08X",
 	    htonl(mac->ipoib_qpn), htonl(mac->ipoib_gidpref[0]),
@@ -1843,7 +1681,7 @@ ibd_async_acache(ibd_state_t *state, ipoib_mac_t *mac)
 		 */
 		if ((mce = ibd_async_mcache(state, mac, &redirected)) ==
 		    NULL) {
-			state->id_ah_op = ERRORED;
+			state->id_ah_op = IBD_OP_ERRORED;
 			return;
 		}
 
@@ -1857,7 +1695,7 @@ ibd_async_acache(ibd_state_t *state, ipoib_mac_t *mac)
 		 * okay, we will come back here.
 		 */
 		if (redirected) {
-			ret = ROUTERED;
+			ret = IBD_OP_ROUTERED;
 			DPRINT(4, "ibd_async_acache :  redirected to "
 			    "%08X:%08X:%08X:%08X:%08X",
 			    htonl(mac->ipoib_qpn), htonl(mac->ipoib_gidpref[0]),
@@ -1867,9 +1705,9 @@ ibd_async_acache(ibd_state_t *state, ipoib_mac_t *mac)
 
 			mutex_enter(&state->id_ac_mutex);
 			if (ibd_acache_find(state, mac, B_FALSE, 0) != NULL) {
+				state->id_ah_op = IBD_OP_ROUTERED;
 				mutex_exit(&state->id_ac_mutex);
 				DPRINT(4, "ibd_async_acache : router AH found");
-				state->id_ah_op = ROUTERED;
 				return;
 			}
 			mutex_exit(&state->id_ac_mutex);
@@ -1894,7 +1732,7 @@ ibd_async_acache(ibd_state_t *state, ipoib_mac_t *mac)
 			/*
 			 * Pretty serious shortage now.
 			 */
-			state->id_ah_op = NOTSTARTED;
+			state->id_ah_op = IBD_OP_NOTSTARTED;
 			mutex_exit(&state->id_ac_mutex);
 			DPRINT(10, "ibd_async_acache : failed to find AH "
 			    "slot\n");
@@ -1953,7 +1791,7 @@ error:
 	 * into the free list.
 	 */
 	mutex_enter(&state->id_ac_mutex);
-	state->id_ah_op = ERRORED;
+	state->id_ah_op = IBD_OP_ERRORED;
 	IBD_ACACHE_INSERT_FREE(state, ce);
 	mutex_exit(&state->id_ac_mutex);
 }
@@ -1994,7 +1832,7 @@ ibd_async_link(ibd_state_t *state, ibd_req_t *req)
 		/*
 		 * If in promiscuous mode ...
 		 */
-		if (state->id_prom_op == COMPLETED) {
+		if (state->id_prom_op == IBD_OP_COMPLETED) {
 			/*
 			 * Drop all nonmembership.
 			 */
@@ -2067,7 +1905,7 @@ ibd_async_link(ibd_state_t *state, ibd_req_t *req)
 	/*
 	 * mac handle is guaranteed to exist since driver does ibt_close_hca()
 	 * (which stops further events from being delivered) before
-	 * mac_unreigster(). At this point, it is guaranteed that mac_register
+	 * mac_unregister(). At this point, it is guaranteed that mac_register
 	 * has already been done.
 	 */
 	mutex_enter(&state->id_link_mutex);
@@ -2198,7 +2036,7 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 
 	req = kmem_cache_alloc(state->id_req_kmc, KM_SLEEP);
 	req->rq_ptr = (void *)opcode;
-	ibd_queue_work_slot(state, req, ASYNC_LINK);
+	ibd_queue_work_slot(state, req, IBD_ASYNC_LINK);
 }
 
 /*
@@ -2502,7 +2340,7 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	state->id_trap_stop = B_TRUE;
 	state->id_trap_inprog = 0;
 
-	mutex_init(&state->id_txcomp_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&state->id_cq_poll_lock, NULL, MUTEX_DRIVER, NULL);
 	state->id_dip = dip;
 
 	mutex_init(&state->id_sched_lock, NULL, MUTEX_DRIVER, NULL);
@@ -2512,17 +2350,23 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	state->id_tx_list.dl_pending_sends = B_FALSE;
 	state->id_tx_list.dl_cnt = 0;
 	mutex_init(&state->id_tx_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&state->id_txpost_lock, NULL, MUTEX_DRIVER, NULL);
+	state->id_tx_busy = 0;
 
 	state->id_rx_list.dl_head = NULL;
 	state->id_rx_list.dl_tail = NULL;
 	state->id_rx_list.dl_bufs_outstanding = 0;
 	state->id_rx_list.dl_cnt = 0;
 	mutex_init(&state->id_rx_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&state->id_rx_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&state->id_rxpost_lock, NULL, MUTEX_DRIVER, NULL);
 
 	(void) sprintf(buf, "ibd_req%d", ddi_get_instance(dip));
 	state->id_req_kmc = kmem_cache_create(buf, sizeof (ibd_req_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);
+
+#ifdef IBD_LOGGING
+	mutex_init(&ibd_lbuf_lock, NULL, MUTEX_DRIVER, NULL);
+#endif
 
 	return (DDI_SUCCESS);
 }
@@ -2533,16 +2377,24 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 static void
 ibd_state_fini(ibd_state_t *state)
 {
-	mutex_destroy(&state->id_tx_list.dl_mutex);
+	kmem_cache_destroy(state->id_req_kmc);
+
+	mutex_destroy(&state->id_rxpost_lock);
 	mutex_destroy(&state->id_rx_list.dl_mutex);
-	mutex_destroy(&state->id_rx_mutex);
+
+	mutex_destroy(&state->id_txpost_lock);
+	mutex_destroy(&state->id_tx_list.dl_mutex);
+
 	mutex_destroy(&state->id_sched_lock);
-	mutex_destroy(&state->id_txcomp_lock);
+	mutex_destroy(&state->id_cq_poll_lock);
 
 	cv_destroy(&state->id_trap_cv);
 	mutex_destroy(&state->id_trap_lock);
 	mutex_destroy(&state->id_link_mutex);
-	kmem_cache_destroy(state->id_req_kmc);
+
+#ifdef IBD_LOGGING
+	mutex_destroy(&ibd_lbuf_lock);
+#endif
 }
 
 /*
@@ -2783,7 +2635,7 @@ ibd_join_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 		/*
 		 * Do the IBA attach.
 		 */
-		DPRINT(10, "ibd_join_group : ibt_attach_mcg \n");
+		DPRINT(10, "ibd_join_group: ibt_attach_mcg \n");
 		if ((ibt_status = ibt_attach_mcg(state->id_chnl_hdl,
 		    &mce->mc_info)) != IBT_SUCCESS) {
 			DPRINT(10, "ibd_join_group : failed qp attachment "
@@ -2986,7 +2838,9 @@ ibd_leave_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 			 */
 			if (mce == NULL)
 				return;
+
 			ASSERT(mce->mc_jstate == IB_MC_JSTATE_FULL);
+
 			mce->mc_fullreap = B_TRUE;
 		}
 
@@ -3033,7 +2887,7 @@ ibd_find_bgroup(ibd_state_t *state)
 
 	bzero(&mcg_attr, sizeof (ibt_mcg_attr_t));
 	mcg_attr.mc_pkey = state->id_pkey;
-	state->id_mgid.gid_guid = IB_MCGID_IPV4_LOW_GROUP_MASK;
+	state->id_mgid.gid_guid = IB_MGID_IPV4_LOWGRP_MASK;
 
 	for (i = 0; i < sizeof (scopes)/sizeof (scopes[0]); i++) {
 		state->id_scope = mcg_attr.mc_scope = scopes[i];
@@ -3154,6 +3008,16 @@ ibd_drv_init(ibd_state_t *state)
 
 	state->id_link_speed = ibd_get_portspeed(state);
 
+	/*
+	 * Read drv conf and record what the policy is on enabling LSO
+	 */
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, state->id_dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, IBD_PROP_LSO_POLICY, 1)) {
+		state->id_lso_policy = B_TRUE;
+	} else {
+		state->id_lso_policy = B_FALSE;
+	}
+
 	ibt_status = ibt_query_hca(state->id_hca_hdl, &hca_attrs);
 	ASSERT(ibt_status == IBT_SUCCESS);
 
@@ -3174,19 +3038,41 @@ ibd_drv_init(ibd_state_t *state)
 		goto drv_init_fail_acache;
 	}
 
-	/*
-	 * Check various tunable limits.
-	 */
-	if (hca_attrs.hca_max_sgl < IBD_MAX_SQSEG) {
-		ibd_print_warn(state, "Setting #sgl = %d instead of default %d",
-		    hca_attrs.hca_max_sgl, IBD_MAX_SQSEG);
-		state->id_max_sqseg = hca_attrs.hca_max_sgl;
-	} else {
-		state->id_max_sqseg = IBD_MAX_SQSEG;
+	if ((hca_attrs.hca_flags2 & IBT_HCA2_RES_LKEY) == IBT_HCA2_RES_LKEY) {
+		state->id_hca_res_lkey_capab = 1;
+		state->id_res_lkey = hca_attrs.hca_reserved_lkey;
 	}
 
 	/*
-	 * First, check #r/s wqes against max channel size.
+	 * Check various tunable limits.
+	 */
+
+	/*
+	 * See if extended sgl size information is provided by the hca; if yes,
+	 * use the correct one and set the maximum sqseg value.
+	 */
+	if (hca_attrs.hca_flags & IBT_HCA_WQE_SIZE_INFO)
+		state->id_max_sqseg = hca_attrs.hca_ud_send_sgl_sz;
+	else
+		state->id_max_sqseg = hca_attrs.hca_max_sgl;
+
+	/*
+	 * Set LSO capability and maximum length
+	 */
+	if (hca_attrs.hca_max_lso_size > 0) {
+		state->id_lso_capable = B_TRUE;
+		if (hca_attrs.hca_max_lso_size > IBD_LSO_MAXLEN)
+			state->id_lso_maxlen = IBD_LSO_MAXLEN;
+		else
+			state->id_lso_maxlen = hca_attrs.hca_max_lso_size;
+	} else {
+		state->id_lso_capable = B_FALSE;
+		state->id_lso_maxlen = 0;
+	}
+
+
+	/*
+	 * Check #r/s wqes against max channel size.
 	 */
 	if (hca_attrs.hca_max_chan_sz < IBD_NUM_RWQE)
 		state->id_num_rwqe = hca_attrs.hca_max_chan_sz;
@@ -3197,6 +3083,14 @@ ibd_drv_init(ibd_state_t *state)
 		state->id_num_swqe = hca_attrs.hca_max_chan_sz;
 	else
 		state->id_num_swqe = IBD_NUM_SWQE;
+
+	/*
+	 * Check the hardware checksum capability. Currently we only consider
+	 * full checksum offload.
+	 */
+	if ((hca_attrs.hca_flags & IBT_HCA_CKSUM_FULL) == IBT_HCA_CKSUM_FULL) {
+		state->id_hwcksum_capab = IBT_HCA_CKSUM_FULL;
+	}
 
 	/*
 	 * Allocate Rx/combined CQ:
@@ -3220,23 +3114,21 @@ ibd_drv_init(ibd_state_t *state)
 			state->id_num_rwqe = cq_attr.cq_size - 1;
 		}
 
-		if (state->id_num_rwqe < IBD_RX_THRESHOLD) {
-			ibd_print_warn(state, "Computed #rwqe %d based on "
-			    "requested size and supportable CQ size is less "
-			    "than the required threshold %d",
-			    state->id_num_rwqe, IBD_RX_THRESHOLD);
-			goto drv_init_fail_min_rwqes;
-		}
-
 		if (ibt_alloc_cq(state->id_hca_hdl, &cq_attr,
 		    &state->id_rcq_hdl, &real_size) != IBT_SUCCESS) {
 			DPRINT(10, "ibd_drv_init : failed in ibt_alloc_cq()\n");
 			goto drv_init_fail_alloc_rcq;
 		}
+
+		if (ibt_modify_cq(state->id_rcq_hdl,
+		    ibd_rxcomp_count, ibd_rxcomp_usec, 0) != IBT_SUCCESS) {
+			DPRINT(10, "ibd_drv_init: Receive CQ interrupt "
+			    "moderation failed\n");
+		}
+
 		state->id_rxwcs_size = state->id_num_rwqe + 1;
 		state->id_rxwcs = kmem_alloc(sizeof (ibt_wc_t) *
 		    state->id_rxwcs_size, KM_SLEEP);
-
 
 		/*
 		 * Allocate Send CQ.
@@ -3253,6 +3145,12 @@ ibd_drv_init(ibd_state_t *state)
 			DPRINT(10, "ibd_drv_init : failed in ibt_alloc_cq()\n");
 			goto drv_init_fail_alloc_scq;
 		}
+		if (ibt_modify_cq(state->id_scq_hdl,
+		    10, 300, 0) != IBT_SUCCESS) {
+			DPRINT(10, "ibd_drv_init: Send CQ interrupt "
+			    "moderation failed\n");
+		}
+
 		state->id_txwcs_size = state->id_num_swqe + 1;
 		state->id_txwcs = kmem_alloc(sizeof (ibt_wc_t) *
 		    state->id_txwcs_size, KM_SLEEP);
@@ -3271,14 +3169,6 @@ ibd_drv_init(ibd_state_t *state)
 			    state->id_num_swqe);
 			state->id_num_swqe = cq_attr.cq_size - 1 -
 			    state->id_num_rwqe;
-		}
-
-		if (state->id_num_rwqe < IBD_RX_THRESHOLD) {
-			ibd_print_warn(state, "Computed #rwqe %d based on "
-			    "requested size and supportable CQ size is less "
-			    "than the required threshold %d",
-			    state->id_num_rwqe, IBD_RX_THRESHOLD);
-			goto drv_init_fail_min_rwqes;
 		}
 
 		state->id_rxwcs_size = cq_attr.cq_size;
@@ -3307,7 +3197,12 @@ ibd_drv_init(ibd_state_t *state)
 		ibd_print_warn(state, "Setting #swqe = %d instead of default "
 		    "%d", state->id_num_swqe, IBD_NUM_SWQE);
 
-	ud_alloc_attr.ud_flags	= IBT_WR_SIGNALED;
+	ud_alloc_attr.ud_flags  = IBT_WR_SIGNALED;
+	if (state->id_hca_res_lkey_capab)
+		ud_alloc_attr.ud_flags |= IBT_FAST_REG_RES_LKEY;
+	if (state->id_lso_policy && state->id_lso_capable)
+		ud_alloc_attr.ud_flags |= IBT_USES_LSO;
+
 	ud_alloc_attr.ud_hca_port_num	= state->id_port;
 	ud_alloc_attr.ud_sizes.cs_sq_sgl = state->id_max_sqseg;
 	ud_alloc_attr.ud_sizes.cs_rq_sgl = IBD_MAX_RQSEG;
@@ -3319,6 +3214,7 @@ ibd_drv_init(ibd_state_t *state)
 	ud_alloc_attr.ud_pd		= state->id_pd_hdl;
 	ud_alloc_attr.ud_pkey_ix	= state->id_pkix;
 	ud_alloc_attr.ud_clone_chan	= NULL;
+
 	if (ibt_alloc_ud_channel(state->id_hca_hdl, IBT_ACHAN_NO_FLAGS,
 	    &ud_alloc_attr, &state->id_chnl_hdl, NULL) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_drv_init : failed in ibt_alloc_ud_channel()"
@@ -3331,7 +3227,16 @@ ibd_drv_init(ibd_state_t *state)
 		DPRINT(10, "ibd_drv_init : failed in ibt_query_ud_channel()");
 		goto drv_init_fail_query_chan;
 	}
+
 	state->id_qpnum = ud_chan_attr.ud_qpn;
+	/* state->id_max_sqseg = ud_chan_attr.ud_chan_sizes.cs_sq_sgl; */
+
+	if (state->id_max_sqseg > IBD_MAX_SQSEG) {
+		state->id_max_sqseg = IBD_MAX_SQSEG;
+	} else if (state->id_max_sqseg < IBD_MAX_SQSEG) {
+		ibd_print_warn(state, "Set #sgl = %d instead of default %d",
+		    state->id_max_sqseg, IBD_MAX_SQSEG);
+	}
 
 	/* Initialize the Transmit buffer list */
 	if (ibd_init_txlist(state) != DDI_SUCCESS) {
@@ -3340,7 +3245,9 @@ ibd_drv_init(ibd_state_t *state)
 	}
 
 	if ((ibd_separate_cqs == 1) && (ibd_txcomp_poll == 0)) {
-		/* Setup the handler we will use for regular DLPI stuff */
+		/*
+		 * Setup the handler we will use for regular DLPI stuff
+		 */
 		ibt_set_cq_handler(state->id_scq_hdl, ibd_scq_handler, state);
 		if (ibt_enable_cq_notify(state->id_scq_hdl,
 		    IBT_NEXT_COMPLETION) != IBT_SUCCESS) {
@@ -3348,13 +3255,6 @@ ibd_drv_init(ibd_state_t *state)
 			    " ibt_enable_cq_notify()\n");
 			goto drv_init_fail_cq_notify;
 		}
-	}
-
-	/* Create the service fifos before we start receiving */
-	if ((state->id_fifos = map_rx_srv_fifos(&state->id_nfifos,
-	    state)) == NULL) {
-		DPRINT(10, "ibd_drv_init : failed in map_rx_srv_fifos()\n");
-		goto drv_init_fail_srv_fifo;
 	}
 
 	/* Initialize the Receive buffer list */
@@ -3369,13 +3269,12 @@ ibd_drv_init(ibd_state_t *state)
 		goto drv_init_fail_join_group;
 	}
 
-	/* Create the async thread */
-	if ((kht = thread_create(NULL, 0, ibd_async_work, state, 0, &p0,
-	    TS_RUN, minclsyspri)) == NULL) {
-		/* Do we have to specially leave the group? */
-		DPRINT(10, "ibd_drv_init : failed in thread_create\n");
-		goto drv_init_fail_thread_create;
-	}
+	/*
+	 * Create the async thread; thread_create never fails.
+	 */
+	kht = thread_create(NULL, 0, ibd_async_work, state, 0, &p0,
+	    TS_RUN, minclsyspri);
+
 	state->id_async_thrid = kht->t_did;
 
 	/*
@@ -3408,16 +3307,10 @@ ibd_drv_init(ibd_state_t *state)
 
 	return (DDI_SUCCESS);
 
-drv_init_fail_thread_create:
-	ibd_leave_group(state, state->id_mgid, IB_MC_JSTATE_FULL);
-
 drv_init_fail_join_group:
 	ibd_fini_rxlist(state);
 
 drv_init_fail_rxlist_init:
-	unmap_rx_srv_fifos(state->id_nfifos, state->id_fifos);
-
-drv_init_fail_srv_fifo:
 drv_init_fail_cq_notify:
 	ibd_fini_txlist(state);
 
@@ -3440,7 +3333,6 @@ drv_init_fail_alloc_scq:
 		DPRINT(10, "ibd_drv_init : Rx ibt_free_cq()");
 	kmem_free(state->id_rxwcs, sizeof (ibt_wc_t) * state->id_rxwcs_size);
 
-drv_init_fail_min_rwqes:
 drv_init_fail_alloc_rcq:
 	ibd_acache_fini(state);
 drv_init_fail_acache:
@@ -3456,19 +3348,144 @@ drv_init_fail_find_bgroup:
 	return (DDI_FAILURE);
 }
 
+
+static int
+ibd_alloc_tx_copybufs(ibd_state_t *state)
+{
+	ibt_mr_attr_t mem_attr;
+
+	/*
+	 * Allocate one big chunk for all regular tx copy bufs
+	 */
+	state->id_tx_buf_sz = state->id_mtu;
+	if (state->id_lso_policy && state->id_lso_capable &&
+	    (IBD_TX_BUF_SZ > state->id_mtu)) {
+		state->id_tx_buf_sz = IBD_TX_BUF_SZ;
+	}
+
+	state->id_tx_bufs = kmem_zalloc(state->id_num_swqe *
+	    state->id_tx_buf_sz, KM_SLEEP);
+
+	/*
+	 * Do one memory registration on the entire txbuf area
+	 */
+	mem_attr.mr_vaddr = (uint64_t)(uintptr_t)state->id_tx_bufs;
+	mem_attr.mr_len = state->id_num_swqe * state->id_tx_buf_sz;
+	mem_attr.mr_as = NULL;
+	mem_attr.mr_flags = IBT_MR_SLEEP;
+	if (ibt_register_mr(state->id_hca_hdl, state->id_pd_hdl, &mem_attr,
+	    &state->id_tx_mr_hdl, &state->id_tx_mr_desc) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_alloc_tx_copybufs: ibt_register_mr failed");
+		kmem_free(state->id_tx_bufs,
+		    state->id_num_swqe * state->id_tx_buf_sz);
+		state->id_tx_bufs = NULL;
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
+ibd_alloc_tx_lsobufs(ibd_state_t *state)
+{
+	ibt_mr_attr_t mem_attr;
+	ibd_lsobuf_t *buflist;
+	ibd_lsobuf_t *lbufp;
+	ibd_lsobuf_t *tail;
+	ibd_lsobkt_t *bktp;
+	uint8_t *membase;
+	uint8_t *memp;
+	uint_t memsz;
+	int i;
+
+	/*
+	 * Allocate the lso bucket
+	 */
+	bktp = kmem_zalloc(sizeof (ibd_lsobkt_t), KM_SLEEP);
+
+	/*
+	 * Allocate the entire lso memory and register it
+	 */
+	memsz = IBD_NUM_LSO_BUFS * IBD_LSO_BUFSZ;
+	membase = kmem_zalloc(memsz, KM_SLEEP);
+
+	mem_attr.mr_vaddr = (uint64_t)(uintptr_t)membase;
+	mem_attr.mr_len = memsz;
+	mem_attr.mr_as = NULL;
+	mem_attr.mr_flags = IBT_MR_SLEEP;
+	if (ibt_register_mr(state->id_hca_hdl, state->id_pd_hdl,
+	    &mem_attr, &bktp->bkt_mr_hdl, &bktp->bkt_mr_desc) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_alloc_tx_lsobufs: ibt_register_mr failed");
+		kmem_free(membase, memsz);
+		kmem_free(bktp, sizeof (ibd_lsobkt_t));
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Now allocate the buflist.  Note that the elements in the buflist and
+	 * the buffers in the lso memory have a permanent 1-1 relation, so we
+	 * can always derive the address of a buflist entry from the address of
+	 * an lso buffer.
+	 */
+	buflist = kmem_zalloc(IBD_NUM_LSO_BUFS * sizeof (ibd_lsobuf_t),
+	    KM_SLEEP);
+
+	/*
+	 * Set up the lso buf chain
+	 */
+	memp = membase;
+	lbufp = buflist;
+	for (i = 0; i < IBD_NUM_LSO_BUFS; i++) {
+		lbufp->lb_isfree = 1;
+		lbufp->lb_buf = memp;
+		lbufp->lb_next = lbufp + 1;
+
+		tail = lbufp;
+
+		memp += IBD_LSO_BUFSZ;
+		lbufp++;
+	}
+	tail->lb_next = NULL;
+
+	/*
+	 * Set up the LSO buffer information in ibd state
+	 */
+	bktp->bkt_bufl = buflist;
+	bktp->bkt_free_head = buflist;
+	bktp->bkt_mem = membase;
+	bktp->bkt_nelem = IBD_NUM_LSO_BUFS;
+	bktp->bkt_nfree = bktp->bkt_nelem;
+
+	state->id_lso = bktp;
+
+	return (DDI_SUCCESS);
+}
+
 /*
- * Allocate the statically allocated Tx buffer list.
+ * Statically allocate Tx buffer list(s).
  */
 static int
 ibd_init_txlist(ibd_state_t *state)
 {
 	ibd_swqe_t *swqe;
+	ibt_lkey_t lkey;
 	int i;
 
+	if (ibd_alloc_tx_copybufs(state) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (state->id_lso_policy && state->id_lso_capable) {
+		if (ibd_alloc_tx_lsobufs(state) != DDI_SUCCESS)
+			state->id_lso_policy = B_FALSE;
+	}
+
+	/*
+	 * Allocate and setup the swqe list
+	 */
+	lkey = state->id_tx_mr_desc.md_lkey;
 	for (i = 0; i < state->id_num_swqe; i++) {
-		if (ibd_alloc_swqe(state, &swqe) != DDI_SUCCESS) {
-			DPRINT(10, "ibd_init_txlist : failed in "
-			    "ibd_alloc_swqe()\n");
+		if (ibd_alloc_swqe(state, &swqe, i, lkey) != DDI_SUCCESS) {
+			DPRINT(10, "ibd_init_txlist: ibd_alloc_swqe failed");
 			ibd_fini_txlist(state);
 			return (DDI_FAILURE);
 		}
@@ -3491,6 +3508,182 @@ ibd_init_txlist(ibd_state_t *state)
 	return (DDI_SUCCESS);
 }
 
+static int
+ibd_acquire_lsobufs(ibd_state_t *state, uint_t req_sz, ibt_wr_ds_t *sgl_p,
+    uint32_t *nds_p)
+{
+	ibd_lsobkt_t *bktp;
+	ibd_lsobuf_t *lbufp;
+	ibd_lsobuf_t *nextp;
+	ibt_lkey_t lso_lkey;
+	uint_t frag_sz;
+	uint_t num_needed;
+	int i;
+
+	ASSERT(sgl_p != NULL);
+	ASSERT(nds_p != NULL);
+	ASSERT(req_sz != 0);
+
+	/*
+	 * Determine how many bufs we'd need for the size requested
+	 */
+	num_needed = req_sz / IBD_LSO_BUFSZ;
+	if ((frag_sz = req_sz % IBD_LSO_BUFSZ) != 0)
+		num_needed++;
+
+	mutex_enter(&state->id_lso_lock);
+
+	/*
+	 * If we don't have enough lso bufs, return failure
+	 */
+	ASSERT(state->id_lso != NULL);
+	bktp = state->id_lso;
+	if (bktp->bkt_nfree < num_needed) {
+		mutex_exit(&state->id_lso_lock);
+		return (-1);
+	}
+
+	/*
+	 * Pick the first 'num_needed' bufs from the free list
+	 */
+	lso_lkey = bktp->bkt_mr_desc.md_lkey;
+	lbufp = bktp->bkt_free_head;
+	for (i = 0; i < num_needed; i++) {
+		ASSERT(lbufp->lb_isfree != 0);
+		ASSERT(lbufp->lb_buf != NULL);
+
+		nextp = lbufp->lb_next;
+
+		sgl_p[i].ds_va = (ib_vaddr_t)(uintptr_t)lbufp->lb_buf;
+		sgl_p[i].ds_key = lso_lkey;
+		sgl_p[i].ds_len = IBD_LSO_BUFSZ;
+
+		lbufp->lb_isfree = 0;
+		lbufp->lb_next = NULL;
+
+		lbufp = nextp;
+	}
+	bktp->bkt_free_head = lbufp;
+
+	/*
+	 * If the requested size is not a multiple of IBD_LSO_BUFSZ, we need
+	 * to adjust the last sgl entry's length. Since we know we need atleast
+	 * one, the i-1 use below is ok.
+	 */
+	if (frag_sz) {
+		sgl_p[i-1].ds_len = frag_sz;
+	}
+
+	/*
+	 * Update nfree count and return
+	 */
+	bktp->bkt_nfree -= num_needed;
+
+	mutex_exit(&state->id_lso_lock);
+
+	*nds_p = num_needed;
+
+	return (0);
+}
+
+static void
+ibd_release_lsobufs(ibd_state_t *state, ibt_wr_ds_t *sgl_p, uint32_t nds)
+{
+	ibd_lsobkt_t *bktp;
+	ibd_lsobuf_t *lbufp;
+	uint8_t *lso_mem_end;
+	uint_t ndx;
+	int i;
+
+	mutex_enter(&state->id_lso_lock);
+
+	bktp = state->id_lso;
+	ASSERT(bktp != NULL);
+
+	lso_mem_end = bktp->bkt_mem + bktp->bkt_nelem * IBD_LSO_BUFSZ;
+	for (i = 0; i < nds; i++) {
+		uint8_t *va;
+
+		va = (uint8_t *)(uintptr_t)sgl_p[i].ds_va;
+		ASSERT(va >= bktp->bkt_mem && va < lso_mem_end);
+
+		/*
+		 * Figure out the buflist element this sgl buffer corresponds
+		 * to and put it back at the head
+		 */
+		ndx = (va - bktp->bkt_mem) / IBD_LSO_BUFSZ;
+		lbufp = bktp->bkt_bufl + ndx;
+
+		ASSERT(lbufp->lb_isfree == 0);
+		ASSERT(lbufp->lb_buf == va);
+
+		lbufp->lb_isfree = 1;
+		lbufp->lb_next = bktp->bkt_free_head;
+		bktp->bkt_free_head = lbufp;
+	}
+	bktp->bkt_nfree += nds;
+
+	mutex_exit(&state->id_lso_lock);
+}
+
+static void
+ibd_free_tx_copybufs(ibd_state_t *state)
+{
+	/*
+	 * Unregister txbuf mr
+	 */
+	if (ibt_deregister_mr(state->id_hca_hdl,
+	    state->id_tx_mr_hdl) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_free_tx_copybufs: ibt_deregister_mr failed");
+	}
+	state->id_tx_mr_hdl = NULL;
+
+	/*
+	 * Free txbuf memory
+	 */
+	kmem_free(state->id_tx_bufs, state->id_num_swqe * state->id_tx_buf_sz);
+	state->id_tx_bufs = NULL;
+}
+
+static void
+ibd_free_tx_lsobufs(ibd_state_t *state)
+{
+	ibd_lsobkt_t *bktp;
+
+	mutex_enter(&state->id_lso_lock);
+
+	if ((bktp = state->id_lso) == NULL) {
+		mutex_exit(&state->id_lso_lock);
+		return;
+	}
+
+	/*
+	 * First, free the buflist
+	 */
+	ASSERT(bktp->bkt_bufl != NULL);
+	kmem_free(bktp->bkt_bufl, bktp->bkt_nelem * sizeof (ibd_lsobuf_t));
+
+	/*
+	 * Unregister the LSO memory and free it
+	 */
+	ASSERT(bktp->bkt_mr_hdl != NULL);
+	if (ibt_deregister_mr(state->id_hca_hdl,
+	    bktp->bkt_mr_hdl) != IBT_SUCCESS) {
+		DPRINT(10,
+		    "ibd_free_lsobufs: ibt_deregister_mr failed");
+	}
+	ASSERT(bktp->bkt_mem);
+	kmem_free(bktp->bkt_mem, bktp->bkt_nelem * IBD_LSO_BUFSZ);
+
+	/*
+	 * Finally free the bucket
+	 */
+	kmem_free(bktp, sizeof (ibd_lsobkt_t));
+	state->id_lso = NULL;
+
+	mutex_exit(&state->id_lso_lock);
+}
+
 /*
  * Free the statically allocated Tx buffer list.
  */
@@ -3499,6 +3692,9 @@ ibd_fini_txlist(ibd_state_t *state)
 {
 	ibd_swqe_t *node;
 
+	/*
+	 * Free the allocated swqes
+	 */
 	mutex_enter(&state->id_tx_list.dl_mutex);
 	while (state->id_tx_list.dl_head != NULL) {
 		node = WQE_TO_SWQE(state->id_tx_list.dl_head);
@@ -3508,6 +3704,9 @@ ibd_fini_txlist(ibd_state_t *state)
 		ibd_free_swqe(state, node);
 	}
 	mutex_exit(&state->id_tx_list.dl_mutex);
+
+	ibd_free_tx_lsobufs(state);
+	ibd_free_tx_copybufs(state);
 }
 
 /*
@@ -3515,49 +3714,31 @@ ibd_fini_txlist(ibd_state_t *state)
  * ready to be posted to the hardware.
  */
 static int
-ibd_alloc_swqe(ibd_state_t *state, ibd_swqe_t **wqe)
+ibd_alloc_swqe(ibd_state_t *state, ibd_swqe_t **wqe, int ndx, ibt_lkey_t lkey)
 {
-	ibt_mr_attr_t mem_attr;
 	ibd_swqe_t *swqe;
 
-	swqe = kmem_alloc(sizeof (ibd_swqe_t), KM_SLEEP);
+	swqe = kmem_zalloc(sizeof (ibd_swqe_t), KM_SLEEP);
 	*wqe = swqe;
+
 	swqe->swqe_type = IBD_WQE_SEND;
 	swqe->swqe_next = NULL;
 	swqe->swqe_prev = NULL;
 	swqe->swqe_im_mblk = NULL;
 
-	/* alloc copy buffer, must be max size to handle multiple mblk case */
-	swqe->swqe_copybuf.ic_bufaddr = kmem_alloc(state->id_mtu, KM_SLEEP);
-
-	mem_attr.mr_vaddr = (uint64_t)(uintptr_t)swqe->swqe_copybuf.ic_bufaddr;
-	mem_attr.mr_len = state->id_mtu;
-	mem_attr.mr_as = NULL;
-	mem_attr.mr_flags = IBT_MR_SLEEP;
-	if (ibt_register_mr(state->id_hca_hdl, state->id_pd_hdl, &mem_attr,
-	    &swqe->swqe_copybuf.ic_mr_hdl, &swqe->swqe_copybuf.ic_mr_desc) !=
-	    IBT_SUCCESS) {
-		DPRINT(10, "ibd_alloc_swqe : failed in ibt_register_mem()");
-		kmem_free(swqe->swqe_copybuf.ic_bufaddr,
-		    state->id_mtu);
-		kmem_free(swqe, sizeof (ibd_swqe_t));
-		return (DDI_FAILURE);
-	}
-
-	swqe->swqe_copybuf.ic_sgl.ds_va =
-	    (ib_vaddr_t)(uintptr_t)swqe->swqe_copybuf.ic_bufaddr;
-	swqe->swqe_copybuf.ic_sgl.ds_key =
-	    swqe->swqe_copybuf.ic_mr_desc.md_lkey;
+	swqe->swqe_copybuf.ic_sgl.ds_va = (ib_vaddr_t)(uintptr_t)
+	    (state->id_tx_bufs + ndx * state->id_tx_buf_sz);
+	swqe->swqe_copybuf.ic_sgl.ds_key = lkey;
 	swqe->swqe_copybuf.ic_sgl.ds_len = 0; /* set in send */
 
 	swqe->w_swr.wr_id = (ibt_wrid_t)(uintptr_t)swqe;
 	swqe->w_swr.wr_flags = IBT_WR_SEND_SIGNAL;
 	swqe->w_swr.wr_trans = IBT_UD_SRV;
-	swqe->w_swr.wr_opcode = IBT_WRC_SEND;
 
 	/* These are set in send */
 	swqe->w_swr.wr_nds = 0;
 	swqe->w_swr.wr_sgl = NULL;
+	swqe->w_swr.wr_opcode = IBT_WRC_SEND;
 
 	return (DDI_SUCCESS);
 }
@@ -3565,16 +3746,10 @@ ibd_alloc_swqe(ibd_state_t *state, ibd_swqe_t **wqe)
 /*
  * Free an allocated send wqe.
  */
+/*ARGSUSED*/
 static void
 ibd_free_swqe(ibd_state_t *state, ibd_swqe_t *swqe)
 {
-
-	if (ibt_deregister_mr(state->id_hca_hdl,
-	    swqe->swqe_copybuf.ic_mr_hdl) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_free_swqe : failed in ibt_deregister_mem()");
-		return;
-	}
-	kmem_free(swqe->swqe_copybuf.ic_bufaddr, state->id_mtu);
 	kmem_free(swqe, sizeof (ibd_swqe_t));
 }
 
@@ -3586,38 +3761,64 @@ ibd_free_swqe(ibd_state_t *state, ibd_swqe_t *swqe)
 static int
 ibd_post_rwqe(ibd_state_t *state, ibd_rwqe_t *rwqe, boolean_t recycle)
 {
-	/*
-	 * Here we should add dl_cnt before post recv, because we would
-	 * have to make sure dl_cnt has already updated before
-	 * corresponding ibd_process_rx() is called.
-	 */
-	atomic_add_32(&state->id_rx_list.dl_cnt, 1);
-	if (ibt_post_recv(state->id_chnl_hdl, &rwqe->w_rwr, 1, NULL) !=
-	    IBT_SUCCESS) {
-		(void) atomic_add_32_nv(&state->id_rx_list.dl_cnt, -1);
-		DPRINT(10, "ibd_post_rwqe : failed in ibt_post_recv()");
-		return (DDI_FAILURE);
+	ibt_status_t ibt_status;
+
+	if (recycle == B_FALSE) {
+		mutex_enter(&state->id_rx_list.dl_mutex);
+		if (state->id_rx_list.dl_head == NULL) {
+			rwqe->rwqe_prev = NULL;
+			rwqe->rwqe_next = NULL;
+			state->id_rx_list.dl_head = RWQE_TO_WQE(rwqe);
+			state->id_rx_list.dl_tail = RWQE_TO_WQE(rwqe);
+		} else {
+			rwqe->rwqe_prev = state->id_rx_list.dl_tail;
+			rwqe->rwqe_next = NULL;
+			state->id_rx_list.dl_tail->w_next = RWQE_TO_WQE(rwqe);
+			state->id_rx_list.dl_tail = RWQE_TO_WQE(rwqe);
+		}
+		mutex_exit(&state->id_rx_list.dl_mutex);
 	}
 
-	/*
-	 * Buffers being recycled are already in the list.
-	 */
-	if (recycle)
-		return (DDI_SUCCESS);
-
-	mutex_enter(&state->id_rx_list.dl_mutex);
-	if (state->id_rx_list.dl_head == NULL) {
-		rwqe->rwqe_prev = NULL;
-		rwqe->rwqe_next = NULL;
-		state->id_rx_list.dl_head = RWQE_TO_WQE(rwqe);
-		state->id_rx_list.dl_tail = RWQE_TO_WQE(rwqe);
+	mutex_enter(&state->id_rxpost_lock);
+	if (state->id_rx_busy) {
+		rwqe->w_post_link = NULL;
+		if (state->id_rx_head)
+			*(state->id_rx_tailp) = (ibd_wqe_t *)rwqe;
+		else
+			state->id_rx_head = rwqe;
+		state->id_rx_tailp = &(rwqe->w_post_link);
 	} else {
-		rwqe->rwqe_prev = state->id_rx_list.dl_tail;
-		rwqe->rwqe_next = NULL;
-		state->id_rx_list.dl_tail->w_next = RWQE_TO_WQE(rwqe);
-		state->id_rx_list.dl_tail = RWQE_TO_WQE(rwqe);
+		state->id_rx_busy = 1;
+		do {
+			mutex_exit(&state->id_rxpost_lock);
+
+			/*
+			 * Here we should add dl_cnt before post recv, because
+			 * we would have to make sure dl_cnt is updated before
+			 * the corresponding ibd_process_rx() is called.
+			 */
+			atomic_add_32(&state->id_rx_list.dl_cnt, 1);
+
+			ibt_status = ibt_post_recv(state->id_chnl_hdl,
+			    &rwqe->w_rwr, 1, NULL);
+			if (ibt_status != IBT_SUCCESS) {
+				(void) atomic_add_32_nv(
+				    &state->id_rx_list.dl_cnt, -1);
+				ibd_print_warn(state, "ibd_post_rwqe: "
+				    "posting failed, ret=%d", ibt_status);
+				return (DDI_FAILURE);
+			}
+
+			mutex_enter(&state->id_rxpost_lock);
+			rwqe = state->id_rx_head;
+			if (rwqe) {
+				state->id_rx_head =
+				    (ibd_rwqe_t *)(rwqe->w_post_link);
+			}
+		} while (rwqe);
+		state->id_rx_busy = 0;
 	}
-	mutex_exit(&state->id_rx_list.dl_mutex);
+	mutex_exit(&state->id_rxpost_lock);
 
 	return (DDI_SUCCESS);
 }
@@ -3678,7 +3879,7 @@ ibd_alloc_rwqe(ibd_state_t *state, ibd_rwqe_t **wqe)
 	ibt_mr_attr_t mem_attr;
 	ibd_rwqe_t *rwqe;
 
-	if ((rwqe = kmem_alloc(sizeof (ibd_rwqe_t), KM_NOSLEEP)) == NULL) {
+	if ((rwqe = kmem_zalloc(sizeof (ibd_rwqe_t), KM_NOSLEEP)) == NULL) {
 		DPRINT(10, "ibd_alloc_rwqe: failed in kmem_alloc");
 		return (DDI_FAILURE);
 	}
@@ -3691,9 +3892,10 @@ ibd_alloc_rwqe(ibd_state_t *state, ibd_rwqe_t **wqe)
 	rwqe->w_freemsg_cb.free_func = ibd_freemsg_cb;
 	rwqe->w_freemsg_cb.free_arg = (char *)rwqe;
 
-	if ((rwqe->rwqe_copybuf.ic_bufaddr = kmem_alloc(state->id_mtu +
-	    IPOIB_GRH_SIZE, KM_NOSLEEP)) == NULL) {
-		DPRINT(10, "ibd_alloc_rwqe: failed in kmem_alloc2");
+	rwqe->rwqe_copybuf.ic_bufaddr = kmem_alloc(state->id_mtu +
+	    IPOIB_GRH_SIZE, KM_NOSLEEP);
+	if (rwqe->rwqe_copybuf.ic_bufaddr == NULL) {
+		DPRINT(10, "ibd_alloc_rwqe: failed in kmem_alloc");
 		kmem_free(rwqe, sizeof (ibd_rwqe_t));
 		return (DDI_FAILURE);
 	}
@@ -3704,6 +3906,7 @@ ibd_alloc_rwqe(ibd_state_t *state, ibd_rwqe_t **wqe)
 		DPRINT(10, "ibd_alloc_rwqe : failed in desballoc()");
 		kmem_free(rwqe->rwqe_copybuf.ic_bufaddr,
 		    state->id_mtu + IPOIB_GRH_SIZE);
+		rwqe->rwqe_copybuf.ic_bufaddr = NULL;
 		kmem_free(rwqe, sizeof (ibd_rwqe_t));
 		return (DDI_FAILURE);
 	}
@@ -3720,6 +3923,7 @@ ibd_alloc_rwqe(ibd_state_t *state, ibd_rwqe_t **wqe)
 		freemsg(rwqe->rwqe_im_mblk);
 		kmem_free(rwqe->rwqe_copybuf.ic_bufaddr,
 		    state->id_mtu + IPOIB_GRH_SIZE);
+		rwqe->rwqe_copybuf.ic_bufaddr = NULL;
 		kmem_free(rwqe, sizeof (ibd_rwqe_t));
 		return (DDI_FAILURE);
 	}
@@ -3742,10 +3946,9 @@ ibd_alloc_rwqe(ibd_state_t *state, ibd_rwqe_t **wqe)
 static void
 ibd_free_rwqe(ibd_state_t *state, ibd_rwqe_t *rwqe)
 {
-
 	if (ibt_deregister_mr(state->id_hca_hdl,
 	    rwqe->rwqe_copybuf.ic_mr_hdl) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_free_rwqe : failed in ibt_deregister_mr()");
+		DPRINT(10, "ibd_free_rwqe: failed in ibt_deregister_mr()");
 		return;
 	}
 
@@ -3760,6 +3963,7 @@ ibd_free_rwqe(ibd_state_t *state, ibd_rwqe_t *rwqe)
 	}
 	kmem_free(rwqe->rwqe_copybuf.ic_bufaddr,
 	    state->id_mtu + IPOIB_GRH_SIZE);
+	rwqe->rwqe_copybuf.ic_bufaddr = NULL;
 	kmem_free(rwqe, sizeof (ibd_rwqe_t));
 }
 
@@ -3817,7 +4021,7 @@ ibd_drv_fini(ibd_state_t *state)
 	 * We possibly need a loop here to wait for all the Tx
 	 * callbacks to happen. The Tx handlers will retrieve
 	 * held resources like AH ac_ref count, registered memory
-	 * and possibly ASYNC_REAP requests. Rx interrupts were already
+	 * and possibly IBD_ASYNC_REAP requests. Rx interrupts were already
 	 * turned off (in ibd_detach()); turn off Tx interrupts and
 	 * poll. By the time the polling returns an empty indicator,
 	 * we are sure we have seen all pending Tx callbacks. Note
@@ -3831,14 +4035,14 @@ ibd_drv_fini(ibd_state_t *state)
 	/*
 	 * No more async requests will be posted since the device has been
 	 * unregistered; completion handlers have been turned off, so Tx
-	 * handler will not cause any more ASYNC_REAP requests. Queue a
+	 * handler will not cause any more IBD_ASYNC_REAP requests. Queue a
 	 * request for the async thread to exit, which will be serviced
 	 * after any pending ones. This can take a while, specially if the
 	 * SM is unreachable, since IBMF will slowly timeout each SM request
 	 * issued by the async thread. Reap the thread before continuing on,
 	 * we do not want it to be lingering in modunloaded code.
 	 */
-	ibd_queue_work_slot(state, &state->id_ah_req, ASYNC_EXIT);
+	ibd_queue_work_slot(state, &state->id_ah_req, IBD_ASYNC_EXIT);
 	thread_join(state->id_async_thrid);
 
 	/*
@@ -3848,7 +4052,7 @@ ibd_drv_fini(ibd_state_t *state)
 	 * aysnc thread would have processed that request by now. Thus the
 	 * nonmember list is guaranteed empty at this point.
 	 */
-	ASSERT(state->id_prom_op != COMPLETED);
+	ASSERT(state->id_prom_op != IBD_OP_COMPLETED);
 
 	/*
 	 * Drop all residual full/non membership. This includes full
@@ -3893,13 +4097,6 @@ ibd_drv_fini(ibd_state_t *state)
 		kmem_free(state->id_txwcs, sizeof (ibt_wc_t) *
 		    state->id_txwcs_size);
 	}
-
-	/*
-	 * We killed the receive interrupts, thus, we will not be
-	 * required to handle received packets anymore. Thus, kill
-	 * service threads since they are not going to be used anymore.
-	 */
-	unmap_rx_srv_fifos(state->id_nfifos, state->id_fifos);
 
 	/*
 	 * Since these following will act on the Rx/Tx list, which
@@ -4038,7 +4235,7 @@ ibd_snet_notices_handler(void *arg, ib_gid_t gid, ibt_subnet_event_code_t code,
 			req = kmem_cache_alloc(state->id_req_kmc, KM_SLEEP);
 			req->rq_gid = event->sm_notice_gid;
 			req->rq_ptr = (void *)code;
-			ibd_queue_work_slot(state, req, ASYNC_TRAP);
+			ibd_queue_work_slot(state, req, IBD_ASYNC_TRAP);
 			break;
 	}
 }
@@ -4057,7 +4254,7 @@ ibd_async_trap(ibd_state_t *state, ibd_req_t *req)
 	 */
 	ibd_leave_group(state, mgid, IB_MC_JSTATE_SEND_ONLY_NON);
 
-	if (state->id_prom_op == COMPLETED) {
+	if (state->id_prom_op == IBD_OP_COMPLETED) {
 		ibd_leave_group(state, mgid, IB_MC_JSTATE_NON);
 
 		/*
@@ -4090,28 +4287,61 @@ ibd_async_trap(ibd_state_t *state, ibd_req_t *req)
 static boolean_t
 ibd_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	_NOTE(ARGUNUSED(arg));
+	ibd_state_t *state = arg;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *txflags = cap_data;
 
-		if (ibd_csum_send > IBD_CSUM_NONE)
-			*txflags = HCKSUM_INET_PARTIAL;
+		/*
+		 * We either do full checksum or not do it at all
+		 */
+		if (state->id_hwcksum_capab & IBT_HCA_CKSUM_FULL)
+			*txflags = HCK_FULLCKSUM | HCKSUM_INET_FULL_V4;
 		else
 			return (B_FALSE);
 		break;
 	}
+
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		/*
+		 * In addition to the capability and policy, since LSO
+		 * relies on hw checksum, we'll not enable LSO if we
+		 * don't have hw checksum.  Of course, if the HCA doesn't
+		 * provide the reserved lkey capability, enabling LSO will
+		 * actually affect performance adversely, so we'll disable
+		 * LSO even for that case.
+		 */
+		if (!state->id_lso_policy || !state->id_lso_capable)
+			return (B_FALSE);
+
+		if ((state->id_hwcksum_capab & IBT_HCA_CKSUM_FULL) == 0)
+			return (B_FALSE);
+
+		if (state->id_hca_res_lkey_capab == 0) {
+			ibd_print_warn(state, "no reserved-lkey capability, "
+			    "disabling LSO");
+			return (B_FALSE);
+		}
+
+		cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+		cap_lso->lso_basic_tcp_ipv4.lso_max = state->id_lso_maxlen - 1;
+		break;
+	}
+
 	default:
 		return (B_FALSE);
 	}
+
 	return (B_TRUE);
 }
 
 /*
  * GLDv3 entry point to start hardware.
  */
-/* ARGSUSED */
+/*ARGSUSED*/
 static int
 ibd_m_start(void *arg)
 {
@@ -4121,13 +4351,10 @@ ibd_m_start(void *arg)
 /*
  * GLDv3 entry point to stop hardware from receiving packets.
  */
-/* ARGSUSED */
+/*ARGSUSED*/
 static void
 ibd_m_stop(void *arg)
 {
-#ifdef RUN_PERFORMANCE
-	ibd_perf((ibd_state_t *)arg);
-#endif
 }
 
 /*
@@ -4156,7 +4383,7 @@ ibd_async_multicast(ibd_state_t *state, ib_gid_t mgid, int op)
 	DPRINT(3, "ibd_async_multicast : async_setmc op %d :"
 	    "%016llx:%016llx\n", op, mgid.gid_prefix, mgid.gid_guid);
 
-	if (op == ASYNC_JOIN) {
+	if (op == IBD_ASYNC_JOIN) {
 
 		if (ibd_join_group(state, mgid, IB_MC_JSTATE_FULL) == NULL) {
 			ibd_print_warn(state, "Joint multicast group failed :"
@@ -4230,11 +4457,11 @@ ibd_m_multicst(void *arg, boolean_t add, const uint8_t *mcmac)
 	if (add) {
 		DPRINT(1, "ibd_m_multicst : %016llx:%016llx\n",
 		    mgid.gid_prefix, mgid.gid_guid);
-		ibd_queue_work_slot(state, req, ASYNC_JOIN);
+		ibd_queue_work_slot(state, req, IBD_ASYNC_JOIN);
 	} else {
 		DPRINT(1, "ibd_m_multicst : unset_multicast : "
 		    "%016llx:%016llx", mgid.gid_prefix, mgid.gid_guid);
-		ibd_queue_work_slot(state, req, ASYNC_LEAVE);
+		ibd_queue_work_slot(state, req, IBD_ASYNC_LEAVE);
 	}
 	return (0);
 }
@@ -4258,7 +4485,7 @@ ibd_async_unsetprom(ibd_state_t *state)
 		mce = list_next(&state->id_mc_non, mce);
 		ibd_leave_group(state, mgid, IB_MC_JSTATE_NON);
 	}
-	state->id_prom_op = NOTSTARTED;
+	state->id_prom_op = IBD_OP_NOTSTARTED;
 }
 
 /*
@@ -4274,7 +4501,7 @@ ibd_async_setprom(ibd_state_t *state)
 	ibt_mcg_info_t *mcg_info;
 	ib_gid_t mgid;
 	uint_t numg;
-	int i, ret = COMPLETED;
+	int i, ret = IBD_OP_COMPLETED;
 
 	DPRINT(2, "ibd_async_setprom : async_set_promisc");
 
@@ -4292,7 +4519,7 @@ ibd_async_setprom(ibd_state_t *state)
 	    IBT_SUCCESS) {
 		ibd_print_warn(state, "Could not get list of IBA multicast "
 		    "groups");
-		ret = ERRORED;
+		ret = IBD_OP_ERRORED;
 		goto done;
 	}
 
@@ -4335,10 +4562,10 @@ ibd_m_promisc(void *arg, boolean_t on)
 		return (ENOMEM);
 	if (on) {
 		DPRINT(1, "ibd_m_promisc : set_promisc : %d", on);
-		ibd_queue_work_slot(state, req, ASYNC_PROMON);
+		ibd_queue_work_slot(state, req, IBD_ASYNC_PROMON);
 	} else {
 		DPRINT(1, "ibd_m_promisc : unset_promisc");
-		ibd_queue_work_slot(state, req, ASYNC_PROMOFF);
+		ibd_queue_work_slot(state, req, IBD_ASYNC_PROMOFF);
 	}
 
 	return (0);
@@ -4369,7 +4596,7 @@ ibd_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = state->id_brd_xmt;
 		break;
 	case MAC_STAT_RBYTES:
-		*val = state->id_recv_bytes;
+		*val = state->id_rcv_bytes;
 		break;
 	case MAC_STAT_IPACKETS:
 		*val = state->id_rcv_pkt;
@@ -4380,9 +4607,6 @@ ibd_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_OPACKETS:
 		*val = state->id_xmt_pkt;
 		break;
-	case MAC_STAT_NORCVBUF:
-		*val = state->id_rx_short;	/* # times below water mark */
-		break;
 	case MAC_STAT_OERRORS:
 		*val = state->id_ah_error;	/* failed AH translation */
 		break;
@@ -4392,6 +4616,7 @@ ibd_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_NOXMTBUF:
 		*val = state->id_tx_short;
 		break;
+	case MAC_STAT_NORCVBUF:
 	default:
 		return (ENOTSUP);
 	}
@@ -4399,43 +4624,61 @@ ibd_m_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
-/*
- * Tx reschedule
- */
 static void
 ibd_async_txsched(ibd_state_t *state)
 {
 	ibd_req_t *req;
+	int ret;
 
-	/*
-	 * For poll mode, if ibd is out of Tx wqe, reschedule to collect
-	 * the CQEs. Otherwise, just return for out of Tx wqe.
-	 */
-
-	if (ibd_txcomp_poll == 1) {
-		mutex_enter(&state->id_txcomp_lock);
+	if (ibd_txcomp_poll)
 		ibd_poll_compq(state, state->id_scq_hdl);
-		mutex_exit(&state->id_txcomp_lock);
-		if (state->id_tx_list.dl_cnt < IBD_TX_UPDATE_THRESHOLD) {
-			req = kmem_cache_alloc(state->id_req_kmc, KM_SLEEP);
-			ibd_queue_work_slot(state, req, ASYNC_SCHED);
-			return;
-		}
-	} else if (state->id_tx_list.dl_cnt < IBD_TX_UPDATE_THRESHOLD) {
-		return;
-	}
 
-	if (state->id_sched_needed) {
-		mac_tx_update(state->id_mh);
-		state->id_sched_needed = B_FALSE;
+	ret = ibd_resume_transmission(state);
+	if (ret && ibd_txcomp_poll) {
+		if (req = kmem_cache_alloc(state->id_req_kmc, KM_NOSLEEP))
+			ibd_queue_work_slot(state, req, IBD_ASYNC_SCHED);
+		else {
+			ibd_print_warn(state, "ibd_async_txsched: "
+			    "no memory, can't schedule work slot");
+		}
 	}
 }
 
+static int
+ibd_resume_transmission(ibd_state_t *state)
+{
+	int flag;
+	int met_thresh = 0;
+	int ret = -1;
+
+	mutex_enter(&state->id_sched_lock);
+	if (state->id_sched_needed & IBD_RSRC_SWQE) {
+		met_thresh = (state->id_tx_list.dl_cnt >
+		    IBD_FREE_SWQES_THRESH);
+		flag = IBD_RSRC_SWQE;
+	} else if (state->id_sched_needed & IBD_RSRC_LSOBUF) {
+		ASSERT(state->id_lso != NULL);
+		met_thresh = (state->id_lso->bkt_nfree >
+		    IBD_FREE_LSOS_THRESH);
+		flag = IBD_RSRC_LSOBUF;
+	}
+	if (met_thresh) {
+		state->id_sched_needed &= ~flag;
+		ret = 0;
+	}
+	mutex_exit(&state->id_sched_lock);
+
+	if (ret == 0)
+		mac_tx_update(state->id_mh);
+
+	return (ret);
+}
+
 /*
- * Release one or more chained send wqes back into free list.
+ * Release the send wqe back into free list.
  */
 static void
-ibd_release_swqes(ibd_state_t *state, ibd_swqe_t *swqe)
+ibd_release_swqe(ibd_state_t *state, ibd_swqe_t *swqe)
 {
 	/*
 	 * Add back on Tx list for reuse.
@@ -4456,11 +4699,11 @@ ibd_release_swqes(ibd_state_t *state, ibd_swqe_t *swqe)
 }
 
 /*
- * Acquire send wqe from free list.
+ * Acquire a send wqe from free list.
  * Returns error number and send wqe pointer.
  */
 static int
-ibd_acquire_swqes(ibd_state_t *state, ibd_swqe_t **swqe)
+ibd_acquire_swqe(ibd_state_t *state, ibd_swqe_t **swqe)
 {
 	int rc = 0;
 	ibd_swqe_t *wqe;
@@ -4474,11 +4717,8 @@ ibd_acquire_swqes(ibd_state_t *state, ibd_swqe_t **swqe)
 	 * we always try to poll.
 	 */
 	if ((ibd_txcomp_poll == 1) &&
-	    (state->id_tx_list.dl_cnt < IBD_TXPOLL_THRESHOLD) &&
-	    (mutex_tryenter(&state->id_txcomp_lock) != 0)) {
-		DPRINT(10, "ibd_send : polling");
+	    (state->id_tx_list.dl_cnt < IBD_TX_POLL_THRESH)) {
 		ibd_poll_compq(state, state->id_scq_hdl);
-		mutex_exit(&state->id_txcomp_lock);
 	}
 
 	/*
@@ -4498,13 +4738,410 @@ ibd_acquire_swqes(ibd_state_t *state, ibd_swqe_t **swqe)
 		 */
 		rc = ENOENT;
 		state->id_tx_list.dl_pending_sends = B_TRUE;
-		DPRINT(5, "ibd_acquire_swqes: out of Tx wqe");
+		DPRINT(5, "ibd_acquire_swqe: out of Tx wqe");
 		atomic_add_64(&state->id_tx_short, 1);
 	}
 	mutex_exit(&state->id_tx_list.dl_mutex);
 	*swqe = wqe;
 
 	return (rc);
+}
+
+static int
+ibd_setup_lso(ibd_swqe_t *node, mblk_t *mp, uint32_t mss,
+    ibt_ud_dest_hdl_t ud_dest)
+{
+	mblk_t	*nmp;
+	int iph_len, tcph_len;
+	ibt_wr_lso_t *lso;
+	uintptr_t ip_start, tcp_start;
+	uint8_t *dst;
+	uint_t pending, mblen;
+
+	/*
+	 * The code in ibd_send would've set 'wr.ud.udwr_dest' by default;
+	 * we need to adjust it here for lso.
+	 */
+	lso = &(node->w_swr.wr.ud_lso);
+	lso->lso_ud_dest = ud_dest;
+	lso->lso_mss = mss;
+
+	/*
+	 * Calculate the LSO header size and set it in the UD LSO structure.
+	 * Note that the only assumption we make is that each of the IPoIB,
+	 * IP and TCP headers will be contained in a single mblk fragment;
+	 * together, the headers may span multiple mblk fragments.
+	 */
+	nmp = mp;
+	ip_start = (uintptr_t)(nmp->b_rptr) + IPOIB_HDRSIZE;
+	if (ip_start >= (uintptr_t)(nmp->b_wptr)) {
+		ip_start = (uintptr_t)nmp->b_cont->b_rptr
+		    + (ip_start - (uintptr_t)(nmp->b_wptr));
+		nmp = nmp->b_cont;
+
+	}
+	iph_len = IPH_HDR_LENGTH((ipha_t *)ip_start);
+
+	tcp_start = ip_start + iph_len;
+	if (tcp_start >= (uintptr_t)(nmp->b_wptr)) {
+		tcp_start = (uintptr_t)nmp->b_cont->b_rptr
+		    + (tcp_start - (uintptr_t)(nmp->b_wptr));
+		nmp = nmp->b_cont;
+	}
+	tcph_len = TCP_HDR_LENGTH((tcph_t *)tcp_start);
+	lso->lso_hdr_sz = IPOIB_HDRSIZE + iph_len + tcph_len;
+
+	/*
+	 * If the lso header fits entirely within a single mblk fragment,
+	 * we'll avoid an additional copy of the lso header here and just
+	 * pass the b_rptr of the mblk directly.
+	 *
+	 * If this isn't true, we'd have to allocate for it explicitly.
+	 */
+	if (lso->lso_hdr_sz <= MBLKL(mp)) {
+		lso->lso_hdr = mp->b_rptr;
+	} else {
+		/* On work completion, remember to free this allocated hdr */
+		lso->lso_hdr = kmem_zalloc(lso->lso_hdr_sz, KM_NOSLEEP);
+		if (lso->lso_hdr == NULL) {
+			DPRINT(10, "ibd_setup_lso: couldn't allocate lso hdr, "
+			    "sz = %d", lso->lso_hdr_sz);
+			lso->lso_hdr_sz = 0;
+			lso->lso_mss = 0;
+			return (-1);
+		}
+	}
+
+	/*
+	 * Copy in the lso header only if we need to
+	 */
+	if (lso->lso_hdr != mp->b_rptr) {
+		dst = lso->lso_hdr;
+		pending = lso->lso_hdr_sz;
+
+		for (nmp = mp; nmp && pending; nmp = nmp->b_cont) {
+			mblen = MBLKL(nmp);
+			if (pending > mblen) {
+				bcopy(nmp->b_rptr, dst, mblen);
+				dst += mblen;
+				pending -= mblen;
+			} else {
+				bcopy(nmp->b_rptr, dst, pending);
+				break;
+			}
+		}
+	}
+
+	return (0);
+}
+
+static void
+ibd_free_lsohdr(ibd_swqe_t *node, mblk_t *mp)
+{
+	ibt_wr_lso_t *lso;
+
+	if ((!node) || (!mp))
+		return;
+
+	/*
+	 * Free any header space that we might've allocated if we
+	 * did an LSO
+	 */
+	if (node->w_swr.wr_opcode == IBT_WRC_SEND_LSO) {
+		lso = &(node->w_swr.wr.ud_lso);
+		if ((lso->lso_hdr) && (lso->lso_hdr != mp->b_rptr)) {
+			kmem_free(lso->lso_hdr, lso->lso_hdr_sz);
+			lso->lso_hdr = NULL;
+			lso->lso_hdr_sz = 0;
+		}
+	}
+}
+
+static void
+ibd_post_send(ibd_state_t *state, ibd_swqe_t *node)
+{
+	uint_t		i;
+	uint_t		num_posted;
+	uint_t		n_wrs;
+	ibt_status_t	ibt_status;
+	ibt_send_wr_t	wrs[IBD_MAX_POST_MULTIPLE];
+	ibd_swqe_t	*elem;
+	ibd_swqe_t	*nodes[IBD_MAX_POST_MULTIPLE];
+
+	node->swqe_next = NULL;
+
+	mutex_enter(&state->id_txpost_lock);
+
+	/*
+	 * Enqueue the new node in chain of wqes to send
+	 */
+	if (state->id_tx_head) {
+		*(state->id_tx_tailp) = (ibd_wqe_t *)node;
+	} else {
+		state->id_tx_head = node;
+	}
+	state->id_tx_tailp = &(node->swqe_next);
+
+	/*
+	 * If someone else is helping out with the sends,
+	 * just go back
+	 */
+	if (state->id_tx_busy) {
+		mutex_exit(&state->id_txpost_lock);
+		return;
+	}
+
+	/*
+	 * Otherwise, mark the flag to indicate that we'll be
+	 * doing the dispatch of what's there in the wqe chain
+	 */
+	state->id_tx_busy = 1;
+
+	while (state->id_tx_head) {
+		/*
+		 * Collect pending requests, IBD_MAX_POST_MULTIPLE wrs
+		 * at a time if possible, and keep posting them.
+		 */
+		for (n_wrs = 0, elem = state->id_tx_head;
+		    (elem) && (n_wrs < IBD_MAX_POST_MULTIPLE);
+		    elem = WQE_TO_SWQE(elem->swqe_next), n_wrs++) {
+
+			nodes[n_wrs] = elem;
+			wrs[n_wrs] = elem->w_swr;
+		}
+		state->id_tx_head = elem;
+
+		/*
+		 * Release the txpost lock before posting the
+		 * send request to the hca; if the posting fails
+		 * for some reason, we'll never receive completion
+		 * intimation, so we'll need to cleanup.
+		 */
+		mutex_exit(&state->id_txpost_lock);
+
+		ASSERT(n_wrs != 0);
+
+		/*
+		 * If posting fails for some reason, we'll never receive
+		 * completion intimation, so we'll need to cleanup. But
+		 * we need to make sure we don't clean up nodes whose
+		 * wrs have been successfully posted. We assume that the
+		 * hca driver returns on the first failure to post and
+		 * therefore the first 'num_posted' entries don't need
+		 * cleanup here.
+		 */
+		num_posted = 0;
+		ibt_status = ibt_post_send(state->id_chnl_hdl,
+		    wrs, n_wrs, &num_posted);
+		if (ibt_status != IBT_SUCCESS) {
+
+			ibd_print_warn(state, "ibd_post_send: "
+			    "posting multiple wrs failed: "
+			    "requested=%d, done=%d, ret=%d",
+			    n_wrs, num_posted, ibt_status);
+
+			for (i = num_posted; i < n_wrs; i++)
+				ibd_tx_cleanup(state, nodes[i]);
+		}
+
+		/*
+		 * Grab the mutex before we go and check the tx Q again
+		 */
+		mutex_enter(&state->id_txpost_lock);
+	}
+
+	state->id_tx_busy = 0;
+	mutex_exit(&state->id_txpost_lock);
+}
+
+static int
+ibd_prepare_sgl(ibd_state_t *state, mblk_t *mp, ibd_swqe_t *node,
+    uint_t lsohdr_sz)
+{
+	ibt_wr_ds_t *sgl;
+	ibt_status_t ibt_status;
+	mblk_t *nmp;
+	mblk_t *data_mp;
+	uchar_t *bufp;
+	size_t blksize;
+	size_t skip;
+	size_t avail;
+	uint_t pktsize;
+	uint_t frag_len;
+	uint_t pending_hdr;
+	uint_t hiwm;
+	int nmblks;
+	int i;
+
+	/*
+	 * Let's skip ahead to the data if this is LSO
+	 */
+	data_mp = mp;
+	pending_hdr = 0;
+	if (lsohdr_sz) {
+		pending_hdr = lsohdr_sz;
+		for (nmp = mp; nmp; nmp = nmp->b_cont) {
+			frag_len = nmp->b_wptr - nmp->b_rptr;
+			if (frag_len > pending_hdr)
+				break;
+			pending_hdr -= frag_len;
+		}
+		data_mp = nmp;	/* start of data past lso header */
+		ASSERT(data_mp != NULL);
+	}
+
+	/*
+	 * Calculate the size of message data and number of msg blocks
+	 */
+	pktsize = 0;
+	for (nmblks = 0, nmp = data_mp; nmp != NULL;
+	    nmp = nmp->b_cont, nmblks++) {
+		pktsize += MBLKL(nmp);
+	}
+	pktsize -= pending_hdr;
+
+	/*
+	 * Translating the virtual address regions into physical regions
+	 * for using the Reserved LKey feature results in a wr sgl that
+	 * is a little longer. Since failing ibt_map_mem_iov() is costly,
+	 * we'll fix a high-water mark (65%) for when we should stop.
+	 */
+	hiwm = (state->id_max_sqseg * 65) / 100;
+
+	/*
+	 * We only do ibt_map_mem_iov() if the pktsize is above the
+	 * "copy-threshold", and if the number of mp fragments is less than
+	 * the maximum acceptable.
+	 */
+	if ((state->id_hca_res_lkey_capab) &&
+	    (pktsize > IBD_TX_COPY_THRESH) &&
+	    (nmblks < hiwm)) {
+		ibt_iov_t iov_arr[IBD_MAX_SQSEG];
+		ibt_iov_attr_t iov_attr;
+
+		iov_attr.iov_as = NULL;
+		iov_attr.iov = iov_arr;
+		iov_attr.iov_buf = NULL;
+		iov_attr.iov_list_len = nmblks;
+		iov_attr.iov_wr_nds = state->id_max_sqseg;
+		iov_attr.iov_lso_hdr_sz = lsohdr_sz;
+		iov_attr.iov_flags = IBT_IOV_SLEEP;
+
+		for (nmp = data_mp, i = 0; i < nmblks; i++, nmp = nmp->b_cont) {
+			iov_arr[i].iov_addr = (caddr_t)(void *)nmp->b_rptr;
+			iov_arr[i].iov_len = MBLKL(nmp);
+			if (i == 0) {
+				iov_arr[i].iov_addr += pending_hdr;
+				iov_arr[i].iov_len -= pending_hdr;
+			}
+		}
+
+		node->w_buftype = IBD_WQE_MAPPED;
+		node->w_swr.wr_sgl = node->w_sgl;
+
+		ibt_status = ibt_map_mem_iov(state->id_hca_hdl, &iov_attr,
+		    (ibt_all_wr_t *)&node->w_swr, &node->w_mi_hdl);
+		if (ibt_status != IBT_SUCCESS) {
+			ibd_print_warn(state, "ibd_send: ibt_map_mem_iov "
+			    "failed, nmblks=%d, ret=%d\n", nmblks, ibt_status);
+			goto ibd_copy_path;
+		}
+
+		return (0);
+	}
+
+ibd_copy_path:
+	if (pktsize <= state->id_tx_buf_sz) {
+		node->swqe_copybuf.ic_sgl.ds_len = pktsize;
+		node->w_swr.wr_nds = 1;
+		node->w_swr.wr_sgl = &node->swqe_copybuf.ic_sgl;
+		node->w_buftype = IBD_WQE_TXBUF;
+
+		/*
+		 * Even though this is the copy path for transfers less than
+		 * id_tx_buf_sz, it could still be an LSO packet.  If so, it
+		 * is possible the first data mblk fragment (data_mp) still
+		 * contains part of the LSO header that we need to skip.
+		 */
+		bufp = (uchar_t *)(uintptr_t)node->w_swr.wr_sgl->ds_va;
+		for (nmp = data_mp; nmp != NULL; nmp = nmp->b_cont) {
+			blksize = MBLKL(nmp) - pending_hdr;
+			bcopy(nmp->b_rptr + pending_hdr, bufp, blksize);
+			bufp += blksize;
+			pending_hdr = 0;
+		}
+
+		return (0);
+	}
+
+	/*
+	 * Copy path for transfers greater than id_tx_buf_sz
+	 */
+	node->w_swr.wr_sgl = node->w_sgl;
+	if (ibd_acquire_lsobufs(state, pktsize,
+	    node->w_swr.wr_sgl, &(node->w_swr.wr_nds)) != 0) {
+		DPRINT(10, "ibd_prepare_sgl: lso bufs acquire failed");
+		return (-1);
+	}
+	node->w_buftype = IBD_WQE_LSOBUF;
+
+	/*
+	 * Copy the larger-than-id_tx_buf_sz packet into a set of
+	 * fixed-sized, pre-mapped LSO buffers. Note that we might
+	 * need to skip part of the LSO header in the first fragment
+	 * as before.
+	 */
+	nmp = data_mp;
+	skip = pending_hdr;
+	for (i = 0; i < node->w_swr.wr_nds; i++) {
+		sgl = node->w_swr.wr_sgl + i;
+		bufp = (uchar_t *)(uintptr_t)sgl->ds_va;
+		avail = IBD_LSO_BUFSZ;
+		while (nmp && avail) {
+			blksize = MBLKL(nmp) - skip;
+			if (blksize > avail) {
+				bcopy(nmp->b_rptr + skip, bufp, avail);
+				skip += avail;
+				avail = 0;
+			} else {
+				bcopy(nmp->b_rptr + skip, bufp, blksize);
+				skip = 0;
+				avail -= blksize;
+				bufp += blksize;
+				nmp = nmp->b_cont;
+			}
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Schedule a completion queue polling to reap the resource we're
+ * short on.  If we implement the change to reap tx completions
+ * in a separate thread, we'll need to wake up that thread here.
+ */
+static int
+ibd_sched_poll(ibd_state_t *state, int resource_type, int q_flag)
+{
+	ibd_req_t *req;
+
+	mutex_enter(&state->id_sched_lock);
+	state->id_sched_needed |= resource_type;
+	mutex_exit(&state->id_sched_lock);
+
+	/*
+	 * If we are asked to queue a work entry, we need to do it
+	 */
+	if (q_flag) {
+		req = kmem_cache_alloc(state->id_req_kmc, KM_NOSLEEP);
+		if (req == NULL)
+			return (-1);
+
+		ibd_queue_work_slot(state, req, IBD_ASYNC_SCHED);
+	}
+
+	return (0);
 }
 
 /*
@@ -4514,28 +5151,47 @@ ibd_acquire_swqes(ibd_state_t *state, ibd_swqe_t **swqe)
 static boolean_t
 ibd_send(ibd_state_t *state, mblk_t *mp)
 {
-	ibt_status_t ibt_status;
-	ibt_mr_attr_t mem_attr;
 	ibd_ace_t *ace;
-	ibd_swqe_t *node = NULL;
+	ibd_swqe_t *node;
 	ipoib_mac_t *dest;
-	ibd_req_t *req;
 	ib_header_info_t *ipibp;
 	ip6_t *ip6h;
-	mblk_t *nmp = mp;
 	uint_t pktsize;
-	size_t	blksize;
-	uchar_t *bufp;
-	int i, ret, len, nmblks = 1;
-	boolean_t dofree = B_TRUE;
+	uint32_t mss;
+	uint32_t hckflags;
+	uint32_t lsoflags = 0;
+	uint_t lsohdr_sz = 0;
+	int ret, len;
+	boolean_t dofree = B_FALSE;
+	boolean_t rc;
 
-	if ((ret = ibd_acquire_swqes(state, &node)) != 0) {
-		state->id_sched_needed = B_TRUE;
-		if (ibd_txcomp_poll == 1) {
-			goto ibd_send_fail;
-		}
-		return (B_FALSE);
+	node = NULL;
+	if (ibd_acquire_swqe(state, &node) != 0) {
+		/*
+		 * If we don't have an swqe available, schedule a transmit
+		 * completion queue cleanup and hold off on sending more
+		 * more packets until we have some free swqes
+		 */
+		if (ibd_sched_poll(state, IBD_RSRC_SWQE, ibd_txcomp_poll) == 0)
+			return (B_FALSE);
+
+		/*
+		 * If a poll cannot be scheduled, we have no choice but
+		 * to drop this packet
+		 */
+		ibd_print_warn(state, "ibd_send: no swqe, pkt drop");
+		return (B_TRUE);
 	}
+
+	/*
+	 * Initialize the commonly used fields in swqe to NULL to protect
+	 * against ibd_tx_cleanup accidentally misinterpreting these on a
+	 * failure.
+	 */
+	node->swqe_im_mblk = NULL;
+	node->w_swr.wr_nds = 0;
+	node->w_swr.wr_sgl = NULL;
+	node->w_swr.wr_opcode = IBT_WRC_SEND;
 
 	/*
 	 * Obtain an address handle for the destination.
@@ -4546,6 +5202,7 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 		IBD_FILL_SCOPE_PKEY(dest, state->id_scope, state->id_pkey);
 
 	pktsize = msgsize(mp);
+
 	atomic_add_64(&state->id_xmt_bytes, pktsize);
 	atomic_inc_64(&state->id_xmt_pkt);
 	if (bcmp(&ipibp->ib_dst, &state->id_bcaddr, IPOIB_ADDRL) == 0)
@@ -4565,29 +5222,36 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 		    htonl(dest->ipoib_gidsuff[0]),
 		    htonl(dest->ipoib_gidsuff[1]));
 		node->w_ahandle = NULL;
+
 		/*
 		 * for the poll mode, it is probably some cqe pending in the
 		 * cq. So ibd has to poll cq here, otherwise acache probably
 		 * may not be recycled.
 		 */
-		if (ibd_txcomp_poll == 1) {
-			mutex_enter(&state->id_txcomp_lock);
+		if (ibd_txcomp_poll == 1)
 			ibd_poll_compq(state, state->id_scq_hdl);
-			mutex_exit(&state->id_txcomp_lock);
-		}
+
 		/*
 		 * Here if ibd_acache_lookup() returns EFAULT, it means ibd
 		 * can not find a path for the specific dest address. We
-		 * should get rid of this kind of packet. With the normal
-		 * case, ibd will return the packet to upper layer and wait
-		 * for AH creating.
+		 * should get rid of this kind of packet.  We also should get
+		 * rid of the packet if we cannot schedule a poll via the
+		 * async thread.  For the normal case, ibd will return the
+		 * packet to upper layer and wait for AH creating.
+		 *
+		 * Note that we always queue a work slot entry for the async
+		 * thread when we fail AH lookup (even in intr mode); this is
+		 * due to the convoluted way the code currently looks for AH.
 		 */
-		if (ret == EFAULT)
-			ret = B_TRUE;
-		else {
-			ret = B_FALSE;
+		if (ret == EFAULT) {
+			dofree = B_TRUE;
+			rc = B_TRUE;
+		} else if (ibd_sched_poll(state, IBD_RSRC_SWQE, 1) != 0) {
+			dofree = B_TRUE;
+			rc = B_TRUE;
+		} else {
 			dofree = B_FALSE;
-			state->id_sched_needed = B_TRUE;
+			rc = B_FALSE;
 		}
 		goto ibd_send_fail;
 	}
@@ -4601,7 +5265,8 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 			if (!pullupmsg(mp, IPV6_HDR_LEN +
 			    sizeof (ib_header_info_t))) {
 				DPRINT(10, "ibd_send: pullupmsg failure ");
-				ret = B_TRUE;
+				dofree = B_TRUE;
+				rc = B_TRUE;
 				goto ibd_send_fail;
 			}
 			ipibp = (ib_header_info_t *)mp->b_rptr;
@@ -4621,7 +5286,8 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 				    IPV6_HDR_LEN + len + 4)) {
 					DPRINT(10, "ibd_send: pullupmsg "
 					    "failure ");
-					ret = B_TRUE;
+					dofree = B_TRUE;
+					rc = B_TRUE;
 					goto ibd_send_fail;
 				}
 				ip6h = (ip6_t *)((uchar_t *)mp->b_rptr +
@@ -4634,108 +5300,68 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 	}
 
 	mp->b_rptr += sizeof (ib_addrs_t);
-	while (((nmp = nmp->b_cont) != NULL) &&
-	    (++nmblks < (state->id_max_sqseg + 1)))
-	;
-
-	pktsize = msgsize(mp);
-	/*
-	 * GLDv3 will check mtu. We do checksum related work here.
-	 */
-	IBD_CKSUM_SEND(mp);
 
 	/*
-	 * Copy the data to preregistered buffers, or register the buffer.
+	 * Do LSO and checksum related work here.  For LSO send, adjust the
+	 * ud destination, the opcode and the LSO header information to the
+	 * work request.
 	 */
-	if ((nmblks <= state->id_max_sqseg) &&
-	    (pktsize > IBD_TX_COPY_THRESHOLD)) {
-		for (i = 0, nmp = mp; i < nmblks; i++, nmp = nmp->b_cont) {
-			mem_attr.mr_vaddr = (uint64_t)(uintptr_t)nmp->b_rptr;
-			mem_attr.mr_len = nmp->b_wptr - nmp->b_rptr;
-			mem_attr.mr_as = NULL;
-			mem_attr.mr_flags = IBT_MR_NOSLEEP;
-			ibt_status = ibt_register_mr(state->id_hca_hdl,
-			    state->id_pd_hdl, &mem_attr,
-			    &node->w_smblkbuf[i].im_mr_hdl,
-			    &node->w_smblkbuf[i].im_mr_desc);
-			if (ibt_status != IBT_SUCCESS) {
-				/*
-				 * We do not expect any error other than
-				 * IBT_INSUFF_RESOURCE.
-				 */
-				if (ibt_status != IBT_INSUFF_RESOURCE)
-					DPRINT(10, "ibd_send: %d\n",
-					    "failed in ibt_register_mem()",
-					    ibt_status);
-				DPRINT(5, "ibd_send: registration failed");
-				node->w_swr.wr_nds = i;
-				/*
-				 * Deregister already registered memory;
-				 * fallback to copying the mblk.
-				 */
-				ibd_deregister_mr(state, node);
-				goto ibd_copy_path;
-			}
-			node->w_smblk_sgl[i].ds_va =
-			    (ib_vaddr_t)(uintptr_t)nmp->b_rptr;
-			node->w_smblk_sgl[i].ds_key =
-			    node->w_smblkbuf[i].im_mr_desc.md_lkey;
-			node->w_smblk_sgl[i].ds_len =
-			    nmp->b_wptr - nmp->b_rptr;
-		}
-		node->swqe_im_mblk = mp;
-		node->w_swr.wr_sgl = node->w_smblk_sgl;
-		node->w_swr.wr_nds = nmblks;
-		dofree = B_FALSE;
+	lso_info_get(mp, &mss, &lsoflags);
+	if ((lsoflags & HW_LSO) != HW_LSO) {
+		node->w_swr.wr_opcode = IBT_WRC_SEND;
+		lsohdr_sz = 0;
 	} else {
-ibd_copy_path:
-		node->swqe_copybuf.ic_sgl.ds_len = pktsize;
-		node->w_swr.wr_nds = 1;
-		node->w_swr.wr_sgl = &node->swqe_copybuf.ic_sgl;
-
-		bufp = (uchar_t *)(uintptr_t)node->w_swr.wr_sgl->ds_va;
-		for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
-			blksize = MBLKL(nmp);
-			bcopy(nmp->b_rptr, bufp, blksize);
-			bufp += blksize;
+		if (ibd_setup_lso(node, mp, mss, ace->ac_dest) != 0) {
+			/*
+			 * The routine can only fail if there's no memory; we
+			 * can only drop the packet if this happens
+			 */
+			ibd_print_warn(state,
+			    "ibd_send: no memory, lso posting failed");
+			dofree = B_TRUE;
+			rc = B_TRUE;
+			goto ibd_send_fail;
 		}
+
+		node->w_swr.wr_opcode = IBT_WRC_SEND_LSO;
+		lsohdr_sz = (node->w_swr.wr.ud_lso).lso_hdr_sz;
 	}
+
+	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &hckflags);
+	if ((hckflags & HCK_FULLCKSUM) == HCK_FULLCKSUM)
+		node->w_swr.wr_flags |= IBT_WR_SEND_CKSUM;
+	else
+		node->w_swr.wr_flags &= ~IBT_WR_SEND_CKSUM;
 
 	/*
-	 * Queue the wqe to hardware.
+	 * Prepare the sgl for posting; the routine can only fail if there's
+	 * no lso buf available for posting. If this is the case, we should
+	 * probably resched for lso bufs to become available and then try again.
 	 */
-	ibt_status = ibt_post_send(state->id_chnl_hdl, &node->w_swr, 1, NULL);
-	if (ibt_status != IBT_SUCCESS) {
-		/*
-		 * We should not fail here; but just in case we do, we
-		 * print out a warning to log.
-		 */
-		ibd_print_warn(state, "ibd_send: posting failed: %d",
-		    ibt_status);
+	if (ibd_prepare_sgl(state, mp, node, lsohdr_sz) != 0) {
+		if (ibd_sched_poll(state, IBD_RSRC_LSOBUF, 1) != 0) {
+			dofree = B_TRUE;
+			rc = B_TRUE;
+		} else {
+			dofree = B_FALSE;
+			rc = B_FALSE;
+		}
+		goto ibd_send_fail;
 	}
+	node->swqe_im_mblk = mp;
 
-	DPRINT(10, "ibd_send : posted packet %d to %08X:%08X:%08X:%08X:%08X",
-	    INCTXPACK, htonl(ace->ac_mac.ipoib_qpn),
-	    htonl(ace->ac_mac.ipoib_gidpref[0]),
-	    htonl(ace->ac_mac.ipoib_gidpref[1]),
-	    htonl(ace->ac_mac.ipoib_gidsuff[0]),
-	    htonl(ace->ac_mac.ipoib_gidsuff[1]));
-
-	if (dofree)
-		freemsg(mp);
+	/*
+	 * Queue the wqe to hardware; since we can now simply queue a
+	 * post instead of doing it serially, we cannot assume anything
+	 * about the 'node' after ibd_post_send() returns.
+	 */
+	ibd_post_send(state, node);
 
 	return (B_TRUE);
 
 ibd_send_fail:
-	if (state->id_sched_needed == B_TRUE) {
-		req = kmem_cache_alloc(state->id_req_kmc, KM_NOSLEEP);
-		if (req != NULL)
-			ibd_queue_work_slot(state, req, ASYNC_SCHED);
-		else {
-			dofree = B_TRUE;
-			ret = B_TRUE;
-		}
-	}
+	if (node && mp)
+		ibd_free_lsohdr(node, mp);
 
 	if (dofree)
 		freemsg(mp);
@@ -4743,7 +5369,7 @@ ibd_send_fail:
 	if (node != NULL)
 		ibd_tx_cleanup(state, node);
 
-	return (ret);
+	return (rc);
 }
 
 /*
@@ -4758,7 +5384,7 @@ ibd_m_tx(void *arg, mblk_t *mp)
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
-		if (!ibd_send(state, mp)) {
+		if (ibd_send(state, mp) == B_FALSE) {
 			/* Send fail */
 			mp->b_next = next;
 			break;
@@ -4777,32 +5403,62 @@ static uint_t
 ibd_intr(char *arg)
 {
 	ibd_state_t *state = (ibd_state_t *)arg;
-	/*
-	 * Poll for completed entries; the CQ will not interrupt any
-	 * more for incoming (or transmitted) packets.
-	 */
-	ibd_poll_compq(state, state->id_rcq_hdl);
 
-	/*
-	 * Now enable CQ notifications; all packets that arrive now
-	 * (or complete transmission) will cause new interrupts.
-	 */
-	if (ibt_enable_cq_notify(state->id_rcq_hdl, IBT_NEXT_COMPLETION) !=
-	    IBT_SUCCESS) {
-		/*
-		 * We do not expect a failure here.
-		 */
-		DPRINT(10, "ibd_intr: ibt_enable_cq_notify() failed");
-	}
-
-	/*
-	 * Repoll to catch all packets that might have arrived after
-	 * we finished the first poll loop and before interrupts got
-	 * armed.
-	 */
 	ibd_poll_compq(state, state->id_rcq_hdl);
 
 	return (DDI_INTR_CLAIMED);
+}
+
+/*
+ * Poll and drain the cq
+ */
+static uint_t
+ibd_drain_cq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl, ibt_wc_t *wcs,
+    uint_t numwcs)
+{
+	ibd_wqe_t *wqe;
+	ibt_wc_t *wc;
+	uint_t total_polled = 0;
+	uint_t num_polled;
+	int i;
+
+	while (ibt_poll_cq(cq_hdl, wcs, numwcs, &num_polled) == IBT_SUCCESS) {
+		total_polled += num_polled;
+		for (i = 0, wc = wcs; i < num_polled; i++, wc++) {
+			wqe = (ibd_wqe_t *)(uintptr_t)wc->wc_id;
+			ASSERT((wqe->w_type == IBD_WQE_SEND) ||
+			    (wqe->w_type == IBD_WQE_RECV));
+			if (wc->wc_status != IBT_WC_SUCCESS) {
+				/*
+				 * Channel being torn down.
+				 */
+				if (wc->wc_status == IBT_WC_WR_FLUSHED_ERR) {
+					DPRINT(5, "ibd_drain_cq: flush error");
+					/*
+					 * Only invoke the Tx handler to
+					 * release possibly held resources
+					 * like AH refcount etc. Can not
+					 * invoke Rx handler because it might
+					 * try adding buffers to the Rx pool
+					 * when we are trying to deinitialize.
+					 */
+					if (wqe->w_type == IBD_WQE_RECV) {
+						continue;
+					} else {
+						DPRINT(10, "ibd_drain_cq: Bad "
+						    "status %d", wc->wc_status);
+					}
+				}
+			}
+			if (wqe->w_type == IBD_WQE_SEND) {
+				ibd_tx_cleanup(state, WQE_TO_SWQE(wqe));
+			} else {
+				ibd_process_rx(state, WQE_TO_RWQE(wqe), wc);
+			}
+		}
+	}
+
+	return (total_polled);
 }
 
 /*
@@ -4812,10 +5468,33 @@ ibd_intr(char *arg)
 static void
 ibd_poll_compq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 {
-	ibd_wqe_t *wqe;
-	ibt_wc_t *wc, *wcs;
-	uint_t numwcs, real_numwcs;
-	int i;
+	ibt_wc_t *wcs;
+	uint_t numwcs;
+	int flag, redo_flag;
+	int redo = 1;
+	uint_t num_polled = 0;
+
+	if (ibd_separate_cqs == 1) {
+		if (cq_hdl == state->id_rcq_hdl) {
+			flag = IBD_RX_CQ_POLLING;
+			redo_flag = IBD_REDO_RX_CQ_POLLING;
+		} else {
+			flag = IBD_TX_CQ_POLLING;
+			redo_flag = IBD_REDO_TX_CQ_POLLING;
+		}
+	} else {
+		flag = IBD_RX_CQ_POLLING | IBD_TX_CQ_POLLING;
+		redo_flag = IBD_REDO_RX_CQ_POLLING | IBD_REDO_TX_CQ_POLLING;
+	}
+
+	mutex_enter(&state->id_cq_poll_lock);
+	if (state->id_cq_poll_busy & flag) {
+		state->id_cq_poll_busy |= redo_flag;
+		mutex_exit(&state->id_cq_poll_lock);
+		return;
+	}
+	state->id_cq_poll_busy |= flag;
+	mutex_exit(&state->id_cq_poll_lock);
 
 	/*
 	 * In some cases (eg detaching), this code can be invoked on
@@ -4841,63 +5520,65 @@ ibd_poll_compq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 		numwcs = state->id_rxwcs_size;
 	}
 
-	if (ibt_poll_cq(cq_hdl, wcs, numwcs, &real_numwcs) == IBT_SUCCESS) {
-		for (i = 0, wc = wcs; i < real_numwcs; i++, wc++) {
-			wqe = (ibd_wqe_t *)(uintptr_t)wc->wc_id;
-			ASSERT((wqe->w_type == IBD_WQE_SEND) ||
-			    (wqe->w_type == IBD_WQE_RECV));
-			if (wc->wc_status != IBT_WC_SUCCESS) {
-				/*
-				 * Channel being torn down.
-				 */
-				if (wc->wc_status == IBT_WC_WR_FLUSHED_ERR) {
-					DPRINT(5, "ibd_intr: flush error");
-					/*
-					 * Only invoke the Tx handler to
-					 * release possibly held resources
-					 * like AH refcount etc. Can not
-					 * invoke Rx handler because it might
-					 * try adding buffers to the Rx pool
-					 * when we are trying to deinitialize.
-					 */
-					if (wqe->w_type == IBD_WQE_RECV) {
-						continue;
-					} else {
-						DPRINT(10, "%s %d",
-						    "ibd_intr: Bad CQ status",
-						    wc->wc_status);
-					}
-				}
-			}
-			if (wqe->w_type == IBD_WQE_SEND) {
-				ibd_tx_cleanup(state, WQE_TO_SWQE(wqe));
-			} else {
-				ibd_process_rx(state, WQE_TO_RWQE(wqe), wc);
-			}
+	/*
+	 * Poll and drain the CQ
+	 */
+	num_polled = ibd_drain_cq(state, cq_hdl, wcs, numwcs);
+
+	/*
+	 * Enable CQ notifications and redrain the cq to catch any
+	 * completions we might have missed after the ibd_drain_cq()
+	 * above and before the ibt_enable_cq_notify() that follows.
+	 * Finally, service any new requests to poll the cq that
+	 * could've come in after the ibt_enable_cq_notify().
+	 */
+	do {
+		if (ibt_enable_cq_notify(cq_hdl, IBT_NEXT_COMPLETION) !=
+		    IBT_SUCCESS) {
+			DPRINT(10, "ibd_intr: ibt_enable_cq_notify() failed");
 		}
+
+		num_polled += ibd_drain_cq(state, cq_hdl, wcs, numwcs);
+
+		mutex_enter(&state->id_cq_poll_lock);
+		if (state->id_cq_poll_busy & redo_flag)
+			state->id_cq_poll_busy &= ~redo_flag;
+		else {
+			state->id_cq_poll_busy &= ~flag;
+			redo = 0;
+		}
+		mutex_exit(&state->id_cq_poll_lock);
+
+	} while (redo);
+
+	/*
+	 * If we polled the receive cq and found anything, we need to flush
+	 * it out to the nw layer here.
+	 */
+	if ((flag & IBD_RX_CQ_POLLING) && (num_polled > 0)) {
+		ibd_flush_rx(state, NULL);
 	}
 }
 
 /*
- * Deregister the mr associated with a given mblk.
+ * Unmap the memory area associated with a given swqe.
  */
 static void
-ibd_deregister_mr(ibd_state_t *state, ibd_swqe_t *swqe)
+ibd_unmap_mem(ibd_state_t *state, ibd_swqe_t *swqe)
 {
-	int i;
+	ibt_status_t stat;
 
-	DPRINT(20, "ibd_deregister_mr: wqe = %p, seg = %d\n", swqe,
-	    swqe->w_swr.wr_nds);
+	DPRINT(20, "ibd_unmap_mem: wqe=%p, seg=%d\n", swqe, swqe->w_swr.wr_nds);
 
-	for (i = 0; i < swqe->w_swr.wr_nds; i++) {
-		if (ibt_deregister_mr(state->id_hca_hdl,
-		    swqe->w_smblkbuf[i].im_mr_hdl) != IBT_SUCCESS) {
-			/*
-			 * We do not expect any errors here.
-			 */
-			DPRINT(10, "failed in ibt_deregister_mem()\n");
+	if (swqe->w_mi_hdl) {
+		if ((stat = ibt_unmap_mem_iov(state->id_hca_hdl,
+		    swqe->w_mi_hdl)) != IBT_SUCCESS) {
+			DPRINT(10,
+			    "failed in ibt_unmap_mem_iov, ret=%d\n", stat);
 		}
+		swqe->w_mi_hdl = NULL;
 	}
+	swqe->w_swr.wr_nds = 0;
 }
 
 /*
@@ -4912,11 +5593,20 @@ ibd_tx_cleanup(ibd_state_t *state, ibd_swqe_t *swqe)
 	DPRINT(20, "ibd_tx_cleanup %p\n", swqe);
 
 	/*
-	 * If this was a dynamic registration in ibd_send(),
-	 * deregister now.
+	 * If this was a dynamic mapping in ibd_send(), we need to
+	 * unmap here. If this was an lso buffer we'd used for sending,
+	 * we need to release the lso buf to the pool, since the resource
+	 * is scarce. However, if this was simply a normal send using
+	 * the copybuf (present in each swqe), we don't need to release it.
 	 */
 	if (swqe->swqe_im_mblk != NULL) {
-		ibd_deregister_mr(state, swqe);
+		if (swqe->w_buftype == IBD_WQE_MAPPED) {
+			ibd_unmap_mem(state, swqe);
+		} else if (swqe->w_buftype == IBD_WQE_LSOBUF) {
+			ibd_release_lsobufs(state,
+			    swqe->w_swr.wr_sgl, swqe->w_swr.wr_nds);
+		}
+		ibd_free_lsohdr(swqe, swqe->swqe_im_mblk);
 		freemsg(swqe->swqe_im_mblk);
 		swqe->swqe_im_mblk = NULL;
 	}
@@ -4978,7 +5668,7 @@ ibd_tx_cleanup(ibd_state_t *state, ibd_swqe_t *swqe)
 					 * creation time.
 					 */
 					ibd_queue_work_slot(state,
-					    &mce->mc_req, ASYNC_REAP);
+					    &mce->mc_req, IBD_ASYNC_REAP);
 				}
 				IBD_ACACHE_INSERT_FREE(state, ace);
 			}
@@ -4989,19 +5679,43 @@ ibd_tx_cleanup(ibd_state_t *state, ibd_swqe_t *swqe)
 	/*
 	 * Release the send wqe for reuse.
 	 */
-	ibd_release_swqes(state, swqe);
+	ibd_release_swqe(state, swqe);
+}
+
+/*
+ * Hand off the processed rx mp chain to mac_rx()
+ */
+static void
+ibd_flush_rx(ibd_state_t *state, mblk_t *mpc)
+{
+	if (mpc == NULL) {
+		mutex_enter(&state->id_rx_lock);
+
+		mpc = state->id_rx_mp;
+
+		state->id_rx_mp = NULL;
+		state->id_rx_mp_tail = NULL;
+		state->id_rx_mp_len = 0;
+
+		mutex_exit(&state->id_rx_lock);
+	}
+
+	if (mpc) {
+		mac_rx(state->id_mh, state->id_rh, mpc);
+	}
 }
 
 /*
  * Processing to be done after receipt of a packet; hand off to GLD
- * in the format expected by GLD.
- * The recvd packet has this format: 2b sap :: 00 :: data.
+ * in the format expected by GLD.  The received packet has this
+ * format: 2b sap :: 00 :: data.
  */
 static void
 ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 {
 	ib_header_info_t *phdr;
 	mblk_t *mp;
+	mblk_t *mpc = NULL;
 	ipoib_hdr_t *ipibp;
 	ip6_t *ip6h;
 	int rxcnt, len;
@@ -5019,6 +5733,15 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	 */
 	mp = rwqe->rwqe_im_mblk;
 	mp->b_wptr = mp->b_rptr + wc->wc_bytes_xfer;
+
+	/*
+	 * Make sure this is NULL or we're in trouble.
+	 */
+	if (mp->b_next != NULL) {
+		ibd_print_warn(state,
+		    "ibd_process_rx: got duplicate mp from rcq?");
+		mp->b_next = NULL;
+	}
 
 	/*
 	 * the IB link will deliver one of the IB link layer
@@ -5058,8 +5781,6 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 		    sizeof (ipoib_mac_t));
 	}
 
-	DPRINT(10, "ibd_process_rx : got packet %d", INCRXPACK);
-
 	/*
 	 * For ND6 packets, padding is at the front of the source/target
 	 * lladdr. However the inet6 layer is not aware of it, hence remove
@@ -5098,38 +5819,58 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 		}
 	}
 
-	atomic_add_64(&state->id_recv_bytes, wc->wc_bytes_xfer);
+	/*
+	 * Update statistics
+	 */
+	atomic_add_64(&state->id_rcv_bytes, wc->wc_bytes_xfer);
 	atomic_inc_64(&state->id_rcv_pkt);
 	if (bcmp(&phdr->ib_dst, &state->id_bcaddr, IPOIB_ADDRL) == 0)
 		atomic_inc_64(&state->id_brd_rcv);
 	else if ((ntohl(phdr->ib_dst.ipoib_qpn) & IB_QPN_MASK) == IB_MC_QPN)
 		atomic_inc_64(&state->id_multi_rcv);
-	/*
-	 * Hand off to service thread/GLD. When we have hardware that
-	 * does hardware checksum, we will pull the checksum from the
-	 * work completion structure here.
-	 * on interrupt cpu.
-	 */
-	ibd_send_up(state, mp);
 
 	/*
-	 * Possibly replenish the Rx pool if needed.
+	 * Set receive checksum status in mp
 	 */
-	if (rxcnt < IBD_RX_THRESHOLD) {
-		state->id_rx_short++;
-		if (ibd_alloc_rwqe(state, &rwqe) == DDI_SUCCESS) {
-			if (ibd_post_rwqe(state, rwqe, B_FALSE) ==
-			    DDI_FAILURE) {
-				ibd_free_rwqe(state, rwqe);
-				return;
-			}
-		}
+	if ((wc->wc_flags & IBT_WC_CKSUM_OK) == IBT_WC_CKSUM_OK) {
+		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
+		    HCK_FULLCKSUM | HCK_FULLCKSUM_OK, 0);
+	}
+
+	/*
+	 * Add this mp to the list of processed mp's to send to
+	 * the nw layer
+	 */
+	mutex_enter(&state->id_rx_lock);
+	if (state->id_rx_mp) {
+		ASSERT(state->id_rx_mp_tail != NULL);
+		state->id_rx_mp_tail->b_next = mp;
+	} else {
+		ASSERT(state->id_rx_mp_tail == NULL);
+		state->id_rx_mp = mp;
+	}
+
+	state->id_rx_mp_tail = mp;
+	state->id_rx_mp_len++;
+
+	if (state->id_rx_mp_len  >= IBD_MAX_RX_MP_LEN) {
+		mpc = state->id_rx_mp;
+
+		state->id_rx_mp = NULL;
+		state->id_rx_mp_tail = NULL;
+		state->id_rx_mp_len = 0;
+	}
+
+	mutex_exit(&state->id_rx_lock);
+
+	if (mpc) {
+		ibd_flush_rx(state, mpc);
 	}
 }
 
 /*
- * Callback code invoked from STREAMs when the recv data buffer is free
- * for recycling.
+ * Callback code invoked from STREAMs when the receive data buffer is
+ * free for recycling.
  */
 static void
 ibd_freemsg_cb(char *arg)
@@ -5143,45 +5884,31 @@ ibd_freemsg_cb(char *arg)
 	if (rwqe->w_freeing_wqe == B_TRUE) {
 		DPRINT(6, "ibd_freemsg: wqe being freed");
 		return;
-	}
-
-	/*
-	 * Upper layer has released held mblk.
-	 */
-	atomic_add_32(&state->id_rx_list.dl_bufs_outstanding, -1);
-
-	if (state->id_rx_list.dl_cnt >= state->id_num_rwqe) {
+	} else {
 		/*
-		 * There are already enough buffers on the Rx ring.
-		 * Free this one up.
+		 * Upper layer has released held mblk, so we have
+		 * no more use for keeping the old pointer in
+		 * our rwqe.
 		 */
 		rwqe->rwqe_im_mblk = NULL;
+	}
+
+	rwqe->rwqe_im_mblk = desballoc(rwqe->rwqe_copybuf.ic_bufaddr,
+	    state->id_mtu + IPOIB_GRH_SIZE, 0, &rwqe->w_freemsg_cb);
+	if (rwqe->rwqe_im_mblk == NULL) {
 		ibd_delete_rwqe(state, rwqe);
 		ibd_free_rwqe(state, rwqe);
-		DPRINT(6, "ibd_freemsg: free up wqe");
-	} else {
-		rwqe->rwqe_im_mblk = desballoc(rwqe->rwqe_copybuf.ic_bufaddr,
-		    state->id_mtu + IPOIB_GRH_SIZE, 0, &rwqe->w_freemsg_cb);
-		if (rwqe->rwqe_im_mblk == NULL) {
-			ibd_delete_rwqe(state, rwqe);
-			ibd_free_rwqe(state, rwqe);
-			DPRINT(6, "ibd_freemsg: desballoc failed");
-			return;
-		}
-
-		/*
-		 * Post back to h/w. We could actually have more than
-		 * id_num_rwqe WQEs on the list if there were multiple
-		 * ibd_freemsg_cb() calls outstanding (since the lock is
-		 * not held the entire time). This will start getting
-		 * corrected over subsequent ibd_freemsg_cb() calls.
-		 */
-		if (ibd_post_rwqe(state, rwqe, B_TRUE) == DDI_FAILURE) {
-			ibd_delete_rwqe(state, rwqe);
-			ibd_free_rwqe(state, rwqe);
-			return;
-		}
+		DPRINT(6, "ibd_freemsg: desballoc failed");
+		return;
 	}
+
+	if (ibd_post_rwqe(state, rwqe, B_TRUE) == DDI_FAILURE) {
+		ibd_delete_rwqe(state, rwqe);
+		ibd_free_rwqe(state, rwqe);
+		return;
+	}
+
+	atomic_add_32(&state->id_rx_list.dl_bufs_outstanding, -1);
 }
 
 static uint_t
@@ -5190,410 +5917,67 @@ ibd_tx_recycle(char *arg)
 	ibd_state_t *state = (ibd_state_t *)arg;
 
 	/*
-	 * Poll for completed entries; the CQ will not interrupt any
-	 * more for completed packets.
+	 * Poll for completed entries
 	 */
 	ibd_poll_compq(state, state->id_scq_hdl);
 
 	/*
-	 * Now enable CQ notifications; all completions originating now
-	 * will cause new interrupts.
+	 * Resume any blocked transmissions if possible
 	 */
-	if (ibt_enable_cq_notify(state->id_scq_hdl, IBT_NEXT_COMPLETION) !=
-	    IBT_SUCCESS) {
-		/*
-		 * We do not expect a failure here.
-		 */
-		DPRINT(10, "ibd_tx_recycle: ibt_enable_cq_notify() failed");
-	}
-
-	/*
-	 * Repoll to catch all packets that might have completed after
-	 * we finished the first poll loop and before interrupts got
-	 * armed.
-	 */
-	ibd_poll_compq(state, state->id_scq_hdl);
-
-	/*
-	 * Call txsched to notify GLDv3 if it required.
-	 */
-	ibd_async_txsched(state);
+	(void) ibd_resume_transmission(state);
 
 	return (DDI_INTR_CLAIMED);
 }
-#ifdef RUN_PERFORMANCE
 
-/*
- * To run the performance test, first do the "ifconfig ibdN plumb" on
- * the Rx and Tx side. Then use mdb -kw to tweak the following variables:
- * ibd_performance=1.
- * ibd_receiver=1 on Rx side.
- * ibd_sender=1 on Tx side.
- * Do "ifconfig ibdN" on Rx side to get the Rx mac address, and update
- * ibd_dest on the Tx side. Next, do ifconfig/unplumb on Rx, this will
- * make it drop into a 1 minute loop waiting for packets. An
- * ifconfig/unplumb on the Tx will cause it to send packets to Rx.
- */
-
-#define	IBD_NUM_UNSIGNAL	ibd_num_unsignal
-#define	IBD_TX_PKTSIZE		ibd_tx_pktsize
-#define	IBD_TX_DATASIZE		ibd_tx_datasize
-
-static ibd_swqe_t **swqes;
-static ibt_wc_t *wcs;
-
-/*
- * Set these on Rx and Tx side to do performance run.
- */
-static int ibd_performance = 0;
-static int ibd_receiver = 0;
-static int ibd_sender = 0;
-static ipoib_mac_t ibd_dest;
-
-/*
- * Interrupt coalescing is achieved by asking for a completion intr
- * only every ibd_num_unsignal'th packet.
- */
-static int ibd_num_unsignal = 8;
-
-/*
- * How big is each packet?
- */
-static int ibd_tx_pktsize = 2048;
-
-/*
- * Total data size to be transmitted.
- */
-static int ibd_tx_datasize = 512*1024*1024;
-
-static volatile boolean_t cq_handler_ran = B_FALSE;
-static volatile int num_completions;
-
-/* ARGSUSED */
+#ifdef IBD_LOGGING
 static void
-ibd_perf_handler(ibt_cq_hdl_t cq_hdl, void *arg)
+ibd_log_init(void)
 {
-	ibd_state_t *state = (ibd_state_t *)arg;
-	ibt_cq_hdl_t cqhdl;
-	ibd_wqe_t *wqe;
-	uint_t polled, i;
-	boolean_t cq_enabled = B_FALSE;
-
-	if (ibd_receiver == 1)
-		cqhdl = state->id_rcq_hdl;
-	else
-		cqhdl = state->id_scq_hdl;
-
-	/*
-	 * Mark the handler as having run and possibly freed up some
-	 * slots. Blocked sends can be retried.
-	 */
-	cq_handler_ran = B_TRUE;
-
-repoll:
-	while (ibt_poll_cq(cqhdl, wcs, IBD_NUM_UNSIGNAL, &polled) ==
-	    IBT_SUCCESS) {
-		num_completions += polled;
-		if (ibd_receiver == 1) {
-			/*
-			 * We can immediately recycle the buffer. No
-			 * need to pass up to any IP layer ...
-			 */
-			for (i = 0; i < polled; i++) {
-				wqe = (ibd_wqe_t *)wcs[i].wc_id;
-				(void) ibt_post_recv(state->id_chnl_hdl,
-				    &(WQE_TO_RWQE(wqe))->w_rwr, 1, NULL);
-			}
-		}
-	}
-
-	/*
-	 * If we just repolled, we are done; exit.
-	 */
-	if (cq_enabled)
-		return;
-
-	/*
-	 * Enable CQ.
-	 */
-	if (ibt_enable_cq_notify(cqhdl, IBT_NEXT_COMPLETION) != IBT_SUCCESS) {
-		/*
-		 * We do not expect a failure here.
-		 */
-		cmn_err(CE_CONT, "ibd_perf_handler: notify failed");
-	}
-	cq_enabled = B_TRUE;
-
-	/*
-	 * Repoll for packets that came in after we finished previous
-	 * poll loop but before we turned on notifications.
-	 */
-	goto repoll;
+	ibd_lbuf = kmem_zalloc(IBD_LOG_SZ, KM_SLEEP);
+	ibd_lbuf_ndx = 0;
 }
 
 static void
-ibd_perf_tx(ibd_state_t *state)
+ibd_log_fini(void)
 {
-	ibt_mr_hdl_t mrhdl;
-	ibt_mr_desc_t mrdesc;
-	ibt_mr_attr_t mem_attr;
-	ibt_status_t stat;
-	ibd_ace_t *ace = NULL;
-	ibd_swqe_t *node;
-	uchar_t *sendbuf;
-	longlong_t stime, etime;
-	longlong_t sspin, espin, tspin = 0;
-	int i, reps, packets;
+	if (ibd_lbuf)
+		kmem_free(ibd_lbuf, IBD_LOG_SZ);
+	ibd_lbuf_ndx = 0;
+	ibd_lbuf = NULL;
+}
 
-	cmn_err(CE_CONT, "ibd_perf_tx: Tx to %08X:%08X:%08X:%08X:%08X",
-	    htonl(ibd_dest.ipoib_qpn), htonl(ibd_dest.ipoib_gidpref[0]),
-	    htonl(ibd_dest.ipoib_gidpref[1]), htonl(ibd_dest.ipoib_gidsuff[0]),
-	    htonl(ibd_dest.ipoib_gidsuff[1]));
-	if ((ibd_dest.ipoib_qpn == 0) || (ibd_dest.ipoib_gidsuff[1] == 0) ||
-	    (ibd_dest.ipoib_gidpref[1] == 0)) {
-		cmn_err(CE_CONT, "ibd_perf_tx: Invalid Rx address");
+static void
+ibd_log(const char *fmt, ...)
+{
+	va_list	ap;
+	uint32_t off;
+	uint32_t msglen;
+	char tmpbuf[IBD_DMAX_LINE];
+
+	if (ibd_lbuf == NULL)
 		return;
-	}
 
-	packets = (IBD_TX_DATASIZE / IBD_TX_PKTSIZE);
-	reps = (packets / IBD_NUM_SWQE);
+	va_start(ap, fmt);
+	msglen = vsnprintf(tmpbuf, IBD_DMAX_LINE, fmt, ap);
+	va_end(ap);
 
-	cmn_err(CE_CONT, "ibd_perf_tx: Data Size = %d", IBD_TX_DATASIZE);
-	cmn_err(CE_CONT, "ibd_perf_tx: Packet Size = %d", IBD_TX_PKTSIZE);
-	cmn_err(CE_CONT, "ibd_perf_tx: # Packets = %d", packets);
-	cmn_err(CE_CONT, "ibd_perf_tx: SendQ depth = %d", IBD_NUM_SWQE);
-	cmn_err(CE_CONT, "ibd_perf_tx: Signal Grp size = %d", IBD_NUM_UNSIGNAL);
-	if ((packets % IBD_NUM_UNSIGNAL) != 0) {
-		/*
-		 * This is required to ensure the last packet will trigger
-		 * a CQ handler callback, thus we can spin waiting fot all
-		 * packets to be received.
-		 */
-		cmn_err(CE_CONT,
-		    "ibd_perf_tx: #Packets not multiple of Signal Grp size");
-		return;
-	}
-	num_completions = 0;
+	if (msglen >= IBD_DMAX_LINE)
+		msglen = IBD_DMAX_LINE - 1;
 
-	swqes = kmem_zalloc(sizeof (ibd_swqe_t *) * IBD_NUM_SWQE,
-	    KM_NOSLEEP);
-	if (swqes == NULL) {
-		cmn_err(CE_CONT, "ibd_perf_tx: no storage");
-		return;
-	}
+	mutex_enter(&ibd_lbuf_lock);
 
-	wcs = kmem_zalloc(sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL, KM_NOSLEEP);
-	if (wcs == NULL) {
-		kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-		cmn_err(CE_CONT, "ibd_perf_tx: no storage");
-		return;
-	}
+	off = ibd_lbuf_ndx;		/* current msg should go here */
+	if ((ibd_lbuf_ndx) && (ibd_lbuf[ibd_lbuf_ndx-1] != '\n'))
+		ibd_lbuf[ibd_lbuf_ndx-1] = '\n';
 
-	/*
-	 * Get the ud_dest for the destination.
-	 */
-	ibd_async_acache(state, &ibd_dest);
-	mutex_enter(&state->id_ac_mutex);
-	ace = ibd_acache_find(state, &ibd_dest, B_FALSE, 0);
-	mutex_exit(&state->id_ac_mutex);
-	if (ace == NULL) {
-		kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-		kmem_free(wcs, sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL);
-		cmn_err(CE_CONT, "ibd_perf_tx: no AH");
-		return;
-	}
+	ibd_lbuf_ndx += msglen;		/* place where next msg should start */
+	ibd_lbuf[ibd_lbuf_ndx] = 0;	/* current msg should terminate */
 
-	/*
-	 * Set up the send buffer.
-	 */
-	sendbuf = kmem_zalloc(IBD_TX_PKTSIZE, KM_NOSLEEP);
-	if (sendbuf == NULL) {
-		kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-		kmem_free(wcs, sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL);
-		cmn_err(CE_CONT, "ibd_perf_tx: no send buffer");
-		return;
-	}
+	if (ibd_lbuf_ndx >= (IBD_LOG_SZ - 2 * IBD_DMAX_LINE))
+		ibd_lbuf_ndx = 0;
 
-	/*
-	 * This buffer can be used in the case when we want to
-	 * send data from the same memory area over and over;
-	 * it might help in reducing memory traffic.
-	 */
-	mem_attr.mr_vaddr = (uint64_t)sendbuf;
-	mem_attr.mr_len = IBD_TX_PKTSIZE;
-	mem_attr.mr_as = NULL;
-	mem_attr.mr_flags = IBT_MR_NOSLEEP;
-	if (ibt_register_mr(state->id_hca_hdl, state->id_pd_hdl, &mem_attr,
-	    &mrhdl, &mrdesc) != IBT_SUCCESS) {
-		kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-		kmem_free(sendbuf, IBD_TX_PKTSIZE);
-		kmem_free(wcs, sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL);
-		cmn_err(CE_CONT, "ibd_perf_tx: registration failed");
-		return;
-	}
+	mutex_exit(&ibd_lbuf_lock);
 
-	/*
-	 * Allocate private send wqe's.
-	 */
-	for (i = 0; i < IBD_NUM_SWQE; i++) {
-		if (ibd_alloc_swqe(state, &node) != DDI_SUCCESS) {
-			kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-			kmem_free(sendbuf, IBD_TX_PKTSIZE);
-			kmem_free(wcs, sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL);
-			cmn_err(CE_CONT, "ibd_alloc_swqe failure");
-			return;
-		}
-		node->w_ahandle = ace;
-#if 0
-		node->w_smblkbuf[0].im_mr_hdl = mrhdl;
-		node->w_smblkbuf[0].im_mr_desc = mrdesc;
-		node->w_smblk_sgl[0].ds_va = (ib_vaddr_t)sendbuf;
-		node->w_smblk_sgl[0].ds_key =
-		    node->w_smblkbuf[0].im_mr_desc.md_lkey;
-		node->w_smblk_sgl[0].ds_len = IBD_TX_PKTSIZE;
-		node->w_swr.wr_sgl = node->w_smblk_sgl;
-#else
-		node->swqe_copybuf.ic_sgl.ds_len = IBD_TX_PKTSIZE;
-		node->w_swr.wr_sgl = &node->swqe_copybuf.ic_sgl;
+	bcopy(tmpbuf, ibd_lbuf+off, msglen);	/* no lock needed for this */
+}
 #endif
-
-		/*
-		 * The last of IBD_NUM_UNSIGNAL consecutive posted WRs
-		 * is marked to invoke the CQ handler. That is the only
-		 * way we come to know when the send queue can accept more
-		 * WRs.
-		 */
-		if (((i + 1) % IBD_NUM_UNSIGNAL) != 0)
-			node->w_swr.wr_flags = IBT_WR_NO_FLAGS;
-		node->w_swr.wr.ud.udwr_dest = ace->ac_dest;
-		node->w_swr.wr_nds = 1;
-
-		swqes[i] = node;
-	}
-
-	ibt_set_cq_handler(state->id_scq_hdl, ibd_perf_handler, state);
-
-	/*
-	 * Post all the requests. We expect this stream of post's will
-	 * not overwhelm the hardware due to periodic completions and
-	 * pollings that happen out of ibd_perf_handler.
-	 * Post a set of requests, till the channel can accept; after
-	 * that, wait for the CQ handler to notify us that there is more
-	 * space.
-	 */
-	stime = gethrtime();
-	for (; reps > 0; reps--)
-		for (i = 0; i < IBD_NUM_SWQE; i++) {
-			node = swqes[i];
-retry:
-			if ((stat = ibt_post_send(state->id_chnl_hdl,
-			    &node->w_swr, 1, NULL)) != IBT_SUCCESS) {
-				if (stat == IBT_CHAN_FULL) {
-					/*
-					 * Spin till the CQ handler runs
-					 * and then try again.
-					 */
-					sspin = gethrtime();
-					while (!cq_handler_ran)
-					;
-					espin = gethrtime();
-					tspin += (espin - sspin);
-					cq_handler_ran = B_FALSE;
-					goto retry;
-				}
-				cmn_err(CE_CONT, "post failure %d/%d", stat, i);
-				goto done;
-			}
-		}
-
-done:
-	/*
-	 * We should really be snapshotting when we get the last
-	 * completion.
-	 */
-	while (num_completions != (packets / IBD_NUM_UNSIGNAL))
-	;
-	etime = gethrtime();
-
-	cmn_err(CE_CONT, "ibd_perf_tx: # signaled completions = %d",
-	    num_completions);
-	cmn_err(CE_CONT, "ibd_perf_tx: Time = %lld nanosec", (etime - stime));
-	cmn_err(CE_CONT, "ibd_perf_tx: Spin Time = %lld nanosec", tspin);
-
-	/*
-	 * Wait a sec for everything to get over.
-	 */
-	delay(drv_usectohz(2000000));
-
-	/*
-	 * Reset CQ handler to real one; free resources.
-	 */
-	if (ibd_separate_cqs == 0) {
-		ibt_set_cq_handler(state->id_scq_hdl, ibd_rcq_handler, state);
-	} else {
-		if (ibd_txcomp_poll == 0)
-			ibt_set_cq_handler(state->id_scq_hdl, ibd_scq_handler,
-			    state);
-		else
-			ibt_set_cq_handler(state->id_scq_hdl, 0, 0);
-	}
-
-	for (i = 0; i < IBD_NUM_SWQE; i++)
-		ibd_free_swqe(state, swqes[i]);
-	(void) ibt_deregister_mr(state->id_hca_hdl, mrhdl);
-	kmem_free(sendbuf, IBD_TX_PKTSIZE);
-	kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-	kmem_free(wcs, sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL);
-}
-
-static void
-ibd_perf_rx(ibd_state_t *state)
-{
-	wcs = kmem_zalloc(sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL, KM_NOSLEEP);
-	if (wcs == NULL) {
-		kmem_free(swqes, sizeof (ibd_swqe_t *) * IBD_NUM_SWQE);
-		cmn_err(CE_CONT, "ibd_perf_tx: no storage");
-		return;
-	}
-
-	/*
-	 * We do not need to allocate private recv wqe's. We will
-	 * just use the regular ones.
-	 */
-
-	num_completions = 0;
-	ibt_set_cq_handler(state->id_rcq_hdl, ibd_perf_handler, state);
-
-	/*
-	 * Delay for a minute for all the packets to come in from
-	 * transmitter.
-	 */
-	cmn_err(CE_CONT, "ibd_perf_rx: RecvQ depth = %d", IBD_NUM_SWQE);
-	delay(drv_usectohz(60000000));
-	cmn_err(CE_CONT, "ibd_perf_rx: Received %d packets", num_completions);
-
-	/*
-	 * Reset CQ handler to real one; free resources.
-	 */
-	ibt_set_cq_handler(state->id_rcq_hdl, ibd_rcq_handler, state);
-	kmem_free(wcs, sizeof (ibt_wc_t) * IBD_NUM_UNSIGNAL);
-}
-
-static void
-ibd_perf(ibd_state_t *state)
-{
-	if (ibd_performance == 0)
-		return;
-
-	if (ibd_receiver == 1) {
-		ibd_perf_rx(state);
-		return;
-	}
-
-	if (ibd_sender == 1) {
-		ibd_perf_tx(state);
-		return;
-	}
-}
-
-#endif /* RUN_PERFORMANCE */
