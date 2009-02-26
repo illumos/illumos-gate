@@ -33,6 +33,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ndi_impldefs.h>
 #include <sys/ddi.h>
+#include <sys/sunmdi.h>
 #include <sys/epm.h>
 
 extern struct scsi_pkt *scsi_init_cache_pkt(struct scsi_address *,
@@ -3153,6 +3154,336 @@ scsi_hba_nodename_compatible_free(char *nodename, char **compatible)
 		    (NCOMPAT * COMPAT_LONGEST));
 }
 
+/* scsi_device property interfaces */
+#define	_TYPE_DEFINED(flags)						\
+	(((flags & SCSI_DEVICE_PROP_TYPE_MSK) == SCSI_DEVICE_PROP_PATH) || \
+	((flags & SCSI_DEVICE_PROP_TYPE_MSK) == SCSI_DEVICE_PROP_DEVICE))
+
+#define	_DEVICE_PIP(sd, flags)						\
+	((((flags & SCSI_DEVICE_PROP_TYPE_MSK) == SCSI_DEVICE_PROP_PATH) && \
+	sd->sd_pathinfo) ? (mdi_pathinfo_t *)sd->sd_pathinfo : NULL)
+
+/* return the unit_address associated with a scsi_device */
+char *
+scsi_device_unit_address(struct scsi_device *sd)
+{
+	mdi_pathinfo_t	*pip;
+
+	ASSERT(sd && sd->sd_dev);
+	if ((sd == NULL) || (sd->sd_dev == NULL))
+		return (NULL);
+
+	pip = _DEVICE_PIP(sd, SCSI_DEVICE_PROP_PATH);
+	if (pip)
+		return (mdi_pi_get_addr(pip));
+	else
+		return (ddi_get_name_addr(sd->sd_dev));
+}
+
+int
+scsi_device_prop_get_int(struct scsi_device *sd, uint_t flags,
+    char *name, int defval)
+{
+	mdi_pathinfo_t	*pip;
+	int		v = defval;
+	int		data;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (v);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip) {
+		rv = mdi_prop_lookup_int(pip, name, &data);
+		if (rv == DDI_PROP_SUCCESS)
+			v = data;
+	} else
+		v = ddi_prop_get_int(DDI_DEV_T_ANY, sd->sd_dev,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, name, v);
+	return (v);
+}
+
+
+int64_t
+scsi_device_prop_get_int64(struct scsi_device *sd, uint_t flags,
+    char *name, int64_t defval)
+{
+	mdi_pathinfo_t	*pip;
+	int64_t		v = defval;
+	int64_t		data;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (v);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip) {
+		rv = mdi_prop_lookup_int64(pip, name, &data);
+		if (rv == DDI_PROP_SUCCESS)
+			v = data;
+	} else
+		v = ddi_prop_get_int64(DDI_DEV_T_ANY, sd->sd_dev,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, name, v);
+	return (v);
+}
+
+int
+scsi_device_prop_lookup_byte_array(struct scsi_device *sd, uint_t flags,
+    char *name, uchar_t **data, uint_t *nelements)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_lookup_byte_array(pip, name, data, nelements);
+	else
+		rv = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, sd->sd_dev,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    name, data, nelements);
+	return (rv);
+}
+
+int
+scsi_device_prop_lookup_int_array(struct scsi_device *sd, uint_t flags,
+    char *name, int **data, uint_t *nelements)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_lookup_int_array(pip, name, data, nelements);
+	else
+		rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, sd->sd_dev,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    name, data, nelements);
+	return (rv);
+}
+
+
+int
+scsi_device_prop_lookup_string(struct scsi_device *sd, uint_t flags,
+    char *name, char **data)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_lookup_string(pip, name, data);
+	else
+		rv = ddi_prop_lookup_string(DDI_DEV_T_ANY, sd->sd_dev,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    name, data);
+	return (rv);
+}
+
+int
+scsi_device_prop_lookup_string_array(struct scsi_device *sd, uint_t flags,
+    char *name, char ***data, uint_t *nelements)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_lookup_string_array(pip, name, data, nelements);
+	else
+		rv = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, sd->sd_dev,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    name, data, nelements);
+	return (rv);
+}
+
+int
+scsi_device_prop_update_byte_array(struct scsi_device *sd, uint_t flags,
+    char *name, uchar_t *data, uint_t nelements)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_update_byte_array(pip, name, data, nelements);
+	else
+		rv = ndi_prop_update_byte_array(DDI_DEV_T_NONE, sd->sd_dev,
+		    name, data, nelements);
+	return (rv);
+}
+
+int
+scsi_device_prop_update_int(struct scsi_device *sd, uint_t flags,
+    char *name, int data)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_update_int(pip, name, data);
+	else
+		rv = ndi_prop_update_int(DDI_DEV_T_NONE, sd->sd_dev,
+		    name, data);
+	return (rv);
+}
+
+int
+scsi_device_prop_update_int64(struct scsi_device *sd, uint_t flags,
+    char *name, int64_t data)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_update_int64(pip, name, data);
+	else
+		rv = ndi_prop_update_int64(DDI_DEV_T_NONE, sd->sd_dev,
+		    name, data);
+	return (rv);
+}
+
+int
+scsi_device_prop_update_int_array(struct scsi_device *sd, uint_t flags,
+    char *name, int *data, uint_t nelements)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_update_int_array(pip, name, data, nelements);
+	else
+		rv = ndi_prop_update_int_array(DDI_DEV_T_NONE, sd->sd_dev,
+		    name, data, nelements);
+	return (rv);
+}
+
+int
+scsi_device_prop_update_string(struct scsi_device *sd, uint_t flags,
+    char *name, char *data)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_update_string(pip, name, data);
+	else
+		rv = ndi_prop_update_string(DDI_DEV_T_NONE, sd->sd_dev,
+		    name, data);
+	return (rv);
+}
+
+int
+scsi_device_prop_update_string_array(struct scsi_device *sd, uint_t flags,
+    char *name, char **data, uint_t nelements)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_update_string_array(pip, name, data, nelements);
+	else
+		rv = ndi_prop_update_string_array(DDI_DEV_T_NONE, sd->sd_dev,
+		    name, data, nelements);
+	return (rv);
+}
+
+int
+scsi_device_prop_remove(struct scsi_device *sd, uint_t flags, char *name)
+{
+	mdi_pathinfo_t	*pip;
+	int		rv;
+
+	ASSERT(sd && name && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (name == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return (DDI_PROP_INVAL_ARG);
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		rv = mdi_prop_remove(pip, name);
+	else
+		rv = ndi_prop_remove(DDI_DEV_T_NONE, sd->sd_dev, name);
+	return (rv);
+}
+
+void
+scsi_device_prop_free(struct scsi_device *sd, uint_t flags, void *data)
+{
+	mdi_pathinfo_t	*pip;
+
+	ASSERT(sd && data && sd->sd_dev && _TYPE_DEFINED(flags));
+	if ((sd == NULL) || (data == NULL) || (sd->sd_dev == NULL) ||
+	    !_TYPE_DEFINED(flags))
+		return;
+
+	pip = _DEVICE_PIP(sd, flags);
+	if (pip)
+		(void) mdi_prop_free(data);
+	else
+		ddi_prop_free(data);
+}
+
+
+/*ARGSUSED*/
 static int
 scsi_hba_bus_config(dev_info_t *self, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **childp)

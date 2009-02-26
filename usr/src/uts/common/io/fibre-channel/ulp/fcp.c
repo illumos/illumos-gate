@@ -10646,10 +10646,9 @@ static int
 fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
-	int			*words;
 	uchar_t			*bytes;
 	uint_t			nbytes;
-	uint_t			nwords;
+	uint16_t		lun_num;
 	struct fcp_tgt	*ptgt;
 	struct fcp_lun	*plun;
 	struct fcp_port	*pptr = (struct fcp_port *)
@@ -10664,9 +10663,9 @@ fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	/* get our port WWN property */
 	bytes = NULL;
-	if ((ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, tgt_dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, PORT_WWN_PROP, &bytes,
-	    &nbytes) != DDI_PROP_SUCCESS) || nbytes != FC_WWN_SIZE) {
+	if ((scsi_device_prop_lookup_byte_array(sd, SCSI_DEVICE_PROP_PATH,
+	    PORT_WWN_PROP, &bytes, &nbytes) != DDI_PROP_SUCCESS) ||
+	    (nbytes != FC_WWN_SIZE)) {
 		/* no port WWN property */
 		FCP_DTRACE(fcp_logq, pptr->port_instbuf, fcp_trace,
 		    FCP_BUF_LEVEL_8, 0,
@@ -10676,39 +10675,28 @@ fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		    nbytes);
 
 		if (bytes != NULL) {
-			ddi_prop_free(bytes);
+			scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 		}
 
 		return (DDI_NOT_WELL_FORMED);
 	}
+	ASSERT(bytes != NULL);
 
-	words = NULL;
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, tgt_dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-	    LUN_PROP, &words, &nwords) != DDI_PROP_SUCCESS) {
-		ASSERT(bytes != NULL);
-
+	lun_num = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    LUN_PROP, 0xFFFF);
+	if (lun_num == 0xFFFF) {
 		FCP_DTRACE(fcp_logq, pptr->port_instbuf, fcp_trace,
 		    FCP_BUF_LEVEL_8, 0,
 		    "fcp_phys_tgt_init: Returning DDI_FAILURE:lun"
 		    " for %s (instance %d)", ddi_get_name(tgt_dip),
 		    ddi_get_instance(tgt_dip));
 
-		ddi_prop_free(bytes);
-
+		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 		return (DDI_NOT_WELL_FORMED);
 	}
-
-	if (nwords == 0) {
-		ddi_prop_free(bytes);
-		ddi_prop_free(words);
-		return (DDI_NOT_WELL_FORMED);
-	}
-
-	ASSERT(bytes != NULL && words != NULL);
 
 	mutex_enter(&pptr->port_mutex);
-	if ((plun = fcp_lookup_lun(pptr, bytes, *words)) == NULL) {
+	if ((plun = fcp_lookup_lun(pptr, bytes, lun_num)) == NULL) {
 		mutex_exit(&pptr->port_mutex);
 		FCP_DTRACE(fcp_logq, pptr->port_instbuf, fcp_trace,
 		    FCP_BUF_LEVEL_8, 0,
@@ -10716,18 +10704,15 @@ fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		    " for %s (instance %d)", ddi_get_name(tgt_dip),
 		    ddi_get_instance(tgt_dip));
 
-		ddi_prop_free(bytes);
-		ddi_prop_free(words);
-
+		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 		return (DDI_FAILURE);
 	}
 
 	ASSERT(bcmp(plun->lun_tgt->tgt_port_wwn.raw_wwn, bytes,
 	    FC_WWN_SIZE) == 0);
-	ASSERT(plun->lun_num == (uint16_t)*words);
+	ASSERT(plun->lun_num == lun_num);
 
-	ddi_prop_free(bytes);
-	ddi_prop_free(words);
+	scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 
 	ptgt = plun->lun_tgt;
 
@@ -10747,9 +10732,9 @@ static int
 fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
-	int			words;
 	uchar_t			*bytes;
 	uint_t			nbytes;
+	uint16_t		lun_num;
 	struct fcp_tgt	*ptgt;
 	struct fcp_lun	*plun;
 	struct fcp_port	*pptr = (struct fcp_port *)
@@ -10777,33 +10762,31 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	/* get our port WWN property */
 	bytes = NULL;
-	if ((mdi_prop_lookup_byte_array(PIP(cip), PORT_WWN_PROP, &bytes,
-	    &nbytes) != DDI_PROP_SUCCESS) || nbytes != FC_WWN_SIZE) {
-		if (bytes) {
-			(void) mdi_prop_free(bytes);
-		}
+	if ((scsi_device_prop_lookup_byte_array(sd, SCSI_DEVICE_PROP_PATH,
+	    PORT_WWN_PROP, &bytes, &nbytes) != DDI_PROP_SUCCESS) ||
+	    (nbytes != FC_WWN_SIZE)) {
+		if (bytes)
+			scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 		return (DDI_NOT_WELL_FORMED);
 	}
 
-	words = 0;
-	if (mdi_prop_lookup_int(PIP(cip), LUN_PROP, &words) !=
-	    DDI_PROP_SUCCESS) {
-		ASSERT(bytes != NULL);
+	ASSERT(bytes != NULL);
 
+	lun_num = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    LUN_PROP, 0xFFFF);
+	if (lun_num == 0xFFFF) {
 		FCP_DTRACE(fcp_logq, pptr->port_instbuf,
 		    fcp_trace, FCP_BUF_LEVEL_8, 0,
 		    "fcp_virt_tgt_init: Returning DDI_FAILURE:lun"
 		    " for %s (instance %d)", ddi_get_name(tgt_dip),
 		    ddi_get_instance(tgt_dip));
 
-		(void) mdi_prop_free(bytes);
+		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 		return (DDI_NOT_WELL_FORMED);
 	}
 
-	ASSERT(bytes != NULL);
-
 	mutex_enter(&pptr->port_mutex);
-	if ((plun = fcp_lookup_lun(pptr, bytes, words)) == NULL) {
+	if ((plun = fcp_lookup_lun(pptr, bytes, lun_num)) == NULL) {
 		mutex_exit(&pptr->port_mutex);
 		FCP_DTRACE(fcp_logq, pptr->port_instbuf,
 		    fcp_trace, FCP_BUF_LEVEL_8, 0,
@@ -10811,18 +10794,15 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		    " for %s (instance %d)", ddi_get_name(tgt_dip),
 		    ddi_get_instance(tgt_dip));
 
-		(void) mdi_prop_free(bytes);
-		(void) mdi_prop_free(&words);
-
+		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 		return (DDI_FAILURE);
 	}
 
 	ASSERT(bcmp(plun->lun_tgt->tgt_port_wwn.raw_wwn, bytes,
 	    FC_WWN_SIZE) == 0);
-	ASSERT(plun->lun_num == (uint16_t)words);
+	ASSERT(plun->lun_num == lun_num);
 
-	(void) mdi_prop_free(bytes);
-	(void) mdi_prop_free(&words);
+	scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
 
 	ptgt = plun->lun_tgt;
 

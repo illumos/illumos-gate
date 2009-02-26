@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,21 +170,81 @@ struct scsi_device {
 };
 
 #ifdef	_KERNEL
-/* The following interfaces are public */
+
+/* ==== The following interfaces are public ==== */
+
 int	scsi_probe(struct scsi_device *sd, int (*callback)(void));
 void	scsi_unprobe(struct scsi_device *sd);
 
-/* The following scsi_device interfaces are currently private */
-size_t	scsi_device_size();
+/* ==== The following interfaces are private (currently) ==== */
 
-/* The interfaces are for drivers that use to SCSI_HBA_ADDR_COMPLEX */
+char	*scsi_device_unit_address(struct scsi_device *sd);
+
+/*
+ * scsi_device_prop_*() property interfaces: flags
+ *
+ *   SCSI_DEVICE_PROP_PATH: property of path-to-device.
+ *	The property is associated with the sd_pathinfo pathinfo node
+ *	as established by scsi_vhci. If sd_pathinfo is NULL then the
+ *	property is associated with the sd_dev devinfo node.
+ *	Implementation uses mdi_prop_*() interfaces applied to
+ *	mdi_pathinfo_t (sd_pathinfo) nodes.
+ *
+ *   SCSI_DEVICE_PROP_DEVICE: property of device.
+ *	The property is always associated with the sd_dev devinfo
+ *	node.  Implementation uses ndi_prop_*() interfaces applied
+ *	dev_info_t (sd_dev) nodes.
+ */
+#define	SCSI_DEVICE_PROP_PATH		0x1	/* type is property-of-path */
+#define	SCSI_DEVICE_PROP_DEVICE		0x2	/* type is property-of-device */
+#define	SCSI_DEVICE_PROP_TYPE_MSK	0xF
+
+int	scsi_device_prop_get_int(struct scsi_device *sd,
+	    uint_t flags, char *name, int defvalue);
+int64_t	scsi_device_prop_get_int64(struct scsi_device *,
+	    uint_t flags, char *name, int64_t defvalue);
+
+int	scsi_device_prop_lookup_byte_array(struct scsi_device *sd,
+	    uint_t flags, char *name, uchar_t **, uint_t *);
+int	scsi_device_prop_lookup_int_array(struct scsi_device *sd,
+	    uint_t flags, char *name, int **, uint_t *);
+int	scsi_device_prop_lookup_string(struct scsi_device *sd,
+	    uint_t flags, char *name, char **);
+int	scsi_device_prop_lookup_string_array(struct scsi_device *sd,
+	    uint_t flags, char *name, char ***, uint_t *);
+
+int	scsi_device_prop_update_byte_array(struct scsi_device *sd,
+	    uint_t flags, char *name, uchar_t *, uint_t);
+int	scsi_device_prop_update_int(struct scsi_device *sd,
+	    uint_t flags, char *name, int);
+int	scsi_device_prop_update_int64(struct scsi_device *sd,
+	    uint_t flags, char *name, int64_t);
+int	scsi_device_prop_update_int_array(struct scsi_device *sd,
+	    uint_t flags, char *name, int *, uint_t);
+int	scsi_device_prop_update_string(struct scsi_device *sd,
+	    uint_t flags, char *name, char *);
+int	scsi_device_prop_update_string_array(struct scsi_device *sd,
+	    uint_t flags, char *name, char **, uint_t);
+
+int	scsi_device_prop_remove(struct scsi_device *sd,
+	    uint_t flags, char *name);
+void	scsi_device_prop_free(struct scsi_device *sd,
+	    uint_t flags, void *data);
+
+/* SCSI_HBA_ADDR_COMPLEX interfaces */
 struct scsi_device	*scsi_address_device(struct scsi_address *sa);
 void	scsi_device_hba_private_set(struct scsi_device *sd, void *data);
 void	*scsi_device_hba_private_get(struct scsi_device *sd);
 
-/* The following interfaces are obsolete */
+/* ==== The following interfaces are private ==== */
+
+size_t	scsi_device_size();
+
+/* ==== The following interfaces are obsolete ==== */
+
 int	scsi_slave(struct scsi_device *sd, int (*callback)(void));
 void	scsi_unslave(struct scsi_device *sd);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
