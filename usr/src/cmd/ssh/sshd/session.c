@@ -32,7 +32,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,6 +556,8 @@ do_exec_no_pty(Session *s, const char *command)
 
 	if (compat20) {
 		session_set_fds(s, pin[1], pout[0], s->is_subsystem ? -1 : perr[0]);
+		if (s->is_subsystem)
+                        close(perr[0]);
 		/* Don't close channel before sending exit-status! */
 		channel_set_wait_for_exit(s->chanid, 1);
 	} else {
@@ -574,6 +576,8 @@ do_exec_no_pty(Session *s, const char *command)
 	 */
 	if (compat20) {
 		session_set_fds(s, inout[1], inout[1], s->is_subsystem ? -1 : err[1]);
+		if (s->is_subsystem)
+                        close(err[1]);
 		/* Don't close channel before sending exit-status! */
 		channel_set_wait_for_exit(s->chanid, 1);
 	} else {
