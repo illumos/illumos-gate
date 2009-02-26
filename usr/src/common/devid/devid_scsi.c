@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * These functions are used to encode SCSI INQUIRY data into
@@ -1107,6 +1105,7 @@ devid_scsi_init(
 	DEVID_FORMLEN(i_devid, u_raw_id_len);
 
 	/* Fill in driver name hint */
+	bzero(i_devid->did_driver, DEVID_HINT_SIZE);
 	if (driver_name != NULL) {
 		driver_name_len = strlen(driver_name);
 		if (driver_name_len > DEVID_HINT_SIZE) {
@@ -1115,8 +1114,6 @@ devid_scsi_init(
 			driver_name_len = DEVID_HINT_SIZE;
 		}
 		bcopy(driver_name, i_devid->did_driver, driver_name_len);
-	} else {
-		bzero(i_devid->did_driver, DEVID_HINT_SIZE);
 	}
 
 	bcopy(raw_id, i_devid->did_id, raw_id_len);
