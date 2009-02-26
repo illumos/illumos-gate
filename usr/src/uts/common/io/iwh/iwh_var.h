@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,10 @@ extern "C" {
 #define	IWH_DMA_SYNC(area, flag) \
 	(void) ddi_dma_sync((area).dma_hdl, (area).offset, \
 	(area).alength, (flag))
+
+#define	IWH_CHK_FAST_RECOVER(sc) \
+	(sc->sc_ic.ic_state == IEEE80211_S_RUN && \
+	sc->sc_ic.ic_opmode == IEEE80211_M_STA)
 
 typedef struct iwh_dma_area {
 	ddi_acc_handle_t	acc_hdl; /* handle for memory */
@@ -156,7 +160,9 @@ typedef struct iwh_softc {
 	ddi_intr_handle_t	*sc_intr_htable;
 	uint_t			sc_intr_pri;
 
-	iwh_rxon_cmd_t	sc_config;
+	iwh_rxon_cmd_t		sc_config;
+	iwh_rxon_cmd_t		sc_config_save;
+
 	uint8_t			sc_eep_map[IWH_SP_EEPROM_SIZE];
 	struct	iwh_eep_calibration *sc_eep_calib;
 	struct	iwh_calib_results	sc_calib_results;

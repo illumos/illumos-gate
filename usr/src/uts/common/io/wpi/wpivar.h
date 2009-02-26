@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -64,6 +64,10 @@ typedef struct wpi_tx_radiotap_header {
 #define	WPI_DMA_SYNC(area, flag) \
 	(void) ddi_dma_sync((area).dma_hdl, (area).offset, \
 	(area).alength, (flag))
+
+#define	WPI_CHK_FAST_RECOVER(sc) \
+	(sc->sc_ic.ic_state == IEEE80211_S_RUN && \
+	sc->sc_ic.ic_opmode == IEEE80211_M_STA)
 
 typedef struct wpi_dma_area {
 	ddi_acc_handle_t	acc_hdl; /* handle for memory */
@@ -164,6 +168,8 @@ typedef struct wpi_softc {
 	ddi_iblock_cookie_t	sc_iblk;
 
 	wpi_config_t		sc_config;
+	wpi_config_t		sc_config_save;
+
 	uint16_t		sc_pwr1[14];
 	uint16_t		sc_pwr2[14];
 

@@ -37,6 +37,10 @@ extern "C" {
 	(void) ddi_dma_sync((area).dma_hdl, (area).offset, \
 	(area).alength, (flag))
 
+#define	IWK_CHK_FAST_RECOVER(sc) \
+	(sc->sc_ic.ic_state == IEEE80211_S_RUN && \
+	sc->sc_ic.ic_opmode == IEEE80211_M_STA)
+
 typedef struct iwk_dma_area {
 	ddi_acc_handle_t	acc_hdl; /* handle for memory */
 	caddr_t			mem_va; /* CPU VA of memory */
@@ -166,7 +170,8 @@ typedef struct iwk_softc {
 	ddi_intr_handle_t	*sc_intr_htable;
 	uint_t			sc_intr_pri;
 
-	iwk_rxon_cmd_t	sc_config;
+	iwk_rxon_cmd_t		sc_config;
+	iwk_rxon_cmd_t		sc_config_save;
 	struct iwk_eep		sc_eep_map; /* eeprom map */
 	uint32_t		sc_scd_base;
 
@@ -214,6 +219,7 @@ typedef struct iwk_softc {
 
 #define	IWK_SUCCESS		0
 #define	IWK_FAIL		EIO
+
 #ifdef __cplusplus
 }
 #endif

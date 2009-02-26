@@ -340,6 +340,7 @@ static void	iwk_thread(iwk_sc_t *sc);
 static void	iwk_watchdog(void *arg);
 static int	iwk_run_state_config_ibss(ieee80211com_t *ic);
 static int	iwk_run_state_config_sta(ieee80211com_t *ic);
+static int	iwk_fast_recover(iwk_sc_t *sc);
 static int	iwk_start_tx_beacon(ieee80211com_t *ic);
 static int	iwk_clean_add_node_ibss(struct ieee80211com *ic,
     uint8_t addr[IEEE80211_ADDR_LEN], uint8_t *index2);
@@ -2491,7 +2492,11 @@ iwk_intr(caddr_t arg, caddr_t unused)
 #endif /* DEBUG */
 		iwk_stop(sc);
 		sc->sc_ostate = sc->sc_ic.ic_state;
-		ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+
+		/* not capable of fast recovery */
+		if (!IWK_CHK_FAST_RECOVER(sc))
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+
 		sc->sc_flags |= IWK_F_HW_ERR_RECOVER;
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2583,6 +2588,12 @@ iwk_m_tx(void *arg, mblk_t *mp)
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		freemsgchain(mp);
 		return (NULL);
+	}
+
+	if ((sc->sc_flags & IWK_F_HW_ERR_RECOVER) &&
+	    IWK_CHK_FAST_RECOVER(sc)) {
+		IWK_DBG((IWK_DEBUG_FW, "iwk_m_tx(): hold queue\n"));
+		return (mp);
 	}
 
 	while (mp != NULL) {
@@ -2892,7 +2903,8 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	ic->ic_stats.is_tx_frags++;
 
 	if (sc->sc_tx_timer == 0)
-		sc->sc_tx_timer = 10;
+		sc->sc_tx_timer = 4;
+
 exit:
 	return (err);
 }
@@ -3288,10 +3300,16 @@ iwk_thread(iwk_sc_t *sc)
 
 			iwk_stop(sc);
 
-			mutex_exit(&sc->sc_mt_lock);
-			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-			delay(drv_usectohz(2000000 + n*500000));
-			mutex_enter(&sc->sc_mt_lock);
+			if (IWK_CHK_FAST_RECOVER(sc)) {
+				/* save runtime configuration */
+				bcopy(&sc->sc_config, &sc->sc_config_save,
+				    sizeof (sc->sc_config));
+			} else {
+				mutex_exit(&sc->sc_mt_lock);
+				ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+				delay(drv_usectohz(2000000 + n*500000));
+				mutex_enter(&sc->sc_mt_lock);
+			}
 
 			err = iwk_init(sc);
 			if (err != IWK_SUCCESS) {
@@ -3302,18 +3320,24 @@ iwk_thread(iwk_sc_t *sc)
 			n = 0;
 			if (!err)
 				sc->sc_flags |= IWK_F_RUNNING;
-			sc->sc_flags &= ~IWK_F_HW_ERR_RECOVER;
-			mutex_exit(&sc->sc_mt_lock);
-			delay(drv_usectohz(2000000));
-			if (sc->sc_ostate != IEEE80211_S_INIT)
-				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
-			mutex_enter(&sc->sc_mt_lock);
+
+			if (!IWK_CHK_FAST_RECOVER(sc) ||
+			    iwk_fast_recover(sc) != IWK_SUCCESS) {
+				sc->sc_flags &= ~IWK_F_HW_ERR_RECOVER;
+
+				mutex_exit(&sc->sc_mt_lock);
+				delay(drv_usectohz(2000000));
+				if (sc->sc_ostate != IEEE80211_S_INIT)
+					ieee80211_new_state(ic,
+					    IEEE80211_S_SCAN, 0);
+				mutex_enter(&sc->sc_mt_lock);
+			}
 		}
 
 		if (ic->ic_mach && (sc->sc_flags & IWK_F_LAZY_RESUME)) {
 			IWK_DBG((IWK_DEBUG_RESUME,
-			    "iwk_thread(): "
-			    "lazy resume\n"));
+			    "iwk_thread(): lazy resume\n"));
+
 			sc->sc_flags &= ~IWK_F_LAZY_RESUME;
 			mutex_exit(&sc->sc_mt_lock);
 			/*
@@ -6167,6 +6191,109 @@ iwk_run_state_config_sta(ieee80211com_t *ic)
 	}
 
 	return (err);
+}
+
+static int
+iwk_fast_recover(iwk_sc_t *sc)
+{
+	ieee80211com_t *ic = &sc->sc_ic;
+	int err;
+
+	mutex_enter(&sc->sc_glock);
+
+	/* restore runtime configuration */
+	bcopy(&sc->sc_config_save, &sc->sc_config,
+	    sizeof (sc->sc_config));
+
+	/* reset state to handle reassociations correctly */
+	sc->sc_config.assoc_id = 0;
+	sc->sc_config.filter_flags &=
+	    ~LE_32(RXON_FILTER_ASSOC_MSK);
+
+	if ((err = iwk_hw_set_before_auth(sc)) != 0) {
+		cmn_err(CE_WARN, "iwk_fast_recover(): "
+		    "failed to setup authentication\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+
+	bcopy(&sc->sc_config_save, &sc->sc_config,
+	    sizeof (sc->sc_config));
+
+	/* update adapter's configuration */
+	err = iwk_run_state_config_sta(ic);
+	if (err != IWK_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_fast_recover(): "
+		    "failed to setup association\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+
+	/* obtain current temperature of chipset */
+	sc->sc_tempera = iwk_curr_tempera(sc);
+
+	/*
+	 * make Tx power calibration to determine
+	 * the gains of DSP and radio
+	 */
+	err = iwk_tx_power_calibration(sc);
+	if (err) {
+		cmn_err(CE_WARN, "iwk_fast_recover(): "
+		    "failed to set tx power table\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+
+	/*
+	 * make initialization for Receiver
+	 * sensitivity calibration
+	 */
+	err = iwk_rx_sens_init(sc);
+	if (err) {
+		cmn_err(CE_WARN, "iwk_fast_recover(): "
+		    "failed to init RX sensitivity\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+
+	/* make initialization for Receiver gain balance */
+	err = iwk_rxgain_diff_init(sc);
+	if (err) {
+		cmn_err(CE_WARN, "iwk_fast_recover(): "
+		    "failed to init phy calibration\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+
+	}
+	/* set LED on */
+	iwk_set_led(sc, 2, 0, 1);
+
+	mutex_exit(&sc->sc_glock);
+
+	/* update keys */
+	if (ic->ic_flags & IEEE80211_F_PRIVACY) {
+		for (int i = 0; i < IEEE80211_KEY_MAX; i++) {
+			if (ic->ic_nw_keys[i].wk_keyix == IEEE80211_KEYIX_NONE)
+				continue;
+			err = iwk_key_set(ic, &ic->ic_nw_keys[i],
+			    ic->ic_bss->in_macaddr);
+			/* failure */
+			if (err == 0) {
+				cmn_err(CE_WARN, "iwk_fast_recover(): "
+				    "failed to setup hardware keys\n");
+				return (IWK_FAIL);
+			}
+		}
+	}
+
+	sc->sc_flags &= ~IWK_F_HW_ERR_RECOVER;
+
+	/* start queue */
+	IWK_DBG((IWK_DEBUG_FW, "iwk_fast_recover(): resume xmit\n"));
+	mac_tx_update(ic->ic_mach);
+
+
+	return (IWK_SUCCESS);
 }
 
 static int

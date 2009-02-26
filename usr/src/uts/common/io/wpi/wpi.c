@@ -278,6 +278,7 @@ static int	wpi_m_getprop(void *arg, const char *pr_name,
 static void	wpi_destroy_locks(wpi_sc_t *sc);
 static int	wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type);
 static void	wpi_thread(wpi_sc_t *sc);
+static int	wpi_fast_recover(wpi_sc_t *sc);
 
 /*
  * Supported rates for 802.11a/b/g modes (in 500Kbps unit).
@@ -1974,7 +1975,11 @@ wpi_intr(caddr_t arg)
 		if (!(sc->sc_flags & WPI_F_HW_ERR_RECOVER)) {
 			sc->sc_ostate = sc->sc_ic.ic_state;
 		}
-		ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+
+		/* not capable of fast recovery */
+		if (!WPI_CHK_FAST_RECOVER(sc))
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+
 		sc->sc_flags |= WPI_F_HW_ERR_RECOVER;
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2038,6 +2043,12 @@ wpi_m_tx(void *arg, mblk_t *mp)
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		freemsgchain(mp);
 		return (NULL);
+	}
+
+	if ((sc->sc_flags & WPI_F_HW_ERR_RECOVER) &&
+	    WPI_CHK_FAST_RECOVER(sc)) {
+		WPI_DBG((WPI_DEBUG_FW, "wpi_m_tx(): hold queue\n"));
+		return (mp);
 	}
 
 	while (mp != NULL) {
@@ -2543,12 +2554,18 @@ wpi_thread(wpi_sc_t *sc)
 			    "try to recover fatal hw error: %d\n", times++));
 
 			wpi_stop(sc);
-			mutex_exit(&sc->sc_mt_lock);
 
-			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-			delay(drv_usectohz(2000000));
+			if (WPI_CHK_FAST_RECOVER(sc)) {
+				/* save runtime configuration */
+				bcopy(&sc->sc_config, &sc->sc_config_save,
+				    sizeof (sc->sc_config));
+			} else {
+				mutex_exit(&sc->sc_mt_lock);
+				ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+				delay(drv_usectohz(2000000));
+				mutex_enter(&sc->sc_mt_lock);
+			}
 
-			mutex_enter(&sc->sc_mt_lock);
 			err = wpi_init(sc);
 			if (err != WPI_SUCCESS) {
 				n++;
@@ -2558,12 +2575,18 @@ wpi_thread(wpi_sc_t *sc)
 			n = 0;
 			if (!err)
 				sc->sc_flags |= WPI_F_RUNNING;
-			sc->sc_flags &= ~WPI_F_HW_ERR_RECOVER;
-			mutex_exit(&sc->sc_mt_lock);
-			delay(drv_usectohz(2000000));
-			if (sc->sc_ostate != IEEE80211_S_INIT)
-				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
-			mutex_enter(&sc->sc_mt_lock);
+
+			if (!WPI_CHK_FAST_RECOVER(sc) ||
+			    wpi_fast_recover(sc) != WPI_SUCCESS) {
+				sc->sc_flags &= ~WPI_F_HW_ERR_RECOVER;
+
+				mutex_exit(&sc->sc_mt_lock);
+				delay(drv_usectohz(2000000));
+				if (sc->sc_ostate != IEEE80211_S_INIT)
+					ieee80211_new_state(ic,
+					    IEEE80211_S_SCAN, 0);
+				mutex_enter(&sc->sc_mt_lock);
+			}
 		}
 
 		if (ic->ic_mach && (sc->sc_flags & WPI_F_LAZY_RESUME)) {
@@ -3342,6 +3365,78 @@ fail1:
 	err = WPI_FAIL;
 	mutex_exit(&sc->sc_glock);
 	return (err);
+}
+
+static int
+wpi_fast_recover(wpi_sc_t *sc)
+{
+	ieee80211com_t *ic = &sc->sc_ic;
+	int err;
+
+	mutex_enter(&sc->sc_glock);
+
+	/* restore runtime configuration */
+	bcopy(&sc->sc_config_save, &sc->sc_config,
+	    sizeof (sc->sc_config));
+
+	sc->sc_config.state = 0;
+	sc->sc_config.filter &= ~LE_32(WPI_FILTER_BSS);
+
+	if ((err = wpi_auth(sc)) != 0) {
+		cmn_err(CE_WARN, "wpi_fast_recover(): "
+		    "failed to setup authentication\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+
+	sc->sc_config.state = LE_16(WPI_CONFIG_ASSOCIATED);
+	sc->sc_config.flags &= ~LE_32(WPI_CONFIG_SHPREAMBLE |
+	    WPI_CONFIG_SHSLOT);
+	if (ic->ic_flags & IEEE80211_F_SHSLOT)
+		sc->sc_config.flags |= LE_32(WPI_CONFIG_SHSLOT);
+	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+		sc->sc_config.flags |= LE_32(WPI_CONFIG_SHPREAMBLE);
+	sc->sc_config.filter |= LE_32(WPI_FILTER_BSS);
+	if (ic->ic_opmode != IEEE80211_M_STA)
+		sc->sc_config.filter |= LE_32(WPI_FILTER_BEACON);
+
+	WPI_DBG((WPI_DEBUG_80211, "config chan %d flags %x\n",
+	    sc->sc_config.chan, sc->sc_config.flags));
+	err = wpi_cmd(sc, WPI_CMD_CONFIGURE, &sc->sc_config,
+	    sizeof (wpi_config_t), 1);
+	if (err != WPI_SUCCESS) {
+		cmn_err(CE_WARN, "failed to setup association\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+	/* link LED on */
+	wpi_set_led(sc, WPI_LED_LINK, 0, 1);
+
+	mutex_exit(&sc->sc_glock);
+
+	/* update keys */
+	if (ic->ic_flags & IEEE80211_F_PRIVACY) {
+		for (int i = 0; i < IEEE80211_KEY_MAX; i++) {
+			if (ic->ic_nw_keys[i].wk_keyix == IEEE80211_KEYIX_NONE)
+				continue;
+			err = wpi_key_set(ic, &ic->ic_nw_keys[i],
+			    ic->ic_bss->in_macaddr);
+			/* failure */
+			if (err == 0) {
+				cmn_err(CE_WARN, "wpi_fast_recover(): "
+				    "failed to setup hardware keys\n");
+				return (WPI_FAIL);
+			}
+		}
+	}
+
+	sc->sc_flags &= ~WPI_F_HW_ERR_RECOVER;
+
+	/* start queue */
+	WPI_DBG((WPI_DEBUG_FW, "wpi_fast_recover(): resume xmit\n"));
+	mac_tx_update(ic->ic_mach);
+
+	return (WPI_SUCCESS);
 }
 
 /*

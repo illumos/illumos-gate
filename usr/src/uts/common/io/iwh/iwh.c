@@ -314,6 +314,9 @@ static int	iwh_detach(dev_info_t *, ddi_detach_cmd_t);
 static void	iwh_destroy_locks(iwh_sc_t *);
 static int	iwh_send(ieee80211com_t *, mblk_t *, uint8_t);
 static void	iwh_thread(iwh_sc_t *);
+static int	iwh_run_state_config(iwh_sc_t *sc);
+static int	iwh_fast_recover(iwh_sc_t *sc);
+
 /*
  * GLD specific operations
  */
@@ -1809,64 +1812,11 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 		IWH_DBG((IWH_DEBUG_80211, "iwh: associated."));
 
-		/*
-		 * update adapter's configuration
-		 */
-		if (sc->sc_assoc_id != in->in_associd) {
-			cmn_err(CE_WARN,
-			    "associate ID mismatch: expected %d, "
-			    "got %d\n",
-			    in->in_associd, sc->sc_assoc_id);
-		}
-		sc->sc_config.assoc_id = in->in_associd & 0x3fff;
-
-		/*
-		 * short preamble/slot time are
-		 * negotiated when associating
-		 */
-		sc->sc_config.flags &=
-		    ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
-		    RXON_FLG_SHORT_SLOT_MSK);
-
-		if (ic->ic_flags & IEEE80211_F_SHSLOT) {
-			sc->sc_config.flags |=
-			    LE_32(RXON_FLG_SHORT_SLOT_MSK);
-		}
-
-		if (ic->ic_flags & IEEE80211_F_SHPREAMBLE) {
-			sc->sc_config.flags |=
-			    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
-		}
-
-		sc->sc_config.filter_flags |=
-		    LE_32(RXON_FILTER_ASSOC_MSK);
-
-		if (ic->ic_opmode != IEEE80211_M_STA) {
-			sc->sc_config.filter_flags |=
-			    LE_32(RXON_FILTER_BCON_AWARE_MSK);
-		}
-
-		IWH_DBG((IWH_DEBUG_80211, "config chan %d flags %x"
-		    " filter_flags %x\n",
-		    sc->sc_config.chan, sc->sc_config.flags,
-		    sc->sc_config.filter_flags));
-
-		err = iwh_cmd(sc, REPLY_RXON, &sc->sc_config,
-		    sizeof (iwh_rxon_cmd_t), 1);
+		err = iwh_run_state_config(sc);
 		if (err != IWH_SUCCESS) {
-			IWH_DBG((IWH_DEBUG_80211,
-			    "could not update configuration\n"));
+			cmn_err(CE_WARN, "iwh_newstate(): "
+			    "failed to set up association\n");
 			mutex_exit(&sc->sc_glock);
-			return (err);
-		}
-
-		/*
-		 * send tx power talbe command
-		 */
-		err = iwh_tx_power_table(sc, 1);
-		if (err != IWH_SUCCESS) {
-			cmn_err(CE_WARN, "iwh_config(): "
-			    "failed to set tx power table.\n");
 			return (err);
 		}
 
@@ -2712,7 +2662,11 @@ iwh_intr(caddr_t arg, caddr_t unused)
 		mutex_exit(&sc->sc_glock);
 		iwh_stop(sc);
 		sc->sc_ostate = sc->sc_ic.ic_state;
-		ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+
+		/* notify upper layer */
+		if (!IWH_CHK_FAST_RECOVER(sc))
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+
 		sc->sc_flags |= IWH_F_HW_ERR_RECOVER;
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2836,6 +2790,12 @@ iwh_m_tx(void *arg, mblk_t *mp)
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		freemsgchain(mp);
 		return (NULL);
+	}
+
+	if ((sc->sc_flags & IWH_F_HW_ERR_RECOVER) &&
+	    IWH_CHK_FAST_RECOVER(sc)) {
+		IWH_DBG((IWH_DEBUG_FW, "iwh_m_tx(): hold queue\n"));
+		return (mp);
 	}
 
 	while (mp != NULL) {
@@ -3129,7 +3089,7 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	ic->ic_stats.is_tx_frags++;
 
 	if (0 == sc->sc_tx_timer) {
-		sc->sc_tx_timer = 10;
+		sc->sc_tx_timer = 4;
 	}
 
 exit:
@@ -3441,12 +3401,16 @@ iwh_thread(iwh_sc_t *sc)
 
 			iwh_stop(sc);
 
-			mutex_exit(&sc->sc_mt_lock);
-
-			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-			delay(drv_usectohz(2000000 + n*500000));
-
-			mutex_enter(&sc->sc_mt_lock);
+			if (IWH_CHK_FAST_RECOVER(sc)) {
+				/* save runtime configuration */
+				bcopy(&sc->sc_config, &sc->sc_config_save,
+				    sizeof (sc->sc_config));
+			} else {
+				mutex_exit(&sc->sc_mt_lock);
+				ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+				delay(drv_usectohz(2000000 + n*500000));
+				mutex_enter(&sc->sc_mt_lock);
+			}
 
 			err = iwh_init(sc);
 			if (err != IWH_SUCCESS) {
@@ -3461,17 +3425,18 @@ iwh_thread(iwh_sc_t *sc)
 				sc->sc_flags |= IWH_F_RUNNING;
 			}
 
-			sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
 
-			mutex_exit(&sc->sc_mt_lock);
+			if (!IWH_CHK_FAST_RECOVER(sc) ||
+			    iwh_fast_recover(sc) != IWH_SUCCESS) {
+				sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
 
-			delay(drv_usectohz(2000000));
-
-			if (sc->sc_ostate != IEEE80211_S_INIT) {
-				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
+				mutex_exit(&sc->sc_mt_lock);
+				delay(drv_usectohz(2000000));
+				if (sc->sc_ostate != IEEE80211_S_INIT)
+					ieee80211_new_state(ic,
+					    IEEE80211_S_SCAN, 0);
+				mutex_enter(&sc->sc_mt_lock);
 			}
-
-			mutex_enter(&sc->sc_mt_lock);
 		}
 
 		if (ic->ic_mach && (sc->sc_flags & IWH_F_LAZY_RESUME)) {
@@ -5132,6 +5097,123 @@ iwh_init_common(iwh_sc_t *sc)
 
 	IWH_WRITE(sc, CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
 	IWH_WRITE(sc, CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
+
+	return (IWH_SUCCESS);
+}
+
+static int
+iwh_fast_recover(iwh_sc_t *sc)
+{
+	ieee80211com_t *ic = &sc->sc_ic;
+	int err;
+
+	mutex_enter(&sc->sc_glock);
+
+	/* restore runtime configuration */
+	bcopy(&sc->sc_config_save, &sc->sc_config,
+	    sizeof (sc->sc_config));
+
+	sc->sc_config.assoc_id = 0;
+	sc->sc_config.filter_flags &= ~LE_32(RXON_FILTER_ASSOC_MSK);
+
+	if ((err = iwh_hw_set_before_auth(sc)) != 0) {
+		cmn_err(CE_WARN, "iwh_fast_recover(): "
+		    "could not setup authentication\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+
+	bcopy(&sc->sc_config_save, &sc->sc_config,
+	    sizeof (sc->sc_config));
+
+	/* update adapter's configuration */
+	err = iwh_run_state_config(sc);
+	if (err != IWH_SUCCESS) {
+		cmn_err(CE_WARN, "iwh_fast_recover(): "
+		    "failed to setup association\n");
+		mutex_exit(&sc->sc_glock);
+		return (err);
+	}
+	/* set LED on */
+	iwh_set_led(sc, 2, 0, 1);
+
+	mutex_exit(&sc->sc_glock);
+
+	sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
+
+	/* start queue */
+	IWH_DBG((IWH_DEBUG_FW, "iwh_fast_recover(): resume xmit\n"));
+	mac_tx_update(ic->ic_mach);
+
+	return (IWH_SUCCESS);
+}
+
+static int
+iwh_run_state_config(iwh_sc_t *sc)
+{
+	struct ieee80211com *ic = &sc->sc_ic;
+	ieee80211_node_t *in = ic->ic_bss;
+	int err = IWH_SUCCESS;
+
+	/*
+	 * update adapter's configuration
+	 */
+	if (sc->sc_assoc_id != in->in_associd) {
+		cmn_err(CE_WARN,
+		    "associate ID mismatch: expected %d, "
+		    "got %d\n",
+		    in->in_associd, sc->sc_assoc_id);
+	}
+	sc->sc_config.assoc_id = in->in_associd & 0x3fff;
+
+	/*
+	 * short preamble/slot time are
+	 * negotiated when associating
+	 */
+	sc->sc_config.flags &=
+	    ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
+	    RXON_FLG_SHORT_SLOT_MSK);
+
+	if (ic->ic_flags & IEEE80211_F_SHSLOT) {
+		sc->sc_config.flags |=
+		    LE_32(RXON_FLG_SHORT_SLOT_MSK);
+	}
+
+	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE) {
+		sc->sc_config.flags |=
+		    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
+	}
+
+	sc->sc_config.filter_flags |=
+	    LE_32(RXON_FILTER_ASSOC_MSK);
+
+	if (ic->ic_opmode != IEEE80211_M_STA) {
+		sc->sc_config.filter_flags |=
+		    LE_32(RXON_FILTER_BCON_AWARE_MSK);
+	}
+
+	IWH_DBG((IWH_DEBUG_80211, "config chan %d flags %x"
+	    " filter_flags %x\n",
+	    sc->sc_config.chan, sc->sc_config.flags,
+	    sc->sc_config.filter_flags));
+
+	err = iwh_cmd(sc, REPLY_RXON, &sc->sc_config,
+	    sizeof (iwh_rxon_cmd_t), 1);
+	if (err != IWH_SUCCESS) {
+		cmn_err(CE_WARN, "iwh_run_state_config(): "
+		    "could not update configuration\n");
+		return (err);
+	}
+
+	/*
+	 * send tx power table command
+	 */
+	err = iwh_tx_power_table(sc, 1);
+	if (err != IWH_SUCCESS) {
+		cmn_err(CE_WARN, "iwh_run_state_config(): "
+		    "failed to set tx power table.\n");
+		return (err);
+	}
 
 	return (IWH_SUCCESS);
 }
