@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
  * operations from a supplied menu or from the command line. Diagnostic
  * options are also available.
  */
-
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -280,6 +280,7 @@ static int	no_physgeom_ioctl = 0;	/* ioctl for physical geometry failed */
 
 static struct ipart	Table[FD_NUMPART];
 static struct ipart	Old_Table[FD_NUMPART];
+static int		skip_verify[FD_NUMPART]; /* special case skip sz chk */
 
 /* Disk geometry information */
 static struct dk_minfo	minfo;
@@ -326,6 +327,10 @@ static void abs_write(void);
 static void load(int funct, char *file);
 static void Set_Table_CHS_Values(int ti);
 static int insert_tbl(int id, int act,
+    int bhead, int bsect, int bcyl,
+    int ehead, int esect, int ecyl,
+    uint32_t rsect, uint32_t numsect);
+static int entry_from_old_table(int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
     uint32_t rsect, uint32_t numsect);
@@ -1378,6 +1383,48 @@ load(int funct, char *file)
 				    line);
 				exit(1);
 			}
+
+			if (entry_from_old_table(id, act, bhead, bsect,
+			    bcyl, ehead, esect, ecyl, rsect, numsect)) {
+				/*
+				 * If we got here it means we copied an
+				 * unmodified entry. So there is no need
+				 * to insert it in the table or do any
+				 * checks against disk size.
+				 *
+				 * This is a work around on the following
+				 * situation (for IDE disks, at least):
+				 * Different operation systems calculate
+				 * disk size different ways, of which there
+				 * are two main ways.
+				 *
+				 * The first, rounds the disk size to modulo
+				 * cylinder size (virtual made-up cylinder
+				 * usually based on maximum number of heads
+				 * and sectors in partition table fields).
+				 * Our OS's (for IDE) and most other "Unix"
+				 * type OS's do this.
+				 *
+				 * The second, uses every single block
+				 * on the disk (to maximize available space).
+				 * Since disk manufactures do not know about
+				 * "virtual cylinders", there are some number
+				 * of blocks that make up a partial cylinder
+				 * at the end of the disk.
+				 *
+				 * The difference between these two methods
+				 * is where the problem is. When one
+				 * tries to install Solaris/OpenSolaris on
+				 * a disk that has another OS using that
+				 * "partial cylinder", install fails. It fails
+				 * since fdisk thinks its asked to create a
+				 * partition with the -F option that contains
+				 * a partition that runs off the end of the
+				 * disk.
+				 */
+				continue;
+			}
+
 			/*
 			 * Find an unused entry to use and put the entry
 			 * in table
@@ -1663,6 +1710,53 @@ insert_tbl(
 }
 
 /*
+ * entry_from_old_table
+ *	If the specified entry is in the old table and is not a Solaris entry
+ *	then insert same entry into new fdisk table. If we do this then
+ *	all checks are skipped for that entry!
+ */
+static int
+entry_from_old_table(
+    int id, int act,
+    int bhead, int bsect, int bcyl,
+    int ehead, int esect, int ecyl,
+    uint32_t rsect, uint32_t numsect)
+{
+	uint32_t	i, j;
+
+	if (id == SUNIXOS || id == SUNIXOS2)
+		return (0);
+	for (i = 0; i < FD_NUMPART - 1; i++) {
+		if (Old_Table[i].systid == id &&
+		    Old_Table[i].bootid == act &&
+		    Old_Table[i].beghead == bhead &&
+		    Old_Table[i].begsect == ((bsect & 0x3f) |
+		    (uchar_t)((bcyl>>2) & 0xc0)) &&
+		    Old_Table[i].begcyl == (uchar_t)(bcyl & 0xff) &&
+		    Old_Table[i].endhead == ehead &&
+		    Old_Table[i].endsect == ((esect & 0x3f) |
+		    (uchar_t)((ecyl>>2) & 0xc0)) &&
+		    Old_Table[i].endcyl == (uchar_t)(ecyl & 0xff) &&
+		    Old_Table[i].relsect == lel(rsect) &&
+		    Old_Table[i].numsect == lel(numsect)) {
+			/* find UNUSED partition table entry */
+			for (j = 0; j < FD_NUMPART; j++) {
+				if (Table[j].systid == UNUSED) {
+					(void) memcpy(&Table[j], &Old_Table[i],
+					    sizeof (Table[0]));
+					skip_verify[j] = 1;
+					return (1);
+
+				}
+			}
+			return (0);
+		}
+
+	}
+	return (0);
+}
+
+/*
  * verify_tbl
  * Verify that no partition entries overlap or exceed the size of
  * the disk.
@@ -1727,7 +1821,8 @@ verify_tbl(void)
 
 			if ((((diskaddr_t)rsect + numsect) > dev_capacity) ||
 			    (((diskaddr_t)rsect + numsect) > DK_MAX_2TB)) {
-				return (-1);
+				if (!skip_verify[i])
+					return (-1);
 			}
 
 			for (j = i + 1; j < FD_NUMPART; j++) {
@@ -1795,11 +1890,13 @@ verify_tbl(void)
 		}
 	}
 	if (Table[i].systid != UNUSED) {
-		if (noMoreParts ||
-		    (((diskaddr_t)lel(Table[i].relsect) +
+		if (noMoreParts)
+			return (-1);
+		if (!skip_verify[i] &&
+		    ((((diskaddr_t)lel(Table[i].relsect) +
 		    lel(Table[i].numsect)) > dev_capacity) ||
 		    (((diskaddr_t)lel(Table[i].relsect) +
-		    lel(Table[i].numsect)) > DK_MAX_2TB)) {
+		    lel(Table[i].numsect)) > DK_MAX_2TB))) {
 			return (-1);
 		}
 	}
@@ -2954,6 +3051,7 @@ nulltbl(void)
 		Table[i].numsect = lel(UNUSED);
 		Table[i].relsect = lel(UNUSED);
 		Table[i].bootid = 0;
+		skip_verify[i] = 0;
 	}
 }
 
