@@ -333,7 +333,7 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 	/* There is no suitable source address to use, return. */
 	if (fp->state == SCTP_FADDRS_UNREACH)
 		return (NULL);
-	ASSERT(!IN6_IS_ADDR_V4MAPPED_ANY(&fp->saddr));
+	ASSERT(!SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr));
 
 	if (isv4) {
 		ipsctplen = sctp->sctp_hdr_len;

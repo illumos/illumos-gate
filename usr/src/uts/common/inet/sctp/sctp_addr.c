@@ -234,7 +234,8 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 	int			i;
 	int			j;
 	int			error = 0;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	boolean_t		isv6;
 
 	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
@@ -243,13 +244,14 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 		sctp_ipif = list_head(&sctps->sctps_g_ipifs[i].sctp_ipif_list);
 		for (j = 0; j < sctps->sctps_g_ipifs[i].ipif_count; j++) {
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
+			isv6 = sctp_ipif->sctp_ipif_isv6;
 			if (SCTP_IPIF_DISCARD(sctp_ipif->sctp_ipif_flags) ||
 			    !SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) ||
 			    !SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) ||
-			    (sctp->sctp_ipversion == IPV4_VERSION &&
-			    sctp_ipif->sctp_ipif_isv6) ||
-			    (sctp->sctp_connp->conn_ipv6_v6only &&
-			    !sctp_ipif->sctp_ipif_isv6)) {
+			    SCTP_IS_ADDR_UNSPEC(!isv6,
+			    sctp_ipif->sctp_ipif_saddr) ||
+			    (sctp->sctp_ipversion == IPV4_VERSION && isv6) ||
+			    (sctp->sctp_connp->conn_ipv6_v6only && !isv6)) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				sctp_ipif = list_next(
 				    &sctps->sctps_g_ipifs[i].sctp_ipif_list,
@@ -978,7 +980,6 @@ sctp_update_ipif_addr(ipif_t *ipif, in6_addr_t v6addr)
 	uint_t		ill_index;
 	int		hindex;
 	sctp_stack_t	*sctps;
-
 
 	sctps = ipif->ipif_ill->ill_ipst->ips_netstack->netstack_sctp;
 

@@ -708,7 +708,9 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 					 * module.
 					 */
 					if (cl_sctp_assoc_change != NULL &&
-					    !IN6_IS_ADDR_UNSPECIFIED(&addr)) {
+					    !SCTP_IS_ADDR_UNSPEC(
+					    IN6_IS_ADDR_V4MAPPED(&addr),
+					    addr)) {
 						if (oph->sph_type ==
 						    htons(PARM_ADD_IP)) {
 							bcopy(&addr, aptr,
@@ -763,7 +765,9 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 					 * module.
 					 */
 					if (cl_sctp_assoc_change != NULL &&
-					    !IN6_IS_ADDR_UNSPECIFIED(&addr)) {
+					    !SCTP_IS_ADDR_UNSPEC(
+					    IN6_IS_ADDR_V4MAPPED(&addr),
+					    addr)) {
 						if (oph->sph_type ==
 						    htons(PARM_ADD_IP)) {
 							bcopy(&addr, aptr,
