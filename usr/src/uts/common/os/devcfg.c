@@ -275,16 +275,22 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 	 *
 	 * DEVI_PSEUDO_NODEID		DDI_NC_PSEUDO		A
 	 * DEVI_SID_NODEID		DDI_NC_PSEUDO		A,P
+	 * DEVI_SID_HIDDEN_NODEID	DDI_NC_PSEUDO		A,P,H
 	 * other			DDI_NC_PROM		P
 	 *
 	 * Where A = DDI_AUTO_ASSIGNED_NODEID (auto-assign a nodeid)
 	 * and	 P = DDI_PERSISTENT
+	 * and	 H = DDI_HIDDEN_NODE
 	 *
 	 * auto-assigned nodeids are also auto-freed.
 	 */
+	devi->devi_node_attributes = 0;
 	switch (nodeid) {
+	case DEVI_SID_HIDDEN_NODEID:
+		devi->devi_node_attributes |= DDI_HIDDEN_NODE;
+		/*FALLTHROUGH*/
 	case DEVI_SID_NODEID:
-		devi->devi_node_attributes = DDI_PERSISTENT;
+		devi->devi_node_attributes |= DDI_PERSISTENT;
 		if ((elem = kmem_zalloc(sizeof (*elem), flag)) == NULL)
 			goto fail;
 		/*FALLTHROUGH*/
@@ -711,7 +717,7 @@ unlink_node(dev_info_t *dip)
  *	Solaris implementation binds nodename after compatible.
  *
  * If we find a binding,
- * - set the binding name to the the string,
+ * - set the binding name to the string,
  * - set major number to driver major
  *
  * If we don't find a binding,
@@ -912,7 +918,7 @@ init_node(dev_info_t *dip)
 
 		/* Unbind: demote the node back to DS_LINKED.  */
 		if ((error = ndi_devi_unbind_driver(dip)) != DDI_SUCCESS) {
-			ndi_rele_devi(pdip);	/* relrease initial hold */
+			ndi_rele_devi(pdip);	/* release initial hold */
 			cmn_err(CE_WARN, "init_node: unbind for rebind "
 			    "of node %s failed", path);
 			goto out;
@@ -932,7 +938,7 @@ init_node(dev_info_t *dip)
 		 * Start by rebinding node to the path-bound driver.
 		 */
 		if ((error = ndi_devi_bind_driver(dip, 0)) != DDI_SUCCESS) {
-			ndi_rele_devi(pdip);	/* relrease initial hold */
+			ndi_rele_devi(pdip);	/* release initial hold */
 			cmn_err(CE_WARN, "init_node: rebind "
 			    "of node %s failed", path);
 			goto out;
@@ -2074,11 +2080,13 @@ i_ddi_devi_attached(dev_info_t *dip)
  * alternative match strategies are supported:
  *
  *	FIND_NODE_BY_NODENAME: Match on node name - typical use.
+ *
  *	FIND_NODE_BY_DRIVER: A match on driver name bound to node is conducted.
  *		This support is used for support of OBP generic names and
  *		for the conversion from driver names to generic names. When
  *		more consistency in the generic name environment is achieved
  *		(and not needed for upgrade) this support can be removed.
+ *
  *	FIND_NODE_BY_ADDR: Match on just the addr.
  *		This support is only used/needed during boot to match
  *		a node bound via a path-based driver alias.
@@ -2544,7 +2552,7 @@ ndi_merge_node(dev_info_t *dip, int (*name_node)(dev_info_t *, char *, int))
 	 * hardware nodes have already been initialized and attached.
 	 *
 	 * N.B. We return success here because the node was *intended*
-	 * 	to be a merge node because there is a hw node with the name.
+	 *	to be a merge node because there is a hw node with the name.
 	 */
 	mutex_enter(&DEVI(hwdip)->devi_lock);
 	if (ndi_dev_is_persistent_node(hwdip) == 0) {
@@ -8038,7 +8046,7 @@ e_ddi_retire_finalize(dev_info_t *dip, void *arg)
 
 /*
  * Returns
- * 	DDI_SUCCESS if constraints allow retire
+ *	DDI_SUCCESS if constraints allow retire
  *	DDI_FAILURE if constraints don't allow retire.
  * cons_array is a NULL terminated array of node paths for
  * which constraints have already been applied.

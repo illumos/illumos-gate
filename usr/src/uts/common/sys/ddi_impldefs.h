@@ -688,10 +688,14 @@ struct ddi_minor {
  *
  * DDI_VHCI_NODE indicates that the node type is VHCI. This flag
  * must be set by ndi_devi_config_vhci() routine only.
+ *
+ * DDI_HIDDEN_NODE indicates that the node should not show up in snapshots
+ * or in /devices.
  */
 #define	DDI_PERSISTENT			0x01
 #define	DDI_AUTO_ASSIGNED_NODEID	0x02
 #define	DDI_VHCI_NODE			0x04
+#define	DDI_HIDDEN_NODE			0x08
 
 #define	DEVI_VHCI_NODE(dip)						\
 	(DEVI(dip)->devi_node_attributes & DDI_VHCI_NODE)
@@ -1042,11 +1046,11 @@ typedef struct impl_devid {
  *			'A' |	// DEVID_ATA_SERIAL	<ascii_id>
  *			'u' |	// unknown		<hex_id>
  *			'U'	// unknown		<ascii_id>
- *              		// NOTE: lower case -> <hex_id>
- *				//       upper case -> <ascii_id>
- *				// NOTE: this covers all types currently
+ *				// NOTE:lower case -> <hex_id>
+ *				//	upper case -> <ascii_id>
+ *				// NOTE:this covers all types currently
  *				//	defined for <revision> 1.
- *				// NOTE: a <type> can be added
+ *				// NOTE:a <type> can be added
  *				//	without changing the <revision>.
  *
  *	<id>		-> <ascii_id> |	// <type> is upper case
@@ -1056,8 +1060,8 @@ typedef struct impl_devid {
  *			// are in the set:
  *			//	[A-Z][a-z][0-9]+-.= and space and 0x00
  *			// the encoded form is:
- *			//	[A-Z][a-z][0-9]+-.= and _     and ~
- *			//          NOTE: ' ' <=> '_', 0x00 <=> '~'
+ *			//	[A-Z][a-z][0-9]+-.= and _ and ~
+ *			//	NOTE: ' ' <=> '_', 0x00 <=> '~'
  *			// these sets are chosen to avoid shell
  *			// and conflicts with DDI node names.
  *
@@ -1070,11 +1074,11 @@ typedef struct impl_devid {
  *
  *   Fibre:
  *	sbus@6,0/SUNW,socal@d,10000/sf@1,0/ssd@w21000020370bb488,0:c,raw
- *      id1,ssd@w20000020370bb488:c,raw
+ *	id1,ssd@w20000020370bb488:c,raw
  *
  *   Copper:
  *	sbus@7,0/SUNW,fas@3,8800000/sd@a,0:c
- *      id1,sd@SIBM_____1XY210__________:c
+ *	id1,sd@SIBM_____1XY210__________:c
  */
 /* determine if a byte of an id meets ASCII representation requirements */
 #define	DEVID_IDBYTE_ISASCII(b)		(				\

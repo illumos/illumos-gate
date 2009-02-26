@@ -173,8 +173,8 @@ ndi_prop_remove_all(dev_info_t *dip)
  * requests to remove an eventcall would bubble up the tree.  Today, this
  * parameter is ignored.
  * Input Parameters:
- *	dip 	- Ignored.
- *	rdip 	- device driver posting the event
+ *	dip	- Ignored.
+ *	rdip	- device driver posting the event
  *	cookie	- valid ddi_eventcookie_t, obtained by caller prior to
  *		  invocation of this routine
  *	impl_data - used by framework
@@ -1722,7 +1722,7 @@ ndi_event_add_callback(ndi_event_hdl_t handle, dev_info_t *child_dip,
 	cb->ndi_evtcb_callback	= event_callback;
 	cb->ndi_evtcb_arg	= arg;
 	cb->ndi_evtcb_cookie	= cookie;
-	cb->devname 		= (char *)ddi_driver_name(child_dip);
+	cb->devname		= (char *)ddi_driver_name(child_dip);
 
 	*cb_id = (ddi_callback_id_t)cb;
 	mutex_enter(&ndi_event_hdl->ndi_evthdl_cb_mutex);
@@ -2155,8 +2155,9 @@ ndi_dev_is_pseudo_node(dev_info_t *dip)
 {
 	/*
 	 * NOTE: this does NOT mean the pseudo branch of the device tree,
-	 * it means the node was created by software (DEVI_SID_NODEID |
-	 * DEVI_PSEUDO_NODEID) instead of being generated from a PROM node.
+	 * it means the node was created by software (DEVI_SID_NODEID ||
+	 * DEVI_PSEUDO_NODEID || DEVI_SID_HIDDEN_NODEID) instead of being
+	 * generated from a PROM node.
 	 */
 	return (DEVI(dip)->devi_node_class == DDI_NC_PSEUDO);
 }
@@ -2165,6 +2166,24 @@ int
 ndi_dev_is_persistent_node(dev_info_t *dip)
 {
 	return ((DEVI(dip)->devi_node_attributes & DDI_PERSISTENT) != 0);
+}
+
+int
+ndi_dev_is_hidden_node(dev_info_t *dip)
+{
+	return ((DEVI(dip)->devi_node_attributes & DDI_HIDDEN_NODE) != 0);
+}
+
+void
+ndi_devi_set_hidden(dev_info_t *dip)
+{
+	DEVI(dip)->devi_node_attributes |= DDI_HIDDEN_NODE;
+}
+
+void
+ndi_devi_clr_hidden(dev_info_t *dip)
+{
+	DEVI(dip)->devi_node_attributes &= ~DDI_HIDDEN_NODE;
 }
 
 int

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1696,7 +1696,7 @@ di_copynode(struct dev_info *node, struct di_stack *dsp, struct di_state *st)
 {
 	di_off_t	off;
 	struct di_node	*me;
-	size_t		size;
+	size_t		size;	struct dev_info *n;
 
 	dcmn_err2((CE_CONT, "di_copynode: depth = %x\n", dsp->depth));
 	ASSERT((node != NULL) && (node == TOP_NODE(dsp)));
@@ -1941,34 +1941,40 @@ subtree:
 
 child:
 	/*
-	 * If there is a child--push child onto stack.
-	 * Hold the parent busy while doing so.
+	 * If there is a visible child--push child onto stack.
+	 * Hold the parent (me) busy while doing so.
 	 */
-	if (node->devi_child) {
-		me->child = off;
-		PUSH_STACK(dsp, node->devi_child, &me->child);
-		return (me->child);
+	if ((n = node->devi_child) != NULL) {
+		/* skip hidden nodes */
+		while (n && ndi_dev_is_hidden_node((dev_info_t *)n))
+			n = n->devi_sibling;
+		if (n) {
+			me->child = off;
+			PUSH_STACK(dsp, n, &me->child);
+			return (me->child);
+		}
 	}
 
 sibling:
 	/*
-	 * no child node, unroll the stack till a sibling of
-	 * a parent node is found or root node is reached
+	 * Done with any child nodes, unroll the stack till a visible
+	 * sibling of a parent node is found or root node is reached.
 	 */
 	POP_STACK(dsp);
-	while (!EMPTY_STACK(dsp) && (node->devi_sibling == NULL)) {
+	while (!EMPTY_STACK(dsp)) {
+		if ((n = node->devi_sibling) != NULL) {
+			/* skip hidden nodes */
+			while (n && ndi_dev_is_hidden_node((dev_info_t *)n))
+				n = n->devi_sibling;
+			if (n) {
+				me->sibling = DI_ALIGN(off);
+				PUSH_STACK(dsp, n, &me->sibling);
+				return (me->sibling);
+			}
+		}
 		node = TOP_NODE(dsp);
 		me = DI_NODE(di_mem_addr(st, *(TOP_OFFSET(dsp))));
 		POP_STACK(dsp);
-	}
-
-	if (!EMPTY_STACK(dsp)) {
-		/*
-		 * a sibling is found, replace top of stack by its sibling
-		 */
-		me->sibling = off;
-		PUSH_STACK(dsp, node->devi_sibling, &me->sibling);
-		return (me->sibling);
 	}
 
 	/*
@@ -2211,7 +2217,7 @@ struct i_layer_data {
 	int		lnode_count;
 	int		link_count;
 	di_off_t	lnode_off;
-	di_off_t 	link_off;
+	di_off_t	link_off;
 };
 
 /*ARGSUSED*/

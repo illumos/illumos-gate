@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * miscellaneous routines for the devfs
@@ -135,11 +133,11 @@ extern dev_info_t	*clone_dip;
 extern major_t		clone_major;
 extern struct dev_ops	*ddi_hold_driver(major_t);
 
-/* dev_info node cache constructor */
-/*ARGSUSED1*/
+/* dv_node node constructor for kmem cache */
 static int
 i_dv_node_ctor(void *buf, void *cfarg, int flag)
 {
+	_NOTE(ARGUNUSED(cfarg, flag))
 	struct dv_node	*dv = (struct dv_node *)buf;
 	struct vnode	*vp;
 
@@ -153,11 +151,11 @@ i_dv_node_ctor(void *buf, void *cfarg, int flag)
 	return (0);
 }
 
-/* dev_info node cache destructor */
-/*ARGSUSED1*/
+/* dv_node node destructor for kmem cache */
 static void
 i_dv_node_dtor(void *buf, void *arg)
 {
+	_NOTE(ARGUNUSED(arg))
 	struct dv_node	*dv = (struct dv_node *)buf;
 	struct vnode	*vp = DVTOV(dv);
 
@@ -167,7 +165,7 @@ i_dv_node_dtor(void *buf, void *arg)
 }
 
 
-/* initialize dev_info node cache */
+/* initialize dv_node node cache */
 void
 dv_node_cache_init()
 {
@@ -179,7 +177,7 @@ dv_node_cache_init()
 	tsd_create(&devfs_clean_key, NULL);
 }
 
-/* destroy dev_info node cache */
+/* destroy dv_node node cache */
 void
 dv_node_cache_fini()
 {
@@ -410,7 +408,7 @@ dv_mknod(struct dv_node *ddv, dev_info_t *devi, char *nm,
 	ASSERT(DEVI_BUSY_OWNED(devi));
 	mutex_enter(&DEVI(devi)->devi_lock);
 	dv->dv_devi = devi;
-	DEVI(devi)->devi_ref++;
+	DEVI(devi)->devi_ref++;		/* ndi_hold_devi(dip) */
 	mutex_exit(&DEVI(devi)->devi_lock);
 
 	dv->dv_ino = dv_mkino(devi, vp->v_type, vp->v_rdev);
@@ -449,7 +447,6 @@ dv_mknod(struct dv_node *ddv, dev_info_t *devi, char *nm,
  * Destroy what we created in dv_mkdir or dv_mknod.
  * In the case of a *referenced* directory, do nothing.
  */
-/*ARGSUSED1*/
 void
 dv_destroy(struct dv_node *dv, uint_t flags)
 {
@@ -1098,6 +1095,15 @@ founddv:
 	}
 
 	/*
+	 * If we configured a hidden node, consider it notfound.
+	 */
+	if (ndi_dev_is_hidden_node(devi)) {
+		ndi_rele_devi(devi);
+		rv = ENOENT;
+		goto notfound;
+	}
+
+	/*
 	 * Don't make vhci clients visible under phci, unless we
 	 * are in miniroot.
 	 */
@@ -1246,6 +1252,10 @@ dv_filldir(struct dv_node *ddv)
 	for (devi = ddi_get_child(pdevi); devi;
 	    devi = ddi_get_next_sibling(devi)) {
 		if (i_ddi_node_state(devi) < DS_PROBED)
+			continue;
+
+		/* skip hidden nodes */
+		if (ndi_dev_is_hidden_node(devi))
 			continue;
 
 		dcmn_err3(("dv_filldir: node %s\n", ddi_node_name(devi)));

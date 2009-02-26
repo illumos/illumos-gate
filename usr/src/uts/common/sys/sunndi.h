@@ -30,7 +30,6 @@
  * Sun Specific NDI definitions
  */
 
-
 #include <sys/esunddi.h>
 #include <sys/sunddi.h>
 #include <sys/obpdefs.h>
@@ -727,6 +726,18 @@ int ndi_dev_is_pseudo_node(dev_info_t *);
  * property of persistence.
  */
 int ndi_dev_is_persistent_node(dev_info_t *);
+
+/*
+ * ndi_dev_is_hidden_node: Return non-zero if the node is hidden.
+ */
+int ndi_dev_is_hidden_node(dev_info_t *);
+
+/*
+ * ndi_devi_set_hidden: mark a node as hidden
+ * ndi_devi_clr_hidden: mark a node as visible
+ */
+void ndi_devi_set_hidden(dev_info_t *);
+void ndi_devi_clr_hidden(dev_info_t *);
 
 /*
  * Event posted when a fault is reported

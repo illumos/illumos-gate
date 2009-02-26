@@ -99,6 +99,10 @@ extern "C" {
  *
  *  o	DEVI_PSEUDO_NODEID specifics a node without persistence.
  *  o	DEVI_SID_NODEID specifies a node with persistence.
+ *  o	DEVI_SID_HIDDEN_NODEID specifies a hidden node with persistence.
+ *
+ * A node with the 'hidden' attribute will not show up in devinfo snapshots
+ * or in /devices file system.
  *
  * A node with the 'persistent' attribute will not be automatically removed by
  * the framework in the current implementation - driver.conf nodes are without
@@ -111,6 +115,7 @@ extern "C" {
 
 #define	DEVI_PSEUDO_NODEID	((int)-1)
 #define	DEVI_SID_NODEID		((int)-2)
+#define	DEVI_SID_HIDDEN_NODEID	((int)-3)
 
 #define	DEVI_PSEUDO_NEXNAME	"pseudo"
 #define	DEVI_ISA_NEXNAME	"isa"
