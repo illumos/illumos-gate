@@ -244,7 +244,7 @@ static int
 getcomponent(const char *path, char *component, const char **nextp)
 {
 	char *p;
-	if (path == NULL)
+	if ((path == NULL) || (path[0] == '\0'))
 		return (ENOENT);
 	/* This would be a good place to reserve some namespace... */
 	p = strpbrk(path, "/@");

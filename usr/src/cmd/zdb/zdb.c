@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,6 +125,11 @@ usage(void)
 	exit(1);
 }
 
+/*
+ * Called for usage errors that are discovered after a call to spa_open(),
+ * dmu_bonus_hold(), or pool_match().  abort() is called for other errors.
+ */
+
 static void
 fatal(const char *fmt, ...)
 {
@@ -136,7 +141,7 @@ fatal(const char *fmt, ...)
 	va_end(ap);
 	(void) fprintf(stderr, "\n");
 
-	abort();
+	exit(1);
 }
 
 static void
@@ -1211,8 +1216,10 @@ dump_dir(objset_t *os)
 
 	(void) printf("\n");
 
-	if (error != ESRCH)
-		fatal("dmu_object_next() = %d", error);
+	if (error != ESRCH) {
+		(void) fprintf(stderr, "dmu_object_next() = %d\n", error);
+		abort();
+	}
 }
 
 static void

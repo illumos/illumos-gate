@@ -504,12 +504,17 @@ dsl_props_set(const char *dsname, nvlist_t *nvl)
 	nvpair_t *elem = NULL;
 	int err;
 
+	/*
+	 * Do these checks before the syncfunc, since it can't fail.
+	 */
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
+		if (strlen(nvpair_name(elem)) >= ZAP_MAXNAMELEN)
+			return (ENAMETOOLONG);
 		if (nvpair_type(elem) == DATA_TYPE_STRING) {
 			char *valstr;
 			VERIFY(nvpair_value_string(elem, &valstr) == 0);
-			if (strlen(valstr) >= ZAP_MAXNAMELEN)
-				return (ENAMETOOLONG);
+			if (strlen(valstr) >= ZAP_MAXVALUELEN)
+				return (E2BIG);
 		}
 	}
 
