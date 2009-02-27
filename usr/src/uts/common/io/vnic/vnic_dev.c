@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,10 @@ static int vnic_m_multicst(void *, boolean_t, const uint8_t *);
 static int vnic_m_unicst(void *, const uint8_t *);
 static int vnic_m_stat(void *, uint_t, uint64_t *);
 static void vnic_m_ioctl(void *, queue_t *, mblk_t *);
+static int vnic_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+static int vnic_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    uint_t, void *, uint_t *);
 static mblk_t *vnic_m_tx(void *, mblk_t *);
 static boolean_t vnic_m_capab_get(void *, mac_capab_t, void *);
 static void vnic_notify_cb(void *, mac_notify_type_t);
@@ -92,7 +96,8 @@ static mod_hash_t	*vnic_hash;
 #define	VNIC_HASHSZ	64
 #define	VNIC_HASH_KEY(vnic_id)	((mod_hash_key_t)(uintptr_t)vnic_id)
 
-#define	VNIC_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
+#define	VNIC_M_CALLBACK_FLAGS	\
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t vnic_m_callbacks = {
 	VNIC_M_CALLBACK_FLAGS,
@@ -104,7 +109,11 @@ static mac_callbacks_t vnic_m_callbacks = {
 	vnic_m_unicst,
 	vnic_m_tx,
 	vnic_m_ioctl,
-	vnic_m_capab_get
+	vnic_m_capab_get,
+	NULL,
+	NULL,
+	vnic_m_setprop,
+	vnic_m_getprop
 };
 
 void
@@ -782,6 +791,48 @@ vnic_m_unicst(void *arg, const uint8_t *macaddr)
 
 	return (mac_vnic_unicast_set(vnic->vn_mch, macaddr));
 }
+
+/*
+ * Callback functions for set/get of properties
+ */
+/*ARGSUSED*/
+static int
+vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	int 		err = ENOTSUP;
+	vnic_t		*vn = m_driver;
+
+	/* allow setting MTU only on an etherstub */
+	if (vn->vn_link_id != DATALINK_INVALID_LINKID)
+		return (err);
+
+	switch (pr_num) {
+	case MAC_PROP_MTU: {
+		uint32_t	mtu;
+
+		if (pr_valsize < sizeof (mtu)) {
+			err = EINVAL;
+			break;
+		}
+		bcopy(pr_val, &mtu, sizeof (mtu));
+		err = mac_maxsdu_update(vn->vn_mh, mtu);
+		break;
+	}
+	default:
+		break;
+	}
+	return (err);
+}
+
+/*ARGSUSED*/
+static int
+vnic_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+{
+	return (ENOTSUP);
+}
+
 
 int
 vnic_info(vnic_info_t *info)
