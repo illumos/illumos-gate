@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -974,13 +974,10 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 
 	if (count > 1) {
 		if (behavior == DDI_INTR_ALLOC_STRICT &&
-		    (apic_multi_msi_enable == 0 || count > apic_multi_msi_max))
+		    apic_multi_msi_enable == 0)
 			return (0);
-
 		if (apic_multi_msi_enable == 0)
 			count = 1;
-		else if (count > apic_multi_msi_max)
-			count = apic_multi_msi_max;
 	}
 
 	/*

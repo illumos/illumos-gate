@@ -61,11 +61,9 @@ int	apic_support_msi = 0;
 
 /* Multiple vector support for MSI */
 int	apic_multi_msi_enable = 1;
-int	apic_multi_msi_max = 2;
 
-/* Maximum no. of MSI-X vectors supported */
+/* Multiple vector support for MSI-X */
 int	apic_msix_enable = 1;
-int	apic_msix_max = 2;
 
 /*
  * apic_pci_msi_enable_vector:

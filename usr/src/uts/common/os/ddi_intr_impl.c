@@ -36,7 +36,12 @@
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>	/* include prototypes */
 
-extern uint_t		ddi_msix_alloc_limit;
+#if defined(__i386) || defined(__amd64)
+/*
+ * MSI-X allocation limit.
+ */
+uint_t		ddi_msix_alloc_limit = DDI_DEFAULT_MSIX_ALLOC;
+#endif
 
 /*
  * New DDI interrupt framework
@@ -226,7 +231,7 @@ i_ddi_intr_get_current_navail(dev_info_t *dip, int type)
 	ddi_cb_t		*cb_p;
 	ddi_irm_pool_t		*pool_p;
 	ddi_irm_req_t		*req_p;
-	uint_t			navail = 0, nintrs, nreq;
+	uint_t			navail = 0, nintrs;
 
 	/* Get maximum number of supported interrupts */
 	nintrs = i_ddi_intr_get_supported_nintrs(dip, type);
@@ -263,15 +268,12 @@ i_ddi_intr_get_current_navail(dev_info_t *dip, int type)
 		}
 	}
 
-	/* Apply MSI-X workarounds */
+#if defined(__i386) || defined(__amd64)
+	/* Global tunable workaround */
 	if (type == DDI_INTR_TYPE_MSIX) {
-		/* Global tunable workaround */
-		if (navail < nintrs)
-			navail = MIN(nintrs, ddi_msix_alloc_limit);
-		/* Device property workaround */
-		if ((nreq = i_ddi_get_msix_alloc_limit(dip)) > 0)
-			navail = MAX(navail, nreq);
+		navail = MIN(nintrs, ddi_msix_alloc_limit);
 	}
+#endif
 
 	/* Always restrict MSI to a precise limit */
 	if (type == DDI_INTR_TYPE_MSI)
@@ -489,20 +491,3 @@ i_ddi_set_msi_msix_cap_ptr(dev_info_t *dip, int cap_ptr)
 		intr_p->devi_cap_ptr = cap_ptr;
 }
 #endif
-
-/* ARGSUSED */
-uint_t
-i_ddi_get_msix_alloc_limit(dev_info_t *dip)
-{
-	uint_t	msix_alloc_limit = ddi_msix_alloc_limit;
-
-#if defined(__sparc)
-	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_NOTPROM |
-	    DDI_PROP_DONTPASS, "#msix-request")) {
-		msix_alloc_limit = MAX(DDI_MAX_MSIX_ALLOC,
-		    ddi_msix_alloc_limit);
-	}
-#endif
-
-	return (msix_alloc_limit);
-}

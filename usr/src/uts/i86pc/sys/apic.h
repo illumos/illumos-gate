@@ -840,8 +840,6 @@ extern int apic_nproc;
 extern int apic_next_bind_cpu;
 extern int apic_redistribute_sample_interval;
 extern int apic_multi_msi_enable;
-extern int apic_multi_msi_max;
-extern int apic_msix_max;
 extern int apic_sci_vect;
 extern uchar_t apic_ipls[];
 extern apic_reg_ops_t *apic_reg_ops;

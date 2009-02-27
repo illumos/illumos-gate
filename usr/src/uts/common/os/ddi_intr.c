@@ -42,14 +42,6 @@
  */
 
 /*
- * MSI-X allocation limit.
- *
- * This MSI-X limit or tunable may be obsolete or change with Interrupt
- * Resource Management (IRM) support.
- */
-uint_t		ddi_msix_alloc_limit = DDI_DEFAULT_MSIX_ALLOC;
-
-/*
  * ddi_intr_get_supported_types:
  *	Return, as a bit mask, the hardware interrupt types supported by
  *	both the device and by the host in the integer pointed

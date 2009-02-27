@@ -157,7 +157,6 @@ ndi_irm_create(dev_info_t *dip, ddi_irm_params_t *paramsp,
 	ASSERT(pool_retp != NULL);
 	ASSERT(paramsp->iparams_total >= 1);
 	ASSERT(paramsp->iparams_types != 0);
-	ASSERT(paramsp->iparams_default >= 1);
 
 	DDI_INTR_IRMDBG((CE_CONT, "ndi_irm_create: dip %p\n", (void *)dip));
 
@@ -167,8 +166,7 @@ ndi_irm_create(dev_info_t *dip, ddi_irm_params_t *paramsp,
 
 	/* Validate parameters */
 	if ((dip == NULL) || (paramsp == NULL) || (pool_retp == NULL) ||
-	    (paramsp->iparams_total < 1) || (paramsp->iparams_types == 0) ||
-	    (paramsp->iparams_default < 1))
+	    (paramsp->iparams_total < 1) || (paramsp->iparams_types == 0))
 		return (NDI_FAILURE);
 
 	/* Allocate and initialize the pool */
@@ -177,7 +175,8 @@ ndi_irm_create(dev_info_t *dip, ddi_irm_params_t *paramsp,
 	pool_p->ipool_policy = irm_default_policy;
 	pool_p->ipool_types = paramsp->iparams_types;
 	pool_p->ipool_totsz = paramsp->iparams_total;
-	pool_p->ipool_defsz = paramsp->iparams_default;
+	pool_p->ipool_defsz = MIN(DDI_MAX_MSIX_ALLOC, MAX(DDI_MIN_MSIX_ALLOC,
+	    paramsp->iparams_total / DDI_MSIX_ALLOC_DIVIDER));
 	list_create(&pool_p->ipool_req_list, sizeof (ddi_irm_req_t),
 	    offsetof(ddi_irm_req_t, ireq_link));
 	list_create(&pool_p->ipool_scratch_list, sizeof (ddi_irm_req_t),
@@ -893,8 +892,8 @@ i_ddi_irm_enqueue(ddi_irm_pool_t *pool_p, boolean_t wait_flag)
 static int
 i_ddi_irm_reduce_large(ddi_irm_pool_t *pool_p, int imbalance)
 {
-	ddi_irm_req_t	*req_p, *next_p;
-	int		nreqs, reduction;
+	ddi_irm_req_t	*head_p, *next_p;
+	int		next_navail, nreqs, reduction;
 
 	ASSERT(pool_p != NULL);
 	ASSERT(imbalance > 0);
@@ -906,62 +905,46 @@ i_ddi_irm_reduce_large(ddi_irm_pool_t *pool_p, int imbalance)
 
 	while (imbalance > 0) {
 
-		req_p = list_head(&pool_p->ipool_scratch_list);
-		next_p = list_next(&pool_p->ipool_scratch_list, req_p);
+		head_p = list_head(&pool_p->ipool_scratch_list);
 
 		/* Fail if nothing is reducible */
-		if (req_p->ireq_navail == 1) {
+		if (head_p->ireq_navail <= pool_p->ipool_defsz) {
 			DDI_INTR_IRMDBG((CE_CONT,
-			    "i_ddi_irm_reduce_large: failure.\n"));
+			    "i_ddi_irm_reduce_large: Failure. "
+			    "All requests have downsized to low limit.\n"));
 			return (DDI_FAILURE);
 		}
 
 		/* Count the number of equally sized requests */
-		nreqs = 1;
-		while (next_p && (req_p->ireq_navail == next_p->ireq_navail)) {
+		for (nreqs = 1, next_p = head_p;
+		    (next_p = list_next(&pool_p->ipool_scratch_list, next_p)) !=
+		    NULL && (head_p->ireq_navail == next_p->ireq_navail);
+		    nreqs++)
+			;
+
+		next_navail = next_p ? next_p->ireq_navail : 0;
+		reduction = head_p->ireq_navail -
+		    MAX(next_navail, pool_p->ipool_defsz);
+
+		if ((reduction * nreqs) > imbalance) {
+			reduction = imbalance / nreqs;
+
+			if (reduction == 0) {
+				reduction = 1;
+				nreqs = imbalance;
+			}
+		}
+
+		next_p = head_p;
+		while (nreqs--) {
+			imbalance -= reduction;
+			next_p->ireq_navail -= reduction;
+			pool_p->ipool_resno -= reduction;
 			next_p = list_next(&pool_p->ipool_scratch_list, next_p);
-			nreqs++;
 		}
 
-		/* Try to reduce multiple requests together */
-		if (nreqs > 1) {
-
-			if (next_p) {
-				reduction = req_p->ireq_navail -
-				    (next_p->ireq_navail + 1);
-			} else {
-				reduction = req_p->ireq_navail - 1;
-			}
-
-			if ((reduction * nreqs) > imbalance)
-				reduction = imbalance / nreqs;
-
-			if (reduction > 0) {
-				while (req_p && (req_p != next_p)) {
-					imbalance -= reduction;
-					req_p->ireq_navail -= reduction;
-					pool_p->ipool_resno -= reduction;
-					req_p = list_next(
-					    &pool_p->ipool_scratch_list, req_p);
-				}
-				continue;
-			}
-		}
-
-		/* Or just reduce the current request */
-		next_p = list_next(&pool_p->ipool_scratch_list, req_p);
-		if (next_p && (req_p->ireq_navail > next_p->ireq_navail)) {
-			reduction = req_p->ireq_navail - next_p->ireq_navail;
-			reduction = MIN(reduction, imbalance);
-		} else {
-			reduction = 1;
-		}
-		imbalance -= reduction;
-		req_p->ireq_navail -= reduction;
-		pool_p->ipool_resno -= reduction;
-
-		/* Re-sort the scratch list if not yet finished */
-		if (imbalance > 0) {
+		if (next_p && next_p->ireq_navail > head_p->ireq_navail) {
+			ASSERT(imbalance == 0);
 			i_ddi_irm_reduce_large_resort(pool_p);
 		}
 	}
@@ -978,21 +961,26 @@ i_ddi_irm_reduce_large(ddi_irm_pool_t *pool_p, int imbalance)
 static void
 i_ddi_irm_reduce_large_resort(ddi_irm_pool_t *pool_p)
 {
-	ddi_irm_req_t	*req_p, *next_p;
+	ddi_irm_req_t	*start_p, *end_p, *next_p;
 
 	ASSERT(pool_p != NULL);
 	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
 
-	req_p = list_remove_head(&pool_p->ipool_scratch_list);
-	next_p = list_head(&pool_p->ipool_scratch_list);
+	start_p = list_head(&pool_p->ipool_scratch_list);
+	end_p = list_next(&pool_p->ipool_scratch_list, start_p);
+	while (end_p && start_p->ireq_navail == end_p->ireq_navail)
+		end_p = list_next(&pool_p->ipool_scratch_list, end_p);
 
-	while (next_p &&
-	    ((next_p->ireq_navail > req_p->ireq_navail) ||
-	    ((next_p->ireq_navail == req_p->ireq_navail) &&
-	    (next_p->ireq_nreq < req_p->ireq_nreq))))
+	next_p = end_p;
+	while (next_p && (next_p->ireq_navail > start_p->ireq_navail))
 		next_p = list_next(&pool_p->ipool_scratch_list, next_p);
 
-	list_insert_before(&pool_p->ipool_scratch_list, next_p, req_p);
+	while (start_p != end_p) {
+		list_remove(&pool_p->ipool_scratch_list, start_p);
+		list_insert_before(&pool_p->ipool_scratch_list, next_p,
+		    start_p);
+		start_p = list_head(&pool_p->ipool_scratch_list);
+	}
 }
 
 /*
@@ -1026,7 +1014,7 @@ i_ddi_irm_reduce_even(ddi_irm_pool_t *pool_p, int imbalance)
 	    "i_ddi_irm_reduce_even: pool_p %p imbalance %d\n",
 	    (void *)pool_p, imbalance));
 
-	while ((nmin > 0) && (imbalance > 0)) {
+	while (imbalance > 0) {
 
 		/* Count reducible requests */
 		nreduce = 0;
@@ -1038,10 +1026,12 @@ i_ddi_irm_reduce_even(ddi_irm_pool_t *pool_p, int imbalance)
 			nreduce++;
 		}
 
-		/* If none are reducible, try a lower minimum */
+		/* Fail if none are reducible */
 		if (nreduce == 0) {
-			nmin--;
-			continue;
+			DDI_INTR_IRMDBG((CE_CONT,
+			    "i_ddi_irm_reduce_even: Failure. "
+			    "All requests have downsized to low limit.\n"));
+			return (DDI_FAILURE);
 		}
 
 		/* Compute reduction */
@@ -1071,34 +1061,48 @@ i_ddi_irm_reduce_even(ddi_irm_pool_t *pool_p, int imbalance)
 		}
 	}
 
-	if (nmin == 0) {
-		DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_reduce_even: failure.\n"));
-		return (DDI_FAILURE);
-	}
-
 	return (DDI_SUCCESS);
 }
 
 /*
  * i_ddi_irm_reduce_new()
  *
- *	Reduces new requests to zero.  This is only used as a
- *	last resort after another reduction algorithm failed.
+ *	Reduces new requests.  This is only used as a last resort
+ *	after another reduction algorithm failed.
  */
 static void
 i_ddi_irm_reduce_new(ddi_irm_pool_t *pool_p, int imbalance)
 {
 	ddi_irm_req_t	*req_p;
+	uint_t		nreduce;
 
 	ASSERT(pool_p != NULL);
 	ASSERT(imbalance > 0);
 	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
 
+	while (imbalance > 0) {
+		nreduce = 0;
+		for (req_p = list_head(&pool_p->ipool_scratch_list);
+		    req_p && (imbalance > 0);
+		    req_p = list_next(&pool_p->ipool_scratch_list, req_p)) {
+			if (req_p->ireq_flags & DDI_IRM_FLAG_NEW &&
+			    req_p->ireq_navail > 1) {
+				req_p->ireq_navail--;
+				pool_p->ipool_resno--;
+				imbalance--;
+				nreduce++;
+			}
+		}
+
+		if (nreduce == 0)
+			break;
+	}
+
 	for (req_p = list_head(&pool_p->ipool_scratch_list);
 	    req_p && (imbalance > 0);
 	    req_p = list_next(&pool_p->ipool_scratch_list, req_p)) {
-		ASSERT(req_p->ireq_navail == 1);
 		if (req_p->ireq_flags & DDI_IRM_FLAG_NEW) {
+			ASSERT(req_p->ireq_navail == 1);
 			req_p->ireq_navail--;
 			pool_p->ipool_resno--;
 			imbalance--;

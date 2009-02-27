@@ -142,7 +142,7 @@ struct ioapic_reprogram_data apic_reprogram_info[APIC_MAX_VECTOR+1];
  * is indexed by IRQ number, NOT by vector number.
  */
 
-int	apic_intr_policy = INTR_ROUND_ROBIN_WITH_AFFINITY;
+int	apic_intr_policy = INTR_ROUND_ROBIN;
 
 int	apic_next_bind_cpu = 1; /* For round robin assignment */
 				/* start with cpu 1 */
@@ -1705,9 +1705,6 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		 * of the multi-MSI support
 		 */
 		if (i_ddi_intr_get_current_nenables(irqptr->airq_dip) == 1) {
-			apic_pci_msi_unconfigure(irqptr->airq_dip,
-			    DDI_INTR_TYPE_MSI, irqptr->airq_ioapicindex);
-
 			apic_pci_msi_disable_mode(irqptr->airq_dip,
 			    DDI_INTR_TYPE_MSI);
 		}
@@ -2410,10 +2407,11 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 
 					cmn_err(CE_CONT,
 					    "!%s: %s (%s) instance #%d "
-					    "vector 0x%x ioapic 0x%x "
+					    "irq 0x%x vector 0x%x ioapic 0x%x "
 					    "intin 0x%x is bound to cpu %d\n",
 					    psm_name,
 					    name, drv_name, instance, irq,
+					    apic_irq_table[irq]->airq_vector,
 					    ioapicid, intin, cpu);
 					return (cpu);
 				}
@@ -2480,14 +2478,16 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 		}
 	}
 	if (drv_name != NULL)
-		cmn_err(CE_CONT, "!%s: %s (%s) instance %d "
+		cmn_err(CE_CONT, "!%s: %s (%s) instance %d irq 0x%x "
 		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
-		    psm_name, name, drv_name, instance,
-		    irq, ioapicid, intin, bind_cpu & ~IRQ_USER_BOUND);
+		    psm_name, name, drv_name, instance, irq,
+		    apic_irq_table[irq]->airq_vector, ioapicid, intin,
+		    bind_cpu & ~IRQ_USER_BOUND);
 	else
-		cmn_err(CE_CONT, "!%s: "
+		cmn_err(CE_CONT, "!%s: irq 0x%x "
 		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
-		    psm_name, irq, ioapicid, intin, bind_cpu & ~IRQ_USER_BOUND);
+		    psm_name, irq, apic_irq_table[irq]->airq_vector, ioapicid,
+		    intin, bind_cpu & ~IRQ_USER_BOUND);
 
 	return ((uint32_t)bind_cpu);
 }

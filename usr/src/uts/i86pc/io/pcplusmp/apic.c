@@ -2242,13 +2242,10 @@ apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
 
 	if (count > 1) {
 		if (behavior == DDI_INTR_ALLOC_STRICT &&
-		    (apic_multi_msi_enable == 0 || count > apic_multi_msi_max))
+		    apic_multi_msi_enable == 0)
 			return (0);
-
 		if (apic_multi_msi_enable == 0)
 			count = 1;
-		else if (count > apic_multi_msi_max)
-			count = apic_multi_msi_max;
 	}
 
 	if ((rcount = apic_navail_vector(dip, pri)) > count)
@@ -2337,14 +2334,6 @@ apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
 {
 	int	rcount, i;
 	major_t	major;
-
-	if (count > 1) {
-		if (behavior == DDI_INTR_ALLOC_STRICT) {
-			if (count > apic_msix_max)
-				return (0);
-		} else if (count > apic_msix_max)
-			count = apic_msix_max;
-	}
 
 	mutex_enter(&airq_mutex);
 

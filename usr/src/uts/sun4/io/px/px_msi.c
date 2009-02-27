@@ -83,7 +83,6 @@ px_msi_attach(px_t *px_p)
 	bzero(&irm_params, sizeof (ddi_irm_params_t));
 	irm_params.iparams_types = msi_state_p->msi_type;
 	irm_params.iparams_total = msi_state_p->msi_cnt;
-	irm_params.iparams_default = DDI_DEFAULT_MSIX_ALLOC;
 	if (ndi_irm_create(dip, &irm_params, &irm_pool_p) == DDI_SUCCESS) {
 		msi_state_p->msi_pool_p = irm_pool_p;
 	} else {
