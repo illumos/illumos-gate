@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -485,10 +485,11 @@ fw_identify(int start)
 			logmsg(MSG_INFO,
 			    "Chassis Serial Number: %s\n",
 			    newdev->addresses[0]);
-		} else {
-			(void) strlcpy(newdev->addresses[0],
-			    "(not supported)", 17);
-		}
+		} else
+			logmsg(MSG_INFO,
+			    "%s: no chassis-serial-number property "
+			    "for device %s\n",
+			    driver, newdev->access_devname);
 
 
 		rv = di_prop_lookup_strings(DDI_DEV_T_ANY,
@@ -498,8 +499,6 @@ fw_identify(int start)
 			    "%s: no target-port property "
 			    "for device %s\n",
 			    driver, newdev->access_devname);
-			(void) strlcpy(newdev->addresses[1],
-			    "(not supported)", 17);
 		} else
 			logmsg(MSG_INFO,
 			    "target-port property: %s\n",
@@ -539,8 +538,10 @@ fw_identify(int start)
 			    tempdev->ident->pid,
 			    tempdev->ident->revid,
 			    tempdev->index,
-			    tempdev->addresses[0],
-			    tempdev->addresses[1],
+			    (tempdev->addresses[0] ? tempdev->addresses[0] :
+			    "(not supported)"),
+			    (tempdev->addresses[1] ? tempdev->addresses[1] :
+			    "(not supported)"),
 			    &tempdev->plugin);
 		}
 	}
@@ -567,8 +568,10 @@ fw_devinfo(struct devicelist *thisdev)
 	    thisdev->ident->vid,
 	    thisdev->ident->pid,
 	    thisdev->ident->revid,
-	    thisdev->addresses[0],
-	    thisdev->addresses[1]);
+	    (thisdev->addresses[0] ? thisdev->addresses[0] :
+	    "(not supported)"),
+	    (thisdev->addresses[1] ? thisdev->addresses[1] :
+	    "(not supported)"));
 
 	fprintf(stdout, "\n\n");
 
