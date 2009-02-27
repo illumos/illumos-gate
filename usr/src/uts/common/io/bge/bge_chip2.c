@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2775,7 +2775,7 @@ bge_chip_sync(bge_t *bgep)
 	void (*opfn)(bge_t *bgep, bge_regno_t reg, uint32_t bits);
 	boolean_t promisc;
 	uint64_t macaddr;
-	uint32_t fill;
+	uint32_t fill = 0;
 	int i, j;
 	int retval = DDI_SUCCESS;
 
@@ -2847,13 +2847,12 @@ bge_chip_sync(bge_t *bgep)
 		 * MAC address(es) ...
 		 */
 		for (j = 0; j < MAC_ADDRESS_REGS_MAX; j++) {
-			for (i = 0, fill = 0, macaddr = 0ull;
+			for (i = 0, macaddr = 0ull;
 			    i < ETHERADDRL; ++i) {
 				macaddr <<= 8;
 				macaddr |= bgep->curr_addr[j].addr[i];
-				fill += bgep->curr_addr[j].addr[i];
 			}
-			bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
+			fill += (macaddr >> 16) + (macaddr & 0xffffffff);
 			bge_reg_put64(bgep, MAC_ADDRESS_REG(j), macaddr);
 
 			BGE_DEBUG(("bge_chip_sync($%p) "
@@ -2863,6 +2862,14 @@ bge_chip_sync(bge_t *bgep)
 #ifdef BGE_IPMI_ASF
 	}
 #endif
+	/*
+	 * Set random seed of backoff interval
+	 *   - Writing zero means no backoff interval
+	 */
+	fill = ((fill >> 20) + (fill >> 10) + fill) & 0x3ff;
+	if (fill == 0)
+		fill = 1;
+	bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
 
 	/*
 	 * Set or clear the PROMISCUOUS mode bit

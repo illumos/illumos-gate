@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,8 +107,7 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 	 *	at this point, there must be at least one place NOT free
 	 *	we're not about to free more places than were claimed!
 	 */
-	ASSERT(srp->tx_free > 0);
-	ASSERT(srp->tx_free < srp->desc.nslots);
+	ASSERT(srp->tx_free <= srp->desc.nslots);
 
 	buf_item_head = buf_item_tail = NULL;
 	for (n = 0, slot = srp->tc_next; slot != *srp->cons_index_p;

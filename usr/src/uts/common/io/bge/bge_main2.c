@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,9 +32,12 @@
 
 /*
  * This is the string displayed by modinfo, etc.
+ */
+static char bge_ident[] = "Broadcom Gb Ethernet";
+/*
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v1.01";
+static char bge_version[] = "Broadcom Gb Ethernet v1.02";
 
 /*
  * Property names
@@ -477,10 +480,9 @@ bge_m_stop(void *arg)
 	mutex_enter(bgep->genlock);
 	if (!(bgep->progress & PROGRESS_INTR)) {
 		/* can happen during autorecovery */
-		mutex_exit(bgep->genlock);
-		return;
-	}
-	bge_stop(bgep);
+		bgep->bge_chip_state = BGE_CHIP_STOPPED;
+	} else
+		bge_stop(bgep);
 
 	bgep->link_update_timer = 0;
 	bgep->link_state = LINK_STATE_UNKNOWN;
@@ -739,8 +741,8 @@ bge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		mutex_exit(bgep->genlock);
 		return (ENOTSUP);
 	}
-	if ((DEVICE_5906_SERIES_CHIPSETS(bgep) &&
-	    (pr_num == MAC_PROP_EN_1000FDX_CAP) ||
+	if (DEVICE_5906_SERIES_CHIPSETS(bgep) &&
+	    ((pr_num == MAC_PROP_EN_1000FDX_CAP) ||
 	    (pr_num == MAC_PROP_EN_1000HDX_CAP))) {
 		mutex_exit(bgep->genlock);
 		return (ENOTSUP);
@@ -842,11 +844,6 @@ reprogram:
 				bgep->param_link_tx_pause = B_FALSE;
 				break;
 			case LINK_FLOWCTRL_RX:
-				if (!((bgep->param_lp_pause == 0) &&
-				    (bgep->param_lp_asym_pause == 1))) {
-					err = EINVAL;
-					break;
-				}
 				bgep->param_adv_pause = 1;
 				bgep->param_adv_asym_pause = 1;
 
@@ -854,11 +851,6 @@ reprogram:
 				bgep->param_link_tx_pause = B_FALSE;
 				break;
 			case LINK_FLOWCTRL_TX:
-				if (!((bgep->param_lp_pause == 1) &&
-				    (bgep->param_lp_asym_pause == 1))) {
-					err = EINVAL;
-					break;
-				}
 				bgep->param_adv_pause = 0;
 				bgep->param_adv_asym_pause = 1;
 
@@ -866,11 +858,8 @@ reprogram:
 				bgep->param_link_tx_pause = B_TRUE;
 				break;
 			case LINK_FLOWCTRL_BI:
-				if (bgep->param_lp_pause != 1) {
-					err = EINVAL;
-					break;
-				}
 				bgep->param_adv_pause = 1;
+				bgep->param_adv_asym_pause = 0;
 
 				bgep->param_link_rx_pause = B_TRUE;
 				bgep->param_link_tx_pause = B_TRUE;
@@ -922,8 +911,8 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	    (pr_num == MAC_PROP_EN_10FDX_CAP) ||
 	    (pr_num == MAC_PROP_EN_10HDX_CAP))) ||
 	    (DEVICE_5906_SERIES_CHIPSETS(bgep) &&
-	    (pr_num == MAC_PROP_EN_1000FDX_CAP) ||
-	    (pr_num == MAC_PROP_EN_1000HDX_CAP)))
+	    ((pr_num == MAC_PROP_EN_1000FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_1000HDX_CAP))))
 		*perm = MAC_PROP_PERM_READ;
 	mutex_exit(bgep->genlock);
 
@@ -3516,6 +3505,8 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 #endif
 
 	ddi_report_dev(devinfo);
+	cmn_err(CE_CONT, "%s\n", bge_version);
+
 	return (DDI_SUCCESS);
 
 attach_fail:
