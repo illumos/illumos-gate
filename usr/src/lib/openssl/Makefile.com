@@ -19,15 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/openssl/Makefile.openssl
-include $(SRC)/lib/Makefile.rootfs
-
+# must define VERS before including Makefile.lib
 VERS =		.$(OPENSSL_VERSION)
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.rootfs
 
 CPPFLAGS =	$(OPENSSL_BUILD_CPPFLAGS) $(CPPFLAGS.master)
 
