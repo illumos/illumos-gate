@@ -181,6 +181,13 @@ cpu_halt(void)
 	 * in our cache still, so it's inexpensive to check, and if there
 	 * is anything runnable we won't have to wait for the poke.
 	 *
+	 * Any interrupt will awaken the cpu from halt. Looping here
+	 * will filter spurious interrupts that wake us up, but don't
+	 * represent a need for us to head back out to idle().  This
+	 * will enable the idle loop to be more efficient and sleep in
+	 * the processor pipeline for a larger percent of the time,
+	 * which returns useful cycles to the peer hardware strand
+	 * that shares the pipeline.
 	 */
 	s = disable_vec_intr();
 	while (*p == 0 &&

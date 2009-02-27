@@ -212,40 +212,38 @@ mach_memscrub(void)
 }
 
 /*
- * Halt the calling CPU until awoken via an interrupt
+ * Halt the present CPU until awoken via an interrupt.
  * This routine should only be invoked if cpu_halt_cpu()
  * exists and is supported, see mach_cpu_halt_idle()
  */
-static void
+void
 cpu_halt(void)
 {
-	cpu_t		*cpup = CPU;
-	processorid_t	cpu_sid = cpup->cpu_seqid;
-	cpupart_t	*cp = cpup->cpu_part;
-	int		hset_update = 1;
-	uint_t		pstate;
-	extern uint_t	getpstate(void);
-	extern void	setpstate(uint_t);
+	cpu_t *cpup = CPU;
+	processorid_t cpu_sid = cpup->cpu_seqid;
+	cpupart_t *cp = cpup->cpu_part;
+	int hset_update = 1;
+	volatile int *p = &cpup->cpu_disp->disp_nrunnable;
+	uint_t s;
 
 	/*
-	 * If this CPU is online, and there's multiple CPUs
-	 * in the system, then we should notate our halting
+	 * If this CPU is online then we should notate our halting
 	 * by adding ourselves to the partition's halted CPU
 	 * bitset. This allows other CPUs to find/awaken us when
 	 * work becomes available.
 	 */
-	if (CPU->cpu_flags & CPU_OFFLINE || ncpus == 1)
+	if (CPU->cpu_flags & CPU_OFFLINE)
 		hset_update = 0;
 
 	/*
-	 * Add ourselves to the partition's halted CPU bitset
+	 * Add ourselves to the partition's halted CPUs bitset
 	 * and set our HALTED flag, if necessary.
 	 *
 	 * When a thread becomes runnable, it is placed on the queue
 	 * and then the halted cpu bitset is checked to determine who
 	 * (if anyone) should be awoken. We therefore need to first
-	 * add ourselves to the halted cpu bitset, and then check if there
-	 * is any work available. The order is important to prevent a race
+	 * add ourselves to the halted bitset, and then check if there
+	 * is any work available.  The order is important to prevent a race
 	 * that can lead to work languishing on a run queue somewhere while
 	 * this CPU remains halted.
 	 *
@@ -273,7 +271,10 @@ cpu_halt(void)
 	}
 
 	/*
-	 * We're on our way to being halted.
+	 * We're on our way to being halted.  Wait until something becomes
+	 * runnable locally or we are awaken (i.e. removed from the halt set).
+	 * Note that the call to hv_cpu_yield() can return even if we have
+	 * nothing to do.
 	 *
 	 * Disable interrupts now, so that we'll awaken immediately
 	 * after halting if someone tries to poke us between now and
@@ -282,53 +283,46 @@ cpu_halt(void)
 	 * We check for the presence of our bit after disabling interrupts.
 	 * If it's cleared, we'll return. If the bit is cleared after
 	 * we check then the poke will pop us out of the halted state.
+	 * Also, if the offlined CPU has been brought back on-line, then
+	 * we return as well.
 	 *
 	 * The ordering of the poke and the clearing of the bit by cpu_wakeup
 	 * is important.
 	 * cpu_wakeup() must clear, then poke.
 	 * cpu_halt() must disable interrupts, then check for the bit.
-	 */
-	pstate = getpstate();
-	setpstate(pstate & ~PSTATE_IE);
-
-	if (hset_update && bitset_in_set(&cp->cp_haltset, cpu_sid) == 0) {
-		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-		setpstate(pstate);
-		return;
-	}
-
-	/*
+	 *
 	 * The check for anything locally runnable is here for performance
 	 * and isn't needed for correctness. disp_nrunnable ought to be
 	 * in our cache still, so it's inexpensive to check, and if there
 	 * is anything runnable we won't have to wait for the poke.
+	 *
+	 * Any interrupt will awaken the cpu from halt. Looping here
+	 * will filter spurious interrupts that wake us up, but don't
+	 * represent a need for us to head back out to idle().  This
+	 * will enable the idle loop to be more efficient and sleep in
+	 * the processor pipeline for a larger percent of the time,
+	 * which returns useful cycles to the peer hardware strand
+	 * that shares the pipeline.
 	 */
-	if (cpup->cpu_disp->disp_nrunnable != 0) {
-		if (hset_update) {
-			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-			bitset_atomic_del(&cp->cp_haltset, cpu_sid);
-		}
-		setpstate(pstate);
-		return;
-	}
+	s = disable_vec_intr();
+	while (*p == 0 &&
+	    ((hset_update && bitset_in_set(&cp->cp_haltset, cpu_sid)) ||
+	    (!hset_update && (CPU->cpu_flags & CPU_OFFLINE)))) {
 
-	/*
-	 * Halt the strand.
-	 */
-	if (&cpu_halt_cpu) {
 		DTRACE_PROBE1(idle__state__transition,
 		    uint_t, IDLE_STATE_HALTED);
-
-		cpu_halt_cpu();
-
+		(void) cpu_halt_cpu();
 		DTRACE_PROBE1(idle__state__transition,
 		    uint_t, IDLE_STATE_NORMAL);
+
+		enable_vec_intr(s);
+		s = disable_vec_intr();
 	}
 
 	/*
 	 * We're no longer halted
 	 */
-	setpstate(pstate);
+	enable_vec_intr(s);
 	if (hset_update) {
 		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 		bitset_atomic_del(&cp->cp_haltset, cpu_sid);
