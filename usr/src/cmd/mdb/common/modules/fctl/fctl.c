@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1007,12 +1007,11 @@ fc_dump_logmsg(fc_trace_dmsg_t *addr, uint_t pktstart, uint_t pktend,
 
 			if ((pktnum >= pktstart) && (pktnum <= pktend)) {
 				(void) mdb_snprintf(merge, sizeof (merge),
-				    "[%09d:%03d:%03d:%03d] %s",
-				    (int)msg.id_time.tv_sec,
+				    "[%Y:%03d:%03d:%03d] %s",
+				    msg.id_time.tv_sec,
 				    (int)msg.id_time.tv_nsec/1000000,
 				    (int)(msg.id_time.tv_nsec/1000)%1000,
-				    (int)msg.id_time.tv_nsec%1000,
-				    buf);
+				    (int)msg.id_time.tv_nsec%1000, buf);
 				mdb_printf("%s", merge);
 				if (printed != NULL)
 					(*printed) ++;
@@ -1070,9 +1069,7 @@ fc_dump_old_logmsg(fc_trace_dmsgv1_t *addr, uint_t pktstart, uint_t pktend,
 
 			if ((pktnum >= pktstart) && (pktnum <= pktend)) {
 				(void) mdb_snprintf(merge, sizeof (merge),
-				    "[%d] %s",
-				    msg.id_time,
-				    buf);
+				    "[%Y] %s", msg.id_time, buf);
 				mdb_printf("%s", merge);
 				if (printed != NULL)
 					(*printed) ++;
