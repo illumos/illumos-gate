@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1316,7 +1316,7 @@ extern boolean_t kcf_rngprov_check(void);
 extern int kcf_rnd_get_pseudo_bytes(uint8_t *, size_t);
 extern int kcf_rnd_get_bytes(uint8_t *, size_t, boolean_t, boolean_t);
 extern int random_add_pseudo_entropy(uint8_t *, size_t, uint_t);
-extern void kcf_rnd_chpoll(int, short *, struct pollhead **);
+extern void kcf_rnd_chpoll(short, int, short *, struct pollhead **);
 extern void kcf_rnd_schedule_timeout(boolean_t);
 extern int crypto_uio_data(crypto_data_t *, uchar_t *, int, cmd_type_t,
     void *, void (*update)());

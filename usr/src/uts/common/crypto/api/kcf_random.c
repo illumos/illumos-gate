@@ -876,24 +876,32 @@ kcf_rnd_schedule_timeout(boolean_t do_mech2id)
 }
 
 /*
+ * Called from the driver for a poll on /dev/random
+ * . POLLOUT always succeeds.
+ * . POLLIN and POLLRDNORM will block until a
+ *   minimum amount of entropy is available.
+ *
  * &rnd_pollhead is passed in *phpp in order to indicate the calling thread
  * will block. When enough random bytes are available, later, the timeout
  * handler routine will issue the pollwakeup() calls.
  */
 void
-kcf_rnd_chpoll(int anyyet, short *reventsp, struct pollhead **phpp)
+kcf_rnd_chpoll(short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
 {
-	/*
-	 * Sampling of rnbyte_cnt is an atomic
-	 * operation. Hence we do not need any locking.
-	 */
-	if (rnbyte_cnt >= MINEXTRACTBYTES) {
-		*reventsp |= (POLLIN | POLLRDNORM);
-	} else {
-		*reventsp = 0;
-		if (!anyyet)
-			*phpp = &rnd_pollhead;
+	*reventsp = events & POLLOUT;
+
+	if (events & (POLLIN | POLLRDNORM)) {
+		/*
+		 * Sampling of rnbyte_cnt is an atomic
+		 * operation. Hence we do not need any locking.
+		 */
+		if (rnbyte_cnt >= MINEXTRACTBYTES)
+			*reventsp |= (events & (POLLIN | POLLRDNORM));
 	}
+
+	if (*reventsp == 0 && !anyyet)
+		*phpp = &rnd_pollhead;
 }
 
 /*ARGSUSED*/

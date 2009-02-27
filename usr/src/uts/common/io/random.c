@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,9 +307,11 @@ rnd_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	return (0);
 }
 
+static struct pollhead urnd_pollhd;
+
 /*
  * poll(2) is supported as follows:
- * . Only POLLIN, POLLOUT, and POLLRDNORM events are valid.
+ * . Only POLLIN, POLLOUT, and POLLRDNORM events are supported.
  * . POLLOUT always succeeds.
  * . POLLIN and POLLRDNORM from /dev/urandom always succeeds.
  * . POLLIN and POLLRDNORM from /dev/random will block until a
@@ -317,28 +319,22 @@ rnd_write(dev_t dev, struct uio *uiop, cred_t *credp)
  */
 static int
 rnd_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
-	struct pollhead **phpp)
+    struct pollhead **phpp)
 {
 	switch (getminor(dev)) {
 	case DEVURANDOM:
 		*reventsp = events & (POLLOUT | POLLIN | POLLRDNORM);
 
-		/* We're being polled for non-supported events */
+		/*
+		 * A non NULL pollhead pointer should be returned in case
+		 * user polls for 0 events.
+		 */
 		if (*reventsp == 0 && !anyyet)
-			return (EINVAL);
+			*phpp = &urnd_pollhd;
 
 		break;
 	case DEVRANDOM:
-		*reventsp = events & POLLOUT;
-
-		/* Either POLLOUT only or unsupported event */
-		if ((events & (POLLIN | POLLRDNORM)) == 0) {
-			if (*reventsp == 0 && !anyyet)
-				return (EINVAL);
-			break;
-		}
-
-		kcf_rnd_chpoll(anyyet, reventsp, phpp);
+		kcf_rnd_chpoll(events, anyyet, reventsp, phpp);
 		break;
 	default:
 		return (ENXIO);
