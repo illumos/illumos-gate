@@ -1578,6 +1578,8 @@ mp_startup(void)
 
 	mutex_exit(&cpu_lock);
 
+	post_startup_cpu_fixups();
+
 	/*
 	 * Enable preemption here so that contention for any locks acquired
 	 * later in mp_startup may be preempted if the thread owning those

@@ -214,6 +214,15 @@ extern "C" {
 #define	REG_APIC_BASE_MSR	0x1b
 #define	REG_X2APIC_BASE_MSR	0x800	/* The MSR address offset of x2APIC */
 
+#if !defined(__xpv)
+/*
+ * AMD C1E
+ */
+#define	MSR_AMD_INT_PENDING_CMP_HALT	0xC0010055
+#define	AMD_ACTONCMPHALT_SHIFT	27
+#define	AMD_ACTONCMPHALT_MASK	3
+#endif
+
 #define	MSR_DEBUGCTL		0x1d9
 
 #define	DEBUGCTL_LBR		0x01
@@ -636,6 +645,8 @@ extern	char bcopy_patch_start;
 extern	char bcopy_patch_end;
 extern	char bcopy_ck_size;
 #endif
+
+extern void post_startup_cpu_fixups(void);
 
 extern uint_t workaround_errata(struct cpu *);
 

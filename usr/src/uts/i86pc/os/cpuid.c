@@ -48,6 +48,8 @@
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
+#else
+#include <sys/ontrap.h>
 #endif
 
 /*
@@ -3893,6 +3895,36 @@ cpuid_deep_cstates_supported(void)
 	}
 }
 
+#endif	/* !__xpv */
+
+void
+post_startup_cpu_fixups(void)
+{
+#ifndef __xpv
+	/*
+	 * Some AMD processors support C1E state. Entering this state will
+	 * cause the local APIC timer to stop, which we can't deal with at
+	 * this time.
+	 */
+	if (cpuid_getvendor(CPU) == X86_VENDOR_AMD) {
+		on_trap_data_t otd;
+		uint64_t reg;
+
+		if (!on_trap(&otd, OT_DATA_ACCESS)) {
+			reg = rdmsr(MSR_AMD_INT_PENDING_CMP_HALT);
+			/* Disable C1E state if it is enabled by BIOS */
+			if ((reg >> AMD_ACTONCMPHALT_SHIFT) &
+			    AMD_ACTONCMPHALT_MASK) {
+				reg &= ~(AMD_ACTONCMPHALT_MASK <<
+				    AMD_ACTONCMPHALT_SHIFT);
+				wrmsr(MSR_AMD_INT_PENDING_CMP_HALT, reg);
+			}
+		}
+		no_trap();
+	}
+#endif	/* !__xpv */
+}
+
 #if defined(__amd64) && !defined(__xpv)
 /*
  * Patch in versions of bcopy for high performance Intel Nhm processors
@@ -3914,5 +3946,3 @@ patch_memops(uint_t vendor)
 	}
 }
 #endif  /* __amd64 && !__xpv */
-
-#endif	/* !__xpv */

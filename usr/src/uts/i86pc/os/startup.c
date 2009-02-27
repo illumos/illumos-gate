@@ -108,7 +108,6 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/cpc_impl.h>
-#include <sys/x86_archext.h>
 #include <sys/cpu_module.h>
 #include <sys/smbios.h>
 #include <sys/debug_info.h>
@@ -2115,6 +2114,7 @@ startup_end(void)
 		prom_printf("ERROR: failed to attach AMD IOMMU\n");
 	}
 #endif
+	post_startup_cpu_fixups();
 
 	PRM_POINT("startup_end() done");
 }
