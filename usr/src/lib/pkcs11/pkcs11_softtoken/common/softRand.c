@@ -19,17 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
+#include <cryptoutil.h>
 #include "softGlobal.h"
 #include "softRandom.h"
 #include "softSession.h"
@@ -59,28 +58,21 @@ C_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed, CK_ULONG ulSeedLen)
 
 	if (soft_urandom_seed_fd < 0) {
 		(void) pthread_mutex_lock(&soft_giant_mutex);
-			/* Check again holding the mutex */
+		/* Check again holding the mutex */
+		if (soft_urandom_seed_fd < 0) {
+			soft_urandom_seed_fd = open_nointr(DEV_URANDOM,
+			    O_WRONLY);
 			if (soft_urandom_seed_fd < 0) {
-				while ((soft_urandom_seed_fd = open(DEV_URANDOM,
-				    O_WRONLY)) < 0) {
-					if (errno != EINTR)
-						break;
-				}
-				if (soft_urandom_seed_fd < 0) {
-					(void) pthread_mutex_unlock(
-					    &soft_giant_mutex);
-					if (errno == EACCES)
-						return (
-						CKR_RANDOM_SEED_NOT_SUPPORTED);
-					return (CKR_DEVICE_ERROR);
-				}
-				(void) fcntl(soft_urandom_seed_fd, F_SETFD,
-				    FD_CLOEXEC);
+				(void) pthread_mutex_unlock(&soft_giant_mutex);
+				if (errno == EACCES)
+					return (CKR_RANDOM_SEED_NOT_SUPPORTED);
+				return (CKR_DEVICE_ERROR);
 			}
+		}
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
 	}
 
-	nwrite = looping_write(soft_urandom_seed_fd, pSeed, ulSeedLen);
+	nwrite = writen_nointr(soft_urandom_seed_fd, pSeed, ulSeedLen);
 	if (nwrite <= 0) {
 		return (CKR_DEVICE_ERROR);
 	}

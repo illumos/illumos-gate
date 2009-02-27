@@ -53,6 +53,7 @@ SUNWprivate {
 	get_metaslot_info;
 	get_pkcs11conf_info;
 	hexstr_to_bytes;
+	open_nointr;
 	pkcs11_default_token;
 	pkcs11_get_pass;
 	pkcs11_mech2keytype;
@@ -63,8 +64,10 @@ SUNWprivate {
 	pkcs11_read_data;
 	pkcs11_str2mech;
 	pkcs11_strerror;
+	readn_nointr;
 	str2lifetime;
 	tohexstr;
+	writen_nointr;
     local:
 	*;
 };

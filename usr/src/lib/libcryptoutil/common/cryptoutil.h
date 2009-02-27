@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +147,10 @@ extern int pkcs11_get_pass(char *token_name, char **pdata, size_t *psize,
 extern int pkcs11_random_data(void *dbuf, size_t dlen);
 extern int pkcs11_nzero_random_data(void *dbuf, size_t dlen);
 extern int pkcs11_read_data(char *filename, void **dbuf, size_t *dlen);
+
+extern int open_nointr(const char *path, int oflag, ...);
+extern ssize_t readn_nointr(int fd, void *dbuf, size_t dlen);
+extern ssize_t writen_nointr(int fd, void *dbuf, size_t dlen);
 
 #ifdef __cplusplus
 }

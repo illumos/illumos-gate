@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -31,6 +29,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <locale.h>
+#include <stdarg.h>
 #include <cryptoutil.h>
 
 #ifdef	_REENTRANT
@@ -60,13 +59,19 @@ static int	urandom_fd = -1;
  * Equivalent of open(2) insulated from EINTR.
  * Also sets close-on-exec.
  */
-static int
-OPEN(const char *path, int oflag)
+int
+open_nointr(const char *path, int oflag, ...)
 {
 	int	fd;
+	mode_t	pmode;
+	va_list	alist;
+
+	va_start(alist, oflag);
+	pmode = va_arg(alist, mode_t);
+	va_end(alist);
 
 	do {
-		if ((fd = open(path, oflag)) >= 0) {
+		if ((fd = open(path, oflag, pmode)) >= 0) {
 			(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 			break;
 		}
@@ -78,8 +83,8 @@ OPEN(const char *path, int oflag)
 /*
  * Equivalent of read(2) insulated from EINTR.
  */
-static ssize_t
-READ(int fd, void *dbuf, size_t dlen)
+ssize_t
+readn_nointr(int fd, void *dbuf, size_t dlen)
 {
 	char	*marker = dbuf;
 	size_t	left = dlen;
@@ -92,6 +97,34 @@ READ(int fd, void *dbuf, size_t dlen)
 				continue;
 			}
 			err = nread;		/* hard error */
+			break;
+		} else if (nread == 0) {
+			break;
+		}
+	}
+	return (err != 0 ? err : dlen - left);
+}
+
+/*
+ * Equivalent of write(2) insulated from EINTR.
+ */
+ssize_t
+writen_nointr(int fd, void *dbuf, size_t dlen)
+{
+	char	*marker = dbuf;
+	size_t	left = dlen;
+	ssize_t	nwrite = 0, err;
+
+	for (err = 0; left > 0 && nwrite != -1; marker += nwrite,
+	    left -= nwrite) {
+		if ((nwrite = write(fd, marker, left)) < 0) {
+			if (errno == EINTR) {	/* keep trying */
+				nwrite = 0;
+				continue;
+			}
+			err = nwrite;		/* hard error */
+			break;
+		} else if (nwrite == 0) {
 			break;
 		}
 	}
@@ -107,7 +140,7 @@ pkcs11_open_random(void)
 {
 	RAND_LOCK(&random_mutex);
 	if (random_fd < 0)
-		random_fd = OPEN(RANDOM_DEVICE, O_RDONLY);
+		random_fd = open_nointr(RANDOM_DEVICE, O_RDONLY);
 	RAND_UNLOCK(&random_mutex);
 	return (random_fd);
 }
@@ -117,7 +150,7 @@ pkcs11_open_urandom(void)
 {
 	RAND_LOCK(&urandom_mutex);
 	if (urandom_fd < 0)
-		urandom_fd = OPEN(URANDOM_DEVICE, O_RDONLY);
+		urandom_fd = open_nointr(URANDOM_DEVICE, O_RDONLY);
 	RAND_UNLOCK(&urandom_mutex);
 	return (urandom_fd);
 }
@@ -161,7 +194,7 @@ pkcs11_random_data(void *dbuf, size_t dlen)
 	if (pkcs11_open_urandom() < 0)
 		return (-1);
 
-	if (READ(urandom_fd, dbuf, dlen) == dlen)
+	if (readn_nointr(urandom_fd, dbuf, dlen) == dlen)
 		return (0);
 	return (-1);
 }

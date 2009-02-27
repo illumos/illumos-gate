@@ -694,9 +694,6 @@ boolean_t meta_slotManager_token_write_protected(void);
 boolean_t metaslot_logged_in();
 void metaslot_set_logged_in_flag(boolean_t value);
 
-int looping_read(int, void *, int);
-int looping_write(int, void *, int);
-
 /*
  * Prototypes for the various meta_Foo implementations of C_Foo.
  *

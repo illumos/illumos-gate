@@ -1307,23 +1307,20 @@ clone_by_wrap(meta_object_t *object, slot_object_t *new_clone,
 		 */
 		int fd;
 
-		while ((fd = open(RANDOM_DEVICE, O_RDONLY)) < 0) {
-			if (errno != EINTR)
-				break;
-		}
+		fd = open_nointr(RANDOM_DEVICE, O_RDONLY);
 		if (fd == -1) {
 			rv = CKR_FUNCTION_FAILED;
 			goto finish;
 		}
 		key_len = wrap_info.key_length;
 
-		if (looping_read(fd, key_data, key_len) != key_len) {
+		if (readn_nointr(fd, key_data, key_len) != key_len) {
 			rv = CKR_FUNCTION_FAILED;
 			goto finish;
 		}
 
 		if (wrap_info.iv_length > 0) {
-			if (looping_read(fd, ivbuf, wrap_info.iv_length)
+			if (readn_nointr(fd, ivbuf, wrap_info.iv_length)
 			    != wrap_info.iv_length) {
 				rv = CKR_FUNCTION_FAILED;
 				goto finish;

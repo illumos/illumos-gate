@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Functions used for manipulating the keystore
@@ -259,7 +257,7 @@ calculate_hashed_pin_offset(int fd)
 		return (-1);
 	}
 
-	if (looping_read(fd, (char *)&salt_length,
+	if (readn_nointr(fd, (char *)&salt_length,
 	    KS_HASHED_PIN_SALT_LEN_SIZE) != KS_HASHED_PIN_SALT_LEN_SIZE) {
 		return (-1);
 	}
@@ -369,11 +367,8 @@ create_keystore()
 	}
 
 	/* create keystore description file */
-	while ((fd = open(get_desc_file_path(ks_desc_file),
-	    O_RDWR|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	fd = open_nointr(get_desc_file_path(ks_desc_file),
+	    O_RDWR|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (fd < 0) {
 		if (errno == EEXIST) {
 			return (0);
@@ -383,9 +378,6 @@ create_keystore()
 			return (-1);
 		}
 	}
-
-	/* Mark fd as "close on exec" */
-	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 
 	if (lock_file(fd, B_FALSE, B_TRUE) != 0) {
 		(void) unlink(ks_desc_file);
@@ -419,33 +411,33 @@ create_keystore()
 	/* write file format release number */
 	bzero(ver_buf, sizeof (ver_buf));
 	(void) strcpy((char *)ver_buf, KS_PKCS11_VER);
-	if ((looping_write(fd, (char *)ver_buf, sizeof (ver_buf)))
+	if ((writen_nointr(fd, (char *)ver_buf, sizeof (ver_buf)))
 	    != sizeof (ver_buf)) {
 		goto cleanup;
 	}
 
 	/* write version number, version = 0 since keystore just created */
 	buf = SWAP32(0);
-	if (looping_write(fd, (void *)&buf, KS_VER_SIZE) != KS_VER_SIZE) {
+	if (writen_nointr(fd, (void *)&buf, KS_VER_SIZE) != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* write monotonic-counter.  Counter for keystore objects start at 1 */
 	buf = SWAP32(1);
-	if (looping_write(fd, (void *)&buf, KS_COUNTER_SIZE)
+	if (writen_nointr(fd, (void *)&buf, KS_COUNTER_SIZE)
 	    != KS_COUNTER_SIZE) {
 		goto cleanup;
 	}
 
 	/* initial encryption key salt should be all NULL */
 	bzero(salt, sizeof (salt));
-	if (looping_write(fd, (void *)salt, KS_KEY_SALT_SIZE)
+	if (writen_nointr(fd, (void *)salt, KS_KEY_SALT_SIZE)
 	    != KS_KEY_SALT_SIZE) {
 		goto cleanup;
 	}
 
 	/* initial HMAC key salt should also be all NULL */
-	if (looping_write(fd, (void *)salt, KS_HMAC_SALT_SIZE)
+	if (writen_nointr(fd, (void *)salt, KS_HMAC_SALT_SIZE)
 	    != KS_HMAC_SALT_SIZE) {
 		goto cleanup;
 	}
@@ -465,24 +457,24 @@ create_keystore()
 
 	/* write hashed pin salt length */
 	ulong_buf = SWAP64(hashed_pin_salt_len);
-	if (looping_write(fd, (void *)&ulong_buf, KS_HASHED_PIN_SALT_LEN_SIZE)
+	if (writen_nointr(fd, (void *)&ulong_buf, KS_HASHED_PIN_SALT_LEN_SIZE)
 	    != KS_HASHED_PIN_SALT_LEN_SIZE) {
 		goto cleanup;
 	}
 
-	if (looping_write(fd, (void *)hashed_pin_salt,
+	if (writen_nointr(fd, (void *)hashed_pin_salt,
 	    hashed_pin_salt_len) != hashed_pin_salt_len) {
 		goto cleanup;
 	}
 
 	/* write MD5 hashed pin of the default pin */
 	ulong_buf = SWAP64(hashed_pin_len);
-	if (looping_write(fd, (void *)&ulong_buf, KS_HASHED_PINLEN_SIZE)
+	if (writen_nointr(fd, (void *)&ulong_buf, KS_HASHED_PINLEN_SIZE)
 	    != KS_HASHED_PINLEN_SIZE) {
 		goto cleanup;
 	}
 
-	if (looping_write(fd, (void *)hashed_pin, hashed_pin_len)
+	if (writen_nointr(fd, (void *)hashed_pin, hashed_pin_len)
 	    != hashed_pin_len) {
 		goto cleanup;
 	}
@@ -491,7 +483,7 @@ create_keystore()
 
 	(void) close(fd);
 	if (hashed_pin_salt)
-	    free(hashed_pin_salt);
+		free(hashed_pin_salt);
 	return (0);
 
 cleanup:
@@ -575,15 +567,10 @@ acquire_file_lock(int *fd, char *fname, mode_t mode) {
 		(void) close(*fd);
 
 		/* re-open */
-		while ((*fd = open(fname, mode|O_NONBLOCK)) < 0) {
-			if (errno != EINTR)
-				break;
-		}
+		*fd = open_nointr(fname, mode|O_NONBLOCK);
 		if (*fd < 0) {
 			return (-1);
 		}
-
-		(void) fcntl(*fd, F_SETFD, FD_CLOEXEC);
 
 		/* acquire lock again */
 		if (lock_file(*fd, read_lock, B_TRUE) != 0) {
@@ -615,29 +602,19 @@ open_and_lock_keystore_desc(mode_t mode, boolean_t do_create_keystore,
 
 	/* open the keystore description file in requested mode */
 	fname = get_desc_file_path(ks_desc_file);
-	while ((fd = open(fname, mode|O_NONBLOCK)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	fd = open_nointr(fname, mode|O_NONBLOCK);
 	if (fd < 0) {
 		if ((errno == ENOENT) && (do_create_keystore)) {
 			if (create_keystore() < 0) {
 				goto done;
 			}
-			while ((fd = open(fname, mode|O_NONBLOCK)) < 0) {
-				if (errno != EINTR)
-					break;
-			}
+			fd = open_nointr(fname, mode|O_NONBLOCK);
 			if (fd < 0) {
 				goto done;
-			} else {
-				(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 			}
 		} else {
 			goto done;
 		}
-	} else {
-		(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 	}
 
 	if (lock_held) {
@@ -725,15 +702,10 @@ open_and_lock_object_file(ks_obj_handle_t *ks_handle, int oflag,
 		    get_pri_obj_path(pri_obj_path), ks_handle->name);
 	}
 
-	while ((fd = open(obj_fname, oflag|O_NONBLOCK)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	fd = open_nointr(obj_fname, oflag|O_NONBLOCK);
 	if (fd < 0) {
 		return (-1);
 	}
-
-	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 
 	if (lock_held) {
 		/* already hold the lock */
@@ -771,15 +743,11 @@ create_updated_keystore_version(int fd, char *tmp_fname)
 	size_t nread;
 
 	/* first, create the tempoary file */
-	while ((tmp_fd = open(tmp_fname,
-	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	tmp_fd = open_nointr(tmp_fname,
+	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (tmp_fd < 0) {
 		return (-1);
 	}
-	(void) fcntl(tmp_fd, F_SETFD, FD_CLOEXEC);
 
 	/*
 	 * copy everything from keystore version to temp file except
@@ -788,19 +756,19 @@ create_updated_keystore_version(int fd, char *tmp_fname)
 	 */
 
 	/* pkcs11 version */
-	if (looping_read(fd, buf, KS_PKCS11_VER_SIZE) != KS_PKCS11_VER_SIZE) {
+	if (readn_nointr(fd, buf, KS_PKCS11_VER_SIZE) != KS_PKCS11_VER_SIZE) {
 		goto cleanup;
 	}
 
-	if (looping_write(tmp_fd, buf, KS_PKCS11_VER_SIZE)
-	    != KS_PKCS11_VER_SIZE) {
+	if (writen_nointr(tmp_fd, buf, KS_PKCS11_VER_SIZE) !=
+	    KS_PKCS11_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* version number, it needs to be updated */
 
 	/* read the current version number */
-	if (looping_read(fd, &version, KS_VER_SIZE) != KS_VER_SIZE) {
+	if (readn_nointr(fd, &version, KS_VER_SIZE) != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
@@ -809,18 +777,18 @@ create_updated_keystore_version(int fd, char *tmp_fname)
 	version = SWAP32(version);
 
 	/* write the updated value to the tmp file */
-	if (looping_write(tmp_fd, (void *)&version, KS_VER_SIZE)
+	if (writen_nointr(tmp_fd, (void *)&version, KS_VER_SIZE)
 	    != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* read rest of information, nothing needs to be updated */
-	nread = looping_read(fd, buf, BUFSIZ);
+	nread = readn_nointr(fd, buf, BUFSIZ);
 	while (nread > 0) {
-		if (looping_write(tmp_fd, buf, nread) != nread) {
+		if (writen_nointr(tmp_fd, buf, nread) != nread) {
 			goto cleanup;
 		}
-		nread = looping_read(fd, buf, BUFSIZ);
+		nread = readn_nointr(fd, buf, BUFSIZ);
 	}
 
 	(void) close(tmp_fd);
@@ -924,7 +892,7 @@ get_hashed_pin(int fd, char **hashed_pin)
 		return (CKR_FUNCTION_FAILED);
 	}
 
-	if (looping_read(fd, (char *)&hashed_pin_size,
+	if (readn_nointr(fd, (char *)&hashed_pin_size,
 	    KS_HASHED_PINLEN_SIZE) != KS_HASHED_PINLEN_SIZE) {
 		return (CKR_FUNCTION_FAILED);
 	}
@@ -936,7 +904,7 @@ get_hashed_pin(int fd, char **hashed_pin)
 		return (CKR_HOST_MEMORY);
 	}
 
-	if ((looping_read(fd, *hashed_pin, hashed_pin_size))
+	if ((readn_nointr(fd, *hashed_pin, hashed_pin_size))
 	    != (ssize_t)hashed_pin_size) {
 		free(*hashed_pin);
 		*hashed_pin = NULL;
@@ -1090,7 +1058,7 @@ soft_keystore_get_version(uint_t *version, boolean_t lock_held)
 		goto cleanup;
 	}
 
-	if (looping_read(fd, (char *)&buf, KS_VER_SIZE) != KS_VER_SIZE) {
+	if (readn_nointr(fd, (char *)&buf, KS_VER_SIZE) != KS_VER_SIZE) {
 		ret_val = -1;
 		goto cleanup;
 	}
@@ -1143,7 +1111,7 @@ soft_keystore_get_object_version(ks_obj_handle_t *ks_handle,
 	 * read version.  Version is always first item in object file
 	 * so, no need to do lseek
 	 */
-	if (looping_read(fd, (char *)&tmp, OBJ_VER_SIZE) != OBJ_VER_SIZE) {
+	if (readn_nointr(fd, (char *)&tmp, OBJ_VER_SIZE) != OBJ_VER_SIZE) {
 		ret_val = -1;
 		goto cleanup;
 	}
@@ -1233,7 +1201,7 @@ read_obj_data(int old_fd, char **buf, ssize_t *bytes_read)
 		return (CKR_HOST_MEMORY);
 	}
 
-	nread = looping_read(old_fd, *buf, BUFSIZ);
+	nread = readn_nointr(old_fd, *buf, BUFSIZ);
 	if (nread < 0) {
 		free(*buf);
 		return (CKR_FUNCTION_FAILED);
@@ -1250,7 +1218,7 @@ read_obj_data(int old_fd, char **buf, ssize_t *bytes_read)
 			return (CKR_HOST_MEMORY);
 		}
 		*buf = buf1;
-		nread_tmp = looping_read(old_fd,
+		nread_tmp = readn_nointr(old_fd,
 		    *buf + ((loop_count - 1) * BUFSIZ), BUFSIZ);
 		if (nread_tmp < 0) {
 			free(*buf);
@@ -1285,15 +1253,10 @@ reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
 	CK_ULONG decrypted_len, encrypted_len, hmac_len;
 	CK_BYTE hmac[OBJ_HMAC_SIZE], *decrypted_buf = NULL, *buf = NULL;
 
-	while ((old_fd = open(orig_obj_name, O_RDONLY|O_NONBLOCK)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	old_fd = open_nointr(orig_obj_name, O_RDONLY|O_NONBLOCK);
 	if (old_fd < 0) {
 		return (-1);
 	}
-
-	(void) fcntl(old_fd, F_SETFD, FD_CLOEXEC);
 
 	if (acquire_file_lock(&old_fd, orig_obj_name, O_RDONLY) != 0) {
 		if (old_fd > 0) {
@@ -1302,17 +1265,12 @@ reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
 		return (-1);
 	}
 
-	while ((new_fd = open(new_obj_name,
-	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-			if (errno != EINTR)
-				break;
-	}
+	new_fd = open_nointr(new_obj_name,
+	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (new_fd < 0) {
 		(void) close(old_fd);
 		return (-1);
 	}
-
-	(void) fcntl(new_fd, F_SETFD, FD_CLOEXEC);
 
 	if (lock_file(new_fd, B_FALSE, B_TRUE) != 0) {
 		/* unlock old file */
@@ -1323,7 +1281,7 @@ reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
 	}
 
 	/* read version, increment, and write to tmp file */
-	if (looping_read(old_fd, (char *)&version, OBJ_VER_SIZE)
+	if (readn_nointr(old_fd, (char *)&version, OBJ_VER_SIZE)
 	    != OBJ_VER_SIZE) {
 		goto cleanup;
 	}
@@ -1332,13 +1290,13 @@ reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
 	version++;
 	version = SWAP32(version);
 
-	if (looping_write(new_fd, (char *)&version, OBJ_VER_SIZE)
+	if (writen_nointr(new_fd, (char *)&version, OBJ_VER_SIZE)
 	    != OBJ_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* read old iv */
-	if (looping_read(old_fd, (char *)old_iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
+	if (readn_nointr(old_fd, (char *)old_iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
 		goto cleanup;
 	}
 
@@ -1347,7 +1305,7 @@ reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
 		goto cleanup;
 	}
 
-	if (looping_write(new_fd, (char *)iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
+	if (writen_nointr(new_fd, (char *)iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
 		goto cleanup;
 	}
 
@@ -1421,14 +1379,14 @@ reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
 	}
 
 	/* write new hmac */
-	if (looping_write(new_fd, (char *)hmac, OBJ_HMAC_SIZE)
+	if (writen_nointr(new_fd, (char *)hmac, OBJ_HMAC_SIZE)
 	    != OBJ_HMAC_SIZE) {
 		free(buf);
 		goto cleanup;
 	}
 
 	/* write re-encrypted buffer to temp file */
-	if (looping_write(new_fd, (void *)buf, encrypted_len)
+	if (writen_nointr(new_fd, (void *)buf, encrypted_len)
 	    != encrypted_len) {
 		free(buf);
 		goto cleanup;
@@ -1514,30 +1472,26 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 	 * create a tempoary file for the keystore description
 	 * file for updating version and counter information
 	 */
-	while ((tmp_ks_fd = open(tmp_ks_desc_name,
-	    O_RDWR|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	tmp_ks_fd = open_nointr(tmp_ks_desc_name,
+	    O_RDWR|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (tmp_ks_fd < 0) {
 		(void) close(fd);
 		return (-1);
 	}
-	(void) fcntl(tmp_ks_fd, F_SETFD, FD_CLOEXEC);
 
 	/* read and write PKCS version to temp file */
-	if (looping_read(fd, filebuf, KS_PKCS11_VER_SIZE)
+	if (readn_nointr(fd, filebuf, KS_PKCS11_VER_SIZE)
 	    != KS_PKCS11_VER_SIZE) {
 		goto cleanup;
 	}
 
-	if (looping_write(tmp_ks_fd, filebuf, KS_PKCS11_VER_SIZE)
+	if (writen_nointr(tmp_ks_fd, filebuf, KS_PKCS11_VER_SIZE)
 	    != KS_PKCS11_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* get version number, and write updated number to temp file */
-	if (looping_read(fd, &version, KS_VER_SIZE) != KS_VER_SIZE) {
+	if (readn_nointr(fd, &version, KS_VER_SIZE) != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
@@ -1545,18 +1499,18 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 	version++;
 	version = SWAP32(version);
 
-	if (looping_write(tmp_ks_fd, (void *)&version, KS_VER_SIZE)
+	if (writen_nointr(tmp_ks_fd, (void *)&version, KS_VER_SIZE)
 	    != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
 
 	/* read and write counter, no modification necessary */
-	if (looping_read(fd, filebuf, KS_COUNTER_SIZE) != KS_COUNTER_SIZE) {
+	if (readn_nointr(fd, filebuf, KS_COUNTER_SIZE) != KS_COUNTER_SIZE) {
 		goto cleanup;
 	}
 
-	if (looping_write(tmp_ks_fd, filebuf, KS_COUNTER_SIZE)
+	if (writen_nointr(tmp_ks_fd, filebuf, KS_COUNTER_SIZE)
 	    != KS_COUNTER_SIZE) {
 		goto cleanup;
 	}
@@ -1566,7 +1520,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 	if (crypt_salt == NULL) {
 		goto cleanup;
 	}
-	if (looping_read(fd, (char *)crypt_salt, KS_KEY_SALT_SIZE)
+	if (readn_nointr(fd, (char *)crypt_salt, KS_KEY_SALT_SIZE)
 	    != KS_KEY_SALT_SIZE) {
 		goto cleanup;
 	}
@@ -1576,7 +1530,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 	if (hmac_salt == NULL) {
 		goto cleanup;
 	}
-	if (looping_read(fd, (char *)hmac_salt, KS_HMAC_SALT_SIZE)
+	if (readn_nointr(fd, (char *)hmac_salt, KS_HMAC_SALT_SIZE)
 	    != KS_HMAC_SALT_SIZE) {
 		goto cleanup;
 	}
@@ -1593,7 +1547,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		    != CKR_OK) {
 			goto cleanup;
 		}
-		if (looping_write(tmp_ks_fd, (void *)new_crypt_salt,
+		if (writen_nointr(tmp_ks_fd, (void *)new_crypt_salt,
 		    KS_KEY_SALT_SIZE) != KS_KEY_SALT_SIZE) {
 			free(new_crypt_salt);
 			(void) soft_cleanup_object(new_crypt_key);
@@ -1606,7 +1560,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 			(void) soft_cleanup_object(new_crypt_key);
 			goto cleanup;
 		}
-		if (looping_write(tmp_ks_fd, (void *)new_hmac_salt,
+		if (writen_nointr(tmp_ks_fd, (void *)new_hmac_salt,
 		    KS_HMAC_SALT_SIZE) != KS_HMAC_SALT_SIZE) {
 			free(new_hmac_salt);
 			goto cleanup3;
@@ -1618,7 +1572,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 			goto cleanup;
 		}
 		/* no change to the encryption salt */
-		if (looping_write(tmp_ks_fd, (void *)crypt_salt,
+		if (writen_nointr(tmp_ks_fd, (void *)crypt_salt,
 		    KS_KEY_SALT_SIZE) != KS_KEY_SALT_SIZE) {
 			(void) soft_cleanup_object(new_crypt_key);
 			goto cleanup;
@@ -1631,7 +1585,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		}
 
 		/* no change to the hmac salt */
-		if (looping_write(tmp_ks_fd, (void *)hmac_salt,
+		if (writen_nointr(tmp_ks_fd, (void *)hmac_salt,
 		    KS_HMAC_SALT_SIZE) != KS_HMAC_SALT_SIZE) {
 			goto cleanup3;
 		}
@@ -1641,12 +1595,12 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 	 * read hashed pin salt, and write to updated keystore description
 	 * file unmodified.
 	 */
-	if (looping_read(fd, (char *)&hashed_pin_salt_length,
+	if (readn_nointr(fd, (char *)&hashed_pin_salt_length,
 	    KS_HASHED_PIN_SALT_LEN_SIZE) != KS_HASHED_PIN_SALT_LEN_SIZE) {
 		goto cleanup3;
 	}
 
-	if (looping_write(tmp_ks_fd, (void *)&hashed_pin_salt_length,
+	if (writen_nointr(tmp_ks_fd, (void *)&hashed_pin_salt_length,
 	    KS_HASHED_PIN_SALT_LEN_SIZE) != KS_HASHED_PIN_SALT_LEN_SIZE) {
 		goto cleanup3;
 	}
@@ -1658,13 +1612,13 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		goto cleanup3;
 	}
 
-	if ((looping_read(fd, hashed_pin_salt, hashed_pin_salt_length)) !=
+	if ((readn_nointr(fd, hashed_pin_salt, hashed_pin_salt_length)) !=
 	    (ssize_t)hashed_pin_salt_length) {
 		free(hashed_pin_salt);
 		goto cleanup3;
 	}
 
-	if ((looping_write(tmp_ks_fd, hashed_pin_salt, hashed_pin_salt_length))
+	if ((writen_nointr(tmp_ks_fd, hashed_pin_salt, hashed_pin_salt_length))
 	    != (ssize_t)hashed_pin_salt_length) {
 		free(hashed_pin_salt);
 		goto cleanup3;
@@ -1689,12 +1643,12 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 
 	/* write new hashed pin length to file */
 	swaped_val = SWAP64(new_hashed_pin_len);
-	if (looping_write(tmp_ks_fd, (void *)&swaped_val,
+	if (writen_nointr(tmp_ks_fd, (void *)&swaped_val,
 	    KS_HASHED_PINLEN_SIZE) != KS_HASHED_PINLEN_SIZE) {
 		goto cleanup3;
 	}
 
-	if (looping_write(tmp_ks_fd, (void *)new_hashed_pin,
+	if (writen_nointr(tmp_ks_fd, (void *)new_hashed_pin,
 	    new_hashed_pin_len) != (ssize_t)new_hashed_pin_len) {
 		goto cleanup3;
 	}
@@ -1868,7 +1822,7 @@ soft_keystore_authpin(uchar_t  *pin)
 		goto cleanup;
 	}
 
-	if (looping_read(fd, (char *)crypt_salt, KS_KEY_SALT_SIZE)
+	if (readn_nointr(fd, (char *)crypt_salt, KS_KEY_SALT_SIZE)
 	    != KS_KEY_SALT_SIZE) {
 		goto cleanup;
 	}
@@ -1887,7 +1841,7 @@ soft_keystore_authpin(uchar_t  *pin)
 		goto cleanup;
 	}
 
-	if (looping_read(fd, (char *)hmac_salt, KS_HMAC_SALT_SIZE)
+	if (readn_nointr(fd, (char *)hmac_salt, KS_HMAC_SALT_SIZE)
 	    != KS_HMAC_SALT_SIZE) {
 		goto cleanup;
 	}
@@ -2101,19 +2055,19 @@ soft_keystore_get_single_obj(ks_obj_handle_t *ks_handle,
 	(obj->ks_handle).public = ks_handle->public;
 
 	/* 1st get the version */
-	if (looping_read(fd, &(obj->obj_version), OBJ_VER_SIZE)
+	if (readn_nointr(fd, &(obj->obj_version), OBJ_VER_SIZE)
 	    != OBJ_VER_SIZE) {
 		goto cleanup;
 	}
 	obj->obj_version = SWAP32(obj->obj_version);
 
 	/* Then, read the IV */
-	if (looping_read(fd, iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
+	if (readn_nointr(fd, iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
 		goto cleanup;
 	}
 
 	/* Then, read the HMAC */
-	if (looping_read(fd, obj_hmac, OBJ_HMAC_SIZE) != OBJ_HMAC_SIZE) {
+	if (readn_nointr(fd, obj_hmac, OBJ_HMAC_SIZE) != OBJ_HMAC_SIZE) {
 		goto cleanup;
 	}
 
@@ -2277,31 +2231,26 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 	 * create a tempoary file for the keystore description
 	 * file for updating version and counter information
 	 */
-	while ((tmp_ks_fd = open(tmp_ks_desc_name,
-	    O_RDWR|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	tmp_ks_fd = open_nointr(tmp_ks_desc_name,
+	    O_RDWR|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (tmp_ks_fd < 0) {
 		(void) close(fd);
 		return (-1);
 	}
 
-	(void) fcntl(tmp_ks_fd, F_SETFD, FD_CLOEXEC);
-
 	/* read and write pkcs11 version */
-	if (looping_read(fd, filebuf, KS_PKCS11_VER_SIZE)
+	if (readn_nointr(fd, filebuf, KS_PKCS11_VER_SIZE)
 	    != KS_PKCS11_VER_SIZE) {
 		goto cleanup;
 	}
 
-	if (looping_write(tmp_ks_fd, filebuf, KS_PKCS11_VER_SIZE)
+	if (writen_nointr(tmp_ks_fd, filebuf, KS_PKCS11_VER_SIZE)
 	    != KS_PKCS11_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* get version number, and write updated number to temp file */
-	if (looping_read(fd, &version, KS_VER_SIZE) != KS_VER_SIZE) {
+	if (readn_nointr(fd, &version, KS_VER_SIZE) != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
@@ -2309,13 +2258,13 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 	version++;
 	version = SWAP32(version);
 
-	if (looping_write(tmp_ks_fd, (void *)&version,
+	if (writen_nointr(tmp_ks_fd, (void *)&version,
 	    KS_VER_SIZE) != KS_VER_SIZE) {
 		goto cleanup;
 	}
 
 	/* get object count value */
-	if (looping_read(fd, &counter, KS_COUNTER_SIZE) != KS_COUNTER_SIZE) {
+	if (readn_nointr(fd, &counter, KS_COUNTER_SIZE) != KS_COUNTER_SIZE) {
 		goto cleanup;
 	}
 	counter = SWAP32(counter);
@@ -2330,18 +2279,12 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 	}
 
 	/* create object file */
-	while ((obj_fd = open(obj_name,
-	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	obj_fd = open_nointr(obj_name,
+	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (obj_fd < 0) {
 		/* can't create object file */
 		goto cleanup;
 	}
-
-	/* mark obj_fd "close on exec" */
-	(void) fcntl(obj_fd, F_SETFD, FD_CLOEXEC);
 
 	/* lock object file for writing */
 	if (lock_file(obj_fd, B_FALSE, B_TRUE) != 0) {
@@ -2351,7 +2294,7 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 
 	/* write object meta data */
 	version = SWAP32(1);
-	if (looping_write(obj_fd, (void *)&version, sizeof (version))
+	if (writen_nointr(obj_fd, (void *)&version, sizeof (version))
 	    != sizeof (version)) {
 		goto cleanup2;
 	}
@@ -2366,19 +2309,19 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 
 	}
 
-	if (looping_write(obj_fd, (void *)iv, sizeof (iv)) != sizeof (iv)) {
+	if (writen_nointr(obj_fd, (void *)iv, sizeof (iv)) != sizeof (iv)) {
 		goto cleanup2;
 	}
 
 	if (public) {
 
 		bzero(obj_hmac, sizeof (obj_hmac));
-		if (looping_write(obj_fd, (void *)obj_hmac,
+		if (writen_nointr(obj_fd, (void *)obj_hmac,
 		    sizeof (obj_hmac)) != sizeof (obj_hmac)) {
 			goto cleanup2;
 		}
 
-		if (looping_write(obj_fd, (char *)buf, len) != len) {
+		if (writen_nointr(obj_fd, (char *)buf, len) != len) {
 			goto cleanup2;
 		}
 
@@ -2428,14 +2371,14 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 		}
 
 		/* write hmac */
-		if (looping_write(obj_fd, (void *)obj_hmac,
+		if (writen_nointr(obj_fd, (void *)obj_hmac,
 		    sizeof (obj_hmac)) != sizeof (obj_hmac)) {
 			free(encrypted_buf);
 			goto cleanup2;
 		}
 
 		/* write encrypted object */
-		if (looping_write(obj_fd, (void *)encrypted_buf, out_len)
+		if (writen_nointr(obj_fd, (void *)encrypted_buf, out_len)
 		    != out_len) {
 			free(encrypted_buf);
 			goto cleanup2;
@@ -2455,18 +2398,18 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 	 */
 	counter++;
 	counter = SWAP32(counter);
-	if (looping_write(tmp_ks_fd, (void *)&counter,
+	if (writen_nointr(tmp_ks_fd, (void *)&counter,
 	    sizeof (counter)) != sizeof (counter)) {
 		goto cleanup2;
 	}
 
 	/* read rest of keystore description file and store into temp file */
-	nread = looping_read(fd, filebuf, sizeof (filebuf));
+	nread = readn_nointr(fd, filebuf, sizeof (filebuf));
 	while (nread > 0) {
-		if (looping_write(tmp_ks_fd, filebuf, nread) != nread) {
+		if (writen_nointr(tmp_ks_fd, filebuf, nread) != nread) {
 			goto cleanup2;
 		}
-		nread = looping_read(fd, filebuf, sizeof (filebuf));
+		nread = readn_nointr(fd, filebuf, sizeof (filebuf));
 	}
 
 	(void) close(tmp_ks_fd);
@@ -2587,19 +2530,15 @@ soft_keystore_modify_obj(ks_obj_handle_t *ks_handle, uchar_t *buf,
 		    (ks_handle->name) + strlen(OBJ_PREFIX));
 	}
 
-	while ((tmp_fd = open(tmp_name,
-	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	tmp_fd = open_nointr(tmp_name,
+	    O_WRONLY|O_CREAT|O_EXCL|O_NONBLOCK, S_IRUSR|S_IWUSR);
 	if (tmp_fd < 0) {
 		/* can't create tmp object file */
 		goto cleanup1;
 	}
-	(void) fcntl(tmp_fd, F_SETFD, FD_CLOEXEC);
 
 	/* read version, increment, and write to tmp file */
-	if (looping_read(fd, (char *)&version, OBJ_VER_SIZE) != OBJ_VER_SIZE) {
+	if (readn_nointr(fd, (char *)&version, OBJ_VER_SIZE) != OBJ_VER_SIZE) {
 		goto cleanup2;
 	}
 
@@ -2607,7 +2546,7 @@ soft_keystore_modify_obj(ks_obj_handle_t *ks_handle, uchar_t *buf,
 	version++;
 	version = SWAP32(version);
 
-	if (looping_write(tmp_fd, (char *)&version, OBJ_VER_SIZE)
+	if (writen_nointr(tmp_fd, (char *)&version, OBJ_VER_SIZE)
 	    != OBJ_VER_SIZE) {
 		goto cleanup2;
 	}
@@ -2617,7 +2556,7 @@ soft_keystore_modify_obj(ks_obj_handle_t *ks_handle, uchar_t *buf,
 		goto cleanup2;
 	}
 
-	if (looping_write(tmp_fd, (char *)iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
+	if (writen_nointr(tmp_fd, (char *)iv, OBJ_IV_SIZE) != OBJ_IV_SIZE) {
 		goto cleanup2;
 	}
 
@@ -2625,13 +2564,13 @@ soft_keystore_modify_obj(ks_obj_handle_t *ks_handle, uchar_t *buf,
 
 		/* hmac is always NULL for public objects */
 		bzero(obj_hmac, sizeof (obj_hmac));
-		if (looping_write(tmp_fd, (char *)obj_hmac, OBJ_HMAC_SIZE)
+		if (writen_nointr(tmp_fd, (char *)obj_hmac, OBJ_HMAC_SIZE)
 		    != OBJ_HMAC_SIZE) {
 			goto cleanup2;
 		}
 
 		/* write updated object */
-		if (looping_write(tmp_fd, (char *)buf, len) != len) {
+		if (writen_nointr(tmp_fd, (char *)buf, len) != len) {
 			goto cleanup2;
 		}
 
@@ -2680,13 +2619,13 @@ soft_keystore_modify_obj(ks_obj_handle_t *ks_handle, uchar_t *buf,
 			goto cleanup2;
 		}
 
-		if (looping_write(tmp_fd, (char *)obj_hmac, OBJ_HMAC_SIZE)
+		if (writen_nointr(tmp_fd, (char *)obj_hmac, OBJ_HMAC_SIZE)
 		    != OBJ_HMAC_SIZE) {
 			free(encrypted_buf);
 			goto cleanup2;
 		}
 
-		if (looping_write(tmp_fd, (void *)encrypted_buf, out_len)
+		if (writen_nointr(tmp_fd, (void *)encrypted_buf, out_len)
 		    != out_len) {
 			free(encrypted_buf);
 			goto cleanup2;
@@ -2853,7 +2792,7 @@ soft_keystore_get_pin_salt(char **salt)
 		goto cleanup;
 	}
 
-	if (looping_read(fd, (char *)&hashed_pin_salt_size,
+	if (readn_nointr(fd, (char *)&hashed_pin_salt_size,
 	    KS_HASHED_PIN_SALT_LEN_SIZE) != KS_HASHED_PIN_SALT_LEN_SIZE) {
 		goto cleanup;
 	}
@@ -2864,7 +2803,7 @@ soft_keystore_get_pin_salt(char **salt)
 		goto cleanup;
 	}
 
-	if ((looping_read(fd, *salt, hashed_pin_salt_size))
+	if ((readn_nointr(fd, *salt, hashed_pin_salt_size))
 	    != (ssize_t)hashed_pin_salt_size) {
 		free(*salt);
 		goto cleanup;
@@ -2927,7 +2866,7 @@ soft_keystore_pin_initialized(boolean_t *initialized, char **hashed_pin,
 		goto cleanup;
 	}
 
-	if (looping_read(fd, (char *)crypt_salt, KS_KEY_SALT_SIZE)
+	if (readn_nointr(fd, (char *)crypt_salt, KS_KEY_SALT_SIZE)
 	    != KS_KEY_SALT_SIZE) {
 		ret_val = CKR_FUNCTION_FAILED;
 		goto cleanup;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * General-Purpose Functions
@@ -292,59 +290,4 @@ CK_RV
 meta_CancelFunction(CK_SESSION_HANDLE hSession)
 {
 	return (CKR_FUNCTION_NOT_PARALLEL);
-}
-
-/*
- * Perform a write that can handle EINTR.
- */
-int
-looping_write(int fd, void *buf, int len)
-{
-	char *p = buf;
-	int cc, len2 = 0;
-
-	if (len == 0)
-		return (0);
-
-	do {
-		cc = write(fd, p, len);
-		if (cc < 0) {
-			if (errno == EINTR)
-				continue;
-			return (cc);
-		} else if (cc == 0) {
-			return (len2);
-		} else {
-			p += cc;
-			len2 += cc;
-			len -= cc;
-		}
-	} while (len > 0);
-	return (len2);
-}
-
-/*
- * Perform a read that can handle EINTR.
- */
-int
-looping_read(int fd, void *buf, int len)
-{
-	char *p = buf;
-	int cc, len2 = 0;
-
-	do {
-		cc = read(fd, p, len);
-		if (cc < 0) {
-			if (errno == EINTR)
-				continue;
-			return (cc);	/* errno is already set */
-		} else if (cc == 0) {
-			return (len2);
-		} else {
-			p += cc;
-			len2 += cc;
-			len -= cc;
-		}
-	} while (len > 0);
-	return (len2);
 }

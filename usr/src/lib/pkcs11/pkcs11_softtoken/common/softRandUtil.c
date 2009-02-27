@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -36,6 +34,7 @@
 #include <sys/types.h>
 #include <security/cryptoki.h>
 #include <bignum.h>
+#include <cryptoutil.h>
 #include "softGlobal.h"
 #include "softRandom.h"
 #include "softCrypt.h"
@@ -56,18 +55,13 @@ soft_random_generator(CK_BYTE *ran_out, CK_ULONG ran_len, boolean_t token)
 			(void) pthread_mutex_lock(&soft_giant_mutex);
 			/* Check again holding the mutex */
 			if (soft_random_fd < 0) {
-				while ((soft_random_fd = open(DEV_RANDOM,
-				    O_RDONLY)) < 0) {
-					if (errno != EINTR)
-						break;
-				}
+				soft_random_fd = open_nointr(DEV_RANDOM,
+				    O_RDONLY);
 				if (soft_random_fd < 0) {
 					(void) pthread_mutex_unlock(
 					    &soft_giant_mutex);
 					return (CKR_DEVICE_ERROR);
 				}
-				(void) fcntl(soft_random_fd, F_SETFD,
-				    FD_CLOEXEC);
 			}
 			(void) pthread_mutex_unlock(&soft_giant_mutex);
 		}
@@ -76,27 +70,22 @@ soft_random_generator(CK_BYTE *ran_out, CK_ULONG ran_len, boolean_t token)
 			(void) pthread_mutex_lock(&soft_giant_mutex);
 			/* Check again holding the mutex */
 			if (soft_urandom_fd < 0) {
-				while ((soft_urandom_fd = open(DEV_URANDOM,
-				    O_RDONLY)) < 0) {
-					if (errno != EINTR)
-						break;
-				}
+				soft_urandom_fd = open_nointr(DEV_URANDOM,
+				    O_RDONLY);
 				if (soft_urandom_fd < 0) {
 					(void) pthread_mutex_unlock(
 					    &soft_giant_mutex);
 					return (CKR_DEVICE_ERROR);
 				}
-				(void) fcntl(soft_urandom_fd, F_SETFD,
-				    FD_CLOEXEC);
 			}
 			(void) pthread_mutex_unlock(&soft_giant_mutex);
 		}
 	}
 
 	if (token)
-		nread = looping_read(soft_random_fd, ran_out, ran_len);
+		nread = readn_nointr(soft_random_fd, ran_out, ran_len);
 	else
-		nread = looping_read(soft_urandom_fd, ran_out, ran_len);
+		nread = readn_nointr(soft_urandom_fd, ran_out, ran_len);
 
 	if (nread <= 0) {
 		return (CKR_DEVICE_ERROR);

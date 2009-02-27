@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Random Number Generation Functions
@@ -74,27 +72,21 @@ meta_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed,
 
 	if (meta_urandom_seed_fd < 0) {
 		(void) pthread_mutex_lock(&initmutex);
-			/* Check again holding the mutex */
+		/* Check again holding the mutex */
+		if (meta_urandom_seed_fd < 0) {
+			meta_urandom_seed_fd = open_nointr(RANDOM_DEVICE,
+			    O_WRONLY);
 			if (meta_urandom_seed_fd < 0) {
-				while ((meta_urandom_seed_fd = open(
-				    RANDOM_DEVICE, O_WRONLY)) < 0) {
-					if (errno != EINTR)
-						break;
-				}
-				if (meta_urandom_seed_fd < 0) {
-					(void) pthread_mutex_unlock(&initmutex);
-					if (errno == EACCES)
-						return (
-						CKR_RANDOM_SEED_NOT_SUPPORTED);
-					return (CKR_DEVICE_ERROR);
-				}
-				(void) fcntl(meta_urandom_seed_fd, F_SETFD,
-				    FD_CLOEXEC);
+				(void) pthread_mutex_unlock(&initmutex);
+				if (errno == EACCES)
+					return (CKR_RANDOM_SEED_NOT_SUPPORTED);
+				return (CKR_DEVICE_ERROR);
 			}
+		}
 		(void) pthread_mutex_unlock(&initmutex);
 	}
 
-	n = looping_write(meta_urandom_seed_fd, pSeed, ulSeedLen);
+	n = writen_nointr(meta_urandom_seed_fd, pSeed, ulSeedLen);
 	if (n <= 0) {
 		return (CKR_DEVICE_ERROR);
 	}
@@ -130,15 +122,12 @@ meta_GenerateRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pRandomData,
 		return (rv);
 	REFRELEASE(session);
 
-	while ((fd = open(RANDOM_DEVICE, O_RDONLY)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
+	fd = open_nointr(RANDOM_DEVICE, O_RDONLY);
 	if (fd == -1) {
 		return (CKR_DEVICE_ERROR);
 	}
 
-	n = looping_read(fd, pRandomData, ulRandomLen);
+	n = readn_nointr(fd, pRandomData, ulRandomLen);
 	if (n <= 0) {
 		(void) close(fd);
 		return (CKR_DEVICE_ERROR);

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <errno.h>
@@ -462,35 +460,6 @@ C_CancelFunction(CK_SESSION_HANDLE hSession)
 }
 
 /*
- * Perform a write that can handle EINTR.
- */
-int
-looping_write(int fd, void *buf, int len)
-{
-	char *p = buf;
-	int cc, len2 = 0;
-
-	if (len == 0)
-		return (0);
-
-	do {
-		cc = write(fd, p, len);
-		if (cc < 0) {
-			if (errno == EINTR)
-				continue;
-			return (cc);
-		} else if (cc == 0) {
-			return (len2);
-		} else {
-			p += cc;
-			len2 += cc;
-			len -= cc;
-		}
-	} while (len > 0);
-	return (len2);
-}
-
-/*
  * Take out all mutexes before fork.
  * Order:
  * 1. soft_giant_mutex
@@ -537,30 +506,4 @@ softtoken_fork_child()
 	(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
 	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
-}
-
-/*
- * Perform a read that can handle EINTR.
- */
-int
-looping_read(int fd, void *buf, int len)
-{
-	char *p = buf;
-	int cc, len2 = 0;
-
-	do {
-		cc = read(fd, p, len);
-		if (cc < 0) {
-			if (errno == EINTR)
-				continue;
-			return (cc);	/* errno is already set */
-		} else if (cc == 0) {
-			return (len2);
-		} else {
-			p += cc;
-			len2 += cc;
-			len -= cc;
-		}
-	} while (len > 0);
-	return (len2);
 }

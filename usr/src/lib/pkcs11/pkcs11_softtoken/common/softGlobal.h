@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SOFTGLOBAL_H
 #define	_SOFTGLOBAL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,9 +69,6 @@ extern struct ses_to_be_freed_list ses_delay_freed;
 				CKF_RESTORE_KEY_NOT_NEEDED|\
 				CKF_DUAL_CRYPTO_OPERATIONS|\
 				CKF_TOKEN_INITIALIZED
-
-extern int looping_read(int, void *, int);
-extern int looping_write(int, void *, int);
 
 #ifdef	__cplusplus
 }
