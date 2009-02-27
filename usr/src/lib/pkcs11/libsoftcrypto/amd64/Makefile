@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/pkcs11/libsoftcrypto/amd64/Makefile
@@ -38,13 +38,12 @@ BIGNUM_PSM_OBJS= bignum_amd64.o bignum_amd64_asm.o
 BIGNUM_PSM_SRC= $(BIGNUM_DIR)/$(MACH64)/bignum_amd64.c \
 		$(BIGNUM_DIR)/$(MACH64)/bignum_amd64_asm.s
 
-
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-BIGNUM_FLAGS += -DPSR_MUL
-LINTFLAGS64 += $(BIGNUM_FLAGS) $(AES_FLAGS)
-
+CFLAGS		+= -xO4 -xcrossfile
+BIGNUM_FLAGS	+= -DPSR_MUL
+LINTFLAGS64	+= $(BIGNUM_FLAGS) $(AES_FLAGS)
 CLEANFILES      += arcfour-x86_64.s
 
 LDLIBS  += -lc
@@ -52,11 +51,11 @@ LIBS += $(LINTLIB)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
 
-arcfour-x86_64.s: $(ARCFOUR_DIR)/amd64/arcfour-x86_64.pl
+arcfour-x86_64.s:	$(ARCFOUR_DIR)/amd64/arcfour-x86_64.pl
 	$(PERL) $? $@
 
 pics/%.o:	$(AES_DIR)/$(MACH64)/%.c
-	$(COMPILE.c) $(AES_FLAGS) -o $@ $< 
+	$(COMPILE.c) $(AES_FLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(AES_DIR)/$(MACH64)/%.s
@@ -64,14 +63,14 @@ pics/%.o:	$(AES_DIR)/$(MACH64)/%.s
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(BIGNUM_DIR)/$(MACH64)/%.c
-	$(COMPILE.c) $(BIGNUM_FLAGS) -o $@ $< 
+	$(COMPILE.c) $(BIGNUM_FLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(BIGNUM_DIR)/$(MACH64)/%.s
 	$(COMPILE64.s) $(BIGNUM_FLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: arcfour-x86_64.s
+pics/%.o:	arcfour-x86_64.s
 	$(COMPILE64.s) $(ARCFOUR_FLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 

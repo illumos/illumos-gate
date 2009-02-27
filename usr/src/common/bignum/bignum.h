@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _BIGNUM_H
 #define	_BIGNUM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -34,17 +32,18 @@ extern "C" {
 
 #include <sys/types.h>
 
-#ifndef __sparcv9
-#define	BIGNUM_CHUNK_32
-#else
+#if defined(__sparcv9) || defined(__amd64) /* 64-bit chunk size */
 #ifndef UMUL64
-#define	UMUL64
+#define	UMUL64	/* 64-bit multiplication results are supported */
 #endif
+#else
+#define	BIGNUM_CHUNK_32
 #endif
 
 
 #define	BITSINBYTE	8
 
+/* Bignum "digits" (aka "chunks" or "words") are either 32- or 64-bits */
 #ifdef BIGNUM_CHUNK_32
 #define	BIG_CHUNK_SIZE		32
 #define	BIG_CHUNK_TYPE		uint32_t
@@ -53,6 +52,7 @@ extern "C" {
 #define	BIG_CHUNK_ALLBITS	0xffffffff
 #define	BIG_CHUNK_LOWHALFBITS	0xffff
 #define	BIG_CHUNK_HALF_HIGHBIT	0x8000
+
 #else
 #define	BIG_CHUNK_SIZE		64
 #define	BIG_CHUNK_TYPE		uint64_t
@@ -65,7 +65,7 @@ extern "C" {
 
 #define	BITLEN2BIGNUMLEN(x)	(((x) + BIG_CHUNK_SIZE - 1) / BIG_CHUNK_SIZE)
 #define	CHARLEN2BIGNUMLEN(x)	(((x) + sizeof (BIG_CHUNK_TYPE) - 1) / \
-				sizeof (BIG_CHUNK_TYPE))
+				    sizeof (BIG_CHUNK_TYPE))
 
 #define	BIGNUM_WORDSIZE	(BIG_CHUNK_SIZE / BITSINBYTE)  /* word size in bytes */
 #define	BIG_CHUNKS_FOR_160BITS	((160 + BIG_CHUNK_SIZE - 1) / BIG_CHUNK_SIZE)
@@ -78,10 +78,10 @@ extern "C" {
  */
 typedef struct {
 	/* size and len in units of BIG_CHUNK_TYPE words  */
-	int size; /* size of memory allocated for value   */
-	int len;  /* number of words that hold valid data in value */
-	int sign; /* 1 for nonnegative, -1 for negative   */
-	int malloced; /* 1 if value was malloced 0 if not */
+	uint32_t	size;	/* size of memory allocated for value  */
+	uint32_t	len;	/* number of valid data words in value */
+	int		sign;	/* 1 for nonnegative, -1 for negative  */
+	int		malloced; /* 1 if value was malloced, 0 if not */
 	BIG_CHUNK_TYPE *value;
 } BIGNUM;
 

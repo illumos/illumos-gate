@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * If compiled without -DRF_INLINE_MACROS then needs -lm at link time
  * If compiled with -DRF_INLINE_MACROS then needs conv.il at compile time
- * (i.e. cc <compileer_flags> -DRF_INLINE_MACROS conv.il mont_mulf.c )
+ * (i.e. cc <compiler_flags> -DRF_INLINE_MACROS conv.il mont_mulf.c )
  */
 
 #include <sys/types.h>
@@ -94,10 +91,10 @@ void
 conv_d16_to_i32(uint32_t *i32, double *d16, int64_t *tmp, int ilen)
 {
 	int i;
-	int64_t t, t1,		/* using int64_t and not uint64_t */
-		a, b, c, d;	/* because more efficient code is */
+	int64_t t, t1,		/* Using int64_t and not uint64_t */
+	    a, b, c, d;		/* because more efficient code is */
 				/* generated this way, and there  */
-				/* is no overflow  */
+				/* is no overflow.  */
 	t1 = 0;
 	a = (int64_t)d16[0];
 	b = (int64_t)d16[1];
@@ -201,8 +198,7 @@ conv_i32_to_d32_and_d16(double *d32, double *d16, uint32_t *i32, int len)
 #pragma pipeloop(0)
 	for (i = 0; i < len - 3; i += 4) {
 		i16_to_d16_and_d32x4(&TwoToMinus16, &TwoTo16, &Zero,
-					&(d16[2*i]), &(d32[i]),
-					(float *)(&(i32[i])));
+		    &(d16[2*i]), &(d32[i]), (float *)(&(i32[i])));
 	}
 	for (; i < len; i++) {
 		a = i32[i];
@@ -279,24 +275,24 @@ void mont_mulf_noconv(uint32_t *result,
 			}
 
 			digit = mod(lower32(b, Zero) * dn0,
-				    TwoToMinus16, TwoTo16);
+			    TwoToMinus16, TwoTo16);
 		}
 	} else {
 		a = dt[0] = pdm1[0] * pdm2[0];
 
 		dt[65] = dt[64] = dt[63] = dt[62] = dt[61] = dt[60] =
-			dt[59] = dt[58] = dt[57] = dt[56] = dt[55] =
-			dt[54] = dt[53] = dt[52] = dt[51] = dt[50] =
-			dt[49] = dt[48] = dt[47] = dt[46] = dt[45] =
-			dt[44] = dt[43] = dt[42] = dt[41] = dt[40] =
-			dt[39] = dt[38] = dt[37] = dt[36] = dt[35] =
-			dt[34] = dt[33] = dt[32] = dt[31] = dt[30] =
-			dt[29] = dt[28] = dt[27] = dt[26] = dt[25] =
-			dt[24] = dt[23] = dt[22] = dt[21] = dt[20] =
-			dt[19] = dt[18] = dt[17] = dt[16] = dt[15] =
-			dt[14] = dt[13] = dt[12] = dt[11] = dt[10] =
-			dt[9] = dt[8] = dt[7] = dt[6] = dt[5] = dt[4] =
-			dt[3] = dt[2] = dt[1] = Zero;
+		    dt[59] = dt[58] = dt[57] = dt[56] = dt[55] =
+		    dt[54] = dt[53] = dt[52] = dt[51] = dt[50] =
+		    dt[49] = dt[48] = dt[47] = dt[46] = dt[45] =
+		    dt[44] = dt[43] = dt[42] = dt[41] = dt[40] =
+		    dt[39] = dt[38] = dt[37] = dt[36] = dt[35] =
+		    dt[34] = dt[33] = dt[32] = dt[31] = dt[30] =
+		    dt[29] = dt[28] = dt[27] = dt[26] = dt[25] =
+		    dt[24] = dt[23] = dt[22] = dt[21] = dt[20] =
+		    dt[19] = dt[18] = dt[17] = dt[16] = dt[15] =
+		    dt[14] = dt[13] = dt[12] = dt[11] = dt[10] =
+		    dt[9] = dt[8] = dt[7] = dt[6] = dt[5] = dt[4] =
+		    dt[3] = dt[2] = dt[1] = Zero;
 
 		pdn_0 = pdn[0];
 		pdm1_0 = pdm1[0];
@@ -326,9 +322,9 @@ void mont_mulf_noconv(uint32_t *result,
 			pdtj[26] += pdm1[13] *m2j + pdn[13] * digit;
 			pdtj[28] += pdm1[14] *m2j + pdn[14] * digit;
 			pdtj[30] += pdm1[15] *m2j + pdn[15] * digit;
-			/* no need for cleenup, cannot overflow */
+			/* no need for cleanup, cannot overflow */
 			digit = mod(lower32(b, Zero) * dn0,
-				    TwoToMinus16, TwoTo16);
+			    TwoToMinus16, TwoTo16);
 		}
 	}
 

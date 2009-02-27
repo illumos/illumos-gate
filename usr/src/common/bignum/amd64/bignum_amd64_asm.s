@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 
@@ -34,17 +31,17 @@
 
 /* ARGSUSED */
 uint64_t
-big_mul_set_vec64(uint64_t *r, uint64_t *a, int len, uint64_t digit)
+big_mul_set_vec(uint64_t *r, uint64_t *a, int len, uint64_t digit)
 { return (0); }
 
 /* ARGSUSED */
 uint64_t
-big_mul_add_vec64(uint64_t *r, uint64_t *a, int len, uint64_t digit)
+big_mul_add_vec(uint64_t *r, uint64_t *a, int len, uint64_t digit)
 { return (0); }
 
 /* ARGSUSED */
 void
-big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
+big_sqr_vec(uint64_t *r, uint64_t *a, int len)
 {}
 
 #else	/* lint */
@@ -55,11 +52,8 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 /  the 64X64->128 bit  unsigned multiply instruction.
 /
 /  As defined in Sun's bignum library for pkcs11, bignums are
-/  composed of an array of 32-bit "digits" along with descriptive
-/  information.  The arrays of digits are only required to be
-/  aligned on 32-bit boundary.  This implementation works only
-/  when the two factors and the result happen to be 64 bit aligned
-/  and have an even number of digits.
+/  composed of an array of 64-bit "digits" or "chunks" along with
+/  descriptive information.
 /
 / ------------------------------------------------------------------------
 
@@ -68,9 +62,9 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 / r and a are 64 bit aligned.
 /
 / uint64_t
-/ big_mul_set_vec64(uint64_t *r, uint64_t *a, int len, uint64_t digit)
+/ big_mul_set_vec(uint64_t *r, uint64_t *a, int len, uint64_t digit)
 /
-	ENTRY(big_mul_set_vec64)
+	ENTRY(big_mul_set_vec)
 	xorq	%rax, %rax		/ if (len == 0) return (0)
 	testq	%rdx, %rdx
 	jz	.L17
@@ -219,7 +213,8 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 .L17:
 	movq	%r9, %rax
 	ret
-	SET_SIZE(big_mul_set_vec64)
+	SET_SIZE(big_mul_set_vec)
+
 
 / ------------------------------------------------------------------------
 /
@@ -227,11 +222,8 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 /  the 64X64->128 bit  unsigned multiply instruction.
 /
 /  As defined in Sun's bignum library for pkcs11, bignums are
-/  composed of an array of 32-bit "digits" along with descriptive
-/  information.  The arrays of digits are only required to be
-/  aligned on 32-bit boundary.  This implementation works only
-/  when the two factors and the result happen to be 64 bit aligned
-/  and have an even number of digits.
+/  composed of an array of 64-bit "digits" or "chunks" along with
+/  descriptive information.
 /
 / ------------------------------------------------------------------------
 
@@ -240,9 +232,9 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 / r and a are 64 bit aligned.
 /
 / uint64_t
-/ big_mul_add_vec64(uint64_t *r, uint64_t *a, int len, uint64_t digit)
+/ big_mul_add_vec(uint64_t *r, uint64_t *a, int len, uint64_t digit)
 /
-	ENTRY(big_mul_add_vec64)
+	ENTRY(big_mul_add_vec)
 	xorq	%rax, %rax		/ if (len == 0) return (0)
 	testq	%rdx, %rdx
 	jz	.L27
@@ -436,13 +428,13 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 .L27:
 	movq	%r9, %rax
 	ret
-	SET_SIZE(big_mul_add_vec64)
+	SET_SIZE(big_mul_add_vec)
 
 
 / void
-/ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
+/ big_sqr_vec(uint64_t *r, uint64_t *a, int len)
 
-	ENTRY(big_sqr_vec64)
+	ENTRY(big_sqr_vec)
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12
@@ -461,7 +453,7 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 	leaq	8(%r14), %rsi		/ arg2 = ta + 1
 	movq	%r15, %rdx		/ arg3 = tlen
 	movq	0(%r14), %rcx		/ arg4 = ta[0]
-	call	big_mul_set_vec64
+	call	big_mul_set_vec
 	movq	%rax, 0(%r13, %r15, 8)	/ tr[tlen] = cy
 .L31:
 	decq	%r15			/ --tlen
@@ -473,7 +465,7 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 	leaq	8(%r14), %rsi		/ arg2 = ta + 1
 	movq	%r15, %rdx		/ arg3 = tlen
 	movq	0(%r14), %rcx		/ arg4 = ta[0]
-	call	big_mul_add_vec64
+	call	big_mul_add_vec
 	movq	%rax, 0(%r13, %r15, 8)	/ tr[tlen] = cy
 	jmp	.L31
 
@@ -552,6 +544,6 @@ big_sqr_vec64(uint64_t *r, uint64_t *a, int len)
 
 	ret
 
-	SET_SIZE(big_sqr_vec64)
+	SET_SIZE(big_sqr_vec)
 
 #endif	/* lint */

@@ -19,15 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#define	big_div_pos_fast big_div_pos
-
-#include "bignum.h"
 
 /*
  * Configuration guide
@@ -50,7 +44,7 @@
  *
  * HWCAP
  *   Meaning: Call multiply support functions through a function pointer.
- *   On x86, there are multiple implementations for differnt hardware
+ *   On x86, there are multiple implementations for different hardware
  *   capabilities, such as MMX, SSE2, etc.  Tests are made at run-time, when
  *   a function is first used.  So, the support functions are called through
  *   a function pointer.  There is no need for that on Sparc, because there
@@ -68,16 +62,33 @@
  */
 
 
+#include <sys/types.h>
+#include "bignum.h"
+
 #ifdef	_KERNEL
 #include <sys/ddi.h>
 #include <sys/mdesc.h>
 #include <sys/crypto/common.h>
 
-#include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/param.h>
 #include <sys/sunddi.h>
 
+#else
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+#define	ASSERT	assert
+#endif	/* _KERNEL */
+
+#ifdef	_LP64 /* truncate 64-bit size_t to 32-bits */
+#define	UI32(ui)	((uint32_t)ui)
+#else /* size_t already 32-bits */
+#define	UI32(ui)	(ui)
+#endif
+
+
+#ifdef	_KERNEL
 #define	big_malloc(size)	kmem_alloc(size, KM_NOSLEEP)
 #define	big_free(ptr, size)	kmem_free(ptr, size)
 
@@ -94,11 +105,6 @@ big_realloc(void *from, size_t oldsize, size_t newsize)
 }
 
 #else	/* _KERNEL */
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#define	ASSERT	assert
 
 #ifndef MALLOC_DEBUG
 
@@ -126,6 +132,11 @@ big_malloc(size_t size)
 
 #define	big_realloc(x, y, z) realloc((x), (z))
 
+
+/*
+ * printbignum()
+ * Print a BIGNUM type to stdout.
+ */
 void
 printbignum(char *aname, BIGNUM *a)
 {
@@ -135,13 +146,13 @@ printbignum(char *aname, BIGNUM *a)
 	for (i = a->len - 1; i >= 0; i--) {
 #ifdef BIGNUM_CHUNK_32
 		(void) printf("%08x ", a->value[i]);
-		if ((i % 8 == 0) && (i != 0)) {
+		if (((i & (BITSINBYTE - 1)) == 0) && (i != 0)) {
 			(void) printf("\n");
 		}
 #else
 		(void) printf("%08x %08x ", (uint32_t)((a->value[i]) >> 32),
 		    (uint32_t)((a->value[i]) & 0xffffffff));
-		if ((i % 4 == 0) && (i != 0)) {
+		if (((i & 3) == 0) && (i != 0)) { /* end of this chunk */
 			(void) printf("\n");
 		}
 #endif
@@ -152,11 +163,27 @@ printbignum(char *aname, BIGNUM *a)
 #endif	/* _KERNEL */
 
 
-/* size in BIG_CHUNK_SIZE-bit words */
+/*
+ * big_init()
+ * Initialize and allocate memory for a BIGNUM type.
+ *
+ * big_init(number, size) is equivalent to big_init1(number, size, NULL, 0)
+ *
+ * Note: call big_finish() to free memory allocated by big_init().
+ *
+ * Input:
+ * number	Uninitialized memory for BIGNUM
+ * size		Minimum size, in BIG_CHUNK_SIZE-bit words, required for BIGNUM
+ *
+ * Output:
+ * number	Initialized BIGNUM
+ *
+ * Return BIG_OK on success or BIG_NO_MEM for an allocation error.
+ */
 BIG_ERR_CODE
 big_init(BIGNUM *number, int size)
 {
-	number->value = big_malloc(sizeof (BIG_CHUNK_TYPE) * size);
+	number->value = big_malloc(BIGNUM_WORDSIZE * size);
 	if (number->value == NULL) {
 		return (BIG_NO_MEM);
 	}
@@ -167,12 +194,32 @@ big_init(BIGNUM *number, int size)
 	return (BIG_OK);
 }
 
-/* size in BIG_CHUNK_SIZE-bit words */
+
+/*
+ * big_init1()
+ * Initialize and, if needed, allocate memory for a BIGNUM type.
+ * Use the buffer passed, buf, if any, instad of allocating memory
+ * if it's at least "size" bytes.
+ *
+ * Note: call big_finish() to free memory allocated by big_init().
+ *
+ * Input:
+ * number	Uninitialized memory for BIGNUM
+ * size		Minimum size, in BIG_CHUNK_SIZE-bit words, required for BIGNUM
+ * buf		Buffer for storing a BIGNUM.
+ *		If NULL, big_init1() will allocate a buffer
+ * bufsize	Size, in BIG_CHUNK_SIZE_bit words, of buf
+ *
+ * Output:
+ * number	Initialized BIGNUM
+ *
+ * Return BIG_OK on success or BIG_NO_MEM for an allocation error.
+ */
 BIG_ERR_CODE
 big_init1(BIGNUM *number, int size, BIG_CHUNK_TYPE *buf, int bufsize)
 {
 	if ((buf == NULL) || (size > bufsize)) {
-		number->value = big_malloc(sizeof (BIG_CHUNK_TYPE) * size);
+		number->value = big_malloc(BIGNUM_WORDSIZE * size);
 		if (number->value == NULL) {
 			return (BIG_NO_MEM);
 		}
@@ -183,122 +230,111 @@ big_init1(BIGNUM *number, int size, BIG_CHUNK_TYPE *buf, int bufsize)
 		number->size = bufsize;
 		number->malloced = 0;
 	}
-		number->len = 0;
-		number->sign = 1;
+	number->len = 0;
+	number->sign = 1;
 
 	return (BIG_OK);
 }
 
+
+/*
+ * big_finish()
+ * Free memory, if any, allocated by big_init() or big_init1().
+ */
 void
 big_finish(BIGNUM *number)
 {
 	if (number->malloced == 1) {
-		big_free(number->value,
-		    sizeof (BIG_CHUNK_TYPE) * number->size);
+		big_free(number->value, BIGNUM_WORDSIZE * number->size);
 		number->malloced = 0;
 	}
 }
 
 
 /*
- *  bn->size should be at least
- * (len + sizeof (BIG_CHUNK_TYPE) - 1) / sizeof (BIG_CHUNK_TYPE) bytes
+ * bn->size should be at least
+ * (len + BIGNUM_WORDSIZE - 1) / BIGNUM_WORDSIZE bytes
  * converts from byte-big-endian format to bignum format (words in
  * little endian order, but bytes within the words big endian)
  */
 void
 bytestring2bignum(BIGNUM *bn, uchar_t *kn, size_t len)
 {
-	int		i, j, offs;
+	int		i, j;
+	uint32_t	offs;
+	const uint32_t	slen = UI32(len);
 	BIG_CHUNK_TYPE	word;
 	uchar_t		*knwordp;
 
-#ifdef	_LP64
-	offs = (uint32_t)len % sizeof (BIG_CHUNK_TYPE);
-	bn->len = (uint32_t)len / sizeof (BIG_CHUNK_TYPE);
+	if (slen == 0) {
+		bn->len = 1;
+		bn->value[0] = 0;
+		return;
+	}
 
-	for (i = 0; i < (uint32_t)len / sizeof (BIG_CHUNK_TYPE); i++) {
-#else	/* !_LP64 */
-	offs = len % sizeof (BIG_CHUNK_TYPE);
-	bn->len = len / sizeof (BIG_CHUNK_TYPE);
-	for (i = 0; i < len / sizeof (BIG_CHUNK_TYPE); i++) {
-#endif	/* _LP64 */
-		knwordp = &(kn[len - sizeof (BIG_CHUNK_TYPE) * (i + 1)]);
+	offs = slen % BIGNUM_WORDSIZE;
+	bn->len = slen / BIGNUM_WORDSIZE;
+
+	for (i = 0; i < slen / BIGNUM_WORDSIZE; i++) {
+		knwordp = &(kn[slen - BIGNUM_WORDSIZE * (i + 1)]);
 		word = knwordp[0];
-		for (j = 1; j < sizeof (BIG_CHUNK_TYPE); j++) {
-			word = (word << 8)+ knwordp[j];
+		for (j = 1; j < BIGNUM_WORDSIZE; j++) {
+			word = (word << BITSINBYTE) + knwordp[j];
 		}
 		bn->value[i] = word;
 	}
 	if (offs > 0) {
 		word = kn[0];
-		for (i = 1; i < offs; i++) word = (word << 8) + kn[i];
+		for (i = 1; i < offs; i++) word = (word << BITSINBYTE) + kn[i];
 		bn->value[bn->len++] = word;
 	}
-	while ((bn->len > 1) && (bn->value[bn->len-1] == 0)) {
+	while ((bn->len > 1) && (bn->value[bn->len - 1] == 0)) {
 		bn->len --;
 	}
 }
 
+
 /*
  * copies the least significant len bytes if
- * len < bn->len * sizeof (BIG_CHUNK_TYPE)
+ * len < bn->len * BIGNUM_WORDSIZE
  * converts from bignum format to byte-big-endian format.
  * bignum format is words of type  BIG_CHUNK_TYPE in little endian order.
  */
 void
 bignum2bytestring(uchar_t *kn, BIGNUM *bn, size_t len)
 {
-	int		i, j, offs;
+	int		i, j;
+	uint32_t	offs;
+	const uint32_t	slen = UI32(len);
 	BIG_CHUNK_TYPE	word;
 
-	if (len < sizeof (BIG_CHUNK_TYPE) * bn->len) {
-#ifdef	_LP64
-		for (i = 0; i < (uint32_t)len / sizeof (BIG_CHUNK_TYPE); i++) {
-#else	/* !_LP64 */
-		for (i = 0; i < len / sizeof (BIG_CHUNK_TYPE); i++) {
-#endif	/* _LP64 */
+	if (len < BIGNUM_WORDSIZE * bn->len) {
+		for (i = 0; i < slen / BIGNUM_WORDSIZE; i++) {
 			word = bn->value[i];
-			for (j = 0; j < sizeof (BIG_CHUNK_TYPE); j++) {
-				kn[len - sizeof (BIG_CHUNK_TYPE) * i - j - 1] =
+			for (j = 0; j < BIGNUM_WORDSIZE; j++) {
+				kn[slen - BIGNUM_WORDSIZE * i - j - 1] =
 				    word & 0xff;
-				word = word >> 8;
+				word = word >> BITSINBYTE;
 			}
 		}
-#ifdef	_LP64
-		offs = (uint32_t)len % sizeof (BIG_CHUNK_TYPE);
-#else	/* !_LP64 */
-		offs = len % sizeof (BIG_CHUNK_TYPE);
-#endif	/* _LP64 */
+		offs = slen % BIGNUM_WORDSIZE;
 		if (offs > 0) {
-			word = bn->value[len / sizeof (BIG_CHUNK_TYPE)];
-#ifdef	_LP64
-			for (i =  (uint32_t)len % sizeof (BIG_CHUNK_TYPE);
-			    i > 0; i --) {
-#else	/* !_LP64 */
-			for (i = len % sizeof (BIG_CHUNK_TYPE);
-			    i > 0; i --) {
-#endif	/* _LP64 */
+			word = bn->value[slen / BIGNUM_WORDSIZE];
+			for (i =  slen % BIGNUM_WORDSIZE; i > 0; i --) {
 				kn[i - 1] = word & 0xff;
-				word = word >> 8;
+				word = word >> BITSINBYTE;
 			}
 		}
 	} else {
 		for (i = 0; i < bn->len; i++) {
 			word = bn->value[i];
-			for (j = 0; j < sizeof (BIG_CHUNK_TYPE); j++) {
-				kn[len - sizeof (BIG_CHUNK_TYPE) * i - j - 1] =
+			for (j = 0; j < BIGNUM_WORDSIZE; j++) {
+				kn[slen - BIGNUM_WORDSIZE * i - j - 1] =
 				    word & 0xff;
-				word = word >> 8;
+				word = word >> BITSINBYTE;
 			}
 		}
-#ifdef	_LP64
-		for (i = 0;
-		    i < (uint32_t)len - sizeof (BIG_CHUNK_TYPE) * bn->len;
-		    i++) {
-#else	/* !_LP64 */
-		for (i = 0; i < len - sizeof (BIG_CHUNK_TYPE) * bn->len; i++) {
-#endif	/* _LP64 */
+		for (i = 0; i < slen - BIGNUM_WORDSIZE * bn->len; i++) {
 			kn[i] = 0;
 		}
 	}
@@ -315,14 +351,14 @@ big_bitlength(BIGNUM *a)
 	while ((l > 0) && (a->value[l] == 0)) {
 		l--;
 	}
-	b = sizeof (BIG_CHUNK_TYPE) * BITSINBYTE;
+	b = BIG_CHUNK_SIZE;
 	c = a->value[l];
 	while ((b > 1) && ((c & BIG_CHUNK_HIGHBIT) == 0)) {
 		c = c << 1;
 		b--;
 	}
 
-	return (l * sizeof (BIG_CHUNK_TYPE) * BITSINBYTE + b);
+	return (l * BIG_CHUNK_SIZE + b);
 }
 
 
@@ -340,11 +376,11 @@ big_copy(BIGNUM *dest, BIGNUM *src)
 	if (dest->size < len) {
 		if (dest->malloced == 1) {
 			newptr = (BIG_CHUNK_TYPE *)big_realloc(dest->value,
-			    sizeof (BIG_CHUNK_TYPE) * dest->size,
-			    sizeof (BIG_CHUNK_TYPE) * len);
+			    BIGNUM_WORDSIZE * dest->size,
+			    BIGNUM_WORDSIZE * len);
 		} else {
 			newptr = (BIG_CHUNK_TYPE *)
-			    big_malloc(sizeof (BIG_CHUNK_TYPE) * len);
+			    big_malloc(BIGNUM_WORDSIZE * len);
 			if (newptr != NULL) {
 				dest->malloced = 1;
 			}
@@ -375,10 +411,10 @@ big_extend(BIGNUM *number, int size)
 		return (BIG_OK);
 	if (number->malloced) {
 		number->value = big_realloc(number->value,
-		    sizeof (BIG_CHUNK_TYPE) * number->size,
-		    sizeof (BIG_CHUNK_TYPE) * size);
+		    BIGNUM_WORDSIZE * number->size,
+		    BIGNUM_WORDSIZE * size);
 	} else {
-		newptr = big_malloc(sizeof (BIG_CHUNK_TYPE) * size);
+		newptr = big_malloc(BIGNUM_WORDSIZE * size);
 		if (newptr != NULL) {
 			for (i = 0; i < number->size; i++) {
 				newptr[i] = number->value[i];
@@ -561,7 +597,7 @@ big_cmp_abs(BIGNUM *aa, BIGNUM *bb)
 			}
 		}
 	} else {
-		i = aa->len-1;
+		i = aa->len - 1;
 	}
 	for (; i >= 0; i--) {
 		if (aa->value[i] > bb->value[i]) {
@@ -795,8 +831,8 @@ big_sub_pos_high(BIGNUM *result, BIGNUM *aa, BIGNUM *bb)
 int
 big_cmp_abs_high(BIGNUM *aa, BIGNUM *bb)
 {
-	int lendiff;
-	BIGNUM aa1;
+	int		lendiff;
+	BIGNUM		aa1;
 
 	lendiff = aa->len - bb->len;
 	aa1.len = bb->len;
@@ -912,7 +948,7 @@ big_shiftright(BIGNUM *result, BIGNUM *aa, int offs)
 	cy = aa->value[0] >> offs;
 	for (i = 1; i < aa->len; i++) {
 		ai = aa->value[i];
-		result->value[i-1] = (ai << (BIG_CHUNK_SIZE - offs)) | cy;
+		result->value[i - 1] = (ai << (BIG_CHUNK_SIZE - offs)) | cy;
 		cy = ai >> offs;
 	}
 	result->len = aa->len;
@@ -926,7 +962,7 @@ big_shiftright(BIGNUM *result, BIGNUM *aa, int offs)
  * it is assumed that aa and bb are positive
  */
 BIG_ERR_CODE
-big_div_pos_fast(BIGNUM *result, BIGNUM *remainder, BIGNUM *aa, BIGNUM *bb)
+big_div_pos(BIGNUM *result, BIGNUM *remainder, BIGNUM *aa, BIGNUM *bb)
 {
 	BIG_ERR_CODE	err = BIG_OK;
 	int		i, alen, blen, tlen, rlen, offs;
@@ -1077,6 +1113,7 @@ ret1:
 	return (err);
 }
 
+
 /*
  * If there is no processor-specific integer implementation of
  * the lower level multiply functions, then this code is provided
@@ -1106,7 +1143,7 @@ ret1:
 
 #define	MUL_SET_VEC_ROUND_PREFETCH(R) \
 	p = pf * d; \
-	pf = (uint64_t)a[R+1]; \
+	pf = (uint64_t)a[R + 1]; \
 	t = p + cy; \
 	r[R] = (uint32_t)t; \
 	cy = t >> 32
@@ -1120,7 +1157,7 @@ ret1:
 #define	MUL_ADD_VEC_ROUND_PREFETCH(R) \
 	t = (uint64_t)r[R]; \
 	p = pf * d; \
-	pf = (uint64_t)a[R+1]; \
+	pf = (uint64_t)a[R + 1]; \
 	t = p + t + cy; \
 	r[R] = (uint32_t)t; \
 	cy = t >> 32
@@ -1242,10 +1279,10 @@ big_mul_add_vec(uint32_t *r, uint32_t *a, int len, uint32_t b)
 void
 big_sqr_vec(uint32_t *r, uint32_t *a, int len)
 {
-	uint32_t *tr, *ta;
-	int tlen, row, col;
-	uint64_t p, s, t, t2, cy;
-	uint32_t d;
+	uint32_t	*tr, *ta;
+	int		tlen, row, col;
+	uint64_t	p, s, t, t2, cy;
+	uint32_t	d;
 
 	tr = r + 1;
 	ta = a;
@@ -1276,13 +1313,13 @@ big_sqr_vec(uint32_t *r, uint32_t *a, int len)
 		cy = (t >> 32) + (t2 >> 32);
 		if (row == len - 1)
 			break;
-		p = ((uint64_t)r[col+1] << 1) + cy;
-		r[col+1] = (uint32_t)p;
+		p = ((uint64_t)r[col + 1] << 1) + cy;
+		r[col + 1] = (uint32_t)p;
 		cy = p >> 32;
 		++row;
 		col += 2;
 	}
-	r[col+1] = (uint32_t)cy;
+	r[col + 1] = (uint32_t)cy;
 }
 
 #else /* BIG_CHUNK_SIZE == 64 */
@@ -1361,10 +1398,11 @@ big_sqr_vec(BIG_CHUNK_TYPE *r, BIG_CHUNK_TYPE *a, int len)
 	ASSERT(r != a);
 	r[len] = big_mul_set_vec(r, a, len, a[0]);
 	for (i = 1; i < len; ++i)
-		r[len + i] = big_mul_add_vec(r+i, a, len, a[i]);
+		r[len + i] = big_mul_add_vec(r + i, a, len, a[i]);
 }
 
 #endif /* BIG_CHUNK_SIZE == 32/64 */
+
 
 #else /* ! UMUL64 */
 
@@ -1432,7 +1470,7 @@ big_sqr_vec(uint32_t *r, uint32_t *a, int len)
 	ASSERT(r != a);
 	r[len] = big_mul_set_vec(r, a, len, a[0]);
 	for (i = 1; i < len; ++i)
-		r[len + i] = big_mul_add_vec(r+i, a, len, a[i]);
+		r[len + i] = big_mul_add_vec(r + i, a, len, a[i]);
 }
 
 #endif /* UMUL64 */
@@ -1445,7 +1483,7 @@ big_mul_vec(BIG_CHUNK_TYPE *r, BIG_CHUNK_TYPE *a, int alen,
 
 	r[alen] = big_mul_set_vec(r, a, alen, b[0]);
 	for (i = 1; i < blen; ++i)
-		r[alen + i] = big_mul_add_vec(r+i, a, alen, b[i]);
+		r[alen + i] = big_mul_add_vec(r + i, a, alen, b[i]);
 }
 
 
@@ -1492,6 +1530,7 @@ big_mul(BIGNUM *result, BIGNUM *aa, BIGNUM *bb)
 	bb->len = blen;
 
 	rsize = alen + blen;
+	ASSERT(rsize > 0);
 	if (result->size < rsize) {
 		err = big_extend(result, rsize);
 		if (err != BIG_OK) {
@@ -1549,14 +1588,14 @@ big_mul(BIGNUM *result, BIGNUM *aa, BIGNUM *bb)
 	} else {
 		tmp1.len = rsize;
 	}
-	if ((err = big_copy(result, &tmp1)) != BIG_OK) {
-		return (err);
-	}
+
+	err = big_copy(result, &tmp1);
+
 	result->sign = sign;
 
 	big_finish(&tmp1);
 
-	return (BIG_OK);
+	return (err);
 }
 
 
@@ -1619,9 +1658,11 @@ big_mont_mul(BIGNUM *ret, BIGNUM *a, BIGNUM *b, BIGNUM *n, BIG_CHUNK_TYPE n0)
 			rr[i] = rr[i + nlen];
 		}
 	}
-	for (i = nlen - 1; (i >= 0) && (rr[i] == 0); i--)
+
+	/* Remove leading zeros, but keep at least 1 digit: */
+	for (i = nlen - 1; (i > 0) && (rr[i] == 0); i--)
 		;
-	ret->len = i+1;
+	ret->len = i + 1;
 
 	return (BIG_OK);
 }
@@ -1764,8 +1805,8 @@ big_modexp_ncp_int(BIGNUM *result, BIGNUM *ma, BIGNUM *e, BIGNUM *n,
 	BIGNUM		tmp1;
 	BIG_CHUNK_TYPE	tmp1value[BIGTMPSIZE];
 	int		i, j, k, l, m, p;
-	int		bit, bitind, bitcount, groupbits, apowerssize;
-	int		nbits;
+	uint32_t	bit, bitind, bitcount, groupbits, apowerssize;
+	uint32_t	nbits;
 	BIG_ERR_CODE	err;
 
 	nbits = big_numbits(e);
@@ -1783,10 +1824,11 @@ big_modexp_ncp_int(BIGNUM *result, BIGNUM *ma, BIGNUM *e, BIGNUM *n,
 		return (err);
 	}
 
-	/* set the malloced bit to help cleanup */
+	/* clear the malloced bit to help cleanup */
 	for (i = 0; i < apowerssize; i++) {
 		apowers[i].malloced = 0;
 	}
+
 	for (i = 0; i < apowerssize; i++) {
 		if ((err = big_init1(&(apowers[i]), n->len, NULL, 0)) !=
 		    BIG_OK) {
@@ -1803,7 +1845,7 @@ big_modexp_ncp_int(BIGNUM *result, BIGNUM *ma, BIGNUM *e, BIGNUM *n,
 
 	for (i = 1; i < apowerssize; i++) {
 		if ((err = big_mont_mul(&tmp1, ma,
-		    &(apowers[i-1]), n, n0)) != BIG_OK) {
+		    &(apowers[i - 1]), n, n0)) != BIG_OK) {
 			goto ret;
 		}
 		(void) big_copy(&apowers[i], &tmp1);
@@ -1912,12 +1954,13 @@ big_modexp_ncp_float(BIGNUM *result, BIGNUM *ma, BIGNUM *e, BIGNUM *n,
     BIGNUM *tmp, BIG_CHUNK_TYPE n0)
 {
 
-	int		i, j, k, l, m, p, bit, bitind, bitcount, nlen;
+	int		i, j, k, l, m, p;
+	uint32_t	bit, bitind, bitcount, nlen;
 	double		dn0;
 	double		*dn, *dt, *d16r, *d32r;
 	uint32_t	*nint, *prod;
 	double		*apowers[APOWERS_MAX_SIZE];
-	int		nbits, groupbits, apowerssize;
+	uint32_t	nbits, groupbits, apowerssize;
 	BIG_ERR_CODE	err = BIG_OK;
 
 #ifdef _KERNEL
@@ -2077,7 +2120,7 @@ big_modexp_ncp_float(BIGNUM *result, BIGNUM *ma, BIGNUM *e, BIGNUM *n,
 					}
 					conv_i32_to_d32(d32r, prod, nlen);
 					mont_mulf_noconv(prod, d32r,
-					    apowers[p >> (l+1)],
+					    apowers[p >> (l + 1)],
 					    dt, dn, nint, nlen, dn0);
 					for (m = 0; m < l; m++) {
 						conv_i32_to_d32_and_d16(d32r,
@@ -2183,8 +2226,9 @@ big_modexp_ext(BIGNUM *result, BIGNUM *a, BIGNUM *e, BIGNUM *n, BIGNUM *n_rr,
 		goto ret1;
 	}
 
-	/* set the malloced bit to help cleanup */
+	/* clear the malloced bit to help cleanup */
 	rr.malloced = 0;
+
 	if (n_rr == NULL) {
 		if ((err = big_init1(&rr, 2 * n->len + 1,
 		    rrvalue, arraysize(rrvalue))) != BIG_OK) {
@@ -2381,7 +2425,8 @@ big_sqrt_pos(BIGNUM *result, BIGNUM *n)
 	BIG_CHUNK_TYPE	t2value[BIGTMPSIZE];
 	BIG_CHUNK_TYPE	t3value[BIGTMPSIZE];
 	BIG_CHUNK_TYPE	prodvalue[BIGTMPSIZE];
-	int		i, nbits, diff, nrootbits, highbits;
+	int		i, diff;
+	uint32_t	nbits, nrootbits, highbits;
 	BIG_ERR_CODE	err;
 
 	nbits = big_numbits(n);
@@ -2551,7 +2596,8 @@ ret1:
 BIG_ERR_CODE
 big_Lucas(BIGNUM *Lkminus1, BIGNUM *Lk, BIGNUM *p, BIGNUM *k, BIGNUM *n)
 {
-	int		m, w, i;
+	int		i;
+	uint32_t	m, w;
 	BIG_CHUNK_TYPE	bit;
 	BIGNUM		ki, tmp, tmp2;
 	BIG_CHUNK_TYPE	kivalue[BIGTMPSIZE];
@@ -2569,7 +2615,7 @@ big_Lucas(BIGNUM *Lkminus1, BIGNUM *Lk, BIGNUM *p, BIGNUM *k, BIGNUM *n)
 	    kivalue, arraysize(kivalue))) != BIG_OK)
 		return (err);
 
-	if ((err = big_init1(&tmp, 2 * n->len +1,
+	if ((err = big_init1(&tmp, 2 * n->len + 1,
 	    tmpvalue, arraysize(tmpvalue))) != BIG_OK)
 		goto ret1;
 
@@ -2692,7 +2738,7 @@ big_isprime_pos_ext(BIGNUM *n, big_modexp_ncp_info_t *info)
 		goto ret4;
 	}
 
-	(void) big_sub_pos(&o, n, &big_One); 	/* cannot fail */
+	(void) big_sub_pos(&o, n, &big_One);	/* cannot fail */
 	(void) big_copy(&nminus1, &o);		/* cannot fail */
 	e = 0;
 	while ((o.value[0] & 1) == 0) {
@@ -2781,16 +2827,13 @@ big_isprime_pos(BIGNUM *n)
 
 #define	SIEVESIZE 1000
 
-uint32_t smallprimes[] =
-{
-3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
-51, 53, 59, 61, 67, 71, 73, 79, 83, 89, 91, 97
-};
-
 
 BIG_ERR_CODE
 big_nextprime_pos_ext(BIGNUM *result, BIGNUM *n, big_modexp_ncp_info_t *info)
 {
+	static const uint32_t smallprimes[] = {
+	    3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
+	    51, 53, 59, 61, 67, 71, 73, 79, 83, 89, 91, 97 };
 	BIG_ERR_CODE	err;
 	int		sieve[SIEVESIZE];
 	int		i;
