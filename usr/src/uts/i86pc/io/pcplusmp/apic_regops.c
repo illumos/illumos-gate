@@ -310,6 +310,8 @@ x2apic_send_ipi(int cpun, int ipl)
 	int vector;
 	ulong_t flag;
 
+	ASSERT(apic_mode == LOCAL_X2APIC);
+
 	/*
 	 * With X2APIC, Intel relaxed the semantics of the
 	 * WRMSR instruction such that references to the X2APIC
@@ -344,11 +346,12 @@ x2apic_send_ipi(int cpun, int ipl)
 	APIC_AV_PENDING_SET();
 #endif	/* DEBUG */
 
-	if ((cpun == psm_get_cpu_id()))
-		apic_reg_ops->apic_write(X2APIC_SELF_IPI, vector);
-	else
+	if ((cpun == psm_get_cpu_id())) {
+		X2APIC_WRITE(X2APIC_SELF_IPI, vector);
+	} else {
 		apic_reg_ops->apic_write_int_cmd(
 		    apic_cpus[cpun].aci_local_id, vector);
+	}
 
 	intr_restore(flag);
 }

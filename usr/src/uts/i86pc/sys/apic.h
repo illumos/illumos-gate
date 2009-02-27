@@ -61,7 +61,7 @@ extern "C" {
 /* Logical Destination register */
 #define	APIC_DEST_REG		0x34
 
-/* Destination Format rgister */
+/* Destination Format register */
 #define	APIC_FORMAT_REG		0x38
 
 /* Spurious Interrupt Vector register */
@@ -107,7 +107,7 @@ extern "C" {
 #define	LOCAL_X2APIC		0x3
 
 /* x2APIC SELF IPI Register */
-#define	X2APIC_SELF_IPI		0x100
+#define	X2APIC_SELF_IPI		0xFC
 
 /* General x2APIC constants used at various places */
 #define	APIC_SVR		12

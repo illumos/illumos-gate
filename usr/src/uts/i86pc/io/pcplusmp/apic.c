@@ -1012,10 +1012,11 @@ apic_intr_enter(int ipl, int *vectorp)
 	 * cache usage. So, we leave it as is.
 	 */
 	if (!apic_level_intr[irq]) {
-		if (apic_mode == LOCAL_APIC)
+		if (apic_mode == LOCAL_APIC) {
 			LOCAL_APIC_WRITE_REG(APIC_EOI_REG, 0);
-		else
+		} else {
 			X2APIC_WRITE(APIC_EOI_REG, 0);
+		}
 	}
 
 #ifdef	DEBUG
