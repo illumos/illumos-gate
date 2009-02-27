@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -522,7 +522,8 @@ contract_process_kill(contract_t *ct, proc_t *ex, int checkpriv)
 
 	for (p = list_head(&ctp->conp_members); p != NULL;
 	    p = list_next(&ctp->conp_members, p)) {
-		if ((p == ex) || (pgrp != -1 && p->p_pgrp != pgrp) ||
+		if ((p == ex) ||
+		    (pgrp != -1 && (p->p_stat == SIDL || p->p_pgrp != pgrp)) ||
 		    (checkpriv && !contract_process_cankill(p, ex, ctp)))
 			continue;
 

@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2974,9 +2972,11 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		break;
 #if defined(__x86)
 	case PR_LDT:
+		mutex_exit(&p->p_lock);
 		mutex_enter(&p->p_ldtlock);
 		vap->va_size = prnldt(p) * sizeof (struct ssd);
 		mutex_exit(&p->p_ldtlock);
+		mutex_enter(&p->p_lock);
 		break;
 #endif
 	case PR_USAGE:

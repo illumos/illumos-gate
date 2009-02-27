@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1249,9 +1249,11 @@ startover:
 	{
 		int n;
 
+		mutex_exit(&p->p_lock);
 		mutex_enter(&p->p_ldtlock);
 		n = prnldt(p);
 		mutex_exit(&p->p_ldtlock);
+		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		if (copyout(&n, cmaddr, sizeof (n)))
 			error = EFAULT;
@@ -1263,6 +1265,7 @@ startover:
 		struct ssd *ssd;
 		int n;
 
+		mutex_exit(&p->p_lock);
 		mutex_enter(&p->p_ldtlock);
 		n = prnldt(p);
 
@@ -1276,6 +1279,7 @@ startover:
 		}
 		if (thing == NULL) {
 			mutex_exit(&p->p_ldtlock);
+			mutex_enter(&p->p_lock);
 			prunlock(pnp);
 			goto startover;
 		}
@@ -1285,6 +1289,7 @@ startover:
 		if (n != 0)
 			prgetldt(p, ssd);
 		mutex_exit(&p->p_ldtlock);
+		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 
 		/* mark the end of the list with a null entry */
@@ -2884,9 +2889,11 @@ startover:
 	{
 		int n;
 
+		mutex_exit(&p->p_lock);
 		mutex_enter(&p->p_ldtlock);
 		n = prnldt(p);
 		mutex_exit(&p->p_ldtlock);
+		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		if (copyout(&n, cmaddr, sizeof (n)))
 			error = EFAULT;
@@ -2898,6 +2905,7 @@ startover:
 		struct ssd *ssd;
 		int n;
 
+		mutex_exit(&p->p_lock);
 		mutex_enter(&p->p_ldtlock);
 		n = prnldt(p);
 
@@ -2911,6 +2919,7 @@ startover:
 		}
 		if (thing == NULL) {
 			mutex_exit(&p->p_ldtlock);
+			mutex_enter(&p->p_lock);
 			prunlock(pnp);
 			goto startover;
 		}
@@ -2920,6 +2929,7 @@ startover:
 		if (n != 0)
 			prgetldt(p, ssd);
 		mutex_exit(&p->p_ldtlock);
+		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 
 		/* mark the end of the list with a null entry */
