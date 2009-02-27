@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -372,7 +372,8 @@ proc_object(char *optarg)
 			if (IN6_IS_ADDR_V4MAPPED(
 			    (in6_addr_t *)he->h_addr_list[0])) {
 				/* address is IPv4 (32 bits) */
-				(void) memcpy(&obj_id, he->h_addr_list[0], 4);
+				(void) memcpy(&obj_id,
+				    he->h_addr_list[0] + 12, 4);
 				ip_type = AU_IPv4;
 			} else {
 				(void) memcpy(ip_ipv6, he->h_addr_list[0], 16);
