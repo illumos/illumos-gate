@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,6 +153,7 @@ enum {
 	CRC32,		/* for crc32, with different size operands */
 	XADDB,		/* for xaddb */
 	MOVSXZ,		/* AMD64 mov sign extend 32 to 64 bit instruction */
+	MOVBE,		/* movbe instruction */
 
 /*
  * MMX/SIMD addressing modes.
@@ -811,6 +812,20 @@ const instable_t dis_opSIMDrepz[256] = {
 /*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 };
 
+/*
+ * The following two tables are used to encode crc32 and movbe
+ * since they share the same opcodes.
+ */
+const instable_t dis_op0F38F0[2] = {
+/*  [00]  */	TNS("crc32b",CRC32),
+		TS("movbe",MOVBE),
+};
+
+const instable_t dis_op0F38F1[2] = {
+/*  [00]  */	TS("crc32",CRC32),
+		TS("movbe",MOVBE),
+};
+
 const instable_t dis_op0F38[256] = {
 /*  [00]  */	TNSZ("pshufb",XMM_66o,16),TNSZ("phaddw",XMM_66o,16),TNSZ("phaddd",XMM_66o,16),TNSZ("phaddsw",XMM_66o,16),
 /*  [04]  */	TNSZ("pmaddubsw",XMM_66o,16),TNSZ("phsubw",XMM_66o,16),	TNSZ("phsubd",XMM_66o,16),TNSZ("phsubsw",XMM_66o,16),
@@ -886,8 +901,7 @@ const instable_t dis_op0F38[256] = {
 /*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
-
-/*  [F0]  */	TNS("crc32b",CRC32),	TS("crc32",CRC32),	INVALID,		INVALID,
+/*  [F0]  */	IND(dis_op0F38F0),	IND(dis_op0F38F1),	INVALID,		INVALID,
 /*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -2127,6 +2141,21 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 			if (dtrace_get_opcode(x, &opcode6, &opcode7) != 0)
 				goto error;
 			dp = (instable_t *)&dis_op0F38[(opcode6<<4)|opcode7];
+
+			/*
+			 * Both crc32 and movbe have the same 3rd opcode
+			 * byte of either 0xF0 or 0xF1, so we use another
+			 * indirection to distinguish between the two.
+			 */
+			if (dp->it_indirect == (instable_t *)dis_op0F38F0 ||
+			    dp->it_indirect == (instable_t *)dis_op0F38F1) {
+
+				dp = dp->it_indirect;
+				if (rep_prefix != 0xF2) {
+					/* It is movbe */
+					dp++;
+				}
+			}
 #ifdef DIS_TEXT
 			if (strcmp(dp->it_name, "INVALID") == 0)
 				goto error;
@@ -2154,6 +2183,11 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 						goto error;
 					}
 					rep_prefix = 0;
+					break;
+				case MOVBE:
+					if (rep_prefix != 0x0) {
+						goto error;
+					}
 					break;
 				default:
 					goto error;
@@ -2434,6 +2468,27 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		if (opnd_size_prefix)
 			x->d86_opnd_size = opnd_size = SIZE16;
 		dtrace_get_operand(x, mode, r_m, wbit, 0);
+		break;
+	case MOVBE:
+		opnd_size = SIZE32;
+		if (rex_prefix & REX_W)
+			opnd_size = SIZE64;
+		x->d86_opnd_size = opnd_size;
+
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
+		wbit = WBIT(opcode7);
+		if (opnd_size_prefix)
+			x->d86_opnd_size = opnd_size = SIZE16;
+		if (wbit) {
+			/* reg -> mem */
+			dtrace_get_operand(x, REG_ONLY, reg, LONG_OPND, 0);
+			dtrace_get_operand(x, mode, r_m, wbit, 1);
+		} else {
+			/* mem -> reg */
+			dtrace_get_operand(x, REG_ONLY, reg, LONG_OPND, 1);
+			dtrace_get_operand(x, mode, r_m, wbit, 0);
+		}
 		break;
 
 	/*
