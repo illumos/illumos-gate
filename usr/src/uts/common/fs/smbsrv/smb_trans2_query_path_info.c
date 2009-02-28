@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -375,7 +375,11 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name))
 	    != 0) {
 		kmem_free(name, MAXNAMELEN);
-		smbsr_errno(sr, rc);
+		if (rc == ENOENT)
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		else
+			smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
@@ -389,7 +393,11 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
 
-		smbsr_errno(sr, rc);
+		if (rc == ENOENT)
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		else
+			smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
@@ -457,6 +465,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_BASIC_INFO:
+	case SMB_FILE_BASIC_INFORMATION:
 		/*
 		 * NT includes 6 undocumented bytes at the end of this
 		 * response, which are required by NetBench 5.01.
@@ -472,6 +481,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_STANDARD_INFO:
+	case SMB_FILE_STANDARD_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		/*
 		 * Add 2 bytes to pad data to long. It is
@@ -571,6 +581,19 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "q",
 		    ap->sa_vattr.va_nodeid);
+		break;
+
+	case SMB_FILE_ATTR_TAG_INFORMATION:
+		/*
+		 * If dattr includes FILE_ATTRIBUTE_REPARSE_POINT, the
+		 * second dword should be the reparse tag.  Otherwise
+		 * the tag value should be set to zero.
+		 * We don't support reparse points, so we set the tag
+		 * to zero.
+		 */
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "ll",
+		    (uint32_t)dattr, 0);
 		break;
 
 	default:

@@ -117,10 +117,10 @@ smb_omode_to_amask(uint32_t desired_access)
 
 	case SMB_DA_ACCESS_EXECUTE:
 		return (FILE_GENERIC_EXECUTE);
-	}
 
-	/* invalid open mode */
-	return ((uint32_t)SMB_INVALID_AMASK);
+	default:
+		return (FILE_GENERIC_ALL);
+	}
 }
 
 /*
@@ -149,11 +149,9 @@ smb_denymode_to_sharemode(uint32_t desired_access, char *fname)
 		return (FILE_SHARE_WRITE);
 
 	case SMB_DA_SHARE_DENY_NONE:
+	default:
 		return (FILE_SHARE_READ | FILE_SHARE_WRITE);
 	}
-
-	/* invalid deny mode */
-	return ((uint32_t)SMB_INVALID_SHAREMODE);
 }
 
 /*
@@ -176,7 +174,7 @@ smb_ofun_to_crdisposition(uint16_t  ofun)
 	int col = (ofun & SMB_OFUN_CREATE_MASK) >> 4;
 
 	if (row == 3)
-		return ((uint32_t)SMB_INVALID_CRDISPOSITION);
+		return (FILE_MAXIMUM_DISPOSITION + 1);
 
 	return (ofun_cr_map[row][col]);
 }
@@ -204,6 +202,11 @@ smb_common_open(smb_request_t *sr)
 	if (status == NT_STATUS_SHARING_VIOLATION) {
 		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 		    ERRDOS, ERROR_SHARING_VIOLATION);
+	}
+
+	if (status == NT_STATUS_NO_SUCH_FILE) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+		    ERRDOS, ERROR_FILE_NOT_FOUND);
 	}
 
 	return (status);
@@ -293,28 +296,27 @@ smb_common_open(smb_request_t *sr)
  * 4. Opening an existing file or directory
  *    The request attributes are ignored.
  */
-
 static uint32_t
 smb_open_subr(smb_request_t *sr)
 {
-	int			created = 0;
-	struct smb_node		*node = 0;
-	struct smb_node		*dnode = 0;
-	struct smb_node		*cur_node;
-	struct open_param	*op = &sr->arg.open;
-	int			rc;
-	struct smb_ofile	*of;
-	smb_attr_t		new_attr;
-	int			pathlen;
-	int			max_requested = 0;
-	uint32_t		max_allowed;
-	uint32_t		status = NT_STATUS_SUCCESS;
-	int			is_dir;
-	smb_error_t		err;
-	int			is_stream = 0;
-	int			lookup_flags = SMB_FOLLOW_LINKS;
-	uint32_t		daccess;
-	uint32_t		uniq_fid;
+	int		created = 0;
+	smb_node_t	*node = NULL;
+	smb_node_t	*dnode = NULL;
+	smb_node_t	*cur_node;
+	open_param_t	*op = &sr->arg.open;
+	int		rc;
+	smb_ofile_t	*of;
+	smb_attr_t	new_attr;
+	int		pathlen;
+	int		max_requested = 0;
+	uint32_t	max_allowed;
+	uint32_t	status = NT_STATUS_SUCCESS;
+	int		is_dir;
+	smb_error_t	err;
+	boolean_t	is_stream = B_FALSE;
+	int		lookup_flags = SMB_FOLLOW_LINKS;
+	uint32_t	daccess;
+	uint32_t	uniq_fid;
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
 
@@ -479,7 +481,7 @@ smb_open_subr(smb_request_t *sr)
 			}
 		} else {
 			if ((op->create_options & FILE_DIRECTORY_FILE) ||
-			    (op->my_flags & MYF_MUST_BE_DIRECTORY)) {
+			    (op->nt_flags & NT_CREATE_FLAG_OPEN_TARGET_DIR)) {
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
@@ -537,9 +539,10 @@ smb_open_subr(smb_request_t *sr)
 		}
 
 		if (smb_oplock_conflict(node, sr->session, op))
-			smb_oplock_break(node);
+			(void) smb_oplock_break(node,
+			    SMB_SESSION_GET_ID(sr->session), B_FALSE);
 
-		rw_enter(&node->n_share_lock, RW_WRITER);
+		smb_node_wrlock(node);
 
 		if ((op->create_disposition == FILE_SUPERSEDE) ||
 		    (op->create_disposition == FILE_OVERWRITE_IF) ||
@@ -549,8 +552,8 @@ smb_open_subr(smb_request_t *sr)
 			    (FILE_WRITE_DATA | FILE_APPEND_DATA |
 			    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))) ||
 			    (!smb_sattr_check(node->attr.sa_dosattr,
-			    op->dattr, NULL))) {
-				rw_exit(&node->n_share_lock);
+			    op->dattr))) {
+				smb_node_unlock(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
@@ -564,7 +567,7 @@ smb_open_subr(smb_request_t *sr)
 		    op->desired_access, op->share_access);
 
 		if (status == NT_STATUS_SHARING_VIOLATION) {
-			rw_exit(&node->n_share_lock);
+			smb_node_unlock(node);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -577,7 +580,7 @@ smb_open_subr(smb_request_t *sr)
 		if (status != NT_STATUS_SUCCESS) {
 			smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
 
-			rw_exit(&node->n_share_lock);
+			smb_node_unlock(node);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -599,7 +602,7 @@ smb_open_subr(smb_request_t *sr)
 		case FILE_OVERWRITE:
 			if (node->attr.sa_vattr.va_type == VDIR) {
 				smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
-				rw_exit(&node->n_share_lock);
+				smb_node_unlock(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
@@ -620,7 +623,7 @@ smb_open_subr(smb_request_t *sr)
 				if (rc) {
 					smb_fsop_unshrlock(sr->user_cr, node,
 					    uniq_fid);
-					rw_exit(&node->n_share_lock);
+					smb_node_unlock(node);
 					smb_node_release(node);
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
@@ -659,7 +662,6 @@ smb_open_subr(smb_request_t *sr)
 			break;
 		}
 	} else {
-
 		/* Last component was not found. */
 		dnode = op->fqi.dir_snode;
 
@@ -675,11 +677,20 @@ smb_open_subr(smb_request_t *sr)
 			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 		}
 
+		if ((is_dir == 0) && (!is_stream) &&
+		    smb_is_invalid_filename(op->fqi.last_comp)) {
+			smb_node_release(dnode);
+			SMB_NULL_FQI_NODES(op->fqi);
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+			    ERRDOS, ERROR_INVALID_NAME);
+			return (NT_STATUS_OBJECT_NAME_INVALID);
+		}
+
 		/*
 		 * lock the parent dir node in case another create
 		 * request to the same parent directory comes in.
 		 */
-		smb_rwx_rwenter(&dnode->n_lock, RW_WRITER);
+		smb_node_wrlock(dnode);
 
 		bzero(&new_attr, sizeof (new_attr));
 		new_attr.sa_dosattr = op->dattr;
@@ -722,7 +733,7 @@ smb_open_subr(smb_request_t *sr)
 			    &op->fqi.last_snode, &op->fqi.last_attr);
 
 			if (rc != 0) {
-				smb_rwx_rwexit(&dnode->n_lock);
+				smb_node_unlock(dnode);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
@@ -733,16 +744,16 @@ smb_open_subr(smb_request_t *sr)
 
 			op->fqi.last_attr = node->attr;
 
-			rw_enter(&node->n_share_lock, RW_WRITER);
+			smb_node_wrlock(node);
 
 			status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
 			    op->desired_access, op->share_access);
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
-				rw_exit(&node->n_share_lock);
-				smb_rwx_rwexit(&dnode->n_lock);
+				smb_node_unlock(node);
 				SMB_DEL_NEWOBJ(op->fqi);
 				smb_node_release(node);
+				smb_node_unlock(dnode);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				return (status);
@@ -757,7 +768,7 @@ smb_open_subr(smb_request_t *sr)
 			    op->fqi.last_comp, &new_attr,
 			    &op->fqi.last_snode, &op->fqi.last_attr);
 			if (rc != 0) {
-				smb_rwx_rwexit(&dnode->n_lock);
+				smb_node_unlock(dnode);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
@@ -765,7 +776,7 @@ smb_open_subr(smb_request_t *sr)
 			}
 
 			node = op->fqi.last_snode;
-			rw_enter(&node->n_share_lock, RW_WRITER);
+			smb_node_wrlock(node);
 		}
 
 		created = 1;
@@ -808,42 +819,14 @@ smb_open_subr(smb_request_t *sr)
 		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
 
 		SMB_DEL_NEWOBJ(op->fqi);
-		rw_exit(&node->n_share_lock);
+		smb_node_unlock(node);
 		smb_node_release(node);
 		if (created)
-			smb_rwx_rwexit(&dnode->n_lock);
+			smb_node_unlock(dnode);
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_error(sr, err.status, err.errcls, err.errcode);
 		return (err.status);
-	}
-
-	if (op->fqi.last_attr.sa_vattr.va_type == VREG) {
-		status = smb_oplock_acquire(sr, of, op);
-
-		if (status != NT_STATUS_SUCCESS) {
-			rw_exit(&node->n_share_lock);
-			/*
-			 * smb_fsop_unshrlock() and smb_fsop_close()
-			 * are called from smb_ofile_close()
-			 */
-			smb_ofile_close(of, 0);
-			smb_ofile_release(of);
-			if (created)
-				smb_rwx_rwexit(&dnode->n_lock);
-
-			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
-
-			smbsr_error(sr, status,
-			    ERRDOS, ERROR_SHARING_VIOLATION);
-			return (status);
-		}
-
-		op->dsize = op->fqi.last_attr.sa_vattr.va_size;
-	} else { /* VDIR or VLNK */
-		op->my_flags &= ~MYF_OPLOCK_MASK;
-		op->dsize = 0;
 	}
 
 	/*
@@ -863,10 +846,18 @@ smb_open_subr(smb_request_t *sr)
 	sr->smb_fid = of->f_fid;
 	sr->fid_ofile = of;
 
-	rw_exit(&node->n_share_lock);
+	smb_node_unlock(node);
 
 	if (created)
-		smb_rwx_rwexit(&dnode->n_lock);
+		smb_node_unlock(dnode);
+
+	if (op->fqi.last_attr.sa_vattr.va_type == VREG) {
+		smb_oplock_acquire(node, of, op);
+		op->dsize = op->fqi.last_attr.sa_vattr.va_size;
+	} else { /* VDIR or VLNK */
+		op->op_oplock_level = SMB_OPLOCK_NONE;
+		op->dsize = 0;
+	}
 
 	smb_node_release(dnode);
 	SMB_NULL_FQI_NODES(op->fqi);

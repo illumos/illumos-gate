@@ -22,9 +22,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_node.c	1.9	08/08/07 SMI"
-
 /*
  * SMB Node State Machine
  * ----------------------
@@ -82,18 +79,29 @@
  */
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
+#include <smbsrv/smb_kstat.h>
 #include <sys/pathname.h>
 #include <sys/sdt.h>
 #include <sys/nbmlock.h>
 
-uint32_t smb_is_executable(char *path);
-static void smb_node_delete_on_close(smb_node_t *node);
+uint32_t smb_is_executable(char *);
+static void smb_node_delete_on_close(smb_node_t *);
+static void smb_node_create_audit_buf(smb_node_t *, int);
+static void smb_node_destroy_audit_buf(smb_node_t *);
+static void smb_node_audit(smb_node_t *);
+static smb_node_t *smb_node_alloc(char *, vnode_t *, smb_attr_t *,
+    smb_llist_t *bucket, uint32_t hashkey);
+static void smb_node_free(smb_node_t *);
+static int smb_node_constructor(void *, void *, int);
+static void smb_node_destructor(void *, void *);
+static smb_llist_t *smb_node_get_hash(fsid_t *, smb_attr_t *, uint32_t *);
 
 #define	VALIDATE_DIR_NODE(_dir_, _node_) \
     ASSERT((_dir_)->n_magic == SMB_NODE_MAGIC); \
     ASSERT(((_dir_)->vp->v_xattrdir) || ((_dir_)->vp->v_type == VDIR)); \
     ASSERT((_dir_)->dir_snode != (_node_));
 
+static kmem_cache_t	*smb_node_cache = NULL;
 static boolean_t	smb_node_initialized = B_FALSE;
 static smb_llist_t	smb_node_hash_table[SMBND_HASH_MASK+1];
 
@@ -112,6 +120,9 @@ smb_node_init(void)
 
 	if (smb_node_initialized)
 		return (0);
+	smb_node_cache = kmem_cache_create(SMBSRV_KSTAT_NODE_CACHE,
+	    sizeof (smb_node_t), 8, smb_node_constructor, smb_node_destructor,
+	    NULL, NULL, NULL, 0);
 
 	for (i = 0; i <= SMBND_HASH_MASK; i++) {
 		smb_llist_constructor(&smb_node_hash_table[i],
@@ -160,6 +171,8 @@ smb_node_fini(void)
 	for (i = 0; i <= SMBND_HASH_MASK; i++) {
 		smb_llist_destructor(&smb_node_hash_table[i]);
 	}
+	kmem_cache_destroy(smb_node_cache);
+	smb_node_cache = NULL;
 	smb_node_initialized = B_FALSE;
 }
 
@@ -237,9 +250,7 @@ smb_node_lookup(
 		fsid = vp->v_vfsp->vfs_fsid;
 	}
 
-	hashkey = fsid.val[0] + attr->sa_vattr.va_nodeid;
-	hashkey += (hashkey >> 24) + (hashkey >> 16) + (hashkey >> 8);
-	node_hdr = &smb_node_hash_table[(hashkey & SMBND_HASH_MASK)];
+	node_hdr = smb_node_get_hash(&fsid, attr, &hashkey);
 	lock_mode = RW_READER;
 
 	smb_llist_enter(node_hdr, lock_mode);
@@ -249,10 +260,12 @@ smb_node_lookup(
 			ASSERT(node->n_magic == SMB_NODE_MAGIC);
 			ASSERT(node->n_hash_bucket == node_hdr);
 			if ((node->n_hashkey == hashkey) && (node->vp == vp)) {
-				smb_rwx_xenter(&node->n_lock);
+				mutex_enter(&node->n_mutex);
 				DTRACE_PROBE1(smb_node_lookup_hit,
 				    smb_node_t *, node);
 				switch (node->n_state) {
+				case SMB_NODE_STATE_OPLOCK_GRANTED:
+				case SMB_NODE_STATE_OPLOCK_BREAKING:
 				case SMB_NODE_STATE_AVAILABLE:
 					/* The node was found. */
 					node->n_refcnt++;
@@ -268,8 +281,8 @@ smb_node_lookup(
 					node->attr = *attr;
 					node->n_size = attr->sa_vattr.va_size;
 
-					smb_audit_node(node);
-					smb_rwx_xexit(&node->n_lock);
+					smb_node_audit(node);
+					mutex_exit(&node->n_mutex);
 					smb_llist_exit(node_hdr);
 					return (node);
 
@@ -279,7 +292,7 @@ smb_node_lookup(
 					 * to be destroyed. We act as it hasn't
 					 * been found.
 					 */
-					smb_rwx_xexit(&node->n_lock);
+					mutex_exit(&node->n_mutex);
 					break;
 				default:
 					/*
@@ -288,7 +301,7 @@ smb_node_lookup(
 					 * been found.
 					 */
 					ASSERT(0);
-					smb_rwx_xexit(&node->n_lock);
+					mutex_exit(&node->n_mutex);
 					break;
 				}
 			}
@@ -300,34 +313,9 @@ smb_node_lookup(
 		}
 		break;
 	}
-	node = kmem_cache_alloc(sr->sr_server->si_cache_node, KM_SLEEP);
-	bzero(node, sizeof (smb_node_t));
-
-	node->n_state = SMB_NODE_STATE_AVAILABLE;
-	node->n_hash_bucket = node_hdr;
-	node->n_sr = sr;
-	node->vp = vp;
-	VN_HOLD(node->vp);
-	node->n_hashkey = hashkey;
-	node->n_refcnt = 1;
-	node->attr = *attr;
-	node->flags |= NODE_FLAGS_ATTR_VALID;
-	node->n_size = node->attr.sa_vattr.va_size;
-	node->n_orig_session_id = sr->session->s_kid;
+	node = smb_node_alloc(od_name, vp, attr, node_hdr, hashkey);
 	node->n_orig_uid = crgetuid(sr->user_cr);
-	node->n_cache = sr->sr_server->si_cache_node;
 
-	ASSERT(od_name);
-	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
-
-	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
-	    offsetof(smb_ofile_t, f_nnd));
-	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
-	    offsetof(smb_lock_t, l_lnd));
-
-
-	if (strcmp(od_name, XATTR_DIR) == 0)
-		node->flags |= NODE_XATTR_DIR;
 	if (op)
 		node->flags |= smb_is_executable(op->fqi.last_comp);
 
@@ -344,13 +332,9 @@ smb_node_lookup(
 		node->unnamed_stream_node = unnamed_node;
 	}
 
-	smb_rwx_init(&node->n_lock);
-	node->n_magic = SMB_NODE_MAGIC;
-	smb_audit_buf_node_create(node);
 	DTRACE_PROBE1(smb_node_lookup_miss, smb_node_t *, node);
-	smb_audit_node(node);
+	smb_node_audit(node);
 	smb_llist_insert_head(node_hdr, node);
-
 	smb_llist_exit(node_hdr);
 	return (node);
 }
@@ -364,7 +348,7 @@ smb_node_lookup(
  */
 
 smb_node_t *
-smb_stream_node_lookup(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
+smb_stream_node_lookup(smb_request_t *sr, cred_t *cr, smb_node_t *fnode,
     vnode_t *xattrdirvp, vnode_t *vp, char *stream_name, smb_attr_t *ret_attr)
 {
 	smb_node_t	*xattrdir_node;
@@ -398,20 +382,25 @@ smb_stream_node_lookup(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
  * Care also needs to be taken with respect to racing deallocations of a
  * structure.
  */
-
 void
 smb_node_ref(smb_node_t *node)
 {
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(node);
 
-	smb_rwx_xenter(&node->n_lock);
-	node->n_refcnt++;
-	ASSERT(node->n_refcnt);
-	DTRACE_PROBE1(smb_node_ref_exit, smb_node_t *, node);
-	smb_audit_node(node);
-	smb_rwx_xexit(&node->n_lock);
+	mutex_enter(&node->n_mutex);
+	switch (node->n_state) {
+	case SMB_NODE_STATE_AVAILABLE:
+	case SMB_NODE_STATE_OPLOCK_GRANTED:
+	case SMB_NODE_STATE_OPLOCK_BREAKING:
+		node->n_refcnt++;
+		ASSERT(node->n_refcnt);
+		DTRACE_PROBE1(smb_node_ref_exit, smb_node_t *, node);
+		smb_node_audit(node);
+		break;
+	default:
+		SMB_PANIC();
+	}
+	mutex_exit(&node->n_mutex);
 }
 
 /*
@@ -438,10 +427,9 @@ smb_node_ref(smb_node_t *node)
 void
 smb_node_release(smb_node_t *node)
 {
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
+	SMB_NODE_VALID(node);
 
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 	ASSERT(node->n_refcnt);
 	DTRACE_PROBE1(smb_node_release, smb_node_t *, node);
 	if (--node->n_refcnt == 0) {
@@ -449,7 +437,7 @@ smb_node_release(smb_node_t *node)
 
 		case SMB_NODE_STATE_AVAILABLE:
 			node->n_state = SMB_NODE_STATE_DESTROYING;
-			smb_rwx_xexit(&node->n_lock);
+			mutex_exit(&node->n_mutex);
 
 			smb_llist_enter(node->n_hash_bucket, RW_WRITER);
 			smb_llist_remove(node->n_hash_bucket, node);
@@ -459,11 +447,6 @@ smb_node_release(smb_node_t *node)
 			 * Check if the file was deleted
 			 */
 			smb_node_delete_on_close(node);
-			node->n_magic = (uint32_t)~SMB_NODE_MAGIC;
-
-			/* These lists should be empty. */
-			smb_llist_destructor(&node->n_ofile_list);
-			smb_llist_destructor(&node->n_lock_list);
 
 			if (node->dir_snode) {
 				ASSERT(node->dir_snode->n_magic ==
@@ -477,21 +460,15 @@ smb_node_release(smb_node_t *node)
 				smb_node_release(node->unnamed_stream_node);
 			}
 
-			ASSERT(node->vp);
-			VN_RELE(node->vp);
-
-			smb_audit_buf_node_destroy(node);
-			smb_rwx_destroy(&node->n_lock);
-			kmem_cache_free(node->n_cache, node);
+			smb_node_free(node);
 			return;
 
 		default:
-			ASSERT(0);
-			break;
+			SMB_PANIC();
 		}
 	}
-	smb_audit_node(node);
-	smb_rwx_xexit(&node->n_lock);
+	smb_node_audit(node);
+	mutex_exit(&node->n_mutex);
 }
 
 static void
@@ -523,39 +500,37 @@ smb_node_delete_on_close(smb_node_t *node)
  * smb_node_rename()
  *
  */
-int
+void
 smb_node_rename(
-    smb_node_t	*from_dir_snode,
-    smb_node_t	*ret_snode,
-    smb_node_t	*to_dir_snode,
+    smb_node_t	*from_dnode,
+    smb_node_t	*ret_node,
+    smb_node_t	*to_dnode,
     char	*to_name)
 {
-	ASSERT(from_dir_snode);
-	ASSERT(to_dir_snode);
-	ASSERT(ret_snode);
-	ASSERT(from_dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(to_dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(ret_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(from_dir_snode->n_state == SMB_NODE_STATE_AVAILABLE);
-	ASSERT(to_dir_snode->n_state == SMB_NODE_STATE_AVAILABLE);
-	ASSERT(ret_snode->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(from_dnode);
+	SMB_NODE_VALID(to_dnode);
+	SMB_NODE_VALID(ret_node);
 
-	smb_node_ref(to_dir_snode);
-	smb_rwx_xenter(&ret_snode->n_lock);
-	ret_snode->dir_snode = to_dir_snode;
-	smb_rwx_xexit(&ret_snode->n_lock);
-	ASSERT(to_dir_snode->dir_snode != ret_snode);
-	ASSERT((to_dir_snode->vp->v_xattrdir) ||
-	    (to_dir_snode->vp->v_type == VDIR));
-	smb_node_release(from_dir_snode);
-
-	(void) strcpy(ret_snode->od_name, to_name);
-
-	/*
-	 * XXX Need to update attributes?
-	 */
-
-	return (0);
+	smb_node_ref(to_dnode);
+	mutex_enter(&ret_node->n_mutex);
+	switch (ret_node->n_state) {
+	case SMB_NODE_STATE_AVAILABLE:
+	case SMB_NODE_STATE_OPLOCK_GRANTED:
+	case SMB_NODE_STATE_OPLOCK_BREAKING:
+		ret_node->dir_snode = to_dnode;
+		mutex_exit(&ret_node->n_mutex);
+		ASSERT(to_dnode->dir_snode != ret_node);
+		ASSERT((to_dnode->vp->v_xattrdir) ||
+		    (to_dnode->vp->v_type == VDIR));
+		smb_node_release(from_dnode);
+		(void) strcpy(ret_node->od_name, to_name);
+		/*
+		 * XXX Need to update attributes?
+		 */
+		break;
+	default:
+		SMB_PANIC();
+	}
 }
 
 int
@@ -567,12 +542,6 @@ smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
 	smb_llist_t	*node_hdr;
 	smb_node_t	*node;
 
-	/*
-	 * Take an explicit hold on rootdir.  This goes with the
-	 * corresponding release in smb_node_root_fini()/smb_node_release().
-	 */
-	VN_HOLD(vp);
-
 	va.sa_mask = SMB_AT_ALL;
 	error = smb_vop_getattr(vp, NULL, &va, 0, kcred);
 	if (error) {
@@ -580,42 +549,16 @@ smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
 		return (error);
 	}
 
-	hashkey = vp->v_vfsp->vfs_fsid.val[0] + va.sa_vattr.va_nodeid;
-	hashkey += (hashkey >> 24) + (hashkey >> 16) + (hashkey >> 8);
-	node_hdr = &smb_node_hash_table[(hashkey & SMBND_HASH_MASK)];
+	node_hdr = smb_node_get_hash(&vp->v_vfsp->vfs_fsid, &va, &hashkey);
 
-	node = kmem_cache_alloc(sv->si_cache_node, KM_SLEEP);
-	bzero(node, sizeof (smb_node_t));
-
-	node->n_state = SMB_NODE_STATE_AVAILABLE;
-	node->n_hash_bucket = node_hdr;
-	node->vp = vp;
-	node->n_hashkey = hashkey;
-	node->n_refcnt = 1;
-	node->attr = va;
-	node->flags |= NODE_FLAGS_ATTR_VALID;
-	node->n_size = node->attr.sa_vattr.va_size;
-	node->n_cache = sv->si_cache_node;
-	(void) strlcpy(node->od_name, ROOTVOL, sizeof (node->od_name));
-
-	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
-	    offsetof(smb_ofile_t, f_nnd));
-	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
-	    offsetof(smb_lock_t, l_lnd));
-
-	smb_rwx_init(&node->n_lock);
-	node->n_magic = SMB_NODE_MAGIC;
-	smb_audit_buf_node_create(node);
+	node = smb_node_alloc(ROOTVOL, vp, &va, node_hdr, hashkey);
 
 	sv->si_root_smb_node = node;
-
-	smb_audit_node(node);
+	smb_node_audit(node);
 	smb_llist_enter(node_hdr, RW_WRITER);
 	smb_llist_insert_head(node_hdr, node);
 	smb_llist_exit(node_hdr);
-
 	*root = node;
-
 	return (0);
 }
 
@@ -630,12 +573,12 @@ smb_node_get_size(smb_node_t *node, smb_attr_t *attr)
 	if (attr->sa_vattr.va_type == VDIR)
 		return (0);
 
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 	if (node && (node->flags & NODE_FLAGS_SET_SIZE))
 		size = node->n_size;
 	else
 		size = attr->sa_vattr.va_size;
-	smb_rwx_xexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 	return (size);
 }
 
@@ -662,9 +605,13 @@ timeval_cmp(timestruc_t *a, timestruc_t *b)
  * will be updated when client close the file.
  */
 void
-smb_node_set_time(struct smb_node *node, struct timestruc *crtime,
-    struct timestruc *mtime, struct timestruc *atime,
-    struct timestruc *ctime, unsigned int what)
+smb_node_set_time(
+    smb_node_t	*node,
+    timestruc_t	*crtime,
+    timestruc_t	*mtime,
+    timestruc_t	*atime,
+    timestruc_t	*ctime,
+    uint_t	what)
 {
 	if (what == 0)
 		return;
@@ -675,7 +622,7 @@ smb_node_set_time(struct smb_node *node, struct timestruc *crtime,
 	    (what & SMB_AT_CTIME && ctime == 0))
 		return;
 
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 
 	if ((what & SMB_AT_CRTIME) &&
 	    timeval_cmp((timestruc_t *)&node->attr.sa_crtime,
@@ -731,7 +678,7 @@ smb_node_set_time(struct smb_node *node, struct timestruc *crtime,
 	} else {
 		gethrestime(&node->attr.sa_vattr.va_ctime);
 	}
-	smb_rwx_xexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 }
 
 
@@ -773,12 +720,12 @@ smb_node_set_dosattr(smb_node_t *node, uint32_t dosattr)
 	    FILE_ATTRIBUTE_READONLY |
 	    FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
 
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 	if (node->attr.sa_dosattr != mode) {
 		node->attr.sa_dosattr = mode;
 		node->what |= SMB_AT_DOSATTR;
 	}
-	smb_rwx_xexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 }
 
 /*
@@ -812,7 +759,7 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr)
 {
 	int	rc = -1;
 
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 	if (!(node->attr.sa_dosattr & FILE_ATTRIBUTE_READONLY) &&
 	    !(node->flags & NODE_FLAGS_DELETE_ON_CLOSE)) {
 		crhold(cr);
@@ -820,20 +767,20 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr)
 		node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
 		rc = 0;
 	}
-	smb_rwx_xexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 	return (rc);
 }
 
 void
 smb_node_reset_delete_on_close(smb_node_t *node)
 {
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
 		node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
 		crfree(node->delete_on_close_cred);
 		node->delete_on_close_cred = NULL;
 	}
-	smb_rwx_xexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 }
 
 /*
@@ -846,15 +793,16 @@ smb_node_reset_delete_on_close(smb_node_t *node)
  * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
  */
 uint32_t
-smb_node_open_check(struct smb_node *node, cred_t *cr,
-    uint32_t desired_access, uint32_t share_access)
+smb_node_open_check(
+    smb_node_t	*node,
+    cred_t	*cr,
+    uint32_t	desired_access,
+    uint32_t	share_access)
 {
 	smb_ofile_t *of;
 	uint32_t status;
 
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(node);
 
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	of = smb_llist_head(&node->n_ofile_list);
@@ -879,19 +827,16 @@ smb_node_open_check(struct smb_node *node, cred_t *cr,
 }
 
 uint32_t
-smb_node_rename_check(struct smb_node *node)
+smb_node_rename_check(smb_node_t *node)
 {
-	struct smb_ofile *of;
-	uint32_t status;
+	smb_ofile_t	*of;
+	uint32_t	status;
 
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(node);
 
 	/*
 	 * Intra-CIFS check
 	 */
-
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	of = smb_llist_head(&node->n_ofile_list);
 	while (of) {
@@ -913,7 +858,6 @@ smb_node_rename_check(struct smb_node *node)
 	/*
 	 * system-wide share check
 	 */
-
 	if (nbl_share_conflict(node->vp, NBL_RENAME, NULL))
 		return (NT_STATUS_SHARING_VIOLATION);
 	else
@@ -923,12 +867,10 @@ smb_node_rename_check(struct smb_node *node)
 uint32_t
 smb_node_delete_check(smb_node_t *node)
 {
-	smb_ofile_t *of;
-	uint32_t status;
+	smb_ofile_t	*of;
+	uint32_t	status;
 
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(node);
 
 	if (node->attr.sa_vattr.va_type == VDIR)
 		return (NT_STATUS_SUCCESS);
@@ -936,7 +878,6 @@ smb_node_delete_check(smb_node_t *node)
 	/*
 	 * intra-CIFS check
 	 */
-
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	of = smb_llist_head(&node->n_ofile_list);
 	while (of) {
@@ -958,7 +899,6 @@ smb_node_delete_check(smb_node_t *node)
 	/*
 	 * system-wide share check
 	 */
-
 	if (nbl_share_conflict(node->vp, NBL_REMOVE, NULL))
 		return (NT_STATUS_SHARING_VIOLATION);
 	else
@@ -975,7 +915,7 @@ smb_node_delete_check(smb_node_t *node)
 void
 smb_node_start_crit(smb_node_t *node, krw_t mode)
 {
-	rw_enter(&node->n_share_lock, mode);
+	rw_enter(&node->n_lock, mode);
 	nbl_start_crit(node->vp, mode);
 }
 
@@ -989,11 +929,260 @@ void
 smb_node_end_crit(smb_node_t *node)
 {
 	nbl_end_crit(node->vp);
-	rw_exit(&node->n_share_lock);
+	rw_exit(&node->n_lock);
 }
 
 int
 smb_node_in_crit(smb_node_t *node)
 {
-	return (nbl_in_crit(node->vp) && RW_LOCK_HELD(&node->n_share_lock));
+	return (nbl_in_crit(node->vp) && RW_LOCK_HELD(&node->n_lock));
+}
+
+void
+smb_node_rdlock(smb_node_t *node)
+{
+	rw_enter(&node->n_lock, RW_READER);
+}
+
+void
+smb_node_wrlock(smb_node_t *node)
+{
+	rw_enter(&node->n_lock, RW_WRITER);
+}
+
+void
+smb_node_unlock(smb_node_t *node)
+{
+	rw_exit(&node->n_lock);
+}
+
+uint32_t
+smb_node_get_ofile_count(smb_node_t *node)
+{
+	uint32_t	cntr;
+
+	SMB_NODE_VALID(node);
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	cntr = smb_llist_get_count(&node->n_ofile_list);
+	smb_llist_exit(&node->n_ofile_list);
+	return (cntr);
+}
+
+void
+smb_node_add_ofile(smb_node_t *node, smb_ofile_t *of)
+{
+	SMB_NODE_VALID(node);
+
+	smb_llist_enter(&node->n_ofile_list, RW_WRITER);
+	smb_llist_insert_tail(&node->n_ofile_list, of);
+	smb_llist_exit(&node->n_ofile_list);
+}
+
+void
+smb_node_rem_ofile(smb_node_t *node, smb_ofile_t *of)
+{
+	SMB_NODE_VALID(node);
+
+	smb_llist_enter(&node->n_ofile_list, RW_WRITER);
+	smb_llist_remove(&node->n_ofile_list, of);
+	smb_llist_exit(&node->n_ofile_list);
+}
+
+void
+smb_node_inc_open_ofiles(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+
+	mutex_enter(&node->n_mutex);
+	node->n_open_count++;
+	mutex_exit(&node->n_mutex);
+}
+
+void
+smb_node_dec_open_ofiles(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+
+	mutex_enter(&node->n_mutex);
+	node->n_open_count--;
+	mutex_exit(&node->n_mutex);
+}
+
+uint32_t
+smb_node_get_open_ofiles(smb_node_t *node)
+{
+	uint32_t	cnt;
+
+	SMB_NODE_VALID(node);
+
+	mutex_enter(&node->n_mutex);
+	cnt = node->n_open_count;
+	mutex_exit(&node->n_mutex);
+	return (cnt);
+}
+
+/*
+ * smb_node_alloc
+ */
+static smb_node_t *
+smb_node_alloc(
+    char	*od_name,
+    vnode_t	*vp,
+    smb_attr_t	*attr,
+    smb_llist_t	*bucket,
+    uint32_t	hashkey)
+{
+	smb_node_t	*node;
+
+	node = kmem_cache_alloc(smb_node_cache, KM_SLEEP);
+
+	if (node->n_audit_buf != NULL)
+		node->n_audit_buf->anb_index = 0;
+
+	node->attr = *attr;
+	node->flags = NODE_FLAGS_ATTR_VALID;
+	node->n_size = node->attr.sa_vattr.va_size;
+	VN_HOLD(vp);
+	node->vp = vp;
+	node->n_refcnt = 1;
+	node->n_hash_bucket = bucket;
+	node->n_hashkey = hashkey;
+	node->n_orig_uid = 0;
+	node->readonly_creator = NULL;
+	node->waiting_event = 0;
+	node->what = 0;
+	node->n_open_count = 0;
+	node->dir_snode = NULL;
+	node->unnamed_stream_node = NULL;
+	node->delete_on_close_cred = NULL;
+
+	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
+	if (strcmp(od_name, XATTR_DIR) == 0)
+		node->flags |= NODE_XATTR_DIR;
+
+	node->n_state = SMB_NODE_STATE_AVAILABLE;
+	node->n_magic = SMB_NODE_MAGIC;
+	return (node);
+}
+
+/*
+ * smb_node_free
+ */
+static void
+smb_node_free(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+
+	node->n_magic = 0;
+	VERIFY(!list_link_active(&node->n_lnd));
+	VERIFY(node->n_lock_list.ll_count == 0);
+	VERIFY(node->n_ofile_list.ll_count == 0);
+	VERIFY(node->n_oplock.ol_xthread == NULL);
+	VERIFY(node->n_oplock.ol_waiters_count == 0);
+	VN_RELE(node->vp);
+	kmem_cache_free(smb_node_cache, node);
+}
+
+/*
+ * smb_node_constructor
+ */
+static int
+smb_node_constructor(void *buf, void *un, int kmflags)
+{
+	_NOTE(ARGUNUSED(kmflags, un))
+
+	smb_node_t	*node = (smb_node_t *)buf;
+
+	bzero(node, sizeof (smb_node_t));
+
+	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
+	    offsetof(smb_ofile_t, f_nnd));
+	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
+	    offsetof(smb_lock_t, l_lnd));
+	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
+	rw_init(&node->n_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&node->n_mutex, NULL, MUTEX_DEFAULT, NULL);
+	smb_node_create_audit_buf(node, kmflags);
+	return (0);
+}
+
+/*
+ * smb_node_destructor
+ */
+static void
+smb_node_destructor(void *buf, void *un)
+{
+	_NOTE(ARGUNUSED(un))
+
+	smb_node_t	*node = (smb_node_t *)buf;
+
+	smb_node_destroy_audit_buf(node);
+	mutex_destroy(&node->n_mutex);
+	rw_destroy(&node->n_lock);
+	cv_destroy(&node->n_oplock.ol_cv);
+	smb_llist_destructor(&node->n_lock_list);
+	smb_llist_destructor(&node->n_ofile_list);
+}
+
+/*
+ * smb_node_create_audit_buf
+ */
+static void
+smb_node_create_audit_buf(smb_node_t *node, int kmflags)
+{
+	smb_audit_buf_node_t	*abn;
+
+	if (smb_audit_flags & SMB_AUDIT_NODE) {
+		abn = kmem_zalloc(sizeof (smb_audit_buf_node_t), kmflags);
+		abn->anb_max_index = SMB_AUDIT_BUF_MAX_REC - 1;
+		node->n_audit_buf = abn;
+	}
+}
+
+/*
+ * smb_node_destroy_audit_buf
+ */
+static void
+smb_node_destroy_audit_buf(smb_node_t *node)
+{
+	if (node->n_audit_buf != NULL) {
+		kmem_free(node->n_audit_buf, sizeof (smb_audit_buf_node_t));
+		node->n_audit_buf = NULL;
+	}
+}
+
+/*
+ * smb_node_audit
+ *
+ * This function saves the calling stack in the audit buffer of the node passed
+ * in.
+ */
+static void
+smb_node_audit(smb_node_t *node)
+{
+	smb_audit_buf_node_t	*abn;
+	smb_audit_record_node_t	*anr;
+
+	if (node->n_audit_buf) {
+		abn = node->n_audit_buf;
+		anr = abn->anb_records;
+		anr += abn->anb_index;
+		abn->anb_index++;
+		abn->anb_index &= abn->anb_max_index;
+		anr->anr_refcnt = node->n_refcnt;
+		anr->anr_depth = getpcstack(anr->anr_stack,
+		    SMB_AUDIT_STACK_DEPTH);
+	}
+}
+
+static smb_llist_t *
+smb_node_get_hash(fsid_t *fsid, smb_attr_t *attr, uint32_t *phashkey)
+{
+	uint32_t	hashkey;
+
+	hashkey = fsid->val[0] + attr->sa_vattr.va_nodeid;
+	hashkey += (hashkey >> 24) + (hashkey >> 16) + (hashkey >> 8);
+	*phashkey = hashkey;
+	return (&smb_node_hash_table[(hashkey & SMBND_HASH_MASK)]);
 }

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_lock.c	1.10	08/08/04 SMI"
 
 /*
  * This module provides range lock functionality for CIFS/SMB clients.
@@ -279,9 +277,7 @@ smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 	smb_lock_t	*nxtl;
 	list_t		destroy_list;
 
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(node);
 	ASSERT(node->n_refcnt);
 
 	/*
@@ -352,9 +348,7 @@ smb_range_check(smb_request_t *sr, smb_node_t *node, uint64_t start,
 	int nbl_op;
 	int rc;
 
-	ASSERT(node);
-	ASSERT(node->n_magic == SMB_NODE_MAGIC);
-	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+	SMB_NODE_VALID(node);
 
 	ASSERT(smb_node_in_crit(node));
 

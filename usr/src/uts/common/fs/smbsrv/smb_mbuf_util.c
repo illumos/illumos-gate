@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,60 @@
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/mbuf.h>
+#include <smbsrv/smb_kstat.h>
+
+static kmem_cache_t	*smb_mbc_cache = NULL;
+
+int
+smb_mbc_init(void)
+{
+	if (smb_mbc_cache == NULL) {
+		smb_mbc_cache = kmem_cache_create(SMBSRV_KSTAT_MBC_CACHE,
+		    sizeof (mbuf_chain_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+	}
+	return (0);
+}
+
+void
+smb_mbc_fini(void)
+{
+	if (smb_mbc_cache != NULL) {
+		kmem_cache_destroy(smb_mbc_cache);
+		smb_mbc_cache = NULL;
+	}
+}
+
+mbuf_chain_t *
+smb_mbc_alloc(uint32_t max_bytes)
+{
+	mbuf_chain_t	*mbc;
+	mbuf_t		*m;
+
+	mbc = kmem_cache_alloc(smb_mbc_cache, KM_SLEEP);
+	bzero(mbc, sizeof (*mbc));
+	mbc->mbc_magic = SMB_MBC_MAGIC;
+
+	if (max_bytes != 0) {
+		MGET(m, M_WAIT, MT_DATA);
+		m->m_len = 0;
+		mbc->chain = m;
+		if (max_bytes > MINCLSIZE)
+			MCLGET(m, M_WAIT);
+	}
+	mbc->max_bytes = max_bytes;
+	return (mbc);
+}
+
+void
+smb_mbc_free(mbuf_chain_t *mbc)
+{
+	SMB_MBC_VALID(mbc);
+
+	m_freem(mbc->chain);
+	mbc->chain = NULL;
+	mbc->mbc_magic = 0;
+	kmem_cache_free(smb_mbc_cache, mbc);
+}
 
 /*
  * smb_mbuf_get

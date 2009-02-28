@@ -267,6 +267,8 @@ smb_server_svc_init(void)
 	int	rc = 0;
 
 	while (rc == 0) {
+		if (rc = smb_mbc_init())
+			continue;
 		if (rc = smb_vop_init())
 			continue;
 		if (rc = smb_node_init())
@@ -291,6 +293,7 @@ smb_server_svc_init(void)
 	smb_fem_fini();
 	smb_node_fini();
 	smb_vop_fini();
+	smb_mbc_fini();
 	return (rc);
 }
 
@@ -313,6 +316,7 @@ smb_server_svc_fini(void)
 		smb_fem_fini();
 		smb_node_fini();
 		smb_vop_fini();
+		smb_mbc_fini();
 		smb_llist_destructor(&smb_servers);
 		rc = 0;
 	}
@@ -375,8 +379,6 @@ smb_server_create(void)
 	    sizeof (smb_ofile_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 	sv->si_cache_odir = kmem_cache_create("smb_odir_cache",
 	    sizeof (smb_odir_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-	sv->si_cache_node = kmem_cache_create("smb_node_cache",
-	    sizeof (smb_node_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 
 	smb_thread_init(&sv->si_thread_timers,
 	    "smb_timers", smb_server_timers, sv,
@@ -487,7 +489,6 @@ smb_server_delete(void)
 	kmem_cache_destroy(sv->si_cache_tree);
 	kmem_cache_destroy(sv->si_cache_ofile);
 	kmem_cache_destroy(sv->si_cache_odir);
-	kmem_cache_destroy(sv->si_cache_node);
 
 	smb_thread_destroy(&sv->si_thread_timers);
 	smb_thread_destroy(&sv->si_thread_unexport);

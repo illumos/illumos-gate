@@ -23,9 +23,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_mangle_name.c	1.3	08/08/07 SMI"
-
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/sunddi.h>
 #include <sys/errno.h>
 #include <smbsrv/string.h>
@@ -35,9 +34,35 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
+#define	SMB_NAME83_BASELEN	8
+#define	SMB_NAME83_LEN		12
+
+/*
+ * Characters we don't allow in DOS file names.
+ * If a filename contains any of these chars, it should get mangled.
+ *
+ * '.' is also an invalid DOS char but since it's a special
+ * case it doesn't appear in the list.
+ */
+static char *invalid_dos_chars =
+	"\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017"
+	"\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037"
+	" \"/\\:|<>*?";
+
+/*
+ * According to MSKB article #142982, Windows deletes invalid chars and
+ * spaces from file name in mangling process; and invalid chars include:
+ * ."/\[]:;=,
+ *
+ * But some of these chars and some other chars (e.g. +) are replaced
+ * with underscore (_). They are introduced here as special chars.
+ */
+static char *special_chars = "[];=,+";
+
+#define	isinvalid(c)	(strchr(invalid_dos_chars, c) || (c & 0x80))
+
 static int smb_match_unknown(char *name, char *pattern);
-static int smb_is_reserved_dos_name(char *name);
-static int smb_match_reserved(char *name, char *rsrv);
+static boolean_t smb_is_reserved_dos_name(const char *name);
 
 /*
  * smb_match_name
@@ -156,121 +181,80 @@ smb_match_unknown(char *name, char *pattern)
 }
 
 /*
- * smb_match_reserved
+ * Return true if name contains characters that are invalid in a file
+ * name or it is a reserved DOS device name.  Otherwise, returns false.
  *
- * Checks if the given name matches given
- * DOS reserved name prefix.
- *
- * Returns 1 if match, 0 otherwise
+ * Control characters (values 0 - 31) and the following characters are
+ * invalid:
+ *	< > : " / \ | ? *
  */
-static int
-smb_match_reserved(char *name, char *rsrv)
+boolean_t
+smb_is_invalid_filename(const char *name)
 {
-	char ch;
+	const char *p;
 
-	int len = strlen(rsrv);
-	return (!utf8_strncasecmp(rsrv, name, len) &&
-	    ((ch = *(name + len)) == 0 || ch == '.'));
+	if ((p = strpbrk(name, invalid_dos_chars)) != NULL) {
+		if (*p != ' ')
+			return (B_TRUE);
+	}
+
+	return (smb_is_reserved_dos_name(name));
 }
 
 /*
  * smb_is_reserved_dos_name
  *
- * This function checks if the name is a reserved dos name.
- *
- * The function returns 1 when the name is a reserved dos name;
- * otherwise, it returns 0.
+ * This function checks if the name is a reserved DOS device name.
+ * The device name should not be followed immediately by an extension,
+ * for example, NUL.txt.
  */
-static int
-smb_is_reserved_dos_name(char *name)
+static boolean_t
+smb_is_reserved_dos_name(const char *name)
 {
+	static char *cnames[] = { "CLOCK$", "COM1", "COM2", "COM3", "COM4",
+		"COM5", "COM6", "COM7", "COM8", "COM9", "CON" };
+	static char *lnames[] = { "LPT1", "LPT2", "LPT3", "LPT4", "LPT5",
+		"LPT6", "LPT7", "LPT8", "LPT9" };
+	static char *others[] = { "AUX", "NUL", "PRN" };
+	char	**reserved;
 	char	ch;
+	int	n_reserved;
+	int	len;
+	int	i;
 
-	/*
-	 * Eliminate all names reserved by DOS and Windows.
-	 */
 	ch = mts_toupper(*name);
 
 	switch (ch) {
 	case 'A':
-		if (smb_match_reserved(name, "AUX"))
-			return (1);
-		break;
-
-	case 'C':
-		if (smb_match_reserved(name, "CLOCK$") ||
-		    smb_match_reserved(name, "COM1") ||
-		    smb_match_reserved(name, "COM2") ||
-		    smb_match_reserved(name, "COM3") ||
-		    smb_match_reserved(name, "COM4") ||
-		    smb_match_reserved(name, "CON")) {
-			return (1);
-		}
-
-		break;
-
-	case 'L':
-		if ((utf8_strncasecmp("LPT1", name, 4) == 0) ||
-		    (utf8_strncasecmp("LPT2", name, 4) == 0) ||
-		    (utf8_strncasecmp("LPT3", name, 4) == 0))
-			return (1);
-		break;
-
 	case 'N':
-		if (smb_match_reserved(name, "NUL"))
-			return (1);
-		break;
-
 	case 'P':
-		if (smb_match_reserved(name, "PRN"))
-			return (1);
+		reserved = others;
+		n_reserved = sizeof (others) / sizeof (others[0]);
+		break;
+	case 'C':
+		reserved = cnames;
+		n_reserved = sizeof (cnames) / sizeof (cnames[0]);
+		break;
+	case 'L':
+		reserved = lnames;
+		n_reserved = sizeof (lnames) / sizeof (lnames[0]);
+		break;
+	default:
+		return (B_FALSE);
 	}
 
-	/*
-	 * If the server is configured to support Catia Version 5
-	 * deployments, any filename that contains backslash will
-	 * have already been translated to the UTF-8 encoding of
-	 * Latin Small Letter Y with Diaeresis. Thus, the check
-	 * for backslash in the filename is not necessary.
-	 */
-#ifdef CATIA_SUPPORT
-	/* XXX Catia support */
-	if ((get_caps() & NFCAPS_CATIA) == 0) {
-		while (*name != 0) {
-			if (*name == '\\')
-				return (1);
-			name++;
+	for (i  = 0; i < n_reserved; ++i) {
+		len = strlen(reserved[i]);
+
+		if (utf8_strncasecmp(reserved[i], name, len) == 0) {
+			ch = *(name + len);
+			if ((ch == '\0') || (ch == '.'))
+				return (B_TRUE);
 		}
 	}
-#endif /* CATIA_SUPPORT */
 
-	return (0);
+	return (B_FALSE);
 }
-
-/*
- * Characters we don't allow in DOS file names.
- * If a filename contains any of these chars, it should
- * get mangled.
- *
- * '.' is also an invalid DOS char but since it's a special
- * case it doesn't appear in the list.
- */
-static char *invalid_dos_chars =
-	"\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017"
-	"\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037"
-	" \"/\\:|<>*?";
-
-/*
- * According to MSKB article #142982, Windows deletes invalid chars and
- * spaces from file name in mangling process; and invalid chars include:
- * ."/\[]:;=,
- *
- * But some of these chars and some other chars (e.g. +) are replaced
- * with underscore (_). They are introduced here as special chars.
- */
-static char *special_chars = "[];=,+";
-
-#define	isinvalid(c)	(strchr(invalid_dos_chars, c) || (c & 0x80))
 
 /*
  * smb_needs_mangle
@@ -479,28 +463,38 @@ smb_generate_mangle(ino64_t fileid, unsigned char *mangle_buf)
 /*
  * smb_maybe_mangled_name
  *
- * returns true if the passed name can possibly be a mangled name.
- * mangled names should be valid dos file names hence less than 12 characters
- * long and should contain at least one tilde character.
+ * Mangled names should be valid DOS file names: less than 12 characters
+ * long, contain at least one tilde character and conform to an 8.3 name
+ * format.
  *
- * note that this function can be further enhanced to check for invalid
- * dos characters/character patterns (such as "file..1.c") but this version
- * should be sufficient in most cases.
+ * Returns true if the name looks like a mangled name.
  */
 int
 smb_maybe_mangled_name(char *name)
 {
-	int i, has_tilde = 0;
+	const char *p;
+	boolean_t has_tilde = B_FALSE;
+	int ndots = 0;
+	int i;
 
-	for (i = 0; *name && (i < 12); i++, name++) {
-		if ((*name == '~') && (i < 8))
-			has_tilde = 1;
+	for (p = name, i = 0; (*p != '\0') && (i < SMB_NAME83_LEN); i++, p++) {
+		if ((strchr(special_chars, *p) != NULL) ||
+		    (strchr(invalid_dos_chars, *p) != NULL))
+			return (B_FALSE);
 
-		if (*name == '.' && has_tilde == 0)
-			return (0);
+		if (*p == '.') {
+			if ((++ndots) > 1)
+				return (B_FALSE);
+		}
+
+		if ((*p == '~') && (i < SMB_NAME83_BASELEN))
+			has_tilde = B_TRUE;
+
+		if (*p == '.' && !has_tilde)
+			return (B_FALSE);
 	}
 
-	return ((*name == 0) && has_tilde);
+	return ((*p == 0) && has_tilde);
 }
 
 /*

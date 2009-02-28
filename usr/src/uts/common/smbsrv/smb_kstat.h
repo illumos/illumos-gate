@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,17 +29,25 @@
 #ifndef _SMBSRV_SMB_KSTAT_H
 #define	_SMBSRV_SMB_KSTAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	SMBSRV_KSTAT_MODULE	"smbsrv"
-#define	SMBSRV_KSTAT_CLASS	"net"
-#define	SMBSRV_KSTAT_NAME	"smbsrv"
-#define	SMBSRV_KSTAT_NAME_CMDS	"smbsrv_commands"
-#define	SMBSRV_KSTAT_TXRCACHE	"smb_txreq"
+#define	SMBSRV_KSTAT_MODULE		"smbsrv"
+#define	SMBSRV_KSTAT_CLASS		"net"
+#define	SMBSRV_KSTAT_NAME		"smbsrv"
+#define	SMBSRV_KSTAT_NAME_CMDS		"smbsrv_commands"
+#define	SMBSRV_KSTAT_TXRCACHE		"smb_txreq"
+#define	SMBSRV_KSTAT_UNEXPORT_CACHE	"smb_unexport_cache"
+#define	SMBSRV_KSTAT_VFS_CACHE		"smb_vfs_cache"
+#define	SMBSRV_KSTAT_REQUEST_CACHE	"smb_request_cache"
+#define	SMBSRV_KSTAT_SESSION_CACHE	"smb_session_cache"
+#define	SMBSRV_KSTAT_USER_CACHE		"smb_user_cache"
+#define	SMBSRV_KSTAT_TREE_CACHE		"smb_tree_cache"
+#define	SMBSRV_KSTAT_OFILE_CACHE	"smb_ofile_cache"
+#define	SMBSRV_KSTAT_ODIR_CACHE		"smb_odir_cache"
+#define	SMBSRV_KSTAT_NODE_CACHE		"smb_node_cache"
+#define	SMBSRV_KSTAT_MBC_CACHE		"smb_mbc_cache"
 
 #ifdef	__cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,7 +132,8 @@ smb_com_set_information(smb_request_t *sr)
 		/*
 		 * for the benefit of attribute setting later on
 		 */
-		smb_oplock_break(node);
+		(void) smb_oplock_break(node, SMB_SESSION_GET_ID(sr->session),
+		    B_FALSE);
 	}
 
 	/*

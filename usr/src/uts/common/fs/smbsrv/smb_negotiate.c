@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_negotiate.c	1.6	08/07/21 SMI"
-
 /*
  * Notes on the virtual circuit (VC) values in the SMB Negotiate
  * response and SessionSetupAndx request.
@@ -358,7 +356,12 @@ smb_com_negotiate(smb_request_t *sr)
 		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
 		    SO_RCVBUF, (const void *)&smb_nt_tcp_rcvbuf,
 		    sizeof (smb_nt_tcp_rcvbuf), CRED());
+		/*
+		 * UNICODE support is required for long share names,
+		 * long file names and streams.
+		 */
 		capabilities = CAP_LARGE_FILES
+		    | CAP_UNICODE
 		    | CAP_NT_SMBS
 		    | CAP_STATUS32
 		    | CAP_NT_FIND
@@ -366,15 +369,8 @@ smb_com_negotiate(smb_request_t *sr)
 		    | CAP_LEVEL_II_OPLOCKS
 		    | CAP_LOCK_AND_READ
 		    | CAP_RPC_REMOTE_APIS
-		    | CAP_LARGE_READX;
-
-		/*
-		 * UNICODE support is required to enable support for long
-		 * share names and long file names and streams.
-		 */
-
-		capabilities |= CAP_UNICODE;
-
+		    | CAP_LARGE_READX
+		    | CAP_LARGE_WRITEX;
 
 		/*
 		 * Turn off Extended Security Negotiation

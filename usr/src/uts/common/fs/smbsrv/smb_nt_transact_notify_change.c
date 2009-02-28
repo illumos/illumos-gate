@@ -195,7 +195,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 	    &CompletionFilter, &sr->smb_fid, &WatchTree) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);

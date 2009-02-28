@@ -22,9 +22,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_oplock.c	1.5	08/08/07 SMI"
-
 /*
  * SMB Locking library functions.
  */
@@ -33,9 +30,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <inet/tcp.h>
 
-/*
- * Oplock functionality enable/disable
- */
+static void smb_oplock_enter(smb_node_t *);
 
 /*
  *	Magic		0xFF 'S' 'M' 'B'
@@ -118,7 +113,8 @@
  * smb_oplock_acquire
  *
  * Attempt to acquire an oplock. Note that the oplock granted may be
- * none, i.e. the oplock was not granted.
+ * none, i.e. the oplock was not granted. The result of the acquisition is
+ * provided in ol->ol_level.
  *
  * Grant an oplock to the requestor if this session is the only one
  * that has the file open, regardless of the number of instances of
@@ -132,100 +128,99 @@
  * depending on what action is taken by the other client (unlock or close),
  * an oplock may or may not be granted.  (The breaking of an oplock is
  * done earlier in the calling path.)
- *
- * XXX: Node synchronization is not yet implemented.  However, racing
- * opens are handled thus:
- *
- * A racing oplock acquire can happen in the open path between
- * smb_oplock_break() and smb_fsop_open(), but no later.  (Once
- * the file is open via smb_fsop_open()/VOP_OPEN,
- * smb_fsop_oplock_install() will not be able to install an oplock,
- * which requires an open count of 1.)
- *
- * Hence, we can safely break any oplock that came in after the
- * smb_oplock_break() done previously in the open path, knowing that
- * no other racing oplock acquisitions should be able to succeed
- * because we already have the file open (see above).
- *
- * The type of oplock being requested is passed in op->my_flags.  The result
- * is also returned in op->my_flags.
- *
- * (Note that exclusive and batch oplocks are treated interchangeably.)
- *
- * The Returns NT status codes:
- *	NT_STATUS_SUCCESS
- *	NT_STATUS_CONNECTION_DISCONNECTED
  */
-DWORD
-smb_oplock_acquire(
-    smb_request_t	*sr,
-    smb_ofile_t		*of,
-    struct open_param	*op)
+void
+smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
 {
-	smb_node_t		*node;
-	unsigned int		level;
+	smb_session_t	*session;
+	smb_oplock_t	*ol;
+	clock_t		time;
 
-	ASSERT(sr);
-	ASSERT(of);
-	ASSERT(op);
-	ASSERT(op->fqi.last_attr.sa_vattr.va_type == VREG);
+	SMB_NODE_VALID(node);
+	SMB_OFILE_VALID(of);
 
-	level = op->my_flags & MYF_OPLOCK_MASK;
+	ASSERT(node == SMB_OFILE_GET_NODE(of));
 
-	op->my_flags &= ~MYF_OPLOCK_MASK;
+	session = SMB_OFILE_GET_SESSION(of);
 
-	if ((sr->sr_cfg->skc_oplock_enable == 0) ||
-	    smb_tree_has_feature(of->f_tree, SMB_TREE_NO_OPLOCKS))
-		return (NT_STATUS_SUCCESS);
+	if (!smb_session_oplocks_enable(session) ||
+	    smb_tree_has_feature(SMB_OFILE_GET_TREE(of), SMB_TREE_NO_OPLOCKS)) {
+		/* This implies that trees cannot overlap. */
+		op->op_oplock_level = SMB_OPLOCK_NONE;
+		return;
+	}
 
-	if (!((MYF_IS_EXCLUSIVE_OPLOCK(level)) ||
-	    (MYF_IS_BATCH_OPLOCK(level))))
-		return (NT_STATUS_SUCCESS);
+	ol = &node->n_oplock;
+	time = MSEC_TO_TICK(smb_oplock_timeout) + ddi_get_lbolt();
 
-	node = of->f_node;
+	mutex_enter(&node->n_mutex);
 
-	smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+	for (;;) {
+		int	rc;
 
-	if (EXCLUSIVE_OPLOCK_IN_FORCE(node) ||
-	    BATCH_OPLOCK_IN_FORCE(node)) {
+		smb_oplock_enter(node);
 
-		smb_rwx_rwexit(&node->n_lock);
-
-		if (SMB_SAME_SESSION(sr->session,
-		    node->n_oplock.op_ofile->f_session)) {
-			op->my_flags |= level;
-			return (NT_STATUS_SUCCESS);
-		} else if (SMB_ATTR_ONLY_OPEN(op)) {
-			ASSERT(!(op->my_flags & MYF_OPLOCK_MASK));
-			return (NT_STATUS_SUCCESS);
+		if (node->n_state == SMB_NODE_STATE_AVAILABLE) {
+			if ((op->op_oplock_level == SMB_OPLOCK_LEVEL_II) ||
+			    (op->op_oplock_level == SMB_OPLOCK_NONE) ||
+			    (node->n_open_count > 1)) {
+				mutex_exit(&node->n_mutex);
+				op->op_oplock_level = SMB_OPLOCK_NONE;
+				return;
+			}
+			ol->ol_ofile = of;
+			ol->ol_sess_id = SMB_SESSION_GET_ID(session);
+			ol->ol_level = op->op_oplock_level;
+			ol->ol_xthread = curthread;
+			node->n_state = SMB_NODE_STATE_OPLOCK_GRANTED;
+			mutex_exit(&node->n_mutex);
+			if (smb_fsop_oplock_install(node, of->f_mode) == 0) {
+				smb_ofile_set_oplock_granted(of);
+				return;
+			}
+			mutex_enter(&node->n_mutex);
+			ASSERT(node->n_state == SMB_NODE_STATE_OPLOCK_GRANTED);
+			node->n_state = SMB_NODE_STATE_AVAILABLE;
+			ol->ol_xthread = NULL;
+			op->op_oplock_level = SMB_OPLOCK_NONE;
+			if (ol->ol_waiters_count != 0)
+				cv_broadcast(&ol->ol_cv);
+			break;
 		}
 
-		smb_oplock_break(node);
+		if (node->n_state == SMB_NODE_STATE_OPLOCK_GRANTED) {
+			if (SMB_SESSION_GET_ID(session) == ol->ol_sess_id)
+				break;
+			node->n_state = SMB_NODE_STATE_OPLOCK_BREAKING;
+			smb_session_oplock_break(
+			    SMB_OFILE_GET_SESSION(ol->ol_ofile), ol->ol_ofile);
+		}
 
-		smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+		ASSERT(node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING);
+
+		ol->ol_waiters_count++;
+		rc = cv_timedwait(&ol->ol_cv, &node->n_mutex, time);
+		ol->ol_waiters_count--;
+
+		if (rc == -1) {
+			/*
+			 * Oplock release timed out.
+			 */
+			if (node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING) {
+				node->n_state = SMB_NODE_STATE_AVAILABLE;
+				ol->ol_xthread = curthread;
+				mutex_exit(&node->n_mutex);
+				smb_fsop_oplock_uninstall(node);
+				smb_session_oplock_break_timedout(
+				    SMB_OFILE_GET_SESSION(ol->ol_ofile));
+				mutex_enter(&node->n_mutex);
+				ol->ol_xthread = NULL;
+				if (ol->ol_waiters_count != 0)
+					cv_broadcast(&ol->ol_cv);
+			}
+		}
 	}
-
-	if (smb_fsop_oplock_install(node, of->f_mode) != 0) {
-		smb_rwx_rwexit(&node->n_lock);
-		return (NT_STATUS_SUCCESS);
-	}
-
-	node->n_oplock.op_ofile = of;
-	node->n_oplock.op_ipaddr = sr->session->ipaddr;
-	node->n_oplock.op_kid = sr->session->s_kid;
-	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-
-	if (MYF_IS_EXCLUSIVE_OPLOCK(level))
-		node->flags |= NODE_EXCLUSIVE_OPLOCK;
-
-	if (MYF_IS_BATCH_OPLOCK(level))
-		node->flags |= NODE_BATCH_OPLOCK;
-
-	op->my_flags |= level;
-
-	smb_rwx_rwexit(&node->n_lock);
-
-	return (NT_STATUS_SUCCESS);
+	mutex_exit(&node->n_mutex);
 }
 
 /*
@@ -233,207 +228,116 @@ smb_oplock_acquire(
  *
  * The oplock break may succeed for multiple reasons: file close, oplock
  * release, holder connection dropped, requesting client disconnect etc.
- * Whatever the reason, the oplock should be broken when this function
- * returns. The exceptions are when the client making this request gets
- * disconnected or when another client is handling the break and it gets
- * disconnected.
  *
- * Returns NT status codes:
- *	NT_STATUS_SUCCESS                  No oplock in force, i.e. the
- *						oplock has been broken.
- *	NT_STATUS_CONNECTION_DISCONNECTED  Requesting client disconnected.
- *	NT_STATUS_INTERNAL_ERROR
+ * Returns:
+ *
+ *	B_TRUE	The oplock is broken.
+ *	B_FALSE	The oplock is being broken. This is returned if nowait is set
+ *		to B_TRUE;
  */
-
-void
-smb_oplock_break(smb_node_t *node)
+boolean_t
+smb_oplock_break(smb_node_t *node, uint64_t sess_id, boolean_t nowait)
 {
-	smb_session_t		*oplock_session;
-	smb_ofile_t		*oplock_ofile;
-	struct mbuf_chain	mbc;
-	int			retries = 0;
-	clock_t			elapsed_time;
-	clock_t			max_time;
-	boolean_t		flag;
+	smb_oplock_t	*ol;
+	clock_t		time;
 
-	smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+	SMB_NODE_VALID(node);
+	ol = &node->n_oplock;
+	time = MSEC_TO_TICK(smb_oplock_timeout) + ddi_get_lbolt();
 
-	if (!OPLOCKS_IN_FORCE(node)) {
-		smb_rwx_rwexit(&node->n_lock);
-		return;
+	mutex_enter(&node->n_mutex);
+	if (ol->ol_sess_id == sess_id) {
+		mutex_exit(&node->n_mutex);
+		return (B_TRUE);
 	}
 
-	if (node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) {
-		elapsed_time = 0;
-		max_time = MSEC_TO_TICK(smb_oplock_timeout * OPLOCK_RETRIES);
-		/*
-		 * Another client is already attempting to break the oplock.
-		 * We wait for it to finish. If the caller was trying to
-		 * acquire an oplock, he should retry in case the client's
-		 * connection was dropped while trying to break the oplock.
-		 *
-		 * If the holder's connection has been dropped, we yield to
-		 * allow the thread handling the break to detect it and set
-		 * the flags.
-		 */
-		while ((node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) &&
-		    (elapsed_time < max_time)) {
-			clock_t	timeleft;
+	for (;;) {
+		int	rc;
 
-			timeleft = smb_rwx_rwwait(&node->n_lock, max_time);
-			if (timeleft == -1) {
-				elapsed_time = max_time;
-			} else {
-				elapsed_time += max_time - timeleft;
-			}
+		smb_oplock_enter(node);
+
+		if (node->n_state == SMB_NODE_STATE_AVAILABLE) {
+			mutex_exit(&node->n_mutex);
+			return (B_TRUE);
 		}
-		/*
-		 * If there are no oplocks in force we're done.
-		 */
-		if (!OPLOCKS_IN_FORCE(node)) {
-			smb_rwx_rwexit(&node->n_lock);
-			return;
-		} else {
+
+		if (node->n_state == SMB_NODE_STATE_OPLOCK_GRANTED) {
+			node->n_state = SMB_NODE_STATE_OPLOCK_BREAKING;
+			smb_session_oplock_break(
+			    SMB_OFILE_GET_SESSION(ol->ol_ofile), ol->ol_ofile);
+		}
+
+		ASSERT(node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING);
+		if (nowait) {
+			mutex_exit(&node->n_mutex);
+			return (B_FALSE);
+		}
+		ol->ol_waiters_count++;
+		rc = cv_timedwait(&ol->ol_cv, &node->n_mutex, time);
+		ol->ol_waiters_count--;
+		if (rc == -1) {
 			/*
-			 * This is an anomalous condition.
-			 * Cancel/release the oplock.
+			 * Oplock release timed out.
 			 */
-			smb_oplock_release(node, B_TRUE);
-			smb_rwx_rwexit(&node->n_lock);
-			return;
+			if (node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING) {
+				node->n_state = SMB_NODE_STATE_AVAILABLE;
+				ol->ol_xthread = curthread;
+				mutex_exit(&node->n_mutex);
+				smb_fsop_oplock_uninstall(node);
+				smb_session_oplock_break_timedout(
+				    SMB_OFILE_GET_SESSION(ol->ol_ofile));
+				mutex_enter(&node->n_mutex);
+				ol->ol_xthread = NULL;
+				if (ol->ol_waiters_count != 0)
+					cv_broadcast(&ol->ol_cv);
+				break;
+			}
 		}
 	}
-
-	oplock_ofile = node->n_oplock.op_ofile;
-	ASSERT(oplock_ofile);
-
-	oplock_session = oplock_ofile->f_session;
-	ASSERT(oplock_session);
-
-	/*
-	 * Start oplock break.
-	 */
-
-	node->n_oplock.op_flags |= OPLOCK_FLAG_BREAKING;
-
-	smb_rwx_rwexit(&node->n_lock);
-
-	max_time = MSEC_TO_TICK(smb_oplock_timeout);
-	do {
-		MBC_INIT(&mbc, MLEN);
-		(void) smb_mbc_encodef(&mbc, "Mb19.wwwwbb3.ww10.",
-		    SMB_COM_LOCKING_ANDX, oplock_ofile->f_tree->t_tid,
-		    0xffff, 0, 0xffff, 8, 0xff, oplock_ofile->f_fid,
-		    LOCKING_ANDX_OPLOCK_RELEASE);
-
-		flag = B_TRUE;
-		smb_rwx_rwenter(&oplock_session->s_lock, RW_WRITER);
-		while (flag) {
-			switch (oplock_session->s_state) {
-			case SMB_SESSION_STATE_DISCONNECTED:
-			case SMB_SESSION_STATE_TERMINATED:
-				smb_rwx_rwexit(&oplock_session->s_lock);
-				smb_rwx_rwenter(&node->n_lock, RW_WRITER);
-
-				node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-				node->n_oplock.op_flags &=
-				    ~OPLOCK_FLAG_BREAKING;
-				node->n_oplock.op_ofile = NULL;
-				bzero(&node->n_oplock.op_ipaddr,
-				    sizeof (node->n_oplock.op_ipaddr));
-				node->n_oplock.op_kid = 0;
-
-				smb_rwx_rwexit(&node->n_lock);
-
-				return;
-
-			case SMB_SESSION_STATE_OPLOCK_BREAKING:
-				flag = B_FALSE;
-				break;
-
-			case SMB_SESSION_STATE_NEGOTIATED:
-				oplock_session->s_state =
-				    SMB_SESSION_STATE_OPLOCK_BREAKING;
-				flag = B_FALSE;
-				break;
-
-			default:
-				(void) smb_rwx_rwwait(&oplock_session->s_lock,
-				    -1);
-				break;
-			}
-		}
-		smb_rwx_rwexit(&oplock_session->s_lock);
-
-		(void) smb_session_send(oplock_session, 0, &mbc);
-
-		elapsed_time = 0;
-
-		smb_rwx_rwenter(&node->n_lock, RW_WRITER);
-		while ((node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) &&
-		    (elapsed_time < max_time)) {
-			clock_t	timeleft;
-
-			timeleft = smb_rwx_rwwait(&node->n_lock, max_time);
-			if (timeleft == -1) {
-				elapsed_time = max_time;
-			} else {
-				elapsed_time += max_time - timeleft;
-			}
-		}
-
-		if (!OPLOCKS_IN_FORCE(node)) {
-			/*
-			 * smb_oplock_release() was called
-			 */
-			smb_rwx_rwexit(&node->n_lock);
-			return;
-		}
-	} while (++retries < OPLOCK_RETRIES);
-
-	/*
-	 * Retries exhausted and timed out.
-	 * Cancel the oplock and continue.
-	 */
-
-	smb_oplock_release(node, B_TRUE);
-
-	smb_rwx_rwexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
+	return (B_TRUE);
 }
 
 /*
  * smb_oplock_release
  *
- * This function uninstalls the FEM oplock monitors and
- * clears all flags in relation to an oplock on the
- * given node.
- *
- * The function can be called with the node->n_lock held
- * or not held.
+ * This function releases the oplock on the node passed in. If other threads
+ * were waiting for the oplock to be released they are signaled.
  */
-
-void /*ARGSUSED*/
-smb_oplock_release(smb_node_t *node, boolean_t have_rwx)
+void
+smb_oplock_release(smb_node_t *node, smb_ofile_t *of)
 {
-	if (!have_rwx)
-		smb_rwx_rwenter(&node->n_lock, RW_WRITER);
+	smb_oplock_t	*ol;
 
-	if (!OPLOCKS_IN_FORCE(node)) {
-		if (!have_rwx)
-			smb_rwx_rwexit(&node->n_lock);
-		return;
+	SMB_NODE_VALID(node);
+	ol = &node->n_oplock;
+
+	mutex_enter(&node->n_mutex);
+	smb_oplock_enter(node);
+	switch (node->n_state) {
+	case SMB_NODE_STATE_AVAILABLE:
+		break;
+
+	case SMB_NODE_STATE_OPLOCK_GRANTED:
+	case SMB_NODE_STATE_OPLOCK_BREAKING:
+		if (ol->ol_ofile == of) {
+			node->n_state = SMB_NODE_STATE_AVAILABLE;
+			ol->ol_xthread = curthread;
+			mutex_exit(&node->n_mutex);
+			smb_fsop_oplock_uninstall(node);
+			smb_session_oplock_released(
+			    SMB_OFILE_GET_SESSION(ol->ol_ofile));
+			mutex_enter(&node->n_mutex);
+			ol->ol_xthread = NULL;
+			if (ol->ol_waiters_count != 0)
+				cv_broadcast(&ol->ol_cv);
+		}
+		break;
+
+	default:
+		SMB_PANIC();
 	}
-
-	smb_fsop_oplock_uninstall(node);
-
-	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
-	node->n_oplock.op_flags &= ~OPLOCK_FLAG_BREAKING;
-	node->n_oplock.op_ofile = NULL;
-	bzero(&node->n_oplock.op_ipaddr, sizeof (node->n_oplock.op_ipaddr));
-	node->n_oplock.op_kid = 0;
-
-	if (!have_rwx)
-		smb_rwx_rwexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 }
 
 /*
@@ -443,37 +347,97 @@ smb_oplock_release(smb_node_t *node, boolean_t have_rwx)
  * Other CIFS functions may call smb_oplock_conflict() with a session
  * pointer so as to do the session check.
  */
-
 boolean_t
-smb_oplock_conflict(smb_node_t *node, smb_session_t *session,
-    struct open_param *op)
+smb_oplock_conflict(smb_node_t *node, smb_session_t *session, open_param_t *op)
 {
-	smb_session_t		*oplock_session;
-	smb_ofile_t		*oplock_ofile;
+	boolean_t	rb;
 
-	smb_rwx_rwenter(&node->n_lock, RW_READER);
+	SMB_NODE_VALID(node);
+	SMB_SESSION_VALID(session);
 
-	if (!OPLOCKS_IN_FORCE(node)) {
-		smb_rwx_rwexit(&node->n_lock);
-		return (B_FALSE);
+	mutex_enter(&node->n_mutex);
+	smb_oplock_enter(node);
+	switch (node->n_state) {
+	case SMB_NODE_STATE_AVAILABLE:
+		rb = B_FALSE;
+		break;
+
+	case SMB_NODE_STATE_OPLOCK_GRANTED:
+	case SMB_NODE_STATE_OPLOCK_BREAKING:
+		if (SMB_SESSION_GET_ID(session) == node->n_oplock.ol_sess_id) {
+			rb = B_FALSE;
+			break;
+		}
+
+		if (op != NULL) {
+			if (((op->desired_access & ~(FILE_READ_ATTRIBUTES |
+			    FILE_WRITE_ATTRIBUTES | SYNCHRONIZE)) == 0) &&
+			    (op->create_disposition != FILE_SUPERSEDE) &&
+			    (op->create_disposition != FILE_OVERWRITE)) {
+				/* Attributs only */
+				rb = B_FALSE;
+				break;
+			}
+		}
+		rb = B_TRUE;
+		break;
+
+	default:
+		SMB_PANIC();
 	}
+	mutex_exit(&node->n_mutex);
+	return (rb);
+}
 
-	oplock_ofile = node->n_oplock.op_ofile;
-	ASSERT(oplock_ofile);
+/*
+ * smb_oplock_exit
+ *
+ * The the calling thread has the pointer to its context stored in ol_thread
+ * it resets that field. If any other thread is waiting for that field to
+ * turn to NULL it is signaled.
+ *
+ * Returns:
+ *	B_TRUE	Oplock unlocked
+ *	B_FALSE	Oplock still locked
+ */
+boolean_t
+smb_oplock_exit(smb_node_t *node)
+{
+	smb_oplock_t	*ol;
+	boolean_t	rb;
 
-	oplock_session = oplock_ofile->f_session;
-	ASSERT(oplock_session);
+	SMB_NODE_VALID(node);
+	ol = &node->n_oplock;
+	rb = B_FALSE;
 
-	if (SMB_SAME_SESSION(session, oplock_session)) {
-		smb_rwx_rwexit(&node->n_lock);
-		return (B_FALSE);
+	mutex_enter(&node->n_mutex);
+	if ((ol->ol_xthread != NULL) && (ol->ol_xthread == curthread)) {
+		ol->ol_xthread = NULL;
+		if (ol->ol_waiters_count != 0)
+			cv_broadcast(&ol->ol_cv);
+		rb = B_TRUE;
 	}
+	mutex_exit(&node->n_mutex);
+	return (rb);
+}
 
-	if (SMB_ATTR_ONLY_OPEN(op)) {
-		smb_rwx_rwexit(&node->n_lock);
-		return (B_FALSE);
+/*
+ * smb_oplock_wait
+ *
+ * The mutex of the node must have benn entered before calling this function.
+ * If the field ol_xthread is not NULL and doesn't contain the pointer to the
+ * context of the calling thread, the caller will sleep until that field is
+ * reset (set to NULL).
+ */
+static void
+smb_oplock_enter(smb_node_t *node)
+{
+	smb_oplock_t	*ol = &node->n_oplock;
+
+	if ((ol->ol_xthread != NULL) && (ol->ol_xthread != curthread)) {
+		ol->ol_waiters_count++;
+		while (ol->ol_xthread != NULL)
+			cv_wait(&ol->ol_cv, &node->n_mutex);
+		ol->ol_waiters_count--;
 	}
-
-	smb_rwx_rwexit(&node->n_lock);
-	return (B_TRUE);
 }

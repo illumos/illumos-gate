@@ -973,7 +973,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 	/* check search attributes */
 	dosattr = smb_node_get_dosattr(fnode);
-	if (!smb_sattr_check(dosattr, od->d_sattr, fileinfo->fi_name)) {
+	if (!smb_sattr_check(dosattr, od->d_sattr)) {
 		smb_node_release(fnode);
 		return (ENOENT);
 	}
@@ -1063,7 +1063,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 	/* check search attributes */
 	dosattr = smb_node_get_dosattr(fnode);
-	if (!smb_sattr_check(dosattr, od->d_sattr, fileinfo->fi_name)) {
+	if (!smb_sattr_check(dosattr, od->d_sattr)) {
 		smb_node_release(fnode);
 		return (ENOENT);
 	}

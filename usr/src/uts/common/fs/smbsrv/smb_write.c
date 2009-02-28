@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,13 @@
 #define	SMB_WRMODE_WRITE_THRU	0x0001
 #define	SMB_WRMODE_IS_STABLE(M)	((M) & SMB_WRMODE_WRITE_THRU)
 
+/*
+ * The limit in bytes that the marshalling will grow the buffer
+ * chain to accomodate incoming data on SmbWriteX requests.
+ * This sets the upper limit for the data-count per SmbWriteX
+ * request.
+ */
+#define	SMB_WRITEX_MAX		102400
 
 static int smb_write_common(smb_request_t *, smb_rw_param_t *);
 static int smb_write_truncate(smb_request_t *, smb_rw_param_t *);
@@ -53,16 +60,18 @@ smb_pre_write(smb_request_t *sr)
 {
 	smb_rw_param_t *param;
 	uint32_t off;
+	uint16_t count;
 	int rc;
 
 	param = kmem_zalloc(sizeof (smb_rw_param_t), KM_SLEEP);
 	sr->arg.rw = param;
 	param->rw_magic = SMB_RW_MAGIC;
 
-	rc = smbsr_decode_vwv(sr, "wwl", &sr->smb_fid, &param->rw_count, &off);
+	rc = smbsr_decode_vwv(sr, "wwl", &sr->smb_fid, &count, &off);
 
+	param->rw_count = (uint32_t)count;
 	param->rw_offset = (uint64_t)off;
-	param->rw_vdb.uio.uio_loffset = (offset_t)param->rw_offset;
+	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 	DTRACE_SMB_2(op__Write__start, smb_request_t *, sr,
 	    smb_rw_param_t *, param);
@@ -85,7 +94,7 @@ smb_com_write(smb_request_t *sr)
 	smb_rw_param_t *param = sr->arg.rw;
 	int rc;
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -98,13 +107,13 @@ smb_com_write(smb_request_t *sr)
 	} else {
 		rc = smbsr_decode_data(sr, "D", &param->rw_vdb);
 
-		if ((rc != 0) || (param->rw_vdb.len != param->rw_count)) {
+		if ((rc != 0) || (param->rw_vdb.vdb_len != param->rw_count)) {
 			smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 			    ERRDOS, ERROR_INVALID_PARAMETER);
 			return (SDRC_ERROR);
 		}
 
-		param->rw_vdb.uio.uio_loffset = (offset_t)param->rw_offset;
+		param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 		rc = smb_write_common(sr, param);
 	}
@@ -115,7 +124,8 @@ smb_com_write(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->rw_count, 0);
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
+	    (uint16_t)param->rw_count, 0);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -135,6 +145,7 @@ smb_pre_write_and_close(smb_request_t *sr)
 {
 	smb_rw_param_t *param;
 	uint32_t off;
+	uint16_t count;
 	int rc;
 
 	param = kmem_zalloc(sizeof (smb_rw_param_t), KM_SLEEP);
@@ -143,12 +154,13 @@ smb_pre_write_and_close(smb_request_t *sr)
 
 	if (sr->smb_wct == 12) {
 		rc = smbsr_decode_vwv(sr, "wwll12.", &sr->smb_fid,
-		    &param->rw_count, &off, &param->rw_last_write);
+		    &count, &off, &param->rw_last_write);
 	} else {
 		rc = smbsr_decode_vwv(sr, "wwll", &sr->smb_fid,
-		    &param->rw_count, &off, &param->rw_last_write);
+		    &count, &off, &param->rw_last_write);
 	}
 
+	param->rw_count = (uint32_t)count;
 	param->rw_offset = (uint64_t)off;
 
 	DTRACE_SMB_2(op__WriteAndClose__start, smb_request_t *, sr,
@@ -170,9 +182,10 @@ smb_sdrc_t
 smb_com_write_and_close(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
+	uint16_t count;
 	int rc = 0;
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -189,13 +202,13 @@ smb_com_write_and_close(smb_request_t *sr)
 		rc = smbsr_decode_data(sr, ".#B", param->rw_count,
 		    &param->rw_vdb);
 
-		if ((rc != 0) || (param->rw_vdb.len != param->rw_count)) {
+		if ((rc != 0) || (param->rw_vdb.vdb_len != param->rw_count)) {
 			smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 			    ERRDOS, ERROR_INVALID_PARAMETER);
 			return (SDRC_ERROR);
 		}
 
-		param->rw_vdb.uio.uio_loffset = (offset_t)param->rw_offset;
+		param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 		rc = smb_write_common(sr, param);
 	}
@@ -208,7 +221,8 @@ smb_com_write_and_close(smb_request_t *sr)
 
 	smb_ofile_close(sr->fid_ofile, param->rw_last_write);
 
-	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->rw_count, 0);
+	count = (uint16_t)param->rw_count;
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, count, 0);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -234,6 +248,7 @@ smb_pre_write_and_unlock(smb_request_t *sr)
 {
 	smb_rw_param_t *param;
 	uint32_t off;
+	uint16_t count;
 	uint16_t remcnt;
 	int rc;
 
@@ -241,9 +256,9 @@ smb_pre_write_and_unlock(smb_request_t *sr)
 	sr->arg.rw = param;
 	param->rw_magic = SMB_RW_MAGIC;
 
-	rc = smbsr_decode_vwv(sr, "wwlw", &sr->smb_fid, &param->rw_count, &off,
-	    &remcnt);
+	rc = smbsr_decode_vwv(sr, "wwlw", &sr->smb_fid, &count, &off, &remcnt);
 
+	param->rw_count = (uint32_t)count;
 	param->rw_offset = (uint64_t)off;
 
 	DTRACE_SMB_2(op__WriteAndUnlock__start, smb_request_t *, sr,
@@ -273,7 +288,7 @@ smb_com_write_and_unlock(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -286,15 +301,16 @@ smb_com_write_and_unlock(smb_request_t *sr)
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
+
 	rc = smbsr_decode_data(sr, "D", &param->rw_vdb);
 
-	if ((rc != 0) || (param->rw_count != param->rw_vdb.len)) {
+	if ((rc != 0) || (param->rw_count != param->rw_vdb.vdb_len)) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		return (SDRC_ERROR);
 	}
 
-	param->rw_vdb.uio.uio_loffset = (offset_t)param->rw_offset;
+	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 	if ((rc = smb_write_common(sr, param)) != 0) {
 		if (sr->smb_error.status != NT_STATUS_FILE_LOCK_CONFLICT)
@@ -310,7 +326,8 @@ smb_com_write_and_unlock(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->rw_count, 0);
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
+	    (uint16_t)param->rw_count, 0);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -324,6 +341,11 @@ smb_com_write_and_unlock(smb_request_t *sr)
  *
  * If bit 0 of WriteMode is set, Fid must refer to a disk file and
  * the data must be on stable storage before responding.
+ *
+ * MS-SMB 3.3.5.8 update to LM 0.12 4.2.5:
+ * If CAP_LARGE_WRITEX is set, the byte count may be larger than the
+ * negotiated buffer size and the server is expected to write the
+ * number of bytes specified.
  */
 smb_sdrc_t
 smb_pre_write_andx(smb_request_t *sr)
@@ -331,6 +353,8 @@ smb_pre_write_andx(smb_request_t *sr)
 	smb_rw_param_t *param;
 	uint32_t off_low;
 	uint32_t off_high;
+	uint16_t datalen_low;
+	uint16_t datalen_high;
 	uint16_t remcnt;
 	int rc;
 
@@ -339,20 +363,23 @@ smb_pre_write_andx(smb_request_t *sr)
 	param->rw_magic = SMB_RW_MAGIC;
 
 	if (sr->smb_wct == 14) {
-		rc = smbsr_decode_vwv(sr, "4.wl4.ww2.wwl", &sr->smb_fid,
-		    &off_low, &param->rw_mode, &remcnt, &param->rw_count,
-		    &param->rw_dsoff, &off_high);
+		rc = smbsr_decode_vwv(sr, "4.wl4.wwwwwl", &sr->smb_fid,
+		    &off_low, &param->rw_mode, &remcnt, &datalen_high,
+		    &datalen_low, &param->rw_dsoff, &off_high);
 
 		param->rw_dsoff -= 63;
 		param->rw_offset = ((uint64_t)off_high << 32) | off_low;
 	} else {
-		rc = smbsr_decode_vwv(sr, "4.wl4.ww2.ww", &sr->smb_fid,
-		    &off_low, &param->rw_mode, &remcnt, &param->rw_count,
-		    &param->rw_dsoff);
+		rc = smbsr_decode_vwv(sr, "4.wl4.wwwww", &sr->smb_fid,
+		    &off_low, &param->rw_mode, &remcnt, &datalen_high,
+		    &datalen_low, &param->rw_dsoff);
 
 		param->rw_offset = (uint64_t)off_low;
 		param->rw_dsoff -= 59;
 	}
+
+	param->rw_count = ((uint32_t)datalen_high << 16) |
+	    (uint32_t)datalen_low;
 
 	DTRACE_SMB_2(op__WriteX__start, smb_request_t *, sr,
 	    smb_rw_param_t *, param);
@@ -373,12 +400,14 @@ smb_sdrc_t
 smb_com_write_andx(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
+	uint16_t count_high;
+	uint16_t count_low;
 	int rc;
 
 	ASSERT(param);
 	ASSERT(param->rw_magic == SMB_RW_MAGIC);
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -392,15 +421,17 @@ smb_com_write_andx(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
+	sr->smb_data.max_bytes = SMB_WRITEX_MAX;
 	rc = smbsr_decode_data(sr, "#.#B", param->rw_dsoff, param->rw_count,
 	    &param->rw_vdb);
-	if ((rc != 0) || (param->rw_vdb.len != param->rw_count)) {
+
+	if ((rc != 0) || (param->rw_vdb.vdb_len != param->rw_count)) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		return (SDRC_ERROR);
 	}
 
-	param->rw_vdb.uio.uio_loffset = (offset_t)param->rw_offset;
+	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 	if (param->rw_count != 0) {
 		if ((rc = smb_write_common(sr, param)) != 0) {
@@ -411,8 +442,11 @@ smb_com_write_andx(smb_request_t *sr)
 		}
 	}
 
-	rc = smbsr_encode_result(sr, 6, 0, "bb1.ww6.w",
-	    6, sr->andx_com, 15, param->rw_count, 0);
+	count_low = param->rw_count & 0xFFFF;
+	count_high = (param->rw_count >> 16) & 0xFF;
+
+	rc = smbsr_encode_result(sr, 6, 0, "bb1.wwwwww",
+	    6, sr->andx_com, 15, count_low, 0, count_high, 0, 0);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -451,7 +485,7 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 		}
 
 		rc = smb_fsop_write(sr, sr->user_cr, node,
-		    &param->rw_vdb.uio, &lcount, &node->attr, stability);
+		    &param->rw_vdb.vdb_uio, &lcount, &node->attr, stability);
 
 		if (rc)
 			return (rc);
@@ -465,13 +499,13 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 			}
 		}
 
-		param->rw_count = (uint16_t)lcount;
+		param->rw_count = lcount;
 		break;
 
 	case STYPE_IPC:
-		param->rw_count = (uint16_t)param->rw_vdb.uio.uio_resid;
+		param->rw_count = param->rw_vdb.vdb_uio.uio_resid;
 
-		if ((rc = smb_opipe_write(sr, &param->rw_vdb.uio)) != 0)
+		if ((rc = smb_opipe_write(sr, &param->rw_vdb.vdb_uio)) != 0)
 			param->rw_count = 0;
 		break;
 
@@ -517,10 +551,10 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 			append_only = B_TRUE;
 	}
 
-	smb_rwx_xenter(&node->n_lock);
+	mutex_enter(&node->n_mutex);
 
 	if (append_only && (param->rw_offset < node->n_size)) {
-		smb_rwx_xexit(&node->n_lock);
+		mutex_exit(&node->n_mutex);
 		return (EACCES);
 	}
 
@@ -528,7 +562,7 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 		status = smb_lock_range_access(sr, node, param->rw_offset,
 		    param->rw_count, B_TRUE);
 		if (status != NT_STATUS_SUCCESS) {
-			smb_rwx_xexit(&node->n_lock);
+			mutex_exit(&node->n_mutex);
 			smbsr_error(sr, NT_STATUS_FILE_LOCK_CONFLICT,
 			    ERRDOS, ERROR_LOCK_VIOLATION);
 			return (EACCES);
@@ -538,7 +572,7 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 	node->flags |= NODE_FLAGS_SET_SIZE;
 	node->n_size = param->rw_offset;
 
-	smb_rwx_xexit(&node->n_lock);
+	mutex_exit(&node->n_mutex);
 
 	if ((rc = smb_set_file_size(sr, node)) != 0)
 		return (rc);

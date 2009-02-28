@@ -40,10 +40,6 @@
 #include <sys/sid.h>
 #include <sys/priv_names.h>
 
-#ifdef DEBUG
-uint_t smb_tsd_key;
-#endif
-
 static boolean_t
 smb_thread_continue_timedwait_locked(smb_thread_t *thread, int ticks);
 
@@ -143,24 +139,6 @@ smb_convert_unicode_wildcards(char *path)
 }
 
 /*
- * smb_is_dot_or_dotdot
- *
- * Use when checking for the "." and ".." entries in a directory.
- * Returns B_TRUE if the name is "." or "..". Otherwise returns B_FALSE.
- */
-boolean_t
-smb_is_dot_or_dotdot(const char *name)
-{
-	if (*name != '.')
-		return (B_FALSE);
-
-	if ((name[1] == 0) || (name[1] == '.' && name[2] == 0))
-		return (B_TRUE);
-
-	return (B_FALSE);
-}
-
-/*
  * smb_sattr_check
  *
  * Check file attributes against a search attribute (sattr) mask.
@@ -195,14 +173,8 @@ smb_is_dot_or_dotdot(const char *name)
  * Returns true if the file and sattr match; otherwise, returns false.
  */
 boolean_t
-smb_sattr_check(uint16_t dosattr, uint16_t sattr, char *name)
+smb_sattr_check(uint16_t dosattr, uint16_t sattr)
 {
-	if (name) {
-		if (smb_is_dot_or_dotdot(name) &&
-		    !(sattr & FILE_ATTRIBUTE_HIDDEN))
-			return (B_FALSE);
-	}
-
 	if ((dosattr & FILE_ATTRIBUTE_DIRECTORY) &&
 	    !(sattr & FILE_ATTRIBUTE_DIRECTORY))
 		return (B_FALSE);
@@ -1794,37 +1766,6 @@ smb_timegm(struct tm *tm)
 	return (tsec);
 }
 
-#ifdef	DEBUG
-uint32_t	smb_audit_flags = SMB_AUDIT_NODE;
-#else
-uint32_t	smb_audit_flags = 0;
-#endif
-
-void
-smb_audit_buf_node_create(smb_node_t *node)
-{
-	smb_audit_buf_node_t	*abn;
-
-	if (smb_audit_flags & SMB_AUDIT_NODE) {
-		abn = kmem_zalloc(sizeof (smb_audit_buf_node_t), KM_SLEEP);
-		abn->anb_max_index = SMB_AUDIT_BUF_MAX_REC - 1;
-		node->n_audit_buf = abn;
-	}
-}
-
-void
-smb_audit_buf_node_destroy(smb_node_t *node)
-{
-	smb_audit_buf_node_t	*abn;
-
-	abn = node->n_audit_buf;
-
-	if (abn) {
-		node->n_audit_buf = NULL;
-		kmem_free(abn, sizeof (smb_audit_buf_node_t));
-	}
-}
-
 /*
  * smb_cred_set_sid
  *
@@ -2090,4 +2031,16 @@ smb_cred_create_privs(cred_t *user_cr, uint32_t privileges)
 	}
 
 	return (cr);
+}
+
+/*
+ * smb_panic
+ *
+ * Logs the file name, function name and line number passed in and panics the
+ * system.
+ */
+void
+smb_panic(char *file, const char *func, int line)
+{
+	cmn_err(CE_PANIC, "%s:%s:%d\n", file, func, line);
 }

@@ -324,9 +324,6 @@ smb_com_search(smb_request_t *sr)
 		if ((rc != 0 || (eos == B_TRUE)))
 			break;
 
-		if (smb_is_dot_or_dotdot(fileinfo.fi_name))
-			continue;
-
 		(void) memset(name, ' ', sizeof (name));
 		if (*fileinfo.fi_shortname == '\0') {
 			(void) strlcpy(name, fileinfo.fi_name,
@@ -604,18 +601,18 @@ smb_com_find_unique(struct smb_request *sr)
 	smb_odir_t		*od;
 	smb_fileinfo_t		fileinfo;
 	boolean_t		eos;
-	struct vardata_block	*vdb;
+	smb_vdb_t		*vdb;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
 
-	vdb = kmem_alloc(sizeof (struct vardata_block), KM_SLEEP);
+	vdb = kmem_alloc(sizeof (smb_vdb_t), KM_SLEEP);
 	if ((smbsr_decode_data(sr, "%AV", sr, &path, vdb) != 0) ||
-	    (vdb->len != 0)) {
-		kmem_free(vdb, sizeof (struct vardata_block));
+	    (vdb->vdb_len != 0)) {
+		kmem_free(vdb, sizeof (smb_vdb_t));
 		return (SDRC_ERROR);
 	}
-	kmem_free(vdb, sizeof (struct vardata_block));
+	kmem_free(vdb, sizeof (smb_vdb_t));
 
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 

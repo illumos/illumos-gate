@@ -38,10 +38,12 @@ static volatile uint64_t smb_kids;
 
 uint32_t smb_keep_alive = SSN_KEEP_ALIVE_TIMEOUT;
 
+static void smb_session_cancel(smb_session_t *);
 static int smb_session_message(smb_session_t *);
 static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
     uint8_t *, size_t);
 static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
+static void smb_session_oplock_broken(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 void dump_smb_inaddr(smb_inaddr_t *ipaddr);
 
@@ -438,7 +440,6 @@ smb_request_cancel(smb_request_t *sr)
 		mutex_enter(&sr->sr_awaiting->l_mutex);
 		cv_broadcast(&sr->sr_awaiting->l_cv);
 		mutex_exit(&sr->sr_awaiting->l_mutex);
-
 		break;
 
 	case SMB_REQ_STATE_WAITING_EVENT:
@@ -462,8 +463,7 @@ smb_request_cancel(smb_request_t *sr)
 	 *	SMB_REQ_STATE_INITIALIZING:
 	 */
 	default:
-		ASSERT(0);
-		break;
+		SMB_PANIC();
 	}
 	mutex_exit(&sr->sr_mutex);
 }
@@ -669,6 +669,9 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	smb_llist_constructor(&session->s_xa_list, sizeof (smb_xa_t),
 	    offsetof(smb_xa_t, xa_lnd));
 
+	list_create(&session->s_oplock_brkreqs, sizeof (mbuf_chain_t),
+	    offsetof(mbuf_chain_t, mbc_lnd));
+
 	smb_net_txl_constructor(&session->s_txlst);
 
 	smb_rwx_init(&session->s_lock);
@@ -708,12 +711,22 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 void
 smb_session_delete(smb_session_t *session)
 {
+	mbuf_chain_t	*mbc;
+
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
 
-	session->s_magic = (uint32_t)~SMB_SESSION_MAGIC;
+	session->s_magic = 0;
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_net_txl_destructor(&session->s_txlst);
+
+	while ((mbc = list_head(&session->s_oplock_brkreqs)) != NULL) {
+		SMB_MBC_VALID(mbc);
+		list_remove(&session->s_oplock_brkreqs, mbc);
+		smb_mbc_free(mbc);
+	}
+	list_destroy(&session->s_oplock_brkreqs);
+
 	smb_slist_destructor(&session->s_req_list);
 	smb_llist_destructor(&session->s_user_list);
 	smb_llist_destructor(&session->s_xa_list);
@@ -726,7 +739,7 @@ smb_session_delete(smb_session_t *session)
 	kmem_cache_free(session->s_cache, session);
 }
 
-void
+static void
 smb_session_cancel(smb_session_t *session)
 {
 	smb_xa_t	*xa, *nextxa;
@@ -751,7 +764,9 @@ smb_session_cancel(smb_session_t *session)
 		smb_xa_close(xa);
 		xa = nextxa;
 	}
+	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 	smb_user_logoff_all(session);
+	smb_rwx_rwexit(&session->s_lock);
 }
 
 /*
@@ -785,8 +800,7 @@ smb_session_cancel_requests(
 }
 
 void
-smb_session_worker(
-    void	*arg)
+smb_session_worker(void	*arg)
 {
 	smb_request_t	*sr;
 
@@ -794,7 +808,7 @@ smb_session_worker(
 
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 
-
+	sr->sr_worker = curthread;
 	mutex_enter(&sr->sr_mutex);
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_SUBMITTED:
@@ -1117,13 +1131,15 @@ smb_request_free(smb_request_t *sr)
 {
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(sr->session);
-	ASSERT(sr->fid_ofile == NULL);
 	ASSERT(sr->r_xa == NULL);
 
-	if (sr->tid_tree)
+	if (sr->fid_ofile != NULL)
+		smb_ofile_release(sr->fid_ofile);
+
+	if (sr->tid_tree != NULL)
 		smb_tree_release(sr->tid_tree);
 
-	if (sr->uid_user)
+	if (sr->uid_user != NULL)
 		smb_user_release(sr->uid_user);
 
 	smb_slist_remove(&sr->session->s_req_list, sr);
@@ -1156,4 +1172,122 @@ char ipstr[INET6_ADDRSTRLEN];
 		cmn_err(CE_WARN, "error ipstr=%s", ipstr);
 	else
 		cmn_err(CE_WARN, "error converting ip address");
+}
+
+boolean_t
+smb_session_oplocks_enable(smb_session_t *session)
+{
+	SMB_SESSION_VALID(session);
+	if (session->s_cfg.skc_oplock_enable == 0)
+		return (B_FALSE);
+	else
+		return (B_TRUE);
+}
+
+/*
+ * smb_session_breaking_oplock
+ *
+ * This MUST be a cross-session call, i.e. the caller must be in a different
+ * context than the one passed.
+ */
+void
+smb_session_oplock_break(smb_session_t *session, smb_ofile_t *of)
+{
+	mbuf_chain_t	*mbc;
+
+	SMB_SESSION_VALID(session);
+
+	mbc = smb_mbc_alloc(MLEN);
+
+	(void) smb_mbc_encodef(mbc, "Mb19.wwwwbb3.ww10.",
+	    SMB_COM_LOCKING_ANDX,
+	    SMB_TREE_GET_TID(SMB_OFILE_GET_TREE(of)),
+	    0xFFFF, 0, 0xFFFF, 8, 0xFF,
+	    SMB_OFILE_GET_FID(of),
+	    LOCKING_ANDX_OPLOCK_RELEASE);
+
+	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+	switch (session->s_state) {
+	case SMB_SESSION_STATE_NEGOTIATED:
+	case SMB_SESSION_STATE_OPLOCK_BREAKING:
+		session->s_state = SMB_SESSION_STATE_OPLOCK_BREAKING;
+		session->s_oplock_brkcntr++;
+		(void) smb_session_send(session, 0, mbc);
+		smb_mbc_free(mbc);
+		break;
+
+	case SMB_SESSION_STATE_READ_RAW_ACTIVE:
+		list_insert_tail(&session->s_oplock_brkreqs, mbc);
+		break;
+
+	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_TERMINATED:
+		smb_mbc_free(mbc);
+		break;
+
+	default:
+		SMB_PANIC();
+	}
+	smb_rwx_rwexit(&session->s_lock);
+}
+
+/*
+ * smb_session_oplock_released
+ *
+ * This function MUST be called in the context of the session of the client
+ * holding the oplock. The lock of the session must have been entered in
+ * RW_READER or RW_WRITER mode.
+ */
+void
+smb_session_oplock_released(smb_session_t *session)
+{
+	krw_t	mode;
+
+	SMB_SESSION_VALID(session);
+
+	mode = smb_rwx_rwupgrade(&session->s_lock);
+	smb_session_oplock_broken(session);
+	smb_rwx_rwdowngrade(&session->s_lock, mode);
+}
+
+/*
+ * smb_session_oplock_break_timedout
+ *
+ * This function MUST be called when the client holding the oplock to file
+ * failed to release it in the time alloted. It is a cross-session call (The
+ * caller must be calling in the context of another session).
+ */
+void
+smb_session_oplock_break_timedout(smb_session_t *session)
+{
+	SMB_SESSION_VALID(session);
+
+	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+	smb_session_oplock_broken(session);
+	smb_rwx_rwexit(&session->s_lock);
+}
+
+/*
+ * smb_session_oplock_broken
+ *
+ * Does the actual work.
+ */
+static void
+smb_session_oplock_broken(smb_session_t *session)
+{
+	switch (session->s_state) {
+	case SMB_SESSION_STATE_OPLOCK_BREAKING:
+		if (--session->s_oplock_brkcntr == 0)
+			session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		break;
+
+	case SMB_SESSION_STATE_NEGOTIATED:
+	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
+	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_TERMINATED:
+		break;
+
+	default:
+		SMB_PANIC();
+	}
 }

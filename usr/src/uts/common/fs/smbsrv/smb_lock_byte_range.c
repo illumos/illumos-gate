@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB: lock_byte_range
  *
@@ -86,7 +83,7 @@ smb_com_lock_byte_range(struct smb_request *sr)
 	if (smbsr_decode_vwv(sr, "wll", &sr->smb_fid, &count, &off) != 0)
 		return (SDRC_ERROR);
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERRbadfid);

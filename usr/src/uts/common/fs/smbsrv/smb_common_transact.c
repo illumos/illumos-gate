@@ -19,9 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
  */
 
 #include <smbsrv/smb_incl.h>
@@ -1373,7 +1372,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	uint16_t	devstate;
 	char		*req_fmt;
 	char		*rep_fmt;
-	struct vardata_block vdb;
+	smb_vdb_t	vdb;
 
 	n_setup = (xa->smb_msrcnt < 200) ? xa->smb_msrcnt : 200;
 	n_setup++;
@@ -1403,8 +1402,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			break;
 
 		case TRANS_TRANSACT_NMPIPE:
-			sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
-			    sr->smb_fid);
+			smbsr_lookup_file(sr);
 			if (sr->fid_ofile == NULL) {
 				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 				    ERRDOS, ERRbadfid);
@@ -1416,7 +1414,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			if (rc != 0)
 				goto trans_err_not_supported;
 
-			rc = smb_opipe_transact(sr, &vdb.uio);
+			rc = smb_opipe_transact(sr, &vdb.vdb_uio);
 			break;
 
 		case TRANS_WAIT_NMPIPE:
@@ -1586,6 +1584,10 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 
 	/* for now, only respond to the */
 	switch (opcode) {
+	case TRANS2_OPEN2:
+		rc = smb_com_trans2_open2(sr, xa);
+		break;
+
 	case TRANS2_CREATE_DIRECTORY:
 		rc = smb_com_trans2_create_directory(sr, xa);
 		break;
@@ -1663,6 +1665,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		rc = smb_com_trans2_set_file_information(sr, xa);
 		break;
 	default:
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		goto trans_err_not_supported;
 	}
 

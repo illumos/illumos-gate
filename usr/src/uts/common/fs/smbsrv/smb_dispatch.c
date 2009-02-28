@@ -21,13 +21,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *
- * Dispatching SMB requests.
  */
 
 /*
- * ALMOST EVERYTHING YOU NEED TO KNOW ABOUT A SERVER MESSAGE BLOCK
+ * SMB requests.
  *
  * Request
  *   Header
@@ -151,7 +148,7 @@ static kmutex_t smb_dispatch_ksmtx;
 static int is_andx_com(unsigned char);
 static int smbsr_check_result(struct smb_request *, int, int);
 
-static smb_dispatch_table_t	dispatch[SMB_COM_NUM] = {
+static smb_disp_entry_t	dispatch[SMB_COM_NUM] = {
 	{ SMB_SDT_OPS(create_directory),			/* 0x00 000 */
 	    PC_NETWORK_PROGRAM_1_0, 0, RW_READER,
 	    { "SmbCreateDirectory", KSTAT_DATA_UINT64 } },
@@ -545,9 +542,6 @@ smbsr_cleanup(smb_request_t *sr)
 	ASSERT((sr->sr_state != SMB_REQ_STATE_CLEANED_UP) &&
 	    (sr->sr_state != SMB_REQ_STATE_COMPLETED));
 
-	if (sr->fid_ofile)
-		smbsr_disconnect_file(sr);
-
 	if (sr->r_xa) {
 		if (sr->r_xa->xa_flags & SMB_XA_FLAG_COMPLETE)
 			smb_xa_close(sr->r_xa);
@@ -578,11 +572,14 @@ boolean_t
 smb_dispatch_request(struct smb_request *sr)
 {
 	smb_sdrc_t		sdrc;
-	smb_dispatch_table_t	*sdd;
+	smb_disp_entry_t	*sdd;
 	boolean_t		disconnect = B_FALSE;
 	smb_session_t		*session;
+	uint32_t		capabilities;
+	uint32_t		byte_count;
 
 	session = sr->session;
+	capabilities = session->capabilities;
 
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
@@ -675,10 +672,24 @@ andx_more:
 		goto report_error;
 	}
 
-	(void) MBC_SHADOW_CHAIN(&sr->smb_data, &sr->command,
-	    sr->command.chain_offset, sr->smb_bcc);
+	/*
+	 * Ignore smb_bcc if CAP_LARGE_READX/CAP_LARGE_WRITEX
+	 * and this is SmbReadX/SmbWriteX since this enables
+	 * large reads/write and bcc is only 16-bits.
+	 */
+	if (((sr->smb_com == SMB_COM_READ_ANDX) &&
+	    (capabilities & CAP_LARGE_READX)) ||
+	    ((sr->smb_com == SMB_COM_WRITE_ANDX) &&
+	    (capabilities & CAP_LARGE_WRITEX))) {
+		byte_count = sr->command.max_bytes - sr->command.chain_offset;
+	} else {
+		byte_count = (uint32_t)sr->smb_bcc;
+	}
 
-	sr->command.chain_offset += sr->smb_bcc;
+	(void) MBC_SHADOW_CHAIN(&sr->smb_data, &sr->command,
+	    sr->command.chain_offset, byte_count);
+
+	sr->command.chain_offset += byte_count;
 	if (sr->command.chain_offset > sr->command.max_bytes) {
 		disconnect = B_TRUE;
 		goto report_error;
@@ -1168,6 +1179,14 @@ smbsr_disconnect_file(smb_request_t *sr)
 	(void) smb_ofile_release(of);
 }
 
+void
+smbsr_lookup_file(smb_request_t *sr)
+{
+	if (sr->fid_ofile == NULL)
+		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
+		    sr->smb_fid);
+}
+
 static int
 is_andx_com(unsigned char com)
 {
@@ -1241,8 +1260,8 @@ smb_com_invalid(smb_request_t *sr)
 static int
 smb_dispatch_kstat_update(kstat_t *ksp, int rw)
 {
-	smb_dispatch_table_t *sdd;
-	kstat_named_t *ks_named;
+	smb_disp_entry_t	*sdd;
+	kstat_named_t		*ks_named;
 	int i;
 
 	if (rw == KSTAT_WRITE)

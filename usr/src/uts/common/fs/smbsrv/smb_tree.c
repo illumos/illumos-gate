@@ -549,6 +549,7 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	 * aclaccess (those from the ACL object for the share). This
 	 * is done during the alloc.
 	 */
+
 	tree = smb_tree_alloc(user, sharename, si->shr_path, STYPE_DISKTREE,
 	    snode, hostaccess & aclaccess);
 

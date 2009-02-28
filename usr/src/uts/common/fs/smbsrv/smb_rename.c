@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_rename.c	1.6	08/08/04 SMI"
 
 #include <smbsrv/nterror.h>
 #include <sys/synch.h>
@@ -182,8 +180,8 @@ smb_do_rename(
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
-
-	smb_oplock_break(src_node);
+	(void) smb_oplock_break(src_node, SMB_SESSION_GET_ID(sr->session),
+	    B_FALSE);
 
 	for (count = 0; count <= 3; count++) {
 		if (count) {

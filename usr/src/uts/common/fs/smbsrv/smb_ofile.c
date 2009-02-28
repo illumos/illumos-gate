@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,6 +220,10 @@ smb_ofile_open(
 	} else {
 		ASSERT(ftype == SMB_FTYPE_DISK); /* Regular file, not a pipe */
 		ASSERT(node);
+
+		if (of->f_granted_access == FILE_EXECUTE)
+			of->f_flags |= SMB_OFLAGS_EXECONLY;
+
 		if (crgetuid(of->f_cr) == node->attr.sa_vattr.va_uid) {
 			/*
 			 * Add this bit for the file's owner even if it's not
@@ -251,9 +255,8 @@ smb_ofile_open(
 		if (op->created_readonly)
 			node->readonly_creator = of;
 
-		smb_llist_enter(&node->n_ofile_list, RW_WRITER);
-		smb_llist_insert_tail(&node->n_ofile_list, of);
-		smb_llist_exit(&node->n_ofile_list);
+		smb_node_add_ofile(node, of);
+		smb_node_inc_open_ofiles(node);
 	}
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
 	smb_llist_insert_tail(&tree->t_ofile_list, of);
@@ -292,7 +295,6 @@ smb_ofile_close(
 			 * For files created readonly, propagate the readonly
 			 * bit to the ofile now
 			 */
-
 			if (of->f_node->readonly_creator == of) {
 				of->f_node->attr.sa_dosattr |=
 				    FILE_ATTRIBUTE_READONLY;
@@ -303,7 +305,6 @@ smb_ofile_close(
 			smb_ofile_close_timestamp_update(of, last_wtime);
 			(void) smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 			smb_commit_delete_on_close(of);
-			smb_oplock_release(of->f_node, B_FALSE);
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
@@ -324,6 +325,11 @@ smb_ofile_close(
 		ASSERT(of->f_refcnt);
 		ASSERT(of->f_state == SMB_OFILE_STATE_CLOSING);
 		of->f_state = SMB_OFILE_STATE_CLOSED;
+		if (of->f_oplock_granted) {
+			smb_node_dec_open_ofiles(of->f_node);
+			smb_oplock_release(of->f_node, of);
+			of->f_oplock_granted = B_FALSE;
+		}
 		mutex_exit(&of->f_mutex);
 		return;
 	}
@@ -403,6 +409,9 @@ smb_ofile_release(
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 
 	mutex_enter(&of->f_mutex);
+	if (of->f_oplock_exit)
+		if (smb_oplock_exit(of->f_node))
+			of->f_oplock_exit = B_FALSE;
 	ASSERT(of->f_refcnt);
 	of->f_refcnt--;
 	switch (of->f_state) {
@@ -599,13 +608,11 @@ smb_ofile_close_timestamp_update(
  *
  */
 boolean_t
-smb_ofile_is_open(
-    smb_ofile_t		*of)
+smb_ofile_is_open(smb_ofile_t *of)
 {
 	boolean_t	rc = B_FALSE;
 
-	ASSERT(of);
-	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
+	SMB_OFILE_VALID(of);
 
 	mutex_enter(&of->f_mutex);
 	if (of->f_state == SMB_OFILE_STATE_OPEN) {
@@ -613,6 +620,17 @@ smb_ofile_is_open(
 	}
 	mutex_exit(&of->f_mutex);
 	return (rc);
+}
+
+void
+smb_ofile_set_oplock_granted(smb_ofile_t *of)
+{
+	SMB_OFILE_VALID(of);
+	mutex_enter(&of->f_mutex);
+	ASSERT(!of->f_oplock_granted);
+	of->f_oplock_granted = B_TRUE;
+	of->f_oplock_exit = B_TRUE;
+	mutex_exit(&of->f_mutex);
 }
 
 /* *************************** Static Functions ***************************** */
@@ -697,9 +715,7 @@ smb_ofile_delete(
 	} else {
 		ASSERT(of->f_ftype == SMB_FTYPE_DISK);
 		ASSERT(of->f_node != NULL);
-		smb_llist_enter(&of->f_node->n_ofile_list, RW_WRITER);
-		smb_llist_remove(&of->f_node->n_ofile_list, of);
-		smb_llist_exit(&of->f_node->n_ofile_list);
+		smb_node_rem_ofile(of->f_node, of);
 		smb_node_release(of->f_node);
 	}
 
@@ -763,7 +779,7 @@ smb_ofile_open_check(
 
 	mutex_enter(&of->f_mutex);
 
-	if (of->f_state != SMB_OFILE_STATE_OPEN) {
+	if (of->f_state !=  SMB_OFILE_STATE_OPEN) {
 		mutex_exit(&of->f_mutex);
 		return (NT_STATUS_INVALID_HANDLE);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,30 +186,23 @@ smb_common_create(smb_request_t *sr)
 	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX))
 		op->mtime.tv_sec = smb_local2gmt(sr, op->mtime.tv_sec);
 	op->mtime.tv_nsec = 0;
+	op->dsize = 0;
 	op->omode = SMB_DA_ACCESS_READ_WRITE | SMB_DA_SHARE_COMPATIBILITY;
 	op->desired_access = smb_omode_to_amask(op->omode);
 	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
 
-	if ((op->desired_access == ((uint32_t)SMB_INVALID_AMASK)) ||
-	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
-		    ERRDOS, ERROR_INVALID_PARAMETER);
-		return (NT_STATUS_INVALID_PARAMETER);
-	}
-
-	op->dsize = 0;
-
 	if (sr->smb_flg & SMB_FLAGS_OPLOCK) {
-		if (sr->smb_flg & SMB_FLAGS_OPLOCK_NOTIFY_ANY) {
-			op->my_flags = MYF_BATCH_OPLOCK;
-		} else {
-			op->my_flags = MYF_EXCLUSIVE_OPLOCK;
-		}
+		if (sr->smb_flg & SMB_FLAGS_OPLOCK_NOTIFY_ANY)
+			op->op_oplock_level = SMB_OPLOCK_BATCH;
+		else
+			op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;
+	} else {
+		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
 
 	status = smb_common_open(sr);
 
-	if (MYF_OPLOCK_TYPE(op->my_flags) == MYF_OPLOCK_NONE) {
+	if (op->op_oplock_level == SMB_OPLOCK_NONE) {
 		sr->smb_flg &=
 		    ~(SMB_FLAGS_OPLOCK | SMB_FLAGS_OPLOCK_NOTIFY_ANY);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,6 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	struct open_param *op = &sr->arg.open;
 	uint8_t SecurityFlags;
 	uint32_t EaLength;
-	uint32_t Flags;
 	uint32_t ImpersonationLevel;
 	uint32_t NameLength;
 	uint32_t sd_len;
@@ -72,7 +71,7 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 
 	rc = smb_mbc_decodef(&xa->req_param_mb, "%lllqllllllllb",
 	    sr,
-	    &Flags,
+	    &op->nt_flags,
 	    &op->rootdirfid,
 	    &op->desired_access,
 	    &op->dsize,
@@ -99,16 +98,12 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		}
 	}
 
-	if (Flags) {
-		if (Flags & NT_CREATE_FLAG_REQUEST_OPLOCK) {
-			if (Flags & NT_CREATE_FLAG_REQUEST_OPBATCH)
-				op->my_flags = MYF_BATCH_OPLOCK;
-			else
-				op->my_flags = MYF_EXCLUSIVE_OPLOCK;
-		}
-
-		if (Flags & NT_CREATE_FLAG_OPEN_TARGET_DIR)
-			op->my_flags |= MYF_MUST_BE_DIRECTORY;
+	op->op_oplock_level = SMB_OPLOCK_NONE;
+	if (op->nt_flags & NT_CREATE_FLAG_REQUEST_OPLOCK) {
+		if (op->nt_flags & NT_CREATE_FLAG_REQUEST_OPBATCH)
+			op->op_oplock_level = SMB_OPLOCK_BATCH;
+		else
+			op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;
 	}
 
 	if (sd_len) {
@@ -155,7 +150,14 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+		    ERRDOS, ERRbadaccess);
+		return (SDRC_ERROR);
+	}
+
+	if (op->create_disposition > FILE_MAXIMUM_DISPOSITION) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+		    ERRDOS, ERRbadaccess);
 		return (SDRC_ERROR);
 	}
 
@@ -175,8 +177,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		op->fqi.dir_snode = sr->tid_tree->t_snode;
 	} else {
 		sr->smb_fid = (ushort_t)op->rootdirfid;
-		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
-		    sr->smb_fid);
+		smbsr_lookup_file(sr);
 		if (sr->fid_ofile == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
@@ -193,17 +194,17 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		switch (MYF_OPLOCK_TYPE(op->my_flags)) {
-		case MYF_EXCLUSIVE_OPLOCK :
+		switch (op->op_oplock_level) {
+		case SMB_OPLOCK_EXCLUSIVE:
 			OplockLevel = 1;
 			break;
-		case MYF_BATCH_OPLOCK :
+		case SMB_OPLOCK_BATCH:
 			OplockLevel = 2;
 			break;
-		case MYF_LEVEL_II_OPLOCK :
+		case SMB_OPLOCK_LEVEL_II:
 			OplockLevel = 3;
 			break;
-		case MYF_OPLOCK_NONE :
+		case SMB_OPLOCK_NONE:
 		default:
 			OplockLevel = 0;
 			break;

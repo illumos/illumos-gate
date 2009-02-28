@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -107,6 +105,8 @@ static const fs_operation_def_t smb_oplock_tmpl[] = {
 	VOPNAME_VNEVENT, { .femop_vnevent = smb_fem_oplock_vnevent },
 	NULL, NULL
 };
+
+static int smb_fem_oplock_break(femarg_t *, caller_context_t *);
 
 /*
  * smb_fem_init
@@ -397,21 +397,19 @@ smb_fem_fcn_symlink(
  * CIFS higher-level routines will break oplocks as needed prior
  * to getting to the VFS layer.
  */
-
-#define	SMB_FEM_OPLOCK_BREAK(arg) \
-	smb_oplock_break((smb_node_t *)((arg)->fa_fnode->fn_available));
-
 static int
 smb_fem_oplock_open(
-	femarg_t *arg,
-	int mode,
-	cred_t *cr,
-	struct caller_context *ct)
+    femarg_t		*arg,
+    int			mode,
+    cred_t		*cr,
+    caller_context_t	*ct)
 {
-	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-		SMB_FEM_OPLOCK_BREAK(arg);
+	int	rc;
 
-	return (vnext_open(arg, mode, cr, ct));
+	rc = smb_fem_oplock_break(arg, ct);
+	if (rc == 0)
+		rc = vnext_open(arg, mode, cr, ct);
+	return (rc);
 }
 
 /*
@@ -421,16 +419,18 @@ smb_fem_oplock_open(
 
 static int
 smb_fem_oplock_read(
-	femarg_t *arg,
-	uio_t *uiop,
-	int ioflag,
-	cred_t *cr,
-	struct caller_context *ct)
+    femarg_t		*arg,
+    uio_t		*uiop,
+    int			ioflag,
+    cred_t		*cr,
+    caller_context_t	*ct)
 {
-	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-		SMB_FEM_OPLOCK_BREAK(arg);
+	int	rc;
 
-	return (vnext_read(arg, uiop, ioflag, cr, ct));
+	rc = smb_fem_oplock_break(arg, ct);
+	if (rc == 0)
+		rc = vnext_read(arg, uiop, ioflag, cr, ct);
+	return (rc);
 }
 
 /*
@@ -440,74 +440,84 @@ smb_fem_oplock_read(
 
 static int
 smb_fem_oplock_write(
-	femarg_t *arg,
-	uio_t *uiop,
-	int ioflag,
-	cred_t *cr,
-	struct caller_context *ct)
+    femarg_t		*arg,
+    uio_t		*uiop,
+    int			ioflag,
+    cred_t		*cr,
+    caller_context_t	*ct)
 {
-	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-		SMB_FEM_OPLOCK_BREAK(arg);
+	int	rc;
 
-	return (vnext_write(arg, uiop, ioflag, cr, ct));
+	rc = smb_fem_oplock_break(arg, ct);
+	if (rc == 0)
+		rc = vnext_write(arg, uiop, ioflag, cr, ct);
+	return (rc);
 }
 
 static int
 smb_fem_oplock_setattr(
-	femarg_t *arg,
-	vattr_t *vap,
-	int flags,
-	cred_t *cr,
-	caller_context_t *ct)
+    femarg_t		*arg,
+    vattr_t		*vap,
+    int			flags,
+    cred_t		*cr,
+    caller_context_t	*ct)
 {
-	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-		SMB_FEM_OPLOCK_BREAK(arg);
+	int	rc;
 
-	return (vnext_setattr(arg, vap, flags, cr, ct));
+	rc = smb_fem_oplock_break(arg, ct);
+	if (rc == 0)
+		rc = vnext_setattr(arg, vap, flags, cr, ct);
+	return (rc);
 }
 
 static int
 smb_fem_oplock_rwlock(
-	femarg_t *arg,
-	int write_lock,
-	caller_context_t *ct)
+    femarg_t		*arg,
+    int			write_lock,
+    caller_context_t	*ct)
 {
 	if (write_lock) {
-		if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-			SMB_FEM_OPLOCK_BREAK(arg);
-	}
+		int	rc;
 
+		rc = smb_fem_oplock_break(arg, ct);
+		if (rc != 0)
+			return (rc);
+	}
 	return (vnext_rwlock(arg, write_lock, ct));
 }
 
 static int
 smb_fem_oplock_space(
-	femarg_t *arg,
-	int cmd,
-	flock64_t *bfp,
-	int flag,
-	offset_t offset,
-	cred_t *cr,
-	caller_context_t *ct)
+    femarg_t		*arg,
+    int			cmd,
+    flock64_t		*bfp,
+    int			flag,
+    offset_t		offset,
+    cred_t		*cr,
+    caller_context_t	*ct)
 {
-	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-		SMB_FEM_OPLOCK_BREAK(arg);
+	int	rc;
 
-	return (vnext_space(arg, cmd, bfp, flag, offset, cr, ct));
+	rc = smb_fem_oplock_break(arg, ct);
+	if (rc == 0)
+		rc = vnext_space(arg, cmd, bfp, flag, offset, cr, ct);
+	return (rc);
 }
 
 static int
 smb_fem_oplock_setsecattr(
-	femarg_t *arg,
-	vsecattr_t *vsap,
-	int flag,
-	cred_t *cr,
-	caller_context_t *ct)
+    femarg_t		*arg,
+    vsecattr_t		*vsap,
+    int			flag,
+    cred_t		*cr,
+    caller_context_t	*ct)
 {
-	if (ct == NULL || ct->cc_caller_id != smb_ct.cc_caller_id)
-		SMB_FEM_OPLOCK_BREAK(arg);
+	int	rc;
 
-	return (vnext_setsecattr(arg, vsap, flag, cr, ct));
+	rc = smb_fem_oplock_break(arg, ct);
+	if (rc == 0)
+		rc = vnext_setsecattr(arg, vsap, flag, cr, ct);
+	return (rc);
 }
 
 /*
@@ -526,22 +536,54 @@ smb_fem_oplock_setsecattr(
 
 static int
 smb_fem_oplock_vnevent(
-	femarg_t *arg,
-	vnevent_t vnevent,
-	vnode_t *dvp,
-	char *name,
-	caller_context_t *ct)
+    femarg_t		*arg,
+    vnevent_t		vnevent,
+    vnode_t		*dvp,
+    char		*name,
+    caller_context_t	*ct)
 {
+	int	rc;
+
 	switch (vnevent) {
 	case VE_REMOVE:
 	case VE_RENAME_DEST:
 	case VE_RENAME_SRC:
-
-		SMB_FEM_OPLOCK_BREAK(arg);
+		rc = smb_fem_oplock_break(arg, ct);
+		if (rc != 0)
+			return (rc);
 		break;
 
 	default:
 		break;
 	}
 	return (vnext_vnevent(arg, vnevent, dvp, name, ct));
+}
+
+static int
+smb_fem_oplock_break(femarg_t *arg, caller_context_t *ct)
+{
+	smb_node_t	*node;
+	int		rc;
+
+	node = (smb_node_t *)((arg)->fa_fnode->fn_available);
+	SMB_NODE_VALID(node);
+
+	if (ct == NULL) {
+		(void) smb_oplock_break(node, 0, B_FALSE);
+		return (0);
+	}
+
+	if (ct->cc_caller_id == smb_ct.cc_caller_id)
+		return (0);
+
+	if (ct->cc_flags & CC_DONTBLOCK) {
+		if (smb_oplock_break(node, 0, B_TRUE))
+			return (0);
+		ct->cc_flags |= CC_WOULDBLOCK;
+		rc = EAGAIN;
+	} else {
+		(void) smb_oplock_break(node, 0, B_FALSE);
+		rc = 0;
+	}
+	return (rc);
 }

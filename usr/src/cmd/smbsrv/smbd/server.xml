@@ -144,7 +144,7 @@ file.
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.smb' />
 		<propval name='oplock_enable' type='boolean'
-			value='false' override='true'/>
+			value='true' override='true'/>
 		<propval name='autohome_map' type='astring'
 			value='/etc' override='true'/>
 		<propval name='domain_sid' type='astring'
@@ -170,7 +170,7 @@ file.
 		<propval name='srvsvc_sharesetinfo_enable' type='boolean'
 			value='false' override='true'/>
 		<propval name='max_workers' type='integer'
-			value='64' override='true'/>
+			value='1024' override='true'/>
 		<propval name='max_connections' type='integer'
 			value='-1' override='true'/>
 		<propval name='keep_alive' type='integer'

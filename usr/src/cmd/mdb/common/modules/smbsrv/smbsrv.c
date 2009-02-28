@@ -1609,7 +1609,7 @@ smb_lock(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 smb_stats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	smb_dispatch_table_t	*disp;
+	smb_disp_entry_t	*disp;
 	GElf_Sym		sym;
 	int			nstats = 0, i;
 
@@ -1627,7 +1627,7 @@ smb_stats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	nstats = sym.st_size / sizeof (smb_dispatch_table_t);
+	nstats = sym.st_size / sizeof (smb_disp_entry_t);
 
 	mdb_printf("All dispatched SMB requests statistics:\n\n");
 	for (i = 0; i < nstats; i++) {

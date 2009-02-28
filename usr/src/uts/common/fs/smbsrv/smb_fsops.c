@@ -1075,7 +1075,7 @@ smb_fsop_rename(
 		if (from_snode == NULL) {
 			rc = ENOMEM;
 		} else {
-			(void) smb_node_rename(from_dir_snode, from_snode,
+			smb_node_rename(from_dir_snode, from_snode,
 			    to_dir_snode, to_name);
 			smb_node_release(from_snode);
 		}

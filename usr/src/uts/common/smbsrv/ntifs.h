@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_NTIFS_H
 #define	_SMBSRV_NTIFS_H
-
-#pragma ident	"@(#)ntifs.h	1.3	08/07/30 SMI"
 
 /*
  * This file provides definitions compatible with the NT Installable
@@ -229,6 +227,7 @@ typedef enum _FILE_INFORMATION_CLASS {
 	FileInformationReserved32,	/* 32 */
 	FileInformationReserved33,	/* 33 */
 	FileNetworkOpenInformation,	/* 34 */
+	FileAttributeTagInformation,	/* 35 */
 	FileMaximumInformation
 } FILE_INFORMATION_CLASS;
 

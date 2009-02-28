@@ -443,10 +443,16 @@ smb_pathname(
 		if ((err = pn_getcomponent(&upn, component)) != 0)
 			break;
 
-		if (smb_maybe_mangled_name(component)) {
+		/*
+		 * This mangled name handling is in the wrong place.
+		 * The name must be looked up prior to any mangled
+		 * name checking.
+		 *
+		 * Temporary: check for ~ to keep smbtorture quiet.
+		 */
+		if (*component != '~' && smb_maybe_mangled_name(component)) {
 			if ((err = smb_unmangle_name(sr, cred, dnode,
-			    component, real_name, MAXNAMELEN, 0, 0,
-			    1)) != 0)
+			    component, real_name, MAXNAMELEN, 0, 0, 1)) != 0)
 				break;
 			/*
 			 * Do not pass FIGNORECASE to lookuppnvp().

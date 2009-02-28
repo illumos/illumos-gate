@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * SMB mbuf marshaling encode/decode.
@@ -147,6 +146,7 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 	uint8_t		cval;
 	uint8_t		*cvalp;
 	uint8_t		**cvalpp;
+	uint16_t	wval;
 	uint16_t	*wvalp;
 	uint32_t	*lvalp;
 	uint64_t	*llvalp;
@@ -240,29 +240,29 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 
 		case 'B':
 			vdp = va_arg(ap, struct vardata_block *);
-			vdp->tag = 0;
-
-			/*LINTED E_ASSIGN_NARROW_CONV (BYTE)*/
-			vdp->len = repc;
-			vdp->uio.uio_iov = &vdp->iovec[0];
-			vdp->uio.uio_iovcnt = MAX_IOVEC;
-			vdp->uio.uio_resid = repc;
-			if (mbc_marshal_get_uio(mbc, &vdp->uio) != 0)
+			vdp->vdb_tag = 0;
+			vdp->vdb_len = repc;
+			vdp->vdb_uio.uio_iov = &vdp->vdb_iovec[0];
+			vdp->vdb_uio.uio_iovcnt = MAX_IOVEC;
+			vdp->vdb_uio.uio_resid = repc;
+			if (mbc_marshal_get_uio(mbc, &vdp->vdb_uio) != 0)
 				return (-1);
 			break;
 
 		case 'D':
 		case 'V':
 			vdp = va_arg(ap, struct vardata_block *);
-			if (mbc_marshal_get_char(mbc, &vdp->tag) != 0)
+			if (mbc_marshal_get_char(mbc, &vdp->vdb_tag) != 0)
 				return (-1);
-			if (mbc_marshal_get_short(mbc, &vdp->len) != 0)
+			if (mbc_marshal_get_short(mbc, &wval) != 0)
 				return (-1);
-			vdp->uio.uio_iov = &vdp->iovec[0];
-			vdp->uio.uio_iovcnt = MAX_IOVEC;
-			vdp->uio.uio_resid = vdp->len;
-			if (vdp->len != 0) {
-				if (mbc_marshal_get_uio(mbc, &vdp->uio) != 0)
+			vdp->vdb_len = (uint32_t)wval;
+			vdp->vdb_uio.uio_iov = &vdp->vdb_iovec[0];
+			vdp->vdb_uio.uio_iovcnt = MAX_IOVEC;
+			vdp->vdb_uio.uio_resid = vdp->vdb_len;
+			if (vdp->vdb_len != 0) {
+				if (mbc_marshal_get_uio(mbc,
+				    &vdp->vdb_uio) != 0)
 					return (-1);
 			}
 			break;
@@ -540,9 +540,9 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 
 			if (mbc_marshal_put_char(mbc, 1) != 0)
 				return (DECODE_NO_MORE_DATA);
-			if (mbc_marshal_put_short(mbc, vdp->len) != 0)
+			if (mbc_marshal_put_short(mbc, vdp->vdb_len) != 0)
 				return (DECODE_NO_MORE_DATA);
-			if (mbc_marshal_put_uio(mbc, &vdp->uio) != 0)
+			if (mbc_marshal_put_uio(mbc, &vdp->vdb_uio) != 0)
 				return (DECODE_NO_MORE_DATA);
 			break;
 
@@ -564,9 +564,9 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
 
 			if (mbc_marshal_put_char(mbc, 5) != 0)
 				return (DECODE_NO_MORE_DATA);
-			if (mbc_marshal_put_short(mbc, vdp->len) != 0)
+			if (mbc_marshal_put_short(mbc, vdp->vdb_len) != 0)
 				return (DECODE_NO_MORE_DATA);
-			if (mbc_marshal_put_uio(mbc, &vdp->uio) != 0)
+			if (mbc_marshal_put_uio(mbc, &vdp->vdb_uio) != 0)
 				return (DECODE_NO_MORE_DATA);
 			break;
 

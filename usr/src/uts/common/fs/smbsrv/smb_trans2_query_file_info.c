@@ -99,7 +99,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -227,6 +227,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_BASIC_INFO:
+	case SMB_FILE_BASIC_INFORMATION:
 		/*
 		 * NT includes 6 undocumented bytes at the end of this
 		 * response, which are required by NetBench 5.01.
@@ -242,8 +243,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_STANDARD_INFO:
-		(void) smb_mbc_encodef(&xa->rep_param_mb, "w",
-		    SMB_QUERY_FILE_STANDARD_INFO);
+	case SMB_FILE_STANDARD_INFORMATION:
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		/*
 		 * Add 2 bytes to pad data to long. It is
 		 * necessary because Win2k expects the padded bytes.
@@ -369,6 +370,19 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "qwbbb3.",
 		    datasz, 0, 0, 0, 0);
+		break;
+
+	case SMB_FILE_ATTR_TAG_INFORMATION:
+		/*
+		 * If dattr includes FILE_ATTRIBUTE_REPARSE_POINT, the
+		 * second dword should be the reparse tag.  Otherwise
+		 * the tag value should be set to zero.
+		 * We don't support reparse points, so we set the tag
+		 * to zero.
+		 */
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "ll",
+		    (uint32_t)dattr, 0);
 		break;
 
 	default:

@@ -19,17 +19,26 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#include <sys/syslog.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
 
-int smb_common_read(smb_request_t *, smb_rw_param_t *);
+/*
+ * The maximum number of bytes to return from SMB Core
+ * SmbRead or SmbLockAndRead.
+ */
+#define	SMB_CORE_READ_MAX	4432
 
+/*
+ * The limit in bytes for SmbReadX.
+ */
+#define	SMB_READX_MAX		0x10000
+
+int smb_common_read(smb_request_t *, smb_rw_param_t *);
 
 /*
  * Read bytes from a file or named pipe (SMB Core).
@@ -51,6 +60,7 @@ smb_pre_read(smb_request_t *sr)
 {
 	smb_rw_param_t *param;
 	uint32_t off_low;
+	uint16_t count;
 	uint16_t remcnt;
 	int rc;
 
@@ -58,9 +68,10 @@ smb_pre_read(smb_request_t *sr)
 	sr->arg.rw = param;
 
 	rc = smbsr_decode_vwv(sr, "wwlw", &sr->smb_fid,
-	    &param->rw_count, &off_low, &remcnt);
+	    &count, &off_low, &remcnt);
 
 	param->rw_offset = (uint64_t)off_low;
+	param->rw_count = (uint32_t)count;
 	param->rw_mincnt = 0;
 
 	DTRACE_SMB_2(op__Read__start, smb_request_t *, sr,
@@ -82,9 +93,10 @@ smb_sdrc_t
 smb_com_read(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
+	uint16_t count;
 	int rc;
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -92,13 +104,17 @@ smb_com_read(smb_request_t *sr)
 
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
+	if (param->rw_count > SMB_CORE_READ_MAX)
+		param->rw_count = SMB_CORE_READ_MAX;
+
 	if ((rc = smb_common_read(sr, param)) != 0) {
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
+	count = (uint16_t)param->rw_count;
 	rc = smbsr_encode_result(sr, 5, VAR_BCC, "bw8.wbwC",
-	    5, param->rw_count, VAR_BCC, 0x01, param->rw_count, &sr->raw_data);
+	    5, count, VAR_BCC, 0x01, count, &sr->raw_data);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -129,17 +145,19 @@ smb_sdrc_t
 smb_pre_lock_and_read(smb_request_t *sr)
 {
 	smb_rw_param_t *param;
-	uint16_t remcnt;
 	uint32_t off_low;
+	uint16_t count;
+	uint16_t remcnt;
 	int rc;
 
 	param = kmem_zalloc(sizeof (smb_rw_param_t), KM_SLEEP);
 	sr->arg.rw = param;
 
 	rc = smbsr_decode_vwv(sr, "wwlw", &sr->smb_fid,
-	    &param->rw_count, &off_low, &remcnt);
+	    &count, &off_low, &remcnt);
 
 	param->rw_offset = (uint64_t)off_low;
+	param->rw_count = (uint32_t)count;
 	param->rw_mincnt = 0;
 
 	DTRACE_SMB_2(op__LockAndRead__start, smb_request_t *, sr,
@@ -162,6 +180,7 @@ smb_com_lock_and_read(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
 	DWORD status;
+	uint16_t count;
 	int rc;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
@@ -169,7 +188,7 @@ smb_com_lock_and_read(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -178,19 +197,24 @@ smb_com_lock_and_read(smb_request_t *sr)
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	status = smb_lock_range(sr, param->rw_offset, (uint64_t)param->rw_count,
-	    UINT_MAX, SMB_LOCK_TYPE_READWRITE);
+	    0, SMB_LOCK_TYPE_READWRITE);
+
 	if (status != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, status);
 		return (SDRC_ERROR);
 	}
+
+	if (param->rw_count > SMB_CORE_READ_MAX)
+		param->rw_count = SMB_CORE_READ_MAX;
 
 	if ((rc = smb_common_read(sr, param)) != 0) {
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
+	count = (uint16_t)param->rw_count;
 	rc = smbsr_encode_result(sr, 5, VAR_BCC, "bw8.wbwC",
-	    5, param->rw_count, VAR_BCC, 0x1, param->rw_count, &sr->raw_data);
+	    5, count, VAR_BCC, 0x1, count, &sr->raw_data);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -214,6 +238,7 @@ smb_com_lock_and_read(smb_request_t *sr)
  * we send a zero length session packet, which will force the client to
  * retry the read.
  *
+ * Do not return errors from SmbReadRaw.
  * Read errors are handled by sending a zero length response.
  */
 smb_sdrc_t
@@ -223,6 +248,7 @@ smb_pre_read_raw(smb_request_t *sr)
 	uint32_t off_low;
 	uint32_t off_high;
 	uint32_t timeout;
+	uint16_t count;
 	int rc;
 
 	param = kmem_zalloc(sizeof (smb_rw_param_t), KM_SLEEP);
@@ -230,25 +256,43 @@ smb_pre_read_raw(smb_request_t *sr)
 
 	if (sr->smb_wct == 8) {
 		rc = smbsr_decode_vwv(sr, "wlwwl2.", &sr->smb_fid,
-		    &off_low, &param->rw_count, &param->rw_mincnt,
-		    &timeout);
-		param->rw_offset = (uint64_t)off_low;
+		    &off_low, &count, &param->rw_mincnt, &timeout);
+		if (rc == 0) {
+			param->rw_offset = (uint64_t)off_low;
+			param->rw_count = (uint32_t)count;
+		}
 	} else {
 		rc = smbsr_decode_vwv(sr, "wlwwl2.l", &sr->smb_fid,
-		    &off_low, &param->rw_count, &param->rw_mincnt,
-		    &timeout, &off_high);
-		param->rw_offset = ((uint64_t)off_high << 32) | off_low;
+		    &off_low, &count, &param->rw_mincnt, &timeout, &off_high);
+		if (rc == 0) {
+			param->rw_offset = ((uint64_t)off_high << 32) | off_low;
+			param->rw_count = (uint32_t)count;
+		}
 	}
 
 	DTRACE_SMB_2(op__ReadRaw__start, smb_request_t *, sr,
 	    smb_rw_param_t *, param);
 
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_read_raw(smb_request_t *sr)
 {
+	mbuf_chain_t	*mbc;
+
+	if (sr->session->s_state == SMB_SESSION_STATE_READ_RAW_ACTIVE) {
+		sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+
+		while ((mbc = list_head(&sr->session->s_oplock_brkreqs)) !=
+		    NULL) {
+			SMB_MBC_VALID(mbc);
+			list_remove(&sr->session->s_oplock_brkreqs, mbc);
+			(void) smb_session_send(sr->session, 0, mbc);
+			smb_mbc_free(mbc);
+		}
+	}
+
 	DTRACE_SMB_2(op__ReadRaw__done, smb_request_t *, sr,
 	    smb_rw_param_t *, sr->arg.rw);
 
@@ -259,21 +303,23 @@ smb_sdrc_t
 smb_com_read_raw(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
-	smb_node_t *node;
-	int rc;
 
 	switch (sr->session->s_state) {
 	case SMB_SESSION_STATE_NEGOTIATED:
+		sr->session->s_state = SMB_SESSION_STATE_READ_RAW_ACTIVE;
 		break;
 
 	case SMB_SESSION_STATE_OPLOCK_BREAKING:
 		(void) smb_session_send(sr->session, 0, NULL);
-		sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
 		return (SDRC_NO_REPLY);
 
 	case SMB_SESSION_STATE_TERMINATED:
 	case SMB_SESSION_STATE_DISCONNECTED:
 		return (SDRC_NO_REPLY);
+
+	case SMB_SESSION_STATE_READ_RAW_ACTIVE:
+		sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		return (SDRC_DROP_VC);
 
 	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
 	case SMB_SESSION_STATE_CONNECTED:
@@ -282,27 +328,21 @@ smb_com_read_raw(smb_request_t *sr)
 		return (SDRC_DROP_VC);
 	}
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
-		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
-		return (SDRC_ERROR);
+		(void) smb_session_send(sr->session, 0, NULL);
+		return (SDRC_NO_REPLY);
 	}
 
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
-	rc = smb_common_read(sr, param);
+	if (param->rw_mincnt > param->rw_count)
+		param->rw_mincnt = 0;
 
-	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		node = sr->fid_ofile->f_node;
-		if (node->n_oplock.op_flags & OPLOCK_FLAG_BREAKING) {
-			rc = EAGAIN;
-		}
-	}
-
-	if (rc != 0) {
+	if (smb_common_read(sr, param) != 0) {
 		(void) smb_session_send(sr->session, 0, NULL);
 		m_freem(sr->raw_data.chain);
-		sr->raw_data.chain = 0;
+		sr->raw_data.chain = NULL;
 	} else {
 		(void) smb_session_send(sr->session, 0, &sr->raw_data);
 	}
@@ -314,6 +354,12 @@ smb_com_read_raw(smb_request_t *sr)
  * Read bytes from a file (SMB Core).  This request was extended in
  * LM 0.12 to support 64-bit offsets, indicated by sending a wct of
  * 12 and including additional offset information.
+ *
+ * MS-SMB 3.3.5.7 update to LM 0.12 4.2.4:
+ * If wct is 12 and CAP_LARGE_READX is set, the count may be larger
+ * than the negotiated buffer size.  If maxcnt_high is 0xFF, it must
+ * be ignored.  Otherwise, maxcnt_high represents the upper 16 bits
+ * of rw_count.
  */
 smb_sdrc_t
 smb_pre_read_andx(smb_request_t *sr)
@@ -321,6 +367,9 @@ smb_pre_read_andx(smb_request_t *sr)
 	smb_rw_param_t *param;
 	uint32_t off_low;
 	uint32_t off_high;
+	uint32_t maxcnt_high;
+	uint16_t maxcnt_low;
+	uint16_t mincnt;
 	uint16_t remcnt;
 	int rc;
 
@@ -328,16 +377,23 @@ smb_pre_read_andx(smb_request_t *sr)
 	sr->arg.rw = param;
 
 	if (sr->smb_wct == 12) {
-		rc = smbsr_decode_vwv(sr, "b3.wlw6.wl", &param->rw_andx,
-		    &sr->smb_fid, &off_low, &param->rw_count, &remcnt,
-		    &off_high);
+		rc = smbsr_decode_vwv(sr, "b3.wlwwlwl", &param->rw_andx,
+		    &sr->smb_fid, &off_low, &maxcnt_low, &mincnt, &maxcnt_high,
+		    &remcnt, &off_high);
 
-		param->rw_offset = ((uint64_t)off_high << 32) | off_low;
+		param->rw_offset = ((uint64_t)off_high << 32) |
+		    (uint64_t)off_low;
+
+		param->rw_count = (uint32_t)maxcnt_low;
+		if (maxcnt_high < 0xFF)
+			param->rw_count |= maxcnt_high << 16;
 	} else {
-		rc = smbsr_decode_vwv(sr, "b3.wlw6.w", &param->rw_andx,
-		    &sr->smb_fid, &off_low, &param->rw_count, &remcnt);
+		rc = smbsr_decode_vwv(sr, "b3.wlwwlw", &param->rw_andx,
+		    &sr->smb_fid, &off_low, &maxcnt_low, &mincnt, &maxcnt_high,
+		    &remcnt);
 
 		param->rw_offset = (uint64_t)off_low;
+		param->rw_count = (uint32_t)maxcnt_low;
 	}
 
 	param->rw_mincnt = 0;
@@ -361,10 +417,13 @@ smb_sdrc_t
 smb_com_read_andx(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
+	uint16_t datalen_high;
+	uint16_t datalen_low;
+	uint16_t data_offset;
 	uint16_t offset2;
 	int rc;
 
-	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
+	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
@@ -372,41 +431,50 @@ smb_com_read_andx(smb_request_t *sr)
 
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
+	if (param->rw_count >= SMB_READX_MAX)
+		param->rw_count = 0;
+
 	if ((rc = smb_common_read(sr, param)) != 0) {
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
-	/*
-	 * Ensure that the next response offset is zero
-	 * if there is no secondary command.
-	 */
-	offset2 = (param->rw_andx == 0xFF) ? 0 : param->rw_count + 59;
+	datalen_low = param->rw_count & 0xFFFF;
+	datalen_high = (param->rw_count >> 16) & 0xFF;
 
 	/*
-	 * The STYPE_IPC response format is different.
-	 * The unknown value (2) may be to indicate that it
-	 * is a follow-up to an earlier RPC transaction.
+	 * If this is a secondary command, the data offset
+	 * includes the previous wct + sizeof(wct).
 	 */
+	data_offset = (sr->andx_prev_wct == 0) ? 0 : sr->andx_prev_wct + 1;
+
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
-		rc = smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.ww10.wbC",
+		data_offset += 60;
+		offset2 = (param->rw_andx == 0xFF) ? 0 : param->rw_count + 60;
+
+		rc = smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.www8.wbC",
 		    12,			/* wct */
-		    param->rw_andx,	/* Secondary andx command */
-		    offset2,		/* offset to next */
-		    0,			/* must be 0 */
-		    param->rw_count,	/* data byte count */
-		    60,			/* Offset from start to data */
+		    param->rw_andx,	/* secondary andx command */
+		    offset2,		/* offset to next command */
+		    0,			/* set to 0 for named pipes */
+		    datalen_low,	/* data byte count */
+		    data_offset,	/* offset from start to data */
+		    datalen_high,	/* data byte count */
 		    VAR_BCC,		/* BCC marker */
-		    0x02,		/* unknown */
+		    0x00,		/* padding */
 		    &sr->raw_data);
 	} else {
-		rc = smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.ww10.wC",
+		data_offset += 59;
+		offset2 = (param->rw_andx == 0xFF) ? 0 : param->rw_count + 59;
+
+		rc = smbsr_encode_result(sr, 12, VAR_BCC, "bb1.ww4.www8.wC",
 		    12,			/* wct */
-		    param->rw_andx,	/* Secondary andx command */
-		    offset2,		/* offset to next */
-		    -1,			/* must be -1 */
-		    param->rw_count,	/* data byte count */
-		    59,			/* Offset from start to data */
+		    param->rw_andx,	/* secondary andx command */
+		    offset2,		/* offset to next command */
+		    -1,			/* must be -1 for regular files */
+		    datalen_low,	/* data byte count */
+		    data_offset,	/* offset from start to data */
+		    datalen_high,	/* data byte count */
 		    VAR_BCC,		/* BCC marker */
 		    &sr->raw_data);
 	}
@@ -431,12 +499,12 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 	struct mbuf *top;
 	int rc;
 
-	vdb->tag = 0;
-	vdb->uio.uio_iov = &vdb->iovec[0];
-	vdb->uio.uio_iovcnt = MAX_IOVEC;
-	vdb->uio.uio_resid = param->rw_count;
-	vdb->uio.uio_loffset = (offset_t)param->rw_offset;
-	vdb->uio.uio_segflg = UIO_SYSSPACE;
+	vdb->vdb_tag = 0;
+	vdb->vdb_uio.uio_iov = &vdb->vdb_iovec[0];
+	vdb->vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb->vdb_uio.uio_resid = param->rw_count;
+	vdb->vdb_uio.uio_loffset = (offset_t)param->rw_offset;
+	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
 
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
@@ -451,21 +519,33 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 			}
 		}
 
+		if ((ofile->f_flags & SMB_OFLAGS_EXECONLY) &&
+		    !(sr->smb_flg2 & SMB_FLAGS2_PAGING_IO)) {
+			/*
+			 * SMB_FLAGS2_PAGING_IO: permit execute-only reads.
+			 *
+			 * Reject request if the file has been opened
+			 * execute-only and SMB_FLAGS2_PAGING_IO is not set.
+			 */
+			rc = EACCES;
+			break;
+		}
+
 		(void) smb_sync_fsattr(sr, sr->user_cr, node);
 
-		sr->raw_data.max_bytes = vdb->uio.uio_resid;
-		top = smb_mbuf_allocate(&vdb->uio);
+		sr->raw_data.max_bytes = vdb->vdb_uio.uio_resid;
+		top = smb_mbuf_allocate(&vdb->vdb_uio);
 
-		rc = smb_fsop_read(sr, sr->user_cr, node, &vdb->uio,
+		rc = smb_fsop_read(sr, sr->user_cr, node, &vdb->vdb_uio,
 		    &node->attr);
 
-		sr->raw_data.max_bytes -= vdb->uio.uio_resid;
+		sr->raw_data.max_bytes -= vdb->vdb_uio.uio_resid;
 		smb_mbuf_trim(top, sr->raw_data.max_bytes);
 		MBC_ATTACH_MBUF(&sr->raw_data, top);
 		break;
 
 	case STYPE_IPC:
-		rc = smb_opipe_read(sr, &vdb->uio);
+		rc = smb_opipe_read(sr, &vdb->vdb_uio);
 		break;
 
 	default:
@@ -473,7 +553,7 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 		break;
 	}
 
-	param->rw_count -= vdb->uio.uio_resid;
+	param->rw_count -= vdb->vdb_uio.uio_resid;
 
 	if (rc != 0)
 		return (rc);
