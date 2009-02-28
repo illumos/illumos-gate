@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG = powertop
-OBJS = $(PROG).o display.o battery.o cpufreq.o cpuidle.o events.o util.o suggestions.o
+OBJS = $(PROG).o display.o battery.o cpufreq.o cpuidle.o events.o util.o suggestions.o turbo.o
 SRCS = $(OBJS:%.o=../%.c)
 
 include ../../Makefile.cmd

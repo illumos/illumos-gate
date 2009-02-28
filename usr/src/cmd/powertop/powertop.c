@@ -81,6 +81,7 @@ main(int argc, char **argv)
 	dump 		= 0;
 	event_mode	= ' ';
 	max_cstate	= 0;
+	g_turbo_supported = B_FALSE;
 
 	while ((c = getopt_long(argc, argv, "d:vt:h", opts, &index2)) != EOF) {
 		if (c == -1)
@@ -159,6 +160,11 @@ main(int argc, char **argv)
 	if (pt_events_stat_prepare() != -1)
 		features |= FEATURE_EVENTS;
 
+	/* Prepare turbo statistics */
+	if (pt_turbo_stat_prepare() == 0) {
+		features |= FEATURE_TURBO;
+	}
+
 	(void) printf(_("Collecting data for %.2f second(s) \n"),
 	    (float)ticktime);
 
@@ -229,6 +235,12 @@ main(int argc, char **argv)
 
 		if (reinit)
 			continue;
+
+		/* Collect turbo statistics */
+		if (features & FEATURE_TURBO &&
+		    pt_turbo_stat_collect() < 0) {
+			exit(EXIT_FAILURE);
+		}
 
 		/*
 		 * Initialize curses if we're not dumping and

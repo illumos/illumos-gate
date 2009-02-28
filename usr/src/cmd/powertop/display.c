@@ -229,6 +229,7 @@ show_cstates(void)
 	char		c[100];
 	int		i;
 	double		total_pstates = 0.0, avg, res;
+	uint64_t	p0_speed, p1_speed;
 
 	if (!dump) {
 		(void) werase(cstate_window);
@@ -272,13 +273,59 @@ show_cstates(void)
 			    g_ncpus/1000000);
 		}
 
-		for (i = 0;  i < npstates; i++) {
+		/*
+		 * display ACPI_PSTATE from P(n) to P(1)
+		 */
+		for (i = 0;  i < npstates - 1; i++) {
 			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
 			    (long)pstate_info[i].speed,
 			    100 * (pstate_info[i].total_time/g_ncpus/1000000
 			    /total_pstates));
 			print(cstate_window, i+1, 48, "%s\n", c);
 		}
+
+		/*
+		 * display ACPI_PSTATE P0 according to if turbo
+		 * mode is supported
+		 */
+		if (g_turbo_supported) {
+			p1_speed = pstate_info[npstates - 2].speed;
+			/*
+			 * if g_turbo_ratio <= 1.0, it will be ignored.
+			 * we display P(0) as P(1) + 1.
+			 */
+			if (g_turbo_ratio <= 1.0) {
+				p0_speed = p1_speed + 1;
+			}
+			/*
+			 * if g_turbo_ratio > 1.0, that means turbo mode works.
+			 * So, P(0) = ratio * P(1);
+			 */
+			else {
+				p0_speed = (uint64_t)(p1_speed * g_turbo_ratio);
+				if (p0_speed < (p1_speed + 1))
+				p0_speed = p1_speed + 1;
+			}
+			/*
+			 * reset the ratio for the next round
+			 */
+			g_turbo_ratio = 0.0;
+
+			/*
+			 * setup the string for the display
+			 */
+			(void) sprintf(c, "%4lu Mhz(turbo)\t%.1f%%",
+			    (long)p0_speed,
+			    100 * (pstate_info[i].total_time/g_ncpus/1000000
+			    /total_pstates));
+		} else {
+			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
+			    (long)pstate_info[i].speed,
+			    100 * (pstate_info[i].total_time/g_ncpus/1000000
+			    /total_pstates));
+		}
+		print(cstate_window, i+1, 48, "%s\n", c);
+
 	}
 	if (!dump)
 		(void) wnoutrefresh(cstate_window);

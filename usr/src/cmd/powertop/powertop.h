@@ -63,6 +63,7 @@
 #define	FEATURE_CSTATE		0x1
 #define	FEATURE_PSTATE		0x2
 #define	FEATURE_EVENTS		0x4
+#define	FEATURE_TURBO		0x8
 
 #define	BIT_DEPTH_BUF		10
 
@@ -132,6 +133,15 @@ typedef struct cpu_power_info {
 	hrtime_t	dtrace_time;
 } cpu_power_info_t;
 
+/*
+ * turbo information
+ */
+typedef struct turbo_info {
+	uint64_t	t_mcnt;
+	uint64_t	t_acnt;
+} turbo_info_t;
+
+
 typedef	void		(suggestion_func)(void);
 
 /*
@@ -192,6 +202,12 @@ pstate_info_t		pstate_info[NSTATES];
  * Per CPU power state information
  */
 cpu_power_info_t	*cpu_power_states;
+
+/*
+ * Turbo mode related information
+ */
+extern boolean_t	g_turbo_supported;
+extern double		g_turbo_ratio;
 
 /*
  * Extern declarations
@@ -273,5 +289,11 @@ extern	int 		pt_cpuidle_stat_prepare(void);
 extern	int 		pt_cpuidle_stat_collect(double interval);
 extern	int 		pt_events_stat_prepare(void);
 extern	int 		pt_events_stat_collect(void);
+
+/*
+ * turbo related
+ */
+extern	int		pt_turbo_stat_prepare(void);
+extern	int		pt_turbo_stat_collect(void);
 
 #endif /* __INCLUDE_GUARD_POWERTOP_H_ */

@@ -113,6 +113,7 @@ typedef struct cpupm_mach_state {
 	uint32_t		ms_caps;
 	dev_info_t		*ms_dip;
 	kmutex_t		ms_lock;
+	void			*ms_vendor;
 	struct cpupm_notification *ms_handlers;
 } cpupm_mach_state_t;
 
