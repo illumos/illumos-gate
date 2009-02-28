@@ -168,19 +168,6 @@ static IMA_STATUS getSolarisNodeProps(IMA_NODE_PROPERTIES *nodeProps) {
 	if (number_of_plugins == -1)
 		InitLibrary();
 
-	/*
-	 * See if iscsiadm and ima plugin packages have been installed.
-	 */
-	ret = system("pkginfo SUNWima > /dev/null");
-	if (ret) {
-		return (status);
-	}
-
-	ret = system("pkginfo SUNWiscsir > /dev/null");
-	if (ret) {
-		return (status);
-	}
-
 	os_obtainmutex(libMutex);
 	status = IMA_ERROR_OBJECT_NOT_FOUND;
 
@@ -243,19 +230,6 @@ static IMA_STATUS setSolarisSharedNodeName(const IMA_NODE_NAME name) {
 	if (number_of_plugins == -1)
 		InitLibrary();
 
-	/*
-	 * See if iscsiadm and ima plugin packages have been installed.
-	 */
-	ret = system("pkginfo SUNWima > /dev/null");
-	if (ret) {
-		return (status);
-	}
-
-	ret = system("pkginfo SUNWiscsir > /dev/null");
-	if (ret) {
-		return (status);
-	}
-
 	os_obtainmutex(libMutex);
 	status = IMA_ERROR_OBJECT_NOT_FOUND;
 
@@ -292,19 +266,6 @@ static IMA_STATUS setSolarisSharedNodeAlias(const IMA_NODE_ALIAS alias) {
 
 	if (number_of_plugins == -1)
 		InitLibrary();
-
-	/*
-	 * See if iscsiadm and ima plugin packages have been installed.
-	 */
-	ret = system("pkginfo SUNWima > /dev/null");
-	if (ret) {
-		return (status);
-	}
-
-	ret = system("pkginfo SUNWiscsir > /dev/null");
-	if (ret) {
-		return (status);
-	}
 
 	os_obtainmutex(libMutex);
 	status = IMA_ERROR_OBJECT_NOT_FOUND;
