@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -410,6 +410,7 @@ todpc_rtcput(unsigned char *buf)
 	unsigned char	century = RTC_CENTURY;
 	unsigned char	day_alrm = pc_rtc_offset.day_alrm;
 	unsigned char	mon_alrm = pc_rtc_offset.mon_alrm;
+	unsigned char	tmp;
 
 	if (pc_rtc_offset.century != 0) {
 		century = pc_rtc_offset.century;
@@ -428,7 +429,10 @@ todpc_rtcput(unsigned char *buf)
 
 	if (day_alrm > 0) {
 		outb(RTC_ADDR, day_alrm);
-		outb(RTC_DATA, ((struct rtc_t *)buf)->rtc_adom);
+		/* preserve RTC_VRT bit; some virt envs accept writes there */
+		tmp = inb(RTC_DATA) & RTC_VRT;
+		tmp |= ((struct rtc_t *)buf)->rtc_adom & ~RTC_VRT;
+		outb(RTC_DATA, tmp);
 	}
 	if (mon_alrm > 0) {
 		outb(RTC_ADDR, mon_alrm);
