@@ -385,7 +385,9 @@ smb_pre_read_andx(smb_request_t *sr)
 		    (uint64_t)off_low;
 
 		param->rw_count = (uint32_t)maxcnt_low;
-		if (maxcnt_high < 0xFF)
+
+		if ((sr->session->capabilities & CAP_LARGE_READX) &&
+		    (maxcnt_high < 0xFF))
 			param->rw_count |= maxcnt_high << 16;
 	} else {
 		rc = smbsr_decode_vwv(sr, "b3.wlwwlw", &param->rw_andx,

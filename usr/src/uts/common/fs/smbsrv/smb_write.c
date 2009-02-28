@@ -378,8 +378,10 @@ smb_pre_write_andx(smb_request_t *sr)
 		param->rw_dsoff -= 59;
 	}
 
-	param->rw_count = ((uint32_t)datalen_high << 16) |
-	    (uint32_t)datalen_low;
+	param->rw_count = (uint32_t)datalen_low;
+
+	if (sr->session->capabilities & CAP_LARGE_WRITEX)
+		param->rw_count |= ((uint32_t)datalen_high << 16);
 
 	DTRACE_SMB_2(op__WriteX__start, smb_request_t *, sr,
 	    smb_rw_param_t *, param);

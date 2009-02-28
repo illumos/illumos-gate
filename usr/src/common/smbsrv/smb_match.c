@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,19 +32,52 @@
 #endif
 #include <smbsrv/ctype.h>
 
+/*
+ * Maximum recursion depth for the wildcard match functions.
+ * These functions may recurse when processing a '*'.
+ */
+#define	SMB_MATCH_DEPTH_MAX	32
+
 #define	SMB_CRC_POLYNOMIAL	0xD8B5D8B5
 
+static int smb_match_private(const char *, const char *, int *);
+static int smb_match_ci_private(const char *, const char *, int *);
+
 /*
- *	c	Any non-special character matches itslef
- *	?	Match any character
- *	ab	character 'a' followed by character 'b'
- *	S	Any string of non-special characters
- *	AB	String 'A' followed by string 'B'
- *	*	Any String, including the empty string
+ * Returns:
+ * 1	match
+ * 0	no-match
  */
 int
 smb_match(char *patn, char *str)
 {
+	int depth = 0;
+	int rc;
+
+	if ((rc = smb_match_private(patn, str, &depth)) == -1)
+		rc = 0;
+
+	return (rc);
+}
+
+/*
+ * The '*' character matches multiple characters.
+ * The '?' character matches a single character.
+ *
+ * If the pattern has trailing '?'s then it matches the specified number
+ * of characters or less.  For example, "x??" matches "xab", "xa" and "x",
+ * but not "xabc".
+ *
+ * Returns:
+ * 1	match
+ * 0	no-match
+ * -1	no-match, too many wildcards in pattern
+ */
+static int
+smb_match_private(const char *patn, const char *str, int *depth)
+{
+	int rc;
+
 	for (;;) {
 		switch (*patn) {
 		case 0:
@@ -60,75 +93,18 @@ smb_match(char *patn, char *str)
 			}
 			/*NOTREACHED*/
 
-#if 0
-		case '[':
-			int	invert = 0, clower, cupper;
-
-			patn++;
-			if (*patn == '!') {
-				invert = 1;
-				patn++;
-			}
-			for (;;) {
-				clower = *patn;
-				if (clower == 0)
-					break;
-				if (clower == ']') {
-					patn++;
-					break;
-				}
-				patn++;
-				if (*patn == '-') {
-					/* range */
-					patn++;
-					cupper = *patn;
-					if (cupper == 0)
-						break;
-					patn++;
-				} else {
-					cupper = clower;
-				}
-				if (*str < clower || cupper < *str)
-					continue;
-
-				/* match */
-				if (invert)
-					return (0);
-
-				while (*patn && *patn++ != ']')
-					;
-				str++;
-				continue; /* THIS WON`T WORK */
-			}
-			if (invert) {
-				str++;
-				continue;
-			}
-			return (0);
-
-#endif
-
 		case '*':
-			patn++;
+			patn += strspn(patn, "*");
 			if (*patn == 0)
 				return (1);
 
-#if 0
-			if (*patn != '?' && *patn != '*' && *patn != '[') {
-				/* accelerate */
-				while (*str) {
-					if (*str == *patn &&
-					    match(patn+1, str+1))
-						return (1);
-					str++;
-				}
-				return (0);
-			}
-#endif
+			if ((*depth)++ >= SMB_MATCH_DEPTH_MAX)
+				return (-1);
 
 			while (*str) {
-				if (smb_match(patn, str))
-					return (1);
+				rc = smb_match_private(patn, str, depth);
+				if (rc != 0)
+					return (rc);
 				str++;
 			}
 			return (0);
@@ -141,6 +117,7 @@ smb_match(char *patn, char *str)
 			continue;
 		}
 	}
+	/*NOTREACHED*/
 }
 
 int
@@ -177,11 +154,42 @@ smb_match83(char *patn, char *str83)
 	return (smb_match_ci(name83, str83));
 }
 
-
-
+/*
+ * Returns:
+ * 1	match
+ * 0	no-match
+ */
 int
 smb_match_ci(char *patn, char *str)
 {
+	int depth = 0;
+	int rc;
+
+	if ((rc = smb_match_ci_private(patn, str, &depth)) == -1)
+		rc = 0;
+
+	return (rc);
+}
+
+/*
+ * The '*' character matches multiple characters.
+ * The '?' character matches a single character.
+ *
+ * If the pattern has trailing '?'s then it matches the specified number
+ * of characters or less.  For example, "x??" matches "xab", "xa" and "x",
+ * but not "xabc".
+ *
+ * Returns:
+ * 1	match
+ * 0	no-match
+ * -1	no-match, too many wildcards in pattern
+ */
+static int
+smb_match_ci_private(const char *patn, const char *str, int *depth)
+{
+	const char *p;
+	int rc;
+
 	/*
 	 * "<" is a special pattern that matches only those names that do
 	 * NOT have an extension. "." and ".." are ok.
@@ -193,6 +201,7 @@ smb_match_ci(char *patn, char *str)
 			return (1);
 		return (0);
 	}
+
 	for (;;) {
 		switch (*patn) {
 		case 0:
@@ -204,19 +213,24 @@ smb_match_ci(char *patn, char *str)
 				patn++;
 				continue;
 			} else {
-				return (0);
+				p = patn;
+				p += strspn(p, "?");
+				return ((*p == '\0') ? 1 : 0);
 			}
 			/*NOTREACHED*/
 
-
 		case '*':
-			patn++;
+			patn += strspn(patn, "*");
 			if (*patn == 0)
 				return (1);
 
+			if ((*depth)++ >= SMB_MATCH_DEPTH_MAX)
+				return (-1);
+
 			while (*str) {
-				if (smb_match_ci(patn, str))
-					return (1);
+				rc = smb_match_ci_private(patn, str, depth);
+				if (rc != 0)
+					return (rc);
 				str++;
 			}
 			return (0);
@@ -236,7 +250,7 @@ smb_match_ci(char *patn, char *str)
 			continue;
 		}
 	}
-	/* NOT REACHED */
+	/*NOTREACHED*/
 }
 
 uint32_t

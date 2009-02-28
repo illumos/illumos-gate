@@ -783,7 +783,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	od->d_odid = odid;
 	od->d_sattr = sattr;
 	(void) strlcpy(od->d_pattern, pattern, sizeof (od->d_pattern));
-	od->d_wildcards = (smb_convert_unicode_wildcards(od->d_pattern) != 0);
+	od->d_wildcards = (smb_convert_wildcards(od->d_pattern) != 0);
 	od->d_is_edp = vfs_has_feature(dnode->vp->v_vfsp, VFSFT_DIRENTFLAGS);
 	od->d_ignore_case =
 	    smb_tree_has_feature(tree, SMB_TREE_CASEINSENSITIVE);

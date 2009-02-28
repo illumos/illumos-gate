@@ -242,7 +242,7 @@ int smbsr_connect_tree(struct smb_request *);
 
 int smb_common_create_directory(struct smb_request *);
 
-int		smb_convert_unicode_wildcards(char *);
+int	smb_convert_wildcards(char *);
 int	smb_ascii_or_unicode_strlen(struct smb_request *, char *);
 int	smb_ascii_or_unicode_strlen_null(struct smb_request *, char *);
 int	smb_ascii_or_unicode_null_len(struct smb_request *);
