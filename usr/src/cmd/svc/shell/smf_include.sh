@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -160,6 +160,11 @@ smf_netstrategy () {
 #   every second until the contract is empty.  This will catch
 #   races between fork(2) and pkill(1).
 #
+#   Note that time in this routine is tracked (after being input
+#   via TIMEOUT) in 10ths of a second.  This is because we want
+#   to sleep for short periods of time, and expr(1) is too dumb
+#   to do non-integer math.
+#
 #   Returns 1 if the contract is invalid.
 #   Returns 2 if WAIT is "1", TIMEOUT is > 0, and TIMEOUT expires.
 #   Returns 0 on success.
@@ -170,6 +175,9 @@ smf_kill_contract() {
 	time_to_wait=$4
 
 	[ -z "$time_to_wait" ] && time_to_wait=0
+
+	# convert to 10ths.
+	time_to_wait=`expr $time_to_wait * 10`
 
 	# Verify contract id is valid using pgrep
 	/usr/bin/pgrep -c $1 > /dev/null 2>&1
@@ -195,17 +203,26 @@ smf_kill_contract() {
  
 	# If contract does not empty, keep killing the contract to catch
 	# any child processes missed because they were forking
-	/usr/bin/sleep 5
 	/usr/bin/pgrep -c $1 > /dev/null 2>&1
 	while [ $? -eq 0 ] ; do
-		
-		time_waited=`/usr/bin/expr $time_waited + 5`
-		
-		# Return  if TIMEOUT was passed, and it has expired
+		# Return 2 if TIMEOUT was passed, and it has expired
 		[ "$time_to_wait" -gt 0 -a $time_waited -ge $time_to_wait ] && \
 		    return 2
-		/usr/bin/pkill -$2 -c $1
-		/usr/bin/sleep 5
+
+		#
+		# At five second intervals, issue the kill again.  Note that
+		# the sleep time constant (in tenths) must be a factor of 50
+		# for the remainder trick to work.  i.e. sleeping 2 tenths is
+		# fine, but 27 tenths is not.
+		#
+		remainder=`/usr/bin/expr $time_waited % 50`
+		if [ $time_waited -gt 0 -a $remainder -eq 0 ]; then
+			/usr/bin/pkill -$2 -c $1
+		fi
+
+		# Wait two tenths, and go again.
+		/usr/bin/sleep 0.2
+		time_waited=`/usr/bin/expr $time_waited + 2`
 		/usr/bin/pgrep -c $1 > /dev/null 2>&1
 	done
 

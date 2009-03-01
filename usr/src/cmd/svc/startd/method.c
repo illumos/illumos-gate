@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * method.c - method execution functions
@@ -955,13 +953,23 @@ assured_kill:
 	 */
 	if (type == METHOD_STOP && (!instance_is_transient_style(inst)) &&
 	    !(contract_is_empty(inst->ri_i.i_primary_ctid))) {
+		int times = 0;
 
 		if (timeout != METHOD_TIMEOUT_INFINITE)
 			timeout_insert(inst, inst->ri_i.i_primary_ctid,
 			    timeout);
 
 		for (;;) {
-			(void) poll(NULL, 0, 100);
+			/*
+			 * Check frequently at first, then back off.  This
+			 * keeps startd from idling while shutting down.
+			 */
+			if (times < 20) {
+				(void) poll(NULL, 0, 5);
+				times++;
+			} else {
+				(void) poll(NULL, 0, 100);
+			}
 			if (contract_is_empty(inst->ri_i.i_primary_ctid))
 				break;
 		}

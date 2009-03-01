@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <libcontract_priv.h>
 #include <libscf_priv.h>
 #include <limits.h>
+#include <poll.h>
 #include <port.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -52,6 +53,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <utmpx.h>
+#include <spawn.h>
 
 #include "configd_exit.h"
 #include "protocol.h"
@@ -678,4 +680,111 @@ fork_rc_script(char rl, const char *arg, boolean_t wait)
 
 	perror("exec");
 	exit(0);
+}
+
+extern char **environ;
+
+/*
+ * A local variation on system(3c) which accepts a timeout argument.  This
+ * allows us to better ensure that the system will actually shut down.
+ *
+ * gracetime specifies an amount of time in seconds which the routine must wait
+ * after the command exits, to allow for asynchronous effects (like sent
+ * signals) to take effect.  This can be zero.
+ */
+void
+fork_with_timeout(const char *cmd, uint_t gracetime, uint_t timeout)
+{
+	int err = 0;
+	pid_t pid;
+	char *argv[4];
+	posix_spawnattr_t attr;
+	posix_spawn_file_actions_t factions;
+
+	sigset_t mask, savemask;
+	uint_t msec_timeout;
+	uint_t msec_spent = 0;
+	uint_t msec_gracetime;
+	int status;
+
+	msec_timeout = timeout * 1000;
+	msec_gracetime = gracetime * 1000;
+
+	/*
+	 * See also system(3c) in libc.  This is very similar, except
+	 * that we avoid some unneeded complexity.
+	 */
+	err = posix_spawnattr_init(&attr);
+	if (err == 0)
+		err = posix_spawnattr_setflags(&attr,
+		    POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF |
+		    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP |
+		    POSIX_SPAWN_NOEXECERR_NP);
+
+	/*
+	 * We choose to close fd's above 2, a deviation from system.
+	 */
+	if (err == 0)
+		err = posix_spawn_file_actions_init(&factions);
+	if (err == 0)
+		err = posix_spawn_file_actions_addclosefrom_np(&factions,
+		    STDERR_FILENO + 1);
+
+	(void) sigemptyset(&mask);
+	(void) sigaddset(&mask, SIGCHLD);
+	(void) thr_sigsetmask(SIG_BLOCK, &mask, &savemask);
+
+	argv[0] = "/bin/sh";
+	argv[1] = "-c";
+	argv[2] = (char *)cmd;
+	argv[3] = NULL;
+
+	if (err == 0)
+		err = posix_spawn(&pid, "/bin/sh", &factions, &attr,
+		    (char *const *)argv, (char *const *)environ);
+
+	(void) posix_spawnattr_destroy(&attr);
+	(void) posix_spawn_file_actions_destroy(&factions);
+
+	if (err) {
+		uu_warn("Failed to spawn %s: %s\n", cmd, strerror(err));
+	} else {
+		for (;;) {
+			int w;
+			w = waitpid(pid, &status, WNOHANG);
+			if (w == -1 && errno != EINTR)
+				break;
+			if (w > 0) {
+				/*
+				 * Command succeeded, so give it gracetime
+				 * seconds for it to have an effect.
+				 */
+				if (status == 0 && msec_gracetime != 0)
+					(void) poll(NULL, 0, msec_gracetime);
+				break;
+			}
+
+			(void) poll(NULL, 0, 100);
+			msec_spent += 100;
+			/*
+			 * If we timed out, kill off the process, then try to
+			 * wait for it-- it's possible that we could accumulate
+			 * a zombie here since we don't allow waitpid to hang,
+			 * but it's better to let that happen and continue to
+			 * make progress.
+			 */
+			if (msec_spent >= msec_timeout) {
+				uu_warn("'%s' timed out after %d "
+				    "seconds.  Killing.\n", cmd,
+				    timeout);
+				(void) kill(pid, SIGTERM);
+				(void) poll(NULL, 0, 100);
+				(void) kill(pid, SIGKILL);
+				(void) poll(NULL, 0, 100);
+				(void) waitpid(pid, &status, WNOHANG);
+				break;
+			}
+		}
+	}
+	(void) thr_sigsetmask(SIG_BLOCK, &savemask, NULL);
 }

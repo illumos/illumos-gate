@@ -588,6 +588,7 @@ void fork_rc_script(char, const char *, boolean_t);
 void *fork_configd_thread(void *);
 
 pid_t startd_fork1(int *);
+void fork_with_timeout(const char *, uint_t, uint_t);
 
 /* graph.c */
 void graph_init(void);

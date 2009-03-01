@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -168,14 +168,6 @@ if [ -n "$FFLAG" -a "$FSType" != "nfs"  -a -n "$RFLAG" ]; then		# 7
 fi
 
 ZONENAME=`zonename`
-
-# Check and if needed sync the boot archive before unmounting everything.
-#
-if [ -z "${RFLAG}${NFLAG}${HFLAG}${FSType}" -a "$ZONENAME" = "global" \
-    -a -x /sbin/bootadm ] ; then
-	/sbin/bootadm -a update_all
-fi
-
 
 #
 # If we are in deferred activation patching, and the caller is 

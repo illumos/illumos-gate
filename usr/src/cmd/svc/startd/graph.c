@@ -178,6 +178,11 @@ static boolean_t go_single_user_mode = B_FALSE;
 static boolean_t go_to_level1 = B_FALSE;
 
 /*
+ * Tracks when we started halting.
+ */
+static time_t halting_time = 0;
+
+/*
  * This tracks the legacy runlevel to ensure we signal init and manage
  * utmpx entries correctly.
  */
@@ -3441,11 +3446,44 @@ out:
 	return (0);
 }
 
+
+static void
+kill_user_procs(void)
+{
+	(void) fputs("svc.startd: Killing user processes.\n", stdout);
+
+	/*
+	 * Despite its name, killall's role is to get select user processes--
+	 * basically those representing terminal-based logins-- to die.  Victims
+	 * are located by killall in the utmp database.  Since these are most
+	 * often shell based logins, and many shells mask SIGTERM (but are
+	 * responsive to SIGHUP) we first HUP and then shortly thereafter
+	 * kill -9.
+	 */
+	(void) fork_with_timeout("/usr/sbin/killall HUP", 1, 5);
+	(void) fork_with_timeout("/usr/sbin/killall KILL", 1, 5);
+
+	/*
+	 * Note the selection of user id's 0, 1 and 15, subsequently
+	 * inverted by -v.  15 is reserved for dladmd.  Yes, this is a
+	 * kludge-- a better policy is needed.
+	 *
+	 * Note that fork_with_timeout will only wait out the 1 second
+	 * "grace time" if pkill actually returns 0.  So if there are
+	 * no matches, this will run to completion much more quickly.
+	 */
+	(void) fork_with_timeout("/usr/bin/pkill -TERM -v -u 0,1,15", 1, 5);
+	(void) fork_with_timeout("/usr/bin/pkill -KILL -v -u 0,1,15", 1, 5);
+}
+
 static void
 do_uadmin(void)
 {
-	int fd, left;
+	int fd;
 	struct statvfs vfs;
+	time_t now;
+	struct tm nowtm;
+	char down_buf[256], time_buf[256];
 
 	const char * const resetting = "/etc/svc/volatile/resetting";
 
@@ -3458,30 +3496,87 @@ do_uadmin(void)
 	/* Kill dhcpagent if we're not using nfs for root */
 	if ((statvfs("/", &vfs) == 0) &&
 	    (strncmp(vfs.f_basetype, "nfs", sizeof ("nfs") - 1) != 0))
-		(void) system("/usr/bin/pkill -x -u 0 dhcpagent");
+		fork_with_timeout("/usr/bin/pkill -x -u 0 dhcpagent", 0, 5);
 
-	(void) system("/usr/sbin/killall");
-	left = 5;
-	while (left > 0)
-		left = sleep(left);
+	/*
+	 * Call sync(2) now, before we kill off user processes.  This takes
+	 * advantage of the several seconds of pause we have before the
+	 * killalls are done.  Time we can make good use of to get pages
+	 * moving out to disk.
+	 *
+	 * Inside non-global zones, we don't bother, and it's better not to
+	 * anyway, since sync(2) can have system-wide impact.
+	 */
+	if (getzoneid() == 0)
+		sync();
 
-	(void) system("/usr/sbin/killall 9");
-	left = 10;
-	while (left > 0)
-		left = sleep(left);
+	kill_user_procs();
 
-	sync();
-	sync();
-	sync();
+	/*
+	 * Note that this must come after the killing of user procs, since
+	 * killall relies on utmpx, and this command affects the contents of
+	 * said file.
+	 */
+	if (access("/usr/lib/acct/closewtmp", X_OK) == 0)
+		fork_with_timeout("/usr/lib/acct/closewtmp", 0, 5);
 
-	(void) system("/sbin/umountall -l");
-	(void) system("/sbin/umount /tmp >/dev/null 2>&1");
-	(void) system("/sbin/umount /var/adm >/dev/null 2>&1");
-	(void) system("/sbin/umount /var/run >/dev/null 2>&1");
-	(void) system("/sbin/umount /var >/dev/null 2>&1");
-	(void) system("/sbin/umount /usr >/dev/null 2>&1");
+	/*
+	 * For patches which may be installed as the system is shutting
+	 * down, we need to ensure, one more time, that the boot archive
+	 * really is up to date.
+	 */
+	if (getzoneid() == 0 && access("/usr/sbin/bootadm", X_OK) == 0)
+		fork_with_timeout("/usr/sbin/bootadm -ea update_all", 0, 3600);
 
-	uu_warn("The system is down.\n");
+	fork_with_timeout("/sbin/umountall -l", 0, 5);
+	fork_with_timeout("/sbin/umount /tmp /var/adm /var/run /var "
+	    ">/dev/null 2>&1", 0, 5);
+
+	/*
+	 * Try to get to consistency for whatever UFS filesystems are left.
+	 * This is pretty expensive, so we save it for the end in the hopes of
+	 * minimizing what it must do.  The other option would be to start in
+	 * parallel with the killall's, but lockfs tends to throw out much more
+	 * than is needed, and so subsequent commands (like umountall) take a
+	 * long time to get going again.
+	 *
+	 * Inside of zones, we don't bother, since we're not about to terminate
+	 * the whole OS instance.
+	 *
+	 * On systems using only ZFS, this call to lockfs -fa is a no-op.
+	 */
+	if (getzoneid() == 0) {
+		if (access("/usr/sbin/lockfs", X_OK) == 0)
+			fork_with_timeout("/usr/sbin/lockfs -fa", 0, 30);
+
+		sync();	/* once more, with feeling */
+	}
+
+	fork_with_timeout("/sbin/umount /usr >/dev/null 2>&1", 0, 5);
+
+	/*
+	 * Construct and emit the last words from userland:
+	 * "<timestamp> The system is down.  Shutdown took <N> seconds."
+	 *
+	 * Normally we'd use syslog, but with /var and other things
+	 * potentially gone, try to minimize the external dependencies.
+	 */
+	now = time(NULL);
+	(void) localtime_r(&now, &nowtm);
+
+	if (strftime(down_buf, sizeof (down_buf),
+	    "%b %e %T The system is down.", &nowtm) == 0) {
+		(void) strlcpy(down_buf, "The system is down.",
+		    sizeof (down_buf));
+	}
+
+	if (halting_time != 0 && halting_time <= now) {
+		(void) snprintf(time_buf, sizeof (time_buf),
+		    "  Shutdown took %lu seconds.", now - halting_time);
+	} else {
+		time_buf[0] = '\0';
+	}
+	(void) printf("%s%s\n", down_buf, time_buf);
 
 	(void) uadmin(A_SHUTDOWN, halting, NULL);
 	uu_warn("uadmin() failed");
@@ -3681,23 +3776,8 @@ single_user_thread(void *unused)
 	MUTEX_LOCK(&single_user_thread_lock);
 	single_user_thread_count++;
 
-	if (!booting_to_single_user) {
-		/*
-		 * From rcS.sh: Look for ttymon, in.telnetd, in.rlogind and
-		 * processes in their process groups so they can be terminated.
-		 */
-		(void) fputs("svc.startd: Killing user processes: ", stdout);
-		(void) system("/usr/sbin/killall");
-		(void) system("/usr/sbin/killall 9");
-		(void) system("/usr/bin/pkill -TERM -v -u 0,1");
-
-		left = 5;
-		while (left > 0)
-			left = sleep(left);
-
-		(void) system("/usr/bin/pkill -KILL -v -u 0,1");
-		(void) puts("done.");
-	}
+	if (!booting_to_single_user)
+		kill_user_procs();
 
 	if (go_single_user_mode || booting_to_single_user) {
 		msg = "SINGLE USER MODE\n";
@@ -4972,16 +5052,19 @@ dgraph_set_runlevel(scf_propertygroup_t *pg, scf_property_t *prop)
 		break;
 
 	case '0':
+		halting_time = time(NULL);
 		fork_rc_script(rl, stop, B_TRUE);
 		halting = AD_HALT;
 		goto uadmin;
 
 	case '5':
+		halting_time = time(NULL);
 		fork_rc_script(rl, stop, B_TRUE);
 		halting = AD_POWEROFF;
 		goto uadmin;
 
 	case '6':
+		halting_time = time(NULL);
 		fork_rc_script(rl, stop, B_TRUE);
 		halting = AD_BOOT;
 		goto uadmin;

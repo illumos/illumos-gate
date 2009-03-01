@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -60,6 +58,10 @@
 	  when there are many glommed kernels to wad up, a longer timeout is
 	  needed. However if it doesn't finish eventually something up, and
 	  an error message to trigger further investigation is appropriate.
+
+	  Please note that a similar timeout exists in startd, which again
+	  runs bootadm at the end of shutdown.  These timeouts should be
+	  adjusted in sync with each other.
 	-->
 	<exec_method
 		type='method'
