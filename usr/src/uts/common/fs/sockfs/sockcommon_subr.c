@@ -827,10 +827,17 @@ again1:
 					so->so_flowctrld = B_FALSE;
 					mutex_exit(&so->so_lock);
 					/*
-					 * open up flow control
+					 * Open up flow control. SCTP does
+					 * not have any downcalls, and it will
+					 * clr flow ctrl in sosctp_recvmsg().
 					 */
-					(*so->so_downcalls->sd_clr_flowctrl)
-					    (so->so_proto_handle);
+					if (so->so_downcalls != NULL &&
+					    so->so_downcalls->sd_clr_flowctrl !=
+					    NULL) {
+						(*so->so_downcalls->
+						    sd_clr_flowctrl)
+						    (so->so_proto_handle);
+					}
 				} else {
 					mutex_exit(&so->so_lock);
 				}

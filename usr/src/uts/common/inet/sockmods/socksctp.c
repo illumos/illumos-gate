@@ -475,6 +475,7 @@ sosctp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	struct sctp_soassoc *ssa = NULL;
 	int flags, error = 0;
 	struct T_unitdata_ind *tind;
+	ssize_t orig_resid = uiop->uio_resid;
 	int len, count, readcnt = 0, rxqueued;
 	socklen_t controllen, namelen;
 	void *opt;
@@ -503,8 +504,8 @@ sosctp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 		 * coming in, there's not going to be new messages coming
 		 * in either.
 		 */
-		if (so->so_rcv_q_head == NULL && ss->ss_assoccnt == 0 &&
-		    !(so->so_state & SS_ACCEPTCONN)) {
+		if (so->so_rcv_q_head == NULL && so->so_rcv_head == NULL &&
+		    ss->ss_assoccnt == 0 && !(so->so_state & SS_ACCEPTCONN)) {
 			return (ENOTCONN);
 		}
 	}
@@ -589,6 +590,8 @@ again:
 		freemsg(mp);
 	}
 done:
+	if (!(flags & MSG_PEEK))
+		readcnt = orig_resid - uiop->uio_resid;
 	/*
 	 * Determine if we need to update SCTP about the buffer
 	 * space.  For performance reason, we cannot update SCTP
@@ -598,8 +601,6 @@ done:
 	if (ssa == NULL) {
 		mutex_enter(&so->so_lock);
 		rxqueued = so->so_rcv_queued;
-
-		so->so_rcv_queued = rxqueued - readcnt;
 		count = so->so_rcvbuf - so->so_rcv_queued;
 
 		ASSERT(so->so_rcv_q_head != NULL ||
@@ -610,8 +611,8 @@ done:
 		mutex_exit(&so->so_lock);
 
 		if (readcnt > 0 && (((count > 0) &&
-		    (rxqueued >= so->so_rcvlowat)) ||
-		    (so->so_rcv_queued == 0))) {
+		    ((rxqueued + readcnt) >= so->so_rcvlowat)) ||
+		    (rxqueued == 0))) {
 			/*
 			 * If amount of queued data is higher than watermark,
 			 * updata SCTP's idea of available buffer space.
@@ -619,6 +620,13 @@ done:
 			sctp_recvd((struct sctp_s *)so->so_proto_handle, count);
 		}
 	} else {
+		/*
+		 * Each association keeps track of how much data it has
+		 * queued; we need to update the value here. Note that this
+		 * is slightly different from SOCK_STREAM type sockets, which
+		 * does not need to update the byte count, as it is already
+		 * done in so_dequeue_msg().
+		 */
 		mutex_enter(&so->so_lock);
 		rxqueued = ssa->ssa_rcv_queued;
 
@@ -2047,6 +2055,7 @@ sctp_assoc_recv(sock_upper_handle_t handle, mblk_t *mp, size_t len, int flags,
 	mblk_t *mp2;
 	union sctp_notification *sn;
 	struct sctp_sndrcvinfo *sinfo;
+	ssize_t space_available;
 
 	ASSERT(ssa->ssa_type == SOSCTP_ASSOC);
 	ASSERT(so->so_type == SOCK_SEQPACKET);
@@ -2143,10 +2152,14 @@ sctp_assoc_recv(sock_upper_handle_t handle, mblk_t *mp, size_t len, int flags,
 	ASSERT((mp->b_rptr - DB_BASE(mp)) >= sizeof (ssa));
 	*(struct sctp_soassoc **)DB_BASE(mp) = ssa;
 
-	mutex_exit(&so->so_lock);
+	ssa->ssa_rcv_queued += len;
+	space_available = so->so_rcvbuf - ssa->ssa_rcv_queued;
+	so_enqueue_msg(so, mp, len);
 
-	return (so_queue_msg((sock_upper_handle_t)so, mp, len, 0, errorp,
-	    NULL));
+	/* so_notify_data drops so_lock */
+	so_notify_data(so, len);
+
+	return (space_available);
 }
 
 static void

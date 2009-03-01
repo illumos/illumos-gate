@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +40,6 @@ extern "C" {
 struct sctp_sonode {
 	int			ss_type;	/* sonode or soassoc */
 	struct sonode		ss_so;
-	struct sockaddr_in6	ss_laddr;	/* can fit both v4 & v6 */
-	struct sockaddr_in6	ss_faddr;
 	sctp_assoc_t		ss_maxassoc;	/* assoc array size for 1-N */
 	sctp_assoc_t		ss_assoccnt;	/* current # of assocs */
 	struct sctp_sa_id	*ss_assocs;	/* assoc array for 1-N */

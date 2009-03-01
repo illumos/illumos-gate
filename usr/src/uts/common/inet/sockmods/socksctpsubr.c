@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,10 +175,8 @@ sosctp_assoc_create(struct sctp_sonode *ss, int kmflag)
 		ssa->ssa_sonode = ss;
 		ssa->ssa_state = 0;
 		ssa->ssa_error = 0;
-#if 0
-		ssa->ssa_txqueued = 0;
-#endif
 		ssa->ssa_snd_qfull = 0;
+		ssa->ssa_rcv_queued = 0;
 	}
 	dprint(2, ("sosctp_assoc_create %p %p\n", (void *)ss, (void *)ssa));
 	return (ssa);
@@ -523,9 +521,6 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 	    (ssa->ssa_state & (SS_ISCONNECTED|SS_ISCONNECTING|
 	    SS_ISDISCONNECTING|SS_CANTSENDMORE|SS_CANTRCVMORE|SS_ISBOUND));
 	nss->ss_so.so_error = ssa->ssa_error;
-#if 0
-	nss->ss_so.so_txqueued = ssa->ssa_txqueued;
-#endif
 	nss->ss_so.so_snd_qfull = ssa->ssa_snd_qfull;
 	nss->ss_wroff = ssa->ssa_wroff;
 	nss->ss_wrsize = ssa->ssa_wrsize;

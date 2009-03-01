@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,19 +191,19 @@ struct sonode {
 	short		so_pollev;	/* events that should be generated */
 
 	/* Receive */
-	unsigned int	so_rcv_queued;
-	mblk_t		*so_rcv_q_head;
+	unsigned int	so_rcv_queued;	/* # bytes on both rcv lists */
+	mblk_t		*so_rcv_q_head;	/* processing/copyout rcv queue */
 	mblk_t		*so_rcv_q_last_head;
-	mblk_t		*so_rcv_head;		/* 1st mblk in the list */
+	mblk_t		*so_rcv_head;	/* protocol prequeue */
 	mblk_t		*so_rcv_last_head;	/* last mblk in b_next chain */
-	kcondvar_t	so_rcv_cv;
+	kcondvar_t	so_rcv_cv;	/* wait for data */
 	uint_t		so_rcv_wanted;	/* # of bytes wanted by app */
 	timeout_id_t	so_rcv_timer_tid;
 
 #define	so_rcv_thresh	so_proto_props.sopp_rcvthresh
 #define	so_rcv_timer_interval so_proto_props.sopp_rcvtimer
 
-	kcondvar_t	so_snd_cv;
+	kcondvar_t	so_snd_cv;	/* wait for snd buffers */
 	uint32_t
 		so_snd_qfull: 1,	/* Transmit full */
 		so_rcv_wakeup: 1,
