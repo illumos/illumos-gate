@@ -422,6 +422,10 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 	static boolean_t firsttime = B_TRUE;
 	char *ip_type_str;
 
+	/* Skip a zone that shutdown while we were collecting data. */
+	if (zent->zname[0] == '\0')
+		return;
+
 	if (zent->ziptype == ZS_EXCLUSIVE)
 		ip_type_str = "excl";
 	else
@@ -471,6 +475,7 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	char root[MAXPATHLEN], *cp;
 	int err;
 	uuid_t uuid;
+	zone_dochandle_t handle;
 
 	(void) strlcpy(zent->zname, zone_name, sizeof (zent->zname));
 	(void) strlcpy(zent->zroot, "???", sizeof (zent->zroot));
@@ -543,47 +548,49 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	 */
 	if (zid == GLOBAL_ZONEID) {
 		zent->ziptype = ZS_SHARED;
-	} else {
+		return (Z_OK);
+	}
 
-		if (zent->zstate_num == ZONE_STATE_RUNNING) {
-			ushort_t flags;
+	/*
+	 * There is a race condition where the zone could boot while
+	 * we're walking the index file.  In this case the zone state
+	 * could be seen as running from the call above, but the zoneid
+	 * would be undefined.
+	 *
+	 * There is also a race condition where the zone could shutdown after
+	 * we got its running state above.  This is also not an error and
+	 * we fall back to getting the ziptype from the zone configuration.
+	 */
+	if (zent->zstate_num == ZONE_STATE_RUNNING &&
+	    zid != ZONE_ID_UNDEFINED) {
+		ushort_t flags;
 
-			if (zone_getattr(zid, ZONE_ATTR_FLAGS, &flags,
-			    sizeof (flags)) < 0) {
-				zperror2(zent->zname,
-				    gettext("could not get zone flags"));
-				return (Z_ERR);
-			}
+		if (zone_getattr(zid, ZONE_ATTR_FLAGS, &flags,
+		    sizeof (flags)) >= 0) {
 			if (flags & ZF_NET_EXCL)
 				zent->ziptype = ZS_EXCLUSIVE;
 			else
 				zent->ziptype = ZS_SHARED;
-		} else {
-			zone_dochandle_t handle;
-
-			if ((handle = zonecfg_init_handle()) == NULL) {
-				zperror2(zent->zname,
-				    gettext("could not init handle"));
-				return (Z_ERR);
-			}
-			if ((err = zonecfg_get_handle(zent->zname, handle))
-			    != Z_OK) {
-				zperror2(zent->zname,
-				    gettext("could not get handle"));
-				zonecfg_fini_handle(handle);
-				return (Z_ERR);
-			}
-
-			if ((err = zonecfg_get_iptype(handle, &zent->ziptype))
-			    != Z_OK) {
-				zperror2(zent->zname,
-				    gettext("could not get ip-type"));
-				zonecfg_fini_handle(handle);
-				return (Z_ERR);
-			}
-			zonecfg_fini_handle(handle);
+			return (Z_OK);
 		}
 	}
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror2(zent->zname, gettext("could not init handle"));
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(zent->zname, handle)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get handle"));
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_iptype(handle, &zent->ziptype)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get ip-type"));
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+	zonecfg_fini_handle(handle);
 
 	return (Z_OK);
 }
@@ -594,6 +601,10 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
  * to fetch the list of running zones (stored in the global zents).  This
  * function may be called multiple times, so if zents is already set, we
  * return immediately to save work.
+ *
+ * Note that the data about running zones can change while this function
+ * is running, so its possible that the list of zones will have empty slots
+ * at the end.
  */
 
 static int
@@ -646,8 +657,12 @@ again:
 		char altname[ZONENAME_MAX];
 
 		if (getzonenamebyid(zids[i], name, sizeof (name)) < 0) {
-			zperror(gettext("failed to get zone name"), B_FALSE);
-			retv = Z_ERR;
+			/*
+			 * There is a race condition where the zone may have
+			 * shutdown since we retrieved the number of running
+			 * zones above.  This is not an error, there will be
+			 * an empty slot at the end of the list.
+			 */
 			continue;
 		}
 		if (zonecfg_is_scratch(name)) {
@@ -669,8 +684,12 @@ again:
 				continue;
 		}
 		if (lookup_zone_info(name, zids[i], zentp) != Z_OK) {
-			zerror(gettext("failed to get zone data"));
-			retv = Z_ERR;
+			/*
+			 * There is a race condition where the zone may have
+			 * shutdown since we retrieved the number of running
+			 * zones above.  This is not an error, there will be
+			 * an empty slot at the end of the list.
+			 */
 			continue;
 		}
 		zentp++;
