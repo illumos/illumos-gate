@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>			/* Standard */
 #include <stdlib.h>
@@ -117,17 +116,17 @@ static int		log_no_autoshutdown_warning = 0;
 static mutex_t		poweroff_mutex;
 
 static char *autoshutdown_cmd[] = {
-	"/usr/openwin/bin/sys-suspend",
+	"/usr/bin/sys-suspend",
 	"-n", "-d", ":0", NULL
 };
 
 static char *power_button_cmd[] = {
-	"/usr/openwin/bin/sys-suspend",
+	"/usr/bin/sys-suspend",
 	"-h", "-d", ":0", NULL
 };
 
 static char *autoS3_cmd[] = {
-	"/usr/openwin/bin/sys-suspend",
+	"/usr/bin/sys-suspend",
 	"-n", "-d", ":0", NULL
 };
 

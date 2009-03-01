@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/power/Makefile
 #
@@ -33,11 +31,14 @@ DAEMON =	powerd
 PMCFG_SRCS = 	conf.c parse.c handlers.c
 PMCFG_OBJS =	$(PMCFG_SRCS:%.c=%.o)
 PMCFG = 	pmconfig
-SRCS = 		$(DAEMON_SRCS) $(PMCFG_SRCS)
+SUSPEND_SRCS = 	sys-suspend.c pm_pam_conv.c
+SUSPEND_OBJS =	$(SUSPEND_SRCS:%.c=%.o)
+SUSPEND = 	sys-suspend
+SRCS = 		$(DAEMON_SRCS) $(PMCFG_SRCS) $(SUSPEND_SRCS)
 OBJS = 		$(SRCS:%.c=%.o)
 SCRIPTS =	sysidpm.sh
 SYSIDPM = 	sysidpm
-PROG =		$(DAEMON) $(PMCFG) $(SYSIDPM)
+PROG =		$(DAEMON) $(PMCFG) $(SYSIDPM) $(SUSPEND)
 POWERCONF=	power.conf
 ETCFILES =	$(POWERCONF)
 POWERPERM =	power
@@ -54,7 +55,7 @@ TEXT_DOMAIN=	SUNW_OST_OSCMD
 
 XGETFLAGS +=    -a -x power_all.xcl
 POFILE=		power_all.po
-POFILES=	$(PMCFG_SRCS:%.c=%.po)
+POFILES=	$(PMCFG_SRCS:%.c=%.po) $(SUSPEND_SRCS:%.c=%.po)
 # needed because POFILES is deleted by clobber, but it's under
 # SCCS control here.
 OPOFILES=	sysidpm.po
@@ -67,11 +68,15 @@ LDEVINFO=	-ldevinfo
 
 DAEMON_LDLIBS =	$(LDLIBS.cmd) -lkstat $(LDEVINFO)
 PMCFG_LDLIBS =	$(LDLIBS.cmd) -lcmd -lsmbios -lkstat $($(MACH)_LDEVINFO)
+SUSPEND_LDLIBS = $(LDLIBS.cmd) -lbsm -lpam -lsecdb
 
 OWNER= root
 ROOTUSRSBINPMCFG= $(PMCFG:%=$(ROOTUSRSBIN)/%)
 $(ROOTUSRSBINPMCFG) := GROUP= bin
 $(ROOTUSRSBINPMCFG) := FILEMODE= 4555
+ROOTUSRBINSUSPEND= $(SUSPEND:%=$(ROOTBIN)/%)
+$(ROOTUSRBINSUSPEND) := GROUP= bin
+$(ROOTUSRBINSUSPEND) := FILEMODE= 4555
 
 GROUP= sys
 ROOTLIBPOWER= $(ROOTLIB)/power
@@ -116,7 +121,11 @@ $(PMCFG): $(PMCFG_OBJS)
 	$(LINK.c) -o $@ $(PMCFG_OBJS) $(PMCFG_LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPMCFG) $(ROOTLIBPOWERDAEMON) \
+$(SUSPEND): $(SUSPEND_OBJS)
+	$(LINK.c) -o $@ $(SUSPEND_OBJS) $(SUSPEND_LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTUSRSBINPMCFG) $(ROOTLIBPOWERDAEMON) $(ROOTUSRBINSUSPEND) \
 	$(ROOTETCFILES) $(ROOTUSRSBINSYSIDPM) $(ROOTETCDEFAULTFILES) \
 	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
@@ -145,6 +154,7 @@ lint := LINTFLAGS=-auxn
 lint:
 	$(LINT.c) $(DAEMON_SRCS)
 	$(LINT.c) $(PMCFG_SRCS)
+	$(LINT.c) $(SUSPEND_SRCS)
 
 cstyle:
 	$(CSTYLE) $(SRCS)

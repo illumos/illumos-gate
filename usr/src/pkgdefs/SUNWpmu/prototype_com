@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1993-1998,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -46,6 +44,7 @@ i depend
 #
 d none usr 0755 root sys
 d none usr/sbin 0755 root bin
+d none usr/bin 0755 root bin
 d none usr/kernel 0755 root sys
 d none usr/kernel/drv 0755 root sys
 d none usr/lib 0755 root bin
@@ -54,3 +53,4 @@ f none usr/sbin/pmconfig 4555 root bin
 f none usr/sbin/sysidpm 755 root sys
 f none usr/kernel/drv/pm.conf 0644 root sys
 f none usr/lib/power/powerd 0555 root bin
+f none usr/bin/sys-suspend 4555 root bin
