@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -683,6 +683,8 @@ extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
 extern mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
 		    int32_t *offset, mblk_t **end_mp, uint32_t seq,
 		    boolean_t sendall, uint32_t *seg_len, boolean_t rexmit);
+extern void	tcp_xmit_reset(void *arg, mblk_t *mp, void *arg2);
+
 /*
  * The TCP Fanout structure.
  * The hash tables and their linkage (tcp_*_hash_next, tcp_ptp*hn) are
@@ -744,6 +746,21 @@ typedef struct tcp_ioc_abort_conn_s {
 
 #if (defined(_KERNEL) || defined(_KMEMUSER))
 extern void tcp_rput_other(tcp_t *tcp, mblk_t *mp);
+#endif
+
+#if (defined(_KERNEL))
+#define	TCP_XRE_EVENT_IP_FANOUT_TCP 1
+
+/*
+ * This is a private structure used to pass data to an squeue function during
+ * tcp's listener reset sending path.
+ */
+typedef struct tcp_xmit_reset_event {
+	int		tcp_xre_event;
+	int		tcp_xre_iphdrlen;
+	zoneid_t	tcp_xre_zoneid;
+	tcp_stack_t	*tcp_xre_tcps;
+} tcp_xmit_reset_event_t;
 #endif
 
 #ifdef	__cplusplus

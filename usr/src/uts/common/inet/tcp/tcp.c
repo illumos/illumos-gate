@@ -23165,6 +23165,34 @@ tcp_xmit_end(tcp_t *tcp)
 	return (0);
 }
 
+/* ARGSUSED */
+void
+tcp_xmit_reset(void *arg, mblk_t *mp, void *arg2)
+{
+	conn_t *connp = (conn_t *)arg;
+	mblk_t *mp1;
+	tcp_t *tcp = connp->conn_tcp;
+	tcp_xmit_reset_event_t *eventp;
+
+	ASSERT(mp->b_datap->db_type == M_PROTO &&
+	    MBLKL(mp) == sizeof (tcp_xmit_reset_event_t));
+
+	if (tcp->tcp_state != TCPS_LISTEN) {
+		freemsg(mp);
+		return;
+	}
+
+	mp1 = mp->b_cont;
+	mp->b_cont = NULL;
+	eventp = (tcp_xmit_reset_event_t *)mp->b_rptr;
+	ASSERT(eventp->tcp_xre_tcps->tcps_netstack ==
+	    connp->conn_netstack);
+
+	tcp_xmit_listeners_reset(mp1, eventp->tcp_xre_iphdrlen,
+	    eventp->tcp_xre_zoneid, eventp->tcp_xre_tcps, connp);
+	freemsg(mp);
+}
+
 /*
  * Generate a "no listener here" RST in response to an "unknown" segment.
  * connp is set by caller when RST is in response to an unexpected

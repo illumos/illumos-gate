@@ -3409,7 +3409,6 @@ ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
 	return (1);
 }
 
-
 /*
  * Fanout for TCP packets
  * The caller puts <fport, lport> in the ports parameter.
@@ -3459,10 +3458,15 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			}
 		}
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
-		    ipst->ips_netstack->netstack_tcp, connp);
-		if (connp != NULL)
+		if (connp != NULL) {
+			ip_xmit_reset_serialize(first_mp, hdr_len, zoneid,
+			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
+		} else {
+			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
+			    ipst->ips_netstack->netstack_tcp, NULL);
+		}
+
 		return;
 	}
 
@@ -3507,7 +3511,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			return;
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
+			ip_xmit_reset_serialize(first_mp, hdr_len, zoneid,
 			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
 			return;

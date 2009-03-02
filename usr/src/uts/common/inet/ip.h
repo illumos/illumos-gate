@@ -3410,6 +3410,10 @@ extern boolean_t	ipsq_pending_mp_cleanup(ill_t *, conn_t *);
 extern void	conn_ioctl_cleanup(conn_t *);
 extern ill_t	*conn_get_held_ill(conn_t *, ill_t **, int *);
 
+struct tcp_stack;
+extern void ip_xmit_reset_serialize(mblk_t *, int, zoneid_t, struct tcp_stack *,
+    conn_t *);
+
 struct multidata_s;
 struct pdesc_s;
 
@@ -3758,6 +3762,7 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_CONNECT_FINISH		41
 #define	SQTAG_SYNCHRONOUS_OP		42
 #define	SQTAG_TCP_SHUTDOWN_OUTPUT	43
+#define	SQTAG_XMIT_EARLY_RESET		44
 
 #define	NOT_OVER_IP(ip_wq)	\
 	(ip_wq->q_next != NULL ||	\

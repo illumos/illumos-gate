@@ -6750,6 +6750,48 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 }
 
 /*
+ * Serialize tcp resets by calling tcp_xmit_reset_serialize through
+ * SQUEUE_ENTER_ONE(SQ_FILL). We do this to ensure the reset is handled on
+ * the correct squeue, in this case the same squeue as a valid listener with
+ * no current connection state for the packet we are processing. The function
+ * is called for synchronizing both IPv4 and IPv6.
+ */
+void
+ip_xmit_reset_serialize(mblk_t *mp, int hdrlen, zoneid_t zoneid,
+    tcp_stack_t *tcps, conn_t *connp)
+{
+	mblk_t *rst_mp;
+	tcp_xmit_reset_event_t *eventp;
+
+	rst_mp = allocb(sizeof (tcp_xmit_reset_event_t), BPRI_HI);
+
+	if (rst_mp == NULL) {
+		freemsg(mp);
+		return;
+	}
+
+	rst_mp->b_datap->db_type = M_PROTO;
+	rst_mp->b_wptr += sizeof (tcp_xmit_reset_event_t);
+
+	eventp = (tcp_xmit_reset_event_t *)rst_mp->b_rptr;
+	eventp->tcp_xre_event = TCP_XRE_EVENT_IP_FANOUT_TCP;
+	eventp->tcp_xre_iphdrlen = hdrlen;
+	eventp->tcp_xre_zoneid = zoneid;
+	eventp->tcp_xre_tcps = tcps;
+
+	rst_mp->b_cont = mp;
+	mp = rst_mp;
+
+	/*
+	 * Increment the connref, this ref will be released by the squeue
+	 * framework.
+	 */
+	CONN_INC_REF(connp);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_xmit_reset, connp,
+	    SQ_FILL, SQTAG_XMIT_EARLY_RESET);
+}
+
+/*
  * Fanout for TCP packets
  * The caller puts <fport, lport> in the ports parameter.
  *
@@ -6852,7 +6894,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			return;
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid,
+			ip_xmit_reset_serialize(first_mp, ip_hdr_len, zoneid,
 			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
 			return;
@@ -13085,7 +13127,7 @@ try_again:
 			return (NULL);
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid,
+			ip_xmit_reset_serialize(first_mp, ip_hdr_len, zoneid,
 			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
 			return (NULL);
