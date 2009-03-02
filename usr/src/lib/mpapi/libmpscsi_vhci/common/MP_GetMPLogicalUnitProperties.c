@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,13 +85,13 @@ char
 	log(LOG_INFO, "getDeviceFileName()", " - enter");
 
 	log(LOG_INFO, "getDeviceFileName()",
-		" - instanceNum: %llx",
-		instanceNum);
+	    " - instanceNum: %llx",
+	    instanceNum);
 
 	root_node = di_init("/", DINFOCACHE);
 	if (DI_NODE_NIL == root_node) {
 		log(LOG_INFO, "MP_GetMultipathLusPlugin()",
-			" - $ERROR, di_init() failed");
+		    " - $ERROR, di_init() failed");
 
 		return (NULL);
 	}
@@ -100,7 +100,7 @@ char
 	cur_node = di_drv_first_node("scsi_vhci", root_node);
 	if (DI_NODE_NIL == cur_node) {
 		log(LOG_INFO, "getDeviceFileName()",
-			" - $ERROR, di_drv_first_node() failed");
+		    " - $ERROR, di_drv_first_node() failed");
 
 		di_fini(root_node);
 
@@ -112,13 +112,12 @@ char
 
 	while (DI_NODE_NIL != cur_node) {
 
-		nodeInstance =
-		(MP_UINT64)di_instance(cur_node);
+		nodeInstance = (MP_UINT64)di_instance(cur_node);
 
 		if (nodeInstance == instanceNum) {
 
 			log(LOG_INFO, "getDeviceFileName()",
-				" - found node.");
+			    " - found node.");
 
 			break;
 		}
@@ -130,12 +129,12 @@ char
 
 		dlHandle = di_devlink_init(NULL, 0);
 		if (NULL == dlHandle) {
-		    log(LOG_INFO, "getDeviceFileName()",
+			log(LOG_INFO, "getDeviceFileName()",
 			    " - $ERROR, di_devlink_init() failed.");
 
-		    di_fini(root_node);
+			di_fini(root_node);
 
-		    return (NULL);
+			return (NULL);
 		}
 
 		pathName = di_devfs_path(cur_node);
@@ -143,7 +142,7 @@ char
 		(void) snprintf(fullName, 511, "%s:%s", pathName, minorName);
 
 		log(LOG_INFO, "getDeviceFileName()",
-			" - fullName: {%s]", fullName);
+		    " - fullName: {%s]", fullName);
 
 		(void) memset(&warg, 0, sizeof (walk_devlink_t));
 
@@ -151,11 +150,11 @@ char
 		warg.linkpp = &devLink;
 
 		diStatus = di_devlink_walk(dlHandle,
-				NULL,
-				fullName,
-				DI_PRIMARY_LINK,
-				(void *)&warg,
-				get_devlink);
+		    NULL,
+		    fullName,
+		    DI_PRIMARY_LINK,
+		    (void *)&warg,
+		    get_devlink);
 
 		if (diStatus != 0) {
 
@@ -176,7 +175,7 @@ char
 		if (NULL != devLink) {
 
 			deviceFileName =
-				(char *)calloc(1, strlen(devLink) + 1);
+			    (char *)calloc(1, strlen(devLink) + 1);
 
 			(void) strncpy(deviceFileName, devLink,
 			    strlen(devLink));
@@ -184,10 +183,10 @@ char
 		} else {
 
 			log(LOG_INFO, "getDeviceFileName()",
-				" - $ERROR, devLink is NULL.");
+			    " - $ERROR, devLink is NULL.");
 
 			deviceFileName =
-				(char *)calloc(1, 256);
+			    (char *)calloc(1, 256);
 
 			(void) strncpy(deviceFileName, pathName, 255);
 		}
@@ -201,6 +200,7 @@ char
 
 	di_fini(root_node);
 
+	free(devLink);
 
 	log(LOG_INFO, "getDeviceFileName()", " - exit");
 
@@ -234,14 +234,14 @@ MP_GetMPLogicalUnitProperties(MP_OID oid,
 
 
 	log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-		"oid.objectSequenceNumber = %llx",
-		oid.objectSequenceNumber);
+	    "oid.objectSequenceNumber = %llx",
+	    oid.objectSequenceNumber);
 
 	if (g_scsi_vhci_fd < 0) {
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			"invalid driver file handle");
+		    "invalid driver file handle");
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			" - error exit");
+		    " - error exit");
 		return (MP_STATUS_FAILED);
 	}
 
@@ -258,7 +258,7 @@ MP_GetMPLogicalUnitProperties(MP_OID oid,
 	ioctlStatus = ioctl(g_scsi_vhci_fd, MP_CMD, &mp_ioctl);
 
 	log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-		" IOCTL call returned: %d", ioctlStatus);
+	    " IOCTL call returned: %d", ioctlStatus);
 
 	if (ioctlStatus < 0) {
 		ioctlStatus = errno;
@@ -266,14 +266,14 @@ MP_GetMPLogicalUnitProperties(MP_OID oid,
 
 	if (ioctlStatus != 0) {
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			"IOCTL call failed.  IOCTL error is: %d",
-			ioctlStatus);
+		    "IOCTL call failed.  IOCTL error is: %d",
+		    ioctlStatus);
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			"IOCTL call failed.  IOCTL error is: %s",
-			strerror(ioctlStatus));
+		    "IOCTL call failed.  IOCTL error is: %s",
+		    strerror(ioctlStatus));
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			"IOCTL call failed.  mp_ioctl.mp_errno: %x",
-			mp_ioctl.mp_errno);
+		    "IOCTL call failed.  mp_ioctl.mp_errno: %x",
+		    mp_ioctl.mp_errno);
 
 		if (ENOTSUP == ioctlStatus) {
 			mpStatus = MP_STATUS_UNSUPPORTED;
@@ -284,7 +284,7 @@ MP_GetMPLogicalUnitProperties(MP_OID oid,
 		}
 
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			" - error exit");
+		    " - error exit");
 
 		return (mpStatus);
 	}
@@ -304,12 +304,12 @@ MP_GetMPLogicalUnitProperties(MP_OID oid,
 	if (NULL != deviceFileName) {
 
 		log(LOG_INFO, "MP_GetMPLogicalUnitProperties()",
-			"deviceFileName: %s",
-			deviceFileName);
+		    "deviceFileName: %s",
+		    deviceFileName);
 
 		(void) strncpy(pProps->deviceFileName,
-				deviceFileName,
-				sizeof (pProps->deviceFileName) - 1);
+		    deviceFileName,
+		    sizeof (pProps->deviceFileName) - 1);
 
 		free(deviceFileName);
 	}
@@ -334,16 +334,16 @@ MP_GetMPLogicalUnitProperties(MP_OID oid,
 	revisionLength = sizeof (pProps->revision);
 
 	(void) strncpy(pProps->vendor,
-			luInfo.prodInfo.vendor,
-			vendorLength);
+	    luInfo.prodInfo.vendor,
+	    vendorLength);
 
 	(void) strncpy(pProps->product,
-			luInfo.prodInfo.product,
-			productLength);
+	    luInfo.prodInfo.product,
+	    productLength);
 
 	(void) strncpy(pProps->revision,
-			luInfo.prodInfo.revision,
-			revisionLength);
+	    luInfo.prodInfo.revision,
+	    revisionLength);
 
 	log(LOG_INFO, "MP_GetMPLogicalUnitProperties()", " - exit");
 
