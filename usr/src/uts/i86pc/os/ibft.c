@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/bootprops.h>
 #include <sys/kmem.h>
 #include <sys/psm.h>
+#include <sys/bootconf.h>
 
 #ifndef	NULL
 #define	NULL	0
@@ -162,6 +163,7 @@ typedef struct iSCSI_ibft_target {
 #define	IPV4_OFFSET			12
 
 #define	IBFT_INVALID_MSG		"Invalid iBFT table 0x%x"
+#define	IBFT_NOPROBE_MSG		"iSCSI boot is disabled"
 
 typedef enum ibft_status {
 	IBFT_STATUS_OK = 0,
@@ -192,6 +194,7 @@ extern int memcmp(const void *s1, const void *s2, size_t n);
 extern void bcopy(const void *s1, void *s2, size_t n);
 extern void iscsi_print_boot_property();
 
+int ibft_noprobe = 0;
 ib_boot_prop_t boot_property;		/* static allocated */
 extern ib_boot_prop_t *iscsiboot_prop;	/* to be filled */
 
@@ -727,6 +730,29 @@ ld_ib_prop()
 {
 	ibft_status_t	ret	=   IBFT_STATUS_OK;
 	char		*ibft_tbl_buf;
+
+	if (do_bsys_getproplen(NULL, "ibft-noprobe") > 0)
+		ibft_noprobe = 1;
+
+	if (ibft_noprobe != 0) {
+		/*
+		 * Scanning for iBFT may conflict with devices which use memory
+		 * in 640-1024KB of physical address space.  The iBFT
+		 * specification suggests use of low RAM method - scanning
+		 * physical memory 512-1024 KB for iBFT table.  However, the
+		 * Upper Memory Area (UMA) 640-1024 KB may contain device
+		 * memory or memory mapped I/O.  Although reading from I/O area
+		 * is usually fine, the actual behavior depends on device
+		 * implementation.  In some cases, the user may want to disable
+		 * low RAM method and prevent reading from device I/O area.
+		 *
+		 * To disable low RAM method:
+		 * 1) pass "-B ibft-noprobe=1" on kernel command line
+		 * 2) add line "set ibft_noprobe=1" in /etc/system
+		 */
+		cmn_err(CE_NOTE, IBFT_NOPROBE_MSG);
+		return;
+	}
 
 	ibft_tbl_buf = (char *)kmem_zalloc(ISCSI_IBFT_TBL_BUF_LEN,
 	    KM_SLEEP);
