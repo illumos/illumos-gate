@@ -395,8 +395,8 @@ start_again:
 
 	tdc_stats = tx_ring_p->tdc_stats;
 	mark_mode = (tx_ring_p->descs_pending &&
-	    ((tx_ring_p->tx_ring_size - tx_ring_p->descs_pending)
-	    < nxge_tx_minfree));
+	    (((int)tx_ring_p->tx_ring_size - (int)tx_ring_p->descs_pending) <
+	    (int)nxge_tx_minfree));
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
 	    "TX Descriptor ring is channel %d mark mode %d",

@@ -2501,6 +2501,9 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 				}
 				break;
 			}
+
+			if (p_cfgp->max_rdcs < nrdcs)
+				nrdcs = p_cfgp->max_rdcs;
 		} else {
 			nrdcs = 0;
 		}

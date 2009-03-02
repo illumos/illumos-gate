@@ -36,14 +36,8 @@ uint32_t 	nxge_dma_obp_props_only = 1;	/* use obp published props */
 uint32_t 	nxge_use_rdc_intr = 1;		/* debug to assign rdc intr */
 /*
  * PSARC/2007/453 MSI-X interrupt limit override
- * (This PSARC case is limited to MSI-X vectors
- *  and SPARC platforms only).
  */
-#if defined(_BIG_ENDIAN)
 uint32_t	nxge_msi_enable = 2;
-#else
-uint32_t	nxge_msi_enable = 1;
-#endif
 
 /*
  * Software workaround for a Neptune (PCI-E)
