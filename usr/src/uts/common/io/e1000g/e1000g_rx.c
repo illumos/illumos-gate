@@ -102,9 +102,9 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 
 	ref_cnt = atomic_dec_32_nv(&packet->ref_cnt);
 	if (ref_cnt == 0) {
+		mutex_enter(&e1000g_rx_detach_lock);
 		e1000g_free_rx_sw_packet(packet, B_FALSE);
 
-		mutex_enter(&e1000g_rx_detach_lock);
 		atomic_dec_32(&rx_data->pending_count);
 		atomic_dec_32(&e1000g_mblks_pending);
 

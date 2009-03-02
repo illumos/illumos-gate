@@ -644,3 +644,8 @@ Notes on packaging:
    6699662 global e1000g rwlock prevents scaling on multiple interfaces
    6781905 super slow throughput on e1000g 82541 and 82547 chips
    6786783 e1000g needs to have a new tx stall detection mechanism to cover 82546 errata No.18
+
+5.3.5
+======
+  This version has the following fix:
+   6732858 panic in e1000g_free_dma_buffer
