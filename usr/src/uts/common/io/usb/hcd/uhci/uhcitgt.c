@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,6 +556,31 @@ uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	return (USB_SUCCESS);
 }
 
+/*
+ * uhci_hcdi_pipe_reset_data_toggle:
+ */
+void
+uhci_hcdi_pipe_reset_data_toggle(
+	usba_pipe_handle_data_t	*ph)
+{
+	uhci_state_t		*uhcip = uhci_obtain_state(
+	    ph->p_usba_device->usb_root_hub_dip);
+	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
+
+	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
+	    "uhci_hcdi_pipe_reset_data_toggle:");
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+
+	mutex_enter(&ph->p_mutex);
+	pp->pp_data_toggle = 0;
+	usba_hcdi_set_data_toggle(ph->p_usba_device, ph->p_ep.bEndpointAddress,
+	    pp->pp_data_toggle);
+	mutex_exit(&ph->p_mutex);
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+}
 
 /*
  * uhci_hcdi_pipe_ctrl_xfer:

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +83,12 @@ typedef struct usba_hcdi_ops {
 	int	(*usba_hcdi_pipe_reset)(
 		usba_pipe_handle_data_t	*pipe_handle,
 		usb_flags_t		usb_flags);
+
+	/*
+	 * pipe management
+	 */
+	void	(*usba_hcdi_pipe_reset_data_toggle)(
+		usba_pipe_handle_data_t	*pipe_handle);
 
 	/*
 	 * data transfer management

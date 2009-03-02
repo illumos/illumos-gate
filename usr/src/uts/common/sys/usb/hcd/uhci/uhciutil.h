@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,8 @@ int	uhci_hcdi_pipe_close(usba_pipe_handle_data_t *pipe_handle,
 		    usb_flags_t flags);
 int	uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *pipe_handle,
 		    usb_flags_t usb_flags);
+void	uhci_hcdi_pipe_reset_data_toggle(
+	    usba_pipe_handle_data_t *pipe_handle);
 int	uhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *,
 		    usb_ctrl_req_t *, usb_flags_t);
 int	uhci_hcdi_pipe_bulk_xfer(usba_pipe_handle_data_t *,

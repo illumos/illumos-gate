@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one ehci_state
 one usba_device
@@ -47,6 +46,8 @@ root ehci_hcdi_pipe_bulk_xfer
 root ehci_hcdi_pipe_intr_xfer
 root ehci_hcdi_pipe_isoc_xfer
 root ehci_hcdi_pm_support
+root ehci_hcdi_pipe_reset_data_toggle
+root ehci_quiesce
 
 root hubd_hotplug_thread
 root hubd_exception_cb

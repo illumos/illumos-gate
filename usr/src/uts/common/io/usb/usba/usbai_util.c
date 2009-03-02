@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1597,6 +1597,12 @@ usba_sync_clear_feature(dev_info_t *dip,
 	uint_t	feature = ((uint_t)n >> 8) & 0xff;
 	uint_t	what = (uint_t)n & 0xff;
 	int	rval;
+	usba_device_t		*usba_device;
+	usba_pipe_handle_data_t *ph_data;
+	usba_ph_impl_t		*ph_im;
+	uchar_t			ep_index;
+	usb_ep_descr_t		*eptd;
+
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_sync_clear_feature: "
@@ -1605,6 +1611,44 @@ usba_sync_clear_feature(dev_info_t *dip,
 
 	rval = usb_clear_feature(dip, (usb_pipe_handle_t)ph_impl, type,
 	    feature, what, usb_flags);
+
+	/*
+	 * Reset data toggle to DATA0 for bulk and interrupt endpoint.
+	 * Data toggle synchronization is not supported for isochronous
+	 * transfer.Halt feature is not supported by control endpoint.
+	 *
+	 * From USB2.0 specification:
+	 * 1.Section 5.8.5 Bulk Transfer Data Sequences
+	 * Removal of the halt condition is achieved via software intervention
+	 * through a separate control pipe. This recovery will reset the data
+	 * toggle bit to DATA0 for the endpoint on both the host and the device.
+	 *
+	 * 2.Section 5.7.5 Interrupt Transfer Data Sequences
+	 * Removal of the halt condition is achieved via software intervention
+	 * through a separate control pipe. This recovery will reset the data
+	 * toggle bit to DATA0 for the endpoint on both the host and the device.
+	 *
+	 * 3.Section 9.4.5
+	 * If the condition causing a halt has been removed, clearing the Halt
+	 * feature via a ClearFeature(ENDPOINT_HALT) request results in the
+	 * endpoint no longer returning a STALL. For endpoints using data
+	 * toggle, regardless of whether an endpoint has the Halt feature set, a
+	 * ClearFeature(ENDPOINT_HALT) request always results in the data toggle
+	 * being reinitialized to DATA0.
+	 *
+	 */
+	if (rval == USB_SUCCESS && feature == 0) {
+		usba_device = usba_get_usba_device(dip);
+		ep_index = usb_get_ep_index((uint8_t)what);
+		ph_im = &usba_device->usb_ph_list[ep_index];
+		ph_data = usba_get_ph_data((usb_pipe_handle_t)ph_im);
+		eptd = &ph_data->p_ep;
+		if ((eptd->bmAttributes & USB_EP_ATTR_MASK) ==
+		    USB_EP_ATTR_BULK || (eptd->bmAttributes &
+		    USB_EP_ATTR_MASK) == USB_EP_ATTR_INTR)
+			usba_device->usb_hcdi_ops->
+			    usba_hcdi_pipe_reset_data_toggle(ph_data);
+	}
 
 	usba_release_ph_data(ph_impl);
 

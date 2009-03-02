@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -796,6 +796,8 @@ uhci_alloc_hcdi_ops(uhci_state_t *uhcip)
 	hcdi_ops->usba_hcdi_pipe_open = uhci_hcdi_pipe_open;
 	hcdi_ops->usba_hcdi_pipe_close	= uhci_hcdi_pipe_close;
 	hcdi_ops->usba_hcdi_pipe_reset = uhci_hcdi_pipe_reset;
+	hcdi_ops->usba_hcdi_pipe_reset_data_toggle =
+	    uhci_hcdi_pipe_reset_data_toggle;
 
 	hcdi_ops->usba_hcdi_pipe_ctrl_xfer = uhci_hcdi_pipe_ctrl_xfer;
 	hcdi_ops->usba_hcdi_pipe_bulk_xfer = uhci_hcdi_pipe_bulk_xfer;

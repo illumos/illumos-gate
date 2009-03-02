@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,8 @@ static int	ohci_hcdi_pipe_close(
 static int	ohci_hcdi_pipe_reset(
 				usba_pipe_handle_data_t	*ph,
 				usb_flags_t		usb_flags);
+static void	ohci_hcdi_pipe_reset_data_toggle(
+				usba_pipe_handle_data_t	*ph);
 static int	ohci_hcdi_pipe_ctrl_xfer(
 				usba_pipe_handle_data_t	*ph,
 				usb_ctrl_req_t		*ctrl_reqp,
@@ -2031,6 +2033,8 @@ ohci_alloc_hcdi_ops(ohci_state_t	*ohcip)
 	usba_hcdi_ops->usba_hcdi_pipe_close = ohci_hcdi_pipe_close;
 
 	usba_hcdi_ops->usba_hcdi_pipe_reset = ohci_hcdi_pipe_reset;
+	usba_hcdi_ops->usba_hcdi_pipe_reset_data_toggle =
+	    ohci_hcdi_pipe_reset_data_toggle;
 
 	usba_hcdi_ops->usba_hcdi_pipe_ctrl_xfer = ohci_hcdi_pipe_ctrl_xfer;
 	usba_hcdi_ops->usba_hcdi_pipe_bulk_xfer = ohci_hcdi_pipe_bulk_xfer;
@@ -2782,6 +2786,32 @@ ohci_hcdi_pipe_reset(
 	return (error);
 }
 
+/*
+ * ohci_hcdi_pipe_reset_data_toggle:
+ */
+void
+ohci_hcdi_pipe_reset_data_toggle(
+	usba_pipe_handle_data_t	*ph)
+{
+	ohci_state_t		*ohcip = ohci_obtain_state(
+	    ph->p_usba_device->usb_root_hub_dip);
+	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
+
+	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
+	    "ohci_hcdi_pipe_reset_data_toggle:");
+
+	mutex_enter(&ohcip->ohci_int_mutex);
+
+	mutex_enter(&ph->p_mutex);
+	usba_hcdi_set_data_toggle(ph->p_usba_device, ph->p_ep.bEndpointAddress,
+	    DATA0);
+	mutex_exit(&ph->p_mutex);
+
+	Set_ED(pp->pp_ept->hced_headp,
+	    Get_ED(pp->pp_ept->hced_headp) & (~HC_EPT_Carry));
+	mutex_exit(&ohcip->ohci_int_mutex);
+
+}
 
 /*
  * ohci_hcdi_pipe_ctrl_xfer:
