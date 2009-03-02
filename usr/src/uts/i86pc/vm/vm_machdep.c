@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -695,9 +695,7 @@ map_addr_proc(
 			 * heap, this bit of code might even be correct.
 			 */
 			slen = p->p_usrstack - base -
-			    (((size_t)rctl_enforced_value(
-			    rctlproc_legacy[RLIMIT_STACK],
-			    p->p_rctls, p) + PAGEOFFSET) & PAGEMASK);
+			    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
 		}
 	} else
 #endif

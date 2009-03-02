@@ -197,6 +197,24 @@ struct mobj_stats {
 #define	MOBJ_STAT_ADD(stat)
 #endif
 
+/*
+ * Check if addr is at or above the address space reserved for the stack.
+ * The stack is at the top of the address space for all sparc processes
+ * and 64 bit x86 processes.  For 32 bit x86, the stack is not at the top
+ * of the address space and thus this check wil always return false for
+ * 32 bit x86 processes.
+ */
+#if defined(__sparc)
+#define	OVERLAPS_STACK(addr, p)						\
+	(addr >= (p->p_usrstack - ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK)))
+#elif defined(__amd64)
+#define	OVERLAPS_STACK(addr, p)						\
+	((p->p_model == DATAMODEL_LP64) &&				\
+	(addr >= (p->p_usrstack - ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK))))
+#elif defined(__i386)
+#define	OVERLAPS_STACK(addr, p)	0
+#endif
+
 /* lv_flags values - bitmap */
 #define	LV_ELF32	0x1		/* 32 bit ELF file */
 #define	LV_ELF64	0x2		/* 64 bit ELF file */
@@ -627,7 +645,8 @@ mmapobj_unmap_exec(mmapobj_result_t *mrp, int num_mapped, caddr_t start_addr)
 static caddr_t
 mmapobj_lookup_start_addr(struct lib_va *lvp)
 {
-	struct as *as = curproc->p_as;
+	proc_t *p = curproc;
+	struct as *as = p->p_as;
 	struct segvn_crargs crargs = SEGVN_ZFOD_ARGS(PROT_USER, PROT_ALL);
 	int error;
 	uint_t ma_flags = _MAP_LOW32;
@@ -650,8 +669,7 @@ mmapobj_lookup_start_addr(struct lib_va *lvp)
 	 */
 	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL) ||
 	    valid_usr_range(base, len, PROT_ALL, as, as->a_userlimit) !=
-	    RANGE_OKAY) {
-
+	    RANGE_OKAY || OVERLAPS_STACK(base + len, p)) {
 		if (lvp->lv_flags & LV_ELF64) {
 			ma_flags = 0;
 		}
@@ -701,7 +719,8 @@ static caddr_t
 mmapobj_alloc_start_addr(struct lib_va **lvpp, size_t len, int use_lib_va,
     size_t align, vattr_t *vap)
 {
-	struct as *as = curproc->p_as;
+	proc_t *p = curproc;
+	struct as *as = p->p_as;
 	struct segvn_crargs crargs = SEGVN_ZFOD_ARGS(PROT_USER, PROT_ALL);
 	int error;
 	model_t model;
@@ -756,14 +775,14 @@ mmapobj_alloc_start_addr(struct lib_va **lvpp, size_t len, int use_lib_va,
 				lib_va_start = lib_va_end - lib_va_len;
 
 				/*
-			 	 * Need to make sure we avoid the address hole.
+				 * Need to make sure we avoid the address hole.
 				 * We know lib_va_end is valid but we need to
 				 * make sure lib_va_start is as well.
 				 */
 				if ((lib_va_end > (size_t)hole_end) &&
 				    (lib_va_start < (size_t)hole_end)) {
 					lib_va_start = P2ROUNDUP(
-					   (size_t)hole_end, PAGESIZE);
+					    (size_t)hole_end, PAGESIZE);
 					lib_va_len = lib_va_end - lib_va_start;
 				}
 				lib_va_64_arena = vmem_create("lib_va_64",
@@ -844,7 +863,7 @@ nolibva:
 	 */
 	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL) ||
 	    valid_usr_range(base, len, PROT_ALL, as, as->a_userlimit) !=
-	    RANGE_OKAY) {
+	    RANGE_OKAY || OVERLAPS_STACK(base + len, p)) {
 		MOBJ_STAT_ADD(get_addr);
 		base = (caddr_t)align;
 		map_addr(&base, len, 0, 1, ma_flags);

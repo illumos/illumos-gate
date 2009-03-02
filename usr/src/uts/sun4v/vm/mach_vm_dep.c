@@ -225,9 +225,8 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		ASSERT(userlimit > base);
 		slen = userlimit - base;
 	} else {
-		slen = p->p_usrstack - base - (((size_t)rctl_enforced_value(
-		    rctlproc_legacy[RLIMIT_STACK], p->p_rctls, p) + PAGEOFFSET)
-		    & PAGEMASK);
+		slen = p->p_usrstack - base -
+		    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
 	}
 	/* Make len be a multiple of PAGESIZE */
 	len = (len + PAGEOFFSET) & PAGEMASK;

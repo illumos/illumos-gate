@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UNIX machine dependent virtual memory support.
@@ -195,9 +193,8 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		ASSERT(userlimit > base);
 		slen = userlimit - base;
 	} else {
-		slen = p->p_usrstack - base - (((size_t)rctl_enforced_value(
-		    rctlproc_legacy[RLIMIT_STACK], p->p_rctls, p) + PAGEOFFSET)
-		    & PAGEMASK);
+		slen = p->p_usrstack - base -
+		    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
 	}
 
 	/* Make len be a multiple of PAGESIZE */
