@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -168,6 +168,7 @@ double 			g_interval;
  */
 int 			dump;
 char			event_mode;
+extern boolean_t	gui;
 
 /*
  * Event info array

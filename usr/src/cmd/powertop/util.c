@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -67,7 +67,7 @@ pt_error(char *format, ...)
 	int 	err = errno;
 	va_list alist;
 
-	if (!dump)
+	if (gui)
 		return;
 
 	if (progname != NULL)
@@ -104,7 +104,7 @@ enumerate_cpus(void)
 void
 usage(void)
 {
-	(void) fprintf(stderr, "%s   (C) 2008 Intel Corporation\n\n", TITLE);
+	(void) fprintf(stderr, "%s   (C) 2009 Intel Corporation\n\n", TITLE);
 	(void) fprintf(stderr, "Usage: powertop [option]\n");
 	(void) fprintf(stderr, "  -d, --dump [count]	Read wakeups count "
 	    "times and print list of top offenders\n");
