@@ -33,7 +33,6 @@
 #include <sys/stat.h>
 #include <papi_impl.h>
 
-
 /*
  * for an older application that may have been linked with a pre-v1.0
  * PAPI implementation.
@@ -151,8 +150,24 @@ authorized(service_t *svc, int32_t id)
 				result = PAPI_OK;
 		}
 
-		if ((result != PAPI_OK) && (strcmp(user, r->user) == 0))
-			result = PAPI_OK;
+		if (result != PAPI_OK) {
+			if (strcmp(user, r->user) == 0)
+				result = PAPI_OK;
+			else {
+				/*
+				 * user request r->user might contain the
+				 * host info also
+				 */
+				char *token;
+				token = strtok(r->user, "@");
+
+				if (token != NULL) {
+					if (strcmp(user, token) == 0)
+						result = PAPI_OK;
+					free(token);
+				}
+			}
+		}
 
 		freerequest(r);
 	} else
@@ -898,6 +913,9 @@ papiJobCancel(papi_service_t handle, char *printer, int32_t job_id)
 	if (papiAttributeListGetString(svc->attributes, NULL, "user-name",
 	    &user) == PAPI_OK) {
 		REQUEST *r = getrequest(req_id);
+
+		if ((result = authorized(handle, job_id)) != PAPI_OK)
+			result = PAPI_NOT_AUTHORIZED;
 
 		if ((r != NULL) && (r->user != NULL) &&
 		    (strcmp(r->user, user) != 0))

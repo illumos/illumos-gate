@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: common.c 162 2006-05-08 14:17:44Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -159,11 +157,11 @@ printer_state_line(FILE *fp, papi_printer_t p, int num_jobs, char *name)
 	char *reason = "";
 
 	(void) papiAttributeListGetInteger(list, NULL,
-				"printer-state", &state);
+	    "printer-state", &state);
 	(void) papiAttributeListGetString(list, NULL,
-				"printer-state-reasons", &reason);
+	    "printer-state-reasons", &reason);
 	(void) papiAttributeListGetString(list, NULL,
-				"printer-name", &name);
+	    "printer-name", &name);
 
 	if ((state != 0x03) || (num_jobs != 0)) {
 		fprintf(fp, "%s: %s", name, state_string(state));
@@ -192,42 +190,42 @@ print_job_line(FILE *fp, int count, papi_job_t job, int fmt, int ac, char *av[])
 	char *suffix = "k";
 
 	(void) papiAttributeListGetInteger(list, NULL,
-					"job-id", &id);
+	    "job-id", &id);
 	(void) papiAttributeListGetInteger(list, NULL,
-					"job-id-requested", &id);
+	    "job-id-requested", &id);
 	(void) papiAttributeListGetString(list, NULL,
-					"job-originating-user-name", &user);
+	    "job-originating-user-name", &user);
 	(void) papiAttributeListGetString(list, NULL,
-					"job-originating-host-name", &host);
+	    "job-originating-host-name", &host);
 
 	/* if we are looking and it doesn't match, return early */
 	if ((ac > 0) && (match_job(id, user, ac, av) < 0))
 		return;
 
 	(void) papiAttributeListGetInteger(list, NULL,
-					"copies", &copies);
+	    "copies", &copies);
 	(void) papiAttributeListGetInteger(list, NULL,
-					"number-of-intervening-jobs", &rank);
+	    "number-of-intervening-jobs", &rank);
 
 	if (papiAttributeListGetInteger(list, NULL, "job-octets", &size)
-			== PAPI_OK)
+	    == PAPI_OK)
 		suffix = "bytes";
 	else
 		(void) papiAttributeListGetInteger(list, NULL,
-					"job-k-octets", &size);
+		    "job-k-octets", &size);
 	(void) papiAttributeListGetString(list, NULL,
-					"job-name", &name);
+	    "job-name", &name);
 
 	size *= copies;
 
 	if (fmt == 3) {
 		fprintf(fp, gettext("%s\t%-8.8s %d\t%-32.32s%d %s\n"),
-			rank_string(++rank), user, id, name, size, suffix);
+		    rank_string(++rank), user, id, name, size, suffix);
 	} else
 		fprintf(fp, gettext(
-			"\n%s: %s\t\t\t\t[job %d %s]\n\t%-32.32s\t%d %s\n"),
-			user, rank_string(++rank), id, host, name, size,
-			suffix);
+		    "\n%s: %s\t\t\t\t[job %d %s]\n\t%-32.32s\t%d %s\n"),
+		    user, rank_string(++rank), id, host, name, size,
+		    suffix);
 }
 
 /*
@@ -245,11 +243,11 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	char *mesg = gettext("cancelled");
 
 	papiAttributeListGetInteger(list, NULL,
-					"job-id", &id);
+	    "job-id", &id);
 	papiAttributeListGetInteger(list, NULL,
-					"job-id-requested", &rid);
+	    "job-id-requested", &rid);
 	papiAttributeListGetString(list, NULL,
-					"job-originating-user-name", &user);
+	    "job-originating-user-name", &user);
 
 	/* if we are looking and it doesn't match, return early */
 	if ((ac > 0) && (match_job(id, user, ac, av) < 0) &&
@@ -260,7 +258,10 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	if (status != PAPI_OK)
 		mesg = papiStatusString(status);
 
-	fprintf(fp, "%s-%d: %s\n", printer, id, mesg);
+	if (id != 0)
+		fprintf(fp, "%s-%d: %s\n", printer, id, mesg);
+	else
+		fprintf(fp, "%s-%d: %s\n", printer, rid, mesg);
 }
 
 int
@@ -281,17 +282,17 @@ berkeley_queue_report(papi_service_t svc, FILE *fp, char *dest, int fmt,
 	status = papiPrinterQuery(svc, dest, pattrs, NULL, &p);
 	if (status != PAPI_OK) {
 		fprintf(fp, gettext(
-			"Failed to query service for state of %s: %s\n"),
-			dest, verbose_papi_message(svc, status));
+		    "Failed to query service for state of %s: %s\n"),
+		    dest, verbose_papi_message(svc, status));
 		return (-1);
 	}
 
 	status = papiPrinterListJobs(svc, dest, jattrs, PAPI_LIST_JOBS_ALL,
-					0, &jobs);
+	    0, &jobs);
 	if (status != PAPI_OK) {
 		fprintf(fp, gettext(
-			"Failed to query service for jobs on %s: %s\n"),
-			dest, verbose_papi_message(svc, status));
+		    "Failed to query service for jobs on %s: %s\n"),
+		    dest, verbose_papi_message(svc, status));
 		return (-1);
 	}
 	if (jobs != NULL) {
@@ -325,11 +326,11 @@ berkeley_cancel_request(papi_service_t svc, FILE *fp, char *dest,
 			"job-id-requested", NULL };
 
 	status = papiPrinterListJobs(svc, dest, jattrs, PAPI_LIST_JOBS_ALL,
-					0, &jobs);
+	    0, &jobs);
 
 	if (status != PAPI_OK) {
 		fprintf(fp, gettext("Failed to query service for %s: %s\n"),
-			dest, verbose_papi_message(svc, status));
+		    dest, verbose_papi_message(svc, status));
 		return (-1);
 	}
 
@@ -381,7 +382,7 @@ char **
 strsplit(char *string, const char *seperators)
 {
 	char	*list[BUFSIZ],
-		**result;
+	    **result;
 	int	length = 0;
 
 	if ((string == NULL) || (seperators == NULL))
@@ -389,8 +390,8 @@ strsplit(char *string, const char *seperators)
 
 	(void) memset(list, 0, sizeof (list));
 	for (list[length] = strtok(string, seperators);
-		(list[length] != NULL) && (length < (BUFSIZ - 2));
-		list[length] = strtok(NULL, seperators))
+	    (list[length] != NULL) && (length < (BUFSIZ - 2));
+	    list[length] = strtok(NULL, seperators))
 			length++;
 
 	if ((result = (char **)calloc(length+1, sizeof (char *))) != NULL)
@@ -472,16 +473,16 @@ all_list(papi_service_t svc)
 	status = papiPrinterQuery(svc, "_all", list, NULL, &printer);
 	if ((status == PAPI_OK) && (printer != NULL)) {
 		papi_attribute_t **attributes =
-					papiPrinterGetAttributeList(printer);
+		    papiPrinterGetAttributeList(printer);
 		if (attributes != NULL) {
 			void *iter = NULL;
 			char *value = NULL;
 
 			for (status = papiAttributeListGetString(attributes,
-						&iter, "member-names", &value);
-				status == PAPI_OK;
-				status = papiAttributeListGetString(attributes,
-						&iter, NULL, &value))
+			    &iter, "member-names", &value);
+			    status == PAPI_OK;
+			    status = papiAttributeListGetString(attributes,
+			    &iter, NULL, &value))
 					list_append(&result, strdup(value));
 		}
 		papiPrinterFree(printer);
@@ -504,11 +505,11 @@ printers_list(papi_service_t svc)
 
 		for (i = 0; printers[i] != NULL; i++) {
 			papi_attribute_t **attributes =
-				papiPrinterGetAttributeList(printers[i]);
+			    papiPrinterGetAttributeList(printers[i]);
 			char *name = NULL;
 
 			(void) papiAttributeListGetString(attributes, NULL,
-						"printer-name", &name);
+			    "printer-name", &name);
 			if ((name != NULL) && (strcmp(name, "_default") != 0))
 				list_append(&result, strdup(name));
 		}
@@ -571,7 +572,7 @@ cli_auth_callback(papi_service_t svc, void *app_data)
 
 	/* build the prompt string */
 	snprintf(prompt, sizeof (prompt),
-		gettext("passphrase for %s to access %s: "), user, svc_name);
+	    gettext("passphrase for %s to access %s: "), user, svc_name);
 
 	/* ask for the passphrase */
 	if ((passphrase = getpassphrase(prompt)) != NULL)

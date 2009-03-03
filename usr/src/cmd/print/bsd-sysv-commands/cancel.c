@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -60,7 +60,7 @@ cancel_jobs_for_user(char *user, papi_encryption_t encryption, char *pname) {
 	int i, exit_code;
 
 	if (pname == NULL) {
-		status = papiServiceCreate(&svc, NULL, user, NULL,
+		status = papiServiceCreate(&svc, NULL, NULL, NULL,
 		    cli_auth_callback, encryption, NULL);
 		printers = interest_list(svc);
 		papiServiceDestroy(svc);
@@ -74,7 +74,7 @@ cancel_jobs_for_user(char *user, papi_encryption_t encryption, char *pname) {
 	for (i = 0; printers[i] != NULL; i++) {
 		char *printer = printers[i];
 
-		status = papiServiceCreate(&svc, printer, user, NULL,
+		status = papiServiceCreate(&svc, printer, NULL, NULL,
 		    cli_auth_callback, encryption, NULL);
 
 		if (status != PAPI_OK) {
@@ -129,7 +129,7 @@ main(int ac, char *av[])
 
 		(void) get_printer_id(av[c], &printer, &id);
 
-		status = papiServiceCreate(&svc, printer, user, NULL,
+		status = papiServiceCreate(&svc, printer, NULL, NULL,
 		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
 			fprintf(stderr,

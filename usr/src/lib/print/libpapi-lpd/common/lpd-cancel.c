@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpd-cancel.c 155 2006-04-26 02:34:54Z ktou $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	__EXTENSIONS__	/* for strtok_r() */
 #include <stdio.h>
@@ -58,10 +56,11 @@ lpd_cancel_job(service_t *svc, int id)
 	if (fdgets(buf, sizeof (buf), fd) != NULL) {
 		if (buf[0] == '\0')
 			status = PAPI_NOT_FOUND;
-		else if (strstr(buf, "permission denied") != NULL)
+		else if ((strstr(buf, "permission denied") != NULL) ||
+		    (strstr(buf, "not-authorized") != NULL))
 			status = PAPI_NOT_AUTHORIZED;
 		else if ((strstr(buf, "cancelled") != NULL) ||
-			 (strstr(buf, "removed") != NULL))
+		    (strstr(buf, "removed") != NULL))
 			status = PAPI_OK;
 	} else
 		status = PAPI_NOT_FOUND;
@@ -100,15 +99,15 @@ lpd_purge_jobs(service_t *svc, job_t ***jobs)
 
 			ptr = strtok_r(buf, ":", &iter);
 			papiAttributeListAddString(&attributes, PAPI_ATTR_EXCL,
-					"job-name", ptr);
+			    "job-name", ptr);
 			id = atoi(ptr);
 			papiAttributeListAddInteger(&attributes, PAPI_ATTR_EXCL,
-					"job-id", id);
+			    "job-id", id);
 			papiAttributeListAddString(&attributes, PAPI_ATTR_EXCL,
-					"job-printer", queue);
+			    "job-printer", queue);
 
 			if ((job = (job_t *)calloc(1, (sizeof (*job))))
-					!= NULL) {
+			    != NULL) {
 				job->attributes = attributes;
 				list_append(jobs, job);
 			} else
