@@ -51,10 +51,10 @@ usage(char *program)
 		name++;
 
 	fprintf(stdout, gettext("Usage: %s [-d] [-r] [-s] [-t] [-a [list]] "
-		"[-c [list]] [-o [list] [-l]] [-R [list] [-l]] "
-		"[-p [list] [-D] [-l]] [-v [list]] [-S [list] [-l]] "
-		"[-f [list] [-l]] [-u list]\n"),
-		name);
+	    "[-c [list]] [-o [list] [-l]] [-R [list] [-l]] "
+	    "[-p [list] [-D] [-l]] [-v [list]] [-S [list] [-l]] "
+	    "[-f [list] [-l]] [-u list]\n"),
+	    name);
 	exit(1);
 }
 
@@ -77,7 +77,7 @@ printer_name(papi_printer_t printer)
 
 	if (attributes != NULL)
 		papiAttributeListGetString(attributes, NULL,
-				"printer-name", &result);
+		    "printer-name", &result);
 
 	return (result);
 }
@@ -91,7 +91,7 @@ lpstat_default_printer(papi_encryption_t encryption)
 	char *name = NULL;
 
 	status = papiServiceCreate(&svc, NULL, NULL, NULL, cli_auth_callback,
-					encryption, NULL);
+	    encryption, NULL);
 	if (status == PAPI_OK) {
 		char *req[] = { "printer-name", NULL };
 
@@ -123,7 +123,7 @@ lpstat_service_status(papi_encryption_t encryption)
 		name = DEFAULT_SERVICE_URI;
 
 	status = papiServiceCreate(&svc, name, NULL, NULL, cli_auth_callback,
-					encryption, NULL);
+	    encryption, NULL);
 	if (status != PAPI_OK) {
 		printf(gettext("scheduler is not running\n"));
 		result = -1;
@@ -147,7 +147,7 @@ get_device_uri(papi_service_t svc, char *name)
 		papi_attribute_t **attrs = papiPrinterGetAttributeList(p);
 
 		(void) papiAttributeListGetString(attrs, NULL,
-					"device-uri", &result);
+		    "device-uri", &result);
 		if (result != NULL)
 			result = strdup(result);
 
@@ -209,17 +209,17 @@ report_device(papi_service_t svc, char *name, papi_printer_t printer,
 
 	if (name == NULL) {
 		status = papiAttributeListGetString(attrs, NULL,
-					"printer-name", &name);
+		    "printer-name", &name);
 		if (status != PAPI_OK)
 			status = papiAttributeListGetString(attrs, NULL,
-					"printer-uri-supported", &name);
+			    "printer-uri-supported", &name);
 	}
 
 	if (name == NULL)
 		return (-1);
 
 	(void) papiAttributeListGetString(attrs, NULL,
-					"printer-uri-supported", &uri);
+	    "printer-uri-supported", &uri);
 
 	if ((uri != NULL) && (uri_from_string(uri, &u) == 0)) {
 		char *nodename = localhostname();
@@ -234,7 +234,7 @@ report_device(papi_service_t svc, char *name, papi_printer_t printer,
 			return (0);
 		} else if (uri != NULL) {
 			printf(gettext("system for %s: %s (as %s)\n"), name,
-				u->host, uri);
+			    u->host, uri);
 			return (0);
 		}
 
@@ -260,35 +260,35 @@ report_accepting(papi_service_t svc, char *name, papi_printer_t printer,
 
 	if (name == NULL) {
 		status = papiAttributeListGetString(attrs, NULL,
-					"printer-name", &name);
+		    "printer-name", &name);
 		if (status != PAPI_OK)
 			status = papiAttributeListGetString(attrs, NULL,
-					"printer-uri-supported", &name);
+			    "printer-uri-supported", &name);
 	}
 	if (name == NULL)
 		return (-1);
 
 	(void) papiAttributeListGetBoolean(attrs, NULL,
-				"printer-is-accepting-jobs", &boolean);
+	    "printer-is-accepting-jobs", &boolean);
 	(void) time(&curr);
 	(void) papiAttributeListGetDatetime(attrs, NULL,
-					"printer-up-time", &curr);
+	    "printer-up-time", &curr);
 	(void) papiAttributeListGetDatetime(attrs, NULL,
-					"printer-state-time", &curr);
+	    "printer-state-time", &curr);
 	(void) papiAttributeListGetDatetime(attrs, NULL,
-					"lpsched-reject-date", &curr);
+	    "lpsched-reject-date", &curr);
 
 	if (boolean == PAPI_TRUE) {
 		printf(gettext("%s accepting requests since %s\n"),
-			name, nctime(&curr));
+		    name, nctime(&curr));
 	} else {
 		char *reason = "unknown reason";
 
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-reject-reason", &reason);
+		    "lpsched-reject-reason", &reason);
 
 		printf(gettext("%s not accepting requests since %s\n\t%s\n"),
-			name, nctime(&curr), reason);
+		    name, nctime(&curr), reason);
 	}
 
 	return (0);
@@ -307,23 +307,23 @@ report_class(papi_service_t svc, char *name, papi_printer_t printer,
 	void *iter = NULL;
 
 	status = papiAttributeListGetString(attrs, &iter,
-				"member-names", &member);
+	    "member-names", &member);
 	if (status == PAPI_NOT_FOUND)	/* it's not a class */
 		return (0);
 
 	if (name == NULL) {
 		status = papiAttributeListGetString(attrs, NULL,
-					"printer-name", &name);
+		    "printer-name", &name);
 		if (status != PAPI_OK)
 			status = papiAttributeListGetString(attrs, NULL,
-					"printer-uri-supported", &name);
+			    "printer-uri-supported", &name);
 	}
 	if (name == NULL)
 		return (-1);
 
 	printf(gettext("members of class %s:\n\t%s\n"), name, member);
 	while (papiAttributeListGetString(attrs, &iter, NULL, &member)
-			== PAPI_OK)
+	    == PAPI_OK)
 		printf("\t%s\n", member);
 
 	return (0);
@@ -344,18 +344,19 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 	time_t curr;
 	int32_t pstat = 0;
 	char *member = NULL;
+	papi_job_t *j = NULL;
 
 	status = papiAttributeListGetString(attrs, NULL,
-				"member-names", &member);
+	    "member-names", &member);
 	if (status == PAPI_OK)	/* it's a class */
 		return (0);
 
 	if (name == NULL) {
 		status = papiAttributeListGetString(attrs, NULL,
-					"printer-name", &name);
+		    "printer-name", &name);
 		if (status != PAPI_OK)
 			status = papiAttributeListGetString(attrs, NULL,
-					"printer-uri-supported", &name);
+			    "printer-uri-supported", &name);
 	}
 	if (name == NULL)
 		return (-1);
@@ -363,23 +364,49 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 	printf(gettext("printer %s "), name);
 
 	status = papiAttributeListGetInteger(attrs, NULL,
-					"printer-state", &pstat);
+	    "printer-state", &pstat);
 
 	switch (pstat) {
 	case 0x03:	/* idle */
 		printf(gettext("idle. enabled"));
 		break;
-	case 0x04: {	/* processing */
-		char *requested[] = { "job-id", NULL };
-		papi_job_t *j = NULL;
-		int32_t jobid = 0;
+	case 0x04: /* processing */
+		status = papiPrinterListJobs(svc, name, NULL,
+		    0, 0, &j);
 
-		(void) papiPrinterListJobs(svc, name, requested, 0, 1, &j);
-		if ((j != NULL) && (j[0] != NULL))
-			jobid = papiJobGetId(j[0]);
-		papiJobListFree(j);
+		if (status == PAPI_OK) {
+			if (j != NULL) {
+				int i = 0;
+				int32_t jobid = 0;
+				int32_t jstate = 0;
+				int flag = 0;
 
-		printf(gettext("now printing %s-%d. enabled"), name, jobid);
+				for (i = 0; j[i] != NULL; ++i) {
+					attrs = papiJobGetAttributeList(j[i]);
+
+					papiAttributeListGetInteger(attrs,
+					    NULL, "job-state", &jstate);
+					papiAttributeListGetInteger(attrs,
+					    NULL, "job-id", &jobid);
+
+					/*
+					 * If the job-state is not
+					 * "held", "cancelled" or
+					 * "completed" then only print.
+					 */
+					if ((jstate != 0x04) &&
+					    (jstate != 0x07) &&
+					    (jstate != 0x09)) {
+						if (flag == 0)
+							printf(gettext
+							    ("now printing"\
+							    " %s-%d. enabled"),
+							    name, jobid);
+						flag = 1;
+					}
+				}
+				papiJobListFree(j);
+			}
 		}
 		break;
 	case 0x05:	/* stopped */
@@ -392,20 +419,20 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 
 	(void) time(&curr);
 	(void) papiAttributeListGetDatetime(attrs, NULL,
-					"printer-up-time", &curr);
+	    "printer-up-time", &curr);
 	(void) papiAttributeListGetDatetime(attrs, NULL,
-					"printer-state-time", &curr);
+	    "printer-state-time", &curr);
 	(void) papiAttributeListGetDatetime(attrs, NULL,
-					"lpsched-disable-date", &curr);
+	    "lpsched-disable-date", &curr);
 	printf(gettext(" since %s. available.\n"), nctime(&curr));
 
 	if (pstat == 0x05) {
 		char *reason = "unknown reason";
 
 		(void) papiAttributeListGetString(attrs, NULL,
-					"printer-state-reasons", &reason);
+		    "printer-state-reasons", &reason);
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-disable-reason", &reason);
+		    "lpsched-disable-reason", &reason);
 		printf(gettext("\t%s\n"), reason);
 	}
 
@@ -415,16 +442,16 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
-					"form-ready", &str);
+		    "form-ready", &str);
 		printf(gettext("\tForm mounted: %s\n"), str);
 
 		str = "";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"document-format-supported", &str);
+		    "document-format-supported", &str);
 		printf(gettext("\tContent types: %s"), str);
 		while (papiAttributeListGetString(attrs, &iter, NULL, &str)
-				== PAPI_OK)
+		    == PAPI_OK)
 			printf(", %s", str);
 		printf("\n");
 
@@ -443,84 +470,84 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-dial-info", &str);
+		    "lpsched-dial-info", &str);
 		printf(gettext("\tConnection: %s\n"),
 		    ((str[0] == '\0') ? gettext("direct") : str));
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-interface-script", &str);
+		    "lpsched-interface-script", &str);
 		printf(gettext("\tInterface: %s\n"), str);
 
 		str = NULL;
 		(void) papiAttributeListGetString(attrs, NULL,
-					"ppd-file-uri", &str);
+		    "ppd-file-uri", &str);
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-ppd-source-path", &str);
+		    "lpsched-ppd-source-path", &str);
 		if (str != NULL)
 			printf(gettext("\tPPD: %s\n"), str);
 
 		str = NULL;
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-fault-alert-command", &str);
+		    "lpsched-fault-alert-command", &str);
 		if (str != NULL)
 			printf(gettext("\tOn fault: %s\n"), str);
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
-					"lpsched-fault-recovery", &str);
+		    "lpsched-fault-recovery", &str);
 		printf(gettext("\tAfter fault: %s\n"),
-			((str[0] == '\0') ? gettext("continue") : str));
+		    ((str[0] == '\0') ? gettext("continue") : str));
 
 		str = "(all)";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"requesting-user-name-allowed", &str);
+		    "requesting-user-name-allowed", &str);
 		printf(gettext("\tUsers allowed:\n\t\t%s\n"),
-			((str[0] == '\0') ? gettext("(none)") : str));
+		    ((str[0] == '\0') ? gettext("(none)") : str));
 		if ((str != NULL) && (str[0] != '\0'))
 			while (papiAttributeListGetString(attrs, &iter, NULL,
-					&str) == PAPI_OK)
+			    &str) == PAPI_OK)
 				printf("\t\t%s\n", str);
 
 		str = NULL;
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"requesting-user-name-denied", &str);
+		    "requesting-user-name-denied", &str);
 		if (str != NULL) {
 			printf(gettext("\tUsers denied:\n\t\t%s\n"),
-				((str[0] == '\0') ? gettext("(none)") : str));
+			    ((str[0] == '\0') ? gettext("(none)") : str));
 			if ((str != NULL) && (str[0] != '\0'))
 				while (papiAttributeListGetString(attrs, &iter,
-						NULL, &str) == PAPI_OK)
+				    NULL, &str) == PAPI_OK)
 					printf("\t\t%s\n", str);
 		}
 
 		str = "none";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"form-supported", &str);
+		    "form-supported", &str);
 		printf(gettext("\tForms allowed:\n\t\t(%s)\n"),
-			((str[0] == '\0') ? gettext("none") : str));
+		    ((str[0] == '\0') ? gettext("none") : str));
 		if ((str != NULL) && (str[0] != '\0'))
 			while (papiAttributeListGetString(attrs, &iter, NULL,
-					&str) == PAPI_OK)
+			    &str) == PAPI_OK)
 				printf("\t\t(%s)\n", str);
 
 		str = "";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"media-supported", &str);
+		    "media-supported", &str);
 		printf(gettext("\tMedia supported:\n\t\t%s\n"),
-			((str[0] == '\0') ? gettext("(none)") : str));
+		    ((str[0] == '\0') ? gettext("(none)") : str));
 		if ((str != NULL) && (str[0] != '\0'))
 			while (papiAttributeListGetString(attrs, &iter, NULL,
-					&str) == PAPI_OK)
+			    &str) == PAPI_OK)
 				printf("\t\t%s\n", str);
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
-					"job-sheets-supported", &str);
+		    "job-sheets-supported", &str);
 		if ((strcasecmp(str, "none")) == 0)
 			str = gettext("page never printed");
 		else if (strcasecmp(str, "optional") == 0)
@@ -534,12 +561,12 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 		str = "";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"lpsched-print-wheels", &str);
+		    "lpsched-print-wheels", &str);
 		printf(gettext("\tCharacter sets:\n\t\t%s\n"),
-			((str[0] == '\0') ? gettext("(none)") : str));
+		    ((str[0] == '\0') ? gettext("(none)") : str));
 		if ((str != NULL) && (str[0] != '\0'))
 			while (papiAttributeListGetString(attrs, &iter, NULL,
-					&str) == PAPI_OK)
+			    &str) == PAPI_OK)
 				printf("\t\t%s\n", str);
 
 		printf(gettext("\tDefault pitch:\n"));
@@ -549,11 +576,11 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 		str = "";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
-					"lpsched-options", &str);
+		    "lpsched-options", &str);
 		if (str != NULL) {
 			printf(gettext("\tOptions: %s"), str);
 			while (papiAttributeListGetString(attrs, &iter, NULL,
-						&str) == PAPI_OK)
+			    &str) == PAPI_OK)
 				printf(", %s", str);
 			printf("\n");
 		}
@@ -580,16 +607,16 @@ printer_query(char *name, int (*report)(papi_service_t, char *, papi_printer_t,
 	papi_service_t svc = NULL;
 
 	status = papiServiceCreate(&svc, name, NULL, NULL, cli_auth_callback,
-					encryption, NULL);
+	    encryption, NULL);
 	if (status != PAPI_OK) {
 		if (status == PAPI_NOT_FOUND)
 			fprintf(stderr, gettext("%s: unknown printer\n"),
-				name ? name : "(NULL)");
+			    name ? name : "(NULL)");
 		else
 			fprintf(stderr, gettext(
-				"Failed to contact service for %s: %s\n"),
-				name ? name : "(NULL)",
-				verbose_papi_message(svc, status));
+			    "Failed to contact service for %s: %s\n"),
+			    name ? name : "(NULL)",
+			    verbose_papi_message(svc, status));
 		papiServiceDestroy(svc);
 		return (-1);
 	}
@@ -602,8 +629,8 @@ printer_query(char *name, int (*report)(papi_service_t, char *, papi_printer_t,
 
 			for (i = 0; interest[i] != NULL; i++)
 				result += printer_query(interest[i], report,
-							encryption, verbose,
-							description);
+				    encryption, verbose,
+				    description);
 		}
 	} else {
 		papi_printer_t printer = NULL;
@@ -625,15 +652,15 @@ printer_query(char *name, int (*report)(papi_service_t, char *, papi_printer_t,
 		status = papiPrinterQuery(svc, name, keys, NULL, &printer);
 		if (status != PAPI_OK) {
 			fprintf(stderr, gettext(
-				"Failed to get printer info for %s: %s\n"),
-				name, verbose_papi_message(svc, status));
+			    "Failed to get printer info for %s: %s\n"),
+			    name, verbose_papi_message(svc, status));
 			papiServiceDestroy(svc);
 			return (-1);
 		}
 
 		if (printer != NULL)
 			result = report(svc, name, printer, verbose,
-					description);
+			    description);
 
 		papiPrinterFree(printer);
 	}
@@ -675,7 +702,7 @@ report_job(papi_job_t job, int show_rank, int verbose)
 	int32_t id = -1;
 
 	(void) papiAttributeListGetString(attrs, NULL,
-				"job-originating-user-name", &user);
+	    "job-originating-user-name", &user);
 
 	if ((users != NULL) && (match_user(user, users) < 0))
 		return (0);
@@ -694,22 +721,22 @@ report_job(papi_job_t job, int show_rank, int verbose)
 
 	(void) time(&clock);
 	(void) papiAttributeListGetInteger(attrs, NULL,
-				"time-at-creation", (int32_t *)&clock);
+	    "time-at-creation", (int32_t *)&clock);
 	(void) strftime(date, sizeof (date), "%b %d %R", localtime(&clock));
 
 	(void) papiAttributeListGetString(attrs, NULL,
-				"job-printer-uri", &destination);
+	    "job-printer-uri", &destination);
 	(void) papiAttributeListGetString(attrs, NULL,
-				"printer-name", &destination);
+	    "printer-name", &destination);
 	(void) papiAttributeListGetInteger(attrs, NULL,
-				"job-id", &id);
+	    "job-id", &id);
 	snprintf(request, sizeof (request), "%s-%d", destination, id);
 
 	if (show_rank != 0) {
 		int32_t rank = -1;
 
 		(void) papiAttributeListGetInteger(attrs, NULL,
-				"number-of-intervening-jobs", &rank);
+		    "number-of-intervening-jobs", &rank);
 		rank++;
 
 		printf("%3d %-21s %-14s %7ld %s",
@@ -718,7 +745,7 @@ report_job(papi_job_t job, int show_rank, int verbose)
 		printf("%-23s %-14s %7ld   %s", request, User, size, date);
 
 	(void) papiAttributeListGetInteger(attrs, NULL,
-				"job-state", &jstate);
+	    "job-state", &jstate);
 	if (jstate == 0x04)
 		printf(gettext(", being held"));
 	else if (jstate == 0x07)
@@ -730,7 +757,7 @@ report_job(papi_job_t job, int show_rank, int verbose)
 		char *form = NULL;
 
 		(void) papiAttributeListGetString(attrs, NULL,
-				"output-device-assigned", &destination);
+		    "output-device-assigned", &destination);
 		printf("\n\t assigned %s", destination);
 
 		(void) papiAttributeListGetString(attrs, NULL, "form", &form);
@@ -761,7 +788,7 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 
 	do {
 		status = papiServiceCreate(&svc, printer, NULL, NULL,
-			    cli_auth_callback, encryption, NULL);
+		    cli_auth_callback, encryption, NULL);
 
 		if ((status == PAPI_OK) && (printer != NULL))
 			print_flag = 1;
@@ -778,7 +805,7 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 			get_printer_id(printer, &printer, &id);
 
 			status = papiServiceCreate(&svc, printer, NULL, NULL,
-				    cli_auth_callback, encryption, NULL);
+			    cli_auth_callback, encryption, NULL);
 
 			if (status != PAPI_OK) {
 				fprintf(stderr, gettext(
@@ -797,13 +824,13 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 
 				for (i = 0; interest[i] != NULL; i++)
 					result += job_query(interest[i], report,
-						    encryption, show_rank, verbose);
+					    encryption, show_rank, verbose);
 			}
 		} else if (id == -1) { /* a printer */
 			papi_job_t *jobs = NULL;
 
 			status = papiPrinterListJobs(svc, printer, NULL,
-				    0, 0, &jobs);
+			    0, 0, &jobs);
 			if (status != PAPI_OK) {
 				fprintf(stderr, gettext(
 				    "Failed to get job list: %s\n"),
@@ -817,7 +844,7 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 
 				for (i = 0; jobs[i] != NULL; i++)
 					result += report(jobs[i],
-						    show_rank, verbose);
+					    show_rank, verbose);
 			}
 
 			papiJobListFree(jobs);
@@ -831,8 +858,10 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 			if (status != PAPI_OK) {
 				if (!print_flag)
 					fprintf(stderr, gettext(
-					    "Failed to get job info for %s: %s\n"),
-					    request, verbose_papi_message(svc, status));
+					    "Failed to get job"\
+					    " info for %s: %s\n"),
+					    request,
+					    verbose_papi_message(svc, status));
 				papiServiceDestroy(svc);
 				return (-1);
 			}
@@ -866,17 +895,16 @@ report_form(char *name, papi_attribute_t **attrs, int verbose)
 	void *iter = NULL;
 
 	for (status = papiAttributeListGetString(attrs, &iter,
-					"form-supported", &form);
-		status == PAPI_OK;
-		status = papiAttributeListGetString(attrs, &iter,
-							NULL, &form)) {
+	    "form-supported", &form);
+	    status == PAPI_OK;
+	    status = papiAttributeListGetString(attrs, &iter,
+	    NULL, &form)) {
 		if ((name == NULL) || (strcmp(name, form) == 0)) {
 			printf(gettext("form %s is available to you\n"), form);
 			if (verbose != 0) {
 				char *detail = NULL;
 				status = papiAttributeListGetString(attrs, NULL,
-						"form-supported-detail",
-						&detail);
+				    "form-supported-detail", &detail);
 				if (status == PAPI_OK)
 					printf("%s\n", detail);
 			}
@@ -894,15 +922,15 @@ report_print_wheels(char *name, papi_attribute_t **attrs, int verbose)
 	void *iter = NULL;
 
 	for (status = papiAttributeListGetString(attrs, &iter,
-					"pw-supported", &pw);
-		status == PAPI_OK;
-		status = papiAttributeListGetString(attrs, &iter, NULL, &pw)) {
+	    "pw-supported", &pw);
+	    status == PAPI_OK;
+	    status = papiAttributeListGetString(attrs, &iter, NULL, &pw)) {
 		if ((name == NULL) || (strcmp(name, pw) == 0)) {
 			printf(gettext("charset %s is available\n"), pw);
 			if (verbose != 0) {
 				char *info = NULL;
 				status = papiAttributeListGetString(attrs, NULL,
-						"pw-supported-extra", &info);
+				    "pw-supported-extra", &info);
 				if (status == PAPI_OK)
 					printf("%s\n", info);
 			}
@@ -922,7 +950,7 @@ service_query(char *name, int (*report)(char *, papi_attribute_t **, int),
 	papi_attribute_t **attrs = NULL;
 
 	status = papiServiceCreate(&svc, name, NULL, NULL, cli_auth_callback,
-					encryption, NULL);
+	    encryption, NULL);
 	if (status != PAPI_OK) {
 		papiServiceDestroy(svc);
 		return (-1);
@@ -961,7 +989,7 @@ main(int ac, char *av[])
 	argv = (char **)calloc((ac + 1), sizeof (char *));
 	for (c = 0; c < ac; c++) {
 		if ((av[c][0] == '-') && (av[c][1] == 'l') &&
-			(isalpha(av[c][2]) != 0)) {
+		    (isalpha(av[c][2]) != 0)) {
 			/* preserve old "-l[po...]" behavior */
 			argv[c] = &av[c][1];
 			argv[c][0] = '-';
@@ -1021,16 +1049,15 @@ main(int ac, char *av[])
 		switch (c) {
 		case 'a':
 			exit_code += printer_query(optarg, report_accepting,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			break;
 		case 'c':
 			exit_code += printer_query(optarg, report_class,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			break;
 		case 'p':
 			exit_code += printer_query(optarg, report_printer,
-						encryption, verbose,
-						description);
+			    encryption, verbose, description);
 			break;
 		case 'd':
 			exit_code += lpstat_default_printer(encryption);
@@ -1042,7 +1069,7 @@ main(int ac, char *av[])
 			if (optarg != NULL)
 				users = strsplit(optarg, ", \n");
 			exit_code += job_query(NULL, report_job,
-						encryption, rank, verbose);
+			    encryption, rank, verbose);
 			if (users != NULL) {
 				free(users);
 				users = NULL;
@@ -1050,50 +1077,50 @@ main(int ac, char *av[])
 			break;
 		case 'v':
 			exit_code += printer_query(optarg, report_device,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			break;
 		case 'R':	/* set "rank" flag in first pass */
 		case 'o':
 			exit_code += job_query(optarg, report_job,
-						encryption, rank, verbose);
+			    encryption, rank, verbose);
 			break;
 		case 'f':
 			exit_code += service_query(optarg, report_form,
-						encryption, verbose);
+			    encryption, verbose);
 			break;
 		case 'S':
 			exit_code += service_query(optarg, report_print_wheels,
-						encryption, verbose);
+			    encryption, verbose);
 			break;
 		case 's':
 			exit_code += lpstat_service_status(encryption);
 			exit_code += lpstat_default_printer(encryption);
 			exit_code += printer_query(NULL, report_class,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			exit_code += printer_query(NULL, report_device,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			exit_code += service_query(optarg, report_form,
-						encryption, verbose);
+			    encryption, verbose);
 			exit_code += service_query(optarg, report_print_wheels,
-						encryption, verbose);
+			    encryption, verbose);
 			break;
 		case 't':
 			exit_code += lpstat_service_status(encryption);
 			exit_code += lpstat_default_printer(encryption);
 			exit_code += printer_query(NULL, report_class,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			exit_code += printer_query(NULL, report_device,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			exit_code += printer_query(NULL, report_accepting,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			exit_code += printer_query(NULL, report_printer,
-						encryption, verbose, 0);
+			    encryption, verbose, 0);
 			exit_code += service_query(optarg, report_form,
-						encryption, verbose);
+			    encryption, verbose);
 			exit_code += service_query(optarg, report_print_wheels,
-						encryption, verbose);
+			    encryption, verbose);
 			exit_code += job_query(NULL, report_job,
-						encryption, rank, verbose);
+			    encryption, rank, verbose);
 			break;
 		case 'L':	/* local-only, ignored */
 		case 'l':	/* increased verbose level in first pass */
@@ -1112,7 +1139,7 @@ main(int ac, char *av[])
 		if (pw != NULL)
 			users = strsplit(pw->pw_name, "");
 		exit_code += job_query(NULL, report_job, encryption,
-					rank, verbose);
+		    rank, verbose);
 		if (users != NULL) {
 			free(users);
 			users = NULL;
@@ -1120,7 +1147,7 @@ main(int ac, char *av[])
 	} else {
 		for (c = optind; c < ac; c++)
 			exit_code += job_query(argv[c], report_job, encryption,
-					rank, verbose);
+			    rank, verbose);
 	}
 
 
