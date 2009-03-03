@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "igb_sw.h"
 
@@ -57,10 +55,10 @@ igb_update_stats(kstat_t *ks, int rw)
 	 * Basic information.
 	 */
 	igb_ks->link_speed.value.ui64 = igb->link_speed;
+	igb_ks->reset_count.value.ui64 = igb->reset_count;
+	igb_ks->dout_sync.value.ui64 = igb->dout_sync;
 
 #ifdef IGB_DEBUG
-	igb_ks->reset_count.value.ui64 = igb->reset_count;
-
 	igb_ks->rx_frame_error.value.ui64 = 0;
 	igb_ks->rx_cksum_error.value.ui64 = 0;
 	igb_ks->rx_exceed_pkt.value.ui64 = 0;
@@ -175,10 +173,12 @@ igb_init_stats(igb_t *igb)
 	 */
 	kstat_named_init(&igb_ks->link_speed, "link_speed",
 	    KSTAT_DATA_UINT64);
-
-#ifdef IGB_DEBUG
 	kstat_named_init(&igb_ks->reset_count, "reset_count",
 	    KSTAT_DATA_UINT64);
+	kstat_named_init(&igb_ks->dout_sync, "DMA_out_sync",
+	    KSTAT_DATA_UINT64);
+
+#ifdef IGB_DEBUG
 	kstat_named_init(&igb_ks->rx_frame_error, "rx_frame_error",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&igb_ks->rx_cksum_error, "rx_cksum_error",

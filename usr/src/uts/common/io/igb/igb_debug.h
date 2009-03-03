@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,14 +22,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
 #ifndef	_IGB_DEBUG_H
 #define	_IGB_DEBUG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,8 +49,8 @@ extern "C" {
 #define	IGB_DEBUGLOG_3(adapter, fmt, d1, d2, d3)	\
 	igb_log((adapter), (fmt), (d1), (d2), (d3))
 
-#define	IGB_DEBUG_STAT_COND(val, cond)	if (cond) (val)++;
-#define	IGB_DEBUG_STAT(val)		(val)++;
+#define	IGB_DEBUG_STAT_COND(val, cond)	if (cond) (val)++
+#define	IGB_DEBUG_STAT(val)		(val)++
 
 #else
 
@@ -66,7 +64,7 @@ extern "C" {
 
 #endif	/* IGB_DEBUG */
 
-#define	IGB_STAT(val)		(val)++;
+#define	IGB_STAT(val)		(val)++
 
 #ifdef IGB_DEBUG
 

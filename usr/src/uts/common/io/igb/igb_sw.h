@@ -183,8 +183,8 @@ extern "C" {
 #define	ATTACH_PROGRESS_ALLOC_RINGS	0x0010	/* Rings allocated */
 #define	ATTACH_PROGRESS_ADD_INTR	0x0020	/* Intr handlers added */
 #define	ATTACH_PROGRESS_LOCKS		0x0040	/* Locks initialized */
-#define	ATTACH_PROGRESS_INIT		0x0080	/* Device initialized */
-#define	ATTACH_PROGRESS_INIT_RINGS	0x0100	/* Rings initialized */
+#define	ATTACH_PROGRESS_INIT_ADAPTER	0x0080	/* Adapter initialized */
+#define	ATTACH_PROGRESS_ALLOC_DMA	0x0100	/* DMA resources allocated */
 #define	ATTACH_PROGRESS_STATS		0x0200	/* Kstats created */
 #define	ATTACH_PROGRESS_NDD		0x0400	/* NDD initialized */
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
@@ -364,6 +364,7 @@ typedef struct adapter_info {
 	igb_nic_func_t	setup_msix;	/* set up msi-x vectors */
 	/* capabilities */
 	uint32_t	flags;		/* capability flags */
+	uint32_t	rxdctl_mask;	/* mask for RXDCTL register */
 } adapter_info_t;
 
 /*
@@ -628,7 +629,7 @@ typedef struct igb_rx_ring {
 #endif
 
 	struct igb		*igb;		/* Pointer to igb struct */
-	mac_ring_handle_t	ring_handle; /* call back ring handle */
+	mac_ring_handle_t	ring_handle;	/* call back ring handle */
 	uint32_t		group_index;	/* group index */
 	uint64_t		ring_gen_num;
 } igb_rx_ring_t;
@@ -661,6 +662,7 @@ typedef struct igb {
 	uint32_t		attach_progress;
 	uint32_t		loopback_mode;
 	uint32_t		max_frame_size;
+	uint32_t		dout_sync;
 
 	uint32_t		mr_enable;	/* Enable multiple rings */
 	uint32_t		vmdq_mode;	/* Mode of VMDq */
@@ -693,6 +695,7 @@ typedef struct igb {
 	boolean_t		rx_hcksum_enable; /* Rx h/w cksum offload */
 	uint32_t		rx_copy_thresh; /* Rx copy threshold */
 	uint32_t		rx_limit_per_intr; /* Rx pkts per interrupt */
+
 	uint32_t		intr_throttling[MAX_NUM_EITR];
 	uint32_t		intr_force;
 
@@ -740,9 +743,9 @@ typedef struct igb {
 typedef struct igb_stat {
 
 	kstat_named_t link_speed;	/* Link Speed */
-#ifdef IGB_DEBUG
 	kstat_named_t reset_count;	/* Reset Count */
-
+	kstat_named_t dout_sync;	/* DMA out of sync */
+#ifdef IGB_DEBUG
 	kstat_named_t rx_frame_error;	/* Rx Error in Packet */
 	kstat_named_t rx_cksum_error;	/* Rx Checksum Error */
 	kstat_named_t rx_exceed_pkt;	/* Rx Exceed Max Pkt Count */
@@ -810,7 +813,6 @@ typedef struct igb_stat {
 /*
  * Function prototypes in e1000_osdep.c
  */
-void e1000_enable_pciex_master(struct e1000_hw *);
 void e1000_rar_clear(struct e1000_hw *hw, uint32_t);
 void e1000_rar_set_vmdq(struct e1000_hw *hw, const uint8_t *, uint32_t,
     uint32_t, uint8_t);

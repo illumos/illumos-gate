@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.4";
+static char igb_version[] = "igb 1.1.5";
 
 /*
  * Local function protoypes
@@ -41,17 +41,16 @@ static void igb_init_properties(igb_t *);
 static int igb_init_driver_settings(igb_t *);
 static void igb_init_locks(igb_t *);
 static void igb_destroy_locks(igb_t *);
+static int igb_init_mac_address(igb_t *);
 static int igb_init(igb_t *);
-static int igb_chip_start(igb_t *);
-static void igb_chip_stop(igb_t *);
+static int igb_init_adapter(igb_t *);
+static void igb_stop_adapter(igb_t *);
 static int igb_reset(igb_t *);
 static void igb_tx_clean(igb_t *);
 static boolean_t igb_tx_drain(igb_t *);
 static boolean_t igb_rx_drain(igb_t *);
 static int igb_alloc_rings(igb_t *);
-static int igb_init_rings(igb_t *);
 static void igb_free_rings(igb_t *);
-static void igb_fini_rings(igb_t *);
 static void igb_setup_rings(igb_t *);
 static void igb_setup_rx(igb_t *);
 static void igb_setup_tx(igb_t *);
@@ -205,15 +204,17 @@ static adapter_info_t igb_82575_cap = {
 
 	/* capabilities */
 	(IGB_FLAG_HAS_DCA |	/* capability flags */
-	IGB_FLAG_VMDQ_POOL)
+	IGB_FLAG_VMDQ_POOL),
+
+	0xffc00000		/* mask for RXDCTL register */
 };
 
 static adapter_info_t igb_82576_cap = {
 	/* limits */
-	12,		/* maximum number of rx queues */
+	16,		/* maximum number of rx queues */
 	1,		/* minimum number of rx queues */
 	4,		/* default number of rx queues */
-	12,		/* maximum number of tx queues */
+	16,		/* maximum number of tx queues */
 	1,		/* minimum number of tx queues */
 	4,		/* default number of tx queues */
 	65535,		/* maximum interrupt throttle rate */
@@ -227,7 +228,9 @@ static adapter_info_t igb_82576_cap = {
 	/* capabilities */
 	(IGB_FLAG_HAS_DCA |	/* capability flags */
 	IGB_FLAG_VMDQ_POOL |
-	IGB_FLAG_NEED_CTX_IDX)
+	IGB_FLAG_NEED_CTX_IDX),
+
+	0xffe00000		/* mask for RXDCTL register */
 };
 
 /*
@@ -423,25 +426,22 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	igb->attach_progress |= ATTACH_PROGRESS_LOCKS;
 
 	/*
-	 * Initialize chipset hardware
+	 * Allocate DMA resources
 	 */
-	mutex_enter(&igb->gen_lock);
+	if (igb_alloc_dma(igb) != IGB_SUCCESS) {
+		igb_error(igb, "Failed to allocate DMA resources");
+		goto attach_fail;
+	}
+	igb->attach_progress |= ATTACH_PROGRESS_ALLOC_DMA;
+
+	/*
+	 * Initialize the adapter and setup the rx/tx rings
+	 */
 	if (igb_init(igb) != IGB_SUCCESS) {
-		mutex_exit(&igb->gen_lock);
 		igb_error(igb, "Failed to initialize adapter");
 		goto attach_fail;
 	}
-	mutex_exit(&igb->gen_lock);
-	igb->attach_progress |= ATTACH_PROGRESS_INIT;
-
-	/*
-	 * Initialize DMA and hardware settings for rx/tx rings
-	 */
-	if (igb_init_rings(igb) != IGB_SUCCESS) {
-		igb_error(igb, "Failed to initialize rings");
-		goto attach_fail;
-	}
-	igb->attach_progress |= ATTACH_PROGRESS_INIT_RINGS;
+	igb->attach_progress |= ATTACH_PROGRESS_INIT_ADAPTER;
 
 	/*
 	 * Initialize statistics
@@ -617,7 +617,9 @@ igb_quiesce(dev_info_t *devinfo)
 	return (DDI_SUCCESS);
 }
 
-
+/*
+ * igb_unconfigure - release all resources held by this instance
+ */
 static void
 igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 {
@@ -673,16 +675,16 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 	/*
 	 * Release the DMA resources of rx/tx rings
 	 */
-	if (igb->attach_progress & ATTACH_PROGRESS_INIT_RINGS) {
-		igb_fini_rings(igb);
+	if (igb->attach_progress & ATTACH_PROGRESS_ALLOC_DMA) {
+		igb_free_dma(igb);
 	}
 
 	/*
-	 * Stop the chipset
+	 * Stop the adapter
 	 */
-	if (igb->attach_progress & ATTACH_PROGRESS_INIT) {
+	if (igb->attach_progress & ATTACH_PROGRESS_INIT_ADAPTER) {
 		mutex_enter(&igb->gen_lock);
-		igb_chip_stop(igb);
+		igb_stop_adapter(igb);
 		mutex_exit(&igb->gen_lock);
 		if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
 			ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
@@ -1059,6 +1061,11 @@ igb_suspend(dev_info_t *devinfo)
 
 	igb->igb_state |= IGB_SUSPENDED;
 
+	if (!(igb->igb_state & IGB_STARTED)) {
+		mutex_exit(&igb->gen_lock);
+		return (DDI_SUCCESS);
+	}
+
 	igb_stop(igb);
 
 	mutex_exit(&igb->gen_lock);
@@ -1071,25 +1078,70 @@ igb_suspend(dev_info_t *devinfo)
 	return (DDI_SUCCESS);
 }
 
-/*
- * igb_init - Initialize the device
- */
 static int
 igb_init(igb_t *igb)
 {
+	int i;
+
+	mutex_enter(&igb->gen_lock);
+
+	/*
+	 * Initilize the adapter
+	 */
+	if (igb_init_adapter(igb) != IGB_SUCCESS) {
+		mutex_exit(&igb->gen_lock);
+		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
+		return (IGB_FAILURE);
+	}
+
+	/*
+	 * Setup the rx/tx rings
+	 */
+	for (i = 0; i < igb->num_rx_rings; i++)
+		mutex_enter(&igb->rx_rings[i].rx_lock);
+	for (i = 0; i < igb->num_tx_rings; i++)
+		mutex_enter(&igb->tx_rings[i].tx_lock);
+
+	igb_setup_rings(igb);
+
+	for (i = igb->num_tx_rings - 1; i >= 0; i--)
+		mutex_exit(&igb->tx_rings[i].tx_lock);
+	for (i = igb->num_rx_rings - 1; i >= 0; i--)
+		mutex_exit(&igb->rx_rings[i].rx_lock);
+
+	mutex_exit(&igb->gen_lock);
+
+	return (IGB_SUCCESS);
+}
+
+/*
+ * igb_init_mac_address - Initialize the default MAC address
+ *
+ * On success, the MAC address is entered in the igb->hw.mac.addr
+ * and hw->mac.perm_addr fields and the adapter's RAR(0) receive
+ * address register.
+ *
+ * Important side effects:
+ * 1. adapter is reset - this is required to put it in a known state.
+ * 2. all of non-volatile memory (NVM) is read & checksummed - NVM is where
+ * MAC address and all default settings are stored, so a valid checksum
+ * is required.
+ */
+static int
+igb_init_mac_address(igb_t *igb)
+{
 	struct e1000_hw *hw = &igb->hw;
-	uint32_t pba;
-	uint32_t high_water;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
 
 	/*
 	 * Reset chipset to put the hardware in a known state
-	 * before we try to do anything with the eeprom
+	 * before we try to get MAC address from NVM.
 	 */
 	if (e1000_reset_hw(hw) != E1000_SUCCESS) {
-		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
-		goto init_fail;
+		igb_error(igb, "Adapter reset failed.");
+		goto init_mac_fail;
 	}
 
 	/*
@@ -1105,9 +1157,52 @@ igb_init(igb_t *igb)
 			igb_error(igb,
 			    "Invalid NVM checksum. Please contact "
 			    "the vendor to update the NVM.");
-			igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
-			goto init_fail;
+			goto init_mac_fail;
 		}
+	}
+
+	/*
+	 * Get the mac address
+	 * This function should handle SPARC case correctly.
+	 */
+	if (!igb_find_mac_address(igb)) {
+		igb_error(igb, "Failed to get the mac address");
+		goto init_mac_fail;
+	}
+
+	/* Validate mac address */
+	if (!is_valid_mac_addr(hw->mac.addr)) {
+		igb_error(igb, "Invalid mac address");
+		goto init_mac_fail;
+	}
+
+	return (IGB_SUCCESS);
+
+init_mac_fail:
+	return (IGB_FAILURE);
+}
+
+/*
+ * igb_init_adapter - Initialize the adapter
+ */
+static int
+igb_init_adapter(igb_t *igb)
+{
+	struct e1000_hw *hw = &igb->hw;
+	uint32_t pba;
+	uint32_t high_water;
+	int i;
+
+	ASSERT(mutex_owned(&igb->gen_lock));
+
+	/*
+	 * In order to obtain the default MAC address, this will reset the
+	 * adapter and validate the NVM that the address and many other
+	 * default settings come from.
+	 */
+	if (igb_init_mac_address(igb) != IGB_SUCCESS) {
+		igb_error(igb, "Failed to initialize MAC address");
+		goto init_adapter_fail;
 	}
 
 	/*
@@ -1124,6 +1219,11 @@ igb_init(igb_t *igb)
 	 * it in the rx FIFO.  Should be the lower of:
 	 * 90% of the Rx FIFO size, or the full Rx FIFO size minus one full
 	 * frame.
+	 */
+	/*
+	 * The default setting of PBA is correct for 82575 and other supported
+	 * adapters do not have the E1000_PBA register, so PBA value is only
+	 * used for calculation here and is never written to the adapter.
 	 */
 	if (hw->mac.type == e1000_82575) {
 		pba = E1000_PBA_34K;
@@ -1147,13 +1247,15 @@ igb_init(igb_t *igb)
 	hw->fc.pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc.send_xon = B_TRUE;
 
+	e1000_validate_mdi_setting(hw);
+
 	/*
-	 * Reset the chipset hardware the second time to validate
-	 * the PBA setting.
+	 * Reset the chipset hardware the second time to put PBA settings
+	 * into effect.
 	 */
 	if (e1000_reset_hw(hw) != E1000_SUCCESS) {
-		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
-		goto init_fail;
+		igb_error(igb, "Second reset failed");
+		goto init_adapter_fail;
 	}
 
 	/*
@@ -1176,125 +1278,33 @@ igb_init(igb_t *igb)
 	(void) igb_setup_link(igb, B_FALSE);
 
 	/*
-	 * Initialize the chipset hardware
-	 */
-	if (igb_chip_start(igb) != IGB_SUCCESS) {
-		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
-		goto init_fail;
-	}
-
-	if (igb_check_acc_handle(igb->osdep.cfg_handle) != DDI_FM_OK) {
-		goto init_fail;
-	}
-
-	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK) {
-		goto init_fail;
-	}
-
-	return (IGB_SUCCESS);
-
-init_fail:
-	/*
-	 * Reset PHY if possible
-	 */
-	if (e1000_check_reset_block(hw) == E1000_SUCCESS)
-		(void) e1000_phy_hw_reset(hw);
-
-	ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
-
-	return (IGB_FAILURE);
-}
-
-/*
- * igb_init_rings - Allocate DMA resources for all rx/tx rings and
- * initialize relevant hardware settings.
- */
-static int
-igb_init_rings(igb_t *igb)
-{
-	int i;
-
-	/*
-	 * Allocate buffers for all the rx/tx rings
-	 */
-	if (igb_alloc_dma(igb) != IGB_SUCCESS)
-		return (IGB_FAILURE);
-
-	/*
-	 * Setup the rx/tx rings
-	 */
-	mutex_enter(&igb->gen_lock);
-
-	for (i = 0; i < igb->num_rx_rings; i++)
-		mutex_enter(&igb->rx_rings[i].rx_lock);
-	for (i = 0; i < igb->num_tx_rings; i++)
-		mutex_enter(&igb->tx_rings[i].tx_lock);
-
-	igb_setup_rings(igb);
-
-	for (i = igb->num_tx_rings - 1; i >= 0; i--)
-		mutex_exit(&igb->tx_rings[i].tx_lock);
-	for (i = igb->num_rx_rings - 1; i >= 0; i--)
-		mutex_exit(&igb->rx_rings[i].rx_lock);
-
-	mutex_exit(&igb->gen_lock);
-
-	return (IGB_SUCCESS);
-}
-
-/*
- * igb_fini_rings - Release DMA resources of all rx/tx rings
- */
-static void
-igb_fini_rings(igb_t *igb)
-{
-	/*
-	 * Release the DMA/memory resources of rx/tx rings
-	 */
-	igb_free_dma(igb);
-}
-
-/*
- * igb_chip_start - Initialize and start the chipset hardware
- */
-static int
-igb_chip_start(igb_t *igb)
-{
-	struct e1000_hw *hw = &igb->hw;
-	int i;
-
-	ASSERT(mutex_owned(&igb->gen_lock));
-
-	/*
-	 * Get the mac address
-	 * This function should handle SPARC case correctly.
-	 */
-	if (!igb_find_mac_address(igb)) {
-		igb_error(igb, "Failed to get the mac address");
-		return (IGB_FAILURE);
-	}
-
-	/* Validate mac address */
-	if (!is_valid_mac_addr(hw->mac.addr)) {
-		igb_error(igb, "Invalid mac address");
-		return (IGB_FAILURE);
-	}
-
-	/* Disable wakeup control by default */
-	E1000_WRITE_REG(hw, E1000_WUC, 0);
-
-	/*
 	 * Configure/Initialize hardware
 	 */
 	if (e1000_init_hw(hw) != E1000_SUCCESS) {
 		igb_error(igb, "Failed to initialize hardware");
-		return (IGB_FAILURE);
+		goto init_adapter_fail;
 	}
+
+	/*
+	 * Disable wakeup control by default
+	 */
+	E1000_WRITE_REG(hw, E1000_WUC, 0);
+
+	/*
+	 * Record phy info in hw struct
+	 */
+	(void) e1000_get_phy_info(hw);
 
 	/*
 	 * Make sure driver has control
 	 */
 	igb_get_driver_control(hw);
+
+	/*
+	 * Restore LED settings to the default from EEPROM
+	 * to meet the standard for Sun platforms.
+	 */
+	(void) e1000_cleanup_led(hw);
 
 	/*
 	 * Setup MSI-X interrupts
@@ -1318,24 +1328,28 @@ igb_chip_start(igb_t *igb)
 	for (i = 0; i < igb->intr_cnt; i++)
 		E1000_WRITE_REG(hw, E1000_EITR(i), igb->intr_throttling[i]);
 
-	/* Enable PCI-E master */
-	if (hw->bus.type == e1000_bus_type_pci_express) {
-		e1000_enable_pciex_master(hw);
-	}
-
 	/*
 	 * Save the state of the phy
 	 */
 	igb_get_phy_state(igb);
 
 	return (IGB_SUCCESS);
+
+init_adapter_fail:
+	/*
+	 * Reset PHY if possible
+	 */
+	if (e1000_check_reset_block(hw) == E1000_SUCCESS)
+		(void) e1000_phy_hw_reset(hw);
+
+	return (IGB_FAILURE);
 }
 
 /*
- * igb_chip_stop - Stop the chipset hardware
+ * igb_stop_adapter - Stop the adapter
  */
 static void
-igb_chip_stop(igb_t *igb)
+igb_stop_adapter(igb_t *igb)
 {
 	struct e1000_hw *hw = &igb->hw;
 
@@ -1353,10 +1367,8 @@ igb_chip_stop(igb_t *igb)
 	}
 
 	/*
-	 * Reset PHY if possible
+	 * e1000_phy_hw_reset is not needed here, MAC reset above is sufficient
 	 */
-	if (e1000_check_reset_block(hw) == E1000_SUCCESS)
-		(void) e1000_phy_hw_reset(hw);
 }
 
 /*
@@ -1391,9 +1403,9 @@ igb_reset(igb_t *igb)
 		mutex_enter(&igb->tx_rings[i].tx_lock);
 
 	/*
-	 * Stop the chipset hardware
+	 * Stop the adapter
 	 */
-	igb_chip_stop(igb);
+	igb_stop_adapter(igb);
 
 	/*
 	 * Clean the pending tx data/resources
@@ -1401,9 +1413,9 @@ igb_reset(igb_t *igb)
 	igb_tx_clean(igb);
 
 	/*
-	 * Start the chipset hardware
+	 * Start the adapter
 	 */
-	if (igb_chip_start(igb) != IGB_SUCCESS) {
+	if (igb_init_adapter(igb) != IGB_SUCCESS) {
 		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
 		goto reset_failure;
 	}
@@ -1606,20 +1618,20 @@ igb_start(igb_t *igb)
 		mutex_enter(&igb->tx_rings[i].tx_lock);
 
 	/*
-	 * Start the chipset hardware
+	 * Start the adapter
 	 */
-	if (!(igb->attach_progress & ATTACH_PROGRESS_INIT)) {
-		if (igb_init(igb) != IGB_SUCCESS) {
+	if ((igb->attach_progress & ATTACH_PROGRESS_INIT_ADAPTER) == 0) {
+		if (igb_init_adapter(igb) != IGB_SUCCESS) {
 			igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
 			goto start_failure;
 		}
-		igb->attach_progress |= ATTACH_PROGRESS_INIT;
-	}
+		igb->attach_progress |= ATTACH_PROGRESS_INIT_ADAPTER;
 
-	/*
-	 * Setup the rx/tx rings
-	 */
-	igb_setup_rings(igb);
+		/*
+		 * Setup the rx/tx rings
+		 */
+		igb_setup_rings(igb);
+	}
 
 	/*
 	 * Enable adapter interrupts
@@ -1661,7 +1673,7 @@ igb_stop(igb_t *igb)
 
 	ASSERT(mutex_owned(&igb->gen_lock));
 
-	igb->attach_progress &= ~ ATTACH_PROGRESS_INIT;
+	igb->attach_progress &= ~ATTACH_PROGRESS_INIT_ADAPTER;
 
 	/*
 	 * Disable the adapter interrupts
@@ -1679,9 +1691,9 @@ igb_stop(igb_t *igb)
 		mutex_enter(&igb->tx_rings[i].tx_lock);
 
 	/*
-	 * Stop the chipset hardware
+	 * Stop the adapter
 	 */
-	igb_chip_stop(igb);
+	igb_stop_adapter(igb);
 
 	/*
 	 * Clean the pending tx data/resources
@@ -1804,12 +1816,15 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 	uint32_t size;
 	uint32_t buf_low;
 	uint32_t buf_high;
-	uint32_t reg_val;
+	uint32_t rxdctl;
 	int i;
 
 	ASSERT(mutex_owned(&rx_ring->rx_lock));
 	ASSERT(mutex_owned(&igb->gen_lock));
 
+	/*
+	 * Initialize descriptor ring with buffer addresses
+	 */
 	for (i = 0; i < igb->rx_ring_size; i++) {
 		rcb = rx_ring->work_list[i];
 		rbd = &rx_ring->rbd_ring[i];
@@ -1817,12 +1832,6 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 		rbd->read.pkt_addr = rcb->rx_buf.dma_address;
 		rbd->read.hdr_addr = NULL;
 	}
-
-	/*
-	 * Initialize the length register
-	 */
-	size = rx_ring->ring_size * sizeof (union e1000_adv_rx_desc);
-	E1000_WRITE_REG(hw, E1000_RDLEN(rx_ring->index), size);
 
 	/*
 	 * Initialize the base address registers
@@ -1833,10 +1842,28 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 	E1000_WRITE_REG(hw, E1000_RDBAL(rx_ring->index), buf_low);
 
 	/*
-	 * Setup head & tail pointers
+	 * Initialize the length register
 	 */
-	E1000_WRITE_REG(hw, E1000_RDT(rx_ring->index), rx_ring->ring_size - 1);
-	E1000_WRITE_REG(hw, E1000_RDH(rx_ring->index), 0);
+	size = rx_ring->ring_size * sizeof (union e1000_adv_rx_desc);
+	E1000_WRITE_REG(hw, E1000_RDLEN(rx_ring->index), size);
+
+	/*
+	 * Initialize buffer size & descriptor type
+	 */
+	E1000_WRITE_REG(hw, E1000_SRRCTL(rx_ring->index),
+	    ((igb->rx_buf_size >> E1000_SRRCTL_BSIZEPKT_SHIFT) |
+	    E1000_SRRCTL_DESCTYPE_ADV_ONEBUF));
+
+	/*
+	 * Setup the Receive Descriptor Control Register (RXDCTL)
+	 */
+	rxdctl = E1000_READ_REG(hw, E1000_RXDCTL(rx_ring->index));
+	rxdctl &= igb->capab->rxdctl_mask;
+	rxdctl |= E1000_RXDCTL_QUEUE_ENABLE;
+	rxdctl |= 16;		/* pthresh */
+	rxdctl |= 8 << 8;	/* hthresh */
+	rxdctl |= 1 << 16;	/* wthresh */
+	E1000_WRITE_REG(hw, E1000_RXDCTL(rx_ring->index), rxdctl);
 
 	rx_ring->rbd_next = 0;
 
@@ -1851,26 +1878,6 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 		rx_ring->rcb_tail = 0;
 		rx_ring->rcb_free = rx_ring->free_list_size;
 	}
-
-	/*
-	 * Setup the Receive Descriptor Control Register (RXDCTL)
-	 */
-	reg_val = E1000_READ_REG(hw, E1000_RXDCTL(rx_ring->index));
-	reg_val |= E1000_RXDCTL_QUEUE_ENABLE;
-	reg_val &= 0xFFF00000;
-	reg_val |= 16;		/* pthresh */
-	reg_val |= 8 << 8;	/* hthresh */
-	reg_val |= 1 << 16;	/* wthresh */
-	E1000_WRITE_REG(hw, E1000_RXDCTL(rx_ring->index), reg_val);
-
-	/*
-	 * Setup the Split and Replication Receive Control Register.
-	 * Set the rx buffer size and the advanced descriptor type.
-	 */
-	reg_val = (igb->rx_buf_size >> E1000_SRRCTL_BSIZEPKT_SHIFT) |
-	    E1000_SRRCTL_DESCTYPE_ADV_ONEBUF;
-
-	E1000_WRITE_REG(hw, E1000_SRRCTL(rx_ring->index), reg_val);
 }
 
 static void
@@ -1879,35 +1886,50 @@ igb_setup_rx(igb_t *igb)
 	igb_rx_ring_t *rx_ring;
 	igb_rx_group_t *rx_group;
 	struct e1000_hw *hw = &igb->hw;
-	uint32_t reg_val, rctl;
+	uint32_t rctl, rxcsum;
 	uint32_t ring_per_group;
 	int i;
 
 	/*
-	 * Setup the Receive Control Register (RCTL), and ENABLE the
-	 * receiver. The initial configuration is to: Enable the receiver,
-	 * accept broadcasts, discard bad packets (and long packets),
-	 * disable VLAN filter checking, set the receive descriptor
-	 * minimum threshold size to 1/2, and the receive buffer size to
-	 * 2k.
+	 * Setup the Receive Control Register (RCTL), and enable the
+	 * receiver. The initial configuration is to: enable the receiver,
+	 * accept broadcasts, discard bad packets, accept long packets,
+	 * disable VLAN filter checking, and set receive buffer size to
+	 * 2k.  For 82575, also set the receive descriptor minimum
+	 * threshold size to 1/2 the ring.
 	 */
 	rctl = E1000_READ_REG(hw, E1000_RCTL);
 
 	/*
-	 * only used for wakeup control.  This driver doesn't do wakeup
-	 * but leave this here for completeness.
+	 * Clear the field used for wakeup control.  This driver doesn't do
+	 * wakeup but leave this here for completeness.
 	 */
 	rctl &= ~(3 << E1000_RCTL_MO_SHIFT);
 
-	rctl |= E1000_RCTL_EN |		/* Enable Receive Unit */
-	    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
-	    E1000_RCTL_LPE |		/* Large Packet Enable bit */
-	    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
-	    E1000_RCTL_RDMTS_HALF |
-	    E1000_RCTL_SECRC |		/* Strip Ethernet CRC */
-	    E1000_RCTL_LBM_NO;		/* Loopback Mode = none */
+	switch (hw->mac.type) {
+	case e1000_82575:
+		rctl |= (E1000_RCTL_EN |	/* Enable Receive Unit */
+		    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
+		    E1000_RCTL_LPE |		/* Large Packet Enable */
+						/* Multicast filter offset */
+		    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
+		    E1000_RCTL_RDMTS_HALF |	/* rx descriptor threshold */
+		    E1000_RCTL_SECRC);		/* Strip Ethernet CRC */
+		break;
 
-	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+	case e1000_82576:
+		rctl |= (E1000_RCTL_EN |	/* Enable Receive Unit */
+		    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
+		    E1000_RCTL_LPE |		/* Large Packet Enable */
+						/* Multicast filter offset */
+		    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
+		    E1000_RCTL_SECRC);		/* Strip Ethernet CRC */
+		break;
+
+	default:
+		igb_log(igb, "unsupported MAC type: %d", hw->mac.type);
+		return;	/* should never come here; this will cause rx failure */
+	}
 
 	for (i = 0; i < igb->num_rx_groups; i++) {
 		rx_group = &igb->rx_groups[i];
@@ -1916,7 +1938,8 @@ igb_setup_rx(igb_t *igb)
 	}
 
 	/*
-	 * igb_setup_rx_ring must be called after configuring RCTL
+	 * Set up all rx descriptor rings - must be called before receive unit
+	 * enabled.
 	 */
 	ring_per_group = igb->num_rx_rings / igb->num_rx_groups;
 	for (i = 0; i < igb->num_rx_rings; i++) {
@@ -1938,11 +1961,11 @@ igb_setup_rx(igb_t *igb)
 	 * Hardware checksum settings
 	 */
 	if (igb->rx_hcksum_enable) {
-		reg_val =
+		rxcsum =
 		    E1000_RXCSUM_TUOFL |	/* TCP/UDP checksum */
 		    E1000_RXCSUM_IPOFL;		/* IP checksum */
 
-		E1000_WRITE_REG(hw, E1000_RXCSUM, reg_val);
+		E1000_WRITE_REG(hw, E1000_RXCSUM, rxcsum);
 	}
 
 	/*
@@ -1971,6 +1994,31 @@ igb_setup_rx(igb_t *igb)
 		 */
 		igb_setup_mac_rss_classify(igb);
 		break;
+	}
+
+	/*
+	 * Enable the receive unit - must be done after all
+	 * the rx setup above.
+	 */
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+
+	/*
+	 * Initialize all adapter ring head & tail pointers - must
+	 * be done after receive unit is enabled
+	 */
+	for (i = 0; i < igb->num_rx_rings; i++) {
+		rx_ring = &igb->rx_rings[i];
+		E1000_WRITE_REG(hw, E1000_RDH(i), 0);
+		E1000_WRITE_REG(hw, E1000_RDT(i), rx_ring->ring_size - 1);
+	}
+
+	/*
+	 * 82575 with manageability enabled needs a special flush to make
+	 * sure the fifos start clean.
+	 */
+	if ((hw->mac.type == e1000_82575) &&
+	    (E1000_READ_REG(hw, E1000_MANC) & E1000_MANC_RCV_TCO_EN)) {
+		e1000_rx_fifo_flush_82575(hw);
 	}
 }
 
@@ -2061,14 +2109,6 @@ igb_setup_tx_ring(igb_tx_ring_t *tx_ring)
 	}
 
 	/*
-	 * Enable specific tx ring, it is required by multiple tx
-	 * ring support.
-	 */
-	reg_val = E1000_READ_REG(hw, E1000_TXDCTL(tx_ring->index));
-	reg_val |= E1000_TXDCTL_QUEUE_ENABLE;
-	E1000_WRITE_REG(hw, E1000_TXDCTL(tx_ring->index), reg_val);
-
-	/*
 	 * Initialize hardware checksum offload settings
 	 */
 	tx_ring->hcksum_context.hcksum_flags = 0;
@@ -2104,8 +2144,6 @@ igb_setup_tx(igb_t *igb)
 	reg_val &= ~E1000_TCTL_CT;
 	reg_val |= E1000_TCTL_PSP | E1000_TCTL_RTLC |
 	    (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
-
-	e1000_config_collision_dist(hw);
 
 	/* Enable transmits */
 	reg_val |= E1000_TCTL_EN;
@@ -2800,18 +2838,33 @@ static boolean_t
 igb_is_link_up(igb_t *igb)
 {
 	struct e1000_hw *hw = &igb->hw;
-	boolean_t link_up;
+	boolean_t link_up = B_FALSE;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
 
-	(void) e1000_check_for_link(hw);
-
-	if ((E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU) ||
-	    ((hw->phy.media_type == e1000_media_type_internal_serdes) &&
-	    (hw->mac.serdes_has_link))) {
-		link_up = B_TRUE;
-	} else {
-		link_up = B_FALSE;
+	/*
+	 * get_link_status is set in the interrupt handler on link-status-change
+	 * or rx sequence error interrupt.  get_link_status will stay
+	 * false until the e1000_check_for_link establishes link only
+	 * for copper adapters.
+	 */
+	switch (hw->phy.media_type) {
+	case e1000_media_type_copper:
+		if (hw->mac.get_link_status) {
+			(void) e1000_check_for_link(hw);
+			link_up = !hw->mac.get_link_status;
+		} else {
+			link_up = B_TRUE;
+		}
+		break;
+	case e1000_media_type_fiber:
+		(void) e1000_check_for_link(hw);
+		link_up = (E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU);
+		break;
+	case e1000_media_type_internal_serdes:
+		(void) e1000_check_for_link(hw);
+		link_up = hw->mac.serdes_has_link;
+		break;
 	}
 
 	return (link_up);
@@ -2876,11 +2929,11 @@ static void
 igb_local_timer(void *arg)
 {
 	igb_t *igb = (igb_t *)arg;
-	struct e1000_hw *hw = &igb->hw;
-	boolean_t link_changed;
+	boolean_t link_changed = B_FALSE;
 
 	if (igb_stall_check(igb)) {
 		igb_fm_ereport(igb, DDI_FM_DEVICE_STALL);
+		ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 		igb->reset_count++;
 		if (igb_reset(igb) == IGB_SUCCESS)
 			ddi_fm_service_impact(igb->dip,
@@ -2888,17 +2941,12 @@ igb_local_timer(void *arg)
 	}
 
 	mutex_enter(&igb->gen_lock);
-	link_changed = igb_link_check(igb);
+	if (!(igb->igb_state & IGB_SUSPENDED) && (igb->igb_state & IGB_STARTED))
+		link_changed = igb_link_check(igb);
 	mutex_exit(&igb->gen_lock);
 
 	if (link_changed)
 		mac_link_update(igb->mac_hdl, igb->link_state);
-
-	/*
-	 * Set Timer Interrupts
-	 */
-	if (igb->intr_type != DDI_INTR_TYPE_MSIX)
-		E1000_WRITE_REG(hw, E1000_ICS, E1000_IMS_RXT0);
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
 		ddi_fm_service_impact(igb->dip, DDI_SERVICE_DEGRADED);
@@ -3190,6 +3238,9 @@ igb_enable_adapter_interrupts_82576(igb_t *igb)
 {
 	struct e1000_hw *hw = &igb->hw;
 
+	/* Clear any pending interrupts */
+	(void) E1000_READ_REG(hw, E1000_ICR);
+
 	if (igb->intr_type == DDI_INTR_TYPE_MSIX) {
 
 		/* Interrupt enabling for MSI-X */
@@ -3219,6 +3270,9 @@ igb_enable_adapter_interrupts_82575(igb_t *igb)
 {
 	struct e1000_hw *hw = &igb->hw;
 	uint32_t reg;
+
+	/* Clear any pending interrupts */
+	(void) E1000_READ_REG(hw, E1000_ICR);
 
 	if (igb->intr_type == DDI_INTR_TYPE_MSIX) {
 		/* Interrupt enabling for MSI-X */
@@ -3430,25 +3484,41 @@ igb_set_internal_mac_loopback(igb_t *igb)
 	struct e1000_hw *hw;
 	uint32_t ctrl;
 	uint32_t rctl;
+	uint32_t ctrl_ext;
+	uint16_t phy_ctrl;
+	uint16_t phy_status;
 
 	hw = &igb->hw;
 
-	/* Set the Receive Control register */
-	rctl = E1000_READ_REG(hw, E1000_RCTL);
-	rctl &= ~E1000_RCTL_LBM_TCVR;
-	rctl |= E1000_RCTL_LBM_MAC;
-	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+	(void) e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl);
+	phy_ctrl &= ~MII_CR_AUTO_NEG_EN;
+	(void) e1000_write_phy_reg(hw, PHY_CONTROL, phy_ctrl);
+
+	(void) e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+
+	/* Set link mode to PHY (00b) in the Extended Control register */
+	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+	ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
+	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 
 	/* Set the Device Control register */
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
+	if (!(phy_status & MII_SR_LINK_STATUS))
+		ctrl |= E1000_CTRL_ILOS; /* Set ILOS when the link is down */
 	ctrl &= ~E1000_CTRL_SPD_SEL;	/* Clear the speed sel bits */
 	ctrl |= (E1000_CTRL_SLU |	/* Force link up */
 	    E1000_CTRL_FRCSPD |		/* Force speed */
 	    E1000_CTRL_FRCDPX |		/* Force duplex */
 	    E1000_CTRL_SPD_1000 |	/* Force speed to 1000 */
 	    E1000_CTRL_FD);		/* Force full duplex */
-	ctrl &= ~E1000_CTRL_ILOS;	/* Clear ILOS when there's a link */
+
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
+
+	/* Set the Receive Control register */
+	rctl = E1000_READ_REG(hw, E1000_RCTL);
+	rctl &= ~E1000_RCTL_LBM_TCVR;
+	rctl |= E1000_RCTL_LBM_MAC;
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
 }
 
 /*
@@ -3797,11 +3867,22 @@ igb_intr_tx_other(void *arg1, void *arg2)
 	igb_intr_tx_work(&igb->tx_rings[0]);
 
 	/*
-	 * Need check cause bits and only link change will
-	 * be processed
+	 * Check for "other" causes.
 	 */
 	if (icr & E1000_ICR_LSC) {
 		igb_intr_link_work(igb);
+	}
+
+	/*
+	 * The DOUTSYNC bit indicates a tx packet dropped because
+	 * DMA engine gets "out of sync". There isn't a real fix
+	 * for this. The Intel recommendation is to count the number
+	 * of occurrences so user can detect when it is happening.
+	 * The issue is non-fatal and there's no recovery action
+	 * available.
+	 */
+	if (icr & E1000_ICR_DOUTSYNC) {
+		IGB_STAT(igb->dout_sync);
 	}
 
 	return (DDI_INTR_CLAIMED);

@@ -60,39 +60,26 @@ e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 }
 
 /*
- * The real intent of this routine is to return the value from pci-e
- * config space at offset reg into the capability space.
- * ICH devices are "PCI Express"-ish.  They have a configuration space,
- * but do not contain PCI Express Capability registers, so this returns
- * the equivalent of "not supported"
+ * Return the 16-bit value from pci-e config space at offset reg into the pci-e
+ * capability block.
  */
 int32_t
 e1000_read_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 {
-	*value = pci_config_get16(OS_DEP(hw)->cfg_handle,
-	    PCI_EX_CONF_CAP + reg);
+	uint32_t pcie_cap = PCI_EX_CONF_CAP;	/* default */
+
+	switch (hw->mac.type) {
+	case e1000_82575:
+		pcie_cap = 0xa0;
+		break;
+	case e1000_82576:
+		pcie_cap = 0xa0;
+		break;
+	}
+
+	*value = pci_config_get16(OS_DEP(hw)->cfg_handle, (pcie_cap + reg));
 
 	return (0);
-}
-
-/*
- * Enables PCI-Express master access.
- *
- * hw: Struct containing variables accessed by shared code
- *
- * returns: - none.
- */
-void
-e1000_enable_pciex_master(struct e1000_hw *hw)
-{
-	uint32_t ctrl;
-
-	if (hw->bus.type != e1000_bus_type_pci_express)
-		return;
-
-	ctrl = E1000_READ_REG(hw, E1000_CTRL);
-	ctrl &= ~E1000_CTRL_GIO_MASTER_DISABLE;
-	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 }
 
 /*
