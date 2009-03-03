@@ -3860,7 +3860,7 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	uchar_t			*mac_addr;
 	int			mac_slot = -1, maclen = 0, mac_prefix_len = 0;
 	dladm_arg_list_t	*proplist = NULL;
-	uint16_t		vid = 0;
+	int			vid = 0;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":tfR:l:m:n:p:r:v:H",
@@ -3920,10 +3920,12 @@ do_create_vnic(int argc, char *argv[], const char *use)
 			}
 			break;
 		case 'v':
-			vid = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || *endp != '\0' || vid == 0)
-				/* VID of 0 is invalid */
-				die("invalid VLAN id");
+			if (vid != 0)
+				die_optdup(option);
+
+			if (!str2int(optarg, &vid) || vid < 1 || vid > 4094)
+				die("invalid VLAN identifier '%s'", optarg);
+
 			break;
 		case 'f':
 			flags |= DLADM_OPT_FORCE;

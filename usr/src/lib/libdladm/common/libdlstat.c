@@ -49,7 +49,7 @@
 struct flowlist {
 	char		flowname[MAXFLOWNAMELEN];
 	datalink_id_t	linkid;
-	uint_t		ifspeed;
+	uint64_t	ifspeed;
 	boolean_t	first;
 	boolean_t	display;
 	pktsum_t 	prevstats;

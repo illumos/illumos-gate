@@ -1668,7 +1668,7 @@ i_dladm_add_ap_module(const char *module, struct dlautopush *dlap)
 		dlap->dap_anchor = dlap->dap_npush;
 		return (DLADM_STATUS_OK);
 	}
-	if (dlap->dap_npush > MAXAPUSH)
+	if (dlap->dap_npush >= MAXAPUSH)
 		return (DLADM_STATUS_BADVALCNT);
 
 	(void) strlcpy(dlap->dap_aplist[dlap->dap_npush++], module,
