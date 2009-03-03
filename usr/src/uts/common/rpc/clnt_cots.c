@@ -3249,9 +3249,12 @@ clnt_dispatch_notifyall(queue_t *q, int32_t msg_type, int32_t reason)
 				 * be sending any more RPC replies, we abort
 				 * the connection, including flushing
 				 * any RPC requests that are in-transit.
+				 * In either case, mark the entry as dead so
+				 * that it can be closed by the connection
+				 * manager's garbage collector.
 				 */
+				cm_entry->x_dead = TRUE;
 				if (cm_entry->x_closing) {
-					cm_entry->x_dead = TRUE;
 					mutex_exit(&connmgr_lock);
 					have_connmgr_lock = 0;
 					if (clnt_stop_idle != NULL)
