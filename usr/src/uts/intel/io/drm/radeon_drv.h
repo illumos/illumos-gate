@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -32,8 +32,6 @@
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __RADEON_DRV_H__
 #define	__RADEON_DRV_H__
@@ -372,7 +370,7 @@ extern int radeon_driver_vblank_wait(drm_device_t *dev,
 extern int radeon_driver_vblank_wait2(drm_device_t *dev,
     unsigned int *sequence);
 extern irqreturn_t radeon_driver_irq_handler(DRM_IRQ_ARGS);
-extern void radeon_driver_irq_preinstall(drm_device_t *dev);
+extern int radeon_driver_irq_preinstall(drm_device_t *dev);
 extern void radeon_driver_irq_postinstall(drm_device_t *dev);
 extern void radeon_driver_irq_uninstall(drm_device_t *dev);
 extern int radeon_vblank_crtc_get(struct drm_device *dev);

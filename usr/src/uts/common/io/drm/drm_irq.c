@@ -221,12 +221,13 @@ drm_irq_install(drm_device_t *dev)
 		DRM_ERROR("drm_irq_install: irq already enabled");
 		return (EBUSY);
 	}
-	dev->irq_enabled = 1;
+
 	DRM_DEBUG("drm_irq_install irq=%d\n", dev->irq);
-	dev->context_flag = 0;
 
 	/* before installing handler */
-	dev->driver->irq_preinstall(dev);
+	ret = dev->driver->irq_preinstall(dev);
+	if (ret)
+		return (EINVAL);
 
 	/* install handler */
 	ret  = drm_install_irq_handle(dev);
@@ -237,6 +238,9 @@ drm_irq_install(drm_device_t *dev)
 
 	/* after installing handler */
 	dev->driver->irq_postinstall(dev);
+
+	dev->irq_enabled = 1;
+	dev->context_flag = 0;
 
 	return (0);
 }

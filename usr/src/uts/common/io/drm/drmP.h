@@ -545,7 +545,7 @@ struct drm_driver_info {
 	int (*kernel_context_switch)(struct drm_device *, int, int);
 	int (*kernel_context_switch_unlock)(struct drm_device *);
 	int (*device_is_agp) (struct drm_device *);
-	void (*irq_preinstall)(struct drm_device *);
+	int (*irq_preinstall)(struct drm_device *);
 	void (*irq_postinstall)(struct drm_device *);
 	void (*irq_uninstall)(struct drm_device *dev);
 	uint_t (*irq_handler)(DRM_IRQ_ARGS);

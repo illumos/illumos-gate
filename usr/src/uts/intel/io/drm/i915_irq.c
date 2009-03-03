@@ -942,13 +942,18 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 
 /* drm_dma.h hooks
 */
-void i915_driver_irq_preinstall(drm_device_t * dev)
+int i915_driver_irq_preinstall(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
+
+	if (!dev_priv->mmio_map)
+		return -EINVAL;
 
 	I915_WRITE(HWSTAM, 0xeffe);
 	I915_WRITE(IMR, 0xffffffff);
 	I915_WRITE(IER, 0x0);
+
+	return 0;
 }
 
 void i915_driver_irq_postinstall(drm_device_t * dev)

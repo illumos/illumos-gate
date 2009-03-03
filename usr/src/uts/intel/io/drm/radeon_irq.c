@@ -1,6 +1,6 @@
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* radeon_irq.c -- IRQ handling for radeon -*- linux-c -*- */
@@ -34,8 +34,6 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  *    Michel D�zer <michel@daenzer.net>
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 #include "radeon_drm.h"
@@ -296,11 +294,14 @@ static void radeon_enable_interrupt(struct drm_device *dev)
 /*
  * drm_dma.h hooks
  */
-void
+int
 radeon_driver_irq_preinstall(drm_device_t *dev)
 {
 	drm_radeon_private_t *dev_priv =
 	    (drm_radeon_private_t *)dev->dev_private;
+
+	if (!dev_priv->mmio)
+		return (EINVAL);
 
 	/* Disable *all* interrupts */
 	RADEON_WRITE(RADEON_GEN_INT_CNTL, 0);
@@ -309,6 +310,8 @@ radeon_driver_irq_preinstall(drm_device_t *dev)
 	(void) radeon_acknowledge_irqs(dev_priv,
 	    (RADEON_SW_INT_TEST_ACK | RADEON_CRTC_VBLANK_STAT |
 	    RADEON_CRTC2_VBLANK_STAT));
+
+	return (0);
 }
 
 void
