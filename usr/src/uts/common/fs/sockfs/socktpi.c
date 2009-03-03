@@ -1884,7 +1884,6 @@ again:
 
 	/*
 	 * Record so_peercred and so_cpid from a cred in the T_CONN_IND.
-	 * Send down a T_CONN_RES without a cred.
 	 */
 	if ((DB_REF(mp) > 1) || MBLKSIZE(mp) <
 	    (sizeof (struct T_conn_res) + sizeof (intptr_t))) {
@@ -1900,7 +1899,7 @@ again:
 		freemsg(mp);
 
 		mp = soallocproto1(NULL, sizeof (struct T_conn_res) +
-		    sizeof (intptr_t), 0, _ALLOC_INTR, NULL);
+		    sizeof (intptr_t), 0, _ALLOC_INTR, cr);
 		if (mp == NULL) {
 			/*
 			 * Accept can not fail with ENOBUFS.
@@ -1922,6 +1921,8 @@ again:
 		mp->b_rptr = DB_BASE(mp);
 		conn_res = (struct T_conn_res *)mp->b_rptr;
 		mp->b_wptr = mp->b_rptr + sizeof (struct T_conn_res);
+
+		mblk_setcred(mp, cr, curproc->p_pid);
 	}
 
 	/*
