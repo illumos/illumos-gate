@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <sys/consdev.h>
 #include <sys/kbtrans.h>
 #include <sys/policy.h>
+#include <sys/sunldi.h>
 #include "kbtrans_lower.h"
 #include "kbtrans_streams.h"
 
@@ -447,8 +448,25 @@ kbtrans_streams_key(
 	struct kbtrans_lower *lower;
 	struct keyboard *kp;
 
+	static int attempt_one_reset = 1;
+
 	lower = &upper->kbtrans_lower;
 	kp = lower->kbtrans_keyboard;
+
+	/* trigger switch back to text mode */
+	if (attempt_one_reset == 1) {
+		ldi_ident_t li;
+		extern void progressbar_key_abort(ldi_ident_t);
+
+		if (ldi_ident_from_stream(upper->kbtrans_streams_readq, &li)
+		    != 0) {
+			cmn_err(CE_NOTE, "!ldi_ident_from_stream failed");
+		} else {
+			progressbar_key_abort(li);
+			ldi_ident_release(li);
+		}
+		attempt_one_reset = 0;
+	}
 
 	if (upper->kbtrans_streams_abortable) {
 		switch (upper->kbtrans_streams_abort_state) {

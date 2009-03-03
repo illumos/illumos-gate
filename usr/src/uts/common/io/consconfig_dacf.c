@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,7 +158,7 @@ static void	consconfig_rem_dev(cons_state_t *, dev_t);
 static void	consconfig_add_dev(cons_state_t *, cons_prop_t *);
 static cons_prop_t *consconfig_find_dev(cons_state_t *, dev_t);
 static void	consconfig_free_prop(cons_prop_t *prop);
-static void	flush_usb_serial_buf(void);
+static void	flush_deferred_console_buf(void);
 
 
 /*
@@ -1497,7 +1497,7 @@ dynamic_console_config(void)
 	    "mousedev %lx, kbddev %lx, fbdev %lx, rconsdev %lx\n",
 	    mousedev,  kbddev, fbdev, rconsdev);
 
-	flush_usb_serial_buf();
+	flush_deferred_console_buf();
 }
 
 
@@ -2059,22 +2059,26 @@ consconfig_free_prop(cons_prop_t *prop)
 }
 
 /*
- * Boot code can't print to usb serial device. The early boot message
- * is saved in a buffer at address indicated by "usb-serial-buf".
- * This function flushes the message to the USB serial line
+ * The early boot code can't print to a usb serial device or the
+ * graphical boot screen.
+ *
+ * The early boot messages are saved in a buffer at the address indicated
+ * by "deferred-console-buf" This function flushes the message to the
+ * current console now that it is set up.
  */
 static void
-flush_usb_serial_buf(void)
+flush_deferred_console_buf(void)
 {
 	int rval;
 	vnode_t *vp;
-	uint_t usbser_buf;
-	char *kc, *bc, *usbser_kern_buf;
+	uint_t defcons_buf;
+	char *kc, *bc, *defcons_kern_buf;
 
-	usbser_buf = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
-	    DDI_PROP_DONTPASS, "usb-serial-buf", 0);
+	/* defcons_buf is in low memory, so an int works here */
+	defcons_buf = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "deferred-console-buf", 0);
 
-	if (usbser_buf == 0)
+	if (defcons_buf == 0)
 		return;
 
 	/*
@@ -2107,13 +2111,13 @@ flush_usb_serial_buf(void)
 	 * Copy message to a kernel buffer. Various kernel routines
 	 * expect buffer to be above kernelbase
 	 */
-	kc = usbser_kern_buf = (char *)kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
-	bc = (char *)(uintptr_t)usbser_buf;
+	kc = defcons_kern_buf = (char *)kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
+	bc = (char *)(uintptr_t)defcons_buf;
 	while (*kc++ = *bc++)
 		;
-	console_printf("%s", usbser_kern_buf);
+	console_printf("%s", defcons_kern_buf);
 
-	kmem_free(usbser_kern_buf, MMU_PAGESIZE);
+	kmem_free(defcons_kern_buf, MMU_PAGESIZE);
 }
 
 boolean_t

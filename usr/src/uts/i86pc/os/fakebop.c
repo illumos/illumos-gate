@@ -2146,16 +2146,18 @@ build_firmware_properties(void)
 }
 
 /*
- * fake up a boot property for USB serial console early boot output
+ * fake up a boot property for deferred early console output
+ * this is used by both graphical boot and the (developer only)
+ * USB serial console
  */
 void *
-usbser_init(size_t size)
+defcons_init(size_t size)
 {
 	static char *p = NULL;
 
 	p = do_bsys_alloc(NULL, NULL, size, MMU_PAGESIZE);
 	*p = 0;
-	bsetprop("usb-serial-buf", strlen("usb-serial-buf") + 1,
+	bsetprop("deferred-console-buf", strlen("deferred-console-buf") + 1,
 	    &p, sizeof (p));
 	return (p);
 }

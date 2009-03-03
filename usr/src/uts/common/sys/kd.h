@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ extern "C" {
 #define	KDSETMODE	(KDIOC|10)	/* set text/graphics mode */
 #define	KD_TEXT		0
 #define	KD_GRAPHICS	1
+#define	KD_RESETTEXT	2
 
 #ifdef __cplusplus
 }

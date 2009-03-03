@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@
 #include <sys/errno.h>
 #include <sys/devops.h>
 #include <sys/note.h>
-
+#include <sys/consplat.h>
 
 /*
  * On supported configurations, the firmware defines the keyboard and mouse
@@ -125,4 +125,9 @@ consconfig_get_usb_ms_path(void) {
 	if (usb_ms_path)
 		return (i_ddi_strdup(usb_ms_path, KM_SLEEP));
 	return (NULL);
+}
+
+extern char *
+consconfig_get_plat_fbpath(void) {
+	return (plat_fbpath());
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,9 +161,10 @@ struct vgatext_softc {
 		unsigned char blue;
 	}			colormap[VGA8_CMAP_ENTRIES];
 	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
-	agp_master_softc_t	*agp_master; /* NULL mean not PCI, for AGP */
+	agp_master_softc_t	*agp_master; /* NULL means not PCI, for AGP */
 	ddi_acc_handle_t	*pci_cfg_hdlp;	/* PCI conf handle */
 	unsigned int flags;
+	kmutex_t lock;
 };
 
 #define	VGATEXT_FLAG_CONSOLE 0x00000001
@@ -449,6 +450,8 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	softc->polledio.copy = vgatext_polled_copy;
 	softc->polledio.cursor = vgatext_polled_cursor;
 
+	mutex_init(&(softc->lock), NULL, MUTEX_DRIVER, NULL);
+
 	error = ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_get_parent(devi),
 	    DDI_PROP_DONTPASS, "device_type", &parent_type);
 	if (error != DDI_SUCCESS) {
@@ -527,7 +530,20 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		softc->text_base = (caddr_t)softc->fb.addr + VGA_COLOR_BASE;
 	else
 		softc->text_base = (caddr_t)softc->fb.addr + VGA_MONO_BASE;
-	softc->current_base = softc->text_base;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "console", &cons) == DDI_SUCCESS) {
+		if (strcmp(cons, "graphics") == 0) {
+			happyface_boot = 1;
+			vgatext_silent = 1;
+			softc->current_base = softc->shadow;
+		} else {
+			softc->current_base = softc->text_base;
+		}
+		ddi_prop_free(cons);
+	} else {
+		softc->current_base = softc->text_base;
+	}
 
 	(void) sprintf(buf, "text-%d", unit);
 	error = ddi_create_minor_node(devi, buf, S_IFCHR,
@@ -539,15 +555,6 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    devi, DDI_PROP_CANSLEEP, DDI_KERNEL_IOCTL, NULL, 0);
 	if (error != DDI_SUCCESS)
 		goto fail;
-
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
-	    DDI_PROP_DONTPASS, "console", &cons) == DDI_SUCCESS) {
-		if (strcmp(cons, "graphics") == 0) {
-			happyface_boot = 1;
-			vgatext_silent = 1;
-		}
-		ddi_prop_free(cons);
-	}
 
 	vgatext_check_for_console(devi, softc, pci_pcie_bus);
 
@@ -599,6 +606,7 @@ vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			ddi_regs_map_free(&softc->fb.handle);
 		if (softc->regs.mapped)
 			ddi_regs_map_free(&softc->regs.handle);
+		mutex_destroy(&(softc->lock));
 		ddi_remove_minor_node(devi, NULL);
 		(void) ddi_soft_state_free(vgatext_softc_head, instance);
 		return (DDI_SUCCESS);
@@ -810,7 +818,9 @@ vgatext_ioctl(
 
 	switch (DEV2MINOR(dev)) {
 	case GFX_MINOR:
+		mutex_enter(&(softc->lock));
 		err = do_gfx_ioctl(cmd, data, mode, softc);
+		mutex_exit(&(softc->lock));
 		break;
 
 	case AGPMASTER_MINOR:
@@ -823,45 +833,81 @@ vgatext_ioctl(
 		return (EBADF);
 	}
 	return (err);
+}
 
+static void
+vgatext_save_text(struct vgatext_softc *softc)
+{
+	unsigned i;
+
+	for (i = 0; i < sizeof (softc->shadow); i++)
+		softc->shadow[i] = softc->current_base[i];
+}
+
+static void
+vgatext_progressbar_stop()
+{
+	extern void progressbar_stop(void);
+
+	if (vgatext_silent == 1) {
+		vgatext_silent = 0;
+		progressbar_stop();
+	}
+}
+
+static void
+vgatext_kdsettext(struct vgatext_softc *softc)
+{
+	int i;
+
+	vgatext_init(softc);
+	for (i = 0; i < sizeof (softc->shadow); i++) {
+		softc->text_base[i] = softc->shadow[i];
+	}
+	softc->current_base = softc->text_base;
+	if (softc->cursor.visible) {
+		vgatext_set_cursor(softc,
+		    softc->cursor.row, softc->cursor.col);
+	}
+	vgatext_restore_colormap(softc);
+}
+
+static void
+vgatext_kdsetgraphics(struct vgatext_softc *softc)
+{
+	vgatext_progressbar_stop();
+	vgatext_save_text(softc);
+	softc->current_base = softc->shadow;
+#if	defined(USE_BORDERS)
+	vgatext_init_graphics(softc);
+#endif
 }
 
 static int
 vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 {
-	int i;
-
 	if ((mode == softc->mode) || (!VGATEXT_IS_CONSOLE(softc)))
 		return (0);
 
 	switch (mode) {
 	case KD_TEXT:
-		vgatext_init(softc);
-		for (i = 0; i < sizeof (softc->shadow); i++) {
-			softc->text_base[i] = softc->shadow[i];
-		}
-		softc->current_base = softc->text_base;
-		if (softc->cursor.visible) {
-			vgatext_set_cursor(softc,
-			    softc->cursor.row, softc->cursor.col);
-		}
-		vgatext_restore_colormap(softc);
+		vgatext_kdsettext(softc);
 		break;
 
 	case KD_GRAPHICS:
-		if (vgatext_silent == 1) {
-			extern void progressbar_stop(void);
+		vgatext_kdsetgraphics(softc);
+		break;
 
-			vgatext_silent = 0;
-			progressbar_stop();
+	case KD_RESETTEXT:
+		/*
+		 * In order to avoid racing with a starting X server,
+		 * this needs to be a test and set that is performed in
+		 * a single (softc->lock protected) ioctl into this driver.
+		 */
+		if (softc->mode == KD_TEXT && vgatext_silent == 1) {
+			vgatext_progressbar_stop();
+			vgatext_kdsettext(softc);
 		}
-		for (i = 0; i < sizeof (softc->shadow); i++) {
-			softc->shadow[i] = softc->text_base[i];
-		}
-		softc->current_base = softc->shadow;
-#if	defined(USE_BORDERS)
-		vgatext_init_graphics(softc);
-#endif
 		break;
 
 	default:
@@ -942,8 +988,6 @@ vgatext_cons_display(struct vgatext_softc *softc, struct vis_consdisplay *da)
 	};
 	struct cgatext *addr;
 
-	if (vgatext_silent)
-		return;
 	/*
 	 * Sanity checks.  This is a last-ditch effort to avoid damage
 	 * from brokenness or maliciousness above.
@@ -994,9 +1038,6 @@ vgatext_cons_copy(struct vgatext_softc *softc, struct vis_conscopy *ma)
 	unsigned short	*from_row_start;
 	screen_size_t	rows_to_move;
 	unsigned short	*base;
-
-	if (vgatext_silent)
-		return;
 
 	/*
 	 * Sanity checks.  Note that this is a last-ditch effort to avoid

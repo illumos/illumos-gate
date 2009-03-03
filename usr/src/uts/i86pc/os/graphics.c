@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -32,6 +30,9 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <vm/seg_kmem.h>
+#include <sys/file.h>
+#include <sys/kd.h>
+#include <sys/sunldi.h>
 
 #define	VIDEOMEM	0xa0000
 
@@ -189,5 +190,34 @@ progressbar_stop(void)
 	/* unmap video memory */
 	hat_unload(kas.a_hat, videomem, videomem_size, HAT_UNLOAD_UNLOCK);
 	vmem_free(heap_arena, videomem, videomem_size);
+#endif
+}
+
+/*ARGSUSED*/
+void
+progressbar_key_abort(ldi_ident_t li)
+{
+#if !defined(__xpv)
+	char *fbpath;
+	int ret;
+	ldi_handle_t hdl;
+
+	extern char *consconfig_get_plat_fbpath(void);
+
+	if (graphics_mode == 0)
+		return;
+
+	fbpath = consconfig_get_plat_fbpath();
+
+	if (ldi_open_by_name(fbpath, FWRITE, kcred, &hdl, li) != 0) {
+		cmn_err(CE_NOTE, "!ldi_open_by_name failed");
+	} else {
+		if (ldi_ioctl(hdl, KDSETMODE, KD_RESETTEXT, FKIOCTL,
+		    kcred, &ret)
+		    != 0)
+				cmn_err(CE_NOTE,
+				    "!ldi_ioctl for KD_RESETTEXT failed");
+		(void) ldi_close(hdl, NULL, kcred);
+	}
 #endif
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,8 +44,8 @@
 #if defined(__xpv)
 #include <sys/evtchn_impl.h>
 #endif /* __xpv */
-static char *usbser_buf;
-static char *usbser_cur;
+static char *defcons_buf;
+static char *defcons_cur;
 #endif /* _BOOT */
 
 #if defined(__xpv)
@@ -711,9 +711,9 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 	/*
 	 * USB serial -- we just collect data into a buffer
 	 */
-	if (console == CONS_USBSER) {
-		extern void *usbser_init(size_t);
-		usbser_buf = usbser_cur = usbser_init(MMU_PAGESIZE);
+	if (console == CONS_USBSER || console == CONS_SCREEN_GRAPHICS) {
+		extern void *defcons_init(size_t);
+		defcons_buf = defcons_cur = defcons_init(MMU_PAGESIZE);
 	}
 }
 
@@ -746,10 +746,10 @@ bcons_device_change(int new_console)
 #endif /* __xpv */
 
 static void
-usbser_putchar(int c)
+defcons_putchar(int c)
 {
-	if (usbser_cur - usbser_buf < MMU_PAGESIZE)
-		*usbser_cur++ = c;
+	if (defcons_cur - defcons_buf < MMU_PAGESIZE)
+		*defcons_cur++ = c;
 }
 #endif	/* _BOOT */
 
@@ -803,12 +803,11 @@ _doputchar(int c)
 		screen_putchar(c);
 		return;
 	case CONS_SCREEN_GRAPHICS:
-		return;
 #if !defined(_BOOT)
 	case CONS_USBSER:
-		usbser_putchar(c);
-		return;
+		defcons_putchar(c);
 #endif /* _BOOT */
+		return;
 	}
 }
 
