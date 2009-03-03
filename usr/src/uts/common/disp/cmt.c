@@ -1230,7 +1230,8 @@ cmt_pad_disable(pghw_type_t type)
 		 * policy other than load balancing, promote the child
 		 * above the power domain to ensure it's policy dominates.
 		 */
-		if (GROUP_SIZE(pg->cmt_children) == 1) {
+		if (pg->cmt_children != NULL &&
+		    GROUP_SIZE(pg->cmt_children) == 1) {
 			child = GROUP_ACCESS(pg->cmt_children, 0);
 			if ((child->cmt_policy & CMT_BALANCE) == 0) {
 				cmt_hier_promote(child);
