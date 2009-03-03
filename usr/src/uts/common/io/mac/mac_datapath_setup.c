@@ -1231,15 +1231,22 @@ done:
 static void
 mac_tx_srs_update_bwlimit(mac_soft_ring_set_t *srs, mac_resource_props_t *mrp)
 {
-	mac_srs_tx_t	*srs_tx = &srs->srs_tx;
-	uint32_t	tx_mode;
-	mac_impl_t *mip = srs->srs_mcip->mci_mip;
+	uint32_t		tx_mode;
+	mac_srs_tx_t		*srs_tx = &srs->srs_tx;
+	mac_client_impl_t	*mcip = srs->srs_mcip;
+	mac_impl_t		*mip = mcip->mci_mip;
+
+	/*
+	 * We need to quiesce/restart the client here because mac_tx() and
+	 * srs->srs_tx->st_func do not hold srs->srs_lock while accessing
+	 * st_mode and related fields, which are modified by the code below.
+	 */
+	mac_tx_client_quiesce(mcip, SRS_QUIESCE);
 
 	mutex_enter(&srs->srs_lock);
 	mutex_enter(&srs->srs_bw->mac_bw_lock);
 
 	tx_mode = srs_tx->st_mode;
-
 	if (mrp->mrp_maxbw == MRP_MAXBW_RESETVAL) {
 		/* Reset bandwidth limit */
 		if (tx_mode == SRS_TX_BW) {
@@ -1279,6 +1286,8 @@ done:
 	srs_tx->st_func = mac_tx_get_func(srs_tx->st_mode);
 	mutex_exit(&srs->srs_bw->mac_bw_lock);
 	mutex_exit(&srs->srs_lock);
+
+	mac_tx_client_restart(mcip);
 }
 
 /*
