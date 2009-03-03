@@ -503,14 +503,14 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 	if ((err = zonecfg_create_snapshot(zone_name)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to create snapshot: %s",
 		    zonecfg_strerror(err));
-		return (-1);
+		goto bad;
 	}
 
 	if ((zone_id = vplat_create(zlogp, mount_cmd)) == -1) {
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
-		return (-1);
+		goto bad;
 	}
 	if (vplat_bringup(zlogp, mount_cmd, zone_id) != 0) {
 		bringup_failure_recovery = B_TRUE;
@@ -518,13 +518,21 @@ zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd, int zstate)
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
-		return (-1);
+		goto bad;
 	}
 
 	if (brand_poststatechg(zlogp, zstate, Z_READY) != 0)
-		return (-1);
+		goto bad;
 
 	return (0);
+
+bad:
+	/*
+	 * If something goes wrong, we up the zones's state to the target
+	 * state, READY, and then invoke the hook as if we're halting.
+	 */
+	(void) brand_poststatechg(zlogp, ZONE_STATE_READY, Z_HALT);
+	return (-1);
 }
 
 int
@@ -770,7 +778,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 
 	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
 		zerror(zlogp, B_TRUE, "unable to get zoneid");
-		return (-1);
+		goto bad;
 	}
 
 	cb.zlogp = zlogp;
@@ -780,7 +788,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	/* Get a handle to the brand info for this zone */
 	if ((bh = brand_open(brand_name)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
-		return (-1);
+		goto bad;
 	}
 
 	/*
@@ -792,7 +800,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	if (brand_platform_iter_mounts(bh, mount_early_fs, &cb) != 0) {
 		zerror(zlogp, B_FALSE, "unable to mount filesystems");
 		brand_close(bh);
-		return (-1);
+		goto bad;
 	}
 
 	/*
@@ -801,7 +809,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone path");
 		brand_close(bh);
-		return (-1);
+		goto bad;
 	}
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
 	if (brand_get_boot(bh, zone_name, zpath, cmdbuf + EXEC_LEN,
@@ -809,7 +817,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 		zerror(zlogp, B_FALSE,
 		    "unable to determine branded zone's boot callback");
 		brand_close(bh);
-		return (-1);
+		goto bad;
 	}
 
 	/* Get the path for this zone's init(1M) (or equivalent) process.  */
@@ -817,7 +825,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 		zerror(zlogp, B_FALSE,
 		    "unable to determine zone's init(1M) location");
 		brand_close(bh);
-		return (-1);
+		goto bad;
 	}
 
 	brand_close(bh);
@@ -827,26 +835,26 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	if (err == Z_INVAL)
 		eventstream_write(Z_EVT_ZONE_BADARGS);
 	else if (err != Z_OK)
-		return (-1);
+		goto bad;
 
 	assert(init_file[0] != '\0');
 
 	/* Try to anticipate possible problems: Make sure init is executable. */
 	if (zone_get_rootpath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
-		return (-1);
+		goto bad;
 	}
 
 	(void) snprintf(initpath, sizeof (initpath), "%s%s", zpath, init_file);
 
 	if (stat(initpath, &st) == -1) {
 		zerror(zlogp, B_TRUE, "could not stat %s", initpath);
-		return (-1);
+		goto bad;
 	}
 
 	if ((st.st_mode & S_IXUSR) == 0) {
 		zerror(zlogp, B_FALSE, "%s is not executable", initpath);
-		return (-1);
+		goto bad;
 	}
 
 	/*
@@ -857,28 +865,36 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
 	    (do_subproc(zlogp, cmdbuf, NULL) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
-		return (-1);
+		goto bad;
 	}
 
 	if (zone_setattr(zoneid, ZONE_ATTR_INITNAME, init_file, 0) == -1) {
 		zerror(zlogp, B_TRUE, "could not set zone boot file");
-		return (-1);
+		goto bad;
 	}
 
 	if (zone_setattr(zoneid, ZONE_ATTR_BOOTARGS, nbootargs, 0) == -1) {
 		zerror(zlogp, B_TRUE, "could not set zone boot arguments");
-		return (-1);
+		goto bad;
 	}
 
 	if (zone_boot(zoneid) == -1) {
 		zerror(zlogp, B_TRUE, "unable to boot zone");
-		return (-1);
+		goto bad;
 	}
 
 	if (brand_poststatechg(zlogp, zstate, Z_BOOT) != 0)
-		return (-1);
+		goto bad;
 
 	return (0);
+
+bad:
+	/*
+	 * If something goes wrong, we up the zones's state to the target
+	 * state, RUNNING, and then invoke the hook as if we're halting.
+	 */
+	(void) brand_poststatechg(zlogp, ZONE_STATE_RUNNING, Z_HALT);
+	return (-1);
 }
 
 static int
