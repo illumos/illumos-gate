@@ -36,6 +36,12 @@ extern "C" {
 
 #define	ARCH_EXEC_MISS gettext("archive creation file not found: %s: %s\n")
 
+#define	PATH_EXEC_OWNER gettext("%s is not owned by %d, skipping\n")
+
+#define	PATH_EXEC_LINK gettext("%s is not a regular file, skipping\n")
+
+#define	PATH_EXEC_PERMS gettext("%s is others or group writable, skipping\n")
+
 #define	MUST_BE_ROOT gettext("you must be root to run this command\n")
 
 #define	NOT_ARCHIVE_BOOT \
@@ -130,8 +136,6 @@ extern "C" {
 
 #define	OPEN_FAIL gettext("failed to open file: %s: %s\n")
 
-#define	GZ_OPEN_FAIL gettext("failed to open %s\n")
-
 #define	LOCK_FAIL gettext("failed to lock file: %s: %s\n")
 
 #define	UNLOCK_FAIL gettext("failed to unlock file: %s: %s\n")
@@ -143,8 +147,6 @@ extern "C" {
 #define	NO_FLIST gettext("archive filelist is empty\n")
 
 #define	CLOSE_FAIL gettext("failed to close file: %s: %s\n")
-
-#define	GZCLOSE_FAIL gettext("unable to close %s\n")
 
 #define	RENAME_FAIL gettext("rename to file failed: %s: %s\n")
 
@@ -217,9 +219,6 @@ extern "C" {
 #define	STATVFS_FAIL gettext("statvfs failed for %s: %s\n")
 
 #define	IS_RAMDISK gettext("%s is on a ramdisk device\n")
-
-#define	SKIP_RAMDISK \
-	gettext("Filesystem %s is on a ramdisk, skipping archive creation\n")
 
 #define	PRINT gettext("%s\n")
 
@@ -472,7 +471,7 @@ gettext("found or created GRUB signature %s for %s\n")
 #define	NO_O_OSROOT gettext("OS root not specified with -o option: %s\n")
 
 #define	RDONLY_FS \
-	gettext("archive update failed for %s: filesystem is readonly\n")
+	gettext("%s filesystem is read-only, skipping archives update\n")
 
 #define	RDONLY_TEST_ERROR gettext("error during read-only test on %s: %s\n")
 

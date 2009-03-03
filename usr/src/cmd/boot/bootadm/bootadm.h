@@ -255,12 +255,9 @@ extern int is_sparc(void);
 	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL " " ZFS_BOOT
 
 /* Helpers */
-#define	MKISOFS_BIN		"/usr/bin/mkisofs"
-#define	MKISOFS_BFUBIN		"/tmp/bfubin/mkisofs"
+#define	MKISOFS_PATH		"/usr/bin/mkisofs"
 #define	DD_PATH_USR		"/usr/bin/dd"
-#define	DD_PATH_BFU		"/tmp/bfubin/dd"
-#define	LOCKFS_BIN		"/usr/sbin/lockfs"
-#define	LOCKFS_BFU		"/tmp/bfubin/lockfs"
+#define	LOCKFS_PATH		"/usr/sbin/lockfs"
 
 /* A first guess at the number of entries in a menu */
 #define	BAM_ENTRY_NUM		10

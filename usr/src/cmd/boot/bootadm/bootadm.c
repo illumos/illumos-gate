@@ -237,6 +237,7 @@ static char rootbuf[PATH_MAX] = "/";
 static int bam_update_all;
 static int bam_alt_platform;
 static char *bam_platform;
+static char *bam_home_env = NULL;
 
 /* function prototypes */
 static void parse_args_internal(int, char *[]);
@@ -362,7 +363,6 @@ typedef struct _dirinfo {
 #define	IS_SPARC_TARGET		0x00000002
 #define	UPDATE_ERROR		0x00000004
 #define	RDONLY_FSCHK		0x00000008
-#define	RAMDSK_FSCHK		0x00000010
 
 #define	is_flag_on(flag)	(walk_arg.update_flags & flag ? 1 : 0)
 #define	set_flag(flag)		(walk_arg.update_flags |= flag)
@@ -433,6 +433,66 @@ usage(void)
 #endif
 }
 
+/*
+ * Best effort attempt to restore the $HOME value.
+ */
+static void
+restore_env()
+{
+	char	home_env[PATH_MAX];
+
+	if (bam_home_env) {
+		(void) snprintf(home_env, sizeof (home_env), "HOME=%s",
+		    bam_home_env);
+		(void) putenv(home_env);
+	}
+}
+
+
+#define		SLEEP_TIME	5
+#define		MAX_TRIES	4
+
+/*
+ * Sanitize the environment in which bootadm will execute its sub-processes
+ * (ex. mkisofs). This is done to prevent those processes from attempting
+ * to access files (ex. .mkisofsrc) or stat paths that might be on NFS
+ * or, potentially, insecure.
+ */
+static void
+sanitize_env()
+{
+	int	stry = 0;
+
+	/* don't depend on caller umask */
+	(void) umask(0022);
+
+	/* move away from a potential unsafe current working directory */
+	while (chdir("/") == -1) {
+		if (errno != EINTR) {
+			bam_print("WARNING: unable to chdir to /");
+			break;
+		}
+	}
+
+	bam_home_env = getenv("HOME");
+	while (bam_home_env != NULL && putenv("HOME=/") == -1) {
+		if (errno == ENOMEM) {
+			/* retry no more than MAX_TRIES times */
+			if (++stry > MAX_TRIES) {
+				bam_print("WARNING: unable to recover from "
+				    "system memory pressure... aborting \n");
+				bam_exit(EXIT_FAILURE);
+			}
+			/* memory is tight, try to sleep */
+			bam_print("Attempting to recover from memory pressure: "
+			    "sleeping for %d seconds\n", SLEEP_TIME * stry);
+			(void) sleep(SLEEP_TIME * stry);
+		} else {
+			bam_print("WARNING: unable to sanitize HOME\n");
+		}
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -449,10 +509,7 @@ main(int argc, char *argv[])
 
 	INJECT_ERROR1("ASSERT_ON", assert(0))
 
-	/*
-	 * Don't depend on caller's umask
-	 */
-	(void) umask(0022);
+	sanitize_env();
 
 	parse_args(argc, argv);
 
@@ -789,6 +846,34 @@ elide_trailing_slash(const char *src, char *dst, size_t dstsize)
 	}
 }
 
+static int
+is_safe_exec(char *path)
+{
+	struct stat	sb;
+
+	if (lstat(path, &sb) != 0) {
+		bam_error(STAT_FAIL, path, strerror(errno));
+		return (BAM_ERROR);
+	}
+
+	if (!S_ISREG(sb.st_mode)) {
+		bam_error(PATH_EXEC_LINK, path);
+		return (BAM_ERROR);
+	}
+
+	if (sb.st_uid != getuid()) {
+		bam_error(PATH_EXEC_OWNER, path, getuid());
+		return (BAM_ERROR);
+	}
+
+	if (sb.st_mode & S_IWOTH || sb.st_mode & S_IWGRP) {
+		bam_error(PATH_EXEC_PERMS, path);
+		return (BAM_ERROR);
+	}
+
+	return (BAM_SUCCESS);
+}
+
 static error_t
 bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 {
@@ -1085,6 +1170,7 @@ bam_print_stderr(char *format, ...)
 static void
 bam_exit(int excode)
 {
+	restore_env();
 	bam_unlock();
 	exit(excode);
 }
@@ -1401,7 +1487,7 @@ setup_file(char *base, const char *path, cachefile *cf)
 
 	if (bam_direct == BAM_DIRECT_DBOOT) {
 		if ((cf->out.gzfile = gzopen(cf->path, "wb")) == NULL) {
-			bam_error(GZ_OPEN_FAIL, gzerror(cf->out.gzfile, NULL));
+			bam_error(OPEN_FAIL, cf->path, strerror(errno));
 			return (BAM_ERROR);
 		}
 		(void) gzsetparams(cf->out.gzfile, Z_BEST_SPEED,
@@ -1425,8 +1511,9 @@ cache_write(cachefile cf, char *buf, int size)
 	if (bam_direct == BAM_DIRECT_DBOOT) {
 		if (gzwrite(cf.out.gzfile, buf, size) < 1) {
 			bam_error(GZ_WRITE_FAIL, gzerror(cf.out.gzfile, &err));
-			if (err == Z_ERRNO)
+			if (err == Z_ERRNO && bam_verbose) {
 				bam_error(WRITE_FAIL, cf.path, strerror(errno));
+			}
 			return (BAM_ERROR);
 		}
 	} else {
@@ -1446,14 +1533,10 @@ cache_close(cachefile cf)
 	if (bam_direct == BAM_DIRECT_DBOOT) {
 		if (cf.out.gzfile) {
 			ret = gzclose(cf.out.gzfile);
-			if (ret == Z_OK)
-				return (BAM_SUCCESS);
-			else if (ret == Z_ERRNO)
+			if (ret != Z_OK) {
 				bam_error(CLOSE_FAIL, cf.path, strerror(errno));
-			else
-				bam_error(GZCLOSE_FAIL, gzerror(cf.out.gzfile,
-				    NULL));
-			return (BAM_ERROR);
+				return (BAM_ERROR);
+			}
 		}
 	} else {
 		if (cf.out.fdfile != -1) {
@@ -1476,7 +1559,12 @@ dircache_updatefile(const char *path, int what)
 	FILE 		*infile;
 	cachefile 	outfile, outupdt;
 
-	if (bam_nowrite())
+	if (bam_nowrite()) {
+		set_dir_flag(what, NEED_UPDATE);
+		return (BAM_SUCCESS);
+	}
+
+	if (!has_cachedir(what))
 		return (BAM_SUCCESS);
 
 	if ((infile = fopen(path, "rb")) == NULL) {
@@ -1507,6 +1595,8 @@ dircache_updatefile(const char *path, int what)
 
 	set_dir_flag(what, NEED_UPDATE);
 	get_count(what)++;
+	if (get_count(what) > COUNT_MAX)
+		set_dir_flag(what, NO_MULTI);
 	exitcode = BAM_SUCCESS;
 out:
 	(void) fclose(infile);
@@ -1608,26 +1698,22 @@ update_dircache(const char *path, int flags)
 		 */
 		if (memcmp(elf.e_ident, ELFMAG, 4) != 0) {
 			if (strstr(path, "/amd64")) {
-				if (has_cachedir(FILE64))
-					rc = dircache_updatefile(path, FILE64);
-			} else if (has_cachedir(FILE64)) {
+				rc = dircache_updatefile(path, FILE64);
+			} else {
 				rc = dircache_updatefile(path, FILE32);
 				if (rc == BAM_SUCCESS)
 					rc = dircache_updatefile(path, FILE64);
-			} else {
-				rc = dircache_updatefile(path, FILE32);
 			}
 		} else {
 			/*
 			 * Based on the ELF class we copy the file in the 32-bit
 			 * or the 64-bit cache directory.
 			 */
-			if (elf.e_ident[EI_CLASS] == ELFCLASS32)
+			if (elf.e_ident[EI_CLASS] == ELFCLASS32) {
 				rc = dircache_updatefile(path, FILE32);
-			else if (elf.e_ident[EI_CLASS] == ELFCLASS64)
-				if (has_cachedir(FILE64))
-					rc = dircache_updatefile(path, FILE64);
-			else {
+			} else if (elf.e_ident[EI_CLASS] == ELFCLASS64) {
+				rc = dircache_updatefile(path, FILE64);
+			} else {
 				bam_print(NO3264ELF, path);
 				/* paranoid */
 				rc  = dircache_updatefile(path, FILE32);
@@ -1798,11 +1884,9 @@ cmpstat(
 	 * If we got there, the file is already listed as to be included in the
 	 * iso image. We just need to know if we are going to rebuild it or not
 	 */
-
 	if (is_flag_on(IS_SPARC_TARGET) &&
-	    is_dir_flag_on(FILE64, NEED_UPDATE) && !bam_smf_check)
+	    is_dir_flag_on(FILE64, NEED_UPDATE) && !bam_nowrite())
 		return (0);
-
 	/*
 	 * File exists in old archive. Check if file has changed
 	 */
@@ -2020,6 +2104,8 @@ check_flags_and_files(char *root)
 	 */
 	if (is_flag_on(IS_SPARC_TARGET)) {
 		ret = is_valid_archive(root, FILE64);
+		if (ret == BAM_ERROR)
+			return (BAM_ERROR);
 	} else {
 		int	what = FILE32;
 		do {
@@ -2139,6 +2225,9 @@ read_list(char *root, filelist_t  *flistp)
 		return (BAM_ERROR);
 	}
 
+	if (is_safe_exec(path) == BAM_ERROR)
+		return (BAM_ERROR);
+
 	/*
 	 * If extract_boot_filelist is present, exec it, otherwise read
 	 * the filelists directly, for compatibility with older images.
@@ -2244,7 +2333,8 @@ getoldstat(char *root)
 out_err:
 	if (fd != -1)
 		(void) close(fd);
-	set_dir_flag(FILE32, NEED_UPDATE);
+	if (!is_flag_on(IS_SPARC_TARGET))
+		set_dir_flag(FILE32, NEED_UPDATE);
 	set_dir_flag(FILE64, NEED_UPDATE);
 }
 
@@ -2264,8 +2354,6 @@ delete_stale(char *file, int what)
 
 		set_dir_flag(what, (NEED_UPDATE | NO_MULTI));
 	}
-	if (bam_verbose)
-		bam_print(PARSEABLE_STALE_FILE, path);
 }
 
 /*
@@ -2309,12 +2397,16 @@ check4stale(char *root)
 		if (access(path, F_OK) < 0) {
 			int	what;
 
-			if (is_flag_on(IS_SPARC_TARGET))
-				set_dir_flag(FILE64, NEED_UPDATE);
+			if (bam_verbose)
+				bam_print(PARSEABLE_STALE_FILE, path);
 
-			for (what = FILE32; what < CACHEDIR_NUM; what++)
-				if (has_cachedir(what))
-					delete_stale(file, what);
+			if (is_flag_on(IS_SPARC_TARGET)) {
+				set_dir_flag(FILE64, NEED_UPDATE);
+			} else {
+				for (what = FILE32; what < CACHEDIR_NUM; what++)
+					if (has_cachedir(what))
+						delete_stale(file, what);
+			}
 		}
 	}
 }
@@ -2509,7 +2601,8 @@ update_required(char *root)
 	}
 
 	if (walk_arg.new_nvlp == NULL) {
-		(void) fclose(walk_arg.sparcfile);
+		if (walk_arg.sparcfile != NULL)
+			(void) fclose(walk_arg.sparcfile);
 		bam_error(NO_NEW_STAT);
 	}
 
@@ -2521,35 +2614,11 @@ update_required(char *root)
 		return (0);
 	}
 
-	(void) fclose(walk_arg.sparcfile);
+	if (walk_arg.sparcfile != NULL)
+		(void) fclose(walk_arg.sparcfile);
 
 	return (1);
 }
-
-/*
- * Returns 1 if we're dealing with a bfu archive update, 0 otherwise
- */
-static int
-is_bfu()
-{
-	char *path;
-
-	path = getenv("PATH");
-	if (path != NULL &&
-	    strncmp(path, "/tmp/bfubin", strlen("/tmp/bfubin")) == 0) {
-		struct stat	sb;
-		if (stat("/tmp/bfubin", &sb) == 0) {
-			if (!(sb.st_mode & S_IFDIR))
-				return (0);
-			if (sb.st_uid != getuid())
-				return (0);
-			return (1);
-		}
-	}
-	return (0);
-}
-
-#define	LOCKFS_PATH	(is_bfu() ? LOCKFS_BFU : LOCKFS_BIN)
 
 static int
 flushfs(char *root)
@@ -2566,14 +2635,16 @@ static int
 do_archive_copy(char *source, char *dest)
 {
 
-	(void) sync();
+	sync();
 
 	/* the equivalent of mv archive-new-$pid boot_archive */
-	if (rename(source, dest) != 0)
+	if (rename(source, dest) != 0) {
+		(void) unlink(source);
 		return (BAM_ERROR);
+	}
 
 	if (flushfs(bam_root) != 0)
-		(void) sync();
+		sync();
 
 	return (BAM_SUCCESS);
 }
@@ -2586,12 +2657,21 @@ check_cmdline(filelist_t flist)
 	for (lp = flist.head; lp; lp = lp->next) {
 		if (strstr(lp->line, "Error:") != NULL ||
 		    strstr(lp->line, "Inode number overflow") != NULL) {
-			(void) fprintf(stderr, "%s", lp->line);
+			(void) fprintf(stderr, "%s\n", lp->line);
 			return (BAM_ERROR);
 		}
 	}
 
 	return (BAM_SUCCESS);
+}
+
+static void
+dump_errormsg(filelist_t flist)
+{
+	line_t	*lp;
+
+	for (lp = flist.head; lp; lp = lp->next)
+		(void) fprintf(stderr, "%s\n", lp->line);
 }
 
 static int
@@ -2615,19 +2695,12 @@ check_archive(char *dest)
 static int
 is_mkisofs()
 {
-	if (is_bfu()) {
-		if (access(MKISOFS_BFUBIN, X_OK) == 0)
-			return (1);
-	} else {
-		if (access(MKISOFS_BIN, X_OK) == 0)
-			return (1);
-	}
+	if (access(MKISOFS_PATH, X_OK) == 0)
+		return (1);
 	return (0);
 }
 
 #define	MKISO_PARAMS	" -quiet -graft-points -dlrDJN -relaxed-filenames "
-#define	MKISO_PATH	(is_bfu() ? MKISOFS_BFUBIN : MKISOFS_BIN)
-#define	DD_PATH		(is_bfu() ? DD_PATH_BFU : DD_PATH_USR)
 
 static int
 create_sparc_archive(char *archive, char *tempname, char *bootblk, char *list)
@@ -2646,14 +2719,16 @@ create_sparc_archive(char *archive, char *tempname, char *bootblk, char *list)
 	 * Prepare mkisofs command line and execute it
 	 */
 	(void) snprintf(cmdline, sizeof (cmdline), "%s %s -G %s -o \"%s\" "
-	    "-path-list \"%s\" 2>&1", MKISO_PATH, MKISO_PARAMS, bootblk,
+	    "-path-list \"%s\" 2>&1", MKISOFS_PATH, MKISO_PARAMS, bootblk,
 	    tempname, list);
 
 	BAM_DPRINTF((D_CMDLINE, func, cmdline));
 
 	ret = exec_cmd(cmdline, &flist);
-	if (ret != 0 || check_cmdline(flist) == BAM_ERROR)
+	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
+		dump_errormsg(flist);
 		goto out_err;
+	}
 
 	filelist_free(&flist);
 
@@ -2662,7 +2737,7 @@ create_sparc_archive(char *archive, char *tempname, char *bootblk, char *list)
 	 * execute it
 	 */
 	(void) snprintf(cmdline, sizeof (cmdline), "%s if=\"%s\" of=\"%s\""
-	    " bs=1b oseek=1 count=15 conv=notrunc conv=sync 2>&1", DD_PATH,
+	    " bs=1b oseek=1 count=15 conv=notrunc conv=sync 2>&1", DD_PATH_USR,
 	    bootblk, tempname);
 
 	BAM_DPRINTF((D_CMDLINE, func, cmdline));
@@ -2722,7 +2797,8 @@ extend_iso_archive(char *archive, char *tempname, char *update_dir)
 
 	fd = open(archive, O_RDWR);
 	if (fd == -1) {
-		bam_error(OPEN_FAIL, archive, strerror(errno));
+		if (bam_verbose)
+			bam_error(OPEN_FAIL, archive, strerror(errno));
 		goto out_err;
 	}
 
@@ -2732,12 +2808,14 @@ extend_iso_archive(char *archive, char *tempname, char *update_dir)
 	ret = pread64(fd, saved_desc, sizeof (saved_desc),
 	    VOLDESC_OFF * CD_BLOCK);
 	if (ret != sizeof (saved_desc)) {
-		bam_error(READ_FAIL, archive, strerror(errno));
+		if (bam_verbose)
+			bam_error(READ_FAIL, archive, strerror(errno));
 		goto out_err;
 	}
 
 	if (memcmp(saved_desc[0].type, "\1CD001", 6)) {
-		bam_error(SIGN_FAIL, archive);
+		if (bam_verbose)
+			bam_error(SIGN_FAIL, archive);
 		goto out_err;
 	}
 
@@ -2748,33 +2826,39 @@ extend_iso_archive(char *archive, char *tempname, char *update_dir)
 	next_session = P2ROUNDUP(from_733(saved_desc[0].volume_space_size), 16);
 
 	(void) snprintf(cmdline, sizeof (cmdline), "%s -C 16,%d -M %s %s -o \""
-	    "%s\" \"%s\" 2>&1", MKISO_PATH, next_session, archive, MKISO_PARAMS,
-	    tempname, update_dir);
+	    "%s\" \"%s\" 2>&1", MKISOFS_PATH, next_session, archive,
+	    MKISO_PARAMS, tempname, update_dir);
 
 	BAM_DPRINTF((D_CMDLINE, func, cmdline));
 
 	ret = exec_cmd(cmdline, &flist);
 	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
-		bam_error(MULTI_FAIL, cmdline);
+		if (bam_verbose) {
+			bam_error(MULTI_FAIL, cmdline);
+			dump_errormsg(flist);
+		}
 		goto out_flist_err;
 	}
 	filelist_free(&flist);
 
 	newfd = open(tempname, O_RDONLY);
 	if (newfd == -1) {
-		bam_error(OPEN_FAIL, archive, strerror(errno));
+		if (bam_verbose)
+			bam_error(OPEN_FAIL, archive, strerror(errno));
 		goto out_err;
 	}
 
 	ret = pread64(newfd, saved_desc, sizeof (saved_desc),
 	    VOLDESC_OFF * CD_BLOCK);
 	if (ret != sizeof (saved_desc)) {
-		bam_error(READ_FAIL, archive, strerror(errno));
+		if (bam_verbose)
+			bam_error(READ_FAIL, archive, strerror(errno));
 		goto out_err;
 	}
 
 	if (memcmp(saved_desc[0].type, "\1CD001", 6)) {
-		bam_error(SIGN_FAIL, archive);
+		if (bam_verbose)
+			bam_error(SIGN_FAIL, archive);
 		goto out_err;
 	}
 
@@ -2796,33 +2880,43 @@ extend_iso_archive(char *archive, char *tempname, char *update_dir)
 
 	ret = pwrite64(fd, saved_desc, DVD_BLOCK, VOLDESC_OFF*CD_BLOCK);
 	if (ret != DVD_BLOCK) {
-		bam_error(WRITE_FAIL, archive, strerror(errno));
+		if (bam_verbose)
+			bam_error(WRITE_FAIL, archive, strerror(errno));
 		goto out_err;
 	}
 	(void) close(newfd);
 	newfd = -1;
 
+	ret = fsync(fd);
+	if (ret != 0)
+		sync();
+
 	ret = close(fd);
 	if (ret != 0) {
-		bam_error(CLOSE_FAIL, archive, strerror(errno));
+		if (bam_verbose)
+			bam_error(CLOSE_FAIL, archive, strerror(errno));
 		return (BAM_ERROR);
 	}
 	fd = -1;
 
 	(void) snprintf(cmdline, sizeof (cmdline), "%s if=%s of=%s bs=32k "
-	    "seek=%d conv=sync 2>&1", DD_PATH, tempname, archive,
+	    "seek=%d conv=sync 2>&1", DD_PATH_USR, tempname, archive,
 	    (next_session/16));
 
 	BAM_DPRINTF((D_CMDLINE, func, cmdline));
 
 	ret = exec_cmd(cmdline, &flist);
 	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
-		bam_error(MULTI_FAIL, cmdline);
+		if (bam_verbose)
+			bam_error(MULTI_FAIL, cmdline);
 		goto out_flist_err;
 	}
 	filelist_free(&flist);
 
 	(void) unlink(tempname);
+
+	if (flushfs(bam_root) != 0)
+		sync();
 
 	if (bam_verbose)
 		bam_print("boot archive updated successfully\n");
@@ -2848,13 +2942,14 @@ create_x86_archive(char *archive, char *tempname, char *update_dir)
 	const char	*func = "create_x86_archive()";
 
 	(void) snprintf(cmdline, sizeof (cmdline), "%s %s -o \"%s\" \"%s\" "
-	    "2>&1", MKISO_PATH, MKISO_PARAMS, tempname, update_dir);
+	    "2>&1", MKISOFS_PATH, MKISO_PARAMS, tempname, update_dir);
 
 	BAM_DPRINTF((D_CMDLINE, func, cmdline));
 
 	ret = exec_cmd(cmdline, &flist);
 	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
 		bam_error(ARCHIVE_FAIL, cmdline);
+		dump_errormsg(flist);
 		filelist_free(&flist);
 		(void) unlink(tempname);
 		return (BAM_ERROR);
@@ -2964,18 +3059,19 @@ create_ramdisk(char *root)
 	char *cmdline, path[PATH_MAX];
 	size_t len;
 	struct stat sb;
-	int ret, what;
+	int ret, what, status = BAM_SUCCESS;
 
 	/* If there is mkisofs, use it to create the required archives */
 	if (is_mkisofs()) {
 		for (what = FILE32; what < CACHEDIR_NUM; what++) {
-			if (is_dir_flag_on(what, NEED_UPDATE)) {
+			if (has_cachedir(what) && is_dir_flag_on(what,
+			    NEED_UPDATE)) {
 				ret = mkisofs_archive(root, what);
 				if (ret != 0)
-					return (BAM_ERROR);
+					status = BAM_ERROR;
 			}
 		}
-		return (BAM_SUCCESS);
+		return (status);
 	}
 
 	/*
@@ -2989,6 +3085,9 @@ create_ramdisk(char *root)
 		bam_error(ARCH_EXEC_MISS, path, strerror(errno));
 		return (BAM_ERROR);
 	}
+
+	if (is_safe_exec(path) == BAM_ERROR)
+		return (BAM_ERROR);
 
 	len = strlen(path) + strlen(root) + 10;	/* room for space + -R */
 	if (bam_alt_platform)
@@ -3289,36 +3388,26 @@ update_archive(char *root, char *opt)
 	}
 
 	/*
-	 * Don't generate archive on ramdisk, but still check if the
-	 * archive is up-to-date
+	 * Don't generate archive on ramdisk.
 	 */
-	if (is_ramdisk(root)) {
-		set_flag(RAMDSK_FSCHK);
-		bam_check = 1;
-	}
+	if (is_ramdisk(root))
+		return (BAM_SUCCESS);
 
 	/*
-	 * Now check if updated is really needed
+	 * Now check if an update is really needed.
 	 */
 	ret = update_required(root);
 
 	/*
-	 * The check command (-n) is *not* a dry run
+	 * The check command (-n) is *not* a dry run.
 	 * It only checks if the archive is in sync.
-	 * A readonly filesystem or being on a ramdisk have to be considered
-	 * errors only if an update is required.
+	 * A readonly filesystem has to be considered an error only if an update
+	 * is required.
 	 */
-	if (bam_check) {
+	if (bam_nowrite()) {
 		if (is_flag_on(RDONLY_FSCHK)) {
 			if (ret > 0)
 				bam_error(RDONLY_FS, root);
-			if (bam_update_all)
-				return ((ret != 0) ? BAM_ERROR : BAM_SUCCESS);
-		}
-
-		if (is_flag_on(RAMDSK_FSCHK)) {
-			if (ret > 0)
-				bam_error(SKIP_RAMDISK, root);
 			if (bam_update_all)
 				return ((ret != 0) ? BAM_ERROR : BAM_SUCCESS);
 		}
@@ -4487,12 +4576,24 @@ static FILE *
 create_diskmap(char *osroot)
 {
 	FILE *fp;
-	char cmd[PATH_MAX];
+	char cmd[PATH_MAX + 16];
+	char path[PATH_MAX];
 	const char *fcn = "create_diskmap()";
 
 	/* make sure we have a map file */
 	fp = fopen(GRUBDISK_MAP, "r");
 	if (fp == NULL) {
+		int	ret;
+
+		ret = snprintf(path, sizeof (path), "%s/%s", osroot,
+		    CREATE_DISKMAP);
+		if (ret >= sizeof (path)) {
+			bam_error(PATH_TOO_LONG, osroot);
+			return (NULL);
+		}
+		if (is_safe_exec(path) == BAM_ERROR)
+			return (NULL);
+
 		(void) snprintf(cmd, sizeof (cmd),
 		    "%s/%s > /dev/null", osroot, CREATE_DISKMAP);
 		if (exec_cmd(cmd, NULL) != 0)
