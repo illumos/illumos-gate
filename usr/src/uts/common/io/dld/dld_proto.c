@@ -251,8 +251,10 @@ proto_info_req(dld_str_t *dsp, mblk_t *mp)
 	}
 
 	/* Only VLAN links and links that have a normal tag mode support QOS. */
-	if (mac_client_vid(dsp->ds_mch) != VLAN_ID_NONE ||
-	    dsp->ds_dlp->dl_tagmode == LINK_TAGMODE_NORMAL) {
+	if ((dsp->ds_mch != NULL &&
+	    mac_client_vid(dsp->ds_mch) != VLAN_ID_NONE) ||
+	    (dsp->ds_dlp != NULL &&
+	    dsp->ds_dlp->dl_tagmode == LINK_TAGMODE_NORMAL)) {
 		dlp->dl_qos_range_offset = (uintptr_t)rangep - (uintptr_t)dlp;
 		dlp->dl_qos_range_length = sizeof (dl_qos_cl_range1_t);
 
