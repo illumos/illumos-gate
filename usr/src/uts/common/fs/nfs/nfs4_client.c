@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2978,13 +2978,15 @@ nfs4_mi_zonelist_remove(mntinfo4_t *mi)
 	/* if this mi is marked dead, then the zone already released it */
 	if (!(mi->mi_flags & MI4_DEAD)) {
 		list_remove(&mig->mig_list, mi);
+		mutex_exit(&mi->mi_lock);
 
 		/* release the holds put on in zonelist_add(). */
 		VFS_RELE(mi->mi_vfsp);
 		MI4_RELE(mi);
 		ret = 1;
+	} else {
+		mutex_exit(&mi->mi_lock);
 	}
-	mutex_exit(&mi->mi_lock);
 
 	/*
 	 * We can be called asynchronously by VFS_FREEVFS() after the zone
