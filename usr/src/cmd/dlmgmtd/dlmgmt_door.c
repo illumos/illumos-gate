@@ -325,24 +325,25 @@ dlmgmt_upcall_destroy(void *argp, void *retp)
 		goto done;
 	}
 
-	if (((linkp->ll_flags & flags) & DLMGMT_ACTIVE) &&
-	    ((err = dlmgmt_delete_db_entry(linkid, DLMGMT_ACTIVE)) != 0)) {
-		dflags = DLMGMT_ACTIVE;
-		goto done;
+	if (((linkp->ll_flags & flags) & DLMGMT_ACTIVE) != 0) {
+		err = dlmgmt_delete_db_entry(linkid, DLMGMT_ACTIVE);
+		if (err != 0)
+			goto done;
+		dflags |= DLMGMT_ACTIVE;
 	}
 
-	if (((linkp->ll_flags & flags) & DLMGMT_PERSIST) &&
-	    ((err = dlmgmt_delete_db_entry(linkid, DLMGMT_PERSIST)) != 0)) {
-		if (dflags != 0)
-			(void) dlmgmt_write_db_entry(linkp->ll_linkid, dflags);
+	if (((linkp->ll_flags & flags) & DLMGMT_PERSIST) != 0) {
+		err = dlmgmt_delete_db_entry(linkid, DLMGMT_PERSIST);
+		if (err != 0)
+			goto done;
 		dflags |= DLMGMT_PERSIST;
-		goto done;
 	}
 
-	if ((err = dlmgmt_destroy_common(linkp, flags)) != 0 && dflags != 0)
+	err = dlmgmt_destroy_common(linkp, flags);
+done:
+	if (err != 0 && dflags != 0)
 		(void) dlmgmt_write_db_entry(linkp->ll_linkid, dflags);
 
-done:
 	dlmgmt_table_unlock();
 	retvalp->lr_err = err;
 }

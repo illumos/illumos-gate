@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -758,7 +758,7 @@ dlmgmt_advance_dlconfid(dlmgmt_dlconf_t *dlconfp)
 			 * wrapped around. search from 1.
 			 */
 			dlconf.ld_id = dlmgmt_nextconfid = 1;
-			dlconfp = avl_find(&dlmgmt_name_avl, &dlconf, NULL);
+			dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
 			if (dlconfp == NULL)
 				return;
 		} else {
@@ -767,7 +767,7 @@ dlmgmt_advance_dlconfid(dlmgmt_dlconf_t *dlconfp)
 				return;
 			}
 		}
-		dlconfp = AVL_NEXT(&dlmgmt_name_avl, dlconfp);
+		dlconfp = AVL_NEXT(&dlmgmt_dlconf_avl, dlconfp);
 		dlmgmt_nextconfid++;
 	}
 	dlmgmt_nextconfid = 0;
