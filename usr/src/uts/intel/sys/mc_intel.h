@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -208,6 +208,11 @@ extern "C" {
 #define	INTEL_QP_IO	0x34008086
 #define	INTEL_QP_36D	0x34068086
 #define	INTEL_QP_24D	0x34038086
+#define	INTEL_QP_WP	0x34058086
+#define	INTEL_QP_U1	0x34018086
+#define	INTEL_QP_U2	0x34028086
+#define	INTEL_QP_U3	0x34048086
+#define	INTEL_QP_U4	0x34078086
 
 /* Intel QuickPath Bus Interconnect Errors */
 

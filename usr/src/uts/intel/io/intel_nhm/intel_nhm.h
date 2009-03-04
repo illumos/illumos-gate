@@ -31,7 +31,11 @@
 extern "C" {
 #endif
 
-#define	NHM_CPU	0x2c408086
+#define	NHM_EP_CPU	0x2c408086
+#define	NHM_WS_CPU	0x2c418086
+#define	NHM_CPU_RAS	0x2c1a8086
+
+#define	NHM_INTERCONNECT	"Intel QuickPath"
 
 #define	MAX_CPU_NODES	2
 #define	CPU_PCI_DEVS	6
@@ -47,12 +51,12 @@ extern "C" {
     nhm_pci_getl(SOCKET_BUS(cpu), 3, 0, 0x4c, 0)
 #define	MC_SMI_SPARE_DIMM_ERROR_STATUS_RD(cpu) \
     nhm_pci_getl(SOCKET_BUS(cpu), 3, 0, 0x50, 0)
+#define	MC_CPU_RAS_RD(cpu) \
+    nhm_pci_getl(SOCKET_BUS(cpu), 3, 2, 0, 0)
 #define	MC_SCRUB_CONTROL_RD(cpu) \
     nhm_pci_getl(SOCKET_BUS(cpu), 3, 2, 0x4c, 0)
 #define	MC_SCRUB_CONTROL_WR(cpu, reg) nhm_pci_putl(SOCKET_BUS(cpu), 3, 2, \
     0x4c, reg);
-#define	MC_RAS_STATUS_RD(cpu) \
-    nhm_pci_getl(SOCKET_BUS(cpu), 3, 2, 0x54, 0)
 #define	MC_SSR_CONTROL_RD(cpu)	nhm_pci_getl(SOCKET_BUS(cpu), 3, 2, 0x48, 0)
 #define	MC_SSR_CONTROL_WR(cpu, reg) nhm_pci_putl(SOCKET_BUS(cpu), 3, 2, 0x48, \
     reg);
@@ -99,6 +103,7 @@ extern "C" {
  * MC_STATUS
  */
 #define	CHANNEL_DISABLED(reg, channel) ((reg) & (1 << (channel)))
+#define	WS_ECC_ENABLED	0x10
 /*
  * MC_CHANNEL_DIMM_INIT_PARAMS
  */

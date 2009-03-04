@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,8 +124,13 @@ gintel_init(cmi_hdl_t hdl, void **datap)
 			gintel_error_action_return |= CMS_ERRSCOPE_POISONED;
 		break;
 	case INTEL_QP_IO:
+	case INTEL_QP_WP:
 	case INTEL_QP_36D:
 	case INTEL_QP_24D:
+	case INTEL_QP_U1:
+	case INTEL_QP_U2:
+	case INTEL_QP_U3:
+	case INTEL_QP_U4:
 		quickpath = 1;
 		break;
 	default:

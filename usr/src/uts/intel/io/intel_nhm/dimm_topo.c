@@ -246,17 +246,7 @@ inhm_dimmlist(uint32_t node, nvlist_t *nvl)
 char *
 inhm_mc_name()
 {
-	char *mc;
-
-	switch (nhm_chipset) {
-	case NHM_CPU:
-		mc = "Intel QuickPath";
-		break;
-	default:
-		mc = "Intel QuickPath";
-		break;
-	}
-	return (mc);
+	return (NHM_INTERCONNECT);
 }
 
 void

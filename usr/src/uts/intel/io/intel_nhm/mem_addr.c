@@ -749,9 +749,9 @@ choose_cpu(int *lastslot_p)
 	first = 0;
 	last = MAX_CPU_NODES;
 	id = CPU_ID_RD(0);
-	if (id == NHM_CPU) {
+	if (id == NHM_EP_CPU || id == NHM_WS_CPU) {
 		id = CPU_ID_RD(1);
-		if (id != NHM_CPU) {
+		if (id != NHM_EP_CPU && id !=  NHM_WS_CPU) {
 			last = 1;
 		}
 	} else {
@@ -846,11 +846,13 @@ mem_reg_init()
 	}
 
 	for (i = nhm_slot; i < nhm_lastslot; i++) {
-		mc_ras_enables = MC_RAS_ENABLES_RD(i);
-		if (RAS_LOCKSTEP_ENABLE(mc_ras_enables))
-			lockstep[i] = 1;
-		if (RAS_MIRROR_MEM_ENABLE(mc_ras_enables))
-			mirror_mode[i] = 1;
+		if (MC_CPU_RAS_RD(i) == NHM_CPU_RAS) {
+			mc_ras_enables = MC_RAS_ENABLES_RD(i);
+			if (RAS_LOCKSTEP_ENABLE(mc_ras_enables))
+				lockstep[i] = 1;
+			if (RAS_MIRROR_MEM_ENABLE(mc_ras_enables))
+				mirror_mode[i] = 1;
+		}
 		mc_channel_mapping = MC_CHANNEL_MAPPER_RD(i);
 		if (CHANNEL_MAP(mc_channel_mapping, 2, 0) == 0 &&
 		    CHANNEL_MAP(mc_channel_mapping, 2, 1) == 0)
@@ -921,5 +923,8 @@ mem_reg_init()
 	}
 	mc_control = MC_CONTROL_RD(nhm_slot);
 	closed_page = MC_CONTROL_CLOSED_PAGE(mc_control);
-	ecc_enabled = MC_CONTROL_ECCEN(mc_control);
+	if (MC_CPU_RAS_RD(nhm_slot) == NHM_CPU_RAS)
+		ecc_enabled = MC_CONTROL_ECCEN(mc_control);
+	else if ((MC_STATUS_RD(nhm_slot) & WS_ECC_ENABLED) != 0)
+		ecc_enabled = 1;
 }
