@@ -21469,13 +21469,17 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	    num_burst_seg >= 2 && (*usable - 1) / mss >= 1) {
 		/*
 		 * Try to find usable IRE/ILL and do basic check to the ILL.
+		 * Double check LSO usability before going further, since the
+		 * underlying interface could have been changed. In case of any
+		 * change of LSO capability, set tcp_ire_ill_check_done to
+		 * B_FALSE to force to check the ILL with the next send.
 		 */
-		if (tcp_send_find_ire_ill(tcp, NULL, &ire, &ill)) {
+		if (tcp_send_find_ire_ill(tcp, NULL, &ire, &ill) &&
+		    tcp->tcp_lso && ILL_LSO_TCP_USABLE(ill)) {
 			/*
 			 * Enable LSO with this transmission.
-			 * Since IRE has been hold in
-			 * tcp_send_find_ire_ill(), IRE_REFRELE(ire)
-			 * should be called before return.
+			 * Since IRE has been hold in tcp_send_find_ire_ill(),
+			 * IRE_REFRELE(ire) should be called before return.
 			 */
 			do_lso_send = B_TRUE;
 			ire_fp_mp = ire->ire_nce->nce_fp_mp;
@@ -21483,6 +21487,8 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			/* Round up to multiple of 4 */
 			ire_fp_mp_len = ((ire_fp_mp_len + 3) / 4) * 4;
 		} else {
+			tcp->tcp_lso = B_FALSE;
+			tcp->tcp_ire_ill_check_done = B_FALSE;
 			do_lso_send = B_FALSE;
 			ill = NULL;
 		}

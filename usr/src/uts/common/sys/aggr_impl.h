@@ -147,7 +147,8 @@ typedef struct aggr_grp_s {
 			lg_zcopy : 1,
 			lg_vlan : 1,
 			lg_force : 1,
-			lg_pad_bits : 9;
+			lg_lso : 1,
+			lg_pad_bits : 8;
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
 	mac_handle_t	lg_mh;
@@ -168,6 +169,7 @@ typedef struct aggr_grp_s {
 	uint32_t	lg_hcksum_txflags;
 	uint_t		lg_max_sdu;
 	uint32_t	lg_margin;
+	mac_capab_lso_t lg_cap_lso;
 
 	/*
 	 * The following fields are used by the LACP packets processing.
