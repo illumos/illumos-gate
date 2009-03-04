@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,9 @@
 #include    "isns_protocol.h"
 #include    "isns_log.h"
 #include    "isns_provider.h"
+
+/* door creation flag */
+extern boolean_t door_created;
 
 /* macro for allocating name buffers for the request */
 #define	NEW_REQARGV(old, n) (xmlChar **)realloc((xmlChar *)old, \
@@ -1431,6 +1434,7 @@ setup_mgmt_door(msg_queue_t *sys_q)
 			if (darg.rsize > darg.data_size) {
 			    (void) munmap(darg.rbuf, darg.rsize);
 			}
+			door_created = B_FALSE;
 			return (0);
 		}
 		(void) close(fd);
@@ -1461,6 +1465,8 @@ setup_mgmt_door(msg_queue_t *sys_q)
 		    ISNS_DOOR_NAME, errno);
 		return (-1);
 	}
+
+	door_created = B_TRUE;
 
 	return (0);
 }

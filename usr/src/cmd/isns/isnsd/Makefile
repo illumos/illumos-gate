@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -66,7 +66,7 @@ LDLIBS		+= -lsecdb -lsocket -lnsl -lscf -lxml2 -ldoor
 all:	$(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(COBJS) $(LDLIBS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 %.h: %.d

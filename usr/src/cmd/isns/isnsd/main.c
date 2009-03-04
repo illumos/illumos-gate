@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,11 @@ boolean_t time_to_exit = B_FALSE;
 static uint32_t thr_ref_count;
 static pthread_mutex_t thr_count_mtx = PTHREAD_MUTEX_INITIALIZER;
 #define	MAX_RETRY_COUNT	10 /* for checking remaining threads before exit. */
+
+/*
+ * Door creation flag.
+ */
+boolean_t door_created = B_FALSE;
 
 /*
  * global system message queue
@@ -444,8 +449,11 @@ main(
 				isnslog(LOG_DEBUG, "main",
 				    "sending SCN stop msg.");
 				(void) queue_msg_set(scn_q, SCN_STOP, NULL);
-				isnslog(LOG_DEBUG, "main", "closing the door.");
-				(void) fdetach(ISNS_DOOR_NAME);
+				if (door_created) {
+					isnslog(LOG_DEBUG, "main",
+					    "closing the door.");
+					(void) fdetach(ISNS_DOOR_NAME);
+				}
 				(void) pthread_join(esi_tid, NULL);
 				isnslog(LOG_DEBUG, "main",
 				    "esi thread %d exited.", esi_tid);
