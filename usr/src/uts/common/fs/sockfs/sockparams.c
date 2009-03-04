@@ -135,13 +135,6 @@ sockparams_kstat_init(struct sockparams *sp)
 {
 	char name[KSTAT_STRLEN];
 
-	kstat_named_init(&sp->sp_stats.sps_nfallback, "nfallback",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&sp->sp_stats.sps_nactive, "nactive",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&sp->sp_stats.sps_ncreate, "ncreate",
-	    KSTAT_DATA_UINT64);
-
 	(void) snprintf(name, KSTAT_STRLEN, "socket_%d_%d_%d", sp->sp_family,
 	    sp->sp_type, sp->sp_protocol);
 
@@ -227,14 +220,18 @@ sockparams_create(int family, int type, int protocol, char *modname,
 	sp->sp_refcnt = 0;
 	sp->sp_flags = flags;
 
+	kstat_named_init(&sp->sp_stats.sps_nfallback, "nfallback",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&sp->sp_stats.sps_nactive, "nactive",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&sp->sp_stats.sps_ncreate, "ncreate",
+	    KSTAT_DATA_UINT64);
+
 	/*
-	 * We do not create kstats for ephemeral entries, but we do keep
-	 * track how many we have created.
+	 * Track how many ephemeral entries we have created.
 	 */
 	if (sp->sp_flags & SOCKPARAMS_EPHEMERAL)
 		sp_g_stats.spgs_ephem_nalloc.value.ui64++;
-	else
-		sockparams_kstat_init(sp);
 
 	if (modname != NULL) {
 		sp->sp_smod_name = modname;
@@ -265,10 +262,8 @@ error:
 		kmem_free(modname, strlen(modname) + 1);
 	if (devpathlen != 0)
 		kmem_free(devpath, devpathlen);
-	if (sp != NULL) {
-		sockparams_kstat_fini(sp);
+	if (sp != NULL)
 		kmem_free(sp, sizeof (*sp));
-	}
 	return (NULL);
 }
 
@@ -669,9 +664,24 @@ soconfig(int family, int type, int protocol,
 		    devpath, devpathlen, 0, KM_SLEEP, &error);
 
 		if (sp != NULL) {
+			/*
+			 * The sockparams entry becomes globally visible once
+			 * we call sockparams_add(). So we add a reference so
+			 * we do not have to worry about the entry being
+			 * immediately deleted.
+			 */
+			SOCKPARAMS_INC_REF(sp);
 			error = sockparams_add(sp);
-			if (error != 0)
+			if (error != 0) {
+				SOCKPARAMS_DEC_REF(sp);
 				sockparams_destroy(sp);
+			} else {
+				/*
+				 * Unique sockparams entry, so init the kstats.
+				 */
+				sockparams_kstat_init(sp);
+				SOCKPARAMS_DEC_REF(sp);
+			}
 		}
 	}
 
