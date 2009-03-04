@@ -1570,7 +1570,6 @@ big_mul(BIGNUM *result, BIGNUM *aa, BIGNUM *bb)
 	    tmp1value, arraysize(tmp1value))) != BIG_OK) {
 		return (err);
 	}
-	(void) big_copy(&tmp1, aa);
 	t = tmp1.value;
 
 	for (i = 0; i < rsize; i++) {
