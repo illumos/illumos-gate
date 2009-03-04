@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -898,7 +898,7 @@ verrexit(caddr_t fmt, va_list ap)
 	if (!recursing) {
 		recursing = 1;
 		if (errorlocked || iscorrupt) {
-			if (havesb && fswritefd > 0) {
+			if (havesb && fswritefd >= 0) {
 				sblock.fs_clean = FSBAD;
 				sblock.fs_state = FSOKAY - (long)sblock.fs_time;
 				sblock.fs_state = -sblock.fs_state;
@@ -944,7 +944,7 @@ vpfatal(caddr_t fmt, va_list ap)
 		(void) printf(
 		    "%s: UNEXPECTED INCONSISTENCY; RUN fsck MANUALLY.\n",
 		    devname);
-		if (havesb && fswritefd > 0) {
+		if (havesb && fswritefd >= 0) {
 			sblock.fs_clean = FSBAD;
 			sblock.fs_state = -(FSOKAY - (long)sblock.fs_time);
 			sbdirty();
