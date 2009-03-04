@@ -47,6 +47,8 @@
 #include <sys/kbtrans.h>
 #include <sys/policy.h>
 #include <sys/sunldi.h>
+#include <sys/class.h>
+#include <sys/spl.h>
 #include "kbtrans_lower.h"
 #include "kbtrans_streams.h"
 
@@ -191,6 +193,30 @@ struct keyboard_callback	trans_event_callback  = {
 	kbtrans_setled,
 };
 
+static void
+progressbar_key_abort_thread(struct kbtrans *upper)
+{
+	ldi_ident_t li;
+	extern void progressbar_key_abort(ldi_ident_t);
+
+
+	if (ldi_ident_from_stream(upper->kbtrans_streams_readq, &li) != 0) {
+		cmn_err(CE_NOTE, "!ldi_ident_from_stream failed");
+	} else {
+		mutex_enter(&upper->progressbar_key_abort_lock);
+		while (upper->progressbar_key_abort_flag == 0)
+			cv_wait(&upper->progressbar_key_abort_cv,
+			    &upper->progressbar_key_abort_lock);
+		if (upper->progressbar_key_abort_flag == 1)
+			progressbar_key_abort(li);
+		mutex_exit(&upper->progressbar_key_abort_lock);
+		ldi_ident_release(li);
+	}
+
+
+	thread_exit();
+}
+
 /*
  * kbtrans_streams_init:
  *	Initialize the stream, keytables, callbacks, etc.
@@ -316,6 +342,14 @@ kbtrans_streams_init(
 
 	upper->kbtrans_streams_flags = KBTRANS_STREAMS_OPEN;
 
+	upper->progressbar_key_abort_flag = 0;
+	cv_init(&upper->progressbar_key_abort_cv, NULL, CV_DEFAULT, NULL);
+	/* this counts on no keyboards being above ipl 12 */
+	mutex_init(&upper->progressbar_key_abort_lock, NULL, MUTEX_SPIN,
+	    (void *)ipltospl(12));
+	(void) thread_create(NULL, 0, progressbar_key_abort_thread,
+	    upper, 0, &p0, TS_RUN, minclsyspri);
+
 	DPRINTF(PRINT_L1, PRINT_MASK_OPEN, (upper, "kbtrans_streams_init "
 	    "exiting"));
 	return (0);
@@ -347,6 +381,16 @@ kbtrans_streams_fini(struct kbtrans *upper)
 	}
 	kmem_free(upper->kbtrans_streams_downs,
 	    upper->kbtrans_streams_downs_bytes);
+
+	mutex_enter(&upper->progressbar_key_abort_lock);
+	if (upper->progressbar_key_abort_flag == 0) {
+		upper->progressbar_key_abort_flag = 2;
+		cv_signal(&upper->progressbar_key_abort_cv);
+	}
+	mutex_exit(&upper->progressbar_key_abort_lock);
+	cv_destroy(&upper->progressbar_key_abort_cv);
+	mutex_destroy(&upper->progressbar_key_abort_lock);
+
 	kmem_free(upper, sizeof (struct kbtrans));
 
 	DPRINTF(PRINT_L1, PRINT_MASK_CLOSE, (upper, "kbtrans_streams_fini "
@@ -448,25 +492,16 @@ kbtrans_streams_key(
 	struct kbtrans_lower *lower;
 	struct keyboard *kp;
 
-	static int attempt_one_reset = 1;
-
 	lower = &upper->kbtrans_lower;
 	kp = lower->kbtrans_keyboard;
 
 	/* trigger switch back to text mode */
-	if (attempt_one_reset == 1) {
-		ldi_ident_t li;
-		extern void progressbar_key_abort(ldi_ident_t);
-
-		if (ldi_ident_from_stream(upper->kbtrans_streams_readq, &li)
-		    != 0) {
-			cmn_err(CE_NOTE, "!ldi_ident_from_stream failed");
-		} else {
-			progressbar_key_abort(li);
-			ldi_ident_release(li);
-		}
-		attempt_one_reset = 0;
+	mutex_enter(&upper->progressbar_key_abort_lock);
+	if (upper->progressbar_key_abort_flag == 0) {
+		upper->progressbar_key_abort_flag = 1;
+		cv_signal(&upper->progressbar_key_abort_cv);
 	}
+	mutex_exit(&upper->progressbar_key_abort_lock);
 
 	if (upper->kbtrans_streams_abortable) {
 		switch (upper->kbtrans_streams_abort_state) {

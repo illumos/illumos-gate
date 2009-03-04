@@ -1013,8 +1013,6 @@ kb8042_received_byte(
 	enum keystate	state;
 	boolean_t	synthetic_release_needed;
 
-	static int	attempt_one_reset = 1;
-
 #ifdef	KD_DEBUG
 	kb8042_debug_hotkey(scancode);
 #endif
@@ -1042,20 +1040,6 @@ kb8042_received_byte(
 		    key_pos);
 	}
 #endif
-
-	/* trigger switch back to text mode */
-	if (attempt_one_reset == 1) {
-		ldi_ident_t li;
-		extern void progressbar_key_abort(ldi_ident_t);
-
-		if (ldi_ident_from_dev(kb8042->w_dev, &li) != 0) {
-			cmn_err(CE_NOTE, "!ldi_ident_from_stream failed");
-		} else {
-			progressbar_key_abort(li);
-			ldi_ident_release(li);
-		}
-		attempt_one_reset = 0;
-	}
 
 	/*
 	 * Don't know if we want this permanently, but it seems interesting

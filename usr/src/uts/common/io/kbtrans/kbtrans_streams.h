@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,10 @@ struct  kbtrans {
 		VT_SWITCH_KEY_ALT,	/* left Alt key is pressed */
 		VT_SWITCH_KEY_ALTGR	/* right Alt key is pressed */
 	}		vt_switch_keystate;
+
+	kcondvar_t progressbar_key_abort_cv;
+	kmutex_t progressbar_key_abort_lock;
+	int progressbar_key_abort_flag;
 };
 
 #ifdef __cplusplus
