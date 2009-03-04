@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -984,13 +984,14 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 	med_db_hdr_t	*dbhbr;
 	med_rec_t	*medrecp;
 	med_data_t	medd;
-	med_data_t	*save_medd;
+	med_data_t	save_medd;
 	md_h_t		mdh;
 	uint_t		latest_med_dat_cc = 0;
 	int		retval = 0;
 	int		medok = 0;
 	int		golden = 0;
 	bool_t		obandiskset;
+	int		isSetFound = 0;
 
 	/* Open the meddb file */
 	if ((fd = open(MED_DB_FILE, O_RDONLY, 0)) == -1) {
@@ -1048,12 +1049,12 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 
 		/*
 		 * For oban diskset first entry in the rec_nodes field is
-		 * "multiowner" and all other entries are null
+		 * "multiowner" and all other entries are empty.
 		 * Check if this is really multiowner diskset.
 		 */
 
 		if ((strcmp(medrecp->med_rec_nodes[0], MED_MN_CALLER) == 0) &&
-		    (medrecp->med_rec_nodes[1] == NULL))
+		    (medrecp->med_rec_nodes[1][0] == '\0'))
 			obandiskset = TRUE;
 		else
 			obandiskset = FALSE;
@@ -1074,23 +1075,25 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 				    gettext("Mediator"), gettext("Status"),
 				    gettext("Golden"));
 
-			if (medrecp->med_rec_meds.n_cnt == 0) {
-				if (verbose)
-					(void) printf(gettext(
-					    "No mediator hosts configured for"
-					    " set \"%s\".\n"),
-					    sname);
-				goto out;
-			}
+			isSetFound = 1;
 			setname = sname;
 		} else {
 			setname = medrecp->med_rec_snm;
 		}
 		setnum = medrecp->med_rec_sn;
+		(void) memset(&medd, '\0', sizeof (medd));
+		(void) memset(&mdh, '\0', sizeof (mdh));
+		(void) memset(&save_medd, '\0', sizeof (save_medd));
+		latest_med_dat_cc = 0;
 
-		for (j = 0; j < medrecp->med_rec_meds.n_cnt; j ++) {
-			(void) memset(&medd, 0, sizeof (medd));
-			(void) memset(&mdh, 0, sizeof (mdh));
+		for (j = 0; j < MED_MAX_HOSTS; j++) {
+			/*
+			 * It is possible for the n_lst[j] slot to be empty
+			 * if the mediator node has already been removed so
+			 * go to the next slot.
+			 */
+			if (medrecp->med_rec_meds.n_lst[j].a_cnt == 0)
+				continue;
 			mdh = medrecp->med_rec_meds.n_lst[j];
 
 			if ((sname != NULL) && (verbose))
@@ -1124,12 +1127,20 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 					goto out;
 				}
 			} else {
+				/*
+				 * Make sure this node has the correct value
+				 * for the mediator record. If not we want the
+				 * highest value from the other nodes. Save it
+				 * for updating once the loop through all the
+				 * mediator nodes has completed.
+				 */
 				if (sname == NULL) {
 					if (latest_med_dat_cc <
 					    medd.med_dat_cc) {
 						latest_med_dat_cc =
 						    medd.med_dat_cc;
-						save_medd = &medd;
+						(void) memcpy(&save_medd, &medd,
+						    sizeof (medd));
 					}
 				} else {
 					if (verbose)
@@ -1152,14 +1163,26 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 			}
 		}
 		if (sname == NULL) {
+
+			/*
+			 * Mediators only become active when there are
+			 * replica updates to the sets and this can only
+			 * occur when there is a disk in the set.
+			 * If there are no disks found then the save_medd
+			 * structure will be empty. If save_medd is empty,
+			 * do not update the set.
+			 */
+			if (save_medd.med_dat_sn == 0)
+				continue;
 			/*
 			 * Update the latest mediator information
 			 * on this node
 			 */
 			(void) strlcpy(mdh.a_nm[0], mynode(),
 			    sizeof (mdh.a_nm[0]));
+			mdh.a_cnt = 1;
 			if (clnt_user_med_upd_data(&mdh, obandiskset,
-			    setname, setnum, save_medd, ep) == -1) {
+			    setname, setnum, &save_medd, ep) == -1) {
 				/*
 				 * We had some errors while updaing the
 				 * record. This means this metaset is
@@ -1167,8 +1190,8 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 				 * information.
 				 */
 				mde_perror(ep, "");
-				continue;
 			}
+
 		} else {
 			if (golden) {
 				retval = 0;
@@ -1180,6 +1203,11 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 	}
 
 out:
+	if ((sname != NULL) && (isSetFound == 0)) {
+		(void) mderror(ep, MDE_NO_SET, sname);
+		mde_perror(ep, "");
+		retval = 1;
+	}
 	if (rec_buf != NULL)
 		Free(rec_buf);
 	if (close(fd) < 0) {

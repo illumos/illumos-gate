@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mediator status utility.
@@ -42,7 +39,7 @@ usage(
 		md_eprintf("%s\n", string);
 	(void) fprintf(stderr, gettext(
 	    "usage:	%s [-q] -s setname\n"),
-	myname);
+	    myname);
 	md_exit(sp, (string == NULL) ? 0 : 1);
 }
 
@@ -60,6 +57,12 @@ main(
 	md_error_t		status = mdnullerror;
 	md_error_t		*ep = &status;
 	mdsetname_t		*sp = NULL;
+	md_set_desc		*sd;
+	int			i;
+	md_h_t			mdh;
+	med_data_t		medd;
+	int			medok = 0;
+	int			golden = 0;
 	int			verbose = 1;
 
 	/*
@@ -85,7 +88,6 @@ main(
 		exit(1);
 	}
 
-
 	/* initialize */
 	if (md_init(argc, argv, 0, 1, ep) != 0) {
 		mde_perror(ep, "");
@@ -96,20 +98,21 @@ main(
 	opterr = 1;
 	while ((c = getopt(argc, argv, "qs:?")) != -1) {
 		switch (c) {
-		    case 'q':
-			    verbose = 0;
-			    break;
-		    case 's':
-			    sname = optarg;
-			    break;
-		    case '?':
-			    if (optopt == '?')
-			    usage(sp, NULL);
-			    /*FALLTHROUGH*/
-		    default:
+		case 'q':
+			verbose = 0;
+			break;
+		case 's':
+			sname = optarg;
+			break;
+		case '?':
+			if (optopt == '?')
+				usage(sp, NULL);
+			/*FALLTHROUGH*/
+		default:
 			usage(sp, gettext("unknown command"));
 		}
 	}
+
 	/* must have set for everything else */
 	if (strcmp(sname, MD_LOCAL_NAME) == 0)
 		usage(sp, gettext("setname must be specified"));
@@ -120,9 +123,90 @@ main(
 		md_exit(sp, 1);
 	}
 
+	if ((sp = metasetname(sname, ep)) != NULL) {
+
+		if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+			mde_perror(ep, "");
+			md_exit(sp, 1);
+		}
+
+		if (sd->sd_med.n_cnt == 0) {
+			if (verbose)
+				(void) printf(gettext("No mediator hosts"
+				    "configured for set \"%s\".\n"), sname);
+			md_exit(sp, 2);
+		}
+
+		if (verbose)
+			(void) printf("%8.8s\t\t%6.6s\t"
+			    "%6.6s\n", gettext("Mediator"),
+			    gettext("Status"), gettext("Golden"));
+
+		for (i = 0; i < MED_MAX_HOSTS; i++) {
+
+			if (sd->sd_med.n_lst[i].a_cnt == 0)
+				continue;
+
+			(void) memset(&medd, '\0', sizeof (medd));
+			(void) memset(&mdh, '\0', sizeof (mdh));
+			mdh = sd->sd_med.n_lst[i];
+
+			if (verbose)
+				(void) printf("%-17.17s\t",
+				    sd->sd_med.n_lst[i].a_nm[0]);
+
+			if (clnt_med_get_data(&mdh, sp, &medd, ep) == -1) {
+				if (mdanyrpcerror(ep)) {
+					if (verbose)
+						(void) printf("%s\n",
+						    gettext("Unreachable"));
+				continue;
+				} else if (mdiserror(ep, MDE_MED_ERROR)) {
+					if (verbose)
+						(void) printf("%s\n",
+						    gettext("Bad"));
+				} else {
+					if (verbose)
+						(void) printf("%s\n",
+						    gettext("Fatal"));
+				}
+				mde_perror(ep, "");
+				if (mdiserror(ep, MDE_MED_ERROR))
+					continue;
+				md_exit(sp, 1);
+			}
+
+			if (verbose)
+				(void) printf("%s", gettext("Ok"));
+
+			if (medd.med_dat_fl & MED_DFL_GOLDEN) {
+				if (verbose)
+					(void) printf("\t%s",
+					    gettext("Yes"));
+				golden++;
+			} else {
+				if (verbose)
+					(void) printf("\t%s", gettext("No"));
+			}
+
+			if (verbose)
+				(void) printf("\n");
+
+			medok++;
+		}
+
+		if (golden)
+			md_exit(sp, 0);
+
+		if (medok < ((sd->sd_med.n_cnt / 2) + 1))
+			md_exit(sp, 1);
+
+		md_exit(sp, 0);
+	}
+
 	/*
-	 * Get the mediator information from file
-	 * /etc/lvm/meddb and print it.
+	 * Print the mediator status using /etc/lvm/meddb if host is not
+	 * part of metaset but part of mediators.
 	 */
 
 	if (meta_mediator_info_from_file(sname, verbose, ep)) {

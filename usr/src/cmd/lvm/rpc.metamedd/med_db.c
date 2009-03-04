@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "med_local.h"
 #include "med_hash.h"
@@ -126,7 +123,7 @@ add_key(med_med_t *medp, int medridx)
 
 	if (med_db_cache == (Cache *) NULL) {
 		len = init_cache(&med_db_cache, HASHSIZE, BSZ, med_hash,
-			med_comp, med_kfree, (void (*)())NULL);
+		    med_comp, med_kfree, (void (*)())NULL);
 		if (len == -1) {
 			med_eprintf("add_key(): init_cache() failed.\n");
 			return (-1);
@@ -231,16 +228,34 @@ add_db_keys(int medridx, med_err_t *medep)
 	med_rec_t	*medrp;
 	int		i;
 
+	medrp = &med_db_medrp[medridx];
+	med.med_setno = medrp->med_rec_sn;
+	med.med_setname = medrp->med_rec_snm;
+
 	for (i = 0; i < MD_MAXSIDES; i++) {
-		medrp = &med_db_medrp[medridx];
 		if (medrp->med_rec_nodes[i][0] == '\0')
 			continue;
-		med.med_setno = medrp->med_rec_sn;
-		med.med_setname = medrp->med_rec_snm;
 		med.med_caller  = medrp->med_rec_nodes[i];
 		if (add_key(&med, medridx) == -1)
 			return (med_error(medep, MDE_MED_DBKEYADDFAIL,
 			    medrp->med_rec_nodes[i]));
+	}
+
+	/*
+	 * Looping through the actual list of mediator hosts
+	 * because a mediator host may not actually be a host
+	 * in the diskset and so access for such a host needs
+	 * to be added.
+	 */
+	for (i = 0; i < MED_MAX_HOSTS; i++) {
+		if ((medrp->med_rec_meds.n_cnt > 0) &&
+		    (medrp->med_rec_meds.n_lst[i].a_cnt != 0)) {
+			med.med_caller  =
+			    medrp->med_rec_meds.n_lst[i].a_nm[0];
+			if (add_key(&med, medridx) == -1)
+				return (med_error(medep, MDE_MED_DBKEYADDFAIL,
+				    medrp->med_rec_meds.n_lst[i].a_nm[0]));
+		}
 	}
 	return (0);
 }
@@ -252,16 +267,28 @@ del_db_keys(int medridx, med_err_t *medep)
 	med_rec_t	*medrp;
 	int		i;
 
+	medrp = &med_db_medrp[medridx];
+	med.med_setno = medrp->med_rec_sn;
+	med.med_setname = medrp->med_rec_snm;
+
 	for (i = 0; i < MD_MAXSIDES; i++) {
-		medrp = &med_db_medrp[medridx];
 		if (medrp->med_rec_nodes[i][0] == '\0')
 			continue;
-		med.med_setno = medrp->med_rec_sn;
-		med.med_setname = medrp->med_rec_snm;
 		med.med_caller  = medrp->med_rec_nodes[i];
 		if (del_key(&med) == -1)
 			return (med_error(medep, MDE_MED_DBKEYDELFAIL,
 			    medrp->med_rec_nodes[i]));
+	}
+
+	for (i = 0; i < MED_MAX_HOSTS; i++) {
+		if ((medrp->med_rec_meds.n_cnt > 0) &&
+		    (medrp->med_rec_meds.n_lst[i].a_cnt != 0)) {
+			med.med_caller  =
+			    medrp->med_rec_meds.n_lst[i].a_nm[0];
+			if (del_key(&med) == -1)
+				return (med_error(medep, MDE_MED_DBKEYDELFAIL,
+				    medrp->med_rec_meds.n_lst[i].a_nm[0]));
+		}
 	}
 	return (0);
 }
@@ -860,7 +887,7 @@ med_db_put_data(med_med_t *medp, med_data_t *meddp, med_err_t *medep)
 
 
 	if (! med_db_is_inited)
-		return (med_error(medep, MDE_MED_DBNOTINIT, "med_db_pud_data"));
+		return (med_error(medep, MDE_MED_DBNOTINIT, "med_db_put_data"));
 
 	if (medp->med_setno != meddp->med_dat_sn)
 		return (med_error(medep, MDE_MED_DBARGSMISMATCH,
