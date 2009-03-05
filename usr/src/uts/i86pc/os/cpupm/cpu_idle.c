@@ -40,13 +40,14 @@
 #include <sys/callb.h>
 
 extern void cpu_idle_adaptive(void);
+extern uint32_t cpupm_next_cstate(cma_c_state_t *cs_data,
+    cpu_acpi_cstate_t *cstates, uint32_t cs_count, hrtime_t start);
 
 static int cpu_idle_init(cpu_t *);
 static void cpu_idle_fini(cpu_t *);
 static boolean_t cpu_deep_idle_callb(void *arg, int code);
 static boolean_t cpu_idle_cpr_callb(void *arg, int code);
 static void acpi_cpu_cstate(cpu_acpi_cstate_t *cstate);
-static void cpuidle_set_cstate_latency(cpu_t *cp);
 
 /*
  * Interfaces for modules implementing Intel's deep c-state.
@@ -377,9 +378,6 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 			    gbl_FADT->XPmTimerBlock.Address, &value, 32);
 			tlb_service();
 		}
-	} else {
-		cmn_err(CE_WARN, "!_CST: cs_type %lx bad asid type %lx\n",
-		    (long)cs_type, (long)type);
 	}
 
 	/*
@@ -422,12 +420,13 @@ void
 cpu_acpi_idle(void)
 {
 	cpu_t *cp = CPU;
-	uint16_t cs_type;
 	cpu_acpi_handle_t handle;
 	cma_c_state_t *cs_data;
-	cpu_acpi_cstate_t *cstate;
+	cpu_acpi_cstate_t *cstates;
 	hrtime_t start, end;
 	int cpu_max_cstates;
+	uint32_t cs_indx;
+	uint16_t cs_type;
 
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
@@ -435,15 +434,19 @@ cpu_acpi_idle(void)
 	ASSERT(CPU_ACPI_CSTATES(handle) != NULL);
 
 	cs_data = mach_state->ms_cstate.cma_state.cstate;
-	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
-	ASSERT(cstate != NULL);
+	cstates = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
+	ASSERT(cstates != NULL);
 	cpu_max_cstates = cpu_acpi_get_max_cstates(handle);
 	if (cpu_max_cstates > CPU_MAX_CSTATES)
 		cpu_max_cstates = CPU_MAX_CSTATES;
+	if (cpu_max_cstates == 1) {	/* no ACPI c-state data */
+		(*non_deep_idle_cpu)();
+		return;
+	}
 
 	start = gethrtime_unscaled();
 
-	cs_type = cpupm_next_cstate(cs_data, start);
+	cs_indx = cpupm_next_cstate(cs_data, cstates, cpu_max_cstates, start);
 
 	/*
 	 * OSPM uses the BM_STS bit to determine the power state to enter
@@ -451,8 +454,9 @@ cpu_acpi_idle(void)
 	 * if C3 is determined, bus master activity demotes the power state
 	 * to C2.
 	 */
-	if ((cs_type >= CPU_ACPI_C3) && cpu_acpi_bm_sts())
-		cs_type = CPU_ACPI_C2;
+	if ((cstates[cs_indx].cs_type >= CPU_ACPI_C3) && cpu_acpi_bm_sts())
+		--cs_indx;
+	cs_type = cstates[cs_indx].cs_type;
 
 	/*
 	 * BM_RLD determines if the Cx power state was exited as a result of
@@ -470,8 +474,6 @@ cpu_acpi_idle(void)
 		CPU_ACPI_BM_INFO(handle) |= BM_RLD;
 	}
 
-	cstate += cs_type - 1;
-
 	switch (cs_type) {
 	default:
 		/* FALLTHROUGH */
@@ -480,7 +482,7 @@ cpu_acpi_idle(void)
 		break;
 
 	case CPU_ACPI_C2:
-		acpi_cpu_cstate(cstate);
+		acpi_cpu_cstate(&cstates[cs_indx]);
 		break;
 
 	case CPU_ACPI_C3:
@@ -498,7 +500,7 @@ cpu_acpi_idle(void)
 		} else if (x86_vendor != X86_VENDOR_Intel) {
 			__acpi_wbinvd();
 		}
-		acpi_cpu_cstate(cstate);
+		acpi_cpu_cstate(&cstates[cs_indx]);
 		if (CPU_ACPI_BM_INFO(handle) & BM_ARB_DIS) {
 			cpu_acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
 			CPU_ACPI_BM_INFO(handle) &= ~BM_ARB_DIS;
@@ -593,7 +595,6 @@ cpu_idle_init(cpu_t *cp)
 
 	cpupm_alloc_domains(cp, CPUPM_C_STATES);
 	cpupm_alloc_ms_cstate(cp);
-	cpuidle_set_cstate_latency(cp);
 
 	if (cpu_deep_cstates_supported()) {
 		mutex_enter(&cpu_idle_callb_mutex);
@@ -795,7 +796,6 @@ cpuidle_cstate_instance(cpu_t *cp)
 			hpet.callback(CST_EVENT_MULTIPLE_CSTATES);
 			disp_enq_thread = cstate_wakeup;
 			cp->cpu_m.mcpu_idle_cpu = cpu_acpi_idle;
-			cpuidle_set_cstate_latency(cp);
 		} else if (mcpu->max_cstates == CPU_ACPI_C1) {
 			disp_enq_thread = non_deep_idle_disp_enq_thread;
 			cp->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
@@ -840,38 +840,4 @@ cpuidle_manage_cstates(void *ctx)
 		return;
 
 	cpuidle_cstate_instance(cp);
-}
-
-static void
-cpuidle_set_cstate_latency(cpu_t *cp)
-{
-	cpupm_mach_state_t	*mach_state =
-	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
-	cpu_acpi_handle_t	handle;
-	cpu_acpi_cstate_t	*acpi_cstates;
-	cma_c_state_t		*cpupm_cdata;
-	uint32_t		i, cnt;
-
-	cpupm_cdata = mach_state->ms_cstate.cma_state.cstate;
-
-	ASSERT(cpupm_cdata != 0);
-	ASSERT(mach_state != NULL);
-	handle = mach_state->ms_acpi_handle;
-	ASSERT(handle != NULL);
-
-	cnt = CPU_ACPI_CSTATES_COUNT(handle);
-	acpi_cstates = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
-
-	cpupm_cdata->cs_C2_latency = CPU_CSTATE_LATENCY_UNDEF;
-	cpupm_cdata->cs_C3_latency = CPU_CSTATE_LATENCY_UNDEF;
-
-	for (i = 1; i <= cnt; ++i, ++acpi_cstates) {
-		if ((cpupm_cdata->cs_C2_latency == CPU_CSTATE_LATENCY_UNDEF) &&
-		    (acpi_cstates->cs_type == CPU_ACPI_C2))
-			cpupm_cdata->cs_C2_latency =  acpi_cstates->cs_latency;
-
-		if ((cpupm_cdata->cs_C3_latency == CPU_CSTATE_LATENCY_UNDEF) &&
-		    (acpi_cstates->cs_type == CPU_ACPI_C3))
-			cpupm_cdata->cs_C3_latency =  acpi_cstates->cs_latency;
-	}
 }

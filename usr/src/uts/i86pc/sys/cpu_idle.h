@@ -47,8 +47,6 @@ extern "C" {
 #define	CPU_IDLE_DEEP_CFG	(0x1)	/* Deep Idle disabled by user */
 #define	CPU_IDLE_CPR_CFG	(0x2)	/* In CPR */
 
-#define	CPU_CSTATE_LATENCY_UNDEF	(1000000)	/* ACPI info missing */
-
 typedef struct cpu_idle_kstat_s {
 	struct kstat_named	addr_space_id;	/* register address space id */
 	struct kstat_named	cs_latency;	/* worst latency */

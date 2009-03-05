@@ -172,8 +172,6 @@ typedef struct cpu_acpi_cstate
 	uint32_t cs_type;
 	uint32_t cs_latency;
 	uint32_t cs_power;
-	uint32_t promotion;
-	uint32_t demotion;
 	kstat_t	*cs_ksp;
 } cpu_acpi_cstate_t;
 

@@ -235,7 +235,7 @@ hpet_acpi_fini(void)
 	if (hpet.supported == HPET_NO_SUPPORT)
 		return;
 	if (hpet.supported >= HPET_TIMER_SUPPORT)
-		hpet_stop_main_counter(&hpet_info);
+		(void) hpet_stop_main_counter(&hpet_info);
 	if (hpet.supported > HPET_TIMER_SUPPORT)
 		hpet_disable_timer(&hpet_info, hpet_info.cstate_timer.timer);
 }

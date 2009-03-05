@@ -89,9 +89,6 @@ typedef struct cma_c_state {
 	hrtime_t	cs_smpl_len;	/* sample duration */
 	hrtime_t	cs_smpl_idle;	/* idle time in last sample */
 	uint64_t	cs_smpl_idle_pct;	/* % idle time in last smpl */
-
-	hrtime_t	cs_C2_latency;	/* C2 round trip latency */
-	hrtime_t	cs_C3_latency;	/* C3 round trip latency */
 } cma_c_state_t;
 
 typedef union cma_state {
@@ -187,7 +184,6 @@ extern boolean_t cpupm_throttle_ready(void);
 extern boolean_t cpupm_cstate_ready(void);
 extern void cpupm_add_notify_handler(cpu_t *, CPUPM_NOTIFY_HANDLER, void *);
 extern int cpupm_get_top_speed(cpu_t *);
-extern uint32_t cpupm_next_cstate(cma_c_state_t *, hrtime_t);
 extern void cpupm_idle_cstate_data(cma_c_state_t *, int);
 extern void cpupm_wakeup_cstate_data(cma_c_state_t *, hrtime_t);
 

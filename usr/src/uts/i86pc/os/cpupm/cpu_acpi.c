@@ -24,6 +24,7 @@
  */
 
 #include <sys/cpu_acpi.h>
+#include <sys/cpu_idle.h>
 
 /*
  * List of the processor ACPI object types that are being used.
@@ -711,8 +712,15 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	}
 
 	if (count < 2) {
-		cmn_err(CE_NOTE, "!cpu_acpi: _CST invalid count %d < 2\n",
+		cmn_err(CE_NOTE, "!cpu_acpi: _CST invalid count %d < 2",
 		    count);
+		AcpiOsFree(abuf.Pointer);
+		return (-1);
+	}
+	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
+	if (cstate[0].cs_type != CPU_ACPI_C1) {
+		cmn_err(CE_NOTE, "!cpu_acpi: _CST first element type not C1: "
+		    "%d", (int)cstate->cs_type);
 		AcpiOsFree(abuf.Pointer);
 		return (-1);
 	}

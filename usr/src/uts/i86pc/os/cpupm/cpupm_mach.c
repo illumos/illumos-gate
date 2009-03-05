@@ -33,6 +33,7 @@
 #include <sys/cpu_idle.h>
 #include <sys/cpu_acpi.h>
 #include <sys/cpupm_throttle.h>
+#include <sys/dtrace.h>
 
 /*
  * This callback is used to build the PPM CPU domains once
@@ -842,11 +843,13 @@ cpupm_wakeup_cstate_data(cma_c_state_t *cs_data, hrtime_t end)
  * when there is real work to do.
  */
 uint32_t
-cpupm_next_cstate(cma_c_state_t *cs_data, hrtime_t start)
+cpupm_next_cstate(cma_c_state_t *cs_data, cpu_acpi_cstate_t *cstates,
+    uint32_t cs_count, hrtime_t start)
 {
-	hrtime_t		duration;
-	hrtime_t		ave_interval;
-	hrtime_t		ave_idle_time;
+	hrtime_t duration;
+	hrtime_t ave_interval;
+	hrtime_t ave_idle_time;
+	uint32_t i;
 
 	duration = cs_data->cs_idle_exit - cs_data->cs_idle_enter;
 	scalehrtime(&duration);
@@ -868,25 +871,26 @@ cpupm_next_cstate(cma_c_state_t *cs_data, hrtime_t start)
 
 		/*
 		 * Strand level C-state policy
+		 * The cpu_acpi_cstate_t *cstates array is not required to
+		 * have an entry for both CPU_ACPI_C2 and CPU_ACPI_C3.
+		 * There are cs_count entries in the cstates array.
+		 * cs_data->cs_next_cstate contains the index of the next
+		 * C-state this CPU should enter.
 		 */
-		cs_data->cs_next_cstate = CPU_ACPI_C3;
+		ASSERT(cstates[0].cs_type == CPU_ACPI_C1);
 
 		/*
 		 * Will CPU be idle long enough to save power?
 		 */
 		ave_idle_time = (cs_data->cs_smpl_idle /
 		    cpupm_cs_sample_tunable) / 1000;
-		if (ave_idle_time < (cs_data->cs_C2_latency *
-		    cpupm_cs_idle_save_tunable)) {
-			cs_data->cs_next_cstate = CPU_ACPI_C1;
-			DTRACE_PROBE2(cpupm__next__cstate, cpu_t *, CPU,
-			    int, 1);
-			return (cs_data->cs_next_cstate);
-		} else if (ave_idle_time < (cs_data->cs_C3_latency *
-		    cpupm_cs_idle_save_tunable)) {
-			cs_data->cs_next_cstate = CPU_ACPI_C2;
-			DTRACE_PROBE2(cpupm__next__cstate, cpu_t *, CPU,
-			    int, 2);
+		for (i = 1; i < cs_count; ++i) {
+			if (ave_idle_time < (cstates[i].cs_latency *
+			    cpupm_cs_idle_save_tunable)) {
+				cs_count = i;
+				DTRACE_PROBE2(cpupm__next__cstate, cpu_t *,
+				    CPU, int, i);
+			}
 		}
 
 		/*
@@ -895,33 +899,43 @@ cpupm_next_cstate(cma_c_state_t *cs_data, hrtime_t start)
 		 */
 		ave_interval = (cs_data->cs_smpl_len / cpupm_cs_sample_tunable)
 		    / 1000;
-		if (ave_interval <=
-		    (cs_data->cs_C2_latency * cpupm_cs_idle_cost_tunable)) {
-			cs_data->cs_next_cstate = CPU_ACPI_C1;
-			DTRACE_PROBE2(cpupm__next__cstate, cpu_t *, CPU,
-			    int, 3);
-			return (cs_data->cs_next_cstate);
-		} else if (ave_interval <=
-		    (cs_data->cs_C3_latency * cpupm_cs_idle_cost_tunable)) {
-			cs_data->cs_next_cstate = CPU_ACPI_C2;
-			DTRACE_PROBE2(cpupm__next__cstate, cpu_t *, CPU,
-			    int, 4);
+		for (i = 1; i < cs_count; ++i) {
+			if (ave_interval <= (cstates[i].cs_latency *
+			    cpupm_cs_idle_cost_tunable)) {
+				cs_count = i;
+				DTRACE_PROBE2(cpupm__next__cstate, cpu_t *,
+				    CPU, int, (CPU_MAX_CSTATES + i));
+			}
 		}
 
 		/*
 		 * Idle percent
 		 */
-		if (cs_data->cs_smpl_idle_pct < cpupm_C2_idle_pct_tunable) {
-			cs_data->cs_next_cstate = CPU_ACPI_C1;
-			DTRACE_PROBE2(cpupm__next__cstate, cpu_t *, CPU,
-			    int, 5);
-			return (cs_data->cs_next_cstate);
-		} else if ((cs_data->cs_next_cstate > CPU_ACPI_C2) &&
-		    (cs_data->cs_smpl_idle_pct < cpupm_C3_idle_pct_tunable)) {
-			cs_data->cs_next_cstate = CPU_ACPI_C2;
-			DTRACE_PROBE2(cpupm__next__cstate, cpu_t *, CPU,
-			    int, 6);
+		for (i = 1; i < cs_count; ++i) {
+			switch (cstates[i].cs_type) {
+			case CPU_ACPI_C2:
+				if (cs_data->cs_smpl_idle_pct <
+				    cpupm_C2_idle_pct_tunable) {
+					cs_count = i;
+					DTRACE_PROBE2(cpupm__next__cstate,
+					    cpu_t *, CPU, int,
+					    ((2 * CPU_MAX_CSTATES) + i));
+				}
+				break;
+
+			case CPU_ACPI_C3:
+				if (cs_data->cs_smpl_idle_pct <
+				    cpupm_C3_idle_pct_tunable) {
+					cs_count = i;
+					DTRACE_PROBE2(cpupm__next__cstate,
+					    cpu_t *, CPU, int,
+					    ((2 * CPU_MAX_CSTATES) + i));
+				}
+				break;
+			}
 		}
+
+		cs_data->cs_next_cstate = cs_count - 1;
 	}
 
 	return (cs_data->cs_next_cstate);
