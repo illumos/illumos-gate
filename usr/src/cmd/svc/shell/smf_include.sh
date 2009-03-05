@@ -177,7 +177,7 @@ smf_kill_contract() {
 	[ -z "$time_to_wait" ] && time_to_wait=0
 
 	# convert to 10ths.
-	time_to_wait=`expr $time_to_wait * 10`
+	time_to_wait=`/usr/bin/expr $time_to_wait '*' 10`
 
 	# Verify contract id is valid using pgrep
 	/usr/bin/pgrep -c $1 > /dev/null 2>&1
