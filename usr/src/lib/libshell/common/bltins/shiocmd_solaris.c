@@ -1112,8 +1112,15 @@ extern int b_poll(int argc, char *argv[], void *extra)
 
         varname = argv[0];
 
+#ifdef __GNUC__
+        /*
+         * Allocate one extra array entry to keep ctfconvert+gcc builds
+         * happy until CR #6379193 is fixed.
+         */
+	struct pollfd pollfd[bpoll_max+1];
+#else
 	struct pollfd pollfd[bpoll_max];
-	
+#endif
 	for(i=0 ; i < bpoll_max ; i++)
 	{	
 		np = nv_open_fmt(shp->var_tree, NV_VARNAME|NV_NOFAIL|NV_NOADD, "%s[%d].fd", varname, i);
