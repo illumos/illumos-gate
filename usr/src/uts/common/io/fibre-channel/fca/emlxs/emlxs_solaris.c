@@ -5017,8 +5017,6 @@ emlxs_quiesce(dev_info_t *dip)
 	hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
 	port = &PPORT;
 
-	prom_printf("emlxs%d: emlxs_quiesce...\n ", ddiinst);
-
 	if (hba == NULL || port == NULL) {
 		return (DDI_FAILURE);
 	}
