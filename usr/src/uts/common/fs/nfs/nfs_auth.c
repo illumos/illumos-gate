@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -604,6 +604,33 @@ nfsauth_access(struct exportinfo *exi, struct svc_req *req)
 	}
 
 	access = nfsauth_cache_get(exi, req, flavor);
+
+	/*
+	 * Client's security flavor doesn't match with "ro" or
+	 * "rw" list. Try again using AUTH_NONE if present.
+	 */
+	if ((access & NFSAUTH_WRONGSEC) && (flavor != AUTH_NONE)) {
+		/*
+		 * Have we already encountered AUTH_NONE ?
+		 */
+		if (authnone_entry != -1) {
+			mapaccess = NFSAUTH_MAPNONE;
+			access = nfsauth_cache_get(exi, req, AUTH_NONE);
+		} else {
+			/*
+			 * Check for AUTH_NONE presence.
+			 */
+			for (; i < exi->exi_export.ex_seccnt; i++) {
+				if (sp[i].s_secinfo.sc_nfsnum == AUTH_NONE) {
+					mapaccess = NFSAUTH_MAPNONE;
+					access = nfsauth_cache_get(exi, req,
+					    AUTH_NONE);
+					break;
+				}
+			}
+		}
+	}
+
 	if (access & NFSAUTH_DENIED)
 		access = NFSAUTH_DENIED;
 
