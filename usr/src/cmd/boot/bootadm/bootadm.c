@@ -7072,7 +7072,7 @@ enable_svc(char *svc)
 			return (1);
 		}
 		(void) sleep(1);
-	} while (sleeptime < 60);
+	} while (++sleeptime < 60);
 
 	bam_error(TIMEOUT_ENABLE_SVC, svc);
 
