@@ -17,14 +17,12 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_ZIL_H
 #define	_SYS_ZIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Intent log format:
@@ -47,7 +45,13 @@ typedef struct zil_header {
 	uint64_t zh_replay_seq;	/* highest replayed sequence number */
 	blkptr_t zh_log;	/* log chain */
 	uint64_t zh_claim_seq;	/* highest claimed sequence number */
-	uint64_t zh_pad[5];
+	uint64_t zh_flags;	/* header flags */
+	uint64_t zh_pad[4];
 } zil_header_t;
+
+/*
+ * zh_flags bit settings
+ */
+#define	ZIL_REPLAY_NEEDED 0x1	/* replay needed - internal only */
 
 #endif	/* _SYS_ZIL_H */
