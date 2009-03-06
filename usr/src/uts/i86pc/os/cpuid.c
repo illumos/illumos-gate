@@ -113,6 +113,14 @@ uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
 
 uint_t enable486;
+/*
+ * This is set if Solaris is booted in a fully virtualized mode:
+ *	- as HVM guest under xVM
+ *	- as guest under VMware
+ * check_for_hvm() has the logic to detect these 2 cases.
+ * This is not applicable if Solaris is booted as a para virtual guest.
+ */
+int platform_is_virt = 0;
 
 /*
  * monitor/mwait info.
@@ -443,6 +451,10 @@ check_for_hvm()
 	xen_str = (char *)xen_signature;
 	if (strcmp("XenVMMXenVMM", xen_str) == 0 && cp.cp_eax <= 0x40000002)
 		xpv_is_hvm = 1;
+
+	/* could we be running under vmware hypervisor */
+	if (xpv_is_hvm || vmware_platform())
+		platform_is_virt = 1;
 }
 #endif	/* __xpv */
 

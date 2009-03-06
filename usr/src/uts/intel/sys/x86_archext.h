@@ -620,6 +620,7 @@ extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
 extern uint32_t *cpuid_mwait_alloc(struct cpu *);
 extern void cpuid_mwait_free(struct cpu *);
 extern int cpuid_deep_cstates_supported(void);
+extern int vmware_platform(void);
 #endif
 
 struct cpu_ucode_info;

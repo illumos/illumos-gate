@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,7 +134,7 @@ static volatile int tsc_sync_go;
 }
 
 int tsc_master_slave_sync_needed = 1;
-extern int xpv_is_hvm;
+extern int platform_is_virt;
 
 static int	tsc_max_delta;
 static hrtime_t tsc_sync_tick_delta[NCPU];
@@ -416,7 +416,7 @@ tsc_sync_master(processorid_t slave)
 	tsc_sync_t *tsc = tscp;
 	int cnt;
 
-	if (!tsc_master_slave_sync_needed || xpv_is_hvm)
+	if (!tsc_master_slave_sync_needed || platform_is_virt)
 		return;
 
 	flags = clear_int_flag();
@@ -493,7 +493,7 @@ tsc_sync_slave(void)
 	tsc_sync_t *tsc = tscp;
 	int cnt;
 
-	if (!tsc_master_slave_sync_needed || xpv_is_hvm)
+	if (!tsc_master_slave_sync_needed || platform_is_virt)
 		return;
 
 	flags = clear_int_flag();

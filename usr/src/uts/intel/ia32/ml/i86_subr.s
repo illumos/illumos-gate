@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4275,6 +4275,67 @@ mfence_insn(void)
 	mfence
 	ret
 	SET_SIZE(mfence_insn)
+
+#endif /* __i386 */
+#endif /* __lint */
+
+/*
+ * This is how VMware lets the guests figure that they are running
+ * on top of VMWare platform :
+ * Write 0xA in the ECX register and put the I/O port address value of
+ * 0x564D5868 in the EAX register. Then read a word from port 0x5658.
+ * If VMWare is installed than this code will be executed correctly and
+ * the EBX register will contain the same I/O port address value of 0x564D5868.
+ * If VMWare is not installed then OS will return an exception on port access. 
+ */
+#if defined(__lint)
+
+int
+vmware_platform(void) { return (1); }
+
+#else
+
+#if defined(__amd64)
+
+	ENTRY(vmware_platform)
+	pushq	%rbx
+	xorl	%ebx, %ebx
+	movl	$0x564d5868, %eax
+	movl	$0xa, %ecx
+	movl	$0x5658, %edx
+	inl	(%dx)
+	movl	$0x564d5868, %ecx
+	xorl	%eax, %eax
+	cmpl	%ecx, %ebx
+	jne	1f
+	incl	%eax
+1:
+	popq	%rbx
+	ret
+	SET_SIZE(vmware_platform)
+
+#elif defined(__i386)
+
+	ENTRY(vmware_platform)
+	pushl	%ebx
+	pushl	%ecx
+	pushl	%edx
+	xorl	%ebx, %ebx
+	movl	$0x564d5868, %eax
+	movl	$0xa, %ecx
+	movl	$0x5658, %edx
+	inl	(%dx)
+	movl	$0x564d5868, %ecx
+	xorl	%eax, %eax
+	cmpl	%ecx, %ebx
+	jne	1f
+	incl	%eax
+1:
+	popl	%edx
+	popl	%ecx
+	popl	%ebx
+	ret
+	SET_SIZE(vmware_platform)
 
 #endif /* __i386 */
 #endif /* __lint */
