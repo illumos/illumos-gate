@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <security/pam_appl.h>
 #include <pwd.h>
@@ -163,7 +161,7 @@ key_in_keytab(const char *user, int debug)
 		return (retval);
 
 	/* need to free context with krb5_free_context */
-	if (code = krb5_init_context(&kcontext)) {
+	if (code = krb5_init_secure_context(&kcontext)) {
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (%s): Error initializing "

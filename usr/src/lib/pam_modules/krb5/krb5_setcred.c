@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,7 +297,7 @@ attempt_refresh_cred(
 	};
 
 	/* Create a new context here. */
-	if (krb5_init_context(&kmd->kcontext) != 0) {
+	if (krb5_init_secure_context(&kmd->kcontext) != 0) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): unable to "

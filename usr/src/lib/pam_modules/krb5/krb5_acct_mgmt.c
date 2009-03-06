@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <kadm5/admin.h>
 #include <krb5.h>
@@ -191,16 +188,16 @@ exp_warn(
 	}
 
 	/*
-	 * If we error out from krb5_init_context, then just set error code,
-	 * check to see about debug message and exit out of routine as the
+	 * If we error out from krb5_init_secure_context, then just set error
+	 * code, check to see about debug message and exit out of routine as the
 	 * context could not possibly have been setup.
 	 */
 
-	if (code = krb5_init_context(&kmd->kcontext)) {
+	if (code = krb5_init_secure_context(&kmd->kcontext)) {
 		err = PAM_SYSTEM_ERR;
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_ERR, "PAM-KRB5 (acct): "
-			    "krb5_init_context failed: code=%d",
+			    "krb5_init_secure_context failed: code=%d",
 			    code);
 		goto exit;
 	}

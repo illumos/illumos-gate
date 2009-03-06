@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kadm5/admin.h>
 #include <krb5.h>
@@ -317,7 +315,7 @@ krb5_verifypw(
 
 	(void) memset((char *)&params, 0, sizeof (params));
 
-	if (code = krb5_init_context(&context)) {
+	if (code = krb5_init_secure_context(&context)) {
 		return (6);
 	}
 
@@ -417,7 +415,7 @@ krb5_changepw(
 
 	(void) memset((char *)&params, 0, sizeof (params));
 
-	if (krb5_init_context(&context) != 0)
+	if (krb5_init_secure_context(&context) != 0)
 		return (PAM_SYSTEM_ERR);
 
 	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,

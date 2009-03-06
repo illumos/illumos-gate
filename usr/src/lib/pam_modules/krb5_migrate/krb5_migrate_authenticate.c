@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kadm5/admin.h>
 #include <krb5.h>
@@ -143,7 +141,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	/*
 	 * Now, lets do the all krb5/kadm5 setup for the principal addition
 	 */
-	if (retval = krb5_init_context(&context)) {
+	if (retval = krb5_init_secure_context(&context)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
 		    "PAM-KRB5-AUTOMIGRATE (auth): Error initializing "
 		    "krb5: %s", error_message(retval));
