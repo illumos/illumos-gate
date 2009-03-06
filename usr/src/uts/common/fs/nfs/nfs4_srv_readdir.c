@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -633,12 +633,12 @@ readagain:
 
 	rddir_result_size = rddir_data_len - uio.uio_resid;
 
-	/* Reading at the end of the directory */
-	if (iseofdir && (rddir_result_size == 0)) {
+	/* No data were read. Check if we reached the end of the directory. */
+	if (rddir_result_size == 0) {
 		/* encode the BOOLEAN marking no further entries */
 		IXDR_PUT_U_INT32(ptr, false);
 		/* encode the BOOLEAN signifying end of directory */
-		IXDR_PUT_U_INT32(ptr, true);
+		IXDR_PUT_U_INT32(ptr, iseofdir ? true : false);
 		resp->data_len = (char *)ptr - (char *)beginning_ptr;
 		resp->mblk->b_wptr += resp->data_len;
 		kmem_free((caddr_t)rddir_data, rddir_data_len);
