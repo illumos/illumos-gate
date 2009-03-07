@@ -198,60 +198,58 @@ fix_vfstab()
 }
 
 #
-# Delete or disable SMF services.
-# Zone is booted to milestone=none when this function is called.
+# Collect the data needed to delete or disable SMF services before we run
+# the 'update on attach'.  For a normal zone migration, 'update on attach'
+# will fix things up, but since we're p2v-ing a physical image there are
+# SMF services which UoA can't handle (since those services aren't enabled
+# in a simple zone image.
 #
-fix_smf()
+fix_smf_pre_uoa()
 {
-	#
-	# Delete services that are delivered in hollow pkgs.
 	#
 	# Start by getting the svc manifests that are delivered by hollow
 	# pkgs then use 'svccfg inventory' to get the names of the svcs
 	# delivered by those manifests.  The svc names are saved into a
-	# temporary file.  We then login to the zone and delete them from SMF
-	# so that the various dependencies also get cleaned up properly.
+	# temporary file.
 	#
 
-	smftmpfile=$(/usr/bin/mktemp -t -p /var/tmp smf.XXXXXX)
-	if [[ -z "$smftmpfile" ]]; then
+	SMFTMPFILE=$(/usr/bin/mktemp -t -p /var/tmp smf.XXXXXX)
+	if [[ -z "$SMFTMPFILE" ]]; then
 		error "$e_tmpfile"
 		return
 	fi
 
-	for i in /var/sadm/pkg/*
+	for i in $ZONEROOT/var/sadm/pkg/*
 	do
 		pkg=$(/usr/bin/basename $i)
-		[[ ! -f /var/sadm/pkg/$pkg/save/pspool/$pkg/pkgmap ]] && \
-		    continue
+		[[ ! -f $ZONEROOT/var/sadm/pkg/$pkg/save/pspool/$pkg/pkgmap ]] \
+		    && continue
 
-		manifests=$(/usr/bin/nawk '{if ($2 == "f" &&
+		/usr/bin/egrep -s "SUNW_PKG_HOLLOW=true" \
+		    $ZONEROOT/var/sadm/pkg/$pkg/pkginfo || continue
+
+		for j in $(/usr/bin/nawk '{if ($2 == "f" &&
 		    substr($4, 1, 17) == "var/svc/manifest/") print $4}' \
-		    /var/sadm/pkg/$pkg/save/pspool/$pkg/pkgmap)
-
-		if [[ -n "$manifests" ]]; then
-			/usr/bin/egrep -s "SUNW_PKG_HOLLOW=true" \
-			    /var/sadm/pkg/$pkg/pkginfo || continue
-
-			for j in $manifests
+		    $ZONEROOT/var/sadm/pkg/$pkg/save/pspool/$pkg/pkgmap)
+		do
+			svcs=$(SVCCFG_NOVALIDATE=1 \
+			    SVCCFG_REPOSITORY=$ZONEROOT/etc/svc/repository.db \
+			    /usr/sbin/svccfg inventory $ZONEROOT/$j)
+			for k in $svcs
 			do
-				svcs=$(SVCCFG_NOVALIDATE=1 /usr/sbin/svccfg \
-				    inventory /$j)
-				for k in $svcs
-				do
-					case $k in
-					*:default)
-						# ignore default instance
-						;;
-					*)
-						echo $k >> $smftmpfile
-						;;
-					esac
-				done
+				echo $k /$j >> $SMFTMPFILE
 			done
-		fi
+		done
 	done
+}
 
+#
+# Delete or disable SMF services.
+# Zone is booted to milestone=none when this function is called.
+# Use the SMF data collected by fix_smf_pre_uoa() to delete the services.
+#
+fix_smf()
+{
 	# 
 	# Zone was already booted to milestone=none, wait until SMF door exists.
 	#
@@ -264,38 +262,38 @@ fix_smf()
 	if [[ $i -eq 9 && ! -r $ZONEROOT/etc/svc/volatile/repository_door ]];
 	then
 		error "$e_nosmf"
-		/usr/bin/rm -f $smftmpfile
+		/usr/bin/rm -f $SMFTMPFILE
 		return
 	fi
 
 	insttmpfile=$(/usr/bin/mktemp -t -p /var/tmp instsmf.XXXXXX)
 	if [[ -z "$insttmpfile" ]]; then
 		error "$e_tmpfile"
-		/usr/bin/rm -f $smftmpfile
+		/usr/bin/rm -f $SMFTMPFILE
 		return
 	fi
 
-	# Get a list of the svcs that exist in the zone.
+	vlog "$v_rmhollowsvcs"
+        while read fmri mfst
+	do
+		# Delete the svc.
+		vlog "$v_delsvc" "$fmri"
+		echo "/usr/sbin/svccfg delete -f $fmri"
+		echo "/usr/sbin/svccfg delhash -d $mfst"
+		echo "rm -f $mfst"
+	done < $SMFTMPFILE > $ZONEROOT/tmp/smf_rm
+
+	/usr/sbin/zlogin -S $ZONENAME /bin/sh /tmp/smf_rm >/dev/null 2>&1
+
+	/usr/bin/rm -f $SMFTMPFILE
+
+	# Get a list of the svcs that now exist in the zone.
 	/usr/sbin/zlogin -S $ZONENAME /usr/bin/svcs -aH | \
 	    /usr/bin/nawk '{print $3}' >>$insttmpfile
 
 	[[ -n $LOGFILE ]] && \
 	    printf "[$(date)] ${MSG_PREFIX}${v_svcsinzone}\n" >&2
 	[[ -n $LOGFILE ]] && cat $insttmpfile >&2
-
-	vlog "$v_rmhollowsvcs"
-	for i in $(cat $smftmpfile)
-	do
-		# Skip svcs not installed in the zone.
-		/usr/bin/egrep -s "$i:" $insttmpfile || continue
-
-		# Delete the svc.
-		vlog "$v_delsvc" "$i"
-		/usr/sbin/zlogin -S $ZONENAME /usr/sbin/svccfg delete $i >&2 \
-		    || error "$e_delsvc" $i
-	done
-
-	/usr/bin/rm -f $smftmpfile
 
 	#
 	# Fix network services if shared stack.
@@ -545,6 +543,9 @@ fi
 if [[ ! -f $ZONEROOT/var/run && ! -d $ZONEROOT/var/run ]]; then
 	mkdir -m 1755 -p $ZONEROOT/var/run || exit $EXIT_CODE
 fi
+if [[ ! -f $ZONEROOT/var/tmp && ! -d $ZONEROOT/var/tmp ]]; then
+	mkdir -m 1777 -p $ZONEROOT/var/tmp || exit $EXIT_CODE
+fi
 if [[ ! -h $ZONEROOT/etc && ! -f $ZONEROOT/etc/mnttab ]]; then
 	/usr/bin/touch $ZONEROOT/etc/mnttab || exit $EXIT_CODE
 	/usr/bin/chmod 444 $ZONEROOT/etc/mnttab || exit $EXIT_CODE
@@ -562,6 +563,7 @@ fi
 
 # Check for zones inside of image.
 warn_zones
+fix_smf_pre_uoa
 
 #
 # Run update on attach.  State is currently 'incomplete' so use the private
@@ -569,8 +571,8 @@ warn_zones
 #
 log "$v_update"
 /usr/sbin/zoneadm -z $ZONENAME attach -U $backout >&2
-res=$?
 if (( $? != 0 )); then
+	/usr/bin/rm -f $SMFTMPFILE
 	fatal "$e_badupdate"
 else
 	log "$v_updatedone"
@@ -608,6 +610,7 @@ zone_is_running=1
 /usr/sbin/zoneadm -z $ZONENAME boot -f -- -m milestone=none
 if (( $? != 0 )); then
 	error "$e_badboot"
+	/usr/bin/rm -f $SMFTMPFILE
 	fatal "$e_exitfail"
 fi
 
