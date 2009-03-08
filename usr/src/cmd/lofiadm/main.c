@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/crypto/ioctl.h>
 #include <sys/crypto/ioctladmin.h>
 #include "utils.h"
+#include <LzmaEnc.h>
 
 /* Only need the IV len #defines out of these files, nothing else. */
 #include <aes/aes_impl.h>
@@ -65,7 +66,7 @@ static const char USAGE[] =
 	" [-c aes-128-cbc|aes-192-cbc|aes-256-cbc|des3-cbc|blowfish-cbc]"
 	" [-e] [-k keyfile] [-T [token]:[manuf]:[serial]:key]\n"
 	"       %s -d file | device\n"
-	"       %s -C [algorithm] [-s segment_size] file\n"
+	"       %s -C [gzip|gzip-6|gzip-9|lzma] [-s segment_size] file\n"
 	"       %s -U file\n"
 	"       %s [ file | device ]\n";
 
@@ -120,11 +121,14 @@ int	mech_aliases_count = (sizeof (mech_aliases) / sizeof (mech_alias_t));
 
 static int gzip_compress(void *src, size_t srclen, void *dst,
 	size_t *destlen, int level);
+static int lzma_compress(void *src, size_t srclen, void *dst,
+	size_t *destlen, int level);
 
 lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
-	{NULL,  gzip_compress,  6,	"gzip"}, /* default */
-	{NULL,	gzip_compress,	6,	"gzip-6"},
-	{NULL,	gzip_compress,	9, 	"gzip-9"}
+	{NULL,  		gzip_compress,  6,	"gzip"}, /* default */
+	{NULL,			gzip_compress,	6,	"gzip-6"},
+	{NULL,			gzip_compress,	9, 	"gzip-9"},
+	{NULL,  		lzma_compress, 	0, 	"lzma"}
 };
 
 /* For displaying lofi mappings */
@@ -139,11 +143,18 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 #define	GIGABYTE		(KILOBYTE * MEGABYTE)
 #define	LIBZ			"libz.so"
 
-static int (*compress2p)(void *, ulong_t *, void *, size_t, int) = NULL;
-
-static int gzip_compress(void *src, size_t srclen, void *dst,
-	size_t *dstlen, int level)
+static void
+usage(const char *pname)
 {
+	(void) fprintf(stderr, gettext(USAGE), pname, pname, pname,
+	    pname, pname);
+	exit(E_USAGE);
+}
+
+static int
+gzip_compress(void *src, size_t srclen, void *dst, size_t *dstlen, int level)
+{
+	static int (*compress2p)(void *, ulong_t *, void *, size_t, int) = NULL;
 	void *libz_hdl = NULL;
 
 	/*
@@ -169,12 +180,83 @@ static int gzip_compress(void *src, size_t srclen, void *dst,
 	return (0);
 }
 
+/*ARGSUSED*/
 static void
-usage(const char *pname)
+*SzAlloc(void *p, size_t size)
 {
-	(void) fprintf(stderr, gettext(USAGE), pname, pname, pname,
-	    pname, pname);
-	exit(E_USAGE);
+	return (malloc(size));
+}
+
+/*ARGSUSED*/
+static void
+SzFree(void *p, void *address, size_t size)
+{
+	free(address);
+}
+
+static ISzAlloc g_Alloc = {
+	SzAlloc,
+	SzFree
+};
+
+#define	LZMA_UNCOMPRESSED_SIZE	8
+#define	LZMA_HEADER_SIZE (LZMA_PROPS_SIZE + LZMA_UNCOMPRESSED_SIZE)
+
+/*ARGSUSED*/
+static int
+lzma_compress(void *src, size_t srclen, void *dst,
+	size_t *dstlen, int level)
+{
+	CLzmaEncProps props;
+	size_t outsize2;
+	size_t outsizeprocessed;
+	size_t outpropssize = LZMA_PROPS_SIZE;
+	uint64_t t = 0;
+	SRes res;
+	Byte *dstp;
+	int i;
+
+	outsize2 = *dstlen;
+
+	LzmaEncProps_Init(&props);
+
+	/*
+	 * The LZMA compressed file format is as follows -
+	 *
+	 * Offset Size(bytes) Description
+	 * 0		1	LZMA properties (lc, lp, lp (encoded))
+	 * 1		4	Dictionary size (little endian)
+	 * 5		8	Uncompressed size (little endian)
+	 * 13			Compressed data
+	 */
+
+	/* set the dictionary size to be 8MB */
+	props.dictSize = 1 << 23;
+
+	if (*dstlen < LZMA_HEADER_SIZE)
+		return (SZ_ERROR_OUTPUT_EOF);
+
+	dstp = (Byte *)dst;
+	t = srclen;
+	/*
+	 * Set the uncompressed size in the LZMA header
+	 * The LZMA properties (specified in 'props')
+	 * will be set by the call to LzmaEncode()
+	 */
+	for (i = 0; i < LZMA_UNCOMPRESSED_SIZE; i++, t >>= 8) {
+		dstp[LZMA_PROPS_SIZE + i] = (Byte)t;
+	}
+
+	outsizeprocessed = outsize2 - LZMA_HEADER_SIZE;
+	res = LzmaEncode(dstp + LZMA_HEADER_SIZE, &outsizeprocessed,
+	    src, srclen, &props, dstp, &outpropssize, 0, NULL,
+	    &g_Alloc, &g_Alloc);
+
+	if (res != 0)
+		return (-1);
+
+	*dstlen = outsizeprocessed + LZMA_HEADER_SIZE;
+	return (0);
 }
 
 /*

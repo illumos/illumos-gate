@@ -19,51 +19,15 @@
 # CDDL HEADER END
 #
 #
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+The source in this directory has been derived from
+LZMA SDK 4.62 downloaded from http://www.7-zip.org/sdk.html
 
-PROG= lofiadm
-OBJS= main.o utils.o
-LZMAOBJS= LzmaEnc.o LzFind.o
-
-SRCS= $(OBJS:%.o=%.c)
-
-POFILES= $(OBJS:%.o=%.po) 
-
-include ../Makefile.cmd
-
-CPPFLAGS += -I $(SRC)/common/crypto -I $(SRC)/common/lzma
-LDLIBS += -ldevinfo -lpkcs11 -lcryptoutil
-
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-
-.KEEP_STATE:
-
-all: $(LZMAOBJS) $(PROG) $(POFILE)
-
-LzmaEnc.o:	$(SRC)/common/lzma/LzmaEnc.c
-	$(COMPILE.c) -o $@ $(SRC)/common/lzma/LzmaEnc.c
-	$(POST_PROCESS)
-
-LzFind.o:	$(SRC)/common/lzma/LzFind.c
-	$(COMPILE.c) -o $@ $(SRC)/common/lzma/LzFind.c
-	$(POST_PROCESS)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LZMAOBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-install: all $(ROOTUSRSBINPROG)
-
-$(POFILE): $(POFILES)
-	$(RM) $@
-	cat $(POFILES) > $@
-
-clean:
-	$(RM) $(PROG) $(OBJS) $(LZMAOBJS) $(POFILE) $(POFILES)
-
-lint:	lint_SRCS
-
-include ../Makefile.targ
+In an effort to provide ease of syncing with the upstream
+code, this source hasn't changed much. As such this code is
+waived from the usual Solaris coding standards and is
+particularly not lint clean. An effort has been made, however, 
+to have the components compiled into the Solaris kernel be 
+lint free (this includes LzmaDec.c currently)  

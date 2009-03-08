@@ -629,7 +629,7 @@ INSTANCE_OBJS += inst_sync.o
 
 IWSCN_OBJS +=	iwscons.o
 
-LOFI_OBJS +=	lofi.o
+LOFI_OBJS +=	lofi.o LzmaDec.o
 
 FSSNAP_OBJS +=	fssnap.o
 

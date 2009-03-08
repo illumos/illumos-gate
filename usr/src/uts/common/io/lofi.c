@@ -132,6 +132,7 @@
 #include <sys/zmod.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
+#include <LzmaDec.h>
 
 /*
  * The basis for CRYOFF is derived from usr/src/uts/common/sys/fs/ufs_fs.h.
@@ -184,11 +185,31 @@ const char lofi_crypto_magic[6] = LOFI_CRYPTO_MAGIC;
 static int gzip_decompress(void *src, size_t srclen, void *dst,
 	size_t *destlen, int level);
 
+static int lzma_decompress(void *src, size_t srclen, void *dst,
+	size_t *dstlen, int level);
+
 lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 	{gzip_decompress,	NULL,	6,	"gzip"}, /* default */
 	{gzip_decompress,	NULL,	6,	"gzip-6"},
-	{gzip_decompress,	NULL,	9,	"gzip-9"}
+	{gzip_decompress,	NULL,	9,	"gzip-9"},
+	{lzma_decompress,	NULL,	0,	"lzma"}
 };
+
+/*ARGSUSED*/
+static void
+*SzAlloc(void *p, size_t size)
+{
+	return (kmem_alloc(size, KM_SLEEP));
+}
+
+/*ARGSUSED*/
+static void
+SzFree(void *p, void *address, size_t size)
+{
+	kmem_free(address, size);
+}
+
+static ISzAlloc g_Alloc = { SzAlloc, SzFree };
 
 static int
 lofi_busy(void)
@@ -484,12 +505,14 @@ lofi_blk_mech(struct lofi_state *lsp, longlong_t lblkno)
 		    lblkno, ret);
 		if (lsp->ls_mech.cm_param != iv)
 			kmem_free(iv, iv_len);
+
 		return (ret);
 	}
 
 	/* clean up the iv from the last computation */
 	if (lsp->ls_mech.cm_param != NULL && lsp->ls_mech.cm_param != iv)
 		kmem_free(lsp->ls_mech.cm_param, lsp->ls_mech.cm_param_len);
+
 	lsp->ls_mech.cm_param_len = iv_len;
 	lsp->ls_mech.cm_param = iv;
 
@@ -746,13 +769,36 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 }
 
 /*ARGSUSED*/
-static int gzip_decompress(void *src, size_t srclen, void *dst,
+static int
+gzip_decompress(void *src, size_t srclen, void *dst,
     size_t *dstlen, int level)
 {
 	ASSERT(*dstlen >= srclen);
 
 	if (z_uncompress(dst, dstlen, src, srclen) != Z_OK)
 		return (-1);
+	return (0);
+}
+
+#define	LZMA_HEADER_SIZE	(LZMA_PROPS_SIZE + 8)
+/*ARGSUSED*/
+static int
+lzma_decompress(void *src, size_t srclen, void *dst,
+	size_t *dstlen, int level)
+{
+	size_t insizepure;
+	void *actual_src;
+	ELzmaStatus status;
+
+	insizepure = srclen - LZMA_HEADER_SIZE;
+	actual_src = (void *)((Byte *)src + LZMA_HEADER_SIZE);
+
+	if (LzmaDecode((Byte *)dst, (size_t *)dstlen,
+	    (const Byte *)actual_src, &insizepure,
+	    (const Byte *)src, LZMA_PROPS_SIZE, LZMA_FINISH_ANY, &status,
+	    &g_Alloc) != SZ_OK) {
+		return (-1);
+	}
 	return (0);
 }
 
@@ -904,8 +950,20 @@ lofi_strategy_task(void *arg)
 		 * We have the compressed blocks, now uncompress them
 		 */
 		cmpbuf = compressed_seg + sdiff;
-		for (i = sblkno; i < (eblkno + 1) && i < lsp->ls_comp_index_sz;
-		    i++) {
+		for (i = sblkno; i <= eblkno; i++) {
+			ASSERT(i < lsp->ls_comp_index_sz - 1);
+
+			/*
+			 * The last segment is special in that it is
+			 * most likely not going to be the same
+			 * (uncompressed) size as the other segments.
+			 */
+			if (i == (lsp->ls_comp_index_sz - 2)) {
+				seglen = lsp->ls_uncomp_last_seg_sz;
+			} else {
+				seglen = lsp->ls_uncomp_seg_sz;
+			}
+
 			/*
 			 * Each of the segment index entries contains
 			 * the starting block number for that segment.
@@ -914,14 +972,8 @@ lofi_strategy_task(void *arg)
 			 * block number of this segment and the starting
 			 * block number of the next segment.
 			 */
-			if ((i == eblkno) &&
-			    (i == lsp->ls_comp_index_sz - 1)) {
-				cmpbytes = lsp->ls_vp_comp_size -
-				    lsp->ls_comp_seg_index[i];
-			} else {
-				cmpbytes = lsp->ls_comp_seg_index[i + 1] -
-				    lsp->ls_comp_seg_index[i];
-			}
+			cmpbytes = lsp->ls_comp_seg_index[i + 1] -
+			    lsp->ls_comp_seg_index[i];
 
 			/*
 			 * The first byte in a compressed segment is a flag
@@ -932,8 +984,6 @@ lofi_strategy_task(void *arg)
 				bcopy((cmpbuf + SEGHDR), uncompressed_seg,
 				    (cmpbytes - SEGHDR));
 			} else {
-				seglen = lsp->ls_uncomp_seg_sz;
-
 				if (li->l_decompress((cmpbuf + SEGHDR),
 				    (cmpbytes - SEGHDR), uncompressed_seg,
 				    &seglen, li->l_level) != 0) {
@@ -947,14 +997,8 @@ lofi_strategy_task(void *arg)
 			 * have to copy and copy it
 			 */
 			xfersize = lsp->ls_uncomp_seg_sz - sblkoff;
-			if (i == eblkno) {
-				if (i == (lsp->ls_comp_index_sz - 1))
-					xfersize -= (lsp->ls_uncomp_last_seg_sz
-					    - eblkoff);
-				else
-					xfersize -=
-					    (lsp->ls_uncomp_seg_sz - eblkoff);
-			}
+			if (i == eblkno)
+				xfersize -= (lsp->ls_uncomp_seg_sz - eblkoff);
 
 			bcopy((uncompressed_seg + sblkoff), bufaddr, xfersize);
 
@@ -1434,7 +1478,7 @@ lofi_map_compressed_file(struct lofi_state *lsp, char *buf)
 	    + lsp->ls_uncomp_last_seg_sz;
 
 	/*
-	 * Index size is rounded up to a 512 byte boundary for ease
+	 * Index size is rounded up to DEV_BSIZE for ease
 	 * of segmapping
 	 */
 	index_sz = sizeof (*lsp->ls_comp_seg_index) * lsp->ls_comp_index_sz;

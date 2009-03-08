@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,6 +265,7 @@ enum lofi_compress {
 	LOFI_COMPRESS_GZIP = 0,
 	LOFI_COMPRESS_GZIP_6 = 1,
 	LOFI_COMPRESS_GZIP_9 = 2,
+	LOFI_COMPRESS_LZMA = 3,
 	LOFI_COMPRESS_FUNCTIONS
 };
 
