@@ -304,6 +304,10 @@ extern "C" {
  */
 #define	E1000G_TBD_LENGTH_MASK		0x000fffff
 
+#define	E1000G_IS_VLAN_PACKET(ptr)				\
+	((((struct ether_vlan_header *)(uintptr_t)ptr)->ether_tpid) ==	\
+	htons(ETHERTYPE_VLAN))
+
 /*
  * QUEUE_INIT_LIST -- Macro which will init ialize a queue to NULL.
  */
@@ -601,6 +605,7 @@ typedef struct _e1000g_stat {
 
 	kstat_named_t rx_error;		/* Rx Error in Packet */
 	kstat_named_t rx_allocb_fail;	/* Rx Allocb Failure */
+	kstat_named_t rx_size_error;	/* Rx Size Error */
 
 	kstat_named_t tx_no_desc;	/* Tx No Desc */
 	kstat_named_t tx_no_swpkt;	/* Tx No Pkt Buffer */
@@ -807,6 +812,7 @@ typedef struct _e1000g_rx_ring {
 	uint32_t stat_error;
 	uint32_t stat_allocb_fail;
 	uint32_t stat_exceed_pkt;
+	uint32_t stat_size_error;
 #ifdef E1000G_DEBUG
 	uint32_t stat_none;
 	uint32_t stat_multi_desc;

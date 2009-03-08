@@ -175,6 +175,7 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	e1000g_ksp->rx_error.value.ul = rx_ring->stat_error;
 	e1000g_ksp->rx_allocb_fail.value.ul = rx_ring->stat_allocb_fail;
+	e1000g_ksp->rx_size_error.value.ul = rx_ring->stat_size_error;
 
 	e1000g_ksp->tx_no_swpkt.value.ul = tx_ring->stat_no_swpkt;
 	e1000g_ksp->tx_no_desc.value.ul = tx_ring->stat_no_desc;
@@ -733,6 +734,8 @@ e1000g_init_stats(struct e1000g *Adapter)
 	kstat_named_init(&e1000g_ksp->rx_error, "Rx Error",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->rx_allocb_fail, "Rx Allocb Failure",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&e1000g_ksp->rx_size_error, "Rx Size Error",
 	    KSTAT_DATA_ULONG);
 
 	kstat_named_init(&e1000g_ksp->tx_no_desc, "Tx No Desc",

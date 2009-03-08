@@ -1350,14 +1350,9 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_data_t *rx_data, ddi_dma_attr_t *p_dma_attr)
 	 * we can use it. It gives better efficiency.
 	 */
 	packet->mp = desballoc((unsigned char *)
-	    rx_buf->address - E1000G_IPALIGNROOM,
-	    rx_buf->size + E1000G_IPALIGNROOM,
+	    rx_buf->address,
+	    rx_buf->size,
 	    BPRI_MED, &packet->free_rtn);
-
-	if (packet->mp != NULL) {
-		packet->mp->b_rptr += E1000G_IPALIGNROOM;
-		packet->mp->b_wptr += E1000G_IPALIGNROOM;
-	}
 
 	packet->dma_type = e1000g_dma_type;
 	packet->ref_cnt = 1;

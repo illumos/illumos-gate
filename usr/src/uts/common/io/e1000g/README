@@ -649,3 +649,11 @@ Notes on packaging:
 ======
   This version has the following fix:
    6732858 panic in e1000g_free_dma_buffer
+
+5.3.6
+======
+  This version has the following fixes:
+   6589577 Huron does not discard and does transmit frames greater than maxFrameSize
+   6809729 Panic in function 'e1000g_rxfree_func' on T2000
+   6809877 e1000g E1000G_IPALIGNROOM code can be rewritten
+

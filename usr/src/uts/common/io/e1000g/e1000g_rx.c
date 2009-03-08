@@ -79,13 +79,8 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 		address = (unsigned char *)packet->rx_buf->address;
 		if (address != NULL) {
 			packet->mp = desballoc((unsigned char *)
-			    address - E1000G_IPALIGNROOM,
-			    packet->rx_buf->size + E1000G_IPALIGNROOM,
+			    address, packet->rx_buf->size,
 			    BPRI_MED, &packet->free_rtn);
-		}
-		if (packet->mp != NULL) {
-			packet->mp->b_rptr += E1000G_IPALIGNROOM;
-			packet->mp->b_wptr += E1000G_IPALIGNROOM;
 		}
 	}
 
@@ -112,9 +107,6 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 		    (rx_data->flag & E1000G_RX_STOPPED)) {
 			devi_node = rx_data->priv_devi_node;
 
-			e1000g_free_rx_pending_buffers(rx_data);
-			e1000g_free_rx_data(rx_data);
-
 			if (devi_node != NULL) {
 				ring_cnt = atomic_dec_32_nv(
 				    &devi_node->pending_rx_count);
@@ -129,6 +121,9 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 				atomic_dec_32(
 				    &Adapter->pending_rx_count);
 			}
+
+			e1000g_free_rx_pending_buffers(rx_data);
+			e1000g_free_rx_data(rx_data);
 		}
 		mutex_exit(&e1000g_rx_detach_lock);
 	}
@@ -406,6 +401,8 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 	uint16_t cksumflags;
 	uint_t chain_sz = 0;
 	e1000g_rx_data_t *rx_data;
+	uint32_t max_size;
+	uint32_t min_size;
 
 	ret_mp = NULL;
 	ret_nmp = NULL;
@@ -434,6 +431,9 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 		E1000G_DEBUG_STAT(rx_ring->stat_none);
 		return (ret_mp);
 	}
+
+	max_size = Adapter->max_frame_size - ETHERFCSL - VLAN_TAGSZ;
+	min_size = ETHERMIN;
 
 	/*
 	 * Loop through the receive descriptors starting at the last known
@@ -580,14 +580,8 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 		 */
 		if (packet->mp == NULL) {
 			packet->mp = desballoc((unsigned char *)
-			    rx_buf->address - E1000G_IPALIGNROOM,
-			    length + E1000G_IPALIGNROOM,
+			    rx_buf->address, length,
 			    BPRI_MED, &packet->free_rtn);
-
-			if (packet->mp != NULL) {
-				packet->mp->b_rptr += E1000G_IPALIGNROOM;
-				packet->mp->b_wptr += E1000G_IPALIGNROOM;
-			}
 		}
 
 		if (packet->mp != NULL) {
@@ -739,6 +733,15 @@ rx_copy:
 		}
 
 rx_end_of_packet:
+		if (E1000G_IS_VLAN_PACKET(rx_data->rx_mblk->b_rptr))
+			max_size = Adapter->max_frame_size - ETHERFCSL;
+
+		if ((rx_data->rx_mblk_len > max_size) ||
+		    (rx_data->rx_mblk_len < min_size)) {
+			E1000G_STAT(rx_ring->stat_size_error);
+			goto rx_drop;
+		}
+
 		/*
 		 * Found packet with EOP
 		 * Process the last fragment.
