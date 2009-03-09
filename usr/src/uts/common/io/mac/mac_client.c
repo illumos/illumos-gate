@@ -1629,7 +1629,6 @@ mac_update_single_active_client(mac_impl_t *mip)
  * for the MAC clients defined on top of the same underlying MAC
  * instance, unless the MAC_UNICAST_NODUPCHECK is specified.
  */
-
 int
 i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
     mac_unicast_handle_t *mah, uint16_t vid, mac_diag_t *diag)
@@ -1896,14 +1895,18 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	mcip->mci_unicast_list = muip;
 	rw_exit(&mcip->mci_rw_lock);
 
-	if (nactiveclients_added)
-		mac_update_single_active_client(mip);
-
 	*mah = (mac_unicast_handle_t)muip;
 
-	/* add it to the flow list of this mcip */
+	/*
+	 * First add the flent to the flow list of this mcip. Then set
+	 * the mip's mi_single_active_client if needed. The Rx path assumes
+	 * that mip->mi_single_active_client will always have an associated
+	 * flent.
+	 */
 	mac_client_add_to_flow_list(mcip, flent);
 
+	if (nactiveclients_added)
+		mac_update_single_active_client(mip);
 	/*
 	 * Trigger a renegotiation of the capabilities when the number of
 	 * active clients changes from 1 to 2, since some of the capabilities
@@ -1934,10 +1937,8 @@ bail:
 	if (mac_started)
 		mac_stop((mac_handle_t)mip);
 
-	if (nactiveclients_added) {
+	if (nactiveclients_added)
 		mip->mi_nactiveclients--;
-		mac_update_single_active_client(mip);
-	}
 
 	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
