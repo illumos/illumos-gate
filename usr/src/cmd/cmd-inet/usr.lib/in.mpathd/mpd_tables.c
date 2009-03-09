@@ -221,12 +221,6 @@ phyint_link_init(struct phyint *pi)
 		goto failed;
 	}
 
-	retval = dlpi_bind(pi->pi_dh, DLPI_ANY_SAP, NULL);
-	if (retval != DLPI_SUCCESS) {
-		errmsg = "cannot bind to DLPI_ANY_SAP";
-		goto failed;
-	}
-
 	/*
 	 * Check if the link supports DLPI link state notifications.  For
 	 * historical reasons, the actual changes are tracked through routing

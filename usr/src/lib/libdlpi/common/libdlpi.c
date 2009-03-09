@@ -835,8 +835,6 @@ dlpi_enabnotify(dlpi_handle_t dh, uint_t notes, dlpi_notifyfunc_t *funcp,
 	retval = dlpi_info((dlpi_handle_t)dip, &dlinfo, 0);
 	if (retval != DLPI_SUCCESS)
 		return (retval);
-	if (dlinfo.di_state != DL_IDLE)
-		return (DL_OUTSTATE);
 
 	if (dip->dli_note_processing)
 		return (DLPI_FAILURE);

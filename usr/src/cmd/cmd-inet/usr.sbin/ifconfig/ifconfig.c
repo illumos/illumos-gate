@@ -1621,9 +1621,6 @@ setifether(char *addr, int64_t param)
 	if ((retval = dlpi_open(name, &dh, 0)) != DLPI_SUCCESS)
 		Perrdlpi_exit("cannot dlpi_open() link", name, retval);
 
-	if ((retval = dlpi_bind(dh, DLPI_ANY_SAP, NULL)) != DLPI_SUCCESS)
-		Perrdlpi_exit("cannot dlpi_bind() link", name, retval);
-
 	retval = dlpi_enabnotify(dh, DL_NOTE_PHYS_ADDR, notifycb, NULL, &id);
 	if (retval == DLPI_SUCCESS) {
 		(void) dlpi_disabnotify(dh, id, NULL);
