@@ -672,6 +672,17 @@ extern int opteron_workaround_6323525;
 extern void patch_workaround_6323525(void);
 #endif
 
+extern int get_hwenv(void);
+extern int is_controldom(void);
+
+/*
+ * Defined hardware environments
+ */
+#define	HW_NATIVE	0x00	/* Running on bare metal */
+#define	HW_XEN_PV	0x01	/* Running on Xen Hypervisor paravirutualized */
+#define	HW_XEN_HVM	0x02	/* Running on Xen hypervisor HVM */
+#define	HW_VMWARE	0x03	/* Running on VMware hypervisor */
+
 #endif	/* _KERNEL */
 
 #endif

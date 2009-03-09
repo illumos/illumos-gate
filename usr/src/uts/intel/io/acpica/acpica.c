@@ -36,6 +36,7 @@
 #include <sys/sunddi.h>
 #include <sys/esunddi.h>
 #include <sys/kstat.h>
+#include <sys/x86_archext.h>
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
@@ -370,6 +371,7 @@ acpica_process_user_options()
 int
 acpica_init()
 {
+	extern void acpica_find_ioapics(void);
 	ACPI_STATUS status;
 
 	/*
@@ -406,6 +408,13 @@ acpica_init()
 		acpica_ec_init();
 
 		acpica_init_state = ACPICA_INITIALIZED;
+		/*
+		 * If we are running on the Xen hypervisor as dom0 we need to
+		 * find the ioapics so we can prevent ACPI from trying to
+		 * access them.
+		 */
+		if (get_hwenv() == HW_XEN_PV && is_controldom())
+			acpica_find_ioapics();
 		acpica_init_kstats();
 error:
 		if (acpica_init_state != ACPICA_INITIALIZED) {

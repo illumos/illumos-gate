@@ -102,9 +102,6 @@ mlsetup(struct regs *rp)
 	extern struct classfuncs sys_classfuncs;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
-#if !defined(__xpv)
-	extern int xpv_is_hvm;
-#endif
 
 	ASSERT_STACK_ALIGNED();
 
@@ -180,7 +177,7 @@ mlsetup(struct regs *rp)
 	 * The Xen hypervisor does not correctly report whether rdtscp is
 	 * supported or not, so we must assume that it is not.
 	 */
-	if (xpv_is_hvm == 0 && (x86_feature & X86_TSCP))
+	if (get_hwenv() != HW_XEN_HVM && (x86_feature & X86_TSCP))
 		patch_tsc_read(X86_HAVE_TSCP);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_AMD &&
 	    cpuid_getfamily(CPU) <= 0xf && (x86_feature & X86_SSE2) != 0)

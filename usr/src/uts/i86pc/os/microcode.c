@@ -203,32 +203,22 @@ ucode_free(processorid_t id, void* buf, size_t size)
 static int
 ucode_capable_amd(cpu_t *cp)
 {
-#ifndef	__xpv
-	extern int xpv_is_hvm;
-	if (xpv_is_hvm) {
+	int hwenv = get_hwenv();
+
+	if (hwenv == HW_XEN_HVM || (hwenv == HW_XEN_PV && !is_controldom())) {
 		return (0);
 	}
-#else
-	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
-		return (0);
-	}
-#endif
 	return (cpuid_getfamily(cp) >= 0x10);
 }
 
 static int
 ucode_capable_intel(cpu_t *cp)
 {
-#ifndef	__xpv
-	extern int xpv_is_hvm;
-	if (xpv_is_hvm) {
+	int hwenv = get_hwenv();
+
+	if (hwenv == HW_XEN_HVM || (hwenv == HW_XEN_PV && !is_controldom())) {
 		return (0);
 	}
-#else
-	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
-		return (0);
-	}
-#endif
 	return (cpuid_getfamily(cp) >= 6);
 }
 

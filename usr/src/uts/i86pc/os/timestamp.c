@@ -134,7 +134,6 @@ static volatile int tsc_sync_go;
 }
 
 int tsc_master_slave_sync_needed = 1;
-extern int platform_is_virt;
 
 static int	tsc_max_delta;
 static hrtime_t tsc_sync_tick_delta[NCPU];
@@ -415,8 +414,11 @@ tsc_sync_master(processorid_t slave)
 	hrtime_t write_time, x, mtsc_after, tdelta;
 	tsc_sync_t *tsc = tscp;
 	int cnt;
+	int hwtype;
 
-	if (!tsc_master_slave_sync_needed || platform_is_virt)
+	hwtype = get_hwenv();
+	if (!tsc_master_slave_sync_needed || hwtype == HW_XEN_HVM ||
+	    hwtype == HW_VMWARE)
 		return;
 
 	flags = clear_int_flag();
@@ -492,8 +494,11 @@ tsc_sync_slave(void)
 	hrtime_t s1;
 	tsc_sync_t *tsc = tscp;
 	int cnt;
+	int hwtype;
 
-	if (!tsc_master_slave_sync_needed || platform_is_virt)
+	hwtype = get_hwenv();
+	if (!tsc_master_slave_sync_needed || hwtype == HW_XEN_HVM ||
+	    hwtype == HW_VMWARE)
 		return;
 
 	flags = clear_int_flag();

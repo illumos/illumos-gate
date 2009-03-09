@@ -541,11 +541,6 @@ static int lower_pages_count = 0;
 struct system_hardware system_hardware;
 
 /*
- * Is this Solaris instance running in a fully virtualized xVM domain?
- */
-int xpv_is_hvm = 0;
-
-/*
  * Enable some debugging messages concerning memory usage...
  */
 static void
@@ -1431,7 +1426,7 @@ startup_modules(void)
 	 */
 	microfind();
 
-	if (xpv_is_hvm)
+	if (get_hwenv() == HW_XEN_HVM)
 		update_default_path();
 #endif
 
@@ -1542,7 +1537,7 @@ startup_modules(void)
 	 * Initialize a handle for the boot cpu - others will initialize
 	 * as they startup.  Do not do this if we know we are in an HVM domU.
 	 */
-	if (!xpv_is_hvm &&
+	if ((get_hwenv() != HW_XEN_HVM) &&
 	    (hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
 	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL &&
 	    (x86_feature & X86_MCA))
@@ -2155,7 +2150,7 @@ post_startup(void)
 		 * Startup the memory scrubber.
 		 * XXPV	This should be running somewhere ..
 		 */
-		if (!xpv_is_hvm)
+		if (get_hwenv() != HW_XEN_HVM)
 			memscrub_init();
 #endif
 	}
