@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -544,8 +544,9 @@ cont:
 			unlink(tnam);
 			crabort(BADCREATE);
 		}
-	} else
-		fprintf(stderr, "crontab: %s\n", gettext(ERRSFND));
+	} else {
+		crabort(ERRSFND);
+	}
 	unlink(tnam);
 }
 
