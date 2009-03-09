@@ -124,9 +124,10 @@ mac_flow_print_header(uint_t args)
 {
 	switch (args) {
 	case MAC_FLOW_NONE:
-		mdb_printf("%<u>%?s %-32s %-6s %?s %?s %-20s%</u>\n",
-		    "ADDR", "FLOW NAME", "LINKID", "MCIP", "MIP",
-		    "MIP NAME");
+		mdb_printf("%?s %-20s %4s %?s %?s %-16s\n",
+		    "", "", "LINK", "", "", "MIP");
+		mdb_printf("%<u>%?s %-20s %4s %?s %?s %-16s%</u>\n",
+		    "ADDR", "FLOW NAME", "ID", "MCIP", "MIP", "NAME");
 		break;
 	case MAC_FLOW_ATTR:
 		mdb_printf("%<u>%?s %-32s %-7s %6s "
@@ -139,21 +140,22 @@ mac_flow_print_header(uint_t args)
 		    "ADDR", "FLOW NAME", "MAXBW(M)", "PRIORITY");
 		break;
 	case MAC_FLOW_MISC:
-		mdb_printf("%<u>%?s %-32s %10s %10s "
-		    "%32s %s%</u>\n",
+		mdb_printf("%<u>%?s %-24s %10s %10s "
+		    "%20s %4s%</u>\n",
 		    "ADDR", "FLOW NAME", "TYPE", "FLAGS",
 		    "MATCH_FN", "ZONE");
 		break;
 	case MAC_FLOW_RX:
-		mdb_printf("%<u>%?s %-24s %7s %s%</u>\n",
-		    "ADDR", "FLOW NAME", "SRS_CNT", "RX_SRS");
+		mdb_printf("%?s %-24s %3s %s\n", "", "", "SRS", "RX");
+		mdb_printf("%<u>%?s %-24s %3s %s%</u>\n",
+		    "ADDR", "FLOW NAME", "CNT", "SRS");
 		break;
 	case MAC_FLOW_TX:
 		mdb_printf("%<u>%?s %-32s %?s %</u>\n",
 		    "ADDR", "FLOW NAME", "TX_SRS");
 		break;
 	case MAC_FLOW_STATS:
-		mdb_printf("%<u>%?s %-32s %?s %?s%</u>\n",
+		mdb_printf("%<u>%?s %-32s %16s %16s%</u>\n",
 		    "ADDR", "FLOW NAME", "RBYTES", "OBYTES");
 		break;
 	}
@@ -215,8 +217,8 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 	}
 	switch (args) {
 	case MAC_FLOW_NONE: {
-		mdb_printf("%?p %-32s %6d %?p "
-		    "%?p %-20s\n",
+		mdb_printf("%?p %-20s %4d %?p "
+		    "%?p %-16s\n",
 		    addr, fe.fe_flow_name, fe.fe_link_id, fe.fe_mcip,
 		    mcip.mci_mip, mip.mi_name);
 		break;
@@ -233,7 +235,7 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 			return (DCMD_ERR);
 		}
 		mdb_printf("%?p %-32s "
-		    "%-7s %6d"
+		    "%-7s %6d "
 		    "%4d:%-4d ",
 		    addr, fe.fe_flow_name,
 		    mac_flow_proto2str(fdesc.fd_protocol), fdesc.fd_local_port,
@@ -282,8 +284,8 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 		    fe.fe_flags, flow_flag_bits);
 		mdb_snprintf(flow_type, 2 * FLOW_MAX_TYPE, "%hb",
 		    fe.fe_type, flow_type_bits);
-		mdb_printf("%?p %-32s %10s %10s "
-		    "%32s %-d\n",
+		mdb_printf("%?p %-24s %10s %10s "
+		    "%20s %4d\n",
 		    addr, fe.fe_flow_name, flow_type, flow_flags,
 		    func_name, fe.fe_zoneid);
 		break;
@@ -294,7 +296,7 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 
 		rxaddr = addr + OFFSETOF(flow_entry_t, fe_rx_srs);
 		(void) mdb_vread(rx_srs, MAC_RX_SRS_SIZE, rxaddr);
-		mdb_printf("%?p %-24s %7d ",
+		mdb_printf("%?p %-24s %3d ",
 		    addr, fe.fe_flow_name, fe.fe_rx_srs_cnt);
 		for (i = 0; i < MAX_RINGS_PER_GROUP; i++) {
 			if (rx_srs[i] == 0)
@@ -541,19 +543,19 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	switch (args) {
 	case MAC_SRS_RX: {
 		if (DCMD_HDRSPEC(flags)) {
-			mdb_printf("%?s %-20s %-8s %-8s %-8s "
-			    "%-8s %-3s\n",
+			mdb_printf("%?s %-20s %-8s %-8s %8s "
+			    "%8s %3s\n",
 			    "", "", "", "", "MBLK",
 			    "Q", "SR");
-			mdb_printf("%<u>%?s %-20s %-8s %-8s %-8s "
-			    "%-8s %-3s%</u>\n",
+			mdb_printf("%<u>%?s %-20s %-8s %-8s %8s "
+			    "%8s %3s%</u>\n",
 			    "ADDR", "LINK_NAME", "STATE", "TYPE", "CNT",
 			    "BYTES", "CNT");
 		}
 		if (srs.srs_type & SRST_TX)
 			return (DCMD_OK);
 		mdb_printf("%?p %-20s %08x %08x "
-		    "%-8d %-8d %-3d\n",
+		    "%8d %8d %3d\n",
 		    addr, mci.mci_name, srs.srs_state, srs.srs_type,
 		    srs.srs_count, srs.srs_size, srs.srs_soft_ring_count);
 		break;
@@ -561,11 +563,11 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case MAC_SRS_TX: {
 		if (DCMD_HDRSPEC(flags)) {
 			mdb_printf("%?s %-16s %-4s %-8s "
-			    "%-8s %-8s %-8s %-3s\n",
+			    "%-8s %8s %8s %3s\n",
 			    "", "", "TX", "",
 			    "", "MBLK", "Q", "SR");
 			mdb_printf("%<u>%?s %-16s %-4s %-8s "
-			    "%-8s %-8s %-8s %-3s%</u>\n",
+			    "%-8s %8s %8s %3s%</u>\n",
 			    "ADDR", "LINK_NAME", "MODE", "STATE",
 			    "TYPE", "CNT", "BYTES", "CNT");
 		}
@@ -573,7 +575,7 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_OK);
 
 		mdb_printf("%?p %-16s %-4s "
-		    "%08x %08x %-8d %-8d %-3d\n",
+		    "%08x %08x %8d %8d %3d\n",
 		    addr, mci.mci_name, mac_srs_txmode2str(srs.srs_tx.st_mode),
 		    srs.srs_state, srs.srs_type, srs.srs_count, srs.srs_size,
 		    srs.srs_oth_ring_count);
@@ -668,20 +670,20 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mac_srs_rx_t srs_rx = srs.srs_rx;
 
 		if (DCMD_HDRSPEC(flags)) {
-			mdb_printf("%?s %-16s %-8s %-8s "
-			    "%-8s %-8s %-8s\n",
+			mdb_printf("%?s %-16s %8s %8s "
+			    "%8s %8s %8s\n",
 			    "", "", "INTR", "POLL",
 			    "CHAIN", "CHAIN", "CHAIN");
-			mdb_printf("%<u>%?s %-16s %-8s %-8s "
-			    "%-8s %-8s %-8s%</u>\n",
+			mdb_printf("%<u>%?s %-16s %8s %8s "
+			    "%8s %8s %8s%</u>\n",
 			    "ADDR", "LINK_NAME", "COUNT", "COUNT",
 			    "<10", "10-50", ">50");
 		}
 		if (srs.srs_type & SRST_TX)
 			return (DCMD_OK);
-		mdb_printf("%?p %-16s %-8d "
-		    "%-8d %-8d "
-		    "%-8d %-8d\n",
+		mdb_printf("%?p %-16s %8d "
+		    "%8d %8d "
+		    "%8d %8d\n",
 		    addr, mci.mci_name, srs_rx.sr_intr_count,
 		    srs_rx.sr_poll_count, srs_rx.sr_chain_cnt_undr10,
 		    srs_rx.sr_chain_cnt_10to50, srs_rx.sr_chain_cnt_over50);
@@ -689,26 +691,49 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 	case MAC_SRS_TXSTAT: {
 		mac_srs_tx_t srs_tx = srs.srs_tx;
+		mac_soft_ring_t *s_ringp, s_ring;
+		boolean_t	first = B_TRUE;
 
 		if (DCMD_HDRSPEC(flags)) {
-			mdb_printf("%?s %-20s %-5s %-8s "
-			    "%-8s %-8s %-8s\n",
-			    "", "", "WOKEN", "MAX",
-			    "DROP", "BLOCK", "UNBLOCK");
-			mdb_printf("%<u>%?s %-20s %-5s %-8s "
-			    "%-8s %-8s %-8s%</u>\n",
-			    "ADDR", "LINK_NAME", "UP", "Q_COUNT",
-			    "COUNT", "COUNT", "COUNT");
+			mdb_printf("%?s %-20s %?s %8s %8s %8s\n",
+			    "", "", "SOFT", "DROP", "BLOCK", "UNBLOCK");
+			mdb_printf("%<u>%?s %-20s %?s %8s %8s %8s%</u>\n",
+			    "ADDR", "LINK_NAME", "RING", "COUNT", "COUNT",
+			    "COUNT");
 		}
 		if (!(srs.srs_type & SRST_TX))
 			return (DCMD_OK);
 
-		mdb_printf("%?p %-20s %-5d "
-		    "%-8d %-8d "
-		    "%-8d %-8d\n",
-		    addr, mci.mci_name, srs.srs_tx.st_woken_up,
-		    srs_tx.st_max_q_cnt, srs_tx.st_drop_count,
-		    srs_tx.st_blocked_cnt, srs_tx.st_unblocked_cnt);
+		mdb_printf("%?p %-20s ", addr, mci.mci_name);
+
+		/*
+		 * Case of no soft rings, print the info from
+		 * mac_srs_tx_t.
+		 */
+		if (srs.srs_oth_ring_count == 0) {
+			mdb_printf("%?p %8d %8d %8d\n",
+			    0, srs_tx.st_drop_count, srs_tx.st_blocked_cnt,
+			    srs_tx.st_unblocked_cnt);
+			break;
+		}
+
+		for (s_ringp = srs.srs_soft_ring_head; s_ringp != NULL;
+		    s_ringp = s_ring.s_ring_next) {
+			(void) mdb_vread(&s_ring, sizeof (s_ring),
+			    (uintptr_t)s_ringp);
+			if (first) {
+				mdb_printf("%?p %8d %8d %8d\n",
+				    s_ringp, s_ring.s_ring_drops,
+				    s_ring.s_ring_blocked_cnt,
+				    s_ring.s_ring_unblocked_cnt);
+				first = B_FALSE;
+				continue;
+			}
+			mdb_printf("%?s %-20s %?p %8d %8d %8d\n",
+			    "", "", s_ringp, s_ring.s_ring_drops,
+			    s_ring.s_ring_blocked_cnt,
+			    s_ring.s_ring_unblocked_cnt);
+		}
 		break;
 	}
 	case MAC_SRS_NONE: {
