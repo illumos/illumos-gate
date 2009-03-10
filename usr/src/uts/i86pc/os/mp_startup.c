@@ -120,6 +120,13 @@ init_cpu_info(struct cpu *cp)
 	 */
 	cp->cpu_curr_clock = cpu_freq_hz;
 
+	/*
+	 * Supported frequencies.
+	 */
+	if (cp->cpu_supp_freqs == NULL) {
+		cpu_set_supp_freqs(cp, NULL);
+	}
+
 	(void) strcpy(pi->pi_processor_type, "i386");
 	if (fpu_exists)
 		(void) strcpy(pi->pi_fputypes, "i387 compatible");

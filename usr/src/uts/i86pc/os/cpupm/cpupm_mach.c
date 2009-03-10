@@ -144,8 +144,6 @@ cpupm_init(cpu_t *cp)
 	uint_t nspeeds;
 	int ret;
 
-	cpupm_set_supp_freqs(cp, NULL, 1);
-
 	mach_state = cp->cpu_m.mcpu_pm_mach_state =
 	    kmem_zalloc(sizeof (cpupm_mach_state_t), KM_SLEEP);
 	mach_state->ms_caps = CPUPM_NO_STATES;
@@ -207,9 +205,13 @@ cpupm_init(cpu_t *cp)
 	if (mach_state->ms_tstate.cma_ops != NULL) {
 		ret = mach_state->ms_tstate.cma_ops->cpus_init(cp);
 		if (ret != 0) {
-			cmn_err(CE_WARN, "!cpupm_init: processor %d:"
-			    " unable to initialize T-state support",
-			    cp->cpu_id);
+			char err_msg[128];
+			int p_res;
+			p_res =	snprintf(err_msg, sizeof (err_msg),
+			    "!cpupm_init: processor %d: unable to initialize "
+			    "T-state support", cp->cpu_id);
+			if (p_res >= 0)
+				DTRACE_PROBE1(cpu_ts_err_msg, char *, err_msg);
 			mach_state->ms_tstate.cma_ops = NULL;
 			cpupm_disable(CPUPM_T_STATES);
 		} else {
