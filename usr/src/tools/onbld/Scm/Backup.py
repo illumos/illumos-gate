@@ -59,7 +59,6 @@ dirstate, are optional.
 
 import os, pwd, shutil, traceback, tarfile, time
 from mercurial import changegroup, patch, node, util, revlog
-from cStringIO import StringIO
 
 
 class CdmNodeMissing(util.Abort):
@@ -211,7 +210,7 @@ class CdmUncommittedBackup(object):
         # Note that this doesn't handle uncommitted merges
         # as CdmUncommittedBackup itself doesn't.
         #
-        wctx = self.ws.repo.workingctx()
+        wctx = self.ws.workingctx()
         parent = wctx.parents()[0]
 
         ret = []
@@ -228,7 +227,7 @@ class CdmUncommittedBackup(object):
             raise util.Abort("Unable to backup an uncommitted merge.\n"
                              "Please complete your merge and commit")
 
-        dirstate = node.hex(self.ws.repo.changectx().node())
+        dirstate = node.hex(self.ws.workingctx().parents()[0].node())
 
         fp = None
         try:
@@ -255,8 +254,8 @@ class CdmUncommittedBackup(object):
         try:
             try:
                 fp = open(self.bu.backupfile('diff'), 'w')
-                patch.diff(self.ws.repo, fp=fp,
-                           opts=patch.diffopts(self.ws.ui, opts={'git': True}))
+                opts = patch.diffopts(self.ws.ui, opts={'git': True})
+                fp.write(self.ws.diff(opts=opts))
             except EnvironmentError, e:
                 raise util.Abort("couldn't save working copy diff: %s" % e)
         finally:
@@ -264,7 +263,7 @@ class CdmUncommittedBackup(object):
                 fp.close()
 
     def _dirstate(self):
-        '''Return the current working copy node'''
+        '''Return the desired working copy node from the backup'''
         fp = None
         try:
             try:
@@ -282,11 +281,18 @@ class CdmUncommittedBackup(object):
         diff = self.bu.backupfile('diff')
         dirstate = self._dirstate()
 
+        #
+        # Check that the patch's parent changeset exists.
+        #
         try:
-            self.ws.clean(rev=dirstate)
+            n = node.bin(dirstate)
+            self.ws.repo.changelog.lookup(n)
         except revlog.LookupError, e:
             raise CdmNodeMissing("couldn't restore uncommitted changes",
-                                             e.name)
+                                 e.name)
+
+        try:
+            self.ws.clean(rev=dirstate)
         except util.Abort, e:
             raise util.Abort("couldn't update to saved node: %s" % e)
 
@@ -339,16 +345,14 @@ class CdmUncommittedBackup(object):
 
     def need_backup(self):
         '''Compare backup of uncommitted changes to workspace'''
-        if self._dirstate() != node.hex(self.ws.repo.changectx().node()):
+        cnode = self.ws.workingctx().parents()[0].node()
+        if self._dirstate() != node.hex(cnode):
             return True
 
-        curdiff = StringIO()
+        opts = patch.diffopts(self.ws.ui, opts={'git': True})
+        curdiff = self.ws.diff(opts=opts)
+
         diff = self.bu.backupfile('diff')
-        fd = None
-
-        patch.diff(self.ws.repo, fp=curdiff,
-                   opts=patch.diffopts(self.ws.ui, opts={'git': True}))
-
         if os.path.exists(diff):
             try:
                 try:
@@ -363,7 +367,7 @@ class CdmUncommittedBackup(object):
         else:
             backdiff = ''
 
-        if backdiff != curdiff.getvalue():
+        if backdiff != curdiff:
             return True
 
 
@@ -513,7 +517,13 @@ class CdmMetadataBackup(object):
                 if elt.isdir():     # Don't care about directories
                     continue
 
-                if (elt.mtime != os.path.getmtime(fpath) or
+                #
+                # The filesystem can give us mtime with fractional seconds
+                # (as a float), whereas tar files only keep it to the second.
+                #
+                # Always compare to the integer (second-granularity) mtime.
+                #
+                if (elt.mtime != int(os.path.getmtime(fpath)) or
                     elt.size != os.path.getsize(fpath)):
                     return True
 

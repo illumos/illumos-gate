@@ -66,13 +66,13 @@ def yes_no(ui, msg, default):
         defanswer = 'n'
 
     resp = ui.prompt(msg + prompt, r'([Yy(es)?|[Nn]o?)?',
-		     default=defanswer)
+                     default=defanswer)
     if not resp:
-	return default
+        return default
     elif resp[0] in ['Y', 'y']:
-	return True
+        return True
     else:
-	return False
+        return False
 
 
 def _buildfilelist(repo, args):
@@ -122,7 +122,6 @@ def not_check(repo, cmd):
     '''return a function which returns boolean indicating whether a file
     should be skipped for CMD.'''
 
-
     #
     # The ignore routines need a canonical path to the file (relative to the
     # repo root), whereas the check commands get paths relative to the cwd.
@@ -137,10 +136,10 @@ def not_check(repo, cmd):
 
     ignorefiles = []
 
-    for f in [ repo.join('cdm/%s.NOT' % cmd),
-               repo.wjoin('exception_lists/%s' % cmd) ]:
+    for f in [repo.join('cdm/%s.NOT' % cmd),
+               repo.wjoin('exception_lists/%s' % cmd)]:
         if os.path.exists(f):
-	    ignorefiles.append(f)
+            ignorefiles.append(f)
 
     if ignorefiles:
         ign = ignore.ignore(repo.root, ignorefiles, repo.ui.warn)
@@ -163,27 +162,30 @@ def not_check(repo, cmd):
 #
 wslist = {}
 
+
 def reposetup(ui, repo):
     if repo.local() and repo not in wslist:
         wslist[repo] = WorkSpace(repo)
 
-	if ui.interactive and sys.stdin.isatty():
-	    ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
-			 'python:hgext_cdm.pbconfirm')
+        if ui.interactive and sys.stdin.isatty():
+            ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
+                         'python:hgext_cdm.pbconfirm')
+
 
 def pbconfirm(ui, repo, hooktype, source):
     def wrapper(settings=None):
-	    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, settings)
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, settings)
 
     if source == 'push':
         if not yes_no(ui, "Are you sure you wish to push?", False):
             return 1
         else:
             settings = termios.tcgetattr(sys.stdin.fileno())
-	    orig = list(settings)
-	    atexit.register(wrapper, orig)
-	    settings[3] = settings[3] & (~termios.ISIG) # c_lflag
-	    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, settings)
+            orig = list(settings)
+            atexit.register(wrapper, orig)
+            settings[3] = settings[3] & (~termios.ISIG) # c_lflag
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, settings)
+
 
 def cdm_pdiffs(ui, repo, *pats, **opts):
     '''list workspace diffs relative to parent workspace
@@ -525,7 +527,7 @@ def cdm_branchchk(ui, repo, **opts):
     ui.write('Checking for multiple heads (or branches):\n')
 
     heads = set(repo.heads())
-    parents = set([x.node() for x in repo.workingctx().parents()])
+    parents = set([x.node() for x in wslist[repo].workingctx().parents()])
 
     #
     # We care if there's more than one head, and those heads aren't
@@ -983,11 +985,11 @@ def cdm_webrev(ui, repo, **opts):
 
     webrev_args = ""
     for key in opts.keys():
-    	if opts[key]:
-	    if type(opts[key]) == type(True):
-	        webrev_args += '-' + key + ' '
+        if opts[key]:
+            if type(opts[key]) == type(True):
+                webrev_args += '-' + key + ' '
             else:
-	        webrev_args += '-' + key + ' ' + opts[key] + ' '
+                webrev_args += '-' + key + ' ' + opts[key] + ' '
 
     retval = os.system('webrev ' + webrev_args)
     if retval != 0:
@@ -1084,11 +1086,11 @@ cmdtable = {
                             ('l', 'l', '', 'extract file list from putback -n'),
                             ('N', 'N', None, 'supress comments'),
                             ('n', 'n', None, 'do not generate webrev'),
-			    ('O', 'O', None, 'OpenSolaris mode'),
+                            ('O', 'O', None, 'OpenSolaris mode'),
                             ('o', 'o', '', 'output directory'),
                             ('p', 'p', '', 'use specified parent'),
                             ('t', 't', '', 'upload target'),
-			    ('U', 'U', None, 'upload the webrev'),
+                            ('U', 'U', None, 'upload the webrev'),
                             ('w', 'w', '', 'use wx active file')],
                'hg webrev [WEBREV_OPTIONS]'),
 }

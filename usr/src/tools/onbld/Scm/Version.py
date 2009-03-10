@@ -14,30 +14,33 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 '''
-Minimal amount of code to check the version of Mercurial in use
-against our expectations.
+Deal with Mercurial versioning.
+
+At a basic level, code to verify that the version of Mercurial in use
+is suitable for use with Cadmium, and compare that version for the
+sake of adapting to Mercurial API changes.
 '''
 
 #
-# It is important that this rely on as little of Mercurial as is possible.
+# It is important that this module rely on as little of Mercurial as
+# is possible.
 #
-
 from mercurial import version
 
 
 class VersionMismatch(Exception):
-    "Exception used to indicate a mis-match between Scm tools and Mercurial"
+    "Exception used to indicate a mismatch between SCM tools and Mercurial"
     pass
 
 #
 # List of versions that are explicitly acceptable to us
 #
-GOOD_VERSIONS = ['1.0', '1.0.1', '1.0.2']
+GOOD_VERSIONS = ['1.0.2', '1.1.2']
 
 
 def check_version():
@@ -52,6 +55,49 @@ def check_version():
 
     if version.get_version() not in GOOD_VERSIONS:
         raise VersionMismatch("Scm expects Mercurial version %s, "
-                              "actual version is %s" %
+                              "actual version is %s." %
                               (versionstring(GOOD_VERSIONS),
                                version.get_version()))
+
+
+def _split_version(ver):
+    '''Return the Mercurial version as a list [MAJOR, MINOR, MICRO],
+    if this is not a released Mercurial return None.'''
+
+    try:
+        l = map(int, ver.split('.'))
+        # If there's only one element, it's not really a tagged version
+        if len(l) <= 1:
+            return None
+        else:
+            return l
+    except ValueError:
+        return None
+
+
+def at_least(desired):
+    '''Return boolean indicating if the running version is greater
+    than or equal to, the version specified by major, minor, micro'''
+
+    hgver = _split_version(version.get_version())
+    desired = map(int, desired.split('.'))
+
+    #
+    # If _split_version() returns None, we're running on a Mercurial that
+    # has not been tagged as a release.  We assume this to be newer
+    # than any released version.
+    #
+    if hgver == None:
+        return True
+
+    # Pad our versions to the same overall length, appending 0's
+    while len(hgver) < len(desired):
+        hgver.append(0)
+    while len(desired) < len(hgver):
+        desired.append(0)
+
+    for real, req in zip(hgver, desired):
+        if real != req:
+            return real > req
+
+    return True

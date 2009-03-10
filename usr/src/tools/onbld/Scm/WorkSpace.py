@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -48,6 +48,8 @@ import os
 from mercurial import hg, patch, cmdutil, util, node, repo
 from mercurial import revlog, repair
 from hgext import mq
+
+from onbld.Scm import Version
 
 
 class ActiveEntry(object):
@@ -424,7 +426,7 @@ class ActiveList(object):
         if parentfile.size() != localfile.size():
             return True
 
-        if parentfile.fileflags() != localfile.fileflags():
+        if self.ws.flags(parentfile) != self.ws.flags(localfile):
             return True
 
         if parentfile.cmp(localfile.data()):
@@ -478,7 +480,7 @@ class WorkSpace(object):
         # local branch heads to those which are outgoing
         #
         outnodes = self.repo.changelog.nodesbetween(bases, heads)[0]
-        wctx = self.repo.workingctx()
+        wctx = self.workingctx()
 
         #
         # A modified working context is seen as a proto-branch, where
@@ -553,6 +555,10 @@ class WorkSpace(object):
         on change-type'''
         states = ['modified', 'added', 'removed', 'deleted', 'unknown',
               'ignored']
+
+        if base is None and Version.at_least("1.1"):
+            base = '.'
+
         chngs = self.repo.status(base, head)
         return dict(zip(states, chngs))
 
@@ -580,20 +586,20 @@ class WorkSpace(object):
 
     def modified(self):
         '''Return a list of files modified in the workspace'''
-        wctx = self.repo.workingctx()
+        wctx = self.workingctx()
         return sorted(wctx.files() + wctx.deleted()) or None
 
     def merged(self):
         '''Return boolean indicating whether the workspace has an uncommitted
         merge'''
-        wctx = self.repo.workingctx()
+        wctx = self.workingctx()
         return len(wctx.parents()) > 1
 
     def branched(self):
         '''Return boolean indicating whether the workspace has an
         uncommitted named branch'''
 
-        wctx = self.repo.workingctx()
+        wctx = self.workingctx()
         return wctx.branch() != wctx.parents()[0].branch()
 
     def active(self, parent=None):
@@ -649,13 +655,11 @@ class WorkSpace(object):
         if not act.revs:
             return
 
-        names, match = cmdutil.matchpats(self.repo, pats, opts)[:2]
+        matchfunc = self.matcher(pats, opts)
         opts = patch.diffopts(self.ui, opts)
 
-        ret = cStringIO.StringIO()
-        patch.diff(self.repo, act.parenttip.node(), act.localtip.node(),
-                   names, fp=ret, opts=opts, match=match)
-        return ret.getvalue()
+        return self.diff(act.parenttip.node(), act.localtip.node(),
+                         match=matchfunc, opts=opts)
 
     #
     # Theory:
@@ -817,6 +821,7 @@ class WorkSpace(object):
     def clean(self, rev=None):
         '''Bring workspace up to REV (or tip) forcefully (discarding in
         progress changes)'''
+
         if rev != None:
             rev = self.repo.lookup(rev)
         else:
@@ -829,3 +834,40 @@ class WorkSpace(object):
         '''True if the workspace has Mq patches applied'''
         q = mq.queue(self.ui, self.repo.join(''))
         return q.applied
+
+    if Version.at_least("1.1"):
+        def workingctx(self):
+            return self.repo.changectx(None)
+
+        def flags(self, ctx):
+            return ctx.flags()
+
+        def matcher(self, pats, opts):
+            return cmdutil.match(self.repo, pats, opts)
+
+        def diff(self, node1=None, node2=None, match=None, opts=None):
+            ret = cStringIO.StringIO()
+
+            for chunk in patch.diff(self.repo, node1, node2, match=match,
+                                    opts=opts):
+                ret.write(chunk)
+
+            return ret.getvalue()
+    else:
+        def workingctx(self):
+            return self.repo.workingctx()
+
+        def flags(self, ctx):
+            return ctx.fileflags()
+
+        def matcher(self, pats, opts):
+            return cmdutil.matchpats(self.repo, pats, opts)[1]
+
+        def diff(self, node1=None, node2=None, match=None, opts=None):
+            ret = cStringIO.StringIO()
+
+            imatch = match or util.always
+            patch.diff(self.repo, node1, node2, fp=ret, match=imatch,
+                       opts=opts)
+
+            return ret.getvalue()
