@@ -1038,6 +1038,7 @@ xdfs_probe(dev_info_t *dip)
 	(void) ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
 	    DDI_KERNEL_IOCTL, NULL, 0);
 
+	kmem_free(path, MAXPATHLEN);
 	return (DDI_PROBE_SUCCESS);
 }
 
