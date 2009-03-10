@@ -52,9 +52,6 @@ uint32_t nxge_groups_per_port = 2;
 extern uint32_t nxge_use_partition;
 extern uint32_t nxge_dma_obp_props_only;
 
-extern uint16_t nxge_rcr_timeout;
-extern uint16_t nxge_rcr_threshold;
-
 extern uint_t nxge_rx_intr(void *, void *);
 extern uint_t nxge_tx_intr(void *, void *);
 extern uint_t nxge_mif_intr(void *, void *);
@@ -1966,6 +1963,30 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	    p_cfgp, p_cfgp->max_rdc_grpids,
 	    p_cfgp->def_mac_rxdma_grpid));
 
+	nxgep->intr_timeout = NXGE_RDC_RCR_TIMEOUT;
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+	    "rxdma-intr-time", (int **)&prop_val, &prop_len) ==
+	    DDI_PROP_SUCCESS) {
+		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
+			nxgep->intr_timeout = prop_val[0];
+			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
+			    nxgep->dip, "rxdma-intr-time", prop_val, prop_len);
+		}
+		ddi_prop_free(prop_val);
+	}
+
+	nxgep->intr_threshold = NXGE_RDC_RCR_THRESHOLD;
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+	    "rxdma-intr-pkts", (int **)&prop_val, &prop_len) ==
+	    DDI_PROP_SUCCESS) {
+		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
+			nxgep->intr_threshold = prop_val[0];
+			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
+			    nxgep->dip, "rxdma-intr-pkts", prop_val, prop_len);
+		}
+		ddi_prop_free(prop_val);
+	}
+
 	nxge_set_hw_dma_config(nxgep);
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "<== nxge_use_default_dma_config_n2"));
 	return (status);
@@ -2214,23 +2235,26 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	    p_cfgp, p_cfgp->start_ldg, p_cfgp->max_ldgs,
 	    p_cfgp->def_mac_rxdma_grpid));
 
+	nxgep->intr_timeout = NXGE_RDC_RCR_TIMEOUT;
 	prop = param_arr[param_rxdma_intr_time].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
 	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
-			nxge_rcr_timeout = prop_val[0];
+			nxgep->intr_timeout = prop_val[0];
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
 			    nxgep->dip, prop, prop_val, prop_len);
 		}
 		ddi_prop_free(prop_val);
 	}
+
+	nxgep->intr_threshold = NXGE_RDC_RCR_THRESHOLD;
 	prop = param_arr[param_rxdma_intr_pkts].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
 	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
-			nxge_rcr_threshold = prop_val[0];
+			nxgep->intr_threshold = prop_val[0];
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
 			    nxgep->dip, prop, prop_val, prop_len);
 		}
@@ -2390,8 +2414,8 @@ nxge_set_rdc_intr_property(p_nxge_t nxgep)
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 
 	for (i = 0; i < NXGE_MAX_RDCS; i++) {
-		p_dma_cfgp->rcr_timeout[i] = nxge_rcr_timeout;
-		p_dma_cfgp->rcr_threshold[i] = nxge_rcr_threshold;
+		p_dma_cfgp->rcr_timeout[i] = nxgep->intr_timeout;
+		p_dma_cfgp->rcr_threshold[i] = nxgep->intr_threshold;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, " <== nxge_set_rdc_intr_property"));
@@ -2777,15 +2801,17 @@ nxge_set_hw_class_config(p_nxge_t nxgep)
 	p_nxge_class_pt_cfg_t p_class_cfgp;
 	int start_prop, end_prop;
 	uint_t prop_cnt;
+	int start_class, j = 0;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, " ==> nxge_set_hw_class_config"));
 
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	param_arr = nxgep->param_arr;
-	start_prop = param_class_opt_ip_usr4;
+	start_prop = param_class_opt_ipv4_tcp;
 	end_prop = param_class_opt_ipv6_sctp;
+	start_class = TCAM_CLASS_TCP_IPV4;
 
-	for (i = start_prop; i <= end_prop; i++) {
+	for (i = start_prop, j = 0; i <= end_prop; i++, j++) {
 		prop = param_arr[i].fcode_name;
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip,
 		    0, prop, &int_prop_val,
@@ -2795,7 +2821,7 @@ nxge_set_hw_class_config(p_nxge_t nxgep)
 		} else {
 			cfg_value = (uint32_t)param_arr[i].value;
 		}
-		p_class_cfgp->class_cfg[i - start_prop] = cfg_value;
+		p_class_cfgp->class_cfg[start_class + j] = cfg_value;
 	}
 
 	prop = param_arr[param_h1_init_value].fcode_name;

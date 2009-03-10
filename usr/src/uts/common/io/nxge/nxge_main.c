@@ -103,8 +103,6 @@ uint32_t 	nxge_dvma_thresh = TX_FASTDVMA_MIN;
 uint32_t 	nxge_dma_stream_thresh = TX_STREAM_MIN;
 uint32_t	nxge_jumbo_mtu	= TX_JUMBO_MTU;
 boolean_t	nxge_jumbo_enable = B_FALSE;
-uint16_t	nxge_rcr_timeout = NXGE_RDC_RCR_TIMEOUT;
-uint16_t	nxge_rcr_threshold = NXGE_RDC_RCR_THRESHOLD;
 nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
 
 /* MAX LSO size */

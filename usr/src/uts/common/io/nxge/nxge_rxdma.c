@@ -62,9 +62,6 @@ extern uint32_t nxge_mblks_pending;
 extern uint32_t nxge_max_rx_pkts;
 boolean_t nxge_jumbo_enable;
 
-extern uint16_t nxge_rcr_timeout;
-extern uint16_t nxge_rcr_threshold;
-
 /*
  * Tunables to manage the receive buffer blocks.
  *
@@ -3324,15 +3321,6 @@ nxge_map_rxdma(p_nxge_t nxgep, int channel)
 
 	if (nxge_alloc_rxb(nxgep, channel) != NXGE_OK)
 		return (NXGE_ERROR);
-
-	/*
-	 * Timeout should be set based on the system clock divider.
-	 * A timeout value of 1 assumes that the
-	 * granularity (1000) is 3 microseconds running at 300MHz.
-	 */
-
-	nxgep->intr_threshold = nxge_rcr_threshold;
-	nxgep->intr_timeout = nxge_rcr_timeout;
 
 	/*
 	 * Map descriptors from the buffer polls for each dma channel.

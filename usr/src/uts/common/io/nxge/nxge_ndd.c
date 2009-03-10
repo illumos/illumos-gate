@@ -114,6 +114,8 @@ static int nxge_param_get_mac_rdcgrp(p_nxge_t, queue_t *,
 	p_mblk_t, caddr_t);
 static int nxge_param_get_rxdma_rdcgrp_info(p_nxge_t, queue_t *,
 	p_mblk_t, caddr_t);
+static int nxge_param_get_rx_intr_time(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
+static int nxge_param_get_rx_intr_pkts(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
 static int nxge_param_get_ip_opt(p_nxge_t, queue_t *, mblk_t *, caddr_t);
 static int nxge_param_get_mac(p_nxge_t, queue_t *q, p_mblk_t, caddr_t);
 static int nxge_param_get_debug_flag(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
@@ -301,11 +303,13 @@ static nxge_param_t	nxge_param_arr[] = {
 		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 0, 0, "default-port-rdc", "default_port_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_rx_intr_time, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_rx_intr_time, nxge_param_rx_intr_time,
+		NXGE_PARAM_RXDMA_RW,
 		NXGE_RDC_RCR_TIMEOUT_MIN, NXGE_RDC_RCR_TIMEOUT_MAX,
 		NXGE_RDC_RCR_TIMEOUT, 0, "rxdma-intr-time", "rxdma_intr_time"},
 
-	{ nxge_param_get_generic, nxge_param_rx_intr_pkts, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_rx_intr_pkts, nxge_param_rx_intr_pkts,
+		NXGE_PARAM_RXDMA_RW,
 		NXGE_RDC_RCR_THRESHOLD_MIN, NXGE_RDC_RCR_THRESHOLD_MAX,
 		NXGE_RDC_RCR_THRESHOLD, 0,
 		"rxdma-intr-pkts", "rxdma_intr_pkts"},
@@ -950,6 +954,36 @@ nxge_param_get_port_mode(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	    nxgep->soft_lso_enable ? "enable" : "disable");
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_port_mode"));
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+nxge_param_get_rx_intr_time(p_nxge_t nxgep, queue_t *q, mblk_t *mp, caddr_t cp)
+{
+	p_nxge_param_t pa = (p_nxge_param_t)cp;
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_rx_intr_time"));
+
+	pa->value = (uint32_t)nxgep->intr_timeout;
+	(void) mi_mpprintf(mp, "%d", (uint32_t)nxgep->intr_timeout);
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_rx_intr_time"));
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+nxge_param_get_rx_intr_pkts(p_nxge_t nxgep, queue_t *q, mblk_t *mp, caddr_t cp)
+{
+	p_nxge_param_t pa = (p_nxge_param_t)cp;
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_rx_intr_pkts"));
+
+	pa->value = (uint32_t)nxgep->intr_threshold;
+	(void) mi_mpprintf(mp, "%d", (uint32_t)nxgep->intr_threshold);
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_rx_intr_pkts"));
 	return (0);
 }
 
@@ -1833,6 +1867,13 @@ nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
 		if (class == -1)
 			return (EINVAL);
 
+		/* Filter out the allowed bits */
+		pa->value &= (NXGE_CLASS_FLOW_USE_PORTNUM |
+		    NXGE_CLASS_FLOW_USE_L2DA | NXGE_CLASS_FLOW_USE_VLAN |
+		    NXGE_CLASS_FLOW_USE_PROTO | NXGE_CLASS_FLOW_USE_IPSRC |
+		    NXGE_CLASS_FLOW_USE_IPDST | NXGE_CLASS_FLOW_USE_SRC_PORT |
+		    NXGE_CLASS_FLOW_USE_DST_PORT);
+
 		status = nxge_fflp_ip_class_config(nxgep, class, pa->value);
 		if (status != NXGE_OK)
 			return (EINVAL);
@@ -1862,6 +1903,12 @@ nxge_param_get_ip_opt(p_nxge_t nxgep, queue_t *q,
 	status = nxge_fflp_ip_class_config_get(nxgep, class, &cfg_value);
 	if (status != NXGE_OK)
 		return (EINVAL);
+
+	/* Filter out the allowed bits */
+	cfg_value &= (NXGE_CLASS_FLOW_USE_PORTNUM | NXGE_CLASS_FLOW_USE_L2DA |
+	    NXGE_CLASS_FLOW_USE_VLAN | NXGE_CLASS_FLOW_USE_PROTO |
+	    NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_IPDST |
+	    NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_DST_PORT);
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
 	    "nxge_param_get_ip_opt_get %x ", cfg_value));
@@ -2517,6 +2564,12 @@ nxge_dld_get_ip_opt(p_nxge_t nxgep, caddr_t cp)
 	status = nxge_fflp_ip_class_config_get(nxgep, class, &cfg_value);
 	if (status != NXGE_OK)
 		return (EINVAL);
+
+	/* Filter out the allowed bits */
+	cfg_value &= (NXGE_CLASS_FLOW_USE_PORTNUM | NXGE_CLASS_FLOW_USE_L2DA |
+	    NXGE_CLASS_FLOW_USE_VLAN | NXGE_CLASS_FLOW_USE_PROTO |
+	    NXGE_CLASS_FLOW_USE_IPSRC | NXGE_CLASS_FLOW_USE_IPDST |
+	    NXGE_CLASS_FLOW_USE_SRC_PORT | NXGE_CLASS_FLOW_USE_DST_PORT);
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL,
 	    "nxge_param_get_ip_opt_get %x ", cfg_value));
