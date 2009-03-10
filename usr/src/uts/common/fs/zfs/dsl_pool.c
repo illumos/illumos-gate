@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,14 +129,15 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 			goto out;
 		err = dsl_dataset_hold_obj(dp, dd->dd_phys->dd_head_dataset_obj,
 		    FTAG, &ds);
-		if (err)
-			goto out;
-		err = dsl_dataset_hold_obj(dp, ds->ds_phys->ds_prev_snap_obj,
-		    dp, &dp->dp_origin_snap);
-		if (err)
-			goto out;
-		dsl_dataset_rele(ds, FTAG);
+		if (err == 0) {
+			err = dsl_dataset_hold_obj(dp,
+			    ds->ds_phys->ds_prev_snap_obj, dp,
+			    &dp->dp_origin_snap);
+			dsl_dataset_rele(ds, FTAG);
+		}
 		dsl_dir_close(dd, dp);
+		if (err)
+			goto out;
 	}
 
 	/* get scrub status */
