@@ -108,7 +108,7 @@ struct dld_str_s {					/* Protected by */
 	/*
 	 * Current DLPI state.
 	 */
-	t_uscalar_t		ds_dlstate;		/* ds_lock */
+	t_uscalar_t		ds_dlstate;		/* SL */
 
 	/*
 	 * DLPI style
@@ -311,16 +311,22 @@ typedef struct dld_ap {
 	mutex_exit(&(dsp)->ds_lock);					\
 }
 
-#define	DLD_CLRQFULL(dsp) {						\
-	queue_t *q = (dsp)->ds_wq;					\
-									\
-	mutex_enter(&(dsp)->ds_lock);					\
-	if (!mac_tx_is_flow_blocked((dsp)->ds_mch, NULL)) {		\
-		if ((dsp)->ds_tx_flow_mp == NULL)			\
-			(dsp)->ds_tx_flow_mp = getq(q);			\
-		ASSERT((dsp)->ds_tx_flow_mp != NULL);			\
-	}								\
-	mutex_exit(&(dsp)->ds_lock);					\
+/*
+ * This is called to check whether we can disable the flow control, and
+ * it is usually only needed in TX data-path when the dsp->ds_dlstate is
+ * DL_IDLE. Otherwise, it does not hurt to always disable the flow control.
+ */
+#define	DLD_CLRQFULL(dsp) {					\
+	queue_t *q = (dsp)->ds_wq;				\
+								\
+	mutex_enter(&(dsp)->ds_lock);				\
+	if ((dsp)->ds_dlstate != DL_IDLE ||			\
+	    !mac_tx_is_flow_blocked((dsp)->ds_mch, NULL)) {	\
+		if ((dsp)->ds_tx_flow_mp == NULL)		\
+			(dsp)->ds_tx_flow_mp = getq(q);		\
+		ASSERT((dsp)->ds_tx_flow_mp != NULL);		\
+	}							\
+	mutex_exit(&(dsp)->ds_lock);				\
 }
 
 #define	DLD_TX(dsp, mp, f_hint, flag)				\

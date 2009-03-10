@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,12 +79,17 @@ softmac_rput_process_data(softmac_lower_t *slp, mblk_t *mp)
 
 	if (DB_REF(mp) > 1) {
 		mblk_t *tmp;
+		uint32_t start, stuff, end, value, flags;
 
 		if ((tmp = copymsg(mp)) == NULL) {
 			cmn_err(CE_WARN, "softmac_rput_process_data: "
 			    "copymsg failed");
 			goto failed;
 		}
+		hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end,
+		    &value, &flags);
+		VERIFY(hcksum_assoc(tmp, NULL, NULL, start, stuff, end,
+		    value, flags, KM_NOSLEEP) == 0);
 		freemsg(mp);
 		mp = tmp;
 	}
