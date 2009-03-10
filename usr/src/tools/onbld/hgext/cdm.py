@@ -707,7 +707,7 @@ def cdm_nits(ui, repo, *args, **opts):
     return run_checks(wslist[repo], cmds, *args, **opts)
 
 
-def cdm_pbchk(ui, repo, *args, **opts):
+def cdm_pbchk(ui, repo, **opts):
     '''pre-putback check all active files
 
     Run cddlchk, comchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
@@ -734,7 +734,7 @@ def cdm_pbchk(ui, repo, *args, **opts):
         cdm_outchk,
         cdm_mergechk]
 
-    return run_checks(wslist[repo], cmds, *args, **opts)
+    return run_checks(wslist[repo], cmds, **opts)
 
 
 def cdm_recommit(ui, repo, **opts):
