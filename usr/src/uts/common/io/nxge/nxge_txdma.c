@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1078,7 +1079,7 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 		status = (nmblks <= ((int)tx_ring_p->tx_ring_size -
 		    (int)tx_ring_p->descs_pending - TX_FULL_MARK));
 		if (status) {
-			cas32((uint32_t *)&tx_ring_p->queueing, 1, 0);
+			(void) cas32((uint32_t *)&tx_ring_p->queueing, 1, 0);
 		}
 	} else {
 		status = (nmblks <= ((int)tx_ring_p->tx_ring_size -

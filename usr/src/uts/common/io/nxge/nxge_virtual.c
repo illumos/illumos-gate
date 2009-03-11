@@ -27,6 +27,17 @@
 #include <sys/nxge/nxge_mac.h>
 #include <sys/nxge/nxge_hio.h>
 
+/*
+ * Local defines for FWARC 2006/556
+ */
+#define	NXGE_NIU_TDMA_PROP_LEN		2
+#define	NXGE_NIU_RDMA_PROP_LEN		2
+#define	NXGE_NIU_0_INTR_PROP_LEN	19
+#define	NXGE_NIU_1_INTR_PROP_LEN	17
+
+/*
+ * Local functions.
+ */
 static void nxge_get_niu_property(dev_info_t *, niu_type_t *);
 static nxge_status_t nxge_get_mac_addr_properties(p_nxge_t);
 static nxge_status_t nxge_use_cfg_n2niu_properties(p_nxge_t);
@@ -1774,20 +1785,20 @@ nxge_use_cfg_neptune_properties(p_nxge_t nxgep)
 }
 
 /*
- * FWARC 2006/556
+ * FWARC 2006/556 for N2 NIU.  Get the properties
+ * from the prom.
  */
-
 static nxge_status_t
 nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 {
-	int ndmas;
-	uint8_t func;
-	p_nxge_dma_pt_cfg_t p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t p_cfgp;
-	int *prop_val;
-	uint_t prop_len;
-	int i;
-	nxge_status_t status = NXGE_OK;
+	int			ndmas;
+	uint8_t			func;
+	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
+	p_nxge_hw_pt_cfg_t	p_cfgp;
+	int			*prop_val;
+	uint_t			prop_len;
+	int			i;
+	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2"));
 
@@ -1800,16 +1811,24 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
 	    "tx-dma-channels", (int **)&prop_val,
 	    &prop_len) == DDI_PROP_SUCCESS) {
-		p_cfgp->tdc.start = prop_val[0];
-		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-		    "==> nxge_use_default_dma_config_n2: tdc starts %d "
-		    "(#%d)", p_cfgp->tdc.start, prop_len));
+		if (prop_len != NXGE_NIU_TDMA_PROP_LEN) {
+			ddi_prop_free(prop_val);
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_use_default_dma_config_n2: "
+			    "get tx-dma-channels failed"));
+			return (NXGE_DDI_FAILED);
+		} else {
+			p_cfgp->tdc.start = prop_val[0];
+			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
+			    "==> nxge_use_default_dma_config_n2: tdc starts %d "
+			    "(#%d)", p_cfgp->tdc.start, prop_len));
 
-		ndmas = prop_val[1];
-		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-		    "==> nxge_use_default_dma_config_n2: #tdc %d (#%d)",
-		    ndmas, prop_len));
-		ddi_prop_free(prop_val);
+			ndmas = prop_val[1];
+			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
+			    "==> nxge_use_default_dma_config_n2: #tdc %d (#%d)",
+			    ndmas, prop_len));
+			ddi_prop_free(prop_val);
+		}
 	} else {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "==> nxge_use_default_dma_config_n2: "
@@ -1829,15 +1848,24 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
 	    "rx-dma-channels", (int **)&prop_val,
 	    &prop_len) == DDI_PROP_SUCCESS) {
-		p_cfgp->start_rdc = prop_val[0];
-		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-		    "==> nxge_use_default_dma_config_n2(obp): rdc start %d"
-		    " (#%d)", p_cfgp->start_rdc, prop_len));
-		ndmas = prop_val[1];
-		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-		    "==> nxge_use_default_dma_config_n2(obp):#rdc %d (#%d)",
-		    ndmas, prop_len));
-		ddi_prop_free(prop_val);
+		if (prop_len != NXGE_NIU_TDMA_PROP_LEN) {
+			ddi_prop_free(prop_val);
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_use_default_dma_config_n2: "
+			    "get rx-dma-channels failed"));
+			return (NXGE_DDI_FAILED);
+		} else {
+			p_cfgp->start_rdc = prop_val[0];
+			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
+			    "==> nxge_use_default_dma_config_n2(obp):"
+			    " rdc start %d (#%d)",
+			    p_cfgp->start_rdc, prop_len));
+			ndmas = prop_val[1];
+			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
+			    "==> nxge_use_default_dma_config_n2(obp): "
+			    "#rdc %d (#%d)", ndmas, prop_len));
+			ddi_prop_free(prop_val);
+		}
 	} else {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "==> nxge_use_default_dma_config_n2: "
@@ -1855,6 +1883,15 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
 	    "interrupts", (int **)&prop_val,
 	    &prop_len) == DDI_PROP_SUCCESS) {
+		if ((prop_len != NXGE_NIU_0_INTR_PROP_LEN) &&
+		    (prop_len != NXGE_NIU_1_INTR_PROP_LEN)) {
+			ddi_prop_free(prop_val);
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_use_default_dma_config_n2: "
+			    "get interrupts failed"));
+			return (NXGE_DDI_FAILED);
+		}
+
 		/*
 		 * For each device assigned, the content of each interrupts
 		 * property is its logical device group.
