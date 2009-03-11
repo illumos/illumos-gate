@@ -1981,6 +1981,18 @@ create_contig_pfnlist(uint_t flags)
 		if (++contig_pfn_cnt == contig_pfn_max)
 			break;
 	}
+	/*
+	 * Sanity check the new list.
+	 */
+	if (contig_pfn_cnt < 2) { /* no contig pfns */
+		contig_pfn_cnt = 0;
+		contig_pfnlist_buildfailed++;
+		kmem_free(contig_pfn_list, contig_pfn_max * sizeof (pfn_t));
+		contig_pfn_list = NULL;
+		contig_pfn_max = 0;
+		ret = 0;
+		goto out;
+	}
 	qsort(contig_pfn_list, contig_pfn_cnt, sizeof (pfn_t), mfn_compare);
 	compact_contig_pfn_list();
 	/*
@@ -2062,8 +2074,13 @@ update_contig_pfnlist(pfn_t pfn, mfn_t oldmfn, mfn_t newmfn)
 			probe_hi = probe_pos;
 		probe_pos = (probe_hi + probe_lo) / 2;
 	}
-	if (probe_pos >= 0)  { /* remove pfn fom list */
-		contig_pfn_cnt--;
+	if (probe_pos >= 0) {
+		/*
+		 * Remove pfn from list and ensure next alloc
+		 * position stays in bounds.
+		 */
+		if (--contig_pfn_cnt <= next_alloc_pfn)
+			next_alloc_pfn = 0;
 		ovbcopy(&contig_pfn_list[probe_pos + 1],
 		    &contig_pfn_list[probe_pos],
 		    (contig_pfn_cnt - probe_pos) * sizeof (pfn_t));
