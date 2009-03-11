@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,7 @@ static void variable_handler(tgt_node_t *, target_queue_t *, target_queue_t *,
 char		*target_basedir		= NULL;
 char		*target_log		= DEFAULT_TARGET_LOG;
 char		*config_file		= DEFAULT_CONFIG_LOCATION;
+char		*pgr_basedir		= NULL;
 int		iscsi_port		= 3260, /* defined by the spec */
 		dbg_lvl			= 0,
 		door_min_space;
@@ -209,6 +210,8 @@ process_config()
 	    &dbg_timestamps);
 	(void) tgt_find_value_boolean(node, XML_ELEMENT_PGR_PERSIST,
 	    &pgr_persist);
+	(void) tgt_find_value_str(node, XML_ELEMENT_PGR_BASEDIR,
+	    &pgr_basedir);
 	if (tgt_find_value_intchk(node, XML_ELEMENT_LOGLVL,
 	    &qlog_lvl) == True)
 		queue_log(True);

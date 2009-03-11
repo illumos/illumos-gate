@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -641,7 +641,7 @@ spc_pr_in_repcap(
 {
 	scsi_prin_rpt_cap_t	*buf = (scsi_prin_rpt_cap_t *)bp;
 
-	buf->crh = 0;			/* Support Reserve/Release Exceptions */
+	buf->crh = 1;			/* Support Reserve/Release Exceptions */
 	buf->sip_c = 1;			/* Specify Initiator Ports Capable */
 	buf->atp_c = 1;			/* All Target Ports Capable */
 	buf->ptpl_c = 1;		/* Persist Through Power Loss C */
@@ -823,7 +823,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	int			status;
 
 	/*
-	 * If this is the first time using the persistance data,
+	 * If this is the first time using the persistence data,
 	 * initialize the reservation and resource key queues
 	 */
 	(void) pthread_rwlock_wrlock(&res->res_rwlock);
@@ -1893,14 +1893,26 @@ spc_pr_read(t10_cmd_t *cmd)
 	t10_lu_impl_t		*lu;
 	int			i, pfd;
 	Boolean_t		status = False;
-	char			path[MAXPATHLEN];
+	char			*c, path[MAXPATHLEN] = {0};
 
 	/*
-	 * Open the PERSISTANCE file specification if one exists
+	 * Open the PERSISTENCE file specification if one exists
+	 * taking into account the alternate location if a ZVOL
 	 */
-	(void) snprintf(path, MAXPATHLEN, "%s/%s/%s%d",
-	    target_basedir, cmd->c_lu->l_targ->s_targ_base,
-	    PERSISTANCEBASE, cmd->c_lu->l_common->l_num);
+	if (tgt_find_value_str(cmd->c_lu->l_common->l_root, XML_ELEMENT_BACK,
+	    &c) == True) {
+		if (((pgr_basedir != NULL) && (strlen(pgr_basedir) != 0)) &&
+		    (strncmp(ZVOL_PATH, c, sizeof (ZVOL_PATH) - 1) == 0)) {
+			(void) snprintf(path, MAXPATHLEN, "%s/%s-%s%d",
+			    pgr_basedir, &c[sizeof (ZVOL_PATH) - 1],
+			    PERSISTENCEBASE, cmd->c_lu->l_common->l_num);
+		} else {
+			(void) snprintf(path, MAXPATHLEN, "%s/%s/%s%d",
+			    target_basedir, cmd->c_lu->l_targ->s_targ_base,
+			    PERSISTENCEBASE, cmd->c_lu->l_common->l_num);
+		}
+		free(c);
+	}
 	if ((pfd = open(path, O_RDONLY)) >= 0) {
 		struct stat pstat;
 		if ((fstat(pfd, &pstat)) == 0)
@@ -1923,7 +1935,7 @@ spc_pr_read(t10_cmd_t *cmd)
 	}
 
 	/*
-	 * If this is the first time using the persistance data,
+	 * If this is the first time using the persistence data,
 	 * initialize the reservation and resource key queues
 	 */
 	if (pgr->pgr_rsrvlist.lnk_fwd == NULL) {
@@ -2016,7 +2028,7 @@ spc_pr_write(t10_cmd_t *cmd)
 	spc_pr_persist_disk_t	*buf;
 	ssize_t			length, bufsize;
 	int			i, pfd = -1;
-	char			path[MAXPATHLEN];
+	char			*c, path[MAXPATHLEN] = {0};
 	Boolean_t		status = True;
 
 	/*
@@ -2080,11 +2092,23 @@ spc_pr_write(t10_cmd_t *cmd)
 	}
 
 	/*
-	 * Open/create the PERSISTANCE file specification
+	 * Open the PERSISTENCE file specification if one exists
+	 * taking into account the alternate location if a ZVOL
 	 */
-	(void) snprintf(path, MAXPATHLEN, "%s/%s/%s%d",
-	    target_basedir, cmd->c_lu->l_targ->s_targ_base,
-	    PERSISTANCEBASE, cmd->c_lu->l_common->l_num);
+	if (tgt_find_value_str(cmd->c_lu->l_common->l_root, XML_ELEMENT_BACK,
+	    &c) == True) {
+		if (((pgr_basedir != NULL) && (strlen(pgr_basedir) != 0)) &&
+		    (strncmp(ZVOL_PATH, c, sizeof (ZVOL_PATH) - 1) == 0)) {
+			(void) snprintf(path, MAXPATHLEN, "%s/%s-%s%d",
+			    pgr_basedir, &c[sizeof (ZVOL_PATH) - 1],
+			    PERSISTENCEBASE, cmd->c_lu->l_common->l_num);
+		} else {
+			(void) snprintf(path, MAXPATHLEN, "%s/%s/%s%d",
+			    target_basedir, cmd->c_lu->l_targ->s_targ_base,
+			    PERSISTENCEBASE, cmd->c_lu->l_common->l_num);
+		}
+		free(c);
+	}
 	if ((pfd = open(path, O_WRONLY|O_CREAT, 0600)) >= 0) {
 		length = write(pfd, buf, bufsize);
 		(void) close(pfd);

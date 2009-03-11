@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,6 +150,7 @@ typedef enum {
 #define	XML_ELEMENT_MORESPACE	"more-space-required"
 #define	XML_VALUE_TRUE		"true"
 #define	XML_ELEMENT_PGR_PERSIST	"PGR-persist"
+#define	XML_ELEMENT_PGR_BASEDIR	"PGR-basedir"
 
 typedef enum {
 	NodeFree,

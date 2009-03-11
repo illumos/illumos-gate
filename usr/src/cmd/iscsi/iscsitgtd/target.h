@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,8 +74,9 @@ extern "C" {
 #define	PARAMBASE		"params."
 #define	LUNBASE			"lun."
 #define	OSDBASE			"osd_root."
-#define	PERSISTANCEBASE		"pgr."
+#define	PERSISTENCEBASE		"pgr."
 #define	ISCSI_TARGET_ALIAS	"TargetAlias"
+#define	ZVOL_PATH		"/dev/zvol/rdsk/"
 
 /*
  * Base file name for persistent reservation data (PR). The format used is pr.
@@ -230,6 +231,7 @@ extern admin_table_t	admin_prop_list[];
 extern char 		*target_basedir;
 extern char 		*target_log;
 extern char		*config_file;
+extern char		*pgr_basedir;
 extern tgt_node_t	*targets_config;
 extern tgt_node_t	*main_config;
 extern uchar_t		mac_addr[];

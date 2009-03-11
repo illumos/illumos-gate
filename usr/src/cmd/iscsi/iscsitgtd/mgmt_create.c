@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,8 +71,6 @@ static Boolean_t setup_disk_backing(err_code_t *code, char *path, char *backing,
     tgt_node_t *n, uint64_t *size);
 static Boolean_t setup_raw_backing(err_code_t *code, char *path, char *backing,
     uint64_t *size);
-
-#define	ZVOL_PATH	"/dev/zvol/rdsk/"
 
 /*
  * []----
@@ -545,6 +543,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 		 */
 		if (tgt_find_attr_str(n, XML_ELEMENT_INCORE, &cptr) == True) {
 			if (strcmp(cptr, "true") != 0) {
+				free(cptr);
 				xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 				goto error;
 			}
