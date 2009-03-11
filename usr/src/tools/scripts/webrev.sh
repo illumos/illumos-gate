@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -331,6 +331,27 @@ function upload_webrev
 	fi
 
 	return 0
+}
+
+#
+# input_cmd | url_encode | output_cmd
+#
+# URL-encode (percent-encode) reserved characters as defined in RFC 3986.
+#
+# Reserved characters are: :/?#[]@!$&'()*+,;=
+#
+# While not a reserved character itself, percent '%' is reserved by definition
+# so encode it first to avoid recursive transformation, and skip '/' which is
+# a path delimiter.
+#
+function url_encode
+{
+	sed -e "s|%|%25|g" -e "s|:|%3A|g" -e "s|\&|%26|g" \
+	    -e "s|?|%3F|g" -e "s|#|%23|g" -e "s|\[|%5B|g" \
+	    -e "s|*|%2A|g" -e "s|@|%40|g" -e "s|\!|%21|g" \
+	    -e "s|=|%3D|g" -e "s|;|%3B|g" -e "s|\]|%5D|g" \
+	    -e "s|(|%28|g" -e "s|)|%29|g" -e "s|\'|%27|g" \
+	    -e "s|+|%2B|g" -e "s|\,|%2C|g" -e "s|\\\$|%24|g"
 }
 
 #
@@ -2918,12 +2939,14 @@ printCI $TOTL $TINS $TDEL $TMOD $TUNC
 print "</td></tr>"
 
 if [[ -f $WDIR/$WNAME.patch ]]; then
+	wpatch_url="$(print $WNAME.patch | url_encode)"
 	print "<tr><th>Patch of changes:</th><td>"
-	print "<a href=\"$WNAME.patch\">$WNAME.patch</a></td></tr>"
+	print "<a href=\"$wpatch_url\">$WNAME.patch</a></td></tr>"
 fi
 if [[ -f $WDIR/$WNAME.pdf ]]; then
+	wpdf_url="$(print $WNAME.pdf | url_encode)"
 	print "<tr><th>Printable review:</th><td>"
-	print "<a href=\"$WNAME.pdf\">$WNAME.pdf</a></td></tr>"
+	print "<a href=\"$wpdf_url\">$WNAME.pdf</a></td></tr>"
 fi
 
 if [[ -n "$iflag" ]]; then
@@ -2972,16 +2995,21 @@ do
 	# If there's a diffs file, make diffs links
 
 	if [[ -f $F.cdiff.html ]]; then
-		print "<a href=\"$P.cdiff.html\">Cdiffs</a>"
-		print "<a href=\"$P.udiff.html\">Udiffs</a>"
+		cdiff_url="$(print $P.cdiff.html | url_encode)"
+		udiff_url="$(print $P.udiff.html | url_encode)"
+		print "<a href=\"$cdiff_url\">Cdiffs</a>"
+		print "<a href=\"$udiff_url\">Udiffs</a>"
 
 		if [[ -f $F.wdiff.html && -x $WDIFF ]]; then
-			print "<a href=\"$P.wdiff.html\">Wdiffs</a>"
+			wdiff_url="$(print $P.wdiff.html | url_encode)"
+			print "<a href=\"$wdiff_url\">Wdiffs</a>"
 		fi
 
-		print "<a href=\"$P.sdiff.html\">Sdiffs</a>"
+		sdiff_url="$(print $P.sdiff.html | url_encode)"
+		print "<a href=\"$sdiff_url\">Sdiffs</a>"
 
-		print "<a href=\"$P.frames.html\">Frames</a>"
+		frames_url="$(print $P.frames.html | url_encode)"
+		print "<a href=\"$frames_url\">Frames</a>"
 	else
 		print " ------ ------ ------"
 
@@ -2995,7 +3023,8 @@ do
 	# If there's an old file, make the link
 
 	if [[ -f $F-.html ]]; then
-		print "<a href=\"$P-.html\">Old</a>"
+		oldfile_url="$(print $P-.html | url_encode)"
+		print "<a href=\"$oldfile_url\">Old</a>"
 	else
 		print " ---"
 	fi
@@ -3003,19 +3032,22 @@ do
 	# If there's an new file, make the link
 
 	if [[ -f $F.html ]]; then
-		print "<a href=\"$P.html\">New</a>"
+		newfile_url="$(print $P.html | url_encode)"
+		print "<a href=\"$newfile_url\">New</a>"
 	else
 		print " ---"
 	fi
 
 	if [[ -f $F.patch ]]; then
-		print "<a href=\"$P.patch\">Patch</a>"
+		patch_url="$(print $P.patch | url_encode)"
+		print "<a href=\"$patch_url\">Patch</a>"
 	else
 		print " -----"
 	fi
 
 	if [[ -f $WDIR/raw_files/new/$P ]]; then
-		print "<a href=\"raw_files/new/$P\">Raw</a>"
+		rawfiles_url="$(print raw_files/new/$P | url_encode)"
+		print "<a href=\"$rawfiles_url\">Raw</a>"
 	else
 		print " ---"
 	fi
