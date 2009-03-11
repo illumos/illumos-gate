@@ -1160,7 +1160,7 @@ restore_file(int *fp,
 		}
 		if (want_this_file) {
 
-			*fp = open(real_name, O_CREAT | O_WRONLY,
+			*fp = open(real_name, O_CREAT | O_TRUNC | O_WRONLY,
 			    S_IRUSR | S_IWUSR);
 			if (*fp == -1) {
 				NDMP_LOG(LOG_ERR,

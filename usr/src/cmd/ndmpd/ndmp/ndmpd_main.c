@@ -50,7 +50,6 @@
 #include "ndmpd.h"
 #include "ndmpd_common.h"
 
-
 /* zfs library handle & mutex */
 libzfs_handle_t *zlibh;
 mutex_t	zlib_mtx;
@@ -259,10 +258,12 @@ main(int argc, char *argv[])
 	(void) sigaction(SIGHUP, &act, NULL);
 	(void) sigaction(SIGINT, &act, NULL);
 	(void) sigaction(SIGUSR1, &act, NULL);
+	(void) sigaction(SIGPIPE, &act, NULL);
 	(void) sigdelset(&set, SIGTERM);
 	(void) sigdelset(&set, SIGHUP);
 	(void) sigdelset(&set, SIGINT);
 	(void) sigdelset(&set, SIGUSR1);
+	(void) sigdelset(&set, SIGPIPE);
 
 	(void) daemonize_init(argv[0]);
 
@@ -300,6 +301,9 @@ main(int argc, char *argv[])
 
 		switch (ndmpd.s_sigval) {
 		case 0:
+			break;
+
+		case SIGPIPE:
 			break;
 
 		case SIGHUP:

@@ -2595,6 +2595,7 @@ scsi_test_unit_ready(int dev_id)
 	ucmd.uscsi_cdb = (caddr_t)&cdb;
 	ucmd.uscsi_cdblen = CDB_GROUP0;
 	ucmd.uscsi_flags |= USCSI_SILENT;
+	ucmd.uscsi_timeout = 60;	/* Allow maximum 1 min */
 
 	retval = ioctl(dev_id, USCSICMD, &ucmd);
 

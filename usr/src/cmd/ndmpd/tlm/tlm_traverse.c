@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,6 +259,12 @@ fs_getstat(char *path, fs_fhandle_t *fh, struct stat64 *st, path_list_t **pl)
 		return (errno);
 
 	fh->fh_fid = st->st_ino;
+
+	if (!S_ISDIR(st->st_mode)) {
+		fh->fh_fpath = NULL;
+		return (0);
+	}
+
 	if (pl)
 		fh->fh_fpath = fs_add_pathlist(path, pl);
 	else
