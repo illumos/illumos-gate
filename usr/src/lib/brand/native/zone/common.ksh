@@ -219,6 +219,15 @@ umnt_fs()
 }
 
 #
+# Perform any cleanup in the zoneroot after unpacking the archive.
+#
+post_unpack()
+{
+	( cd "$ZONEROOT" && \
+	    find . \( -type b -o -type c \) -exec rm -f "{}" \; )
+}
+
+#
 # Determine flar compression style from identification file.
 #
 get_compression()
@@ -378,13 +387,14 @@ install_flar()
 
 	# Extract archive
 	if [[ $compression == "compress" ]]; then
-		/usr/bin/zcat | ppriv -e -s A=all,-sys_devices \
+		/usr/bin/zcat | \
 		    $archiver_command $archiver_arguments 2>/dev/null
 	else
-		ppriv -e -s A=all,-sys_devices \
-		    $archiver_command $archiver_arguments 2>/dev/null
+		$archiver_command $archiver_arguments 2>/dev/null
 	fi
 	result=$?
+
+	post_unpack
 
 	(( $result != 0 )) && return 1
 
@@ -401,11 +411,14 @@ install_cpio()
 
 	cpioopts="-idmfE $ipdcpiofile"
 
-	vlog "cd \"$ZONEROOT\" && $stage1 \"$archive\" | "
-	vlog "ppriv -e -s A=all,-sys_devices cpio $cpioopts"
+	vlog "cd \"$ZONEROOT\" && $stage1 \"$archive\" | cpio $cpioopts"
 
-	( cd "$ZONEROOT" && $stage1 "$archive" | \
-	     ppriv -e -s A=all,-sys_devices cpio $cpioopts )
+	( cd "$ZONEROOT" && $stage1 "$archive" | cpio $cpioopts )
+	result=$?
+
+	post_unpack
+
+	return $result
 }
 
 #
@@ -419,11 +432,14 @@ install_pax()
 		filtopt="-c $(/usr/bin/cat $ipdpaxfile)"
 	fi
 
-	vlog "cd \"$ZONEROOT\" && "
-	vlog "ppriv -e -s A=all,-sys_devices pax -r -f \"$archive\" $filtopt"
+	vlog "cd \"$ZONEROOT\" && pax -r -f \"$archive\" $filtopt"
 
-	( cd "$ZONEROOT" && ppriv -e -s A=all,-sys_devices \
-	    pax -r -f "$archive" $filtopt )
+	( cd "$ZONEROOT" && pax -r -f "$archive" $filtopt )
+	result=$?
+
+	post_unpack
+
+	return $result
 }
 
 #
@@ -433,8 +449,7 @@ install_ufsdump()
 {
 	archive=$1
 
-	vlog "cd \"$ZONEROOT\" && "
-	vlog "ppriv -e -s A=all,-sys_devices ufsrestore rf \"$archive\""
+	vlog "cd \"$ZONEROOT\" && ufsrestore rf \"$archive\""
 
 	#
 	# ufsrestore goes interactive if you ^C it.  To prevent that,
@@ -442,8 +457,12 @@ install_ufsdump()
 	# Note that there is no way to filter inherit-pkg-dirs for a full
 	# restore so there will be warnings in the log file.
 	#
-	( cd "$ZONEROOT" && ppriv -e -s A=all,-sys_devices \
-	    ufsrestore rf "$archive" < /dev/null )
+	( cd "$ZONEROOT" && ufsrestore rf "$archive" < /dev/null )
+	result=$?
+
+	post_unpack
+
+	return $result
 }
 
 #
@@ -475,10 +494,15 @@ install_dir()
 	findopts="-xdev ( -type d -o -type f -o -type l ) -print"
 
 	vlog "cd \"$source_dir\" && find $flist $findopts | "
-	vlog "ppriv -e -s A=all,-sys_devices cpio $cpioopts \"$ZONEROOT\""
+	vlog "cpio $cpioopts \"$ZONEROOT\""
 
 	( cd "$source_dir" && find $flist $findopts | \
-	    ppriv -e -s A=all,-sys_devices cpio $cpioopts "$ZONEROOT" )
+	    cpio $cpioopts "$ZONEROOT" )
+	result=$?
+
+	post_unpack
+
+	return $result
 }
 
 # Setup i18n output
