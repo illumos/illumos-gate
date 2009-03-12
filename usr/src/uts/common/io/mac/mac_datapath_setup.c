@@ -99,7 +99,7 @@ int mac_soft_ring_poll_thres = 16;
  * If no TX rings are available, then MAC client(s) will be assigned the
  * default Tx ring. Default Tx ring can be shared among multiple MAC clients.
  */
-uint32_t mac_tx_ring_count = 8;
+uint32_t mac_tx_ring_count = 32;
 boolean_t mac_tx_serialize = B_FALSE;
 
 /*
