@@ -492,7 +492,9 @@ iscsi_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 	 * Receive the requested data.  Block until all
 	 * data is received or timeout.
 	 */
+	ksocket_hold(ks);
 	ksocket_recvmsg(ks, msg, prflag, &recv, CRED());
+	ksocket_rele(ks);
 	DTRACE_PROBE1(ksocket_recvmsg, size_t, recv);
 	return (recv);
 }

@@ -309,8 +309,14 @@ iscsi_rx_thread(iscsi_thread_t *thread, void *arg)
 		case ISCSI_STATUS_TCP_RX_ERROR:
 			/* connection had an error */
 			mutex_enter(&icp->conn_state_mutex);
-			(void) iscsi_conn_state_machine(icp,
-			    ISCSI_CONN_EVENT_T15);
+			/*
+			 * recvmsg may return after the closing of socket
+			 * with this error
+			 */
+			if (ISCSI_CONN_STATE_FULL_FEATURE(icp->conn_state)) {
+				(void) iscsi_conn_state_machine(icp,
+				    ISCSI_CONN_EVENT_T15);
+			}
 			mutex_exit(&icp->conn_state_mutex);
 			break;
 		case ISCSI_STATUS_HEADER_DIGEST_ERROR:
