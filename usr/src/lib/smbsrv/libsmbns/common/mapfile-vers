@@ -44,12 +44,12 @@ SUNWprivate {
 	dyndns_stop;
 	dyndns_update;
 	dyndns_update_zones;
-	smb_adjoin_report_err;
 	smb_ads_add_share;
 	smb_ads_build_unc_name;
 	smb_ads_close;
 	smb_ads_init;
 	smb_ads_join;
+	smb_ads_join_errmsg;
 	smb_ads_lookup_msdcs;
 	smb_ads_lookup_share;
 	smb_ads_open;

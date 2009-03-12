@@ -126,9 +126,9 @@ typedef struct smb_kmod_cfg {
 #define	SMB_VERSION_MAJOR  4
 #define	SMB_VERSION_MINOR  0
 
-int smbnative_os_value(char *native_os);
-int smbnative_lm_value(char *native_lm);
-int smbnative_pdc_value(char *native_lm);
+int smbnative_os_value(const char *);
+int smbnative_lm_value(const char *);
+int smbnative_pdc_value(const char *);
 
 /*
  * Support for passthrough authentication.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -178,8 +178,8 @@ k5_kinit(struct k_opts *opts, struct k5_data *k5)
 		code = krb5_os_localaddr(k5->ctx, &addresses);
 		if (code != 0) {
 			errmsg = error_message(code);
-			syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "k5_kinit: "
-			    "getting local addresses (%s)"), errmsg);
+			syslog(LOG_ERR, "k5_kinit: getting local addresses "
+			    "(%s)", errmsg);
 			goto cleanup;
 		}
 		krb5_get_init_creds_opt_set_address_list(&options, addresses);
@@ -191,9 +191,8 @@ k5_kinit(struct k_opts *opts, struct k5_data *k5)
 		code = krb5_kt_resolve(k5->ctx, opts->keytab_name, &keytab);
 		if (code != 0) {
 			errmsg = error_message(code);
-			syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "k5_kinit: "
-			    "resolving keytab %s (%s)"), errmsg,
-			    opts->keytab_name);
+			syslog(LOG_ERR, "k5_kinit: resolving keytab %s (%s)",
+			    errmsg, opts->keytab_name);
 			goto cleanup;
 		}
 	}
@@ -223,16 +222,13 @@ k5_kinit(struct k_opts *opts, struct k5_data *k5)
 		switch (opts->action) {
 		case INIT_PW:
 		case INIT_KT:
-			doing = dgettext(TEXT_DOMAIN, "k5_kinit: "
-			    "getting initial credentials");
+			doing = "k5_kinit: getting initial credentials";
 			break;
 		case VALIDATE:
-			doing = dgettext(TEXT_DOMAIN, "k5_kinit: "
-			    "validating credentials");
+			doing = "k5_kinit: validating credentials";
 			break;
 		case RENEW:
-			doing = dgettext(TEXT_DOMAIN, "k5_kinit: "
-			    "renewing credentials");
+			doing = "k5_kinit: renewing credentials";
 			break;
 		}
 
@@ -246,12 +242,10 @@ k5_kinit(struct k_opts *opts, struct k5_data *k5)
 			    "You may want the -4 option in the future", doing);
 			return (1);
 		} else if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY) {
-			syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "%s "
-			    "(Password incorrect)"), doing);
+			syslog(LOG_ERR, "%s (Password incorrect)", doing);
 		} else {
 			errmsg = error_message(code);
-			syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "%s (%s)"),
-			    doing, errmsg);
+			syslog(LOG_ERR, "%s (%s)", doing, errmsg);
 		}
 		goto cleanup;
 	}
@@ -265,17 +259,15 @@ k5_kinit(struct k_opts *opts, struct k5_data *k5)
 	code = krb5_cc_initialize(k5->ctx, k5->cc, k5->me);
 	if (code) {
 		errmsg = error_message(code);
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "k5_kinit: "
-		    "initializing cache %s (%s)"),
-		    opts->k5_cache_name?opts->k5_cache_name:"", errmsg);
+		syslog(LOG_ERR, "k5_kinit: initializing cache %s (%s)",
+		    opts->k5_cache_name ? opts->k5_cache_name : "", errmsg);
 		goto cleanup;
 	}
 
 	code = krb5_cc_store_cred(k5->ctx, k5->cc, &my_creds);
 	if (code) {
 		errmsg = error_message(code);
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "k5_kinit: "
-		    "storing credentials (%s)"), errmsg);
+		syslog(LOG_ERR, "k5_kinit: storing credentials (%s)", errmsg);
 		goto cleanup;
 	}
 
@@ -309,19 +301,16 @@ smb_kinit(char *user, char *passwd)
 	(void) memset(&k5, 0, sizeof (k5));
 
 	if (k5_begin(&opts, &k5) != 0) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "smb_kinit: "
-		    "NOT Authenticated to Kerberos v5  k5_begin failed\n"));
+		syslog(LOG_ERR, "NOT authenticated with Kerberos v5. "
+		    "k5_begin failed\n");
 		return (0);
 	}
 
 	authed_k5 = k5_kinit(&opts, &k5);
-	if (authed_k5) {
-		syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN, "smb_kinit: "
-		    "Authenticated to Kerberos v5\n"));
-	} else {
-		syslog(LOG_DEBUG, dgettext(TEXT_DOMAIN, "smb_kinit: "
-		    "NOT Authenticated to Kerberos v5\n"));
-	}
+	if (authed_k5)
+		syslog(LOG_DEBUG, "Authenticated with Kerberos v5\n");
+	else
+		syslog(LOG_DEBUG, "NOT authenticated with Kerberos v5\n");
 
 	k5_end(&k5);
 
@@ -459,8 +448,6 @@ acquire_cred:
 	if ((maj = gss_acquire_cred(&min, desired_name, 0, desired_mechs,
 	    GSS_C_INITIATE, cred_handle, NULL, NULL)) != GSS_S_COMPLETE) {
 		if (!*kinit_retry && pwd != NULL && *pwd != '\0') {
-			syslog(LOG_ERR, "%s: Retry kinit to "
-			    "acquire credential.\n", caller_mod);
 			(void) smb_kinit(user, pwd);
 			*kinit_retry = 1;
 			goto acquire_cred;
@@ -548,8 +535,6 @@ krb5_establish_sec_ctx_kinit(char *user, char *pwd,
 			(void) gss_delete_sec_context(&min, gss_context, NULL);
 
 		if ((user != NULL) && (pwd != NULL) && !*kinit_retry) {
-			syslog(LOG_ERR, "%s: Retry kinit to establish "
-			    "security context.\n", caller_mod);
 			(void) smb_kinit(user, pwd);
 			*kinit_retry = 1;
 			*do_acquire_cred = 1;

@@ -726,12 +726,19 @@ smb_getdataset(const char *path, char *dataset, size_t len)
 			break;
 		}
 
-		/* strip last component off if there is one */
-		if ((cp = strrchr(cp, '/')) != NULL) {
-			*cp = '\0';
-			if (tmppath[0] == '\0')
-				(void) strcpy(tmppath, "/");
-		}
+		if (strcmp(tmppath, "/") == 0)
+			break;
+
+		if ((cp = strrchr(tmppath, '/')) == NULL)
+			break;
+
+		/*
+		 * The path has multiple components.
+		 * Remove the last component and try again.
+		 */
+		*cp = '\0';
+		if (tmppath[0] == '\0')
+			(void) strcpy(tmppath, "/");
 
 		cp = tmppath;
 	}

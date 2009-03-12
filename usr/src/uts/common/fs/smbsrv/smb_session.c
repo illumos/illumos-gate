@@ -43,7 +43,6 @@ static int smb_session_message(smb_session_t *);
 static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
     uint8_t *, size_t);
 static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
-static void smb_session_oplock_broken(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 void dump_smb_inaddr(smb_inaddr_t *ipaddr);
 
@@ -132,10 +131,8 @@ smb_session_reconnection_check(smb_session_list_t *se, smb_session_t *sess)
 	while (sn) {
 		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
 		if ((sn != sess) &&
-		    smb_inet_equal(&sn->ipaddr, &sess->ipaddr,
-		    SMB_INET_NOMASK) &&
-		    smb_inet_equal(&sn->local_ipaddr, &sess->local_ipaddr,
-		    SMB_INET_NOMASK) &&
+		    smb_inet_equal(&sn->ipaddr, &sess->ipaddr) &&
+		    smb_inet_equal(&sn->local_ipaddr, &sess->local_ipaddr) &&
 		    (strcasecmp(sn->workstation, sess->workstation) == 0) &&
 		    (sn->opentime <= sess->opentime) &&
 		    (sn->s_kid < sess->s_kid)) {
@@ -681,18 +678,28 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 			slen = sizeof (sin);
 			(void) ksocket_getsockname(new_so,
 			    (struct sockaddr *)&sin, &slen, CRED());
-			bcopy(&sin, &session->local_ipaddr.a_ip, slen);
+			bcopy(&sin.sin_addr,
+			    &session->local_ipaddr.au_addr.au_ipv4,
+			    sizeof (in_addr_t));
+			slen = sizeof (sin);
 			(void) ksocket_getpeername(new_so,
 			    (struct sockaddr *)&sin, &slen, CRED());
-			bcopy(&sin, &session->ipaddr.a_ip, slen);
+			bcopy(&sin.sin_addr,
+			    &session->ipaddr.au_addr.au_ipv4,
+			    sizeof (in_addr_t));
 		} else {
 			slen = sizeof (sin6);
 			(void) ksocket_getsockname(new_so,
 			    (struct sockaddr *)&sin6, &slen, CRED());
-			bcopy(&sin6, &session->local_ipaddr.a_ip, slen);
+			bcopy(&sin6.sin6_addr,
+			    &session->local_ipaddr.au_addr.au_ipv6,
+			    sizeof (in6_addr_t));
+			slen = sizeof (sin6);
 			(void) ksocket_getpeername(new_so,
 			    (struct sockaddr *)&sin6, &slen, CRED());
-			bcopy(&sin6, &session->ipaddr.a_ip, slen);
+			bcopy(&sin6.sin6_addr,
+			    &session->ipaddr.au_addr.au_ipv6,
+			    sizeof (in6_addr_t));
 		}
 		session->ipaddr.a_family = family;
 		session->local_ipaddr.a_family = family;
@@ -1211,7 +1218,6 @@ smb_session_oplock_break(smb_session_t *session, smb_ofile_t *of)
 	case SMB_SESSION_STATE_NEGOTIATED:
 	case SMB_SESSION_STATE_OPLOCK_BREAKING:
 		session->s_state = SMB_SESSION_STATE_OPLOCK_BREAKING;
-		session->s_oplock_brkcntr++;
 		(void) smb_session_send(session, 0, mbc);
 		smb_mbc_free(mbc);
 		break;
@@ -1229,65 +1235,4 @@ smb_session_oplock_break(smb_session_t *session, smb_ofile_t *of)
 		SMB_PANIC();
 	}
 	smb_rwx_rwexit(&session->s_lock);
-}
-
-/*
- * smb_session_oplock_released
- *
- * This function MUST be called in the context of the session of the client
- * holding the oplock. The lock of the session must have been entered in
- * RW_READER or RW_WRITER mode.
- */
-void
-smb_session_oplock_released(smb_session_t *session)
-{
-	krw_t	mode;
-
-	SMB_SESSION_VALID(session);
-
-	mode = smb_rwx_rwupgrade(&session->s_lock);
-	smb_session_oplock_broken(session);
-	smb_rwx_rwdowngrade(&session->s_lock, mode);
-}
-
-/*
- * smb_session_oplock_break_timedout
- *
- * This function MUST be called when the client holding the oplock to file
- * failed to release it in the time alloted. It is a cross-session call (The
- * caller must be calling in the context of another session).
- */
-void
-smb_session_oplock_break_timedout(smb_session_t *session)
-{
-	SMB_SESSION_VALID(session);
-
-	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-	smb_session_oplock_broken(session);
-	smb_rwx_rwexit(&session->s_lock);
-}
-
-/*
- * smb_session_oplock_broken
- *
- * Does the actual work.
- */
-static void
-smb_session_oplock_broken(smb_session_t *session)
-{
-	switch (session->s_state) {
-	case SMB_SESSION_STATE_OPLOCK_BREAKING:
-		if (--session->s_oplock_brkcntr == 0)
-			session->s_state = SMB_SESSION_STATE_NEGOTIATED;
-		break;
-
-	case SMB_SESSION_STATE_NEGOTIATED:
-	case SMB_SESSION_STATE_WRITE_RAW_ACTIVE:
-	case SMB_SESSION_STATE_DISCONNECTED:
-	case SMB_SESSION_STATE_TERMINATED:
-		break;
-
-	default:
-		SMB_PANIC();
-	}
 }

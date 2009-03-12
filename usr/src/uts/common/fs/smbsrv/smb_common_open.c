@@ -539,8 +539,7 @@ smb_open_subr(smb_request_t *sr)
 		}
 
 		if (smb_oplock_conflict(node, sr->session, op))
-			(void) smb_oplock_break(node,
-			    SMB_SESSION_GET_ID(sr->session), B_FALSE);
+			(void) smb_oplock_break(node, sr->session, B_FALSE);
 
 		smb_node_wrlock(node);
 

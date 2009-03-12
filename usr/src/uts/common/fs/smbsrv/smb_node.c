@@ -26,16 +26,36 @@
  * SMB Node State Machine
  * ----------------------
  *
- *    +----------------------------+	 T0
- *    |  SMB_NODE_STATE_AVAILABLE  |<----------- Creation/Allocation
- *    +----------------------------+
+ *
+ *		    +----------- Creation/Allocation
  *		    |
- *		    | T1
+ *		    | T0
  *		    |
  *		    v
- *    +-----------------------------+    T2
- *    |  SMB_NODE_STATE_DESTROYING  |----------> Deletion/Free
+ *    +----------------------------+        T1
+ *    |  SMB_NODE_STATE_AVAILABLE  |--------------------+
+ *    +----------------------------+			|
+ *		    |	     ^				|
+ *		    |	     |				v
+ *		    |	     |	  T2	+-------------------------------+
+ *		    |	     |<---------| SMB_NODE_STATE_OPLOCK_GRANTED |
+ *		    |	     |		+-------------------------------+
+ *		    | T5     |				|
+ *		    |	     |				| T3
+ *		    |	     |				v
+ *		    |	     |	  T4	+--------------------------------+
+ *		    |	     +----------| SMB_NODE_STATE_OPLOCK_BREAKING |
+ *		    |			+--------------------------------+
+ *		    |
+ *		    v
  *    +-----------------------------+
+ *    |  SMB_NODE_STATE_DESTROYING  |
+ *    +-----------------------------+
+ *		    |
+ *		    |
+ *		    | T6
+ *		    |
+ *		    +----------> Deletion/Free
  *
  * Transition T0
  *
@@ -45,11 +65,42 @@
  *
  * Transition T1
  *
+ *    This transition occurs smb_oplock_acquire() during an OPEN.
+ *
+ * Transition T2
+ *
+ *    This transition occurs in smb_oplock_release(). The events triggering
+ *    it are:
+ *
+ *	- LockingAndX sent by the client that was granted the oplock.
+ *	- Closing of the file.
+ *
+ * Transition T3
+ *
+ *    This transition occurs in smb_oplock_break(). The events triggering
+ *    it are:
+ *
+ *	- Another client wants to open the file.
+ *	- A client is trying to delete the file.
+ *	- A client is trying to rename the file.
+ *	- A client is trying to set/modify  the file attributes.
+ *
+ * Transition T4
+ *
+ *    This transition occurs in smb_oplock_release or smb_oplock_break(). The
+ *    events triggering it are:
+ *
+ *	- The client that was granting the oplock releases it (close or
+ *	  LockingAndx).
+ *	- The time alloted to release the oplock expired.
+ *
+ * Transition T5
+ *
  *    This transition occurs in smb_node_release(). If the reference count
  *    drops to zero the state is moved to SMB_NODE_STATE_DESTROYING and no more
  *    reference count will be given out for that node.
  *
- * Transition T2
+ * Transition T6
  *
  *    This transition occurs in smb_node_release(). The structure is deleted.
  *
@@ -1079,7 +1130,8 @@ smb_node_free(smb_node_t *node)
 	VERIFY(node->n_lock_list.ll_count == 0);
 	VERIFY(node->n_ofile_list.ll_count == 0);
 	VERIFY(node->n_oplock.ol_xthread == NULL);
-	VERIFY(node->n_oplock.ol_waiters_count == 0);
+	VERIFY(mutex_owner(&node->n_mutex) == NULL);
+	VERIFY(!RW_LOCK_HELD(&node->n_lock));
 	VN_RELE(node->vp);
 	kmem_cache_free(smb_node_cache, node);
 }

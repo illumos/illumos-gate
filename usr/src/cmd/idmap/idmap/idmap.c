@@ -1484,6 +1484,8 @@ print_error_info(idmap_info *info)
 	name_mapping_t	nm;
 	char		*rule_text;
 
+	(void) memset(&nm, 0, sizeof (nm));
+
 	switch (how->map_type) {
 	case IDMAP_MAP_TYPE_DS_AD:
 		(void) fprintf(stderr,

@@ -100,7 +100,6 @@
  * Length of "dc=" prefix.
  */
 #define	SMB_ADS_DN_PREFIX_LEN	3
-#define	SMB_ADS_MSDCS_SVC_CNT	2
 
 static char *smb_ads_computer_objcls[] = {
 	"top", "person", "organizationalPerson",
@@ -117,28 +116,6 @@ static mutex_t smb_ads_cached_host_mtx;
 
 static char smb_ads_site[SMB_ADS_SITE_MAX];
 static mutex_t smb_ads_site_mtx;
-
-/*
- * smb_ads_adjoin_errmsg
- *
- * Use the adjoin return status defined in adjoin_status_t as the index
- * to this table.
- */
-static char *smb_ads_adjoin_errmsg[] = {
-	"ADJOIN succeeded.",
-	"ADJOIN failed to get handle.",
-	"ADJOIN failed to generate machine password.",
-	"ADJOIN failed to add workstation trust account.",
-	"ADJOIN failed to modify workstation trust account.",
-	"ADJOIN failed to get list of encryption types.",
-	"ADJOIN failed to initialize kerberos context.",
-	"ADJOIN failed to get Kerberos principal.",
-	"ADJOIN failed to set machine account password on AD.",
-	"ADJOIN failed to modify CONTROL attribute of the account.",
-	"ADJOIN failed to write Kerberos keytab file.",
-	"ADJOIN failed to configure domain_name property for idmapd.",
-	"ADJOIN failed to refresh idmap service."
-};
 
 /* attribute/value pair */
 typedef struct smb_ads_avpair {
@@ -163,7 +140,7 @@ static smb_ads_qstat_t smb_ads_lookup_computer_n_attr(smb_ads_handle_t *,
     smb_ads_avpair_t *, int, char *);
 static int smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *, int, char *);
 static krb5_kvno smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *, char *);
-static int smb_ads_gen_machine_passwd(char *, int);
+static void smb_ads_gen_machine_passwd(char *, int);
 static smb_ads_host_info_t *smb_ads_get_cached_host(void);
 static void smb_ads_set_cached_host(smb_ads_host_info_t *);
 static void smb_ads_free_cached_host(void);
@@ -612,15 +589,15 @@ smb_ads_query_dns_server(char *domain, char *msdcs_svc_name)
 	    C_IN, T_SRV, msg.buf, sizeof (msg.buf));
 
 	if (len < 0) {
-		smb_tracef("smbns_ads: DNS query for '%s' failed (%s)",
+		syslog(LOG_NOTICE, "DNS query for %s failed: %s",
 		    msdcs_svc_name, hstrerror(res_state.res_h_errno));
 		res_ndestroy(&res_state);
 		return (NULL);
 	}
 
 	if (len > sizeof (msg.buf)) {
-		smb_tracef("smbns_ads: DNS query %s: message too big (%d)",
-		    msdcs_svc_name, len);
+		syslog(LOG_NOTICE,
+		    "DNS query for %s failed: too big", msdcs_svc_name);
 		res_ndestroy(&res_state);
 		return (NULL);
 	}
@@ -631,8 +608,8 @@ smb_ads_query_dns_server(char *domain, char *msdcs_svc_name)
 
 	/* check truncated message bit */
 	if (msg.hdr.tc)
-		smb_tracef("smbns_ads: DNS query for '%s' detected "
-		    "truncated TCP reply message", msdcs_svc_name);
+		syslog(LOG_NOTICE,
+		    "DNS query for %s failed: truncated", msdcs_svc_name);
 
 	qcnt = ntohs(msg.hdr.qdcount);
 	ans_cnt = ntohs(msg.hdr.ancount);
@@ -684,19 +661,20 @@ smb_ads_query_dns_server(char *domain, char *msdcs_svc_name)
 }
 
 /*
- * smb_ads_set_site_service
+ * smb_ads_get_site_service
  *
- * This method sets the name of the site, to look for the ADS domain.
+ * Gets the msdcs SRV RR for the specified site.
  */
 static void
-smb_ads_set_site_service(char *site_service)
+smb_ads_get_site_service(char *site_service, size_t len)
 {
 	(void) mutex_lock(&smb_ads_site_mtx);
 	if (*smb_ads_site == '\0')
 		*site_service = '\0';
 	else
-		(void) snprintf(site_service, sizeof (site_service),
+		(void) snprintf(site_service, len,
 		    SMB_ADS_MSDCS_SRV_SITE_RR, smb_ads_site);
+
 	(void) mutex_unlock(&smb_ads_site_mtx);
 }
 
@@ -764,8 +742,6 @@ smb_ads_find_host(char *domain, char *sought)
 	smb_ads_host_list_t *hlist;
 	smb_ads_host_info_t *hlistp = NULL, *hentry = NULL, *host = NULL;
 	char site_service[MAXHOSTNAMELEN];
-	char *msdcs_svc_name[SMB_ADS_MSDCS_SVC_CNT] =
-	    {site_service, SMB_ADS_MSDCS_SRV_DC_RR};
 
 	if ((sought) && (*sought == '\0'))
 		sought = NULL;
@@ -791,20 +767,19 @@ smb_ads_find_host(char *domain, char *sought)
 		smb_ads_free_cached_host();
 	}
 
-	smb_ads_set_site_service(site_service);
 
 	/*
 	 * First look for ADS hosts in ADS site if configured.  Then try
 	 * without ADS site info.
 	 */
-	for (i = 0; i < SMB_ADS_MSDCS_SVC_CNT; i++) {
-		if (*msdcs_svc_name[i] == '\0')
-			continue;
+	hlist = NULL;
+	smb_ads_get_site_service(site_service, MAXHOSTNAMELEN);
+	if (*site_service != '\0')
+		hlist = smb_ads_query_dns_server(domain, site_service);
 
-		hlist = smb_ads_query_dns_server(domain, msdcs_svc_name[i]);
-		if (hlist != NULL)
-			break;
-	}
+	if (!hlist)
+		hlist = smb_ads_query_dns_server(domain,
+		    SMB_ADS_MSDCS_SRV_DC_RR);
 
 	if ((hlist == NULL) || (hlist->ah_list == NULL) || (hlist->ah_cnt == 0))
 		return (NULL);
@@ -1090,11 +1065,11 @@ smb_ads_display_stat(OM_uint32 maj, OM_uint32 min)
 	OM_uint32 min2;
 	(void) gss_display_status(&min2, maj, GSS_C_GSS_CODE, GSS_C_NULL_OID,
 	    &msg_ctx, &msg);
-	smb_tracef("smbns_ads: major status error: %s", (char *)msg.value);
+	smb_tracef("major status: %s", (char *)msg.value);
 	(void) gss_release_buffer(&min2, &msg);
 	(void) gss_display_status(&min2, min, GSS_C_MECH_CODE, GSS_C_NULL_OID,
 	    &msg_ctx, &msg);
-	smb_tracef("smbns_ads: minor status error: %s", (char *)msg.value);
+	smb_tracef("minor status: %s", (char *)msg.value);
 	(void) gss_release_buffer(&min2, &msg);
 }
 
@@ -1286,7 +1261,7 @@ smb_ads_establish_sec_context(smb_ads_handle_t *ah, gss_ctx_id_t *gss_context,
 		    &cred, NULL, NULL, sercred);
 		if (stat != LDAP_SUCCESS &&
 		    stat != LDAP_SASL_BIND_IN_PROGRESS) {
-			smb_tracef("smbns_ads: ldap_sasl_bind error: %s",
+			syslog(LOG_NOTICE, "ldap_sasl_bind: %s",
 			    ldap_err2string(stat));
 			if (oid != GSS_C_NO_OID)
 				(void) gss_release_oid(&min, &oid);
@@ -1381,7 +1356,7 @@ smb_ads_negotiate_sec_layer(smb_ads_handle_t *ah, gss_ctx_id_t gss_context,
 	stat = ldap_sasl_bind_s(ah->ld, NULL, "GSSAPI", &cred, NULL, NULL,
 	    &sercred);
 	if (stat != LDAP_SUCCESS && stat != LDAP_SASL_BIND_IN_PROGRESS) {
-		smb_tracef("smbns_ads: ldap_sasl_bind error: %s:",
+		syslog(LOG_NOTICE, "ldap_sasl_bind: %s",
 		    ldap_err2string(stat));
 		(void) gss_release_buffer(&min, &wrap_outbuf);
 		return (-1);
@@ -1512,8 +1487,7 @@ smb_ads_add_share(smb_ads_handle_t *ah, const char *adsShareName,
 	attrs[j]->mod_values = unc_names;
 
 	if ((ret = ldap_add_s(ah->ld, share_dn, attrs)) != LDAP_SUCCESS) {
-		smb_tracef("smbns_ads: %s: ldap_add error: %s",
-		    share_dn, ldap_err2string(ret));
+		smb_tracef("%s: ldap_add: %s", share_dn, ldap_err2string(ret));
 		smb_ads_free_attr(attrs);
 		free(share_dn);
 		return (ret);
@@ -1554,8 +1528,7 @@ smb_ads_del_share(smb_ads_handle_t *ah, const char *adsShareName,
 	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
 	    adsContainer, ah->domain_dn);
 	if ((ret = ldap_delete_s(ah->ld, share_dn)) != LDAP_SUCCESS) {
-		smb_tracef("smbns_ads: ldap_delete error: %s",
-		    ldap_err2string(ret));
+		smb_tracef("ldap_delete: %s", ldap_err2string(ret));
 		free(share_dn);
 		return (-1);
 	}
@@ -1672,8 +1645,8 @@ smb_ads_lookup_share(smb_ads_handle_t *ah, const char *adsShareName,
 	if ((ret = ldap_search_s(ah->ld, share_dn,
 	    LDAP_SCOPE_BASE, filter, attrs, 0, &res)) != LDAP_SUCCESS) {
 		if (ret != LDAP_NO_SUCH_OBJECT)
-			smb_tracef("smbns_ads: %s: ldap_search error: %s",
-			    share_dn, ldap_err2string(ret));
+			smb_tracef("%s: ldap_search: %s", share_dn,
+			    ldap_err2string(ret));
 
 		(void) ldap_msgfree(res);
 		free(share_dn);
@@ -2011,7 +1984,7 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	switch (op) {
 	case LDAP_MOD_ADD:
 		if ((ret = ldap_add_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-			smb_tracef("smbns_ads: ldap_add error: %s",
+			syslog(LOG_NOTICE, "ldap_add: %s",
 			    ldap_err2string(ret));
 			ret = -1;
 		}
@@ -2019,7 +1992,7 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 
 	case LDAP_MOD_REPLACE:
 		if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-			smb_tracef("smbns_ads: ldap_replace error: %s",
+			syslog(LOG_NOTICE, "ldap_modify: %s",
 			    ldap_err2string(ret));
 			ret = -1;
 		}
@@ -2046,8 +2019,7 @@ smb_ads_del_computer(smb_ads_handle_t *ah, char *dn)
 	int rc;
 
 	if ((rc = ldap_delete_s(ah->ld, dn)) != LDAP_SUCCESS)
-		smb_tracef("smbns_ads: ldap_delete error: %s",
-		    ldap_err2string(rc));
+		smb_tracef("ldap_delete: %s", ldap_err2string(rc));
 }
 
 /*
@@ -2263,8 +2235,7 @@ smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *ah, int flags, char *dn)
 	ctl_val[1] = 0;
 	attrs[0]->mod_values = ctl_val;
 	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-		smb_tracef("smbns_ads: ldap_modify error: %s",
-		    ldap_err2string(ret));
+		syslog(LOG_NOTICE, "ldap_modify: %s", ldap_err2string(ret));
 	}
 
 	smb_ads_free_attr(attrs);
@@ -2301,7 +2272,7 @@ smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah, char *dn)
  * quality check (three character classes), an uppercase letter is
  * used as the first character of the machine password.
  */
-static int
+static void
 smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 {
 	char *data = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK"
@@ -2309,8 +2280,8 @@ smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 	int datalen = strlen(data);
 	int i, data_idx;
 
-	if (!machine_passwd || bufsz == 0)
-		return (-1);
+	assert(machine_passwd);
+	assert(bufsz > 0);
 
 	/*
 	 * The decimal value of upper case 'A' is 65. Randomly pick
@@ -2323,7 +2294,6 @@ smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 	}
 
 	machine_passwd[bufsz - 1] = 0;
-	return (0);
 }
 
 /*
@@ -2392,11 +2362,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		return (SMB_ADJOIN_ERR_GET_HANDLE);
 	}
 
-	if (smb_ads_gen_machine_passwd(machine_passwd, len) != 0) {
-		smb_ads_close(ah);
-		smb_ccache_remove(SMB_CCACHE_PATH);
-		return (SMB_ADJOIN_ERR_GEN_PASSWD);
-	}
+	smb_ads_gen_machine_passwd(machine_passwd, len);
 
 	if ((dclevel = smb_ads_get_dc_level(ah)) == -1) {
 		smb_ads_close(ah);
@@ -2465,7 +2431,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
 		    SMB_ADS_USER_ACCT_CTL_DONT_EXPIRE_PASSWD);
 
-		syslog(LOG_NOTICE, "smbns_ads: Unable to set the "
+		syslog(LOG_NOTICE, "Unable to set the "
 		    "TRUSTED_FOR_DELEGATION userAccountControl flag on "
 		    "the machine account in Active Directory.  Please refer "
 		    "to the Troubleshooting guide for more information.");
@@ -2541,17 +2507,55 @@ adjoin_cleanup:
 }
 
 /*
- * smb_adjoin_report_err
+ * smb_ads_join_errmsg
  *
  * Display error message for the specific adjoin error code.
  */
-char *
-smb_adjoin_report_err(smb_adjoin_status_t status)
+void
+smb_ads_join_errmsg(smb_adjoin_status_t status)
 {
-	if (status < 0 || status >= SMB_ADJOIN_NUM_STATUS)
-		return ("ADJOIN: unknown status");
+	int i;
+	struct xlate_table {
+		smb_adjoin_status_t status;
+		char *msg;
+	} adjoin_table[] = {
+		{ SMB_ADJOIN_ERR_GET_HANDLE, "Failed to connect to an "
+		    "Active Directory server." },
+		{ SMB_ADJOIN_ERR_GET_DCLEVEL, "Unknown functional level of "
+		    "the domain controller. The rootDSE attribute named "
+		    "\"domainControllerFunctionality\" is missing from the "
+		    "Active Directory." },
+		{ SMB_ADJOIN_ERR_ADD_TRUST_ACCT, "Failed to create the "
+		    "workstation trust account." },
+		{ SMB_ADJOIN_ERR_MOD_TRUST_ACCT, "Failed to modify the "
+		    "workstation trust account." },
+		{ SMB_ADJOIN_ERR_DUP_TRUST_ACCT, "Failed to create the "
+		    "workstation trust account because its name is already "
+		    "in use." },
+		{ SMB_ADJOIN_ERR_TRUST_ACCT, "Error in querying the "
+		    "workstation trust account" },
+		{ SMB_ADJOIN_ERR_INIT_KRB_CTX, "Failed to initialize Kerberos "
+		    "context." },
+		{ SMB_ADJOIN_ERR_GET_SPNS, "Failed to get Kerberos "
+		    "principals." },
+		{ SMB_ADJOIN_ERR_KSETPWD, "Failed to set machine password." },
+		{ SMB_ADJOIN_ERR_UPDATE_CNTRL_ATTR,  "Failed to modify "
+		    "userAccountControl attribute of the workstation trust "
+		    "account." },
+		{ SMB_ADJOIN_ERR_WRITE_KEYTAB, "Error in writing to local "
+		    "keytab file (i.e /etc/krb5/krb5.keytab)." },
+		{ SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN, "Failed to update idmap "
+		    "configuration." },
+		{ SMB_ADJOIN_ERR_IDMAP_REFRESH, "Failed to refresh idmap "
+		    "service." },
+		{ SMB_ADJOIN_ERR_COMMIT_KEYTAB, "Failed to commit changes to "
+		    "local keytab file (i.e. /etc/krb5/krb5.keytab)." }
+	};
 
-	return (smb_ads_adjoin_errmsg[status]);
+	for (i = 0; i < sizeof (adjoin_table) / sizeof (adjoin_table[0]); i++) {
+		if (adjoin_table[i].status == status)
+			syslog(LOG_NOTICE, "%s", adjoin_table[i].msg);
+	}
 }
 
 /*
@@ -2578,7 +2582,7 @@ smb_ads_select_pdc(smb_ads_host_list_t *hlist)
 	cnt = hlist->ah_cnt;
 	for (i = 0; i < cnt; i++) {
 		hentry = &hlist->ah_list[i];
-		if (smb_inet_equal(&hentry->ipaddr, &ipaddr, SMB_INET_NOMASK) &&
+		if (smb_inet_equal(&hentry->ipaddr, &ipaddr) &&
 		    (smb_ads_ldap_ping(hentry) == 0))
 			return (hentry);
 	}

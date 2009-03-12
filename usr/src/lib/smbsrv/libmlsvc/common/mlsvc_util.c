@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/systm.h>
+#include <syslog.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
@@ -114,8 +115,10 @@ mlsvc_netlogon(char *server, char *domain)
 	DWORD status;
 
 	if (netr_open(server, domain, &netr_handle) == 0) {
-		status = netlogon_auth(server, &netr_handle,
-		    NETR_FLG_INIT);
+		if ((status = netlogon_auth(server, &netr_handle,
+		    NETR_FLG_INIT)) != NT_STATUS_SUCCESS)
+			syslog(LOG_NOTICE, "Failed to establish NETLOGON "
+			    "credential chain");
 		(void) netr_close(&netr_handle);
 	} else {
 		status = NT_STATUS_OPEN_FAILED;
@@ -136,6 +139,7 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 	int erc;
 	DWORD status;
 	char machine_passwd[NETR_MACHINE_ACCT_PASSWD_MAX];
+	smb_adjoin_status_t err;
 
 	machine_passwd[0] = '\0';
 
@@ -149,12 +153,14 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 	if (erc == AUTH_USER_GRANT) {
 		if (mlsvc_ntjoin_support == B_FALSE) {
 
-			if (smb_ads_join(dinfo->d_fqdomain, user, plain_text,
-			    machine_passwd, sizeof (machine_passwd))
-			    == SMB_ADJOIN_SUCCESS)
+			if ((err = smb_ads_join(dinfo->d_fqdomain, user,
+			    plain_text, machine_passwd,
+			    sizeof (machine_passwd))) == SMB_ADJOIN_SUCCESS) {
 				status = NT_STATUS_SUCCESS;
-			else
+			} else {
+				smb_ads_join_errmsg(err);
 				status = NT_STATUS_UNSUCCESSFUL;
+			}
 		} else {
 			if (mlsvc_user_getauth(dinfo->d_dc, user, &auth)
 			    != 0) {
@@ -174,8 +180,11 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 		if (status == NT_STATUS_SUCCESS) {
 			erc = smb_setdomainprops(NULL, dinfo->d_dc,
 			    machine_passwd);
-			if (erc != 0)
+			if (erc != 0) {
+				syslog(LOG_NOTICE, "Failed to update CIFS "
+				    "configuration");
 				return (NT_STATUS_UNSUCCESSFUL);
+			}
 
 			status = mlsvc_netlogon(dinfo->d_dc, dinfo->d_nbdomain);
 		}

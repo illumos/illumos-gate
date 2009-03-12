@@ -884,8 +884,22 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
 static void
 smb_tree_get_flags(vfs_t *vfsp, smb_tree_t *tree)
 {
-	uint32_t flags = SMB_TREE_SUPPORTS_ACLS;
-	char *name;
+	typedef struct smb_mtype {
+		char		*mt_name;
+		size_t		mt_namelen;
+		uint32_t	mt_flags;
+	} smb_mtype_t;
+
+	static smb_mtype_t smb_mtype[] = {
+		{ "zfs",	3,	SMB_TREE_UNICODE_ON_DISK },
+		{ "ufs",	3,	SMB_TREE_UNICODE_ON_DISK },
+		{ "nfs",	3,	SMB_TREE_NFS_MOUNTED },
+		{ "tmpfs",	5,	SMB_TREE_NO_EXPORT }
+	};
+	smb_mtype_t	*mtype;
+	char		*name;
+	uint32_t	flags = SMB_TREE_SUPPORTS_ACLS;
+	int		i;
 
 	if (vfsp->vfs_flag & VFS_RDONLY)
 		flags |= SMB_TREE_READONLY;
@@ -898,11 +912,11 @@ smb_tree_get_flags(vfs_t *vfsp, smb_tree_t *tree)
 
 	name = vfssw[vfsp->vfs_fstype].vsw_name;
 
-	if (strcmp(name, "tmpfs") == 0)
-		flags |= SMB_TREE_NO_EXPORT;
-
-	if (strncasecmp(name, NFS, sizeof (NFS)) == 0)
-		flags |= SMB_TREE_NFS_MOUNTED;
+	for (i = 0; i < sizeof (smb_mtype) / sizeof (smb_mtype[0]); ++i) {
+		mtype = &smb_mtype[i];
+		if (strncasecmp(name, mtype->mt_name, mtype->mt_namelen) == 0)
+			flags |= mtype->mt_flags;
+	}
 
 	(void) strlcpy(tree->t_typename, name, SMB_TYPENAMELEN);
 	(void) utf8_strupr((char *)tree->t_typename);
@@ -925,7 +939,8 @@ smb_tree_get_flags(vfs_t *vfsp, smb_tree_t *tree)
 	if (vfs_has_feature(vfsp, VFSFT_ACEMASKONACCESS))
 		flags |= SMB_TREE_ACEMASKONACCESS;
 
-	DTRACE_PROBE1(smb__tree__flags, uint32_t, flags);
+	DTRACE_PROBE2(smb__tree__flags, uint32_t, flags, char *, name);
+
 
 	tree->t_flags = flags;
 }

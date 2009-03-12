@@ -405,12 +405,40 @@ int MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
 
 #define	MBC_ROOM_FOR(b, n) (((b)->chain_offset + (n)) <= (b)->max_bytes)
 
+/*
+ * ol_sess_id:
+ *
+ *	ID of the session holding the oplock (if an oplock was granted).
+ *
+ * ol_xthread:
+ *
+ *	Worker thread treating the command that was granted the oplock. Until
+ *	that thread is done with that command and has submitted the response
+ *	to the network stack, all the other threads will be suspended in
+ *	smb_oplock_enter(). They will be awaken when the worker thread
+ *	referenced in 'ol_xthread' calls smb_oplock_broadcast().
+ *
+ *	The purpose of this mechanism is to prevent another thread from
+ *	triggering a oplock break before the response conveying the grant
+ *	has been sent.
+ *
+ * ol_ofile
+ *
+ *	Open file that was granted the oplock.
+ *
+ * ol_waiters_count
+ *
+ *	Number of threads waiting for a call to smb_oplock_broadcast().
+ *
+ * ol_level
+ *
+ *	Level of the oplock granted.
+ */
 typedef struct smb_oplock {
 	uint64_t		ol_sess_id;
 	kcondvar_t		ol_cv;
 	kthread_t		*ol_xthread;
 	struct smb_ofile	*ol_ofile;
-	uint32_t		ol_waiters_count;
 	uint8_t			ol_level;
 } smb_oplock_t;
 
@@ -718,7 +746,6 @@ typedef struct smb_session {
 	uchar_t			*outpipe_data;
 	int			outpipe_datalen;
 	int			outpipe_cookie;
-	uint32_t		s_oplock_brkcntr;
 	list_t			s_oplock_brkreqs;
 } smb_session_t;
 
@@ -787,6 +814,7 @@ typedef struct smb_user {
 #define	SMB_TREE_ACLONCREATE		0x00000400
 #define	SMB_TREE_ACEMASKONACCESS	0x00000800
 #define	SMB_TREE_NFS_MOUNTED		0x00001000
+#define	SMB_TREE_UNICODE_ON_DISK	0x00002000
 
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,

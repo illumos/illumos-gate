@@ -24,6 +24,8 @@
  */
 
 #include <sys/mdb_modapi.h>
+#include <sys/thread.h>
+#include <sys/taskq_impl.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/smb_ktypes.h>
@@ -246,6 +248,7 @@ static smb_com_entry_t	smb_com[256] =
 	SMB_COM_ENTRY(SMB_COM_NT_TRANSACT, "No"),
 	SMB_COM_ENTRY(SMB_COM_NT_TRANSACT_SECONDARY, "No"),
 	SMB_COM_ENTRY(SMB_COM_NT_CREATE_ANDX, "No"),
+	SMB_COM_ENTRY(0xA3, "?"),
 	SMB_COM_ENTRY(SMB_COM_NT_CANCEL, "No"),
 	SMB_COM_ENTRY(SMB_COM_NT_RENAME, "No"),
 	SMB_COM_ENTRY(0xA6, "?"),
@@ -303,6 +306,7 @@ static smb_com_entry_t	smb_com[256] =
 	SMB_COM_ENTRY(SMB_COM_WRITE_BULK_DATA, "No"),
 	SMB_COM_ENTRY(0xDB, "?"),
 	SMB_COM_ENTRY(0xDC, "?"),
+	SMB_COM_ENTRY(0xDD, "?"),
 	SMB_COM_ENTRY(0xDE, "?"),
 	SMB_COM_ENTRY(0xDF, "?"),
 	SMB_COM_ENTRY(0xE0, "?"),
@@ -370,6 +374,7 @@ static int smb_dcmd_getopt(uint_t *, int, const mdb_arg_t *);
 static int smb_dcmd_setopt(uint_t, int, mdb_arg_t *);
 static int smb_obj_expand(uintptr_t, uint_t, const smb_exp_t *, ulong_t);
 static int smb_obj_list(const char *, uint_t, uint_t);
+static int smb_worker_findstack(uintptr_t);
 
 /*
  * MDB module linkage information:
@@ -805,12 +810,13 @@ smb_dcmd_session(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				mdb_printf(
 				    "%<b>%<u>%-?s "
 				    "%-16s "
-				    "%-16s%</u>\n",
+				    "%-16s%</u>%</b>\n",
 				    "SESSION", "CLIENT_IP_ADDR",
 				    "LOCAL_IP_ADDR");
+
 			mdb_printf(
-			    "%-?p %-16I %-16I\n", addr, se->ipaddr,
-			    se->local_ipaddr);
+			    "%-?p %-16I %-16I\n", addr, se->ipaddr.a_ipv4,
+			    se->local_ipaddr.a_ipv4);
 		}
 	}
 	if (smb_obj_expand(addr, opts, smb_session_exp, indent))
@@ -870,7 +876,7 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (opts & SMB_OPT_VERBOSE) {
 			mdb_printf(
-			    "%<b>%<u>SMB request information (%p):"
+			    "%</b>%</u>SMB request information (%p):"
 			    "%</u>%</b>\n\n", addr);
 			mdb_printf("First SMB COM: %u (%s)\n",
 			    sr->first_smb_com,
@@ -884,16 +890,15 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    sr->smb_fid, sr->fid_ofile);
 			mdb_printf("PID: %u\n", sr->smb_pid);
 			mdb_printf("MID: %u\n\n", sr->smb_mid);
+			smb_worker_findstack((uintptr_t)sr->sr_worker);
 		} else {
 			if (DCMD_HDRSPEC(flags))
 				mdb_printf(
-				    "%<b>%<u>"
-				    "%-?s "
-				    "%s%</u>%</b>\n"
-				    "ADDR", "COM");
+				    "%<b>%<u>%-?s %-?s %-16s %s%</u>%</b>\n",
+				    "ADDR", "Worker", "STATE", "COM");
 
-			mdb_printf("%-?p %s\n", addr, state,
-			    smb_com[sr->first_smb_com]);
+			mdb_printf("%-?p %-?p %-16s %s\n", addr, sr->sr_worker,
+			    state, smb_com[sr->first_smb_com]);
 		}
 	}
 	return (DCMD_OK);
@@ -2132,5 +2137,40 @@ smb_obj_list(const char *name, uint_t opts, uint_t flags)
 		mdb_warn("failed to list %s", name);
 		return (DCMD_ERR);
 	}
+	return (DCMD_OK);
+}
+
+static int
+smb_worker_findstack(uintptr_t addr)
+{
+	kthread_t	t;
+	taskq_t		tq;
+	char		cmd[80];
+	mdb_arg_t	cmdarg;
+
+	if (mdb_vread(&t, sizeof (kthread_t), addr) == -1) {
+		mdb_warn("failed to read kthread_t at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread(&tq, sizeof (taskq_t), (uintptr_t)t.t_taskq) == -1)
+		tq.tq_name[0] = '\0';
+
+	mdb_inc_indent(2);
+
+	mdb_printf("PC: %a", t.t_pc);
+	if (t.t_tid == 0) {
+		if (tq.tq_name[0] != '\0')
+			mdb_printf("    TASKQ: %s\n", tq.tq_name);
+		else
+			mdb_printf("    THREAD: %a()\n", t.t_startpc);
+	}
+
+	mdb_snprintf(cmd, sizeof (cmd), "<.$c%d", 16);
+	cmdarg.a_type = MDB_TYPE_STRING;
+	cmdarg.a_un.a_str = cmd;
+	(void) mdb_call_dcmd("findstack", addr, DCMD_ADDRSPEC, 1, &cmdarg);
+	mdb_dec_indent(2);
+	mdb_printf("\n");
 	return (DCMD_OK);
 }

@@ -180,8 +180,7 @@ smb_do_rename(
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
-	(void) smb_oplock_break(src_node, SMB_SESSION_GET_ID(sr->session),
-	    B_FALSE);
+	(void) smb_oplock_break(src_node, sr->session, B_FALSE);
 
 	for (count = 0; count <= 3; count++) {
 		if (count) {

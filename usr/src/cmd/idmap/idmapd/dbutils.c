@@ -1355,33 +1355,24 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res, int *wksid)
 				continue;
 			res->id.idmap_id_u.uid = wksids[i].pid;
 			res->direction = wksids[i].direction;
-			if (req->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
-				res->info.how.map_type =
-				    IDMAP_MAP_TYPE_KNOWN_SID;
-				res->info.src = IDMAP_MAP_SRC_HARD_CODED;
-			}
+			res->info.how.map_type = IDMAP_MAP_TYPE_KNOWN_SID;
+			res->info.src = IDMAP_MAP_SRC_HARD_CODED;
 			return (IDMAP_SUCCESS);
 		case IDMAP_GID:
 			if (wksids[i].is_user == 1)
 				continue;
 			res->id.idmap_id_u.gid = wksids[i].pid;
 			res->direction = wksids[i].direction;
-			if (req->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
-				res->info.how.map_type =
-				    IDMAP_MAP_TYPE_KNOWN_SID;
-				res->info.src = IDMAP_MAP_SRC_HARD_CODED;
-			}
+			res->info.how.map_type = IDMAP_MAP_TYPE_KNOWN_SID;
+			res->info.src = IDMAP_MAP_SRC_HARD_CODED;
 			return (IDMAP_SUCCESS);
 		case IDMAP_POSIXID:
 			res->id.idmap_id_u.uid = wksids[i].pid;
 			res->id.idtype = (!wksids[i].is_user) ?
 			    IDMAP_GID : IDMAP_UID;
 			res->direction = wksids[i].direction;
-			if (req->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
-				res->info.how.map_type =
-				    IDMAP_MAP_TYPE_KNOWN_SID;
-				res->info.src = IDMAP_MAP_SRC_HARD_CODED;
-			}
+			res->info.how.map_type = IDMAP_MAP_TYPE_KNOWN_SID;
+			res->info.src = IDMAP_MAP_SRC_HARD_CODED;
 			return (IDMAP_SUCCESS);
 		default:
 			return (IDMAP_ERR_NOTSUPPORTED);
@@ -1414,11 +1405,8 @@ lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user)
 				return (IDMAP_ERR_MEMORY);
 			}
 			res->direction = wksids[i].direction;
-			if (req->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
-				res->info.how.map_type =
-				    IDMAP_MAP_TYPE_KNOWN_SID;
-				res->info.src = IDMAP_MAP_SRC_HARD_CODED;
-			}
+			res->info.how.map_type = IDMAP_MAP_TYPE_KNOWN_SID;
+			res->info.src = IDMAP_MAP_SRC_HARD_CODED;
 			return (IDMAP_SUCCESS);
 		}
 	}
@@ -2463,7 +2451,7 @@ generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user,
 	if (res->id.idtype == IDMAP_SID)
 		res->id.idtype = is_user ? IDMAP_USID : IDMAP_GSID;
 
-	if (!fallback && req->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
+	if (!fallback) {
 		res->info.how.map_type = IDMAP_MAP_TYPE_LOCAL_SID;
 		res->info.src = IDMAP_MAP_SRC_ALGORITHMIC;
 	}
@@ -2530,10 +2518,8 @@ lookup_localsid2pid(idmap_mapping *req, idmap_id_res *res)
 	default:
 		return (IDMAP_ERR_NOTSUPPORTED);
 	}
-	if (req->flag & IDMAP_REQ_FLG_MAPPING_INFO) {
-		res->info.how.map_type = IDMAP_MAP_TYPE_LOCAL_SID;
-		res->info.src = IDMAP_MAP_SRC_ALGORITHMIC;
-	}
+	res->info.how.map_type = IDMAP_MAP_TYPE_LOCAL_SID;
+	res->info.src = IDMAP_MAP_SRC_ALGORITHMIC;
 	return (IDMAP_SUCCESS);
 }
 
@@ -2824,7 +2810,6 @@ name_based_mapping_sid2pid(lookup_state_t *state,
 out:
 	if (sql != NULL)
 		sqlite_freemem(sql);
-	res->info.how.map_type = IDMAP_MAP_TYPE_RULE_BASED;
 	if (retcode == IDMAP_SUCCESS) {
 		if (values[1] != NULL)
 			res->direction =
@@ -2843,6 +2828,10 @@ out:
 		idmap_namerule_set(rule, values[3], values[2],
 		    values[0], is_wuser, is_user, strtol(values[4], &end, 10),
 		    res->direction);
+	}
+
+	if (retcode != IDMAP_ERR_NOTFOUND) {
+		res->info.how.map_type = IDMAP_MAP_TYPE_RULE_BASED;
 		res->info.src = IDMAP_MAP_SRC_NEW;
 	}
 
@@ -3997,7 +3986,6 @@ name_based_mapping_pid2sid(lookup_state_t *state, const char *unixname,
 out:
 	if (sql != NULL)
 		sqlite_freemem(sql);
-	res->info.how.map_type = IDMAP_MAP_TYPE_RULE_BASED;
 	if (retcode == IDMAP_SUCCESS) {
 		res->id.idtype = is_wuser ? IDMAP_USID : IDMAP_GSID;
 
@@ -4021,8 +4009,13 @@ out:
 		    is_user, strtol(values[3], &end, 10),
 		    strtol(values[5], &end, 10),
 		    rule->direction);
+	}
+
+	if (retcode != IDMAP_ERR_NOTFOUND) {
+		res->info.how.map_type = IDMAP_MAP_TYPE_RULE_BASED;
 		res->info.src = IDMAP_MAP_SRC_NEW;
 	}
+
 	if (vm != NULL)
 		(void) sqlite_finalize(vm, NULL);
 	return (retcode);

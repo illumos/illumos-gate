@@ -725,7 +725,8 @@ int smb_nic_addhost(const char *, const char *, int, const char **);
 int smb_nic_delhost(const char *);
 int smb_nic_getfirst(smb_niciter_t *);
 int smb_nic_getnext(smb_niciter_t *);
-boolean_t smb_nic_exists(smb_inaddr_t *, boolean_t);
+boolean_t smb_nic_is_local(smb_inaddr_t *);
+boolean_t smb_nic_is_same_subnet(smb_inaddr_t *);
 
 /* NIC Monitoring functions */
 int smb_nicmon_start(const char *);

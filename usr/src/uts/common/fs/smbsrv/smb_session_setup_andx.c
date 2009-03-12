@@ -268,6 +268,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	smb_sessionsetup_info_t sinfo;
 	smb_session_key_t *session_key = NULL;
 	char ipaddr_buf[INET6_ADDRSTRLEN];
+	int native_lm;
 	int auth_res;
 	int rc;
 
@@ -327,11 +328,10 @@ smb_com_session_setup_andx(smb_request_t *sr)
 			    &sinfo.ssi_native_lm);
 
 		/*
-		 * Native Lanman could be null so we really don't care
-		 * if above decode fails, but to have a valid value for
-		 * the field we set it to Win NT.
+		 * If the Native Lanman cannot be determined,
+		 * default to Windows NT.
 		 */
-		if (rc != 0)
+		if (rc != 0 || sinfo.ssi_native_lm == NULL)
 			sinfo.ssi_native_lm = "NT LAN Manager 4.0";
 	} else {
 		rc = smbsr_decode_vwv(sr, "b.wwwwlw4.", &sr->andx_com,
@@ -365,7 +365,8 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		if (smbsr_decode_data(sr, "%u", sr, &sinfo.ssi_domain) != 0)
 			sinfo.ssi_domain = "";
 
-		sr->session->native_os = NATIVE_OS_UNKNOWN;
+		sr->session->native_os = NATIVE_OS_WINNT;
+		sinfo.ssi_native_lm = "NT LAN Manager 4.0";
 	}
 
 	/*
@@ -402,6 +403,10 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
+	native_lm = smbnative_lm_value(sinfo.ssi_native_lm);
+	if (native_lm == NATIVE_LM_WIN2000)
+		sinfo.ssi_capabilities |= CAP_LARGE_FILES |
+		    CAP_LARGE_READX | CAP_LARGE_WRITEX;
 	sr->session->capabilities = sinfo.ssi_capabilities;
 
 	/*

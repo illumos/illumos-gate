@@ -587,25 +587,6 @@ smb_server_start(struct smb_io_start *io_start)
 			break;
 		if (rc = smb_thread_start(&sv->si_thread_unexport))
 			break;
-		/*
-		 * XXX We give up the NET_MAC_AWARE privilege because it keeps
-		 * us from re-opening the connection when there are leftover TCP
-		 * connections in TCPS_TIME_WAIT state.  There seem to be some
-		 * security ramifications around reestablishing a connection
-		 * while possessing the NET_MAC_AWARE privilege.
-		 *
-		 * This approach may cause problems when we try to support
-		 * zones.  An alternative would be to retry the connection setup
-		 * for a fixed period of time until the stale connections clear
-		 * up but that implies we would be offline for a couple minutes
-		 * every time the service is restarted with active connections.
-		 */
-		rc = setpflags(NET_MAC_AWARE, 0, CRED());
-		if (rc) {
-			cmn_err(CE_WARN,
-			    "Cannot remove NET_MAC_AWARE privilege");
-			break;
-		}
 		if (rc = smb_opipe_door_open(io_start->opipe)) {
 			cmn_err(CE_WARN, "Cannot open opipe door");
 			break;
@@ -1251,7 +1232,8 @@ smb_server_listen(
 {
 	int			rc;
 	ksocket_t		s_so;
-	uint32_t		on = 1;
+	const uint32_t		on = 1;
+	const uint32_t		off = 0;
 	smb_session_t		*session;
 
 	if (pthread_create_error) {
@@ -1278,8 +1260,10 @@ smb_server_listen(
 		if (ld->ld_so) {
 
 			(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
-			    SO_REUSEADDR, (const void *)&on, sizeof (on),
-			    CRED());
+			    SO_MAC_EXEMPT, &off, sizeof (off), CRED());
+			(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
+			    SO_REUSEADDR, &on, sizeof (on), CRED());
+
 			if (family == AF_INET) {
 				rc = ksocket_bind(ld->ld_so,
 				    (struct sockaddr *)&ld->ld_sin,
@@ -1325,11 +1309,9 @@ smb_server_listen(
 			DTRACE_PROBE1(so__accept, struct sonode *, s_so);
 
 			(void) ksocket_setsockopt(s_so, IPPROTO_TCP,
-			    TCP_NODELAY, (const void *)&on, sizeof (on),
-			    CRED());
+			    TCP_NODELAY, &on, sizeof (on), CRED());
 			(void) ksocket_setsockopt(s_so, SOL_SOCKET,
-			    SO_KEEPALIVE, (const void *)&on, sizeof (on),
-			    CRED());
+			    SO_KEEPALIVE, &on, sizeof (on), CRED());
 			(void) ksocket_setsockopt(s_so, SOL_SOCKET, SO_SNDBUF,
 			    (const void *)&txbuf_size, sizeof (txbuf_size),
 			    CRED());

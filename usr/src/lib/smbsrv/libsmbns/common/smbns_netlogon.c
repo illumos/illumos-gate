@@ -541,15 +541,19 @@ smb_better_dc(uint32_t cur_ip, uint32_t new_ip)
 
 	if (cur_ip == 0)
 		return (1);
+	/*
+	 * see if there is a DC in the
+	 * same subnet
+	 */
 
 	ipaddr.a_family = AF_INET;
 	ipaddr.a_ipv4 = cur_ip;
-	if (smb_nic_exists(&ipaddr, B_TRUE))
+	if (smb_nic_is_same_subnet(&ipaddr))
 		return (0);
 
 	ipaddr.a_family = AF_INET;
 	ipaddr.a_ipv4 = new_ip;
-	if (smb_nic_exists(&ipaddr, B_TRUE))
+	if (smb_nic_is_same_subnet(&ipaddr))
 		return (1);
 	/*
 	 * Otherwise, just keep the old one.

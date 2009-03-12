@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This module defines generic functions to map Native OS and Native
@@ -39,10 +37,25 @@
 #include <smbsrv/string.h>
 #include <smbsrv/smbinfo.h>
 
+typedef struct smb_native {
+	int sn_value;
+	const char *sn_name;
+} smb_native_t;
+
 /*
  * smbnative_os_value
  *
  * Return the appropriate native OS value for the specified native OS name.
+ *
+ * Example OS values used by Windows:
+ *
+ *	Windows 4.0, Windows NT, Windows NT 4.0
+ *	Windows 5.0, Windows 5.1
+ *	Windows 2000, Windows 2000 5.0, Windows 2000 5.1
+ *	Windows 2002
+ *	Windows .NET
+ *	Windows Server 2003
+ *	Windows XP
  *
  * Windows 2000 server:            "Windows 2000 2195"
  * Windows XP Professional client: "Windows 2002 2543"
@@ -58,14 +71,9 @@
  * Samba reports UNIX as its Native OS, which we can map to NT 4.0.
  */
 int
-smbnative_os_value(char *native_os)
+smbnative_os_value(const char *native_os)
 {
-	typedef struct native_os_table {
-		int os_value;
-		char *os_name;
-	} native_os_table_t;
-
-	static native_os_table_t os_table[] = {
+	static smb_native_t os_table[] = {
 		{ NATIVE_OS_WINNT,	"Windows NT 4.0"	},
 		{ NATIVE_OS_WINNT,	"Windows NT"		},
 		{ NATIVE_OS_WIN95,	"Windows 4.0"		},
@@ -76,7 +84,7 @@ smbnative_os_value(char *native_os)
 		{ NATIVE_OS_WIN2000,	"Windows 2000"		},
 		{ NATIVE_OS_WIN2000,	"Windows 2002"		},
 		{ NATIVE_OS_WIN2000,	"Windows .NET"		},
-		{ NATIVE_OS_WIN2000,	"Windows Server 2003"	},
+		{ NATIVE_OS_WIN2000,	"Windows Server"	},
 		{ NATIVE_OS_WIN2000,	"Windows XP"		},
 		{ NATIVE_OS_WINNT,	"UNIX"			},
 		{ NATIVE_OS_MACOS,	"MacOS" 		}
@@ -84,30 +92,27 @@ smbnative_os_value(char *native_os)
 
 	int i;
 	int len;
-	char *os_name;
+	const char *name;
 
-	if (native_os == NULL) {
+	if (native_os == NULL)
 		return (NATIVE_OS_UNKNOWN);
-	}
 
-	if (*native_os == '\0') {
-		/*
-		 * Windows Vista sends an empty native OS string.
-		 */
+	/*
+	 * Windows Vista sends an empty native OS string.
+	 */
+	if (*native_os == '\0')
 		return (NATIVE_OS_WIN2000);
-	}
 
 	for (i = 0; i < sizeof (os_table)/sizeof (os_table[0]); ++i) {
-		os_name = os_table[i].os_name;
-		len = strlen(os_name);
+		name = os_table[i].sn_name;
+		len = strlen(name);
 
-		if (utf8_strncasecmp(os_name, native_os, len) == 0) {
-			return (os_table[i].os_value);
-		}
+		if (utf8_strncasecmp(name, native_os, len) == 0)
+			return (os_table[i].sn_value);
 	}
+
 	return (NATIVE_OS_UNKNOWN);
 }
-
 
 /*
  * smbnative_lm_value
@@ -117,129 +122,100 @@ smbnative_os_value(char *native_os)
  * clients that means we can miss the first character, so we do an
  * additional check starting from the second character.
  *
- * DAVE (Thursby Software: CIFS for MacOS) sometimes uses a Unicode
- * character in the LanMan name. Variations seen so far are:
+ * Example LanMan values:
  *
- *	44 00 41 00 56 00 45 00 00 00        D.A.V.E...
- *
- *	44 00 41 00 56 00 45 00 22 21 20 00 56 00 32 00
- *	2E 00 35 00 2E 00 31 00 00 00        D.A.V.E."!..V.2...5...1...
- *
- * Samba reports its own name (Samba) as its Native LM, which we can
- * map to NT LM 4.0.
+ *	NT LAN Manager 4.0
+ *	Windows 4.0
+ *	Windows NT, Windows NT 4.0
+ *	Windows 2000 LAN Manager
+ *	Windows 2000, Windows 2000 5.0, Windows 2000 5.1
+ *	Windows 2002, Windows 2002 5.1
+ *	Windows .NET, Windows .NET 5.2
+ *	Windows Server 2003
+ *	Windows XP
+ *	NETSMB		(Solaris CIFS client)
+ *	DAVE		(Thursby Software: CIFS for MacOS)
+ *	Samba
  */
 int
-smbnative_lm_value(char *native_lm)
+smbnative_lm_value(const char *native_lm)
 {
-	typedef struct native_lm_table {
-		int lm_value;
-		char *lm_name;
-	} native_lm_table_t;
-
-	static native_lm_table_t lm_table[] = {
+	static smb_native_t lm_table[] = {
 		{ NATIVE_LM_NT,		"NT LAN Manager 4.0"		},
-		{ NATIVE_LM_NT,		"Windows NT 4.0"		},
 		{ NATIVE_LM_NT,		"Windows NT"			},
 		{ NATIVE_LM_NT,		"Windows 4.0"			},
-		{ NATIVE_LM_WIN2000,	"Windows 2000 LAN Manager"	},
-		{ NATIVE_LM_WIN2000,	"Windows 2000 5.0"		},
-		{ NATIVE_LM_WIN2000,	"Windows 2000 5.1"		},
-		{ NATIVE_LM_WIN2000,	"Windows 2000",			},
-		{ NATIVE_LM_WIN2000,	"Windows 2002 5.1"		},
-		{ NATIVE_LM_WIN2000,	"Windows 2002"			},
-		{ NATIVE_LM_WIN2000,	"Windows .NET 5.2"		},
-		{ NATIVE_LM_WIN2000,	"Windows .NET"			},
-		{ NATIVE_LM_WIN2000,	"Windows Server 2003"		},
-		{ NATIVE_LM_WIN2000,	"Windows XP"			},
-		{ NATIVE_LM_NT,		"Samba"				},
 		{ NATIVE_LM_NT,		"DAVE"				}
 	};
 
 	int i;
 	int len;
-	char *lm_name;
+	const char *name;
 
-	if (native_lm == NULL) {
-		return (NATIVE_LM_NONE);
-	}
-
-	if (*native_lm == '\0') {
-		/*
-		 * Windows Vista sends an empty native LM string.
-		 */
+	/*
+	 * Windows Vista sends an empty native LM string.
+	 */
+	if (native_lm == NULL || *native_lm == '\0')
 		return (NATIVE_LM_WIN2000);
-	}
 
 	for (i = 0; i < sizeof (lm_table)/sizeof (lm_table[0]); ++i) {
-		lm_name = lm_table[i].lm_name;
-		len = strlen(lm_name);
+		name = lm_table[i].sn_name;
+		len = strlen(name);
 
-		if ((utf8_strncasecmp(lm_name, native_lm, len) == 0) ||
-		    (utf8_strncasecmp(&lm_name[1], native_lm, len - 1) == 0)) {
-			return (lm_table[i].lm_value);
+		if ((utf8_strncasecmp(name, native_lm, len) == 0) ||
+		    (utf8_strncasecmp(&name[1], native_lm, len - 1) == 0)) {
+			return (lm_table[i].sn_value);
 		}
 	}
-	return (NATIVE_LM_NONE);
+
+	return (NATIVE_LM_WIN2000);
 }
 
 /*
  * smbnative_pdc_value
  *
- * This function is used when NetFORCE contacting a PDC
- * to authenticate a connected user to determine and keep
- * the PDC type.
+ * This function is called when libsmbrdr connects to a PDC.
+ * The PDC type is derived from the Native LanMan string.
+ * The PDC value will default to PDC_WIN2000.
  *
- * The reason for adding this functionality is that NetFORCE
- * doesn't support Samba PDC but code didn't check the PDC type
- * and do authentication agains any PDC. This behaviour could
- * cause problem in some circumstances.
- * Now that we determine the PDC type the authentication code
- * can be configured (by smb.samba.pdc env var) to return access
- * denied to authentication attempts when PDC is Samba.
+ * Example strings:
+ *
+ *	NT LAN Manager 4.0
+ *	Windows 4.0, Windows NT, Windows NT 4.0
+ *	Windows 2000 LAN Manager
+ *	Windows 2000, Windows 2000 5.0, Windows 2000 5.1
+ *	Windows 2002, Windows 2002 5.1
+ *	Windows .NET, Windows .NET 5.2
+ *	Samba
+ *	DAVE
  */
 int
-smbnative_pdc_value(char *native_lm)
+smbnative_pdc_value(const char *native_lm)
 {
-	typedef struct pdc_table {
-		int pdc_value;
-		char *pdc_lmname;
-	} pdc_table_t;
-
-	static pdc_table_t pdc_table[] = {
+	static smb_native_t pdc_table[] = {
 		{ PDC_WINNT,	"NT LAN Manager 4.0"		},
 		{ PDC_WINNT,	"Windows NT 4.0"		},
 		{ PDC_WINNT,	"Windows NT"			},
 		{ PDC_WINNT,	"Windows 4.0"			},
-		{ PDC_WIN2000,	"Windows 2000 LAN Manager"	},
-		{ PDC_WIN2000,	"Windows 2000 5.0"		},
-		{ PDC_WIN2000,	"Windows 2000 5.1"		},
-		{ PDC_WIN2000,	"Windows 2000",			},
-		{ PDC_WIN2000,	"Windows 2002 5.1"		},
-		{ PDC_WIN2000,	"Windows 2002"			},
-		{ PDC_WIN2000,	"Windows .NET 5.2"		},
-		{ PDC_WIN2000,	"Windows .NET"			},
-		{ PDC_SAMBA,	"Samba"				},
-		{ PDC_WINNT,	"DAVE"				}
+		{ PDC_WINNT,	"DAVE"				},
+		{ PDC_SAMBA,	"Samba"				}
 	};
 
 	int i;
 	int len;
-	char *pdc_lmname;
+	const char *name;
 
-	if (native_lm == 0) {
-		return (PDC_UNKNOWN);
-	}
+	if (native_lm == NULL || *native_lm == '\0')
+		return (PDC_WIN2000);
 
 	for (i = 0; i < sizeof (pdc_table)/sizeof (pdc_table[0]); ++i) {
-		pdc_lmname = pdc_table[i].pdc_lmname;
-		len = strlen(pdc_lmname);
+		name = pdc_table[i].sn_name;
+		len = strlen(name);
 
-		if ((utf8_strncasecmp(pdc_lmname, native_lm, len) == 0) ||
-		    (utf8_strncasecmp(&pdc_lmname[1], native_lm, len - 1)
-		    == 0)) {
-			return (pdc_table[i].pdc_value);
+		if ((utf8_strncasecmp(name, native_lm, len) == 0) ||
+		    (utf8_strncasecmp(&name[1], native_lm, len - 1) == 0)) {
+			return (pdc_table[i].sn_value);
 		}
 	}
 
-	return (PDC_UNKNOWN);
+	return (PDC_WIN2000);
 }

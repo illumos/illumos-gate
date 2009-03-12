@@ -2163,7 +2163,7 @@ smb_send_node_status_response(struct addr_entry *addr,
 
 	ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
 	ipaddr.a_family = AF_INET;
-	if (smb_nic_exists(&ipaddr, B_TRUE))
+	if (smb_nic_is_same_subnet(&ipaddr))
 		net_ipaddr = addr->sin.sin_addr.s_addr;
 	else
 		net_ipaddr = 0;
@@ -4728,7 +4728,7 @@ ignore:		bzero(addr, sizeof (struct addr_entry));
 
 		ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
 		ipaddr.a_family = AF_INET;
-		if (smb_nic_exists(&ipaddr, B_FALSE))
+		if (smb_nic_is_local(&ipaddr))
 			goto ignore;
 
 		/*

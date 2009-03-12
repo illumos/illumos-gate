@@ -184,18 +184,13 @@ int smb_net_id(uint32_t);
 void smb_process_file_notify_change_queue(struct smb_ofile *of);
 
 void smb_oplock_acquire(smb_node_t *, smb_ofile_t *, open_param_t	*);
-boolean_t smb_oplock_break(smb_node_t *, uint64_t, boolean_t);
+boolean_t smb_oplock_break(smb_node_t *, smb_session_t *, boolean_t);
 void smb_oplock_release(smb_node_t *, smb_ofile_t *);
 boolean_t smb_oplock_conflict(smb_node_t *, smb_session_t *, open_param_t *);
-boolean_t smb_oplock_exit(smb_node_t *);
+boolean_t smb_oplock_broadcast(smb_node_t *);
 
 /*
  * macros used in oplock processing
- *
- * SMB_SAME_SESSION: Checks for equivalence
- * of session.  If an existing oplock is
- * from the same IP address/session as the current
- * request, the oplock is not broken.
  *
  * SMB_ATTR_ONLY_OPEN: Checks to see if this is
  * an attribute-only open with no contravening
@@ -204,11 +199,6 @@ boolean_t smb_oplock_exit(smb_node_t *);
  * of FILE_SUPERSEDE or FILE_OVERWRITE can allow
  * an oplock break.
  */
-
-#define	SMB_SAME_SESSION(sess1, sess2)				\
-	((sess1) && (sess2) &&					\
-	(smb_inet_equal(&sess1->ipaddr, &sess2->ipaddr, 0)) &&	\
-	((sess1)->s_kid == (sess2)->s_kid))			\
 
 #define	SMB_ATTR_ONLY_OPEN(op)					\
 	((op) && (op)->desired_access &&			\
@@ -508,8 +498,6 @@ void smb_session_list_signal(smb_session_list_t *);
 smb_user_t *smb_session_dup_user(smb_session_t *, char *, char *);
 void smb_session_correct_keep_alive_values(smb_session_list_t *, uint32_t);
 void smb_session_oplock_break(smb_session_t *, smb_ofile_t *);
-void smb_session_oplock_released(smb_session_t *);
-void smb_session_oplock_break_timedout(smb_session_t *);
 int smb_session_send(smb_session_t *, uint8_t type, mbuf_chain_t *);
 int smb_session_xprt_gethdr(smb_session_t *, smb_xprt_t *);
 boolean_t smb_session_oplocks_enable(smb_session_t *);

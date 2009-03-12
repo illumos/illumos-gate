@@ -41,7 +41,23 @@
 const struct in6_addr ipv6addr_any = IN6ADDR_ANY_INIT;
 
 boolean_t
-smb_inet_equal(smb_inaddr_t *ip1, smb_inaddr_t *ip2, uint32_t v4mask)
+smb_inet_equal(smb_inaddr_t *ip1, smb_inaddr_t *ip2)
+{
+	if ((ip1->a_family == AF_INET) &&
+	    (ip2->a_family == AF_INET) &&
+	    (ip1->a_ipv4 == ip2->a_ipv4))
+		return (B_TRUE);
+
+	if ((ip1->a_family == AF_INET6) &&
+	    (ip2->a_family == AF_INET6) &&
+	    (!memcmp(&ip1->a_ipv6, &ip2->a_ipv6, IPV6_ADDR_LEN)))
+		return (B_TRUE);
+	else
+		return (B_FALSE);
+}
+
+boolean_t
+smb_inet_same_subnet(smb_inaddr_t *ip1, smb_inaddr_t *ip2, uint32_t v4mask)
 {
 	if ((ip1->a_family == AF_INET) &&
 	    (ip2->a_family == AF_INET) &&

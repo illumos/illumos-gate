@@ -255,8 +255,8 @@ smb_ofile_open(
 		if (op->created_readonly)
 			node->readonly_creator = of;
 
-		smb_node_add_ofile(node, of);
 		smb_node_inc_open_ofiles(node);
+		smb_node_add_ofile(node, of);
 	}
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
 	smb_llist_insert_tail(&tree->t_ofile_list, of);
@@ -325,10 +325,12 @@ smb_ofile_close(
 		ASSERT(of->f_refcnt);
 		ASSERT(of->f_state == SMB_OFILE_STATE_CLOSING);
 		of->f_state = SMB_OFILE_STATE_CLOSED;
-		if (of->f_oplock_granted) {
+		if (of->f_node != NULL) {
 			smb_node_dec_open_ofiles(of->f_node);
-			smb_oplock_release(of->f_node, of);
-			of->f_oplock_granted = B_FALSE;
+			if (of->f_oplock_granted) {
+				smb_oplock_release(of->f_node, of);
+				of->f_oplock_granted = B_FALSE;
+			}
 		}
 		mutex_exit(&of->f_mutex);
 		return;
@@ -410,7 +412,7 @@ smb_ofile_release(
 
 	mutex_enter(&of->f_mutex);
 	if (of->f_oplock_exit)
-		if (smb_oplock_exit(of->f_node))
+		if (smb_oplock_broadcast(of->f_node))
 			of->f_oplock_exit = B_FALSE;
 	ASSERT(of->f_refcnt);
 	of->f_refcnt--;

@@ -269,19 +269,35 @@ smb_nic_getnext(smb_niciter_t *ni)
 }
 
 boolean_t
-smb_nic_exists(smb_inaddr_t *ipaddr, boolean_t use_mask)
+smb_nic_is_local(smb_inaddr_t *ipaddr)
 {
 	smb_nic_t *cfg;
-	uint32_t mask = 0;
 	int i;
 
 	(void) rw_rdlock(&smb_niclist.nl_rwl);
 
 	for (i = 0; i < smb_niclist.nl_cnt; i++) {
 		cfg = &smb_niclist.nl_nics[i];
-		if (use_mask)
-			mask = cfg->nic_mask;
-		if (smb_inet_equal(ipaddr, &cfg->nic_ip, mask)) {
+		if (smb_inet_equal(ipaddr, &cfg->nic_ip)) {
+			(void) rw_unlock(&smb_niclist.nl_rwl);
+			return (B_TRUE);
+		}
+	}
+	(void) rw_unlock(&smb_niclist.nl_rwl);
+	return (B_FALSE);
+}
+
+boolean_t
+smb_nic_is_same_subnet(smb_inaddr_t *ipaddr)
+{
+	smb_nic_t *cfg;
+	int i;
+
+	(void) rw_rdlock(&smb_niclist.nl_rwl);
+
+	for (i = 0; i < smb_niclist.nl_cnt; i++) {
+		cfg = &smb_niclist.nl_nics[i];
+		if (smb_inet_same_subnet(ipaddr, &cfg->nic_ip, cfg->nic_mask)) {
 			(void) rw_unlock(&smb_niclist.nl_rwl);
 			return (B_TRUE);
 		}

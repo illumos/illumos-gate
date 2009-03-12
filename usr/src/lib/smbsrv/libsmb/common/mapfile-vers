@@ -252,7 +252,8 @@ SUNWprivate {
 	smb_msgbuf_word_align;
 	smb_nic_addhost;
 	smb_nic_delhost;
-	smb_nic_exists;
+	smb_nic_is_local;
+	smb_nic_is_same_subnet;
 	smb_nic_fini;
 	smb_nic_getfirst;
 	smb_nic_getnext;

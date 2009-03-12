@@ -376,7 +376,7 @@ smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
 		ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
 		ipaddr.a_family = AF_INET;
 		/* Don't send anything to myself... */
-		if (smb_nic_exists(&ipaddr, B_FALSE))
+		if (smb_nic_is_local(&ipaddr))
 			goto next;
 
 		sin.sin_addr.s_addr = ipaddr.a_ipv4;
@@ -456,7 +456,7 @@ smb_netbios_datagram_send_to_net(struct name_entry *src,
 	do {
 		ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
 		ipaddr.a_family = AF_INET;
-		if (smb_nic_exists(&ipaddr, B_FALSE))
+		if (smb_nic_is_local(&ipaddr))
 			goto next;
 
 		sin.sin_addr.s_addr = ipaddr.a_ipv4;
@@ -1008,7 +1008,7 @@ ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
 		/* Ignore any incoming packets from myself... */
 		ipaddr.a_ipv4 = datagram->inaddr.sin.sin_addr.s_addr;
 		ipaddr.a_family = AF_INET;
-		if (smb_nic_exists(&ipaddr, B_FALSE)) {
+		if (smb_nic_is_local(&ipaddr)) {
 			goto ignore;
 		}
 

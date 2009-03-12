@@ -288,6 +288,7 @@ smb_get_dcinfo(char *namebuf, uint32_t namebuflen, smb_inaddr_t *ipaddr)
 			bzero(ipaddr, sizeof (smb_inaddr_t));
 		} else {
 			(void) memcpy(ipaddr, h->h_addr, h->h_length);
+			ipaddr->a_family = h->h_addrtype;
 			freehostent(h);
 		}
 		xdr_free(xdr_string, (char *)&srvname);

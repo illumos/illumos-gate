@@ -603,6 +603,8 @@ smbadm_join_domain(const char *domain, const char *username)
 	default:
 		(void) fprintf(stderr, gettext("failed to join %s: %s\n"),
 		    jdi.domain_name, xlate_nt_status(status));
+		(void) fprintf(stderr, gettext("Please refer to the system log"
+		    " for more information.\n"));
 		bzero(&jdi, sizeof (jdi));
 		return (1);
 	}

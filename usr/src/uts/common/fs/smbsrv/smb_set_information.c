@@ -132,8 +132,7 @@ smb_com_set_information(smb_request_t *sr)
 		/*
 		 * for the benefit of attribute setting later on
 		 */
-		(void) smb_oplock_break(node, SMB_SESSION_GET_ID(sr->session),
-		    B_FALSE);
+		(void) smb_oplock_break(node, sr->session, B_FALSE);
 	}
 
 	/*

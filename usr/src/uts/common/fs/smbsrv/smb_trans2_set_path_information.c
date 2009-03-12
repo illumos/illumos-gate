@@ -161,8 +161,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 		/*
 		 * for the benefit of attribute setting later on
 		 */
-		(void) smb_oplock_break(ret_snode,
-		    SMB_SESSION_GET_ID(sr->session), B_FALSE);
+		(void) smb_oplock_break(ret_snode, sr->session, B_FALSE);
 	}
 
 	info->node = ret_snode;

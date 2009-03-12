@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBSMBNS_H
 #define	_LIBSMBNS_H
-
-#pragma ident	"@(#)libsmbns.h	1.10	08/07/24 SMI"
 
 #include <ldap.h>
 #include <smbsrv/libsmb.h>
@@ -55,13 +53,11 @@ typedef struct smb_ads_handle {
 typedef enum smb_adjoin_status {
 	SMB_ADJOIN_SUCCESS = 0,
 	SMB_ADJOIN_ERR_GET_HANDLE,
-	SMB_ADJOIN_ERR_GEN_PASSWD,
 	SMB_ADJOIN_ERR_GET_DCLEVEL,
 	SMB_ADJOIN_ERR_ADD_TRUST_ACCT,
 	SMB_ADJOIN_ERR_MOD_TRUST_ACCT,
 	SMB_ADJOIN_ERR_DUP_TRUST_ACCT,
 	SMB_ADJOIN_ERR_TRUST_ACCT,
-	SMB_ADJOIN_ERR_GET_ENCTYPES,
 	SMB_ADJOIN_ERR_INIT_KRB_CTX,
 	SMB_ADJOIN_ERR_GET_SPNS,
 	SMB_ADJOIN_ERR_KSETPWD,
@@ -69,8 +65,7 @@ typedef enum smb_adjoin_status {
 	SMB_ADJOIN_ERR_WRITE_KEYTAB,
 	SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN,
 	SMB_ADJOIN_ERR_IDMAP_REFRESH,
-	SMB_ADJOIN_ERR_COMMIT_KEYTAB,
-	SMB_ADJOIN_NUM_STATUS
+	SMB_ADJOIN_ERR_COMMIT_KEYTAB
 } smb_adjoin_status_t;
 
 /* ADS functions */
@@ -88,7 +83,7 @@ extern int smb_ads_lookup_share(smb_ads_handle_t *, const char *, const char *,
 extern int smb_ads_add_share(smb_ads_handle_t *, const char *, const char *,
     const char *);
 extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, int);
-extern char *smb_adjoin_report_err(smb_adjoin_status_t);
+extern void smb_ads_join_errmsg(smb_adjoin_status_t);
 extern boolean_t smb_ads_lookup_msdcs(char *, char *, char *, uint32_t);
 
 /* DYNDNS functions */

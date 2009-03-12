@@ -569,7 +569,7 @@ smb_fem_oplock_break(femarg_t *arg, caller_context_t *ct)
 	SMB_NODE_VALID(node);
 
 	if (ct == NULL) {
-		(void) smb_oplock_break(node, 0, B_FALSE);
+		(void) smb_oplock_break(node, NULL, B_FALSE);
 		return (0);
 	}
 
@@ -577,12 +577,12 @@ smb_fem_oplock_break(femarg_t *arg, caller_context_t *ct)
 		return (0);
 
 	if (ct->cc_flags & CC_DONTBLOCK) {
-		if (smb_oplock_break(node, 0, B_TRUE))
+		if (smb_oplock_break(node, NULL, B_TRUE))
 			return (0);
 		ct->cc_flags |= CC_WOULDBLOCK;
 		rc = EAGAIN;
 	} else {
-		(void) smb_oplock_break(node, 0, B_FALSE);
+		(void) smb_oplock_break(node, NULL, B_FALSE);
 		rc = 0;
 	}
 	return (rc);

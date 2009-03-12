@@ -58,9 +58,8 @@ typedef struct smb_inaddr {
 #define	SMB_IPSTRLEN(family) \
 ((family == AF_INET) ? INET_ADDRSTRLEN : INET6_ADDRSTRLEN)
 
-#define	SMB_INET_NOMASK 0xffffffff
-
-boolean_t smb_inet_equal(smb_inaddr_t *, smb_inaddr_t *, uint32_t);
+boolean_t smb_inet_equal(smb_inaddr_t *, smb_inaddr_t *);
+boolean_t smb_inet_same_subnet(smb_inaddr_t *, smb_inaddr_t *, uint32_t);
 boolean_t smb_inet_iszero(smb_inaddr_t *);
 const char *smb_inet_ntop(smb_inaddr_t *, char *, int);
 

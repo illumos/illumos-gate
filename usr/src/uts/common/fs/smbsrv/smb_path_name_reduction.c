@@ -302,10 +302,7 @@ smb_pathname_reduce(
 		ppn.pn_path[0] = '\0';
 	}
 
-	if (strcmp(ppn.pn_buf, "/") == 0) {
-		smb_node_ref(local_root_node);
-		*dir_node = local_root_node;
-	} else if (ppn.pn_buf[0] == '\0') {
+	if ((strcmp(ppn.pn_buf, "/") == 0) || (ppn.pn_buf[0] == '\0')) {
 		smb_node_ref(local_cur_node);
 		*dir_node = local_cur_node;
 	} else {

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_trans2_query_fs_information.c	1.7	08/08/07 SMI"
 
 /*
  * SMB: trans2_query_fs_information
@@ -375,7 +373,9 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		}
 
 		flags = FILE_CASE_PRESERVED_NAMES;
-		/* flags |= FILE_UNICODE_ON_DISK; */
+
+		if (tree->t_flags & SMB_TREE_UNICODE_ON_DISK)
+			flags |= FILE_UNICODE_ON_DISK;
 
 		if (tree->t_flags & SMB_TREE_SUPPORTS_ACLS)
 			flags |= FILE_PERSISTENT_ACLS;
