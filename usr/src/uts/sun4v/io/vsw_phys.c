@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -479,11 +479,11 @@ vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type)
  *	MAC layer to allocate a share and corresponding resources
  *	ahead of time.
  *
- *	MAC_OPEN_FLAGS_TAG_DISABLE -- This flag is used for VLAN
+ *	MAC_UNICAST_TAG_DISABLE -- This flag is used for VLAN
  *	support. It will cause MAC to not add any tags, but expect
  *	vsw to tag the packets.
  *
- *	MAC_OPEN_FLAGS_STRIP_DISABLE -- This flag is used for VLAN
+ *	MAC_UNICAST_STRIP_DISABLE -- This flag is used for VLAN
  *	support. It will case the MAC layer to not strip the tags.
  *	Vsw may have to strip the tag for pvid case.
  */
@@ -495,9 +495,7 @@ vsw_maccl_open(vsw_t *vswp, vsw_port_t *port, int type)
 	char		mac_cl_name[MAXNAMELEN];
 	const char	*dev_name;
 	mac_client_handle_t *mchp;
-	uint64_t flags = (MAC_OPEN_FLAGS_NO_HWRINGS |
-	    MAC_OPEN_FLAGS_TAG_DISABLE |
-	    MAC_OPEN_FLAGS_STRIP_DISABLE);
+	uint64_t flags = MAC_OPEN_FLAGS_NO_HWRINGS;
 
 	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 	if (vswp->mh == NULL) {
@@ -657,11 +655,12 @@ static int
 vsw_set_port_hw_addr(vsw_port_t *port)
 {
 	vsw_t			*vswp = port->p_vswp;
-	uint16_t		mac_flags = 0;
 	mac_diag_t		diag;
 	uint8_t			*macaddr;
 	uint16_t		vid = VLAN_ID_NONE;
 	int			rv;
+	uint16_t		mac_flags = MAC_UNICAST_TAG_DISABLE |
+	    MAC_UNICAST_STRIP_DISABLE;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -720,12 +719,13 @@ vsw_set_port_hw_addr(vsw_port_t *port)
 static int
 vsw_set_if_hw_addr(vsw_t *vswp)
 {
-	uint16_t		mac_flags = 0;
 	mac_diag_t		diag;
 	uint8_t			*macaddr;
 	uint8_t			primary_addr[ETHERADDRL];
 	uint16_t		vid = VLAN_ID_NONE;
 	int			rv;
+	uint16_t		mac_flags = MAC_UNICAST_TAG_DISABLE |
+	    MAC_UNICAST_STRIP_DISABLE;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -1100,6 +1100,8 @@ vsw_mac_add_vlans(vsw_t *vswp, mac_client_handle_t mch, uint8_t *macaddr,
 	mac_diag_t	diag;
 	int		rv;
 	int		i;
+
+	flags |= MAC_UNICAST_TAG_DISABLE | MAC_UNICAST_STRIP_DISABLE;
 
 	/* Add vlans to the MAC layer */
 	for (i = 0; i < nvids; i++) {

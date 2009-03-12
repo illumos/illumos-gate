@@ -607,7 +607,9 @@ dls_mac_active_set(dls_link_t *dlp)
 		mac_diag_t diag;
 
 		/* request the primary MAC address */
-		if ((err = mac_unicast_primary_add(dlp->dl_mch, &dlp->dl_mah,
+		if ((err = mac_unicast_add(dlp->dl_mch, NULL,
+		    MAC_UNICAST_PRIMARY | MAC_UNICAST_TAG_DISABLE |
+		    MAC_UNICAST_DISABLE_TX_VID_CHECK, &dlp->dl_mah, 0,
 		    &diag)) != 0) {
 			return (err);
 		}

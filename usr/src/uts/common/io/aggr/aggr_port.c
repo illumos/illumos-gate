@@ -185,8 +185,7 @@ aggr_port_create(aggr_grp_t *grp, const datalink_id_t linkid, boolean_t force,
 
 	(void) snprintf(client_name, MAXNAMELEN, "%s-%s", aggr_name, port_name);
 	if ((err = mac_client_open(mh, &mch, client_name,
-	    MAC_OPEN_FLAGS_IS_AGGR_PORT | MAC_OPEN_FLAGS_EXCLUSIVE |
-	    MAC_OPEN_FLAGS_DISABLE_TX_VID_CHECK)) != 0) {
+	    MAC_OPEN_FLAGS_IS_AGGR_PORT | MAC_OPEN_FLAGS_EXCLUSIVE)) != 0) {
 		goto fail;
 	}
 
@@ -205,7 +204,8 @@ aggr_port_create(aggr_grp_t *grp, const datalink_id_t linkid, boolean_t force,
 		goto fail;
 	}
 
-	if ((err = mac_unicast_primary_add(mch, &mah, &diag)) != 0) {
+	if ((err = mac_unicast_add(mch, NULL, MAC_UNICAST_PRIMARY |
+	    MAC_UNICAST_DISABLE_TX_VID_CHECK, &mah, 0, &diag)) != 0) {
 		VERIFY(mac_margin_remove(mh, margin) == 0);
 		id_free(aggr_portids, portid);
 		goto fail;

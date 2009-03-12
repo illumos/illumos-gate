@@ -2283,8 +2283,9 @@ aggr_set_port_sdu(aggr_grp_t *grp, aggr_port_t *port, uint32_t sdu,
 	}
 	err = mac_set_mtu(port->lp_mh, sdu, old_mtu);
 try_again:
-	if (removed && (rv = mac_unicast_primary_add(port->lp_mch,
-	    &port->lp_mah, &diag)) != 0) {
+	if (removed && (rv = mac_unicast_add(port->lp_mch, NULL,
+	    MAC_UNICAST_PRIMARY | MAC_UNICAST_DISABLE_TX_VID_CHECK,
+	    &port->lp_mah, 0, &diag)) != 0) {
 		/*
 		 * following is a workaround for a bug in 'bge' driver.
 		 * See CR 6794654 for more information and this work around
@@ -2295,7 +2296,7 @@ try_again:
 			goto try_again;
 		}
 		/*
-		 * if mac_unicast_primary_add() failed while setting the MTU,
+		 * if mac_unicast_add() failed while setting the MTU,
 		 * detach the port from the group.
 		 */
 		mac_perim_enter_by_mh(port->lp_mh, &mph);

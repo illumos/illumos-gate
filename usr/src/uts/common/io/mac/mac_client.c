@@ -1191,15 +1191,6 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	if ((flags & MAC_OPEN_FLAGS_IS_AGGR_PORT) != 0)
 		mcip->mci_state_flags |= MCIS_IS_AGGR_PORT;
 
-	if ((flags & MAC_OPEN_FLAGS_TAG_DISABLE) != 0)
-		mcip->mci_state_flags |= MCIS_TAG_DISABLE;
-
-	if ((flags & MAC_OPEN_FLAGS_STRIP_DISABLE) != 0)
-		mcip->mci_state_flags |= MCIS_STRIP_DISABLE;
-
-	if ((flags & MAC_OPEN_FLAGS_DISABLE_TX_VID_CHECK) != 0)
-		mcip->mci_state_flags |= MCIS_DISABLE_TX_VID_CHECK;
-
 	if ((flags & MAC_OPEN_FLAGS_USE_DATALINK_NAME) != 0) {
 		datalink_id_t	linkid;
 
@@ -1681,6 +1672,16 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 */
 		ASSERT(mcip->mci_unicast != NULL);
 
+		/* Check for VLAN flags, if present */
+		if ((flags & MAC_UNICAST_TAG_DISABLE) != 0)
+			mcip->mci_state_flags |= MCIS_TAG_DISABLE;
+
+		if ((flags & MAC_UNICAST_STRIP_DISABLE) != 0)
+			mcip->mci_state_flags |= MCIS_STRIP_DISABLE;
+
+		if ((flags & MAC_UNICAST_DISABLE_TX_VID_CHECK) != 0)
+			mcip->mci_state_flags |= MCIS_DISABLE_TX_VID_CHECK;
+
 		/*
 		 * Ensure that the primary unicast address of the VNIC
 		 * is added only once.
@@ -1813,6 +1814,16 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 			mcip->mci_state_flags |= MCIS_UNICAST_HW;
 		}
 
+		/* Check for VLAN flags, if present */
+		if ((flags & MAC_UNICAST_TAG_DISABLE) != 0)
+			mcip->mci_state_flags |= MCIS_TAG_DISABLE;
+
+		if ((flags & MAC_UNICAST_STRIP_DISABLE) != 0)
+			mcip->mci_state_flags |= MCIS_STRIP_DISABLE;
+
+		if ((flags & MAC_UNICAST_DISABLE_TX_VID_CHECK) != 0)
+			mcip->mci_state_flags |= MCIS_DISABLE_TX_VID_CHECK;
+
 		MAC_CLIENT_SET_PRIORITY_RANGE(mcip,
 		    (mrp.mrp_mask & MRP_PRIORITY) ? mrp.mrp_priority :
 		    MPL_LINK_DEFAULT);
@@ -1853,6 +1864,25 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 * We don't need to create kstat for this as except for
 		 * the fdesc, everything will be used from in the 1st flent.
 		 */
+
+		/*
+		 * Assert that the specified flags are consistent with the
+		 * flags specified by previous calls to mac_unicast_add().
+		 */
+		ASSERT(((flags & MAC_UNICAST_TAG_DISABLE) != 0 &&
+		    (mcip->mci_state_flags & MCIS_TAG_DISABLE) != 0) ||
+		    ((flags & MAC_UNICAST_TAG_DISABLE) == 0 &&
+		    (mcip->mci_state_flags & MCIS_TAG_DISABLE) == 0));
+
+		ASSERT(((flags & MAC_UNICAST_STRIP_DISABLE) != 0 &&
+		    (mcip->mci_state_flags & MCIS_STRIP_DISABLE) != 0) ||
+		    ((flags & MAC_UNICAST_STRIP_DISABLE) == 0 &&
+		    (mcip->mci_state_flags & MCIS_STRIP_DISABLE) == 0));
+
+		ASSERT(((flags & MAC_UNICAST_DISABLE_TX_VID_CHECK) != 0 &&
+		    (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK) != 0) ||
+		    ((flags & MAC_UNICAST_DISABLE_TX_VID_CHECK) == 0 &&
+		    (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK) == 0));
 
 		if (bcmp(mac_addr, map->ma_addr, map->ma_len) != 0) {
 			err = EINVAL;
@@ -1961,23 +1991,6 @@ mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 }
 
 /*
- * Add the primary MAC address to the MAC client. This is a convenience
- * function which can be called by primary MAC clients which do not
- * need to specify any other additional flags.
- *
- * It's called in one of following situations:
- *   * dls as the primary MAC client
- *   * aggr as an exclusive client
- *   * by VNIC's client
- */
-int
-mac_unicast_primary_add(mac_client_handle_t mch, mac_unicast_handle_t *mah,
-    mac_diag_t *diag)
-{
-	return (mac_unicast_add(mch, NULL, MAC_UNICAST_PRIMARY, mah, 0, diag));
-}
-
-/*
  * Remove a MAC address which was previously added by mac_unicast_add().
  */
 int
@@ -2003,6 +2016,15 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 
 		mac_tx_client_flush(mcip);
 		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_VNIC_PRIMARY;
+
+		if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
+			mcip->mci_state_flags &= ~MCIS_TAG_DISABLE;
+
+		if (mcip->mci_state_flags & MCIS_STRIP_DISABLE)
+			mcip->mci_state_flags &= ~MCIS_STRIP_DISABLE;
+
+		if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
+			mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
 
 		kmem_free(muip, sizeof (mac_unicast_impl_t));
 		i_mac_perim_exit(mip);
@@ -2151,6 +2173,15 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
 	mcip->mci_state_flags &= ~MCIS_UNICAST_HW;
+
+	if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
+		mcip->mci_state_flags &= ~MCIS_TAG_DISABLE;
+
+	if (mcip->mci_state_flags & MCIS_STRIP_DISABLE)
+		mcip->mci_state_flags &= ~MCIS_STRIP_DISABLE;
+
+	if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
+		mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
 
 	mac_stop((mac_handle_t)mip);
 

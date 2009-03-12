@@ -75,22 +75,22 @@ typedef enum {
 } mac_client_promisc_type_t;
 
 /* flags passed to mac_unicast_add() */
-#define	MAC_UNICAST_NODUPCHECK		0x0001
-#define	MAC_UNICAST_PRIMARY		0x0002
-#define	MAC_UNICAST_HW			0x0004
-#define	MAC_UNICAST_VNIC_PRIMARY	0x0008
+#define	MAC_UNICAST_NODUPCHECK			0x0001
+#define	MAC_UNICAST_PRIMARY			0x0002
+#define	MAC_UNICAST_HW				0x0004
+#define	MAC_UNICAST_VNIC_PRIMARY		0x0008
+#define	MAC_UNICAST_TAG_DISABLE			0x0010
+#define	MAC_UNICAST_STRIP_DISABLE		0x0020
+#define	MAC_UNICAST_DISABLE_TX_VID_CHECK	0x0040
 
 /* flags passed to mac_client_open */
 #define	MAC_OPEN_FLAGS_IS_VNIC			0x0001
 #define	MAC_OPEN_FLAGS_EXCLUSIVE		0x0002
-#define	MAC_OPEN_FLAGS_TAG_DISABLE		0x0004
-#define	MAC_OPEN_FLAGS_IS_AGGR_PORT		0x0008
-#define	MAC_OPEN_FLAGS_STRIP_DISABLE		0x0010
-#define	MAC_OPEN_FLAGS_NO_HWRINGS		0x0020
-#define	MAC_OPEN_FLAGS_SHARES_DESIRED		0x0040
-#define	MAC_OPEN_FLAGS_DISABLE_TX_VID_CHECK	0x0080
-#define	MAC_OPEN_FLAGS_USE_DATALINK_NAME	0x0100
-#define	MAC_OPEN_FLAGS_REQ_HWRINGS		0x0200
+#define	MAC_OPEN_FLAGS_IS_AGGR_PORT		0x0004
+#define	MAC_OPEN_FLAGS_NO_HWRINGS		0x0008
+#define	MAC_OPEN_FLAGS_SHARES_DESIRED		0x0010
+#define	MAC_OPEN_FLAGS_USE_DATALINK_NAME	0x0020
+#define	MAC_OPEN_FLAGS_REQ_HWRINGS		0x0040
 
 /* flags passed to mac_client_close */
 #define	MAC_CLOSE_FLAGS_IS_VNIC		0x0001
@@ -113,8 +113,6 @@ extern void mac_client_close(mac_client_handle_t, uint16_t);
 
 extern int mac_unicast_add(mac_client_handle_t, uint8_t *, uint16_t,
     mac_unicast_handle_t *, uint16_t, mac_diag_t *);
-extern int mac_unicast_primary_add(mac_client_handle_t, mac_unicast_handle_t *,
-    mac_diag_t *);
 extern int mac_unicast_remove(mac_client_handle_t, mac_unicast_handle_t);
 
 extern int mac_multicast_add(mac_client_handle_t, const uint8_t *);

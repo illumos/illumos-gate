@@ -633,7 +633,6 @@ i_dls_link_create(const char *name, dls_link_t **dlpp)
 	ASSERT(dlp->dl_mch == NULL);
 
 	err = mac_client_open(dlp->dl_mh, &dlp->dl_mch, NULL,
-	    MAC_OPEN_FLAGS_TAG_DISABLE | MAC_OPEN_FLAGS_DISABLE_TX_VID_CHECK |
 	    MAC_OPEN_FLAGS_USE_DATALINK_NAME);
 	if (err != 0)
 		goto bail;
