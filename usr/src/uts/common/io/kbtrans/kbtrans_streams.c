@@ -199,7 +199,6 @@ progressbar_key_abort_thread(struct kbtrans *upper)
 	ldi_ident_t li;
 	extern void progressbar_key_abort(ldi_ident_t);
 
-
 	if (ldi_ident_from_stream(upper->kbtrans_streams_readq, &li) != 0) {
 		cmn_err(CE_NOTE, "!ldi_ident_from_stream failed");
 	} else {
@@ -212,7 +211,6 @@ progressbar_key_abort_thread(struct kbtrans *upper)
 		mutex_exit(&upper->progressbar_key_abort_lock);
 		ldi_ident_release(li);
 	}
-
 
 	thread_exit();
 }
@@ -235,6 +233,7 @@ kbtrans_streams_init(
 	struct kbtrans *upper;
 	struct kbtrans_lower *lower;
 	int err;
+	kthread_t *tid;
 
 	/*
 	 * Default to relatively generic tables.
@@ -347,8 +346,9 @@ kbtrans_streams_init(
 	/* this counts on no keyboards being above ipl 12 */
 	mutex_init(&upper->progressbar_key_abort_lock, NULL, MUTEX_SPIN,
 	    (void *)ipltospl(12));
-	(void) thread_create(NULL, 0, progressbar_key_abort_thread,
-	    upper, 0, &p0, TS_RUN, minclsyspri);
+	tid = thread_create(NULL, 0, progressbar_key_abort_thread, upper,
+	    0, &p0, TS_RUN, minclsyspri);
+	upper->progressbar_key_abort_t_did = tid->t_did;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_OPEN, (upper, "kbtrans_streams_init "
 	    "exiting"));
@@ -386,8 +386,11 @@ kbtrans_streams_fini(struct kbtrans *upper)
 	if (upper->progressbar_key_abort_flag == 0) {
 		upper->progressbar_key_abort_flag = 2;
 		cv_signal(&upper->progressbar_key_abort_cv);
+		mutex_exit(&upper->progressbar_key_abort_lock);
+		thread_join(upper->progressbar_key_abort_t_did);
+	} else {
+		mutex_exit(&upper->progressbar_key_abort_lock);
 	}
-	mutex_exit(&upper->progressbar_key_abort_lock);
 	cv_destroy(&upper->progressbar_key_abort_cv);
 	mutex_destroy(&upper->progressbar_key_abort_lock);
 

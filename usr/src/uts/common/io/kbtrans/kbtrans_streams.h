@@ -142,6 +142,7 @@ struct  kbtrans {
 	kcondvar_t progressbar_key_abort_cv;
 	kmutex_t progressbar_key_abort_lock;
 	int progressbar_key_abort_flag;
+	kt_did_t progressbar_key_abort_t_did;
 };
 
 #ifdef __cplusplus
