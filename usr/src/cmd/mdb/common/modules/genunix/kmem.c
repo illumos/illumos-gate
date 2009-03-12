@@ -132,7 +132,7 @@ kmem_cpu_cache_walk_step(mdb_walk_state_t *wsp)
 	const cpu_t *cpu = wsp->walk_layer;
 	kmem_cpu_cache_t cc;
 
-	caddr += cpu->cpu_cache_offset;
+	caddr += OFFSETOF(kmem_cache_t, cache_cpu[cpu->cpu_seqid]);
 
 	if (mdb_vread(&cc, sizeof (kmem_cpu_cache_t), caddr) == -1) {
 		mdb_warn("couldn't read kmem_cpu_cache at %p", caddr);
