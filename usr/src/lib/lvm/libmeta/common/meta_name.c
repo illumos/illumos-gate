@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <meta.h>
 #include <metad.h>
@@ -50,7 +49,6 @@
 #define	VAL2STR(x)	QUOTE(x)
 
 extern	char	*getfullblkname();
-extern	char	*getfullrawname();
 
 /*
  * caches
@@ -66,48 +64,81 @@ static	mdhspnamelist_t		*hsplistp = NULL;
 static int chksetname(mdsetname_t **spp, char *sname, md_error_t *ep);
 
 /*
- * leak proof name conversion
+ * FUNCTION:	meta_dsk_to_rdsk()
+ * INPUT:	str - Fully qualified pathname of a block or character device
+ * RETURNS:	char * - The pathname of the raw device
+ * PURPOSE:	Allocation of a new string representing the character device
+ *		associated with the input string.  Note that no checking is
+ *		done to verify the existence of this device file.
  */
 static char *
-rawname(
-	char	*uname
-)
+meta_dsk_to_rdsk(char *str)
 {
-	char	*p;
-	struct stat	sbuf1, sbuf2;
+	char	*dp = NULL;
+	char	*rdskp = NULL;
 
-	if ((p = getfullrawname(uname)) == NULL) {
-		return (NULL);
-	} else if (*p == '\0') {
-		Free(p);
-		return (NULL);
-	} else {
-		if (stat(uname, &sbuf1) != 0) {
-			(void) printf(dgettext(TEXT_DOMAIN,
-			    "device to mount in /etc/vfstab is "
-			    "invalid for device %s\n"), uname);
-			exit(1);
+	assert(*str == '/');
+
+	if ((dp = strstr(str, "/rdsk/")) != NULL)
+		return (Strdup(str));
+
+	/*
+	 * If this is a malformed string, (i.e. containing neither
+	 * "/rdsk/" nor "/dsk/") then check to see if the caller
+	 * is passing old school device names like "/dev/[r]sd" or
+	 * exotic hardware presenting "/dev/[r]dc" names.
+	 */
+	if ((dp = strstr(str, "/dsk/")) == NULL) {
+		if (strncmp(str, "/dev/r", 6) == 0) {
+			return (Strdup(str));
+		} else if (strncmp(str, "/dev/", 5) == 0) {
+			dp = str + 4;
+		} else {
+			return (NULL);
 		}
-		if (stat(p, &sbuf2) != 0) {
-			(void) printf(dgettext(TEXT_DOMAIN,
-			    "device to fsck in /etc/vfstab is "
-			    "invalid for raw device %s\n"), p);
-			exit(1);
-		}
-		if (sbuf1.st_rdev != sbuf2.st_rdev) {
-			(void) printf(dgettext(TEXT_DOMAIN,
-			    "/etc/vfstab entries inconsistent on "
-			    "line containing device %s\n"), uname);
-			exit(1);
-		}
-		if (!S_ISCHR(sbuf2.st_mode)) {
-			(void) printf(dgettext(TEXT_DOMAIN,
-			    "/etc/vfstab device to fsck is not a "
-			    "raw device for device %s\n"), p);
-			exit(1);
-		}
-		return (p);
 	}
+
+	dp++;
+	if (*dp == '\0')
+		return (NULL);
+
+	rdskp = Zalloc(strlen(str) + 2);
+	(void) strncpy(rdskp, str, dp - str);
+	rdskp[dp - str] = 'r';
+	(void) strcpy(rdskp + (dp - str) + 1, dp);
+
+	return (rdskp);
+}
+
+/*
+ * FUNCTION:	rawname()
+ * INPUT:	uname - Fully qualified pathname of a block or character device
+ * RETURNS:	char * - The fully qualified character device pathname
+ * PURPOSE:	Return the fully qualified pathname of the character device
+ *		corresponding to the block or character device passed in.
+ */
+static char *
+rawname(char *uname)
+{
+	char		*new_path = NULL;
+	int		ret = -1;
+	struct stat	statbuf;
+
+	if (*uname != '/')
+		return (NULL);
+
+	if ((new_path = meta_dsk_to_rdsk(uname)) == NULL)
+		return (NULL);
+
+	if (strncmp("/dev/", new_path, 5) == 0) {
+		ret = stat(new_path, &statbuf);
+		if (ret != 0 || (! S_ISCHR(statbuf.st_mode))) {
+			Free(new_path);
+			return (NULL);
+		}
+	}
+
+	return (new_path);
 }
 
 char *
@@ -176,9 +207,9 @@ parse_device(
 
 	/* fully-qualified  - local set */
 	if (((sscanf(tname, "/dev/md/dsk/%" VAL2STR(FILENAME_MAX) "s%n",
-			devname, &len) == 1) && (strlen(tname) == len)) ||
+	    devname, &len) == 1) && (strlen(tname) == len)) ||
 	    ((sscanf(tname, "/dev/md/rdsk/%" VAL2STR(FILENAME_MAX) "s%n",
-			devname, &len) == 1) && (strlen(tname) == len))) {
+	    devname, &len) == 1) && (strlen(tname) == len))) {
 		*snamep = Strdup(MD_LOCAL_NAME);
 		*fnamep = Strdup(devname);
 		Free(tname);
@@ -187,11 +218,11 @@ parse_device(
 
 	/* with setname specified - either fully qualified and relative spec */
 	if (((sscanf(tname, "%[^/]/%" VAL2STR(FILENAME_MAX) "s%n",
-		setname, devname, &len) == 2) && (strlen(tname) == len)) ||
+	    setname, devname, &len) == 2) && (strlen(tname) == len)) ||
 	    ((sscanf(tname, "/dev/md/%[^/]/dsk/%" VAL2STR(FILENAME_MAX) "s%n",
-		setname, devname, &len) == 2) && (strlen(tname) == len)) ||
+	    setname, devname, &len) == 2) && (strlen(tname) == len)) ||
 	    ((sscanf(tname, "/dev/md/%[^/]/rdsk/%" VAL2STR(FILENAME_MAX) "s%n",
-		setname, devname, &len) == 2) && (strlen(tname) == len))) {
+	    setname, devname, &len) == 2) && (strlen(tname) == len))) {
 
 		*snamep = Strdup(setname);
 		*fnamep = Strdup(devname);
@@ -281,7 +312,7 @@ meta_canonicalize(
 	if (!valid_name_syntax(tname)) {
 		Free(tname);
 		if (sname != NULL)
-		    Free(sname);
+			Free(sname);
 		return (NULL);
 	}
 
@@ -298,7 +329,7 @@ meta_canonicalize(
 	}
 
 	if (sname != NULL)
-	    Free(sname);
+		Free(sname);
 
 	return (cname);
 }
@@ -332,7 +363,7 @@ meta_canonicalize_check_set(
 	if (chksetname(spp, sname, ep) != 0) {
 		Free(tname);
 		if (sname != NULL)
-		    Free(sname);
+			Free(sname);
 		return (NULL);
 	}
 
@@ -349,7 +380,7 @@ meta_canonicalize_check_set(
 	}
 
 	if (sname != NULL)
-	    Free(sname);
+		Free(sname);
 
 	return (cname);
 }
@@ -419,9 +450,9 @@ is_existing_metadevice(
 	 */
 	if (uname[0] == '/') {
 		if (strncmp("/dev/md", uname, strlen("/dev/md")) == 0 &&
-			(raw_name = rawname(uname)) != NULL) {
-		    Free(raw_name);
-		    return (1);
+		    (raw_name = rawname(uname)) != NULL) {
+			Free(raw_name);
+			return (1);
 		}
 		return (0);
 	}
@@ -442,8 +473,8 @@ is_existing_metadevice(
 	}
 
 	if ((raw_name = rawname(full_path)) != NULL) {
-	    Free(raw_name);
-	    retval = 1;
+		Free(raw_name);
+		retval = 1;
 	}
 
 	if (set_name != NULL)
@@ -907,7 +938,7 @@ chkset(
 	/* if we already have a set, make sure it's the same */
 	if (*spp != NULL && !metaislocalset(*spp)) {
 		if ((*spp)->setname != sname &&
-				strcmp((*spp)->setname, sname) != 0) {
+		    strcmp((*spp)->setname, sname) != 0) {
 			return (mderror(ep, MDE_SET_DIFF, sname));
 		}
 		return (0);
@@ -1295,8 +1326,8 @@ static	char *
 getrname(mdsetname_t **spp, char *uname,
     meta_device_type_t *type, md_error_t *ep)
 {
-	char			*rname,
-				*fname;
+	char			*rname;
+	char			*fname;
 	int			i;
 	int 			rname_cnt = 0;
 	char			*rname_list[3];
@@ -1305,30 +1336,30 @@ getrname(mdsetname_t **spp, char *uname,
 	assert(uname != NULL);
 	/* if it is an absolute name then just call rawname on the input */
 	if (uname[0] == '/') {
-	    if ((rname = rawname(uname)) != NULL) {
-		/*
-		 * If the returned rname does not match with
-		 * the specified uname type, we'll return null.
-		 */
-		if (strncmp(rname, "/dev/md", strlen("/dev/md")) == 0) {
-			if (*type == LOGICAL_DEVICE) {
-				(void) mdsyserror(ep, ENOENT, uname);
-				return (NULL);
+		if ((rname = rawname(uname)) != NULL) {
+			/*
+			 * If the returned rname does not match with
+			 * the specified uname type, we'll return null.
+			 */
+			if (strncmp(rname, "/dev/md", strlen("/dev/md")) == 0) {
+				if (*type == LOGICAL_DEVICE) {
+					(void) mdsyserror(ep, ENOENT, uname);
+					return (NULL);
+				}
+				*type = META_DEVICE;
+			} else {
+				if (*type == META_DEVICE) {
+					(void) mdsyserror(ep, ENOENT, uname);
+					return (NULL);
+				}
+				*type = LOGICAL_DEVICE;
 			}
-			*type = META_DEVICE;
-		} else {
-			if (*type == META_DEVICE) {
-				(void) mdsyserror(ep, ENOENT, uname);
-				return (NULL);
-			}
-			*type = LOGICAL_DEVICE;
+			return (rname);
 		}
-		return (rname);
-	    }
 
-	    /* out of luck */
-	    (void) mdsyserror(ep, ENOENT, uname);
-	    return (NULL);
+		/* out of luck */
+		(void) mdsyserror(ep, ENOENT, uname);
+		return (NULL);
 	}
 
 	/*
@@ -1412,38 +1443,6 @@ getrname(mdsetname_t **spp, char *uname,
 	}
 
 	/*
-	 * If all else fails try the straight uname.
-	 * NOTE: This check was at the beginning of getrname instead
-	 * of here. It was moved to avoid a conflict with SC3.0. If
-	 * a diskset was mounted with the same name it would hang
-	 * the cluster in a loop. Example:
-	 *
-	 *	fubar/d10 -m fubar/d0 fubar/d1
-	 *	mount /dev/md/fubar/dsk/d10 /fubar
-	 *
-	 * When the system was booted SVM would try to take ownership
-	 * of diskset fubar. This would cause rawname("fubar/d10") to be
-	 * called. rawname() stats the string which caused the cluster
-	 * reservation code to try and take ownership which it was already
-	 * doing and a deadlock would occur. By moving this final attempt
-	 * at resolving the rawname to the end we avoid this deadlock.
-	 */
-	if (rname = rawname(uname)) {
-		/*
-		 * It's only possible to get a logical device from this
-		 * rawname call since a metadevice would have been
-		 * detected earlier.
-		 */
-		if (*type == LOGICAL_DEVICE &&
-		    (strncmp(rname, "/dev/md/", strlen("/dev/md"))) != 1)
-			return (rname);
-		else {
-			rname_list[rname_cnt] = rname;
-			rname_cnt++;
-		}
-	}
-
-	/*
 	 * At this point, we've searched /dev/md/rdsk, /dev/rdsk and
 	 * ./ for the specified device. rname_list contains all
 	 * the matches we've found and rname_cnt is the number of
@@ -1494,9 +1493,9 @@ getrname(mdsetname_t **spp, char *uname,
 					 * error was printed above.
 					 */
 					(void) printf(dgettext(TEXT_DOMAIN,
-						"Error: ambiguous device "
-						"name.\n%s %s\n\n"),
-						rname_list[0], rname_list[1]);
+					    "Error: ambiguous device "
+					    "name.\n%s %s\n\n"),
+					    rname_list[0], rname_list[1]);
 				}
 				rname = NULL;
 			} else {
@@ -1549,7 +1548,6 @@ getrawnames(
 	if (mdissyserror(ep, ENOENT) && *uname_type != META_DEVICE) {
 		if (uname[0] == '/') {
 			/* Absolute name */
-			char			*p;
 			uint_t			d = 0;
 			int			l = 0;
 			char			onmb[BUFSIZ+1], snm[BUFSIZ+1];
@@ -1584,23 +1582,9 @@ getrawnames(
 				return (rname);
 			}
 
-			/* /.../dsk/... */
-			if ((p = strstr(uname, "/dsk/")) != NULL) {
+			/* /.../dsk/... or /.../rdsk/... */
+			if ((rname = meta_dsk_to_rdsk(uname)) != NULL) {
 				mdclrerror(ep);
-				++p;
-				rname = Malloc(strlen(uname) + 1 + 1);
-				(void) strncpy(rname, uname, (p - uname));
-				rname[(p - uname)] = 'r';
-				(void) strcpy(&rname[(p - uname) + 1], p);
-				*dnamep = metadiskname(rname);
-				*uname_type = LOGICAL_DEVICE;
-				return (rname);
-			}
-
-			/* /.../rdsk/... */
-			else if (strstr(uname, "/rdsk/") != NULL) {
-				mdclrerror(ep);
-				rname = Strdup(uname);
 				*dnamep = metadiskname(rname);
 				*uname_type = LOGICAL_DEVICE;
 				return (rname);
@@ -1750,7 +1734,7 @@ parse_ctd(
 	/* check the device and slice */
 	cl = strlen(device_start_pos);
 	if (sscanf(device_start_pos, "d%us%u%n", &device, slice, &l) != 2 ||
-			l != cl) {
+	    l != cl) {
 		/* check the device and partition */
 		if (sscanf(device_start_pos, "d%up%u%n", &device, slice, &l)
 		    == 2 && l == cl) {
@@ -2163,8 +2147,8 @@ setup_slice(
 			    'a' + partno);
 		} else if (sscanf(dname, "/dev/%" VAL2STR(BUFSIZ) "[^0-9/]%u%n",
 		    onmb, &d, &l) == 2 && l == cl) {
-			    (void) snprintf(srname, len, "/dev/%s%u%c", onmb, d,
-				'a' + partno);
+			(void) snprintf(srname, len, "/dev/%s%u%c", onmb, d,
+			    'a' + partno);
 		} else {
 			/* build the slice that is wanted */
 			(void) snprintf(srname, len, "%ss%u", dname, partno);
@@ -2269,6 +2253,7 @@ metaflushfastnames()
 	}
 	fastnmlp = NULL;
 }
+
 static char *
 getrname_fast(char *unm, meta_device_type_t uname_type, md_error_t *ep)
 {
@@ -2277,15 +2262,14 @@ getrname_fast(char *unm, meta_device_type_t uname_type, md_error_t *ep)
 	int			cl = strlen(unm);
 	char			onmb[BUFSIZ+1], snm[BUFSIZ+1], cnmb[BUFSIZ];
 	char			*rnm;
-	char			*p;
 	size_t			len;
 
 	if (uname_type == META_DEVICE) {
 		/* fully qualified  - local set */
 		if (((sscanf(unm, "/dev/md/dsk/%" VAL2STR(BUFSIZ) "s%n",
-				onmb, &len) == 1) && (cl == len)) ||
-		    ((sscanf(unm, "/dev/md/rdsk/%" VAL2STR(BUFSIZ) "s%n",
-				onmb, &len) == 1) && (cl == len))) {
+		    onmb, &len) == 1) && (cl == len)) || ((sscanf(unm,
+		    "/dev/md/rdsk/%" VAL2STR(BUFSIZ) "s%n",
+		    onmb, &len) == 1) && (cl == len))) {
 			len = strlen("/dev/md/rdsk/") +	strlen(onmb) + 1;
 			rnm = Zalloc(len);
 			(void) snprintf(rnm, len, "/dev/md/rdsk/%s", onmb);
@@ -2294,14 +2278,13 @@ getrname_fast(char *unm, meta_device_type_t uname_type, md_error_t *ep)
 
 		/* fully qualified - setname specified */
 		if (((sscanf(unm, "/dev/md/%[^/]/dsk/%"
-				VAL2STR(BUFSIZ) "s%n",
-				snm, onmb, &len) == 2) && (cl == len)) ||
-		    ((sscanf(unm, "/dev/md/%[^/]/rdsk/%"
-				VAL2STR(BUFSIZ) "s%n",
-				snm, onmb, &len) == 2) && (cl == len))) {
+		    VAL2STR(BUFSIZ) "s%n", snm, onmb, &len) == 2) &&
+		    (cl == len)) || ((sscanf(unm, "/dev/md/%[^/]/rdsk/%"
+		    VAL2STR(BUFSIZ) "s%n", snm, onmb, &len) == 2) &&
+		    (cl == len))) {
 
 			len = strlen("/dev/md//rdsk/") + strlen(snm) +
-				strlen(onmb) + 1;
+			    strlen(onmb) + 1;
 			rnm = Zalloc(len);
 			(void) snprintf(rnm, len, "/dev/md/%s/rdsk/%s",
 			    snm, onmb);
@@ -2316,7 +2299,7 @@ getrname_fast(char *unm, meta_device_type_t uname_type, md_error_t *ep)
 
 		/* setname specified <setname>/<metadev> */
 		if (((sscanf(unm, "%[^/]/%" VAL2STR(BUFSIZ) "s%n",
-				snm, onmb, &len) == 2) && (cl == len))) {
+		    snm, onmb, &len) == 2) && (cl == len))) {
 			/* Not <setname>/<metadev>  - error */
 			if (strchr(onmb, '/') != NULL) {
 				(void) mdsyserror(ep, EINVAL, unm);
@@ -2324,7 +2307,7 @@ getrname_fast(char *unm, meta_device_type_t uname_type, md_error_t *ep)
 			}
 
 			len = strlen("/dev/md//rdsk/") + strlen(snm) +
-				strlen(onmb) + 1;
+			    strlen(onmb) + 1;
 			rnm = Zalloc(len);
 			(void) snprintf(rnm, len, "/dev/md/%s/rdsk/%s",
 			    snm, onmb);
@@ -2355,23 +2338,16 @@ getrname_fast(char *unm, meta_device_type_t uname_type, md_error_t *ep)
 	    sscanf(unm, "/dev/%" VAL2STR(BUFSIZ) "[^0-9/]%u"
 	    "%" VAL2STR(BUFSIZ) "[a-h]%n",
 	    onmb, &d, snm, &l) == 3) && l == cl) {
-		if ((p = strchr("abcdefgh", snm[0])) != NULL) {
+		if (strchr("abcdefgh", snm[0]) != NULL) {
 			(void) snprintf(cnmb, sizeof (cnmb), "/dev/r%s%u%s",
 			    onmb, d, snm);
 			return (Strdup(cnmb));
 		}
 	}
 
-	if ((p = strstr(unm, "/dsk/")) != NULL) {	/* /.../dsk/... */
-		++p;
-		rnm = Zalloc(strlen(unm) + 1 + 1);
-		(void) strncpy(rnm, unm, (p - unm));
-		rnm[(p - unm)] = 'r';
-		(void) strcpy(&rnm[(p - unm) + 1], p);
+	/* /.../dsk/... or /.../rdsk/... */
+	if ((rnm = meta_dsk_to_rdsk(unm)) != NULL)
 		return (rnm);
-	} else if (strstr(unm, "/rdsk/") != NULL) {	/* /.../rdsk/... */
-		return (Strdup(unm));
-	}
 
 	/*
 	 * Shouldn't get here but if we do then we have an unrecognized
@@ -2423,13 +2399,13 @@ metainitfastname(
 	dnp->type = MDT_FAST_COMP;
 
 	if (((sscanf(uname, "/dev/rdsk/c%ut%ud%us%u%n", &c, &t, &d,
-		&s, &l) == 4 ||
+	    &s, &l) == 4 ||
 	    sscanf(uname, "/dev/dsk/c%ut%ud%us%u%n", &c, &t, &d,
-		&s, &l) == 4 ||
+	    &s, &l) == 4 ||
 	    sscanf(uname, "/dev/ap/rdsk/mc%ut%ud%us%u%n", &c, &t, &d,
-		&s, &l) == 4 ||
+	    &s, &l) == 4 ||
 	    sscanf(uname, "/dev/ap/dsk/mc%ut%ud%us%u%n", &c, &t, &d,
-		&s, &l) == 4 ||
+	    &s, &l) == 4 ||
 	    sscanf(uname, "/dev/did/rdsk/d%us%u%n", &t, &s, &l) == 2 ||
 	    sscanf(uname, "/dev/did/dsk/d%us%u%n", &t, &s, &l) == 2||
 	    sscanf(uname, "/dev/rdsk/c%ud%us%u%n", &c, &d, &s, &l) == 3 ||
@@ -2442,7 +2418,7 @@ metainitfastname(
 	    sscanf(uname, "/dev/did/dsk/d%u%n", &t, &l) == 1 ||
 	    sscanf(uname, "/dev/rdsk/c%ud%u%n", &c, &d, &l) == 2 ||
 	    sscanf(uname, "/dev/dsk/c%ud%u%n", &c, &d, &l) == 2) &&
-		l == strlen(uname))) {
+	    l == strlen(uname))) {
 		if ((np->cname = strrchr(uname, '/')) == NULL)
 			np->cname = Strdup(uname);
 		else
@@ -2505,7 +2481,7 @@ metaname_common(
 
 	/* get raw name (rname) of the slice and drive (dname) we have */
 	if ((rname = getrawnames(spp, uname,
-				&dname, &uname_type, ep)) == NULL) {
+	    &dname, &uname_type, ep)) == NULL) {
 		return (NULL);
 	}
 
@@ -2960,7 +2936,8 @@ metadrivename(
 	 * increment the mplen counter once for each decimal digit in
 	 * (MD_MAX_PARTS - 1).
 	 */
-	for (i = MD_MAX_PARTS - 1, mplen = 0; i; i /= 10, ++mplen);
+	for (i = MD_MAX_PARTS - 1, mplen = 0; i; i /= 10, ++mplen)
+		;
 	len = strlen(uname) + mplen + 2;
 	slicename = Malloc(len);
 
@@ -3023,7 +3000,7 @@ metaslicename_type(
 	}
 
 	if ((namep = meta_name_getname(&sp, dnp->cname,
-					uname_type, ep)) == NULL)
+	    uname_type, ep)) == NULL)
 		return (NULL);
 
 	np = setup_slice(sp, uname_type, dnp, NULL, NULL, dnp->rname,
@@ -3138,7 +3115,7 @@ metaismeta(
 )
 {
 	return (np->drivenamep->type == MDT_META ||
-		np->drivenamep->type == MDT_FAST_META);
+	    np->drivenamep->type == MDT_FAST_META);
 }
 
 int
@@ -3166,13 +3143,13 @@ metachkdisk(
 
 	if ((! metaismeta(np)) && (dnp->type != MDT_COMP)) {
 		switch (dnp->type) {
-		    case MDT_ACCES:
-		    case MDT_UNKNOWN:
-			    return (mdsyserror(ep, dnp->errnum, np->bname));
-		    default:
-			    assert(0);
-			    return (mddeverror(ep, MDE_NOT_DISK, np->dev,
-				np->cname));
+			case MDT_ACCES:
+			case MDT_UNKNOWN:
+				return (mdsyserror(ep, dnp->errnum, np->bname));
+			default:
+				assert(0);
+				return (mddeverror(ep, MDE_NOT_DISK, np->dev,
+				    np->cname));
 		}
 	}
 	return (0);
@@ -3460,7 +3437,7 @@ metahsphspname(
 
 	/* get corresponding hotspare pool name */
 	if ((uname = meta_gethspnmentbyid(sp->setno,
-			MD_SIDEWILD, hsp, ep)) == NULL)
+	    MD_SIDEWILD, hsp, ep)) == NULL)
 		return (NULL);
 
 	/* setup name */

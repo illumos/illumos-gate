@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2727,91 +2727,109 @@ md_raid_ioctl(
 
 	case DKIOCGVTOC:
 	{
-		struct vtoc	vtoc;
+		struct vtoc	*vtoc;
 
 		if (! (mode & FREAD))
 			return (EACCES);
 
-		if ((err = raid_get_vtoc(un, &vtoc)) != 0) {
+		vtoc = kmem_zalloc(sizeof (*vtoc), KM_SLEEP);
+		if ((err = raid_get_vtoc(un, vtoc)) != 0) {
+			kmem_free(vtoc, sizeof (*vtoc));
 			return (err);
 		}
 
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
-			if (ddi_copyout(&vtoc, data, sizeof (vtoc), mode))
+			if (ddi_copyout(vtoc, data, sizeof (*vtoc), mode))
 				err = EFAULT;
 		}
 #ifdef _SYSCALL32
 		else {
-			struct vtoc32 vtoc32;
-			vtoctovtoc32(vtoc, vtoc32);
-			if (ddi_copyout(&vtoc32, data, sizeof (vtoc32), mode))
+			struct vtoc32	*vtoc32;
+
+			vtoc32 = kmem_zalloc(sizeof (*vtoc32), KM_SLEEP);
+
+			vtoctovtoc32((*vtoc), (*vtoc32));
+			if (ddi_copyout(vtoc32, data, sizeof (*vtoc32), mode))
 				err = EFAULT;
+			kmem_free(vtoc32, sizeof (*vtoc32));
 		}
 #endif /* _SYSCALL32 */
 
+		kmem_free(vtoc, sizeof (*vtoc));
 		return (err);
 	}
 
 	case DKIOCSVTOC:
 	{
-		struct vtoc	vtoc;
+		struct vtoc	*vtoc;
 
 		if (! (mode & FWRITE))
 			return (EACCES);
 
+		vtoc = kmem_zalloc(sizeof (*vtoc), KM_SLEEP);
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
-			if (ddi_copyin(data, &vtoc, sizeof (vtoc), mode)) {
+			if (ddi_copyin(data, vtoc, sizeof (*vtoc), mode)) {
 				err = EFAULT;
 			}
 		}
 #ifdef _SYSCALL32
 		else {
-			struct vtoc32 vtoc32;
-			if (ddi_copyin(data, &vtoc32, sizeof (vtoc32), mode)) {
+			struct vtoc32	*vtoc32;
+
+			vtoc32 = kmem_zalloc(sizeof (*vtoc32), KM_SLEEP);
+
+			if (ddi_copyin(data, vtoc32, sizeof (*vtoc32), mode)) {
 				err = EFAULT;
 			} else {
-				vtoc32tovtoc(vtoc32, vtoc);
+				vtoc32tovtoc((*vtoc32), (*vtoc));
 			}
+			kmem_free(vtoc32, sizeof (*vtoc32));
 		}
 #endif /* _SYSCALL32 */
 
 		if (err == 0)
-			err = raid_set_vtoc(un, &vtoc);
+			err = raid_set_vtoc(un, vtoc);
 
+		kmem_free(vtoc, sizeof (*vtoc));
 		return (err);
 	}
 
 	case DKIOCGEXTVTOC:
 	{
-		struct extvtoc	extvtoc;
+		struct extvtoc	*extvtoc;
 
 		if (! (mode & FREAD))
 			return (EACCES);
 
-		if ((err = raid_get_extvtoc(un, &extvtoc)) != 0) {
+		extvtoc = kmem_zalloc(sizeof (*extvtoc), KM_SLEEP);
+		if ((err = raid_get_extvtoc(un, extvtoc)) != 0) {
+			kmem_free(extvtoc, sizeof (*extvtoc));
 			return (err);
 		}
 
-		if (ddi_copyout(&extvtoc, data, sizeof (extvtoc), mode))
+		if (ddi_copyout(extvtoc, data, sizeof (*extvtoc), mode))
 			err = EFAULT;
 
+		kmem_free(extvtoc, sizeof (*extvtoc));
 		return (err);
 	}
 
 	case DKIOCSEXTVTOC:
 	{
-		struct extvtoc	extvtoc;
+		struct extvtoc	*extvtoc;
 
 		if (! (mode & FWRITE))
 			return (EACCES);
 
-		if (ddi_copyin(data, &extvtoc, sizeof (extvtoc), mode)) {
+		extvtoc = kmem_zalloc(sizeof (*extvtoc), KM_SLEEP);
+		if (ddi_copyin(data, extvtoc, sizeof (*extvtoc), mode)) {
 			err = EFAULT;
 		}
 
 		if (err == 0)
-			err = raid_set_extvtoc(un, &extvtoc);
+			err = raid_set_extvtoc(un, extvtoc);
 
+		kmem_free(extvtoc, sizeof (*extvtoc));
 		return (err);
 	}
 

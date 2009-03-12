@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3099,12 +3099,23 @@ mdmn_comm_reinit_set_svc_2(set_t *setnop, struct svc_req *rqstp)
 		/* destroy all rpc clients from this set */
 		for (node = set_descriptor[setno]->sd_nodelist; node;
 		    node = node->nd_next) {
+			/*
+			 * Since the CLIENT for ourself will be recreated
+			 * shortly, and this node is guaranteed to be
+			 * there after a reconfig, there's no reason to go
+			 * through destroying it.  It also avoids an issue
+			 * with calling clnt_create() later from within the
+			 * server thread, which can effectively deadlock
+			 * itself due to RPC design limitations.
+			 */
+			if (node == set_descriptor[setno]->sd_mn_mynode)
+				continue;
 			mdmn_clnt_destroy(client[setno][node->nd_nodeid]);
 			if (client[setno][node->nd_nodeid] != (CLIENT *)NULL) {
 				client[setno][node->nd_nodeid] = (CLIENT *)NULL;
 			}
 		}
-	md_mn_set_inited[setno] &= ~MDMN_SET_NODES;
+		md_mn_set_inited[setno] &= ~MDMN_SET_NODES;
 	}
 
 	commd_debug(MD_MMV_MISC, "reinit: done init_set(%d)\n", setno);

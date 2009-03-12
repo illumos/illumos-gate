@@ -83,6 +83,7 @@
 		<propval name='rpc_low_version' type='integer' value='2' />
 		<propval name='rpc_high_version' type='integer' value='2' />
 		<propval name='proto' type='astring' value='tcp' />
+		<propval name='connection_backlog' type='integer' value='32' />
 	</property_group>
 
 	<property_group name='firewall_config' type='com.sun,fw_configuration'>

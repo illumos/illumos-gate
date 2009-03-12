@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -42,8 +41,6 @@
 
 #include <sys/mnttab.h>
 #include <sys/swap.h>
-
-#include "meta_lib_prv.h"
 #include <devid.h>
 #include <sys/dumpadm.h>
 
@@ -63,6 +60,24 @@ typedef struct dev_list {
 } dev_list_t;
 
 static dev_list_t	*devnamelist = NULL;
+
+static char	*skip_these_mntents[] = {
+	"nfs",
+	"autofs",
+	"proc",
+	"tmpfs",
+	"cachefs",
+	"rfs",
+	"fd",
+	"mntfs",
+	"lofs",
+	"devfs",
+	"dev",
+	"ctfs",
+	"objfs",
+	"sharefs",
+	NULL
+};
 
 /*
  * free swap info
@@ -163,7 +178,7 @@ meta_check_swapped(
 			    snp, 0, -1, ep);
 			if (rval != 0) {
 				(void) mdoverlaperror(ep, MDE_OVERLAP_SWAP,
-					np->cname, NULL, snp->cname);
+				    np->cname, NULL, snp->cname);
 			}
 		}
 	}
@@ -251,7 +266,7 @@ meta_check_dump(
 			    dump_np, 0, -1, ep);
 			if (rval != 0) {
 				(void) mdoverlaperror(ep, MDE_OVERLAP_DUMP,
-					np->cname, NULL, dump_np->cname);
+				    np->cname, NULL, dump_np->cname);
 			}
 		}
 	}
@@ -282,6 +297,8 @@ meta_check_mounted(
 	if ((mfp = open_mnttab()) == NULL)
 		return (mdsyserror(ep, errno, MNTTAB));
 	while ((getmntent(mfp, &m) == 0) && (rval == 0)) {
+		char		**fstype = skip_these_mntents;
+		int		skipit = 0;
 		mdname_t	*mnp;
 
 		if ((m.mnt_special == NULL) || (m.mnt_mountp == NULL))
@@ -290,16 +307,13 @@ meta_check_mounted(
 		if (m.mnt_mountp[0] != '/')
 			continue;
 
-		if ((strcmp(m.mnt_fstype, "nfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "autofs") == 0) ||
-		    (strcmp(m.mnt_fstype, "proc") == 0) ||
-		    (strcmp(m.mnt_fstype, "tmpfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "cachefs") == 0) ||
-		    (strcmp(m.mnt_fstype, "lofs") == 0) ||
-		    (strcmp(m.mnt_fstype, "rfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "fd") == 0) ||
-		    (strcmp(m.mnt_fstype, "mntfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "devfs") == 0))
+		while (*fstype != NULL)
+			if (strcmp(m.mnt_fstype, *fstype++) == 0) {
+				skipit++;
+				break;
+			}
+
+		if (skipit == 1)
 			continue;
 
 		(void) strcpy(mountp, m.mnt_mountp);
@@ -318,7 +332,7 @@ meta_check_mounted(
 			    mnp, 0, -1, ep);
 			if (rval != 0) {
 				(void) mdoverlaperror(ep, MDE_OVERLAP_MOUNTED,
-					np->cname, mountp, mnp->cname);
+				    np->cname, mountp, mnp->cname);
 			}
 		}
 	}
@@ -351,6 +365,8 @@ meta_check_drivemounted(
 	if ((mfp = open_mnttab()) == NULL)
 		return (mdsyserror(ep, errno, MNTTAB));
 	while ((getmntent(mfp, &m) == 0) && (rval == 0)) {
+		char		**fstype = skip_these_mntents;
+		int		skipit = 0;
 		mdname_t	*mnp;
 
 		if ((m.mnt_special == NULL) || (m.mnt_mountp == NULL))
@@ -359,14 +375,13 @@ meta_check_drivemounted(
 		if (m.mnt_mountp[0] != '/')
 			continue;
 
-		if ((strcmp(m.mnt_fstype, "nfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "autofs") == 0) ||
-		    (strcmp(m.mnt_fstype, "proc") == 0) ||
-		    (strcmp(m.mnt_fstype, "tmpfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "cachefs") == 0) ||
-		    (strcmp(m.mnt_fstype, "lofs") == 0) ||
-		    (strcmp(m.mnt_fstype, "rfs") == 0) ||
-		    (strcmp(m.mnt_fstype, "fd") == 0))
+		while (*fstype != NULL)
+			if (strcmp(m.mnt_fstype, *fstype++) == 0) {
+				skipit++;
+				break;
+			}
+
+		if (skipit == 1)
 			continue;
 
 		(void) strcpy(mountp, m.mnt_mountp);
@@ -586,9 +601,8 @@ meta_check_samedrive(
 	 * involve 2 opens, closes, and devid gets for each existing soft
 	 * partition
 	 */
-	for (dnlp = devnamelist;
-			(dnlp != NULL) && !(devid1_found && devid2_found);
-			dnlp = dnlp->dev_nxt) {
+	for (dnlp = devnamelist; (dnlp != NULL) &&
+	    !(devid1_found && devid2_found); dnlp = dnlp->dev_nxt) {
 		if (!devid1_found && (strcmp(dnlp->dev_name, name1) == 0)) {
 			devid1_found = 1;
 			devid1 = dnlp->devid;
@@ -761,11 +775,11 @@ meta_check_overlap(
 			    uname, np1->cname));
 		}
 		if (ret == IDENTICAL_NAME_DEVT)
-		    return (mduseerror(ep,		/* slice overlaps */
-			MDE_OVERLAP, np1->dev, uname, np1->cname));
+			return (mduseerror(ep,		/* slice overlaps */
+			    MDE_OVERLAP, np1->dev, uname, np1->cname));
 		else
-		    return (mduseerror(ep, 		/* same devid */
-			MDE_SAME_DEVID, np1->dev, uname, np2->cname));
+			return (mduseerror(ep,		/* same devid */
+			    MDE_SAME_DEVID, np1->dev, uname, np2->cname));
 	}
 
 	/* return success */
