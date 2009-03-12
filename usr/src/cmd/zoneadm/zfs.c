@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the functions used to support the ZFS integration
@@ -720,6 +718,12 @@ create_zfs_zonepath(char *zonepath)
 
 	if (path2name(zonepath, zfs_name, sizeof (zfs_name)) != Z_OK)
 		return;
+
+	/* Check if the dataset already exists. */
+	if ((zhp = zfs_open(g_zfs, zfs_name, ZFS_TYPE_DATASET)) != NULL) {
+		zfs_close(zhp);
+		return;
+	}
 
 	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0 ||
 	    nvlist_add_string(props, zfs_prop_to_name(ZFS_PROP_SHARENFS),
