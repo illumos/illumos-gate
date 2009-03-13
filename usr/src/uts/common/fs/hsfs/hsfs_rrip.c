@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Rock Ridge extensions to the System Use Sharing protocol
@@ -220,7 +218,7 @@ name_parse(
 	size_t	len;
 
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_ROOT))
-		(void) strcpy((char *)dst, "/");
+		dst[0] = 0;
 
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_CURRENT)) {
 		SUA_string = (uchar_t *)".";
@@ -379,14 +377,11 @@ rrip_sym_link(sig_args_t *sig_args_p)
 		    MAXPATHLEN);
 
 		/*
-		 * If the component is continued, Don't put a
-		 * '/' in the pathname, but do NULL terminate it.
-		 * And avoid 2 '//' in a row, or if '/' was wanted
+		 * If the component is continued don't put a '/' in
+		 * the pathname, but do NULL terminate it.
 		 */
 		if (IS_NAME_BIT_SET(RRIP_COMP_FLAGS(comp_ptr),
-		    RRIP_NAME_CONTINUE) ||
-		    (sym_link[sym_link_len - 1] == '/')) {
-
+		    RRIP_NAME_CONTINUE)) {
 			sym_link[sym_link_len] = '\0';
 		} else {
 			sym_link[sym_link_len] = '/';
@@ -399,9 +394,11 @@ rrip_sym_link(sig_args_t *sig_args_p)
 	}
 
 	/*
-	 * take out  the last slash
+	 * If we reached the end of the symbolic link, take out the
+	 * last slash, but don't change ROOT "/" to an empty string.
 	 */
-	if (sym_link[sym_link_len - 1] == '/')
+	if (!IS_NAME_BIT_SET(RRIP_SL_FLAGS(sl_ptr), RRIP_NAME_CONTINUE) &&
+	    sym_link_len > 1 && sym_link[sym_link_len - 1] == '/')
 		sym_link[--sym_link_len] = '\0';
 
 	/*
