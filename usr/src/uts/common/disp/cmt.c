@@ -100,6 +100,36 @@ static int		cmt_hw_blacklisted[PGHW_NUM_COMPONENTS];
  */
 int			cmt_sched_disabled = 0;
 
+/*
+ * Status codes for CMT lineage validation
+ * See pg_cmt_lineage_validate() below
+ */
+typedef enum cmt_lineage_validation {
+	CMT_LINEAGE_VALID,
+	CMT_LINEAGE_NON_CONCENTRIC,
+	CMT_LINEAGE_PG_SPANS_LGRPS,
+	CMT_LINEAGE_NON_PROMOTABLE,
+	CMT_LINEAGE_REPAIRED,
+	CMT_LINEAGE_UNRECOVERABLE
+} cmt_lineage_validation_t;
+
+/*
+ * Status of the current lineage under construction.
+ * One must be holding cpu_lock to change this.
+ */
+cmt_lineage_validation_t	cmt_lineage_status = CMT_LINEAGE_VALID;
+
+/*
+ * Power domain definitions (on x86) are defined by ACPI, and
+ * therefore may be subject to BIOS bugs.
+ */
+#define	PG_CMT_HW_SUSPECT(hw)	PGHW_IS_PM_DOMAIN(hw)
+
+/*
+ * Macro to test if PG is managed by the CMT PG class
+ */
+#define	IS_CMT_PG(pg)	(((pg_t *)(pg))->pg_class->pgc_id == pg_cmt_class_id)
+
 static pg_cid_t		pg_cmt_class_id;		/* PG class id */
 
 static pg_t		*pg_cmt_alloc();
@@ -117,40 +147,13 @@ static int		pg_cmt_cpu_belongs(pg_t *, cpu_t *);
 static int		pg_cmt_hw(pghw_type_t);
 static cmt_lgrp_t	*pg_cmt_find_lgrp(lgrp_handle_t);
 static cmt_lgrp_t	*pg_cmt_lgrp_create(lgrp_handle_t);
-static int		pg_cmt_lineage_validate(pg_cmt_t **, int *);
 static void		cmt_ev_thread_swtch(pg_t *, cpu_t *, hrtime_t,
 			    kthread_t *, kthread_t *);
 static void		cmt_ev_thread_swtch_pwr(pg_t *, cpu_t *, hrtime_t,
 			    kthread_t *, kthread_t *);
 static void		cmt_ev_thread_remain_pwr(pg_t *, cpu_t *, kthread_t *);
+static cmt_lineage_validation_t	pg_cmt_lineage_validate(pg_cmt_t **, int *);
 
-/*
- * Macro to test if PG is managed by the CMT PG class
- */
-#define	IS_CMT_PG(pg)	(((pg_t *)(pg))->pg_class->pgc_id == pg_cmt_class_id)
-
-/*
- * Status codes for CMT lineage validation
- * See cmt_lineage_validate() below
- */
-typedef enum cmt_lineage_validation {
-	CMT_LINEAGE_VALID,
-	CMT_LINEAGE_NON_CONCENTRIC,
-	CMT_LINEAGE_REPAIRED,
-	CMT_LINEAGE_UNRECOVERABLE
-} cmt_lineage_validation_t;
-
-/*
- * Status of the current lineage under construction.
- * One must be holding cpu_lock to change this.
- */
-static cmt_lineage_validation_t	cmt_lineage_status = CMT_LINEAGE_VALID;
-
-/*
- * Power domain definitions (on x86) are defined by ACPI, and
- * therefore may be subject to BIOS bugs.
- */
-#define	PG_CMT_HW_SUSPECT(hw)	PGHW_IS_PM_DOMAIN(hw)
 
 /*
  * CMT PG ops
@@ -457,6 +460,7 @@ pg_cmt_cpu_init(cpu_t *cp)
 	pg_cmt_t	*cpu_cmt_hier[PGHW_NUM_COMPONENTS];
 	lgrp_handle_t	lgrp_handle;
 	cmt_lgrp_t	*lgrp;
+	cmt_lineage_validation_t	lineage_status;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
@@ -578,10 +582,12 @@ pg_cmt_cpu_init(cpu_t *cp)
 	 * This routine will also try to fix the lineage along with the
 	 * rest of the PG hierarchy should it detect an issue.
 	 *
-	 * If it returns -1, an unrecoverable error has happened and we
-	 * need to return.
+	 * If it returns anything other than VALID or REPAIRED, an
+	 * unrecoverable error has occurred, and we cannot proceed.
 	 */
-	if (pg_cmt_lineage_validate(cpu_cmt_hier, &levels) < 0)
+	lineage_status = pg_cmt_lineage_validate(cpu_cmt_hier, &levels);
+	if ((lineage_status != CMT_LINEAGE_VALID) &&
+	    (lineage_status != CMT_LINEAGE_REPAIRED))
 		return;
 
 	/*
@@ -1451,7 +1457,14 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz)
 			    GRP_NORESIZE);
 		}
 		/*
-		 * Add PGs children to it's group of siblings.
+		 * Move PG's children from it's children set to it's parent's
+		 * children set. Note that the parent's children set, and PG's
+		 * siblings set are the same thing.
+		 *
+		 * Because we are iterating over the same group that we are
+		 * operating on (removing the children), first add all of PG's
+		 * children to the parent's children set, and once we are done
+		 * iterating, empty PG's children set.
 		 */
 		if (pg->cmt_children != NULL) {
 			children = pg->cmt_children;
@@ -1459,19 +1472,13 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz)
 			group_iter_init(&child_iter);
 			while ((child = group_iterate(children, &child_iter))
 			    != NULL) {
-				/*
-				 * Transplant child from it's siblings set to
-				 * PGs.
-				 */
-				if (pg->cmt_siblings != NULL &&
-				    child->cmt_siblings != NULL &&
-				    group_remove(child->cmt_siblings, child,
-				    GRP_NORESIZE) != -1) {
+				if (pg->cmt_siblings != NULL) {
 					r = group_add(pg->cmt_siblings, child,
 					    GRP_NORESIZE);
 					ASSERT(r == 0);
 				}
 			}
+			group_empty(pg->cmt_children);
 		}
 
 		/*
@@ -1536,64 +1543,203 @@ pg_cmt_disable(void)
 	cmn_err(CE_NOTE, "!CMT thread placement optimizations unavailable");
 }
 
-static int
+/*
+ * CMT lineage validation
+ *
+ * This routine is invoked by pg_cmt_cpu_init() to validate the integrity
+ * of the PGs in a CPU's lineage. This is necessary because it's possible that
+ * some groupings (power domain groupings in particular) may be defined by
+ * sources that are buggy (e.g. BIOS bugs). In such cases, it may not be
+ * possible to integrate those groupings into the CMT PG hierarchy, if doing
+ * so would violate the subset invariant of the hierarchy, which says that
+ * a PG must be subset of its parent (if it has one).
+ *
+ * pg_cmt_lineage_validate()'s purpose is to detect grouping definitions that
+ * would result in a violation of this invariant. If a violation is found,
+ * and the PG is of a grouping type who's definition is known to originate from
+ * suspect sources (BIOS), then pg_cmt_prune() will be invoked to prune the
+ * PG (and all other instances PG's sharing relationship type) from the
+ * hierarchy. Further, future instances of that sharing relationship type won't
+ * be instantiated. If the grouping definition doesn't originate from suspect
+ * sources, then pg_cmt_disable() will be invoked to log an error, and disable
+ * CMT scheduling altogether.
+ *
+ * This routine is invoked after the CPU has been added to the PGs in which
+ * it belongs, but before those PGs have been added to (or had their place
+ * adjusted in) the CMT PG hierarchy.
+ *
+ * The first argument is the CPUs PG lineage (essentially an array of PGs in
+ * which the CPU belongs) that has already been sorted in ascending order
+ * by CPU count. Some of the PGs in the CPUs lineage may already have other
+ * CPUs in them, and have already been integrated into the CMT hierarchy.
+ *
+ * The addition of this new CPU to these pre-existing PGs means that those
+ * PGs may need to be promoted up in the hierarchy to satisfy the subset
+ * invariant. In additon to testing the subset invariant for the lineage,
+ * this routine also verifies that the addition of the new CPU to the
+ * existing PGs wouldn't cause the subset invariant to be violated in
+ * the exiting lineages.
+ *
+ * This routine will normally return one of the following:
+ * CMT_LINEAGE_VALID - There were no problems detected with the lineage.
+ * CMT_LINEAGE_REPAIRED - Problems were detected, but repaired via pruning.
+ *
+ * Otherwise, this routine will return a value indicating which error it
+ * was unable to recover from (and set cmt_lineage_status along the way).
+ */
+static cmt_lineage_validation_t
 pg_cmt_lineage_validate(pg_cmt_t **lineage, int *sz)
 {
-	int		i, size;
-	pg_cmt_t	*pg, *parent, *pg_bad;
+	int		i, j, size;
+	pg_cmt_t	*pg, *pg_next, *pg_bad, *pg_tmp;
 	cpu_t		*cp;
 	pg_cpu_itr_t	cpu_iter;
+	lgrp_handle_t	lgrp;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
 revalidate:
 	size = *sz;
 	pg_bad = NULL;
-	for (i = 0; i < size - 1; i++) {
+	lgrp = LGRP_NULL_HANDLE;
+	for (i = 0; i < size; i++) {
 
 		pg = lineage[i];
-		parent = lineage[i + 1];
+		if (i < size - 1)
+			pg_next = lineage[i + 1];
+		else
+			pg_next = NULL;
 
 		/*
 		 * We assume that the lineage has already been sorted
 		 * by the number of CPUs. In fact, we depend on it.
 		 */
-		ASSERT(PG_NUM_CPUS((pg_t *)pg) <= PG_NUM_CPUS((pg_t *)parent));
+		ASSERT(pg_next == NULL ||
+		    (PG_NUM_CPUS((pg_t *)pg) <= PG_NUM_CPUS((pg_t *)pg_next)));
 
 		/*
-		 * Walk each of the CPUs in the PGs group, and verify that
-		 * the next larger PG contains at least the CPUs in this one.
+		 * Check to make sure that the existing parent of PG (if any)
+		 * is either in the PG's lineage, or the PG has more CPUs than
+		 * its existing parent and can and should be promoted above its
+		 * parent.
+		 *
+		 * Since the PG topology is in the middle of being changed, we
+		 * need to check whether the PG's existing parent (if any) is
+		 * part of its lineage (and therefore should contain the new
+		 * CPU). If not, it means that the addition of the new CPU
+		 * should have made this PG have more CPUs than its parent, and
+		 * this PG should be promoted to be above its existing parent
+		 * now. We need to verify all of this to defend against a buggy
+		 * BIOS giving bad power domain CPU groupings. Sigh.
+		 */
+		if (pg->cmt_parent) {
+			/*
+			 * Determine if cmt_parent is in this lineage
+			 */
+			for (j = 0; j < size; j++) {
+				pg_tmp = lineage[j];
+				if (pg_tmp == pg->cmt_parent)
+					break;
+			}
+			if (pg_tmp != pg->cmt_parent) {
+				/*
+				 * cmt_parent is not in the lineage, verify
+				 * it is a proper subset of PG.
+				 */
+				if (PG_NUM_CPUS((pg_t *)pg->cmt_parent) >=
+				    PG_NUM_CPUS((pg_t *)pg)) {
+					/*
+					 * Not a proper subset if pg has less
+					 * CPUs than cmt_parent...
+					 */
+					cmt_lineage_status =
+					    CMT_LINEAGE_NON_PROMOTABLE;
+					goto handle_error;
+				}
+			}
+		}
+
+		/*
+		 * Walk each of the CPUs in the PGs group and perform
+		 * consistency checks along the way.
 		 */
 		PG_CPU_ITR_INIT((pg_t *)pg, cpu_iter);
 		while ((cp = pg_cpu_next(&cpu_iter)) != NULL) {
-			if (pg_cpu_find((pg_t *)parent, cp) == B_FALSE) {
+			/*
+			 * Verify that there aren't any CPUs contained in PG
+			 * that the next PG in the lineage (which is larger
+			 * or same size) doesn't also contain.
+			 */
+			if (pg_next != NULL &&
+			    pg_cpu_find((pg_t *)pg_next, cp) == B_FALSE) {
 				cmt_lineage_status = CMT_LINEAGE_NON_CONCENTRIC;
+				goto handle_error;
+			}
+
+			/*
+			 * Verify that all the CPUs in the PG are in the same
+			 * lgroup.
+			 */
+			if (lgrp == LGRP_NULL_HANDLE) {
+				lgrp = lgrp_plat_cpu_to_hand(cp->cpu_id);
+			} else if (lgrp_plat_cpu_to_hand(cp->cpu_id) != lgrp) {
+				cmt_lineage_status = CMT_LINEAGE_PG_SPANS_LGRPS;
 				goto handle_error;
 			}
 		}
 	}
 
 handle_error:
+	/*
+	 * Some of these validation errors can result when the CPU grouping
+	 * information is derived from buggy sources (for example, incorrect
+	 * ACPI tables on x86 systems).
+	 *
+	 * We'll try to recover in such cases by pruning out the illegal
+	 * groupings from the PG hierarchy, which means that we won't optimize
+	 * for those levels, but we will for the remaining ones.
+	 */
 	switch (cmt_lineage_status) {
 	case CMT_LINEAGE_VALID:
 	case CMT_LINEAGE_REPAIRED:
 		break;
+	case CMT_LINEAGE_PG_SPANS_LGRPS:
+		/*
+		 * We've detected a PG whose CPUs span lgroups.
+		 *
+		 * This isn't supported, as the dispatcher isn't allowed to
+		 * to do CMT thread placement across lgroups, as this would
+		 * conflict with policies implementing MPO thread affinity.
+		 *
+		 * The handling for this falls through to the next case.
+		 */
+	case CMT_LINEAGE_NON_PROMOTABLE:
+		/*
+		 * We've detected a PG that already exists in another CPU's
+		 * lineage that cannot cannot legally be promoted into place
+		 * without breaking the invariants of the hierarchy.
+		 */
+		if (PG_CMT_HW_SUSPECT(((pghw_t *)pg)->pghw_hw)) {
+			if (pg_cmt_prune(pg, lineage, sz) == 0) {
+				cmt_lineage_status = CMT_LINEAGE_REPAIRED;
+				goto revalidate;
+			}
+		}
+		/*
+		 * Something went wrong trying to prune out the bad level.
+		 * Disable CMT scheduling altogether.
+		 */
+		pg_cmt_disable();
+		break;
 	case CMT_LINEAGE_NON_CONCENTRIC:
 		/*
-		 * We've detected a non-concentric PG lineage.
+		 * We've detected a non-concentric PG lineage, which means that
+		 * there's a PG in the lineage that has CPUs that the next PG
+		 * over in the lineage (which is the same size or larger)
+		 * doesn't have.
 		 *
-		 * This can happen when some of the CPU grouping information
-		 * is derived from buggy sources (for example, incorrect ACPI
-		 * tables on x86 systems).
-		 *
-		 * We attempt to recover from this by pruning out the
-		 * illegal groupings from the PG hierarchy, which means that
-		 * we won't optimize for those levels, but we will for the
-		 * remaining ones.
-		 *
-		 * If a given level has CPUs not found in it's parent, then
-		 * we examine the PG and it's parent to see if either grouping
-		 * is enumerated from potentially buggy sources.
+		 * In this case, we examine the two PGs to see if either
+		 * grouping is defined by potentially buggy sources.
 		 *
 		 * If one has less CPUs than the other, and contains CPUs
 		 * not found in the parent, and it is an untrusted enumeration,
@@ -1603,15 +1749,15 @@ handle_error:
 		 * This process repeats until we have a concentric lineage,
 		 * or we would have to prune out level derived from what we
 		 * thought was a reliable source, in which case CMT scheduling
-		 * is disabled all together.
+		 * is disabled altogether.
 		 */
-		if ((PG_NUM_CPUS((pg_t *)pg) < PG_NUM_CPUS((pg_t *)parent)) &&
+		if ((PG_NUM_CPUS((pg_t *)pg) < PG_NUM_CPUS((pg_t *)pg_next)) &&
 		    (PG_CMT_HW_SUSPECT(((pghw_t *)pg)->pghw_hw))) {
 			pg_bad = pg;
 		} else if (PG_NUM_CPUS((pg_t *)pg) ==
-		    PG_NUM_CPUS((pg_t *)parent)) {
-			if (PG_CMT_HW_SUSPECT(((pghw_t *)parent)->pghw_hw)) {
-				pg_bad = parent;
+		    PG_NUM_CPUS((pg_t *)pg_next)) {
+			if (PG_CMT_HW_SUSPECT(((pghw_t *)pg_next)->pghw_hw)) {
+				pg_bad = pg_next;
 			} else if (PG_CMT_HW_SUSPECT(((pghw_t *)pg)->pghw_hw)) {
 				pg_bad = pg;
 			}
@@ -1622,17 +1768,20 @@ handle_error:
 				goto revalidate;
 			}
 		}
-		/*FALLTHROUGH*/
-	default:
 		/*
-		 * If we're here, something has gone wrong in trying to
-		 * recover from a illegal PG hierarchy, or we've encountered
-		 * a validation error for which we don't know how to recover.
-		 * In this case, disable CMT scheduling all together.
+		 * Something went wrong trying to identify and/or prune out
+		 * the bad level. Disable CMT scheduling altogether.
 		 */
 		pg_cmt_disable();
+		break;
+	default:
+		/*
+		 * If we're here, we've encountered a validation error for
+		 * which we don't know how to recover. In this case, disable
+		 * CMT scheduling altogether.
+		 */
 		cmt_lineage_status = CMT_LINEAGE_UNRECOVERABLE;
-		return (-1);
+		pg_cmt_disable();
 	}
-	return (0);
+	return (cmt_lineage_status);
 }
