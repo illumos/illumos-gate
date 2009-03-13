@@ -25,7 +25,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-
 /*
  * slave/kpropd.c
  *
@@ -94,10 +93,16 @@
 #include <libgen.h>
 
 #define SYSLOG_CLASS LOG_DAEMON
+#define	INITIAL_TIMER 10
 
 char *poll_time = NULL;
 char *def_realm = NULL;
 boolean_t runonce = B_FALSE;
+
+/*
+ * Global fd to close upon alarm time-out.
+ */
+volatile int gfd = -1;
 
 /*
  * This struct simulates the use of _kadm5_server_handle_t
@@ -304,6 +309,14 @@ main(argc, argv)
 	exit(ret);
 }
 
+void resync_alarm(int sn)
+{
+	close(gfd);
+	if (debug)
+		fprintf(stderr, gettext("resync_alarm: closing fd: %d\n"), gfd);
+	gfd = -1;
+}
+
 int do_standalone(iprop_role iproprole)
 {
     struct	linger linger;
@@ -313,6 +326,12 @@ int do_standalone(iprop_role iproprole)
     int	ret, status = 0;
     struct	sockaddr_in6 sin6 = { AF_INET6 };
     int sin6_size = sizeof (sin6);
+    /*
+     * Timer for accept/read calls, in case of network type errors.
+     */
+    int backoff_timer = INITIAL_TIMER;
+
+retry:
 
     /* listen for either ipv4 or ipv6 */
     finet = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
@@ -348,6 +367,23 @@ int do_standalone(iprop_role iproprole)
 			(void *)&linger, sizeof(linger)) < 0)
 		    com_err(progname, errno,
 			    gettext("while setting socket option (SO_LINGER)"));
+	    /*
+	     * We also want to set a timer so that the slave is not waiting
+	     * until infinity for an update from the master.
+	     */
+	    gfd = finet;
+	    signal(SIGALRM, resync_alarm);
+	    if (debug) {
+		fprintf(stderr, "do_standalone: setting resync alarm to %d\n",
+		    backoff_timer);
+	    }
+	    if (alarm(backoff_timer) != 0) {
+		if (debug) {
+		    fprintf(stderr,
+			gettext("%s: alarm already set\n"), progname);
+		}
+	    }
+	    backoff_timer *= 2;
     }
     if ((ret = bind(finet, (struct sockaddr *)&sin6, sizeof(sin6))) < 0) {
 	if (debug) {
@@ -408,13 +444,33 @@ int do_standalone(iprop_role iproprole)
 		s = accept(finet, (struct sockaddr *) &sin6, &sin6_size);
 
 		if (s < 0) {
-			if (errno != EINTR) {
-				/* Solaris Kerberos: Keep error messages consistent */
-				com_err(progname, errno,
-		    gettext("while accepting connection")); 
+			int e = errno; 
+			if (e != EINTR) { 
+				/* 
+				 * Solaris Kerberos: Keep error messages 
+				 * consistent 
+				 */ 
+				com_err(progname, e, 
+				    gettext("while accepting connection")); 
+				backoff_timer = INITIAL_TIMER;
 			}
-			continue;
+			/* 
+			 * If we got EBADF, an alarm signal handler closed 
+			 * the file descriptor on us. 
+			 */ 
+			if (e != EBADF) 
+				close(finet); 
+			/* 
+			 * An alarm could have been set and the fd closed, we 
+			 * should retry in case of transient network error for 
+			 * up to a couple of minutes. 
+			 */ 
+			if (backoff_timer > 120) 
+				return (EINTR); 
+			goto retry; 
 		}
+		alarm(0);
+		gfd = -1;
 		if (debug && (iproprole != IPROP_SLAVE))
 			child_pid = 0;
 		else
@@ -434,10 +490,17 @@ int do_standalone(iprop_role iproprole)
 	    /*NOTREACHED*/
 		default:
 	    /* parent */
+	    /*
+	     * Errors should not be considered fatal in the iprop case as we
+	     * could have transient type errors, such as network outage, etc.
+	     * Sleeping 3s for 2s linger interval.
+	     */
 	    if (wait(&status) < 0) {
 		com_err(progname, errno,
 		    gettext("while waiting to receive database"));
-		exit(1);
+		if (iproprole != IPROP_SLAVE)
+		    exit(1);
+		sleep(3);
 	    }
 
 	    close(s);
@@ -478,8 +541,24 @@ void doit(fd)
 		exit(1);
 	}
 	log_ctx = kpropd_context->kdblog_context;
-	if (log_ctx && (log_ctx->iproprole == IPROP_SLAVE))
+	if (log_ctx && (log_ctx->iproprole == IPROP_SLAVE)) {
 		ulog_set_role(doit_context, IPROP_SLAVE);
+		/*
+		 * We also want to set a timer so that the slave is not waiting
+		 * until infinity for an update from the master.
+		 */
+		if (debug)
+			fprintf(stderr, "doit: setting resync alarm to %ds\n",
+			    INITIAL_TIMER);
+		signal(SIGALRM, resync_alarm);
+		gfd = fd;
+		if (alarm(INITIAL_TIMER) != 0) {
+			if (debug) {
+				fprintf(stderr,
+				    gettext("%s: alarm already set\n"), progname);
+			}
+		}
+	}
 
 	fromlen = (socklen_t)sizeof (from);
 	if (getpeername(fd, (struct sockaddr *) &from, &fromlen) < 0) {
@@ -552,6 +631,12 @@ void doit(fd)
 	 */
 	/* Solaris Kerberos */
 	kerberos_authenticate(doit_context, fd, &client, &etype, &from);
+
+	/*
+	 * Turn off alarm upon successful authentication from master.
+	 */
+	alarm(0);
+	gfd = -1;
 
 	if (!authorized_principal(doit_context, client, etype)) {
 		char	*name;
@@ -905,10 +990,6 @@ reinit:
 				 * the full dump
 				 */
 				ret = do_standalone(log_ctx->iproprole);
-				if (ret)
-					syslog(LOG_WARNING,
-					    gettext("kpropd: Full resync, "
-					    "invalid return."));
 				if (debug)
 					if (ret)
 						fprintf(stderr,
@@ -918,7 +999,18 @@ reinit:
 						fprintf(stderr,
 						    gettext("Full resync "
 						    "was successful\n"));
-				frdone = B_TRUE;
+				if (ret) {
+					syslog(LOG_WARNING,
+					    gettext("kpropd: Full resync, "
+					    "invalid return."));
+					/*
+					 * Start backing-off immediately after
+					 * failure.
+					 */
+					backoff_cnt++;
+					frdone = B_FALSE;
+				} else
+					frdone = B_TRUE;
 				break;
 
 			case UPDATE_BUSY:
@@ -1674,7 +1766,7 @@ recv_error(context, inbuf)
 				error->text.data);
 	} else if (error->error) {
 		com_err(progname, error->error + ERROR_TABLE_BASE_krb5,
-			gettext("signalled from server"));
+			gettext("signaled from server"));
 		if (error->text.data)
 			fprintf(stderr,
 				gettext("Error text from client: %s\n"),
