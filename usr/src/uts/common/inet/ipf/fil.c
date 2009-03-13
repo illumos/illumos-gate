@@ -968,67 +968,67 @@ fr_info_t *fin;
 
 	fr_checkv4sum(fin);
 
-	if (fin->fin_dlen > 1) {
-		icmp = fin->fin_dp;
+	/*
+	 * This is a right place to set icmp pointer, since the memory
+	 * referenced by fin_dp could get reallocated. The code down below can
+	 * rely on fact icmp variable always points to ICMP header.
+	 */
+	icmp = fin->fin_dp;
+	fin->fin_data[0] = *(u_short *)icmp;
+	fin->fin_data[1] = icmp->icmp_id;
 
-		fin->fin_data[0] = *(u_short *)icmp;
-
-		switch (icmp->icmp_type)
-		{
-		case ICMP_ECHOREPLY :
-		case ICMP_ECHO :
-		/* Router discovery messaes - RFC 1256 */
-		case ICMP_ROUTERADVERT :
-		case ICMP_ROUTERSOLICIT :
-			minicmpsz = ICMP_MINLEN;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
-		 * 3 * timestamp(3 * 4)
-		 */
-		case ICMP_TSTAMP :
-		case ICMP_TSTAMPREPLY :
-			minicmpsz = 20;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
-		 * mask(4)
-		 */
-		case ICMP_MASKREQ :
-		case ICMP_MASKREPLY :
+	switch (icmp->icmp_type)
+	{
+	case ICMP_ECHOREPLY :
+	case ICMP_ECHO :
+	/* Router discovery messaes - RFC 1256 */
+	case ICMP_ROUTERADVERT :
+	case ICMP_ROUTERSOLICIT :
+		minicmpsz = ICMP_MINLEN;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
+	 * 3 * timestamp(3 * 4)
+	 */
+	case ICMP_TSTAMP :
+	case ICMP_TSTAMPREPLY :
+		minicmpsz = 20;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
+	 * mask(4)
+	 */
+	case ICMP_MASKREQ :
+	case ICMP_MASKREPLY :
 			minicmpsz = 12;
 			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) + ip(20+)
-		 */
-		case ICMP_UNREACH :
-			if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
-				if (icmp->icmp_nextmtu < ifs->ifs_fr_icmpminfragmtu)
-					fin->fin_flx |= FI_BAD;
-			}
-			/* FALLTHRU */
-		case ICMP_SOURCEQUENCH :
-		case ICMP_REDIRECT :
-		case ICMP_TIMXCEED :
-		case ICMP_PARAMPROB :
-			fin->fin_flx |= FI_ICMPERR;
-			if (fr_coalesce(fin) != 1)
-				return;
-			/*
-			 * ICMP error packets should not be generated for IP
-			 * packets that are a fragment that isn't the first
-			 * fragment.
-			 */
-			oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
-			if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) + ip(20+)
+	 */
+	case ICMP_UNREACH :
+		if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
+			if (icmp->icmp_nextmtu < ifs->ifs_fr_icmpminfragmtu)
 				fin->fin_flx |= FI_BAD;
-			break;
-		default :
-			break;
 		}
-
-		if (fin->fin_dlen >= 6)				/* ID field */
-			fin->fin_data[1] = icmp->icmp_id;
+		/* FALLTHRU */
+	case ICMP_SOURCEQUENCH :
+	case ICMP_REDIRECT :
+	case ICMP_TIMXCEED :
+	case ICMP_PARAMPROB :
+		fin->fin_flx |= FI_ICMPERR;
+		if (fr_coalesce(fin) != 1)
+			return;
+		/*
+		 * ICMP error packets should not be generated for IP
+		 * packets that are a fragment that isn't the first
+		 * fragment.
+		 */
+		oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
+		if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+			fin->fin_flx |= FI_BAD;
+		break;
+	default :
+		break;
 	}
 
 	frpr_short(fin, minicmpsz);
