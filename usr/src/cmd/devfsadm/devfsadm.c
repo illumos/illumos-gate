@@ -600,7 +600,7 @@ parse_args(int argc, char *argv[])
 		build_dev = FALSE;
 
 		while ((opt =
-		    getopt(argc, argv, "a:bcd:fi:m:np:R:r:suvV:")) != EOF) {
+		    getopt(argc, argv, "a:bc:dfi:m:np:R:r:suvV:")) != EOF) {
 			switch (opt) {
 			case 'a':
 				ap = calloc(sizeof (struct aliases), 1);
