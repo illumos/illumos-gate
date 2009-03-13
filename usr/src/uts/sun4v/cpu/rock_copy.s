@@ -862,7 +862,7 @@ continue_bcopy:
 
 	! Main loop to write out doubles.  Note: o5 & 7 == 0
 	
-	ldx	[%o0], %d34
+	ldd	[%o0], %d34
 	subcc	%o5, 8, %o5		! update local count
 	bz,pn	%ncc, 1f
 	add	%o0, 8, %o0		! update SRC
