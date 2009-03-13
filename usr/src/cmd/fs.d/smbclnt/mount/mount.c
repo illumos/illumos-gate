@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,25 +307,14 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Darwin takes defaults from the
-	 * mounted-on directory.
-	 * We want the real uid/gid.
-	 * XXX: Is this correct?
+	 * Fill in mdata defaults.
 	 */
-#ifdef __sun
 	if (mdata.uid == (uid_t)-1)
 		mdata.uid = getuid();
 	if (mdata.gid == (gid_t)-1)
 		mdata.gid = getgid();
-#else
-	if (mdata.uid == (uid_t)-1)
-		mdata.uid = st.st_uid;
-	if (mdata.gid == (gid_t)-1)
-		mdata.gid = st.st_gid;
-#endif
-
 	if (mdata.file_mode == 0)
-		mdata.file_mode = st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+		mdata.file_mode = S_IRWXU;
 	if (mdata.dir_mode == 0) {
 		mdata.dir_mode = mdata.file_mode;
 		if (mdata.dir_mode & S_IRUSR)

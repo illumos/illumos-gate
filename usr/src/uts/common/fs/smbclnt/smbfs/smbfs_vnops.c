@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1237,8 +1237,6 @@ smbfs_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
  * If FNODSYNC is specified, then there is nothing to do because
  * metadata changes are not cached on the client before being
  * sent to the server.
- *
- * Currently, this is a no-op since we don't cache data, either.
  */
 /* ARGSUSED */
 static int
@@ -1246,7 +1244,10 @@ smbfs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 {
 	int		error = 0;
 	smbmntinfo_t	*smi;
+	smbnode_t 	*np;
+	struct smb_cred scred;
 
+	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
 
 	if (curproc->p_zone != smi->smi_zone)
@@ -1257,6 +1258,19 @@ smbfs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 
 	if ((syncflag & FNODSYNC) || IS_SWAPVP(vp))
 		return (0);
+
+	if ((syncflag & (FSYNC|FDSYNC)) == 0)
+		return (0);
+
+	/* Shared lock for n_fid use in _flush */
+	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
+		return (EINTR);
+	smb_credinit(&scred, curproc, cr);
+
+	error = smbfs_smb_flush(np, &scred);
+
+	smb_credrele(&scred);
+	smbfs_rw_exit(&np->r_lkserlock);
 
 	return (error);
 }
