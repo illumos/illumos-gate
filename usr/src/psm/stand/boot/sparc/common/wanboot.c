@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 /* EXPORT DELETE START */
@@ -1496,55 +1494,71 @@ init_netdev(char *bpath)
 {
 	pnode_t		anode;
 	int		proplen;
-	static char	netalias[OBP_MAXPATHLEN];
+	char		netalias[OBP_MAXPATHLEN];
+	static char	devpath[OBP_MAXPATHLEN];
+	char		*p;
+
+	bzero(netalias, sizeof (netalias));
+	bzero(devpath, sizeof (devpath));
 
 	/*
 	 * Wanboot will either have loaded over the network (in which case
 	 * bpath will name a network device), or from CD-ROM or disk.  In
-	 * both cases ensure that the 'net' alias corresponds to a network
+	 * either case ensure that the 'net' alias corresponds to a network
 	 * device, and that if a network boot was performed that it is
 	 * identical to bpath.  This is so that the interface name can always
 	 * be determined for CD-ROM or disk boots, and for manually-configured
 	 * network boots.  The latter restriction may be relaxed in the future.
 	 */
 	anode = prom_alias_node();
-	if ((proplen = prom_getproplen(anode, "net")) > 0 &&
-	    proplen < sizeof (netalias)) {
-		(void) prom_getprop(anode, "net", (caddr_t)netalias);
+	if ((proplen = prom_getproplen(anode, "net")) <= 0 ||
+	    proplen > sizeof (netalias)) {
+		goto error;
+	}
+	(void) prom_getprop(anode, "net", (caddr_t)netalias);
 
-		if (is_netdev(netalias)) {
-			char	*p;
+	/*
+	 * Strip boot arguments from the net device to form
+	 * the boot device path, returned as netdev_path.
+	 */
+	if (strlcpy(devpath, netalias, sizeof (devpath)) >= sizeof (devpath))
+		goto error;
+	if ((p = strchr(devpath, ':')) != NULL) {
+		*p = '\0';
+	}
 
-			/*
-			 * Strip device arguments from netalias[].
-			 */
-			if ((p = strchr(netalias, ':')) != NULL) {
-				*p = '\0';
-			}
+	if (!is_netdev(netalias)) {
+		bootlog("wanboot", BOOTLOG_CRIT, "'net'=%s\n", netalias);
+		goto error;
+	}
 
-			/*
-			 * If bpath is a network device path, then v2path
-			 * will be a copy of this sans device arguments.
-			 */
-			if (!is_netdev(bpath) ||
-			    strcmp(v2path, netalias) == 0) {
-				/*
-				 * Stash the netdev_path bootprop value, then
-				 * initialize the hardware and return success.
-				 */
-				netdev_path = netalias;
-				mac_init(bpath);
-				return (B_TRUE);
-			}
-
+	if (is_netdev(bpath)) {
+		/*
+		 * If bpath is a network device path, then v2path
+		 * will be a copy of this sans device arguments.
+		 */
+		if (strcmp(v2path, devpath) != 0) {
+			bootlog("wanboot", BOOTLOG_CRIT,
+			    "'net'=%s\n", netalias);
 			bootlog("wanboot", BOOTLOG_CRIT,
 			    "wanboot requires that the 'net' alias refers to ");
 			bootlog("wanboot", BOOTLOG_CRIT,
 			    "the network device path from which it loaded");
 			return (B_FALSE);
 		}
+	} else {
+		bpath = netalias;
 	}
 
+	/*
+	 * Configure the network and return the network device.
+	 */
+	bootlog("wanboot", BOOTLOG_INFO, "configuring %s\n", bpath);
+	netdev_path = devpath;
+	mac_init(bpath);
+	return (B_TRUE);
+
+error:
 	/*
 	 * If we haven't established a device path for a network interface,
 	 * then we're doomed.

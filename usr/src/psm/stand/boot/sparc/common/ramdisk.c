@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/promif.h>
@@ -193,7 +191,7 @@ char ramdisk_bootable[] =
 
 #define	BOOT_ARCHIVE_ALLOC_SIZE	(32 * 1024 * 1024)	/* 32 MB */
 #define	BOOTFS_VIRT		((caddr_t)0x50f00000)
-#define	ROOTFS_VIRT		((caddr_t)0x51000000)
+#define	ROOTFS_VIRT		((caddr_t)0x52000000)
 
 struct ramdisk_attr {
 	char *rd_name;
