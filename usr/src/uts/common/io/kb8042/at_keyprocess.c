@@ -2,9 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +18,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -278,7 +274,7 @@ static const unsigned char	keytab_e0_set1[] = {
 /* 1e */	INVALID,
 /* 1f */	INVALID,
 
-/* 20 */	INVALID,
+/* 20 */	KEY(235),	/* Mute */
 /* 21 */	INVALID,
 /* 22 */	INVALID,
 /* 23 */	INVALID,
@@ -292,10 +288,10 @@ static const unsigned char	keytab_e0_set1[] = {
 /* 2b */	INVALID,
 /* 2c */	INVALID,
 /* 2d */	INVALID,
-/* 2e */	INVALID,
+/* 2e */	KEY(234),	/* Volume Down */
 /* 2f */	INVALID,
 
-/* 30 */	INVALID,
+/* 30 */	KEY(233),	/* Volume Up */
 /* 31 */	INVALID,
 /* 32 */	INVALID,
 /* 33 */	INVALID,
@@ -716,6 +712,19 @@ KeyboardConvertScan_init(struct kb8042 *kb8042, int scanset)
 	return (DDI_SUCCESS);
 }
 
+/*
+ *	KeyboardConvertScan(*kb8042, scan, *keynum, *state
+ *		*synthetic_release_needed)
+ *
+ *	State machine that takes scan codes from the keyboard and resolves
+ *	them to key numbers using the above tables.  Returns B_TRUE if this
+ *	scan code completes a scan code sequence, in which case "keynum",
+ *	"state", and "synthetic_release_needed" will be filled in correctly.
+ *
+ *	"synthetic_release_needed" is a hack to handle the additional two
+ *	keys on a Korean keyboard.  They report press only, so we tell the
+ *	upper layer to synthesize the release.
+ */
 boolean_t
 KeyboardConvertScan(
     struct kb8042	*kb8042,
@@ -730,19 +739,6 @@ KeyboardConvertScan(
 	    synthetic_release_needed));
 }
 
-/*
- *	KeyboardConvertScan(*kb8042, scan, *keynum, *state
- *		*synthetic_release_needed)
- *
- *	State machine that takes scan codes from the keyboard and resolves
- *	them to key numbers using the above tables.  Returns B_TRUE if this
- *	scan code completes a scan code sequence, in which case "keynum",
- *	"state", and "synthetic_release_needed" will be filled in correctly.
- *
- *	"synthetic_release_needed" is a hack to handle the additional two
- *	keys on a Korean keyboard.  They report press only, so we tell the
- *	upper layer to synthesize the release.
- */
 boolean_t
 KeyboardConvertScan_set1(
     struct kb8042	*kb8042,
@@ -905,8 +901,8 @@ KeyboardConvertScan_set1(
 		 */
 
 		DEBUG_KD(("-> %s keypos %d\n",
-			*state == KEY_RELEASED ? "released" : "pressed",
-			*keynum));
+		    *state == KEY_RELEASED ? "released" : "pressed",
+		    *keynum));
 
 		return (B_TRUE);		/* resolved to a key */
 	}
@@ -1129,8 +1125,8 @@ KeyboardConvertScan_set2(
 		 */
 
 		DEBUG_KD(("-> %s keypos %d\n",
-			*state == KEY_RELEASED ? "released" : "pressed",
-			*keynum));
+		    *state == KEY_RELEASED ? "released" : "pressed",
+		    *keynum));
 
 		return (B_TRUE);		/* resolved to a key */
 	}
