@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -635,6 +635,7 @@ zfs_freezfsvfs(zfsvfs_t *zfsvfs)
 {
 	mutex_destroy(&zfsvfs->z_znodes_lock);
 	mutex_destroy(&zfsvfs->z_online_recv_lock);
+	mutex_destroy(&zfsvfs->z_lock);
 	list_destroy(&zfsvfs->z_all_znodes);
 	rrw_destroy(&zfsvfs->z_teardown_lock);
 	rw_destroy(&zfsvfs->z_teardown_inactive_lock);
@@ -668,6 +669,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 
 	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&zfsvfs->z_online_recv_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zfsvfs->z_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
 	    offsetof(znode_t, z_link_node));
 	rrw_init(&zfsvfs->z_teardown_lock);

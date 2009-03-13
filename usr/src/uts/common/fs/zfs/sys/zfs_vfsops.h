@@ -75,6 +75,7 @@ struct zfsvfs {
 	kmutex_t	z_online_recv_lock; /* recv in prog grabs as WRITER */
 	uint64_t	z_version;	/* ZPL version */
 	uint64_t	z_shares_dir;	/* hidden shares dir */
+	kmutex_t	z_lock;
 #define	ZFS_OBJ_MTX_SZ	64
 	kmutex_t	z_hold_mtx[ZFS_OBJ_MTX_SZ];	/* znode hold locks */
 };

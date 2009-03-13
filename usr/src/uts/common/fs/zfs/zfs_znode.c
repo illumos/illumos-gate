@@ -426,7 +426,7 @@ zfs_create_op_tables()
 	return (error);
 }
 
-static int
+int
 zfs_create_share_dir(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 {
 	vattr_t vattr;
@@ -536,6 +536,16 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp)
 	if (error)
 		return (error);
 
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_FUID_TABLES, 8, 1,
+	    &zfsvfs->z_fuid_obj);
+	if (error == ENOENT)
+		error = 0;
+
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_SHARES_DIR, 8, 1,
+	    &zfsvfs->z_shares_dir);
+	if (error && error != ENOENT)
+		return (error);
+
 	/*
 	 * Initialize zget mutex's
 	 */
@@ -554,32 +564,7 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp)
 		return (error);
 	}
 	ASSERT3U((*zpp)->z_id, ==, zfsvfs->z_root);
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_FUID_TABLES, 8, 1,
-	    &zfsvfs->z_fuid_obj);
-	if (error == ENOENT)
-		error = 0;
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_SHARES_DIR, 8, 1,
-	    &zfsvfs->z_shares_dir);
-	if (error == ENOENT) {
-		dmu_tx_t *tx;
-
-		if (!dmu_objset_is_snapshot(zfsvfs->z_os)) {
-			tx = dmu_tx_create(zfsvfs->z_os);
-			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, TRUE,
-			    ZFS_SHARES_DIR);
-			dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
-			error = dmu_tx_assign(tx, TXG_WAIT);
-			if (error) {
-				dmu_tx_abort(tx);
-			} else {
-				error = zfs_create_share_dir(zfsvfs, tx);
-				dmu_tx_commit(tx);
-			}
-		} else { /* Don't create directory on older snapshots */
-			error = 0;
-		}
-	}
 	return (error);
 }
 

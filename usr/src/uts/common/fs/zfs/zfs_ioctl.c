@@ -3007,10 +3007,38 @@ zfs_ioc_smb_acl(zfs_cmd_t *zc)
 
 	dzp = VTOZ(vp);
 	zfsvfs = dzp->z_zfsvfs;
-
 	ZFS_ENTER(zfsvfs);
 
+	/*
+	 * Create share dir if its missing.
+	 */
+	mutex_enter(&zfsvfs->z_lock);
+	if (zfsvfs->z_shares_dir == 0) {
+		dmu_tx_t *tx;
+
+		tx = dmu_tx_create(zfsvfs->z_os);
+		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, TRUE,
+		    ZFS_SHARES_DIR);
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
+		error = dmu_tx_assign(tx, TXG_WAIT);
+		if (error) {
+			dmu_tx_abort(tx);
+		} else {
+			error = zfs_create_share_dir(zfsvfs, tx);
+			dmu_tx_commit(tx);
+		}
+		if (error) {
+			mutex_exit(&zfsvfs->z_lock);
+			VN_RELE(vp);
+			ZFS_EXIT(zfsvfs);
+			return (error);
+		}
+	}
+	mutex_exit(&zfsvfs->z_lock);
+
+	ASSERT(zfsvfs->z_shares_dir);
 	if ((error = zfs_zget(zfsvfs, zfsvfs->z_shares_dir, &sharedir)) != 0) {
+		VN_RELE(vp);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
