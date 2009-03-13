@@ -716,7 +716,7 @@ extern dev_info_t	*scsi_vhci_dip;
 	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"1.187"
+#define	FCP_VERSION		"1.188"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
 #define	FCP_NUM_ELEMENTS(array)			\
@@ -4081,8 +4081,7 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 	}
 
 	case DEVCTL_DEVICE_RESET: {
-		struct fcp_lun	*plun;
-		struct scsi_address	ap;
+		struct fcp_lun		*plun;
 		child_info_t		*cip = CIP(cdip);
 
 		ASSERT(cdip != NULL);
@@ -4101,29 +4100,25 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 		mutex_enter(&plun->lun_tgt->tgt_mutex);
 		if (!(plun->lun_state & FCP_SCSI_LUN_TGT_INIT)) {
 			mutex_exit(&plun->lun_tgt->tgt_mutex);
-			*rval = ENXIO;
-			break;
-		}
-		ap.a_hba_tran = plun->lun_tran;
-		ASSERT(pptr->port_tran != NULL);
-		mutex_exit(&plun->lun_tgt->tgt_mutex);
 
-		/*
-		 * There is a chance lun_tran is NULL at this point. So check
-		 * for it. If it is NULL, it basically means that the tgt has
-		 * been freed. So, just return a "No such device or address"
-		 * error.
-		 */
-		if (ap.a_hba_tran == NULL) {
 			*rval = ENXIO;
 			break;
 		}
+
+		if (plun->lun_sd == NULL) {
+			mutex_exit(&plun->lun_tgt->tgt_mutex);
+
+			*rval = ENXIO;
+			break;
+		}
+		mutex_exit(&plun->lun_tgt->tgt_mutex);
 
 		/*
 		 * set up ap so that fcp_reset can figure out
 		 * which target to reset
 		 */
-		if (fcp_scsi_reset(&ap, RESET_TARGET) == FALSE) {
+		if (fcp_scsi_reset(&plun->lun_sd->sd_address,
+		    RESET_TARGET) == FALSE) {
 			*rval = EIO;
 		}
 		break;
@@ -10720,7 +10715,7 @@ fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	plun->lun_tgt_count++;
 	scsi_device_hba_private_set(sd, plun);
 	plun->lun_state |= FCP_SCSI_LUN_TGT_INIT;
-	plun->lun_tran = hba_tran;
+	plun->lun_sd = sd;
 	mutex_exit(&ptgt->tgt_mutex);
 	mutex_exit(&pptr->port_mutex);
 
@@ -10810,7 +10805,7 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	plun->lun_tgt_count++;
 	scsi_device_hba_private_set(sd, plun);
 	plun->lun_state |= FCP_SCSI_LUN_TGT_INIT;
-	plun->lun_tran = hba_tran;
+	plun->lun_sd = sd;
 	mutex_exit(&ptgt->tgt_mutex);
 	mutex_exit(&pptr->port_mutex);
 
@@ -10876,7 +10871,7 @@ fcp_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	if (--plun->lun_tgt_count == 0) {
 		plun->lun_state &= ~FCP_SCSI_LUN_TGT_INIT;
 	}
-	plun->lun_tran = NULL;
+	plun->lun_sd = NULL;
 	mutex_exit(&ptgt->tgt_mutex);
 }
 

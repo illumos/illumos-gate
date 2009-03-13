@@ -1021,9 +1021,9 @@ struct fcp_lun {
 	 */
 	struct fcp_lun		*lun_next;
 	/*
-	 * SCSI Host Bus Adapter (HBA) driver transport vector structure.
+	 * lun level association with scsi_device
 	 */
-	struct scsi_hba_tran	*lun_tran;
+	struct scsi_device	*lun_sd;
 	/*
 	 * per-Lun control flag.  A value of '1' means the LUN is managed by
 	 * mpxio.  A value of '0' means the LUN has been physically enumerated
