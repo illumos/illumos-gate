@@ -828,20 +828,18 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 	credp = msg_extractcred(mp, &cpid);
 	if (credp == NULL) {
 		credp = newcred_from_bslabel(&sl, doi, KM_NOSLEEP);
-		if (credp == NULL)
-			return (B_FALSE);
-		mblk_setcred(mp, credp, cpid);
 	} else {
 		cred_t	*newcr;
 
 		newcr = copycred_from_bslabel(credp, &sl, doi,
 		    KM_NOSLEEP);
 		crfree(credp);
-		if (newcr == NULL)
-			return (B_FALSE);
-		mblk_setcred(mp, newcr, cpid);
 		credp = newcr;
 	}
+	if (credp == NULL)
+		return (B_FALSE);
+	mblk_setcred(mp, credp, cpid);
+	crfree(credp);			/* mblk has ref on cred */
 
 	/*
 	 * If the source was unlabeled, then flag as such,
