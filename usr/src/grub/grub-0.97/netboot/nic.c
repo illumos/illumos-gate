@@ -99,6 +99,11 @@ int network_ready = 0;
 int	vci_etherboot;
 #endif
 
+char *bootfile = NULL;
+configfile_origin_t configfile_origin = CFG_HARDCODED;
+char *vendor_configfile = NULL;
+char vendor_configfile_len;
+
 static void update_network_configuration(void);
 
 static int dummy(void *unused __unused)
@@ -558,7 +563,7 @@ static int await_bootp(int ival __unused, void *ptr __unused,
 	memset(arptable[ARP_SERVER].node, 0, ETH_ALEN);  /* Kill arp */
 	arptable[ARP_GATEWAY].ipaddr.s_addr = bootpreply->bp_giaddr.s_addr;
 	memset(arptable[ARP_GATEWAY].node, 0, ETH_ALEN);  /* Kill arp */
-	/* We don't care bootpreply->bp_file, it must be 'pxegrub':-) */
+	bootfile = bootpreply->bp_file;
 	memcpy((char *)rfc1533_venddata, (char *)(bootpreply->bp_vend), len);
 	decode_rfc1533(rfc1533_venddata, 0, len, 1);
 	return(1);
@@ -648,7 +653,6 @@ static int await_dhcp(int ival __unused, void *ptr __unused,
 	dhcpack_length = len + sizeof (struct dhcp_t) - DHCP_OPT_LEN;
 	memcpy((char *)dhcpack_buf, (char *)dhcpreply, dhcpack_length);
 #endif
-
 	arptable[ARP_CLIENT].ipaddr.s_addr = dhcpreply->bp_yiaddr.s_addr;
 	dhcp_addr.s_addr = dhcpreply->bp_yiaddr.s_addr;
 	netmask = default_netmask();
@@ -656,7 +660,7 @@ static int await_dhcp(int ival __unused, void *ptr __unused,
 	memset(arptable[ARP_SERVER].node, 0, ETH_ALEN);  /* Kill arp */
 	arptable[ARP_GATEWAY].ipaddr.s_addr = dhcpreply->bp_giaddr.s_addr;
 	memset(arptable[ARP_GATEWAY].node, 0, ETH_ALEN);  /* Kill arp */
-	/* We don't care bootpreply->bp_file. It must be 'pxegrub' */
+	bootfile = dhcpreply->bp_file;
 	memcpy((char *)rfc1533_venddata, (char *)(dhcpreply->bp_vend), len);
 	decode_rfc1533(rfc1533_venddata, 0, len, 1);
 	return(1);
@@ -1096,6 +1100,9 @@ int decode_rfc1533(unsigned char *p, unsigned int block, unsigned int len, int e
 			   in GRUB 1.0.  */
 			memcpy (config_file, p + 2, l);
 			config_file[l] = 0;
+			vendor_configfile = p + 2;
+			vendor_configfile_len = l;
+			configfile_origin = CFG_150;
 		}
 		else {
 			;
@@ -1211,10 +1218,52 @@ void print_network_configuration (void)
 	if (! network_ready)
 		grub_printf ("Network interface not initialized yet.\n");
 	else {
+		if (hostnamelen == 0)
+			etherboot_printf ("Hostname: not set\n");
+		else
+			etherboot_printf ("Hostname: %s\n", hostname);
+
 		etherboot_printf ("Address: %@\n", arptable[ARP_CLIENT].ipaddr.s_addr);
 		etherboot_printf ("Netmask: %@\n", netmask);
-		etherboot_printf ("Server: %@\n", arptable[ARP_SERVER].ipaddr.s_addr);
 		etherboot_printf ("Gateway: %@\n", arptable[ARP_GATEWAY].ipaddr.s_addr);
+		etherboot_printf ("Server: %@\n", arptable[ARP_SERVER].ipaddr.s_addr);
+		if (vendor_configfile == NULL) {
+			etherboot_printf ("Site Option 150: not set\n");
+		} else {
+			/*
+			 * vendor_configfile points into the packet and
+			 * is not NULL terminated, so it needs to be
+			 * patched up before printing it out
+			 */
+			char c = vendor_configfile[vendor_configfile_len];
+			vendor_configfile[vendor_configfile_len] = '\0';
+			etherboot_printf ("Site Option 150: %s\n",
+			    vendor_configfile);
+			vendor_configfile[vendor_configfile_len] = c;
+		}
+
+		if (bootfile == NULL)
+			etherboot_printf ("BootFile: not set\n");
+		else
+			etherboot_printf ("BootFile: %s\n", bootfile);
+
+		etherboot_printf ("GRUB menu file: %s", config_file);
+		switch (configfile_origin) {
+		case CFG_HARDCODED:
+			etherboot_printf (" from hardcoded default\n");
+			break;
+		case CFG_150:
+			etherboot_printf (" from Site Option 150\n");
+			break;
+		case CFG_MAC:
+			etherboot_printf (" inferred from system MAC\n");
+			break;
+		case CFG_BOOTFILE:
+			etherboot_printf (" inferred from BootFile\n");
+			break;
+		default:
+			etherboot_printf ("\n");
+		}
 	}
 	LeaveFunction("print_network_configuration");
 }
@@ -1293,7 +1342,7 @@ dhcp_copy(struct dhcp_t *dhcpreply)
 	memset(arptable[ARP_SERVER].node, 0, ETH_ALEN);  /* Kill arp */
 	arptable[ARP_GATEWAY].ipaddr.s_addr = dhcpreply->bp_giaddr.s_addr;
 	memset(arptable[ARP_GATEWAY].node, 0, ETH_ALEN);  /* Kill arp */
-	/* We don't care bootpreply->bp_file. It must be 'pxegrub' */
+	bootfile = dhcpreply->bp_file;
 	memcpy((char *)rfc1533_venddata, (char *)(dhcpreply->bp_vend), len);
 	decode_rfc1533(rfc1533_venddata, 0, len, 1);
 }

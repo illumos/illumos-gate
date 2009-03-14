@@ -587,6 +587,14 @@ typedef enum
   MAX_ERR_NUM
 } grub_error_t;
 
+typedef enum
+{
+	CFG_HARDCODED,
+	CFG_150,
+	CFG_MAC,
+	CFG_BOOTFILE
+} configfile_origin_t;
+
 extern unsigned long install_partition;
 extern unsigned long boot_drive;
 extern unsigned long install_second_sector;
@@ -596,6 +604,8 @@ extern int saved_entryno;
 extern unsigned char force_lba;
 extern char version_string[];
 extern char config_file[];
+extern char *bootfile;
+extern configfile_origin_t configfile_origin;
 extern unsigned char md5hash[];
 extern char pkg_version[];
 extern unsigned long linux_text_len;

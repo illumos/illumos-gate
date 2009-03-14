@@ -944,27 +944,10 @@ dhcp_func (char *arg, int flags)
   return 0;
 }
 
-static void solaris_config_file (void)
+static int
+test_config_file(char *menufile)
 {
-	static char menufile[64];
-	static char hexdigit[] = "0123456789ABCDEF";
-	char *c = menufile;
-	int i;
 	int err;
-
-	/* if config_file is from DHCP option 150, keep the setting */
-	if (grub_strcmp(config_file, "/boot/grub/menu.lst") != 0)
-		return;
-
-	/* default solaris configfile name menu.lst.01<ether_addr> */
-	grub_strcpy(c, "menu.lst.01");
-	c += grub_strlen(c);
-	for (i = 0; i < ETH_ALEN; i++) {
-		unsigned char b = arptable[ARP_CLIENT].node[i];
-		*c++ = hexdigit[b >> 4];
-		*c++ = hexdigit[b & 0xf];
-	}
-	*c = 0;
 
 	/*
 	 * If the file exists, make it the default. Else, fallback
@@ -975,14 +958,74 @@ static void solaris_config_file (void)
 	if (grub_open(menufile)) {
 		grub_strcpy(config_file, menufile);
 		grub_close();
-	} else {
-		char *cp = config_file;
-		/* skip leading slashes for tftp */
-		while (*cp == '/')
-			++cp;
-	  	grub_memmove (config_file, cp, strlen(cp) + 1);
+		errnum = err;
+		return (1);
 	}
 	errnum = err;
+	return (0);
+}
+
+static void solaris_config_file (void)
+{
+	static char menufile[64];
+	static char hexdigit[] = "0123456789ABCDEF";
+	char *c = menufile;
+	int i;
+
+	/*
+	 * if DHCP option 150 has been provided, config_file will
+	 * already contain the string, try it.
+	 */
+	if (configfile_origin == CFG_150) {
+		if (test_config_file(config_file))
+			return;
+	}
+
+	/*
+	 * try to find host (MAC address) specific configfile:
+	 * menu.lst.01<ether_addr>
+	 */
+	grub_strcpy(c, "menu.lst.01");
+	c += grub_strlen(c);
+	for (i = 0; i < ETH_ALEN; i++) {
+		unsigned char b = arptable[ARP_CLIENT].node[i];
+		*c++ = hexdigit[b >> 4];
+		*c++ = hexdigit[b & 0xf];
+	}
+	*c = 0;
+	configfile_origin = CFG_MAC;
+	if (test_config_file(menufile))
+		return;
+
+	/*
+	 * try to find a configfile derived from the DHCP/bootp
+	 * BootFile string: menu.lst.<BootFile>
+	 */
+	if (bootfile != NULL && bootfile[0] != 0) {
+		c = menufile;
+		grub_strcpy(c, "menu.lst.");
+		c += grub_strlen("menu.lst.");
+		i = grub_strlen("pxegrub.");
+		if (grub_memcmp(bootfile, "pxegrub.", i) == 0)
+			grub_strcpy(c, bootfile + i);
+		else
+			grub_strcpy(c, bootfile);
+		configfile_origin = CFG_BOOTFILE;
+		if (test_config_file(menufile))
+			return;
+	}
+
+	/*
+	 * Default to hard coded "/boot/grub/menu.lst" config file.
+	 * This is the last resort, so there's no need to test it,
+	 * as there's nothing else to try.
+	 */
+	char *cp = config_file;
+	/* skip leading slashes for tftp */
+	while (*cp == '/')
+		++cp;
+  	grub_memmove (config_file, cp, strlen(cp) + 1);
+	configfile_origin = CFG_HARDCODED;
 }
 
 static struct builtin builtin_dhcp =
