@@ -649,7 +649,7 @@ callout_table_walk_fini(mdb_walk_state_t *wsp)
 
 static const char *co_typenames[] = { "R", "N" };
 
-#define	CO_PLAIN_ID(xid)	 ((xid) & ~CALLOUT_EXECUTING)
+#define	CO_PLAIN_ID(xid)	((xid) & CALLOUT_ID_MASK)
 
 #define	TABLE_TO_SEQID(x)	((x) >> CALLOUT_TYPE_BITS)
 
@@ -667,7 +667,7 @@ static const char *co_typenames[] = { "R", "N" };
 #define	COF_ADDR	0x0000400
 #define	COF_EXEC	0x0000800
 #define	COF_HIRES	0x0001000
-/* 0x0002000 reserved for future flags */
+#define	COF_ABS		0x0002000
 #define	COF_TABLE	0x0004000
 #define	COF_BYIDH	0x0008000
 #define	COF_FREE	0x0010000
@@ -702,6 +702,7 @@ typedef struct callout_data {
 	int ndx;		/* table index. */
 	int bucket;		/* which list/id bucket are we in */
 	hrtime_t exp;		/* expire time */
+	int list_flags;		/* copy of cl_flags */
 } callout_data_t;
 
 /* this callback does the actual callback itself (finally). */
@@ -726,7 +727,6 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 	    (coargs->param != (uintptr_t)co->c_arg)) {
 		return (WALK_NEXT);
 	}
-
 	if (!(coargs->flags & COF_LONG) && (co->c_xid & CALLOUT_LONGTERM)) {
 		return (WALK_NEXT);
 	}
@@ -734,9 +734,6 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 		return (WALK_NEXT);
 	}
 	if ((coargs->flags & COF_EXEC) && !(co->c_xid & CALLOUT_EXECUTING)) {
-		return (WALK_NEXT);
-	}
-	if ((coargs->flags & COF_HIRES) && !(co->c_xid & CALLOUT_HRESTIME)) {
 		return (WALK_NEXT);
 	}
 
@@ -751,9 +748,50 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 				    "time from %p", co->c_list);
 				coargs->exp = 0;
 			}
+			/* and flags. */
+			if (mdb_vread(&coargs->list_flags, sizeof (int),
+			    (uintptr_t)co->c_list + offsetof(callout_list_t,
+			    cl_flags)) == -1) {
+				mdb_warn("failed to read list flags"
+				    "from %p", co->c_list);
+				coargs->list_flags = 0;
+			}
 		} else {
 			/* free callouts can't use list pointer. */
 			coargs->exp = 0;
+			coargs->list_flags = 0;
+		}
+		if (coargs->exp != 0) {
+			if ((coargs->flags & COF_TIME) &&
+			    (coargs->exp != coargs->time)) {
+				return (WALK_NEXT);
+			}
+			if ((coargs->flags & COF_BEFORE) &&
+			    (coargs->exp > coargs->btime)) {
+				return (WALK_NEXT);
+			}
+			if ((coargs->flags & COF_AFTER) &&
+			    (coargs->exp < coargs->atime)) {
+				return (WALK_NEXT);
+			}
+		}
+		/* tricky part, since both HIRES and ABS can be set */
+		if ((coargs->flags & COF_HIRES) && (coargs->flags & COF_ABS)) {
+			/* both flags are set, only skip "regular" ones */
+			if (! (coargs->list_flags &
+			    (CALLOUT_FLAG_HRESTIME | CALLOUT_FLAG_ABSOLUTE))) {
+				return (WALK_NEXT);
+			}
+		} else {
+			/* individual flags, or no flags */
+			if ((coargs->flags & COF_HIRES) &&
+			    !(coargs->list_flags & CALLOUT_FLAG_HRESTIME)) {
+				return (WALK_NEXT);
+			}
+			if ((coargs->flags & COF_ABS) &&
+			    !(coargs->list_flags & CALLOUT_FLAG_ABSOLUTE)) {
+				return (WALK_NEXT);
+			}
 		}
 	}
 
@@ -774,11 +812,13 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 		} else if (coargs->flags & COF_BYIDH) {
 			mdb_printf("%<u>%-14s %</u>", "EXP");
 		}
-		mdb_printf("%<u>%-3s %-?s %-20s%</u>",
-		    "XHL", "XID", "FUNC(ARG)");
+		mdb_printf("%<u>%-4s %-?s %-20s%</u>",
+		    "XHAL", "XID", "FUNC(ARG)");
 		if (coargs->flags & COF_LONGLIST) {
 			mdb_printf("%<u> %-?s %-?s %-?s %-?s%</u>",
 			    "PREVID", "NEXTID", "PREVL", "NEXTL");
+			mdb_printf("%<u> %-?s %-4s %-?s%</u>",
+			    "DONE", "UTOS", "THREAD");
 		}
 		mdb_printf("\n");
 		coargs->flags &= ~COF_CHDR;
@@ -786,6 +826,7 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 	}
 
 	if (!(coargs->flags & COF_ADDR)) {
+		int list_flags = coargs->list_flags;
 		if (!(coargs->flags & COF_VERBOSE)) {
 			mdb_printf("%-3d %1s %-14llx ",
 			    TABLE_TO_SEQID(tableid),
@@ -797,15 +838,18 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 			    (coargs->flags & COF_EXPREL) ?
 			    coargs->exp - coargs->now : coargs->exp);
 		}
-		mdb_printf("%1s%1s%1s %-?llx %a(%p)",
+		mdb_printf("%1s%1s%1s%1s %-?llx %a(%p)",
 		    (co->c_xid & CALLOUT_EXECUTING) ? "X" : " ",
-		    (co->c_xid & CALLOUT_HRESTIME) ? "H" : " ",
+		    (list_flags & CALLOUT_FLAG_HRESTIME) ? "H" : " ",
+		    (list_flags & CALLOUT_FLAG_ABSOLUTE) ? "A" : " ",
 		    (co->c_xid & CALLOUT_LONGTERM) ? "L" : " ",
 		    (long long)coid, co->c_func, co->c_arg);
 		if (coargs->flags & COF_LONGLIST) {
 			mdb_printf(" %-?p %-?p %-?p %-?p",
 			    co->c_idprev, co->c_idnext, co->c_clprev,
 			    co->c_clnext);
+			mdb_printf(" %-?p %-4d %-0?p",
+			    co->c_done, co->c_waiting, co->c_executor);
 		}
 	} else {
 		/* address only */
@@ -829,6 +873,8 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 	}
 
 	coargs->exp = cl->cl_expiration;
+	coargs->list_flags = cl->cl_flags;
+
 	if ((coargs->flags & COF_TIME) &&
 	    (cl->cl_expiration != coargs->time)) {
 		return (WALK_NEXT);
@@ -845,6 +891,23 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 	    (cl->cl_callouts.ch_head == NULL)) {
 		return (WALK_NEXT);
 	}
+	/* FOUR cases, each different, !A!B, !AB, A!B, AB */
+	if ((coargs->flags & COF_HIRES) && (coargs->flags & COF_ABS)) {
+		/* both flags are set, only skip "regular" ones */
+		if (! (cl->cl_flags &
+		    (CALLOUT_FLAG_HRESTIME | CALLOUT_FLAG_ABSOLUTE))) {
+			return (WALK_NEXT);
+		}
+	} else {
+		if ((coargs->flags & COF_HIRES) &&
+		    !(cl->cl_flags & CALLOUT_FLAG_HRESTIME)) {
+			return (WALK_NEXT);
+		}
+		if ((coargs->flags & COF_ABS) &&
+		    !(cl->cl_flags & CALLOUT_FLAG_ABSOLUTE)) {
+			return (WALK_NEXT);
+		}
+	}
 
 	if ((coargs->flags & COF_LHDR) && !(coargs->flags & COF_ADDR) &&
 	    (coargs->flags & (COF_LIST | COF_VERBOSE))) {
@@ -852,12 +915,12 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 			/* don't be redundant again */
 			mdb_printf("%<u>SEQ T %</u>");
 		}
-		mdb_printf("%<u>EXP            BUCKET "
-		    "CALLOUTS         UTOS THREAD         %</u>");
+		mdb_printf("%<u>EXP            HA BUCKET "
+		    "CALLOUTS         %</u>");
 
 		if (coargs->flags & COF_LONGLIST) {
-			mdb_printf("%<u> %-?s %-?s %-?s%</u>",
-			    "DONE", "PREV", "NEXT");
+			mdb_printf("%<u> %-?s %-?s%</u>",
+			    "PREV", "NEXT");
 		}
 		mdb_printf("\n");
 		coargs->flags &= ~COF_LHDR;
@@ -872,15 +935,18 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 				    CALLOUT_TYPE_MASK]);
 			}
 
-			mdb_printf("%-14llx %-6d %-0?p %-4d %-0?p",
+			mdb_printf("%-14llx %1s%1s %-6d %-0?p ",
 			    (coargs->flags & COF_EXPREL) ?
 			    coargs->exp - coargs->now : coargs->exp,
-			    coargs->bucket, cl->cl_callouts.ch_head,
-			    cl->cl_waiting, cl->cl_executor);
+			    (coargs->list_flags & CALLOUT_FLAG_HRESTIME) ?
+			    "H" : " ",
+			    (coargs->list_flags & CALLOUT_FLAG_ABSOLUTE) ?
+			    "A" : " ",
+			    coargs->bucket, cl->cl_callouts.ch_head);
 
 			if (coargs->flags & COF_LONGLIST) {
-				mdb_printf(" %-?p %-?p %-?p",
-				    cl->cl_done, cl->cl_prev, cl->cl_next);
+				mdb_printf(" %-?p %-?p",
+				    cl->cl_prev, cl->cl_next);
 			}
 		} else {
 			/* address only */
@@ -1159,6 +1225,7 @@ callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    's', MDB_OPT_CLRBITS, COF_LONG, &coargs.flags,
 	    'x', MDB_OPT_SETBITS, COF_EXEC, &coargs.flags,
 	    'h', MDB_OPT_SETBITS, COF_HIRES, &coargs.flags,
+	    'B', MDB_OPT_SETBITS, COF_ABS, &coargs.flags,
 	    'E', MDB_OPT_SETBITS, COF_EMPTY, &coargs.flags,
 	    'd', MDB_OPT_SETBITS, 1, &dflag,
 	    'C', MDB_OPT_UINTPTR_SET, &Cflag, &Ctmp,
@@ -1372,14 +1439,13 @@ calloutid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (coargs.flags & COF_DECODE) {
 		if (DCMD_HDRSPEC(flags)) {
-			mdb_printf("%<u>%3s %1s %3s %-?s %-6s %</u>\n",
-			    "SEQ", "T", "XHL", "XID", "IDHASH");
+			mdb_printf("%<u>%3s %1s %2s %-?s %-6s %</u>\n",
+			    "SEQ", "T", "XL", "XID", "IDHASH");
 		}
-		mdb_printf("%-3d %1s %1s%1s%1s %-?llx %-6d\n",
+		mdb_printf("%-3d %1s %1s%1s %-?llx %-6d\n",
 		    TABLE_TO_SEQID(tableid),
 		    co_typenames[tableid & CALLOUT_TYPE_MASK],
 		    (xid & CALLOUT_EXECUTING) ? "X" : " ",
-		    (xid & CALLOUT_HRESTIME) ? "H" : " ",
 		    (xid & CALLOUT_LONGTERM) ? "L" : " ",
 		    (long long)coid, idhash);
 		return (DCMD_OK);
@@ -1436,6 +1502,7 @@ callout_help(void)
 	    " -s|l : limit display to (s)hort-term ids or (l)ong-term ids\n"
 	    " -x : limit display to callouts which are executing\n"
 	    " -h : limit display to callouts based on hrestime\n"
+	    " -B : limit display to callouts based on absolute time\n"
 	    " -t|a|b nsec: limit display to callouts that expire a(t) time,"
 	    " (a)fter time,\n     or (b)efore time. Use -a and -b together "
 	    " to specify a range.\n     For \"now\", use -d[t|a|b] 0.\n"
@@ -4190,7 +4257,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "as2proc", ":", "convert as to proc_t address", as2proc },
 	{ "binding_hash_entry", ":", "print driver names hash table entry",
 		binding_hash_entry },
-	{ "callout", "?[-r|n] [-s|l] [-xh] [-t | -ab nsec [-dkD]]"
+	{ "callout", "?[-r|n] [-s|l] [-xhB] [-t | -ab nsec [-dkD]]"
 	    " [-C addr | -S seqid] [-f name|addr] [-p name| addr] [-T|L [-E]]"
 	    " [-FivVA]",
 	    "display callouts", callout, callout_help },

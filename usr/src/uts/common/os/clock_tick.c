@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/thread.h>
 #include <sys/proc.h>
@@ -148,6 +146,7 @@ clock_t			clock_tick_proc_max;
 clock_tick_set_t	*clock_tick_set;
 int			clock_tick_nsets;
 int			clock_tick_scan;
+ulong_t			clock_tick_intr;
 
 static uint_t	clock_tick_execute(caddr_t, caddr_t);
 static void	clock_tick_execute_common(int, int, int, clock_t, int);
@@ -182,13 +181,16 @@ clock_tick_init_pre(void)
 	/*
 	 * Perform initialization in case multi-threading is chosen later.
 	 */
+	if (&create_softint != NULL) {
+		clock_tick_intr = create_softint(LOCK_LEVEL,
+		    clock_tick_execute, (caddr_t)NULL);
+	}
 	for (i = 0; i < NCPU; i++, buf += size) {
 		ctp = (clock_tick_cpu_t *)buf;
 		clock_tick_cpu[i] = ctp;
 		mutex_init(&ctp->ct_lock, NULL, MUTEX_DEFAULT, NULL);
 		if (&create_softint != NULL) {
-			ctp->ct_intr = create_softint(LOCK_LEVEL,
-			    clock_tick_execute, (caddr_t)ctp);
+			ctp->ct_intr = clock_tick_intr;
 		}
 		ctp->ct_pending = 0;
 	}
@@ -264,6 +266,9 @@ clock_tick_schedule_one(clock_tick_set_t *csp, int pending, processorid_t cid)
 	clock_tick_cpu_t	*ctp;
 
 	ASSERT(&invoke_softint != NULL);
+
+	atomic_inc_ulong(&clock_tick_active);
+
 	/*
 	 * Schedule tick accounting for a set of CPUs.
 	 */
@@ -569,11 +574,10 @@ clock_tick_execute(caddr_t arg1, caddr_t arg2)
 	 * later on.
 	 */
 	if (!CLOCK_TICK_XCALL_SAFE(CPU))
-		return (1);
+		goto out;
 
-	atomic_inc_ulong(&clock_tick_active);
+	ctp = clock_tick_cpu[CPU->cpu_id];
 
-	ctp = (clock_tick_cpu_t *)arg1;
 	mutex_enter(&ctp->ct_lock);
 	pending = ctp->ct_pending;
 	if (pending == 0) {

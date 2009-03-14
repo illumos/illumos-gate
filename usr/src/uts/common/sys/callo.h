@@ -61,6 +61,9 @@ typedef struct callout {
 	callout_list_t	*c_list;	/* callout list */
 	void		(*c_func)(void *); /* function to call */
 	void		*c_arg;		/* argument to function */
+	kthread_t	*c_executor;	/* executing thread */
+	kcondvar_t	c_done;		/* signal callout completion */
+	ushort_t	c_waiting;	/* untimeout waiting flag */
 } callout_t;
 
 /*
@@ -84,26 +87,16 @@ typedef struct callout {
  *
  * Here is the bit layout for the callout ID:
  *
- *      63    62    61  ...  32   31       30    29 .. X+1  X ... 1   0
- *  -----------------------------------------------------------------------
- *  | Exec | Hres | Generation | Long | Counter | ID bits | Table  | Type |
- *  |      | time | number     | term | High    |         | number |      |
- *  -----------------------------------------------------------------------
+ *      63   62  ...  32   31      30     29 .. X+1  X ... 1   0
+ *  ----------------------------------------------------------------
+ *  | Exec | Generation | Long | Counter | ID bits | Table  | Type |
+ *  |      | number     | term | High    |         | number |      |
+ *  ----------------------------------------------------------------
  *
  * Exec(uting):
  *    This is the executing bit which is only set in the extended callout
  *    ID. This bit indicates that the callout handler is currently being
  *    executed.
- *
- * Hrestime:
- *    Kernel features like condition variables use hrestime (system date) in
- *    conjunction with callouts. Under normal circumstances, these callouts
- *    are handled in the usual manner. They go off at specified times. But
- *    when the system time is changed abruptly (e.g., via stime()), these
- *    callouts are required to be processed immediately so that they can
- *    wakeup their threads immediately. The Hrestime bit is used to mark
- *    such callouts. When the system time is changed, the callout subsystem
- *    is called to process all callouts with this bit set.
  *
  * Generation number:
  *    This is the generation part of the ID.
@@ -143,8 +136,7 @@ typedef struct callout {
  *    and one normal callout table.
  */
 #define	CALLOUT_EXECUTING	0x8000000000000000ULL
-#define	CALLOUT_HRESTIME	0x4000000000000000ULL
-#define	CALLOUT_ID_MASK		~(CALLOUT_EXECUTING | CALLOUT_HRESTIME)
+#define	CALLOUT_ID_MASK		~(CALLOUT_EXECUTING)
 #define	CALLOUT_GENERATION_LOW	0x100000000ULL
 #define	CALLOUT_LONGTERM	0x80000000
 #define	CALLOUT_COUNTER_HIGH	0x40000000
@@ -226,10 +218,7 @@ struct callout_list {
 	callout_list_t	*cl_prev;	/* prev in clhash */
 	hrtime_t	cl_expiration;	/* expiration for callouts in list */
 	callout_hash_t	cl_callouts;	/* list of callouts */
-	kcondvar_t	cl_done;	/* signal callout completion */
-	ushort_t	cl_waiting;	/* count of waiting untimeouts */
-	kthread_id_t	cl_executor;	/* thread executing callout */
-	ulong_t		cl_pad;		/* cache alignment */
+	int		cl_flags;	/* callout flags */
 };
 
 /*
@@ -267,7 +256,7 @@ typedef enum callout_stat_type {
  * Callout flags:
  *
  * CALLOUT_FLAG_ROUNDUP
- *	Roundup the expiration time to the nearest resolution boundary.
+ *	Roundup the expiration time to the next resolution boundary.
  *	If this flag is not specified, the expiration time is rounded down.
  * CALLOUT_FLAG_ABSOLUTE
  *	Normally, the expiration passed to the timeout API functions is an
@@ -276,9 +265,9 @@ typedef enum callout_stat_type {
  * CALLOUT_FLAG_HRESTIME
  *	Normally, callouts are not affected by changes to system time
  *	(hrestime). This flag is used to create a callout that is affected
- *	by system time. If system time changes, these timers must expire
- *	at once. These are used by condition variables and LWP timers that
- *	need this behavior.
+ *	by system time. If system time changes, these timers must be
+ *	handled in a special way (see callout.c). These are used by condition
+ *	variables and LWP timers that need this behavior.
  * CALLOUT_FLAG_32BIT
  *	Legacy interfaces timeout() and realtime_timeout() pass this flag
  *	to timeout_generic() to indicate that a 32-bit ID should be allocated.
@@ -288,6 +277,7 @@ typedef enum callout_stat_type {
 #define	CALLOUT_FLAG_HRESTIME		0x4
 #define	CALLOUT_FLAG_32BIT		0x8
 
+#define	CALLOUT_LIST_FLAGS	(CALLOUT_FLAG_ABSOLUTE | CALLOUT_FLAG_HRESTIME)
 /*
  * On 32-bit systems, the legacy interfaces, timeout() and realtime_timeout(),
  * must pass CALLOUT_FLAG_32BIT to timeout_generic() so that a 32-bit ID

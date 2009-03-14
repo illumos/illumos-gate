@@ -52,6 +52,15 @@ static callout_cache_t *callout_caches;		/* linked list of caches */
 #pragma align 64(callout_table)
 static callout_table_t *callout_table;		/* global callout table array */
 
+/*
+ * We run normal callouts from PIL 10. This means that no other handler that
+ * runs at PIL 10 is allowed to wait for normal callouts directly or indirectly
+ * as it will cause a deadlock. This has always been an unwritten rule.
+ * We are making it explicit here.
+ */
+static int callout_realtime_level = CY_LOW_LEVEL;
+static int callout_normal_level = CY_LOCK_LEVEL;
+
 static char *callout_kstat_names[] = {
 	"callout_timeouts",
 	"callout_timeouts_pending",
@@ -144,6 +153,53 @@ static char *callout_kstat_names[] = {
 	CALLOUT_HASH_DELETE(hash, cl, cl_next, cl_prev)
 
 /*
+ * For normal callouts, there is a deadlock scenario if two callouts that
+ * have an inter-dependency end up on the same callout list. To break the
+ * deadlock, you need two taskq threads running in parallel. We compute
+ * the number of taskq threads here using a bunch of conditions to make
+ * it optimal for the common case. This is an ugly hack, but one that is
+ * necessary (sigh).
+ */
+#define	CALLOUT_THRESHOLD	100000000
+#define	CALLOUT_EXEC_COMPUTE(ct, exec)					\
+{									\
+	callout_list_t *cl;						\
+									\
+	cl = ct->ct_expired.ch_head;					\
+	if (cl == NULL) {						\
+		/*							\
+		 * If the expired list is NULL, there is nothing to	\
+		 * process.						\
+		 */							\
+		exec = 0;						\
+	} else if ((cl->cl_next == NULL) &&				\
+	    (cl->cl_callouts.ch_head == cl->cl_callouts.ch_tail)) {	\
+		/*							\
+		 * If there is only one callout list and it contains	\
+		 * only one callout, there is no need for two threads.	\
+		 */							\
+		exec = 1;						\
+	} else if ((ct->ct_heap_num == 0) ||				\
+	    (ct->ct_heap[0] > gethrtime() + CALLOUT_THRESHOLD)) {	\
+		/*							\
+		 * If the heap has become empty, we need two threads as	\
+		 * there is no one to kick off the second thread in the	\
+		 * future. If the heap is not empty and the top of the	\
+		 * heap does not expire in the near future, we need two	\
+		 * threads.						\
+		 */							\
+		exec = 2;						\
+	} else {							\
+		/*							\
+		 * We have multiple callouts to process. But the cyclic	\
+		 * will fire in the near future. So, we only need one	\
+		 * thread for now.					\
+		 */							\
+		exec = 1;						\
+	}								\
+}
+
+/*
  * Allocate a callout structure.  We try quite hard because we
  * can't sleep, and if we can't do the allocation, we're toast.
  * Failing all, we try a KM_PANIC allocation. Note that we never
@@ -164,6 +220,9 @@ callout_alloc(callout_table_t *ct)
 		cp = kmem_alloc_tryhard(size, &size, KM_NOSLEEP | KM_PANIC);
 	}
 	cp->c_xid = 0;
+	cp->c_executor = NULL;
+	cv_init(&cp->c_done, NULL, CV_DEFAULT, NULL);
+	cp->c_waiting = 0;
 
 	mutex_enter(&ct->ct_mutex);
 	ct->ct_allocations++;
@@ -198,18 +257,18 @@ callout_list_alloc(callout_table_t *ct)
 }
 
 /*
- * Find the callout list that corresponds to an expiration. There can
- * be only one.
+ * Find a callout list that corresponds to an expiration.
  */
 static callout_list_t *
-callout_list_get(callout_table_t *ct, hrtime_t expiration, int hash)
+callout_list_get(callout_table_t *ct, hrtime_t expiration, int flags, int hash)
 {
 	callout_list_t *cl;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
 	for (cl = ct->ct_clhash[hash].ch_head; (cl != NULL); cl = cl->cl_next) {
-		if (cl->cl_expiration == expiration)
+		if ((cl->cl_expiration == expiration) &&
+		    (cl->cl_flags == flags))
 			return (cl);
 	}
 
@@ -217,8 +276,8 @@ callout_list_get(callout_table_t *ct, hrtime_t expiration, int hash)
 }
 
 /*
- * Find the callout list that corresponds to an expiration. There can
- * be only one. If the callout list is null, free it. Else, return it.
+ * Find the callout list that corresponds to an expiration.
+ * If the callout list is null, free it. Else, return it.
  */
 static callout_list_t *
 callout_list_check(callout_table_t *ct, hrtime_t expiration, int hash)
@@ -227,24 +286,25 @@ callout_list_check(callout_table_t *ct, hrtime_t expiration, int hash)
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
-	cl = callout_list_get(ct, expiration, hash);
-	if (cl != NULL) {
-		if (cl->cl_callouts.ch_head != NULL) {
-			/*
-			 * There is exactly one callout list for every
-			 * unique expiration. So, we are done.
-			 */
-			return (cl);
-		}
+	for (cl = ct->ct_clhash[hash].ch_head; (cl != NULL); cl = cl->cl_next) {
+		if (cl->cl_expiration == expiration) {
+			if (cl->cl_callouts.ch_head != NULL) {
+				/*
+				 * Found a match.
+				 */
+				return (cl);
+			}
 
-		CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
-		cl->cl_next = ct->ct_lfree;
-		ct->ct_lfree = cl;
+			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
+			cl->cl_next = ct->ct_lfree;
+			ct->ct_lfree = cl;
+
+			return (NULL);
+		}
 	}
 
 	return (NULL);
 }
-
 /*
  * Initialize a callout table's heap, if necessary. Preallocate some free
  * entries so we don't have to check for NULL elsewhere.
@@ -354,7 +414,7 @@ callout_upheap(callout_table_t *ct)
 }
 
 /*
- * Insert a new, unique expiration into a callout table's heap.
+ * Insert a new expiration into a callout table's heap.
  */
 static void
 callout_heap_insert(callout_table_t *ct, hrtime_t expiration)
@@ -597,12 +657,10 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	 */
 	now = gethrtime();
 	if (flags & CALLOUT_FLAG_ABSOLUTE) {
-		ASSERT(expiration > 0);
 		interval = expiration - now;
 	} else {
 		interval = expiration;
 		expiration += now;
-		ASSERT(expiration > 0);
 	}
 	if (flags & CALLOUT_FLAG_ROUNDUP)
 		expiration += resolution - 1;
@@ -638,9 +696,8 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	}
 
 	cp->c_xid = id;
-	if (flags & CALLOUT_FLAG_HRESTIME)
-		cp->c_xid |= CALLOUT_HRESTIME;
 
+	flags &= CALLOUT_LIST_FLAGS;
 	hash = CALLOUT_CLHASH(expiration);
 
 again:
@@ -648,7 +705,7 @@ again:
 	 * Try to see if a callout list already exists for this expiration.
 	 * Most of the time, this will be the case.
 	 */
-	cl = callout_list_get(ct, expiration, hash);
+	cl = callout_list_get(ct, expiration, flags, hash);
 	if (cl == NULL) {
 		/*
 		 * Check if we have enough space in the heap to insert one
@@ -686,6 +743,7 @@ again:
 		}
 		ct->ct_lfree = cl->cl_next;
 		cl->cl_expiration = expiration;
+		cl->cl_flags = flags;
 
 		CALLOUT_LIST_INSERT(ct->ct_clhash[hash], cl);
 
@@ -803,7 +861,6 @@ untimeout_generic(callout_id_t id, int nowait)
 	callout_table_t *ct;
 	callout_t *cp;
 	callout_id_t xid;
-	callout_list_t *cl;
 	int hash;
 	callout_id_t bogus;
 
@@ -825,7 +882,6 @@ untimeout_generic(callout_id_t id, int nowait)
 		if ((xid & CALLOUT_ID_MASK) != id)
 			continue;
 
-		cl = cp->c_list;
 		if ((xid & CALLOUT_EXECUTING) == 0) {
 			hrtime_t expiration;
 
@@ -838,7 +894,7 @@ untimeout_generic(callout_id_t id, int nowait)
 			 * order to avoid lots of X-calls to the CPU associated
 			 * with the callout table.
 			 */
-			expiration = cl->cl_expiration;
+			expiration = cp->c_list->cl_expiration;
 			CALLOUT_DELETE(ct, cp);
 			cp->c_idnext = ct->ct_free;
 			ct->ct_free = cp;
@@ -857,12 +913,12 @@ untimeout_generic(callout_id_t id, int nowait)
 		/*
 		 * The callout we want to delete is currently executing.
 		 * The DDI states that we must wait until the callout
-		 * completes before returning, so we block on cl_done until the
+		 * completes before returning, so we block on c_done until the
 		 * callout ID changes (to the old ID if it's on the freelist,
 		 * or to a new callout ID if it's in use).  This implicitly
 		 * assumes that callout structures are persistent (they are).
 		 */
-		if (cl->cl_executor == curthread) {
+		if (cp->c_executor == curthread) {
 			/*
 			 * The timeout handler called untimeout() on itself.
 			 * Stupid, but legal.  We can't wait for the timeout
@@ -876,13 +932,13 @@ untimeout_generic(callout_id_t id, int nowait)
 		if (nowait == 0) {
 			/*
 			 * We need to wait. Indicate that we are waiting by
-			 * incrementing cl_waiting. This prevents the executor
-			 * from doing a wakeup on cl_done if there are no
+			 * incrementing c_waiting. This prevents the executor
+			 * from doing a wakeup on c_done if there are no
 			 * waiters.
 			 */
 			while (cp->c_xid == xid) {
-				cl->cl_waiting = 1;
-				cv_wait(&cl->cl_done, &ct->ct_mutex);
+				cp->c_waiting = 1;
+				cv_wait(&cp->c_done, &ct->ct_mutex);
 			}
 		}
 		mutex_exit(&ct->ct_mutex);
@@ -901,7 +957,7 @@ untimeout_generic(callout_id_t id, int nowait)
 	 * (1) the callout already fired, or (2) the caller passed us
 	 * a bogus value.  Perform a sanity check to detect case (2).
 	 */
-	bogus = (CALLOUT_EXECUTING | CALLOUT_HRESTIME | CALLOUT_COUNTER_HIGH);
+	bogus = (CALLOUT_EXECUTING | CALLOUT_COUNTER_HIGH);
 	if (((id & bogus) != CALLOUT_COUNTER_HIGH) && (id != 0))
 		panic("untimeout: impossible timeout id %llx",
 		    (unsigned long long)id);
@@ -955,19 +1011,28 @@ untimeout_default(callout_id_t id, int nowait)
 static void
 callout_list_expire(callout_table_t *ct, callout_list_t *cl)
 {
-	callout_t *cp;
+	callout_t *cp, *cnext;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 	ASSERT(cl != NULL);
 
-	cl->cl_executor = curthread;
+	for (cp = cl->cl_callouts.ch_head; cp != NULL; cp = cnext) {
+		/*
+		 * Multiple executor threads could be running at the same
+		 * time. If this callout is already being executed,
+		 * go on to the next one.
+		 */
+		if (cp->c_xid & CALLOUT_EXECUTING) {
+			cnext = cp->c_clnext;
+			continue;
+		}
 
-	while ((cp = cl->cl_callouts.ch_head) != NULL) {
 		/*
 		 * Indicate to untimeout() that a callout is
 		 * being expired by the executor.
 		 */
 		cp->c_xid |= CALLOUT_EXECUTING;
+		cp->c_executor = curthread;
 		mutex_exit(&ct->ct_mutex);
 
 		DTRACE_PROBE1(callout__start, callout_t *, cp);
@@ -979,9 +1044,11 @@ callout_list_expire(callout_table_t *ct, callout_list_t *cl)
 		ct->ct_expirations++;
 		ct->ct_timeouts_pending--;
 		/*
-		 * Indicate completion for cl_done.
+		 * Indicate completion for c_done.
 		 */
 		cp->c_xid &= ~CALLOUT_EXECUTING;
+		cp->c_executor = NULL;
+		cnext = cp->c_clnext;
 
 		/*
 		 * Delete callout from ID hash table and the callout
@@ -992,13 +1059,11 @@ callout_list_expire(callout_table_t *ct, callout_list_t *cl)
 		cp->c_idnext = ct->ct_free;
 		ct->ct_free = cp;
 
-		if (cl->cl_waiting) {
-			cl->cl_waiting = 0;
-			cv_broadcast(&cl->cl_done);
+		if (cp->c_waiting) {
+			cp->c_waiting = 0;
+			cv_broadcast(&cp->c_done);
 		}
 	}
-
-	cl->cl_executor = NULL;
 }
 
 /*
@@ -1013,28 +1078,19 @@ callout_expire(callout_table_t *ct)
 
 	for (cl = ct->ct_expired.ch_head; (cl != NULL); cl = clnext) {
 		/*
-		 * Multiple executor threads could be running at the same
-		 * time. Each callout list is processed by only one thread.
-		 * If this callout list is already being processed by another
-		 * executor, go on to the next one.
-		 */
-		if (cl->cl_executor != NULL) {
-			clnext = cl->cl_next;
-			continue;
-		}
-
-		/*
 		 * Expire all the callouts in this callout list.
 		 */
 		callout_list_expire(ct, cl);
 
-		/*
-		 * Free the callout list.
-		 */
 		clnext = cl->cl_next;
-		CALLOUT_LIST_DELETE(ct->ct_expired, cl);
-		cl->cl_next = ct->ct_lfree;
-		ct->ct_lfree = cl;
+		if (cl->cl_callouts.ch_head == NULL) {
+			/*
+			 * Free the callout list.
+			 */
+			CALLOUT_LIST_DELETE(ct->ct_expired, cl);
+			cl->cl_next = ct->ct_lfree;
+			ct->ct_lfree = cl;
+		}
 	}
 }
 
@@ -1082,14 +1138,14 @@ callout_execute(callout_table_t *ct)
 void
 callout_normal(callout_table_t *ct)
 {
-	int exec;
+	int i, exec;
 
 	mutex_enter(&ct->ct_mutex);
 	callout_heap_delete(ct);
-	exec = (ct->ct_expired.ch_head != NULL);
+	CALLOUT_EXEC_COMPUTE(ct, exec);
 	mutex_exit(&ct->ct_mutex);
 
-	if (exec) {
+	for (i = 0; i < exec; i++) {
 		ASSERT(ct->ct_taskq != NULL);
 		(void) taskq_dispatch(ct->ct_taskq,
 		    (task_func_t *)callout_execute, ct, TQ_NOSLEEP);
@@ -1271,16 +1327,15 @@ callout_debug_callb(void *arg, int code)
 }
 
 /*
- * Move the hrestime callouts to the expired list. Then program the table's
- * cyclic to expire immediately so that the callouts can be executed
+ * Move the absolute hrestime callouts to the expired list. Then program the
+ * table's cyclic to expire immediately so that the callouts can be executed
  * immediately.
  */
 static void
 callout_hrestime_one(callout_table_t *ct)
 {
-	callout_list_t *cl, *ecl;
-	callout_t *cp;
-	int hash;
+	callout_list_t *cl, *clnext;
+	int hash, flags;
 
 	mutex_enter(&ct->ct_mutex);
 	if (ct->ct_heap_num == 0) {
@@ -1288,34 +1343,20 @@ callout_hrestime_one(callout_table_t *ct)
 		return;
 	}
 
-	if (ct->ct_lfree == NULL)
-		callout_list_alloc(ct);
-	ecl = ct->ct_lfree;
-	ct->ct_lfree = ecl->cl_next;
-
+	flags = CALLOUT_LIST_FLAGS;
 	for (hash = 0; hash < CALLOUT_BUCKETS; hash++) {
-		for (cl = ct->ct_clhash[hash].ch_head; cl; cl = cl->cl_next) {
-			for (cp = cl->cl_callouts.ch_head; cp;
-			    cp = cp->c_clnext) {
-				if ((cp->c_xid & CALLOUT_HRESTIME) == 0)
-					continue;
-				CALLOUT_HASH_DELETE(cl->cl_callouts, cp,
-				    c_clnext, c_clprev);
-				cp->c_list = ecl;
-				CALLOUT_HASH_APPEND(ecl->cl_callouts, cp,
-				    c_clnext, c_clprev);
+		for (cl = ct->ct_clhash[hash].ch_head; cl; cl = clnext) {
+			clnext = cl->cl_next;
+			if (cl->cl_flags == flags) {
+				CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
+				CALLOUT_LIST_APPEND(ct->ct_expired, cl);
 			}
 		}
 	}
 
-	if (ecl->cl_callouts.ch_head != NULL) {
-		CALLOUT_LIST_APPEND(ct->ct_expired, ecl);
-		if (ct->ct_suspend == 0)
-			(void) cyclic_reprogram(ct->ct_cyclic, gethrtime());
-	} else {
-		ecl->cl_next = ct->ct_lfree;
-		ct->ct_lfree = ecl;
-	}
+	if ((ct->ct_expired.ch_head != NULL) && (ct->ct_suspend == 0))
+		(void) cyclic_reprogram(ct->ct_cyclic, gethrtime());
+
 	mutex_exit(&ct->ct_mutex);
 }
 
@@ -1439,11 +1480,21 @@ callout_cyclic_init(callout_table_t *ct)
 
 	/*
 	 * Create the callout table cyclics.
+	 *
+	 * The realtime cyclic handler executes at low PIL. The normal cyclic
+	 * handler executes at lock PIL. This is because there are cases
+	 * where code can block at PIL > 1 waiting for a normal callout handler
+	 * to unblock it directly or indirectly. If the normal cyclic were to
+	 * be executed at low PIL, it could get blocked out by the waiter
+	 * and cause a deadlock.
 	 */
 	ASSERT(ct->ct_cyclic == CYCLIC_NONE);
 
 	hdlr.cyh_func = (cyc_func_t)CALLOUT_CYCLIC_HANDLER(t);
-	hdlr.cyh_level = CY_LOW_LEVEL;
+	if (ct->ct_type == CALLOUT_REALTIME)
+		hdlr.cyh_level = callout_realtime_level;
+	else
+		hdlr.cyh_level = callout_normal_level;
 	hdlr.cyh_arg = ct;
 	when.cyt_when = CY_INFINITY;
 	when.cyt_interval = CY_INFINITY;

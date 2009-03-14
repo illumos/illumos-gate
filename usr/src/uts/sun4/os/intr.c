@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -839,7 +839,7 @@ create_softint(uint_t pil, uint_t (*func)(caddr_t, caddr_t), caddr_t arg1)
 {
 	uint64_t inum;
 
-	inum = add_softintr(pil, func, arg1, SOFTINT_ST);
+	inum = add_softintr(pil, func, arg1, SOFTINT_MT);
 	return ((ulong_t)inum);
 }
 
