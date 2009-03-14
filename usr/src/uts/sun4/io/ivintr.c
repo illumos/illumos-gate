@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interrupt Vector Table Configuration
@@ -58,6 +56,7 @@ static	kmutex_t intr_vec_pool_mutex;	/* Protect interrupt vector pool */
 
 /* Kmem cache handle for interrupt allocation */
 kmem_cache_t	*intr_vec_cache = NULL;	/* For HW and single target SW intrs */
+static	kmutex_t intr_vec_cache_mutex;	/* Protect intr_vec_cache usage */
 
 /*
  * init_ivintr() - Initialize an Interrupt Vector Table.
@@ -68,6 +67,7 @@ init_ivintr()
 	mutex_init(&intr_vec_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&softint_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&intr_vec_pool_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&intr_vec_cache_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	/*
 	 * Initialize the reserved interrupt vector data structure pools
@@ -89,12 +89,17 @@ init_ivintr()
 void
 fini_ivintr()
 {
-	if (intr_vec_cache)
+	mutex_enter(&intr_vec_cache_mutex);
+	if (intr_vec_cache) {
 		kmem_cache_destroy(intr_vec_cache);
+		intr_vec_cache = NULL;
+	}
+	mutex_exit(&intr_vec_cache_mutex);
 
 	mutex_destroy(&intr_vec_pool_mutex);
 	mutex_destroy(&softint_mutex);
 	mutex_destroy(&intr_vec_mutex);
+	mutex_destroy(&intr_vec_cache_mutex);
 }
 
 /*
@@ -142,9 +147,11 @@ iv_alloc(softint_type_t type)
 	 * interrupts. Create a kmem cache for the interrupt allocation,
 	 * if it is not already available.
 	 */
+	mutex_enter(&intr_vec_cache_mutex);
 	if (intr_vec_cache == NULL)
 		intr_vec_cache = kmem_cache_create("intr_vec_cache",
 		    sizeof (intr_vec_t), 64, NULL, NULL, NULL, NULL, NULL, 0);
+	mutex_exit(&intr_vec_cache_mutex);
 
 	iv_p = kmem_cache_alloc(intr_vec_cache, KM_SLEEP);
 	bzero(iv_p, sizeof (intr_vec_t));

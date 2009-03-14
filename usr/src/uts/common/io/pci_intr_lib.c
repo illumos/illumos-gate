@@ -56,7 +56,15 @@ pci_class_val_t pci_default_pil [] = {
 	{0x0c0100, 0xffff00, 0x4},	/* Serial Bus, ACCESS.bus */
 	{0x0c0200, 0xffff00, 0x4},	/* Serial Bus, SSA */
 	{0x0c0300, 0xffff00, 0x9},	/* Serial Bus Universal Serial Bus */
+/*
+ * XXX - This is a temporary workaround and it will be removed
+ *       after x86 interrupt scalability support.
+ */
+#if defined(__i386) || defined(__amd64)
+	{0x0c0400, 0xffff00, 0x5},	/* Serial Bus, Fibre Channel */
+#else
 	{0x0c0400, 0xffff00, 0x6},	/* Serial Bus, Fibre Channel */
+#endif
 	{0x0c0600, 0xffff00, 0x6}	/* Serial Bus, Infiniband */
 };
 
