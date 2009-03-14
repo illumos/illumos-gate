@@ -815,14 +815,25 @@ static void
 cpupm_event_notify_handler(ACPI_HANDLE obj, UINT32 val, void *ctx)
 {
 #ifndef __xpv
+
+	cpu_t *cp = ctx;
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+
+	if (mach_state == NULL)
+		return;
+
 	/*
 	 * Currently, we handle _TPC,_CST and _PPC change notifications.
 	 */
-	if (val == CPUPM_TPC_CHANGE_NOTIFICATION) {
+	if (val == CPUPM_TPC_CHANGE_NOTIFICATION &&
+	    mach_state->ms_caps & CPUPM_T_STATES) {
 		cpupm_throttle_manage_notification(ctx);
-	} else if (val == CPUPM_CST_CHANGE_NOTIFICATION) {
+	} else if (val == CPUPM_CST_CHANGE_NOTIFICATION &&
+	    mach_state->ms_caps & CPUPM_C_STATES) {
 		cpuidle_manage_cstates(ctx);
-	} else if (val == CPUPM_PPC_CHANGE_NOTIFICATION) {
+	} else if (val == CPUPM_PPC_CHANGE_NOTIFICATION &&
+	    mach_state->ms_caps & CPUPM_P_STATES) {
 		cpupm_power_manage_notifications(ctx);
 	}
 #endif

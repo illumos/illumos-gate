@@ -205,12 +205,28 @@ cpudrv_get_topspeed(void *ctx)
 static void
 cpudrv_notify_handler(ACPI_HANDLE obj, UINT32 val, void *ctx)
 {
-	extern pm_cpupm_t cpupm;
+	cpu_t			*cp;
+	cpupm_mach_state_t	*mach_state;
+	cpudrv_devstate_t	*cpudsp;
+	dev_info_t		*dip;
+	int			instance;
+	extern pm_cpupm_t	cpupm;
+
+	dip = ctx;
+	instance = ddi_get_instance(dip);
+	cpudsp = ddi_get_soft_state(cpudrv_state, instance);
+	if (cpudsp == NULL)
+		return;
+	cp = cpudsp->cp;
+	mach_state = (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	if (mach_state == NULL)
+		return;
 
 	/*
 	 * We only handle _PPC change notifications.
 	 */
-	if (val == CPUPM_PPC_CHANGE_NOTIFICATION && !PM_EVENT_CPUPM)
+	if (!PM_EVENT_CPUPM && val == CPUPM_PPC_CHANGE_NOTIFICATION &&
+	    mach_state->ms_caps & CPUPM_P_STATES)
 		cpudrv_redefine_topspeed(ctx);
 }
 
