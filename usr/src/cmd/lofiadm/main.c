@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/lofi.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -1539,7 +1540,8 @@ lofi_compress(int *lfd, const char *filename, int compress_index,
 		 * ensures that that segment is left uncompressed.
 		 */
 		len_compressed = real_segsize;
-		if (real_segsize > segsize - COMPRESS_THRESHOLD) {
+		if (segsize <= COMPRESS_THRESHOLD ||
+		    real_segsize > (segsize - COMPRESS_THRESHOLD)) {
 			(void) memcpy(compressed_seg + SEGHDR, uncompressed_seg,
 			    rbytes);
 			type = UNCOMPRESSED;
@@ -1861,7 +1863,7 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			segsize = convert_to_num(optarg);
-			if (segsize == 0 || segsize % DEV_BSIZE)
+			if (segsize < DEV_BSIZE || !ISP2(segsize))
 				die(gettext("segment size %s is invalid "
 				    "or not a multiple of minimum block "
 				    "size %ld\n"), optarg, DEV_BSIZE);
