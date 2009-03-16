@@ -15150,9 +15150,11 @@ update_ack:
 			if (!(sodp->sod_state & SOD_ENABLED) ||
 			    (tcp->tcp_kssl_ctx != NULL &&
 			    DB_TYPE(mp) == M_DATA)) {
+				mutex_exit(sodp->sod_lockp);
 				sodp = NULL;
+			} else {
+				mutex_exit(sodp->sod_lockp);
 			}
-			mutex_exit(sodp->sod_lockp);
 		}
 		if (mp->b_datap->db_type != M_DATA ||
 		    (flags & TH_MARKNEXT_NEEDED)) {
