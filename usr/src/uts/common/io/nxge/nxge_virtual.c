@@ -85,12 +85,6 @@ extern uint32_t nxge_rbr_spare_size;
 
 extern npi_status_t npi_mac_altaddr_disable(npi_handle_t, uint8_t, uint8_t);
 
-/*
- * XXX: Use temporarily to specify the number of packets each interrupt process
- * By default, the number of packet processed per interrupt is 1.
- */
-int	nxge_max_intr_pkts;
-
 static uint8_t p2_tx_fair[2] = {12, 12};
 static uint8_t p2_tx_equal[2] = {12, 12};
 static uint8_t p4_tx_fair[4] = {6, 6, 6, 6};
@@ -1628,14 +1622,6 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		    " common hardware not set", nxgep->niu_type));
 		return (NXGE_ERROR);
 	}
-
-	/*
-	 * XXX: read-in the config file to determine the number of packet
-	 * to process by each interrupt.
-	 */
-	nxge_max_intr_pkts = ddi_getprop(DDI_DEV_T_ANY, nxgep->dip,
-	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "max_intr_pkts", 1);
-
 
 	/*
 	 * Get info on how many ports Neptune card has.

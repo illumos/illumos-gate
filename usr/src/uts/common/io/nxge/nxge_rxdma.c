@@ -39,13 +39,6 @@
 	(rdc + nxgep->pt_config.hw_config.start_rdc)
 
 /*
- * XXX: This is a tunable to limit the number of packets each interrupt
- * handles.  0 (default) means that each interrupt takes as much packets
- * as it finds.
- */
-extern int	nxge_max_intr_pkts;
-
-/*
  * Globals: tunable parameters (/etc/system or adb)
  *
  */
@@ -2235,13 +2228,6 @@ nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
 		if ((bytes_to_pickup != -1) &&
 		    (totallen >= bytes_to_pickup)) {
 			break;
-		}
-
-		/* limit the number of packets for interrupt */
-		if (!(rcr_p->poll_flag)) {
-			if (npkt_read == nxge_max_intr_pkts) {
-				break;
-			}
 		}
 	}
 

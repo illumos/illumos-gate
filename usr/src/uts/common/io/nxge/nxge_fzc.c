@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -760,6 +761,7 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	npi_handle_t	handle;
 	npi_status_t	rs = NPI_SUCCESS;
 	nxge_status_t	status = NXGE_OK;
+	nxge_rdc_grp_t	*rdc_grp_p;
 	clock_t		lbolt;
 	int		table;
 
@@ -808,8 +810,10 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	hardware = &nxgep->pt_config.hw_config;
 	for (table = 0; table < NXGE_MAX_RDC_GRPS; table++) {
 		/* Does this table belong to <nxgep>? */
-		if (hardware->grpids[table] == (nxgep->function_num + 256))
-			status = nxge_init_fzc_rdc_tbl(nxgep, table);
+		if (hardware->grpids[table] == (nxgep->function_num + 256)) {
+			rdc_grp_p = &nxgep->pt_config.rdc_grps[table];
+			status = nxge_init_fzc_rdc_tbl(nxgep, rdc_grp_p, table);
+		}
 	}
 
 	/* Ethernet Timeout Counter (?) */
@@ -821,19 +825,16 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 }
 
 nxge_status_t
-nxge_init_fzc_rdc_tbl(p_nxge_t nxge, int rdc_tbl)
+nxge_init_fzc_rdc_tbl(p_nxge_t nxge, nxge_rdc_grp_t *group, int rdc_tbl)
 {
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	nx_rdc_tbl_t	*table;
-	nxge_rdc_grp_t	*group;
 	npi_handle_t	handle;
 
 	npi_status_t	rs = NPI_SUCCESS;
 	nxge_status_t	status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxge, DMA_CTL, "==> nxge_init_fzc_rdc_tbl(%d)", table));
-
-	group = &nxge->pt_config.rdc_grps[rdc_tbl];
 
 	/* This RDC table must have been previously bound to <nxge>. */
 	MUTEX_ENTER(&nhd->lock);

@@ -1248,6 +1248,7 @@ static int
 nxge_hio_group_start(mac_group_driver_t gdriver)
 {
 	nxge_ring_group_t	*group = (nxge_ring_group_t *)gdriver;
+	nxge_rdc_grp_t		*rdc_grp_p;
 	int			rdctbl;
 	int			dev_gindex;
 
@@ -1262,6 +1263,7 @@ nxge_hio_group_start(mac_group_driver_t gdriver)
 	mutex_enter(group->nxgep->genlock);
 	dev_gindex = group->nxgep->pt_config.hw_config.def_mac_rxdma_grpid +
 	    group->gindex;
+	rdc_grp_p = &group->nxgep->pt_config.rdc_grps[dev_gindex];
 
 	/*
 	 * Get an rdc table for this group.
@@ -1285,7 +1287,7 @@ nxge_hio_group_start(mac_group_driver_t gdriver)
 
 	group->rdctbl = rdctbl;
 
-	(void) nxge_init_fzc_rdc_tbl(group->nxgep, rdctbl);
+	(void) nxge_init_fzc_rdc_tbl(group->nxgep, rdc_grp_p, rdctbl);
 
 	group->started = B_TRUE;
 	mutex_exit(group->nxgep->genlock);
@@ -2216,17 +2218,9 @@ nxge_hio_rdc_share(
 	}
 
 	/*
-	 * We have to initialize the guest's RDC table, too.
-	 * -----------------------------------------------------
+	 * Update the RDC group.
 	 */
 	rdc_grp = &nxge->pt_config.rdc_grps[vr->rdc_tbl];
-	if (rdc_grp->max_rdcs == 0) {
-		rdc_grp->start_rdc = (uint8_t)channel;
-		rdc_grp->def_rdc = (uint8_t)channel;
-		rdc_grp->max_rdcs = 1;
-	} else {
-		rdc_grp->max_rdcs++;
-	}
 	NXGE_DC_SET(rdc_grp->map, channel);
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_rdc_share"));

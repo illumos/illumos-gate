@@ -5628,7 +5628,7 @@ nxge_group_add_ring(mac_group_driver_t gh, mac_ring_driver_t rh,
 		rdc_grp->map |= (1 << channel);
 		rdc_grp->max_rdcs++;
 
-		(void) nxge_init_fzc_rdc_tbl(nxge, rgroup->rdctbl);
+		(void) nxge_init_fzc_rdc_tbl(nxge, rdc_grp, rgroup->rdctbl);
 		break;
 	}
 }
@@ -5673,7 +5673,7 @@ nxge_group_rem_ring(mac_group_driver_t gh, mac_ring_driver_t rh,
 		rdc_grp->map &= ~(1 << channel);
 		rdc_grp->max_rdcs--;
 
-		(void) nxge_init_fzc_rdc_tbl(nxge, rgroup->rdctbl);
+		(void) nxge_init_fzc_rdc_tbl(nxge, rdc_grp, rgroup->rdctbl);
 		break;
 	}
 }

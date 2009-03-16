@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NXGE_NXGE_FZC_H
 #define	_SYS_NXGE_NXGE_FZC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,7 +56,7 @@ nxge_status_t nxge_init_fzc_rdc(p_nxge_t, uint16_t);
 nxge_status_t nxge_init_fzc_rx_common(p_nxge_t);
 nxge_status_t nxge_init_fzc_rxdma_port(p_nxge_t);
 
-nxge_status_t nxge_init_fzc_rdc_tbl(nxge_t *, int);
+nxge_status_t nxge_init_fzc_rdc_tbl(nxge_t *, nxge_rdc_grp_t *, int);
 
 int nxge_fzc_rdc_tbl_bind(nxge_t *, int, int);
 int nxge_fzc_rdc_tbl_unbind(p_nxge_t, int);
