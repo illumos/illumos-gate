@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -555,6 +555,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5906:
 	case MHCR_CHIP_ASIC_REV_5700:
 	case MHCR_CHIP_ASIC_REV_5701:
+	case MHCR_CHIP_ASIC_REV_5723:
 		/*
 		 * Just a plain reset; the "check" code breaks these chips
 		 */

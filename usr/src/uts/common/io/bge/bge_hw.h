@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +67,6 @@ extern "C" {
 #define	DEVICE_ID_5705M			0x165d
 #define	DEVICE_ID_5705MA3		0x165e
 #define	DEVICE_ID_5705F			0x166e
-#define	DEVICE_ID_5706			0x164a
 #define	DEVICE_ID_5780			0x166a
 #define	DEVICE_ID_5782			0x1696
 #define	DEVICE_ID_5787			0x169b
@@ -85,6 +84,7 @@ extern "C" {
 #define	DEVICE_ID_5756M			0x1674
 #define	DEVICE_ID_5721			0x1659
 #define	DEVICE_ID_5722			0x165a
+#define	DEVICE_ID_5723			0x165b
 #define	DEVICE_ID_5714C			0x1668
 #define	DEVICE_ID_5714S			0x1669
 #define	DEVICE_ID_5715C			0x1678
@@ -178,6 +178,9 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5752) ||\
 		(bgep->chipid.device == DEVICE_ID_5752M) ||\
 		(bgep->chipid.device == DEVICE_ID_5789))
+
+#define	DEVICE_5723_SERIES_CHIPSETS(bgep) \
+		(bgep->chipid.device == DEVICE_ID_5723)
 
 #define	DEVICE_5714_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5714C) ||\
@@ -284,6 +287,11 @@ extern "C" {
 #define	MHCR_CHIP_REV_5906_A1		0xc0010000
 #define	MHCR_CHIP_REV_5906_A2		0xc0020000
 
+#define	MHCR_CHIP_REV_5723_A0		0xf0000000
+#define	MHCR_CHIP_REV_5723_A1		0xf0010000
+#define	MHCR_CHIP_REV_5723_A2		0xf0020000
+#define	MHCR_CHIP_REV_5723_B0		0xf1000000
+
 #define	MHCR_CHIP_ASIC_REV(ChipRevId)	((ChipRevId) & 0xf0000000)
 #define	MHCR_CHIP_ASIC_REV_5700		(0x7 << 28)
 #define	MHCR_CHIP_ASIC_REV_5701		(0x0 << 28)
@@ -298,6 +306,7 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5755		((uint32_t)0xa << 28)
 #define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
 #define	MHCR_CHIP_ASIC_REV_5906		((uint32_t)0xc << 28)
+#define	MHCR_CHIP_ASIC_REV_5723		((uint32_t)0xf << 28)
 
 
 /*
@@ -430,11 +439,13 @@ extern "C" {
  * which are only applicable on BCM5751 and BCM5721.
  */
 #define	PCI_CONF_DEV_CTRL		0xd8
+#define	PCI_CONF_DEV_CTRL_5723		0xd4
 #define	READ_REQ_SIZE_MAX		0x5000
 #define	DEV_CTRL_NO_SNOOP		0x0800
 #define	DEV_CTRL_RELAXED		0x0010
 
 #define	PCI_CONF_DEV_STUS		0xda
+#define	PCI_CONF_DEV_STUS_5723		0xd6
 #define	DEVICE_ERROR_STUS		0xf
 
 #define	NIC_MEM_WINDOW_OFFSET		0x00008000	/* 32k	*/

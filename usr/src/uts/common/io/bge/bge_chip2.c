@@ -511,9 +511,14 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 */
 	bge_cfg_clr16(bgep, PCIX_CONF_COMM, PCIX_COMM_RELAXED);
 
-	if (cidp->pci_type == BGE_PCI_E)
-		bge_cfg_clr16(bgep, PCI_CONF_DEV_CTRL,
-		    DEV_CTRL_NO_SNOOP | DEV_CTRL_RELAXED);
+	if (cidp->pci_type == BGE_PCI_E) {
+		if (DEVICE_5723_SERIES_CHIPSETS(bgep)) {
+			bge_cfg_clr16(bgep, PCI_CONF_DEV_CTRL_5723,
+			    DEV_CTRL_NO_SNOOP | DEV_CTRL_RELAXED);
+		} else
+			bge_cfg_clr16(bgep, PCI_CONF_DEV_CTRL,
+			    DEV_CTRL_NO_SNOOP | DEV_CTRL_RELAXED);
+	}
 }
 
 #ifdef __amd64
@@ -606,10 +611,18 @@ bge_reg_get64(bge_t *bgep, bge_regno_t regno)
 	uint64_t regval;
 
 #ifdef	__amd64
-	if (bge_get_em64t_type()) {
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep) || bge_get_em64t_type()) {
 		regval = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno + 4));
 		regval <<= 32;
 		regval |= ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno));
+	} else {
+		regval = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, regno));
+	}
+#elif defined(__sparc)
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep)) {
+		regval = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno));
+		regval <<= 32;
+		regval |= ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno + 4));
 	} else {
 		regval = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, regno));
 	}
@@ -641,13 +654,23 @@ bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data)
 #endif	/* _LITTLE_ENDIAN */
 
 #ifdef	__amd64
-	if (bge_get_em64t_type()) {
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep) || bge_get_em64t_type()) {
 		ddi_put32(bgep->io_handle,
 		    PIO_ADDR(bgep, regno), (uint32_t)data);
 		BGE_PCICHK(bgep);
 		ddi_put32(bgep->io_handle,
 		    PIO_ADDR(bgep, regno + 4), (uint32_t)(data >> 32));
 
+	} else {
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, regno), data);
+	}
+#elif defined(__sparc)
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep)) {
+		ddi_put32(bgep->io_handle,
+		    PIO_ADDR(bgep, regno + 4), (uint32_t)data);
+		BGE_PCICHK(bgep);
+		ddi_put32(bgep->io_handle,
+		    PIO_ADDR(bgep, regno), (uint32_t)(data >> 32));
 	} else {
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, regno), data);
 	}
@@ -879,7 +902,16 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 	addr += NIC_MEM_WINDOW_OFFSET;
 
 #ifdef	__amd64
-		if (bge_get_em64t_type()) {
+		if (DEVICE_5723_SERIES_CHIPSETS(bgep) || bge_get_em64t_type()) {
+			data = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
+			data <<= 32;
+			data |= ddi_get32(bgep->io_handle,
+			    PIO_ADDR(bgep, addr + 4));
+		} else {
+			data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
+		}
+#elif defined(__sparc)
+		if (DEVICE_5723_SERIES_CHIPSETS(bgep)) {
 			data = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
 			data <<= 32;
 			data |= ddi_get32(bgep->io_handle,
@@ -911,12 +943,22 @@ bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data)
 	addr += NIC_MEM_WINDOW_OFFSET;
 
 #ifdef	__amd64
-	if (bge_get_em64t_type()) {
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep) || bge_get_em64t_type()) {
 		ddi_put32(bgep->io_handle,
 		    PIO_ADDR(bgep, addr), (uint32_t)data);
 		BGE_PCICHK(bgep);
 		ddi_put32(bgep->io_handle,
 		    PIO_ADDR(bgep, addr + 4), (uint32_t)(data >> 32));
+	} else {
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), data);
+	}
+#elif defined(__sparc)
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep)) {
+		ddi_put32(bgep->io_handle,
+		    PIO_ADDR(bgep, addr + 4), (uint32_t)data);
+		BGE_PCICHK(bgep);
+		ddi_put32(bgep->io_handle,
+		    PIO_ADDR(bgep, addr), (uint32_t)(data >> 32));
 	} else {
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), data);
 	}
@@ -951,7 +993,7 @@ bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 
 	p = (void *)rcbp;
 #ifdef	__amd64
-	if (bge_get_em64t_type()) {
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep) || bge_get_em64t_type()) {
 		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr),
 		    (uint32_t)(*p));
 		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 4),
@@ -964,6 +1006,20 @@ bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 	} else {
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), *p++);
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr+8), *p);
+	}
+#elif defined(__sparc)
+	if (DEVICE_5723_SERIES_CHIPSETS(bgep)) {
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 4),
+		    (uint32_t)(*p));
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr),
+		    (uint32_t)(*p >> 32));
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 12),
+		    (uint32_t)(*(p + 1)));
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 8),
+		    (uint32_t)(*p >> 32));
+	} else {
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), *p++);
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr + 8), *p);
 	}
 #else
 	ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), *p++);
@@ -1625,6 +1681,7 @@ bge_nvmem_rw32(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 
 		case BGE_FLASH_READ:
 			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5723_SERIES_CHIPSETS(bgep) ||
 			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 				bge_reg_set32(bgep, NVM_ACCESS_REG,
 				    NVM_ACCESS_ENABLE);
@@ -1632,6 +1689,7 @@ bge_nvmem_rw32(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 			err = bge_flash_access(bgep,
 			    NVM_FLASH_CMD_RD, addr, dp);
 			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5723_SERIES_CHIPSETS(bgep) ||
 			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 				bge_reg_clr32(bgep, NVM_ACCESS_REG,
 				    NVM_ACCESS_ENABLE);
@@ -1640,6 +1698,7 @@ bge_nvmem_rw32(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 
 		case BGE_FLASH_WRITE:
 			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5723_SERIES_CHIPSETS(bgep) ||
 			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 				bge_reg_set32(bgep, NVM_ACCESS_REG,
 				    NVM_WRITE_ENABLE|NVM_ACCESS_ENABLE);
@@ -1649,6 +1708,7 @@ bge_nvmem_rw32(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 			    NVM_FLASH_CMD_WR, addr, dp);
 			bge_nvmem_protect(bgep, B_TRUE);
 			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5723_SERIES_CHIPSETS(bgep) ||
 			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 				bge_reg_clr32(bgep, NVM_ACCESS_REG,
 				    NVM_WRITE_ENABLE|NVM_ACCESS_ENABLE);
@@ -1793,7 +1853,6 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705C:
 	case DEVICE_ID_5705_2:
-	case DEVICE_ID_5706:
 	case DEVICE_ID_5780:
 	case DEVICE_ID_5782:
 	case DEVICE_ID_5787:
@@ -1810,6 +1869,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5756M:
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5722:
+	case DEVICE_ID_5723:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
 	case DEVICE_ID_5715C:
@@ -2075,9 +2135,23 @@ bge_chip_id_init(bge_t *bgep)
 		dev_ok = B_TRUE;
 		break;
 
-	case DEVICE_ID_5706:
-		cidp->chip_label = 5706;
+	case DEVICE_ID_5723:
+		cidp->chip_label = 5723;
+		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->msi_enabled = bge_enable_msi;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
+		cidp->mbuf_base = bge_mbuf_pool_base_5705;
+		cidp->mbuf_length = bge_mbuf_pool_len_5705;
+		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->bge_mlcr_default |= MLCR_MISC_PINS_OUTPUT_ENABLE_1;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->statistic_type = BGE_STAT_REG;
+		dev_ok = B_TRUE;
 		break;
 
 	case DEVICE_ID_5780:
@@ -2491,6 +2565,7 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 		 */
 		if (DEVICE_5705_SERIES_CHIPSETS(bgep)||
 		    DEVICE_5721_SERIES_CHIPSETS(bgep)||
+		    DEVICE_5723_SERIES_CHIPSETS(bgep)||
 		    DEVICE_5714_SERIES_CHIPSETS(bgep)||
 		    DEVICE_5906_SERIES_CHIPSETS(bgep)) {
 			regval |= MISC_CONFIG_GPHY_POWERDOWN_OVERRIDE;
@@ -2561,6 +2636,13 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 				    PCI_CONF_DEV_CTRL, READ_REQ_SIZE_MAX);
 				pci_config_put16(bgep->cfg_handle,
 				    PCI_CONF_DEV_STUS, DEVICE_ERROR_STUS);
+			}
+
+			if (bgep->chipid.chip_label == 5723) {
+				pci_config_put16(bgep->cfg_handle,
+				    PCI_CONF_DEV_CTRL_5723, READ_REQ_SIZE_MAX);
+				pci_config_put16(bgep->cfg_handle,
+				    PCI_CONF_DEV_STUS_5723, DEVICE_ERROR_STUS);
 			}
 		}
 
