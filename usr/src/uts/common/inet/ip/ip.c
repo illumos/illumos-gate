@@ -15573,7 +15573,8 @@ ip_accept_tcp(ill_t *ill, ill_rx_ring_t *ip_ring, squeue_t *target_sqp,
 			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets,
 			    pkt_len);
 
-			ire = ip_fast_forward(ire, dst, ill, mp);
+			if (mp != NULL)
+				ire = ip_fast_forward(ire, dst, ill, mp);
 			continue;
 		}
 
@@ -15632,7 +15633,8 @@ local_accept:
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
 		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets, pkt_len);
 
-		if ((mp = ip_tcp_input(mp, ipha, ill, B_FALSE, ire, mp,
+		if (mp != NULL &&
+		    (mp = ip_tcp_input(mp, ipha, ill, B_FALSE, ire, mp,
 		    0, q, ip_ring)) != NULL) {
 			if ((curr_sqp = GET_SQUEUE(mp)) == target_sqp) {
 				ADD_TO_CHAIN(ahead, atail, acnt, mp);
