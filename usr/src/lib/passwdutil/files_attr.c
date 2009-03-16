@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -740,8 +738,9 @@ files_update(attrlist *items, pwu_repository_t *rep, void *buf)
 		case ATTR_LOCK_ACCOUNT:
 			if (spw->sp_pwdp == NULL) {
 				spw->sp_pwdp = LOCKSTRING;
-			} else if (strncmp(spw->sp_pwdp, LOCKSTRING,
-			    sizeof (LOCKSTRING)-1) != 0) {
+			} else if ((strncmp(spw->sp_pwdp, LOCKSTRING,
+			    sizeof (LOCKSTRING)-1) != 0) &&
+			    (strcmp(spw->sp_pwdp, NOLOGINSTRING) != 0)) {
 				len = sizeof (LOCKSTRING)-1 +
 				    strlen(spw->sp_pwdp) + 1;
 				pword = malloc(len);

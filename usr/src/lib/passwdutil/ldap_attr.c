@@ -699,8 +699,9 @@ ldap_update(attrlist *items, pwu_repository_t *rep, void *buf)
 				break;	/* not managing passwordAccount */
 			if (spw->sp_pwdp == NULL) {
 				spw->sp_pwdp = LOCKSTRING;
-			} else if (strncmp(spw->sp_pwdp, LOCKSTRING,
-			    sizeof (LOCKSTRING)-1) != 0) {
+			} else if ((strncmp(spw->sp_pwdp, LOCKSTRING,
+			    sizeof (LOCKSTRING)-1) != 0) &&
+			    (strcmp(spw->sp_pwdp, NOLOGINSTRING) != 0)) {
 				len = sizeof (LOCKSTRING)-1 +
 				    strlen(spw->sp_pwdp) + 1 +
 				    sizeof ("{crypt}");

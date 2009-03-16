@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -166,21 +164,20 @@ nisplus_handle(char *name, char *domain, int access_type)
 	nis_result *handle;
 
 	if ((strlen(name) + strlen(domain) + PASSTABLELEN + 9) >
-						(size_t)NIS_MAXNAMELEN)
+	    (size_t)NIS_MAXNAMELEN)
 		return (NULL);
 
 	(void) snprintf(buf, sizeof (buf), "[name=%s],%s.%s", name, PASSTABLE,
-		domain);
+	    domain);
 	if (buf[strlen(buf) - 1] != '.')
 		(void) strcat(buf, ".");
 
 	if (access_type == NISPLUS_LOOKUP)
 		handle = nis_list(buf,
-			USE_DGRAM+FOLLOW_LINKS+FOLLOW_PATH, NULL, NULL);
+		    USE_DGRAM+FOLLOW_LINKS+FOLLOW_PATH, NULL, NULL);
 	else
 		handle = nis_list(buf,
-			USE_DGRAM+FOLLOW_LINKS+FOLLOW_PATH+MASTER_ONLY,
-			NULL, NULL);
+		    USE_DGRAM+FOLLOW_LINKS+FOLLOW_PATH+MASTER_ONLY, NULL, NULL);
 
 	if (handle->status != NIS_SUCCESS)
 		return (NULL);
@@ -548,10 +545,11 @@ nisplus_update(attrlist *items, pwu_repository_t *rep, void *buf)
 				    EN_CRYPT|EN_MODIFIED;
 				statebuf->col_flags[COL_SHADOW] =
 				    EN_CRYPT|EN_MODIFIED;
-			} else if (strncmp(spw->sp_pwdp, LOCKSTRING,
-			    sizeof (LOCKSTRING)-1) != 0) {
+			} else if ((strncmp(spw->sp_pwdp, LOCKSTRING,
+			    sizeof (LOCKSTRING)-1) != 0) &&
+			    (strcmp(spw->sp_pwdp, NOLOGINSTRING) != 0)) {
 				len = sizeof (LOCKSTRING)-1 +
-					strlen(spw->sp_pwdp) + 1;
+				    strlen(spw->sp_pwdp) + 1;
 				pword = malloc(len);
 				if (pword == NULL) {
 					return (PWU_NOMEM);
@@ -564,9 +562,9 @@ nisplus_update(attrlist *items, pwu_repository_t *rep, void *buf)
 				statebuf->proto |= PWU_OLD_PROTO;
 				statebuf->hash_pword = 0;
 				statebuf->col_flags[COL_PASSWD] =
-					EN_CRYPT|EN_MODIFIED;
+				    EN_CRYPT|EN_MODIFIED;
 				statebuf->col_flags[COL_SHADOW] =
-					EN_CRYPT|EN_MODIFIED;
+				    EN_CRYPT|EN_MODIFIED;
 			}
 			break;
 
@@ -575,7 +573,7 @@ nisplus_update(attrlist *items, pwu_repository_t *rep, void *buf)
 			    strncmp(spw->sp_pwdp, LOCKSTRING,
 			    sizeof (LOCKSTRING)-1) == 0) {
 				(void) strcpy(spw->sp_pwdp,
-					spw->sp_pwdp + sizeof (LOCKSTRING)-1);
+				    spw->sp_pwdp + sizeof (LOCKSTRING)-1);
 				spw->sp_lstchg = DAY_NOW_32;
 				statebuf->proto |= PWU_OLD_PROTO;
 				statebuf->hash_pword = 0;
@@ -909,8 +907,7 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 	statebuf = (struct statebuf *)buf;
 
 	if (npd_makeclnthandle(statebuf->domain, &clnt, &srv_pubkey,
-				&srv_keylen, &srv_keyalgtype,
-				&key_type) == FALSE) {
+	    &srv_keylen, &srv_keyalgtype, &key_type) == FALSE) {
 		syslog(LOG_ERR,
 		    "Couldn't make a client handle to NIS+ password daemon");
 		retval = PWU_RECOVERY_ERR;
@@ -945,8 +942,8 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 	    AUTH_DES_KEY(srv_keylen, srv_keyalgtype) ? 1 : 3) == 0) {
 		syslog(LOG_ERR, "Couldn't get a common DES key "
 		    "(keylen = %d, algtype = %d)", srv_keylen, srv_keyalgtype);
-		    retval = PWU_RECOVERY_ERR;
-		    goto out;
+		retval = PWU_RECOVERY_ERR;
+		goto out;
 	}
 
 	/*
@@ -954,8 +951,8 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 	 * password as part of the authentication.
 	 */
 	npd_res = nispasswd_auth(name, statebuf->domain, oldpw, u_pubkey,
-				key_type, srv_keylen, srv_keyalgtype, deskeys,
-				clnt, &ident, &randval, &error);
+	    key_type, srv_keylen, srv_keyalgtype, deskeys, clnt, &ident,
+	    &randval, &error);
 
 	if (npd_res == NPD_FAILED) {
 		if (error >= 0 &&
@@ -976,7 +973,7 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 			 */
 			statebuf->col_flags[COL_SHADOW] = EN_CRYPT|EN_MODIFIED;
 			retval = nisplus_old_proto(name, oldpw, oldrpcpw,
-							rep, buf);
+			    rep, buf);
 		}
 		goto out;
 	} else if (npd_res == NPD_TRYAGAIN) {
@@ -1006,8 +1003,7 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 		shell = NULL;
 
 	npd_res = nispasswd_pass(clnt, ident, randval, &deskeys[0],
-				newpass, gecos, shell,
-				&error, &errlist);
+	    newpass, gecos, shell, &error, &errlist);
 
 	if (npd_res == NPD_FAILED) {
 		retval = PWU_RECOVERY_ERR;
@@ -1018,8 +1014,8 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 			 * failed to update the credentials (SECRETKEY).
 			 * We therefore try to update the credentials directly.
 			 */
-			retval = nisplus_update_cred(name, oldrpcpw ? oldrpcpw
-							: oldpw, rep, buf);
+			retval = nisplus_update_cred(name,
+			    oldrpcpw ? oldrpcpw : oldpw, rep, buf);
 		} else {
 			/* We don't update creds for gecos/shell updates */
 			retval = PWU_SUCCESS;
@@ -1123,15 +1119,15 @@ nisplus_old_proto(char *name, char *oldpw, char *oldrpcpw,
 	if (col_flags[COL_SHADOW]) {
 		if (spw->sp_expire != -1) {
 			(void) snprintf(shadow, sizeof (shadow),
-				"%d:%d:%d:%d:%d::%u",
-				spw->sp_lstchg, spw->sp_min, spw->sp_max,
-				spw->sp_warn, spw->sp_inact, spw->sp_flag);
+			    "%d:%d:%d:%d:%d::%u",
+			    spw->sp_lstchg, spw->sp_min, spw->sp_max,
+			    spw->sp_warn, spw->sp_inact, spw->sp_flag);
 		} else {
 			(void) snprintf(shadow, sizeof (shadow),
-				"%d:%d:%d:%d:%d:%d:%u",
-				spw->sp_lstchg, spw->sp_min, spw->sp_max,
-				spw->sp_warn, spw->sp_inact, spw->sp_expire,
-				spw->sp_flag);
+			    "%d:%d:%d:%d:%d:%d:%u",
+			    spw->sp_lstchg, spw->sp_min, spw->sp_max,
+			    spw->sp_warn, spw->sp_inact, spw->sp_expire,
+			    spw->sp_flag);
 		}
 		ecol[COL_SHADOW].EC_VAL = shadow;
 		ecol[COL_SHADOW].EC_LEN = strlen(shadow) + 1;
@@ -1229,7 +1225,7 @@ nisplus_putpwnam(char *name, char *oldpw, char *oldrpcpw,
 
 	if (statebuf->proto & PWU_OLD_PROTO) {
 		result = nisplus_old_proto(name, short_pwptr,
-			short_rpcpwptr, rep, buf);
+		    short_rpcpwptr, rep, buf);
 	}
 
 	if (result == PWU_SUCCESS && (statebuf->proto & PWU_NEW_PROTO)) {
@@ -1238,7 +1234,7 @@ nisplus_putpwnam(char *name, char *oldpw, char *oldrpcpw,
 			(void) seteuid(getuid());
 
 		result = nisplus_new_proto(name, short_pwptr,
-			short_rpcpwptr, rep, buf);
+		    short_rpcpwptr, rep, buf);
 
 		(void) seteuid(cur_euid);
 	}
@@ -1276,18 +1272,18 @@ extract_sec_keyinfo(
 	}
 
 	if (!__nis_authtype2mechalias(*authtype, mechalias,
-					sizeof (mechalias))) {
+	    sizeof (mechalias))) {
 		syslog(LOG_ERR,
-			"can't convert authtype '%s' to mechanism alias",
-			*authtype);
+		    "can't convert authtype '%s' to mechanism alias",
+		    *authtype);
 		return (0);
 	}
 
 	/* Make sure the mech is in the NIS+ security cf. */
 	if (__nis_translate_mechanism(mechalias, keylen, algtype) < 0) {
 		syslog(LOG_WARNING,
-		"can't convert mechanism alias '%s' to keylen and algtype",
-			mechalias);
+		    "can't convert mechanism alias '%s' to keylen and algtype",
+		    mechalias);
 		return (0);
 	}
 
@@ -1310,8 +1306,8 @@ nisplus_get_cred(uid_t uid, char *domain, nis_result **cred_res)
 	*cred_res = NULL;
 
 	namelen = snprintf(buf, sizeof (buf),
-			"[auth_name=%d,auth_type=LOCAL],%s.%s",
-			(int)uid, PKTABLE, domain);
+	    "[auth_name=%d,auth_type=LOCAL],%s.%s",
+	    (int)uid, PKTABLE, domain);
 	if (namelen >= sizeof (buf)) {
 		syslog(LOG_ERR, "nisplus_get_cred: name too long");
 		return (PWU_SYSTEM_ERROR);
@@ -1320,7 +1316,7 @@ nisplus_get_cred(uid_t uid, char *domain, nis_result **cred_res)
 		(void) strcat(buf, ".");
 
 	local_res = nis_list(buf, USE_DGRAM + FOLLOW_LINKS + FOLLOW_PATH +
-			MASTER_ONLY, NULL, NULL);
+	    MASTER_ONLY, NULL, NULL);
 
 	if (local_res == NULL || local_res->status != NIS_SUCCESS) {
 		if (local_res)
@@ -1337,8 +1333,8 @@ nisplus_get_cred(uid_t uid, char *domain, nis_result **cred_res)
 	cred_domain = nis_domain_of(local_cname);
 
 	namelen = snprintf(buf, sizeof (buf),
-			"[cname=%s],%s.%s",	/* get all entries for user */
-			local_cname, PKTABLE, cred_domain);
+	    "[cname=%s],%s.%s",		/* get all entries for user */
+	    local_cname, PKTABLE, cred_domain);
 
 	if (namelen >= sizeof (buf)) {
 		syslog(LOG_ERR, "nisplus_get_cred: cname too long");
@@ -1350,7 +1346,7 @@ nisplus_get_cred(uid_t uid, char *domain, nis_result **cred_res)
 	nis_freeresult(local_res);
 
 	*cred_res = nis_list(buf, USE_DGRAM + FOLLOW_LINKS + FOLLOW_PATH +
-			MASTER_ONLY, NULL, NULL);
+	    MASTER_ONLY, NULL, NULL);
 
 	return (PWU_SUCCESS);
 }
@@ -1426,7 +1422,7 @@ nisplus_verify_rpc_passwd(char *name, char *oldpw, pwu_repository_t *rep)
 
 		if (!nisplus_getnetnamebyuid(netname, pw->pw_uid)) {
 			syslog(LOG_ERR, "nisplus_verify_rpc_passwd: "
-				"Can't get netname");
+			    "Can't get netname");
 			continue;
 		}
 		if ((tmpkey = strdup(key)) == NULL)
@@ -1457,14 +1453,14 @@ reencrypt_secret(char *oldsec, char *oldpass, char *newpass,
 
 	if (!xdecrypt_g(oldsec, keylen, algtype, oldpass, netname, TRUE)) {
 		syslog(LOG_INFO, "secret key decrypt failed for %s/%d-%d",
-			netname, keylen, algtype);
+		    netname, keylen, algtype);
 		return (NULL);
 	}
 
 	if (!xencrypt_g(oldsec, keylen, algtype, newpass, netname,
 	    &newsec, TRUE)) {
 		syslog(LOG_ERR, "secret key encrypt failed for user %s/%d-%d",
-			netname, keylen, algtype);
+		    netname, keylen, algtype);
 		return (NULL);
 	}
 
