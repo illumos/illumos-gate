@@ -75,6 +75,10 @@ typedef struct smbd {
 	int		s_door_srv;
 	int		s_door_opipe;
 	int		s_secmode;	/* Current security mode */
+	boolean_t	s_nbt_listener_running;
+	boolean_t	s_tcp_listener_running;
+	pthread_t	s_nbt_listener_id;
+	pthread_t	s_tcp_listener_id;
 } smbd_t;
 
 #ifdef __cplusplus

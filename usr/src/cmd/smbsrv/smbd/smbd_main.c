@@ -90,8 +90,9 @@ static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
 static void smbd_refresh_dc(void);
 
-static pthread_t nbt_listener;
-static pthread_t tcp_listener;
+static int smbd_start_listeners(void);
+static void smbd_stop_listeners(void);
+
 static pthread_t refresh_thr;
 static pthread_cond_t refresh_cond;
 static pthread_mutex_t refresh_mutex;
@@ -662,10 +663,7 @@ smbd_already_running(void)
 static int
 smbd_kernel_bind(void)
 {
-	pthread_attr_t	tattr;
 	smb_io_t	smb_io;
-	int		rc1;
-	int		rc2;
 	int		rc;
 
 	bzero(&smb_io, sizeof (smb_io));
@@ -699,28 +697,12 @@ smbd_kernel_bind(void)
 		return (errno);
 	}
 
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-
-	rc1 = pthread_create(&nbt_listener, &tattr, smbd_nbt_listener, NULL);
-	if (rc1 != 0)
-		smbd_report("unable to start NBT service");
-
-	rc2 = pthread_create(&tcp_listener, &tattr, smbd_tcp_listener, NULL);
-	if (rc2 != 0)
-		smbd_report("unable to start TCP service");
-
-	(void) pthread_attr_destroy(&tattr);
-
-	rc = rc1;
-	if (rc == 0)
-		rc = rc2;
-
+	rc = smbd_start_listeners();
 	if (rc == 0) {
 		smbd.s_kbound = B_TRUE;
 		return (0);
 	}
-
+	smbd_stop_listeners();
 	(void) close(smbd.s_drv_fd);
 	smbd.s_drv_fd = -1;
 	return (rc);
@@ -733,6 +715,7 @@ static void
 smbd_kernel_unbind(void)
 {
 	if (smbd.s_drv_fd != -1) {
+		smbd_stop_listeners();
 		(void) close(smbd.s_drv_fd);
 		smbd.s_drv_fd = -1;
 		smbd.s_kbound = B_FALSE;
@@ -920,6 +903,58 @@ smbd_report(const char *fmt, ...)
 	va_end(ap);
 
 	(void) fprintf(stderr, "smbd: %s\n", buf);
+}
+
+static int
+smbd_start_listeners(void)
+{
+	int		rc1;
+	int		rc2;
+	pthread_attr_t	tattr;
+
+	(void) pthread_attr_init(&tattr);
+
+	if (!smbd.s_nbt_listener_running) {
+		rc1 = pthread_create(&smbd.s_nbt_listener_id, &tattr,
+		    smbd_nbt_listener, NULL);
+		if (rc1 != 0)
+			smbd_report("unable to start NBT service");
+		else
+			smbd.s_nbt_listener_running = B_TRUE;
+	}
+
+	if (!smbd.s_tcp_listener_running) {
+		rc2 = pthread_create(&smbd.s_tcp_listener_id, &tattr,
+		    smbd_tcp_listener, NULL);
+		if (rc2 != 0)
+			smbd_report("unable to start TCP service");
+		else
+			smbd.s_tcp_listener_running = B_TRUE;
+	}
+
+	(void) pthread_attr_destroy(&tattr);
+
+	if (rc1 != 0)
+		return (rc1);
+	return (rc2);
+}
+
+static void
+smbd_stop_listeners(void)
+{
+	void	*status;
+
+	if (smbd.s_nbt_listener_running) {
+		(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
+		(void) pthread_join(smbd.s_nbt_listener_id, &status);
+		smbd.s_nbt_listener_running = B_FALSE;
+	}
+
+	if (smbd.s_tcp_listener_running) {
+		(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
+		(void) pthread_join(smbd.s_tcp_listener_id, &status);
+		smbd.s_tcp_listener_running = B_FALSE;
+	}
 }
 
 /*
