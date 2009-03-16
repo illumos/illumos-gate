@@ -532,11 +532,7 @@ proto_unbind_req(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Unbind the channel to stop packets being received.
 	 */
-	if (dls_unbind(dsp) != 0) {
-		dl_err = DL_OUTSTATE;
-		mac_perim_exit(mph);
-		goto failed;
-	}
+	dls_unbind(dsp);
 
 	/*
 	 * Disable polling mode, if it is enabled.

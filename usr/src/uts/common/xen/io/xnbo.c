@@ -387,7 +387,7 @@ xnbo_close_mac(xnbo_t *xnbop)
 
 	if (xnbop->o_promiscuous) {
 		if (xnbop->o_mphp != NULL) {
-			(void) mac_promisc_remove(xnbop->o_mphp);
+			mac_promisc_remove(xnbop->o_mphp);
 			xnbop->o_mphp = NULL;
 		}
 		xnbop->o_promiscuous = B_FALSE;

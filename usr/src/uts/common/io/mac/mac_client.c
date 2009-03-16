@@ -2351,14 +2351,13 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 /*
  * Remove a multicast address previously aded through mac_promisc_add().
  */
-int
+void
 mac_promisc_remove(mac_promisc_handle_t mph)
 {
 	mac_promisc_impl_t *mpip = (mac_promisc_impl_t *)mph;
 	mac_client_impl_t *mcip = mpip->mpi_mcip;
 	mac_impl_t *mip = mcip->mci_mip;
 	mac_cb_info_t *mcbi;
-	int rc = 0;
 
 	i_mac_perim_enter(mip);
 
@@ -2368,10 +2367,8 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 	 * to close the mac end point and we can't have stale callbacks.
 	 */
 	if (!(mpip->mpi_no_phys)) {
-		rc = mac_promisc_set((mac_handle_t)mip, B_FALSE,
+		(void) mac_promisc_set((mac_handle_t)mip, B_FALSE,
 		    MAC_DEVPROMISC);
-		if (rc != 0)
-			goto done;
 	}
 	mcbi = &mip->mi_promisc_cb_info;
 	mutex_enter(mcbi->mcbi_lockp);
@@ -2386,9 +2383,7 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 	mutex_exit(mcbi->mcbi_lockp);
 	mac_stop((mac_handle_t)mip);
 
-done:
 	i_mac_perim_exit(mip);
-	return (rc);
 }
 
 /*

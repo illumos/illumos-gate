@@ -536,9 +536,7 @@ aggr_port_promisc(aggr_port_t *port, boolean_t on)
 			return (rc);
 		}
 	} else {
-		rc = mac_promisc_remove(port->lp_mphp);
-		if (rc != 0)
-			return (rc);
+		mac_promisc_remove(port->lp_mphp);
 		port->lp_mphp = NULL;
 		mac_rx_set(port->lp_mch, aggr_recv_cb, port);
 	}

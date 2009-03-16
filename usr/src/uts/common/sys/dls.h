@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@ typedef struct dls_link_s	dls_link_t;
 extern int	dls_open(dls_link_t *, dls_dl_handle_t, dld_str_t *);
 extern void	dls_close(dld_str_t *);
 extern int	dls_bind(dld_str_t *, uint32_t);
-extern int	dls_unbind(dld_str_t *);
+extern void	dls_unbind(dld_str_t *);
 
 extern int	dls_promisc(dld_str_t *, uint32_t);
 

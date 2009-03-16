@@ -127,7 +127,7 @@ extern uint64_t mac_client_stat_get(mac_client_handle_t, uint_t);
 
 extern int mac_promisc_add(mac_client_handle_t, mac_client_promisc_type_t,
     mac_rx_t, void *, mac_promisc_handle_t *, uint16_t);
-extern int mac_promisc_remove(mac_promisc_handle_t);
+extern void mac_promisc_remove(mac_promisc_handle_t);
 
 extern mac_notify_handle_t mac_notify_add(mac_handle_t, mac_notify_t, void *);
 extern int mac_notify_remove(mac_notify_handle_t, boolean_t);

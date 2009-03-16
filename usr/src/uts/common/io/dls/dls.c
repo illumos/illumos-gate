@@ -102,7 +102,7 @@ dls_close(dld_str_t *dsp)
 	 * If the dld_str_t is bound then unbind it.
 	 */
 	if (dsp->ds_dlstate == DL_IDLE) {
-		(void) dls_unbind(dsp);
+		dls_unbind(dsp);
 		dsp->ds_dlstate = DL_UNBOUND;
 	}
 
@@ -189,7 +189,7 @@ dls_bind(dld_str_t *dsp, uint32_t sap)
 	return (0);
 }
 
-int
+void
 dls_unbind(dld_str_t *dsp)
 {
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
@@ -200,12 +200,9 @@ dls_unbind(dld_str_t *dsp)
 	 * See comments in dls_bind().
 	 */
 	if (dsp->ds_vlan_mph != NULL) {
-		int err;
-
-		err = mac_promisc_remove(dsp->ds_vlan_mph);
-		ASSERT(err == 0);
+		mac_promisc_remove(dsp->ds_vlan_mph);
 		dsp->ds_vlan_mph = NULL;
-		return (err);
+		return;
 	}
 
 	/*
@@ -214,7 +211,6 @@ dls_unbind(dld_str_t *dsp)
 	 */
 	dls_link_remove(dsp->ds_dlp, dsp);
 	dsp->ds_sap = 0;
-	return (0);
 }
 
 int
@@ -240,21 +236,14 @@ dls_promisc(dld_str_t *dsp, uint32_t old_flags)
 
 		/* Remove vlan promisc handle to avoid sending dup copy up */
 		if (dsp->ds_vlan_mph != NULL) {
-			err = mac_promisc_remove(dsp->ds_vlan_mph);
+			mac_promisc_remove(dsp->ds_vlan_mph);
 			dsp->ds_vlan_mph = NULL;
 		}
 	} else if (old_flags != 0 && dsp->ds_promisc == 0) {
 		ASSERT(dsp->ds_mph != NULL);
-		err = mac_promisc_remove(dsp->ds_mph);
-		/*
-		 * The failure only relates to resetting the device promiscuity
-		 * The mac layer does not fail in freeing up the promiscuous
-		 * data structures, and so we clear the ds_mph. The dld stream
-		 * may be closing and we can't fail that.
-		 */
+
+		mac_promisc_remove(dsp->ds_mph);
 		dsp->ds_mph = NULL;
-		if (err != 0)
-			return (err);
 
 		if (dsp->ds_sap == ETHERTYPE_VLAN &&
 		    dsp->ds_dlstate != DL_UNBOUND) {
@@ -275,9 +264,7 @@ dls_promisc(dld_str_t *dsp, uint32_t old_flags)
 		 * physical promiscuous mode.
 		 */
 		ASSERT(dsp->ds_mph != NULL);
-		err = mac_promisc_remove(dsp->ds_mph);
-		if (err != 0)
-			return (err);
+		mac_promisc_remove(dsp->ds_mph);
 		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
 		    dls_rx_promisc, dsp, &dsp->ds_mph, 0);
 	}

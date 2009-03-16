@@ -1200,8 +1200,12 @@ mac_promisc_set(mac_handle_t mh, boolean_t on, mac_promisc_type_t ptype)
 
 	i_mac_perim_enter(mip);
 	rv = i_mac_promisc_set(mip, on, ptype);
+	if (rv != 0 && !on) {
+		cmn_err(CE_WARN, "%s: failed to switch OFF promiscuous mode "
+		    "because of error 0x%x", mip->mi_name, rv);
+		rv = 0;
+	}
 	i_mac_perim_exit(mip);
-
 	return (rv);
 }
 
