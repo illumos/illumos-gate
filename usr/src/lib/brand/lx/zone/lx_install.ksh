@@ -28,7 +28,6 @@
 PATH=/bin:/usr/bin:/usr/sbin:/usr/sfw/bin
 
 export PATH
-umask 022
 
 # Setup i18n output
 TEXTDOMAIN="SUNW_OST_OSCMD"

@@ -5561,6 +5561,11 @@ main(int argc, char **argv)
 		zerror(gettext("could not change directory to /."));
 		exit(Z_ERR);
 	}
+	/*
+	 * Use the default system mask rather than anything that may have been
+	 * set by the caller.
+	 */
+	(void) umask(CMASK);
 
 	if (init_zfs() != Z_OK)
 		exit(Z_ERR);
