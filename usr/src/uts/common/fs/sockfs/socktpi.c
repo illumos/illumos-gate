@@ -3712,11 +3712,7 @@ retry:
 out:
 	mutex_enter(&so->so_lock);
 out_locked:
-	if (so->so_direct != NULL) {
-		mutex_enter(so->so_direct->sod_lockp);
-		reterr = sod_rcv_done(so, suiop, uiop);
-		mutex_exit(so->so_direct->sod_lockp);
-	}
+	reterr = sod_rcv_done(so, suiop, uiop);
 	if (reterr != 0 && error == 0)
 		error = reterr;
 	so_unlock_read(so);	/* Clear SOREADLOCKED */
