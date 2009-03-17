@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,9 @@ extern "C" {
  * Boot property names
  */
 #define	BP_CPU_APICID_ARRAY	"cpu_apicid_array"
+#define	BP_LGRP_SLIT_ENABLE	"lgrp_slit_enable"
+#define	BP_LGRP_SRAT_ENABLE	"lgrp_srat_enable"
+#define	BP_LGRP_TOPO_LEVELS	"lgrp_topo_levels"
 
 /*
  * masks to hand to bsys_alloc memory allocator
@@ -246,6 +249,8 @@ extern void bop_panic(const char *, ...)
 #pragma rarely_called(bop_panic)
 
 extern void boot_prop_finish(void);
+
+extern int bootprop_getval(const char *, u_longlong_t *);
 
 /*
  * Back door to fakebop.c to get physical memory allocated.

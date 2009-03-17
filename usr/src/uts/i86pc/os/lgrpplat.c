@@ -20,12 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * LOCALITY GROUP (LGROUP) PLATFORM SUPPORT FOR X86/AMD64 PLATFORMS
@@ -683,7 +680,26 @@ lgrp_plat_init(void)
 	 */
 	lgrp_plat_node_cnt = max_mem_nodes = 1;
 #else	/* __xpv */
-	uint_t	probe_op;
+	uint_t		probe_op;
+	u_longlong_t	value;
+
+	/*
+	 * Get boot property for lgroup topology height limit
+	 */
+	if (bootprop_getval(BP_LGRP_TOPO_LEVELS, &value) == 0)
+		(void) lgrp_topo_ht_limit_set((int)value);
+
+	/*
+	 * Get boot property for enabling/disabling SRAT
+	 */
+	if (bootprop_getval(BP_LGRP_SRAT_ENABLE, &value) == 0)
+		lgrp_plat_srat_enable = (int)value;
+
+	/*
+	 * Get boot property for enabling/disabling SLIT
+	 */
+	if (bootprop_getval(BP_LGRP_SLIT_ENABLE, &value) == 0)
+		lgrp_plat_slit_enable = (int)value;
 
 	/*
 	 * Initialize as a UMA machine

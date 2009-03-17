@@ -59,6 +59,8 @@
 #include <vm/kboot_mmu.h>
 #include <vm/hat_pte.h>
 #include <sys/dmar_acpi.h>
+#include <sys/kobj.h>
+#include <sys/kobj_lex.h>
 #include "acpi_fw.h"
 
 static int have_console = 0;	/* set once primitive console is initialized */
@@ -2168,5 +2170,29 @@ boot_compinfo(int fd, struct compinfo *cbp)
 {
 	cbp->iscmp = 0;
 	cbp->blksize = MAXBSIZE;
+	return (0);
+}
+
+#define	BP_MAX_STRLEN	32
+
+/*
+ * Get value for given boot property
+ */
+int
+bootprop_getval(const char *prop_name, u_longlong_t *prop_value)
+{
+	int		boot_prop_len;
+	char		str[BP_MAX_STRLEN];
+	u_longlong_t	value;
+
+	boot_prop_len = BOP_GETPROPLEN(bootops, prop_name);
+	if (boot_prop_len < 0 || boot_prop_len > sizeof (str) ||
+	    BOP_GETPROP(bootops, prop_name, str) < 0 ||
+	    kobj_getvalue(str, &value) == -1)
+		return (-1);
+
+	if (prop_value)
+		*prop_value = value;
+
 	return (0);
 }

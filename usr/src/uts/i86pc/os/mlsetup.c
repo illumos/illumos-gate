@@ -53,8 +53,6 @@
 #include <sys/archsystm.h>
 #include <sys/promif.h>
 #include <sys/bootconf.h>
-#include <sys/kobj.h>
-#include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace.h>
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -79,19 +77,6 @@ static unsigned char dummy_cpu_pri[MAXIPL + 1] = {
 };
 
 
-static uint32_t
-bootprop_getval(char *name)
-{
-	char prop[32];
-	u_longlong_t ll;
-	extern struct bootops *bootops;
-	if ((BOP_GETPROPLEN(bootops, name) > sizeof (prop)) ||
-	    (BOP_GETPROP(bootops, name, prop) < 0) ||
-	    (kobj_getvalue(prop, &ll) == -1))
-		return (0);
-	return ((uint32_t)ll);
-}
-
 /*
  * Setup routine called right before main(). Interposing this function
  * before main() allows us to call it in a machine-independent fashion.
@@ -99,6 +84,7 @@ bootprop_getval(char *name)
 void
 mlsetup(struct regs *rp)
 {
+	u_longlong_t prop_value;
 	extern struct classfuncs sys_classfuncs;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
@@ -129,14 +115,25 @@ mlsetup(struct regs *rp)
 	 * when checking cpu features
 	 */
 
-	cpuid_feature_ecx_include =
-	    bootprop_getval("cpuid_feature_ecx_include");
-	cpuid_feature_ecx_exclude =
-	    bootprop_getval("cpuid_feature_ecx_exclude");
-	cpuid_feature_edx_include =
-	    bootprop_getval("cpuid_feature_edx_include");
-	cpuid_feature_edx_exclude =
-	    bootprop_getval("cpuid_feature_edx_exclude");
+	if (bootprop_getval("cpuid_feature_ecx_include", &prop_value) != 0)
+		cpuid_feature_ecx_include = 0;
+	else
+		cpuid_feature_ecx_include = (uint32_t)prop_value;
+
+	if (bootprop_getval("cpuid_feature_ecx_exclude", &prop_value) != 0)
+		cpuid_feature_ecx_exclude = 0;
+	else
+		cpuid_feature_ecx_exclude = (uint32_t)prop_value;
+
+	if (bootprop_getval("cpuid_feature_edx_include", &prop_value) != 0)
+		cpuid_feature_edx_include = 0;
+	else
+		cpuid_feature_edx_include = (uint32_t)prop_value;
+
+	if (bootprop_getval("cpuid_feature_edx_exclude", &prop_value) != 0)
+		cpuid_feature_edx_exclude = 0;
+	else
+		cpuid_feature_edx_exclude = (uint32_t)prop_value;
 
 	/*
 	 * The first lightweight pass (pass0) through the cpuid data
@@ -325,10 +322,13 @@ mlsetup(struct regs *rp)
 
 	prom_init("kernel", (void *)NULL);
 
-	boot_ncpus = bootprop_getval("boot-ncpus");
-
-	if (boot_ncpus <= 0 || boot_ncpus > NCPU)
+	if (bootprop_getval("boot-ncpus", &prop_value) != 0)
 		boot_ncpus = NCPU;
+	else {
+		boot_ncpus = (int)prop_value;
+		if (boot_ncpus <= 0 || boot_ncpus > NCPU)
+			boot_ncpus = NCPU;
+	}
 
 	max_ncpus = boot_max_ncpus = boot_ncpus;
 
