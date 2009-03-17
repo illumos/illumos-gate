@@ -70,8 +70,6 @@ typedef	struct __mac_group_handle	*mac_group_handle_t;
 
 #define	MAC_MAX_MINOR	1000
 
-typedef	uint32_t		datalink_id_t;
-
 typedef enum {
 	LINK_STATE_UNKNOWN = -1,
 	LINK_STATE_DOWN,

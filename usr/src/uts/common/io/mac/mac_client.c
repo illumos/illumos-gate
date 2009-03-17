@@ -3678,11 +3678,20 @@ mac_validate_props(mac_resource_props_t *mrp)
 			return (EINVAL);
 	}
 	if (mrp->mrp_mask & MRP_CPUS) {
-		int i;
+		int i, j;
 		mac_cpu_mode_t	fanout;
 
 		if (mrp->mrp_ncpus > ncpus || mrp->mrp_ncpus > MAX_SR_FANOUT)
 			return (EINVAL);
+
+		for (i = 0; i < mrp->mrp_ncpus; i++) {
+			for (j = 0; j < mrp->mrp_ncpus; j++) {
+				if (i != j &&
+				    mrp->mrp_cpu[i] == mrp->mrp_cpu[j]) {
+					return (EINVAL);
+				}
+			}
+		}
 
 		for (i = 0; i < mrp->mrp_ncpus; i++) {
 			cpu_t *cp;
