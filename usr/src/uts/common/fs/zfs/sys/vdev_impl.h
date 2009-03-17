@@ -188,7 +188,9 @@ struct vdev {
 	kmutex_t	vdev_probe_lock; /* protects vdev_probe_zio	*/
 };
 
-#define	VDEV_SKIP_SIZE		(16 << 10)
+#define	VDEV_PAD_SIZE		(8 << 10)
+/* 2 padding areas (vl_pad1 and vl_pad2) to skip */
+#define	VDEV_SKIP_SIZE		VDEV_PAD_SIZE * 2
 #define	VDEV_PHYS_SIZE		(112 << 10)
 #define	VDEV_UBERBLOCK_RING	(128 << 10)
 
@@ -206,7 +208,8 @@ typedef struct vdev_phys {
 } vdev_phys_t;
 
 typedef struct vdev_label {
-	char		vl_pad[VDEV_SKIP_SIZE];			/*  16K */
+	char		vl_pad1[VDEV_PAD_SIZE];			/*  8K */
+	char		vl_pad2[VDEV_PAD_SIZE];			/*  8K */
 	vdev_phys_t	vl_vdev_phys;				/* 112K	*/
 	char		vl_uberblock[VDEV_UBERBLOCK_RING];	/* 128K	*/
 } vdev_label_t;							/* 256K total */

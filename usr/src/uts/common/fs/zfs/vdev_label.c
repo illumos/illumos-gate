@@ -488,6 +488,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	spa_t *spa = vd->vdev_spa;
 	nvlist_t *label;
 	vdev_phys_t *vp;
+	char *pad2;
 	uberblock_t *ub;
 	zio_t *zio;
 	char *buf;
@@ -636,6 +637,10 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	*ub = spa->spa_uberblock;
 	ub->ub_txg = 0;
 
+	/* Initialize the 2nd padding area. */
+	pad2 = zio_buf_alloc(VDEV_PAD_SIZE);
+	bzero(pad2, VDEV_PAD_SIZE);
+
 	/*
 	 * Write everything in parallel.
 	 */
@@ -647,6 +652,15 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		    offsetof(vdev_label_t, vl_vdev_phys),
 		    sizeof (vdev_phys_t), NULL, NULL, flags);
 
+		/*
+		 * Skip the 1st padding area.
+		 * Zero out the 2nd padding area where it might have
+		 * left over data from previous filesystem format.
+		 */
+		vdev_label_write(zio, vd, l, pad2,
+		    offsetof(vdev_label_t, vl_pad2),
+		    VDEV_PAD_SIZE, NULL, NULL, flags);
+
 		for (int n = 0; n < VDEV_UBERBLOCK_COUNT(vd); n++) {
 			vdev_label_write(zio, vd, l, ub,
 			    VDEV_UBERBLOCK_OFFSET(vd, n),
@@ -657,6 +671,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	error = zio_wait(zio);
 
 	nvlist_free(label);
+	zio_buf_free(pad2, VDEV_PAD_SIZE);
 	zio_buf_free(ub, VDEV_UBERBLOCK_SIZE(vd));
 	zio_buf_free(vp, sizeof (vdev_phys_t));
 
