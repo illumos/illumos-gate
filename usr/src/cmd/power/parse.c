@@ -368,7 +368,7 @@ find_line_end(char *line, int *lcnt)
  * call the action routine or conftab handler routine.
  */
 void
-parse_conf_file(char *name, vact_t action)
+parse_conf_file(char *name, vact_t action, boolean_t first_parse)
 {
 	char *file_buf, *cline, *line, *lend;
 	cinfo_t *cip;
@@ -377,11 +377,14 @@ parse_conf_file(char *name, vact_t action)
 	int dontcare;
 
 	/*
-	 * Do the "implied default" for autoS3
+	 * Do the "implied default" for autoS3, but only before we
+	 * start parsing the first conf file.
 	 */
-	(void) S3_helper("S3-support-enable", "S3-support-disable",
-	    PM_ENABLE_S3, PM_DISABLE_S3, "S3-support", "default",
-	    &dontcare, -1);
+	if (first_parse) {
+		(void) S3_helper("S3-support-enable", "S3-support-disable",
+		    PM_ENABLE_S3, PM_DISABLE_S3, "S3-support", "default",
+		    &dontcare, -1);
+	}
 
 	file_buf = get_conf_data(name);
 	mesg(MDEBUG, "\nnow parsing \"%s\"...\n", name);

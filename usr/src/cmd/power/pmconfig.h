@@ -113,7 +113,7 @@ extern int lineno;
 extern char **line_args;
 extern void lookup_estar_vers(void);
 extern void lookup_perms(void);
-extern void parse_conf_file(char *, vact_t);
+extern void parse_conf_file(char *, vact_t, boolean_t);
 
 /*
  * handlers.c

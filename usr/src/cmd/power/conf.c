@@ -397,7 +397,7 @@ conf_scanner(prmup_t *pref)
 	mesg(MDEBUG, "\nscanning set is %s\n", pref ? pref->set : "both");
 	checkup = pref;
 	parse_conf_file((pref == NULL || pref->perm)
-	    ? power_conf : default_conf, filter);
+	    ? power_conf : default_conf, filter, B_FALSE);
 }
 
 
@@ -464,7 +464,7 @@ write_conf(void)
 	 * since some alt conf lines may be skipped, the trusted source is
 	 * searched for those lines to retain their functionality.
 	 */
-	parse_conf_file(default_conf, search);
+	parse_conf_file(default_conf, search, B_FALSE);
 
 	(void) close(tmp_fd);
 
@@ -547,7 +547,7 @@ main(int cnt, char **vec)
 		mesg(MEXIT, "cannot stat %s, %s\n", default_conf,
 		    strerror(errno));
 	new_cc.loadaverage_thold = DFLT_THOLD;
-	parse_conf_file(power_conf, NULL);
+	parse_conf_file(power_conf, NULL, B_TRUE);
 	if (fflag)
 		rval = write_conf();
 	cleanup();
