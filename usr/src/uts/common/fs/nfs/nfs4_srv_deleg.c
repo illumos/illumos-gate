@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <rpc/auth.h>
@@ -53,6 +51,7 @@ srv_deleg_policy_t rfs4_deleg_policy = SRV_NEVER_DELEGATE;
 static int rfs4_deleg_wlp = 5;
 kmutex_t rfs4_deleg_lock;
 static int rfs4_deleg_disabled;
+static int rfs4_max_setup_cb_tries = 5;
 
 #ifdef DEBUG
 
@@ -342,18 +341,24 @@ retry:
 
 /*
  * Given a client struct, inspect the callback info to see if the
- * callback path is up and available.  If it is being initialized,
- * then wait for the CB_NULL RPC call to occur.
+ * callback path is up and available.
+ *
+ * If new callback path is available and no one has set it up then
+ * try to set it up. If setup is not successful after 5 tries (5 secs)
+ * then gives up and returns NULL.
+ *
+ * If callback path is being initialized, then wait for the CB_NULL RPC
+ * call to occur.
  */
 static rfs4_cbinfo_t *
 rfs4_cbinfo_hold(rfs4_client_t *cp)
 {
 	rfs4_cbinfo_t *cbp = &cp->cbinfo;
+	int retries = 0;
 
-retry:
 	mutex_enter(cbp->cb_lock);
 
-	if (cbp->cb_newer.cb_new == TRUE && cbp->cb_nullcaller == FALSE) {
+	while (cbp->cb_newer.cb_new == TRUE && cbp->cb_nullcaller == FALSE) {
 		/*
 		 * Looks like a new callback path may be available and
 		 * noone has set it up.
@@ -361,7 +366,20 @@ retry:
 		mutex_exit(cbp->cb_lock);
 		rfs4_dbe_hold(cp->dbe);
 		rfs4_do_cb_null(cp); /* caller will release client hold */
-		goto retry;
+
+		mutex_enter(cbp->cb_lock);
+		/*
+		 * If callback path is no longer new, or it's being setup
+		 * then stop and wait for it to be done.
+		 */
+		if (cbp->cb_newer.cb_new == FALSE || cbp->cb_nullcaller == TRUE)
+			break;
+		mutex_exit(cbp->cb_lock);
+
+		if (++retries >= rfs4_max_setup_cb_tries)
+			return (NULL);
+		delay(hz);
+		mutex_enter(cbp->cb_lock);
 	}
 
 	/* Is there a thread working on doing the CB_NULL RPC? */
