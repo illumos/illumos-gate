@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -607,9 +607,50 @@ gexec(
 	/* SunOS 4.x buy-back */
 	if ((vp->v_vfsp->vfs_flag & VFS_NOSETUID) &&
 	    (vattr.va_mode & (VSUID|VSGID))) {
-		cmn_err(CE_NOTE,
-		    "!%s, uid %d: setuid execution not allowed, dev=%lx",
-		    exec_file, cred->cr_uid, vp->v_vfsp->vfs_dev);
+		char path[MAXNAMELEN];
+		refstr_t *mntpt = NULL;
+		int ret = -1;
+
+		bzero(path, sizeof (path));
+		zone_hold(pp->p_zone);
+
+		ret = vnodetopath(pp->p_zone->zone_rootvp, vp, path,
+		    sizeof (path), cred);
+
+		/* fallback to mountpoint if a path can't be found */
+		if ((ret != 0) || (ret == 0 && path[0] == '\0'))
+			mntpt = vfs_getmntpoint(vp->v_vfsp);
+
+		if (mntpt == NULL)
+			zcmn_err(pp->p_zone->zone_id, CE_NOTE,
+			    "!uid %d: setuid execution not allowed, "
+			    "file=%s", cred->cr_uid, path);
+		else
+			zcmn_err(pp->p_zone->zone_id, CE_NOTE,
+			    "!uid %d: setuid execution not allowed, "
+			    "fs=%s, file=%s", cred->cr_uid,
+			    ZONE_PATH_TRANSLATE(refstr_value(mntpt),
+			    pp->p_zone), exec_file);
+
+		if (!INGLOBALZONE(pp)) {
+			/* zone_rootpath always has trailing / */
+			if (mntpt == NULL)
+				cmn_err(CE_NOTE, "!zone: %s, uid: %d "
+				    "setuid execution not allowed, file=%s%s",
+				    pp->p_zone->zone_name, cred->cr_uid,
+				    pp->p_zone->zone_rootpath, path + 1);
+			else
+				cmn_err(CE_NOTE, "!zone: %s, uid: %d "
+				    "setuid execution not allowed, fs=%s, "
+				    "file=%s", pp->p_zone->zone_name,
+				    cred->cr_uid, refstr_value(mntpt),
+				    exec_file);
+		}
+
+		if (mntpt != NULL)
+			refstr_rele(mntpt);
+
+		zone_rele(pp->p_zone);
 	}
 
 	/*
