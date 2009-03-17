@@ -776,15 +776,6 @@ ldi_open_by_vp(vnode_t **vpp, int flag, cred_t *cr,
 		    "ldi open", (void *)nlhp));
 	}
 
-	/* Flush back any dirty pages associated with the device. */
-	if (nlhp->lh_type & LH_CBDEV) {
-		vnode_t	*cvp = common_specvp(nlhp->lh_vp);
-		dev_t	dev = cvp->v_rdev;
-
-		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred, NULL);
-		bflush(dev);
-	}
-
 	*vpp = vp;
 	*lhp = (ldi_handle_t)nlhp;
 	return (0);
@@ -1685,15 +1676,6 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 		return (EINVAL);
 
 	ASSERT(!servicing_interrupt());
-
-	/* Flush back any dirty pages associated with the device. */
-	if (handlep->lh_type & LH_CBDEV) {
-		vnode_t	*cvp = common_specvp(handlep->lh_vp);
-		dev_t	dev = cvp->v_rdev;
-
-		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred, NULL);
-		bflush(dev);
-	}
 
 #ifdef	LDI_OBSOLETE_EVENT
 
