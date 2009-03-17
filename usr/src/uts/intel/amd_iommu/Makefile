@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile drives production of the amd_iommu driver kernel module.
@@ -48,10 +48,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-#ALL_TARGET	= $(BINARY) $(CONFMOD)
-ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 # depends on misc/iommulib and misc/acpica
@@ -77,7 +76,7 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS) $(CONF_INSTALL_DEPS)
 
 #
 #	Include common targets.
