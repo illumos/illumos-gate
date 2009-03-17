@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,11 +50,21 @@ extern "C" {
  * iommu_page_unmap()
  *   unmap page out of kva
  */
-paddr_t iommu_page_alloc(int kmflag);
-void iommu_page_free(paddr_t paddr);
-caddr_t iommu_page_map(paddr_t paddr);
-void iommu_page_unmap(caddr_t kva);
 
+typedef struct iommu_pghdl {
+	ddi_dma_handle_t dma_hdl;
+	ddi_acc_handle_t mem_hdl;
+	paddr_t paddr;
+	caddr_t vaddr;
+	struct iommu_pghdl *prev;
+	struct iommu_pghdl *next;
+} iommu_pghdl_t;
+
+struct intel_iommu_state;
+
+iommu_pghdl_t *iommu_page_alloc(struct intel_iommu_state *iommu, int kmflag);
+void iommu_page_free(struct intel_iommu_state *iommu, paddr_t paddr);
+caddr_t iommu_get_vaddr(struct intel_iommu_state *iommu, paddr_t paddr);
 
 typedef struct iommu_rscs_s *iommu_rscs_t;
 

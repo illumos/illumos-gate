@@ -413,6 +413,9 @@ typedef struct iotlb_pend_head {
 
 struct inv_queue_state;
 struct intr_remap_tbl_state;
+struct iommu_pghdl;
+
+#define	IOMMU_PGHDL_HASH_SIZE	(256)
 
 /*
  * struct intel_iommu_state
@@ -445,6 +448,7 @@ struct intr_remap_tbl_state;
  * iu_pend_head		- pending iotlb list
  * iu_inv_queue		- invalidation queue state
  * iu_intr_remap_tbl	- interrupt remapping table state
+ * iu_pghdl_hash	- hash of pages allocated for IOMMU internal work.
  */
 typedef struct intel_iommu_state {
 	list_node_t		node;
@@ -470,6 +474,7 @@ typedef struct intel_iommu_state {
 	iotlb_pend_head_t	iu_pend_head;
 	struct inv_queue_state	*iu_inv_queue;
 	struct intr_remap_tbl_state	*iu_intr_remap_tbl;
+	struct iommu_pghdl	*iu_pghdl_hash[IOMMU_PGHDL_HASH_SIZE];
 } intel_iommu_state_t;
 
 /*

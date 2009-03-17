@@ -274,18 +274,17 @@ iommu_page_init(void)
 static paddr_t
 iommu_get_page(intel_iommu_state_t *iommu, int kmflag)
 {
-	paddr_t paddr;
+	iommu_pghdl_t *pghdl;
 	caddr_t vaddr;
 
-	paddr = iommu_page_alloc(kmflag);
-	vaddr = iommu_page_map(paddr);
+	pghdl = iommu_page_alloc(iommu, kmflag);
+	vaddr = pghdl->vaddr;
 	bzero(vaddr, IOMMU_PAGE_SIZE);
 	iommu->iu_dmar_ops->do_clflush(vaddr, IOMMU_PAGE_SIZE);
-	iommu_page_unmap(vaddr);
 
 	page_num++;
 
-	return (paddr);
+	return (pghdl->paddr);
 }
 
 /*
@@ -293,9 +292,9 @@ iommu_get_page(intel_iommu_state_t *iommu, int kmflag)
  *   free the iommu page allocated with iommu_get_page
  */
 static void
-iommu_free_page(paddr_t paddr)
+iommu_free_page(intel_iommu_state_t *iommu, paddr_t paddr)
 {
-	iommu_page_free(paddr);
+	iommu_page_free(iommu, paddr);
 	page_num--;
 }
 
@@ -339,7 +338,7 @@ calculate_agaw(int gaw)
 static void
 destroy_iommu_state(intel_iommu_state_t *iommu)
 {
-	iommu_free_page(iommu->iu_root_entry_paddr);
+	iommu_free_page(iommu, iommu->iu_root_entry_paddr);
 	iommu_rscs_fini(&(iommu->iu_domain_id_hdl));
 	mutex_destroy(&(iommu->iu_reg_lock));
 	mutex_destroy(&(iommu->iu_root_context_lock));
@@ -1827,14 +1826,15 @@ iommu_domain_init(dmar_domain_state_t *domain)
 	/*
 	 * create the first level page table
 	 */
-	domain->dm_page_table_paddr =
-	    iommu_get_page(domain->dm_iommu, KM_SLEEP);
+	domain->dm_page_table_paddr = iommu_get_page(domain->dm_iommu,
+	    KM_SLEEP);
 
 	/*
 	 * init the CPU available page tables
 	 */
 	domain->dm_pt_tree.vp = kmem_zalloc(IOMMU_PAGE_SIZE << 1, KM_SLEEP);
-	domain->dm_pt_tree.pp = iommu_page_map(domain->dm_page_table_paddr);
+	domain->dm_pt_tree.pp = iommu_get_vaddr(domain->dm_iommu,
+	    domain->dm_page_table_paddr);
 	domain->dm_identity = B_FALSE;
 
 	/*
@@ -1972,7 +1972,7 @@ domain_set_root_context(dmar_domain_state_t *domain,
 	/*
 	 * set root entry
 	 */
-	root = iommu_page_map(iommu->iu_root_entry_paddr);
+	root = iommu_get_vaddr(iommu, iommu->iu_root_entry_paddr);
 	rce = (iorce_t)root + bus;
 	mutex_enter(&(iommu->iu_root_context_lock));
 	if (!ROOT_ENTRY_GET_P(rce)) {
@@ -1980,10 +1980,10 @@ domain_set_root_context(dmar_domain_state_t *domain,
 		ROOT_ENTRY_SET_P(rce);
 		ROOT_ENTRY_SET_CTP(rce, paddr);
 		iommu->iu_dmar_ops->do_clflush((caddr_t)rce, sizeof (*rce));
-		context = iommu_page_map(paddr);
+		context = iommu_get_vaddr(iommu, paddr);
 	} else {
 		paddr = ROOT_ENTRY_GET_CTP(rce);
-		context = iommu_page_map(paddr);
+		context = iommu_get_vaddr(iommu, paddr);
 	}
 
 	/* set context entry */
@@ -2003,8 +2003,6 @@ domain_set_root_context(dmar_domain_state_t *domain,
 	}
 
 	mutex_exit(&(iommu->iu_root_context_lock));
-	iommu_page_unmap(root);
-	iommu_page_unmap(context);
 
 	/* cache mode set, flush context cache */
 	if (IOMMU_CAP_GET_CM(iommu->iu_capability)) {
@@ -2300,7 +2298,7 @@ iommu_setup_level_table(dmar_domain_state_t *domain,
 		domain->dm_iommu->iu_dmar_ops->do_clflush((caddr_t)pte,
 		    sizeof (*pte));
 		vpte->vp = kmem_zalloc(IOMMU_PAGE_SIZE << 1, KM_SLEEP);
-		vpte->pp = iommu_page_map(child);
+		vpte->pp = iommu_get_vaddr(domain->dm_iommu, child);
 	}
 
 	return (vpte);

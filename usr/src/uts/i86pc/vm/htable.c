@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,7 +264,7 @@ xen_map(uint64_t pte, caddr_t va)
  * A wrapper around page_get_physical(), with some extra checks.
  */
 static pfn_t
-ptable_alloc(void)
+ptable_alloc(uintptr_t seed)
 {
 	pfn_t pfn;
 	page_t *pp;
@@ -298,7 +298,7 @@ ptable_alloc(void)
 	}
 #endif /* DEBUG */
 
-	pp = page_get_physical(KM_NOSLEEP);
+	pp = page_get_physical(seed);
 	if (pp == NULL)
 		return (PFN_INVALID);
 	ASSERT(PAGE_SHARED(pp));
@@ -326,13 +326,28 @@ ptable_free(pfn_t pfn)
 	atomic_add_32(&active_ptables, -1);
 	if (pp == NULL)
 		panic("ptable_free(): no page for pfn!");
+	ASSERT(PAGE_SHARED(pp));
 	ASSERT(pfn == pp->p_pagenum);
 	ASSERT(!IN_XPV_PANIC());
+
+	/*
+	 * Get an exclusive lock, might have to wait for a kmem reader.
+	 */
+	if (!page_tryupgrade(pp)) {
+		page_unlock(pp);
+		/*
+		 * RFE: we could change this to not loop forever
+		 * For now looping works - it's just like sfmmu.
+		 */
+		while (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_RECLAIM))
+			continue;
+	}
 #ifdef __xpv
 	if (kpm_vbase && xen_kpm_page(pfn, PT_VALID | PT_WRITABLE) < 0)
 		panic("failure making kpm r/w pfn=0x%lx", pfn);
 #endif
-	page_free_physical(pp);
+	page_free(pp, 1);
+	page_unresv(1);
 }
 
 /*
@@ -767,7 +782,7 @@ htable_alloc(
 		 */
 		if (ht != NULL && !is_bare) {
 			ht->ht_hat = hat;
-			ht->ht_pfn = ptable_alloc();
+			ht->ht_pfn = ptable_alloc((uintptr_t)ht);
 			if (ht->ht_pfn == PFN_INVALID) {
 				if (USE_HAT_RESERVES())
 					htable_put_reserve(ht);
@@ -830,7 +845,7 @@ htable_alloc(
 		for (;;) {
 			htable_t *stolen;
 
-			hat->hat_user_ptable = ptable_alloc();
+			hat->hat_user_ptable = ptable_alloc((uintptr_t)ht + 1);
 			if (hat->hat_user_ptable != PFN_INVALID)
 				break;
 			stolen = htable_steal(1);

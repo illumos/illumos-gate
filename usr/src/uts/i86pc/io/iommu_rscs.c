@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,8 +50,28 @@
 #include <vm/hat_i86.h>
 #include <sys/machsystm.h>
 #include <sys/iommu_rscs.h>
+#include <sys/intel_iommu.h>
 
+ddi_dma_attr_t page_dma_attr = {
+	DMA_ATTR_V0,
+	0U,
+	0xffffffffU,
+	0xffffffffU,
+	MMU_PAGESIZE, /* page aligned */
+	0x1,
+	0x1,
+	0xffffffffU,
+	0xffffffffU,
+	1,
+	4,
+	0
+};
 
+ddi_device_acc_attr_t page_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_NEVERSWAP_ACC,
+	DDI_STRICTORDER_ACC
+};
 
 typedef struct iommu_rscs_s {
 	/*
@@ -78,85 +98,116 @@ typedef struct iommu_rscs_s {
 	kmutex_t rs_mutex;
 } iommu_rscs_state_t;
 
+static uint_t
+iommu_pghdl_hash_func(paddr_t paddr)
+{
+	return (paddr % IOMMU_PGHDL_HASH_SIZE);
+}
 
 /*
  * iommu_page_alloc()
  *
  */
-paddr_t
-iommu_page_alloc(int kmflag)
+iommu_pghdl_t *
+iommu_page_alloc(intel_iommu_state_t *iommu, int kmflag)
 {
-	paddr_t paddr;
-	page_t *pp;
+	size_t actual_size = 0;
+	iommu_pghdl_t *pghdl;
+	caddr_t vaddr;
+	uint_t idx;
 
 	ASSERT(kmflag == KM_SLEEP || kmflag == KM_NOSLEEP);
 
-	pp = page_get_physical(kmflag);
-	if (pp == NULL) {
-		return (NULL);
+	pghdl = kmem_zalloc(sizeof (*pghdl), kmflag);
+	if (pghdl == NULL) {
+		return (0);
 	}
 
-	paddr =  pa_to_ma((uint64_t)pp->p_pagenum << PAGESHIFT);
+	if (ddi_dma_alloc_handle(ddi_root_node(), &page_dma_attr, DDI_DMA_SLEEP,
+	    NULL, &pghdl->dma_hdl) != DDI_SUCCESS) {
+		kmem_free(pghdl, sizeof (*pghdl));
+		return (0);
+	}
 
-	return (paddr);
+	if (ddi_dma_mem_alloc(pghdl->dma_hdl, PAGESIZE, &page_acc_attr,
+	    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
+	    (kmflag == KM_SLEEP) ? DDI_DMA_SLEEP : DDI_DMA_DONTWAIT,
+	    NULL, &vaddr, &actual_size, &pghdl->mem_hdl) != DDI_SUCCESS) {
+		ddi_dma_free_handle(&pghdl->dma_hdl);
+		kmem_free(pghdl, sizeof (*pghdl));
+		return (0);
+	}
+
+	ASSERT(actual_size == PAGESIZE);
+
+	if (actual_size != PAGESIZE) {
+		ddi_dma_mem_free(&pghdl->mem_hdl);
+		ddi_dma_free_handle(&pghdl->dma_hdl);
+		kmem_free(pghdl, sizeof (*pghdl));
+		return (0);
+
+	}
+
+	pghdl->paddr = pfn_to_pa(hat_getpfnum(kas.a_hat, vaddr));
+
+	idx = iommu_pghdl_hash_func(pghdl->paddr);
+	pghdl->next = iommu->iu_pghdl_hash[idx];
+	if (pghdl->next)
+		pghdl->next->prev = pghdl;
+	iommu->iu_pghdl_hash[idx] = pghdl;
+
+	return (pghdl);
 }
-
 
 /*
  * iommu_page_free()
  */
 void
-iommu_page_free(paddr_t paddr)
+iommu_page_free(intel_iommu_state_t *iommu, paddr_t paddr)
 {
-	page_t *pp;
+	uint_t idx;
+	iommu_pghdl_t *pghdl;
 
-	pp = page_numtopp_nolock(ma_to_pa(paddr) >> PAGESHIFT);
-	page_free_physical(pp);
+	idx = iommu_pghdl_hash_func(paddr);
+	pghdl = iommu->iu_pghdl_hash[idx];
+	while (pghdl && pghdl->paddr != paddr)
+		continue;
+	if (pghdl == NULL) {
+		cmn_err(CE_PANIC,
+		    "Freeing a free IOMMU page: paddr=0x%" PRIx64,
+		    paddr);
+		/*NOTREACHED*/
+	}
+	if (pghdl->prev == NULL)
+		iommu->iu_pghdl_hash[idx] = pghdl->next;
+	else
+		pghdl->prev->next = pghdl->next;
+	if (pghdl->next)
+		pghdl->next->prev = pghdl->prev;
+
+	ddi_dma_mem_free(&pghdl->mem_hdl);
+	ddi_dma_free_handle(&pghdl->dma_hdl);
+	kmem_free(pghdl, sizeof (*pghdl));
 }
 
-
 /*
- * iommu_page_map()
- *
+ * iommu_get_vaddr()
  */
 caddr_t
-iommu_page_map(paddr_t addr)
+iommu_get_vaddr(intel_iommu_state_t *iommu, paddr_t paddr)
 {
-	paddr_t paddr;
-	caddr_t kva;
-	page_t *pp;
+	uint_t idx;
+	iommu_pghdl_t *pghdl;
 
-	paddr = ma_to_pa(addr);
-
-	if (kpm_enable) {
-		kva = hat_kpm_pfn2va((pfn_t)btop(paddr));
-	} else {
-		kva = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
-		if (kva == NULL) {
-			return (NULL);
-		}
-		pp = page_numtopp_nolock(paddr >> PAGESHIFT);
-		hat_memload(kas.a_hat, kva, pp,
-		    PROT_READ | PROT_WRITE, HAT_LOAD_LOCK);
+	idx = iommu_pghdl_hash_func(paddr);
+	pghdl = iommu->iu_pghdl_hash[idx];
+	while (pghdl && pghdl->paddr != paddr)
+		continue;
+	if (pghdl == NULL) {
+		return (0);
 	}
-
-	return (kva);
+	return (pghdl->vaddr);
 }
-
-
-/*
- * iommu_page_unmap()
- *
- */
-void
-iommu_page_unmap(caddr_t kva)
-{
-	if (!kpm_enable) {
-		hat_unload(kas.a_hat, kva, PAGESIZE, HAT_UNLOAD_UNLOCK);
-		vmem_free(heap_arena, kva, PAGESIZE);
-	}
-}
-
 
 
 /*
