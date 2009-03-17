@@ -6612,6 +6612,7 @@ hold_devi(major_t major, int instance, int flags)
 	struct devnames	*dnp;
 	dev_info_t	*dip;
 	char		*path;
+	char		*vpath;
 
 	if ((major >= devcnt) || (instance == -1))
 		return (NULL);
@@ -6665,8 +6666,26 @@ hold_devi(major_t major, int instance, int flags)
 
 	/* reconstruct the path and drive attach by path through devfs. */
 	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-	if (e_ddi_majorinstance_to_path(major, instance, path) == 0)
+	if (e_ddi_majorinstance_to_path(major, instance, path) == 0) {
 		dip = e_ddi_hold_devi_by_path(path, flags);
+
+		/*
+		 * Verify that we got the correct device - a path_to_inst file
+		 * with a bogus/corrupt path (or a nexus that changes its
+		 * unit-address format) could result in an incorrect answer
+		 *
+		 * Verify major, instance, and path.
+		 */
+		vpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		if (dip &&
+		    ((DEVI(dip)->devi_major != major) ||
+		    ((DEVI(dip)->devi_instance != instance)) ||
+		    (strcmp(path, ddi_pathname(dip, vpath)) != 0))) {
+			ndi_rele_devi(dip);
+			dip = NULL;	/* no answer better than wrong answer */
+		}
+		kmem_free(vpath, MAXPATHLEN);
+	}
 	kmem_free(path, MAXPATHLEN);
 	return (dip);			/* with devi held */
 }
