@@ -6884,14 +6884,9 @@ ohci_create_transfer_wrapper(
 		return (NULL);
 	}
 
-	/* SLEEP flag should not be used in interrupt context */
-	if (servicing_interrupt()) {
-		kmem_flag = KM_NOSLEEP;
-		dmamem_wait = DDI_DMA_DONTWAIT;
-	} else {
-		kmem_flag = KM_SLEEP;
-		dmamem_wait = DDI_DMA_SLEEP;
-	}
+	/* SLEEP flag should not be used while holding mutex */
+	kmem_flag = KM_NOSLEEP;
+	dmamem_wait = DDI_DMA_DONTWAIT;
 
 	/* Allocate space for the transfer wrapper */
 	tw = kmem_zalloc(sizeof (ohci_trans_wrapper_t), kmem_flag);

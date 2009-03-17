@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2998,14 +2998,9 @@ ehci_create_transfer_wrapper(
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
-	/* SLEEP flag should not be used in interrupt context */
-	if (servicing_interrupt()) {
-		kmem_flag = KM_NOSLEEP;
-		dmamem_wait = DDI_DMA_DONTWAIT;
-	} else {
-		kmem_flag = KM_SLEEP;
-		dmamem_wait = DDI_DMA_SLEEP;
-	}
+	/* SLEEP flag should not be used while holding mutex */
+	kmem_flag = KM_NOSLEEP;
+	dmamem_wait = DDI_DMA_DONTWAIT;
 
 	/* Allocate space for the transfer wrapper */
 	tw = kmem_zalloc(sizeof (ehci_trans_wrapper_t), kmem_flag);
