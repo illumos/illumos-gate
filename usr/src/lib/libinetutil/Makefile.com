@@ -25,7 +25,8 @@
 
 LIBRARY = libinetutil.a
 VERS = 	  .1
-OBJECTS = octet.o inetutil.o ifspec.o ifaddrlist.o ifaddrlistx.o eh.o tq.o
+OBJECTS = octet.o inetutil.o ifspec.o ifaddrlist.o ifaddrlistx.o eh.o tq.o \
+	    ofmt.o
 
 include ../../Makefile.lib
 
@@ -38,7 +39,8 @@ SRCDIR =	../common
 COMDIR =	$(SRC)/common/net/dhcp
 SRCS = 		$(COMDIR)/octet.c $(SRCDIR)/inetutil.c \
 		$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c \
-		$(SRCDIR)/ifaddrlist.c $(SRCDIR)/ifaddrlistx.c
+		$(SRCDIR)/ifaddrlist.c $(SRCDIR)/ifaddrlistx.c \
+		$(SRCDIR)/ofmt.c
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsocket -lc

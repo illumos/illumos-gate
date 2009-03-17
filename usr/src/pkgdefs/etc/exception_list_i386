@@ -508,6 +508,7 @@ usr/lib/libinetsvc.so			i386
 # the shared object is shipped.
 #
 usr/include/libinetutil.h		i386
+usr/include/ofmt.h			i386
 usr/include/netinet/inetutil.h		i386
 usr/lib/llib-linetutil			i386
 usr/lib/llib-linetutil.ln		i386

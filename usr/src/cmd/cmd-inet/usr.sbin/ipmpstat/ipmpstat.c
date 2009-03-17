@@ -33,6 +33,7 @@
 #include <libsysevent.h>
 #include <locale.h>
 #include <netdb.h>
+#include <ofmt.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -62,28 +63,27 @@
  *	  Since target information is included with the interface information,
  *	  both -i and -t use the interface walker (walk_if()).
  *
- *      * The ipmpstat_sfunc_t function pointers (sfunc_*) obtain a given
- *	  value for a given IPMP object.  Each ipmpstat_sunc_t is passed a
- *	  buffer to write its result into, the buffer's size, and an
- *	  ipmpstat_sfunc_arg_t state structure.  The state structure consists
- *	  of a pointer to the IPMP object to obtain information from
- *	  (sa_data), and an open libipmp handle (sa_ih) which can be used to
- *	  do additional libipmp queries, if necessary (e.g., because the
- *	  object does not have all of the needed information).
+ *      * The ofmt_sfunc_t function pointers (sfunc_*) obtain a given value
+ *	  for a given IPMP object.  Each ofmt_sfunc_t is passed a buffer to
+ *	  write its result into, the buffer's size, and an ipmpstat_sfunc_arg_t
+ *	  state structure.  The state structure consists of a pointer to the
+ *	  IPMP object to obtain information from (sa_data), and an open libipmp
+ *	  handle (sa_ih) which can be used to do additional libipmp queries, if
+ *	  necessary (e.g., because the object does not have all of the needed
+ *	  information).
  *
- *	* The ipmpstat_field_t structure provides the list of supported fields
- *	  for a given output format, along with output formatting information
- *	  (e.g., field width), and a pointer to an ipmpstat_sfunc_t function
- *	  that can obtain the value for a IPMP given object.  For a given
- *	  ipmpstat output format, there's a corresponding array of
- *	  ipmpstat_field_t structures.  Thus, one ipmpstat_field_t array is
- *	  used per ipmpstat invocation.
+ *	* The ofmt_field_t arrays (*_fields[]) provide the supported fields for
+ *	  a given output format, along with output formatting information
+ *	  (e.g., field width) and a pointer to an ofmt_sfunc_t function that
+ *	  can obtain the value for a given IPMP object.  One ofmt_field_t array
+ *	  is used per ipmpstat invocation, and is passed to ofmt_open() (along
+ *	  with the output fields and modes requested by the user) to create an
+ *	  ofmt_t.
  *
- *	* The ipmpstat_ofmt_t provides an ordered list of the requested
- *	  ipmpstat_field_t's (e.g., via -o) for a given ipmpstat invocation.
- *	  It is built at runtime from the command-line arguments.  This
- *	  structure (and a given IPMP object) is used by ofmt_output() to
- *	  output a single line of information about that IPMP object.
+ *      * The ofmt_t structure is a handle that tracks all information
+ *        related to output formatting and is used by libinetutil`ofmt_print()
+ *	  (indirectly through our local ofmt_output() utility routine) to
+ *	  output a single line of information about the provided IPMP object.
  *
  *	* The ipmpstat_cbfunc_t function pointers (*_cbfunc) are called back
  *	  by the walkers.  They are used both internally to implement nested
@@ -104,25 +104,6 @@ typedef struct ipmpstat_sfunc_arg {
 	ipmp_handle_t		sa_ih;
 	void			*sa_data;
 } ipmpstat_sfunc_arg_t;
-
-typedef void ipmpstat_sfunc_t(ipmpstat_sfunc_arg_t *, char *, uint_t);
-
-/*
- * Data type that describes how to output a field; used by ofmt_output*().
- */
-typedef struct ipmpstat_field {
-	const char		*f_name;	/* field name */
-	uint_t			f_width;	/* output width */
-	ipmpstat_sfunc_t	*f_sfunc;	/* value->string function */
-} ipmpstat_field_t;
-
-/*
- * Data type that specifies the output field order; used by ofmt_output*()
- */
-typedef struct ipmpstat_ofmt {
-	const ipmpstat_field_t	*o_field;	/* current field info */
-	struct ipmpstat_ofmt	*o_next;	/* next field */
-} ipmpstat_ofmt_t;
 
 /*
  * Function pointers used to iterate through IPMP objects.
@@ -150,8 +131,8 @@ typedef struct ipmpstat_enum {
  * Data type used to pass state between probe_output() and probe_event().
  */
 typedef struct ipmpstat_probe_state {
-	ipmp_handle_t	ps_ih;			/* open IPMP handle */
-	ipmpstat_ofmt_t	*ps_ofmt; 		/* requested ofmt string */
+	ipmp_handle_t	ps_ih;		/* open IPMP handle */
+	ofmt_handle_t	ps_ofmt;	/* open formatted-output handle */
 } ipmpstat_probe_state_t;
 
 /*
@@ -177,22 +158,19 @@ enum {
 
 static const char	*progname;
 static hrtime_t		probe_output_start;
-static struct winsize	winsize;
 static ipmpstat_opt_t	opt;
+static ofmt_handle_t	ofmt;
 static ipmpstat_enum_t	addr_state[], group_state[], if_state[], if_link[];
 static ipmpstat_enum_t	if_probe[], targ_mode[];
-static ipmpstat_field_t addr_fields[], group_fields[], if_fields[];
-static ipmpstat_field_t probe_fields[], targ_fields[];
+static ofmt_field_t	addr_fields[], group_fields[], if_fields[];
+static ofmt_field_t	probe_fields[], targ_fields[];
 static ipmpstat_cbfunc_t walk_addr_cbfunc, walk_if_cbfunc;
 static ipmpstat_cbfunc_t info_output_cbfunc, targinfo_output_cbfunc;
 static ipmpstat_walker_t walk_addr, walk_if, walk_group;
 
 static int probe_event(sysevent_t *, void *);
-static void probe_output(ipmp_handle_t, ipmpstat_ofmt_t *);
-static ipmpstat_field_t *field_find(ipmpstat_field_t *, const char *);
-static ipmpstat_ofmt_t *ofmt_create(const char *, ipmpstat_field_t []);
-static void ofmt_output(const ipmpstat_ofmt_t *, ipmp_handle_t, void *);
-static void ofmt_destroy(ipmpstat_ofmt_t *);
+static void probe_output(ipmp_handle_t, ofmt_handle_t);
+static void ofmt_output(ofmt_handle_t, ipmp_handle_t, void *);
 static void enum2str(const ipmpstat_enum_t *, int, char *, uint_t);
 static void sockaddr2str(const struct sockaddr_storage *, char *, uint_t);
 static void sighandler(int);
@@ -208,12 +186,14 @@ main(int argc, char **argv)
 	int c;
 	int err;
 	const char *ofields = NULL;
+	ofmt_status_t ofmterr;
+	ofmt_field_t *fields = NULL;
+	uint_t ofmtflags = 0;
 	ipmp_handle_t ih;
 	ipmp_qcontext_t qcontext = IPMP_QCONTEXT_SNAP;
-	ipmpstat_ofmt_t *ofmt;
-	ipmpstat_field_t *fields = NULL;
 	ipmpstat_cbfunc_t *cbfunc;
 	ipmpstat_walker_t *walker;
+	char errbuf[OFMT_BUFSIZE];
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -237,6 +217,7 @@ main(int argc, char **argv)
 			break;
 		case 'P':
 			opt |= IPMPSTAT_OPT_PARSABLE;
+			ofmtflags |= OFMT_PARSABLE;
 			break;
 		case 'o':
 			ofields = optarg;
@@ -273,13 +254,20 @@ main(int argc, char **argv)
 	if (argc > optind || fields == NULL)
 		usage();
 
-	if (opt & IPMPSTAT_OPT_PARSABLE) {
-		if (ofields == NULL) {
-			die("output field list (-o) required in parsable "
-			    "output mode\n");
-		} else if (strcasecmp(ofields, "all") == 0) {
-			die("\"all\" not allowed in parsable output mode\n");
-		}
+	/*
+	 * Open a handle to the formatted output engine.
+	 */
+	ofmterr = ofmt_open(ofields, fields, ofmtflags, IPMPSTAT_NCOL, &ofmt);
+	if (ofmterr != OFMT_SUCCESS) {
+		/*
+		 * If some fields were badly formed in human-friendly mode, we
+		 * emit a warning and continue.  Otherwise exit immediately.
+		 */
+		(void) ofmt_strerror(ofmt, ofmterr, errbuf, sizeof (errbuf));
+		if (ofmterr != OFMT_EBADFIELDS || (opt & IPMPSTAT_OPT_PARSABLE))
+			die("%s\n", errbuf);
+		else
+			warn("%s\n", errbuf);
 	}
 
 	/*
@@ -287,19 +275,12 @@ main(int argc, char **argv)
 	 * is used to redisplay the output headers when necessary.
 	 */
 	(void) sigset(SIGWINCH, sighandler);
-	sighandler(SIGWINCH);
 
 	if ((err = ipmp_open(&ih)) != IPMP_SUCCESS)
 		die_ipmperr(err, "cannot create IPMP handle");
 
 	if (ipmp_ping_daemon(ih) != IPMP_SUCCESS)
 		die("cannot contact in.mpathd(1M) -- is IPMP in use?\n");
-
-	/*
-	 * Create the ofmt linked list that will eventually be passed to
-	 * to ofmt_output() to output the fields.
-	 */
-	ofmt = ofmt_create(ofields, fields);
 
 	/*
 	 * If we've been asked to display probes, then call the probe output
@@ -318,7 +299,7 @@ main(int argc, char **argv)
 		(*walker)(ih, cbfunc, ofmt);
 	}
 
-	ofmt_destroy(ofmt);
+	ofmt_close(ofmt);
 	ipmp_close(ih);
 
 	return (EXIT_SUCCESS);
@@ -430,24 +411,27 @@ walk_addr_cbfunc(ipmp_handle_t ih, void *infop, void *arg)
 	}
 }
 
-static void
-sfunc_nvwarn(const char *nvname, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_nvwarn(const char *nvname)
 {
 	warn("cannot retrieve %s\n", nvname);
-	(void) strlcpy(buf, "?", bufsize);
+	return (B_FALSE);
 }
 
-static void
-sfunc_addr_address(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_addr_address(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_addrinfo_t *adinfop = arg->sa_data;
 
 	sockaddr2str(&adinfop->ad_addr, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_addr_group(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_addr_group(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int err;
 	ipmp_addrinfo_t *adinfop = arg->sa_data;
 	ipmp_groupinfo_t *grinfop;
@@ -456,32 +440,37 @@ sfunc_addr_group(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 	if (err != IPMP_SUCCESS) {
 		warn_ipmperr(err, "cannot get info for group `%s'",
 		    adinfop->ad_group);
-		(void) strlcpy(buf, "?", bufsize);
-		return;
+		return (B_FALSE);
 	}
 	(void) strlcpy(buf, grinfop->gr_ifname, bufsize);
 	ipmp_freegroupinfo(grinfop);
+	return (B_TRUE);
 }
 
-static void
-sfunc_addr_state(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_addr_state(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_addrinfo_t *adinfop = arg->sa_data;
 
 	enum2str(addr_state, adinfop->ad_state, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_addr_inbound(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_addr_inbound(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_addrinfo_t *adinfop = arg->sa_data;
 
 	(void) strlcpy(buf, adinfop->ad_binding, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_addr_outbound(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_addr_outbound(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int err;
 	uint_t i, nactive = 0;
 	ipmp_ifinfo_t *ifinfop;
@@ -490,14 +479,14 @@ sfunc_addr_outbound(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 	ipmp_groupinfo_t *grinfop;
 
 	if (adinfop->ad_state == IPMP_ADDR_DOWN)
-		return;
+		return (B_TRUE);
 
 	/*
 	 * If there's no inbound interface for this address, there can't
 	 * be any outbound traffic.
 	 */
 	if (adinfop->ad_binding[0] == '\0')
-		return;
+		return (B_TRUE);
 
 	/*
 	 * The address can use any active interface in the group, so
@@ -507,8 +496,7 @@ sfunc_addr_outbound(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 	if (err != IPMP_SUCCESS) {
 		warn_ipmperr(err, "cannot get info for group `%s'",
 		    adinfop->ad_group);
-		(void) strlcpy(buf, "?", bufsize);
-		return;
+		return (B_FALSE);
 	}
 
 	iflistp = grinfop->gr_iflistp;
@@ -528,46 +516,56 @@ sfunc_addr_outbound(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 		ipmp_freeifinfo(ifinfop);
 	}
 	ipmp_freegroupinfo(grinfop);
+	return (B_TRUE);
 }
 
-static void
-sfunc_group_name(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_group_name(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_groupinfo_t *grinfop = arg->sa_data;
 
 	(void) strlcpy(buf, grinfop->gr_name, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_group_ifname(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_group_ifname(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_groupinfo_t *grinfop = arg->sa_data;
 
 	(void) strlcpy(buf, grinfop->gr_ifname, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_group_state(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_group_state(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_groupinfo_t *grinfop = arg->sa_data;
 
 	enum2str(group_state, grinfop->gr_state, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_group_fdt(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_group_fdt(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_groupinfo_t *grinfop = arg->sa_data;
 
 	if (grinfop->gr_fdt == 0)
-		return;
+		return (B_TRUE);
 
 	(void) snprintf(buf, bufsize, "%.2fs", MS2FLOATSEC(grinfop->gr_fdt));
+	return (B_TRUE);
 }
 
-static void
-sfunc_group_interfaces(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_group_interfaces(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int err;
 	uint_t i;
 	char *active, *inactive, *unusable;
@@ -627,30 +625,36 @@ sfunc_group_interfaces(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 		(void) strlcat(buf, unusable, bufsize);
 		(void) strlcat(buf, "]", bufsize);
 	}
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_name(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_name(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 
 	(void) strlcpy(buf, ifinfop->if_name, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_active(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_active(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 
 	if (ifinfop->if_flags & IPMP_IFFLAG_ACTIVE)
 		(void) strlcpy(buf, "yes", bufsize);
 	else
 		(void) strlcpy(buf, "no", bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_group(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_group(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int err;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 	ipmp_groupinfo_t *grinfop;
@@ -659,17 +663,18 @@ sfunc_if_group(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 	if (err != IPMP_SUCCESS) {
 		warn_ipmperr(err, "cannot get info for group `%s'",
 		    ifinfop->if_group);
-		(void) strlcpy(buf, "?", bufsize);
-		return;
+		return (B_TRUE);
 	}
 
 	(void) strlcpy(buf, grinfop->gr_ifname, bufsize);
 	ipmp_freegroupinfo(grinfop);
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_flags(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_flags(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int err;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 	ipmp_groupinfo_t *grinfop;
@@ -695,7 +700,7 @@ sfunc_if_flags(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 	if (err != IPMP_SUCCESS) {
 		warn_ipmperr(err, "cannot get broadcast/multicast info for "
 		    "group `%s'", ifinfop->if_group);
-		return;
+		return (B_TRUE);
 	}
 
 	if (strcmp(grinfop->gr_m4ifname, ifinfop->if_name) == 0)
@@ -708,175 +713,174 @@ sfunc_if_flags(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 		buf[IPMPSTAT_BFLAG_INDEX] = 'b';
 
 	ipmp_freegroupinfo(grinfop);
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_link(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_link(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 
 	enum2str(if_link, ifinfop->if_linkstate, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_probe(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_probe(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 
 	enum2str(if_probe, ifinfop->if_probestate, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_if_state(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_if_state(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_ifinfo_t *ifinfop = arg->sa_data;
 
 	enum2str(if_state, ifinfop->if_state, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_id(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_id(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	uint32_t probe_id;
 	nvlist_t *nvl = arg->sa_data;
 
-	if (nvlist_lookup_uint32(nvl, IPMP_PROBE_ID, &probe_id) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_ID", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_uint32(nvl, IPMP_PROBE_ID, &probe_id) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_ID"));
 
 	(void) snprintf(buf, bufsize, "%u", probe_id);
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_ifname(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_ifname(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	char *ifname;
 	nvlist_t *nvl = arg->sa_data;
 
-	if (nvlist_lookup_string(nvl, IPMP_IF_NAME, &ifname) != 0) {
-		sfunc_nvwarn("IPMP_IF_NAME", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_string(nvl, IPMP_IF_NAME, &ifname) != 0)
+		return (sfunc_nvwarn("IPMP_IF_NAME"));
 
 	(void) strlcpy(buf, ifname, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_time(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_time(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	hrtime_t start;
 	nvlist_t *nvl = arg->sa_data;
 
-	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_START_TIME, &start) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_START_TIME", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_START_TIME, &start) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_START_TIME"));
 
 	(void) snprintf(buf, bufsize, "%.2fs",
 	    (float)(start - probe_output_start) / NANOSEC);
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_target(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_target(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	uint_t nelem;
 	struct sockaddr_storage *target;
 	nvlist_t *nvl = arg->sa_data;
 
 	if (nvlist_lookup_byte_array(nvl, IPMP_PROBE_TARGET,
-	    (uchar_t **)&target, &nelem) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_TARGET", buf, bufsize);
-		return;
-	}
+	    (uchar_t **)&target, &nelem) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_TARGET"));
 
 	sockaddr2str(target, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_rtt(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_rtt(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	hrtime_t start, ackproc;
 	nvlist_t *nvl = arg->sa_data;
 	uint32_t state;
 
-	if (nvlist_lookup_uint32(nvl, IPMP_PROBE_STATE, &state) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_STATE", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_uint32(nvl, IPMP_PROBE_STATE, &state) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_STATE"));
 
 	if (state != IPMP_PROBE_ACKED)
-		return;
+		return (B_TRUE);
 
-	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_START_TIME, &start) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_START_TIME", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_START_TIME, &start) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_START_TIME"));
 
-	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_ACKPROC_TIME, &ackproc) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_ACKPROC_TIME", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_ACKPROC_TIME, &ackproc) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_ACKPROC_TIME"));
 
 	(void) snprintf(buf, bufsize, "%.2fms", NS2FLOATMS(ackproc - start));
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_netrtt(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_netrtt(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	hrtime_t sent, ackrecv;
 	nvlist_t *nvl = arg->sa_data;
 	uint32_t state;
 
-	if (nvlist_lookup_uint32(nvl, IPMP_PROBE_STATE, &state) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_STATE", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_uint32(nvl, IPMP_PROBE_STATE, &state) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_STATE"));
 
 	if (state != IPMP_PROBE_ACKED)
-		return;
+		return (B_TRUE);
 
-	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_SENT_TIME, &sent) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_SENT_TIME", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_SENT_TIME, &sent) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_SENT_TIME"));
 
-	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_ACKRECV_TIME, &ackrecv) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_ACKRECV_TIME", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_hrtime(nvl, IPMP_PROBE_ACKRECV_TIME, &ackrecv) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_ACKRECV_TIME"));
 
 	(void) snprintf(buf, bufsize, "%.2fms", NS2FLOATMS(ackrecv - sent));
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_rttavg(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_rttavg(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int64_t rttavg;
 	nvlist_t *nvl = arg->sa_data;
 
-	if (nvlist_lookup_int64(nvl, IPMP_PROBE_TARGET_RTTAVG, &rttavg) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_TARGET_RTTAVG", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_int64(nvl, IPMP_PROBE_TARGET_RTTAVG, &rttavg) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_TARGET_RTTAVG"));
 
 	if (rttavg != 0)
 		(void) snprintf(buf, bufsize, "%.2fms", NS2FLOATMS(rttavg));
+	return (B_TRUE);
 }
 
-static void
-sfunc_probe_rttdev(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_probe_rttdev(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	int64_t rttdev;
 	nvlist_t *nvl = arg->sa_data;
 
-	if (nvlist_lookup_int64(nvl, IPMP_PROBE_TARGET_RTTDEV, &rttdev) != 0) {
-		sfunc_nvwarn("IPMP_PROBE_TARGET_RTTDEV", buf, bufsize);
-		return;
-	}
+	if (nvlist_lookup_int64(nvl, IPMP_PROBE_TARGET_RTTDEV, &rttdev) != 0)
+		return (sfunc_nvwarn("IPMP_PROBE_TARGET_RTTDEV"));
 
 	if (rttdev != 0)
 		(void) snprintf(buf, bufsize, "%.2fms", NS2FLOATMS(rttdev));
+	return (B_TRUE);
 }
 
 /* ARGSUSED */
@@ -891,7 +895,7 @@ probe_enabled_cbfunc(ipmp_handle_t ih, void *infop, void *arg)
 }
 
 static void
-probe_output(ipmp_handle_t ih, ipmpstat_ofmt_t *ofmt)
+probe_output(ipmp_handle_t ih, ofmt_handle_t ofmt)
 {
 	char sub[MAX_SUBID_LEN];
 	evchan_t *evch;
@@ -972,34 +976,41 @@ out:
 	return (0);
 }
 
-static void
-sfunc_targ_ifname(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_targ_ifname(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_targinfo_t *targinfop = arg->sa_data;
 
 	(void) strlcpy(buf, targinfop->it_name, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_targ_mode(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_targ_mode(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_targinfo_t *targinfop = arg->sa_data;
 
 	enum2str(targ_mode, targinfop->it_targmode, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_targ_testaddr(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_targ_testaddr(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	ipmp_targinfo_t *targinfop = arg->sa_data;
 
 	if (targinfop->it_targmode != IPMP_TARG_DISABLED)
 		sockaddr2str(&targinfop->it_testaddr, buf, bufsize);
+	return (B_TRUE);
 }
 
-static void
-sfunc_targ_targets(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
+static boolean_t
+sfunc_targ_targets(ofmt_arg_t *ofmtarg, char *buf, uint_t bufsize)
 {
+	ipmpstat_sfunc_arg_t *arg = ofmtarg->ofmt_cbarg;
 	uint_t i;
 	char *targname = alloca(bufsize);
 	ipmp_targinfo_t *targinfop = arg->sa_data;
@@ -1011,6 +1022,7 @@ sfunc_targ_targets(ipmpstat_sfunc_arg_t *arg, char *buf, uint_t bufsize)
 		if ((i + 1) < targlistp->al_naddr)
 			(void) strlcat(buf, " ", bufsize);
 	}
+	return (B_TRUE);
 }
 
 static void
@@ -1039,227 +1051,18 @@ targinfo_output_cbfunc(ipmp_handle_t ih, void *infop, void *arg)
 }
 
 /*
- * Creates an ipmpstat_ofmt_t field list from the comma-separated list of
- * user-specified fields passed via `ofields'.  The table of known fields
- * (and their attributes) is passed via `fields'.
- */
-static ipmpstat_ofmt_t *
-ofmt_create(const char *ofields, ipmpstat_field_t fields[])
-{
-	char *token, *lasts, *ofields_dup;
-	const char *fieldname;
-	ipmpstat_ofmt_t *ofmt, *ofmt_head = NULL, *ofmt_tail;
-	ipmpstat_field_t *fieldp;
-	uint_t cols = 0;
-
-	/*
-	 * If "-o" was omitted or "-o all" was specified, build a list of
-	 * field names.  If "-o" was omitted, stop building the list when
-	 * we run out of columns.
-	 */
-	if (ofields == NULL || strcasecmp(ofields, "all") == 0) {
-		for (fieldp = fields; fieldp->f_name != NULL; fieldp++) {
-			cols += fieldp->f_width;
-			if (ofields == NULL && cols > IPMPSTAT_NCOL)
-				break;
-
-			if ((ofmt = calloc(sizeof (*ofmt), 1)) == NULL)
-				die("cannot allocate output format list");
-
-			ofmt->o_field = fieldp;
-			if (ofmt_head == NULL) {
-				ofmt_head = ofmt;
-				ofmt_tail = ofmt;
-			} else {
-				ofmt_tail->o_next = ofmt;
-				ofmt_tail = ofmt;
-			}
-		}
-		return (ofmt_head);
-	}
-
-	if ((ofields_dup = strdup(ofields)) == NULL)
-		die("cannot allocate output format list");
-
-	token = ofields_dup;
-	while ((fieldname = strtok_r(token, ",", &lasts)) != NULL) {
-		token = NULL;
-
-		if ((fieldp = field_find(fields, fieldname)) == NULL) {
-			/*
-			 * Since machine parsers are unlikely to be able to
-			 * gracefully handle missing fields, die if we're in
-			 * parsable mode.  Otherwise, just print a warning.
-			 */
-			if (opt & IPMPSTAT_OPT_PARSABLE)
-				die("unknown output field `%s'\n", fieldname);
-
-			warn("ignoring unknown output field `%s'\n", fieldname);
-			continue;
-		}
-
-		if ((ofmt = calloc(sizeof (*ofmt), 1)) == NULL)
-			die("cannot allocate output format list");
-
-		ofmt->o_field = fieldp;
-		if (ofmt_head == NULL) {
-			ofmt_head = ofmt;
-			ofmt_tail = ofmt;
-		} else {
-			ofmt_tail->o_next = ofmt;
-			ofmt_tail = ofmt;
-		}
-	}
-
-	free(ofields_dup);
-	if (ofmt_head == NULL)
-		die("no valid output fields specified\n");
-
-	return (ofmt_head);
-}
-
-/*
- * Destroys the provided `ofmt' field list.
+ * Outputs one row of values.  The values to output are obtained through the
+ * callback function pointers.  The actual values are computed from the `ih'
+ * and `arg' structures passed to the callback function.
  */
 static void
-ofmt_destroy(ipmpstat_ofmt_t *ofmt)
+ofmt_output(const ofmt_handle_t ofmt, ipmp_handle_t ih, void *arg)
 {
-	ipmpstat_ofmt_t *ofmt_next;
+	ipmpstat_sfunc_arg_t	sfunc_arg;
 
-	for (; ofmt != NULL; ofmt = ofmt_next) {
-		ofmt_next = ofmt->o_next;
-		free(ofmt);
-	}
-}
-
-/*
- * Outputs a header for the fields named by `ofmt'.
- */
-static void
-ofmt_output_header(const ipmpstat_ofmt_t *ofmt)
-{
-	const ipmpstat_field_t *fieldp;
-
-	for (; ofmt != NULL; ofmt = ofmt->o_next) {
-		fieldp = ofmt->o_field;
-
-		if (ofmt->o_next == NULL)
-			(void) printf("%s", fieldp->f_name);
-		else
-			(void) printf("%-*s", fieldp->f_width, fieldp->f_name);
-	}
-	(void) printf("\n");
-}
-
-/*
- * Outputs one row of values for the fields named by `ofmt'.  The values to
- * output are obtained through the `ofmt' function pointers, which are
- * indirectly passed the `ih' and `arg' structures for state; see the block
- * comment at the start of this file for details.
- */
-static void
-ofmt_output(const ipmpstat_ofmt_t *ofmt, ipmp_handle_t ih, void *arg)
-{
-	int i;
-	char buf[1024];
-	boolean_t escsep;
-	static int nrow;
-	const char *value;
-	uint_t width, valwidth;
-	uint_t compress, overflow = 0;
-	const ipmpstat_field_t *fieldp;
-	ipmpstat_sfunc_arg_t sfunc_arg;
-
-	/*
-	 * For each screenful of data, display the header.
-	 */
-	if ((nrow++ % winsize.ws_row) == 0 && !(opt & IPMPSTAT_OPT_PARSABLE)) {
-		ofmt_output_header(ofmt);
-		nrow++;
-	}
-
-	/*
-	 * Check if we'll be displaying multiple fields per line, and thus
-	 * need to escape the field separator.
-	 */
-	escsep = (ofmt != NULL && ofmt->o_next != NULL);
-
-	for (; ofmt != NULL; ofmt = ofmt->o_next) {
-		fieldp = ofmt->o_field;
-
-		sfunc_arg.sa_ih = ih;
-		sfunc_arg.sa_data = arg;
-
-		buf[0] = '\0';
-		(*fieldp->f_sfunc)(&sfunc_arg, buf, sizeof (buf));
-
-		if (opt & IPMPSTAT_OPT_PARSABLE) {
-			for (i = 0; buf[i] != '\0'; i++) {
-				if (escsep && (buf[i] == ':' || buf[i] == '\\'))
-					(void) putchar('\\');
-				(void) putchar(buf[i]);
-			}
-			if (ofmt->o_next != NULL)
-				(void) putchar(':');
-		} else {
-			value = (buf[0] == '\0') ? "--" : buf;
-
-			/*
-			 * To avoid needless line-wraps, for the last field,
-			 * don't include any trailing whitespace.
-			 */
-			if (ofmt->o_next == NULL) {
-				(void) printf("%s", value);
-				continue;
-			}
-
-			/*
-			 * For other fields, grow the width as necessary to
-			 * ensure the value completely fits.  However, if
-			 * there's unused whitespace in subsequent fields,
-			 * then "compress" that whitespace to attempt to get
-			 * the columns to line up again.
-			 */
-			width = fieldp->f_width;
-			valwidth = strlen(value);
-
-			if (valwidth + overflow >= width) {
-				overflow += valwidth - width + 1;
-				(void) printf("%s ", value);
-				continue;
-			}
-
-			if (overflow > 0) {
-				compress = MIN(overflow, width - valwidth);
-				overflow -= compress;
-				width -= compress;
-			}
-			(void) printf("%-*s", width, value);
-		}
-	}
-	(void) printf("\n");
-
-	/*
-	 * In case stdout has been redirected to e.g. a pipe, flush stdout so
-	 * that commands can act on our output immediately.
-	 */
-	(void) fflush(stdout);
-}
-
-/*
- * Searches the `fields' array for a field matching `fieldname'.  Returns
- * a pointer to that field on success, or NULL on failure.
- */
-static ipmpstat_field_t *
-field_find(ipmpstat_field_t *fields, const char *fieldname)
-{
-	ipmpstat_field_t *fieldp;
-
-	for (fieldp = fields; fieldp->f_name != NULL; fieldp++) {
-		if (strcasecmp(fieldp->f_name, fieldname) == 0)
-			return (fieldp);
-	}
-	return (NULL);
+	sfunc_arg.sa_ih = ih;
+	sfunc_arg.sa_data = arg;
+	ofmt_print(ofmt, &sfunc_arg);
 }
 
 /*
@@ -1318,11 +1121,7 @@ sighandler(int sig)
 {
 	assert(sig == SIGWINCH);
 
-	if (ioctl(1, TIOCGWINSZ, &winsize) == -1 ||
-	    winsize.ws_col == 0 || winsize.ws_row == 0) {
-		winsize.ws_col = 80;
-		winsize.ws_row = 24;
-	}
+	ofmt_update_winsize(ofmt);
 }
 
 static void
@@ -1415,94 +1214,94 @@ die_ipmperr(int ipmperr, const char *format, ...)
 	exit(EXIT_FAILURE);
 }
 
-static ipmpstat_field_t addr_fields[] = {
-	{ "ADDRESS",    26,	sfunc_addr_address	},
-	{ "STATE",	7,	sfunc_addr_state	},
-	{ "GROUP",	12,	sfunc_addr_group	},
-	{ "INBOUND",	12,	sfunc_addr_inbound	},
-	{ "OUTBOUND",	23,	sfunc_addr_outbound	},
-	{ NULL,		0, 	NULL			}
+static ofmt_field_t addr_fields[] = {
+	{ "ADDRESS",    26,	0, sfunc_addr_address		},
+	{ "STATE",	7,	0, sfunc_addr_state		},
+	{ "GROUP",	12,	0, sfunc_addr_group		},
+	{ "INBOUND",	12,	0, sfunc_addr_inbound		},
+	{ "OUTBOUND",	23,	0, sfunc_addr_outbound		},
+	{ NULL,		0, 	0, NULL				}
 };
 
-static ipmpstat_field_t group_fields[] = {
-	{ "GROUP",	12, 	sfunc_group_ifname	},
-	{ "GROUPNAME",	12,	sfunc_group_name 	},
-	{ "STATE",	10,	sfunc_group_state	},
-	{ "FDT",	10,	sfunc_group_fdt		},
-	{ "INTERFACES",	30,	sfunc_group_interfaces	},
-	{ NULL,		0, 	NULL			}
+static ofmt_field_t group_fields[] = {
+	{ "GROUP",	12, 	0, sfunc_group_ifname		},
+	{ "GROUPNAME",	12,	0, sfunc_group_name 		},
+	{ "STATE",	10,	0, sfunc_group_state		},
+	{ "FDT",	10,	0, sfunc_group_fdt		},
+	{ "INTERFACES",	30,	0, sfunc_group_interfaces	},
+	{ NULL,		0, 	0, NULL				}
 };
 
-static ipmpstat_field_t if_fields[] = {
-	{ "INTERFACE",	12,	sfunc_if_name		},
-	{ "ACTIVE",	8, 	sfunc_if_active		},
-	{ "GROUP",	12,	sfunc_if_group		},
-	{ "FLAGS",	10,	sfunc_if_flags		},
-	{ "LINK",	10,	sfunc_if_link		},
-	{ "PROBE",	10,	sfunc_if_probe		},
-	{ "STATE",	10, 	sfunc_if_state		},
-	{ NULL,		0, 	NULL			}
+static ofmt_field_t if_fields[] = {
+	{ "INTERFACE",	12,	0, sfunc_if_name		},
+	{ "ACTIVE",	8, 	0, sfunc_if_active		},
+	{ "GROUP",	12,	0, sfunc_if_group		},
+	{ "FLAGS",	10,	0, sfunc_if_flags		},
+	{ "LINK",	10,	0, sfunc_if_link		},
+	{ "PROBE",	10,	0, sfunc_if_probe		},
+	{ "STATE",	10, 	0, sfunc_if_state		},
+	{ NULL,		0, 	0, NULL				}
 };
 
-static ipmpstat_field_t probe_fields[] = {
-	{ "TIME",	10,	sfunc_probe_time	},
-	{ "INTERFACE",	12,	sfunc_probe_ifname	},
-	{ "PROBE",	7,	sfunc_probe_id		},
-	{ "NETRTT",	10,	sfunc_probe_netrtt	},
-	{ "RTT",	10,	sfunc_probe_rtt		},
-	{ "RTTAVG",	10,	sfunc_probe_rttavg	},
-	{ "TARGET",	20,	sfunc_probe_target	},
-	{ "RTTDEV",	10,	sfunc_probe_rttdev	},
-	{ NULL,		0, 	NULL			}
+static ofmt_field_t probe_fields[] = {
+	{ "TIME",	10,	0, sfunc_probe_time		},
+	{ "INTERFACE",	12,	0, sfunc_probe_ifname		},
+	{ "PROBE",	7,	0, sfunc_probe_id		},
+	{ "NETRTT",	10,	0, sfunc_probe_netrtt		},
+	{ "RTT",	10,	0, sfunc_probe_rtt		},
+	{ "RTTAVG",	10,	0, sfunc_probe_rttavg		},
+	{ "TARGET",	20,	0, sfunc_probe_target		},
+	{ "RTTDEV",	10,	0, sfunc_probe_rttdev		},
+	{ NULL,		0, 	0, NULL				}
 };
 
-static ipmpstat_field_t targ_fields[] = {
-	{ "INTERFACE",	12,	sfunc_targ_ifname	},
-	{ "MODE",	10,	sfunc_targ_mode		},
-	{ "TESTADDR",	20,	sfunc_targ_testaddr	},
-	{ "TARGETS",	38,	sfunc_targ_targets	},
-	{ NULL,		0, 	NULL			}
+static ofmt_field_t targ_fields[] = {
+	{ "INTERFACE",	12,	0, sfunc_targ_ifname		},
+	{ "MODE",	10,	0, sfunc_targ_mode		},
+	{ "TESTADDR",	20,	0, sfunc_targ_testaddr		},
+	{ "TARGETS",	38,	0, sfunc_targ_targets		},
+	{ NULL,		0, 	0, NULL				}
 };
 
 static ipmpstat_enum_t	addr_state[] = {
-	{ "up",		IPMP_ADDR_UP			},
-	{ "down",	IPMP_ADDR_DOWN			},
-	{ NULL,		0 				}
+	{ "up",		IPMP_ADDR_UP				},
+	{ "down",	IPMP_ADDR_DOWN				},
+	{ NULL,		0 					}
 };
 
 static ipmpstat_enum_t	group_state[] = {
-	{ "ok",		IPMP_GROUP_OK 			},
-	{ "failed",	IPMP_GROUP_FAILED		},
-	{ "degraded",	IPMP_GROUP_DEGRADED		},
-	{ NULL,		0 				}
+	{ "ok",		IPMP_GROUP_OK 				},
+	{ "failed",	IPMP_GROUP_FAILED			},
+	{ "degraded",	IPMP_GROUP_DEGRADED			},
+	{ NULL,		0 					}
 };
 
 static ipmpstat_enum_t	if_link[] = {
-	{ "up",		IPMP_LINK_UP 			},
-	{ "down",	IPMP_LINK_DOWN			},
-	{ "unknown",	IPMP_LINK_UNKNOWN		},
-	{ NULL,		0 				}
+	{ "up",		IPMP_LINK_UP 				},
+	{ "down",	IPMP_LINK_DOWN				},
+	{ "unknown",	IPMP_LINK_UNKNOWN			},
+	{ NULL,		0 					}
 };
 
 static ipmpstat_enum_t	if_probe[] = {
-	{ "ok",		IPMP_PROBE_OK 			},
-	{ "failed",	IPMP_PROBE_FAILED		},
-	{ "unknown",	IPMP_PROBE_UNKNOWN		},
-	{ "disabled",	IPMP_PROBE_DISABLED		},
-	{ NULL,		0 				}
+	{ "ok",		IPMP_PROBE_OK 				},
+	{ "failed",	IPMP_PROBE_FAILED			},
+	{ "unknown",	IPMP_PROBE_UNKNOWN			},
+	{ "disabled",	IPMP_PROBE_DISABLED			},
+	{ NULL,		0 					}
 };
 
 static ipmpstat_enum_t	if_state[] = {
-	{ "ok",		IPMP_IF_OK 			},
-	{ "failed",	IPMP_IF_FAILED			},
-	{ "unknown",	IPMP_IF_UNKNOWN			},
-	{ "offline",	IPMP_IF_OFFLINE			},
-	{ NULL,		0 				}
+	{ "ok",		IPMP_IF_OK 				},
+	{ "failed",	IPMP_IF_FAILED				},
+	{ "unknown",	IPMP_IF_UNKNOWN				},
+	{ "offline",	IPMP_IF_OFFLINE				},
+	{ NULL,		0 					}
 };
 
 static ipmpstat_enum_t	targ_mode[] = {
-	{ "disabled",	IPMP_TARG_DISABLED		},
-	{ "routes",	IPMP_TARG_ROUTES		},
-	{ "multicast",	IPMP_TARG_MULTICAST		},
-	{ NULL,		0 				}
+	{ "disabled",	IPMP_TARG_DISABLED			},
+	{ "routes",	IPMP_TARG_ROUTES			},
+	{ "multicast",	IPMP_TARG_MULTICAST			},
+	{ NULL,		0 					}
 };

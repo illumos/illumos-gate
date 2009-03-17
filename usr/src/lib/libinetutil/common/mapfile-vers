@@ -63,6 +63,11 @@ SUNWprivate_1.1 {
 	iu_unregister_event;
 	octet_to_hexascii;
 	sockaddrcmp;
+	ofmt_open;
+	ofmt_close;
+	ofmt_print;
+	ofmt_update_winsize;
+	ofmt_strerror;
     local:
 	*;
 };

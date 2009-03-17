@@ -511,6 +511,7 @@ usr/lib/libinetsvc.so			sparc
 # the shared object is shipped.
 #
 usr/include/libinetutil.h		sparc
+usr/include/ofmt.h			sparc
 usr/include/netinet/inetutil.h		sparc
 usr/lib/llib-linetutil			sparc
 usr/lib/llib-linetutil.ln		sparc

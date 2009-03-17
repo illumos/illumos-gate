@@ -29,7 +29,7 @@ ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 include $(SRC)/cmd/Makefile.cmd
 
 C99MODE = $(C99_ENABLE)
-LDLIBS += -lipmp -lsocket -lsysevent -lnvpair
+LDLIBS += -lipmp -lsocket -lsysevent -lnvpair -linetutil
 XGETFLAGS += -a -x $(PROG).xcl
 
 .KEEP_STATE:

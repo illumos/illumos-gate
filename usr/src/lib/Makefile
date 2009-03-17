@@ -314,6 +314,7 @@ MSGSUBDIRS=		\
 	libidmap	\
 	libinetcfg	\
 	libipmp		\
+	libinetutil	\
 	libnsl		\
 	libpam		\
 	libpicl		\

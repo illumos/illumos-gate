@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -27,6 +27,8 @@ msgid  ""
 msgid  "\t%-10llu"
 msgid  "\t%-6.1f"
 msgid  "\t-"
+msgid  "--"
+msgid  "--,"
 msgid  "\tipackets  rbytes      opackets  obytes          "
 msgid  "\n"
 msgid  " "
@@ -300,6 +302,7 @@ msgid  "opktdist"
 msgid  "output"
 msgid  "over"
 msgid  "parseable"
+msgid  "parsable"
 msgid  "pause"
 msgid  "pd:si:"
 msgid  "peeradv"

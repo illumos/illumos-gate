@@ -49,62 +49,16 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <stddef.h>
-
-#define	CMD_TYPE_ANY	0xffffffff
-#define	STR_UNDEF_VAL	"--"
-
-
-/*
- * data structures and routines for printing output.
- */
-
-typedef struct print_field_s {
-	const char	*pf_name;
-	const char	*pf_header;
-	uint_t		pf_width;
-	union {
-		uint_t	_pf_index;
-		size_t	_pf_offset;
-	}_pf_un;
-#define	pf_index	_pf_un._pf_index
-#define	pf_offset	_pf_un._pf_offset;
-	uint_t	pf_cmdtype;
-} print_field_t;
-
-typedef struct print_state_s {
-	print_field_t	**ps_fields;
-	uint_t		ps_nfields;
-	boolean_t	ps_lastfield;
-	uint_t		ps_overflow;
-} print_state_t;
+#include <ofmt.h>
 
 typedef struct show_usage_state_s {
 	boolean_t	us_plot;
-	boolean_t	us_parseable;
+	boolean_t	us_parsable;
 	boolean_t	us_printheader;
 	boolean_t	us_first;
 	boolean_t	us_showall;
-	print_state_t	us_print;
+	ofmt_handle_t	us_ofmt;
 } show_usage_state_t;
-
-typedef char *(*print_callback_t)(print_field_t *, void *);
-static print_field_t **parse_output_fields(char *, print_field_t *, int,
-    uint_t, uint_t *);
-
-static void print_header(print_state_t *);
-static void print_field(print_state_t *, print_field_t *, const char *,
-    boolean_t);
-
-static void flowadm_print_output(print_state_t *, boolean_t,
-    print_callback_t, void *);
-
-/*
- * helper function that, when invoked as flowadm(print_field(pf, buf)
- * prints string which is offset by pf->pf_offset within buf.
- */
-static char *flowadm_print_field(print_field_t *, void *);
-
-#define	MAX_FIELD_LEN	32
 
 typedef struct show_flow_state {
 	boolean_t		fs_firstonly;
@@ -112,11 +66,10 @@ typedef struct show_flow_state {
 	pktsum_t		fs_prevstats;
 	uint32_t		fs_flags;
 	dladm_status_t		fs_status;
-	print_state_t		fs_print;
+	ofmt_handle_t		fs_ofmt;
 	const char		*fs_flow;
 	const char		*fs_link;
-	boolean_t		fs_parseable;
-	boolean_t		fs_printheader;
+	boolean_t		fs_parsable;
 	boolean_t		fs_persist;
 	boolean_t		fs_stats;
 	uint64_t		fs_mask;
@@ -150,6 +103,10 @@ static void	die_dlerr(dladm_status_t, const char *, ...);
 static void	warn(const char *, ...);
 static void	warn_dlerr(dladm_status_t, const char *, ...);
 
+/* callback functions for printing output */
+static ofmt_cb_t print_flowprop_cb, print_default_cb, print_flow_stats_cb;
+static void flowadm_ofmt_check(ofmt_status_t, boolean_t, ofmt_handle_t);
+
 typedef struct	cmd {
 	char	*c_name;
 	void	(*c_fn)(int, char **);
@@ -168,6 +125,7 @@ static cmd_t	cmds[] = {
 
 static const struct option longopts[] = {
 	{"link",		required_argument,	0, 'l'},
+	{"parsable",		no_argument,		0, 'p'},
 	{"parseable",		no_argument,		0, 'p'},
 	{"statistics",		no_argument,		0, 's'},
 	{"interval",		required_argument,	0, 'i'},
@@ -188,7 +146,6 @@ static const struct option prop_longopts[] = {
 /*
  * structures for 'flowadm remove-flow'
  */
-
 typedef struct remove_flow_state {
 	boolean_t	fs_tempop;
 	const char	*fs_altroot;
@@ -198,6 +155,7 @@ typedef struct remove_flow_state {
 #define	PROTO_MAXSTR_LEN	7
 #define	PORT_MAXSTR_LEN		6
 #define	DSFIELD_MAXSTR_LEN	10
+#define	NULL_OFMT		{NULL, 0, 0, NULL}
 
 typedef struct flow_fields_buf_s
 {
@@ -209,23 +167,22 @@ typedef struct flow_fields_buf_s
 	char flow_dsfield[DSFIELD_MAXSTR_LEN];
 } flow_fields_buf_t;
 
-static print_field_t flow_fields[] = {
-/* name,	header,		field width,	index,		cmdtype	*/
-{  "flow",	"FLOW",		11,
-    offsetof(flow_fields_buf_t, flow_name),	CMD_TYPE_ANY},
-{  "link",	"LINK",		11,
-    offsetof(flow_fields_buf_t, flow_link),	CMD_TYPE_ANY},
-{  "ipaddr",	"IPADDR",	30,
-    offsetof(flow_fields_buf_t, flow_ipaddr),	CMD_TYPE_ANY},
-{  "proto",	"PROTO",	6,
-    offsetof(flow_fields_buf_t, flow_proto),	CMD_TYPE_ANY},
-{  "port",	 "PORT",	7,
-    offsetof(flow_fields_buf_t, flow_port),	CMD_TYPE_ANY},
-{  "dsfld",	"DSFLD",	9,
-    offsetof(flow_fields_buf_t, flow_dsfield),	CMD_TYPE_ANY}}
+static ofmt_field_t flow_fields[] = {
+/* name,	field width,	index */
+{  "FLOW",	12,
+	offsetof(flow_fields_buf_t, flow_name), print_default_cb},
+{  "LINK",	12,
+	offsetof(flow_fields_buf_t, flow_link), print_default_cb},
+{  "IPADDR",	31,
+	offsetof(flow_fields_buf_t, flow_ipaddr), print_default_cb},
+{  "PROTO",	7,
+	offsetof(flow_fields_buf_t, flow_proto), print_default_cb},
+{  "PORT",	8,
+	offsetof(flow_fields_buf_t, flow_port), print_default_cb},
+{  "DSFLD",	10,
+	offsetof(flow_fields_buf_t, flow_dsfield), print_default_cb},
+NULL_OFMT}
 ;
-
-#define	FLOW_MAX_FIELDS		(sizeof (flow_fields) / sizeof (print_field_t))
 
 /*
  * structures for 'flowadm show-flowprop'
@@ -238,16 +195,15 @@ typedef enum {
 	FLOWPROP_POSSIBLE
 } flowprop_field_index_t;
 
-static print_field_t flowprop_fields[] = {
-/* name,	header,		fieldwidth,	index,		cmdtype */
-{ "flow",	"FLOW",		12,	FLOWPROP_FLOW,		CMD_TYPE_ANY},
-{ "property",	"PROPERTY",	15,	FLOWPROP_PROPERTY,	CMD_TYPE_ANY},
-{ "value",	"VALUE",	14,	FLOWPROP_VALUE,		CMD_TYPE_ANY},
-{ "default",	"DEFAULT",	14,	FLOWPROP_DEFAULT,	CMD_TYPE_ANY},
-{ "possible",	"POSSIBLE",	20,	FLOWPROP_POSSIBLE,	CMD_TYPE_ANY}}
+static ofmt_field_t flowprop_fields[] = {
+/* name,	fieldwidth,	index, 		callback */
+{ "FLOW",	13,	FLOWPROP_FLOW,		print_flowprop_cb},
+{ "PROPERTY",	16,	FLOWPROP_PROPERTY,	print_flowprop_cb},
+{ "VALUE",	15,	FLOWPROP_VALUE,		print_flowprop_cb},
+{ "DEFAULT",	15,	FLOWPROP_DEFAULT,	print_flowprop_cb},
+{ "POSSIBLE",	21,	FLOWPROP_POSSIBLE,	print_flowprop_cb},
+NULL_OFMT}
 ;
-#define	FLOWPROP_MAX_FIELDS					\
-	(sizeof (flowprop_fields) / sizeof (print_field_t))
 
 #define	MAX_PROP_LINE		512
 
@@ -257,12 +213,12 @@ typedef struct show_flowprop_state {
 	char			*fs_line;
 	char			**fs_propvals;
 	dladm_arg_list_t	*fs_proplist;
-	boolean_t		fs_parseable;
+	boolean_t		fs_parsable;
 	boolean_t		fs_persist;
 	boolean_t		fs_header;
 	dladm_status_t		fs_status;
 	dladm_status_t		fs_retstatus;
-	print_state_t		fs_print;
+	ofmt_handle_t		fs_ofmt;
 } show_flowprop_state_t;
 
 typedef struct set_flowprop_state {
@@ -290,29 +246,26 @@ typedef enum {
 	FLOW_S_OERRORS
 } flow_s_field_index_t;
 
-static print_field_t flow_s_fields[] = {
-/* name,	header,		field width,	index,		cmdtype	*/
-{ "flow",	"FLOW",			15,	FLOW_S_FLOW,	CMD_TYPE_ANY},
-{ "ipackets",	"IPACKETS",		10,	FLOW_S_IPKTS,	CMD_TYPE_ANY},
-{ "rbytes",	"RBYTES",		8,	FLOW_S_RBYTES,	CMD_TYPE_ANY},
-{ "ierrors",	"IERRORS",		10,	FLOW_S_IERRORS,	CMD_TYPE_ANY},
-{ "opackets",	"OPACKETS",		12,	FLOW_S_OPKTS,	CMD_TYPE_ANY},
-{ "obytes",	"OBYTES",		12,	FLOW_S_OBYTES,	CMD_TYPE_ANY},
-{ "oerrors",	"OERRORS",		8,	FLOW_S_OERRORS,	CMD_TYPE_ANY}}
+static ofmt_field_t flow_s_fields[] = {
+/* name,	field width,	index,		callback */
+{ "FLOW",	15,	FLOW_S_FLOW,	print_flow_stats_cb},
+{ "IPACKETS",	10,	FLOW_S_IPKTS,	print_flow_stats_cb},
+{ "RBYTES",	8,	FLOW_S_RBYTES,	print_flow_stats_cb},
+{ "IERRORS",	10,	FLOW_S_IERRORS,	print_flow_stats_cb},
+{ "OPACKETS",	12,	FLOW_S_OPKTS,	print_flow_stats_cb},
+{ "OBYTES",	12,	FLOW_S_OBYTES,	print_flow_stats_cb},
+{ "OERRORS",	8,	FLOW_S_OERRORS,	print_flow_stats_cb},
+NULL_OFMT}
 ;
-#define	FLOW_S_MAX_FIELDS \
-	(sizeof (flow_s_fields) / sizeof (print_field_t))
 
 typedef struct flow_args_s {
 	char		*flow_s_flow;
 	pktsum_t	*flow_s_psum;
 } flow_args_t;
-static char *print_flow_stats(print_field_t *, void *);
 
 /*
  * structures for 'flowadm show-usage'
  */
-
 typedef struct  usage_fields_buf_s {
 	char	usage_flow[12];
 	char	usage_duration[10];
@@ -323,25 +276,24 @@ typedef struct  usage_fields_buf_s {
 	char	usage_bandwidth[14];
 } usage_fields_buf_t;
 
-static print_field_t usage_fields[] = {
-/* name,	header,		field width,	offset,	cmdtype		*/
-{ "flow",	"FLOW",			12,
-    offsetof(usage_fields_buf_t, usage_flow),		CMD_TYPE_ANY},
-{ "duration",	"DURATION",		10,
-    offsetof(usage_fields_buf_t, usage_duration),	CMD_TYPE_ANY},
-{ "ipackets",	"IPACKETS",		9,
-    offsetof(usage_fields_buf_t, usage_ipackets),	CMD_TYPE_ANY},
-{ "rbytes",	"RBYTES",		10,
-    offsetof(usage_fields_buf_t, usage_rbytes),		CMD_TYPE_ANY},
-{ "opackets",	"OPACKETS",		9,
-    offsetof(usage_fields_buf_t, usage_opackets),	CMD_TYPE_ANY},
-{ "obytes",	"OBYTES",		10,
-    offsetof(usage_fields_buf_t, usage_obytes),		CMD_TYPE_ANY},
-{ "bandwidth",	"BANDWIDTH",		14,
-    offsetof(usage_fields_buf_t, usage_bandwidth),	CMD_TYPE_ANY}}
+static ofmt_field_t usage_fields[] = {
+/* name,	field width,	offset */
+{ "FLOW",	13,
+	offsetof(usage_fields_buf_t, usage_flow), print_default_cb},
+{ "DURATION",	11,
+	offsetof(usage_fields_buf_t, usage_duration), print_default_cb},
+{ "IPACKETS",	10,
+	offsetof(usage_fields_buf_t, usage_ipackets), print_default_cb},
+{ "RBYTES",	11,
+	offsetof(usage_fields_buf_t, usage_rbytes), print_default_cb},
+{ "OPACKETS",	10,
+	offsetof(usage_fields_buf_t, usage_opackets), print_default_cb},
+{ "OBYTES",	11,
+	offsetof(usage_fields_buf_t, usage_obytes), print_default_cb},
+{ "BANDWIDTH",	15,
+	offsetof(usage_fields_buf_t, usage_bandwidth), print_default_cb},
+NULL_OFMT}
 ;
-
-#define	USAGE_MAX_FIELDS	(sizeof (usage_fields) / sizeof (print_field_t))
 
 /*
  * structures for 'dladm show-usage link'
@@ -356,24 +308,22 @@ typedef struct  usage_l_fields_buf_s {
 	char	usage_l_bandwidth[14];
 } usage_l_fields_buf_t;
 
-static print_field_t usage_l_fields[] = {
-/* name,	header,		field width,	offset,	cmdtype		*/
-{ "flow",	"FLOW",		12,
-    offsetof(usage_l_fields_buf_t, usage_l_flow),	CMD_TYPE_ANY},
-{ "start",	"START",	13,
-    offsetof(usage_l_fields_buf_t, usage_l_stime),	CMD_TYPE_ANY},
-{ "end",	"END",		13,
-    offsetof(usage_l_fields_buf_t, usage_l_etime),	CMD_TYPE_ANY},
-{ "rbytes",	"RBYTES",	8,
-    offsetof(usage_l_fields_buf_t, usage_l_rbytes),	CMD_TYPE_ANY},
-{ "obytes",	"OBYTES",	8,
-    offsetof(usage_l_fields_buf_t, usage_l_obytes),	CMD_TYPE_ANY},
-{ "bandwidth",	"BANDWIDTH",	14,
-    offsetof(usage_l_fields_buf_t, usage_l_bandwidth),	CMD_TYPE_ANY}}
+static ofmt_field_t usage_l_fields[] = {
+/* name,	field width,	offset */
+{ "FLOW",	13,
+	offsetof(usage_l_fields_buf_t, usage_l_flow), print_default_cb},
+{ "START",	14,
+	offsetof(usage_l_fields_buf_t, usage_l_stime), print_default_cb},
+{ "END",	14,
+	offsetof(usage_l_fields_buf_t, usage_l_etime), print_default_cb},
+{ "RBYTES",	9,
+	offsetof(usage_l_fields_buf_t, usage_l_rbytes), print_default_cb},
+{ "OBYTES",	9,
+	offsetof(usage_l_fields_buf_t, usage_l_obytes), print_default_cb},
+{ "BANDWIDTH",	15,
+	offsetof(usage_l_fields_buf_t, usage_l_bandwidth), print_default_cb},
+NULL_OFMT}
 ;
-
-#define	USAGE_L_MAX_FIELDS \
-	(sizeof (usage_l_fields) /sizeof (print_field_t))
 
 #define	PRI_HI		100
 #define	PRI_LO 		10
@@ -588,14 +538,7 @@ show_usage_time(dladm_usage_t *usage, void *arg)
 	(void) snprintf(ubuf.usage_l_bandwidth, sizeof (ubuf.usage_l_bandwidth),
 	    "%s Mbps", dladm_bw2str(usage->du_bandwidth, buf));
 
-	if (!state->us_parseable && !state->us_printheader) {
-		print_header(&state->us_print);
-		state->us_printheader = B_TRUE;
-	}
-
-	flowadm_print_output(&state->us_print, state->us_parseable,
-	    flowadm_print_field, (void *)&ubuf);
-
+	ofmt_print(state->us_ofmt, (void *)&ubuf);
 	return (DLADM_STATUS_OK);
 }
 
@@ -634,13 +577,7 @@ show_usage_res(dladm_usage_t *usage, void *arg)
 	(void) snprintf(ubuf.usage_bandwidth, sizeof (ubuf.usage_bandwidth),
 	    "%s Mbps", dladm_bw2str(usage->du_bandwidth, buf));
 
-	if (!state->us_parseable && !state->us_printheader) {
-		print_header(&state->us_print);
-		state->us_printheader = B_TRUE;
-	}
-
-	flowadm_print_output(&state->us_print, state->us_parseable,
-	    flowadm_print_field, (void *)&ubuf);
+	ofmt_print(state->us_ofmt, (void *)&ubuf);
 
 	return (DLADM_STATUS_OK);
 }
@@ -669,15 +606,16 @@ do_show_usage(int argc, char *argv[])
 	boolean_t		F_arg = B_FALSE;
 	char			*fields_str = NULL;
 	char			*formatspec_str = NULL;
-	print_field_t		**fields;
-	uint_t			nfields;
 	char			*all_fields =
 	    "flow,duration,ipackets,rbytes,opackets,obytes,bandwidth";
 	char			*all_l_fields =
 	    "flow,start,end,rbytes,obytes,bandwidth";
+	ofmt_handle_t		ofmt;
+	ofmt_status_t		oferr;
+	uint_t			ofmtflags = 0;
 
 	bzero(&state, sizeof (show_usage_state_t));
-	state.us_parseable = B_FALSE;
+	state.us_parsable = B_FALSE;
 	state.us_printheader = B_FALSE;
 	state.us_plot = B_FALSE;
 	state.us_first = B_TRUE;
@@ -726,24 +664,22 @@ do_show_usage(int argc, char *argv[])
 		resource = argv[optind];
 	}
 
+	if (state.us_parsable)
+		ofmtflags |= OFMT_PARSABLE;
 	if (resource == NULL && stime == NULL && etime == NULL) {
 		if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0))
 			fields_str = all_fields;
-		fields = parse_output_fields(fields_str, usage_fields,
-		    USAGE_MAX_FIELDS, CMD_TYPE_ANY, &nfields);
+		oferr = ofmt_open(fields_str, usage_fields, ofmtflags,
+		    0, &ofmt);
 	} else {
 		if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0))
 			fields_str = all_l_fields;
-		fields = parse_output_fields(fields_str, usage_l_fields,
-		    USAGE_L_MAX_FIELDS, CMD_TYPE_ANY, &nfields);
+		oferr = ofmt_open(fields_str, usage_l_fields, ofmtflags,
+		    0, &ofmt);
 	}
 
-	if (fields == NULL) {
-		die("invalid fields(s) specified");
-		return;
-	}
-	state.us_print.ps_fields = fields;
-	state.us_print.ps_nfields = nfields;
+	flowadm_ofmt_check(oferr, state.us_parsable, ofmt);
+	state.us_ofmt = ofmt;
 
 	if (F_arg && d_arg)
 		die("incompatible -d and -F options");
@@ -770,6 +706,7 @@ do_show_usage(int argc, char *argv[])
 		    DLADM_LOGTYPE_FLOW, file, stime, etime, &state);
 	}
 
+	ofmt_close(ofmt);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "show-usage");
 }
@@ -949,15 +886,6 @@ remove_flow(dladm_flow_attr_t *attr, void *arg)
 		return (DLADM_WALK_TERMINATE);
 }
 
-static char *
-flowadm_print_field(print_field_t *pf, void *arg)
-{
-	char *value;
-
-	value = (char *)arg + pf->pf_offset;
-	return (value);
-}
-
 /*ARGSUSED*/
 static dladm_status_t
 print_flow(show_flow_state_t *state, dladm_flow_attr_t *attr,
@@ -1007,13 +935,7 @@ show_flow(dladm_flow_attr_t *attr, void *arg)
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
-	if (!statep->fs_parseable && !statep->fs_printheader) {
-		print_header(&statep->fs_print);
-		statep->fs_printheader = B_TRUE;
-	}
-
-	flowadm_print_output(&statep->fs_print, statep->fs_parseable,
-	    flowadm_print_field, (void *)&fbuf);
+	ofmt_print(statep->fs_ofmt, (void *)&fbuf);
 
 done:
 	statep->fs_status = status;
@@ -1067,48 +989,47 @@ get_flow_stats(const char *flowname, pktsum_t *stats)
 	(void) kstat_close(kcp);
 }
 
-
-static char *
-print_flow_stats(print_field_t *pf, void *arg)
+static boolean_t
+print_flow_stats_cb(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
 {
-	flow_args_t	*fargs = arg;
+	flow_args_t	*fargs = of_arg->ofmt_cbarg;
 	pktsum_t	*diff_stats = fargs->flow_s_psum;
-	static char	buf[DLADM_STRSIZE];
 
-	switch (pf->pf_index) {
+	switch (of_arg->ofmt_id) {
 	case FLOW_S_FLOW:
-		(void) snprintf(buf, sizeof (buf), "%s", fargs->flow_s_flow);
+		(void) snprintf(buf, bufsize, "%s", fargs->flow_s_flow);
 		break;
 	case FLOW_S_IPKTS:
-		(void) snprintf(buf, sizeof (buf), "%llu",
+		(void) snprintf(buf, bufsize, "%llu",
 		    diff_stats->ipackets);
 		break;
 	case FLOW_S_RBYTES:
-		(void) snprintf(buf, sizeof (buf), "%llu",
+		(void) snprintf(buf, bufsize, "%llu",
 		    diff_stats->rbytes);
 		break;
 	case FLOW_S_IERRORS:
-		(void) snprintf(buf, sizeof (buf), "%u",
+		(void) snprintf(buf, bufsize, "%u",
 		    diff_stats->ierrors);
 		break;
 	case FLOW_S_OPKTS:
-		(void) snprintf(buf, sizeof (buf), "%llu",
+		(void) snprintf(buf, bufsize, "%llu",
 		    diff_stats->opackets);
 		break;
 	case FLOW_S_OBYTES:
-		(void) snprintf(buf, sizeof (buf), "%llu",
+		(void) snprintf(buf, bufsize, "%llu",
 		    diff_stats->obytes);
 		break;
 	case FLOW_S_OERRORS:
-		(void) snprintf(buf, sizeof (buf), "%u",
+		(void) snprintf(buf, bufsize, "%u",
 		    diff_stats->oerrors);
 		break;
 	default:
 		die("invalid input");
 		break;
 	}
-	return (buf);
+	return (B_TRUE);
 }
+
 /* ARGSUSED */
 static int
 show_flow_stats(dladm_flow_attr_t *attr, void *arg)
@@ -1131,9 +1052,7 @@ show_flow_stats(dladm_flow_attr_t *attr, void *arg)
 
 	fargs.flow_s_flow = name;
 	fargs.flow_s_psum = &diff_stats;
-	flowadm_print_output(&state->fs_print, state->fs_parseable,
-	    print_flow_stats, &fargs);
-
+	ofmt_print(state->fs_ofmt, (void *)&fargs);
 	state->fs_prevstats = stats;
 
 	return (DLADM_WALK_CONTINUE);
@@ -1160,18 +1079,13 @@ flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval,
     char *fields_str, show_flow_state_t *state)
 {
 	dladm_flow_attr_t	attr;
-	print_field_t		**fields;
-	uint_t			nfields;
+	ofmt_handle_t		ofmt;
+	ofmt_status_t		oferr;
+	uint_t			ofmtflags = 0;
 
-	fields = parse_output_fields(fields_str, flow_s_fields,
-	    FLOW_S_MAX_FIELDS, CMD_TYPE_ANY, &nfields);
-	if (fields == NULL) {
-		die("invalid field(s) specified");
-		return;
-	}
-
-	state->fs_print.ps_fields = fields;
-	state->fs_print.ps_nfields = nfields;
+	oferr = ofmt_open(fields_str, flow_s_fields, ofmtflags, 0, &ofmt);
+	flowadm_ofmt_check(oferr, state->fs_parsable, ofmt);
+	state->fs_ofmt = ofmt;
 
 	if (flow != NULL &&
 	    dladm_flow_info(handle, flow, &attr) != DLADM_STATUS_OK)
@@ -1183,8 +1097,6 @@ flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval,
 	 */
 	state->fs_firstonly = (interval != 0);
 
-	if (!state->fs_parseable)
-		print_header(&state->fs_print);
 	for (;;) {
 		state->fs_donefirst = B_FALSE;
 
@@ -1210,6 +1122,7 @@ flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval,
 
 		(void) sleep(interval);
 	}
+	ofmt_close(ofmt);
 }
 
 static void
@@ -1227,12 +1140,9 @@ do_show_flow(int argc, char *argv[])
 	uint32_t		interval = 0;
 	show_flow_state_t	state;
 	char			*fields_str = NULL;
-	print_field_t		**fields;
-	uint_t			nfields;
-	char			*all_fields =
-	    "flow,link,ipaddr,proto,port,dsfld";
-	char			*allstat_fields =
-	    "flow,ipackets,rbytes,ierrors,opackets,obytes,oerrors";
+	ofmt_handle_t		ofmt;
+	ofmt_status_t		oferr;
+	uint_t			ofmtflags = 0;
 
 	bzero(&state, sizeof (state));
 
@@ -1241,7 +1151,8 @@ do_show_flow(int argc, char *argv[])
 	    longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			state.fs_parseable = B_TRUE;
+			state.fs_parsable = B_TRUE;
+			ofmtflags |= OFMT_PARSABLE;
 			break;
 		case 'P':
 			state.fs_persist = B_TRUE;
@@ -1288,7 +1199,6 @@ do_show_flow(int argc, char *argv[])
 			break;
 		}
 	}
-
 	if (i_arg && !(s_arg || S_arg))
 		die("the -i option can be used only with -s or -S");
 
@@ -1309,28 +1219,14 @@ do_show_flow(int argc, char *argv[])
 		return;
 	}
 
-	if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0)) {
-		if (s_arg)
-			fields_str = allstat_fields;
-		else
-			fields_str = all_fields;
-	}
-
 	if (s_arg) {
 		flow_stats(state.fs_flow, linkid, interval, fields_str, &state);
 		return;
 	}
 
-	fields = parse_output_fields(fields_str, flow_fields, FLOW_MAX_FIELDS,
-	    CMD_TYPE_ANY, &nfields);
-
-	if (fields == NULL) {
-		die("invalid fields(s) specified");
-		return;
-	}
-
-	state.fs_print.ps_fields = fields;
-	state.fs_print.ps_nfields = nfields;
+	oferr = ofmt_open(fields_str, flow_fields, ofmtflags, 0, &ofmt);
+	flowadm_ofmt_check(oferr, state.fs_parsable, ofmt);
+	state.fs_ofmt = ofmt;
 
 	/* Show attributes of one flow */
 	if (state.fs_flow != NULL) {
@@ -1346,6 +1242,7 @@ do_show_flow(int argc, char *argv[])
 		    &state, DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_ACTIVE);
 	}
+	ofmt_close(ofmt);
 }
 
 static dladm_status_t
@@ -1693,8 +1590,8 @@ print_flowprop(const char *flowname, show_flowprop_state_t *statep,
 	ptr = buf;
 	lim = buf + DLADM_STRSIZE;
 	for (i = 0; i < valcnt; i++) {
-		if (propvals[i][0] == '\0' && !statep->fs_parseable)
-			ptr += snprintf(ptr, lim - ptr, STR_UNDEF_VAL",");
+		if (propvals[i][0] == '\0' && !statep->fs_parsable)
+			ptr += snprintf(ptr, lim - ptr, "--,");
 		else
 			ptr += snprintf(ptr, lim - ptr, "%s,", propvals[i]);
 		if (ptr >= lim)
@@ -1704,7 +1601,7 @@ print_flowprop(const char *flowname, show_flowprop_state_t *statep,
 		buf[strlen(buf) - 1] = '\0';
 
 	lim = statep->fs_line + MAX_PROP_LINE;
-	if (statep->fs_parseable) {
+	if (statep->fs_parsable) {
 		*pptr += snprintf(*pptr, lim - *pptr,
 		    "%s", buf);
 	} else {
@@ -1712,17 +1609,17 @@ print_flowprop(const char *flowname, show_flowprop_state_t *statep,
 	}
 }
 
-static char *
-flowprop_callback(print_field_t *pf, void *fs_arg)
+static boolean_t
+print_flowprop_cb(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
 {
-	flowprop_args_t		*arg = fs_arg;
+	flowprop_args_t		*arg = of_arg->ofmt_cbarg;
 	char 			*propname = arg->fs_propname;
 	show_flowprop_state_t	*statep = arg->fs_state;
 	char			*ptr = statep->fs_line;
 	char			*lim = ptr + MAX_PROP_LINE;
 	char			*flowname = arg->fs_flowname;
 
-	switch (pf->pf_index) {
+	switch (of_arg->ofmt_id) {
 	case FLOWPROP_FLOW:
 		(void) snprintf(ptr, lim - ptr, "%s", statep->fs_flow);
 		break;
@@ -1760,12 +1657,12 @@ flowprop_callback(print_field_t *pf, void *fs_arg)
 		die("invalid input");
 		break;
 	}
-	return (ptr);
+	(void) strlcpy(buf, ptr, bufsize);
+	return (B_TRUE);
 skip:
-	if (statep->fs_status != DLADM_STATUS_OK)
-		return (NULL);
-	else
-		return ("");
+	buf[0] = '\0';
+	return ((statep->fs_status == DLADM_STATUS_OK) ?
+	    B_TRUE : B_FALSE);
 }
 
 static int
@@ -1779,13 +1676,7 @@ show_one_flowprop(void *arg, const char *propname)
 	fs_arg.fs_propname = (char *)propname;
 	fs_arg.fs_flowname = (char *)statep->fs_flow;
 
-	if (statep->fs_header) {
-		statep->fs_header = B_FALSE;
-		if (!statep ->fs_parseable)
-			print_header(&statep->fs_print);
-	}
-	flowadm_print_output(&statep->fs_print, statep->fs_parseable,
-	    flowprop_callback, (void *)&fs_arg);
+	ofmt_print(statep->fs_ofmt, (void *)&fs_arg);
 
 	return (DLADM_WALK_CONTINUE);
 }
@@ -1820,20 +1711,17 @@ static void
 do_show_flowprop(int argc, char **argv)
 {
 	int			option;
-	boolean_t		o_arg = B_FALSE;
 	dladm_arg_list_t	*proplist = NULL;
 	show_flowprop_state_t	state;
 	char			*fields_str = NULL;
-	print_field_t		**fields;
-	uint_t			nfields;
-	char			*all_fields =
-	    "flow,property,value,default,possible";
+	ofmt_handle_t		ofmt;
+	ofmt_status_t		oferr;
+	uint_t			ofmtflags = 0;
 
-	fields_str = all_fields;
 	opterr = 0;
 	state.fs_propvals = NULL;
 	state.fs_line = NULL;
-	state.fs_parseable = B_FALSE;
+	state.fs_parsable = B_FALSE;
 	state.fs_persist = B_FALSE;
 	state.fs_header = B_TRUE;
 	state.fs_retstatus = DLADM_STATUS_OK;
@@ -1849,7 +1737,8 @@ do_show_flowprop(int argc, char **argv)
 				die("invalid flow properties specified");
 			break;
 		case 'c':
-			state.fs_parseable = B_TRUE;
+			state.fs_parsable = B_TRUE;
+			ofmtflags |= OFMT_PARSABLE;
 			break;
 		case 'P':
 			state.fs_persist = B_TRUE;
@@ -1860,23 +1749,13 @@ do_show_flowprop(int argc, char **argv)
 				die("invalid link '%s'", optarg);
 			break;
 		case 'o':
-			o_arg = B_TRUE;
-			if (strcasecmp(optarg, "all") == 0)
-				fields_str = all_fields;
-			else
-				fields_str = optarg;
+			fields_str = optarg;
 			break;
 		default:
 			die_opterr(optopt, option);
 			break;
 		}
 	}
-
-	if (state.fs_parseable && !o_arg)
-		die("-p requires -o");
-
-	if (state.fs_parseable && strcasecmp(fields_str, "all") == 0)
-		die("\"-o all\" is invalid with -p");
 
 	if (optind == (argc - 1)) {
 		if (strlen(argv[optind]) >= MAXFLOWNAMELEN)
@@ -1885,20 +1764,12 @@ do_show_flowprop(int argc, char **argv)
 	} else if (optind != argc) {
 		usage();
 	}
-	bzero(&state.fs_print, sizeof (print_state_t));
 	state.fs_proplist = proplist;
 	state.fs_status = DLADM_STATUS_OK;
 
-	fields = parse_output_fields(fields_str, flowprop_fields,
-	    FLOWPROP_MAX_FIELDS, CMD_TYPE_ANY, &nfields);
-
-	if (fields == NULL) {
-		die("invalid field(s) specified");
-		return;
-	}
-
-	state.fs_print.ps_fields = fields;
-	state.fs_print.ps_nfields = nfields;
+	oferr = ofmt_open(fields_str, flowprop_fields, ofmtflags, 0, &ofmt);
+	flowadm_ofmt_check(oferr, state.fs_parsable, ofmt);
+	state.fs_ofmt = ofmt;
 
 	/* Show properties for one flow */
 	if (state.fs_flow != NULL) {
@@ -1916,6 +1787,7 @@ do_show_flowprop(int argc, char **argv)
 	}
 
 	dladm_free_props(proplist);
+	ofmt_close(ofmt);
 }
 
 static void
@@ -1974,179 +1846,39 @@ show_flowprop_one_flow(void *arg, const char *flow)
 	statep->fs_flow = savep;
 }
 
-typedef struct {
-	char	*s_buf;
-	char	**s_fields;	/* array of pointer to the fields in s_buf */
-	uint_t	s_nfields;	/* the number of fields in s_buf */
-} split_t;
-
 /*
- * Free the split_t structure pointed to by `sp'.
+ * default output callback function that, when invoked from dladm_print_output,
+ * prints string which is offset by of_arg->ofmt_id within buf.
  */
-static void
-splitfree(split_t *sp)
+static boolean_t
+print_default_cb(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
 {
-	free(sp->s_buf);
-	free(sp->s_fields);
-	free(sp);
-}
-
-/*
- * Split `str' into at most `maxfields' fields, each field at most `maxlen' in
- * length.  Return a pointer to a split_t containing the split fields, or NULL
- * on failure.
- */
-static split_t *
-split(const char *str, uint_t maxfields, uint_t maxlen)
-{
-	char	*field, *token, *lasts = NULL;
-	split_t	*sp;
-
-	if (*str == '\0' || maxfields == 0 || maxlen == 0)
-		return (NULL);
-
-	sp = calloc(sizeof (split_t), 1);
-	if (sp == NULL)
-		return (NULL);
-
-	sp->s_buf = strdup(str);
-	sp->s_fields = malloc(sizeof (char *) * maxfields);
-	if (sp->s_buf == NULL || sp->s_fields == NULL)
-		goto fail;
-
-	token = sp->s_buf;
-	while ((field = strtok_r(token, ",", &lasts)) != NULL) {
-		if (sp->s_nfields == maxfields || strlen(field) > maxlen)
-			goto fail;
-		token = NULL;
-		sp->s_fields[sp->s_nfields++] = field;
-	}
-	return (sp);
-fail:
-	splitfree(sp);
-	return (NULL);
-}
-
-static print_field_t **
-parse_output_fields(char *str, print_field_t *template, int max_fields,
-    uint_t cmdtype, uint_t *countp)
-{
-	split_t		*sp;
-	boolean_t	good_match = B_FALSE;
-	uint_t		i, j;
-	print_field_t	**pf = NULL;
-
-	sp = split(str, max_fields, MAX_FIELD_LEN);
-
-	if (sp == NULL)
-		return (NULL);
-
-	pf = malloc(sp->s_nfields * sizeof (print_field_t *));
-	if (pf == NULL)
-		goto fail;
-
-	for (i = 0; i < sp->s_nfields; i++) {
-		for (j = 0; j < max_fields; j++) {
-			if (strcasecmp(sp->s_fields[i],
-			    template[j].pf_name) == 0) {
-				good_match = template[j]. pf_cmdtype & cmdtype;
-				break;
-			}
-		}
-		if (!good_match)
-			goto fail;
-
-		good_match = B_FALSE;
-		pf[i] = &template[j];
-	}
-	*countp = i;
-	splitfree(sp);
-	return (pf);
-fail:
-	free(pf);
-	splitfree(sp);
-	return (NULL);
-}
-
-static void
-flowadm_print_output(print_state_t *statep, boolean_t parseable,
-    print_callback_t fn, void *arg)
-{
-	int i;
 	char *value;
-	print_field_t **pf;
 
-	pf = statep->ps_fields;
-	for (i = 0; i < statep->ps_nfields; i++) {
-		statep->ps_lastfield = (i + 1 == statep->ps_nfields);
-		value = (*fn)(pf[i], arg);
-		if (value != NULL)
-			print_field(statep, pf[i], value, parseable);
-	}
-	(void) putchar('\n');
+	value = (char *)of_arg->ofmt_cbarg + of_arg->ofmt_id;
+	(void) strlcpy(buf, value, bufsize);
+	return (B_TRUE);
 }
 
 static void
-print_header(print_state_t *ps)
+flowadm_ofmt_check(ofmt_status_t oferr, boolean_t parsable,
+    ofmt_handle_t ofmt)
 {
-	int i;
-	print_field_t **pf;
+	char buf[OFMT_BUFSIZE];
 
-	pf = ps->ps_fields;
-	for (i = 0; i < ps->ps_nfields; i++) {
-		ps->ps_lastfield = (i + 1 == ps->ps_nfields);
-		print_field(ps, pf[i], pf[i]->pf_header, B_FALSE);
-	}
-	(void) putchar('\n');
-}
-
-static void
-print_field(print_state_t *statep, print_field_t *pfp, const char *value,
-    boolean_t parseable)
-{
-	uint_t	width = pfp->pf_width;
-	uint_t	valwidth;
-	uint_t	compress;
-
-	/*
-	 * Parsable fields are separated by ':'. If such a field contains
-	 * a ':' or '\', this character is prefixed by a '\'.
-	 */
-	if (parseable) {
-		char	c;
-
-		if (statep->ps_nfields == 1) {
-			(void) printf("%s", value);
-			return;
-		}
-		while ((c = *value++) != '\0') {
-			if (c == ':' || c == '\\')
-				(void) putchar('\\');
-			(void) putchar(c);
-		}
-		if (!statep->ps_lastfield)
-			(void) putchar(':');
+	if (oferr == OFMT_SUCCESS)
 		return;
+	(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
+	/*
+	 * All errors are considered fatal in parsable mode.
+	 * NOMEM errors are always fatal, regardless of mode.
+	 * For other errors, we print diagnostics in human-readable
+	 * mode and processs what we can.
+	 */
+	if (parsable || oferr == OFMT_ENOFIELDS) {
+		ofmt_close(ofmt);
+		die(buf);
 	} else {
-		if (value[0] == '\0')
-			value = STR_UNDEF_VAL;
-		if (statep->ps_lastfield) {
-			(void) printf("%s", value);
-			statep->ps_overflow = 0;
-			return;
-		}
-
-		valwidth = strlen(value);
-		if (valwidth > width) {
-			statep->ps_overflow += valwidth - width;
-		} else if (valwidth < width && statep->ps_overflow > 0) {
-			compress = min(statep->ps_overflow, width - valwidth);
-			statep->ps_overflow -= compress;
-			width -= compress;
-		}
-		(void) printf("%-*s", width, value);
+		warn(buf);
 	}
-
-	if (!statep->ps_lastfield)
-		(void) putchar(' ');
 }
