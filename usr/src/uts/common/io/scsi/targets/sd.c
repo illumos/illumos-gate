@@ -5037,47 +5037,6 @@ sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi, int reservation_flag)
 	ASSERT(mutex_owned(SD_MUTEX(un)));
 	ASSERT((SD_DEVINFO(un)) == devi);
 
-	/*
-	 * If transport has already registered a devid for this target
-	 * then that takes precedence over the driver's determination
-	 * of the devid.
-	 */
-	if (ddi_devid_get(SD_DEVINFO(un), &un->un_devid) == DDI_SUCCESS) {
-		ASSERT(un->un_devid);
-		return; /* use devid registered by the transport */
-	}
-
-	/*
-	 * This is the case of antiquated Sun disk drives that have the
-	 * FAB_DEVID property set in the disk_table.  These drives
-	 * manage the devid's by storing them in last 2 available sectors
-	 * on the drive and have them fabricated by the ddi layer by calling
-	 * ddi_devid_init and passing the DEVID_FAB flag.
-	 */
-	if (un->un_f_opt_fab_devid == TRUE) {
-		/*
-		 * Depending on EINVAL isn't reliable, since a reserved disk
-		 * may result in invalid geometry, so check to make sure a
-		 * reservation conflict did not occur during attach.
-		 */
-		if ((sd_get_devid(ssc) == EINVAL) &&
-		    (reservation_flag != SD_TARGET_IS_RESERVED)) {
-			/*
-			 * The devid is invalid AND there is no reservation
-			 * conflict.  Fabricate a new devid.
-			 */
-			(void) sd_create_devid(ssc);
-		}
-
-		/* Register the devid if it exists */
-		if (un->un_devid != NULL) {
-			(void) ddi_devid_register(SD_DEVINFO(un),
-			    un->un_devid);
-			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-			    "sd_register_devid: Devid Fabricated\n");
-		}
-		return;
-	}
 
 	/*
 	 * We check the availability of the World Wide Name (0x83) and Unit
@@ -5153,6 +5112,53 @@ sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi, int reservation_flag)
 		}
 	}
 
+	/*
+	 * If transport has already registered a devid for this target
+	 * then that takes precedence over the driver's determination
+	 * of the devid.
+	 *
+	 * NOTE: The reason this check is done here instead of at the beginning
+	 * of the function is to allow the code above to create the
+	 * 'inquiry-serial-no' property.
+	 */
+	if (ddi_devid_get(SD_DEVINFO(un), &un->un_devid) == DDI_SUCCESS) {
+		ASSERT(un->un_devid);
+		un->un_f_devid_transport_defined = TRUE;
+		goto cleanup; /* use devid registered by the transport */
+	}
+
+	/*
+	 * This is the case of antiquated Sun disk drives that have the
+	 * FAB_DEVID property set in the disk_table.  These drives
+	 * manage the devid's by storing them in last 2 available sectors
+	 * on the drive and have them fabricated by the ddi layer by calling
+	 * ddi_devid_init and passing the DEVID_FAB flag.
+	 */
+	if (un->un_f_opt_fab_devid == TRUE) {
+		/*
+		 * Depending on EINVAL isn't reliable, since a reserved disk
+		 * may result in invalid geometry, so check to make sure a
+		 * reservation conflict did not occur during attach.
+		 */
+		if ((sd_get_devid(ssc) == EINVAL) &&
+		    (reservation_flag != SD_TARGET_IS_RESERVED)) {
+			/*
+			 * The devid is invalid AND there is no reservation
+			 * conflict.  Fabricate a new devid.
+			 */
+			(void) sd_create_devid(ssc);
+		}
+
+		/* Register the devid if it exists */
+		if (un->un_devid != NULL) {
+			(void) ddi_devid_register(SD_DEVINFO(un),
+			    un->un_devid);
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_register_devid: Devid Fabricated\n");
+		}
+		goto cleanup;
+	}
+
 	/* encode best devid possible based on data available */
 	if (ddi_devid_scsi_encode(DEVID_SCSI_ENCODE_VERSION_LATEST,
 	    (char *)ddi_driver_name(SD_DEVINFO(un)),
@@ -5193,6 +5199,7 @@ sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi, int reservation_flag)
 		}
 	}
 
+cleanup:
 	/* clean up resources */
 	if (inq80 != NULL) {
 		kmem_free(inq80, inq80_len);
@@ -8484,11 +8491,16 @@ sd_unit_detach(dev_info_t *devi)
 	 */
 	kmem_free(un->un_fm_private, sizeof (struct sd_fm_internal));
 
-	/* Unregister and free device id. */
-	ddi_devid_unregister(devi);
-	if (un->un_devid) {
-		ddi_devid_free(un->un_devid);
-		un->un_devid = NULL;
+	/*
+	 * Unregister and free device id if it was not registered
+	 * by the transport.
+	 */
+	if (un->un_f_devid_transport_defined == FALSE) {
+		ddi_devid_unregister(devi);
+		if (un->un_devid) {
+			ddi_devid_free(un->un_devid);
+			un->un_devid = NULL;
+		}
 	}
 
 	/*

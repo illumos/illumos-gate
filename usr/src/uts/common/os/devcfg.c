@@ -1033,6 +1033,12 @@ uninit_node(dev_info_t *dip)
 
 	error = (*f)(pdip, pdip, DDI_CTLOPS_UNINITCHILD, dip, (void *)NULL);
 	if (error == DDI_SUCCESS) {
+		/* ensure that devids are unregistered */
+		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
+			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
+			ddi_devid_unregister(dip);
+		}
+
 		/* if uninitchild forgot to set devi_addr to NULL do it now */
 		ddi_set_name_addr(dip, NULL);
 
@@ -1224,14 +1230,7 @@ attach_node(dev_info_t *dip)
 
 	if (rv != DDI_SUCCESS) {
 		DEVI_CLR_NEED_RESET(dip);
-
-		/* ensure that devids are unregistered */
-		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
-			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
-			mutex_exit(&DEVI(dip)->devi_lock);
-			ddi_devid_unregister(dip);
-		} else
-			mutex_exit(&DEVI(dip)->devi_lock);
+		mutex_exit(&DEVI(dip)->devi_lock);
 
 		/*
 		 * Cleanup dacf reservations
@@ -1347,14 +1346,7 @@ detach_node(dev_info_t *dip, uint_t flag)
 	/* a detached node can't have attached or .conf children */
 	mutex_enter(&DEVI(dip)->devi_lock);
 	DEVI(dip)->devi_flags &= ~(DEVI_MADE_CHILDREN|DEVI_ATTACHED_CHILDREN);
-
-	/* ensure that devids registered during attach are unregistered */
-	if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
-		DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
-		mutex_exit(&DEVI(dip)->devi_lock);
-		ddi_devid_unregister(dip);
-	} else
-		mutex_exit(&DEVI(dip)->devi_lock);
+	mutex_exit(&DEVI(dip)->devi_lock);
 
 	/*
 	 * If the instance has successfully detached in detach_driver() context,

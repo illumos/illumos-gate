@@ -437,7 +437,8 @@ struct sd_lun {
 	    un_f_sync_cache_required	:1,	/* flag to check if */
 						/* SYNC CACHE needs to be */
 						/* sent in sdclose */
-	    un_f_reserved		:13;
+	    un_f_devid_transport_defined :1,	/* devid defined by transport */
+	    un_f_reserved		:12;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
