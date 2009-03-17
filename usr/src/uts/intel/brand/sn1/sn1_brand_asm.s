@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,18 +255,16 @@ ENTRY(sn1_brand_syscall_callback)
 SET_SIZE(sn1_brand_syscall_callback)
 
 /*
- * %rax - syscall number
- * %rcx - user space %esp
- * %rdx - user space return address
- *
- * XXX: not tested yet.  Need a Nocona machine first.
+ * %eax - syscall number
+ * %ecx - user space %esp
+ * %edx - user space return address
  */
 ENTRY(sn1_brand_sysenter_callback)
 
 	CALLBACK_PROLOGUE(%rax, %r15, %r15b)
 
-	subq	$4, %rcx		/* Save room for user ret addr	*/
-	movq	%rdx, (%rcx)		/* Save current return addr	*/
+	subl	$4, %ecx		/* Save room for user ret addr	*/
+	movl	%edx, (%rcx)		/* Save current return addr	*/
 	GET_P_BRAND_DATA(%rsp, 1, %rdx)	/* get p_brand_data		*/
 	movq	SPD_HANDLER(%rdx), %rdx	/* get p_brand_data->spd_handler ptr */
 	popq	%r15			/* Restore scratch register	*/
