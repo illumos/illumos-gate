@@ -63,6 +63,7 @@ SUNWprivate_1.1 {
 	dladm_set_secobj;
 	dladm_unset_secobj;
 	dladm_walk_secobj;
+	dladm_str2interval;
 	dladm_bw2str;
 	dladm_str2bw;
 	dladm_secobjclass2str;

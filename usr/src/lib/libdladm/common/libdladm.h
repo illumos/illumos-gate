@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,6 +209,7 @@ extern dladm_status_t	dladm_set_rootdir(const char *);
 extern const char	*dladm_class2str(datalink_class_t, char *);
 extern const char	*dladm_media2str(uint32_t, char *);
 extern boolean_t	dladm_valid_linkname(const char *);
+extern boolean_t	dladm_str2interval(char *, uint32_t *);
 extern dladm_status_t	dladm_str2bw(char *, uint64_t *);
 extern const char	*dladm_bw2str(int64_t, char *);
 

@@ -784,9 +784,14 @@ do_add_flow(int argc, char *argv[])
 
 	char			option;
 	boolean_t		l_arg = B_FALSE;
+	char			propstr[DLADM_STRSIZE];
+	char			attrstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 	dladm_arg_list_t	*attrlist = NULL;
 	dladm_status_t		status;
+
+	bzero(propstr, DLADM_STRSIZE);
+	bzero(attrstr, DLADM_STRSIZE);
 
 	while ((option = getopt_long(argc, argv, "tR:l:a:p:",
 	    prop_longopts, NULL)) != -1) {
@@ -808,14 +813,16 @@ do_add_flow(int argc, char *argv[])
 			l_arg = B_TRUE;
 			break;
 		case 'a':
-			if (dladm_parse_flow_attrs(optarg, &attrlist, B_FALSE)
-			    != DLADM_STATUS_OK)
-				die("invalid flow attribute specified");
+			(void) strlcat(attrstr, optarg, DLADM_STRSIZE);
+			if (strlcat(attrstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("attribute list too long '%s'", attrstr);
 			break;
 		case 'p':
-			if (dladm_parse_flow_props(optarg, &proplist, B_FALSE)
-			    != DLADM_STATUS_OK)
-				die("invalid flow property specified");
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
 		default:
 			die_opterr(optopt, option);
@@ -836,6 +843,13 @@ do_add_flow(int argc, char *argv[])
 			die("flow name too long");
 		name = argv[index];
 	}
+
+	if (dladm_parse_flow_attrs(attrstr, &attrlist, B_FALSE)
+	    != DLADM_STATUS_OK)
+		die("invalid flow attribute specified");
+	if (dladm_parse_flow_props(propstr, &proplist, B_FALSE)
+	    != DLADM_STATUS_OK)
+		die("invalid flow property specified");
 
 	status = dladm_flow_add(handle, linkid, attrlist, proplist, name,
 	    t_arg, altroot);
@@ -1211,7 +1225,6 @@ do_show_flow(int argc, char *argv[])
 	boolean_t		l_arg = B_FALSE;
 	boolean_t		o_arg = B_FALSE;
 	uint32_t		interval = 0;
-	char			*endp = NULL;
 	show_flow_state_t	state;
 	char			*fields_str = NULL;
 	print_field_t		**fields;
@@ -1258,11 +1271,8 @@ do_show_flow(int argc, char *argv[])
 
 			i_arg = B_TRUE;
 
-			errno = 0;
-			interval = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || interval == 0 || *endp != '\0')
-				die("invalid interval value" " '%d'\n",
-				    interval);
+			if (!dladm_str2interval(optarg, &interval))
+				die("invalid interval value '%s'", optarg);
 			break;
 		case 'l':
 			if (strlcpy(linkname, optarg, MAXLINKNAMELEN)
@@ -1359,21 +1369,25 @@ set_flowprop_persist(const char *flow, const char *prop_name, char **prop_val,
 static void
 set_flowprop(int argc, char **argv, boolean_t reset)
 {
-	int		i, option;
-	char		errmsg[DLADM_STRSIZE];
-	const char	*flow = NULL;
+	int			i, option;
+	char			errmsg[DLADM_STRSIZE];
+	const char		*flow = NULL;
+	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
-	boolean_t	temp = B_FALSE;
-	dladm_status_t	status = DLADM_STATUS_OK;
+	boolean_t		temp = B_FALSE;
+	dladm_status_t		status = DLADM_STATUS_OK;
 
 	opterr = 0;
+	bzero(propstr, DLADM_STRSIZE);
+
 	while ((option = getopt_long(argc, argv, ":p:R:t",
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			if (dladm_parse_flow_props(optarg, &proplist, reset)
-			    != DLADM_STATUS_OK)
-				die("invalid flow property specified");
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
 		case 't':
 			temp = B_TRUE;
@@ -1400,6 +1414,10 @@ set_flowprop(int argc, char **argv, boolean_t reset)
 	}
 	if (flow == NULL)
 		die("flow name must be specified");
+
+	if (dladm_parse_flow_props(propstr, &proplist, reset)
+	    != DLADM_STATUS_OK)
+		die("invalid flow property specified");
 
 	if (proplist == NULL) {
 		char *errprop;

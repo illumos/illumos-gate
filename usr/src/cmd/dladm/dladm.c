@@ -1410,11 +1410,14 @@ do_create_aggr(int argc, char *argv[], const char *use)
 	char			*links[MAXPORT];
 	dladm_status_t		status;
 	dladm_status_t		pstatus;
+	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 	int			i;
 	datalink_id_t		linkid;
 
 	ndev = nlink = opterr = 0;
+	bzero(propstr, DLADM_STRSIZE);
+
 	while ((option = getopt_long(argc, argv, ":d:l:L:P:R:tfu:T:p:",
 	    lopts, NULL)) != -1) {
 		switch (option) {
@@ -1480,10 +1483,12 @@ do_create_aggr(int argc, char *argv[], const char *use)
 			altroot = optarg;
 			break;
 		case 'p':
-			if (dladm_parse_link_props(optarg, &proplist, B_FALSE)
-			    != DLADM_STATUS_OK)
-				die("invalid aggregation property");
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
+
 		default:
 			die_opterr(optopt, option, use);
 			break;
@@ -1532,6 +1537,10 @@ do_create_aggr(int argc, char *argv[], const char *use)
 	    lacp_timer, flags);
 	if (status != DLADM_STATUS_OK)
 		goto done;
+
+	if (dladm_parse_link_props(propstr, &proplist, B_FALSE)
+	    != DLADM_STATUS_OK)
+		die("invalid aggregation property");
 
 	if (proplist == NULL)
 		return;
@@ -1946,10 +1955,13 @@ do_create_vlan(int argc, char *argv[], const char *use)
 	uint32_t		flags = (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
 	char			*altroot = NULL;
 	char			vlan[MAXLINKNAMELEN];
+	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 	dladm_status_t		status;
 
 	opterr = 0;
+	bzero(propstr, DLADM_STRSIZE);
+
 	while ((option = getopt_long(argc, argv, ":tfR:l:v:p:",
 	    lopts, NULL)) != -1) {
 		switch (option) {
@@ -1974,10 +1986,10 @@ do_create_vlan(int argc, char *argv[], const char *use)
 			altroot = optarg;
 			break;
 		case 'p':
-			if (dladm_parse_link_props(optarg, &proplist, B_FALSE)
-			    != DLADM_STATUS_OK) {
-				die("invalid vlan property");
-			}
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
 		case 'f':
 			flags |= DLADM_OPT_FORCE;
@@ -2013,6 +2025,10 @@ do_create_vlan(int argc, char *argv[], const char *use)
 	    DLADM_STATUS_OK) {
 		die("invalid link name '%s'", link);
 	}
+
+	if (dladm_parse_link_props(propstr, &proplist, B_FALSE)
+	    != DLADM_STATUS_OK)
+		die("invalid vlan property");
 
 	if ((status = dladm_vlan_create(handle, vlan, dev_linkid, vid, proplist,
 	    flags, &linkid)) != DLADM_STATUS_OK) {
@@ -2976,7 +2992,7 @@ do_show_link(int argc, char *argv[], const char *use)
 	boolean_t	p_arg = B_FALSE;
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	char		linkname[MAXLINKNAMELEN];
-	int		interval = 0;
+	uint32_t	interval = 0;
 	show_state_t	state;
 	dladm_status_t	status;
 	boolean_t	o_arg = B_FALSE;
@@ -3027,7 +3043,7 @@ do_show_link(int argc, char *argv[], const char *use)
 				die_optdup(option);
 
 			i_arg = B_TRUE;
-			if (!str2int(optarg, &interval) || interval == 0)
+			if (!dladm_str2interval(optarg, &interval))
 				die("invalid interval value '%s'", optarg);
 			break;
 		default:
@@ -3136,7 +3152,7 @@ do_show_aggr(int argc, char *argv[], const char *use)
 	uint32_t		flags = DLADM_OPT_ACTIVE;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	int			option;
-	int			interval = 0;
+	uint32_t		interval = 0;
 	int			key;
 	dladm_status_t		status;
 	boolean_t		o_arg = B_FALSE;
@@ -3199,7 +3215,7 @@ do_show_aggr(int argc, char *argv[], const char *use)
 				die_optdup(option);
 
 			i_arg = B_TRUE;
-			if (!str2int(optarg, &interval) || interval == 0)
+			if (!dladm_str2interval(optarg, &interval))
 				die("invalid interval value '%s'", optarg);
 			break;
 		default:
@@ -3859,10 +3875,13 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	vnic_mac_addr_type_t	mac_addr_type = VNIC_MAC_ADDR_TYPE_AUTO;
 	uchar_t			*mac_addr;
 	int			mac_slot = -1, maclen = 0, mac_prefix_len = 0;
+	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 	int			vid = 0;
 
 	opterr = 0;
+	bzero(propstr, DLADM_STRSIZE);
+
 	while ((option = getopt_long(argc, argv, ":tfR:l:m:n:p:r:v:H",
 	    vnic_lopts, NULL)) != -1) {
 		switch (option) {
@@ -3906,9 +3925,10 @@ do_create_vnic(int argc, char *argv[], const char *use)
 				die("invalid slot number");
 			break;
 		case 'p':
-			if (dladm_parse_link_props(optarg, &proplist, B_FALSE)
-			    != DLADM_STATUS_OK)
-				die("invalid vnic property");
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
 		case 'r':
 			mac_addr = _link_aton(optarg, &mac_prefix_len);
@@ -3971,6 +3991,10 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	if (dladm_name2info(handle, devname, &dev_linkid, NULL, NULL, NULL) !=
 	    DLADM_STATUS_OK)
 		die("invalid link name '%s'", devname);
+
+	if (dladm_parse_link_props(propstr, &proplist, B_FALSE)
+	    != DLADM_STATUS_OK)
+		die("invalid vnic property");
 
 	status = dladm_vnic_create(handle, name, dev_linkid, mac_addr_type,
 	    mac_addr, maclen, &mac_slot, mac_prefix_len, vid, &linkid, proplist,
@@ -4295,7 +4319,6 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	boolean_t		s_arg = B_FALSE;
 	boolean_t		i_arg = B_FALSE;
 	boolean_t		l_arg = B_FALSE;
-	char			*endp = NULL;
 	uint32_t		interval = 0, flags = DLADM_OPT_ACTIVE;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	datalink_id_t		dev_linkid = DATALINK_ALL_LINKID;
@@ -4346,8 +4369,7 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 				    "more than once");
 			}
 			i_arg = B_TRUE;
-			interval = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || interval == 0 || *endp != '\0')
+			if (!dladm_str2interval(optarg, &interval))
 				die("invalid interval value '%s'", optarg);
 			break;
 		case 'o':
@@ -5706,6 +5728,7 @@ static void
 do_show_linkprop(int argc, char **argv, const char *use)
 {
 	int			option;
+	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	show_linkprop_state_t	state;
@@ -5720,6 +5743,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 
 	fields_str = all_fields;
 
+	bzero(propstr, DLADM_STRSIZE);
 	opterr = 0;
 	state.ls_propvals = NULL;
 	state.ls_line = NULL;
@@ -5727,13 +5751,15 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	state.ls_persist = B_FALSE;
 	state.ls_header = B_TRUE;
 	state.ls_retstatus = DLADM_STATUS_OK;
+
 	while ((option = getopt_long(argc, argv, ":p:cPo:",
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			if (dladm_parse_link_props(optarg, &proplist, B_TRUE)
-			    != DLADM_STATUS_OK)
-				die("invalid link properties specified");
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
 		case 'c':
 			state.ls_parseable = B_TRUE;
@@ -5769,6 +5795,10 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	} else if (optind != argc) {
 		usage();
 	}
+
+	if (dladm_parse_link_props(propstr, &proplist, B_TRUE)
+	    != DLADM_STATUS_OK)
+		die("invalid link properties specified");
 
 	bzero(&state.ls_print, sizeof (print_state_t));
 	state.ls_proplist = proplist;
@@ -5919,17 +5949,20 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 	datalink_id_t		linkid;
 	boolean_t		temp = B_FALSE;
 	dladm_status_t		status = DLADM_STATUS_OK;
+	char			propstr[DLADM_STRSIZE];
 	dladm_arg_list_t	*proplist = NULL;
 
 	opterr = 0;
+	bzero(propstr, DLADM_STRSIZE);
+
 	while ((option = getopt_long(argc, argv, ":p:R:t",
 	    prop_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			if (dladm_parse_link_props(optarg, &proplist, reset) !=
-			    DLADM_STATUS_OK) {
-				die("invalid link properties specified");
-			}
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
 			break;
 		case 't':
 			temp = B_TRUE;
@@ -5946,6 +5979,10 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 	/* get link name (required last argument) */
 	if (optind != (argc - 1))
 		usage();
+
+	if (dladm_parse_link_props(propstr, &proplist, reset) !=
+	    DLADM_STATUS_OK)
+		die("invalid link properties specified");
 
 	if (proplist == NULL && !reset)
 		die("link property must be specified");

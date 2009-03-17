@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,6 +356,22 @@ dladm_errno2status(int err)
 	default:
 		return (DLADM_STATUS_FAILED);
 	}
+}
+
+boolean_t
+dladm_str2interval(char *oarg, uint32_t *interval)
+{
+	int		val;
+	char		*endp = NULL;
+
+	errno = 0;
+	val = strtol(oarg, &endp, 10);
+	if (errno != 0 || val <= 0 || *endp != '\0')
+		return (B_FALSE);
+
+	*interval = val;
+
+	return (B_TRUE);
 }
 
 dladm_status_t
@@ -825,6 +841,12 @@ dladm_parse_args(char *str, dladm_arg_list_t **listp, boolean_t novalues)
 	dladm_arg_info_t	*aip;
 	char			*buf, *curr;
 	int			len, i;
+
+	if (str == NULL)
+		return (DLADM_STATUS_BADVAL);
+
+	if (str[0] == '\0')
+		return (DLADM_STATUS_OK);
 
 	list = malloc(sizeof (dladm_arg_list_t));
 	if (list == NULL)

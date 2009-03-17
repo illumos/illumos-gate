@@ -264,7 +264,8 @@ dladm_parse_flow_attrs(char *str, dladm_arg_list_t **listp, boolean_t novalues)
 	    != DLADM_STATUS_OK)
 		return (DLADM_STATUS_ATTR_PARSE_ERR);
 
-	if (flow_attrlist_check(*listp) != DLADM_STATUS_OK) {
+	if (*listp != NULL && flow_attrlist_check(*listp)
+	    != DLADM_STATUS_OK) {
 		dladm_free_attrs(*listp);
 		return (DLADM_STATUS_ATTR_PARSE_ERR);
 	}

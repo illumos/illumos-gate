@@ -477,8 +477,8 @@ dladm_parse_flow_props(char *str, dladm_arg_list_t **listp, boolean_t novalues)
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
-	status = flow_proplist_check(*listp);
-	if (status != DLADM_STATUS_OK) {
+	if (*listp != NULL && (status = flow_proplist_check(*listp)
+	    != DLADM_STATUS_OK)) {
 		dladm_free_props(*listp);
 		return (status);
 	}

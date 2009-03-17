@@ -845,13 +845,13 @@ dladm_get_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	case DLADM_PROP_VAL_PERM:
 		if (pdp->pd_set == NULL) {
 			perm_flags = MAC_PROP_PERM_READ;
-			*val_cntp = 1;
 		} else {
 			status = pdp->pd_get(handle, pdp, linkid, prop_val,
 			    val_cntp, media, dld_flags, &perm_flags);
 		}
 
 		*prop_val[0] = '\0';
+		*val_cntp = 1;
 		if (status == DLADM_STATUS_OK)
 			(void) dladm_perm2str(perm_flags, *prop_val);
 		break;
@@ -1527,6 +1527,7 @@ do_extract_cpus(val_desc_t *vdp, void *arg, uint_t cnt)
 	mrp->mrp_ncpus = vmrp->mrp_ncpus;
 	mrp->mrp_mask |= (MRP_CPUS|MRP_CPUS_USERSPEC);
 	mrp->mrp_fanout_mode = MCM_CPUS;
+	mrp->mrp_intr_cpu = -1;
 
 	return (DLADM_STATUS_OK);
 }
