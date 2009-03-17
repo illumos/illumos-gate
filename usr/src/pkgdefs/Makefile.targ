@@ -52,6 +52,14 @@ $(CHKINSTALL): $(PKGDEFS)/common_files/$(CHKINSTALLSRC)
 # that will only be evaluated for the intended failure
 # case.
 #
+# The three "${TRUE}" macros cover the situations where SCM_TYPE
+# is not set (""), or it's set by nightly.sh for a tarball source
+# tree ("none"), or it's set by bldenv for a tarball source tree
+# ("unknown").
+#
+NOT_UNDER_=${TRUE}
+NOT_UNDER_none=${TRUE}
+NOT_UNDER_unknown=${TRUE}
 NOT_UNDER_mercurial= \
 	( hg locate --include . $@ > /dev/null ; [ $$? != 0 ] )
 NOT_UNDER_teamware=[ ! -f SCCS/s.$@ ]
