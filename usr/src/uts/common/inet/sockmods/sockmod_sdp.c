@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +121,15 @@ socksdp_create(struct sockparams *sp, int family, int type, int protocol,
 		version = so_default_version;
 	}
 	so->so_version = (short)version;
+
+	/*
+	 * set the default values to be INFPSZ
+	 * if a protocol desires it can change the value later
+	 */
+	so->so_proto_props.sopp_rxhiwat = SOCKET_RECVHIWATER;
+	so->so_proto_props.sopp_rxlowat = SOCKET_RECVLOWATER;
+	so->so_proto_props.sopp_maxpsz = INFPSZ;
+	so->so_proto_props.sopp_maxblk = INFPSZ;
 
 	return (so);
 }

@@ -669,6 +669,9 @@ sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size, int wroff,
 	mblk_t *mp;
 	dblk_t *dp;
 
+	if (blk_size == INFPSZ)
+		blk_size = count;
+
 	/*
 	 * Loop until we have all data copied into mblk's.
 	 */
