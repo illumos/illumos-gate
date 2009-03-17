@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -919,14 +919,14 @@ ioat_cmd_post(void *private, dcopy_cmd_t cmd)
 
 	/* if the channel has had a fatal failure, return failure */
 	if (channel->ic_channel_state == IOAT_CHANNEL_IN_FAILURE) {
-		mutex_exit(&ring->cr_cmpl_mutex);
+		mutex_exit(&ring->cr_desc_mutex);
 		return (DCOPY_FAILURE);
 	}
 
 	/* make sure we have space for the descriptors */
 	e = ioat_ring_reserve(channel, ring, cmd);
 	if (e != DCOPY_SUCCESS) {
-		mutex_exit(&ring->cr_cmpl_mutex);
+		mutex_exit(&ring->cr_desc_mutex);
 		return (DCOPY_NORESOURCES);
 	}
 
