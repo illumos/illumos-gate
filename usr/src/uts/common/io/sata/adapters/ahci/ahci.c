@@ -5455,10 +5455,20 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 		}
 	}
 
+	/* print the fatal error type */
 	ahci_log_fatal_error_message(ahci_ctlp, port, intr_status);
 	port_serror = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port));
+
+	/* print PxSERR related error message */
 	ahci_log_serror_message(ahci_ctlp, port, port_serror, 0);
+
+	/* print task file register value */
+	if (intr_status & AHCI_INTR_STATUS_TFES) {
+		cmn_err(CE_WARN, "!ahci%d: ahci port %d task_file_status "
+		    "= 0x%x", instance, port, task_file_status);
+	}
+
 out1:
 	/* Prepare the argument for the taskq */
 	args = ahci_portp->ahciport_event_args;
@@ -7187,22 +7197,22 @@ ahci_log_fatal_error_message(ahci_ctl_t *ahci_ctlp, uint8_t port,
 	int instance = ddi_get_instance(ahci_ctlp->ahcictl_dip);
 
 	if (intr_status & AHCI_INTR_STATUS_IFS)
-		cmn_err(CE_WARN, "ahci%d: ahci port %d has interface fatal "
+		cmn_err(CE_WARN, "!ahci%d: ahci port %d has interface fatal "
 		    "error", instance, port);
 
 	if (intr_status & AHCI_INTR_STATUS_HBDS)
-		cmn_err(CE_WARN, "ahci%d: ahci port %d has bus data error",
+		cmn_err(CE_WARN, "!ahci%d: ahci port %d has bus data error",
 		    instance, port);
 
 	if (intr_status & AHCI_INTR_STATUS_HBFS)
-		cmn_err(CE_WARN, "ahci%d: ahci port %d has bus fatal error",
+		cmn_err(CE_WARN, "!ahci%d: ahci port %d has bus fatal error",
 		    instance, port);
 
 	if (intr_status & AHCI_INTR_STATUS_TFES)
-		cmn_err(CE_WARN, "ahci%d: ahci port %d has task file error",
+		cmn_err(CE_WARN, "!ahci%d: ahci port %d has task file error",
 		    instance, port);
 
-	cmn_err(CE_WARN, "ahci%d: ahci port %d is trying to do error "
+	cmn_err(CE_WARN, "!ahci%d: ahci port %d is trying to do error "
 	    "recovery", instance, port);
 }
 
@@ -7301,11 +7311,11 @@ ahci_log_serror_message(ahci_ctl_t *ahci_ctlp, uint8_t port,
 		AHCIDBG0(AHCIDBG_ERRS, ahci_ctlp, err_msg_header);
 		AHCIDBG0(AHCIDBG_ERRS, ahci_ctlp, err_msg);
 	} else if (ahci_ctlp) {
-		cmn_err(CE_WARN, "ahci%d: %s %s",
+		cmn_err(CE_WARN, "!ahci%d: %s %s",
 		    ddi_get_instance(ahci_ctlp->ahcictl_dip),
 		    err_msg_header, err_msg);
 	} else {
-		cmn_err(CE_WARN, "ahci: %s %s", err_msg_header, err_msg);
+		cmn_err(CE_WARN, "!ahci: %s %s", err_msg_header, err_msg);
 	}
 }
 

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SATA_DEFS_H
 #define	_SATA_DEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -392,6 +390,15 @@ typedef struct sata_id {
 /* SATA Features Supported (word 78) - not used */
 
 /* SATA Features Enabled (word 79) - not used */
+
+#define	SATA_READ_AHEAD_SUPPORTED(x)	((x).ai_cmdset82 & SATA_LOOK_AHEAD)
+#define	SATA_READ_AHEAD_ENABLED(x)	((x).ai_features85 & SATA_LOOK_AHEAD)
+#define	SATA_WRITE_CACHE_SUPPORTED(x)	((x).ai_cmdset82 & SATA_WRITE_CACHE)
+#define	SATA_WRITE_CACHE_ENABLED(x)	((x).ai_features85 & SATA_WRITE_CACHE)
+#define	SATA_RM_NOTIFIC_SUPPORTED(x)	\
+	((x).ai_cmdset83 & SATA_RM_STATUS_NOTIFIC)
+#define	SATA_RM_NOTIFIC_ENABLED(x)	\
+	((x).ai_features86 & SATA_RM_STATUS_NOTIFIC)
 
 /*
  * Generic NCQ related defines

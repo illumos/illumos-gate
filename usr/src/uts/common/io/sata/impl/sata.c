@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5957,23 +5957,23 @@ sata_build_msense_page_8(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 		page->mode_page.code = MODEPAGE_CACHING;	/* PS = 0 */
 		page->mode_page.length = PAGELENGTH_DAD_MODE_CACHE_SCSI3;
 
-		if ((sata_id->ai_cmdset82 & SATA_LOOK_AHEAD) &&
-		    !(sata_id->ai_features85 & SATA_LOOK_AHEAD)) {
+		if (SATA_READ_AHEAD_SUPPORTED(*sata_id) &&
+		    !SATA_READ_AHEAD_ENABLED(*sata_id)) {
 			page->dra = 1;		/* Read Ahead disabled */
 			page->rcd = 1;		/* Read Cache disabled */
 		}
-		if ((sata_id->ai_cmdset82 & SATA_WRITE_CACHE) &&
-		    (sata_id->ai_features85 & SATA_WRITE_CACHE))
+		if (SATA_WRITE_CACHE_SUPPORTED(*sata_id) &&
+		    SATA_WRITE_CACHE_ENABLED(*sata_id))
 			page->wce = 1;		/* Write Cache enabled */
 	} else {
 		/* Changeable parameters */
 		page->mode_page.code = MODEPAGE_CACHING;
 		page->mode_page.length = PAGELENGTH_DAD_MODE_CACHE_SCSI3;
-		if (sata_id->ai_cmdset82 & SATA_LOOK_AHEAD) {
+		if (SATA_READ_AHEAD_SUPPORTED(*sata_id)) {
 			page->dra = 1;
 			page->rcd = 1;
 		}
-		if (sata_id->ai_cmdset82 & SATA_WRITE_CACHE)
+		if (SATA_WRITE_CACHE_SUPPORTED(*sata_id))
 			page->wce = 1;
 	}
 	return (PAGELENGTH_DAD_MODE_CACHE_SCSI3 +
@@ -6167,8 +6167,8 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 	 * We can manipulate only write cache and read ahead
 	 * (read cache) setting.
 	 */
-	if (!(sata_id->ai_cmdset82 & SATA_LOOK_AHEAD) &&
-	    !(sata_id->ai_cmdset82 & SATA_WRITE_CACHE)) {
+	if (!SATA_READ_AHEAD_SUPPORTED(*sata_id) &&
+	    !SATA_WRITE_CACHE_SUPPORTED(*sata_id)) {
 		/*
 		 * None of the features is supported - ignore
 		 */
@@ -6177,12 +6177,12 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 	}
 
 	/* Current setting of Read Ahead (and Read Cache) */
-	if (sata_id->ai_features85 & SATA_LOOK_AHEAD)
+	if (SATA_READ_AHEAD_ENABLED(*sata_id))
 		dra = 0;	/* 0 == not disabled */
 	else
 		dra = 1;
 	/* Current setting of Write Cache */
-	if (sata_id->ai_features85 & SATA_WRITE_CACHE)
+	if (SATA_WRITE_CACHE_ENABLED(*sata_id))
 		wce = 1;
 	else
 		wce = 0;
@@ -9666,24 +9666,24 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 static void
 sata_save_drive_settings(sata_drive_info_t *sdinfo)
 {
-	if ((sdinfo->satadrv_id.ai_cmdset82 & SATA_LOOK_AHEAD) ||
-	    (sdinfo->satadrv_id.ai_cmdset82 & SATA_WRITE_CACHE)) {
+	if (SATA_READ_AHEAD_SUPPORTED(sdinfo->satadrv_id) ||
+	    SATA_WRITE_CACHE_SUPPORTED(sdinfo->satadrv_id)) {
 
 		/* Current setting of Read Ahead (and Read Cache) */
-		if (sdinfo->satadrv_id.ai_features85 & SATA_LOOK_AHEAD)
+		if (SATA_READ_AHEAD_ENABLED(sdinfo->satadrv_id))
 			sdinfo->satadrv_settings |= SATA_DEV_READ_AHEAD;
 		else
 			sdinfo->satadrv_settings &= ~SATA_DEV_READ_AHEAD;
 
 		/* Current setting of Write Cache */
-		if (sdinfo->satadrv_id.ai_features85 & SATA_WRITE_CACHE)
+		if (SATA_WRITE_CACHE_ENABLED(sdinfo->satadrv_id))
 			sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
 		else
 			sdinfo->satadrv_settings &= ~SATA_DEV_WRITE_CACHE;
 	}
 
 	if (sdinfo->satadrv_type == SATA_DTYPE_ATAPICD) {
-		if (sdinfo->satadrv_id.ai_cmdset83 & SATA_RM_STATUS_NOTIFIC)
+		if (SATA_RM_NOTIFIC_SUPPORTED(sdinfo->satadrv_id))
 			sdinfo->satadrv_settings |= SATA_DEV_RMSN;
 		else
 			sdinfo->satadrv_settings &= ~SATA_DEV_RMSN;
@@ -12940,14 +12940,12 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 	case SATA_DTYPE_ATAPITAPE:
 	case SATA_DTYPE_ATAPIDISK:
 		/*  Set Removable Media Status Notification, if necessary */
-		if ((new_sdinfo.satadrv_id.ai_cmdset83 &
-		    SATA_RM_STATUS_NOTIFIC) != 0 && restore != 0) {
+		if (SATA_RM_NOTIFIC_SUPPORTED(new_sdinfo.satadrv_id) &&
+		    restore != 0) {
 			if (((sdinfo->satadrv_settings & SATA_DEV_RMSN) &&
-			    (!(new_sdinfo.satadrv_id.ai_features86 &
-			    SATA_RM_STATUS_NOTIFIC))) ||
+			    (!SATA_RM_NOTIFIC_ENABLED(new_sdinfo.satadrv_id)))||
 			    ((!(sdinfo->satadrv_settings & SATA_DEV_RMSN)) &&
-			    (new_sdinfo.satadrv_id.ai_features86 &
-			    SATA_RM_STATUS_NOTIFIC))) {
+			    SATA_RM_NOTIFIC_ENABLED(new_sdinfo.satadrv_id))) {
 				/* Current setting does not match saved one */
 				if (sata_set_rmsn(sata_hba_inst, sdinfo,
 				    sdinfo->satadrv_settings &
@@ -12972,63 +12970,80 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 		break;
 	}
 
-	if (!(new_sdinfo.satadrv_id.ai_cmdset82 & SATA_LOOK_AHEAD) &&
-	    !(new_sdinfo.satadrv_id.ai_cmdset82 & SATA_WRITE_CACHE)) {
-		/* None of the features is supported - do nothing */
+	if (!SATA_READ_AHEAD_SUPPORTED(new_sdinfo.satadrv_id) &&
+	    !SATA_WRITE_CACHE_SUPPORTED(new_sdinfo.satadrv_id)) {
+		/*
+		 * neither READ AHEAD nor WRITE CACHE is supported
+		 * - do nothing
+		 */
 		SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 		    "settable features not supported\n", NULL);
 		goto update_sdinfo;
 	}
 
-	if (((new_sdinfo.satadrv_id.ai_features85 & SATA_LOOK_AHEAD) &&
+	if ((SATA_READ_AHEAD_ENABLED(new_sdinfo.satadrv_id) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD)) &&
-	    ((new_sdinfo.satadrv_id.ai_features85 & SATA_WRITE_CACHE) &&
+	    (SATA_WRITE_CACHE_ENABLED(new_sdinfo.satadrv_id) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE))) {
-		/* Nothing to do */
+		/*
+		 * both READ AHEAD and WRITE CACHE are enabled
+		 * - Nothing to do
+		 */
 		SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 		    "no device features to set\n", NULL);
 		goto update_sdinfo;
 	}
 
-	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_LOOK_AHEAD) &&
-	    (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD))) {
-		if (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD) {
+	cache_op = 0;
+
+	if (SATA_READ_AHEAD_SUPPORTED(new_sdinfo.satadrv_id)) {
+		if ((sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD) &&
+		    !SATA_READ_AHEAD_ENABLED(new_sdinfo.satadrv_id)) {
 			/* Enable read ahead / read cache */
 			cache_op = SATAC_SF_ENABLE_READ_AHEAD;
 			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 			    "enabling read cache\n", NULL);
-		} else {
+		} else if (!(sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD) &&
+		    SATA_READ_AHEAD_ENABLED(new_sdinfo.satadrv_id)) {
 			/* Disable read ahead  / read cache */
 			cache_op = SATAC_SF_DISABLE_READ_AHEAD;
 			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 			    "disabling read cache\n", NULL);
 		}
 
-		/* Try to set read cache mode */
-		rval_set = sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
-		    cache_op);
-		if (rval != SATA_FAILURE && rval_set != SATA_SUCCESS)
-			rval = rval_set;
+		if (cache_op != 0) {
+			/* Try to set read cache mode */
+			rval_set = sata_set_cache_mode(sata_hba_inst,
+			    &new_sdinfo, cache_op);
+			if (rval != SATA_FAILURE && rval_set != SATA_SUCCESS)
+				rval = rval_set;
+		}
 	}
 
-	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_WRITE_CACHE) &&
-	    (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE))) {
-		if (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE) {
+	cache_op = 0;
+
+	if (SATA_WRITE_CACHE_SUPPORTED(new_sdinfo.satadrv_id)) {
+		if ((sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE) &&
+		    !SATA_WRITE_CACHE_ENABLED(new_sdinfo.satadrv_id)) {
 			/* Enable write cache */
 			cache_op = SATAC_SF_ENABLE_WRITE_CACHE;
 			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 			    "enabling write cache\n", NULL);
-		} else {
+		} else if (!(sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE) &&
+		    SATA_WRITE_CACHE_ENABLED(new_sdinfo.satadrv_id)) {
 			/* Disable write cache */
 			cache_op = SATAC_SF_DISABLE_WRITE_CACHE;
 			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 			    "disabling write cache\n", NULL);
 		}
-		/* Try to set write cache mode */
-		rval_set = sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
-		    cache_op);
-		if (rval != SATA_FAILURE && rval_set != SATA_SUCCESS)
-			rval = rval_set;
+
+		if (cache_op != 0) {
+			/* Try to set write cache mode */
+			rval_set = sata_set_cache_mode(sata_hba_inst,
+			    &new_sdinfo, cache_op);
+			if (rval != SATA_FAILURE && rval_set != SATA_SUCCESS)
+				rval = rval_set;
+		}
 	}
 	if (rval != SATA_SUCCESS)
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
