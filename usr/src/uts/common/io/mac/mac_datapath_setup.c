@@ -3362,11 +3362,9 @@ mac_fanout_recompute(mac_impl_t *mip)
 {
 	mac_client_impl_t	*mcip;
 
-
 	i_mac_perim_enter(mip);
-	ASSERT(!(mip->mi_state_flags & MIS_IS_VNIC));
-
-	if (mip->mi_linkstate != LINK_STATE_UP) {
+	if ((mip->mi_state_flags & MIS_IS_VNIC) != 0 ||
+	    mip->mi_linkstate != LINK_STATE_UP) {
 		i_mac_perim_exit(mip);
 		return;
 	}

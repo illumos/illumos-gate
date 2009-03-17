@@ -349,7 +349,6 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 
 	vnic->vn_id = vnic_id;
 	vnic->vn_link_id = linkid;
-	vnic->vn_started = B_FALSE;
 
 	if (!is_anchor) {
 		if (linkid == DATALINK_INVALID_LINKID) {
@@ -503,6 +502,7 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 	ASSERT(err == 0);
 	vnic_count++;
 
+	vnic->vn_enabled = B_TRUE;
 	rw_exit(&vnic_lock);
 
 	return (0);
@@ -584,6 +584,7 @@ vnic_dev_delete(datalink_id_t vnic_id, uint32_t flags)
 		return (rc);
 	}
 
+	vnic->vn_enabled = B_FALSE;
 	(void) mod_hash_remove(vnic_hash, VNIC_HASH_KEY(vnic_id), &val);
 	ASSERT(vnic == (vnic_t *)val);
 	vnic_count--;
@@ -872,20 +873,33 @@ vnic_notify_cb(void *arg, mac_notify_type_t type)
 	vnic_t *vnic = arg;
 
 	/*
-	 * Only the VLAN VNIC needs to be notified with primary MAC
-	 * address change.
+	 * Do not deliver notifications if the vnic is not fully initialized
+	 * or is in process of being torn down.
 	 */
-	if (vnic->vn_addr_type != VNIC_MAC_ADDR_TYPE_PRIMARY)
+	if (!vnic->vn_enabled)
 		return;
 
 	switch (type) {
 	case MAC_NOTE_UNICST:
+		/*
+		 * Only the VLAN VNIC needs to be notified with primary MAC
+		 * address change.
+		 */
+		if (vnic->vn_addr_type != VNIC_MAC_ADDR_TYPE_PRIMARY)
+			return;
+
 		/*  the unicast MAC address value */
 		mac_unicast_primary_get(vnic->vn_lower_mh, vnic->vn_addr);
 
 		/* notify its upper layer MAC about MAC address change */
 		mac_unicst_update(vnic->vn_mh, (const uint8_t *)vnic->vn_addr);
 		break;
+
+	case MAC_NOTE_LINK:
+		mac_link_update(vnic->vn_mh,
+		    mac_client_stat_get(vnic->vn_mch, MAC_STAT_LINK_STATE));
+		break;
+
 	default:
 		break;
 	}
