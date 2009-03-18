@@ -4092,7 +4092,7 @@ emlxs_fct_dmem_init(emlxs_port_t *port)
 		}
 
 		bctl = (emlxs_fct_dmem_bctl_t *)kmem_zalloc(p->dmem_nbufs *
-		    sizeof (emlxs_fct_dmem_bctl_t), KM_NOSLEEP);
+		    sizeof (emlxs_fct_dmem_bctl_t), KM_SLEEP);
 
 		if (bctl == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
@@ -4112,7 +4112,7 @@ emlxs_fct_dmem_init(emlxs_port_t *port)
 		total_mem = p->dmem_buf_size * p->dmem_nbufs;
 
 		if (ddi_dma_mem_alloc(p->dmem_dma_handle, total_mem, &acc,
-		    DDI_DMA_STREAMING, DDI_DMA_DONTWAIT, 0,
+		    DDI_DMA_STREAMING, DDI_DMA_SLEEP, 0,
 		    (caddr_t *)&addr, &len,
 		    &p->dmem_acc_handle) != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
@@ -4122,7 +4122,7 @@ emlxs_fct_dmem_init(emlxs_port_t *port)
 
 		if (ddi_dma_addr_bind_handle(p->dmem_dma_handle, NULL,
 		    (caddr_t)addr, total_mem,
-		    DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_DONTWAIT, 0,
+		    DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_SLEEP, 0,
 		    &cookie, &ncookie) != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 			    "emlxs_fct_dmem_init: Unable to bind handle.");

@@ -5952,7 +5952,7 @@ emlxs_hba_attach(dev_info_t *dip)
 
 	/* Allocate a transport structure */
 	hba->fca_tran =
-	    (fc_fca_tran_t *)kmem_zalloc(sizeof (fc_fca_tran_t), KM_NOSLEEP);
+	    (fc_fca_tran_t *)kmem_zalloc(sizeof (fc_fca_tran_t), KM_SLEEP);
 	if (hba->fca_tran == NULL) {
 		cmn_err(CE_WARN,
 		    "?%s%d: fca_hba_attach failed. Unable to allocate fca_tran "
@@ -6926,7 +6926,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 		buf_info->virt =
 		    (uint32_t *)kmem_zalloc((size_t)buf_info->size,
-		    KM_NOSLEEP);
+		    KM_SLEEP);
 		buf_info->phys = 0;
 		buf_info->data_handle = 0;
 		buf_info->dma_handle = 0;
@@ -6948,7 +6948,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		 * Allocate the DMA handle for this DMA object
 		 */
 		status = ddi_dma_alloc_handle((void *)hba->dip,
-		    &dma_attr, DDI_DMA_DONTWAIT,
+		    &dma_attr, DDI_DMA_SLEEP,
 		    NULL, (ddi_dma_handle_t *)&buf_info->dma_handle);
 		if (status != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
@@ -6977,7 +6977,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		status = ddi_dma_addr_bind_handle(
 		    (ddi_dma_handle_t)buf_info->dma_handle, NULL,
 		    (caddr_t)buf_info->virt, (size_t)buf_info->size,
-		    dma_flag, DDI_DMA_DONTWAIT, NULL, &dma_cookie,
+		    dma_flag, DDI_DMA_SLEEP, NULL, &dma_cookie,
 		    &cookie_count);
 
 		if (status != DDI_DMA_MAPPED || (cookie_count > 1)) {
@@ -7027,7 +7027,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		 * Allocate the DMA handle for this DMA object
 		 */
 		status = ddi_dma_alloc_handle((void *)hba->dip, &dma_attr,
-		    DDI_DMA_DONTWAIT, NULL,
+		    DDI_DMA_SLEEP, NULL,
 		    (ddi_dma_handle_t *)&buf_info->dma_handle);
 		if (status != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
@@ -7045,7 +7045,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		status = ddi_dma_mem_alloc(
 		    (ddi_dma_handle_t)buf_info->dma_handle,
 		    (size_t)buf_info->size, &dev_attr, DDI_DMA_CONSISTENT,
-		    DDI_DMA_DONTWAIT, NULL, (caddr_t *)&buf_info->virt,
+		    DDI_DMA_SLEEP, NULL, (caddr_t *)&buf_info->virt,
 		    &dma_reallen, (ddi_acc_handle_t *)&buf_info->data_handle);
 
 		if ((status != DDI_SUCCESS) || (buf_info->size > dma_reallen)) {
@@ -7068,7 +7068,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		status = ddi_dma_addr_bind_handle(
 		    (ddi_dma_handle_t)buf_info->dma_handle, NULL,
 		    (caddr_t)buf_info->virt, (size_t)buf_info->size,
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
 		    &dma_cookie, &cookie_count);
 
 		if (status != DDI_DMA_MAPPED || (cookie_count > 1)) {

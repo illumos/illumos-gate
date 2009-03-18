@@ -81,7 +81,7 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 	mp->fc_memsize = sizeof (NODELIST);
 	mp->fc_numblks = (int16_t)hba->max_nodes + 2;
 	mp->fc_total_memsize = mp->fc_memsize * mp->fc_numblks;
-	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_NOSLEEP);
+	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_SLEEP);
 	mp->fc_memget_cnt = mp->fc_numblks;
 	mp->fc_memput_cnt = 0;
 	mp->fc_memstart_phys = 0;
@@ -131,7 +131,7 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 	mp->fc_memsize = sizeof (IOCBQ);
 	mp->fc_numblks = (uint16_t)cfg[CFG_NUM_IOCBS].current;
 	mp->fc_total_memsize = mp->fc_memsize * mp->fc_numblks;
-	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_NOSLEEP);
+	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_SLEEP);
 	mp->fc_lowmem = (mp->fc_numblks >> 4);
 	mp->fc_memget_cnt = mp->fc_numblks;
 	mp->fc_memput_cnt = 0;
@@ -180,7 +180,7 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 	mp->fc_memsize = sizeof (MAILBOXQ);
 	mp->fc_numblks = (int16_t)hba->max_nodes + 32;
 	mp->fc_total_memsize = mp->fc_memsize * mp->fc_numblks;
-	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_NOSLEEP);
+	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_SLEEP);
 	mp->fc_lowmem = (mp->fc_numblks >> 3);
 	mp->fc_memget_cnt = mp->fc_numblks;
 	mp->fc_memput_cnt = 0;
