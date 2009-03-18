@@ -2784,9 +2784,6 @@ aui_auditsys(au_event_t e)
 	case BSM_AUDIT:
 		e = AUE_AUDIT;
 		break;
-	case BSM_GETPORTAUDIT:
-		e = AUE_GETPORTAUDIT;
-		break;
 	case BSM_AUDITON:
 	case BSM_AUDITCTL:
 
@@ -3035,7 +3032,6 @@ aus_auditsys(struct t_audit_data *tad)
 	case AUE_GETAUDIT:
 	case AUE_GETAUDIT_ADDR:
 	case AUE_AUDIT:
-	case AUE_GETPORTAUDIT:
 	case AUE_AUDITON_GPOLICY:
 	case AUE_AUDITON_GQCTRL:
 	case AUE_AUDITON_GETKMASK:

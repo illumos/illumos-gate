@@ -168,8 +168,8 @@ extern "C" {
 #define	AUE_SETAUID		131	/* =aa setauid(2) */
 #define	AUE_GETAUDIT		132	/* =aa getaudit(2) */
 #define	AUE_SETAUDIT		133	/* =aa setaudit(2) */
-#define	AUE_GETUSERAUDIT	134	/* =no getuseraudit(2) */
-#define	AUE_SETUSERAUDIT	135	/* =no setuseraudit(2) */
+/*				134	    OBSOLETE */
+/*				135	    OBSOLETE */
 /* 				136	    OBSOLETE */
 /*				137	    OBSOLETE */
 #define	AUE_AUDITON		138	/* =no auditon(2) */
@@ -181,11 +181,11 @@ extern "C" {
 #define	AUE_AUDITON_SESTATE	144	/* =no auditctl(2): SETESTATE */
 #define	AUE_AUDITON_GQCTRL	145	/* =as auditctl(2): GETQCTRL */
 #define	AUE_AUDITON_SQCTRL	146	/* =as auditctl(2): SETQCTRL */
-#define	AUE_GETKERNSTATE	147	/* =no getkernstate(2) */
-#define	AUE_SETKERNSTATE	148	/* =no setkernstate(2) */
-#define	AUE_GETPORTAUDIT	149	/* =no getportaudit(2) */
-#define	AUE_AUDITSTAT		150	/* =no auditstat(2) */
-#define	AUE_REVOKE		151	/* =no revoke(2) */
+/*				147	    OBSOLETE */
+/*				148	    OBSOLETE */
+/*				149	    OBSOLETE */
+/*				150	    OBSOLETE */
+/*				151	    OBSOLETE */
 #define	AUE_MAC			152	/* =no MAC use */
 #define	AUE_ENTERPROM		153	/* =na enter prom */
 #define	AUE_EXITPROM		154	/* =na exit prom */

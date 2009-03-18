@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,18 +230,13 @@ extern int	getfauditflags(au_mask_t *, au_mask_t *, au_mask_t *);
 
 extern int	audit(char *, int);
 extern int	auditon(int, caddr_t, int);
-extern int	auditstat(au_stat_t *);
 extern int	auditdoor(int);
 extern int	getaudit(auditinfo_t *);
 extern int	getaudit_addr(auditinfo_addr_t *, int);
 extern int	getauid(au_id_t *);
-extern int	getkernstate(au_mask_t *);
-extern int	getuseraudit(au_id_t, au_mask_t *);
 extern int	setaudit(auditinfo_t *);
 extern int	setaudit_addr(auditinfo_addr_t *, int);
 extern int	setauid(au_id_t *);
-extern int	setkernstate(au_mask_t *);
-extern int	setuseraudit(au_id_t, au_mask_t *);
 
 #define	BSM_TEXTBUFSZ	256 /* size of string for generic text token */
 

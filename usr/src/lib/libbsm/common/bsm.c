@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -62,20 +60,6 @@ setauid(au_id_t *auid)
 
 
 int
-getuseraudit(au_id_t uid, au_mask_t *mask)
-{
-	return (syscall(SYS_auditsys, BSM_GETUSERAUDIT, uid, mask));
-}
-
-
-int
-setuseraudit(au_id_t uid, au_mask_t *mask)
-{
-	return (syscall(SYS_auditsys, BSM_SETUSERAUDIT, uid, mask));
-}
-
-
-int
 getaudit(auditinfo_t *ai)
 {
 	return (syscall(SYS_auditsys, BSM_GETAUDIT, ai));
@@ -103,28 +87,7 @@ setaudit_addr(auditinfo_addr_t *ai, int len)
 
 
 int
-getkernstate(au_mask_t *mask)
-{
-	return (syscall(SYS_auditsys, BSM_GETKERNSTATE, mask));
-}
-
-
-int
-setkernstate(au_mask_t *mask)
-{
-	return (syscall(SYS_auditsys, BSM_SETKERNSTATE, mask));
-}
-
-
-int
 auditon(int cmd, caddr_t data, int length)
 {
 	return (syscall(SYS_auditsys, BSM_AUDITCTL, cmd, data, length));
-}
-
-
-int
-auditstat(au_stat_t *stat)
-{
-	return (syscall(SYS_auditsys, BSM_AUDITSTAT, stat));
 }
