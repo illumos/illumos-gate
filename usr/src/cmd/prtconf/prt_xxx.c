@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stddef.h>
@@ -407,4 +405,41 @@ dump_priv_data(int ilev, di_node_t node)
 	pdp->pd_print(priv, ilev);
 
 	/* ignore driver private data for now */
+}
+
+#define	LOOKUP_PROP(proptype, ph, nodetype, dev, node, name, data)	\
+	((nodetype == DI_PROM_NODEID) ?					\
+	di_prom_prop_lookup_##proptype(ph, node, name, data) :		\
+	di_prop_lookup_##proptype(dev, node, name, data))
+#define	ISPCI(s)						\
+	(((s) != NULL) && ((strcmp((s), "pci") == 0) ||		\
+	(strcmp((s), "pciex") == 0)))
+/*
+ * Print vendor ID and device ID for PCI devices
+ */
+int
+print_pciid(di_node_t node, di_prom_handle_t ph)
+{
+	di_node_t pnode = di_parent_node(node);
+	char *s = NULL;
+	int *i, type = di_nodeid(node);
+
+	if (LOOKUP_PROP(strings, ph, type, DDI_DEV_T_ANY, pnode,
+	    "device_type", &s) <= 0)
+		return (0);
+
+	if (!ISPCI(s))
+		return (0);	/* not a pci device */
+
+	(void) printf(" (%s", s);
+	if (LOOKUP_PROP(ints, ph, type, DDI_DEV_T_ANY, node,
+	    "vendor-id", &i) > 0)
+		(void) printf("%x", i[0]);
+
+	if (LOOKUP_PROP(ints, ph, type, DDI_DEV_T_ANY, node,
+	    "device-id", &i) > 0)
+		(void) printf(",%x", i[0]);
+	(void) printf(")");
+
+	return (1);
 }

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * For machines that support the openprom, fetch and print the list
@@ -94,6 +92,11 @@ typedef struct dumpops {
 	dump_propdevt_t dop_propdevt;
 } dumpops_t;
 
+typedef struct di_args {
+	di_prom_handle_t	prom_hdl;
+	di_devlink_handle_t	devlink_hdl;
+} di_arg_t;
+
 static const dumpops_t sysprop_dumpops = {
 	&prop_dumpops,
 	(dump_nextprop_t)di_prop_sys_next,
@@ -128,7 +131,7 @@ static const dumpops_t sysprop_dumpops = {
 #define	NUM_ELEMENTS(A) (sizeof (A) / sizeof (A[0]))
 
 static int prop_type_guess(const dumpops_t *, void *, void **, int *);
-static void walk_driver(di_node_t, di_devlink_handle_t);
+static void walk_driver(di_node_t, di_arg_t *);
 static int dump_devs(di_node_t, void *);
 static int dump_prop_list(const dumpops_t *, const char *,
 				int, void *, dev_t, int *);
@@ -157,6 +160,8 @@ void
 prtconf_devinfo(void)
 {
 	struct di_priv_data	fetch;
+	di_arg_t		di_arg;
+	di_prom_handle_t	prom_hdl = DI_PROM_HANDLE_NIL;
 	di_devlink_handle_t	devlink_hdl = NULL;
 	di_node_t		root_node;
 	uint_t			flag;
@@ -170,6 +175,12 @@ prtconf_devinfo(void)
 
 	if (opts.o_target) {
 		flag |= (DINFOMINOR | DINFOPATH);
+	}
+
+	if (opts.o_pciid) {
+		flag |= DINFOPROP;
+		if ((prom_hdl = di_prom_init()) == DI_PROM_HANDLE_NIL)
+			exit(_error("di_prom_init() failed."));
 	}
 
 	if (opts.o_forcecache) {
@@ -208,12 +219,17 @@ prtconf_devinfo(void)
 			exit(0);
 	}
 
+	di_arg.prom_hdl = prom_hdl;
+	di_arg.devlink_hdl = devlink_hdl;
+
 	/*
 	 * ...and walk all nodes to report them out...
 	 */
 	if (dbg.d_bydriver) {
 		opts.o_target = 0;
-		walk_driver(root_node, devlink_hdl);
+		walk_driver(root_node, &di_arg);
+		if (prom_hdl != DI_PROM_HANDLE_NIL)
+			di_prom_fini(prom_hdl);
 		if (devlink_hdl != NULL)
 			(void) di_devlink_fini(&devlink_hdl);
 		di_fini(root_node);
@@ -270,9 +286,11 @@ prtconf_devinfo(void)
 		}
 	}
 
-	(void) di_walk_node(root_node, DI_WALK_CLDFIRST, devlink_hdl,
+	(void) di_walk_node(root_node, DI_WALK_CLDFIRST, &di_arg,
 	    dump_devs);
 
+	if (prom_hdl != DI_PROM_HANDLE_NIL)
+		di_prom_fini(prom_hdl);
 	if (devlink_hdl != NULL)
 		(void) di_devlink_fini(&devlink_hdl);
 	di_fini(root_node);
@@ -674,14 +692,14 @@ print:		nitems = prop_type_guess(dumpops, prop, &prop_data, &prop_type);
  * walk_driver is a debugging facility.
  */
 static void
-walk_driver(di_node_t root, di_devlink_handle_t devlink_hdl)
+walk_driver(di_node_t root, di_arg_t *di_arg)
 {
 	di_node_t node;
 
 	node = di_drv_first_node(dbg.d_drivername, root);
 
 	while (node != DI_NODE_NIL) {
-		(void) dump_devs(node, devlink_hdl);
+		(void) dump_devs(node, di_arg);
 		node = di_drv_next_node(node);
 	}
 }
@@ -693,7 +711,8 @@ walk_driver(di_node_t root, di_devlink_handle_t devlink_hdl)
 static int
 dump_devs(di_node_t node, void *arg)
 {
-	di_devlink_handle_t	devlink_hdl = (di_devlink_handle_t)arg;
+	di_arg_t		*di_arg = arg;
+	di_devlink_handle_t	devlink_hdl = di_arg->devlink_hdl;
 	int			ilev = 0;	/* indentation level */
 	char			*driver_name;
 	di_node_t		root_node, tmp;
@@ -730,6 +749,8 @@ dump_devs(di_node_t node, void *arg)
 	indent_to_level(ilev);
 
 	(void) printf("%s", di_node_name(node));
+	if (opts.o_pciid)
+		(void) print_pciid(node, di_arg->prom_hdl);
 
 	/*
 	 * if this node does not have an instance number or is the

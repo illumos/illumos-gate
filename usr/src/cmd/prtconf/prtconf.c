@@ -44,9 +44,10 @@ static char	new_path[MAXPATHLEN];
 #define	INDENT_LENGTH	4
 
 #ifdef	__x86
-static const char *usage = "%s [ -V | -x | -abcvpPD ] [ <device_path > ]\n";
+static const char *usage = "%s [ -V | -x | -abcdvpPD ] [ <device_path > ]\n";
 #else
-static const char *usage = "%s [ -F | -V | -x | -abcvpPD ][ <device_path > ]\n";
+static const char *usage =
+	"%s [ -F | -V | -x | -abcdvpPD ][ <device_path > ]\n";
 #endif	/* __x86 */
 
 static void
@@ -166,9 +167,9 @@ cleanup_path(const char *input_path, char *path)
  */
 
 #ifdef	DEBUG
-static const char *optstring = "abcDvVxpPFf:M:dLuC";
+static const char *optstring = "abcdDvVxpPFf:M:dLuC";
 #else
-static const char *optstring = "abcDvVxpPFf:uC";
+static const char *optstring = "abcdDvVxpPFf:uC";
 #endif	/* DEBUG */
 
 int
@@ -191,6 +192,9 @@ main(int argc, char *argv[])
 			break;
 		case 'c':
 			++opts.o_children;
+			break;
+		case 'd':
+			++opts.o_pciid;
 			break;
 		case 'D':
 			++opts.o_drv_name;
