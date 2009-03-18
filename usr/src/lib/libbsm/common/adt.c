@@ -845,7 +845,7 @@ adt_load_ttyname(const char *ttyname, adt_termid_t **termid)
 	if (sysinfo(SI_HOSTNAME, localhost, MAXHOSTNAMELEN) < 0)
 		goto return_err_free; /* errno from sysinfo */
 
-	if (ttyname != NULL) {
+	if (ttyname != NULL && *ttyname != '\0') {
 		if (stat(ttyname, &stat_buf) < 0)
 			goto return_err_free;
 
