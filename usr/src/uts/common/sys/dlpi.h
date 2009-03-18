@@ -104,6 +104,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_CONTROL_ACK		0x113	/* Device specific control ack */
 #define	DL_PASSIVE_REQ		0x114	/* Allow access to aggregated link */
 #define	DL_INTR_MODE_REQ	0x115	/* Request Rx processing in INTR mode */
+#define	DL_NOTIFY_CONF		0x116	/* Notification from upstream */
 
 /*
  * Primitives used for Connectionless Service
@@ -385,7 +386,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_PROMISC_MULTI	0x03	/* promiscuous mode for multicast */
 
 /*
- * DLPI notification codes for DL_NOTIFY primitives.
+ * DLPI notification codes for DL_NOTIFY_REQ primitives.
  * Bit-wise distinct since DL_NOTIFY_REQ and DL_NOTIFY_ACK carry multiple
  * notification codes.
  */
@@ -400,6 +401,12 @@ typedef struct dl_ipnetinfo {
 #define	DL_NOTE_SPEED		0x0100	/* Approximate link speed */
 #define	DL_NOTE_FASTPATH_FLUSH	0x0200	/* Fast Path info changes */
 #define	DL_NOTE_CAPAB_RENEG	0x0400	/* Initiate capability renegotiation */
+#define	DL_NOTE_REPLUMB		0x0800	/* Inform the link to replumb */
+
+/*
+ * DLPI notification codes for DL_NOTIFY_CONF primitives.
+ */
+#define	DL_NOTE_REPLUMB_DONE	0x0001	/* Indicate replumb has done */
 
 /*
  * DLPI Quality Of Service definition for use in QOS structure definitions.
@@ -1017,6 +1024,14 @@ typedef struct {
 } dl_notify_ind_t;
 
 /*
+ * DL_NOTIFY_CONF, M_PROTO type
+ */
+typedef struct {
+	t_uscalar_t	dl_primitive;	/* set to DL_NOTIFY_CONF */
+	uint32_t	dl_notification; /* Which notification? */
+} dl_notify_conf_t;
+
+/*
  * DL_AGGR_REQ, M_PROTO type
  */
 typedef struct {
@@ -1507,6 +1522,7 @@ union DL_primitives {
 	dl_notify_req_t		notify_req;
 	dl_notify_ack_t		notify_ack;
 	dl_notify_ind_t		notify_ind;
+	dl_notify_conf_t	notify_conf;
 	dl_aggr_req_t		aggr_req;
 	dl_aggr_ind_t		aggr_ind;
 	dl_unaggr_req_t		unaggr_req;
@@ -1574,6 +1590,7 @@ union DL_primitives {
 #define	DL_NOTIFY_REQ_SIZE	sizeof (dl_notify_req_t)
 #define	DL_NOTIFY_ACK_SIZE	sizeof (dl_notify_ack_t)
 #define	DL_NOTIFY_IND_SIZE	sizeof (dl_notify_ind_t)
+#define	DL_NOTIFY_CONF_SIZE	sizeof (dl_notify_conf_t)
 #define	DL_AGGR_REQ_SIZE	sizeof (dl_aggr_req_t)
 #define	DL_AGGR_IND_SIZE	sizeof (dl_aggr_ind_t)
 #define	DL_UNAGGR_REQ_SIZE	sizeof (dl_unaggr_req_t)

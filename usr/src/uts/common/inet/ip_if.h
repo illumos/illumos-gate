@@ -188,6 +188,7 @@ extern	void	ill_refresh_bcast(ill_t *);
 extern	void	ill_restart_dad(ill_t *, boolean_t);
 extern	boolean_t	ill_setdefaulttoken(ill_t *);
 extern	int	ill_set_phys_addr(ill_t *, mblk_t *);
+extern	int	ill_replumb(ill_t *, mblk_t *);
 extern	void	ill_set_ndmp(ill_t *, mblk_t *, uint_t, uint_t);
 
 extern mblk_t	*ill_pending_mp_get(ill_t *, conn_t **, uint_t);

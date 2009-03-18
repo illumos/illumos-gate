@@ -2158,7 +2158,9 @@ uint32_t
 mac_no_notification(mac_handle_t mh)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
-	return (mip->mi_unsup_note);
+
+	return (((mip->mi_state_flags & MIS_LEGACY) != 0) ?
+	    mip->mi_capab_legacy.ml_unsup_note : 0);
 }
 
 /*
@@ -2840,6 +2842,28 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 		    valsize, val, perm);
 	}
 	return (err);
+}
+
+int
+mac_fastpath_disable(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if ((mip->mi_state_flags & MIS_LEGACY) == 0)
+		return (0);
+
+	return (mip->mi_capab_legacy.ml_fastpath_disable(mip->mi_driver));
+}
+
+void
+mac_fastpath_enable(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if ((mip->mi_state_flags & MIS_LEGACY) == 0)
+		return;
+
+	mip->mi_capab_legacy.ml_fastpath_enable(mip->mi_driver);
 }
 
 void
@@ -4391,34 +4415,79 @@ mac_log_linkinfo(void *arg)
 	rw_exit(&i_mac_impl_lock);
 }
 
+typedef struct i_mac_fastpath_state_s {
+	boolean_t	mf_disable;
+	int		mf_err;
+} i_mac_fastpath_state_t;
+
+/*ARGSUSED*/
+static uint_t
+i_mac_fastpath_disable_walker(mod_hash_key_t key, mod_hash_val_t *val,
+    void *arg)
+{
+	i_mac_fastpath_state_t	*state = arg;
+	mac_handle_t		mh = (mac_handle_t)val;
+
+	if (state->mf_disable)
+		state->mf_err = mac_fastpath_disable(mh);
+	else
+		mac_fastpath_enable(mh);
+
+	return (state->mf_err == 0 ? MH_WALK_CONTINUE : MH_WALK_TERMINATE);
+}
+
 /*
  * Start the logging timer.
  */
-void
+int
 mac_start_logusage(mac_logtype_t type, uint_t interval)
 {
+	i_mac_fastpath_state_t state = {B_TRUE, 0};
+	int err;
+
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	switch (type) {
 	case MAC_LOGTYPE_FLOW:
 		if (mac_flow_log_enable) {
 			rw_exit(&i_mac_impl_lock);
-			return;
+			return (0);
 		}
-		mac_flow_log_enable = B_TRUE;
 		/* FALLTHRU */
 	case MAC_LOGTYPE_LINK:
 		if (mac_link_log_enable) {
 			rw_exit(&i_mac_impl_lock);
-			return;
+			return (0);
 		}
-		mac_link_log_enable = B_TRUE;
 		break;
 	default:
 		ASSERT(0);
 	}
+
+	/* Disable fastpath */
+	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_disable_walker, &state);
+	if ((err = state.mf_err) != 0) {
+		/* Reenable fastpath  */
+		state.mf_disable = B_FALSE;
+		state.mf_err = 0;
+		mod_hash_walk(i_mac_impl_hash,
+		    i_mac_fastpath_disable_walker, &state);
+		rw_exit(&i_mac_impl_lock);
+		return (err);
+	}
+
+	switch (type) {
+	case MAC_LOGTYPE_FLOW:
+		mac_flow_log_enable = B_TRUE;
+		/* FALLTHRU */
+	case MAC_LOGTYPE_LINK:
+		mac_link_log_enable = B_TRUE;
+		break;
+	}
+
 	mac_logging_interval = interval;
 	rw_exit(&i_mac_impl_lock);
 	mac_log_linkinfo(NULL);
+	return (0);
 }
 
 /*
@@ -4428,6 +4497,7 @@ void
 mac_stop_logusage(mac_logtype_t type)
 {
 	i_mac_log_state_t	lstate;
+	i_mac_fastpath_state_t	state = {B_FALSE, 0};
 
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	lstate.mi_fenable = mac_flow_log_enable;
@@ -4455,6 +4525,10 @@ mac_stop_logusage(mac_logtype_t type)
 	default:
 		ASSERT(0);
 	}
+
+	/* Reenable fastpath */
+	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_disable_walker, &state);
+
 	rw_exit(&i_mac_impl_lock);
 	(void) untimeout(mac_logging_timer);
 	mac_logging_timer = 0;

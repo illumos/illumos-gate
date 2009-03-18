@@ -95,7 +95,6 @@ ip_ard_template
 ip_area_template
 ip_ared_template
 ip_areq_template
-ip_aresq_template
 ip_arma_multi_template
 ip_aroff_template
 ip_aron_template

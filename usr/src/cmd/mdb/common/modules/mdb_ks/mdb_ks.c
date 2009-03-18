@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Mdb kernel support module.  This module is loaded automatically when the
@@ -1578,6 +1576,7 @@ mdb_dlpi_prim(int prim)
 	case DL_NOTIFY_REQ:	return ("DL_NOTIFY_REQ");
 	case DL_NOTIFY_ACK:	return ("DL_NOTIFY_ACK");
 	case DL_NOTIFY_IND:	return ("DL_NOTIFY_IND");
+	case DL_NOTIFY_CONF:	return ("DL_NOTIFY_CONF");
 	case DL_CAPABILITY_REQ:	return ("DL_CAPABILITY_REQ");
 	case DL_CAPABILITY_ACK:	return ("DL_CAPABILITY_ACK");
 	case DL_CONTROL_REQ:	return ("DL_CONTROL_REQ");

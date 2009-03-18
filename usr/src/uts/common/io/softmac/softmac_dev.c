@@ -19,28 +19,45 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #include <sys/types.h>
-#include <sys/dld.h>
 #include <inet/common.h>
 #include <sys/stropts.h>
 #include <sys/modctl.h>
-#include <sys/avl.h>
+#include <sys/dld.h>
 #include <sys/softmac_impl.h>
-#include <sys/softmac.h>
 
 dev_info_t		*softmac_dip = NULL;
+static kmem_cache_t	*softmac_upper_cachep;
 
-static int softmac_open(queue_t *, dev_t *, int, int, cred_t *);
-static int softmac_close(queue_t *);
-static void softmac_rput(queue_t *, mblk_t *);
-static void softmac_rsrv(queue_t *);
-static void softmac_wput(queue_t *, mblk_t *);
-static void softmac_wsrv(queue_t *);
+/*
+ * This function is a generic open(9E) entry point into the softmac for
+ * both the softmac module and the softmac driver.
+ */
+static int softmac_cmn_open(queue_t *, dev_t *, int, int, cred_t *);
+
+/*
+ * The following softmac_mod_xxx() functions are (9E) entry point functions for
+ * the softmac module.
+ */
+static int softmac_mod_close(queue_t *);
+static void softmac_mod_rput(queue_t *, mblk_t *);
+static void softmac_mod_wput(queue_t *, mblk_t *);
+static void softmac_mod_wsrv(queue_t *);
+
+/*
+ * The following softmac_drv_xxx() functions are (9E) entry point functions for
+ * the softmac driver.
+ */
+static int softmac_drv_open(queue_t *, dev_t *, int, int, cred_t *);
+static int softmac_drv_close(queue_t *);
+static void softmac_drv_wput(queue_t *, mblk_t *);
+static void softmac_drv_wsrv(queue_t *);
+
 static int softmac_attach(dev_info_t *, ddi_attach_cmd_t);
 static int softmac_detach(dev_info_t *, ddi_detach_cmd_t);
 static int softmac_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
@@ -68,21 +85,21 @@ static struct module_info softmac_dld_modinfo = {
 };
 
 static struct qinit softmac_urinit = {
-	(pfi_t)softmac_rput,	/* qi_putp */
-	(pfi_t)softmac_rsrv,	/* qi_srvp */
-	softmac_open,		/* qi_qopen */
-	softmac_close,		/* qi_qclose */
-	NULL,			/* qi_qadmin */
-	&softmac_modinfo	/* qi_minfo */
+	(pfi_t)softmac_mod_rput,	/* qi_putp */
+	(pfi_t)NULL,			/* qi_srvp */
+	softmac_cmn_open,		/* qi_qopen */
+	softmac_mod_close,		/* qi_qclose */
+	NULL,				/* qi_qadmin */
+	&softmac_modinfo		/* qi_minfo */
 };
 
 static struct qinit softmac_uwinit = {
-	(pfi_t)softmac_wput,	/* qi_putp */
-	(pfi_t)softmac_wsrv,	/* qi_srvp */
-	NULL,			/* qi_qopen */
-	NULL,			/* qi_qclose */
-	NULL,			/* qi_qadmin */
-	&softmac_modinfo	/* qi_minfo */
+	(pfi_t)softmac_mod_wput,	/* qi_putp */
+	(pfi_t)softmac_mod_wsrv,	/* qi_srvp */
+	NULL,				/* qi_qopen */
+	NULL,				/* qi_qclose */
+	NULL,				/* qi_qadmin */
+	&softmac_modinfo		/* qi_minfo */
 };
 
 static struct streamtab softmac_tab = {
@@ -95,11 +112,12 @@ DDI_DEFINE_STREAM_OPS(softmac_ops, nulldev, nulldev, softmac_attach,
     ddi_quiesce_not_supported);
 
 static struct qinit softmac_dld_r_qinit = {
-	NULL, NULL, dld_open, dld_close, NULL, &softmac_dld_modinfo
+	NULL, NULL, softmac_drv_open, softmac_drv_close, NULL,
+	&softmac_dld_modinfo
 };
 
 static struct qinit softmac_dld_w_qinit = {
-	(pfi_t)dld_wput, (pfi_t)dld_wsrv, NULL, NULL, NULL,
+	(pfi_t)softmac_drv_wput, (pfi_t)softmac_drv_wsrv, NULL, NULL, NULL,
 	&softmac_dld_modinfo
 };
 
@@ -128,12 +146,60 @@ static struct modlinkage softmac_modlinkage = {
 	NULL
 };
 
+/*ARGSUSED*/
+static int
+softmac_upper_constructor(void *buf, void *arg, int kmflag)
+{
+	softmac_upper_t	*sup = buf;
+
+	bzero(buf, sizeof (softmac_upper_t));
+
+	mutex_init(&sup->su_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&sup->su_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&sup->su_disp_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&sup->su_disp_cv, NULL, CV_DEFAULT, NULL);
+	list_create(&sup->su_req_list, sizeof (softmac_switch_req_t),
+	    offsetof(softmac_switch_req_t, ssq_req_list_node));
+	return (0);
+}
+
+/*ARGSUSED*/
+static void
+softmac_upper_destructor(void *buf, void *arg)
+{
+	softmac_upper_t	*sup = buf;
+
+	ASSERT(sup->su_slp == NULL);
+	ASSERT(sup->su_pending_head == NULL && sup->su_pending_tail == NULL);
+	ASSERT(!sup->su_dlpi_pending);
+	ASSERT(!sup->su_active);
+	ASSERT(!sup->su_closing);
+	ASSERT(sup->su_tx_flow_mp == NULL);
+	ASSERT(sup->su_tx_inprocess == 0);
+	ASSERT(sup->su_mode == SOFTMAC_UNKNOWN);
+	ASSERT(!sup->su_tx_busy);
+	ASSERT(!sup->su_bound);
+	ASSERT(!sup->su_taskq_scheduled);
+	ASSERT(list_is_empty(&sup->su_req_list));
+
+	list_destroy(&sup->su_req_list);
+	mutex_destroy(&sup->su_mutex);
+	cv_destroy(&sup->su_cv);
+	mutex_destroy(&sup->su_disp_mutex);
+	cv_destroy(&sup->su_disp_cv);
+}
+
 int
 _init(void)
 {
 	int	err;
 
 	softmac_init();
+
+	softmac_upper_cachep = kmem_cache_create("softmac_upper_cache",
+	    sizeof (softmac_upper_t), 0, softmac_upper_constructor,
+	    softmac_upper_destructor, NULL, NULL, NULL, 0);
+	ASSERT(softmac_upper_cachep != NULL);
 
 	if ((err = mod_install(&softmac_modlinkage)) != 0) {
 		softmac_fini();
@@ -154,6 +220,7 @@ _fini(void)
 	if ((err = mod_remove(&softmac_modlinkage)) != 0)
 		return (err);
 
+	kmem_cache_destroy(softmac_upper_cachep);
 	softmac_fini();
 
 	return (0);
@@ -166,7 +233,7 @@ _info(struct modinfo *modinfop)
 }
 
 static int
-softmac_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
+softmac_cmn_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	softmac_lower_t	*slp;
 	/*
@@ -198,16 +265,15 @@ softmac_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 	/*
 	 * Regular device open of a softmac DLPI node.  We modify
 	 * the queues' q_qinfo pointer such that all future STREAMS
-	 * operations will go through dld's entry points (including
-	 * dld_close()).
+	 * operations will go through another set of entry points
 	 */
 	rq->q_qinfo = &softmac_dld_r_qinit;
 	WR(rq)->q_qinfo = &softmac_dld_w_qinit;
-	return (dld_open(rq, devp, flag, sflag, credp));
+	return (softmac_drv_open(rq, devp, flag, sflag, credp));
 }
 
 static int
-softmac_close(queue_t *rq)
+softmac_mod_close(queue_t *rq)
 {
 	softmac_lower_t	*slp = rq->q_ptr;
 
@@ -237,10 +303,11 @@ softmac_close(queue_t *rq)
 }
 
 static void
-softmac_rput(queue_t *rq, mblk_t *mp)
+softmac_mod_rput(queue_t *rq, mblk_t *mp)
 {
-	softmac_lower_t *slp = rq->q_ptr;
-	union DL_primitives *dlp;
+	softmac_lower_t		*slp = rq->q_ptr;
+	softmac_lower_rxinfo_t	*rxinfo;
+	union DL_primitives	*dlp;
 
 	/*
 	 * This is the softmac module.
@@ -249,11 +316,21 @@ softmac_rput(queue_t *rq, mblk_t *mp)
 	ASSERT((mp->b_next == NULL) && (mp->b_prev == NULL));
 
 	switch (DB_TYPE(mp)) {
-	case M_DATA:
+	case M_DATA: {
+
 		/*
-		 * Some drivers start to send up packets even if not in the
-		 * DL_IDLE state, where sl_softmac is not set yet.  Drop the
-		 * packet in this case.
+		 * If sl_rxinfo is non-NULL. This is dedicated-lower-stream
+		 * created for fastpath. Directly call the rx callback.
+		 */
+		if ((rxinfo = slp->sl_rxinfo) != NULL) {
+			rxinfo->slr_rx(rxinfo->slr_arg, NULL, mp, NULL);
+			break;
+		}
+
+		/*
+		 * A shared-lower-stream. Some driver starts to send up
+		 * packets even it not in the DL_IDLE state, where
+		 * sl_softmac is not set yet. Drop the packet in this case.
 		 */
 		if (slp->sl_softmac == NULL) {
 			freemsg(mp);
@@ -275,18 +352,13 @@ softmac_rput(queue_t *rq, mblk_t *mp)
 		 */
 		if (DB_REF(mp) == 1) {
 			ASSERT(slp->sl_softmac != NULL);
-			/*
-			 * We don't need any locks to protect sl_handle
-			 * because ip_input() can tolerate if sl_handle
-			 * is reset to NULL when DL_CAPAB_POLL is
-			 * disabled.
-			 */
 			mac_rx(slp->sl_softmac->smac_mh, NULL, mp);
 			return;
 		} else {
 			softmac_rput_process_data(slp, mp);
 		}
 		break;
+	}
 	case M_PROTO:
 	case M_PCPROTO:
 		if (MBLKL(mp) < sizeof (dlp->dl_primitive)) {
@@ -295,6 +367,12 @@ softmac_rput(queue_t *rq, mblk_t *mp)
 		}
 		dlp = (union DL_primitives *)mp->b_rptr;
 		if (dlp->dl_primitive == DL_UNITDATA_IND) {
+
+			if ((rxinfo = slp->sl_rxinfo) != NULL) {
+				rxinfo->slr_rx(rxinfo->slr_arg, NULL, mp, NULL);
+				break;
+			}
+
 			cmn_err(CE_WARN, "got unexpected %s message",
 			    dl_primstr(DL_UNITDATA_IND));
 			freemsg(mp);
@@ -302,19 +380,13 @@ softmac_rput(queue_t *rq, mblk_t *mp)
 		}
 		/*FALLTHROUGH*/
 	default:
-		softmac_rput_process_notdata(rq, mp);
+		softmac_rput_process_notdata(rq, slp->sl_sup, mp);
 		break;
 	}
 }
 
-/* ARGSUSED */
 static void
-softmac_rsrv(queue_t *rq)
-{
-}
-
-static void
-softmac_wput(queue_t *wq, mblk_t *mp)
+softmac_mod_wput(queue_t *wq, mblk_t *mp)
 {
 	/*
 	 * This is the softmac module
@@ -342,7 +414,6 @@ softmac_wput(queue_t *wq, mblk_t *mp)
 			 */
 			arg = (smac_ioc_start_t *)mp->b_cont->b_rptr;
 			arg->si_slp = slp;
-
 			miocack(wq, mp, sizeof (*arg), 0);
 			break;
 		}
@@ -359,7 +430,7 @@ softmac_wput(queue_t *wq, mblk_t *mp)
 }
 
 static void
-softmac_wsrv(queue_t *wq)
+softmac_mod_wsrv(queue_t *wq)
 {
 	softmac_lower_t *slp = wq->q_ptr;
 
@@ -372,7 +443,9 @@ softmac_wsrv(queue_t *wq)
 	 * Inform that the tx resource is available; mac_tx_update() will
 	 * inform all the upper streams sharing this lower stream.
 	 */
-	if (slp->sl_softmac != NULL)
+	if (slp->sl_sup != NULL)
+		qenable(slp->sl_sup->su_wq);
+	else if (slp->sl_softmac != NULL)
 		mac_tx_update(slp->sl_softmac->smac_mh);
 }
 
@@ -419,4 +492,180 @@ softmac_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	}
 
 	return (DDI_FAILURE);
+}
+
+/*ARGSUSED*/
+static void
+softmac_dedicated_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    mac_header_info_t *mhip)
+{
+	queue_t *rq = ((softmac_upper_t *)arg)->su_rq;
+
+	if (canputnext(rq))
+		putnext(rq, mp);
+	else
+		freemsg(mp);
+}
+
+/*ARGSUSED*/
+static int
+softmac_drv_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	softmac_upper_t	*sup = NULL;
+	softmac_t	*softmac;
+	int		err = 0;
+
+	/*
+	 * This is a softmac device created for a legacy device, find the
+	 * associated softmac and initialize the softmac_upper_t structure.
+	 */
+	if ((err = softmac_hold(*devp, &softmac)) != 0)
+		return (err);
+
+	sup = kmem_cache_alloc(softmac_upper_cachep, KM_NOSLEEP);
+	if (sup == NULL) {
+		err = ENOMEM;
+		goto fail;
+	}
+
+	ASSERT(list_is_empty(&sup->su_req_list));
+
+	if ((sup->su_tx_flow_mp = allocb(1, BPRI_HI)) == NULL) {
+		err = ENOMEM;
+		goto fail;
+	}
+
+	sup->su_rq = rq;
+	sup->su_wq = WR(rq);
+	sup->su_softmac = softmac;
+	sup->su_mode = SOFTMAC_UNKNOWN;
+
+	sup->su_rxinfo.slr_arg = sup;
+	sup->su_rxinfo.slr_rx = softmac_dedicated_rx;
+	sup->su_direct_rxinfo.slr_arg = sup;
+	sup->su_direct_rxinfo.slr_rx = softmac_dedicated_rx;
+
+	if ((err = dld_str_open(rq, devp, sup)) != 0) {
+		freeb(sup->su_tx_flow_mp);
+		sup->su_tx_flow_mp = NULL;
+		goto fail;
+	}
+
+	return (0);
+
+fail:
+	if (sup != NULL)
+		kmem_cache_free(softmac_upper_cachep, sup);
+	softmac_rele(softmac);
+	return (err);
+}
+
+static int
+softmac_drv_close(queue_t *rq)
+{
+	softmac_upper_t	*sup = dld_str_private(rq);
+	softmac_t	*softmac = sup->su_softmac;
+
+	ASSERT(WR(rq)->q_next == NULL);
+
+	qprocsoff(rq);
+
+	ASSERT(sup->su_tx_inprocess == 0);
+
+	/*
+	 * Wait until the pending request are processed by the worker thread.
+	 */
+	mutex_enter(&sup->su_disp_mutex);
+	sup->su_closing = B_TRUE;
+	while (sup->su_dlpi_pending)
+		cv_wait(&sup->su_disp_cv, &sup->su_disp_mutex);
+	mutex_exit(&sup->su_disp_mutex);
+
+	softmac_upperstream_close(sup);
+
+	if (sup->su_tx_flow_mp != NULL) {
+		freeb(sup->su_tx_flow_mp);
+		sup->su_tx_flow_mp = NULL;
+	}
+
+	if (sup->su_active) {
+		mutex_enter(&softmac->smac_active_mutex);
+		softmac->smac_nactive--;
+		mutex_exit(&softmac->smac_active_mutex);
+		sup->su_active = B_FALSE;
+	}
+
+	sup->su_bound = B_FALSE;
+	sup->su_softmac = NULL;
+	sup->su_closing = B_FALSE;
+
+	kmem_cache_free(softmac_upper_cachep, sup);
+
+	softmac_rele(softmac);
+	return (dld_str_close(rq));
+}
+
+static void
+softmac_drv_wput(queue_t *wq, mblk_t *mp)
+{
+	softmac_upper_t	*sup = dld_str_private(wq);
+	t_uscalar_t	prim;
+
+	ASSERT(wq->q_next == NULL);
+
+	switch (DB_TYPE(mp)) {
+	case M_DATA:
+	case M_MULTIDATA:
+		softmac_wput_data(sup, mp);
+		break;
+	case M_PROTO:
+	case M_PCPROTO:
+
+		if (MBLKL(mp) < sizeof (t_uscalar_t)) {
+			freemsg(mp);
+			return;
+		}
+
+		prim = ((union DL_primitives *)mp->b_rptr)->dl_primitive;
+		if (prim == DL_UNITDATA_REQ) {
+			softmac_wput_data(sup, mp);
+			return;
+		}
+
+		softmac_wput_nondata(sup, mp);
+		break;
+	default:
+		softmac_wput_nondata(sup, mp);
+		break;
+	}
+}
+
+static void
+softmac_drv_wsrv(queue_t *wq)
+{
+	softmac_upper_t	*sup = dld_str_private(wq);
+
+	ASSERT(wq->q_next == NULL);
+
+	mutex_enter(&sup->su_mutex);
+	if (sup->su_mode != SOFTMAC_FASTPATH) {
+		/*
+		 * Bump su_tx_inprocess so that su_mode won't change.
+		 */
+		sup->su_tx_inprocess++;
+		mutex_exit(&sup->su_mutex);
+		dld_wsrv(wq);
+		mutex_enter(&sup->su_mutex);
+		if (--sup->su_tx_inprocess == 0)
+			cv_signal(&sup->su_cv);
+	} else if (sup->su_tx_busy && SOFTMAC_CANPUTNEXT(sup->su_slp->sl_wq)) {
+		/*
+		 * The flow-conctol of the dedicated-lower-stream is
+		 * relieved, relieve the flow-control of the
+		 * upper-stream too.
+		 */
+		sup->su_tx_flow_mp = getq(wq);
+		sup->su_tx_busy = B_FALSE;
+	}
+	mutex_exit(&sup->su_mutex);
 }

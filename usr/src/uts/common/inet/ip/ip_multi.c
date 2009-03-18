@@ -81,8 +81,6 @@ static int	ilg_add_v6(conn_t *connp, const in6_addr_t *group, ill_t *ill,
 static void	ilg_delete(conn_t *connp, ilg_t *ilg, const in6_addr_t *src);
 static mblk_t	*ill_create_dl(ill_t *ill, uint32_t dl_primitive,
     uint32_t length, uint32_t *addr_lenp, uint32_t *addr_offp);
-static mblk_t	*ill_create_squery(ill_t *ill, ipaddr_t ipaddr,
-    uint32_t addrlen, uint32_t addroff, mblk_t *mp_tail);
 static void	conn_ilg_reap(conn_t *connp);
 static int	ip_opt_delete_group_excl(conn_t *connp, ipaddr_t group,
     ipif_t *ipif, mcast_record_t fmode, ipaddr_t src);
@@ -676,6 +674,42 @@ ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
 }
 
 /*
+ * Mapping the given IP multicast address to the L2 multicast mac address.
+ */
+static void
+ill_multicast_mapping(ill_t *ill, ipaddr_t ip_addr, uint8_t *hw_addr,
+    uint32_t hw_addrlen)
+{
+	dl_unitdata_req_t *dlur;
+	ipaddr_t proto_extract_mask;
+	uint8_t *from, *bcast_addr;
+	uint32_t hw_extract_start;
+	int len;
+
+	ASSERT(IN_CLASSD(ntohl(ip_addr)));
+	ASSERT(hw_addrlen == ill->ill_phys_addr_length);
+	ASSERT((ill->ill_phyint->phyint_flags & PHYI_MULTI_BCAST) == 0);
+	ASSERT((ill->ill_flags & ILLF_MULTICAST) != 0);
+
+	/*
+	 * Find the physical broadcast address.
+	 */
+	dlur = (dl_unitdata_req_t *)ill->ill_bcast_mp->b_rptr;
+	bcast_addr = (uint8_t *)dlur + dlur->dl_dest_addr_offset;
+	if (ill->ill_sap_length > 0)
+		bcast_addr += ill->ill_sap_length;
+
+	VERIFY(MEDIA_V4MINFO(ill->ill_media, hw_addrlen, bcast_addr,
+	    hw_addr, &hw_extract_start, &proto_extract_mask));
+
+	len = MIN((int)hw_addrlen - hw_extract_start, IP_ADDR_LEN);
+	ip_addr &= proto_extract_mask;
+	from = (uint8_t *)&ip_addr;
+	while (len-- > 0)
+		hw_addr[hw_extract_start + len] |= from[len];
+}
+
+/*
  * Send a multicast request to the driver for enabling multicast reception
  * for v6groupp address. The caller has already checked whether it is
  * appropriate to send one or not.
@@ -698,48 +732,30 @@ ip_ll_send_enabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 		return (0);
 
 	/*
-	 * Create a AR_ENTRY_SQUERY message with a dl_enabmulti_req tacked
-	 * on.
+	 * Create a DL_ENABMULTI_REQ.
 	 */
 	mp = ill_create_dl(ill, DL_ENABMULTI_REQ, sizeof (dl_enabmulti_req_t),
 	    &addrlen, &addroff);
 	if (!mp)
 		return (ENOMEM);
+
 	if (IN6_IS_ADDR_V4MAPPED(v6groupp)) {
 		ipaddr_t v4group;
 
 		IN6_V4MAPPED_TO_IPADDR(v6groupp, v4group);
-		/*
-		 * NOTE!!!
-		 * The "addroff" passed in here was calculated by
-		 * ill_create_dl(), and will be used by ill_create_squery()
-		 * to perform some twisted coding magic. It is the offset
-		 * into the dl_xxx_req of the hw addr. Here, it will be
-		 * added to b_wptr - b_rptr to create a magic number that
-		 * is not an offset into this squery mblk.
-		 * The actual hardware address will be accessed only in the
-		 * dl_xxx_req, not in the squery. More importantly,
-		 * that hardware address can *only* be accessed in this
-		 * mblk chain by calling mi_offset_param_c(), which uses
-		 * the magic number in the squery hw offset field to go
-		 * to the *next* mblk (the dl_xxx_req), subtract the
-		 * (b_wptr - b_rptr), and find the actual offset into
-		 * the dl_xxx_req.
-		 * Any method that depends on using the
-		 * offset field in the dl_disabmulti_req or squery
-		 * to find either hardware address will similarly fail.
-		 *
-		 * Look in ar_entry_squery() in arp.c to see how this offset
-		 * is used.
-		 */
-		mp = ill_create_squery(ill, v4group, addrlen, addroff, mp);
-		if (!mp)
-			return (ENOMEM);
-		ip1dbg(("ip_ll_send_enabmulti_req: IPv4 putnext %s on %s\n",
+
+		ill_multicast_mapping(ill, v4group,
+		    mp->b_rptr + addroff, addrlen);
+
+		ip1dbg(("ip_ll_send_enabmulti_req: IPv4 %s on %s\n",
 		    inet_ntop(AF_INET6, v6groupp, group_buf,
 		    sizeof (group_buf)),
 		    ill->ill_name));
-		putnext(ill->ill_rq, mp);
+
+		/* Track the state if this is the first enabmulti */
+		if (ill->ill_dlpi_multicast_state == IDS_UNKNOWN)
+			ill->ill_dlpi_multicast_state = IDS_INPROGRESS;
+		ill_dlpi_send(ill, mp);
 	} else {
 		ip1dbg(("ip_ll_send_enabmulti_req: IPv6 ndp_mcastreq %s on"
 		    " %s\n",
@@ -934,7 +950,7 @@ ip_ll_send_disabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 {
 	mblk_t	*mp;
 	char	group_buf[INET6_ADDRSTRLEN];
-	uint32_t	addrlen, addroff;
+	uint32_t addrlen, addroff;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -945,12 +961,10 @@ ip_ll_send_disabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 		return (0);
 
 	/*
-	 * Create a AR_ENTRY_SQUERY message with a dl_disabmulti_req tacked
-	 * on.
+	 * Create a DL_DISABMULTI_REQ.
 	 */
 	mp = ill_create_dl(ill, DL_DISABMULTI_REQ,
 	    sizeof (dl_disabmulti_req_t), &addrlen, &addroff);
-
 	if (!mp)
 		return (ENOMEM);
 
@@ -958,29 +972,15 @@ ip_ll_send_disabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 		ipaddr_t v4group;
 
 		IN6_V4MAPPED_TO_IPADDR(v6groupp, v4group);
-		/*
-		 * NOTE!!!
-		 * The "addroff" passed in here was calculated by
-		 * ill_create_dl(), and will be used by ill_create_squery()
-		 * to perform some twisted coding magic. It is the offset
-		 * into the dl_xxx_req of the hw addr. Here, it will be
-		 * added to b_wptr - b_rptr to create a magic number that
-		 * is not an offset into this mblk.
-		 *
-		 * Please see the comment in ip_ll_send)enabmulti_req()
-		 * for a complete explanation.
-		 *
-		 * Look in ar_entry_squery() in arp.c to see how this offset
-		 * is used.
-		 */
-		mp = ill_create_squery(ill, v4group, addrlen, addroff, mp);
-		if (!mp)
-			return (ENOMEM);
-		ip1dbg(("ip_ll_send_disabmulti_req: IPv4 putnext %s on %s\n",
+
+		ill_multicast_mapping(ill, v4group,
+		    mp->b_rptr + addroff, addrlen);
+
+		ip1dbg(("ip_ll_send_disabmulti_req: IPv4 %s on %s\n",
 		    inet_ntop(AF_INET6, v6groupp, group_buf,
 		    sizeof (group_buf)),
 		    ill->ill_name));
-		putnext(ill->ill_rq, mp);
+		ill_dlpi_send(ill, mp);
 	} else {
 		ip1dbg(("ip_ll_send_disabmulti_req: IPv6 ndp_mcastreq %s on"
 		    " %s\n",
@@ -1296,58 +1296,6 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 		    fanout_flags, zoneid);
 }
 
-static area_t	ip_aresq_template = {
-	AR_ENTRY_SQUERY,		/* cmd */
-	sizeof (area_t)+IP_ADDR_LEN,	/* name offset */
-	sizeof (area_t),	/* name len (filled by ill_arp_alloc) */
-	IP_ARP_PROTO_TYPE,		/* protocol, from arps perspective */
-	sizeof (area_t),			/* proto addr offset */
-	IP_ADDR_LEN,			/* proto addr_length */
-	0,				/* proto mask offset */
-	/* Rest is initialized when used */
-	0,				/* flags */
-	0,				/* hw addr offset */
-	0,				/* hw addr length */
-};
-
-static mblk_t *
-ill_create_squery(ill_t *ill, ipaddr_t ipaddr, uint32_t addrlen,
-    uint32_t addroff, mblk_t *mp_tail)
-{
-	mblk_t	*mp;
-	area_t	*area;
-
-	mp = ill_arp_alloc(ill, (uchar_t *)&ip_aresq_template,
-	    (caddr_t)&ipaddr);
-	if (!mp) {
-		freemsg(mp_tail);
-		return (NULL);
-	}
-	area = (area_t *)mp->b_rptr;
-	area->area_hw_addr_length = addrlen;
-	area->area_hw_addr_offset = mp->b_wptr - mp->b_rptr + addroff;
-	/*
-	 * NOTE!
-	 *
-	 * The area_hw_addr_offset, as can be seen, does not hold the
-	 * actual hardware address offset. Rather, it holds the offset
-	 * to the hw addr in the dl_xxx_req in mp_tail, modified by
-	 * adding (mp->b_wptr - mp->b_rptr). This allows the function
-	 * mi_offset_paramc() to find the hardware address in the
-	 * *second* mblk (dl_xxx_req), not this mblk.
-	 *
-	 * Using mi_offset_paramc() is thus the *only* way to access
-	 * the dl_xxx_hw address.
-	 *
-	 * The squery hw address should *not* be accessed.
-	 *
-	 * See ar_entry_squery() in arp.c for an example of how all this works.
-	 */
-
-	mp->b_cont = mp_tail;
-	return (mp);
-}
-
 /*
  * Create a DLPI message; for DL_{ENAB,DISAB}MULTI_REQ, room is left for
  * the hardware address.
@@ -1422,63 +1370,6 @@ ill_create_dl(ill_t *ill, uint32_t dl_primitive, uint32_t length,
 	ip1dbg(("ill_create_dl: addr_len %d, addr_off %d\n",
 	    *addr_lenp, *addr_offp));
 	return (mp);
-}
-
-/*
- * Writer processing for ip_wput_ctl(): send the DL_{ENAB,DISAB}MULTI_REQ
- * messages that had been delayed until we'd heard back from ARP.  One catch:
- * we need to ensure that no one else becomes writer on the IPSQ before we've
- * received the replies, or they'll incorrectly process our replies as part of
- * their unrelated IPSQ operation.  To do this, we start a new IPSQ operation,
- * which will complete when we process the reply in ip_rput_dlpi_writer().
- */
-/* ARGSUSED */
-static void
-ip_wput_ctl_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
-{
-	ill_t *ill = q->q_ptr;
-	t_uscalar_t prim = ((union DL_primitives *)mp->b_rptr)->dl_primitive;
-
-	ASSERT(IAM_WRITER_ILL(ill));
-	ASSERT(prim == DL_ENABMULTI_REQ || prim == DL_DISABMULTI_REQ);
-	ip1dbg(("ip_wput_ctl_writer: %s\n", dl_primstr(prim)));
-
-	if (prim == DL_ENABMULTI_REQ) {
-		/* Track the state if this is the first enabmulti */
-		if (ill->ill_dlpi_multicast_state == IDS_UNKNOWN)
-			ill->ill_dlpi_multicast_state = IDS_INPROGRESS;
-	}
-
-	ipsq_current_start(ipsq, ill->ill_ipif, 0);
-	ill_dlpi_send(ill, mp);
-}
-
-void
-ip_wput_ctl(queue_t *q, mblk_t *mp)
-{
-	ill_t	*ill = q->q_ptr;
-	mblk_t	*dlmp = mp->b_cont;
-	area_t	*area = (area_t *)mp->b_rptr;
-	t_uscalar_t prim;
-
-	/* Check that we have an AR_ENTRY_SQUERY with a tacked on mblk */
-	if (MBLKL(mp) < sizeof (area_t) || area->area_cmd != AR_ENTRY_SQUERY ||
-	    dlmp == NULL) {
-		putnext(q, mp);
-		return;
-	}
-
-	/* Check that the tacked on mblk is a DL_{DISAB,ENAB}MULTI_REQ */
-	prim = ((union DL_primitives *)dlmp->b_rptr)->dl_primitive;
-	if (prim != DL_DISABMULTI_REQ && prim != DL_ENABMULTI_REQ) {
-		putnext(q, mp);
-		return;
-	}
-	freeb(mp);
-
-	/* See comments above ip_wput_ctl_writer() for details */
-	ill_refhold(ill);
-	qwriter_ip(ill, ill->ill_wq, dlmp, ip_wput_ctl_writer, NEW_OP, B_FALSE);
 }
 
 /*

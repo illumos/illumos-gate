@@ -119,7 +119,7 @@ extern void		dls_rx_promisc(void *, mac_resource_handle_t, mblk_t *,
 extern void		dls_rx_vlan_promisc(void *, mac_resource_handle_t,
 			    mblk_t *, boolean_t);
 extern int		dls_active_set(dld_str_t *);
-extern void		dls_active_clear(dld_str_t *);
+extern void		dls_active_clear(dld_str_t *, boolean_t);
 
 extern void		dls_mgmt_init(void);
 extern void		dls_mgmt_fini(void);

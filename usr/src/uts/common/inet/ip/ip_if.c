@@ -193,6 +193,8 @@ static void	ill_glist_delete(ill_t *);
 static void	ill_phyint_reinit(ill_t *ill);
 static void	ill_set_nce_router_flags(ill_t *, boolean_t);
 static void	ill_set_phys_addr_tail(ipsq_t *, queue_t *, mblk_t *, void *);
+static void	ill_replumb_tail(ipsq_t *, queue_t *, mblk_t *, void *);
+
 static ip_v6intfid_func_t ip_ether_v6intfid, ip_ib_v6intfid;
 static ip_v6intfid_func_t ip_ipmp_v6intfid, ip_nodef_v6intfid;
 static ip_v6mapinfo_func_t ip_ether_v6mapinfo, ip_ib_v6mapinfo;
@@ -1587,18 +1589,24 @@ conn_cleanup_ill(conn_t *connp, caddr_t arg)
 	mutex_exit(&connp->conn_lock);
 }
 
-/* ARGSUSED */
-void
-ipif_all_down_tail(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
+static void
+ill_down_ipifs_tail(ill_t *ill)
 {
-	ill_t	*ill = q->q_ptr;
 	ipif_t	*ipif;
 
-	ASSERT(IAM_WRITER_IPSQ(ipsq));
+	ASSERT(IAM_WRITER_ILL(ill));
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
 	}
+}
+
+/* ARGSUSED */
+void
+ipif_all_down_tail(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
+{
+	ASSERT(IAM_WRITER_IPSQ(ipsq));
+	ill_down_ipifs_tail(q->q_ptr);
 	freemsg(mp);
 	ipsq_current_finish(ipsq);
 }
@@ -3007,10 +3015,10 @@ ill_capability_dld_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 			    ill->ill_name);
 			return;
 		}
-		idc->idc_capab_df = (ip_capab_func_t)dld.dld_capab;
-		idc->idc_capab_dh = (void *)dld.dld_capab_handle;
 		ill->ill_dld_capab = idc;
 	}
+	idc->idc_capab_df = (ip_capab_func_t)dld.dld_capab;
+	idc->idc_capab_dh = (void *)dld.dld_capab_handle;
 	ip1dbg(("ill_capability_dld_ack: interface %s "
 	    "supports DLD version %d\n", ill->ill_name, DLD_CURRENT_VERSION));
 
@@ -6317,6 +6325,10 @@ ipif_ill_refrele_tail(ill_t *ill)
 			qwriter_ip(ill, ill->ill_rq, mp,
 			    ill_set_phys_addr_tail, CUR_OP, B_TRUE);
 			return;
+		case DL_NOTE_REPLUMB:
+			qwriter_ip(ill, ill->ill_rq, mp,
+			    ill_replumb_tail, CUR_OP, B_TRUE);
+			return;
 		default:
 			ASSERT(0);
 			ill_refrele(ill);
@@ -8021,6 +8033,7 @@ ipsq_exit(ipsq_t *ipsq)
 void
 ipsq_current_start(ipsq_t *ipsq, ipif_t *ipif, int ioccmd)
 {
+	ill_t *ill = ipif->ipif_ill;
 	ipxop_t *ipx = ipsq->ipsq_xop;
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
@@ -8032,6 +8045,39 @@ ipsq_current_start(ipsq_t *ipsq, ipif_t *ipif, int ioccmd)
 	mutex_enter(&ipx->ipx_lock);
 	ipx->ipx_current_ipif = ipif;
 	mutex_exit(&ipx->ipx_lock);
+
+	/*
+	 * Set IPIF_CHANGING on one or more ipifs associated with the
+	 * current exclusive operation.  IPIF_CHANGING prevents any new
+	 * references to the ipif (so that the references will eventually
+	 * drop to zero) and also prevents any "get" operations (e.g.,
+	 * SIOCGLIFFLAGS) from being able to access the ipif until the
+	 * operation has completed and the ipif is again in a stable state.
+	 *
+	 * For ioctls, IPIF_CHANGING is set on the ipif associated with the
+	 * ioctl.  For internal operations (where ioccmd is zero), all ipifs
+	 * on the ill are marked with IPIF_CHANGING since it's unclear which
+	 * ipifs will be affected.
+	 *
+	 * Note that SIOCLIFREMOVEIF is a special case as it sets
+	 * IPIF_CONDEMNED internally after identifying the right ipif to
+	 * operate on.
+	 */
+	switch (ioccmd) {
+	case SIOCLIFREMOVEIF:
+		break;
+	case 0:
+		mutex_enter(&ill->ill_lock);
+		ipif = ipif->ipif_ill->ill_ipif;
+		for (; ipif != NULL; ipif = ipif->ipif_next)
+			ipif->ipif_state_flags |= IPIF_CHANGING;
+		mutex_exit(&ill->ill_lock);
+		break;
+	default:
+		mutex_enter(&ill->ill_lock);
+		ipif->ipif_state_flags |= IPIF_CHANGING;
+		mutex_exit(&ill->ill_lock);
+	}
 }
 
 /*
@@ -8061,7 +8107,13 @@ ipsq_current_finish(ipsq_t *ipsq)
 
 		mutex_enter(&ill->ill_lock);
 		dlpi_pending = ill->ill_dlpi_pending;
-		ipif->ipif_state_flags &= ~IPIF_CHANGING;
+		if (ipx->ipx_current_ioctl == 0) {
+			ipif = ill->ill_ipif;
+			for (; ipif != NULL; ipif = ipif->ipif_next)
+				ipif->ipif_state_flags &= ~IPIF_CHANGING;
+		} else {
+			ipif->ipif_state_flags &= ~IPIF_CHANGING;
+		}
 		mutex_exit(&ill->ill_lock);
 	}
 
@@ -14010,20 +14062,9 @@ ill_up_ipifs_on_ill(ill_t *ill, queue_t *q, mblk_t *mp)
 	if (ill == NULL)
 		return (0);
 
-	/*
-	 * Except for ipif_state_flags and ill_state_flags the other
-	 * fields of the ipif/ill that are modified below are protected
-	 * implicitly since we are a writer. We would have tried to down
-	 * even an ipif that was already down, in ill_down_ipifs. So we
-	 * just blindly clear the IPIF_CHANGING flag here on all ipifs.
-	 */
 	ASSERT(IAM_WRITER_ILL(ill));
-
 	ill->ill_up_ipifs = B_TRUE;
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-		mutex_enter(&ill->ill_lock);
-		ipif->ipif_state_flags &= ~IPIF_CHANGING;
-		mutex_exit(&ill->ill_lock);
 		if (ipif->ipif_was_up) {
 			if (!(ipif->ipif_flags & IPIF_UP))
 				err = ipif_up(ipif, q, mp);
@@ -14060,19 +14101,16 @@ ill_up_ipifs(ill_t *ill, queue_t *q, mblk_t *mp)
 }
 
 /*
- * Bring down any IPIF_UP ipifs on ill.
+ * Bring down any IPIF_UP ipifs on ill. If "logical" is B_TRUE, we bring
+ * down the ipifs without sending DL_UNBIND_REQ to the driver.
  */
 static void
-ill_down_ipifs(ill_t *ill)
+ill_down_ipifs(ill_t *ill, boolean_t logical)
 {
 	ipif_t *ipif;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
-	/*
-	 * Except for ipif_state_flags the other fields of the ipif/ill that
-	 * are modified below are protected implicitly since we are a writer
-	 */
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		/*
 		 * We go through the ipif_down logic even if the ipif
@@ -14083,19 +14121,19 @@ ill_down_ipifs(ill_t *ill)
 		if (ipif->ipif_flags & IPIF_UP)
 			ipif->ipif_was_up = B_TRUE;
 
-		mutex_enter(&ill->ill_lock);
-		ipif->ipif_state_flags |= IPIF_CHANGING;
-		mutex_exit(&ill->ill_lock);
-
 		/*
 		 * Need to re-create net/subnet bcast ires if
 		 * they are dependent on ipif.
 		 */
 		if (!ipif->ipif_isv6)
 			ipif_check_bcast_ires(ipif);
-		(void) ipif_logical_down(ipif, NULL, NULL);
-		ipif_non_duplicate(ipif);
-		ipif_down_tail(ipif);
+		if (logical) {
+			(void) ipif_logical_down(ipif, NULL, NULL);
+			ipif_non_duplicate(ipif);
+			ipif_down_tail(ipif);
+		} else {
+			(void) ipif_down(ipif, NULL, NULL);
+		}
 	}
 }
 
@@ -14408,6 +14446,7 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 {
 	union DL_primitives *dlp;
 	t_uscalar_t prim;
+	boolean_t waitack = B_FALSE;
 
 	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
 
@@ -14437,11 +14476,20 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 	 * we only wait for the ACK of the DL_UNBIND_REQ.
 	 */
 	mutex_enter(&ill->ill_lock);
-	if (!(ill->ill_state_flags & ILL_CONDEMNED) || (prim == DL_UNBIND_REQ))
+	if (!(ill->ill_state_flags & ILL_CONDEMNED) ||
+	    (prim == DL_UNBIND_REQ)) {
 		ill->ill_dlpi_pending = prim;
+		waitack = B_TRUE;
+	}
 
 	mutex_exit(&ill->ill_lock);
 	putnext(ill->ill_wq, mp);
+
+	/*
+	 * There is no ack for DL_NOTIFY_CONF messages
+	 */
+	if (waitack && prim == DL_NOTIFY_CONF)
+		ill_dlpi_done(ill, prim);
 }
 
 /*
@@ -16165,14 +16213,13 @@ ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	 * Record state needed to complete this operation when the
 	 * DL_BIND_ACK shows up.  Also remember the pre-allocated mblks.
 	 */
-	ASSERT(WR(q)->q_next == NULL);
-	connp = Q_TO_CONN(q);
-
-	mutex_enter(&connp->conn_lock);
+	connp = CONN_Q(q) ? Q_TO_CONN(q) : NULL;
+	ASSERT(connp != NULL || !CONN_Q(q));
+	GRAB_CONN_LOCK(q);
 	mutex_enter(&ipif->ipif_ill->ill_lock);
 	success = ipsq_pending_mp_add(connp, ipif, q, mp, 0);
 	mutex_exit(&ipif->ipif_ill->ill_lock);
-	mutex_exit(&connp->conn_lock);
+	RELEASE_CONN_LOCK(q);
 	if (!success)
 		goto bad;
 
@@ -19981,7 +20028,7 @@ ill_set_phys_addr(ill_t *ill, mblk_t *mp)
 	 * If we can quiesce the ill, then set the address.  If not, then
 	 * ill_set_phys_addr_tail() will be called from ipif_ill_refrele_tail().
 	 */
-	ill_down_ipifs(ill);
+	ill_down_ipifs(ill, B_TRUE);
 	mutex_enter(&ill->ill_lock);
 	if (!ill_is_quiescent(ill)) {
 		/* call cannot fail since `conn_t *' argument is NULL */
@@ -20060,6 +20107,75 @@ ill_set_ndmp(ill_t *ill, mblk_t *ndmp, uint_t addroff, uint_t addrlen)
 	ill->ill_nd_lla = ndmp->b_rptr + addroff;
 	ill->ill_nd_lla_mp = ndmp;
 	ill->ill_nd_lla_len = addrlen;
+}
+
+/*
+ * Replumb the ill.
+ */
+int
+ill_replumb(ill_t *ill, mblk_t *mp)
+{
+	ipsq_t *ipsq = ill->ill_phyint->phyint_ipsq;
+
+	ASSERT(IAM_WRITER_IPSQ(ipsq));
+
+	ipsq_current_start(ipsq, ill->ill_ipif, 0);
+
+	/*
+	 * If we can quiesce the ill, then continue.  If not, then
+	 * ill_replumb_tail() will be called from ipif_ill_refrele_tail().
+	 */
+	ill_down_ipifs(ill, B_FALSE);
+
+	mutex_enter(&ill->ill_lock);
+	if (!ill_is_quiescent(ill)) {
+		/* call cannot fail since `conn_t *' argument is NULL */
+		(void) ipsq_pending_mp_add(NULL, ill->ill_ipif, ill->ill_rq,
+		    mp, ILL_DOWN);
+		mutex_exit(&ill->ill_lock);
+		return (EINPROGRESS);
+	}
+	mutex_exit(&ill->ill_lock);
+
+	ill_replumb_tail(ipsq, ill->ill_rq, mp, NULL);
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+ill_replumb_tail(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy)
+{
+	ill_t *ill = q->q_ptr;
+
+	ASSERT(IAM_WRITER_IPSQ(ipsq));
+
+	ill_down_ipifs_tail(ill);
+
+	freemsg(ill->ill_replumb_mp);
+	ill->ill_replumb_mp = copyb(mp);
+
+	/*
+	 * Successfully quiesced and brought down the interface, now we send
+	 * the DL_NOTE_REPLUMB_DONE message down to the driver. Reuse the
+	 * DL_NOTE_REPLUMB message.
+	 */
+	mp = mexchange(NULL, mp, sizeof (dl_notify_conf_t), M_PROTO,
+	    DL_NOTIFY_CONF);
+	ASSERT(mp != NULL);
+	((dl_notify_conf_t *)mp->b_rptr)->dl_notification =
+	    DL_NOTE_REPLUMB_DONE;
+	ill_dlpi_send(ill, mp);
+
+	/*
+	 * If there are ipifs to bring up, ill_up_ipifs() will return
+	 * EINPROGRESS, and ipsq_current_finish() will be called by
+	 * ip_rput_dlpi_writer() or ip_arp_done() when the last ipif is
+	 * brought up.
+	 */
+	if (ill->ill_replumb_mp == NULL ||
+	    ill_up_ipifs(ill, q, ill->ill_replumb_mp) != EINPROGRESS) {
+		ipsq_current_finish(ipsq);
+	}
 }
 
 major_t IP_MAJ;

@@ -207,12 +207,18 @@ struct dld_str_s {					/* Protected by */
 	dls_multicst_addr_t	*ds_dmap;		/* ds_rw_lock */
 	dls_rx_t		ds_rx;			/* ds_lock */
 	void			*ds_rx_arg;		/* ds_lock */
-	boolean_t		ds_active;		/* SL */
+	uint_t			ds_nactive;		/* SL */
 	dld_str_t		*ds_next;		/* SL */
 	dls_head_t		*ds_head;
 	dls_dl_handle_t		ds_ddh;
 	list_node_t		ds_tqlist;
+
+	/*
+	 * driver private data set by the driver when calling dld_str_open().
+	 */
+	void			*ds_private;
 };
+
 
 #define	DLD_DATATHR_INC(dsp)	{		\
 	ASSERT(MUTEX_HELD(&(dsp)->ds_lock));	\

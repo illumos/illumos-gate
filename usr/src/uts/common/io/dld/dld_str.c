@@ -213,27 +213,19 @@ dld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
 	return (rc);
 }
 
-/*
- * qi_qopen: open(9e)
- */
-/*ARGSUSED*/
+void *
+dld_str_private(queue_t *q)
+{
+	return (((dld_str_t *)(q->q_ptr))->ds_private);
+}
+
 int
-dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
+dld_str_open(queue_t *rq, dev_t *devp, void *private)
 {
 	dld_str_t	*dsp;
 	major_t		major;
 	minor_t		minor;
 	int		err;
-
-	if (sflag == MODOPEN)
-		return (ENOTSUP);
-
-	/*
-	 * This is a cloning driver and therefore each queue should only
-	 * ever get opened once.
-	 */
-	if (rq->q_ptr != NULL)
-		return (EBUSY);
 
 	major = getmajor(*devp);
 	minor = getminor(*devp);
@@ -249,12 +241,14 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (ENOSR);
 
 	ASSERT(dsp->ds_dlstate == DL_UNATTACHED);
+	dsp->ds_private = private;
 	if (minor != 0) {
 		/*
 		 * Style 1 open
 		 */
 		if ((err = dld_str_attach(dsp, (t_uscalar_t)minor - 1)) != 0)
 			goto failed;
+
 		ASSERT(dsp->ds_dlstate == DL_UNBOUND);
 	} else {
 		(void) qassociate(rq, -1);
@@ -276,11 +270,8 @@ failed:
 	return (err);
 }
 
-/*
- * qi_qclose: close(9e)
- */
 int
-dld_close(queue_t *rq)
+dld_str_close(queue_t *rq)
 {
 	dld_str_t	*dsp = rq->q_ptr;
 
@@ -298,11 +289,6 @@ dld_close(queue_t *rq)
 		cv_wait(&dsp->ds_dlpi_pending_cv, &dsp->ds_lock);
 	mutex_exit(&dsp->ds_lock);
 
-	/*
-	 * Disable the queue srv(9e) routine.
-	 */
-	qprocsoff(rq);
-
 
 	/*
 	 * This stream was open to a provider node. Check to see
@@ -319,6 +305,40 @@ dld_close(queue_t *rq)
 
 	dld_str_destroy(dsp);
 	return (0);
+}
+
+/*
+ * qi_qopen: open(9e)
+ */
+/*ARGSUSED*/
+int
+dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	if (sflag == MODOPEN)
+		return (ENOTSUP);
+
+	/*
+	 * This is a cloning driver and therefore each queue should only
+	 * ever get opened once.
+	 */
+	if (rq->q_ptr != NULL)
+		return (EBUSY);
+
+	return (dld_str_open(rq, devp, NULL));
+}
+
+/*
+ * qi_qclose: close(9e)
+ */
+int
+dld_close(queue_t *rq)
+{
+	/*
+	 * Disable the queue srv(9e) routine.
+	 */
+	qprocsoff(rq);
+
+	return (dld_str_close(rq));
 }
 
 /*
@@ -603,6 +623,7 @@ dld_str_destroy(dld_str_t *dsp)
 	ASSERT(dsp->ds_direct == B_FALSE);
 	ASSERT(dsp->ds_lso == B_FALSE);
 	ASSERT(dsp->ds_lso_max == 0);
+	ASSERT(dsp->ds_passivestate != DLD_ACTIVE);
 
 	/*
 	 * Reinitialize all the flags.
@@ -930,11 +951,10 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 	dev_t			dev;
 	int			err;
 	const char		*drvname;
-	mac_perim_handle_t	mph;
+	mac_perim_handle_t	mph = NULL;
 	boolean_t		qassociated = B_FALSE;
 	dls_link_t		*dlp = NULL;
 	dls_dl_handle_t		ddp = NULL;
-	boolean_t		entered_perim = B_FALSE;
 
 	if ((drvname = ddi_major_to_name(dsp->ds_major)) == NULL)
 		return (EINVAL);
@@ -959,7 +979,6 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 
 	if ((err = mac_perim_enter_by_macname(dls_devnet_mac(ddp), &mph)) != 0)
 		goto failed;
-	entered_perim = B_TRUE;
 
 	/*
 	 * Open a channel.
@@ -986,7 +1005,7 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 failed:
 	if (dlp != NULL)
 		dls_link_rele(dlp);
-	if (entered_perim)
+	if (mph != NULL)
 		mac_perim_exit(mph);
 	if (ddp != NULL)
 		dls_devnet_rele(ddp);

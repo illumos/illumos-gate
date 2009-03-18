@@ -208,6 +208,7 @@ static void	ar_ce_walk(arp_stack_t *as, void (*pfi)(ace_t *, void *),
 static void	ar_client_notify(const arl_t *arl, mblk_t *mp, int code);
 static int	ar_close(queue_t *q);
 static int	ar_cmd_dispatch(queue_t *q, mblk_t *mp, boolean_t from_wput);
+static void	ar_cmd_drain(arl_t *arl);
 static void	ar_cmd_done(arl_t *arl);
 static mblk_t	*ar_dlpi_comm(t_uscalar_t prim, size_t size);
 static void	ar_dlpi_send(arl_t *, mblk_t *);
@@ -1331,6 +1332,53 @@ ar_dlpi_comm(t_uscalar_t prim, size_t size)
 	return (mp);
 }
 
+static void
+ar_dlpi_dispatch(arl_t *arl)
+{
+	mblk_t *mp;
+	t_uscalar_t primitive = DL_PRIM_INVAL;
+
+	while (((mp = arl->arl_dlpi_deferred) != NULL) &&
+	    (arl->arl_dlpi_pending == DL_PRIM_INVAL)) {
+		union DL_primitives *dlp = (union DL_primitives *)mp->b_rptr;
+
+		DTRACE_PROBE2(dlpi_dispatch, arl_t *, arl, mblk_t *, mp);
+
+		ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
+		arl->arl_dlpi_deferred = mp->b_next;
+		mp->b_next = NULL;
+
+		/*
+		 * If this is a DL_NOTIFY_CONF, no ack is expected.
+		 */
+		if ((primitive = dlp->dl_primitive) != DL_NOTIFY_CONF)
+			arl->arl_dlpi_pending = dlp->dl_primitive;
+		putnext(arl->arl_wq, mp);
+	}
+
+	if (arl->arl_dlpi_pending == DL_PRIM_INVAL) {
+		/*
+		 * No pending DLPI operation.
+		 */
+		ASSERT(mp == NULL);
+		DTRACE_PROBE1(dlpi_idle, arl_t *, arl);
+
+		/*
+		 * If the last DLPI message dispatched is DL_NOTIFY_CONF,
+		 * it is not assoicated with any pending cmd request, drain
+		 * the rest of pending cmd requests, otherwise call
+		 * ar_cmd_done() to finish up the current pending cmd
+		 * operation.
+		 */
+		if (primitive == DL_NOTIFY_CONF)
+			ar_cmd_drain(arl);
+		else
+			ar_cmd_done(arl);
+	} else if (mp != NULL) {
+		DTRACE_PROBE2(dlpi_defer, arl_t *, arl, mblk_t *, mp);
+	}
+}
+
 /*
  * The following two functions serialize DLPI messages to the driver, much
  * along the lines of ill_dlpi_send and ill_dlpi_done in IP. Basically,
@@ -1341,26 +1389,18 @@ ar_dlpi_comm(t_uscalar_t prim, size_t size)
 static void
 ar_dlpi_send(arl_t *arl, mblk_t *mp)
 {
+	mblk_t **mpp;
+
 	ASSERT(arl != NULL);
 	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
 
-	if (arl->arl_dlpi_pending != DL_PRIM_INVAL) {
-		mblk_t **mpp;
+	/* Always queue the message. Tail insertion */
+	mpp = &arl->arl_dlpi_deferred;
+	while (*mpp != NULL)
+		mpp = &((*mpp)->b_next);
+	*mpp = mp;
 
-		/* Must queue message. Tail insertion */
-		mpp = &arl->arl_dlpi_deferred;
-		while (*mpp != NULL)
-			mpp = &((*mpp)->b_next);
-		*mpp = mp;
-
-		DTRACE_PROBE2(dlpi_defer, arl_t *, arl, mblk_t *, mp);
-		return;
-	}
-
-	arl->arl_dlpi_pending =
-	    ((union DL_primitives *)mp->b_rptr)->dl_primitive;
-	DTRACE_PROBE2(dlpi_send, arl_t *, arl, mblk_t *, mp);
-	putnext(arl->arl_wq, mp);
+	ar_dlpi_dispatch(arl);
 }
 
 /*
@@ -1372,30 +1412,71 @@ ar_dlpi_send(arl_t *arl, mblk_t *mp)
 static void
 ar_dlpi_done(arl_t *arl, t_uscalar_t prim)
 {
-	mblk_t *mp;
-
 	if (arl->arl_dlpi_pending != prim) {
 		DTRACE_PROBE2(dlpi_done_unexpected, arl_t *, arl,
 		    t_uscalar_t, prim);
 		return;
 	}
 
-	if ((mp = arl->arl_dlpi_deferred) == NULL) {
-		DTRACE_PROBE2(dlpi_done_idle, arl_t *, arl, t_uscalar_t, prim);
-		arl->arl_dlpi_pending = DL_PRIM_INVAL;
-		ar_cmd_done(arl);
-		return;
+	DTRACE_PROBE2(dlpi_done, arl_t *, arl, t_uscalar_t, prim);
+	arl->arl_dlpi_pending = DL_PRIM_INVAL;
+	ar_dlpi_dispatch(arl);
+}
+
+/*
+ * Send a DL_NOTE_REPLUMB_DONE message down to the driver to indicate
+ * the replumb process has already been done. Note that mp is either a
+ * DL_NOTIFY_IND message or an AR_INTERFACE_DOWN message (comes from IP).
+ */
+static void
+arp_replumb_done(arl_t *arl, mblk_t *mp)
+{
+	ASSERT(arl->arl_state == ARL_S_DOWN && arl->arl_replumbing);
+
+	mp = mexchange(NULL, mp, sizeof (dl_notify_conf_t), M_PROTO,
+	    DL_NOTIFY_CONF);
+	((dl_notify_conf_t *)(mp->b_rptr))->dl_notification =
+	    DL_NOTE_REPLUMB_DONE;
+	arl->arl_replumbing = B_FALSE;
+	ar_dlpi_send(arl, mp);
+}
+
+static void
+ar_cmd_drain(arl_t *arl)
+{
+	mblk_t	*mp;
+	queue_t	*q;
+
+	/*
+	 * Run the commands that have been enqueued while we were waiting
+	 * for the last command (AR_INTERFACE_UP or AR_INTERFACE_DOWN)
+	 * to complete.
+	 */
+	while ((mp = arl->arl_queue) != NULL) {
+		if (((uintptr_t)mp->b_prev & CMD_IN_PROGRESS) != 0) {
+			/*
+			 * The current command is an AR_INTERFACE_UP or
+			 * AR_INTERFACE_DOWN and is waiting for a DLPI ack
+			 * from the driver. Return. We can't make progress now.
+			 */
+			break;
+		}
+
+		mp = ar_cmd_dequeue(arl);
+		mp->b_prev = AR_DRAINING;
+		q = mp->b_queue;
+		mp->b_queue = NULL;
+
+		/*
+		 * Don't call put(q, mp) since it can lead to reorder of
+		 * messages by sending the current messages to the end of
+		 * arp's syncq
+		 */
+		if (q->q_flag & QREADR)
+			ar_rput(q, mp);
+		else
+			ar_wput(q, mp);
 	}
-
-	arl->arl_dlpi_deferred = mp->b_next;
-	mp->b_next = NULL;
-
-	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
-
-	arl->arl_dlpi_pending =
-	    ((union DL_primitives *)mp->b_rptr)->dl_primitive;
-	DTRACE_PROBE2(dlpi_done_next, arl_t *, arl, mblk_t *, mp);
-	putnext(arl->arl_wq, mp);
 }
 
 static void
@@ -1409,7 +1490,6 @@ ar_cmd_done(arl_t *arl)
 	queue_t			*dlpi_op_done_q;
 	ar_t			*ar_arl;
 	ar_t			*ar_ip;
-	queue_t			*q;
 
 	ASSERT(arl->arl_state == ARL_S_UP || arl->arl_state == ARL_S_DOWN);
 
@@ -1458,44 +1538,24 @@ ar_cmd_done(arl_t *arl)
 				ar_arl->ar_arl_ip_assoc = ar_ip;
 				ar_ip->ar_arl_ip_assoc = ar_arl;
 			}
-		}
-		inet_freemsg(mp);
-	}
 
-	/*
-	 * Run the commands that have been enqueued while we were waiting
-	 * for the last command (AR_INTERFACE_UP or AR_INTERFACE_DOWN)
-	 * to complete.
-	 */
-	while ((mp = ar_cmd_dequeue(arl)) != NULL) {
-		mp->b_prev = AR_DRAINING;
-		q = mp->b_queue;
-		mp->b_queue = NULL;
-
-		/*
-		 * Don't call put(q, mp) since it can lead to reorder of
-		 * messages by sending the current messages to the end of
-		 * arp's syncq
-		 */
-		if (q->q_flag & QREADR)
-			ar_rput(q, mp);
-		else
-			ar_wput(q, mp);
-
-		if ((mp = arl->arl_queue) == NULL)
-			goto done;	/* no work to do */
-
-		if ((cmd = (uintptr_t)mp->b_prev) & CMD_IN_PROGRESS) {
+			inet_freemsg(mp);
+		} else if (cmd == AR_INTERFACE_DOWN && arl->arl_replumbing) {
 			/*
-			 * The current command is an AR_INTERFACE_UP or
-			 * AR_INTERFACE_DOWN and is waiting for a DLPI ack
-			 * from the driver. Return. We can't make progress now.
+			 * The arl is successfully brought down and this is
+			 * a result of the DL_NOTE_REPLUMB process. Reset
+			 * mp->b_prev first (it keeps the 'cmd' information
+			 * at this point).
 			 */
-			goto done;
+			mp->b_prev = NULL;
+			arp_replumb_done(arl, mp);
+		} else {
+			inet_freemsg(mp);
 		}
 	}
 
-done:
+	ar_cmd_drain(arl);
+
 	if (dlpi_op_done_mp != NULL) {
 		DTRACE_PROBE3(cmd_done_next, arl_t *, arl,
 		    queue_t *, dlpi_op_done_q, mblk_t *, dlpi_op_done_mp);
@@ -2136,8 +2196,18 @@ ar_interface_down(queue_t *q, mblk_t *mp)
 	 * The arl is already down, no work to do.
 	 */
 	if (arl->arl_state == ARL_S_DOWN) {
-		/* ar_rput frees the mp */
-		return (0);
+		if (arl->arl_replumbing) {
+			/*
+			 * The arl is already down and this is a result of
+			 * the DL_NOTE_REPLUMB process. Return EINPROGRESS
+			 * so this mp won't be freed by ar_rput().
+			 */
+			arp_replumb_done(arl, mp);
+			return (EINPROGRESS);
+		} else {
+			/* ar_rput frees the mp */
+			return (0);
+		}
 	}
 
 	/*
@@ -2672,7 +2742,7 @@ ar_ll_up(arl_t *arl)
 	if (notify_mp == NULL)
 		goto bad;
 	((dl_notify_req_t *)notify_mp->b_rptr)->dl_notifications =
-	    DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN;
+	    DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN | DL_NOTE_REPLUMB;
 
 	arl->arl_state = ARL_S_PENDING;
 	if (arl->arl_provider_style == DL_STYLE2) {
@@ -3852,6 +3922,16 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 	case DL_NOTIFY_IND:
 		DTRACE_PROBE2(rput_dl_notify_ind, arl_t *, arl,
 		    dl_notify_ind_t *, &dlp->notify_ind);
+
+		if (dlp->notify_ind.dl_notification == DL_NOTE_REPLUMB) {
+			arl->arl_replumbing = B_TRUE;
+			if (arl->arl_state == ARL_S_DOWN) {
+				arp_replumb_done(arl, mp);
+				return;
+			}
+			break;
+		}
+
 		if (ap != NULL) {
 			switch (dlp->notify_ind.dl_notification) {
 			case DL_NOTE_LINK_UP:

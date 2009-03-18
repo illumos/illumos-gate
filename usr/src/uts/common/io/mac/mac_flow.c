@@ -335,8 +335,9 @@ mac_flow_rem_subflow(flow_entry_t *flent)
 {
 	flow_tab_t		*ft = flent->fe_flow_tab;
 	mac_client_impl_t	*mcip = ft->ft_mcip;
+	mac_handle_t		mh = (mac_handle_t)ft->ft_mip;
 
-	ASSERT(MAC_PERIM_HELD((mac_handle_t)ft->ft_mip));
+	ASSERT(MAC_PERIM_HELD(mh));
 
 	mac_flow_remove(ft, flent, B_FALSE);
 	if (flent->fe_mcip == NULL) {
@@ -348,10 +349,11 @@ mac_flow_rem_subflow(flow_entry_t *flent)
 			mac_flow_tab_destroy(ft);
 			mcip->mci_subflow_tab = NULL;
 		}
-		return;
+	} else {
+		mac_flow_wait(flent, FLOW_DRIVER_UPCALL);
+		mac_link_flow_clean((mac_client_handle_t)mcip, flent);
 	}
-	mac_flow_wait(flent, FLOW_DRIVER_UPCALL);
-	mac_link_flow_clean((mac_client_handle_t)mcip, flent);
+	mac_fastpath_enable(mh);
 }
 
 /*
@@ -363,13 +365,17 @@ mac_flow_add_subflow(mac_client_handle_t mch, flow_entry_t *flent,
     boolean_t instantiate_flow)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_handle_t		mh = (mac_handle_t)mcip->mci_mip;
 	flow_tab_info_t		*ftinfo;
 	flow_mask_t		mask;
 	flow_tab_t		*ft;
 	int			err;
 	boolean_t		ft_created = B_FALSE;
 
-	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
+	ASSERT(MAC_PERIM_HELD(mh));
+
+	if ((err = mac_fastpath_disable(mh)) != 0)
+		return (err);
 
 	/*
 	 * If the subflow table exists already just add the new subflow
@@ -382,8 +388,10 @@ mac_flow_add_subflow(mac_client_handle_t mch, flow_entry_t *flent,
 		 * Try to create a new table and then add the subflow to the
 		 * newly created subflow table
 		 */
-		if ((ftinfo = mac_flow_tab_info_get(mask)) == NULL)
+		if ((ftinfo = mac_flow_tab_info_get(mask)) == NULL) {
+			mac_fastpath_enable(mh);
 			return (EOPNOTSUPP);
+		}
 
 		mac_flow_tab_create(ftinfo->fti_ops, mask, ftinfo->fti_size,
 		    mcip->mci_mip, &ft);
@@ -394,6 +402,7 @@ mac_flow_add_subflow(mac_client_handle_t mch, flow_entry_t *flent,
 	if (err != 0) {
 		if (ft_created)
 			mac_flow_tab_destroy(ft);
+		mac_fastpath_enable(mh);
 		return (err);
 	}
 
@@ -405,6 +414,7 @@ mac_flow_add_subflow(mac_client_handle_t mch, flow_entry_t *flent,
 			mac_flow_remove(ft, flent, B_FALSE);
 			if (ft_created)
 				mac_flow_tab_destroy(ft);
+			mac_fastpath_enable(mh);
 			return (err);
 		}
 	} else {

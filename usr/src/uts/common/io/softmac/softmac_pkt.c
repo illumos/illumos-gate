@@ -27,16 +27,6 @@
 #include <inet/led.h>
 #include <sys/softmac_impl.h>
 
-/*
- * Macro to check whether the write-queue of the lower stream is full.
- *
- * Because softmac is pushed right above the underlying device and
- * _I_INSERT/_I_REMOVE is not processed in the lower stream, it is
- * safe to directly access the q_next pointer.
- */
-#define	CANPUTNEXT(q)	\
-	(!((q)->q_next->q_nfsrv->q_flag & QFULL) || canput((q)->q_next))
-
 mblk_t *
 softmac_m_tx(void *arg, mblk_t *mp)
 {
@@ -46,7 +36,7 @@ softmac_m_tx(void *arg, mblk_t *mp)
 	 * Optimize for the most common case.
 	 */
 	if (mp->b_next == NULL) {
-		if (!CANPUTNEXT(wq))
+		if (!SOFTMAC_CANPUTNEXT(wq))
 			return (mp);
 
 		mp->b_flag |= MSGNOLOOP;
@@ -57,7 +47,7 @@ softmac_m_tx(void *arg, mblk_t *mp)
 	while (mp != NULL) {
 		mblk_t *next = mp->b_next;
 
-		if (!CANPUTNEXT(wq))
+		if (!SOFTMAC_CANPUTNEXT(wq))
 			break;
 		mp->b_next = NULL;
 		mp->b_flag |= MSGNOLOOP;
@@ -66,7 +56,6 @@ softmac_m_tx(void *arg, mblk_t *mp)
 	}
 	return (mp);
 }
-
 
 void
 softmac_rput_process_data(softmac_lower_t *slp, mblk_t *mp)
@@ -141,7 +130,7 @@ dlpi_get_errno(t_uscalar_t error, t_uscalar_t unix_errno)
 	return (error == DL_SYSERR ? unix_errno : EINVAL);
 }
 
-static int
+int
 softmac_output(softmac_lower_t *slp, mblk_t *mp, t_uscalar_t dl_prim,
     t_uscalar_t ack, mblk_t **mpp)
 {
@@ -227,7 +216,7 @@ softmac_ioctl_tx(softmac_lower_t *slp, mblk_t *mp, mblk_t **mpp)
 	softmac_serialize_exit(slp);
 }
 
-static int
+int
 softmac_mexchange_error_ack(mblk_t **mpp, t_uscalar_t error_primitive,
 	t_uscalar_t error, t_uscalar_t unix_errno)
 {

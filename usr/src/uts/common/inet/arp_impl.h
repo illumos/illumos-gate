@@ -64,7 +64,8 @@ typedef struct arl_s {
 	t_uscalar_t	arl_dlpi_pending;	/* pending DLPI request */
 	mblk_t		*arl_dlpi_deferred;	/* Deferred DLPI messages */
 	uint_t		arl_state;		/* lower interface state */
-	uint_t		arl_closing : 1;	/* stream is closing */
+	uint_t		arl_closing : 1,	/* stream is closing */
+			arl_replumbing : 1;	/* Wait for IP to bring down */
 	uint32_t	arl_index;		/* instance number */
 	struct arlphy_s	*arl_phy;		/* physical info, if any */
 	struct arl_s	*arl_ipmp_arl;		/* pointer to group arl_t */

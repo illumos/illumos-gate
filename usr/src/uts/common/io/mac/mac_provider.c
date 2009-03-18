@@ -131,7 +131,6 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	uint_t			instance;
 	boolean_t		style1_created = B_FALSE;
 	boolean_t		style2_created = B_FALSE;
-	mac_capab_legacy_t	legacy;
 	char			*driver;
 	minor_t			minor = 0;
 
@@ -298,14 +297,11 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	}
 	mip->mi_callbacks = mregp->m_callbacks;
 
-	if (i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_LEGACY, &legacy))
+	if (mac_capab_get((mac_handle_t)mip, MAC_CAPAB_LEGACY,
+	    &mip->mi_capab_legacy)) {
 		mip->mi_state_flags |= MIS_LEGACY;
-
-	if (mip->mi_state_flags & MIS_LEGACY) {
-		mip->mi_unsup_note = legacy.ml_unsup_note;
-		mip->mi_phy_dev = legacy.ml_dev;
+		mip->mi_phy_dev = mip->mi_capab_legacy.ml_dev;
 	} else {
-		mip->mi_unsup_note = 0;
 		mip->mi_phy_dev = makedevice(ddi_driver_major(mip->mi_dip),
 		    ddi_get_instance(mip->mi_dip) + 1);
 	}
@@ -504,6 +500,12 @@ mac_unregister(mac_handle_t mh)
 	i_mac_notify_exit(mip);
 
 	i_mac_perim_enter(mip);
+
+	/*
+	 * There is still resource properties configured over this mac.
+	 */
+	if (mip->mi_resource_props.mrp_mask != 0)
+		mac_fastpath_enable((mac_handle_t)mip);
 
 	if (mip->mi_minor < MAC_MAX_MINOR + 1) {
 		ddi_remove_minor_node(mip->mi_dip, mip->mi_name);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,22 @@ softmac_send_bind_req(softmac_lower_t *slp, uint_t sap)
 }
 
 int
+softmac_send_unbind_req(softmac_lower_t *slp)
+{
+	mblk_t			*reqmp;
+
+	/*
+	 * create unbind req message and send it down
+	 */
+	reqmp = mexchange(NULL, NULL, DL_UNBIND_REQ_SIZE, M_PROTO,
+	    DL_UNBIND_REQ);
+	if (reqmp == NULL)
+		return (ENOMEM);
+
+	return (softmac_proto_tx(slp, reqmp, NULL));
+}
+
+int
 softmac_send_promisc_req(softmac_lower_t *slp, t_uscalar_t level, boolean_t on)
 {
 	mblk_t		*reqmp;
@@ -105,6 +121,7 @@ softmac_m_promisc(void *arg, boolean_t on)
 	softmac_t		*softmac = arg;
 	softmac_lower_t		*slp = softmac->smac_lower;
 
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
 	ASSERT(slp != NULL);
 	return (softmac_send_promisc_req(slp, DL_PROMISC_PHYS, on));
 }
@@ -120,6 +137,7 @@ softmac_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	t_uscalar_t		dl_prim;
 	uint32_t		size, addr_length;
 
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
 	/*
 	 * create multicst message and send it down
 	 */
@@ -162,6 +180,7 @@ softmac_m_unicst(void *arg, const uint8_t *macaddr)
 	mblk_t			*reqmp;
 	size_t			size;
 
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
 	/*
 	 * create set_phys_addr message and send it down
 	 */
@@ -425,16 +444,72 @@ runt:
 }
 
 void
-softmac_rput_process_notdata(queue_t *rq, mblk_t *mp)
+softmac_rput_process_notdata(queue_t *rq, softmac_upper_t *sup, mblk_t *mp)
 {
-	softmac_lower_t	*slp = rq->q_ptr;
+	softmac_lower_t		*slp = rq->q_ptr;
+	union DL_primitives	*dlp;
+	ssize_t			len = MBLKL(mp);
 
 	switch (DB_TYPE(mp)) {
 	case M_PROTO:
 	case M_PCPROTO:
-		softmac_rput_process_proto(rq, mp);
-		break;
+		/*
+		 * If this is a shared-lower-stream, pass it to softmac to
+		 * process.
+		 */
+		if (sup == NULL) {
+			softmac_rput_process_proto(rq, mp);
+			break;
+		}
 
+		/*
+		 * Dedicated-lower-stream.
+		 */
+		dlp = (union DL_primitives *)mp->b_rptr;
+		ASSERT(len >= sizeof (dlp->dl_primitive));
+		switch (dlp->dl_primitive) {
+		case DL_OK_ACK:
+			if (len < DL_OK_ACK_SIZE)
+				goto runt;
+
+			/*
+			 * If this is a DL_OK_ACK for a DL_UNBIND_REQ, pass it
+			 * to softmac to process, otherwise directly pass it to
+			 * the upper stream.
+			 */
+			if (dlp->ok_ack.dl_correct_primitive == DL_UNBIND_REQ) {
+				softmac_rput_process_proto(rq, mp);
+				break;
+			}
+
+			putnext(sup->su_rq, mp);
+			break;
+		case DL_ERROR_ACK:
+			if (len < DL_ERROR_ACK_SIZE)
+				goto runt;
+
+			/*
+			 * If this is a DL_ERROR_ACK for a DL_UNBIND_REQ, pass
+			 * it to softmac to process, otherwise directly pass it
+			 * to the upper stream.
+			 */
+			if (dlp->error_ack.dl_error_primitive ==
+			    DL_UNBIND_REQ) {
+				softmac_rput_process_proto(rq, mp);
+				break;
+			}
+
+			putnext(sup->su_rq, mp);
+			break;
+		case DL_BIND_ACK:
+		case DL_CAPABILITY_ACK:
+			softmac_rput_process_proto(rq, mp);
+			break;
+		default:
+			putnext(sup->su_rq, mp);
+			break;
+		}
+		break;
 	case M_FLUSH:
 		if (*mp->b_rptr & FLUSHR)
 			flushq(rq, FLUSHDATA);
@@ -447,6 +522,11 @@ softmac_rput_process_notdata(queue_t *rq, mblk_t *mp)
 	case M_IOCNAK:
 	case M_COPYIN:
 	case M_COPYOUT:
+		if (sup != NULL) {
+			putnext(sup->su_rq, mp);
+			break;
+		}
+
 		mutex_enter(&slp->sl_mutex);
 		if (!slp->sl_pending_ioctl) {
 			mutex_exit(&slp->sl_mutex);
@@ -460,7 +540,7 @@ softmac_rput_process_notdata(queue_t *rq, mblk_t *mp)
 		slp->sl_ack_mp = mp;
 		cv_broadcast(&slp->sl_cv);
 		mutex_exit(&slp->sl_mutex);
-		return;
+		break;
 
 	default:
 		cmn_err(CE_NOTE, "softmac: got unsupported mblk type 0x%x",
@@ -468,4 +548,8 @@ softmac_rput_process_notdata(queue_t *rq, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return;
+runt:
+	cmn_err(CE_WARN, "softmac: got runt %s", dl_primstr(dlp->dl_primitive));
+	freemsg(mp);
 }

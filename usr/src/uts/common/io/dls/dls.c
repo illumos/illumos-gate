@@ -46,8 +46,17 @@ dls_open(dls_link_t *dlp, dls_dl_handle_t ddh, dld_str_t *dsp)
 	if (zid != GLOBAL_ZONEID && dlp->dl_zid != zid)
 		return (ENOENT);
 
-	if ((err = mac_start(dlp->dl_mh)) != 0)
+	/*
+	 * mac_start() is required for non-legacy MACs to show accurate
+	 * kstats even before the interface is brought up. For legacy
+	 * drivers, this is not needed. Further, calling mac_start() for
+	 * legacy drivers would make the shared-lower-stream to stay in
+	 * the DL_IDLE state, which in turn causes performance regression.
+	 */
+	if (!mac_capab_get(dlp->dl_mh, MAC_CAPAB_LEGACY, NULL) &&
+	    ((err = mac_start(dlp->dl_mh)) != 0)) {
 		return (err);
+	}
 
 	local = (zid == dlp->dl_zid);
 	dlp->dl_zone_ref += (local ? 1 : 0);
@@ -96,7 +105,7 @@ dls_close(dld_str_t *dsp)
 	}
 	dsp->ds_dmap = NULL;
 
-	dls_active_clear(dsp);
+	dls_active_clear(dsp, B_TRUE);
 
 	/*
 	 * If the dld_str_t is bound then unbind it.
@@ -126,7 +135,8 @@ dls_close(dld_str_t *dsp)
 
 	dsp->ds_dlp = NULL;
 
-	mac_stop(dsp->ds_mh);
+	if (!mac_capab_get(dsp->ds_mh, MAC_CAPAB_LEGACY, NULL))
+		mac_stop(dsp->ds_mh);
 
 	/*
 	 * Release our reference to the dls_link_t allowing that to be
@@ -628,29 +638,50 @@ dls_active_set(dld_str_t *dsp)
 
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
-	/* If we're already active, then there's nothing more to do. */
-	if (dsp->ds_active)
+	if (dsp->ds_passivestate == DLD_PASSIVE)
 		return (0);
 
-	if ((err = dls_mac_active_set(dsp->ds_dlp)) != 0) {
+	/* If we're already active, then there's nothing more to do. */
+	if ((dsp->ds_nactive == 0) &&
+	    ((err = dls_mac_active_set(dsp->ds_dlp)) != 0)) {
 		/* except for ENXIO all other errors are mapped to EBUSY */
 		if (err != ENXIO)
 			return (EBUSY);
 		return (err);
 	}
 
-	dsp->ds_active = B_TRUE;
+	dsp->ds_passivestate = DLD_ACTIVE;
+	dsp->ds_nactive++;
 	return (0);
 }
 
+/*
+ * Note that dls_active_set() is called whenever an active operation
+ * (DL_BIND_REQ, DL_ENABMULTI_REQ ...) is processed and
+ * dls_active_clear(dsp, B_FALSE) is called whenever the active operation
+ * is being undone (DL_UNBIND_REQ, DL_DISABMULTI_REQ ...). In some cases,
+ * a stream is closed without every active operation being undone and we
+ * need to clear all the "active" states by calling
+ * dls_active_clear(dsp, B_TRUE).
+ */
 void
-dls_active_clear(dld_str_t *dsp)
+dls_active_clear(dld_str_t *dsp, boolean_t all)
 {
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
-	if (!dsp->ds_active)
+	if (dsp->ds_passivestate == DLD_PASSIVE)
 		return;
 
+	if (all && dsp->ds_nactive == 0)
+		return;
+
+	ASSERT(dsp->ds_nactive > 0);
+
+	dsp->ds_nactive -= (all ? dsp->ds_nactive : 1);
+	if (dsp->ds_nactive != 0)
+		return;
+
+	ASSERT(dsp->ds_passivestate == DLD_ACTIVE);
 	dls_mac_active_clear(dsp->ds_dlp);
-	dsp->ds_active = B_FALSE;
+	dsp->ds_passivestate = DLD_UNINITIALIZED;
 }

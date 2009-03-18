@@ -430,8 +430,7 @@ proto_bind_req(dld_str_t *dsp, mblk_t *mp)
 
 	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    ((err = dls_active_set(dsp)) != 0)) {
+	if ((err = dls_active_set(dsp)) != 0) {
 		dl_err = DL_SYSERR;
 		goto failed2;
 	}
@@ -460,8 +459,7 @@ proto_bind_req(dld_str_t *dsp, mblk_t *mp)
 		}
 
 		dsp->ds_dlstate = DL_UNBOUND;
-		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp);
+		dls_active_clear(dsp, B_FALSE);
 		goto failed2;
 	}
 
@@ -489,9 +487,6 @@ proto_bind_req(dld_str_t *dsp, mblk_t *mp)
 	dlsap_addr_length += sizeof (uint16_t);
 
 	dsp->ds_dlstate = DL_IDLE;
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-		dsp->ds_passivestate = DLD_ACTIVE;
-
 	dlbindack(q, mp, sap, dlsap_addr, dlsap_addr_length, 0, 0);
 	return;
 
@@ -557,6 +552,7 @@ proto_unbind_req(dld_str_t *dsp, mblk_t *mp)
 	dsp->ds_mode = DLD_UNITDATA;
 	dsp->ds_dlstate = DL_UNBOUND;
 
+	dls_active_clear(dsp, B_FALSE);
 	mac_perim_exit(mph);
 	dlokack(dsp->ds_wq, mp, DL_UNBIND_REQ);
 	return;
@@ -609,8 +605,7 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 
 	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    ((err = dls_active_set(dsp)) != 0)) {
+	if ((promisc_saved == 0) && (err = dls_active_set(dsp)) != 0) {
 		dsp->ds_promisc = promisc_saved;
 		dl_err = DL_SYSERR;
 		goto failed2;
@@ -624,15 +619,13 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 	if (err != 0) {
 		dl_err = DL_SYSERR;
 		dsp->ds_promisc = promisc_saved;
-		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp);
+		if (promisc_saved == 0)
+			dls_active_clear(dsp, B_FALSE);
 		goto failed2;
 	}
 
 	mac_perim_exit(mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-		dsp->ds_passivestate = DLD_ACTIVE;
 	dlokack(q, mp, DL_PROMISCON_REQ);
 	return;
 
@@ -702,12 +695,18 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	 * Adjust channel promiscuity.
 	 */
 	err = dls_promisc(dsp, promisc_saved);
-	mac_perim_exit(mph);
 
 	if (err != 0) {
+		mac_perim_exit(mph);
 		dl_err = DL_SYSERR;
 		goto failed;
 	}
+
+	if (dsp->ds_promisc == 0)
+		dls_active_clear(dsp, B_FALSE);
+
+	mac_perim_exit(mph);
+
 	dlokack(q, mp, DL_PROMISCOFF_REQ);
 	return;
 failed:
@@ -741,14 +740,12 @@ proto_enabmulti_req(dld_str_t *dsp, mblk_t *mp)
 
 	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    ((err = dls_active_set(dsp)) != 0)) {
+	if ((dsp->ds_dmap == NULL) && (err = dls_active_set(dsp)) != 0) {
 		dl_err = DL_SYSERR;
 		goto failed2;
 	}
 
 	err = dls_multicst_add(dsp, mp->b_rptr + dlp->dl_addr_offset);
-
 	if (err != 0) {
 		switch (err) {
 		case EINVAL:
@@ -763,16 +760,13 @@ proto_enabmulti_req(dld_str_t *dsp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
-		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp);
-
+		if (dsp->ds_dmap == NULL)
+			dls_active_clear(dsp, B_FALSE);
 		goto failed2;
 	}
 
 	mac_perim_exit(mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-		dsp->ds_passivestate = DLD_ACTIVE;
 	dlokack(q, mp, DL_ENABMULTI_REQ);
 	return;
 
@@ -809,6 +803,8 @@ proto_disabmulti_req(dld_str_t *dsp, mblk_t *mp)
 
 	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 	err = dls_multicst_remove(dsp, mp->b_rptr + dlp->dl_addr_offset);
+	if ((err == 0) && (dsp->ds_dmap == NULL))
+		dls_active_clear(dsp, B_FALSE);
 	mac_perim_exit(mph);
 
 	if (err != 0) {
@@ -909,8 +905,7 @@ proto_setphysaddr_req(dld_str_t *dsp, mblk_t *mp)
 
 	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    ((err = dls_active_set(dsp)) != 0)) {
+	if ((err = dls_active_set(dsp)) != 0) {
 		dl_err = DL_SYSERR;
 		goto failed2;
 	}
@@ -928,17 +923,13 @@ proto_setphysaddr_req(dld_str_t *dsp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
-		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp);
-
+		dls_active_clear(dsp, B_FALSE);
 		goto failed2;
 
 	}
 
 	mac_perim_exit(mph);
 
-	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-		dsp->ds_passivestate = DLD_ACTIVE;
 	dlokack(q, mp, DL_SET_PHYS_ADDR_REQ);
 	return;
 

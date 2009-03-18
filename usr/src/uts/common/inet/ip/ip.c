@@ -15825,8 +15825,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 		switch (dlea->dl_error_primitive) {
 		case DL_DISABMULTI_REQ:
-			if (!ill->ill_isv6)
-				ipsq_current_finish(ipsq);
 			ill_dlpi_done(ill, dlea->dl_error_primitive);
 			break;
 		case DL_PROMISCON_REQ:
@@ -15902,18 +15900,17 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				mp1 = ipsq_pending_mp_get(ipsq, &connp);
 			if (mp1 != NULL) {
 				/*
-				 * This operation (SIOCSLIFFLAGS) must have
-				 * happened from a conn.
+				 * This might be a result of a DL_NOTE_REPLUMB
+				 * notification. In that case, connp is NULL.
 				 */
-				ASSERT(connp != NULL);
-				q = CONNP_TO_WQ(connp);
+				if (connp != NULL)
+					q = CONNP_TO_WQ(connp);
+
 				(void) ipif_down(ipif, NULL, NULL);
 				/* error is set below the switch */
 			}
 			break;
 		case DL_ENABMULTI_REQ:
-			if (!ill->ill_isv6)
-				ipsq_current_finish(ipsq);
 			ill_dlpi_done(ill, DL_ENABMULTI_REQ);
 
 			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
@@ -16030,11 +16027,11 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		if (mp1 == NULL)
 			break;
 		/*
-		 * Because mp1 was added by ill_dl_up(), and it always
-		 * passes a valid connp, connp must be valid here.
+		 * mp1 was added by ill_dl_up(). if that is a result of
+		 * a DL_NOTE_REPLUMB notification, connp could be NULL.
 		 */
-		ASSERT(connp != NULL);
-		q = CONNP_TO_WQ(connp);
+		if (connp != NULL)
+			q = CONNP_TO_WQ(connp);
 
 		/*
 		 * We are exclusive. So nothing can change even after
@@ -16056,12 +16053,14 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 */
 		if (ill->ill_isv6) {
 			if (ill->ill_flags & ILLF_XRESOLV) {
-				mutex_enter(&connp->conn_lock);
+				if (connp != NULL)
+					mutex_enter(&connp->conn_lock);
 				mutex_enter(&ill->ill_lock);
 				success = ipsq_pending_mp_add(connp, ipif, q,
 				    mp1, 0);
 				mutex_exit(&ill->ill_lock);
-				mutex_exit(&connp->conn_lock);
+				if (connp != NULL)
+					mutex_exit(&connp->conn_lock);
 				if (success) {
 					err = ipif_resolver_up(ipif,
 					    Res_act_initial);
@@ -16087,11 +16086,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * Leave the pending mblk intact so that
 			 * the ioctl completes in ip_rput().
 			 */
-			mutex_enter(&connp->conn_lock);
+			if (connp != NULL)
+				mutex_enter(&connp->conn_lock);
 			mutex_enter(&ill->ill_lock);
 			success = ipsq_pending_mp_add(connp, ipif, q, mp1, 0);
 			mutex_exit(&ill->ill_lock);
-			mutex_exit(&connp->conn_lock);
+			if (connp != NULL)
+				mutex_exit(&connp->conn_lock);
 			if (success) {
 				err = ipif_resolver_up(ipif, Res_act_initial);
 				if (err == EINPROGRESS) {
@@ -16152,6 +16153,15 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		case DL_NOTE_PHYS_ADDR:
 			err = ill_set_phys_addr(ill, mp);
 			break;
+
+		case DL_NOTE_REPLUMB:
+			/*
+			 * Directly return after calling ill_replumb().
+			 * Note that we should not free mp as it is reused
+			 * in the ill_replumb() function.
+			 */
+			err = ill_replumb(ill, mp);
+			return;
 
 		case DL_NOTE_FASTPATH_FLUSH:
 			ill_fastpath_flush(ill);
@@ -16462,8 +16472,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		switch (dloa->dl_correct_primitive) {
 		case DL_ENABMULTI_REQ:
 		case DL_DISABMULTI_REQ:
-			if (!ill->ill_isv6)
-				ipsq_current_finish(ipsq);
 			ill_dlpi_done(ill, dloa->dl_correct_primitive);
 			break;
 		case DL_PROMISCON_REQ:
@@ -27048,20 +27056,6 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	ipsq_current_start(ipsq, ci.ci_ipif, ipip->ipi_cmd);
 
 	/*
-	 * For most set ioctls that come here, this serves as a single point
-	 * where we set the IPIF_CHANGING flag. This ensures that there won't
-	 * be any new references to the ipif. This helps functions that go
-	 * through this path and end up trying to wait for the refcnts
-	 * associated with the ipif to go down to zero.  The exception is
-	 * SIOCSLIFREMOVEIF, which sets IPIF_CONDEMNED internally after
-	 * identifying the right ipif to operate on.
-	 */
-	mutex_enter(&(ci.ci_ipif)->ipif_ill->ill_lock);
-	if (ipip->ipi_cmd != SIOCLIFREMOVEIF)
-		(ci.ci_ipif)->ipif_state_flags |= IPIF_CHANGING;
-	mutex_exit(&(ci.ci_ipif)->ipif_ill->ill_lock);
-
-	/*
 	 * A return value of EINPROGRESS means the ioctl is
 	 * either queued and waiting for some reason or has
 	 * already completed.
@@ -27321,7 +27315,7 @@ nak:
 			break;
 		switch (((arc_t *)mp->b_rptr)->arc_cmd) {
 		case AR_ENTRY_SQUERY:
-			ip_wput_ctl(q, mp);
+			putnext(q, mp);
 			return;
 		case AR_CLIENT_NOTIFY:
 			ip_arp_news(q, mp);

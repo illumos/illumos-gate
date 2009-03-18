@@ -69,6 +69,8 @@ static mod_hash_t	*softmac_hash;
 static kmutex_t		smac_global_lock;
 static kcondvar_t	smac_global_cv;
 
+static kmem_cache_t	*softmac_cachep;
+
 #define	SOFTMAC_HASHSZ		64
 
 static void softmac_create_task(void *);
@@ -79,9 +81,14 @@ static void softmac_m_stop(void *);
 static int softmac_m_open(void *);
 static void softmac_m_close(void *);
 static boolean_t softmac_m_getcapab(void *, mac_capab_t, void *);
+static int softmac_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+static int softmac_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *, uint_t *);
+
 
 #define	SOFTMAC_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_OPEN | MC_CLOSE)
+	(MC_IOCTL | MC_GETCAPAB | MC_OPEN | MC_CLOSE | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t softmac_m_callbacks = {
 	SOFTMAC_M_CALLBACK_FLAGS,
@@ -95,8 +102,56 @@ static mac_callbacks_t softmac_m_callbacks = {
 	softmac_m_ioctl,
 	softmac_m_getcapab,
 	softmac_m_open,
-	softmac_m_close
+	softmac_m_close,
+	softmac_m_setprop,
+	softmac_m_getprop
 };
+
+/*ARGSUSED*/
+static int
+softmac_constructor(void *buf, void *arg, int kmflag)
+{
+	softmac_t	*softmac = buf;
+
+	bzero(buf, sizeof (softmac_t));
+	mutex_init(&softmac->smac_mutex, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&softmac->smac_active_mutex, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&softmac->smac_fp_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&softmac->smac_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&softmac->smac_fp_cv, NULL, CV_DEFAULT, NULL);
+	list_create(&softmac->smac_sup_list, sizeof (softmac_upper_t),
+	    offsetof(softmac_upper_t, su_list_node));
+	return (0);
+}
+
+/*ARGSUSED*/
+static void
+softmac_destructor(void *buf, void *arg)
+{
+	softmac_t	*softmac = buf;
+
+	ASSERT(softmac->smac_fp_disable_clients == 0);
+	ASSERT(!softmac->smac_fastpath_admin_disabled);
+
+	ASSERT(!(softmac->smac_flags & SOFTMAC_ATTACH_DONE));
+	ASSERT(softmac->smac_hold_cnt == 0);
+	ASSERT(softmac->smac_attachok_cnt == 0);
+	ASSERT(softmac->smac_mh == NULL);
+	ASSERT(softmac->smac_softmac[0] == NULL &&
+	    softmac->smac_softmac[1] == NULL);
+	ASSERT(softmac->smac_state == SOFTMAC_INITIALIZED);
+	ASSERT(softmac->smac_lower == NULL);
+	ASSERT(softmac->smac_active == B_FALSE);
+	ASSERT(softmac->smac_nactive == 0);
+	ASSERT(list_is_empty(&softmac->smac_sup_list));
+
+	list_destroy(&softmac->smac_sup_list);
+	mutex_destroy(&softmac->smac_mutex);
+	mutex_destroy(&softmac->smac_active_mutex);
+	mutex_destroy(&softmac->smac_fp_mutex);
+	cv_destroy(&softmac->smac_cv);
+	cv_destroy(&softmac->smac_fp_cv);
+}
 
 void
 softmac_init()
@@ -108,11 +163,19 @@ softmac_init()
 	rw_init(&softmac_hash_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&smac_global_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&smac_global_cv, NULL, CV_DRIVER, NULL);
+
+	softmac_cachep = kmem_cache_create("softmac_cache",
+	    sizeof (softmac_t), 0, softmac_constructor,
+	    softmac_destructor, NULL, NULL, NULL, 0);
+	ASSERT(softmac_cachep != NULL);
+	softmac_fp_init();
 }
 
 void
 softmac_fini()
 {
+	softmac_fp_fini();
+	kmem_cache_destroy(softmac_cachep);
 	rw_destroy(&softmac_hash_lock);
 	mod_hash_destroy_hash(softmac_hash);
 	mutex_destroy(&smac_global_lock);
@@ -281,16 +344,12 @@ softmac_create(dev_info_t *dip, dev_t dev)
 	 * Check whether the softmac for the specified device already exists
 	 */
 	rw_enter(&softmac_hash_lock, RW_WRITER);
-	if ((err = mod_hash_find(softmac_hash, (mod_hash_key_t)devname,
+	if ((mod_hash_find(softmac_hash, (mod_hash_key_t)devname,
 	    (mod_hash_val_t *)&softmac)) != 0) {
 
-		softmac = kmem_zalloc(sizeof (softmac_t), KM_SLEEP);
-		mutex_init(&softmac->smac_mutex, NULL, MUTEX_DRIVER, NULL);
-		cv_init(&softmac->smac_cv, NULL, CV_DRIVER, NULL);
+		softmac = kmem_cache_alloc(softmac_cachep, KM_SLEEP);
 		(void) strlcpy(softmac->smac_devname, devname, MAXNAMELEN);
-		/*
-		 * Insert the softmac into the hash table.
-		 */
+
 		err = mod_hash_insert(softmac_hash,
 		    (mod_hash_key_t)softmac->smac_devname,
 		    (mod_hash_val_t)softmac);
@@ -413,8 +472,18 @@ softmac_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_LEGACY: {
 		mac_capab_legacy_t *legacy = cap_data;
 
+		/*
+		 * The caller is not interested in the details.
+		 */
+		if (legacy == NULL)
+			break;
+
 		legacy->ml_unsup_note = ~softmac->smac_notifications &
 		    (DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN | DL_NOTE_SPEED);
+		legacy->ml_active_set = softmac_active_set;
+		legacy->ml_active_clear = softmac_active_clear;
+		legacy->ml_fastpath_disable = softmac_fastpath_disable;
+		legacy->ml_fastpath_enable = softmac_fastpath_enable;
 		legacy->ml_dev = makedevice(softmac->smac_umajor,
 		    softmac->smac_uppa + 1);
 		break;
@@ -816,22 +885,23 @@ softmac_mac_register(softmac_t *softmac)
 	 * Try to create the datalink for this softmac.
 	 */
 	if ((err = softmac_create_datalink(softmac)) != 0) {
-		if (!(softmac->smac_flags & SOFTMAC_NOSUPP)) {
+		if (!(softmac->smac_flags & SOFTMAC_NOSUPP))
 			(void) mac_unregister(softmac->smac_mh);
-			softmac->smac_mh = NULL;
-		}
+		mutex_enter(&softmac->smac_mutex);
+		softmac->smac_mh = NULL;
+		goto done;
 	}
 	/*
 	 * If succeed, create the thread which handles the DL_NOTIFY_IND from
 	 * the lower stream.
 	 */
+	mutex_enter(&softmac->smac_mutex);
 	if (softmac->smac_mh != NULL) {
 		softmac->smac_notify_thread = thread_create(NULL, 0,
 		    softmac_notify_thread, softmac, 0, &p0,
 		    TS_RUN, minclsyspri);
 	}
 
-	mutex_enter(&softmac->smac_mutex);
 done:
 	ASSERT(softmac->smac_state == SOFTMAC_ATTACH_INPROG &&
 	    softmac->smac_attachok_cnt == softmac->smac_cnt);
@@ -967,7 +1037,6 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 			rw_exit(&softmac_hash_lock);
 			return (0);
 		}
-
 		err = mod_hash_remove(softmac_hash,
 		    (mod_hash_key_t)devname,
 		    (mod_hash_val_t *)&hashval);
@@ -975,10 +1044,9 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 
 		mutex_exit(&softmac->smac_mutex);
 		rw_exit(&softmac_hash_lock);
-
-		mutex_destroy(&softmac->smac_mutex);
-		cv_destroy(&softmac->smac_cv);
-		kmem_free(softmac, sizeof (softmac_t));
+		ASSERT(softmac->smac_fp_disable_clients == 0);
+		softmac->smac_fastpath_admin_disabled = B_FALSE;
+		kmem_cache_free(softmac_cachep, softmac);
 		return (0);
 	}
 	mutex_exit(&softmac->smac_mutex);
@@ -1119,27 +1187,84 @@ softmac_recreate()
 	} while (smw.smw_retry);
 }
 
-/* ARGSUSED */
 static int
 softmac_m_start(void *arg)
 {
-	return (0);
+	softmac_t	*softmac = arg;
+	softmac_lower_t	*slp = softmac->smac_lower;
+	int		err;
+
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
+	/*
+	 * Bind to SAP 2 on token ring, 0 on other interface types.
+	 * (SAP 0 has special significance on token ring).
+	 * Note that the receive-side packets could come anytime after bind.
+	 */
+	err = softmac_send_bind_req(slp, softmac->smac_media == DL_TPR ? 2 : 0);
+	if (err != 0)
+		return (err);
+
+	/*
+	 * Put the lower stream to the DL_PROMISC_SAP mode in order to receive
+	 * all packets of interest.
+	 *
+	 * some driver (e.g. the old legacy eri driver) incorrectly passes up
+	 * packets to DL_PROMISC_SAP stream when the lower stream is not bound,
+	 * so that we send DL_PROMISON_REQ after DL_BIND_REQ.
+	 */
+	err = softmac_send_promisc_req(slp, DL_PROMISC_SAP, B_TRUE);
+	if (err != 0) {
+		(void) softmac_send_unbind_req(slp);
+		return (err);
+	}
+
+	/*
+	 * Enable capabilities the underlying driver claims to support.
+	 * Some driver requires this being called after the stream is bound.
+	 */
+	if ((err = softmac_capab_enable(slp)) != 0) {
+		(void) softmac_send_promisc_req(slp, DL_PROMISC_SAP, B_FALSE);
+		(void) softmac_send_unbind_req(slp);
+	}
+
+	return (err);
 }
 
 /* ARGSUSED */
 static void
 softmac_m_stop(void *arg)
 {
+	softmac_t	*softmac = arg;
+	softmac_lower_t	*slp = softmac->smac_lower;
+
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
+
+	/*
+	 * It is not needed to reset zerocopy, MDT or HCKSUM capabilities.
+	 */
+	(void) softmac_send_promisc_req(slp, DL_PROMISC_SAP, B_FALSE);
+	(void) softmac_send_unbind_req(slp);
 }
 
 /*
- * Set up the lower stream above the legacy device which is shared by
- * GLDv3 MAC clients. Put the lower stream into DLIOCRAW mode to send
- * and receive the raw data. Further, put the lower stream into
+ * Set up the lower stream above the legacy device. There are two different
+ * type of lower streams:
+ *
+ * - Shared lower-stream
+ *
+ * Shared by all GLDv3 MAC clients. Put the lower stream to the DLIOCRAW
+ * mode to send and receive the raw data. Further, put the lower stream into
  * DL_PROMISC_SAP mode to receive all packets of interest.
+ *
+ * - Dedicated lower-stream
+ *
+ * The lower-stream which is dedicated to upper IP/ARP stream. This is used
+ * as fast-path for IP. In this case, the second argument is the pointer to
+ * the softmac upper-stream.
  */
-static int
-softmac_lower_setup(softmac_t *softmac, softmac_lower_t **slpp)
+int
+softmac_lower_setup(softmac_t *softmac, softmac_upper_t *sup,
+    softmac_lower_t **slpp)
 {
 	ldi_ident_t		li;
 	dev_t			dev;
@@ -1153,7 +1278,13 @@ softmac_lower_setup(softmac_t *softmac, softmac_lower_t **slpp)
 	if ((err = ldi_ident_from_dip(softmac_dip, &li)) != 0)
 		return (err);
 
+	/*
+	 * The GLDv3 framework makes sure that mac_unregister(), mac_open(),
+	 * and mac_close() cannot be called at the same time. So we don't
+	 * need any protection to access softmac here.
+	 */
 	dev = softmac->smac_dev;
+
 	err = ldi_open_by_dev(&dev, OTYP_CHR, FREAD|FWRITE, kcred, &lh, li);
 	ldi_ident_release(li);
 	if (err != 0)
@@ -1172,10 +1303,13 @@ softmac_lower_setup(softmac_t *softmac, softmac_lower_t **slpp)
 	}
 
 	/*
-	 * Put the lower stream into DLIOCRAW mode to send/receive raw data.
+	 * If this is the shared-lower-stream, put the lower stream to
+	 * the DLIOCRAW mode to send/receive raw data.
 	 */
-	if ((err = ldi_ioctl(lh, DLIOCRAW, 0, FKIOCTL, kcred, &rval)) != 0)
+	if ((sup == NULL) && (err = ldi_ioctl(lh, DLIOCRAW, 0, FKIOCTL,
+	    kcred, &rval)) != 0) {
 		goto done;
+	}
 
 	/*
 	 * Then push the softmac shim layer atop the lower stream.
@@ -1198,50 +1332,25 @@ softmac_lower_setup(softmac_t *softmac, softmac_lower_t **slpp)
 		goto done;
 	}
 	slp = start_arg.si_slp;
+	slp->sl_sup = sup;
 	slp->sl_lh = lh;
 	slp->sl_softmac = softmac;
 	*slpp = slp;
 
-	/*
-	 * Bind to SAP 2 on token ring, 0 on other interface types.
-	 * (SAP 0 has special significance on token ring).
-	 * Note that the receive-side packets could come anytime after bind.
-	 */
-	if (softmac->smac_media == DL_TPR)
-		err = softmac_send_bind_req(slp, 2);
-	else
-		err = softmac_send_bind_req(slp, 0);
-	if (err != 0)
-		goto done;
+	if (sup != NULL) {
+		slp->sl_rxinfo = &sup->su_rxinfo;
+	} else {
+		/*
+		 * Send DL_NOTIFY_REQ to enable certain DL_NOTIFY_IND.
+		 * We don't have to wait for the ack.
+		 */
+		notifications = DL_NOTE_PHYS_ADDR | DL_NOTE_LINK_UP |
+		    DL_NOTE_LINK_DOWN | DL_NOTE_PROMISC_ON_PHYS |
+		    DL_NOTE_PROMISC_OFF_PHYS;
 
-	/*
-	 * Put the lower stream into DL_PROMISC_SAP mode to receive all
-	 * packets of interest.
-	 *
-	 * Some drivers (e.g. the old legacy eri driver) incorrectly pass up
-	 * packets to DL_PROMISC_SAP stream when the lower stream is not bound,
-	 * so we send DL_PROMISON_REQ after DL_BIND_REQ.
-	 */
-	if ((err = softmac_send_promisc_req(slp, DL_PROMISC_SAP, B_TRUE)) != 0)
-		goto done;
-
-	/*
-	 * Enable the capabilities the underlying driver claims to support.
-	 * Some drivers require this to be called after the stream is bound.
-	 */
-	if ((err = softmac_capab_enable(slp)) != 0)
-		goto done;
-
-	/*
-	 * Send the DL_NOTIFY_REQ to enable certain DL_NOTIFY_IND.
-	 * We don't have to wait for the ack.
-	 */
-	notifications = DL_NOTE_PHYS_ADDR | DL_NOTE_LINK_UP |
-	    DL_NOTE_LINK_DOWN | DL_NOTE_PROMISC_ON_PHYS |
-	    DL_NOTE_PROMISC_OFF_PHYS;
-
-	(void) softmac_send_notify_req(slp,
-	    (notifications & softmac->smac_notifications));
+		(void) softmac_send_notify_req(slp,
+		    (notifications & softmac->smac_notifications));
+	}
 
 done:
 	if (err != 0)
@@ -1257,13 +1366,11 @@ softmac_m_open(void *arg)
 	int		err;
 
 	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
-	ASSERT(softmac->smac_lower_state == SOFTMAC_INITIALIZED);
 
-	if ((err = softmac_lower_setup(softmac, &slp)) != 0)
+	if ((err = softmac_lower_setup(softmac, NULL, &slp)) != 0)
 		return (err);
 
 	softmac->smac_lower = slp;
-	softmac->smac_lower_state = SOFTMAC_READY;
 	return (0);
 }
 
@@ -1274,7 +1381,6 @@ softmac_m_close(void *arg)
 	softmac_lower_t	*slp;
 
 	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
-	ASSERT(softmac->smac_lower_state == SOFTMAC_READY);
 	slp = softmac->smac_lower;
 	ASSERT(slp != NULL);
 
@@ -1282,8 +1388,72 @@ softmac_m_close(void *arg)
 	 * Note that slp is destroyed when lh is closed.
 	 */
 	(void) ldi_close(slp->sl_lh, FREAD|FWRITE, kcred);
-	softmac->smac_lower_state = SOFTMAC_INITIALIZED;
 	softmac->smac_lower = NULL;
+}
+
+/*
+ * Softmac supports two priviate link properteis:
+ *
+ * - "_fastpath"
+ *
+ *    This is a read-only link property which points out the current data-path
+ *    model of the given legacy link. The possible values are "disabled" and
+ *    "enabled".
+ *
+ * - "_disable_fastpath"
+ *
+ *    This is a read-write link property which can be used to disable or enable
+ *    the fast-path of the given legacy link. The possible values are "true"
+ *    and "false". Note that even when "_disable_fastpath" is set to be
+ *    "false", the fast-path may still not be enabled since there may be
+ *    other mac cleints that request the fast-path to be disabled.
+ */
+/* ARGSUSED */
+static int
+softmac_m_setprop(void *arg, const char *name, mac_prop_id_t id,
+    uint_t valsize, const void *val)
+{
+	softmac_t	*softmac = arg;
+
+	if (id != MAC_PROP_PRIVATE || strcmp(name, "_disable_fastpath") != 0)
+		return (ENOTSUP);
+
+	if (strcmp(val, "true") == 0)
+		return (softmac_datapath_switch(softmac, B_TRUE, B_TRUE));
+	else if (strcmp(val, "false") == 0)
+		return (softmac_datapath_switch(softmac, B_FALSE, B_TRUE));
+	else
+		return (EINVAL);
+}
+
+static int
+softmac_m_getprop(void *arg, const char *name, mac_prop_id_t id, uint_t flags,
+    uint_t valsize, void *val, uint_t *perm)
+{
+	softmac_t	*softmac = arg;
+	char		*fpstr;
+
+	if (id != MAC_PROP_PRIVATE)
+		return (ENOTSUP);
+
+	if (strcmp(name, "_fastpath") == 0) {
+		if ((flags & MAC_PROP_DEFAULT) != 0)
+			return (ENOTSUP);
+
+		*perm = MAC_PROP_PERM_READ;
+		mutex_enter(&softmac->smac_fp_mutex);
+		fpstr = (DATAPATH_MODE(softmac) == SOFTMAC_SLOWPATH) ?
+		    "disabled" : "enabled";
+		mutex_exit(&softmac->smac_fp_mutex);
+	} else if (strcmp(name, "_disable_fastpath") == 0) {
+		*perm = MAC_PROP_PERM_RW;
+		fpstr = ((flags & MAC_PROP_DEFAULT) != 0) ? "false" :
+		    (softmac->smac_fastpath_admin_disabled ? "true" : "false");
+	} else {
+		return (ENOTSUP);
+	}
+
+	return (strlcpy(val, fpstr, valsize) >= valsize ? EINVAL : 0);
 }
 
 int
@@ -1367,12 +1537,39 @@ again:
 void
 softmac_rele_device(dls_dev_handle_t ddh)
 {
+	if (ddh != NULL)
+		softmac_rele((softmac_t *)ddh);
+}
+
+int
+softmac_hold(dev_t dev, softmac_t **softmacp)
+{
 	softmac_t	*softmac;
+	char		*drv;
+	mac_handle_t	mh;
+	char		mac[MAXNAMELEN];
+	int		err;
 
-	if (ddh == NULL)
-		return;
+	if ((drv = ddi_major_to_name(getmajor(dev))) == NULL)
+		return (EINVAL);
 
-	softmac = (softmac_t *)ddh;
+	(void) snprintf(mac, MAXNAMELEN, "%s%d", drv, getminor(dev) - 1);
+	if ((err = mac_open(mac, &mh)) != 0)
+		return (err);
+
+	softmac = (softmac_t *)mac_driver(mh);
+
+	mutex_enter(&softmac->smac_mutex);
+	softmac->smac_hold_cnt++;
+	mutex_exit(&softmac->smac_mutex);
+	mac_close(mh);
+	*softmacp = softmac;
+	return (0);
+}
+
+void
+softmac_rele(softmac_t *softmac)
+{
 	mutex_enter(&softmac->smac_mutex);
 	softmac->smac_hold_cnt--;
 	mutex_exit(&softmac->smac_mutex);

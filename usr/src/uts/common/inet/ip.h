@@ -1953,6 +1953,7 @@ typedef struct ill_s {
 	mblk_t	*ill_promiscoff_mp;	/* for ill_leave_allmulti() */
 	mblk_t	*ill_dlpi_deferred;	/* b_next chain of control messages */
 	mblk_t	*ill_ardeact_mp;	/* deact mp from ipmp_ill_activate() */
+	mblk_t	*ill_replumb_mp;	/* replumb mp from ill_replumb() */
 	mblk_t	*ill_phys_addr_mp;	/* mblk which holds ill_phys_addr */
 #define	ill_last_mp_to_free	ill_phys_addr_mp
 
@@ -1977,7 +1978,6 @@ typedef struct ill_s {
 		ill_dl_up : 1,
 		ill_up_ipifs : 1,
 		ill_note_link : 1,	/* supports link-up notification */
-
 		ill_capab_reneg : 1, /* capability renegotiation to be done */
 		ill_dld_capab_inprog : 1, /* direct dld capab call in prog */
 		ill_need_recover_multicast : 1,

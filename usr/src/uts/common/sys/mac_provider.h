@@ -145,6 +145,24 @@ typedef struct mac_capab_multifactaddr_s {
 } mac_capab_multifactaddr_t;
 
 /*
+ * Info and callbacks of legacy devices.
+ */
+typedef struct mac_capab_legacy_s {
+	/*
+	 * Notifications that the legacy device does not support.
+	 */
+	uint32_t	ml_unsup_note;
+	/*
+	 * dev_t of the legacy device; can be held to force attach.
+	 */
+	dev_t		ml_dev;
+	boolean_t	(*ml_active_set)(void *);
+	void		(*ml_active_clear)(void *);
+	int		(*ml_fastpath_disable)(void *);
+	void		(*ml_fastpath_enable)(void *);
+} mac_capab_legacy_t;
+
+/*
  * MAC driver entry point types.
  */
 typedef int		(*mac_getstat_t)(void *, uint_t, uint64_t *);

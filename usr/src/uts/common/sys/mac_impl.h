@@ -457,9 +457,10 @@ struct mac_impl_s {
 	mac_resource_props_t	mi_resource_props;	/* SL */
 
 	minor_t			mi_minor;		/* WO */
-	dev_t			mi_phy_dev;		/* WO */
 	uint32_t		mi_oref;		/* SL */
-	uint32_t		mi_unsup_note;		/* WO */
+	mac_capab_legacy_t	mi_capab_legacy;	/* WO */
+	dev_t			mi_phy_dev;		/* WO */
+
 	/*
 	 * List of margin value requests added by mac clients. This list is
 	 * sorted: the first one has the greatest value.

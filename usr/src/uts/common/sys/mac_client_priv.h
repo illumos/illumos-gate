@@ -63,6 +63,7 @@ extern void mac_ioctl(mac_handle_t, queue_t *, mblk_t *);
 extern link_state_t mac_link_get(mac_handle_t);
 extern void mac_resource_set(mac_client_handle_t, mac_resource_add_t, void *);
 extern dev_info_t *mac_devinfo_get(mac_handle_t);
+extern void *mac_driver(mac_handle_t);
 extern boolean_t mac_capab_get(mac_handle_t, mac_capab_t, void *);
 extern boolean_t mac_sap_verify(mac_handle_t, uint32_t, uint32_t *);
 extern mblk_t *mac_header(mac_handle_t, const uint8_t *, uint32_t, mblk_t *,

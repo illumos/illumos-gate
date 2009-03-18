@@ -410,6 +410,12 @@ mac_devinfo_get(mac_handle_t mh)
 	return (((mac_impl_t *)mh)->mi_dip);
 }
 
+void *
+mac_driver(mac_handle_t mh)
+{
+	return (((mac_impl_t *)mh)->mi_driver);
+}
+
 const char *
 mac_name(mac_handle_t mh)
 {
@@ -1637,9 +1643,8 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	boolean_t bcast_added = B_FALSE;
 	boolean_t nactiveclients_added = B_FALSE;
 	boolean_t mac_started = B_FALSE;
+	boolean_t fastpath_disabled = B_FALSE;
 	mac_resource_props_t mrp;
-
-	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
 	/* when VID is non-zero, the underlying MAC can not be VNIC */
 	ASSERT(!((mip->mi_state_flags & MIS_IS_VNIC) && (vid != 0)));
@@ -1708,19 +1713,39 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	}
 
 	/*
-	 * Return EBUSY if:
-	 *  - this is an exclusive active mac client and there already exist
-	 *    active mac clients, or
-	 *  - there already exist an exclusively active mac client.
+	 * If this is a VNIC/VLAN, disable softmac fast-path.
 	 */
-	if ((mcip->mci_state_flags & MCIS_EXCLUSIVE) &&
-	    (mip->mi_nactiveclients != 0) || (mip->mi_state_flags &
-	    MIS_EXCLUSIVE)) {
+	if (mcip->mci_state_flags & MCIS_IS_VNIC) {
+		err = mac_fastpath_disable((mac_handle_t)mip);
+		if (err != 0)
+			return (err);
+		fastpath_disabled = B_TRUE;
+	}
+
+	/*
+	 * Return EBUSY if:
+	 *  - there is an exclusively active mac client exists.
+	 *  - this is an exclusive active mac client but
+	 *	a. there is already active mac clients exist, or
+	 *	b. fastpath streams are already plumbed on this legacy device
+	 */
+	if (mip->mi_state_flags & MIS_EXCLUSIVE) {
+		if (fastpath_disabled)
+			mac_fastpath_enable((mac_handle_t)mip);
 		return (EBUSY);
 	}
 
-	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
+		ASSERT(!fastpath_disabled);
+		if (mip->mi_nactiveclients != 0)
+			return (EBUSY);
+
+		if ((mip->mi_state_flags & MIS_LEGACY) &&
+		    !(mip->mi_capab_legacy.ml_active_set(mip->mi_driver))) {
+			return (EBUSY);
+		}
 		mip->mi_state_flags |= MIS_EXCLUSIVE;
+	}
 
 	bzero(&mrp, sizeof (mac_resource_props_t));
 	if (is_primary && !(mcip->mci_state_flags & (MCIS_IS_VNIC |
@@ -1970,8 +1995,15 @@ bail:
 	if (nactiveclients_added)
 		mip->mi_nactiveclients--;
 
-	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
+		if (mip->mi_state_flags & MIS_LEGACY)
+			mip->mi_capab_legacy.ml_active_clear(mip->mi_driver);
+	}
+
+	if (fastpath_disabled)
+		mac_fastpath_enable((mac_handle_t)mip);
+
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
 	return (err);
 }
@@ -2087,10 +2119,10 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 			mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr,
 			    muip->mui_vid);
 		}
-		mac_stop((mac_handle_t)mip);
+
 		FLOW_FINAL_REFRELE(flent);
-		i_mac_perim_exit(mip);
-		return (0);
+		ASSERT(!(mcip->mci_state_flags & MCIS_EXCLUSIVE));
+		goto done;
 	}
 
 	/*
@@ -2170,8 +2202,14 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 		mac_capab_update((mac_handle_t)mip);
 		mac_virtual_link_update(mip);
 	}
-	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
+
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
+
+		if (mip->mi_state_flags & MIS_LEGACY)
+			mip->mi_capab_legacy.ml_active_clear(mip->mi_driver);
+	}
+
 	mcip->mci_state_flags &= ~MCIS_UNICAST_HW;
 
 	if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
@@ -2183,10 +2221,16 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
 		mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
 
-	mac_stop((mac_handle_t)mip);
-
-	i_mac_perim_exit(mip);
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
+
+done:
+	/*
+	 * Disable fastpath if this is a VNIC or a VLAN.
+	 */
+	if (mcip->mci_state_flags & MCIS_IS_VNIC)
+		mac_fastpath_enable((mac_handle_t)mip);
+	mac_stop((mac_handle_t)mip);
+	i_mac_perim_exit(mip);
 	return (0);
 }
 
@@ -3149,16 +3193,17 @@ mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
 	/*
-	 * if mi_nactiveclients > 1, only MAC_CAPAB_HCKSUM,
-	 * MAC_CAPAB_NO_NATIVEVLAN, MAC_CAPAB_NO_ZCOPY can be advertised.
+	 * if mi_nactiveclients > 1, only MAC_CAPAB_LEGACY, MAC_CAPAB_HCKSUM,
+	 * MAC_CAPAB_NO_NATIVEVLAN and MAC_CAPAB_NO_ZCOPY can be advertised.
 	 */
 	if (mip->mi_nactiveclients > 1) {
 		switch (cap) {
-		case MAC_CAPAB_HCKSUM:
-			return (i_mac_capab_get(mh, cap, cap_data));
 		case MAC_CAPAB_NO_NATIVEVLAN:
 		case MAC_CAPAB_NO_ZCOPY:
 			return (B_TRUE);
+		case MAC_CAPAB_LEGACY:
+		case MAC_CAPAB_HCKSUM:
+			break;
 		default:
 			return (B_FALSE);
 		}
@@ -3303,13 +3348,28 @@ i_mac_set_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mac_client_impl_t	*mcip;
 	int			err = 0;
-	mac_resource_props_t	tmrp;
+	uint32_t		resmask, newresmask;
+	mac_resource_props_t	tmrp, umrp;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
 	err = mac_validate_props(mrp);
 	if (err != 0)
 		return (err);
+
+	bcopy(&mip->mi_resource_props, &umrp, sizeof (mac_resource_props_t));
+	resmask = umrp.mrp_mask;
+	mac_update_resources(mrp, &umrp, B_FALSE);
+	newresmask = umrp.mrp_mask;
+
+	if (resmask == 0 && newresmask != 0) {
+		/*
+		 * Bandwidth, priority or cpu link properties configured,
+		 * must disable fastpath.
+		 */
+		if ((err = mac_fastpath_disable((mac_handle_t)mip)) != 0)
+			return (err);
+	}
 
 	/*
 	 * Since bind_cpu may be modified by mac_client_set_resources()
@@ -3322,9 +3382,20 @@ i_mac_set_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 		err =
 		    mac_client_set_resources((mac_client_handle_t)mcip, &tmrp);
 	}
-	/* if mac_client_set_resources failed, do not update the values */
-	if (err == 0)
-		mac_update_resources(mrp, &mip->mi_resource_props, B_FALSE);
+
+	/* Only update the values if mac_client_set_resources succeeded */
+	if (err == 0) {
+		bcopy(&umrp, &mip->mi_resource_props,
+		    sizeof (mac_resource_props_t));
+		/*
+		 * If bankwidth, priority or cpu link properties cleared,
+		 * renable fastpath.
+		 */
+		if (resmask != 0 && newresmask == 0)
+			mac_fastpath_enable((mac_handle_t)mip);
+	} else if (resmask == 0 && newresmask != 0) {
+		mac_fastpath_enable((mac_handle_t)mip);
+	}
 	return (err);
 }
 
