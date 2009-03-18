@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,10 +47,10 @@ typedef struct cmi_hdl_impl {
 	uint64_t cmih_flags;
 } cmi_hdl_impl_t;
 
-struct cmi_hdl_arr_ent {
+typedef struct cmi_hdl_ent {
 	volatile uint32_t cmae_refcnt;
 	cmi_hdl_impl_t *cmae_hdlp;
-};
+} cmi_hdl_ent_t;
 
 typedef struct cmi {
 	struct cmi *cmi_next;
@@ -73,47 +73,137 @@ struct cms_ctl {
 	void *cs_cmsdata;
 };
 
-#define	CMI_MAX_CHIPS			16
-#define	CMI_MAX_CORES_PER_CHIP		8
-#define	CMI_MAX_STRANDS_PER_CORE	2
-#define	CMI_HDL_HASHSZ (CMI_MAX_CHIPS * CMI_MAX_CORES_PER_CHIP * \
-    CMI_MAX_STRANDS_PER_CORE)
+#define	CMI_MAX_CHIPID_NBITS		6	/* max chipid of 63 */
+#define	CMI_MAX_CORES_PER_CHIP_NBITS	4	/* 16 cores per chip max */
+#define	CMI_MAX_STRANDS_PER_CORE_NBITS	3	/* 8 strands per core max */
+
+#define	CMI_MAX_CHIPID			((1 << (CMI_MAX_CHIPID_NBITS)) - 1)
+#define	CMI_MAX_CORES_PER_CHIP		(1 << CMI_MAX_CORES_PER_CHIP_NBITS)
+#define	CMI_MAX_STRANDS_PER_CORE	(1 << CMI_MAX_STRANDS_PER_CORE_NBITS)
+#define	CMI_MAX_STRANDS_PER_CHIP	(CMI_MAX_CORES_PER_CHIP * \
+					    CMI_MAX_STRANDS_PER_CORE)
+
+#define	CMI_HDL_ARR_IDX_CORE(coreid) \
+	(((coreid) & (CMI_MAX_CORES_PER_CHIP - 1)) << \
+	CMI_MAX_STRANDS_PER_CORE_NBITS)
+
+#define	CMI_HDL_ARR_IDX_STRAND(strandid) \
+	(((strandid) & (CMI_MAX_STRANDS_PER_CORE - 1)))
+
+#define	CMI_HDL_ARR_IDX(coreid, strandid) \
+	(CMI_HDL_ARR_IDX_CORE(coreid) | CMI_HDL_ARR_IDX_STRAND(strandid))
+
+#define	CMI_CHIPID_ARR_SZ		(1 << CMI_MAX_CHIPID_NBITS)
 
 struct cmih_walk_state {
-	int idx;
-	struct cmi_hdl_arr_ent *arrent;
+	int chipid, coreid, strandid;	/* currently visited cpu */
+	cmi_hdl_ent_t *chip_tab[CMI_CHIPID_ARR_SZ];
 };
+
+/*
+ * Advance the <chipid,coreid,strandid> tuple to the next strand entry
+ * Return true upon sucessful result. Otherwise return false if already reach
+ * the highest strand.
+ */
+static boolean_t
+cmih_ent_next(struct cmih_walk_state *wsp)
+{
+	uint_t carry = 0;
+
+	/* Check for end of the table */
+	if (wsp->chipid == CMI_MAX_CHIPID &&
+	    wsp->coreid == (CMI_MAX_CORES_PER_CHIP - 1) &&
+	    wsp->strandid == (CMI_MAX_STRANDS_PER_CORE - 1))
+		return (B_FALSE);
+
+	/* increment the strand id */
+	wsp->strandid++;
+	carry =  wsp->strandid >> CMI_MAX_STRANDS_PER_CORE_NBITS;
+	wsp->strandid =  wsp->strandid & (CMI_MAX_STRANDS_PER_CORE - 1);
+	if (carry == 0)
+		return (B_TRUE);
+
+	/* increment the core id */
+	wsp->coreid++;
+	carry = wsp->coreid >> CMI_MAX_CORES_PER_CHIP_NBITS;
+	wsp->coreid = wsp->coreid & (CMI_MAX_CORES_PER_CHIP - 1);
+	if (carry == 0)
+		return (B_TRUE);
+
+	/* increment the chip id */
+	wsp->chipid = ++wsp->chipid & (CMI_MAX_CHIPID);
+
+	return (B_TRUE);
+}
+
+/*
+ * Lookup for the hdl entry of a given <chip,core,strand>
+ */
+static cmi_hdl_ent_t *
+cmih_ent_lookup(struct cmih_walk_state *wsp)
+{
+	if (wsp == NULL || wsp->chip_tab[wsp->chipid] == NULL)
+		return (NULL);	/* chip is not present */
+
+	return (wsp->chip_tab[wsp->chipid] +
+	    CMI_HDL_ARR_IDX(wsp->coreid, wsp->strandid));
+}
+
+/* forward decls */
+static void
+cmih_walk_fini(mdb_walk_state_t *wsp);
 
 static int
 cmih_walk_init(mdb_walk_state_t *wsp)
 {
-	size_t sz = CMI_HDL_HASHSZ * sizeof (struct cmi_hdl_arr_ent);
+	int i;
+	ssize_t sz;
 	struct cmih_walk_state *awsp;
-	uintptr_t addr;
+	void *pg;
+	cmi_hdl_ent_t *ent;
 
 	if (wsp->walk_addr != NULL) {
 		mdb_warn("cmihdl is a global walker\n");
 		return (WALK_ERR);
 	}
 
-	if (mdb_readvar(&addr, "cmi_hdl_arr") == -1) {
-		mdb_warn("read of cmi_hdl_arr failed");
-		return (WALK_ERR);
-	} else if (addr == NULL) {
-		return (WALK_DONE);
-	}
-
 	wsp->walk_data = awsp =
 	    mdb_zalloc(sizeof (struct cmih_walk_state), UM_SLEEP);
-	awsp->arrent = mdb_alloc(sz, UM_SLEEP);
 
-	if (mdb_vread(awsp->arrent, sz, addr) != sz) {
-		mdb_warn("read of cmi_hdl_arr array at 0x%p failed", addr);
+	/* table of chipid entries */
+	if ((sz = mdb_readvar(&awsp->chip_tab, "cmi_chip_tab")) == -1) {
+		mdb_warn("read of cmi_chip_tab failed");
+		mdb_free(wsp->walk_data, sizeof (struct cmih_walk_state));
+		wsp->walk_data = NULL;
+		return (WALK_ERR);
+	} else if (sz < sizeof (awsp->chip_tab)) {
+		mdb_warn("Unexpected cmi_chip_tab size (exp=%ld, actual=%ld)",
+		    sizeof (awsp->chip_tab), sz);
+		mdb_free(wsp->walk_data, sizeof (struct cmih_walk_state));
+		wsp->walk_data = NULL;
 		return (WALK_ERR);
 	}
 
-	wsp->walk_addr =
-	    (uintptr_t)((struct cmi_hdl_arr_ent *)wsp->walk_data)->cmae_hdlp;
+	/* read the per-chip table that contains all strands of the chip */
+	sz = CMI_MAX_STRANDS_PER_CHIP * sizeof (cmi_hdl_ent_t);
+	for (i = 0; i < CMI_CHIPID_ARR_SZ; i++) {
+		if (awsp->chip_tab[i] == NULL)
+			continue; /* this chip(i) is not present */
+		pg = mdb_alloc(sz, UM_SLEEP);
+		if (mdb_vread(pg, sz, (uintptr_t)awsp->chip_tab[i]) != sz) {
+			mdb_warn("read of cmi_hdl(%i) array at 0x%p failed",
+			    i, awsp->chip_tab[i]);
+			mdb_free(pg, sz);
+			cmih_walk_fini(wsp);
+			return (WALK_ERR);
+		}
+		awsp->chip_tab[i] = pg;
+	}
+
+	/* Look up the hdl of the first strand <0,0,0> */
+	wsp->walk_addr = NULL;
+	if ((ent = cmih_ent_lookup(awsp)) != NULL)
+		wsp->walk_addr = (uintptr_t)ent->cmae_hdlp;
 
 	return (WALK_NEXT);
 }
@@ -122,12 +212,15 @@ static int
 cmih_walk_step(mdb_walk_state_t *wsp)
 {
 	struct cmih_walk_state *awsp = wsp->walk_data;
-	uintptr_t addr = (uintptr_t)(awsp->arrent)[awsp->idx].cmae_hdlp;
+	uintptr_t addr = NULL;
 	cmi_hdl_impl_t hdl;
+	cmi_hdl_ent_t *ent;
 	int rv;
 
+	if ((ent = cmih_ent_lookup(awsp)) != NULL)
+		addr = (uintptr_t)ent->cmae_hdlp;
 	if (wsp->walk_addr == NULL || addr == NULL)
-		return (++awsp->idx < CMI_HDL_HASHSZ ? WALK_NEXT : WALK_DONE);
+		return (cmih_ent_next(awsp) ? WALK_NEXT : WALK_DONE);
 
 	if (mdb_vread(&hdl, sizeof (hdl), addr) != sizeof (hdl)) {
 		mdb_warn("read of handle at 0x%p failed", addr);
@@ -138,7 +231,7 @@ cmih_walk_step(mdb_walk_state_t *wsp)
 	    wsp->walk_cbdata)) != WALK_NEXT)
 		return (rv);
 
-	return (++awsp->idx < CMI_HDL_HASHSZ ? WALK_NEXT : WALK_DONE);
+	return (cmih_ent_next(awsp) ? WALK_NEXT : WALK_DONE);
 }
 
 static void
@@ -147,10 +240,18 @@ cmih_walk_fini(mdb_walk_state_t *wsp)
 	struct cmih_walk_state *awsp = wsp->walk_data;
 
 	if (awsp != NULL) {
-		if (awsp->arrent != NULL)
-			mdb_free(awsp->arrent, CMI_HDL_HASHSZ *
-			    sizeof (struct cmih_walk_state));
+		int i;
+		for (i = 0; i < CMI_CHIPID_ARR_SZ; i++) {
+			/* free the per-chip table */
+			if (awsp->chip_tab[i] != NULL) {
+				mdb_free((void *)awsp->chip_tab[i],
+				    CMI_MAX_STRANDS_PER_CHIP *
+				    sizeof (cmi_hdl_ent_t));
+				awsp->chip_tab[i] = NULL;
+			}
+		}
 		mdb_free(wsp->walk_data, sizeof (struct cmih_walk_state));
+		wsp->walk_data = NULL;
 	}
 }
 
