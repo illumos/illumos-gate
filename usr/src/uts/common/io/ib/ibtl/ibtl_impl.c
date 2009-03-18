@@ -251,14 +251,14 @@ ibt_attach(ibt_clnt_modinfo_t *mod_infop, dev_info_t *arg, void *clnt_private,
 	 * we expect 'arg' to be Not NULL and point to client driver's
 	 * device info struct.
 	 */
-	if ((!IBT_CLNT_MGMT_CLASS(mod_infop->mi_clnt_class)) &&
+	if ((!IBT_MISCMOD_CLIENTS(mod_infop->mi_clnt_class)) &&
 	    (arg == NULL)) {
 		IBTF_DPRINTF_L1(ibtf, "ibt_attach: "
 		    "arg not set with driver's dip.");
 		return (IBT_INVALID_PARAM);
 	}
 
-	if (!IBT_CLNT_MGMT_CLASS(mod_infop->mi_clnt_class)) {
+	if (!IBT_MISCMOD_CLIENTS(mod_infop->mi_clnt_class)) {
 		pdip = ddi_get_parent(arg);
 		if (pdip == NULL ||
 		    ibtl_ibnex_valid_hca_parent(pdip) != IBT_SUCCESS) {

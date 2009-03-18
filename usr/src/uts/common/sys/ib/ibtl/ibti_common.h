@@ -81,6 +81,7 @@ typedef enum ibt_clnt_class_e {
 	IBT_IBMA,		/* The IBMA Module */
 	IBT_CM,			/* The CM Module */
 	IBT_DM,			/* The DM Module */
+	IBT_DM_AGENT,		/* DM Agent Module */
 	IBT_CLASS_NUM		/* Place holder for class count */
 } ibt_clnt_class_t;
 
@@ -92,12 +93,25 @@ typedef enum ibt_clnt_class_e {
 
 #define	IBT_CLNT_GENERAL_CLASS(class)	((class) == IBT_NETWORK || \
 					(class) == IBT_GENERIC || \
+					(class) == IBT_DM_AGENT || \
+					(class) == IBT_TEST_DEV || \
 					(class) == IBT_USER)
 
 #define	IBT_CLNT_MGMT_CLASS(class)	((class) == IBT_IBMA || \
 					(class) == IBT_CM || \
+					(class) == IBT_DM)
+
+/*
+ * These are some special client classes which don't have a 'dip' hence have
+ * to be handled specially in ibt_attach, where we bypass the check for a valid
+ * dip if the client belongs to the class below.
+ */
+#define	IBT_MISCMOD_CLIENTS(class)	((class) == IBT_IBMA || \
+					(class) == IBT_CM || \
 					(class) == IBT_DM || \
+					(class) == IBT_DM_AGENT || \
 					(class) == IBT_TEST_DEV)
+
 /*
  * Event record & status returns for asynchronous events and errors.
  */
