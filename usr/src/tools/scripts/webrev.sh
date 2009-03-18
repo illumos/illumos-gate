@@ -141,144 +141,282 @@ span.new {
 </style>
 '
 
+#
+# Display remote target with prefix and trailing slash.
+#
+function print_upload_header
+{
+	typeset -r prefix=$1
+	typeset display_target
+
+	if [[ -z $tflag ]]; then
+		display_target=${prefix}${remote_target}
+	else
+		display_target=${remote_target}
+	fi
+
+	if [[ ${display_target} != */ ]]; then
+		display_target=${display_target}/
+	fi
+
+	print "      Upload to: ${display_target}\n" \
+	    "     Uploading: \c"
+}
+
+#
 # Upload the webrev via rsync. Return 0 on success, 1 on error.
+#
 function rsync_upload
 {
-	if (( $# != 1 )); then
-		return 1
+	if (( $# != 2 )); then
+		print "\nERROR: rsync_upload: wrong usage ($#)"
+		exit 1
 	fi
 
-	typeset dst=$1
+	typeset -r dst=$1
+	integer -r print_err_msg=$2
 
-	print "        Syncing: \c"
-	# end source directory with a slash in order to copy just
-	# directory contents, not the whole directory
-	$RSYNC -r -q $WDIR/ $dst
+	print_upload_header ${rsync_prefix}
+	print "rsync ... \c"
+	typeset -r err_msg=$( $MKTEMP /tmp/rsync_err.XXX )
+	if [[ -z $err_msg ]]; then
+		print "\nERROR: rsync_upload: cannot create temporary file"
+		return 1
+	fi
+	#
+	# The source directory must end with a slash in order to copy just
+	# directory contents, not the whole directory.
+	#
+	typeset src_dir=$WDIR
+	if [[ ${src_dir} != */ ]]; then
+		src_dir=${src_dir}/
+	fi
+	$RSYNC -r -q ${src_dir} $dst 2>$err_msg
 	if (( $? != 0 )); then
-		print "failed to sync webrev directory " \
-		    "'$WDIR' to '$dst'"
+		if (( ${print_err_msg} > 0 )); then
+			print "Failed.\nERROR: rsync failed"
+			print "src dir: '${src_dir}'\ndst dir: '$dst'"
+			print "error messages:"
+			$SED 's/^/> /' $err_msg
+			rm -f $err_msg
+		fi
 		return 1
 	fi
 
+	rm -f $err_msg
 	print "Done."
 	return 0
 }
 
+#
+# Create directories on remote host using SFTP. Return 0 on success,
+# 1 on failure.
+#
+function remote_mkdirs
+{
+	typeset -r dir_spec=$1
+
+	#
+	# If the supplied path is absolute we assume all directories are
+	# created, otherwise try to create all directories in the path
+	# except the last one which will be created by scp.
+	#
+	if [[ "${dir_spec}" == */* && "${dir_spec}" != /* ]]; then
+		print "mkdirs \c"
+		#
+		# Remove the last directory from directory specification.
+		#
+		typeset -r dirs_mk=${dir_spec%/*}
+		typeset -r batch_file_mkdir=$( $MKTEMP /tmp/webrev_mkdir.XXX )
+		if [[ -z $batch_file_mkdir ]]; then
+			print "\nERROR: remote_mkdirs:" \
+			    "cannot create temporary file for batch file"
+			return 1
+		fi
+                OLDIFS=$IFS
+                IFS=/
+		typeset dir
+                for dir in ${dirs_mk}; do
+			#
+			# Use the '-' prefix to ignore mkdir errors in order
+			# to avoid an error in case the directory already
+			# exists. We check the directory with chdir to be sure
+			# there is one.
+			#
+                        print -- "-mkdir ${dir}" >> ${batch_file_mkdir}
+                        print "chdir ${dir}" >> ${batch_file_mkdir}
+                done
+                IFS=$OLDIFS
+		typeset -r sftp_err_msg=$( $MKTEMP /tmp/webrev_scp_err.XXX )
+		if [[ -z ${sftp_err_msg} ]]; then
+			print "\nERROR: remote_mkdirs:" \
+			    "cannot create temporary file for error messages"
+			return 1
+		fi
+		$SFTP -b ${batch_file_mkdir} ${host_spec} 2>${sftp_err_msg} 1>&2
+		if (( $? != 0 )); then
+			print "\nERROR: failed to create remote directories"
+			print "error messages:"
+			$SED 's/^/> /' ${sftp_err_msg}
+			rm -f ${sftp_err_msg} ${batch_file_mkdir}
+			return 1
+		fi
+		rm -f ${sftp_err_msg} ${batch_file_mkdir}
+	fi
+
+	return 0
+}
+
+#
 # Upload the webrev via SSH. Return 0 on success, 1 on error.
+#
 function ssh_upload
 {
 	if (( $# != 1 )); then
-		print "ssh_upload: wrong usage"
-		return 1
+		print "\nERROR: ssh_upload: wrong number of arguments"
+		exit 1
 	fi
 
 	typeset dst=$1
 	typeset -r host_spec=${dst%%:*}
 	typeset -r dir_spec=${dst#*:}
 
-	# if the deletion was explicitly requested there is no need
-	# to perform it again
+	#
+	# Display the upload information before calling delete_webrev
+	# because it will also print its progress.
+	#
+	print_upload_header ${ssh_prefix}
+
+	#
+	# If the deletion was explicitly requested there is no need
+	# to perform it again.
+	#
 	if [[ -z $Dflag ]]; then
-		# we do not care about return value because this might be
-		# the first time this directory is uploaded
+		#
+		# We do not care about return value because this might be
+		# the first time this directory is uploaded.
+		#
 		delete_webrev 0
 	fi
 
-	# if the supplied path is absolute we assume all directories are
-	# created, otherwise try to create all directories in the path
-	# except the last one which will be created by scp
-	if [[ "${dir_spec}" == */* && "${dir_spec}" != /* ]]; then
-		print "  Creating dirs: \c"
-		typeset -r dirs_mk=${dir_spec%/*}
-		typeset -r batch_file_mkdir=$( $MKTEMP /tmp/$webrev_mkdir.XXX )
-                OLDIFS=$IFS
-                IFS=/
-                mk=
-                for dir in $dirs_mk; do
-                        if [[ -z $mk ]]; then
-                                mk=$dir
-                        else
-                                mk=$mk/$dir
-                        fi
-                        echo "mkdir $mk" >> $batch_file_mkdir
-                done
-                IFS=$OLDIFS
-		$SFTP -b $batch_file_mkdir $host_spec 2>/dev/null 1>&2
-		if (( $? != 0 )); then
-			echo "Failed to create remote directories"
-			rm -f $batch_file_mkdir
-			return 1
-		fi
-		rm -f $batch_file_mkdir
-		print "Done."
-	fi
-
-	print "      Uploading: \c"
-	$SCP -q -C -B -o PreferredAuthentications=publickey -r \
-		$WDIR $dst
+	#
+	# Create remote directories. Any error reporting will be done
+	# in remote_mkdirs function.
+	#
+	remote_mkdirs ${dir_spec}
 	if (( $? != 0 )); then
-		print "failed to upload webrev directory" \
-		    "'$WDIR' to '$dst'"
 		return 1
 	fi
 
+	print "upload ... \c"
+	typeset -r scp_err_msg=$( $MKTEMP /tmp/scp_err.XXX )
+	if [[ -z ${scp_err_msg} ]]; then
+		print "\nERROR: ssh_upload:" \
+		    "cannot create temporary file for error messages"
+		return 1
+	fi
+	$SCP -q -C -B -o PreferredAuthentications=publickey -r \
+		$WDIR $dst 2>${scp_err_msg}
+	if (( $? != 0 )); then
+		print "Failed.\nERROR: scp failed"
+		print "src dir: '$WDIR'\ndst dir: '$dst'"
+		print "error messages:"
+		$SED 's/^/> /' ${scp_err_msg}
+		rm -f ${scp_err_msg}
+		return 1
+	fi
+
+	rm -f ${scp_err_msg}
 	print "Done."
 	return 0
 }
 
 #
 # Delete webrev at remote site. Return 0 on success, 1 or exit code from sftp
-# on failure.
+# on failure. If first argument is 1 then perform the check of sftp return
+# value otherwise ignore it. If second argument is present it means this run
+# only performs deletion.
 #
 function delete_webrev
 {
-	if (( $# != 1 )); then
-		print "delete_webrev: wrong usage"
-		return 1
+	if (( $# < 1 )); then
+		print "delete_webrev: wrong number of arguments"
+		exit 1
 	fi
 
+	integer -r check=$1
+	integer delete_only=0
+	if (( $# == 2 )); then
+		delete_only=1
+	fi
+
+	#
 	# Strip the transport specification part of remote target first.
+	#
 	typeset -r stripped_target=${remote_target##*://}
 	typeset -r host_spec=${stripped_target%%:*}
 	typeset -r dir_spec=${stripped_target#*:}
-	integer -r check=$1
 	typeset dir_rm
 
+	#
 	# Do not accept an absolute path.
+	#
 	if [[ ${dir_spec} == /* ]]; then
 		return 1
 	fi
 
+	#
 	# Strip the ending slash.
+	#
 	if [[ ${dir_spec} == */ ]]; then
 		dir_rm=${dir_spec%%/}
 	else
 		dir_rm=${dir_spec}
 	fi
 
-	print "Removing remote: \c"
+	if (( ${delete_only} > 0 )); then
+		print "       Removing: \c"
+	else
+		print "rmdir \c"
+	fi
 	if [[ -z "$dir_rm" ]]; then
-		print "empty directory for removal"
+		print "\nERROR: empty directory for removal"
 		return 1
 	fi
 
+	#
 	# Prepare batch file.
+	#
 	typeset -r batch_file_rm=$( $MKTEMP /tmp/webrev_remove.XXX )
 	if [[ -z $batch_file_rm ]]; then
-		print "Cannot create temporary file"
+		print "\nERROR: delete_webrev: cannot create temporary file"
 		return 1
 	fi
 	print "rename $dir_rm $TRASH_DIR/removed.$$" > $batch_file_rm
 
+	#
 	# Perform remote deletion and remove the batch file.
-	$SFTP -b $batch_file_rm $host_spec 2>/dev/null 1>&2
+	#
+	typeset -r sftp_err_msg=$( $MKTEMP /tmp/webrev_scp_err.XXX )
+	if [[ -z ${sftp_err_msg} ]]; then
+		print "\nERROR: delete_webrev:" \
+		    "cannot create temporary file for error messages"
+		return 1
+	fi
+	$SFTP -b $batch_file_rm $host_spec 2>${sftp_err_msg} 1>&2
 	integer -r ret=$?
 	rm -f $batch_file_rm
 	if (( $ret != 0 && $check > 0 )); then
-		print "Failed"
+		print "Failed.\nERROR: failed to remove remote directories"
+		print "error messages:"
+		$SED 's/^/> /' ${sftp_err_msg}
+		rm -f ${sftp_err_msg}
 		return $ret
 	fi
-	print "Done."
+	rm -f ${sftp_err_msg}
+	if (( ${delete_only} > 0 )); then
+		print "Done."
+	fi
 
 	return 0
 }
@@ -288,49 +426,55 @@ function delete_webrev
 #
 function upload_webrev
 {
-	typeset -r rsync_prefix="rsync://"
-	typeset -r ssh_prefix="ssh://"
+	integer ret
 
 	if [[ ! -d "$WDIR" ]]; then
-		echo "webrev directory '$WDIR' does not exist"
+		print "\nERROR: webrev directory '$WDIR' does not exist"
 		return 1
 	fi
 
+	#
 	# Perform a late check to make sure we do not upload closed source
 	# to remote target when -n is used. If the user used custom remote
 	# target he probably knows what he is doing.
+	#
 	if [[ -n $nflag && -z $tflag ]]; then
 		$FIND $WDIR -type d -name closed \
 			| $GREP closed >/dev/null
 		if (( $? == 0 )); then
-			echo "directory '$WDIR' contains \"closed\" directory"
+			print "\nERROR: directory '$WDIR' contains" \
+			    "\"closed\" directory"
 			return 1
 		fi
 	fi
 
-	# we have the URI for remote destination now so let's start the upload
+
+	#
+	# We have the URI for remote destination now so let's start the upload.
+	#
 	if [[ -n $tflag ]]; then
 		if [[ "${remote_target}" == ${rsync_prefix}?* ]]; then
-			rsync_upload ${remote_target##$rsync_prefix}
-			return $?
+			rsync_upload ${remote_target##$rsync_prefix} 1
+			ret=$?
+			return $ret
 		elif [[ "${remote_target}" == ${ssh_prefix}?* ]]; then
 			ssh_upload ${remote_target##$ssh_prefix}
-			return $?
-		else
-			echo "invalid upload URI ($remote_target)"
-			return 1
+			ret=$?
+			return $ret
 		fi
 	else
-		# try rsync first and fallback to SSH in case it fails
-		rsync_upload ${remote_target}
-		if (( $? != 0 )); then
-			echo "rsync upload failed, falling back to SSH"
+		#
+		# Try rsync first and fallback to SSH in case it fails.
+		#
+		rsync_upload ${remote_target} 0
+		ret=$?
+		if (( $ret != 0 )); then
+			print "Failed. (falling back to SSH)"
 			ssh_upload ${remote_target}
+			ret=$?
 		fi
-		return $?
+		return $ret
 	fi
-
-	return 0
 }
 
 #
@@ -346,7 +490,7 @@ function upload_webrev
 #
 function url_encode
 {
-	sed -e "s|%|%25|g" -e "s|:|%3A|g" -e "s|\&|%26|g" \
+	$SED -e "s|%|%25|g" -e "s|:|%3A|g" -e "s|\&|%26|g" \
 	    -e "s|?|%3F|g" -e "s|#|%23|g" -e "s|\[|%5B|g" \
 	    -e "s|*|%2A|g" -e "s|@|%40|g" -e "s|\!|%21|g" \
 	    -e "s|=|%3D|g" -e "s|;|%3B|g" -e "s|\]|%5D|g" \
@@ -363,7 +507,7 @@ function url_encode
 #
 html_quote()
 {
-	sed -e "s/&/\&amp;/g" -e "s/</\&lt;/g" -e "s/>/\&gt;/g" "$@" | expand
+	$SED -e "s/&/\&amp;/g" -e "s/</\&lt;/g" -e "s/>/\&gt;/g" "$@" | expand
 }
 
 #
@@ -373,7 +517,7 @@ html_quote()
 #
 bug2url()
 {
-	sed -e 's|[0-9]\{5,\}|<a href=\"'$BUGURL'&\">&</a>|g'
+	$SED -e 's|[0-9]\{5,\}|<a href=\"'$BUGURL'&\">&</a>|g'
 }
 
 #
@@ -387,9 +531,9 @@ bug2url()
 sac2url()
 {
 	if [[ -z "$Oflag" ]]; then
-	    sed -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\1/\2/\3\">\1 \2/\3</a>|g'
+	    $SED -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\1/\2/\3\">\1 \2/\3</a>|g'
 	else
-	    sed -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\2/\3\">\1 \2/\3</a>|g'
+	    $SED -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\2/\3\">\1 \2/\3</a>|g'
 	fi
 }
 
@@ -1658,7 +1802,7 @@ function env_from_flist
 	# list.  Then copy those into our local versions of those
 	# variables if they have not been set already.
 	#
-	eval `sed -e "s/#.*$//" $FLIST | $GREP = `
+	eval `$SED -e "s/#.*$//" $FLIST | $GREP = `
 
 	if [[ -z $codemgr_ws && -n $CODEMGR_WS ]]; then
 		codemgr_ws=$CODEMGR_WS
@@ -1794,9 +1938,9 @@ function build_old_new_mercurial
 	else
 		file="$PDIR/$PF"
 	fi
-	file=`echo $file | sed 's#/#\\\/#g'`
+	file=`echo $file | $SED 's#/#\\\/#g'`
 	# match the exact filename, and return only the permission digits
-	old_mode=`sed -n -e "/^\\(...\\) . ${file}$/s//\\1/p" \
+	old_mode=`$SED -n -e "/^\\(...\\) . ${file}$/s//\\1/p" \
 	    < $HG_PARENT_MANIFEST`
 
 	#
@@ -1988,6 +2132,7 @@ PATH=$(dirname $(whence $0)):$PATH
 [[ -z $AWK ]] && AWK=`look_for_prog gawk`
 [[ -z $AWK ]] && AWK=`look_for_prog awk`
 [[ -z $SCP ]] && SCP=`look_for_prog scp`
+[[ -z $SED ]] && SED=`look_for_prog sed`
 [[ -z $SFTP ]] && SFTP=`look_for_prog sftp`
 [[ -z $MKTEMP ]] && MKTEMP=`look_for_prog mktemp`
 [[ -z $GREP ]] && GREP=`look_for_prog grep`
@@ -2021,6 +2166,9 @@ integer TOTL TINS TDEL TMOD TUNC
 
 # default remote host for upload/delete
 typeset -r DEFAULT_REMOTE_HOST="cr.opensolaris.org"
+# prefixes for upload targets
+typeset -r rsync_prefix="rsync://"
+typeset -r ssh_prefix="ssh://"
 
 Dflag=
 flist_mode=
@@ -2373,7 +2521,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	# if we don't have one.
 	#
 	if [[ -z $HG_PARENT ]]; then
-		eval `sed -e "s/#.*$//" $wxfile | $GREP HG_PARENT=`
+		eval `$SED -e "s/#.*$//" $wxfile | $GREP HG_PARENT=`
 	fi
 
 	#
@@ -2383,7 +2531,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	#
 	if [[ -z $HG_PARENT && -x $HG_ACTIVE ]]; then
 		$HG_ACTIVE -w $codemgr_ws -p $real_parent | \
-		    eval `sed -e "s/#.*$//" | $GREP HG_PARENT=`
+		    eval `$SED -e "s/#.*$//" | $GREP HG_PARENT=`
 	elif [[ -z $HG_PARENT ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
@@ -2476,35 +2624,65 @@ fi
 
 # Make sure remote target is well formed for remote upload/delete.
 if [[ -n $Dflag || -n $Uflag ]]; then
+	#
 	# If remote target is not specified, build it from scratch using
 	# the default values.
+	#
 	if [[ -z $tflag ]]; then
 		remote_target=${DEFAULT_REMOTE_HOST}:${WNAME}
 	else
+		#
+		# Check upload target prefix first.
+		#
+		if [[ "${remote_target}" != ${rsync_prefix}* &&
+		    "${remote_target}" != ${ssh_prefix}* ]]; then
+			print "ERROR: invalid prefix of upload URI" \
+			    "($remote_target)"
+			exit 1
+		fi
+		#
 		# If destination specification is not in the form of
 		# host_spec:remote_dir then assume it is just remote hostname
 		# and append a colon and destination directory formed from
 		# local webrev directory name.
-		if [[ -z ${remote_target##*:} ]]; then
+		#
+		typeset target_no_prefix=${remote_target##*://}
+		if [[ ${target_no_prefix} == *:* ]]; then
 			if [[ "${remote_target}" == *: ]]; then
-				dst=${remote_target}${WNAME}
+				remote_target=${remote_target}${WNAME}
+			fi
+		else
+			if [[ ${target_no_prefix} == */* ]]; then
+				print "ERROR: badly formed upload URI" \
+					"($remote_target)"
+				exit 1
 			else
-				dst=${remote_target}:${WNAME}
+				remote_target=${remote_target}:${WNAME}
 			fi
 		fi
 	fi
+
+	#
+	# Strip trailing slash. Each upload method will deal with directory
+	# specification separately.
+	#
+	remote_target=${remote_target%/}
 fi
 
+#
 # Option -D by itself (option -U not present) implies no webrev generation.
+#
 if [[ -z $Uflag && -n $Dflag ]]; then
-	delete_webrev 1
+	delete_webrev 1 1
 	exit $?
 fi
 
+#
 # Do not generate the webrev, just upload it or delete it.
+#
 if [[ -n $nflag ]]; then
 	if [[ -n $Dflag ]]; then
-		delete_webrev 1
+		delete_webrev 1 1
 		(( $? == 0 )) || exit $?
 	fi
 	if [[ -n $Uflag ]]; then
@@ -2535,7 +2713,7 @@ if [[ -n $parent_webrev ]]; then
 else
 	if [[ -n $HG_PARENT ]]; then
 		hg_parent_short=`echo $HG_PARENT \
-			| sed -e 's/\([0-9a-f]\{12\}\).*/\1/'`
+			| $SED -e 's/\([0-9a-f]\{12\}\).*/\1/'`
 		print "Compare against: $PWS (at $hg_parent_short)"
 	else
 		print "Compare against: $PWS"
@@ -2582,7 +2760,7 @@ print "   Output Files:"
 #
 # Clean up the file list: Remove comments, blank lines and env variables.
 #
-sed -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST > /tmp/$$.flist.clean
+$SED -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST > /tmp/$$.flist.clean
 FLIST=/tmp/$$.flist.clean
 
 #
@@ -2602,7 +2780,7 @@ if [[ $SCM_MODE == "mercurial" ]]; then
 	#    character, space, the filename, end of line.
 	#
 	SEDFILE=/tmp/$$.manifest.sed
-	sed '
+	$SED '
 		s#^[^ ]* ##
 		s#/#\\\/#g
 		s#^.*$#/^... . &$/p#
@@ -2614,7 +2792,7 @@ if [[ $SCM_MODE == "mercurial" ]]; then
 	#
 	HG_PARENT_MANIFEST=/tmp/$$.manifest
 	hg -R $CWS manifest -v -r $HG_PARENT |
-	    sed -n -f $SEDFILE > $HG_PARENT_MANIFEST
+	    $SED -n -f $SEDFILE > $HG_PARENT_MANIFEST
 fi
 
 #
@@ -2729,8 +2907,8 @@ do
 	# 	    [to add a file] @@ -1,0 +X,Y @@  -->  @@ -0,0 +X,Y @@
 	#	    [to del a file] @@ -X,Y +1,0 @@  -->  @@ -X,Y +0,0 @@
 	#
-	cleanse_rmfile="sed 's/^\(@@ [0-9+,-]*\) [0-9+,-]* @@$/\1 +0,0 @@/'"
-	cleanse_newfile="sed 's/^@@ [0-9+,-]* \([0-9+,-]* @@\)$/@@ -0,0 \1/'"
+	cleanse_rmfile="$SED 's/^\(@@ [0-9+,-]*\) [0-9+,-]* @@$/\1 +0,0 @@/'"
+	cleanse_newfile="$SED 's/^@@ [0-9+,-]* \([0-9+,-]* @@\)$/@@ -0,0 \1/'"
 
 	rm -f $WDIR/$DIR/$F.patch
 	if [[ -z $rename ]]; then
@@ -3152,9 +3330,11 @@ exec 3<&-			# close FD 3.
 
 print "Done."
 
+#
 # If remote deletion was specified and fails do not continue.
+#
 if [[ -n $Dflag ]]; then
-	delete_webrev 1
+	delete_webrev 1 1
 	(( $? == 0 )) || exit $?
 fi
 
