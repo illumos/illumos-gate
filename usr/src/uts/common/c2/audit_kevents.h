@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _BSM_AUDIT_KEVENTS_H
 #define	_BSM_AUDIT_KEVENTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -337,14 +335,18 @@ extern "C" {
 #define	AUE_PF_POLICY_FLIP	298	/* =as Flip IPsec policy */
 #define	AUE_PF_POLICY_FLUSH	299	/* =as Flush IPsec policy rules */
 #define	AUE_PF_POLICY_ALGS	300	/* =as Update IPsec algorithms */
-#define	AUE_PORTFS		301	/* =fa */
+#define	AUE_PORTFS		301	/* =no portfs(2) - place holder */
 #define	AUE_LABELSYS_TNRH	302	/* =as tnrh(2) */
 #define	AUE_LABELSYS_TNRHTP	303	/* =as tnrhtp(2) */
 #define	AUE_LABELSYS_TNMLP	304	/* =as tnmlp(2) */
+#define	AUE_PORTFS_ASSOCIATE	305	/* =fa portfs(2) - port associate */
+#define	AUE_PORTFS_DISSOCIATE	306	/* =fa portfs(2) - port disassociate */
+
+
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		304
+#define	MAX_KEVENTS		306
 
 
 #ifdef __cplusplus

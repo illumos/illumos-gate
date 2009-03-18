@@ -2,7 +2,7 @@
 # Two "#" are comments that are copied to audit_record_attr
 # other comments are removed.
 ##
-## Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+## Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 ## Use is subject to license terms.
 ##
 ## CDDL HEADER START
@@ -1263,6 +1263,22 @@ label=AUE_PATHCONF
 label=AUE_PIPE
 format=kernel
 # class is no, not usually printed
+
+label=AUE_PORTFS
+  skip=Not used (placeholder for AUE_PORTFS_*).
+
+label=AUE_PORTFS_ASSOCIATE
+  syscall=portfs
+  see=port_associate(3C)
+  case=Port association via PORT_SOURCE_FILE
+  format=[path]1:attr
+    comment=name of the file/directory to be watched
+
+label=AUE_PORTFS_DISSOCIATE
+  syscall=portfs
+  see=port_dissociate(3C)
+  case=Port disassociation via PORT_SOURCE_FILE
+  format=kernel
 
 label=AUE_PRIOCNTLSYS
   syscall=priocntl

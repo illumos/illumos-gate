@@ -5607,12 +5607,19 @@ aui_portfs(au_event_t e)
 	 */
 	switch (((uint_t)uap->a1) & PORT_CODE_MASK) {
 	case PORT_ASSOCIATE:
+		/* check source */
+		if (((uint_t)uap->a3 == PORT_SOURCE_FILE) ||
+		    ((uint_t)uap->a3 == PORT_SOURCE_FD)) {
+			e = AUE_PORTFS_ASSOCIATE;
+		} else {
+			e = AUE_NULL;
+		}
+		break;
 	case PORT_DISSOCIATE:
-		/*
-		 * check source
-		 */
-		if ((uint_t)uap->a3 == PORT_SOURCE_FILE) {
-			e = AUE_PORTFS;
+		/* check source */
+		if (((uint_t)uap->a3 == PORT_SOURCE_FILE) ||
+		    ((uint_t)uap->a3 == PORT_SOURCE_FD)) {
+			e = AUE_PORTFS_DISSOCIATE;
 		} else {
 			e = AUE_NULL;
 		}

@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -343,11 +343,15 @@
 298:AUE_PF_POLICY_FLIP:Flip IPsec policy:as
 299:AUE_PF_POLICY_FLUSH:Flush IPsec policy rules:as
 300:AUE_PF_POLICY_ALGS:Update IPsec algorithms:as
-301:AUE_PORTFS:portfs(2) - file events source:fa
+# AUE_PORTFS is a placeholder and won't be generated.
+301:AUE_PORTFS:portfs(2) - file events source - place holder:no
 #
 302:AUE_LABELSYS_TNRH:tnrh(2) - config TN remote host cache:as
 303:AUE_LABELSYS_TNRHTP:tnrhtp(2) - config TN remote host template cache:as
 304:AUE_LABELSYS_TNMLP:tnmlp(2) - config TN multi-level port entry:as
+#
+305:AUE_PORTFS_ASSOCIATE:portfs(2) - file events source - PORT_ASSOCIATE:fa
+306:AUE_PORTFS_DISSOCIATE:portfs(2) - file events source - PORT_DISSOCIATE:fa
 #
 # user level audit events
 #	2048 -  6143	Reserved
