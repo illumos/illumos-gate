@@ -154,7 +154,6 @@ ipcl_debug_level
 ipcl_raw_fanout_size
 ipcl_udp_fanout_size
 ipif_loopback_name
-ipif_nv_tbl
 ipif_zero
 ipinfov4
 ipinfov6
@@ -213,7 +212,6 @@ modlinkage
 modlstrmod
 multicast_encap_iphdr
 netdev_privs
-netmasks
 prov_update_handle
 radix_mask_cache
 radix_node_cache
@@ -298,7 +296,6 @@ tcp_random_lock
 tcp_random_rptr
 tcp_random_state
 tcp_randtbl
-tcp_report_header
 tcp_rinfo
 tcp_rinitv4
 tcp_rinitv6

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is used to support the hidden __sin6_src_id in the sockaddr_in6
@@ -109,16 +107,6 @@
 #include <sys/kmem.h>
 #include <inet/ipsec_impl.h>
 #include <inet/tun.h>
-
-/* Data structure to represent addresses */
-struct srcid_map {
-	struct srcid_map	*sm_next;
-	in6_addr_t		sm_addr;	/* Local address */
-	uint_t			sm_srcid;	/* source id */
-	uint_t			sm_refcnt;	/* > 1 ipif with same addr? */
-	zoneid_t		sm_zoneid;	/* zone id */
-};
-typedef struct srcid_map srcid_map_t;
 
 static uint_t		srcid_nextid(ip_stack_t *);
 static srcid_map_t	**srcid_lookup_addr(const in6_addr_t *addr,
@@ -261,40 +249,6 @@ ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid,
 		*addr = smp->sm_addr;
 	}
 	rw_exit(&ipst->ips_srcid_lock);
-}
-
-/*
- * ndd report function
- */
-/*ARGSUSED*/
-int
-ip_srcid_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
-{
-	srcid_map_t	*smp;
-	char		abuf[INET6_ADDRSTRLEN];
-	zoneid_t	zoneid;
-	ip_stack_t	*ipst;
-
-	if (CONN_Q(q)) {
-		ipst = CONNQ_TO_IPST(q);
-		zoneid = Q_TO_CONN(q)->conn_zoneid;
-	} else {
-		ipst = ILLQ_TO_IPST(q);
-		zoneid =  ((ill_t *)q->q_ptr)->ill_zoneid;
-	}
-	(void) mi_mpprintf(mp,
-	    "addr                                           "
-	    "id     zone refcnt");
-	rw_enter(&ipst->ips_srcid_lock, RW_READER);
-	for (smp = ipst->ips_srcid_head; smp != NULL; smp = smp->sm_next) {
-		if (zoneid != GLOBAL_ZONEID && zoneid != smp->sm_zoneid)
-			continue;
-		(void) mi_mpprintf(mp, "%46s %5u %5d %5u",
-		    inet_ntop(AF_INET6, &smp->sm_addr, abuf, sizeof (abuf)),
-		    smp->sm_srcid, smp->sm_zoneid, smp->sm_refcnt);
-	}
-	rw_exit(&ipst->ips_srcid_lock);
-	return (0);
 }
 
 /* Assign the next available ID */

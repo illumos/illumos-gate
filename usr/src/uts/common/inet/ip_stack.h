@@ -135,6 +135,15 @@ typedef struct ire_stats {
 #define	IDLHASHINDEX(X)	\
 	((((uintptr_t)(X) >> 2) + ((uintptr_t)(X) >> 9)) & (TX_FANOUT_SIZE - 1))
 
+/* Data structure to represent addresses */
+typedef struct srcid_map {
+	struct srcid_map	*sm_next;
+	in6_addr_t		sm_addr;	/* Local address */
+	uint_t			sm_srcid;	/* source id */
+	uint_t			sm_refcnt;	/* > 1 ipif with same addr? */
+	zoneid_t		sm_zoneid;	/* zone id */
+} srcid_map_t;
+
 /*
  * IP stack instances
  */

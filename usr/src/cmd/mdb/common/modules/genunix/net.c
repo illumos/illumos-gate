@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,11 @@
 
 #define	NETSTAT_FIRST	0x80000000u
 
+typedef struct netstat_cb_data_s {
+	uint_t	opts;
+	conn_t	conn;
+	int	af;
+} netstat_cb_data_t;
 
 /* Walkers for various *_stack_t */
 int
@@ -401,11 +406,6 @@ const mi_payload_walk_arg_t mi_icmp_arg = {
 	MI_PAYLOAD_DEVICE | MI_PAYLOAD_MODULE
 };
 
-const mi_payload_walk_arg_t mi_ill_arg = {
-	"ip_stacks", OFFSETOF(ip_stack_t, ips_ip_g_head), sizeof (ill_t),
-	MI_PAYLOAD_MODULE
-};
-
 int
 sonode(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -613,18 +613,19 @@ netstat_tcp_verbose_pr(const tcp_t *tcp)
 
 /*ARGSUSED*/
 static int
-netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
+netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 {
-	const uintptr_t opts = (uintptr_t)cb_data;
+	netstat_cb_data_t *ncb = cb_data;
+	uint_t opts = ncb->opts;
+	int af = ncb->af;
 	uintptr_t tcp_kaddr;
-	conn_t conns, *connp;
+	conn_t *connp = &ncb->conn;
 	tcp_t tcps, *tcp;
 
-	if (mdb_vread(&conns, sizeof (conn_t), kaddr) == -1) {
+	if (mdb_vread(connp, sizeof (conn_t), kaddr) == -1) {
 		mdb_warn("failed to read conn_t at %p", kaddr);
 		return (WALK_ERR);
 	}
-	connp = &conns;
 
 	tcp_kaddr = (uintptr_t)connp->conn_tcp;
 	if (mdb_vread(&tcps, sizeof (tcp_t), tcp_kaddr) == -1) {
@@ -633,7 +634,6 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 	}
 
 	tcp = &tcps;
-
 	connp->conn_tcp = tcp;
 	tcp->tcp_connp = connp;
 
@@ -653,45 +653,34 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 		mdb_printf(" ");
 		net_ipv6addrport_pr(&tcp->tcp_remote_v6, tcp->tcp_fport);
 	}
-	mdb_printf(" %4i", ns_to_stackid((uintptr_t)connp->conn_netstack));
-
+	mdb_printf(" %5i", ns_to_stackid((uintptr_t)connp->conn_netstack));
 	mdb_printf(" %4i\n", connp->conn_zoneid);
-
 	if (opts & NETSTAT_VERBOSE)
 		netstat_tcp_verbose_pr(tcp);
 
 	return (WALK_NEXT);
 }
 
-static int
-netstat_tcpv4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
-{
-	return (netstat_tcp_cb(kaddr, walk_data, cb_data, AF_INET));
-}
-
-static int
-netstat_tcpv6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
-{
-	return (netstat_tcp_cb(kaddr, walk_data, cb_data, AF_INET6));
-}
-
 /*ARGSUSED*/
 static int
-netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
+netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 {
-	const uintptr_t opts = (uintptr_t)cb_data;
+	netstat_cb_data_t *ncb = cb_data;
+	uint_t opts = ncb->opts;
+	int af = ncb->af;
 	udp_t udp;
-	conn_t conns;
+	conn_t *connp = &ncb->conn;
+	char *state;
 
-	if (mdb_vread(&conns, sizeof (conn_t), kaddr) == -1) {
+	if (mdb_vread(connp, sizeof (conn_t), kaddr) == -1) {
 		mdb_warn("failed to read conn_t at %p", kaddr);
 		return (WALK_ERR);
 	}
 
 	if (mdb_vread(&udp, sizeof (udp_t),
-	    (uintptr_t)conns.conn_udp) == -1) {
+	    (uintptr_t)connp->conn_udp) == -1) {
 		mdb_warn("failed to read conn_udp at %p",
-		    (uintptr_t)conns.conn_udp);
+		    (uintptr_t)connp->conn_udp);
 		return (WALK_ERR);
 	}
 
@@ -701,7 +690,16 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 		return (WALK_NEXT);
 	}
 
-	mdb_printf("%0?p %2i ", kaddr, udp.udp_state);
+	if (udp.udp_state == TS_UNBND)
+		state = "UNBOUND";
+	else if (udp.udp_state == TS_IDLE)
+		state = "IDLE";
+	else if (udp.udp_state == TS_DATA_XFER)
+		state = "CONNECTED";
+	else
+		state = "UNKNOWN";
+
+	mdb_printf("%0?p %10s ", (uintptr_t)connp->conn_udp, state);
 	if (af == AF_INET) {
 		net_ipv4addrport_pr(&udp.udp_v6src, udp.udp_port);
 		mdb_printf(" ");
@@ -711,23 +709,62 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 		mdb_printf(" ");
 		net_ipv6addrport_pr(&udp.udp_v6dst, udp.udp_dstport);
 	}
-	mdb_printf(" %4i", ns_to_stackid((uintptr_t)conns.conn_netstack));
-
-	mdb_printf(" %4i\n", conns.conn_zoneid);
+	mdb_printf(" %5i", ns_to_stackid((uintptr_t)connp->conn_netstack));
+	mdb_printf(" %4i\n", connp->conn_zoneid);
 
 	return (WALK_NEXT);
 }
 
+/*ARGSUSED*/
 static int
-netstat_udpv4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
+netstat_icmp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 {
-	return (netstat_udp_cb(kaddr, walk_data, cb_data, AF_INET));
-}
+	netstat_cb_data_t *ncb = cb_data;
+	int af = ncb->af;
+	icmp_t icmp;
+	conn_t *connp = &ncb->conn;
+	char *state;
 
-static int
-netstat_udpv6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
-{
-	return (netstat_udp_cb(kaddr, walk_data, cb_data, AF_INET6));
+	if (mdb_vread(connp, sizeof (conn_t), kaddr) == -1) {
+		mdb_warn("failed to read conn_t at %p", kaddr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&icmp, sizeof (icmp_t),
+	    (uintptr_t)connp->conn_icmp) == -1) {
+		mdb_warn("failed to read conn_icmp at %p",
+		    (uintptr_t)connp->conn_icmp);
+		return (WALK_ERR);
+	}
+
+	if ((af == AF_INET && icmp.icmp_ipversion != IPV4_VERSION) ||
+	    (af == AF_INET6 && icmp.icmp_ipversion != IPV6_VERSION)) {
+		return (WALK_NEXT);
+	}
+
+	if (icmp.icmp_state == TS_UNBND)
+		state = "UNBOUND";
+	else if (icmp.icmp_state == TS_IDLE)
+		state = "IDLE";
+	else if (icmp.icmp_state == TS_DATA_XFER)
+		state = "CONNECTED";
+	else
+		state = "UNKNOWN";
+
+	mdb_printf("%0?p %10s ", (uintptr_t)connp->conn_icmp, state);
+	if (af == AF_INET) {
+		mdb_printf("%*I ", ADDR_V4_WIDTH,
+		    V4_PART_OF_V6((icmp.icmp_v6src)));
+		mdb_printf("%*I ", ADDR_V4_WIDTH,
+		    V4_PART_OF_V6((icmp.icmp_v6dst.sin6_addr)));
+	} else if (af == AF_INET6) {
+		mdb_printf("%*N ", ADDR_V6_WIDTH, &icmp.icmp_v6src);
+		mdb_printf("%*N ", ADDR_V6_WIDTH, &icmp.icmp_v6dst);
+	}
+	mdb_printf(" %5i", ns_to_stackid((uintptr_t)connp->conn_netstack));
+	mdb_printf(" %4i\n", icmp.icmp_zoneid);
+
+	return (WALK_NEXT);
 }
 
 /*
@@ -1047,6 +1084,71 @@ netstat_irev6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	return (WALK_NEXT);
 }
 
+static void
+netstat_header_v4(int proto)
+{
+	if (proto == IPPROTO_TCP)
+		mdb_printf("%<u>%-?s ", "TCPv4");
+	else if (proto == IPPROTO_UDP)
+		mdb_printf("%<u>%-?s ", "UDPv4");
+	else if (proto == IPPROTO_ICMP)
+		mdb_printf("%<u>%-?s ", "ICMPv4");
+	mdb_printf("State %6s%*s %6s%*s %-5s %-4s%</u>\n",
+	    "", ADDR_V4_WIDTH, "Local Address",
+	    "", ADDR_V4_WIDTH, "Remote Address", "Stack", "Zone");
+}
+
+static void
+netstat_header_v6(int proto)
+{
+	if (proto == IPPROTO_TCP)
+		mdb_printf("%<u>%-?s ", "TCPv6");
+	else if (proto == IPPROTO_UDP)
+		mdb_printf("%<u>%-?s ", "UDPv6");
+	else if (proto == IPPROTO_ICMP)
+		mdb_printf("%<u>%-?s ", "ICMPv6");
+	mdb_printf("State %6s%*s %6s%*s %-5s %-4s%</u>\n",
+	    "", ADDR_V6_WIDTH, "Local Address",
+	    "", ADDR_V6_WIDTH, "Remote Address", "Stack", "Zone");
+}
+
+static int
+netstat_print_conn(const char *cache, int proto, mdb_walk_cb_t cbfunc,
+    void *cbdata)
+{
+	netstat_cb_data_t *ncb = cbdata;
+
+	if ((ncb->opts & NETSTAT_VERBOSE) && proto == IPPROTO_TCP)
+		netstat_tcp_verbose_header_pr();
+	if (mdb_walk(cache, cbfunc, cbdata) == -1) {
+		mdb_warn("failed to walk %s", cache);
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+static int
+netstat_print_common(const char *cache, int proto, mdb_walk_cb_t cbfunc,
+    void *cbdata)
+{
+	netstat_cb_data_t *ncb = cbdata;
+	int af = ncb->af;
+	int status = DCMD_OK;
+
+	if (af != AF_INET6) {
+		ncb->af = AF_INET;
+		netstat_header_v4(proto);
+		status = netstat_print_conn(cache, proto, cbfunc, cbdata);
+	}
+	if (status == DCMD_OK && af != AF_INET) {
+		ncb->af = AF_INET6;
+		netstat_header_v6(proto);
+		status = netstat_print_conn(cache, proto, cbfunc, cbdata);
+	}
+	ncb->af = af;
+	return (status);
+}
+
 /*ARGSUSED*/
 int
 netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -1054,6 +1156,9 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t opts = 0;
 	const char *optf = NULL;
 	const char *optP = NULL;
+	netstat_cb_data_t *cbdata;
+	int status;
+	int af = 0;
 
 	if (mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, NETSTAT_ALL, &opts,
@@ -1065,7 +1170,8 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (optP != NULL) {
-		if ((strcmp("tcp", optP) != 0) && (strcmp("udp", optP) != 0))
+		if ((strcmp("tcp", optP) != 0) && (strcmp("udp", optP) != 0) &&
+		    (strcmp("icmp", optP) != 0))
 			return (DCMD_USAGE);
 		if (opts & NETSTAT_ROUTE)
 			return (DCMD_USAGE);
@@ -1102,74 +1208,7 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	if ((optP == NULL) || (strcmp("tcp", optP) == 0)) {
-		if ((optf == NULL) || (strcmp("inet", optf) == 0)) {
-			/* Print TCPv4 connection */
-			mdb_printf("%<u>%-?s St %*s       %*s       "
-			    "%s%       %s%</u>\n",
-			    "TCPv4", ADDR_V4_WIDTH, "Local Address",
-			    ADDR_V4_WIDTH, "Remote Address", "Stack", "Zone");
-
-			if (opts & NETSTAT_VERBOSE)
-				netstat_tcp_verbose_header_pr();
-
-			if (mdb_walk("tcp_conn_cache", netstat_tcpv4_cb,
-			    (void *)(uintptr_t)opts) == -1) {
-				mdb_warn("failed to walk tcp_conn_cache");
-				return (DCMD_ERR);
-			}
-		}
-
-		if ((optf == NULL) || (strcmp("inet6", optf) == 0)) {
-			/* Print TCPv6 connection */
-			mdb_printf("%<u>%-?s St %*s       %*s       "
-			    "%s       %s%\n%</u>",
-			    "TCPv6", ADDR_V6_WIDTH, "Local Address",
-			    ADDR_V6_WIDTH, "Remote Address", "Stack", "Zone");
-
-			if (opts & NETSTAT_VERBOSE)
-				netstat_tcp_verbose_header_pr();
-
-			if (mdb_walk("tcp_conn_cache", netstat_tcpv6_cb,
-			    (void *)(uintptr_t)opts) == -1) {
-				mdb_warn("failed to walk tcp_conn_cache");
-				return (DCMD_ERR);
-			}
-		}
-	}
-
-	if ((optP == NULL) || (strcmp("udp", optP) == 0)) {
-		if ((optf == NULL) || (strcmp("inet", optf) == 0)) {
-			/* Print UDPv4 connection */
-			mdb_printf("%<u>%-?s St %*s       %*s       "
-			    "%s       %s%\n%</u>",
-			    "UDPv4", ADDR_V4_WIDTH, "Local Address",
-			    ADDR_V4_WIDTH, "Remote Address", "Stack", "Zone");
-
-			if (mdb_walk("udp_conn_cache", netstat_udpv4_cb,
-			    (void *)(uintptr_t)opts) == -1) {
-				mdb_warn("failed to walk udp_conn_cache");
-				return (DCMD_ERR);
-			}
-
-		}
-
-		if ((optf == NULL) || (strcmp("inet6", optf) == 0)) {
-			/* Print UDPv6 connection */
-			mdb_printf("%<u>%-?s St %*s       %*s       "
-			    "%s       %s%\n%</u>",
-			    "UDPv6", ADDR_V6_WIDTH, "Local Address",
-			    ADDR_V6_WIDTH, "Remote Address", "Stack", "Zone");
-
-			if (mdb_walk("udp_conn_cache", netstat_udpv6_cb,
-			    (void *)(uintptr_t)opts) == -1) {
-				mdb_warn("failed to walk udp_conn_cache");
-				return (DCMD_ERR);
-			}
-		}
-	}
-
-	if (((optf == NULL) || (strcmp("unix", optf) == 0)) && (optP == NULL)) {
+	if ((opts & NETSTAT_UNIX) && (optP == NULL)) {
 		/* Print Unix Domain Sockets */
 		mdb_printf("%<u>%-?s %-10s %-?s %-?s %-14s %-14s %s%</u>\n",
 		    "AF_UNIX", "Type", "Vnode", "Conn", "Local Addr",
@@ -1179,7 +1218,39 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("failed to walk genunix`sonode");
 			return (DCMD_ERR);
 		}
+		if (!(opts & (NETSTAT_V4 | NETSTAT_V6)))
+			return (DCMD_OK);
 	}
 
-	return (DCMD_OK);
+	cbdata = mdb_alloc(sizeof (netstat_cb_data_t), UM_SLEEP);
+	cbdata->opts = opts;
+	if ((optf != NULL) && (opts & NETSTAT_V4))
+		af = AF_INET;
+	else if ((optf != NULL) && (opts & NETSTAT_V6))
+		af = AF_INET6;
+
+	cbdata->af = af;
+	if ((optP == NULL) || (strcmp("tcp", optP) == 0)) {
+		status = netstat_print_common("tcp_conn_cache", IPPROTO_TCP,
+		    netstat_tcp_cb, cbdata);
+		if (status != DCMD_OK)
+			goto out;
+	}
+
+	if ((optP == NULL) || (strcmp("udp", optP) == 0)) {
+		status = netstat_print_common("udp_conn_cache", IPPROTO_UDP,
+		    netstat_udp_cb, cbdata);
+		if (status != DCMD_OK)
+			goto out;
+	}
+
+	if ((optP == NULL) || (strcmp("icmp", optP) == 0)) {
+		status = netstat_print_common("rawip_conn_cache", IPPROTO_ICMP,
+		    netstat_icmp_cb, cbdata);
+		if (status != DCMD_OK)
+			goto out;
+	}
+out:
+	mdb_free(cbdata, sizeof (netstat_cb_data_t));
+	return (status);
 }

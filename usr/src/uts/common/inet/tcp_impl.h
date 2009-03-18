@@ -234,16 +234,15 @@ typedef struct tcpparam_s {
 #define	tcps_mss_max_ipv6		tcps_params[50].tcp_param_val
 #define	tcps_rev_src_routes		tcps_params[51].tcp_param_val
 #define	tcps_local_dack_interval	tcps_params[52].tcp_param_val
-#define	tcps_ndd_get_info_interval	tcps_params[53].tcp_param_val
-#define	tcps_local_dacks_max		tcps_params[54].tcp_param_val
-#define	tcps_ecn_permitted		tcps_params[55].tcp_param_val
-#define	tcps_rst_sent_rate_enabled	tcps_params[56].tcp_param_val
-#define	tcps_rst_sent_rate		tcps_params[57].tcp_param_val
-#define	tcps_push_timer_interval	tcps_params[58].tcp_param_val
-#define	tcps_use_smss_as_mss_opt	tcps_params[59].tcp_param_val
-#define	tcps_keepalive_abort_interval_high	tcps_params[60].tcp_param_max
-#define	tcps_keepalive_abort_interval		tcps_params[60].tcp_param_val
-#define	tcps_keepalive_abort_interval_low	tcps_params[60].tcp_param_min
+#define	tcps_local_dacks_max		tcps_params[53].tcp_param_val
+#define	tcps_ecn_permitted		tcps_params[54].tcp_param_val
+#define	tcps_rst_sent_rate_enabled	tcps_params[55].tcp_param_val
+#define	tcps_rst_sent_rate		tcps_params[56].tcp_param_val
+#define	tcps_push_timer_interval	tcps_params[57].tcp_param_val
+#define	tcps_use_smss_as_mss_opt	tcps_params[58].tcp_param_val
+#define	tcps_keepalive_abort_interval_high	tcps_params[59].tcp_param_max
+#define	tcps_keepalive_abort_interval		tcps_params[59].tcp_param_val
+#define	tcps_keepalive_abort_interval_low	tcps_params[59].tcp_param_min
 
 extern struct qinit tcp_loopback_rinit, tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;

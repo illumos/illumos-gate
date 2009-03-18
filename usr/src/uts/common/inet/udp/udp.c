@@ -133,11 +133,6 @@
 /* For /etc/system control */
 uint_t udp_bind_fanout_size = UDP_BIND_FANOUT_SIZE;
 
-#define	NDD_TOO_QUICK_MSG \
-	"ndd get info rate too high for non-privileged users, try again " \
-	"later.\n"
-#define	NDD_OUT_OF_BUF_MSG	"<< Out of buffer >>\n"
-
 /* Option processing attrs */
 typedef struct udpattrs_s {
 	union {
@@ -190,11 +185,8 @@ static int	udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt);
 static int	udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		    cred_t *cr);
-static void	udp_report_item(mblk_t *mp, udp_t *udp);
 static int	udp_rinfop(queue_t *q, infod_t *dp);
 static int	udp_rrw(queue_t *q, struiod_t *dp);
-static int	udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
 static void	udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp,
 		    ipha_t *ipha);
 static void	udp_ud_err(queue_t *q, mblk_t *mp, uchar_t *destaddr,
@@ -407,7 +399,6 @@ udpparam_t udp_param_arr[] = {
  { 0,		     (1<<30), UDP_XMIT_LOWATER, "udp_xmit_lowat"},
  { UDP_RECV_LOWATER, (1<<30), UDP_RECV_HIWATER,	"udp_recv_hiwat"},
  { 65536,	(1<<30),	2*1024*1024,	"udp_max_buf"},
- { 100,		60000,		1000,		"udp_ndd_get_info_interval"},
 };
 /* END CSTYLED */
 
@@ -464,80 +455,6 @@ retry:
 	}
 
 	return (next_priv_port--);
-}
-
-/* UDP bind hash report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-udp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	udp_fanout_t	*udpf;
-	int		i;
-	zoneid_t	zoneid;
-	conn_t		*connp;
-	udp_t		*udp;
-	udp_stack_t	*us;
-
-	connp = Q_TO_CONN(q);
-	udp = connp->conn_udp;
-	us = udp->udp_us;
-
-	/* Refer to comments in udp_status_report(). */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - us->us_last_ndd_get_info_time <
-		    drv_usectohz(us->us_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-
-	(void) mi_mpprintf(mp,
-	    "UDP     " MI_COL_HDRPAD_STR
-	/*   12345678[89ABCDEF] */
-	    " zone lport src addr        dest addr       port  state");
-	/*    1234 12345 xxx.xxx.xxx.xxx xxx.xxx.xxx.xxx 12345 UNBOUND */
-
-	zoneid = connp->conn_zoneid;
-
-	for (i = 0; i < us->us_bind_fanout_size; i++) {
-		udpf = &us->us_bind_fanout[i];
-		mutex_enter(&udpf->uf_lock);
-
-		/* Print the hash index. */
-		udp = udpf->uf_udp;
-		if (zoneid != GLOBAL_ZONEID) {
-			/* skip to first entry in this zone; might be none */
-			while (udp != NULL &&
-			    udp->udp_connp->conn_zoneid != zoneid)
-				udp = udp->udp_bind_hash;
-		}
-		if (udp != NULL) {
-			uint_t print_len, buf_len;
-
-			buf_len = mp->b_cont->b_datap->db_lim -
-			    mp->b_cont->b_wptr;
-			print_len = snprintf((char *)mp->b_cont->b_wptr,
-			    buf_len, "%d\n", i);
-			if (print_len < buf_len) {
-				mp->b_cont->b_wptr += print_len;
-			} else {
-				mp->b_cont->b_wptr += buf_len;
-			}
-			for (; udp != NULL; udp = udp->udp_bind_hash) {
-				if (zoneid == GLOBAL_ZONEID ||
-				    zoneid == udp->udp_connp->conn_zoneid)
-					udp_report_item(mp->b_cont, udp);
-			}
-		}
-		mutex_exit(&udpf->uf_lock);
-	}
-	us->us_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
 }
 
 /*
@@ -3465,16 +3382,6 @@ udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt)
 		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(ndp, "udp_status", udp_status_report, NULL,
-	    NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "udp_bind_hash", udp_bind_hash_report, NULL,
-	    NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
 	return (B_TRUE);
 }
 
@@ -4773,99 +4680,6 @@ udp_snmp_set(queue_t *q, t_scalar_t level, t_scalar_t name,
 	default:
 		return (1);
 	}
-}
-
-static void
-udp_report_item(mblk_t *mp, udp_t *udp)
-{
-	char *state;
-	char addrbuf1[INET6_ADDRSTRLEN];
-	char addrbuf2[INET6_ADDRSTRLEN];
-	uint_t print_len, buf_len;
-
-	buf_len = mp->b_datap->db_lim - mp->b_wptr;
-	ASSERT(buf_len >= 0);
-	if (buf_len == 0)
-		return;
-
-	if (udp->udp_state == TS_UNBND)
-		state = "UNBOUND";
-	else if (udp->udp_state == TS_IDLE)
-		state = "IDLE";
-	else if (udp->udp_state == TS_DATA_XFER)
-		state = "CONNECTED";
-	else
-		state = "UnkState";
-	print_len = snprintf((char *)mp->b_wptr, buf_len,
-	    MI_COL_PTRFMT_STR "%4d %5u %s %s %5u %s\n",
-	    (void *)udp, udp->udp_connp->conn_zoneid, ntohs(udp->udp_port),
-	    inet_ntop(AF_INET6, &udp->udp_v6src, addrbuf1, sizeof (addrbuf1)),
-	    inet_ntop(AF_INET6, &udp->udp_v6dst, addrbuf2, sizeof (addrbuf2)),
-	    ntohs(udp->udp_dstport), state);
-	if (print_len < buf_len) {
-		mp->b_wptr += print_len;
-	} else {
-		mp->b_wptr += buf_len;
-	}
-}
-
-/* Report for ndd "udp_status" */
-/* ARGSUSED */
-static int
-udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	zoneid_t zoneid;
-	connf_t	*connfp;
-	conn_t	*connp = Q_TO_CONN(q);
-	udp_t	*udp = connp->conn_udp;
-	int	i;
-	udp_stack_t *us = udp->udp_us;
-	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
-
-	/*
-	 * Because of the ndd constraint, at most we can have 64K buffer
-	 * to put in all UDP info.  So to be more efficient, just
-	 * allocate a 64K buffer here, assuming we need that large buffer.
-	 * This may be a problem as any user can read udp_status.  Therefore
-	 * we limit the rate of doing this using us_ndd_get_info_interval.
-	 * This should be OK as normal users should not do this too often.
-	 */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - us->us_last_ndd_get_info_time <
-		    drv_usectohz(us->us_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-	(void) mi_mpprintf(mp,
-	    "UDP     " MI_COL_HDRPAD_STR
-	/*   12345678[89ABCDEF] */
-	    " zone lport src addr        dest addr       port  state");
-	/*    1234 12345 xxx.xxx.xxx.xxx xxx.xxx.xxx.xxx 12345 UNBOUND */
-
-	zoneid = connp->conn_zoneid;
-
-	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
-		connp = NULL;
-
-		while ((connp = ipcl_get_next_conn(connfp, connp,
-		    IPCL_UDPCONN))) {
-			udp = connp->conn_udp;
-			if (zoneid != GLOBAL_ZONEID &&
-			    zoneid != connp->conn_zoneid)
-				continue;
-
-			udp_report_item(mp->b_cont, udp);
-		}
-	}
-	us->us_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
 }
 
 /*

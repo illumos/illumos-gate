@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,10 +163,6 @@ struct tcp_stack {
 	struct __ldi_handle *tcps_g_q_lh;
 	cred_t		*tcps_g_q_cr;    /* For _inactive close call */
 
-	/* Protected by tcp_hsp_lock */
-	struct tcp_hsp	**tcps_hsp_hash;	/* Hash table for HSPs */
-	krwlock_t	 tcps_hsp_lock;
-
 	/*
 	 * Extra privileged ports. In host byte order.
 	 * Protected by tcp_epriv_port_lock.
@@ -214,15 +210,6 @@ struct tcp_stack {
 
 	/* Packet dropper for TCP IPsec policy drops. */
 	ipdropper_t	tcps_dropper;
-
-	/*
-	 * This controls the rate some ndd info report functions can be used
-	 * by non-priviledged users.  It stores the last time such info is
-	 * requested.  When those report functions are called again, this
-	 * is checked with the current time and compare with the ndd param
-	 * tcp_ndd_get_info_interval.
-	 */
-	clock_t		tcps_last_ndd_get_info_time;
 
 	/*
 	 * These two variables control the rate for TCP to generate RSTs in

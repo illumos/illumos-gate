@@ -4458,7 +4458,7 @@ static const mdb_dcmd_t dcmds[] = {
 	/* from net.c */
 	{ "mi", ":[-p] [-d | -m]", "filter and display MI object or payload",
 		mi },
-	{ "netstat", "[-arv] [-f inet | inet6 | unix] [-P tcp | udp]",
+	{ "netstat", "[-arv] [-f inet | inet6 | unix] [-P tcp | udp | icmp]",
 		"show network statistics", netstat },
 	{ "sonode", "?[-f inet | inet6 | unix | #] "
 		"[-t stream | dgram | raw | #] [-p #]",
@@ -4828,14 +4828,10 @@ static const mdb_walker_t walkers[] = {
 	{ "icmp", "walk ICMP control structures using MI for all stacks",
 		mi_payload_walk_init, mi_payload_walk_step, NULL,
 		&mi_icmp_arg },
-	{ "ill", "walk ill_t structures using MI for all stacks",
-		mi_payload_walk_init, mi_payload_walk_step, NULL, &mi_ill_arg },
-
 	{ "mi", "given a MI_O, walk the MI",
 		mi_walk_init, mi_walk_step, mi_walk_fini, NULL },
 	{ "sonode", "given a sonode, walk its children",
 		sonode_walk_init, sonode_walk_step, sonode_walk_fini, NULL },
-
 	{ "ar_stacks", "walk all the ar_stack_t",
 		ar_stacks_walk_init, ar_stacks_walk_step, NULL },
 	{ "icmp_stacks", "walk all the icmp_stack_t",

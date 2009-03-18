@@ -3386,7 +3386,6 @@ extern int	ip_srcid_insert(const in6_addr_t *, zoneid_t, ip_stack_t *);
 extern int	ip_srcid_remove(const in6_addr_t *, zoneid_t, ip_stack_t *);
 extern void	ip_srcid_find_id(uint_t, in6_addr_t *, zoneid_t, netstack_t *);
 extern uint_t	ip_srcid_find_addr(const in6_addr_t *, zoneid_t, netstack_t *);
-extern int	ip_srcid_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 
 extern uint8_t	ipoptp_next(ipoptp_t *);
 extern uint8_t	ipoptp_first(ipoptp_t *, ipha_t *);

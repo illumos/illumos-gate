@@ -819,8 +819,6 @@ static void	conn_drain_fini(ip_stack_t *);
 static void	conn_drain_tail(conn_t *connp, boolean_t closing);
 
 static void	conn_walk_drain(ip_stack_t *, idl_tx_list_t *);
-static void	conn_walk_fanout_table(connf_t *, uint_t, pfv_t, void *,
-    zoneid_t);
 static void	conn_setqfull(conn_t *);
 static void	conn_clrqfull(conn_t *);
 
@@ -859,8 +857,6 @@ static void	icmp_kstat_fini(netstackid_t, kstat_t *);
 static int	icmp_kstat_update(kstat_t *kp, int rw);
 static void	*ip_kstat2_init(netstackid_t, ip_stat_t *);
 static void	ip_kstat2_fini(netstackid_t, kstat_t *);
-
-static int	ip_conn_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 
 static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
     ire_t *, mblk_t *, uint_t, queue_t *, ill_rx_ring_t *);
@@ -1000,21 +996,11 @@ static ipndp_t	lcl_ndp_arr[] = {
 #define	IPNDP_IP6_FORWARDING_OFFSET	1
 	{  ip_param_generic_get,	ip_forward_set,	NULL,
 	    "ip6_forwarding" },
-	{  ip_ill_report,	NULL,		NULL,
-	    "ip_ill_status" },
-	{  ip_ipif_report,	NULL,		NULL,
-	    "ip_ipif_status" },
-	{  ip_conn_report,	NULL,		NULL,
-	    "ip_conn_status" },
-	{  nd_get_long,		nd_set_long,	(caddr_t)&ip_rput_pullups,
-	    "ip_rput_pullups" },
-	{  ip_srcid_report,	NULL,		NULL,
-	    "ip_srcid_status" },
 	{ ip_param_generic_get, ip_input_proc_set,
 	    (caddr_t)&ip_squeue_enter, "ip_squeue_enter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_squeue_fanout, "ip_squeue_fanout" },
-#define	IPNDP_CGTP_FILTER_OFFSET	9
+#define	IPNDP_CGTP_FILTER_OFFSET	4
 	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, NULL,
 	    "ip_cgtp_filter" },
 	{  ip_param_generic_get, ip_int_set, (caddr_t)&ip_debug,
@@ -28458,30 +28444,6 @@ ill_flow_enable(void *arg, ip_mac_tx_cookie_t cookie)
 }
 
 /*
- * Walk the list of all conn's calling the function provided with the
- * specified argument for each.	 Note that this only walks conn's that
- * have been bound.
- * Applies to both IPv4 and IPv6.
- */
-static void
-conn_walk_fanout(pfv_t func, void *arg, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	conn_walk_fanout_table(ipst->ips_ipcl_udp_fanout,
-	    ipst->ips_ipcl_udp_fanout_size,
-	    func, arg, zoneid);
-	conn_walk_fanout_table(ipst->ips_ipcl_conn_fanout,
-	    ipst->ips_ipcl_conn_fanout_size,
-	    func, arg, zoneid);
-	conn_walk_fanout_table(ipst->ips_ipcl_bind_fanout,
-	    ipst->ips_ipcl_bind_fanout_size,
-	    func, arg, zoneid);
-	conn_walk_fanout_table(ipst->ips_ipcl_proto_fanout,
-	    IPPROTO_MAX, func, arg, zoneid);
-	conn_walk_fanout_table(ipst->ips_ipcl_proto_fanout_v6,
-	    IPPROTO_MAX, func, arg, zoneid);
-}
-
-/*
  * Flowcontrol has relieved, and STREAMS has backenabled us. For each list
  * of conns that need to be drained, check if drain is already in progress.
  * If so set the idl_repeat bit, indicating that the last conn in the list
@@ -28518,97 +28480,6 @@ conn_walk_drain(ip_stack_t *ipst, idl_tx_list_t *tx_list)
 		}
 		mutex_exit(&idl->idl_lock);
 	}
-}
-
-/*
- * Walk an conn hash table of `count' buckets, calling func for each entry.
- */
-static void
-conn_walk_fanout_table(connf_t *connfp, uint_t count, pfv_t func, void *arg,
-    zoneid_t zoneid)
-{
-	conn_t	*connp;
-
-	while (count-- > 0) {
-		mutex_enter(&connfp->connf_lock);
-		for (connp = connfp->connf_head; connp != NULL;
-		    connp = connp->conn_next) {
-			if (zoneid == GLOBAL_ZONEID ||
-			    zoneid == connp->conn_zoneid) {
-				CONN_INC_REF(connp);
-				mutex_exit(&connfp->connf_lock);
-				(*func)(connp, arg);
-				mutex_enter(&connfp->connf_lock);
-				CONN_DEC_REF(connp);
-			}
-		}
-		mutex_exit(&connfp->connf_lock);
-		connfp++;
-	}
-}
-
-/* conn_walk_fanout routine invoked for ip_conn_report for each conn. */
-static void
-conn_report1(conn_t *connp, void *mp)
-{
-	char	buf1[INET6_ADDRSTRLEN];
-	char	buf2[INET6_ADDRSTRLEN];
-	uint_t	print_len, buf_len;
-
-	ASSERT(connp != NULL);
-
-	buf_len = ((mblk_t *)mp)->b_datap->db_lim - ((mblk_t *)mp)->b_wptr;
-	if (buf_len <= 0)
-		return;
-	(void) inet_ntop(AF_INET6, &connp->conn_srcv6, buf1, sizeof (buf1));
-	(void) inet_ntop(AF_INET6, &connp->conn_remv6, buf2, sizeof (buf2));
-	print_len = snprintf((char *)((mblk_t *)mp)->b_wptr, buf_len,
-	    MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR
-	    "%5d %s/%05d %s/%05d\n",
-	    (void *)connp, (void *)CONNP_TO_RQ(connp),
-	    (void *)CONNP_TO_WQ(connp), connp->conn_zoneid,
-	    buf1, connp->conn_lport,
-	    buf2, connp->conn_fport);
-	if (print_len < buf_len) {
-		((mblk_t *)mp)->b_wptr += print_len;
-	} else {
-		((mblk_t *)mp)->b_wptr += buf_len;
-	}
-}
-
-/*
- * Named Dispatch routine to produce a formatted report on all conns
- * that are listed in one of the fanout tables.
- * This report is accessed by using the ndd utility to "get" ND variable
- * "ip_conn_status".
- */
-/* ARGSUSED */
-static int
-ip_conn_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
-{
-	conn_t *connp = Q_TO_CONN(q);
-
-	(void) mi_mpprintf(mp,
-	    "CONN      " MI_COL_HDRPAD_STR
-	    "rfq      " MI_COL_HDRPAD_STR
-	    "stq      " MI_COL_HDRPAD_STR
-	    " zone local		 remote");
-
-	/*
-	 * Because of the ndd constraint, at most we can have 64K buffer
-	 * to put in all conn info.  So to be more efficient, just
-	 * allocate a 64K buffer here, assuming we need that large buffer.
-	 * This should be OK as only privileged processes can do ndd /dev/ip.
-	 */
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, "<< Out of buffer >>\n");
-		return (0);
-	}
-
-	conn_walk_fanout(conn_report1, mp->b_cont, connp->conn_zoneid,
-	    connp->conn_netstack->netstack_ip);
-	return (0);
 }
 
 /*

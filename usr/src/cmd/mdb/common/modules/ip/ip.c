@@ -28,6 +28,7 @@
 #include <sys/stream.h>
 #include <sys/socket.h>
 #include <sys/avl_impl.h>
+#include <net/if_types.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -53,6 +54,7 @@
 #define	ADDR_WIDTH 11
 #define	L2MAXADDRSTRLEN	255
 #define	MAX_SAP_LEN	255
+#define	DEFCOLS		80
 
 typedef struct {
 	const char *bit_name;	/* name of bit */
@@ -101,8 +103,106 @@ typedef struct th_walk_data {
 	clock_t		thw_lbolt;
 } th_walk_data_t;
 
+typedef struct ipcl_hash_walk_data_s {
+	conn_t		*conn;
+	int		connf_tbl_index;
+	uintptr_t	hash_tbl;
+	int		hash_tbl_size;
+} ipcl_hash_walk_data_t;
+
+typedef struct ill_walk_data_s {
+	ill_t 		ill;
+} ill_walk_data_t;
+
+typedef struct ill_cbdata_s {
+	uintptr_t ill_addr;
+	int	  ill_ipversion;
+	boolean_t verbose;
+} ill_cbdata_t;
+
+typedef struct ipif_walk_data_s {
+	ipif_t 		ipif;
+} ipif_walk_data_t;
+
+typedef struct ipif_cbdata_s {
+	ill_t		ill;
+	int		ipif_ipversion;
+	boolean_t 	verbose;
+} ipif_cbdata_t;
+
+typedef struct hash_walk_arg_s {
+	off_t	tbl_off;
+	off_t	size_off;
+} hash_walk_arg_t;
+
+static hash_walk_arg_t udp_hash_arg = {
+	OFFSETOF(ip_stack_t, ips_ipcl_udp_fanout),
+	OFFSETOF(ip_stack_t, ips_ipcl_udp_fanout_size)
+};
+
+static hash_walk_arg_t conn_hash_arg = {
+	OFFSETOF(ip_stack_t, ips_ipcl_conn_fanout),
+	OFFSETOF(ip_stack_t, ips_ipcl_conn_fanout_size)
+};
+
+static hash_walk_arg_t bind_hash_arg = {
+	OFFSETOF(ip_stack_t, ips_ipcl_bind_fanout),
+	OFFSETOF(ip_stack_t, ips_ipcl_bind_fanout_size)
+};
+
+static hash_walk_arg_t proto_hash_arg = {
+	OFFSETOF(ip_stack_t, ips_ipcl_proto_fanout),
+	0
+};
+
+static hash_walk_arg_t proto_v6_hash_arg = {
+	OFFSETOF(ip_stack_t, ips_ipcl_proto_fanout_v6),
+	0
+};
+
+typedef struct ip_list_walk_data_s {
+	off_t 	nextoff;
+} ip_list_walk_data_t;
+
+typedef struct ip_list_walk_arg_s {
+	off_t	off;
+	size_t	size;
+	off_t	nextp_off;
+} ip_list_walk_arg_t;
+
+static ip_list_walk_arg_t ipif_walk_arg = {
+	OFFSETOF(ill_t, ill_ipif),
+	sizeof (ipif_t),
+	OFFSETOF(ipif_t, ipif_next)
+};
+
+static ip_list_walk_arg_t srcid_walk_arg = {
+	OFFSETOF(ip_stack_t, ips_srcid_head),
+	sizeof (srcid_map_t),
+	OFFSETOF(srcid_map_t, sm_next)
+};
+
 static int iphdr(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int ip6hdr(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+static int ill(uintptr_t, uint_t, int, const mdb_arg_t *);
+static void ill_help(void);
+static int ill_walk_init(mdb_walk_state_t *);
+static int ill_walk_step(mdb_walk_state_t *);
+static int ill_format(uintptr_t, const void *, void *);
+static void ill_header(boolean_t);
+
+static int ipif(uintptr_t, uint_t, int, const mdb_arg_t *);
+static void ipif_help(void);
+static int ipif_walk_init(mdb_walk_state_t *);
+static int ipif_walk_step(mdb_walk_state_t *);
+static int ipif_format(uintptr_t, const void *, void *);
+static void ipif_header(boolean_t);
+
+static int ip_list_walk_init(mdb_walk_state_t *);
+static int ip_list_walk_step(mdb_walk_state_t *);
+static void ip_list_walk_fini(mdb_walk_state_t *);
+static int srcid_walk_step(mdb_walk_state_t *);
 
 static int ire_format(uintptr_t addr, const void *, void *);
 static int nce_format(uintptr_t addr, const nce_t *nce, int ipversion);
@@ -112,6 +212,16 @@ static int nce_stack_walk_init(mdb_walk_state_t *wsp);
 static int nce_stack_walk_step(mdb_walk_state_t *wsp);
 static void nce_stack_walk_fini(mdb_walk_state_t *wsp);
 static int nce_cb(uintptr_t addr, const nce_walk_data_t *iw, nce_cbdata_t *id);
+
+static int ipcl_hash_walk_init(mdb_walk_state_t *);
+static int ipcl_hash_walk_step(mdb_walk_state_t *);
+static void ipcl_hash_walk_fini(mdb_walk_state_t *);
+
+static int conn_status_walk_step(mdb_walk_state_t *);
+static int conn_status(uintptr_t, uint_t, int, const mdb_arg_t *);
+static void conn_status_help(void);
+
+static int srcid_status(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 /*
  * Given the kernel address of an ip_stack_t, return the stackid
@@ -522,7 +632,7 @@ ire_format(uintptr_t addr, const void *ire_arg, void *ire_cb_arg)
 
 	static const mdb_bitmask_t mmasks[] = {
 		{ "CONDEMNED",	IRE_MARK_CONDEMNED,	IRE_MARK_CONDEMNED },
-		{ "TESTHIDDEN",	IRE_MARK_TESTHIDDEN,	IRE_MARK_TESTHIDDEN },
+		{ "TESTHIDDEN", IRE_MARK_TESTHIDDEN,    IRE_MARK_TESTHIDDEN },
 		{ "NOADD",	IRE_MARK_NOADD,		IRE_MARK_NOADD	},
 		{ "TEMPORARY",	IRE_MARK_TEMPORARY,	IRE_MARK_TEMPORARY },
 		{ "USESRC",	IRE_MARK_USESRC_CHECK,	IRE_MARK_USESRC_CHECK },
@@ -1220,11 +1330,21 @@ th_trace_help(void)
 }
 
 static const mdb_dcmd_t dcmds[] = {
+	{ "conn_status", ":",
+	    "display connection structures from ipcl hash tables",
+	    conn_status, conn_status_help },
+	{ "srcid_status", ":",
+	    "display connection structures from ipcl hash tables",
+	    srcid_status },
+	{ "ill", "?[-v] [-P v4 | v6]", "display ill_t structures",
+	    ill, ill_help },
 	{ "illif", "?[-P v4 | v6]",
 	    "display or filter IP Lower Level InterFace structures", illif,
 	    illif_help },
 	{ "iphdr", ":[-vf]", "display an IPv4 header", iphdr },
 	{ "ip6hdr", ":[-vf]", "display an IPv6 header", ip6hdr },
+	{ "ipif", "?[-v] [-P v4 | v6]", "display ipif structures",
+	    ipif, ipif_help },
 	{ "ire", "?[-v] [-P v4|v6]",
 	    "display Internet Route Entry structures", ire },
 	{ "nce", "?[-P v4 | v6]", "display Neighbor Cache Entry structures",
@@ -1240,11 +1360,26 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const mdb_walker_t walkers[] = {
+	{ "conn_status", "walk list of conn_t structures",
+		ip_stacks_common_walk_init, conn_status_walk_step, NULL },
 	{ "illif", "walk list of ill interface types for all stacks",
 		ip_stacks_common_walk_init, illif_walk_step, NULL },
 	{ "illif_stack", "walk list of ill interface types",
 		illif_stack_walk_init, illif_stack_walk_step,
 		illif_stack_walk_fini },
+	{ "ill", "walk list of nce structures for all stacks",
+		ill_walk_init, ill_walk_step, NULL },
+	{ "ipif", "walk list of ipif structures for all stacks",
+		ipif_walk_init, ipif_walk_step, NULL },
+	{ "ipif_list", "walk the linked list of ipif structures "
+		"for a given ill",
+		ip_list_walk_init, ip_list_walk_step,
+		ip_list_walk_fini, &ipif_walk_arg },
+	{ "srcid", "walk list of srcid_map structures for all stacks",
+		ip_stacks_common_walk_init, srcid_walk_step, NULL },
+	{ "srcid_list", "walk list of srcid_map structures for a stack",
+		ip_list_walk_init, ip_list_walk_step, ip_list_walk_fini,
+		&srcid_walk_arg },
 	{ "ire", "walk active ire_t structures",
 		ire_walk_init, ire_walk_step, NULL },
 	{ "ire_ctable", "walk ire_t structures in the ctable",
@@ -1260,6 +1395,23 @@ static const mdb_walker_t walkers[] = {
 	{ "nce_stack", "walk list of nce structures",
 		nce_stack_walk_init, nce_stack_walk_step,
 		nce_stack_walk_fini},
+	{ "udp_hash", "walk list of conn_t structures in ips_ipcl_udp_fanout",
+		ipcl_hash_walk_init, ipcl_hash_walk_step,
+		ipcl_hash_walk_fini, &udp_hash_arg},
+	{ "conn_hash", "walk list of conn_t structures in ips_ipcl_conn_fanout",
+		ipcl_hash_walk_init, ipcl_hash_walk_step,
+		ipcl_hash_walk_fini, &conn_hash_arg},
+	{ "bind_hash", "walk list of conn_t structures in ips_ipcl_bind_fanout",
+		ipcl_hash_walk_init, ipcl_hash_walk_step,
+		ipcl_hash_walk_fini, &bind_hash_arg},
+	{ "proto_hash", "walk list of conn_t structures in "
+	    "ips_ipcl_proto_fanout",
+		ipcl_hash_walk_init, ipcl_hash_walk_step,
+		ipcl_hash_walk_fini, &proto_hash_arg},
+	{ "proto_v6_hash", "walk list of conn_t structures in "
+	    "ips_ipcl_proto_fanout_v6",
+		ipcl_hash_walk_init, ipcl_hash_walk_step,
+		ipcl_hash_walk_fini, &proto_v6_hash_arg},
 	{ NULL }
 };
 
@@ -1517,6 +1669,110 @@ nce_walk_step(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+static uintptr_t
+ipcl_hash_get_next_connf_tbl(ipcl_hash_walk_data_t *iw)
+{
+	struct connf_s connf;
+	uintptr_t addr = NULL, next;
+	int index = iw->connf_tbl_index;
+
+	do {
+		next = iw->hash_tbl + index * sizeof (struct connf_s);
+		if (++index >= iw->hash_tbl_size) {
+			addr = NULL;
+			break;
+		}
+		if (mdb_vread(&connf, sizeof (struct connf_s), next) == -1)  {
+			mdb_warn("failed to read conn_t at %p", next);
+			return (NULL);
+		}
+		addr = (uintptr_t)connf.connf_head;
+	} while (addr == NULL);
+	iw->connf_tbl_index = index;
+	return (addr);
+}
+
+static int
+ipcl_hash_walk_init(mdb_walk_state_t *wsp)
+{
+	const hash_walk_arg_t *arg = wsp->walk_arg;
+	ipcl_hash_walk_data_t *iw;
+	uintptr_t tbladdr;
+	uintptr_t sizeaddr;
+
+	iw = mdb_alloc(sizeof (ipcl_hash_walk_data_t), UM_SLEEP);
+	iw->conn = mdb_alloc(sizeof (conn_t), UM_SLEEP);
+	tbladdr = wsp->walk_addr + arg->tbl_off;
+	sizeaddr = wsp->walk_addr + arg->size_off;
+
+	if (mdb_vread(&iw->hash_tbl, sizeof (uintptr_t), tbladdr) == -1) {
+		mdb_warn("can't read fanout table addr at %p", tbladdr);
+		mdb_free(iw->conn, sizeof (conn_t));
+		mdb_free(iw, sizeof (ipcl_hash_walk_data_t));
+		return (WALK_ERR);
+	}
+	if (arg->tbl_off == OFFSETOF(ip_stack_t, ips_ipcl_proto_fanout) ||
+	    arg->tbl_off == OFFSETOF(ip_stack_t, ips_ipcl_proto_fanout_v6)) {
+		iw->hash_tbl_size = IPPROTO_MAX;
+	} else {
+		if (mdb_vread(&iw->hash_tbl_size, sizeof (int),
+		    sizeaddr) == -1) {
+			mdb_warn("can't read fanout table size addr at %p",
+			    sizeaddr);
+			mdb_free(iw->conn, sizeof (conn_t));
+			mdb_free(iw, sizeof (ipcl_hash_walk_data_t));
+			return (WALK_ERR);
+		}
+	}
+	iw->connf_tbl_index = 0;
+	wsp->walk_addr = ipcl_hash_get_next_connf_tbl(iw);
+	wsp->walk_data = iw;
+
+	if (wsp->walk_addr != NULL)
+		return (WALK_NEXT);
+	else
+		return (WALK_DONE);
+}
+
+static int
+ipcl_hash_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = wsp->walk_addr;
+	ipcl_hash_walk_data_t *iw = wsp->walk_data;
+	conn_t *conn = iw->conn;
+	int ret = WALK_DONE;
+
+	while (addr != NULL) {
+		if (mdb_vread(conn, sizeof (conn_t), addr) == -1) {
+			mdb_warn("failed to read conn_t at %p", addr);
+			return (WALK_ERR);
+		}
+		ret = wsp->walk_callback(addr, iw, wsp->walk_cbdata);
+		if (ret != WALK_NEXT)
+			break;
+		addr = (uintptr_t)conn->conn_next;
+	}
+	if (ret == WALK_NEXT) {
+		wsp->walk_addr = ipcl_hash_get_next_connf_tbl(iw);
+
+		if (wsp->walk_addr != NULL)
+			return (WALK_NEXT);
+		else
+			return (WALK_DONE);
+	}
+
+	return (ret);
+}
+
+static void
+ipcl_hash_walk_fini(mdb_walk_state_t *wsp)
+{
+	ipcl_hash_walk_data_t *iw = wsp->walk_data;
+
+	mdb_free(iw->conn, sizeof (conn_t));
+	mdb_free(iw, sizeof (ipcl_hash_walk_data_t));
+}
+
 /*
  * Called with walk_addr being the address of ips_ndp{4,6}
  */
@@ -1588,4 +1844,702 @@ nce_cb(uintptr_t addr, const nce_walk_data_t *iw, nce_cbdata_t *id)
 	}
 	(void) nce_format(addr, &nce, id->nce_ipversion);
 	return (WALK_NEXT);
+}
+
+static int
+ill_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("illif", wsp) == -1) {
+		mdb_warn("can't walk 'illif'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+static int
+ill_walk_step(mdb_walk_state_t *wsp)
+{
+	ill_if_t ill_if;
+
+	if (mdb_vread(&ill_if, sizeof (ill_if_t), wsp->walk_addr) == -1) {
+		mdb_warn("can't read ill_if_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	wsp->walk_addr = (uintptr_t)(wsp->walk_addr +
+	    offsetof(ill_if_t, illif_avl_by_ppa));
+	if (mdb_pwalk("avl", wsp->walk_callback, wsp->walk_cbdata,
+	    wsp->walk_addr) == -1) {
+		mdb_warn("can't walk 'avl'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+ill_cb(uintptr_t addr, const ill_walk_data_t *iw, ill_cbdata_t *id)
+{
+	ill_t ill;
+
+	if (mdb_vread(&ill, sizeof (ill_t), (uintptr_t)addr) == -1) {
+		mdb_warn("failed to read ill at %p", addr);
+		return (WALK_NEXT);
+	}
+	return (ill_format((uintptr_t)addr, &ill, id));
+}
+
+static void
+ill_header(boolean_t verbose)
+{
+	if (verbose) {
+		mdb_printf("%-?s %-8s %3s %-10s %-?s %-?s %-10s%</u>\n",
+		    "ADDR", "NAME", "VER", "TYPE", "WQ", "IPST", "FLAGS");
+		mdb_printf("%-?s %4s%4s %-?s\n",
+		    "PHYINT", "CNT", "", "GROUP");
+		mdb_printf("%<u>%80s%</u>\n", "");
+	} else {
+		mdb_printf("%<u>%-?s %-8s %-3s %-10s %4s %-?s %-10s%</u>\n",
+		    "ADDR", "NAME", "VER", "TYPE", "CNT", "WQ", "FLAGS");
+	}
+}
+
+static int
+ill_format(uintptr_t addr, const void *illptr, void *ill_cb_arg)
+{
+	ill_t *ill = (ill_t *)illptr;
+	ill_cbdata_t *illcb = ill_cb_arg;
+	boolean_t verbose = illcb->verbose;
+	phyint_t phyi;
+	static const mdb_bitmask_t fmasks[] = {
+		{ "R",		PHYI_RUNNING,		PHYI_RUNNING	},
+		{ "P",		PHYI_PROMISC,		PHYI_PROMISC	},
+		{ "V",		PHYI_VIRTUAL,		PHYI_VIRTUAL	},
+		{ "I",		PHYI_IPMP,		PHYI_IPMP	},
+		{ "f",		PHYI_FAILED,		PHYI_FAILED	},
+		{ "S",		PHYI_STANDBY,		PHYI_STANDBY	},
+		{ "i",		PHYI_INACTIVE,		PHYI_INACTIVE	},
+		{ "O",		PHYI_OFFLINE,		PHYI_OFFLINE	},
+		{ "T", 		ILLF_NOTRAILERS,	ILLF_NOTRAILERS },
+		{ "A",		ILLF_NOARP,		ILLF_NOARP	},
+		{ "M",		ILLF_MULTICAST,		ILLF_MULTICAST	},
+		{ "F",		ILLF_ROUTER,		ILLF_ROUTER	},
+		{ "D",		ILLF_NONUD,		ILLF_NONUD	},
+		{ "X",		ILLF_NORTEXCH,		ILLF_NORTEXCH	},
+		{ NULL,		0,			0		}
+	};
+	static const mdb_bitmask_t v_fmasks[] = {
+		{ "RUNNING",	PHYI_RUNNING,		PHYI_RUNNING	},
+		{ "PROMISC",	PHYI_PROMISC,		PHYI_PROMISC	},
+		{ "VIRTUAL",	PHYI_VIRTUAL,		PHYI_VIRTUAL	},
+		{ "IPMP",	PHYI_IPMP,		PHYI_IPMP	},
+		{ "FAILED",	PHYI_FAILED,		PHYI_FAILED	},
+		{ "STANDBY",	PHYI_STANDBY,		PHYI_STANDBY	},
+		{ "INACTIVE",	PHYI_INACTIVE,		PHYI_INACTIVE	},
+		{ "OFFLINE",	PHYI_OFFLINE,		PHYI_OFFLINE	},
+		{ "NOTRAILER",	ILLF_NOTRAILERS,	ILLF_NOTRAILERS },
+		{ "NOARP",	ILLF_NOARP,		ILLF_NOARP	},
+		{ "MULTICAST",	ILLF_MULTICAST,		ILLF_MULTICAST	},
+		{ "ROUTER",	ILLF_ROUTER,		ILLF_ROUTER	},
+		{ "NONUD",	ILLF_NONUD,		ILLF_NONUD	},
+		{ "NORTEXCH",	ILLF_NORTEXCH,		ILLF_NORTEXCH	},
+		{ NULL,		0,			0		}
+	};
+	char ill_name[LIFNAMSIZ];
+	int cnt;
+	char *typebuf;
+	char sbuf[DEFCOLS];
+	int ipver = illcb->ill_ipversion;
+
+	if (ipver != 0) {
+		if ((ipver == IPV4_VERSION && ill->ill_isv6) ||
+		    (ipver == IPV6_VERSION && !ill->ill_isv6)) {
+			return (WALK_NEXT);
+		}
+	}
+	if (mdb_vread(&phyi, sizeof (phyint_t),
+	    (uintptr_t)ill->ill_phyint) == -1) {
+		mdb_warn("failed to read ill_phyint at %p",
+		    (uintptr_t)ill->ill_phyint);
+		return (WALK_NEXT);
+	}
+	(void) mdb_readstr(ill_name, MIN(LIFNAMSIZ, ill->ill_name_length),
+	    (uintptr_t)ill->ill_name);
+
+	switch (ill->ill_type) {
+	case 0:
+		typebuf = "LOOPBACK";
+		break;
+	case IFT_ETHER:
+		typebuf = "ETHER";
+		break;
+	case IFT_OTHER:
+		typebuf = "OTHER";
+		break;
+	default:
+		typebuf = NULL;
+		break;
+	}
+	cnt = ill->ill_refcnt + ill->ill_ire_cnt + ill->ill_nce_cnt +
+	    ill->ill_ilm_walker_cnt + ill->ill_ilm_cnt;
+	mdb_printf("%-?p %-8s %-3s ",
+	    addr, ill_name, ill->ill_isv6 ? "v6" : "v4");
+	if (typebuf != NULL)
+		mdb_printf("%-10s ", typebuf);
+	else
+		mdb_printf("%-10x ", ill->ill_type);
+	if (verbose) {
+		mdb_printf("%-?p %-?p %-llb\n",
+		    ill->ill_wq, ill->ill_ipst,
+		    ill->ill_flags | phyi.phyint_flags, v_fmasks);
+		mdb_printf("%-?p %4d%4s %-?p\n",
+		    ill->ill_phyint, cnt, "", ill->ill_grp);
+		mdb_snprintf(sbuf, sizeof (sbuf), "%*s %3s",
+		    sizeof (uintptr_t) * 2, "", "");
+		mdb_printf("%s|\n%s+--> %3d %-18s "
+		    "references from active threads\n",
+		    sbuf, sbuf, ill->ill_refcnt, "ill_refcnt");
+		mdb_printf("%*s %7d %-18s ires referencing this ill\n",
+		    strlen(sbuf), "", ill->ill_ire_cnt, "ill_ire_cnt");
+		mdb_printf("%*s %7d %-18s nces referencing this ill\n",
+		    strlen(sbuf), "", ill->ill_nce_cnt, "ill_nce_cnt");
+		mdb_printf("%*s %7d %-18s ilms referencing this ill\n",
+		    strlen(sbuf), "", ill->ill_ilm_cnt, "ill_ilm_cnt");
+		mdb_printf("%*s %7d %-18s active ilm walkers\n\n",
+		    strlen(sbuf), "", ill->ill_ilm_walker_cnt,
+		    "ill_ilm_walker_cnt");
+	} else {
+		mdb_printf("%4d %-?p %-llb\n",
+		    cnt, ill->ill_wq,
+		    ill->ill_flags | phyi.phyint_flags, fmasks);
+	}
+	return (WALK_NEXT);
+}
+
+static int
+ill(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	ill_t ill_data;
+	ill_cbdata_t id;
+	int ipversion = 0;
+	const char *opt_P = NULL;
+	uint_t verbose = FALSE;
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    'P', MDB_OPT_STR, &opt_P, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (opt_P != NULL) {
+		if (strcmp("v4", opt_P) == 0) {
+			ipversion = IPV4_VERSION;
+		} else if (strcmp("v6", opt_P) == 0) {
+			ipversion = IPV6_VERSION;
+		} else {
+			mdb_warn("invalid protocol '%s'\n", opt_P);
+			return (DCMD_USAGE);
+		}
+	}
+
+	id.verbose = verbose;
+	id.ill_addr = addr;
+	id.ill_ipversion = ipversion;
+
+	ill_header(verbose);
+	if (flags & DCMD_ADDRSPEC) {
+		if (mdb_vread(&ill_data, sizeof (ill_t), addr) == -1) {
+			mdb_warn("failed to read ill at %p\n", addr);
+			return (DCMD_ERR);
+		}
+		(void) ill_format(addr, &ill_data, &id);
+	} else {
+		if (mdb_walk("ill", (mdb_walk_cb_t)ill_cb, &id) == -1) {
+			mdb_warn("failed to walk ills\n");
+			return (DCMD_ERR);
+		}
+	}
+	return (DCMD_OK);
+}
+
+static void
+ill_help(void)
+{
+	mdb_printf("Prints the following fields: ill ptr, name, "
+	    "IP version, count, ill type and ill flags.\n"
+	    "The count field is a sum of individual refcnts and is expanded "
+	    "with the -v option.\n\n");
+	mdb_printf("Options:\n");
+	mdb_printf("\t-P v4 | v6"
+	    "\tfilter ill structures for the specified protocol\n");
+}
+
+static int
+ip_list_walk_init(mdb_walk_state_t *wsp)
+{
+	const ip_list_walk_arg_t *arg = wsp->walk_arg;
+	ip_list_walk_data_t *iw;
+	uintptr_t addr = (uintptr_t)(wsp->walk_addr + arg->off);
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("only local walks supported\n");
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&wsp->walk_addr, sizeof (uintptr_t),
+	    addr) == -1) {
+		mdb_warn("failed to read list head at %p", addr);
+		return (WALK_ERR);
+	}
+	iw = mdb_alloc(sizeof (ip_list_walk_data_t), UM_SLEEP);
+	iw->nextoff = arg->nextp_off;
+	wsp->walk_data = iw;
+
+	return (WALK_NEXT);
+}
+
+static int
+ip_list_walk_step(mdb_walk_state_t *wsp)
+{
+	ip_list_walk_data_t *iw = wsp->walk_data;
+	uintptr_t addr = wsp->walk_addr;
+
+	if (addr == NULL)
+		return (WALK_DONE);
+	wsp->walk_addr = addr + iw->nextoff;
+	if (mdb_vread(&wsp->walk_addr, sizeof (uintptr_t),
+	    wsp->walk_addr) == -1) {
+		mdb_warn("failed to read list node at %p", addr);
+		return (WALK_ERR);
+	}
+	return (wsp->walk_callback(addr, iw, wsp->walk_cbdata));
+}
+
+static void
+ip_list_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (ip_list_walk_data_t));
+}
+
+static int
+ipif_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("ill", wsp) == -1) {
+		mdb_warn("can't walk 'ills'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+static int
+ipif_walk_step(mdb_walk_state_t *wsp)
+{
+	if (mdb_pwalk("ipif_list", wsp->walk_callback, wsp->walk_cbdata,
+	    wsp->walk_addr) == -1) {
+		mdb_warn("can't walk 'ipif_list'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+ipif_cb(uintptr_t addr, const ipif_walk_data_t *iw, ipif_cbdata_t *id)
+{
+	ipif_t ipif;
+
+	if (mdb_vread(&ipif, sizeof (ipif_t), (uintptr_t)addr) == -1) {
+		mdb_warn("failed to read ipif at %p", addr);
+		return (WALK_NEXT);
+	}
+	if (mdb_vread(&id->ill, sizeof (ill_t),
+	    (uintptr_t)ipif.ipif_ill) == -1) {
+		mdb_warn("failed to read ill at %p", ipif.ipif_ill);
+		return (WALK_NEXT);
+	}
+	(void) ipif_format((uintptr_t)addr, &ipif, id);
+	return (WALK_NEXT);
+}
+
+static void
+ipif_header(boolean_t verbose)
+{
+	if (verbose) {
+		mdb_printf("%-?s %-10s %-3s %-?s %-8s %-30s\n",
+		    "ADDR", "NAME", "CNT", "ILL", "STFLAGS", "FLAGS");
+		mdb_printf("%s\n%s\n",
+		    "LCLADDR", "BROADCAST");
+		mdb_printf("%<u>%80s%</u>\n", "");
+	} else {
+		mdb_printf("%-?s %-10s %6s %-?s %-8s %-30s\n",
+		    "ADDR", "NAME", "CNT", "ILL", "STFLAGS", "FLAGS");
+		mdb_printf("%s\n%<u>%80s%</u>\n", "LCLADDR", "");
+	}
+}
+
+#ifdef _BIG_ENDIAN
+#define	ip_ntohl_32(x)	((x) & 0xffffffff)
+#else
+#define	ip_ntohl_32(x)	(((uint32_t)(x) << 24) | \
+			(((uint32_t)(x) << 8) & 0xff0000) | \
+			(((uint32_t)(x) >> 8) & 0xff00) | \
+			((uint32_t)(x)  >> 24))
+#endif
+
+int
+mask_to_prefixlen(int af, const in6_addr_t *addr)
+{
+	int len = 0;
+	int i;
+	uint_t mask = 0;
+
+	if (af == AF_INET6) {
+		for (i = 0; i < 4; i++) {
+			if (addr->s6_addr32[i] == 0xffffffff) {
+				len += 32;
+			} else {
+				mask = addr->s6_addr32[i];
+				break;
+			}
+		}
+	} else {
+		mask = V4_PART_OF_V6((*addr));
+	}
+	if (mask > 0)
+		len += (33 - mdb_ffs(ip_ntohl_32(mask)));
+	return (len);
+}
+
+static int
+ipif_format(uintptr_t addr, const void *ipifptr, void *ipif_cb_arg)
+{
+	const ipif_t *ipif = ipifptr;
+	ipif_cbdata_t *ipifcb = ipif_cb_arg;
+	boolean_t verbose = ipifcb->verbose;
+	char ill_name[LIFNAMSIZ];
+	char buf[LIFNAMSIZ];
+	int cnt;
+	static const mdb_bitmask_t sfmasks[] = {
+		{ "CO",		IPIF_CONDEMNED,		IPIF_CONDEMNED},
+		{ "CH",		IPIF_CHANGING,		IPIF_CHANGING},
+		{ "SL",		IPIF_SET_LINKLOCAL,	IPIF_SET_LINKLOCAL},
+		{ "ZS",		IPIF_ZERO_SOURCE,	IPIF_ZERO_SOURCE},
+		{ NULL,		0,			0		}
+	};
+	static const mdb_bitmask_t fmasks[] = {
+		{ "UP",		IPIF_UP,		IPIF_UP		},
+		{ "UNN",	IPIF_UNNUMBERED,	IPIF_UNNUMBERED},
+		{ "DHCP",	IPIF_DHCPRUNNING,	IPIF_DHCPRUNNING},
+		{ "PRIV",	IPIF_PRIVATE,		IPIF_PRIVATE},
+		{ "NOXMT",	IPIF_NOXMIT,		IPIF_NOXMIT},
+		{ "NOLCL",	IPIF_NOLOCAL,		IPIF_NOLOCAL},
+		{ "DEPR",	IPIF_DEPRECATED,	IPIF_DEPRECATED},
+		{ "PREF",	IPIF_PREFERRED,		IPIF_PREFERRED},
+		{ "TEMP",	IPIF_TEMPORARY,		IPIF_TEMPORARY},
+		{ "ACONF",	IPIF_ADDRCONF,		IPIF_ADDRCONF},
+		{ "ANY",	IPIF_ANYCAST,		IPIF_ANYCAST},
+		{ "NFAIL",	IPIF_NOFAILOVER,	IPIF_NOFAILOVER},
+		{ NULL,		0,			0		}
+	};
+	char flagsbuf[2 * A_CNT(fmasks)];
+	char bitfields[A_CNT(fmasks)];
+	char sflagsbuf[A_CNT(sfmasks)];
+	char sbuf[DEFCOLS], addrstr[INET6_ADDRSTRLEN];
+	int ipver = ipifcb->ipif_ipversion;
+	int af;
+
+	if (ipver != 0) {
+		if ((ipver == IPV4_VERSION && ipifcb->ill.ill_isv6) ||
+		    (ipver == IPV6_VERSION && !ipifcb->ill.ill_isv6)) {
+			return (WALK_NEXT);
+		}
+	}
+	if ((mdb_readstr(ill_name, MIN(LIFNAMSIZ,
+	    ipifcb->ill.ill_name_length),
+	    (uintptr_t)ipifcb->ill.ill_name)) == -1) {
+		mdb_warn("failed to read ill_name of ill %p\n", ipifcb->ill);
+		return (WALK_NEXT);
+	}
+	if (ipif->ipif_id != 0) {
+		mdb_snprintf(buf, LIFNAMSIZ, "%s:%d",
+		    ill_name, ipif->ipif_id);
+	} else {
+		mdb_snprintf(buf, LIFNAMSIZ, "%s", ill_name);
+	}
+	mdb_snprintf(bitfields, sizeof (bitfields), "%s",
+	    ipif->ipif_addr_ready ? ",ADR" : "",
+	    ipif->ipif_multicast_up ? ",MU" : "",
+	    ipif->ipif_was_up ? ",WU" : "",
+	    ipif->ipif_was_dup ? ",WD" : "",
+	    ipif->ipif_joined_allhosts ? ",JA" : "");
+	mdb_snprintf(flagsbuf, sizeof (flagsbuf), "%llb%s",
+	    ipif->ipif_flags, fmasks, bitfields);
+	mdb_snprintf(sflagsbuf, sizeof (sflagsbuf), "%b",
+	    ipif->ipif_state_flags, sfmasks);
+
+	cnt = ipif->ipif_refcnt + ipif->ipif_ire_cnt + ipif->ipif_ilm_cnt;
+
+	if (ipifcb->ill.ill_isv6) {
+		mdb_snprintf(addrstr, sizeof (addrstr), "%N",
+		    &ipif->ipif_v6lcl_addr);
+		af = AF_INET6;
+	} else {
+		mdb_snprintf(addrstr, sizeof (addrstr), "%I",
+		    V4_PART_OF_V6((ipif->ipif_v6lcl_addr)));
+		af = AF_INET;
+	}
+
+	if (verbose) {
+		mdb_printf("%-?p %-10s %3d %-?p %-8s %-30s\n",
+		    addr, buf, cnt, ipif->ipif_ill,
+		    sflagsbuf, flagsbuf);
+		mdb_snprintf(sbuf, sizeof (sbuf), "%*s %12s",
+		    sizeof (uintptr_t) * 2, "", "");
+		mdb_printf("%s |\n%s +---> %4d %-15s "
+		    "Active consistent reader cnt\n",
+		    sbuf, sbuf, ipif->ipif_refcnt, "ipif_refcnt");
+		mdb_printf("%*s %10d %-15s "
+		    "Number of ire's referencing this ipif\n",
+		    strlen(sbuf), "", ipif->ipif_ire_cnt, "ipif_ire_cnt");
+		mdb_printf("%*s %10d %-15s "
+		    "Number of ilm's referencing this ipif\n\n",
+		    strlen(sbuf), "", ipif->ipif_ilm_cnt, "ipif_ilm_cnt");
+		mdb_printf("%-s/%d\n",
+		    addrstr, mask_to_prefixlen(af, &ipif->ipif_v6net_mask));
+		if (ipifcb->ill.ill_isv6) {
+			mdb_printf("%-N\n", &ipif->ipif_v6brd_addr);
+		} else {
+			mdb_printf("%-I\n",
+			    V4_PART_OF_V6((ipif->ipif_v6brd_addr)));
+		}
+	} else {
+		mdb_printf("%-?p %-10s %6d %-?p %-8s %-30s\n",
+		    addr, buf, cnt, ipif->ipif_ill,
+		    sflagsbuf, flagsbuf);
+		mdb_printf("%-s/%d\n",
+		    addrstr, mask_to_prefixlen(af, &ipif->ipif_v6net_mask));
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+ipif(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	ipif_t ipif;
+	ipif_cbdata_t id;
+	int ipversion = 0;
+	const char *opt_P = NULL;
+	uint_t verbose = FALSE;
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    'P', MDB_OPT_STR, &opt_P, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (opt_P != NULL) {
+		if (strcmp("v4", opt_P) == 0) {
+			ipversion = IPV4_VERSION;
+		} else if (strcmp("v6", opt_P) == 0) {
+			ipversion = IPV6_VERSION;
+		} else {
+			mdb_warn("invalid protocol '%s'\n", opt_P);
+			return (DCMD_USAGE);
+		}
+	}
+
+	id.verbose = verbose;
+	id.ipif_ipversion = ipversion;
+
+	if (flags & DCMD_ADDRSPEC) {
+		if (mdb_vread(&ipif, sizeof (ipif_t), addr) == -1) {
+			mdb_warn("failed to read ipif at %p\n", addr);
+			return (DCMD_ERR);
+		}
+		ipif_header(verbose);
+		if (mdb_vread(&id.ill, sizeof (ill_t),
+		    (uintptr_t)ipif.ipif_ill) == -1) {
+			mdb_warn("failed to read ill at %p", ipif.ipif_ill);
+			return (WALK_NEXT);
+		}
+		return (ipif_format(addr, &ipif, &id));
+	} else {
+		ipif_header(verbose);
+		if (mdb_walk("ipif", (mdb_walk_cb_t)ipif_cb, &id) == -1) {
+			mdb_warn("failed to walk ipifs\n");
+			return (DCMD_ERR);
+		}
+	}
+	return (DCMD_OK);
+}
+
+static void
+ipif_help(void)
+{
+	mdb_printf("Prints the following fields: ipif ptr, name, "
+	    "count, ill ptr, state flags and ipif flags.\n"
+	    "The count field is a sum of individual refcnts and is expanded "
+	    "with the -v option.\n"
+	    "The flags field shows the following:"
+	    "\n\tUNN -> UNNUMBERED, DHCP -> DHCPRUNNING, PRIV -> PRIVATE, "
+	    "\n\tNOXMT -> NOXMIT, NOLCL -> NOLOCAL, DEPR -> DEPRECATED, "
+	    "\n\tPREF -> PREFERRED, TEMP -> TEMPORARY, ACONF -> ADDRCONF, "
+	    "\n\tANY -> ANYCAST, NFAIL -> NOFAILOVER, "
+	    "\n\tADR -> ipif_addr_ready, MU -> ipif_multicast_up, "
+	    "\n\tWU -> ipif_was_up, WD -> ipif_was_dup, "
+	    "JA -> ipif_joined_allhosts.\n\n");
+	mdb_printf("Options:\n");
+	mdb_printf("\t-P v4 | v6"
+	    "\tfilter ipif structures on ills for the specified protocol\n");
+}
+
+static int
+conn_status_walk_fanout(uintptr_t addr, mdb_walk_state_t *wsp,
+    const char *walkname)
+{
+	if (mdb_pwalk(walkname, wsp->walk_callback, wsp->walk_cbdata,
+	    addr) == -1) {
+		mdb_warn("couldn't walk '%s' at %p", walkname, addr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+static int
+conn_status_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = wsp->walk_addr;
+
+	(void) conn_status_walk_fanout(addr, wsp, "udp_hash");
+	(void) conn_status_walk_fanout(addr, wsp, "conn_hash");
+	(void) conn_status_walk_fanout(addr, wsp, "bind_hash");
+	(void) conn_status_walk_fanout(addr, wsp, "proto_hash");
+	(void) conn_status_walk_fanout(addr, wsp, "proto_v6_hash");
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+conn_status_cb(uintptr_t addr, const void *walk_data,
+    void *private)
+{
+	netstack_t nss;
+	char src_addrstr[INET6_ADDRSTRLEN];
+	char rem_addrstr[INET6_ADDRSTRLEN];
+	const ipcl_hash_walk_data_t *iw = walk_data;
+	conn_t *conn = iw->conn;
+
+	if (mdb_vread(conn, sizeof (conn_t), addr) == -1) {
+		mdb_warn("failed to read conn_t at %p", addr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&nss, sizeof (nss),
+	    (uintptr_t)conn->conn_netstack) == -1) {
+		mdb_warn("failed to read netstack_t %p",
+		    conn->conn_netstack);
+		return (WALK_ERR);
+	}
+	mdb_printf("%-?p %-?p %?d %?d\n", addr, conn->conn_wq,
+	    nss.netstack_stackid, conn->conn_zoneid);
+
+	if (conn->conn_af_isv6) {
+		mdb_snprintf(src_addrstr, sizeof (rem_addrstr), "%N",
+		    &conn->conn_srcv6);
+		mdb_snprintf(rem_addrstr, sizeof (rem_addrstr), "%N",
+		    &conn->conn_remv6);
+	} else {
+		mdb_snprintf(src_addrstr, sizeof (src_addrstr), "%I",
+		    V4_PART_OF_V6((conn->conn_srcv6)));
+		mdb_snprintf(rem_addrstr, sizeof (rem_addrstr), "%I",
+		    V4_PART_OF_V6((conn->conn_remv6)));
+	}
+	mdb_printf("%s:%-5d\n%s:%-5d\n",
+	    src_addrstr, conn->conn_lport, rem_addrstr, conn->conn_fport);
+	return (WALK_NEXT);
+}
+
+static void
+conn_header(void)
+{
+	mdb_printf("%-?s %-?s %?s %?s\n%s\n%s\n",
+	    "ADDR", "WQ", "STACK", "ZONE", "SRC:PORT", "DEST:PORT");
+	mdb_printf("%<u>%80s%</u>\n", "");
+}
+
+/*ARGSUSED*/
+static int
+conn_status(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	conn_header();
+	if (flags & DCMD_ADDRSPEC) {
+		(void) conn_status_cb(addr, NULL, NULL);
+	} else {
+		if (mdb_walk("conn_status", (mdb_walk_cb_t)conn_status_cb,
+		    NULL) == -1) {
+			mdb_warn("failed to walk conn_fanout");
+			return (DCMD_ERR);
+		}
+	}
+	return (DCMD_OK);
+}
+
+static void
+conn_status_help(void)
+{
+	mdb_printf("Prints conn_t structures from the following hash tables: "
+	    "\n\tips_ipcl_udp_fanout\n\tips_ipcl_bind_fanout"
+	    "\n\tips_ipcl_conn_fanout\n\tips_ipcl_proto_fanout"
+	    "\n\tips_ipcl_proto_fanout_v6\n");
+}
+
+static int
+srcid_walk_step(mdb_walk_state_t *wsp)
+{
+	if (mdb_pwalk("srcid_list", wsp->walk_callback, wsp->walk_cbdata,
+	    wsp->walk_addr) == -1) {
+		mdb_warn("can't walk 'srcid_list'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+srcid_status_cb(uintptr_t addr, const void *walk_data,
+    void *private)
+{
+	srcid_map_t smp;
+
+	if (mdb_vread(&smp, sizeof (srcid_map_t), addr) == -1) {
+		mdb_warn("failed to read srcid_map at %p", addr);
+		return (WALK_ERR);
+	}
+	mdb_printf("%-?p %3d %4d %6d %N\n",
+	    addr, smp.sm_srcid, smp.sm_zoneid, smp.sm_refcnt,
+	    &smp.sm_addr);
+	return (WALK_NEXT);
+}
+
+static void
+srcid_header(void)
+{
+	mdb_printf("%-?s %3s %4s %6s %s\n",
+	    "ADDR", "ID", "ZONE", "REFCNT", "IPADDR");
+	mdb_printf("%<u>%80s%</u>\n", "");
+}
+
+/*ARGSUSED*/
+static int
+srcid_status(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	srcid_header();
+	if (flags & DCMD_ADDRSPEC) {
+		(void) srcid_status_cb(addr, NULL, NULL);
+	} else {
+		if (mdb_walk("srcid", (mdb_walk_cb_t)srcid_status_cb,
+		    NULL) == -1) {
+			mdb_warn("failed to walk srcid_map");
+			return (DCMD_ERR);
+		}
+	}
+	return (DCMD_OK);
 }

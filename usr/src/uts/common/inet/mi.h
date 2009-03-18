@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -46,24 +46,6 @@ extern "C" {
 #define	MI_COPY_CASE(dir, cnt)	(((cnt)<<2)|dir)
 #define	MI_COPY_STATE(mp)	MI_COPY_CASE(MI_COPY_DIRECTION(mp), \
 					MI_COPY_COUNT(mp))
-
-#ifdef __lint
-/* Lint complains about %p with field width specifiers. */
-#define	MI_COL_PTRFMT_STR	"%p "
-#define	MI_COL_HDRPAD_STR	""
-#else
-#ifdef _ILP32
-#if defined(__GNUC__)
-#define	MI_COL_PTRFMT_STR	"%8p "
-#else
-#define	MI_COL_PTRFMT_STR	"%08p "
-#endif	/* __GNUC__ */
-#define	MI_COL_HDRPAD_STR	""
-#else
-#define	MI_COL_PTRFMT_STR	"%16p "
-#define	MI_COL_HDRPAD_STR	"        "
-#endif
-#endif
 
 /*
  * Double linked list of type MI_O with a mi_head_t as the head.

@@ -629,13 +629,6 @@ uint_t tcp_free_list_max_cnt = 0;
 #define	IP_ADDR_CACHE_HASH(faddr)					\
 	(ntohl(faddr) & (IP_ADDR_CACHE_SIZE -1))
 
-/* Hash for HSPs uses all 32 bits, since both networks and hosts are in table */
-#define	TCP_HSP_HASH_SIZE 256
-
-#define	TCP_HSP_HASH(addr)					\
-	(((addr>>24) ^ (addr >>16) ^			\
-	    (addr>>8) ^ (addr)) % TCP_HSP_HASH_SIZE)
-
 /*
  * TCP options struct returned from tcp_parse_options.
  */
@@ -725,19 +718,6 @@ typedef struct tcpt_s {
 	pfv_t	tcpt_pfv;	/* The routine we are to call */
 	tcp_t	*tcpt_tcp;	/* The parameter we are to pass in */
 } tcpt_t;
-
-/* Host Specific Parameter structure */
-typedef struct tcp_hsp {
-	struct tcp_hsp	*tcp_hsp_next;
-	in6_addr_t	tcp_hsp_addr_v6;
-	in6_addr_t	tcp_hsp_subnet_v6;
-	uint_t		tcp_hsp_vers;	/* IPV4_VERSION | IPV6_VERSION */
-	int32_t		tcp_hsp_sendspace;
-	int32_t		tcp_hsp_recvspace;
-	int32_t		tcp_hsp_tstamp;
-} tcp_hsp_t;
-#define	tcp_hsp_addr	V4_PART_OF_V6(tcp_hsp_addr_v6)
-#define	tcp_hsp_subnet	V4_PART_OF_V6(tcp_hsp_subnet_v6)
 
 /*
  * Functions called directly via squeue having a prototype of edesc_t.
@@ -847,8 +827,6 @@ static mblk_t	*tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start);
 static void	tcp_reass_elim_overlap(tcp_t *tcp, mblk_t *mp);
 static void	tcp_reinit(tcp_t *tcp);
 static void	tcp_reinit_values(tcp_t *tcp);
-static void	tcp_report_item(mblk_t *mp, tcp_t *tcp, int hashval,
-		    tcp_t *thisstream, cred_t *cr);
 
 static uint_t	tcp_rwnd_reopen(tcp_t *tcp);
 static uint_t	tcp_rcv_drain(tcp_t *tcp);
@@ -861,16 +839,6 @@ static void	tcp_rput_common(tcp_t *tcp, mblk_t *mp);
 static void	tcp_rsrv(queue_t *q);
 static int	tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd);
 static int	tcp_snmp_state(tcp_t *tcp);
-static int	tcp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
-static int	tcp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
-static int	tcp_listen_hash_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
-static int	tcp_conn_hash_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
-static int	tcp_acceptor_hash_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
 static void	tcp_timer(void *arg);
 static void	tcp_timer_callback(void *);
 static in_port_t tcp_update_next_port(in_port_t port, const tcp_t *tcp,
@@ -903,8 +871,6 @@ static void	tcp_xmit_early_reset(char *str, mblk_t *mp,
 		    zoneid_t zoneid, tcp_stack_t *, conn_t *connp);
 static void	tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq,
 		    uint32_t ack, int ctl);
-static tcp_hsp_t *tcp_hsp_lookup(ipaddr_t addr, tcp_stack_t *);
-static tcp_hsp_t *tcp_hsp_lookup_ipv6(in6_addr_t *addr, tcp_stack_t *);
 static int	setmaxps(queue_t *q, int maxpsz);
 static void	tcp_set_rto(tcp_t *, time_t);
 static boolean_t tcp_check_policy(tcp_t *, mblk_t *, ipha_t *, ip6_t *,
@@ -1213,7 +1179,6 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 1,		TCP_MSS_MAX_IPV6, TCP_MSS_MAX_IPV6, "tcp_mss_max_ipv6"},
  { 0,		1,		0,		"tcp_rev_src_routes"},
  { 10*MS,	500*MS,		50*MS,		"tcp_local_dack_interval"},
- { 100*MS,	60*SECONDS,	1*SECONDS,	"tcp_ndd_get_info_interval"},
  { 0,		16,		8,		"tcp_local_dacks_max"},
  { 0,		2,		1,		"tcp_ecn_permitted"},
  { 0,		1,		1,		"tcp_rst_sent_rate_enabled"},
@@ -1272,11 +1237,6 @@ static tcpparam_t lcl_tcp_mdt_max_pbufs_param =
  */
 #define	DISP_PORT_ONLY		1
 #define	DISP_ADDR_AND_PORT	2
-
-#define	NDD_TOO_QUICK_MSG \
-	"ndd get info rate too high for non-privileged users, try again " \
-	"later.\n"
-#define	NDD_OUT_OF_BUF_MSG	"<< Out of buffer >>\n"
 
 #define	IS_VMLOANED_MBLK(mp) \
 	(((mp)->b_datap->db_struioflag & STRUIO_ZC) != 0)
@@ -2551,7 +2511,6 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 static int
 tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 {
-	tcp_hsp_t	*hsp;
 	ire_t		*ire;
 	ire_t		*sire = NULL;
 	iulp_t		*ire_uinfo = NULL;
@@ -2958,30 +2917,6 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 
 	if (ire->ire_type & (IRE_LOOPBACK | IRE_LOCAL))
 		tcp->tcp_loopback = B_TRUE;
-
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		hsp = tcp_hsp_lookup(tcp->tcp_remote, tcps);
-	} else {
-		hsp = tcp_hsp_lookup_ipv6(&tcp->tcp_remote_v6, tcps);
-	}
-
-	if (hsp != NULL) {
-		/* Only modify if we're going to make them bigger */
-		if (hsp->tcp_hsp_sendspace > tcp->tcp_xmit_hiwater) {
-			tcp->tcp_xmit_hiwater = hsp->tcp_hsp_sendspace;
-			if (tcps->tcps_snd_lowat_fraction != 0)
-				tcp->tcp_xmit_lowater = tcp->tcp_xmit_hiwater /
-				    tcps->tcps_snd_lowat_fraction;
-		}
-
-		if (hsp->tcp_hsp_recvspace > tcp->tcp_rwnd) {
-			tcp->tcp_rwnd = hsp->tcp_hsp_recvspace;
-		}
-
-		/* Copy timestamp flag only for active open */
-		if (!tcp_detached)
-			tcp->tcp_snd_ts_ok = hsp->tcp_hsp_tstamp;
-	}
 
 	if (sire != NULL)
 		IRE_REFRELE(sire);
@@ -11225,31 +11160,6 @@ tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
 		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(ndp, "tcp_status", tcp_status_report, NULL,
-	    NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_bind_hash", tcp_bind_hash_report,
-	    NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_listen_hash",
-	    tcp_listen_hash_report, NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_conn_hash", tcp_conn_hash_report,
-	    NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_acceptor_hash",
-	    tcp_acceptor_hash_report, NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
 	if (!nd_load(ndp, "tcp_1948_phrase", NULL,
 	    tcp_1948_phrase_set, NULL)) {
 		nd_free(ndp);
@@ -16561,394 +16471,6 @@ tcp_snmp_state(tcp_t *tcp)
 	default:
 		return (0);
 	}
-}
-
-static char tcp_report_header[] =
-	"TCP     " MI_COL_HDRPAD_STR
-	"zone dest	    snxt     suna     "
-	"swnd       rnxt     rack     rwnd       rto   mss   w sw rw t "
-	"recent   [lport,fport] state";
-
-/*
- * TCP status report triggered via the Named Dispatch mechanism.
- */
-/* ARGSUSED */
-static void
-tcp_report_item(mblk_t *mp, tcp_t *tcp, int hashval, tcp_t *thisstream,
-    cred_t *cr)
-{
-	char hash[10], addrbuf[INET6_ADDRSTRLEN];
-	boolean_t ispriv = secpolicy_ip_config(cr, B_TRUE) == 0;
-	char cflag;
-	in6_addr_t	v6dst;
-	char buf[80];
-	uint_t print_len, buf_len;
-
-	buf_len = mp->b_datap->db_lim - mp->b_wptr;
-	if (buf_len <= 0)
-		return;
-
-	if (hashval >= 0)
-		(void) sprintf(hash, "%03d ", hashval);
-	else
-		hash[0] = '\0';
-
-	/*
-	 * Note that we use the remote address in the tcp_b  structure.
-	 * This means that it will print out the real destination address,
-	 * not the next hop's address if source routing is used.  This
-	 * avoid the confusion on the output because user may not
-	 * know that source routing is used for a connection.
-	 */
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		IN6_IPADDR_TO_V4MAPPED(tcp->tcp_remote, &v6dst);
-	} else {
-		v6dst = tcp->tcp_remote_v6;
-	}
-	(void) inet_ntop(AF_INET6, &v6dst, addrbuf, sizeof (addrbuf));
-	/*
-	 * the ispriv checks are so that normal users cannot determine
-	 * sequence number information using NDD.
-	 */
-
-	if (TCP_IS_DETACHED(tcp))
-		cflag = '*';
-	else
-		cflag = ' ';
-	print_len = snprintf((char *)mp->b_wptr, buf_len,
-	    "%s " MI_COL_PTRFMT_STR "%d %s %08x %08x %010d %08x %08x "
-	    "%010d %05ld %05d %1d %02d %02d %1d %08x %s%c\n",
-	    hash,
-	    (void *)tcp,
-	    tcp->tcp_connp->conn_zoneid,
-	    addrbuf,
-	    (ispriv) ? tcp->tcp_snxt : 0,
-	    (ispriv) ? tcp->tcp_suna : 0,
-	    tcp->tcp_swnd,
-	    (ispriv) ? tcp->tcp_rnxt : 0,
-	    (ispriv) ? tcp->tcp_rack : 0,
-	    tcp->tcp_rwnd,
-	    tcp->tcp_rto,
-	    tcp->tcp_mss,
-	    tcp->tcp_snd_ws_ok,
-	    tcp->tcp_snd_ws,
-	    tcp->tcp_rcv_ws,
-	    tcp->tcp_snd_ts_ok,
-	    tcp->tcp_ts_recent,
-	    tcp_display(tcp, buf, DISP_PORT_ONLY), cflag);
-	if (print_len < buf_len) {
-		((mblk_t *)mp)->b_wptr += print_len;
-	} else {
-		((mblk_t *)mp)->b_wptr += buf_len;
-	}
-}
-
-/*
- * TCP status report (for listeners only) triggered via the Named Dispatch
- * mechanism.
- */
-/* ARGSUSED */
-static void
-tcp_report_listener(mblk_t *mp, tcp_t *tcp, int hashval)
-{
-	char addrbuf[INET6_ADDRSTRLEN];
-	in6_addr_t	v6dst;
-	uint_t print_len, buf_len;
-
-	buf_len = mp->b_datap->db_lim - mp->b_wptr;
-	if (buf_len <= 0)
-		return;
-
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src, &v6dst);
-		(void) inet_ntop(AF_INET6, &v6dst, addrbuf, sizeof (addrbuf));
-	} else {
-		(void) inet_ntop(AF_INET6, &tcp->tcp_ip6h->ip6_src,
-		    addrbuf, sizeof (addrbuf));
-	}
-	print_len = snprintf((char *)mp->b_wptr, buf_len,
-	    "%03d "
-	    MI_COL_PTRFMT_STR
-	    "%d %s %05u %08u %d/%d/%d%c\n",
-	    hashval, (void *)tcp,
-	    tcp->tcp_connp->conn_zoneid,
-	    addrbuf,
-	    (uint_t)BE16_TO_U16(tcp->tcp_tcph->th_lport),
-	    tcp->tcp_conn_req_seqnum,
-	    tcp->tcp_conn_req_cnt_q0, tcp->tcp_conn_req_cnt_q,
-	    tcp->tcp_conn_req_max,
-	    tcp->tcp_syn_defense ? '*' : ' ');
-	if (print_len < buf_len) {
-		((mblk_t *)mp)->b_wptr += print_len;
-	} else {
-		((mblk_t *)mp)->b_wptr += buf_len;
-	}
-}
-
-/* TCP status report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-tcp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	tcp_t	*tcp;
-	int	i;
-	conn_t	*connp;
-	connf_t	*connfp;
-	zoneid_t zoneid;
-	tcp_stack_t *tcps;
-	ip_stack_t *ipst;
-
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-	tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/*
-	 * Because of the ndd constraint, at most we can have 64K buffer
-	 * to put in all TCP info.  So to be more efficient, just
-	 * allocate a 64K buffer here, assuming we need that large buffer.
-	 * This may be a problem as any user can read tcp_status.  Therefore
-	 * we limit the rate of doing this using tcp_ndd_get_info_interval.
-	 * This should be OK as normal users should not do this too often.
-	 */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
-		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-
-	(void) mi_mpprintf(mp, "%s", tcp_report_header);
-
-	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-
-		ipst = tcps->tcps_netstack->netstack_ip;
-		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
-
-		connp = NULL;
-
-		while ((connp =
-		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
-			tcp = connp->conn_tcp;
-			if (zoneid != GLOBAL_ZONEID &&
-			    zoneid != connp->conn_zoneid)
-				continue;
-			tcp_report_item(mp->b_cont, tcp, -1, tcp,
-			    cr);
-		}
-
-	}
-
-	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
-}
-
-/* TCP status report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-tcp_bind_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	tf_t	*tbf;
-	tcp_t	*tcp, *ltcp;
-	int	i;
-	zoneid_t zoneid;
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-
-	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
-		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-
-	(void) mi_mpprintf(mp, "    %s", tcp_report_header);
-
-	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
-		tbf = &tcps->tcps_bind_fanout[i];
-		mutex_enter(&tbf->tf_lock);
-		for (ltcp = tbf->tf_tcp; ltcp != NULL;
-		    ltcp = ltcp->tcp_bind_hash) {
-			for (tcp = ltcp; tcp != NULL;
-			    tcp = tcp->tcp_bind_hash_port) {
-				if (zoneid != GLOBAL_ZONEID &&
-				    zoneid != tcp->tcp_connp->conn_zoneid)
-					continue;
-				CONN_INC_REF(tcp->tcp_connp);
-				tcp_report_item(mp->b_cont, tcp, i,
-				    Q_TO_TCP(q), cr);
-				CONN_DEC_REF(tcp->tcp_connp);
-			}
-		}
-		mutex_exit(&tbf->tf_lock);
-	}
-	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
-}
-
-/* TCP status report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-tcp_listen_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	connf_t	*connfp;
-	conn_t	*connp;
-	tcp_t	*tcp;
-	int	i;
-	zoneid_t zoneid;
-	tcp_stack_t *tcps;
-	ip_stack_t	*ipst;
-
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-	tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
-		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-
-	(void) mi_mpprintf(mp,
-	    "    TCP    " MI_COL_HDRPAD_STR
-	    "zone IP addr	 port  seqnum   backlog (q0/q/max)");
-
-	ipst = tcps->tcps_netstack->netstack_ip;
-
-	for (i = 0; i < ipst->ips_ipcl_bind_fanout_size; i++) {
-		connfp = &ipst->ips_ipcl_bind_fanout[i];
-		connp = NULL;
-		while ((connp =
-		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
-			tcp = connp->conn_tcp;
-			if (zoneid != GLOBAL_ZONEID &&
-			    zoneid != connp->conn_zoneid)
-				continue;
-			tcp_report_listener(mp->b_cont, tcp, i);
-		}
-	}
-
-	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
-}
-
-/* TCP status report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-tcp_conn_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	connf_t	*connfp;
-	conn_t	*connp;
-	tcp_t	*tcp;
-	int	i;
-	zoneid_t zoneid;
-	tcp_stack_t *tcps;
-	ip_stack_t *ipst;
-
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-	tcps = Q_TO_TCP(q)->tcp_tcps;
-	ipst = tcps->tcps_netstack->netstack_ip;
-
-	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
-		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-
-	(void) mi_mpprintf(mp, "tcp_conn_hash_size = %d",
-	    ipst->ips_ipcl_conn_fanout_size);
-	(void) mi_mpprintf(mp, "    %s", tcp_report_header);
-
-	for (i = 0; i < ipst->ips_ipcl_conn_fanout_size; i++) {
-		connfp =  &ipst->ips_ipcl_conn_fanout[i];
-		connp = NULL;
-		while ((connp =
-		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
-			tcp = connp->conn_tcp;
-			if (zoneid != GLOBAL_ZONEID &&
-			    zoneid != connp->conn_zoneid)
-				continue;
-			tcp_report_item(mp->b_cont, tcp, i,
-			    Q_TO_TCP(q), cr);
-		}
-	}
-
-	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
-}
-
-/* TCP status report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-tcp_acceptor_hash_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	tf_t	*tf;
-	tcp_t	*tcp;
-	int	i;
-	zoneid_t zoneid;
-	tcp_stack_t	*tcps;
-
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-	tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/* Refer to comments in tcp_status_report(). */
-	if (cr == NULL || secpolicy_ip_config(cr, B_TRUE) != 0) {
-		if (ddi_get_lbolt() - tcps->tcps_last_ndd_get_info_time <
-		    drv_usectohz(tcps->tcps_ndd_get_info_interval * 1000)) {
-			(void) mi_mpprintf(mp, NDD_TOO_QUICK_MSG);
-			return (0);
-		}
-	}
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, NDD_OUT_OF_BUF_MSG);
-		return (0);
-	}
-
-	(void) mi_mpprintf(mp, "    %s", tcp_report_header);
-
-	for (i = 0; i < TCP_FANOUT_SIZE; i++) {
-		tf = &tcps->tcps_acceptor_fanout[i];
-		mutex_enter(&tf->tf_lock);
-		for (tcp = tf->tf_tcp; tcp != NULL;
-		    tcp = tcp->tcp_acceptor_hash) {
-			if (zoneid != GLOBAL_ZONEID &&
-			    zoneid != tcp->tcp_connp->conn_zoneid)
-				continue;
-			tcp_report_item(mp->b_cont, tcp, i,
-			    Q_TO_TCP(q), cr);
-		}
-		mutex_exit(&tf->tf_lock);
-	}
-	tcps->tcps_last_ndd_get_info_time = ddi_get_lbolt();
-	return (0);
 }
 
 /*
@@ -24171,197 +23693,6 @@ tcp_acceptor_hash_remove(tcp_t *tcp)
 	tcp->tcp_acceptor_lockp = NULL;
 }
 
-/* Data for fast netmask macro used by tcp_hsp_lookup */
-
-static ipaddr_t netmasks[] = {
-	IN_CLASSA_NET, IN_CLASSA_NET, IN_CLASSB_NET,
-	IN_CLASSC_NET | IN_CLASSD_NET  /* Class C,D,E */
-};
-
-#define	netmask(addr) (netmasks[(ipaddr_t)(addr) >> 30])
-
-/*
- * XXX This routine should go away and instead we should use the metrics
- * associated with the routes to determine the default sndspace and rcvspace.
- */
-static tcp_hsp_t *
-tcp_hsp_lookup(ipaddr_t addr, tcp_stack_t *tcps)
-{
-	tcp_hsp_t *hsp = NULL;
-
-	/* Quick check without acquiring the lock. */
-	if (tcps->tcps_hsp_hash == NULL)
-		return (NULL);
-
-	rw_enter(&tcps->tcps_hsp_lock, RW_READER);
-
-	/* This routine finds the best-matching HSP for address addr. */
-
-	if (tcps->tcps_hsp_hash) {
-		int i;
-		ipaddr_t srchaddr;
-		tcp_hsp_t *hsp_net;
-
-		/* We do three passes: host, network, and subnet. */
-
-		srchaddr = addr;
-
-		for (i = 1; i <= 3; i++) {
-			/* Look for exact match on srchaddr */
-
-			hsp = tcps->tcps_hsp_hash[TCP_HSP_HASH(srchaddr)];
-			while (hsp) {
-				if (hsp->tcp_hsp_vers == IPV4_VERSION &&
-				    hsp->tcp_hsp_addr == srchaddr)
-					break;
-				hsp = hsp->tcp_hsp_next;
-			}
-			ASSERT(hsp == NULL ||
-			    hsp->tcp_hsp_vers == IPV4_VERSION);
-
-			/*
-			 * If this is the first pass:
-			 *   If we found a match, great, return it.
-			 *   If not, search for the network on the second pass.
-			 */
-
-			if (i == 1)
-				if (hsp)
-					break;
-				else
-				{
-					srchaddr = addr & netmask(addr);
-					continue;
-				}
-
-			/*
-			 * If this is the second pass:
-			 *   If we found a match, but there's a subnet mask,
-			 *    save the match but try again using the subnet
-			 *    mask on the third pass.
-			 *   Otherwise, return whatever we found.
-			 */
-
-			if (i == 2) {
-				if (hsp && hsp->tcp_hsp_subnet) {
-					hsp_net = hsp;
-					srchaddr = addr & hsp->tcp_hsp_subnet;
-					continue;
-				} else {
-					break;
-				}
-			}
-
-			/*
-			 * This must be the third pass.  If we didn't find
-			 * anything, return the saved network HSP instead.
-			 */
-
-			if (!hsp)
-				hsp = hsp_net;
-		}
-	}
-
-	rw_exit(&tcps->tcps_hsp_lock);
-	return (hsp);
-}
-
-/*
- * XXX Equally broken as the IPv4 routine. Doesn't handle longest
- * match lookup.
- */
-static tcp_hsp_t *
-tcp_hsp_lookup_ipv6(in6_addr_t *v6addr, tcp_stack_t *tcps)
-{
-	tcp_hsp_t *hsp = NULL;
-
-	/* Quick check without acquiring the lock. */
-	if (tcps->tcps_hsp_hash == NULL)
-		return (NULL);
-
-	rw_enter(&tcps->tcps_hsp_lock, RW_READER);
-
-	/* This routine finds the best-matching HSP for address addr. */
-
-	if (tcps->tcps_hsp_hash) {
-		int i;
-		in6_addr_t v6srchaddr;
-		tcp_hsp_t *hsp_net;
-
-		/* We do three passes: host, network, and subnet. */
-
-		v6srchaddr = *v6addr;
-
-		for (i = 1; i <= 3; i++) {
-			/* Look for exact match on srchaddr */
-
-			hsp = tcps->tcps_hsp_hash[TCP_HSP_HASH(
-			    V4_PART_OF_V6(v6srchaddr))];
-			while (hsp) {
-				if (hsp->tcp_hsp_vers == IPV6_VERSION &&
-				    IN6_ARE_ADDR_EQUAL(&hsp->tcp_hsp_addr_v6,
-				    &v6srchaddr))
-					break;
-				hsp = hsp->tcp_hsp_next;
-			}
-
-			/*
-			 * If this is the first pass:
-			 *   If we found a match, great, return it.
-			 *   If not, search for the network on the second pass.
-			 */
-
-			if (i == 1)
-				if (hsp)
-					break;
-				else {
-					/* Assume a 64 bit mask */
-					v6srchaddr.s6_addr32[0] =
-					    v6addr->s6_addr32[0];
-					v6srchaddr.s6_addr32[1] =
-					    v6addr->s6_addr32[1];
-					v6srchaddr.s6_addr32[2] = 0;
-					v6srchaddr.s6_addr32[3] = 0;
-					continue;
-				}
-
-			/*
-			 * If this is the second pass:
-			 *   If we found a match, but there's a subnet mask,
-			 *    save the match but try again using the subnet
-			 *    mask on the third pass.
-			 *   Otherwise, return whatever we found.
-			 */
-
-			if (i == 2) {
-				ASSERT(hsp == NULL ||
-				    hsp->tcp_hsp_vers == IPV6_VERSION);
-				if (hsp &&
-				    !IN6_IS_ADDR_UNSPECIFIED(
-				    &hsp->tcp_hsp_subnet_v6)) {
-					hsp_net = hsp;
-					V6_MASK_COPY(*v6addr,
-					    hsp->tcp_hsp_subnet_v6, v6srchaddr);
-					continue;
-				} else {
-					break;
-				}
-			}
-
-			/*
-			 * This must be the third pass.  If we didn't find
-			 * anything, return the saved network HSP instead.
-			 */
-
-			if (!hsp)
-				hsp = hsp_net;
-		}
-	}
-
-	rw_exit(&tcps->tcps_hsp_lock);
-	return (hsp);
-}
-
 /*
  * Type three generator adapted from the random() function in 4.4 BSD:
  */
@@ -24935,7 +24266,6 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	tcps->tcps_netstack = ns;
 
 	/* Initialize locks */
-	rw_init(&tcps->tcps_hsp_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_g_q_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&tcps->tcps_g_q_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_iss_key_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -25071,7 +24401,6 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 	tcps->tcps_acceptor_fanout = NULL;
 
 	mutex_destroy(&tcps->tcps_iss_key_lock);
-	rw_destroy(&tcps->tcps_hsp_lock);
 	mutex_destroy(&tcps->tcps_g_q_lock);
 	cv_destroy(&tcps->tcps_g_q_cv);
 	mutex_destroy(&tcps->tcps_epriv_port_lock);

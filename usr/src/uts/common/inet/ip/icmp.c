@@ -137,8 +137,6 @@ static int	icmp_param_set(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
 static int	icmp_snmp_set(queue_t *q, t_scalar_t level, t_scalar_t name,
 		    uchar_t *ptr, int len);
-static int	icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
 static void	icmp_ud_err(queue_t *q, mblk_t *mp, t_scalar_t err);
 static void	icmp_tpi_unbind(queue_t *q, mblk_t *mp);
 static int	icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst);
@@ -3306,11 +3304,6 @@ icmp_param_register(IDP *ndp, icmpparam_t *icmppa, int cnt)
 			}
 		}
 	}
-	if (!nd_load(ndp, "icmp_status", icmp_status_report, NULL,
-	    NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
 	return (B_TRUE);
 }
 
@@ -4133,62 +4126,6 @@ icmp_snmp_set(queue_t *q, t_scalar_t level, t_scalar_t name,
 	default:
 		return (1);
 	}
-}
-
-/* Report for ndd "icmp_status" */
-/* ARGSUSED */
-static int
-icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	conn_t  *connp;
-	ip_stack_t *ipst;
-	char	laddrbuf[INET6_ADDRSTRLEN];
-	char	faddrbuf[INET6_ADDRSTRLEN];
-	int	i;
-
-	(void) mi_mpprintf(mp,
-	    "RAWIP    " MI_COL_HDRPAD_STR
-	/*   01234567[89ABCDEF] */
-	    "  src addr        dest addr       state");
-	/*   xxx.xxx.xxx.xxx xxx.xxx.xxx.xxx UNBOUND */
-
-	connp = Q_TO_CONN(q);
-	ipst = connp->conn_netstack->netstack_ip;
-	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
-		connf_t *connfp;
-		char	*state;
-
-		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
-		connp = NULL;
-
-		while ((connp = ipcl_get_next_conn(connfp, connp,
-		    IPCL_RAWIPCONN)) != NULL) {
-			icmp_t  *icmp;
-
-			mutex_enter(&(connp)->conn_lock);
-			icmp = connp->conn_icmp;
-
-			if (icmp->icmp_state == TS_UNBND)
-				state = "UNBOUND";
-			else if (icmp->icmp_state == TS_IDLE)
-				state = "IDLE";
-			else if (icmp->icmp_state == TS_DATA_XFER)
-				state = "CONNECTED";
-			else
-				state = "UnkState";
-
-			(void) mi_mpprintf(mp, MI_COL_PTRFMT_STR "%s %s %s",
-			    (void *)icmp,
-			    inet_ntop(AF_INET6, &icmp->icmp_v6dst.sin6_addr,
-			    faddrbuf,
-			    sizeof (faddrbuf)),
-			    inet_ntop(AF_INET6, &icmp->icmp_v6src, laddrbuf,
-			    sizeof (laddrbuf)),
-			    state);
-			mutex_exit(&(connp)->conn_lock);
-		}
-	}
-	return (0);
 }
 
 /*

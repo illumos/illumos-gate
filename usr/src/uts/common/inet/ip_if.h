@@ -298,8 +298,6 @@ extern	ip_extract_func_t ip_extract_arpreq, ip_extract_lifreq;
 extern	ip_extract_func_t ip_extract_tunreq;
 
 extern	int	ip_addr_availability_check(ipif_t *);
-extern	int	ip_ill_report(queue_t *, mblk_t *, caddr_t, cred_t *);
-extern	int	ip_ipif_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	void	ip_ll_subnet_defaults(ill_t *, mblk_t *);
 
 extern	int	ip_rt_add(ipaddr_t, ipaddr_t, ipaddr_t, ipaddr_t, int,

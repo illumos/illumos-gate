@@ -235,15 +235,6 @@ struct udp_stack {
 	mib2_udp_t	us_udp_mib;	/* SNMP fixed size info */
 
 /*
- * This controls the rate some ndd info report functions can be used
- * by non-priviledged users.  It stores the last time such info is
- * requested.  When those report functions are called again, this
- * is checked with the current time and compare with the ndd param
- * udp_ndd_get_info_interval.
- */
-	clock_t		us_last_ndd_get_info_time;
-
-/*
  * The smallest anonymous port in the priviledged port range which UDP
  * looks for free port.  Use in the option UDP_ANONPRIVBIND.
  */
@@ -354,7 +345,6 @@ typedef	struct udpahdr_s {
 #define	us_xmit_lowat			us_param_arr[8].udp_param_value
 #define	us_recv_hiwat			us_param_arr[9].udp_param_value
 #define	us_max_buf			us_param_arr[10].udp_param_value
-#define	us_ndd_get_info_interval	us_param_arr[11].udp_param_value
 
 
 #define	UDP_STAT(us, x)		((us)->us_statistics.x.value.ui64++)
