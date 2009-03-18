@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,11 +140,11 @@ event fault.memory.generic-x86.dimm_ce@CSPATH,
 
 prop fault.memory.generic-x86.page_ce@CSPATH
     { ADDR_VALID && CONTAINS_CS && !CS_PGFLT_LIMIT_REACHED && SET_ADDR } (1)->
-    ereport.cpu.generic-x86.mem_ce@chip/core/strand;
+    ereport.cpu.generic-x86.mem_ce@chip/core<>/strand<>;
 
 prop fault.memory.generic-x86.dimm_ce@CSPATH
     { ADDR_VALID && CONTAINS_CS && CS_DIMMSB_THRESH_REACHED } (1)->
-    ereport.cpu.generic-x86.mem_ce@chip/core/strand;
+    ereport.cpu.generic-x86.mem_ce@chip/core<>/strand<>;
 
 event upset.memory.generic-x86.discard@chip/core/strand;
 prop upset.memory.generic-x86.discard@chip/core/strand
@@ -165,16 +165,16 @@ event fault.memory.generic-x86.dimm_ue@CSPATH;
 
 prop fault.memory.generic-x86.page_ue@CSPATH
     { ADDR_VALID && CONTAINS_CS && SET_ADDR } (1)->
-    ereport.cpu.generic-x86.mem_ue@chip/core/strand;
+    ereport.cpu.generic-x86.mem_ue@chip/core<>/strand<>;
 
 prop fault.memory.generic-x86.dimm_ue@CSPATH
     { ADDR_VALID && CONTAINS_CS } (1)->
-    ereport.cpu.generic-x86.mem_ue@chip/core/strand;
+    ereport.cpu.generic-x86.mem_ue@chip/core<>/strand<>;
 
 event upset.memory.generic-x86.discard3@CSPATH;
 prop upset.memory.generic-x86.discard3@CSPATH
     { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
-    ereport.cpu.generic-x86.mem_ue@chip/core/strand;
+    ereport.cpu.generic-x86.mem_ue@chip/core<>/strand<>;
 
 /*
  *	 ========= Propogations for GART Table Walk Errors =============

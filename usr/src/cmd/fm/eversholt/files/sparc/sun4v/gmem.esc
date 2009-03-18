@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,13 +65,13 @@ MEMUE_ERPT(strand);
 									\
 	prop fault.memory.bank@DIMMPATH					\
 	    { DIAGNOSE_ERPT && CONTAINS_DIMM } (1)->			\
-	    ereport.cpu.generic-sparc.mem-uc@level;			\
+	    ereport.cpu.generic-sparc.mem-uc@level<>;			\
 									\
 	event upset.memory.bank@DIMMPATH;				\
 									\
 	prop upset.memory.bank@DIMMPATH					\
 	    { !DIAGNOSE_ERPT } (1)->					\
-	    ereport.cpu.generic-sparc.mem-uc@level
+	    ereport.cpu.generic-sparc.mem-uc@level<>
 
 FLT_MEM_UE_BANK(chip);
 FLT_MEM_UE_BANK(core);
@@ -83,13 +83,13 @@ FLT_MEM_UE_BANK(strand);
 									\
 	prop fault.memory.page@DIMMPATH					\
 	    { DIAGNOSE_ERPT && CONTAINS_DIMM && SET_ADDR && SET_OFFSET } (1)-> \
-	    ereport.cpu.generic-sparc.mem-uc@level;			\
+	    ereport.cpu.generic-sparc.mem-uc@level<>;			\
 									\
 	event upset.memory.page@DIMMPATH;				\
 									\
 	prop upset.memory.page@DIMMPATH					\
 	    { !DIAGNOSE_ERPT } (1)->					\
-	    ereport.cpu.generic-sparc.mem-uc@level
+	    ereport.cpu.generic-sparc.mem-uc@level<>
 
 FLT_MEM_UE_PAGE(chip);
 FLT_MEM_UE_PAGE(core);
@@ -135,7 +135,7 @@ prop fault.memory.memlink@CHIP
 prop fault.memory.memlink@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF && SET_SERDN &&
     SET_SERDT && SET_RATIO } (1)->
-    ereport.cpu.generic-sparc.membuf-crc@CHIP;
+    ereport.cpu.generic-sparc.membuf-crc@CHIP<>;
 
 event upset.memory.memlink@CHIP;
 
@@ -152,12 +152,12 @@ prop fault.memory.memlink@MEM_BUFF
 prop fault.memory.memlink@CHIP
     { DIAGNOSE_ERPT && CONTAINS_CHIP && SET_SERDN &&
     SET_SERDT && SET_RATIO } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF<>;
 
 prop fault.memory.memlink@MEM_CTRL
     { DIAGNOSE_ERPT && CONTAINS_MEMCTRL && SET_SERDN &&
     SET_SERDT && SET_RATIO } (1)->  
-    ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF<>;
 
 event upset.memory.memlink@MEM_BUFF;
 
@@ -175,7 +175,7 @@ prop fault.memory.memlink@MEM_CTRL
 prop fault.memory.memlink@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF && SET_SERDN &&
     SET_SERDT && SET_RATIO } (1)->
-    ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL;
+    ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL<>;
 
 event upset.memory.memlink@MEM_CTRL;
 
@@ -205,7 +205,7 @@ prop fault.memory.memlink-uc@CHIP
 
 prop fault.memory.memlink-uc@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP;
+    ereport.cpu.generic-sparc.membuf-crc-uc@CHIP<>;
 
 event upset.memory.memlink-uc@CHIP;
 
@@ -222,11 +222,11 @@ prop fault.memory.memlink-uc@MEM_BUFF
 
 prop fault.memory.memlink-uc@CHIP
     { DIAGNOSE_ERPT && CONTAINS_CHIP } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>;
 
 prop fault.memory.memlink-uc@MEM_CTRL
     { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>;
 
 event upset.memory.memlink-uc@MEM_BUFF;
 
@@ -243,7 +243,7 @@ prop fault.memory.memlink-uc@MEM_CTRL
 
 prop fault.memory.memlink-uc@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL;
+    ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL<>;
 
 event upset.memory.memlink-uc@MEM_CTRL;
 
@@ -274,7 +274,7 @@ prop fault.memory.memlink-failover@CHIP
 
 prop fault.memory.memlink-failover@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-failover@CHIP;
+    ereport.cpu.generic-sparc.membuf-crc-failover@CHIP<>;
 
 event upset.memory.memlink-failover@CHIP;
 
@@ -290,11 +290,11 @@ prop fault.memory.memlink-failover@MEM_BUFF
 
 prop fault.memory.memlink-failover@CHIP
     { DIAGNOSE_ERPT && CONTAINS_CHIP } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF<>;
 
 prop fault.memory.memlink-failover@MEM_CTRL
     { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF;
+    ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF<>;
 
 event upset.memory.memlink-failover@MEM_BUFF;
 
@@ -310,7 +310,7 @@ prop fault.memory.memlink-failover@MEM_CTRL
 
 prop fault.memory.memlink-failover@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
-    ereport.cpu.generic-sparc.membuf-crc-failover@MEM_CTRL;
+    ereport.cpu.generic-sparc.membuf-crc-failover@MEM_CTRL<>;
 
 event upset.memory.memlink-failover@MEM_CTRL;
 

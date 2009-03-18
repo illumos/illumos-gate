@@ -20,7 +20,7 @@
  */
 
 /* 
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -243,28 +243,28 @@ event fault.memory.dimm_ck@chip/memory-controller/dimm/rank,
 prop fault.memory.page_sb@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SINGLE_BIT_CE &&
       SB_PGFLTS + CK_PGFLTS < RANK_PGFLT_MAX && SET_ADDR && SET_OFFSET } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
-    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
-    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core<>/strand<>,
+    ereport.cpu.amd.bu.s_ecc1@chip/core<>/strand<>,
+    ereport.cpu.amd.nb.mem_ce@chip/core<>/strand<>;
 
 prop fault.memory.page_ck@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && !SINGLE_BIT_CE &&
       SB_PGFLTS + CK_PGFLTS < RANK_PGFLT_MAX && SET_ADDR && SET_OFFSET } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
-    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
-    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core<>/strand<>,
+    ereport.cpu.amd.bu.s_ecc1@chip/core<>/strand<>,
+    ereport.cpu.amd.nb.mem_ce@chip/core<>/strand<>;
 
 prop fault.memory.dimm_sb@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SB_PGFLTS + CK_PGFLTS > RANK_THRESH &&
       SB_PGFLTS > RANK_THRESH / 2 } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
-    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
-    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core<>/strand<>,
+    ereport.cpu.amd.bu.s_ecc1@chip/core<>/strand<>,
+    ereport.cpu.amd.nb.mem_ce@chip/core<>/strand<>;
 
 prop fault.memory.dimm_ck@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SB_PGFLTS + CK_PGFLTS > RANK_THRESH &&
       CK_PGFLTS > RANK_THRESH / 2 } (1)->
-    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
+    ereport.cpu.amd.nb.mem_ce@chip/core<>/strand<>;
 
 /*
  * If the address is not valid then no resource member will be included
@@ -306,17 +306,17 @@ event fault.memory.page_ue@chip/memory-controller/dimm/rank, message=0,
 
 prop fault.memory.dimm_ue@chip/memory-controller/dimm/rank
     { CONTAINS_RANK } (1)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/core/strand,
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/core/strand,
-    ereport.cpu.amd.bu.s_eccm@chip/core/strand,
-    ereport.cpu.amd.nb.mem_ue@chip/core/strand;
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/core<>/strand<>,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/core<>/strand<>,
+    ereport.cpu.amd.bu.s_eccm@chip/core<>/strand<>,
+    ereport.cpu.amd.nb.mem_ue@chip/core<>/strand<>;
 
 prop fault.memory.page_ue@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (1)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/core/strand,
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/core/strand,
-    ereport.cpu.amd.bu.s_eccm@chip/core/strand,
-    ereport.cpu.amd.nb.mem_ue@chip/core/strand;
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/core<>/strand<>,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/core<>/strand<>,
+    ereport.cpu.amd.bu.s_eccm@chip/core<>/strand<>,
+    ereport.cpu.amd.nb.mem_ue@chip/core<>/strand<>;
 
 event upset.memory.discard3@chip/core/strand;
 prop upset.memory.discard3@chip/core/strand
@@ -353,7 +353,7 @@ prop error.memory.cs_testfail@chip/memory-controller/chip-select (1)->
 	confprop(chip/memory-controller/chip-select, s) == \
 	confprop(chip/memory-controller/dimm/rank, "csname"))
 
-prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank (1)->
+prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank (0)->
     error.memory.cs_testfail@chip/memory-controller/chip-select
     { CSMATCH("dimm1-csname") || CSMATCH("dimm2-csname")};
 

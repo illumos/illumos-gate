@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4507,7 +4507,7 @@ bofi_dvma_sync(ddi_dma_handle_t h, uint_t index, uint_t view)
  * bofi intercept routine - gets called instead of users interrupt routine
  */
 static uint_t
-bofi_intercept_intr(caddr_t xp)
+bofi_intercept_intr(caddr_t xp, caddr_t arg2)
 {
 	struct bofi_errent *ep;
 	struct bofi_link   *lp;
@@ -4525,7 +4525,7 @@ bofi_intercept_intr(caddr_t xp)
 	 */
 	if (hp->link == NULL)
 		return (hp->save.intr.int_handler
-		    (hp->save.intr.int_handler_arg1, NULL));
+		    (hp->save.intr.int_handler_arg1, arg2));
 	mutex_enter(&bofi_mutex);
 	/*
 	 * look for any errdefs
@@ -4575,7 +4575,7 @@ bofi_intercept_intr(caddr_t xp)
 	 */
 	for (i = 0; i < intr_count; i++) {
 		result = hp->save.intr.int_handler
-		    (hp->save.intr.int_handler_arg1, NULL);
+		    (hp->save.intr.int_handler_arg1, arg2);
 		if (result == DDI_INTR_CLAIMED)
 			unclaimed_counter >>= 1;
 		else if (++unclaimed_counter >= 20)

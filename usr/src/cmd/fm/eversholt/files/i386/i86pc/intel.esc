@@ -20,7 +20,7 @@
  */
 
 /* 
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -280,7 +280,7 @@ prop fault.memory.intel.dimm_ce@dimm/rank
 prop error.memory.intel.dimm_ce@dimm
     { !confprop_defined(dimm, "dimm-size") &&
     count(stat.ce_pgflt@dimm) > 512 } (1)->
-    ereport.cpu.intel.nb.mem_ce@dimm/rank;
+    ereport.cpu.intel.nb.mem_ce@dimm/rank<>;
 
 #define DIMM_CE(dimm_size, n, t, fault_rate) \
 	prop fault.memory.intel.dimm_ce@dimm/rank { \
@@ -290,7 +290,7 @@ prop error.memory.intel.dimm_ce@dimm
 	prop error.memory.intel.dimm_ce@dimm { \
 	    confprop(dimm, "dimm-size") == dimm_size && \
 	    count(stat.ce_pgflt@dimm) > fault_rate } (1)-> \
-    	    ereport.cpu.intel.nb.mem_ce@dimm/rank;
+    	    ereport.cpu.intel.nb.mem_ce@dimm/rank<>;
 	
 DIMM_CE("8G", 8, 1week, 2000)
 DIMM_CE("4G", 4, 1week, 1500)

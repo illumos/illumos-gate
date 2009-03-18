@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma dictionary "PCIEX"
 
@@ -110,9 +108,9 @@ engine serd.io.pciex.flt-nf@PCIEXFN, N=NONFATAL_DPE_COUNT, T=NONFATAL_DPE_TIME;
 event fault.io.pciex.device-interr-unaf@PCIEXFN, FITrate=PCIEX_DEV_FIT,
 	engine=serd.io.pciex.flt-nf@PCIEXFN;
 
-engine serd.io.pciex.corrlink@PCIEXFN, N=CORRLINK_COUNT, T=CORRLINK_TIME;
+engine serd.io.device.nonfatal@PCIEXFN, N=CORRLINK_COUNT, T=CORRLINK_TIME;
 event fault.io.pciex.device-interr-corr@PCIEXFN, FITrate=PCIEX_DEV_FIT,
-	engine=serd.io.pciex.corrlink@PCIEXFN;
+	engine=serd.io.device.nonfatal@PCIEXFN;
 
 event fault.io.pciex.device-interr@pciexrc, FITrate=PCIEX_RC_FIT;
 
@@ -122,9 +120,9 @@ engine serd.io.pciex.flt-nf@pciexrc, N=NONFATAL_DPE_COUNT, T=NONFATAL_DPE_TIME;
 event fault.io.pciex.device-interr-unaf@pciexrc, FITrate=PCIEX_RC_FIT,
 	engine=serd.io.pciex.flt-nf@pciexrc;
 
-engine serd.io.pciex.corrlink@pciexrc, N=CORRLINK_COUNT, T=CORRLINK_TIME;
+engine serd.io.device.nonfatal@pciexrc, N=CORRLINK_COUNT, T=CORRLINK_TIME;
 event fault.io.pciex.device-interr-corr@pciexrc, FITrate=PCIEX_RC_FIT,
-	engine=serd.io.pciex.corrlink@pciexrc;
+	engine=serd.io.device.nonfatal@pciexrc;
 
 event fault.io.pciex.device-invreq@PCIEXFN, FITrate=PCIEX_DEV_INV_FIT;
 
@@ -191,7 +189,7 @@ prop error.io.device.f-device@PCIEXFN (1)->
     ereport.io.device.intern_corr@PCIEXFN,
     ereport.io.device.intern_uncorr@PCIEXFN;
 
-prop error.io.device.f-device@PCIEXFN (1)->
+prop error.io.device.f-device@PCIEXFN (0)->
     error.io.pciex.lost-d@PCIEXFN;
 
 prop error.io.device.deg-device@PCIEXFN (1)->
@@ -219,23 +217,37 @@ prop error.io.device.nf-device@PCIEXFN (1)->
 /*
  * handling of service impact ereports.
  */
-prop error.io.pciex.lost-d@PCIEXFN (0)->
+prop error.io.pciex.lost-d@PCIEXFN (1)->
     ereport.io.service.lost@PCIEXFN,
     error.io.pciex.lost-d@PCIEXFN/PCIEXFNHZ,
     error.io.pciex.lost-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pciex.lost-d@PCIFN (0)->
+prop error.io.pciex.lost-d@PCIEXFN (0)->
+    ereport.io.service.unaffected@PCIEXFN,
+    ereport.io.service.degraded@PCIEXFN;
+
+prop error.io.pciex.lost-d@PCIFN (1)->
     ereport.io.service.lost@PCIFN,
     error.io.pciex.lost-d@PCIFN/PCIFNHZ;
+
+prop error.io.pciex.lost-d@PCIFN (0)->
+    ereport.io.service.unaffected@PCIFN,
+    ereport.io.service.degraded@PCIFN;
 
 prop error.io.pciex.degraded-d@PCIEXFN (1)->
     ereport.io.service.degraded@PCIEXFN,
     error.io.pciex.degraded-d@PCIEXFN/PCIEXFNHZ,
     error.io.pciex.degraded-d@PCIEXFN/PCIFNHZ;
 
+prop error.io.pciex.degraded-d@PCIEXFN (0)->
+    ereport.io.service.unaffected@PCIEXFN;
+
 prop error.io.pciex.degraded-d@PCIFN (1)->
     ereport.io.service.degraded@PCIFN,
     error.io.pciex.degraded-d@PCIFN/PCIFNHZ;
+
+prop error.io.pciex.degraded-d@PCIFN (0)->
+    ereport.io.service.unaffected@PCIFN;
 
 prop error.io.pciex.noimpact-d@PCIEXFN (1)->
     ereport.io.service.unaffected@PCIEXFN,
@@ -288,7 +300,7 @@ prop fault.io.pciex.device-invreq@pciexrc (1)->
     error.io.pciex.badreq-d@pciexrc/PCIEXFNHZ;
 
 prop fault.io.pciex.device-interr-corr@pciexrc (1)->
-    error.io.pciex.corrlink@pciexrc/pciexbus<>;
+    error.io.pciex.corrlink@pciexrc/pciexbus<> { setserdsuffix("_corr") };
 
 prop fault.io.pciex.device-interr-unaf@pciexrc (1)->
     error.io.pciex.nf-poisecrc-d@pciexrc/PCIEXFNHZ;
@@ -340,13 +352,15 @@ prop fault.io.pciex.device-invreq@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.flt-badreq-u@PCIEXFN;
 
 prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SU(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@pciexbus;
+    error.io.pciex.corrlink@pciexbus { setserdsuffix("_corr") };
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_SU(PCIEXFN) } (1)->
     error.io.pciex.flt-nf-poisecrc-u@PCIEXFN;
 
-prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_LF(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@pciexbus,
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    error.io.pciex.corrlink@pciexbus { setserdsuffix("_corr") };
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_LF(PCIEXFN) } (0)->
     error.io.device.nf-device@PCIEXFN;
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_LF(PCIEXFN) } (1)->
@@ -397,7 +411,7 @@ prop fault.io.pciex.device-noresp@PCIEXFN { IS_SD(PCIEXFN) } (1)->
     error.io.pciex.nr-d@PCIEXFN/PCIEXFNHZ;
 
 prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@PCIEXFN/pciexbus<>;
+    error.io.pciex.corrlink@PCIEXFN/pciexbus<> { setserdsuffix("_corr") };
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_SD(PCIEXFN) } (1)->
     error.io.pciex.nf-poisecrc-d@PCIEXFN/PCIEXFNHZ;
@@ -481,7 +495,7 @@ prop fault.io.pciex.device-noresp@PCIEXFN { IS_BG(PCIEXFN) } (1)->
     error.io.pci.nr-drw-d@PCIEXFN/PCIFNHZ;
 
 prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_BG(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@pciexbus;
+    error.io.pciex.corrlink@pciexbus { setserdsuffix("_corr") };
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_BG(PCIEXFN) } (1)->
     error.io.pciex.flt-nf-poisecrc-u@PCIEXFN,
@@ -540,7 +554,7 @@ prop error.io.pciex.f-poisecrc-d@PCIEXFN (1)->
     error.io.pciex.poisreq-d@PCIEXFN,
     error.io.pciex.poiscomp-d@PCIEXFN;
 
-prop error.io.pciex.f-poisecrc-d@PCIEXFN (1)->
+prop error.io.pciex.f-poisecrc-d@PCIEXFN (0)->
     error.io.pciex.lost-d@PCIEXFN;
 
 prop error.io.pciex.deg-poisecrc-d@PCIEXFN (1)->
@@ -576,7 +590,7 @@ prop error.io.pciex.flt-f-poisecrc-u@PCIEXFN (1)->
     error.io.pciex.flt-poisreq-u@PCIEXFN,
     error.io.pciex.flt-poiscomp-u@PCIEXFN;
 
-prop error.io.pciex.flt-f-poisecrc-u@PCIEXFN (1)->
+prop error.io.pciex.flt-f-poisecrc-u@PCIEXFN (0)->
     error.io.pciex.lost-d@PCIEXFN;
 
 /*

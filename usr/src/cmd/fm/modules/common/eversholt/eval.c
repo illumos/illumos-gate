@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eval.c -- constraint evaluation module
@@ -526,7 +526,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		ASSERTinfo(np->u.expr.left->t == T_QUOTE,
 		    ptree_nodetype2str(np->u.expr.left->t));
 
-		if (arrowp->head->myevent->count == 0)
+		if (!(arrowp->head->myevent->cached_state & REQMNTS_CREDIBLE))
 			return (0);
 
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
@@ -587,7 +587,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		char *str;
 		struct event *flt = arrowp->tail->myevent;
 
-		if (arrowp->head->myevent->count == 0)
+		if (!(arrowp->head->myevent->cached_state & REQMNTS_CREDIBLE))
 			return (0);
 
 		if (funcname == L_setserdn)

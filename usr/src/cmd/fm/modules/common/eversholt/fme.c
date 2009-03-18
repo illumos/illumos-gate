@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.c -- fault management exercise module
@@ -3767,7 +3767,7 @@ requirements_test(struct fme *fmep, struct event *ep,
 				ep2 = ap->arrowp->head->myevent;
 				platform_set_payloadnvp(ep2->nvp);
 				(void) checkconstraints(fmep, ap->arrowp);
-				if (ap->arrowp->forever_true) {
+				if (!ap->arrowp->forever_false) {
 					/*
 					 * if all arrows are invalidated by the
 					 * constraints, then we should elide the
