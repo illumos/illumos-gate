@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -24,12 +23,15 @@
 #	  All Rights Reserved
 
 #
-#	Copyright (c) 1996-2000 by Sun Microsystems, Inc.
-#	All rights reserved.
-#ident	"%Z%%M%	%I%	%E% SMI"
+#	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+#	Use is subject to license terms.
 PATH=/usr/bin
 USAGE="usage: dircmp [-d] [-s] [-wn] dir1 dir2"
-trap "rm -f /usr/tmp/dc$$*;exit" 1 2 3 15
+
+TEMPDIR=`mktemp -d /var/tmp/dir.XXXXXX`
+if [ -z "$TEMPDIR" ]; then exit 1; fi 
+
+trap "rm -f -r $TEMPDIR;exit" 0 1 2 3 15
 typeset -i exitstat=0
 typeset -i sizediff
 typeset -i cmpdiff
@@ -50,15 +52,15 @@ function dodiffs {
 		*text)  ;;
 		*script) ;;
 		*empty*) echo $D1/`basename "$a"` is an empty file |
-			  pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
+			  pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
 			continue
         	;;
         	*cannot*) echo $D1/`basename "$a"` does not exist |
-			  pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
+			  pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
 			continue
         	;;
         	*)	echo $D1/`basename "$a"` is an object file |
-		   	  pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
+		   	  pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
 			continue
         	;;
 	esac
@@ -67,15 +69,15 @@ function dodiffs {
         	*text)  ;;
         	*script) ;;
         	*empty*) echo $D2/`basename "$a"` is an empty file |
-			  pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
+			  pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
 			continue
         	;;
         	*cannot*) echo $D2/`basename "$a"` does not exist |
-			  pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
+			  pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
 			continue
         	;;
         	*)	echo $D2/`basename "$a"` is an object file |
-			  pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
+			  pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
 			continue
         	;;
 	esac
@@ -87,9 +89,9 @@ function dodiffs {
 	then cmd="diff"
 	else cmd="bdiff"
 	fi
-	($cmd "$D1"/"$a" "$D2"/"$a"; echo $? > /usr/tmp/dc$$status) | \
-	    pr -h "diff of $a in $D1 and $D2" >> /usr/tmp/dc$$g
-	if [[ `cat /usr/tmp/dc$$status` != 0 ]]
+	($cmd "$D1"/"$a" "$D2"/"$a"; echo $? > $TEMPDIR/dc$$status) | \
+	    pr -h "diff of $a in $D1 and $D2" >> $TEMPDIR/dc$$g
+	if [[ `cat $TEMPDIR/dc$$status` != 0 ]]
 	then exitstat=$diffstat
 	fi
 }
@@ -132,17 +134,17 @@ fi
 # At this point, print those that are unique.
 #
 cd "$D1"
-find . -print | sort > /usr/tmp/dc$$a
+find . -print | sort > $TEMPDIR/dc$$a
 cd "$D0"
 cd "$D2"
-find . -print | sort > /usr/tmp/dc$$b
-comm /usr/tmp/dc$$a /usr/tmp/dc$$b | sed -n \
-	-e "/^		/w /usr/tmp/dc$$c" \
-	-e "/^	[^	]/w /usr/tmp/dc$$d" \
-	-e "/^[^	]/w /usr/tmp/dc$$e"
-rm -f /usr/tmp/dc$$a /usr/tmp/dc$$b
-pr -w${width} -h "$D1 only and $D2 only" -m /usr/tmp/dc$$e /usr/tmp/dc$$d
-rm -f /usr/tmp/dc$$e /usr/tmp/dc$$d
+find . -print | sort > $TEMPDIR/dc$$b
+comm $TEMPDIR/dc$$a $TEMPDIR/dc$$b | sed -n \
+	-e "/^		/w $TEMPDIR/dc$$c" \
+	-e "/^	[^	]/w $TEMPDIR/dc$$d" \
+	-e "/^[^	]/w $TEMPDIR/dc$$e"
+rm -f $TEMPDIR/dc$$a $TEMPDIR/dc$$b
+pr -w${width} -h "$D1 only and $D2 only" -m $TEMPDIR/dc$$e $TEMPDIR/dc$$d
+rm -f $TEMPDIR/dc$$e $TEMPDIR/dc$$d
 #
 # Generate long ls listings for those dirs/files common to both hierarchies.
 # Use -lgn to avoid problem when user or group names are too long, causing
@@ -154,19 +156,19 @@ rm -f /usr/tmp/dc$$e /usr/tmp/dc$$d
 #      '/tmp/foo -> FOO' becomes '/tmp/foo'
 
 # The following sed is to read filenames with special characters
-sed -e 's/..//'  -e  's/\([^-a-zA-Z0-9/_.]\)/\\\1/g' < /usr/tmp/dc$$c > /usr/tmp/dc$$f
+sed -e 's/..//'  -e  's/\([^-a-zA-Z0-9/_.]\)/\\\1/g' < $TEMPDIR/dc$$c > $TEMPDIR/dc$$f
 
 
-cat /usr/tmp/dc$$f | xargs ls -lLgnd | \
-  sed -e '/^[bc]/ s/, *//' -e '/^l/ s/ -> .*//' > /usr/tmp/dc$$i 2>/dev/null
+cat $TEMPDIR/dc$$f | xargs ls -lLgnd | \
+  sed -e '/^[bc]/ s/, *//' -e '/^l/ s/ -> .*//' > $TEMPDIR/dc$$i 2>/dev/null
 cd "$D0"
 cd "$D1"
 
 
-cat /usr/tmp/dc$$f | xargs ls -lLgnd | \
-sed -e '/^[bc]/ s/, *//' -e '/^l/ s/ -> .*//' > /usr/tmp/dc$$h 2>/dev/null
+cat $TEMPDIR/dc$$f | xargs ls -lLgnd | \
+sed -e '/^[bc]/ s/, *//' -e '/^l/ s/ -> .*//' > $TEMPDIR/dc$$h 2>/dev/null
 cd "$D0"
-> /usr/tmp/dc$$g
+> $TEMPDIR/dc$$g
 #
 # Process the results of the 'ls -lLgnd' to obtain file size info
 # and identify a large file's existence.
@@ -230,9 +232,8 @@ while read -u3 tmp tmp tmp fsize1 tmp tmp tmp a &&
 	elif (( Sflag != 1 ))
 	then echo "special  	$a"
 	fi
-done 3</usr/tmp/dc$$h 4</usr/tmp/dc$$i | pr -r -h "Comparison of $D1 $D2"
+done 3<$TEMPDIR/dc$$h 4<$TEMPDIR/dc$$i | pr -r -h "Comparison of $D1 $D2"
 if (( Dflag == 1 ))
-then cat /usr/tmp/dc$$g
+then cat $TEMPDIR/dc$$g
 fi
-rm -f /usr/tmp/dc$$*
 exit $exitstat
