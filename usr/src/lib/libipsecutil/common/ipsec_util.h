@@ -45,6 +45,7 @@ extern "C" {
 #include <err.h>
 #include <errfp.h>
 #include <net/pfpolicy.h>
+#include <libtecla.h>
 
 #ifndef A_CNT
 /* macros for array manipulation */
@@ -54,10 +55,16 @@ extern "C" {
 
 /* used for file parsing */
 #define	NBUF_SIZE	16
-#define	IBUF_SIZE	2048
 #define	COMMENT_CHAR	'#'
 #define	CONT_CHAR	'\\'
 #define	QUOTE_CHAR	'"'
+/*
+ * Input buffer size limits maximum line length for both file parsing and
+ * interactive mode. 4K chars should be enough even for broad commands and
+ * all possible key lenghts of today's symmetric ciphers entered via
+ * ipseckey(1M) which has the most bifurcated grammar from all IPsec commands.
+ */
+#define	IBUF_SIZE	4096
 
 /* used for command-line parsing */
 #define	START_ARG	8
@@ -163,7 +170,8 @@ extern boolean_t dump_sadb_idtype(uint8_t, FILE *, int *);
 /* callback function passed in to do_interactive() */
 typedef void (*parse_cmdln_fn)(int, char **, char *, boolean_t);
 
-extern void do_interactive(FILE *, char *, char *, char *, parse_cmdln_fn);
+extern void do_interactive(FILE *, char *, char *, char *, parse_cmdln_fn,
+    CplMatchFn *);
 
 extern uint_t lines_parsed;
 extern uint_t lines_added;

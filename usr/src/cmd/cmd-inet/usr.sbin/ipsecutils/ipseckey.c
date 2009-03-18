@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,16 @@ static boolean_t in_cluster_mode = B_FALSE;
 static uint64_t get_buffer[MAX_GET_SIZE];
 
 /*
+ * Disable default TAB completion for now (until some brave soul tackles it).
+ */
+/* ARGSUSED */
+static
+CPL_MATCH_FN(no_match)
+{
+	return (0);
+}
+
+/*
  * Create/Grow a buffer large enough to hold error messages. If *ebuf
  * is not NULL then it will contain a copy of the command line that
  * triggered the error/warning, copy this into a new buffer or
@@ -151,7 +161,7 @@ record_error(char *ep, char *ebuf, char *fmt, ...)
 }
 
 /*
- * Print usage message.
+ * If not in interactive mode print usage message and exit.
  */
 static void
 usage(void)
@@ -163,8 +173,11 @@ usage(void)
 		    gettext("\tipseckey [ -nvp ] -f infile\n"));
 		(void) fprintf(stderr,
 		    gettext("\tipseckey [ -nvp ] -s outfile\n"));
+		EXIT_FATAL(NULL);
+	} else {
+		(void) fprintf(stderr,
+		    gettext("Type help or ? for usage info\n"));
 	}
-	EXIT_FATAL(NULL);
 }
 
 
@@ -372,7 +385,7 @@ parsesatype(char *type, char *ebuf)
 			tt->token = SADB_SATYPE_UNSPEC;
 		}
 	}
-	handle_errors(ep, NULL, B_FALSE, B_FALSE);
+	handle_errors(ep, NULL, interactive ? B_TRUE : B_FALSE, B_FALSE);
 	return (tt->token);
 }
 
@@ -3060,12 +3073,14 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 }
 
 /*
- * "ipseckey monitor" should exit very gracefully if ^C is tapped.
+ * "ipseckey monitor" should exit very gracefully if ^C is tapped provided
+ * it is not running in interactive mode.
  */
 static void
 monitor_catch(int signal)
 {
-	errx(signal, gettext("Bailing on signal %d."), signal);
+	if (!interactive)
+		errx(signal, gettext("Bailing on signal %d."), signal);
 }
 
 /*
@@ -3075,10 +3090,15 @@ static void
 domonitor(boolean_t passive)
 {
 	struct sadb_msg *samsg;
+	struct sigaction newsig, oldsig;
 	int rc;
 
 	/* Catch ^C. */
-	(void) signal(SIGINT, monitor_catch);
+	newsig.sa_handler = monitor_catch;
+	newsig.sa_flags = 0;
+	(void) sigemptyset(&newsig.sa_mask);
+	(void) sigaddset(&newsig.sa_mask, SIGINT);
+	(void) sigaction(SIGINT, &newsig, &oldsig);
 
 	samsg = (struct sadb_msg *)get_buffer;
 	if (!passive) {
@@ -3098,8 +3118,12 @@ domonitor(boolean_t passive)
 		 * return 0.
 		 */
 		rc = read(keysock, samsg, sizeof (get_buffer));
-		if (rc == -1)
-			Bail("read (in domonitor)");
+		if (rc == -1) {
+			if (errno == EINTR && interactive)
+				goto out;
+			else
+				Bail("read (in domonitor)");
+		}
 		(void) printf(gettext("Read %d bytes.\n"), rc);
 		/*
 		 * Q:  Should I use the same method of printing as GET does?
@@ -3108,6 +3132,11 @@ domonitor(boolean_t passive)
 		print_samsg(stdout, get_buffer, B_TRUE, vflag, nflag);
 		(void) putchar('\n');
 	}
+
+out:
+	if (interactive)
+		/* restore SIGINT behavior */
+		(void) sigaction(SIGINT, &oldsig, NULL);
 }
 
 /*
@@ -3179,9 +3208,24 @@ dohelpcmd(char *cmds)
 		break;
 	case CMD_FLUSH:
 		puts_tr("flush - Delete all SAs");
+		puts_tr("");
+		puts_tr("Optional arguments:");
+		puts_tr("all        delete all SAs");
+		puts_tr("esp        delete just ESP SAs");
+		puts_tr("ah         delete just AH SAs");
+		puts_tr("<number>   delete just SAs with type given by number");
+		puts_tr("");
 		break;
 	case CMD_DUMP:
 		puts_tr("dump - Display all SAs");
+		puts_tr("");
+		puts_tr("Optional arguments:");
+		puts_tr("all        display all SAs");
+		puts_tr("esp        display just ESP SAs");
+		puts_tr("ah         display just AH SAs");
+		puts_tr("<number>   display just SAs with type "
+		    "given by number");
+		puts_tr("");
 		break;
 	case CMD_MONITOR:
 		puts_tr("monitor - Monitor all PF_KEY reply messages.");
@@ -3272,15 +3316,31 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 		if (read_cmdfile)
 			ERROR(ep, ebuf, gettext("Monitor not appropriate in "
 			    "config file."));
-		else
+		else {
 			domonitor(B_FALSE);
+			/*
+			 * Return from the function in interactive mode to
+			 * avoid error message in the next switch statement.
+			 * Also print newline to prevent prompt clobbering.
+			 * The same is done for CMD_PMONITOR.
+			 */
+			if (interactive) {
+				(void) printf("\n");
+				return;
+			}
+		}
 		break;
 	case CMD_PMONITOR:
 		if (read_cmdfile)
 			ERROR(ep, ebuf, gettext("Monitor not appropriate in "
 			    "config file."));
-		else
+		else {
 			domonitor(B_TRUE);
+			if (interactive) {
+				(void) printf("\n");
+				return;
+			}
+		}
 		break;
 	case CMD_QUIT:
 		EXIT_OK(NULL);
@@ -3309,6 +3369,12 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 
 	switch (cmd) {
 	case CMD_FLUSH:
+		if (argc > 2) {
+			ERROR(ep, ebuf, gettext("Too many arguments for "
+			    "flush command"));
+			handle_errors(ep, ebuf,
+			    interactive ? B_TRUE : B_FALSE, B_FALSE);
+		}
 		if (!cflag)
 			doflush(satype);
 		/*
@@ -3352,8 +3418,15 @@ parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 		if (read_cmdfile)
 			ERROR(ep, ebuf, gettext("Dump not appropriate in "
 			    "config file."));
-		else
+		else {
+			if (argc > 2) {
+				ERROR(ep, ebuf, gettext("Too many arguments "
+				    "for dump command"));
+				handle_errors(ep, ebuf,
+				    interactive ? B_TRUE : B_FALSE, B_FALSE);
+			}
 			dodump(satype, NULL);
+		}
 		break;
 	case CMD_SAVE:
 		if (read_cmdfile) {
@@ -3502,10 +3575,10 @@ main(int argc, char *argv[])
 		(void) fflush(stdout);
 		doflush(SADB_SATYPE_UNSPEC);
 	}
-	if (infile != stdin || *argv == NULL) {
+	if (infile != stdin || argc == 0) {
 		/* Go into interactive mode here. */
 		do_interactive(infile, configfile, "ipseckey> ", my_fmri,
-		    parseit);
+		    parseit, no_match);
 	}
 	parseit(argc, argv, NULL, B_FALSE);
 

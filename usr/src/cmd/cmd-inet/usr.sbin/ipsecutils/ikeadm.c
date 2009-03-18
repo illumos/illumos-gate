@@ -70,6 +70,16 @@ static int	doorfd = -1;
 #define	IKEADM_HELP_HELP	IKE_SVC_MAX + 11
 #define	IKEADM_EXIT		IKE_SVC_MAX + 12
 
+/*
+ * Disable default TAB completion for now (until some brave soul tackles it).
+ */
+/* ARGSUSED */
+static
+CPL_MATCH_FN(no_match)
+{
+	return (0);
+}
+
 static void
 command_complete(int s)
 {
@@ -87,6 +97,9 @@ usage()
 		(void) fprintf(stderr, gettext("Usage:\t"
 		    "ikeadm [ -hnp ] cmd obj [cmd-specific options]\n"));
 		(void) fprintf(stderr, gettext("      \tikeadm help\n"));
+	} else {
+		(void) fprintf(stderr,
+		    gettext("\nType help for usage info\n"));
 	}
 
 	command_complete(1);
@@ -115,7 +128,6 @@ print_help()
 	    "\thelp  [get|set|add|del|dump|flush|read|write|token|help]\n");
 	(void) printf("\texit  %s\n", gettext("exit the program"));
 	(void) printf("\tquit  %s\n", gettext("exit the program"));
-	(void) printf("\n");
 
 	command_complete(0);
 }
@@ -3098,13 +3110,25 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 
 	switch (cmd) {
 	case IKE_SVC_GET_DEFS:
+		if (argc != 0) {
+			print_get_help();
+			break;
+		}
 		do_getdefs(cmd);
 		break;
 	case IKE_SVC_GET_DBG:
 	case IKE_SVC_GET_PRIV:
+		if (argc != 0) {
+			print_get_help();
+			break;
+		}
 		do_getvar(cmd);
 		break;
 	case IKE_SVC_GET_STATS:
+		if (argc != 0) {
+			print_get_help();
+			break;
+		}
 		do_getstats(cmd);
 		break;
 	case IKE_SVC_SET_DBG:
@@ -3119,6 +3143,10 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 	case IKE_SVC_DUMP_RULES:
 	case IKE_SVC_DUMP_PS:
 	case IKE_SVC_DUMP_CERTCACHE:
+		if (argc != NULL) {
+			print_dump_help();
+			break;
+		}
 		do_dump(cmd);
 		break;
 	case IKE_SVC_GET_P1:
@@ -3135,6 +3163,10 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 		break;
 	case IKE_SVC_FLUSH_P1S:
 	case IKE_SVC_FLUSH_CERTCACHE:
+		if (argc != 0) {
+			print_flush_help();
+			break;
+		}
 		do_flush(cmd);
 		break;
 	case IKE_SVC_READ_RULES:
@@ -3227,7 +3259,8 @@ main(int argc, char **argv)
 
 	if (*argv == NULL) {
 		/* no cmd-line args, do interactive mode */
-		do_interactive(stdin, NULL, "ikeadm> ", NULL, parseit);
+		do_interactive(stdin, NULL, "ikeadm> ", NULL, parseit,
+		    no_match);
 	}
 
 	parseit(argc, argv, NULL, B_FALSE);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,10 @@
 
 #define	EFD(file) (((file) == stdout) ? stderr : (file))
 
+/* Limits for interactive mode. */
+#define	MAX_LINE_LEN	IBUF_SIZE
+#define	MAX_CMD_HIST	64000	/* in bytes */
+
 /* Set standard default/initial values for globals... */
 boolean_t pflag = B_FALSE;	/* paranoid w.r.t. printing keying material */
 boolean_t nflag = B_FALSE;	/* avoid nameservice? */
@@ -68,6 +72,7 @@ uint_t	lines_parsed = 0;
 jmp_buf	env;		/* for error recovery in interactive/readfile modes */
 char *my_fmri = NULL;
 FILE *debugfile = stderr;
+static GetLine *gl = NULL;	/* for interactive mode */
 
 /*
  * Print errno and exit if cmdline or readfile, reset state if interactive
@@ -437,16 +442,97 @@ create_argv(char *ibuf, int *newargc, char ***thisargv)
 }
 
 /*
+ * init interactive mode if needed and not yet initialized
+ */
+static void
+init_interactive(FILE *infile, CplMatchFn *match_fn)
+{
+	if (infile == stdin) {
+		if (gl == NULL) {
+			if ((gl = new_GetLine(MAX_LINE_LEN,
+			    MAX_CMD_HIST)) == NULL)
+				errx(1, dgettext(TEXT_DOMAIN,
+				    "tecla initialization failed"));
+
+			if (gl_customize_completion(gl, NULL,
+			    match_fn) != 0) {
+				(void) del_GetLine(gl);
+				errx(1, dgettext(TEXT_DOMAIN,
+				    "tab completion failed to initialize"));
+			}
+
+			/*
+			 * In interactive mode we only want to terminate
+			 * when explicitly requested (e.g. by a command).
+			 */
+			(void) sigset(SIGINT, SIG_IGN);
+		}
+	} else {
+		readfile = B_TRUE;
+	}
+}
+
+/*
+ * free tecla data structure
+ */
+static void
+fini_interactive(void)
+{
+	if (gl != NULL)
+		(void) del_GetLine(gl);
+}
+
+/*
+ * Get single input line, wrapping around interactive and non-interactive
+ * mode.
+ */
+static char *
+do_getstr(FILE *infile, char *prompt, char *ibuf, size_t ibuf_size)
+{
+	char	*line;
+
+	if (infile != stdin)
+		return (fgets(ibuf, ibuf_size, infile));
+
+	/*
+	 * If the user hits ^C then we want to catch it and
+	 * start over.  If the user hits EOF then we want to
+	 * bail out.
+	 */
+once_again:
+	line = gl_get_line(gl, prompt, NULL, -1);
+	if (gl_return_status(gl) == GLR_SIGNAL) {
+		gl_abandon_line(gl);
+		goto once_again;
+	} else if (gl_return_status(gl) == GLR_ERROR) {
+		gl_abandon_line(gl);
+		errx(1, dgettext(TEXT_DOMAIN, "Error reading terminal: %s\n"),
+		    gl_error_message(gl, NULL, 0));
+	} else {
+		if (line != NULL) {
+			if (strlcpy(ibuf, line, ibuf_size) >= ibuf_size)
+				warnx(dgettext(TEXT_DOMAIN,
+				    "Line too long (max=%d chars)"),
+				    ibuf_size);
+			line = ibuf;
+		}
+	}
+
+	return (line);
+}
+
+/*
  * Enter a mode where commands are read from a file.  Treat stdin special.
  */
 void
 do_interactive(FILE *infile, char *configfile, char *promptstring,
-    char *my_fmri, parse_cmdln_fn parseit)
+    char *my_fmri, parse_cmdln_fn parseit, CplMatchFn *match_fn)
 {
 	char		ibuf[IBUF_SIZE], holder[IBUF_SIZE];
 	char		*hptr, **thisargv, *ebuf;
 	int		thisargc;
 	boolean_t	continue_in_progress = B_FALSE;
+	char		*s;
 
 	(void) setjmp(env);
 
@@ -454,14 +540,10 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 	interactive = B_TRUE;
 	bzero(ibuf, IBUF_SIZE);
 
-	if (infile == stdin) {
-		(void) printf("%s", promptstring);
-		(void) fflush(stdout);
-	} else {
-		readfile = B_TRUE;
-	}
+	/* panics for us */
+	init_interactive(infile, match_fn);
 
-	while (fgets(ibuf, IBUF_SIZE, infile) != NULL) {
+	while ((s = do_getstr(infile, promptstring, ibuf, IBUF_SIZE)) != NULL) {
 		if (readfile)
 			lineno++;
 		thisargc = 0;
@@ -472,8 +554,15 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 		 * be null-terminated because of fgets().
 		 */
 		if (ibuf[IBUF_SIZE - 2] != '\0') {
-			ipsecutil_exit(SERVICE_FATAL, my_fmri, debugfile,
-			    dgettext(TEXT_DOMAIN, "Line %d too big."), lineno);
+			if (infile == stdin) {
+				/* do_getstr() issued a warning already */
+				bzero(ibuf, IBUF_SIZE);
+				continue;
+			} else {
+				ipsecutil_exit(SERVICE_FATAL, my_fmri,
+				    debugfile, dgettext(TEXT_DOMAIN,
+				    "Line %d too big."), lineno);
+			}
 		}
 
 		if (!continue_in_progress) {
@@ -621,9 +710,14 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 				    lines_added);
 		}
 	} else {
-		(void) putchar('\n');
+		/* no newline upon Ctrl-D */
+		if (s != NULL)
+			(void) putchar('\n');
 		(void) fflush(stdout);
 	}
+
+	fini_interactive();
+
 	EXIT_OK(NULL);
 }
 
