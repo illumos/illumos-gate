@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1304,10 +1304,20 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 
 	/* check if a monitor detected a delegation conflict */
 	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		if (in_crit)
+			nbl_end_crit(vp);
 		VN_RELE(vp);
 		/* mark as wouldblock so response is dropped */
 		curthread->t_flag |= T_WOULDBLOCK;
 		mutex_enter(&rfs_async_write_lock);
+		if (rfs_async_write_head == nlp)
+			rfs_async_write_head = nlp->next;
+		else {
+			lp = rfs_async_write_head;
+			while (lp->next != nlp)
+				lp = lp->next;
+			lp->next = nlp->next;
+		}
 		for (rp = nlp->list; rp != NULL; rp = rp->list) {
 			if (rp->ns->ns_status == RFSWRITE_INITVAL) {
 				rp->ns->ns_status = puterrno(error);
