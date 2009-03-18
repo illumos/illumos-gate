@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -306,7 +306,7 @@ r_net_read(SVCXPRT *xprt)
 		(void) svc_sendreply(xprt, xdr_readres, (char *)&resp);
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-			"r_net_read: EPROTO cd out or not enabled");
+		    "!r_net_read: EPROTO cd out or not enabled");
 #endif
 		return;
 	}
@@ -329,7 +329,7 @@ r_net_read(SVCXPRT *xprt)
 				if (dset = rdc_net_get_set(diskio.cd, st)) {
 					rdc_net_del_set(diskio.cd, dset);
 				} else {
-					cmn_err(CE_NOTE, "r_net_read: get_set "
+					cmn_err(CE_NOTE, "!r_net_read: get_set "
 					    "has failed in cleanup");
 				}
 			}
@@ -341,9 +341,8 @@ r_net_read(SVCXPRT *xprt)
 
 #ifdef DEBUG
 	if ((diskio.flag & RDC_RREAD_DATA) == 0) {
-		cmn_err(CE_WARN,
-			"r_net_read: received non-DATA rpc! flag %x",
-			diskio.flag);
+		cmn_err(CE_WARN, "!r_net_read: received non-DATA rpc! flag %x",
+		    diskio.flag);
 	}
 #endif
 
@@ -395,10 +394,6 @@ r_net_read(SVCXPRT *xprt)
 		resp.rr_bufsize = FBA_SIZE(diskio.len);
 		buffer = kmem_alloc(resp.rr_bufsize, KM_NOSLEEP);
 		if (!buffer) {
-#ifdef DEBUG
-			cmn_err(CE_NOTE,
-			    "r_net_read: failed kmem_alloc");
-#endif
 			resp.rr_status = RDCERR_NOMEM;
 		} else {
 			resp.rr_data = buffer;
@@ -468,8 +463,7 @@ r_net_read6(SVCXPRT *xprt)
 		resp.rr_status = RDCERR_NOENT;
 		(void) svc_sendreply(xprt, xdr_readres, (char *)&resp);
 #ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"r_net_read6: EPROTO cd out or not enabled");
+		cmn_err(CE_NOTE, "!r_net_read6: EPROTO cd out or not enabled");
 #endif
 		return;
 	}
@@ -492,7 +486,7 @@ r_net_read6(SVCXPRT *xprt)
 				if (dset = rdc_net_get_set(diskio.cd, st)) {
 					rdc_net_del_set(diskio.cd, dset);
 				} else {
-					cmn_err(CE_NOTE, "read6: get_set "
+					cmn_err(CE_NOTE, "!read6: get_set "
 					    "has failed in cleanup");
 				}
 			}
@@ -504,9 +498,8 @@ r_net_read6(SVCXPRT *xprt)
 
 #ifdef DEBUG
 	if ((diskio.flag & RDC_RREAD_DATA) == 0) {
-		cmn_err(CE_WARN,
-			"read6: received non-DATA rpc! flag %x",
-			diskio.flag);
+		cmn_err(CE_WARN, "!read6: received non-DATA rpc! flag %x",
+		    diskio.flag);
 	}
 #endif
 
@@ -558,10 +551,6 @@ r_net_read6(SVCXPRT *xprt)
 		resp.rr_bufsize = FBA_SIZE(diskio.len);
 		buffer = kmem_alloc(resp.rr_bufsize, KM_NOSLEEP);
 		if (!buffer) {
-#ifdef DEBUG
-			cmn_err(CE_NOTE,
-			    "read6: failed kmem_alloc");
-#endif
 			resp.rr_status = RDCERR_NOMEM;
 		} else {
 			resp.rr_data = buffer;
@@ -627,10 +616,6 @@ r_net_write5(SVCXPRT *xprt)
 	diskio.data.data_val = kmem_alloc(RDC_MAXDATA, KM_NOSLEEP);
 
 	if (!diskio.data.data_val) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"r_net_write5: kmem_alloc failed: status IO_FAILED");
-#endif
 		ret2 = ENOMEM;
 		goto out;
 	}
@@ -639,16 +624,14 @@ r_net_write5(SVCXPRT *xprt)
 	if (!st) {
 		ret2 = ENOMEM;
 #ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"r_net_write5:SVC_GETARGS failed: st  %d", st);
+		cmn_err(CE_NOTE, "!r_net_write5:SVC_GETARGS failed: st %d", st);
 #endif
 		goto out;
 	}
 	if ((diskio.cd >= rdc_max_sets) || (diskio.cd < 0)) {
 		ret2 = EPROTO;
 #ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"r_net_write6: EPROTO cd out or not enabled");
+		cmn_err(CE_NOTE, "!r_net_write6: EPROTO cd out or not enabled");
 #endif
 		goto out;
 	}
@@ -660,8 +643,7 @@ r_net_write5(SVCXPRT *xprt)
 	if (!IS_ENABLED(urdc) || IS_STATE(urdc, RDC_LOGGING)) {
 		ret2 = EPROTO;
 #ifdef DEBUG
-		cmn_err(CE_NOTE,
-		    "r_net_write6: cd logging or not enabled (%x)",
+		cmn_err(CE_NOTE, "!r_net_write6: cd logging / not enabled (%x)",
 		    rdc_get_vflags(urdc));
 #endif
 		krdc = NULL; /* so we don't try to unqueue kstat entry */
@@ -680,8 +662,8 @@ r_net_write5(SVCXPRT *xprt)
 		dset = rdc_net_add_set(diskio.cd);
 		if (dset == NULL) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE,
-			    "r_net_write5: failed to add dataset");
+			cmn_err(CE_NOTE, "!r_net_write5: "
+			    "failed to add dataset");
 #endif
 			ret2 = EIO;
 			goto out;
@@ -694,10 +676,6 @@ r_net_write5(SVCXPRT *xprt)
 		ditem = kmem_alloc(sizeof (rdc_net_dataitem_t), KM_NOSLEEP);
 		if (ditem == NULL) {
 			ret2 = ENOMEM;
-#ifdef DEBUG
-			cmn_err(CE_NOTE,
-			    "r_net_write5: alloc of ditem failed");
-#endif
 			goto out;
 		}
 		RDC_DSMEMUSE(sizeof (rdc_net_dataitem_t));
@@ -754,7 +732,7 @@ r_net_write5(SVCXPRT *xprt)
 			ret2 = EPROTO;
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "r_net_write5: net_get_set failed cd %d idx %d",
+			    "!r_net_write5: net_get_set failed cd %d idx %d",
 			    diskio.cd, diskio.idx);
 #endif
 			goto out;
@@ -799,8 +777,8 @@ out:
 	 */
 	if (!st || !RDC_SUCCESS(ret2)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "r_net_write5 error case? st %x ret %d",
-			st, ret2);
+		cmn_err(CE_WARN, "!r_net_write5 error case? st %x ret %d",
+		    st, ret2);
 #endif
 		if (dset) {
 			rdc_net_del_set(diskio.cd, dset);
@@ -848,10 +826,6 @@ r_net_write6(SVCXPRT *xprt)
 	diskio.data.data_val = kmem_alloc(RDC_MAXDATA, KM_NOSLEEP);
 
 	if (!diskio.data.data_val) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"r_net_write6: kmem_alloc failed: status IO_FAILED");
-#endif
 		ret2 = ENOMEM;
 		goto out;
 	}
@@ -861,7 +835,7 @@ r_net_write6(SVCXPRT *xprt)
 		ret2 = ENOMEM;
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		    "r_net_write6:SVC_GETARGS failed: st  %d", st);
+		    "!r_net_write6:SVC_GETARGS failed: st  %d", st);
 #endif
 		goto out;
 	}
@@ -869,8 +843,7 @@ r_net_write6(SVCXPRT *xprt)
 	if ((diskio.cd >= rdc_max_sets) || (diskio.cd < 0)) {
 		ret2 = EPROTO;
 #ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"r_net_write6: EPROTO cd out or not enabled");
+		cmn_err(CE_NOTE, "!r_net_write6: EPROTO cd out or not enabled");
 #endif
 		goto out;
 	}
@@ -885,7 +858,7 @@ r_net_write6(SVCXPRT *xprt)
 		ret2 = EPROTO;
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		    "r_net_write6: cd logging or not enabled (%x)",
+		    "!r_net_write6: cd logging or not enabled (%x)",
 		    rdc_get_vflags(urdc));
 #endif
 		krdc = NULL; /* so we don't try to unqueue kstat entry */
@@ -897,7 +870,7 @@ r_net_write6(SVCXPRT *xprt)
 		ret2 = EIO;
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		    "r_net_write6: No group structure for set %s:%s",
+		    "!r_net_write6: No group structure for set %s:%s",
 		    urdc->secondary.intf, urdc->secondary.file);
 #endif
 		krdc = NULL; /* so we don't try to unqueue kstat entry */
@@ -907,7 +880,7 @@ r_net_write6(SVCXPRT *xprt)
 #ifdef DEBUG
 	if (rdc_netwrite6) {
 		cmn_err(CE_NOTE,
-		    "r_net_write6: idx %d seq %u current seq %u pos %llu "
+		    "!r_net_write6: idx %d seq %u current seq %u pos %llu "
 		    "len %d sfba %llu nfba %d endoblk %d",
 		    diskio.idx, diskio.seq, group->seq,
 		    (unsigned long long)diskio.pos, diskio.len,
@@ -928,7 +901,7 @@ r_net_write6(SVCXPRT *xprt)
 		if (dset == NULL) {
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "r_net_write6: failed to add dataset");
+			    "!r_net_write6: failed to add dataset");
 #endif
 			ret2 = EIO;
 			goto out;
@@ -941,10 +914,6 @@ r_net_write6(SVCXPRT *xprt)
 		ditem = kmem_alloc(sizeof (rdc_net_dataitem_t), KM_NOSLEEP);
 		if (ditem == NULL) {
 			ret2 = ENOMEM;
-#ifdef DEBUG
-			cmn_err(CE_NOTE,
-			    "r_net_write6: alloc of ditem failed");
-#endif
 			goto out;
 		}
 		RDC_DSMEMUSE(sizeof (rdc_net_dataitem_t));
@@ -1001,7 +970,7 @@ r_net_write6(SVCXPRT *xprt)
 			ret2 = EPROTO;
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "r_net_write6: net_get_set failed cd %d idx %d "
+			    "!r_net_write6: net_get_set failed cd %d idx %d "
 			    "packet sequence %u expected seq %u",
 			    diskio.cd, diskio.idx, diskio.seq, group->seq);
 #endif
@@ -1065,7 +1034,7 @@ r_net_write6(SVCXPRT *xprt)
 				}
 				if (!RDC_INFRONT(diskio.seq, maxseq)) {
 #ifdef	DEBUG
-					cmn_err(CE_WARN, "net_write6: Queue "
+					cmn_err(CE_WARN, "!net_write6: Queue "
 					    "size %d exceeded seqack %u "
 					    "this seq %u maxseq %u seq %u",
 					    RDC_MAXPENDQ, group->seqack,
@@ -1134,7 +1103,7 @@ r_net_write6(SVCXPRT *xprt)
 		dset = NULL;
 #ifdef	DEBUG
 		if (!RDC_SUCCESS(ret2)) {
-			cmn_err(CE_WARN, "r_net_write6: writemaxfba failed %d",
+			cmn_err(CE_WARN, "!r_net_write6: writemaxfba failed %d",
 			    ret2);
 		}
 #endif
@@ -1177,7 +1146,7 @@ out:
 	 */
 	if (!st || !RDC_SUCCESS(ret2)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "r_net_write6 error st %x ret %d seq %u",
+		cmn_err(CE_WARN, "!r_net_write6 error st %x ret %d seq %u",
 		    st, ret2, diskio.seq);
 #endif
 		if (dset) {
@@ -1214,9 +1183,9 @@ r_net_ping4(SVCXPRT *xprt, struct svc_req *req)
 
 		for (ip = rdc_if_top; ip; ip = ip->next) {
 			if ((bcmp(ping.p_ifaddr, ip->ifaddr.buf,
-							RDC_MAXADDR) == 0) &&
+			    RDC_MAXADDR) == 0) &&
 			    (bcmp(ping.s_ifaddr, ip->r_ifaddr.buf,
-							RDC_MAXADDR) == 0)) {
+			    RDC_MAXADDR) == 0)) {
 				ip->new_pulse++;
 				ip->deadness = 1;
 
@@ -1231,7 +1200,7 @@ r_net_ping4(SVCXPRT *xprt, struct svc_req *req)
 	} else {
 		svcerr_decode(xprt);
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "SNDR: couldn't get ping4 arguments");
+		cmn_err(CE_NOTE, "!SNDR: couldn't get ping4 arguments");
 #endif
 	}
 
@@ -1264,9 +1233,9 @@ r_net_ping7(SVCXPRT *xprt, struct svc_req *req)
 
 		for (ip = rdc_if_top; ip; ip = ip->next) {
 			if ((bcmp(ping.p_ifaddr.buf, ip->ifaddr.buf,
-						ping.p_ifaddr.len) == 0) &&
+			    ping.p_ifaddr.len) == 0) &&
 			    (bcmp(ping.s_ifaddr.buf, ip->r_ifaddr.buf,
-						ping.s_ifaddr.len) == 0)) {
+			    ping.s_ifaddr.len) == 0)) {
 				ip->new_pulse++;
 				ip->deadness = 1;
 
@@ -1281,7 +1250,7 @@ r_net_ping7(SVCXPRT *xprt, struct svc_req *req)
 	} else {
 		svcerr_decode(xprt);
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "SNDR: couldn't get ping7 arguments");
+		cmn_err(CE_NOTE, "!SNDR: couldn't get ping7 arguments");
 #endif
 	}
 
@@ -1347,7 +1316,7 @@ r_net_bmap6(SVCXPRT *xprt)
 	 */
 	if (ret == 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "Bitmap clear in r_net_bmap6");
+		cmn_err(CE_NOTE, "!Bitmap clear in r_net_bmap6");
 #endif
 		RDC_ZERO_BITMAP(krdc);
 		rdc_many_enter(krdc);
@@ -1432,7 +1401,7 @@ r_net_bdata6(SVCXPRT *xprt)
 	 */
 	if ((ret == 0) && bd.endoblk && (krdc->bitmap_write > 0)) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "r_net_bdata6: Written bitmap for %s:%s",
+		cmn_err(CE_NOTE, "!r_net_bdata6: Written bitmap for %s:%s",
 		    urdc->secondary.intf, urdc->secondary.file);
 #endif
 		ret = rdc_write_bitmap(krdc);
@@ -1527,7 +1496,7 @@ r_net_state4(SVCXPRT *xprt)
 		if (index < 0 || (krdc->type_flag & RDC_DISABLEPEND)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "r_net_state: no index or disable pending");
+			    "!r_net_state: no index or disable pending");
 #endif
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
@@ -1538,15 +1507,14 @@ r_net_state4(SVCXPRT *xprt)
 		if (!IS_ENABLED(urdc)) {
 			index = -1;
 #ifdef DEBUG
-			cmn_err(CE_WARN,
-			    "r_net_state: set not enabled ");
+			cmn_err(CE_WARN, "!r_net_state: set not enabled ");
 #endif
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
 		}
 
 		if (krdc->lsrv == NULL) {
-			cmn_err(CE_NOTE, "r_net_state: no valid svp\n");
+			cmn_err(CE_NOTE, "!r_net_state: no valid svp\n");
 			index = -1;
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
@@ -1554,8 +1522,7 @@ r_net_state4(SVCXPRT *xprt)
 		if (!krdc || !krdc->group) {
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "r_net_state: no valid krdc %p\n",
-			    (void*)krdc);
+			    "!r_net_state: no valid krdc %p\n", (void*)krdc);
 #endif
 			index = -1;
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
@@ -1567,8 +1534,7 @@ r_net_state4(SVCXPRT *xprt)
 			mutex_exit(&rdc_conf_lock);
 			index = -1;
 #ifdef DEBUG
-			cmn_err(CE_WARN,
-			    "r_net_state: disable pending");
+			cmn_err(CE_WARN, "!r_net_state: disable pending");
 #endif
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
@@ -1726,7 +1692,7 @@ out:
 	if (log) {
 		rdc_group_enter(krdc);
 		rdc_group_log(krdc, RDC_NOFLUSH | RDC_OTHERREMOTE,
-			"Sync aborted or logging started");
+		    "Sync aborted or logging started");
 		rdc_group_exit(krdc);
 	}
 }
@@ -1777,7 +1743,7 @@ r_net_state(SVCXPRT *xprt)
 		if (index < 0 || (krdc->type_flag & RDC_DISABLEPEND)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "r_net_state: no index or disable pending");
+			    "!r_net_state: no index or disable pending");
 #endif
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
@@ -1788,15 +1754,14 @@ r_net_state(SVCXPRT *xprt)
 		if (!IS_ENABLED(urdc)) {
 			index = -1;
 #ifdef DEBUG
-			cmn_err(CE_WARN,
-			    "r_net_state: set not enabled ");
+			cmn_err(CE_WARN, "!r_net_state: set not enabled ");
 #endif
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
 		}
 
 		if (krdc->lsrv == NULL) {
-			cmn_err(CE_NOTE, "r_net_state: no valid svp\n");
+			cmn_err(CE_NOTE, "!r_net_state: no valid svp\n");
 			index = -1;
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
@@ -1804,8 +1769,7 @@ r_net_state(SVCXPRT *xprt)
 		if (!krdc || !krdc->group) {
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "r_net_state: no valid krdc %p\n",
-			    (void*)krdc);
+			    "!r_net_state: no valid krdc %p\n", (void*)krdc);
 #endif
 			index = -1;
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
@@ -1817,8 +1781,7 @@ r_net_state(SVCXPRT *xprt)
 			mutex_exit(&rdc_conf_lock);
 			index = -1;
 #ifdef DEBUG
-			cmn_err(CE_WARN,
-			    "r_net_state: disable pending");
+			cmn_err(CE_WARN, "!r_net_state: disable pending");
 #endif
 			(void) svc_sendreply(xprt, xdr_int, (char *)&index);
 			return;
@@ -1976,7 +1939,7 @@ out:
 	if (log) {
 		rdc_group_enter(krdc);
 		rdc_group_log(krdc, RDC_NOFLUSH | RDC_OTHERREMOTE,
-			"Sync aborted or logging started");
+		    "Sync aborted or logging started");
 		rdc_group_exit(krdc);
 	}
 	free_rdc_netbuf(&(state.netaddr));
@@ -2105,9 +2068,8 @@ rdc_dsetcopy(rdc_net_dataset_t *dset, nsc_vec_t *invec, nsc_off_t fba_pos,
 	if (!bdata || !dset || !invec) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		    "rdc: dsetcopy: parameters failed bdata %p, dset %p "
-		    "invec %p",
-		    (void *)bdata, (void *)dset, (void *)invec);
+		    "!rdc: dsetcopy: parameters failed bdata %p, dset %p "
+		    "invec %p", (void *)bdata, (void *)dset, (void *)invec);
 #endif
 		return (FALSE);
 	}
@@ -2116,7 +2078,7 @@ rdc_dsetcopy(rdc_net_dataset_t *dset, nsc_vec_t *invec, nsc_off_t fba_pos,
 	    (dir != COPY_IN && dir != COPY_OUT)) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		"rdc: dsetcopy: params failed fba_len %" NSC_SZFMT
+		    "!rdc: dsetcopy: params failed fba_len %" NSC_SZFMT
 		    " fba_pos %" NSC_SZFMT ", dir %d", fba_len, fba_pos, dir);
 #endif
 		return (FALSE);
@@ -2128,14 +2090,14 @@ rdc_dsetcopy(rdc_net_dataset_t *dset, nsc_vec_t *invec, nsc_off_t fba_pos,
 
 	if (!len) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc: dsetcopy: len = 0");
+		cmn_err(CE_NOTE, "!rdc: dsetcopy: len = 0");
 #endif
 		return (FALSE);
 	}
 
 	if (len != blen) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc: dsetcopy: len %d != blen %d", len, blen);
+		cmn_err(CE_NOTE, "!rdc:dsetcopy: len %d != blen %d", len, blen);
 #endif
 		if (len > blen)
 			len = blen;
@@ -2145,10 +2107,9 @@ rdc_dsetcopy(rdc_net_dataset_t *dset, nsc_vec_t *invec, nsc_off_t fba_pos,
 		/* should never happen */
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		    "rdc: dsetcopy: handle limits pos %" NSC_SZFMT " (%"
+		    "!rdc: dsetcopy: handle limits pos %" NSC_SZFMT " (%"
 		    NSC_SZFMT ") len %" NSC_SZFMT " (%" NSC_SZFMT ")",
-		    fba_pos, dset->pos, fba_len,
-		    dset->fbalen);
+		    fba_pos, dset->pos, fba_len, dset->fbalen);
 #endif
 		return (FALSE);	/* Don't overrun handle */
 	}
@@ -2219,8 +2180,8 @@ rdc_start_server(struct rdc_svc_args *args, int mode)
 	fp = getf(STRUCT_FGET(rs, fd));
 	if (fp == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_start_server fd %d, fp %p", args->fd,
-			(void *) fp);
+		cmn_err(CE_WARN, "!rdc_start_server fd %d, fp %p", args->fd,
+		    (void *) fp);
 #endif
 		return (EBADF);
 	}
@@ -2288,7 +2249,7 @@ rdc_sleepq(rdc_group_t *group, rdc_sleepq_t *sq)
 		group->sleepq = sq;
 	} else {
 		if (sq->seq == group->sleepq->seq) {
-			cmn_err(CE_WARN, "rdc_sleepq: Attempt to "
+			cmn_err(CE_WARN, "!rdc_sleepq: Attempt to "
 			    "add duplicate request to queue %d", sq->seq);
 			return (1);
 		}
@@ -2300,7 +2261,7 @@ rdc_sleepq(rdc_group_t *group, rdc_sleepq_t *sq)
 
 			while (findsq->next) {
 				if (sq->seq == findsq->next->seq) {
-					cmn_err(CE_WARN, "rdc_sleepq: "
+					cmn_err(CE_WARN, "!rdc_sleepq: "
 					    "Attempt to add duplicate "
 					    "request to queue %d", sq->seq);
 					return (1);
@@ -2386,7 +2347,7 @@ rdc_writemaxfba(rdc_k_info_t *krdc, rdc_u_info_t *urdc,
 	} while ((ret == EINTR) && (eintr_count < MAX_EINTR_COUNT));
 	if (ret != 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_writemaxfba: reserve devs "
+		cmn_err(CE_NOTE, "!rdc_writemaxfba: reserve devs "
 		    "failed %d", ret);
 #endif
 		goto out;
@@ -2399,7 +2360,7 @@ rdc_writemaxfba(rdc_k_info_t *krdc, rdc_u_info_t *urdc,
 	ret = nsc_maxfbas(RDC_U_FD(krdc), 0, &mfba);
 	if (ret != 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_writemaxfba: msc_maxfbas failed %d",
+		cmn_err(CE_NOTE, "!rdc_writemaxfba: msc_maxfbas failed %d",
 		    ret);
 #endif
 		goto out;
@@ -2434,7 +2395,7 @@ rdc_writemaxfba(rdc_k_info_t *krdc, rdc_u_info_t *urdc,
 		    NSC_WRBUF|NSC_NODATA|nocache, &handle);
 		if (ret != 0) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "rdc_writemaxfba: "
+			cmn_err(CE_NOTE, "!rdc_writemaxfba: "
 			    "nsc_alloc (d1) buf failed %d at "
 			    "pos %" NSC_SZFMT " len %" NSC_SZFMT,
 			    ret, pos, wsize);
@@ -2445,7 +2406,7 @@ rdc_writemaxfba(rdc_k_info_t *krdc, rdc_u_info_t *urdc,
 		ret = rdc_combywrite(krdc, handle);
 		if (ret != 0) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "rdc_writemaxfba: "
+			cmn_err(CE_NOTE, "!rdc_writemaxfba: "
 			    "write failed (d1) %d offset %" NSC_SZFMT " "
 			    "length %" NSC_SZFMT, ret, pos, wsize);
 #endif
@@ -2475,14 +2436,14 @@ out:
 			 * This string is used in the ZatoIchi MASNDR
 			 * tests, if you change this, update the test.
 			 */
-			cmn_err(CE_NOTE, "writemaxfba: Write "
+			cmn_err(CE_NOTE, "!writemaxfba: Write "
 			    "sequence %u", seq);
 		}
 #endif
 		if (krdc->io_kstats) {
 			KSTAT_IO_PTR(krdc->io_kstats)->writes++;
 			KSTAT_IO_PTR(krdc->io_kstats)->nwritten +=
-				FBA_SIZE(kstat_len);
+			    FBA_SIZE(kstat_len);
 		}
 	}
 	if (handle)
@@ -2546,7 +2507,7 @@ rdc_combywrite(rdc_k_info_t *krdc, nsc_buf_t *handle)
 		    handle->sb_len, 0, ktmp);
 		if (!RDC_SUCCESS(multiret)) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "combywrite: "
+			cmn_err(CE_NOTE, "!combywrite: "
 			    "rdc_multi_write failed "
 			    "status %d ret %d",
 			    handle->sb_error, multiret);
@@ -2654,7 +2615,7 @@ rdc_dopending(rdc_group_t *group, netwriteres *netretp)
 		dset = rdc_net_get_set(sq->sindex, sq->idx);
 		if (dset == NULL) {
 #ifdef	DEBUG
-			cmn_err(CE_NOTE, "pending: %s:%s rdc_net_get_set "
+			cmn_err(CE_NOTE, "!pending: %s:%s rdc_net_get_set "
 			    "failed", urdc->secondary.intf,
 			    urdc->secondary.file);
 #endif
@@ -2674,7 +2635,7 @@ rdc_dopending(rdc_group_t *group, netwriteres *netretp)
 			rdc_setbitind(&pendcnt, pendvec, dset,
 			    sq->seq, sq->pindex, sq->qpos);
 		} else {
-			cmn_err(CE_WARN, "dopending: Write of pending "
+			cmn_err(CE_WARN, "!dopending: Write of pending "
 			    "asynchronous task failed, with "
 			    "sequence number %u for SNDR set %s:%s",
 			    sq->seq, urdc->secondary.intf,
@@ -2693,8 +2654,7 @@ cleansq:
 		int vecsz;
 #ifdef DEBUG
 		if (rdc_netwrite6) {
-			cmn_err(CE_NOTE, "packing pend, count %d",
-			    pendcnt);
+			cmn_err(CE_NOTE, "!packing pend, count %d", pendcnt);
 		}
 #endif
 		vecsz = pendcnt * sizeof (net_pendvec_t);
@@ -2724,9 +2684,6 @@ rdc_dset2vec(rdc_net_dataset_t *dset)
 	vecret = kmem_alloc((dset->nitems + 1) * sizeof (nsc_vec_t),
 	    KM_NOSLEEP);
 	if (vecret == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "dset2vec: vector alloc failed");
-#endif
 		return (NULL);
 	}
 	RDC_DSMEMUSE((dset->nitems + 1) * sizeof (nsc_vec_t));
@@ -2794,7 +2751,7 @@ rdc_readmaxfba(int cd, nsc_off_t pos, nsc_size_t fbalen, int nocache)
 	} while ((ret == EINTR) && (eintr_count < MAX_EINTR_COUNT));
 	if (ret != 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "readmaxfba: reserve failed on set %s:%s %d",
+		cmn_err(CE_NOTE, "!readmaxfba: reserve failed on set %s:%s %d",
 		    urdc->secondary.intf, urdc->secondary.file,
 		    ret);
 #endif
@@ -2807,7 +2764,7 @@ rdc_readmaxfba(int cd, nsc_off_t pos, nsc_size_t fbalen, int nocache)
 	dset = rdc_net_add_set(cd);
 	if (dset == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "readmaxfba: Unable to allocate dset on set "
+		cmn_err(CE_NOTE, "!readmaxfba: Unable to allocate dset on set "
 		    "%s:%s", urdc->secondary.intf, urdc->secondary.file);
 #endif
 		goto out;
@@ -2817,7 +2774,7 @@ rdc_readmaxfba(int cd, nsc_off_t pos, nsc_size_t fbalen, int nocache)
 	ret = nsc_maxfbas(RDC_U_FD(krdc), 0, &mfba);
 	if (ret != 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "readmaxfba: msc_maxfbas failed on set %s:%s "
+		cmn_err(CE_NOTE, "!readmaxfba: msc_maxfbas failed on set %s:%s "
 		    "%d", urdc->secondary.intf,	urdc->secondary.file, ret);
 #endif
 		goto out;
@@ -2837,7 +2794,7 @@ rdc_readmaxfba(int cd, nsc_off_t pos, nsc_size_t fbalen, int nocache)
 		    nocache|NSC_NODATA, &handle);
 		if (ret != 0) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "readmaxfba: alloc failed on set"
+			cmn_err(CE_NOTE, "!readmaxfba: alloc failed on set"
 			    "%s:%s %d", urdc->secondary.intf,
 			    urdc->secondary.file, ret);
 #endif
@@ -2845,9 +2802,6 @@ rdc_readmaxfba(int cd, nsc_off_t pos, nsc_size_t fbalen, int nocache)
 		}
 		ditem = kmem_alloc(sizeof (rdc_net_dataitem_t), KM_NOSLEEP);
 		if (ditem == NULL) {
-#ifdef DEBUG
-			cmn_err(CE_NOTE, "readmaxfba: ditem alloc failed");
-#endif
 			goto out;
 		}
 		RDC_DSMEMUSE(sizeof (rdc_net_dataitem_t));
@@ -2937,7 +2891,7 @@ rdc_combyread(rdc_k_info_t *krdc, rdc_u_info_t *urdc, nsc_buf_t *handle)
 
 	if (ret != 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "combyread: read failed on set %s:%s %d",
+		cmn_err(CE_NOTE, "!combyread: read failed on set %s:%s %d",
 		    urdc->secondary.intf, urdc->secondary.file, ret);
 #endif
 		if (!(rdc_get_vflags(urdc) & RDC_VOL_FAILED)) {
@@ -2968,7 +2922,7 @@ rdc_combyread(rdc_k_info_t *krdc, rdc_u_info_t *urdc, nsc_buf_t *handle)
 		 */
 		if (ret != 0) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "combyread: remote read failed on "
+			cmn_err(CE_NOTE, "!combyread: remote read failed on "
 			    "set %s:%s %d", utmp->secondary.intf,
 			    utmp->secondary.file, ret);
 #endif

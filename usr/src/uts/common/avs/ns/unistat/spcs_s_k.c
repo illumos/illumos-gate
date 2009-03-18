@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ static int bytestream_transport_initialized = 0;
 static void init_status(spcs_s_pinfo_t *p)
 {
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "init_status entry");
+	cmn_err(CE_WARN, "!init_status entry");
 #endif
 	p->major = SPCS_S_MAJOR_REV;
 	p->minor = SPCS_S_MINOR_REV;
@@ -82,7 +82,7 @@ static void init_status(spcs_s_pinfo_t *p)
 	p->scount = 0;
 	p->tcount = 0;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "init_status exit");
+	cmn_err(CE_WARN, "!init_status exit");
 #endif
 }
 
@@ -96,15 +96,15 @@ spcs_s_kcreate()
 {
 	spcs_s_pinfo_t *kstatus;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_kcreate entry");
+	cmn_err(CE_WARN, "!spcs_s_kcreate entry");
 #endif
 	kstatus = (spcs_s_pinfo_t *)
-			kmem_alloc(sizeof (spcs_s_pinfo_t), KM_SLEEP);
+	    kmem_alloc(sizeof (spcs_s_pinfo_t), KM_SLEEP);
 
 	if (kstatus)
 		init_status(kstatus);
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_kcreate exit");
+	cmn_err(CE_WARN, "!spcs_s_kcreate exit");
 #endif
 	return ((spcs_s_info_t)kstatus);
 }
@@ -117,7 +117,7 @@ void
 spcs_s_kinit(spcs_s_info_t kstatus)
 {
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_kinit called");
+	cmn_err(CE_WARN, "!spcs_s_kinit called");
 #endif
 	init_status((spcs_s_pinfo_t *)kstatus);
 }
@@ -134,11 +134,11 @@ void
 spcs_s_kfree(spcs_s_info_t kstatus)
 {
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_kfree entry");
+	cmn_err(CE_WARN, "!spcs_s_kfree entry");
 #endif
 	kmem_free((void *)kstatus, sizeof (spcs_s_pinfo_t));
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_kfree exit");
+	cmn_err(CE_WARN, "!spcs_s_kfree exit");
 #endif
 }
 
@@ -155,7 +155,7 @@ spcs_delete(spcs_s_pinfo_t *p)
 	int i;
 	int d;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_delete entry");
+	cmn_err(CE_WARN, "!spcs_s_delete entry");
 #endif
 	d = p->idata[0].f.sup_count + 1;
 
@@ -163,7 +163,7 @@ spcs_delete(spcs_s_pinfo_t *p)
 		p->idata[i] = p->idata[i+d];
 	p->icount -= d;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_delete exit");
+	cmn_err(CE_WARN, "!spcs_s_delete exit");
 #endif
 }
 
@@ -179,7 +179,7 @@ add_code(spcs_s_pinfo_t *p, spcs_s_status_t stcode)
 	spcs_s_udata_t c;
 	c.s = stcode;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "add_code entry");
+	cmn_err(CE_WARN, "!add_code entry");
 #endif
 
 	if ((p->icount + c.f.sup_count + 1) > SPCS_S_IDSIZE) {
@@ -187,16 +187,16 @@ add_code(spcs_s_pinfo_t *p, spcs_s_status_t stcode)
 			spcs_delete(p);
 		p->idata[p->icount++].s = SPCS_EOVERFLOW;
 
-		cmn_err(_CELEVEL, "SPCS Unistat: not enough room in idata!");
+		cmn_err(_CELEVEL, "!SPCS Unistat: not enough room in idata!");
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "add_code exit 1");
+		cmn_err(CE_WARN, "!add_code exit 1");
 #endif
 
 		return (B_TRUE);
 	} else
 		p->idata[p->icount++] = c;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "add_code exit 2");
+	cmn_err(CE_WARN, "!add_code exit 2");
 #endif
 	return (B_FALSE);
 }
@@ -214,7 +214,7 @@ add_item(spcs_s_pinfo_t *p, char *string)
 	int len;
 	char *nullstr = "XXXXXXXX";
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "add_item entry");
+	cmn_err(CE_WARN, "!add_item entry");
 #endif
 	len = strlen(string);
 
@@ -228,15 +228,11 @@ add_item(spcs_s_pinfo_t *p, char *string)
 	if (len == 0) {
 		string = nullstr;
 		len = strlen(nullstr);
-#ifdef LATER
-		cmn_err(_CELEVEL,
-		"SPCS: Unistat zero length string passed to add_item");
-#endif
 	}
 	if ((len + 1) > (SPCS_S_SDSIZE - p->scount))
 		cmn_err(_CELEVEL,
-		"SPCS: Unistat sdata array too small: needed %d bytes",
-			len + 1);
+		    "!SPCS: Unistat sdata array too small: needed %d bytes",
+		    len + 1);
 
 	p->idata[p->icount].su.type = SU_STRING;
 	p->idata[p->icount++].su.offset = p->scount;
@@ -261,17 +257,17 @@ check_revision(spcs_s_info_t ustatus)
 	int mode = 0;
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "check_revision entry");
+	cmn_err(CE_WARN, "!check_revision entry");
 #endif
 
 	m =
-	"SPCS Unistat failure (product packaging error): data struct mismatch";
+	    "!SPCS Unistat failure (packaging error): data struct mismatch";
 	(void) ddi_copyin((void *) ustatus, (void *) p, SPCS_S_REVSIZE, mode);
 
 	if ((p->major == SPCS_S_MAJOR_REV) && (p->minor == SPCS_S_MINOR_REV)) {
 		/* Both match */
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "check_revision exit 1");
+		cmn_err(CE_WARN, "!check_revision exit 1");
 #endif
 		return (B_TRUE);
 	}
@@ -282,9 +278,8 @@ check_revision(spcs_s_info_t ustatus)
 	 */
 
 #ifdef DEBUG
-	cmn_err(CE_WARN, "unistat kernel v%d.%d, user v%d.%d\n",
-		SPCS_S_MAJOR_REV, SPCS_S_MINOR_REV,
-		(int)p->major, (int)p->minor);
+	cmn_err(CE_WARN, "!unistat kernel v%d.%d, user v%d.%d\n",
+	    SPCS_S_MAJOR_REV, SPCS_S_MINOR_REV, (int)p->major, (int)p->minor);
 #endif
 
 	if (p->major > SPCS_S_MAJOR_REV) {
@@ -317,7 +312,7 @@ check_revision(spcs_s_info_t ustatus)
 		cmn_err(CE_WARN, m);
 	}
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "check_revision exit 2");
+	cmn_err(CE_WARN, "!check_revision exit 2");
 #endif
 	return (B_FALSE);
 }
@@ -340,14 +335,14 @@ spcs_s_add(spcs_s_info_t kstatus, spcs_s_status_t stcode, ...)
 	char *sp;
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_add entry");
+	cmn_err(CE_WARN, "!cspcs_s_add entry");
 #endif
 	p = (spcs_s_pinfo_t *)kstatus;
 	c.s = stcode;
 
 	if (add_code(p, stcode) == B_TRUE) {
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_add exit 1");
+		cmn_err(CE_WARN, "!cspcs_s_add exit 1");
 #endif
 		return;
 	}
@@ -362,7 +357,7 @@ spcs_s_add(spcs_s_info_t kstatus, spcs_s_status_t stcode, ...)
 
 	va_end(ap);
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_add exit 2");
+	cmn_err(CE_WARN, "!cspcs_s_add exit 2");
 #endif
 }
 
@@ -377,7 +372,7 @@ scopyout(spcs_s_pinfo_t *kstatus, spcs_s_pinfo_t *ustatus)
 {
 	int mode = 0;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "scopyout entry");
+	cmn_err(CE_WARN, "!scopyout entry");
 #endif
 
 	/*
@@ -387,7 +382,7 @@ scopyout(spcs_s_pinfo_t *kstatus, spcs_s_pinfo_t *ustatus)
 	 */
 
 	if (kstatus->tcount)
-		cmn_err(_CELEVEL, "SPCS: Unistat asynch data in ioctl status!");
+		cmn_err(_CELEVEL, "!SPCS: Unistat async data in ioctl status!");
 
 	/*
 	 * Gently, Bentley
@@ -399,16 +394,16 @@ scopyout(spcs_s_pinfo_t *kstatus, spcs_s_pinfo_t *ustatus)
 	 */
 
 	(void) ddi_copyout((void *) kstatus, (void *) ustatus,
-		sizeof (spcs_s_pinfo_t) - (sizeof (kstatus->idata) +
-		sizeof (kstatus->sdata) + sizeof (kstatus->tdata)), mode);
+	    sizeof (spcs_s_pinfo_t) - (sizeof (kstatus->idata) +
+	    sizeof (kstatus->sdata) + sizeof (kstatus->tdata)), mode);
 	(void) ddi_copyout((void *)kstatus->idata, (void *) ustatus->idata,
-		(kstatus->icount * sizeof (kstatus->idata[0])), mode);
+	    (kstatus->icount * sizeof (kstatus->idata[0])), mode);
 	(void) ddi_copyout((void *)kstatus->sdata, (void *) ustatus->sdata,
-		(kstatus->scount * sizeof (kstatus->sdata[0])), mode);
+	    (kstatus->scount * sizeof (kstatus->sdata[0])), mode);
 	(void) ddi_copyout((void *)kstatus->tdata, (void *) ustatus->tdata,
-		(kstatus->tcount * sizeof (kstatus->tdata[0])), mode);
+	    (kstatus->tcount * sizeof (kstatus->tdata[0])), mode);
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "scopyout exit");
+	cmn_err(CE_WARN, "!scopyout exit");
 #endif
 }
 
@@ -420,13 +415,13 @@ void
 spcs_s_copyout(spcs_s_info_t *kstatus_a, spcs_s_info_t ustatus)
 {
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_copyout entry");
+	cmn_err(CE_WARN, "!spcs_s_copyout entry");
 #endif
 	if (check_revision(ustatus) == B_TRUE)
 		scopyout((spcs_s_pinfo_t *)*kstatus_a,
 		    (spcs_s_pinfo_t *)ustatus);
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_copyout exit");
+	cmn_err(CE_WARN, "!spcs_s_copyout exit");
 #endif
 }
 
@@ -440,7 +435,7 @@ void
 spcs_s_copyoutf(spcs_s_info_t *kstatus_a, spcs_s_info_t ustatus)
 {
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_copyoutf entry");
+	cmn_err(CE_WARN, "!spcs_s_copyoutf entry");
 #endif
 	if (check_revision(ustatus) == B_TRUE)
 		scopyout((spcs_s_pinfo_t *)*kstatus_a,
@@ -448,7 +443,7 @@ spcs_s_copyoutf(spcs_s_info_t *kstatus_a, spcs_s_info_t ustatus)
 	spcs_s_kfree(*kstatus_a);
 	*kstatus_a = NULL;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_copyoutf exit");
+	cmn_err(CE_WARN, "!spcs_s_copyoutf exit");
 #endif
 }
 
@@ -462,12 +457,12 @@ spcs_s_oldest_status(spcs_s_info_t kstatus)
 {
 	spcs_s_pinfo_t *p;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_oldest_status entry");
+	cmn_err(CE_WARN, "!spcs_s_oldest_status entry");
 #endif
 	p = (spcs_s_pinfo_t *)kstatus;
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_oldest_status exit");
+	cmn_err(CE_WARN, "!spcs_s_oldest_status exit");
 #endif
 	return (p->icount ? p->idata[0].s : SPCS_S_OK);
 }
@@ -484,7 +479,7 @@ last_code_idx(spcs_s_pinfo_t *p)
 	int last = 0;
 	int idx = 0;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "last_code_idx entry");
+	cmn_err(CE_WARN, "!last_code_idx entry");
 #endif
 
 	while (idx < p->icount) {
@@ -492,7 +487,7 @@ last_code_idx(spcs_s_pinfo_t *p)
 		idx += p->idata[idx].f.sup_count + 1;
 	}
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "last_code_idx exit");
+	cmn_err(CE_WARN, "!last_code_idx exit");
 #endif
 	return (last);
 }
@@ -508,7 +503,7 @@ spcs_s_youngest_status(spcs_s_info_t kstatus)
 	spcs_s_pinfo_t *p;
 	spcs_s_status_t temp;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_youngest_status entry");
+	cmn_err(CE_WARN, "!spcs_s_youngest_status entry");
 #endif
 	p = (spcs_s_pinfo_t *)kstatus;
 
@@ -518,7 +513,7 @@ spcs_s_youngest_status(spcs_s_info_t kstatus)
 		temp = SPCS_S_OK;
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_youngest_status exit");
+	cmn_err(CE_WARN, "!spcs_s_youngest_status exit");
 #endif
 	return (temp);
 }
@@ -540,7 +535,7 @@ spcs_s_ocopyout(spcs_s_info_t *kstatus_a,
 	char *sp;
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_ocopyout entry");
+	cmn_err(CE_WARN, "!spcs_s_ocopyout entry");
 #endif
 	p  = (spcs_s_pinfo_t *)*kstatus_a;
 	c.s = stcode;
@@ -565,7 +560,7 @@ spcs_s_ocopyout(spcs_s_info_t *kstatus_a,
 		scopyout(p, (spcs_s_pinfo_t *)ustatus);
 	}
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_ocopyout exit");
+	cmn_err(CE_WARN, "!spcs_s_ocopyout exit");
 #endif
 	return (ret.s);
 }
@@ -589,7 +584,7 @@ spcs_s_ocopyoutf(spcs_s_info_t *kstatus_a,
 	char *sp;
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_ocopyoutf entry");
+	cmn_err(CE_WARN, "!spcs_s_ocopyoutf entry");
 #endif
 	p = *(spcs_s_pinfo_t **)kstatus_a;
 	c.s = stcode;
@@ -617,7 +612,7 @@ spcs_s_ocopyoutf(spcs_s_info_t *kstatus_a,
 	spcs_s_kfree((spcs_s_info_t)p);
 	*kstatus_a = NULL;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_ocopyoutf exit");
+	cmn_err(CE_WARN, "!spcs_s_ocopyoutf exit");
 #endif
 	return (ret.s);
 }
@@ -631,7 +626,7 @@ spcs_s_is_solaris(spcs_s_status_t error)
 {
 	spcs_s_udata_t c;
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_is_solaris called");
+	cmn_err(CE_WARN, "!spcs_s_is_solaris called");
 #endif
 	c.s = error;
 	return (c.f.module == 0 ? B_TRUE : B_FALSE);
@@ -647,7 +642,7 @@ char
 	char tempbuf[20];
 
 #ifdef UNISTAT_TRACE
-	cmn_err(CE_WARN, "spcs_s_inttostring entry 0x%x", val);
+	cmn_err(CE_WARN, "!spcs_s_inttostring entry 0x%x", val);
 #endif
 	if (buflen) {
 		if (hex)
@@ -662,7 +657,7 @@ char
 		(void) strcpy(buf, "***");
 	}
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_inttostring exit: %s", buf);
+		cmn_err(CE_WARN, "!spcs_s_inttostring exit: %s", buf);
 #endif
 	return (buf);
 }
@@ -676,7 +671,7 @@ int
 spcs_s_start_bytestream()
 {
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_start_bytestream called");
+		cmn_err(CE_WARN, "!spcs_s_start_bytestream called");
 #endif
 	bytestream_transport_initialized = 1;
 	return (SPCS_S_OK);
@@ -692,7 +687,7 @@ int
 spcs_s_stop_bytestream()
 {
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_stop_bytestream called");
+		cmn_err(CE_WARN, "!spcs_s_stop_bytestream called");
 #endif
 	bytestream_transport_initialized = 0;
 	return (SPCS_S_OK);
@@ -719,26 +714,27 @@ spcs_s_add_bytestream(spcs_s_info_t kstatus, spcs_s_status_t stcode,
 {
 	spcs_s_pinfo_t *p;
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_add_bytestream entry");
+		cmn_err(CE_WARN, "!spcs_s_add_bytestream entry");
 #endif
 	p = (spcs_s_pinfo_t *)kstatus;
 
 	if (p->tcount == SPCS_S_TDSIZE)
 		cmn_err(CE_PANIC,
-		"SPCS: Unistat too many calls to spcs_s_add_bytestream");
+		    "SPCS: Unistat too many calls to spcs_s_add_bytestream");
 	if ((p->icount + 2) >= SPCS_S_TDSIZE)
 		cmn_err(CE_PANIC,
-		"SPCS: Unistat idata array too small in spcs_s_add_bytestream");
+		    "SPCS: Unistat idata array too small in "
+		    "spcs_s_add_bytestream");
 	p->idata[p->icount].s = stcode;
 	if (p->idata[p->icount++].f.sup_count != 1)
 		cmn_err(CE_PANIC,
-		"SPCS: Unistat wrong sup_count in spcs_s_add_bytestream");
+		    "SPCS: Unistat wrong sup_count in spcs_s_add_bytestream");
 	p->idata[p->icount].su.type = SU_BYTESTREAM;
 	p->idata[p->icount].su.offset = p->tcount++;
 	p->tdata[p->idata[p->icount].su.offset].size = size;
 	p->tdata[p->idata[p->icount++].su.offset].u_p.data = data;
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_add_bytestream exit");
+		cmn_err(CE_WARN, "!spcs_s_add_bytestream exit");
 #endif
 }
 
@@ -758,7 +754,7 @@ spcs_s_asynch_status(spcs_s_info_t kstatus)
 	int i, s, b, suppcount;
 	uchar_t *bp;
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_asynch_status entry");
+		cmn_err(CE_WARN, "!spcs_s_asynch_status entry");
 #endif
 	p = (spcs_s_pinfo_t *)kstatus;
 
@@ -820,14 +816,14 @@ spcs_s_asynch_status(spcs_s_info_t kstatus)
 
 	if (! bytestream_transport_initialized) {
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_asynch_status exit 1");
+		cmn_err(CE_WARN, "!spcs_s_asynch_status exit 1");
 #endif
 		return (SPCS_S_ERROR);
 	}
 
-	cmn_err(CE_NOTE, "SPCS Unistat Asynchronous Status Dump");
-	cmn_err(CE_NOTE, "This is a test fixture waiting for a pipe or");
-	cmn_err(CE_NOTE, "shared memory");
+	cmn_err(CE_NOTE, "!SPCS Unistat Asynchronous Status Dump");
+	cmn_err(CE_NOTE, "!This is a test fixture waiting for a pipe or");
+	cmn_err(CE_NOTE, "!shared memory");
 
 	/*
 	 * I'd like nothing more than to code up a really cool pipe or mmap'd
@@ -857,26 +853,28 @@ spcs_s_asynch_status(spcs_s_info_t kstatus)
 
 		suppcount = p->idata[i].f.sup_count;
 
-		cmn_err(CE_NOTE, "Status item %d value %x supplements %d",
-			i, p->idata[i].s, suppcount);
+		cmn_err(CE_NOTE, "!Status item %d value %x supplements %d",
+		    i, p->idata[i].s, suppcount);
 		i++;
 
 		for (s = 0; s < suppcount; s++) {
 			if (p->idata[i+s].su.type == SU_STRING)
 				cmn_err(CE_NOTE,
-				"Supplement %d string value: %s", s,
-				(char *)(p->sdata + p->idata[i+s].su.offset));
+				    "!Supplement %d string value: %s", s,
+				    (char *)(p->sdata +
+				    p->idata[i+s].su.offset));
 			else {
 				cmn_err(CE_NOTE,
-				"Supplement %d bytestream dump:", s);
-				cmn_err(CE_NOTE, "offset data");
+				    "!Supplement %d bytestream dump:", s);
+				cmn_err(CE_NOTE, "!offset data");
 				bp = p->tdata[p->idata[i+s].su.offset].u_p.data;
 				/* The SunSoft mandated 8 character tabstops */
 				/* really BITE MY BUTT */
 				for (b = 0;
 				    b < p->tdata[p->idata[i+s].su.offset].size;
 				    b++)
-					cmn_err(CE_NOTE, "%6d   %2x", b, *bp++);
+					cmn_err(CE_NOTE, "!%6d   %2x",
+					    b, *bp++);
 			}
 		}
 
@@ -884,7 +882,7 @@ spcs_s_asynch_status(spcs_s_info_t kstatus)
 	}
 
 #ifdef UNISTAT_TRACE
-		cmn_err(CE_WARN, "spcs_s_asynch_status exit 2");
+		cmn_err(CE_WARN, "!spcs_s_asynch_status exit 2");
 #endif
 	return (SPCS_S_OK);
 }

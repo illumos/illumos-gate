@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,10 +171,10 @@ sd_setup_ssconfig()
 
 	if (_sd_cache_config.write_cache)
 		safestore_config.ssc_wsize =
-			_sd_cache_config.write_cache * MEGABYTE;
+		    _sd_cache_config.write_cache * MEGABYTE;
 	else
 		safestore_config.ssc_wsize =
-			(_sd_cache_config.cache_mem[_SD_NO_NET] * MEGABYTE)/2;
+		    (_sd_cache_config.cache_mem[_SD_NO_NET] * MEGABYTE)/2;
 	safestore_config.ssc_maxfiles = sdbc_max_devs;
 	safestore_config.ssc_pattern = _sd_cache_config.fill_pattern;
 	safestore_config.ssc_flag = _sd_cache_config.gen_pattern ?
@@ -243,7 +243,7 @@ _sdbc_configure(_sd_cache_param_t *uptr,
 	 */
 	for (i = 0; i < MAX_CACHE_NET; i++) {
 		if (_sd_cache_config.cache_mem[i] < 0) {
-			cmn_err(CE_WARN, "_sdbc_configure: "
+			cmn_err(CE_WARN, "!_sdbc_configure: "
 			    "negative cache size (%d) for net %d",
 			    _sd_cache_config.cache_mem[i], i);
 			spcs_s_add(spcs_kstatus, SDBC_ENONETMEM);
@@ -252,7 +252,7 @@ _sdbc_configure(_sd_cache_param_t *uptr,
 		}
 		if (_sd_cache_config.cache_mem[i] > MAX_CACHE_SIZE) {
 			_sd_cache_config.cache_mem[i] = MAX_CACHE_SIZE;
-			cmn_err(CE_WARN, "_sdbc_configure: "
+			cmn_err(CE_WARN, "!_sdbc_configure: "
 			    "cache size limited to %d megabytes for net %d",
 			    MAX_CACHE_SIZE, i);
 		}
@@ -326,7 +326,7 @@ _sdbc_configure(_sd_cache_param_t *uptr,
 tryss:
 	/* open and configure the safestore module */
 	if ((sdbc_safestore = sst_open(ss_type, 0)) == NULL) {
-		cmn_err(CE_WARN, "cannot open safestore module for type %x",
+		cmn_err(CE_WARN, "!cannot open safestore module for type %x",
 		    ss_type);
 		rc = SDBC_EENABLEFAIL;
 		goto out;
@@ -335,7 +335,7 @@ tryss:
 		if (SSOP_CONFIGURE(sdbc_safestore, &safestore_config,
 		    spcs_kstatus)) {
 			cmn_err(CE_WARN,
-			    "cannot configure safestore module for type %x",
+			    "!cannot configure safestore module for type %x",
 			    ss_type);
 			(void) sst_close(sdbc_safestore);
 
@@ -359,9 +359,9 @@ tryss:
 
 
 	_sd_net_config.sn_csize =
-		_sd_cache_config.cache_mem[_SD_NO_NET] * MEGABYTE;
+	    _sd_cache_config.cache_mem[_SD_NO_NET] * MEGABYTE;
 	_sd_net_config.sn_cpages =
-		_sd_net_config.sn_csize / BLK_SIZE(1);
+	    _sd_net_config.sn_csize / BLK_SIZE(1);
 
 	_sd_net_config.sn_configured = 1;
 	cache_bytes = _sd_net_config.sn_cpages * BLK_SIZE(1);
@@ -403,7 +403,7 @@ tryss:
 		_sdbc_set_warm_start();
 		_sdbc_ft_hold_io = 1;
 		cmn_err(CE_WARN,
-		    "sdbc(_sdbc_configure) cache marked dirty after"
+		    "!sdbc(_sdbc_configure) cache marked dirty after"
 		    " incomplete shutdown");
 	}
 
@@ -470,7 +470,7 @@ tryss:
 	mutex_exit(&_sdbc_ft_hold_io_lk);
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "sd_config: Cache has been configured");
+	cmn_err(CE_NOTE, "!sd_config: Cache has been configured");
 #endif
 
 	rc = 0;
@@ -505,7 +505,7 @@ _sdbc_deconfigure(spcs_s_info_t spcs_kstatus)
 	ASSERT(MUTEX_HELD(&_sdbc_config_lock));
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SD cache being deconfigured.");
+	cmn_err(CE_NOTE, "!SD cache being deconfigured.");
 #endif
 
 	/* check if there is pinned data and our mirror is down */
@@ -521,7 +521,7 @@ _sdbc_deconfigure(spcs_s_info_t spcs_kstatus)
 			if (!(_SD_CD_ALL_WRITES(i)))
 				continue;
 			spcs_s_add(spcs_kstatus, SDBC_EPINNED,
-				cdi->cd_info->sh_filename);
+			    cdi->cd_info->sh_filename);
 			rc = SDBC_EDISABLEFAIL;
 			goto out;
 		}
@@ -552,12 +552,12 @@ _sdbc_deconfigure(spcs_s_info_t spcs_kstatus)
 			/* Re-register-power if it was register before. */
 			if (sdbc_power) {
 				sdbc_power = nsc_register_power("sdbc",
-					_sdbc_power_def);
+				    _sdbc_power_def);
 			}
 
 			/* Remove NSC_FORCED_WRTHRU if we set it */
 			(void) _sd_clear_node_hint(
-				(~saved_hint) & _SD_HINT_MASK);
+			    (~saved_hint) & _SD_HINT_MASK);
 
 			rc = SDBC_EDISABLEFAIL;
 			goto out;
@@ -577,7 +577,7 @@ _sdbc_deconfigure(spcs_s_info_t spcs_kstatus)
 	if (_sd_cache_files) {
 		for (i = 0; i < sdbc_max_devs; i++) {
 			if (FILE_OPENED(i) && ((rc = _sd_close(i)) > 0)) {
-				cmn_err(CE_WARN, "sdbc(_sd_deconfigure)"
+				cmn_err(CE_WARN, "!sdbc(_sd_deconfigure)"
 				    " %d not closed (%d)\n", i, rc);
 			}
 		}
@@ -602,7 +602,7 @@ _sdbc_deconfigure(spcs_s_info_t spcs_kstatus)
 			if (!(_SD_CD_ALL_WRITES(i)))
 				continue;
 			cmn_err(CE_WARN,
-			    "sdbc(_sd_deconfigure) Pinned Data on cd %d(%s)",
+			    "!sdbc(_sd_deconfigure) Pinned Data on cd %d(%s)",
 			    i, cdi->cd_info->sh_filename);
 			pinneddata++;
 		}
@@ -683,7 +683,7 @@ _sdbc_deconfigure(spcs_s_info_t spcs_kstatus)
 	_sd_node_hint = 0;
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SD cache deconfigured.");
+	cmn_err(CE_NOTE, "!SD cache deconfigured.");
 #endif
 
 	rc = 0;
@@ -720,7 +720,7 @@ get_high_bit(int size)
 
 	if (highbit <= 0) {
 		cmn_err(CE_WARN,
-		    "sdbc(get_high_bit) invalid block size %x\n", size);
+		    "!sdbc(get_high_bit) invalid block size %x\n", size);
 		return (-1);
 	}
 
@@ -740,7 +740,7 @@ _sd_fill_pattern(caddr_t addr, uint_t pat, uint_t size)
 
 	if ((fmt_page = (caddr_t)nsc_kmem_alloc(ptob(1),
 	    KM_SLEEP, sdbc_local_mem)) == NULL) {
-		cmn_err(CE_WARN, "sdbc(_sd_fill pattern) no more memory");
+		cmn_err(CE_WARN, "!sdbc(_sd_fill pattern) no more memory");
 		return (-1);
 	}
 	for (i = 0; i < page_size; i += 4)

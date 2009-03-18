@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -724,15 +724,15 @@ typedef struct _sd_map_info {
 #define	ASSERT_LEN(len) \
 	if (len > _SD_MAX_FBAS) {\
 		cmn_err(CE_WARN, \
-		    "sdbc(ASSERT_LEN) fba exceeds limits. fba_len %" NSC_SZFMT \
-		    ". Max %d", len, _SD_MAX_FBAS); \
+		    "!sdbc(ASSERT_LEN) fba exceeds limits. fba_len %" \
+		    NSC_SZFMT ". Max %d", len, _SD_MAX_FBAS); \
 		return (EIO);    }
 
 #define	ASSERT_IO_SIZE(fba_num, fba_len, cd) \
 	if ((fba_num + fba_len) > \
 	    (_sd_cache_files[(cd)].cd_info->sh_filesize)) { \
 		cmn_err(CE_WARN, \
-		    "sdbc(ASSERT_IO_SIZE) io beyond end of file." \
+		    "!sdbc(ASSERT_IO_SIZE) io beyond end of file." \
 		    " fpos %" NSC_SZFMT " len %" NSC_SZFMT " file size 0 - %" \
 		    NSC_SZFMT "\n", fba_num, fba_len, \
 		    (_sd_cache_files[(cd)].cd_info->sh_filesize)); \
@@ -745,7 +745,7 @@ typedef struct _sd_map_info {
 	    (((m_fpos) + (m_flen)) > \
 	    ((m_h1)->bh_fba_pos + (m_h1)->bh_fba_len))) { \
 		cmn_err(CE_WARN, \
-		    "sdbc(ASSERT_HANDLE_LIMITS) operation out of bounds" \
+		    "!sdbc(ASSERT_HANDLE_LIMITS) operation out of bounds" \
 		    " cd %x want %" NSC_SZFMT " to %" NSC_SZFMT ". Handle %" \
 		    NSC_SZFMT " to %" NSC_SZFMT, HANDLE_CD(m_h1), m_fpos,\
 		    m_flen, (m_h1)->bh_fba_pos, (m_h1)->bh_fba_len); \
@@ -968,12 +968,12 @@ typedef void (*sdbc_ea_fn_t) (blind_t, nsc_off_t, nsc_size_t, int);
 	if ((hndl)->bh_read_cb) \
 	    ((*((hndl)->bh_read_cb))(hndl)); \
 	else cmn_err(CE_WARN, \
-	    "sdbc(_SD_READ_CALLBACK) not registered. io lost");
+	    "!sdbc(_SD_READ_CALLBACK) not registered. io lost");
 #define	_SD_WRITE_CALLBACK(hndl)	\
 	if ((hndl)->bh_write_cb) \
 		((*((hndl)->bh_write_cb))(hndl)); \
 	else cmn_err(CE_WARN, \
-	    "sdbc(_SD_WRITE_CALLBACK) not registered. io lost");
+	    "!sdbc(_SD_WRITE_CALLBACK) not registered. io lost");
 
 #endif /* _KERNEL */
 

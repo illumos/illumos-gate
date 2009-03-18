@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -604,8 +604,8 @@ _sdbc_stats_deconfigure(void)
 
 	if (sdbc_cd_io_kstats_mutexes) {
 	/* mutexes are already destroyed in cd_kstat_remove() */
-		kmem_free(sdbc_cd_io_kstats_mutexes, sizeof (kmutex_t) *
-			sdbc_max_devs);
+		kmem_free(sdbc_cd_io_kstats_mutexes,
+		    sizeof (kmutex_t) * sdbc_max_devs);
 		sdbc_cd_io_kstats_mutexes = NULL;
 	}
 
@@ -653,7 +653,7 @@ _sdbc_stats_configure(int cblocks)
 		sdbc_global_stats_kstat->ks_private = _sd_cache_stats;
 		kstat_install(sdbc_global_stats_kstat);
 	} else {
-		cmn_err(CE_WARN, "sdbc: gstats kstat failed");
+		cmn_err(CE_WARN, "!sdbc: gstats kstat failed");
 	}
 
 	/* global I/O kstats */
@@ -698,7 +698,7 @@ _sdbc_stats_configure(int cblocks)
 		sdbc_dynmem_kstat_dm->ks_private = &dynmem_processing_dm;
 		kstat_install(sdbc_dynmem_kstat_dm);
 	} else {
-		cmn_err(CE_WARN, "sdbc: dynmem kstat failed");
+		cmn_err(CE_WARN, "!sdbc: dynmem kstat failed");
 	}
 #endif
 
@@ -733,13 +733,11 @@ sdbc_dmqueues_configure()
 	++max_dm_queues; /* need a "0" queue for centrys with no memory */
 
 	sdbc_dm_queues = (_sd_queue_t *)
-			    kmem_zalloc(max_dm_queues * sizeof (_sd_queue_t),
-				    KM_SLEEP);
+	    kmem_zalloc(max_dm_queues * sizeof (_sd_queue_t), KM_SLEEP);
 
 #ifdef DEBUG
 	dmchainpull_table = (int *)kmem_zalloc(max_dm_queues *
-						max_dm_queues * sizeof (int),
-						KM_SLEEP);
+	    max_dm_queues * sizeof (int), KM_SLEEP);
 #endif
 
 	for (i = 0; i < max_dm_queues; ++i) {
@@ -780,7 +778,7 @@ _sdbc_lruq_configure(_sd_queue_t *_sd_lru)
 	mutex_init(&_sd_lru->sq_qlock, NULL, MUTEX_DRIVER, NULL);
 
 	_sd_lru->sq_qhead.cc_next = _sd_lru->sq_qhead.cc_prev
-		= &(_sd_lru->sq_qhead);
+	    = &(_sd_lru->sq_qhead);
 	return (0);
 }
 
@@ -870,7 +868,7 @@ _sdbc_mem_configure(int cblocks, spcs_s_info_t kstatus)
 	first_entry_dm = 0;
 	for (i = 0; i < num_blks; i++, blk++) {
 		centry = _sd_cctl[(blk/_sd_cctl_groupsz)] +
-			(blk%_sd_cctl_groupsz);
+		    (blk%_sd_cctl_groupsz);
 		centry->cc_sync = &_sd_ccent_sync[blk % _sd_ccsync_cnt];
 		centry->cc_next = centry->cc_prev = NULL;
 		centry->cc_dirty_next = centry->cc_dirty_link = NULL;
@@ -927,10 +925,10 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 	int err = 0;
 
 	_sdbc_gl_file_info_size = safestore_config.ssc_maxfiles *
-					sizeof (ss_voldata_t);
+	    sizeof (ss_voldata_t);
 
 	if ((_sdbc_gl_file_info = kmem_zalloc(_sdbc_gl_file_info_size,
-						KM_NOSLEEP)) == NULL) {
+	    KM_NOSLEEP)) == NULL) {
 		spcs_s_add(kstatus, SDBC_ENOSFNV);
 		return (-1);
 	}
@@ -947,8 +945,8 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 	if (_sdbc_warm_start()) {
 
 		if (SSOP_GETVDIR(sdbc_safestore, &key, &vdir)) {
-			cmn_err(CE_WARN, "sdbc(_sdbc_gl_file_configure): "
-						"cannot read safestore");
+			cmn_err(CE_WARN, "!sdbc(_sdbc_gl_file_configure): "
+			    "cannot read safestore");
 			return (-1);
 		}
 
@@ -959,7 +957,7 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 		 */
 
 		while ((err = SSOP_GETVDIRENT(sdbc_safestore, &vdir, fileinfo))
-								== SS_OK) {
+		    == SS_OK) {
 			++fileinfo;
 		}
 
@@ -980,8 +978,8 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 		 */
 
 		if (SSOP_GETVDIR(sdbc_safestore, &key, &vdir)) {
-			cmn_err(CE_WARN, "sdbc(_sdbc_gl_file_configure): "
-						"cannot read safestore");
+			cmn_err(CE_WARN, "!sdbc(_sdbc_gl_file_configure): "
+			    "cannot read safestore");
 			return (-1);
 		}
 
@@ -991,7 +989,7 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 		 */
 
 		while ((err = SSOP_GETVDIRENT(sdbc_safestore, &vdir,
-							&tempfinfo)) == 0) {
+		    &tempfinfo)) == 0) {
 			/*
 			 * initialize the host memory copy of the
 			 * global file region.  this means setting the
@@ -1006,11 +1004,11 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 
 			/* initialize the directory entry */
 			if ((err = SSOP_SETVOL(sdbc_safestore, fileinfo))
-								== SS_ERR) {
+			    == SS_ERR) {
 				cmn_err(CE_WARN,
-					"sdbc(_sdbc_gl_file_configure): "
-					"volume entry write failure %p",
-					(void *)fileinfo->sv_vol);
+				    "!sdbc(_sdbc_gl_file_configure): "
+				    "volume entry write failure %p",
+				    (void *)fileinfo->sv_vol);
 				break;
 			}
 
@@ -1019,8 +1017,8 @@ _sdbc_gl_file_configure(spcs_s_info_t kstatus)
 
 		/* coming up clean, continue in w-t mode */
 		if (err != SS_EOF)
-			cmn_err(CE_WARN, "sdbc(_sdbc_gl_file_configure) "
-				"unable to init safe store volinfo");
+			cmn_err(CE_WARN, "!sdbc(_sdbc_gl_file_configure) "
+			    "unable to init safe store volinfo");
 	}
 
 	return (0);
@@ -1051,10 +1049,9 @@ _sdbc_gl_centry_configure(spcs_s_info_t kstatus)
 	_sdbc_gl_centry_info_size = sizeof (ss_centry_info_t) * wblocks;
 
 	if ((_sdbc_gl_centry_info = kmem_zalloc(_sdbc_gl_centry_info_size,
-					KM_NOSLEEP)) == NULL) {
-		cmn_err(CE_WARN,
-			"sdbc(_sdbc_gl_centry_configure) "
-			"alloc failed for gl_centry_info region");
+	    KM_NOSLEEP)) == NULL) {
+		cmn_err(CE_WARN, "!sdbc(_sdbc_gl_centry_configure) "
+		    "alloc failed for gl_centry_info region");
 
 		_sdbc_gl_centry_deconfigure();
 		return (-1);
@@ -1072,8 +1069,8 @@ _sdbc_gl_centry_configure(spcs_s_info_t kstatus)
 	if (_sdbc_warm_start()) {
 
 		if (SSOP_GETCDIR(sdbc_safestore, &key, &cdir)) {
-			cmn_err(CE_WARN, "sdbc(_sdbc_gl_centry_configure): "
-						"cannot read safestore");
+			cmn_err(CE_WARN, "!sdbc(_sdbc_gl_centry_configure): "
+			    "cannot read safestore");
 			return (-1);
 		}
 
@@ -1084,7 +1081,7 @@ _sdbc_gl_centry_configure(spcs_s_info_t kstatus)
 		 */
 
 		while ((err = SSOP_GETCDIRENT(sdbc_safestore, &cdir, cinfo))
-								== 0) {
+		    == 0) {
 			++cinfo;
 		}
 
@@ -1101,8 +1098,8 @@ _sdbc_gl_centry_configure(spcs_s_info_t kstatus)
 	} else {
 
 		if (SSOP_GETCDIR(sdbc_safestore, &key, &cdir)) {
-			cmn_err(CE_WARN, "sdbc(_sdbc_gl_centry_configure): "
-						"cannot read safestore");
+			cmn_err(CE_WARN, "!sdbc(_sdbc_gl_centry_configure): "
+			    "cannot read safestore");
 			return (-1);
 		}
 
@@ -1112,16 +1109,16 @@ _sdbc_gl_centry_configure(spcs_s_info_t kstatus)
 		 */
 
 		while ((err = SSOP_GETCDIRENT(sdbc_safestore, &cdir, cinfo))
-								== 0) {
+		    == 0) {
 			cinfo->sc_cd = -1;
 			cinfo->sc_fpos = -1;
 
 			if ((err = SSOP_SETCENTRY(sdbc_safestore, cinfo))
-								== SS_ERR) {
+			    == SS_ERR) {
 				cmn_err(CE_WARN,
-					"sdbc(_sdbc_gl_centry_configure): "
-					"cache entry write failure %p",
-					(void *)cinfo->sc_res);
+				    "!sdbc(_sdbc_gl_centry_configure): "
+				    "cache entry write failure %p",
+				    (void *)cinfo->sc_res);
 				break;
 			}
 
@@ -1130,8 +1127,8 @@ _sdbc_gl_centry_configure(spcs_s_info_t kstatus)
 
 		/* coming up clean, continue in w-t mode */
 		if (err != SS_EOF) {
-			cmn_err(CE_WARN, "sdbc(sdbc_gl_centry_configure) "
-				"_sdbc_gl_centry_info initialization failed");
+			cmn_err(CE_WARN, "!sdbc(sdbc_gl_centry_configure) "
+			    "_sdbc_gl_centry_info initialization failed");
 		}
 	}
 
@@ -1172,14 +1169,14 @@ _sdbc_mem_deconfigure(int cblocks)
 			cv_destroy(&_sd_ccent_sync[i]._cc_blkcv);
 		}
 		nsc_kmem_free(_sd_ccent_sync,
-			_sd_ccsync_cnt * sizeof (_sd_cctl_sync_t));
+		    _sd_ccsync_cnt * sizeof (_sd_cctl_sync_t));
 	}
 	_sd_ccent_sync = NULL;
 
 	for (i = 0; i < _SD_CCTL_GROUPS; i++) {
 		if (_sd_cctl[i] != NULL) {
 			nsc_kmem_free(_sd_cctl[i],
-				_sd_cctl_groupsz * sizeof (_sd_cctl_t));
+			    _sd_cctl_groupsz * sizeof (_sd_cctl_t));
 			_sd_cctl[i] = NULL;
 		}
 	}
@@ -1323,7 +1320,7 @@ _sd_open(char *filename, int flag)
 	int cd;
 
 	if (!_sd_cache_initialized) {
-		cmn_err(CE_WARN, "sdbc(_sd_open) cache not initialized");
+		cmn_err(CE_WARN, "!sdbc(_sd_open) cache not initialized");
 		return (-EINVAL);
 	}
 	cd = _sd_open_cd(filename, -1, flag);
@@ -1390,7 +1387,7 @@ retry_open:
 			cdi->cd_info = &_sd_cache_stats->st_shared[cd];
 		else if (cdi->cd_info->sh_alloc &&
 		    strcmp(cdi->cd_info->sh_filename, filename)) {
-			cmn_err(CE_WARN, "sdbc(_sd_open_cd) cd %d mismatch",
+			cmn_err(CE_WARN, "!sdbc(_sd_open_cd) cd %d mismatch",
 			    cd);
 			mutex_exit(&_sd_cache_lock);
 			return (-EEXIST);
@@ -1418,8 +1415,8 @@ retry_open:
 	mutex_enter(&_sd_cache_lock);
 
 	for (cdi = &(_sd_cache_files[new_cd]),
-			cdg = _sdbc_gl_file_info + new_cd;
-			new_cd < (sdbc_max_devs); new_cd++, cdi++, cdg++) {
+	    cdg = _sdbc_gl_file_info + new_cd;
+	    new_cd < (sdbc_max_devs); new_cd++, cdi++, cdg++) {
 		if (strlen(cdg->sv_volname) != 0)
 			if (strcmp(cdg->sv_volname, filename))
 				continue;
@@ -1437,7 +1434,7 @@ retry_open:
 				}
 				cdi->cd_info->sh_alloc = CD_ALLOC_IN_PROGRESS;
 				(void) strcpy(cdi->cd_info->sh_filename,
-								filename);
+				    filename);
 				(void) strcpy(cdg->sv_volname, filename);
 
 				cdg->sv_cd = new_cd;
@@ -1513,7 +1510,7 @@ known_cd:
 		cdi->cd_info->sh_failed = 2;
 	} else if (cdi->cd_info->sh_failed != 2)
 		if ((cdi->cd_global->sv_pinned == _SD_SELF_HOST) &&
-			!failover_open)
+		    !failover_open)
 			cdi->cd_info->sh_failed = 1;
 		else
 			cdi->cd_info->sh_failed = 0;
@@ -1532,8 +1529,8 @@ known_cd:
 	mutex_exit(&_sd_cache_lock);
 
 	if (cd_kstat_add(alloc_cd) < 0) {
-		cmn_err(CE_WARN, "Could not create kstats for cache descriptor "
-			"%d", alloc_cd);
+		cmn_err(CE_WARN, "!Could not create kstats for cache descriptor"
+		    " %d", alloc_cd);
 	}
 
 
@@ -1591,16 +1588,15 @@ _sd_close(int cd)
 	if (rc != 0) {
 		mutex_enter(&_sd_cache_lock);
 		if ((rc == EAGAIN) &&
-			(cdi->cd_global->sv_pinned == _SD_NO_HOST)) {
-				cdi->cd_global->sv_pinned = _SD_SELF_HOST;
-				SSOP_SETVOL(sdbc_safestore, cdi->cd_global);
-
+		    (cdi->cd_global->sv_pinned == _SD_NO_HOST)) {
+			cdi->cd_global->sv_pinned = _SD_SELF_HOST;
+			SSOP_SETVOL(sdbc_safestore, cdi->cd_global);
 		}
 
 		cdi->cd_info->sh_alloc &= ~CD_CLOSE_IN_PROGRESS;
 		mutex_exit(&_sd_cache_lock);
 		SDTRACE(ST_EXIT|SDF_CLOSE, cd, 0, SDT_INV_BL,
-			_SD_CD_WBLK_USED(cd), rc);
+		    _SD_CD_WBLK_USED(cd), rc);
 		goto out;
 	}
 
@@ -1617,7 +1613,7 @@ _sd_close(int cd)
 	mutex_exit(&_sd_cache_lock);
 
 	if (cd_kstat_remove(cd) < 0) {
-		cmn_err(CE_WARN, "Could not remove kstat for cache descriptor "
+		cmn_err(CE_WARN, "!Could not remove kstat for cache descriptor "
 		    "%d", cd);
 	}
 
@@ -1678,9 +1674,8 @@ _sdbc_remote_store_pinned(int cd)
 			/* is this always necessary? jgk */
 
 			if (SSOP_WRITE_CBLOCK(sdbc_safestore,
-					cc_ent->cc_write->sc_res,
-					cc_ent->cc_data,
-					CACHE_BLOCK_SIZE, 0)) {
+			    cc_ent->cc_write->sc_res, cc_ent->cc_data,
+			    CACHE_BLOCK_SIZE, 0)) {
 				mutex_exit(&cdi->cd_lock);
 				return (-1);
 			}
@@ -1796,15 +1791,15 @@ _sdbc_io_attach_cd(blind_t xcd)
 
 	if ((cdi->cd_info == NULL) || (cdi->cd_info->sh_failed)) {
 		DTRACE_PROBE1(_sdbc_io_attach_cd_end3,
-				struct _sd_shared *, cdi->cd_info);
+		    struct _sd_shared *, cdi->cd_info);
 
 		return (EINVAL);
 	}
 
 #if defined(_SD_FAULT_RES)
 	/* wait for node recovery to finish */
-	if (_sd_node_recovery) (void)
-		_sd_recovery_wait();
+	if (_sd_node_recovery)
+		(void) _sd_recovery_wait();
 #endif
 
 	/* this will provoke a sdbc_fd_attach_cd call .. */
@@ -1896,16 +1891,16 @@ _sdbc_io_detach_cd(blind_t xcd)
 	}
 
 #if defined(_SD_FAULT_RES)
-	if (_sd_node_recovery) (void)
-		_sd_recovery_wait();
+	if (_sd_node_recovery)
+		(void) _sd_recovery_wait();
 #endif
 	/* relinquish responsibility for device */
 	cdi = &(_sd_cache_files[cd]);
 	if (!(cdi->cd_rawfd) || !nsc_held(cdi->cd_rawfd)) {
-		cmn_err(CE_WARN, "sdbc(_sdbc_detach_cd) (%d) not attached", cd);
+		cmn_err(CE_WARN, "!sdbc(_sdbc_detach_cd)(%d) not attached", cd);
 		SDTRACE(ST_EXIT|SDF_DETACH, cd, 0, SDT_INV_BL, 0, EPROTO);
 		DTRACE_PROBE1(_sdbc_io_detach_cd_end2,
-				nsc_fd_t *, cdi->cd_rawfd);
+		    nsc_fd_t *, cdi->cd_rawfd);
 
 		return (EPROTO);
 	}
@@ -1964,12 +1959,12 @@ sdbc_detach_cd(blind_t xcd, int rd_only)
 			SSOP_SETVOL(sdbc_safestore, cdi->cd_global);
 		} else {
 			cmn_err(CE_WARN,
-			    "sdbc(_sdbc_detach_cd) (%d) attached by node %d",
+			    "!sdbc(_sdbc_detach_cd) (%d) attached by node %d",
 			    cd, cdi->cd_global->sv_attached);
 			SDTRACE(SDF_DETACH, cd, 0, SDT_INV_BL, 0, EPROTO);
 
 			DTRACE_PROBE1(sdbc_detach_cd_end3,
-				int, cdi->cd_global->sv_attached);
+			    int, cdi->cd_global->sv_attached);
 
 			return (EPROTO);
 		}
@@ -2052,8 +2047,7 @@ _sd_get_pinned(blind_t xcd)
 	while (cc_ent) {
 		if (CENTRY_PINNED(cc_ent))
 			nsc_pinned_data(cdi->cd_iodev,
-				BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
-					BLK_FBAS);
+			    BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)), BLK_FBAS);
 		cc_ent = cc_ent->cc_dirty_next;
 		if (!cc_ent)
 			cc_ent = cc_list = cc_list->cc_dirty_link;
@@ -2174,7 +2168,7 @@ skip:
 				st_cblk_off = 0;
 				st_cblk_len = (sdbc_cblk_fba_t)
 				    ((fba_len > (nsc_size_t)BLK_FBAS) ?
-					BLK_FBAS : fba_len);
+				    BLK_FBAS : fba_len);
 				continue;
 			}
 
@@ -2204,7 +2198,7 @@ skip:
 				sdbc_prefetch_deallocd++;
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-				    "prefetch centry %p cd %d cblk %" NSC_SZFMT
+				    "!prefetch centry %p cd %d cblk %" NSC_SZFMT
 				    " fba_len %" NSC_SZFMT " lost to dealloc?! "
 				    "cc_data %p",
 				    (void *)centry, cd, cblk, fba_orig_len,
@@ -2248,7 +2242,7 @@ skip:
 				sdbc_centry_init_dm(centry);
 
 				DTRACE_PROBE1(_sd_prefetch_buf,
-						_sd_cctl_t *, centry);
+				    _sd_cctl_t *, centry);
 			} else {
 				/* block mismatch */
 				sdbc_prefetch_lost++;
@@ -2258,7 +2252,7 @@ skip:
 			}
 		} else {
 			centry = sdbc_centry_alloc(cd, cblk, request_blocks,
-				    &stall, &alloc_tok, ALLOC_NOWAIT);
+			    &stall, &alloc_tok, ALLOC_NOWAIT);
 
 			if (centry == NULL) {
 				/*
@@ -2291,8 +2285,7 @@ skip:
 			if (CENTRY_PAGEIO(centry))
 				pageio = 0;
 
-			DTRACE_PROBE1(_sd_alloc_buf,
-					_sd_cctl_t *, centry);
+			DTRACE_PROBE1(_sd_alloc_buf, _sd_cctl_t *, centry);
 
 			this_entry_type = ELIGIBLE_ENTRY_DM;
 			if (centry->cc_aging_dm & FOUND_IN_HASH_DM)
@@ -2344,33 +2337,29 @@ skip:
 				    st_cblk_len);
 				DTRACE_PROBE4(_sd_prefetch_buf_data1,
 				    uint64_t, (uint64_t)(BLK_TO_FBA_NUM(cblk) +
-					    st_cblk_off),
-				    int, st_cblk_len,
+				    st_cblk_off), int, st_cblk_len,
 				    char *, *(int64_t *)(centry->cc_data +
-						FBA_SIZE(st_cblk_off)),
-				    char *, *(int64_t *)(centry->cc_data +
-					    FBA_SIZE(st_cblk_off + st_cblk_len)
-						- 8));
+				    FBA_SIZE(st_cblk_off)), char *,
+				    *(int64_t *)(centry->cc_data +
+				    FBA_SIZE(st_cblk_off + st_cblk_len) - 8));
 			}
 
 			handle->bh_centry = centry;
 			st_cblk_off = 0;
 			st_cblk_len = (sdbc_cblk_fba_t)
 			    ((fba_len > (nsc_size_t)BLK_FBAS) ?
-				BLK_FBAS : fba_len);
+			    BLK_FBAS : fba_len);
 		} else {
 			if (!SDBC_VALID_BITS(st_cblk_off, st_cblk_len, centry))
 				last_ioent = centry;
 			else {
 				DTRACE_PROBE4(_sd_prefetch_buf_data2,
 				    uint64_t, (uint64_t)(BLK_TO_FBA_NUM(cblk) +
-					    st_cblk_off),
-					int, st_cblk_len,
-					char *, *(int64_t *)(centry->cc_data +
-						FBA_SIZE(st_cblk_off)),
-					char *, *(int64_t *)(centry->cc_data +
-					    FBA_SIZE(st_cblk_off + st_cblk_len)
-						- 8));
+				    st_cblk_off), int, st_cblk_len,
+				    char *, *(int64_t *)(centry->cc_data +
+				    FBA_SIZE(st_cblk_off)), char *,
+				    *(int64_t *)(centry->cc_data +
+				    FBA_SIZE(st_cblk_off + st_cblk_len) - 8));
 			}
 
 			lentry->cc_chain = centry;
@@ -2382,7 +2371,8 @@ skip:
 
 		/* if this block has a new identity clear prefetch history */
 		if (this_entry_type != HASH_ENTRY_DM)
-		    centry->cc_aging_dm &= ~(PREFETCH_BUF_I | PREFETCH_BUF_E);
+			centry->cc_aging_dm &=
+			    ~(PREFETCH_BUF_I | PREFETCH_BUF_E);
 
 		centry->cc_aging_dm &= ~(ENTRY_FIELD_DM);
 		centry->cc_aging_dm |= this_entry_type | PREFETCH_BUF_E;
@@ -2424,14 +2414,14 @@ skip:
 				sdbc_prefetch_trailing++;
 			}
 			fba_len = (CENTRY_BLK(last_ioent) -
-					CENTRY_BLK(ioent) + 1) *  BLK_FBAS -
-					BLK_FBA_OFF(io_pos);
+			    CENTRY_BLK(ioent) + 1) *  BLK_FBAS -
+			    BLK_FBA_OFF(io_pos);
 			fba_orig_len = fba_len + (io_pos - fba_pos);
 		}
 
 		_SD_DISCONNECT_CALLBACK(handle);
 		sts = _sd_doread(handle,  ioent, io_pos,
-				(fba_pos + fba_orig_len - io_pos), flag);
+		    (fba_pos + fba_orig_len - io_pos), flag);
 		if (sts > 0)
 			(void) _sd_free_buf(handle);
 	} else {
@@ -2477,7 +2467,7 @@ _sd_cc_wait(int cd, nsc_off_t cblk, _sd_cctl_t *centry, int flag)
 	} else {
 		/* Oops! */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "_sd_cc_wait: unknown flag value (%x)", flag);
+		cmn_err(CE_WARN, "!_sd_cc_wait: unknown flag value (%x)", flag);
 #endif
 		return;
 	}
@@ -2492,8 +2482,7 @@ _sd_cc_wait(int cd, nsc_off_t cblk, _sd_cctl_t *centry, int flag)
 			(*waiters)--;
 			mutex_exit(&centry->cc_lock);
 			SDTRACE(ST_INFO|SDF_ENT_GET,
-				cd, 0, BLK_TO_FBA_NUM(cblk),
-				(nsc_usec()-stime), 0);
+			    cd, 0, BLK_TO_FBA_NUM(cblk), (nsc_usec()-stime), 0);
 		} else {
 			(*waiters)--;
 			mutex_exit(&centry->cc_lock);
@@ -2657,7 +2646,7 @@ _sd_alloc_buf(blind_t xcd, nsc_off_t fba_pos, nsc_size_t fba_len, int flag,
 #endif
 	if (fba_len == 0) {
 		SDTRACE(ST_EXIT|SDF_ALLOCBUF, cd, fba_len, fba_pos,
-			flag, EINVAL);
+		    flag, EINVAL);
 		sts = EINVAL;
 		goto done;
 	}
@@ -2773,7 +2762,7 @@ cget:
 				sdbc_allocb_deallocd++;
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-				    "centry %p cd %d cblk %" NSC_SZFMT
+				    "!centry %p cd %d cblk %" NSC_SZFMT
 				    " fba_len %" NSC_SZFMT " lost to dealloc?! "
 				    "cc_data %p", (void *)centry, cd, cblk,
 				    fba_orig_len, (void *)centry->cc_data);
@@ -2814,7 +2803,7 @@ cget:
 				sdbc_centry_init_dm(centry);
 
 				DTRACE_PROBE1(_sd_alloc_buf1,
-						_sd_cctl_t *, centry);
+				    _sd_cctl_t *, centry);
 			} else {
 				/* block mismatch: release, alloc new block */
 				sdbc_allocb_lost++;
@@ -2826,8 +2815,8 @@ cget:
 			}
 		} else {
 			centry = sdbc_centry_alloc(cd, cblk,
-					dmchain_request_blocks, &stall,
-					&alloc_tok, locked ? ALLOC_LOCKED : 0);
+			    dmchain_request_blocks, &stall,
+			    &alloc_tok, locked ? ALLOC_LOCKED : 0);
 
 			/*
 			 * dmchaining adjustment.
@@ -2838,8 +2827,7 @@ cget:
 			if (CENTRY_PAGEIO(centry))
 				pageio = 0;
 
-			DTRACE_PROBE1(_sd_alloc_buf2,
-					_sd_cctl_t *, centry);
+			DTRACE_PROBE1(_sd_alloc_buf2, _sd_cctl_t *, centry);
 
 			this_entry_type = ELIGIBLE_ENTRY_DM;
 			if (centry->cc_aging_dm & FOUND_IN_HASH_DM)
@@ -2909,17 +2897,16 @@ cget:
 					    st_cblk_len);
 
 					DTRACE_PROBE4(_sd_alloc_data1,
-					    uint64_t,
-						(uint64_t)(BLK_TO_FBA_NUM(cblk)
-						    + st_cblk_off),
-					    int, st_cblk_len,
+					    uint64_t, (uint64_t)
+					    (BLK_TO_FBA_NUM(cblk) +
+					    st_cblk_off), int, st_cblk_len,
 					    char *, *(int64_t *)
-						(centry->cc_data +
-						    FBA_SIZE(st_cblk_off)),
+					    (centry->cc_data +
+					    FBA_SIZE(st_cblk_off)),
 					    char *, *(int64_t *)
-						(centry->cc_data +
-						FBA_SIZE(st_cblk_off +
-						    st_cblk_len) - 8));
+					    (centry->cc_data +
+					    FBA_SIZE(st_cblk_off + st_cblk_len)
+					    - 8));
 				}
 			}
 			cblk++;
@@ -2936,19 +2923,16 @@ cget:
 						DATA_LOG(SDF_ALLOC, centry, 0,
 						    end_cblk_len);
 
-						DTRACE_PROBE4(
-						    _sd_alloc_data2,
+						DTRACE_PROBE4(_sd_alloc_data2,
 						    uint64_t,
-							BLK_TO_FBA_NUM(cblk),
+						    BLK_TO_FBA_NUM(cblk),
 						    int, end_cblk_len,
-						    char *,
-							*(int64_t *)
-							(centry->cc_data),
-						    char *,
-							*(int64_t *)
-							(centry->cc_data +
-							FBA_SIZE(end_cblk_len)
-							    - 8));
+						    char *, *(int64_t *)
+						    (centry->cc_data),
+						    char *, *(int64_t *)
+						    (centry->cc_data +
+						    FBA_SIZE(end_cblk_len)
+						    - 8));
 					}
 				}
 			}
@@ -2965,20 +2949,15 @@ cget:
 						DATA_LOG(SDF_ALLOC, centry, 0,
 						    BLK_FBAS);
 
-						DTRACE_PROBE4(
-						    _sd_alloc_data3,
-						    uint64_t,
-							(uint64_t)
-							BLK_TO_FBA_NUM(cblk),
+						DTRACE_PROBE4(_sd_alloc_data3,
+						    uint64_t, (uint64_t)
+						    BLK_TO_FBA_NUM(cblk),
 						    int, BLK_FBAS,
-						    char *,
-							*(int64_t *)
-							(centry->cc_data),
-						    char *,
-							*(int64_t *)
-							(centry->cc_data +
-							FBA_SIZE(BLK_FBAS) -
-							    8));
+						    char *, *(int64_t *)
+						    (centry->cc_data),
+						    char *, *(int64_t *)
+						    (centry->cc_data +
+						    FBA_SIZE(BLK_FBAS) - 8));
 					}
 				}
 			}
@@ -2987,7 +2966,8 @@ cget:
 
 		/* if this block has a new identity clear prefetch history */
 		if (this_entry_type != HASH_ENTRY_DM)
-		    centry->cc_aging_dm &= ~(PREFETCH_BUF_I | PREFETCH_BUF_E);
+			centry->cc_aging_dm &=
+			    ~(PREFETCH_BUF_I | PREFETCH_BUF_E);
 
 		centry->cc_aging_dm &= ~(ENTRY_FIELD_DM);
 		centry->cc_aging_dm |= this_entry_type;
@@ -3021,7 +3001,7 @@ cget:
 #ifdef DEBUG
 		err = _sd_free_buf(handle);
 		if (err) {
-			cmn_err(CE_WARN, "sdbc(_sd_alloc_buf): _sd_free_buf "
+			cmn_err(CE_WARN, "!sdbc(_sd_alloc_buf): _sd_free_buf "
 			    "failed: err:%d handle:%p", err, (void *)handle);
 		}
 #else
@@ -3044,11 +3024,9 @@ cget:
 	bufvec = handle->bh_bufvec;
 
 	while (centry) {
-		DTRACE_PROBE3(_sd_alloc_buf_centrys,
-				_sd_cctl_t *, centry,
-				int, cd,
-				uint64_t, (uint64_t)
-				    BLK_TO_FBA_NUM(CENTRY_BLK(centry)));
+		DTRACE_PROBE3(_sd_alloc_buf_centrys, _sd_cctl_t *, centry,
+		    int, cd, uint64_t,
+		    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(centry)));
 
 		if (fba_len == fba_orig_len) {
 			bufvec->bufaddr = (centry->cc_data +
@@ -3104,7 +3082,7 @@ cget:
 		_sd_bufvec_t *tbufvec;
 
 		for (tbufvec = handle->bh_bufvec; tbufvec != bufvec;
-			++tbufvec) {
+		    ++tbufvec) {
 			if ((min_frag > tbufvec->buflen) || (min_frag == 0))
 				min_frag = tbufvec->buflen;
 
@@ -3118,10 +3096,8 @@ cget:
 	}
 
 	/* buffer memory frag stats */
-	DTRACE_PROBE4(_sd_alloc_buf_frag,
-			uint64_t, (uint64_t)fba_orig_len,
-			int, nfrags, int, min_frag,
-			int, max_frag);
+	DTRACE_PROBE4(_sd_alloc_buf_frag, uint64_t, (uint64_t)fba_orig_len,
+	    int, nfrags, int, min_frag, int, max_frag);
 
 
 	if (flag & NSC_WRBUF) {
@@ -3132,11 +3108,11 @@ cget:
 			handle->bh_flag |= NSC_FORCED_WRTHRU;
 		} else {
 			for (centry = handle->bh_centry;
-				centry; centry = centry->cc_chain) {
+			    centry; centry = centry->cc_chain) {
 
 				CENTRY_SET_FTPOS(centry);
 				SSOP_SETCENTRY(sdbc_safestore,
-					centry->cc_write);
+				    centry->cc_write);
 			}
 		}
 	}
@@ -3149,7 +3125,7 @@ alloc_done:
 	if (ioent) {
 		_SD_DISCONNECT_CALLBACK(handle);
 		sts = _sd_doread(handle,  ioent, io_pos,
-			(fba_pos + fba_orig_len - io_pos), flag);
+		    (fba_pos + fba_orig_len - io_pos), flag);
 		if (sts > 0)
 			(void) _sd_free_buf(handle);
 	} else
@@ -3234,7 +3210,7 @@ sdbc_check_cctl_cot(_sd_cctl_t *centry)
 
 	/* these bits should be cleared out (STICKY_METADATA_DM not used) */
 	if (age & (AVAIL_ENTRY_DM | FOUND_HOLD_OVER_DM | FOUND_IN_HASH_DM |
-		STICKY_METADATA_DM))
+	    STICKY_METADATA_DM))
 		ccent_ok = 0;
 
 	/* eligible has no data and no size */
@@ -3259,7 +3235,7 @@ sdbc_check_cctl_cot(_sd_cctl_t *centry)
 
 	if (!ccent_ok)
 		cmn_err(cmn_level,
-		    "sdbc(sdbc_check_cctl_cot): inconsistent ccent %p "
+		    "!sdbc(sdbc_check_cctl_cot): inconsistent ccent %p "
 		    "age %x size %d data %p", (void *)centry, age, size,
 		    (void *)data);
 
@@ -3346,7 +3322,7 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 				if (centry) {
 
 					if (sdbc_check_cot &&
-						!sdbc_check_cctl_cot(centry)) {
+					    !sdbc_check_cctl_cot(centry)) {
 						ret = EINTR;
 						break;
 					}
@@ -3360,7 +3336,7 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 				if (!(centry->cc_aging_dm & ELIGIBLE_ENTRY_DM))
 					cl = 5;
 				else if (prev_ent && (prev_ent->cc_aging_dm &
-					    ELIGIBLE_ENTRY_DM))
+				    ELIGIBLE_ENTRY_DM))
 					cl = 15;
 				else
 					cl = 10;
@@ -3368,14 +3344,14 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 
 			case (5): /* process NON-ELIGIBLE entries */
 				if (!(centry->cc_aging_dm &
-					(HASH_ENTRY_DM|HOLD_ENTRY_DM))) {
+				    (HASH_ENTRY_DM|HOLD_ENTRY_DM))) {
 					/* no catagory */
 
 					/* consistency check */
 					if (centry->cc_alloc_size_dm ||
-							centry->cc_data) {
+					    centry->cc_data) {
 						cmn_err(cmn_level,
-						    "sdbc(setup_cot): "
+						    "!sdbc(setup_cot): "
 						    "OTHER with data/size %p",
 						    (void *)centry);
 
@@ -3387,7 +3363,7 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 					    ~CATAGORY_ENTRY_DM;
 					centry->cc_alloc_size_dm = BLK_SIZE(1);
 					DTRACE_PROBE1(_sd_setup_category,
-						_sd_cctl_t *, centry);
+					    _sd_cctl_t *, centry);
 				}
 				cl = 1;
 			break;
@@ -3403,8 +3379,8 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 				 */
 				/* consistency check */
 				if (centry->cc_alloc_size_dm ||
-							centry->cc_data) {
-					cmn_err(cmn_level, "sdbc(setup_cot): "
+				    centry->cc_data) {
+					cmn_err(cmn_level, "!sdbc(setup_cot): "
 					    "HOST with data/size %p",
 					    (void *)centry);
 					ret = EINTR;
@@ -3422,7 +3398,7 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 					centry->cc_alloc_size_dm = BLK_SIZE(1);
 					anchor = centry;
 					DTRACE_PROBE1(_sd_setup_category,
-						_sd_cctl_t *, anchor);
+					    _sd_cctl_t *, anchor);
 					cl = 1;
 				} else {
 					/*
@@ -3440,8 +3416,8 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 
 				/* consistency check */
 				if (centry->cc_alloc_size_dm ||
-							centry->cc_data) {
-					cmn_err(cmn_level, "sdbc(setup_cot): "
+				    centry->cc_data) {
+					cmn_err(cmn_level, "!sdbc(setup_cot): "
 					    "PARA with data/size %p",
 					    (void *)centry);
 
@@ -3466,7 +3442,7 @@ _sd_setup_category_on_type(_sd_cctl_t *header)
 					 * this parasite
 					 */
 					DTRACE_PROBE1(_sd_setup_category,
-						_sd_cctl_t *, centry);
+					    _sd_cctl_t *, centry);
 
 					anchor->cc_alloc_size_dm += BLK_SIZE(1);
 
@@ -3576,7 +3552,7 @@ _sd_setup_mem_chaining(_sd_cctl_t *header, int flag)
 				 * the anchor alloc
 				 */
 				if (!(centry->cc_aging_dm &
-					    (HASH_ENTRY_DM| HOLD_ENTRY_DM))) {
+				    (HASH_ENTRY_DM| HOLD_ENTRY_DM))) {
 					centry->cc_head_dm = anchor;
 
 					/* chain prev to this */
@@ -3587,7 +3563,7 @@ _sd_setup_mem_chaining(_sd_cctl_t *header, int flag)
 					 * host entry memory
 					 */
 					centry->cc_data = anchor->cc_data +
-						centry->cc_alloc_size_dm;
+					    centry->cc_alloc_size_dm;
 					centry->cc_alloc_size_dm = 0;
 				}
 				cl = 1;
@@ -3620,14 +3596,14 @@ _sd_check_buffer_alloc(int cd, nsc_off_t fba_pos, nsc_size_t fba_len,
 	 * arbitrary pointer and try to pass it off as a handle.
 	 */
 	if ((*hp)->bh_flag & (~_SD_VALID_FLAGS)) {
-		cmn_err(CE_WARN, "sdbc(_sd_check_buffer_alloc) "
+		cmn_err(CE_WARN, "!sdbc(_sd_check_buffer_alloc) "
 		    "cd %d invalid handle %p flags %x",
 		    cd, (void *)*hp, (*hp)->bh_flag);
 		return (EINVAL);
 	}
 
 	if ((_sd_cache_initialized == 0) || (FILE_OPENED(cd) == 0)) {
-		cmn_err(CE_WARN, "sdbc(_sd_check_buffer_alloc) "
+		cmn_err(CE_WARN, "!sdbc(_sd_check_buffer_alloc) "
 		    "cd %d not open. Cache init %d",
 		    cd, _sd_cache_initialized);
 		return (EINVAL);
@@ -3636,7 +3612,7 @@ _sd_check_buffer_alloc(int cd, nsc_off_t fba_pos, nsc_size_t fba_len,
 	if (!(_sd_cache_files[cd].cd_rawfd) ||
 	    !nsc_held(_sd_cache_files[cd].cd_rawfd)) {
 		cmn_err(CE_WARN,
-		    "sdbc(_sd_check_buffer_alloc) cd %d is not attached", cd);
+		    "!sdbc(_sd_check_buffer_alloc) cd %d is not attached", cd);
 		return (EINVAL);
 	}
 
@@ -3657,7 +3633,7 @@ sdbc_check_handle(_sd_buf_handle_t *handle)
 
 	if (!_SD_HANDLE_ACTIVE(handle)) {
 
-		cmn_err(cmn_level, "sdbc(_sd_free_buf): invalid handle %p"
+		cmn_err(cmn_level, "!sdbc(_sd_free_buf): invalid handle %p"
 		    "cd %d fpos %" NSC_SZFMT " flen %" NSC_SZFMT " flag %x",
 		    (void *)handle, HANDLE_CD(handle), handle->bh_fba_pos,
 		    handle->bh_fba_len, handle->bh_flag);
@@ -3697,7 +3673,7 @@ _sd_free_buf(_sd_buf_handle_t *handle)
 	int fpos = handle->bh_fba_pos;
 
 	SDTRACE(ST_ENTER|SDF_FREEBUF, HANDLE_CD(handle),
-		handle->bh_fba_len, handle->bh_fba_pos, 0, 0);
+	    handle->bh_fba_len, handle->bh_fba_pos, 0, 0);
 
 	if (sdbc_check_handle(handle) == 0)
 		return (EINVAL);
@@ -3852,7 +3828,7 @@ sdbc_get_dmchain(int cblocks, int *stall, int flag)
 			mutex_enter(&q->sq_qlock);
 
 			for (tmp_dmchain = qhead->cc_next; tmp_dmchain != qhead;
-					tmp_dmchain = tmp_dmchain->cc_next) {
+			    tmp_dmchain = tmp_dmchain->cc_next) {
 
 				/*
 				 * get a dmchain
@@ -3861,7 +3837,7 @@ sdbc_get_dmchain(int cblocks, int *stall, int flag)
 				if (sdbc_dmchain_avail(tmp_dmchain)) {
 					/* put on MRU end of queue */
 					sdbc_requeue_dmchain(q, tmp_dmchain,
-								1, 0);
+					    1, 0);
 					cc_dmchain = tmp_dmchain;
 					break;
 				}
@@ -3957,7 +3933,7 @@ sdbc_dmchain_avail(_sd_cctl_t *cc_ent)
 		 */
 		while (cc_ent) {
 			(void) _sd_hash_delete((struct _sd_hash_hd *)cc_ent,
-						_sd_htable);
+			    _sd_htable);
 
 			mutex_enter(&cc_ent->cc_lock);
 			if (cc_ent->cc_await_use) {
@@ -4179,7 +4155,7 @@ sdbc_centry_alloc_blks(int cd, nsc_off_t cblk, nsc_size_t reqblks, int flag)
 
 	while (reqblks) {
 		centry = sdbc_centry_alloc(cd, cblk, reqblks, &stall,
-				&alloc_tok, flag);
+		    &alloc_tok, flag);
 
 		if (!centry)
 			break;
@@ -4260,7 +4236,7 @@ sdbc_centry_alloc(int cd, nsc_off_t cblk, nsc_size_t req_blocks, int *stall,
 
 	if (sdbc_use_dmchain)
 		centry = sdbc_alloc_dmc(cd, cblk, req_blocks, stall, alloc_tok,
-					flag);
+		    flag);
 	else
 		centry = sdbc_alloc_lru(cd, cblk, stall, flag);
 
@@ -4297,7 +4273,7 @@ sdbc_alloc_dmc(int cd, nsc_off_t cblk, nsc_size_t req_blocks, int *stall,
 		 * for all members of dmchain.
 		 */
 		if (dmc->sab_dmchain =
-			sdbc_get_dmchain(req_blocks, stall, flag)) {
+		    sdbc_get_dmchain(req_blocks, stall, flag)) {
 
 			/* remember q it came from */
 			if (dmc->sab_dmchain->cc_alloc_size_dm)
@@ -4386,10 +4362,10 @@ alloc_try:
 		 * _sd_hash_insert() and SET_CENTRY_INUSE().
 		 */
 		if ((_sd_cctl_t *)_sd_hash_search(cd, cblk, _sd_htable)
-							!= old_ent) {
+		    != old_ent) {
 			sdbc_centry_deallocd++;
 #ifdef DEBUG
-			cmn_err(CE_WARN, "cc_ent %p cd %d cblk %" NSC_SZFMT
+			cmn_err(CE_WARN, "!cc_ent %p cd %d cblk %" NSC_SZFMT
 			    " lost to dealloc?! cc_data %p", (void *)old_ent,
 			    cd, cblk, (void *)old_ent->cc_data);
 #endif
@@ -4436,8 +4412,7 @@ alloc_try:
 	}
 
 
-	SDTRACE(ST_EXIT|SDF_ENT_ALLOC, cd, 0,
-		BLK_TO_FBA_NUM(cblk), 0, 0);
+	SDTRACE(ST_EXIT|SDF_ENT_ALLOC, cd, 0, BLK_TO_FBA_NUM(cblk), 0, 0);
 
 	mutex_enter(&cc_ent->cc_lock);
 	if (cc_ent->cc_await_use) {
@@ -4523,7 +4498,7 @@ sdbc_centry_alloc_end(sdbc_allocbuf_t *alloc_tok)
 	ASSERT((chainpull >= 0) && (chainpull < max_dm_queues));
 	if (chainpull)
 		(*(dmchainpull_table + (dmc->sab_q *
-			max_dm_queues + chainpull)))++;
+		    max_dm_queues + chainpull)))++;
 #endif
 
 }
@@ -4698,7 +4673,7 @@ retry_alloc_centry:
 			    _sd_hash_search(cd, cblk, _sd_htable) != old_ent) {
 				sdbc_centry_deallocd++;
 #ifdef DEBUG
-				cmn_err(CE_WARN, "cc_ent %p cd %d cblk %"
+				cmn_err(CE_WARN, "!cc_ent %p cd %d cblk %"
 				    NSC_SZFMT " lost to dealloc?! cc_data %p",
 				    (void *)old_ent, cd, cblk,
 				    (void *)old_ent->cc_data);
@@ -4737,7 +4712,7 @@ retry_alloc_centry:
 		}
 
 		SDTRACE(ST_EXIT|SDF_ENT_ALLOC, cd, tries,
-			BLK_TO_FBA_NUM(cblk), 0, 0);
+		    BLK_TO_FBA_NUM(cblk), 0, 0);
 
 		if (cc_ent->cc_await_use) {
 			mutex_enter(&cc_ent->cc_lock);
@@ -4782,14 +4757,14 @@ sdbc_centry_init_dm(_sd_cctl_t *centry)
 		centry->cc_aging_dm &= ~(FINAL_AGING_DM);
 
 		DTRACE_PROBE1(sdbc_centry_init_dm_end,
-				char *, centry->cc_data);
+		    char *, centry->cc_data);
 		return;
 	}
 
 	centry->cc_aging_dm &= ~(FINAL_AGING_DM | CATAGORY_ENTRY_DM);
 
 	if (centry->cc_head_dm || centry->cc_next_dm)
-		cmn_err(cmn_level, "sdbc(sdbc_centry_init_dm): "
+		cmn_err(cmn_level, "!sdbc(sdbc_centry_init_dm): "
 		    "non-zero mem chain in ccent %p", (void *)centry);
 
 	centry->cc_head_dm = 0;
@@ -4874,7 +4849,7 @@ _sd_centry_release(_sd_cctl_t *centry)
 	ss_centry_info_t *wctl;
 
 	SDTRACE(ST_ENTER|SDF_ENT_FREE, CENTRY_CD(centry), 0,
-		BLK_TO_FBA_NUM(CENTRY_BLK(centry)), 0, 0);
+	    BLK_TO_FBA_NUM(CENTRY_BLK(centry)), 0, 0);
 
 	CLEAR_CENTRY_PAGEIO(centry);
 
@@ -4912,7 +4887,7 @@ _sd_centry_release(_sd_cctl_t *centry)
 
 					if (_sd_lru_reinsert(q, centry)) {
 						sdbc_requeue_dmchain(q,
-								centry, 1, 1);
+						    centry, 1, 1);
 					}
 				}
 			} else {
@@ -4945,7 +4920,7 @@ _sd_centry_release(_sd_cctl_t *centry)
 	}
 
 	SDTRACE(ST_EXIT|SDF_ENT_FREE, CENTRY_CD(centry), 0,
-		BLK_TO_FBA_NUM(CENTRY_BLK(centry)), 0, 0);
+	    BLK_TO_FBA_NUM(CENTRY_BLK(centry)), 0, 0);
 
 	/* only clear inuse after final reference to centry */
 
@@ -4970,8 +4945,8 @@ sdbc_get_cinfo_byres(ss_resource_t *res)
 		return (NULL);
 
 	cinfo = _sdbc_gl_centry_info;
-	cend = _sdbc_gl_centry_info + (_sdbc_gl_centry_info_size /
-					sizeof (ss_centry_info_t)) - 1;
+	cend = _sdbc_gl_centry_info +
+	    (_sdbc_gl_centry_info_size / sizeof (ss_centry_info_t)) - 1;
 
 	for (; cinfo <= cend; ++cinfo)
 		if (cinfo->sc_res == res) {
@@ -5021,7 +4996,7 @@ _sd_alloc_write(_sd_cctl_t *centry, int *stall)
 		return (0);
 
 	if ((SSOP_ALLOCRESOURCE(sdbc_safestore, need, stall, &reslist))
-							== SS_OK) {
+	    == SS_OK) {
 		savereslist = reslist;
 		for (ce = centry; ce; ce = ce->cc_chain) {
 			if (ce->cc_write)
@@ -5040,7 +5015,7 @@ _sd_alloc_write(_sd_cctl_t *centry, int *stall)
 			 */
 			if ((err != SS_OK) || !ce->cc_write) {
 
-				cmn_err(CE_WARN, "_sd_alloc_write: "
+				cmn_err(CE_WARN, "!_sd_alloc_write: "
 				    "bad resource list 0x%p"
 				    "changing to forced write thru mode",
 				    (void *)savereslist);
@@ -5048,10 +5023,10 @@ _sd_alloc_write(_sd_cctl_t *centry, int *stall)
 				(void) _sd_set_node_hint(NSC_FORCED_WRTHRU);
 
 				while (SSOP_GETRESOURCE(sdbc_safestore,
-					&savereslist, &res) == SS_OK) {
+				    &savereslist, &res) == SS_OK) {
 
 					SSOP_DEALLOCRESOURCE(sdbc_safestore,
-							res);
+					    res);
 				}
 
 				return (-1);
@@ -5105,7 +5080,7 @@ _sd_read(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 
 #if !defined(_SD_NOCHECKS)
 	if (!_SD_HANDLE_ACTIVE(handle)) {
-		cmn_err(CE_WARN, "sdbc(_sd_read) handle %p not active",
+		cmn_err(CE_WARN, "!sdbc(_sd_read) handle %p not active",
 		    (void *)handle);
 		ret = EINVAL;
 		goto out;
@@ -5136,16 +5111,12 @@ _sd_read(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 		goto need_io;
 	DATA_LOG(SDF_RD, cc_ent, st_cblk_off, st_cblk_len);
 
-	DTRACE_PROBE4(_sd_read_data1,
-		uint64_t,
-		    (uint64_t)(BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)) +
-			st_cblk_off),
-		uint64_t, (uint64_t)st_cblk_len,
-		char *,
-		    *(int64_t *)(cc_ent->cc_data + FBA_SIZE(st_cblk_off)),
-		char *,
-		    *(int64_t *)(cc_ent->cc_data +
-			FBA_SIZE(st_cblk_off + st_cblk_len) - 8));
+	DTRACE_PROBE4(_sd_read_data1, uint64_t,
+	    (uint64_t)(BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)) + st_cblk_off),
+	    uint64_t, (uint64_t)st_cblk_len, char *,
+	    *(int64_t *)(cc_ent->cc_data + FBA_SIZE(st_cblk_off)),
+	    char *, *(int64_t *)(cc_ent->cc_data +
+	    FBA_SIZE(st_cblk_off + st_cblk_len) - 8));
 
 	fba_pos += st_cblk_len;
 	fba_len -= st_cblk_len;
@@ -5156,13 +5127,12 @@ _sd_read(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 			goto need_io;
 		DATA_LOG(SDF_RD, cc_ent, 0, BLK_FBAS);
 
-		DTRACE_PROBE4(_sd_read_data2,
-			uint64_t,
-			    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
-			uint64_t, (uint64_t)BLK_FBAS,
-			char *, *(int64_t *)(cc_ent->cc_data),
-			char *, *(int64_t *)(cc_ent->cc_data +
-			    FBA_SIZE(BLK_FBAS) - 8));
+		DTRACE_PROBE4(_sd_read_data2, uint64_t,
+		    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
+		    uint64_t, (uint64_t)BLK_FBAS,
+		    char *, *(int64_t *)(cc_ent->cc_data),
+		    char *, *(int64_t *)(cc_ent->cc_data +
+		    FBA_SIZE(BLK_FBAS) - 8));
 
 		fba_pos += BLK_FBAS;
 		fba_len -= BLK_FBAS;
@@ -5173,13 +5143,12 @@ _sd_read(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 			goto need_io;
 		DATA_LOG(SDF_RD, cc_ent, 0, end_cblk_len);
 
-		DTRACE_PROBE4(_sd_read_data3,
-			uint64_t,
-			    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
-			uint64_t, (uint64_t)end_cblk_len,
-			char *, *(int64_t *)(cc_ent->cc_data),
-			char *, *(int64_t *)(cc_ent->cc_data +
-			    FBA_SIZE(end_cblk_len) - 8));
+		DTRACE_PROBE4(_sd_read_data3, uint64_t,
+		    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
+		    uint64_t, (uint64_t)end_cblk_len,
+		    char *, *(int64_t *)(cc_ent->cc_data),
+		    char *, *(int64_t *)(cc_ent->cc_data +
+		    FBA_SIZE(end_cblk_len) - 8));
 	}
 
 	CACHE_FBA_READ(handle->bh_cd, fba_orig_len);
@@ -5241,29 +5210,33 @@ sdbc_doread_prefetch(_sd_cctl_t *cc_ent, nsc_off_t fba_pos, nsc_size_t fba_len)
 		if (_sd_hash_search(cd, st_cblk - 1, _sd_htable)) {
 			if (!_sd_hash_search(cd, next_cblk, _sd_htable)) {
 
-				cc_ra = sdbc_centry_alloc_blks(cd, next_cblk, 1,
-								ALLOC_NOWAIT);
+				cc_ra = sdbc_centry_alloc_blks
+				    (cd, next_cblk, 1, ALLOC_NOWAIT);
 				if (cc_ra) {
 					/* if in cache don't readahead */
-				    if (cc_ra->cc_aging_dm & HASH_ENTRY_DM) {
-					++sdbc_ra_hash;
-					_sd_centry_release(cc_ra);
-				    } else {
-					cc_ent->cc_chain = cc_ra;
-					cc_ra->cc_chain = 0;
-					fba_count =
-					    (vol_fill > (nsc_size_t)BLK_FBAS) ?
-						BLK_FBAS : (int)vol_fill;
-					/*
-					 * indicate implicit prefetch and
-					 * mark for release in
-					 * _sd_read_complete()
-					 */
-					cc_ra->cc_aging_dm |= (PREFETCH_BUF_I |
-							    PREFETCH_BUF_IR);
-				    }
-				} else
+					if (cc_ra->cc_aging_dm &
+					    HASH_ENTRY_DM) {
+						++sdbc_ra_hash;
+						_sd_centry_release(cc_ra);
+					} else {
+						cc_ent->cc_chain = cc_ra;
+						cc_ra->cc_chain = 0;
+						fba_count =
+						    (vol_fill >
+						    (nsc_size_t)BLK_FBAS) ?
+						    BLK_FBAS : (int)vol_fill;
+						/*
+						 * indicate implicit prefetch
+						 * and mark for release in
+						 * _sd_read_complete()
+						 */
+						cc_ra->cc_aging_dm |=
+						    (PREFETCH_BUF_I |
+						    PREFETCH_BUF_IR);
+					}
+				} else {
 					++sdbc_ra_none;
+				}
 			}
 		}
 
@@ -5333,15 +5306,14 @@ _sd_doread(_sd_buf_handle_t *handle, _sd_cctl_t *cc_ent, nsc_off_t fba_pos,
 	/* compute fill to end of cache block */
 	end_cblk_fill = (BLK_FBAS - 1) - ((fba_len - 1) % BLK_FBAS);
 	vol_end_fill = _sd_cache_files[(cd)].cd_info->sh_filesize -
-			(fba_pos + fba_len);
+	    (fba_pos + fba_len);
 
 	/* fill to lesser of cache block or end of volume */
 	fba_len += ((nsc_size_t)end_cblk_fill < vol_end_fill) ? end_cblk_fill :
 	    vol_end_fill;
 
-	DTRACE_PROBE2(_sd_doread_rfill,
-			nsc_off_t, fba_pos,
-			nsc_size_t, fba_len);
+	DTRACE_PROBE2(_sd_doread_rfill, nsc_off_t, fba_pos,
+	    nsc_size_t, fba_len);
 
 
 	/* for small reads do 1-block readahead if previous block is in cache */
@@ -5365,7 +5337,7 @@ _sd_doread(_sd_buf_handle_t *handle, _sd_cctl_t *cc_ent, nsc_off_t fba_pos,
 		cc_temp = cc_temp->cc_chain;
 	}
 	bp = sd_alloc_iob(_sd_cache_files[cd].cd_crdev,
-			fba_pos, num_bdl, B_READ);
+	    fba_pos, num_bdl, B_READ);
 	if (bp == NULL) {
 		SDTRACE(ST_EXIT|SDF_READ, cd, fba_len, fba_pos, flag, E2BIG);
 		return (E2BIG);
@@ -5469,15 +5441,12 @@ _sd_read_complete(_sd_buf_handle_t *handle, nsc_off_t fba_pos,
 		SDBC_SET_VALID_BITS(st_cblk_off, st_cblk_len, cc_iocent);
 		DATA_LOG(SDF_RDIO, cc_iocent, st_cblk_off, st_cblk_len);
 
-		DTRACE_PROBE4(_sd_read_complete_data1,
-			uint64_t, (uint64_t)
-			    BLK_TO_FBA_NUM(CENTRY_BLK(cc_iocent)) + st_cblk_off,
-			int, st_cblk_len,
-			char *, *(int64_t *)
-			    (cc_iocent->cc_data + FBA_SIZE(st_cblk_off)),
-			char *, *(int64_t *)
-			    (cc_iocent->cc_data +
-				FBA_SIZE(st_cblk_off + st_cblk_len) - 8));
+		DTRACE_PROBE4(_sd_read_complete_data1, uint64_t, (uint64_t)
+		    BLK_TO_FBA_NUM(CENTRY_BLK(cc_iocent)) + st_cblk_off,
+		    int, st_cblk_len, char *,
+		    *(int64_t *)(cc_iocent->cc_data + FBA_SIZE(st_cblk_off)),
+		    char *, *(int64_t *)(cc_iocent->cc_data +
+		    FBA_SIZE(st_cblk_off + st_cblk_len) - 8));
 
 
 		first_iocent = cc_iocent;
@@ -5488,15 +5457,12 @@ _sd_read_complete(_sd_buf_handle_t *handle, nsc_off_t fba_pos,
 			SET_FULLY_VALID(cc_iocent);
 			DATA_LOG(SDF_RDIO, cc_iocent, 0, BLK_FBAS);
 
-			DTRACE_PROBE4(_sd_read_complete_data2,
-				uint64_t, (uint64_t)
-				    BLK_TO_FBA_NUM(CENTRY_BLK(cc_iocent)),
-				int, BLK_FBAS,
-				char *,
-				    *(int64_t *)(cc_iocent->cc_data),
-				char *,
-				    *(int64_t *)(cc_iocent->cc_data +
-					FBA_SIZE(BLK_FBAS) - 8));
+			DTRACE_PROBE4(_sd_read_complete_data2, uint64_t,
+			    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(cc_iocent)),
+			    int, BLK_FBAS, char *,
+			    *(int64_t *)(cc_iocent->cc_data), char *,
+			    *(int64_t *)(cc_iocent->cc_data +
+			    FBA_SIZE(BLK_FBAS) - 8));
 
 			/*
 			 * 4755485 release implicit prefetch buffers
@@ -5532,15 +5498,12 @@ _sd_read_complete(_sd_buf_handle_t *handle, nsc_off_t fba_pos,
 			SDBC_SET_VALID_BITS(0, end_cblk_len, cc_iocent);
 			DATA_LOG(SDF_RDIO, cc_iocent, 0, end_cblk_len);
 
-			DTRACE_PROBE4(_sd_read_complete_data3,
-				uint64_t, (uint64_t)
-				    BLK_TO_FBA_NUM(CENTRY_BLK(cc_iocent)),
-				int, end_cblk_len,
-				char *,
-				    *(int64_t *)(cc_iocent->cc_data),
-				char *,
-				    *(int64_t *)(cc_iocent->cc_data +
-					FBA_SIZE(end_cblk_len) - 8));
+			DTRACE_PROBE4(_sd_read_complete_data3, uint64_t,
+			    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(cc_iocent)),
+			    int, end_cblk_len, char *,
+			    *(int64_t *)(cc_iocent->cc_data), char *,
+			    *(int64_t *)(cc_iocent->cc_data +
+			    FBA_SIZE(end_cblk_len) - 8));
 		}
 	}
 
@@ -5577,7 +5540,7 @@ _sd_async_read_ea(blind_t xhandle, nsc_off_t fba_pos, nsc_size_t fba_len,
 		_sd_cache_files[cd].cd_info->sh_failed = 1;
 	}
 	SDTRACE(ST_ENTER|SDF_READ_EA, HANDLE_CD(handle),
-		handle->bh_fba_len, handle->bh_fba_pos, 0, error);
+	    handle->bh_fba_len, handle->bh_fba_pos, 0, error);
 
 	_sd_read_complete(handle, fba_pos, fba_len, error);
 
@@ -5586,7 +5549,7 @@ _sd_async_read_ea(blind_t xhandle, nsc_off_t fba_pos, nsc_size_t fba_len,
 #endif
 
 	SDTRACE(ST_EXIT|SDF_READ_EA, HANDLE_CD(handle),
-		handle->bh_fba_len, handle->bh_fba_pos, 0, 0);
+	    handle->bh_fba_len, handle->bh_fba_pos, 0, 0);
 	_SD_READ_CALLBACK(handle);
 }
 
@@ -5715,7 +5678,7 @@ _sd_write(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 
 	if (!_SD_HANDLE_ACTIVE(handle)) {
 		SDALERT(SDF_WRITE,
-			SDT_INV_CD, 0, SDT_INV_BL, handle->bh_flag, 0);
+		    SDT_INV_CD, 0, SDT_INV_BL, handle->bh_flag, 0);
 		ret = EINVAL;
 		goto out;
 	}
@@ -5798,14 +5761,12 @@ _sd_write(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 loop1:
 	DATA_LOG(SDF_WR, cc_ent, st_cblk_off, st_cblk_len);
 
-	DTRACE_PROBE4(_sd_write_data1,
-		uint64_t, (uint64_t)
-		    (BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)) + st_cblk_off),
-		int, st_cblk_len,
-		char *,
-		    *(int64_t *)(cc_ent->cc_data + FBA_SIZE(st_cblk_off)),
-		char *, *(int64_t *)(cc_ent->cc_data +
-		    FBA_SIZE(st_cblk_off+ st_cblk_len) - 8));
+	DTRACE_PROBE4(_sd_write_data1, uint64_t, (uint64_t)
+	    (BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)) + st_cblk_off),
+	    int, st_cblk_len, char *,
+	    *(int64_t *)(cc_ent->cc_data + FBA_SIZE(st_cblk_off)),
+	    char *, *(int64_t *)(cc_ent->cc_data +
+	    FBA_SIZE(st_cblk_off+ st_cblk_len) - 8));
 
 	cur_fba_len -= st_cblk_len;
 	cc_ent = cc_ent->cc_chain;
@@ -5814,7 +5775,7 @@ loop1:
 		if (CENTRY_DIRTY(cc_ent) && update_dirty(cc_ent, 0, BLK_FBAS)) {
 			if (cur_chain) {
 				_sd_enqueue_dirty(cd, cur_chain, dirty_next,
-							num_queued);
+				    num_queued);
 				cur_chain = dirty_next = NULL;
 			}
 			goto loop2;
@@ -5835,13 +5796,11 @@ loop1:
 	loop2:
 		DATA_LOG(SDF_WR, cc_ent, 0, BLK_FBAS);
 
-		DTRACE_PROBE4(_sd_write_data2,
-			uint64_t,
-			    (uint64_t)(BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent))),
-			int, BLK_FBAS,
-			char *, *(int64_t *)(cc_ent->cc_data),
-			char *, *(int64_t *)(cc_ent->cc_data +
-			    FBA_SIZE(BLK_FBAS) - 8));
+		DTRACE_PROBE4(_sd_write_data2, uint64_t,
+		    (uint64_t)(BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent))),
+		    int, BLK_FBAS, char *, *(int64_t *)(cc_ent->cc_data),
+		    char *, *(int64_t *)(cc_ent->cc_data +
+		    FBA_SIZE(BLK_FBAS) - 8));
 
 		cc_ent = cc_ent->cc_chain;
 		cur_fba_len -= BLK_FBAS;
@@ -5849,7 +5808,7 @@ loop1:
 
 #if defined(_SD_DEBUG)
 	if (cur_fba_len != end_cblk_len)
-		cmn_err(CE_WARN, "fba_len %" NSC_SZFMT " end_cblk_len %d in "
+		cmn_err(CE_WARN, "!fba_len %" NSC_SZFMT " end_cblk_len %d in "
 		    "_sd_write", cur_fba_len, end_cblk_len);
 #endif
 
@@ -5858,7 +5817,7 @@ loop1:
 		    end_cblk_len)) {
 			if (cur_chain) {
 				_sd_enqueue_dirty(cd, cur_chain, dirty_next,
-						num_queued);
+				    num_queued);
 				cur_chain = dirty_next = NULL;
 			}
 			goto loop3;
@@ -5881,13 +5840,11 @@ loop3:
 	if (cur_fba_len) {
 		DATA_LOG(SDF_WR, cc_ent, 0, end_cblk_len);
 
-		DTRACE_PROBE4(_sd_write_data3,
-			uint64_t,
-			    (uint64_t)(BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent))),
-			int, end_cblk_len,
-			char *, *(int64_t *)(cc_ent->cc_data),
-			char *, *(int64_t *)(cc_ent->cc_data +
-				FBA_SIZE(end_cblk_len) - 8));
+		DTRACE_PROBE4(_sd_write_data3, uint64_t,
+		    (uint64_t)(BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent))),
+		    int, end_cblk_len, char *, *(int64_t *)(cc_ent->cc_data),
+		    char *, *(int64_t *)(cc_ent->cc_data +
+		    FBA_SIZE(end_cblk_len) - 8));
 
 	}
 
@@ -5960,7 +5917,7 @@ _sd_queue_write(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len)
 
 			if (sblk && flush_pos_valid) {
 				(void) _sd_write(handle, flush_pos, flush_len,
-							NSC_QUEUE);
+				    NSC_QUEUE);
 				flush_pos_valid = 0;
 				flush_len = 0;
 			}
@@ -6010,14 +5967,13 @@ _sd_remote_store(_sd_cctl_t *cc_ent, nsc_off_t fba_pos, nsc_size_t fba_len)
 
 	ss_res = cc_ent->cc_write->sc_res;
 	if (SSOP_WRITE_CBLOCK(sdbc_safestore, ss_res,
-				cc_ent->cc_data + FBA_SIZE(st_cblk_off),
-				FBA_SIZE(st_cblk_len),
-				FBA_SIZE(st_cblk_off))) {
+	    cc_ent->cc_data + FBA_SIZE(st_cblk_off), FBA_SIZE(st_cblk_len),
+	    FBA_SIZE(st_cblk_off))) {
 
 		cmn_err(CE_WARN,
-		"sdbc(_sd_write) safe store failed. Going synchronous");
+		    "!sdbc(_sd_write) safe store failed. Going synchronous");
 		SDTRACE(SDF_REFLECT, CENTRY_CD(cc_ent), fba_len,
-						fba_pos, 0, -1);
+		    fba_pos, 0, -1);
 		return (-1);
 	}
 
@@ -6025,15 +5981,13 @@ _sd_remote_store(_sd_cctl_t *cc_ent, nsc_off_t fba_pos, nsc_size_t fba_len)
 	while (fba_len > (nsc_size_t)end_cblk_len) {
 		fba_len -= BLK_FBAS;
 
-		if (SSOP_WRITE_CBLOCK(sdbc_safestore, ss_res,
-					cc_ent->cc_data,
-					CACHE_BLOCK_SIZE, 0)) {
+		if (SSOP_WRITE_CBLOCK(sdbc_safestore, ss_res, cc_ent->cc_data,
+		    CACHE_BLOCK_SIZE, 0)) {
 
-			cmn_err(CE_WARN,
-			    "sdbc(_sd_write) safe store failed. "
+			cmn_err(CE_WARN, "!sdbc(_sd_write) safe store failed. "
 			    "Going synchronous");
 			SDTRACE(SDF_REFLECT, CENTRY_CD(cc_ent), fba_len,
-						fba_pos, 0, -1);
+			    fba_pos, 0, -1);
 			return (-1);
 		}
 
@@ -6042,14 +5996,12 @@ _sd_remote_store(_sd_cctl_t *cc_ent, nsc_off_t fba_pos, nsc_size_t fba_len)
 
 	if (fba_len) {
 		if (SSOP_WRITE_CBLOCK(sdbc_safestore, ss_res,
-					cc_ent->cc_data,
-					FBA_SIZE(end_cblk_len), 0)) {
+		    cc_ent->cc_data, FBA_SIZE(end_cblk_len), 0)) {
 
-			cmn_err(CE_WARN,
-			    "sdbc(_sd_write) nvmem dma failed. "
+			cmn_err(CE_WARN, "!sdbc(_sd_write) nvmem dma failed. "
 			    "Going synchronous");
 			SDTRACE(SDF_REFLECT, CENTRY_CD(cc_ent), fba_len,
-						fba_pos, 0, -1);
+			    fba_pos, 0, -1);
 			return (-1);
 		}
 	}
@@ -6155,7 +6107,7 @@ _sd_sync_write2(_sd_buf_handle_t *wr_handle, nsc_off_t wr_st_pos,
 				}
 
 				SSOP_SETCENTRY(sdbc_safestore,
-							wr_ent->cc_write);
+				    wr_ent->cc_write);
 			}
 
 			mutex_exit(&wr_ent->cc_lock);
@@ -6182,15 +6134,12 @@ _sd_sync_write2(_sd_buf_handle_t *wr_handle, nsc_off_t wr_st_pos,
 
 		DATA_LOG(SDF_WRSYNC, rd_ent, rd_pos, this_len);
 
-		DTRACE_PROBE4(_sd_sync_write2_data,
-		    uint64_t,
-			(uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(rd_ent)) + rd_pos,
-		    uint64_t, (uint64_t)this_len,
-		    char *,
-			*(int64_t *)(rd_ent->cc_data + FBA_SIZE(rd_pos)),
-		    char *,
-		    *(int64_t *)(rd_ent->cc_data +
-			FBA_SIZE(rd_pos + this_len) - 8));
+		DTRACE_PROBE4(_sd_sync_write2_data, uint64_t,
+		    (uint64_t)BLK_TO_FBA_NUM(CENTRY_BLK(rd_ent)) + rd_pos,
+		    uint64_t, (uint64_t)this_len, char *,
+		    *(int64_t *)(rd_ent->cc_data + FBA_SIZE(rd_pos)),
+		    char *, *(int64_t *)(rd_ent->cc_data +
+		    FBA_SIZE(rd_pos + this_len) - 8));
 
 		sd_add_fba(bp, &rd_ent->cc_addr, rd_pos, this_len);
 
@@ -6275,7 +6224,7 @@ _sd_zero(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 	}
 
 	if (!_SD_HANDLE_ACTIVE(handle)) {
-		cmn_err(CE_WARN, "sdbc(_sd_zero) handle %p not active",
+		cmn_err(CE_WARN, "!sdbc(_sd_zero) handle %p not active",
 		    (void *)handle);
 
 		DTRACE_PROBE1(handle_active, int, handle->bh_flag);
@@ -6371,12 +6320,11 @@ _sd_copy(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 		return (EIO);
 	}
 	if (!_SD_HANDLE_ACTIVE(handle1) || !_SD_HANDLE_ACTIVE(handle2)) {
-		cmn_err(CE_WARN, "sdbc(_sd_copy) handle %p or %p not active",
+		cmn_err(CE_WARN, "!sdbc(_sd_copy) handle %p or %p not active",
 		    (void *)handle1, (void *)handle2);
 
-		DTRACE_PROBE2(handle_active1,
-				int, handle1->bh_flag,
-				int, handle2->bh_flag);
+		DTRACE_PROBE2(handle_active1, int, handle1->bh_flag,
+		    int, handle2->bh_flag);
 
 		return (EINVAL);
 	}
@@ -6399,7 +6347,7 @@ _sd_copy(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 			off2 = FBA_SIZE(BLK_FBA_OFF(fba_pos2));
 
 			bcopy(cc_ent1->cc_data+off1, cc_ent2->cc_data+off2,
-				FBA_SIZE(1));
+			    FBA_SIZE(1));
 
 			fba_pos1++;
 			fba_pos2++;
@@ -6479,12 +6427,11 @@ _sd_copy_direct(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 
 	if (!_SD_HANDLE_ACTIVE(handle1) || !_SD_HANDLE_ACTIVE(handle2)) {
 		cmn_err(CE_WARN,
-		    "sdbc(_sd_copy_direct) handle %p or %p not active",
+		    "!sdbc(_sd_copy_direct) handle %p or %p not active",
 		    (void *)handle1, (void *)handle2);
 
-		DTRACE_PROBE2(handle_active2,
-				int, handle1->bh_flag,
-				int, handle2->bh_flag);
+		DTRACE_PROBE2(handle_active2, int, handle1->bh_flag,
+		    int, handle2->bh_flag);
 
 		return (EINVAL);
 	}
@@ -6494,7 +6441,7 @@ _sd_copy_direct(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 
 	if ((handle2->bh_flag & NSC_WRITE) == 0) {
 		cmn_err(CE_WARN,
-		    "sdbc(_sd_copy_direct) handle2 %p is not writeable",
+		    "!sdbc(_sd_copy_direct) handle2 %p is not writeable",
 		    (void *)handle2);
 		DTRACE_PROBE1(handle2_write, int, handle2->bh_flag);
 		return (EINVAL);
@@ -6535,8 +6482,8 @@ _sd_enqueue_dirty(int cd, _sd_cctl_t *chain, _sd_cctl_t *cc_last, int numq)
 	cdi = &(_sd_cache_files[cd]);
 #if defined(_SD_DEBUG)
 	if (chain->cc_dirty_link)
-		cmn_err(CE_WARN, "dirty_link set in enq %x fl %x",
-			chain->cc_dirty_link, chain->cc_flag);
+		cmn_err(CE_WARN, "!dirty_link set in enq %x fl %x",
+		    chain->cc_dirty_link, chain->cc_flag);
 #endif
 
 	/* was FAST */
@@ -6602,8 +6549,8 @@ _sd_enqueue_dirty_chain(int cd,
 	cdi = &(_sd_cache_files[cd]);
 	if (chain_last->cc_dirty_link)
 		cmn_err(CE_PANIC,
-			"_sd_enqueue_dirty_chain: chain_last %p dirty_link %p",
-			(void *)chain_last, (void *)chain_last->cc_dirty_link);
+		    "!_sd_enqueue_dirty_chain: chain_last %p dirty_link %p",
+		    (void *)chain_last, (void *)chain_last->cc_dirty_link);
 	/* was FAST */
 	mutex_enter(&(cdi->cd_lock));
 	cdi->cd_last_ent = NULL;
@@ -6721,7 +6668,7 @@ _sd_get_stats(_sd_stats_t *uptr, int convert_32)
 		ssioc_stats_t ss_stats;
 
 		if (SSOP_CTL(sdbc_safestore, SSIOC_STATS,
-						(uintptr_t)&ss_stats) == 0)
+		    (uintptr_t)&ss_stats) == 0)
 			_sd_cache_stats->st_wlru_inq = ss_stats.wq_inq;
 		else
 			_sd_cache_stats->st_wlru_inq = 0;
@@ -6891,7 +6838,7 @@ _sd_discard_pinned(blind_t xcd, nsc_off_t fba_pos, nsc_size_t fba_len)
 	}
 
 	for (cblk = FBA_TO_BLK_NUM(fba_pos);
-		cblk < FBA_TO_BLK_LEN(fba_pos + fba_len); cblk++) {
+	    cblk < FBA_TO_BLK_LEN(fba_pos + fba_len); cblk++) {
 		if (cc_ent =
 		    (_sd_cctl_t *)_sd_hash_search(cd, cblk, _sd_htable)) {
 			if (!CENTRY_PINNED(cc_ent))
@@ -6910,7 +6857,7 @@ _sd_discard_pinned(blind_t xcd, nsc_off_t fba_pos, nsc_size_t fba_len)
 				cc_tmp = &((*cc_tmp)->cc_dirty_next);
 				if (!*cc_tmp)
 					cc_lst = &((*cc_lst)->cc_dirty_link),
-					cc_tmp = cc_lst;
+					    cc_tmp = cc_lst;
 			}
 			if (*cc_tmp) {
 				found++;
@@ -6919,15 +6866,15 @@ _sd_discard_pinned(blind_t xcd, nsc_off_t fba_pos, nsc_size_t fba_len)
 				nxt = cc_ent->cc_dirty_next;
 				if (nxt) {
 					nxt->cc_dirty_link =
-						(*cc_lst)->cc_dirty_link;
+					    (*cc_lst)->cc_dirty_link;
 					*cc_lst = nxt;
 				} else {
 					*cc_lst = (*cc_lst)->cc_dirty_link;
 				}
 				cdi->cd_info->sh_numfail--;
 				nsc_unpinned_data(cdi->cd_iodev,
-					BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
-					BLK_FBAS);
+				    BLK_TO_FBA_NUM(CENTRY_BLK(cc_ent)),
+				    BLK_FBAS);
 			}
 			mutex_exit(&cdi->cd_lock);
 
@@ -6948,7 +6895,7 @@ _sd_discard_pinned(blind_t xcd, nsc_off_t fba_pos, nsc_size_t fba_len)
 				wctl->sc_dirty = 0;
 				SSOP_SETCENTRY(sdbc_safestore, wctl);
 				SSOP_DEALLOCRESOURCE(sdbc_safestore,
-							wctl->sc_res);
+				    wctl->sc_res);
 			}
 
 			if (!sdbc_use_dmchain)
@@ -7019,7 +6966,7 @@ _sd_alloc_handle(sdbc_callback_fn_t d_cb, sdbc_callback_fn_t r_cb,
 	_sd_buf_handle_t *handle;
 
 	handle = (_sd_buf_handle_t *)kmem_zalloc(sizeof (_sd_buf_handle_t),
-							KM_SLEEP);
+	    KM_SLEEP);
 	/* maintain list and count for debugging */
 	mutex_enter(&_sd_handle_list.hl_lock);
 
@@ -7047,7 +6994,7 @@ _sd_free_handle(_sd_buf_handle_t *handle)
 {
 
 	if ((handle->bh_flag & NSC_HALLOCATED) == 0) {
-		cmn_err(CE_WARN, "sdbc(_sd_free_handle) handle %p not valid",
+		cmn_err(CE_WARN, "!sdbc(_sd_free_handle) handle %p not valid",
 		    (void *)handle);
 
 		DTRACE_PROBE(_sd_free_handle_end);
@@ -7056,7 +7003,7 @@ _sd_free_handle(_sd_buf_handle_t *handle)
 	}
 	if (_SD_HANDLE_ACTIVE(handle)) {
 		cmn_err(CE_WARN,
-		    "sdbc(_sd_free_handle) attempt to free active handle %p",
+		    "!sdbc(_sd_free_handle) attempt to free active handle %p",
 		    (void *)handle);
 
 		DTRACE_PROBE1(free_handle_active, int, handle->bh_flag);
@@ -7180,7 +7127,7 @@ int
 sd_get_file_info_size(void *uaddrp)
 {
 	if (copyout(&_sdbc_gl_file_info_size, uaddrp,
-					sizeof (_sdbc_gl_file_info_size))) {
+	    sizeof (_sdbc_gl_file_info_size))) {
 		return (EFAULT);
 	}
 
@@ -7288,7 +7235,7 @@ sdbc_cd_stats_update(kstat_t *ksp, int rw)
 		(void) strlcpy(sdbc_shstats->ci_sdbc_vol_name.value.c,
 		    shstats_vars->sh_filename + name_len, KSTAT_DATA_CHAR_LEN);
 	} else {
-		cmn_err(CE_WARN, "Kstat error: no volume name associated "
+		cmn_err(CE_WARN, "!Kstat error: no volume name associated "
 		    "with cache descriptor");
 	}
 
@@ -7342,13 +7289,13 @@ cd_kstat_add(int cd)
 	char name[KSTAT_STRLEN];
 
 	if (cd < 0 || cd >= sdbc_max_devs) {
-		cmn_err(CE_WARN, "invalid cache descriptor: %d", cd);
+		cmn_err(CE_WARN, "!invalid cache descriptor: %d", cd);
 		return (-1);
 	}
 
 	/* create a regular kstat for this cache descriptor */
 	if (!sdbc_cd_kstats) {
-		cmn_err(CE_WARN, "sdbc_cd_kstats not allocated");
+		cmn_err(CE_WARN, "!sdbc_cd_kstats not allocated");
 		return (-1);
 	}
 
@@ -7366,12 +7313,12 @@ cd_kstat_add(int cd)
 		    &_sd_cache_stats->st_shared[cd];
 		kstat_install(sdbc_cd_kstats[cd]);
 	} else {
-		cmn_err(CE_WARN, "cdstats %d kstat allocation failed", cd);
+		cmn_err(CE_WARN, "!cdstats %d kstat allocation failed", cd);
 	}
 
 	/* create an I/O kstat for this cache descriptor */
 	if (!sdbc_cd_io_kstats) {
-		cmn_err(CE_WARN, "sdbc_cd_io_kstats not allocated");
+		cmn_err(CE_WARN, "!sdbc_cd_io_kstats not allocated");
 		return (-1);
 	}
 
@@ -7382,7 +7329,7 @@ cd_kstat_add(int cd)
 
 	if (sdbc_cd_io_kstats[cd]) {
 		if (!sdbc_cd_io_kstats_mutexes) {
-			cmn_err(CE_WARN, "sdbc_cd_io_kstats_mutexes not "
+			cmn_err(CE_WARN, "!sdbc_cd_io_kstats_mutexes not "
 			    "allocated");
 			return (-1);
 		}
@@ -7395,7 +7342,7 @@ cd_kstat_add(int cd)
 		kstat_install(sdbc_cd_io_kstats[cd]);
 
 	} else {
-		cmn_err(CE_WARN, "sdbc cd %d io kstat allocation failed", cd);
+		cmn_err(CE_WARN, "!sdbc cd %d io kstat allocation failed", cd);
 	}
 
 	return (0);
@@ -7414,7 +7361,7 @@ static int
 cd_kstat_remove(int cd)
 {
 	if (cd < 0 || cd >= sdbc_max_devs) {
-		cmn_err(CE_WARN, "invalid cache descriptor: %d", cd);
+		cmn_err(CE_WARN, "!invalid cache descriptor: %d", cd);
 		return (-1);
 	}
 

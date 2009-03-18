@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,15 +124,15 @@ _sdbc_ft_load(void)
 	mutex_init(&_sd_ft_data.fi_sleep, NULL, MUTEX_DRIVER, NULL);
 	return (0);
 }
+
+
 int
 _sdbc_ft_configure(void)
 {
 	_sd_ft_exit = 1;
 	return (nsc_create_process(
-		(void (*)(void *))_sd_health_thread, 0, TRUE));
+	    (void (*)(void *))_sd_health_thread, 0, TRUE));
 }
-
-
 
 
 void
@@ -169,7 +169,7 @@ _sd_health_thread(void)
 	sdbc_setmodeandftdata();
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "sdbc(_sd_health_thread) safestore "
+	cmn_err(CE_NOTE, "!sdbc(_sd_health_thread) safestore "
 	    "is %s. Fast writes %s",
 	    (_SD_MIRROR_CONFIGD) ? "up" : "down",
 	    (_SD_NODE_HINTS & _SD_WRTHRU_MASK) ?
@@ -218,7 +218,7 @@ _sd_health_thread(void)
 				mutex_exit(&_sd_ft_data.fi_lock);
 				/* Assume other side is still up */
 				cmn_err(CE_WARN,
-				    "sdbc(_sd_health_thread)"
+				    "!sdbc(_sd_health_thread)"
 				    "Safestore is down. Fast writes %s",
 				    (_SD_NODE_HINTS & _SD_WRTHRU_MASK) ?
 				    "disabled" : "enabled");
@@ -230,7 +230,7 @@ _sd_health_thread(void)
 				/* Wait for cache to drain and panic */
 				_sd_wait_for_dirty();
 				cmn_err(CE_WARN,
-				    "sdbc(_sd_health_thread)"
+				    "!sdbc(_sd_health_thread)"
 				    " dirty blocks flushed");
 				continue;
 			}
@@ -241,14 +241,14 @@ _sd_health_thread(void)
 			mutex_exit(&_sd_ft_data.fi_lock);
 			if (!SAFESTORE_LOCAL(sdbc_safestore))
 				cmn_err(CE_WARN,
-				    "sdbc(_sd_health_thread)"
+				    "!sdbc(_sd_health_thread)"
 				    " Cache on node %d is down. "
 				    "Fast writes %s",
 				    _SD_MIRROR_HOST,
 				    (_SD_NODE_HINTS & _SD_WRTHRU_MASK) ?
 				    "disabled" : "enabled");
 			cmn_err(CE_NOTE,
-			    "sdbc(_sd_health_thread)"
+			    "!sdbc(_sd_health_thread)"
 			    " Cache recovery in progress");
 			_sd_cache_recover();
 
@@ -258,14 +258,14 @@ _sd_health_thread(void)
 			cv_broadcast(&_sd_ft_data.fi_rem_sv);
 			mutex_exit(&_sd_ft_data.fi_lock);
 			cmn_err(CE_NOTE,
-			    "sdbc(_sd_health_thread) %s Cache recovery done",
+			    "!sdbc(_sd_health_thread) %s Cache recovery done",
 			    _sd_async_recovery ?
 			    "asynchronous" : "synchronous");
 			/* restore previous state */
 			if (warm_started && !_sd_is_mirror_down()) {
 				(void) _sd_clear_node_hint(NSC_FORCED_WRTHRU);
 				cmn_err(CE_NOTE,
-				    "sdbc(_sd_health_thread) Fast writes %s",
+				    "!sdbc(_sd_health_thread) Fast writes %s",
 				    (_SD_NODE_HINTS & _SD_WRTHRU_MASK) ?
 				    "disabled" : "enabled");
 			}
@@ -305,7 +305,7 @@ _sdbc_recovery_io_wait(void)
 		delay(HZ/8);
 	}
 	if (_sd_ft_data.fi_numio != 0) {
-		cmn_err(CE_WARN, "sdbc(_sdbc_recovery_io_wait) %d "
+		cmn_err(CE_WARN, "!sdbc(_sdbc_recovery_io_wait) %d "
 		    "recovery i/o's not done", _sd_ft_data.fi_numio);
 		return (EIO);
 	}
@@ -355,7 +355,7 @@ _sd_recovery_wblk_wait(int cd)
 	_sd_cd_info_t *cdi = &_sd_cache_files[cd];
 
 	while (_sd_cache_initialized &&
-		FILE_OPENED(cd) && cdi->cd_recovering) {
+	    FILE_OPENED(cd) && cdi->cd_recovering) {
 		/* spawn writer if none */
 		if (!cdi->cd_writer) (void) cd_writer(cd);
 		delay(HZ/8);
@@ -408,7 +408,7 @@ _sd_cache_recover(void)
 
 	if (cblocks_processed)
 		cmn_err(CE_NOTE,
-		    "sdbc %ssynchronous recovery complete "
+		    "!sdbc %ssynchronous recovery complete "
 		    "%d cache blocks processed",
 		    _sd_async_recovery ? "a" : "",
 		    cblocks_processed);
@@ -444,7 +444,7 @@ _sd_ft_clone(ss_centry_info_t *ft_cent, int async)
 	SDTRACE(ST_ENTER|SDF_FT_CLONE, cd, BLK_FBAS, cblk, dirty, _SD_NO_NET);
 	cdi = &(_sd_cache_files[cd]);
 	if ((cdi->cd_info->sh_failed != 2) && !FILE_OPENED(cd)) {
-		cmn_err(CE_WARN, "sdbc(_sd_ft_clone) recovery "
+		cmn_err(CE_WARN, "!sdbc(_sd_ft_clone) recovery "
 		    "write failed: cd %x; cblk %" NSC_SZFMT "; dirty %x",
 		    cd, cblk, dirty);
 		SDTRACE(ST_EXIT|SDF_FT_CLONE,
@@ -459,7 +459,7 @@ _sd_ft_clone(ss_centry_info_t *ft_cent, int async)
 
 	if (SSOP_READ_CBLOCK(sdbc_safestore, res, (void *)ent->cc_data,
 	    CACHE_BLOCK_SIZE, 0) == SS_ERR) {
-		cmn_err(CE_WARN, "sdbc(_sd_ft_clone) read of "
+		cmn_err(CE_WARN, "!sdbc(_sd_ft_clone) read of "
 		    "pinned data block failed. cannot recover "
 		    "0x%p size 0x%x", (void *)res, CACHE_BLOCK_SIZE);
 
@@ -544,7 +544,7 @@ _sd_cache_mirror_enable(int host)
 {
 	if (_sd_cache_initialized) {
 		if (host != _SD_MIRROR_HOST) {
-			cmn_err(CE_WARN, "sdbc(_sd_cache_mirror_enable) "
+			cmn_err(CE_WARN, "!sdbc(_sd_cache_mirror_enable) "
 			    "Configured mirror %x. Got message from %x",
 			    _SD_MIRROR_HOST, host);
 			return (-EINVAL);
@@ -559,7 +559,7 @@ _sd_cache_mirror_enable(int host)
 					(void) _sdbc_remote_store_pinned(i);
 
 			cmn_err(CE_NOTE,
-			    "sdbc(_sd_cache_mirror_enable) Cache on "
+			    "!sdbc(_sd_cache_mirror_enable) Cache on "
 			    "mirror node %d is up. Fast writes enabled",
 			    host);
 			_sd_mirror_up();
@@ -711,11 +711,10 @@ _sd_hash_invalidate_cd(int CD)
 			 * Skip if device doesn't match or pinned.
 			 * (-1) skip attached cd's
 			 */
-			if ((CD != -1 &&
-				(cd != CD || CENTRY_PINNED(cc_ent))) ||
-				(CD == -1 && nsc_held(cdi->cd_rawfd))) {
-					hptr = hptr->hh_next;
-					continue;
+			if ((CD != -1 && (cd != CD || CENTRY_PINNED(cc_ent))) ||
+			    (CD == -1 && nsc_held(cdi->cd_rawfd))) {
+				hptr = hptr->hh_next;
+				continue;
 			}
 			mutex_exit(bucket->hb_lock);
 
@@ -733,16 +732,16 @@ _sd_hash_invalidate_cd(int CD)
 				/* cc_inuse is set, delete on block match */
 				if (CC_CD_BLK_MATCH(cd, blk, ent)) {
 					xmem_inval_hit++;
-					(void)
-					_sd_hash_delete((struct _sd_hash_hd *)
-							ent, _sd_htable);
+					(void) _sd_hash_delete(
+					    (struct _sd_hash_hd *)ent,
+					    _sd_htable);
 
 					if (sdbc_use_dmchain) {
 
 						/* attempt to que head */
 						if (ent->cc_alloc_size_dm) {
 							sdbc_requeue_head_dm_try
-									(ent);
+							    (ent);
 						}
 					} else
 						_sd_requeue_head(ent);
@@ -879,7 +878,7 @@ _sd_cd_online(int cd, int discard)
 		}
 	}
 	if (num != failed)
-		cmn_err(CE_WARN, "sdbc(_sd_cd_online) count %d vs numfail %d",
+		cmn_err(CE_WARN, "!sdbc(_sd_cd_online) count %d vs numfail %d",
 		    num, failed);
 	if (discard) {
 		_sd_hash_invalidate_cd(cd);
@@ -962,16 +961,15 @@ _sd_failover_file_open(void)
 		 * for recovery on nvmem systems we open all devices.
 		 */
 		if ((!_sdbc_warm_start()) &&
-			((cd_gl->sv_attached != _SD_MIRROR_HOST) &&
-			(cd_gl->sv_pinned != _SD_MIRROR_HOST) &&
-			(cd_gl->sv_pinned != _SD_SELF_HOST)))
+		    ((cd_gl->sv_attached != _SD_MIRROR_HOST) &&
+		    (cd_gl->sv_pinned != _SD_MIRROR_HOST) &&
+		    (cd_gl->sv_pinned != _SD_SELF_HOST)))
 			continue;
-		if (!cd_gl->sv_volname ||
-			!cd_gl->sv_volname[0])
+		if (!cd_gl->sv_volname || !cd_gl->sv_volname[0])
 			continue;
 
 		if (_sd_open_cd(cd_gl->sv_volname, cd, flag) < 0) {
-			cmn_err(CE_WARN, " sdbc(_sd_failover_file_open) "
+			cmn_err(CE_WARN, "!sdbc(_sd_failover_file_open) "
 			    "Unable to open disk partition %s",
 			    cd_gl->sv_volname);
 			continue;
@@ -1009,7 +1007,7 @@ sdbc_recover_vol(ss_vol_t *vol, int cd)
 	key.cdk_u.ck_vol = vol;
 
 	if (SSOP_GETCDIR(sdbc_safestore, &key, &cdir)) {
-		cmn_err(CE_WARN, "sdbc(sdbc_recover_vol): "
+		cmn_err(CE_WARN, "!sdbc(sdbc_recover_vol): "
 		    "cannot recover volume %s",
 		    cd_gl->sv_volname);
 		return (0);
@@ -1020,10 +1018,10 @@ sdbc_recover_vol(ss_vol_t *vol, int cd)
 	while (1) {
 
 		if ((err = SSOP_GETCDIRENT(sdbc_safestore, &cdir, &centry))
-								== SS_ERR) {
-			cmn_err(CE_WARN, "sdbc(sdbc_recover_vol): "
-				"cache entry read failure %s %p",
-				cd_gl->sv_volname, (void *)centry.sc_res);
+		    == SS_ERR) {
+			cmn_err(CE_WARN, "!sdbc(sdbc_recover_vol): "
+			    "cache entry read failure %s %p",
+			    cd_gl->sv_volname, (void *)centry.sc_res);
 
 			continue;
 		}
@@ -1039,7 +1037,7 @@ sdbc_recover_vol(ss_vol_t *vol, int cd)
 		 */
 		if ((cinfo = sdbc_get_cinfo_byres(centry.sc_res)) == NULL) {
 			/* should not happen */
-			cmn_err(CE_WARN, "sdbc(sdbc_recover_vol): "
+			cmn_err(CE_WARN, "!sdbc(sdbc_recover_vol): "
 			    "invalid ss resource %p", (void *)centry.sc_res);
 			continue;
 		}
@@ -1068,8 +1066,8 @@ sdbc_recover_vol(ss_vol_t *vol, int cd)
 
 	if (cblocks_processed)
 		cmn_err(CE_NOTE,
-	"sdbc(sdbc_recover_vol) %d cache blocks processed for volume %s",
-			cblocks_processed, cd_gl->sv_volname);
+		    "!sdbc(sdbc_recover_vol) %d cache blocks processed for "
+		    "volume %s", cblocks_processed, cd_gl->sv_volname);
 
 	return (cblocks_processed);
 }
@@ -1161,7 +1159,7 @@ _sd_uncommit(_sd_buf_handle_t *handle, nsc_off_t fba_pos, nsc_size_t fba_len,
 
 #if defined(_SD_DEBUG)
 	if (cc_len != end_cblk_len)
-		cmn_err(CE_WARN, "fba_len %" NSC_SZFMT " end_cblk_len %d in "
+		cmn_err(CE_WARN, "!fba_len %" NSC_SZFMT " end_cblk_len %d in "
 		    "_sd_write", fba_len, end_cblk_len);
 #endif
 
@@ -1217,7 +1215,7 @@ _sd_wait_for_flush(int cd)
 			if (cdi->cd_info->sh_failed)
 				break;
 			if (++tries > 128) {
-				cmn_err(CE_WARN, "sdbc(_sd_wait_for_flush) "
+				cmn_err(CE_WARN, "!sdbc(_sd_wait_for_flush) "
 				    "%s still has %d blocks pending %d"
 				    " in progress (@ %lx)",
 				    cdi->cd_info->sh_filename, last_used,

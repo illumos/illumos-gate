@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,7 +262,7 @@ ii_create_kstats()
 			    ii_throttle_delay;
 			iigkstat.ii_copy_direct.value.ul = ii_copy_direct;
 		} else {
-			cmn_err(CE_WARN, "Unable to create II global stats");
+			cmn_err(CE_WARN, "!Unable to create II global stats");
 		}
 	}
 }
@@ -283,7 +283,7 @@ iiattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	instance = ddi_get_instance(dip);
 	if (ddi_soft_state_zalloc(ii_statep, instance) != 0) {
-		cmn_err(CE_WARN, "ii: no memory for instance %d state.",
+		cmn_err(CE_WARN, "!ii: no memory for instance %d state.",
 		    instance);
 		return (DDI_FAILURE);
 	}
@@ -292,95 +292,96 @@ iiattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	xsp = ddi_get_soft_state(ii_statep, instance);
 	if (xsp == NULL) {
 		cmn_err(CE_WARN,
-		    "ii: attach: could not get state for instance %d.",
+		    "!ii: attach: could not get state for instance %d.",
 		    instance);
 		goto out;
 	}
 
 	ii_debug = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_debug", 0);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_debug", 0);
 	if (ii_debug != 0) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "ii: initializing ii version %d.%d.%d.%d",
+		cmn_err(CE_NOTE, "!ii: initializing ii version %d.%d.%d.%d",
 		    dsw_major_rev, dsw_minor_rev,
 		    dsw_micro_rev, dsw_baseline_rev);
 #else
 		if (dsw_micro_rev) {
-			cmn_err(CE_NOTE, "ii: initializing ii version %d.%d.%d",
+			cmn_err(CE_NOTE, "!ii: initializing ii vers %d.%d.%d",
 			    dsw_major_rev, dsw_minor_rev, dsw_micro_rev);
 		} else {
-			cmn_err(CE_NOTE, "ii: initializing ii version %d.%d",
+			cmn_err(CE_NOTE, "!ii: initializing ii version %d.%d",
 			    dsw_major_rev, dsw_minor_rev);
 		}
 #endif
 		switch (ii_debug) {
 		case 1:
 		case 2:	cmn_err(CE_NOTE,
-			    "ii: ii_debug=%d is enabled.", ii_debug);
+			    "!ii: ii_debug=%d is enabled.", ii_debug);
 			break;
 		default:
 			cmn_err(CE_WARN,
-			    "ii: Value of ii_debug=%d is not 0,1 or 2.",
+			    "!ii: Value of ii_debug=%d is not 0,1 or 2.",
 			    ii_debug);
 		}
 	}
 
 	ii_bitmap = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_bitmap", II_WTHRU);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_bitmap", II_WTHRU);
 	switch (ii_bitmap) {
 		case II_KMEM:
-		    if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: ii_bitmap is in memory");
-		    break;
+			if (ii_debug > 0)
+				cmn_err(CE_NOTE, "!ii: ii_bitmap is in memory");
+		break;
 		case II_FWC:
-		    if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: ii_bitmap is on disk, no FWC");
-		    break;
+			if (ii_debug > 0)
+				cmn_err(CE_NOTE, "!ii: ii_bitmap is on disk,"
+				    " no FWC");
+		break;
 		case II_WTHRU:
-		    if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: ii_bitmap is on disk");
-		    break;
+			if (ii_debug > 0)
+				cmn_err(CE_NOTE, "!ii: ii_bitmap is on disk");
+		break;
 		default:
-		    cmn_err(CE_NOTE,
-			"ii: ii_bitmap=%d out of range; defaulting WTHRU(%d)",
-			ii_bitmap, II_WTHRU);
-		ii_bitmap = II_WTHRU;
+			cmn_err(CE_NOTE,
+			    "!ii: ii_bitmap=%d out of range; "
+			    "defaulting WTHRU(%d)", ii_bitmap, II_WTHRU);
+			ii_bitmap = II_WTHRU;
 	}
 
 	/* pick up these values if in ii.conf, otherwise leave alone */
 	i = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_throttle_unit", 0);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_throttle_unit", 0);
 	if (i > 0) {
 		ii_throttle_unit = i;
 		if ((ii_throttle_unit < MIN_THROTTLE_UNIT) ||
 		    (ii_throttle_unit > MAX_THROTTLE_UNIT) ||
 		    (ii_debug > 0))
 			cmn_err(CE_NOTE,
-				"ii: ii_throttle_unit=%d", ii_throttle_unit);
+			    "!ii: ii_throttle_unit=%d", ii_throttle_unit);
 	}
 
 	i = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_throttle_delay", 0);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_throttle_delay", 0);
 	if (i > 0) {
 		ii_throttle_delay = i;
 		if ((ii_throttle_delay < MIN_THROTTLE_DELAY) ||
 		    (ii_throttle_delay > MIN_THROTTLE_DELAY) ||
 		    (ii_debug > 0))
 			cmn_err(CE_NOTE,
-				"ii: ii_throttle_delay=%d", ii_throttle_delay);
+			    "!ii: ii_throttle_delay=%d", ii_throttle_delay);
 	}
 
 	ii_copy_direct = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_copy_direct", 1);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "ii_copy_direct", 1);
 	if (i > 0) {
 		ii_copy_direct = i;
 		if ((ii_copy_direct < 0) || (ii_copy_direct > 1))
 			cmn_err(CE_NOTE,
-				"ii: ii_copy_direct=%d", ii_copy_direct);
+			    "!ii: ii_copy_direct=%d", ii_copy_direct);
 	}
 
 	if (_ii_init_dev()) {
-		cmn_err(CE_WARN, "ii: _ii_init_dev failed");
+		cmn_err(CE_WARN, "!ii: _ii_init_dev failed");
 		goto out;
 	}
 	flags |= DIDINIT;
@@ -389,8 +390,8 @@ iiattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	xsp->instance = instance;
 
 	if (ddi_create_minor_node(dip, "ii", S_IFCHR, instance, DDI_PSEUDO, 0)
-		    != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "ii: could not create node.");
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "!ii: could not create node.");
 		goto out;
 	}
 	flags |= DIDNODES;
@@ -428,7 +429,7 @@ iidetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	xsp = ddi_get_soft_state(ii_statep, instance);
 	if (xsp == NULL) {
 		cmn_err(CE_WARN,
-		    "ii: detach: could not get state for instance %d.",
+		    "!ii: detach: could not get state for instance %d.",
 		    instance);
 		return (DDI_FAILURE);
 	}
@@ -478,7 +479,7 @@ iiprint(dev_t dev, char *str)
 {
 	int instance = 0;
 
-	cmn_err(CE_WARN, "ii%d: %s", instance, str);
+	cmn_err(CE_WARN, "!ii%d: %s", instance, str);
 	return (0);
 }
 

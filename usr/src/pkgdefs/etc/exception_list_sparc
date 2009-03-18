@@ -1266,7 +1266,6 @@ usr/include/sys/fibre-channel/ulp/fcsm.h	sparc
 # private AVS headers
 #
 usr/bin/sd_stats			sparc
-usr/bin/errgen				sparc
 usr/bin/dscfgcli			sparc
 usr/bin/sd_diag				sparc
 usr/include/nsctl.h			sparc

@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 DYNPROG=	errgen
@@ -30,7 +30,7 @@ PROG=	$(DYNPROG)
 
 OBJS=	errgen.o
 
-CFLAGS += -v
+CFLAGS += $(CCVERBOSE)
 LINTFLAGS += -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 
 .KEEP_STATE:
@@ -39,7 +39,7 @@ LINTFLAGS += -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 
 all: $(PROG)
 
-install: all $(ROOTPROG)
+install: all
 
 lint:	lint_PROG
 
@@ -47,7 +47,7 @@ clean:
 	$(RM) *.o $(POFILE)
 
 $(PROG):	$(OBJS)
-	$(LINK.c) $(OBJS) -o $@
+	$(NATIVECC) $(CFLAGS) $(OBJS) -o $@
 	$(POST_PROCESS)
 
 include	../../Makefile.targ

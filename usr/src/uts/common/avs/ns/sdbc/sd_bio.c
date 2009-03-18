@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,8 +221,7 @@ _sdbc_iobuf_configure(int num)
 		num = _SD_DEFAULT_IOBUFS;
 
 	if ((_sd_buflist.hooks = (iob_hook_t *)nsc_kmem_zalloc(
-			num * sizeof (iob_hook_t), KM_SLEEP, sdbc_iobuf_mem))
-			== NULL) {
+	    num * sizeof (iob_hook_t), KM_SLEEP, sdbc_iobuf_mem)) == NULL) {
 		return (-1);
 	}
 
@@ -245,7 +244,7 @@ _sdbc_iobuf_configure(int num)
 
 	for (i = 0; i < MAX_HOOK_LOCKS; i++)
 		mutex_init(&_sd_buflist.hook_locks[i], NULL, MUTEX_DRIVER,
-				NULL);
+		    NULL);
 
 	cv_init(&_sd_buflist.hook_wait, NULL, CV_DRIVER, NULL);
 	_sd_buflist.hook_waiters = 0;
@@ -282,7 +281,7 @@ _sdbc_iobuf_deconfigure(void)
 		}
 		cv_destroy(&_sd_buflist.hook_wait);
 		nsc_kmem_free(_sd_buflist.hooks,
-			_sd_buflist.bl_init_count * sizeof (iob_hook_t));
+		    _sd_buflist.bl_init_count * sizeof (iob_hook_t));
 		for (i = 0; i < MAX_HOOK_LOCKS; i ++) {
 			mutex_destroy(&_sd_buflist.hook_locks[i]);
 		}
@@ -521,7 +520,7 @@ _sd_extend_iob(struct buf *head_bp)
 	ASSERT(BLK_FBA_OFF(hook->size) == 0);
 
 	bp->b_lblkno = (diskaddr_t)hook->start_fba +
-		(diskaddr_t)FBA_NUM(hook->size);
+	    (diskaddr_t)FBA_NUM(hook->size);
 
 	bp->b_bufsize = 0;
 	bp->b_resid = 0;
@@ -572,7 +571,7 @@ sd_alloc_iob(dev_t dev, nsc_off_t fba_pos, int blks, int flag)
 	 *  pick an arbitrary lock
 	 */
 	hook->lockp = &_sd_buflist.hook_locks[((long)hook >> 9) &
-			(MAX_HOOK_LOCKS - 1)];
+	    (MAX_HOOK_LOCKS - 1)];
 	hook->start_fba = fba_pos;
 	hook->last_fba = fba_pos;
 	hook->size = 0;
@@ -652,11 +651,11 @@ _sd_pack_pages(struct buf *bp, struct buf *list, sd_addr_t *addr,
 			hook->PAGE_IO++;
 #endif /* _SD_BIO_STATS */
 			_sd_add_vm_to_bp_plist(list,
-				(unsigned char *) start_addr);
+			    (unsigned char *) start_addr);
 			list->b_bufsize = page_size -
-					(start_addr & page_offset_mask);
+			    (start_addr & page_offset_mask);
 			list->b_un.b_addr = (caddr_t)
-					(start_addr & page_offset_mask);
+			    (start_addr & page_offset_mask);
 			size -= list->b_bufsize;
 			start_addr += list->b_bufsize;
 		}
@@ -669,7 +668,7 @@ _sd_pack_pages(struct buf *bp, struct buf *list, sd_addr_t *addr,
 #endif /* _SD_BIO_STATS */
 
 			_sd_add_vm_to_bp_plist(list,
-				(unsigned char *) start_addr);
+			    (unsigned char *) start_addr);
 			start_addr += page_size;
 			list->b_bufsize += page_size;
 #ifdef _SD_BIO_STATS
@@ -692,7 +691,7 @@ _sd_pack_pages(struct buf *bp, struct buf *list, sd_addr_t *addr,
 			 *  This will do for now.
 			 */
 			cmn_err(CE_PANIC,
-				"_sd_pack_pages: couldn't extend iob");
+			    "_sd_pack_pages: couldn't extend iob");
 		}
 
 		/* kernel virtual */
@@ -730,7 +729,7 @@ _sd_pack_pages_nopageio(struct buf *bp, struct buf *list, sd_addr_t *addr,
 		 *  This will do for now.
 		 */
 		cmn_err(CE_PANIC, "_sd_pack_pages_nopageio: couldn't "
-				"extend iob");
+		    "extend iob");
 	}
 
 	if (list->b_bufsize &&
@@ -749,7 +748,7 @@ _sd_pack_pages_nopageio(struct buf *bp, struct buf *list, sd_addr_t *addr,
 			 *  This will do for now.
 			 */
 			cmn_err(CE_PANIC, "_sd_pack_pages_nopageio: couldn't "
-						"extend iob");
+			    "extend iob");
 		}
 		list->b_un.b_addr = (caddr_t)start_addr;
 		list->b_bufsize = (size_t)size;
@@ -804,7 +803,7 @@ sd_add_fba(struct buf *bp, sd_addr_t *addr, nsc_off_t fba_pos,
 				_sd_pack_pages(bp, bp, addr, offset, size);
 			else
 				_sd_pack_pages_nopageio(bp, bp, addr, offset,
-							size);
+				    size);
 		} else {
 			if (DO_PAGE_LIST) {
 				if (hook->tail->b_flags & B_PAGEIO) {
@@ -817,29 +816,25 @@ sd_add_fba(struct buf *bp, sd_addr_t *addr, nsc_off_t fba_pos,
 					 */
 					if (hook->skipped)
 						_sd_pack_pages(bp, NULL, addr,
-								offset, size);
+						    offset, size);
 					else
 						_sd_pack_pages(bp, hook->tail,
-								addr, offset,
-									size);
+						    addr, offset, size);
 				} else {
 					/*
 					 * Last buffer was vanilla i/o or worse
 					 * (sd_add_mem)
 					 */
 					_sd_pack_pages(bp, NULL, addr, offset,
-							size);
+					    size);
 				}
 			} else {
 				if (hook->skipped)
 					_sd_pack_pages_nopageio(bp, NULL,
-								addr, offset,
-								size);
+					    addr, offset, size);
 				else
 					_sd_pack_pages_nopageio(bp,
-								hook->tail,
-								addr,
-								offset, size);
+					    hook->tail, addr, offset, size);
 			}
 		}
 		hook->skipped = 0;
@@ -889,7 +884,7 @@ sd_add_mem(struct buf *bp, char *buf, nsc_size_t len)
 		 */
 		if (BLK_FBA_OFF(n) != 0) {
 			cmn_err(CE_WARN,
-			    "sdbc(sd_add_mem) i/o request not FBA sized (%"
+			    "!sdbc(sd_add_mem) i/o request not FBA sized (%"
 			    NSC_SZFMT ")", n);
 		}
 
@@ -941,8 +936,8 @@ sd_start_io(struct buf *bp, strategy_fn_t strategy, sdbc_ea_fn_t fn,
 	struct buf *bp_next;
 	int (*ea_fn)(struct buf *, iob_hook_t *);
 #ifdef _SD_BIO_STATS
-	static int total_pages, total_pages_combined, total_norm,
-			total_norm_combined, total_skipped;
+	static int total_pages, total_pages_combined, total_norm;
+	static int total_norm_combined, total_skipped;
 	static nsc_size_t total_norm_size;
 
 	static int total_bufs;
@@ -972,17 +967,14 @@ sd_start_io(struct buf *bp, strategy_fn_t strategy, sdbc_ea_fn_t fn,
 
 	for (; bp; bp = bp_next) {
 
-	DTRACE_PROBE4(sd_start_io_bufs,
-			struct buf *, bp,
-			long, bp->b_bufsize,
-			int, bp->b_flags,
-			iob_hook_t *, hook);
+	DTRACE_PROBE4(sd_start_io_bufs, struct buf *, bp, long, bp->b_bufsize,
+	    int, bp->b_flags, iob_hook_t *, hook);
 
 		bp_next = bp->b_forw;
 		if (!(bp->b_flags & B_READ)) {
 			SD_WRITES_TOT++;
 			SD_WRITES_LEN[(bp->b_bufsize/32768) %
-				(sizeof (SD_WRITES_LEN)/sizeof (int))]++;
+			    (sizeof (SD_WRITES_LEN)/sizeof (int))]++;
 		}
 		bp->b_iodone = hook->iob_drv_iodone;
 		bp->b_bcount = bp->b_bufsize;
@@ -1047,7 +1039,7 @@ sd_start_io(struct buf *bp, strategy_fn_t strategy, sdbc_ea_fn_t fn,
 	if (__start_io_count == 2000) {
 		__start_io_count = 0;
 		cmn_err(CE_WARN,
-		    "sdbc(sd_start_io) t_bufs %d pages %d "
+		    "!sdbc(sd_start_io) t_bufs %d pages %d "
 		    "combined %d norm %d norm_size %" NSC_SZFMT " skipped %d",
 		    total_bufs,
 		    total_pages, total_pages_combined, total_norm,
@@ -1062,7 +1054,7 @@ sd_start_io(struct buf *bp, strategy_fn_t strategy, sdbc_ea_fn_t fn,
 		total_norm_size = 0;
 
 		cmn_err(CE_WARN,
-		    "sdbc(sd_start_io) (r) max_run %d, total_xp %d total yp %d",
+		    "!sdbc(sd_start_io)(r) max_run %d, total_xp %d total yp %d",
 		    max_run_r, total_xpages_r, total_ypages_r);
 
 		total_xpages_r = 0;
@@ -1070,7 +1062,7 @@ sd_start_io(struct buf *bp, strategy_fn_t strategy, sdbc_ea_fn_t fn,
 		max_run_r = 0;
 
 		cmn_err(CE_WARN,
-		    "sdbc(sd_start_io) (w) max_run %d, total_xp %d total yp %d",
+		    "!sdbc(sd_start_io)(w) max_run %d, total_xp %d total yp %d",
 		    max_run_w, total_xpages_w, total_ypages_w);
 
 		total_xpages_w = 0;

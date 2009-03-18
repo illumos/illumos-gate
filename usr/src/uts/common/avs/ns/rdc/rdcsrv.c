@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,9 +225,8 @@ rdcsrv_dispatch(struct svc_req *req, SVCXPRT *xprt)
 
 	if ((req->rq_vers < RDC_VERS_MIN) || (req->rq_vers > RDC_VERS_MAX)) {
 		svcerr_noproc(xprt);
-		cmn_err(CE_NOTE,
-			"rdcsrv_dispatch: unknown version %d",
-			req->rq_vers);
+		cmn_err(CE_NOTE, "!rdcsrv_dispatch: unknown version %d",
+		    req->rq_vers);
 		/* svcerr_noproc does a freeargs on xprt */
 		goto done;
 	}
@@ -238,9 +237,8 @@ rdcsrv_dispatch(struct svc_req *req, SVCXPRT *xprt)
 	if (req->rq_proc >= srvp->nprocs ||
 	    disp->dispfn == rdcsrv_noproc) {
 		svcerr_noproc(xprt);
-		cmn_err(CE_NOTE,
-			"rdcsrv_dispatch: bad proc number %d",
-			req->rq_proc);
+		cmn_err(CE_NOTE, "!rdcsrv_dispatch: bad proc number %d",
+		    req->rq_proc);
 		/* svcerr_noproc does a freeargs on xprt */
 		goto done;
 	} else if (disp->clone) {
@@ -261,7 +259,7 @@ rdcsrv_dispatch(struct svc_req *req, SVCXPRT *xprt)
 
 outdisp:
 	if (!SVC_FREEARGS(xprt, (xdrproc_t)0, (caddr_t)0))
-		cmn_err(CE_NOTE, "rdcsrv_dispatch: bad freeargs");
+		cmn_err(CE_NOTE, "!rdcsrv_dispatch: bad freeargs");
 done:
 	mutex_enter(&rdcsrv_lock);
 	rdcsrv_refcnt--;
@@ -291,11 +289,11 @@ rdcsrv_create(file_t *fp, rdc_svc_args_t *args, int mode)
 	addrmask.maxlen = STRUCT_FGET(uap, addrmask.maxlen);
 	addrmask.buf = kmem_alloc(addrmask.maxlen, KM_SLEEP);
 	error = ddi_copyin(STRUCT_FGETP(uap, addrmask.buf), addrmask.buf,
-			addrmask.len, mode);
+	    addrmask.len, mode);
 	if (error) {
 		kmem_free(addrmask.buf, addrmask.maxlen);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "copyin of addrmask failed %p", (void *) args);
+		cmn_err(CE_WARN, "!addrmask copyin failed %p", (void *) args);
 #endif
 		return (error);
 	}
@@ -311,8 +309,7 @@ rdcsrv_create(file_t *fp, rdc_svc_args_t *args, int mode)
 	 */
 #if defined(_SunOS_5_6) || defined(_SunOS_5_7)
 	error = svc_tli_kcreate(fp, RDC_RPC_MAX,
-		STRUCT_FGETP(uap, netid), &addrmask,
-		STRUCT_FGET(uap, nthr), &xprt);
+	    STRUCT_FGETP(uap, netid), &addrmask, STRUCT_FGET(uap, nthr), &xprt);
 #else
 	{
 #if defined(_SunOS_5_8)
@@ -328,28 +325,25 @@ rdcsrv_create(file_t *fp, rdc_svc_args_t *args, int mode)
 		error = svc_pool_create(&p);
 		if (error) {
 			cmn_err(CE_NOTE,
-				"rdcsrv_create: svc_pool_create failed %d",
-				error);
+			    "!rdcsrv_create: svc_pool_create failed %d", error);
 			return (error);
 		}
 #endif
 		error = svc_tli_kcreate(fp, RDC_RPC_MAX,
-				STRUCT_FGETP(uap, netid), &addrmask,
-				&xprt, &rdcsrv_sct, NULL, RDC_SVCPOOL_ID,
-				FALSE);
+		    STRUCT_FGETP(uap, netid), &addrmask,
+		    &xprt, &rdcsrv_sct, NULL, RDC_SVCPOOL_ID, FALSE);
 	}
 #endif
 
 	if (error) {
-		cmn_err(CE_NOTE,
-			"rdcsrv_create: svc_tli_kcreate failed %d",
-			error);
+		cmn_err(CE_NOTE, "!rdcsrv_create: svc_tli_kcreate failed %d",
+		    error);
 		return (error);
 	}
 
 #if defined(_SunOS_5_6) || defined(_SunOS_5_7)
 	if (xprt == NULL) {
-		cmn_err(CE_NOTE, "xprt in rdcsrv_create is NULL");
+		cmn_err(CE_NOTE, "!xprt in rdcsrv_create is NULL");
 	} else {
 		/*
 		 * Register a cleanup routine in case the transport gets
@@ -359,14 +353,14 @@ rdcsrv_create(file_t *fp, rdc_svc_args_t *args, int mode)
 		 * panic.
 		 */
 		if (!svc_control(xprt, SVCSET_CLOSEPROC,
-			(void *)rdcsrv_xprtclose)) {
+		    (void *)rdcsrv_xprtclose)) {
 			cmn_err(
 #ifdef DEBUG
-				CE_PANIC,
+			    CE_PANIC,
 #else
-				CE_WARN,
+			    CE_WARN,
 #endif
-				"rdcsrv_create: couldn't set xprt callback");
+			    "!rdcsrv_create: couldn't set xprt callback");
 
 			error = EBADF;
 			goto done;
@@ -375,11 +369,11 @@ rdcsrv_create(file_t *fp, rdc_svc_args_t *args, int mode)
 
 	for (vers = RDC_VERS_MIN; vers <= RDC_VERS_MAX; vers++) {
 		rc = svc_register(xprt, (ulong_t)RDC_PROGRAM, vers,
-				rdcstub_dispatch, 0);
+		    rdcstub_dispatch, 0);
 		if (!rc) {
 			cmn_err(CE_NOTE,
-				"rdcsrv_create: svc_register(%d, %lu) failed",
-				RDC_PROGRAM, vers);
+			    "!rdcsrv_create: svc_register(%d, %lu) failed",
+			    RDC_PROGRAM, vers);
 
 			if (!error) {
 				error = EBADF;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ nst_kmem_xalloc(size_t size, int sec, void *(*alloc)(size_t, int))
 		usec -= NST_MEMORY_TIMEOUT;
 	}
 
-	cmn_err(CE_WARN, "nst_kmem_xalloc: failed to allocate %ld bytes", size);
+	cmn_err(CE_WARN, "!nst_kmem_xalloc: failed to alloc %ld bytes", size);
 	return (NULL);
 }
 
@@ -164,8 +164,7 @@ nst_thread_alloc(nstset_t *set, const int sleep)
 
 	if (set->set_flag & NST_SF_KILL) {
 		mutex_exit(&set->set_lock);
-		DTRACE_PROBE1(nst_thread_alloc_err_kill,
-				nstset_t *, set);
+		DTRACE_PROBE1(nst_thread_alloc_err_kill, nstset_t *, set);
 		return (NULL);
 	}
 
@@ -181,14 +180,12 @@ nst_thread_alloc(nstset_t *set, const int sleep)
 
 			set->set_res_cnt++;
 
-			DTRACE_PROBE2(nst_thread_alloc_sleep,
-				nstset_t *, set,
-				int, set->set_res_cnt);
+			DTRACE_PROBE2(nst_thread_alloc_sleep, nstset_t *, set,
+			    int, set->set_res_cnt);
 
 			cv_wait(&set->set_res_cv, &set->set_lock);
 
-			DTRACE_PROBE1(nst_thread_alloc_wake,
-				nstset_t *, set);
+			DTRACE_PROBE1(nst_thread_alloc_wake, nstset_t *, set);
 
 			set->set_res_cnt--;
 
@@ -272,7 +269,7 @@ nst_thread_run(void *arg)
 	if (!tp->tp_set) {
 		mutex_exit(&nst_global_lock);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nst_thread_run(%p): already dead?",
+		cmn_err(CE_WARN, "!nst_thread_run(%p): already dead?",
 		    (void *)tp);
 #endif
 		return;
@@ -289,7 +286,7 @@ nst_thread_run(void *arg)
 	if (!set) {
 		mutex_exit(&nst_global_lock);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nst_thread_run(%p): no set?", (void *)tp);
+		cmn_err(CE_WARN, "!nst_thread_run(%p): no set?", (void *)tp);
 #endif
 		return;
 	}
@@ -325,13 +322,11 @@ nst_thread_run(void *arg)
 			set->set_nlive--;
 		}
 
-		DTRACE_PROBE1(nst_thread_run_sleep,
-			    nsthread_t *, tp);
+		DTRACE_PROBE1(nst_thread_run_sleep, nsthread_t *, tp);
 
 		cv_wait(&tp->tp_cv, &set->set_lock);
 
-		DTRACE_PROBE1(nst_thread_run_wake,
-			    nsthread_t *, tp);
+		DTRACE_PROBE1(nst_thread_run_wake, nsthread_t *, tp);
 
 		if ((set->set_flag & NST_SF_KILL) ||
 		    (tp->tp_flag & NST_TF_KILL)) {
@@ -348,7 +343,7 @@ nst_thread_run(void *arg)
 #ifdef DEBUG
 		else {
 			cmn_err(CE_WARN,
-			    "nst_thread_run(%p): NULL function pointer",
+			    "!nst_thread_run(%p): NULL function pointer",
 			    (void *)tp);
 		}
 #endif
@@ -393,7 +388,7 @@ nst_thread_destroy(nsthread_t *tp)
 	tp->tp_set = NULL;
 
 	if (tp->tp_flag & NST_TF_INUSE) {
-		cmn_err(CE_WARN, "nst_thread_destroy(%p): still in use!",
+		cmn_err(CE_WARN, "!nst_thread_destroy(%p): still in use!",
 		    (void *)tp);
 		/* leak the thread */
 		return;
@@ -429,9 +424,8 @@ nst_thread_create(nstset_t *set)
 		mutex_exit(&set->set_lock);
 
 		if (tp) {
-			DTRACE_PROBE2(nst_thread_create_end,
-				nstset_t *, set,
-				nsthread_t *, tp);
+			DTRACE_PROBE2(nst_thread_create_end, nstset_t *, set,
+			    nsthread_t *, tp);
 			return (tp);
 		}
 	}
@@ -440,8 +434,7 @@ nst_thread_create(nstset_t *set)
 
 	tp = nst_kmem_zalloc(sizeof (*tp), 2);
 	if (!tp) {
-		DTRACE_PROBE1(nst_thread_create_err_mem,
-				nstset_t *, set);
+		DTRACE_PROBE1(nst_thread_create_err_mem, nstset_t *, set);
 		return (NULL);
 	}
 
@@ -455,11 +448,10 @@ nst_thread_create(nstset_t *set)
 		mutex_exit(&set->set_lock);
 		nst_thread_destroy(tp);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nst_thread_create: called during destroy");
+		cmn_err(CE_WARN, "!nst_thread_create: called during destroy");
 #endif
-		DTRACE_PROBE2(nst_thread_create_err_kill,
-				nstset_t *, set,
-				nsthread_t *, tp);
+		DTRACE_PROBE2(nst_thread_create_err_kill, nstset_t *, set,
+		    nsthread_t *, tp);
 		return (NULL);
 	}
 
@@ -474,15 +466,13 @@ nst_thread_create(nstset_t *set)
 
 	mutex_exit(&nst_global_lock);
 
-	DTRACE_PROBE2(nst_dbg_thr_create_proc_start,
-				nstset_t *, set,
-				nsthread_t *, tp);
+	DTRACE_PROBE2(nst_dbg_thr_create_proc_start, nstset_t *, set,
+	    nsthread_t *, tp);
 
 	rc = nsc_create_process(nst_thread_run, tp, 0);
 
-	DTRACE_PROBE2(nst_dbg_thr_create_proc_end,
-				nstset_t *, set,
-				nsthread_t *, tp);
+	DTRACE_PROBE2(nst_dbg_thr_create_proc_end, nstset_t *, set,
+	    nsthread_t *, tp);
 
 	if (!rc) {
 		/*
@@ -539,12 +529,11 @@ nst_thread_create(nstset_t *set)
 		nst_thread_destroy(tp);
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		"nst_thread_create: error (rc %d, set_flag %x, set_nthread %d)",
-			rc, set->set_flag, set->set_nthread);
+		    "!nst_thread_create: error (rc %d, set_flag %x, "
+		    "set_nthread %d)", rc, set->set_flag, set->set_nthread);
 #endif
-		DTRACE_PROBE2(nst_thread_create_err_proc,
-				nstset_t *, set,
-				nsthread_t *, tp);
+		DTRACE_PROBE2(nst_thread_create_err_proc, nstset_t *, set,
+		    nsthread_t *, tp);
 
 		return (NULL);
 	}
@@ -595,8 +584,7 @@ nst_create(nstset_t *set, void (*func)(), blind_t arg, int flags)
 		return (NULL);
 
 	if (set->set_flag & NST_SF_KILL) {
-		DTRACE_PROBE1(nst_create_err_kill,
-				nstset_t *, set);
+		DTRACE_PROBE1(nst_create_err_kill, nstset_t *, set);
 		return (NULL);
 	}
 
@@ -659,10 +647,9 @@ nst_destroy(nstset_t *set)
 	if (!sp) {
 		mutex_exit(&nst_global_lock);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nst_destroy(%p): no set?", (void *)set);
+		cmn_err(CE_WARN, "!nst_destroy(%p): no set?", (void *)set);
 #endif
-		DTRACE_PROBE1(nst_destroy_err_noset,
-				nstset_t *, set);
+		DTRACE_PROBE1(nst_destroy_err_noset, nstset_t *, set);
 		return;
 	}
 
@@ -677,7 +664,7 @@ nst_destroy(nstset_t *set)
 
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "nst_destroy(%p): duplicate destroy of set", (void *)set);
+		    "!nst_destroy(%p): duplicate destroy of set", (void *)set);
 #endif
 
 		set->set_destroy_cnt++;
@@ -686,8 +673,7 @@ nst_destroy(nstset_t *set)
 
 		mutex_exit(&set->set_lock);
 
-		DTRACE_PROBE1(nst_destroy_end,
-				nstset_t *, set);
+		DTRACE_PROBE1(nst_destroy_end, nstset_t *, set);
 
 		return;
 	}
@@ -744,8 +730,7 @@ nst_destroy(nstset_t *set)
 
 #ifdef DEBUG
 	if (set->set_nthread != 0) {
-		cmn_err(CE_WARN,
-		    "nst_destroy(%p): nthread != 0 (%d)",
+		cmn_err(CE_WARN, "!nst_destroy(%p): nthread != 0 (%d)",
 		    (void *)set, set->set_nthread);
 	}
 #endif
@@ -766,8 +751,7 @@ nst_destroy(nstset_t *set)
 	if (set->set_nthread != 0) {
 		/* leak the set control structure */
 
-		DTRACE_PROBE1(nst_destroy_end,
-				nstset_t *, set);
+		DTRACE_PROBE1(nst_destroy_end, nstset_t *, set);
 
 		return;
 	}
@@ -796,7 +780,7 @@ nst_add_thread(nstset_t *set, int nthread)
 	if (!set || nthread < 1) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "nst_add_thread(%p, %d) - bad args", (void *)set, nthread);
+		    "!nst_add_thread(%p, %d) - bad args", (void *)set, nthread);
 #endif
 		return (0);
 	}
@@ -833,7 +817,7 @@ nst_del_thread(nstset_t *set, int nthread)
 	if (!set || nthread < 1) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "nst_del_thread(%p, %d) - bad args", (void *)set, nthread);
+		    "!nst_del_thread(%p, %d) - bad args", (void *)set, nthread);
 #endif
 		return (0);
 	}
@@ -894,14 +878,14 @@ nst_init(char *name, int nthread)
 
 	if (nthread < 1) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nst_init: invalid arg");
+		cmn_err(CE_WARN, "!nst_init: invalid arg");
 #endif
 		return (NULL);
 	}
 
 	if (nthread > USHRT_MAX) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nst_init: arg limit exceeded");
+		cmn_err(CE_WARN, "!nst_init: arg limit exceeded");
 #endif
 		return (NULL);
 	}
@@ -938,18 +922,19 @@ nst_init(char *name, int nthread)
 			kmem_free(set, sizeof (*set));
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-				"nst_init: duplicate set \"%s\"", name);
+			    "!nst_init: duplicate set \"%s\"", name);
 #endif
 			/* add threads if necessary */
 
 			if (nthread > sp->set_nthread) {
-			    i = nst_add_thread(sp, nthread - sp->set_nthread);
+				i = nst_add_thread(sp,
+				    nthread - sp->set_nthread);
 #ifdef DEBUG
-			    if (i !=  (nthread - sp->set_nthread))
-				cmn_err(CE_WARN,
-					"nst_init: failed to allocate %d "
-					"threads (got %d)",
-					(nthread - sp->set_nthread), i);
+				if (i !=  (nthread - sp->set_nthread))
+					cmn_err(CE_WARN,
+					    "!nst_init: failed to allocate %d "
+					    "threads (got %d)",
+					    (nthread - sp->set_nthread), i);
 #endif
 			}
 
@@ -970,8 +955,8 @@ nst_init(char *name, int nthread)
 	if (i != nthread) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-			"nst_init: failed to allocate %d threads (got %d)",
-			nthread, i);
+		    "!nst_init: failed to allocate %d threads (got %d)",
+		    nthread, i);
 #endif
 		nst_destroy(set);
 		return (NULL);

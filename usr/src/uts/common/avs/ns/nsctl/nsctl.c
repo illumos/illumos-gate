@@ -177,7 +177,7 @@ _init(void)
 
 	if (err) {
 		(void) nsc_unload();
-		cmn_err(CE_NOTE, "nsctl_init: err %d", err);
+		cmn_err(CE_NOTE, "!nsctl_init: err %d", err);
 	}
 
 	return (err);
@@ -250,7 +250,7 @@ _nsctl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		if ((rc = _nsc_init_raw(_nsc_max_devices)) != 0) {
 			cmn_err(CE_WARN,
-			    "nsctl: unable to initialize raw io provider: %d",
+			    "!nsctl: unable to initialize raw io provider: %d",
 			    rc);
 			return (DDI_FAILURE);
 		}
@@ -264,7 +264,7 @@ _nsctl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (rc != DDI_SUCCESS) {
 			/* free anything we allocated here */
 			cmn_err(CE_WARN,
-			    "_nsctl_attach: ddi_create_minor_node failed %d",
+			    "!_nsctl_attach: ddi_create_minor_node failed %d",
 			    rc);
 			return (DDI_FAILURE);
 		}
@@ -328,7 +328,7 @@ _nsctl_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 _nsctl_print(dev_t dev, char *s)
 {
-	cmn_err(CE_WARN, "nsctl:%s", s);
+	cmn_err(CE_WARN, "!nsctl:%s", s);
 	return (0);
 }
 
@@ -360,7 +360,7 @@ nsc_init()
 	    NSC_RAW_ID | _nsc_raw_flags, _nsc_raw_def);
 
 	if (!_nsc_raw_io)
-		cmn_err(CE_WARN, "_nsc_init: register io failed - raw");
+		cmn_err(CE_WARN, "!_nsc_init: register io failed - raw");
 
 	_nsc_init_ncio();
 	_nsc_init_frz();
@@ -384,7 +384,7 @@ nscsetup()
 	    0, _nsc_local_mem);
 
 	if (!_nsc_minor_fd) {
-		cmn_err(CE_WARN, "nscsetup - alloc failed");
+		cmn_err(CE_WARN, "!nscsetup - alloc failed");
 		return;
 	}
 
@@ -392,7 +392,7 @@ nscsetup()
 	    0, _nsc_local_mem);
 
 	if (!_nsc_minor_slp)  {
-		cmn_err(CE_WARN, "nscsetup - alloc failed");
+		cmn_err(CE_WARN, "!nscsetup - alloc failed");
 		nsc_kmem_free(_nsc_minor_fd, sizeof (nsc_fd_t *) * _nsc_maxdev);
 		_nsc_minor_fd = (nsc_fd_t **)NULL;
 	}

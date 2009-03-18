@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,14 +141,14 @@ rdc_if_xxx(rdc_if_t *ip, char *updown)
 		rdc_if_ipv6(&this[4], this_str);
 		rdc_if_ipv6(&other[4], other_str);
 
-		cmn_err(CE_NOTE, "SNDR: Interface %s <==> %s : %s",
+		cmn_err(CE_NOTE, "!SNDR: Interface %s <==> %s : %s",
 		    this_str, other_str, updown);
 	} else {
 		uchar_t *this = (uchar_t *)ip->ifaddr.buf;
 		uchar_t *other = (uchar_t *)ip->r_ifaddr.buf;
 
 		cmn_err(CE_NOTE,
-		    "SNDR: Interface %d.%d.%d.%d <==> %d.%d.%d.%d : %s",
+		    "!SNDR: Interface %d.%d.%d.%d <==> %d.%d.%d.%d : %s",
 		    (int)this[4], (int)this[5], (int)this[6], (int)this[7],
 		    (int)other[4], (int)other[5], (int)other[6], (int)other[7],
 		    updown);
@@ -214,9 +214,8 @@ rdc_health_thread(void *arg)
 				    RDC_MAXADDR);
 			/* secondary ifaddr */
 				err = rdc_clnt_call_any(ip->srv, ip,
-						RDCPROC_PING4,
-						xdr_rdc_ping6, (char *)&ping6,
-						xdr_int, (char *)&ret, &t);
+				    RDCPROC_PING4, xdr_rdc_ping6,
+				    (char *)&ping6, xdr_int, (char *)&ret, &t);
 			} else {
 				ping.p_ifaddr.buf = r_ifaddr;
 				ping.p_ifaddr.len = ip->r_ifaddr.len;
@@ -225,9 +224,8 @@ rdc_health_thread(void *arg)
 				ping.s_ifaddr.len = ip->ifaddr.len;
 				ping.s_ifaddr.maxlen = ip->ifaddr.len;
 				err = rdc_clnt_call_any(ip->srv, ip,
-						RDCPROC_PING4,
-						xdr_rdc_ping, (char *)&ping,
-						xdr_int, (char *)&ret, &t);
+				    RDCPROC_PING4, xdr_rdc_ping, (char *)&ping,
+				    xdr_int, (char *)&ret, &t);
 			}
 
 
@@ -343,8 +341,8 @@ rdc_set_if_vers(rdc_u_info_t *urdc, rpcvers_t vers)
 			/* found matching interface structure */
 			ip->rpc_version = vers;
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "rdc intf %p rpc version set to %u",
-				(void *)ip, vers);
+			cmn_err(CE_NOTE, "!rdc intf %p rpc version set to %u",
+			    (void *)ip, vers);
 #endif
 			break;
 		}
@@ -644,18 +642,17 @@ rdc_check_secondary(rdc_if_t *ip, int update)
 	if (!ip || !ip->isprimary) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_check_secondary: ip %p, isprimary %d, issecondary %d",
+		    "!rdc_check_secondary: ip %p, isprimary %d, issecondary %d",
 		    (void *) ip, ip ? ip->isprimary : 0,
-			ip ? ip->issecondary : 0);
+		    ip ? ip->issecondary : 0);
 #endif
 		return (FALSE);
 	}
 
 	if (!ip->deadness) {
 #ifdef DEBUG
-		cmn_err(CE_WARN,
-			"rdc_check_secondary: ip %p, ip->deadness %d",
-			(void *) ip, ip->deadness);
+		cmn_err(CE_WARN, "!rdc_check_secondary: ip %p, ip->deadness %d",
+		    (void *) ip, ip->deadness);
 #endif
 		return (FALSE);
 	}
@@ -724,9 +721,9 @@ rdc_update_health(rdc_if_t *ip)
 	if (!ip->isprimary) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_update_health: ip %p, isprimary %d, issecondary %d",
+		    "!rdc_update_health: ip %p, isprimary %d, issecondary %d",
 		    (void *) ip, ip ? ip->isprimary : 0,
-			ip ? ip->issecondary : 0);
+		    ip ? ip->issecondary : 0);
 #endif
 		return;
 	}
@@ -757,11 +754,10 @@ rdc_update_health(rdc_if_t *ip)
 						rdc_group_exit(krdc);
 						continue;
 					}
-					rdc_group_log(krdc,
-						RDC_NOFLUSH |
-						RDC_NOREMOTE |
-						RDC_QUEUING,
-					"hm detected secondary interface down");
+					rdc_group_log(krdc, RDC_NOFLUSH |
+					    RDC_NOREMOTE | RDC_QUEUING,
+					    "hm detected secondary "
+					    "interface down");
 
 					rdc_group_exit(krdc);
 

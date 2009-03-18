@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libunistat/Makefile
@@ -67,7 +67,7 @@ $(ROOTHDRDIR)/spcs_errors.h: $(MACH)/spcs_errors.h
 	$(INS.file) $(MACH)/spcs_errors.h
 
 $(MACH)/spcs_errors.h:	FRC
-	@ cd $(MACH); pwd; make spcs_errors.h
+	@ cd $(MACH); pwd; $(MAKE) spcs_errors.h
 
 $(ROOTHDRDIR)/spcs_s_u.h: common/spcs_s_u.h
 	$(INS.file) common/spcs_s_u.h
@@ -76,19 +76,19 @@ $(ROOTHDRDIR)/spcs_etext.h: $(MACH)/spcs_etext.h
 	$(INS.file) $(MACH)/spcs_etext.h
 
 $(MACH)/spcs_etext.h:	FRC
-	@ cd $(MACH); pwd; make spcs_etext.h
+	@ cd $(MACH); pwd; $(MAKE) spcs_etext.h
 
 $(ROOTHDRDIR)/spcs_dtrinkets.h: $(MACH)/spcs_dtrinkets.h
 	$(INS.file) $(MACH)/spcs_dtrinkets.h
 
 $(MACH)/spcs_dtrinkets.h:	FRC
-	@ cd $(MACH); pwd; make spcs_dtrinkets.h
+	@ cd $(MACH); pwd; $(MAKE) spcs_dtrinkets.h
 
 $(ROOTHDRDIR)/spcs_etrinkets.h: $(MACH)/spcs_etrinkets.h
 	$(INS.file) $(MACH)/spcs_etrinkets.h
 
 $(MACH)/spcs_etrinkets.h:	FRC
-	@ cd $(MACH); pwd; make spcs_etrinkets.h
+	@ cd $(MACH); pwd; $(MAKE) spcs_etrinkets.h
 
 $(MACH) $(MACH64):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

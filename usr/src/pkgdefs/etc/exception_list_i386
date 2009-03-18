@@ -1157,7 +1157,6 @@ usr/include/sys/fibre-channel/ulp/fcsm.h	i386
 # private AVS headers, commands and libraries
 #
 usr/bin/sd_stats			i386
-usr/bin/errgen				i386
 usr/bin/dscfgcli			i386
 usr/bin/sd_diag				i386
 usr/include/nsctl.h			i386

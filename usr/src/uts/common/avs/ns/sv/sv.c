@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,19 +272,16 @@ _init(void)
 	}
 
 #ifdef DEBUG
-	cmn_err(CE_CONT, "!sv %s %s (revision %d.%d.%d.%d, %s, %s)\n",
-	    __DATE__, __TIME__,
+	cmn_err(CE_CONT, "!sv (revision %d.%d.%d.%d, %s, %s)\n",
 	    sv_major_rev, sv_minor_rev, sv_micro_rev, sv_baseline_rev,
 	    ISS_VERSION_STR, BUILD_DATE_STR);
 #else
 	if (sv_micro_rev) {
-		cmn_err(CE_CONT, "!sv %s %s (revision %d.%d.%d, %s, %s)\n",
-		    __DATE__, __TIME__,
+		cmn_err(CE_CONT, "!sv (revision %d.%d.%d, %s, %s)\n",
 		    sv_major_rev, sv_minor_rev, sv_micro_rev,
 		    ISS_VERSION_STR, BUILD_DATE_STR);
 	} else {
-		cmn_err(CE_CONT, "!sv %s %s (revision %d.%d, %s, %s)\n",
-		    __DATE__, __TIME__,
+		cmn_err(CE_CONT, "!sv (revision %d.%d, %s, %s)\n",
 		    sv_major_rev, sv_minor_rev,
 		    ISS_VERSION_STR, BUILD_DATE_STR);
 	}
@@ -355,7 +352,7 @@ sv_init_devs(void)
 	if (sv_max_devices <= 0) {
 		/* nsctl is not attached (nskernd not running) */
 		if (sv_debug > 0)
-			cmn_err(CE_CONT, "sv: nsc_max_devices = 0\n");
+			cmn_err(CE_CONT, "!sv: nsc_max_devices = 0\n");
 		return (EAGAIN);
 	}
 
@@ -363,7 +360,7 @@ sv_init_devs(void)
 	    KM_NOSLEEP, sv_mem);
 
 	if (sv_devs == NULL) {
-		cmn_err(CE_WARN, "sv: could not allocate sv_devs array");
+		cmn_err(CE_WARN, "!sv: could not allocate sv_devs array");
 		return (ENOMEM);
 	}
 
@@ -373,7 +370,7 @@ sv_init_devs(void)
 	}
 
 	if (sv_debug > 0)
-		cmn_err(CE_CONT, "sv: sv_init_devs successful\n");
+		cmn_err(CE_CONT, "!sv: sv_init_devs successful\n");
 
 	return (0);
 }
@@ -390,7 +387,7 @@ sv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sv_dip = dip;
 
 		if (ddi_create_minor_node(dip, "sv", S_IFCHR,
-					    0, DDI_PSEUDO, 0) != DDI_SUCCESS)
+		    0, DDI_PSEUDO, 0) != DDI_SUCCESS)
 			goto failed;
 
 		mutex_enter(&sv_mutex);
@@ -417,7 +414,7 @@ sv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "sv_threads", sv_threads);
 
 		if (sv_debug > 0)
-			cmn_err(CE_CONT, "sv: sv_threads=%d\n", sv_threads);
+			cmn_err(CE_CONT, "!sv: sv_threads=%d\n", sv_threads);
 
 		if (sv_threads > sv_threads_max)
 			sv_threads_max = sv_threads;
@@ -524,7 +521,7 @@ sv_getmajor(const dev_t dev)
 	 * Return an error, instead of panicing the system
 	 */
 	if (MUTEX_HELD(&sv_mutex)) {
-		cmn_err(CE_WARN, "sv: could not allocate sv_maj_t");
+		cmn_err(CE_WARN, "!sv: could not allocate sv_maj_t");
 		return (NULL);
 	}
 
@@ -551,7 +548,7 @@ sv_getmajor(const dev_t dev)
 	if ((maj = *insert) != 0)
 		maj->sm_major = umaj;
 	else
-		cmn_err(CE_WARN, "sv: could not allocate sv_maj_t");
+		cmn_err(CE_WARN, "!sv: could not allocate sv_maj_t");
 
 	mutex_exit(&sv_mutex);
 
@@ -645,8 +642,7 @@ retry:
 		nsc_membar_stld();	/* preserve register load order */
 
 		if (maj->sm_seq != seq) {
-			DTRACE_PROBE1(sv_dev_to_sv_retry,
-		    dev_t, dev);
+			DTRACE_PROBE1(sv_dev_to_sv_retry, dev_t, dev);
 			try++;
 			goto retry;
 		}
@@ -933,8 +929,7 @@ sv_enable(const caddr_t path, const int flag,
 	rc = sv_get_state(udev, &svp);
 	if (rc) {
 		mutex_exit(&sv_mutex);
-		DTRACE_PROBE1(sv_enable_err_state,
-				dev_t, udev);
+		DTRACE_PROBE1(sv_enable_err_state, dev_t, udev);
 		return (rc);
 	}
 
@@ -953,13 +948,12 @@ sv_enable(const caddr_t path, const int flag,
 	 */
 
 	svp->sv_fd = nsc_open(path, (svp->sv_flag | NSC_DEVICE),
-				sv_fd_def, (blind_t)udev, &rc);
+	    sv_fd_def, (blind_t)udev, &rc);
 
 	if (svp->sv_fd == NULL) {
 		if (kstatus)
 			spcs_s_add(kstatus, rc);
-		DTRACE_PROBE1(sv_enable_err_fd,
-				dev_t, udev);
+		DTRACE_PROBE1(sv_enable_err_fd, dev_t, udev);
 		return (sv_free(svp, SV_ESDOPEN));
 	}
 
@@ -981,8 +975,7 @@ sv_enable(const caddr_t path, const int flag,
 	if (rc != 0) {
 		if (kstatus)
 			spcs_s_add(kstatus, rc);
-		DTRACE_PROBE1(sv_enable_err_lyr_open,
-				dev_t, udev);
+		DTRACE_PROBE1(sv_enable_err_lyr_open, dev_t, udev);
 		return (sv_free(svp, SV_ELYROPEN));
 	}
 
@@ -994,10 +987,8 @@ sv_enable(const caddr_t path, const int flag,
 		maj->sm_dev_ops = nsc_get_devops(getmajor(udev));
 
 		if (maj->sm_dev_ops == NULL ||
-			maj->sm_dev_ops->devo_cb_ops == NULL) {
-			DTRACE_PROBE1(
-			    sv_enable_err_load,
-				dev_t, udev);
+		    maj->sm_dev_ops->devo_cb_ops == NULL) {
+			DTRACE_PROBE1(sv_enable_err_load, dev_t, udev);
 			return (sv_free(svp, SV_ELOAD));
 		}
 
@@ -1007,14 +998,12 @@ sv_enable(const caddr_t path, const int flag,
 		if (cb_ops->cb_strategy == NULL ||
 		    cb_ops->cb_strategy == nodev ||
 		    cb_ops->cb_strategy == nulldev) {
-			DTRACE_PROBE1(sv_enable_err_nostrategy,
-				dev_t, udev);
+			DTRACE_PROBE1(sv_enable_err_nostrategy, dev_t, udev);
 			return (sv_free(svp, SV_ELOAD));
 		}
 
 		if (cb_ops->cb_strategy == sv_lyr_strategy) {
-			DTRACE_PROBE1(sv_enable_err_svstrategy,
-				dev_t, udev);
+			DTRACE_PROBE1(sv_enable_err_svstrategy, dev_t, udev);
 			return (sv_free(svp, SV_ESTRATEGY));
 		}
 
@@ -1116,7 +1105,7 @@ svattach_fd(blind_t arg)
 	int rc;
 
 	if (sv_debug > 0)
-		cmn_err(CE_CONT, "svattach_fd(%p, %p)\n", arg, (void *)svp);
+		cmn_err(CE_CONT, "!svattach_fd(%p, %p)\n", arg, (void *)svp);
 
 	if (svp == NULL) {
 		cmn_err(CE_WARN, "!svattach_fd: no state (arg %p)", arg);
@@ -1137,7 +1126,7 @@ svattach_fd(blind_t arg)
 
 	if (sv_debug > 0) {
 		cmn_err(CE_CONT,
-		    "svattach_fd(%p): size %" NSC_SZFMT ", "
+		    "!svattach_fd(%p): size %" NSC_SZFMT ", "
 		    "maxfbas %" NSC_SZFMT "\n",
 		    arg, svp->sv_nblocks, svp->sv_maxfbas);
 	}
@@ -1153,7 +1142,7 @@ svdetach_fd(blind_t arg)
 	sv_dev_t *svp = sv_dev_to_sv(dev, NULL);
 
 	if (sv_debug > 0)
-		cmn_err(CE_CONT, "svdetach_fd(%p, %p)\n", arg, (void *)svp);
+		cmn_err(CE_CONT, "!svdetach_fd(%p, %p)\n", arg, (void *)svp);
 
 	/* svp can be NULL during disable of an sv */
 	if (svp == NULL)
@@ -1273,7 +1262,7 @@ sv_lyr_open(dev_t *devp, int flag, int otyp, cred_t *crp)
 		 * coming from nskernd:get_bsize().
 		 */
 		rc = sv_reserve(svp->sv_fd,
-			NSC_TRY|NSC_NOWAIT|NSC_MULTI|NSC_PCATCH);
+		    NSC_TRY | NSC_NOWAIT | NSC_MULTI | NSC_PCATCH);
 		if (rc == 0) {
 			tmph = NULL;
 
@@ -1332,9 +1321,8 @@ sv_lyr_close(dev_t dev, int flag, int otyp, cred_t *crp)
 		 * to pass it straight through to the
 		 * underlying driver.
 		 */
-		DTRACE_PROBE2(sv_lyr_close_recursive,
-			    sv_dev_t *, svp,
-			    dev_t, dev);
+		DTRACE_PROBE2(sv_lyr_close_recursive, sv_dev_t *, svp,
+		    dev_t, dev);
 		svp = NULL;
 	}
 
@@ -1354,8 +1342,7 @@ sv_lyr_close(dev_t dev, int flag, int otyp, cred_t *crp)
 				mutex_exit(&svp->sv_olock);
 				rw_exit(&svp->sv_lock);
 
-				DTRACE_PROBE1(sv_lyr_close_end,
-						dev_t, dev);
+				DTRACE_PROBE1(sv_lyr_close_end, dev_t, dev);
 
 				return (0);
 			}
@@ -1407,8 +1394,7 @@ sv_find_enabled(const dev_t dev, sv_maj_t **majpp)
 		 */
 		rw_exit(&svp->sv_lock);
 
-		DTRACE_PROBE1(sv_find_enabled_retry,
-				dev_t, dev);
+		DTRACE_PROBE1(sv_find_enabled_retry, dev_t, dev);
 
 		delay(2);
 	}
@@ -1456,15 +1442,13 @@ sv_lyr_uio(dev_t dev, uio_t *uiop, cred_t *crp, int rw)
 		 * guard access mode
 		 * - prevent user level access to the device
 		 */
-		DTRACE_PROBE1(sv_lyr_uio_err_guard,
-				uio_t *, uiop);
+		DTRACE_PROBE1(sv_lyr_uio_err_guard, uio_t *, uiop);
 		rc = EPERM;
 		goto out;
 	}
 
 	if ((rc = sv_reserve(svp->sv_fd, NSC_MULTI|NSC_PCATCH)) != 0) {
-		DTRACE_PROBE1(sv_lyr_uio_err_rsrv,
-				uio_t *, uiop);
+		DTRACE_PROBE1(sv_lyr_uio_err_rsrv, uio_t *, uiop);
 		goto out;
 	}
 
@@ -1592,10 +1576,9 @@ sv_list(void *ptr, const int size, int *extra, const int ilp32)
 
 		if (*nblocks == 0) {
 			if (sv_debug > 3)
-				cmn_err(CE_CONT, "sv_list: need to reserve\n");
+				cmn_err(CE_CONT, "!sv_list: need to reserve\n");
 
-			if (sv_reserve(svp->sv_fd,
-					NSC_MULTI|NSC_PCATCH) == 0) {
+			if (sv_reserve(svp->sv_fd, NSC_MULTI|NSC_PCATCH) == 0) {
 				*nblocks = svp->sv_nblocks;
 				nsc_release(svp->sv_fd);
 			}
@@ -1678,7 +1661,7 @@ sv_thread_tune(int threads)
 #ifdef DEBUG
 	if (change) {
 		cmn_err(CE_NOTE,
-		    "sv_thread_tune: threads needed %d, nthreads %d, "
+		    "!sv_thread_tune: threads needed %d, nthreads %d, "
 		    "nthreads change %d",
 		    sv_threads_needed, nst_nthread(sv_tset), change);
 	}
@@ -1774,8 +1757,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 
 	kstatus = spcs_s_kcreate();
 	if (!kstatus) {
-		DTRACE_PROBE1(sv_ioctl_err_kcreate,
-				dev_t, dev);
+		DTRACE_PROBE1(sv_ioctl_err_kcreate, dev_t, dev);
 		return (ENOMEM);
 	}
 
@@ -1789,7 +1771,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			sv_conf32_t svc32;
 
 			if (ddi_copyin((void *)arg, &svc32,
-					sizeof (svc32), mode) < 0) {
+			    sizeof (svc32), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -1801,7 +1783,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			svc.svc_minor = svc32.svc_minor;
 		} else {
 			if (ddi_copyin((void *)arg, &svc,
-					sizeof (svc), mode) < 0) {
+			    sizeof (svc), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -1821,14 +1803,13 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 
 			if (sv_tset == NULL) {
 				cmn_err(CE_WARN,
-				    "sv: could not allocate %d threads",
+				    "!sv: could not allocate %d threads",
 				    sv_threads);
 			}
 		}
 
 		rc = sv_enable(svc.svc_path, svc.svc_flag,
-				makedevice(svc.svc_major, svc.svc_minor),
-				kstatus);
+		    makedevice(svc.svc_major, svc.svc_minor), kstatus);
 
 		if (rc == 0) {
 			sv_config_time = nsc_lbolt();
@@ -1838,10 +1819,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			mutex_exit(&sv_mutex);
 		}
 
-		DTRACE_PROBE3(sv_ioctl_end,
-				dev_t, dev,
-				int, *rvalp,
-				int, rc);
+		DTRACE_PROBE3(sv_ioctl_end, dev_t, dev, int, *rvalp, int, rc);
 
 		return (spcs_s_ocopyoutf(&kstatus, svc.svc_error, rc));
 		/* NOTREACHED */
@@ -1852,7 +1830,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			sv_conf32_t svc32;
 
 			if (ddi_copyin((void *)arg, &svc32,
-					sizeof (svc32), mode) < 0) {
+			    sizeof (svc32), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -1864,7 +1842,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			svc.svc_flag  = svc32.svc_flag;
 		} else {
 			if (ddi_copyin((void *)arg, &svc,
-					sizeof (svc), mode) < 0) {
+			    sizeof (svc), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -1905,11 +1883,11 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			if (svc.svc_major == (major_t)-1 &&
 			    svc.svc_minor == (minor_t)-1)
 				return (spcs_s_ocopyoutf(&kstatus,
-					svc.svc_error, SV_ENODEV));
+				    svc.svc_error, SV_ENODEV));
 		}
 
 		rc = sv_disable(makedevice(svc.svc_major, svc.svc_minor),
-				kstatus);
+		    kstatus);
 
 		if (rc == 0) {
 			sv_config_time = nsc_lbolt();
@@ -1919,10 +1897,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			mutex_exit(&sv_mutex);
 		}
 
-		DTRACE_PROBE3(sv_ioctl_2,
-				dev_t, dev,
-				int, *rvalp,
-				int, rc);
+		DTRACE_PROBE3(sv_ioctl_2, dev_t, dev, int, *rvalp, int, rc);
 
 		return (spcs_s_ocopyoutf(&kstatus, svc.svc_error, rc));
 		/* NOTREACHED */
@@ -1931,7 +1906,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 
 		if (ilp32) {
 			if (ddi_copyin((void *)arg, &svl32,
-					sizeof (svl32), mode) < 0) {
+			    sizeof (svl32), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -1941,7 +1916,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			usvn = (void *)(unsigned long)svl32.svl_names;
 		} else {
 			if (ddi_copyin((void *)arg, &svl,
-					sizeof (svl), mode) < 0) {
+			    sizeof (svl), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -1955,11 +1930,11 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 		if ((size < 0) || (size > sv_max_devices)) {
 			/* Array size is out of range */
 			return (spcs_s_ocopyoutf(&kstatus, ustatus,
-				SV_EARRBOUNDS, "0",
-				spcs_s_inttostring(sv_max_devices, itmp1,
-						sizeof (itmp1), 0),
-				spcs_s_inttostring(size, itmp2,
-						sizeof (itmp2), 0)));
+			    SV_EARRBOUNDS, "0",
+			    spcs_s_inttostring(sv_max_devices, itmp1,
+			    sizeof (itmp1), 0),
+			    spcs_s_inttostring(size, itmp2,
+			    sizeof (itmp2), 0)));
 		}
 
 		if (ilp32)
@@ -1989,7 +1964,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 
 			/* Return the list structure */
 			if (ddi_copyout(&svl32, (void *)arg,
-					sizeof (svl32), mode) < 0) {
+			    sizeof (svl32), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				if (svn != NULL)
 					kmem_free(svn, bytes);
@@ -2001,7 +1976,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 
 			/* Return the list structure */
 			if (ddi_copyout(&svl, (void *)arg,
-					sizeof (svl), mode) < 0) {
+			    sizeof (svl), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				if (svn != NULL)
 					kmem_free(svn, bytes);
@@ -2019,10 +1994,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			kmem_free(svn, bytes);
 		}
 
-		DTRACE_PROBE3(sv_ioctl_3,
-				dev_t, dev,
-				int, *rvalp,
-				int, 0);
+		DTRACE_PROBE3(sv_ioctl_3, dev_t, dev, int, *rvalp, int, 0);
 
 		return (spcs_s_ocopyoutf(&kstatus, ustatus, 0));
 		/* NOTREACHED */
@@ -2033,7 +2005,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			sv_version32_t svv32;
 
 			if (ddi_copyin((void *)arg, &svv32,
-					sizeof (svv32), mode) < 0) {
+			    sizeof (svv32), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -2044,7 +2016,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			svv32.svv_baseline_rev = sv_baseline_rev;
 
 			if (ddi_copyout(&svv32, (void *)arg,
-					sizeof (svv32), mode) < 0) {
+			    sizeof (svv32), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -2052,7 +2024,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			ustatus = (spcs_s_info_t)svv32.svv_error;
 		} else {
 			if (ddi_copyin((void *)arg, &svv,
-					sizeof (svv), mode) < 0) {
+			    sizeof (svv), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -2063,7 +2035,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			svv.svv_baseline_rev = sv_baseline_rev;
 
 			if (ddi_copyout(&svv, (void *)arg,
-					sizeof (svv), mode) < 0) {
+			    sizeof (svv), mode) < 0) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -2071,10 +2043,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 			ustatus = svv.svv_error;
 		}
 
-		DTRACE_PROBE3(sv_ioctl_4,
-				dev_t, dev,
-				int, *rvalp,
-				int, 0);
+		DTRACE_PROBE3(sv_ioctl_4, dev_t, dev, int, *rvalp, int, 0);
 
 		return (spcs_s_ocopyoutf(&kstatus, ustatus, 0));
 		/* NOTREACHED */
@@ -2082,8 +2051,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 	case SVIOC_UNLOAD:
 		rc = sv_prepare_unload();
 
-		if (ddi_copyout(&rc, (void *)arg,
-				sizeof (rc), mode) < 0) {
+		if (ddi_copyout(&rc, (void *)arg, sizeof (rc), mode) < 0) {
 			rc = EFAULT;
 		}
 
@@ -2093,10 +2061,7 @@ svioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvalp)
 	default:
 		spcs_s_kfree(kstatus);
 
-		DTRACE_PROBE3(sv_ioctl_4,
-				dev_t, dev,
-				int, *rvalp,
-				int, EINVAL);
+		DTRACE_PROBE3(sv_ioctl_4, dev_t, dev, int, *rvalp, int, EINVAL);
 
 		return (EINVAL);
 		/* NOTREACHED */
@@ -2111,7 +2076,7 @@ static int
 svprint(dev_t dev, char *str)
 {
 	int instance = ddi_get_instance(sv_dip);
-	cmn_err(CE_WARN, "%s%d: %s", ddi_get_name(sv_dip), instance, str);
+	cmn_err(CE_WARN, "!%s%d: %s", ddi_get_name(sv_dip), instance, str);
 	return (0);
 }
 
@@ -2134,7 +2099,7 @@ _sv_lyr_strategy(struct buf *bp)
 	rc = 0;
 
 	if (sv_debug > 5)
-		cmn_err(CE_CONT, "_sv_lyr_strategy(%p)\n", (void *)bp);
+		cmn_err(CE_CONT, "!_sv_lyr_strategy(%p)\n", (void *)bp);
 
 	svp = sv_find_enabled(bp->b_edev, &maj);
 	if (svp == NULL) {
@@ -2161,25 +2126,22 @@ _sv_lyr_strategy(struct buf *bp)
 		 * guard access mode
 		 * - prevent user level access to the device
 		 */
-		DTRACE_PROBE1(sv_lyr_strategy_err_guard,
-				struct buf *, bp);
+		DTRACE_PROBE1(sv_lyr_strategy_err_guard, struct buf *, bp);
 		bioerror(bp, EPERM);
 		goto out;
 	}
 
 	if ((rc = sv_reserve(svp->sv_fd, NSC_MULTI|NSC_PCATCH)) != 0) {
-		DTRACE_PROBE1(sv_lyr_strategy_err_rsrv,
-				struct buf *, bp);
+		DTRACE_PROBE1(sv_lyr_strategy_err_rsrv, struct buf *, bp);
 
 		if (rc == EINTR)
-			cmn_err(CE_WARN, "nsc_reserve() returned EINTR");
+			cmn_err(CE_WARN, "!nsc_reserve() returned EINTR");
 		bioerror(bp, rc);
 		goto out;
 	}
 
 	if (bp->b_lblkno >= (diskaddr_t)svp->sv_nblocks) {
-		DTRACE_PROBE1(sv_lyr_strategy_eof,
-				struct buf *, bp);
+		DTRACE_PROBE1(sv_lyr_strategy_eof, struct buf *, bp);
 
 		if (bp->b_flags & B_READ) {
 			/* return EOF, not an error */
@@ -2197,21 +2159,18 @@ _sv_lyr_strategy(struct buf *bp)
 	 * a temporary handle per allocation/free pair.
 	 */
 
-	DTRACE_PROBE1(sv_dbg_alloch_start,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_alloch_start, sv_dev_t *, svp);
 
 	bufh = nsc_alloc_handle(svp->sv_fd, NULL, NULL, NULL);
 
-	DTRACE_PROBE1(sv_dbg_alloch_end,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_alloch_end, sv_dev_t *, svp);
 
 	if (bufh && (bufh->sb_flag & NSC_HACTIVE) != 0) {
-		DTRACE_PROBE1(sv_lyr_strategy_err_hactive,
-				struct buf *, bp);
+		DTRACE_PROBE1(sv_lyr_strategy_err_hactive, struct buf *, bp);
 
 		cmn_err(CE_WARN,
-			"sv: allocated active handle (bufh %p, flags %x)",
-			(void *)bufh, bufh->sb_flag);
+		    "!sv: allocated active handle (bufh %p, flags %x)",
+		    (void *)bufh, bufh->sb_flag);
 
 		bioerror(bp, ENXIO);
 		goto done;
@@ -2248,14 +2207,12 @@ loop:
 	    int, rw);
 
 	rc = nsc_alloc_buf(svp->sv_fd, (nsc_off_t)(bp->b_lblkno + fba_off),
-				fba_len, rw, &hndl);
+	    fba_len, rw, &hndl);
 
-	DTRACE_PROBE1(sv_dbg_allocb_end,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_allocb_end, sv_dev_t *, svp);
 
 	if (rc > 0) {
-		DTRACE_PROBE1(sv_lyr_strategy_err_alloc,
-				struct buf *, bp);
+		DTRACE_PROBE1(sv_lyr_strategy_err_alloc, struct buf *, bp);
 		bioerror(bp, rc);
 		if (hndl != bufh)
 			(void) nsc_free_buf(hndl);
@@ -2273,9 +2230,8 @@ loop:
 		 * data.
 		 */
 
-		DTRACE_PROBE2(sv_dbg_read_start,
-			sv_dev_t *, svp,
-			uint64_t, (uint64_t)(hndl->sb_pos + hndl->sb_len - 1));
+		DTRACE_PROBE2(sv_dbg_read_start, sv_dev_t *, svp,
+		    uint64_t, (uint64_t)(hndl->sb_pos + hndl->sb_len - 1));
 
 		rc = nsc_read(hndl, (hndl->sb_pos + hndl->sb_len - 1), 1, 0);
 		if (rc > 0) {
@@ -2283,12 +2239,10 @@ loop:
 			goto done;
 		}
 
-		DTRACE_PROBE1(sv_dbg_read_end,
-			sv_dev_t *, svp);
+		DTRACE_PROBE1(sv_dbg_read_end, sv_dev_t *, svp);
 	}
 
-	DTRACE_PROBE1(sv_dbg_bcopy_start,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_bcopy_start, sv_dev_t *, svp);
 
 	while (tocopy > 0) {
 		nbytes = min(tocopy, (nsc_size_t)v->sv_len);
@@ -2304,19 +2258,16 @@ loop:
 		v++;
 	}
 
-	DTRACE_PROBE1(sv_dbg_bcopy_end,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_bcopy_end, sv_dev_t *, svp);
 
 	if ((bp->b_flags & B_READ) == 0) {
-		DTRACE_PROBE3(sv_dbg_write_start,
-			sv_dev_t *, svp,
+		DTRACE_PROBE3(sv_dbg_write_start, sv_dev_t *, svp,
 		    uint64_t, (uint64_t)hndl->sb_pos,
 		    uint64_t, (uint64_t)hndl->sb_len);
 
 		rc = nsc_write(hndl, hndl->sb_pos, hndl->sb_len, 0);
 
-		DTRACE_PROBE1(sv_dbg_write_end,
-			sv_dev_t *, svp);
+		DTRACE_PROBE1(sv_dbg_write_end, sv_dev_t *, svp);
 
 		if (rc > 0) {
 			bioerror(bp, rc);
@@ -2333,17 +2284,15 @@ loop:
 	fba_req -= fba_len;
 
 	if (fba_req > 0) {
-		DTRACE_PROBE1(sv_dbg_freeb_start,
-			sv_dev_t *, svp);
+		DTRACE_PROBE1(sv_dbg_freeb_start, sv_dev_t *, svp);
 
 		rc = nsc_free_buf(hndl);
 
-		DTRACE_PROBE1(sv_dbg_freeb_end,
-			sv_dev_t *, svp);
+		DTRACE_PROBE1(sv_dbg_freeb_end, sv_dev_t *, svp);
 
 		if (rc > 0) {
 			DTRACE_PROBE1(sv_lyr_strategy_err_free,
-				struct buf *, bp);
+			    struct buf *, bp);
 			bioerror(bp, rc);
 		}
 
@@ -2355,17 +2304,15 @@ loop:
 
 done:
 	if (hndl != NULL) {
-		DTRACE_PROBE1(sv_dbg_freeb_start,
-			sv_dev_t *, svp);
+		DTRACE_PROBE1(sv_dbg_freeb_start, sv_dev_t *, svp);
 
 		rc = nsc_free_buf(hndl);
 
-		DTRACE_PROBE1(sv_dbg_freeb_end,
-			sv_dev_t *, svp);
+		DTRACE_PROBE1(sv_dbg_freeb_end, sv_dev_t *, svp);
 
 		if (rc > 0) {
 			DTRACE_PROBE1(sv_lyr_strategy_err_free,
-				struct buf *, bp);
+			    struct buf *, bp);
 			bioerror(bp, rc);
 		}
 
@@ -2375,24 +2322,20 @@ done:
 	if (bufh)
 		(void) nsc_free_handle(bufh);
 
-	DTRACE_PROBE1(sv_dbg_rlse_start,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_rlse_start, sv_dev_t *, svp);
 
 	nsc_release(svp->sv_fd);
 
-	DTRACE_PROBE1(sv_dbg_rlse_end,
-			sv_dev_t *, svp);
+	DTRACE_PROBE1(sv_dbg_rlse_end, sv_dev_t *, svp);
 
 out:
 	if (sv_debug > 5) {
 		cmn_err(CE_CONT,
-		    "_sv_lyr_strategy: bp %p, bufh %p, bp->b_error %d\n",
+		    "!_sv_lyr_strategy: bp %p, bufh %p, bp->b_error %d\n",
 		    (void *)bp, (void *)bufh, bp->b_error);
 	}
 
-	DTRACE_PROBE2(sv_lyr_strategy_end,
-				struct buf *, bp,
-				int, bp->b_error);
+	DTRACE_PROBE2(sv_lyr_strategy_end, struct buf *, bp, int, bp->b_error);
 
 	rw_exit(&svp->sv_lock);
 	biodone(bp);
@@ -2419,14 +2362,13 @@ sv_lyr_strategy(struct buf *bp)
 	 */
 	if (sv_dev_to_sv(bp->b_edev, NULL) == NULL) {
 		/* not sv enabled - just pass through */
-		DTRACE_PROBE1(sv_lyr_strategy_notsv,
-				struct buf *, bp);
+		DTRACE_PROBE1(sv_lyr_strategy_notsv, struct buf *, bp);
 		_sv_lyr_strategy(bp);
 		return (0);
 	}
 
 	if (sv_debug > 4) {
-		cmn_err(CE_CONT, "sv_lyr_strategy: nthread %d nlive %d\n",
+		cmn_err(CE_CONT, "!sv_lyr_strategy: nthread %d nlive %d\n",
 		    nst_nthread(sv_tset), nst_nlive(sv_tset));
 	}
 
@@ -2445,11 +2387,11 @@ sv_lyr_strategy(struct buf *bp)
 		 */
 		if (sv_debug > 0) {
 			cmn_err(CE_CONT,
-			    "sv_lyr_strategy: thread alloc failed\n");
+			    "!sv_lyr_strategy: thread alloc failed\n");
 		}
 
 		DTRACE_PROBE1(sv_lyr_strategy_no_thread,
-				struct buf *, bp);
+		    struct buf *, bp);
 
 		_sv_lyr_strategy(bp);
 		sv_no_threads++;
@@ -2458,7 +2400,7 @@ sv_lyr_strategy(struct buf *bp)
 		if (nlive > sv_max_nlive) {
 			if (sv_debug > 0) {
 				cmn_err(CE_CONT,
-				    "sv_lyr_strategy: "
+				    "!sv_lyr_strategy: "
 				    "new max nlive %d (nthread %d)\n",
 				    nlive, nst_nthread(sv_tset));
 			}
@@ -2495,7 +2437,7 @@ sv_fix_dkiocgvtoc(const intptr_t arg, const int mode, sv_dev_t *svp)
 
 	if (pnum < 0 || pnum >= V_NUMPAR) {
 		cmn_err(CE_WARN,
-		    "sv_gvtoc: unable to determine partition number "
+		    "!sv_gvtoc: unable to determine partition number "
 		    "for dev %lx", svp->sv_dev);
 		return (EINVAL);
 	}
@@ -2595,7 +2537,7 @@ sv_fix_dkiocgetefi(const intptr_t arg, const int mode, sv_dev_t *svp)
 
 	if (pnum < 0) {
 		cmn_err(CE_WARN,
-		    "sv_efi: unable to determine partition number for dev %lx",
+		    "!sv_efi: unable to determine partition number for dev %lx",
 		    svp->sv_dev);
 		return (EINVAL);
 	}
@@ -2619,7 +2561,7 @@ sv_fix_dkiocgetefi(const intptr_t arg, const int mode, sv_dev_t *svp)
 		unparts = 1;
 	else if (pnum >= unparts) {
 		cmn_err(CE_WARN,
-		    "sv_efi: partition# beyond end of user array (%d >= %d)",
+		    "!sv_efi: partition# beyond end of user array (%d >= %d)",
 		    pnum, unparts);
 		return (EINVAL);
 	}
@@ -2778,9 +2720,8 @@ sv_lyr_ioctl(const dev_t dev, const int cmd, const intptr_t arg,
 			 * to the underlying driver as though the device
 			 * was not sv enabled.
 			 */
-			DTRACE_PROBE2(sv_lyr_ioctl_nskernd,
-					sv_dev_t *, svp,
-					dev_t, dev);
+			DTRACE_PROBE2(sv_lyr_ioctl_nskernd, sv_dev_t *, svp,
+			    dev_t, dev);
 
 			rw_exit(&svp->sv_lock);
 			svp = NULL;
@@ -2814,9 +2755,7 @@ sv_lyr_ioctl(const dev_t dev, const int cmd, const intptr_t arg,
 
 		rw_exit(&svp->sv_lock);
 
-		DTRACE_PROBE2(sv_lyr_ioctl_svtoc,
-				dev_t, dev,
-				int, EPERM);
+		DTRACE_PROBE2(sv_lyr_ioctl_svtoc, dev_t, dev, int, EPERM);
 
 		return (EPERM);
 

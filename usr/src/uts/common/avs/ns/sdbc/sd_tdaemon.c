@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,7 +197,7 @@ _sdbc_tdaemon_configure(int num)
 		return (-1);
 
 	for (i = 0; i < num; i++) {
-	    cv_init(&gld[i].blk, NULL, CV_DRIVER, NULL);
+		cv_init(&gld[i].blk, NULL, CV_DRIVER, NULL);
 	}
 	mutex_enter(&tdaemon_lock);
 	test_created = 1;
@@ -215,12 +215,12 @@ _sdbc_tdaemon_configure(int num)
 
 	for (i = 0; i < num; i++) {
 		(void) nsc_create_process(
-			(void (*)(void *))_sd_idle_daemon, 0, FALSE);
+		    (void (*)(void *))_sd_idle_daemon, 0, FALSE);
 	}
 
 #ifdef DEBUG
 	if (num)
-	    cmn_err(CE_NOTE, "Starting %d SDBC test daemon(s).", num);
+		cmn_err(CE_NOTE, "!Starting %d SDBC test daemon(s).", num);
 #endif
 	return (0);
 }
@@ -302,7 +302,7 @@ static void
 daemon_wakeup(int i)
 {
 #ifdef _SD_DEBUG
-	cmn_err(CE_NOTE, "unblocking %d %x", i, gld[i].blk);
+	cmn_err(CE_NOTE, "!unblocking %d %x", i, gld[i].blk);
 #endif
 	mutex_enter(&tdaemon_lock);
 	cv_broadcast(&gld[i].blk);
@@ -335,7 +335,7 @@ _sd_idle_daemon(void)
 		mutex_enter(&tdaemon_lock);
 		gld[who].asleep = 1;
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "%d daemon: sleeping %p", who,
+		cmn_err(CE_NOTE, "!%d daemon: sleeping %p", who,
 		    (void *)&gld[who].blk);
 #endif
 
@@ -389,7 +389,7 @@ _sd_idle_daemon(void)
 			break;
 #endif
 		default:
-			cmn_err(CE_WARN, "%d daemon %d type inval\n", who,
+			cmn_err(CE_WARN, "!%d daemon %d type inval\n", who,
 			    gld[who].type);
 			break;
 		}
@@ -431,7 +431,7 @@ _sd_test_start(void *args, int *rvp)
 	} *uap = (struct a *)args;
 
 	*rvp = _fork_test_daemon(uap->num, uap->type, uap->loop,
-					uap->from, uap->seed);
+	    uap->from, uap->seed);
 
 	return (0);
 }
@@ -451,20 +451,20 @@ test_control(int typ, int cd, nsc_off_t fba_pos, nsc_size_t fba_len)
 	switch (typ) {
 	case 1:
 		rc = _sdbc_io_attach_cd((blind_t)(unsigned long)cd);
-		cmn_err(CE_NOTE, "_sdbc_io_attach_cd(%d): %d", cd, rc);
+		cmn_err(CE_NOTE, "!_sdbc_io_attach_cd(%d): %d", cd, rc);
 		break;
 	case 2:
 		rc = _sdbc_io_detach_cd((blind_t)(unsigned long)cd);
-		cmn_err(CE_NOTE, "_sdbc_io_detach_cd(%d): %d", cd, rc);
+		cmn_err(CE_NOTE, "!_sdbc_io_detach_cd(%d): %d", cd, rc);
 		break;
 	case 3:
 		_test_async_fail = _sd_cache_files[cd].cd_crdev;
-		cmn_err(CE_NOTE, "async fail dev %lu (cd=%d)", _test_async_fail,
-		    cd);
+		cmn_err(CE_NOTE, "!async fail dev %lu (cd=%d)",
+		    _test_async_fail, cd);
 		break;
 	case 4:
 		_test_async_fail = 0;
-		cmn_err(CE_NOTE, "async fail cleared");
+		cmn_err(CE_NOTE, "!async fail cleared");
 		break;
 #if 0
 	case 5:
@@ -476,16 +476,16 @@ test_control(int typ, int cd, nsc_off_t fba_pos, nsc_size_t fba_len)
 #endif
 	case 7:
 		rc = _sd_get_pinned((blind_t)(unsigned long)cd);
-		cmn_err(CE_NOTE, "get_pinned(%d): %d", cd, rc);
+		cmn_err(CE_NOTE, "!get_pinned(%d): %d", cd, rc);
 		break;
 	case 8:
 		rc = _sd_discard_pinned((blind_t)(unsigned long)cd, fba_pos,
 		    fba_len);
-		cmn_err(CE_NOTE, "discard_pinned(%d,%" NSC_SZFMT ",%" NSC_SZFMT
+		cmn_err(CE_NOTE, "!discard_pinned(%d,%" NSC_SZFMT ",%" NSC_SZFMT
 		    "): %d", cd, fba_pos, fba_len, rc);
 		break;
 	default:
-		cmn_err(CE_WARN, "cache device command %d invalid\n", typ);
+		cmn_err(CE_WARN, "!cache device command %d invalid\n", typ);
 	}
 	return (rc);
 }
@@ -509,7 +509,7 @@ _fork_test_daemon(int num_disks, int test_typ, int loop_cnt, int from, int seed)
 
 	type = test_typ;
 	cmn_err(CE_NOTE,
-	    "sd_test %d %d %d %d %d", num_disks, type, loop_cnt, from, seed);
+	    "!sd_test %d %d %d %d %d", num_disks, type, loop_cnt, from, seed);
 	if (type == 100) {
 		test_stop = 1;
 		return (0);
@@ -537,7 +537,7 @@ _fork_test_daemon(int num_disks, int test_typ, int loop_cnt, int from, int seed)
 #endif
 			default :
 				cmn_err(CE_WARN,
-				    "Usage : sd_test <test_num> 99"
+				    "!Usage : sd_test <test_num> 99"
 				    " <param1> <param2> <param3>");
 				break;
 		}
@@ -558,11 +558,11 @@ again:
 
 	for (i = from; i < (from+num_disks); i++) {
 		if (daemon_awake(i)) {
-			cmn_err(CE_WARN, "Daemon %d awake!?", i);
+			cmn_err(CE_WARN, "!Daemon %d awake!?", i);
 			return (-1);
 		}
 		if (daemon_nexist(i)) {
-			cmn_err(CE_WARN, "Daemon %d nexist!?", i);
+			cmn_err(CE_WARN, "!Daemon %d nexist!?", i);
 			return (-1);
 		}
 
@@ -571,7 +571,7 @@ again:
 		gld[i].seed = seed;
 		daemon_wakeup(i);
 	}
-	cmn_err(CE_CONT, "%d daemons woken (test %d)\n", num_disks, type);
+	cmn_err(CE_CONT, "!%d daemons woken (test %d)\n", num_disks, type);
 	if (num_disks <= 0)
 		return (0);
 
@@ -581,7 +581,7 @@ again:
 		if (!cv_wait_sig(&_wait_daemons, &tdaemon_lock)) {
 			mutex_exit(&tdaemon_lock);
 			test_stop = 1;
-			cmn_err(CE_WARN, "Interrupt: stopping tests");
+			cmn_err(CE_WARN, "!Interrupt: stopping tests");
 			return (-1); /* interrupt */
 		}
 		mutex_exit(&tdaemon_lock);
@@ -664,11 +664,11 @@ _sd_test_rwloop_seq(int i, int loops, int seed, int forw)
 	_sd_buf_handle_t *fbuf, *buf;
 
 	if (strlen(devarray[i]) == 0) {
-		cmn_err(CE_WARN, "child %d devarray null", i);
+		cmn_err(CE_WARN, "!child %d devarray null", i);
 		return;
 	}
 	if ((cd = _sd_open(devarray[i], dev_flag[i])) < 0) {
-		cmn_err(CE_WARN, "Open error %s child %d", devarray[i], i);
+		cmn_err(CE_WARN, "!Open error %s child %d", devarray[i], i);
 		return;
 	}
 	SET_CD_STATE(cd, i);
@@ -685,7 +685,7 @@ _sd_test_rwloop_seq(int i, int loops, int seed, int forw)
 	sts = _sd_alloc_buf((blind_t)(unsigned long)cd, 0, len, NSC_WRBUF,
 	    &fbuf);
 	if (sts > 0)  {
-		cmn_err(CE_WARN, "Buffer alloc failed %d", sts);
+		cmn_err(CE_WARN, "!Buffer alloc failed %d", sts);
 		return;
 	}
 	(void) _sd_copy_pattern_to_handle(fbuf, 0, len);
@@ -704,7 +704,7 @@ _sd_test_rwloop_seq(int i, int loops, int seed, int forw)
 		sts = _sd_alloc_buf((blind_t)(unsigned long)cd, offset, len,
 		    NSC_WRBUF, &buf);
 		if (sts > 0) {
-			cmn_err(CE_WARN, "ch %d getbuf error(WRBUF)%d", i, sts);
+			cmn_err(CE_WARN, "!ch%d getbuf error(WRBUF)%d", i, sts);
 			goto done;
 		}
 		(void) _sd_copy_handle(fbuf, buf, 0, offset, len, j);
@@ -713,17 +713,17 @@ _sd_test_rwloop_seq(int i, int loops, int seed, int forw)
 		while (sts > 0) {
 			if (forw && _sd_hwrite(buf, offset + len - sts,
 			    12, 0) > 0) {
-				cmn_err(CE_WARN, "ch %d fwwr err", i);
+				cmn_err(CE_WARN, "!ch %d fwwr err", i);
 				test_stop = 1;
 			}
 			sts -= 12;
 			if (!forw && _sd_hwrite(buf, offset + sts, 12, 0) > 0) {
-				cmn_err(CE_WARN, "ch %d rvwr err", i);
+				cmn_err(CE_WARN, "!ch %d rvwr err", i);
 				test_stop = 1;
 			}
 		}
 		if (sts = _sd_free_buf(buf)) {
-			cmn_err(CE_WARN, "ch %d freebuf error %d", i, sts);
+			cmn_err(CE_WARN, "!ch %d freebuf error %d", i, sts);
 			goto done;
 		}
 		_td_detach_cd(cd);
@@ -741,21 +741,21 @@ _sd_test_rwloop_seq(int i, int loops, int seed, int forw)
 		sts = _sd_alloc_buf((blind_t)(unsigned long)cd, offset, len,
 		    NSC_RDBUF, &buf);
 		if (sts > 0) {
-			cmn_err(CE_WARN, "ch %d getbuf error(WRBUF)%d", i, sts);
+			cmn_err(CE_WARN, "!ch%d getbuf error(WRBUF)%d", i, sts);
 			goto done;
 		}
 		(void) _sd_compare_handle(fbuf, buf, 0, offset, len, j);
 
 		if (sts = _sd_free_buf(buf)) {
-			cmn_err(CE_WARN, "ch %d freebuf error %d", i, sts);
+			cmn_err(CE_WARN, "!ch %d freebuf error %d", i, sts);
 			goto done;
 		}
 		_td_detach_cd(cd);
 	}
 done:
 	if (sts = _sd_free_buf(fbuf))
-		cmn_err(CE_WARN, "child %d freebuf error %d", i, sts);
-	cmn_err(1, "TEST OVER : rwloop_seq_%s() child %d",
+		cmn_err(CE_WARN, "!child %d freebuf error %d", i, sts);
+	cmn_err(CE_NOTE, "!TEST OVER : rwloop_seq_%s() child %d",
 	    forw ? "forw" : "rev", i);
 }
 
@@ -835,7 +835,7 @@ _sd_copy_handle(_sd_buf_handle_t *handle1,
 
 
 	if (BLK_FBA_OFF(fba_pos1) != BLK_FBA_OFF(fba_pos2)) {
-		cmn_err(CE_WARN, "Cannot copy unaligned handles");
+		cmn_err(CE_WARN, "!Cannot copy unaligned handles");
 		return (0);
 	}
 
@@ -897,7 +897,7 @@ _sd_compare_handle(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 		cc_ent1 = cc_ent1->cc_chain;
 
 	if (BLK_FBA_OFF(fba_pos1) != BLK_FBA_OFF(fba_pos2)) {
-		cmn_err(CE_WARN, "Cannot compare unaligned handles");
+		cmn_err(CE_WARN, "!Cannot compare unaligned handles");
 		return (0);
 	}
 
@@ -915,7 +915,8 @@ _sd_compare_handle(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 	if (bcmp(cc_ent->cc_data + FBA_SIZE(st_cblk_off),
 	    cc_ent1->cc_data + FBA_SIZE(st_cblk_off),
 	    FBA_SIZE(st_cblk_len)) != 0)
-		cmn_err(CE_WARN, "Data mismatch fba_pos:%" NSC_SZFMT, fba_pos2);
+		cmn_err(CE_WARN, "!Data mismatch fba_pos:%" NSC_SZFMT,
+		    fba_pos2);
 
 	cur_fba_len -= st_cblk_len;
 	cc_ent = cc_ent->cc_chain;
@@ -926,7 +927,7 @@ _sd_compare_handle(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 		*skew_word = skew | (++skew_count << 24);
 		if (bcmp(cc_ent->cc_data, cc_ent1->cc_data,
 		    CACHE_BLOCK_SIZE) != 0)
-			cmn_err(CE_WARN, "Data mismatch fba_pos:%" NSC_SZFMT,
+			cmn_err(CE_WARN, "!Data mismatch fba_pos:%" NSC_SZFMT,
 			    fba_pos2);
 
 		cc_ent = cc_ent->cc_chain;
@@ -938,7 +939,7 @@ _sd_compare_handle(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 		*skew_word = skew | (++skew_count << 24);
 		if (bcmp(cc_ent->cc_data, cc_ent1->cc_data,
 		    FBA_SIZE(end_cblk_len)) != 0)
-			cmn_err(CE_WARN, "Data mismatch fba_pos:%" NSC_SZFMT,
+			cmn_err(CE_WARN, "!Data mismatch fba_pos:%" NSC_SZFMT,
 			    fba_pos2);
 	}
 	return (0);
@@ -951,11 +952,11 @@ _sd_compare_handle(_sd_buf_handle_t *handle1, _sd_buf_handle_t *handle2,
 #define	WAIT_IO(st, cd, buf, l) \
 if ((st != NSC_DONE) && (st != NSC_HIT)) { \
 	if (st != NSC_PENDING) \
-		cmn_err(CE_WARN, "alloc sts: %d", st); \
+		cmn_err(CE_WARN, "!alloc sts: %d", st); \
 	else { \
 		buf = wait_io(cd, &st); \
 		if (st) { \
-			cmn_err(CE_WARN, "ch %d getbuf errpr %d\n", l, st); \
+			cmn_err(CE_WARN, "!ch %d getbuf errpr %d\n", l, st); \
 			if (buf) \
 				(void) _sd_free_buf(buf); \
 			return; \
@@ -1018,11 +1019,11 @@ _sd_direct_test(int c, int loop, int seed, int type)
 	tioerr = 0;
 
 	if (strlen(devarray[c]) == 0) {
-		cmn_err(CE_WARN, "child %d devarray null\n", c);
+		cmn_err(CE_WARN, "!child %d devarray null\n", c);
 		return;
 	}
 	if ((cd = _sd_open(devarray[c], dev_flag[c])) < 0) {
-		cmn_err(CE_WARN, "Open error %s child %d\n", devarray[c], c);
+		cmn_err(CE_WARN, "!Open error %s child %d\n", devarray[c], c);
 		return;
 	}
 
@@ -1034,17 +1035,17 @@ _sd_direct_test(int c, int loop, int seed, int type)
 	    (filesize / (60 * 1024)) : loop;
 
 	st_time = nsc_usec();
-	cmn_err(CE_CONT, "Test 100: %s file %d cd %d loops %x seed\n",
+	cmn_err(CE_CONT, "!Test 100: %s file %d cd %d loops %x seed\n",
 	    devarray[c], cd, loop, seed);
 	cmn_err(CE_CONT,
-	    "Test 100: %d recsize %d recs %d throttle %d hd %d doz\n",
+	    "!Test 100: %d recsize %d recs %d throttle %d hd %d doz\n",
 	    rec_size, recs, throttle, ckd_hd, ckd_doz);
 
 	for (i = 0; i < loops; i++) {
 		curpos = i * 120;
 		if (ckd_doz) {
 			bp = sd_alloc_iob(_sd_cache_files[cd].cd_crdev,
-					curpos, 20, B_WRITE);
+			    curpos, 20, B_WRITE);
 			sd_add_mem(bp, caddr, ckd_hd_sz);
 			(void) sd_start_io(bp,
 			    _sd_cache_files[cd].cd_strategy, myend, NULL);
@@ -1053,7 +1054,7 @@ _sd_direct_test(int c, int loop, int seed, int type)
 		}
 		if (ckd_doz == 2) {
 			bp = sd_alloc_iob(_sd_cache_files[cd].cd_crdev,
-					curpos, 20, B_WRITE);
+			    curpos, 20, B_WRITE);
 			sd_add_mem(bp, caddr, 4096-ckd_sskip*512);
 			(void) sd_start_io(bp,
 			    _sd_cache_files[cd].cd_strategy, myend, NULL);
@@ -1070,7 +1071,7 @@ _sd_direct_test(int c, int loop, int seed, int type)
 		done_size += recs * rec_bsz;
 
 		if (tiodone && ((tiodone / 300) > print_stuff)) {
-			cmn_err(CE_CONT, "Done %d ios %d size in %lu time\n",
+			cmn_err(CE_CONT, "!Done %d ios %d size in %lu time\n",
 			    tiodone,
 			    ckd_doz ? ((ckd_doz == 2) ?
 			    (tiodone * (recs * rec_bsz + 4096)) / 3:
@@ -1084,7 +1085,7 @@ _sd_direct_test(int c, int loop, int seed, int type)
 	}
 	while ((tiodone + tioerr) < iosent) {
 		if (tiodone && ((tiodone / 300) > print_stuff)) {
-			cmn_err(CE_CONT, "Done %d ios %d size in %lu time\n",
+			cmn_err(CE_CONT, "!Done %d ios %d size in %lu time\n",
 			    tiodone,
 			    ckd_doz ? ((ckd_doz == 2) ?
 			    (tiodone * (recs * rec_bsz + 4096)) / 3:
@@ -1094,7 +1095,7 @@ _sd_direct_test(int c, int loop, int seed, int type)
 			print_stuff++;
 		}
 	}
-	cmn_err(CE_CONT, "Done %d ios %d size in %lu time\n",
+	cmn_err(CE_CONT, "!Done %d ios %d size in %lu time\n",
 	    tiodone,
 	    ckd_doz ? ((ckd_doz == 2) ?
 	    (tiodone * (recs * rec_bsz + 4096)) / 3:
@@ -1121,10 +1122,10 @@ init_dmatest(void)
 	dma_test = nsc_register_mem("dmatest:mem", NSC_MEM_GLOBAL, 0);
 	dma_mem = (int *)nsc_kmem_zalloc(4096, 0, dma_test);
 	if (!dma_mem) {
-		cmn_err(CE_NOTE, "could not get rm mem\n");
+		cmn_err(CE_NOTE, "!could not get rm mem\n");
 		return (1);
 	}
-	cmn_err(CE_NOTE, "rm = 0x%p\n", (void *)dma_mem);
+	cmn_err(CE_NOTE, "!rm = 0x%p\n", (void *)dma_mem);
 	return (0);
 }
 
@@ -1144,7 +1145,7 @@ test_dma_loop(int net, int seg)
 	delay(3*HZ);
 
 	if (!dma_mem && init_dmatest()) {
-		cmn_err(CE_WARN, "test_dma_loop: init failed");
+		cmn_err(CE_WARN, "!test_dma_loop: init failed");
 		return;
 	}
 

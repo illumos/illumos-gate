@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -421,7 +421,7 @@ ii_reclaim_overflow(_ii_info_t *ip)
 		for (node_id = 0; node_id < ip->bi_mstchks; node_id++) {
 			if ((node = read_node(ip, node_id)) == NULL) {
 				DTRACE_PROBE(_iit_reclaim_overflow_end);
-				/* hum.... */ return;
+				return;
 			}
 			ii_free_overflow(ip, node->vchunk_id);
 			release_node(ip, node, node_id);
@@ -591,9 +591,9 @@ ii_btsize(nsc_size_t tree_len)
 
 	if (ii_debug > 1)
 		cmn_err(CE_NOTE,
-		    "ii_btsize: bitmap with %" NSC_SZFMT
+		    "!ii_btsize: bitmap with %" NSC_SZFMT
 		    " spare fba's will map %" NSC_SZFMT " chunks",
-			tree_len, nchunks);
+		    tree_len, nchunks);
 
 	return (nchunks);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,7 +341,7 @@ _nsc_rmmap_free(nsc_rmmap_t *map, char *name, nsc_mem_t *mp)
 
 	mutex_exit(&_nsc_global_lock);
 
-	cmn_err(CE_WARN, "nsctl: _nsc_rmmap_free: invalid free");
+	cmn_err(CE_WARN, "!nsctl: _nsc_rmmap_free: invalid free");
 }
 
 
@@ -809,7 +809,7 @@ nsc_strmatch(char *s, char *pat)
 
 			if (!*pat || neg)
 				return (0);
-		    lp:
+lp:
 			continue;
 		}
 
@@ -882,7 +882,7 @@ nsc_fatal()
 	caller_sym = kobj_getsymname((uintptr_t)caller, &offset);
 #endif	/* !DS_DDICT */
 
-	cmn_err(CE_WARN, "nsctl: nsc_fatal called at 0x%p (%s+0x%lx)",
+	cmn_err(CE_WARN, "!nsctl: nsc_fatal called at 0x%p (%s+0x%lx)",
 	    caller, caller_sym ? caller_sym : "?", offset);
 
 	/*
@@ -894,7 +894,7 @@ nsc_fatal()
 
 #else	/* !DEBUG */
 
-	cmn_err(CE_WARN, "nsctl: nsc_fatal called at 0x%p", caller);
+	cmn_err(CE_WARN, "!nsctl: nsc_fatal called at 0x%p", caller);
 
 #endif	/* DEBUG */
 
@@ -924,13 +924,13 @@ nsc_cm_errhdlr(void *src, void *dst, size_t len, int errval)
 	static int _nsc_baddma_already_seen = 0;
 
 	if (!(_nsc_baddma_already_seen % 100)) {
-		cmn_err(CE_WARN, "nsc_cm_errhdlr: media down, forced_wrthru");
+		cmn_err(CE_WARN, "!nsc_cm_errhdlr: media down, forced_wrthru");
 
 		_nsc_baddma_already_seen += 1;
 
 		if (_nsc_baddma_already_seen >= 100) {
 			cmn_err(CE_WARN,
-			    "nsc_cm_errhdlr: this message "
+			    "!nsc_cm_errhdlr: this message "
 			    "displayed every 100 errors");
 		}
 	}
@@ -955,7 +955,7 @@ _nsc_deinit_svc(void)
 {
 	if (_nsc_services != NULL) {
 		cmn_err(CE_PANIC,
-			"nsctl: services registered in _nsc_deinit_svc");
+		    "nsctl: services registered in _nsc_deinit_svc");
 		/* NOTREACHED */
 	}
 

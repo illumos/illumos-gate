@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libunistat/Makefile.com
@@ -81,8 +81,8 @@ EDEFS=	$(MODS:%=$(SRCDIR)/%/%.edef)
 TRNKS=	$(MODS:%=$(SRCDIR)/%/%.trnk)
 DTRNKS=	$(MODS:%=$(SRCDIR)/%/%.dtrnk)
 
-ERRGEN_DIR=	../../../cmd/avs/errgen
-ERRGEN=		$(ROOT)/usr/bin/errgen
+ERRGEN_DIR=	$(SRC)/cmd/avs/errgen
+ERRGEN=		$(ERRGEN_DIR)/errgen
 
 # production (non-debug)
 DFLAGS =	-DISSTATIC=static

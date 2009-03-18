@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,7 +215,7 @@ _fini(void)
 		return (EBUSY);
 	} else if (_sd_ioset &&
 	    (_sd_ioset->set_nlive || _sd_ioset->set_nthread)) {
-		cmn_err(CE_WARN, "sdbc:_fini() %d threads still "
+		cmn_err(CE_WARN, "!sdbc:_fini() %d threads still "
 		    "active; %d threads in set\n", _sd_ioset->set_nlive,
 		    _sd_ioset->set_nthread);
 		return (EBUSY);
@@ -288,7 +288,7 @@ _sdbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (sdbc_max_fbas > _SD_MAX_FBAS) {
 		cmn_err(CE_WARN,
-		    "_sdbc_attach: sdbc_max_fbas set to %d", _SD_MAX_FBAS);
+		    "!_sdbc_attach: sdbc_max_fbas set to %d", _SD_MAX_FBAS);
 		sdbc_max_fbas = _SD_MAX_FBAS;
 	}
 
@@ -370,11 +370,10 @@ _sdbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #define	MINOR_NUMBER	0
 #ifdef MINOR_NAME
 	if (ddi_create_minor_node(dip, MINOR_NAME, S_IFCHR,
-		MINOR_NUMBER, DDI_PSEUDO, 0)
-		    != DDI_SUCCESS) {
-			/* free anything we allocated here */
-			return (DDI_FAILURE);
-		}
+	    MINOR_NUMBER, DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		/* free anything we allocated here */
+		return (DDI_FAILURE);
+	}
 #endif /* MINOR_NAME */
 
 	/* Announce presence of the device */
@@ -462,7 +461,7 @@ _sdbc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 int
 _sdbc_print(dev_t dev, char *s)
 {
-	cmn_err(CE_WARN, "sdbc(_sdbc_print) %s", s);
+	cmn_err(CE_WARN, "!sdbc(_sdbc_print) %s", s);
 	return (0);
 }
 #else
@@ -541,7 +540,7 @@ sdbcunload(void)
 {
 	if (_sd_cache_initialized) {
 		cmn_err(CE_WARN,
-		    "sdbc(sdbcunload) cannot unload module - cache in use!");
+		    "!sdbc(sdbcunload) cannot unload module - cache in use!");
 		return (EEXIST);
 	}
 #ifdef m88k
@@ -619,7 +618,7 @@ sdbcopen(dev_t *devp, int flag, int otyp, cred_t *crp)
 
 	if (nd < nsc_min_nodeid) {
 		cmn_err(CE_WARN,
-		    "sdbc(sdbcopen) open failed, systemid (%d) must be >= %d",
+		    "!sdbc(sdbcopen) open failed, systemid (%d) must be >= %d",
 		    nd, nsc_min_nodeid);
 		return (EINVAL);
 	}
@@ -665,7 +664,7 @@ convert_ioctl_args(int cmd, void *arg, int mode, _sdbc_ioctl_t *args)
 	case SDBC_UNUSED_3:
 		args->sdbc_ustatus = (spcs_s_info_t)args32.sdbc_ustatus;
 		cmn_err(CE_WARN,
-		    "sdbc(convert_ioctl_args) obsolete sdbc ioctl used");
+		    "!sdbc(convert_ioctl_args) obsolete sdbc ioctl used");
 		return (EINVAL);
 
 	case SDBC_ADUMP:
@@ -883,14 +882,14 @@ sdbc_get_cd_blk(_sdbc_ioctl_t *args, int mode)
 
 		if (sdbc_safestore) {
 			cmn_err(CE_WARN,
-			    "sdbc(sdbc_get_cd_blk) cc_write 0x%p sc-res 0x%p",
+			    "!sdbc(sdbc_get_cd_blk) cc_write 0x%p sc-res 0x%p",
 			    (void *)cc_ent->cc_write,
 			    (void *)cc_ent->cc_write->sc_res);
 
 			if ((taddr = kmem_alloc(CACHE_BLOCK_SIZE,
 			    KM_NOSLEEP)) == NULL) {
 				cmn_err(CE_WARN,
-				    "sdbc(sdbc_get_cd_blk) kmem_alloc failed."
+				    "!sdbc(sdbc_get_cd_blk) kmem_alloc failed."
 				    " cannot get write data");
 				info.ci_write = NULL;
 				rc = EFAULT;
@@ -899,13 +898,13 @@ sdbc_get_cd_blk(_sdbc_ioctl_t *args, int mode)
 			    CACHE_BLOCK_SIZE, 0) == SS_ERR) {
 
 				cmn_err(CE_WARN, "sdbc(sdbc_get_cd_blk) "
-				    "safestore read failed");
+				    "!safestore read failed");
 				rc = EFAULT;
 
 			} else if (copyout(taddr, (void *)addr[4],
 			    CACHE_BLOCK_SIZE)) {
 				cmn_err(CE_WARN,
-				    "sdbc(sdbc_get_cd_blk) copyout failed."
+				    "!sdbc(sdbc_get_cd_blk) copyout failed."
 				    " cannot get write data");
 				rc = EFAULT;
 			}
@@ -979,12 +978,12 @@ sdbcioctl(dev_t dev, int cmd, void *arg, int mode, cred_t *crp, int *rvp)
 	case SDBC_ENABLE:
 		mutex_enter(&_sdbc_config_lock);
 		rc = _sdbc_configure((_sd_cache_param_t *)args.arg0,
-			NULL, kstatus);
+		    NULL, kstatus);
 		if (rc && rc != EALREADY && rc != SDBC_ENONETMEM) {
 			(void) _sdbc_deconfigure(kstatus);
 			mutex_exit(&_sdbc_config_lock);
-			return (spcs_s_ocopyoutf(&kstatus,
-				args.sdbc_ustatus, rc));
+			return (spcs_s_ocopyoutf
+			    (&kstatus, args.sdbc_ustatus, rc));
 		}
 		mutex_exit(&_sdbc_config_lock);
 		return (spcs_s_ocopyoutf(&kstatus, args.sdbc_ustatus, rc));
@@ -1128,8 +1127,8 @@ sdbcioctl(dev_t dev, int cmd, void *arg, int mode, cred_t *crp, int *rvp)
 		rc = _sdbc_configure(NULL, &mgmt_config_info, kstatus);
 		if (rc && rc != EALREADY) {
 			(void) _sdbc_deconfigure(kstatus);
-			return (spcs_s_ocopyoutf(&kstatus,
-				args.sdbc_ustatus, rc));
+			return (spcs_s_ocopyoutf
+			    (&kstatus, args.sdbc_ustatus, rc));
 		}
 
 		return (spcs_s_ocopyoutf(&kstatus, args.sdbc_ustatus, rc));
@@ -1154,7 +1153,7 @@ sdbcioctl(dev_t dev, int cmd, void *arg, int mode, cred_t *crp, int *rvp)
 		cache_version.baseline = sdbc_baseline_rev;
 
 		if (ddi_copyout(&cache_version, (void *)args.arg0,
-			sizeof (cache_version_t), mode)) {
+		    sizeof (cache_version_t), mode)) {
 			rc = EFAULT;
 			break;
 		}
@@ -1192,7 +1191,7 @@ sdbcioctl(dev_t dev, int cmd, void *arg, int mode, cred_t *crp, int *rvp)
 
 #endif /* DEBUG */
 	default:
-		_sd_print(3, "SDBC unknown ioctl: 0x%x unsupported", cmd);
+		_sd_print(3, "!SDBC unknown ioctl: 0x%x unsupported", cmd);
 		rc = EINVAL;
 		break;
 	}
@@ -1216,7 +1215,7 @@ _sd_timed_block(clock_t ticks, kcondvar_t *cvp)
 	clock_t ticker;
 
 	if (drv_getparm(LBOLT, &ticker) != 0)
-		cmn_err(CE_WARN, "_sd_timed_block:failed to get current time");
+		cmn_err(CE_WARN, "!_sd_timed_block:failed to get current time");
 
 	mutex_enter(&_sd_block_lk);
 	(void) cv_timedwait(cvp, &_sd_block_lk, ticks + ticker);
@@ -1251,8 +1250,8 @@ _sd_data_log(int num, _sd_cctl_t *centry, nsc_off_t st, nsc_size_t len)
 	blk = BLK_TO_FBA_NUM(CENTRY_BLK(centry));
 	for (i = st; i < (st + len); i++)
 		SDTRACE(num, CENTRY_CD(centry), 1, blk + i,
-			*(int *)(centry->cc_data + FBA_SIZE(i)),
-			*(int *)(centry->cc_data + FBA_SIZE(i) + 4));
+		    *(int *)(centry->cc_data + FBA_SIZE(i)),
+		    *(int *)(centry->cc_data + FBA_SIZE(i) + 4));
 #endif /* _SD_FBA_DATA_LOG */
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,14 +95,14 @@ int
 _rdc_init_dev()
 {
 	_rdc_io_hc = nsc_register_io("rdc-high-cache",
-		NSC_RDCH_ID|NSC_REFCNT|NSC_FILTER, _rdc_io_def);
+	    NSC_RDCH_ID|NSC_REFCNT|NSC_FILTER, _rdc_io_def);
 	if (_rdc_io_hc == NULL)
-		cmn_err(CE_WARN, "rdc: nsc_register_io (high, cache) failed.");
+		cmn_err(CE_WARN, "!rdc: nsc_register_io (high, cache) failed.");
 
 	_rdc_io_hr = nsc_register_io("rdc-high-raw",
-		NSC_RDCHR_ID|NSC_REFCNT|NSC_FILTER, _rdc_ior_def);
+	    NSC_RDCHR_ID|NSC_REFCNT|NSC_FILTER, _rdc_ior_def);
 	if (_rdc_io_hr == NULL)
-		cmn_err(CE_WARN, "rdc: nsc_register_io (high, raw) failed.");
+		cmn_err(CE_WARN, "!rdc: nsc_register_io (high, raw) failed.");
 
 	if (!_rdc_io_hc || !_rdc_io_hr) {
 		_rdc_deinit_dev();
@@ -127,14 +127,14 @@ _rdc_deinit_dev()
 	if (_rdc_io_hc) {
 		if ((rc = nsc_unregister_io(_rdc_io_hc, 0)) != 0)
 			cmn_err(CE_WARN,
-			    "rdc: nsc_unregister_io (high, cache) failed: %d",
+			    "!rdc: nsc_unregister_io (high, cache) failed: %d",
 			    rc);
 	}
 
 	if (_rdc_io_hr) {
 		if ((rc = nsc_unregister_io(_rdc_io_hr, 0)) != 0)
 			cmn_err(CE_WARN,
-			    "rdc: nsc_unregister_io (high, raw) failed: %d",
+			    "!rdc: nsc_unregister_io (high, raw) failed: %d",
 			    rc);
 	}
 }
@@ -167,8 +167,8 @@ rdc_idev_open(rdc_k_info_t *krdc, char *pathname, int *rc)
 
 		dp->id_cache_dev.bi_krdc = krdc;
 		dp->id_cache_dev.bi_fd = nsc_open(pathname,
-			NSC_RDCHR_ID|NSC_RDWR|NSC_DEVICE,
-			_rdc_fd_def, (blind_t)&dp->id_cache_dev, rc);
+		    NSC_RDCHR_ID|NSC_RDWR|NSC_DEVICE,
+		    _rdc_fd_def, (blind_t)&dp->id_cache_dev, rc);
 		if (!dp->id_cache_dev.bi_fd) {
 			kmem_free(dp, sizeof (*dp));
 			return (NULL);
@@ -176,8 +176,8 @@ rdc_idev_open(rdc_k_info_t *krdc, char *pathname, int *rc)
 
 		dp->id_raw_dev.bi_krdc = krdc;
 		dp->id_raw_dev.bi_fd = nsc_open(pathname,
-			NSC_RDCHR_ID|NSC_RDWR|NSC_DEVICE,
-			_rdc_fd_def, (blind_t)&dp->id_raw_dev, rc);
+		    NSC_RDCHR_ID|NSC_RDWR|NSC_DEVICE,
+		    _rdc_fd_def, (blind_t)&dp->id_raw_dev, rc);
 		if (!dp->id_raw_dev.bi_fd) {
 			(void) nsc_close(dp->id_cache_dev.bi_fd);
 			kmem_free(dp, sizeof (*dp));
@@ -247,15 +247,14 @@ rdc_idev_close(rdc_k_info_t *krdc, rdc_info_dev_t *dp)
 #ifdef DEBUG
 		if (!(++count % 16)) {
 			cmn_err(CE_NOTE,
-				"_rdc_idev_close(%s): waiting for nsc_release",
-				rdc_u_info[krdc->index].primary.file);
+			    "!_rdc_idev_close(%s): waiting for nsc_release",
+			    rdc_u_info[krdc->index].primary.file);
 		}
 		if (count > (16*20)) {
 			/* waited for 20 seconds - too long - panic */
 			cmn_err(CE_PANIC,
-				"_rdc_idev_close(%s, %p): lost nsc_release",
-				rdc_u_info[krdc->index].primary.file,
-				(void *)krdc);
+			    "!_rdc_idev_close(%s, %p): lost nsc_release",
+			    rdc_u_info[krdc->index].primary.file, (void *)krdc);
 		}
 #endif
 		mutex_exit(&dp->id_rlock);
@@ -304,7 +303,7 @@ rdc_get_details(rdc_k_info_t *krdc)
 		if (rc != 0) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_get_details: partsize failed (%d)", rc);
+			    "!rdc_get_details: partsize failed (%d)", rc);
 #endif /* DEBUG */
 			urdc->volume_size = vol_size = 0;
 		}
@@ -314,7 +313,7 @@ rdc_get_details(rdc_k_info_t *krdc)
 		if (rc != 0) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_get_details: maxfbas failed (%d)", rc);
+			    "!rdc_get_details: maxfbas failed (%d)", rc);
 #endif /* DEBUG */
 			maxfbas = 0;
 		}
@@ -353,7 +352,7 @@ rdc_dev_open(rdc_set_t *rdc_set, int options)
 
 	if (index == rdc_max_sets) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_dev_open: out of cd\'s");
+		cmn_err(CE_WARN, "!rdc_dev_open: out of cd\'s");
 #endif
 		index = -EINVAL;
 		goto out;
@@ -361,7 +360,7 @@ rdc_dev_open(rdc_set_t *rdc_set, int options)
 
 	if (krdc->devices && (krdc->c_fd || krdc->r_fd)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_dev_open: %s already open", pathname);
+		cmn_err(CE_WARN, "!rdc_dev_open: %s already open", pathname);
 #endif
 		index = -EINVAL;
 		goto out;
@@ -404,9 +403,9 @@ rdc_dev_close(rdc_k_info_t *krdc)
 #ifdef DEBUG
 	if (!krdc->devices || !krdc->c_fd || !krdc->r_fd) {
 		cmn_err(CE_WARN,
-			"rdc_dev_close(%p): c_fd %p r_fd %p", (void *)krdc,
-			(void *) (krdc->devices ? krdc->c_fd : 0),
-			(void *) (krdc->devices ? krdc->r_fd : 0));
+		    "!rdc_dev_close(%p): c_fd %p r_fd %p", (void *)krdc,
+		    (void *) (krdc->devices ? krdc->c_fd : 0),
+		    (void *) (krdc->devices ? krdc->r_fd : 0));
 	}
 #endif
 
@@ -419,9 +418,8 @@ rdc_dev_close(rdc_k_info_t *krdc)
 	urdc->primary.file[0] = '\0';
 
 	if (_rdc_open_count <= 0) {
-		cmn_err(CE_WARN,
-			"rdc: _rdc_open_count corrupt: %d",
-			_rdc_open_count);
+		cmn_err(CE_WARN, "!rdc: _rdc_open_count corrupt: %d",
+		    _rdc_open_count);
 	}
 
 	_rdc_open_count--;
@@ -535,7 +533,7 @@ rdc_unintercept(rdc_k_info_t *krdc)
 	if (krdc->r_tok) {
 		rc = nsc_unregister_path(krdc->r_tok, 0);
 		if (rc) {
-			cmn_err(CE_WARN, "rdc: unregister rawfd %d", rc);
+			cmn_err(CE_WARN, "!rdc: unregister rawfd %d", rc);
 			err = rc;
 		}
 		krdc->r_tok = NULL;
@@ -544,7 +542,7 @@ rdc_unintercept(rdc_k_info_t *krdc)
 	if (krdc->c_tok) {
 		rc = nsc_unregister_path(krdc->c_tok, 0);
 		if (rc) {
-			cmn_err(CE_WARN, "rdc: unregister cachefd %d", rc);
+			cmn_err(CE_WARN, "!rdc: unregister cachefd %d", rc);
 			if (!err)
 				err = rc;
 		}
@@ -554,7 +552,7 @@ rdc_unintercept(rdc_k_info_t *krdc)
 	if (krdc->b_tok) {
 		rc = nsc_unregister_path(krdc->b_tok, 0);
 		if (rc) {
-			cmn_err(CE_WARN, "rdc: unregister bitmap %d", rc);
+			cmn_err(CE_WARN, "!rdc: unregister bitmap %d", rc);
 			err = rc;
 		}
 		krdc->b_tok = NULL;
@@ -618,7 +616,7 @@ _rdc_rlse_d(rdc_k_info_t *krdc, int devs)
 	int raw = (devs & RDC_RAW);
 
 	if (!krdc) {
-		cmn_err(CE_WARN, "rdc: _rdc_rlse_devs null krdc");
+		cmn_err(CE_WARN, "!rdc: _rdc_rlse_devs null krdc");
 		return;
 	}
 
@@ -698,8 +696,8 @@ _rdc_rlse_d(rdc_k_info_t *krdc, int devs)
 			cv_broadcast(&krdc->devices->id_rcv);
 		}
 	} else {
-		cmn_err(CE_WARN, "rdc: _rdc_rlse_devs no reserve? krdc %p",
-			(void *) krdc);
+		cmn_err(CE_WARN, "!rdc: _rdc_rlse_devs no reserve? krdc %p",
+		    (void *) krdc);
 	}
 }
 
@@ -763,11 +761,11 @@ _rdc_rsrv_d(int raw, _rdc_info_dev_t *rid, _rdc_info_dev_t *cid, int flag,
 	    (rid->bi_ofailed < 0) ||
 	    (cid->bi_ofailed < 0)) {
 		cmn_err(CE_WARN,
-		    "_rdc_rsrv_d: negative counts (rsrv %d %d orsrv %d %d)",
+		    "!_rdc_rsrv_d: negative counts (rsrv %d %d orsrv %d %d)",
 		    rid->bi_rsrv, cid->bi_rsrv,
 		    rid->bi_orsrv, cid->bi_orsrv);
 		cmn_err(CE_WARN,
-		    "_rdc_rsrv_d: negative counts (fail %d %d ofail %d %d)",
+		    "!_rdc_rsrv_d: negative counts (fail %d %d ofail %d %d)",
 		    rid->bi_failed, cid->bi_failed,
 		    rid->bi_ofailed, cid->bi_ofailed);
 		cmn_err(CE_PANIC, "_rdc_rsrv_d: negative counts (krdc %p)",
@@ -785,7 +783,7 @@ _rdc_rsrv_d(int raw, _rdc_info_dev_t *rid, _rdc_info_dev_t *cid, int flag,
 		krdc->devices->id_release++;
 		while (IS_RSRV(rid))
 			cv_wait(&krdc->devices->id_rcv,
-				&krdc->devices->id_rlock);
+			    &krdc->devices->id_rlock);
 		krdc->devices->id_release--;
 	}
 
@@ -872,7 +870,7 @@ _rdc_rsrv_d(int raw, _rdc_info_dev_t *rid, _rdc_info_dev_t *cid, int flag,
 				rdc_many_exit(krdc);
 				rc = -1;
 #ifdef DEBUG
-				cmn_err(CE_NOTE, "nsc_reserve failed "
+				cmn_err(CE_NOTE, "!nsc_reserve failed "
 				    "with rc == %d\n", rc);
 #endif
 			} else {
@@ -920,7 +918,6 @@ _rdc_rsrv_devs(rdc_k_info_t *krdc, int devs, int flag)
 	int got = 0;
 
 	if (!krdc) {
-		cmn_err(CE_WARN, "rdc: _rdc_rsrv_devs null krdc");
 		return (EINVAL);
 	}
 
@@ -941,7 +938,7 @@ _rdc_rsrv_devs(rdc_k_info_t *krdc, int devs, int flag)
 				rc = 0;
 			} else {
 				cmn_err(CE_WARN,
-				    "rdc: nsc_reserve(%s) failed %d\n",
+				    "!rdc: nsc_reserve(%s) failed %d\n",
 				    nsc_pathname(krdc->c_fd), rc);
 			}
 		} else {
@@ -954,9 +951,8 @@ _rdc_rsrv_devs(rdc_k_info_t *krdc, int devs, int flag)
 			rc = EIO;
 		else if ((krdc->bmaprsrv == 0) &&
 		    (rc = nsc_reserve(krdc->bitmapfd, 0)) != 0) {
-			cmn_err(CE_WARN,
-				"rdc: nsc_reserve(%s) failed %d\n",
-				nsc_pathname(krdc->bitmapfd), rc);
+			cmn_err(CE_WARN, "!rdc: nsc_reserve(%s) failed %d\n",
+			    nsc_pathname(krdc->bitmapfd), rc);
 		} else {
 			krdc->bmaprsrv++;
 			got |= RDC_BMP;
@@ -1139,7 +1135,7 @@ _rdc_alloc_buf(rdc_fd_t *rfd, nsc_off_t pos, nsc_size_t len, int flag,
 	if (pos + len > urdc->volume_size) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-			    "rdc: Attempt to access beyond end of rdc volume");
+		    "!rdc: Attempt to access beyond end of rdc volume");
 #endif
 		return (EIO);
 	}
@@ -1148,7 +1144,7 @@ _rdc_alloc_buf(rdc_fd_t *rfd, nsc_off_t pos, nsc_size_t len, int flag,
 	if (h == NULL) {
 		/* should never happen (nsctl does this for us) */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "_rdc_alloc_buf entered without buffer!");
+		cmn_err(CE_WARN, "!_rdc_alloc_buf entered without buffer!");
 #endif
 		h = (rdc_buf_t *)_rdc_alloc_handle(NULL, NULL, NULL, rfd);
 		if (h == NULL)
@@ -1160,7 +1156,7 @@ _rdc_alloc_buf(rdc_fd_t *rfd, nsc_off_t pos, nsc_size_t len, int flag,
 
 	if (flag & NSC_NOBLOCK) {
 		cmn_err(CE_WARN,
-		    "_rdc_alloc_buf: removing unsupported NSC_NOBLOCK flag");
+		    "!_rdc_alloc_buf: removing unsupported NSC_NOBLOCK flag");
 		flag &= ~(NSC_NOBLOCK);
 	}
 
@@ -1186,7 +1182,7 @@ _rdc_alloc_buf(rdc_fd_t *rfd, nsc_off_t pos, nsc_size_t len, int flag,
 		rc = EIO;
 	} else {
 		rc = nsc_alloc_buf(RDC_U_FD(krdc), pos, len,
-			ioflag, &h->rdc_bufp);
+		    ioflag, &h->rdc_bufp);
 		if (!RDC_SUCCESS(rc)) {
 			rdc_many_enter(krdc);
 			if (rdc_get_vflags(urdc) & RDC_PRIMARY) {
@@ -1197,7 +1193,7 @@ _rdc_alloc_buf(rdc_fd_t *rfd, nsc_off_t pos, nsc_size_t len, int flag,
 				rdc_set_flags(urdc, RDC_SYNC_NEEDED);
 			}
 			rdc_set_flags_log(urdc, RDC_VOL_FAILED,
-				"nsc_alloc_buf failed");
+			    "nsc_alloc_buf failed");
 			rdc_many_exit(krdc);
 			rdc_write_state(urdc);
 		}
@@ -1298,8 +1294,8 @@ _rdc_free_buf(rdc_buf_t *h)
 		if (!RDC_SUCCESS(rc)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "_rdc_free_buf(%p): nsc_free_buf(%p) returned %d",
-				(void *) h, (void *) h->rdc_bufp, rc);
+			    "!_rdc_free_buf(%p): nsc_free_buf(%p) returned %d",
+			    (void *) h, (void *) h->rdc_bufp, rc);
 #endif
 			return (rc);
 		}
@@ -1322,8 +1318,8 @@ _rdc_free_buf(rdc_buf_t *h)
 		if (!RDC_SUCCESS(rc)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "_rdc_free_buf(%p): _rdc_free_handle returned %d",
-				(void *) h, rc);
+			    "!_rdc_free_buf(%p): _rdc_free_handle returned %d",
+			    (void *) h, rc);
 #endif
 			return (rc);
 		}
@@ -1631,14 +1627,16 @@ _rdc_detach(rdc_fd_t *rfd, nsc_iodev_t *iodev)
 				cv_broadcast(&krdc->group->asyncqcv);
 				mutex_exit(&krdc->group->ra_queue.net_qlock);
 				cmn_err(CE_WARN,
-	"RDC: async I/O pending and not drained for %s during detach",
-				rdc_u_info[krdc->index].primary.file);
+				    "!RDC: async I/O pending and not drained "
+				    "for %s during detach",
+				    rdc_u_info[krdc->index].primary.file);
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-		"nitems: %" NSC_SZFMT " nblocks: %" NSC_SZFMT
-		" head: 0x%p tail: 0x%p",
-		    qp->nitems, qp->blocks, (void *)qp->net_qhead,
-		    (void *)qp->net_qtail);
+				    "!nitems: %" NSC_SZFMT " nblocks: %"
+				    NSC_SZFMT " head: 0x%p tail: 0x%p",
+				    qp->nitems, qp->blocks,
+				    (void *)qp->net_qhead,
+				    (void *)qp->net_qtail);
 #endif
 			} while (krdc->group->rdc_thrnum > 0);
 		}
@@ -1646,7 +1644,7 @@ _rdc_detach(rdc_fd_t *rfd, nsc_iodev_t *iodev)
 
 	mutex_enter(&krdc->devices->id_rlock);
 	if (krdc->iodev != iodev)
-		cmn_err(CE_WARN, "_rdc_detach: iodev mismatch %p : %p",
+		cmn_err(CE_WARN, "!_rdc_detach: iodev mismatch %p : %p",
 		    (void *) krdc->iodev, (void *) iodev);
 
 	krdc->iodev = NULL;
@@ -1759,7 +1757,7 @@ _rdc_attach_fd(blind_t arg)
 
 	if ((rc = nsc_partsize(dip->bi_fd, &partsize)) != 0) {
 		cmn_err(CE_WARN,
-		    "SNDR: cannot get volume size of %s, error %d",
+		    "!SNDR: cannot get volume size of %s, error %d",
 		    nsc_pathname(dip->bi_fd), rc);
 	} else if (urdc->volume_size == 0 && partsize > 0) {
 		/* set volume size for the first time */
@@ -1782,13 +1780,13 @@ _rdc_attach_fd(blind_t arg)
 		}
 
 		cmn_err(CE_WARN,
-		    "SNDR: %s changed size from %" NSC_SZFMT " to %" NSC_SZFMT,
+		    "!SNDR: %s changed size from %" NSC_SZFMT " to %" NSC_SZFMT,
 		    nsc_pathname(dip->bi_fd), urdc->volume_size, partsize);
 	}
 
 	if ((rc = nsc_maxfbas(dip->bi_fd, 0, &maxfbas)) != 0) {
 		cmn_err(CE_WARN,
-		    "SNDR: cannot get max transfer size for %s, error %d",
+		    "!SNDR: cannot get max transfer size for %s, error %d",
 		    nsc_pathname(dip->bi_fd), rc);
 	} else if (maxfbas > 0) {
 		krdc->maxfbas = min(RDC_MAX_MAXFBAS, maxfbas);
@@ -1844,16 +1842,16 @@ _rdc_read(rdc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 
 	if (!RDC_HANDLE_LIMITS(&h->rdc_bufh, pos, len)) {
 		cmn_err(CE_WARN,
-		    "_rdc_read: bounds check: io(handle) pos %" NSC_XSZFMT
+		    "!_rdc_read: bounds check: io(handle) pos %" NSC_XSZFMT
 		    "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
-			pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
+		    pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
 		h->rdc_bufh.sb_error = EINVAL;
 		return (h->rdc_bufh.sb_error);
 	}
 
 	if (flag & NSC_NOBLOCK) {
 		cmn_err(CE_WARN,
-		    "_rdc_read: removing unsupported NSC_NOBLOCK flag");
+		    "!_rdc_read: removing unsupported NSC_NOBLOCK flag");
 		flag &= ~(NSC_NOBLOCK);
 	}
 
@@ -1919,10 +1917,10 @@ _rdc_remote_write(rdc_k_info_t *krdc, rdc_buf_t *h, nsc_buf_t *nsc_h,
 				syncblockpos = LOG_TO_FBA_NUM(krdc->syncbitpos);
 
 				DTRACE_PROBE4(rdc_remote_write,
-					nsc_off_t, krdc->syncbitpos,
-					nsc_off_t, syncblockpos,
-					nsc_off_t, pos,
-					nsc_size_t, len);
+				    nsc_off_t, krdc->syncbitpos,
+				    nsc_off_t, syncblockpos,
+				    nsc_off_t, pos,
+				    nsc_size_t, len);
 
 				/*
 				 * If the current I/O's position plus length is
@@ -1965,8 +1963,8 @@ _rdc_remote_write(rdc_k_info_t *krdc, rdc_buf_t *h, nsc_buf_t *nsc_h,
 			if (anon == NULL) {
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-				    "enqueue write failed for handle %p",
-					(void *) h);
+				    "!enqueue write failed for handle %p",
+				    (void *) h);
 #endif
 				return (EINVAL);
 			}
@@ -2021,9 +2019,9 @@ _rdc_multi_write(nsc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag,
 	retval = rc = 0;
 	if (!RDC_HANDLE_LIMITS(h, pos, len)) {
 		cmn_err(CE_WARN,
-	    "_rdc_multi_write: bounds check: io(handle) pos %" NSC_XSZFMT
-	    "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
-			pos, h->sb_pos, len, h->sb_len);
+		    "!_rdc_multi_write: bounds check: io(handle) pos %"
+		    NSC_XSZFMT "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%"
+		    NSC_XSZFMT ")", pos, h->sb_pos, len, h->sb_len);
 		return (EINVAL);
 	}
 
@@ -2051,7 +2049,7 @@ _rdc_multi_write(nsc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag,
 
 	if (flag & NSC_NOBLOCK) {
 		cmn_err(CE_WARN,
-		    "_rdc_multi_write: removing unsupported NSC_NOBLOCK flag");
+		    "!_rdc_multi_write: removing unsupported NSC_NOBLOCK flag");
 		flag &= ~(NSC_NOBLOCK);
 	}
 
@@ -2132,7 +2130,7 @@ _rdc_sync_write_thr(rdc_aio_t *p)
 #ifdef	DEBUG
 	urdc = &rdc_u_info[krdc->index];
 	if (!IS_ENABLED(urdc)) {
-		cmn_err(CE_WARN, "rdc_sync_write_thr: set not enabled %s:%s",
+		cmn_err(CE_WARN, "!rdc_sync_write_thr: set not enabled %s:%s",
 		    urdc->secondary.file,
 		    urdc->secondary.bitmap);
 	}
@@ -2140,7 +2138,7 @@ _rdc_sync_write_thr(rdc_aio_t *p)
 	rdc_group_exit(krdc);
 	bitmask = p->iostatus;	/* overload */
 	rc2 = _rdc_remote_write(krdc, h, &h->rdc_bufh, p->pos, p->len,
-		p->flag, bitmask);
+	    p->flag, bitmask);
 
 
 	/*
@@ -2236,9 +2234,9 @@ _rdc_write(rdc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 	nthr = 0;
 	if (!RDC_HANDLE_LIMITS(&h->rdc_bufh, pos, len)) {
 		cmn_err(CE_WARN,
-		"_rdc_write: bounds check: io(handle) pos %" NSC_XSZFMT
-		"(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
-			pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
+		    "!_rdc_write: bounds check: io(handle) pos %" NSC_XSZFMT
+		    "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
+		    pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
 		h->rdc_bufh.sb_error = EINVAL;
 		return (h->rdc_bufh.sb_error);
 	}
@@ -2249,9 +2247,10 @@ _rdc_write(rdc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 	do {
 		if (RDC_SET_BITMAP(krdc, pos, len, &bitmask) < 0) {
 			if (rdc_eio_nobmp) {
-			    (void) nsc_uncommit(h->rdc_bufp, pos, len, flag);
-			    /* set the error, but try the other sets */
-			    h->rdc_bufh.sb_error = EIO;
+				(void) nsc_uncommit
+				    (h->rdc_bufp, pos, len, flag);
+				/* set the error, but try the other sets */
+				h->rdc_bufh.sb_error = EIO;
 			}
 		}
 
@@ -2309,7 +2308,7 @@ write1:
 		if (p == NULL) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_alloc_buf  aio_buf allocation failed");
+			    "!rdc_alloc_buf  aio_buf allocation failed");
 #endif
 			goto localwrite;
 		}
@@ -2322,8 +2321,7 @@ write1:
 		if (!RDC_SUCCESS(rc1)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_alloc_buf NSC_ANON allocation failed"
-			    " rc %d",
+			    "!rdc_alloc_buf NSC_ANON allocation failed rc %d",
 			    rc1);
 #endif
 			mutex_exit(&h->aio_lock);
@@ -2343,14 +2341,14 @@ write1:
 		if (!RDC_SUCCESS(rc1)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "_rdc_write: nsc_copy failed rc=%d state %x",
+			    "!_rdc_write: nsc_copy failed rc=%d state %x",
 			    rc1, rdc_get_vflags(urdc));
 #endif
 			rc1 = nsc_free_buf(p->rdc_abufp);
 			rdc_aio_buf_del(h, krdc);
 			rdc_group_enter(krdc);
 			rdc_group_log(krdc, RDC_FLUSH|RDC_OTHERREMOTE,
-				"nsc_copy failure");
+			    "nsc_copy failure");
 			rdc_group_exit(krdc);
 		}
 		DTRACE_PROBE(rdc_write_async_end);
@@ -2365,7 +2363,7 @@ write1:
 
 			if (nthr >= SNDR_MAXTHREADS) {
 #ifdef DEBUG
-				cmn_err(CE_NOTE, "nthr overrun in _rdc_write");
+				cmn_err(CE_NOTE, "!nthr overrun in _rdc_write");
 #endif
 				thrrc = ENOEXEC;
 				goto localwrite;
@@ -2374,7 +2372,7 @@ write1:
 			anon = rdc_aio_buf_get(h, krdc->index);
 			if (anon == NULL) {
 #ifdef DEBUG
-				cmn_err(CE_WARN, "rdc_aio_buf_get failed for "
+				cmn_err(CE_WARN, "!rdc_aio_buf_get failed for "
 				    "%p", (void *)h);
 #endif
 				thrrc = ENOEXEC;
@@ -2388,7 +2386,7 @@ write1:
 
 			if (bp[nthr] == NULL) {
 #ifdef DEBUG
-				cmn_err(CE_NOTE, "_rdcwrite: "
+				cmn_err(CE_NOTE, "!_rdcwrite: "
 				    "kmem_alloc failed bp aio (1)");
 #endif
 				thrrc = ENOEXEC;
@@ -2396,12 +2394,12 @@ write1:
 			}
 			/* start the queue io */
 			tp = nst_create(_rdc_ioset, _rdc_diskq_enqueue_thr,
-				(void *)bp[nthr], NST_SLEEP);
+			    (void *)bp[nthr], NST_SLEEP);
 
 			if (tp == NULL) {
 #ifdef DEBUG
 				cmn_err(CE_NOTE,
-					"_rdcwrite: nst_create failure");
+				    "!_rdcwrite: nst_create failure");
 #endif
 				thrrc = ENOEXEC;
 			} else {
@@ -2433,9 +2431,7 @@ write1:
 	 */
 
 	if (IS_PRIMARY(urdc) && !IS_STATE(urdc, RDC_LOGGING) &&
-		!BUF_IS_ASYNC(h)) {
-
-
+	    !BUF_IS_ASYNC(h)) {
 		/*
 		 * if forward syncing, we must do local IO first
 		 * then remote io. Don't spawn thread
@@ -2455,7 +2451,7 @@ write1:
 		}
 		if (nthr >= SNDR_MAXTHREADS) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "nthr overrun in _rdc_write");
+			cmn_err(CE_NOTE, "!nthr overrun in _rdc_write");
 #endif
 			thrrc = ENOEXEC;
 			goto localwrite;
@@ -2465,18 +2461,14 @@ write1:
 		    flag, krdc->index, bitmask);
 
 		if (bp[nthr] == NULL) {
-#ifdef DEBUG
-			cmn_err(CE_NOTE, "_rdcwrite: kmem_alloc failed bp aio");
-#endif
 			thrrc = ENOEXEC;
 			goto localwrite;
 		}
 		tp = nst_create(_rdc_ioset, _rdc_sync_write_thr,
-			(void *)bp[nthr], NST_SLEEP);
+		    (void *)bp[nthr], NST_SLEEP);
 		if (tp == NULL) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE,
-				"_rdcwrite: nst_create failure");
+			cmn_err(CE_NOTE, "!_rdcwrite: nst_create failure");
 #endif
 			thrrc = ENOEXEC;
 		} else {
@@ -2584,8 +2576,7 @@ write2:
 			 * Get any error return from thread
 			 */
 			if ((remote || rsync) && bp[winddown]->flag) {
-				h->rdc_bufh.sb_error =
-					bp[winddown]->flag;
+				h->rdc_bufh.sb_error = bp[winddown]->flag;
 			}
 			if (bp[winddown])
 				kmem_free(bp[winddown], sizeof (rdc_aio_t));
@@ -2631,9 +2622,9 @@ _rdc_bzero(nsc_buf_t *h, nsc_off_t pos, nsc_size_t len)
 
 	if (!RDC_HANDLE_LIMITS(h, pos, len)) {
 		cmn_err(CE_WARN,
-		"_rdc_bzero: bounds check: io(handle) pos %" NSC_XSZFMT
-		"(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
-			pos, h->sb_pos, len, h->sb_len);
+		    "!_rdc_bzero: bounds check: io(handle) pos %" NSC_XSZFMT
+		    "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
+		    pos, h->sb_pos, len, h->sb_len);
 		return;
 	}
 
@@ -2742,9 +2733,9 @@ _rdc_zero(rdc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 
 	if (!RDC_HANDLE_LIMITS(&h->rdc_bufh, pos, len)) {
 		cmn_err(CE_WARN,
-		    "_rdc_zero: bounds check: io(handle) pos %" NSC_XSZFMT
+		    "!_rdc_zero: bounds check: io(handle) pos %" NSC_XSZFMT
 		    "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
-			pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
+		    pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
 		h->rdc_bufh.sb_error = EINVAL;
 		return (h->rdc_bufh.sb_error);
 	}
@@ -2781,7 +2772,7 @@ zero1:
 		if (p == NULL) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_alloc_buf  aio_buf allocation failed");
+			    "!rdc_alloc_buf  aio_buf allocation failed");
 #endif
 			goto localzero;
 		}
@@ -2790,7 +2781,7 @@ zero1:
 		if (!RDC_SUCCESS(rc1)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_alloc_buf NSC_ANON allocation failed rc %d",
+			    "!rdc_alloc_buf NSC_ANON allocation failed rc %d",
 			    rc1);
 #endif
 			mutex_exit(&h->aio_lock);
@@ -2807,14 +2798,14 @@ zero1:
 		if (!RDC_SUCCESS(rc1)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "_rdc_zero: nsc_zero failed rc=%d state %x",
+			    "!_rdc_zero: nsc_zero failed rc=%d state %x",
 			    rc1, rdc_get_vflags(urdc));
 #endif
 			rc1 = nsc_free_buf(p->rdc_abufp);
 			rdc_aio_buf_del(h, krdc);
 			rdc_group_enter(krdc);
 			rdc_group_log(krdc, RDC_FLUSH | RDC_OTHERREMOTE,
-				"nsc_zero failed");
+			    "nsc_zero failed");
 			rdc_group_exit(krdc);
 		}
 	}	/* end of async */
@@ -2823,7 +2814,7 @@ localzero:
 
 	if (flag & NSC_NOBLOCK) {
 		cmn_err(CE_WARN,
-		    "_rdc_zero: removing unsupported NSC_NOBLOCK flag");
+		    "!_rdc_zero: removing unsupported NSC_NOBLOCK flag");
 		flag &= ~(NSC_NOBLOCK);
 	}
 
@@ -2936,16 +2927,16 @@ _rdc_uncommit(rdc_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 
 	if (!RDC_HANDLE_LIMITS(&h->rdc_bufh, pos, len)) {
 		cmn_err(CE_WARN,
-		"_rdc_uncommit: bounds check: io(handle) pos %" NSC_XSZFMT
-		"(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
-			pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
+		    "!_rdc_uncommit: bounds check: io(handle) pos %" NSC_XSZFMT
+		    "(%" NSC_XSZFMT ") len %" NSC_XSZFMT "(%" NSC_XSZFMT ")",
+		    pos, h->rdc_bufh.sb_pos, len, h->rdc_bufh.sb_len);
 		h->rdc_bufh.sb_error = EINVAL;
 		return (h->rdc_bufh.sb_error);
 	}
 
 	if (flag & NSC_NOBLOCK) {
 		cmn_err(CE_WARN,
-		    "_rdc_uncommit: removing unsupported NSC_NOBLOCK flag");
+		    "!_rdc_uncommit: removing unsupported NSC_NOBLOCK flag");
 		flag &= ~(NSC_NOBLOCK);
 	}
 

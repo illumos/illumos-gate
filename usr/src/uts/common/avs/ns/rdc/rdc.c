@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,8 +183,6 @@ int rdc_auto_sync;
 int rdc_max_sets;
 extern int rdc_health_thres;
 
-static const char rdc_built[] = "@(#) rdc: built " __TIME__ " " __DATE__;
-
 kmutex_t rdc_sync_mutex;
 rdc_sync_event_t rdc_sync_event;
 clock_t rdc_sync_event_timeout;
@@ -244,8 +242,6 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
-	cmn_err(CE_CONT, "!%s\n", rdc_built);
-
 	(void) strncpy(sndr_version, _VERSION_, sizeof (sndr_version));
 
 	instance = ddi_get_instance(dip);
@@ -263,25 +259,25 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "rdc_max_sets", 64);
 
 	if (_rdc_init_dev()) {
-		cmn_err(CE_WARN, "rdc: _rdc_init_dev failed");
+		cmn_err(CE_WARN, "!rdc: _rdc_init_dev failed");
 		goto out;
 	}
 	flags |= DIDINIT;
 
 	if (_rdc_load() != 0) {
-		cmn_err(CE_WARN, "rdc: _rdc_load failed");
+		cmn_err(CE_WARN, "!rdc: _rdc_load failed");
 		goto out;
 	}
 
 	if (_rdc_configure()) {
-		cmn_err(CE_WARN, "rdc: _rdc_configure failed");
+		cmn_err(CE_WARN, "!rdc: _rdc_configure failed");
 		goto out;
 	}
 	flags |= DIDCONFIG;
 
 	if (ddi_create_minor_node(dip, "rdc", S_IFCHR, instance, DDI_PSEUDO, 0)
-		    != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "rdc: could not create node.");
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "!rdc: could not create node.");
 		goto out;
 	}
 	flags |= DIDNODES;
@@ -296,14 +292,14 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case RDC_BMP_ALWAYS:		/* 1 */
 		break;
 	case RDC_BMP_NEVER:		/* 2 */
-		cmn_err(CE_NOTE, "SNDR bitmap mode override");
+		cmn_err(CE_NOTE, "!SNDR bitmap mode override");
 		cmn_err(CE_CONT,
-			"SNDR: bitmaps will only be written on shutdown\n");
+		    "!SNDR: bitmaps will only be written on shutdown\n");
 		break;
 	default:			/* unknown */
 		cmn_err(CE_NOTE,
-			"SNDR: unknown bitmap mode %d - autodetecting mode",
-			rdc_bitmap_mode);
+		    "!SNDR: unknown bitmap mode %d - autodetecting mode",
+		    rdc_bitmap_mode);
 		rdc_bitmap_mode = RDC_BMP_AUTO;
 		break;
 	}
@@ -320,7 +316,7 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (i >= RDC_MIN_HEALTH_THRES)
 		rdc_health_thres = i;
 	else
-		cmn_err(CE_WARN, "value rdc_heath_thres from rdc.conf ignored "
+		cmn_err(CE_WARN, "!value rdc_heath_thres from rdc.conf ignored "
 		    "as it is smaller than the min value of %d",
 		    RDC_MIN_HEALTH_THRES);
 
@@ -338,7 +334,7 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sndr_kstats->ks_private = &rdc_k_info[0];
 		kstat_install(sndr_kstats);
 	} else
-			cmn_err(CE_WARN, "SNDR: module kstats failed");
+			cmn_err(CE_WARN, "!SNDR: module kstats failed");
 
 	return (DDI_SUCCESS);
 
@@ -461,7 +457,7 @@ rdcprint(dev_t dev, char *str)
 {
 	int instance = 0;
 
-	cmn_err(CE_WARN, "rdc%d: %s", instance, str);
+	cmn_err(CE_WARN, "!rdc%d: %s", instance, str);
 	return (0);
 }
 
@@ -549,7 +545,7 @@ rdc_status_copy32(const void *arg, void *usetp, size_t size, int mode)
 	bzero(&set32, sizeof (set32));
 
 	tailsize = sizeof (struct rdc_addr32) -
-		offsetof(struct rdc_addr32, intf);
+	    offsetof(struct rdc_addr32, intf);
 
 	/* primary address structure, avoiding netbuf */
 	bcopy(&urdc->primary.intf[0], &set32.primary.intf[0], tailsize);
@@ -568,7 +564,7 @@ rdc_status_copy32(const void *arg, void *usetp, size_t size, int mode)
 	 * for ASSERT, put them under debug to avoid lint warning.
 	 */
 	tailsize32 = sizeof (struct rdc_set32) -
-		offsetof(struct rdc_set32, flags);
+	    offsetof(struct rdc_set32, flags);
 	ASSERT(tailsize == tailsize32);
 #endif
 
@@ -823,7 +819,7 @@ rdcioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *crp, int *rvp)
 			STRUCT_FSET(parms, baseline, sndr_baseline_rev);
 
 			if (ddi_copyout(STRUCT_BUF(parms), (void *)args.arg0,
-				STRUCT_SIZE(parms), mode)) {
+			    STRUCT_SIZE(parms), mode)) {
 				spcs_s_kfree(kstatus);
 				return (EFAULT);
 			}
@@ -943,24 +939,24 @@ rdc_info_stats_update(kstat_t *ksp, int rw)
 	    urdc->maxqitems;
 
 	kstat_named_setstr(&rdc_info_stats->s_primary_vol,
-			urdc->primary.file);
+	    urdc->primary.file);
 
 	kstat_named_setstr(&rdc_info_stats->s_secondary_vol,
-			urdc->secondary.file);
+	    urdc->secondary.file);
 
 	if (rdc_get_vflags(urdc) & RDC_PRIMARY) {
 		kstat_named_setstr(&rdc_info_stats->s_bitmap,
-				urdc->primary.bitmap);
+		    urdc->primary.bitmap);
 	} else {
 		kstat_named_setstr(&rdc_info_stats->s_bitmap,
-				urdc->secondary.bitmap);
+		    urdc->secondary.bitmap);
 	}
 
 	kstat_named_setstr(&rdc_info_stats->s_primary_intf,
-			urdc->primary.intf);
+	    urdc->primary.intf);
 
 	kstat_named_setstr(&rdc_info_stats->s_secondary_intf,
-			urdc->secondary.intf);
+	    urdc->secondary.intf);
 
 	rdc_info_stats->s_type_flag.value.ul = krdc->type_flag;
 	rdc_info_stats->s_bitmap_size.value.ul = krdc->bitmap_size;
@@ -977,24 +973,24 @@ rdc_info_stats_update(kstat_t *ksp, int rw)
 	if (RDC_IS_MEMQ(krdc->group)) {
 		(void) strcpy(rdc_info_stats->s_aqueue_type.value.c, "memory");
 		rdc_info_stats->s_aqueue_blk_hwm.value.ul =
-			krdc->group->ra_queue.blocks_hwm;
+		    krdc->group->ra_queue.blocks_hwm;
 		rdc_info_stats->s_aqueue_itm_hwm.value.ul =
-			krdc->group->ra_queue.nitems_hwm;
+		    krdc->group->ra_queue.nitems_hwm;
 		rdc_info_stats->s_aqueue_throttle.value.ul =
-			krdc->group->ra_queue.throttle_delay;
+		    krdc->group->ra_queue.throttle_delay;
 		rdc_info_stats->s_aqueue_items.value.ul =
-			krdc->group->ra_queue.nitems;
+		    krdc->group->ra_queue.nitems;
 		rdc_info_stats->s_aqueue_blocks.value.ul =
-			krdc->group->ra_queue.blocks;
+		    krdc->group->ra_queue.blocks;
 
 	} else if (RDC_IS_DISKQ(krdc->group)) {
 		disk_queue *q = &krdc->group->diskq;
 		rdc_info_stats->s_aqueue_blk_hwm.value.ul =
-			krdc->group->diskq.blocks_hwm;
+		    krdc->group->diskq.blocks_hwm;
 		rdc_info_stats->s_aqueue_itm_hwm.value.ul =
-			krdc->group->diskq.nitems_hwm;
+		    krdc->group->diskq.nitems_hwm;
 		rdc_info_stats->s_aqueue_throttle.value.ul =
-			krdc->group->diskq.throttle_delay;
+		    krdc->group->diskq.throttle_delay;
 		rdc_info_stats->s_aqueue_items.value.ul = QNITEMS(q);
 		rdc_info_stats->s_aqueue_blocks.value.ul = QBLOCKS(q);
 		(void) strcpy(rdc_info_stats->s_aqueue_type.value.c, "disk");
@@ -1018,15 +1014,15 @@ rdc_kstat_create(int index)
 		    KSTAT_FLAG_VIRTUAL);
 #ifdef DEBUG
 		if (!krdc->set_kstats)
-			cmn_err(CE_NOTE, "krdc:u_kstat null");
+			cmn_err(CE_NOTE, "!krdc:u_kstat null");
 #endif
 
 		if (krdc->set_kstats) {
 			/* calculate exact size of KSTAT_DATA_STRINGs */
 			varsize = strlen(urdc->primary.file) + 1
-				+ strlen(urdc->secondary.file) + 1
-				+ strlen(urdc->primary.intf) + 1
-				+ strlen(urdc->secondary.intf) + 1;
+			    + strlen(urdc->secondary.file) + 1
+			    + strlen(urdc->primary.intf) + 1
+			    + strlen(urdc->secondary.intf) + 1;
 			if (rdc_get_vflags(urdc) & RDC_PRIMARY) {
 				varsize += strlen(urdc->primary.bitmap) + 1;
 			} else {
@@ -1039,17 +1035,17 @@ rdc_kstat_create(int index)
 			krdc->set_kstats->ks_private = &rdc_k_info[j];
 			kstat_install(krdc->set_kstats);
 		} else
-			cmn_err(CE_WARN, "SNDR: k-kstats failed");
+			cmn_err(CE_WARN, "!SNDR: k-kstats failed");
 	}
 
 	krdc->io_kstats = kstat_create(RDC_KSTAT_MODULE, j, NULL,
-				"disk", KSTAT_TYPE_IO, 1, 0);
+	    "disk", KSTAT_TYPE_IO, 1, 0);
 	if (krdc->io_kstats) {
 		krdc->io_kstats->ks_lock = &krdc->kstat_mutex;
 		kstat_install(krdc->io_kstats);
 	}
 	krdc->bmp_kstats = kstat_create("sndrbmp", j, NULL,
-				"disk", KSTAT_TYPE_IO, 1, 0);
+	    "disk", KSTAT_TYPE_IO, 1, 0);
 	if (krdc->bmp_kstats) {
 		krdc->bmp_kstats->ks_lock = &krdc->bmp_kstat_mutex;
 		kstat_install(krdc->bmp_kstats);
@@ -1099,7 +1095,7 @@ rdc_clrkstat(void *arg)
 		return (EINVAL);
 	}
 	krdc->io_kstats = kstat_create(RDC_KSTAT_MODULE, index, NULL,
-				"disk", KSTAT_TYPE_IO, 1, 0);
+	    "disk", KSTAT_TYPE_IO, 1, 0);
 	if (krdc->io_kstats) {
 		krdc->io_kstats->ks_lock = &krdc->kstat_mutex;
 		kstat_install(krdc->io_kstats);

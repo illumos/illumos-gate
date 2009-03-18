@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,7 +158,6 @@ static int _ii_ll_add(_ii_info_t *, kmutex_t *, _ii_lsthead_t **, char *,
     char **);
 static int _ii_ll_remove(_ii_info_t *, kmutex_t *, _ii_lsthead_t **, char **);
 #define	_ii_unlock_chunk(ip, chunk)	_ii_unlock_chunks(ip, chunk, 1)
-char ii_built[] = "@(#) ii: built " __TIME__ " " __DATE__;
 extern const int dsw_major_rev;
 extern const int dsw_minor_rev;
 extern const int dsw_micro_rev;
@@ -232,16 +231,16 @@ _ii_init_dev()
 	_ii_io = nsc_register_io("ii", NSC_II_ID|NSC_REFCNT|NSC_FILTER,
 	    _ii_io_def);
 	if (_ii_io == NULL)
-		cmn_err(CE_WARN, "ii: nsc_register_io failed.");
+		cmn_err(CE_WARN, "!ii: nsc_register_io failed.");
 
 	_ii_ior = nsc_register_io("ii-raw", NSC_IIR_ID|NSC_REFCNT|NSC_FILTER,
 	    _ii_ior_def);
 	if (_ii_ior == NULL)
-		cmn_err(CE_WARN, "ii: nsc_register_io r failed.");
+		cmn_err(CE_WARN, "!ii: nsc_register_io r failed.");
 
 	_ii_local_mem = nsc_register_mem("ii:kmem", NSC_MEM_LOCAL, 0);
 	if (_ii_local_mem == NULL)
-		cmn_err(CE_WARN, "ii: nsc_register_mem failed.");
+		cmn_err(CE_WARN, "!ii: nsc_register_mem failed.");
 
 
 	if (!_ii_io || !_ii_ior || !_ii_local_mem) {
@@ -254,9 +253,6 @@ _ii_init_dev()
 	mutex_init(&_ii_config_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&_ii_cluster_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&_ii_group_mutex, NULL, MUTEX_DRIVER, NULL);
-
-	if (ii_debug > 0)
-		cmn_err(CE_NOTE, ii_built);
 
 	ii_volume_update = nsc_register_svc("RDCVolumeUpdated", 0);
 	ii_report_luns = nsc_register_svc("IIReportLuns", 0);
@@ -409,7 +405,7 @@ int devs;
 
 	ASSERT(ip->bi_head != (_ii_info_t *)0xdeadbeef);
 	if (!ip) {
-		cmn_err(CE_WARN, "ii: _ii_rlse_devs null ip");
+		cmn_err(CE_WARN, "!ii: _ii_rlse_devs null ip");
 		return;
 	}
 
@@ -461,14 +457,12 @@ _ii_rsrv_d(int raw, _ii_info_dev_t *rid, _ii_info_dev_t *cid, int flag,
 	 * until the release has been done.
 	 */
 	if (RSRV(rid) && (flag == II_EXTERNAL) &&
-			(raw == 0) && (rid->bi_flag != II_EXTERNAL)) {
+	    (raw == 0) && (rid->bi_flag != II_EXTERNAL)) {
 		ip->bi_release++;
 		while (RSRV(rid)) {
-			DTRACE_PROBE1(_ii_rsrv_d_wait,
-				_ii_info_dev_t *, rid);
+			DTRACE_PROBE1(_ii_rsrv_d_wait, _ii_info_dev_t *, rid);
 			cv_wait(&ip->bi_releasecv, &ip->bi_rsrvmutex);
-			DTRACE_PROBE1(_ii_rsrv_d_resume,
-				_ii_info_dev_t *, rid);
+			DTRACE_PROBE1(_ii_rsrv_d_resume, _ii_info_dev_t *, rid);
 		}
 		ip->bi_release--;
 	}
@@ -527,7 +521,7 @@ _ii_rsrv_devs(_ii_info_t *ip, int devs, int flag)
 	ASSERT(!(devs & (MST|SHD)));
 
 	if (!ip) {
-		cmn_err(CE_WARN, "ii: _ii_rsrv_devs null ip");
+		cmn_err(CE_WARN, "!ii: _ii_rsrv_devs null ip");
 		return (EINVAL);
 	}
 
@@ -536,21 +530,21 @@ _ii_rsrv_devs(_ii_info_t *ip, int devs, int flag)
 	DTRACE_PROBE(_ii_rsrv_devs_mutex);
 
 	if (rc == 0 && (devs&(MST|MSTR)) != 0 &&
-			(ip->bi_flags&DSW_SHDIMPORT) == 0) {
+	    (ip->bi_flags&DSW_SHDIMPORT) == 0) {
 		DTRACE_PROBE(_ii_rsrv_devs_master);
 		if (NSHADOWS(ip) && ip != ip->bi_master) {
 			if ((rc = _ii_rsrv_devs(ip->bi_master, devs&(MST|MSTR),
-						flag)) != 0) {
+			    flag)) != 0) {
 				cmn_err(CE_WARN,
-					"ii: nsc_reserve multi-master failed");
+				    "!ii: nsc_reserve multi-master failed");
 			} else {
 				got |= devs&(MST|MSTR);
 			}
 		} else {
 			if ((rc = _ii_rsrv_d((devs&MSTR) != 0, ip->bi_mstrdev,
-					ip->bi_mstdev, flag, ip)) != 0) {
+			    ip->bi_mstdev, flag, ip)) != 0) {
 				cmn_err(CE_WARN,
-				    "ii: nsc_reserve master failed %d", rc);
+				    "!ii: nsc_reserve master failed %d", rc);
 			} else {
 				got |= (devs&(MST|MSTR));
 			}
@@ -558,12 +552,12 @@ _ii_rsrv_devs(_ii_info_t *ip, int devs, int flag)
 	}
 
 	if (rc == 0 && (devs&(SHD|SHDR)) != 0 &&
-				(ip->bi_flags&DSW_SHDEXPORT) == 0) {
+	    (ip->bi_flags&DSW_SHDEXPORT) == 0) {
 		DTRACE_PROBE(_ii_rsrv_devs_shadow);
 		if ((rc = _ii_rsrv_d((devs&SHDR) != 0, &ip->bi_shdrdev,
-					&ip->bi_shddev, flag, ip)) != 0) {
-				cmn_err(CE_WARN,
-				    "ii: nsc_reserve shadow failed %d", rc);
+		    &ip->bi_shddev, flag, ip)) != 0) {
+			cmn_err(CE_WARN,
+			    "!ii: nsc_reserve shadow failed %d", rc);
 		} else {
 			got |= (devs&(SHD|SHDR));
 		}
@@ -572,9 +566,9 @@ _ii_rsrv_devs(_ii_info_t *ip, int devs, int flag)
 	if (rc == 0 && (devs&BMP) != 0 && ip->bi_bmpfd) {
 		DTRACE_PROBE(_ii_rsrv_devs_bitmap);
 		if ((ip->bi_bmprsrv == 0) &&
-			(rc = nsc_reserve(ip->bi_bmpfd, 0)) != 0) {
-				cmn_err(CE_WARN,
-				    "ii: nsc_reserve bitmap failed %d", rc);
+		    (rc = nsc_reserve(ip->bi_bmpfd, 0)) != 0) {
+			cmn_err(CE_WARN,
+			    "!ii: nsc_reserve bitmap failed %d", rc);
 		} else {
 			(ip->bi_bmprsrv)++;
 			got |= BMP;
@@ -652,9 +646,8 @@ ii_fill_copy_bmp(_ii_info_t *ip)
 	if ((max_chunk & 0x7) != 0)
 		max_chunk = (max_chunk + 7) & ~7;
 
-	DTRACE_PROBE2(_ii_fill_copy_bmp_chunks,
-			chunkid_t, chunk_num,
-			chunkid_t, max_chunk);
+	DTRACE_PROBE2(_ii_fill_copy_bmp_chunks, chunkid_t, chunk_num,
+	    chunkid_t, max_chunk);
 
 	for (; chunk_num < max_chunk; chunk_num++) {
 		(void) II_CLR_COPY_BIT(ip, chunk_num);
@@ -672,7 +665,7 @@ ii_update_denied(_ii_info_t *ip, spcs_s_info_t kstatus,
 	unsigned char *bmp;
 
 	update.volume = direction == CV_SHD2MST ? ii_pathname(MSTFD(ip)) :
-					ip->bi_keyname;
+	    ip->bi_keyname;
 	update.denied = 0;
 	update.protocol = RDC_SVC_ONRETURN;
 	update.size = size = FBA_SIZE(DSW_BM_FBA_LEN(ip->bi_size));
@@ -683,9 +676,7 @@ ii_update_denied(_ii_info_t *ip, spcs_s_info_t kstatus,
 		return (1);
 	}
 
-	DTRACE_PROBE2(_ii_update_denied,
-			int, all,
-			int, size);
+	DTRACE_PROBE2(_ii_update_denied, int, all, int, size);
 
 	if (all) {
 		while (size-- > 0)
@@ -767,8 +758,7 @@ ii_volume(char *vol, int locked)
 			break;
 		}
 	}
-	DTRACE_PROBE1(_ii_volume_data,
-			int, rc);
+	DTRACE_PROBE1(_ii_volume_data, int, rc);
 
 	if (!locked) {
 		mutex_exit(&_ii_info_mutex);
@@ -902,7 +892,7 @@ _ii_kstat_create(_ii_info_t *ip, char *type)
 		nptr = ip->bi_kstat_io.bmpio;
 		break;
 	default:
-		cmn_err(CE_WARN, "Unable to determine kstat type (%c)", *type);
+		cmn_err(CE_WARN, "!Unable to determine kstat type (%c)", *type);
 		setnum = -1;
 		break;
 	}
@@ -926,7 +916,7 @@ _ii_kstat_create(_ii_info_t *ip, char *type)
 		result->ks_lock = &ip->bi_kstat_io.statmutex;
 		kstat_install(result);
 	} else {
-		cmn_err(CE_WARN, "Unable to create %s kstats for set %s", type,
+		cmn_err(CE_WARN, "!Unable to create %s kstats for set %s", type,
 		    ip->bi_keyname);
 	}
 
@@ -967,7 +957,7 @@ _ii_overflow_kstat_create(_ii_info_t *ip, _ii_overflow_t *op)
 		kstat_install(result);
 	} else {
 		mutex_destroy(&op->ii_kstat_mutex);
-		cmn_err(CE_WARN, "Unabled to create overflow kstat for set "
+		cmn_err(CE_WARN, "!Unabled to create overflow kstat for set "
 		    "%s", ip->bi_keyname);
 	}
 
@@ -1016,7 +1006,7 @@ ii_str_kstat_copy(char *str, char *p1, char *p2, char *p3, char *p4)
 		 */
 		if (!whinged) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "May not have enough room "
+			cmn_err(CE_WARN, "!May not have enough room "
 			    "to store volume name in kstats");
 #endif
 			whinged = 1;
@@ -1177,10 +1167,8 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 	} else if (copyin((void *)arg, &uconf, sizeof (uconf)) < 0)
 		return (EFAULT);
 
-	DTRACE_PROBE3(_ii_config_info,
-			char *, uconf.master_vol,
-			char *, uconf.shadow_vol,
-			char *, uconf.bitmap_vol);
+	DTRACE_PROBE3(_ii_config_info, char *, uconf.master_vol,
+	    char *, uconf.shadow_vol, char *, uconf.bitmap_vol);
 
 	kstatus = spcs_s_kcreate();
 	if (kstatus == NULL)
@@ -1200,9 +1188,9 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 		return (spcs_s_ocopyoutf(&kstatus, uconf.status, ENOMEM));
 	}
 	ip->bi_mstdev = nsc_kmem_zalloc(sizeof (*ip->bi_mstdev), KM_SLEEP,
-					_ii_local_mem);
+	    _ii_local_mem);
 	ip->bi_mstrdev = nsc_kmem_zalloc(sizeof (*ip->bi_mstdev), KM_SLEEP,
-					_ii_local_mem);
+	    _ii_local_mem);
 	if (ip->bi_mstdev == NULL || ip->bi_mstrdev == NULL) {
 		mutex_exit(&_ii_config_mutex);
 		_ii_info_free(ip);
@@ -1292,7 +1280,7 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 		if (bm_header == NULL) {
 			if (ii_debug > 0)
 				cmn_err(CE_WARN,
-				    "ii: _ii_bm_header_get returned NULL");
+				    "!ii: _ii_bm_header_get returned NULL");
 			mutex_exit(&_ii_config_mutex);
 			_ii_info_free(ip);
 			return (spcs_s_ocopyoutf(&kstatus, uconf.status,
@@ -1333,7 +1321,7 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 		}
 		/* restore latest modification time, if header version >= 5 */
 		if (bm_header->ii_version >= 5) {
-		    ip->bi_mtime = bm_header->ii_mtime;
+			ip->bi_mtime = bm_header->ii_mtime;
 		}
 
 		/* Fetch master and shadow names from bitmap header */
@@ -1372,12 +1360,10 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 		}
 
 		if (strncmp(bm_header->bitmap_vol, uconf.bitmap_vol,
-							DSW_NAMELEN) ||
-		    ((!(ip->bi_flags&DSW_SHDIMPORT)) &&
-			strncmp(bm_header->master_vol, uconf.master_vol,
-							DSW_NAMELEN)) ||
-		    strncmp(bm_header->shadow_vol, uconf.shadow_vol,
-							DSW_NAMELEN)) {
+		    DSW_NAMELEN) || ((!(ip->bi_flags&DSW_SHDIMPORT)) &&
+		    strncmp(bm_header->master_vol, uconf.master_vol,
+		    DSW_NAMELEN)) || strncmp(bm_header->shadow_vol,
+		    uconf.shadow_vol, DSW_NAMELEN)) {
 			mutex_exit(&_ii_config_mutex);
 			_ii_bm_header_free(bm_header, ip, tmp);
 			_ii_rlse_devs(ip, BMP);
@@ -1390,7 +1376,7 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 		if ((ip->bi_flags)&DSW_TREEMAP) {
 			if (ii_debug > 0)
 				cmn_err(CE_NOTE,
-					"II: Resuming short shadow volume");
+				    "!II: Resuming short shadow volume");
 
 			ip->bi_mstchks = bm_header->ii_mstchks;
 			ip->bi_shdchks = bm_header->ii_shdchks;
@@ -1399,7 +1385,7 @@ _ii_config(intptr_t arg, int ilp32, int *rvp, int iflags)
 
 			if (bm_header->overflow_vol[0] != 0)
 				if ((rc = ii_overflow_attach(ip,
-					bm_header->overflow_vol, 0)) != 0) {
+				    bm_header->overflow_vol, 0)) != 0) {
 					mutex_exit(&_ii_config_mutex);
 					_ii_bm_header_free(bm_header, ip, tmp);
 					_ii_rlse_devs(ip, BMP);
@@ -1460,7 +1446,7 @@ header_checked:
 	switch (ii_bitmap) {
 	case II_KMEM:
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: using volatile bitmaps");
+			cmn_err(CE_NOTE, "!ii: using volatile bitmaps");
 		ip->bi_bitmap_ops = &kmem_buf_bmp;
 		break;
 	case II_FWC:
@@ -1471,15 +1457,15 @@ header_checked:
 		else
 			ip->bi_bitmap_ops = &alloc_buf_bmp;
 		if (ii_debug > 0) {
-			cmn_err(CE_NOTE, "ii: chosen to use %s bitmaps",
-				ip->bi_bitmap_ops == &kmem_buf_bmp ?
-					"volatile" : "persistent");
+			cmn_err(CE_NOTE, "!ii: chosen to use %s bitmaps",
+			    ip->bi_bitmap_ops == &kmem_buf_bmp ?
+			    "volatile" : "persistent");
 		}
 		break;
 	case II_WTHRU:
 	default:
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: using persistent bitmaps");
+			cmn_err(CE_NOTE, "!ii: using persistent bitmaps");
 		ip->bi_bitmap_ops = &alloc_buf_bmp;
 		break;
 	}
@@ -1574,7 +1560,7 @@ header_checked:
 			_ii_info_free(ip);
 			spcs_s_add(kstatus, rc);
 			return (spcs_s_ocopyoutf(&kstatus, uconf.status,
-							DSW_EOPEN));
+			    DSW_EOPEN));
 		}
 	}
 
@@ -1602,7 +1588,7 @@ header_checked:
 			ii_nconcopy = 2;
 		ASSERT(ii_nconcopy > 0);
 		sema_init(&_ii_concopy_sema, ii_nconcopy, NULL,
-					SEMA_DRIVER, NULL);
+		    SEMA_DRIVER, NULL);
 		_ii_concopy_init = 1;
 	}
 
@@ -1624,7 +1610,7 @@ header_checked:
 			mutex_exit(&_ii_config_mutex);
 			_ii_info_free(ip);
 			return (spcs_s_ocopyoutf(&kstatus, uconf.status,
-								DSW_EOFFLINE));
+			    DSW_EOFFLINE));
 		}
 	}
 
@@ -1637,7 +1623,7 @@ header_checked:
 			_ii_info_free(ip);
 			spcs_s_add(kstatus, rc);
 			return (spcs_s_ocopyoutf(&kstatus, uconf.status,
-						DSW_EOPEN));
+			    DSW_EOPEN));
 		}
 
 		ip->bi_mstrfd = nsc_open(uconf.master_vol,
@@ -1648,7 +1634,7 @@ header_checked:
 			_ii_info_free(ip);
 			spcs_s_add(kstatus, rc);
 			return (spcs_s_ocopyoutf(&kstatus, uconf.status,
-						DSW_EOPEN));
+			    DSW_EOPEN));
 		}
 	}
 
@@ -1662,8 +1648,8 @@ header_checked:
 		/* link new shadow group together with others sharing master */
 		if (ii_debug > 0)
 			cmn_err(CE_NOTE,
-		    "II: shadow %s shares master %s with other shadow groups",
-		    uconf.shadow_vol, uconf.master_vol);
+			    "!II: shadow %s shares master %s with other shadow"
+			    " groups", uconf.shadow_vol, uconf.master_vol);
 		hip = hip->bi_head;
 		nsc_kmem_free(ip->bi_mstrdev, sizeof (*ip->bi_mstrdev));
 		nsc_kmem_free(ip->bi_mstdev, sizeof (*ip->bi_mstdev));
@@ -1697,7 +1683,7 @@ header_checked:
 		ip->bi_kstat->ks_private = ip;
 		kstat_install(ip->bi_kstat);
 	} else {
-		cmn_err(CE_WARN, "Unable to create set-specific kstats");
+		cmn_err(CE_WARN, "!Unable to create set-specific kstats");
 	}
 
 #ifndef DISABLE_KSTATS
@@ -1755,7 +1741,7 @@ header_checked:
 		 */
 		if (existing) {
 			bmp_size = 2 * DSW_BM_FBA_LEN(mst_size) +
-							DSW_SHD_BM_OFFSET;
+			    DSW_SHD_BM_OFFSET;
 			goto no_more_bmp_tests;
 		}
 		spcs_s_add(kstatus, rc);
@@ -1777,7 +1763,7 @@ header_checked:
 	 */
 	resized = (shd_size != mst_size);
 	if (resized && ii_need_same_size(ip)) {
-		cmn_err(CE_WARN, "Cannot enable II set: would change volume "
+		cmn_err(CE_WARN, "!Cannot enable II set: would change volume "
 		    "size on RDC");
 		rc = DSW_EOPACKAGE;
 		_ii_rlse_devs(ip, rtype);
@@ -1788,7 +1774,7 @@ header_checked:
 		/* bitmap volume too small */
 		if (ii_debug > 0)
 			cmn_err(CE_NOTE,
-			    "ii: invalid sizes: bmp %" NSC_SZFMT " mst %"
+			    "!ii: invalid sizes: bmp %" NSC_SZFMT " mst %"
 			    NSC_SZFMT " %" NSC_SZFMT "",
 			    bmp_size, mst_size, DSW_BM_FBA_LEN(mst_size));
 		rc = DSW_EBMPSIZE;
@@ -1799,7 +1785,7 @@ header_checked:
 	if ((shd_size < mst_size) && (uconf.flag&DSW_GOLDEN) != 0) {
 		/* shadow volume too small */
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "shd size too small (%" NSC_SZFMT
+			cmn_err(CE_NOTE, "!shd size too small (%" NSC_SZFMT
 			    ") for independent set's master (%" NSC_SZFMT ")",
 			    shd_size, mst_size);
 		rc = DSW_ESHDSIZE;
@@ -1809,7 +1795,7 @@ header_checked:
 	}
 
 	ip->bi_busy = kmem_zalloc(1 + (ip->bi_size / (DSW_SIZE * DSW_BITS)),
-						KM_SLEEP);
+	    KM_SLEEP);
 	if (!ip->bi_busy) {
 		rc = ENOMEM;
 		_ii_rlse_devs(ip, rtype);
@@ -1828,7 +1814,7 @@ header_checked:
 		if (bm_header == NULL) {
 			if (ii_debug > 0)
 				cmn_err(CE_WARN,
-				    "ii: _ii_bm_header_get returned NULL");
+				    "!ii: _ii_bm_header_get returned NULL");
 			rc = DSW_EHDRBMP;
 			_ii_rlse_devs(ip, rtype);
 			_ii_reserve_end(ip);
@@ -1837,15 +1823,15 @@ header_checked:
 		bzero(bm_header, sizeof (*bm_header));
 		/* copy pathnames into it */
 		(void) strncpy(bm_header->master_vol, uconf.master_vol,
-			DSW_NAMELEN);
+		    DSW_NAMELEN);
 		(void) strncpy(bm_header->shadow_vol, uconf.shadow_vol,
-			DSW_NAMELEN);
+		    DSW_NAMELEN);
 		(void) strncpy(bm_header->bitmap_vol, uconf.bitmap_vol,
-			DSW_NAMELEN);
+		    DSW_NAMELEN);
 		(void) strncpy(bm_header->clstr_name, uconf.cluster_tag,
-			DSW_NAMELEN);
+		    DSW_NAMELEN);
 		(void) strncpy(bm_header->group_name, uconf.group_name,
-			DSW_NAMELEN);
+		    DSW_NAMELEN);
 
 		if (uconf.cluster_tag[0] != 0)
 			(void) II_LINK_CLUSTER(ip, uconf.cluster_tag);
@@ -1899,8 +1885,8 @@ header_checked:
 			nsc_size_t tmp_chunks;
 
 			if (ii_debug > 1)
-				cmn_err(CE_NOTE, "ii: using tree index on %s",
-							uconf.master_vol);
+				cmn_err(CE_NOTE, "!ii: using tree index on %s",
+				    uconf.master_vol);
 			shd_chunks = shd_size / DSW_SIZE;
 			/* do not add in partial chunk at end */
 
@@ -1913,7 +1899,7 @@ header_checked:
 			    DSW_BM_FBA_LEN(ip->bi_size);
 			if (bmp_chunks < (nsc_size_t)ip->bi_mstchks) {
 				if (ii_debug > -1) {
-					cmn_err(CE_NOTE, "ii: bitmap volume too"
+					cmn_err(CE_NOTE, "!ii: bitmap vol too"
 					    "small: %" NSC_SZFMT " vs. %"
 					    NSC_SZFMT, bmp_size,
 					    tmp_chunks);
@@ -1987,7 +1973,7 @@ header_checked:
 		(void) _ii_rsrv_devs(ip, rtype, II_INTERNAL);
 
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: config: master %s shadow %s",
+			cmn_err(CE_NOTE, "!ii: config: master %s shadow %s",
 			    uconf.master_vol, uconf.shadow_vol);
 		rc = 0;
 		if ((uconf.flag & DSW_GOLDEN) && !import) {
@@ -2026,7 +2012,7 @@ header_checked:
 	 * then the bitmaps must be assumed to be bad.
 	 */
 	if (bm_header->ii_magic == DSW_DIRTY &&
-					ip->bi_bitmap_ops != &alloc_buf_bmp) {
+	    ip->bi_bitmap_ops != &alloc_buf_bmp) {
 		type = bm_header->ii_type;
 		_ii_bm_header_free(bm_header, ip, tmp);
 		if (type == DSW_GOLDEN_TYPE) {
@@ -2082,7 +2068,7 @@ no_more_bmp_tests:
 	_ii_reserve_end(ip);
 
 	if (ii_debug > 0)
-		cmn_err(CE_NOTE, "ii: config: master %s shadow %s",
+		cmn_err(CE_NOTE, "!ii: config: master %s shadow %s",
 		    uconf.master_vol, uconf.shadow_vol);
 
 	rc = 0;
@@ -2161,7 +2147,7 @@ _ii_perform_disable(char *setname, spcs_s_info_t *kstatusp, int reclaim)
 		mutex_exit(&_ii_info_mutex);
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
-		cmn_err(CE_WARN, "Cannot disable II set: would change "
+		cmn_err(CE_WARN, "!Cannot disable II set: would change "
 		    "volume size on RDC");
 		DTRACE_PROBE(DSW_EOPACKAGE_resize);
 		return (DSW_EOPACKAGE);
@@ -2198,7 +2184,7 @@ _ii_perform_disable(char *setname, spcs_s_info_t *kstatusp, int reclaim)
 		 */
 
 		if (ii_debug > 1)
-			cmn_err(CE_NOTE, "ii: Shadow copy invalidated");
+			cmn_err(CE_NOTE, "!ii: Shadow copy invalidated");
 		II_READ_START(ip, shadow);
 		rc = nsc_alloc_buf(SHDFD(ip), ii_header, 128 - ii_header,
 		    NSC_RDWRBUF, &tmp);
@@ -2240,7 +2226,7 @@ _ii_perform_disable(char *setname, spcs_s_info_t *kstatusp, int reclaim)
 		bm_header = _ii_bm_header_get(ip, &tmp);
 	if (rc == 0 && bm_header) {
 		if (ii_debug > 1)
-			cmn_err(CE_NOTE, "ii: Invalid header written");
+			cmn_err(CE_NOTE, "!ii: Invalid header written");
 		bm_header->ii_magic = DSW_INVALID;
 		/* write it to disk */
 		(void) _ii_bm_header_put(bm_header, ip, tmp);
@@ -2321,9 +2307,8 @@ _ii_disable(intptr_t arg, int ilp32, int *rvp)
 	if (!uparms.shadow_vol[0])
 		return (spcs_s_ocopyoutf(&kstatus, uparms.status, DSW_EEMPTY));
 
-	DTRACE_PROBE2(_ii_disable_info,
-			char *, uparms.shadow_vol,
-			int, uparms.flags);
+	DTRACE_PROBE2(_ii_disable_info, char *, uparms.shadow_vol,
+	    int, uparms.flags);
 
 	/* group or single set? */
 	if (uparms.flags & CV_IS_GROUP) {
@@ -2470,8 +2455,8 @@ _ii_stat(intptr_t arg, int ilp32, int *rvp)
 		bzero(ustat.overflow_vol, DSW_NAMELEN);
 	if (ip->bi_overflow) {
 		(void) strncpy(ilp32 ? ustat32.overflow_vol :
-			ustat.overflow_vol, ip->bi_overflow->ii_volname,
-			DSW_NAMELEN);
+		    ustat.overflow_vol, ip->bi_overflow->ii_volname,
+		    DSW_NAMELEN);
 	}
 
 	ustat.shdsize = ip->bi_shdchks;
@@ -2562,26 +2547,25 @@ _ii_list(intptr_t arg, int ilp32, int *rvp)
 			bzero(&cf32, sizeof (cf32));
 			cf32.flag = ip->bi_flags;
 			(void) strncpy(cf32.master_vol,
-				ii_pathname(ip->bi_mstfd), DSW_NAMELEN);
+			    ii_pathname(ip->bi_mstfd), DSW_NAMELEN);
 			(void) strncpy(cf32.shadow_vol,
-				ip->bi_keyname, DSW_NAMELEN);
+			    ip->bi_keyname, DSW_NAMELEN);
 			(void) strncpy(cf32.bitmap_vol, (ip->bi_bmpfd)
-				? ii_pathname(ip->bi_bmpfd)
-				: "<offline_bitmap>", DSW_NAMELEN);
-			if (copyout(&cf32, (void *)cf32p,
-							sizeof (cf32)))
+			    ? ii_pathname(ip->bi_bmpfd)
+			    : "<offline_bitmap>", DSW_NAMELEN);
+			if (copyout(&cf32, (void *)cf32p, sizeof (cf32)))
 				rc = EFAULT;
 			cf32p++;
 		} else {
 			bzero(&cf, sizeof (cf));
 			cf.flag = ip->bi_flags;
 			(void) strncpy(cf.master_vol,
-				ii_pathname(ip->bi_mstfd), DSW_NAMELEN);
+			    ii_pathname(ip->bi_mstfd), DSW_NAMELEN);
 			(void) strncpy(cf.shadow_vol,
-				ip->bi_keyname, DSW_NAMELEN);
+			    ip->bi_keyname, DSW_NAMELEN);
 			(void) strncpy(cf.bitmap_vol, (ip->bi_bmpfd)
-				? ii_pathname(ip->bi_bmpfd)
-				: "<offline_bitmap>", DSW_NAMELEN);
+			    ? ii_pathname(ip->bi_bmpfd)
+			    : "<offline_bitmap>", DSW_NAMELEN);
 			if (copyout(&cf, (void *)cfp, sizeof (cf)))
 				rc = EFAULT;
 			cfp++;
@@ -2727,7 +2711,7 @@ _ii_offline(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, uparms.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 
 	mutex_exit(&ip->bi_mutex);
@@ -2798,8 +2782,8 @@ _ii_wait(intptr_t arg, int ilp32, int *rvp)
 		if (ip->bi_locked_pid == 0) {
 			rc = DSW_ENOTLOCKED;
 		} else if (uparms.pid == -1) {
-			cmn_err(CE_WARN, "ii: Copy/Update PID %d, cleared",
-				ip->bi_locked_pid);
+			cmn_err(CE_WARN, "!ii: Copy/Update PID %d, cleared",
+			    ip->bi_locked_pid);
 			ip->bi_locked_pid = 0;
 		} else if (uparms.pid != ip->bi_locked_pid) {
 			rc = DSW_EINUSE;
@@ -2909,7 +2893,7 @@ _ii_reset(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, uparms.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 
 	/*
@@ -3057,7 +3041,7 @@ _ii_reset(intptr_t arg, int ilp32, int *rvp)
 
 	/* check with RDC */
 	if (ii_update_denied(ip, kstatus, (ip->bi_flags & DSW_COPYINGS) ?
-			CV_SHD2MST : 0, 1)) {
+	    CV_SHD2MST : 0, 1)) {
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		_ii_rlse_devs(ip, rtype);
@@ -3177,10 +3161,10 @@ _ii_copyparm(intptr_t arg, int ilp32, int *rvp)
 	tmp = ip->bi_throttle_delay;
 	if (copyp.copy_delay != -1) {
 		if (copyp.copy_delay >= MIN_THROTTLE_DELAY &&
-				copyp.copy_delay <= MAX_THROTTLE_DELAY)
+		    copyp.copy_delay <= MAX_THROTTLE_DELAY)
 			ip->bi_throttle_delay = copyp.copy_delay;
 		else {
-			cmn_err(CE_WARN, "ii: delay out of range %d",
+			cmn_err(CE_WARN, "!ii: delay out of range %d",
 			    copyp.copy_delay);
 			rc = EINVAL;
 		}
@@ -3194,7 +3178,7 @@ _ii_copyparm(intptr_t arg, int ilp32, int *rvp)
 			if (rc != EINVAL)
 				ip->bi_throttle_unit = copyp.copy_unit;
 		} else {
-			cmn_err(CE_WARN, "ii: unit out of range %d",
+			cmn_err(CE_WARN, "!ii: unit out of range %d",
 			    copyp.copy_unit);
 			if (rc != EINVAL) {
 				rc = EINVAL;
@@ -3576,15 +3560,15 @@ _ii_segment(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&_ii_info_mutex);
 		if (ip == NULL)
 			return (spcs_s_ocopyoutf(&kstatus, usegment.status,
-				DSW_ENOTFOUND));
+			    DSW_ENOTFOUND));
 	} else
 		return (spcs_s_ocopyoutf(&kstatus, usegment.status,
-			DSW_EEMPTY));
+		    DSW_EEMPTY));
 
 	mutex_exit(&ip->bi_mutex);
 
 	size = ((((ip->bi_size + (DSW_SIZE-1))
-		/ DSW_SIZE) + (DSW_BITS-1))) / DSW_BITS;
+	    / DSW_SIZE) + (DSW_BITS-1))) / DSW_BITS;
 	bi_idxfba = ip->bi_copyfba + (ip->bi_copyfba - ip->bi_shdfba);
 	if (((nsc_size_t)usegment.seg_number > DSW_BM_FBA_LEN(ip->bi_size)) ||
 	    (usegment.shd_size > size) ||
@@ -3592,7 +3576,7 @@ _ii_segment(intptr_t arg, int ilp32, int *rvp)
 	    (!(ip->bi_flags & DSW_GOLDEN) && (usegment.idx_size > size*32))) {
 		_ii_ioctl_done(ip);
 		return (spcs_s_ocopyoutf(&kstatus, usegment.status,
-			DSW_EMISMATCH));
+		    DSW_EMISMATCH));
 	}
 
 	if ((rc = _ii_rsrv_devs(ip, BMP, II_INTERNAL)) != 0) {
@@ -3601,19 +3585,19 @@ _ii_segment(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, usegment.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 
 	if (usegment.shd_bitmap && usegment.shd_size > 0)
 		rc = II_CO_BMP(ip, ip->bi_shdfba+usegment.seg_number,
-				usegment.shd_bitmap, usegment.shd_size);
+		    usegment.shd_bitmap, usegment.shd_size);
 	if (rc == 0 && usegment.cpy_bitmap && usegment.cpy_size > 0)
 		rc = II_CO_BMP(ip, ip->bi_copyfba+usegment.seg_number,
-				usegment.cpy_bitmap, usegment.cpy_size);
+		    usegment.cpy_bitmap, usegment.cpy_size);
 	if (!(ip->bi_flags & DSW_GOLDEN)) {
 		if (rc == 0 && usegment.idx_bitmap && usegment.idx_size > 0)
 			rc = II_CO_BMP(ip, bi_idxfba+usegment.seg_number*32,
-				usegment.idx_bitmap, usegment.idx_size);
+			    usegment.idx_bitmap, usegment.idx_size);
 	}
 
 	_ii_rlse_devs(ip, BMP);
@@ -3687,7 +3671,7 @@ _ii_bitmap(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 
 	if (ubitmap.shd_bitmap && ubitmap.shd_size > 0)
@@ -3763,7 +3747,7 @@ _ii_export(intptr_t arg, int ilp32, int *rvp)
 		 * the shadow is already in an exported state
 		 */
 		rc = ip->bi_flags & (DSW_SHDEXPORT|DSW_SHDIMPORT)
-			? DSW_EALREADY : DSW_EDEPENDENCY;
+		    ? DSW_EALREADY : DSW_EDEPENDENCY;
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		return (spcs_s_ocopyoutf(&kstatus, uparms.status, rc));
@@ -3773,7 +3757,7 @@ _ii_export(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, uparms.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 	II_FLAG_SET(DSW_SHDEXPORT, ip);
 
@@ -3910,18 +3894,17 @@ _ii_join(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 	rc = II_CI_BMP(ip, ip->bi_shdfba, ubitmap.shd_bitmap,
-		    ubitmap.shd_size);
+	    ubitmap.shd_size);
 	/* open up shadow */
 	if ((rc = ii_open_shadow(ip, ip->bi_keyname)) != 0) {
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		_ii_rlse_devs(ip, rtype);
-		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status,
-						DSW_EOPEN));
+		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status, DSW_EOPEN));
 	}
 	ii_register_shd(ip);
 	if (!rc)
@@ -4023,7 +4006,7 @@ _ii_ocreate(intptr_t arg, int ilp32, int *rvp)
 	op->ii_urefcnt = 0;
 	(void) strncpy(op->ii_volname, uioctl.shadow_vol, DSW_NAMELEN);
 	rc = _ii_nsc_io(0, KS_NA, fd, NSC_WRBUF, II_OHEADER_FBA,
-		(unsigned char *)&op->ii_do, sizeof (op->ii_do));
+	    (unsigned char *)&op->ii_do, sizeof (op->ii_do));
 	(void) nsc_release(fd);
 	(void) nsc_close(fd);
 	if (rc) {
@@ -4112,15 +4095,14 @@ _ii_oattach(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, uconfig.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 	/* attach volume */
 	if ((rc = ii_overflow_attach(ip, uconfig.bitmap_vol, 1)) != 0) {
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		_ii_rlse_devs(ip, rtype);
-		return (spcs_s_ocopyoutf(&kstatus, uconfig.status,
-		    rc));
+		return (spcs_s_ocopyoutf(&kstatus, uconfig.status, rc));
 	}
 
 	/* re-write header so shadow can be restarted with overflow volume */
@@ -4133,10 +4115,10 @@ _ii_oattach(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		_ii_rlse_devs(ip, rtype);
 		return (spcs_s_ocopyoutf(&kstatus, uconfig.status,
-			    DSW_EHDRBMP));
+		    DSW_EHDRBMP));
 	}
 	(void) strncpy(bm_header->overflow_vol, uconfig.bitmap_vol,
-		DSW_NAMELEN);
+	    DSW_NAMELEN);
 	(void) _ii_bm_header_put(bm_header, ip, tmp);
 	_ii_rlse_devs(ip, rtype);
 	_ii_ioctl_done(ip);
@@ -4200,7 +4182,7 @@ _ii_odetach(intptr_t arg, int ilp32, int *rvp)
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status,
-					DSW_EODEPENDENCY));
+		    DSW_EODEPENDENCY));
 	}
 	rtype = BMP;
 	if ((rc = _ii_rsrv_devs(ip, rtype, II_INTERNAL)) != 0) {
@@ -4208,7 +4190,7 @@ _ii_odetach(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 	ii_overflow_free(ip, RECLAIM);
 	/* re-write header to break link with overflow volume */
@@ -4219,7 +4201,7 @@ _ii_odetach(intptr_t arg, int ilp32, int *rvp)
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		return (spcs_s_ocopyoutf(&kstatus, ubitmap.status,
-			    DSW_EHDRBMP));
+		    DSW_EHDRBMP));
 	}
 	bzero(bm_header->overflow_vol, DSW_NAMELEN);
 	(void) _ii_bm_header_put(bm_header, ip, tmp);
@@ -4366,11 +4348,11 @@ _ii_olist(intptr_t arg, int ilp32, int *rvp)
 
 	mutex_enter(&_ii_overflow_mutex);
 	for (op = _ii_overflow_top; i < ulist.count && op;
-						carg += DSW_NAMELEN) {
+	    carg += DSW_NAMELEN) {
 		if (copyout(op->ii_volname, carg+name_offset, DSW_NAMELEN)) {
 			mutex_exit(&_ii_overflow_mutex);
 			return (spcs_s_ocopyoutf(&kstatus, ulist.status,
-								EFAULT));
+			    EFAULT));
 		}
 		i++;
 		op = op->ii_next;
@@ -4507,22 +4489,18 @@ _ii_move_grp(intptr_t arg, int ilp32, int *rvp)
 	if (!umove.new_group[0]) {
 		/* are we clearing the group association? */
 		if (ip->bi_group) {
-			DTRACE_PROBE2(_ii_move_grp1,
-					char *, ip->bi_keyname,
-					char *, ip->bi_group);
+			DTRACE_PROBE2(_ii_move_grp1, char *, ip->bi_keyname,
+			    char *, ip->bi_group);
 			rc = II_UNLINK_GROUP(ip);
 		}
 	} else if (!ip->bi_group) {
 		rc = II_LINK_GROUP(ip, umove.new_group);
-		DTRACE_PROBE2(_ii_move_grp2,
-				char *, ip->bi_keyname,
-				char *, ip->bi_group);
+		DTRACE_PROBE2(_ii_move_grp2, char *, ip->bi_keyname,
+		    char *, ip->bi_group);
 	} else {
 		/* remove it from one group and add it to the other */
-		DTRACE_PROBE3(_ii_move_grp,
-				char *, ip->bi_keyname,
-				char *, ip->bi_group,
-				char *, umove.new_group);
+		DTRACE_PROBE3(_ii_move_grp, char *, ip->bi_keyname,
+		    char *, ip->bi_group, char *, umove.new_group);
 		rc = II_UNLINK_GROUP(ip);
 		if (!rc)
 			rc = II_LINK_GROUP(ip, umove.new_group);
@@ -4534,7 +4512,7 @@ _ii_move_grp(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, umove.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 	bm_header = _ii_bm_header_get(ip, &tmp);
 	if (bm_header) {
@@ -4596,23 +4574,19 @@ _ii_change_tag(intptr_t arg, int ilp32, int *rvp)
 	if (!umove.new_group[0]) {
 		/* are we clearing the group association? */
 		if (ip->bi_cluster) {
-			DTRACE_PROBE2(_ii_change_tag,
-					char *, ip->bi_keyname,
-					char *, ip->bi_cluster);
+			DTRACE_PROBE2(_ii_change_tag, char *, ip->bi_keyname,
+			    char *, ip->bi_cluster);
 			rc = II_UNLINK_CLUSTER(ip);
 		}
 	} else if (!ip->bi_cluster) {
 		/* are we adding it to a group for the first time? */
 		rc = II_LINK_CLUSTER(ip, umove.new_group);
-		DTRACE_PROBE2(_ii_change_tag,
-				char *, ip->bi_keyname,
-				char *, ip->bi_cluster);
+		DTRACE_PROBE2(_ii_change_tag, char *, ip->bi_keyname,
+		    char *, ip->bi_cluster);
 	} else {
 		/* remove it from one group and add it to the other */
-		DTRACE_PROBE3(_ii_change_tag_2,
-				char *, ip->bi_keyname,
-				char *, ip->bi_cluster,
-				char *, umove.new_group);
+		DTRACE_PROBE3(_ii_change_tag_2, char *, ip->bi_keyname,
+		    char *, ip->bi_cluster, char *, umove.new_group);
 		rc = II_UNLINK_CLUSTER(ip);
 		if (!rc)
 			rc = II_LINK_CLUSTER(ip, umove.new_group);
@@ -4624,7 +4598,7 @@ _ii_change_tag(intptr_t arg, int ilp32, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, umove.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 	bm_header = _ii_bm_header_get(ip, &tmp);
 	if (bm_header) {
@@ -4684,7 +4658,7 @@ _ii_chk_copy(_ii_info_t *ip, int flags, spcs_s_info_t *kstatusp, pid_t pid,
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
 		return (_ii_spcs_s_ocopyoutf(kstatusp, ustatus,
-						DSW_EISEXPORTED));
+		    DSW_EISEXPORTED));
 	}
 
 	if ((flags & CV_SHD2MST) == CV_SHD2MST) {
@@ -4692,7 +4666,7 @@ _ii_chk_copy(_ii_info_t *ip, int flags, spcs_s_info_t *kstatusp, pid_t pid,
 				_ii_ioctl_done(ip);
 				mutex_exit(&ip->bi_mutex);
 				return (_ii_spcs_s_ocopyoutf(kstatusp, ustatus,
-							DSW_ECOPYING));
+				    DSW_ECOPYING));
 		}
 		/* check if any sibling shadow is copying towards this master */
 		for (xip = ip->bi_head; xip; xip = xip->bi_sibling) {
@@ -4700,7 +4674,7 @@ _ii_chk_copy(_ii_info_t *ip, int flags, spcs_s_info_t *kstatusp, pid_t pid,
 				_ii_ioctl_done(ip);
 				mutex_exit(&ip->bi_mutex);
 				return (_ii_spcs_s_ocopyoutf(kstatusp, ustatus,
-							DSW_ECOPYING));
+				    DSW_ECOPYING));
 			}
 		}
 	}
@@ -4713,12 +4687,11 @@ _ii_chk_copy(_ii_info_t *ip, int flags, spcs_s_info_t *kstatusp, pid_t pid,
 	}
 
 	if (ip->bi_flags & DSW_TREEMAP) {
-		if ((ip->bi_flags & DSW_OVERFLOW) &&
-				(flags & CV_SHD2MST)) {
+		if ((ip->bi_flags & DSW_OVERFLOW) && (flags & CV_SHD2MST)) {
 			_ii_ioctl_done(ip);
 			mutex_exit(&ip->bi_mutex);
 			return (_ii_spcs_s_ocopyoutf(kstatusp, ustatus,
-						DSW_EINCOMPLETE));
+			    DSW_EINCOMPLETE));
 		}
 	}
 
@@ -4741,7 +4714,7 @@ _ii_chk_copy(_ii_info_t *ip, int flags, spcs_s_info_t *kstatusp, pid_t pid,
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(*kstatusp, rc);
 		return (_ii_spcs_s_ocopyoutf(kstatusp, ustatus,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 
 	if (ii_update_denied(ip, *kstatusp, flags & CV_SHD2MST, 0)) {
@@ -4750,7 +4723,7 @@ _ii_chk_copy(_ii_info_t *ip, int flags, spcs_s_info_t *kstatusp, pid_t pid,
 		mutex_exit(&ip->bi_mutex);
 		_ii_rlse_devs(ip, rtype);
 		return (_ii_spcs_s_ocopyoutf(kstatusp, ustatus,
-			DSW_EOPACKAGE));
+		    DSW_EOPACKAGE));
 	}
 
 	return (0);
@@ -4808,8 +4781,7 @@ _ii_do_copy(_ii_info_t *ip, int flags, spcs_s_info_t kstatus, int waitflag)
 		if (rc == 0)
 			rc = II_ZEROBM(ip);	/* update copy of shadow */
 		if (((op = ip->bi_overflow) != NULL) &&
-			(op->ii_hversion >= 1) &&
-			(op->ii_hmagic == II_OMAGIC)) {
+		    (op->ii_hversion >= 1) && (op->ii_hmagic == II_OMAGIC)) {
 			mutex_enter(&_ii_overflow_mutex);
 			if (ip->bi_flags & DSW_OVRHDRDRTY) {
 				mutex_enter(&ip->bi_mutex);
@@ -4882,7 +4854,7 @@ _ii_do_copy(_ii_info_t *ip, int flags, spcs_s_info_t kstatus, int waitflag)
 			II_FLAG_SET(DSW_COPYINGM | DSW_COPYINGP, ip);
 		mutex_exit(&ip->bi_mutex);
 		rc = _ii_copyvol(ip, (flags & CV_SHD2MST),
-			rtype, kstatus, waitflag);
+		    rtype, kstatus, waitflag);
 	} else {
 		mutex_enter(&ip->bi_mutex);
 		_ii_ioctl_done(ip);
@@ -5338,7 +5310,7 @@ _ii_bitsset(intptr_t arg, int ilp32, int cmd, int *rvp)
 
 	if (!ubitsset.shadow_vol[0])
 		return (spcs_s_ocopyoutf(&kstatus, ubitsset.status,
-			DSW_EEMPTY));
+		    DSW_EEMPTY));
 
 	mutex_enter(&_ii_info_mutex);
 	ip = _ii_find_set(ubitsset.shadow_vol);
@@ -5355,7 +5327,7 @@ _ii_bitsset(intptr_t arg, int ilp32, int cmd, int *rvp)
 		mutex_exit(&ip->bi_mutex);
 		spcs_s_add(kstatus, rc);
 		return (spcs_s_ocopyoutf(&kstatus, ubitsset.status,
-			DSW_ERSRVFAIL));
+		    DSW_ERSRVFAIL));
 	}
 
 	ubitsset.tot_size = ip->bi_size / DSW_SIZE;
@@ -5435,42 +5407,42 @@ _ii_stopvol(_ii_info_t *ip)
 
 	rc = _ii_reserve_begin(ip);
 	if (rc) {
-		cmn_err(CE_WARN, "_ii_stopvol: _ii_reserve_begin %d", rc);
+		cmn_err(CE_WARN, "!_ii_stopvol: _ii_reserve_begin %d", rc);
 	}
 	if (!NSHADOWS(ip)) {
 		if (mst_tok) {
 			rc = _ii_unregister_path(mst_tok, NSC_PCATCH,
 			    "master");
 			if (rc)
-				cmn_err(CE_WARN, "ii: unregister master %d",
-							rc);
+				cmn_err(CE_WARN, "!ii: unregister master %d",
+				    rc);
 		}
 
 		if (mstr_tok) {
 			rc = _ii_unregister_path(mstr_tok, NSC_PCATCH,
 			    "raw master");
 			if (rc)
-				cmn_err(CE_WARN, "ii: unregister raw master %d",
-							rc);
+				cmn_err(CE_WARN, "!ii: unregister raw "
+				    "master %d", rc);
 		}
 	}
 
 	if (shd_tok) {
 		rc = _ii_unregister_path(shd_tok, NSC_PCATCH, "shadow");
 		if (rc)
-			cmn_err(CE_WARN, "ii: unregister shadow %d", rc);
+			cmn_err(CE_WARN, "!ii: unregister shadow %d", rc);
 	}
 
 	if (shdr_tok) {
 		rc = _ii_unregister_path(shdr_tok, NSC_PCATCH, "raw shadow");
 		if (rc)
-			cmn_err(CE_WARN, "ii: unregister raw shadow %d", rc);
+			cmn_err(CE_WARN, "!ii: unregister raw shadow %d", rc);
 	}
 
 	if (bmp_tok) {
 		rc = _ii_unregister_path(bmp_tok, NSC_PCATCH, "bitmap");
 		if (rc)
-			cmn_err(CE_WARN, "ii: unregister bitmap %d", rc);
+			cmn_err(CE_WARN, "!ii: unregister bitmap %d", rc);
 	}
 	_ii_reserve_end(ip);
 
@@ -5533,7 +5505,7 @@ _ii_find_vol(char *volume, int vol)
 		if ((*xip)->bi_disabled)
 			continue;
 		if (strcmp(volume, vol == MST ? ii_pathname((*xip)->bi_mstfd) :
-						(*xip)->bi_keyname) == 0) {
+		    (*xip)->bi_keyname) == 0) {
 			break;
 		}
 	}
@@ -5622,7 +5594,7 @@ _ii_bm_header_get(_ii_info_t *ip, nsc_buf_t **tmp)
 	II_READ_END(ip, bitmap, rc, FBA_LEN(sizeof (ii_header_t)));
 	if (!II_SUCCESS(rc)) {
 		if (ii_debug > 2)
-			cmn_err(CE_WARN, "ii: nsc_alloc_buf returned 0x%x",
+			cmn_err(CE_WARN, "!ii: nsc_alloc_buf returned 0x%x",
 			    rc);
 		if (*tmp)
 			(void) nsc_free_buf(*tmp);
@@ -5760,7 +5732,7 @@ _ii_nsc_io(_ii_info_t *ip, int ks, nsc_fd_t *fd, int flag, nsc_off_t fba_pos,
 	rc = nsc_maxfbas(fd, 0, &maxfbas);
 	if (!II_SUCCESS(rc)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "_ii_nsc_io: maxfbas failed (%d)", rc);
+		cmn_err(CE_WARN, "!_ii_nsc_io: maxfbas failed (%d)", rc);
 #endif
 		maxfbas = DSW_CBLK_FBA;
 	}
@@ -5769,9 +5741,9 @@ _ii_nsc_io(_ii_info_t *ip, int ks, nsc_fd_t *fd, int flag, nsc_off_t fba_pos,
 	fba_req = FBA_LEN(io_len);
 
 #ifdef DEBUG_SPLIT_IO
-	cmn_err(CE_NOTE, "_ii_nsc_io: maxfbas = %08x", maxfbas);
-	cmn_err(CE_NOTE, "_ii_nsc_io: toaddr=%08x, io_len=%08x, fba_req=%08x",
-		toaddr, io_len, fba_req);
+	cmn_err(CE_NOTE, "!_ii_nsc_io: maxfbas = %08x", maxfbas);
+	cmn_err(CE_NOTE, "!_ii_nsc_io: toaddr=%08x, io_len=%08x, fba_req=%08x",
+	    toaddr, io_len, fba_req);
 #endif
 
 loop:
@@ -5779,13 +5751,12 @@ loop:
 	fba_len = min(fba_req, maxfbas);
 	tocopy = min(io_len, FBA_SIZE(fba_len));
 
-	DTRACE_PROBE2(_ii_nsc_io_buffer,
-			nsc_off_t, fba_pos,
-			nsc_size_t, fba_len);
+	DTRACE_PROBE2(_ii_nsc_io_buffer, nsc_off_t, fba_pos,
+	    nsc_size_t, fba_len);
 
 #ifdef DEBUG_SPLIT_IO
-	cmn_err(CE_NOTE, "_ii_nsc_io: fba_pos=%08x, fba_len=%08x",
-		fba_pos, fba_len);
+	cmn_err(CE_NOTE, "!_ii_nsc_io: fba_pos=%08x, fba_len=%08x",
+	    fba_pos, fba_len);
 #endif
 
 #ifndef DISABLE_KSTATS
@@ -5804,7 +5775,7 @@ loop:
 			II_READ_START(ip, overflow);
 			break;
 		default:
-			cmn_err(CE_WARN, "Invalid kstats type %d", ks);
+			cmn_err(CE_WARN, "!Invalid kstats type %d", ks);
 			break;
 		}
 	}
@@ -5847,8 +5818,8 @@ loop:
 		 * data.
 		 */
 #ifdef DEBUG_SPLIT_IO
-		cmn_err(CE_NOTE, "_ii_nsc_io: Read-B4-Write %08x",
-			fba_pos+FBA_NUM(io_len));
+		cmn_err(CE_NOTE, "!_ii_nsc_io: Read-B4-Write %08x",
+		    fba_pos+FBA_NUM(io_len));
 #endif
 
 #ifdef DISABLE_KSTATS
@@ -5875,7 +5846,7 @@ loop:
 			rc = nsc_read(tmp, fba_pos+FBA_NUM(io_len), 1, 0);
 			break;
 		default:
-			cmn_err(CE_WARN, "Invalid kstats type %d", ks);
+			cmn_err(CE_WARN, "!Invalid kstats type %d", ks);
 			rc = nsc_read(tmp, fba_pos+FBA_NUM(io_len), 1, 0);
 			break;
 		}
@@ -5893,7 +5864,7 @@ loop:
 	while (tocopy > 0) {
 		if (vecp->sv_addr == 0 || vecp->sv_len == 0) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "_ii_nsc_io: ran off end of handle");
+			cmn_err(CE_WARN, "!_ii_nsc_io: ran off end of handle");
 #endif
 			break;
 		}
@@ -5946,7 +5917,7 @@ loop:
 			rc = nsc_write(tmp, tmp->sb_pos, tmp->sb_len, 0);
 			break;
 		default:
-			cmn_err(CE_WARN, "Invalid kstats type %d", ks);
+			cmn_err(CE_WARN, "!Invalid kstats type %d", ks);
 			rc = nsc_write(tmp, tmp->sb_pos, tmp->sb_len, 0);
 			break;
 		}
@@ -5990,8 +5961,7 @@ ii_overflow_attach(_ii_info_t *ip, char *name, int first)
 		ip->bi_overflow = op;
 		op->ii_crefcnt++;
 		op->ii_drefcnt++;
-		if ((op->ii_flags & IIO_CNTR_INVLD) &&
-			(op->ii_hversion >= 1)) {
+		if ((op->ii_flags & IIO_CNTR_INVLD) && (op->ii_hversion >= 1)) {
 			if (!first)
 				mutex_enter(&ip->bi_mutex);
 			ip->bi_flags |= DSW_OVRHDRDRTY;
@@ -6002,13 +5972,13 @@ ii_overflow_attach(_ii_info_t *ip, char *name, int first)
 #ifndef DISABLE_KSTATS
 		ip->bi_kstat_io.overflow = op->ii_overflow;
 		(void) strlcpy(ip->bi_kstat_io.ovrio, op->ii_ioname,
-			KSTAT_DATA_CHAR_LEN);
+		    KSTAT_DATA_CHAR_LEN);
 #endif
 		/* write header */
 		if (!(rc = nsc_reserve(op->ii_dev->bi_fd, NSC_MULTI))) {
-		    rc = _ii_nsc_io(ip, KS_OVR, op->ii_dev->bi_fd, NSC_WRBUF,
-			II_OHEADER_FBA, (unsigned char *)&op->ii_do,
-			sizeof (op->ii_do));
+			rc = _ii_nsc_io(ip, KS_OVR, op->ii_dev->bi_fd,
+			    NSC_WRBUF, II_OHEADER_FBA,
+			    (unsigned char *)&op->ii_do, sizeof (op->ii_do));
 			(void) nsc_release(op->ii_dev->bi_fd);
 			++iigkstat.assoc_over.value.ul;
 		}
@@ -6020,7 +5990,7 @@ ii_overflow_attach(_ii_info_t *ip, char *name, int first)
 		return (ENOMEM);
 	}
 	if ((op->ii_dev = kmem_zalloc(sizeof (_ii_info_dev_t), KM_SLEEP))
-								== NULL) {
+	    == NULL) {
 		kmem_free(op, sizeof (*op));
 		mutex_exit(&_ii_overflow_mutex);
 		return (ENOMEM);
@@ -6029,14 +5999,14 @@ ii_overflow_attach(_ii_info_t *ip, char *name, int first)
 	if ((op->ii_overflow = _ii_overflow_kstat_create(ip, op))) {
 		ip->bi_kstat_io.overflow = op->ii_overflow;
 		(void) strlcpy(op->ii_ioname, ip->bi_kstat_io.ovrio,
-			KSTAT_DATA_CHAR_LEN);
+		    KSTAT_DATA_CHAR_LEN);
 	} else {
 		goto fail;
 	}
 #endif
 	/* open overflow volume */
 	op->ii_dev->bi_fd = nsc_open(name, NSC_IIR_ID|NSC_FILE|NSC_RDWR, NULL,
-					(blind_t)&(op->ii_dev->bi_iodev), &rc);
+	    (blind_t)&(op->ii_dev->bi_iodev), &rc);
 	if (!op->ii_dev->bi_fd)
 		op->ii_dev->bi_fd = nsc_open(name,
 		    NSC_IIR_ID|NSC_DEVICE|NSC_RDWR, NULL,
@@ -6062,10 +6032,10 @@ ii_overflow_attach(_ii_info_t *ip, char *name, int first)
 	}
 	/* On resume, check for old hmagic */
 	if (strncmp(op->ii_volname, name, DSW_NAMELEN) ||
-		((op->ii_hmagic != II_OLD_OMAGIC) &&
-		(op->ii_hmagic != II_OMAGIC))) {
-			rc = DSW_EOMAGIC;
-			goto fail;
+	    ((op->ii_hmagic != II_OLD_OMAGIC) &&
+	    (op->ii_hmagic != II_OMAGIC))) {
+		rc = DSW_EOMAGIC;
+		goto fail;
 	}
 	/* set up counts */
 	op->ii_crefcnt = 1;
@@ -6076,11 +6046,11 @@ ii_overflow_attach(_ii_info_t *ip, char *name, int first)
 		/* if header version > 0, check if header written */
 		if (((op->ii_flags & IIO_HDR_WRTN) == 0) &&
 		    (op->ii_hversion >= 1)) {
-		    op->ii_flags |= IIO_CNTR_INVLD;
-		    mutex_enter(&ip->bi_mutex);
-		    ip->bi_flags |= DSW_OVRHDRDRTY;
-		    mutex_exit(&ip->bi_mutex);
-		    op->ii_urefcnt++;
+			op->ii_flags |= IIO_CNTR_INVLD;
+			mutex_enter(&ip->bi_mutex);
+			ip->bi_flags |= DSW_OVRHDRDRTY;
+			mutex_exit(&ip->bi_mutex);
+			op->ii_urefcnt++;
 		}
 	}
 	op->ii_flags &= ~IIO_HDR_WRTN;
@@ -6193,7 +6163,7 @@ ii_overflow_free(_ii_info_t *ip, int reclaim)
 		(void) nsc_close(op->ii_dev->bi_fd);
 
 		for (xp = &_ii_overflow_top; *xp && *xp != op;
-					xp = &((*xp)->ii_next))
+		    xp = &((*xp)->ii_next))
 			/* NULL statement */;
 		*xp = op->ii_next;
 
@@ -6345,7 +6315,7 @@ _ii_info_freeshd(_ii_info_t *ip)
 
 	if (ip->bi_busy)
 		kmem_free(ip->bi_busy,
-			1 + (ip->bi_size / (DSW_SIZE * DSW_BITS)));
+		    1 + (ip->bi_size / (DSW_SIZE * DSW_BITS)));
 	ip->bi_busy = NULL;
 
 	if (ip->bi_kstat_io.shadow) {
@@ -6524,7 +6494,7 @@ _ii_copy_chunks(_ii_info_t *ip, int flag, chunkid_t chunk_num, int nchunks)
 
 		ovr_flag = II_ISOVERFLOW(shd_chunk);
 		shd_pos = DSW_CHK2FBA((ovr_flag) ?
-			II_2OVERFLOW(shd_chunk) : shd_chunk);
+		    II_2OVERFLOW(shd_chunk) : shd_chunk);
 	} else {
 		ovr_flag = FALSE;
 		shd_chunk = chunk_num;
@@ -6536,9 +6506,7 @@ _ii_copy_chunks(_ii_info_t *ip, int flag, chunkid_t chunk_num, int nchunks)
 	 * avoid deadlocks on the same chunk.
 	 */
 
-	DTRACE_PROBE2(_ii_copy_chunks_alloc,
-			nsc_off_t, pos,
-			nsc_size_t, len);
+	DTRACE_PROBE2(_ii_copy_chunks_alloc, nsc_off_t, pos, nsc_size_t, len);
 
 	II_ALLOC_BUF(ip, master, rc, MSTFD(ip), pos, len, mst_flag, &mst_tmp);
 	if (!II_SUCCESS(rc)) {
@@ -6574,9 +6542,8 @@ _ii_copy_chunks(_ii_info_t *ip, int flag, chunkid_t chunk_num, int nchunks)
 	/*
 	 * The direction of copy is determined by the mst_flag.
 	 */
-	DTRACE_PROBE2(_ii_copy_chunks_copy,
-		kstat_named_t, ii_copy_direct,
-		int, mst_flag);
+	DTRACE_PROBE2(_ii_copy_chunks_copy, kstat_named_t, ii_copy_direct,
+	    int, mst_flag);
 
 	if (ii_copy_direct) {
 		if (mst_flag & NSC_WRBUF) {
@@ -6733,8 +6700,8 @@ _ii_copy_on_write(_ii_info_t *ip, int flag, chunkid_t chunk_num, int nchunks)
 			rtype = SHDR|BMP;
 			(void) _ii_rsrv_devs(xip, rtype, II_INTERNAL);
 			_ii_lock_chunk(xip, chunk_num);
-			rc = _ii_copy_on_write(xip, flag|CV_SIBLING,
-							chunk_num, 1);
+			rc = _ii_copy_on_write(xip, flag | CV_SIBLING,
+			    chunk_num, 1);
 
 			/*
 			 * See comments in _ii_shadow_write()
@@ -6827,7 +6794,7 @@ _ii_copy_on_write(_ii_info_t *ip, int flag, chunkid_t chunk_num, int nchunks)
 			} else {
 				/* Copy shadow to master */
 				rc = _ii_copy_chunks(ip, CV_SHD2MST, chunk_num,
-					nchunks);
+				    nchunks);
 			}
 		}
 	}
@@ -6901,7 +6868,7 @@ _ii_copyvolp(struct copy_args *ca)
 		else
 			nc_try = (int)nc_max;
 		chunk_num = II_NEXT_COPY_BIT(ip, chunk_num + nc_got,
-			max_chunk, nc_try, &nc_got);
+		    max_chunk, nc_try, &nc_got);
 
 		if (chunk_num >= max_chunk)	/* loop complete */
 			break;
@@ -6914,7 +6881,7 @@ _ii_copyvolp(struct copy_args *ca)
 
 		sema_p(&_ii_concopy_sema);
 		rc = _ii_copy_on_write(ip, (flag & CV_SHD2MST), chunk_num,
-			nc_got);
+		    nc_got);
 		sema_v(&_ii_concopy_sema);
 		if (ip->bi_flags & DSW_TREEMAP)
 			ii_tdelete(ip, chunk_num);
@@ -6926,7 +6893,7 @@ _ii_copyvolp(struct copy_args *ca)
 			break;
 		}
 		if (ip->bi_release ||
-				(++chunkcount % ip->bi_throttle_unit) == 0) {
+		    (++chunkcount % ip->bi_throttle_unit) == 0) {
 			_ii_rlse_devs(ip, (ca->rtype&(~BMP)));
 			rsrv = 0;
 			delay(ip->bi_throttle_delay);
@@ -6948,7 +6915,7 @@ _ii_copyvolp(struct copy_args *ca)
 				(void) nsc_maxfbas(MSTFD(ip), 0, &mst_max);
 				(void) nsc_maxfbas(SHDFD(ip), 0, &shd_max);
 				nc_max = (mst_max < shd_max) ?
-					mst_max : shd_max;
+				    mst_max : shd_max;
 				nc_max /= DSW_SIZE;
 			}
 		}
@@ -6980,7 +6947,7 @@ skip:
 			rs = II_CNT_BITS(ip, ip->bi_shdfba, &shadow_set,
 			    bitmap_size);
 			if ((rs == 0) && (shadow_set <
-					(nsc_size_t)ip->bi_shdchks)) {
+			    (nsc_size_t)ip->bi_shdchks)) {
 				II_FLAG_CLR(DSW_VOVERFLOW, ip);
 				--iigkstat.spilled_over.value.ul;
 			}
@@ -7033,11 +7000,11 @@ _ii_copyvol(_ii_info_t *ip, int flag, int rtype, spcs_s_info_t kstatus,
 	ca->rc = 0;
 
 	if (rc = nsc_create_process((void (*)(void *))_ii_copyvolp,
-		(void *)ca, FALSE)) {
+	    (void *)ca, FALSE)) {
 		mutex_enter(&ip->bi_mutex);
 		_ii_ioctl_done(ip);
 		mutex_exit(&ip->bi_mutex);
-		cmn_err(CE_NOTE, "Can't create II copy process");
+		cmn_err(CE_NOTE, "!Can't create II copy process");
 		kmem_free(ca, sizeof (*ca));
 		return (rc);
 	}
@@ -7130,7 +7097,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 		rc = _ii_report_bmp(ip);
 		if (rc) {
 			if (ii_debug > 0) {
-				cmn_err(CE_WARN, "Unable to mark bitmap bad in"
+				cmn_err(CE_WARN, "!Unable to mark bitmap bad in"
 				    " config DB; rc = %d", rc);
 			}
 			ip->bi_flags |= DSW_CFGOFFLINE;
@@ -7147,7 +7114,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 		/* prevent further use of bitmap */
 		flags |= DSW_BMPOFFLINE;
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: Bitmap offline");
+			cmn_err(CE_NOTE, "!ii: Bitmap offline");
 
 		switch (copy_flags) {
 
@@ -7155,7 +7122,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 			/* Bitmap offline, copying master to shadow */
 			flags |= DSW_SHDOFFLINE;
 			if (ii_debug > 0)
-				cmn_err(CE_NOTE, "ii: Implied shadow offline");
+				cmn_err(CE_NOTE, "!ii: Implied shadow offline");
 			break;
 
 		case DSW_COPYINGS:
@@ -7164,7 +7131,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 				/* Shadow is still usable */
 				if (ii_debug > 0)
 					cmn_err(CE_NOTE,
-					    "ii: Implied master offline");
+					    "!ii: Implied master offline");
 				flags |= DSW_MSTOFFLINE;
 			} else {
 				/*
@@ -7174,7 +7141,8 @@ _ii_error(_ii_info_t *ip, int error_type)
 				flags |= DSW_SHDOFFLINE | DSW_MSTOFFLINE;
 				if (ii_debug > 0)
 					cmn_err(CE_NOTE,
-				"ii: Implied master and shadow offline");
+					    "ii: Implied master and "
+					    "shadow offline");
 			}
 			break;
 
@@ -7183,7 +7151,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 			if (!golden) {
 				if (ii_debug > 0)
 					cmn_err(CE_NOTE,
-					    "ii: Implied shadow offline");
+					    "!ii: Implied shadow offline");
 				flags |= DSW_SHDOFFLINE;
 			}
 			break;
@@ -7194,17 +7162,17 @@ _ii_error(_ii_info_t *ip, int error_type)
 		flags |= DSW_OVROFFLINE;
 		ASSERT(ip->bi_overflow);
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: Overflow offline");
+			cmn_err(CE_NOTE, "!ii: Overflow offline");
 		/* FALLTHRU */
 	case DSW_SHDOFFLINE:
 		flags |= DSW_SHDOFFLINE;
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: Shadow offline");
+			cmn_err(CE_NOTE, "!ii: Shadow offline");
 
 		if (copy_flags == DSW_COPYINGS) {
 			/* Shadow offline, copying shadow to master */
 			if (ii_debug > 0)
-				cmn_err(CE_NOTE, "ii: Implied master offline");
+				cmn_err(CE_NOTE, "!ii: Implied master offline");
 			flags |= DSW_MSTOFFLINE;
 		}
 		break;
@@ -7212,7 +7180,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 	case DSW_MSTOFFLINE:
 		flags |= DSW_MSTOFFLINE;
 		if (ii_debug > 0)
-			cmn_err(CE_NOTE, "ii: Master offline");
+			cmn_err(CE_NOTE, "!ii: Master offline");
 
 		switch (copy_flags) {
 
@@ -7220,7 +7188,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 			/* Master offline, copying master to shadow */
 			flags |= DSW_SHDOFFLINE;
 			if (ii_debug > 0)
-				cmn_err(CE_NOTE, "ii: Implied shadow offline");
+				cmn_err(CE_NOTE, "!ii: Implied shadow offline");
 			break;
 
 		case DSW_COPYINGS:
@@ -7229,7 +7197,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 				flags |= DSW_SHDOFFLINE;
 				if (ii_debug > 0)
 					cmn_err(CE_NOTE,
-					    "ii: Implied shadow offline");
+					    "!ii: Implied shadow offline");
 			}
 			break;
 
@@ -7239,7 +7207,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 				flags |= DSW_SHDOFFLINE;
 				if (ii_debug > 0)
 					cmn_err(CE_NOTE,
-					    "ii: Implied shadow offline");
+					    "!ii: Implied shadow offline");
 			}
 			break;
 		}
@@ -7253,7 +7221,7 @@ _ii_error(_ii_info_t *ip, int error_type)
 	mutex_exit(&ip->bi_mutex);
 
 	if (!recursive_call &&
-		NSHADOWS(ip) && (flags&DSW_MSTOFFLINE) == DSW_MSTOFFLINE) {
+	    NSHADOWS(ip) && (flags&DSW_MSTOFFLINE) == DSW_MSTOFFLINE) {
 		/* take master offline for all other sibling shadows */
 		for (xip = ip->bi_head; xip; xip = xip->bi_sibling) {
 			if (xip == ip)
@@ -7368,9 +7336,9 @@ _ii_unlock_chunks(_ii_info_t *ip, chunkid_t  chunk, int n)
 
 		for (; n-- > 0; chunk++) {
 			ASSERT(DSW_BIT_ISSET(ip->bi_busy[chunk / DSW_BITS],
-				chunk % DSW_BITS));
+			    chunk % DSW_BITS));
 			DSW_BIT_CLR(ip->bi_busy[chunk / DSW_BITS],
-				chunk % DSW_BITS);
+			    chunk % DSW_BITS);
 			rw_exit(&ip->bi_busyrw);	/* RW_READER */
 		}
 		cv_broadcast(&ip->bi_busycv);
@@ -7395,9 +7363,8 @@ _ii_ab_co_bmp(_ii_info_t *ip, nsc_off_t bm_offset, unsigned char *user_bm,
 	size_t	co_len;
 	int	rc;
 
-	DTRACE_PROBE2(_ii_ab_co_bmp_start,
-			nsc_off_t, bm_offset,
-			nsc_size_t, user_bm_size);
+	DTRACE_PROBE2(_ii_ab_co_bmp_start, nsc_off_t, bm_offset,
+	    nsc_size_t, user_bm_size);
 
 	if (ip->bi_flags & DSW_BMPOFFLINE)
 		return (EIO);
@@ -7414,7 +7381,7 @@ _ii_ab_co_bmp(_ii_info_t *ip, nsc_off_t bm_offset, unsigned char *user_bm,
 	else if (bm_offset < (last_fba = ip->bi_copyfba + co_len))
 		/*EMPTY*/;
 	else if ((ip->bi_flags & DSW_TREEMAP) &&
-		(bm_offset < (last_fba = last_fba + (co_len * 32))))
+	    (bm_offset < (last_fba = last_fba + (co_len * 32))))
 		/*EMPTY*/;
 	else return (EIO);
 
@@ -7429,7 +7396,7 @@ _ii_ab_co_bmp(_ii_info_t *ip, nsc_off_t bm_offset, unsigned char *user_bm,
 		    DSW_CBLK_FBA : last_fba - fba_pos;
 		II_READ_START(ip, bitmap);
 		rc = nsc_alloc_buf(ip->bi_bmpfd, fba_pos, buf_fba_len,
-				NSC_RDBUF, &tmp);
+		    NSC_RDBUF, &tmp);
 		II_READ_END(ip, bitmap, rc, buf_fba_len);
 		if (!II_SUCCESS(rc)) {
 			if (tmp)
@@ -7480,9 +7447,8 @@ int user_bm_size)
 	int	n;
 	unsigned char *tmp_buf, *tmpp, *tmpq;
 
-	DTRACE_PROBE2(_ii_ab_ci_bmp_start,
-			nsc_off_t, bm_offset,
-			nsc_size_t, user_bm_size);
+	DTRACE_PROBE2(_ii_ab_ci_bmp_start, nsc_off_t, bm_offset,
+	    nsc_size_t, user_bm_size);
 
 	if (ip->bi_flags & DSW_BMPOFFLINE)
 		return (EIO);
@@ -7497,7 +7463,7 @@ int user_bm_size)
 		    DSW_CBLK_FBA : last_fba - fba_pos;
 		II_READ_START(ip, bitmap);
 		rc = nsc_alloc_buf(ip->bi_bmpfd, fba_pos, buf_fba_len,
-				NSC_RDWRBUF, &tmp);
+		    NSC_RDWRBUF, &tmp);
 		II_READ_END(ip, bitmap, rc, buf_fba_len);
 		if (!II_SUCCESS(rc)) {
 			if (tmp)
@@ -7563,7 +7529,7 @@ _ii_ab_zerobm(_ii_info_t *ip)
 	for (fba_pos = ip->bi_shdfba; fba_pos < size; fba_pos += DSW_CBLK_FBA) {
 		tmp = NULL;
 		len = fba_pos + DSW_CBLK_FBA < size ?
-					DSW_CBLK_FBA : size - fba_pos;
+		    DSW_CBLK_FBA : size - fba_pos;
 		II_READ_START(ip, bitmap);
 		rc = nsc_alloc_buf(ip->bi_bmpfd, fba_pos, len, NSC_RDWRBUF,
 		    &tmp);
@@ -7623,7 +7589,8 @@ _ii_ab_copybm(_ii_info_t *ip)
 
 			_ii_error(ip, DSW_BMPOFFLINE);
 			if (ii_debug > 1)
-			    cmn_err(CE_NOTE, "ii: copybm failed 1 rc %d", rc);
+				cmn_err(CE_NOTE, "!ii: copybm failed 1 rc %d",
+				    rc);
 
 			return (rc);
 		}
@@ -7638,12 +7605,13 @@ _ii_ab_copybm(_ii_info_t *ip)
 
 			_ii_error(ip, DSW_BMPOFFLINE);
 			if (ii_debug > 1)
-			    cmn_err(CE_NOTE, "ii: copybm failed 2 rc %d", rc);
+				cmn_err(CE_NOTE, "!ii: copybm failed 2 rc %d",
+				    rc);
 
 			return (rc);
 		}
 		rc = nsc_copy(shd_tmp, copy_tmp, shd_fba_pos, copy_fba_pos,
-							len);
+		    len);
 		if (II_SUCCESS(rc)) {
 			II_NSC_WRITE(ip, bitmap, rc, copy_tmp, copy_fba_pos,
 			    len, 0);
@@ -7653,7 +7621,8 @@ _ii_ab_copybm(_ii_info_t *ip)
 		(void) nsc_free_buf(copy_tmp);
 		if (!II_SUCCESS(rc)) {
 			if (ii_debug > 1)
-			    cmn_err(CE_NOTE, "ii: copybm failed 4 rc %d", rc);
+				cmn_err(CE_NOTE, "!ii: copybm failed 4 rc %d",
+				    rc);
 			_ii_error(ip, DSW_BMPOFFLINE);
 			return (rc);
 		}
@@ -7884,9 +7853,9 @@ _ii_ab_set_shd_bit(_ii_info_t *ip, chunkid_t chunk)
 		return (rc);
 	}
 	if (DSW_BIT_ISSET(tmp->sb_vec->sv_addr[chunk/DSW_BITS],
-			chunk%DSW_BITS) == 0) {
+	    chunk%DSW_BITS) == 0) {
 		DSW_BIT_SET(tmp->sb_vec->sv_addr[chunk/DSW_BITS],
-						chunk%DSW_BITS);
+		    chunk%DSW_BITS);
 		II_NSC_WRITE(ip, bitmap, rc, tmp, fba, 1, 0);
 		if ((ip->bi_state & DSW_CNTSHDBITS) == 0)
 			ip->bi_shdbits++;
@@ -7970,9 +7939,9 @@ _ii_ab_set_copy_bit(_ii_info_t *ip, chunkid_t chunk)
 		return (rc);
 	}
 	if (DSW_BIT_ISSET(tmp->sb_vec->sv_addr[chunk/DSW_BITS],
-			chunk%DSW_BITS) == 0) {
+	    chunk%DSW_BITS) == 0) {
 		DSW_BIT_SET(tmp->sb_vec->sv_addr[chunk/DSW_BITS],
-						chunk%DSW_BITS);
+		    chunk%DSW_BITS);
 		if ((ip->bi_state & DSW_CNTCPYBITS) == 0)
 			ip->bi_copybits++;
 
@@ -8021,7 +7990,7 @@ _ii_ab_clr_copy_bits(_ii_info_t *ip, chunkid_t chunk, int nchunks)
 	}
 	for (; nchunks-- > 0; chunk++) {
 		DSW_BIT_CLR(tmp->sb_vec->sv_addr[chunk/DSW_BITS],
-					chunk%DSW_BITS);
+		    chunk%DSW_BITS);
 		if (ip->bi_copybits > 0)
 			ip->bi_copybits--;
 	}
@@ -8153,16 +8122,16 @@ again:
 					(void) nsc_free_buf(tmp);
 					_ii_lock_chunk(ip, startchunk);
 					if (_ii_ab_tst_copy_bit(ip, startchunk)
-							!= 1) {
+					    != 1) {
 						/*
 						 * another process copied this
 						 * chunk while we were acquiring
 						 * the chunk lock.
 						 */
 						_ii_unlock_chunk(ip,
-							startchunk);
+						    startchunk);
 						DTRACE_PROBE(
-						_ii_ab_next_copy_bit_again);
+						    _ii_ab_next_copy_bit_again);
 						goto again;
 					}
 					*got = 1;
@@ -8174,10 +8143,8 @@ again:
 				chunk++;
 				for (; --wanted > 0 && nextchunk < high;
 				    nextchunk++, chunk++) {
-					if (!DSW_BIT_ISSET(
-						tmp->sb_vec->sv_addr
-							[chunk/DSW_BITS],
-						    chunk%DSW_BITS)) {
+					if (!DSW_BIT_ISSET(tmp->sb_vec->sv_addr
+					    [chunk/DSW_BITS], chunk%DSW_BITS)) {
 						break;	/* end of bit run */
 					}
 					if (_ii_trylock_chunk(ip, nextchunk))
@@ -8436,7 +8403,7 @@ _ii_km_co_bmp(_ii_info_t *ip, nsc_off_t bm_offset, unsigned char *user_bm,
 	else if (bm_offset < (last_fba = ip->bi_copyfba + co_len))
 		/*EMPTY*/;
 	else if ((ip->bi_flags & DSW_TREEMAP) &&
-		(bm_offset < (last_fba = last_fba + (co_len * 32))))
+	    (bm_offset < (last_fba = last_fba + (co_len * 32))))
 		/*EMPTY*/;
 	else return (EIO);
 
@@ -8834,7 +8801,7 @@ _ii_km_next_copy_bit(_ii_info_t *ip, chunkid_t chunk, chunkid_t maxchunk,
 			for (nextchunk = chunk + 1;
 			    *got < want && nextchunk < maxchunk; nextchunk++) {
 				if (!DSW_BIT_ISSET(bmp[nextchunk/DSW_BITS],
-						nextchunk%DSW_BITS))
+				    nextchunk%DSW_BITS))
 					break;
 				if (_ii_trylock_chunk(ip, nextchunk))
 					(*got)++;
@@ -8895,7 +8862,7 @@ _ii_km_cnt_bits(_ii_info_t *ip, nsc_off_t bm_offset, nsc_size_t *counter,
 	cp = ip->bi_bitmap + start_offset;
 	for (i = k = 0; i < bm_size; i++)
 		for (j = (unsigned)*cp++; j; j &= j - 1)
-		    k++;
+			k++;
 	*counter = k;
 
 	return (0);
@@ -9131,13 +9098,12 @@ _ii_fill_buf(ii_fd_t *bfd, nsc_off_t fba_pos, nsc_size_t fba_len, int flag,
 				goto out;
 			}
 			if (*handle2 == NULL &&
-					(ip->bi_flags&DSW_TREEMAP) == 0) {
+			    (ip->bi_flags&DSW_TREEMAP) == 0) {
 				rc = EIO;
 				goto out;
 			}
 			rc = ii_read_volume(ip, bfd->ii_shd,
-					*handle2, *handle,
-					chunk_num, temp_fba, bmp_len);
+			    *handle2, *handle, chunk_num, temp_fba, bmp_len);
 			if (!II_SUCCESS(rc)) {
 				_ii_error(ip, DSW_MSTOFFLINE);
 				_ii_error(ip, DSW_SHDOFFLINE);
@@ -9153,9 +9119,8 @@ _ii_fill_buf(ii_fd_t *bfd, nsc_off_t fba_pos, nsc_size_t fba_len, int flag,
 				rc = EIO;
 				goto out;
 			}
-			rc = ii_read_volume(ip, !(bfd->ii_shd),
-					*handle, NULL,
-					chunk_num, temp_fba, bmp_len);
+			rc = ii_read_volume(ip, !(bfd->ii_shd), *handle, NULL,
+			    chunk_num, temp_fba, bmp_len);
 			if (!II_SUCCESS(rc)) {
 				if (bfd->ii_shd)
 					_ii_error(ip, DSW_SHDOFFLINE);
@@ -9198,9 +9163,7 @@ _ii_shadow_write(ii_fd_t *bfd, nsc_off_t pos, nsc_size_t len)
 	int	flag;
 	int hanging;
 
-	DTRACE_PROBE2(_ii_shadow_write_start,
-			nsc_off_t, pos,
-			nsc_size_t, len);
+	DTRACE_PROBE2(_ii_shadow_write_start, nsc_off_t, pos, nsc_size_t, len);
 
 	/* fail immediately if config DB is unavailable */
 	if ((ip->bi_flags & DSW_CFGOFFLINE) == DSW_CFGOFFLINE) {
@@ -9296,7 +9259,7 @@ _ii_alloc_buf(ii_fd_t *bfd, nsc_off_t pos, nsc_size_t len, int flag,
 	if (pos + len > ip->bi_size) {
 		if (ii_debug > 1)
 			cmn_err(CE_NOTE,
-			    "ii: Attempt to access beyond end of ii volume");
+			    "!ii: Attempt to access beyond end of ii volume");
 		DTRACE_PROBE(_ii_alloc_buf_end);
 		return (EIO);
 	}
@@ -9317,7 +9280,7 @@ _ii_alloc_buf(ii_fd_t *bfd, nsc_off_t pos, nsc_size_t len, int flag,
 	 */
 
 	h->ii_rsrv = BMP | (raw ? (bfd->ii_shd ? MSTR : SHDR)
-				: (bfd->ii_shd ? MST : SHD));
+	    : (bfd->ii_shd ? MST : SHD));
 
 	if (!bfd->ii_shd)
 		ip = ip->bi_master;
@@ -9365,8 +9328,8 @@ _ii_alloc_buf(ii_fd_t *bfd, nsc_off_t pos, nsc_size_t len, int flag,
 			    (flag&NSC_RDAHEAD)|NSC_MIXED, &h->ii_bufp2);
 			if (!II_SUCCESS(rc)) {
 				if (ii_debug > 2)
-				    cmn_err(CE_WARN,
-					"ii: Join/write-S race detected\n");
+					cmn_err(CE_WARN, "!ii: "
+					    "Join/write-S race detected\n");
 				if (h->ii_bufp2)
 					(void) nsc_free_buf(h->ii_bufp2);
 				h->ii_bufp2 = NULL;
@@ -9434,13 +9397,13 @@ _ii_alloc_buf(ii_fd_t *bfd, nsc_off_t pos, nsc_size_t len, int flag,
 		    ((ip->bi_flags & DSW_COPYINGP) ||
 		    (!(ip->bi_flags & DSW_GOLDEN))) &&
 		    (!(ip->bi_flags &
-			(DSW_TREEMAP|DSW_SHDOFFLINE|DSW_SHDEXPORT)))) {
+		    (DSW_TREEMAP|DSW_SHDOFFLINE|DSW_SHDEXPORT)))) {
 			rc = nsc_alloc_buf(SHDFD(ip), pos, len,
 			    (flag&NSC_RDAHEAD)|NSC_MIXED, &h->ii_bufp2);
 			if (!II_SUCCESS(rc)) {
 				if (ii_debug > 2)
-				    cmn_err(CE_WARN,
-					"ii: Join/write-M race detected\n");
+					cmn_err(CE_WARN, "!ii: "
+					    "Join/write-M race detected\n");
 				if (h->ii_bufp2)
 					(void) nsc_free_buf(h->ii_bufp2);
 				h->ii_bufp2 = NULL;
@@ -9458,12 +9421,12 @@ _ii_alloc_buf(ii_fd_t *bfd, nsc_off_t pos, nsc_size_t len, int flag,
 
 	if (flag & NSC_RDBUF)
 		rc = _ii_fill_buf(bfd, pos, len, flag,
-			h->ii_abufp ? &h->ii_abufp : &h->ii_bufp, &h->ii_bufp2);
+		    h->ii_abufp ? &h->ii_abufp : &h->ii_bufp, &h->ii_bufp2);
 
 error:
 	if (II_SUCCESS(rc)) {
 		h->ii_bufh.sb_vec = h->ii_abufp ? h->ii_abufp->sb_vec :
-							h->ii_bufp->sb_vec;
+		    h->ii_bufp->sb_vec;
 		h->ii_bufh.sb_error = 0;
 		h->ii_bufh.sb_flag |= flag;
 		h->ii_bufh.sb_pos = pos;
@@ -10036,10 +9999,8 @@ ii_get_group_list(char *group, int *count)
 static void
 _ii_pinned(_ii_info_dev_t *dip, nsc_off_t pos, nsc_size_t len)
 {
-	DTRACE_PROBE3(_ii_pinned_start,
-			nsc_iodev_t, dip->bi_iodev,
-			nsc_off_t, pos,
-			nsc_size_t, len);
+	DTRACE_PROBE3(_ii_pinned_start, nsc_iodev_t, dip->bi_iodev,
+	    nsc_off_t, pos, nsc_size_t, len);
 
 	nsc_pinned_data(dip->bi_iodev, pos, len);
 
@@ -10076,7 +10037,7 @@ _ii_read(ii_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 		sb_vec = *src;
 		*src = h->ii_bufh.sb_vec;
 		rc = _ii_fill_buf(h->ii_fd, pos, len, flag,
-			h->ii_abufp ? &h->ii_abufp : &h->ii_bufp, &h->ii_bufp2);
+		    h->ii_abufp ? &h->ii_abufp : &h->ii_bufp, &h->ii_bufp2);
 		*src = sb_vec;
 	}
 	if (!II_SUCCESS(rc))
@@ -10135,7 +10096,7 @@ _ii_write(ii_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 			if (overflow)
 				mapped_chunk = II_2OVERFLOW(mapped_chunk);
 			mapped_fba = DSW_CHK2FBA(mapped_chunk) +
-						(pos % DSW_SIZE);
+			    (pos % DSW_SIZE);
 			copy_len = DSW_SIZE - (pos % DSW_SIZE);
 			if (copy_len > len)
 				copy_len = len;
@@ -10146,12 +10107,12 @@ _ii_write(ii_buf_t *h, nsc_off_t pos, nsc_size_t len, int flag)
 				    copy_len, NSC_WRBUF, &tmp);
 			} else
 				rc = nsc_alloc_buf(SHDFD(ip), mapped_fba,
-					copy_len, NSC_WRBUF, &tmp);
+				    copy_len, NSC_WRBUF, &tmp);
 			sb_vec = h->ii_abufp->sb_vec;
 			h->ii_abufp->sb_vec = h->ii_bufh.sb_vec;
 			if (II_SUCCESS(rc)) {
 				rc = nsc_copy(h->ii_abufp, tmp, pos,
-					    mapped_fba, copy_len);
+				    mapped_fba, copy_len);
 			}
 			if (overflow) {
 				II_NSC_WRITE(ip, overflow, rc, tmp, mapped_fba,
@@ -10274,7 +10235,7 @@ _ii_ll_add(_ii_info_t *ip, kmutex_t *mutex, _ii_lsthead_t **lst, char *name,
 
 	node = kmem_zalloc(sizeof (_ii_lstinfo_t), KM_SLEEP);
 	if (!node) {
-		cmn_err(CE_WARN, "ii: _ii_ll_add: ENOMEM");
+		cmn_err(CE_WARN, "!ii: _ii_ll_add: ENOMEM");
 		DTRACE_PROBE(_ii_ll_add_end_ENOMEM);
 		return (ENOMEM);
 	}
@@ -10298,7 +10259,7 @@ _ii_ll_add(_ii_info_t *ip, kmutex_t *mutex, _ii_lsthead_t **lst, char *name,
 		*head = kmem_zalloc(sizeof (_ii_lsthead_t), KM_SLEEP);
 		if (!*head) {
 			/* bother */
-			cmn_err(CE_WARN, "ii: _ii_ll_add: ENOMEM");
+			cmn_err(CE_WARN, "!ii: _ii_ll_add: ENOMEM");
 			kmem_free(node, sizeof (_ii_lstinfo_t));
 			DTRACE_PROBE(_ii_ll_add_end_2);
 			return (ENOMEM);

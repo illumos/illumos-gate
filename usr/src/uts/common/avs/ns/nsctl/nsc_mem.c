@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,12 +136,12 @@ _nsc_clear_dirty(int force)
 			    _nsc_rm_nvmem_base)->rh_dirty,
 			    sizeof (ulong_t), nsc_cm_errhdlr) < 0) {
 				cmn_err(CE_WARN,
-				    "nsctl: _nsc_clear_magic: "
+				    "!nsctl: _nsc_clear_magic: "
 				    "hdr force clear failed 0x%p",
 				    (void *)_nsc_rm_nvmem_base);
 			} else {
 				cmn_err(CE_WARN,
-				    "nsctl: _nsc_clear_magic: "
+				    "!nsctl: _nsc_clear_magic: "
 				    "hdr force cleared 0x%p",
 				    (void *)_nsc_rm_nvmem_base);
 				_nsc_rmhdr_ptr->rh_dirty = 0;
@@ -161,12 +161,12 @@ _nsc_clear_dirty(int force)
 				    _nsc_rm_nvmem_base)->rh_dirty,
 				    sizeof (ulong_t), nsc_cm_errhdlr) < 0) {
 					cmn_err(CE_WARN,
-					    "nsctl: _nsc_clear_magic: "
+					    "!nsctl: _nsc_clear_magic: "
 					    "hdr clear failed 0x%p",
 					    (void *)_nsc_rm_nvmem_base);
 				} else {
 					cmn_err(CE_WARN,
-					    "nsctl: _nsc_clear_magic: "
+					    "!nsctl: _nsc_clear_magic: "
 					    "hdr cleared 0x%p",
 					    (void *)_nsc_rm_nvmem_base);
 					_nsc_rmhdr_ptr->rh_dirty = 0;
@@ -174,13 +174,14 @@ _nsc_clear_dirty(int force)
 				rc = 0;
 			} else {
 				cmn_err(CE_WARN,
-	"nsctl: _nsc_clear_magic: global area in use. cannot clear magic");
+				    "!nsctl: _nsc_clear_magic: "
+				    "global area in use. cannot clear magic");
 				rc = EBUSY;
 			}
 			mutex_exit(&_nsc_global_lock);
 		} else {
 			cmn_err(CE_WARN,
-			"nsctl: _nsc_clear_magic: cannot clear magic");
+			    "!nsctl: _nsc_clear_magic: cannot clear magic");
 			rc = EINVAL;
 		}
 	} else
@@ -364,15 +365,14 @@ _nsc_global_setup()
 		if (_nsc_rm_nvmem_base) {
 			if (hdr->rh_dirty) { /* corrupted */
 				cmn_err(CE_WARN,
-				    "nsctl: _nsc_global_setup: nv bad header");
+				    "!nsctl: _nsc_global_setup: nv bad header");
 				mutex_exit(&_nsc_global_lock);
 				return;
 			}
 			if (nsc_commit_mem((void *)_nsc_rm_base,
 			    (void *)_nsc_rm_nvmem_base,
 			    size, nsc_cm_errhdlr) < 0)
-				cmn_err(CE_WARN,
-				    "_nsc_global_setup: "
+				cmn_err(CE_WARN, "!_nsc_global_setup: "
 				    "nvmem header not updated");
 		}
 	}
@@ -382,21 +382,21 @@ _nsc_global_setup()
 
 	if (hdr->magic != _NSCTL_HDRMAGIC || (hdr->ver != _NSCTL_HDRVER &&
 	    hdr->ver != _NSCTL_HDRVER3)) {
-		cmn_err(CE_WARN, "nsctl: _nsc_global_setup: bad header");
+		cmn_err(CE_WARN, "!nsctl: _nsc_global_setup: bad header");
 		return;
 	}
 
 	if (hdr->ver == _NSCTL_HDRVER3 && hdr->maxdev != nsc_max_devices()) {
 		_nsc_set_max_devices(hdr->maxdev);
 		cmn_err(CE_WARN,
-		    "nsctl: _nsc_global_setup: setting nsc_max_devices to %d",
+		    "!nsctl: _nsc_global_setup: setting nsc_max_devices to %d",
 		    hdr->maxdev);
 	}
 
 	if (!_nsc_rmmap_init(hdr->map, "nsc_global", _NSC_GLSLOT,
 	    _nsc_rm_size - hdr->size, hdr->size)) {
 		cmn_err(CE_WARN,
-		    "nsctl: _nsc_global_setup: global map init failed");
+		    "!nsctl: _nsc_global_setup: global map init failed");
 		return;
 	}
 
@@ -671,7 +671,7 @@ nsc_mem_avail(nsc_mem_t *mem)
 		return (_nsc_rm_avail(mem));
 
 #ifdef DEBUG
-	cmn_err(CE_WARN, "nsc_mem_avail: called for non-global memory!");
+	cmn_err(CE_WARN, "!nsc_mem_avail: called for non-global memory!");
 #endif
 
 	return (0);
@@ -713,7 +713,7 @@ _nsc_global_zero(ulong_t offset, size_t size)
 		    size % ZSIZE,
 		    nsc_cm_errhdlr);
 		if ((rc <  0) || failed)
-			cmn_err(CE_WARN, "_nsc_global_zero: clear mem failed");
+			cmn_err(CE_WARN, "!_nsc_global_zero: clear mem failed");
 		return;
 	}
 
@@ -742,7 +742,7 @@ _nsc_rm_alloc(size_t *sizep, nsc_mem_t *mem)
 	caddr_t	retaddr;
 
 	if (!_nsc_global_map) {
-		cmn_err(CE_WARN, "_nsc_rm_alloc: no map");
+		cmn_err(CE_WARN, "!_nsc_rm_alloc: no map");
 		return (NULL);
 	}
 
@@ -750,7 +750,7 @@ _nsc_rm_alloc(size_t *sizep, nsc_mem_t *mem)
 
 	if (mem->base || mem->pend) {
 		mutex_exit(&_nsc_mem_lock);
-		cmn_err(CE_WARN, "_nsc_rm_alloc: invalid alloc");
+		cmn_err(CE_WARN, "!_nsc_rm_alloc: invalid alloc");
 		return (NULL);
 	}
 
@@ -782,7 +782,7 @@ _nsc_rm_alloc(size_t *sizep, nsc_mem_t *mem)
 
 		mem->pend = 0;
 		cmn_err(CE_WARN,
-		    "_nsc_rm_alloc: alloc %ld bytes - %ld available",
+		    "!_nsc_rm_alloc: alloc %ld bytes - %ld available",
 		    size, _nsc_rm_avail(mem));
 		return (NULL);
 	}
@@ -900,7 +900,7 @@ _nsc_get_global_sizes(void *arg, int *rvp)
 		return (EINVAL);
 
 	if (copyout(&_nsc_rmhdr_ptr->size, arg,
-		sizeof (_nsc_rmhdr_ptr->size)) < 0)
+	    sizeof (_nsc_rmhdr_ptr->size)) < 0)
 		return (EFAULT);
 
 	*rvp = 0;

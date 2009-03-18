@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ rdc_ns_io(nsc_fd_t *fd, int flag, nsc_off_t fba_pos, uchar_t *io_addr,
 	rc = nsc_maxfbas(fd, 0, &maxfbas);
 	if (!RDC_SUCCESS(rc)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_ns_io: maxfbas failed (%d)", rc);
+		cmn_err(CE_WARN, "!rdc_ns_io: maxfbas failed (%d)", rc);
 #endif
 		maxfbas = 256;
 	}
@@ -156,7 +156,7 @@ loop:
 	while (tocopy > 0) {
 		if (vecp->sv_addr == 0 || vecp->sv_len == 0) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "rdc_ns_io: ran off end of handle");
+			cmn_err(CE_WARN, "!rdc_ns_io: ran off end of handle");
 #endif
 			break;
 		}
@@ -227,8 +227,8 @@ rdc_fill_header(rdc_u_info_t *urdc, rdc_header_t *header)
 	header->syshostid = urdc->syshostid;
 	header->refcntsize = rdc_refcntsize(krdc);
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 }
 
@@ -246,9 +246,6 @@ rdc_read_header(rdc_k_info_t *krdc, rdc_header_t *header)
 	} u_hdrp;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_header: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -259,9 +256,6 @@ rdc_read_header(rdc_k_info_t *krdc, rdc_header_t *header)
 		return (-1);
 
 	if (krdc->bitmapfd == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_header: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 	if (_rdc_rsrv_devs(krdc, RDC_BMP, RDC_INTERNAL)) {
@@ -276,7 +270,7 @@ rdc_read_header(rdc_k_info_t *krdc, rdc_header_t *header)
 	}
 
 	sts = rdc_ns_io(krdc->bitmapfd, NSC_RDBUF, 0, (uchar_t *)header,
-		sizeof (rdc_header_t));
+	    sizeof (rdc_header_t));
 
 	if (krdc->bmp_kstats) {
 		mutex_enter(krdc->bmp_kstats->ks_lock);
@@ -287,7 +281,7 @@ rdc_read_header(rdc_k_info_t *krdc, rdc_header_t *header)
 	}
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_read_header: %s read failed %d",
+		cmn_err(CE_WARN, "!rdc_read_header: %s read failed %d",
 		    urdc->primary.file, sts);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "read header failed");
 	}
@@ -303,7 +297,7 @@ rdc_read_header(rdc_k_info_t *krdc, rdc_header_t *header)
 		 * be changed when state is re-written.
 		 */
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "sndr: old style (V4) bit map header");
+		cmn_err(CE_NOTE, "!sndr: old style (V4) bit map header");
 #endif
 		header->magic = RDC_HDR_MAGIC;
 		u_hdrp.current = header;
@@ -314,8 +308,8 @@ rdc_read_header(rdc_k_info_t *krdc, rdc_header_t *header)
 		u_hdrp.current->maxqfbas = u_hdrp.v4->maxqfbas;
 		u_hdrp.current->refcntsize = 1;	/* new field */
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)u_hdrp.current->refcntsize, __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)u_hdrp.current->refcntsize, __LINE__, __FILE__);
 #endif
 		return (0);
 	case RDC_HDR_MAGIC:
@@ -337,9 +331,6 @@ rdc_write_header(rdc_k_info_t *krdc, rdc_header_t *header)
 	int sts;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_header: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -350,9 +341,6 @@ rdc_write_header(rdc_k_info_t *krdc, rdc_header_t *header)
 		return (-1);
 
 	if (krdc->bitmapfd == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_header: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
@@ -368,7 +356,7 @@ rdc_write_header(rdc_k_info_t *krdc, rdc_header_t *header)
 	}
 
 	sts = rdc_ns_io(krdc->bitmapfd, rdc_wrflag, 0, (uchar_t *)header,
-		sizeof (rdc_header_t));
+	    sizeof (rdc_header_t));
 
 	if (krdc->bmp_kstats) {
 		mutex_enter(krdc->bmp_kstats->ks_lock);
@@ -376,11 +364,11 @@ rdc_write_header(rdc_k_info_t *krdc, rdc_header_t *header)
 		mutex_exit(krdc->bmp_kstats->ks_lock);
 		KSTAT_IO_PTR(krdc->bmp_kstats)->writes++;
 		KSTAT_IO_PTR(krdc->bmp_kstats)->nwritten +=
-			sizeof (rdc_header_t);
+		    sizeof (rdc_header_t);
 	}
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_write_header: %s write failed %d",
+		cmn_err(CE_WARN, "!rdc_write_header: %s write failed %d",
 		    urdc->primary.file, sts);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "write failed");
 	}
@@ -410,8 +398,8 @@ rdc_set_refcnt_ops(rdc_k_info_t *krdc, size_t refcntsize)
 		break;
 	}
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	set refcnt ops for refcntsize %d - %d:%s",
-		(int)refcntsize, __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: set refcnt ops for refcntsize %d - %d:%s",
+	    (int)refcntsize, __LINE__, __FILE__);
 #endif
 }
 
@@ -431,9 +419,6 @@ rdc_read_state(rdc_k_info_t *krdc, int *statep, int *hostidp)
 	int sts;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_state: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -447,9 +432,6 @@ rdc_read_state(rdc_k_info_t *krdc, int *statep, int *hostidp)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_state: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
@@ -466,8 +448,8 @@ rdc_read_state(rdc_k_info_t *krdc, int *statep, int *hostidp)
 		*hostidp = header.syshostid;
 		rdc_set_refcnt_ops(krdc, header.refcntsize);
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 		sts = 0;
 		break;
@@ -487,9 +469,6 @@ rdc_clear_state(rdc_k_info_t *krdc)
 	rdc_header_t header;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_clear_state: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -503,9 +482,6 @@ rdc_clear_state(rdc_k_info_t *krdc)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_clear_state: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
@@ -532,11 +508,11 @@ rdc_clear_state(rdc_k_info_t *krdc)
 		mutex_exit(krdc->bmp_kstats->ks_lock);
 		KSTAT_IO_PTR(krdc->bmp_kstats)->writes++;
 		KSTAT_IO_PTR(krdc->bmp_kstats)->nwritten +=
-			sizeof (rdc_header_t);
+		    sizeof (rdc_header_t);
 	}
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_clear_state: %s write failed",
+		cmn_err(CE_WARN, "!rdc_clear_state: %s write failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "write failed");
 	}
@@ -558,9 +534,6 @@ rdc_write_state(rdc_u_info_t *urdc)
 	rdc_header_t header;
 
 	if (urdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_state: NULL urdc");
-#endif
 		return;
 	}
 
@@ -575,9 +548,6 @@ rdc_write_state(rdc_u_info_t *urdc)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_state: NULL bitmapfd");
-#endif
 		return;
 	}
 
@@ -605,7 +575,7 @@ rdc_write_state(rdc_u_info_t *urdc)
 	}
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_write_state: %s read failed",
+		cmn_err(CE_WARN, "!rdc_write_state: %s read failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "read failed");
 		goto done;
@@ -631,7 +601,7 @@ rdc_write_state(rdc_u_info_t *urdc)
 	}
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_write_state: %s write failed",
+		cmn_err(CE_WARN, "!rdc_write_state: %s write failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "write failed");
 	}
@@ -654,9 +624,6 @@ rdc_read_bitmap(rdc_k_info_t *krdc, struct bitmapdata *data)
 	int sts;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_bitmap: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -665,9 +632,6 @@ rdc_read_bitmap(rdc_k_info_t *krdc, struct bitmapdata *data)
 		data->len = krdc->bitmap_size;
 
 		if (data->data == NULL) {
-#ifdef DEBUG
-			cmn_err(CE_WARN, "rdc_read_bitmap: kmem_alloc failed");
-#endif
 			return (-1);
 		}
 	}
@@ -682,22 +646,16 @@ rdc_read_bitmap(rdc_k_info_t *krdc, struct bitmapdata *data)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_bitmap: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
 	if (data == NULL && krdc->dcio_bitmap == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_read_bitmap: NULL dcio_bitmap");
-#endif
 		return (-1);
 	}
 
 	if (_rdc_rsrv_devs(krdc, RDC_BMP, RDC_INTERNAL)) {
-		cmn_err(CE_WARN, "rdc_read_bitmap: %s reserve failed",
+		cmn_err(CE_WARN, "!rdc_read_bitmap: %s reserve failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "reserve failed");
 		mutex_exit(&krdc->bmapmutex);
@@ -711,7 +669,7 @@ rdc_read_bitmap(rdc_k_info_t *krdc, struct bitmapdata *data)
 	}
 
 	sts = rdc_ns_io(krdc->bitmapfd, NSC_RDBUF, RDC_BITMAP_FBA,
-		data ? data->data : krdc->dcio_bitmap, krdc->bitmap_size);
+	    data ? data->data : krdc->dcio_bitmap, krdc->bitmap_size);
 
 	if (krdc->bmp_kstats) {
 		mutex_enter(krdc->bmp_kstats->ks_lock);
@@ -724,7 +682,7 @@ rdc_read_bitmap(rdc_k_info_t *krdc, struct bitmapdata *data)
 	_rdc_rlse_devs(krdc, RDC_BMP);
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_read_bitmap: %s read failed",
+		cmn_err(CE_WARN, "!rdc_read_bitmap: %s read failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "read failed");
 		mutex_exit(&krdc->bmapmutex);
@@ -742,9 +700,6 @@ rdc_write_bitmap(rdc_k_info_t *krdc)
 	int sts;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -758,17 +713,11 @@ rdc_write_bitmap(rdc_k_info_t *krdc)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
 	if (krdc->dcio_bitmap == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap: NULL dcio_bitmap");
-#endif
 		return (-1);
 	}
 
@@ -785,7 +734,7 @@ rdc_write_bitmap(rdc_k_info_t *krdc)
 	}
 
 	sts = rdc_ns_io(krdc->bitmapfd, rdc_wrflag, RDC_BITMAP_FBA,
-		krdc->dcio_bitmap, krdc->bitmap_size);
+	    krdc->dcio_bitmap, krdc->bitmap_size);
 
 	if (krdc->bmp_kstats) {
 		mutex_enter(krdc->bmp_kstats->ks_lock);
@@ -798,7 +747,7 @@ rdc_write_bitmap(rdc_k_info_t *krdc)
 	_rdc_rlse_devs(krdc, RDC_BMP);
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_write_bitmap: %s write failed",
+		cmn_err(CE_WARN, "!rdc_write_bitmap: %s write failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "write failed");
 		mutex_exit(&krdc->bmapmutex);
@@ -816,9 +765,6 @@ rdc_write_bitmap_fba(rdc_k_info_t *krdc, nsc_off_t fba)
 	int sts;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap_fba: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -832,22 +778,16 @@ rdc_write_bitmap_fba(rdc_k_info_t *krdc, nsc_off_t fba)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap_fba: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
 	if (krdc->dcio_bitmap == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap_fba: NULL dcio_bitmap");
-#endif
 		return (-1);
 	}
 
 	if (_rdc_rsrv_devs(krdc, RDC_BMP, RDC_INTERNAL)) {
-		cmn_err(CE_WARN, "rdc_write_bitmap_fba: %s reserve failed",
+		cmn_err(CE_WARN, "!rdc_write_bitmap_fba: %s reserve failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "reserve failed");
 		mutex_exit(&krdc->bmapmutex);
@@ -860,7 +800,7 @@ rdc_write_bitmap_fba(rdc_k_info_t *krdc, nsc_off_t fba)
 		mutex_exit(krdc->bmp_kstats->ks_lock);
 	}
 	sts = rdc_ns_io(krdc->bitmapfd, rdc_wrflag, RDC_BITMAP_FBA + fba,
-		krdc->dcio_bitmap + fba * 512, 512);
+	    krdc->dcio_bitmap + fba * 512, 512);
 
 	if (krdc->bmp_kstats) {
 		mutex_enter(krdc->bmp_kstats->ks_lock);
@@ -873,7 +813,7 @@ rdc_write_bitmap_fba(rdc_k_info_t *krdc, nsc_off_t fba)
 	_rdc_rlse_devs(krdc, RDC_BMP);
 
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_write_bitmap_fba: %s write failed",
+		cmn_err(CE_WARN, "!rdc_write_bitmap_fba: %s write failed",
 		    urdc->primary.file);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "write failed");
 		mutex_exit(&krdc->bmapmutex);
@@ -904,9 +844,6 @@ rdc_write_bitmap_pattern(rdc_k_info_t *krdc, const char pattern)
 	nsc_size_t	tocopy;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap_pattern: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -920,9 +857,6 @@ rdc_write_bitmap_pattern(rdc_k_info_t *krdc, const char pattern)
 
 	if (krdc->bitmapfd == NULL) {
 		mutex_exit(&krdc->bmapmutex);
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_write_bitmap_pattern: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
@@ -944,7 +878,7 @@ rdc_write_bitmap_pattern(rdc_k_info_t *krdc, const char pattern)
 	if (!RDC_SUCCESS(rc)) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-			"rdc_write_bitmap_pattern: maxfbas failed (%d)", rc);
+		    "!rdc_write_bitmap_pattern: maxfbas failed (%d)", rc);
 #endif
 		maxfbas = 256;
 	}
@@ -958,8 +892,8 @@ loop:
 
 	rc = nsc_alloc_buf(krdc->bitmapfd, fba_pos, fba_len, rdc_wrflag, &h);
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "rdc_write_bitmap_pattern: %s write failed %d",
-		    urdc->primary.file, rc);
+		cmn_err(CE_WARN, "!rdc_write_bitmap_pattern: %s "
+		    "write failed %d", urdc->primary.file, rc);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "nsc_alloc_buf failed");
 		if (h) {
 			(void) nsc_free_handle(h);
@@ -985,7 +919,7 @@ loop:
 		if (v->sv_addr == 0 || v->sv_len == 0) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_write_bitmap_pattern: ran off end of handle");
+			    "!rdc_write_bitmap_pattern: ran off end of handle");
 #endif
 			break;
 		}
@@ -999,8 +933,8 @@ loop:
 
 	rc = nsc_write(h, h->sb_pos, h->sb_len, 0);
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "rdc_write_bitmap_pattern: %s write failed %d",
-		    urdc->primary.file, rc);
+		cmn_err(CE_WARN, "!rdc_write_bitmap_pattern: "
+		    "%s write failed %d", urdc->primary.file, rc);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "write failed");
 		(void) nsc_free_buf(h);
 		_rdc_rlse_devs(krdc, RDC_BMP);
@@ -1063,13 +997,11 @@ rdc_ref_size_possible(nsc_size_t bitmap_size, nsc_size_t vol_size)
 	nsc_size_t bitmap_end_fbas;
 
 	bitmap_end_fbas = RDC_BITMAP_FBA + FBA_LEN(bitmap_size);
-	ref_size = FBA_LEN(bitmap_size * BITS_IN_BYTE *
-			sizeof (unsigned char));
+	ref_size = FBA_LEN(bitmap_size * BITS_IN_BYTE * sizeof (unsigned char));
 	if (bitmap_end_fbas + ref_size > vol_size)
 		return ((size_t)0);
 
-	ref_size = FBA_LEN(bitmap_size * BITS_IN_BYTE *
-			sizeof (unsigned int));
+	ref_size = FBA_LEN(bitmap_size * BITS_IN_BYTE * sizeof (unsigned int));
 	if (bitmap_end_fbas + ref_size > vol_size)
 		return (sizeof (unsigned char));
 	return (sizeof (unsigned int));
@@ -1088,16 +1020,10 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 	size_t ref_size;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_move_bitmap: NULL krdc");
-#endif
 		return (-1);
 	}
 
 	if (krdc->bitmapfd == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_move_bitmap: NULL bitmapfd");
-#endif
 		return (-1);
 	}
 
@@ -1105,10 +1031,10 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 	if (RDC_IS_DISKQ(krdc->group)) {
 		/* new volume must support at least the old refcntsize */
 		req_size += FBA_LEN(krdc->bitmap_size * BITS_IN_BYTE *
-			rdc_refcntsize(krdc));
+		    rdc_refcntsize(krdc));
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 	}
 
@@ -1116,7 +1042,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 
 	if (rdc_read_header(krdc, &header) < 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_move_bitmap: Read old header failed");
+		cmn_err(CE_WARN, "!rdc_move_bitmap: Read old header failed");
 #endif
 		mutex_exit(&krdc->bmapmutex);
 		return (-1);
@@ -1131,7 +1057,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 		if (newfd == NULL) {
 			/* Can't open new bitmap */
 			cmn_err(CE_WARN,
-			    "rdc_move_bitmap: Cannot open new bitmap %s",
+			    "!rdc_move_bitmap: Cannot open new bitmap %s",
 			    newbitmap);
 			goto fail;
 		}
@@ -1139,7 +1065,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 
 	sts = nsc_reserve(newfd, 0);
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_move_bitmap: Reserve failed for %s",
+		cmn_err(CE_WARN, "!rdc_move_bitmap: Reserve failed for %s",
 		    newbitmap);
 		goto fail;
 	}
@@ -1148,7 +1074,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 
 	if (!RDC_SUCCESS(sts)) {
 		cmn_err(CE_WARN,
-		    "rdc_move_bitmap: nsc_partsize failed for %s", newbitmap);
+		    "!rdc_move_bitmap: nsc_partsize failed for %s", newbitmap);
 		goto fail;
 	}
 
@@ -1156,7 +1082,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 
 	if (vol_size < req_size) {
 		cmn_err(CE_WARN,
-		    "rdc_move_bitmap: bitmap %s too small: %" NSC_SZFMT
+		    "!rdc_move_bitmap: bitmap %s too small: %" NSC_SZFMT
 		    " vs %" NSC_SZFMT " blocks", newbitmap, vol_size, req_size);
 		goto fail;
 	}
@@ -1169,15 +1095,15 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 			krdc->bitmapfd = oldfd;	/* replace under lock */
 			mutex_exit(&krdc->devices->id_rlock);
 			cmn_err(CE_WARN,
-			    "rdc_move_bitmap: Reserve failed for %s",
+			    "!rdc_move_bitmap: Reserve failed for %s",
 			    newbitmap);
 			goto fail;
 		}
 	}
 	rdc_set_refcnt_ops(krdc, ref_size);
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 	mutex_exit(&krdc->devices->id_rlock);
 
@@ -1196,7 +1122,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 
 	if (rdc_write_header(krdc, &header) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_move_bitmap: Write header %s failed", newbitmap);
+		    "!rdc_move_bitmap: Write header %s failed", newbitmap);
 		goto fail;
 	}
 
@@ -1205,7 +1131,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 	if (rdc_write_bitmap(krdc) < 0) {
 		mutex_enter(&krdc->bmapmutex);
 		cmn_err(CE_WARN,
-		    "rdc_move_bitmap: Write bitmap %s failed", newbitmap);
+		    "!rdc_move_bitmap: Write bitmap %s failed", newbitmap);
 		goto fail;
 	}
 
@@ -1216,8 +1142,8 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 		rdc_group_exit(krdc);
 		rc = nsc_unregister_path(krdc->b_tok, 0);
 		if (rc)
-			cmn_err(CE_WARN,
-			    "rdc_move_bitmap: unregister bitmap failed %d", rc);
+			cmn_err(CE_WARN, "!rdc_move_bitmap: "
+			    "unregister bitmap failed %d", rc);
 		else
 			krdc->b_tok = nsc_register_path(newbitmap,
 			    NSC_CACHE | NSC_DEVICE, _rdc_io_hc);
@@ -1245,14 +1171,14 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 			mutex_exit(krdc->bmp_kstats->ks_lock);
 			KSTAT_IO_PTR(krdc->bmp_kstats)->writes++;
 			KSTAT_IO_PTR(krdc->bmp_kstats)->nwritten +=
-				sizeof (header);
+			    sizeof (header);
 		}
 
 	}
 #ifdef DEBUG
 	if (sts != 0) {
 		cmn_err(CE_WARN,
-		    "rdc_move_bitmap: unable to clear bitmap header on %s",
+		    "!rdc_move_bitmap: unable to clear bitmap header on %s",
 		    nsc_pathname(oldfd));
 	}
 #endif
@@ -1260,7 +1186,7 @@ rdc_move_bitmap(rdc_k_info_t *krdc, char *newbitmap)
 	/* nsc_close will undo any reservation */
 	if (nsc_close(oldfd) != 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_move_bitmap: close of old bitmap failed");
+		cmn_err(CE_WARN, "!rdc_move_bitmap: close old bitmap failed");
 #else
 		;
 		/*EMPTY*/
@@ -1286,9 +1212,6 @@ rdc_close_bitmap(rdc_k_info_t *krdc)
 {
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_close_bitmap: NULL krdc");
-#endif
 		return;
 	}
 
@@ -1297,7 +1220,7 @@ rdc_close_bitmap(rdc_k_info_t *krdc)
 	if (krdc->bitmapfd) {
 		if (nsc_close(krdc->bitmapfd) != 0) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "nsc_close on bitmap failed");
+			cmn_err(CE_WARN, "!nsc_close on bitmap failed");
 #else
 			;
 			/*EMPTY*/
@@ -1316,9 +1239,6 @@ rdc_free_bitmap(rdc_k_info_t *krdc, int cmd)
 	rdc_u_info_t *urdc = &rdc_u_info[krdc->index];
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_free_bitmap: NULL krdc");
-#endif
 		return;
 	}
 
@@ -1335,13 +1255,13 @@ rdc_free_bitmap(rdc_k_info_t *krdc, int cmd)
 		/* gotta drop mutex, in case q needs to fail */
 		if (RDC_IS_DISKQ(krdc->group) && rdc_suspend_diskq(krdc) < 0) {
 			cmn_err(CE_WARN,
-			    "rdc_free_bitmap: diskq suspend failed");
+			    "!rdc_free_bitmap: diskq suspend failed");
 		}
 
 		mutex_enter(&krdc->bmapmutex);
 		if (rdc_read_header(krdc, &header) < 0) {
 			cmn_err(CE_WARN,
-			    "rdc_free_bitmap: Read header failed");
+			    "!rdc_free_bitmap: Read header failed");
 		} else {
 			rdc_fill_header(urdc, &header);
 
@@ -1377,9 +1297,6 @@ rdc_alloc_bitmap(rdc_k_info_t *krdc)
 	nsc_size_t bitmap_ref_size;
 
 	if (krdc == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_alloc_bitmap: NULL krdc");
-#endif
 		return (-1);
 	}
 
@@ -1392,7 +1309,7 @@ rdc_alloc_bitmap(rdc_k_info_t *krdc)
 	if (krdc->dcio_bitmap) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_alloc_bitmap: bitmap %s already allocated",
+		    "!rdc_alloc_bitmap: bitmap %s already allocated",
 		    bitmapname);
 #endif
 		return (0);
@@ -1408,7 +1325,7 @@ rdc_alloc_bitmap(rdc_k_info_t *krdc)
 	krdc->dcio_bitmap = (uchar_t *)kmem_zalloc(krdc->bitmap_size,
 	    KM_SLEEP);
 	if (krdc->dcio_bitmap == NULL) {
-		cmn_err(CE_WARN, "rdc_alloc_bitmap: alloc %" NSC_SZFMT
+		cmn_err(CE_WARN, "!rdc_alloc_bitmap: alloc %" NSC_SZFMT
 		    " failed for %s", krdc->bitmap_size, bitmapname);
 		return (-1);
 	}
@@ -1424,7 +1341,7 @@ rdc_alloc_bitmap(rdc_k_info_t *krdc)
 		    KM_SLEEP);
 		if (krdc->bitmap_ref == NULL) {
 			cmn_err(CE_WARN,
-			    "rdc_alloc_bitmap: ref alloc %" NSC_SZFMT
+			    "!rdc_alloc_bitmap: ref alloc %" NSC_SZFMT
 			    " failed for %s",
 			    bitmap_ref_size, bitmapname);
 			return (-1);
@@ -1464,8 +1381,8 @@ rdc_open_bitmap(rdc_k_info_t *krdc)
 
 	rdc_set_refcnt_ops(krdc, sizeof (unsigned char));
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 	if (krdc->bitmapfd == NULL)
 		krdc->bitmapfd = nsc_open(bitmapname,
@@ -1474,7 +1391,7 @@ rdc_open_bitmap(rdc_k_info_t *krdc)
 		krdc->bitmapfd = nsc_open(bitmapname,
 		    NSC_RDCHR_ID|NSC_CACHE|NSC_DEVICE|NSC_RDWR, 0, 0, 0);
 		if (krdc->bitmapfd == NULL) {
-			cmn_err(CE_WARN, "rdc_open_bitmap: Unable to open %s",
+			cmn_err(CE_WARN, "!rdc_open_bitmap: Unable to open %s",
 			    bitmapname);
 			goto fail;
 		}
@@ -1482,7 +1399,7 @@ rdc_open_bitmap(rdc_k_info_t *krdc)
 
 	sts = _rdc_rsrv_devs(krdc, RDC_BMP, RDC_INTERNAL);
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_open_bitmap: Reserve failed for %s",
+		cmn_err(CE_WARN, "!rdc_open_bitmap: Reserve failed for %s",
 		    bitmapname);
 		goto fail;
 	}
@@ -1491,14 +1408,14 @@ rdc_open_bitmap(rdc_k_info_t *krdc)
 
 	if (!RDC_SUCCESS(sts)) {
 		cmn_err(CE_WARN,
-		    "rdc_open_bitmap: nsc_partsize failed for %s", bitmapname);
+		    "!rdc_open_bitmap: nsc_partsize failed for %s", bitmapname);
 		goto fail;
 	}
 
 	if (vol_size < req_size) {
 		/* minimum size supports unsigned char reference counts */
 		cmn_err(CE_WARN,
-		    "rdc_open_bitmap: bitmap %s too small: %" NSC_SZFMT " vs %"
+		    "!rdc_open_bitmap: bitmap %s too small: %" NSC_SZFMT " vs %"
 		    NSC_SZFMT "blocks",
 		    bitmapname, vol_size, req_size);
 		goto fail;
@@ -1519,8 +1436,8 @@ rdc_open_bitmap(rdc_k_info_t *krdc)
 	    BMAP_REF_PREF_SIZE)) {
 		/* test for larger ref counts */
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 		req_size = bit_size;
 		req_size += FBA_LEN(krdc->bitmap_size * BITS_IN_BYTE *
@@ -1529,8 +1446,8 @@ rdc_open_bitmap(rdc_k_info_t *krdc)
 			rdc_set_refcnt_ops(krdc, sizeof (unsigned int));
 	}
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 	return (0);
 
@@ -1564,7 +1481,7 @@ rdc_enable_bitmap(rdc_k_info_t *krdc, int set)
 	rdc_clr_flags(urdc, RDC_BMP_FAILED);
 	if (rdc_read_header(krdc, &header) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_enable_bitmap: Read header %s failed", bitmapname);
+		    "!rdc_enable_bitmap: Read header %s failed", bitmapname);
 		mutex_exit(&krdc->bmapmutex);
 		goto fail;
 	}
@@ -1577,7 +1494,7 @@ rdc_enable_bitmap(rdc_k_info_t *krdc, int set)
 
 	if (rdc_write_header(krdc, &header) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_enable_bitmap: Write header %s failed",
+		    "!rdc_enable_bitmap: Write header %s failed",
 		    bitmapname);
 		mutex_exit(&krdc->bmapmutex);
 		goto fail;
@@ -1586,7 +1503,7 @@ rdc_enable_bitmap(rdc_k_info_t *krdc, int set)
 
 	if (rdc_write_bitmap(krdc) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_enable_bitmap: Write bitmap %s failed",
+		    "!rdc_enable_bitmap: Write bitmap %s failed",
 		    bitmapname);
 		goto fail;
 	}
@@ -1614,7 +1531,7 @@ _rdc_rdwr_refcnt(rdc_k_info_t *krdc, int rwflg)
 	urdc = &rdc_u_info[krdc->index];
 
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "rdc_rdwr_refcnt: %s refcount for %s",
+	cmn_err(CE_NOTE, "!rdc_rdwr_refcnt: %s refcount for %s",
 	    (rwflg == NSC_READ) ? "resuming" : "writing",
 	    urdc->primary.bitmap);
 #endif
@@ -1622,12 +1539,12 @@ _rdc_rdwr_refcnt(rdc_k_info_t *krdc, int rwflg)
 	mutex_enter(&krdc->bmapmutex);
 
 	if (_rdc_rsrv_devs(krdc, RDC_BMP, RDC_INTERNAL)) {
-		cmn_err(CE_WARN, "rdc_rdwr_refcnt: reserve failed");
+		cmn_err(CE_WARN, "!rdc_rdwr_refcnt: reserve failed");
 		goto fail;
 	}
 
 	if (krdc->bitmap_size == 0) {
-		cmn_err(CE_WARN, "rdc_rdwr_refcnt: NULL bitmap!");
+		cmn_err(CE_WARN, "!rdc_rdwr_refcnt: NULL bitmap!");
 		goto fail;
 	}
 
@@ -1638,7 +1555,7 @@ _rdc_rdwr_refcnt(rdc_k_info_t *krdc, int rwflg)
 	    (uchar_t *)krdc->bitmap_ref, len);
 
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "unable to %s refcount from bitmap %s",
+		cmn_err(CE_WARN, "!unable to %s refcount from bitmap %s",
 		    (rwflg == NSC_READ) ? "retrieve" : "write",
 		    urdc->primary.bitmap);
 		rdc_set_flags_log(urdc, RDC_BMP_FAILED, "refcount I/O failed");
@@ -1650,7 +1567,7 @@ _rdc_rdwr_refcnt(rdc_k_info_t *krdc, int rwflg)
 	mutex_exit(&krdc->bmapmutex);
 
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "rdc_rdwr_refcnt: %s refcount for %s",
+	cmn_err(CE_NOTE, "!rdc_rdwr_refcnt: %s refcount for %s",
 	    (rwflg == NSC_READ) ? "resumed" : "wrote",
 	    urdc->primary.bitmap);
 #endif
@@ -1708,7 +1625,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 		bitmapname = &urdc->secondary.bitmap[0];
 
 	if (header->magic != RDC_HDR_MAGIC) {
-		cmn_err(CE_WARN, "rdc_resume_state: Bad magic in %s",
+		cmn_err(CE_WARN, "!rdc_resume_state: Bad magic in %s",
 		    bitmapname);
 		return (-1);
 	}
@@ -1717,7 +1634,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 	    NSC_MAXPATH) != 0) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_resume_state: Found %s Expected %s",
+		    "!rdc_resume_state: Found %s Expected %s",
 		    header->primary.file, urdc->primary.file);
 #endif /* DEBUG */
 		return (-1);
@@ -1727,7 +1644,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 	    NSC_MAXPATH) != 0) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_resume_state: Found %s Expected %s",
+		    "!rdc_resume_state: Found %s Expected %s",
 		    header->secondary.file, urdc->secondary.file);
 #endif /* DEBUG */
 		return (-1);
@@ -1737,7 +1654,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 	    NSC_MAXPATH) != 0) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_resume_state: Found %s Expected %s",
+		    "!rdc_resume_state: Found %s Expected %s",
 		    header->primary.bitmap, urdc->primary.bitmap);
 #endif /* DEBUG */
 		return (-1);
@@ -1747,7 +1664,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 	    NSC_MAXPATH) != 0) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_resume_state: Found %s Expected %s",
+		    "!rdc_resume_state: Found %s Expected %s",
 		    header->secondary.bitmap, urdc->secondary.bitmap);
 #endif /* DEBUG */
 		return (-1);
@@ -1768,8 +1685,8 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 	rdc_many_enter(krdc);
 	rdc_set_refcnt_ops(krdc, header->refcntsize);
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 	if (header->flags & RDC_VOL_FAILED)
 		rdc_set_flags(urdc, RDC_VOL_FAILED);
@@ -1787,7 +1704,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 
 		if (RDC_FILL_BITMAP(krdc, TRUE) != 0) {
 			cmn_err(CE_WARN,
-			    "rdc_resume_state: Fill bitmap %s failed",
+			    "!rdc_resume_state: Fill bitmap %s failed",
 			    bitmapname);
 			return (-1);
 		}
@@ -1800,7 +1717,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 
 		if (rdc_read_bitmap(krdc, NULL) < 0) {
 			cmn_err(CE_WARN,
-			    "rdc_resume_state: Read bitmap %s failed",
+			    "!rdc_resume_state: Read bitmap %s failed",
 			    bitmapname);
 			return (-1);
 		}
@@ -1824,7 +1741,7 @@ rdc_resume_state(rdc_k_info_t *krdc, const rdc_header_t *header)
 		mutex_enter(QLOCK(q));
 		if ((rdc_read_refcount(krdc) < 0)) {
 			cmn_err(CE_WARN,
-			    "rdc_resume_state: Resume bitmap %s's refcount"
+			    "!rdc_resume_state: Resume bitmap %s's refcount"
 			    "failed",
 			    urdc->primary.bitmap);
 			mutex_exit(QLOCK(q));
@@ -1864,7 +1781,7 @@ rdc_resume_bitmap(rdc_k_info_t *krdc)
 	rdc_clr_flags(urdc, RDC_BMP_FAILED);
 	if (rdc_read_header(krdc, &header) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_resume_bitmap: Read header %s failed", bitmapname);
+		    "!rdc_resume_bitmap: Read header %s failed", bitmapname);
 		mutex_exit(&krdc->bmapmutex);
 		goto fail;
 	}
@@ -1884,7 +1801,7 @@ rdc_resume_bitmap(rdc_k_info_t *krdc)
 
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_resume_bitmap: Converting v2 header for bitmap %s",
+		    "!rdc_resume_bitmap: Converting v2 header for bitmap %s",
 		    bitmapname);
 #endif
 		bzero((char *)&new_header, sizeof (rdc_header_t));
@@ -1927,7 +1844,7 @@ rdc_resume_bitmap(rdc_k_info_t *krdc)
 		if (rdc_write_header(krdc, &header) < 0) {
 			mutex_exit(&krdc->bmapmutex);
 			cmn_err(CE_WARN,
-			    "rdc_resume_bitmap: Write header %s failed",
+			    "!rdc_resume_bitmap: Write header %s failed",
 			    bitmapname);
 			goto fail;
 		}
@@ -1943,7 +1860,7 @@ rdc_resume_bitmap(rdc_k_info_t *krdc)
 		if (rdc_write_header(krdc, &header) < 0) {
 			mutex_exit(&krdc->bmapmutex);
 			cmn_err(CE_WARN,
-			    "rdc_resume_bitmap: Write header %s failed",
+			    "!rdc_resume_bitmap: Write header %s failed",
 			    bitmapname);
 			goto fail;
 		}
@@ -1984,9 +1901,6 @@ rdc_std_zero_bitref(rdc_k_info_t *krdc)
 		if (RDC_IS_DISKQ(krdc->group) && rdc_refcntsize(krdc) !=
 		    BMAP_REF_PREF_SIZE) {
 			/* see if we can upgrade the size of the ref counters */
-#ifdef DEBUG_REFCNT
-			cmn_err(CE_NOTE, "sndr: check for new refcount size");
-#endif
 			sts = _rdc_rsrv_devs(krdc, RDC_BMP, RDC_INTERNAL);
 			if (!RDC_SUCCESS(sts)) {
 				goto nochange;
@@ -1994,12 +1908,12 @@ rdc_std_zero_bitref(rdc_k_info_t *krdc)
 			sts = nsc_partsize(krdc->bitmapfd, &vol_size);
 
 			newrefcntsize = rdc_ref_size_possible(krdc->bitmap_size,
-				vol_size);
+			    vol_size);
 			if (newrefcntsize > rdc_refcntsize(krdc)) {
 				rdc_set_refcnt_ops(krdc, newrefcntsize);
 #ifdef DEBUG_REFCNT
-	cmn_err(CE_NOTE, "sndr:	refcntsize %d - %d:%s",
-		(int)rdc_refcntsize(krdc), __LINE__, __FILE__);
+	cmn_err(CE_NOTE, "!sndr: refcntsize %d - %d:%s",
+	    (int)rdc_refcntsize(krdc), __LINE__, __FILE__);
 #endif
 			}
 nochange:
@@ -2027,7 +1941,7 @@ rdc_reset_bitmap(rdc_k_info_t *krdc)
 	rdc_clr_flags(urdc, RDC_BMP_FAILED);
 	if (rdc_read_header(krdc, &header) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_reset_bitmap: Read header %s failed", bitmapname);
+		    "!rdc_reset_bitmap: Read header %s failed", bitmapname);
 		goto fail_with_mutex;
 	}
 
@@ -2035,7 +1949,7 @@ rdc_reset_bitmap(rdc_k_info_t *krdc)
 
 	if (rdc_write_header(krdc, &header) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_reset_bitmap: Write header %s failed",
+		    "!rdc_reset_bitmap: Write header %s failed",
 		    bitmapname);
 		goto fail_with_mutex;
 	}
@@ -2047,14 +1961,14 @@ rdc_reset_bitmap(rdc_k_info_t *krdc)
 	if (krdc->bitmap_write == 0) {
 		if (rdc_write_bitmap_fill(krdc) < 0) {
 			cmn_err(CE_WARN,
-			    "rdc_reset_bitmap: Write bitmap %s failed",
+			    "!rdc_reset_bitmap: Write bitmap %s failed",
 			    bitmapname);
 			goto fail;
 		}
 		krdc->bitmap_write = -1;
 	} else if (rdc_write_bitmap(krdc) < 0) {
 		cmn_err(CE_WARN,
-		    "rdc_reset_bitmap: Write bitmap %s failed",
+		    "!rdc_reset_bitmap: Write bitmap %s failed",
 		    bitmapname);
 		goto fail;
 	}
@@ -2067,8 +1981,8 @@ fail_with_mutex:
 	rdc_set_flags_log(urdc, RDC_BMP_FAILED, "reset failed");
 	mutex_exit(&krdc->bmapmutex);
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SNDR: unable to reset bitmap for %s:%s",
-		urdc->secondary.intf, urdc->secondary.file);
+	cmn_err(CE_NOTE, "!SNDR: unable to reset bitmap for %s:%s",
+	    urdc->secondary.intf, urdc->secondary.file);
 #endif
 	return (-1);
 }
@@ -2123,8 +2037,10 @@ _rdc_net_bmap(const struct bmap6 *b6, net_bdata6 *bd6)
 	struct timeval t;
 	int e, ret;
 	uint64_t left;
-	uint64_t bmap_blksize = krdc->rpc_version < RDC_VERSION7 ?
-		BMAP_BLKSIZE : BMAP_BLKSIZEV7;
+	uint64_t bmap_blksize;
+
+	bmap_blksize = krdc->rpc_version < RDC_VERSION7 ?
+	    BMAP_BLKSIZE : BMAP_BLKSIZEV7;
 
 	t.tv_sec = rdc_rpc_tmout;
 	t.tv_usec = 0;
@@ -2256,11 +2172,11 @@ again:
 
 		if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
-		    cmn_err(CE_WARN,
-			"rdc_std_set_bitmap: recovery bitmaps not allocated");
+			cmn_err(CE_WARN, "!rdc_std_set_bitmap: "
+			    "recovery bitmaps not allocated");
 #endif
-		    mutex_exit(&krdc->bmapmutex);
-		    return (-1);
+			mutex_exit(&krdc->bmapmutex);
+			return (-1);
 		}
 
 		use_ref = IS_PRIMARY(urdc) && IS_ASYNC(urdc) &&
@@ -2310,14 +2226,14 @@ again:
 						delay(4);
 						rdc_bitmap_delay++;
 						if (printerr--) {
-	cmn_err(CE_WARN, "SNDR: bitmap reference count maxed out for %s:%s",
+	cmn_err(CE_WARN, "!SNDR: bitmap reference count maxed out for %s:%s",
 	    urdc->secondary.intf, urdc->secondary.file);
 
 						}
 
 						if ((tries-- <= 0) &&
 						    IS_STATE(urdc, queuing)) {
-	cmn_err(CE_WARN, "SNDR: giving up on reference count, logging set"
+	cmn_err(CE_WARN, "!SNDR: giving up on reference count, logging set"
 	    " %s:%s", urdc->secondary.intf, urdc->secondary.file);
 							rdc_group_enter(krdc);
 							rdc_group_log(krdc,
@@ -2366,11 +2282,11 @@ rdc_std_clr_bitmap(rdc_k_info_t *krdc, const nsc_off_t fba_pos,
 
 		if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
-		    cmn_err(CE_WARN,
-			"rdc_std_clr_bitmap: recovery bitmaps not allocated");
+			cmn_err(CE_WARN, "!rdc_std_clr_bitmap: "
+			    "recovery bitmaps not allocated");
 #endif
-		    mutex_exit(&krdc->bmapmutex);
-		    return;
+			mutex_exit(&krdc->bmapmutex);
+			return;
 		}
 
 		if (((bitmask == 0xffffffff) ||
@@ -2397,7 +2313,7 @@ rdc_std_clr_bitmap(rdc_k_info_t *krdc, const nsc_off_t fba_pos,
 				urdc->bits_set--;
 				if (!fbaset || fba != BIT_TO_FBA(st)) {
 					if (fbaset &&
-						krdc->bitmap_write > 0) {
+					    krdc->bitmap_write > 0) {
 						mutex_exit(&krdc->bmapmutex);
 						if (rdc_write_bitmap_fba(krdc,
 						    fba) < 0)
@@ -2444,11 +2360,11 @@ rdc_std_check_bit(rdc_k_info_t *krdc, nsc_off_t pos, nsc_size_t len)
 
 		if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
-		    cmn_err(CE_WARN,
-			"rdc_std_check_bit: recovery bitmaps not allocated");
+			cmn_err(CE_WARN, "!rdc_std_check_bit: "
+			    "recovery bitmaps not allocated");
 #endif
-		    mutex_exit(&krdc->bmapmutex);
-		    return;
+			mutex_exit(&krdc->bmapmutex);
+			return;
 		}
 
 		if (!BMAP_BIT_ISSET(krdc->dcio_bitmap, st)) {
@@ -2484,7 +2400,7 @@ rdc_std_count_dirty(rdc_k_info_t *krdc)
 	if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_std_count_dirty: no bitmap configured for %s",
+		    "!rdc_std_count_dirty: no bitmap configured for %s",
 		    urdc->primary.file);
 #endif
 		return (0);
@@ -2525,7 +2441,7 @@ rdc_std_fill_bitmap(rdc_k_info_t *krdc, const int write)
 	if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_std_fill_bitmap: no bitmap configured for %s",
+		    "!rdc_std_fill_bitmap: no bitmap configured for %s",
 		    urdc->primary.file);
 #endif
 		return (-1);
@@ -2560,13 +2476,13 @@ rdc_std_zero_bitmap(rdc_k_info_t *krdc)
 	if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "rdc_std_zero_bitmap: no bitmap configured for %s",
+		    "!rdc_std_zero_bitmap: no bitmap configured for %s",
 		    urdc->primary.file);
 #endif
 		return;
 	}
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "Clearing bitmap for %s", urdc->secondary.file);
+	cmn_err(CE_NOTE, "!Clearing bitmap for %s", urdc->secondary.file);
 #endif
 
 	ASSERT(urdc->volume_size != 0);

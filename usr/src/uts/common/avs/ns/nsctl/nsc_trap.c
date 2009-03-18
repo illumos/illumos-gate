@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,51 +47,35 @@ nsc_do_sysevent(char *driver_name, char *trap_messages, int errorno,
 	attr_list = NULL;
 	rc = nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, KM_SLEEP);
 	if (rc != 0) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "%s: unable to alloc sysevent", driver_name);
-#endif
 		goto out;
 	}
 	rc = nvlist_add_int32(attr_list, "alertlevel", alertlevel);
 	if (rc != 0) {
-#ifdef DEBUG
-		cmn_err(CE_WARN,
-		    "%s: unable to add node data to sysevent", driver_name);
-#endif
 		goto out;
 	}
-	rc = nvlist_add_string(attr_list, "messagevalue",
-		trap_messages);
+	rc = nvlist_add_string(attr_list, "messagevalue", trap_messages);
 	if (rc != 0) {
-#ifdef DEBUG
-		cmn_err(CE_WARN,
-		    "%s: unable to add state data to sysevent", driver_name);
-#endif
 		goto out;
 	}
 	rc = nvlist_add_int32(attr_list, "errorno", errorno);
 	if (rc != 0) {
-#ifdef DEBUG
-		cmn_err(CE_WARN,
-		    "%s: unable to add value data to sysevent", driver_name);
-#endif
 		goto out;
 	}
 	if (strcmp(driver_name, "sdbc") == 0)
 		rc = ddi_log_sysevent(info_dip, DDI_VENDOR_SUNW,
-		SVE_CACHE_CLASS, component, attr_list, NULL, DDI_SLEEP);
+		    SVE_CACHE_CLASS, component, attr_list, NULL, DDI_SLEEP);
 	else if (strcmp(driver_name, "ste") == 0)
 		rc = ddi_log_sysevent(info_dip, DDI_VENDOR_SUNW,
-		SVE_STE_CLASS, component, attr_list, NULL, DDI_SLEEP);
+		    SVE_STE_CLASS, component, attr_list, NULL, DDI_SLEEP);
 	else if (strcmp(driver_name, "ii") == 0)
 		rc = ddi_log_sysevent(info_dip, DDI_VENDOR_SUNW,
-		SVE_II_CLASS, component, attr_list, NULL, DDI_SLEEP);
+		    SVE_II_CLASS, component, attr_list, NULL, DDI_SLEEP);
 out:
 	if (attr_list)
 		nvlist_free(attr_list);
 
 	if (rc != 0) {
-		cmn_err(CE_WARN, "%s: unable to log sysevent %d:%s and %d",
+		cmn_err(CE_WARN, "!%s: unable to log sysevent %d:%s and %d",
 		    driver_name, errorno, trap_messages, alertlevel);
 	}
 #endif  /* which O/S? */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ cl_call_sig(struct __client *rh, rpcproc_t proc,
 	sigintr(&smask, 0);
 	rh->cl_nosignal = TRUE;
 	stat = ((*(rh)->cl_ops->cl_call)\
-		(rh, proc, xargs, argsp, xres, resp, secs));
+	    (rh, proc, xargs, argsp, xres, resp, secs));
 	rh->cl_nosignal = FALSE;
 	sigunintr(&smask);
 	return (stat);
@@ -137,7 +137,7 @@ rdc_net_getsize(int index, uint64_t *sizeptr)
 #ifdef DEBUG
 	if (krdc->intf == NULL)
 		cmn_err(CE_WARN,
-		    "rdc_net_getsize: null intf for index %d", index);
+		    "!rdc_net_getsize: null intf for index %d", index);
 #endif
 	if (krdc->rpc_version <= RDC_VERSION5) {
 		err = rdc_clnt_call(krdc->lsrv, RDCPROC_GETSIZE,
@@ -236,7 +236,7 @@ rdc_net_getbmap(int index, int size)
 #ifdef DEBUG
 	if (krdc->intf == NULL)
 		cmn_err(CE_WARN,
-		    "rdc_net_getbmap: null intf for index %d", index);
+		    "!rdc_net_getbmap: null intf for index %d", index);
 #endif
 
 	if (krdc->rpc_version <= RDC_VERSION5) {
@@ -316,7 +316,7 @@ again:
 	    xdr_proc, setp, xdr_int, (char *)&state, &t);
 
 	if (err == RPC_PROGVERSMISMATCH && (krdc->rpc_version !=
-		RDC_VERS_MIN)) {
+	    RDC_VERS_MIN)) {
 		if (krdc->rpc_version-- == RDC_VERSION7) {
 			/* set_state struct changed with v7 of protocol */
 #ifdef sparc
@@ -325,7 +325,7 @@ again:
 			bcopy(urdc->primary.addr.buf, s4.netaddr,
 			    s4.netaddrlen);
 			bcopy(urdc->secondary.addr.buf, s4.rnetaddr,
-			s4.rnetaddrlen);
+			    s4.rnetaddrlen);
 			(void) strncpy(s4.pfile, urdc->primary.file,
 			    RDC_MAXNAMLEN);
 			(void) strncpy(s4.sfile, urdc->secondary.file,
@@ -341,7 +341,7 @@ again:
 		goto again;
 	}
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "sndr get_state: Protocol ver %d", krdc->rpc_version);
+	cmn_err(CE_NOTE, "!sndr get_state: Protocol ver %d", krdc->rpc_version);
 #endif
 
 	if (err) {
@@ -376,7 +376,7 @@ xdr_rdresult(XDR *xdrs, readres *rr)
 {
 
 	return (xdr_union(xdrs, (enum_t *)&(rr->rr_status),
-		(caddr_t)&(rr->rr_ok), rdres_discrim, xdr_void));
+	    (caddr_t)&(rr->rr_ok), rdres_discrim, xdr_void));
 }
 
 static int
@@ -427,7 +427,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 
 	if (!RDC_HANDLE_LIMITS(handle, fba_pos, fba_len)) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_net_read: handle bounds");
+		cmn_err(CE_NOTE, "!rdc_net_read: handle bounds");
 #endif
 		return (EINVAL);
 	}
@@ -476,7 +476,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 #ifdef DEBUG
 	if (krdc->intf == NULL)
 		cmn_err(CE_WARN,
-		    "rdc_net_read: null intf for index %d", local_index);
+		    "!rdc_net_read: null intf for index %d", local_index);
 #endif
 	/*
 	 * switch on proto version.
@@ -511,7 +511,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 
 	if (err) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_net_read: setup err %d", err);
+		cmn_err(CE_NOTE, "!rdc_net_read: setup err %d", err);
 #endif
 		if (err == RPC_INTR)
 			ret = EINTR;
@@ -524,7 +524,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 	if (ret == 0) {		/* No valid index from r_net_read */
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-		    "rdc_net_read: no valid index from r_net_read");
+		    "!rdc_net_read: no valid index from r_net_read");
 #endif
 		return (ENOBUFS);
 	}
@@ -581,7 +581,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 		if (!rr.rr_data) {
 			/* error */
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "rdc_net_read: kmem_alloc failed");
+			cmn_err(CE_NOTE, "!rdc_net_read: kmem_alloc failed");
 #endif
 			return (ENOMEM);
 		}
@@ -591,7 +591,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 #ifdef DEBUG
 		if (krdc->intf == NULL)
 			cmn_err(CE_WARN,
-			    "rdc_net_read: null intf for index %d",
+			    "!rdc_net_read: null intf for index %d",
 			    local_index);
 #endif
 		if (krdc->io_kstats) {
@@ -624,7 +624,7 @@ rdc_net_read(int local_index, int remote_index, nsc_buf_t *handle,
 
 		if (err) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "rdc_net_read: rpc err %d", err);
+			cmn_err(CE_NOTE, "!rdc_net_read: rpc err %d", err);
 #endif
 			if (err == RPC_INTR) {
 				ret = EINTR;
@@ -722,7 +722,7 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 	/* if not a diskq buffer */
 	if ((qpos == -1) && (!RDC_HANDLE_LIMITS(handle, fba_pos, fba_len))) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_net_write: handle bounds");
+		cmn_err(CE_NOTE, "!rdc_net_write: handle bounds");
 #endif
 		return (EINVAL);
 	}
@@ -789,9 +789,8 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 
 #ifdef DEBUG
 	if (krdc->intf == NULL)
-		cmn_err(CE_WARN,
-			"rdc_net_write: null intf for index %d",
-			local_index);
+		cmn_err(CE_WARN, "!rdc_net_write: null intf for index %d",
+		    local_index);
 #endif
 
 	vec = handle->sb_vec;
@@ -838,7 +837,7 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 		if (!transptr) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "rdc_net_write: walked off end of handle!");
+			    "!rdc_net_write: walked off end of handle!");
 #endif
 			ret = EINVAL;
 			goto remote_error;
@@ -866,7 +865,7 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 #ifdef DEBUG
 		if (krdc->intf == NULL)
 			cmn_err(CE_WARN,
-			    "rdc_net_write: null intf for index %d",
+			    "!rdc_net_write: null intf for index %d",
 			    local_index);
 #endif
 		DTRACE_PROBE(rdc_netwrite_clntcall_start);
@@ -919,8 +918,8 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 				ret = ENOLINK;
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-				"rdc_net_write(5): cd %d err %d ret %d",
-				remote_index, err, ret);
+			    "!rdc_net_write(5): cd %d err %d ret %d",
+			    remote_index, err, ret);
 #endif
 			goto remote_error;
 		}
@@ -928,7 +927,7 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 		if (netresptr->result < 0) {
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "rdc_net_write: r_net_write(5) "
+			    "!rdc_net_write: r_net_write(5) "
 			    "returned: %d",
 			    -netresptr->result);
 #endif
@@ -941,7 +940,7 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 		} else if (netresptr->index == 0) {
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "rdc_net_write: no valid index from "
+			    "!rdc_net_write: no valid index from "
 			    "r_net_write(5)");
 #endif
 			ret = ENOBUFS;
@@ -962,7 +961,7 @@ rdc_net_write(int local_index, int remote_index, nsc_buf_t *handle,
 		if (krdc->io_kstats) {
 			KSTAT_IO_PTR(krdc->io_kstats)->writes++;
 			KSTAT_IO_PTR(krdc->io_kstats)->nwritten +=
-				FBA_SIZE(translen);
+			    FBA_SIZE(translen);
 		}
 		transptr += FBA_SIZE(translen);
 		sv_len -= FBA_SIZE(translen);
@@ -1022,7 +1021,7 @@ rdc_dump_alloc_bufs_cd(int index)
 	if (!krdc->c_fd) {
 		/* cannot do anything! */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_dump_alloc_bufs_cd(%d): c_fd NULL",
+		cmn_err(CE_WARN, "!rdc_dump_alloc_bufs_cd(%d): c_fd NULL",
 		    index);
 #endif
 		return (0);
@@ -1053,7 +1052,7 @@ rdc_dump_alloc_bufs_cd(int index)
 			int tries = 5;
 #ifdef DEBUG_DISKQ
 			cmn_err(CE_NOTE,
-			    "dumpalloccd sending diskq->memq flusher to sleep");
+			    "!dumpalloccd sending diskq->memq flush to sleep");
 #endif
 			q->qfflags |= RDC_QFILLSLEEP;
 			mutex_exit(&q->net_qlock);
@@ -1222,7 +1221,7 @@ _rdc_async_throttle(rdc_k_info_t *this, long len)
 			    (_rdc_diskq_isfull(q, len)) &&
 			    (!IS_STATE(urdc, RDC_DISKQ_FAILED))) {
 				if (print_msg) {
-					cmn_err(CE_WARN, "rdc async throttle:"
+					cmn_err(CE_WARN, "!rdc async throttle:"
 					    " disk queue %s full",
 					    &urdc->disk_queue[0]);
 
@@ -1237,10 +1236,13 @@ _rdc_async_throttle(rdc_k_info_t *this, long len)
 				q->throttle_delay += 10;
 
 				if (!(tries--) && IS_STATE(urdc, RDC_QUEUING)) {
-	cmn_err(CE_WARN, "SNDR: disk queue %s full and not flushing. giving up",
-	    &urdc->disk_queue[0]);
-	cmn_err(CE_WARN, "SNDR: %s:%s entering logging mode",
-	    urdc->secondary.intf, urdc->secondary.file);
+					cmn_err(CE_WARN, "!SNDR: disk queue "
+					    "%s full & not flushing. giving up",
+					    &urdc->disk_queue[0]);
+					cmn_err(CE_WARN, "!SNDR: %s:%s entering"
+					    " logging mode",
+					    urdc->secondary.intf,
+					    urdc->secondary.file);
 					rdc_fail_diskq(krdc, RDC_WAIT,
 					    RDC_DOLOG | RDC_NOFAIL);
 					mutex_enter(QLOCK(q));
@@ -1253,7 +1255,7 @@ _rdc_async_throttle(rdc_k_info_t *this, long len)
 			    _rdc_diskq_isfull(q, len) &&
 			    !IS_STATE(urdc, RDC_DISKQ_FAILED)) {
 				if (print_msg) {
-					cmn_err(CE_WARN, "disk queue %s full",
+					cmn_err(CE_WARN, "!disk queue %s full",
 					    &urdc->disk_queue[0]);
 					print_msg = 0;
 				}
@@ -1369,9 +1371,9 @@ rdc_memq_enqueue(rdc_k_info_t *krdc, rdc_aio_t *aio)
 #ifdef DEBUG
 		if (q->blocks != 0 || q->nitems != 0) {
 			cmn_err(CE_PANIC,
-			"rdc enqueue: q %p, qhead 0, q blocks %" NSC_SZFMT
-			", nitems %" NSC_SZFMT,
-				(void *) q, q->blocks, q->nitems);
+			    "rdc enqueue: q %p, qhead 0, q blocks %" NSC_SZFMT
+			    ", nitems %" NSC_SZFMT,
+			    (void *) q, q->blocks, q->nitems);
 		}
 #endif
 
@@ -1404,10 +1406,10 @@ out:
 
 		if (qblocks != q->blocks || nitems != q->nitems) {
 			cmn_err(CE_PANIC,
-			"rdc enqueue: q %p, q blocks %" NSC_SZFMT " (%"
-			NSC_SZFMT "), nitems %" NSC_SZFMT " (%" NSC_SZFMT ")",
-				(void *) q, q->blocks, qblocks, q->nitems,
-				nitems);
+			    "rdc enqueue: q %p, q blocks %" NSC_SZFMT " (%"
+			    NSC_SZFMT "), nitems %" NSC_SZFMT " (%"
+			    NSC_SZFMT ")", (void *) q, q->blocks, qblocks,
+			    q->nitems, nitems);
 		}
 	}
 #endif
@@ -1569,7 +1571,7 @@ rdc_writer(int index)
 
 		/* that failed; add a thread to the set and try again */
 		if (nst_add_thread(_rdc_flset, 1) != 1) {
-			cmn_err(CE_WARN, "rdc_writer index %d nst_add_thread "
+			cmn_err(CE_WARN, "!rdc_writer index %d nst_add_thread "
 			    "error, tries: %d", index, tries);
 			break;
 		}
@@ -1585,7 +1587,7 @@ rdc_writer(int index)
 		return (1);
 	}
 
-	cmn_err(CE_WARN, "rdc_writer: index %d nst_create error", index);
+	cmn_err(CE_WARN, "!rdc_writer: index %d nst_create error", index);
 	rdc_many_enter(krdc);
 	mutex_enter(qlock);
 	group->rdc_thrnum--;
@@ -1597,7 +1599,7 @@ rdc_writer(int index)
 		 * failing to be created.
 		 */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_writer: group being destroyed");
+		cmn_err(CE_WARN, "!rdc_writer: group being destroyed");
 #endif
 		rdc_delgroup(group);
 		krdc->group = NULL;
@@ -1641,21 +1643,21 @@ rdc_flush_memq(int index)
 	rdc_group_t *group = krdc->group;
 	if (!group || group->count == 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_flush_memq: no group left!");
+		cmn_err(CE_WARN, "!rdc_flush_memq: no group left!");
 #endif
 		return;
 	}
 
 	if (!krdc->c_fd) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_flush_memq: no c_fd!");
+		cmn_err(CE_WARN, "!rdc_flush_memq: no c_fd!");
 #endif
 		goto thread_death;
 	}
 
 #ifdef DEBUG_DISABLE
 	if (index < 0 || (krdc->type_flag & RDC_DISABLEPEND)) {
-		cmn_err(CE_WARN, "rdc_flush_memq: DISABLE PENDING!");
+		cmn_err(CE_WARN, "!rdc_flush_memq: DISABLE PENDING!");
 		/*
 		 * Need to continue as we may be trying to flush IO
 		 * while trying to disable or suspend
@@ -1674,7 +1676,7 @@ rdc_flush_memq(int index)
 		group = krdc->group;
 		if (!group || group->count == 0) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "rdc_flush_memq: no group left!");
+			cmn_err(CE_WARN, "!rdc_flush_memq: no group left!");
 #endif
 			break;
 		}
@@ -1782,7 +1784,7 @@ rdc_flush_memq(int index)
 			rdc_group_enter(krdc);
 			ASSERT(krdc->group);
 			rdc_group_log(krdc, RDC_NOFLUSH | RDC_ALLREMOTE,
-				"memq flush aio status not RDC_IO_DONE");
+			    "memq flush aio status not RDC_IO_DONE");
 			rdc_group_exit(krdc);
 			rdc_dump_queue(aio->index);
 		}
@@ -1807,7 +1809,7 @@ thread_death:
 		 * Race with remove_from_group while write thread was running
 		 */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_flush_memq: group being destroyed");
+		cmn_err(CE_WARN, "!rdc_flush_memq: group being destroyed");
 #endif
 		rdc_delgroup(group);
 		krdc->group = NULL;
@@ -1836,21 +1838,21 @@ rdc_flush_diskq(int index)
 
 	if (!group || group->count == 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_flush_diskq: no group left!");
+		cmn_err(CE_WARN, "!rdc_flush_diskq: no group left!");
 #endif
 		return;
 	}
 
 	if (!krdc->c_fd) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_flush_diskq: no c_fd!");
+		cmn_err(CE_WARN, "!rdc_flush_diskq: no c_fd!");
 #endif
 		return;
 	}
 
 #ifdef DEBUG_DISABLE
 	if (index < 0 || (krdc->type_flag & RDC_DISABLEPEND)) {
-		cmn_err(CE_WARN, "rdc_flush_diskq: DISABLE PENDING!");
+		cmn_err(CE_WARN, "!rdc_flush_diskq: DISABLE PENDING!");
 		/*
 		 * Need to continue as we may be trying to flush IO
 		 * while trying to disable or suspend
@@ -1862,7 +1864,7 @@ rdc_flush_diskq(int index)
 
 	if (IS_QSTATE(q, RDC_QDISABLEPEND) || IS_STATE(urdc, RDC_LOGGING)) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "flusher thread death 1 %x", QSTATE(q));
+		cmn_err(CE_NOTE, "!flusher thread death 1 %x", QSTATE(q));
 #endif
 		goto thread_death;
 	}
@@ -1876,7 +1878,7 @@ rdc_flush_diskq(int index)
 		group = krdc->group;
 		if (!group || group->count == 0) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "rdc_flush_diskq: no group left!");
+			cmn_err(CE_WARN, "!rdc_flush_diskq: no group left!");
 #endif
 			break;
 		}
@@ -1964,7 +1966,7 @@ rdc_flush_diskq(int index)
 			rdc_group_enter(krdc);
 			rdc_group_log(krdc,
 			    RDC_NOFLUSH | RDC_ALLREMOTE | RDC_QUEUING,
-				"diskq flush aio status not RDC_IO_DONE");
+			    "diskq flush aio status not RDC_IO_DONE");
 			rdc_group_exit(krdc);
 			rdc_dump_queue(aio->index);
 		}
@@ -1975,7 +1977,7 @@ rdc_flush_diskq(int index)
 #ifdef DEBUG_DISABLE
 		if (krdc->type_flag & RDC_DISABLEPEND) {
 			cmn_err(CE_WARN,
-				"rdc_flush_diskq: DISABLE PENDING after IO!");
+			    "!rdc_flush_diskq: DISABLE PENDING after IO!");
 		}
 #endif
 		if (krdc->remote_index < 0 || !krdc->lsrv || !krdc->intf)
@@ -1983,7 +1985,7 @@ rdc_flush_diskq(int index)
 
 		if (IS_QSTATE(q, RDC_QDISABLEPEND)) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "flusher thread death 2");
+			cmn_err(CE_NOTE, "!flusher thread death 2");
 #endif
 			break;
 		}
@@ -2012,7 +2014,7 @@ thread_death:
 		 * Race with remove_from_group while write thread was running
 		 */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_flush_diskq: group being destroyed");
+		cmn_err(CE_WARN, "!rdc_flush_diskq: group being destroyed");
 #endif
 		mutex_enter(&group->diskqmutex);
 		rdc_close_diskq(group);
@@ -2129,7 +2131,7 @@ _rdc_remote_flush(rdc_aio_t *aio)
 	rc = _rdc_rsrv_devs(krdc, rtype, RDC_INTERNAL);
 	if (rc != 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "_rdc_remote_flush: reserve, index %d, rc %d",
+		cmn_err(CE_WARN, "!_rdc_remote_flush: reserve, index %d, rc %d",
 		    aio->index, rc);
 #endif
 		goto failed;
@@ -2142,11 +2144,11 @@ _rdc_remote_flush(rdc_aio_t *aio)
 	 */
 	if (!aio->handle) {
 		rc = nsc_alloc_buf(RDC_U_FD(krdc), aio->pos, aio->len,
-			(aio->flag & ~NSC_WRITE) | NSC_READ, &h);
+		    (aio->flag & ~NSC_WRITE) | NSC_READ, &h);
 		if (!RDC_SUCCESS(rc)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN,
-			    "_rdc_remote_flush: alloc_buf, index %d, pos %"
+			    "!_rdc_remote_flush: alloc_buf, index %d, pos %"
 			    NSC_SZFMT ", len %" NSC_SZFMT ", rc %d",
 			    aio->index, aio->pos, aio->len, rc);
 #endif
@@ -2219,7 +2221,7 @@ _rdc_remote_flush(rdc_aio_t *aio)
 	if (rc != 0) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-		    "_rdc_remote_flush: write, index %d, pos %" NSC_SZFMT
+		    "!_rdc_remote_flush: write, index %d, pos %" NSC_SZFMT
 		    ", len %" NSC_SZFMT ", "
 		    "rc %d seq %u group seq %u seqack %u qpos %" NSC_SZFMT,
 		    aio->index, aio->pos, aio->len, rc, aio->seq,
@@ -2227,7 +2229,7 @@ _rdc_remote_flush(rdc_aio_t *aio)
 #endif
 		if (rc == ENOLINK) {
 			cmn_err(CE_WARN,
-			    "Hard timeout detected (%d sec) "
+			    "!Hard timeout detected (%d sec) "
 			    "on SNDR set %s:%s",
 			    rdc_rpc_tmout, urdc->secondary.intf,
 			    urdc->secondary.file);
@@ -2509,7 +2511,8 @@ rdc_drain_queue(int index)
 		return (rdc_drain_net_queue(index));
 	/* oops.. */
 #ifdef DEBUG
-	cmn_err(CE_WARN, "rdc_drain_queue: attempting drain of unknown Q type");
+	cmn_err(CE_WARN, "!rdc_drain_queue: "
+	    "attempting drain of unknown Q type");
 #endif
 	return (0);
 }
@@ -2593,7 +2596,7 @@ rdc_dump_queue(int index)
 			int tries = 3;
 #ifdef DEBUG_DISKQ
 			cmn_err(CE_NOTE,
-			    "dumpq sending diskq->memq flusher to sleep");
+			    "!dumpq sending diskq->memq flusher to sleep");
 #endif
 			q->qfflags |= RDC_QFILLSLEEP;
 			mutex_exit(&q->net_qlock);
@@ -2719,7 +2722,7 @@ rdc_clnt_get(rdc_srv_t *svp, rpcvers_t vers, struct chtab **rch, CLIENT **clp)
 		    ch->ch_dev == svp->ri_knconf->knc_rdev &&
 		    ch->ch_protofmly != NULL &&
 		    strcmp(ch->ch_protofmly,
-			svp->ri_knconf->knc_protofmly) == 0) {
+		    svp->ri_knconf->knc_protofmly) == 0) {
 			/* found the correct chain to walk */
 			break;
 		}
@@ -2745,12 +2748,11 @@ rdc_clnt_get(rdc_srv_t *svp, rpcvers_t vers, struct chtab **rch, CLIENT **clp)
 		mutex_exit(&rdc_clnt_lock);
 
 		ret = clnt_tli_kcreate(svp->ri_knconf, &(svp->ri_addr),
-				RDC_PROGRAM, vers, max_msgsize, retries,
-				cred, &client);
+		    RDC_PROGRAM, vers, max_msgsize, retries, cred, &client);
 
 		if (ret != 0) {
 			cmn_err(CE_NOTE,
-				"rdc_call: tli_kcreate failed %d", ret);
+			    "!rdc_call: tli_kcreate failed %d", ret);
 			return (ret);
 		}
 
@@ -2771,15 +2773,15 @@ rdc_clnt_get(rdc_srv_t *svp, rpcvers_t vers, struct chtab **rch, CLIENT **clp)
 
 		if (ch->ch_client == NULL) {
 			ret = clnt_tli_kcreate(svp->ri_knconf, &(svp->ri_addr),
-				RDC_PROGRAM, vers, max_msgsize, retries,
-				cred, &ch->ch_client);
+			    RDC_PROGRAM, vers, max_msgsize, retries,
+			    cred, &ch->ch_client);
 			if (ret != 0) {
 				ch->ch_inuse = FALSE;
 				return (ret);
 			}
 
 			(void) CLNT_CONTROL(ch->ch_client, CLSET_PROGRESS,
-				NULL);
+			    NULL);
 			*clp = ch->ch_client;
 
 			return (0);
@@ -2790,7 +2792,7 @@ rdc_clnt_get(rdc_srv_t *svp, rpcvers_t vers, struct chtab **rch, CLIENT **clp)
 		 * so we first reinitialise the handle.
 		 */
 			(void) clnt_tli_kinit(ch->ch_client, svp->ri_knconf,
-				&(svp->ri_addr), max_msgsize, retries, cred);
+			    &(svp->ri_addr), max_msgsize, retries, cred);
 
 			*clp = ch->ch_client;
 			return (0);
@@ -2806,7 +2808,7 @@ rdc_clnt_get(rdc_srv_t *svp, rpcvers_t vers, struct chtab **rch, CLIENT **clp)
 		ch->ch_vers = vers;
 		ch->ch_dev = svp->ri_knconf->knc_rdev;
 		ch->ch_protofmly = (char *)kmem_zalloc(
-			strlen(svp->ri_knconf->knc_protofmly)+1, KM_SLEEP);
+		    strlen(svp->ri_knconf->knc_protofmly)+1, KM_SLEEP);
 		if (ch->ch_protofmly)
 			(void) strcpy(ch->ch_protofmly,
 			    svp->ri_knconf->knc_protofmly);
@@ -2816,13 +2818,12 @@ rdc_clnt_get(rdc_srv_t *svp, rpcvers_t vers, struct chtab **rch, CLIENT **clp)
 	mutex_exit(&rdc_clnt_lock);
 
 	ret = clnt_tli_kcreate(svp->ri_knconf, &(svp->ri_addr),
-			RDC_PROGRAM, vers, max_msgsize, retries,
-			cred, clp);
+	    RDC_PROGRAM, vers, max_msgsize, retries, cred, clp);
 
 	if (ret != 0) {
 		if (ch)
 			ch->ch_inuse = FALSE;
-		cmn_err(CE_NOTE, "rdc_call: tli_kcreate failed %d", ret);
+		cmn_err(CE_NOTE, "!rdc_call: tli_kcreate failed %d", ret);
 		return (ret);
 	}
 
@@ -2868,9 +2869,7 @@ rdc_clnt_call(rdc_srv_t *svp, rpcproc_t proc, rpcvers_t vers,
 
 	do {
 		DTRACE_PROBE3(rdc_clnt_call_1,
-				CLIENT *, rh,
-				rpcproc_t, proc,
-				xdrproc_t, xargs);
+		    CLIENT *, rh, rpcproc_t, proc, xdrproc_t, xargs);
 
 		err = cl_call_sig(rh, proc, xargs, argsp, xres, resp, *timeout);
 
@@ -2902,8 +2901,8 @@ rdc_clnt_call(rdc_srv_t *svp, rpcproc_t proc, rpcvers_t vers,
 			 */
 				if (err == RPC_INPROGRESS)
 					break;
-				cmn_err(CE_NOTE, "SNDR client: err %d %s",
-					err, clnt_sperrno(err));
+				cmn_err(CE_NOTE, "!SNDR client: err %d %s",
+				    err, clnt_sperrno(err));
 			}
 	} while (tries && (tries < 2));
 done:
@@ -2932,7 +2931,7 @@ rdc_clnt_call_any(rdc_srv_t *svp, rdc_if_t *ip, rpcproc_t proc,
 
 	do {
 		rc = rdc_clnt_call(svp, proc, vers, xargs, argsp,
-				xres, resp, timeout);
+		    xres, resp, timeout);
 
 		if (rc == RPC_PROGVERSMISMATCH) {
 			/*
@@ -2967,7 +2966,7 @@ rdc_clnt_call_walk(rdc_k_info_t *krdc, rpcproc_t proc, xdrproc_t xargs,
 
 	do {
 		rc = rdc_clnt_call(svp, proc, vers, xargs, argsp,
-				xres, resp, timeout);
+		    xres, resp, timeout);
 
 		if (rc == RPC_PROGVERSMISMATCH) {
 			/*
@@ -3050,7 +3049,7 @@ _rdc_clnt_destroy(struct chtab **p, const int list)
 
 			if (ch->ch_protofmly)
 				kmem_free(ch->ch_protofmly,
-					strlen(ch->ch_protofmly)+1);
+				    strlen(ch->ch_protofmly)+1);
 
 			kmem_free(ch, sizeof (*ch));
 		} else {
@@ -3087,7 +3086,7 @@ rdc_clnt_destroy(void)
 	if (leak) {
 		/* we are about to leak clients */
 		cmn_err(CE_WARN,
-			"rdc_clnt_destroy: leaking %d inuse clients", leak);
+		    "!rdc_clnt_destroy: leaking %d inuse clients", leak);
 	}
 
 	mutex_exit(&rdc_clnt_lock);
@@ -3157,7 +3156,7 @@ rdc_async6(void *arg, int mode, int *rvp)
 		if ((async6.spos < async6.pos) ||
 		    ((async6.spos + async6.slen) >
 		    (async6.pos + async6.len))) {
-			cmn_err(CE_WARN, "Sub task not within range "
+			cmn_err(CE_WARN, "!Sub task not within range "
 			    "start %d length %d sub start %d sub length %d",
 			    async6.pos, async6.len, async6.spos, async6.slen);
 			return (EIO);
@@ -3178,7 +3177,7 @@ rdc_async6(void *arg, int mode, int *rvp)
 
 	data6.local_cd = krdc->index;
 	if (krdc->remote_index == -1) {
-		cmn_err(CE_WARN, "Remote index not known");
+		cmn_err(CE_WARN, "!Remote index not known");
 		kmem_free(data, datasz);
 		return (EIO);
 	} else {
@@ -3220,7 +3219,7 @@ rdc_async6(void *arg, int mode, int *rvp)
 		if (netret.result < 0) {
 			rc = -netret.result;
 		}
-		cmn_err(CE_NOTE, "async6: seq %u result %d index %d "
+		cmn_err(CE_NOTE, "!async6: seq %u result %d index %d "
 		    "pendcnt %d",
 		    netret.seq, netret.result, netret.index,
 		    netret.vecdata.vecdata_len);
@@ -3228,7 +3227,7 @@ rdc_async6(void *arg, int mode, int *rvp)
 			net_pendvec_t pvec;
 			bcopy(netret.vecdata.vecdata_val + i, &pvec,
 			    sizeof (net_pendvec_t));
-			cmn_err(CE_NOTE, "Seq %u pos %llu len %llu",
+			cmn_err(CE_NOTE, "!Seq %u pos %llu len %llu",
 			    pvec.seq, (unsigned long long)pvec.apos,
 			    (unsigned long long)pvec.alen);
 		}
@@ -3237,7 +3236,7 @@ rdc_async6(void *arg, int mode, int *rvp)
 			    netret.vecdata.vecdata_len *
 			    sizeof (net_pendvec_t));
 	} else {
-		cmn_err(CE_NOTE, "async6: rpc call failed %d", rc);
+		cmn_err(CE_NOTE, "!async6: rpc call failed %d", rc);
 	}
 	*rvp = netret.index;
 	return (rc);
@@ -3308,7 +3307,7 @@ rdc_readgen(void *arg, int mode, int *rvp)
 	t.tv_sec = rdc_rpc_tmout;
 	t.tv_usec = 0;
 	if (krdc->remote_index == -1) {
-		cmn_err(CE_WARN, "Remote index not known");
+		cmn_err(CE_WARN, "!Remote index not known");
 		ret = EIO;
 		goto out;
 	}

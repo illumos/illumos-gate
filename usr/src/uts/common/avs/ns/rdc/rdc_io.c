@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -239,9 +239,9 @@ rdc_thread_tune(int sets)
 
 #ifdef DEBUG
 	if (change) {
-		cmn_err(CE_NOTE,
-		"rdc_thread_tune: nsets %d, nthreads %d, nthreads change %d",
-			rdc_sets_active, nst_nthread(_rdc_ioset), change);
+		cmn_err(CE_NOTE, "!rdc_thread_tune: "
+		    "nsets %d, nthreads %d, nthreads change %d",
+		    rdc_sets_active, nst_nthread(_rdc_ioset), change);
 	}
 #endif
 }
@@ -359,7 +359,7 @@ _rdc_load(void)
 	}
 
 	rdc_volume_update = nsc_register_svc("RDCVolumeUpdated",
-			rdc_volume_update_svc);
+	    rdc_volume_update_svc);
 
 	return (0);
 }
@@ -696,33 +696,24 @@ add_to_group(rdc_k_info_t *krdc, int options, int cmd)
 	trc = nst_create(_rdc_ioset, rdc_qfiller_thr, (void *)krdc, NST_SLEEP);
 	if (trc == NULL) {
 		rc = -1;
-		cmn_err(CE_NOTE, "unable to create queue filler daemon");
+		cmn_err(CE_NOTE, "!unable to create queue filler daemon");
 		goto fail;
 	}
 
 	if (urdc->disk_queue[0] == '\0') {
 		krdc->group->flags |= RDC_MEMQUE;
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "enabling memory queue");
-#endif
 	} else {
 		krdc->group->flags |= RDC_DISKQUE;
 
 		/* XXX check here for resume or enable and act accordingly */
 
 		if (cmd == RDC_CMD_RESUME) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "resuming disk queue %s", urdc->disk_queue);
-#endif
 			rc = rdc_resume_diskq(krdc);
 
 		} else if (cmd == RDC_CMD_ENABLE) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "enabling disk queue %s", urdc->disk_queue);
-#endif
 			rc = rdc_enable_diskq(krdc);
 			if ((rc == RDC_EQNOADD) && (cmd != RDC_CMD_ENABLE)) {
-				cmn_err(CE_WARN, "disk queue %s enable failed,"
+				cmn_err(CE_WARN, "!disk queue %s enable failed,"
 				    " enabling memory queue",
 				    urdc->disk_queue);
 				krdc->group->flags &= ~RDC_DISKQUE;
@@ -824,21 +815,14 @@ change_group(rdc_k_info_t *krdc, int options)
 	trc = nst_create(_rdc_ioset, rdc_qfiller_thr, (void *)krdc, NST_SLEEP);
 	if (trc == NULL) {
 		rc = -1;
-		cmn_err(CE_NOTE, "unable to create queue filler daemon");
+		cmn_err(CE_NOTE, "!unable to create queue filler daemon");
 		goto bad;
 	}
 
 	if (urdc->disk_queue[0] == 0) {
 		krdc->group->flags |= RDC_MEMQUE;
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_change_group: enabling memory queue");
-#endif
 	} else {
 		krdc->group->flags |= RDC_DISKQUE;
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_change_group: enabling disk queue %s",
-		    urdc->disk_queue);
-#endif
 		if ((rc = rdc_enable_diskq(krdc)) < 0)
 			goto bad;
 	}
@@ -1105,14 +1089,14 @@ rdc_set_flags_log(rdc_u_info_t *urdc, int flags, char *why)
 		return;
 
 	if (flags & RDC_LOGGING)
-	    cmn_err(CE_NOTE, "!sndr: %s:%s entered logging mode: %s",
-		urdc->secondary.intf, urdc->secondary.file, why);
+		cmn_err(CE_NOTE, "!sndr: %s:%s entered logging mode: %s",
+		    urdc->secondary.intf, urdc->secondary.file, why);
 	if (flags & RDC_VOL_FAILED)
-	    cmn_err(CE_NOTE, "!sndr: %s:%s volume failed: %s",
-		urdc->secondary.intf, urdc->secondary.file, why);
+		cmn_err(CE_NOTE, "!sndr: %s:%s volume failed: %s",
+		    urdc->secondary.intf, urdc->secondary.file, why);
 	if (flags & RDC_BMP_FAILED)
-	    cmn_err(CE_NOTE, "!sndr: %s:%s bitmap failed: %s",
-		urdc->secondary.intf, urdc->secondary.file, why);
+		cmn_err(CE_NOTE, "!sndr: %s:%s bitmap failed: %s",
+		    urdc->secondary.intf, urdc->secondary.file, why);
 }
 /*
  * rdc_lor(source, dest, len)
@@ -1178,7 +1162,8 @@ rdc_volume_update_svc(intptr_t arg)
 	int rc;
 
 #ifdef DEBUG_IIUPDATE
-	cmn_err(CE_NOTE, "SNDR received update request for %s", update->volume);
+	cmn_err(CE_NOTE, "!SNDR received update request for %s",
+	    update->volume);
 #endif
 
 	if ((update->protocol != RDC_SVC_ONRETURN) &&
@@ -1214,7 +1199,7 @@ rdc_volume_update_svc(intptr_t arg)
 	do {
 		if (!(rdc_get_vflags(urdc) & RDC_LOGGING)) {
 #ifdef DEBUG_IIUPDATE
-		cmn_err(CE_NOTE, "SNDR refused update request for %s",
+		cmn_err(CE_NOTE, "!SNDR refused update request for %s",
 		    update->volume);
 #endif
 		update->denied = 1;
@@ -1225,7 +1210,7 @@ rdc_volume_update_svc(intptr_t arg)
 		if (IS_MANY(krdc) && IS_STATE(urdc, RDC_PRIMARY)) {
 			rdc_many_enter(krdc);
 			for (krdc = krdc->many_next; krdc != this;
-				krdc = krdc->many_next) {
+			    krdc = krdc->many_next) {
 				urdc = &rdc_u_info[krdc->index];
 				if (!IS_ENABLED(urdc))
 					continue;
@@ -1236,7 +1221,7 @@ rdc_volume_update_svc(intptr_t arg)
 	} while (krdc != this);
 
 #ifdef DEBUG_IIUPDATE
-	cmn_err(CE_NOTE, "SNDR allowed update request for %s", update->volume);
+	cmn_err(CE_NOTE, "!SNDR allowed update request for %s", update->volume);
 #endif
 	urdc = &rdc_u_info[krdc->index];
 	do {
@@ -1256,7 +1241,7 @@ rdc_volume_update_svc(intptr_t arg)
 		if (IS_MANY(krdc) && IS_STATE(urdc, RDC_PRIMARY)) {
 			rdc_many_enter(krdc);
 			for (krdc = krdc->many_next; krdc != this;
-				krdc = krdc->many_next) {
+			    krdc = krdc->many_next) {
 				index = krdc->index;
 				if (!IS_ENABLED(urdc))
 					continue;
@@ -1299,7 +1284,7 @@ rdc_check(rdc_k_info_t *krdc, rdc_set_t *rdc_set)
 	if (strncmp(urdc->primary.file, rdc_set->primary.file,
 	    NSC_MAXPATH) != 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_check: primary file mismatch %s vs %s",
+		cmn_err(CE_WARN, "!rdc_check: primary file mismatch %s vs %s",
 		    urdc->primary.file, rdc_set->primary.file);
 #endif
 		return (1);
@@ -1309,7 +1294,7 @@ rdc_check(rdc_k_info_t *krdc, rdc_set_t *rdc_set)
 	    bcmp(urdc->primary.addr.buf, rdc_set->primary.addr.buf,
 	    urdc->primary.addr.len) != 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_check: primary address mismatch for %s",
+		cmn_err(CE_WARN, "!rdc_check: primary address mismatch for %s",
 		    urdc->primary.file);
 #endif
 		return (1);
@@ -1318,7 +1303,7 @@ rdc_check(rdc_k_info_t *krdc, rdc_set_t *rdc_set)
 	if (strncmp(urdc->secondary.file, rdc_set->secondary.file,
 	    NSC_MAXPATH) != 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_check: secondary file mismatch %s vs %s",
+		cmn_err(CE_WARN, "!rdc_check: secondary file mismatch %s vs %s",
 		    urdc->secondary.file, rdc_set->secondary.file);
 #endif
 		return (1);
@@ -1328,7 +1313,7 @@ rdc_check(rdc_k_info_t *krdc, rdc_set_t *rdc_set)
 	    bcmp(urdc->secondary.addr.buf, rdc_set->secondary.addr.buf,
 	    urdc->secondary.addr.len) != 0) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_check: secondary address mismatch for %s",
+		cmn_err(CE_WARN, "!rdc_check: secondary addr mismatch for %s",
 		    urdc->secondary.file);
 #endif
 		return (1);
@@ -1721,8 +1706,8 @@ rdc_lookup_multimany(rdc_k_info_t *krdc, const int ismany)
 			 * krdc but shares the same data volume as krdc.
 			 */
 			if ((rdc_get_vflags(utmp) & RDC_PRIMARY) &&
-				strncmp(utmp->primary.file, pathname,
-				NSC_MAXPATH) == 0 && (krdc != ktmp)) {
+			    strncmp(utmp->primary.file, pathname,
+			    NSC_MAXPATH) == 0 && (krdc != ktmp)) {
 				break;
 			}
 		} else {
@@ -1731,8 +1716,8 @@ rdc_lookup_multimany(rdc_k_info_t *krdc, const int ismany)
 			 * krdc but shares the same data volume as krdc.
 			 */
 			if (!(rdc_get_vflags(utmp) & RDC_PRIMARY) &&
-				strncmp(utmp->secondary.file, pathname,
-				NSC_MAXPATH) == 0 && (krdc != ktmp)) {
+			    strncmp(utmp->secondary.file, pathname,
+			    NSC_MAXPATH) == 0 && (krdc != ktmp)) {
 				break;
 			}
 		}
@@ -1814,18 +1799,14 @@ print_many(rdc_k_info_t *start)
 	rdc_k_info_t *p = start;
 	rdc_u_info_t *q = &rdc_u_info[p->index];
 
-	cmn_err(CE_NOTE, "rdc: start 1-to-many chain");
-
 	do {
-		cmn_err(CE_CONT, "krdc %p, %s %s (many_nxt %p multi_nxt %p)\n",
-			p, q->primary.file, q->secondary.file, p->many_next,
-			p->multi_next);
+		cmn_err(CE_CONT, "!krdc %p, %s %s (many_nxt %p multi_nxt %p)\n",
+		    p, q->primary.file, q->secondary.file, p->many_next,
+		    p->multi_next);
 		delay(10);
 		p = p->many_next;
 		q = &rdc_u_info[p->index];
 	} while (p && p != start);
-
-	cmn_err(CE_NOTE, "rdc: end 1-to-many chain");
 }
 #endif /* DEBUG_MANY */
 
@@ -1849,8 +1830,8 @@ add_to_multi(rdc_k_info_t *krdc)
 
 #ifdef DEBUG_MANY
 	cmn_err(CE_NOTE,
-		"add_to_multi: lookup_multimany: mindex %d prim %s sec %s",
-		mindex, urdc->primary.file, urdc->secondary.file);
+	    "!add_to_multi: lookup_multimany: mindex %d prim %s sec %s",
+	    mindex, urdc->primary.file, urdc->secondary.file);
 #endif
 
 	if (mindex >= 0) {
@@ -1889,8 +1870,8 @@ add_to_multi(rdc_k_info_t *krdc)
 	} else {
 		krdc->multi_next = NULL;
 #ifdef DEBUG_MANY
-		cmn_err(CE_NOTE, "add_to_multi: NULL multi_next index %d",
-			krdc->index);
+		cmn_err(CE_NOTE, "!add_to_multi: NULL multi_next index %d",
+		    krdc->index);
 #endif
 	}
 
@@ -1920,8 +1901,6 @@ add_to_many(rdc_k_info_t *krdc)
 	oindex = rdc_lookup_multimany(krdc, TRUE);
 	if (oindex < 0) {
 #ifdef DEBUG_MANY
-		cmn_err(CE_NOTE, "rdc: before add_to_many empty");
-		cmn_err(CE_NOTE, "rdc: after add_to_many");
 		print_many(krdc);
 #endif
 		rdc_many_exit(krdc);
@@ -1931,14 +1910,12 @@ add_to_many(rdc_k_info_t *krdc)
 	okrdc = &rdc_k_info[oindex];
 
 #ifdef DEBUG_MANY
-	cmn_err(CE_NOTE, "rdc: before add_to_many");
 	print_many(okrdc);
 #endif
 	krdc->many_next = okrdc->many_next;
 	okrdc->many_next = krdc;
 
 #ifdef DEBUG_MANY
-	cmn_err(CE_NOTE, "rdc: after add_to_many");
 	print_many(okrdc);
 #endif
 	rdc_many_exit(krdc);
@@ -1960,14 +1937,11 @@ remove_from_many(rdc_k_info_t *old)
 	rdc_many_enter(old);
 
 #ifdef DEBUG_MANY
-	cmn_err(CE_NOTE, "rdc: before remove_from_many");
+	cmn_err(CE_NOTE, "!rdc: before remove_from_many");
 	print_many(old);
 #endif
 
 	if (old->many_next == old) {
-#ifdef DEBUG_MANY
-		cmn_err(CE_NOTE, "rdc: after remove_from_many empty");
-#endif
 		/* remove from multihop */
 		if ((q = old->multi_next) != NULL) {
 			ASSERT(q->multi_next == old);
@@ -2000,9 +1974,9 @@ remove_from_many(rdc_k_info_t *old)
 
 #ifdef DEBUG_MANY
 	if (p == old) {
-		cmn_err(CE_NOTE, "rdc: after remove_from_many empty");
+		cmn_err(CE_NOTE, "!rdc: after remove_from_many empty");
 	} else {
-		cmn_err(CE_NOTE, "rdc: after remove_from_many");
+		cmn_err(CE_NOTE, "!rdc: after remove_from_many");
 		print_many(p);
 	}
 #endif
@@ -2216,21 +2190,21 @@ _rdc_enable(rdc_set_t *rdc_set, int options, spcs_s_info_t kstatus)
 			if (rc == 0) {
 #ifdef DEBUG
 				if (krdc->maxfbas != maxfbas)
-				    cmn_err(CE_NOTE,
-				"_rdc_enable: diskq maxfbas = %" NSC_SZFMT
-				", primary maxfbas = %" NSC_SZFMT,
-					maxfbas, krdc->maxfbas);
+					cmn_err(CE_NOTE,
+					    "!_rdc_enable: diskq maxfbas = %"
+					    NSC_SZFMT ", primary maxfbas = %"
+					    NSC_SZFMT, maxfbas, krdc->maxfbas);
 #endif
 				krdc->maxfbas = min(krdc->maxfbas, maxfbas);
 			} else {
 				cmn_err(CE_WARN,
-				    "_rdc_enable: diskq maxfbas failed (%d)",
+				    "!_rdc_enable: diskq maxfbas failed (%d)",
 				    rc);
 			}
 			_rdc_rlse_diskq(grp);
 		} else {
 			cmn_err(CE_WARN,
-			    "_rdc_enable: diskq reserve failed (%d)", rc);
+			    "!_rdc_enable: diskq reserve failed (%d)", rc);
 		}
 	}
 
@@ -2338,9 +2312,8 @@ _rdc_enable(rdc_set_t *rdc_set, int options, spcs_s_info_t kstatus)
 		krdc->lsrv = svp;
 	else {
 #ifdef DEBUG
-		cmn_err(CE_WARN,
-		    "_rdc_enable: krdc->lsrv already set: %p",
-			(void *) krdc->lsrv);
+		cmn_err(CE_WARN, "!_rdc_enable: krdc->lsrv already set: %p",
+		    (void *) krdc->lsrv);
 #endif
 		rdc_destroy_svinfo(svp);
 	}
@@ -2366,14 +2339,14 @@ _rdc_enable(rdc_set_t *rdc_set, int options, spcs_s_info_t kstatus)
 			spcs_s_add(kstatus, RDC_EREGISTER,
 			    urdc->secondary.file);
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "nsc_register_path failed %s",
+		cmn_err(CE_NOTE, "!nsc_register_path failed %s",
 		    urdc->primary.file);
 #endif
 		rc = RDC_EREGISTER;
 		goto bmpfail;
 	}
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SNDR: enabled %s %s", urdc->primary.file,
+	cmn_err(CE_NOTE, "!SNDR: enabled %s %s", urdc->primary.file,
 	    urdc->secondary.file);
 #endif
 
@@ -2520,7 +2493,7 @@ _rdc_disable(rdc_k_info_t *krdc, rdc_config_t *uap, spcs_s_info_t kstatus)
 	(void) rdc_unintercept(krdc);
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SNDR: disabled %s %s", urdc->primary.file,
+	cmn_err(CE_NOTE, "!SNDR: disabled %s %s", urdc->primary.file,
 	    urdc->secondary.file);
 #endif
 
@@ -2553,14 +2526,16 @@ _rdc_disable(rdc_k_info_t *krdc, rdc_config_t *uap, spcs_s_info_t kstatus)
 				cv_broadcast(&krdc->group->asyncqcv);
 				mutex_exit(&krdc->group->ra_queue.net_qlock);
 				cmn_err(CE_WARN,
-		"SNDR: async I/O pending and not flushed for %s during disable",
+				    "!SNDR: async I/O pending and not flushed "
+				    "for %s during disable",
 				    urdc->primary.file);
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-		"nitems: %" NSC_SZFMT " nblocks: %" NSC_SZFMT
-		" head: 0x%p tail: 0x%p",
-		    qp->nitems,
-		    qp->blocks, (void *)qp->net_qhead, (void *)qp->net_qtail);
+				    "!nitems: %" NSC_SZFMT " nblocks: %"
+				    NSC_SZFMT " head: 0x%p tail: 0x%p",
+				    qp->nitems, qp->blocks,
+				    (void *)qp->net_qhead,
+				    (void *)qp->net_qtail);
 #endif
 			} while (krdc->group->rdc_thrnum > 0);
 		}
@@ -2627,7 +2602,7 @@ _rdc_disable(rdc_k_info_t *krdc, rdc_config_t *uap, spcs_s_info_t kstatus)
 	krdc->type_flag = 0;
 #ifdef	DEBUG
 	if (krdc->dcio_bitmap)
-		cmn_err(CE_WARN, "_rdc_disable: possible mem leak, "
+		cmn_err(CE_WARN, "!_rdc_disable: possible mem leak, "
 		    "dcio_bitmap");
 #endif
 	krdc->dcio_bitmap = NULL;
@@ -2824,9 +2799,8 @@ _rdc_sync_wrthr(void *thrinfo)
 	int rc;
 	int tries = 0;
 
-	DTRACE_PROBE2(rdc_sync_loop_netwrite_start,
-			int, krdc->index,
-			nsc_buf_t *, handle);
+	DTRACE_PROBE2(rdc_sync_loop_netwrite_start, int, krdc->index,
+	    nsc_buf_t *, handle);
 
 retry:
 	rc = nsc_alloc_buf(RDC_U_FD(krdc), syncinfo->offset, syncinfo->len,
@@ -2863,7 +2837,7 @@ retry:
 		}
 
 		DTRACE_PROBE(rdc_sync_wrthr_remote_write_err);
-		cmn_err(CE_WARN, "rdc_sync_wrthr: remote write failed (%d) "
+		cmn_err(CE_WARN, "!rdc_sync_wrthr: remote write failed (%d) "
 		    "0x%x", rc, rdc_get_vflags(urdc));
 
 		goto failed;
@@ -2906,7 +2880,7 @@ _rdc_sync_rdthr(void *thrinfo)
 	    handle->sb_pos, handle->sb_len);
 
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "rdc_sync_rdthr: remote read failed (%d)", rc);
+		cmn_err(CE_WARN, "!rdc_sync_rdthr: remote read failed(%d)", rc);
 		goto failed;
 	}
 	if (!IS_STATE(urdc, RDC_FULL))
@@ -2961,7 +2935,7 @@ _rdc_sync_thread(void *thrinfo)
 
 	if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "_rdc_sync_wrthr: NULL bitmap");
+		cmn_err(CE_NOTE, "!_rdc_sync_wrthr: NULL bitmap");
 #else
 	/*EMPTY*/
 #endif
@@ -3056,7 +3030,7 @@ _rdc_sync_status_ok(sync_status_t *status, int *offset)
 #endif
 	}
 #ifdef DEBUGSYNCSTATUS
-	cmn_err(CE_NOTE, "rdc_sync_status_ok: checked %d statuses", i);
+	cmn_err(CE_NOTE, "!rdc_sync_status_ok: checked %d statuses", i);
 #endif
 	return (0);
 }
@@ -3120,7 +3094,7 @@ _rdc_sync(rdc_k_info_t *krdc)
 #ifdef DEBUG
 		if (!alloc_h) {
 			cmn_err(CE_WARN,
-				"rdc sync: failed to pre-alloc handle");
+			    "!rdc sync: failed to pre-alloc handle");
 		}
 #endif
 	} else {
@@ -3239,7 +3213,8 @@ _rdc_sync(rdc_k_info_t *krdc)
 				if (ss == NULL) {
 					mutex_exit(&sync_info.lock);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_sync: can't allocate status for mt sync");
+					cmn_err(CE_WARN, "!rdc_sync: can't "
+					    "allocate status for mt sync");
 #endif
 					goto retry;
 				}
@@ -3259,7 +3234,8 @@ _rdc_sync(rdc_k_info_t *krdc)
 				if (trc == NULL) {
 					mutex_exit(&sync_info.lock);
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "rdc_sync: unable to mt sync");
+					cmn_err(CE_NOTE, "!rdc_sync: unable to "
+					    "mt sync");
 #endif
 					_rdc_free_sync_status(ss);
 					kmem_free(syncinfo, sizeof (*syncinfo));
@@ -3309,8 +3285,7 @@ retry:
 			if (!RDC_SUCCESS(sts)) {
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-					"rdc sync: remote read failed (%d)",
-					sts);
+				    "!rdc sync: remote read failed (%d)", sts);
 #endif
 				DTRACE_PROBE(rdc_sync_loop_remote_read_err);
 				goto failed;
@@ -3322,7 +3297,7 @@ retry:
 			/* commit locally */
 
 			sts = nsc_write(handle, handle->sb_pos,
-				handle->sb_len, 0);
+			    handle->sb_len, 0);
 
 			if (!RDC_SUCCESS(sts)) {
 				/* reverse sync needed already set */
@@ -3337,8 +3312,7 @@ retry:
 		} else {
 			/* send local data to remote */
 			DTRACE_PROBE2(rdc_sync_loop_netwrite_start,
-					int, krdc->index,
-					nsc_buf_t *, handle);
+			    int, krdc->index, nsc_buf_t *, handle);
 
 			if ((sts = rdc_net_write(krdc->index,
 			    krdc->remote_index, handle, handle->sb_pos,
@@ -3359,7 +3333,7 @@ retry:
 				}
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-				    "rdc sync: remote write failed (%d) 0x%x",
+				    "!rdc sync: remote write failed (%d) 0x%x",
 				    sts, rdc_get_vflags(urdc));
 #endif
 				DTRACE_PROBE(rdc_sync_loop_netwrite_err);
@@ -3373,7 +3347,7 @@ retry:
 
 		if (krdc->dcio_bitmap == NULL) {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "_rdc_sync: NULL bitmap");
+			cmn_err(CE_NOTE, "!_rdc_sync: NULL bitmap");
 #else
 		;
 		/*EMPTY*/
@@ -3382,7 +3356,7 @@ retry:
 
 			RDC_SET_BITMASK(offset, len, &bitmask);
 			RDC_CLR_BITMAP(krdc, offset, len, bitmask, \
-					RDC_BIT_FORCE);
+			    RDC_BIT_FORCE);
 			ASSERT(!IS_ASYNC(urdc));
 		}
 
@@ -3412,11 +3386,11 @@ retry:
 
 			if (rdc_prealloc_handle) {
 				alloc_h = nsc_alloc_handle(RDC_U_FD(krdc),
-							NULL, NULL, NULL);
+				    NULL, NULL, NULL);
 #ifdef DEBUG
 				if (!alloc_h) {
-					cmn_err(CE_WARN,
-					"rdc sync: failed to pre-alloc handle");
+					cmn_err(CE_WARN, "!rdc_sync: "
+					    "failed to pre-alloc handle");
 				}
 #endif
 			}
@@ -3567,8 +3541,8 @@ rdc_sync(rdc_config_t *uparms, spcs_s_info_t kstatus)
 	if (!IS_STATE(urdc, RDC_LOGGING)) {
 		spcs_s_add(kstatus, RDC_ESETNOTLOGGING, urdc->secondary.intf,
 		    urdc->secondary.file);
-		    rc = RDC_ENOTLOGGING;
-		    goto notstarted_unlock;
+		rc = RDC_ENOTLOGGING;
+		goto notstarted_unlock;
 	}
 
 	if (rdc_check(krdc, rdc_set)) {
@@ -3593,8 +3567,8 @@ rdc_sync(rdc_config_t *uparms, spcs_s_info_t kstatus)
 		spcs_s_add(kstatus, RDC_EQNORSYNC, rdc_set->primary.intf,
 		    rdc_set->primary.file, rdc_set->secondary.intf,
 		    rdc_set->secondary.file);
-		    rc = RDC_EQNORSYNC;
-		    goto notstarted_unlock;
+		rc = RDC_EQNORSYNC;
+		goto notstarted_unlock;
 	}
 
 	svp = krdc->lsrv;
@@ -3655,7 +3629,7 @@ rdc_sync(rdc_config_t *uparms, spcs_s_info_t kstatus)
 	if (krdc->aux_state & RDC_AUXSYNCIP) {
 #ifdef DEBUG
 		if (!rdc_get_vflags(urdc) & RDC_SYNCING) {
-			cmn_err(CE_WARN, "rdc_sync: "
+			cmn_err(CE_WARN, "!rdc_sync: "
 			    "RDC_AUXSYNCIP set, SYNCING off");
 		}
 #endif
@@ -3762,7 +3736,7 @@ rdc_sync(rdc_config_t *uparms, spcs_s_info_t kstatus)
 				rdc_set_flags(urdc, RDC_ASYNC);
 			krdc->remote_index = -1;
 			rdc_set_flags_log(urdc, RDC_LOGGING,
-				"failed to read remote bitmap");
+			    "failed to read remote bitmap");
 			rdc_write_state(urdc);
 			goto failed;
 		}
@@ -4006,7 +3980,7 @@ _rdc_suspend(rdc_k_info_t *krdc, rdc_set_t *rdc_set, spcs_s_info_t kstatus)
 	(void) rdc_unintercept(krdc);
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SNDR: suspended %s %s", urdc->primary.file,
+	cmn_err(CE_NOTE, "!SNDR: suspended %s %s", urdc->primary.file,
 	    urdc->secondary.file);
 #endif
 
@@ -4035,14 +4009,16 @@ _rdc_suspend(rdc_k_info_t *krdc, rdc_set_t *rdc_set, spcs_s_info_t kstatus)
 				cv_broadcast(&krdc->group->asyncqcv);
 				mutex_exit(&krdc->group->ra_queue.net_qlock);
 				cmn_err(CE_WARN,
-		"SNDR: async I/O pending and not flushed for %s during suspend",
+				    "!SNDR: async I/O pending and not flushed "
+				    "for %s during suspend",
 				    urdc->primary.file);
 #ifdef DEBUG
 				cmn_err(CE_WARN,
-		"nitems: %" NSC_SZFMT " nblocks: %" NSC_SZFMT
-		" head: 0x%p tail: 0x%p",
-		    qp->nitems, qp->blocks, (void *)qp->net_qhead,
-		    (void *)qp->net_qtail);
+				    "!nitems: %" NSC_SZFMT " nblocks: %"
+				    NSC_SZFMT " head: 0x%p tail: 0x%p",
+				    qp->nitems, qp->blocks,
+				    (void *)qp->net_qhead,
+				    (void *)qp->net_qtail);
 #endif
 			} while (krdc->group->rdc_thrnum > 0);
 		}
@@ -4109,7 +4085,7 @@ _rdc_suspend(rdc_k_info_t *krdc, rdc_set_t *rdc_set, spcs_s_info_t kstatus)
 	krdc->type_flag = 0;
 #ifdef	DEBUG
 	if (krdc->dcio_bitmap)
-		cmn_err(CE_WARN, "_rdc_suspend: possible mem leak, "
+		cmn_err(CE_WARN, "!_rdc_suspend: possible mem leak, "
 		    "dcio_bitmap");
 #endif
 	krdc->dcio_bitmap = NULL;
@@ -4346,21 +4322,22 @@ _rdc_resume(rdc_set_t *rdc_set, int options, spcs_s_info_t kstatus)
 			if (rc == 0) {
 #ifdef DEBUG
 				if (krdc->maxfbas != maxfbas)
-				    cmn_err(CE_NOTE,
-				"_rdc_resume: diskq maxfbas = %" NSC_SZFMT
-				", primary maxfbas = %" NSC_SZFMT,
-					maxfbas, krdc->maxfbas);
+					cmn_err(CE_NOTE,
+					    "!_rdc_resume: diskq maxfbas = %"
+					    NSC_SZFMT ", primary maxfbas = %"
+					    NSC_SZFMT, maxfbas, krdc->maxfbas);
 #endif
-				krdc->maxfbas = min(krdc->maxfbas, maxfbas);
+					krdc->maxfbas = min(krdc->maxfbas,
+					    maxfbas);
 			} else {
 				cmn_err(CE_WARN,
-				    "_rdc_resume: diskq maxfbas failed (%d)",
+				    "!_rdc_resume: diskq maxfbas failed (%d)",
 				    rc);
 			}
 			_rdc_rlse_diskq(grp);
 		} else {
 			cmn_err(CE_WARN,
-			    "_rdc_resume: diskq reserve failed (%d)", rc);
+			    "!_rdc_resume: diskq reserve failed (%d)", rc);
 		}
 	}
 
@@ -4471,9 +4448,8 @@ _rdc_resume(rdc_set_t *rdc_set, int options, spcs_s_info_t kstatus)
 		krdc->lsrv = svp;
 	else {
 #ifdef DEBUG
-		cmn_err(CE_WARN,
-		    "_rdc_resume: krdc->lsrv already set: %p",
-			(void *) krdc->lsrv);
+		cmn_err(CE_WARN, "!_rdc_resume: krdc->lsrv already set: %p",
+		    (void *) krdc->lsrv);
 #endif
 		rdc_destroy_svinfo(svp);
 	}
@@ -4500,14 +4476,14 @@ _rdc_resume(rdc_set_t *rdc_set, int options, spcs_s_info_t kstatus)
 			spcs_s_add(kstatus, RDC_EREGISTER,
 			    urdc->secondary.file);
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "nsc_register_path failed %s",
+		cmn_err(CE_NOTE, "!nsc_register_path failed %s",
 		    urdc->primary.file);
 #endif
 		rc = RDC_EREGISTER;
 		goto bmpfail;
 	}
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "SNDR: resumed %s %s", urdc->primary.file,
+	cmn_err(CE_NOTE, "!SNDR: resumed %s %s", urdc->primary.file,
 	    urdc->secondary.file);
 #endif
 
@@ -4695,7 +4671,7 @@ rdc_group_log(rdc_k_info_t *krdc, int flag, char *why)
 	dq = &krdc->group->diskq;
 	if (do_group) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "SNDR:Group point-in-time for group: %s %s:%s",
+		cmn_err(CE_NOTE, "!SNDR:Group point-in-time for grp: %s %s:%s",
 		    urdc->group_name, urdc->primary.intf, urdc->secondary.intf);
 #endif
 		DTRACE_PROBE(rdc_diskq_group_PIT);
@@ -4710,7 +4686,7 @@ rdc_group_log(rdc_k_info_t *krdc, int flag, char *why)
 			if (!IS_ENABLED(q))
 				continue;
 			rdc_set_flags_log(q, RDC_LOGGING,
-				"consistency group member following leader");
+			    "consistency group member following leader");
 			if (RDC_IS_DISKQ(p->group))
 				flag_op(q, RDC_QUEUING);
 		}
@@ -4764,7 +4740,7 @@ rdc_group_log(rdc_k_info_t *krdc, int flag, char *why)
 				if (p->lsrv && krdc->intf &&
 				    !krdc->intf->if_down) {
 					(void) rdc_net_state(p->index,
-						CCIO_ENABLELOG);
+					    CCIO_ENABLELOG);
 				}
 			}
 			rdc_many_exit(krdc);
@@ -4793,7 +4769,7 @@ rdc_group_log(rdc_k_info_t *krdc, int flag, char *why)
 				    == EAGAIN)
 					delay(2);
 				if ((RDC_IS_DISKQ(krdc->group)) &&
-					(!(flag & RDC_QUEUING))) { /* fail! */
+				    (!(flag & RDC_QUEUING))) { /* fail! */
 					mutex_enter(QLOCK(dq));
 					rdc_init_diskq_header(krdc->group,
 					    &krdc->group->diskq.disk_hdr);
@@ -4812,7 +4788,7 @@ rdc_group_log(rdc_k_info_t *krdc, int flag, char *why)
 			flag_op(urdc, RDC_QUEUING);
 
 		if ((RDC_IS_DISKQ(krdc->group)) &&
-			(!(flag & RDC_QUEUING))) { /* fail! */
+		    (!(flag & RDC_QUEUING))) { /* fail! */
 			RDC_ZERO_BITREF(krdc);
 			mutex_enter(QLOCK(dq));
 			rdc_init_diskq_header(krdc->group,
@@ -5217,9 +5193,9 @@ rdc_reconfig(rdc_config_t *uparms, spcs_s_info_t kstatus)
 			    NSC_MAXPATH);
 			mutex_exit(&rdc_conf_lock);
 			spcs_s_add(kstatus, RDC_EGROUP,
-				urdc->primary.intf, urdc->primary.file,
-				urdc->secondary.intf, urdc->secondary.file,
-				uparms->rdc_set->group_name);
+			    urdc->primary.intf, urdc->primary.file,
+			    urdc->secondary.intf, urdc->secondary.file,
+			    uparms->rdc_set->group_name);
 			rc = RDC_EGROUP;
 			goto done;
 		}
@@ -5333,10 +5309,9 @@ rdc_reconfig(rdc_config_t *uparms, spcs_s_info_t kstatus)
 
 		if (IS_MANY(krdc) || IS_MULTI(krdc)) {
 			mutex_exit(&rdc_conf_lock);
-			spcs_s_add(kstatus, RDC_EMASTER,
-				urdc->primary.intf,
-				urdc->primary.file, urdc->secondary.intf,
-				urdc->secondary.file);
+			spcs_s_add(kstatus, RDC_EMASTER, urdc->primary.intf,
+			    urdc->primary.file, urdc->secondary.intf,
+			    urdc->secondary.file);
 			return (RDC_EMASTER);
 		}
 		bzero((void *) &rdc_set, sizeof (rdc_set_t));
@@ -5350,27 +5325,27 @@ rdc_reconfig(rdc_config_t *uparms, spcs_s_info_t kstatus)
 		free_rdc_netbuf(&saddr);
 		/* copy primary parts of urdc to rdc_set field by field */
 		(void) strncpy(rdc_set.primary.intf, urdc->primary.intf,
-			MAX_RDC_HOST_SIZE);
+		    MAX_RDC_HOST_SIZE);
 		(void) strncpy(rdc_set.primary.file, urdc->primary.file,
 		    NSC_MAXPATH);
 		(void) strncpy(rdc_set.primary.bitmap, urdc->primary.bitmap,
-			NSC_MAXPATH);
+		    NSC_MAXPATH);
 
 		/* Now overwrite urdc primary */
 		(void) strncpy(urdc->primary.intf, urdc->secondary.intf,
-			MAX_RDC_HOST_SIZE);
+		    MAX_RDC_HOST_SIZE);
 		(void) strncpy(urdc->primary.file, urdc->secondary.file,
-			NSC_MAXPATH);
+		    NSC_MAXPATH);
 		(void) strncpy(urdc->primary.bitmap, urdc->secondary.bitmap,
-			NSC_MAXPATH);
+		    NSC_MAXPATH);
 
 		/* Now ovwewrite urdc secondary */
 		(void) strncpy(urdc->secondary.intf, rdc_set.primary.intf,
-			MAX_RDC_HOST_SIZE);
+		    MAX_RDC_HOST_SIZE);
 		(void) strncpy(urdc->secondary.file, rdc_set.primary.file,
-			NSC_MAXPATH);
+		    NSC_MAXPATH);
 		(void) strncpy(urdc->secondary.bitmap, rdc_set.primary.bitmap,
-			NSC_MAXPATH);
+		    NSC_MAXPATH);
 
 		if (rdc_get_vflags(urdc) & RDC_PRIMARY) {
 			rdc_clr_flags(urdc, RDC_PRIMARY);
@@ -5397,7 +5372,7 @@ rdc_reconfig(rdc_config_t *uparms, spcs_s_info_t kstatus)
 				    KM_SLEEP);
 			if (krdc->bitmap_ref == NULL) {
 				cmn_err(CE_WARN,
-				    "rdc_reconfig: bitmap_ref alloc %"
+				    "!rdc_reconfig: bitmap_ref alloc %"
 				    NSC_SZFMT " failed",
 				    krdc->bitmap_size * BITS_IN_BYTE *
 				    BMAP_REF_PREF_SIZE);
@@ -5407,7 +5382,7 @@ rdc_reconfig(rdc_config_t *uparms, spcs_s_info_t kstatus)
 		}
 
 		if ((rdc_get_vflags(urdc) & RDC_PRIMARY) &&
-			(rdc_get_vflags(urdc) & RDC_SYNC_NEEDED)) {
+		    (rdc_get_vflags(urdc) & RDC_SYNC_NEEDED)) {
 			/* Primary, so reverse sync needed */
 			rdc_many_enter(krdc);
 			rdc_clr_flags(urdc, RDC_SYNC_NEEDED);
@@ -5772,14 +5747,13 @@ rdc_bitmapset(int op, char *sechost, char *secdev, void *bmapaddr, int bmapsz,
 
 	if (off % FBA_SIZE(1)) {
 		/* Must be modulo FBA */
-		cmn_err(CE_WARN, "bitmapset: Offset is not on an FBA "
-		    "boundary %llu",
-		    (unsigned long long)off);
+		cmn_err(CE_WARN, "!bitmapset: Offset is not on an FBA "
+		    "boundary %llu", (unsigned long long)off);
 		return (EINVAL);
 	}
 	if (bmapsz % FBA_SIZE(1)) {
 		/* Must be modulo FBA */
-		cmn_err(CE_WARN, "bitmapset: Size is not on an FBA "
+		cmn_err(CE_WARN, "!bitmapset: Size is not on an FBA "
 		    "boundary %d", bmapsz);
 		return (EINVAL);
 	}
@@ -5933,19 +5907,15 @@ rdc_checkforbitmap(int index, nsc_off_t limit)
 		return (ENXIO);
 	}
 	if (krdc->dcio_bitmap == NULL) {
-		cmn_err(CE_WARN, "checkforbitmap: No bitmap for set (%s:%s)",
-		    urdc->secondary.intf,
-		    urdc->secondary.file);
+		cmn_err(CE_WARN, "!checkforbitmap: No bitmap for set (%s:%s)",
+		    urdc->secondary.intf, urdc->secondary.file);
 		return (ENOENT);
 	}
 	if (limit > krdc->bitmap_size) {
-		cmn_err(CE_WARN, "checkbitmap: Bitmap exceeded, "
+		cmn_err(CE_WARN, "!checkbitmap: Bitmap exceeded, "
 		    "incore %" NSC_SZFMT " user supplied %" NSC_SZFMT
-		    " for set (%s:%s)",
-		    krdc->bitmap_size,
-		    limit,
-		    urdc->secondary.intf,
-		    urdc->secondary.file);
+		    " for set (%s:%s)", krdc->bitmap_size,
+		    limit, urdc->secondary.intf, urdc->secondary.file);
 		return (ENOSPC);
 	}
 	return (0);
@@ -5984,8 +5954,7 @@ rdc_installbitmap(int op, void *bmapaddr, int bmapsz,
 		}
 		if (ddi_copyin((char *)bmapaddr + copied, ormem,
 		    len, mode)) {
-			cmn_err(CE_WARN, "installbitmap: Copyin "
-			    "failed");
+			cmn_err(CE_WARN, "!installbitmap: Copyin failed");
 			rc = EFAULT;
 			goto out;
 		}
@@ -6016,11 +5985,10 @@ rdc_installbitmap(int op, void *bmapaddr, int bmapsz,
 					    fba)) {
 
 						cmn_err(CE_WARN,
-						    "installbitmap: "
+						    "!installbitmap: "
 						    "write_bitmap_fba failed "
 						    "on fba number %" NSC_SZFMT
-						    " set %s:%s",
-						    fba,
+						    " set %s:%s", fba,
 						    urdc->secondary.intf,
 						    urdc->secondary.file);
 						goto out;
@@ -6079,10 +6047,10 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 		fsvaddr.buf =  kmem_zalloc(fsvaddr.len, KM_SLEEP);
 
 		if (ddi_copyin(STRUCT_FGETP(pa, addr.buf),
-			fsvaddr.buf, fsvaddr.len, mode)) {
+		    fsvaddr.buf, fsvaddr.len, mode)) {
 			kmem_free(fsvaddr.buf, fsvaddr.len);
 #ifdef DEBUG
-			cmn_err(CE_WARN, "copyin failed primary.addr 2");
+			cmn_err(CE_WARN, "!copyin failed primary.addr 2");
 #endif
 			return (EFAULT);
 		}
@@ -6093,9 +6061,9 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 		tsvaddr.buf =  kmem_zalloc(tsvaddr.len, KM_SLEEP);
 
 		if (ddi_copyin(STRUCT_FGETP(sa, addr.buf),
-			tsvaddr.buf, tsvaddr.len, mode)) {
+		    tsvaddr.buf, tsvaddr.len, mode)) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "copyin failed secondary addr");
+			cmn_err(CE_WARN, "!copyin failed secondary addr");
 #endif
 			kmem_free(fsvaddr.buf, fsvaddr.len);
 			kmem_free(tsvaddr.buf, tsvaddr.len);
@@ -6116,7 +6084,7 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 		if (ddi_copyin(STRUCT_FGETP(uparms, rdc_set->netconfig),
 		    STRUCT_BUF(knconf_tmp), STRUCT_SIZE(knconf_tmp), mode)) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "copyin failed netconfig");
+			cmn_err(CE_WARN, "!copyin failed netconfig");
 #endif
 			kmem_free(fsvaddr.buf, fsvaddr.len);
 			kmem_free(tsvaddr.buf, tsvaddr.len);
@@ -6144,7 +6112,7 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 		rc = ddi_copyin(knconf->knc_protofmly, pf, KNC_STRSIZE, mode);
 		if (rc) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "copyin failed parms protofmly");
+			cmn_err(CE_WARN, "!copyin failed parms protofmly");
 #endif
 			rc = EFAULT;
 			goto out;
@@ -6152,7 +6120,7 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 		rc = ddi_copyin(knconf->knc_proto, p, KNC_STRSIZE, mode);
 		if (rc) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "copyin failed parms proto");
+			cmn_err(CE_WARN, "!copyin failed parms proto");
 #endif
 			rc = EFAULT;
 			goto out;
@@ -6166,11 +6134,11 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 	/* copy relevant parts of rdc_config to uap field by field */
 
 	(void) strncpy(uap->rdc_set[0].primary.intf, STRUCT_FGETP(pa, intf),
-		MAX_RDC_HOST_SIZE);
+	    MAX_RDC_HOST_SIZE);
 	(void) strncpy(uap->rdc_set[0].primary.file, STRUCT_FGETP(pa, file),
-		NSC_MAXPATH);
+	    NSC_MAXPATH);
 	(void) strncpy(uap->rdc_set[0].primary.bitmap, STRUCT_FGETP(pa, bitmap),
-		NSC_MAXPATH);
+	    NSC_MAXPATH);
 	uap->rdc_set[0].netconfig = knconf;
 	uap->rdc_set[0].flags = STRUCT_FGET(uparms, rdc_set->flags);
 	uap->rdc_set[0].index = STRUCT_FGET(uparms, rdc_set->index);
@@ -6187,14 +6155,14 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 	uap->rdc_set[0].secondary.addr = tsvaddr;	/* struct copy */
 
 	(void) strncpy(uap->rdc_set[0].secondary.intf, STRUCT_FGETP(sa, intf),
-		MAX_RDC_HOST_SIZE);
+	    MAX_RDC_HOST_SIZE);
 	(void) strncpy(uap->rdc_set[0].secondary.file, STRUCT_FGETP(sa, file),
-		NSC_MAXPATH);
+	    NSC_MAXPATH);
 	(void) strncpy(uap->rdc_set[0].secondary.bitmap,
-		STRUCT_FGETP(sa, bitmap), NSC_MAXPATH);
+	    STRUCT_FGETP(sa, bitmap), NSC_MAXPATH);
 
 	(void) strncpy(uap->rdc_set[0].direct_file,
-		STRUCT_FGETP(rs, direct_file), NSC_MAXPATH);
+	    STRUCT_FGETP(rs, direct_file), NSC_MAXPATH);
 
 	(void) strncpy(uap->rdc_set[0].group_name, STRUCT_FGETP(rs, group_name),
 	    NSC_MAXPATH);
@@ -6206,9 +6174,9 @@ _rdc_config(void *arg, int mode, spcs_s_info_t kstatus, int *rvp)
 	uap->options = STRUCT_FGET(uparms, options);
 
 	enable = (uap->command == RDC_CMD_ENABLE ||
-		uap->command == RDC_CMD_RESUME);
+	    uap->command == RDC_CMD_RESUME);
 	disable = (uap->command == RDC_CMD_DISABLE ||
-		uap->command == RDC_CMD_SUSPEND);
+	    uap->command == RDC_CMD_SUSPEND);
 
 	/*
 	 * Initialise the threadset if it has not already been done.
@@ -6380,8 +6348,7 @@ rdc_net_add_set(int index)
 	rdc_net_dataset_t *dset;
 
 	if (index >= rdc_max_sets) {
-		cmn_err(CE_NOTE, "rdc_net_add_set: "
-		    "bad index %d", index);
+		cmn_err(CE_NOTE, "!rdc_net_add_set: bad index %d", index);
 		return (NULL);
 	}
 	krdc = &rdc_k_info[index];
@@ -6389,7 +6356,7 @@ rdc_net_add_set(int index)
 
 	dset = kmem_alloc(sizeof (*dset), KM_NOSLEEP);
 	if (dset == NULL) {
-		cmn_err(CE_NOTE, "rdc_net_add_set: kmem_alloc failed");
+		cmn_err(CE_NOTE, "!rdc_net_add_set: kmem_alloc failed");
 		return (NULL);
 	}
 	RDC_DSMEMUSE(sizeof (*dset));
@@ -6422,7 +6389,7 @@ rdc_net_add_set(int index)
 		for (dset2 = krdc->net_dataset; dset2; dset2 = dset2->next) {
 			if (dset2->id == dset->id) {
 				cmn_err(CE_PANIC,
-				"rdc_net_add_set duplicate id %p:%d %p:%d",
+				    "rdc_net_add_set duplicate id %p:%d %p:%d",
 				    (void *)dset, dset->id,
 				    (void *)dset2, dset2->id);
 			}
@@ -6446,8 +6413,7 @@ rdc_net_get_set(int index, int id)
 	rdc_net_dataset_t *dset;
 
 	if (index >= rdc_max_sets) {
-		cmn_err(CE_NOTE, "rdc_net_get_set: "
-		    "bad index %d", index);
+		cmn_err(CE_NOTE, "!rdc_net_get_set: bad index %d", index);
 		return (NULL);
 	}
 	krdc = &rdc_k_info[index];
@@ -6475,8 +6441,7 @@ rdc_net_put_set(int index, rdc_net_dataset_t *dset)
 	rdc_k_info_t *krdc;
 
 	if (index >= rdc_max_sets) {
-		cmn_err(CE_NOTE, "rdc_net_put_set: "
-		    "bad index %d", index);
+		cmn_err(CE_NOTE, "!rdc_net_put_set: bad index %d", index);
 		return;
 	}
 	krdc = &rdc_k_info[index];
@@ -6501,8 +6466,7 @@ rdc_net_del_set(int index, rdc_net_dataset_t *dset)
 	rdc_k_info_t *krdc;
 
 	if (index >= rdc_max_sets) {
-		cmn_err(CE_NOTE, "rdc_net_del_set: "
-		    "bad index %d", index);
+		cmn_err(CE_NOTE, "!rdc_net_del_set: bad index %d", index);
 		return;
 	}
 	krdc = &rdc_k_info[index];
@@ -6545,7 +6509,7 @@ rdc_net_free_set(rdc_k_info_t *krdc, rdc_net_dataset_t *dset)
 
 #ifdef DEBUG
 	if (found == 0) {
-		cmn_err(CE_WARN, "rdc_net_free_set: Unable to find "
+		cmn_err(CE_WARN, "!rdc_net_free_set: Unable to find "
 		    "dataset 0x%p in krdc list", (void *)dset);
 	}
 #endif
@@ -6595,7 +6559,7 @@ rdc_aio_tbuf_get(void *n, void *h, int pos, int len, int flag, int index, int s)
 	p = kmem_zalloc(sizeof (rdc_aio_t), KM_NOSLEEP);
 	if (p == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, "_rdcaiotbufget: kmem_alloc failed bp aio");
+		cmn_err(CE_NOTE, "!_rdcaiotbufget: kmem_alloc failed bp aio");
 #endif
 		return (NULL);
 	} else {
@@ -6622,7 +6586,7 @@ rdc_aio_buf_get(rdc_buf_t *h, int index)
 	aio_buf_t *p;
 
 	if (index >= rdc_max_sets) {
-		cmn_err(CE_NOTE, "rdc: rdc_aio_buf_get bad index %x", index);
+		cmn_err(CE_NOTE, "!rdc: rdc_aio_buf_get bad index %x", index);
 		return (NULL);
 	}
 
@@ -6673,7 +6637,7 @@ rdc_aio_buf_add(int index, rdc_buf_t *h)
 
 	p = kmem_zalloc(sizeof (*p), KM_NOSLEEP);
 	if (p == NULL) {
-		cmn_err(CE_NOTE, "rdc_aio_buf_add: kmem_alloc failed");
+		cmn_err(CE_NOTE, "!rdc_aio_buf_add: kmem_alloc failed");
 		return (NULL);
 	}
 
@@ -6721,7 +6685,7 @@ rdc_newgroup()
 	 * one extra thread for the disk queue flusher
 	 */
 	if (nst_add_thread(_rdc_flset, 3) != 3)
-		cmn_err(CE_NOTE, "rdc_newgroup: nst_add_thread failed");
+		cmn_err(CE_NOTE, "!rdc_newgroup: nst_add_thread failed");
 
 	return (group);
 }
@@ -6742,7 +6706,7 @@ rdc_delgroup(rdc_group_t *group)
 	/* try to remove flusher threads that this group added to _rdc_flset */
 	if (nst_del_thread(_rdc_flset, group->rdc_addthrnum + 3) !=
 	    group->rdc_addthrnum + 3)
-		cmn_err(CE_NOTE, "rdc_delgroup: nst_del_thread failed");
+		cmn_err(CE_NOTE, "!rdc_delgroup: nst_del_thread failed");
 
 	mutex_destroy(&group->lock);
 	mutex_destroy(&group->ra_queue.net_qlock);

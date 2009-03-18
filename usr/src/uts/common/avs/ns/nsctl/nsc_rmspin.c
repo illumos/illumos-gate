@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +169,7 @@ nsc_rm_lock_alloc(char *name, int flag, void *arg)
 		mutex_destroy(&lk->lockp);
 		nsc_kmem_free(lk, sizeof (*lk));
 
-		cmn_err(CE_WARN, "nsctl: rmlock double allocation (%s)", name);
+		cmn_err(CE_WARN, "!nsctl: rmlock double allocation (%s)", name);
 		return (NULL);
 	}
 
@@ -208,7 +208,7 @@ nsc_rmlock_t *rmlockp;
 	rmlockp->prev->next = rmlockp->next;
 
 	if (rmlockp->child) {
-		cmn_err(CE_WARN, "nsctl: rmlock destroyed when locked (%s)",
+		cmn_err(CE_WARN, "!nsctl: rmlock destroyed when locked (%s)",
 		    rmlockp->name);
 		nsc_do_unlock(rmlockp->child);
 		rmlockp->child = NULL;
@@ -267,10 +267,4 @@ nsc_rm_unlock(nsc_rmlock_t *rmlockp)
 		rmlockp->child = NULL;
 		mutex_exit(&rmlockp->lockp);
 	}
-#ifdef DEBUG
-	else {
-		cmn_err(CE_WARN, "nsc_rm_unlock(%s) - not locked",
-		    rmlockp->name);
-	}
-#endif
 }

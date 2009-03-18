@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,8 +94,8 @@ dup_rdc_netbuf(const struct netbuf *from, struct netbuf *to)
 	to->len = from->len;
 
 	if (from->len > to->maxlen) {
-		cmn_err(CE_WARN, "dup_rdc_netbuf: from->len %d, to->maxlen %d",
-			from->len, to->maxlen);
+		cmn_err(CE_WARN, "!dup_rdc_netbuf: from->len %d, to->maxlen %d",
+		    from->len, to->maxlen);
 	}
 
 	bcopy(from->buf, to->buf, (size_t)from->len);
@@ -111,25 +111,25 @@ rdc_print_svinfo(rdc_srv_t *svp, char *str)
 	if (svp == NULL)
 		return;
 
-	cmn_err(CE_NOTE, "rdc %s servinfo: %p\n", str, (void *) svp);
+	cmn_err(CE_NOTE, "!rdc %s servinfo: %p\n", str, (void *) svp);
 
 	if (svp->ri_knconf != NULL) {
-		cmn_err(CE_NOTE, "knconf: semantics %d",
+		cmn_err(CE_NOTE, "!knconf: semantics %d",
 		    svp->ri_knconf->knc_semantics);
-		cmn_err(CE_NOTE, "	protofmly %s",
+		cmn_err(CE_NOTE, "!	protofmly %s",
 		    svp->ri_knconf->knc_protofmly);
-		cmn_err(CE_NOTE, "	proto	  %s",
+		cmn_err(CE_NOTE, "!	proto	  %s",
 		    svp->ri_knconf->knc_proto);
-		cmn_err(CE_NOTE, "	rdev	  %lx",
+		cmn_err(CE_NOTE, "!	rdev	  %lx",
 		    svp->ri_knconf->knc_rdev);
 	}
 
 	for (i = 0; i < svp->ri_addr.len; i++)
 		printf("%u ", svp->ri_addr.buf[i]);
 
-	cmn_err(CE_NOTE, "\naddr:	len %d buf %p\n",
+	cmn_err(CE_NOTE, "!\naddr:	len %d buf %p\n",
 	    svp->ri_addr.len, (void *) svp->ri_addr.buf);
-	cmn_err(CE_NOTE, "host:	%s\n", svp->ri_hostname);
+	cmn_err(CE_NOTE, "!host:	%s\n", svp->ri_hostname);
 }
 #endif /* DEBUG */
 
@@ -146,16 +146,10 @@ rdc_create_svinfo(char *host, struct netbuf *svaddr, struct knetconfig *conf)
 	int hlen = strlen(host) + 1;
 
 	if (conf == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_create_svinfo: NULL knetconfig\n");
-#endif
 		return (NULL);
 	}
 
 	if (host == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_create_svinfo: NULL host\n");
-#endif
 		return (NULL);
 	}
 
@@ -164,9 +158,6 @@ rdc_create_svinfo(char *host, struct netbuf *svaddr, struct knetconfig *conf)
 	nvp->ri_hostname = kmem_zalloc(hlen, KM_SLEEP);
 
 	if (nvp == NULL || nvp->ri_hostname == NULL || nvp->ri_knconf == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_create_svinfo: zalloc failed");
-#endif
 		rdc_destroy_svinfo(nvp);
 		return (NULL);
 	}
@@ -179,16 +170,13 @@ rdc_create_svinfo(char *host, struct netbuf *svaddr, struct knetconfig *conf)
 
 	if (nvp->ri_knconf->knc_protofmly == NULL ||
 	    nvp->ri_knconf->knc_proto == NULL) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_create_svinfo: out of memory\n");
-#endif
 		rdc_destroy_svinfo(nvp);
 		return (NULL);
 
 	}
 
 	(void) strncpy(nvp->ri_knconf->knc_protofmly, conf->knc_protofmly,
-		KNC_STRSIZE);
+	    KNC_STRSIZE);
 	(void) strncpy(nvp->ri_knconf->knc_proto, conf->knc_proto, KNC_STRSIZE);
 
 	dup_rdc_netbuf(svaddr, &nvp->ri_addr);
@@ -196,7 +184,7 @@ rdc_create_svinfo(char *host, struct netbuf *svaddr, struct knetconfig *conf)
 	nvp->ri_secdata = NULL;		/* For now */
 	(void) strncpy(nvp->ri_hostname, host, hlen);
 #ifdef DEBUG_IP
-	rdc_print_svinfo(nvp, "create");
+	rdc_print_svinfo(nvp, "!create");
 #endif
 	return (nvp);
 }
@@ -233,7 +221,7 @@ rdc_netbuf_toint(struct netbuf *nb)
 {
 	int ret;
 	if (nb->len > RDC_MAXADDR)
-		cmn_err(CE_NOTE, "rdc_netbuf_toint: bad size %d", nb->len);
+		cmn_err(CE_NOTE, "!rdc_netbuf_toint: bad size %d", nb->len);
 
 	switch (nb->len) {
 		case 4:
@@ -247,7 +235,7 @@ rdc_netbuf_toint(struct netbuf *nb)
 			return (ret);
 
 		default:
-			cmn_err(CE_NOTE, " rdc_netbuf_toint: size %d", nb->len);
+			cmn_err(CE_NOTE, "!rdc_netbuf_toint: size %d", nb->len);
 		}
 	return (0);
 }

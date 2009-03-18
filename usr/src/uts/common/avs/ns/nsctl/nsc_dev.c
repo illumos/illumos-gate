@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -870,7 +870,7 @@ int flag;
 		    (int)getmajor((dev_t)fd->sf_cd), FALSE);
 #ifdef DEBUG
 		if (rc != 1) {
-			cmn_err(CE_NOTE, "nsctl: could not set DevMaj (%s:%x)",
+			cmn_err(CE_NOTE, "!nsctl: could not set DevMaj (%s:%x)",
 			    dev->nsc_path, (int)getmajor((dev_t)fd->sf_cd));
 		}
 #endif
@@ -879,7 +879,7 @@ int flag;
 		    (int)getminor((dev_t)fd->sf_cd), FALSE);
 #ifdef DEBUG
 		if (rc != 1) {
-			cmn_err(CE_NOTE, "nsctl: could not set DevMin (%s:%x)",
+			cmn_err(CE_NOTE, "!nsctl: could not set DevMin (%s:%x)",
 			    dev->nsc_path, (int)getminor((dev_t)fd->sf_cd));
 		}
 #endif
@@ -1139,7 +1139,7 @@ _nsc_setval(nsc_dev_t *dev, char *path, char *name, int val, int do_ncall)
 
 	if (strlen(name) >= NSC_SETVAL_MAX) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nsc_setval: max name size (%d) exceeded (%d)",
+		cmn_err(CE_WARN, "!nsc_setval: max name size(%d) exceeded(%d)",
 		    NSC_SETVAL_MAX-1, (int)strlen(name));
 #endif
 		return (0);

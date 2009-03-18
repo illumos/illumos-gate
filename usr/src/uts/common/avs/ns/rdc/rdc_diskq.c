@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@
 #include <sys/nsctl/nsctl.h>
 
 #include <sys/kmem.h>
-#include <sys/cmn_err.h>
 #include <sys/ddi.h>
 
 #include <sys/sdt.h>		/* dtrace is S10 or later */
@@ -67,7 +66,7 @@ _rdc_rsrv_diskq(rdc_group_t *group)
 	} else if ((group->diskqrsrv == 0) &&
 	    (rc = nsc_reserve(group->diskqfd, 0)) != 0) {
 		cmn_err(CE_WARN,
-		    "rdc: nsc_reserve(%s) failed %d\n",
+		    "!rdc: nsc_reserve(%s) failed %d\n",
 		    nsc_pathname(group->diskqfd), rc);
 	} else {
 		group->diskqrsrv++;
@@ -154,7 +153,7 @@ rdc_close_diskq(rdc_group_t *grp)
 
 	if (grp == NULL) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_close_diskq: NULL group!");
+		cmn_err(CE_WARN, "!rdc_close_diskq: NULL group!");
 #endif
 		return;
 	}
@@ -162,7 +161,7 @@ rdc_close_diskq(rdc_group_t *grp)
 	if (grp->diskqfd) {
 		if (nsc_close(grp->diskqfd) != 0) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "nsc_close on diskq failed");
+			cmn_err(CE_WARN, "!nsc_close on diskq failed");
 #else
 			;
 			/*EMPTY*/
@@ -203,7 +202,7 @@ rdc_open_diskq(rdc_k_info_t *krdc)
 		grp->diskqfd = nsc_open(diskqname,
 		    NSC_RDCHR_ID|NSC_DEVICE|NSC_WRITE, 0, 0, 0);
 		if (grp->diskqfd == NULL) {
-			cmn_err(CE_WARN, "rdc_open_diskq: Unable to open %s",
+			cmn_err(CE_WARN, "!rdc_open_diskq: Unable to open %s",
 			    diskqname);
 			goto fail;
 		}
@@ -219,7 +218,7 @@ rdc_open_diskq(rdc_k_info_t *krdc)
 	/* just test a reserve release */
 	sts = _rdc_rsrv_diskq(grp);
 	if (!RDC_SUCCESS(sts)) {
-		cmn_err(CE_WARN, "rdc_open_diskq: Reserve failed for %s",
+		cmn_err(CE_WARN, "!rdc_open_diskq: Reserve failed for %s",
 		    diskqname);
 		goto fail;
 	}
@@ -356,12 +355,12 @@ rdc_fail_diskq(rdc_k_info_t *krdc, int wait, int flag)
 		return;
 
 	if (!(flag & RDC_NOFAIL))
-		cmn_err(CE_WARN, "disk queue %s failure", q->disk_queue);
+		cmn_err(CE_WARN, "!disk queue %s failure", q->disk_queue);
 
 	if (flag & RDC_DOLOG) {
 		rdc_group_enter(krdc);
 		rdc_group_log(krdc, RDC_NOFLUSH | RDC_ALLREMOTE,
-			"disk queue failed");
+		    "disk queue failed");
 		rdc_group_exit(krdc);
 	}
 	mutex_enter(QHEADLOCK(dq));
@@ -441,7 +440,7 @@ rdc_stamp_diskq(rdc_k_info_t *krdc, int rsrvd, int failflags)
 	urdc = &rdc_u_info[krdc->index];
 
 	if (!rsrvd && _rdc_rsrv_diskq(grp)) {
-		cmn_err(CE_WARN, "rdc_stamp_diskq: %s reserve failed",
+		cmn_err(CE_WARN, "!rdc_stamp_diskq: %s reserve failed",
 		    urdc->disk_queue);
 		mutex_exit(QLOCK(q));
 		rdc_fail_diskq(krdc, RDC_NOWAIT, failflags);
@@ -452,7 +451,7 @@ rdc_stamp_diskq(rdc_k_info_t *krdc, int rsrvd, int failflags)
 	rc = nsc_alloc_buf(grp->diskqfd, 0, 1, flags, &head);
 
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "Alloc buf failed for disk queue %s",
+		cmn_err(CE_WARN, "!Alloc buf failed for disk queue %s",
 		    &urdc->disk_queue[0]);
 		mutex_exit(QLOCK(q));
 		rdc_fail_diskq(krdc, RDC_NOWAIT, failflags);
@@ -467,7 +466,7 @@ rdc_stamp_diskq(rdc_k_info_t *krdc, int rsrvd, int failflags)
 	head->sb_vec = &vec[0];
 
 #ifdef DEBUG_DISKQ
-	cmn_err(CE_NOTE, "rdc_stamp_diskq: hdr: %p magic: %x state: "
+	cmn_err(CE_NOTE, "!rdc_stamp_diskq: hdr: %p magic: %x state: "
 	    "%x head: %d tail: %d size: %d nitems: %d blocks: %d",
 	    q, QMAGIC(q), QSTATE(q), QHEAD(q),
 	    QTAIL(q), QSIZE(q), QNITEMS(q), QBLOCKS(q));
@@ -478,7 +477,7 @@ rdc_stamp_diskq(rdc_k_info_t *krdc, int rsrvd, int failflags)
 	if (!RDC_SUCCESS(rc)) {
 		if (!rsrvd)
 			_rdc_rlse_diskq(grp);
-		cmn_err(CE_CONT, "disk queue %s failed rc %d",
+		cmn_err(CE_CONT, "!disk queue %s failed rc %d",
 		    &urdc->disk_queue[0], rc);
 		mutex_exit(QLOCK(q));
 		rdc_fail_diskq(krdc, RDC_NOWAIT, failflags);
@@ -524,7 +523,7 @@ rdc_init_diskq_header(rdc_group_t *grp, dqheader *header)
 	/* do this last, as this might be a failure. get the kernel state ok */
 	rc = _rdc_rsrv_diskq(grp);
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "init_diskq_hdr: Reserve failed for queue");
+		cmn_err(CE_WARN, "!init_diskq_hdr: Reserve failed for queue");
 		return;
 	}
 	(void) nsc_partsize(grp->diskqfd, &header->h.disk_size);
@@ -605,7 +604,7 @@ rdc_read_diskq_header(rdc_k_info_t *krdc)
 		char buf[NSC_MAXPATH];
 		(void) snprintf(buf, NSC_MAXPATH, "%s:%s", urdc->secondary.intf,
 		    &urdc->secondary.intf[0]);
-		cmn_err(CE_WARN, "Disk Queue Header read failed for %s",
+		cmn_err(CE_WARN, "!Disk Queue Header read failed for %s",
 		    &urdc->group_name[0] == '\0' ? buf:
 		    &urdc->group_name[0]);
 		return (-1);
@@ -625,7 +624,7 @@ rdc_read_diskq_header(rdc_k_info_t *krdc)
 		char buf[NSC_MAXPATH];
 		(void) snprintf(buf, NSC_MAXPATH, "%s:%s", urdc->secondary.intf,
 		    &urdc->secondary.file[0]);
-		cmn_err(CE_WARN, "Disk Queue Header read failed(%d) for %s",
+		cmn_err(CE_WARN, "!Disk Queue Header read failed(%d) for %s",
 		    rc, &urdc->group_name[0] == '\0' ? buf :
 		    &urdc->group_name[0]);
 		return (-1);
@@ -642,7 +641,7 @@ rdc_stop_diskq_flusher(rdc_k_info_t *krdc)
 	disk_queue q, *qp;
 	rdc_group_t *group;
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "stopping flusher threads");
+	cmn_err(CE_NOTE, "!stopping flusher threads");
 #endif
 	group = krdc->group;
 	qp = &krdc->group->diskq;
@@ -743,7 +742,7 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 
 	/* check diskq magic number */
 	if (QMAGIC(q) != RDC_DISKQ_MAGIC) {
-		cmn_err(CE_WARN, "SNDR: unable to resume diskq %s,"
+		cmn_err(CE_WARN, "!SNDR: unable to resume diskq %s,"
 		    " incorrect magic number in header", urdc->disk_queue);
 		rdc_init_diskq_header(group, &group->diskq.disk_hdr);
 		SET_QSTATE(q, RDC_QBADRESUME);
@@ -758,7 +757,7 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 		h1 = *(diskq_header1 *)(&group->diskq.disk_hdr.h);
 		hc = &group->diskq.disk_hdr.h;
 
-		cmn_err(CE_WARN, "SNDR: old version header for diskq %s,"
+		cmn_err(CE_WARN, "!SNDR: old version header for diskq %s,"
 		    " upgrading to current version", urdc->disk_queue);
 		hc->vers = RDC_DISKQ_VERS;
 		hc->state = h1.state;
@@ -773,7 +772,7 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 		hc->ack_last = h1.ack_last;
 
 		if (hc->nitems > 0) {
-			cmn_err(CE_WARN, "SNDR: unable to resume diskq %s,"
+			cmn_err(CE_WARN, "!SNDR: unable to resume diskq %s,"
 			    " old version Q contains data", urdc->disk_queue);
 			rdc_init_diskq_header(group, &group->diskq.disk_hdr);
 			SET_QSTATE(q, RDC_QBADRESUME);
@@ -782,7 +781,7 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 		break;
 #else
 		case RDC_DISKQ_VER_64BIT:
-			cmn_err(CE_WARN, "SNDR: unable to resume diskq %s,"
+			cmn_err(CE_WARN, "!SNDR: unable to resume diskq %s,"
 			    " diskq header newer than current version",
 			    urdc->disk_queue);
 			rdc_init_diskq_header(group, &group->diskq.disk_hdr);
@@ -794,7 +793,7 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 			/* okay, current version diskq */
 		break;
 		default:
-			cmn_err(CE_WARN, "SNDR: unable to resume diskq %s,"
+			cmn_err(CE_WARN, "!SNDR: unable to resume diskq %s,"
 			    " unknown diskq header version", urdc->disk_queue);
 			rdc_init_diskq_header(group, &group->diskq.disk_hdr);
 			SET_QSTATE(q, RDC_QBADRESUME);
@@ -802,7 +801,7 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 		break;
 	}
 	if (IS_QSTATE(q, RDC_SHUTDOWN_BAD)) {
-		cmn_err(CE_WARN, "SNDR: unable to resume diskq %s,"
+		cmn_err(CE_WARN, "!SNDR: unable to resume diskq %s,"
 		    " unsafe shutdown", urdc->disk_queue);
 		rdc_init_diskq_header(group, &group->diskq.disk_hdr);
 		SET_QSTATE(q, RDC_QBADRESUME);
@@ -825,9 +824,9 @@ rdc_resume_diskq(rdc_k_info_t *krdc)
 	mutex_exit(QLOCK(q));
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "rdc_resume_diskq: resuming diskq %s \n",
+	cmn_err(CE_NOTE, "!rdc_resume_diskq: resuming diskq %s \n",
 	    urdc->disk_queue);
-	cmn_err(CE_NOTE, "qinfo: " QDISPLAY(q));
+	cmn_err(CE_NOTE, "!qinfo: " QDISPLAY(q));
 #endif
 	if (rc == 0)
 		return (0);
@@ -891,7 +890,7 @@ rdc_suspend_diskq(rdc_k_info_t *krdc)
 	krdc->group->diskq.disk_hdr.h.state &= ~RDC_QDISABLEPEND;
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "suspending disk queue\n" QDISPLAY(q));
+	cmn_err(CE_NOTE, "!suspending disk queue\n" QDISPLAY(q));
 #endif
 
 	/* to avoid a possible deadlock, release in order, and reacquire */
@@ -933,7 +932,7 @@ rdc_dup_aio(rdc_aio_t *orig, rdc_aio_t *copy)
 	rc = nsc_alloc_abuf(orig->pos, orig->len, 0, &copy->handle);
 	if (!RDC_SUCCESS(rc)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_dup_aio: alloc_buf failed (%d)", rc);
+		cmn_err(CE_WARN, "!rdc_dup_aio: alloc_buf failed (%d)", rc);
 #endif
 		return (rc);
 	}
@@ -942,7 +941,7 @@ rdc_dup_aio(rdc_aio_t *orig, rdc_aio_t *copy)
 	if (!RDC_SUCCESS(rc)) {
 		(void) nsc_free_buf(copy->handle);
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_dup_aio: copy buf failed (%d)", rc);
+		cmn_err(CE_WARN, "!rdc_dup_aio: copy buf failed (%d)", rc);
 #endif
 		return (rc);
 	}
@@ -997,7 +996,7 @@ rdc_qfill_shldwakeup(rdc_k_info_t *krdc)
 			}
 		}
 #ifdef DEBUG_DISKQ_NOISY
-		cmn_err(CE_NOTE, "Waking up diskq->memq flusher, flags 0x%x"
+		cmn_err(CE_NOTE, "!Waking up diskq->memq flusher, flags 0x%x"
 		    " idx: %d", rdc_get_vflags(urdc), urdc->index);
 #endif
 		return (1);
@@ -1093,9 +1092,9 @@ rdc_diskq_enqueue(rdc_k_info_t *krdc, rdc_aio_t *aio)
 
 	if (!vec || !iohdr) {
 		if (!vec) {
-			cmn_err(CE_WARN, "vec kmem alloc failed");
+			cmn_err(CE_WARN, "!vec kmem alloc failed");
 		} else {
-			cmn_err(CE_WARN, "iohdr kmem alloc failed");
+			cmn_err(CE_WARN, "!iohdr kmem alloc failed");
 		}
 		if (vec)
 			kmem_free(vec, sizeof (*vec));
@@ -1147,7 +1146,7 @@ retry:
 		 * it's not worth the trouble breaking up the write
 		 */
 #ifdef DEBUG_DISKQWRAP
-		cmn_err(CE_NOTE, "wrapping Q tail: " QDISPLAY(q));
+		cmn_err(CE_NOTE, "!wrapping Q tail: " QDISPLAY(q));
 #endif
 		/*LINTED*/
 		WRAPQTAIL(q);
@@ -1180,13 +1179,13 @@ retry:
 		if ((retries >= 8) || (delay_time >= 256)) {
 			delay_time = 2;
 			if (print_msg) {
-				cmn_err(CE_WARN, "enqueue: disk queue %s full",
+				cmn_err(CE_WARN, "!enqueue: disk queue %s full",
 				    &urdc->disk_queue[0]);
 				print_msg = 0;
 #ifdef DEBUG
-				cmn_err(CE_WARN, QDISPLAY(q));
+				cmn_err(CE_WARN, "!qinfo: " QDISPLAY(q));
 #else
-				cmn_err(CE_CONT, QDISPLAYND(q));
+				cmn_err(CE_CONT, "!qinfo: " QDISPLAYND(q));
 #endif
 			}
 			/*
@@ -1197,14 +1196,14 @@ retry:
 			    (IS_STATE(urdc, RDC_QUEUING))) {
 
 				if (IS_STATE(urdc, RDC_QUEUING)) {
-		cmn_err(CE_WARN, "SNDR: disk queue %s full and not flushing. "
+		cmn_err(CE_WARN, "!SNDR: disk queue %s full and not flushing. "
 		    "giving up", &urdc->disk_queue[0]);
-		cmn_err(CE_WARN, "SNDR: %s:%s entering logging mode",
+		cmn_err(CE_WARN, "!SNDR: %s:%s entering logging mode",
 		    urdc->secondary.intf, urdc->secondary.file);
 				}
 
 				rdc_fail_diskq(krdc, RDC_WAIT,
-				RDC_DOLOG | RDC_NOFAIL);
+				    RDC_DOLOG | RDC_NOFAIL);
 				kmem_free(iohdr, sizeof (*iohdr));
 				kmem_free(vec, sizeof (*vec) * numvecs);
 				mutex_enter(QLOCK(q));
@@ -1257,7 +1256,7 @@ retry:
 	DTRACE_PROBE(rdc_diskq_rsrv);
 
 	if (_rdc_rsrv_diskq(group)) {
-		cmn_err(CE_WARN, "rdc_enqueue: %s reserve failed",
+		cmn_err(CE_WARN, "!rdc_enqueue: %s reserve failed",
 		    &urdc->disk_queue[0]);
 		rdc_fail_diskq(krdc, RDC_WAIT, RDC_DOLOG);
 		kmem_free(iohdr, sizeof (*iohdr));
@@ -1280,7 +1279,7 @@ retry:
 	DTRACE_PROBE(rdc_diskq_alloc_end);
 
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "disk queue %s alloc failed(%d) %" NSC_SZFMT,
+		cmn_err(CE_WARN, "!disk queue %s alloc failed(%d) %" NSC_SZFMT,
 		    &urdc->disk_queue[0], rc, iofbas);
 		rdc_fail_diskq(krdc, RDC_WAIT, RDC_DOLOG);
 		rc = ENOMEM;
@@ -1291,7 +1290,7 @@ retry:
 
 #ifdef DEBUG_WRITER_UBERNOISE
 
-	cmn_err(CE_NOTE, "about to write to queue, qbuf: %p, qhead: %d, "
+	cmn_err(CE_NOTE, "!about to write to queue, qbuf: %p, qhead: %d, "
 	    "qtail: %d, len: %d contents: %c%c%c%c%c",
 	    (void *) qbuf, qhead, qtail, iofbas,
 	    qbuf->sb_vec[1].sv_addr[0],
@@ -1299,7 +1298,7 @@ retry:
 	    qbuf->sb_vec[1].sv_addr[2],
 	    qbuf->sb_vec[1].sv_addr[3],
 	    qbuf->sb_vec[1].sv_addr[4]);
-	cmn_err(CE_CONT, QDISPLAYND(q));
+	cmn_err(CE_CONT, "!qinfo: " QDISPLAYND(q));
 
 #endif
 
@@ -1308,7 +1307,7 @@ retry:
 	DTRACE_PROBE2(rdc_diskq_nswrite_end, int, qtail, nsc_size_t, iofbas);
 
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "disk queue %s write failed %d",
+		cmn_err(CE_WARN, "!disk queue %s write failed %d",
 		    &urdc->disk_queue[0], rc);
 		rdc_fail_diskq(krdc, RDC_WAIT, RDC_DOLOG);
 		goto fail;
@@ -1374,7 +1373,7 @@ rdc_add_iohdr(io_hdr *header, rdc_group_t *group)
 	p = q->iohdrs;
 	while (p) {
 		if (p->dat.qpos == header->dat.qpos) {
-			cmn_err(CE_WARN, " ADDING DUPLICATE HEADER %" NSC_SZFMT,
+			cmn_err(CE_WARN, "!ADDING DUPLICATE HEADER %" NSC_SZFMT,
 			    p->dat.qpos);
 			kmem_free(header, sizeof (*header));
 			mutex_exit(QLOCK(q));
@@ -1439,9 +1438,9 @@ rdc_clr_iohdr(rdc_k_info_t *krdc, nsc_size_t qpos)
 	if (!found) {
 		if (RDC_BETWEEN(QHEAD(q), QNXTIO(q), qpos)) {
 #ifdef DEBUG
-			cmn_err(CE_WARN, "iohdr already cleared? "
+			cmn_err(CE_WARN, "!iohdr already cleared? "
 			"qpos %" NSC_SZFMT " cnt %d ", qpos, cnt);
-			cmn_err(CE_WARN, "Qinfo: " QDISPLAY(q));
+			cmn_err(CE_WARN, "!Qinfo: " QDISPLAY(q));
 #endif
 			mutex_exit(QLOCK(q));
 			return;
@@ -1460,7 +1459,7 @@ rdc_clr_iohdr(rdc_k_info_t *krdc, nsc_size_t qpos)
 	while (hp && (hp->dat.qpos == QHEAD(q)) &&
 	    (hp->dat.iostatus == RDC_IOHDR_DONE)) {
 #ifdef DEBUG_FLUSHER_UBERNOISE
-		cmn_err(CE_NOTE, "clr_iohdr info: magic %x type %d pos %d"
+		cmn_err(CE_NOTE, "!clr_iohdr info: magic %x type %d pos %d"
 		    " qpos %d hpos %d len %d flag 0x%x iostatus %x setid %d",
 		    hp->dat.magic, hp->dat.type, hp->dat.pos, hp->dat.qpos,
 		    hp->dat.hpos, hp->dat.len, hp->dat.flag,
@@ -1477,7 +1476,7 @@ rdc_clr_iohdr(rdc_k_info_t *krdc, nsc_size_t qpos)
 
 		if (QHEADSHLDWRAP(q)) { /* simple enough */
 #ifdef DEBUG_DISKQWRAP
-			cmn_err(CE_NOTE, "wrapping Q head: " QDISPLAY(q));
+			cmn_err(CE_NOTE, "!wrapping Q head: " QDISPLAY(q));
 #endif
 			/*LINTED*/
 			WRAPQHEAD(q);
@@ -1502,7 +1501,7 @@ rdc_clr_iohdr(rdc_k_info_t *krdc, nsc_size_t qpos)
 	    !(IS_QSTATE(q, RDC_QDISABLEPEND))) {
 #ifdef DEBUG_FLUSHER_UBERNOISE
 		rdc_u_info_t *urdc = &rdc_u_info[krdc->index];
-		cmn_err(CE_NOTE, "clr_iohdr: diskq %s empty, "
+		cmn_err(CE_NOTE, "!clr_iohdr: diskq %s empty, "
 		    "resetting defaults", urdc->disk_queue);
 #endif
 
@@ -1527,13 +1526,13 @@ rdc_iohdr_ok(io_hdr *hdr)
 bad:
 
 #ifdef DEBUG
-	cmn_err(CE_WARN, "Bad io header magic %x type %d pos %" NSC_SZFMT
+	cmn_err(CE_WARN, "!Bad io header magic %x type %d pos %" NSC_SZFMT
 	    " hpos %" NSC_SZFMT " qpos %" NSC_SZFMT " len %" NSC_SZFMT
 	    " flag %d iostatus %d setid %d", hdr->dat.magic,
 	    hdr->dat.type, hdr->dat.pos, hdr->dat.hpos, hdr->dat.qpos,
 	    hdr->dat.len, hdr->dat.flag, hdr->dat.iostatus, hdr->dat.setid);
 #else
-	cmn_err(CE_WARN, "Bad io header retrieved");
+	cmn_err(CE_WARN, "!Bad io header retrieved");
 #endif
 	return (0);
 }
@@ -1697,7 +1696,7 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 
 	netq = kmem_zalloc(sizeof (*netq), KM_NOSLEEP);
 	if (netq == NULL) {
-		cmn_err(CE_WARN, "SNDR: unable to allocate net queue");
+		cmn_err(CE_WARN, "!SNDR: unable to allocate net queue");
 		return (NULL);
 	}
 
@@ -1708,7 +1707,7 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 	endobuf = bufoff + buf->sb_len;
 
 #ifdef DEBUG_FLUSHER_UBERNOISE
-	cmn_err(CE_WARN, "BUFFOFFENTER %d", bufoff);
+	cmn_err(CE_WARN, "!BUFFOFFENTER %d", bufoff);
 #endif
 	/* CONSTCOND */
 	while (1) {
@@ -1718,7 +1717,7 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 			goto fail;
 		}
 #ifdef DEBUG_FLUSHER_UBERNOISE
-		cmn_err(CE_WARN, "BUFFOFF_0 %d", bufoff);
+		cmn_err(CE_WARN, "!BUFFOFF_0 %d", bufoff);
 #endif
 
 		if ((vaddr == NULL) || (vlen == 0))
@@ -1737,7 +1736,7 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 		hdr = kmem_zalloc(sizeof (*hdr), KM_NOSLEEP);
 		if (hdr == NULL) {
 			cmn_err(CE_WARN,
-			    "SNDR: unable to alocate net queue header");
+			    "!SNDR: unable to alocate net queue header");
 			goto fail;
 		}
 
@@ -1747,18 +1746,18 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 
 		if (!rdc_iohdr_ok(hdr)) {
 			cmn_err(CE_WARN,
-			    "unable to retrieve i/o data from queue %s "
+			    "!unable to retrieve i/o data from queue %s "
 			    "at offset %" NSC_SZFMT " bp: %" NSC_SZFMT " bl: %"
 			    NSC_SZFMT, urdc->disk_queue,
 			    bufoff, buf->sb_pos, buf->sb_len);
 #ifdef DEBUG_DISKQ
-			cmn_err(CE_WARN, "FAILING QUEUE state: %x",
+			cmn_err(CE_WARN, "!FAILING QUEUE state: %x",
 			    rdc_get_vflags(urdc));
-			cmn_err(CE_WARN, QDISPLAY(dq));
-			cmn_err(CE_WARN, "VADDR %p, IOADDR %p", vaddr, ioaddr);
-			cmn_err(CE_WARN, "BUF %p", buf);
+			cmn_err(CE_WARN, "!qinfo: " QDISPLAY(dq));
+			cmn_err(CE_WARN, "!VADDR %p, IOADDR %p", vaddr, ioaddr);
+			cmn_err(CE_WARN, "!BUF %p", buf);
 #endif
-			cmn_err(CE_WARN, QDISPLAYND(dq));
+			cmn_err(CE_WARN, "!qinfo: " QDISPLAYND(dq));
 
 			goto fail;
 		}
@@ -1777,7 +1776,7 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 		aio = kmem_zalloc(sizeof (*aio), KM_NOSLEEP);
 		if (aio == NULL) {
 			bufcnt -= FBA_NUM(sizeof (*hdr));
-			cmn_err(CE_WARN, "SNDR: unable to alloc net queue aio");
+			cmn_err(CE_WARN, "!SNDR: net queue aio alloc failed");
 			goto fail;
 		}
 
@@ -1790,7 +1789,7 @@ rdc_diskq_buf2queue(rdc_group_t *grp, nsc_buf_t **abuf, int index)
 		rdc_fill_aio(grp, aio, hdr, buf);
 
 		if (aio->index < 0) {
-			cmn_err(CE_WARN, "Set id %d not found or no longer "
+			cmn_err(CE_WARN, "!Set id %d not found or no longer "
 			    "enabled, failing disk queue", hdr->dat.setid);
 			kmem_free(aio, sizeof (*aio));
 			goto fail;
@@ -1881,7 +1880,7 @@ fail:
 
 	if (fail) { /* real failure, not just state change */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_diskq_buf2queue: failing disk queue %s",
+		cmn_err(CE_WARN, "!rdc_diskq_buf2queue: failing disk queue %s",
 		    urdc->disk_queue);
 #endif
 		rdc_fail_diskq(krdc, RDC_NOWAIT, RDC_DOLOG);
@@ -1938,7 +1937,7 @@ rdc_diskq_unqueue(int index)
 	DTRACE_PROBE(rdc_diskq_unq_rsrv);
 
 	if (_rdc_rsrv_diskq(group)) {
-		cmn_err(CE_WARN, "rdc_unqueue: %s reserve failed",
+		cmn_err(CE_WARN, "!rdc_unqueue: %s reserve failed",
 		    urdc->disk_queue);
 		goto fail;
 	}
@@ -1957,7 +1956,7 @@ rdc_diskq_unqueue(int index)
 
 	if (QNXTIOSHLDWRAP(q)) {
 #ifdef DEBUG_DISKQWRAP
-		cmn_err(CE_NOTE, "wrapping Q nxtio: " QDISPLAY(q));
+		cmn_err(CE_NOTE, "!wrapping Q nxtio: " QDISPLAY(q));
 #endif
 		/*LINTED*/
 		WRAPQNXTIO(q);
@@ -1990,7 +1989,7 @@ rdc_diskq_unqueue(int index)
 	while ((qhead == LASTQTAIL(q)) && (IS_QSTATE(q, QTAILBUSY))) {
 		mutex_exit(QLOCK(q));
 #ifdef DEBUG_DISKQ
-		cmn_err(CE_NOTE, "Qtail busy delay lastqtail: %d", qhead);
+		cmn_err(CE_NOTE, "!Qtail busy delay lastqtail: %d", qhead);
 #endif
 		delay(5);
 		mutex_enter(QLOCK(q));
@@ -2005,11 +2004,11 @@ rdc_diskq_unqueue(int index)
 	DTRACE_PROBE(rdc_diskq_iohdr_read_end);
 
 	if (!RDC_SUCCESS(rc) || !rdc_iohdr_ok(iohdr)) {
-		cmn_err(CE_WARN, "unable to retrieve i/o data from queue %s"
+		cmn_err(CE_WARN, "!unable to retrieve i/o data from queue %s"
 		    " at offset %" NSC_SZFMT " rc %d", urdc->disk_queue,
 		    qhead, rc);
 #ifdef DEBUG_DISKQ
-		cmn_err(CE_WARN, QDISPLAY(q));
+		cmn_err(CE_WARN, "!qinfo: " QDISPLAY(q));
 #endif
 		mutex_exit(QHEADLOCK(q));
 		goto fail;
@@ -2035,7 +2034,7 @@ rdc_diskq_unqueue(int index)
 
 #ifdef DEBUG_FLUSHER_UBERNOISE
 	p = &iohdr->dat;
-	cmn_err(CE_NOTE, "unqueued iohdr from %d pos: %d len: %d flag: %d "
+	cmn_err(CE_NOTE, "!unqueued iohdr from %d pos: %d len: %d flag: %d "
 	    "iostatus: %d setid: %d time: %d", qhead, p->pos, p->len,
 	    p->flag, p->iostatus, p->setid, p->time);
 #endif
@@ -2059,7 +2058,7 @@ rdc_diskq_unqueue(int index)
 	DTRACE_PROBE(rdc_diskq_unq_allocbuf2_end);
 
 	if (!RDC_SUCCESS(rc) || !RDC_SUCCESS(rc1)) { /* uh-oh */
-		cmn_err(CE_WARN, "disk queue %s read failure",
+		cmn_err(CE_WARN, "!disk queue %s read failure",
 		    urdc->disk_queue);
 		goto fail;
 	}
@@ -2069,7 +2068,7 @@ rdc_diskq_unqueue(int index)
 
 	if (!RDC_SUCCESS(rc2)) {
 #ifdef DEBUG
-		cmn_err(CE_WARN, "nsc_copy failed for diskq unqueue");
+		cmn_err(CE_WARN, "!nsc_copy failed for diskq unqueue");
 #endif
 		goto fail;
 	}
@@ -2098,7 +2097,7 @@ nullbuf:
 	aio->index = rdc_setid2idx(iohdr->dat.setid);
 	if (aio->index < 0) { /* uh-oh */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "rdc_diskq_unqueue: index < 0");
+		cmn_err(CE_WARN, "!rdc_diskq_unqueue: index < 0");
 #endif
 		goto fail;
 	}
@@ -2106,7 +2105,7 @@ nullbuf:
 
 #ifdef DEBUG_FLUSHER_UBERNOISE_STAMP
 	h = &q->disk_hdr.h;
-	cmn_err(CE_NOTE, "stamping diskq header:\n"
+	cmn_err(CE_NOTE, "!stamping diskq header:\n"
 	    "magic: %x\nstate: %d\nhead_offset: %d\n"
 	    "tail_offset: %d\ndisk_size: %d\nnitems: %d\nblocks: %d\n",
 	    h->magic, h->state, h->head_offset, h->tail_offset,
@@ -2126,7 +2125,7 @@ nullbuf:
 
 #ifdef DEBUG_FLUSHER_UBERNOISE
 	if (!nullhandle) {
-		cmn_err(CE_NOTE, "UNQUEUING, %p"
+		cmn_err(CE_NOTE, "!UNQUEUING, %p"
 		    " contents: %c%c%c%c%c pos: %d len: %d",
 		    (void *)aio->handle,
 		    aio->handle->sb_vec[0].sv_addr[0],
@@ -2136,9 +2135,9 @@ nullbuf:
 		    aio->handle->sb_vec[0].sv_addr[4],
 		    aio->handle->sb_pos, aio->handle->sb_len);
 	} else {
-		cmn_err(CE_NOTE, "UNQUEUING, NULL " QDISPLAY(q));
+		cmn_err(CE_NOTE, "!UNQUEUING, NULL " QDISPLAY(q));
 	}
-	cmn_err(CE_NOTE, "qinfo: " QDISPLAY(q));
+	cmn_err(CE_NOTE, "!qinfo: " QDISPLAY(q));
 #endif
 
 	return (aio);
@@ -2155,7 +2154,7 @@ fail:
 
 	_rdc_rlse_diskq(group);
 #ifdef DEBUG
-	cmn_err(CE_WARN, "diskq_unqueue: failing diskq");
+	cmn_err(CE_WARN, "!diskq_unqueue: failing diskq");
 #endif
 	mutex_enter(QLOCK(q));
 	rdc_clr_qbusy(q);
@@ -2334,7 +2333,7 @@ rdc_read_diskq_buf(int index)
 	mutex_exit(QLOCK(dq));
 
 	if (_rdc_rsrv_diskq(group)) {
-		cmn_err(CE_WARN, "rdc_readdiskqbuf: %s reserve failed",
+		cmn_err(CE_WARN, "!rdc_readdiskqbuf: %s reserve failed",
 		    urdc->disk_queue);
 		mutex_enter(QLOCK(dq));
 		rdc_clr_qbusy(dq); /* prevent disables on the queue */
@@ -2366,7 +2365,7 @@ rdc_read_diskq_buf(int index)
 
 	if (QNXTIOSHLDWRAP(dq)) {
 #ifdef DEBUG_DISKQWRAP
-		cmn_err(CE_NOTE, "wrapping Q nxtio: " QDISPLAY(dq));
+		cmn_err(CE_NOTE, "!wrapping Q nxtio: " QDISPLAY(dq));
 #endif
 		/*LINTED*/
 		WRAPQNXTIO(dq);
@@ -2403,10 +2402,8 @@ rdc_read_diskq_buf(int index)
 		if (len <= 0)
 			delay(50);
 
-		DTRACE_PROBE3(rdc_read_diskq_buf_bail4,
-				int, len,
-				int, rdc_get_vflags(urdc),
-				int, nq->qfflags);
+		DTRACE_PROBE3(rdc_read_diskq_buf_bail4, int, len,
+		    int, rdc_get_vflags(urdc), int, nq->qfflags);
 
 		goto done;
 	}
@@ -2414,9 +2411,9 @@ rdc_read_diskq_buf(int index)
 	DTRACE_PROBE2(rdc_calc_len, int, len, int, (int)QNXTIO(dq));
 
 #ifdef DEBUG_FLUSHER_UBERNOISE
-	cmn_err(CE_WARN, "CALC_LEN(%d) h:%d n%d t%d, w%d",
+	cmn_err(CE_WARN, "!CALC_LEN(%d) h:%d n%d t%d, w%d",
 	    len, QHEAD(dq), QNXTIO(dq), QTAIL(dq), QWRAP(dq));
-	cmn_err(CE_CONT, QDISPLAYND(dq));
+	cmn_err(CE_CONT, "!qinfo: " QDISPLAYND(dq));
 #endif
 	SET_QCOALBOUNDS(dq, QNXTIO(dq) + len);
 
@@ -2426,7 +2423,7 @@ rdc_read_diskq_buf(int index)
 		mutex_exit(QLOCK(dq));
 
 #ifdef DEBUG_FLUSHER_UBERNOISE
-		cmn_err(CE_NOTE, "Qtail busy delay nxtio %d len %d "
+		cmn_err(CE_NOTE, "!Qtail busy delay nxtio %d len %d "
 		    "lastqtail: %d", QNXTIO(dq), len, LASTQTAIL(dq));
 #endif
 		delay(20);
@@ -2456,7 +2453,7 @@ rdc_read_diskq_buf(int index)
 	    NSC_NOCACHE | NSC_READ, &buf);
 
 	if (!RDC_SUCCESS(rc)) {
-		cmn_err(CE_WARN, "disk queue %s read failure pos %" NSC_SZFMT
+		cmn_err(CE_WARN, "!disk queue %s read failure pos %" NSC_SZFMT
 		    " len %d", urdc->disk_queue, QNXTIO(dq), len);
 		fail++;
 		buf = NULL;
@@ -2474,7 +2471,7 @@ rdc_read_diskq_buf(int index)
 	tmpnq = rdc_diskq_buf2queue(group, &buf, index);
 
 #ifdef DEBUG_FLUSHER_UBERNOISE
-	cmn_err(CE_NOTE, "QBUF p: %d l: %d p+l: %d users: %d qblocks: %d ",
+	cmn_err(CE_NOTE, "!QBUF p: %d l: %d p+l: %d users: %d qblocks: %d ",
 	    "qitems: %d WASTED: %d", buf->sb_pos, buf->sb_len,
 	    buf->sb_pos+buf->sb_len, buf->sb_user, tmpnq?tmpnq->blocks:-1,
 	    tmpnq?tmpnq->nitems:-1,
@@ -2482,8 +2479,8 @@ rdc_read_diskq_buf(int index)
 #endif
 
 	DTRACE_PROBE3(rdc_buf2que_returned, net_queue *, tmpnq?tmpnq:0,
-			uint64_t, tmpnq?tmpnq->nitems:0,
-			uint_t, tmpnq?tmpnq->net_qhead->seq:0);
+	    uint64_t, tmpnq?tmpnq->nitems:0,
+	    uint_t, tmpnq?tmpnq->net_qhead->seq:0);
 done:
 
 	/* we don't need to retain the buf */
@@ -2532,14 +2529,12 @@ rdc_dequeue(rdc_k_info_t *krdc, int *rc)
 
 	if (aio == NULL) {
 #ifdef DEBUG
-		if (q->nitems != 0 ||
-		    q->blocks != 0 ||
-		    q->net_qtail != 0) {
+		if (q->nitems != 0 || q->blocks != 0 || q->net_qtail != 0) {
 			cmn_err(CE_PANIC,
-"rdc_dequeue(1): q %p, q blocks %" NSC_SZFMT ", nitems %" NSC_SZFMT
-", qhead %p qtail %p",
-				(void *) q, q->blocks, q->nitems,
-				(void *) aio, (void *) q->net_qtail);
+			    "rdc_dequeue(1): q %p, q blocks %" NSC_SZFMT
+			    " , nitems %" NSC_SZFMT ", qhead %p qtail %p",
+			    (void *) q, q->blocks, q->nitems,
+			    (void *) aio, (void *) q->net_qtail);
 		}
 #endif
 
@@ -2567,15 +2562,12 @@ rdc_dequeue(rdc_k_info_t *krdc, int *rc)
 
 #ifdef DEBUG
 	if (q->net_qhead == NULL) {
-		if (q->nitems != 0 ||
-		    q->blocks != 0 ||
-		    q->net_qtail != 0) {
-			cmn_err(CE_PANIC,
-"rdc_dequeue(2): q %p, q blocks %" NSC_SZFMT " nitems %" NSC_SZFMT
-", qhead %p qtail %p",
-				(void *) q, q->blocks, q->nitems,
-				(void *) q->net_qhead,
-				(void *) q->net_qtail);
+		if (q->nitems != 0 || q->blocks != 0 || q->net_qtail != 0) {
+			cmn_err(CE_PANIC, "rdc_dequeue(2): q %p, q blocks %"
+			    NSC_SZFMT " nitems %" NSC_SZFMT
+			    " , qhead %p qtail %p",
+			    (void *) q, q->blocks, q->nitems,
+			    (void *) q->net_qhead, (void *) q->net_qtail);
 		}
 	}
 #endif
@@ -2630,7 +2622,7 @@ rdc_qfill_shldsleep(rdc_k_info_t *krdc)
 
 	if (nq->qfflags & RDC_QFILLSLEEP) {
 #ifdef DEBUG_DISKQ_NOISY
-	cmn_err(CE_NOTE, "Sleeping diskq->memq flusher: QFILLSLEEP idx: %d",
+	cmn_err(CE_NOTE, "!Sleeping diskq->memq flusher: QFILLSLEEP idx: %d",
 	    krdc->index);
 #endif
 		return (1);
@@ -2638,7 +2630,7 @@ rdc_qfill_shldsleep(rdc_k_info_t *krdc)
 
 	if (IS_STATE(urdc, RDC_LOGGING) || IS_STATE(urdc, RDC_SYNCING)) {
 #ifdef DEBUG_DISKQ_NOISY
-	cmn_err(CE_NOTE, "Sleeping diskq->memq flusher: Sync|Log (0x%x)"
+	cmn_err(CE_NOTE, "!Sleeping diskq->memq flusher: Sync|Log (0x%x)"
 	    " idx: %d", rdc_get_vflags(urdc), urdc->index);
 #endif
 		return (1);
@@ -2647,7 +2639,7 @@ rdc_qfill_shldsleep(rdc_k_info_t *krdc)
 	mutex_enter(QLOCK(dq));
 	if ((QNXTIO(dq) == QTAIL(dq)) && !IS_QSTATE(dq, RDC_QFULL)) {
 #ifdef DEBUG_DISKQ_NOISY
-		cmn_err(CE_NOTE, "Sleeping diskq->memq flusher: QEMPTY");
+		cmn_err(CE_NOTE, "!Sleeping diskq->memq flusher: QEMPTY");
 #endif
 		mutex_exit(QLOCK(dq));
 		return (1);
@@ -2658,8 +2650,7 @@ rdc_qfill_shldsleep(rdc_k_info_t *krdc)
 		nq->hwmhit = 1;
 		/* stuck flushers ? */
 #ifdef DEBUG_DISKQ_NOISY
-		cmn_err(CE_NOTE,
-		    "Sleeping diskq->memq flusher: memq full:"
+		cmn_err(CE_NOTE, "!Sleeping diskq->memq flusher: memq full:"
 		    " seq: %d seqack %d", krdc->group->seq,
 		    krdc->group->seqack);
 #endif
@@ -2683,10 +2674,9 @@ rdc_join_netqueues(net_queue *q, net_queue *tmpq)
 	if (q->net_qhead == NULL) { /* empty */
 #ifdef DEBUG
 		if (q->blocks != 0 || q->nitems != 0) {
-			cmn_err(CE_PANIC,
-			"rdc filler: q %p, qhead 0, "
-			" q blocks %" NSC_SZFMT ", nitems %" NSC_SZFMT,
-			(void *) q, q->blocks, q->nitems);
+			cmn_err(CE_PANIC, "rdc filler: q %p, qhead 0, "
+			    " q blocks %" NSC_SZFMT ", nitems %" NSC_SZFMT,
+			    (void *) q, q->blocks, q->nitems);
 		}
 #endif
 		q->net_qhead = tmpq->net_qhead;
@@ -2776,7 +2766,7 @@ nulltmpq:
 			if (q->qfflags & RDC_QFILLSTOP) {
 #ifdef DEBUG_DISKQ
 			cmn_err(CE_NOTE,
-			    "rdc_qfiller_thr: recieved kill signal");
+			    "!rdc_qfiller_thr: recieved kill signal");
 #endif
 				mutex_exit(&q->net_qlock);
 				goto done;
@@ -2791,7 +2781,7 @@ done:
 	q->qfill_sleeping = RDC_QFILL_DEAD; /* the big sleep */
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "rdc_qfiller_thr stopping");
+	cmn_err(CE_NOTE, "!rdc_qfiller_thr stopping");
 #endif
 	q->qfflags &= ~RDC_QFILLSTOP;
 
@@ -2811,7 +2801,7 @@ _rdc_add_diskq(int index, char *diskq)
 
 	if (!diskq || urdc->disk_queue[0]) { /* how'd that happen? */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "NULL diskq in _rdc_add_diskq");
+		cmn_err(CE_WARN, "!NULL diskq in _rdc_add_diskq");
 #endif
 		rc = -1;
 		goto fail;
@@ -2823,7 +2813,7 @@ _rdc_add_diskq(int index, char *diskq)
 	group->flags |= RDC_DISKQUE;
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "adding diskq to group %s", urdc->group_name);
+	cmn_err(CE_NOTE, "!adding diskq to group %s", urdc->group_name);
 #endif
 	mutex_enter(&rdc_conf_lock);
 	rc = rdc_enable_diskq(krdc);
@@ -2871,7 +2861,8 @@ rdc_add_diskq(rdc_config_t *uparms, spcs_s_info_t kstatus)
 		goto failed;
 	}
 	urdc = &rdc_u_info[index];
-	this = krdc = &rdc_k_info[index];
+	krdc = &rdc_k_info[index];
+	this = &rdc_k_info[index];
 	group = krdc->group;
 	diskq = uparms->rdc_set->disk_queue;
 
@@ -2898,7 +2889,7 @@ rdc_add_diskq(rdc_config_t *uparms, spcs_s_info_t kstatus)
 
 		if (!RDC_SUCCESS(rc)) {
 			cmn_err(CE_WARN,
-			    "rdc_open_diskq: Bitmap reserve failed");
+			    "!rdc_open_diskq: Bitmap reserve failed");
 			spcs_s_add(kstatus, RDC_EBITMAP,
 			    urdc->primary.bitmap);
 			rc = RDC_EBITMAP;
@@ -3073,7 +3064,7 @@ _rdc_kill_diskq(rdc_u_info_t *urdc)
 
 	group->flags |= RDC_DISKQ_KILL;
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "disabling disk queue %s", urdc->disk_queue);
+	cmn_err(CE_NOTE, "!disabling disk queue %s", urdc->disk_queue);
 #endif
 
 	mutex_enter(QLOCK(q));
@@ -3096,7 +3087,7 @@ _rdc_kill_diskq(rdc_u_info_t *urdc)
 	}
 
 #ifdef DEBUG
-	cmn_err(CE_NOTE, "_rdc_kill_diskq: enabling memory queue");
+	cmn_err(CE_NOTE, "!_rdc_kill_diskq: enabling memory queue");
 #endif
 	group->flags &= ~(RDC_DISKQUE|RDC_DISKQ_KILL);
 	group->flags |= RDC_MEMQUE;
@@ -3187,7 +3178,8 @@ rdc_rem_diskq(rdc_config_t *uparms, spcs_s_info_t kstatus)
 	}
 
 	urdc = &rdc_u_info[index];
-	this = krdc = &rdc_k_info[index];
+	this = &rdc_k_info[index];
+	krdc = &rdc_k_info[index];
 
 	do {
 		if (!IS_STATE(urdc, RDC_LOGGING)) {
@@ -3242,7 +3234,7 @@ rdc_rem_diskq(rdc_config_t *uparms, spcs_s_info_t kstatus)
 				 * No progress seen, increment retry counter
 				 */
 				int rc = group->rdc_thrnum ?
-					RDC_EQFLUSHING : RDC_EQNOTEMPTY;
+				    RDC_EQFLUSHING : RDC_EQNOTEMPTY;
 				spcs_s_add(kstatus, rc, urdc->disk_queue);
 				return (rc);
 			}
