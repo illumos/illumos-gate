@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,6 +172,10 @@ typedef struct {
  * Dyn.d_un.d_val field of the Elf*_Dyn structure.
  */
 #define	DT_VALRNGLO	0x6ffffd00
+
+#define	DT_GNU_PRELINKED 0x6ffffdf5	/* prelinking timestamp (unused) */
+#define	DT_GNU_CONFLICTSZ 0x6ffffdf6	/* size of conflict section (unused) */
+#define	DT_GNU_LIBLISTSZ 0x6ffffdf7	/* size of library list (unused) */
 #define	DT_CHECKSUM	0x6ffffdf8	/* elf checksum */
 #define	DT_PLTPADSZ	0x6ffffdf9	/* pltpadding size */
 #define	DT_MOVEENT	0x6ffffdfa	/* move table entry size */
@@ -192,6 +196,13 @@ typedef struct {
  * built, these entries will need to be adjusted.
  */
 #define	DT_ADDRRNGLO	0x6ffffe00
+
+#define	DT_GNU_HASH	0x6ffffef5	/* GNU-style hash table (unused) */
+#define	DT_TLSDESC_PLT	0x6ffffef6	/* GNU (unused) */
+#define	DT_TLSDESC_GOT	0x6ffffef7	/* GNU (unused) */
+#define	DT_GNU_CONFLICT	0x6ffffef8	/* start of conflict section (unused) */
+#define	DT_GNU_LIBLIST	0x6ffffef9	/* Library list (unused) */
+
 #define	DT_CONFIG	0x6ffffefa	/* configuration information */
 #define	DT_DEPAUDIT	0x6ffffefb	/* dependency auditing */
 #define	DT_AUDIT	0x6ffffefc	/* object auditing */

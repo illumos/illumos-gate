@@ -1444,3 +1444,4 @@ Bugid   Risk Synopsis
 6807050 GNU linkonce sections can create duplicate and incompatible
 	eh_frame FDE entries
 6807864	ld.so.1 is susceptible to a fatal dlsym()/setlocale() race
+6813909 generalize eh_frame support to non-amd64 platforms

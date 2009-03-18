@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libconv.a
@@ -48,9 +46,9 @@ COMOBJS=	arch.o			c_literal.o \
 		config.o		corenote.o \
 		data.o			deftag.o \
 		demangle.o		dl.o \
-		dwarf_ehe.o		group.o	\
-		lddstub.o		segments.o \
-		version.o
+		dwarf.o			dwarf_ehe.o \
+		group.o			lddstub.o \
+		segments.o		version.o
 
 COMOBJS_NOMSG =	tokens.o
 

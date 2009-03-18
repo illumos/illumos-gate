@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -50,8 +50,10 @@
 @ MSG_PT_SUNWCAP	"[ PT_SUNWCAP ]"
 @ MSG_PT_SUNWCAP_ALT	"PT_SUNWCAP"
 
-@ MSG_PT_SUNW_UNWIND	"[ PT_SUNW_UNWIND ]"
+@ MSG_PT_SUNW_UNWIND		"[ PT_SUNW_UNWIND ]"
 @ MSG_PT_SUNW_UNWIND_ALT	"PT_SUNW_UNWIND"
+@ MSG_PT_SUNW_EH_FRAME		"[ PT_SUNW_EH_FRAME ]"
+@ MSG_PT_SUNW_EH_FRAME_ALT	"PT_SUNW_EH_FRAME"
 
 @ MSG_PF_X		 "PF_X"
 @ MSG_PF_W		 "PF_W"

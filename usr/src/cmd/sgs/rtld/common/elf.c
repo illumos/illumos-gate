@@ -1673,6 +1673,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 			cap = (Cap *)((uintptr_t)phdr->p_vaddr + base);
 			break;
 		case PT_SUNW_UNWIND:
+		case PT_SUNW_EH_FRAME:
 			uphdr = phdr;
 			break;
 		default:

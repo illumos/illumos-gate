@@ -555,7 +555,9 @@ static uintptr_t
 process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
-	int stab_index = 0;
+	int		stab_index = 0;
+	Word		is_flags = 0;
+	uintptr_t	r;
 
 	/*
 	 * Never include .stab.excl sections in any output file.
@@ -587,37 +589,93 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * our own version, so don't allow any input sections of these types to
 	 * be added to the output section list (why a relocatable object would
 	 * have a .plt or .got is a mystery, but stranger things have occurred).
+	 *
+	 * If there are any unwind sections, and this is a platform that uses
+	 * SHT_PROGBITS for unwind sections, then set their ident to reflect
+	 * that.
 	 */
 	if (ident) {
-		if (shdr->sh_flags & SHF_TLS)
+		if (shdr->sh_flags & SHF_TLS) {
 			ident = ld_targ.t_id.id_tls;
-		else if ((shdr->sh_flags & ~ALL_SHF_IGNORE) ==
-		    (SHF_ALLOC | SHF_EXECINSTR))
+		} else if ((shdr->sh_flags & ~ALL_SHF_IGNORE) ==
+		    (SHF_ALLOC | SHF_EXECINSTR)) {
 			ident = ld_targ.t_id.id_text;
-		else if (shdr->sh_flags & SHF_ALLOC) {
-			if ((strcmp(name, MSG_ORIG(MSG_SCN_PLT)) == 0) ||
-			    (strcmp(name, MSG_ORIG(MSG_SCN_GOT)) == 0))
-				ident = ld_targ.t_id.id_null;
-			else if (stab_index) {
-				/*
-				 * This is a work-around for x86 compilers that
-				 * have set SHF_ALLOC for the .stab.index
-				 * section.
-				 *
-				 * Because of this, make sure that the
-				 * .stab.index does not end up as the last
-				 * section in the text segment.  Older linkers
-				 * can produce segmentation violations when they
-				 * strip (ld -s) against a shared object whose
-				 * last section in the text segment is a .stab.
-				 */
-				ident = ld_targ.t_id.id_interp;
-			} else
-				ident = ld_targ.t_id.id_data;
+		} else if (shdr->sh_flags & SHF_ALLOC) {
+			int done = 0;
+
+			if (name[0] == '.') {
+				switch (name[1]) {
+				case 'e':
+					if ((ld_targ.t_m.m_sht_unwind ==
+					    SHT_PROGBITS) &&
+					    (strcmp(name,
+					    MSG_ORIG(MSG_SCN_EHFRAME)) == 0)) {
+						ident = ld_targ.t_id.id_unwind;
+						is_flags = FLG_IS_EHFRAME;
+						done = 1;
+					}
+					break;
+				case 'g':
+					if (strcmp(name,
+					    MSG_ORIG(MSG_SCN_GOT)) == 0) {
+						ident = ld_targ.t_id.id_null;
+						done = 1;
+						break;
+					}
+					if ((ld_targ.t_m.m_sht_unwind ==
+					    SHT_PROGBITS)&&
+					    (strcmp(name,
+					    MSG_ORIG(MSG_SCN_GCC_X_TBL)) ==
+					    0)) {
+						ident = ld_targ.t_id.id_unwind;
+						done = 1;
+						break;
+					}
+					break;
+				case 'p':
+					if (strcmp(name,
+					    MSG_ORIG(MSG_SCN_PLT)) == 0) {
+						ident = ld_targ.t_id.id_null;
+						done = 1;
+					}
+					break;
+				}
+			}
+			if (!done) {
+				if (stab_index) {
+					/*
+					 * This is a work-around for x86
+					 * compilers that have set SHF_ALLOC
+					 * for the .stab.index section.
+					 *
+					 * Because of this, make sure that the
+					 * .stab.index does not end up as the
+					 * last section in the text segment.
+					 * Older linkers can produce
+					 * segmentation violations when they
+					 * strip (ld -s) against a shared
+					 * object whose last section in the
+					 * text segment is a .stab.
+					 */
+					ident = ld_targ.t_id.id_interp;
+				} else {
+					ident = ld_targ.t_id.id_data;
+				}
+			}
 		} else
 			ident = ld_targ.t_id.id_note;
 	}
-	return (process_section(name, ifl, shdr, scn, ndx, ident, ofl));
+
+	r = process_section(name, ifl, shdr, scn, ndx, ident, ofl);
+
+	/*
+	 * On success, process_section() creates an input section descriptor.
+	 * Now that it exists, we can add any pending input section flags.
+	 */
+	if ((is_flags != 0) && (r == 1))
+		ifl->ifl_isdesc[ndx]->is_flags |= is_flags;
+
+	return (r);
 }
 
 /*
@@ -1277,6 +1335,21 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 }
 
 /*
+ * Process a progbits section from a relocatable object (ET_REL).
+ * This is used on non-amd64 objects to recognize .eh_frame sections.
+ */
+/*ARGSUSED1*/
+static uintptr_t
+process_progbits_final(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
+{
+	if (isc->is_osdesc && (isc->is_flags & FLG_IS_EHFRAME) &&
+	    (ld_unwind_register(isc->is_osdesc, ofl) == S_ERROR))
+		return (S_ERROR);
+
+	return (1);
+}
+
+/*
  * Process a group section.
  */
 static uintptr_t
@@ -1415,8 +1488,10 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  * procedure (ie. things that can only be done when all required sections
  * have been collected).
  */
-static uintptr_t (*Initial[SHT_NUM][2])() = {
+typedef uintptr_t	(* initial_func_t)(const char *, Ifl_desc *, Shdr *,
+			    Elf_Scn *, Word, int, Ofl_desc *);
 
+static initial_func_t Initial[SHT_NUM][2] = {
 /*			ET_REL			ET_DYN			*/
 
 /* SHT_NULL	*/	invalid_section,	invalid_section,
@@ -1440,10 +1515,13 @@ static uintptr_t (*Initial[SHT_NUM][2])() = {
 /* SHT_SYMTAB_SHNDX */	process_sym_shndx,	NULL
 };
 
-static uintptr_t (*Final[SHT_NUM][2])() = {
+typedef uintptr_t	(* final_func_t)(Is_desc *, Ifl_desc *, Ofl_desc *);
+
+static final_func_t Final[SHT_NUM][2] = {
+/*			ET_REL			ET_DYN			*/
 
 /* SHT_NULL	*/	NULL,			NULL,
-/* SHT_PROGBITS	*/	NULL,			NULL,
+/* SHT_PROGBITS	*/	process_progbits_final,	NULL,
 /* SHT_SYMTAB	*/	ld_sym_process,		ld_sym_process,
 /* SHT_STRTAB	*/	NULL,			NULL,
 /* SHT_RELA	*/	rel_process,		NULL,
@@ -1643,8 +1721,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 					return (S_ERROR);
 				break;
 			case SHT_SUNW_cap:
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				capisp = ifl->ifl_isdesc[ndx];
 				break;
@@ -1655,13 +1733,13 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 					return (S_ERROR);
 				break;
 			case SHT_SUNW_move:
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				break;
 			case SHT_SUNW_syminfo:
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				sifisp = ifl->ifl_isdesc[ndx];
 				break;
@@ -1677,20 +1755,20 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				ifl->ifl_isdesc[ndx]->is_flags |= FLG_IS_COMDAT;
 				break;
 			case SHT_SUNW_verdef:
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				vdfisp = ifl->ifl_isdesc[ndx];
 				break;
 			case SHT_SUNW_verneed:
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				vndisp = ifl->ifl_isdesc[ndx];
 				break;
 			case SHT_SUNW_versym:
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_null, ofl) == S_ERROR)
 					return (S_ERROR);
 				vsyisp = ifl->ifl_isdesc[ndx];
 				break;
@@ -1704,9 +1782,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				if (ld_targ.t_m.m_mach !=
 				    LD_TARG_BYCLASS(EM_SPARC, EM_SPARCV9))
 					goto do_default;
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ld_targ.t_id.id_gotdata, ofl) ==
-				    S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ld_targ.t_id.id_gotdata, ofl) == S_ERROR)
 					return (S_ERROR);
 				break;
 #if	defined(_ELF64)
@@ -1732,15 +1809,17 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 					    scn, ndx, ld_targ.t_id.id_unwind,
 					    ofl) == S_ERROR)
 						return (S_ERROR);
+					ifl->ifl_isdesc[ndx]->is_flags |=
+					    FLG_IS_EHFRAME;
 				}
 				break;
 #endif
 			default:
 			do_default:
-				if (ident != ld_targ.t_id.id_null)
-					ident = ld_targ.t_id.id_user;
-				if (process_section(name, ifl, shdr, scn,
-				    ndx, ident, ofl) == S_ERROR)
+				if (process_section(name, ifl, shdr, scn, ndx,
+				    ((ident == ld_targ.t_id.id_null) ?
+				    ident : ld_targ.t_id.id_user), ofl) ==
+				    S_ERROR)
 					return (S_ERROR);
 				break;
 			}
@@ -1935,9 +2014,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			 * objects.
 			 */
 			if (osp && (ld_targ.t_m.m_mach == EM_AMD64) &&
-			    (ld_targ.t_uw.uw_append_unwind != NULL) &&
-			    ((*ld_targ.t_uw.uw_append_unwind)(osp, ofl) ==
-			    S_ERROR))
+			    (ld_unwind_register(osp, ofl) == S_ERROR))
 				return (S_ERROR);
 #endif
 		}

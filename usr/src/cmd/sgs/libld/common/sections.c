@@ -2771,11 +2771,8 @@ ld_make_sections(Ofl_desc *ofl)
 				return (S_ERROR);
 			if (make_dynsym(ofl) == S_ERROR)
 				return (S_ERROR);
-#if	defined(_ELF64)
-			if ((ld_targ.t_uw.uw_make_unwindhdr != NULL) &&
-			    ((*ld_targ.t_uw.uw_make_unwindhdr)(ofl) == S_ERROR))
+			if (ld_unwind_make_hdr(ofl) == S_ERROR)
 				return (S_ERROR);
-#endif
 			if (make_dynsort(ofl) == S_ERROR)
 				return (S_ERROR);
 		}

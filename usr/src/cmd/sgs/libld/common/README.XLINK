@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 
 
@@ -72,8 +71,8 @@ In addition, the target-specific files usually include the target
 in their name (i.e. machrel.sparc.c).
 
 Although the target dependent and independent (common) code is well separated,
-they are interdependent. For example, the common code is aware of
-the target-specific section types that can occur only for some targets
+they are interdependent. The common code is explicitly aware of
+target-specific section types that can occur only for some targets
 (i.e. SHT_AMD64_UNWIND). This is not an architecture that allows
 for arbitrary target support to be dynamically plugged into an unchanged
 platform independent core. Rather, it is an organization that allows

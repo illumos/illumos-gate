@@ -348,14 +348,11 @@ ld_main(int argc, char **argv, Half mach)
 	if (ld_reloc_process(ofl) == S_ERROR)
 		return (ld_exit(ofl));
 
-#if	defined(_ELF64)
 	/*
-	 * Fill in contents for Unwind Header
+	 * Fill in contents for unwind header (.eh_frame_hdr)
 	 */
-	if ((ld_targ.t_uw.uw_populate_unwindhdr != NULL) &&
-	    ((*ld_targ.t_uw.uw_populate_unwindhdr)(ofl) == S_ERROR))
+	if (ld_unwind_populate_hdr(ofl) == S_ERROR)
 		return (ld_exit(ofl));
-#endif
 
 	/*
 	 * Finally create the files elf checksum.

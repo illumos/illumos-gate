@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -860,7 +860,11 @@ extern	const char	*conv_demangle_name(const char *);
 extern	const char	*conv_dl_flag(int, Conv_fmt_flags_t,
 			    Conv_dl_flag_buf_t *);
 extern	const char	*conv_dl_mode(int, int, Conv_dl_mode_buf_t *);
+extern	const char	*conv_dwarf_cfa(uchar_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
 extern	const char	*conv_dwarf_ehe(uint_t, Conv_dwarf_ehe_buf_t *);
+extern	const char	*conv_dwarf_regname(Half, Word, Conv_fmt_flags_t,
+			    int *, Conv_inv_buf_t *);
 extern	const char	*conv_elfdata_type(Elf_Type, Conv_inv_buf_t *);
 extern	const char	*conv_grphdl_flags(uint_t, Conv_grphdl_flags_buf_t *);
 extern	const char	*conv_grpdesc_flags(uint_t, Conv_grpdesc_flags_buf_t *);

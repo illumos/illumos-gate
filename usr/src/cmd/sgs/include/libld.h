@@ -201,10 +201,8 @@ struct ofl_desc {
 	List		ofl_rtldinfo;	/* list of rtldinfo syms */
 	List		ofl_osgroups;	/* list of output GROUP sections */
 	List		ofl_ostlsseg;	/* pointer to sections in TLS segment */
-#if	defined(_ELF64)			/* for amd64 target only */
-	List		ofl_unwind;	/* list of unwind output sections */
+	APlist		*ofl_unwind;	/* list of unwind output sections */
 	Os_desc		*ofl_unwindhdr;	/* Unwind hdr */
-#endif
 	avl_tree_t	ofl_symavl;	/* pointer to head of Syms AVL tree */
 	Sym_desc	**ofl_regsyms;	/* array of potential register */
 	Word		ofl_regsymsno;	/*    symbols and array count */
@@ -607,6 +605,7 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_GROUPS	0x0200		/* section has groups to process */
 #define	FLG_IS_PLACE	0x0400		/* section requires to be placed */
 #define	FLG_IS_COMDAT	0x0800		/* section is COMDAT */
+#define	FLG_IS_EHFRAME	0x1000		/* section is .eh_frame */
 
 /*
  * Map file and output file processing structures

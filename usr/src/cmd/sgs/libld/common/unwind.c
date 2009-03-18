@@ -24,18 +24,14 @@
  * Use is subject to license terms.
  */
 
-#define	ELF_TARGET_AMD64
-
 #include	<string.h>
 #include	<stdio.h>
 #include	<sys/types.h>
 #include	<sgs.h>
 #include	<debug.h>
-#include	<i386/machdep_x86.h>
 #include	<_libld.h>
 #include	<dwarf.h>
 #include	<stdlib.h>
-#include	"unwind.amd.h"
 
 /*
  * A EH_FRAME_HDR consists of the following:
@@ -112,16 +108,16 @@
  * =================
  *
  * The call frame information needed for unwinding the stack is output in
- * an ELF section(s) of type SHT_AMD64_UNWIND. In the simplest case there
- * will be one such section per object file and it will be named
- * ".eh_frame".  An .eh_frame section consists of one or more
+ * an ELF section(s) of type SHT_AMD64_UNWIND (amd64) or SHT_PROGBITS (other).
+ * In the simplest case there will be one such section per object file and it
+ * will be named ".eh_frame".  An .eh_frame section consists of one or more
  * subsections. Each subsection contains a CIE (Common Information Entry)
  * followed by varying number of FDEs (Frame Descriptor Entry). A FDE
  * corresponds to an explicit or compiler generated function in a
  * compilation unit, all FDEs can access the CIE that begins their
  * subsection for data.
  *
- * If an object file contains C++ template instantiations there shall be
+ * If an object file contains C++ template instantiations, there shall be
  * a separate CIE immediately preceding each FDE corresponding to an
  * instantiation.
  *
@@ -287,10 +283,28 @@
 
 
 
+static uint_t
+extract_uint(const uchar_t *data, uint64_t *ndx, int do_swap)
+{
+	uint_t	r;
+	uchar_t *p = (uchar_t *)&r;
+
+	data += *ndx;
+	if (do_swap)
+		UL_ASSIGN_BSWAP_WORD(p, data);
+	else
+		UL_ASSIGN_WORD(p, data);
+
+	(*ndx) += 4;
+	return (r);
+}
+
 /*
- * The job of this function is to determine how much space
- * will be required for the final table.  We'll build
- * it later.
+ * Create an unwind header (.eh_frame_hdr) output section.
+ * The section is created and space reserved, but the data
+ * is not copied into place. That is done by a later call
+ * to ld_unwind_populate(), after active relocations have been
+ * processed.
  *
  * When GNU linkonce processing is in effect, we can end up in a situation
  * where the FDEs related to discarded sections remain in the eh_frame
@@ -303,21 +317,22 @@
  * where all FDEs are valid.
  */
 uintptr_t
-make_amd64_unwindhdr(Ofl_desc *ofl)
+ld_unwind_make_hdr(Ofl_desc *ofl)
 {
+	int		bswap = (ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0;
 	Shdr		*shdr;
 	Elf_Data	*elfdata;
 	Is_desc		*isp;
 	size_t		size;
 	Xword		fde_cnt;
-	Listnode	*lnp;
+	Aliste		idx;
 	Os_desc		*osp;
 
 	/*
 	 * we only build a unwind header if we have
 	 * some unwind information in the file.
 	 */
-	if (ofl->ofl_unwind.head == NULL)
+	if (aplist_nitems(ofl->ofl_unwind) == 0)
 		return (1);
 
 	/*
@@ -326,7 +341,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	if ((elfdata = libld_calloc(sizeof (Elf_Data), 1)) == 0)
 		return (S_ERROR);
 	elfdata->d_type = ELF_T_BYTE;
-	elfdata->d_align = M_WORD_ALIGN;
+	elfdata->d_align = ld_targ.t_m.m_word_align;
 	elfdata->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
@@ -334,9 +349,9 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	 */
 	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
 		return (S_ERROR);
-	shdr->sh_type = SHT_AMD64_UNWIND;
+	shdr->sh_type = ld_targ.t_m.m_sht_unwind;
 	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_addralign = M_WORD_ALIGN;
+	shdr->sh_addralign = ld_targ.t_m.m_word_align;
 	shdr->sh_entsize = 0;
 
 	/*
@@ -349,7 +364,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	isp->is_indata = elfdata;
 
 	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isp,
-	    M_ID_UNWINDHDR, 0)) == (Os_desc *)S_ERROR)
+	    ld_targ.t_id.id_unwindhdr, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -358,7 +373,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	 * in the binary search table.
 	 */
 	fde_cnt = 0;
-	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, osp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx, osp)) {
 		Listnode    *_lnp;
 
 		for (LIST_TRAVERSE(&osp->os_isdescs, _lnp, isp)) {
@@ -370,7 +385,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 
 			while (off < size) {
 				uint_t		length, id;
-				uint64_t	ndx;
+				uint64_t	ndx = 0;
 
 				/*
 				 * Extract length in lsb format.  A zero length
@@ -378,15 +393,14 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 				 * that processing for unwind information is
 				 * complete.
 				 */
-				if ((length = LSB32EXTRACT(data + off)) == 0)
+				length = extract_uint(data + off, &ndx, bswap);
+				if (length == 0)
 					break;
 
 				/*
 				 * Extract CIE id in lsb format.
 				 */
-				ndx = 4;
-				id = LSB32EXTRACT(data + off + ndx);
-				ndx += 4;
+				id = extract_uint(data + off, &ndx, bswap);
 
 				/*
 				 * A CIE record has a id of '0', otherwise
@@ -470,12 +484,12 @@ bintabcompare(const void *p1, const void *p2)
 }
 
 uintptr_t
-populate_amd64_unwindhdr(Ofl_desc *ofl)
+ld_unwind_populate_hdr(Ofl_desc *ofl)
 {
 	uchar_t		*hdrdata;
 	uint_t		*binarytable;
 	uint_t		hdroff;
-	Listnode	*lnp;
+	Aliste		idx;
 	Addr		hdraddr;
 	Os_desc		*hdrosp;
 	Os_desc		*osp;
@@ -524,7 +538,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 	first_unwind = 0;
 	fde_count = 0;
 
-	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, osp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx, osp)) {
 		uchar_t		*data;
 		size_t		size;
 		uint64_t	off = 0;
@@ -544,22 +558,21 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 
 		while (off < size) {
 			uint_t	    length, id;
-			uint64_t    ndx;
+			uint64_t    ndx = 0;
 
 			/*
 			 * Extract length in lsb format.  A zero length
 			 * indicates that this CIE is a terminator and that
 			 * processing of unwind information is complete.
 			 */
-			if ((length = LSB32EXTRACT(data + off)) == 0)
+			length = extract_uint(data + off, &ndx, bswap);
+			if (length == 0)
 				goto done;
 
 			/*
 			 * Extract CIE id in lsb format.
 			 */
-			ndx = 4;
-			id = LSB32EXTRACT(data + off + ndx);
-			ndx += 4;
+			id = extract_uint(data + off, &ndx, bswap);
 
 			/*
 			 * A CIE record has a id of '0'; otherwise
@@ -627,7 +640,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 						&data[off + ndx],
 						&ndx, ciePflag,
 						ofl->ofl_dehdr->e_ident,
-						shdr->sh_addr + off + ndx);
+						shdr->sh_addr, off + ndx);
 					    break;
 					case 'R':
 					    /* code encoding */
@@ -648,7 +661,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 
 				initloc = dwarf_ehe_extract(&data[off],
 				    &ndx, cieRflag, ofl->ofl_dehdr->e_ident,
-				    shdr->sh_addr + off + ndx);
+				    shdr->sh_addr, off + ndx);
 
 				/*
 				 * Ignore FDEs with initloc set to 0.
@@ -686,7 +699,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 
 done:
 	/*
-	 * Do a quick sort on the binary table. If this is a cross
+	 * Do a quicksort on the binary table. If this is a cross
 	 * link from a system with the opposite byte order, xlate
 	 * the resulting values into LSB order.
 	 */
@@ -710,7 +723,7 @@ done:
 	/* LINTED */
 	uint_ptr = (uint_t *)(&hdrdata[hdroff]);
 	*uint_ptr = first_unwind->os_shdr->sh_addr -
-	    hdrosp->os_shdr->sh_addr + hdroff;
+	    (hdrosp->os_shdr->sh_addr + hdroff);
 	if (bswap)
 		*uint_ptr = ld_bswap_Word(*uint_ptr);
 
@@ -724,7 +737,7 @@ done:
 	/*
 	 * If relaxed relocations are active, then there is a chance
 	 * that we didn't use all the space reserved for this section.
-	 * For details, see the note at head of make_amd64_unwindhdr() above.
+	 * For details, see the note at head of ld_unwind_make_hdr() above.
 	 *
 	 * Find the PT_SUNW_UNWIND program header, and change the size values
 	 * to the size of the subset of the section that was actually used.
@@ -745,23 +758,34 @@ done:
 	return (1);
 }
 
+/*
+ * Append an .eh_frame section to our output list if not already present.
+ *
+ * Usually, there is a single .eh_frame output section. However, there can
+ * be more if there are incompatible section flags on incoming sections.
+ * If this does happen, the frame_ptr field of the eh_frame_hdr section
+ * will point at the base of the first output section, and the other
+ * sections will not be accessible via frame_ptr. However, the .eh_frame_hdr
+ * will be able to access all the data in the different .eh_frame sections,
+ * because the entries in sorted table are all encoded as DW_EH_PE_datarel.
+ */
 uintptr_t
-append_amd64_unwind(Os_desc *osp, Ofl_desc * ofl)
+ld_unwind_register(Os_desc *osp, Ofl_desc * ofl)
 {
-	Listnode    *lnp;
-	Os_desc	    *_osp;
+	Aliste	idx;
+	Os_desc	*_osp;
 	/*
 	 * Check to see if this output section is already
 	 * on the list.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, _osp))
+	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx, _osp))
 		if (osp == _osp)
 			return (1);
 
 	/*
 	 * Append output section to unwind list
 	 */
-	if (list_appendc(&ofl->ofl_unwind, osp) == 0)
+	if (aplist_append(&ofl->ofl_unwind, osp, AL_CNT_UNWIND) == NULL)
 		return (S_ERROR);
 	return (1);
 }

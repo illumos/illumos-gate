@@ -19,10 +19,8 @@
 # CDDL HEADER END
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 @ MSG_STT_NOTYPE		"NOTY"
@@ -37,8 +35,10 @@
 @ MSG_STT_FILE_ALT		"STT_FILE"
 @ MSG_STT_COMMON		"COMM"
 @ MSG_STT_COMMON_ALT		"STT_COMMON"
-@ MSG_STT_TLS			"TLS "
+@ MSG_STT_TLS			"TLS"
 @ MSG_STT_TLS_ALT		"STT_TLS"
+@ MSG_STT_IFUNC			"IFUNC"
+@ MSG_STT_IFUNC_ALT		"STT_IFUNC"
 @ MSG_STT_SPARC_REGISTER	"REGI"
 @ MSG_STT_SPARC_REGISTER_ALT	"STT_SPARC_REGISTER"
 

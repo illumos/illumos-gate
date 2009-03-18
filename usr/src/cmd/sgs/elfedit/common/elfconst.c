@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdlib.h>
 #include	<stdio.h>
@@ -1132,6 +1131,9 @@ static elfedit_atoui_sym_t sym_pt[] = {
 
 	{ MSG_ORIG(MSG_PT_SUNW_UNWIND),		PT_SUNW_UNWIND },
 	{ MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT1),	PT_SUNW_UNWIND },
+
+	{ MSG_ORIG(MSG_PT_SUNW_EH_FRAME),	PT_SUNW_EH_FRAME },
+	{ MSG_ORIG(MSG_PT_SUNW_EH_FRAME_ALT1),	PT_SUNW_EH_FRAME },
 
 	{ MSG_ORIG(MSG_PT_SUNWBSS),		PT_SUNWBSS },
 	{ MSG_ORIG(MSG_PT_SUNWBSS_ALT1),	PT_SUNWBSS },

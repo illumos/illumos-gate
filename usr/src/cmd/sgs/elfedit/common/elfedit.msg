@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 @ _START_
@@ -1246,6 +1244,8 @@
 @ MSG_PT_TLS_ALT1		"tls"
 @ MSG_PT_SUNW_UNWIND		"PT_SUNW_UNWIND"	# 0x6464e550
 @ MSG_PT_SUNW_UNWIND_ALT1	"sunw_unwind"
+@ MSG_PT_SUNW_EH_FRAME		"PT_SUNW_EH_FRAME"	# 0x6474e550
+@ MSG_PT_SUNW_EH_FRAME_ALT1	"sunw_eh_frame"
 @ MSG_PT_SUNWBSS		"PT_SUNWBSS"		# 0x6ffffffa
 @ MSG_PT_SUNWBSS_ALT1		"sunwbss"
 @ MSG_PT_SUNWSTACK		"PT_SUNWSTACK"		# 0x6ffffffb

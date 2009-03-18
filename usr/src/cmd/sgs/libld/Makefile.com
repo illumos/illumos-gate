@@ -33,14 +33,14 @@ COMOBJS32 =	args32.o	entry32.o	exit32.o	groups32.o \
 		libs32.o	files32.o	map32.o		order32.o \
 		outfile32.o	place32.o	relocate32.o	resolve32.o \
 		sections32.o	sunwmove32.o	support32.o	syms32.o \
-		update32.o	version32.o
+		update32.o	unwind32.o	version32.o
 
 COMOBJS64 =	args64.o	entry64.o	exit64.o	groups64.o \
 		ldentry64.o	ldlibs64.o	ldmachdep64.o	ldmain64.o \
 		libs64.o	files64.o	map64.o		order64.o \
 		outfile64.o 	place64.o	relocate64.o	resolve64.o \
 		sections64.o	sunwmove64.o	support64.o	syms64.o \
-		update64.o	version64.o
+		update64.o	unwind64.o	version64.o
 
 TOOLOBJS =	alist.o		assfail.o	findprime.o	string_table.o \
 		strhash.o
@@ -58,7 +58,7 @@ L_SPARC_MACHOBJS64 =	machrel.sparc64.o	machsym.sparc64.o
 # Target specific objects (i386/amd64)
 E_X86_TOOLOBJS =	leb128.o
 L_X86_MACHOBJS32 =	machrel.intel32.o
-L_X86_MACHOBJS64 =	machrel.amd64.o		unwind.amd64.o
+L_X86_MACHOBJS64 =	machrel.amd64.o
 
 
 # All target specific objects rolled together

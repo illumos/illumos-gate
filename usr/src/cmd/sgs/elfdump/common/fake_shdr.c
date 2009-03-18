@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Generate a cache of section header information for an ELF
@@ -1173,6 +1172,7 @@ fake_shdr_cache(const char *file, int fd, Elf *elf, Ehdr *ehdr,
 			break;
 
 		case PT_SUNW_UNWIND:
+		case PT_SUNW_EH_FRAME:
 			sec.unwind.type = SINFO_T_UNWIND;
 			sinfo = &sec.unwind;
 			break;

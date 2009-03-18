@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,14 +23,12 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DWARF_H
 #define	_DWARF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -254,20 +251,7 @@ typedef enum _LANG {
 extern	uint64_t	uleb_extract(unsigned char *, uint64_t *);
 extern	int64_t		sleb_extract(unsigned char *, uint64_t *);
 extern	uint64_t	dwarf_ehe_extract(unsigned char *, uint64_t *,
-				uint_t, unsigned char *, uint64_t);
-
-/*
- * LSB32EXTRACT()
- *
- * Extract a LSB encoded int which may or may not be
- * aligned on a 4 byte boundary.  This macro will work
- * on either a MSB or LSB based system.
- */
-#define	LSB32EXTRACT(lsbptr)	((unsigned int)(\
-				((unsigned const char *)(lsbptr))[0] + \
-				(((unsigned const char *)(lsbptr))[1] << 8) + \
-				(((unsigned const char *)(lsbptr))[2] << 16) + \
-				(((unsigned const char *)(lsbptr))[3] << 24)))
+			    uint_t, unsigned char *, uint64_t, uint64_t);
 
 #ifdef	__cplusplus
 }

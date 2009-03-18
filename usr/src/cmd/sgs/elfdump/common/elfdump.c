@@ -185,7 +185,7 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 		/*
 		 * Do we have a empty string table?
 		 */
-		if (strs == 0) {
+		if (strs == NULL) {
 			if (!strsec_err) {
 				(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 				    file, strsec->c_name);
@@ -411,92 +411,109 @@ sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr)
 }
 
 /*
- * A couple of instances of unwind data are printed as tables of 8 data items
- * expressed as 0x?? integers.
- */
-#define	UNWINDTBLSZ	10 + (8 * 5) + 1
-
-static void
-unwindtbl(uint64_t *ndx, uint_t len, uchar_t *data, uint64_t doff,
-    const char *msg, const char *pre, size_t plen)
-{
-	char	buffer[UNWINDTBLSZ];
-	uint_t	boff = plen, cnt = 0;
-
-	dbg_print(0, msg);
-	(void) strncpy(buffer, pre, UNWINDTBLSZ);
-
-	while (*ndx < (len + 4)) {
-		if (cnt == 8) {
-			dbg_print(0, buffer);
-			boff = plen;
-			cnt = 0;
-		}
-		(void) snprintf(&buffer[boff], UNWINDTBLSZ - boff,
-		    MSG_ORIG(MSG_UNW_TBLENTRY), data[doff + (*ndx)++]);
-		boff += 5;
-		cnt++;
-	}
-	if (cnt)
-		dbg_print(0, buffer);
-}
-
-/*
  * Obtain a specified Phdr entry.
  */
 static Phdr *
-getphdr(Word phnum, Word type, const char *file, Elf *elf)
+getphdr(Word phnum, Word *type_arr, Word type_cnt, const char *file, Elf *elf)
 {
-	Word	cnt;
+	Word	cnt, tcnt;
 	Phdr	*phdr;
 
 	if ((phdr = elf_getphdr(elf)) == NULL) {
 		failure(file, MSG_ORIG(MSG_ELF_GETPHDR));
-		return (0);
+		return (NULL);
 	}
 
 	for (cnt = 0; cnt < phnum; phdr++, cnt++) {
-		if (phdr->p_type == type)
-			return (phdr);
+		for (tcnt = 0; tcnt < type_cnt; tcnt++) {
+			if (phdr->p_type == type_arr[tcnt])
+				return (phdr);
+		}
 	}
-	return (0);
+	return (NULL);
 }
 
 static void
 unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
     Elf *elf)
 {
+#if	defined(_ELF64)
+#define	MSG_UNW_BINSRTAB2	MSG_UNW_BINSRTAB2_64
+#define	MSG_UNW_BINSRTABENT	MSG_UNW_BINSRTABENT_64
+#else
+#define	MSG_UNW_BINSRTAB2	MSG_UNW_BINSRTAB2_32
+#define	MSG_UNW_BINSRTABENT	MSG_UNW_BINSRTABENT_32
+#endif
+
+	static Word phdr_types[] = { PT_SUNW_UNWIND, PT_SUNW_EH_FRAME };
+
+	int			frame_cnt = 0, hdr_cnt = 0, frame_ndx, hdr_ndx;
+	uint64_t		save_frame_ptr, save_frame_base;
 	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
-	Word	cnt;
-	Phdr	*uphdr = 0;
+	Word			cnt;
+	Phdr			*uphdr = NULL;
 
 	/*
-	 * For the moment - UNWIND is only relevant for a AMD64 object.
+	 * Historical background: .eh_frame and .eh_frame_hdr sections
+	 * come from the GNU compilers (particularly C++), and are used
+	 * under all architectures. Their format is based on DWARF. When
+	 * the amd64 ABI was defined, these sections were adopted wholesale
+	 * from the existing practice.
+	 *
+	 * When amd64 support was added to Solaris, support for these
+	 * sections was added, using the SHT_AMD64_UNWIND section type
+	 * to identify them. At first, we ignored them in objects for
+	 * non-amd64 targets, but later broadened our support to include
+	 * other architectures in order to better support gcc-generated
+	 * objects.
+	 *
+	 * We match these sections by name, rather than section type,
+	 * because they can come in as either SHT_AMD64_UNWIND, or as
+	 * SHT_PROGBITS, and because we need to distinquish between
+	 * the two types (.eh_frame and .eh_frame_hdr).
 	 */
-	if (ehdr->e_machine != EM_AMD64)
-		return;
 
 	if (phnum)
-		uphdr = getphdr(phnum, PT_SUNW_UNWIND, file, elf);
+		uphdr = getphdr(phnum, phdr_types,
+		    sizeof (phdr_types) / sizeof (*phdr_types), file, elf);
 
 	for (cnt = 1; cnt < shnum; cnt++) {
 		Cache		*_cache = &cache[cnt];
 		Shdr		*shdr = _cache->c_shdr;
 		uchar_t		*data;
 		size_t		datasize;
-		uint64_t	off, ndx, frame_ptr, fde_cnt, tabndx;
+		uint64_t	ndx, frame_ptr, fde_cnt, tabndx;
 		uint_t		vers, frame_ptr_enc, fde_cnt_enc, table_enc;
 
 		/*
-		 * AMD64 - this is a strmcp() just to find the gcc produced
-		 * sections.  Soon gcc should be setting the section type - and
-		 * we'll not need this strcmp().
+		 * Skip sections of the wrong type. On amd64, Solaris tags
+		 * these as SHT_AMD64_UNWIND, while gcc started out issuing
+		 * them as SHT_PROGBITS and switched over when the amd64 ABI
+		 * was finalized. On non-amd64, they're all SHT_PROGBITS.
 		 */
-		if ((shdr->sh_type != SHT_AMD64_UNWIND) &&
-		    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRM),
-		    MSG_SCN_FRM_SIZE) != 0) &&
-		    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRMHDR),
-		    MSG_SCN_FRMHDR_SIZE) != 0))
+		switch (shdr->sh_type) {
+		case SHT_PROGBITS:
+			if (ehdr->e_machine == EM_AMD64)
+				continue;
+			break;
+		case SHT_AMD64_UNWIND:
+			if (ehdr->e_machine != EM_AMD64)
+				continue;
+			break;
+		default:
+			continue;
+		}
+
+		/*
+		 * Only sections with names starting with .eh_frame or
+		 * .eh_frame_hdr are of interest. We do a prefix comparison,
+		 * allowing for naming conventions like .eh_frame.foo, hence
+		 * the use of strncmp() rather than strcmp(). This means that
+		 * we only really need to test for .eh_frame, as it's a
+		 * prefix of .eh_frame_hdr.
+		 */
+		if (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRM),
+		    MSG_SCN_FRM_SIZE) != 0)
 			continue;
 
 		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
@@ -510,7 +527,6 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 
 		data = (uchar_t *)(_cache->c_data->d_buf);
 		datasize = _cache->c_data->d_size;
-		off = 0;
 
 		/*
 		 * Is this a .eh_frame_hdr
@@ -518,6 +534,15 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 		if ((uphdr && (shdr->sh_addr == uphdr->p_vaddr)) ||
 		    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRMHDR),
 		    MSG_SCN_FRMHDR_SIZE) == 0)) {
+			/*
+			 * There can only be a single .eh_frame_hdr.
+			 * Flag duplicates.
+			 */
+			if (++hdr_cnt > 1)
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_MULTEHFRMHDR), file,
+				    EC_WORD(cnt), _cache->c_name);
+
 			dbg_print(0, MSG_ORIG(MSG_UNW_FRMHDR));
 			ndx = 0;
 
@@ -529,14 +554,18 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 			dbg_print(0, MSG_ORIG(MSG_UNW_FRMVERS), vers);
 
 			frame_ptr = dwarf_ehe_extract(data, &ndx, frame_ptr_enc,
-			    ehdr->e_ident, shdr->sh_addr + ndx);
+			    ehdr->e_ident, shdr->sh_addr, ndx);
+			if (hdr_cnt == 1) {
+				hdr_ndx = cnt;
+				save_frame_ptr = frame_ptr;
+			}
 
 			dbg_print(0, MSG_ORIG(MSG_UNW_FRPTRENC),
 			    conv_dwarf_ehe(frame_ptr_enc, &dwarf_ehe_buf),
 			    EC_XWORD(frame_ptr));
 
 			fde_cnt = dwarf_ehe_extract(data, &ndx, fde_cnt_enc,
-			    ehdr->e_ident, shdr->sh_addr + ndx);
+			    ehdr->e_ident, shdr->sh_addr, ndx);
 
 			dbg_print(0, MSG_ORIG(MSG_UNW_FDCNENC),
 			    conv_dwarf_ehe(fde_cnt_enc, &dwarf_ehe_buf),
@@ -549,197 +578,46 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 			for (tabndx = 0; tabndx < fde_cnt; tabndx++) {
 				dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTABENT),
 				    EC_XWORD(dwarf_ehe_extract(data, &ndx,
-				    table_enc, ehdr->e_ident, shdr->sh_addr)),
+				    table_enc, ehdr->e_ident, shdr->sh_addr,
+				    ndx)),
 				    EC_XWORD(dwarf_ehe_extract(data, &ndx,
-				    table_enc, ehdr->e_ident, shdr->sh_addr)));
+				    table_enc, ehdr->e_ident, shdr->sh_addr,
+				    ndx)));
 			}
-			continue;
+		} else {		/* Display the .eh_frame section */
+			frame_cnt++;
+			if (frame_cnt == 1) {
+				frame_ndx = cnt;
+				save_frame_base = shdr->sh_addr;
+			} else if ((frame_cnt >  1) &&
+			    (ehdr->e_type != ET_REL)) {
+				Conv_inv_buf_t	inv_buf;
+
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_WARN_MULTEHFRM), file,
+				    EC_WORD(cnt), _cache->c_name,
+				    conv_ehdr_type(ehdr->e_type, 0, &inv_buf));
+			}
+			dump_eh_frame(data, datasize, shdr->sh_addr,
+			    ehdr->e_machine, ehdr->e_ident);
 		}
 
 		/*
-		 * Walk the Eh_frame's
+		 * If we've seen the .eh_frame_hdr and the first
+		 * .eh_frame section, compare the header frame_ptr
+		 * to the address of the actual frame section to ensure
+		 * the link-editor got this right.
 		 */
-		while (off < datasize) {
-			uint_t		cieid, cielength, cieversion;
-			uint_t		cieretaddr;
-			int		cieRflag, cieLflag, ciePflag, cieZflag;
-			uint_t		cieaugndx, length, id;
-			uint64_t	ciecalign, ciedalign;
-			char		*cieaugstr;
-
-			ndx = 0;
-			/*
-			 * Extract length in lsb format.  A zero length
-			 * indicates that this CIE is a terminator and that
-			 * processing for this unwind information should end.
-			 * However, skip this entry and keep processing, just
-			 * in case there is any other information remaining in
-			 * this section.  Note, ld(1) will terminate the
-			 * processing of the .eh_frame contents for this file
-			 * after a zero length CIE, thus any information that
-			 * does follow is ignored by ld(1), and is therefore
-			 * questionable.
-			 */
-			if ((length = LSB32EXTRACT(data + off + ndx)) == 0) {
-				dbg_print(0, MSG_ORIG(MSG_UNW_ZEROTERM));
-				off += 4;
-				continue;
-			}
-			ndx += 4;
-
-			/*
-			 * extract CIE id in lsb format
-			 */
-			id = LSB32EXTRACT(data + off + ndx);
-			ndx += 4;
-
-			/*
-			 * A CIE record has a id of '0', otherwise this is a
-			 * FDE entry and the 'id' is the CIE pointer.
-			 */
-			if (id == 0) {
-				uint64_t    persVal;
-
-				cielength = length;
-				cieid = id;
-				cieLflag = ciePflag = cieRflag = cieZflag = 0;
-
-				dbg_print(0, MSG_ORIG(MSG_UNW_CIE),
-				    EC_XWORD(shdr->sh_addr + off));
-				dbg_print(0, MSG_ORIG(MSG_UNW_CIELNGTH),
-				    cielength, cieid);
-
-				cieversion = data[off + ndx];
-				ndx += 1;
-				cieaugstr = (char *)(&data[off + ndx]);
-				ndx += strlen(cieaugstr) + 1;
-
-				dbg_print(0, MSG_ORIG(MSG_UNW_CIEVERS),
-				    cieversion, cieaugstr);
-
-				ciecalign = uleb_extract(&data[off], &ndx);
-				ciedalign = sleb_extract(&data[off], &ndx);
-				cieretaddr = data[off + ndx];
-				ndx += 1;
-
-				dbg_print(0, MSG_ORIG(MSG_UNW_CIECALGN),
-				    EC_XWORD(ciecalign), EC_XWORD(ciedalign),
-				    cieretaddr);
-
-				if (cieaugstr[0])
-					dbg_print(0,
-					    MSG_ORIG(MSG_UNW_CIEAXVAL));
-
-				for (cieaugndx = 0; cieaugstr[cieaugndx];
-				    cieaugndx++) {
-					uint_t	val;
-
-					switch (cieaugstr[cieaugndx]) {
-					case 'z':
-						val = uleb_extract(&data[off],
-						    &ndx);
-						dbg_print(0,
-						    MSG_ORIG(MSG_UNW_CIEAXSIZ),
-						    val);
-						cieZflag = 1;
-						break;
-					case 'P':
-						ciePflag = data[off + ndx];
-						ndx += 1;
-
-						persVal = dwarf_ehe_extract(
-						    &data[off], &ndx, ciePflag,
-						    ehdr->e_ident,
-						    shdr->sh_addr + off + ndx);
-						dbg_print(0,
-						    MSG_ORIG(MSG_UNW_CIEAXPERS),
-						    ciePflag,
-						    conv_dwarf_ehe(ciePflag,
-						    &dwarf_ehe_buf),
-						    EC_XWORD(persVal));
-						break;
-					case 'R':
-						val = data[off + ndx];
-						ndx += 1;
-						dbg_print(0,
-						    MSG_ORIG(MSG_UNW_CIEAXCENC),
-						    val, conv_dwarf_ehe(val,
-						    &dwarf_ehe_buf));
-						cieRflag = val;
-						break;
-					case 'L':
-						val = data[off + ndx];
-						ndx += 1;
-						dbg_print(0,
-						    MSG_ORIG(MSG_UNW_CIEAXLSDA),
-						    val, conv_dwarf_ehe(val,
-						    &dwarf_ehe_buf));
-						cieLflag = val;
-						break;
-					default:
-						dbg_print(0,
-						    MSG_ORIG(MSG_UNW_CIEAXUNEC),
-						    cieaugstr[cieaugndx]);
-						break;
-					}
-				}
-				if ((cielength + 4) > ndx)
-					unwindtbl(&ndx, cielength, data, off,
-					    MSG_ORIG(MSG_UNW_CIECFI),
-					    MSG_ORIG(MSG_UNW_CIEPRE),
-					    MSG_UNW_CIEPRE_SIZE);
-				off += cielength + 4;
-
-			} else {
-				uint_t	    fdelength = length;
-				int	    fdecieptr = id;
-				uint64_t    fdeinitloc, fdeaddrrange;
-
-				dbg_print(0, MSG_ORIG(MSG_UNW_FDE),
-				    EC_XWORD(shdr->sh_addr + off));
-				dbg_print(0, MSG_ORIG(MSG_UNW_FDELNGTH),
-				    fdelength, fdecieptr);
-
-				fdeinitloc = dwarf_ehe_extract(&data[off],
-				    &ndx, cieRflag, ehdr->e_ident,
-				    shdr->sh_addr + off + ndx);
-				fdeaddrrange = dwarf_ehe_extract(&data[off],
-				    &ndx, (cieRflag & ~DW_EH_PE_pcrel),
-				    ehdr->e_ident,
-				    shdr->sh_addr + off + ndx);
-
-				dbg_print(0, MSG_ORIG(MSG_UNW_FDEINITLOC),
-				    EC_XWORD(fdeinitloc),
-				    EC_XWORD(fdeaddrrange));
-
-				if (cieaugstr[0])
-					dbg_print(0,
-					    MSG_ORIG(MSG_UNW_FDEAXVAL));
-				if (cieZflag) {
-					uint64_t    val;
-					val = uleb_extract(&data[off], &ndx);
-					dbg_print(0,
-					    MSG_ORIG(MSG_UNW_FDEAXSIZE),
-					    EC_XWORD(val));
-					if (val & cieLflag) {
-						fdeinitloc = dwarf_ehe_extract(
-						    &data[off], &ndx, cieLflag,
-						    ehdr->e_ident,
-						    shdr->sh_addr + off + ndx);
-						dbg_print(0,
-						    MSG_ORIG(MSG_UNW_FDEAXLSDA),
-						    EC_XWORD(val));
-					}
-				}
-				if ((fdelength + 4) > ndx)
-					unwindtbl(&ndx, fdelength, data, off,
-					    MSG_ORIG(MSG_UNW_FDECFI),
-					    MSG_ORIG(MSG_UNW_FDEPRE),
-					    MSG_UNW_FDEPRE_SIZE);
-				off += fdelength + 4;
-			}
-		}
+		if ((hdr_cnt > 0) && (frame_cnt > 0) &&
+		    (save_frame_ptr != save_frame_base))
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADEHFRMPTR),
+			    file, EC_WORD(hdr_ndx), cache[hdr_ndx].c_name,
+			    EC_XWORD(save_frame_ptr), EC_WORD(frame_ndx),
+			    cache[frame_ndx].c_name, EC_XWORD(save_frame_base));
 	}
+
+#undef MSG_UNW_BINSRTAB2
+#undef MSG_UNW_BINSRTABENT
 }
 
 /*
@@ -864,8 +742,11 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 static void
 interp(const char *file, Cache *cache, Word shnum, Word phnum, Elf *elf)
 {
+	static Word phdr_types[] = { PT_INTERP };
+
+
 	Word	cnt;
-	Shdr	*ishdr = 0;
+	Shdr	*ishdr = NULL;
 	Cache	*icache;
 	Off	iphdr_off = 0;
 	Xword	iphdr_fsz;
@@ -876,7 +757,9 @@ interp(const char *file, Cache *cache, Word shnum, Word phnum, Elf *elf)
 	if (phnum) {
 		Phdr	*phdr;
 
-		if ((phdr = getphdr(phnum, PT_INTERP, file, elf)) != 0) {
+		phdr = getphdr(phnum, phdr_types,
+		    sizeof (phdr_types) / sizeof (*phdr_types), file, elf);
+		if (phdr != NULL) {
 			iphdr_off = phdr->p_offset;
 			iphdr_fsz = phdr->p_filesz;
 		}
@@ -941,7 +824,7 @@ syminfo(Cache *cache, Word shnum, const char *file)
 	Sym		*syms;
 	Dyn		*dyns;
 	Word		infonum, cnt, ndx, symnum;
-	Cache		*infocache = 0, *symsec, *strsec;
+	Cache		*infocache = NULL, *symsec, *strsec;
 
 	for (cnt = 1; cnt < shnum; cnt++) {
 		if (cache[cnt].c_shdr->sh_type == SHT_SUNW_syminfo) {
@@ -949,7 +832,7 @@ syminfo(Cache *cache, Word shnum, const char *file)
 			break;
 		}
 	}
-	if (infocache == 0)
+	if (infocache == NULL)
 		return;
 
 	infoshdr = infocache->c_shdr;
@@ -976,7 +859,7 @@ syminfo(Cache *cache, Word shnum, const char *file)
 		return;
 
 	dyns = cache[infoshdr->sh_info].c_data->d_buf;
-	if (dyns == 0) {
+	if (dyns == NULL) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 		    file, cache[infoshdr->sh_info].c_name);
 		return;
@@ -1000,7 +883,7 @@ syminfo(Cache *cache, Word shnum, const char *file)
 
 	for (ndx = 1, info++; ndx < infonum; ndx++, info++) {
 		Sym 		*sym;
-		const char	*needed = 0, *name;
+		const char	*needed = NULL, *name;
 
 		if ((info->si_flags == 0) && (info->si_boundto == 0))
 			continue;
@@ -1510,7 +1393,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 	 * Symbol types for which we check that the specified
 	 * address/size land inside the target section.
 	 */
-	static const int addr_symtype[STT_NUM] = {
+	static const int addr_symtype[] = {
 		0,			/* STT_NOTYPE */
 		1,			/* STT_OBJECT */
 		1,			/* STT_FUNC */
@@ -1518,8 +1401,17 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 		0,			/* STT_FILE */
 		1,			/* STT_COMMON */
 		0,			/* STT_TLS */
+		0,			/* STT_IFUNC */
+		0,			/* 8 */
+		0,			/* 9 */
+		0,			/* 10 */
+		0,			/* 11 */
+		0,			/* 12 */
+		0,			/* STT_SPARC_REGISTER */
+		0,			/* 14 */
+		0,			/* 15 */
 	};
-#if STT_NUM != (STT_TLS + 1)
+#if STT_NUM != (STT_IFUNC + 1)
 #error "STT_NUM has grown. Update addr_symtype[]"
 #endif
 
@@ -1551,7 +1443,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 	    &state->cache[state->seccache->c_shdr->sh_link], state->file,
 	    sym->st_name);
 
-	tshdr = 0;
+	tshdr = NULL;
 	sec = NULL;
 
 	if (state->ehdr->e_type == ET_CORE) {
@@ -2692,7 +2584,7 @@ static void
 move(Cache *cache, Word shnum, const char *file, uint_t flags)
 {
 	Word		cnt;
-	const char	*fmt = 0;
+	const char	*fmt = NULL;
 
 	for (cnt = 1; cnt < shnum; cnt++) {
 		Word	movenum, symnum, ndx;
@@ -2735,7 +2627,7 @@ move(Cache *cache, Word shnum, const char *file, uint_t flags)
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_MOVE), _cache->c_name);
 		dbg_print(0, MSG_INTL(MSG_MOVE_TITLE));
 
-		if (fmt == 0)
+		if (fmt == NULL)
 			fmt = MSG_INTL(MSG_MOVE_ENTRY);
 
 		for (ndx = 0; ndx < movenum; move++, ndx++) {
@@ -3589,7 +3481,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 	Elf_Data	*data;
 	size_t		ndx;
 	Shdr		*nameshdr;
-	char		*names = 0;
+	char		*names = NULL;
 	Cache		*cache, *_cache;
 	size_t		*shdr_ndx_arr, shdr_ndx_arr_cnt;
 
@@ -3620,7 +3512,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN),
 		    EC_WORD(elf_ndxscn(scn)));
 
-	} else if ((names = data->d_buf) == 0)
+	} else if ((names = data->d_buf) == NULL)
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_SHSTRNULL), file);
 
 	/*
@@ -3743,6 +3635,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 					    MSG_ORIG(MSG_FMT_SECSYM),
 					    EC_WORD(secsz), secname, symname);
 				}
+
 				continue;
 			}
 
@@ -3938,7 +3831,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 			return (ret);
 		}
 	} else
-		shdr = 0;
+		shdr = NULL;
 
 	/*
 	 * Print the elf header.
@@ -4083,10 +3976,15 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 			case SHT_PROGBITS:
 				/*
 				 * Heuristic time: It is usually bad form
-				 * to assume that specific section names
-				 * have a given meaning. However, the
-				 * ELF ABI does specify a few such names. Try
-				 * to match them:
+				 * to assume the meaning/format of a PROGBITS
+				 * section based on its name. However, there
+				 * are exceptions: The ELF ABI specifies
+				 * .interp and .got sections by name. Existing
+				 * practice has similarly pinned down the
+				 * meaning of unwind sections (.eh_frame and
+				 * .eh_frame_hdr).
+				 *
+				 * Check for these special names.
 				 */
 				if (strcmp(_cache->c_name,
 				    MSG_ORIG(MSG_ELF_INTERP)) == 0)
@@ -4094,6 +3992,10 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 				else if (strcmp(_cache->c_name,
 				    MSG_ORIG(MSG_ELF_GOT)) == 0)
 					flags |= FLG_SHOW_GOT;
+				else if (strncmp(_cache->c_name,
+				    MSG_ORIG(MSG_SCN_FRM),
+				    MSG_SCN_FRM_SIZE) == 0)
+					flags |= FLG_SHOW_UNWIND;
 				break;
 
 			case SHT_SYMTAB:

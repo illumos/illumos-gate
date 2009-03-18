@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <dwarf.h>
@@ -183,9 +181,21 @@ sleb_extract(unsigned char *data, uint64_t *dotp)
 	return (res);
 }
 
+/*
+ * Extract a DWARF encoded datum
+ *
+ * entry:
+ *	data - Base of data buffer containing encoded bytes
+ *	dotp - Address of variable containing index within data
+ *		at which the desired datum starts.
+ *	ehe_flags - DWARF encoding
+ *	eident - ELF header e_ident[] array for object being processed
+ *	sh_base - Base address of ELF section containing desired datum
+ *	sh_offset - Offset relative to sh_base of desired datum.
+ */
 uint64_t
 dwarf_ehe_extract(unsigned char *data, uint64_t *dotp, uint_t ehe_flags,
-    unsigned char *eident, uint64_t pcaddr)
+    unsigned char *eident, uint64_t sh_base, uint64_t sh_offset)
 {
 	uint64_t    dot = *dotp;
 	uint_t	    lsb;
@@ -269,11 +279,18 @@ dwarf_ehe_extract(unsigned char *data, uint64_t *dotp, uint_t ehe_flags,
 	}
 
 	/*
-	 * If pcrel and we have a value (ie: we've been
-	 * relocated), then adjust the value.
+	 * If value is relative to a base address, adjust it
 	 */
-	if (result && (ehe_flags & DW_EH_PE_pcrel)) {
-		result = pcaddr + result;
+	if (result) {
+		switch (ehe_flags & 0xf0) {
+		case DW_EH_PE_pcrel:
+			result += sh_base + sh_offset;
+			break;
+
+		case DW_EH_PE_datarel:
+			result += sh_base;
+			break;
+		}
 	}
 	*dotp = dot;
 	return (result);

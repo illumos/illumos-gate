@@ -98,6 +98,9 @@ typedef struct {
 	Word		m_plt_reservsz;
 	Word		m_plt_shf_flags;
 
+	/* Section type of .eh_frame/.eh_frame_hdr sections */
+	Word		m_sht_unwind;
+
 	Word		m_dt_register;
 } Target_mach;
 
@@ -134,6 +137,7 @@ typedef struct {
 	Word		id_tlsbss;
 	Word		id_unknown;
 	Word		id_unwind;
+	Word		id_unwindhdr;
 	Word		id_user;
 	Word		id_version;
 } Target_machid;
@@ -218,26 +222,12 @@ typedef struct {
 	int		(* ms_reg_enter)(Sym_desc *, Ofl_desc *);
 } Target_machsym;
 
-/*
- * amd64 unwind header support
- *
- * These fields are allowed to be NULL for targets that do not support
- * amd64 unwind headers. If any of these fields are non-NULL, all of them are
- * required to be present (use empty stub routines if necessary).
- */
-typedef struct {
-	uintptr_t	(* uw_make_unwindhdr)(Ofl_desc *);
-	uintptr_t	(* uw_populate_unwindhdr)(Ofl_desc *);
-	uintptr_t	(* uw_append_unwind)(Os_desc *, Ofl_desc *);
-} Target_unwind;
-
 typedef struct {
 	Target_mach	t_m;
 	Target_machid	t_id;
 	Target_nullfunc	t_nf;
 	Target_machrel	t_mr;
 	Target_machsym	t_ms;
-	Target_unwind	t_uw;
 } Target;
 
 
@@ -330,16 +320,17 @@ typedef struct {
 /*
  * Define Alist initialization sizes.
  */
-#define	AL_CNT_IFL_GROUPS	20	/* ifl_groups initial alist count */
-#define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs initial alist count */
-#define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs initial alist count */
+#define	AL_CNT_IFL_GROUPS	20	/* ifl_groups */
+#define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs */
+#define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs */
 #define	AL_CNT_OS_MSTRISDESCS	10	/* os_mstrisdescs */
 #define	AL_CNT_OS_RELISDESCS	100	/* os_relisdescs */
 #define	AL_CNT_OS_COMDATS	20	/* os_comdats */
-#define	AL_CNT_SG_OSDESC	40	/* sg_osdescs initial alist count */
-#define	AL_CNT_SG_SECORDER	40	/* sg_secorder initial alist count */
+#define	AL_CNT_SG_OSDESC	40	/* sg_osdescs */
+#define	AL_CNT_SG_SECORDER	40	/* sg_secorder */
 #define	AL_CNT_STRMRGREL	500	/* ld_make_strmerge() reloc alist cnt */
 #define	AL_CNT_STRMRGSYM	20	/* ld_make_strmerge() sym alist cnt */
+#define	AL_CNT_UNWIND		1	/* ofl_unwind */
 
 /*
  * Return codes for {tls|got}_fixups() routines
@@ -590,6 +581,9 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_targ			ld64_targ
 #define	ld_targ_init_sparc	ld64_targ_init_sparc
 #define	ld_targ_init_x86	ld64_targ_init_x86
+#define	ld_unwind_make_hdr	ld64_unwind_make_hdr
+#define	ld_unwind_populate_hdr	ld64_unwind_populate_hdr
+#define	ld_unwind_register	ld64_unwind_register
 #define	ld_vers_base		ld64_vers_base
 #define	ld_vers_check_defs	ld64_vers_check_defs
 #define	ld_vers_check_need	ld64_vers_check_need
@@ -673,6 +667,9 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_targ			ld32_targ
 #define	ld_targ_init_sparc	ld32_targ_init_sparc
 #define	ld_targ_init_x86	ld32_targ_init_x86
+#define	ld_unwind_make_hdr	ld32_unwind_make_hdr
+#define	ld_unwind_populate_hdr	ld32_unwind_populate_hdr
+#define	ld_unwind_register	ld32_unwind_register
 #define	ld_vers_base		ld32_vers_base
 #define	ld_vers_check_defs	ld32_vers_check_defs
 #define	ld_vers_check_need	ld32_vers_check_need
@@ -791,6 +788,10 @@ extern uintptr_t	ld_sym_spec(Ofl_desc *);
 extern Target		ld_targ;
 extern const Target	*ld_targ_init_sparc(void);
 extern const Target	*ld_targ_init_x86(void);
+
+extern uintptr_t	ld_unwind_make_hdr(Ofl_desc *);
+extern uintptr_t	ld_unwind_populate_hdr(Ofl_desc *);
+extern uintptr_t	ld_unwind_register(Os_desc *, Ofl_desc *);
 
 extern Ver_desc		*ld_vers_base(Ofl_desc *);
 extern uintptr_t	ld_vers_check_defs(Ofl_desc *);

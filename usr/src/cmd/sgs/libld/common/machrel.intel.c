@@ -1670,6 +1670,9 @@ ld_targ_init_x86(void)
 			M_PLT_RESERVSZ,		/* m_plt_reservsz */
 			M_PLT_SHF_FLAGS,	/* m_plt_shf_flags */
 
+			/* Section type of .eh_frame/.eh_frame_hdr sections */
+			SHT_PROGBITS,		/* m_sht_unwind */
+
 			M_DT_REGISTER,		/* m_dt_register */
 		},
 		{			/* Target_machid */
@@ -1701,6 +1704,7 @@ ld_targ_init_x86(void)
 			M_ID_TLSBSS,		/* id_tlsbss */
 			M_ID_UNKNOWN,		/* id_unknown */
 			M_ID_UNWIND,		/* id_unwind */
+			M_ID_UNWINDHDR,		/* id_unwindhdr */
 			M_ID_USER,		/* id_user */
 			M_ID_VERSION,		/* id_version */
 		},
@@ -1737,11 +1741,6 @@ ld_targ_init_x86(void)
 			NULL,			/* ms_is_regsym */
 			NULL,			/* ms_reg_find */
 			NULL			/* ms_reg_enter */
-		},
-		{			/* Target_unwind */
-			NULL,		/* uw_make_unwindhdr */
-			NULL,		/* uw_populate_unwindhdr */
-			NULL,		/* uw_append_unwind */
 		}
 	};
 

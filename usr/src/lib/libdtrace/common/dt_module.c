@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/modctl.h>
@@ -66,6 +64,10 @@ dt_module_symhash_insert(dt_module_t *dmp, const char *name, uint_t id)
 static uint_t
 dt_module_syminit32(dt_module_t *dmp)
 {
+#if STT_NUM != (STT_IFUNC + 1)
+#error "STT_NUM has grown. update dt_module_syminit32()"
+#endif
+
 	const Elf32_Sym *sym = dmp->dm_symtab.cts_data;
 	const char *base = dmp->dm_strtab.cts_data;
 	size_t ss_size = dmp->dm_strtab.cts_size;
@@ -76,7 +78,7 @@ dt_module_syminit32(dt_module_t *dmp)
 		const char *name = base + sym->st_name;
 		uchar_t type = ELF32_ST_TYPE(sym->st_info);
 
-		if (type >= STT_NUM || type == STT_SECTION)
+		if (type >= STT_IFUNC || type == STT_SECTION)
 			continue; /* skip sections and unknown types */
 
 		if (sym->st_name == 0 || sym->st_name >= ss_size)
@@ -95,6 +97,10 @@ dt_module_syminit32(dt_module_t *dmp)
 static uint_t
 dt_module_syminit64(dt_module_t *dmp)
 {
+#if STT_NUM != (STT_IFUNC + 1)
+#error "STT_NUM has grown. update dt_module_syminit64()"
+#endif
+
 	const Elf64_Sym *sym = dmp->dm_symtab.cts_data;
 	const char *base = dmp->dm_strtab.cts_data;
 	size_t ss_size = dmp->dm_strtab.cts_size;
@@ -105,7 +111,7 @@ dt_module_syminit64(dt_module_t *dmp)
 		const char *name = base + sym->st_name;
 		uchar_t type = ELF64_ST_TYPE(sym->st_info);
 
-		if (type >= STT_NUM || type == STT_SECTION)
+		if (type >= STT_IFUNC || type == STT_SECTION)
 			continue; /* skip sections and unknown types */
 
 		if (sym->st_name == 0 || sym->st_name >= ss_size)

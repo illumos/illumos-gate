@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,7 @@ typedef enum {
 	LD_DYN,
 	LD_DTRACE,
 	LD_TLS,
-#if	defined(_ELF64)
-	LD_UNWIND,		/* (amd64-only) */
-#endif
+	LD_UNWIND,
 	LD_NOTE,
 	LD_EXTRA,
 	LD_NUM
@@ -138,11 +136,9 @@ static const Sg_desc sg_desc[LD_NUM] = {
 	SG_DESC_INIT(PT_TLS, PF_R, MSG_ORIG(MSG_ENT_TLS),
 	    (FLG_SG_TYPE | FLG_SG_FLAGS)),
 
-#if	defined(_ELF64)
-	/* LD_UNWIND (amd64-only) */
+	/* LD_UNWIND */
 	SG_DESC_INIT(PT_SUNW_UNWIND, PF_R, MSG_ORIG(MSG_ENT_UNWIND),
 	    (FLG_SG_TYPE | FLG_SG_FLAGS)),
-#endif
 
 	/* LD_NOTE */
 	SG_DESC_INIT(PT_NOTE, 0, MSG_ORIG(MSG_ENT_NOTE), FLG_SG_TYPE),
@@ -297,7 +293,6 @@ ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 		switch (idx) {
 		case LD_LRODATA:
 		case LD_LDATA:
-		case LD_UNWIND:
 			if ((ld_targ.t_m.m_mach != EM_AMD64))
 				continue;
 		}

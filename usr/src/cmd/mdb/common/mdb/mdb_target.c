@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MDB Target Layer
@@ -1904,6 +1902,10 @@ mdb_tgt_xdata_delete(mdb_tgt_t *t, const char *name)
 int
 mdb_tgt_sym_match(const GElf_Sym *sym, uint_t mask)
 {
+#if STT_NUM != (STT_IFUNC + 1)
+#error "STT_NUM has grown. update mdb_tgt_sym_match()"
+#endif
+
 	uchar_t s_bind = GELF_ST_BIND(sym->st_info);
 	uchar_t s_type = GELF_ST_TYPE(sym->st_info);
 
@@ -1911,10 +1913,10 @@ mdb_tgt_sym_match(const GElf_Sym *sym, uint_t mask)
 	 * In case you haven't already guessed, this relies on the bitmask
 	 * used by <mdb/mdb_target.h> and <libproc.h> for encoding symbol
 	 * type and binding matching the order of STB and STT constants
-	 * in <sys/elf.h>.  ELF can't change without breaking binary
+	 * in <sys/elf.h>.  Changes to ELF must maintain binary
 	 * compatibility, so I think this is reasonably fair game.
 	 */
-	if (s_bind < STB_NUM && s_type < STT_NUM) {
+	if (s_bind < STB_NUM && s_type < STT_IFUNC) {
 		uint_t type = (1 << (s_type + 8)) | (1 << s_bind);
 		return ((type & ~mask) == 0);
 	}

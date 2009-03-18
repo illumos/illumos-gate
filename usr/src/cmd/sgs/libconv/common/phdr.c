@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * String conversion routines for program header attributes.
@@ -36,6 +34,7 @@
 /* Instantiate a local copy of conv_map2str() from _conv.h */
 DEFINE_conv_map2str
 
+/*ARGSUSED*/
 const char *
 conv_phdr_type(Half mach, Word type, Conv_fmt_flags_t fmt_flags,
     Conv_inv_buf_t *inv_buf)
@@ -87,13 +86,21 @@ error "PT_NUM has grown. Update phdrs[]"
 			return (conv_map2str(inv_buf, (type - PT_SUNWBSS),
 			    fmt_flags, ARRAY_NELTS(uphdrs), uphdrs));
 		}
-	} else if ((type == PT_SUNW_UNWIND) && (mach == EM_AMD64)) {
+	} else if (type == PT_SUNW_UNWIND) {
 		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
 		case CONV_FMT_ALT_DUMP:
 		case CONV_FMT_ALT_FILE:
 			return (MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT));
 		default:
 			return (MSG_ORIG(MSG_PT_SUNW_UNWIND));
+		}
+	} else if (type == PT_SUNW_EH_FRAME) {
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			return (MSG_ORIG(MSG_PT_SUNW_EH_FRAME_ALT));
+		default:
+			return (MSG_ORIG(MSG_PT_SUNW_EH_FRAME));
 		}
 	} else
 		return (conv_invalid_val(inv_buf, type, 0));

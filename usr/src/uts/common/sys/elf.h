@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,13 +322,22 @@ typedef struct {
 #define	PT_LOOS		0x60000000	/* OS specific range */
 
 /*
- * Note: The amd64 psABI defines that the UNWIND program header
- *	 should reside in the OS specific range of the program
- *	 headers.
+ * PT_SUNW_UNWIND and PT_SUNW_EH_FRAME perform the same function,
+ * providing access to the .eh_frame_hdr section of the object.
+ * PT_SUNW_UNWIND is the original value, while PT_SUNW_EH_FRAME is
+ * required by the amd64 psABI. The Solaris link-editor (ld) tags output
+ * objects with PT_SUNW_UNWIND, but the Solaris runtime linker (ld.so.1)
+ * will accept and use either value.
  */
-#define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
-#define	PT_GNU_EH_FRAME	PT_SUNW_UNWIND
+#define	PT_SUNW_UNWIND		0x6464e550
+#define	PT_SUNW_EH_FRAME	0x6474e550
+#define	PT_GNU_EH_FRAME		PT_SUNW_EH_FRAME
 
+/*
+ * Linux specific program headers not currently used by Solaris
+ */
+#define	PT_GNU_STACK	0x6474e551	/* Indicates stack executability */
+#define	PT_GNU_RELRO	0x6474e552	/* Read-only after relocation */
 
 #define	PT_LOSUNW	0x6ffffffa
 #define	PT_SUNWBSS	0x6ffffffa	/* Sun Specific segment (unused) */
@@ -421,15 +430,24 @@ typedef struct {
 #define	SHT_SUNW_COMDAT		0x6ffffffb
 #define	SHT_SUNW_syminfo	0x6ffffffc
 #define	SHT_SUNW_verdef		0x6ffffffd
+#define	SHT_GNU_verdef		SHT_SUNW_verdef
 #define	SHT_SUNW_verneed	0x6ffffffe
+#define	SHT_GNU_verneed		SHT_SUNW_verneed
 #define	SHT_SUNW_versym		0x6fffffff
+#define	SHT_GNU_versym		SHT_SUNW_versym
 #define	SHT_HISUNW		0x6fffffff
 #define	SHT_HIOS		0x6fffffff
 
-/* GNU/Linux ABI specific values */
-#define	SHT_GNU_verdef		0x6ffffffd
-#define	SHT_GNU_verneed		0x6ffffffe
-#define	SHT_GNU_versym		0x6fffffff
+/*
+ * GNU/Linux OSABI specific values with different meanings than under Solaris.
+ * Due to the overlap in assigned values with the Solaris OSABI, correct
+ * interpretation of these values requires knowledge of the OSABI used by
+ * the object.
+ */
+#define	SHT_GNU_ATTRIBUTES	0x6ffffff5	/* Object attributes */
+#define	SHT_GNU_HASH		0x6ffffff6	/* GNU-style hash table */
+#define	SHT_GNU_LIBLIST		0x6ffffff7	/* Prelink library list */
+#define	SHT_CHECKSUM		0x6ffffff8	/* Checksum for DSO content */
 
 #define	SHT_LOPROC	0x70000000	/* processor specific range */
 #define	SHT_HIPROC	0x7fffffff
@@ -520,15 +538,17 @@ typedef struct {
 #define	STB_LOPROC	13		/* processor specific range */
 #define	STB_HIPROC	15
 
-#define	STT_NOTYPE	0		/* TYPE */
-#define	STT_OBJECT	1
-#define	STT_FUNC	2
-#define	STT_SECTION	3
-#define	STT_FILE	4
-#define	STT_COMMON	5
-#define	STT_TLS		6
-#define	STT_NUM		7
-
+#define	STT_NOTYPE	0		/* symbol type is unspecified */
+#define	STT_OBJECT	1		/* data object */
+#define	STT_FUNC	2		/* code object */
+#define	STT_SECTION	3		/* symbol identifies an ELF section */
+#define	STT_FILE	4		/* symbol's name is file name */
+#define	STT_COMMON	5		/* common data object */
+#define	STT_TLS		6		/* thread-local data object */
+#define	STT_IFUNC	7		/* indirect code object (unused) */
+#define	STT_NUM		8		/* # defined types in generic range */
+#define	STT_LOOS	10		/* OS specific range */
+#define	STT_HIOS	12
 #define	STT_LOPROC	13		/* processor specific range */
 #define	STT_HIPROC	15
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2753,6 +2753,10 @@ static int
 Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
     int which, int mask, pr_order_t order, proc_xsym_f *func, void *cd)
 {
+#if STT_NUM != (STT_IFUNC + 1)
+#error "STT_NUM has grown. update Psymbol_iter_com()"
+#endif
+
 	GElf_Sym sym;
 	GElf_Shdr shdr;
 	map_info_t *mptr;
@@ -2833,11 +2837,11 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
 			 * In case you haven't already guessed, this relies on
 			 * the bitmask used in <libproc.h> for encoding symbol
 			 * type and binding matching the order of STB and STT
-			 * constants in <sys/elf.h>.  ELF can't change without
-			 * breaking binary compatibility, so I think this is
+			 * constants in <sys/elf.h>.  Changes to ELF must
+			 * maintain binary compatibility, so I think this is
 			 * reasonably fair game.
 			 */
-			if (s_bind < STB_NUM && s_type < STT_NUM) {
+			if (s_bind < STB_NUM && s_type < STT_IFUNC) {
 				type = (1 << (s_type + 8)) | (1 << s_bind);
 				if ((type & ~mask) != 0)
 					continue;

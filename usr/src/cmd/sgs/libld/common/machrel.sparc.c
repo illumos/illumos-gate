@@ -2247,6 +2247,9 @@ ld_targ_init_sparc(void)
 			M_PLT_RESERVSZ,		/* m_plt_reservsz */
 			M_PLT_SHF_FLAGS,	/* m_plt_shf_flags */
 
+			/* Section type of .eh_frame/.eh_frame_hdr sections */
+			SHT_PROGBITS,		/* m_sht_unwind */
+
 			M_DT_REGISTER,		/* m_dt_register */
 		},
 		{			/* Target_machid */
@@ -2277,7 +2280,8 @@ ld_targ_init_sparc(void)
 			M_ID_TLS,		/* id_tls */
 			M_ID_TLSBSS,		/* id_tlsbss */
 			M_ID_UNKNOWN,		/* id_unknown */
-			M_ID_UNKNOWN,		/* id_unwind (unused) */
+			M_ID_UNWIND,		/* id_unwind */
+			M_ID_UNWINDHDR,		/* id_unwindhdr */
 			M_ID_USER,		/* id_user */
 			M_ID_VERSION,		/* id_version */
 		},
@@ -2314,11 +2318,6 @@ ld_targ_init_sparc(void)
 			ld_is_regsym_sparc,	/* ms_is_regsym */
 			ld_reg_find_sparc,	/* ms_reg_find */
 			ld_reg_enter_sparc	/* ms_reg_enter */
-		},
-		{			/* Target_unwind */
-			NULL,		/* uw_make_unwindhdr */
-			NULL,		/* uw_populate_unwindhdr */
-			NULL,		/* uw_append_unwind */
 		}
 	};
 

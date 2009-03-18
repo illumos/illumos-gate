@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * String conversion routines for symbol attributes.
@@ -99,14 +98,14 @@ conv_sym_info_type(Half mach, uchar_t type, Conv_fmt_flags_t fmt_flags,
 		MSG_STT_NOTYPE,		MSG_STT_OBJECT,
 		MSG_STT_FUNC,		MSG_STT_SECTION,
 		MSG_STT_FILE,		MSG_STT_COMMON,
-		MSG_STT_TLS
+		MSG_STT_TLS,		MSG_STT_IFUNC
 	};
 
 	static const Msg	types_alt[] = {
 		MSG_STT_NOTYPE_ALT,	MSG_STT_OBJECT_ALT,
 		MSG_STT_FUNC_ALT,	MSG_STT_SECTION_ALT,
 		MSG_STT_FILE_ALT,	MSG_STT_COMMON_ALT,
-		MSG_STT_TLS_ALT
+		MSG_STT_TLS_ALT,	MSG_STT_IFUNC_ALT
 	};
 
 	if (type < STT_NUM) {

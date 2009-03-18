@@ -149,6 +149,10 @@
 @ MSG_ERR_DYNSYMVAL	"%s: %s: symbol value does not match \
 			 DT_%s entry: %s: value: %#llx\n"
 @ MSG_ERR_MALSTR	"%s: %s: malformed string table, initial or final byte\n"
+@ MSG_ERR_MULTEHFRMHDR	"%s: [%d: %s] multiple .eh_frame_hdr sections seen \
+			(1 expected)\n"
+@ MSG_ERR_BADEHFRMPTR	"%s: section[%d: %s] FramePtr (%#llx) does not match \
+			 shdr[%d: %s].sh_addr (%#llx)\n"
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
@@ -161,6 +165,8 @@
 			 header have conflicting size or offsets\n"
 @ MSG_WARN_INADDR32SF1	"%s: capabilities section %s: software capability \
 			 ADDR32: is ineffective within a 32-bit object\n"
+@ MSG_WARN_MULTEHFRM	"%s: section[%d: %s]: %s object has multiple \
+			.eh_frame sections\n"
 
 # Elf Output Messages
 
@@ -292,6 +298,8 @@
 @ MSG_STR_8SP		"        "
 @ MSG_STR_EMPTY		""
 @ MSG_STR_CORE		"CORE"
+@ MSG_STR_LOC		"loc"
+@ MSG_STR_INITLOC	"initloc"
 
 @ MSG_FMT_INDENT	"	%s"
 @ MSG_FMT_INDEX		" [%lld]"
@@ -319,37 +327,60 @@
 
 @ MSG_UNW_FRMHDR	"Frame Header:"
 @ MSG_UNW_FRMVERS	"  Version: %d"
-@ MSG_UNW_FRPTRENC	"  FramePtrEnc: %-20s  FramePtr: 0x%llx"
+@ MSG_UNW_FRPTRENC	"  FramePtrEnc: %-20s  FramePtr: %#llx"
 @ MSG_UNW_FDCNENC	"  FdeCntEnc:   %-20s  FdeCnt: %lld"
 @ MSG_UNW_TABENC	"  TableEnc:    %-20s"
 @ MSG_UNW_BINSRTAB1	"  Binary Search Table:"
-@ MSG_UNW_BINSRTAB2	"      InitialLoc          FdeLoc"
-@ MSG_UNW_BINSRTABENT	"    0x%016llx  0x%016llx"
+@ MSG_UNW_BINSRTAB2_32	"      InitialLoc    FdeLoc"
+@ MSG_UNW_BINSRTAB2_64	"      InitialLoc          FdeLoc"
+@ MSG_UNW_BINSRTABENT_32 "    0x%08llx    0x%08llx"
+@ MSG_UNW_BINSRTABENT_64 "    0x%016llx  0x%016llx"
 @ MSG_UNW_ZEROTERM	"ZERO terminator: [0x00000000]"
-@ MSG_UNW_CIE		"CIE: [0x%08llx]"
+@ MSG_UNW_CIE		"CIE: [%#llx]"
 @ MSG_UNW_CIELNGTH	" length: 0x%02x cieid: %d"
-@ MSG_UNW_CIEVERS	" version: %d  augstring: `%s'"
-@ MSG_UNW_CIECALGN	" codealign: 0x%llx  dataalign: %lld  \
+@ MSG_UNW_CIEVERS	" version: %d  augmentation: `%s'"
+@ MSG_UNW_CIECALGN	" codealign: %#llx  dataalign: %lld  \
 			  retaddr: %d"
-@ MSG_UNW_CIEAXVAL	" Auxiliary vals:"
+@ MSG_UNW_CIEAXVAL	" Augmentation Data:"
 @ MSG_UNW_CIEAXSIZ	"   size: %d"
-@ MSG_UNW_CIEAXPERS	"   pers: 0x%02x %s 0x%08llx"
-@ MSG_UNW_CIEAXCENC	"   cenc: 0x%02x %s"
-@ MSG_UNW_CIEAXLSDA	"   lsda: 0x%02x %s"
+@ MSG_UNW_CIEAXPERS	"   personality:"
+@ MSG_UNW_CIEAXPERSENC	"       encoding: 0x%02x %s"
+@ MSG_UNW_CIEAXPERSRTN	"       routine:  %#08llx"
+@ MSG_UNW_CIEAXCENC	"   code pointer encoding: 0x%02x %s"
+@ MSG_UNW_CIEAXLSDA	"   lsda encoding: 0x%02x %s"
 @ MSG_UNW_CIEAXUNEC	"   Unexpected aug val: %c"
 @ MSG_UNW_CIECFI	" CallFrameInstructions:"
-@ MSG_UNW_CIEPRE	"   "
 
-@ MSG_UNW_FDE		" FDE: [0x%08llx]"
-@ MSG_UNW_FDELNGTH	"    length: 0x%02x  cieptr: 0x%02x"
-@ MSG_UNW_FDEINITLOC	"    initloc: 0x%08llx  addrrange: 0x%04llx"
-@ MSG_UNW_FDEAXVAL	"   Auxiliary vals:"
-@ MSG_UNW_FDEAXSIZE	"      size: 0x%llx"
-@ MSG_UNW_FDEAXLSDA	"    lsda: 0x%llx"
-@ MSG_UNW_FDECFI	"    CallFrameInstructions:"
-@ MSG_UNW_FDEPRE	"      "
+@ MSG_UNW_FDE		" FDE: [%#llx]"
+@ MSG_UNW_FDELNGTH	"    length:  %#x  cieptr: %#x"
+@ MSG_UNW_FDEINITLOC	"    initloc: %#llx  addrrange: %#llx  endloc: %#llx"
+@ MSG_UNW_FDEAXVAL	"   Augmentation Data:"
+@ MSG_UNW_FDEAXSIZE	"      size: %#llx"
+@ MSG_UNW_FDEAXLSDA	"      lsda: %#llx"
+@ MSG_UNW_FDECFI	"   CallFrameInstructions:"
 
-@ MSG_UNW_TBLENTRY	"0x%02x "
+# Unwind section Call Frame Instructions. These all start with a leading
+# "%*s%s", used to insert leading whitespace and the opcode name.
+
+@ MSG_CFA_ADV_LOC	"%*s%s: %s + %llu => %#llx"
+@ MSG_CFA_CFAOFF	"%*s%s: %s, cfa%+lld"
+@ MSG_CFA_CFASET	"%*s%s: cfa=%#llx"
+@ MSG_CFA_LLD		"%*s%s: %lld"
+@ MSG_CFA_LLU		"%*s%s: %llu"
+@ MSG_CFA_REG		"%*s%s: %s"
+@ MSG_CFA_REG_OFFLLD	"%*s%s: %s, offset=%lld"
+@ MSG_CFA_REG_OFFLLU	"%*s%s: %s, offset=%llu"
+@ MSG_CFA_REG_REG	"%*s%s: %s, %s"
+@ MSG_CFA_SIMPLE	"%*s%s"
+@ MSG_CFA_SIMPLEREP	"%*s%s [%d]"
+@ MSG_CFA_EBLK		"%*s%s: expr(%llu bytes)"
+@ MSG_CFA_REG_EBLK	"%*s%s: %s, expr(%llu bytes)"
+
+# Architecture specific register name formats
+
+@ MSG_REG_FMT_BASIC	"r%d"
+@ MSG_REG_FMT_NAME	"r%d (%s)"
+
 
 # Note messages
 
@@ -653,6 +684,8 @@
 @ MSG_PT_TLS_ALT1		"tls"
 @ MSG_PT_SUNW_UNWIND		"PT_SUNW_UNWIND"	# 0x6464e550
 @ MSG_PT_SUNW_UNWIND_ALT1	"sunw_unwind"
+@ MSG_PT_SUNW_EH_FRAME		"PT_SUNW_EH_FRAME"	# 0x6474e550
+@ MSG_PT_SUNW_EH_FRAME_ALT1	"sunw_eh_frame"
 @ MSG_PT_SUNWBSS		"PT_SUNWBSS"		# 0x6ffffffa
 @ MSG_PT_SUNWBSS_ALT1		"sunwbss"
 @ MSG_PT_SUNWSTACK		"PT_SUNWSTACK"		# 0x6ffffffb

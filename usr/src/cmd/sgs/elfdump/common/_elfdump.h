@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__ELFDUMP_H
 #define	__ELFDUMP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<_machelf.h>
 #include	<debug.h>
@@ -224,7 +222,9 @@ typedef enum {
 #endif
 
 extern	corenote_ret_t	corenote(Half, int, Word, const char *, Word);
-extern	void	dump_hex_bytes(const char *, size_t, int, int, int);
+extern	void	dump_eh_frame(uchar_t *, size_t, uint64_t, Half e_machine,
+		    uchar_t *e_ident);
+extern	void	dump_hex_bytes(const void *, size_t, int, int, int);
 
 extern	int	fake_shdr_cache32(const char *, int, Elf *, Elf32_Ehdr *,
 		    Cache **, size_t *);

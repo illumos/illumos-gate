@@ -456,12 +456,9 @@ ld_create_outfile(Ofl_desc *ofl)
 			} else if (ptype == PT_TLS) {
 				if (flags & FLG_OF_TLSPHDR)
 					nseg++;
-#if	defined(_ELF64)
-			} else if ((ld_targ.t_m.m_mach == EM_AMD64) &&
-			    (ptype == PT_SUNW_UNWIND)) {
+			} else if (ptype == PT_SUNW_UNWIND) {
 				if (ofl->ofl_unwindhdr)
 					nseg++;
-#endif
 			} else if (ptype == PT_SUNWDTRACE) {
 				if (ofl->ofl_dtracesym)
 					nseg++;

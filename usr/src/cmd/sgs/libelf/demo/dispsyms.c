@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * dispsyms: Display Symbols
@@ -62,8 +61,11 @@ static const char *symtype[STT_NUM] = {
 /* STT_FILE */		"FILE",
 /* STT_COMMON */	"COMM",
 /* STT_TLS */		"TLS"
+/* STT_IFUNC */		"IFUNC"
 };
-
+#if STT_NUM != (STT_IFUNC + 1)
+#error "STT_NUM has grown. Update symtype[]."
+#endif
 
 #define	INTSTRLEN	32
 
@@ -79,13 +81,13 @@ print_symtab(Elf *elf, const char *file)
 
 	if (gelf_getehdr(elf, &ehdr) == 0) {
 		(void) fprintf(stderr, "%s: elf_getehdr() failed: %s\n",
-			file, elf_errmsg(0));
+		    file, elf_errmsg(0));
 		return;
 	}
 
 	if (elf_getshstrndx(elf, &shstrndx) == 0) {
 		(void) fprintf(stderr, "%s: elf_getshstrndx() failed: %s\n",
-			file, elf_errmsg(0));
+		    file, elf_errmsg(0));
 		return;
 	}
 
@@ -99,8 +101,8 @@ print_symtab(Elf *elf, const char *file)
 
 		if (gelf_getshdr(scn, &shdr) == 0) {
 			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			    "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 		if ((shdr.sh_type != SHT_SYMTAB) &&
@@ -114,8 +116,8 @@ print_symtab(Elf *elf, const char *file)
 		 */
 		if ((symdata = elf_getdata(scn, 0)) == 0) {
 			(void) fprintf(stderr,
-				"%s: elf_getdata() failed: %s\n",
-				file, elf_errmsg(0));
+			    "%s: elf_getdata() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 
@@ -123,9 +125,9 @@ print_symtab(Elf *elf, const char *file)
 		 * Print symbol table title and header for symbol display
 		 */
 		(void) printf("\nSymTab: %s:%s\n", file,
-			elf_strptr(elf, shstrndx, shdr.sh_name));
+		    elf_strptr(elf, shstrndx, shdr.sh_name));
 		(void) printf("  index   value    size     type "
-			"bind  oth shndx name\n");
+		    "bind  oth shndx name\n");
 
 		/*
 		 * We now iterate over the full symbol table printing
@@ -153,8 +155,8 @@ print_symtab(Elf *elf, const char *file)
 			if (gelf_getsymshndx(symdata, shndxdata, ndx,
 			    &sym, &shndx) == NULL) {
 				(void) fprintf(stderr,
-					"%s: gelf_getsymshndx() failed: %s\n",
-					file, elf_errmsg(0));
+				    "%s: gelf_getsymshndx() failed: %s\n",
+				    file, elf_errmsg(0));
 				return;
 			}
 			/*
@@ -200,9 +202,9 @@ print_symtab(Elf *elf, const char *file)
 				    (gelf_getsymshndx(symdata, shndxdata, ndx,
 				    &sym, &shndx) == NULL)) {
 					(void) fprintf(stderr,
-						"%s: gelf_getsymshndx() "
-						"failed: %s\n",
-						file, elf_errmsg(0));
+					    "%s: gelf_getsymshndx() "
+					    "failed: %s\n",
+					    file, elf_errmsg(0));
 					return;
 				}
 				/*
@@ -227,7 +229,7 @@ print_symtab(Elf *elf, const char *file)
 				typestr = symtype[type];
 			else {
 				(void) snprintf(typebuf, INTSTRLEN,
-					"%d", type);
+				    "%d", type);
 				typestr = typebuf;
 			}
 
@@ -235,7 +237,7 @@ print_symtab(Elf *elf, const char *file)
 				bindstr = symbind[bind];
 			else {
 				(void) snprintf(bindbuf, INTSTRLEN,
-					"%d", bind);
+				    "%d", bind);
 				bindstr = bindbuf;
 			}
 
@@ -261,12 +263,12 @@ print_symtab(Elf *elf, const char *file)
 					shndxstr = (const char *)"XIND";
 				else {
 					(void) snprintf(shndxbuf, INTSTRLEN,
-						"%ld", shndx);
+					    "%ld", shndx);
 					shndxstr = shndxbuf;
 				}
 			} else {
 				(void) snprintf(shndxbuf, INTSTRLEN,
-					"%ld", shndx);
+				    "%ld", shndx);
 				shndxstr = shndxbuf;
 			}
 
@@ -274,10 +276,10 @@ print_symtab(Elf *elf, const char *file)
 			 * Display the symbol entry.
 			 */
 			(void) printf("[%3d] 0x%08llx 0x%08llx %-4s "
-				"%-6s %2d %5s %s\n",
-				ndx, sym.st_value, sym.st_size,
-				typestr, bindstr, sym.st_other, shndxstr,
-				elf_strptr(elf, shdr.sh_link, sym.st_name));
+			    "%-6s %2d %5s %s\n",
+			    ndx, sym.st_value, sym.st_size,
+			    typestr, bindstr, sym.st_other, shndxstr,
+			    elf_strptr(elf, shdr.sh_link, sym.st_name));
 		}
 	}
 }
@@ -317,7 +319,7 @@ process_elf(Elf *elf, char *file, int fd, int member)
 			 * 'archivename(membername)'.
 			 */
 			(void) snprintf(buffer, 1024, "%s(%s)",
-				file, arhdr->ar_name);
+			    file, arhdr->ar_name);
 
 			/*
 			 * recursivly process the ELF members.
@@ -330,8 +332,8 @@ process_elf(Elf *elf, char *file, int fd, int member)
 	default:
 		if (!member)
 			(void) fprintf(stderr,
-				"%s: unexpected elf_kind(): 0x%x\n",
-				file, elf_kind(elf));
+			    "%s: unexpected elf_kind(): 0x%x\n",
+			    file, elf_kind(elf));
 		return;
 	}
 }
@@ -354,7 +356,7 @@ main(int argc, char **argv)
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		(void) fprintf(stderr,
-			"elf_version() failed: %s\n", elf_errmsg(0));
+		    "elf_version() failed: %s\n", elf_errmsg(0));
 		return (1);
 	}
 

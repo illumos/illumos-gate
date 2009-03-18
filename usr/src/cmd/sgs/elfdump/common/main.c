@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Dump an elf file.
@@ -250,6 +249,9 @@ static atoui_sym_t sym_pt[] = {
 	{ MSG_ORIG(MSG_PT_SUNW_UNWIND),		PT_SUNW_UNWIND },
 	{ MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT1),	PT_SUNW_UNWIND },
 
+	{ MSG_ORIG(MSG_PT_SUNW_EH_FRAME),	PT_SUNW_EH_FRAME },
+	{ MSG_ORIG(MSG_PT_SUNW_EH_FRAME_ALT1),	PT_SUNW_EH_FRAME },
+
 	{ MSG_ORIG(MSG_PT_SUNWBSS),		PT_SUNWBSS },
 	{ MSG_ORIG(MSG_PT_SUNWBSS_ALT1),	PT_SUNWBSS },
 
@@ -348,9 +350,10 @@ detail_usage()
  *	shows (bytes_per_col * col_per_row) bytes of data.
  */
 void
-dump_hex_bytes(const char *data, size_t n, int indent,
+dump_hex_bytes(const void *data, size_t n, int indent,
 	int bytes_per_col, int col_per_row)
 {
+	const uchar_t *ldata = data;
 	int	bytes_per_row = bytes_per_col * col_per_row;
 	int	ndx, byte, word;
 	char	string[128], *str = string;
@@ -372,12 +375,12 @@ dump_hex_bytes(const char *data, size_t n, int indent,
 	index_width = strlen(index);
 	index_width = S_ROUND(index_width, 8);
 
-	for (ndx = byte = word = 0; n > 0; n--, data++) {
+	for (ndx = byte = word = 0; n > 0; n--, ldata++) {
 		while (sp_prefix-- > 0)
 			*str++ = ' ';
 
 		(void) snprintf(str, sizeof (string),
-		    MSG_ORIG(MSG_HEXDUMP_TOK), (int)*data);
+		    MSG_ORIG(MSG_HEXDUMP_TOK), (int)*ldata);
 		str += 2;
 		sp_prefix = 1;
 
@@ -741,9 +744,9 @@ archive(const char *file, int fd, Elf *elf, uint_t flags,
 {
 	Elf_Cmd		cmd = ELF_C_READ;
 	Elf_Arhdr	*arhdr;
-	Elf		*_elf = 0;
+	Elf		*_elf = NULL;
 	size_t		ptr;
-	Elf_Arsym	*arsym = 0;
+	Elf_Arsym	*arsym = NULL;
 
 	/*
 	 * Determine if the archive symbol table itself is required.
@@ -795,15 +798,15 @@ archive(const char *file, int fd, Elf *elf, uint_t flags,
 				if (elf_rand(elf, arsym->as_off) !=
 				    arsym->as_off) {
 					failure(file, MSG_ORIG(MSG_ELF_RAND));
-					arhdr = 0;
+					arhdr = NULL;
 				} else if ((_elf = elf_begin(fd,
 				    ELF_C_READ, elf)) == 0) {
 					failure(file, MSG_ORIG(MSG_ELF_BEGIN));
-					arhdr = 0;
+					arhdr = NULL;
 				} else if ((arhdr = elf_getarhdr(_elf)) == 0) {
 					failure(file,
 					    MSG_ORIG(MSG_ELF_GETARHDR));
-					arhdr = 0;
+					arhdr = NULL;
 				}
 
 				_offset = arsym->as_off;

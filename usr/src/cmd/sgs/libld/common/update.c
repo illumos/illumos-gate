@@ -3383,17 +3383,15 @@ ld_update_outfile(Ofl_desc *ofl)
 		}
 
 		/*
-		 * As the AMD unwind program header occurs after the loadable
-		 * headers in the segment descriptor table, all the address
-		 * information for the .eh_frame output section will have been
-		 * figured out by now.
+		 * As the unwind (.eh_frame_hdr) program header occurs after
+		 * the loadable headers in the segment descriptor table, all
+		 * the address information for the .eh_frame output section
+		 * will have been figured out by now.
 		 */
-#if	defined(_ELF64)
-		if ((ld_targ.t_m.m_mach == EM_AMD64) &&
-		    (phdr->p_type == PT_SUNW_UNWIND)) {
+		if (phdr->p_type == PT_SUNW_UNWIND) {
 			Shdr	    *shdr;
 
-			if (ofl->ofl_unwindhdr == 0)
+			if (ofl->ofl_unwindhdr == NULL)
 				continue;
 
 			shdr = ofl->ofl_unwindhdr->os_shdr;
@@ -3408,7 +3406,7 @@ ld_update_outfile(Ofl_desc *ofl)
 			ofl->ofl_phdr[phdrndx++] = *phdr;
 			continue;
 		}
-#endif
+
 		/*
 		 * As the TLS program header occurs after the loadable
 		 * headers in the segment descriptor table, all the address
