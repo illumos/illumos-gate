@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -30,12 +30,14 @@ COMMONBASE = ../../common
 PROG = fcinfo
 ROOT_PROG_LINK = $(ROOTUSRSBIN)/fcadm
 MANIFEST = npiv_config.xml
+MANIFEST += fcoe_config.xml
 SVCMETHOD = npivconfig
+SVCMETHOD += fcoeconfig
 PRODUCT = $(PROG)
 
 $(ROOT_PROG_LINK) := FILEMODE = 0555
 
-LOCAL_OBJS = fcinfo.o fcinfo-list.o fcadm-list.o printAttrs.o
+LOCAL_OBJS = fcinfo.o fcinfo-list.o fcadm-list.o printAttrs.o fcoeadm.o
 COMMON_OBJS = cmdparse.o
 LOCAL_SRCS = $(LOCAL_OBJS:%.o=%.c)
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.c)
@@ -44,14 +46,19 @@ SRCS =  $(LOCAL_SRCS) $(COMMON_SRCS)
 
 include ../Makefile.cmd
 
+POFILE = fcinfo_cmd.po
+POFILES = fcinfo.po fcinfo-list.po fcadm-list.po printAttrs.po fcoeadm.po
+
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 
 LDLIBS += -lHBAAPI
+LDLIBS += -lfcoe
 LDLIBS += -lscf
 
 INCS += -I.
 INCS += -I$(SRC)/lib/hbaapi/common
 INCS += -I$(COMMONBASE)/cmdparse
+INCS += -I$(SRC)/lib/libfcoe/common
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
@@ -81,6 +88,9 @@ install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTUSRSBINPROG) $(ROOT_PROG_LIN
 cmdparse.o: $(COMMONBASE)/cmdparse/cmdparse.c
 	$(COMPILE.c) -o $@ $(COMMONBASE)/cmdparse/cmdparse.c
 	$(POST_PROCESS_O)
+$(POFILE): $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 clean:
 	$(RM) $(OBJS)
 

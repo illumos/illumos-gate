@@ -1341,8 +1341,21 @@ stmf_alloc(stmf_struct_id_t struct_id, int additional_size, int flags)
 	if (sh == NULL)
 		return (NULL);
 
-	sh->fp = (__istmf_t *)GET_BYTE_OFFSET(sh, stmf_sizes[struct_id].shared);
-	sh->cp = GET_BYTE_OFFSET(sh->fp, stmf_sizes[struct_id].fw_private);
+	/*
+	 * In principle, the implementation inside stmf_alloc should not
+	 * be changed anyway. But the original order of framework private
+	 * data and caller private data does not support sglist in the caller
+	 * private data.
+	 * To work around this, the memory segments of framework private
+	 * data and caller private data are re-ordered here.
+	 * A better solution is to provide a specific interface to allocate
+	 * the sglist, then we will not need this workaround any more.
+	 * But before the new interface is available, the memory segment
+	 * ordering should be kept as is.
+	 */
+	sh->cp = GET_BYTE_OFFSET(sh, stmf_sizes[struct_id].shared);
+	sh->fp = (__istmf_t *)GET_BYTE_OFFSET(sh,
+	    stmf_sizes[struct_id].shared + additional_size);
 
 	sh->fp->bp = sh;
 	/* Just store the total size instead of storing additional size */

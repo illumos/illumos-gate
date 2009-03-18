@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_STMF_H
@@ -87,6 +87,7 @@ typedef struct stmf_data_buf {
 #define	DB_SEND_STATUS_GOOD		0x0004
 #define	DB_STATUS_GOOD_SENT		0x0008
 #define	DB_DONT_CACHE			0x0010
+#define	DB_DONT_REUSE			0x0020
 
 typedef struct scsi_task {
 	void		*task_stmf_private;

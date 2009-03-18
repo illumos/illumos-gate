@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,10 @@ static int npivDeletePortFunc(int, char **, cmdOptions_t *, void *);
 static int npivCreatePortListFunc(int, char **, cmdOptions_t *, void *);
 static int npivListHbaPortFunc(int, char **, cmdOptions_t *, void *);
 static int npivListRemotePortFunc(int, char **, cmdOptions_t *, void *);
+static int fcoeAdmCreatePortFunc(int, char **, cmdOptions_t *, void *);
+static int fcoeListPortsFunc(int, char **, cmdOptions_t *, void *);
+static int fcoeAdmDeletePortFunc(int, char **, cmdOptions_t *, void *);
+static int fcoeAdmCreatePortListFunc(int, char **, cmdOptions_t *, void *);
 static char *getExecBasename(char *);
 
 /*
@@ -63,6 +67,7 @@ optionTbl_t fcinfolongOptions[] = {
 	{"initiator", no_argument,	'i', NULL},
 	{"linkstat", no_argument,	'l', NULL},
 	{"scsi-target", no_argument,	's', NULL},
+	{"fcoe", no_argument,		'e', NULL},
 	{"verbose", no_argument,	'v', NULL},
 	{NULL, 0, 0}
 };
@@ -72,6 +77,8 @@ optionTbl_t fcadmlongOptions[] = {
 	{"node", required_argument,	'n', OPTIONSTRING2},
 	{"linkstat", no_argument,	'l', NULL},
 	{"scsi-target", no_argument,	's', NULL},
+	{"fcoe-force-promisc", no_argument, 'f', NULL},
+	{"target", no_argument,		't', NULL},
 	{NULL, 0, 0}
 };
 
@@ -79,7 +86,7 @@ optionTbl_t fcadmlongOptions[] = {
  * Add new subcommands here
  */
 subCommandProps_t fcinfosubcommands[] = {
-	{"hba-port", listHbaPortFunc, "itl", NULL, NULL,
+	{"hba-port", listHbaPortFunc, "itel", NULL, NULL,
 		OPERAND_OPTIONAL_MULTIPLE, "WWN"},
 	{"remote-port", listRemotePortFunc, "lsp", "p", NULL,
 		OPERAND_OPTIONAL_MULTIPLE, "WWN"},
@@ -106,8 +113,21 @@ subCommandProps_t fcadmsubcommands[] = {
 	{"create-port-list",
 	    npivCreatePortListFunc, NULL, NULL, NULL,
 	    OPERAND_NONE, NULL},
+	{"create-fcoe-port",
+	    fcoeAdmCreatePortFunc, "tpnf", "t", NULL,
+		OPERAND_MANDATORY_SINGLE, "Network Interface Name"},
+	{"delete-fcoe-port",
+	    fcoeAdmDeletePortFunc, NULL, NULL, NULL,
+		OPERAND_MANDATORY_SINGLE, "Network Interface Name"},
+	{"list-fcoe-ports",
+	    fcoeListPortsFunc, "t", NULL, NULL,
+		OPERAND_NONE, NULL},
+	{"create-fcoe-ports",
+	    fcoeAdmCreatePortListFunc, "t", NULL, NULL,
+		OPERAND_NONE, NULL},
 	{NULL, 0, NULL, NULL, NULL, 0, NULL, NULL}
 };
+
 /*
  * Pass in options/arguments, rest of arguments
  */
@@ -190,6 +210,50 @@ npivListRemotePortFunc(int objects, char *argv[],
 }
 
 /*
+ * Pass in options/arguments, rest of arguments
+ */
+/*ARGSUSED*/
+static int
+fcoeAdmCreatePortFunc(int objects, char *argv[], cmdOptions_t *options,
+    void *addArgs)
+{
+	return (fcoe_adm_create_port(objects, argv, options));
+}
+
+/*
+ * Pass in options/arguments, rest of arguments
+ */
+/*ARGSUSED*/
+static int
+fcoeAdmDeletePortFunc(int objects, char *argv[], cmdOptions_t *options,
+    void *addArgs)
+{
+	return (fcoe_adm_delete_port(objects, argv));
+}
+
+/*
+ * Pass in options/arguments, rest of arguments
+ */
+/*ARGSUSED*/
+static int
+fcoeListPortsFunc(int objects, char *argv[], cmdOptions_t *options,
+    void *addArgs)
+{
+	return (fcoe_adm_list_ports(options));
+}
+
+/*
+ * Pass in options/arguments, rest of arguments
+ */
+/*ARGSUSED*/
+static int
+fcoeAdmCreatePortListFunc(int objects, char *argv[], cmdOptions_t *options,
+    void *addArgs)
+{
+	return (fcoe_adm_create_portlist(options));
+}
+
+/*
  * input:
  *  execFullName - exec name of program (argv[0])
  *
@@ -245,6 +309,12 @@ main(int argc, char *argv[])
 	int ret;
 	int funcRet;
 	void *subcommandArgs = NULL;
+
+	(void) setlocale(LC_ALL, "");
+#if	!defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
 
 	/* set global command name */
 	cmdName = getExecBasename(argv[0]);

@@ -83,7 +83,7 @@ sbd_do_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 		if (iolen == 0)
 			break;
 		if (sst->sst_data_read(sst, laddr, (uint64_t)iolen,
-		    dbuf->db_sglist[0].seg_addr) != STMF_SUCCESS) {
+		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			/* Do not need to do xfer anymore, just complete it */
 			dbuf->db_data_size = 0;
@@ -145,6 +145,27 @@ sbd_handle_read_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		else
 			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 		return;
+	}
+	if (dbuf->db_flags & DB_DONT_REUSE) {
+		/* allocate new dbuf */
+		uint32_t maxsize, minsize, old_minsize;
+		stmf_free_dbuf(task, dbuf);
+
+		maxsize = (scmd->len > (128*1024)) ? 128*1024 : scmd->len;
+		minsize = maxsize >> 2;
+		do {
+			old_minsize = minsize;
+			dbuf = stmf_alloc_dbuf(task, maxsize, &minsize, 0);
+		} while ((dbuf == NULL) && (old_minsize > minsize) &&
+		    (minsize >= 512));
+		if (dbuf == NULL) {
+			scmd->nbufs --;
+			if (scmd->nbufs == 0) {
+				stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+				    STMF_ALLOC_FAILURE, NULL);
+			}
+			return;
+		}
 	}
 	sbd_do_read_xfer(task, scmd, dbuf);
 }
@@ -329,7 +350,7 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		if (iolen == 0)
 			break;
 		if (sst->sst_data_write(sst, laddr, (uint64_t)iolen,
-		    dbuf->db_sglist[0].seg_addr) != STMF_SUCCESS) {
+		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			break;
 		}
@@ -351,7 +372,7 @@ WRITE_XFER_DONE:
 			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 		return;
 	}
-	if (dbuf_reusable == 0) {
+	if (dbuf->db_flags & DB_DONT_REUSE || dbuf_reusable == 0) {
 		uint32_t maxsize, minsize, old_minsize;
 		/* free current dbuf and allocate a new one */
 		stmf_free_dbuf(task, dbuf);
@@ -746,9 +767,9 @@ void
 sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 			uint8_t *p, int bsize)
 {
-	uint8_t *cdbp = (uint8_t *)&task->task_cdb[0];
-	uint32_t cmd_size;
-	uint8_t page_length;
+	uint8_t		*cdbp = (uint8_t *)&task->task_cdb[0];
+	uint32_t	 cmd_size;
+	uint8_t		 page_length;
 
 	/*
 	 * Basic protocol checks.

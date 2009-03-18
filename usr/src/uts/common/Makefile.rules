@@ -576,6 +576,11 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/comstar/port/qlt/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/comstar/port/fcoet/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/iscsit/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -601,6 +606,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/dmfe/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/drm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/fcoe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1671,6 +1680,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/comstar/port/qlt/%.c
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/iscsit/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/comstar/port/fcoet/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/comstar/port/iscsit/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1687,6 +1699,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/dmfe/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/drm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/fcoe/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/hotplug/hpcsvc/%.c

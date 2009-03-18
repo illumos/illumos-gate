@@ -242,6 +242,9 @@ COMMON_SUBDIRS= \
 	SUNWfcprtr \
 	SUNWfcsm \
 	SUNWfctl \
+	SUNWfcoe \
+	SUNWfcoeu \
+	SUNWfcoet \
 	SUNWfilebench \
 	SUNWfmd  \
 	SUNWfmdr  \

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,6 +377,10 @@ processHBA(HBA_HANDLE handle, HBA_ADAPTERATTRIBUTES attrs, int portIndex,
 	int			discPortCount;
 
 	if (resourceType == HBA_PORT) {
+		if ((flags & PRINT_FCOE) == PRINT_FCOE &&
+		    attrs.VendorSpecificID != 0xFC0E) {
+			return (0);
+		}
 		printHBAPortInfo(&port, &attrs, mode);
 		if ((flags & PRINT_LINKSTAT) == PRINT_LINKSTAT) {
 			printLinkStat(handle, port.PortWWN, port.PortWWN);
@@ -736,6 +740,8 @@ fc_util_list_hbaport(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 			processHBA_flags |= PRINT_INITIATOR;
 		} else if (options->optval == 't') {
 			processHBA_flags |= PRINT_TARGET;
+		} else if (options->optval == 'e') {
+			processHBA_flags |= PRINT_FCOE;
 		}
 	}
 
@@ -837,8 +843,9 @@ fc_util_list_hbaport(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 			}
 			processHBA(handle, attrs, portIndex, port, NULL,
 			    HBA_PORT, processHBA_flags, mode);
-			if (printHBANPIVPortInfo(handle, portIndex)
-			    != 0) {
+			if ((processHBA_flags & PRINT_FCOE) != PRINT_FCOE &&
+			    attrs.VendorSpecificID != 0xFC0E &&
+			    printHBANPIVPortInfo(handle, portIndex) != 0) {
 				err_cnt++;
 			}
 			HBA_CloseAdapter(handle);
@@ -920,8 +927,11 @@ fc_util_list_hbaport(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 				processHBA(handle, attrs, portIndex, port,
 				    NULL, HBA_PORT, processHBA_flags,
 				    INITIATOR_MODE);
-				if (printHBANPIVPortInfo(handle, portIndex)
-				    != 0) {
+				if ((processHBA_flags & PRINT_FCOE) !=
+				    PRINT_FCOE &&
+				    attrs.VendorSpecificID != 0xFC0E &&
+				    printHBANPIVPortInfo(handle,
+				    portIndex) != 0) {
 					err_cnt++;
 				}
 			}

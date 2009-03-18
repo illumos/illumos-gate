@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -356,6 +356,7 @@ COMMON_SUBDIRS = \
 	lib/libefi \
 	lib/libelfsign \
 	lib/libexacct \
+	lib/libfcoe \
 	lib/libgen \
 	lib/libgss \
 	lib/libidmap \

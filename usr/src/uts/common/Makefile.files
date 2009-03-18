@@ -840,6 +840,10 @@ FCT_OBJS += discovery.o fct.o
 
 QLT_OBJS += 2400.o 2500.o qlt.o qlt_dma.o
 
+FCOE_OBJS += fcoe.o fcoe_eth.o fcoe_fc.o
+
+FCOET_OBJS += fcoet.o fcoet_eth.o fcoet_fc.o
+
 ISCSIT_SHARED_OBJS += \
 		iscsit_common.o
 

@@ -152,6 +152,7 @@ SUBDIRS += \
 	libkrb5	.WAIT	\
 	krb5	.WAIT	\
 	libsmbfs	\
+	libfcoe		\
 	libstmf		\
 	libnsctl	\
 	libunistat	\
@@ -430,6 +431,7 @@ HDRSUBDIRS=		\
 	libslp		\
 	libsmedia	\
 	libsqlite	\
+	libfcoe		\
 	libstmf		\
 	libsum		\
 	libsysevent	\

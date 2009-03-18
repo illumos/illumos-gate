@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef	_SYS_ETHERNET_H
 #define	_SYS_ETHERNET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,6 +92,7 @@ struct ether_vlan_extinfo {
 #define	ETHERTYPE_PPPOES	(0x8864)	/* PPPoE Session Stage */
 #define	ETHERTYPE_EAPOL		(0x888e)	/* EAPOL protocol */
 #define	ETHERTYPE_RSN_PREAUTH	(0x88c7)	/* RSN PRE-Authentication */
+#define	ETHERTYPE_FCOE		(0x8906)	/* FCoE */
 #define	ETHERTYPE_MAX		(0xffff)	/* Max valid ethernet type */
 
 /*

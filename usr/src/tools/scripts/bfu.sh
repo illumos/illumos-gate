@@ -305,6 +305,7 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/fc-fabric
 	lib/svc/method/iscsid
 	lib/svc/method/npivconfig
+	lib/svc/method/fcoeconfig
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
 	lib/svc/method/svc-dcs
@@ -362,6 +363,7 @@ superfluous_nonglobal_zone_files="
 	var/log/pool
 	var/svc/manifest/network/iscsi_initiator.xml
 	var/svc/manifest/network/npiv_config.xml
+	var/svc/manifest/network/fcoe_config.xml
 	var/svc/manifest/network/rpc/mdcomm.xml
 	var/svc/manifest/network/rpc/meta.xml
 	var/svc/manifest/network/rpc/metamed.xml

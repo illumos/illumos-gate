@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_FCT_H
@@ -294,6 +294,7 @@ typedef struct fct_link_info {
 #define	PORT_SPEED_2G			2
 #define	PORT_SPEED_4G			4
 #define	PORT_SPEED_8G			8
+#define	PORT_SPEED_10G			16
 
 /*
  * Abort commands

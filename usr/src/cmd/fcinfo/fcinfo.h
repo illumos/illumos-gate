@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@ extern "C" {
 #include <netinet/in.h>
 #include <inttypes.h>
 #include <cmdparse.h>
+#include <locale.h>
 
 #ifdef _BIG_ENDIAN
 #define	htonll(x)   (x)
@@ -88,15 +89,38 @@ extern "C" {
 #define	NPIV_PG_NAME	"npiv-port-list"
 #define	NPIV_PORT_LIST	"port_list"
 
+#define	FCOE_SCF_ADD		0
+#define	FCOE_SCF_REMOVE		1
+
+#define	FCOE_SUCCESS			0
+#define	FCOE_ERROR			1
+#define	FCOE_ERROR_NOT_FOUND		2
+#define	FCOE_ERROR_EXISTS		3
+#define	FCOE_ERROR_SERVICE_NOT_FOUND	4
+#define	FCOE_ERROR_NOMEM		5
+#define	FCOE_ERROR_MEMBER_NOT_FOUND	6
+#define	FCOE_ERROR_BUSY			7
+
+#define	FCOE_PORT_LIST_LENGTH	255
+
+#define	FCOE_SERVICE	"network/fcoe_config"
+#define	FCOE_PG_NAME	"fcoe-port-list-pg"
+#define	FCOE_PORT_LIST	"port_list_p"
+
 /* flags that are needed to be passed into processHBA */
 #define	PRINT_LINKSTAT	    0x00000001	/* print link statistics information */
 #define	PRINT_SCSI_TARGET   0x00000010	/* print Scsi target information */
 #define	PRINT_INITIATOR	    0x00000100	/* print intiator port information */
 #define	PRINT_TARGET	    0x00001000	/* print target port information */
+#define	PRINT_FCOE	    0x00010000	/* print fcoe port information */
 
 /* flags for Adpater/port mode */
 #define	INITIATOR_MODE	    0x00000001
 #define	TARGET_MODE	    0x00000010
+
+/* FCOE */
+#define	FCOE_MAX_MAC_NAME_LEN		32
+#define	FCOE_USER_RAW_FRAME_SIZE	224
 
 typedef struct _tgtPortWWNList {
 	HBA_WWN portWWN;
@@ -141,6 +165,13 @@ int fc_util_list_logicalunit(int pathCount, char **argv, cmdOptions_t *options);
 int fc_util_delete_npivport(int wwnCount, char **argv, cmdOptions_t *options);
 int fc_util_create_npivport(int wwnCount, char **argv, cmdOptions_t *options);
 int fc_util_create_portlist();
+
+int fcoe_adm_create_port(int objects, char *argv[],
+    cmdOptions_t *options);
+int fcoe_adm_delete_port(int objects, char *argv[]);
+int fcoe_adm_list_ports(cmdOptions_t *options);
+int fcoe_adm_create_portlist(cmdOptions_t *options);
+
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -38,6 +38,27 @@ if [ "${PKG_INSTALL_ROOT}" != "" -a "${PKG_INSTALL_ROOT}" != "/" ]; then
 	#
 	exit 0
 fi
+
+#
+# Confirm service is installed, otherwise exit.
+#
+/usr/bin/svcprop -q ${SERVICE} || exit 0
+
+SVCPROP=`svcprop -p general/enabled ${SERVICE}`
+
+#
+# Check to see if the service is running and if so disable it.
+#
+if [ "${SVCPROP}" = "true" ]; then
+	svcadm disable ${SERVICE}
+	if [ $? -ne 0 ]; then
+		echo "\n$0 Disabling of ${SERVICE} failed!\n" >&2
+		exit 1
+	fi
+	svcadm refresh ${SERVICE}
+fi
+
+SERVICE="svc:/network/fcoe_config:default"
 
 #
 # Confirm service is installed, otherwise exit.

@@ -218,14 +218,18 @@ fct_li_to_txt(fct_link_info_t *li, char *topology, char *speed)
 		(void) strcpy(topology, topologies[li->port_topology]);
 	}
 
-	if ((s == 0) || ((s & 0xf0) != 0) || ((s & (s - 1)) != 0)) {
+	if ((s == 0) || ((s & 0xf00) != 0) || ((s & (s - 1)) != 0)) {
 		speed[0] = '?';
+	} else if (s == PORT_SPEED_10G) {
+		speed[0] = '1';
+		speed[1] = '0';
+		speed[2] = 'G';
+		speed[3] = 0;
 	} else {
 		speed[0] = '0' + li->port_speed;
+		speed[1] = 'G';
+		speed[2] = 0;
 	}
-
-	speed[1] = 'G';
-	speed[2] = 0;
 }
 
 /*
