@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -580,7 +580,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 180 (loadable) kaio */
 aui_null,	AUE_NULL,	aus_null,	/* 181 (loadable) */
 		auf_null,	0,
 aui_portfs,	AUE_PORTFS,	aus_null,	/* 182 (loadable) portfs */
-		auf_null,	0,
+		auf_null,	S2E_MLD,
 aui_null,	AUE_NULL,	aus_null,	/* 183 (loadable) */
 		auf_null,	0,
 aui_labelsys,	AUE_NULL,	aus_labelsys,	/* 184 labelsys */
