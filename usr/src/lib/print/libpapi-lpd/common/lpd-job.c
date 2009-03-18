@@ -282,6 +282,17 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 		    "rfc-1179-font-s", s);
 	}
 
+	/*
+	 * The document format needs to be added, but the control line
+	 * should be added when the filenames are figured out.
+	 */
+	s = NULL;
+	papiAttributeListGetString(attributes, NULL, "document-format", &s);
+	if (s != NULL) {
+		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
+		    "document-format", s);
+	}
+
 	return (status);
 }
 
