@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,8 +64,6 @@
 #include "iscsi_ffp.h"
 #include "errcode.h"
 #include "t10.h"
-
-#define	PGNAME_SIZE	64
 
 static Boolean_t create_pg(targ_scf_t *h, char *pgname, char *prop);
 static void new_property(targ_scf_t *h, tgt_node_t *n);
@@ -255,6 +253,66 @@ create_pg(targ_scf_t *h, char *pgname, char *prop)
 }
 
 /*
+ * Manage allocating dynamic memory for a string that is stored in
+ * the SCF database.
+ *
+ * scf_limit(3SCF) is called in order to compute the maximum length of
+ * the type of string specified by the 'limit' argument.  malloc()
+ * is then called to allocate the memory.
+ *
+ * If the function returns True, then the by-reference arguments will
+ * be updated to hold the length and address of the memory chunk.
+ */
+static Boolean_t
+alloc_scf_element(uint32_t limit, ssize_t *max_len, void **buf)
+{
+	ssize_t max_name_len;
+	void *name_buf;
+	Boolean_t status = False;
+
+	/*
+	 * Dynamically compute the maximum length of the specified type
+	 * of string so that our algorithms do not use an arbitrary,
+	 * statically-defined value.
+	 */
+	if ((max_name_len = scf_limit(limit)) >= 0) {
+		/*
+		 * scf_limit's return value knows nothing about a C-string's
+		 * trailing NULL byte; increment the count to allow for it.
+		 */
+		max_name_len++;
+
+		if ((name_buf = malloc(max_name_len)) != NULL) {
+			*max_len = max_name_len;
+			*buf = name_buf;
+			status = True;
+		}
+	}
+
+	return (status);
+}
+
+/*
+ * Allocate dynamic memory for a string containing a NAME that is stored in
+ * the SCF database.
+ */
+static Boolean_t
+alloc_scf_name(ssize_t *max_len, void **buf)
+{
+	return (alloc_scf_element(SCF_LIMIT_MAX_NAME_LENGTH, max_len, buf));
+}
+
+/*
+ * Allocate dynamic memory for a string containing a VALUE that is stored in
+ * the SCF database.
+ */
+static Boolean_t
+alloc_scf_value(ssize_t *max_len, void **buf)
+{
+	return (alloc_scf_element(SCF_LIMIT_MAX_VALUE_LENGTH, max_len, buf));
+}
+
+/*
  * mgmt_get_main_config() loads main configuration
  * from scf into a node tree.
  * Main configuration includes: admin/target/tpgt/initiator info.
@@ -272,8 +330,10 @@ mgmt_get_main_config(tgt_node_t **node)
 	scf_iter_t *iter = NULL;
 	scf_iter_t *iter_v = NULL;
 	scf_iter_t *iter_pv = NULL;
-	char pname[32];
-	char valuebuf[MAXPATHLEN];
+	char *pname = NULL;
+	char *valuebuf = NULL;
+	ssize_t max_name_len;
+	ssize_t max_value_len;
 	char passcode[32];
 	unsigned int outlen;
 	tgt_node_t	*n;
@@ -289,6 +349,11 @@ mgmt_get_main_config(tgt_node_t **node)
 	prop = scf_property_create(h->t_handle);
 	value = scf_value_create(h->t_handle);
 	iter = scf_iter_create(h->t_handle);
+
+	if ((alloc_scf_name(&max_name_len, (void *)&pname) == False) ||
+	    (alloc_scf_value(&max_value_len, (void *)&valuebuf) == False)) {
+		goto error;
+	}
 
 	(void) pthread_mutex_lock(&scf_conf_mutex);
 
@@ -308,8 +373,8 @@ mgmt_get_main_config(tgt_node_t **node)
 
 	while (scf_iter_next_property(iter, prop) > 0) {
 		(void) scf_property_get_value(prop, value);
-		(void) scf_value_get_as_string(value, valuebuf, MAXPATHLEN);
-		(void) scf_property_get_name(prop, pname, sizeof (pname));
+		(void) scf_value_get_as_string(value, valuebuf, max_value_len);
+		(void) scf_property_get_name(prop, pname, max_name_len);
 
 		/* avoid load auth to incore data */
 		if (strcmp(pname, ISCSI_READ_AUTHNAME) == 0 ||
@@ -343,7 +408,7 @@ mgmt_get_main_config(tgt_node_t **node)
 	while (scf_iter_next_pg(iter, h->t_pg) > 0) {
 		char *iname;
 
-		(void) scf_pg_get_name(h->t_pg, pname, sizeof (pname));
+		(void) scf_pg_get_name(h->t_pg, pname, max_name_len);
 		pgname_decode(pname);
 		iname = strchr(pname, '_');
 		if (iname == NULL) {
@@ -370,7 +435,7 @@ mgmt_get_main_config(tgt_node_t **node)
 			char *vname;
 
 			(void) scf_property_get_name(prop, pname,
-			    sizeof (pname));
+			    max_name_len);
 			/* avoid load auth to incore data */
 			if (strcmp(pname, ISCSI_READ_AUTHNAME) == 0 ||
 			    strcmp(pname, ISCSI_MODIFY_AUTHNAME) == 0 ||
@@ -381,7 +446,7 @@ mgmt_get_main_config(tgt_node_t **node)
 			if (vname == NULL) {
 				(void) scf_property_get_value(prop, value);
 				(void) scf_value_get_as_string(value, valuebuf,
-				    MAXPATHLEN);
+				    max_value_len);
 
 				pn = tgt_node_alloc(pname, String, valuebuf);
 				if (pn == NULL)
@@ -399,7 +464,7 @@ mgmt_get_main_config(tgt_node_t **node)
 				while (scf_iter_next_value(iter_pv, value)
 				    > 0) {
 					(void) scf_value_get_as_string(
-					    value, valuebuf, MAXPATHLEN);
+					    value, valuebuf, max_value_len);
 					/*
 					 * map 'acl' to 'initiator' since that
 					 * is what used inside the acl-list.
@@ -435,9 +500,9 @@ mgmt_get_main_config(tgt_node_t **node)
 		while (scf_iter_next_property(iter, prop) > 0) {
 			(void) scf_property_get_value(prop, value);
 			(void) scf_value_get_as_string(value, valuebuf,
-			    MAXPATHLEN);
+			    max_value_len);
 			(void) scf_property_get_name(prop, pname,
-			    sizeof (pname));
+			    max_name_len);
 
 			/* avoid load auth to incore data */
 			if (strcmp(pname, ISCSI_READ_AUTHNAME) == 0 ||
@@ -482,6 +547,10 @@ error:
 		scf_iter_destroy(iter_pv);
 	if (iter_v != NULL)
 		scf_iter_destroy(iter_v);
+
+	free(valuebuf);
+	free(pname);
+
 	scf_iter_destroy(iter);
 	scf_value_destroy(value);
 	scf_property_destroy(prop);
@@ -575,7 +644,8 @@ mgmt_config_save2scf()
 	scf_property_t *prop = NULL;
 	scf_value_t *value = NULL;
 	scf_iter_t *iter = NULL;
-	char pgname[PGNAME_SIZE];
+	char *pgname = NULL;
+	ssize_t max_name_len;
 	char passcode[32];
 	char *incore = NULL;
 	unsigned int	outlen;
@@ -585,15 +655,20 @@ mgmt_config_save2scf()
 	scf_transaction_t *tx = NULL;
 	secret_list_t	*sl_head;
 	secret_list_t	*sl_tail;
+	Boolean_t status = False;
 
 	h = mgmt_handle_init();
 
 	if (h == NULL)
-		return (False);
+		return (status);
 
 	prop = scf_property_create(h->t_handle);
 	value = scf_value_create(h->t_handle);
 	iter = scf_iter_create(h->t_handle);
+
+	if (alloc_scf_name(&max_name_len, (void *)&pgname) == False) {
+		goto error;
+	}
 
 	(void) pthread_mutex_lock(&scf_conf_mutex);
 
@@ -695,7 +770,7 @@ mgmt_config_save2scf()
 			free(incore);
 		}
 
-		(void) snprintf(pgname, sizeof (pgname), "%s_%s", n->x_name,
+		(void) snprintf(pgname, max_name_len, "%s_%s", n->x_name,
 		    n->x_value);
 
 		if (mgmt_transaction_start(h, pgname, "configuration")
@@ -775,38 +850,36 @@ mgmt_config_save2scf()
 	if (smf_refresh_instance(SA_TARGET_SVC_INSTANCE_FMRI) != 0)
 		goto error;
 
-	(void) pthread_mutex_unlock(&scf_conf_mutex);
-	scf_iter_destroy(iter);
-	scf_value_destroy(value);
-	scf_property_destroy(prop);
-	mgmt_handle_fini(h);
-	return (True);
-
+	status = True;
 error:
 	(void) pthread_mutex_unlock(&scf_conf_mutex);
+	free(pgname);
 	scf_iter_destroy(iter);
 	scf_value_destroy(value);
 	scf_property_destroy(prop);
 	mgmt_handle_fini(h);
-	return (False);
+	return (status);
 }
 
 Boolean_t
 mgmt_param_save2scf(tgt_node_t *node, char *target_name, int lun)
 {
 	targ_scf_t *h = NULL;
-	scf_property_t *prop = NULL;
-	scf_value_t *value = NULL;
-	scf_iter_t *iter = NULL;
-	char pgname[PGNAME_SIZE];
+	char *pgname = NULL;
+	ssize_t max_name_len;
 	tgt_node_t	*n = NULL;
+	Boolean_t status = False;
 
 	h = mgmt_handle_init();
 
 	if (h == NULL)
-		return (False);
+		return (status);
 
-	(void) snprintf(pgname, sizeof (pgname), "param_%s_%d", target_name,
+	if (alloc_scf_name(&max_name_len, (void *)&pgname) == False) {
+		goto error;
+	}
+
+	(void) snprintf(pgname, max_name_len, "param_%s_%d", target_name,
 	    lun);
 
 	(void) pthread_mutex_lock(&scf_param_mutex);
@@ -835,20 +908,12 @@ mgmt_param_save2scf(tgt_node_t *node, char *target_name, int lun)
 		(void) mgmt_transaction_end(h);
 	}
 
-	(void) pthread_mutex_unlock(&scf_param_mutex);
-	scf_iter_destroy(iter);
-	scf_value_destroy(value);
-	scf_property_destroy(prop);
-	mgmt_handle_fini(h);
-	return (True);
-
+	status = True;
 error:
 	(void) pthread_mutex_unlock(&scf_param_mutex);
-	scf_iter_destroy(iter);
-	scf_value_destroy(value);
-	scf_property_destroy(prop);
+	free(pgname);
 	mgmt_handle_fini(h);
-	return (False);
+	return (status);
 }
 
 /*
@@ -866,10 +931,13 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	scf_property_t *prop = NULL;
 	scf_value_t *value = NULL;
 	scf_iter_t *iter = NULL;
-	char pname[64];
-	char expgname[PGNAME_SIZE * PG_FACTOR];
-	char pgname[PGNAME_SIZE];
-	char valuebuf[MAXPATHLEN];
+	char *pname = NULL;
+	char *expgname = NULL;
+	char *pgname = NULL;
+	char *valuebuf = NULL;
+	ssize_t max_name_len;
+	ssize_t expg_max_name_len;
+	ssize_t max_value_len;
 	tgt_node_t	*n;
 	Boolean_t status = False;
 
@@ -884,9 +952,25 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	value = scf_value_create(h->t_handle);
 	iter = scf_iter_create(h->t_handle);
 
-	(void) snprintf(pgname, sizeof (pgname), "param_%s_%d", target_name,
+	if ((alloc_scf_name(&max_name_len, (void *)&pname) == NULL) ||
+	    (alloc_scf_name(&max_name_len, (void *)&pgname) == NULL) ||
+	    (alloc_scf_value(&max_value_len, (void *)&valuebuf) == NULL)) {
+		goto error;
+	}
+
+	/*
+	 * Allocate memory for an "expanded" (or "decoded") Property Group
+	 * name.
+	 */
+	expg_max_name_len = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH) * PG_FACTOR
+	    + 1;
+	if ((expgname = malloc(expg_max_name_len)) == NULL) {
+		goto error;
+	}
+
+	(void) snprintf(pgname, max_name_len, "param_%s_%d", target_name,
 	    lun);
-	pgname_encode(pgname, expgname, PGNAME_SIZE);
+	pgname_encode(pgname, expgname, max_name_len);
 
 	(void) pthread_mutex_lock(&scf_param_mutex);
 
@@ -904,8 +988,8 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 
 	while (scf_iter_next_property(iter, prop) > 0) {
 		(void) scf_property_get_value(prop, value);
-		(void) scf_value_get_as_string(value, valuebuf, MAXPATHLEN);
-		(void) scf_property_get_name(prop, pname, sizeof (pname));
+		(void) scf_value_get_as_string(value, valuebuf, max_value_len);
+		(void) scf_property_get_name(prop, pname, max_name_len);
 
 		/* avoid load auth to incore data */
 		if (strcmp(pname, ISCSI_READ_AUTHNAME) == 0 ||
@@ -929,6 +1013,12 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	status = True;
 error:
 	(void) pthread_mutex_unlock(&scf_param_mutex);
+
+	free(valuebuf);
+	free(expgname);
+	free(pgname);
+	free(pname);
+
 	scf_iter_destroy(iter);
 	scf_value_destroy(value);
 	scf_property_destroy(prop);
@@ -940,24 +1030,30 @@ Boolean_t
 mgmt_param_remove(char *target_name, int lun)
 {
 	targ_scf_t *h = NULL;
-	char pgname[PGNAME_SIZE];
+	char *pgname = NULL;
+	ssize_t max_name_len;
+	Boolean_t status = False;
 
 	h = mgmt_handle_init();
 	if (h == NULL)
-		return (False);
+		return (status);
 
-	(void) snprintf(pgname, sizeof (pgname), "param_%s_%d", target_name,
+	if (alloc_scf_name(&max_name_len, (void *)&pgname) == NULL) {
+		goto error;
+	}
+
+	(void) snprintf(pgname, max_name_len, "param_%s_%d", target_name,
 	    lun);
 
 	if (mgmt_transaction_start(h, pgname, "parameter") == True) {
 		(void) scf_pg_delete(h->t_pg);
 		(void) mgmt_transaction_end(h);
-		(void) mgmt_handle_fini(h);
-		return (True);
-	} else {
-		mgmt_handle_fini(h);
-		return (False);
+		status = True;
 	}
+error:
+	free(pgname);
+	mgmt_handle_fini(h);
+	return (status);
 }
 
 /*
