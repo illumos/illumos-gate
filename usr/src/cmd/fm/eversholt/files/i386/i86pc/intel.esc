@@ -258,39 +258,68 @@ prop upset.memory.intel.discard@motherboard/memory-controller (0)->
 #define DIMM_CE_COUNT   10
 #define DIMM_CE_TIME    1week
 
-event ereport.cpu.intel.nb.mem_ce@dimm/rank{within(12s)};
+event ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(12s)};
 
-engine serd.memory.intel.page_ce@dimm/rank, N=PAGE_CE_COUNT, T=PAGE_CE_TIME;
-event fault.memory.intel.page_ce@dimm/rank, message=0, response=0,
-    count=stat.ce_pgflt@dimm, engine=serd.memory.intel.page_ce@dimm/rank;
-prop fault.memory.intel.page_ce@dimm/rank
+engine serd.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    N=PAGE_CE_COUNT, T=PAGE_CE_TIME;
+event fault.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank, message=0, response=0,
+    count=stat.ce_pgflt@motherboard/memory-controller/dram-channel/dimm,
+    engine=serd.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+prop fault.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank
     { (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
     SET_ADDR && SET_OFFSET } (0)->
-    ereport.cpu.intel.nb.mem_ce@dimm/rank;
+    ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
 
-engine serd.memory.intel.dimm_ce@dimm/rank, N=DIMM_CE_COUNT, T=DIMM_CE_TIME;
-event fault.memory.intel.dimm_ce@dimm/rank,
-    engine=serd.memory.intel.dimm_ce@dimm/rank;
-event error.memory.intel.dimm_ce@dimm;
-prop fault.memory.intel.dimm_ce@dimm/rank (1)->
-    ereport.cpu.intel.nb.mem_ce@dimm/rank;
-prop fault.memory.intel.dimm_ce@dimm/rank
-    { !confprop_defined(dimm, "dimm-size") } (1)->
-    error.memory.intel.dimm_ce@dimm;
-prop error.memory.intel.dimm_ce@dimm
-    { !confprop_defined(dimm, "dimm-size") &&
-    count(stat.ce_pgflt@dimm) > 512 } (1)->
-    ereport.cpu.intel.nb.mem_ce@dimm/rank<>;
+engine serd.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    N=DIMM_CE_COUNT, T=DIMM_CE_TIME;
+event fault.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    engine=serd.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+event error.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm;
+prop fault.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+prop fault.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank
+    { !confprop_defined(motherboard/memory-controller/dram-channel/dimm,
+    "dimm-size") } (1)->
+    error.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm;
+prop error.memory.intel.dimm_ce@motherboard/memory-controller/dram-channel/dimm
+    { !confprop_defined(motherboard/memory-controller/dram-channel/dimm,
+    "dimm-size") &&
+    count(stat.ce_pgflt@
+    motherboard/memory-controller/dram-channel/dimm) > 512 } (1)->
+    ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank<>;
 
 #define DIMM_CE(dimm_size, n, t, fault_rate) \
-	prop fault.memory.intel.dimm_ce@dimm/rank { \
-	    confprop(dimm, "dimm-size") == dimm_size && \
+	prop fault.memory.intel.dimm_ce@ \
+	motherboard/memory-controller/dram-channel/dimm/rank { \
+	    confprop(motherboard/memory-controller/dram-channel/dimm, \
+	    "dimm-size") == dimm_size && \
 	    setserdn(n) & setserdt(t) } (1)-> \
-	    error.memory.intel.dimm_ce@dimm; \
-	prop error.memory.intel.dimm_ce@dimm { \
-	    confprop(dimm, "dimm-size") == dimm_size && \
-	    count(stat.ce_pgflt@dimm) > fault_rate } (1)-> \
-    	    ereport.cpu.intel.nb.mem_ce@dimm/rank<>;
+	    error.memory.intel.dimm_ce@ \
+	    motherboard/memory-controller/dram-channel/dimm; \
+	prop error.memory.intel.dimm_ce@ \
+	    motherboard/memory-controller/dram-channel/dimm { \
+	    confprop(motherboard/memory-controller/dram-channel/dimm, \
+	    "dimm-size") == dimm_size && \
+	    count(stat.ce_pgflt@ \
+	    motherboard/memory-controller/dram-channel/dimm) > fault_rate } \
+	    (1)-> \
+    	    ereport.cpu.intel.nb.mem_ce@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank<>;
 	
 DIMM_CE("8G", 8, 1week, 2000)
 DIMM_CE("4G", 4, 1week, 1500)
@@ -426,15 +455,16 @@ prop upset.discard@rank (0)-> EREPORT_BUS_ERROR;
     payloadprop_contains("resource", \
     asru(motherboard/chip/memory-controller/dram-channel/dimm)))
 
-#define	CPU_MEM_CE_PGFLTS \
-    (count(stat.ce_pgflt@motherboard/chip/memory-controller/dram-channel/dimm))
+#define	STAT_CPU_MEM_CE_PGFLTS \
+    stat.ce_pgflt@motherboard/chip/memory-controller/dram-channel/dimm
+#define	CPU_MEM_CE_PGFLTS \ (count(STAT_CPU_MEM_CE_PGFLTS))
 
 #define SET_RES_OFFSET \
     (!payloadprop_defined("resource[0].hc-specific.offset") || \
     setpayloadprop("asru-offset", \
     payloadprop("resource[0].hc-specific.offset")))
 
-engine stat.ce_pgflt@motherboard/chip/memory-controller/dram-channel/dimm;
+engine STAT_CPU_MEM_CE_PGFLTS;
 
 event ereport.cpu.intel.quickpath.mem_ue@motherboard/chip/memory-controller
     {within(12s)};
@@ -472,7 +502,7 @@ engine serd.memory.intel.page_ce@
 event fault.memory.intel.page_ce@
     motherboard/chip/memory-controller/dram-channel/dimm/rank,
     message=0, response=0,
-    count=stat.ce_pgflt@motherboard/chip/memory-controller/dram-channel/dimm,
+    count=STAT_CPU_MEM_CE_PGFLTS,
     engine=serd.memory.intel.page_ce@
     motherboard/chip/memory-controller/dram-channel/dimm/rank;
 
@@ -494,26 +524,30 @@ event error.memory.intel.dimm_ce@
     motherboard/chip/memory-controller/dram-channel/dimm;
 prop fault.memory.intel.dimm_ce@
     motherboard/chip/memory-controller/dram-channel/dimm
-    { !confprop_defined(dimm, "dimm-size") } (1)->
+    { !confprop_defined(motherboard/chip/memory-controller/dram-channel/dimm,
+    "dimm-size") } (1)->
     error.memory.intel.dimm_ce@
     motherboard/chip/memory-controller/dram-channel/dimm;
 prop error.memory.intel.dimm_ce@
     motherboard/chip/memory-controller/dram-channel/dimm
-    { !confprop_defined(dimm, "dimm-size") &&
-    count(stat.ce_pgflt@dimm) > 512 } (1)->
+    { !confprop_defined(motherboard/chip/memory-controller/dram-channel/dimm,
+    "dimm-size") &&
+    count(STAT_CPU_MEM_CE_PGFLTS) > 512 } (1)->
     ereport.cpu.intel.quickpath.mem_ce@motherboard/chip/memory-controller;
 
 #define	CPU_MEM_DIMM_CE(dimm_size, n, t, fault_rate) \
 	prop fault.memory.intel.dimm_ce@ \
 	    motherboard/chip/memory-controller/dram-channel/dimm { \
-	    confprop(dimm, "dimm-size") == dimm_size && \
+	    confprop(motherboard/chip/memory-controller/dram-channel/dimm, \
+	    "dimm-size") == dimm_size && \
 	    setserdn(n) & setserdt(t) } (1)-> \
 	    error.memory.intel.dimm_ce@ \
 	    motherboard/chip/memory-controller/dram-channel/dimm; \
 	prop error.memory.intel.dimm_ce@ \
 	    motherboard/chip/memory-controller/dram-channel/dimm { \
-	    confprop(dimm, "dimm-size") == dimm_size && \
-	    count(stat.ce_pgflt@dimm) > fault_rate } (1)-> \
+	    confprop(motherboard/chip/memory-controller/dram-channel/dimm, \
+	    "dimm-size") == dimm_size && \
+	    count(STAT_CPU_MEM_CE_PGFLTS) > fault_rate } (1)-> \
 	    ereport.cpu.intel.quickpath.mem_ce@ \
 	    motherboard/chip/memory-controller;
 
@@ -584,15 +618,18 @@ prop fault.cpu.intel.quickpath.mem_bad_id@motherboard/chip/memory-controller (1)
     ereport.cpu.intel.quickpath.mem_bad_id@motherboard/chip/memory-controller;
 
 event ereport.cpu.intel.quickpath.mem_redundant@motherboard/chip/memory-controller {within(1s)};
-engine serd.cpu.intel.quickpath.mem_redundant@motherboard/chip/memory-controller,
+engine serd.cpu.intel.quickpath.mem_redundant@
+    motherboard/chip/memory-controller/dram-channel/dimm,
     N=2, T=72h;
 event fault.cpu.intel.quickpath.mem_redundant@
     motherboard/chip/memory-controller/dram-channel/dimm,
     engine=serd.cpu.intel.quickpath.mem_redundant@
-    motherboard/chip/memory-controller;
+    motherboard/chip/memory-controller/dram-channel/dimm;
 
 prop fault.cpu.intel.quickpath.mem_redundant@
-    motherboard/chip/memory-controller/dram-channel/dimm (1)->
+    motherboard/chip/memory-controller/dram-channel/dimm
+    { payloadprop_contains("resource",
+    asru(motherboard/chip/memory-controller/dram-channel/dimm)) } (1)->
     ereport.cpu.intel.quickpath.mem_redundant@
     motherboard/chip/memory-controller;
 

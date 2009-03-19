@@ -336,7 +336,7 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 			topo_hdl_free(mod->tm_hdl, lpart, strlen(lpart) + 1);
 		} else {
 			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_PART,
-			    part);
+			    "");
 		}
 	}
 	if (rev != NULL) {
@@ -347,7 +347,7 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 			topo_hdl_free(mod->tm_hdl, lrev, strlen(lrev) + 1);
 		} else {
 			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_REV,
-			    rev);
+			    "");
 		}
 	}
 	if (serial != NULL) {
@@ -359,7 +359,7 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 			    strlen(lserial) + 1);
 		} else {
 			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_SER,
-			    serial);
+			    "");
 		}
 	}
 	if (hc_specific != NULL)
