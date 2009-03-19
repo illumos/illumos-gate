@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <libscf.h>
@@ -49,18 +48,16 @@
 #define	VERIFY -1
 
 /* GLOBALS */
-static char	*auditdatafile = AUDITDATAFILE;
 static char	*progname = "audit";
 static char	*usage = "audit [-n] | [-s] | [-t] | [-v filepath]";
 static int	silent = 0;
-static char	*instance_name = "svc:/system/auditd:default";
 
-static int	get_auditd_pid();
 static void	display_smf_error();
 
 static boolean_t is_audit_control_ok(char *);	/* file validation  */
 static boolean_t is_valid_zone(boolean_t);	/* operation ok in this zone? */
 static int	start_auditd();			/* start audit daemon */
+static int	sig_auditd(int);		/* send signal to auditd */
 
 /*
  * audit() - This program serves as a general administrator's interface to
@@ -90,8 +87,6 @@ static int	start_auditd();			/* start audit daemon */
 int
 main(int argc, char *argv[])
 {
-	pid_t pid; /* process id of auditd read from auditdatafile */
-	int	sig = 0; /* signal to send auditd */
 	char	c;
 	char	*first_option;
 
@@ -115,7 +110,8 @@ main(int argc, char *argv[])
 		if (!is_valid_zone(1))	/* 1 == display error if any */
 			exit(10);
 
-		sig = AU_SIG_NEXT_DIR;
+		if (sig_auditd(AU_SIG_NEXT_DIR) != 0)
+			exit(1);
 		break;
 	case 's':
 		if (!is_valid_zone(1))	/* 1 == display error if any */
@@ -128,7 +124,7 @@ main(int argc, char *argv[])
 		if (!is_valid_zone(0))	/* 0 == no error message display */
 			exit(10);
 		/* use bmsunconv to permanently disable, -t for temporary */
-		if (smf_disable_instance(instance_name, SMF_TEMPORARY) != 0) {
+		if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
 			display_smf_error();
 			exit(11);
 		}
@@ -138,7 +134,7 @@ main(int argc, char *argv[])
 		if (!is_valid_zone(0))	/* 0 == no error message display */
 			exit(10);
 
-		if (smf_disable_instance(instance_name, SMF_TEMPORARY) != 0) {
+		if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
 			exit(11);
 		}
 		break;
@@ -155,48 +151,42 @@ main(int argc, char *argv[])
 		exit(6);
 	}
 
-	if (sig != 0) {
-		if (get_auditd_pid(&pid) != 0) {
-			(void) fprintf(stderr, "%s: %s\n", progname,
-			    gettext("can't get process id of auditd from "
-			    "audit_data(4)"));
-			exit(4);
-		}
-
-		if (kill(pid, sig) != 0) {
-			perror(progname);
-			(void) fprintf(stderr,
-			    gettext("%s: cannot signal auditd\n"), progname);
-			exit(1);
-		}
-	}
 	return (0);
 }
 
-
 /*
- * get_auditd_pid(&pid):
+ * sig_auditd(sig)
  *
- * reads PID from audit_data
+ * send a signal to auditd service
  *
  * returns:	0 - successful
  *		1 - error
  */
 
 static int
-get_auditd_pid(pid_t *p_pid)
+sig_auditd(int sig)
 {
-	FILE	*adp;		/* audit_data file pointer */
-	int	retstat;
+	scf_simple_prop_t *prop = NULL;
+	uint64_t	*cid = NULL;
 
-	if ((adp = fopen(auditdatafile, "r")) == NULL) {
-		if (!silent)
-			perror(progname);
+	if ((prop = scf_simple_prop_get(NULL, AUDITD_FMRI, SCF_PG_RESTARTER,
+	    SCF_PROPERTY_CONTRACT)) == NULL) {
+		display_smf_error();
 		return (1);
 	}
-	retstat = (fscanf(adp, "%ld", p_pid) != 1);
-	(void) fclose(adp);
-	return (retstat);
+	if ((scf_simple_prop_numvalues(prop) < 0) ||
+	    (cid = scf_simple_prop_next_count(prop)) == NULL) {
+		scf_simple_prop_free(prop);
+		display_smf_error();
+		return (1);
+	}
+	if (sigsend(P_CTID, (ctid_t)*cid, sig) != 0) {
+		perror("audit: can't signal auditd");
+		scf_simple_prop_free(prop);
+		return (1);
+	}
+	scf_simple_prop_free(prop);
+	return (0);
 }
 
 /*
@@ -360,18 +350,18 @@ start_auditd()
 	    sizeof (audit_state)) != 0)
 		return (12);
 
-	if ((state = smf_get_state(instance_name)) == NULL) {
+	if ((state = smf_get_state(AUDITD_FMRI)) == NULL) {
 		display_smf_error();
 		return (13);
 	}
 	if (strcmp(SCF_STATE_STRING_ONLINE, state) != 0) {
-		if (smf_enable_instance(instance_name, 0) != 0) {
+		if (smf_enable_instance(AUDITD_FMRI, 0) != 0) {
 			display_smf_error();
 			free(state);
 			return (14);
 		}
 	} else {
-		if (smf_refresh_instance(instance_name) != 0) {
+		if (smf_refresh_instance(AUDITD_FMRI) != 0) {
 			display_smf_error();
 			free(state);
 			return (15);
@@ -384,13 +374,13 @@ start_auditd()
 static void
 display_smf_error()
 {
-	int	rc = scf_error();
+	scf_error_t	rc = scf_error();
 
 	switch (rc) {
 	case SCF_ERROR_NOT_FOUND:
 		(void) fprintf(stderr,
 		    "SMF error: \"%s\" not found.\n",
-		    instance_name);
+		    AUDITD_FMRI);
 		break;
 	default:
 		(void) fprintf(stderr, "SMF error: %s\n", scf_strerror(rc));
