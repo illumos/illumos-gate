@@ -32,6 +32,7 @@
 #include	<sys/modctl.h>
 #include	<sys/stat.h>
 #include	<sys/dld_impl.h>
+#include	<sys/dld_ioc.h>
 #include	<sys/dls_impl.h>
 #include	<sys/softmac.h>
 #include	<sys/mac.h>

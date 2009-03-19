@@ -48,6 +48,7 @@
 #include <strings.h>
 #include <syslog.h>
 #include <sys/dld.h>
+#include <sys/dld_ioc.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <unistd.h>

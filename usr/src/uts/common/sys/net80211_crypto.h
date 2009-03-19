@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,10 +38,11 @@
 #ifndef _SYS_NET80211_CRYPTO_H
 #define	_SYS_NET80211_CRYPTO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#ifdef _KERNEL
+#include <sys/stream.h>
 #include <sys/mac.h>
+#endif
 #include <sys/net80211_proto.h>
 
 /*
@@ -127,12 +128,14 @@ extern "C" {
 /* Maximum number of keys */
 #define	IEEE80211_KEY_MAX		IEEE80211_WEP_NKID
 
-struct ieee80211com;
-struct ieee80211_node;
-struct ieee80211_key;
 typedef uint16_t	ieee80211_keyix;	/* h/w key index */
 
 #define	IEEE80211_KEYIX_NONE	((ieee80211_keyix) -1)
+
+#ifdef _KERNEL
+
+struct ieee80211com;
+struct ieee80211_key;
 
 /*
  * Template for a supported cipher.  Ciphers register with the
@@ -239,6 +242,8 @@ void ieee80211_crypto_unregister(struct ieee80211com *ic,
     const struct ieee80211_cipher *);
 void ieee80211_crypto_resetkey(struct ieee80211com *, struct ieee80211_key *,
 	ieee80211_keyix);
+
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }

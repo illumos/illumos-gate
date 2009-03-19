@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <exacct.h>
+#include <net/if.h>
 #include <libdladm.h>
 
 #define	TIMEBUFLEN	20

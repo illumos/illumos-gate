@@ -28,10 +28,9 @@
 #define	_SYS_MAC_H
 
 #include <sys/types.h>
-#include <sys/ddi.h>
+#ifdef	_KERNEL
 #include <sys/sunddi.h>
-#include <sys/stream.h>
-#include <sys/mac_flow.h>
+#endif
 
 /*
  * MAC Services Module

@@ -37,13 +37,9 @@
 
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/dld_ioc.h>
 #include <sys/mac_flow.h>
 #include <sys/conf.h>
 #include <sys/sad.h>
-#include <net/if.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
 #include <sys/mac.h>
 
 #ifdef	__cplusplus

@@ -547,7 +547,8 @@ libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi
 libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
-libdladm:	libdevinfo libinetutil libsocket libnsl libexacct libscf
+libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \
+		libexacct libnsl libkstat libcurses
 libdll: 	libast
 libdlpi:	libinetutil libdladm
 libdscfg:	libnsctl libunistat libsocket libnsl

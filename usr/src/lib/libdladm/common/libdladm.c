@@ -33,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/dld.h>
+#include <sys/dld_ioc.h>
 #include <libdladm_impl.h>
 #include <libintl.h>
 #include <libdlpi.h>

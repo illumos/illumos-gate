@@ -36,6 +36,7 @@
 #include <strings.h>
 #include <syslog.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <libdlpi.h>
 #include "dlmgmt_impl.h"
 

@@ -119,6 +119,7 @@
 #include <sys/dld.h>
 #include <sys/sockio.h>
 #include <sys/softmac_impl.h>
+#include <net/if.h>
 
 static kmutex_t		softmac_taskq_lock;
 static kcondvar_t	softmac_taskq_cv;

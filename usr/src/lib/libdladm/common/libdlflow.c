@@ -30,6 +30,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include <sys/dld_ioc.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>

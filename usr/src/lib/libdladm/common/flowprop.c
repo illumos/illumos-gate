@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/dld.h>
+#include <sys/dld_ioc.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <libdevinfo.h>

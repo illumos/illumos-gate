@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/dld.h>
+#include <sys/ddi.h>
 
 #include <libdllink.h>
 #include <libdlflow.h>

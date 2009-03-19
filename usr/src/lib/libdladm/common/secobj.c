@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/dld.h>
+#include <sys/dld_ioc.h>
 #include <libinetutil.h>
 #include <libdllink.h>
 #include <libdladm_impl.h>
