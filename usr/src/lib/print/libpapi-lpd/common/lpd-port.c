@@ -296,37 +296,52 @@ static int
 massage_control_data(char *data, int id)
 {
 	char *line, *iter = NULL;
-	char *ptr;
+	char *ptr, *datacpy;
 	char host[BUFSIZ];
+	int host_present = 0;
 
-	gethostname(host, sizeof (host));
+	if (gethostname(host, sizeof (host)) != 0)
+		return (-1);
 
-	for (ptr = strchr(data, '\n'); ptr != NULL; ptr = strchr(ptr, '\n')) {
-		ptr++;
+	if ((datacpy = strdup(data)) == NULL) {
+		return (-1);
+	}
+
+	for (ptr = strtok_r(datacpy, "\n", &iter); ptr != NULL;
+	    ptr = strtok_r(NULL, "\n", &iter)) {
 
 		if (ptr[0] == 'H') {
-			if (strncmp(++ptr, host, strlen(host)) != 0)
+			if (strncmp(++ptr, host, strlen(host)) != 0) {
+				free(datacpy);
 				return (-1);
+			}
+			host_present = 1;
 		} else if ((ptr[0] == 'P') || (ptr[0] == 'L')) {
 			/* check the user name */
 			uid_t uid = getuid();
 			struct passwd *pw;
 			int len;
 
-			if (uid == 0)	/* let root do what they want */
+			if (uid == 0) {	/* let root do what they want */
 				continue;
-			if ((pw = getpwuid(uid)) == NULL)
+			}
+			if ((pw = getpwuid(uid)) == NULL) {
+				free(datacpy);
 				return (-1);	/* failed */
+			}
 			len = strlen(pw->pw_name);
-			if ((strncmp(++ptr, pw->pw_name, len) != 0) ||
-			    (ptr[len] != '\n'))
+			if ((strncmp(++ptr, pw->pw_name, len) != 0)) {
+				free(datacpy);
 				return (-1);	/* failed */
+			}
 		} else if ((islower(ptr[0]) != 0) || (ptr[0] == 'U')) {
 			/* check/fix df?XXXhostname */
 			ptr++;
 
-			if (strlen(ptr) < 6)
+			if (strlen(ptr) < 6) {
+				free(datacpy);
 				return (-1);
+			}
 			if ((ptr[0] == 'd') && (ptr[1] == 'f') &&
 			    (ptr[3] == 'X') && (ptr[4] == 'X') &&
 			    (ptr[5] == 'X')) {
@@ -334,12 +349,23 @@ massage_control_data(char *data, int id)
 				ptr[4] = '0' + (id / 10) % 10;
 				ptr[5] = '0' + id % 10;
 
-			if (strncmp(&ptr[6], host, strlen(host)) != 0)
+				if (strncmp(&ptr[6], host, strlen(host)) != 0) {
+					free(datacpy);
+					return (-1);
+				}
+			} else {
+				free(datacpy);
 				return (-1);
-			} else
-				return (-1);
+			}
 		}
+
 	}
+	free(datacpy);
+
+	if (!host_present) {
+		return (-1);
+	}
+
 	return (1);
 }
 
@@ -505,6 +531,7 @@ submit_job(int sock, char *printer, int job_id, char *path)
 		syslog(LOG_ALERT,
 		    "bad control file, possible subversion attempt");
 		free(metadata);
+		errno = EINVAL;
 		close(fd);
 		return (-1);
 	}
