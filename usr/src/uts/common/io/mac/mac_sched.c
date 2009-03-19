@@ -3538,7 +3538,7 @@ mac_rx_deliver(void *arg1, mac_resource_handle_t mrh, mblk_t *mp_chain,
 	mac_client_impl_t *mcip = arg1;
 
 	if (mcip->mci_nvids == 1 &&
-	    !(mcip->mci_state_flags & MCIS_TAG_DISABLE)) {
+	    !(mcip->mci_state_flags & MCIS_STRIP_DISABLE)) {
 		/*
 		 * If the client has exactly one VID associated with it
 		 * and striping of VLAN header is not disabled,
