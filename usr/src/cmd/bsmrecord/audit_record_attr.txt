@@ -1668,6 +1668,10 @@ label=AUE_SETHOSTNAME
 label=AUE_SETKERNSTATE
   skip=Not used.
 
+label=AUE_SETPGID
+  format=[proc]:[arg]1
+  comment=2, pgid, "pgid"
+
 label=AUE_SETPGRP
   format=kernel
 
@@ -1710,6 +1714,9 @@ label=AUE_SETRLIMIT
 #	header,73,2,setrlimit(2),,Thu Nov 08 15:14:17 2001, + 0 msec
 #	subject,tuser1,tuser1,staff,tuser1,staff,9707,497,0 0 tmach2
 #	return,success,0
+
+label=AUE_SETSID
+  format=kernel
 
 label=AUE_SETSOCKOPT
   case=Invalid file descriptor

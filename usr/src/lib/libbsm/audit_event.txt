@@ -353,6 +353,9 @@
 305:AUE_PORTFS_ASSOCIATE:portfs(2) - file events source - PORT_ASSOCIATE:fa
 306:AUE_PORTFS_DISSOCIATE:portfs(2) - file events source - PORT_DISSOCIATE:fa
 #
+307:AUE_SETSID:setsid(2):pm
+308:AUE_SETPGID:setpgid(2):pm
+#
 # user level audit events
 #	2048 -  6143	Reserved
 #

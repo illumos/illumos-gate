@@ -340,12 +340,14 @@ extern "C" {
 #define	AUE_LABELSYS_TNMLP	304	/* =as tnmlp(2) */
 #define	AUE_PORTFS_ASSOCIATE	305	/* =fa portfs(2) - port associate */
 #define	AUE_PORTFS_DISSOCIATE	306	/* =fa portfs(2) - port disassociate */
+#define	AUE_SETSID		307	/* =pm setsid(2) */
+#define	AUE_SETPGID		308	/* =pm setpgid(2) */
 
 
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		306
+#define	MAX_KEVENTS		308
 
 
 #ifdef __cplusplus
