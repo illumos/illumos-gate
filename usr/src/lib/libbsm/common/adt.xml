@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
-Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 -->
@@ -67,7 +67,7 @@ Use is subject to license terms.
 			omitted, the internal name is the same as the
 			external name.
 
-	title,		these tags are used by bsmrecord build to create
+	title,		these tags are used by bsmrecord(1M) build to create
 	program,	audit_record_attr database from adt events.
 	see		Following example demonstrates their semantics:
 
@@ -82,6 +82,18 @@ Use is subject to license terms.
 			      [text]                       username...
 			      					^-   <comment>
 			      return
+
+			If the length of string in any of the given
+			elements is longer than defined, the string is
+			silently truncated to the defined length in the
+			bsmrecord(1M) runtime: 
+				
+				element	<= max (non-truncated) string length
+				title	<= 46
+				program	<= 20
+				see	<= 39
+				comment	<= unlimited
+				token	<= 28
 
 	entry		defines the correspondence between the data
 			supplied by the caller and the token to be
@@ -164,10 +176,11 @@ Use is subject to license terms.
 			If the type is an array, its length must be given
 			explicitly.
 
-	comment		Used by bsmrecord build to generate audit_record_attr.
-			Comment is explanation note printed with token type.
-			Colon (':') may not be used in a comment.
-			See example above for other tags related to bsmrecord.
+	comment		Used by bsmrecord(1M) build to generate 
+			audit_record_attr. Comment is explanation note
+			printed with token type. Colon (':') may not be
+			used in a comment. See example above for other
+			tags related to bsmrecord(1M).
 
 	token		Define allowed token names.
 			- id is the name of token; this name is used
@@ -176,6 +189,8 @@ Use is subject to license terms.
 			- usage is an optional value.  At present, only
 			  "TSOL" is defined; it means that this data is
 			  to be used only in Trusted Solaris implementations.
+			See also example above for "token" tag relation to 
+			the bsmrecord(1M) output.
 
 	msg_list	Define a set of text strings.
 			- id is the name to be used for this group of text

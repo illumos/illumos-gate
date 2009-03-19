@@ -109,6 +109,22 @@ user=head:subj:insert:ret
 # case is used to generate alternate descriptions for a given
 # record.
 #
+# Constraints - the string length; bear in mind, that any annotation of
+# primitives below longer than is specified, will be silently truncated 
+# to given/defined amount of characters in the bsmrecord(1M) runtime:
+#
+#     primitive <= max (non-truncated) string length
+#	case	<= unlimited; if necessary, text continues on a new line
+#	comment	<= unlimited; if necessary, text continues on a new line
+#	label	<= 43
+#	note	<= unlimited; if necessary, text continues on a new line
+#	program	<= 20
+#	see	<= 39
+#	syscall	<= 20
+#	title	<= 46
+#	token	<= 28 (full name)
+#
+#
 # AUE_ACCEPT illustrates the use of all the above.  Note that
 # case is not nested; ellipsis (...) is used to give the effect
 # of nesting.
