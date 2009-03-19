@@ -5056,8 +5056,9 @@ aui_acl(au_event_t e)
 		break;
 	case GETACL:
 	case GETACLCNT:
+	case ACE_GETACL:
 	case ACE_GETACLCNT:
-		/* do nothing for these two values. */
+		/* do nothing for these four values. */
 		e = AUE_NULL;
 		break;
 	default:
