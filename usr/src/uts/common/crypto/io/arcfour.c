@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * RC4 provider for the Kernel Cryptographic Framework (KCF)
@@ -328,12 +326,12 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 
 			left = input->cd_length;
 			while (mp1 != NULL) {
-				if (mp1->b_wptr - start > left) {
+				if (_PTRDIFF(mp1->b_wptr, start) > left) {
 					len = left;
 					arcfour_crypt(key, start, start, len);
 					mp1 = NULL;
 				} else {
-					len = mp1->b_wptr - start;
+					len = _PTRDIFF(mp1->b_wptr, start);
 					arcfour_crypt(key, start, start, len);
 					mp1 = mp1->b_cont;
 					start = mp1->b_rptr;
@@ -438,7 +436,7 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 
 		left = input->cd_length;
 		while (mp1 != NULL) {
-			if (mp1->b_wptr - start > left) {
+			if (_PTRDIFF(mp1->b_wptr, start) > left) {
 				len = left;
 				ret = crypto_arcfour_crypt(key, start, output,
 				    len);
@@ -446,7 +444,7 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 					return (ret);
 				mp1 = NULL;
 			} else {
-				len = mp1->b_wptr - start;
+				len = _PTRDIFF(mp1->b_wptr, start);
 				ret = crypto_arcfour_crypt(key, start, output,
 				    len);
 				if (ret != CRYPTO_SUCCESS)
@@ -609,12 +607,12 @@ crypto_arcfour_crypt(ARCFour_key *key, uchar_t *in, crypto_data_t *out,
 
 			left = length;
 			while (mp1 != NULL) {
-				if (mp1->b_wptr - start > left) {
+				if (_PTRDIFF(mp1->b_wptr, start) > left) {
 					len = left;
 					arcfour_crypt(key, in, start, len);
 					mp1 = NULL;
 				} else {
-					len = mp1->b_wptr - start;
+					len = _PTRDIFF(mp1->b_wptr, start);
 					arcfour_crypt(key, in, start, len);
 					mp1 = mp1->b_cont;
 					start = mp1->b_rptr;

@@ -19,16 +19,20 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(lint) || defined(__lint)
-	/* LINTED */
-	/* Nothing to be linted in this file, its pure assembly source */
-#else	/* lint || __lint */ 
+
+#include "arcfour.h"
+
+/* ARGSUSED */
+void
+arcfour_crypt_aligned(ARCFour_key *key, size_t len, uchar_t *in, uchar_t *out)
+{}
+
+#else	/* lint || __lint */
 
 	.register	%g2,#scratch
 	.register	%g3,#scratch
@@ -46,14 +50,14 @@
 /*
  * SUBROUTINE arcfour_crypt_aligned
  *
- * void arcfour_crypt_aligned(ARCFour_key *key, int len, 
- *			unsigned char *in, unsigned char *out);
+ * void arcfour_crypt_aligned(ARCFour_key *key, size_t len,
+ *			uchar_t *in, uchar_t *out);
  *
  * in and out should be aligned on an 8-byte boundary, but len can be anything
  */
 	.global arcfour_crypt_aligned
-	
-	
+
+
 arcfour_crypt_aligned:
 
 /* EXPORT DELETE START */
@@ -230,7 +234,7 @@ arcfour_crypt_aligned:
 	and	%g5, 255, %g5
 
 
-.Loop1:	
+.Loop1:
 	sll	%o5, 8, %o5
 	ldub	[%i5 + %o1], %o3
 	and	%g1, 255, %g1
@@ -418,8 +422,8 @@ arcfour_crypt_aligned:
 	add	%i3, 8, %i3
 	bnz	%icc, .Loop2_1
 	stb	%g2, [%i0 + 257]
-	
-	ret	
+
+	ret
 	restore	%g0,%g0,%g0
 
 
@@ -462,7 +466,7 @@ arcfour_crypt_aligned:
 	stb	%g1, [%i0 + 256]
 
 	stb	%g2, [%i0 + 257]
-	
+
 	ret
 	restore	%g0,%g0,%g0
 
@@ -471,49 +475,49 @@ arcfour_crypt_aligned:
 	or	%o3, %g0, %g3
 	ba	.L1B
 	and	%g2, 255, %g2
-	
+
 .L2A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L2B
 	and	%g2, 255, %g2
-	
+
 .L3A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L3B
 	and	%g2, 255, %g2
-	
+
 .L4A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L4B
 	and	%g2, 255, %g2
-	
+
 .L5A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L5B
 	and	%g2, 255, %g2
-	
+
 .L6A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L6B
 	and	%g2, 255, %g2
-	
+
 .L7A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L7B
 	and	%g2, 255, %g2
-	
+
 .L8A:
 	add	%o2, %o3, %g2
 	or	%o3, %g0, %g3
 	ba	.L8B
 	and	%g2, 255, %g2
-	
+
 /* EXPORT DELETE END */
 	.type	arcfour_crypt_aligned,2
 	.size	arcfour_crypt_aligned,(. - arcfour_crypt_aligned)

@@ -208,13 +208,14 @@ typedef uint32_t crypto_keysize_unit_t;
 /* Shared operation context format for CKM_RC4 */
 typedef struct {
 #if defined(__amd64)
-	uint32_t i, j;
-	uint32_t arr[256];
+	uint32_t	i, j;
+	uint32_t	arr[256];
+	uint32_t	flag;
 #else
-	uchar_t arr[256];
-	uchar_t i, j;
+	uchar_t		arr[256];
+	uchar_t		i, j;
 #endif /* __amd64 */
-	uint64_t pad;		/* For 64-bit alignment */
+	uint64_t	pad;		/* For 64-bit alignment */
 } arcfour_state_t;
 
 /* Data arguments of cryptographic operations */

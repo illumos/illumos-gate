@@ -43,8 +43,8 @@ include $(SRC)/lib/Makefile.lib.64
 
 CFLAGS		+= -xO4 -xcrossfile
 BIGNUM_FLAGS	+= -DPSR_MUL
-LINTFLAGS64	+= $(BIGNUM_FLAGS) $(AES_FLAGS)
-CLEANFILES      += arcfour-x86_64.s
+LINTFLAGS64	+= $(BIGNUM_FLAGS) $(AES_FLAGS) $(ARCFOUR_FLAGS)
+CLEANFILES	+= arcfour-x86_64.s
 
 LDLIBS  += -lc
 LIBS += $(LINTLIB)
@@ -73,4 +73,3 @@ pics/%.o:	$(BIGNUM_DIR)/$(MACH64)/%.s
 pics/%.o:	arcfour-x86_64.s
 	$(COMPILE64.s) $(ARCFOUR_FLAGS) -o $@ $<
 	$(POST_PROCESS_O)
-

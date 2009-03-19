@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ARCFOUR_H
 #define	_ARCFOUR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,13 +44,16 @@ typedef arcfour_state_t ARCFour_key;
 
 void arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen);
 void arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len);
+
+/* Internal use-only functions */
 #ifdef	sun4u
 void arcfour_crypt_aligned(ARCFour_key *key, size_t len, uchar_t *in,
     uchar_t *out);
 #endif	/* sun4u */
 #ifdef	__amd64
 int arcfour_crypt_on_intel(void);
-#endif	/* _amd64 */
+void arcfour_crypt_asm(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len);
+#endif	/* __amd64 */
 
 #ifdef	__cplusplus
 }

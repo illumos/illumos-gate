@@ -19,15 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#define	ARCFOUR_LOOP_OPTIMIZED
 
 #include "arcfour.h"
 
 #if defined(__amd64)
+/* ARCFour_key.flag values */
+#define	ARCFOUR_ON_INTEL	1
+#define	ARCFOUR_ON_AMD64	0
+
 #ifdef _KERNEL
 #include <sys/x86_archext.h>
 #include <sys/cpuvar.h>
@@ -37,8 +41,16 @@
 #endif	/* _KERNEL */
 #endif	/* __amd64 */
 
-#if !defined(__amd64)
-/* Initialize the key stream 'key' using the key value */
+#ifndef __amd64
+/*
+ * Initialize the key stream 'key' using the key value.
+ *
+ * Input:
+ * keyval	User-provided key
+ * keyvallen	Length, in bytes, of keyval
+ * Output:
+ * key		Initialized ARCFOUR key schedule, based on keyval
+ */
 void
 arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 {
@@ -60,7 +72,7 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 
 	j = 0;
 	for (i = 0; i < 256; i++) {
-		j = (j + key->arr[i] + ext_keyval[i]) % 256;
+		j = (j + key->arr[i] + ext_keyval[i]) & 0xff;
 		tmp = key->arr[i];
 		key->arr[i] = key->arr[j];
 		key->arr[j] = tmp;
@@ -70,27 +82,52 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 
 /* EXPORT DELETE END */
 }
+#endif	/* !__amd64 */
 
 
 /*
  * Encipher 'in' using 'key'.
- * in and out can point to the same location
+ *
+ * Input:
+ * key		ARCFOUR key, initialized by arcfour_key_init()
+ * in		Input text
+ * out		Buffer to contain output text
+ * len		Length, in bytes, of the in and out buffers
+ *
+ * Output:
+ * out		Buffer containing output text
+ *
+ * Note: in and out can point to the same location
  */
 void
 arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 {
-	size_t ii;
-	uchar_t tmp, i, j;
-
 /* EXPORT DELETE START */
+#ifdef	__amd64
+	if (key->flag == ARCFOUR_ON_AMD64) {
+		arcfour_crypt_asm(key, in, out, len);
+	} else { /* Intel EM64T */
+#endif	/* amd64 */
 
+	size_t		ii;
+	uchar_t		i, j, ti, tj;
+#ifdef ARCFOUR_LOOP_OPTIMIZED
+	uchar_t		arr_ij;
+#endif
+#ifdef __amd64
+	uint32_t	*arr;
+#else
+	uchar_t		*arr;
+#endif
+
+#ifdef	sun4u
 	/*
 	 * The sun4u has a version of arcfour_crypt_aligned() hand-tuned for
-	 * the cases where the input and output  buffers are aligned on
+	 * the cases where the input and output buffers are aligned on
 	 * a multiple of 8-byte boundary.
 	 */
-#ifdef	sun4u
-	int index;
+	int		index;
+	uchar_t		tmp;
 
 	index = (((uint64_t)(uintptr_t)in) & 0x7);
 
@@ -101,7 +138,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 		for (index = 8 - (uint64_t)(uintptr_t)in & 0x7;
 		    (index-- > 0) && len > 0;
 		    len--, in++, out++) {
-			i = i + 1;
+			++i;
 			j = j + key->arr[i];
 			tmp = key->arr[i];
 			key->arr[i] = key->arr[j];
@@ -111,8 +148,8 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 		}
 		key->i = i;
 		key->j = j;
-
 	}
+
 	if (len == 0)
 		return;
 
@@ -120,30 +157,78 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 	if ((((uint64_t)(uintptr_t)out) & 7) != 0) {
 #endif	/* sun4u */
-		i = key->i;
-		j = key->j;
-		for (ii = 0; ii < len; ii++) {
-			i = i + 1;
-			j = j + key->arr[i];
-			tmp = key->arr[i];
-			key->arr[i] = key->arr[j];
-			key->arr[j] = tmp;
-			tmp = key->arr[i] + key->arr[j];
-			out[ii] = in[ii] ^ key->arr[tmp];
-		}
-		key->i = i;
-		key->j = j;
+
+	i = key->i;
+	j = key->j;
+	arr = key->arr;
+
+#ifndef ARCFOUR_LOOP_OPTIMIZED
+	/*
+	 * This loop is hasn't been reordered, but is kept for reference
+	 * purposes as it's more readable
+	 */
+	for (ii = 0; ii < len; ++ii) {
+		++i;
+		ti = arr[i];
+		j = j + ti;
+		tj = arr[j];
+		arr[j] = ti;
+		arr[i] = tj;
+		out[ii] = in[ii] ^ arr[(ti + tj) & 0xff];
+	}
+
+#else
+	/*
+	 * This for loop is optimized by carefully spreading out
+	 * memory access and storage to avoid conflicts,
+	 * allowing the processor to process operations in parallel
+	 */
+
+	/* for loop setup */
+	++i;
+	ti = arr[i];
+	j = j + ti;
+	tj = arr[j];
+	arr[j] = ti;
+	arr[i] = tj;
+	arr_ij = arr[(ti + tj) & 0xff];
+	--len;
+
+	for (ii = 0; ii < len; ) {
+		++i;
+		ti = arr[i];
+		j = j + ti;
+		tj = arr[j];
+		arr[j] = ti;
+		arr[i] = tj;
+
+		/* save result from previous loop: */
+		out[ii] = in[ii] ^ arr_ij;
+
+		++ii;
+		arr_ij = arr[(ti + tj) & 0xff];
+	}
+	/* save result from last loop: */
+	out[ii] = in[ii] ^ arr_ij;
+#endif
+
+	key->i = i;
+	key->j = j;
+
 #ifdef	sun4u
 	} else {
 		arcfour_crypt_aligned(key, len, in, out);
 	}
 #endif	/* sun4u */
+#ifdef	__amd64
+	}
+#endif	/* amd64 */
 
 /* EXPORT DELETE END */
 }
 
-#else
 
+#ifdef	__amd64
 /*
  * Return 1 if executing on Intel, otherwise 0 (e.g., AMD64).
  */
@@ -158,4 +243,4 @@ arcfour_crypt_on_intel(void)
 	return ((ui & AV_386_AMD_MMX) == 0);
 #endif	/* _KERNEL */
 }
-#endif	/* !__amd64 */
+#endif	/* __amd64 */

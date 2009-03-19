@@ -33,7 +33,7 @@
 # on either AMD and Intel platforms, I implement both cases. See
 # rc4_skey.c for further details...
 
-# P4 EM64T core appears to be "allergic" to 64-bit inc/dec. Replacing 
+# P4 EM64T core appears to be "allergic" to 64-bit inc/dec. Replacing
 # those with add/sub results in 50% performance improvement of folded
 # loop...
 
@@ -70,24 +70,28 @@
 # 1. Added some comments, "use strict", and declared all variables.
 #
 # 2. Added OpenSolaris ENTRY_NP/SET_SIZE macros from
-# /usr/include/sys/asm_linkage.h, .ident keywords, and lint(1B) guards.
+# /usr/include/sys/asm_linkage.h.
 #
-# 3. Changed function name from RC4() to arcfour_crypt() and RC4_set_key()
+# 3. Changed function name from RC4() to arcfour_crypt_asm() and RC4_set_key()
 # to arcfour_key_init(), and changed the parameter order for both to that
 # used by OpenSolaris.
 #
 # 4. The current method of using cpuid feature bits 20 (NX) or 28 (HTT) from
 # function OPENSSL_ia32_cpuid() to distinguish Intel/AMD does not work for
 # some newer AMD64 processors, as these bits are set on both Intel EM64T
-# processors and newer AMD64 processors.  I replaced this with code to use CPUID
-# instruction subfunction EAX=0 to determine if we're running on "GenuineIntel"
-# or not. The result decides whether to use a
-#	* 1-byte key array (label .LRC4_CHAR, optimal on Intel EM64T) or a
-#	* 4-byte key array (Labels .Lloop1 and .Lloop8, optimal on AMD64).
+# processors and newer AMD64 processors.  I replaced this with C code
+# (function arcfour_crypt_on_intel()) to call cpuid_getvendor()
+# when executing in the kernel and getisax() when executing in userland.
 #
-# 5. Removed x86_64-xlate.pl script (not needed for as(1) or gas(1) assemblers).
+# 5. Set a new field in the key structure, key->flag to 0 for AMD AMD64
+# and 1 for Intel EM64T.  This is to select the most-efficient arcfour_crypt()
+# function to use.
 #
-# 6. Removed Lcloop8 code (slower than Lcloop1 on EM64T and not used on AMD64).
+# 6. Removed x86_64-xlate.pl script (not needed for as(1) or gas(1) assemblers).
+#
+# 7. Removed unused RC4_CHAR, Lcloop1, and Lcloop8 code.
+#
+# 8. Added C function definitions for use by lint(1B).
 #
 
 use strict;
@@ -108,7 +112,8 @@ open STDOUT,">$output";
 #$out="%rcx";	    # arg4
 
 # OpenSolaris:
-# void arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len);
+# void arcfour_crypt_asm(ARCFour_key *key, uchar_t *in, uchar_t *out,
+#	size_t len);
 $dat="%rdi";	    # arg1
 $inp="%rsi";	    # arg2
 $out="%rdx";	    # arg3
@@ -128,14 +133,24 @@ $YY="%r12";
 $TY="%r13";
 
 $code=<<___;
-#if !defined(lint) && !defined(__lint)
+#if defined(lint) || defined(__lint)
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#include "arcfour.h"
 
+/* ARGSUSED */
+void
+arcfour_crypt_asm(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
+{}
+
+/* ARGSUSED */
+void
+arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
+{}
+
+#else
 #include <sys/asm_linkage.h>
 
-
-ENTRY_NP(arcfour_crypt)
+ENTRY_NP(arcfour_crypt_asm)
 	/* EXPORT DELETE START */
 
 	or	$len,$len # If (len == 0) return
@@ -153,15 +168,8 @@ ENTRY_NP(arcfour_crypt)
 	movl	-4($dat),$YY#d
 
 	/
-	/ Use a 1-byte data array, on Intel P4 EM64T,
-	/ which is more efficient there,
-	/ or a 4-byte data array (for AMD AMD64).
+	/ Use a 4-byte key schedule element array
 	/
-
-	/ If RC4_CHAR flag set (Intel EM64T), then use 1-byte array
-	cmpl	\$-1,256($dat)
-	je	.LRC4_CHAR
-	/ otherwise use 4-byte integer array (AMD64)
 	inc	$XX[0]#b
 	movl	($dat,$XX[0],4),$TX[0]#d
 	test	\$-8,$len
@@ -170,10 +178,6 @@ ENTRY_NP(arcfour_crypt)
 
 .align	16
 .Lloop8:
-	/
-	/ This code is for use with a 4-byte integer data array, which is
-	/ more efficient on AMD64 Athlon and Opteron-class processors.
-	/
 ___
 for ($i=0;$i<8;$i++) {
 $code.=<<___;
@@ -205,8 +209,7 @@ $code.=<<___;
 	jnz	.Lloop8
 	cmp	\$0,$len
 	jne	.Lloop1
-___
-$code.=<<___;
+
 .Lexit:
 	/
 	/ Cleanup and exit code
@@ -221,6 +224,7 @@ $code.=<<___;
 	pop	%r13
 	pop	%r12
 	ret
+
 .align	16
 .Lloop1:
 	add	$TX[0]#b,$YY#b
@@ -239,41 +243,9 @@ $code.=<<___;
 	jnz	.Lloop1
 	jmp	.Lexit
 
-
-.align	16
-.LRC4_CHAR:
-	/
-	/ This code is for use with a 1-byte integer data array, which is
-	/ more efficient on Intel P4 EM64T-class processors.
-	/
-	add	\$1,$XX[0]#b
-	movzb	($dat,$XX[0]),$TX[0]#d
-	jmp	.Lcloop1
-
-.align	16
-.Lcloop1:
-	add	$TX[0]#b,$YY#b
-	movzb	($dat,$YY),$TY#d
-	movb	$TX[0]#b,($dat,$YY)
-	movb	$TY#b,($dat,$XX[0])
-	add	$TX[0]#b,$TY#b
-	add	\$1,$XX[0]#b
-	/ Intel Optimization (preload $TY and $XX[0]):
-	movzb	$TY#b,$TY#d
-	movzb	$XX[0]#b,$XX[0]#d
-	movzb	($dat,$TY),$TY#d
-	movzb	($dat,$XX[0]),$TX[0]#d
-	xorb	($inp),$TY#b
-	lea	1($inp),$inp
-	movb	$TY#b,($out)
-	lea	1($out),$out
-	sub	\$1,$len
-	jnz	.Lcloop1
-	jmp	.Lexit
-
 	/* EXPORT DELETE END */
 	ret
-SET_SIZE(arcfour_crypt)
+SET_SIZE(arcfour_crypt_asm)
 ___
 
 
@@ -313,27 +285,22 @@ ENTRY_NP(arcfour_key_init)
 	pop	%rdx		/ Restore arg3
 	pop	%rsi		/ Restore arg2
 	pop	%rdi		/ Restore arg1
+	/ Save return value in key->flag (1=Intel, 0=AMD)
+	movl	%eax,1032($dat)
 
 	/ Set $dat to beginning of array, key->arr[0]
 	lea	8($dat),$dat
 	lea	($inp,$len),$inp
 	neg	$len
 	mov	$len,%rcx
-	/ Zeroed below, as %eax contains a flag from arcfour_crypt_on_intel():
-	/xor	%eax,%eax
+
+	xor	%eax,%eax
 	xor	$ido,$ido
 	xor	%r10,%r10
 	xor	%r11,%r11
 
-	/
-	/ Use a 1-byte data array, on Intel P4 EM64T,
-	/ which is more efficient there,
-	/ or a 4-byte data array (for AMD AMD64).
-	/
-	cmp	\$1,%eax	/ Test if Intel
-	mov	\$0,%eax	/ Zero eax without modifying flags
-	je	.Lc1stloop	/ If Intel then use a 1-byte array,
-	jmp	.Lw1stloop	/ otherwise use a 4-byte array.
+	/ Use a 4-byte data array
+	jmp	.Lw1stloop
 
 .align	16
 .Lw1stloop:
@@ -344,6 +311,7 @@ ENTRY_NP(arcfour_key_init)
 
 	xor	$ido,$ido
 	xor	$idx,$idx
+
 .align	16
 .Lw2ndloop:
 	mov	($dat,$ido,4),%r10d
@@ -356,35 +324,8 @@ ENTRY_NP(arcfour_key_init)
 	mov	%r11d,($dat,$ido,4)
 	add	\$1,$ido#b
 	jnc	.Lw2ndloop
-	jmp	.Lexit_key
 
-.align	16
-.Lc1stloop:
-	/ Intel EM64T (1-byte array)
-	mov	%al,($dat,%rax)
-	add	\$1,%al
-	jnc	.Lc1stloop
-
-	xor	$ido,$ido
-	xor	$idx,$idx
-.align	16
-.Lc2ndloop:
-	mov	($dat,$ido),%r10b
-	add	($inp,$len),$idx#b
-	add	%r10b,$idx#b
-	add	\$1,$len
-	mov	($dat,$idx),%r11b
-	jnz	.Lcnowrap
-	mov	%rcx,$len
-.Lcnowrap:
-	mov	%r10b,($dat,$idx)
-	mov	%r11b,($dat,$ido)
-	add	\$1,$ido#b
-	jnc	.Lc2ndloop
-	movl	\$-1,256($dat)
-
-.align	16
-.Lexit_key:
+	/ Exit code
 	xor	%eax,%eax
 	mov	%eax,-8($dat)
 	mov	%eax,-4($dat)
@@ -393,10 +334,6 @@ ENTRY_NP(arcfour_key_init)
 	ret
 SET_SIZE(arcfour_key_init)
 .asciz	"RC4 for x86_64, CRYPTOGAMS by <appro\@openssl.org>"
-
-#else
-	/* LINTED */
-	/* Nothing to be linted in this file--it's pure assembly source. */
 #endif /* !lint && !__lint */
 ___
 
