@@ -1955,9 +1955,7 @@ arcmsr_ccb_complete(struct CCB *ccb, int flag) {
 		    DDI_DMA_SYNC_FORCPU);
 	}
 
-	if (pkt->pkt_comp) {
-		(*pkt->pkt_comp)(pkt);
-	}
+	scsi_hba_pkt_comp(pkt);
 }
 
 
@@ -3762,9 +3760,7 @@ arcmsr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt) {
 			    ccb->pkt_dma_offset, ccb->pkt_dma_len,
 			    DDI_DMA_SYNC_FORCPU);
 
-		if (pkt->pkt_comp)
-			(*pkt->pkt_comp)(pkt);
-
+		scsi_hba_pkt_comp(pkt);
 
 		return (TRAN_ACCEPT);
 	}

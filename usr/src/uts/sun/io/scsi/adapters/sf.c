@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6191,7 +6191,7 @@ sf_check_targets(struct sf *sf)
 					    (STAT_TIMEOUT|STAT_ABORTED);
 					pkt->pkt_reason = CMD_TIMEOUT;
 					if (pkt->pkt_comp) {
-						(*pkt->pkt_comp)(pkt);
+						scsi_hba_pkt_comp(pkt);
 					/* handle deferred_destroy case */
 					} else {
 						if ((cmd->cmd_block->fcp_cntl.

@@ -5121,10 +5121,9 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 		    "scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
-		if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-		    scsipkt->pkt_comp != NULL)
+		if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
 			/* scsi callback required */
-			(*scsipkt->pkt_comp)(scsipkt);
+			scsi_hba_pkt_comp(scsipkt);
 	}
 	return (TRAN_ACCEPT);
 
@@ -5190,9 +5189,8 @@ sata_reidentify_device(sata_pkt_txlate_t *spx)
 					    sata_device.satadev_addr.cport,
 					    sata_device.satadev_addr.pmport);
 			}
-			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-			    scsipkt->pkt_comp != NULL)
-				(*scsipkt->pkt_comp)(scsipkt);
+			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+				scsi_hba_pkt_comp(scsipkt);
 			return;
 		} else if (rval == SATA_RETRY) {
 			delay(drv_usectohz(1000000 *
@@ -5212,9 +5210,8 @@ sata_reidentify_device(sata_pkt_txlate_t *spx)
 	(void) (*SATA_RESET_DPORT_FUNC(sata_hba_inst))
 	    (SATA_DIP(sata_hba_inst), &sata_device);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
-		(*scsipkt->pkt_comp)(scsipkt);
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+		scsi_hba_pkt_comp(scsipkt);
 }
 
 
@@ -5815,10 +5812,9 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		scsi_hba_pkt_comp(scsipkt);
 }
 
 
@@ -5905,10 +5901,9 @@ sata_txlt_nodata_cmd_completion(sata_pkt_t *sata_pkt)
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		scsi_hba_pkt_comp(scsipkt);
 }
 
 

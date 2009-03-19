@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -757,10 +757,9 @@ amr_periodic(void *data)
 			*pkt->pkt_scbp = 0;
 			pkt->pkt_statistics |= STAT_TIMEOUT;
 			pkt->pkt_reason = CMD_TIMEOUT;
-			if (!(pkt->pkt_flags &
-			    FLAG_NOINTR) && pkt->pkt_comp) {
+			if (!(pkt->pkt_flags & FLAG_NOINTR)) {
 				/* call pkt callback */
-				(*pkt->pkt_comp)(pkt);
+				scsi_hba_pkt_comp(pkt);
 			}
 
 		} else {
@@ -1601,7 +1600,7 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		*pkt->pkt_scbp = 0;
 		ret = TRAN_ACCEPT;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
-			(*pkt->pkt_comp)(pkt);
+			scsi_hba_pkt_comp(pkt);
 		break;
 
 	case SCMD_READ_CAPACITY: /* read capacity */
@@ -1626,7 +1625,7 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		*pkt->pkt_scbp = 0;
 		ret = TRAN_ACCEPT;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
-			(*pkt->pkt_comp)(pkt);
+			scsi_hba_pkt_comp(pkt);
 		break;
 
 	case SCMD_MODE_SENSE:		/* mode sense */
@@ -1644,7 +1643,7 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		*pkt->pkt_scbp = 0;
 		ret = TRAN_ACCEPT;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
-			(*pkt->pkt_comp)(pkt);
+			scsi_hba_pkt_comp(pkt);
 		break;
 
 	case SCMD_TEST_UNIT_READY:	/* test unit ready */
@@ -1668,7 +1667,7 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		ret = TRAN_ACCEPT;
 		*pkt->pkt_scbp = 0;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
-			(*pkt->pkt_comp)(pkt);
+			scsi_hba_pkt_comp(pkt);
 		break;
 
 	default: /* any other commands */
@@ -1683,7 +1682,7 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		*pkt->pkt_scbp = 0;
 		amr_set_arq_data(pkt, KEY_ILLEGAL_REQUEST);
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
-			(*pkt->pkt_comp)(pkt);
+			scsi_hba_pkt_comp(pkt);
 		break;
 	}
 
@@ -2295,10 +2294,8 @@ amr_call_pkt_comp(register struct amr_command *head)
 			pkt->pkt_reason = CMD_INCOMPLETE;
 			amr_set_arq_data(pkt, KEY_HARDWARE_ERROR);
 		}
-
-		if (!(pkt->pkt_flags & FLAG_NOINTR) &&
-		    pkt->pkt_comp) {
-			(*pkt->pkt_comp)(pkt);
+		if (!(pkt->pkt_flags & FLAG_NOINTR)) {
+			scsi_hba_pkt_comp(pkt);
 		}
 	}
 }

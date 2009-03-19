@@ -1389,9 +1389,7 @@ pkt_cleanup:
 			 * never be set.
 			 */
 			ASSERT(vpkt->vpkt_org_vpkt == NULL);
-			if (tpkt->pkt_comp) {
-				tpkt->pkt_comp(tpkt);
-			}
+			scsi_hba_pkt_comp(tpkt);
 		}
 		return (rval);
 	} else if ((pkt->pkt_cdbp[0] == SCMD_PROUT) &&
@@ -2676,9 +2674,7 @@ done:
 	 * mechanism, therefore, vpkt_org_vpkt should never be set here.
 	 */
 	ASSERT(vpkt->vpkt_org_vpkt == NULL);
-	if (tpkt->pkt_comp)
-		(*tpkt->pkt_comp)(tpkt);
-
+	scsi_hba_pkt_comp(tpkt);
 }
 
 /*
@@ -3439,9 +3435,7 @@ vhci_intr(struct scsi_pkt *pkt)
 		}
 	}
 
-	if (tpkt->pkt_comp) {
-		(*tpkt->pkt_comp)(tpkt);
-	}
+	scsi_hba_pkt_comp(tpkt);
 }
 
 /*
@@ -7841,9 +7835,7 @@ vhci_dispatch_scsi_start(void *arg)
 		tpkt = vpkt->vpkt_tgt_pkt;
 	}
 
-	if (tpkt->pkt_comp) {
-		tpkt->pkt_comp(tpkt);
-	}
+	scsi_hba_pkt_comp(tpkt);
 }
 
 static void

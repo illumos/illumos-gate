@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5211,7 +5211,7 @@ scsa2usb_pkt_completion(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 
 	if (pkt->pkt_comp) {
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
-		pkt->pkt_comp(pkt);
+		scsi_hba_pkt_comp(pkt);
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 
 	}

@@ -39,7 +39,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1264,8 +1264,8 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	 * NULL and appropriate reason provided in pkt_reason field
 	 */
 	if (cmd_done) {
-		if (((pkt->pkt_flags & FLAG_NOINTR) == 0) && pkt->pkt_comp) {
-			(*pkt->pkt_comp)(pkt);
+		if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
+			scsi_hba_pkt_comp(pkt);
 		}
 		pkt->pkt_reason = CMD_CMPLT;
 		pkt->pkt_scbp[0] = STATUS_GOOD;
@@ -1327,9 +1327,7 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		return_mfi_pkt(instance, cmd);
 		(void) megasas_common_check(instance, cmd);
 
-		if (pkt->pkt_comp) {
-			(*pkt->pkt_comp)(pkt);
-		}
+		scsi_hba_pkt_comp(pkt);
 
 	}
 
@@ -2928,9 +2926,8 @@ megasas_softintr(struct megasas_instance *instance)
 			}
 
 			/* Call the callback routine */
-			if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
-			    pkt->pkt_comp) {
-				(*pkt->pkt_comp)(pkt);
+			if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
+				scsi_hba_pkt_comp(pkt);
 			}
 
 			break;
@@ -2972,9 +2969,8 @@ megasas_softintr(struct megasas_instance *instance)
 
 			if (cmd->pkt != NULL) {
 				pkt = cmd->pkt;
-				if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
-				    pkt->pkt_comp) {
-					(*pkt->pkt_comp)(pkt);
+				if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
+					scsi_hba_pkt_comp(pkt);
 				}
 			}
 			con_log(CL_ANN, (CE_WARN, "Cmd type unknown !!"));

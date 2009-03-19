@@ -3958,7 +3958,7 @@ aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 			cmn_err(CE_CONT, "unable to create "
 			    "property for t%dL%d (buf_break)", tgt, lun);
 		}
-        }
+	}
 
 	AACDB_PRINT(softs, CE_NOTE,
 	    "aac_tran_tgt_init: c%dt%dL%d ok (%s)", ctl, tgt, lun,
@@ -5744,7 +5744,7 @@ aac_drain_comp_q(struct aac_softstate *softs)
 					pkt->pkt_statistics = 0;
 				}
 			}
-			(*pkt->pkt_comp)(pkt);
+			scsi_hba_pkt_comp(pkt);
 		} else {
 			break;
 		}
