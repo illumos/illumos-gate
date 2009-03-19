@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # WARNING -- this package implements a Sun private interface; it may
 # change without notice.
@@ -97,6 +96,8 @@ sub readAttr {
 	open($fileHandle, $file) or die sprintf("$failedOpen\n", $file, $!);
 
 	my $count = 0;
+	my $lastAttr = '';
+	my $lastMacro = '';
 
 	my $attrState = -1;
 	my $caseState = 0;
@@ -123,6 +124,24 @@ sub readAttr {
 		next if (/^\s*$/);
 
 		if ($attrState < 0) {  # initial state:  header info
+			# continue assigning lines to multiline macros 
+			# type: message
+			if ( $lastMacro ne '' ) {
+				my ($mcr, $attr) = split(/\s*:\s*/, $lastMacro);
+
+				if ($mcr eq "message") {
+					chomp($noteAlias{$attr}); 
+					chop($noteAlias{$attr});
+
+					$_ =~ /^\s*(.*)/i;
+					$noteAlias{$attr} .= $1;
+
+					$lastMacro = chkBslash($lastMacro, \$1);
+				}
+				next;
+			}
+
+			$lastMacro = '';
 			if (/^\s*skipClass\s*=\s*(.*)/i) {
 				my $class = $1;
 				# don't skip what you're searching for
@@ -138,6 +157,7 @@ sub readAttr {
 			elsif (/^\s*message\s*=\s*(.*)/i) {
 				my ($attr, $value) = split(/\s*:\s*/, $1);
 				$noteAlias{$attr} = $value;
+				$lastMacro = chkBslash("message:$attr", \$1);
 				next;
 			}
 			elsif (/^\s*kernel\s*=\s*(.*)/i) {
@@ -151,6 +171,26 @@ sub readAttr {
 				next;
 			}
 		}
+
+		# continue assigning lines to multiline attributes 
+		# type: case, comment, note, format
+		if ( $lastAttr ne '' ) {
+			my $curAttrVal = '';
+
+			eval "\$curAttrVal = \$$lastAttr";
+			chomp($curAttrVal); 
+			chop($curAttrVal);
+
+			$_ =~ /^\s*(.*)/i;
+			$curAttrVal .= $1;
+
+			eval "\$$lastAttr = \$curAttrVal";
+
+			$lastAttr = chkBslash($lastAttr, \$1);
+			next;
+		}
+
+		$lastAttr = '';
 		if (/^\s*label\s*=\s*(.*)/i) {
 			$attrState = 0 if ($attrState < 0);
 			my $newLabel = $1;
@@ -198,12 +238,15 @@ $newLabel is duplicated in the attribute file (line $.)
 		}
 		elsif (/^\s*format\s*=\s*(.*)/i) {
 			$format = $1;
+			$lastAttr = chkBslash("format", \$1);
 		}
 		elsif (/^\s*comment\s*=\s*(.*)/i) {
 			$comment .= $1;
+			$lastAttr = chkBslash("comment", \$1);
 		}
 		elsif (/^\s*note\s*=\s*(.*)/i) {
 			$note .= $1;
+			$lastAttr = chkBslash("note", \$1);
 		}
 		elsif (/^\s*case\s*=\s*(.*)/i) {
 			if ($caseState) {
@@ -212,6 +255,7 @@ $newLabel is duplicated in the attribute file (line $.)
 				$comment = $note = '';
 			}
 			$case = $1;
+			$lastAttr = chkBslash("case", \$1);
 			$caseState = 1;
 		}
 	}
@@ -534,6 +578,21 @@ sub ckAttrEvent {
 	    "$cAttr audit_record_attr entries and $cEvent audit_event entries\n"
 		if ($obj->{'debug'});
 	return ($cError, $error);
+}
+
+# chkBslash (helper)
+# check the given string for backslash character at the end; if found
+# return the string sent as a first argument, otherwise return empty
+# string.
+sub chkBslash ($$) {
+	my $retStr = shift;
+	my $strPtr = shift;
+
+	if ( $$strPtr !~ /\\$/ ) {
+		 $retStr = '';
+	}
+
+	return $retStr;
 }
 
 1;

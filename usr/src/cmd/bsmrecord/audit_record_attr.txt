@@ -71,8 +71,13 @@ token=ret:return
 token=exit:exit
 
 # note names -- certain notes show up repeatedly; collected here
+#
+# To achieve the maximum line length to be less than 80 characters, the 
+# note names (message=) can be defined as a multi line, each line except the
+# last one finished with the backslash character. 
 
-message=ipc_perm:The ipc and ipc_perm tokens are not included if the message ID is not valid.
+message=ipc_perm:The ipc and ipc_perm tokens are not included if \
+  the message ID is not valid.
 
 
 # basic record pattern ("insert" is where event-specific tokens
@@ -124,6 +129,11 @@ user=head:subj:insert:ret
 #	syscall	<= 20
 #	title	<= 46
 #	token	<= 28 (full name)
+#
+# To achieve the maximum line length to be less than 80 characters, one can
+# define the unlimited primitives as a multi line, each line except the
+# last one finished with the backslash character. In addition to above
+# mentioned, the "format=" record attribute follows the same rule.
 #
 #
 # AUE_ACCEPT illustrates the use of all the above.  Note that
@@ -1000,7 +1010,8 @@ label=AUE_MMAP
     format=arg1:arg2:[path]3:[attr]
       comment=1, segment address, "addr":
       comment=2, segment address, "len":
-      comment=if no path, then argument&colon; 1, "nopath&colon; fd", file descriptor
+      comment=if no path, then argument&colon; \
+        1, "nopath&colon; fd", file descriptor
   case=With an invalid file descriptor
     format=arg1:arg2:arg3
       comment=1, segment address, "addr":
@@ -1345,7 +1356,8 @@ label=AUE_P_ONLINE
   format=arg1:arg2:text3
     comment=1, processor ID, "processor ID":
     comment=2, flags value, "flags":
-    comment=text form of flags.  Values&colon;  P_ONLINE, P_OFFLINE, P_NOINTR, P_SPARE, P_FAULTED, P_STATUS
+    comment=text form of flags.  Values&colon;  \
+      P_ONLINE, P_OFFLINE, P_NOINTR, P_SPARE, P_FAULTED, P_STATUS
 
 label=AUE_QUOTACTL
   skip=Not used.
@@ -1559,11 +1571,13 @@ label=AUE_SENDMSG
   case=...and address family is AF_UNIX and path is NULL
     format=path1:attr
       comment=1, file descriptor, "nopath&colon; fd"
-  case=...and address family is AF_INET or AF_INET6, socket is SOCK_DGRAM, SOCK_RAW or SOCK_STREAM
+  case=...and address family is AF_INET or AF_INET6, \
+    socket is SOCK_DGRAM, SOCK_RAW or SOCK_STREAM
     format=arg1:arg2:inet
       comment=1, file descriptor, "so":
       comment=3, flags, "flags"
-  case=...and unknown address family or address family AF_INET or AF_INET6 and not socket SOCK_DGRAM, SOCK_RAW or SOCK_STREAM
+  case=...and unknown address family or address family AF_INET or AF_INET6 \
+    and not socket SOCK_DGRAM, SOCK_RAW or SOCK_STREAM
     format=arg1:arg2:arg3:arg4
       comment=1, file descriptor, "so":
       comment=1, family, "family":
@@ -1742,7 +1756,8 @@ label=AUE_SETSOCKOPT
   case=Valid file descriptor
   case=...and socket is AF_UNIX
     format=path1:arg2:arg3:arg4:arg5:arg6:[arg]7:[data]8
-      comment=if no path, will be argument&colon; 1, "nopath&colon; fd", file descriptor:
+      comment=if no path, will be argument&colon; 1, "nopath&colon; fd", \
+        file descriptor:
       comment=1, file descriptor, "so":
       comment=1, family, "family":
       comment=1, type, "type":
@@ -1848,14 +1863,16 @@ label=AUE_SHUTDOWN
   case=If the socket address is AF_UNIX
     case=...with zero file descriptor
       format=path1:arg2:[arg]3:[arg]4:[arg]5
-	comment=If error&colon; argument&colon; 1, "no path&colon; fd", file descriptor:
+	comment=If error&colon; argument&colon; \
+	  1, "no path&colon; fd", file descriptor:
 	comment=1, file descriptor, "so":
 	comment=1, family, "family":
 	comment=1, type, "type":
 	comment=2, how shutdown code, "how"
     case=...with non-zero file descriptor
       format=path1:arg2:arg3:inet
-	comment=If error&colon; argument&colon; 1, file descriptor, "no path&colon; fd":
+	comment=If error&colon; argument&colon; \
+	  1, file descriptor, "no path&colon; fd":
 	comment=1, file descriptor, "so":
 	comment=2, how shutdown code, "how"
 #old BSM manual wrong; used audit_event.c
@@ -2098,7 +2115,8 @@ label=AUE_cron_invoke
     comment="bad user" name or "user <name> account expired"
   case=else
   format=text1:text2
-    comment="at-job", "batch-job", "crontab-job", "queue-job (<queue_name>)", or "unknown job type (<job_type_id>)":
+    comment="at-job", "batch-job", "crontab-job", "queue-job (<queue_name>)", \
+      or "unknown job type (<job_type_id>)":
     comment=command
 
 label=AUE_crontab_create
