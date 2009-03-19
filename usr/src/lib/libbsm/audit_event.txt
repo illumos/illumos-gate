@@ -100,7 +100,7 @@
 33:AUE_ACCEPT:accept(2):nt
 34:AUE_BIND:bind(2):nt
 35:AUE_SETSOCKOPT:setsockopt(2):nt
-36:AUE_VTRACE:vtrace(2):pm
+36:AUE_VTRACE:vtrace(2):no
 37:AUE_SETTIMEOFDAY:settimeofday(2):no
 38:AUE_FCHOWN:fchown(2):fm
 39:AUE_FCHMOD:fchmod(2):fm
@@ -234,7 +234,7 @@
 197:AUE_NFS:nfs server:no
 198:AUE_READV:readv(2):no
 199:AUE_OSTAT:old stat(2):no
-200:AUE_SETUID:old setuid(2):pm
+200:AUE_SETUID:setuid(2):pm
 201:AUE_STIME:old stime(2):as
 202:AUE_UTIME:old utime(2):fm
 203:AUE_NICE:old nice(2):pm
@@ -335,7 +335,7 @@
 290:AUE_MODDEVPLCY:modctl(2) - configure device policy:as
 291:AUE_MODADDPRIV:modctl(2) - configure additional privilege:as
 292:AUE_CRYPTOADM:kernel cryptographic framework:as
-293:AUE_CONFIGSSL:configure kernel SSL:as
+293:AUE_CONFIGKSSL:configure kernel SSL:as
 294:AUE_BRANDSYS:brandsys(2):ot
 295:AUE_PF_POLICY_ADDRULE:Add IPsec policy rule:as
 296:AUE_PF_POLICY_DELRULE:Delete IPsec policy rule:as
