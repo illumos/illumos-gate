@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel Error Queues
@@ -49,7 +47,7 @@
  * 	facilitates reliable error queue processing even when the system is low
  * 	on memory, and ensures that errorq_dispatch() can be called from any
  * 	context.  When the queue is created, the maximum queue length is
- * 	specified as a parameter to errorq_create() errorq_nvcreate().  This
+ * 	specified as a parameter to errorq_create() and errorq_nvcreate().  This
  *	length should represent a reasonable upper bound on the number of
  *	simultaneous errors.  If errorq_dispatch() or errorq_reserve() is
  *	invoked and no free queue elements are available, the error is
@@ -59,7 +57,7 @@
  * 	When a new error is dispatched, the error data is copied into the
  * 	preallocated queue element so that the caller's buffer can be reused.
  *
- *	When a new error is reserved, an element is moved from the free list
+ *	When a new error is reserved, an element is moved from the free pool
  *	and returned to the caller.  The element buffer data, eqe_data, may be
  *	managed by the caller and dispatched to the errorq by calling
  *	errorq_commit().  This is useful for additions to errorq's
@@ -92,19 +90,19 @@
  *
  *	During error handling, it may be more convenient to store error
  *	queue element data as a fixed buffer of name-value pairs.  The
- *	nvpair library allows construction and destruction of nvlists in
+ *	nvpair library allows construction and destruction of nvlists
  *	in pre-allocated memory buffers.
  *
  *	Error queues created via errorq_nvcreate() store queue element
  *	data as fixed buffer nvlists (ereports).  errorq_reserve()
- *	allocates an errorq element from eqp->eq_free and returns a valid
+ *	allocates an errorq element from eqp->eq_bitmap and returns a valid
  *	pointer	to a errorq_elem_t (queue element) and a pre-allocated
  *	fixed buffer nvlist.  errorq_elem_nvl() is used to gain access
  *	to the nvlist to add name-value ereport members prior to
  *	dispatching the error queue element in errorq_commit().
  *
  *	Once dispatched, the drain function will return the element to
- *	eqp->eq_free and reset the associated nv_alloc structure.
+ *	eqp->eq_bitmap and reset the associated nv_alloc structure.
  *	error_cancel() may be called to cancel an element reservation
  *	element that was never dispatched (committed).  This is useful in
  *	cases where a programming error prevents a queue element from being
@@ -118,11 +116,11 @@
  *	a previous pointer, and a pointer to the corresponding error data
  *	buffer.  The data buffer for a nvlist errorq is a shared buffer
  *	for the allocation of name-value pair lists. The elements are kept on
- *      one of three lists:
+ *      one of four lists:
  *
- *      Unused elements are kept on the free list, a singly-linked list pointed
- *      to by eqp->eq_free, and linked together using eqe_prev.  The eqe_next
- *      pointer is not used by the free list and will be set to NULL.
+ *	Unused elements are kept in the free pool, managed by eqp->eq_bitmap.
+ *	The eqe_prev and eqe_next pointers are not used while in the free pool
+ *	and will be set to NULL.
  *
  *      Pending errors are kept on the pending list, a singly-linked list
  *      pointed to by eqp->eq_pend, and linked together using eqe_prev.  This
@@ -134,7 +132,8 @@
  *      eqe_next pointer is used to traverse from eq_phead to eq_ptail, and the
  *      eqe_prev pointer is used to traverse from eq_ptail to eq_phead.  Once a
  *      queue drain operation begins, the current pending list is moved to the
- *      processing list in a two-phase commit fashion, allowing the panic code
+ *      processing list in a two-phase commit fashion (eq_ptail being cleared
+ *	at the beginning but eq_phead only at the end), allowing the panic code
  *      to always locate and process all pending errors in the event that a
  *      panic occurs in the middle of queue processing.
  *
@@ -226,7 +225,7 @@
  *
  *	Reserve an error queue element for later processing and dispatching.
  *	The element is returned to the caller who may add error-specific data
- *	to element.  The element is retured to the free list when either
+ *	to element.  The element is retured to the free pool when either
  *	errorq_commit() is called and the element asynchronously processed
  *	or immediately when errorq_cancel() is called.
  *
@@ -238,7 +237,7 @@
  * void errorq_cancel(errorq, errorq_elem);
  *
  *	Cancel a pending errorq element reservation.  The errorq element is
- *	returned to the free list upon cancelation.
+ *	returned to the free pool upon cancelation.
  */
 
 #include <sys/errorq_impl.h>
@@ -257,6 +256,7 @@
 #include <sys/compress.h>
 #include <sys/time.h>
 #include <sys/panic.h>
+#include <sys/bitmap.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 
@@ -352,21 +352,21 @@ errorq_create(const char *name, errorq_func_t func, void *private,
 	eqp->eq_ptail = NULL;
 	eqp->eq_pend = NULL;
 	eqp->eq_dump = NULL;
-	eqp->eq_free = eqp->eq_elems;
+	eqp->eq_bitmap = kmem_zalloc(BT_SIZEOFMAP(qlen), KM_SLEEP);
+	eqp->eq_rotor = 0;
 
 	/*
-	 * Iterate over the array of errorq_elem_t structures and place each
-	 * one on the free list and set its data pointer.
+	 * Iterate over the array of errorq_elem_t structures and set its
+	 * data pointer.
 	 */
-	for (eep = eqp->eq_free, data = eqp->eq_data; qlen > 1; qlen--) {
+	for (eep = eqp->eq_elems, data = eqp->eq_data; qlen > 1; qlen--) {
 		eep->eqe_next = NULL;
 		eep->eqe_dump = NULL;
-		eep->eqe_prev = eep + 1;
+		eep->eqe_prev = NULL;
 		eep->eqe_data = data;
 		data += size;
 		eep++;
 	}
-
 	eep->eqe_next = NULL;
 	eep->eqe_prev = NULL;
 	eep->eqe_data = data;
@@ -461,9 +461,54 @@ errorq_destroy(errorq_t *eqp)
 		ddi_remove_softintr(eqp->eq_id);
 
 	kmem_free(eqp->eq_elems, eqp->eq_qlen * sizeof (errorq_elem_t));
+	kmem_free(eqp->eq_bitmap, BT_SIZEOFMAP(eqp->eq_qlen));
 	kmem_free(eqp->eq_data, eqp->eq_qlen * eqp->eq_size);
 
 	kmem_free(eqp, sizeof (errorq_t));
+}
+
+/*
+ * private version of bt_availbit which makes a best-efforts attempt
+ * at allocating in a round-robin fashion in order to facilitate post-mortem
+ * diagnosis.
+ */
+static index_t
+errorq_availbit(ulong_t *bitmap, size_t nbits, index_t curindex)
+{
+	ulong_t bit, maxbit, bx;
+	index_t rval, nextindex = curindex + 1;
+	index_t nextword = nextindex >> BT_ULSHIFT;
+	ulong_t nextbitindex = nextindex & BT_ULMASK;
+	index_t maxindex = nbits - 1;
+	index_t maxword = maxindex >> BT_ULSHIFT;
+	ulong_t maxbitindex = maxindex & BT_ULMASK;
+
+	/*
+	 * First check if there are still some bits remaining in the current
+	 * word, and see if any of those are available. We need to do this by
+	 * hand as the bt_availbit() function always starts at the beginning
+	 * of a word.
+	 */
+	if (nextindex <= maxindex && nextbitindex != 0) {
+		maxbit = (nextword == maxword) ? maxbitindex : BT_ULMASK;
+		for (bx = 0, bit = 1; bx <= maxbit; bx++, bit <<= 1)
+			if (bx >= nextbitindex && !(bitmap[nextword] & bit))
+				return ((nextword << BT_ULSHIFT) + bx);
+		nextword++;
+	}
+	/*
+	 * Now check if there are any words remaining before the end of the
+	 * bitmap. Use bt_availbit() to find any free bits.
+	 */
+	if (nextword <= maxword)
+		if ((rval = bt_availbit(&bitmap[nextword],
+		    nbits - (nextword << BT_ULSHIFT))) != -1)
+			return ((nextword << BT_ULSHIFT) + rval);
+	/*
+	 * Finally loop back to the start and look for any free bits starting
+	 * from the beginning of the bitmap to the current rotor position.
+	 */
+	return (bt_availbit(bitmap, nextindex));
 }
 
 /*
@@ -483,14 +528,20 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 		return; /* drop error if queue is uninitialized or disabled */
 	}
 
-	while ((eep = eqp->eq_free) != NULL) {
-		if (casptr(&eqp->eq_free, eep, eep->eqe_prev) == eep)
-			break;
-	}
+	for (;;) {
+		int i, rval;
 
-	if (eep == NULL) {
-		atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
-		return;
+		if ((i = errorq_availbit(eqp->eq_bitmap, eqp->eq_qlen,
+		    eqp->eq_rotor)) == -1) {
+			atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
+			return;
+		}
+		BT_ATOMIC_SET_EXCL(eqp->eq_bitmap, i, rval);
+		if (rval == 0) {
+			eqp->eq_rotor = i;
+			eep = &eqp->eq_elems[i];
+			break;
+		}
 	}
 
 	ASSERT(len <= eqp->eq_size);
@@ -520,8 +571,8 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
  * In order to synchronize with other attempts to drain the queue, we acquire
  * the adaptive eq_lock, blocking other consumers.  Once this lock is held,
  * we must use compare-and-swap to move the pending list to the processing
- * list and to return elements to the free list in order to synchronize
- * with producers, who do not acquire any locks and only use compare-and-swap.
+ * list and to return elements to the free pool in order to synchronize
+ * with producers, who do not acquire any locks and only use atomic set/clear.
  *
  * An additional constraint on this function is that if the system panics
  * while this function is running, the panic code must be able to detect and
@@ -533,7 +584,7 @@ errorq_dispatch(errorq_t *eqp, const void *data, size_t len, uint_t flag)
 void
 errorq_drain(errorq_t *eqp)
 {
-	errorq_elem_t *eep, *fep, *dep;
+	errorq_elem_t *eep, *dep;
 
 	ASSERT(eqp != NULL);
 	mutex_enter(&eqp->eq_lock);
@@ -605,7 +656,7 @@ errorq_drain(errorq_t *eqp)
 	/*
 	 * Now iterate over the processing list from oldest (eq_phead) to
 	 * newest and log each error.  Once an error is logged, we use
-	 * compare-and-swap to return it to the free list.  If we panic before,
+	 * atomic clear to return it to the free pool.  If we panic before,
 	 * during, or after calling eq_func() (case 4), the error will still be
 	 * found on eq_phead and will be logged in errorq_panic below.
 	 */
@@ -634,14 +685,8 @@ errorq_drain(errorq_t *eqp)
 			continue;
 		}
 
-		for (;;) {
-			fep = eqp->eq_free;
-			eep->eqe_prev = fep;
-			membar_producer();
-
-			if (casptr(&eqp->eq_free, fep, eep) == fep)
-				break;
-		}
+		eep->eqe_prev = NULL;
+		BT_ATOMIC_CLEAR(eqp->eq_bitmap, eep - eqp->eq_elems);
 	}
 
 	mutex_exit(&eqp->eq_lock);
@@ -693,7 +738,7 @@ errorq_init(void)
 static uint64_t
 errorq_panic_drain(uint_t what)
 {
-	errorq_elem_t *eep, *nep, *fep, *dep;
+	errorq_elem_t *eep, *nep, *dep;
 	errorq_t *eqp;
 	uint64_t loggedtmp;
 	uint64_t logged = 0;
@@ -741,7 +786,7 @@ errorq_panic_drain(uint_t what)
 		/*
 		 * In cases (3) and (4) above (or after case (1C/2) handling),
 		 * eq_phead will be set to the oldest error on the processing
-		 * list.  We log each error and return it to the free list.
+		 * list.  We log each error and return it to the free pool.
 		 *
 		 * Unlike errorq_drain(), we don't need to worry about updating
 		 * eq_phead because errorq_panic() will be called at most once.
@@ -770,14 +815,8 @@ errorq_panic_drain(uint_t what)
 				continue;
 			}
 
-			for (;;) {
-				fep = eqp->eq_free;
-				eep->eqe_prev = fep;
-				membar_producer();
-
-				if (casptr(&eqp->eq_free, fep, eep) == fep)
-					break;
-			}
+			eep->eqe_prev = NULL;
+			BT_ATOMIC_CLEAR(eqp->eq_bitmap, eep - eqp->eq_elems);
 		}
 
 		/*
@@ -815,7 +854,7 @@ errorq_panic(void)
 /*
  * Reserve an error queue element for later processing and dispatching.  The
  * element is returned to the caller who may add error-specific data to
- * element.  The element is retured to the free list when either
+ * element.  The element is retured to the free pool when either
  * errorq_commit() is called and the element asynchronously processed
  * or immediately when errorq_cancel() is called.
  */
@@ -829,14 +868,20 @@ errorq_reserve(errorq_t *eqp)
 		return (NULL);
 	}
 
-	while ((eqep = eqp->eq_free) != NULL) {
-		if (casptr(&eqp->eq_free, eqep, eqep->eqe_prev) == eqep)
-			break;
-	}
+	for (;;) {
+		int i, rval;
 
-	if (eqep == NULL) {
-		atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
-		return (NULL);
+		if ((i = errorq_availbit(eqp->eq_bitmap, eqp->eq_qlen,
+		    eqp->eq_rotor)) == -1) {
+			atomic_add_64(&eqp->eq_kstat.eqk_dropped.value.ui64, 1);
+			return (NULL);
+		}
+		BT_ATOMIC_SET_EXCL(eqp->eq_bitmap, i, rval);
+		if (rval == 0) {
+			eqp->eq_rotor = i;
+			eqep = &eqp->eq_elems[i];
+			break;
+		}
 	}
 
 	if (eqp->eq_flags & ERRORQ_NVLIST) {
@@ -881,24 +926,15 @@ errorq_commit(errorq_t *eqp, errorq_elem_t *eqep, uint_t flag)
 
 /*
  * Cancel an errorq element reservation by returning the specified element
- * to the free list.  Duplicate or invalid frees are not supported.
+ * to the free pool.  Duplicate or invalid frees are not supported.
  */
 void
 errorq_cancel(errorq_t *eqp, errorq_elem_t *eqep)
 {
-	errorq_elem_t *fep;
-
 	if (eqep == NULL || !(eqp->eq_flags & ERRORQ_ACTIVE))
 		return;
 
-	for (;;) {
-		fep = eqp->eq_free;
-		eqep->eqe_prev = fep;
-		membar_producer();
-
-		if (casptr(&eqp->eq_free, fep, eqep) == fep)
-			break;
-	}
+	BT_ATOMIC_CLEAR(eqp->eq_bitmap, eqep - eqp->eq_elems);
 
 	atomic_add_64(&eqp->eq_kstat.eqk_cancelled.value.ui64, 1);
 }
