@@ -325,7 +325,7 @@ static ohci_trans_wrapper_t  *ohci_create_isoc_transfer_wrapper(
 				ushort_t		pkt_count,
 				size_t			td_count,
 				uint_t			usb_flags);
-static int	ohci_allocate_tds_for_tw(
+int	ohci_allocate_tds_for_tw(
 				ohci_state_t		*ohcip,
 				ohci_trans_wrapper_t	*tw,
 				size_t			td_count);
@@ -2062,6 +2062,16 @@ ohci_alloc_hcdi_ops(ohci_state_t	*ohcip)
 	    ohci_hcdi_polled_input_exit;
 	usba_hcdi_ops->usba_hcdi_console_input_fini =
 	    ohci_hcdi_polled_input_fini;
+
+	usba_hcdi_ops->usba_hcdi_console_output_init =
+	    ohci_hcdi_polled_output_init;
+	usba_hcdi_ops->usba_hcdi_console_output_enter =
+	    ohci_hcdi_polled_output_enter;
+	usba_hcdi_ops->usba_hcdi_console_write = ohci_hcdi_polled_write;
+	usba_hcdi_ops->usba_hcdi_console_output_exit =
+	    ohci_hcdi_polled_output_exit;
+	usba_hcdi_ops->usba_hcdi_console_output_fini =
+	    ohci_hcdi_polled_output_fini;
 
 	return (usba_hcdi_ops);
 }
@@ -6752,7 +6762,7 @@ ohci_td_iommu_to_cpu(
  * Returns USB_NO_RESOURCES if it was not able to allocate all the requested TD
  * otherwise USB_SUCCESS.
  */
-static int
+int
 ohci_allocate_tds_for_tw(
 	ohci_state_t		*ohcip,
 	ohci_trans_wrapper_t	*tw,

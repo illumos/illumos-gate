@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,10 @@
 #include <sys/usb/hcd/ehci/ehci_intr.h>
 #include <sys/usb/hcd/ehci/ehci_util.h>
 #include <sys/usb/hcd/ehci/ehci_polled.h>
+
+#ifndef __sparc
+extern void invalidate_cache();
+#endif
 
 /*
  * Internal Function Prototypes
@@ -71,9 +75,11 @@ static int	ehci_polled_process_active_intr_qtd_list(
 static int	ehci_polled_handle_normal_qtd(
 				ehci_polled_t		*ehci_polledp,
 				ehci_qtd_t		*qtd);
-static void	ehci_polled_insert_qtd(
+static void	ehci_polled_insert_intr_qtd(
 				ehci_polled_t		*ehci_polledp,
 				ehci_qtd_t		*qtd);
+static void	ehci_polled_insert_bulk_qtd(
+				ehci_polled_t		*ehci_polledp);
 static void	ehci_polled_fill_in_qtd(
 				ehci_state_t		*ehcip,
 				ehci_qtd_t		*qtd,
@@ -99,6 +105,16 @@ static void	ehci_polled_traverse_qtds(
 static void	ehci_polled_finish_interrupt(
 				ehci_state_t		*ehcip,
 				uint_t			intr);
+static int	ehci_polled_create_tw(
+				ehci_polled_t		*ehci_polledp,
+				usba_pipe_handle_data_t	*ph,
+				usb_flags_t		usb_flags);
+static void	ehci_polled_insert_async_qh(
+				ehci_state_t		*ehcip,
+				ehci_pipe_private_t	*pp);
+static void	ehci_polled_remove_async_qh(
+				ehci_state_t		*ehcip,
+				ehci_pipe_private_t	*pp);
 
 /*
  * POLLED entry points
@@ -109,7 +125,7 @@ static void	ehci_polled_finish_interrupt(
 /*
  * ehci_hcdi_polled_input_init:
  *
- * This is the initialization routine for handling the USB keyboard
+ * This is the initialization routine for handling the USB input device
  * in POLLED mode.  This routine is not called from POLLED mode, so
  * it is OK to acquire mutexes.
  */
@@ -224,11 +240,25 @@ int
 ehci_hcdi_polled_input_enter(usb_console_info_impl_t *info)
 {
 	ehci_polled_t		*ehci_polledp;
+	ehci_state_t		*ehcip;
+	usba_pipe_handle_data_t	*ph;
+	ehci_pipe_private_t	*pp;
+	int			pipe_attr;
 
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
 	ehci_polledp = (ehci_polled_t *)info->uci_private;
+	ehcip = ehci_polledp->ehci_polled_ehcip;
+	ph = ehci_polledp->ehci_polled_input_pipe_handle;
+	pp = (ehci_pipe_private_t *)ph->p_hcd_private;
+
+	pipe_attr = ph->p_ep.bmAttributes & USB_EP_ATTR_MASK;
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
 
 	ehci_polledp->ehci_polled_entry++;
-
 	/*
 	 * If the controller is already switched over, just return
 	 */
@@ -237,7 +267,33 @@ ehci_hcdi_polled_input_enter(usb_console_info_impl_t *info)
 		return (USB_SUCCESS);
 	}
 
-	ehci_polled_save_state(ehci_polledp);
+	switch (pipe_attr) {
+	case USB_EP_ATTR_INTR:
+		ehci_polled_save_state(ehci_polledp);
+		break;
+	case USB_EP_ATTR_BULK:
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
+		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) &
+		    ~(EHCI_CMD_PERIODIC_SCHED_ENABLE |
+		    EHCI_CMD_ASYNC_SCHED_ENABLE)));
+		/* Wait for few milliseconds */
+		drv_usecwait(EHCI_POLLED_TIMEWAIT);
+
+		ehci_polled_insert_async_qh(ehcip, pp);
+
+		Set_OpReg(ehci_command,
+		    (Get_OpReg(ehci_command) | EHCI_CMD_ASYNC_SCHED_ENABLE));
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
+		/* Wait for few milliseconds */
+		drv_usecwait(EHCI_POLLED_TIMEWAIT);
+		break;
+	default:
+		return (USB_FAILURE);
+	}
 
 	ehci_polledp->ehci_polled_flags |= POLLED_INPUT_MODE_INUSE;
 
@@ -255,8 +311,23 @@ int
 ehci_hcdi_polled_input_exit(usb_console_info_impl_t *info)
 {
 	ehci_polled_t		*ehci_polledp;
+	ehci_state_t		*ehcip;
+	ehci_pipe_private_t	*pp;
+	int			pipe_attr;
 
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
 	ehci_polledp = (ehci_polled_t *)info->uci_private;
+	ehcip = ehci_polledp->ehci_polled_ehcip;
+	pp = (ehci_pipe_private_t *)ehci_polledp->
+	    ehci_polled_input_pipe_handle->p_hcd_private;
+
+	pipe_attr = ehci_polledp->ehci_polled_input_pipe_handle->
+	    p_ep.bmAttributes & USB_EP_ATTR_MASK;
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
 
 	ehci_polledp->ehci_polled_entry--;
 
@@ -270,7 +341,35 @@ ehci_hcdi_polled_input_exit(usb_console_info_impl_t *info)
 
 	ehci_polledp->ehci_polled_flags &= ~POLLED_INPUT_MODE_INUSE;
 
-	ehci_polled_restore_state(ehci_polledp);
+	switch (pipe_attr & USB_EP_ATTR_MASK) {
+	case USB_EP_ATTR_INTR:
+		ehci_polled_restore_state(ehci_polledp);
+		break;
+	case USB_EP_ATTR_BULK:
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
+		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) &
+		    ~(EHCI_CMD_PERIODIC_SCHED_ENABLE |
+		    EHCI_CMD_ASYNC_SCHED_ENABLE)));
+		/* Wait for few milliseconds */
+		drv_usecwait(EHCI_POLLED_TIMEWAIT);
+
+		ehci_polled_remove_async_qh(ehcip, pp);
+
+		Set_OpReg(ehci_command,
+		    (Get_OpReg(ehci_command) | EHCI_CMD_ASYNC_SCHED_ENABLE |
+		    EHCI_CMD_ASYNC_SCHED_ENABLE));
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
+		/* Wait for few milliseconds */
+		drv_usecwait(EHCI_POLLED_TIMEWAIT);
+		break;
+	default:
+		return (USB_FAILURE);
+
+	}
 
 	return (USB_SUCCESS);
 }
@@ -289,6 +388,7 @@ ehci_hcdi_polled_read(
 	ehci_state_t		*ehcip;
 	ehci_polled_t		*ehci_polledp;
 	uint_t			intr;
+	int			pipe_attr;
 
 	ehci_polledp = (ehci_polled_t *)info->uci_private;
 
@@ -299,6 +399,13 @@ ehci_hcdi_polled_read(
 #endif
 
 	*num_characters = 0;
+
+	pipe_attr = ehci_polledp->ehci_polled_input_pipe_handle->
+	    p_ep.bmAttributes & USB_EP_ATTR_MASK;
+
+	if (pipe_attr == USB_EP_ATTR_BULK) {
+		ehci_polled_insert_bulk_qtd(ehci_polledp);
+	}
 
 	intr = ((Get_OpReg(ehci_status) & Get_OpReg(ehci_interrupt)) &
 	    (EHCI_INTR_FRAME_LIST_ROLLOVER |
@@ -315,21 +422,239 @@ ehci_hcdi_polled_read(
 		    EHCI_INTR_FRAME_LIST_ROLLOVER);
 	}
 
+	/* Process any QTD's on the active interrupt qtd list */
+	*num_characters =
+	    ehci_polled_process_active_intr_qtd_list(ehci_polledp);
+
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ehci_hcdi_polled_output_init:
+ *
+ * This is the initialization routine for handling the USB serial output
+ * in POLLED mode.  This routine is not called from POLLED mode, so
+ * it is OK to acquire mutexes.
+ */
+int
+ehci_hcdi_polled_output_init(
+	usba_pipe_handle_data_t	*ph,
+	usb_console_info_impl_t	*console_output_info)
+{
+	ehci_polled_t		*ehci_polledp;
+	ehci_state_t		*ehcip;
+	ehci_pipe_private_t	*pp;
+	int			ret;
+
+	ehcip = ehci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
+
+	/*
+	 * Grab the ehci_int_mutex so that things don't change on us
+	 * if an interrupt comes in.
+	 */
+	mutex_enter(&ehcip->ehci_int_mutex);
+
+	ret = ehci_polled_init(ph, ehcip, console_output_info);
+
+	if (ret != USB_SUCCESS) {
+
+		/* Allow interrupts to continue */
+		mutex_exit(&ehcip->ehci_int_mutex);
+
+		return (ret);
+	}
+
+	ehci_polledp = (ehci_polled_t *)console_output_info->uci_private;
+	/*
+	 * Mark the structure so that if we are using it, we don't free
+	 * the structures if one of them is unplugged.
+	 */
+	ehci_polledp->ehci_polled_flags |= POLLED_OUTPUT_MODE;
+
+	/*
+	 * Insert the Endpoint Descriptor to appropriate endpoint list.
+	 */
+	pp = (ehci_pipe_private_t *)ehci_polledp->
+	    ehci_polled_input_pipe_handle->p_hcd_private;
+	ehci_polled_insert_async_qh(ehcip, pp);
+
+	/*
+	 * This is a software workaround to fix schizo hardware bug.
+	 * Existence of "no-prom-cdma-sync"  property means consistent
+	 * dma sync should not be done while in prom or polled mode.
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ehcip->ehci_dip,
+	    DDI_PROP_NOTPROM, "no-prom-cdma-sync")) {
+		ehci_polledp->ehci_polled_no_sync_flag = B_TRUE;
+	}
+
+	/* Allow interrupts to continue */
+	mutex_exit(&ehcip->ehci_int_mutex);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ehci_hcdi_polled_output_fini:
+ */
+int
+ehci_hcdi_polled_output_fini(usb_console_info_impl_t *info)
+{
+	ehci_polled_t		*ehci_polledp;
+	ehci_state_t		*ehcip;
+	ehci_pipe_private_t	*pp;
+	int			ret;
+
+	ehci_polledp = (ehci_polled_t *)info->uci_private;
+
+	ehcip = ehci_polledp->ehci_polled_ehcip;
+
+	mutex_enter(&ehcip->ehci_int_mutex);
+
+	/* Remove the Endpoint Descriptor. */
+	pp = (ehci_pipe_private_t *)ehci_polledp->
+	    ehci_polled_input_pipe_handle->p_hcd_private;
+	ehci_polled_remove_async_qh(ehcip, pp);
+
+	/*
+	 * Reset the POLLED_INPUT_MODE flag so that we can tell if
+	 * this structure is in use in the ehci_polled_fini routine.
+	 */
+	ehci_polledp->ehci_polled_flags &= ~POLLED_OUTPUT_MODE;
+
+	ret = ehci_polled_fini(ehci_polledp);
+
+	info->uci_private = NULL;
+
+	mutex_exit(&ehcip->ehci_int_mutex);
+
+	return (ret);
+}
+
+
+/*
+ * ehci_hcdi_polled_output_enter:
+ *
+ * everything is done in input enter
+ */
+/*ARGSUSED*/
+int
+ehci_hcdi_polled_output_enter(usb_console_info_impl_t *info)
+{
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ehci_hcdi_polled_output_exit:
+ *
+ * everything is done in input exit
+ */
+/*ARGSUSED*/
+int
+ehci_hcdi_polled_output_exit(usb_console_info_impl_t *info)
+{
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ehci_hcdi_polled_write:
+ *	Put a key character.
+ */
+int
+ehci_hcdi_polled_write(usb_console_info_impl_t *info, uchar_t *buf,
+    uint_t num_characters, uint_t *num_characters_written)
+{
+	ehci_state_t		*ehcip;
+	ehci_polled_t		*ehci_polledp;
+	ehci_trans_wrapper_t	*tw;
+	ehci_pipe_private_t	*pp;
+	usba_pipe_handle_data_t	*ph;
+	int			intr;
+
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
+	ehci_polledp = (ehci_polled_t *)info->uci_private;
+	ehcip = ehci_polledp->ehci_polled_ehcip;
+	ph = ehci_polledp->ehci_polled_input_pipe_handle;
+	pp = (ehci_pipe_private_t *)ph->p_hcd_private;
+
+	/* Disable all list processing */
+	Set_OpReg(ehci_command, Get_OpReg(ehci_command) &
+	    ~(EHCI_CMD_ASYNC_SCHED_ENABLE |
+	    EHCI_CMD_PERIODIC_SCHED_ENABLE));
+
+	/* Wait for few milliseconds */
+	drv_usecwait(EHCI_POLLED_TIMEWAIT);
+
+	tw = pp->pp_tw_head;
+	ASSERT(tw != NULL);
+
+	/* copy transmit buffer */
+	if (num_characters > POLLED_RAW_BUF_SIZE) {
+		cmn_err(CE_NOTE, "polled write size %d bigger than %d",
+		    num_characters, POLLED_RAW_BUF_SIZE);
+		num_characters = POLLED_RAW_BUF_SIZE;
+	}
+	tw->tw_length = num_characters;
+	ddi_rep_put8(tw->tw_accesshandle,
+	    buf, (uint8_t *)tw->tw_buf,
+	    tw->tw_length, DDI_DEV_AUTOINCR);
+	Sync_IO_Buffer_for_device(tw->tw_dmahandle, tw->tw_length);
+
+	ehci_polled_insert_bulk_qtd(ehci_polledp);
+
+	/* Enable async list processing */
+	Set_OpReg(ehci_command, (Get_OpReg(ehci_command) |
+	    EHCI_CMD_ASYNC_SCHED_ENABLE));
+
+	/* Wait for few milliseconds */
+	drv_usecwait(EHCI_POLLED_TIMEWAIT);
+
+	while (!((Get_OpReg(ehci_status)) & (EHCI_INTR_USB
+	    |EHCI_INTR_FRAME_LIST_ROLLOVER | EHCI_INTR_USB_ERROR))) {
+#ifndef __sparc
+		invalidate_cache();
+#else
+		;
+#endif
+	}
+
+	intr = (Get_OpReg(ehci_status)) &
+	    (EHCI_INTR_FRAME_LIST_ROLLOVER |
+	    EHCI_INTR_USB | EHCI_INTR_USB_ERROR);
+
+	/*
+	 * Check whether any frame list rollover interrupt is pending
+	 * and if it is pending, process this interrupt.
+	 */
+	if (intr & EHCI_INTR_FRAME_LIST_ROLLOVER) {
+
+		ehci_handle_frame_list_rollover(ehcip);
+		ehci_polled_finish_interrupt(ehcip,
+		    EHCI_INTR_FRAME_LIST_ROLLOVER);
+	}
+
 	/* Check for any USB transaction completion notification */
 	if (intr & (EHCI_INTR_USB | EHCI_INTR_USB_ERROR)) {
-		ehcip->ehci_polled_read_count ++;
-		/* Process any QTD's on the active interrupt qtd list */
-		*num_characters =
-		    ehci_polled_process_active_intr_qtd_list(ehci_polledp);
 
-		if (ehcip->ehci_polled_read_count ==
-		    ehcip->ehci_polled_enter_count) {
-			/* Acknowledge the frame list rollover interrupt */
-			ehci_polled_finish_interrupt(ehcip,
-			    intr & (EHCI_INTR_USB | EHCI_INTR_USB_ERROR));
-			ehcip->ehci_polled_read_count = 0;
-		}
+		(void) ehci_polled_process_active_intr_qtd_list(ehci_polledp);
+
+		/* Acknowledge the USB and USB error interrupt */
+		ehci_polled_finish_interrupt(ehcip,
+		    intr & (EHCI_INTR_USB | EHCI_INTR_USB_ERROR));
+
 	}
+
+	*num_characters_written = num_characters;
 
 #ifndef lint
 	_NOTE(COMPETING_THREADS_NOW);
@@ -363,6 +688,7 @@ ehci_polled_init(
 	ehci_polled_t		*ehci_polledp;
 	ehci_pipe_private_t	*pp;
 	ehci_qtd_t		*qtd;
+	int			pipe_attr;
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -465,8 +791,8 @@ ehci_polled_init(
 	}
 
 	/*
-	 * Allocate the interrupt endpoint. This QH will be inserted in
-	 * to the lattice chain for the  keyboard device. This endpoint
+	 * Allocate the endpoint. This QH will be inserted in
+	 * to the lattice chain for the device. This endpoint
 	 * will have the QTDs hanging off of it for the processing.
 	 */
 	ehci_polledp->ehci_polled_qh = ehci_alloc_qh(
@@ -486,33 +812,50 @@ ehci_polled_init(
 	/* Insert the endpoint onto the pipe handle */
 	pp->pp_qh = ehci_polledp->ehci_polled_qh;
 
-	/*
-	 * Set soft interrupt handler flag in the normal mode usb
-	 * pipe handle.
-	 */
-	mutex_enter(&ph->p_mutex);
-	ph->p_spec_flag |= USBA_PH_FLAG_USE_SOFT_INTR;
-	mutex_exit(&ph->p_mutex);
+	pipe_attr = ph->p_ep.bmAttributes & USB_EP_ATTR_MASK;
 
-	/*
-	 * Insert a Interrupt polling request onto the endpoint.
-	 *
-	 * There will now be two QTDs on the QH, one is the dummy QTD that
-	 * was allocated above in the  ehci_alloc_qh and this new one.
-	 */
-	if ((ehci_start_periodic_pipe_polling(ehcip,
-	    ehci_polledp->ehci_polled_input_pipe_handle,
-	    NULL, USB_FLAGS_SLEEP)) != USB_SUCCESS) {
+	switch (pipe_attr) {
+	case USB_EP_ATTR_INTR:
+		/*
+		 * Set soft interrupt handler flag in the normal mode usb
+		 * pipe handle.
+		 */
+		mutex_enter(&ph->p_mutex);
+		ph->p_spec_flag |= USBA_PH_FLAG_USE_SOFT_INTR;
+		mutex_exit(&ph->p_mutex);
 
-		return (USB_NO_RESOURCES);
+		/*
+		 * Insert a Interrupt polling request onto the endpoint.
+		 *
+		 * There will now be two QTDs on the QH, one is the dummy QTD
+		 * that was allocated above in the  ehci_alloc_qh and this
+		 * new one.
+		 */
+		if ((ehci_start_periodic_pipe_polling(ehcip,
+		    ehci_polledp->ehci_polled_input_pipe_handle,
+		    NULL, USB_FLAGS_SLEEP)) != USB_SUCCESS) {
+
+			return (USB_NO_RESOURCES);
+		}
+		/* Get the given new interrupt qtd */
+		qtd = (ehci_qtd_t *)(ehci_qtd_iommu_to_cpu(ehcip,
+		    (Get_QH(pp->pp_qh->qh_next_qtd) & EHCI_QH_NEXT_QTD_PTR)));
+
+		/* Insert this qtd into active interrupt QTD list */
+		ehci_polled_insert_qtd_into_active_intr_qtd_list(ehci_polledp,
+		    qtd);
+		break;
+	case USB_EP_ATTR_BULK:
+		if ((ehci_polled_create_tw(ehci_polledp,
+		    ehci_polledp->ehci_polled_input_pipe_handle,
+		    USB_FLAGS_SLEEP)) != USB_SUCCESS) {
+
+			return (USB_NO_RESOURCES);
+		}
+		break;
+	default:
+		return (USB_FAILURE);
 	}
-
-	/* Get the given new interrupt qtd */
-	qtd = (ehci_qtd_t *)(ehci_qtd_iommu_to_cpu(ehcip,
-	    (Get_QH(pp->pp_qh->qh_next_qtd) & EHCI_QH_NEXT_QTD_PTR)));
-
-	/* Insert this qtd into active interrupt QTD list */
-	ehci_polled_insert_qtd_into_active_intr_qtd_list(ehci_polledp, qtd);
 
 	return (USB_SUCCESS);
 }
@@ -1017,6 +1360,7 @@ ehci_polled_process_active_intr_qtd_list(ehci_polled_t	*ehci_polledp)
 	ehci_trans_wrapper_t	*tw;
 	ehci_pipe_private_t	*pp;
 	usb_cr_t		error;
+	int			pipe_attr, pipe_dir;
 
 	/* Sync QH and QTD pool */
 	if (ehci_polledp->ehci_polled_no_sync_flag == B_FALSE) {
@@ -1026,6 +1370,10 @@ ehci_polled_process_active_intr_qtd_list(ehci_polled_t	*ehci_polledp)
 	/* Create done qtd list */
 	qtd = ehci_polled_create_done_qtd_list(ehci_polledp);
 
+	pipe_attr = ehci_polledp->ehci_polled_input_pipe_handle->
+	    p_ep.bmAttributes & USB_EP_ATTR_MASK;
+	pipe_dir = ehci_polledp->ehci_polled_input_pipe_handle->
+	    p_ep.bEndpointAddress & USB_EP_DIR_MASK;
 	/*
 	 * Traverse the list of transfer descriptors.  We can't destroy
 	 * the qtd_next pointers of these QTDs because we are using it
@@ -1041,7 +1389,7 @@ ehci_polled_process_active_intr_qtd_list(ehci_polled_t	*ehci_polledp)
 		tw = (ehci_trans_wrapper_t *)EHCI_LOOKUP_ID(
 		    (uint32_t)Get_QTD(qtd->qtd_trans_wrapper));
 
-		/* Get ohci pipe from transfer wrapper */
+		/* Get ehci pipe from transfer wrapper */
 		pp = tw->tw_pipe_private;
 
 		/* Look at the status */
@@ -1055,19 +1403,38 @@ ehci_polled_process_active_intr_qtd_list(ehci_polled_t	*ehci_polledp)
 		 * clear the halt condition in the Endpoint  Descriptor
 		 * (QH) associated with this Transfer  Descriptor (QTD).
 		 */
-		if (error == USB_CR_OK) {
-			num_characters +=
-			    ehci_polled_handle_normal_qtd(ehci_polledp, qtd);
-		} else {
+		if (error != USB_CR_OK) {
 			/* Clear the halt bit */
 			Set_QH(pp->pp_qh->qh_status,
 			    Get_QH(pp->pp_qh->qh_status) &
 			    ~(EHCI_QH_STS_XACT_STATUS));
+		} else if (pipe_dir == USB_EP_DIR_IN) {
+
+			num_characters +=
+			    ehci_polled_handle_normal_qtd(ehci_polledp,
+			    qtd);
 		}
 
 		/* Insert this qtd back into QH's qtd list */
-		ehci_polled_insert_qtd(ehci_polledp, qtd);
-
+		switch (pipe_attr) {
+		case USB_EP_ATTR_INTR:
+			ehci_polled_insert_intr_qtd(ehci_polledp, qtd);
+			break;
+		case USB_EP_ATTR_BULK:
+			if (tw->tw_qtd_free_list != NULL) {
+				uint32_t	td_addr;
+				td_addr = ehci_qtd_cpu_to_iommu(ehcip,
+				    tw->tw_qtd_free_list);
+				Set_QTD(qtd->qtd_tw_next_qtd, td_addr);
+				Set_QTD(qtd->qtd_state, EHCI_QTD_DUMMY);
+				tw->tw_qtd_free_list = qtd;
+			} else {
+				tw->tw_qtd_free_list = qtd;
+				Set_QTD(qtd->qtd_tw_next_qtd, NULL);
+				Set_QTD(qtd->qtd_state, EHCI_QTD_DUMMY);
+			}
+			break;
+		}
 		qtd = next_qtd;
 	}
 
@@ -1126,12 +1493,12 @@ ehci_polled_handle_normal_qtd(
 
 
 /*
- * ehci_polled_insert_qtd:
+ * ehci_polled_insert_intr_qtd:
  *
  * Insert a Transfer Descriptor (QTD) on an Endpoint Descriptor (QH).
  */
 static void
-ehci_polled_insert_qtd(
+ehci_polled_insert_intr_qtd(
 	ehci_polled_t		*ehci_polledp,
 	ehci_qtd_t		*qtd)
 {
@@ -1202,6 +1569,61 @@ ehci_polled_insert_qtd(
 
 	/* Insert this qtd onto the tw */
 	ehci_polled_insert_qtd_on_tw(ehcip, tw, curr_dummy_qtd);
+
+	/* Insert this qtd into active interrupt QTD list */
+	ehci_polled_insert_qtd_into_active_intr_qtd_list(
+	    ehci_polledp, curr_dummy_qtd);
+}
+
+
+static void
+ehci_polled_insert_bulk_qtd(
+	ehci_polled_t	*ehci_polledp)
+{
+	ehci_state_t		*ehcip;
+	ehci_pipe_private_t	*pp;
+	ehci_trans_wrapper_t	*tw;
+	ehci_qh_t		*qh;
+	ehci_qtd_t		*new_dummy_qtd;
+	ehci_qtd_t		*curr_dummy_qtd, *next_dummy_qtd;
+	uint_t			qtd_control;
+
+	ehcip = ehci_polledp->ehci_polled_ehcip;
+	pp = (ehci_pipe_private_t *)ehci_polledp->
+	    ehci_polled_input_pipe_handle->p_hcd_private;
+	tw = pp->pp_tw_head;
+	qh = ehci_polledp->ehci_polled_qh;
+	new_dummy_qtd = tw->tw_qtd_free_list;
+
+	if (new_dummy_qtd == NULL) {
+		return;
+	}
+
+	tw->tw_qtd_free_list = ehci_qtd_iommu_to_cpu(ehcip,
+	    Get_QTD(new_dummy_qtd->qtd_tw_next_qtd));
+	Set_QTD(new_dummy_qtd->qtd_tw_next_qtd, NULL);
+
+	/* Get the current and next dummy QTDs */
+	curr_dummy_qtd = ehci_qtd_iommu_to_cpu(ehcip,
+	    Get_QH(qh->qh_dummy_qtd));
+	next_dummy_qtd = ehci_qtd_iommu_to_cpu(ehcip,
+	    Get_QTD(curr_dummy_qtd->qtd_next_qtd));
+
+	/* Update QH's dummy qtd field */
+	Set_QH(qh->qh_dummy_qtd, ehci_qtd_cpu_to_iommu(ehcip, next_dummy_qtd));
+
+	/* Update next dummy's next qtd pointer */
+	Set_QTD(next_dummy_qtd->qtd_next_qtd,
+	    ehci_qtd_cpu_to_iommu(ehcip, new_dummy_qtd));
+
+	qtd_control = (tw->tw_direction | EHCI_QTD_CTRL_INTR_ON_COMPLETE);
+
+	/*
+	 * Fill in the current dummy qtd and
+	 * add the new dummy to the end.
+	 */
+	ehci_polled_fill_in_qtd(ehcip, curr_dummy_qtd, qtd_control,
+	    0, tw->tw_length, tw);
 
 	/* Insert this qtd into active interrupt QTD list */
 	ehci_polled_insert_qtd_into_active_intr_qtd_list(
@@ -1569,4 +1991,275 @@ ehci_polled_finish_interrupt(
 	 * returning from its interrupt handler.
 	 */
 	(void) Get_OpReg(ehci_status);
+}
+
+
+static int
+ehci_polled_create_tw(
+	ehci_polled_t	*ehci_polledp,
+	usba_pipe_handle_data_t	*ph,
+	usb_flags_t	usb_flags)
+{
+	uint_t			ccount;
+	size_t			real_length;
+	ehci_trans_wrapper_t	*tw;
+	ddi_device_acc_attr_t	dev_attr;
+	int			result, pipe_dir, qtd_count;
+	ehci_state_t		*ehcip;
+	ehci_pipe_private_t	*pp;
+	ddi_dma_attr_t		dma_attr;
+
+	ehcip = ehci_polledp->ehci_polled_ehcip;
+	pp = (ehci_pipe_private_t *)ph->p_hcd_private;
+
+	/* Get the required qtd counts */
+	qtd_count = (POLLED_RAW_BUF_SIZE - 1) / EHCI_MAX_QTD_XFER_SIZE + 1;
+
+	if ((tw = kmem_zalloc(sizeof (ehci_trans_wrapper_t),
+	    KM_NOSLEEP)) == NULL) {
+		return (USB_FAILURE);
+	}
+
+	/* allow sg lists for transfer wrapper dma memory */
+	bcopy(&ehcip->ehci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
+	dma_attr.dma_attr_sgllen = EHCI_DMA_ATTR_TW_SGLLEN;
+	dma_attr.dma_attr_align = EHCI_DMA_ATTR_ALIGNMENT;
+
+	/* Allocate the DMA handle */
+	if ((result = ddi_dma_alloc_handle(ehcip->ehci_dip,
+	    &dma_attr, DDI_DMA_DONTWAIT, 0, &tw->tw_dmahandle)) !=
+	    DDI_SUCCESS) {
+		kmem_free(tw, sizeof (ehci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	dev_attr.devacc_attr_version		= DDI_DEVICE_ATTR_V0;
+	dev_attr.devacc_attr_endian_flags	= DDI_STRUCTURE_LE_ACC;
+	dev_attr.devacc_attr_dataorder		= DDI_STRICTORDER_ACC;
+
+	/* Allocate the memory */
+	if ((result = ddi_dma_mem_alloc(tw->tw_dmahandle, POLLED_RAW_BUF_SIZE,
+	    &dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &tw->tw_buf, &real_length, &tw->tw_accesshandle)) !=
+	    DDI_SUCCESS) {
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+		kmem_free(tw, sizeof (ehci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	/* Bind the handle */
+	if ((result = ddi_dma_addr_bind_handle(tw->tw_dmahandle, NULL,
+	    tw->tw_buf, real_length, DDI_DMA_RDWR|DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, NULL, &tw->tw_cookie, &ccount)) !=
+	    DDI_DMA_MAPPED) {
+		ddi_dma_mem_free(&tw->tw_accesshandle);
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+		kmem_free(tw, sizeof (ehci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	/* The cookie count should be 1 */
+	if (ccount != 1) {
+		result = ddi_dma_unbind_handle(tw->tw_dmahandle);
+		ASSERT(result == DDI_SUCCESS);
+
+		ddi_dma_mem_free(&tw->tw_accesshandle);
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+		kmem_free(tw, sizeof (ehci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	if (ehci_allocate_tds_for_tw(ehcip, pp, tw, qtd_count) == USB_SUCCESS) {
+		tw->tw_num_qtds = qtd_count;
+	} else {
+		ehci_deallocate_tw(ehcip, pp, tw);
+		return (USB_FAILURE);
+	}
+	tw->tw_cookie_idx = 0;
+	tw->tw_dma_offs = 0;
+
+	/*
+	 * Only allow one wrapper to be added at a time. Insert the
+	 * new transaction wrapper into the list for this pipe.
+	 */
+	if (pp->pp_tw_head == NULL) {
+		pp->pp_tw_head = tw;
+		pp->pp_tw_tail = tw;
+	} else {
+		pp->pp_tw_tail->tw_next = tw;
+		pp->pp_tw_tail = tw;
+	}
+
+	/* Store the transfer length */
+	tw->tw_length = POLLED_RAW_BUF_SIZE;
+
+	/* Store a back pointer to the pipe private structure */
+	tw->tw_pipe_private = pp;
+
+	/* Store the transfer type - synchronous or asynchronous */
+	tw->tw_flags = usb_flags;
+
+	/* Get and Store 32bit ID */
+	tw->tw_id = EHCI_GET_ID((void *)tw);
+
+	pipe_dir = ph->p_ep.bEndpointAddress & USB_EP_DIR_MASK;
+	tw->tw_direction = (pipe_dir == USB_EP_DIR_OUT)?
+	    EHCI_QTD_CTRL_OUT_PID : EHCI_QTD_CTRL_IN_PID;
+
+	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
+	    "ehci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
+	    (void *)tw, tw->tw_ncookies);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ehci_polled_insert_async_qh:
+ *
+ * Insert a bulk endpoint into the Host Controller's (HC)
+ * Asynchronous schedule endpoint list.
+ */
+static void
+ehci_polled_insert_async_qh(
+	ehci_state_t		*ehcip,
+	ehci_pipe_private_t	*pp)
+{
+	ehci_qh_t		*qh = pp->pp_qh;
+	ehci_qh_t		*async_head_qh;
+	ehci_qh_t		*next_qh;
+	uintptr_t		qh_addr;
+
+	/* Make sure this QH is not already in the list */
+	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == NULL);
+
+	qh_addr = ehci_qh_cpu_to_iommu(ehcip, qh);
+
+	/* Obtain a ptr to the head of the Async schedule list */
+	async_head_qh = ehcip->ehci_head_of_async_sched_list;
+
+	if (async_head_qh == NULL) {
+		/* Set this QH to be the "head" of the circular list */
+		Set_QH(qh->qh_ctrl,
+		    (Get_QH(qh->qh_ctrl) | EHCI_QH_CTRL_RECLAIM_HEAD));
+
+		/* Set new QH's link and previous pointer to itself */
+		Set_QH(qh->qh_link_ptr, qh_addr | EHCI_QH_LINK_REF_QH);
+		Set_QH(qh->qh_prev, qh_addr);
+
+		ehcip->ehci_head_of_async_sched_list = qh;
+
+		/* Set the head ptr to the new endpoint */
+		Set_OpReg(ehci_async_list_addr, qh_addr);
+
+		/*
+		 * For some reason this register might get nulled out by
+		 * the Uli M1575 South Bridge. To workaround the hardware
+		 * problem, check the value after write and retry if the
+		 * last write fails.
+		 *
+		 * If the ASYNCLISTADDR remains "stuck" after
+		 * EHCI_MAX_RETRY retries, then the M1575 is broken
+		 * and is stuck in an inconsistent state and is about
+		 * to crash the machine with a trn_oor panic when it
+		 * does a DMA read from 0x0.  It is better to panic
+		 * now rather than wait for the trn_oor crash; this
+		 * way Customer Service will have a clean signature
+		 * that indicts the M1575 chip rather than a
+		 * mysterious and hard-to-diagnose trn_oor panic.
+		 */
+		if ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+		    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575) &&
+		    (qh_addr != Get_OpReg(ehci_async_list_addr))) {
+			int retry = 0;
+
+			Set_OpRegRetry(ehci_async_list_addr, qh_addr, retry);
+			if (retry >= EHCI_MAX_RETRY)
+				cmn_err(CE_PANIC, "ehci_insert_async_qh:"
+				    " ASYNCLISTADDR write failed.");
+
+			USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "ehci_insert_async_qh: ASYNCLISTADDR "
+			    "write failed, retry=%d", retry);
+		}
+	} else {
+		ASSERT(Get_QH(async_head_qh->qh_ctrl) &
+		    EHCI_QH_CTRL_RECLAIM_HEAD);
+
+		/* Ensure this QH's "H" bit is not set */
+		Set_QH(qh->qh_ctrl,
+		    (Get_QH(qh->qh_ctrl) & ~EHCI_QH_CTRL_RECLAIM_HEAD));
+
+		next_qh = ehci_qh_iommu_to_cpu(ehcip,
+		    Get_QH(async_head_qh->qh_link_ptr) & EHCI_QH_LINK_PTR);
+
+		/* Set new QH's link and previous pointers */
+		Set_QH(qh->qh_link_ptr,
+		    Get_QH(async_head_qh->qh_link_ptr) | EHCI_QH_LINK_REF_QH);
+		Set_QH(qh->qh_prev, ehci_qh_cpu_to_iommu(ehcip, async_head_qh));
+
+		/* Set next QH's prev pointer */
+		Set_QH(next_qh->qh_prev, ehci_qh_cpu_to_iommu(ehcip, qh));
+
+		/* Set QH Head's link pointer points to new QH */
+		Set_QH(async_head_qh->qh_link_ptr,
+		    qh_addr | EHCI_QH_LINK_REF_QH);
+	}
+}
+
+
+/*
+ * ehci_remove_async_qh:
+ *
+ * Remove a control/bulk endpoint into the Host Controller's (HC)
+ * Asynchronous schedule endpoint list.
+ */
+static void
+ehci_polled_remove_async_qh(
+	ehci_state_t		*ehcip,
+	ehci_pipe_private_t	*pp)
+{
+	ehci_qh_t		*qh = pp->pp_qh; /* qh to be removed */
+	ehci_qh_t		*prev_qh, *next_qh;
+
+	prev_qh = ehci_qh_iommu_to_cpu(ehcip,
+	    Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR);
+	next_qh = ehci_qh_iommu_to_cpu(ehcip,
+	    Get_QH(qh->qh_link_ptr) & EHCI_QH_LINK_PTR);
+
+	/* Make sure this QH is in the list */
+	ASSERT(prev_qh != NULL);
+
+	/*
+	 * If next QH and current QH are the same, then this is the last
+	 * QH on the Asynchronous Schedule list.
+	 */
+	if (qh == next_qh) {
+		ASSERT(Get_QH(qh->qh_ctrl) & EHCI_QH_CTRL_RECLAIM_HEAD);
+		/*
+		 * Null our pointer to the async sched list, but do not
+		 * touch the host controller's list_addr.
+		 */
+		ehcip->ehci_head_of_async_sched_list = NULL;
+	} else {
+		/* If this QH is the HEAD then find another one to replace it */
+		if (ehcip->ehci_head_of_async_sched_list == qh) {
+
+			ASSERT(Get_QH(qh->qh_ctrl) & EHCI_QH_CTRL_RECLAIM_HEAD);
+			ehcip->ehci_head_of_async_sched_list = next_qh;
+			Set_QH(next_qh->qh_ctrl,
+			    Get_QH(next_qh->qh_ctrl) |
+			    EHCI_QH_CTRL_RECLAIM_HEAD);
+		}
+		Set_QH(prev_qh->qh_link_ptr, Get_QH(qh->qh_link_ptr));
+		Set_QH(next_qh->qh_prev, Get_QH(qh->qh_prev));
+	}
+
+	/* qh_prev to indicate it is no longer in the circular list */
+	Set_QH(qh->qh_prev, NULL);
+
 }

@@ -19,13 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_USB_OHCID_H
 #define	_SYS_USB_OHCID_H
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -807,6 +806,9 @@ _NOTE(MUTEX_PROTECTS_DATA(ohci_state_t::ohci_int_mutex, ohci_trans_wrapper))
 #define	Sync_IO_Buffer(dma_handle, length) \
 				(void) ddi_dma_sync(dma_handle, \
 				0, length, DDI_DMA_SYNC_FORCPU);
+#define	Sync_IO_Buffer_for_device(dma_handle, length) \
+				(void) ddi_dma_sync(dma_handle, \
+				0, length, DDI_DMA_SYNC_FORDEV);
 
 /*
  * Macros to speed handling of 32bit IDs
@@ -897,6 +899,21 @@ int		ohci_hcdi_polled_input_exit(
 int		ohci_hcdi_polled_input_fini(
 				usb_console_info_impl_t	*info);
 
+int		ohci_hcdi_polled_output_init(
+				usba_pipe_handle_data_t	*ph,
+				usb_console_info_impl_t	*console_output_info);
+int		ohci_hcdi_polled_output_enter(
+				usb_console_info_impl_t	*info);
+int		ohci_hcdi_polled_write(
+				usb_console_info_impl_t *info,
+				uchar_t *buf,
+				uint_t num_characters,
+				uint_t *num_characters_written);
+int		ohci_hcdi_polled_output_exit(
+				usb_console_info_impl_t	*info);
+int		ohci_hcdi_polled_output_fini(
+				usb_console_info_impl_t *info);
+
 /* Root hub related functions */
 int		ohci_init_root_hub(
 				ohci_state_t		*ohcip);
@@ -986,6 +1003,10 @@ usb_frame_number_t ohci_get_current_frame_number(
 void		ohci_handle_outstanding_requests(
 				ohci_state_t		*ohcip,
 				ohci_pipe_private_t	*pp);
+int	ohci_allocate_tds_for_tw(
+				ohci_state_t		*ohcip,
+				ohci_trans_wrapper_t	*tw,
+				size_t			td_count);
 
 #ifdef __cplusplus
 }

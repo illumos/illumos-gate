@@ -1151,7 +1151,20 @@ int		ehci_hcdi_polled_input_exit(
 				usb_console_info_impl_t	*info);
 int		ehci_hcdi_polled_input_fini(
 				usb_console_info_impl_t	*info);
-
+int		ehci_hcdi_polled_output_init(
+				usba_pipe_handle_data_t	*ph,
+				usb_console_info_impl_t	*console_output_info);
+int		ehci_hcdi_polled_output_enter(
+				usb_console_info_impl_t	*info);
+int		ehci_hcdi_polled_write(
+				usb_console_info_impl_t *info,
+				uchar_t *buf,
+				uint_t num_characters,
+				uint_t *num_characters_written);
+int		ehci_hcdi_polled_output_exit(
+				usb_console_info_impl_t	*info);
+int		ehci_hcdi_polled_output_fini(
+				usb_console_info_impl_t *info);
 /*
  * EHCI Root Hub entry points function prototypes.
  */

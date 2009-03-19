@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,19 @@ static void	ohci_polled_handle_frame_number_overflow(
 static void	ohci_polled_finish_interrupt(
 				ohci_state_t		*ohcip,
 				uint_t			intr);
+static void	ohci_polled_insert_bulk_td(
+				ohci_polled_t		*ohci_polledp);
+static int 	ohci_polled_create_tw(
+				ohci_state_t		*ohcip,
+				usba_pipe_handle_data_t	*ph,
+				usb_flags_t		usb_flags);
+static int	ohci_polled_insert_hc_td(
+				ohci_state_t		*ohcip,
+				uint_t			hctd_ctrl,
+				uint32_t		hctd_dma_offs,
+				size_t			hctd_length,
+				ohci_pipe_private_t	*pp,
+				ohci_trans_wrapper_t	*tw);
 /*
  * POLLED entry points
  *
@@ -101,7 +114,7 @@ static void	ohci_polled_finish_interrupt(
 /*
  * ohci_hcdi_polled_input_init:
  *
- * This is the initialization routine for handling the USB keyboard
+ * This is the initialization routine for handling the USB input device
  * in POLLED mode.  This routine is not called from POLLED mode, so
  * it is OK to acquire mutexes.
  */
@@ -113,7 +126,7 @@ ohci_hcdi_polled_input_init(
 {
 	ohci_polled_t		*ohci_polledp;
 	ohci_state_t		*ohcip;
-	int			ret;
+	int			pipe_attr, ret;
 
 	ohcip = ohci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
 
@@ -134,7 +147,6 @@ ohci_hcdi_polled_input_init(
 	}
 
 	ohci_polledp = (ohci_polled_t *)console_input_info->uci_private;
-
 	/*
 	 * Mark the structure so that if we are using it, we don't free
 	 * the structures if one of them is unplugged.
@@ -153,6 +165,13 @@ ohci_hcdi_polled_input_init(
 
 	*polled_buf = ohci_polledp->ohci_polled_buf;
 
+	/* Insert bulkin td into endpoint's tds list */
+	pipe_attr = ohci_polledp->ohci_polled_input_pipe_handle->
+	    p_ep.bmAttributes & USB_EP_ATTR_MASK;
+
+	if (pipe_attr == USB_EP_ATTR_BULK) {
+		ohci_polled_insert_bulk_td(ohci_polledp);
+	}
 	/*
 	 * This is a software workaround to fix schizo hardware bug.
 	 * Existence of "no-prom-cdma-sync"  property means consistent
@@ -290,38 +309,261 @@ ohci_hcdi_polled_read(
 	 * Check whether any Frame Number Overflow interrupt is pending
 	 * and if it is pending, process this interrupt.
 	 */
-
 	if (intr & HCR_INTR_FNO) {
 		ohci_handle_frame_number_overflow(ohcip);
 
 		/* Acknowledge the FNO interrupt */
 		ohci_polled_finish_interrupt(ohcip, HCR_INTR_FNO);
 	}
+
+	/* Check to see if there are any TD's for this input device */
+	if (ohci_polled_check_done_list(ohci_polledp) == USB_SUCCESS) {
+
+		/* Process any TD's on the input done list */
+		*num_characters =
+		    ohci_polled_process_input_list(ohci_polledp);
+	}
+
+	/*
+	 * To make sure after we get the done list from DoneHead,
+	 * every input device get his own TD's in the
+	 * ohci_polled_done_list and then clear the interrupt status.
+	 */
 	if (intr & HCR_INTR_WDH) {
 
-		/* Check to see if there are any TD's for this input device */
-		if (ohci_polled_check_done_list(ohci_polledp) == USB_SUCCESS) {
-
-			/* Process any TD's on the input done list */
-			*num_characters =
-			    ohci_polled_process_input_list(ohci_polledp);
-		}
-
-		/*
-		 * To make sure after we get the done list from DoneHead,
-		 * every input device get his own TD's in the
-		 * ohci_polled_done_list and then clear the interrupt status.
-		 */
-		if (ohcip->ohci_polled_done_list == NULL) {
-
-			/* Acknowledge the WDH interrupt */
-			ohci_polled_finish_interrupt(ohcip, HCR_INTR_WDH);
-		}
+		/* Acknowledge the WDH interrupt */
+		ohci_polled_finish_interrupt(ohcip, HCR_INTR_WDH);
 	}
 #ifndef lint
 	_NOTE(COMPETING_THREADS_NOW);
 #endif
 
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ohci_hcdi_polled_output_init:
+ *
+ * This is the initialization routine for handling the USB serial output
+ * in POLLED mode.  This routine is not called from POLLED mode, so
+ * it is OK to acquire mutexes.
+ */
+int
+ohci_hcdi_polled_output_init(
+	usba_pipe_handle_data_t	*ph,
+	usb_console_info_impl_t	*console_output_info)
+{
+	ohci_polled_t		*ohci_polledp;
+	ohci_state_t		*ohcip;
+	int			ret;
+
+	ohcip = ohci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
+
+	/*
+	 * Grab the ohci_int_mutex so that things don't change on us
+	 * if an interrupt comes in.
+	 */
+	mutex_enter(&ohcip->ohci_int_mutex);
+
+	ret = ohci_polled_init(ph, ohcip, console_output_info);
+
+	if (ret != USB_SUCCESS) {
+
+		/* Allow interrupts to continue */
+		mutex_exit(&ohcip->ohci_int_mutex);
+
+		return (ret);
+	}
+
+	ohci_polledp = (ohci_polled_t *)console_output_info->uci_private;
+	/*
+	 * Mark the structure so that if we are using it, we don't free
+	 * the structures if one of them is unplugged.
+	 */
+	ohci_polledp->ohci_polled_flags |= POLLED_OUTPUT_MODE;
+
+	/*
+	 * This is a software workaround to fix schizo hardware bug.
+	 * Existence of "no-prom-cdma-sync"  property means consistent
+	 * dma sync should not be done while in prom or polled mode.
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ohcip->ohci_dip,
+	    DDI_PROP_NOTPROM, "no-prom-cdma-sync")) {
+		ohci_polledp->ohci_polled_no_sync_flag = B_TRUE;
+	}
+
+	/* Allow interrupts to continue */
+	mutex_exit(&ohcip->ohci_int_mutex);
+
+	return (USB_SUCCESS);
+}
+
+/*
+ * ohci_hcdi_polled_output_fini:
+ */
+int
+ohci_hcdi_polled_output_fini(usb_console_info_impl_t *info)
+{
+	ohci_polled_t		*ohci_polledp;
+	ohci_state_t		*ohcip;
+	int			ret;
+
+	ohci_polledp = (ohci_polled_t *)info->uci_private;
+
+	ohcip = ohci_polledp->ohci_polled_ohcip;
+
+	mutex_enter(&ohcip->ohci_int_mutex);
+
+	/*
+	 * Reset the POLLED_INPUT_MODE flag so that we can tell if
+	 * this structure is in use in the ohci_polled_fini routine.
+	 */
+	ohci_polledp->ohci_polled_flags &= ~POLLED_OUTPUT_MODE;
+
+	ret = ohci_polled_fini(ohci_polledp);
+
+	info->uci_private = NULL;
+
+	mutex_exit(&ohcip->ohci_int_mutex);
+
+	return (ret);
+}
+
+
+/*
+ * ohci_hcdi_polled_output_enter:
+ *
+ * everything is done in input enter
+ */
+/*ARGSUSED*/
+int
+ohci_hcdi_polled_output_enter(usb_console_info_impl_t *info)
+{
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ohci_hcdi_polled_output_exit:
+ *
+ * everything is done in input exit
+ */
+/*ARGSUSED*/
+int
+ohci_hcdi_polled_output_exit(usb_console_info_impl_t *info)
+{
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ohci_hcdi_polled_write:
+ *	Put a key character -- rewrite this!
+ */
+int
+ohci_hcdi_polled_write(usb_console_info_impl_t *info, uchar_t *buf,
+    uint_t num_characters, uint_t *num_characters_written)
+{
+	ohci_state_t		*ohcip;
+	ohci_polled_t		*ohci_polledp;
+	ohci_trans_wrapper_t	*tw;
+	ohci_pipe_private_t	*pp;
+	usba_pipe_handle_data_t	*ph;
+	uint32_t		ctrl;
+	uint_t			intr, bulk_pkg_size;
+	int			i;
+
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
+
+	ohci_polledp = (ohci_polled_t *)info->uci_private;
+	ohcip = ohci_polledp->ohci_polled_ohcip;
+
+	/* Disable periodic list processing */
+	Set_OpReg(hcr_control,
+	    (Get_OpReg(hcr_control) & (~HCR_CONTROL_PLE)));
+
+	/* Add the endpoint to the lattice */
+	for (i = ohcip->ohci_polled_enter_count; i < NUM_INTR_ED_LISTS;
+	    i = i + MIN_LOW_SPEED_POLL_INTERVAL) {
+		Set_HCCA(ohcip->ohci_hccap->HccaIntTble[i],
+		    ohci_ed_cpu_to_iommu(ohcip,
+		    ohci_polledp->ohci_polled_ed));
+	}
+
+	ph = ohci_polledp->ohci_polled_input_pipe_handle;
+	pp = (ohci_pipe_private_t *)ph->p_hcd_private;
+	tw = pp->pp_tw_head;
+
+	ASSERT(tw != NULL);
+	if (tw->tw_hctd_free_list == NULL) {
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
+		return (USB_SUCCESS);
+	}
+
+	/* Copy transmit buffer */
+	if (num_characters > POLLED_RAW_BUF_SIZE) {
+		cmn_err(CE_NOTE, "polled write size %d bigger than %d",
+		    num_characters, POLLED_RAW_BUF_SIZE);
+		num_characters = POLLED_RAW_BUF_SIZE;
+	}
+	tw->tw_length = num_characters;
+
+	ddi_rep_put8(tw->tw_accesshandle,
+	    buf, (uint8_t *)tw->tw_buf,
+	    tw->tw_length, DDI_DEV_AUTOINCR);
+	Sync_IO_Buffer_for_device(tw->tw_dmahandle, tw->tw_length);
+
+	/* Insert td into endpoint's tds list */
+	ctrl = tw->tw_direction | HC_TD_DT_0|HC_TD_1I | HC_TD_R;
+	bulk_pkg_size = min(tw->tw_length, OHCI_MAX_TD_XFER_SIZE);
+
+	(void) ohci_polled_insert_hc_td(ohcip, ctrl, 0, bulk_pkg_size, pp, tw);
+
+	/* Enable periodic list processing */
+	Set_OpReg(hcr_control,
+	    (Get_OpReg(hcr_control) | HCR_CONTROL_PLE));
+
+	/* Wait for bulk out tds transfer completion */
+	for (;;) {
+		intr = Get_OpReg(hcr_intr_status);
+
+		if (intr & HCR_INTR_FNO) {
+			ohci_handle_frame_number_overflow(ohcip);
+			ohci_polled_finish_interrupt(ohcip, HCR_INTR_FNO);
+		}
+
+		if (intr & HCR_INTR_WDH) {
+			if (ohci_polled_check_done_list(ohci_polledp) ==
+			    USB_SUCCESS) {
+				*num_characters_written =
+				    ohci_polled_process_input_list(
+				    ohci_polledp);
+				break;
+			}
+		}
+
+		Set_OpReg(hcr_intr_status, intr);
+		(void) Get_OpReg(hcr_intr_status);
+	}
+
+	/* Remove the endpoint from the lattice */
+	for (i = ohcip->ohci_polled_enter_count; i < NUM_INTR_ED_LISTS;
+	    i = i + MIN_LOW_SPEED_POLL_INTERVAL) {
+		Set_HCCA(ohcip->ohci_hccap->HccaIntTble[i],
+		    ohci_ed_cpu_to_iommu(ohcip,
+		    ohci_polledp->ohci_polled_dummy_ed));
+	}
+
+	Set_OpReg(hcr_intr_status, intr);
+	(void) Get_OpReg(hcr_intr_status);
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
 	return (USB_SUCCESS);
 }
 
@@ -349,6 +591,7 @@ ohci_polled_init(
 {
 	ohci_polled_t		*ohci_polledp;
 	ohci_pipe_private_t	*pp;
+	int			pipe_attr;
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -450,8 +693,8 @@ ohci_polled_init(
 	}
 
 	/*
-	 * Allocate the interrupt endpoint. This ED will be inserted in
-	 * to the lattice chain for the  keyboard device. This endpoint
+	 * Allocate the endpoint. This ED will be inserted in
+	 * to the lattice chain for the device. This endpoint
 	 * will have the TDs hanging off of it for the processing.
 	 */
 	ohci_polledp->ohci_polled_ed = ohci_alloc_hc_ed(ohcip,
@@ -468,27 +711,41 @@ ohci_polled_init(
 	/* Insert the endpoint onto the pipe handle */
 	pp->pp_ept = ohci_polledp->ohci_polled_ed;
 
-	/*
-	 * Set soft interrupt handler flag in the normal mode usb
-	 * pipe handle.
-	 */
-	mutex_enter(&ph->p_mutex);
-	ph->p_spec_flag |= USBA_PH_FLAG_USE_SOFT_INTR;
-	mutex_exit(&ph->p_mutex);
+	pipe_attr = ph->p_ep.bmAttributes & USB_EP_ATTR_MASK;
 
-	/*
-	 * Insert a Interrupt polling request onto the endpoint.
-	 *
-	 * There will now be two TDs on the ED, one is the dummy TD that
-	 * was allocated above in the  ohci_alloc_hc_ed and this new one.
-	 */
-	if ((ohci_start_periodic_pipe_polling(ohcip,
-	    ohci_polledp->ohci_polled_input_pipe_handle,
-	    NULL, USB_FLAGS_SLEEP)) != USB_SUCCESS) {
+	switch (pipe_attr) {
+	case USB_EP_ATTR_INTR:
+		/*
+		 * Set soft interrupt handler flag in the normal mode usb
+		 * pipe handle.
+		 */
+		mutex_enter(&ph->p_mutex);
+		ph->p_spec_flag |= USBA_PH_FLAG_USE_SOFT_INTR;
+		mutex_exit(&ph->p_mutex);
 
-		return (USB_NO_RESOURCES);
+		/*
+		 * Insert a Interrupt polling request onto the endpoint.
+		 *
+		 * There will now be two TDs on the ED, one is the dummy TD
+		 * that was allocated above in the ohci_alloc_hc_ed and
+		 * this new one.
+		 */
+		if ((ohci_start_periodic_pipe_polling(ohcip,
+		    ohci_polledp->ohci_polled_input_pipe_handle,
+		    NULL, USB_FLAGS_SLEEP)) != USB_SUCCESS) {
+			return (USB_NO_RESOURCES);
+		}
+		break;
+	case USB_EP_ATTR_BULK:
+		if ((ohci_polled_create_tw(ohcip,
+		    ohci_polledp->ohci_polled_input_pipe_handle,
+		    USB_FLAGS_SLEEP)) != USB_SUCCESS) {
+			return (USB_NO_RESOURCES);
+		}
+		break;
+	default:
+		return (USB_FAILURE);
 	}
-
 	return (USB_SUCCESS);
 }
 
@@ -1214,7 +1471,6 @@ ohci_polled_restore_state(ohci_polled_t	*ohci_polledp)
 			Set_OpReg(hcr_intr_enable, mask | HCR_INTR_MIE);
 		}
 	}
-
 #ifndef lint
 	_NOTE(COMPETING_THREADS_NOW);
 #endif
@@ -1247,8 +1503,6 @@ ohci_polled_start_processing(ohci_polled_t	*ohci_polledp)
 /*
  * Polled read routines
  */
-
-
 /*
  * ohci_polled_check_done_list:
  *
@@ -1277,6 +1531,7 @@ ohci_polled_check_done_list(ohci_polled_t	*ohci_polledp)
 	if (done_head == NULL) {
 		if (ohcip->ohci_polled_done_list) {
 			done_head = ohcip->ohci_polled_done_list;
+			ohcip->ohci_polled_done_list = NULL;
 		} else {
 
 			return (USB_FAILURE);
@@ -1284,7 +1539,6 @@ ohci_polled_check_done_list(ohci_polled_t	*ohci_polledp)
 	} else {
 		/* Reset the done head to NULL */
 		Set_HCCA(ohcip->ohci_hccap->HccaDoneHead, NULL);
-		ohcip->ohci_polled_done_list = NULL;
 	}
 
 	/* Sync ED and TD pool */
@@ -1309,6 +1563,7 @@ ohci_polled_check_done_list(ohci_polled_t	*ohci_polledp)
 	return (USB_SUCCESS);
 }
 
+
 /*
  * ohci_polled_pickup_done_list:
  *
@@ -1320,7 +1575,6 @@ ohci_polled_pickup_done_list(
 	ohci_td_t	*done_head)
 {
 	ohci_state_t	*ohcip = ohci_polledp->ohci_polled_ohcip;
-	ohci_td_t	*reserve_head = NULL, *reserve_tail = NULL;
 	ohci_td_t	*create_head = NULL, *current_td, *td;
 	ohci_trans_wrapper_t	*tw;
 	ohci_pipe_private_t	*pp;
@@ -1344,8 +1598,8 @@ ohci_polled_pickup_done_list(
 		pp = tw->tw_pipe_private;
 
 		/*
-		 * Figure  out	which  done list to put this TD on and put it
-		 * there.   If	the  pipe handle  of the TD matches the pipe
+		 * Figure  out  which  done list to put this TD on and put it
+		 * there.   If  the  pipe handle  of the TD matches the pipe
 		 * handle  we  are  using for the input device, then this must
 		 * be an input TD, reverse the order and link to the list for
 		 * this input device. Else put the TD to the reserve done list
@@ -1362,28 +1616,24 @@ ohci_polled_pickup_done_list(
 				create_head = current_td;
 			}
 		} else {
-			if (reserve_head == NULL) {
-				reserve_head = reserve_tail = current_td;
+			if (ohcip->ohci_polled_done_list == NULL) {
+				ohcip->ohci_polled_done_list = (ohci_td_t *)
+				    (uintptr_t)ohci_td_cpu_to_iommu(ohcip,
+				    current_td);
 			} else {
-				Set_TD(reserve_tail->hctd_next_td,
-				    ohci_td_cpu_to_iommu(ohcip, current_td));
-				reserve_tail = current_td;
+				Set_TD(current_td->hctd_next_td,
+				    ohcip->ohci_polled_done_list);
+				ohcip->ohci_polled_done_list = (ohci_td_t *)
+				    (uintptr_t)ohci_td_cpu_to_iommu(ohcip,
+				    current_td);
 			}
 		}
 		current_td = td;
 	}
 
-	/* Check if there is other TDs left for other input devices */
-	if (reserve_head) {
-		ohcip->ohci_polled_done_list = (ohci_td_t *)(uintptr_t)
-		    ohci_td_cpu_to_iommu(ohcip, reserve_head);
-
-	} else {
-		ohcip->ohci_polled_done_list = NULL;
-	}
-
 	return (create_head);
 }
+
 
 /*
  * ohci_polled_create_input_list:
@@ -1457,6 +1707,7 @@ ohci_polled_process_input_list(ohci_polled_t	*ohci_polledp)
 	uint_t			num_characters;
 	ohci_trans_wrapper_t	*tw;
 	ohci_pipe_private_t	*pp;
+	int 			pipe_dir;
 
 	/*
 	 * Get the first TD on the input done head.
@@ -1498,13 +1749,52 @@ ohci_polled_process_input_list(ohci_polled_t	*ohci_polledp)
 			/* Clear the halt bit */
 			Set_ED(pp->pp_ept->hced_headp,
 			    (Get_ED(pp->pp_ept->hced_headp) & ~HC_EPT_Halt));
-		} else {
-			num_characters +=
-			    ohci_polled_handle_normal_td(ohci_polledp, td);
 		}
 
-		/* Insert this interrupt TD back onto the ED's TD list */
-		ohci_polled_insert_td(ohcip, td);
+		/* Obtain the transfer wrapper from the TD */
+		tw = (ohci_trans_wrapper_t *)OHCI_LOOKUP_ID(
+		    (uint32_t)Get_TD(td->hctd_trans_wrapper));
+
+		/* Get the pipe direction for this transfer wrapper */
+		pipe_dir = tw->tw_pipe_private->pp_pipe_handle->
+		    p_ep.bEndpointAddress & USB_EP_DIR_MASK;
+
+		switch (pipe_dir) {
+		case USB_EP_DIR_IN:
+			num_characters +=
+			    ohci_polled_handle_normal_td(ohci_polledp,
+			    td);
+
+			/*
+			 * Insert this TD back
+			 * onto the ED's TD list
+			 */
+			ohci_polled_insert_td(ohcip, td);
+			break;
+		case USB_EP_DIR_OUT:
+			ASSERT((ohci_td_t *)tw->tw_hctd_head == td);
+
+			tw->tw_hctd_head = (ohci_td_t *)
+			    ohci_td_iommu_to_cpu(ohcip,
+			    Get_TD(td->hctd_tw_next_td));
+			Set_TD(td->hctd_state, HC_TD_DUMMY);
+
+			if (tw->tw_hctd_head == NULL) {
+				tw->tw_hctd_tail = NULL;
+			}
+
+			if (tw->tw_hctd_free_list != NULL) {
+				uint32_t	td_addr;
+				td_addr = ohci_td_cpu_to_iommu(ohcip,
+				    tw->tw_hctd_free_list);
+				Set_TD(td->hctd_tw_next_td, td_addr);
+				tw->tw_hctd_free_list = td;
+			} else {
+				tw->tw_hctd_free_list = td;
+				Set_TD(td->hctd_tw_next_td, NULL);
+			}
+			break;
+		}
 
 		td = next_td;
 	}
@@ -1535,7 +1825,6 @@ ohci_polled_handle_normal_td(
 	buf = (uchar_t *)tw->tw_buf;
 
 	length = tw->tw_length;
-
 	/*
 	 * If "CurrentBufferPointer" of Transfer Descriptor (TD) is
 	 * not equal to zero, then we  received less data  from the
@@ -1554,7 +1843,7 @@ ohci_polled_handle_normal_td(
 		Sync_IO_Buffer(tw->tw_dmahandle, length);
 	}
 
-	/* Copy the data into the message */
+		/* Copy the data into the message */
 	ddi_rep_get8(tw->tw_accesshandle,
 	    (uint8_t *)ohci_polledp->ohci_polled_buf,
 	    (uint8_t *)buf, length, DDI_DEV_AUTOINCR);
@@ -1579,6 +1868,8 @@ ohci_polled_insert_td(
 	ohci_trans_wrapper_t	*tw;
 	ohci_td_t		*cpu_current_dummy;
 	usb_intr_req_t		*intr_req;
+	usba_pipe_handle_data_t	*ph;
+	int			pipe_attr;
 
 	/* Obtain the transfer wrapper from the TD */
 	tw = (ohci_trans_wrapper_t *)OHCI_LOOKUP_ID(
@@ -1611,16 +1902,27 @@ ohci_polled_insert_td(
 	Set_TD(td->hctd_state, HC_TD_DUMMY);
 
 	pp = tw->tw_pipe_private;
+	ph = pp->pp_pipe_handle;
 
-	/* Obtain the endpoint and interrupt request */
+	/* Obtain the endpoint and the request */
 	ept = pp->pp_ept;
 
-	intr_req = (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	/* Get the pipe attribute */
+	pipe_attr = ph->p_ep.bmAttributes & USB_EP_ATTR_MASK;
 
-	if (intr_req->intr_attributes & USB_ATTRS_SHORT_XFER_OK) {
-		td_control = HC_TD_IN|HC_TD_1I|HC_TD_R;
-	} else {
-		td_control = HC_TD_IN|HC_TD_1I;
+	switch (pipe_attr) {
+	case USB_EP_ATTR_INTR:
+		intr_req = (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+
+		if (intr_req->intr_attributes & USB_ATTRS_SHORT_XFER_OK) {
+			td_control = HC_TD_IN|HC_TD_1I|HC_TD_R;
+		} else {
+			td_control = HC_TD_IN|HC_TD_1I;
+		}
+		break;
+	case USB_EP_ATTR_BULK:
+		td_control = tw->tw_direction|HC_TD_DT_0|HC_TD_1I|HC_TD_R;
+		break;
 	}
 
 	/* Get the current dummy */
@@ -1766,4 +2068,211 @@ ohci_polled_finish_interrupt(
 	 * returning from its interrupt handler.
 	 */
 	(void) Get_OpReg(hcr_intr_status);
+}
+
+
+/*
+ * ohci_polled_buikin_start:
+ * 	Insert bulkin td into endpoint's td list.
+ */
+static void
+ohci_polled_insert_bulk_td(
+	ohci_polled_t	*ohci_polledp)
+{
+	ohci_state_t		*ohcip;
+	ohci_trans_wrapper_t	*tw;
+	ohci_pipe_private_t	*pp;
+	usba_pipe_handle_data_t	*ph;
+	uint32_t		ctrl;
+	uint_t			bulk_pkg_size;
+
+	ohcip = ohci_polledp->ohci_polled_ohcip;
+	ph = ohci_polledp->ohci_polled_input_pipe_handle;
+	pp = (ohci_pipe_private_t *)ph->p_hcd_private;
+
+	tw = pp->pp_tw_head;
+	ASSERT(tw != NULL);
+
+	ctrl = tw->tw_direction | HC_TD_DT_0 | HC_TD_1I | HC_TD_R;
+	bulk_pkg_size = min(POLLED_RAW_BUF_SIZE, OHCI_MAX_TD_XFER_SIZE);
+
+	(void) ohci_polled_insert_hc_td(ohcip, ctrl, 0, bulk_pkg_size, pp, tw);
+}
+
+
+/*
+ * ohci_polled_create_tw:
+ *	Create the transfer wrapper used in polled mode.
+ */
+static int
+ohci_polled_create_tw(
+	ohci_state_t	*ohcip,
+	usba_pipe_handle_data_t	*ph,
+	usb_flags_t	usb_flags)
+{
+	uint_t			ccount;
+	ohci_trans_wrapper_t	*tw;
+	ddi_device_acc_attr_t	dev_attr;
+	ddi_dma_attr_t		dma_attr;
+	ohci_pipe_private_t	*pp;
+	int			result, pipe_dir, td_count;
+	size_t			real_length;
+
+	pp = (ohci_pipe_private_t *)ph->p_hcd_private;
+	td_count = (POLLED_RAW_BUF_SIZE - 1) / OHCI_MAX_TD_XFER_SIZE + 1;
+
+	if ((tw = kmem_zalloc(sizeof (ohci_trans_wrapper_t),
+	    KM_NOSLEEP)) == NULL) {
+		return (USB_FAILURE);
+	}
+
+	/* allow sg lists for transfer wrapper dma memory */
+	bcopy(&ohcip->ohci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
+	dma_attr.dma_attr_sgllen = OHCI_DMA_ATTR_TW_SGLLEN;
+	dma_attr.dma_attr_align = OHCI_DMA_ATTR_ALIGNMENT;
+
+	/* Allocate the DMA handle */
+	if ((result = ddi_dma_alloc_handle(ohcip->ohci_dip,
+	    &dma_attr, DDI_DMA_DONTWAIT, 0, &tw->tw_dmahandle)) !=
+	    DDI_SUCCESS) {
+		kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	dev_attr.devacc_attr_version		= DDI_DEVICE_ATTR_V0;
+	dev_attr.devacc_attr_endian_flags	= DDI_STRUCTURE_LE_ACC;
+	dev_attr.devacc_attr_dataorder		= DDI_STRICTORDER_ACC;
+
+	/* Allocate the memory */
+	if ((result = ddi_dma_mem_alloc(tw->tw_dmahandle, POLLED_RAW_BUF_SIZE,
+	    &dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &tw->tw_buf, &real_length, &tw->tw_accesshandle)) !=
+	    DDI_SUCCESS) {
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+		kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	/* Bind the handle */
+	if ((result = ddi_dma_addr_bind_handle(tw->tw_dmahandle, NULL,
+	    tw->tw_buf, real_length, DDI_DMA_RDWR|DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, NULL, &tw->tw_cookie, &ccount)) !=
+	    DDI_DMA_MAPPED) {
+		ddi_dma_mem_free(&tw->tw_accesshandle);
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+		kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	/* The cookie count should be 1 */
+	if (ccount != 1) {
+		result = ddi_dma_unbind_handle(tw->tw_dmahandle);
+		ASSERT(result == DDI_SUCCESS);
+
+		ddi_dma_mem_free(&tw->tw_accesshandle);
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+		kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+		return (USB_FAILURE);
+	}
+
+	if (ohci_allocate_tds_for_tw(ohcip, tw, td_count) == USB_SUCCESS) {
+		tw->tw_num_tds = td_count;
+	} else {
+		ohci_deallocate_tw_resources(ohcip, pp, tw);
+		return (USB_FAILURE);
+	}
+	tw->tw_cookie_idx = 0;
+	tw->tw_dma_offs = 0;
+
+	/*
+	 * Only allow one wrapper to be added at a time. Insert the
+	 * new transaction wrapper into the list for this pipe.
+	 */
+	if (pp->pp_tw_head == NULL) {
+		pp->pp_tw_head = tw;
+		pp->pp_tw_tail = tw;
+	} else {
+		pp->pp_tw_tail->tw_next = tw;
+		pp->pp_tw_tail = tw;
+	}
+
+	/* Store the transfer length */
+	tw->tw_length = POLLED_RAW_BUF_SIZE;
+
+	/* Store a back pointer to the pipe private structure */
+	tw->tw_pipe_private = pp;
+
+	/* Store the transfer type - synchronous or asynchronous */
+	tw->tw_flags = usb_flags;
+
+	/* Get and Store 32bit ID */
+	tw->tw_id = OHCI_GET_ID((void *)tw);
+
+	ASSERT(tw->tw_id != NULL);
+
+	pipe_dir = ph->p_ep.bEndpointAddress & USB_EP_DIR_MASK;
+	tw->tw_direction = (pipe_dir == USB_EP_DIR_IN) ? HC_TD_IN : HC_TD_OUT;
+
+	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+	    "ohci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
+	    (void *)tw, tw->tw_ncookies);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * ohci_polled_insert_hc_td:
+ *
+ * Insert a Transfer Descriptor (TD) on an Endpoint Descriptor (ED).
+ */
+int
+ohci_polled_insert_hc_td(
+	ohci_state_t		*ohcip,
+	uint_t			hctd_ctrl,
+	uint32_t		hctd_dma_offs,
+	size_t			hctd_length,
+	ohci_pipe_private_t	*pp,
+	ohci_trans_wrapper_t	*tw)
+{
+	ohci_td_t		*new_dummy;
+	ohci_td_t		*cpu_current_dummy;
+	ohci_ed_t		*ept = pp->pp_ept;
+
+	/* Retrieve preallocated td from the TW */
+	new_dummy = tw->tw_hctd_free_list;
+
+	ASSERT(new_dummy != NULL);
+
+	tw->tw_hctd_free_list = ohci_td_iommu_to_cpu(ohcip,
+	    Get_TD(new_dummy->hctd_tw_next_td));
+	Set_TD(new_dummy->hctd_tw_next_td, NULL);
+
+	/* Fill in the current dummy */
+	cpu_current_dummy = (ohci_td_t *)
+	    (ohci_td_iommu_to_cpu(ohcip, Get_ED(ept->hced_tailp)));
+
+	/*
+	 * Fill in the current dummy td and
+	 * add the new dummy to the end.
+	 */
+	ohci_polled_fill_in_td(ohcip, cpu_current_dummy, new_dummy,
+	    hctd_ctrl, hctd_dma_offs, hctd_length, tw);
+
+	/*
+	 * add the new dummy to the ED's list. When
+	 * this occurs, the Host Controller will see
+	 * the newly filled in dummy TD.
+	 */
+	Set_ED(ept->hced_tailp,
+	    (ohci_td_cpu_to_iommu(ohcip, new_dummy)));
+
+	/* Insert this td onto the tw */
+	ohci_polled_insert_td_on_tw(ohcip, tw, cpu_current_dummy);
+
+	return (USB_SUCCESS);
 }

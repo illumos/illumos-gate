@@ -66,6 +66,11 @@ root   ohci_hcdi_polled_input_fini
 root   ohci_hcdi_polled_input_enter
 root   ohci_hcdi_polled_input_exit
 root   ohci_hcdi_polled_read
+root   ohci_hcdi_polled_output_init
+root   ohci_hcdi_polled_output_fini
+root   ohci_hcdi_polled_output_enter
+root   ohci_hcdi_polled_output_exit
+root   ohci_hcdi_polled_write
  
 ### currently unused functions
  

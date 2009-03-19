@@ -1744,6 +1744,17 @@ ehci_alloc_hcdi_ops(ehci_state_t	*ehcip)
 	    ehci_hcdi_polled_input_exit;
 	usba_hcdi_ops->usba_hcdi_console_input_fini =
 	    ehci_hcdi_polled_input_fini;
+
+	usba_hcdi_ops->usba_hcdi_console_output_init =
+	    ehci_hcdi_polled_output_init;
+	usba_hcdi_ops->usba_hcdi_console_output_enter =
+	    ehci_hcdi_polled_output_enter;
+	usba_hcdi_ops->usba_hcdi_console_write =
+	    ehci_hcdi_polled_write;
+	usba_hcdi_ops->usba_hcdi_console_output_exit =
+	    ehci_hcdi_polled_output_exit;
+	usba_hcdi_ops->usba_hcdi_console_output_fini =
+	    ehci_hcdi_polled_output_fini;
 	return (usba_hcdi_ops);
 }
 

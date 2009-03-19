@@ -19,13 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_USB_OHCI_POLLED_H
 #define	_SYS_USB_OHCI_POLLED_H
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +50,7 @@ extern "C" {
  * in use.
  */
 #define	POLLED_INPUT_MODE		0x01
+#define	POLLED_OUTPUT_MODE		0x10
 
 /*
  * These two flags are used to determine if this structure is already in
@@ -58,6 +58,7 @@ extern "C" {
  * restore it once.  These flags are used for the ohci_polled_flags below.
  */
 #define	POLLED_INPUT_MODE_INUSE		0x04
+#define	POLLED_OUTPUT_MODE_INUSE	0x40
 
 /*
  * For ohci bandwidth of low speed interrupt devices limits,
