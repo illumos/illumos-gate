@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,16 @@ static int usba_str_startcmp(char *, char *);
  * USBA private variables and tunables
  */
 static kmutex_t	usba_mutex;
+
+/* mutex to protect usba_root_hubs */
+static kmutex_t usba_hub_mutex;
+
+typedef struct usba_root_hub_ent {
+	dev_info_t *dip;
+	struct usba_root_hub_ent *next;
+}usba_root_hub_ent_t;
+
+static usba_root_hub_ent_t *usba_root_hubs = NULL;
 
 /*
  * ddivs forced binding:
@@ -424,6 +434,7 @@ usba_usba_initialization()
 	    usba_log_handle, "usba_usba_initialization");
 
 	mutex_init(&usba_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&usba_hub_mutex, NULL, MUTEX_DRIVER, NULL);
 	usba_init_list(&usba_device_list, NULL, NULL);
 }
 
@@ -433,6 +444,7 @@ usba_usba_destroy()
 {
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle, "usba_usba_destroy");
 
+	mutex_destroy(&usba_hub_mutex);
 	mutex_destroy(&usba_mutex);
 	usba_destroy_list(&usba_device_list);
 
@@ -1314,18 +1326,67 @@ usba_list_entry_count(usba_list_entry_t *head)
 	return (count);
 }
 
+/* add a new root hub to the usba_root_hubs list */
+
+void
+usba_add_root_hub(dev_info_t *dip)
+{
+	usba_root_hub_ent_t *hub;
+
+	hub = (usba_root_hub_ent_t *)
+	    kmem_zalloc(sizeof (usba_root_hub_ent_t), KM_SLEEP);
+
+	mutex_enter(&usba_hub_mutex);
+	hub->dip = dip;
+	hub->next = usba_root_hubs;
+	usba_root_hubs = hub;
+	mutex_exit(&usba_hub_mutex);
+}
+
+/* remove a root hub from the usba_root_hubs list */
+
+void
+usba_rem_root_hub(dev_info_t *dip)
+{
+	usba_root_hub_ent_t **hubp, *hub;
+
+	mutex_enter(&usba_hub_mutex);
+	hubp = &usba_root_hubs;
+	while (*hubp) {
+		if ((*hubp)->dip == dip) {
+			hub = *hubp;
+			*hubp = hub->next;
+			kmem_free(hub, sizeof (struct usba_root_hub_ent));
+			mutex_exit(&usba_hub_mutex);
+
+			return;
+		}
+		hubp = &(*hubp)->next;
+	}
+	mutex_exit(&usba_hub_mutex);
+}
 
 /*
- * check whether this dip is the root hub. instead of doing a
- * strcmp on the node name we could also check the address
+ * check whether this dip is the root hub. Any root hub known by
+ * usba is recorded in the linked list pointed to by usba_root_hubs
  */
 int
 usba_is_root_hub(dev_info_t *dip)
 {
-	if (dip) {
-		return (ddi_prop_exists(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS|DDI_PROP_NOTPROM, "root-hub"));
+	usba_root_hub_ent_t *hub;
+
+	mutex_enter(&usba_hub_mutex);
+	hub = usba_root_hubs;
+	while (hub) {
+		if (hub->dip == dip) {
+			mutex_exit(&usba_hub_mutex);
+
+			return (1);
+		}
+		hub = hub->next;
 	}
+	mutex_exit(&usba_hub_mutex);
+
 	return (0);
 }
 

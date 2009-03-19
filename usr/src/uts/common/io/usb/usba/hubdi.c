@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,6 +279,8 @@ usba_hubdi_bind_root_hub(dev_info_t *dip,
 		return (USB_FAILURE);
 	}
 
+	usba_add_root_hub(dip);
+
 	root_hubd = kmem_zalloc(sizeof (hubd_t), KM_SLEEP);
 
 	/*
@@ -367,6 +369,8 @@ usba_hubdi_bind_root_hub(dev_info_t *dip,
 fail:
 	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "root-hub");
 
+	usba_rem_root_hub(dip);
+
 	if (ph) {
 		usb_pipe_close(dip, ph,
 		    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, NULL, NULL);
@@ -429,6 +433,8 @@ usba_hubdi_unbind_root_hub(dev_info_t *dip)
 	kmem_free(usba_device->usb_cfg_str_descr, sizeof (uchar_t *));
 
 	usba_free_usba_device(usba_device);
+
+	usba_rem_root_hub(dip);
 
 	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "root-hub");
 

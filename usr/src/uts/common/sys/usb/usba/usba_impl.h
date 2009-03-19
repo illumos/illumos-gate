@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,7 +234,6 @@ typedef  struct usba_hubdi {
 
 } usba_hubdi_t;
 
-
 /*
  * usba_get_mfg_prod_sn_str:
  *	Return a string containing mfg, product, serial number strings.
@@ -288,6 +287,8 @@ int	usba_pipe_setup_func_call(dev_info_t *,
 
 void	usba_pipe_new_state(usba_pipe_handle_data_t *, usb_pipe_state_t);
 
+void usba_add_root_hub(dev_info_t *dip);
+void usba_rem_root_hub(dev_info_t *dip);
 
 /*
  * retrieve string descriptors for manufacturer, vendor and serial
