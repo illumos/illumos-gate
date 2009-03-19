@@ -2065,23 +2065,7 @@ label=AUE_at_perm
 # not referenced outside uevents.h
 
 label=AUE_create_user
-  program=administration: create user
-  format=text1:text2:text3:text4:text5:text6:text7:text8:text9:text10:text11:text12:text13:text14
-    comment=uid:
-    comment=user name:
-    comment=primary gid:
-    comment=secondary gids; blank if none:
-    comment=login shell:
-    comment=password type:
-    comment=min change:
-    comment=max change:
-    comment=max inactive:
-    comment=expiration date:
-    comment=warning:
-    comment=path:
-    comment=server:
-    comment=permissions
-# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
+  skip=Not used.
 
 label=AUE_cron_invoke
   program=/usr/sbin/cron
@@ -2130,22 +2114,13 @@ label=AUE_deallocate_succ
 # See audit_allocate.c
 
 label=AUE_delete_user
-  program=administration: delete user
-  format=text1
-    comment=uid
-# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
+  skip=Not used.
 
 label=AUE_disable_user
-  program=administration: disable user
-  format=text1
-    comment=uid
-# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
+  skip=Not used.
 
 label=AUE_enable_user
-  program=administration: enable user
-  format=text1
-    comment=uid
-# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
+  skip=Not used.
 
 label=AUE_ftpd
   program=/usr/sbin/in.ftpd
@@ -2219,23 +2194,7 @@ label=AUE_listdevice_succ
 # See audit_allocate.c
 
 label=AUE_modify_user
-  program=administration: modify user
-  format=text1:text2:text3:text4:text5:text6:text7:text8:text9:text10:text11:text12:text13:text14
-    comment=uid:
-    comment=user name:
-    comment=primary gid:
-    comment=secondary gids; blank if none:
-    comment=login shell:
-    comment=password type:
-    comment=min change:
-    comment=max change:
-    comment=max inactive:
-    comment=expiration date:
-    comment=warning:
-    comment=path:
-    comment=server:
-    comment=permissions
-# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
+  skip=Not used.
 
 label=AUE_mountd_mount
   title=mountd: NFS mount

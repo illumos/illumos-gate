@@ -414,11 +414,11 @@
 6203:AUE_deallocate_fail:deallocate-device failure:ot
 6205:AUE_listdevice_succ:allocate-list devices success:ot
 6206:AUE_listdevice_fail:allocate-list devices failure:ot
-6207:AUE_create_user:create user:ua
-6208:AUE_modify_user:modify user:ua
-6209:AUE_delete_user:delete user:ua
-6210:AUE_disable_user:disable user:ua
-6211:AUE_enable_user:enable user:ua
+6207:AUE_create_user:create user:no
+6208:AUE_modify_user:modify user:no
+6209:AUE_delete_user:delete user:no
+6210:AUE_disable_user:disable user:no
+6211:AUE_enable_user:enable user:no
 6212:AUE_newgrp_login:newgrp login:lo
 6213:AUE_admin_authenticate:admin login:lo
 6214:AUE_kadmind_auth:authenticated kadmind request:ua
