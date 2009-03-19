@@ -1702,12 +1702,10 @@ aus_msgsys(struct t_audit_data *tad)
 		break;
 	case AUE_MSGCTL:		/* msgctl */
 	case AUE_MSGCTL_RMID:		/* msgctl */
+	case AUE_MSGCTL_SET:		/* msgctl */
 	case AUE_MSGCTL_STAT:		/* msgctl */
 	case AUE_MSGRCV:		/* msgrcv */
 	case AUE_MSGSND:		/* msgsnd */
-		au_uwrite(au_to_arg32(1, "msg ID", msgid));
-		break;
-	case AUE_MSGCTL_SET:		/* msgctl */
 		au_uwrite(au_to_arg32(1, "msg ID", msgid));
 		break;
 	}
@@ -1769,13 +1767,11 @@ aus_semsys(struct t_audit_data *tad)
 	case AUE_SEMCTL_GETVAL:
 	case AUE_SEMCTL_GETALL:
 	case AUE_SEMCTL_GETZCNT:
+	case AUE_SEMCTL_SET:
 	case AUE_SEMCTL_SETVAL:
 	case AUE_SEMCTL_SETALL:
 	case AUE_SEMCTL:
 	case AUE_SEMOP:
-		au_uwrite(au_to_arg32(1, "sem ID", semid));
-		break;
-	case AUE_SEMCTL_SET:
 		au_uwrite(au_to_arg32(1, "sem ID", semid));
 		break;
 	case AUE_SEMGET:
