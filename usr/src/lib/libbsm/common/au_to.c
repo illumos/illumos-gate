@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1414,7 +1414,7 @@ au_to_label(m_label_t *label)
 	token_t *token;			/* local token */
 	adr_t adr;			/* adr memory stream header */
 	char data_header = AUT_LABEL;	/* header for this token */
-	size_t llen = blabel_size();
+	size32_t llen = blabel_size();
 
 	token = get_token(sizeof (char) + llen);
 	if (token == NULL) {

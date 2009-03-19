@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -2195,7 +2194,7 @@ int
 label_token(pr_context_t *context)
 {
 	static m_label_t *label = NULL;
-	static size_t l_size;
+	static size32_t l_size;
 	int	len;
 	int	returnstat;
 	uval_t	uval;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -407,7 +405,7 @@ blabel_free(blevel_t *label_p)
 	free(label_p);
 }
 
-size_t
+size32_t
 blabel_size(void)
 {
 	return (sizeof (blevel_t));

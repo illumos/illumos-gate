@@ -19,15 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_TSOL_LABEL_H
 #define	_TSOL_LABEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/types32.h>
 #include <sys/tsol/label.h>
 #include <priv.h>
 
@@ -123,7 +122,7 @@ extern m_label_t *getlabelbypath(const char *);
 
 extern m_label_t *blabel_alloc(void);
 extern void	blabel_free(m_label_t *);
-extern size_t   blabel_size(void);
+extern size32_t blabel_size(void);
 extern char	*bsltoh(const m_label_t *);
 extern char	*bcleartoh(const m_label_t *);
 

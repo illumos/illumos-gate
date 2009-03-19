@@ -1074,7 +1074,7 @@ adt_from_export_format(adt_internal_state_t *internal,
 		adrm_int32(&context, (int *)&label_len, 1);
 		if (label_len > 0) {
 			/* read in and deal with different sized labels. */
-			size_t	my_label_len = blabel_size();
+			size32_t my_label_len = blabel_size();
 
 			if ((internal->as_label =
 			    m_label_alloc(MAC_LABEL)) == NULL) {
@@ -1110,7 +1110,7 @@ adt_to_export_format(adt_export_data_t *external,
 	struct export_header	head;
 	struct export_link	tail;
 	adr_t			context;
-	size_t			label_len = 0;
+	size32_t		label_len = 0;
 
 	adrm_start(&context, (char *)external);
 
@@ -1368,7 +1368,7 @@ size_t
 adt_export_session_data(const adt_session_data_t *internal,
     adt_export_data_t **external)
 {
-	size_t			length = 0;
+	size32_t		length = 0;
 
 	if ((internal != NULL) &&
 	    ((adt_internal_state_t *)internal)->as_label != NULL) {

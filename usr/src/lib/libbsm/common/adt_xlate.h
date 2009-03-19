@@ -21,7 +21,7 @@
 /*
  * adt_xlate.h
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -237,7 +237,7 @@ struct adt_export_v2 {
 	uint32_t	ax_asid;
 	int		ax_audit_enabled;
 	pid_t		ax_pid;
-	size_t		ax_label_len;	/* 0, unlabeled */
+	size32_t	ax_label_len;	/* 0, unlabeled */
 /*	char		ax_label[ax_label_len];	if, is_system_labeled */
 };
 struct adt_export_v1 {
