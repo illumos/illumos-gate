@@ -54,6 +54,7 @@ token=ipc:ipc
 token=ipc_perm:ipc_perm
 token=newgroup:newgroups
 token=path:path
+token=path_attr:attribute_path
 token=privset:privilege
 token=proc:process
 token=text:text
@@ -783,7 +784,7 @@ label=AUE_FCHOWN
 label=AUE_FCHOWNAT
   see=openat(2)
   case=With a valid absolute/relative file path 
-    format=path:[attr]
+    format=path:[path_attr]:[attr]
   case=With an file path eq. NULL and valid file descriptor
     format=kernel
 
@@ -832,8 +833,7 @@ label=AUE_FSTAT
   skip=Not used.
 
 label=AUE_FSTATAT
-# No information.
-# see=openat(2)
+  format=path:[path_attr]:[attr]
 
 label=AUE_FSTATFS
   case=With a valid file descriptor
@@ -852,7 +852,7 @@ label=AUE_FUSERS
 
 label=AUE_FUTIMESAT
   syscall=utimes(2)
-  format=[path]:[attr]
+  format=[path]:[path_attr]:[attr]
 
 label=AUE_GETAUDIT
   format=kernel
@@ -1176,7 +1176,7 @@ label=AUE_OPEN_R
   see=open(2) - read
 
 label=AUE_OPENAT_R
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
   see=openat(2)
 
 label=AUE_OPEN_RC
@@ -1185,7 +1185,7 @@ label=AUE_OPEN_RC
 
 label=AUE_OPENAT_RC
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_CREAT mangling
 
 label=AUE_OPEN_RT
@@ -1194,7 +1194,7 @@ label=AUE_OPEN_RT
 
 label=AUE_OPENAT_RT
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_TRUNC mangling
 
 label=AUE_OPEN_RTC
@@ -1203,7 +1203,7 @@ label=AUE_OPEN_RTC
 
 label=AUE_OPENAT_RTC
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_TRUNC mangling, fm & O_CREAT mangling
 
 label=AUE_OPEN_RW
@@ -1212,7 +1212,7 @@ label=AUE_OPEN_RW
 
 label=AUE_OPENAT_RW
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_RDWR 
 
 label=AUE_OPEN_RWC
@@ -1221,7 +1221,7 @@ label=AUE_OPEN_RWC
 
 label=AUE_OPENAT_RWC
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_RDWR, fm & O_CREAT mangling
 
 label=AUE_OPEN_RWT
@@ -1230,7 +1230,7 @@ label=AUE_OPEN_RWT
 
 label=AUE_OPENAT_RWT
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_RDWR, fm & O_TRUNC mangling
 
 label=AUE_OPEN_RWTC
@@ -1239,7 +1239,7 @@ label=AUE_OPEN_RWTC
 
 label=AUE_OPENAT_RWTC
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_RDWR, fm & O_TRUNC mangling, fm & O_CREAT mangling
 
 label=AUE_OPEN_W
@@ -1248,7 +1248,7 @@ label=AUE_OPEN_W
 
 label=AUE_OPENAT_W
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 
 label=AUE_OPEN_WC
   format=path:[attr]
@@ -1256,7 +1256,7 @@ label=AUE_OPEN_WC
 
 label=AUE_OPENAT_WC
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_WRONLY, fm & O_CREAT mangling
 
 label=AUE_OPEN_WT
@@ -1265,7 +1265,7 @@ label=AUE_OPEN_WT
 
 label=AUE_OPENAT_WT
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_WRONLY, fm & O_TRUNC mangling
 
 label=AUE_OPEN_WTC
@@ -1274,7 +1274,7 @@ label=AUE_OPEN_WTC
 
 label=AUE_OPENAT_WTC
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 # aui_fsat(): fm & O_WRONLY, fm & O_TRUNC mangling, fm & O_CREAT mangling
 
 label=AUE_OSETPGRP
@@ -1425,7 +1425,7 @@ label=AUE_RENAME
 
 label=AUE_RENAMEAT
 # see openat(2)
-  format=path1:[attr]1:[path]2
+  format=path1:[path_attr]:[attr]1:[path]2:[path_attr]
   comment=from name:
   comment=to name
 
@@ -1961,7 +1961,7 @@ label=AUE_UNLINK
 
 label=AUE_UNLINKAT
   see=openat(2)
-  format=path:[attr]
+  format=path:[path_attr]:[attr]
 
 label=AUE_UNMOUNT
   skip=Not used.
