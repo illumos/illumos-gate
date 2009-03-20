@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpmove.c 146 2006-03-24 00:26:54Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +47,8 @@ usage(char *program)
 		name++;
 
 	fprintf(stdout,
-		gettext("Usage: %s [request-id] (destination)\n"
-			"       %s (source) (destination)\n"), name);
+	    gettext("Usage: %s [request-id] (destination)\n"
+	    "       %s (source) (destination)\n"), name, name);
 	exit(1);
 }
 
@@ -106,11 +104,11 @@ main(int ac, char *av[])
 		(void) get_printer_id(av[c], &printer, &id);
 
 		status = papiServiceCreate(&svc, printer, NULL, NULL,
-					cli_auth_callback, encryption, NULL);
+		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
 			fprintf(stderr, gettext(
-				"Failed to contact service for %s: %s\n"),
-				printer, verbose_papi_message(svc, status));
+			    "Failed to contact service for %s: %s\n"),
+			    printer, verbose_papi_message(svc, status));
 			exit(1);
 		}
 
@@ -122,24 +120,22 @@ main(int ac, char *av[])
 			int count = 0;
 
 			snprintf(message, sizeof (message), "moved jobs to %s",
-					destination);
+			    destination);
 			status = papiPrinterDisable(svc, printer, message);
 			if (status != PAPI_OK) {
 				fprintf(stderr, gettext("Disable %s: %s\n"),
-					printer,
-					verbose_papi_message(svc, status));
+				    printer, verbose_papi_message(svc, status));
 				exit_code = 1;
 			} else
 				printf(gettext(
-				"destination %s is not accepting requests\n"),
-					printer);
+				    "destination %s is not accepting "
+				    "requests\n"), printer);
 
 			status = papiPrinterListJobs(svc, printer, NULL,
-							0, 0, &jobs);
+			    0, 0, &jobs);
 			if (status != PAPI_OK) {
 				fprintf(stderr, gettext("Jobs %s: %s\n"),
-					printer,
-					verbose_papi_message(svc, status));
+				    printer, verbose_papi_message(svc, status));
 				exit_code = 1;
 			}
 
