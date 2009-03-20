@@ -123,35 +123,79 @@ main(int ac, char *av[])
 			    destination);
 			status = papiPrinterDisable(svc, printer, message);
 			if (status != PAPI_OK) {
-				fprintf(stderr, gettext("Disable %s: %s\n"),
-				    printer, verbose_papi_message(svc, status));
-				exit_code = 1;
-			} else
-				printf(gettext(
-				    "destination %s is not accepting "
-				    "requests\n"), printer);
+				/*
+				 * If the user is denied the permission
+				 * to disable then return appropriate msg
+				 */
+				char *result = NULL;
 
-			status = papiPrinterListJobs(svc, printer, NULL,
-			    0, 0, &jobs);
-			if (status != PAPI_OK) {
-				fprintf(stderr, gettext("Jobs %s: %s\n"),
-				    printer, verbose_papi_message(svc, status));
-				exit_code = 1;
-			}
+				result = papiServiceGetStatusMessage(svc);
 
-			printf(gettext("move in progress ...\n"));
-			while ((jobs != NULL) && (*jobs != NULL)) {
-				id = papiJobGetId(*jobs++);
-				if (move_job(svc, printer, id, destination) < 0)
+				if (result != NULL) {
+					/*
+					 * Check if user is denied
+					 * the permission
+					 */
+					if (strstr(result, "permission denied")
+					    != NULL) {
+						/*
+						 * user is denied
+						 * permission
+						 */
+						fprintf(stderr, gettext(
+						    "UX:lpmove: ERROR:"\
+						    " You aren't allowed"\
+						    " to do that.\n\t"\
+						    "  TO FIX: You must"\
+						    " be logged in as"\
+						    " \"lp\" or \"root\".\n"));
+						exit_code = 1;
+					} else {
+						fprintf(stderr, gettext(
+						    "Disable %s: %s\n"),
+						    printer,
+						    verbose_papi_message(
+						    svc, status));
+						exit_code = 1;
+					}
+				} else {
+					fprintf(stderr, gettext(
+					    "Disable %s: %s\n"),
+					    printer,
+					    verbose_papi_message(svc, status));
 					exit_code = 1;
-				else
-					count++;
-			}
-			printf(gettext(
-			    "total of %d requests moved from %s to %s\n"),
-			    count, printer, destination);
+				}
+			} else {
+				printf(gettext(
+				    "destination %s is not accepting"\
+				    " requests\n"), printer);
 
-			papiJobListFree(jobs);
+				status = papiPrinterListJobs(svc, printer, NULL,
+				    0, 0, &jobs);
+				if (status != PAPI_OK) {
+					fprintf(stderr, gettext("Jobs %s:"\
+					    " %s\n"),
+					    printer,
+					    verbose_papi_message(svc, status));
+					exit_code = 1;
+				}
+
+				printf(gettext("move in progress ...\n"));
+				while ((jobs != NULL) && (*jobs != NULL)) {
+					id = papiJobGetId(*jobs++);
+					if (move_job(svc, printer,
+					    id, destination) < 0)
+						exit_code = 1;
+					else
+						count++;
+				}
+				printf(gettext(
+				    "total of %d requests moved"\
+				    " from %s to %s\n"),
+				    count, printer, destination);
+
+				papiJobListFree(jobs);
+			}
 		}
 
 		papiServiceDestroy(svc);
