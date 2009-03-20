@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains RSA helper routines common to
@@ -37,6 +35,7 @@
 #include <sys/param.h>
 #else
 #include <strings.h>
+#include <cryptoutil.h>
 #include "softRandom.h"
 #endif
 
@@ -197,7 +196,9 @@ soft_encrypt_rsa_pkcs_encode(uint8_t *databuf,
 #ifdef _KERNEL
 	rv = knzero_random_generator(padbuf + 2, padbuflen - 3);
 #else
-	rv = soft_nzero_random_generator(padbuf + 2, padbuflen - 3);
+	rv = CKR_OK;
+	if (pkcs11_get_nzero_urandom(padbuf + 2, padbuflen - 3) < 0)
+		rv = CKR_DEVICE_ERROR;
 #endif
 	if (rv != CKR_OK) {
 		return (rv);

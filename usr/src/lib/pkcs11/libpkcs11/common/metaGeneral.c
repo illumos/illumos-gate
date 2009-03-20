@@ -109,8 +109,6 @@ struct CK_FUNCTION_LIST metaslot_functionList = {
 
 pthread_mutex_t initmutex = PTHREAD_MUTEX_INITIALIZER;
 
-int meta_urandom_seed_fd = -1;
-
 ses_to_be_freed_list_t ses_delay_freed;
 object_to_be_freed_list_t obj_delay_freed;
 
@@ -198,10 +196,8 @@ meta_Finalize(CK_VOID_PTR pReserved)
 
 	(void) pthread_mutex_lock(&initmutex);
 
-	if (meta_urandom_seed_fd > 0) {
-		(void) close(meta_urandom_seed_fd);
-		meta_urandom_seed_fd = -1;
-	}
+	pkcs11_close_urandom();
+	pkcs11_close_urandom_seed();
 
 	meta_objectManager_finalize();
 

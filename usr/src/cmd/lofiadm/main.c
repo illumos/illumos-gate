@@ -894,7 +894,7 @@ getkeyfromfile(const char *pathname, mech_alias_t *cipher, char **key,
 		if (*key == NULL)
 			die(gettext("failed to allocate memory for"
 			    " ephemeral key"));
-		if (pkcs11_random_data(*key, *ksz) < 0) {
+		if (pkcs11_get_urandom(*key, *ksz) < 0) {
 			free(*key);
 			die(gettext("failed to get enough random data"));
 		}

@@ -42,111 +42,18 @@
 CK_RV
 soft_random_generator(CK_BYTE *ran_out, CK_ULONG ran_len, boolean_t token)
 {
-
-	long	nread;
-
 	/*
 	 * When random-number generator is called by asymmetric token
 	 * (persistent) key generation, use /dev/random. Otherwise,
 	 * use /dev/urandom.
 	 */
 	if (token) {
-		if (soft_random_fd < 0) {
-			(void) pthread_mutex_lock(&soft_giant_mutex);
-			/* Check again holding the mutex */
-			if (soft_random_fd < 0) {
-				soft_random_fd = open_nointr(DEV_RANDOM,
-				    O_RDONLY);
-				if (soft_random_fd < 0) {
-					(void) pthread_mutex_unlock(
-					    &soft_giant_mutex);
-					return (CKR_DEVICE_ERROR);
-				}
-			}
-			(void) pthread_mutex_unlock(&soft_giant_mutex);
-		}
+		if (pkcs11_get_random(ran_out, ran_len) < 0)
+			return (CKR_DEVICE_ERROR);
 	} else {
-		if (soft_urandom_fd < 0) {
-			(void) pthread_mutex_lock(&soft_giant_mutex);
-			/* Check again holding the mutex */
-			if (soft_urandom_fd < 0) {
-				soft_urandom_fd = open_nointr(DEV_URANDOM,
-				    O_RDONLY);
-				if (soft_urandom_fd < 0) {
-					(void) pthread_mutex_unlock(
-					    &soft_giant_mutex);
-					return (CKR_DEVICE_ERROR);
-				}
-			}
-			(void) pthread_mutex_unlock(&soft_giant_mutex);
-		}
+		if (pkcs11_get_urandom(ran_out, ran_len) < 0)
+			return (CKR_DEVICE_ERROR);
 	}
-
-	if (token)
-		nread = readn_nointr(soft_random_fd, ran_out, ran_len);
-	else
-		nread = readn_nointr(soft_urandom_fd, ran_out, ran_len);
-
-	if (nread <= 0) {
-		return (CKR_DEVICE_ERROR);
-	}
-	return (CKR_OK);
-
-}
-
-
-/*
- * This function guarantees to return non-zero random numbers.
- */
-CK_RV
-soft_nzero_random_generator(CK_BYTE *ran_out, CK_ULONG ran_len)
-{
-
-	CK_RV rv = CKR_OK;
-	size_t ebc = 0; /* count of extra bytes in extrarand */
-	size_t i = 0;
-	char extrarand[32];
-	size_t extrarand_len;
-
-	/*
-	 * soft_random_generator() may return zeros.
-	 */
-	if ((rv = soft_random_generator(ran_out, ran_len, B_FALSE)) != CKR_OK) {
-		return (rv);
-	}
-
-	/*
-	 * Walk through the returned random numbers pointed by ran_out,
-	 * and look for any random number which is zero.
-	 * If we find zero, call soft_random_generator() to generate
-	 * another 32 random numbers pool. Replace any zeros in ran_out[]
-	 * from the random number in pool.
-	 */
-	while (i < ran_len) {
-		if (((char *)ran_out)[i] != 0) {
-			i++;
-			continue;
-		}
-
-		if (ebc == 0) {
-			/* refresh extrarand */
-			extrarand_len = sizeof (extrarand);
-			if ((rv = soft_random_generator((CK_BYTE *)extrarand,
-			    extrarand_len, B_FALSE)) != CKR_OK) {
-				return (rv);
-			}
-
-			ebc = extrarand_len;
-		}
-		-- ebc;
-
-		/*
-		 * The new random byte zero/non-zero will be checked in
-		 * the next pass through the loop.
-		 */
-		((char *)ran_out)[i] = extrarand[ebc];
-	}
-
 	return (CKR_OK);
 }
 

@@ -31,29 +31,24 @@
 #include <locale.h>
 #include <stdarg.h>
 #include <cryptoutil.h>
-
-#ifdef	_REENTRANT
-
 #include <pthread.h>
+
 
 static pthread_mutex_t	random_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t	urandom_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#define	RAND_LOCK(x)	(void) pthread_mutex_lock(x)
-#define	RAND_UNLOCK(x)	(void) pthread_mutex_unlock(x)
-
-#else
-
-#define	RAND_LOCK(x)
-#define	RAND_UNLOCK(x)
-
-#endif
+static pthread_mutex_t	random_seed_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t	urandom_seed_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define	RANDOM_DEVICE		"/dev/random"	/* random device name */
 #define	URANDOM_DEVICE		"/dev/urandom"	/* urandom device name */
 
 static int	random_fd = -1;
 static int	urandom_fd = -1;
+
+static int	random_seed_fd = -1;
+static int	urandom_seed_fd = -1;
+
 
 /*
  * Equivalent of open(2) insulated from EINTR.
@@ -135,49 +130,141 @@ writen_nointr(int fd, void *dbuf, size_t dlen)
  * Opens the random number generator devices if not already open.
  * Always returns the opened fd of the device, or error.
  */
-int
-pkcs11_open_random(void)
+static int
+pkcs11_open_common(int *fd, pthread_mutex_t *mtx, const char *dev, int oflag)
 {
-	RAND_LOCK(&random_mutex);
-	if (random_fd < 0)
-		random_fd = open_nointr(RANDOM_DEVICE, O_RDONLY);
-	RAND_UNLOCK(&random_mutex);
-	return (random_fd);
+	if (*fd < 0) {
+		(void) pthread_mutex_lock(mtx);
+		if (*fd < 0)
+			*fd = open_nointr(dev, oflag);
+		(void) pthread_mutex_unlock(mtx);
+	}
+	return (*fd);
 }
 
-int
+static int
+pkcs11_open_random(void)
+{
+	return (pkcs11_open_common(&random_fd, &random_mutex,
+	    RANDOM_DEVICE, O_RDONLY));
+}
+
+static int
 pkcs11_open_urandom(void)
 {
-	RAND_LOCK(&urandom_mutex);
-	if (urandom_fd < 0)
-		urandom_fd = open_nointr(URANDOM_DEVICE, O_RDONLY);
-	RAND_UNLOCK(&urandom_mutex);
-	return (urandom_fd);
+	return (pkcs11_open_common(&urandom_fd, &urandom_mutex,
+	    URANDOM_DEVICE, O_RDONLY));
+}
+
+static int
+pkcs11_open_random_seed(void)
+{
+	return (pkcs11_open_common(&random_seed_fd, &random_seed_mutex,
+	    RANDOM_DEVICE, O_WRONLY));
+}
+
+static int
+pkcs11_open_urandom_seed(void)
+{
+	return (pkcs11_open_common(&urandom_seed_fd, &urandom_seed_mutex,
+	    URANDOM_DEVICE, O_WRONLY));
 }
 
 /*
  * Close the random number generator devices if already open.
  */
+static void
+pkcs11_close_common(int *fd, pthread_mutex_t *mtx)
+{
+	if (*fd < 0)
+		return;
+	(void) pthread_mutex_lock(mtx);
+	(void) close(*fd);
+	*fd = -1;
+	(void) pthread_mutex_unlock(mtx);
+}
+
 void
 pkcs11_close_random(void)
 {
-	if (random_fd < 0)
-		return;
-	RAND_LOCK(&random_mutex);
-	(void) close(random_fd);
-	random_fd = -1;
-	RAND_UNLOCK(&random_mutex);
+	pkcs11_close_common(&random_fd, &random_mutex);
 }
 
 void
 pkcs11_close_urandom(void)
 {
-	if (urandom_fd < 0)
-		return;
-	RAND_LOCK(&urandom_mutex);
-	(void) close(urandom_fd);
-	urandom_fd = -1;
-	RAND_UNLOCK(&urandom_mutex);
+	pkcs11_close_common(&urandom_fd, &urandom_mutex);
+}
+
+static void
+pkcs11_close_random_seed(void)
+{
+	pkcs11_close_common(&random_seed_fd, &random_seed_mutex);
+}
+
+void
+pkcs11_close_urandom_seed(void)
+{
+	pkcs11_close_common(&urandom_seed_fd, &urandom_seed_mutex);
+}
+
+/*
+ * Seed /dev/random with the data in the buffer.
+ */
+int
+pkcs11_seed_random(void *sbuf, size_t slen)
+{
+	if (sbuf == NULL || slen == 0)
+		return (0);
+
+	/* Seeding error could mean it's not supported (errno = EACCES) */
+	if (pkcs11_open_random_seed() < 0)
+		return (-1);
+
+	if (writen_nointr(random_seed_fd, sbuf, slen) == slen) {
+		pkcs11_close_random_seed();
+		return (0);
+	}
+	return (-1);
+}
+
+/*
+ * Seed /dev/urandom with the data in the buffer.
+ */
+int
+pkcs11_seed_urandom(void *sbuf, size_t slen)
+{
+	if (sbuf == NULL || slen == 0)
+		return (0);
+
+	/* Seeding error could mean it's not supported (errno = EACCES) */
+	if (pkcs11_open_urandom_seed() < 0)
+		return (-1);
+
+	if (writen_nointr(urandom_seed_fd, sbuf, slen) == slen) {
+		pkcs11_close_urandom_seed();
+		return (0);
+	}
+	return (-1);
+}
+
+/*
+ * Put the requested amount of random data into a preallocated buffer.
+ * Good for token key data, persistent objects.
+ */
+int
+pkcs11_get_random(void *dbuf, size_t dlen)
+{
+	if (dbuf == NULL || dlen == 0)
+		return (0);
+
+	/* Read random data directly from /dev/random */
+	if (pkcs11_open_random() < 0)
+		return (-1);
+
+	if (readn_nointr(random_fd, dbuf, dlen) == dlen)
+		return (0);
+	return (-1);
 }
 
 /*
@@ -185,7 +272,7 @@ pkcs11_close_urandom(void)
  * Good for passphrase salts, initialization vectors.
  */
 int
-pkcs11_random_data(void *dbuf, size_t dlen)
+pkcs11_get_urandom(void *dbuf, size_t dlen)
 {
 	if (dbuf == NULL || dlen == 0)
 		return (0);
@@ -200,17 +287,17 @@ pkcs11_random_data(void *dbuf, size_t dlen)
 }
 
 /*
- * Same as pkcs11_random_data but ensures non zero data.
+ * Same as pkcs11_get_urandom but ensures non zero data.
  */
 int
-pkcs11_nzero_random_data(void *dbuf, size_t dlen)
+pkcs11_get_nzero_urandom(void *dbuf, size_t dlen)
 {
 	char	extrarand[32];
 	size_t	bytesleft = 0;
 	size_t	i = 0;
 
 	/* Start with some random data */
-	if (pkcs11_random_data(dbuf, dlen) < 0)
+	if (pkcs11_get_urandom(dbuf, dlen) < 0)
 		return (-1);
 
 	/* Walk through data replacing any 0 bytes with more random data */
@@ -222,7 +309,7 @@ pkcs11_nzero_random_data(void *dbuf, size_t dlen)
 
 		if (bytesleft == 0) {
 			bytesleft = sizeof (extrarand);
-			if (pkcs11_random_data(extrarand, bytesleft) < 0)
+			if (pkcs11_get_urandom(extrarand, bytesleft) < 0)
 				return (-1);
 		}
 		bytesleft--;

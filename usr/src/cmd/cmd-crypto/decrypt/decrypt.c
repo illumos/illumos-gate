@@ -20,7 +20,7 @@
  */
 /* Portions Copyright 2005 Richard Lowe */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -650,7 +650,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	}
 
 	if (cmd->type == CKA_ENCRYPT) {
-		if ((pkcs11_random_data((void *)pivbuf,
+		if ((pkcs11_get_urandom((void *)pivbuf,
 		    mech_aliases[mech_match].ivlen)) != 0) {
 			cryptoerror(LOG_STDERR, gettext(
 			    "Unable to generate random "
@@ -808,7 +808,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			goto do_crypto;
 		}
 	} else if (cmd->type == CKA_ENCRYPT) {
-		rv = pkcs11_random_data((void *)salt, sizeof (salt));
+		rv = pkcs11_get_urandom((void *)salt, sizeof (salt));
 		if (rv != 0) {
 			cryptoerror(LOG_STDERR,
 			gettext("unable to generate random "

@@ -110,7 +110,6 @@ extern "C" {
 /* CK_TOKEN_INFO: More information about token */
 #define	METASLOT_TOKEN_LABEL		"Sun Metaslot                    "
 #define	METASLOT_TOKEN_MODEL		"1.0             "
-#define	RANDOM_DEVICE	"/dev/urandom"
 
 /*
  * Maximum number of objects and sessions to queue up before actually
@@ -556,7 +555,6 @@ extern boolean_t metaslot_enabled;
 extern CK_SLOT_ID metaslot_keystore_slotid;
 extern boolean_t metaslot_auto_key_migrate;
 extern struct CK_FUNCTION_LIST metaslot_functionList;
-extern int meta_urandom_seed_fd;
 extern pthread_mutex_t initmutex;
 
 extern ses_to_be_freed_list_t ses_delay_freed;

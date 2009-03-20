@@ -36,7 +36,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Sun elects to use this software under the MPL license.
@@ -44,8 +44,6 @@
 
 #ifndef _ECC_IMPL_H
 #define	_ECC_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -207,7 +205,8 @@ typedef enum _SECStatus {
 #ifdef _KERNEL
 #define	RNG_GenerateGlobalRandomBytes(p,l) ecc_knzero_random_generator((p), (l))
 #else
-#define	RNG_GenerateGlobalRandomBytes(p,l) soft_nzero_random_generator((p), (l))
+#define	RNG_GenerateGlobalRandomBytes(p,l) \
+	(pkcs11_get_nzero_urandom((p), (l)) < 0 ? CKR_DEVICE_ERROR : CKR_OK)
 #endif
 #define	CHECK_MPI_OK(func) if (MP_OKAY > (err = func)) goto cleanup
 #define	MP_TO_SEC_ERROR(err) 
@@ -216,7 +215,7 @@ typedef enum _SECStatus {
 	CHECK_MPI_OK(mp_read_unsigned_octets((mp), (it).data, (it).len))
 
 extern int ecc_knzero_random_generator(uint8_t *, size_t);
-extern ulong_t soft_nzero_random_generator(uint8_t *, ulong_t);
+extern int pkcs11_get_nzero_urandom(void *, size_t);
 
 extern SECStatus EC_DecodeParams(const SECItem *, ECParams **, int);
 extern SECItem * SECITEM_AllocItem(PRArenaPool *, SECItem *, unsigned int, int);

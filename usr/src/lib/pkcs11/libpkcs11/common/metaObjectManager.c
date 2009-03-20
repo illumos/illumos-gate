@@ -1294,7 +1294,7 @@ clone_by_wrap(meta_object_t *object, slot_object_t *new_clone,
 	}
 
 	/*
-	 * open the random device and read number of bytes required for
+	 * read number of bytes required from random device for
 	 * creating a secret key for wrapping and unwrapping
 	 */
 	if (wrap_info.class == CKO_SECRET_KEY) {
@@ -1305,29 +1305,19 @@ clone_by_wrap(meta_object_t *object, slot_object_t *new_clone,
 		 * use /dev/urandom because this key is used for this
 		 * one time operation only.  It doesn't need to be stored.
 		 */
-		int fd;
-
-		fd = open_nointr(RANDOM_DEVICE, O_RDONLY);
-		if (fd == -1) {
-			rv = CKR_FUNCTION_FAILED;
-			goto finish;
-		}
 		key_len = wrap_info.key_length;
-
-		if (readn_nointr(fd, key_data, key_len) != key_len) {
+		if (pkcs11_get_urandom(key_data, key_len) < 0) {
 			rv = CKR_FUNCTION_FAILED;
 			goto finish;
 		}
 
 		if (wrap_info.iv_length > 0) {
-			if (readn_nointr(fd, ivbuf, wrap_info.iv_length)
-			    != wrap_info.iv_length) {
+			if (pkcs11_get_urandom(
+			    ivbuf, wrap_info.iv_length) < 0) {
 				rv = CKR_FUNCTION_FAILED;
 				goto finish;
 			}
 		}
-
-		(void) close(fd);
 	}
 
 	/* create the wrapping key */

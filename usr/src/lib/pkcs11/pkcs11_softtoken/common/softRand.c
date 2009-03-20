@@ -30,7 +30,6 @@
 #include <security/cryptoki.h>
 #include <cryptoutil.h>
 #include "softGlobal.h"
-#include "softRandom.h"
 #include "softSession.h"
 
 CK_RV
@@ -40,7 +39,6 @@ C_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed, CK_ULONG ulSeedLen)
 	CK_RV	rv;
 	soft_session_t	*session_p;
 	boolean_t	lock_held = B_FALSE;
-	long		nwrite;
 
 	if (!softtoken_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
@@ -56,27 +54,11 @@ C_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed, CK_ULONG ulSeedLen)
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	if (soft_urandom_seed_fd < 0) {
-		(void) pthread_mutex_lock(&soft_giant_mutex);
-		/* Check again holding the mutex */
-		if (soft_urandom_seed_fd < 0) {
-			soft_urandom_seed_fd = open_nointr(DEV_URANDOM,
-			    O_WRONLY);
-			if (soft_urandom_seed_fd < 0) {
-				(void) pthread_mutex_unlock(&soft_giant_mutex);
-				if (errno == EACCES)
-					return (CKR_RANDOM_SEED_NOT_SUPPORTED);
-				return (CKR_DEVICE_ERROR);
-			}
-		}
-		(void) pthread_mutex_unlock(&soft_giant_mutex);
-	}
-
-	nwrite = writen_nointr(soft_urandom_seed_fd, pSeed, ulSeedLen);
-	if (nwrite <= 0) {
+	if (pkcs11_seed_urandom(pSeed, ulSeedLen) < 0) {
+		if (errno == EACCES)
+			return (CKR_RANDOM_SEED_NOT_SUPPORTED);
 		return (CKR_DEVICE_ERROR);
 	}
-
 	return (CKR_OK);
 
 }
@@ -104,6 +86,8 @@ C_GenerateRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pRandomData,
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	return (soft_random_generator(pRandomData, ulRandomLen, B_FALSE));
+	if (pkcs11_get_urandom(pRandomData, ulRandomLen) < 0)
+		return (CKR_DEVICE_ERROR);
+	return (CKR_OK);
 
 }

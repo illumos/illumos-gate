@@ -59,7 +59,6 @@ meta_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed,
 {
 	CK_RV rv;
 	meta_session_t *session;
-	ssize_t n;
 
 	if (pSeed == NULL || ulSeedLen == 0)
 		return (CKR_ARGUMENTS_BAD);
@@ -70,27 +69,11 @@ meta_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed,
 		return (rv);
 	REFRELEASE(session);
 
-	if (meta_urandom_seed_fd < 0) {
-		(void) pthread_mutex_lock(&initmutex);
-		/* Check again holding the mutex */
-		if (meta_urandom_seed_fd < 0) {
-			meta_urandom_seed_fd = open_nointr(RANDOM_DEVICE,
-			    O_WRONLY);
-			if (meta_urandom_seed_fd < 0) {
-				(void) pthread_mutex_unlock(&initmutex);
-				if (errno == EACCES)
-					return (CKR_RANDOM_SEED_NOT_SUPPORTED);
-				return (CKR_DEVICE_ERROR);
-			}
-		}
-		(void) pthread_mutex_unlock(&initmutex);
-	}
-
-	n = writen_nointr(meta_urandom_seed_fd, pSeed, ulSeedLen);
-	if (n <= 0) {
+	if (pkcs11_seed_urandom(pSeed, ulSeedLen) < 0) {
+		if (errno == EACCES)
+			return (CKR_RANDOM_SEED_NOT_SUPPORTED);
 		return (CKR_DEVICE_ERROR);
 	}
-
 	return (CKR_OK);
 }
 
@@ -110,8 +93,6 @@ meta_GenerateRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pRandomData,
 {
 	CK_RV rv;
 	meta_session_t *session;
-	int fd;
-	ssize_t n;
 
 	if (pRandomData == NULL || ulRandomLen < 1)
 		return (CKR_ARGUMENTS_BAD);
@@ -122,18 +103,8 @@ meta_GenerateRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pRandomData,
 		return (rv);
 	REFRELEASE(session);
 
-	fd = open_nointr(RANDOM_DEVICE, O_RDONLY);
-	if (fd == -1) {
+	if (pkcs11_get_urandom(pRandomData, ulRandomLen) < 0) {
 		return (CKR_DEVICE_ERROR);
 	}
-
-	n = readn_nointr(fd, pRandomData, ulRandomLen);
-	if (n <= 0) {
-		(void) close(fd);
-		return (CKR_DEVICE_ERROR);
-	}
-
-	(void) close(fd);
-
 	return (CKR_OK);
 }

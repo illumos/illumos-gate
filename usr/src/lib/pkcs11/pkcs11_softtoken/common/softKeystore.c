@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <crypt.h>
 #include <cryptoutil.h>
@@ -42,23 +40,10 @@
 #include "softKeys.h"
 #include "softKeystore.h"
 #include "softKeystoreUtil.h"
-#include "softRandom.h"
 #include "softMAC.h"
 #include "softOps.h"
 
 soft_session_t token_session;
-
-/*
- * Generate a 16-byte Initialization Vector (IV).
- */
-CK_RV
-soft_gen_iv(CK_BYTE *iv)
-{
-
-	return (soft_nzero_random_generator(iv, 16));
-
-}
-
 
 /*
  * soft_gen_hashed_pin()
@@ -718,7 +703,7 @@ soft_pack_object_size(soft_object_t *objp)
 		 * value_len + value
 		 */
 		return (ROUNDUP(OBJ_SEC_VALUE_LEN(objp), 8) +
-			sizeof (uint64_t));
+		    sizeof (uint64_t));
 
 	case CKO_CERTIFICATE:
 		switch (certtype) {
@@ -727,20 +712,20 @@ soft_pack_object_size(soft_object_t *objp)
 			 * subject_len + subject + value_len + value
 			 */
 			return (ROUNDUP(((cert_attr_t *)
-				X509_CERT_SUBJECT(objp))->length, 8) +
-				ROUNDUP(((cert_attr_t *)
-				X509_CERT_VALUE(objp))->length, 8) +
-				2 * sizeof (uint64_t));
+			    X509_CERT_SUBJECT(objp))->length, 8) +
+			    ROUNDUP(((cert_attr_t *)
+			    X509_CERT_VALUE(objp))->length, 8) +
+			    2 * sizeof (uint64_t));
 
 		case CKC_X_509_ATTR_CERT:
 			/*
 			 * owner_len + owner + value_len + value
 			 */
 			return (ROUNDUP(((cert_attr_t *)
-				X509_ATTR_CERT_OWNER(objp))->length, 8) +
-				ROUNDUP(((cert_attr_t *)
-				X509_ATTR_CERT_VALUE(objp))->length, 8) +
-				2 * sizeof (uint64_t));
+			    X509_ATTR_CERT_OWNER(objp))->length, 8) +
+			    ROUNDUP(((cert_attr_t *)
+			    X509_ATTR_CERT_VALUE(objp))->length, 8) +
+			    2 * sizeof (uint64_t));
 		}
 		return (0);
 
@@ -1717,7 +1702,7 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 			/* subject */
 			if ((rv = soft_unpack_obj_attribute(buf, NULL,
 			    &cert->cert_type_u.x509.subject,
-				&offset, B_TRUE)) != CKR_OK) {
+			    &offset, B_TRUE)) != CKR_OK) {
 				free(cert);
 				return (rv);
 			}
@@ -1727,7 +1712,7 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 			/* value */
 			if ((rv = soft_unpack_obj_attribute(buf, NULL,
 			    &cert->cert_type_u.x509.value,
-				&offset, B_TRUE)) != CKR_OK) {
+			    &offset, B_TRUE)) != CKR_OK) {
 				free(cert);
 				return (rv);
 			}
@@ -1738,7 +1723,7 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 			/* owner */
 			if ((rv = soft_unpack_obj_attribute(buf, NULL,
 			    &cert->cert_type_u.x509_attr.owner,
-				&offset, B_TRUE)) != CKR_OK) {
+			    &offset, B_TRUE)) != CKR_OK) {
 				free(cert);
 				return (rv);
 			}
@@ -1748,7 +1733,7 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 			/* value */
 			if ((rv = soft_unpack_obj_attribute(buf, NULL,
 			    &cert->cert_type_u.x509_attr.value,
-				&offset, B_TRUE)) != CKR_OK) {
+			    &offset, B_TRUE)) != CKR_OK) {
 				free(cert);
 				return (rv);
 			}
@@ -1989,7 +1974,7 @@ soft_gen_crypt_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 
 	if (*saltdata == NULL) {
 		bzero(salt, sizeof (salt));
-		(void) soft_nzero_random_generator(salt, sizeof (salt));
+		(void) pkcs11_get_nzero_urandom(salt, sizeof (salt));
 		*saltdata = malloc(PBKD2_SALT_SIZE);
 		if (*saltdata == NULL)
 			return (CKR_HOST_MEMORY);
@@ -2112,7 +2097,7 @@ soft_gen_hmac_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 
 	if (*saltdata == NULL) {
 		bzero(salt, sizeof (salt));
-		(void) soft_nzero_random_generator(salt, sizeof (salt));
+		(void) pkcs11_get_nzero_urandom(salt, sizeof (salt));
 		*saltdata = malloc(PBKD2_SALT_SIZE);
 		if (*saltdata == NULL)
 			return (CKR_HOST_MEMORY);

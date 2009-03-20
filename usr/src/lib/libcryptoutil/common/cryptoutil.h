@@ -144,8 +144,13 @@ extern char *pkcs11_default_token(void);
 extern int pkcs11_get_pass(char *token_name, char **pdata, size_t *psize,
     size_t min_psize, boolean_t with_confirmation);
 
-extern int pkcs11_random_data(void *dbuf, size_t dlen);
-extern int pkcs11_nzero_random_data(void *dbuf, size_t dlen);
+extern int pkcs11_seed_urandom(void *sbuf, size_t slen);
+extern int pkcs11_get_random(void *dbuf, size_t dlen);
+extern int pkcs11_get_urandom(void *dbuf, size_t dlen);
+extern int pkcs11_get_nzero_urandom(void *dbuf, size_t dlen);
+extern void pkcs11_close_random(void);
+extern void pkcs11_close_urandom(void);
+extern void pkcs11_close_urandom_seed(void);
 extern int pkcs11_read_data(char *filename, void **dbuf, size_t *dlen);
 
 extern int open_nointr(const char *path, int oflag, ...);

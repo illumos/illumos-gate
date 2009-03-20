@@ -120,10 +120,6 @@ soft_session_t *soft_session_list = NULL;
 
 int all_sessions_closing = 0;
 
-int soft_urandom_fd = -1;
-int soft_urandom_seed_fd = -1;
-int soft_random_fd = -1;
-
 slot_t soft_slot;
 obj_to_be_freed_list_t obj_delay_freed;
 ses_to_be_freed_list_t ses_delay_freed;
@@ -328,20 +324,9 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 	softtoken_initialized = B_FALSE;
 	softtoken_pid = 0;
 
-	if (soft_urandom_fd > 0) {
-		(void) close(soft_urandom_fd);
-		soft_urandom_fd = -1;
-	}
-
-	if (soft_urandom_seed_fd > 0) {
-		(void) close(soft_urandom_seed_fd);
-		soft_urandom_seed_fd = -1;
-	}
-
-	if (soft_random_fd > 0) {
-		(void) close(soft_random_fd);
-		soft_random_fd = -1;
-	}
+	pkcs11_close_urandom();
+	pkcs11_close_urandom_seed();
+	pkcs11_close_random();
 
 	/* Destroy the session list lock here */
 	(void) pthread_mutex_destroy(&soft_sessionlist_mutex);

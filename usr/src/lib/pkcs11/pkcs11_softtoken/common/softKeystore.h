@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SOFTKEYSTORE_H
 #define	_SOFTKEYSTORE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,8 +85,6 @@ typedef struct ks_attr_hdr {
 /*
  * Function Prototypes
  */
-CK_RV soft_gen_iv(CK_BYTE *iv);
-
 int soft_gen_hashed_pin(CK_UTF8CHAR_PTR pPin, char **result, char **salt);
 
 CK_RV soft_verify_pin(CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen);

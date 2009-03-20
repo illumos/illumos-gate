@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SOFTRANDOM_H
 #define	_SOFTRANDOM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,17 +34,6 @@ extern "C" {
 #include <security/pkcs11t.h>
 #include <bignum.h>
 #include "softSession.h"
-
-extern int soft_urandom_fd;
-extern int soft_urandom_seed_fd;
-extern int soft_random_fd;
-
-#define	DEV_URANDOM		"/dev/urandom"
-#define	DEV_RANDOM		"/dev/random"
-
-CK_RV soft_random_generator(CK_BYTE *, CK_ULONG, boolean_t);
-
-CK_RV soft_nzero_random_generator(CK_BYTE *, CK_ULONG);
 
 BIG_ERR_CODE random_bignum(BIGNUM *, int, boolean_t);
 

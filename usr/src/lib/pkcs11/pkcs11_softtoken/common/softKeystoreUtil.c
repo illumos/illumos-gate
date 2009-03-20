@@ -1180,6 +1180,18 @@ cleanup:
 	return (ret_val);
 }
 
+
+/*
+ * Generate a 16-byte Initialization Vector (IV).
+ */
+CK_RV
+soft_gen_iv(CK_BYTE *iv)
+{
+	return (pkcs11_get_nzero_urandom(iv, 16) < 0 ?
+	    CKR_DEVICE_ERROR : CKR_OK);
+}
+
+
 /*
  * This function reads all the data until the end of the file, and
  * put the data into the "buf" in argument.  Memory for buf will

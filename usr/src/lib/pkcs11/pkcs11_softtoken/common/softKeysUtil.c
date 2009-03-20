@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -36,6 +34,7 @@
 #include <blowfish_impl.h>
 #include <des_impl.h>
 #include <arcfour.h>
+#include <cryptoutil.h>
 #include "softGlobal.h"
 #include "softSession.h"
 #include "softObject.h"
@@ -43,7 +42,6 @@
 #include "softRSA.h"
 #include "softDH.h"
 #include "softEC.h"
-#include "softRandom.h"
 #include "softMAC.h"
 #include "softOps.h"
 #include "softKeys.h"
@@ -346,12 +344,13 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		break;
 	default:
 		do {
-			rv = soft_random_generator(
-			    OBJ_SEC_VALUE(secret_key), keylen, B_FALSE);
-
 			/* If this fails, bail out */
-			if (rv != CKR_OK)
+			rv = CKR_OK;
+			if (pkcs11_get_urandom(
+			    OBJ_SEC_VALUE(secret_key), keylen) < 0) {
+				rv = CKR_DEVICE_ERROR;
 				break;
+			}
 
 			/* Perform weak key checking for DES and DES3. */
 			if (des_strength > 0) {
