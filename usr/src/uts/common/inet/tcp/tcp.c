@@ -5048,6 +5048,7 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 	squeue_t		*sqp = (squeue_t *)arg;
 	tcp_squeue_priv_t 	*tcp_time_wait;
 	netstack_t		*ns;
+	mblk_t			*rsrv_mp;
 
 	tcp_time_wait =
 	    *((tcp_squeue_priv_t **)squeue_getprivate(sqp, SQPRIVATE_TCP));
@@ -5075,18 +5076,20 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 		return ((void *)connp);
 	}
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP,
-	    tcps->tcps_netstack)) == NULL)
-		return (NULL);
-	tcp = connp->conn_tcp;
 	/*
 	 * Pre-allocate the tcp_rsrv_mp.  This mblk will not be freed
 	 * until this conn_t/tcp_t is freed at ipcl_conn_destroy().
 	 */
-	if ((tcp->tcp_rsrv_mp = allocb(0, BPRI_HI)) == NULL) {
-		ipcl_conn_destroy(connp);
+	if ((rsrv_mp = allocb(0, BPRI_HI)) == NULL)
+		return (NULL);
+	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP,
+	    tcps->tcps_netstack)) == NULL) {
+		freeb(rsrv_mp);
 		return (NULL);
 	}
+	tcp = connp->conn_tcp;
+	tcp->tcp_rsrv_mp = rsrv_mp;
+
 	mutex_init(&tcp->tcp_rsrv_mp_lock, NULL, MUTEX_DEFAULT, NULL);
 	tcp->tcp_tcps = tcps;
 	TCPS_REFHOLD(tcps);
