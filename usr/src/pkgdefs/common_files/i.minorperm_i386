@@ -110,6 +110,7 @@ clone:chxge		0600 root sys 0666 root sys	/dev/chxge
 clone:pcn		0600 root sys 0666 root sys	/dev/pcn
 clone:rtls		0600 root sys 0666 root sys	/dev/rtls
 clone:ath		0600 root sys 0666 root sys	/dev/ath
+clone:atu		0600 root sys 0666 root sys	/dev/atu
 clone:ipw               0600 root sys 0666 root sys     /dev/ipw
 clone:iwh		0600 root sys 0666 root sys	/dev/iwh
 clone:iwi               0600 root sys 0666 root sys     /dev/iwi
@@ -136,6 +137,7 @@ chxge:*			0600 root sys 0666 root sys	/dev/chxge*
 pcn:*			0600 root sys 0666 root sys	/dev/pcn*
 rtls:*			0600 root sys 0666 root sys	/dev/rtls*
 ath:*			0600 root sys 0666 root sys	/dev/ath*
+atu:*			0600 root sys 0666 root sys	/dev/atu*
 ipw:*                   0600 root sys 0666 root sys     /dev/ipw*
 iwh:*			0600 root sys 0666 root sys	/dev/iwh*
 iwi:*                   0600 root sys 0666 root sys     /dev/iwi*
@@ -288,6 +290,7 @@ clone:chxge
 clone:pcn
 clone:rtls
 clone:ath
+clone:atu
 clone:ipw
 clone:iwh
 clone:iwi
@@ -314,6 +317,7 @@ chxge:*
 pcn:*
 rtls:*
 ath:*
+atu:*
 ipw:*
 iwh:*
 iwi:*
