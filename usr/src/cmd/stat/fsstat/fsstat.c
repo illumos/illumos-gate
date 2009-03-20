@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <time.h>
-#include <langinfo.h>
 #include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/vnode.h>
@@ -117,6 +116,8 @@ static char units[] = "num KMGTPE";
 
 char		*cmdname;	/* name of this command */
 int		caught_cont = 0;	/* have caught a SIGCONT */
+
+extern uint_t	timestamp_fmt;	/* print timestamp with stats */
 
 static int	vs_i = 0;	/* Index of current vs[] slot */
 
@@ -824,32 +825,6 @@ set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 	}
 }
 
-void
-print_time(int type)
-{
-	time_t	t;
-	static char *fmt = NULL;	/* Time format */
-
-	/* We only need to retrieve this once per invocation */
-	if (fmt == NULL) {
-		fmt = nl_langinfo(_DATE_FMT);
-	}
-
-	if (time(&t) != -1) {
-		if (type == UDATE) {
-			(void) printf("%ld\n", t);
-		} else if (type == DDATE) {
-			char	dstr[64];
-			int	len;
-
-			len = strftime(dstr, sizeof (dstr), fmt, localtime(&t));
-			if (len > 0) {
-				(void) printf("%s\n", dstr);
-			}
-		}
-	}
-}
-
 /*
  * The idea is that 'dspfunc' should only be modified from the default
  * once since the display options are mutually exclusive.  If 'dspfunc'
@@ -876,11 +851,10 @@ main(int argc, char *argv[])
 	int		c;
 	int		i, j;		/* Generic counters */
 	int		nentities_found;
-	int		linesout;	/* Keeps track of lines printed */
+	int		linesout = 0;	/* Keeps track of lines printed */
 	int		printhdr = 0;	/* Print a header?  0 = no, 1 = yes */
 	int		nfstypes;	/* Number of fstypes */
 	int		dispflag = 0;	/* Flags for display control */
-	int		timestamp = NODATE;	/* Default: no time stamp */
 	long		count = 0;	/* Number of iterations for display */
 	int		forever; 	/* Run forever */
 	long		interval = 0;
@@ -925,14 +899,14 @@ main(int argc, char *argv[])
 		case 'T':	/* Timestamp */
 			if (optarg) {
 				if (strcmp(optarg, "u") == 0) {
-					timestamp = UDATE;
+					timestamp_fmt = UDATE;
 				} else if (strcmp(optarg, "d") == 0) {
-					timestamp = DDATE;
+					timestamp_fmt = DDATE;
 				}
 			}
 
 			/* If it was never set properly... */
-			if (timestamp == NODATE) {
+			if (timestamp_fmt == NODATE) {
 				(void) fprintf(stderr, gettext("%s: -T option "
 				    "requires either 'u' or 'd'\n"), cmdname);
 				usage();
@@ -962,7 +936,7 @@ main(int argc, char *argv[])
 	}
 
 #if PARSABLE_OUTPUT
-	if ((dispflag & DISP_RAW) && (timestamp != NODATE)) {
+	if ((dispflag & DISP_RAW) && (timestamp_fmt != NODATE)) {
 		(void) fprintf(stderr, gettext(
 		    "-P and -T options are mutually exclusive\n"));
 		usage();
@@ -1025,18 +999,24 @@ main(int argc, char *argv[])
 	/* Set start time */
 	start_n = gethrtime();
 
+	/* Initial timestamp */
+	if (timestamp_fmt != NODATE) {
+		print_timestamp();
+		linesout++;
+	}
+
 	/*
 	 * The following loop walks through the entities[] list to "prime
 	 * the pump"
 	 */
-	for (j = 0, linesout = 0; j < nentities; j++) {
+	for (j = 0, printhdr = 1; j < nentities; j++) {
 		entity_t *ent = &entities[j];
 		vopstats_t *vsp = &ent->e_vs[CUR_INDEX];
 		kstat_t *ksp = NULL;
 
 		if (get_vopstats(kc, ent->e_ksname, vsp, &ksp) == 0) {
 			(*dfunc)(ent->e_name, NULL, vsp,
-			    dispflag_policy(linesout == 0, dispflag));
+			    dispflag_policy(printhdr, dispflag));
 			linesout++;
 		} else {
 			/*
@@ -1057,6 +1037,7 @@ main(int argc, char *argv[])
 				    entities[j].e_name);
 			}
 		}
+		printhdr = 0;
 	}
 
 	if (count > 1)
@@ -1080,8 +1061,8 @@ main(int argc, char *argv[])
 		/* Have a kip */
 		sleep_until(&start_n, period_n, forever, &caught_cont);
 
-		if (timestamp) {
-			print_time(timestamp);
+		if (timestamp_fmt != NODATE) {
+			print_timestamp();
 			linesout++;
 		}
 

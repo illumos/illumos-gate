@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -109,7 +107,7 @@ Usage()
 	    "Usage:\tprstat [-acHJLmRtTvZ] [-u euidlist] [-U uidlist]\n"
 	    "\t[-p pidlist] [-P cpulist] [-C psrsetlist] [-h lgrouplist]\n"
 	    "\t[-j projidlist] [-k taskidlist] [-z zoneidlist]\n"
-	    "\t[-s key | -S key] [-n nprocs[,nusers]]\n"
+	    "\t[-s key | -S key] [-n nprocs[,nusers]] [-d d|u]\n"
 	    "\t[interval [counter]]\n"));
 	exit(1);
 }

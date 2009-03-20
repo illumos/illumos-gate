@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "statcommon.h"
 
@@ -32,9 +30,12 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <langinfo.h>
 
 extern char *cmdname;
 extern int caught_cont;
+
+uint_t timestamp_fmt = NODATE;
 
 /*PRINTFLIKE2*/
 void
@@ -126,4 +127,30 @@ cont_handler(int sig_number)
 	/* Re-set the signal handler */
 	(void) signal(sig_number, cont_handler);
 	caught_cont = 1;
+}
+
+/*
+ * Print timestamp as decimal reprentation of time_t value (-T u was specified)
+ * or in date(1) format (-T d was specified).
+ */
+void
+print_timestamp(void)
+{
+	time_t t = time(NULL);
+	static char *fmt = NULL;
+
+	/* We only need to retrieve this once per invocation */
+	if (fmt == NULL)
+		fmt = nl_langinfo(_DATE_FMT);
+
+	if (timestamp_fmt == UDATE) {
+		(void) printf("%ld\n", t);
+	} else if (timestamp_fmt == DDATE) {
+		char dstr[64];
+		int len;
+
+		len = strftime(dstr, sizeof (dstr), fmt, localtime(&t));
+		if (len > 0)
+			(void) printf("%s\n", dstr);
+	}
 }

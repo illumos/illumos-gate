@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,8 +8,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* from UCB 5.4 5/17/86 */
 /* from SunOS 4.1, SID 1.31 */
@@ -26,11 +24,14 @@
 #include <signal.h>
 #include <values.h>
 #include <poll.h>
+#include <locale.h>
 
 #include "statcommon.h"
 
 char *cmdname = "vmstat";
 int caught_cont = 0;
+
+extern uint_t timestamp_fmt;
 
 static	int	hz;
 static	int	pagesize;
@@ -65,40 +66,55 @@ main(int argc, char **argv)
 	kstat_ctl_t *kc;
 	int forever = 0;
 	hrtime_t start_n;
+	int c;
+
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it weren't */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
 
 	pagesize = sysconf(_SC_PAGESIZE);
 	hz = sysconf(_SC_CLK_TCK);
 
-	argc--, argv++;
-	while (argc > 0 && argv[0][0] == '-') {
-		char *cp = *argv++;
-		argc--;
-		while (*++cp) {
-			switch (*cp) {
-
-			case 'S':
-				swflag = !swflag;
-				break;
-			case 's':
-				summary = 1;
-				break;
-			case 'i':
-				intr = 1;
-				break;
-			case 'c':
-				cflag++;
-				break;
-			case 'q':
-				suppress_state = 1;
-				break;
-			case 'p':
-				pflag++;	/* detailed paging info */
-				break;
-			default:
+	while ((c = getopt(argc, argv, "cipqsST:")) != EOF)
+		switch (c) {
+		case 'S':
+			swflag = !swflag;
+			break;
+		case 's':
+			summary = 1;
+			break;
+		case 'i':
+			intr = 1;
+			break;
+		case 'c':
+			cflag++;
+			break;
+		case 'q':
+			suppress_state = 1;
+			break;
+		case 'p':
+			pflag++;	/* detailed paging info */
+			break;
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage();
+			} else {
 				usage();
 			}
+			break;
+		default:
+			usage();
 		}
-	}
+
+	argc -= optind;
+	argv += optind;
 
 	/* consistency with iostat */
 	types |= SNAP_CPUS;
@@ -118,7 +134,7 @@ main(int argc, char **argv)
 	(void) memset(df.if_names, 0, df.if_max_iodevs * sizeof (char *));
 
 	while (argc > 0 && !isdigit(argv[0][0]) &&
-		df.if_nr_names < df.if_max_iodevs) {
+	    df.if_nr_names < df.if_max_iodevs) {
 		df.if_names[df.if_nr_names] = *argv;
 		df.if_nr_names++;
 		argc--, argv++;
@@ -176,7 +192,6 @@ main(int argc, char **argv)
 
 	(void) sigset(SIGCONT, printhdr);
 
-	printhdr(0);
 	dovmstats(old, ss);
 	while (forever || --iter > 0) {
 		/* (void) poll(NULL, 0, poll_interval); */
@@ -263,7 +278,12 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 	etime = etime >= 1.0 ? (etime / nr_active_cpus(new)) / hz : 1.0;
 	updates = denom(DELTA(s_sys.ss_sysinfo.updates));
 
-	if (--lines == 0)
+	if (timestamp_fmt != NODATE) {
+		print_timestamp();
+		lines--;
+	}
+
+	if (--lines <= 0)
 		printhdr(0);
 
 	adj = 0;
@@ -310,7 +330,7 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 	adjprintf(" %*u", 6, pgtok((int)(DELTA(s_sys.ss_vminfo.swap_avail)
 	    / updates)));
 	adjprintf(" %*u", 5, pgtok((int)(DELTA(s_sys.ss_vminfo.freemem)
-						/ updates)));
+	    / updates)));
 	adjprintf(" %*.0f", 3, swflag?
 	    kstat_delta(oldvm, newvm, "swapin") / etime :
 	    kstat_delta(oldvm, newvm, "pgrec") / etime);
@@ -400,7 +420,7 @@ sum_out(char const *pretty, kstat_t *ks, char *name)
 	kstat_named_t *ksn = kstat_data_lookup(ks, name);
 	if (ksn == NULL) {
 		fail(0, "kstat_data_lookup('%s', '%s') failed",
-			ks->ks_name, name);
+		    ks->ks_name, name);
 	}
 
 	(void) printf("%9llu %s\n", ksn->value.ui64, pretty);
@@ -422,18 +442,18 @@ dosum(struct sys_snapshot *ss)
 	ksn = kstat_data_lookup(&ss->ss_agg_vm, "hat_fault");
 	if (ksn == NULL) {
 		fail(0, "kstat_data_lookup('%s', 'hat_fault') failed",
-			ss->ss_agg_vm.ks_name);
+		    ss->ss_agg_vm.ks_name);
 	}
 	total_faults = ksn->value.ui64;
 	ksn = kstat_data_lookup(&ss->ss_agg_vm, "as_fault");
 	if (ksn == NULL) {
 		fail(0, "kstat_data_lookup('%s', 'as_fault') failed",
-			ss->ss_agg_vm.ks_name);
+		    ss->ss_agg_vm.ks_name);
 	}
 	total_faults += ksn->value.ui64;
 
 	(void) printf("%9llu total address trans. faults taken\n",
-		total_faults);
+	    total_faults);
 
 	sum_out("page ins", &ss->ss_agg_vm, "pgin");
 	sum_out("page outs", &ss->ss_agg_vm, "pgout");
@@ -480,8 +500,8 @@ dointr(struct snapshot *ss)
 
 	for (i = 0; i < ss->s_nr_intrs; i++) {
 		(void) printf("%-12.8s %10lu %8.0f\n",
-			ss->s_intrs[i].is_name, ss->s_intrs[i].is_total,
-			ss->s_intrs[i].is_total / etime);
+		    ss->s_intrs[i].is_name, ss->s_intrs[i].is_total,
+		    ss->s_intrs[i].is_total / etime);
 		total += ss->s_intrs[i].is_total;
 	}
 
@@ -503,11 +523,11 @@ docachestats(kstat_ctl_t *kc, hrtime_t interval, int forever)
 	if (iter == 0) {
 		(void) printf("flush statistics: (totals)\n");
 		(void) printf("%8s%8s%8s%8s%8s%8s\n",
-			"usr", "ctx", "rgn", "seg", "pag", "par");
+		    "usr", "ctx", "rgn", "seg", "pag", "par");
 		(void) printf(" %7d %7d %7d %7d %7d %7d\n",
-			old->s_flushes.f_usr, old->s_flushes.f_ctx,
-			old->s_flushes.f_region, old->s_flushes.f_segment,
-			old->s_flushes.f_page, old->s_flushes.f_partial);
+		    old->s_flushes.f_usr, old->s_flushes.f_ctx,
+		    old->s_flushes.f_region, old->s_flushes.f_segment,
+		    old->s_flushes.f_page, old->s_flushes.f_partial);
 		return;
 	}
 
@@ -523,12 +543,12 @@ docachestats(kstat_ctl_t *kc, hrtime_t interval, int forever)
 		new = acquire_snapshot(kc, SNAP_FLUSHES, NULL);
 
 		(void) printf(" %7d %7d %7d %7d %7d %7d\n",
-			new->s_flushes.f_usr - old->s_flushes.f_usr,
-			new->s_flushes.f_ctx - old->s_flushes.f_ctx,
-			new->s_flushes.f_region - old->s_flushes.f_region,
-			new->s_flushes.f_segment - old->s_flushes.f_segment,
-			new->s_flushes.f_page - old->s_flushes.f_page,
-			new->s_flushes.f_partial- old->s_flushes.f_partial);
+		    new->s_flushes.f_usr - old->s_flushes.f_usr,
+		    new->s_flushes.f_ctx - old->s_flushes.f_ctx,
+		    new->s_flushes.f_region - old->s_flushes.f_region,
+		    new->s_flushes.f_segment - old->s_flushes.f_segment,
+		    new->s_flushes.f_page - old->s_flushes.f_page,
+		    new->s_flushes.f_partial- old->s_flushes.f_partial);
 		(void) fflush(stdout);
 		free_snapshot(old);
 		old = new;
@@ -539,6 +559,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-		"Usage: vmstat [-cipqsS] [disk ...] [interval [count]]\n");
+	    "Usage: vmstat [-cipqsS] [-T d|u] [disk ...] "
+	    "[interval [count]]\n");
 	exit(1);
 }

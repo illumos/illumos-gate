@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/resource.h>
@@ -49,6 +47,7 @@
 #include <time.h>
 #include <project.h>
 
+#include <langinfo.h>
 #include <libintl.h>
 #include <locale.h>
 
@@ -173,6 +172,34 @@ static optdesc_t opts = {
 	OPT_PSINFO | OPT_FULLSCREEN | OPT_USEHOME | OPT_TERMCAP,
 	-1			/* sort in decreasing order */
 };
+
+/*
+ * Print timestamp as decimal reprentation of time_t value (-d u was specified)
+ * or the standard date format (-d d was specified).
+ */
+static void
+print_timestamp(void)
+{
+	time_t t = time(NULL);
+	static char *fmt = NULL;
+
+	/* We only need to retrieve this once per invocation */
+	if (fmt == NULL)
+		fmt = nl_langinfo(_DATE_FMT);
+
+	if (opts.o_outpmode & OPT_UDATE) {
+		(void) printf("%ld", t);
+	} else if (opts.o_outpmode & OPT_DDATE) {
+		char dstr[64];
+		int len;
+
+		len = strftime(dstr, sizeof (dstr), fmt, localtime(&t));
+		if (len > 0)
+			(void) printf("%s", dstr);
+	}
+	(void) putp(t_eol);
+	(void) putchar('\n');
+}
 
 static void
 psetloadavg(long psetid, void *ptr)
@@ -338,6 +365,9 @@ list_print(list_t *list)
 		(void) getloadavg(loadavg, 3);
 	}
 
+	if (((opts.o_outpmode & OPT_UDATE) || (opts.o_outpmode & OPT_DDATE)) &&
+	    ((list->l_type == LT_LWPS) || !(opts.o_outpmode & OPT_SPLIT)))
+		print_timestamp();
 	if (opts.o_outpmode & OPT_TTY)
 		(void) putchar('\r');
 	(void) putp(t_ulon);
@@ -916,8 +946,7 @@ prstat_scandir(DIR *procdir)
 				    lwpsinfo->pr_onpro) ||
 				    !has_element(&set_tbl,
 				    lwpsinfo->pr_bindpset) ||
-				    !has_element(&lgr_tbl,
-					lwpsinfo->pr_lgrp))
+				    !has_element(&lgr_tbl, lwpsinfo->pr_lgrp))
 					continue;
 				nlwps++;
 				if ((opts.o_outpmode & (OPT_PSETS | OPT_LWPS))
@@ -1116,6 +1145,9 @@ setmovecur()
 		else
 			n = opts.o_ntop + 1;
 	}
+	if (((opts.o_outpmode & OPT_UDATE) || (opts.o_outpmode & OPT_DDATE)))
+		n++;
+
 	if (movecur != NULL && movecur != empty_string && movecur != t_home)
 		free(movecur);
 	movecur = Zalloc(strlen(t_up) * (n + 5));
@@ -1140,6 +1172,9 @@ setsize()
 			return (1);
 		}
 		n = n - 3;	/* minus header, total and cursor lines */
+		if ((opts.o_outpmode & OPT_UDATE) ||
+		    (opts.o_outpmode & OPT_DDATE))
+			n--;	/* minus timestamp */
 		if (n < 1)
 			Die(gettext("window is too small (try -n)\n"));
 		if (opts.o_outpmode & OPT_SPLIT) {
@@ -1322,8 +1357,8 @@ main(int argc, char **argv)
 
 	pagesize = sysconf(_SC_PAGESIZE);
 
-	while ((opt = getopt(argc, argv, "vcHmaRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z"))
-	    != (int)EOF) {
+	while ((opt = getopt(argc, argv,
+	    "vcd:HmaRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z")) != (int)EOF) {
 		switch (opt) {
 		case 'R':
 			opts.o_outpmode |= OPT_REALTIME;
@@ -1331,6 +1366,18 @@ main(int argc, char **argv)
 		case 'c':
 			opts.o_outpmode &= ~OPT_TERMCAP;
 			opts.o_outpmode &= ~OPT_FULLSCREEN;
+			break;
+		case 'd':
+			if (optarg) {
+				if (*optarg == 'u')
+					opts.o_outpmode |= OPT_UDATE;
+				else if (*optarg == 'd')
+					opts.o_outpmode |= OPT_DDATE;
+				else
+					Usage();
+			} else {
+				Usage();
+			}
 			break;
 		case 'h':
 			fill_table(&lgr_tbl, optarg, 'h');
@@ -1436,15 +1483,14 @@ main(int argc, char **argv)
 		    "-a, -J, -T or -Z\n"));
 
 	if ((opts.o_outpmode & OPT_USERS) &&
-	    (opts.o_outpmode &
-		(OPT_TASKS | OPT_PROJECTS | OPT_ZONES)))
+	    (opts.o_outpmode & (OPT_TASKS | OPT_PROJECTS | OPT_ZONES)))
 		Die(gettext("-a option cannot be used with "
 		    "-t, -J, -T or -Z\n"));
 
 	if (((opts.o_outpmode & OPT_TASKS) &&
 	    (opts.o_outpmode & (OPT_PROJECTS|OPT_ZONES))) ||
 	    ((opts.o_outpmode & OPT_PROJECTS) &&
-		(opts.o_outpmode & (OPT_TASKS|OPT_ZONES)))) {
+	    (opts.o_outpmode & (OPT_TASKS|OPT_ZONES)))) {
 		Die(gettext(
 		    "-J, -T and -Z options are mutually exclusive\n"));
 	}
@@ -1495,6 +1541,8 @@ main(int argc, char **argv)
 		Die(gettext("cannot open /proc directory\n"));
 	if (opts.o_outpmode & OPT_TTY) {
 		(void) printf(gettext("Please wait...\r"));
+		if (!(opts.o_outpmode & OPT_TERMCAP))
+			(void) putchar('\n');
 		(void) fflush(stdout);
 	}
 	set_signals();

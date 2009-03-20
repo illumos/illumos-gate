@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * rewritten from UCB 4.13 83/09/25
  * rewritten from SunOS 4.1 SID 1.18 89/10/06
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +44,7 @@
 #include <strings.h>
 #include <sys/systeminfo.h>
 #include <kstat.h>
+#include <locale.h>
 
 #include "dsr.h"
 #include "statcommon.h"
@@ -127,14 +126,8 @@ static	uint_t	do_conversions;		/* display disks as cXtYdZ (-n) */
 static	uint_t	do_megabytes;		/* display data in MB/sec (-M) */
 static  uint_t	do_controller;		/* display controller info (-C) */
 static  uint_t	do_raw;			/* emit raw format (-r) */
-static  uint_t	do_timestamp;		/* timestamp  each display (-T) */
+extern	uint_t	timestamp_fmt;		/* timestamp  each display (-T) */
 static	uint_t	do_devid;		/* -E should show devid */
-
-/*
- * Definition of allowable types of timestamps
- */
-#define	CDATE 1
-#define	UDATE 2
 
 /*
  * Default number of disk drives to be displayed in basic format
@@ -173,7 +166,6 @@ static format_t *formatter_end;
 static u_longlong_t	ull_delta(u_longlong_t, u_longlong_t);
 static uint_t 	u32_delta(uint_t, uint_t);
 static void setup(void (*nfunc)(void));
-static void print_timestamp(void);
 static void print_tty_hdr1(void);
 static void print_tty_hdr2(void);
 static void print_cpu_hdr1(void);
@@ -208,6 +200,12 @@ main(int argc, char **argv)
 	int forever;
 	hrtime_t start_n;
 	hrtime_t period_n;
+
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it weren't */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
 
 	do_args(argc, argv);
 
@@ -1132,13 +1130,14 @@ do_args(int argc, char **argv)
 		case 'T':
 			if (optarg) {
 				if (*optarg == 'u')
-					do_timestamp = UDATE;
+					timestamp_fmt = UDATE;
 				else if (*optarg == 'd')
-					do_timestamp = CDATE;
+					timestamp_fmt = DDATE;
 				else
 					errflg++;
-			} else
+			} else {
 				errflg++;
+			}
 			break;
 		case 'r':
 			do_raw = 1;
@@ -1357,7 +1356,7 @@ do_format(void)
 		dh_len = strlen(disk_header) - 2;
 	}
 
-	if (do_timestamp)
+	if (timestamp_fmt != NODATE)
 		setup(print_timestamp);
 
 	/*
@@ -1671,33 +1670,6 @@ static void
 print_disk_header(void)
 {
 	push_out(disk_header);
-}
-
-/*
- * Write out a timestamp. Format is all that goes out on
- * the line so no use of push_out.
- *
- * Write out as decimal reprentation of time_t value
- * (-T u was specified) or the string returned from
- * ctime() (-T d was specified).
- */
-static void
-print_timestamp(void)
-{
-	time_t t;
-
-	if (time(&t) != -1) {
-		if (do_timestamp == UDATE) {
-			(void) printf("%ld\n", t);
-		} else if (do_timestamp == CDATE) {
-			char *cpt;
-
-			cpt = ctime(&t);
-			if (cpt) {
-				(void) fputs(cpt, stdout);
-			}
-		}
-	}
 }
 
 /*

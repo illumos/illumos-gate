@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PRSTAT_H
 #define	_PRSTAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <sys/time.h>
@@ -70,6 +68,8 @@ extern "C" {
 #define	OPT_ZONES	0x2000		/* report about zones */
 #define	OPT_PSETS	0x4000		/* report for specified psets */
 #define	OPT_LGRP	0x8000		/* report home lgroups */
+#define	OPT_UDATE	0x20000		/* print unix timestamp */
+#define	OPT_DDATE	0x40000		/* print timestamp in date(1) format */
 
 /*
  * Flags to keep track of process or lwp status

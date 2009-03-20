@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/pset.h>
 #include <sys/types.h>
@@ -44,6 +42,7 @@
 #include <kstat.h>
 #include <poll.h>
 #include <signal.h>
+#include <locale.h>
 
 #include "statcommon.h"
 
@@ -53,6 +52,8 @@
 
 char *cmdname = "mpstat";
 int caught_cont = 0;
+
+extern uint_t timestamp_fmt;
 
 static int hz;
 static int display_pset = -1;
@@ -79,7 +80,13 @@ main(int argc, char **argv)
 	hrtime_t start_n;
 	hrtime_t period_n;
 
-	while ((c = getopt(argc, argv, "apP:q")) != (int)EOF)
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it weren't */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
+
+	while ((c = getopt(argc, argv, "apP:qT:")) != (int)EOF)
 		switch (c) {
 			case 'a':
 				/*
@@ -114,6 +121,18 @@ main(int argc, char **argv)
 				break;
 			case 'q':
 				suppress_state = 1;
+				break;
+			case 'T':
+				if (optarg) {
+					if (*optarg == 'u')
+						timestamp_fmt = UDATE;
+					else if (*optarg == 'd')
+						timestamp_fmt = DDATE;
+					else
+						usage();
+				} else {
+					usage();
+				}
 				break;
 			case '?':
 				usage();
@@ -231,26 +250,26 @@ print_cpu(struct cpu_snapshot *c1, struct cpu_snapshot *c2)
 	percent = 100.0 / etime / hz;
 
 	(void) printf("%3d %4.0f %3.0f %4.0f %5.0f %4.0f "
-	"%4.0f %4.0f %4.0f %4.0f %4.0f %5.0f  %3.0f %3.0f "
-	"%3.0f %3.0f",
-	c2->cs_id,
-	(kstat_delta(old_vm, &c2->cs_vm, "hat_fault") +
-		kstat_delta(old_vm, &c2->cs_vm, "as_fault")) / etime,
-	kstat_delta(old_vm, &c2->cs_vm, "maj_fault") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "xcalls") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "intr") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "intrthread") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "pswitch") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "inv_swtch") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "cpumigrate") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "mutex_adenters") / etime,
-	(kstat_delta(old_sys, &c2->cs_sys, "rw_rdfails") +
-	kstat_delta(old_sys, &c2->cs_sys, "rw_wrfails")) / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "syscall") / etime,
-	kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_user") * percent,
-	kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_kernel") * percent,
-	kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_wait") * percent,
-	kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_idle") * percent);
+	    "%4.0f %4.0f %4.0f %4.0f %4.0f %5.0f  %3.0f %3.0f "
+	    "%3.0f %3.0f",
+	    c2->cs_id,
+	    (kstat_delta(old_vm, &c2->cs_vm, "hat_fault") +
+	    kstat_delta(old_vm, &c2->cs_vm, "as_fault")) / etime,
+	    kstat_delta(old_vm, &c2->cs_vm, "maj_fault") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "xcalls") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "intr") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "intrthread") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "pswitch") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "inv_swtch") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "cpumigrate") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "mutex_adenters") / etime,
+	    (kstat_delta(old_sys, &c2->cs_sys, "rw_rdfails") +
+	    kstat_delta(old_sys, &c2->cs_sys, "rw_wrfails")) / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "syscall") / etime,
+	    kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_user") * percent,
+	    kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_kernel") * percent,
+	    kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_wait") * percent,
+	    kstat_delta(old_sys, &c2->cs_sys, "cpu_ticks_idle") * percent);
 
 	if (show_set)
 		(void) printf(" %3d", c2->cs_pset_id);
@@ -417,27 +436,27 @@ print_pset(struct pset_snapshot *p1, struct pset_snapshot *p2)
 	percent = 100.0 / p2->ps_nr_cpus / etime / hz;
 
 	(void) printf("%3d %4.0f %3.0f %4.0f %5.0f %4.0f "
-	"%4.0f %4.0f %4.0f %4.0f %4.0f %5.0f  %3.0f %3.0f "
-	"%3.0f %3.0f %3d\n",
-	p2->ps_id,
-	(kstat_delta(&old_vm, &new_vm, "hat_fault") +
-		kstat_delta(&old_vm, &new_vm, "as_fault")) / etime,
-	kstat_delta(&old_vm, &new_vm, "maj_fault") / etime,
-	kstat_delta(&old_sys, &new_sys, "xcalls") / etime,
-	kstat_delta(&old_sys, &new_sys, "intr") / etime,
-	kstat_delta(&old_sys, &new_sys, "intrthread") / etime,
-	kstat_delta(&old_sys, &new_sys, "pswitch") / etime,
-	kstat_delta(&old_sys, &new_sys, "inv_swtch") / etime,
-	kstat_delta(&old_sys, &new_sys, "cpumigrate") / etime,
-	kstat_delta(&old_sys, &new_sys, "mutex_adenters") / etime,
-	(kstat_delta(&old_sys, &new_sys, "rw_rdfails") +
-	kstat_delta(&old_sys, &new_sys, "rw_wrfails")) / etime,
-	kstat_delta(&old_sys, &new_sys, "syscall") / etime,
-	kstat_delta(&old_sys, &new_sys, "cpu_ticks_user") * percent,
-	kstat_delta(&old_sys, &new_sys, "cpu_ticks_kernel") * percent,
-	kstat_delta(&old_sys, &new_sys, "cpu_ticks_wait") * percent,
-	kstat_delta(&old_sys, &new_sys, "cpu_ticks_idle") * percent,
-	p2->ps_nr_cpus);
+	    "%4.0f %4.0f %4.0f %4.0f %4.0f %5.0f  %3.0f %3.0f "
+	    "%3.0f %3.0f %3d\n",
+	    p2->ps_id,
+	    (kstat_delta(&old_vm, &new_vm, "hat_fault") +
+	    kstat_delta(&old_vm, &new_vm, "as_fault")) / etime,
+	    kstat_delta(&old_vm, &new_vm, "maj_fault") / etime,
+	    kstat_delta(&old_sys, &new_sys, "xcalls") / etime,
+	    kstat_delta(&old_sys, &new_sys, "intr") / etime,
+	    kstat_delta(&old_sys, &new_sys, "intrthread") / etime,
+	    kstat_delta(&old_sys, &new_sys, "pswitch") / etime,
+	    kstat_delta(&old_sys, &new_sys, "inv_swtch") / etime,
+	    kstat_delta(&old_sys, &new_sys, "cpumigrate") / etime,
+	    kstat_delta(&old_sys, &new_sys, "mutex_adenters") / etime,
+	    (kstat_delta(&old_sys, &new_sys, "rw_rdfails") +
+	    kstat_delta(&old_sys, &new_sys, "rw_wrfails")) / etime,
+	    kstat_delta(&old_sys, &new_sys, "syscall") / etime,
+	    kstat_delta(&old_sys, &new_sys, "cpu_ticks_user") * percent,
+	    kstat_delta(&old_sys, &new_sys, "cpu_ticks_kernel") * percent,
+	    kstat_delta(&old_sys, &new_sys, "cpu_ticks_wait") * percent,
+	    kstat_delta(&old_sys, &new_sys, "cpu_ticks_idle") * percent,
+	    p2->ps_nr_cpus);
 
 out:
 	free(old_vm.ks_data);
@@ -470,6 +489,9 @@ show_cpu_usage(struct snapshot *old, struct snapshot *new, int display_agg)
 	enum snapshot_types type = SNAP_CPUS;
 	snapshot_cb cb = compare_cpu;
 
+	if (timestamp_fmt != NODATE)
+		print_timestamp();
+
 	if (lines_until_reprint == 0 || nr_active_cpus(new) > 1) {
 		print_header(display_agg, show_set);
 		lines_until_reprint = REPRINT;
@@ -494,6 +516,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: mpstat [-aq] [-p | -P processor_set] [interval [count]]\n");
+	    "Usage: mpstat [-aq] [-p | -P processor_set] [-T d|u] "
+	    "[interval [count]]\n");
 	exit(1);
 }

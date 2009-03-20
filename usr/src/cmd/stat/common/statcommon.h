@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common routines for acquiring snapshots of kstats for
@@ -28,8 +28,6 @@
 
 #ifndef	_STATCOMMON_H
 #define	_STATCOMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +57,11 @@ extern "C" {
 #define	IODEV_NO_ID -1
 /* no limit to iodevs to collect */
 #define	UNLIMITED_IODEVS ((size_t)-1)
+
+#define	NODATE	0	/* Default:  No time stamp */
+#define	DDATE	1	/* Standard date format */
+#define	UDATE	2	/* Internal representation of Unix time */
+
 
 enum snapshot_types {
 	/* All CPUs separately */
@@ -319,6 +322,9 @@ void sleep_until(hrtime_t *wakeup, hrtime_t interval, int forever,
 
 /* signal handler - so we can be aware of SIGCONT */
 void cont_handler(int sig_number);
+
+/* Print a timestamp in either Unix or standard format. */
+void print_timestamp(void);
 
 #ifdef __cplusplus
 }

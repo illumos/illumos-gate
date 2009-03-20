@@ -21,7 +21,7 @@
 #
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -30,7 +30,8 @@ use strict;
 use warnings;
 use locale;
 use Getopt::Std;
-use POSIX qw(locale_h ctime);
+use POSIX qw(locale_h strftime);
+use I18N::Langinfo qw(langinfo D_T_FMT);
 use File::Basename;
 use Sun::Solaris::Utils qw(textdomain gettext gmatch);
 use Sun::Solaris::Kstat;
@@ -135,9 +136,11 @@ if (@ARGV >= 2 && $ARGV[-2] =~ /^\d+$/ && $ARGV[-1] =~ /^\d+$/) {
 
 # Get timestamp flag
 my $timestamp;
+my $timefmt;
 if ($timestamp = $opt{T}) {
 	if ($timestamp eq "d") {
-		$timestamp = sub { print(ctime(time())); };
+		$timefmt = langinfo(D_T_FMT) . "\n";
+		$timestamp = sub { print(strftime($timefmt, localtime())); };
 	} elsif ($timestamp eq "u") {
 		$timestamp = sub { print(time(), "\n"); };
 	} else {
