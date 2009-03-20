@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__AUDIT_DOT_H
 #define	__AUDIT_DOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #ifndef _ASM
 
@@ -46,7 +43,7 @@ extern "C" {
  * identify of the shared object is passed to the auditor using a cookie.
  */
 typedef struct {
-	Rt_map *	ac_lmp;		/* audit library identifier */
+	Rt_map		*ac_lmp;	/* audit library identifier */
 	uintptr_t	ac_cookie;	/* cookie assigned to audit library */
 	Word		ac_flags;	/*	and its associated flags */
 } Audit_client;
@@ -60,8 +57,8 @@ typedef struct {
  */
 struct audit_info {
 	uint_t		ai_cnt;		/* no. of clients */
-	Audit_client *	ai_clients;	/* array of client structures */
-	void *		ai_dynplts;	/* array of dynamic plts */
+	Audit_client	*ai_clients;	/* array of client structures */
+	void		*ai_dynplts;	/* array of dynamic plts */
 };
 
 /*
@@ -71,7 +68,7 @@ struct audit_info {
  */
 struct audit_desc {
 	char		*ad_name;	/* originating audit names */
-	List		ad_list;	/* audit objs Audit Interface list */
+	APlist		*ad_list;	/* audit objs Audit Interface list */
 	uint_t		ad_cnt;		/* no. of audit objs in this desc. */
 	uint_t		ad_flags;	/* audit capabilities found */
 };
@@ -125,7 +122,7 @@ extern void		audit_activity(Rt_map *, uint_t);
 extern void		audit_preinit(Rt_map *);
 extern char		*audit_objsearch(Rt_map *, const char *, uint_t);
 extern void		audit_objclose(Rt_map *, Rt_map *);
-extern void		_audit_objclose(List *, Rt_map *);
+extern void		_audit_objclose(APlist *, Rt_map *);
 extern Addr		audit_symbind(Rt_map *, Rt_map *, Sym *, uint_t,
 			    Addr value, uint_t *);
 extern Addr		audit_pltenter(Rt_map *, Rt_map *, Sym *, uint_t,

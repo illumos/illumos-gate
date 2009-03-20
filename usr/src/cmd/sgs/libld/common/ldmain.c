@@ -146,9 +146,9 @@ ld_main(int argc, char **argv, Half mach)
 
 	/*
 	 * Argument pass one.  Get all the input flags (skip any files) and
-	 * check for consistency.  After this point any map file processing
-	 * would have been completed and the entrance criteria and segment
-	 * descriptor lists will be complete.
+	 * check for consistency.  Return from ld_process_flags() marks the
+	 * end of mapfile processing.  The entrance criteria and segment
+	 * descriptors are complete and in their final form.
 	 */
 	if (ld_process_flags(ofl, argc, argv) == S_ERROR)
 		return (1);
@@ -191,11 +191,11 @@ ld_main(int argc, char **argv, Half mach)
 		}
 		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	}
-	if (lib_support.head) {
-		Listnode	*lnp;
-		char		*lib;
+	if (lib_support) {
+		Aliste	idx;
+		char	*lib;
 
-		for (LIST_TRAVERSE(&lib_support, lnp, lib)) {
+		for (APLIST_TRAVERSE(lib_support, idx, lib)) {
 			DBG_CALL(Dbg_support_req(ofl->ofl_lml, lib,
 			    DBG_SUP_CMDLINE));
 			if (ld_sup_loadso(ofl, lib) == S_ERROR)
@@ -205,9 +205,9 @@ ld_main(int argc, char **argv, Half mach)
 	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
 	DBG_CALL(Dbg_ent_print(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
-	    &ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC) != 0));
+	    ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC) != 0));
 	DBG_CALL(Dbg_seg_list(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
-	    &ofl->ofl_segs));
+	    ofl->ofl_segs));
 
 	/*
 	 * The objscnt and soscnt variables were used to estimate the expected
@@ -271,13 +271,11 @@ ld_main(int argc, char **argv, Half mach)
 	ld_sup_input_done(ofl);
 
 	/*
-	 * If there were any partially initialized symbol,
-	 * do preparation works.
+	 * Now that all input section processing is complete, validate and
+	 * process any SHT_SUNW_move sections.
 	 */
-	if (ofl->ofl_ismove.head != 0) {
-		if (ld_sunwmove_preprocess(ofl) == S_ERROR)
-			return (ld_exit(ofl));
-	}
+	if (ofl->ofl_ismove && (ld_process_move(ofl) == S_ERROR))
+		return (ld_exit(ofl));
 
 	/*
 	 * Before validating all symbols count the number of relocation entries.
@@ -402,16 +400,15 @@ ld_main(int argc, char **argv, Half mach)
  * Cleanup an Ifl_desc.
  */
 static void
-ifl_list_cleanup(List *ifl_list)
+ifl_list_cleanup(APlist *apl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Ifl_desc	*ifl;
 
-	for (LIST_TRAVERSE(ifl_list, lnp, ifl))
+	for (APLIST_TRAVERSE(apl, idx, ifl)) {
 		if (ifl->ifl_elf)
 			(void) elf_end(ifl->ifl_elf);
-	ifl_list->head = 0;
-	ifl_list->tail = 0;
+	}
 }
 
 /*
@@ -423,12 +420,14 @@ ld_ofl_cleanup(Ofl_desc *ofl)
 {
 	Ld_heap		*chp, *php;
 	Ar_desc		*adp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	ifl_list_cleanup(&ofl->ofl_objs);
-	ifl_list_cleanup(&ofl->ofl_sos);
+	ifl_list_cleanup(ofl->ofl_objs);
+	ofl->ofl_objs = NULL;
+	ifl_list_cleanup(ofl->ofl_sos);
+	ofl->ofl_sos = NULL;
 
-	for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ars, idx, adp)) {
 		Ar_aux		*aup;
 		Elf_Arsym	*arsym;
 
@@ -446,11 +445,12 @@ ld_ofl_cleanup(Ofl_desc *ofl)
 		}
 		(void) elf_end(adp->ad_elf);
 	}
+	ofl->ofl_ars = NULL;
 
 	(void) elf_end(ofl->ofl_elf);
 	(void) elf_end(ofl->ofl_welf);
 
-	for (chp = ld_heap, php = 0; chp; php = chp, chp = chp->lh_next) {
+	for (chp = ld_heap, php = NULL; chp; php = chp, chp = chp->lh_next) {
 		if (php)
 			(void) munmap((void *)php,
 			    (size_t)php->lh_end - (size_t)php);
@@ -458,5 +458,5 @@ ld_ofl_cleanup(Ofl_desc *ofl)
 	if (php)
 		(void) munmap((void *)php, (size_t)php->lh_end - (size_t)php);
 
-	ld_heap = 0;
+	ld_heap = NULL;
 }

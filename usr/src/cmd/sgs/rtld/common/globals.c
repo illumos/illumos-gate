@@ -76,7 +76,7 @@ ulong_t		ld_entry_cnt = 1;
  * librtld_db (remembering that librtld_db must be able to read old as well as
  * current core files).
  */
-List		dynlm_list =	{ 0, 0 };	/* dynamic list of link-maps */
+APlist		*dynlm_list = NULL;	/* dynamic list of link-maps */
 /*
  * END: Exposed to rtld_db
  */

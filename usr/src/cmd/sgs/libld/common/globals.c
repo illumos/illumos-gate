@@ -36,7 +36,7 @@
 
 Ld_heap		*ld_heap;	/* list of allocated blocks for */
 				/* 	link-edit dynamic allocations */
-List		lib_support;	/* list of support libraries specified */
+APlist		*lib_support;	/* list of support libraries specified */
 				/*	(-S option) */
 int		demangle_flag;	/* symbol demangling required */
 
@@ -47,7 +47,6 @@ int		demangle_flag;	/* symbol demangling required */
 char		*Plibpath;	/* User specified -YP or defaults to LIBPATH */
 char		*Llibdir;	/* User specified -YL */
 char		*Ulibdir;	/* User specified -YU */
-Listnode	*insert_lib;	/* insertion point for -L libraries */
 
 /*
  * A default library search path is used if one was not supplied on the command

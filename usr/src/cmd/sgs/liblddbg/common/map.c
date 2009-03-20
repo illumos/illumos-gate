@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
@@ -143,25 +142,19 @@ Dbg_map_dash(Lm_list *lml, const char *name, Sdf_desc *sdf)
 }
 
 void
-Dbg_map_sort_orig(Lm_list *lml, Sg_desc *sgp)
+Dbg_map_sort(Lm_list *lml)
 {
-	const char	*str;
-
 	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	if (sgp->sg_name && *sgp->sg_name)
-		str = sgp->sg_name;
-	else
-		str = MSG_INTL(MSG_STR_NULL);
-
-	dbg_print(lml, MSG_INTL(MSG_MAP_SORTSEG), str);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_MAP_SORT_TITLE));
 }
 
 void
-Dbg_map_sort_fini(Lm_list *lml, Sg_desc *sgp)
+Dbg_map_sort_seg(Lm_list *lml, Sg_desc *sgp, int orig)
 {
 	const char	*str;
 
@@ -175,7 +168,10 @@ Dbg_map_sort_fini(Lm_list *lml, Sg_desc *sgp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(lml, MSG_INTL(MSG_MAP_SEGSORT), str);
+	if (orig)
+		dbg_print(lml, MSG_INTL(MSG_MAP_SORT_ORIG), str);
+	else
+		dbg_print(lml, MSG_INTL(MSG_MAP_SORT_FINAL), str);
 }
 
 void

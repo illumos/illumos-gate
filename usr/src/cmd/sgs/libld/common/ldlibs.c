@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,12 @@
 #include	"_libld.h"
 
 /*
- * List of support libraries specified (-S option).
+ * Define a list index for "-L" processing.  By default, "-L" search paths are
+ * inserted at the beginning of the associated search list.  However, should a
+ * ";" be discovered in a LD_LIBRARY_PATH listing, then any new "-L" search
+ * paths are inserted following the ";".
  */
-static Listnode	*insert_lib;
+static Aliste	Lidx = 0;
 
 /*
  * Function to handle -YL and -YU substitutions in LIBPATH.  It's probably
@@ -82,7 +85,7 @@ compat_YL_YU(Ofl_desc *ofl, char *path, int index)
 }
 
 static char *
-process_lib_path(Ofl_desc *ofl, List *list, char *path, Boolean subsflag)
+process_lib_path(Ofl_desc *ofl, APlist **apl, char *path, Boolean subsflag)
 {
 	int	i;
 	char	*cp;
@@ -94,27 +97,31 @@ process_lib_path(Ofl_desc *ofl, List *list, char *path, Boolean subsflag)
 		if (cp == NULL) {
 			if (*path == '\0') {
 				if (seenflg)
-					if (list_appendc(list, subsflag ?
-					    compat_YL_YU(ofl, dot, i) : dot) ==
-					    0)
+					if (aplist_append(apl, (subsflag ?
+					    compat_YL_YU(ofl, dot, i) : dot),
+					    AL_CNT_OFL_LIBDIRS) == NULL)
 						return ((char *)S_ERROR);
-			} else
-				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(ofl, path, i) : path) == 0)
-					return ((char *)S_ERROR);
+
+			} else if (aplist_append(apl, (subsflag ?
+			    compat_YL_YU(ofl, path, i) : path),
+			    AL_CNT_OFL_LIBDIRS) == NULL) {
+				return ((char *)S_ERROR);
+			}
 			return (cp);
 		}
 
 		if (*cp == ':') {
 			*cp = '\0';
 			if (cp == path) {
-				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(ofl, dot, i) : dot) == 0)
+				if (aplist_append(apl, (subsflag ?
+				    compat_YL_YU(ofl, dot, i) : dot),
+				    AL_CNT_OFL_LIBDIRS) == NULL)
 					return ((char *)S_ERROR);
-			} else {
-				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(ofl, path, i) : path) == 0)
-					return ((char *)S_ERROR);
+
+			} else if (aplist_append(apl, (subsflag ?
+			    compat_YL_YU(ofl, path, i) : path),
+			    AL_CNT_OFL_LIBDIRS) == NULL) {
+				return ((char *)S_ERROR);
 			}
 			path = cp + 1;
 			seenflg = TRUE;
@@ -124,13 +131,15 @@ process_lib_path(Ofl_desc *ofl, List *list, char *path, Boolean subsflag)
 		/* case ";" */
 
 		if (cp != path) {
-			if (list_appendc(list, subsflag ?
-			    compat_YL_YU(ofl, path, i) : path) == 0)
+			if (aplist_append(apl, (subsflag ?
+			    compat_YL_YU(ofl, path, i) : path),
+			    AL_CNT_OFL_LIBDIRS) == NULL)
 				return ((char *)S_ERROR);
 		} else {
 			if (seenflg)
-				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(ofl, dot, i) : dot) == 0)
+				if (aplist_append(apl, (subsflag ?
+				    compat_YL_YU(ofl, dot, i) : dot),
+				    AL_CNT_OFL_LIBDIRS) == NULL)
 					return ((char *)S_ERROR);
 		}
 		return (cp);
@@ -145,21 +154,16 @@ process_lib_path(Ofl_desc *ofl, List *list, char *path, Boolean subsflag)
 uintptr_t
 ld_add_libdir(Ofl_desc *ofl, const char *path)
 {
-	if (insert_lib == NULL) {
-		if (list_prependc(&ofl->ofl_ulibdirs, path) == 0)
-			return (S_ERROR);
-		insert_lib = ofl->ofl_ulibdirs.head;
-	} else
-		if ((insert_lib = list_insertc(&ofl->ofl_ulibdirs, path,
-		    insert_lib)) == 0)
-			return (S_ERROR);
+	if (aplist_insert(&ofl->ofl_ulibdirs, path,
+	    AL_CNT_OFL_LIBDIRS, Lidx++) == NULL)
+		return (S_ERROR);
 
 	/*
 	 * As -l and -L options can be interspersed, print the library
 	 * search paths each time a new path is added.
 	 */
-	DBG_CALL(Dbg_libs_update(ofl->ofl_lml, &ofl->ofl_ulibdirs,
-	    &ofl->ofl_dlibdirs));
+	DBG_CALL(Dbg_libs_update(ofl->ofl_lml, ofl->ofl_ulibdirs,
+	    ofl->ofl_dlibdirs));
 	return (1);
 }
 
@@ -198,7 +202,7 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 		DBG_CALL(Dbg_libs_l(ofl->ofl_lml, file, path));
 		if ((fd = open(path, O_RDONLY)) != -1) {
 
-			if ((_path = libld_malloc(strlen(path) + 1)) == 0)
+			if ((_path = libld_malloc(strlen(path) + 1)) == NULL)
 				return ((Ifl_desc *)S_ERROR);
 			(void) strcpy(_path, path);
 
@@ -228,7 +232,7 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 	DBG_CALL(Dbg_libs_l(ofl->ofl_lml, file, path));
 	if ((fd = open(path, O_RDONLY)) != -1) {
 
-		if ((_path = libld_malloc(strlen(path) + 1)) == 0)
+		if ((_path = libld_malloc(strlen(path) + 1)) == NULL)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
 
@@ -267,7 +271,7 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 uintptr_t
 ld_find_library(const char *name, Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	char		*path;
 	Ifl_desc	*ifl = 0;
 	Rej_desc	rej = { 0 };
@@ -275,7 +279,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	/*
 	 * Search for this file in any user defined directories.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_ulibdirs, lnp, path)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ulibdirs, idx, path)) {
 		Rej_desc	_rej = { 0 };
 
 		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == NULL) {
@@ -289,7 +293,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	/*
 	 * Finally try the default library search directories.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_dlibdirs, lnp, path)) {
+	for (APLIST_TRAVERSE(ofl->ofl_dlibdirs, idx, path)) {
 		Rej_desc	_rej = { 0 };
 
 		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == NULL) {
@@ -355,7 +359,7 @@ ld_lib_setup(Ofl_desc *ofl)
 	}
 
 	if ((cp != NULL) && (*cp != '\0')) {
-		if ((path = libld_malloc(strlen(cp) + 1)) == 0)
+		if ((path = libld_malloc(strlen(cp) + 1)) == NULL)
 			return (S_ERROR);
 		(void) strcpy(path, cp);
 		DBG_CALL(Dbg_libs_path(ofl->ofl_lml, path, LA_SER_DEFAULT, 0));
@@ -368,13 +372,13 @@ ld_lib_setup(Ofl_desc *ofl)
 
 
 		/*
-		 * If a `;' was seen then initialize the insert flag to the
-		 * tail of this list.  This is where any -L paths will be
-		 * added (otherwise -L paths are prepended to this list).
-		 * Continue to process the remaining path string.
+		 * By default, -L paths are prepended to the library search
+		 * path list, because Lidx == 0.  If a ';' is seen within an
+		 * LD_LIBRARY_PATH string, change the insert index so that -L
+		 * paths are added following the ';'.
 		 */
 		if (path) {
-			insert_lib = ofl->ofl_ulibdirs.tail;
+			Lidx = aplist_nitems(ofl->ofl_ulibdirs);
 			*path = '\0';
 			++path;
 			cp = process_lib_path(ofl, &ofl->ofl_ulibdirs, path,
@@ -398,7 +402,7 @@ ld_lib_setup(Ofl_desc *ofl)
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_BADYP));
 		return (S_ERROR);
 	}
-	DBG_CALL(Dbg_libs_init(ofl->ofl_lml, &ofl->ofl_ulibdirs,
-	    &ofl->ofl_dlibdirs));
+	DBG_CALL(Dbg_libs_init(ofl->ofl_lml, ofl->ofl_ulibdirs,
+	    ofl->ofl_dlibdirs));
 	return (1);
 }

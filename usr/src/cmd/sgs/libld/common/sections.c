@@ -182,14 +182,14 @@ static uintptr_t
 ignore_section_processing(Ofl_desc *ofl)
 {
 	Sg_desc		*sgp;
-	Listnode	*lnp1, *lnp2;
 	Is_desc		*isp;
 	Os_desc		*osp;
 	Ifl_desc	*ifl;
 	Rel_cache	*rcp;
 	int		allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
+	Aliste		idx1;
 
-	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp1, ifl)) {
+	for (APLIST_TRAVERSE(ofl->ofl_objs, idx1, ifl)) {
 		uint_t	num, discard;
 
 		/*
@@ -263,7 +263,7 @@ ignore_section_processing(Ofl_desc *ofl)
 	 * Scan all output relocations searching for those against discarded or
 	 * ignored sections.  If one is found, decrement the total outrel count.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_outrels, lnp1, rcp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_outrels, idx1, rcp)) {
 		Rel_desc	*rsp;
 
 		/* LINTED */
@@ -272,11 +272,11 @@ ignore_section_processing(Ofl_desc *ofl)
 			uint_t		flags, entsize;
 			Shdr		*shdr;
 
-			if ((isc == 0) ||
+			if ((isc == NULL) ||
 			    ((isc->is_flags & (FLG_IS_SECTREF))) ||
-			    ((ifl = isc->is_file) == 0) ||
+			    ((ifl = isc->is_file) == NULL) ||
 			    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0) ||
-			    ((shdr = isc->is_shdr) == 0) ||
+			    ((shdr = isc->is_shdr) == NULL) ||
 			    ((shdr->sh_flags & SHF_ALLOC) == 0))
 				continue;
 
@@ -317,14 +317,15 @@ ignore_section_processing(Ofl_desc *ofl)
 	 * one input section that has not been eliminated. If none are found,
 	 * the -z ignore processing above has eliminated that output section.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Aliste	idx;
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
+		Aliste	idx2;
 		Word	ptype = sgp->sg_phdr.p_type;
 
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
-			int keep = 0;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			Aliste	idx3;
+			int	keep = 0;
 
-			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
+			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
 				ifl = isp->is_file;
 
 				/* Input section is tagged for discard? */
@@ -580,7 +581,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
 		return (S_ERROR);
 	data->d_type = sec_info->d_type;
 	data->d_size = size;
@@ -590,7 +591,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == NULL)
 		return (S_ERROR);
 	shdr->sh_type = shtype;
 	shdr->sh_size = size;
@@ -601,7 +602,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	/*
 	 * Allocate and initialize the Is_desc structure.
 	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
+	if ((isec = libld_calloc(1, sizeof (Is_desc))) == NULL)
 		return (S_ERROR);
 	isec->is_name = shname;
 	isec->is_shdr = shdr;
@@ -644,7 +645,7 @@ new_section_from_template(Ofl_desc *ofl, Is_desc *tmpl_isp, size_t size,
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
 		return (S_ERROR);
 	data->d_type = tmpl_isp->is_indata->d_type;
 	data->d_size = size;
@@ -654,7 +655,7 @@ new_section_from_template(Ofl_desc *ofl, Is_desc *tmpl_isp, size_t size,
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
-	if ((shdr = libld_malloc(sizeof (Shdr))) == 0)
+	if ((shdr = libld_malloc(sizeof (Shdr))) == NULL)
 		return (S_ERROR);
 	*shdr = *tmpl_isp->is_shdr;
 	shdr->sh_addr = 0;
@@ -664,7 +665,7 @@ new_section_from_template(Ofl_desc *ofl, Is_desc *tmpl_isp, size_t size,
 	/*
 	 * Allocate and initialize the Is_desc structure.
 	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
+	if ((isec = libld_calloc(1, sizeof (Is_desc))) == NULL)
 		return (S_ERROR);
 	isec->is_name = tmpl_isp->is_name;
 	isec->is_shdr = shdr;
@@ -686,13 +687,12 @@ new_section_from_template(Ofl_desc *ofl, Is_desc *tmpl_isp, size_t size,
  * section required to represent them.
  */
 uintptr_t
-ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
+ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, uint_t ident)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
 	Os_desc		*osp;
-	uint_t		ident;
 	Xword		rsize = (Xword)ofl->ofl_relocbsssz;
 
 	/*
@@ -710,41 +710,39 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 	shdr->sh_size = size;
 	shdr->sh_addralign = align;
 
-	if (which == MAKE_TLS) {
+	if (ident == ld_targ.t_id.id_tlsbss) {
 		isec->is_name = MSG_ORIG(MSG_SCN_TBSS);
-		ident = ld_targ.t_id.id_tlsbss;
 		ofl->ofl_istlsbss = isec;
 		shdr->sh_flags |= SHF_TLS;
 
-	} else if (which == MAKE_BSS) {
+	} else if (ident == ld_targ.t_id.id_bss) {
 		isec->is_name = MSG_ORIG(MSG_SCN_BSS);
 		ofl->ofl_isbss = isec;
-		ident = ld_targ.t_id.id_bss;
 
 #if	defined(_ELF64)
-	} else if ((ld_targ.t_m.m_mach == EM_AMD64) && (which == MAKE_LBSS)) {
+	} else if ((ld_targ.t_m.m_mach == EM_AMD64) &&
+	    (ident == ld_targ.t_id.id_lbss)) {
 		isec->is_name = MSG_ORIG(MSG_SCN_LBSS);
 		ofl->ofl_islbss = isec;
-		ident = ld_targ.t_id.id_lbss;
 		shdr->sh_flags |= SHF_AMD64_LARGE;
 #endif
 	}
 
 	/*
-	 * Retain this .bss input section as this will be where global
-	 * symbol references are added.
+	 * Retain this .*bss input section as this will be where global symbol
+	 * references are added.
 	 */
 	if ((osp = ld_place_section(ofl, isec, ident, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
-	 * If relocations exist against .*bss section, a
-	 * section symbol must be created for the section in
-	 * the .dynsym symbol table.
+	 * If relocations exist against a .*bss section, a section symbol must
+	 * be created for the section in the .dynsym symbol table.
 	 */
 	if (!(osp->os_flags & FLG_OS_OUTREL)) {
 		ofl_flag_t	flagtotest;
-		if (which == MAKE_TLS)
+
+		if (ident == ld_targ.t_id.id_tlsbss)
 			flagtotest = FLG_OF1_TLSOREL;
 		else
 			flagtotest = FLG_OF1_BSSOREL;
@@ -756,20 +754,18 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 	}
 
 	osp->os_szoutrels = rsize;
-
 	return (1);
 }
 
-
 /*
  * Build a SHT_{INIT|FINI|PREINIT}ARRAY section (specified via
- * ld -z *array=name
+ * ld -z *array=name).
  */
 static uintptr_t
-make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
+make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 {
 	uint_t		entcount;
-	Listnode	*lnp;
+	Aliste		idx;
 	Elf_Data	*data;
 	Is_desc		*isec;
 	Shdr		*shdr;
@@ -779,18 +775,18 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	Os_desc		*osp;
 	uintptr_t	ret = 1;
 
-	if (list->head == NULL)
+	if (alp == NULL)
 		return (1);
 
 	entcount = 0;
-	for (LIST_TRAVERSE(list, lnp, sdp))
+	for (APLIST_TRAVERSE(alp, idx, sdp))
 		entcount++;
 
 	if (new_section(ofl, shtype, sectname, entcount, &isec, &shdr, &data) ==
 	    S_ERROR)
 		return (S_ERROR);
 
-	if ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == 0)
+	if ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == NULL)
 		return (S_ERROR);
 
 	if (ld_place_section(ofl, isec, ld_targ.t_id.id_array, 0) ==
@@ -834,7 +830,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 
 	DBG_CALL(Dbg_reloc_generate(ofl->ofl_lml, osp,
 	    ld_targ.t_m.m_rel_sht_type));
-	for (LIST_TRAVERSE(list, lnp, sdp)) {
+	for (APLIST_TRAVERSE(alp, idx, sdp)) {
 		reld.rel_sname = sdp->sd_name;
 		reld.rel_sym = sdp;
 
@@ -893,7 +889,7 @@ make_dynamic(Ofl_desc *ofl)
 	Elf_Data	*data;
 	Is_desc		*isec;
 	size_t		cnt = 0;
-	Listnode	*lnp;
+	Aliste		idx;
 	Ifl_desc	*ifl;
 	Sym_desc	*sdp;
 	size_t		size;
@@ -920,7 +916,7 @@ make_dynamic(Ofl_desc *ofl)
 	/*
 	 * Reserve entries for any needed dependencies.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_sos, lnp, ifl)) {
+	for (APLIST_TRAVERSE(ofl->ofl_sos, idx, ifl)) {
 		Sdf_desc	*sdf;
 
 		if (!(ifl->ifl_flags & (FLG_IF_NEEDED | FLG_IF_NEEDSTR)))
@@ -1049,10 +1045,12 @@ make_dynamic(Ofl_desc *ofl)
 	}
 
 	if (not_relobj) {
+		Aliste	idx;
+
 		if (ofl->ofl_config) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_config) ==
-			    -1)
+			if (st_insert(ofl->ofl_dynstrtab,
+			    ofl->ofl_config) == -1)
 				return (S_ERROR);
 
 			/*
@@ -1066,8 +1064,8 @@ make_dynamic(Ofl_desc *ofl)
 		}
 		if (ofl->ofl_depaudit) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_depaudit) ==
-			    -1)
+			if (st_insert(ofl->ofl_dynstrtab,
+			    ofl->ofl_depaudit) == -1)
 				return (S_ERROR);
 		}
 		if (ofl->ofl_audit) {
@@ -1165,7 +1163,7 @@ make_dynamic(Ofl_desc *ofl)
 		 * Reserve a entry for each '-zrtldinfo=...' specified
 		 * on the command line.
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_rtldinfo, lnp, sdp))
+		for (APLIST_TRAVERSE(ofl->ofl_rtldinfo, idx, sdp))
 			cnt++;
 
 		/*
@@ -1334,7 +1332,7 @@ make_cap(Ofl_desc *ofl)
 	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
-	if ((data->d_buf = libld_malloc(shdr->sh_size)) == 0)
+	if ((data->d_buf = libld_malloc(shdr->sh_size)) == NULL)
 		return (S_ERROR);
 
 	cap = (Cap *)data->d_buf;
@@ -1454,7 +1452,7 @@ make_hash(Ofl_desc *ofl)
 	/*
 	 * Finalize the section header and data buffer initialization.
 	 */
-	if ((data->d_buf = libld_calloc(size, 1)) == 0)
+	if ((data->d_buf = libld_calloc(size, 1)) == NULL)
 		return (S_ERROR);
 	data->d_size = size;
 	shdr->sh_size = (Xword)size;
@@ -1687,7 +1685,7 @@ make_dyn_shndx(Ofl_desc *ofl, const char *shname, Os_desc *symtab,
 	Shdr		*shdr, *dynshdr;
 	Elf_Data	*data;
 
-	dynsymisp = (Is_desc *)symtab->os_isdescs.head->data;
+	dynsymisp = (Is_desc *)symtab->os_isdescs->apl_data[0];
 	dynshdr = dynsymisp->is_shdr;
 
 	if (new_section(ofl, SHT_SYMTAB_SHNDX, shname,
@@ -1829,14 +1827,14 @@ make_dynstr(Ofl_desc *ofl)
 		for (ndx = 0; ndx < ofl->ofl_regsymsno; ndx++) {
 			Sym_desc	*sdp;
 
-			if ((sdp = ofl->ofl_regsyms[ndx]) == 0)
+			if ((sdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 
 			if (((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
-			if (sdp->sd_sym->st_name == 0)
+			if (sdp->sd_sym->st_name == NULL)
 				continue;
 
 			if (st_insert(ofl->ofl_dynstrtab, sdp->sd_name) == -1)
@@ -2041,7 +2039,7 @@ make_verdef(Ofl_desc *ofl)
 	 * dependencies have symbol representations, which will already be
 	 * accounted for during symbol processing).
 	 */
-	vdp = (Ver_desc *)ofl->ofl_verdesc.head->data;
+	vdp = (Ver_desc *)ofl->ofl_verdesc->apl_data[0];
 
 	if (ofl->ofl_flags & FLG_OF_DYNAMIC) {
 		if (st_insert(ofl->ofl_dynstrtab, vdp->vd_name) == -1)
@@ -2114,7 +2112,7 @@ ld_make_parexpn_data(Ofl_desc *ofl, size_t size, Xword align)
 		shdr->sh_addralign = align;
 	}
 
-	if ((data->d_buf = libld_calloc(size, 1)) == 0)
+	if ((data->d_buf = libld_calloc(size, 1)) == NULL)
 		return (S_ERROR);
 
 	/*
@@ -2143,8 +2141,8 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
-	Listnode	*lnp1;
-	Psym_info	*psym;
+	Aliste		idx;
+	Sym_desc	*sdp;
 	int 		cnt = 1;
 
 
@@ -2152,32 +2150,29 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 	    mv_nums, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
-	if ((data->d_buf = libld_calloc(data->d_size, 1)) == 0)
+	if ((data->d_buf = libld_calloc(data->d_size, 1)) == NULL)
 		return (S_ERROR);
 
 	/*
 	 * Copy move entries
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_parsym, lnp1, psym)) {
-		Listnode	*lnp2;
-		Mv_itm		*mvitm;
+	for (APLIST_TRAVERSE(ofl->ofl_parsyms, idx, sdp)) {
+		Aliste		idx2;
+		Mv_desc		*mdp;
 
-		if (psym->psym_symd->sd_flags & FLG_SY_PAREXPN)
+		if (sdp->sd_flags & FLG_SY_PAREXPN)
 			continue;
-		for (LIST_TRAVERSE(&(psym->psym_mvs), lnp2, mvitm)) {
-			if ((mvitm->mv_flag & FLG_MV_OUTSECT) == 0)
-				continue;
-			mvitm->mv_oidx = cnt;
-			cnt++;
-		}
+
+		for (ALIST_TRAVERSE(sdp->sd_move, idx2, mdp))
+			mdp->md_oidx = cnt++;
 	}
+
 	if ((ofl->ofl_osmove = ld_place_section(ofl, isec, 0, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	return (1);
 }
-
 
 /*
  * Given a relocation descriptor that references a string table
@@ -2230,17 +2225,17 @@ strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
  *	mstrtab - String table to receive input strings. This table
  *		must be in its first (initialization) pass and not
  *		yet cooked (st_getstrtab_sz() not yet called).
- *	rel_aplist - APlist to receive pointer to any relocation
+ *	rel_alpp - APlist to receive pointer to any relocation
  *		descriptors with STT_SECTION symbols that reference
  *		one of the input sections being merged.
- *	sym_aplist - APlist to receive pointer to any symbols that reference
+ *	sym_alpp - APlist to receive pointer to any symbols that reference
  *		one of the input sections being merged.
  *	reloc_list - List of relocation descriptors to examine.
  *		Either ofl->&ofl->ofl_actrels (active relocations)
  *		or &ofl->ofl_outrels (output relocations).
  *
  * exit:
- *	On success, rel_aplist and sym_aplist are updated, and
+ *	On success, rel_alpp and sym_alpp are updated, and
  *	any strings in the mergable input sections referenced by
  *	a relocation has been entered into mstrtab. True (1) is returned.
  *
@@ -2248,16 +2243,16 @@ strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
  */
 static int
 strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
-    APlist **rel_aplist, APlist **sym_aplist, List *reloc_list)
+    APlist **rel_alpp, APlist **sym_alpp, APlist *reloc_alp)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Rel_cache	*rcp;
 	Sym_desc	*sdp;
 	Sym_desc	*last_sdp = NULL;
 	Rel_desc	*rsp;
 	const char	*name;
 
-	for (LIST_TRAVERSE(reloc_list, lnp, rcp)) {
+	for (APLIST_TRAVERSE(reloc_alp, idx, rcp)) {
 		/* LINTED */
 		for (rsp = (Rel_desc *)(rcp + 1); rsp < rcp->rc_free; rsp++) {
 			sdp = rsp->rel_sym;
@@ -2277,8 +2272,8 @@ strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
 			 * last time, don't bother.
 			 */
 			if (last_sdp != sdp) {
-				if (aplist_append(sym_aplist, sdp,
-				    AL_CNT_STRMRGSYM) == 0)
+				if (aplist_append(sym_alpp, sdp,
+				    AL_CNT_STRMRGSYM) == NULL)
 					return (0);
 				last_sdp = sdp;
 			}
@@ -2295,8 +2290,8 @@ strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
 			 */
 			if ((ELF_ST_TYPE(sdp->sd_sym->st_info) ==
 			    STT_SECTION) &&
-			    (aplist_append(rel_aplist, rsp,
-			    AL_CNT_STRMRGREL) == 0))
+			    (aplist_append(rel_alpp, rsp,
+			    AL_CNT_STRMRGREL) == NULL))
 				return (0);
 		}
 	}
@@ -2311,7 +2306,7 @@ strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
  * entry:
  *	ofl - Output file descriptor
  *	osp - Output section descriptor
- *	rel_aplist, sym_aplist, - Address of 2 APlists, to be used
+ *	rel_alpp, sym_alpp, - Address of 2 APlists, to be used
  *		for internal processing. On the initial call to
  *		ld_make_strmerge, these list pointers must be NULL.
  *		The caller is encouraged to pass the same lists back for
@@ -2323,13 +2318,13 @@ strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
  *	If section merging is possible, it is done. If no errors are
  *	encountered, True (1) is returned. On error, S_ERROR.
  *
- *	The contents of rel_aplist and sym_aplist on exit are
+ *	The contents of rel_alpp and sym_alpp on exit are
  *	undefined. The caller can free them, or pass them back to a subsequent
  *	call to this routine, but should not examine their contents.
  */
 static uintptr_t
-ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
-    APlist **sym_aplist)
+ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
+    APlist **sym_alpp)
 {
 	Str_tbl		*mstrtab;	/* string table for string merge secs */
 	Is_desc		*mstrsec;	/* Generated string merge section */
@@ -2396,8 +2391,8 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
 	 *
 	 * Reinitialize the lists to a completely empty state.
 	 */
-	aplist_reset(*rel_aplist);
-	aplist_reset(*sym_aplist);
+	aplist_reset(*rel_alpp);
+	aplist_reset(*sym_alpp);
 
 	/*
 	 * Pass 1:
@@ -2411,11 +2406,11 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
 	 * Build lists of relocations and symbols that will need modification,
 	 * and insert the strings they reference into the mstrtab string table.
 	 */
-	if (strmerge_pass1(ofl, osp, mstrtab, rel_aplist, sym_aplist,
-	    &ofl->ofl_actrels) == 0)
+	if (strmerge_pass1(ofl, osp, mstrtab, rel_alpp, sym_alpp,
+	    ofl->ofl_actrels) == 0)
 		goto return_s_error;
-	if (strmerge_pass1(ofl, osp, mstrtab, rel_aplist, sym_aplist,
-	    &ofl->ofl_outrels) == 0)
+	if (strmerge_pass1(ofl, osp, mstrtab, rel_alpp, sym_alpp,
+	    ofl->ofl_outrels) == 0)
 		goto return_s_error;
 
 	/*
@@ -2434,13 +2429,13 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
 	 * Allocate a data buffer for the new input section.
 	 * Then, associate the buffer with the string table descriptor.
 	 */
-	if ((mstr_data->d_buf = libld_malloc(data_size)) == 0)
+	if ((mstr_data->d_buf = libld_malloc(data_size)) == NULL)
 		goto return_s_error;
 	if (st_setstrbuf(mstrtab, mstr_data->d_buf, data_size) == -1)
 		goto return_s_error;
 
 	/* Add the new section to the output image */
-	if (ld_place_section(ofl, mstrsec, osp->os_scnsymndx, 0) ==
+	if (ld_place_section(ofl, mstrsec, osp->os_identndx, 0) ==
 	    (Os_desc *)S_ERROR)
 		goto return_s_error;
 
@@ -2452,7 +2447,7 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
 	 * record so that the offset it contains is for the new section
 	 * instead of the original.
 	 */
-	for (APLIST_TRAVERSE(*rel_aplist, idx, rsp)) {
+	for (APLIST_TRAVERSE(*rel_alpp, idx, rsp)) {
 		const char	*name;
 
 		/* Put the string into the merged string table */
@@ -2507,7 +2502,7 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
 	 * so that they reference the new input section containing the
 	 * merged strings instead of the original input sections.
 	 */
-	for (APLIST_TRAVERSE(*sym_aplist, idx, sdp)) {
+	for (APLIST_TRAVERSE(*sym_alpp, idx, sdp)) {
 		/*
 		 * If we've already processed this symbol, don't do it
 		 * twice. strmerge_pass1() uses a heuristic (relocations to
@@ -2589,7 +2584,6 @@ uintptr_t
 ld_make_sections(Ofl_desc *ofl)
 {
 	ofl_flag_t	flags = ofl->ofl_flags;
-	Listnode	*lnp1;
 	Sg_desc		*sgp;
 
 	/*
@@ -2606,15 +2600,15 @@ ld_make_sections(Ofl_desc *ofl)
 		return (S_ERROR);
 
 	if (make_array(ofl, SHT_INIT_ARRAY, MSG_ORIG(MSG_SCN_INITARRAY),
-	    &ofl->ofl_initarray) == S_ERROR)
+	    ofl->ofl_initarray) == S_ERROR)
 		return (S_ERROR);
 
 	if (make_array(ofl, SHT_FINI_ARRAY, MSG_ORIG(MSG_SCN_FINIARRAY),
-	    &ofl->ofl_finiarray) == S_ERROR)
+	    ofl->ofl_finiarray) == S_ERROR)
 		return (S_ERROR);
 
 	if (make_array(ofl, SHT_PREINIT_ARRAY, MSG_ORIG(MSG_SCN_PREINITARRAY),
-	    &ofl->ofl_preiarray) == S_ERROR)
+	    ofl->ofl_preiarray) == S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -2643,34 +2637,35 @@ ld_make_sections(Ofl_desc *ofl)
 	 * we create a replacement section, insert it, and discard the
 	 * originals.
 	 *
-	 * rel_aplist and sym_aplist are used by ld_make_strmerge()
+	 * rel_alpp and sym_alpp are used by ld_make_strmerge()
 	 * for its internal processing. We are responsible for the
 	 * initialization and cleanup, and ld_make_strmerge() handles the rest.
-	 * This allows us to reuse a single pair of memory buffers allocatated
-	 * for this processing for all the output sections.
+	 * This allows us to reuse a single pair of memory buffers, allocated
+	 * for this processing, for all the output sections.
 	 */
 	if ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) == 0) {
-		int error_seen = 0;
-		APlist *rel_aplist = NULL;
-		APlist *sym_aplist = NULL;
+		int	error_seen = 0;
+		APlist	*rel_alpp = NULL;
+		APlist	*sym_alpp = NULL;
+		Aliste	idx1;
 
-		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 			Os_desc	*osp;
-			Aliste	idx;
+			Aliste	idx2;
 
-			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp))
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp))
 				if ((osp->os_mstrisdescs != NULL) &&
 				    (ld_make_strmerge(ofl, osp,
-				    &rel_aplist, &sym_aplist) ==
+				    &rel_alpp, &sym_alpp) ==
 				    S_ERROR)) {
 					error_seen = 1;
 					break;
 				}
 		}
-		if (rel_aplist != NULL)
-			free(rel_aplist);
-		if (sym_aplist != NULL)
-			free(sym_aplist);
+		if (rel_alpp != NULL)
+			free(rel_alpp);
+		if (sym_alpp != NULL)
+			free(sym_alpp);
 		if (error_seen != 0)
 			return (S_ERROR);
 	}
@@ -2712,6 +2707,8 @@ ld_make_sections(Ofl_desc *ofl)
 				return (S_ERROR);
 		}
 	} else {
+		Aliste	idx1;
+
 		/*
 		 * Create the required output relocation sections.  Note, new
 		 * sections may be added to the section list that is being
@@ -2720,11 +2717,11 @@ ld_make_sections(Ofl_desc *ofl)
 		 * is prevented by maintaining a previous section pointer and
 		 * insuring that this pointer isn't re-examined.
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 			Os_desc	*osp, *posp = 0;
-			Aliste	idx;
+			Aliste	idx2;
 
-			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 				if ((osp != posp) && osp->os_szoutrels &&
 				    (osp != ofl->ofl_osplt)) {
 					if (make_reloc(ofl, osp) == S_ERROR)
@@ -2827,12 +2824,12 @@ ld_make_sections(Ofl_desc *ofl)
 		} else {
 			osp = ofl->ofl_osdynsym;
 		}
-		isec = (Is_desc *)osp->os_isdescs.head->data;
+		isec = (Is_desc *)osp->os_isdescs->apl_data[0];
 		cnt = (isec->is_shdr->sh_size / isec->is_shdr->sh_entsize);
 
 		if (ofl->ofl_osversym) {
 			osp = ofl->ofl_osversym;
-			isec = (Is_desc *)osp->os_isdescs.head->data;
+			isec = (Is_desc *)osp->os_isdescs->apl_data[0];
 			data = isec->is_indata;
 			shdr = osp->os_shdr;
 			size = cnt * shdr->sh_entsize;
@@ -2841,7 +2838,7 @@ ld_make_sections(Ofl_desc *ofl)
 		}
 		if (ofl->ofl_ossyminfo) {
 			osp = ofl->ofl_ossyminfo;
-			isec = (Is_desc *)osp->os_isdescs.head->data;
+			isec = (Is_desc *)osp->os_isdescs->apl_data[0];
 			data = isec->is_indata;
 			shdr = osp->os_shdr;
 			size = cnt * shdr->sh_entsize;
@@ -2872,13 +2869,11 @@ ld_make_data(Ofl_desc *ofl, size_t size)
 	shdr->sh_size = (Xword)size;
 	shdr->sh_flags |= SHF_WRITE;
 
-	if (ld_place_section(ofl, isec, ld_targ.t_id.id_data, 0) ==
-	    (Os_desc *)S_ERROR)
+	if (aplist_append(&ofl->ofl_mapdata, isec, AL_CNT_OFL_MAPSECS) == NULL)
 		return ((Is_desc *)S_ERROR);
 
 	return (isec);
 }
-
 
 /*
  * Build an additional text section - used to back FUNC symbol definitions
@@ -2911,13 +2906,12 @@ ld_make_text(Ofl_desc *ofl, size_t size)
 	 * Note that there is no need to swap bytes on a non-native,
 	 * link, as the data being copied is given in bytes.
 	 */
-	if ((data->d_buf = libld_calloc(size, 1)) == 0)
+	if ((data->d_buf = libld_calloc(size, 1)) == NULL)
 		return ((Is_desc *)S_ERROR);
 	(void) memcpy(data->d_buf, ld_targ.t_nf.nf_template,
 	    ld_targ.t_nf.nf_size);
 
-	if (ld_place_section(ofl, isec, ld_targ.t_id.id_text, 0) ==
-	    (Os_desc *)S_ERROR)
+	if (aplist_append(&ofl->ofl_maptext, isec, AL_CNT_OFL_MAPSECS) == NULL)
 		return ((Is_desc *)S_ERROR);
 
 	return (isec);

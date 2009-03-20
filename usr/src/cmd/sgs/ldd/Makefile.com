@@ -31,8 +31,9 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJ=		ldd.o
 BLTOBJ=		msg.o
+TOOLSOBJ=	alist.o
 
-OBJS=		$(BLTOBJ) $(COMOBJ)
+OBJS=		$(BLTOBJ) $(COMOBJ) $(TOOLSOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPTS=	$(MAPFILE:%=-M%)
@@ -58,7 +59,8 @@ SGSMSGTARG=	$(SGSMSGCOM)
 SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n ldd_msg
 
-SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA)
+SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA) \
+		$(TOOLSOBJ:%.o=$(SGSTOOLS)/common/%.c)
 LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

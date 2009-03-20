@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
-
 
 /*
  * Print out a single `segment descriptor' entry.
@@ -92,9 +90,9 @@ Dbg_seg_entry(Ofl_desc *ofl, int ndx, Sg_desc *sgp)
  * Print out the available segment descriptors.
  */
 void
-Dbg_seg_list(Lm_list *lml, Half mach, List *lsg)
+Dbg_seg_list(Lm_list *lml, Half mach, APlist *apl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Sg_desc		*sgp;
 	int		ndx = 0;
 
@@ -103,7 +101,7 @@ Dbg_seg_list(Lm_list *lml, Half mach, List *lsg)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SEG_DESC_AVAIL));
-	for (LIST_TRAVERSE(lsg, lnp, sgp))
+	for (APLIST_TRAVERSE(apl, idx, sgp))
 		Dbg_seg_desc_entry(lml, mach, ndx++, sgp);
 }
 
@@ -118,7 +116,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 {
 	Conv_inv_buf_t	inv_buf;
 	Lm_list		*lml = ofl->ofl_lml;
-	Listnode	*lnp;
+	Aliste		idx;
 	Is_desc		*isp;
 	Elf_Data	*data;
 	Shdr		*shdr;
@@ -141,7 +139,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 	if (DBG_NOTDETAIL())
 		return;
 
-	for (LIST_TRAVERSE(&(osp->os_isdescs), lnp, isp)) {
+	for (APLIST_TRAVERSE(osp->os_isdescs, idx, isp)) {
 		const char	*file, *str;
 		Addr		addr;
 

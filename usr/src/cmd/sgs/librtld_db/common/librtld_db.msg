@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Message file for cmd/sgs/librtld_db.
@@ -56,9 +54,11 @@
 			 rtld_db: im:      objbase=0x%llx, ident=0x%llx)"
 @ MSG_DB_READDBGFAIL_1	"rtld_db: rli: failed to read rtld_db_priv: 0x%llx"
 @ MSG_DB_READDBGFAIL_2	"rtld_db: reg: failed to read rdebug: 0x%llx"
-@ MSG_DB_READDBGFAIL_3	"rtld_db: rli: failed to read dynlm_list: 0x%llx"
-@ MSG_DB_READDBGFAIL_4	"rtld_db: rli: failed to read listnode: 0x%llx"
-@ MSG_DB_READDBGFAIL_5	"rtld_db: rli: failed to read listnode.data: 0x%llx"
+@ MSG_DB_READDBGFAIL_3	"rtld_db: rli: failed to read rtd_dynlmlst: 0x%llx"
+@ MSG_DB_READDBGFAIL_4	"rtld_db: rli: failed to read dynlm_list: 0x%llx"
+@ MSG_DB_READDBGFAIL_5	"rtld_db: rli: failed to read dynlm_list->ap_data[]: \
+			 0x%llx"
+@ MSG_DB_READDBGFAIL_6	"rtld_db: rli: failed to read Lm_list: 0x%llx"
 @ MSG_DB_READPRIVFAIL_1	"rtld_db: rr: fail to read rtld_db_priv: 0x%llx"
 @ MSG_DB_BADPVERS	"rtld_db: ve: rtld vs. rtld_db version mismatch: \
 			 %d != %d"
@@ -69,7 +69,7 @@
 @ MSG_DB_LKMAPNOINIT	"rtld_db: rli: link maps are not yet initialized: \
 			 rtd_dynlmlst: 0x%llx"
 @ MSG_DB_LKMAPNOINIT_1	"rtld_db: rli: dynlm_list is not yet initialized: \
-			 dynlm_list.head: 0x%llx"
+			 dynlm_list: 0x%llx"
 @ MSG_DB_NULLITER	"rtld_db: rli: called with null iterator"
 @ MSG_DB_UNEXPEVENT	"rtld_db: rea: unexpected event num: %d"
 @ MSG_DB_READFAIL_1	"rtld_db: vr: read of 0x%llx failed"

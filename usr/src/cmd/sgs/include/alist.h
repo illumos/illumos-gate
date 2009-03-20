@@ -136,6 +136,13 @@ typedef struct {
 	void		*apl_data[1];	/* data area: (arrcnt * size) bytes */
 } APlist;
 
+#ifdef	_SYSCALL32			/* required by librtld_db */
+typedef	struct {
+	Elf32_Word	apl_arritems;
+	Elf32_Word	apl_nitems;
+	Elf32_Addr	apl_data[1];
+} APlist32;
+#endif	/* _SYSCALL32 */
 
 /*
  * The ALIST_OFF_DATA and APLIST_OFF_DATA macros give the byte offset

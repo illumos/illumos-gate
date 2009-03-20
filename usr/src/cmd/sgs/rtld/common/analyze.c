@@ -1021,10 +1021,9 @@ is_devinode_loaded(rtld_stat_t *status, Lm_list *lml, const char *name,
 	 * object is already loaded as an auditor.
 	 */
 	if (flags & FLG_RT_AUDIT) {
-		Lm_list		*lml;
-		Listnode	*lnp;
+		Lm_list	*lml;
 
-		for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
+		for (APLIST_TRAVERSE(dynlm_list, idx, lml)) {
 			Rt_map	*nlmp = lml->lm_head;
 
 			if (nlmp && ((FLAGS(nlmp) &

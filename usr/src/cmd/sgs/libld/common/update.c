@@ -78,7 +78,6 @@ dynsort_compare(const void *idx1, const void *idx2)
 	    (s1->st_value > s2->st_value));
 }
 
-
 /*
  * Scan the sorted symbols, and issue warnings if there are any duplicate
  * values in the list. We only do this if -zverbose is set, or we are
@@ -173,11 +172,11 @@ update_osym(Ofl_desc *ofl)
 	}
 
 
-	Listnode	*lnp1;
 	Sym_desc	*sdp;
 	Sym_avlnode	*sav;
-	Sg_desc		*sgp, *tsgp = 0, *dsgp = 0, *esgp = 0;
-	Os_desc		*osp, *iosp = 0, *fosp = 0;
+	Sg_desc		*sgp, *tsgp = NULL, *dsgp = NULL, *esgp = NULL;
+	Os_desc		*osp, *iosp = NULL, *fosp = NULL;
+	Is_desc		*isc;
 	Ifl_desc	*ifl;
 	Word		bssndx, etext_ndx, edata_ndx = 0, end_ndx, start_ndx;
 	Word		end_abs = 0, etext_abs = 0, edata_abs;
@@ -190,8 +189,8 @@ update_osym(Ofl_desc *ofl)
 	Addr		tlsbssaddr = 0;
 	Addr 		parexpnbase, parexpnaddr;
 	int		start_set = 0;
-	Sym		_sym = {0}, *sym, *symtab = 0;
-	Sym		*dynsym = 0, *ldynsym = 0;
+	Sym		_sym = {0}, *sym, *symtab = NULL;
+	Sym		*dynsym = NULL, *ldynsym = NULL;
 	Word		symtab_ndx = 0;	/* index into .symtab */
 	Word		symtab_gbl_bndx;	/* .symtab ndx 1st global */
 	Word		ldynsym_ndx = 0;	/* index into .SUNW_ldynsym */
@@ -204,10 +203,10 @@ update_osym(Ofl_desc *ofl)
 	Word		dynsymsort_ndx;		/* index dynsymsort array */
 	Word		dyntlssort_ndx;		/* index dyntlssort array */
 	Word		*symndx;	/* Symbol index (for relocation use) */
-	Word		*symshndx = 0;	/* .symtab_shndx table */
-	Word		*dynshndx = 0;	/* .dynsym_shndx table */
-	Word		*ldynshndx = 0;	/* .SUNW_ldynsym_shndx table */
-	Word		ldynsym_cnt = 0; /* # of items in .SUNW_ldynsym */
+	Word		*symshndx = NULL;	/* .symtab_shndx table */
+	Word		*dynshndx = NULL;	/* .dynsym_shndx table */
+	Word		*ldynshndx = NULL;	/* .SUNW_ldynsym_shndx table */
+	Word		ldynsym_cnt = NULL; /* # of items in .SUNW_ldynsym */
 	Str_tbl		*shstrtab;
 	Str_tbl		*strtab;
 	Str_tbl		*dynstr;
@@ -216,7 +215,7 @@ update_osym(Ofl_desc *ofl)
 	Word		*hashchain;	/* hash table chain pointer */
 	Word		hashval;	/* value of hash function */
 	Wk_desc		*wkp;
-	List		weak = {NULL, NULL};
+	Alist		*weak = NULL;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	Word		dtflags_1 = ofl->ofl_dtflags_1;
 	Versym		*versym;
@@ -227,6 +226,7 @@ update_osym(Ofl_desc *ofl)
 	Word		ssndx;		/* global index into sorted_syms */
 	Word		scndx;		/* scoped index into sorted_syms */
 	size_t		stoff;		/* string offset */
+	Aliste		idx1;
 
 	/*
 	 * Initialize pointers to the symbol table entries and the symbol
@@ -369,7 +369,7 @@ update_osym(Ofl_desc *ofl)
 	 */
 	if (DBG_ENABLED) {
 		if ((ofl->ofl_gottable = gottable =
-		    libld_calloc(ofl->ofl_gotcnt, sizeof (Gottable))) == 0)
+		    libld_calloc(ofl->ofl_gotcnt, sizeof (Gottable))) == NULL)
 		return ((Addr)S_ERROR);
 	}
 
@@ -378,10 +378,10 @@ update_osym(Ofl_desc *ofl)
 	 * and the last data segment so that we can update etext and edata. If
 	 * we have empty segments (reservations) record them for setting _end.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Phdr	*phd = &(sgp->sg_phdr);
 		Os_desc	*osp;
-		Aliste	idx;
+		Aliste	idx2;
 
 		if (phd->p_type == PT_LOAD) {
 			if (sgp->sg_osdescs != NULL) {
@@ -398,7 +398,7 @@ update_osym(Ofl_desc *ofl)
 		/*
 		 * Generate a section symbol for each output section.
 		 */
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Word	sectndx;
 
 			sym = &_sym;
@@ -421,12 +421,13 @@ update_osym(Ofl_desc *ofl)
 			if (dynsym && (osp->os_flags & FLG_OS_OUTREL))
 				dynsym[dynsym_ndx++] = *sym;
 
-			if ((dynsym == 0) || (osp->os_flags & FLG_OS_OUTREL)) {
+			if ((dynsym == NULL) ||
+			    (osp->os_flags & FLG_OS_OUTREL)) {
 				if (versym)
 					versym[*symndx - 1] = 0;
-				osp->os_scnsymndx = *symndx - 1;
+				osp->os_identndx = *symndx - 1;
 				DBG_CALL(Dbg_syms_sec_entry(ofl->ofl_lml,
-				    osp->os_scnsymndx, sgp, osp));
+				    osp->os_identndx, sgp, osp));
 			}
 
 			/*
@@ -459,10 +460,10 @@ update_osym(Ofl_desc *ofl)
 			 * While we're here, determine whether a .init or .fini
 			 * section exist.
 			 */
-			if ((iosp == 0) && (strcmp(osp->os_name,
+			if ((iosp == NULL) && (strcmp(osp->os_name,
 			    MSG_ORIG(MSG_SCN_INIT)) == 0))
 				iosp = osp;
-			if ((fosp == 0) && (strcmp(osp->os_name,
+			if ((fosp == NULL) && (strcmp(osp->os_name,
 			    MSG_ORIG(MSG_SCN_FINI)) == 0))
 				fosp = osp;
 		}
@@ -476,9 +477,9 @@ update_osym(Ofl_desc *ofl)
 		int	ndx;
 
 		for (ndx = 0; ndx < ofl->ofl_regsymsno; ndx++) {
-			Sym_desc *	rsdp;
+			Sym_desc	*rsdp;
 
-			if ((rsdp = ofl->ofl_regsyms[ndx]) == 0)
+			if ((rsdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 
 			if (((rsdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
@@ -504,7 +505,7 @@ update_osym(Ofl_desc *ofl)
 	 * and `START'.
 	 */
 	if (!(flags & FLG_OF_RELOBJ)) {
-		Sg_desc *	sgp;
+		Sg_desc	*sgp;
 
 		if (tsgp)
 			etext = tsgp->sg_phdr.p_vaddr + tsgp->sg_phdr.p_filesz;
@@ -527,12 +528,12 @@ update_osym(Ofl_desc *ofl)
 				    MSG_INTL(MSG_UPD_NORDWRSEG));
 		}
 
-		if (dsgp == 0) {
+		if (dsgp == NULL) {
 			if (tsgp)
 				sgp = tsgp;
 			else
 				sgp = 0;
-		} else if (tsgp == 0)
+		} else if (tsgp == NULL)
 			sgp = dsgp;
 		else if (dsgp->sg_phdr.p_vaddr > tsgp->sg_phdr.p_vaddr)
 			sgp = dsgp;
@@ -620,16 +621,15 @@ update_osym(Ofl_desc *ofl)
 		    ofl->ofl_isparexpn->is_indata->d_off);
 		/* LINTED */
 		parexpnndx = elf_ndxscn(osp->os_scn);
-		ofl->ofl_parexpnndx = osp->os_scnsymndx;
+		ofl->ofl_parexpnndx = osp->os_identndx;
 	}
 
 	/*
 	 * If we are generating a .symtab collect all the local symbols,
 	 * assigning a new virtual address or displacement (value).
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp1, ifl)) {
-		Xword		lndx, local;
-		Is_desc *	isc;
+	for (APLIST_TRAVERSE(ofl->ofl_objs, idx1, ifl)) {
+		Xword	lndx, local;
 
 		/*
 		 * Check that we have local symbols to process.  If the user
@@ -640,7 +640,6 @@ update_osym(Ofl_desc *ofl)
 			continue;
 
 		for (lndx = 1; lndx < local; lndx++) {
-			Listnode	*lnp2;
 			Gotndx		*gnp;
 			uchar_t		type;
 			Word		*_symshndx;
@@ -658,8 +657,10 @@ update_osym(Ofl_desc *ofl)
 				return ((Addr)S_ERROR);
 
 			if (DBG_ENABLED) {
-				for (LIST_TRAVERSE(&sdp->sd_GOTndxs,
-				    lnp2, gnp)) {
+				Aliste	idx2;
+
+				for (ALIST_TRAVERSE(sdp->sd_GOTndxs,
+				    idx2, gnp)) {
 					gottable->gt_sym = sdp;
 					gottable->gt_gndx.gn_gotndx =
 					    gnp->gn_gotndx;
@@ -712,11 +713,12 @@ update_osym(Ofl_desc *ofl)
 			 */
 			enter_in_symtab = symtab &&
 			    (!(ofl->ofl_flags & FLG_OF_REDLSYM) ||
-			    (sdp->sd_psyminfo));
+			    sdp->sd_move);
 			enter_in_ldynsym = ldynsym && sdp->sd_name &&
 			    ldynsym_symtype[type] &&
 			    !(ofl->ofl_flags & FLG_OF_REDLSYM);
-			_symshndx = 0;
+			_symshndx = NULL;
+
 			if (enter_in_symtab) {
 				if (!dynsym)
 					sdp->sd_symndx = *symndx;
@@ -764,7 +766,7 @@ update_osym(Ofl_desc *ofl)
 				 * a copy of it.
 				 */
 				if (!(sdp->sd_flags & FLG_SY_UPREQD) &&
-				    !(sdp->sd_psyminfo))
+				    !(sdp->sd_move))
 					continue;
 				if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 				    (sym->st_shndx == SHN_ABS))
@@ -903,10 +905,11 @@ update_osym(Ofl_desc *ofl)
 	 * Assign .bss information for use with updating COMMON symbols.
 	 */
 	if (ofl->ofl_isbss) {
-		osp = ofl->ofl_isbss->is_osdesc;
+		isc = ofl->ofl_isbss;
+		osp = isc->is_osdesc;
 
 		bssaddr = osp->os_shdr->sh_addr +
-		    (Off)_elf_getxoff(ofl->ofl_isbss->is_indata);
+		    (Off)_elf_getxoff(isc->is_indata);
 		/* LINTED */
 		bssndx = elf_ndxscn(osp->os_scn);
 	}
@@ -938,7 +941,8 @@ update_osym(Ofl_desc *ofl)
 	}
 
 	if ((sorted_syms = libld_calloc(ofl->ofl_globcnt +
-	    ofl->ofl_elimcnt + ofl->ofl_scopecnt, sizeof (*sorted_syms))) == 0)
+	    ofl->ofl_elimcnt + ofl->ofl_scopecnt,
+	    sizeof (*sorted_syms))) == NULL)
 		return ((Addr)S_ERROR);
 
 	scndx = 0;
@@ -950,7 +954,7 @@ update_osym(Ofl_desc *ofl)
 	 */
 	for (sav = avl_first(&ofl->ofl_symavl); sav;
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
-		Sym *	symptr;
+		Sym	*symptr;
 		int	local;
 		int	restore;
 
@@ -1097,7 +1101,6 @@ update_osym(Ofl_desc *ofl)
 		Sym_aux		*sap;
 		Half		spec;
 		int		local = 0, dynlocal = 0, enter_in_symtab;
-		Listnode	*lnp2;
 		Gotndx		*gnp;
 		Word		sectndx;
 
@@ -1117,7 +1120,9 @@ update_osym(Ofl_desc *ofl)
 			return ((Addr)S_ERROR);
 
 		if (DBG_ENABLED) {
-			for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
+			Aliste	idx2;
+
+			for (ALIST_TRAVERSE(sdp->sd_GOTndxs, idx2, gnp)) {
 				gottable->gt_sym = sdp;
 				gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
 				gottable->gt_gndx.gn_addend = gnp->gn_addend;
@@ -1206,7 +1211,7 @@ update_osym(Ofl_desc *ofl)
 		if (sdp->sd_symndx && syminfo &&
 		    !(sdp->sd_flags & FLG_SY_NOTAVAIL)) {
 			int	ndx = sdp->sd_symndx;
-			List	*sip = &(ofl->ofl_syminfsyms);
+			APlist 	**alpp = &(ofl->ofl_syminfsyms);
 
 			if (sdp->sd_flags & FLG_SY_MVTOCOMM)
 				/*
@@ -1223,7 +1228,8 @@ update_osym(Ofl_desc *ofl)
 				 * reference is lazy loadable, and if a direct
 				 * binding is to be established.
 				 */
-				if (list_appendc(sip, sdp) == 0)
+				if (aplist_append(alpp, sdp,
+				    AL_CNT_OFL_SYMINFOSYMS) == NULL)
 					return (0);
 
 				syminfo[ndx].si_flags |= SYMINFO_FLG_DIRECT;
@@ -1234,14 +1240,14 @@ update_osym(Ofl_desc *ofl)
 				/*
 				 * Enable direct symbol bindings if:
 				 *
-				 *  .	Symbol was identified with the DIRECT
+				 *  -	Symbol was identified with the DIRECT
 				 *	keyword in a mapfile.
 				 *
-				 *  .	Symbol reference has been bound to a
+				 *  -	Symbol reference has been bound to a
 				 * 	dependency which was specified as
 				 *	requiring direct bindings with -zdirect.
 				 *
-				 *  .	All symbol references are required to
+				 *  -	All symbol references are required to
 				 *	use direct bindings via -Bdirect.
 				 */
 				if (sdp->sd_flags1 & FLG_SY1_DIR)
@@ -1346,7 +1352,9 @@ update_osym(Ofl_desc *ofl)
 					if ((dtflags_1 & DF_1_TRANS) &&
 					    sdp->sd_aux &&
 					    sdp->sd_aux->sa_bindto) {
-						if (list_appendc(sip, sdp) == 0)
+						if (aplist_append(alpp, sdp,
+						    AL_CNT_OFL_SYMINFOSYMS) ==
+						    NULL)
 							return (0);
 					} else {
 						syminfo[ndx].si_boundto =
@@ -1453,49 +1461,42 @@ update_osym(Ofl_desc *ofl)
 		if ((sap->sa_linkndx) &&
 		    (ELF_ST_BIND(sym->st_info) == STB_WEAK) &&
 		    (!sap->sa_PLTndx)) {
-			Sym_desc *	_sdp =
-			    sdp->sd_file->ifl_oldndx[sap->sa_linkndx];
+			Sym_desc	*_sdp;
+
+			_sdp = sdp->sd_file->ifl_oldndx[sap->sa_linkndx];
 
 			if (_sdp->sd_ref != REF_DYN_SEEN) {
-				if ((wkp =
-				    libld_calloc(sizeof (Wk_desc), 1)) == 0)
-					return ((Addr)S_ERROR);
+				Wk_desc	wk;
 
 				if (enter_in_symtab) {
-					if (local)
-						wkp->wk_symtab =
+					if (local) {
+						wk.wk_symtab =
 						    &symtab[scopesym_ndx];
-					else
-						wkp->wk_symtab =
+						scopesym_ndx++;
+					} else {
+						wk.wk_symtab =
 						    &symtab[symtab_ndx];
-				}
-				if (dynsym) {
-					if (!local) {
-						wkp->wk_dynsym =
-						    &dynsym[dynsym_ndx];
-					} else if (dynlocal) {
-						wkp->wk_dynsym =
-						    &ldynsym[ldynscopesym_ndx];
+						symtab_ndx++;
 					}
 				}
-				wkp->wk_weak = sdp;
-				wkp->wk_alias = _sdp;
-
-				if (!(list_appendc(&weak, wkp)))
-					return ((Addr)S_ERROR);
-
-				if (enter_in_symtab)
-					if (local)
-						scopesym_ndx++;
-					else
-						symtab_ndx++;
 				if (dynsym) {
 					if (!local) {
+						wk.wk_dynsym =
+						    &dynsym[dynsym_ndx];
 						dynsym_ndx++;
 					} else if (dynlocal) {
+						wk.wk_dynsym =
+						    &ldynsym[ldynscopesym_ndx];
 						ldynscopesym_ndx++;
 					}
 				}
+				wk.wk_weak = sdp;
+				wk.wk_alias = _sdp;
+
+				if (alist_append(&weak, &wk,
+				    sizeof (Wk_desc), AL_CNT_WEAK) == NULL)
+					return ((Addr)S_ERROR);
+
 				continue;
 			}
 		}
@@ -1711,7 +1712,6 @@ update_osym(Ofl_desc *ofl)
 			symtab[_symndx].st_other = sym->st_other;
 		}
 
-
 		if (enter_in_symtab) {
 			Word	_symndx;
 
@@ -1721,7 +1721,7 @@ update_osym(Ofl_desc *ofl)
 				_symndx = symtab_ndx++;
 			if (((sdp->sd_flags & FLG_SY_SPECSEC) == 0) &&
 			    (sectndx >= SHN_LORESERVE)) {
-				assert(symshndx != 0);
+				assert(symshndx != NULL);
 				symshndx[_symndx] = sectndx;
 				symtab[_symndx].st_shndx = SHN_XINDEX;
 			} else {
@@ -1751,7 +1751,7 @@ update_osym(Ofl_desc *ofl)
 			}
 			if (((sdp->sd_flags & FLG_SY_SPECSEC) == 0) &&
 			    (sectndx >= SHN_LORESERVE)) {
-				assert(_dynshndx != 0);
+				assert(_dynshndx != NULL);
 				_dynshndx[_symndx] = sectndx;
 				_dynsym[_symndx].st_shndx = SHN_XINDEX;
 			} else {
@@ -1769,9 +1769,9 @@ update_osym(Ofl_desc *ofl)
 	 * symbols will be represented in the output, return the weak symbol to
 	 * its correct type.
 	 */
-	for (LIST_TRAVERSE(&weak, lnp1, wkp)) {
-		Sym_desc *	sdp, * _sdp;
-		Sym *		sym, * _sym, * __sym;
+	for (ALIST_TRAVERSE(weak, idx1, wkp)) {
+		Sym_desc	*sdp, *_sdp;
+		Sym		*sym, *_sym, *__sym;
 		uchar_t		bind;
 
 		sdp = wkp->wk_weak;
@@ -1966,7 +1966,7 @@ update_osym(Ofl_desc *ofl)
 static int
 update_odynamic(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Ifl_desc	*ifl;
 	Sym_desc	*sdp;
 	Shdr		*shdr;
@@ -1977,7 +1977,6 @@ update_odynamic(Ofl_desc *ofl)
 	ofl_flag_t	flags = ofl->ofl_flags;
 	int		not_relobj = !(flags & FLG_OF_RELOBJ);
 	Word		cnt;
-
 
 	/*
 	 * A relocatable object with a dynamic section is possible, though
@@ -1994,7 +1993,6 @@ update_odynamic(Ofl_desc *ofl)
 	 *	DT_SUNW_STRPAD
 	 *	DT_LDMACH
 	 */
-
 	dynstr = ofl->ofl_dynstrtab;
 	ofl->ofl_osdynamic->os_shdr->sh_link =
 	    /* LINTED */
@@ -2002,7 +2000,7 @@ update_odynamic(Ofl_desc *ofl)
 
 	dyn = _dyn;
 
-	for (LIST_TRAVERSE(&ofl->ofl_sos, lnp, ifl)) {
+	for (APLIST_TRAVERSE(ofl->ofl_sos, idx, ifl)) {
 		if ((ifl->ifl_flags &
 		    (FLG_IF_IGNORE | FLG_IF_DEPREQD)) == FLG_IF_IGNORE)
 			continue;
@@ -2036,7 +2034,6 @@ update_odynamic(Ofl_desc *ofl)
 	if (not_relobj) {
 		if (ofl->ofl_dtsfltrs != NULL) {
 			Dfltr_desc	*dftp;
-			Aliste		idx;
 
 			for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, idx, dftp)) {
 				if (dftp->dft_flag == FLG_SY_AUXFLTR)
@@ -2097,6 +2094,8 @@ update_odynamic(Ofl_desc *ofl)
 	}
 
 	if (not_relobj) {
+		Aliste	idx;
+
 		if (ofl->ofl_config) {
 			dyn->d_tag = DT_CONFIG;
 			(void) st_setstring(dynstr, ofl->ofl_config, &stoff);
@@ -2357,7 +2356,7 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 		if (ofl->ofl_osmove) {
-			Os_desc *	osp;
+			Os_desc	*osp;
 
 			dyn->d_tag = DT_MOVEENT;
 			osp = ofl->ofl_osmove;
@@ -2374,7 +2373,7 @@ update_odynamic(Ofl_desc *ofl)
 			int	ndx;
 
 			for (ndx = 0; ndx < ofl->ofl_regsymsno; ndx++) {
-				if ((sdp = ofl->ofl_regsyms[ndx]) == 0)
+				if ((sdp = ofl->ofl_regsyms[ndx]) == NULL)
 					continue;
 
 				dyn->d_tag = ld_targ.t_m.m_dt_register;
@@ -2383,7 +2382,7 @@ update_odynamic(Ofl_desc *ofl)
 			}
 		}
 
-		for (LIST_TRAVERSE(&ofl->ofl_rtldinfo, lnp, sdp)) {
+		for (APLIST_TRAVERSE(ofl->ofl_rtldinfo, idx, sdp)) {
 			dyn->d_tag = DT_SUNW_RTLDINF;
 			dyn->d_un.d_ptr = sdp->sd_sym->st_value;
 			dyn++;
@@ -2470,7 +2469,7 @@ update_odynamic(Ofl_desc *ofl)
 static int
 update_overdef(Ofl_desc *ofl)
 {
-	Listnode	*lnp1, *lnp2;
+	Aliste		idx1;
 	Ver_desc	*vdp, *_vdp;
 	Verdef		*vdf, *_vdf;
 	int		num = 0;
@@ -2481,8 +2480,8 @@ update_overdef(Ofl_desc *ofl)
 	 * to point to the dynstr name in preparation for building the version
 	 * section structure.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_verdesc, lnp1, vdp)) {
-		Sym_desc *	sdp;
+	for (APLIST_TRAVERSE(ofl->ofl_verdesc, idx1, vdp)) {
+		Sym_desc	*sdp;
 
 		if (vdp->vd_flags & VER_FLG_BASE) {
 			const char	*name = vdp->vd_name;
@@ -2518,9 +2517,10 @@ update_overdef(Ofl_desc *ofl)
 	 * Traverse the version descriptors and update the version section to
 	 * reflect each version and its associated dependencies.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_verdesc, lnp1, vdp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_verdesc, idx1, vdp)) {
+		Aliste		idx2;
 		Half		cnt = 1;
-		Verdaux *	vdap, * _vdap;
+		Verdaux		*vdap, *_vdap;
 
 		_vdap = vdap = (Verdaux *)(vdf + 1);
 
@@ -2539,7 +2539,7 @@ update_overdef(Ofl_desc *ofl)
 		 * Traverse this versions dependency list generating the
 		 * appropriate version dependency entries.
 		 */
-		for (LIST_TRAVERSE(&vdp->vd_deps, lnp2, _vdp)) {
+		for (APLIST_TRAVERSE(vdp->vd_deps, idx2, _vdp)) {
 			/* LINTED */
 			vdap->vda_name = (uintptr_t)_vdp->vd_name;
 			_vdap = vdap;
@@ -2627,7 +2627,7 @@ update_oversym(Ofl_desc *ofl)
 static int
 update_overneed(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx1;
 	Ifl_desc	*ifl;
 	Verneed		*vnd, *_vnd;
 	Str_tbl		*dynstr;
@@ -2641,7 +2641,7 @@ update_overneed(Ofl_desc *ofl)
 	 * Traverse the shared object list looking for dependencies that have
 	 * versions defined within them.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_sos, lnp, ifl)) {
+	for (APLIST_TRAVERSE(ofl->ofl_sos, idx1, ifl)) {
 		Half		_cnt;
 		Word		cnt = 0;
 		Vernaux		*_vnap, *vnap;
@@ -2661,14 +2661,14 @@ update_overneed(Ofl_desc *ofl)
 		has_specver = sdf && (sdf->sdf_flags & FLG_SDF_SPECVER);
 		if (has_specver) {
 			Sdv_desc	*sdv;
-			Listnode	*lnp2;
+			Aliste		idx2;
 
 			/*
 			 * If version needed definitions were specified in
 			 * a mapfile ($SPECVERS=*) then record those
 			 * definitions.
 			 */
-			for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp2, sdv)) {
+			for (ALIST_TRAVERSE(sdf->sdf_verneed, idx2, sdv)) {
 				/*
 				 * If this $SPECVERS item corresponds
 				 * to a real version, then skip it here
@@ -2788,16 +2788,15 @@ update_overneed(Ofl_desc *ofl)
  * Update syminfo section.
  */
 static uintptr_t
-update_osyminfo(Ofl_desc * ofl)
+update_osyminfo(Ofl_desc *ofl)
 {
-	Os_desc *	symosp, * infosp = ofl->ofl_ossyminfo;
-	Syminfo *	sip = infosp->os_outdata->d_buf;
-	Shdr *		shdr = infosp->os_shdr;
+	Os_desc		*symosp, *infosp = ofl->ofl_ossyminfo;
+	Syminfo		*sip = infosp->os_outdata->d_buf;
+	Shdr		*shdr = infosp->os_shdr;
 	char		*strtab;
-	Listnode *	lnp;
-	Sym_desc *	sdp;
 	Aliste		idx;
-	Sfltr_desc *	sftp;
+	Sym_desc	*sdp;
+	Sfltr_desc	*sftp;
 
 	if (ofl->ofl_flags & FLG_OF_RELOBJ) {
 		symosp = ofl->ofl_ossymtab;
@@ -2817,8 +2816,9 @@ update_osyminfo(Ofl_desc * ofl)
 	/*
 	 * Update any references with the index into the dynamic table.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_syminfsyms, lnp, sdp)) {
-		Ifl_desc *	ifl;
+	for (APLIST_TRAVERSE(ofl->ofl_syminfsyms, idx, sdp)) {
+		Ifl_desc	*ifl;
+
 		if (sdp->sd_aux && sdp->sd_aux->sa_bindto)
 			ifl = sdp->sd_aux->sa_bindto;
 		else
@@ -2842,13 +2842,13 @@ update_osyminfo(Ofl_desc * ofl)
 	DBG_CALL(Dbg_syminfo_title(ofl->ofl_lml));
 	if (DBG_ENABLED) {
 		Word	_cnt, cnt = shdr->sh_size / shdr->sh_entsize;
-		Sym *	symtab = symosp->os_outdata->d_buf;
-		Dyn *	dyn;
+		Sym	*symtab = symosp->os_outdata->d_buf;
+		Dyn	*dyn;
 
 		if (ofl->ofl_osdynamic)
 			dyn = ofl->ofl_osdynamic->os_outdata->d_buf;
 		else
-			dyn = 0;
+			dyn = NULL;
 
 		for (_cnt = 1; _cnt < cnt; _cnt++) {
 			if (sip[_cnt].si_flags || sip[_cnt].si_boundto)
@@ -2908,77 +2908,73 @@ update_oehdr(Ofl_desc * ofl)
 /*
  * Perform move table expansion.
  */
-static uintptr_t
-expand_move(Ofl_desc *ofl, Sym_desc *sdp, Move *u1)
+static void
+expand_move(Ofl_desc *ofl, Sym_desc *sdp, Move *mvp)
 {
-	Move		*mv;
 	Os_desc		*osp;
-	unsigned char	*taddr, *taddr0;
+	uchar_t		*taddr, *taddr0;
 	Sxword		offset;
-	int		i;
-	unsigned int	stride;
+	Half		cnt;
+	uint_t		stride;
 
 	osp = ofl->ofl_isparexpn->is_osdesc;
-	taddr0 = taddr = osp->os_outdata->d_buf;
-	mv = u1;
-
 	offset = sdp->sd_sym->st_value - osp->os_shdr->sh_addr;
+
+	taddr0 = taddr = osp->os_outdata->d_buf;
 	taddr += offset;
-	taddr = taddr + mv->m_poffset;
-	for (i = 0; i < mv->m_repeat; i++) {
+	taddr = taddr + mvp->m_poffset;
+
+	for (cnt = 0; cnt < mvp->m_repeat; cnt++) {
 		/* LINTED */
-		DBG_CALL(Dbg_move_expand(ofl->ofl_lml, mv,
+		DBG_CALL(Dbg_move_expand(ofl->ofl_lml, mvp,
 		    (Addr)(taddr - taddr0)));
-		stride = (unsigned int)mv->m_stride + 1;
+		stride = (uint_t)mvp->m_stride + 1;
+
+		/*
+		 * Update the target address based upon the move entry size.
+		 * This size was validated in ld_process_move().
+		 */
 		/* LINTED */
-		switch (ELF_M_SIZE(mv->m_info)) {
+		switch (ELF_M_SIZE(mvp->m_info)) {
 		case 1:
 			/* LINTED */
-			*taddr = (unsigned char)mv->m_value;
+			*taddr = (uchar_t)mvp->m_value;
 			taddr += stride;
 			break;
 		case 2:
 			/* LINTED */
-			*((Half *)taddr) = (Half)mv->m_value;
-			taddr += 2*stride;
+			*((Half *)taddr) = (Half)mvp->m_value;
+			taddr += 2 * stride;
 			break;
 		case 4:
 			/* LINTED */
-			*((Word *)taddr) = (Word)mv->m_value;
-			taddr += 4*stride;
+			*((Word *)taddr) = (Word)mvp->m_value;
+			taddr += 4 * stride;
 			break;
 		case 8:
 			/* LINTED */
-			*((unsigned long long *)taddr) = mv->m_value;
-			taddr += 8*stride;
+			*((u_longlong_t *)taddr) = mvp->m_value;
+			taddr += 8 * stride;
 			break;
-		default:
-			/*
-			 * Should never come here since this is already
-			 * checked at sunwmove_preprocess().
-			 */
-			return (S_ERROR);
 		}
 	}
-	return (1);
 }
 
 /*
  * Update Move sections.
  */
-static uintptr_t
+static void
 update_move(Ofl_desc *ofl)
 {
 	Word		ndx = 0;
-	Is_desc *	isp;
 	ofl_flag_t	flags = ofl->ofl_flags;
-	Move *		mv1, * mv2;
-	Listnode *	lnp1;
-	Psym_info *	psym;
+	Move		*omvp;
+	Aliste		idx1;
+	Sym_desc	*sdp;
 
 	/*
 	 * Determine the index of the symbol table that will be referenced by
-	 * the relocation entries.
+	 * the Move section.
 	 */
 	if (OFL_ALLOW_DYNSYM(ofl))
 		/* LINTED */
@@ -2988,43 +2984,40 @@ update_move(Ofl_desc *ofl)
 		ndx = (Word) elf_ndxscn(ofl->ofl_ossymtab->os_scn);
 
 	/*
-	 * update sh_link and mv pointer for updating move table.
+	 * Update sh_link of the Move section, and point to the new Move data.
 	 */
 	if (ofl->ofl_osmove) {
 		ofl->ofl_osmove->os_shdr->sh_link = ndx;
-		mv1 = (Move *) ofl->ofl_osmove->os_outdata->d_buf;
+		omvp = (Move *)ofl->ofl_osmove->os_outdata->d_buf;
 	}
 
 	/*
 	 * Update symbol entry index
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_parsym, lnp1, psym)) {
-		Listnode *	lnp2;
-		Mv_itm *	mvp;
-		Sym_desc 	*sdp;
+	for (APLIST_TRAVERSE(ofl->ofl_parsyms, idx1, sdp)) {
+		Aliste		idx2;
+		Mv_desc		*mdp;
 
 		/*
 		 * Expand move table
 		 */
-		if (psym->psym_symd->sd_flags & FLG_SY_PAREXPN) {
-			const char	*s;
+		if (sdp->sd_flags & FLG_SY_PAREXPN) {
+			const char	*str;
 
 			if (flags & FLG_OF_STATIC)
-				s = MSG_INTL(MSG_PSYM_EXPREASON1);
+				str = MSG_INTL(MSG_PSYM_EXPREASON1);
 			else if (ofl->ofl_flags1 & FLG_OF1_NOPARTI)
-				s = MSG_INTL(MSG_PSYM_EXPREASON2);
+				str = MSG_INTL(MSG_PSYM_EXPREASON2);
 			else
-				s = MSG_INTL(MSG_PSYM_EXPREASON3);
+				str = MSG_INTL(MSG_PSYM_EXPREASON3);
+
 			DBG_CALL(Dbg_move_parexpn(ofl->ofl_lml,
-			    psym->psym_symd->sd_name, s));
-			for (LIST_TRAVERSE(&(psym->psym_mvs), lnp2, mvp)) {
-				if ((mvp->mv_flag & FLG_MV_OUTSECT) == 0)
-					continue;
-				mv2 = mvp->mv_ientry;
-				sdp = psym->psym_symd;
+			    sdp->sd_name, str));
+
+			for (ALIST_TRAVERSE(sdp->sd_move, idx2, mdp)) {
 				DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0,
-				    mv2, sdp));
-				(void) expand_move(ofl, sdp, mv2);
+				    mdp->md_move, sdp));
+				expand_move(ofl, sdp, mdp->md_move);
 			}
 			continue;
 		}
@@ -3032,44 +3025,40 @@ update_move(Ofl_desc *ofl)
 		/*
 		 * Process move table
 		 */
-		DBG_CALL(Dbg_move_outmove(ofl->ofl_lml,
-		    psym->psym_symd->sd_name));
-		for (LIST_TRAVERSE(&(psym->psym_mvs), lnp2, mvp)) {
+		DBG_CALL(Dbg_move_outmove(ofl->ofl_lml, sdp->sd_name));
+
+		for (ALIST_TRAVERSE(sdp->sd_move, idx2, mdp)) {
+			Move	*imvp;
 			int	idx = 1;
 			Sym	*sym;
 
-			if ((mvp->mv_flag & FLG_MV_OUTSECT) == 0)
-				continue;
-
-			isp = mvp->mv_isp;
-			mv2 = mvp->mv_ientry;
-			sdp = isp->is_file->ifl_oldndx[ELF_M_SYM(mv2->m_info)];
+			imvp = mdp->md_move;
 			sym = sdp->sd_sym;
 
-			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, mv2, sdp));
+			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 1, imvp, sdp));
 
-			*mv1 = *mv2;
+			*omvp = *imvp;
 			if ((flags & FLG_OF_RELOBJ) == 0) {
 				if (ELF_ST_BIND(sym->st_info) == STB_LOCAL) {
-					Half	symbssndx = ofl->ofl_isbss->
-					    is_osdesc->os_scnsymndx;
+					Os_desc	*osp = sdp->sd_isc->is_osdesc;
+					Word	ndx = osp->os_identndx;
 
-					mv1->m_info =
+					omvp->m_info =
 					    /* LINTED */
-					    ELF_M_INFO(symbssndx, mv2->m_info);
+					    ELF_M_INFO(ndx, imvp->m_info);
 
 					if (ELF_ST_TYPE(sym->st_info) !=
 					    STT_SECTION) {
-						mv1->m_poffset = sym->st_value -
-						    ofl->ofl_isbss->is_osdesc->
-						    os_shdr->sh_addr +
-						    mv2->m_poffset;
+						omvp->m_poffset =
+						    sym->st_value -
+						    osp->os_shdr->sh_addr +
+						    imvp->m_poffset;
 					}
 				} else {
-					mv1->m_info =
+					omvp->m_info =
 					    /* LINTED */
 					    ELF_M_INFO(sdp->sd_symndx,
-					    mv2->m_info);
+					    imvp->m_info);
 				}
 			} else {
 				Boolean 	isredloc = FALSE;
@@ -3078,48 +3067,48 @@ update_move(Ofl_desc *ofl)
 				    (ofl->ofl_flags & FLG_OF_REDLSYM))
 					isredloc = TRUE;
 
-				if (isredloc && !(sdp->sd_psyminfo)) {
-					Word	symndx = sdp->sd_isc->
-					    is_osdesc->os_scnsymndx;
+				if (isredloc && !(sdp->sd_move)) {
+					Os_desc	*osp = sdp->sd_isc->is_osdesc;
+					Word	ndx = osp->os_identndx;
 
-					mv1->m_info =
+					omvp->m_info =
 					    /* LINTED */
-					    ELF_M_INFO(symndx, mv2->m_info);
-					mv1->m_poffset += sym->st_value;
+					    ELF_M_INFO(ndx, imvp->m_info);
+
+					omvp->m_poffset += sym->st_value;
 				} else {
 					if (isredloc)
 						DBG_CALL(Dbg_syms_reduce(ofl,
-						    DBG_SYM_REDUCE_RETAIN, sdp,
-						    idx,
+						    DBG_SYM_REDUCE_RETAIN,
+						    sdp, idx,
 						    ofl->ofl_osmove->os_name));
 
-					mv1->m_info =
+					omvp->m_info =
 					    /* LINTED */
 					    ELF_M_INFO(sdp->sd_symndx,
-					    mv2->m_info);
+					    imvp->m_info);
 				}
 			}
-			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 1, mv1, sdp));
-			mv1++;
+
+			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, omvp, sdp));
+			omvp++;
 			idx++;
 		}
 	}
-	return (1);
 }
 
-
 /*
- * Scan through the SHT_GROUP output sections.  Update their
- * sh_link/sh_info fields as well as the section contents.
+ * Scan through the SHT_GROUP output sections.  Update their sh_link/sh_info
+ * fields as well as the section contents.
  */
 static uintptr_t
 update_ogroup(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Os_desc		*osp;
 	uintptr_t	error = 0;
 
-	for (LIST_TRAVERSE(&ofl->ofl_osgroups, lnp, osp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_osgroups, idx, osp)) {
 		Is_desc		*isp;
 		Ifl_desc	*ifl;
 		Shdr		*shdr = osp->os_shdr;
@@ -3132,7 +3121,7 @@ update_ogroup(Ofl_desc *ofl)
 		 * output GROUP sections - we know there is only one
 		 * item on the list.
 		 */
-		isp = (Is_desc *)osp->os_isdescs.head->data;
+		isp = (Is_desc *)osp->os_isdescs->apl_data[0];
 
 		ifl = isp->is_file;
 		sdp = ifl->ifl_oldndx[isp->is_shdr->sh_info];
@@ -3168,7 +3157,7 @@ update_ostrtab(Os_desc *osp, Str_tbl *stp, uint_t extra)
 {
 	Elf_Data	*data;
 
-	if (osp == 0)
+	if (osp == NULL)
 		return;
 
 	data = osp->os_outdata;
@@ -3187,8 +3176,8 @@ update_ostrtab(Os_desc *osp, Str_tbl *stp, uint_t extra)
 static Word
 translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 {
-	Is_desc *	isp;
-	Ifl_desc *	ifl;
+	Is_desc		*isp;
+	Ifl_desc	*ifl;
 
 	/*
 	 * Don't translate the special section numbers.
@@ -3201,7 +3190,7 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 	 * then there is no translation to do.  In this case we will assume that
 	 * if sh_link has a value, it's the right value.
 	 */
-	isp = (Is_desc *)osp->os_isdescs.head->data;
+	isp = (Is_desc *)osp->os_isdescs->apl_data[0];
 	if ((ifl = isp->is_file) == NULL)
 		return (link);
 
@@ -3218,9 +3207,9 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 	/*
 	 * Follow the link to the input section.
 	 */
-	if ((isp = ifl->ifl_isdesc[link]) == 0)
+	if ((isp = ifl->ifl_isdesc[link]) == NULL)
 		return (0);
-	if ((osp = isp->is_osdesc) == 0)
+	if ((osp = isp->is_osdesc) == NULL)
 		return (0);
 
 	/* LINTED */
@@ -3232,11 +3221,11 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
  * headers, fill in the program headers and update any other data in the
  * output image.  Some general rules:
  *
- *  o	If an interpreter is required always generate a PT_PHDR entry as
+ *  -	If an interpreter is required always generate a PT_PHDR entry as
  *	well.  It is this entry that triggers the kernel into passing the
  *	interpreter an aux vector instead of just a file descriptor.
  *
- *  o	When generating an image that will be interpreted (ie. a dynamic
+ *  -	When generating an image that will be interpreted (ie. a dynamic
  *	executable, a shared object, or a static executable that has been
  *	provided with an interpreter - weird, but possible), make the initial
  *	loadable segment include both the ehdr and phdr[].  Both of these
@@ -3244,7 +3233,7 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
  *	to explicitly defined them as part of the mapped image rather than
  *	relying on page rounding by the interpreter to allow their access.
  *
- *  o	When generating a static image that does not require an interpreter
+ *  -	When generating a static image that does not require an interpreter
  *	have the first loadable segment indicate the address of the first
  *	.section as the start address (things like /kernel/unix and ufsboot
  *	expect this behavior).
@@ -3253,20 +3242,20 @@ uintptr_t
 ld_update_outfile(Ofl_desc *ofl)
 {
 	Addr		size, etext, vaddr;
-	Listnode	*lnp1, *lnp2;
-	Sg_desc		*sgp, *dtracesgp = 0, *capsgp = 0;
+	Sg_desc		*sgp;
+	Sg_desc		*dtracesgp = NULL, *capsgp = NULL, *intpsgp = NULL;
 	Os_desc		*osp;
-	int		phdrndx = 0, segndx = -1, secndx;
+	int		phdrndx = 0, segndx = -1, secndx, intppndx, intpsndx;
 	int		dtracepndx, dtracesndx, cappndx, capsndx;
 	Ehdr		*ehdr = ofl->ofl_nehdr;
 	Shdr		*hshdr;
-	Phdr		*_phdr = 0;
+	Phdr		*_phdr = NULL;
 	Word		phdrsz = (ehdr->e_phnum * ehdr->e_phentsize), shscnndx;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	Word		ehdrsz = ehdr->e_ehsize;
 	Boolean		nobits;
 	Off		offset;
-	Aliste		idx;
+	Aliste		idx1;
 
 	/*
 	 * Initialize the starting address for the first segment.  Executables
@@ -3290,9 +3279,10 @@ ld_update_outfile(Ofl_desc *ofl)
 	 * Loop through the segment descriptors and pick out what we need.
 	 */
 	DBG_CALL(Dbg_seg_title(ofl->ofl_lml));
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Phdr	*phdr = &(sgp->sg_phdr);
 		Xword 	p_align;
+		Aliste	idx2;
 
 		segndx++;
 
@@ -3318,14 +3308,9 @@ ld_update_outfile(Ofl_desc *ofl)
 		}
 		if (phdr->p_type == PT_INTERP) {
 			if (ofl->ofl_osinterp) {
-				Shdr	*shdr = ofl->ofl_osinterp->os_shdr;
-
-				phdr->p_vaddr = phdr->p_memsz = 0;
-				phdr->p_offset = shdr->sh_offset;
-				phdr->p_filesz = shdr->sh_size;
-
-				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
-				ofl->ofl_phdr[phdrndx++] = *phdr;
+				intpsgp = sgp;
+				intpsndx = segndx;
+				intppndx = phdrndx++;
 			}
 			continue;
 		}
@@ -3414,10 +3399,12 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * figured out by now.
 		 */
 		if (phdr->p_type == PT_TLS) {
-			Os_desc	*tlsosp;
-			Shdr	*firstshdr = 0, *lastfileshdr = 0, *lastshdr;
+			Os_desc		*tlsosp;
+			Shdr		*firstshdr = NULL, *lastfileshdr = NULL;
+			Shdr		*lastshdr;
+			Aliste		idx;
 
-			if (ofl->ofl_ostlsseg.head == NULL)
+			if (ofl->ofl_ostlsseg == NULL)
 				continue;
 
 			/*
@@ -3427,10 +3414,10 @@ ld_update_outfile(Ofl_desc *ofl)
 			 * non-nobits section to determine the TLS data
 			 * contribution, which determines the TLS file size.
 			 */
-			for (LIST_TRAVERSE(&ofl->ofl_ostlsseg, lnp2, tlsosp)) {
+			for (APLIST_TRAVERSE(ofl->ofl_ostlsseg, idx, tlsosp)) {
 				Shdr	*tlsshdr = tlsosp->os_shdr;
 
-				if (firstshdr == 0)
+				if (firstshdr == NULL)
 					firstshdr = tlsshdr;
 				if (tlsshdr->sh_type != SHT_NOBITS)
 					lastfileshdr = tlsshdr;
@@ -3529,7 +3516,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		nobits = ((hshdr->sh_type == SHT_NOBITS) &&
 		    ((sgp->sg_flags & FLG_SG_PHREQ) == 0));
 
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Shdr	*shdr = osp->os_shdr;
 
 			p_align = 0;
@@ -3560,7 +3547,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * may be inspected by the interpreter.  Adjust the segments
 		 * size and offset accordingly.
 		 */
-		if ((_phdr == 0) && (phdr->p_type == PT_LOAD) &&
+		if ((_phdr == NULL) && (phdr->p_type == PT_LOAD) &&
 		    ((ofl->ofl_osinterp) || (flags & FLG_OF_DYNAMIC)) &&
 		    (!(ofl->ofl_dtflags_1 & DF_1_NOHDR))) {
 			size = (Addr)S_ROUND((phdrsz + ehdrsz),
@@ -3587,7 +3574,7 @@ ld_update_outfile(Ofl_desc *ofl)
 
 		/*
 		 * If a virtual address has been specified for this segment
-		 * (presumably from a map file) use it and make sure the
+		 * (presumably from a mapfile) use it and make sure the
 		 * previous segment does not run into this segment.
 		 */
 		if (phdr->p_type == PT_LOAD) {
@@ -3625,7 +3612,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * of the loadable segment that contains it.  Update the
 		 * PT_SUNWCAP header similarly.
 		 */
-		if ((_phdr == 0) && (phdr->p_type == PT_LOAD)) {
+		if ((_phdr == NULL) && (phdr->p_type == PT_LOAD)) {
 			_phdr = phdr;
 
 			if ((ofl->ofl_dtflags_1 & DF_1_NOHDR) == 0) {
@@ -3677,7 +3664,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		secndx = 0;
 		hshdr = 0;
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Shdr	*shdr = osp->os_shdr;
 
 			if (shdr->sh_link)
@@ -3762,6 +3749,23 @@ ld_update_outfile(Ofl_desc *ofl)
 		return (S_ERROR);
 
 	/*
+	 * If we have an PT_INTERP phdr, update it now from the associated
+	 * section information.
+	 */
+	if (intpsgp) {
+		Phdr	*phdr = &(intpsgp->sg_phdr);
+		Shdr	*shdr = ofl->ofl_osinterp->os_shdr;
+
+		phdr->p_vaddr = shdr->sh_addr;
+		phdr->p_offset = shdr->sh_offset;
+		phdr->p_memsz = phdr->p_filesz = shdr->sh_size;
+		phdr->p_flags = PF_R;
+
+		DBG_CALL(Dbg_seg_entry(ofl, intpsndx, intpsgp));
+		ofl->ofl_phdr[intppndx] = *phdr;
+	}
+
+	/*
 	 * If we have a PT_SUNWDTRACE phdr, update it now with the address of
 	 * the symbol.  It's only now been updated via update_sym().
 	 */
@@ -3793,7 +3797,7 @@ ld_update_outfile(Ofl_desc *ofl)
 
 		phdr->p_vaddr = shdr->sh_addr;
 		phdr->p_offset = shdr->sh_offset;
-		phdr->p_filesz = shdr->sh_size;
+		phdr->p_memsz = phdr->p_filesz = shdr->sh_size;
 		phdr->p_flags = PF_R;
 
 		DBG_CALL(Dbg_seg_entry(ofl, capsndx, capsgp));
@@ -3809,10 +3813,8 @@ ld_update_outfile(Ofl_desc *ofl)
 	/*
 	 * Update Move Table.
 	 */
-	if (ofl->ofl_osmove || ofl->ofl_isparexpn) {
-		if (update_move(ofl) == S_ERROR)
-			return (S_ERROR);
-	}
+	if (ofl->ofl_osmove || ofl->ofl_isparexpn)
+		update_move(ofl);
 
 	/*
 	 * Build any output headers, version information, dynamic structure and

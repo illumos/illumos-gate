@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -105,8 +104,8 @@
  * intended use we can perform this validation later.
  */
 typedef struct {
-	char		*o_objdir;
-	unsigned int	o_flags;
+	char	*o_objdir;
+	uint_t	o_flags;
 } Objdir;
 
 /*ARGSUSED2*/
@@ -115,13 +114,14 @@ main(int argc, char **argv, char **envp)
 {
 	Crle_desc	crle = { 0 };
 	int		c, error = 0;
-	char **		lib;
-	List		objdirs = { 0, 0 };
-	Objdir		_lobjdir = { 0, 0 }, * lobjdir = &_lobjdir;
+	char		**lib;
+	Alist		*objdirs = NULL;
+	Objdir		*objdir, *iobjdir;
 	struct stat	ostatus, nstatus;
 	int 		c_class;
 
-	if (list_append(&objdirs, lobjdir) == 0)
+	if ((objdir = iobjdir = alist_append(&objdirs, NULL, sizeof (Objdir),
+	    AL_CNT_CRLE)) == NULL)
 		return (1);
 
 	/*
@@ -160,7 +160,7 @@ main(int argc, char **argv, char **envp)
 			/* FALLTHROUGH */	/*	alternative */
 		case 'a':			/* create alternative */
 			crle.c_flags |= (CRLE_CREAT | CRLE_ALTER);
-			lobjdir->o_flags |= (CRLE_CREAT | CRLE_ALTER);
+			objdir->o_flags |= (CRLE_CREAT | CRLE_ALTER);
 			break;
 
 		case 'c':			/* define the config file */
@@ -193,20 +193,20 @@ main(int argc, char **argv, char **envp)
 
 		case 'G':			/* group object */
 			crle.c_flags |= (CRLE_DUMP | CRLE_ALTER);
-			lobjdir->o_flags |= (CRLE_DUMP | CRLE_ALTER);
+			objdir->o_flags |= (CRLE_DUMP | CRLE_ALTER);
 			/* FALLTHROUGH */
 		case 'g':
 			crle.c_flags |= CRLE_CREAT;
-			lobjdir->o_flags |= CRLE_CREAT;
+			objdir->o_flags |= CRLE_CREAT;
 			break;
 
 		case 'I':			/* individual object */
 			crle.c_flags |= (CRLE_DUMP | CRLE_ALTER);
-			lobjdir->o_flags |= (CRLE_DUMP | CRLE_ALTER);
+			objdir->o_flags |= (CRLE_DUMP | CRLE_ALTER);
 			/* FALLTHROUGH */
 		case 'i':
 			crle.c_flags |= CRLE_CREAT;
-			lobjdir->o_flags |= CRLE_CREAT;
+			objdir->o_flags |= CRLE_CREAT;
 			break;
 
 		case 'l':			/* library search path */
@@ -218,13 +218,12 @@ main(int argc, char **argv, char **envp)
 			break;
 
 		case 'o':			/* define an object directory */
-			if (lobjdir->o_objdir) {
-				if ((lobjdir = calloc(sizeof (Objdir), 1)) == 0)
-					return (1);
-				if (list_append(&objdirs, lobjdir) == 0)
+			if (objdir->o_objdir) {
+				if ((objdir = alist_append(&objdirs, NULL,
+				    sizeof (Objdir), AL_CNT_CRLE)) == NULL)
 					return (1);
 			}
-			lobjdir->o_objdir = optarg;
+			objdir->o_objdir = optarg;
 			break;
 
 		case 's':			/* trusted (secure) path */
@@ -269,7 +268,7 @@ main(int argc, char **argv, char **envp)
 	 * Determine the configuration file, which in the case of an existing
 	 * error condition is required in the final error message.
 	 */
-	if (crle.c_confil == 0) {
+	if (crle.c_confil == NULL) {
 		crle.c_flags |= CRLE_CONFDEF;
 		if (c_class == ELFCLASS32) {
 			crle.c_confil = (char *)MSG_ORIG(MSG_PTH_CONFIG);
@@ -332,7 +331,7 @@ main(int argc, char **argv, char **envp)
 #ifdef _ELF64
 	if (c_class == ELFCLASS32) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
-			crle.c_name, crle.c_confil);
+		    crle.c_name, crle.c_confil);
 		return (1);
 	}
 #else
@@ -405,29 +404,29 @@ main(int argc, char **argv, char **envp)
 	 * a default if necessary and insure we're able to write there.
 	 */
 	if (crle.c_flags & CRLE_ALTER) {
-		if (lobjdir->o_objdir == 0) {
+		if (objdir->o_objdir == NULL) {
 			char	*str;
 
 			/*
 			 * Use the configuration files directory.
 			 */
 			if ((str = strrchr(crle.c_confil, '/')) == NULL)
-				lobjdir->o_objdir =
+				objdir->o_objdir =
 				    (char *)MSG_ORIG(MSG_DIR_DOT);
 			else {
 				int	len = str - crle.c_confil;
 
-				if ((lobjdir->o_objdir =
-				    malloc(len + 1)) == 0) {
+				if ((objdir->o_objdir =
+				    malloc(len + 1)) == NULL) {
 					int err = errno;
 					(void) fprintf(stderr,
 					    MSG_INTL(MSG_SYS_MALLOC),
 					    crle.c_name, strerror(err));
 					return (1);
 				}
-				(void) strncpy(lobjdir->o_objdir,
+				(void) strncpy(objdir->o_objdir,
 				    crle.c_confil, len);
-				lobjdir->o_objdir[len] = '\0';
+				objdir->o_objdir[len] = '\0';
 			}
 		}
 
@@ -436,11 +435,11 @@ main(int argc, char **argv, char **envp)
 		 * can access any directories.
 		 */
 		if (crle.c_flags & CRLE_DUMP) {
-			Objdir *	objdir;
-			Listnode *	lnp;
-			int		err = 0;
+			Objdir	*objdir;
+			Aliste	idx;
+			int	err = 0;
 
-			for (LIST_TRAVERSE(&objdirs, lnp, objdir)) {
+			for (ALIST_TRAVERSE(objdirs, idx, objdir)) {
 				if (crle.c_flags & CRLE_VERBOSE)
 					(void) printf(MSG_INTL(MSG_DIA_OBJDIR),
 					    objdir->o_objdir);
@@ -465,7 +464,7 @@ main(int argc, char **argv, char **envp)
 	/*
 	 * Establish any initial object directory.
 	 */
-	crle.c_objdir = _lobjdir.o_objdir;
+	crle.c_objdir = iobjdir->o_objdir;
 
 	/*
 	 * Create a temporary file name in which to build the configuration

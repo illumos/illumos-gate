@@ -435,7 +435,7 @@ getphdr(Word phnum, Word *type_arr, Word type_cnt, const char *file, Elf *elf)
 
 static void
 unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
-    Elf *elf)
+    Elf *elf, uint_t flags)
 {
 #if	defined(_ELF64)
 #define	MSG_UNW_BINSRTAB2	MSG_UNW_BINSRTAB2_64
@@ -603,12 +603,17 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 		}
 
 		/*
-		 * If we've seen the .eh_frame_hdr and the first
-		 * .eh_frame section, compare the header frame_ptr
-		 * to the address of the actual frame section to ensure
-		 * the link-editor got this right.
+		 * If we've seen the .eh_frame_hdr and the first .eh_frame
+		 * section, compare the header frame_ptr to the address of the
+		 * actual frame section to ensure the link-editor got this
+		 * right.  Note, this diagnostic is only produced when unwind
+		 * information is explicitly asked for, as shared objects built
+		 * with an older ld(1) may reveal this inconsistency.  Although
+		 * an inconsistency, it doesn't seem to have any adverse effect
+		 * on existing tools.
 		 */
-		if ((hdr_cnt > 0) && (frame_cnt > 0) &&
+		if (((flags & FLG_MASK_SHOW) != FLG_MASK_SHOW) &&
+		    (hdr_cnt > 0) && (frame_cnt > 0) &&
 		    (save_frame_ptr != save_frame_base))
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADEHFRMPTR),
 			    file, EC_WORD(hdr_ndx), cache[hdr_ndx].c_name,
@@ -4131,7 +4136,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		cap(file, cache, shnum, phnum, ehdr, elf);
 
 	if (flags & FLG_SHOW_UNWIND)
-		unwind(cache, shnum, phnum, ehdr, file, elf);
+		unwind(cache, shnum, phnum, ehdr, file, elf, flags);
 
 
 	/* Release the memory used to cache section headers */

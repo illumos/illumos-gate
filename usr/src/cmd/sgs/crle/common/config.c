@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/mman.h>
 #include	<sys/types.h>
@@ -54,7 +53,7 @@ static const int hashsize[] = {
  * (very link-editor like).
  */
 int
-genconfig(Crle_desc * crle)
+genconfig(Crle_desc *crle)
 {
 	int		ndx, bkt;
 	size_t		size, hashoff = 0, stroff = 0, objoff = 0;
@@ -63,7 +62,7 @@ genconfig(Crle_desc * crle)
 	Addr		addr;
 	Rtc_id		*id;
 	Rtc_head	*head;
-	Word		*hashtbl, * hashbkt, * hashchn, hashbkts = 0;
+	Word		*hashtbl, *hashbkt, *hashchn, hashbkts = 0;
 	char		*strtbl, *_strtbl;
 	Rtc_obj		*objtbl;
 	Rtc_dir		*dirtbl;
@@ -239,8 +238,8 @@ genconfig(Crle_desc * crle)
 	fltrtbl = (Rtc_fltr *)(CAST_PTRINT(char *, head->ch_fltr) + addr);
 	head->ch_flte = flteoff;
 	/* LINTED */
-	fltetbl = _fltetbl = (Rtc_flte *)
-		(CAST_PTRINT(char *, head->ch_flte) + addr);
+	fltetbl = _fltetbl = (Rtc_flte *)(CAST_PTRINT(char *, head->ch_flte) +
+	    addr);
 
 	head->ch_str = stroff;
 	strtbl = _strtbl = (char *)(CAST_PTRINT(char *, head->ch_str) + addr);
@@ -294,7 +293,7 @@ genconfig(Crle_desc * crle)
 				/*
 				 * Skip any empty and non-directory entries.
 				 */
-				if ((obj == 0) ||
+				if ((obj == NULL) ||
 				    ((obj->o_flags & RTC_OBJ_DIRENT) == 0))
 					continue;
 
@@ -344,9 +343,9 @@ genconfig(Crle_desc * crle)
 				 * Increment Rt_obj pointer (make sure pointer
 				 * falls on an 8-byte boundary).
 				 */
-				objtbl = (Rtc_obj *)
-					S_ROUND((uintptr_t)(objtbl + 1),
-						sizeof (Lword));
+				objtbl =
+				    (Rtc_obj *)S_ROUND((uintptr_t)(objtbl + 1),
+				    sizeof (Lword));
 			}
 		}
 
@@ -370,7 +369,7 @@ genconfig(Crle_desc * crle)
 				 * Skip empty and directory entries, and any
 				 * simple filename entries.
 				 */
-				if ((obj == 0) ||
+				if ((obj == NULL) ||
 				    (obj->o_flags & RTC_OBJ_DIRENT) ||
 				    (ent->e_off))
 					continue;
@@ -398,9 +397,8 @@ genconfig(Crle_desc * crle)
 				 */
 				_dirtbl = &dirtbl[ent->e_id - 1];
 				/* LINTED */
-				_filetbl = (Rtc_file *)
-				    (CAST_PTRINT(char *, _dirtbl->cd_file)
-					+ addr);
+				_filetbl = (Rtc_file *)(CAST_PTRINT(char *,
+				    _dirtbl->cd_file) + addr);
 
 				_id = --ent->e_dir->e_cnt;
 				_filetbl[_id].cf_obj =
@@ -553,10 +551,10 @@ genconfig(Crle_desc * crle)
 	 * Add any environment variable entries.
 	 */
 	if (crle->c_envnum) {
-		Env_desc *	env;
-		Listnode *	lnp;
+		Env_desc	*env;
+		Aliste		idx;
 
-		for (LIST_TRAVERSE(&(crle->c_env), lnp, env)) {
+		for (APLIST_TRAVERSE(crle->c_env, idx, env)) {
 			envtbl->env_str = head->ch_str + (_strtbl - strtbl);
 			envtbl->env_flags = env->e_flags;
 
@@ -573,12 +571,12 @@ genconfig(Crle_desc * crle)
 	 * Add any filter/filtee association entries.
 	 */
 	if (crle->c_fltrnum) {
-		Flt_desc *	flt;
-		Listnode *	lnp1;
+		Flt_desc	*flt;
+		Aliste		idx1;
 
-		for (LIST_TRAVERSE(&(crle->c_flt), lnp1, flt)) {
-			Hash_ent *	flte;
-			Listnode *	lnp2;
+		for (APLIST_TRAVERSE(crle->c_flt, idx1, flt)) {
+			Hash_ent	*flte;
+			Aliste		idx2;
 
 			/*
 			 * Establish the filter name, and filtee string, as
@@ -593,7 +591,7 @@ genconfig(Crle_desc * crle)
 			fltrtbl->fr_filtee = (Word)
 			    ((uintptr_t)_fltetbl - (uintptr_t)fltetbl);
 
-			for (LIST_TRAVERSE(&(flt->f_filtee), lnp2, flte)) {
+			for (APLIST_TRAVERSE(flt->f_filtee, idx2, flte)) {
 				/*
 				 * Establish the filtee name as the offset into
 				 * the configuration files string table.

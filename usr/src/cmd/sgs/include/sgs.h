@@ -137,50 +137,6 @@ typedef enum {
 #endif
 
 /*
- * LIST_TRAVERSE() is used as the only "argument" of a "for" loop to
- * traverse a linked list. The node pointer `node' is set to each node in
- * turn and the corresponding data pointer is copied to `data'.  The macro
- * is used as in
- * 	for (LIST_TRAVERSE(List *list, Listnode *node, void *data)) {
- *		process(data);
- *	}
- */
-#define	LIST_TRAVERSE(L, N, D) \
-	(void) (((N) = (L)->head) != NULL && ((D) = (N)->data) != NULL); \
-	(N) != NULL; \
-	(void) (((N) = (N)->next) != NULL && ((D) = (N)->data) != NULL)
-
-typedef	struct listnode	Listnode;
-typedef	struct list	List;
-
-struct	listnode {			/* a node on a linked list */
-	void		*data;		/* the data item */
-	Listnode	*next;		/* the next element */
-};
-
-struct	list {				/* a linked list */
-	Listnode	*head;		/* the first element */
-	Listnode	*tail;		/* the last element */
-};
-
-
-#ifdef _SYSCALL32
-typedef	struct listnode32	Listnode32;
-typedef	struct list32		List32;
-
-struct	listnode32 {			/* a node on a linked list */
-	Elf32_Addr	data;		/* the data item */
-	Elf32_Addr	next;		/* the next element */
-};
-
-struct	list32 {			/* a linked list */
-	Elf32_Addr	head;		/* the first element */
-	Elf32_Addr	tail;		/* the last element */
-};
-#endif	/* _SYSCALL32 */
-
-
-/*
  * Structure to maintain rejected files elf information.  Files that are not
  * applicable to the present link-edit are rejected and a search for an
  * appropriate file may be resumed.  The first rejected files information is
@@ -241,7 +197,6 @@ typedef struct ifl_desc		Ifl_desc;
 typedef struct is_desc		Is_desc;
 typedef struct isa_desc		Isa_desc;
 typedef struct isa_opt		Isa_opt;
-typedef struct mv_desc		Mv_desc;
 typedef struct ofl_desc		Ofl_desc;
 typedef struct os_desc		Os_desc;
 typedef	struct rel_cache	Rel_cache;

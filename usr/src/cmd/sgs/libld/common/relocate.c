@@ -76,8 +76,8 @@
  * Structure to hold copy relocation items.
  */
 typedef struct copy_rel {
-	Sym_desc *	copyrel_symd;	/* symbol descriptor to be copied */
-	Addr 		copyrel_stval;	/* Original symbol value */
+	Sym_desc	*c_sdp;		/* symbol descriptor to be copied */
+	Addr 		c_val;		/* original symbol value */
 } Copy_rel;
 
 /*
@@ -89,13 +89,13 @@ typedef struct copy_rel {
  * The first and the second are serious errors.
  */
 static void
-is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
+is_disp_copied(Ofl_desc *ofl, Copy_rel *crp)
 {
-	Ifl_desc	*ifl = cpy->copyrel_symd->sd_file;
-	Sym_desc	*sdp = cpy->copyrel_symd;
+	Ifl_desc	*ifl = crp->c_sdp->sd_file;
+	Sym_desc	*sdp = crp->c_sdp;
+	Addr		symaddr = crp->c_val;
 	Is_desc		*irel;
-	Addr		symaddr = cpy->copyrel_stval;
-	Listnode	*lnp1;
+	Aliste		idx;
 	Conv_inv_buf_t	inv_buf;
 
 	/*
@@ -116,7 +116,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 	/*
 	 * Traverse the input relocation sections.
 	 */
-	for (LIST_TRAVERSE(&ifl->ifl_relsect, lnp1, irel)) {
+	for (APLIST_TRAVERSE(ifl->ifl_relsect, idx, irel)) {
 		Sym_desc	*rsdp;
 		Is_desc		*trel;
 		Rel		*rend, *reloc;
@@ -464,6 +464,59 @@ disp_inspect(Ofl_desc *ofl, Rel_desc *rld, Boolean rlocal)
 }
 
 /*
+ * Output relocation numbers can vary considerably between building executables
+ * or shared objects (pic vs. non-pic), etc.  But, they typically aren't very
+ * large, so for these objects use a standard bucket size.  For building
+ * relocatable objects, typically there will be an output relocation for every
+ * input relocation.
+ */
+Rel_cache *
+ld_add_rel_cache(Ofl_desc *ofl, APlist **alpp, size_t *nextsize, size_t low,
+    size_t hi)
+{
+	Rel_cache	*rcp;
+	size_t		size;
+	APlist		*alp = *alpp;
+
+	/*
+	 * If there is space available in the present cache bucket, return the
+	 * next free entry.
+	 */
+	if (alp && ((rcp = alp->apl_data[aplist_nitems(alp) - 1]) != NULL) &&
+	    (rcp->rc_free < rcp->rc_end))
+		return (rcp);
+
+	/*
+	 * Allocate a new bucket.
+	 */
+	if (*nextsize == 0) {
+		if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
+			if ((size = ofl->ofl_relocincnt) == 0)
+				size = low;
+			if (size > hi)
+				*nextsize = hi;
+			else
+				*nextsize = low;
+		} else
+			*nextsize = size = hi;
+	} else
+		size = *nextsize;
+
+	size = size * sizeof (Rel_desc);
+
+	if (((rcp = libld_malloc(sizeof (Rel_cache) + size)) == NULL) ||
+	    (aplist_append(alpp, rcp, AL_CNT_OFL_RELS) == NULL))
+		return ((Rel_cache *)S_ERROR);
+
+	/* LINTED */
+	rcp->rc_free = (Rel_desc *)(rcp + 1);
+	/* LINTED */
+	rcp->rc_end = (Rel_desc *)((char *)rcp->rc_free + size);
+
+	return (rcp);
+}
+
+/*
  * Add an active relocation record.
  */
 uintptr_t
@@ -471,46 +524,17 @@ ld_add_actrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Rel_desc	*arsp;
 	Rel_cache	*rcp;
+	static size_t	nextsize = 0;
 
 	/*
 	 * If no relocation cache structures are available, allocate a new
 	 * one and link it into the bucket list.
 	 */
-	if ((ofl->ofl_actrels.tail == 0) ||
-	    ((rcp = (Rel_cache *)ofl->ofl_actrels.tail->data) == 0) ||
-	    ((arsp = rcp->rc_free) == rcp->rc_end)) {
-		static size_t	nextsize = 0;
-		size_t		size;
+	if ((rcp = ld_add_rel_cache(ofl, &ofl->ofl_actrels, &nextsize,
+	    REL_LAIDESCNO, REL_HAIDESCNO)) == (Rel_cache *)S_ERROR)
+		return (S_ERROR);
 
-		/*
-		 * Typically, when generating an executable or shared object
-		 * there will be an active relocation for every input
-		 * relocation.
-		 */
-		if (nextsize == 0) {
-			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
-				if ((size = ofl->ofl_relocincnt) == 0)
-					size = REL_LAIDESCNO;
-				if (size > REL_HAIDESCNO)
-					nextsize = REL_HAIDESCNO;
-				else
-					nextsize = REL_LAIDESCNO;
-			} else
-				nextsize = size = REL_HAIDESCNO;
-		} else
-			size = nextsize;
-
-		size = size * sizeof (Rel_desc);
-
-		if (((rcp = libld_malloc(sizeof (Rel_cache) + size)) == 0) ||
-		    (list_appendc(&ofl->ofl_actrels, rcp) == 0))
-			return (S_ERROR);
-
-		/* LINTED */
-		rcp->rc_free = arsp = (Rel_desc *)(rcp + 1);
-		/* LINTED */
-		rcp->rc_end = (Rel_desc *)((char *)rcp->rc_free + size);
-	}
+	arsp = rcp->rc_free;
 
 	*arsp = *rsp;
 	arsp->rel_flags |= flags;
@@ -566,22 +590,20 @@ ld_bswap_Xword(Xword v)
 uintptr_t
 ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {
-	Sym_desc	*sdp;
+	Sym_desc	*sdp = rsp->rel_sym;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	Gotndx		*gnp;
-
-	sdp = rsp->rel_sym;
 
 	/*
 	 * If this is the first time we've seen this symbol in a GOT
 	 * relocation we need to assign it a GOT token.  Once we've got
 	 * all of the GOT's assigned we can assign the actual indexes.
 	 */
-	if ((gnp = (*ld_targ.t_mr.mr_find_gotndx)(&(sdp->sd_GOTndxs),
+	if ((gnp = (*ld_targ.t_mr.mr_find_got_ndx)(sdp->sd_GOTndxs,
 	    GOT_REF_GENERIC, ofl, rsp)) == 0) {
 		Word	rtype = rsp->rel_rtype;
 
-		if ((*ld_targ.t_mr.mr_assign_got_ndx)(&(sdp->sd_GOTndxs), 0,
+		if ((*ld_targ.t_mr.mr_assign_got_ndx)(&(sdp->sd_GOTndxs), NULL,
 		    GOT_REF_GENERIC, ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 
@@ -646,7 +668,6 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	return (ld_add_actrel(NULL, rsp, ofl));
 }
-
 
 /*
  * Perform relocations for PLT's
@@ -850,8 +871,8 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	 * to the executables .bss at runtime.
 	 */
 	if (!(rsp->rel_usym->sd_flags & FLG_SY_MVTOCOMM)) {
-		Word	rtype = rsp->rel_rtype;
-		Copy_rel *cpy_rel;
+		Word		rtype = rsp->rel_rtype;
+		Copy_rel	cr;
 
 		/*
 		 * Indicate that the symbol(s) against which we're relocating
@@ -905,29 +926,24 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		    ld_targ.t_m.m_word_align : ld_targ.t_m.m_word_align * 2;
 
 		/*
-		 * Whether or not the symbol references initialized
-		 * data we generate a copy relocation - this differs
-		 * from the past where we would not create the COPY_RELOC
-		 * if we were binding against .bss.  This is done
-		 * for *two* reasons.
+		 * Whether or not the symbol references initialized data we
+		 * generate a copy relocation - this differs from the past
+		 * where we would not create the COPY_RELOC if we were binding
+		 * against .bss.  This is done for *two* reasons.
 		 *
-		 *  o If the symbol in the shared object changes to
-		 *    a initialized data - we need the COPY to pick it
-		 *    up.
-		 *  o without the COPY RELOC we can't tell that the
-		 *    symbol from the COPY'd object has been moved
-		 *    and all bindings to it should bind here.
+		 *  -	If the symbol in the shared object changes to a
+		 *	initialized data - we need the COPY to pick it up.
+		 *  -	Without the COPY RELOC we can't tell that the symbol
+		 *	from the COPY'd object has been moved and all bindings
+		 *	to it should bind here.
+		 *
+		 * Keep this symbol in the copy relocation list to check the
+		 * validity later.
 		 */
-
-		/*
-		 * Keep this symbol in the copy relocation list
-		 * to check the validity later.
-		 */
-		if ((cpy_rel = libld_malloc(sizeof (Copy_rel))) == 0)
-			return (S_ERROR);
-		cpy_rel->copyrel_symd = _sdp;
-		cpy_rel->copyrel_stval = stval;
-		if (list_appendc(&ofl->ofl_copyrels, cpy_rel) == 0)
+		cr.c_sdp = _sdp;
+		cr.c_val = stval;
+		if (alist_append(&ofl->ofl_copyrels, &cr, sizeof (Copy_rel),
+		    AL_CNT_OFL_COPYRELS) == NULL)
 			return (S_ERROR);
 
 		rsp->rel_rtype = ld_targ.t_m.m_r_copy;
@@ -1907,23 +1923,23 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 static uintptr_t
 reloc_segments(int wr_flag, Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
+	Aliste		idx1;
 	Sg_desc		*sgp;
 	Is_desc		*isp;
 
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Os_desc	*osp;
-		Aliste	idx;
+		Aliste	idx2;
 
 		if ((sgp->sg_phdr.p_flags & PF_W) != wr_flag)
 			continue;
 
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Is_desc	*risp;
-			Aliste	idx;
+			Aliste	idx3;
 
 			osp->os_szoutrels = 0;
-			for (APLIST_TRAVERSE(osp->os_relisdescs, idx, risp)) {
+			for (APLIST_TRAVERSE(osp->os_relisdescs, idx3, risp)) {
 				Word	indx;
 
 				/*
@@ -1973,27 +1989,27 @@ get_move_entry(Is_desc *rsect, Xword roffset)
 	Is_desc		*misp;
 	Shdr		*mshdr;
 	Xword 		midx;
-	Move		*ret;
+	Move		*mvp;
 
 	/*
 	 * Set info for the target move section
 	 */
 	misp = ifile->ifl_isdesc[rshdr->sh_info];
-	mshdr = (ifile->ifl_isdesc[rshdr->sh_info])->is_shdr;
+	mshdr = misp->is_shdr;
 
 	if (mshdr->sh_entsize == 0)
-		return ((Move *)0);
-	midx = roffset / mshdr->sh_entsize;
-
-	ret = (Move *)misp->is_indata->d_buf;
-	ret += midx;
+		return (NULL);
 
 	/*
-	 * If this is an illgal entry, retun NULL.
+	 * If this is an invalid entry, return NULL.
 	 */
+	midx = roffset / mshdr->sh_entsize;
 	if ((midx * mshdr->sh_entsize) >= mshdr->sh_size)
-		return ((Move *)0);
-	return (ret);
+		return (NULL);
+
+	mvp = (Move *)misp->is_indata->d_buf;
+	mvp += midx;
+	return (mvp);
 }
 
 /*
@@ -2005,16 +2021,13 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 	Ifl_desc	*file = rsect->is_file;
 	Rel		*rend, *reloc;
 	Xword 		rsize, entsize;
-	static Rel_desc reld_zero;
 	Rel_desc 	reld;
 
 	rsize = rsect->is_shdr->sh_size;
 	reloc = (Rel *)rsect->is_indata->d_buf;
 
-	reld = reld_zero;
-
 	/*
-	 * Decide entry size
+	 * Decide entry size.
 	 */
 	entsize = rsect->is_shdr->sh_entsize;
 	if ((entsize == 0) ||
@@ -2031,8 +2044,8 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 	for (rend = (Rel *)((uintptr_t)reloc + (uintptr_t)rsize);
 	    reloc < rend;
 	    reloc = (Rel *)((uintptr_t)reloc + (uintptr_t)entsize)) {
-		Sym_desc *	psdp;
-		Move *		mp;
+		Sym_desc	*psdp;
+		Move		*mvp;
 		Word		rsndx;
 
 		/*
@@ -2041,25 +2054,25 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 		reld.rel_flags = FLG_REL_LOAD;
 		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld, (void *)reloc);
 
-		if (((mp = get_move_entry(rsect, reloc->r_offset)) == 0) ||
-		    ((reld.rel_move = libld_malloc(sizeof (Mv_desc))) == 0))
+		if (((mvp = get_move_entry(rsect, reloc->r_offset)) == NULL) ||
+		    ((reld.rel_move = libld_malloc(sizeof (Mv_reloc))) == NULL))
 			return (S_ERROR);
 
-		psdp = file->ifl_oldndx[ELF_M_SYM(mp->m_info)];
-		reld.rel_move->mvd_move = mp;
-		reld.rel_move->mvd_sym = psdp;
+		psdp = file->ifl_oldndx[ELF_M_SYM(mvp->m_info)];
+		reld.rel_move->mr_move = mvp;
+		reld.rel_move->mr_sym = psdp;
 
 		if (psdp->sd_flags & FLG_SY_PAREXPN) {
-			int	_num, num;
+			int	_num, num = mvp->m_repeat;
 
 			reld.rel_osdesc = ofl->ofl_isparexpn->is_osdesc;
 			reld.rel_isdesc = ofl->ofl_isparexpn;
-			reld.rel_roffset = mp->m_poffset;
+			reld.rel_roffset = mvp->m_poffset;
 
-			for (num = mp->m_repeat, _num = 0; _num < num; _num++) {
+			for (_num = 0; _num < num; _num++) {
 				reld.rel_roffset +=
 				    /* LINTED */
-				    (_num * ELF_M_SIZE(mp->m_info));
+				    (_num * ELF_M_SIZE(mvp->m_info));
 
 				/*
 				 * Generate Reld
@@ -2075,7 +2088,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 			reld.rel_flags |= FLG_REL_MOVETAB;
 			reld.rel_osdesc = ofl->ofl_osmove;
 			reld.rel_isdesc =
-			    ofl->ofl_osmove->os_isdescs.head->data;
+			    ofl->ofl_osmove->os_isdescs->apl_data[0];
 
 			if (process_reld(ofl,
 			    rsect, &reld, rsndx, reloc) == S_ERROR)
@@ -2088,20 +2101,20 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 /*
  * This function is similar to reloc_init().
  *
- * This function is called when the SHT_SUNW_move table is expanded
- * and there were relocation against the SHT_SUNW_move section.
+ * This function is called when the SHT_SUNW_move table is expanded and there
+ * are relocations against the SHT_SUNW_move section.
  */
 static uintptr_t
 reloc_movesections(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
+	Aliste		idx;
 	Is_desc		*risp;
 	uintptr_t	ret = 1;
 
 	/*
 	 * Generate/Expand relocation entries
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_mvrelisdescs, lnp1, risp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ismoverel, idx, risp)) {
 		if (process_movereloc(ofl, risp) == S_ERROR)
 			ret = S_ERROR;
 	}
@@ -2119,7 +2132,7 @@ reloc_movesections(Ofl_desc *ofl)
 uintptr_t
 ld_reloc_init(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Is_desc		*isp;
 	Sym_desc	*sdp;
 
@@ -2149,12 +2162,11 @@ ld_reloc_init(Ofl_desc *ofl)
 	if (reloc_segments(PF_W, ofl) == S_ERROR)
 		return (S_ERROR);
 
-
 	/*
 	 * Process any extra relocations.  These are relocation sections that
 	 * have a NULL sh_info.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_extrarels, lnp, isp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_extrarels, idx, isp)) {
 		if (reloc_section(ofl, NULL, isp, NULL) == S_ERROR)
 			return (S_ERROR);
 	}
@@ -2170,19 +2182,17 @@ ld_reloc_init(Ofl_desc *ofl)
 	 * Now all the relocations are pre-processed,
 	 * check the validity of copy relocations.
 	 */
-	if (ofl->ofl_copyrels.head != 0) {
-		Copy_rel	*cpyrel;
+	if (ofl->ofl_copyrels) {
+		Copy_rel	*crp;
 
-		for (LIST_TRAVERSE(&ofl->ofl_copyrels, lnp, cpyrel)) {
-			sdp = cpyrel->copyrel_symd;
-
+		for (ALIST_TRAVERSE(ofl->ofl_copyrels, idx, crp)) {
 			/*
 			 * If there were no displacement relocation
 			 * in this file, don't worry about it.
 			 */
-			if (sdp->sd_file->ifl_flags &
+			if (crp->c_sdp->sd_file->ifl_flags &
 			    (FLG_IF_DISPPEND | FLG_IF_DISPDONE))
-				is_disp_copied(ofl, cpyrel);
+				is_disp_copied(ofl, crp);
 		}
 	}
 
@@ -2263,7 +2273,7 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 {
 	Rel_desc	*orsp;
 	Rel_cache	*rcp;
-	Listnode	*lnp;
+	Aliste		idx;
 	Reloc_list	*sorted_list;
 	Word		index = 0;
 	int		debug = 0;
@@ -2285,7 +2295,7 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 	 * relocations is used by ld.so.1 to determine what symbol a PLT
 	 * relocation is against.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_outrels, lnp, rcp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_outrels, idx, rcp)) {
 		/*LINTED*/
 		for (orsp = (Rel_desc *)(rcp + 1);
 		    orsp < rcp->rc_free; orsp++) {
@@ -2363,7 +2373,6 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 uintptr_t
 ld_reloc_process(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
 	Sg_desc		*sgp;
 	Os_desc		*osp;
 	Word		ndx = 0;
@@ -2400,6 +2409,8 @@ ld_reloc_process(Ofl_desc *ofl)
 		return (S_ERROR);
 
 	if ((flags & FLG_OF_COMREL) == 0) {
+		Aliste	idx1;
+
 		/*
 		 * Process the relocation sections:
 		 *
@@ -2408,11 +2419,11 @@ ld_reloc_process(Ofl_desc *ofl)
 		 *	symbol table it needs (sh_link) and the section to
 		 *	which the relocation must be applied (sh_info).
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 			Os_desc *osp;
-			Aliste	idx;
+			Aliste	idx2;
 
-			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 				if (osp->os_relosdesc == 0)
 					continue;
 
@@ -2616,52 +2627,39 @@ ld_assign_got_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl, Sym_desc *sdp,
 /*
  * Move Section related function
  */
-static uintptr_t
-newroffset_for_move(Sym_desc *symd,
-	Move *mventry, Xword offset1, Xword *offset2)
+static void
+newroffset_for_move(Sym_desc *sdp, Move *mvp, Xword offset1, Xword *offset2)
 {
-	Psym_info	*psym = symd->sd_psyminfo;
-	Mv_itm		*itm;
-	Listnode	*lnp1;
-	int 		found = 0;
+	Mv_desc		*mdp;
+	Aliste		idx;
 
 	/*
-	 * Search for matching move entry
+	 * Search for matching move entry.
 	 */
-	found = 0;
-	for (LIST_TRAVERSE(&psym->psym_mvs, lnp1, itm)) {
-		if (itm->mv_ientry == mventry) {
-			found = 1;
-			break;
+	for (ALIST_TRAVERSE(sdp->sd_move, idx, mdp)) {
+		if (mdp->md_move == mvp) {
+			/*
+			 * Update r_offset
+			 */
+			*offset2 = (Xword)((mdp->md_oidx - 1) * sizeof (Move) +
+			    offset1 % sizeof (Move));
+			return;
 		}
 	}
-	if (found == 0) {
-		/*
-		 * This should never happen.
-		 */
-		return (S_ERROR);
-	}
-
-	/*
-	 * Update r_offset
-	 */
-	*offset2 = (Xword)((itm->mv_oidx - 1)*sizeof (Move) +
-	    offset1 % sizeof (Move));
-	return (1);
 }
 
 void
 ld_adj_movereloc(Ofl_desc *ofl, Rel_desc *arsp)
 {
-	Move		*move = arsp->rel_move->mvd_move;
-	Sym_desc	*psdp = arsp->rel_move->mvd_sym;
+	Move		*move = arsp->rel_move->mr_move;
+	Sym_desc	*psdp = arsp->rel_move->mr_sym;
 	Xword		newoffset;
 
 	if (arsp->rel_flags & FLG_REL_MOVETAB) {
 		/*
 		 * We are relocating the move table itself.
 		 */
-		(void) newroffset_for_move(psdp, move, arsp->rel_roffset,
+		newroffset_for_move(psdp, move, arsp->rel_roffset,
 		    &newoffset);
 		DBG_CALL(Dbg_move_adjmovereloc(ofl->ofl_lml, arsp->rel_roffset,
 		    newoffset, psdp->sd_name));
@@ -2687,25 +2685,23 @@ ld_adj_movereloc(Ofl_desc *ofl, Rel_desc *arsp)
 Sym_desc *
 ld_am_I_partial(Rel_desc *reld, Xword val)
 {
-	Ifl_desc *	ifile = reld->rel_sym->sd_isc->is_file;
+	Ifl_desc	*ifile = reld->rel_sym->sd_isc->is_file;
 	int 		nlocs = ifile->ifl_locscnt, i;
 
 	for (i = 1; i < nlocs; i++) {
-		Sym *		osym;
-		Sym_desc *	symd = ifile->ifl_oldndx[i];
+		Sym		*osym;
+		Sym_desc	*symd = ifile->ifl_oldndx[i];
 
 		if ((osym = symd->sd_osym) == 0)
 			continue;
 		if ((symd->sd_flags & FLG_SY_PAREXPN) == 0)
 			continue;
 		if ((osym->st_value <= val) &&
-		    (osym->st_value + osym->st_size  > val))
+		    (osym->st_value + osym->st_size > val))
 			return (symd);
 	}
-	return ((Sym_desc *) 0);
+	return (NULL);
 }
-
-
 
 /*
  * Return True (1) if the code processing the given relocation

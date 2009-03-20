@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Utility functions
@@ -39,31 +36,6 @@
 #include "rtc.h"
 #include "_crle.h"
 #include "msg.h"
-
-
-/*
- * Append an item to the specified list, and return a pointer to the list
- * node created.
- */
-Listnode *
-list_append(List * lst, const void * item)
-{
-	Listnode *	lnp;
-
-	if ((lnp = malloc(sizeof (Listnode))) == (Listnode *)0)
-		return (0);
-
-	lnp->data = (void *)item;
-	lnp->next = NULL;
-
-	if (lst->head == NULL)
-		lst->tail = lst->head = lnp;
-	else {
-		lst->tail->next = lnp;
-		lst->tail = lst->tail->next;
-	}
-	return (lnp);
-}
 
 /*
  * Add an environment string.  A list of environment variable descriptors is
@@ -81,7 +53,7 @@ addenv(Crle_desc *crle, const char *arg, unsigned int flags)
 	 * its value.
 	 */
 	if ((str = strchr(arg, '=')) != NULL) {
-		Listnode *	lnp;
+		Aliste	idx;
 
 		varsz = (size_t)(str - arg);
 
@@ -89,7 +61,7 @@ addenv(Crle_desc *crle, const char *arg, unsigned int flags)
 		 * Traverse any existing environment variables to see if we've
 		 * caught a duplicate.
 		 */
-		for (LIST_TRAVERSE(&(crle->c_env), lnp, env)) {
+		for (APLIST_TRAVERSE(crle->c_env, idx, env)) {
 			if ((env->e_varsz == varsz) &&
 			    (strncmp(env->e_str, arg, varsz) == 0)) {
 				/*
@@ -129,14 +101,14 @@ addenv(Crle_desc *crle, const char *arg, unsigned int flags)
 			}
 		}
 	} else {
-		Listnode *	lnp;
+		Aliste	idx;
 
 		/*
 		 * Although this is just a plain environment definition (no "=")
 		 * and probably has no effect on ld.so.1 anyway, we might as
 		 * well make sure we're not duplicating the same string.
 		 */
-		for (LIST_TRAVERSE(&(crle->c_env), lnp, env)) {
+		for (APLIST_TRAVERSE(crle->c_env, idx, env)) {
 			if (env->e_varsz)
 				continue;
 			if (strcmp(env->e_str, arg) == 0) {
@@ -170,7 +142,7 @@ addenv(Crle_desc *crle, const char *arg, unsigned int flags)
 	env->e_totsz = totsz;
 	env->e_flags = flags;
 
-	if (list_append(&(crle->c_env), env) == 0)
+	if (aplist_append(&(crle->c_env), env, AL_CNT_CRLE) == NULL)
 		return (0);
 
 	/*
@@ -286,6 +258,7 @@ dlflags(Crle_desc *crle, const char *arg)
 	(void) strcpy(_arg, arg);
 
 	if ((tok = strtok_r(_arg, separate, &lasts)) != NULL) {
+		/* BEGIN CSTYLED */
 		do {
 		    if (strcmp(tok, MSG_ORIG(MSG_MOD_REL_RELATIVE)) == 0)
 			_flags |= RTLD_REL_RELATIVE;
@@ -316,6 +289,7 @@ dlflags(Crle_desc *crle, const char *arg)
 			return (0);
 		    }
 		} while ((tok = strtok_r(NULL, separate, &lasts)) != NULL);
+		/* END CSTYLED */
 	}
 	if (_flags == 0)
 		(void) fprintf(stderr, MSG_INTL(MSG_ARG_FLAGS),

@@ -32,21 +32,22 @@ include		$(SRC)/cmd/sgs/Makefile.com
 COMOBJ=		config.o	crle.o 		depend.o	dump.o \
 		inspect.o	hash.o		print.o		util.o
 BLTOBJ=		msg.o
+TOOLSOBJ=	alist.o
 
-OBJS=		$(BLTOBJ) $(COMOBJ)
+OBJS=		$(BLTOBJ) $(COMOBJ) $(TOOLSOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPT=		$(MAPFILE:%=-M%)
 
-CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
-		-I$(SRC)/common/sgsrtcid -I$(SRCBASE)/uts/$(ARCH)/sys \
-		$(CPPFLAGS.master) -D__EXTENSIONS__
+CPPFLAGS +=	-I$(SRC)/common/sgsrtcid -I$(SRCBASE)/uts/$(ARCH)/sys \
+		-D__EXTENSIONS__
 LLDFLAGS =	'-R$$ORIGIN/../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../lib/$(MACH64)'
 LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPT) \
 			$(LLDFLAGS) $(ZNOLAZYLOAD)
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) $(DLLIB)
-LINTFLAGS +=	-mx
+LINTFLAGS +=	-x
+LINTFLAGS64 +=	-x
 
 BLTDEFS=        msg.h
 BLTDATA=        msg.c
@@ -60,7 +61,8 @@ SGSMSGALL=	$(SGSMSGCOM)
 
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n crle_msg
 
-SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA)
+SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA) \
+		$(TOOLSOBJ:%.o=$(SGSTOOLS)/common/%.c)
 LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(SGSLINTOUT) $(BLTFILES)

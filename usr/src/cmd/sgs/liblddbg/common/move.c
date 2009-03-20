@@ -35,8 +35,6 @@ Dbg_move_data(Rt_map *lmp)
 
 	if (DBG_NOTCLASS(DBG_C_MOVE))
 		return;
-	if (DBG_NOTDETAIL())
-		return;
 
 	dbg_print(lml, MSG_INTL(MSG_MOVE_FILE), NAME(lmp));
 	dbg_print(lml, MSG_INTL(MSG_MOVE_TITLE2));
@@ -84,8 +82,6 @@ Dbg_move_parexpn(Lm_list *lml, const char *name, const char *reason)
 {
 	if (DBG_NOTCLASS(DBG_C_MOVE))
 		return;
-	if (DBG_NOTDETAIL())
-		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_MOVE_PAREXPN), name, reason);
@@ -96,8 +92,6 @@ void
 Dbg_move_outmove(Lm_list *lml, const char *name)
 {
 	if (DBG_NOTCLASS(DBG_C_MOVE))
-		return;
-	if (DBG_NOTDETAIL())
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
@@ -110,8 +104,6 @@ Dbg_move_expand(Lm_list *lml, Move *mv, Addr addr)
 {
 	if (DBG_NOTCLASS(DBG_C_MOVE))
 		return;
-	if (DBG_NOTDETAIL())
-		return;
 
 	dbg_print(lml, MSG_INTL(MSG_MOVE_EXPAND), EC_ADDR(addr),
 	    EC_LWORD(mv->m_value));
@@ -121,8 +113,6 @@ void
 Dbg_move_input(Lm_list *lml, const char *name)
 {
 	if (DBG_NOTCLASS(DBG_C_MOVE))
-		return;
-	if (DBG_NOTDETAIL())
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
@@ -137,16 +127,14 @@ Dbg_move_entry1(Lm_list *lml, int which, Move *mv, Sym_desc *s)
 
 	if (DBG_NOTCLASS(DBG_C_MOVE))
 		return;
-	if (DBG_NOTDETAIL())
-		return;
 
 	if (which)
 		str = MSG_INTL(MSG_MOVE_ENTRYIN);
 	else
 		str = MSG_INTL(MSG_MOVE_ENTRYOUT);
 
-	dbg_print(lml, str, EC_XWORD(mv->m_poffset), EC_LWORD(mv->m_value),
-	    mv->m_repeat, mv->m_stride, s->sd_name);
+	dbg_print(lml, str, EC_XWORD(mv->m_poffset), ELF_M_SIZE(mv->m_info),
+	    mv->m_repeat, mv->m_stride, EC_LWORD(mv->m_value), s->sd_name);
 }
 
 void
@@ -156,8 +144,6 @@ Dbg_move_entry2(Lm_list *lml, Move *mv, Word st_name, const char *name)
 
 	if (DBG_NOTCLASS(DBG_C_MOVE))
 		return;
-	if (DBG_NOTDETAIL())
-		return;
 
 	if (st_name)
 		sname = name;
@@ -165,15 +151,14 @@ Dbg_move_entry2(Lm_list *lml, Move *mv, Word st_name, const char *name)
 		sname = MSG_INTL(MSG_STR_UNKNOWN);
 
 	dbg_print(lml, MSG_INTL(MSG_MOVE_ENTRYIN), EC_XWORD(mv->m_poffset),
-	    EC_LWORD(mv->m_value), mv->m_repeat, mv->m_stride, sname);
+	    ELF_M_SIZE(mv->m_info), mv->m_repeat, mv->m_stride,
+	    EC_LWORD(mv->m_value), sname);
 }
 
 void
 Dbg_move_bad(Lm_list *lml, ulong_t num, const char *name, Addr addr)
 {
 	if (DBG_NOTCLASS(DBG_C_MOVE))
-		return;
-	if (DBG_NOTDETAIL())
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_MOVE_BAD), EC_XWORD(num), name,

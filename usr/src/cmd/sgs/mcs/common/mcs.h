@@ -23,8 +23,8 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_MCS_H
@@ -143,7 +143,7 @@ typedef struct s_name {
  * Structure to hold command information
  */
 typedef struct cmd_info {
-	List	sh_groups;	/* List of SHT_GROUP sections */
+	APlist	*sh_groups;	/* list of SHT_GROUP sections */
 	int 	no_of_append;
 	int	no_of_delete;
 	int	no_of_nulled;
@@ -192,7 +192,6 @@ int		apply_action(section_info_table *, char *, Cmd_Info *);
 int		each_file(char *, Cmd_Info *);
 void		error_message(int, ...);
 void		mcs_exit(int);
-Listnode *	list_appendc(List *, const void*);
 int		sectcmp(char *);
 void		free_tempfile(Tmp_File *);
 

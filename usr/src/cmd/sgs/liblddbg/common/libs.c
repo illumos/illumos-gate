@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include	"msg.h"
@@ -74,17 +74,17 @@ Dbg_libs_insecure(Lm_list *lml, const char *path, int usable)
 }
 
 static void
-Dbg_lib_dir_print(Lm_list *lml, List *libdir)
+Dbg_lib_dir_print(Lm_list *lml, APlist *libdir)
 {
-	Listnode	*lnp;
-	char		*cp;
+	Aliste	idx;
+	char	*cp;
 
-	for (LIST_TRAVERSE(libdir, lnp, cp))
+	for (APLIST_TRAVERSE(libdir, idx, cp))
 		dbg_print(lml, MSG_ORIG(MSG_LIB_FILE), cp);
 }
 
 void
-Dbg_libs_init(Lm_list *lml, List *ulibdir, List *dlibdir)
+Dbg_libs_init(Lm_list *lml, APlist *ulibdir, APlist *dlibdir)
 {
 	if (DBG_NOTCLASS(DBG_C_LIBS))
 		return;
@@ -165,7 +165,7 @@ Dbg_libs_req(Lm_list *lml, const char *so_name, const char *ref_file,
 }
 
 void
-Dbg_libs_update(Lm_list *lml, List *ulibdir, List *dlibdir)
+Dbg_libs_update(Lm_list *lml, APlist *ulibdir, APlist *dlibdir)
 {
 	if (DBG_NOTCLASS(DBG_C_LIBS))
 		return;

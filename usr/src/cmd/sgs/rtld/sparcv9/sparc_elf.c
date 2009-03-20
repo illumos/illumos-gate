@@ -662,27 +662,25 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 }
 
 static int
-bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
+bindpltpad(Rt_map *lmp, Alist **padlist, Addr value, void **pltaddr,
     const char *fname, const char *sname)
 {
-	Listnode	*lnp, *prevlnp;
-	Pltpadinfo	*pip;
+	Aliste		idx = 0;
+	Pltpadinfo	ppi, *ppip;
 	void		*plt;
 	uintptr_t	pltoff;
 	Rela		rel;
 	int		i;
 
-	prevlnp = 0;
-	for (LIST_TRAVERSE(padlist, lnp, pip)) {
-		if (pip->pp_addr == value) {
-			*pltaddr = pip->pp_plt;
+	for (ALIST_TRAVERSE(*padlist, idx, ppip)) {
+		if (ppip->pp_addr == value) {
+			*pltaddr = ppip->pp_plt;
 			DBG_CALL(Dbg_bind_pltpad_from(lmp, (Addr)*pltaddr,
 			    sname));
 			return (1);
 		}
-		if (pip->pp_addr > value)
+		if (ppip->pp_addr > value)
 			break;
-		prevlnp = lnp;
 	}
 
 	plt = PLTPAD(lmp);
@@ -712,20 +710,12 @@ bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
 
 	(void) elf_plt_write(ADDR(lmp), ADDR(lmp), &rel, value, 0);
 
-	if ((pip = calloc(sizeof (Pltpadinfo), 1)) == 0)
-		return (0);
-	pip->pp_addr = value;
-	pip->pp_plt = plt;
+	ppi.pp_addr = value;
+	ppi.pp_plt = plt;
 
-	if (prevlnp)
-		lnp = list_insert(padlist, pip, prevlnp);
-	else
-		lnp = list_prepend(padlist, pip);
-
-	if (!lnp) {
-		free(pip);
+	if (alist_insert(padlist, &ppi, sizeof (Pltpadinfo),
+	    AL_CNT_PLTPAD, idx) == NULL)
 		return (0);
-	}
 
 	*pltaddr = plt;
 	DBG_CALL(Dbg_bind_pltpad_to(lmp, (Addr)*pltaddr, fname, sname));
@@ -753,7 +743,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	long		relacount = RELACOUNT(lmp);
 	Rela		*rel;
 	Pltbindtype	pbtype;
-	List		pltpadlist = {0, 0};
+	Alist		*pltpadlist = NULL;
 	APlist		*bound = NULL;
 
 	/*
@@ -1358,19 +1348,8 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	/*
 	 * Free up any items on the pltpadlist if it was allocated
 	 */
-	if (pltpadlist.head) {
-		Listnode	*lnp, *plnp = NULL;
-		Pltpadinfo	*pip;
-
-		for (LIST_TRAVERSE(&pltpadlist, lnp, pip)) {
-			if (plnp)
-				free(plnp);
-			free(pip);
-			plnp = lnp;
-		}
-		if (plnp)
-			free(plnp);
-	}
+	if (pltpadlist)
+		free(pltpadlist);
 
 	return (relocate_finish(lmp, bound, ret));
 }

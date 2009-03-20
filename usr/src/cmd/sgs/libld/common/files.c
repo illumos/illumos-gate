@@ -85,7 +85,6 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
     Rej_desc *rej)
 {
 	Ifl_desc	*ifl;
-	List		*list;
 	Rej_desc	_rej = { 0 };
 
 	if (ifl_verify(ehdr, ofl, &_rej) == 0) {
@@ -148,13 +147,13 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
 	 * object input file list.
 	 */
 	if (ifl->ifl_ehdr->e_type == ET_DYN) {
-		list = &ofl->ofl_sos;
+		if (aplist_append(&ofl->ofl_sos, ifl, AL_CNT_OFL_LIBS) == NULL)
+			return ((Ifl_desc *)S_ERROR);
 	} else {
-		list = &ofl->ofl_objs;
+		if (aplist_append(&ofl->ofl_objs, ifl, AL_CNT_OFL_OBJS) == NULL)
+			return ((Ifl_desc *)S_ERROR);
 	}
 
-	if (list_appendc(list, ifl) == 0)
-		return ((Ifl_desc *)S_ERROR);
 	return (ifl);
 }
 
@@ -471,7 +470,8 @@ process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 			ofl->ofl_relocincnt +=
 			    (Word)(shdr->sh_size / shdr->sh_entsize);
 	} else if (ofl->ofl_flags & FLG_OF_EXEC) {
-		if (list_appendc(&ifl->ifl_relsect, ifl->ifl_isdesc[ndx]) == 0)
+		if (aplist_append(&ifl->ifl_relsect, ifl->ifl_isdesc[ndx],
+		    AL_CNT_IFL_RELSECS) == NULL)
 			return (S_ERROR);
 	}
 	return (1);
@@ -855,9 +855,10 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		switch (dyn->d_tag) {
 		case DT_NEEDED:
 		case DT_USED:
-			if (((difl =
-			    libld_calloc(1, sizeof (Ifl_desc))) == 0) ||
-			    (list_appendc(&ofl->ofl_sos, difl) == 0))
+			if (((difl = libld_calloc(1,
+			    sizeof (Ifl_desc))) == NULL) ||
+			    (aplist_append(&ofl->ofl_sos, difl,
+			    AL_CNT_OFL_LIBS) == NULL))
 				return (S_ERROR);
 
 			difl->ifl_name = MSG_ORIG(MSG_STR_DYNAMIC);
@@ -1170,8 +1171,6 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	Dyn		*data, *dyn;
 	char		*str, *rpath = NULL;
 	const char	*soname, *needed;
-	Sdf_desc	*sdf;
-	Listnode	*lnp;
 
 	data = (Dyn *)isc->is_indata->d_buf;
 	str = (char *)ifl->ifl_isdesc[isc->is_shdr->sh_link]->is_indata->d_buf;
@@ -1206,6 +1205,8 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 		} else if ((dyn->d_tag == DT_NEEDED) ||
 		    (dyn->d_tag == DT_USED)) {
+			Sdf_desc	*sdf;
+
 			if (!(ofl->ofl_flags &
 			    (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)))
 				continue;
@@ -1217,9 +1218,9 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * the shared object needed list, if not create a new
 			 * definition for later processing (see finish_libs()).
 			 */
-			needed = expand(ifl->ifl_name, needed, (char **)0);
+			needed = expand(ifl->ifl_name, needed, NULL);
 
-			if ((sdf = sdf_find(needed, &ofl->ofl_soneed)) == 0) {
+			if ((sdf = sdf_find(needed, ofl->ofl_soneed)) == NULL) {
 				if ((sdf = sdf_add(needed,
 				    &ofl->ofl_soneed)) == (Sdf_desc *)S_ERROR)
 					return (S_ERROR);
@@ -1271,6 +1272,7 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 */
 	if (ifl->ifl_flags & FLG_IF_NEEDED) {
 		Ifl_desc	*sifl;
+		Aliste		idx;
 
 		/*
 		 * Determine if anyone else will cause the same SONAME to be
@@ -1280,7 +1282,7 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * library its basename will be used)). Probably rare, but some
 		 * idiot will do it.
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_sos, lnp, sifl)) {
+		for (APLIST_TRAVERSE(ofl->ofl_sos, idx, sifl)) {
 			if ((strcmp(ifl->ifl_soname, sifl->ifl_soname) == 0) &&
 			    (ifl != sifl)) {
 				const char	*hint, *iflb, *siflb;
@@ -1415,24 +1417,26 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		return (0);
 	}
 	if (rndx == 0) {
-		if (list_appendc(&ofl->ofl_extrarels, isc) == 0)
+		if (aplist_append(&ofl->ofl_extrarels, isc,
+		    AL_CNT_OFL_RELS) == NULL)
 			return (S_ERROR);
-	} else if ((risc = ifl->ifl_isdesc[rndx]) != 0) {
+
+	} else if ((risc = ifl->ifl_isdesc[rndx]) != NULL) {
 		/*
 		 * Discard relocations if they are against a section
 		 * which has been discarded.
 		 */
 		if (risc->is_flags & FLG_IS_DISCARD)
 			return (1);
-		if ((osp = risc->is_osdesc) == 0) {
+
+		if ((osp = risc->is_osdesc) == NULL) {
 			if (risc->is_shdr->sh_type == SHT_SUNW_move) {
 				/*
-				 * This section is processed later
-				 * in sunwmove_preprocess() and
-				 * reloc_init().
+				 * This section is processed later in
+				 * process_movereloc().
 				 */
-				if (list_appendc(&ofl->ofl_mvrelisdescs,
-				    isc) == 0)
+				if (aplist_append(&ofl->ofl_ismoverel,
+				    isc, AL_CNT_OFL_MOVE) == NULL)
 					return (S_ERROR);
 				return (1);
 			}
@@ -1931,7 +1935,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		else
 			base++;
 
-		if ((sdf = sdf_find(base, &ofl->ofl_socntl)) != 0) {
+		if ((sdf = sdf_find(base, ofl->ofl_socntl)) != NULL) {
 			sdf->sdf_file = ifl;
 			ifl->ifl_sdfdesc = sdf;
 		}
@@ -1983,11 +1987,12 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			    isp->is_indata, elf);
 
 		/*
-		 * If this is a ST_SUNW_move section from a
-		 * a relocatable file, keep the input section.
+		 * If this is a SHT_SUNW_move section from a relocatable file,
+		 * keep track of the section for later processing.
 		 */
 		if ((row == SHT_SUNW_move) && (column == 0)) {
-			if (list_appendc(&(ofl->ofl_ismove), isp) == 0)
+			if (aplist_append(&(ofl->ofl_ismove), isp,
+			    AL_CNT_OFL_MOVE) == NULL)
 				return (S_ERROR);
 		}
 
@@ -2059,7 +2064,6 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 {
 	Ifl_desc	*ifl;
 	Ehdr		*ehdr;
-	Listnode	*lnp;
 	uintptr_t	error = 0;
 	struct stat	status;
 	Ar_desc		*adp;
@@ -2084,7 +2088,9 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * Determine if we've already come across this archive file.
 		 */
 		if (!(flags & FLG_IF_EXTRACT)) {
-			for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
+			Aliste	idx;
+
+			for (APLIST_TRAVERSE(ofl->ofl_ars, idx, adp)) {
 				if ((adp->ad_stdev != status.st_dev) ||
 				    (adp->ad_stino != status.st_ino))
 					continue;
@@ -2174,18 +2180,19 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * Determine if we've already come across this file.
 		 */
 		if (!(flags & FLG_IF_EXTRACT)) {
-			List	*lst;
+			APlist	*apl;
+			Aliste	idx;
 
 			if (ehdr->e_type == ET_REL)
-				lst = &ofl->ofl_objs;
+				apl = ofl->ofl_objs;
 			else
-				lst = &ofl->ofl_sos;
+				apl = ofl->ofl_sos;
 
 			/*
 			 * Traverse the appropriate file list and determine if
 			 * a dev/inode match is found.
 			 */
-			for (LIST_TRAVERSE(lst, lnp, ifl)) {
+			for (APLIST_TRAVERSE(apl, idx, ifl)) {
 				/*
 				 * Ifl_desc generated via -Nneed, therefore no
 				 * actual file behind it.
@@ -2463,7 +2470,7 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 uintptr_t
 ld_finish_libs(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
+	Aliste		idx1;
 	Sdf_desc	*sdf;
 	Rej_desc	rej = { 0 };
 
@@ -2472,8 +2479,8 @@ ld_finish_libs(Ofl_desc *ofl)
 	 */
 	ofl->ofl_flags |= FLG_OF_DYNLIBS;
 
-	for (LIST_TRAVERSE(&ofl->ofl_soneed, lnp1, sdf)) {
-		Listnode	*lnp2;
+	for (APLIST_TRAVERSE(ofl->ofl_soneed, idx1, sdf)) {
+		Aliste		idx2;
 		char		*path, *slash = NULL;
 		int		fd;
 		Ifl_desc	*ifl;
@@ -2489,7 +2496,7 @@ ld_finish_libs(Ofl_desc *ofl)
 		if (sdf->sdf_file)
 			continue;
 
-		for (LIST_TRAVERSE(&ofl->ofl_sos, lnp2, ifl)) {
+		for (APLIST_TRAVERSE(ofl->ofl_sos, idx2, ifl)) {
 			if (!(ifl->ifl_flags & FLG_IF_NEEDSTR) &&
 			    (strcmp(file, ifl->ifl_soname) == 0)) {
 				sdf->sdf_file = ifl;
@@ -2543,7 +2550,7 @@ ld_finish_libs(Ofl_desc *ofl)
 		/*
 		 * Now search for this file in any user defined directories.
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_ulibdirs, lnp2, path)) {
+		for (APLIST_TRAVERSE(ofl->ofl_ulibdirs, idx2, path)) {
 			Rej_desc	_rej = { 0 };
 
 			ifl = process_req_lib(sdf, path, file, ofl, &_rej);
@@ -2610,7 +2617,7 @@ ld_finish_libs(Ofl_desc *ofl)
 		/*
 		 * Finally try the default library search directories.
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_dlibdirs, lnp2, path)) {
+		for (APLIST_TRAVERSE(ofl->ofl_dlibdirs, idx2, path)) {
 			Rej_desc	_rej = { 0 };
 
 			ifl = process_req_lib(sdf, path, file, ofl, &rej);

@@ -780,7 +780,7 @@ void
 call_init(Rt_map **tobj, int flag)
 {
 	Rt_map		**_tobj, **_nobj;
-	static List	pending = { NULL, NULL };
+	static APlist	*pending = NULL;
 
 	/*
 	 * If we're in the middle of an INITFIRST, this must complete before
@@ -789,7 +789,7 @@ call_init(Rt_map **tobj, int flag)
 	 * INITFIRST objects have their init's fired.
 	 */
 	if (rtld_flags & RT_FL_INITFIRST) {
-		(void) list_append(&pending, tobj);
+		(void) aplist_append(&pending, tobj, AL_CNT_PENDING);
 		return;
 	}
 
@@ -846,17 +846,13 @@ call_init(Rt_map **tobj, int flag)
 		 */
 		if ((rtld_flags & RT_FL_INITFIRST) &&
 		    ((*_nobj == NULL) || !(FLAGS(*_nobj) & FLG_RT_INITFRST))) {
-			Listnode	*lnp;
-			Rt_map		**pobj;
+			Aliste	idx;
+			Rt_map	**pobj;
 
 			rtld_flags &= ~RT_FL_INITFIRST;
 
-			while ((lnp = pending.head) != NULL) {
-				if ((pending.head = lnp->next) == NULL)
-					pending.tail = NULL;
-				pobj = lnp->data;
-				free(lnp);
-
+			for (APLIST_TRAVERSE(pending, idx, pobj)) {
+				aplist_delete(pending, &idx);
 				call_init(pobj, DBG_INIT_PEND);
 			}
 		}
@@ -916,7 +912,7 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 		 * First call any global auditing.
 		 */
 		if (lml->lm_tflags & LML_TFLG_AUD_OBJCLOSE)
-			_audit_objclose(&(auditors->ad_list), lmp);
+			_audit_objclose(auditors->ad_list, lmp);
 
 		/*
 		 * Finally determine whether this object has local auditing
@@ -926,14 +922,13 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			continue;
 
 		if (AFLAGS(lmp) & LML_TFLG_AUD_OBJCLOSE)
-			_audit_objclose(&(AUDITORS(lmp)->ad_list), lmp);
+			_audit_objclose(AUDITORS(lmp)->ad_list, lmp);
 
 		for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
 			clmp = bdp->b_caller;
 
 			if (AFLAGS(clmp) & LML_TFLG_AUD_OBJCLOSE) {
-				_audit_objclose(&(AUDITORS(clmp)->ad_list),
-				    lmp);
+				_audit_objclose(AUDITORS(clmp)->ad_list, lmp);
 				break;
 			}
 		}
@@ -947,9 +942,9 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 void
 atexit_fini()
 {
-	Rt_map		**tobj, *lmp;
-	Lm_list		*lml;
-	Listnode	*lnp;
+	Rt_map	**tobj, *lmp;
+	Lm_list	*lml;
+	Aliste	idx;
 
 	(void) enter(0);
 
@@ -988,7 +983,7 @@ atexit_fini()
 	/*
 	 * Traverse any alternative link-map lists.
 	 */
-	for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
+	for (APLIST_TRAVERSE(dynlm_list, idx, lml)) {
 		/*
 		 * Ignore the base-link-map list, which has already been
 		 * processed, and the runtime linkers link-map list, which is
@@ -1100,102 +1095,6 @@ load_completion(Rt_map *nlmp)
 	 */
 	if (tobj)
 		call_init(tobj, DBG_INIT_SORT);
-}
-
-/*
- * Append an item to the specified list, and return a pointer to the list
- * node created.
- */
-Listnode *
-list_append(List *lst, const void *item)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = malloc(sizeof (Listnode))) == NULL)
-		return (NULL);
-
-	_lnp->data = (void *)item;
-	_lnp->next = NULL;
-
-	if (lst->head == NULL)
-		lst->tail = lst->head = _lnp;
-	else {
-		lst->tail->next = _lnp;
-		lst->tail = lst->tail->next;
-	}
-	return (_lnp);
-}
-
-/*
- * Add an item after specified listnode, and return a pointer to the list
- * node created.
- */
-Listnode *
-list_insert(List *lst, const void *item, Listnode *lnp)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = malloc(sizeof (Listnode))) == NULL)
-		return (NULL);
-
-	_lnp->data = (void *)item;
-	_lnp->next = lnp->next;
-	if (_lnp->next == NULL)
-		lst->tail = _lnp;
-	lnp->next = _lnp;
-	return (_lnp);
-}
-
-/*
- * Prepend an item to the specified list, and return a pointer to the
- * list node created.
- */
-Listnode *
-list_prepend(List *lst, const void *item)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = malloc(sizeof (Listnode))) == NULL)
-		return (0);
-
-	_lnp->data = (void *)item;
-
-	if (lst->head == NULL) {
-		_lnp->next = NULL;
-		lst->tail = lst->head = _lnp;
-	} else {
-		_lnp->next = lst->head;
-		lst->head = _lnp;
-	}
-	return (_lnp);
-}
-
-/*
- * Delete a 'listnode' from a list.
- */
-void
-list_delete(List *lst, void *item)
-{
-	Listnode	*clnp, *plnp;
-
-	for (plnp = NULL, clnp = lst->head; clnp; clnp = clnp->next) {
-		if (item == clnp->data)
-			break;
-		plnp = clnp;
-	}
-
-	if (clnp == NULL)
-		return;
-
-	if (lst->head == clnp)
-		lst->head = clnp->next;
-	if (lst->tail == clnp)
-		lst->tail = plnp;
-
-	if (plnp)
-		plnp->next = clnp->next;
-
-	free(clnp);
 }
 
 /*

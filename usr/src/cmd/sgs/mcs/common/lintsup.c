@@ -29,14 +29,12 @@
 /*
  * Supplimental Pseudo-code to get lint to consider these symbols used.
  */
+
 #include "alist.h"
-#include "msg.h"
 
 void
 foo()
 {
-	(void) _ldd_msg((Msg)&__ldd_msg[0]);
-
 	(void) alist_append(NULL, NULL, 0, 0);
 	alist_delete_by_offset(NULL, NULL);
 	(void) alist_insert_by_offset(NULL, NULL, 0, 0, 0);

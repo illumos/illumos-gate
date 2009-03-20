@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,33 +30,33 @@
 #include	"_libld.h"
 
 /*
- *
+ * Scan all partially initialized symbols to determine what output Move sections
+ * or partially expanded data section, must be created.
  */
 static uintptr_t
 make_mvsections(Ofl_desc *ofl)
 {
-	Listnode *	lnp1;
-	Psym_info *	psym;
+	Aliste		idx;
+	Sym_desc	*sdp;
 	Word 		mv_nums = 0;
 	Xword		align_parexpn = 0;	/* for -z nopartial .data sec */
-	size_t		size_parexpn = 0;	/* Size of parexpn section */
+	size_t		size_parexpn = 0;	/* size of parexpn section */
 
 	/*
 	 * Compute the size of the output move section
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_parsym, lnp1, psym)) {
-		Sym_desc *	symd = psym->psym_symd;
-		Sym *		sym;
-		Xword		align_val;
+	for (APLIST_TRAVERSE(ofl->ofl_parsyms, idx, sdp)) {
+		if (sdp->sd_flags & FLG_SY_PAREXPN) {
+			Sym	*sym = sdp->sd_sym;
+			Xword	align_val;
 
-		sym = symd->sd_sym;
-		if (sym->st_shndx == SHN_COMMON)
-			align_val = sym->st_value;
-		else
-			align_val = 8;
-		if (symd->sd_flags & FLG_SY_PAREXPN) {
+			if (sym->st_shndx == SHN_COMMON)
+				align_val = sym->st_value;
+			else
+				align_val = 8;
+
 			/*
-			 * This global symbol goes to the special
+			 * This global symbol is redirected to the special
 			 * partial initialization .data section.
 			 */
 			size_parexpn = (size_t)S_ROUND(size_parexpn,
@@ -65,14 +65,15 @@ make_mvsections(Ofl_desc *ofl)
 				align_parexpn = align_val;
 
 		} else {
-			mv_nums += psym->psym_num;
+			mv_nums += alist_nitems(sdp->sd_move);
 		}
 	}
 
-	if (mv_nums != 0) {
-		if (ld_make_sunwmove(ofl, mv_nums) == S_ERROR)
-			return (S_ERROR);
-	}
+	/*
+	 * Generate a new Move section.
+	 */
+	if (mv_nums && (ld_make_sunwmove(ofl, mv_nums) == S_ERROR))
+		return (S_ERROR);
 
 	/*
 	 * Add empty area for partially initialized symbols.
@@ -90,266 +91,95 @@ make_mvsections(Ofl_desc *ofl)
 }
 
 /*
- * This function insert the Move_itm into the move list held by
- * psymp.
+ * Assign move descriptors with the associated target symbol.
  */
 static uintptr_t
-insert_mvitm(Ofl_desc *ofl, Psym_info *psymp, Mv_itm *itm)
+append_move_desc(Ofl_desc *ofl, Sym_desc *sdp, Move *mvp, Is_desc *isp)
 {
-	Listnode *	lnpc, *lnpp, *new;
-	Mv_itm *	mvp;
+	int 	i, cnt = mvp->m_repeat;
 
-	/*
-	 * If there is error on this symbol already,
-	 * don't go any further.
-	 */
-	if ((psymp->psym_flag & FLG_PSYM_OVERLAP) != 0)
-		return (1);
-
-	if ((new = libld_calloc(sizeof (Listnode), 1)) == 0)
-		return (S_ERROR);
-	new->data = (void *) itm;
-	lnpp = lnpc = psymp->psym_mvs.head;
-
-	/*
-	 * If this is the first, just update the
-	 * head and tail.
-	 */
-	if (lnpc == (Listnode *) NULL) {
-		psymp->psym_mvs.tail = psymp->psym_mvs.head = new;
-		return (1);
-	}
-
-	for (LIST_TRAVERSE(&psymp->psym_mvs, lnpc, mvp)) {
-		Mv_itm *	small, *large;
-
-		/*
-		 * Check overlapping
-		 * If there is no overlapping so far,
-		 * check overlapping.
-		 */
-		if (itm->mv_start > mvp->mv_start) {
-			small = mvp;
-			large = itm;
-		} else {
-			small = itm;
-			large = mvp;
-		}
-
-		if ((itm->mv_start == mvp->mv_start) ||
-		    (small->mv_start + small->mv_length > large->mv_start)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_PSYM_OVERLAP),
-			    psymp->psym_symd->sd_file->ifl_name,
-			    itm->mv_isp->is_name,
-			    demangle(psymp->psym_symd->sd_name));
-			psymp->psym_flag |= FLG_PSYM_OVERLAP;
-			return (1);
-		}
-
-		/*
-		 * If passed, insert
-		 */
-		if (mvp->mv_start > itm->mv_start) {
-			new->next = lnpc;
-			if (lnpc == psymp->psym_mvs.head) {
-				psymp->psym_mvs.head = new;
-			} else
-				lnpp->next = new;
-			return (1);
-		}
-
-		/*
-		 * If lnpc is the end, add
-		 */
-		if (lnpc->next == NULL) {
-			new->next = lnpc->next;
-			lnpc->next = new;
-			psymp->psym_mvs.tail = new;
-			return (1);
-		}
-
-		/*
-		 * Go next
-		 */
-		lnpp = lnpc;
-	}
-	return (1);
-}
-
-/*
- * Install the mv entry into the Psym_info
- *
- * Count coverage size
- *	If the coverage size meets the symbol size,
- *	mark that the symbol should be expanded.
- *	psymp->psym_symd->sd_flags |= FLG_SY_PAREXPN;
- *
- * Check overlapping
- *	If overlapping occurs, mark it at psymp->psym_flags
- */
-static uintptr_t
-install_mv(Ofl_desc *ofl, Psym_info *psymp, Move *mv, Is_desc *isp)
-{
-	Mv_itm *	mvitmp;
-	int 		cnt = mv->m_repeat;
-	int 		i;
-
-	if ((mvitmp = libld_calloc(sizeof (Mv_itm), cnt)) == 0)
-		return (S_ERROR);
-
-	mvitmp->mv_flag |= FLG_MV_OUTSECT;
-	psymp->psym_num += 1;
 	for (i = 0; i < cnt; i++) {
+		Aliste		idx;
+		Mv_desc		*omdp, nmd;
+
 		/* LINTED */
-		mvitmp->mv_length = ELF_M_SIZE(mv->m_info);
-		mvitmp->mv_start = mv->m_poffset + i *
-		    ((mv->m_stride + 1) * mvitmp->mv_length);
-		mvitmp->mv_ientry = mv;
-		mvitmp->mv_isp = isp;		/* Mark input section */
+		nmd.md_len = ELF_M_SIZE(mvp->m_info);
+		nmd.md_start = mvp->m_poffset + i *
+		    ((mvp->m_stride + 1) * nmd.md_len);
+		nmd.md_move = mvp;
 
 		/*
-		 * Insert the item
+		 * Verify that this move descriptor doesn't overlap any existing
+		 * move descriptors.
 		 */
-		if (insert_mvitm(ofl, psymp, mvitmp) == S_ERROR)
-			return (S_ERROR);
-		mvitmp++;
-	}
-	return (1);
-}
+		for (ALIST_TRAVERSE(sdp->sd_move, idx, omdp)) {
+			Mv_desc	*smdp, *lmdp;
 
-/*
- * Insert the given psym_info
- */
-static uintptr_t
-insert_psym(Ofl_desc *ofl, Psym_info *p1)
-{
-	Listnode *	lnpc, *lnpp, *new;
-	Psym_info *	p2;
-	int		g1 = 0;
-
-	if ((new = libld_calloc(sizeof (Listnode), 1)) == 0)
-		return (S_ERROR);
-	new->data = (void *) p1;
-	lnpp = lnpc = ofl->ofl_parsym.head;
-	if (ELF_ST_BIND(p1->psym_symd->sd_sym->st_info) != STB_LOCAL)
-		g1 = 1;
-
-	/*
-	 * If this is the first, just update the
-	 * head and tail.
-	 */
-	if (lnpc == (Listnode *) NULL) {
-		ofl->ofl_parsym.tail = ofl->ofl_parsym.head = new;
-		return (1);
-	}
-
-	for (LIST_TRAVERSE(&ofl->ofl_parsym, lnpc, p2)) {
-		int cmp1, g2, cmp;
-
-		if (ELF_ST_BIND(p2->psym_symd->sd_sym->st_info) != STB_LOCAL)
-			g2 = 1;
-		else
-			g2 = 0;
-
-		cmp1 = strcmp(p1->psym_symd->sd_name, p2->psym_symd->sd_name);
-
-		/*
-		 * Compute position
-		 */
-		if (g1 == g2)
-			cmp = cmp1;
-		else if (g1 == 0) {
-			/*
-			 * p1 is a local symbol.
-			 * p2 is a global, so p1 passed.
-			 */
-			cmp = -1;
-		} else {
-			/*
-			 * p1 is global
-			 * p2 is still local.
-			 * so try the next one.
-			 *
-			 * If lnpc is the end, add
-			 */
-			if (lnpc->next == NULL) {
-				new->next = lnpc->next;
-				lnpc->next = new;
-				ofl->ofl_parsym.tail = new;
-				break;
+			if (nmd.md_start > omdp->md_start) {
+				smdp = omdp;
+				lmdp = &nmd;
+			} else {
+				smdp = &nmd;
+				lmdp = omdp;
 			}
-			lnpp = lnpc;
-			continue;
+
+			/*
+			 * If this move entry is exactly the same as that of
+			 * a symbol that has overridden this symbol (for example
+			 * should two identical COMMON definitions be associated
+			 * with the same move data), simply ignore this move
+			 * element.
+			 */
+			if ((nmd.md_start == omdp->md_start) &&
+			    ((nmd.md_len == smdp->md_len) &&
+			    sdp->sd_file != isp->is_file))
+				continue;
+
+			if ((nmd.md_start != omdp->md_start) &&
+			    ((smdp->md_start + smdp->md_len) <= lmdp->md_start))
+				continue;
+
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MOVE_OVERLAP), sdp->sd_file->ifl_name,
+			    isp->is_name, demangle(sdp->sd_name),
+			    EC_XWORD(nmd.md_start), EC_XWORD(nmd.md_len),
+			    EC_XWORD(omdp->md_start), EC_XWORD(omdp->md_len));
+
+			/*
+			 * Indicate that an error has occurred, so that
+			 * processing can be terminated once all move errors
+			 * are flushed out.
+			 */
+			sdp->sd_flags1 |= FLG_SY1_OVERLAP;
+			return (1);
 		}
 
-		/*
-		 * If same, just add after
-		 */
-		if (cmp == 0) {
-			new->next = lnpc->next;
-			if (lnpc == ofl->ofl_parsym.tail)
-				ofl->ofl_parsym.tail = new;
-			lnpc->next = new;
-			break;
-		}
-
-		/*
-		 * If passed, insert
-		 */
-		if (cmp < 0) {
-			new->next = lnpc;
-			if (lnpc == ofl->ofl_parsym.head) {
-				ofl->ofl_parsym.head = new;
-			} else
-				lnpp->next = new;
-			break;
-		}
-
-		/*
-		 * If lnpc is the end, add
-		 */
-		if (lnpc->next == NULL) {
-			new->next = lnpc->next;
-			lnpc->next = new;
-			ofl->ofl_parsym.tail = new;
-			break;
-		}
-
-		/*
-		 * Go next
-		 */
-		lnpp = lnpc;
+		if (alist_append(&sdp->sd_move, &nmd, sizeof (Mv_desc),
+		    AL_CNT_SDP_MOVE) == NULL)
+			return (S_ERROR);
 	}
 	return (1);
 }
 
 /*
- * Mark the symbols
- *
- * Check only the symbols which came from the relocatable
- * files.If partially initialized symbols come from
- * shared objects, they can be ignored here because
- * they are already processed when the shared object is
- * created.
- *
+ * Validate a SHT_SUNW_move section.  These are only processed from input
+ * relocatable objects.  The move section entries are validated and any data
+ * structures required for later processing are created.
  */
 uintptr_t
-ld_sunwmove_preprocess(Ofl_desc *ofl)
+ld_process_move(Ofl_desc *ofl)
 {
-	Listnode *	lnp;
-	Is_desc *	isp;
-	Sym_desc *	sdp;
-	Move *		mv;
-	Psym_info *	psym;
+	Aliste		idx;
+	Is_desc		*isp;
 	int 		errcnt = 0;
 
-	for (LIST_TRAVERSE(&ofl->ofl_ismove, lnp, isp)) {
-		Ifl_desc *	ifile = isp->is_file;
+	for (APLIST_TRAVERSE(ofl->ofl_ismove, idx, isp)) {
+		Ifl_desc	*ifile = isp->is_file;
+		Move		*mvp;
 		Xword		i, num;
 
 		DBG_CALL(Dbg_move_input(ofl->ofl_lml, ifile->ifl_name));
-		mv = (Move *) isp->is_indata->d_buf;
+		mvp = (Move *)isp->is_indata->d_buf;
 
 		if (isp->is_shdr->sh_entsize == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -357,41 +187,44 @@ ld_sunwmove_preprocess(Ofl_desc *ofl)
 			    isp->is_file->ifl_name, isp->is_name, EC_XWORD(0));
 			return (S_ERROR);
 		}
-		num = isp->is_shdr->sh_size/isp->is_shdr->sh_entsize;
+		num = isp->is_shdr->sh_size / isp->is_shdr->sh_entsize;
+
 		for (i = 0; i < num; i++) {
-			Xword 	ndx = ELF_M_SYM(mv->m_info);
+			Xword 		ndx = ELF_M_SYM(mvp->m_info);
+			Sym_desc	*sdp;
+			Sym		*sym;
 
 			if ((ndx >= (Xword) isp->is_file->ifl_symscnt) ||
 			    (ndx == 0)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMINFO1),
 				    isp->is_file->ifl_name, isp->is_name, i,
-				    EC_XWORD(mv->m_info));
+				    EC_XWORD(mvp->m_info));
 				return (S_ERROR);
 			}
-			if (mv->m_repeat == 0) {
+			if (mvp->m_repeat == 0) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMREPEAT),
 				    isp->is_file->ifl_name, isp->is_name, i,
-				    EC_XWORD(mv->m_repeat));
+				    EC_XWORD(mvp->m_repeat));
 				return (S_ERROR);
 			}
 
 			sdp = isp->is_file->ifl_oldndx[ndx];
-			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, mv, sdp));
+			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 1, mvp, sdp));
 
 			/*
-			 * Check if this entry has a valid size of not
+			 * Validate that this entry has a valid size.
 			 */
 			/* LINTED */
-			switch (ELF_M_SIZE(mv->m_info)) {
+			switch (ELF_M_SIZE(mvp->m_info)) {
 			case 1: case 2: case 4: case 8:
 				break;
 			default:
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMINFO2),
 				    isp->is_file->ifl_name, isp->is_name, i,
-				    EC_XWORD(mv->m_info));
+				    EC_XWORD(mvp->m_info));
 				return (S_ERROR);
 			}
 
@@ -402,77 +235,77 @@ ld_sunwmove_preprocess(Ofl_desc *ofl)
 			    ((sdp->sd_flags & FLG_SY_VISIBLE) == 0))
 				ld_sym_adjust_vis(sdp, ofl);
 
-			if (sdp->sd_psyminfo == (Psym_info *)NULL) {
+			sym = sdp->sd_sym;
+
+			if (sdp->sd_move == NULL) {
 				/*
-				 * Mark the symbol as partial, and install the
-				 * symbol in the partial symbol list.
+				 * If this is the first move entry associated
+				 * with this symbol, save the symbol on the
+				 * partial symbol list, and initialize various
+				 * state regarding this symbol.
 				 */
-				if ((psym =
-				    libld_calloc(sizeof (Psym_info), 1)) == 0)
+				if (aplist_append(&ofl->ofl_parsyms, sdp,
+				    AL_CNT_OFL_PARSYMS) == NULL)
 					return (S_ERROR);
-				psym->psym_symd = sdp;
-				sdp->sd_psyminfo = psym;
 
 				/*
-				 * Even if the -zredlocsym is in effect, the
-				 * local symbol used for partial initialization
-				 * is kept.
+				 * Even if -zredlocsym is in effect, the local
+				 * symbol used for partial initialization is
+				 * kept.
 				 */
 				if ((ofl->ofl_flags & FLG_OF_REDLSYM) &&
-				    (ELF_ST_BIND(sdp->sd_sym->st_info) ==
-				    STB_LOCAL) &&
-				    (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
-				    STT_OBJECT)) {
+				    (ELF_ST_BIND(sym->st_info) == STB_LOCAL) &&
+				    (ELF_ST_TYPE(sym->st_info) == STT_OBJECT)) {
 					ofl->ofl_locscnt++;
 					if (st_insert(ofl->ofl_strtab,
 					    sdp->sd_name) == -1)
 						return (S_ERROR);
 				}
-				if (insert_psym(ofl, psym) == 0)
-					return (S_ERROR);
 
 				/*
-				 * Mark the input section which the partially
-				 * initialized * symbol is defined.
+				 * Mark the input section associated with this
+				 * partially initialized symbol.
 				 * This is needed when the symbol
 				 * the relocation entry uses symbol information
 				 * not from the symbol entry.
 				 *
 				 * For executable, the following is
 				 * needed only for expanded symbol. However,
-				 * for shared object * any partially non
-				 * expanded symbols are moved * from
+				 * for shared object any partially non
+				 * expanded symbols are moved from
 				 * .bss/COMMON to .sunwbss. So the following are
 				 * needed.
 				 */
-				if ((sdp->sd_sym->st_shndx != SHN_UNDEF) &&
-				    (sdp->sd_sym->st_shndx < SHN_LOPROC)) {
-					Is_desc * isym = ifile->ifl_isdesc[
-					    sdp->sd_sym->st_shndx];
-					isym->is_flags |= FLG_IS_RELUPD;
-					if (sdp->sd_osym == (Sym *) 0) {
+				if ((sym->st_shndx != SHN_UNDEF) &&
+				    (sym->st_shndx < SHN_LOPROC)) {
+					Is_desc	*isc;
+
+					isc = ifile->ifl_isdesc[ sym->st_shndx];
+					isc->is_flags |= FLG_IS_RELUPD;
+
+					if (sdp->sd_osym == NULL) {
 						if ((sdp->sd_osym =
 						    libld_calloc(sizeof (Sym),
-						    1)) == 0)
+						    1)) == NULL)
 							return (S_ERROR);
 						*(sdp->sd_osym) =
 						    *(sdp->sd_sym);
 					}
 				}
-			} else
-				psym = sdp->sd_psyminfo;
+			}
 
-			if (install_mv(ofl, psym, mv, isp) == S_ERROR)
+			if (append_move_desc(ofl, sdp, mvp, isp) == S_ERROR)
 				return (S_ERROR);
-			if ((psym->psym_flag & FLG_PSYM_OVERLAP) != 0)
+
+			if (sdp->sd_flags1 & FLG_SY1_OVERLAP)
 				errcnt++;
 
 			/*
-			 * If this symbol is marked to be
-			 * expanded, go to the next moveentry.
+			 * If this symbol is marked to be expanded, go to the
+			 * next move entry.
 			 */
 			if (sdp->sd_flags & FLG_SY_PAREXPN) {
-				mv++;
+				mvp++;
 				continue;
 			}
 
@@ -499,47 +332,53 @@ ld_sunwmove_preprocess(Ofl_desc *ofl)
 			 */
 			if (((ofl->ofl_flags & FLG_OF_STATIC) != 0) &&
 			    ((ofl->ofl_flags & FLG_OF_EXEC) != 0)) {
-				if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
-				    STT_SECTION) {
+				if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
 					errcnt++;
 					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
-					    psym->psym_symd->sd_file->ifl_name,
+					    sdp->sd_file->ifl_name,
 					    isp->is_name, i,
 					    MSG_INTL(MSG_PSYM_NOSTATIC));
 				} else {
 					sdp->sd_flags |= FLG_SY_PAREXPN;
 				}
 			} else if ((ofl->ofl_flags1 & FLG_OF1_NOPARTI) != 0) {
-				if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
-				    STT_SECTION) {
+				if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
-					    psym->psym_symd->sd_file->ifl_name,
+					    sdp->sd_file->ifl_name,
 					    isp->is_name, i,
 					    MSG_ORIG(MSG_STR_EMPTY));
 				} else {
 					sdp->sd_flags |= FLG_SY_PAREXPN;
 				}
-			} else if (
-			    ((Xword)((sizeof (Move)) * psym->psym_num) >
-			    psym->psym_symd->sd_sym->st_size) &&
-			    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_OBJECT)) {
+			} else if (((Xword)((sizeof (Move)) *
+			    alist_nitems(sdp->sd_move)) > sym->st_size) &&
+			    (ELF_ST_TYPE(sym->st_info) == STT_OBJECT)) {
 				sdp->sd_flags |= FLG_SY_PAREXPN;
 			}
 
 			/*
-			 * If a move section exists that references .bss, make
-			 * sure a section symbol for .bss is introduced into
-			 * the .dynsym.
+			 * If a move entry exists that references a local
+			 * symbol, and this symbol reference will eventually
+			 * be assigned to the associated section, make sure the
+			 * section symbol is available for relocating against
+			 * at runtime.
 			 */
-			if (((sdp->sd_flags & FLG_SY_PAREXPN) == 0) &&
-			    ((ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL) ||
-			    ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
-			    (ofl->ofl_flags & FLG_OF_PROCRED)))) {
-				ofl->ofl_flags1 |= FLG_OF1_BSSOREL;
+			if ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) &&
+			    (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) ||
+			    (ofl->ofl_flags & FLG_OF_REDLSYM))) {
+				Os_desc *osp = sdp->sd_isc->is_osdesc;
+
+				if (osp &&
+				    ((osp->os_flags & FLG_OS_OUTREL) == 0)) {
+					ofl->ofl_dynshdrcnt++;
+					osp->os_flags |= FLG_OS_OUTREL;
+				} else if ((sdp->sd_flags &
+				    FLG_SY_PAREXPN) == 0)
+					ofl->ofl_flags1 |= FLG_OF1_BSSOREL;
 			}
-			mv++;
+			mvp++;
 		}
 	}
 

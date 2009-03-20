@@ -68,14 +68,14 @@ _audit_client(Audit_info *aip, Rt_map *almp)
 {
 	int	ndx;
 
-	if (aip == 0)
-		return (0);
+	if (aip == NULL)
+		return (NULL);
 
 	for (ndx = 0; ndx < aip->ai_cnt; ndx++) {
 		if (aip->ai_clients[ndx].ac_lmp == almp)
 			return (&(aip->ai_clients[ndx]));
 	}
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -84,20 +84,22 @@ _audit_client(Audit_info *aip, Rt_map *almp)
  * that the filtee should be ignored.
  */
 static int
-_audit_objfilter(List *list, Rt_map *frlmp, const char *ref, Rt_map *felmp,
+_audit_objfilter(APlist *list, Rt_map *frlmp, const char *ref, Rt_map *felmp,
     uint_t flags)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*fracp, *feacp;
 
-		if (alp->al_objfilter == 0)
+		if (alp->al_objfilter == NULL)
 			continue;
-		if ((fracp = _audit_client(AUDINFO(frlmp), alp->al_lmp)) == 0)
+		if ((fracp = _audit_client(AUDINFO(frlmp),
+		    alp->al_lmp)) == NULL)
 			continue;
-		if ((feacp = _audit_client(AUDINFO(felmp), alp->al_lmp)) == 0)
+		if ((feacp = _audit_client(AUDINFO(felmp),
+		    alp->al_lmp)) == NULL)
 			continue;
 
 		leave(LIST(alp->al_lmp), thr_flg_reenter);
@@ -118,11 +120,11 @@ audit_objfilter(Rt_map *frlmp, const char *ref, Rt_map *felmp, uint_t flags)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_OBJFILTER))
-		respond = _audit_objfilter(&(auditors->ad_list), frlmp,
+		respond = _audit_objfilter(auditors->ad_list, frlmp,
 		    ref, felmp, flags);
 	if (respond && AUDITORS(frlmp) &&
 	    (AUDITORS(frlmp)->ad_flags & LML_TFLG_AUD_OBJFILTER))
-		respond = _audit_objfilter(&(AUDITORS(frlmp)->ad_list), frlmp,
+		respond = _audit_objfilter(AUDITORS(frlmp)->ad_list, frlmp,
 		    ref, felmp, flags);
 
 	if (appl)
@@ -140,24 +142,24 @@ audit_objfilter(Rt_map *frlmp, const char *ref, Rt_map *felmp, uint_t flags)
  * terminates the search.
  */
 static char *
-_audit_objsearch(List *list, char *name, Rt_map *clmp, uint_t flags)
+_audit_objsearch(APlist *list, char *name, Rt_map *clmp, uint_t flags)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 	char		*nname = (char *)name;
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*acp;
 
-		if (alp->al_objsearch == 0)
+		if (alp->al_objsearch == NULL)
 			continue;
-		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == 0)
+		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == NULL)
 			continue;
 
 		leave(LIST(alp->al_lmp), thr_flg_reenter);
 		nname = (*alp->al_objsearch)(nname, &(acp->ac_cookie), flags);
 		(void) enter(thr_flg_reenter);
-		if (nname == 0)
+		if (nname == NULL)
 			break;
 	}
 	return (nname);
@@ -173,11 +175,11 @@ audit_objsearch(Rt_map *clmp, const char *name, uint_t flags)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_OBJSEARCH))
-		nname = _audit_objsearch(&(auditors->ad_list), nname,
+		nname = _audit_objsearch(auditors->ad_list, nname,
 		    clmp, flags);
 	if (nname && AUDITORS(clmp) &&
 	    (AUDITORS(clmp)->ad_flags & LML_TFLG_AUD_OBJSEARCH))
-		nname = _audit_objsearch(&(AUDITORS(clmp)->ad_list), nname,
+		nname = _audit_objsearch(AUDITORS(clmp)->ad_list, nname,
 		    clmp, flags);
 
 	if (appl)
@@ -192,20 +194,20 @@ audit_objsearch(Rt_map *clmp, const char *name, uint_t flags)
  * la_activity() entry points found.
  */
 static void
-_audit_activity(List *list, Rt_map *clmp, uint_t flags)
+_audit_activity(APlist *list, Rt_map *clmp, uint_t flags)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 	Lm_list		*clml = LIST(clmp);
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*acp;
 		Rt_map		*almp = alp->al_lmp;
 		Lm_list		*alml = LIST(almp);
 
 		if (alp->al_activity == 0)
 			continue;
-		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == 0)
+		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == NULL)
 			continue;
 
 		/*
@@ -249,10 +251,10 @@ audit_activity(Rt_map *clmp, uint_t flags)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_ACTIVITY))
-		_audit_activity(&(auditors->ad_list), clmp, flags);
+		_audit_activity(auditors->ad_list, clmp, flags);
 	if (AUDITORS(clmp) &&
 	    (AUDITORS(clmp)->ad_flags & LML_TFLG_AUD_ACTIVITY))
-		_audit_activity(&(AUDITORS(clmp)->ad_list), clmp, flags);
+		_audit_activity(AUDITORS(clmp)->ad_list, clmp, flags);
 
 	if (appl)
 		rtld_flags &= ~RT_FL_APPLIC;
@@ -266,13 +268,13 @@ audit_activity(Rt_map *clmp, uint_t flags)
  * found.
  */
 static int
-_audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
+_audit_objopen(APlist *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
     int *ndx)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		uint_t		flags;
 		Audit_client	*acp;
 
@@ -284,7 +286,7 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 		acp->ac_lmp = alp->al_lmp;
 		acp->ac_cookie = (uintptr_t)nlmp;
 
-		if (alp->al_objopen == 0)
+		if (alp->al_objopen == NULL)
 			continue;
 
 		DBG_CALL(Dbg_audit_object(LIST(alp->al_lmp), alp->al_libname,
@@ -370,13 +372,13 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors)
-		respond = _audit_objopen(&(auditors->ad_list), nlmp,
+		respond = _audit_objopen(auditors->ad_list, nlmp,
 		    lmid, aip, &ndx);
 	if (respond && AUDITORS(clmp))
-		respond = _audit_objopen(&(AUDITORS(clmp)->ad_list), nlmp,
+		respond = _audit_objopen(AUDITORS(clmp)->ad_list, nlmp,
 		    lmid, aip, &ndx);
 	if (respond && (nlmp != clmp) && AUDITORS(nlmp))
-		respond = _audit_objopen(&(AUDITORS(nlmp)->ad_list), nlmp,
+		respond = _audit_objopen(AUDITORS(nlmp)->ad_list, nlmp,
 		    lmid, aip, &ndx);
 
 	if (appl)
@@ -390,17 +392,17 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
  * la_objclose() entry points found.
  */
 void
-_audit_objclose(List *list, Rt_map *lmp)
+_audit_objclose(APlist *list, Rt_map *lmp)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*acp;
 
-		if (alp->al_objclose == 0)
+		if (alp->al_objclose == NULL)
 			continue;
-		if ((acp = _audit_client(AUDINFO(lmp), alp->al_lmp)) == 0)
+		if ((acp = _audit_client(AUDINFO(lmp), alp->al_lmp)) == NULL)
 			continue;
 
 		leave(LIST(alp->al_lmp), thr_flg_reenter);
@@ -418,10 +420,10 @@ audit_objclose(Rt_map *clmp, Rt_map *lmp)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_OBJCLOSE))
-		_audit_objclose(&(auditors->ad_list), lmp);
+		_audit_objclose(auditors->ad_list, lmp);
 	if (AUDITORS(clmp) &&
 	    (AUDITORS(clmp)->ad_flags & LML_TFLG_AUD_OBJCLOSE))
-		_audit_objclose(&(AUDITORS(clmp)->ad_list), lmp);
+		_audit_objclose(AUDITORS(clmp)->ad_list, lmp);
 
 	if (appl)
 		rtld_flags &= ~RT_FL_APPLIC;
@@ -438,26 +440,26 @@ audit_objclose(Rt_map *clmp, Rt_map *lmp)
  * pointer and pass as a separate argument to the auditor.
  */
 static void
-_audit_pltenter(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
+_audit_pltenter(APlist *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
     uint_t ndx, void *regs, uint_t *flags)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 #if	defined(_ELF64)
 	const char	*name = (const char *)(sym->st_name + STRTAB(dlmp));
 #else
 	const char	*name = (const char *)(sym->st_name);
 #endif
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*racp, *dacp;
 		Addr		prev = sym->st_value;
 
 		if (alp->al_pltenter == 0)
 			continue;
-		if ((racp = _audit_client(AUDINFO(rlmp), alp->al_lmp)) == 0)
+		if ((racp = _audit_client(AUDINFO(rlmp), alp->al_lmp)) == NULL)
 			continue;
-		if ((dacp = _audit_client(AUDINFO(dlmp), alp->al_lmp)) == 0)
+		if ((dacp = _audit_client(AUDINFO(dlmp), alp->al_lmp)) == NULL)
 			continue;
 		if (((racp->ac_flags & FLG_AC_BINDFROM) == 0) ||
 		    ((dacp->ac_flags & FLG_AC_BINDTO) == 0))
@@ -495,11 +497,11 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 		_appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_PLTENTER))
-		_audit_pltenter(&(auditors->ad_list), rlmp, dlmp, &_sym,
+		_audit_pltenter(auditors->ad_list, rlmp, dlmp, &_sym,
 		    ndx, regs, flags);
 	if (AUDITORS(rlmp) &&
 	    (AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_PLTENTER))
-		_audit_pltenter(&(AUDITORS(rlmp)->ad_list), rlmp, dlmp, &_sym,
+		_audit_pltenter(AUDITORS(rlmp)->ad_list, rlmp, dlmp, &_sym,
 		    ndx, regs, flags);
 
 	if (_appl)
@@ -515,23 +517,23 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
  * discussion on st_name.
  */
 static Addr
-_audit_pltexit(List *list, uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp,
+_audit_pltexit(APlist *list, uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp,
     Sym *sym, uint_t ndx)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 #if	defined(_ELF64)
 	const char	*name = (const char *)(sym->st_name + STRTAB(dlmp));
 #endif
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*racp, *dacp;
 
 		if (alp->al_pltexit == 0)
 			continue;
-		if ((racp = _audit_client(AUDINFO(rlmp), alp->al_lmp)) == 0)
+		if ((racp = _audit_client(AUDINFO(rlmp), alp->al_lmp)) == NULL)
 			continue;
-		if ((dacp = _audit_client(AUDINFO(dlmp), alp->al_lmp)) == 0)
+		if ((dacp = _audit_client(AUDINFO(dlmp), alp->al_lmp)) == NULL)
 			continue;
 		if (((racp->ac_flags & FLG_AC_BINDFROM) == 0) ||
 		    ((dacp->ac_flags & FLG_AC_BINDTO) == 0))
@@ -567,10 +569,10 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		_appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_PLTEXIT))
-		_retval = _audit_pltexit(&(auditors->ad_list), _retval,
+		_retval = _audit_pltexit(auditors->ad_list, _retval,
 		    rlmp, dlmp, sym, ndx);
 	if (AUDITORS(rlmp) && (AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_PLTEXIT))
-		_retval = _audit_pltexit(&(AUDITORS(rlmp)->ad_list), _retval,
+		_retval = _audit_pltexit(AUDITORS(rlmp)->ad_list, _retval,
 		    rlmp, dlmp, sym, ndx);
 
 	if (_appl)
@@ -586,27 +588,27 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
  * la_symbind() entry points found.
  */
 static Addr
-_audit_symbind(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
+_audit_symbind(APlist *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
     uint_t *flags, int *called)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 #if	defined(_ELF64)
 	const char	*name = (const char *)(sym->st_name + STRTAB(dlmp));
 #else
 	const char	*name = (const char *)(sym->st_name);
 #endif
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*racp, *dacp;
 		Addr		prev = sym->st_value;
 		uint_t		lflags;
 
 		if (alp->al_symbind == 0)
 			continue;
-		if ((racp = _audit_client(AUDINFO(rlmp), alp->al_lmp)) == 0)
+		if ((racp = _audit_client(AUDINFO(rlmp), alp->al_lmp)) == NULL)
 			continue;
-		if ((dacp = _audit_client(AUDINFO(dlmp), alp->al_lmp)) == 0)
+		if ((dacp = _audit_client(AUDINFO(dlmp), alp->al_lmp)) == NULL)
 			continue;
 		if (((racp->ac_flags & FLG_AC_BINDFROM) == 0) ||
 		    ((dacp->ac_flags & FLG_AC_BINDTO) == 0))
@@ -672,10 +674,10 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
 		_appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_SYMBIND))
-		_sym.st_value = _audit_symbind(&(auditors->ad_list),
+		_sym.st_value = _audit_symbind(auditors->ad_list,
 		    rlmp, dlmp, &_sym, ndx, flags, &called);
 	if (AUDITORS(rlmp) && (AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_SYMBIND))
-		_sym.st_value = _audit_symbind(&(AUDITORS(rlmp)->ad_list),
+		_sym.st_value = _audit_symbind(AUDITORS(rlmp)->ad_list,
 		    rlmp, dlmp, &_sym, ndx, flags, &called);
 
 	/*
@@ -697,17 +699,17 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
  * la_preinit() entry points found.
  */
 static void
-_audit_preinit(List *list, Rt_map *clmp)
+_audit_preinit(APlist *list, Rt_map *clmp)
 {
 	Audit_list	*alp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(list, lnp, alp)) {
+	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*acp;
 
 		if (alp->al_preinit == 0)
 			continue;
-		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == 0)
+		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == NULL)
 			continue;
 
 		leave(LIST(alp->al_lmp), thr_flg_reenter);
@@ -725,9 +727,9 @@ audit_preinit(Rt_map *clmp)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_PREINIT))
-		_audit_preinit(&(auditors->ad_list), clmp);
+		_audit_preinit(auditors->ad_list, clmp);
 	if (AUDITORS(clmp) && (AUDITORS(clmp)->ad_flags & LML_TFLG_AUD_PREINIT))
-		_audit_preinit(&(AUDITORS(clmp)->ad_list), clmp);
+		_audit_preinit(AUDITORS(clmp)->ad_list, clmp);
 
 	if (appl)
 		rtld_flags &= ~RT_FL_APPLIC;
@@ -745,27 +747,22 @@ audit_desc_cleanup(Rt_map *clmp)
 {
 	Audit_desc	*adp = AUDITORS(clmp);
 	Audit_list	*alp;
-	Listnode	*lnp, *olnp;
+	Aliste		idx;
 	APlist		*ghalp = NULL;
 
-	if (adp == 0)
+	if (adp == NULL)
 		return;
 	if (adp->ad_name)
 		free(adp->ad_name);
 
-	olnp = 0;
-	for (LIST_TRAVERSE(&(adp->ad_list), lnp, alp)) {
+	for (APLIST_TRAVERSE(adp->ad_list, idx, alp))
 		(void) aplist_append(&ghalp, alp->al_ghp, AL_CNT_GROUPS);
 
-		if (olnp)
-			free(olnp);
-		olnp = lnp;
-	}
-	if (olnp)
-		free(olnp);
+	free(adp->ad_list);
+	adp->ad_list = NULL;
 
 	free(adp);
-	AUDITORS(clmp) = 0;
+	AUDITORS(clmp) = NULL;
 
 	if (ghalp) {
 		Grp_hdl		*ghp;
@@ -786,7 +783,7 @@ audit_info_cleanup(Rt_map *clmp)
 {
 	Audit_info	*aip = AUDINFO(clmp);
 
-	if (aip == 0)
+	if (aip == NULL)
 		return;
 
 	if (aip->ai_dynplts)
@@ -942,7 +939,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 		 */
 		if ((ghp = dlmopen_intn((Lm_list *)LM_ID_NEWLM, ptr,
 		    (RTLD_FIRST | RTLD_GLOBAL | RTLD_WORLD), clmp,
-		    FLG_RT_AUDIT, orig)) == 0) {
+		    FLG_RT_AUDIT, orig)) == NULL) {
 			error = audit_disable(ptr, clmp, 0, 0);
 			continue;
 		}
@@ -951,8 +948,9 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 		/*
 		 * If this auditor has already been loaded, reuse it.
 		 */
-		if ((alp = LIST(lmp)->lm_alp) != 0) {
-			if (list_append(&(adp->ad_list), alp) == 0)
+		if ((alp = LIST(lmp)->lm_alp) != NULL) {
+			if (aplist_append(&(adp->ad_list), alp,
+			    AL_CNT_AUDITORS) == NULL)
 				return (audit_disable(ptr, clmp, ghp, alp));
 
 			adp->ad_cnt++;
@@ -1016,7 +1014,8 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 			continue;
 		}
 
-		if (list_append(&(adp->ad_list), alp) == 0)
+		if (aplist_append(&(adp->ad_list), alp,
+		    AL_CNT_AUDITORS) == NULL)
 			return (audit_disable(ptr, clmp, ghp, alp));
 
 		adp->ad_cnt++;
@@ -1058,7 +1057,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 	 * to add additional auditing.
 	 */
 	free(adp->ad_name);
-	adp->ad_name = 0;
+	adp->ad_name = NULL;
 
 	return (error);
 }

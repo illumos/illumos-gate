@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<stdio.h>
@@ -46,19 +45,19 @@
 static int
 filter(Crle_desc *crle, const char *filter, const char *str, const char *filtee)
 {
-	Hash_ent *	fltrent, * flteent;
-	Flt_desc *	flt;
-	Listnode *	lnp;
+	Hash_ent	*fltrent, *flteent;
+	Flt_desc	*flt;
+	Aliste		idx;
 
 	/*
 	 * Locate the filter.  Mark the underlying object as the filter to
 	 * reflect that no matter how it is referenced, it's a filter.
 	 */
 	if ((fltrent = get_hash(crle->c_strtbl, (Addr)filter, 0,
-	    HASH_FND_ENT)) == 0)
+	    HASH_FND_ENT)) == NULL)
 		return (1);
 	if ((fltrent = get_hash(crle->c_strtbl, (Addr)fltrent->e_obj->o_path, 0,
-	    HASH_FND_ENT)) == 0)
+	    HASH_FND_ENT)) == NULL)
 		return (1);
 	fltrent->e_obj->o_flags |= RTC_OBJ_FILTER;
 
@@ -67,7 +66,7 @@ filter(Crle_desc *crle, const char *filter, const char *str, const char *filtee)
 	 * this is the object referenced by the filter.
 	 */
 	if ((flteent = get_hash(crle->c_strtbl, (Addr)filtee, 0,
-	    HASH_FND_ENT)) == 0)
+	    HASH_FND_ENT)) == NULL)
 		return (1);
 	flteent->e_flags |= RTC_OBJ_FILTEE;
 
@@ -76,7 +75,7 @@ filter(Crle_desc *crle, const char *filter, const char *str, const char *filtee)
 	 * inspects the resulting configuration file for filters, it's the
 	 * objects real name that will be used (PATHNAME()).
 	 */
-	for (LIST_TRAVERSE(&(crle->c_flt), lnp, flt)) {
+	for (APLIST_TRAVERSE(crle->c_flt, idx, flt)) {
 		/*
 		 * Determine whether this filter and filtee string pair already
 		 * exist.
@@ -89,7 +88,8 @@ filter(Crle_desc *crle, const char *filter, const char *str, const char *filtee)
 		/*
 		 * Add this filtee additional association.
 		 */
-		if (list_append(&(flt->f_filtee), flteent) == 0)
+		if (aplist_append(&(flt->f_filtee), flteent,
+		    AL_CNT_CRLE) == NULL)
 			return (1);
 
 		crle->c_fltenum++;
@@ -99,16 +99,16 @@ filter(Crle_desc *crle, const char *filter, const char *str, const char *filtee)
 	/*
 	 * This is a new filter descriptor.  Add this new filtee association.
 	 */
-	if (((flt = malloc(sizeof (Flt_desc))) == 0) ||
+	if (((flt = malloc(sizeof (Flt_desc))) == NULL) ||
 	    ((flt->f_strsz = strlen(str) + 1) == 0) ||
-	    ((flt->f_str = malloc(flt->f_strsz)) == 0)) {
+	    ((flt->f_str = malloc(flt->f_strsz)) == NULL)) {
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC),
 		    crle->c_name, strerror(err));
 		return (1);
 	}
-	if ((list_append(&(crle->c_flt), flt) == 0) ||
-	    (list_append(&(flt->f_filtee), flteent) == 0))
+	if ((aplist_append(&(crle->c_flt), flt, AL_CNT_CRLE) == NULL) ||
+	    (aplist_append(&(flt->f_filtee), flteent, AL_CNT_CRLE) == NULL))
 		return (1);
 
 	flt->f_fent = fltrent;
@@ -138,7 +138,7 @@ depend(Crle_desc *crle, const char *name, Half flags, GElf_Ehdr *ehdr)
 	 */
 	if (ehdr->e_type == ET_EXEC) {
 		exename = name;
-		preload = 0;
+		preload = NULL;
 	} else {
 		exename = conv_lddstub(M_CLASS);
 		preload = name;

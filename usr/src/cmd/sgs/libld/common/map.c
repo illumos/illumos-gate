@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +68,8 @@ typedef enum {
 } Token;
 
 
-static char	*Mapspace;	/* Malloc space holding map file. */
-static ulong_t	Line_num;	/* Current map file line number. */
+static char	*Mapspace;	/* Malloc space holding mapfile. */
+static ulong_t	Line_num;	/* Current mapfile line number. */
 static char	*Start_tok;	/* First character of current token. */
 static char	*nextchr;	/* Next char in mapfile to examine. */
 
@@ -591,6 +591,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				sgp->sg_phdr.p_vaddr = (Addr)number;
 				sgp->sg_flags |= FLG_SG_VADDR;
 				ofl->ofl_flags1 |= FLG_OF1_VADDR;
+				ofl->ofl_flags |= FLG_OF_SEGSORT;
 				b_vaddr = TRUE;
 				break;
 			case 'p':
@@ -929,14 +930,13 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 			}
 			b_name = TRUE;
 			if ((enp->ec_name =
-			    libld_malloc(strlen(Start_tok) + 1)) == 0)
+			    libld_malloc(strlen(Start_tok) + 1)) == NULL)
 				return (S_ERROR);
 			(void) strcpy((char *)enp->ec_name, Start_tok);
 			/*
-			 * get the index for text reordering
+			 * Set the index for text reordering.
 			 */
-			/* LINTED */
-			enp->ec_ndx = (Word)++index;
+			enp->ec_ordndx = ++index;
 		}
 	}
 	if (tok == TK_COLON) {
@@ -954,10 +954,12 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 				return (S_ERROR);
 			}
 			if ((file =
-			    libld_malloc(strlen(Start_tok) + 1)) == 0)
+			    libld_malloc(strlen(Start_tok) + 1)) == NULL)
 				return (S_ERROR);
 			(void) strcpy(file, Start_tok);
-			if (list_appendc(&(enp->ec_files), file) == 0)
+
+			if (aplist_append(&(enp->ec_files), file,
+			    AL_CNT_EC_FILES) == NULL)
 				return (S_ERROR);
 		}
 	}
@@ -975,21 +977,21 @@ static Ifl_desc *
 map_ifl(const char *mapfile, Ofl_desc *ofl)
 {
 	Ifl_desc	*ifl;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, ifl))
+	for (APLIST_TRAVERSE(ofl->ofl_objs, idx, ifl))
 		if (strcmp(ifl->ifl_name, mapfile) == 0)
 			return (ifl);
 
-	if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) == 0)
+	if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) == NULL)
 		return ((Ifl_desc *)S_ERROR);
 	ifl->ifl_name = mapfile;
 	ifl->ifl_flags = (FLG_IF_MAPFILE | FLG_IF_NEEDED | FLG_IF_FILEREF);
-	if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr), 1)) == 0)
+	if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr), 1)) == NULL)
 		return ((Ifl_desc *)S_ERROR);
 	ifl->ifl_ehdr->e_type = ET_REL;
 
-	if (list_appendc(&ofl->ofl_objs, ifl) == 0)
+	if (aplist_append(&ofl->ofl_objs, ifl, AL_CNT_OFL_OBJS) == NULL)
 		return ((Ifl_desc *)S_ERROR);
 	else
 		return (ifl);
@@ -1038,11 +1040,11 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		char	*name;
 		Word hval;
 
-		if ((name = libld_malloc(strlen(Start_tok) + 1)) == 0)
+		if ((name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
 			return (S_ERROR);
 		(void) strcpy(name, Start_tok);
 
-		if ((sym = libld_calloc(sizeof (Sym), 1)) == 0)
+		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
 			return (S_ERROR);
 		sym->st_shndx = SHN_ABS;
 		sym->st_size = 0;
@@ -1113,11 +1115,11 @@ map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
 		return (S_ERROR);
 	}
 
-	if ((sec_name = libld_malloc(strlen(Start_tok) + 1)) == 0)
+	if ((sec_name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
 		return (S_ERROR);
 	(void) strcpy(sec_name, Start_tok);
 
-	if ((sc_order = libld_malloc(sizeof (Sec_order))) == 0)
+	if ((sc_order = libld_malloc(sizeof (Sec_order))) == NULL)
 		return (S_ERROR);
 
 	sc_order->sco_secname = sec_name;
@@ -1141,7 +1143,6 @@ map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
 	return (1);
 }
 
-
 /*
  * Process a mapfile library specification definition.
  * 	shared_object_name - shared object definition
@@ -1154,7 +1155,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 	char		*version;
 	Token		tok;
 	Sdf_desc	*sdf;
-	Sdv_desc	*sdv;
+	Sdv_desc	sdv;
 	enum {
 	    MD_NONE = 0,
 	    MD_SPECVERS,
@@ -1167,7 +1168,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 	 * If a shared object definition for this file already exists use it,
 	 * otherwise allocate a new descriptor.
 	 */
-	if ((sdf = sdf_find(name, &ofl->ofl_socntl)) == 0) {
+	if ((sdf = sdf_find(name, ofl->ofl_socntl)) == NULL) {
 		if ((sdf = sdf_add(name, &ofl->ofl_socntl)) ==
 		    (Sdf_desc *)S_ERROR)
 			return (S_ERROR);
@@ -1209,7 +1210,8 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 					continue;
 				}
 				if ((sdf->sdf_soname =
-				    libld_malloc(strlen(Start_tok) + 1)) == 0)
+				    libld_malloc(strlen(Start_tok) + 1)) ==
+				    NULL)
 					return (S_ERROR);
 				(void) strcpy((char *)sdf->sdf_soname,
 				    Start_tok);
@@ -1217,10 +1219,6 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 				break;
 			case MD_SPECVERS:
 			case MD_ADDVERS:
-				if ((sdv = libld_calloc(
-				    sizeof (Sdv_desc), 1)) == 0)
-					return (S_ERROR);
-
 				if (dolkey == MD_SPECVERS)
 					sdf->sdf_flags |= FLG_SDF_SPECVER;
 				else
@@ -1235,13 +1233,18 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 					    sdf->sdf_name);
 					return (S_ERROR);
 				}
-				if ((version =
-				    libld_malloc(strlen(Start_tok) + 1)) == 0)
+				if ((version = libld_malloc(
+				    strlen(Start_tok) + 1)) == NULL)
 					return (S_ERROR);
 				(void) strcpy(version, Start_tok);
-				sdv->sdv_name = version;
-				sdv->sdv_ref = mapfile;
-				if (list_appendc(&sdf->sdf_verneed, sdv) == 0)
+
+				sdv.sdv_name = version;
+				sdv.sdv_ref = mapfile;
+				sdv.sdv_flags = 0;
+
+				if (alist_append(&sdf->sdf_verneed, &sdv,
+				    sizeof (Sdv_desc),
+				    AL_CNT_SDF_VERSIONS) == NULL)
 					return (S_ERROR);
 				break;
 			case MD_NONE:
@@ -1288,15 +1291,18 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 		/*
 		 * shared object version requirement.
 		 */
-		if ((version = libld_malloc(strlen(Start_tok) + 1)) == 0)
+		if ((version = libld_malloc(strlen(Start_tok) + 1)) == NULL)
 			return (S_ERROR);
 		(void) strcpy(version, Start_tok);
-		if ((sdv = libld_calloc(sizeof (Sdv_desc), 1)) == 0)
-			return (S_ERROR);
-		sdv->sdv_name = version;
-		sdv->sdv_ref = mapfile;
+
 		sdf->sdf_flags |= FLG_SDF_SELECT;
-		if (list_appendc(&sdf->sdf_vers, sdv) == 0)
+
+		sdv.sdv_name = version;
+		sdv.sdv_ref = mapfile;
+		sdv.sdv_flags = 0;
+
+		if (alist_append(&sdf->sdf_vers, &sdv, sizeof (Sdv_desc),
+		    AL_CNT_SDF_VERSIONS) == NULL)
 			return (S_ERROR);
 	}
 
@@ -1378,11 +1384,11 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 */
 		/* LINTED */
 		hash = (Word)elf_hash(name);
-		if ((vdp = ld_vers_find(name, hash, &ofl->ofl_verdesc)) == 0) {
-			if ((vdp = ld_vers_desc(name, hash,
-			    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR)
-				return (S_ERROR);
-		}
+		if (((vdp = ld_vers_find(name, hash,
+		    ofl->ofl_verdesc)) == NULL) &&
+		    ((vdp = ld_vers_desc(name, hash,
+		    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR))
+			return (S_ERROR);
 
 		/*
 		 * Initialize any new version with an index, the file from which
@@ -1400,18 +1406,18 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * If a version definition hasn't been specified assign any
 		 * symbols to the base version.
 		 */
-		vdp = (Ver_desc *)ofl->ofl_verdesc.head->data;
+		vdp = (Ver_desc *)ofl->ofl_verdesc->apl_data[0];
 	}
 
 	/*
 	 * Scan the mapfile entry picking out scoping and symbol definitions.
 	 */
 	while ((tok = gettoken(ofl, mapfile, 0)) != TK_RIGHTBKT) {
-		Sym_desc * 	sdp;
+		Sym_desc	*sdp;
 		Word		shndx = SHN_UNDEF;
 		uchar_t 	type = STT_NOTYPE;
 		Addr		value = 0, size = 0;
-		char		*_name, *filtee = 0;
+		char		*_name, *filtee = NULL;
 		Word		sym_flags = 0;
 		Half		sym_flags1 = 0;
 		uint_t		filter = 0, novalue = 1, dftflag;
@@ -1428,7 +1434,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			continue;
 		}
 
-		if ((_name = libld_malloc(strlen(Start_tok) + 1)) == 0)
+		if ((_name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
 			return (S_ERROR);
 		(void) strcpy(_name, Start_tok);
 
@@ -1529,7 +1535,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    /* END CSTYLED */
 					}
 					if ((filtee = libld_malloc(
-					    strlen(Start_tok) + 1)) == 0)
+					    strlen(Start_tok) + 1)) == NULL)
 						return (S_ERROR);
 					(void) strcpy(filtee, Start_tok);
 					filter = 0;
@@ -1717,7 +1723,8 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			    scope));
 			if ((sdp = ld_sym_find(_name, hash, &where,
 			    ofl)) == NULL) {
-				if ((sym = libld_calloc(sizeof (Sym), 1)) == 0)
+				if ((sym =
+				    libld_calloc(sizeof (Sym), 1)) == NULL)
 					return (S_ERROR);
 
 				/*
@@ -2024,7 +2031,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * symbol.  This is used later to associate the syminfo
 			 * information with the necessary .dynamic entry.
 			 */
-			if (filter && (filtee == 0)) {
+			if (filter && (filtee == NULL)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_MAP_NOFILTER), mapfile,
 				    EC_XWORD(Line_num), _name);
@@ -2126,8 +2133,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 */
 		/* LINTED */
 		hash = (Word)elf_hash(name);
-		if ((_vdp = ld_vers_find(name, hash, &ofl->ofl_verdesc)) == 0) {
-			if ((_name = libld_malloc(strlen(name) + 1)) == 0)
+		if ((_vdp = ld_vers_find(name, hash,
+		    ofl->ofl_verdesc)) == NULL) {
+			if ((_name = libld_malloc(strlen(name) + 1)) == NULL)
 				return (S_ERROR);
 			(void) strcpy(_name, name);
 
@@ -2142,27 +2150,47 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * first reference (used for error disgnostics if undefined
 		 * version dependencies remain).
 		 */
-		if (ld_vers_find(name, hash, &vdp->vd_deps) == 0)
-			if (list_appendc(&vdp->vd_deps, _vdp) == 0)
+		if (ld_vers_find(name, hash, vdp->vd_deps) == NULL)
+			if (aplist_append(&vdp->vd_deps, _vdp,
+			    AL_CNT_VERDESCS) == NULL)
 				return (S_ERROR);
 
-		if (_vdp->vd_ref == 0)
+		if (_vdp->vd_ref == NULL)
 			_vdp->vd_ref = vdp;
 	}
 	return (1);
 }
 
 /*
- * Sort the segment list by increasing virtual address.
+ * If a user has provided segment definitions via a mapfile, and these segments
+ * have been assigned virtual addresses, sort the associated segments by
+ * increasing virtual address.
+ *
+ * Only PT_LOAD segments can be assigned a virtual address.  These segments can
+ * be one of two types:
+ *
+ *  -	Standard segments for text, data or bss.  These segments will have been
+ *	inserted before the default text (first PT_LOAD) segment.
+ *
+ *  -	Empty (reservation) segments.  These segment will have been inserted at
+ *	the end of any default PT_LOAD segments.
+ *
+ * Any standard segments that are assigned a virtual address will be sorted,
+ * and as their definitions precede any default PT_LOAD segments, these segments
+ * will be assigned sections before any defaults.
+ *
+ * Any reservation segments are also sorted amoung themselves, as these segments
+ * must still follow the standard default segments.
  */
 uintptr_t
 ld_sort_seg_list(Ofl_desc *ofl)
 {
-	List 		seg1, seg2;
-	Listnode	*lnp1, *lnp2, *lnp3;
-	Sg_desc		*sgp1, *sgp2;
+	APlist	*seg1 = NULL, *seg2 = NULL;
+	Sg_desc	*sgp1;
+	Aliste	idx1;
 
-	seg1.head = seg1.tail = seg2.head = seg2.tail = NULL;
+#define	FIRST_SEGMENT(type) \
+	((type == PT_PHDR) || (type == PT_INTERP) || (type == PT_SUNWCAP))
 
 	/*
 	 * Add the .phdr and .interp segments to our list.  These segments must
@@ -2170,12 +2198,11 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	 * the capabilities segment.  This isn't essential, but the capabilities
 	 * section is one of the first in an object.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp1)) {
 		Word	type = sgp1->sg_phdr.p_type;
 
-		if ((type == PT_PHDR) || (type == PT_INTERP) ||
-		    (type == PT_SUNWCAP)) {
-			if (list_appendc(&seg1, sgp1) == 0)
+		if (FIRST_SEGMENT(type)) {
+			if (aplist_append(&seg1, sgp1, AL_CNT_SEGMENTS) == NULL)
 				return (S_ERROR);
 		}
 	}
@@ -2183,98 +2210,103 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	/*
 	 * Add the loadable segments to another list in sorted order.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
-		DBG_CALL(Dbg_map_sort_orig(ofl->ofl_lml, sgp1));
+	DBG_CALL(Dbg_map_sort(ofl->ofl_lml));
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp1)) {
+		DBG_CALL(Dbg_map_sort_seg(ofl->ofl_lml, sgp1, 1));
 
 		if (sgp1->sg_phdr.p_type != PT_LOAD)
 			continue;
 
-		if (!(sgp1->sg_flags & FLG_SG_VADDR) ||
-		    (sgp1->sg_flags & FLG_SG_EMPTY)) {
-			if (list_appendc(&seg2, sgp1) == 0)
+		/*
+		 * If the loadable segment does not contain a vaddr, then it is
+		 * already inserted in the segment list in the correct order.
+		 */
+		if ((sgp1->sg_flags & FLG_SG_VADDR) == 0) {
+			if (aplist_append(&seg2, sgp1, AL_CNT_SEGMENTS) == NULL)
 				return (S_ERROR);
+
 		} else {
-			if (seg2.head == NULL) {
-				if (list_appendc(&seg2, sgp1) == 0)
-					return (S_ERROR);
-				continue;
-			}
-			lnp3 = NULL;
-			for (LIST_TRAVERSE(&seg2, lnp2, sgp2)) {
-				if (!(sgp2->sg_flags & FLG_SG_VADDR) ||
-				    (sgp2->sg_flags & FLG_SG_EMPTY)) {
-					if (lnp3 == NULL) {
-						if (list_prependc(&seg2,
-						    sgp1) == 0)
-							return (S_ERROR);
-					} else {
-						if (list_insertc(&seg2,
-						    sgp1, lnp3) == 0)
-							return (S_ERROR);
-					}
-					lnp3 = NULL;
-					break;
-				}
-				if (sgp1->sg_phdr.p_vaddr <
+			Aliste		idx2;
+			Sg_desc		*sgp2;
+			int		inserted = 0;
+
+			/*
+			 * Traverse the segment list we are creating, looking
+			 * for a segment that defines a vaddr.
+			 */
+			for (APLIST_TRAVERSE(seg2, idx2, sgp2)) {
+				if ((sgp2->sg_flags & FLG_SG_VADDR) == 0)
+					continue;
+
+				if (sgp1->sg_phdr.p_vaddr ==
 				    sgp2->sg_phdr.p_vaddr) {
-					if (lnp3 == NULL) {
-						if (list_prependc(&seg2,
-						    sgp1) == 0)
-							return (S_ERROR);
-					} else {
-						if (list_insertc(&seg2,
-						    sgp1, lnp3) == 0)
-							return (S_ERROR);
-					}
-					lnp3 = NULL;
-					break;
-				} else if (sgp1->sg_phdr.p_vaddr >
-				    sgp2->sg_phdr.p_vaddr) {
-					lnp3 = lnp2;
-				} else {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_SEGSAME),
 					    sgp1->sg_name, sgp2->sg_name);
 					return (S_ERROR);
 				}
-			}
-			if (lnp3 != NULL)
-				if (list_appendc(&seg2, sgp1) == 0)
+
+				if (sgp1->sg_phdr.p_vaddr >
+				    sgp2->sg_phdr.p_vaddr)
+					continue;
+
+				/*
+				 * The segment being inspected has a lower vaddr
+				 * than the present list segment, thus insert
+				 * this segment before the segment on the list.
+				 */
+				if (aplist_insert(&seg2, sgp1, AL_CNT_SEGMENTS,
+				    idx2) == NULL)
 					return (S_ERROR);
+				inserted = 1;
+				break;
+			}
+
+			/*
+			 * If the segment being inspected has not been inserted
+			 * in the segment list, simply append it to the list.
+			 */
+			if ((inserted == 0) && (aplist_append(&seg2,
+			    sgp1, AL_CNT_SEGMENTS) == NULL))
+				return (S_ERROR);
 		}
 	}
 
 	/*
-	 * Add the sorted loadable segments to our list.
+	 * Add the sorted loadable segments to our initial segment list.
 	 */
-	for (LIST_TRAVERSE(&seg2, lnp1, sgp1)) {
-		if (list_appendc(&seg1, sgp1) == 0)
+	for (APLIST_TRAVERSE(seg2, idx1, sgp1)) {
+		if (aplist_append(&seg1, sgp1, AL_CNT_SEGMENTS) == NULL)
 			return (S_ERROR);
 	}
 
 	/*
 	 * Add all other segments to our list.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp1)) {
 		Word	type = sgp1->sg_phdr.p_type;
 
-		if ((type != PT_PHDR) && (type != PT_INTERP) &&
-		    (type != PT_SUNWCAP) && (type != PT_LOAD)) {
-			if (list_appendc(&seg1, sgp1) == 0)
+		if (!FIRST_SEGMENT(type) && (type != PT_LOAD)) {
+			if (aplist_append(&seg1, sgp1, AL_CNT_SEGMENTS) == NULL)
 				return (S_ERROR);
 		}
 	}
-	ofl->ofl_segs.head = ofl->ofl_segs.tail = NULL;
+	free((void *)ofl->ofl_segs);
+	ofl->ofl_segs = NULL;
 
 	/*
 	 * Now rebuild the original list and process all of the
 	 * segment/section ordering information if present.
 	 */
-	for (LIST_TRAVERSE(&seg1, lnp1, sgp1)) {
-		DBG_CALL(Dbg_map_sort_fini(ofl->ofl_lml, sgp1));
-		if (list_appendc(&ofl->ofl_segs, sgp1) == 0)
+	for (APLIST_TRAVERSE(seg1, idx1, sgp1)) {
+		DBG_CALL(Dbg_map_sort_seg(ofl->ofl_lml, sgp1, 0));
+		if (aplist_append(&ofl->ofl_segs, sgp1,
+		    AL_CNT_SEGMENTS) == NULL)
 			return (S_ERROR);
 	}
+
+#undef	FIRST_SEGMENT
+
 	return (1);
 }
 
@@ -2286,14 +2318,11 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 {
 	struct stat	stat_buf;	/* stat of mapfile */
 	int		mapfile_fd;	/* descriptor for mapfile */
-	Listnode	*lnp1;		/* node pointer */
-	Listnode	*lnp2;		/* node pointer */
 	Sg_desc		*sgp1;		/* seg descriptor being manipulated */
 	Sg_desc		*sgp2;		/* temp segment descriptor pointer */
 	Ent_desc	*enp;		/* Segment entrance criteria. */
 	Token		tok;		/* current token. */
-	Listnode	*e_next = NULL;
-					/* next place for entrance criterion */
+	Aliste		endx = 0;	/* next place for entrance criterion */
 	Boolean		new_segment;	/* If true, defines new segment. */
 	char		*name;
 	static	int	num_stack = 0;	/* number of stack segment */
@@ -2318,7 +2347,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		 * Open the directory and interpret each visible file as a
 		 * mapfile.
 		 */
-		if ((dirp = opendir(mapfile)) == 0)
+		if ((dirp = opendir(mapfile)) == NULL)
 			return (1);
 
 		while ((denp = readdir(dirp)) != NULL) {
@@ -2346,7 +2375,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 	/*
 	 * We read the entire mapfile into memory.
 	 */
-	if ((Mapspace = libld_malloc(stat_buf.st_size + 1)) == 0)
+	if ((Mapspace = libld_malloc(stat_buf.st_size + 1)) == NULL)
 		return (S_ERROR);
 	if ((mapfile_fd = open(mapfile, O_RDONLY)) == -1) {
 		err = errno;
@@ -2373,7 +2402,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 	 * We now parse the mapfile until the gettoken routine returns EOF.
 	 */
 	while ((tok = gettoken(ofl, mapfile, 1)) != TK_EOF) {
-		int	ndx = -1;
+		Aliste	idx;
+		int	ndx;
 
 		/*
 		 * Don't know which segment yet.
@@ -2402,7 +2432,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		/*
 		 * Save the initial token.
 		 */
-		if ((name = libld_malloc(strlen(Start_tok) + 1)) == 0)
+		if ((name = libld_malloc(strlen(Start_tok) + 1)) == NULL)
 			return (S_ERROR);
 		(void) strcpy(name, Start_tok);
 
@@ -2429,14 +2459,15 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		 * If we're here we need to interpret the first string as a
 		 * segment name.  Find the segment named in the token.
 		 */
-		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp2)) {
-			ndx++;
+		ndx = 0;
+		for (APLIST_TRAVERSE(ofl->ofl_segs, idx, sgp2)) {
 			if (strcmp(sgp2->sg_name, name) == 0) {
 				sgp1 = sgp2;
 				sgp2->sg_flags &= ~FLG_SG_DISABLED;
 				new_segment = FALSE;
 				break;
 			}
+			ndx++;
 		}
 
 		/*
@@ -2464,13 +2495,12 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		 * can detect changing attributes.
 		 */
 		if (sgp1 == NULL) {
-			if ((sgp1 = libld_calloc(sizeof (Sg_desc),
-			    1)) == 0)
+			if ((sgp1 =
+			    libld_calloc(sizeof (Sg_desc), 1)) == NULL)
 				return (S_ERROR);
 			sgp1->sg_phdr.p_type = PT_NULL;
 			sgp1->sg_name = name;
 			new_segment = TRUE;
-			ndx = -1;
 		}
 
 		if ((strcmp(sgp1->sg_name, MSG_ORIG(MSG_STR_INTERP)) == 0) ||
@@ -2509,7 +2539,6 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 			} else {
 				if (map_equal(mapfile, sgp1, ofl) == S_ERROR)
 					return (S_ERROR);
-				ofl->ofl_flags |= FLG_OF_SEGSORT;
 				DBG_CALL(Dbg_map_set_equal(new_segment));
 			}
 		} else if (tok == TK_COLON) {
@@ -2528,25 +2557,19 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 			/*
 			 * We are looking at a new entrance criteria line.
 			 * Note that entrance criteria are added in the order
-			 * they are found in the map file, but are placed
-			 * before any default criteria.
+			 * they are found in the mapfile, but are placed before
+			 * any default criteria.
 			 */
-			if ((enp = libld_calloc(sizeof (Ent_desc), 1)) == 0)
+			if ((enp = alist_insert(&(ofl->ofl_ents), NULL,
+			    sizeof (Ent_desc), AL_CNT_OFL_ENTRANCE,
+			    endx)) == NULL)
 				return (S_ERROR);
+
 			enp->ec_segment = sgp1;
-			if (e_next == NULL) {
-				if ((e_next = list_prependc(&ofl->ofl_ents,
-				    enp)) == 0)
-					return (S_ERROR);
-			} else {
-				if ((e_next = list_insertc(&ofl->ofl_ents,
-				    enp, e_next)) == 0)
-					return (S_ERROR);
-			}
+			endx++;
 
 			if (map_colon(ofl, mapfile, enp) == S_ERROR)
 				return (S_ERROR);
-			ofl->ofl_flags |= FLG_OF_SEGSORT;
 			DBG_CALL(Dbg_map_ent(ofl->ofl_lml, new_segment,
 			    enp, ofl));
 		} else if (tok == TK_ATSIGN) {
@@ -2561,12 +2584,10 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		}
 
 		/*
-		 * Having completed parsing an entry in the map file determine
+		 * Having completed parsing an entry in the mapfile determine
 		 * if the segment to which it applies is new.
 		 */
 		if (new_segment) {
-			int	src_type, dst_type;
-
 			/*
 			 * If specific fields have not been supplied via
 			 * map_equal(), make sure defaults are supplied.
@@ -2599,22 +2620,32 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 			}
 
 			/*
-			 * Determine where the new segment should be inserted
-			 * in the seg_desc[] list.  Presently the user can
-			 * only add a LOAD or NOTE segment.  Note that these
-			 * segments must be added after any PT_PHDR and
-			 * PT_INTERP (refer Generic ABI, Page 5-4).
+			 * Determine where the new item should be inserted in
+			 * the segment descriptor list.  Presently the user can
+			 * only add the following:
+			 *
+			 *  PT_LOAD	added before the text segment.
+			 *  PT_NULL/empty PT_LOAD
+			 *		added after the data/bss segments, thus
+			 *		we add before the dynamic segment.
+			 *  PT_SUNWSTACK
+			 *		added before the final note segment.
+			 *  PT_NOTE	added before the final note segment.
+			 *
+			 * Note that any new segments must always be added
+			 * after any PT_PHDR and PT_INTERP (refer Generic ABI,
+			 * Page 5-4).
 			 */
 			switch (sgp1->sg_phdr.p_type) {
 			case PT_LOAD:
 			case PT_NULL:
 				if (sgp1->sg_flags & FLG_SG_EMPTY)
-					src_type = 4;
+					sgp1->sg_id = LD_DYN;
 				else
-					src_type = 3;
+					sgp1->sg_id = LD_TEXT;
 				break;
 			case PT_SUNWSTACK:
-				src_type = 8;
+				sgp1->sg_id = LD_NOTE;
 				if (++num_stack >= 2) {
 					/*
 					 * Currently the number of sunw_stack
@@ -2627,7 +2658,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 				}
 				break;
 			case PT_NOTE:
-				src_type = 9;
+				sgp1->sg_id = LD_NOTE;
 				break;
 			default:
 				eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -2636,63 +2667,18 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 				    EC_WORD(sgp1->sg_phdr.p_type));
 				return (S_ERROR);
 			}
-			lnp2 = NULL;
-			for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp2)) {
-				ndx++;
-				switch (sgp2->sg_phdr.p_type) {
-				case PT_PHDR:
-					dst_type = 0;
-					break;
-				case PT_INTERP:
-					dst_type = 1;
-					break;
-				case PT_SUNWCAP:
-					dst_type = 2;
-					break;
-				case PT_LOAD:
-					dst_type = 3;
-					break;
-				case PT_DYNAMIC:
-					dst_type = 5;
-					break;
-				case PT_SUNWDTRACE:
-					dst_type = 6;
-					break;
-				case PT_SHLIB:
-					dst_type = 7;
-					break;
-				case PT_SUNWSTACK:
-					dst_type = 8;
-					break;
-				case PT_NOTE:
-					dst_type = 9;
-					break;
-				case PT_TLS:
-					dst_type = 10;
-					break;
-				case PT_NULL:
-					dst_type = 11;
-					break;
-				default:
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_UNKSEGTYP),
-					    mapfile, EC_XWORD(Line_num),
-					    EC_WORD(sgp2->sg_phdr.p_type));
+
+			ndx = 0;
+			for (APLIST_TRAVERSE(ofl->ofl_segs, idx, sgp2)) {
+				if (sgp1->sg_id > sgp2->sg_id) {
+					ndx++;
+					continue;
+				}
+
+				if (aplist_insert(&ofl->ofl_segs, sgp1,
+				    AL_CNT_SEGMENTS, idx) == NULL)
 					return (S_ERROR);
-				}
-				if (src_type <= dst_type) {
-					if (lnp2 == NULL) {
-						if (list_prependc(
-						    &ofl->ofl_segs, sgp1) == 0)
-							return (S_ERROR);
-					} else {
-						if (list_insertc(&ofl->ofl_segs,
-						    sgp1, lnp2) == 0)
-							return (S_ERROR);
-					}
-					break;
-				}
-				lnp2 = lnp1;
+				break;
 			}
 		}
 		DBG_CALL(Dbg_map_seg(ofl, ndx, sgp1));

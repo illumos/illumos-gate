@@ -123,7 +123,7 @@ typedef struct {
  * cast this variable to an unsigned value.
  */
 typedef struct {
-	Sym_desc *	gt_sym;
+	Sym_desc	*gt_sym;
 	Gotndx		gt_gndx;
 } Gottable;
 
@@ -164,43 +164,44 @@ struct ofl_desc {
 	Phdr		*ofl_tlsphdr;	/* TLS phdr */
 	int		ofl_fd;		/* file descriptor */
 	size_t		ofl_size;	/* image size */
-	List		ofl_maps;	/* list of input mapfiles */
-	List		ofl_segs;	/* list of segments */
-	List		ofl_ents;	/* list of entrance descriptors */
-	List		ofl_objs;	/* relocatable object file list */
+	APlist		*ofl_maps;	/* list of input mapfiles */
+	APlist		*ofl_segs;	/* list of segments */
+	Alist		*ofl_ents;	/* list of entrance descriptors */
+	APlist		*ofl_objs;	/* relocatable object file list */
 	Word		ofl_objscnt;	/* 	and count */
-	List		ofl_ars;	/* archive library list */
+	APlist		*ofl_ars;	/* archive library list */
 	Word		ofl_arscnt;	/* 	and count */
 	int		ofl_ars_gsandx; /* archive group argv index. 0 means */
 					/*	no current group, < 0 means */
 					/*	error reported. >0 is cur ndx */
 	Word		ofl_ars_gsndx;	/* current -zrescan-start ofl_ars ndx */
-	List		ofl_sos;	/* shared object list */
+	APlist		*ofl_sos;	/* shared object list */
 	Word		ofl_soscnt;	/* 	and count */
-	List		ofl_soneed;	/* list of implicitly required .so's */
-	List		ofl_socntl;	/* list of .so control definitions */
-	List		ofl_outrels;	/* list of output relocations */
+	APlist		*ofl_soneed;	/* list of implicitly required .so's */
+	APlist		*ofl_socntl;	/* list of .so control definitions */
+	APlist		*ofl_outrels;	/* list of output relocations */
 	Word		ofl_outrelscnt;	/* 	and count */
-	List		ofl_actrels;	/* list of relocations to perform */
+	APlist		*ofl_actrels;	/* list of relocations to perform */
 	Word		ofl_actrelscnt;	/* 	and count */
 	Word		ofl_entrelscnt;	/* no of relocations entered */
-	List		ofl_copyrels;	/* list of copy relocations */
-	List		ofl_ordered;	/* list of shf_ordered sections */
-	List		ofl_syminfsyms;	/* list of interesting syms */
+	Alist		*ofl_copyrels;	/* list of copy relocations */
+	APlist		*ofl_ordered;	/* list of shf_ordered sections */
+	APlist		*ofl_syminfsyms; /* list of interesting syms */
 					/*	for syminfo processing */
-	List		ofl_ismove;	/* list of .SUNW_move sections */
-	List		ofl_mvrelisdescs; /* list of relocation input section */
+	APlist		*ofl_ismove;	/* list of .SUNW_move sections */
+	APlist		*ofl_ismoverel;	/* list of relocation input section */
 					/* targeting to expanded area */
-	List		ofl_parsym; 	/* list of Parsym_info */
-	List		ofl_extrarels;	/* relocation sections which have */
+	APlist		*ofl_parsyms; 	/* list of partially initialized */
+					/*	symbols (ie. move symbols) */
+	APlist		*ofl_extrarels;	/* relocation sections which have */
 					/*    a NULL sh_info */
 	avl_tree_t	*ofl_groups;	/* pointer to head of Groups AVL tree */
-	List		ofl_initarray;	/* list of init array func names */
-	List		ofl_finiarray;	/* list of fini array func names */
-	List		ofl_preiarray;	/* list of preinit array func names */
-	List		ofl_rtldinfo;	/* list of rtldinfo syms */
-	List		ofl_osgroups;	/* list of output GROUP sections */
-	List		ofl_ostlsseg;	/* pointer to sections in TLS segment */
+	APlist		*ofl_initarray;	/* list of init array func names */
+	APlist		*ofl_finiarray;	/* list of fini array func names */
+	APlist		*ofl_preiarray;	/* list of preinit array func names */
+	APlist		*ofl_rtldinfo;	/* list of rtldinfo syms */
+	APlist		*ofl_osgroups;	/* list of output GROUP sections */
+	APlist		*ofl_ostlsseg;	/* pointer to sections in TLS segment */
 	APlist		*ofl_unwind;	/* list of unwind output sections */
 	Os_desc		*ofl_unwindhdr;	/* Unwind hdr */
 	avl_tree_t	ofl_symavl;	/* pointer to head of Syms AVL tree */
@@ -218,10 +219,10 @@ struct ofl_desc {
 	const char	*ofl_interp;	/* interpreter name used by exec() */
 	char		*ofl_rpath;	/* run path to store in .dynamic */
 	char		*ofl_config;	/* config path to store in .dynamic */
-	List		ofl_ulibdirs;	/* user supplied library search list */
-	List		ofl_dlibdirs;	/* default library search list */
+	APlist		*ofl_ulibdirs;	/* user supplied library search list */
+	APlist		*ofl_dlibdirs;	/* default library search list */
 	Word		ofl_vercnt;	/* number of versions to generate */
-	List		ofl_verdesc;	/* list of version descriptors */
+	APlist		*ofl_verdesc;	/* list of version descriptors */
 	size_t		ofl_verdefsz;	/* size of version definition section */
 	size_t		ofl_verneedsz;	/* size of version needed section */
 	Word		ofl_entercnt;	/* no. of global symbols entered */
@@ -301,6 +302,8 @@ struct ofl_desc {
 	Gottable	*ofl_gottable;	/* debugging got information */
 	Rlxrel_cache	ofl_sr_cache;	/* Cache last result from */
 					/*	sloppy_comdat_reloc() */
+	APlist		*ofl_maptext;	/* mapfile added text sections */
+	APlist		*ofl_mapdata;	/* mapfile added data sections */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -388,7 +391,7 @@ struct ofl_desc {
 
 #define	FLG_OF1_ENCDIFF	0x00800000	/* Host running linker has different */
 					/*	byte order than output object */
-#define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
+#define	FLG_OF1_VADDR	0x01000000	/* user segment defines a vaddr */
 #define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
 #define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */
 #define	FLG_OF1_IGNPRC	0x08000000	/* ignore processing required */
@@ -425,6 +428,14 @@ struct ofl_desc {
 	!((_ofl)->ofl_dtflags_1 & DF_1_NORELOC))
 
 /*
+ * Define a move descriptor used within relocation structures.
+ */
+typedef struct {
+	Move		*mr_move;
+	Sym_desc	*mr_sym;
+} Mv_reloc;
+
+/*
  * Relocation (active & output) processing structure - transparent to common
  * code.
  *
@@ -439,7 +450,7 @@ struct rel_desc {
 	const char	*rel_sname;	/* symbol name (may be "unknown") */
 	Sym_desc	*rel_sym;	/* sym relocation is against */
 	Sym_desc	*rel_usym;	/* strong sym if this is a weak pair */
-	Mv_desc		*rel_move;	/* move table information */
+	Mv_reloc	*rel_move;	/* move table information */
 	Word		rel_flags;	/* misc. flags for relocations */
 	Word		rel_rtype;	/* relocation type */
 	Xword		rel_roffset;	/* relocation offset */
@@ -483,7 +494,7 @@ struct rel_desc {
 					/*	to static tls index */
 #define	FLG_REL_TLSFIX	0x00080000	/* relocation points to TLS instr. */
 					/*	which needs updating */
-#define	FLG_REL_RELA	0x00100000	/* descripter captures a Rela */
+#define	FLG_REL_RELA	0x00100000	/* descriptor captures a Rela */
 #define	FLG_REL_GOTFIX	0x00200000	/* relocation points to GOTOP instr. */
 					/*	which needs updating */
 #define	FLG_REL_NADDEND	0x00400000	/* Replace implicit addend in dest */
@@ -530,15 +541,15 @@ struct ifl_desc {			/* input file descriptor */
 	Word		ifl_shnum;	/* number of sections in file */
 	Word		ifl_shstrndx;	/* index to .shstrtab */
 	Word		ifl_vercnt;	/* number of versions in file */
+	Half		ifl_neededndx;	/* index to NEEDED in .dyn section */
+	Word		ifl_flags;	/* Explicit/implicit reference */
 	Is_desc		**ifl_isdesc;	/* isdesc[scn ndx] = Is_desc ptr */
 	Sdf_desc	*ifl_sdfdesc;	/* control definition */
 	Versym		*ifl_versym;	/* version symbol table array */
 	Ver_index	*ifl_verndx;	/* verndx[ver ndx] = Ver_index */
-	List		ifl_verdesc;	/* version descriptor list */
-	List		ifl_relsect;	/* relocation section list */
+	APlist		*ifl_verdesc;	/* version descriptor list */
+	APlist		*ifl_relsect;	/* relocation section list */
 	Alist		*ifl_groups;	/* SHT_GROUP section list */
-	Half		ifl_neededndx;	/* index to NEEDED in .dyn section */
-	Word		ifl_flags;	/* Explicit/implicit reference */
 };
 
 #define	FLG_IF_CMDLINE	0x00000001	/* full filename specified from the */
@@ -584,7 +595,7 @@ struct is_desc {			/* input section descriptor */
 	Is_desc		*is_comdatkeep;	/* If COMDAT section is discarded, */
 					/* 	this is section that was kept */
 	Word		is_scnndx;	/* original section index in file */
-	Word		is_txtndx;	/* Index for section.  Used to decide */
+	Word		is_ordndx;	/* Index for section.  Used to decide */
 					/*	where to insert section when */
 					/* 	reordering sections */
 	Word		is_keyident;	/* key for SHF_ORDERED processing */
@@ -617,16 +628,17 @@ struct os_desc {			/* Output section descriptor */
 	Os_desc		*os_relosdesc;	/* the output relocation section */
 	APlist		*os_relisdescs;	/* reloc input section descriptors */
 					/*	for this output section */
-	List		os_isdescs;	/* list of input sections in output */
+	APlist		*os_isdescs;	/* list of input sections in output */
 	APlist		*os_mstrisdescs; /* FLG_IS_INSTRMRG input sections */
 	Sort_desc	*os_sort;	/* used for sorting sections */
 	Sg_desc		*os_sgdesc;	/* segment os_desc is placed on */
 	Elf_Data	*os_outdata;	/* output sections raw data */
 	avl_tree_t	*os_comdats;	/* AVL tree of COMDAT input sections */
 					/*	associated to output section */
-	Word		os_scnsymndx;	/* index in output symtab of section */
-					/*	symbol for this section */
-	Word		os_txtndx;	/* Index for section.  Used to decide */
+	Word		os_identndx;	/* section identifier for input */
+					/*	section processing, followed */
+					/*	by section symbol index */
+	Word		os_ordndx;	/* index for section.  Used to decide */
 					/*	where to insert section when */
 					/* 	reordering sections */
 	Xword		os_szoutrels;	/* size of output relocation section */
@@ -650,7 +662,31 @@ struct sort_desc {
 	Word		st_aftercnt;
 };
 
+/*
+ * Types of segment index.
+ */
+typedef enum {
+	LD_PHDR,
+	LD_INTERP,
+	LD_SUNWCAP,
+	LD_TEXT,
+	LD_DATA,
+	LD_BSS,
+#if	defined(_ELF64)
+	LD_LRODATA,		/* (amd64-only) */
+	LD_LDATA,		/* (amd64-only) */
+#endif
+	LD_DYN,
+	LD_DTRACE,
+	LD_TLS,
+	LD_UNWIND,
+	LD_NOTE,
+	LD_EXTRA,
+	LD_NUM
+} Segment_id;
+
 struct sg_desc {			/* output segment descriptor */
+	Segment_id	sg_id;		/* segment identifier (for sorting) */
 	Phdr		sg_phdr;	/* segment header for output file */
 	const char	*sg_name;	/* segment name */
 	Xword		sg_round;	/* data rounding required (mapfile) */
@@ -694,14 +730,14 @@ struct sec_order {
 #define	FLG_SGO_USED	0x0001		/* was ordering used? */
 
 struct ent_desc {			/* input section entrance criteria */
-	List		ec_files;	/* files from which to accept */
+	APlist		*ec_files;	/* files from which to accept */
 					/*	sections */
 	const char	*ec_name;	/* name to match (NULL if none) */
 	Word		ec_type;	/* section type */
 	Word		ec_attrmask;	/* section attribute mask (AWX) */
 	Word		ec_attrbits;	/* sections attribute bits */
 	Sg_desc		*ec_segment;	/* output segment to enter if matched */
-	Word		ec_ndx;		/* index to determine where section */
+	Word		ec_ordndx;	/* index to determine where section */
 					/*	meeting this criteria should */
 					/*	inserted. Used for reordering */
 					/*	of sections. */
@@ -711,47 +747,26 @@ struct ent_desc {			/* input section entrance criteria */
 #define	FLG_EC_USED	0x0001		/* entrance criteria met? */
 
 /*
- *  Move supplementary structures
- *	Sorted by symbol local/global and then by name.
+ * One structure is allocated for a move entry, and associated to the symbol
+ * against which a move is targeted.
  */
-typedef struct psym_info {
-	Sym_desc	*psym_symd;	/* partially initialized symbol */
-	Word 		psym_num;	/* number of move entires */
-	Half 		psym_flag;	/* various flag */
-	List 		psym_mvs;	/* the list of move entries */
-} Psym_info;
-
-#define	FLG_PSYM_OVERLAP	0x01	/* Overlapping */
+typedef struct {
+	Move		*md_move;	/* original Move entry */
+	Xword		md_start;	/* start position */
+	Xword		md_len;		/* length of initialization */
+	Word 		md_oidx;	/* output Move entry index */
+} Mv_desc;
 
 /*
- * One structure is allocated for a move entry.
+ * Symbol descriptor.
  */
-typedef struct mv_itm {
-	Xword		mv_start;	/* start position */
-	Xword		mv_length;	/* The length of initialization */
-	Half		mv_flag;	/* various flags */
-	Is_desc		*mv_isp;	/* input desc. this entry is from */
-	Move		*mv_ientry;	/* Input Move_entry */
-	Word 		mv_oidx;	/* Output Move_entry index */
-} Mv_itm;
-
-#define	FLG_MV_OUTSECT	0x01	/* Will be in move section */
-
-/*
- * Define a move descripter used within relocation structures.
- */
-struct mv_desc {
-	Move		*mvd_move;
-	Sym_desc	*mvd_sym;
-};
-
 struct sym_desc {
-	List		sd_GOTndxs;	/* list of associated GOT entries */
+	Alist		*sd_GOTndxs;	/* list of associated GOT entries */
 	Sym		*sd_sym;	/* pointer to symbol table entry */
 	Sym		*sd_osym;	/* copy of the original symbol entry */
 					/*	used only for local partial */
-	Psym_info	*sd_psyminfo;	/* for partial symbols, maintain a */
-					/*	pointer to parsym_info */
+	Alist		*sd_move;	/* move information associated with a */
+					/*	partially initialized symbol */
 	const char	*sd_name;	/* symbols name */
 	Ifl_desc	*sd_file;	/* file where symbol is taken */
 	Is_desc		*sd_isc;	/* input section of symbol definition */
@@ -770,7 +785,7 @@ struct sym_desc {
  * important for performance.
  */
 struct sym_aux {
-	List 		sa_dfiles;	/* files where symbol is defined */
+	APlist 		*sa_dfiles;	/* files where symbol is defined */
 	Sym		sa_sym;		/* copy of symtab entry */
 	const char	*sa_vfile;	/* first unavailable definition */
 	Ifl_desc	*sa_bindto;	/* symbol to bind to - for translator */
@@ -909,6 +924,7 @@ struct sym_avlnode {
 					/*    mapfile */
 #define	FLG_SY1_DIR	0x00000400	/* global symbol, direct bindings */
 #define	FLG_SY1_NDIR	0x00000800	/* global symbol, nondirect bindings */
+#define	FLG_SY1_OVERLAP	0x00001000	/* Move entry overlap detected */
 
 /*
  * Create a mask for (sym.st_other & visibility) since the gABI does not yet
@@ -935,9 +951,9 @@ struct	sdf_desc {
 	char		*sdf_rpath;	/* library search path DT_RPATH */
 	const char	*sdf_rfile;	/* referencing file for diagnostics */
 	Ifl_desc	*sdf_file;	/* the final input file descriptor */
-	List		sdf_vers;	/* list of versions that are required */
+	Alist		*sdf_vers;	/* list of versions that are required */
 					/*	from this object */
-	List		sdf_verneed;	/* list of VERNEEDS to create for */
+	Alist		*sdf_verneed;	/* list of VERNEEDS to create for */
 					/*	this object (via SPECVERS or */
 					/*	ADDVERS) */
 	Word		sdf_flags;
@@ -976,11 +992,11 @@ struct	sdv_desc {
  */
 struct	ver_desc {
 	const char	*vd_name;	/* version name */
-	Word		vd_hash;	/* hash value of name */
 	Ifl_desc	*vd_file;	/* file that defined version */
+	Word		vd_hash;	/* hash value of name */
 	Half		vd_ndx;		/* coordinates with symbol index */
 	Half		vd_flags;	/* version information */
-	List		vd_deps;	/* version dependencies */
+	APlist		*vd_deps;	/* version dependencies */
 	Ver_desc	*vd_ref;	/* dependency's first reference */
 };
 

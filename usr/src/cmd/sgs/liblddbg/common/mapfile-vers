@@ -41,7 +41,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.69 {
+SUNWprivate_4.70 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -206,10 +206,10 @@ SUNWprivate_4.69 {
 		Dbg64_map_size_new;
 		Dbg32_map_size_old;
 		Dbg64_map_size_old;
-		Dbg32_map_sort_fini;
-		Dbg64_map_sort_fini;
-		Dbg32_map_sort_orig;
-		Dbg64_map_sort_orig;
+		Dbg32_map_sort;
+		Dbg64_map_sort;
+		Dbg32_map_sort_seg;
+		Dbg64_map_sort_seg;
 		Dbg32_map_symbol;
 		Dbg64_map_symbol;
 		Dbg32_map_version;
@@ -277,6 +277,8 @@ SUNWprivate_4.69 {
 
 		Dbg32_sec_added;
 		Dbg64_sec_added;
+		Dbg32_sec_backing;
+		Dbg64_sec_backing;
 		Dbg32_sec_created;
 		Dbg64_sec_created;
 		Dbg32_sec_discarded;

@@ -22,10 +22,9 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Print the list of shared objects required by a dynamic executable or shared
@@ -147,31 +146,7 @@ static char	bind[] =	"LD_BIND_NOW= ",
 static char	*load;
 
 static const char	*prefile_32, *prefile_64, *prefile;
-static List		eopts = { 0, 0 };
-
-/*
- * Append an item to the specified list, and return a pointer to the list
- * node created.
- */
-Listnode *
-list_append(List *lst, const void *item)
-{
-	Listnode	*lnp;
-
-	if ((lnp = malloc(sizeof (Listnode))) == (Listnode *)0)
-		return (0);
-
-	lnp->data = (void *)item;
-	lnp->next = NULL;
-
-	if (lst->head == NULL)
-		lst->tail = lst->head = lnp;
-	else {
-		lst->tail->next = lnp;
-		lst->tail = lst->tail->next;
-	}
-	return (lnp);
-}
+static APlist		*eopts = NULL;
 
 int
 main(int argc, char **argv, char **envp)
@@ -183,7 +158,7 @@ main(int argc, char **argv, char **envp)
 	int	lflag = 0, rflag = 0, sflag = 0, Uflag = 0, uflag = 0;
 	int	pflag = 0, vflag = 0, wflag = 0, nfile, var, error = 0;
 
-	Listnode	*lnp;
+	Aliste	idx;
 
 	/*
 	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
@@ -217,7 +192,7 @@ main(int argc, char **argv, char **envp)
 				error++;
 			break;
 		case 'e' :
-			if (list_append(&eopts, optarg) == 0) {
+			if (aplist_append(&eopts, optarg, 10) == NULL) {
 				(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC),
 				    cname);
 				exit(1);
@@ -296,7 +271,7 @@ main(int argc, char **argv, char **envp)
 	 * Determine if any environment requests are for the LD_PRELOAD family,
 	 * and if so override any environment settings we've established above.
 	 */
-	for (LIST_TRAVERSE(&eopts, lnp, str)) {
+	for (APLIST_TRAVERSE(eopts, idx, str)) {
 		if ((strncmp(str, MSG_ORIG(MSG_LD_PRELOAD_32),
 		    MSG_LD_PRELOAD_32_SIZE)) == 0) {
 			str += MSG_LD_PRELOAD_32_SIZE;
@@ -666,9 +641,9 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 			status = 1;
 		}
 	} else {				/* child */
-		Listnode	*lnp;
-		char		*str;
-		size_t		size;
+		Aliste	idx;
+		char	*str;
+		size_t	size;
 
 		/*
 		 * When using ldd(1) to analyze a shared object we preload the
@@ -750,7 +725,7 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 		 * any preload request established to process a shared object).
 		 */
 		size = 0;
-		for (LIST_TRAVERSE(&eopts, lnp, str)) {
+		for (APLIST_TRAVERSE(eopts, idx, str)) {
 			if (preload) {
 				if (size == 0)
 					size = strlen(preload);

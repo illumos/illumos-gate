@@ -70,7 +70,7 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 	 * never have been able to generate its own symbol entry for this
 	 * member).
 	 */
-	if (amp->am_syms == 0) {
+	if (amp->am_syms == NULL) {
 		Elf_Scn		*scn = NULL;
 		Shdr		*shdr;
 		Elf_Data	*data;
@@ -193,7 +193,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	 * Get the archive symbol table. If this fails, we will
 	 * ignore this file with a warning message.
 	 */
-	if ((start = elf_getarsym(elf, &number)) == 0) {
+	if ((start = elf_getarsym(elf, &number)) == NULL) {
 		if (elf_errno()) {
 			eprintf(ofl->ofl_lml, ERR_ELF,
 			    MSG_INTL(MSG_ELF_GETARSYM), name);
@@ -208,12 +208,12 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	/*
 	 * As this is a new archive reference establish a new descriptor.
 	 */
-	if ((adp = libld_malloc(sizeof (Ar_desc))) == 0)
+	if ((adp = libld_malloc(sizeof (Ar_desc))) == NULL)
 		return ((Ar_desc *)S_ERROR);
 	adp->ad_name = name;
 	adp->ad_elf = elf;
 	adp->ad_start = start;
-	if ((adp->ad_aux = libld_calloc(sizeof (Ar_aux), number)) == 0)
+	if ((adp->ad_aux = libld_calloc(sizeof (Ar_aux), number)) == NULL)
 		return ((Ar_desc *)S_ERROR);
 
 	/*
@@ -227,7 +227,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	/*
 	 * Add this new descriptor to the list of archives.
 	 */
-	if (list_appendc(&ofl->ofl_ars, adp) == 0)
+	if (aplist_append(&ofl->ofl_ars, adp, AL_CNT_OFL_LIBS) == NULL)
 		return ((Ar_desc *)S_ERROR);
 	else
 		return (adp);
@@ -383,10 +383,10 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 * the symbol from the internal symbol table.
 			 * (But you skip this if allextract is specified.)
 			 */
-			if ((allexrt == 0) && ((sdp = aup->au_syms) == 0)) {
+			if ((allexrt == 0) && ((sdp = aup->au_syms) == NULL)) {
 				if ((sdp = ld_sym_find(arsym->as_name,
 				    /* LINTED */
-				    (Word)arsym->as_hash, 0, ofl)) == 0) {
+				    (Word)arsym->as_hash, 0, ofl)) == NULL) {
 					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
 					    ndx, arsym));
 					continue;
@@ -498,7 +498,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				 * the format "%s(%s)".
 				 */
 				len = strlen(name) + strlen(arname) + 3;
-				if ((arpath = libld_malloc(len)) == 0)
+				if ((arpath = libld_malloc(len)) == NULL)
 					return (S_ERROR);
 				(void) snprintf(arpath, len,
 				    MSG_ORIG(MSG_FMT_ARMEM), name, arname);
@@ -547,7 +547,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				 */
 				if (!amp) {
 					if ((amp = libld_calloc(sizeof (Ar_mem),
-					    1)) == 0)
+					    1)) == NULL)
 						return (S_ERROR);
 					amp->am_elf = arelf;
 					amp->am_name = arname;
@@ -568,7 +568,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				 * symbol.
 				 */
 				if (err == 0) {
-					if (aup->au_mem == 0)
+					if (aup->au_mem == NULL)
 						ld_ar_member(adp, arsym,
 						    aup, amp);
 					continue;

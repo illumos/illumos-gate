@@ -30,23 +30,22 @@
 #include	"msg.h"
 #include	"_libld.h"
 
-
 /*
  * Locate a version descriptor.
  */
 Ver_desc *
-ld_vers_find(const char *name, Word hash, List *lst)
+ld_vers_find(const char *name, Word hash, APlist *alp)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Ver_desc	*vdp;
 
-	for (LIST_TRAVERSE(lst, lnp, vdp)) {
+	for (APLIST_TRAVERSE(alp, idx, vdp)) {
 		if (vdp->vd_hash != hash)
 			continue;
 		if (strcmp(vdp->vd_name, name) == 0)
 			return (vdp);
 	}
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -56,20 +55,20 @@ ld_vers_find(const char *name, Word hash, List *lst)
  * until it is determined a descriptor need be created (see map_symbol())).
  */
 Ver_desc *
-ld_vers_desc(const char *name, Word hash, List *lst)
+ld_vers_desc(const char *name, Word hash, APlist **alpp)
 {
 	Ver_desc	*vdp;
 
-	if ((vdp = libld_calloc(sizeof (Ver_desc), 1)) == 0)
+	if ((vdp = libld_calloc(sizeof (Ver_desc), 1)) == NULL)
 		return ((Ver_desc *)S_ERROR);
 
 	vdp->vd_name = name;
 	vdp->vd_hash = hash;
 
-	if (list_appendc(lst, vdp) == 0)
+	if (aplist_append(alpp, vdp, AL_CNT_VERDESCS) == NULL)
 		return ((Ver_desc *)S_ERROR);
-	else
-		return (vdp);
+
+	return (vdp);
 }
 
 /*
@@ -89,7 +88,7 @@ typedef struct {
 static uintptr_t
 vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 {
-	Listnode		*lnp1;
+	Aliste			idx;
 	Ver_desc		*vdp;
 	static int		err = 0;
 	static Ver_Stack	ver_stk = {0, 0, 0};
@@ -157,7 +156,7 @@ vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 	/*
 	 * Now visit children.
 	 */
-	for (LIST_TRAVERSE(&vp->vd_deps, lnp1, vdp))
+	for (APLIST_TRAVERSE(vp->vd_deps, idx, vdp))
 		if (vers_visit_children(ofl, vdp, 1) == S_ERROR)
 			return (S_ERROR);
 
@@ -172,23 +171,22 @@ vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 uintptr_t
 ld_vers_check_defs(Ofl_desc *ofl)
 {
-	Listnode	*lnp1, *lnp2;
+	Aliste		idx1;
 	Ver_desc	*vdp;
 	uintptr_t 	is_cyclic = 0;
-
 
 	DBG_CALL(Dbg_ver_def_title(ofl->ofl_lml, ofl->ofl_name));
 
 	/*
 	 * First check if there are any cyclic dependency
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_verdesc, lnp1, vdp))
+	for (APLIST_TRAVERSE(ofl->ofl_verdesc, idx1, vdp))
 		if ((is_cyclic = vers_visit_children(ofl, vdp, 0)) == S_ERROR)
 			return (S_ERROR);
 	if (is_cyclic)
 		ofl->ofl_flags |= FLG_OF_FATAL;
 
-	for (LIST_TRAVERSE(&ofl->ofl_verdesc, lnp1, vdp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_verdesc, idx1, vdp)) {
 		Byte		cnt;
 		Sym		*sym;
 		Sym_desc	*sdp;
@@ -196,6 +194,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 		unsigned char	bind;
 		Ver_desc	*_vdp;
 		avl_index_t	where;
+		Aliste		idx2;
 
 		if (vdp->vd_ndx == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -228,10 +227,10 @@ ld_vers_check_defs(Ofl_desc *ofl)
 		 * this descriptor.
 		 */
 		cnt = 1;
-		for (LIST_TRAVERSE(&vdp->vd_deps, lnp2, _vdp)) {
+		for (APLIST_TRAVERSE(vdp->vd_deps, idx2, _vdp)) {
 #if	defined(__lint)
 			/* get lint to think `_vdp' is used... */
-			lnp2 = (Listnode *)_vdp;
+			vdp = _vdp;
 #endif
 			cnt++;
 		}
@@ -284,16 +283,19 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			/*
 			 * If the symbol does not exist create it.
 			 */
-			if ((sym = libld_calloc(sizeof (Sym), 1)) == 0)
+			if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
 				return (S_ERROR);
+
 			sym->st_shndx = SHN_ABS;
 			sym->st_info = ELF_ST_INFO(bind, STT_OBJECT);
 			DBG_CALL(Dbg_ver_symbol(ofl->ofl_lml, name));
+
 			if ((sdp = ld_sym_enter(name, sym, vdp->vd_hash,
 			    vdp->vd_file, ofl, 0, SHN_ABS, FLG_SY_SPECSEC,
 			    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
 			    &where)) == (Sym_desc *)S_ERROR)
 				return (S_ERROR);
+
 			sdp->sd_ref = REF_REL_NEED;
 			sdp->sd_aux->sa_overndx = vdp->vd_ndx;
 		}
@@ -307,7 +309,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 static void
 vers_derefer(Ifl_desc *ifl, Ver_desc *vdp, int weak)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Ver_desc	*_vdp;
 	Ver_index	*vip = &ifl->ifl_verndx[vdp->vd_ndx];
 
@@ -324,7 +326,7 @@ vers_derefer(Ifl_desc *ifl, Ver_desc *vdp, int weak)
 	if ((weak && (vdp->vd_flags & VER_FLG_WEAK)) || (!weak))
 		vip->vi_flags |= VER_FLG_INFO;
 
-	for (LIST_TRAVERSE(&vdp->vd_deps, lnp, _vdp))
+	for (APLIST_TRAVERSE(vdp->vd_deps, idx, _vdp))
 		vers_derefer(ifl, _vdp, weak);
 }
 
@@ -336,7 +338,7 @@ vers_derefer(Ifl_desc *ifl, Ver_desc *vdp, int weak)
 uintptr_t
 ld_vers_check_need(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
+	Aliste		idx1;
 	Ifl_desc	*ifl;
 	Half		needndx;
 
@@ -351,8 +353,8 @@ ld_vers_check_need(Ofl_desc *ofl)
 	/*
 	 * Traverse the shared object list looking for dependencies.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_sos, lnp1, ifl)) {
-		Listnode	*lnp2;
+	for (APLIST_TRAVERSE(ofl->ofl_sos, idx1, ifl)) {
+		Aliste		idx2;
 		Ver_index	*vip;
 		Ver_desc	*vdp;
 		Sdf_desc	*sdf = ifl->ifl_sdfdesc;
@@ -370,9 +372,9 @@ ld_vers_check_need(Ofl_desc *ofl)
 		 */
 		if (sdf && (sdf->sdf_flags & FLG_SDF_SPECVER)) {
 			Sdv_desc	*sdv;
-			for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp2,
-			    sdv)) {
+			Aliste		idx3;
 
+			for (ALIST_TRAVERSE(sdf->sdf_verneed, idx3, sdv)) {
 				/*
 				 * If this $SPECVERS item corresponds to
 				 * a real version, then don't issue it
@@ -419,11 +421,11 @@ ld_vers_check_need(Ofl_desc *ofl)
 		/*
 		 * Scan the version dependency list to normalize the referenced
 		 * dependencies.  Any needed version that is inherited by
-		 * another like version is derefereced as it is not necessary
+		 * another like version is dereferenced as it is not necessary
 		 * to make this part of the version dependencies.
 		 */
-		for (LIST_TRAVERSE(&ifl->ifl_verdesc, lnp2, vdp)) {
-			Listnode	*lnp3;
+		for (APLIST_TRAVERSE(ifl->ifl_verdesc, idx2, vdp)) {
+			Aliste		idx3;
 			Ver_desc	*_vdp;
 			int		type;
 
@@ -433,7 +435,7 @@ ld_vers_check_need(Ofl_desc *ofl)
 				continue;
 
 			type = vdp->vd_flags & VER_FLG_WEAK;
-			for (LIST_TRAVERSE(&vdp->vd_deps, lnp3, _vdp))
+			for (APLIST_TRAVERSE(vdp->vd_deps, idx3, _vdp))
 				vers_derefer(ifl, _vdp, type);
 		}
 
@@ -489,21 +491,21 @@ ld_vers_check_need(Ofl_desc *ofl)
 static void
 vers_select(Ofl_desc *ofl, Ifl_desc *ifl, Ver_desc *vdp, const char *ref)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Ver_desc	*_vdp;
 	Ver_index	*vip = &ifl->ifl_verndx[vdp->vd_ndx];
 
 	vip->vi_flags |= FLG_VER_AVAIL;
 	DBG_CALL(Dbg_ver_avail_entry(ofl->ofl_lml, vip, ref));
 
-	for (LIST_TRAVERSE(&vdp->vd_deps, lnp, _vdp))
+	for (APLIST_TRAVERSE(vdp->vd_deps, idx, _vdp))
 		vers_select(ofl, ifl, _vdp, ref);
 }
 
 static Ver_index *
 vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 {
-	Listnode	*lnp;
+	Aliste		idx1;
 	Ver_desc	*vdp;
 	Ver_index	*vip;
 	Sdf_desc	*sdf = ifl->ifl_sdfdesc;
@@ -514,12 +516,11 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 	 * Allocate an index array large enough to hold all of the files
 	 * version descriptors.
 	 */
-	if ((vip = libld_calloc(sizeof (Ver_index),
-	    (count + 1))) == 0)
+	if ((vip = libld_calloc(sizeof (Ver_index), (count + 1))) == NULL)
 		return ((Ver_index *)S_ERROR);
 
-	for (LIST_TRAVERSE(&ifl->ifl_verdesc, lnp, vdp)) {
-		int		ndx = vdp->vd_ndx;
+	for (APLIST_TRAVERSE(ifl->ifl_verdesc, idx1, vdp)) {
+		int	ndx = vdp->vd_ndx;
 
 		vip[ndx].vi_name = vdp->vd_name;
 		vip[ndx].vi_desc = vdp;
@@ -546,17 +547,17 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 		 */
 		if (sdf &&
 		    (sdf->sdf_flags & (FLG_SDF_SPECVER|FLG_SDF_ADDVER))) {
-			Listnode *	lnp2;
-			for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp2, sdv)) {
-				if (strcmp(vip[ndx].vi_name,
-				    sdv->sdv_name) == 0) {
-					vip[ndx].vi_flags |= FLG_VER_REFER;
-					if (sdf->sdf_flags & FLG_SDF_SPECVER)
-						vip[ndx].vi_flags |=
-						    FLG_VER_SPECVER;
-					sdv->sdv_flags |= FLG_SDV_MATCHED;
-					break;
-				}
+			Aliste	idx2;
+
+			for (ALIST_TRAVERSE(sdf->sdf_verneed, idx2, sdv)) {
+				if (strcmp(vip[ndx].vi_name, sdv->sdv_name))
+					continue;
+
+				vip[ndx].vi_flags |= FLG_VER_REFER;
+				if (sdf->sdf_flags & FLG_SDF_SPECVER)
+					vip[ndx].vi_flags |= FLG_VER_SPECVER;
+				sdv->sdv_flags |= FLG_SDV_MATCHED;
+				break;
 			}
 		}
 	}
@@ -567,17 +568,18 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 	 */
 	if (sdf && (sdf->sdf_flags & FLG_SDF_ADDVER)) {
 		int	fail = 0;
-		for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp, sdv)) {
-			if (!(sdv->sdv_flags & FLG_SDV_MATCHED)) {
-				if (fail == 0) {
-					fail++;
-					eprintf(ofl->ofl_lml, ERR_NONE,
-					    MSG_INTL(MSG_VER_ADDVERS),
-					    sdf->sdf_rfile, sdf->sdf_name);
-				}
+
+		for (ALIST_TRAVERSE(sdf->sdf_verneed, idx1, sdv)) {
+			if (sdv->sdv_flags & FLG_SDV_MATCHED)
+				continue;
+
+			if (fail++ == 0) {
 				eprintf(ofl->ofl_lml, ERR_NONE,
-				    MSG_INTL(MSG_VER_ADDVER), sdv->sdv_name);
+				    MSG_INTL(MSG_VER_ADDVERS), sdf->sdf_rfile,
+				    sdf->sdf_name);
 			}
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_VER_ADDVER), sdv->sdv_name);
 		}
 		if (fail)
 			return ((Ver_index *)S_ERROR);
@@ -634,10 +636,10 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * If there is no version section then simply indicate that all version
 	 * definitions asked for do not exist.
 	 */
-	if (isp == 0) {
-		Listnode	*lnp;
+	if (isp == NULL) {
+		Aliste	idx;
 
-		for (LIST_TRAVERSE(&sdf->sdf_vers, lnp, sdv)) {
+		for (ALIST_TRAVERSE(sdf->sdf_vers, idx, sdv)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
 			    sdv->sdv_name, sdv->sdv_ref);
@@ -676,7 +678,7 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	for (_num = 1; _num <= num; _num++,
 	    vdf = (Verdef *)((uintptr_t)vdf + vdf->vd_next)) {
 		const char	*name;
-		Ver_desc	*ivdp, *ovdp = 0;
+		Ver_desc	*ivdp, *ovdp = NULL;
 		Word		hash;
 		Half 		cnt = vdf->vd_cnt;
 		Half		ndx = vdf->vd_ndx;
@@ -693,11 +695,12 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		name = (char *)(str + vdap->vda_name);
 		/* LINTED */
 		hash = (Word)elf_hash(name);
-		if ((ivdp = ld_vers_find(name, hash, &ifl->ifl_verdesc)) == 0) {
-			if ((ivdp = ld_vers_desc(name, hash,
-			    &ifl->ifl_verdesc)) == (Ver_desc *)S_ERROR)
-				return (S_ERROR);
-		}
+		if (((ivdp = ld_vers_find(name, hash,
+		    ifl->ifl_verdesc)) == NULL) &&
+		    ((ivdp = ld_vers_desc(name, hash,
+		    &ifl->ifl_verdesc)) == (Ver_desc *)S_ERROR))
+			return (S_ERROR);
+
 		ivdp->vd_ndx = ndx;
 		ivdp->vd_file = ifl;
 		ivdp->vd_flags = vdf->vd_flags;
@@ -731,7 +734,7 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 				}
 				ofl->ofl_flags |= FLG_OF_VERDEF;
 				if ((ovdp = ld_vers_find(name, hash,
-				    &ofl->ofl_verdesc)) == 0) {
+				    ofl->ofl_verdesc)) == NULL) {
 					if ((ovdp = ld_vers_desc(name, hash,
 					    &ofl->ofl_verdesc)) ==
 					    (Ver_desc *)S_ERROR)
@@ -765,14 +768,14 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 			/* LINTED */
 			hash = (Word)elf_hash(name);
 
-			if ((_ivdp = ld_vers_find(name, hash,
-			    &ifl->ifl_verdesc)) == 0) {
-				if ((_ivdp = ld_vers_desc(name, hash,
-				    &ifl->ifl_verdesc)) ==
-				    (Ver_desc *)S_ERROR)
-					return (S_ERROR);
-			}
-			if (list_appendc(&ivdp->vd_deps, _ivdp) == 0)
+			if (((_ivdp = ld_vers_find(name, hash,
+			    ifl->ifl_verdesc)) == NULL) &&
+			    ((_ivdp = ld_vers_desc(name, hash,
+			    &ifl->ifl_verdesc)) == (Ver_desc *)S_ERROR))
+				return (S_ERROR);
+
+			if (aplist_append(&ivdp->vd_deps, _ivdp,
+			    AL_CNT_VERDESCS) == NULL)
 				return (S_ERROR);
 		}
 		DBG_CALL(Dbg_ver_desc_entry(ofl->ofl_lml, ivdp));
@@ -798,14 +801,14 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	DBG_CALL(Dbg_ver_avail_title(ofl->ofl_lml, file));
 
 	if (sdf && (sdf->sdf_flags & FLG_SDF_SELECT)) {
-		Listnode	*lnp1;
+		Aliste	idx1;
 
-		for (LIST_TRAVERSE(&sdf->sdf_vers, lnp1, sdv)) {
-			Listnode	*lnp2;
+		for (ALIST_TRAVERSE(sdf->sdf_vers, idx1, sdv)) {
+			Aliste		idx2;
 			Ver_desc	*vdp;
 			int		found = 0;
 
-			for (LIST_TRAVERSE(&ifl->ifl_verdesc, lnp2, vdp)) {
+			for (APLIST_TRAVERSE(ifl->ifl_verdesc, idx2, vdp)) {
 				if (strcmp(sdv->sdv_name, vdp->vd_name) == 0) {
 					found++;
 					break;
@@ -877,7 +880,6 @@ ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	for (_num = 1; _num <= num; _num++,
 	    vnd = (Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
 		Sdf_desc	*sdf;
-		Sdv_desc	*sdv;
 		const char	*name;
 		Half		cnt = vnd->vn_cnt;
 		Vernaux		*vnap = (Vernaux *)((uintptr_t)vnd +
@@ -891,7 +893,7 @@ ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * needed versions.  This information may also have been added
 		 * by a mapfile (see map_dash()).
 		 */
-		if ((sdf = sdf_find(name, &ofl->ofl_soneed)) == 0) {
+		if ((sdf = sdf_find(name, ofl->ofl_soneed)) == NULL) {
 			if ((sdf = sdf_add(name, &ofl->ofl_soneed)) ==
 			    (Sdf_desc *)S_ERROR)
 				return (S_ERROR);
@@ -901,18 +903,20 @@ ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 
 		for (_cnt = 0; cnt; _cnt++, cnt--,
 		    vnap = (Vernaux *)((uintptr_t)vnap + vnap->vna_next)) {
-			if (!(sdv =
-			    libld_calloc(sizeof (Sdv_desc), 1)))
+			Sdv_desc	sdv;
+
+			sdv.sdv_name = str + vnap->vna_name;
+			sdv.sdv_ref = file;
+			sdv.sdv_flags = 0;
+
+			if (alist_append(&sdf->sdf_vers, &sdv,
+			    sizeof (Sdv_desc), AL_CNT_SDF_VERSIONS) == NULL)
 				return (S_ERROR);
-			sdv->sdv_name = str + vnap->vna_name;
-			sdv->sdv_ref = file;
-			if (list_appendc(&sdf->sdf_vers, sdv) == 0)
-				return (S_ERROR);
+
 			DBG_CALL(Dbg_ver_need_entry(ofl->ofl_lml, _cnt, name,
-			    sdv->sdv_name));
+			    sdv.sdv_name));
 		}
 	}
-
 	return (1);
 }
 
@@ -994,14 +998,14 @@ ld_vers_base(Ofl_desc *ofl)
 	 * is either the SONAME (if one has been supplied) or the basename of
 	 * the output file.
 	 */
-	if ((name = ofl->ofl_soname) == 0) {
+	if ((name = ofl->ofl_soname) == NULL) {
 		const char	*str = ofl->ofl_name;
 
 		while (*str != '\0') {
 			if (*str++ == '/')
 				name = str;
 		}
-		if (name == 0)
+		if (name == NULL)
 			name = ofl->ofl_name;
 	}
 
@@ -1034,7 +1038,7 @@ ld_vers_base(Ofl_desc *ofl)
 int
 ld_vers_verify(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
+	Aliste		idx1;
 	Sdf_desc	*sdf;
 	char		*nv;
 
@@ -1052,8 +1056,8 @@ ld_vers_verify(Ofl_desc *ofl)
 	if (nv && (*nv != '\0'))
 		return (1);
 
-	for (LIST_TRAVERSE(&ofl->ofl_soneed, lnp1, sdf)) {
-		Listnode	*lnp2;
+	for (APLIST_TRAVERSE(ofl->ofl_soneed, idx1, sdf)) {
+		Aliste		idx2;
 		Sdv_desc	*sdv;
 		Ifl_desc	*ifl = sdf->sdf_file;
 
@@ -1065,10 +1069,10 @@ ld_vers_verify(Ofl_desc *ofl)
 		 * any versioning verification.  This is the same model as
 		 * carried out by ld.so.1 and is intended to allow backward
 		 * compatibility should a shared object with a version
-		 * requirment be returned to an older system on which a
+		 * requirement be returned to an older system on which a
 		 * non-versioned shared object exists.
 		 */
-		if ((ifl == 0) || (ifl->ifl_verdesc.head == 0))
+		if ((ifl == NULL) || (ifl->ifl_verdesc == NULL))
 			continue;
 
 		/*
@@ -1076,12 +1080,12 @@ ld_vers_verify(Ofl_desc *ofl)
 		 * sure that they actually exist in the appropriate file, and
 		 * that they are available for binding.
 		 */
-		for (LIST_TRAVERSE(&sdf->sdf_vers, lnp2, sdv)) {
-			Listnode	*lnp3;
+		for (ALIST_TRAVERSE(sdf->sdf_vers, idx2, sdv)) {
+			Aliste		idx3;
 			Ver_desc	*vdp;
 			int		found = 0;
 
-			for (LIST_TRAVERSE(&ifl->ifl_verdesc, lnp3, vdp)) {
+			for (APLIST_TRAVERSE(ifl->ifl_verdesc, idx3, vdp)) {
 				if (strcmp(sdv->sdv_name, vdp->vd_name) == 0) {
 					found++;
 					break;

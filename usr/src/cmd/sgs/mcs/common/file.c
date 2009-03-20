@@ -23,11 +23,12 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <errno.h>
+#include "alist.h"
 #include "mcs.h"
 #include "extern.h"
 #include "gelf.h"
@@ -102,7 +103,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	 * the data, rather than updating the original file data.
 	 */
 	cmd = ELF_C_READ;
-	if ((arf = elf_begin(fd, cmd, (Elf *)0)) == 0) {
+	if ((arf = elf_begin(fd, cmd, NULL)) == NULL) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		(void) elf_end(arf);
 		(void) close(fd);   /* done processing this file */
@@ -168,7 +169,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 
 			if ((cur_filenm = malloc(len)) == NULL) {
 				error_message(MALLOC_ERROR,
-				    PLAIN_ERROR, (char *)0, prog);
+				    PLAIN_ERROR, NULL, prog);
 				mcs_exit(FAILURE);
 			}
 
@@ -205,7 +206,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 			 */
 			if (!ar_file) {
 				error_message(FILE_TYPE_ERROR, PLAIN_ERROR,
-				    (char *)0, prog, cur_filenm);
+				    NULL, prog, cur_filenm);
 				(void) close(fd);
 				return (FAILURE);
 			} else {
@@ -223,7 +224,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	if (err != 0) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR,
 		    elf_errmsg(err), prog);
-		error_message(NOT_MANIPULATED_ERROR, PLAIN_ERROR, (char *)0,
+		error_message(NOT_MANIPULATED_ERROR, PLAIN_ERROR, NULL,
 		    prog, cur_file);
 		return (FAILURE);
 	}
@@ -279,14 +280,14 @@ process_file(Elf *elf, char *cur_file, Cmd_Info *cmd_info)
 		x = error = FAILURE;
 	} else if ((x = traverse_file(elf, &ehdr, cur_file,
 	    cmd_info, &state)) == FAILURE) {
-		error_message(WRN_MANIPULATED_ERROR, PLAIN_ERROR, (char *)0,
+		error_message(WRN_MANIPULATED_ERROR, PLAIN_ERROR, NULL,
 		    prog, cur_file);
 		error = FAILURE;
 	} else if (x != DONT_BUILD && x != FAILURE) {
 		post_process(cmd_info, &state);
 		if (build_file(elf, &ehdr, cmd_info, &state) == FAILURE) {
 			error_message(WRN_MANIPULATED_ERROR, PLAIN_ERROR,
-			    (char *)0, prog, cur_file);
+			    NULL, prog, cur_file);
 			error = FAILURE;
 		}
 	}
@@ -366,9 +367,10 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 			SET_LOC(sinfo->flags, scn_location(scn, elf, state));
 
 		if (shdr->sh_type == SHT_GROUP) {
-			if (list_appendc(&cmd_info->sh_groups, sinfo) == 0) {
+			if (aplist_append(&cmd_info->sh_groups,
+			    sinfo, 10) == NULL) {
 				error_message(MALLOC_ERROR, PLAIN_ERROR,
-				    (char *)0, prog);
+				    NULL, prog);
 				mcs_exit(FAILURE);
 			}
 		}
@@ -835,7 +837,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 				    src_shdr.sh_entsize);
 				if (new_sym == NULL) {
 					error_message(MALLOC_ERROR,
-					    PLAIN_ERROR, (char *)0, prog);
+					    PLAIN_ERROR, NULL, prog);
 					mcs_exit(FAILURE);
 				}
 
@@ -907,7 +909,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 				newshndx = malloc(entcnt * src_shdr.sh_entsize);
 				if (newshndx == NULL) {
 					error_message(MALLOC_ERROR,
-					    PLAIN_ERROR, (char *)0, prog);
+					    PLAIN_ERROR, NULL, prog);
 					mcs_exit(FAILURE);
 				}
 				elf_data->d_buf = (void *)newshndx;
@@ -976,7 +978,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 				    malloc((dst_shdr.sh_size +
 				    sect_len + 1))) == NULL) {
 					error_message(MALLOC_ERROR,
-					    PLAIN_ERROR, (char *)0, prog);
+					    PLAIN_ERROR, NULL, prog);
 					mcs_exit(FAILURE);
 				}
 				/* put original data plus new data in section */
@@ -1060,7 +1062,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 		if ((elf_data->d_buf = (char *)
 		    calloc(1, string_size + 1)) == NULL) {
 			error_message(MALLOC_ERROR,
-			    PLAIN_ERROR, (char *)0, prog);
+			    PLAIN_ERROR, NULL, prog);
 			mcs_exit(FAILURE);
 		}
 		(void) memcpy(&((char *)elf_data->d_buf)[1],
@@ -1237,7 +1239,7 @@ build_segment_table(Elf * elf, GElf_Ehdr * ehdr, file_state_t *state)
 	state->b_e_seg_table = (Seg_Table *)
 	    calloc(ehdr->e_phnum, sizeof (Seg_Table));
 	if (state->b_e_seg_table == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
 		mcs_exit(FAILURE);
 	}
 
@@ -1282,7 +1284,7 @@ copy_elf_file_to_temp_ar_file(
 
 	if ((buf =
 	    malloc(ROUNDUP(stbuf.st_size))) == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
 		mcs_exit(FAILURE);
 	}
 
@@ -1350,7 +1352,7 @@ copy_non_elf_to_temp_ar(
 		}
 		if ((file_buf =
 		    malloc(ROUNDUP(mem_header->ar_size))) == NULL) {
-			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0,
+			error_message(MALLOC_ERROR, PLAIN_ERROR, NULL,
 			    prog);
 			mcs_exit(FAILURE);
 		}
@@ -1377,9 +1379,9 @@ copy_non_elf_to_temp_ar(
 		}
 		free(file_buf);
 	} else if (CHK_OPT(cmd_info, MIGHT_CHG)) {
-		error_message(SYM_TAB_AR_ERROR, PLAIN_ERROR, (char *)0,
+		error_message(SYM_TAB_AR_ERROR, PLAIN_ERROR, NULL,
 		    prog, cur_file);
-		error_message(EXEC_AR_ERROR, PLAIN_ERROR, (char *)0, cur_file);
+		error_message(EXEC_AR_ERROR, PLAIN_ERROR, NULL, cur_file);
 	}
 }
 
@@ -1427,7 +1429,7 @@ copy_file(int ofd, char *fname, Tmp_File *temp_file)
 	if (buf == (caddr_t)-1) {
 		if ((buf =
 		    malloc(stbuf.st_size * sizeof (char))) == NULL) {
-			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0,
+			error_message(MALLOC_ERROR, PLAIN_ERROR, NULL,
 			    prog);
 			mcs_exit(FAILURE);
 		}
@@ -1516,24 +1518,24 @@ initialize(int shnum, Cmd_Info *cmd_info, file_state_t *state)
 	cmd_info->no_of_append = cmd_info->no_of_delete =
 	    cmd_info->no_of_nulled = cmd_info->no_of_compressed =
 	    cmd_info->no_of_moved = 0;
-	cmd_info->sh_groups.head = cmd_info->sh_groups.tail = 0;
+	cmd_info->sh_groups = NULL;
 
 	state->sec_table = (section_info_table *)
 	    calloc(shnum + 1, sizeof (section_info_table));
 	if (state->sec_table == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
 		mcs_exit(FAILURE);
 	}
 
 	state->off_table = (int64_t *)calloc(shnum, sizeof (int64_t));
 	if (state->off_table == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
 		mcs_exit(FAILURE);
 	}
 
 	state->nobits_table = (int64_t *)calloc(shnum, sizeof (int64_t));
 	if (state->nobits_table == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
 		mcs_exit(FAILURE);
 	}
 }
@@ -1544,9 +1546,9 @@ initialize(int shnum, Cmd_Info *cmd_info, file_state_t *state)
 static void
 post_process(Cmd_Info *cmd_info, file_state_t *state)
 {
-	Listnode *		lnp, *plnp;
-	section_info_table *	sinfo;
-	Word *			grpdata, *ngrpdata;
+	Aliste			idx;
+	section_info_table	*sinfo;
+	Word			*grpdata, *ngrpdata;
 	int64_t			sno, sno2;
 	Word			i, j, num;
 
@@ -1564,7 +1566,7 @@ post_process(Cmd_Info *cmd_info, file_state_t *state)
 		Word	grpcnt;
 		int	deleted = 0;
 
-		for (LIST_TRAVERSE(&cmd_info->sh_groups, lnp, sinfo)) {
+		for (APLIST_TRAVERSE(cmd_info->sh_groups, idx, sinfo)) {
 			if (sinfo->secno == (GElf_Word)DELETED)
 				continue;
 			num = (sinfo->shdr).sh_size/sizeof (Word);
@@ -1606,14 +1608,9 @@ post_process(Cmd_Info *cmd_info, file_state_t *state)
 	}
 
 	/*
-	 * Now we can update data buffers of the
-	 * SHT_GROUP sections.
+	 * Now we can update data buffers of the SHT_GROUP sections.
 	 */
-	plnp = 0;
-	for (LIST_TRAVERSE(&cmd_info->sh_groups, lnp, sinfo)) {
-		if (plnp)
-			free(plnp);
-		plnp = lnp;
+	for (APLIST_TRAVERSE(cmd_info->sh_groups, idx, sinfo)) {
 		if (sinfo->secno == (GElf_Word)DELETED)
 			continue;
 		num = (sinfo->shdr).sh_size/sizeof (Word);
@@ -1622,14 +1619,14 @@ post_process(Cmd_Info *cmd_info, file_state_t *state)
 		 * Need to generate the updated data buffer
 		 */
 		if ((sinfo->mdata = malloc(sizeof (Elf_Data))) == NULL) {
-			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0,
+			error_message(MALLOC_ERROR, PLAIN_ERROR, NULL,
 			    prog);
 			mcs_exit(FAILURE);
 		}
 		*(sinfo->mdata) = *(sinfo->data);
 		if ((ngrpdata = sinfo->mdata->d_buf =
 		    malloc(sinfo->data->d_size)) == NULL) {
-			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0,
+			error_message(MALLOC_ERROR, PLAIN_ERROR, NULL,
 			    prog);
 			mcs_exit(FAILURE);
 		}
@@ -1647,6 +1644,6 @@ post_process(Cmd_Info *cmd_info, file_state_t *state)
 		sinfo->mdata->d_size = j * sizeof (Word);
 		sinfo->data = sinfo->mdata;
 	}
-	if (plnp)
-		free(plnp);
+	free(cmd_info->sh_groups);
+	cmd_info->sh_groups = NULL;
 }

@@ -150,7 +150,7 @@
  *
  *  4. CIE Augmentation       string     Null-terminated string with legal
  *					 values being "" or 'z' optionally
- *					 followed by single occurrances of
+ *					 followed by single occurrences of
  *					 'P', 'L', or 'R' in any order.
  *     String                            The presence of character(s) in the
  *                                       string dictates the content of
@@ -325,14 +325,14 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	Is_desc		*isp;
 	size_t		size;
 	Xword		fde_cnt;
-	Aliste		idx;
+	Aliste		idx1;
 	Os_desc		*osp;
 
 	/*
 	 * we only build a unwind header if we have
 	 * some unwind information in the file.
 	 */
-	if (aplist_nitems(ofl->ofl_unwind) == 0)
+	if (ofl->ofl_unwind == NULL)
 		return (1);
 
 	/*
@@ -373,10 +373,10 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	 * in the binary search table.
 	 */
 	fde_cnt = 0;
-	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx, osp)) {
-		Listnode    *_lnp;
+	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx1, osp)) {
+		Aliste    idx2;
 
-		for (LIST_TRAVERSE(&osp->os_isdescs, _lnp, isp)) {
+		for (APLIST_TRAVERSE(osp->os_isdescs, idx2, isp)) {
 			uchar_t		*data;
 			uint64_t	off = 0;
 
@@ -785,7 +785,8 @@ ld_unwind_register(Os_desc *osp, Ofl_desc * ofl)
 	/*
 	 * Append output section to unwind list
 	 */
-	if (aplist_append(&ofl->ofl_unwind, osp, AL_CNT_UNWIND) == NULL)
+	if (aplist_append(&ofl->ofl_unwind, osp, AL_CNT_OFL_UNWIND) == NULL)
 		return (S_ERROR);
+
 	return (1);
 }

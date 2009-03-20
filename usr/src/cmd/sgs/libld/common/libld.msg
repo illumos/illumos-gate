@@ -492,8 +492,9 @@
 			 associated symbol size is unknown %s"
 @ MSG_PSYM_NOSTATIC	"and partial initialization cannot be deferred to \
 			 a static object"
-@ MSG_PSYM_OVERLAP	"file %s: section %s: symbol `%s' overlapping \
-			 initialization"
+@ MSG_MOVE_OVERLAP	"file %s: section %s: symbol `%s' overlapping move \
+			 initialization: start=0x%llx, length=0x%llx: \
+			 start=0x%llx, length=0x%llx"
 @ MSG_PSYM_EXPREASON1	"output file is static object"
 @ MSG_PSYM_EXPREASON2	"-znopartial option in effect"
 @ MSG_PSYM_EXPREASON3	"move infrastructure size is greater than move data"

@@ -23,10 +23,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<string.h>
@@ -53,12 +52,12 @@ sym_muldef_title()
 }
 
 void
-ld_map_out(Ofl_desc * ofl)
+ld_map_out(Ofl_desc *ofl)
 {
-	Listnode *	lnp1, * lnp2, * lnp3;
-	Sg_desc *	sgp;
-	Is_desc *	isp;
+	Sg_desc		*sgp;
+	Is_desc		*isp;
 	Sym_avlnode	*sav;
+	Aliste		idx1;
 
 	(void) printf(MSG_INTL(MSG_ENT_MAP_FMT_TIL_1),
 	    MSG_INTL(MSG_ENT_MAP_TITLE_1));
@@ -81,20 +80,21 @@ ld_map_out(Ofl_desc * ofl)
 		    MSG_INTL(MSG_ENT_ITM_ADDRESS),
 		    MSG_INTL(MSG_ENT_ITM_SIZE));
 
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Os_desc	*osp;
-		Aliste	idx;
+		Aliste	idx2;
 
 		if (sgp->sg_phdr.p_type != PT_LOAD)
 			continue;
 
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			Aliste	idx3;
 
 			(void) printf(MSG_INTL(MSG_ENT_MAP_ENTRY_1),
 			    osp->os_name, EC_ADDR(osp->os_shdr->sh_addr),
 			    EC_XWORD(osp->os_shdr->sh_size));
 
-			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp3, isp)) {
+			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
 				Addr	addr;
 
 				/*
@@ -139,28 +139,23 @@ ld_map_out(Ofl_desc * ofl)
 	 */
 	for (sav = avl_first(&ofl->ofl_symavl); sav;
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
-		Sym_desc	*sdp;
-		const char	*name, *ducp, *adcp;
-		List		*dfiles;
+		Sym_desc	*sdp = sav->sav_symdesc;
+		const char	*name = sdp->sd_name, *ducp, *adcp;
+		APlist		*dfiles;
+		Aliste		idx;
 
-		sdp = sav->sav_symdesc;
-		name = sdp->sd_name;
-		dfiles = &sdp->sd_aux->sa_dfiles;
+		if (((dfiles = sdp->sd_aux->sa_dfiles) == NULL) ||
+		    (aplist_nitems(dfiles) == 1))
+			continue;
 
 		/*
-		 * Files that define a symbol are saved on the
-		 * `sa_dfiles' list, if the head and tail of
-		 * this list differ there must have been more
-		 * than one symbol definition.  Ignore symbols
-		 * that aren't needed, and any special symbols
-		 * that the link editor may produce (symbols of
-		 * type ABS and COMMON are not recorded in the
-		 * first place, however functions like _init()
-		 * and _fini() commonly have multiple
-		 * occurrances).
+		 * Files that define a symbol are saved on the `sa_dfiles' list.
+		 * Ignore symbols that aren't needed, and any special symbols
+		 * that the link editor may produce (symbols of type ABS and
+		 * COMMON are not recorded in the first place, however functions
+		 * like _init() and _fini() commonly have multiple occurrences).
 		 */
 		if ((sdp->sd_ref == REF_DYN_SEEN) ||
-		    (dfiles->head == dfiles->tail) ||
 		    (sdp->sd_aux && sdp->sd_aux->sa_symspec) ||
 		    (strcmp(MSG_ORIG(MSG_SYM_FINI_U), name) == 0) ||
 		    (strcmp(MSG_ORIG(MSG_SYM_INIT_U), name) == 0) ||
@@ -173,7 +168,7 @@ ld_map_out(Ofl_desc * ofl)
 		ducp = sdp->sd_file->ifl_name;
 		(void) printf(MSG_INTL(MSG_ENT_MUL_ENTRY_1), demangle(name),
 		    ducp);
-		for (LIST_TRAVERSE(dfiles, lnp2, adcp)) {
+		for (APLIST_TRAVERSE(dfiles, idx, adcp)) {
 			/*
 			 * Ignore the referenced symbol.
 			 */
@@ -191,8 +186,8 @@ ld_map_out(Ofl_desc * ofl)
 void
 ld_ent_check(Ofl_desc * ofl)
 {
-	Listnode *	lnp;
-	Ent_desc *	enp;
+	Ent_desc	*enp;
+	Aliste		ndx;
 
 	/*
 	 *  Try to give as much information to the user about the specific
@@ -201,22 +196,23 @@ ld_ent_check(Ofl_desc * ofl)
 	 *  one for criterias where a filename is used and the other
 	 *  for those without a filename.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_ents, lnp, enp)) {
-		if ((enp->ec_segment->sg_flags & FLG_SG_ORDER) &&
-		    !(enp->ec_flags & FLG_EC_USED) && enp->ec_ndx) {
-			Listnode *	_lnp = enp->ec_files.head;
+	for (ALIST_TRAVERSE(ofl->ofl_ents, ndx, enp)) {
+		const char	*file;
 
-			if ((_lnp != NULL) && (_lnp->data != NULL) &&
-			    (char *)(_lnp->data) != NULL) {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_ENT_NOSEC_1),
-				    enp->ec_segment->sg_name, enp->ec_name,
-				    (const char *)(_lnp->data));
-			} else {
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_ENT_NOSEC_2),
-				    enp->ec_segment->sg_name, enp->ec_name);
-			}
+		if (((enp->ec_segment->sg_flags & FLG_SG_ORDER) == 0) ||
+		    (enp->ec_flags & FLG_EC_USED) || (enp->ec_ordndx == 0))
+			continue;
+
+
+		if (enp->ec_files &&
+		    ((file = enp->ec_files->apl_data[0]) != NULL)) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_ENT_NOSEC_1), enp->ec_segment->sg_name,
+			    enp->ec_name, file);
+		} else {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_ENT_NOSEC_2), enp->ec_segment->sg_name,
+			    enp->ec_name);
 		}
 	}
 }

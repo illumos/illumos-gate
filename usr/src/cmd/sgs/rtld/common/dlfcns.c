@@ -63,14 +63,14 @@
 Rt_map *
 _caller(caddr_t cpc, int flags)
 {
-	Lm_list		*lml;
-	Listnode	*lnp;
+	Lm_list	*lml;
+	Aliste	idx1;
 
-	for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
-		Aliste	idx;
+	for (APLIST_TRAVERSE(dynlm_list, idx1, lml)) {
+		Aliste	idx2;
 		Lm_cntl	*lmc;
 
-		for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
+		for (ALIST_TRAVERSE(lml->lm_lists, idx2, lmc)) {
 			Rt_map	*lmp;
 
 			for (lmp = lmc->lc_head; lmp;
@@ -483,10 +483,10 @@ dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 	 * list may have been removed.
 	 */
 	if (olml) {
-		Listnode	*lnp;
-		Lm_list		*lml;
+		Aliste	idx;
+		Lm_list	*lml;
 
-		for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
+		for (APLIST_TRAVERSE(dynlm_list, idx, lml)) {
 			if (olml == lml) {
 				nlmp = olml->lm_head;
 				break;
@@ -806,12 +806,12 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 			lml->lm_flags |= LML_FLG_NOAUDIT;
 		}
 
-		if (list_append(&dynlm_list, lml) == NULL) {
+		if (aplist_append(&dynlm_list, lml, AL_CNT_DYNLIST) == NULL) {
 			free(lml);
 			return (NULL);
 		}
 		if (newlmid(lml) == 0) {
-			list_delete(&dynlm_list, lml);
+			(void) aplist_delete_value(dynlm_list, lml);
 			free(lml);
 			return (NULL);
 		}

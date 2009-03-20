@@ -22,22 +22,27 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Supplimental Pseudo-code to get lint to consider
- * these symbols used.
+ * Supplimental Pseudo-code to get lint to consider these symbols used.
  */
-#include <link.h>
-#include <_libelf.h>
+#include "alist.h"
 #include "msg.h"
 
 void
 foo()
 {
 	(void) _crle_msg((Msg)&__crle_msg[0]);
+
+	(void) alist_append(NULL, NULL, 0, 0);
+	alist_delete_by_offset(NULL, NULL);
+	(void) alist_insert_by_offset(NULL, NULL, 0, 0, 0);
+	alist_reset(NULL);
+
+	(void) aplist_delete_value(NULL, NULL);
+	aplist_reset(NULL);
+	(void) aplist_test(NULL, NULL, 0);
 }

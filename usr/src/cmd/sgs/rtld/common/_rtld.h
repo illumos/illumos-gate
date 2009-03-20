@@ -159,6 +159,10 @@ struct fct {
 #define	AL_CNT_FREELIST	80		/* free_alp */
 #define	AL_CNT_HWCAP	10		/* hwcap candidate */
 #define	AL_CNT_SPATH	4		/* search path */
+#define	AL_CNT_DYNLIST	2		/* dynlm_list */
+#define	AL_CNT_PENDING	2		/* pending tsort list (INITFIRST) */
+#define	AL_CNT_PLTPAD	10		/* plt padding */
+#define	AL_CNT_AUDITORS	2		/* auditing list */
 
 /*
  * Size of buffer for building error messages.
@@ -498,7 +502,7 @@ extern	Rt_lock		rtldlock;	/* rtld lock */
 extern	int		thr_flg_nolock;
 extern	int		thr_flg_reenter;
 
-extern List		dynlm_list;	/* dynamic list of link-maps */
+extern APlist		*dynlm_list;	/* dynamic list of link-maps */
 extern char		**environ;	/* environ pointer */
 
 extern int		dyn_plt_ent_size; /* Size of dynamic plt's */
@@ -650,10 +654,6 @@ extern int		is_path_secure(char *, Rt_map *, uint_t, uint_t);
 extern int		is_rtld_setuid();
 extern int		is_sym_interposer(Rt_map *, Sym *);
 extern void		ldso_plt_init(Rt_map *);
-extern Listnode		*list_append(List *, const void *);
-extern Listnode		*list_insert(List *, const void *, Listnode *);
-extern Listnode		*list_prepend(List *, const void *);
-extern void		list_delete(List *, void *);
 extern void		leave(Lm_list *, int);
 extern void		lm_append(Lm_list *, Aliste, Rt_map *);
 extern void		lm_delete(Lm_list *, Rt_map *);

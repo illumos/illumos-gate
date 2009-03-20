@@ -40,7 +40,6 @@
 @ MSG_STR_DYNLMLIST	"dynlm_list"
 @ MSG_STR_ALIST		"Alist"
 @ MSG_STR_APLIST	"APlist"
-@ MSG_STR_LISTNODE	"Listnode"
 @ MSG_STR_EMPTY		""
 @ MSG_STR_ORPHANED	"<orphaned>"
 @ MSG_STR_SETENV	"setenv"
@@ -57,7 +56,6 @@
 # mdb_walker.walk_descr's
 #
 @ MSG_WWD_RTMAP		"Walk a List of Rt_maps"
-@ MSG_WWD_LIST		"Walk a List"
 
 #
 # Flag Strings
@@ -203,7 +201,6 @@
 # Various generic format strings
 #
 @ MSG_FMT_RT		"[0x%x]\t0x%0?p 0x%0?p %s\n"
-@ MSG_FMT_LN		"0x%0?p 0x%0?p 0x%0?p\n"
 
 #
 # Elf header messages.
@@ -312,29 +309,6 @@
 
 
 #
-# List messages.
-#
-
-@ MSG_LIST_STR		"List"
-
-@ MSG_LIST_DCD		"Display entries in a List"
-
-@ MSG_LIST_TITLE	"Listnode   data       next\n"
-
-@ MSG_LIST_HELP		"\
-   Walk a List structure.  A list consists of a chain of Listnodes.  The head\n\
-   of a List points to the initial node, the tail of the list points to the\n\
-   final node.  A Listnode contains a pointer to a data item and a pointer to\n\
-   the next Listnode.\n\
-   \n\
-   Example:\n\n\
-   \t> ld.so.1`dynlm_list::List\n\
-   \tListnode   data       next\n\
-   \t---------------------------------------------\n\
-   \t0xff3b05ac 0xff3f60c8 0xff3b05c4\n\
-   \t0xff3b05c4 0xff3f60e8 0x00000000\n"
-
-#
 # Lm_list messages.
 #
 
@@ -346,7 +320,8 @@
 @ MSG_LMLIST_LDSO	"(LM_ID_LDSO)"
 @ MSG_LMLIST_NEWLM	"(LM_ID_NEWLM)"
 
-@ MSG_LMLIST_TITLE1	"Link-map lists (%s): 0x%p\n";
+@ MSG_LMLIST_TITLE0	"Link-map lists (%s): 0x0\n";
+@ MSG_LMLIST_TITLE1	"Link-map lists (%s): 0x%p Alist[used %u: total %u]\n";
 @ MSG_LMLIST_TITLE2	"Lm_list: 0x%p  %s\n"
 
 @ MSG_LMLIST_LINE0	"   lists: 0x%0?p Alist[used %u: total %u]\n"

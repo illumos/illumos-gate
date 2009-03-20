@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
@@ -37,7 +36,7 @@ Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
 {
 	Conv_inv_buf_t		inv_buf;
 	Conv_sec_flags_buf_t	sec_flags_buf;
-	Listnode		*lnp;
+	Aliste			idx;
 	char			*cp;
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_NAME),
@@ -49,12 +48,12 @@ Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
 	    MSG_INTL(MSG_STR_NULL)),
 	    conv_sec_flags(enp->ec_attrbits, 0, &sec_flags_buf));
 
-	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX), EC_WORD(enp->ec_ndx),
+	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX), EC_WORD(enp->ec_ordndx),
 	    conv_sec_type(mach, enp->ec_type, 0, &inv_buf));
 
-	if (enp->ec_files.head) {
+	if (enp->ec_files) {
 		dbg_print(lml, MSG_ORIG(MSG_ECR_FILES));
-		for (LIST_TRAVERSE(&(enp->ec_files), lnp, cp))
+		for (APLIST_TRAVERSE(enp->ec_files, idx, cp))
 			dbg_print(lml, MSG_ORIG(MSG_ECR_FILE), cp);
 	}
 }
@@ -63,11 +62,10 @@ Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
  * Print out all `entrance descriptor' entries.
  */
 void
-Dbg_ent_print(Lm_list *lml, Half mach, List *len, Boolean dmode)
+Dbg_ent_print(Lm_list *lml, Half mach, Alist *alp, Boolean dmode)
 {
-	Listnode	*lnp;
 	Ent_desc	*enp;
-	int		ndx = 1;
+	Aliste		ndx;
 
 	if (DBG_NOTCLASS(DBG_C_ENTRY))
 		return;
@@ -76,8 +74,8 @@ Dbg_ent_print(Lm_list *lml, Half mach, List *len, Boolean dmode)
 	dbg_print(lml, MSG_INTL(MSG_ECR_TITLE),
 	    (dmode ? MSG_INTL(MSG_ECR_DYNAMIC) : MSG_INTL(MSG_ECR_STATIC)));
 
-	for (LIST_TRAVERSE(len, lnp, enp)) {
-		dbg_print(lml, MSG_INTL(MSG_ECR_DESC), ndx++);
+	for (ALIST_TRAVERSE(alp, ndx, enp)) {
+		dbg_print(lml, MSG_INTL(MSG_ECR_DESC), EC_WORD(ndx));
 		Dbg_ent_entry(lml, mach, enp);
 	}
 }

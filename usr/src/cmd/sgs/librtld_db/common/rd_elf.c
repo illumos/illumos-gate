@@ -29,6 +29,7 @@
 #include	<link.h>
 #include	<rtld_db.h>
 #include	<rtld.h>
+#include	<alist.h>
 #include	<_rtld_db.h>
 #include	<msg.h>
 #include	<limits.h>
@@ -51,20 +52,19 @@
 #define	_rd_reset32		_rd_reset64
 #define	find_dynamic_ent32	find_dynamic_ent64
 #define	validate_rdebug32	validate_rdebug64
-#define	TList			List
-#define	TListnode		Listnode
+#define	TAPlist			APlist
+#define	TLm_list		Lm_list
 #define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_64
 #else	/* ELF32 */
 #define	Rt_map			Rt_map32
 #define	Rtld_db_priv		Rtld_db_priv32
-#define	TList			List32
-#define	TListnode		Listnode32
-#define	Lm_list			Lm_list32
+#define	TAPlist			APlist32
+#define	TLm_list		Lm_list32
 #define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_32
 #endif	/* _ELF64 */
 #else	/* _LP64 */
-#define	TList			List
-#define	TListnode		Listnode
+#define	TAPlist			APlist
+#define	TLm_list		Lm_list
 #define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_32
 #endif	/* _LP64 */
 
@@ -685,14 +685,18 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
     uint_t *abort_iterp)
 {
 	Rtld_db_priv	db_priv;
-	TList		list;
-	TListnode	lnode;
-	Addr		lnp;
-	unsigned long	ident;
+	TAPlist		apl;
+	uintptr_t	datap, nitems;
+	Addr		addr;
 	rd_err_e	rc;
 
 	LOG(ps_plog(MSG_ORIG(MSG_DB_LOADOBJITER), rap->rd_dmodel, cb,
 	    client_data));
+
+	if (cb == NULL) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_NULLITER)));
+		return (RD_ERR);
+	}
 
 	if (ps_pread(rap->rd_psp, rap->rd_rtlddbpriv, (char *)&db_priv,
 	    sizeof (Rtld_db_priv)) != PS_OK) {
@@ -701,62 +705,72 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 		return (RD_DBERR);
 	}
 
-	if (db_priv.rtd_dynlmlst == 0) {
+	if (db_priv.rtd_dynlmlst == NULL) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT),
 		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_NOMAPS);
 	}
 
-	if (ps_pread(rap->rd_psp, (psaddr_t)db_priv.rtd_dynlmlst, (char *)&list,
-	    sizeof (TList)) != PS_OK) {
+	if (ps_pread(rap->rd_psp, (psaddr_t)db_priv.rtd_dynlmlst, (char *)&addr,
+	    sizeof (Addr)) != PS_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_3),
 		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_DBERR);
 	}
 
-	if (list.head == 0) {
+	if (addr == NULL) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT_1),
-		    EC_ADDR((uintptr_t)list.head)));
+		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_NOMAPS);
 	}
 
-
-	if (cb == 0) {
-		LOG(ps_plog(MSG_ORIG(MSG_DB_NULLITER)));
-		return (RD_ERR);
+	if (ps_pread(rap->rd_psp, (psaddr_t)addr, (char *)&apl,
+	    sizeof (TAPlist)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_4),
+		    EC_ADDR((uintptr_t)addr)));
+		return (RD_DBERR);
 	}
 
-	for (lnp = (Addr)list.head; lnp; lnp = (Addr)lnode.next) {
-		Lm_list	lml;
+	/*
+	 * Iterate through each apl.ap_data[] entry.
+	 */
+	for (datap = (uintptr_t)((char *)(uintptr_t)addr +
+	    ((size_t)(((TAPlist *)0)->apl_data))), nitems = 0;
+	    nitems < apl.apl_nitems; nitems++, datap += sizeof (Addr)) {
+		TLm_list	lm;
+		ulong_t		ident;
 
 		/*
-		 * Iterate through the List of Lm_list's.
+		 * Obtain the Lm_list address for this apl.ap_data[] entry.
 		 */
-		if (ps_pread(rap->rd_psp, (psaddr_t)lnp, (char *)&lnode,
-		    sizeof (TListnode)) != PS_OK) {
-			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_4),
-			    EC_ADDR(lnp)));
+		if (ps_pread(rap->rd_psp, (psaddr_t)datap, (char *)&addr,
+		    sizeof (Addr)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
+			    EC_ADDR(datap)));
 			return (RD_DBERR);
 		}
 
-		if (ps_pread(rap->rd_psp, (psaddr_t)lnode.data, (char *)&lml,
-		    sizeof (Lm_list)) != PS_OK) {
-			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
-			    EC_ADDR((uintptr_t)lnode.data)));
+		/*
+		 * Obtain the Lm_list data for this Lm_list address.
+		 */
+		if (ps_pread(rap->rd_psp, (psaddr_t)addr, (char *)&lm,
+		    sizeof (TLm_list)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_6),
+			    EC_ADDR((uintptr_t)addr)));
 			return (RD_DBERR);
 		}
 
 		/*
 		 * Determine IDENT of current LM_LIST
 		 */
-		if (lml.lm_flags & LML_FLG_BASELM)
+		if (lm.lm_flags & LML_FLG_BASELM)
 			ident = LM_ID_BASE;
-		else if (lml.lm_flags & LML_FLG_RTLDLM)
+		else if (lm.lm_flags & LML_FLG_RTLDLM)
 			ident = LM_ID_LDSO;
 		else
-			ident = (unsigned long)lnode.data;
+			ident = (ulong_t)addr;
 
-		if ((rc = iter_map(rap, ident, (psaddr_t)lml.lm_head,
+		if ((rc = iter_map(rap, ident, (psaddr_t)lm.lm_head,
 		    cb, client_data, abort_iterp)) != RD_OK) {
 			return (rc);
 		}
@@ -766,7 +780,6 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 
 	return (rc);
 }
-
 
 rd_err_e
 _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)

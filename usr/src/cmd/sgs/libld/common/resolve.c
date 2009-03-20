@@ -23,10 +23,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4 6.2/18.2 */
 
 /*
  * Symbol table resolution
@@ -1175,7 +1174,8 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 */
 	if ((ofl->ofl_flags & FLG_OF_GENMAP) && (nsym->st_shndx != SHN_UNDEF) &&
 	    ((nsymflags & FLG_SY_SPECSEC) == 0))
-		if (list_appendc(&sdp->sd_aux->sa_dfiles, ifl->ifl_name) == 0)
+		if (aplist_append(&sdp->sd_aux->sa_dfiles, ifl->ifl_name,
+		    AL_CNT_SDP_DFILES) == NULL)
 			return (S_ERROR);
 
 	/*

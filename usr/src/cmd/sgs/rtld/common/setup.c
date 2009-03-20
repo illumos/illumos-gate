@@ -747,10 +747,10 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Add our two main link-maps to the dynlm_list
 	 */
-	if (list_append(&dynlm_list, &lml_main) == NULL)
+	if (aplist_append(&dynlm_list, &lml_main, AL_CNT_DYNLIST) == NULL)
 		return (0);
 
-	if (list_append(&dynlm_list, &lml_rtld) == NULL)
+	if (aplist_append(&dynlm_list, &lml_rtld, AL_CNT_DYNLIST) == NULL)
 		return (0);
 
 	/*

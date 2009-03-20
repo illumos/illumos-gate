@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include	"msg.h"
@@ -116,6 +116,16 @@ Dbg_sec_unsup_strmerge(Lm_list *lml, Is_desc *isp)
 		    isp->is_name, str, EC_XWORD(isp->is_shdr->sh_addralign),
 		    EC_XWORD(isp->is_shdr->sh_entsize));
 	}
+}
+
+void
+Dbg_sec_backing(Lm_list *lml)
+{
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_SEC_BACKING));
 }
 
 void
@@ -231,7 +241,7 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 {
 	Os_desc		*osp;
 	Is_desc		*isp1;
-	Listnode	*lnp1, *lnp2;
+	Aliste		idx1;
 	Lm_list		*lml = ofl->ofl_lml;
 	const char	*str;
 
@@ -250,7 +260,8 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 	else
 		str = MSG_INTL(MSG_ORD_SORT_AFTER);
 
-	for (LIST_TRAVERSE(&ofl->ofl_ordered, lnp1, osp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ordered, idx1, osp)) {
+		Aliste		idx2;
 		Sort_desc	*sort = osp->os_sort;
 
 		dbg_print(lml, str, osp->os_name);
@@ -258,7 +269,7 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 		    EC_WORD(sort->st_beforecnt), EC_WORD(sort->st_aftercnt),
 		    EC_WORD(sort->st_ordercnt));
 
-		for (LIST_TRAVERSE(&osp->os_isdescs, lnp2, isp1)) {
+		for (APLIST_TRAVERSE(osp->os_isdescs, idx2, isp1)) {
 			Word		link;
 			Ifl_desc	*ifl = isp1->is_file;
 			Is_desc		*isp2;

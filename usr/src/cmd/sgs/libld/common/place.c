@@ -91,9 +91,10 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
  *	On success, returns True (1). On failure, False (0).
  */
 int
-ld_append_isp(Ofl_desc * ofl, Os_desc *osp, Is_desc *isp, int mstr_only)
+ld_append_isp(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp, int mstr_only)
 {
-	if (!mstr_only && (list_appendc(&(osp->os_isdescs), isp) == 0))
+	if (!mstr_only &&
+	    (aplist_append(&(osp->os_isdescs), isp, AL_CNT_OS_ISDESCS) == NULL))
 		return (0);
 
 	/*
@@ -336,11 +337,10 @@ gnu_linkonce_sec(const char *ostr)
 Os_desc *
 ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 {
-	Listnode	*lnp1, *lnp2;
 	Ent_desc	*enp;
 	Sg_desc		*sgp;
 	Os_desc		*osp;
-	Aliste		idx1, idx2;
+	Aliste		idx1, iidx;
 	int		os_ndx;
 	Shdr		*shdr = isp->is_shdr;
 	Xword		shflagmask, shflags = shdr->sh_flags;
@@ -426,7 +426,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	 * finding a segment, then sgp will be NULL.
 	 */
 	sgp = NULL;
-	for (LIST_TRAVERSE(&ofl->ofl_ents, lnp1, enp)) {
+	for (ALIST_TRAVERSE(ofl->ofl_ents, idx1, enp)) {
 		if (enp->ec_segment &&
 		    (enp->ec_segment->sg_flags & FLG_SG_DISABLED))
 			continue;
@@ -439,14 +439,15 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 			continue;
 		if (enp->ec_name && (strcmp(enp->ec_name, isp->is_name) != 0))
 			continue;
-		if (enp->ec_files.head) {
+		if (enp->ec_files) {
+			Aliste	idx2;
 			char	*file;
 			int	found = 0;
 
 			if (isp->is_file == NULL)
 				continue;
 
-			for (LIST_TRAVERSE(&(enp->ec_files), lnp2, file)) {
+			for (APLIST_TRAVERSE(enp->ec_files, idx2, file)) {
 				const char	*name = isp->is_file->ifl_name;
 
 				if (file[0] == '*') {
@@ -472,11 +473,15 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 			if (!found)
 				continue;
 		}
+		sgp = enp->ec_segment;
 		break;
 	}
 
-	if ((sgp = enp->ec_segment) == NULL)
-		sgp = ((Ent_desc *)(ofl->ofl_ents.tail->data))->ec_segment;
+	if (sgp == NULL) {
+		enp = alist_item(ofl->ofl_ents,
+		    alist_nitems(ofl->ofl_ents) - 1);
+		sgp = enp->ec_segment;
+	}
 
 	/*
 	 * By default, the output section for an input section has the same
@@ -517,7 +522,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
 			    oname));
 		}
-		isp->is_txtndx = enp->ec_ndx;
+		isp->is_ordndx = enp->ec_ordndx;
 	}
 
 	/*
@@ -637,10 +642,9 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	 */
 	os_ndx = 0;
 	if (sgp->sg_secorder) {
-		Aliste		idx;
 		Sec_order	*scop;
 
-		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop)) {
+		for (APLIST_TRAVERSE(sgp->sg_secorder, idx1, scop)) {
 			if (strcmp(scop->sco_secname, oname) == 0) {
 				scop->sco_flags |= FLG_SGO_USED;
 				os_ndx = scop->sco_index;
@@ -660,18 +664,18 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	 * prematurely. For final products however, we ignore all
 	 * flags that do not prevent a merge.
 	 */
-	shflagmask = (ofl->ofl_flags & FLG_OF_RELOBJ)
-	    ? ALL_SHF_ORDER : ALL_SHF_IGNORE;
+	shflagmask =
+	    (ofl->ofl_flags & FLG_OF_RELOBJ) ? ALL_SHF_ORDER : ALL_SHF_IGNORE;
 
 	/*
 	 * Traverse the input section list for the output section we have been
 	 * assigned. If we find a matching section simply add this new section.
 	 */
-	idx2 = 0;
+	iidx = 0;
 	for (APLIST_TRAVERSE(sgp->sg_osdescs, idx1, osp)) {
 		Shdr	*_shdr = osp->os_shdr;
 
-		if ((ident == osp->os_scnsymndx) &&
+		if ((ident == osp->os_identndx) &&
 		    (ident != ld_targ.t_id.id_rel) &&
 		    (onamehash == osp->os_namehash) &&
 		    (shdr->sh_type != SHT_GROUP) &&
@@ -683,6 +687,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		    (_shdr->sh_flags & ~shflagmask)) &&
 		    (strcmp(oname, osp->os_name) == 0)) {
 			uintptr_t	err;
+			int		inserted;
 
 			/*
 			 * Process any COMDAT section, keeping the first and
@@ -706,28 +711,35 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 				ofl->ofl_flags |= FLG_OF_TLSPHDR;
 
 			/*
-			 * If is_txtndx is 0 then this section was not
-			 * seen in mapfile, so put it at the end.
-			 * If is_txtndx is not 0 and ?O is turned on
-			 * then check to see where this section should
-			 * be inserted.
+			 * Determine whether this segment requires input section
+			 * ordering.  Sections that require ordering were
+			 * defined via a mapfile, and have an ordering index
+			 * assigned to them (is_ordndx).  Ordered sections are
+			 * placed in ascending order before unordered sections
+			 * (sections with a is_ordndx value of zero).
 			 */
-			if ((sgp->sg_flags & FLG_SG_ORDER) && isp->is_txtndx) {
-				Listnode *	tlist;
+			inserted = 0;
+			if ((sgp->sg_flags & FLG_SG_ORDER) && isp->is_ordndx) {
+				Aliste	idx2;
+				Is_desc	*isp2;
 
-				tlist = list_where(&(osp->os_isdescs),
-				    isp->is_txtndx);
-				if (tlist != NULL) {
-					if (list_insertc(&(osp->os_isdescs),
-					    isp, tlist) == 0)
+				for (APLIST_TRAVERSE(osp->os_isdescs,
+				    idx2, isp2)) {
+					if (isp2->is_ordndx &&
+					    (isp2->is_ordndx <= isp->is_ordndx))
+						continue;
+
+					if (aplist_insert(&(osp->os_isdescs),
+					    isp, AL_CNT_OS_ISDESCS,
+					    idx2) == NULL)
 						return ((Os_desc *)S_ERROR);
-				} else {
-					if (list_prependc(&(osp->os_isdescs),
-					    isp) == 0)
-						return ((Os_desc *)S_ERROR);
+					inserted ++;
+					break;
 				}
-			} else {
-				if (list_appendc(&(osp->os_isdescs), isp) == 0)
+			}
+			if (inserted == 0) {
+				if (aplist_append(&(osp->os_isdescs),
+				    isp, AL_CNT_OS_ISDESCS) == NULL)
 					return ((Os_desc *)S_ERROR);
 			}
 			if (ld_append_isp(ofl, osp, isp, 1) == 0)
@@ -760,20 +772,20 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		 * Do we need to worry about section ordering?
 		 */
 		if (os_ndx) {
-			if (osp->os_txtndx) {
-				if (os_ndx < osp->os_txtndx)
+			if (osp->os_ordndx) {
+				if (os_ndx < osp->os_ordndx)
 					/* insert section here. */
 					break;
 				else {
-					idx2 = idx1 + 1;
+					iidx = idx1 + 1;
 					continue;
 				}
 			} else {
 				/* insert section here. */
 				break;
 			}
-		} else if (osp->os_txtndx) {
-			idx2 = idx1 + 1;
+		} else if (osp->os_ordndx) {
+			iidx = idx1 + 1;
 			continue;
 		}
 
@@ -782,10 +794,10 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		 * present input section we need to insert the new section
 		 * at this point.
 		 */
-		if (ident < osp->os_scnsymndx)
+		if (ident < osp->os_identndx)
 			break;
 
-		idx2 = idx1 + 1;
+		iidx = idx1 + 1;
 	}
 
 	/*
@@ -827,7 +839,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	osp->os_shdr->sh_entsize = shdr->sh_entsize;
 	osp->os_name = oname;
 	osp->os_namehash = onamehash;
-	osp->os_txtndx = os_ndx;
+	osp->os_ordndx = os_ndx;
 	osp->os_sgdesc = sgp;
 
 	if (ifl && (shdr->sh_type == SHT_PROGBITS)) {
@@ -868,13 +880,13 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	}
 
 	/*
-	 * Setions of SHT_GROUP are added to the ofl->ofl_osgroups
-	 * list - so that they can be updated as a group later.
+	 * Sections of type SHT_GROUP are added to the ofl->ofl_osgroups list,
+	 * so that they can be updated as a group later.
 	 */
-	if (shdr->sh_type == SHT_GROUP) {
-		if (list_appendc(&ofl->ofl_osgroups, osp) == 0)
-			return ((Os_desc *)S_ERROR);
-	}
+	if ((shdr->sh_type == SHT_GROUP) &&
+	    (aplist_append(&ofl->ofl_osgroups, osp,
+	    AL_CNT_OFL_OSGROUPS) == NULL))
+		return ((Os_desc *)S_ERROR);
 
 	/*
 	 * If this section is a non-empty TLS section indicate that a PT_TLS
@@ -903,10 +915,10 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	 * be used to hold the sections symbol index as we don't need to retain
 	 * the identifier any more).
 	 */
-	osp->os_scnsymndx = ident;
+	osp->os_identndx = ident;
 
 	/*
-	 * Set alignment
+	 * Set alignment.
 	 */
 	set_addralign(ofl, osp, isp);
 
@@ -917,14 +929,13 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	isp->is_osdesc = osp;
 
 	/*
-	 * Insert the new section at the offset given by idx2. If no
-	 * position for it was identified above, this will be index 0,
-	 * causing the new section to be prepended to the beginning of
-	 * the section list. Otherwise, it is the index following the section
-	 * that was identified.
+	 * Insert the new section at the offset given by iidx.  If no position
+	 * for it was identified above, this will be index 0, causing the new
+	 * section to be prepended to the beginning of the section list.
+	 * Otherwise, it is the index following the section that was identified.
 	 */
 	if (aplist_insert(&sgp->sg_osdescs, osp, AL_CNT_SG_OSDESC,
-	    idx2) == NULL)
+	    iidx) == NULL)
 		return ((Os_desc *)S_ERROR);
 	return (osp);
 }

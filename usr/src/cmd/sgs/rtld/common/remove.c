@@ -202,7 +202,7 @@ remove_lml(Lm_list *lml)
 			ASSERT(avl_numnodes(lml->lm_fpavl) == 0);
 			free(lml->lm_fpavl);
 		}
-		list_delete(&dynlm_list, lml);
+		(void) aplist_delete_value(dynlm_list, lml);
 		free(lml);
 	}
 }
@@ -1335,8 +1335,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			if (clmp && dlmp &&
 			    ((LIST(dlmp)->lm_flags & LML_FLG_NOAUDIT) == 0) &&
 			    (AFLAGS(clmp) & LML_TFLG_AUD_OBJCLOSE))
-				_audit_objclose(&(AUDITORS(clmp)->ad_list),
-				    dlmp);
+				_audit_objclose(AUDITORS(clmp)->ad_list, dlmp);
 		}
 	}
 

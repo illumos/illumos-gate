@@ -191,10 +191,10 @@ typedef struct {
 	uintptr_t	(* mr_reloc_TLS)(Boolean, Rel_desc *, Ofl_desc *);
 	uintptr_t	(* mr_assign_got)(Ofl_desc *, Sym_desc *);
 
-	Gotndx		*(* mr_find_gotndx)(List *, Gotref, Ofl_desc *,
+	Gotndx		*(* mr_find_got_ndx)(Alist *, Gotref, Ofl_desc *,
 			    Rel_desc *);
 	Xword		(* mr_calc_got_offset)(Rel_desc *, Ofl_desc *);
-	uintptr_t	(* mr_assign_got_ndx)(List *, Gotndx *, Gotref,
+	uintptr_t	(* mr_assign_got_ndx)(Alist **, Gotndx *, Gotref,
 			    Ofl_desc *, Rel_desc *, Sym_desc *);
 	void		(* mr_assign_plt_ndx)(Sym_desc *, Ofl_desc *);
 	uintptr_t	(* mr_allocate_got)(Ofl_desc *);
@@ -230,16 +230,6 @@ typedef struct {
 	Target_machsym	t_ms;
 } Target;
 
-
-/*
- * Types of bss sections
- */
-typedef enum {
-	MAKE_BSS,
-	MAKE_LBSS,
-	MAKE_TLS
-} Bss_Type;
-
 /*
  * Structure to manage the update of weak symbols from their associated alias.
  */
@@ -262,7 +252,7 @@ typedef struct func_list {
 
 typedef	struct support_list {
 	const char	*sup_name;	/* ld_support function name */
-	List		sup_funcs;	/* list of support functions */
+	Alist		*sup_funcs;	/* list of support functions */
 } Support_list;
 
 /*
@@ -321,16 +311,49 @@ typedef struct {
  * Define Alist initialization sizes.
  */
 #define	AL_CNT_IFL_GROUPS	20	/* ifl_groups */
+#define	AL_CNT_IFL_RELSECS	6	/* ifl_relsect */
+
 #define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs */
 #define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs */
+#define	AL_CNT_OFL_MAPSECS	10	/* ofl_map{text|data} */
+#define	AL_CNT_OFL_OBJS		50	/* ofl_objs */
+#define	AL_CNT_OFL_LIBS		10	/* ofl_sos */
+#define	AL_CNT_OFL_LIBDIRS	10	/* ofl_[ud]libdirs */
+#define	AL_CNT_OFL_MAPFILES	6	/* ofl_maps */
+#define	AL_CNT_OFL_ENTRANCE	10	/* ofl_ents */
+#define	AL_CNT_OFL_RELS		4	/* ofl_outrels */
+#define	AL_CNT_OFL_COPYRELS	10	/* ofl_copyrels */
+#define	AL_CNT_OFL_ARRAYS	10	/* ofl_{init|fini|prei}array */
+#define	AL_CNT_OFL_OSGROUPS	10	/* ofl_osgroups */
+#define	AL_CNT_OFL_OSTLSSEG	4	/* ofl_ostlsseg */
+#define	AL_CNT_OFL_ORDERED	4	/* ofl_ordered */
+#define	AL_CNT_OFL_SYMINFOSYMS	50	/* ofl_syminfsyms */
+#define	AL_CNT_OFL_MOVE		10	/* ofl_ismove */
+#define	AL_CNT_OFL_UNWIND	1	/* ofl_unwind */
+#define	AL_CNT_OFL_PARSYMS	10	/* ofl_parsyms */
+
 #define	AL_CNT_OS_MSTRISDESCS	10	/* os_mstrisdescs */
 #define	AL_CNT_OS_RELISDESCS	100	/* os_relisdescs */
 #define	AL_CNT_OS_COMDATS	20	/* os_comdats */
+#define	AL_CNT_OS_ISDESCS	60	/* os_isdesc */
+
 #define	AL_CNT_SG_OSDESC	40	/* sg_osdescs */
 #define	AL_CNT_SG_SECORDER	40	/* sg_secorder */
+
+#define	AL_CNT_SDP_GOT		1	/* sd_GOTndxs */
+#define	AL_CNT_SDP_MOVE		1	/* sd_move */
+#define	AL_CNT_SDP_DFILES	1	/* sa_dfiles */
+
+#define	AL_CNT_SDF_VERSIONS	2	/* sdf_{vers|verneed} */
+
+#define	AL_CNT_EC_FILES		1	/* ec_files */
+
+#define	AL_CNT_VERDESCS		20	/* version desc */
+#define	AL_CNT_WEAK		20	/* weak desc */
+#define	AL_CNT_SUPPORT		2	/* support libraries */
 #define	AL_CNT_STRMRGREL	500	/* ld_make_strmerge() reloc alist cnt */
 #define	AL_CNT_STRMRGSYM	20	/* ld_make_strmerge() sym alist cnt */
-#define	AL_CNT_UNWIND		1	/* ofl_unwind */
+#define	AL_CNT_SEGMENTS		20	/* ofl_segs */
 
 /*
  * Return codes for {tls|got}_fixups() routines
@@ -362,18 +385,6 @@ typedef enum {
 #define	REL_LAIDESCNO	50		/* low water mark active buckets */
 #define	REL_HOIDESCNO	500		/* high water mark output buckets */
 #define	REL_LOIDESCNO	10		/* low water mark output buckets */
-
-extern char		*Plibpath;
-extern char		*Llibdir;
-extern char		*Ulibdir;
-extern Ld_heap		*ld_heap;
-extern List		lib_support;
-extern int		demangle_flag;
-extern const Msg	reject[];
-extern int		Verbose;
-extern const int	ldynsym_symtype[];
-extern const int	dynsymsort_symtype[];
-
 
 /*
  * Given a symbol of a type that is allowed within a .SUNW_dynsymsort or
@@ -488,6 +499,20 @@ typedef struct {
 } Isd_node;
 
 /*
+ * Local data items.
+ */
+extern char		*Plibpath;
+extern char		*Llibdir;
+extern char		*Ulibdir;
+extern Ld_heap		*ld_heap;
+extern APlist		*lib_support;
+extern int		demangle_flag;
+extern const Msg	reject[];
+extern int		Verbose;
+extern const int	ldynsym_symtype[];
+extern const int	dynsymsort_symtype[];
+
+/*
  * Local functions.
  */
 extern char		*add_string(char *, char *);
@@ -499,20 +524,16 @@ extern void		libld_free(void *);
 extern void		*libld_malloc(size_t);
 extern void		*libld_realloc(void *, size_t);
 
-extern Listnode		*list_appendc(List *, const void *);
-extern Listnode		*list_insertc(List *, const void *, Listnode *);
-extern Listnode		*list_prependc(List *, const void *);
-extern Listnode		*list_where(List *, Word num);
-
 extern int		isdavl_compare(const void *, const void *);
 
-extern Sdf_desc		*sdf_add(const char *, List *);
-extern Sdf_desc		*sdf_find(const char *, List *);
+extern Sdf_desc		*sdf_add(const char *, APlist **);
+extern Sdf_desc		*sdf_find(const char *, APlist *);
 
 #if	defined(_ELF64)
 
 #define	ld_add_actrel		ld64_add_actrel
 #define	ld_add_libdir		ld64_add_libdir
+#define	ld_add_rel_cache	ld64_add_rel_cache
 #define	ld_adj_movereloc	ld64_adj_movereloc
 #define	ld_am_I_partial		ld64_am_I_partial
 #define	ld_append_isp		ld64_append_isp
@@ -545,6 +566,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_files	ld64_process_files
 #define	ld_process_flags	ld64_process_flags
 #define	ld_process_ifl		ld64_process_ifl
+#define	ld_process_move		ld64_process_move
 #define	ld_process_open		ld64_process_open
 #define	ld_process_ordered	ld64_process_ordered
 #define	ld_process_sym_reloc	ld64_process_sym_reloc
@@ -558,7 +580,6 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sort_ordered		ld64_sort_ordered
 #define	ld_sort_seg_list	ld64_sort_seg_list
 #define	ld_sunw_ldmach		ld64_sunw_ldmach
-#define	ld_sunwmove_preprocess	ld64_sunwmove_preprocess
 #define	ld_sup_atexit		ld64_sup_atexit
 #define	ld_sup_open		ld64_sup_open
 #define	ld_sup_file		ld64_sup_file
@@ -599,6 +620,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 
 #define	ld_add_actrel		ld32_add_actrel
 #define	ld_add_libdir		ld32_add_libdir
+#define	ld_add_rel_cache	ld32_add_rel_cache
 #define	ld_adj_movereloc	ld32_adj_movereloc
 #define	ld_am_I_partial		ld32_am_I_partial
 #define	ld_append_isp		ld32_append_isp
@@ -632,6 +654,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_files	ld32_process_files
 #define	ld_process_flags	ld32_process_flags
 #define	ld_process_ifl		ld32_process_ifl
+#define	ld_process_move		ld32_process_move
 #define	ld_process_open		ld32_process_open
 #define	ld_process_ordered	ld32_process_ordered
 #define	ld_process_sym_reloc	ld32_process_sym_reloc
@@ -644,7 +667,6 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sort_ordered		ld32_sort_ordered
 #define	ld_sort_seg_list	ld32_sort_seg_list
 #define	ld_sunw_ldmach		ld32_sunw_ldmach
-#define	ld_sunwmove_preprocess	ld32_sunwmove_preprocess
 #define	ld_sup_atexit		ld32_sup_atexit
 #define	ld_sup_open		ld32_sup_open
 #define	ld_sup_file		ld32_sup_file
@@ -687,6 +709,8 @@ extern uintptr_t	dbg_setup(const char *, Dbg_desc *, const char **, int);
 
 extern uintptr_t	ld_add_actrel(Word, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_add_libdir(Ofl_desc *, const char *);
+extern Rel_cache	*ld_add_rel_cache(Ofl_desc *, APlist **, size_t *,
+			    size_t, size_t);
 extern void 		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
 extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
 extern int		ld_append_isp(Ofl_desc *, Os_desc *, Is_desc *, int);
@@ -719,7 +743,7 @@ extern void		ld_init(Ofl_desc *);
 
 extern Xword		ld_lcm(Xword, Xword);
 
-extern uintptr_t	ld_make_bss(Ofl_desc *, Xword, Xword, Bss_Type);
+extern uintptr_t	ld_make_bss(Ofl_desc *, Xword, Xword, uint_t);
 extern Is_desc		*ld_make_data(Ofl_desc *, size_t);
 extern uintptr_t	ld_make_got(Ofl_desc *);
 extern uintptr_t	ld_make_parexpn_data(Ofl_desc *, size_t, Xword);
@@ -737,6 +761,7 @@ extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
 extern uintptr_t	ld_process_flags(Ofl_desc *, int, char **);
 extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
 			    Word, Ofl_desc *, Rej_desc *);
+extern uintptr_t	ld_process_move(Ofl_desc *);
 extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
 			    Ofl_desc *, Word, Rej_desc *);
 extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
@@ -756,7 +781,6 @@ extern void		ld_sec_validate(Ofl_desc *);
 extern uintptr_t	ld_sort_ordered(Ofl_desc *);
 extern uintptr_t	ld_sort_seg_list(Ofl_desc *);
 extern Half		ld_sunw_ldmach();
-extern uintptr_t	ld_sunwmove_preprocess(Ofl_desc *);
 extern void		ld_sup_atexit(Ofl_desc *, int);
 extern void		ld_sup_open(Ofl_desc *, const char **, const char **,
 			    int *, int, Elf **, Elf *ref, size_t,
@@ -797,8 +821,8 @@ extern Ver_desc		*ld_vers_base(Ofl_desc *);
 extern uintptr_t	ld_vers_check_defs(Ofl_desc *);
 extern uintptr_t	ld_vers_check_need(Ofl_desc *);
 extern uintptr_t	ld_vers_def_process(Is_desc *, Ifl_desc *, Ofl_desc *);
-extern Ver_desc		*ld_vers_desc(const char *, Word, List *);
-extern Ver_desc		*ld_vers_find(const char *, Word, List *);
+extern Ver_desc		*ld_vers_desc(const char *, Word, APlist **);
+extern Ver_desc		*ld_vers_find(const char *, Word, APlist *);
 extern uintptr_t	ld_vers_need_process(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern void		ld_vers_promote(Sym_desc *, Word, Ifl_desc *,
 			    Ofl_desc *);
@@ -808,7 +832,6 @@ extern int		ld_vers_verify(Ofl_desc *);
 extern uintptr_t	add_regsym(Sym_desc *, Ofl_desc *);
 extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
-extern Listnode		*list_where(List *, Word);
 
 /*
  * Most platforms have both a 32 and 64-bit variant (e.g. EM_SPARC and

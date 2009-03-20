@@ -288,8 +288,8 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_map_set_equal	Dbg64_map_set_equal
 #define	Dbg_map_size_new	Dbg64_map_size_new
 #define	Dbg_map_size_old	Dbg64_map_size_old
-#define	Dbg_map_sort_fini	Dbg64_map_sort_fini
-#define	Dbg_map_sort_orig	Dbg64_map_sort_orig
+#define	Dbg_map_sort		Dbg64_map_sort
+#define	Dbg_map_sort_seg	Dbg64_map_sort_seg
 #define	Dbg_map_symbol		Dbg64_map_symbol
 #define	Dbg_map_version		Dbg64_map_version
 
@@ -325,6 +325,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_reloc_sloppycomdat	Dbg64_reloc_sloppycomdat
 
 #define	Dbg_sec_added		Dbg64_sec_added
+#define	Dbg_sec_backing		Dbg64_sec_backing
 #define	Dbg_sec_created		Dbg64_sec_created
 #define	Dbg_sec_discarded	Dbg64_sec_discarded
 #define	Dbg_sec_genstr_compress	Dbg64_sec_genstr_compress
@@ -494,8 +495,8 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_map_set_equal	Dbg32_map_set_equal
 #define	Dbg_map_size_new	Dbg32_map_size_new
 #define	Dbg_map_size_old	Dbg32_map_size_old
-#define	Dbg_map_sort_fini	Dbg32_map_sort_fini
-#define	Dbg_map_sort_orig	Dbg32_map_sort_orig
+#define	Dbg_map_sort		Dbg32_map_sort
+#define	Dbg_map_sort_seg	Dbg32_map_sort_seg
 #define	Dbg_map_symbol		Dbg32_map_symbol
 #define	Dbg_map_version		Dbg32_map_version
 
@@ -531,6 +532,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_reloc_sloppycomdat	Dbg32_reloc_sloppycomdat
 
 #define	Dbg_sec_added		Dbg32_sec_added
+#define	Dbg_sec_backing		Dbg32_sec_backing
 #define	Dbg_sec_created		Dbg32_sec_created
 #define	Dbg_sec_discarded	Dbg32_sec_discarded
 #define	Dbg_sec_genstr_compress	Dbg32_sec_genstr_compress
@@ -664,7 +666,7 @@ extern	const char *
 		Dbg_demangle_name(const char *);
 
 extern	void	Dbg_ent_entry(Lm_list *, Half, Ent_desc *);
-extern	void	Dbg_ent_print(Lm_list *, Half, List *, Boolean);
+extern	void	Dbg_ent_print(Lm_list *, Half, Alist *, Boolean);
 
 extern	void	Dbg_file_analyze(Rt_map *);
 extern	void	Dbg_file_aout(Lm_list *, const char *, Addr, size_t,
@@ -714,12 +716,12 @@ extern	void	Dbg_libs_audit(Lm_list *, const char *, const char *);
 extern	void	Dbg_libs_find(Lm_list *, const char *);
 extern	void	Dbg_libs_found(Lm_list *, const char *, int);
 extern	void	Dbg_libs_insecure(Lm_list *, const char *, int);
-extern	void	Dbg_libs_init(Lm_list *, List *, List *);
+extern	void	Dbg_libs_init(Lm_list *, APlist *, APlist *);
 extern	void	Dbg_libs_l(Lm_list *, const char *, const char *);
 extern	void	Dbg_libs_path(Lm_list *, const char *, uint_t, const char *);
 extern	void	Dbg_libs_req(Lm_list *, const char *, const char *,
 		    const char *);
-extern	void	Dbg_libs_update(Lm_list *, List *, List *);
+extern	void	Dbg_libs_update(Lm_list *, APlist *, APlist *);
 extern	void	Dbg_libs_yp(Lm_list *, const char *);
 extern	void	Dbg_libs_ylu(Lm_list *, const char *, const char *, int);
 
@@ -732,8 +734,8 @@ extern	void	Dbg_map_set_atsign(Boolean);
 extern	void	Dbg_map_set_equal(Boolean);
 extern	void	Dbg_map_size_new(Lm_list *, const char *);
 extern	void	Dbg_map_size_old(Ofl_desc *, Sym_desc *);
-extern	void	Dbg_map_sort_fini(Lm_list *, Sg_desc *);
-extern	void	Dbg_map_sort_orig(Lm_list *, Sg_desc *);
+extern	void	Dbg_map_sort(Lm_list *);
+extern	void	Dbg_map_sort_seg(Lm_list *, Sg_desc *, int);
 extern	void	Dbg_map_symbol(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_map_version(Lm_list *, const char *, const char *, int);
 
@@ -774,6 +776,7 @@ extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Rel_desc *);
 extern	void	Dbg_reloc_sloppycomdat(Lm_list *, const char *, Sym_desc *);
 
 extern	void	Dbg_sec_added(Lm_list *, Os_desc *, Sg_desc *);
+extern	void	Dbg_sec_backing(Lm_list *);
 extern	void	Dbg_sec_created(Lm_list *, Os_desc *, Sg_desc *);
 extern	void	Dbg_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 extern	void	Dbg_sec_genstr_compress(Lm_list *, const char *,
@@ -789,7 +792,7 @@ extern	void	Dbg_sec_unsup_strmerge(Lm_list *, Is_desc *);
 
 extern	void	Dbg_seg_desc_entry(Lm_list *, Half, int, Sg_desc *);
 extern	void	Dbg_seg_entry(Ofl_desc *, int, Sg_desc *);
-extern	void	Dbg_seg_list(Lm_list *, Half, List *);
+extern	void	Dbg_seg_list(Lm_list *, Half, APlist *);
 extern	void	Dbg_seg_os(Ofl_desc *, Os_desc *, int);
 extern	void	Dbg_seg_title(Lm_list *);
 

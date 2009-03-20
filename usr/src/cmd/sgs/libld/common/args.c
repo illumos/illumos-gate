@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,7 +213,7 @@ ld_rescan_archives(Ofl_desc *ofl, int isgrp, int end_arg_ndx)
 	ofl->ofl_flags1 |= FLG_OF1_EXTRACT;
 
 	while (ofl->ofl_flags1 & FLG_OF1_EXTRACT) {
-		Listnode	*lnp;
+		Aliste		idx;
 		Ar_desc		*adp;
 		Word		start_ndx = isgrp ? ofl->ofl_ars_gsndx : 0;
 		Word		ndx = 0;
@@ -223,7 +223,7 @@ ld_rescan_archives(Ofl_desc *ofl, int isgrp, int end_arg_ndx)
 		DBG_CALL(Dbg_file_ar_rescan(ofl->ofl_lml,
 		    isgrp ? ofl->ofl_ars_gsandx : 1, end_arg_ndx));
 
-		for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
+		for (APLIST_TRAVERSE(ofl->ofl_ars, idx, adp)) {
 			/* If not to starting index yet, skip it */
 			if (ndx++ < start_ndx)
 				continue;
@@ -637,17 +637,43 @@ check_flags(Ofl_desc * ofl, int argc)
 	 * Process any mapfiles after establishing the entrance criteria as
 	 * the user may be redefining or adding sections/segments.
 	 */
-	if (ofl->ofl_maps.head) {
-		Listnode	*lnp;
+	if (ofl->ofl_maps) {
 		const char	*name;
+		Aliste		idx;
+		Is_desc		*isp;
 
-		for (LIST_TRAVERSE(&ofl->ofl_maps, lnp, name))
+		for (APLIST_TRAVERSE(ofl->ofl_maps, idx, name))
 			if (ld_map_parse(name, ofl) == S_ERROR)
 				return (S_ERROR);
 
 		if (ofl->ofl_flags & FLG_OF_SEGSORT)
 			if (ld_sort_seg_list(ofl) == S_ERROR)
 				return (S_ERROR);
+
+		/*
+		 * Mapfiles may have been used to create symbol definitions
+		 * with backing storage.  Although the backing storage is
+		 * associated with an input section, the association of the
+		 * section to an output section (and segment) is initially
+		 * deferred.  Now that all mapfile processing is complete, any
+		 * entrance criteria requirements have been processed, and
+		 * these backing storage sections can be associated with the
+		 * appropriate output section (and segment).
+		 */
+		if (ofl->ofl_maptext || ofl->ofl_mapdata)
+			DBG_CALL(Dbg_sec_backing(ofl->ofl_lml));
+
+		for (APLIST_TRAVERSE(ofl->ofl_maptext, idx, isp)) {
+			if (ld_place_section(ofl, isp,
+			    ld_targ.t_id.id_text, 0) == (Os_desc *)S_ERROR)
+				return (S_ERROR);
+		}
+
+		for (APLIST_TRAVERSE(ofl->ofl_mapdata, idx, isp)) {
+			if (ld_place_section(ofl, isp,
+			    ld_targ.t_id.id_data, 0) == (Os_desc *)S_ERROR)
+				return (S_ERROR);
+		}
 	}
 
 	/*
@@ -756,9 +782,9 @@ createargv(Ofl_desc *ofl, int *error)
 	/*
 	 * Allocate argument vector.
 	 */
-	if ((p0 = (char *)strdup(&optarg[5])) == 0)
+	if ((p0 = (char *)strdup(&optarg[5])) == NULL)
 		return (S_ERROR);
-	if ((argv = libld_malloc((sizeof (char *)) * (argc + 1))) == 0)
+	if ((argv = libld_malloc((sizeof (char *)) * (argc + 1))) == NULL)
 		return (S_ERROR);
 
 	while (*p0) {
@@ -1374,7 +1400,8 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 
 		case 'M':
 			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
-			if (list_appendc(&(ofl->ofl_maps), optarg) == 0)
+			if (aplist_append(&(ofl->ofl_maps), optarg,
+			    AL_CNT_OFL_MAPFILES) == NULL)
 				return (S_ERROR);
 			break;
 
@@ -1408,7 +1435,8 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 
 		case 'S':
 			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
-			if (list_appendc(&lib_support, optarg) == 0)
+			if (aplist_append(&lib_support, optarg,
+			    AL_CNT_SUPPORT) == NULL)
 				return (S_ERROR);
 			break;
 
@@ -1525,9 +1553,10 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    MSG_ORIG(MSG_ARG_CN));
 					ofl->ofl_flags |= FLG_OF_FATAL;
 				}
-				if (((ifl =
-				    libld_calloc(1, sizeof (Ifl_desc))) == 0) ||
-				    (list_appendc(&ofl->ofl_sos, ifl) == 0))
+				if (((ifl = libld_calloc(1,
+				    sizeof (Ifl_desc))) == NULL) ||
+				    (aplist_append(&ofl->ofl_sos, ifl,
+				    AL_CNT_OFL_LIBS) == NULL))
 					return (S_ERROR);
 
 				ifl->ifl_name = MSG_INTL(MSG_STR_COMMAND);
@@ -1603,8 +1632,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    MSG_ARG_INITARRAY_SIZE, ofl,
 					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
-					    (list_appendc(&ofl->ofl_initarray,
-					    sdp) == 0))
+					    (aplist_append(&ofl->ofl_initarray,
+					    sdp, AL_CNT_OFL_ARRAYS) == NULL))
 						return (S_ERROR);
 				} else if (strncmp(optarg,
 				    MSG_ORIG(MSG_ARG_FINIARRAY),
@@ -1613,8 +1642,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    MSG_ARG_FINIARRAY_SIZE, ofl,
 					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
-					    (list_appendc(&ofl->ofl_finiarray,
-					    sdp) == 0))
+					    (aplist_append(&ofl->ofl_finiarray,
+					    sdp, AL_CNT_OFL_ARRAYS) == NULL))
 						return (S_ERROR);
 				} else if (strncmp(optarg,
 				    MSG_ORIG(MSG_ARG_PREINITARRAY),
@@ -1623,8 +1652,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    MSG_ARG_PREINITARRAY_SIZE, ofl,
 					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
-					    (list_appendc(&ofl->ofl_preiarray,
-					    sdp) == 0))
+					    (aplist_append(&ofl->ofl_preiarray,
+					    sdp, AL_CNT_OFL_ARRAYS) == NULL))
 						return (S_ERROR);
 				} else if (strncmp(optarg,
 				    MSG_ORIG(MSG_ARG_RTLDINFO),
@@ -1633,8 +1662,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    MSG_ARG_RTLDINFO_SIZE, ofl,
 					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
-					    (list_appendc(&ofl->ofl_rtldinfo,
-					    sdp) == 0))
+					    (aplist_append(&ofl->ofl_rtldinfo,
+					    sdp, AL_CNT_OFL_ARRAYS) == NULL))
 						return (S_ERROR);
 				} else if (strncmp(optarg,
 				    MSG_ORIG(MSG_ARG_DTRACE),
@@ -1823,7 +1852,7 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 	 * Now that all command line files have been processed see if there are
 	 * any additional `needed' shared object dependencies.
 	 */
-	if (ofl->ofl_soneed.head)
+	if (ofl->ofl_soneed)
 		if (ld_finish_libs(ofl) == S_ERROR)
 			return (S_ERROR);
 
@@ -1856,7 +1885,7 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 	 * from a mapfile or from the input relocatable objects, make sure any
 	 * version dependencies are satisfied, and version symbols created.
 	 */
-	if (ofl->ofl_verdesc.head)
+	if (ofl->ofl_verdesc)
 		if (ld_vers_check_defs(ofl) == S_ERROR)
 			return (S_ERROR);
 
@@ -1880,9 +1909,9 @@ ld_init_strings(Ofl_desc *ofl)
 	else
 		stflags = FLG_STNEW_COMPRESS;
 
-	if (((ofl->ofl_shdrsttab = st_new(stflags)) == 0) ||
-	    ((ofl->ofl_strtab = st_new(stflags)) == 0) ||
-	    ((ofl->ofl_dynstrtab = st_new(stflags)) == 0))
+	if (((ofl->ofl_shdrsttab = st_new(stflags)) == NULL) ||
+	    ((ofl->ofl_strtab = st_new(stflags)) == NULL) ||
+	    ((ofl->ofl_dynstrtab = st_new(stflags)) == NULL))
 		return (S_ERROR);
 
 	return (0);

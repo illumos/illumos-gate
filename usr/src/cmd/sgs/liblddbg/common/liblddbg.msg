@@ -355,7 +355,7 @@
 @ MSG_ECR_TITLE		"%s Entrance Descriptor List (available)"
 @ MSG_ECR_DYNAMIC	"Dynamic"
 @ MSG_ECR_STATIC	"Static"
-@ MSG_ECR_DESC		"entrance descriptor[%d]"
+@ MSG_ECR_DESC		"entrance descriptor[%u]"
 
 
 # Elf Data (section) messages
@@ -526,25 +526,28 @@
 @ MSG_MAP_CNT_DEF_1	"library control definition (-), %s; needed=%s"
 @ MSG_MAP_CNT_DEF_2	"library control definition (-), %s; needed"
 
-@ MSG_MAP_SORTSEG	"map sort_seg_list(): original=%s"
-@ MSG_MAP_SEGSORT	"map sort_seg_list(): sorted=%s"
+@ MSG_MAP_SORT_TITLE	"map file additions: segment sorting required (vaddr):" 
+@ MSG_MAP_SORT_ORIG	"  original=%s"
+@ MSG_MAP_SORT_FINAL	"    sorted=%s"
 
 # Move messages
 
 @ MSG_MOVE_FILE		"file=%s  processing move data"
 
-@ MSG_MOVE_TITLE1	"  i/o      offset       value  repeat  stride  symbol"
-@ MSG_MOVE_TITLE2	"          address       value  repeat  stride  symbol"
+@ MSG_MOVE_TITLE1	"  i/o     offset   size repeat stride            \
+			 value  with respect to"
+@ MSG_MOVE_TITLE2	"  i/o    address   size repeat stride            \
+			 value  with respect to"
 
-@ MSG_MOVE_ENTRYIN	"   in  %#10llx  %#10llx  %6d  %6d  %s"
-@ MSG_MOVE_ENTRYOUT	"  out  %#10llx  %#10llx  %6d  %6d  %s"
-@ MSG_MOVE_EXPAND	"       %#10llx  %#10llx  (expanded)"
+@ MSG_MOVE_ENTRYIN	"   in %#10llx %6d %6d %6d %#16llx  %s"
+@ MSG_MOVE_ENTRYOUT	"  out %#10llx %6d %6d %6d %#16llx  %s"
+@ MSG_MOVE_EXPAND	"      %#10llx                      %#16llx  (expanded)"
 
 @ MSG_MOVE_ADJEXPAND	"for symbol=%s roffset: new=0x%llx"
 @ MSG_MOVE_ADJMOVE	"for symbol=%s roffset: from=0x%llx, to=0x%llx"
 @ MSG_MOVE_OUTSCTADJ	"adjusting addend for symbol=%s"
-@ MSG_MOVE_PAREXPN	"expanding %s into .data: %s"
-@ MSG_MOVE_OUTMOVE	"copying move entries for %s into .SUNW_move"
+@ MSG_MOVE_PAREXPN	"expanding symbol=%s into .data: %s"
+@ MSG_MOVE_OUTMOVE	"copying move entries for symbol=%s into .SUNW_move"
 @ MSG_MOVE_INPUT	"collecting move entries: file=%s"
 @ MSG_MOVE_BAD		"move %lld offset invalid: %s: offset=0x%llx \
 			 lies outside memory image; move discarded"
@@ -565,6 +568,8 @@
 
 
 # Section messages
+
+@ MSG_SEC_BACKING	"map file symbol definitions: create backing storage:"
 
 @ MSG_SEC_INPUT		"section=%s; input from file=%s"
 @ MSG_SEC_INPUT_GENSTR	"section=%s; input generated merged string section"

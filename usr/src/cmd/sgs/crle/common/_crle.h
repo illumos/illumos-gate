@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__CRLE_H
 #define	__CRLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <gelf.h>
@@ -37,7 +35,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
 
 /*
  * Hash table support routines.
@@ -75,17 +72,17 @@ struct hash_obj {
  * what will be converted into object descriptors in the final cache file.
  */
 struct hash_ent {
-	Hash_ent *	e_next;			/* next hash item */
+	Hash_ent	*e_next;		/* next hash item */
 	Word		e_hash;			/* hash value (or inode no.) */
 	Addr		e_key;			/* name (or inode no.) */
 	int		e_off;			/* offset of file in dirname */
 	Half		e_id;			/* directory identifier */
 	Half		e_flags;		/* entry specific flags */
 	Word		e_cnt;			/* no. of files in directory */
-	Hash_ent *	e_dir;			/* files directory */
-	Hash_ent *	e_path;			/* files full path entry */
-	Hash_obj *	e_obj;			/* unique object */
-	Rtc_obj *	e_cobj;			/* final configuration object */
+	Hash_ent	*e_dir;			/* files directory */
+	Hash_ent	*e_path;		/* files full path entry */
+	Hash_obj	*e_obj;			/* unique object */
+	Rtc_obj		*e_cobj;		/* final configuration object */
 };
 
 /*
@@ -97,7 +94,7 @@ struct hash_tbl {
 	ulong_t		t_ident;		/* dev no. for inode cache */
 	int 		t_size;			/* no. of buckets */
 	Hash_type	t_type;			/* HASH_INT or HASH_STR */
-	Hash_ent **	t_entry;		/* entries */
+	Hash_ent	**t_entry;		/* entries */
 };
 
 #define	HASH_FND_ENT	0x01		/* search for existing hash entry */
@@ -117,10 +114,10 @@ typedef struct {
  * Filter/filtee association support.  The filtees are a list of Hash_ent's.
  */
 typedef struct {
-	Hash_ent *	f_fent;		/* filter */
+	Hash_ent	*f_fent;	/* filter */
 	const char	*f_str;		/* filtee string and its associated */
 	size_t		f_strsz;	/*	size */
-	List		f_filtee;	/* filtees */
+	APlist		*f_filtee;	/* filtees */
 } Flt_desc;
 
 /*
@@ -146,15 +143,15 @@ typedef	struct crle_desc {
 	uint_t		c_hashstrnum;	/* no. of hashed strings to create */
 	Hash_tbl	*c_strtbl;	/* string table and size */
 	size_t		c_strsize;
-	List		c_inotbls;	/* list of inode tables */
+	APlist		*c_inotbls;	/* list of inode tables */
 	const char	*c_app;		/* specific application */
 	char		*c_edlibpath;	/* ELF default library path */
 	char		*c_adlibpath;	/* AOUT default library path */
 	char		*c_eslibpath;	/* ELF secure library path */
 	char		*c_aslibpath;	/* AOUT secure library path */
-	List		c_env;		/* environment variables */
+	APlist		*c_env;		/* environment variables */
 	uint_t		c_envnum;	/*	and associated number */
-	List		c_flt;		/* filter/filtee associations */
+	APlist		*c_flt;		/* filter/filtee associations */
 	uint_t		c_fltrnum;	/*	and associated filter number */
 	uint_t		c_fltenum;	/*	and associated filtee number */
 } Crle_desc;
@@ -178,6 +175,8 @@ typedef	struct crle_desc {
 #define	CRLE_ADLIB	0x4000		/* default AOUT search path supplied */
 #define	CRLE_ASLIB	0x8000		/* default AOUT secure path supplied */
 
+#define	AL_CNT_CRLE	10
+
 /*
  * Return type code returned by inspectconfig()
  */
@@ -196,10 +195,9 @@ extern int		depend(Crle_desc *, const char *, Half, GElf_Ehdr *);
 extern int		dlflags(Crle_desc *, const char *);
 extern int		dump(Crle_desc *);
 extern int		genconfig(Crle_desc *);
-extern Hash_ent *	get_hash(Hash_tbl *, Addr, Half, int);
+extern Hash_ent		*get_hash(Hash_tbl *, Addr, Half, int);
 extern int		inspect(Crle_desc *, const char *, Half);
-extern Listnode *	list_append(List *, const void *);
-extern Hash_tbl *	make_hash(int, Hash_type, ulong_t);
+extern Hash_tbl		*make_hash(int, Hash_type, ulong_t);
 extern INSCFG_RET	inspectconfig(Crle_desc *, int);
 extern int		updateconfig(Crle_desc *);
 

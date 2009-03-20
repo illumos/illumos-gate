@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"_debug.h"
 #include	"msg.h"
@@ -70,7 +69,7 @@ Dbg_statistics_ld(Ofl_desc *ofl)
 void
 Dbg_statistics_ar(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Ar_desc		*adp;
 	Elf_Arsym	*arsym;
 	Ar_aux		*aux;
@@ -80,7 +79,7 @@ Dbg_statistics_ar(Ofl_desc *ofl)
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
-	for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ars, idx, adp)) {
 		size_t	poffset = 0;
 		uint_t	count = 0, used = 0;
 

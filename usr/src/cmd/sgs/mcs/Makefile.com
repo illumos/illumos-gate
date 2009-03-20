@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		mcs
@@ -35,10 +33,13 @@ include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
 
 # avoid bootstrap problems
-MCS=		/usr/ccs/bin/mcs
+MCS =		/usr/ccs/bin/mcs
 
-OBJS=		main.o		file.o		utils.o		global.o \
+COMOBJS =	main.o		file.o		utils.o		global.o \
 		message.o
+TOOLSOBJS =	alist.o
+
+OBJS =		$(COMOBJS) $(TOOLSOBJS)
 
 LLDFLAGS =	'-R$$ORIGIN/../../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
@@ -48,7 +49,8 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS +=	-x
 LINTFLAGS64 +=	-x
 
-SRCS =		$(OBJS:%.o=../common/%.c)
-LINTSRCS =	$(SRCS)
+SRCS =		$(COMOBJS:%.o=../common/%.c) \
+		$(TOOLSOBJS:%.o=$(SGSTOOLS)/common/%.c)
+LINTSRCS =	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(OBJS) $(LINTOUTS)

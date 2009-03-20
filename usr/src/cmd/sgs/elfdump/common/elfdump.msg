@@ -231,9 +231,9 @@
 #
 # SHT_MOVE messages
 #
-@ MSG_MOVE_TITLE	"    symndx offset   size repeat stride   \
-			 value               with respect to"
-@ MSG_MOVE_ENTRY	"%10.10s %6lld %6d %6d %6d %#18.18llx  %s"
+@ MSG_MOVE_TITLE	"    symndx     offset   size repeat stride            \
+			 value  with respect to"
+@ MSG_MOVE_ENTRY	"%10.10s %#10llx %6d %6d %6d %#16llx  %s"
 
 #
 # SHT_GROUP messages

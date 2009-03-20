@@ -592,7 +592,8 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 
 		if ((ofl->ofl_flags & FLG_OF_GENMAP) &&
 		    ((sdflags & FLG_SY_SPECSEC) == 0))
-			if (list_appendc(&sap->sa_dfiles, ifl->ifl_name) == 0)
+			if (aplist_append(&sap->sa_dfiles, ifl->ifl_name,
+			    AL_CNT_SDP_DFILES) == NULL)
 				return ((Sym_desc *)S_ERROR);
 	}
 
@@ -1010,7 +1011,7 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 /*
  * Make sure a symbol definition is local to the object being built.
  */
-static int
+inline static int
 ensure_sym_local(Ofl_desc *ofl, Sym_desc *sdp, const char *str)
 {
 	if (sdp->sd_sym->st_shndx == SHN_UNDEF) {
@@ -1044,13 +1045,13 @@ ensure_sym_local(Ofl_desc *ofl, Sym_desc *sdp, const char *str)
  * preinitarray's are local to the object being built.
  */
 static int
-ensure_array_local(Ofl_desc *ofl, List *list, const char *str)
+ensure_array_local(Ofl_desc *ofl, APlist *apl, const char *str)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Sym_desc	*sdp;
 	int		ret = 0;
 
-	for (LIST_TRAVERSE(list, lnp, sdp))
+	for (APLIST_TRAVERSE(apl, idx, sdp))
 		ret += ensure_sym_local(ofl, sdp, str);
 
 	return (ret);
@@ -1412,7 +1413,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		    (((oflags & FLG_OF_RELOBJ) == 0) ||
 		    ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 		    (oflags & FLG_OF_PROCRED)))) {
-			if ((sdp->sd_psyminfo == 0) ||
+			if ((sdp->sd_move == NULL) ||
 			    ((sdp->sd_flags & FLG_SY_PAREXPN) == 0)) {
 				Xword * size, * align;
 
@@ -1571,22 +1572,24 @@ ld_sym_validate(Ofl_desc *ofl)
 	/*
 	 * Generate the .bss section now that we know its size and alignment.
 	 */
-	if (bsssize || !(oflags & FLG_OF_RELOBJ)) {
-		if (ld_make_bss(ofl, bsssize, bssalign, MAKE_BSS) == S_ERROR)
+	if (bsssize) {
+		if (ld_make_bss(ofl, bsssize, bssalign,
+		    ld_targ.t_id.id_bss) == S_ERROR)
 			return (S_ERROR);
 	}
 	if (tlssize) {
-		if (ld_make_bss(ofl, tlssize, tlsalign, MAKE_TLS) == S_ERROR)
+		if (ld_make_bss(ofl, tlssize, tlsalign,
+		    ld_targ.t_id.id_tlsbss) == S_ERROR)
 			return (S_ERROR);
 	}
 #if	defined(_ELF64)
 	if ((ld_targ.t_m.m_mach == EM_AMD64) &&
 	    lbsssize && !(oflags & FLG_OF_RELOBJ)) {
-		if (ld_make_bss(ofl, lbsssize, lbssalign, MAKE_LBSS) == S_ERROR)
+		if (ld_make_bss(ofl, lbsssize, lbssalign,
+		    ld_targ.t_id.id_lbss) == S_ERROR)
 			return (S_ERROR);
 	}
 #endif
-
 	/*
 	 * Determine what entry point symbol we need, and if found save its
 	 * symbol descriptor so that we can update the ELF header entry with the
@@ -1630,16 +1633,16 @@ ld_sym_validate(Ofl_desc *ofl)
 	 * requested, make sure they are defined within the current object
 	 * being built.
 	 */
-	if (ofl->ofl_initarray.head) {
-		ret += ensure_array_local(ofl, &ofl->ofl_initarray,
+	if (ofl->ofl_initarray) {
+		ret += ensure_array_local(ofl, ofl->ofl_initarray,
 		    MSG_ORIG(MSG_SYM_INITARRAY));
 	}
-	if (ofl->ofl_finiarray.head) {
-		ret += ensure_array_local(ofl, &ofl->ofl_finiarray,
+	if (ofl->ofl_finiarray) {
+		ret += ensure_array_local(ofl, ofl->ofl_finiarray,
 		    MSG_ORIG(MSG_SYM_FINIARRAY));
 	}
-	if (ofl->ofl_preiarray.head) {
-		ret += ensure_array_local(ofl, &ofl->ofl_preiarray,
+	if (ofl->ofl_preiarray) {
+		ret += ensure_array_local(ofl, ofl->ofl_preiarray,
 		    MSG_ORIG(MSG_SYM_PREINITARRAY));
 	}
 
@@ -2584,7 +2587,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	Ifl_desc	*ifl = NULL, *_ifl;
 	Sym_desc	*sdp;
 	Word		hash;
-	Listnode	*lnp;
+	Aliste		idx;
 	avl_index_t	where;
 	const char	*reference = MSG_INTL(mid);
 
@@ -2608,7 +2611,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	 * during any symbol resolution (refer to map_ifl() which provides a
 	 * similar method for adding symbols from mapfiles).
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, _ifl))
+	for (APLIST_TRAVERSE(ofl->ofl_objs, idx, _ifl))
 		if (strcmp(_ifl->ifl_name, reference) == 0) {
 			ifl = _ifl;
 			break;
@@ -2618,17 +2621,15 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	 * If no descriptor exists create one.
 	 */
 	if (ifl == NULL) {
-		if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) ==
-		    (Ifl_desc *)0)
+		if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) == NULL)
 			return ((Sym_desc *)S_ERROR);
 		ifl->ifl_name = reference;
 		ifl->ifl_flags = FLG_IF_NEEDED | FLG_IF_FILEREF;
-		if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr),
-		    1)) == NULL)
+		if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr), 1)) == NULL)
 			return ((Sym_desc *)S_ERROR);
 		ifl->ifl_ehdr->e_type = ET_REL;
 
-		if (list_appendc(&ofl->ofl_objs, ifl) == 0)
+		if (aplist_append(&ofl->ofl_objs, ifl, AL_CNT_OFL_OBJS) == NULL)
 			return ((Sym_desc *)S_ERROR);
 	}
 

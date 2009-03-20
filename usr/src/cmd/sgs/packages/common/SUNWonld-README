@@ -1243,6 +1243,17 @@ All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_x86	patch T139575-03
 --------------------------------------------------------------------------------
 
+-------------------------------------
+Solaris 10 1009 (8th Q-update - s10u8)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+6782597 32-bit ld.so.1 needs to accept objects with large inode number
+6805502 The addition of "inline" keywords to sgs code broke the lint
+	verification in S10
+NOTE: The fix for 6805502 is only applicable to s10.
+--------------------------------------------------------------------------------
+
 --------------
 Solaris Nevada
 --------------
@@ -1425,7 +1436,6 @@ Bugid   Risk Synopsis
 6782977 ld segfaults after support lib version error sends bad args to vprintf()
 6773695 ld -z nopartial can break non-pic objects
 6778453 RTLD_GROUP prevents use of application defined malloc
-6782597 32-bit ld.so.1 needs to accept objects with large inode number
 6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104
 6789925 64-bit applications with SF1_SUNW_ADDR32 require non-default starting
 	address
@@ -1445,3 +1455,4 @@ Bugid   Risk Synopsis
 	eh_frame FDE entries
 6807864	ld.so.1 is susceptible to a fatal dlsym()/setlocale() race
 6813909 generalize eh_frame support to non-amd64 platforms
+6801536 ld: mapfile processing oddities unveiled through mmapobj(2) observations

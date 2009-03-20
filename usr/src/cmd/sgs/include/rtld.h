@@ -125,7 +125,7 @@ typedef struct rtld_db_priv {
 	struct r_debug	rtd_rdebug;	/* original r_debug structure */
 	Word		rtd_version;	/* version no. */
 	size_t		rtd_objpad;	/* padding around mmap()ed objects */
-	List		*rtd_dynlmlst;	/* pointer to Dynlm_list */
+	APlist		**rtd_dynlmlst;	/* pointer to dynlm_list pointer */
 } Rtld_db_priv;
 
 #ifdef _SYSCALL32
@@ -133,7 +133,7 @@ typedef struct rtld_db_priv32 {
 	struct r_debug32 rtd_rdebug;	/* original r_debug structure */
 	Elf32_Word	rtd_version;	/* version no. */
 	Elf32_Word	rtd_objpad;	/* padding around mmap()ed objects */
-	Elf32_Addr	rtd_dynlmlst;	/* pointer to Dynlm_list */
+	Elf32_Addr	rtd_dynlmlst;	/* pointer to dynlm_list */
 } Rtld_db_priv32;
 #endif	/* _SYSCALL32 */
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,22 +38,22 @@
  * ld_support_loadso() routine.
  */
 static Support_list support[LDS_NUM] = {
-	{MSG_ORIG(MSG_SUP_VERSION),	{ 0, 0 }},	/* LDS_VERSION */
-	{MSG_ORIG(MSG_SUP_INPUT_DONE),	{ 0, 0 }},	/* LDS_INPUT_DONE */
+	{MSG_ORIG(MSG_SUP_VERSION),	NULL},	/* LDS_VERSION */
+	{MSG_ORIG(MSG_SUP_INPUT_DONE),	NULL},	/* LDS_INPUT_DONE */
 #if	defined(_ELF64)
-	{MSG_ORIG(MSG_SUP_START_64),	{ 0, 0 }},	/* LDS_START */
-	{MSG_ORIG(MSG_SUP_ATEXIT_64),	{ 0, 0 }},	/* LDS_ATEXIT */
-	{MSG_ORIG(MSG_SUP_OPEN_64),	{ 0, 0 }},	/* LDS_OPEN */
-	{MSG_ORIG(MSG_SUP_FILE_64),	{ 0, 0 }},	/* LDS_FILE */
-	{MSG_ORIG(MSG_SUP_INSEC_64),	{ 0, 0 }},	/* LDS_INSEC */
-	{MSG_ORIG(MSG_SUP_SEC_64),	{ 0, 0 }}	/* LDS_SEC */
+	{MSG_ORIG(MSG_SUP_START_64),	NULL},	/* LDS_START */
+	{MSG_ORIG(MSG_SUP_ATEXIT_64),	NULL},	/* LDS_ATEXIT */
+	{MSG_ORIG(MSG_SUP_OPEN_64),	NULL},	/* LDS_OPEN */
+	{MSG_ORIG(MSG_SUP_FILE_64),	NULL},	/* LDS_FILE */
+	{MSG_ORIG(MSG_SUP_INSEC_64),	NULL},	/* LDS_INSEC */
+	{MSG_ORIG(MSG_SUP_SEC_64),	NULL}	/* LDS_SEC */
 #else	/* Elf32 */
-	{MSG_ORIG(MSG_SUP_START),	{ 0, 0 }},	/* LDS_START */
-	{MSG_ORIG(MSG_SUP_ATEXIT),	{ 0, 0 }},	/* LDS_ATEXIT */
-	{MSG_ORIG(MSG_SUP_OPEN),	{ 0, 0 }},	/* LDS_OPEN */
-	{MSG_ORIG(MSG_SUP_FILE),	{ 0, 0 }},	/* LDS_FILE */
-	{MSG_ORIG(MSG_SUP_INSEC),	{ 0, 0 }},	/* LDS_INSEC */
-	{MSG_ORIG(MSG_SUP_SEC),		{ 0, 0 }}	/* LDS_SEC */
+	{MSG_ORIG(MSG_SUP_START),	NULL},	/* LDS_START */
+	{MSG_ORIG(MSG_SUP_ATEXIT),	NULL},	/* LDS_ATEXIT */
+	{MSG_ORIG(MSG_SUP_OPEN),	NULL},	/* LDS_OPEN */
+	{MSG_ORIG(MSG_SUP_FILE),	NULL},	/* LDS_FILE */
+	{MSG_ORIG(MSG_SUP_INSEC),	NULL},	/* LDS_INSEC */
+	{MSG_ORIG(MSG_SUP_SEC),		NULL}	/* LDS_SEC */
 #endif
 };
 
@@ -65,9 +65,8 @@ static Support_list support[LDS_NUM] = {
 uintptr_t
 ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 {
-	void		*handle, (*fptr)();
-	Func_list	*flp;
-	uint_t		interface, version = LD_SUP_VERSION1;
+	void	*handle, (*fptr)();
+	uint_t	interface, version = LD_SUP_VERSION1;
 
 	/*
 	 * Load the required support library.  If we are unable to load it fail
@@ -80,6 +79,8 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 	}
 
 	for (interface = 0; interface < LDS_NUM; interface++) {
+		Func_list	fl;
+
 		if ((fptr = (void (*)())dlsym(handle,
 		    support[interface].sup_name)) == NULL)
 			continue;
@@ -126,15 +127,11 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 			}
 		}
 
-
-		if ((flp = libld_malloc(sizeof (Func_list))) == NULL) {
-			(void) dlclose(handle);
-			return (S_ERROR);
-		}
-		flp->fl_obj = obj;
-		flp->fl_fptr = fptr;
-		flp->fl_version = version;
-		if (list_appendc(&support[interface].sup_funcs, flp) == 0)
+		fl.fl_obj = obj;
+		fl.fl_fptr = fptr;
+		fl.fl_version = version;
+		if (alist_append(&support[interface].sup_funcs, &fl,
+		    sizeof (Func_list), AL_CNT_SUPPORT) == NULL)
 			return (S_ERROR);
 	}
 	return (1);
@@ -147,9 +144,9 @@ void
 ld_sup_start(Ofl_desc *ofl, const Half etype, const char *caller)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(&support[LDS_START].sup_funcs, lnp, flp)) {
+	for (ALIST_TRAVERSE(support[LDS_START].sup_funcs, idx, flp)) {
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_START].sup_name, LDS_START, ofl->ofl_name));
 		(*flp->fl_fptr)(ofl->ofl_name, etype, caller);
@@ -160,9 +157,9 @@ void
 ld_sup_atexit(Ofl_desc *ofl, int ecode)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(&support[LDS_ATEXIT].sup_funcs, lnp, flp)) {
+	for (ALIST_TRAVERSE(support[LDS_ATEXIT].sup_funcs, idx, flp)) {
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_ATEXIT].sup_name, LDS_ATEXIT, 0));
 		(*flp->fl_fptr)(ecode);
@@ -174,14 +171,14 @@ ld_sup_open(Ofl_desc *ofl, const char **opath, const char **ofile, int *ofd,
     int flags, Elf **oelf, Elf *ref, size_t off, const Elf_Kind ekind)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
-	const char	*npath = *opath;
-	const char	*nfile = *ofile;
-	Elf		*nelf = *oelf;
-	int		nfd = *ofd;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(&support[LDS_OPEN].sup_funcs, lnp, flp)) {
-		int	_flags = 0;
+	for (ALIST_TRAVERSE(support[LDS_OPEN].sup_funcs, idx, flp)) {
+		const char	*npath = *opath;
+		const char	*nfile = *ofile;
+		Elf		*nelf = *oelf;
+		int		nfd = *ofd;
+		int		_flags = 0;
 
 		/*
 		 * This interface was introduced in VERSION3.  Only call this
@@ -211,23 +208,23 @@ ld_sup_open(Ofl_desc *ofl, const char **opath, const char **ofile, int *ofd,
 		    support[LDS_OPEN].sup_name, LDS_OPEN, *opath));
 		(*flp->fl_fptr)(&npath, &nfile, &nfd, _flags, &nelf, ref, off,
 		    ekind);
-	}
 
-	/*
-	 * If the file descriptor, ELF descriptor, or file names have been
-	 * modified, then diagnose the differences and return the new data.
-	 * As a basic test, make sure the support library hasn't nulled out
-	 * data ld(1) will try and dereference.
-	 */
-	if ((npath != *opath) || (nfd != *ofd) || (nelf != *oelf)) {
-		Dbg_file_modified(ofl->ofl_lml, flp->fl_obj, *opath, npath,
-		    *ofd, nfd, *oelf, nelf);
-		if (npath)
-			*opath = npath;
-		if (nfile)
-			*ofile = nfile;
-		*ofd = nfd;
-		*oelf = nelf;
+		/*
+		 * If the file descriptor, ELF descriptor, or file names have
+		 * been modified, then diagnose the differences and return the
+		 * new data.  As a basic test, make sure the support library
+		 * hasn't nulled out data ld(1) will try and dereference.
+		 */
+		if ((npath != *opath) || (nfd != *ofd) || (nelf != *oelf)) {
+			Dbg_file_modified(ofl->ofl_lml, flp->fl_obj, *opath,
+			    npath, *ofd, nfd, *oelf, nelf);
+			if (npath)
+				*opath = npath;
+			if (nfile)
+				*ofile = nfile;
+			*ofd = nfd;
+			*oelf = nelf;
+		}
 	}
 }
 
@@ -236,9 +233,9 @@ ld_sup_file(Ofl_desc *ofl, const char *ifile, const Elf_Kind ekind, int flags,
     Elf *elf)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(&support[LDS_FILE].sup_funcs, lnp, flp)) {
+	for (ALIST_TRAVERSE(support[LDS_FILE].sup_funcs, idx, flp)) {
 		int	_flags = 0;
 
 		if (!(flags & FLG_IF_CMDLINE))
@@ -259,12 +256,13 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
     Shdr **oshdr, Word ndx, Elf_Scn *scn, Elf *elf)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
+	Aliste		idx;
 	uint_t		flags = 0;
 	Elf_Data	*data = NULL;
-	Shdr		*nshdr = *oshdr;
 
-	for (LIST_TRAVERSE(&support[LDS_INSEC].sup_funcs, lnp, flp)) {
+	for (ALIST_TRAVERSE(support[LDS_INSEC].sup_funcs, idx, flp)) {
+		Shdr	*nshdr = *oshdr;
+
 		/*
 		 * This interface was introduced in VERSION2.  Only call this
 		 * function for libraries reporting support for version 2 or
@@ -284,17 +282,17 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_INSEC].sup_name, LDS_INSEC, sname));
 		(*flp->fl_fptr)(sname, &nshdr, ndx, data, elf, &flags);
-	}
 
-	/*
-	 * If the section header has been re-allocated (known to occur with
-	 * libCCexcept.so), then diagnose the section header difference and
-	 * return the new section header.
-	 */
-	if (nshdr != *oshdr) {
-		Dbg_shdr_modified(ofl->ofl_lml, flp->fl_obj,
-		    ifl->ifl_ehdr->e_machine, *oshdr, nshdr, sname);
-		*oshdr = nshdr;
+		/*
+		 * If the section header has been re-allocated (known to occur
+		 * with libCCexcept.so), then diagnose the section header
+		 * difference and return the new section header.
+		 */
+		if (nshdr != *oshdr) {
+			Dbg_shdr_modified(ofl->ofl_lml, flp->fl_obj,
+			    ifl->ifl_ehdr->e_machine, *oshdr, nshdr, sname);
+			*oshdr = nshdr;
+		}
 	}
 	return (0);
 }
@@ -304,9 +302,9 @@ ld_sup_section(Ofl_desc *ofl, const char *scn, Shdr *shdr, Word ndx,
     Elf_Data *data, Elf *elf)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
+	Aliste		idx;
 
-	for (LIST_TRAVERSE(&support[LDS_SEC].sup_funcs, lnp, flp)) {
+	for (ALIST_TRAVERSE(support[LDS_SEC].sup_funcs, idx, flp)) {
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_SEC].sup_name, LDS_SEC, scn));
 		(*flp->fl_fptr)(scn, shdr, ndx, data, elf);
@@ -317,10 +315,10 @@ void
 ld_sup_input_done(Ofl_desc *ofl)
 {
 	Func_list	*flp;
-	Listnode	*lnp;
+	Aliste		idx;
 	uint_t		flags = 0;
 
-	for (LIST_TRAVERSE(&support[LDS_INPUT_DONE].sup_funcs, lnp, flp)) {
+	for (ALIST_TRAVERSE(support[LDS_INPUT_DONE].sup_funcs, idx, flp)) {
 		/*
 		 * This interface was introduced in VERSION2.  Only call this
 		 * function for libraries reporting support for version 2 or

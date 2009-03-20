@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines to add file and directory entries into the internal configuration
@@ -74,8 +73,8 @@
  * over any others.
  */
 static int
-enteralt(Crle_desc * crle, const char *path, const char *file, Half flags,
-    Hash_obj * obj)
+enteralt(Crle_desc *crle, const char *path, const char *file, Half flags,
+    Hash_obj *obj)
 {
 	const char	*fmt;
 	char		alter[PATH_MAX];
@@ -127,7 +126,7 @@ enteralt(Crle_desc * crle, const char *path, const char *file, Half flags,
 	 * Allocate the new alternative and update the string table size.
 	 */
 	altsz = strlen(alter) + 1;
-	if ((obj->o_alter = malloc(altsz)) == 0)
+	if ((obj->o_alter = malloc(altsz)) == NULL)
 		return (0);
 	(void) strcpy(obj->o_alter, alter);
 
@@ -145,15 +144,16 @@ enteralt(Crle_desc * crle, const char *path, const char *file, Half flags,
  * establishes the unique object descriptor.
  */
 static Hash_ent *
-enterino(Crle_desc * crle, const char *name, struct stat *status, Half flags)
+enterino(Crle_desc *crle, const char *name, struct stat *status, Half flags)
 {
-	Hash_ent *	ent;
-	Hash_obj *	obj;
-	Hash_tbl *	tbl;
-	Listnode *	lnp = 0;
+	Hash_ent	*ent;
+	Hash_obj	*obj;
+	Hash_tbl	*tbl;
+	Aliste		idx;
 	Addr		ino = (Addr)status->st_ino;
 	ulong_t		dev = status->st_dev;
 	Lword		info;
+	int		found = 0;
 
 	/*
 	 * For configuration file verification we retain information about the
@@ -168,29 +168,32 @@ enterino(Crle_desc * crle, const char *name, struct stat *status, Half flags)
 	 * Determine the objects device number and establish a hash table for
 	 * for this devices inodes.
 	 */
-	for (LIST_TRAVERSE(&crle->c_inotbls, lnp, tbl)) {
-		if (tbl->t_ident == dev)
+	for (APLIST_TRAVERSE(crle->c_inotbls, idx, tbl)) {
+		if (tbl->t_ident == dev) {
+			found = 1;
 			break;
+		}
 	}
-	if (lnp == 0) {
-		if ((tbl = make_hash(crle->c_inobkts, HASH_INT, dev)) == 0)
-			return (0);
-		if (list_append(&crle->c_inotbls, tbl) == 0)
-			return (0);
+	if (found == 0) {
+		if ((tbl = make_hash(crle->c_inobkts, HASH_INT, dev)) == NULL)
+			return (NULL);
+		if (aplist_append(&crle->c_inotbls, tbl, AL_CNT_CRLE) == NULL)
+			return (NULL);
 	}
 
 	/*
 	 * Reuse or add this new object to the inode hash table.
 	 */
-	if ((ent = get_hash(tbl, ino, 0, (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	if ((ent = get_hash(tbl, ino, 0,
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 
 	/*
 	 * If an object descriptor doesn't yet exist create one.
 	 */
-	if ((obj = ent->e_obj) == 0) {
-		if ((obj = calloc(sizeof (Hash_obj), 1)) == 0)
-			return (0);
+	if ((obj = ent->e_obj) == NULL) {
+		if ((obj = calloc(sizeof (Hash_obj), 1)) == NULL)
+			return (NULL);
 		obj->o_tbl = tbl;
 		obj->o_flags = flags;
 		obj->o_info = info;
@@ -199,8 +202,8 @@ enterino(Crle_desc * crle, const char *name, struct stat *status, Half flags)
 		 * Reallocate the objects name, as it might have been composed
 		 * and passed to us on the stack.
 		 */
-		if ((obj->o_path = strdup(name)) == 0)
-			return (0);
+		if ((obj->o_path = strdup(name)) == NULL)
+			return (NULL);
 
 		/*
 		 * Assign this object to the original ino hash entry.
@@ -210,13 +213,12 @@ enterino(Crle_desc * crle, const char *name, struct stat *status, Half flags)
 	return (ent);
 }
 
-
 /*
  * Basic directory entry, establishes entry information, updated global counts
  * and provides any diagnostics.
  */
 static int
-_enterdir(Crle_desc * crle, const char *dir, Hash_ent * ent, Hash_obj * obj)
+_enterdir(Crle_desc *crle, const char *dir, Hash_ent *ent, Hash_obj *obj)
 {
 	size_t	size = strlen(dir) + 1;
 	char	*ndir;
@@ -225,7 +227,7 @@ _enterdir(Crle_desc * crle, const char *dir, Hash_ent * ent, Hash_obj * obj)
 	 * Establish this hash entries key (which is the directory name itself),
 	 * assign the next available directory number, and its object.
 	 */
-	if ((ndir = malloc(size)) == 0)
+	if ((ndir = malloc(size)) == NULL)
 		return (0);
 	(void) strcpy(ndir, dir);
 
@@ -258,24 +260,23 @@ _enterdir(Crle_desc * crle, const char *dir, Hash_ent * ent, Hash_obj * obj)
 	return (1);
 }
 
-
 /*
  * Establish a string hash entry for a directory.
  */
 static Hash_ent *
-enterdir(Crle_desc * crle, const char *odir, Half flags, struct stat *status)
+enterdir(Crle_desc *crle, const char *odir, Half flags, struct stat *status)
 {
-	Hash_tbl *	stbl = crle->c_strtbl;
-	Hash_ent *	ent;
-	Hash_obj *	obj;
-	char		rdir[PATH_MAX], * ndir;
+	Hash_tbl	*stbl = crle->c_strtbl;
+	Hash_ent	*ent;
+	Hash_obj	*obj;
+	char		rdir[PATH_MAX], *ndir;
 
 	/*
 	 * Establish the directories real name, this is the name that will be
 	 * recorded in the object identifier.
 	 */
-	if (realpath(odir, rdir) == 0)
-		return (0);
+	if (realpath(odir, rdir) == NULL)
+		return (NULL);
 
 	if (strcmp(odir, rdir))
 		ndir = rdir;
@@ -294,16 +295,16 @@ enterdir(Crle_desc * crle, const char *odir, Half flags, struct stat *status)
 	/*
 	 * Establish a inode table entry, and the objects unique descriptor.
 	 */
-	if ((ent = enterino(crle, ndir, status, flags)) == 0)
-		return (0);
+	if ((ent = enterino(crle, ndir, status, flags)) == NULL)
+		return (NULL);
 	obj = ent->e_obj;
 
 	/*
 	 * Create a string table entry for the real directory.
 	 */
 	if ((ent = get_hash(stbl, (Addr)ndir, 0,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 
 	/*
 	 * If this is a new entry reassign the directory name and assign a
@@ -311,7 +312,7 @@ enterdir(Crle_desc * crle, const char *odir, Half flags, struct stat *status)
 	 */
 	if (ent->e_id == 0) {
 		if (_enterdir(crle, ndir, ent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 
 	/*
@@ -325,8 +326,8 @@ enterdir(Crle_desc * crle, const char *odir, Half flags, struct stat *status)
 	 * Create a string table entry for this real directory.
 	 */
 	if ((ent = get_hash(stbl, (Addr)odir, 0,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 
 	/*
 	 * If this is a new entry reassign the directory name and assign a
@@ -334,28 +335,27 @@ enterdir(Crle_desc * crle, const char *odir, Half flags, struct stat *status)
 	 */
 	if (ent->e_id == 0) {
 		if (_enterdir(crle, odir, ent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 
 	return (ent);
 }
-
 
 /*
  * Establish a non-existent directory entry.  There is no inode entry created
  * for this, just a directory and its associated object.
  */
 static Hash_ent *
-enternoexistdir(Crle_desc * crle, const char *dir)
+enternoexistdir(Crle_desc *crle, const char *dir)
 {
-	Hash_ent *	ent;
+	Hash_ent	*ent;
 
 	/*
 	 * Reuse or add this new non-existent directory to the string table.
 	 */
 	if ((ent = get_hash(crle->c_strtbl, (Addr)dir, 0,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 
 	/*
 	 * If this is a new entry, assign both the object and the directory
@@ -364,12 +364,12 @@ enternoexistdir(Crle_desc * crle, const char *dir)
 	if (ent->e_id == 0) {
 		Hash_obj *	obj;
 
-		if ((obj = calloc(sizeof (Hash_obj), 1)) == 0)
-			return (0);
+		if ((obj = calloc(sizeof (Hash_obj), 1)) == NULL)
+			return (NULL);
 		obj->o_flags = (RTC_OBJ_NOEXIST | RTC_OBJ_DIRENT);
 
 		if (_enterdir(crle, dir, ent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 	return (ent);
 }
@@ -380,8 +380,8 @@ enternoexistdir(Crle_desc * crle, const char *dir)
  * and provides any diagnostics.
  */
 static int
-_enterfile(Crle_desc * crle, const char *file, int off, Hash_ent * fent,
-    Hash_ent * rent, Hash_ent * dent, Hash_obj * obj)
+_enterfile(Crle_desc *crle, const char *file, int off, Hash_ent *fent,
+    Hash_ent *rent, Hash_ent *dent, Hash_obj *obj)
 {
 	size_t	size = strlen(file) + 1;
 	char	*nfile;
@@ -394,7 +394,7 @@ _enterfile(Crle_desc * crle, const char *file, int off, Hash_ent * fent,
 	 * in the final configuration file.
 	 */
 	if (off == 0) {
-		if ((nfile = malloc(size)) == 0)
+		if ((nfile = malloc(size)) == NULL)
 			return (0);
 		(void) strcpy(nfile, file);
 	} else
@@ -443,35 +443,35 @@ _enterfile(Crle_desc * crle, const char *file, int off, Hash_ent * fent,
  * this, just the files full and simple name, and its associated object.
  */
 static Hash_ent *
-enternoexistfile(Crle_desc * crle, const char *path, const char *file,
-    Hash_ent * dent)
+enternoexistfile(Crle_desc *crle, const char *path, const char *file,
+    Hash_ent *dent)
 {
-	Hash_ent *	rent, * ent;
-	Hash_obj *	obj;
+	Hash_ent	*rent, *ent;
+	Hash_obj	*obj;
 	int		off;
 
 	/*
 	 * Create a string table entry for the full filename.
 	 */
 	if ((rent = get_hash(crle->c_strtbl, (Addr)path, 0,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 
 	/*
 	 * If this is a new entry, assign both the object and the full filename
 	 * entry information.
 	 */
 	if (rent->e_id == 0) {
-		if ((obj = calloc(sizeof (Hash_obj), 1)) == 0)
-			return (0);
+		if ((obj = calloc(sizeof (Hash_obj), 1)) == NULL)
+			return (NULL);
 		obj->o_flags = RTC_OBJ_NOEXIST;
 
 		if (_enterfile(crle, path, 0, rent, 0, dent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 	obj = rent->e_obj;
-	if ((obj->o_path = strdup(path)) == 0)
-		return (0);
+	if ((obj->o_path = strdup(path)) == NULL)
+		return (NULL);
 
 	/*
 	 * Express the filename in terms of the full pathname.  By reusing the
@@ -485,12 +485,12 @@ enternoexistfile(Crle_desc * crle, const char *path, const char *file,
 	 * Create a entry for the individual file within this directory.
 	 */
 	if ((ent = get_hash(crle->c_strtbl, (Addr)file, dent->e_id,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 
 	if (ent->e_id == 0) {
 		if (_enterfile(crle, file, off, ent, rent, dent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 	return (ent);
 }
@@ -500,22 +500,22 @@ enternoexistfile(Crle_desc * crle, const char *path, const char *file,
  * Establish a string hash entry for a file.
  */
 static Hash_ent *
-enterfile(Crle_desc * crle, const char *opath, const char *ofile, Half flags,
-    Hash_ent * odent, struct stat *status)
+enterfile(Crle_desc *crle, const char *opath, const char *ofile, Half flags,
+    Hash_ent *odent, struct stat *status)
 {
-	Hash_tbl *	stbl = crle->c_strtbl;
-	Hash_ent *	ent, * rent, * ndent = odent;
-	Hash_obj *	obj;
+	Hash_tbl	*stbl = crle->c_strtbl;
+	Hash_ent	*ent, *rent, *ndent = odent;
+	Hash_obj	*obj;
 	size_t		size;
-	char		rpath[PATH_MAX], * npath, * nfile;
+	char		rpath[PATH_MAX], *npath, *nfile;
 	int		off;
 
 	/*
 	 * Establish the files real name, this is the name that will be
 	 * recorded in the object identifier.
 	 */
-	if (realpath(opath, rpath) == 0)
-		return (0);
+	if (realpath(opath, rpath) == NULL)
+		return (NULL);
 
 	if (strcmp(opath, rpath)) {
 		npath = rpath;
@@ -538,8 +538,8 @@ enterfile(Crle_desc * crle, const char *opath, const char *ofile, Half flags,
 
 			(void) stat(_npath, &_status);
 			if ((ndent = enterdir(crle, _npath, flags,
-			    &_status)) == 0)
-				return (0);
+			    &_status)) == NULL)
+				return (NULL);
 		}
 	} else {
 		npath = (char *)opath;
@@ -549,19 +549,19 @@ enterfile(Crle_desc * crle, const char *opath, const char *ofile, Half flags,
 	/*
 	 * Establish an inode table entry, and the objects unique descriptor.
 	 */
-	if ((ent = enterino(crle, npath, status, flags)) == 0)
-		return (0);
+	if ((ent = enterino(crle, npath, status, flags)) == NULL)
+		return (NULL);
 	obj = ent->e_obj;
 
 	/*
 	 * Create a string table entry for the full filename.
 	 */
 	if ((rent = get_hash(stbl, (Addr)npath, 0,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 	if (rent->e_id == 0) {
 		if (_enterfile(crle, npath, 0, rent, 0, ndent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 
 	/*
@@ -586,11 +586,11 @@ enterfile(Crle_desc * crle, const char *opath, const char *ofile, Half flags,
 	 * Create a entry for the individual file within this directory.
 	 */
 	if ((ent = get_hash(stbl, (Addr)nfile, ndent->e_id,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 	if (ent->e_id == 0) {
 		if (_enterfile(crle, nfile, off, ent, rent, ndent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 
 	/*
@@ -604,19 +604,19 @@ enterfile(Crle_desc * crle, const char *opath, const char *ofile, Half flags,
 	/*
 	 * Establish an inode table entry, and the objects unique descriptor.
 	 */
-	if ((ent = enterino(crle, opath, status, 0)) == 0)
-		return (0);
+	if ((ent = enterino(crle, opath, status, 0)) == NULL)
+		return (NULL);
 	obj = ent->e_obj;
 
 	/*
 	 * Create a string table entry for the full filename.
 	 */
 	if ((rent = get_hash(stbl, (Addr)opath, 0,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 	if (rent->e_id == 0) {
 		if (_enterfile(crle, opath, 0, rent, 0, odent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 
 	/*
@@ -631,42 +631,41 @@ enterfile(Crle_desc * crle, const char *opath, const char *ofile, Half flags,
 	 * Create a entry for the individual file within this directory.
 	 */
 	if ((ent = get_hash(stbl, (Addr)ofile, odent->e_id,
-	    (HASH_FND_ENT | HASH_ADD_ENT))) == 0)
-		return (0);
+	    (HASH_FND_ENT | HASH_ADD_ENT))) == NULL)
+		return (NULL);
 	if (ent->e_id == 0) {
 		if (_enterfile(crle, ofile, off, ent, rent, odent, obj) == 0)
-			return (0);
+			return (NULL);
 	}
 
 	return (ent);
 }
 
-
 /*
  * Add a file to configuration information.
  */
 static int
-inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
-    Hash_ent * dent, struct stat *status, int error)
+inspect_file(Crle_desc *crle, const char *path, const char *file, Half flags,
+    Hash_ent *dent, struct stat *status, int error)
 {
-	Hash_ent *	ent;
-	Hash_obj *	obj;
+	Hash_ent	*ent;
+	Hash_obj	*obj;
 	int		fd;
-	Elf *		elf;
+	Elf		*elf;
 	GElf_Ehdr	ehdr;
 	GElf_Xword	dyflags = 0;
-	Listnode *	lnp;
-	Hash_tbl *	tbl;
+	Aliste		idx;
+	Hash_tbl	*tbl;
 	Addr		ino = (Addr)status->st_ino;
 
 	/*
 	 * Determine whether this file (inode) has already been processed.
 	 */
-	for (LIST_TRAVERSE(&crle->c_inotbls, lnp, tbl)) {
+	for (APLIST_TRAVERSE(crle->c_inotbls, idx, tbl)) {
 		if (tbl->t_ident != status->st_dev)
 			continue;
 
-		if ((ent = get_hash(tbl, ino, 0, HASH_FND_ENT)) == 0)
+		if ((ent = get_hash(tbl, ino, 0, HASH_FND_ENT)) == NULL)
 			break;
 
 		/*
@@ -674,7 +673,7 @@ inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
 		 * entry for this directory.
 		 */
 		if ((ent = enterfile(crle, path, file, flags, dent,
-		    status)) == 0)
+		    status)) == NULL)
 			return (error);
 		obj = ent->e_obj;
 
@@ -777,7 +776,7 @@ inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
 	/*
 	 * Enter the file in the string hash table.
 	 */
-	if ((ent = enterfile(crle, path, file, flags, dent, status)) == 0) {
+	if ((ent = enterfile(crle, path, file, flags, dent, status)) == NULL) {
 		(void) elf_end(elf);
 		return (error);
 	}
@@ -839,17 +838,16 @@ inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
 	return (0);
 }
 
-
 /*
  * Add a directory to configuration information.
  */
 static int
-inspect_dir(Crle_desc * crle, const char *name, Half flags, struct stat *status)
+inspect_dir(Crle_desc *crle, const char *name, Half flags, struct stat *status)
 {
-	Hash_tbl *	stbl = crle->c_strtbl;
-	DIR *		dir;
+	Hash_tbl	*stbl = crle->c_strtbl;
+	DIR		*dir;
 	struct dirent	*dirent;
-	Hash_ent *	ent;
+	Hash_ent	*ent;
 	int		error = 0;
 	struct stat	_status;
 	char		path[PATH_MAX], * dst;
@@ -859,7 +857,7 @@ inspect_dir(Crle_desc * crle, const char *name, Half flags, struct stat *status)
 	 * Determine whether we've already visited this directory to process
 	 * all its entries.
 	 */
-	if ((ent = get_hash(stbl, (Addr)name, 0, HASH_FND_ENT)) != 0) {
+	if ((ent = get_hash(stbl, (Addr)name, 0, HASH_FND_ENT)) != NULL) {
 		if (ent->e_obj->o_flags & RTC_OBJ_ALLENTS)
 			return (0);
 	} else {
@@ -867,7 +865,7 @@ inspect_dir(Crle_desc * crle, const char *name, Half flags, struct stat *status)
 		 * Create a directory hash entry.
 		 */
 		if ((ent = enterdir(crle, name, (flags | RTC_OBJ_ALLENTS),
-		    status)) == 0)
+		    status)) == NULL)
 			return (1);
 	}
 	ent->e_obj->o_flags |= RTC_OBJ_ALLENTS;
@@ -883,7 +881,7 @@ inspect_dir(Crle_desc * crle, const char *name, Half flags, struct stat *status)
 	/*
 	 * Access the directory in preparation for reading its entries.
 	 */
-	if ((dir = opendir(name)) == 0)
+	if ((dir = opendir(name)) == NULL)
 		return (1);
 
 	/*
@@ -921,7 +919,6 @@ inspect_dir(Crle_desc * crle, const char *name, Half flags, struct stat *status)
 	return (error);
 }
 
-
 /*
  * Inspect a file/dir name.  A stat(name) results in the following actions:
  *
@@ -936,10 +933,10 @@ inspect_dir(Crle_desc * crle, const char *name, Half flags, struct stat *status)
  *	The file is processed and added to the cache if appropriate.
  */
 int
-inspect(Crle_desc * crle, const char *name, Half flags)
+inspect(Crle_desc *crle, const char *name, Half flags)
 {
-	Hash_ent *	ent;
-	const char	*file, * dir;
+	Hash_ent	*ent;
+	const char	*file, *dir;
 	struct stat	status;
 	char		_name[PATH_MAX], _dir[PATH_MAX];
 	Half		nflags = flags & ~RTC_OBJ_CMDLINE;
@@ -951,7 +948,7 @@ inspect(Crle_desc * crle, const char *name, Half flags)
 	 */
 	if (crle->c_dirnum == 0) {
 		if ((crle->c_strtbl = make_hash(crle->c_strbkts,
-		    HASH_STR, 0)) == 0)
+		    HASH_STR, 0)) == NULL)
 			return (1);
 		crle->c_dirnum = 1;
 	}
@@ -984,7 +981,7 @@ inspect(Crle_desc * crle, const char *name, Half flags)
 			 */
 			if ((flags & (RTC_OBJ_DUMP | RTC_OBJ_ALTER)) !=
 			    RTC_OBJ_ALTER) {
-				if ((ent = enternoexistdir(crle, name)) == 0)
+				if ((ent = enternoexistdir(crle, name)) == NULL)
 					return (1);
 				ent->e_flags |= flags;
 				return (0);
@@ -1022,7 +1019,7 @@ inspect(Crle_desc * crle, const char *name, Half flags)
 	/*
 	 * Break the pathname into directory and filename components.
 	 */
-	if ((file = strrchr(name, '/')) == 0) {
+	if ((file = strrchr(name, '/')) == NULL) {
 		dir = MSG_ORIG(MSG_DIR_DOT);
 		(void) strcpy(_name, MSG_ORIG(MSG_PTH_DOT));
 		(void) strcpy(&_name[MSG_PTH_DOT_SIZE], name);
@@ -1045,7 +1042,8 @@ inspect(Crle_desc * crle, const char *name, Half flags)
 	 * Determine whether we've already visited this directory and if not
 	 * create it.
 	 */
-	if ((ent = get_hash(crle->c_strtbl, (Addr)dir, 0, HASH_FND_ENT)) == 0) {
+	if ((ent = get_hash(crle->c_strtbl,
+	    (Addr)dir, 0, HASH_FND_ENT)) == NULL) {
 		struct stat	_status;
 
 		if (stat(dir, &_status) != 0) {
@@ -1061,12 +1059,13 @@ inspect(Crle_desc * crle, const char *name, Half flags)
 				 * directory does, but supposedly it contains
 				 * a file that does.
 				 */
-				if ((ent = enternoexistdir(crle, dir)) == 0)
+				if ((ent = enternoexistdir(crle, dir)) == NULL)
 					return (1);
 				ent->e_flags |= nflags;
 			}
 		} else {
-			if ((ent = enterdir(crle, dir, nflags, &_status)) == 0)
+			if ((ent = enterdir(crle, dir, nflags,
+			    &_status)) == NULL)
 				return (1);
 		}
 	}
@@ -1078,7 +1077,7 @@ inspect(Crle_desc * crle, const char *name, Half flags)
 	 * hadn't be specified from the directory entry.
 	 */
 	if (noexist) {
-		if ((ent = enternoexistfile(crle, name, file, ent)) == 0)
+		if ((ent = enternoexistfile(crle, name, file, ent)) == NULL)
 			return (1);
 		ent->e_flags |= nflags;
 		if (enteralt(crle, name, file, flags, ent->e_obj) == 0)

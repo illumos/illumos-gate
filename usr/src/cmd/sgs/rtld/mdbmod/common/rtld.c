@@ -273,7 +273,7 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
     uint_t flg, const char *msg)
 {
 	APlist		apl;
-	uintptr_t	listcalc, listndx;
+	uintptr_t	datap, nitems;
 	Bnd_desc	*bdp;
 
 	/*
@@ -296,10 +296,10 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 	 * Under verbose mode print the name of each dependency.  An APlist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = APLIST_OFF_DATA + (uintptr_t)addr;
-	if (mdb_vread(&bdp, sizeof (Bnd_desc *), listcalc) == -1) {
+	datap = APLIST_OFF_DATA + (uintptr_t)addr;
+	if (mdb_vread(&bdp, sizeof (Bnd_desc *), datap) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
-		    MSG_ORIG(MSG_BNDDESC_STR), listcalc);
+		    MSG_ORIG(MSG_BNDDESC_STR), datap);
 		return (DCMD_ERR);
 	}
 
@@ -311,11 +311,11 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		return (DCMD_ERR);
 	}
 
-	for (listndx = 1; listndx < apl.apl_nitems; listndx++) {
-		listcalc += sizeof (void *);
-		if (mdb_vread(&bdp, sizeof (Bnd_desc *), listcalc) == -1) {
+	for (nitems = 1; nitems < apl.apl_nitems; nitems++) {
+		datap += sizeof (void *);
+		if (mdb_vread(&bdp, sizeof (Bnd_desc *), datap) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
-			    MSG_ORIG(MSG_BNDDESC_STR), listcalc);
+			    MSG_ORIG(MSG_BNDDESC_STR), datap);
 			return (DCMD_ERR);
 		}
 
@@ -522,9 +522,8 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint_t		flg = 0;
 	GElf_Sym	gsym;
-	List		l;
-	Listnode	ln;
-	uintptr_t	naddr;
+	APlist		*aplp, apl;
+	uintptr_t	datap, nitems;
 	const char	*str;
 	W_desc		wdesc;
 
@@ -561,35 +560,47 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    MSG_ORIG(MSG_STR_DYNLMLIST));
 		return (DCMD_ERR);
 	}
-	if (mdb_vread((void *)&l, sizeof (l), (uintptr_t)gsym.st_value) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_LIST_STR),
+	if (mdb_vread(&aplp, sizeof (APlist *),
+	    (uintptr_t)gsym.st_value) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
 		    gsym.st_value);
 		return (DCMD_ERR);
 	}
 
+	if (aplp == NULL) {
+		mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE0),
+		    MSG_ORIG(MSG_STR_DYNLMLIST));
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&apl, sizeof (APlist), (uintptr_t)aplp) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
+		    aplp);
+	}
 	mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE1), MSG_ORIG(MSG_STR_DYNLMLIST),
-	    gsym.st_value);
+	    aplp, (size_t)apl.apl_nitems, (size_t)apl.apl_arritems);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	flags |= (DCMD_LOOP | DCMD_LOOPFIRST);
-	for (naddr = (uintptr_t)l.head; naddr; naddr = (uintptr_t)ln.next) {
-		Lm_list	lml;
+	for (datap = (uintptr_t)aplp + APLIST_OFF_DATA, nitems = 0;
+	    nitems < apl.apl_nitems; nitems++, datap += sizeof (void *)) {
+		Lm_list	*lml, lm;
 
-		if (mdb_vread(&ln, sizeof (ln), naddr) == -1) {
+		if (mdb_vread(&lml, sizeof (Lm_list *), datap) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
-			    MSG_ORIG(MSG_STR_LISTNODE), naddr);
+			    MSG_ORIG(MSG_LMLIST_STR), datap);
 			return (DCMD_ERR);
 		}
-		if (mdb_vread(&lml, sizeof (lml), (uintptr_t)ln.data) == -1) {
+		if (mdb_vread(&lm, sizeof (Lm_list), (uintptr_t)lml) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
-			    MSG_ORIG(MSG_LMLIST_STR), ln.data);
+			    MSG_ORIG(MSG_LMLIST_STR), lml);
 			return (DCMD_ERR);
 		}
 
 		mdb_inc_indent(2);
-		if (lml.lm_flags & LML_FLG_BASELM)
+		if (lm.lm_flags & LML_FLG_BASELM)
 			str = MSG_ORIG(MSG_LMLIST_BASE);
-		else if (lml.lm_flags & LML_FLG_RTLDLM)
+		else if (lm.lm_flags & LML_FLG_RTLDLM)
 			str = MSG_ORIG(MSG_LMLIST_LDSO);
 		else
 			str = MSG_ORIG(MSG_LMLIST_NEWLM);
@@ -597,7 +608,7 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if ((flags & DCMD_LOOP) && ((flags & DCMD_LOOPFIRST) == 0))
 			mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-		mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE2), ln.data, str);
+		mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE2), datap, str);
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 		mdb_inc_indent(2);
@@ -610,45 +621,13 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		wdesc.w_flags = flg;
 		if (mdb_pwalk(MSG_ORIG(MSG_RTMAPS_STR), rtmap_format,
-		    (void *)&wdesc, (uintptr_t)lml.lm_head) == -1) {
+		    (void *)&wdesc, (uintptr_t)lm.lm_head) == -1) {
 			mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
 		mdb_dec_indent(4);
 		flags &= ~DCMD_LOOPFIRST;
 	}
-	return (DCMD_OK);
-}
-
-static int
-/* ARGSUSED2 */
-format_listnode(uintptr_t addr, const void *data, void *private)
-{
-	Listnode	*lnp = (Listnode *)data;
-
-	mdb_printf(MSG_ORIG(MSG_FMT_LN), addr, lnp->data, lnp->next);
-	return (0);
-}
-
-void
-dcmd_List_help(void)
-{
-	mdb_printf(MSG_ORIG(MSG_LIST_HELP));
-}
-
-static int
-/* ARGSUSED2 */
-dcmd_List(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	if ((flags & DCMD_ADDRSPEC) == 0)
-		return (DCMD_USAGE);
-	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
-		mdb_printf(MSG_ORIG(MSG_LIST_TITLE));
-		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
-	}
-	if (mdb_pwalk(MSG_ORIG(MSG_LIST_STR), format_listnode,
-	    (void *)0, addr) == -1)
-		return (DCMD_ERR);
 	return (DCMD_OK);
 }
 
@@ -689,47 +668,6 @@ dcmd_Setenv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	(void) strcpy(str, argv->a_un.a_str);
 	(void) putenv(str);
 	return (DCMD_OK);
-}
-
-int
-walk_List_init(mdb_walk_state_t *wsp)
-{
-	List	lst;
-
-	if (wsp->walk_addr == NULL) {
-		mdb_warn(MSG_ORIG(MSG_ERR_NAS), MSG_ORIG(MSG_LIST_STR));
-		return (WALK_ERR);
-	}
-
-	if (mdb_vread(&lst, sizeof (List), wsp->walk_addr) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ),
-		    MSG_ORIG(MSG_LIST_STR), wsp->walk_addr);
-		return (WALK_DONE);
-	}
-
-	wsp->walk_addr = (uintptr_t)lst.head;
-	return (WALK_NEXT);
-}
-
-
-static int
-walk_List_step(mdb_walk_state_t *wsp)
-{
-	Listnode	lnp;
-	int		status;
-
-	if (wsp->walk_addr == NULL)
-		return (WALK_DONE);
-
-	if (mdb_vread(&lnp, sizeof (Listnode), wsp->walk_addr) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ),
-		    MSG_ORIG(MSG_STR_LISTNODE), wsp->walk_addr);
-		return (WALK_DONE);
-	}
-
-	status = wsp->walk_callback(wsp->walk_addr, &lnp, wsp->walk_cbdata);
-	wsp->walk_addr = (uintptr_t)lnp.next;
-	return (status);
 }
 
 /*
@@ -877,7 +815,7 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (lml.lm_lists) {
 		Alist		al;
 		Lm_cntl		lmc;
-		uintptr_t	listcalc;
+		uintptr_t	datap;
 
 		addr = (uintptr_t)lml.lm_lists;
 		if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
@@ -894,12 +832,12 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * element has been initialized.
 		 */
 		if (al.al_nitems && (flg & RTLD_FLG_VERBOSE)) {
-			listcalc = ALIST_OFF_DATA + (uintptr_t)addr;
+			datap = ALIST_OFF_DATA + (uintptr_t)addr;
 
 			if (mdb_vread(&lmc, sizeof (Lm_cntl),
-			    listcalc) == -1) {
+			    datap) == -1) {
 				mdb_warn(MSG_ORIG(MSG_ERR_READ),
-				    MSG_ORIG(MSG_LMLIST_STR), listcalc);
+				    MSG_ORIG(MSG_LMLIST_STR), datap);
 				return (DCMD_ERR);
 			}
 		}
@@ -910,10 +848,10 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 		if (al.al_nitems && (flg & RTLD_FLG_VERBOSE)) {
-			uintptr_t	listndx;
+			uintptr_t	nitems;
 
 			mdb_inc_indent(2);
-			mdb_printf(MSG_ORIG(MSG_LMC_LINE1), listcalc);
+			mdb_printf(MSG_ORIG(MSG_LMC_LINE1), datap);
 			mdb_printf(MSG_ORIG(MSG_LMC_LINE2), lmc.lc_head,
 			    lmc.lc_tail);
 			mdb_printf(MSG_ORIG(MSG_LMC_LINE3), lmc.lc_flags,
@@ -937,18 +875,18 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-			for (listndx = 1; listndx < al.al_nitems; listndx++) {
-				listcalc += al.al_size;
+			for (nitems = 1; nitems < al.al_nitems; nitems++) {
+				datap += al.al_size;
 				if (mdb_vread(&lmc, sizeof (Lm_cntl),
-				    listcalc) == -1) {
+				    datap) == -1) {
 					mdb_warn(MSG_ORIG(MSG_ERR_READ),
-					    MSG_ORIG(MSG_LMLIST_STR), listcalc);
+					    MSG_ORIG(MSG_LMLIST_STR), datap);
 					mdb_dec_indent(4);
 					return (DCMD_ERR);
 				}
 
 				mdb_printf(MSG_ORIG(MSG_STR_DASHES));
-				mdb_printf(MSG_ORIG(MSG_LMC_LINE1), listcalc);
+				mdb_printf(MSG_ORIG(MSG_LMC_LINE1), datap);
 				mdb_printf(MSG_ORIG(MSG_LMC_LINE2),
 				    lmc.lc_head, lmc.lc_tail);
 				mdb_printf(MSG_ORIG(MSG_LMC_LINE3),
@@ -1000,9 +938,8 @@ static int
 dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	GElf_Sym	gsym;
-	List		l;
-	Listnode	ln;
-	uintptr_t	naddr;
+	APlist		*aplp, apl;
+	uintptr_t	datap, nitems;
 
 	/*
 	 * If an address was provided us it.
@@ -1019,27 +956,42 @@ dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    MSG_ORIG(MSG_STR_DYNLMLIST));
 		return (DCMD_ERR);
 	}
-	if (mdb_vread((void *)&l, sizeof (l), (uintptr_t)gsym.st_value) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_LIST_STR),
+	if (mdb_vread(&aplp, sizeof (APlist *),
+	    (uintptr_t)gsym.st_value) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
 		    gsym.st_value);
+		return (DCMD_ERR);
+	}
+	if (aplp == NULL) {
+		mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE0),
+		    MSG_ORIG(MSG_STR_DYNLMLIST));
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&apl, sizeof (APlist), (uintptr_t)aplp) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
+		    aplp);
 		return (DCMD_ERR);
 	}
 
 	mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE1), MSG_ORIG(MSG_STR_DYNLMLIST),
-	    gsym.st_value);
+	    aplp, (size_t)apl.apl_nitems, (size_t)apl.apl_arritems);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	flags |= (DCMD_LOOP | DCMD_LOOPFIRST);
-	for (naddr = (uintptr_t)l.head; naddr; naddr = (uintptr_t)ln.next) {
-		if (mdb_vread(&ln, sizeof (ln), naddr) == -1) {
+	for (datap = (uintptr_t)aplp + APLIST_OFF_DATA, nitems = 0;
+	    nitems < apl.apl_nitems; nitems++, datap += sizeof (void *)) {
+		Lm_list	*lml;
+
+		if (mdb_vread(&lml, sizeof (Lm_list *), datap) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
-			    MSG_ORIG(MSG_STR_LISTNODE), naddr);
+			    MSG_ORIG(MSG_LMLIST_STR), datap);
 			return (DCMD_ERR);
 		}
 
 		mdb_inc_indent(2);
-		if (_dcmd_Lm_list((uintptr_t)ln.data, flags,
-		    argc, argv) == DCMD_ERR) {
+		if (_dcmd_Lm_list((uintptr_t)lml, flags, argc,
+		    argv) == DCMD_ERR) {
 			mdb_dec_indent(2);
 			return (DCMD_ERR);
 		}
@@ -1099,7 +1051,7 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	Grp_hdl		gh;
 	Alist		al;
-	uintptr_t	listcalc, listidx;
+	uintptr_t	datap, listidx;
 	char		*str;
 	uint_t		flg = 0;
 
@@ -1161,16 +1113,16 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Under verbose mode print the name of each dependency.  An Alist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = ALIST_OFF_DATA + (uintptr_t)addr;
-	if (dcmd_GrpDesc(listcalc, flags, argc, argv) == DCMD_ERR) {
+	datap = ALIST_OFF_DATA + (uintptr_t)addr;
+	if (dcmd_GrpDesc(datap, flags, argc, argv) == DCMD_ERR) {
 		mdb_dec_indent(4);
 		return (DCMD_ERR);
 	}
 
 	for (listidx = 1; listidx < al.al_nitems; listidx++) {
-		listcalc += al.al_size;
+		datap += al.al_size;
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
-		if (dcmd_GrpDesc(listcalc, flags, argc, argv) == DCMD_ERR) {
+		if (dcmd_GrpDesc(datap, flags, argc, argv) == DCMD_ERR) {
 			mdb_dec_indent(4);
 			return (DCMD_ERR);
 		}
@@ -1193,7 +1145,7 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char		*str;
 	uint_t		flg = 0;
 	APlist		apl;
-	uintptr_t	listcalc, listndx;
+	uintptr_t	datap, nitems;
 	Grp_hdl		*ghp;
 
 	/*
@@ -1241,10 +1193,10 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Under verbose mode print the name of each dependency.  An APlist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = addr + APLIST_OFF_DATA;
-	if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
+	datap = addr + APLIST_OFF_DATA;
+	if (mdb_vread(&ghp, sizeof (Grp_hdl *), datap) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
-		    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
+		    MSG_ORIG(MSG_GRPHDL_STR), datap);
 		return (DCMD_ERR);
 	}
 
@@ -1256,12 +1208,12 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	listndx = 1;
-	for (listndx = 1; listndx < apl.apl_nitems; listndx++) {
-		listcalc += sizeof (void *);
-		if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
+	nitems = 1;
+	for (nitems = 1; nitems < apl.apl_nitems; nitems++) {
+		datap += sizeof (void *);
+		if (mdb_vread(&ghp, sizeof (Grp_hdl *), datap) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
-			    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
+			    MSG_ORIG(MSG_GRPHDL_STR), datap);
 			return (DCMD_ERR);
 		}
 
@@ -1290,7 +1242,7 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char		*str;
 	APlist		apl;
 	uint_t		flg = 0;
-	uintptr_t	listcalc, listndx;
+	uintptr_t	datap, nitems;
 	Grp_hdl		*ghp;
 
 	/*
@@ -1338,10 +1290,10 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Under verbose mode print the name of each dependency.  An APlist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = addr + APLIST_OFF_DATA;
-	if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
+	datap = addr + APLIST_OFF_DATA;
+	if (mdb_vread(&ghp, sizeof (Grp_hdl *), datap) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
-		    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
+		    MSG_ORIG(MSG_GRPHDL_STR), datap);
 		return (DCMD_ERR);
 	}
 
@@ -1353,11 +1305,11 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	for (listndx = 1; listndx < apl.apl_nitems; listndx++) {
-		listcalc += sizeof (void *);
-		if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
+	for (nitems = 1; nitems < apl.apl_nitems; nitems++) {
+		datap += sizeof (void *);
+		if (mdb_vread(&ghp, sizeof (Grp_hdl *), datap) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
-			    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
+			    MSG_ORIG(MSG_GRPHDL_STR), datap);
 			return (DCMD_ERR);
 		}
 
@@ -1536,9 +1488,6 @@ static const mdb_dcmd_t dcmds[] = {
 	{ MSG_ORIG(MSG_EPHDR_STR), MSG_ORIG(MSG_USG_ADDREQ),
 		MSG_ORIG(MSG_EPHDR_DCD),
 		dcmd_ElfPhdr, dcmd_ElfPhdr_help},
-	{ MSG_ORIG(MSG_LIST_STR), MSG_ORIG(MSG_USG_ADDREQ),
-		MSG_ORIG(MSG_LIST_DCD),
-		dcmd_List, dcmd_List_help},
 	{ MSG_ORIG(MSG_LMLIST_STR), MSG_ORIG(MSG_USG_ADDREQ_V),
 		MSG_ORIG(MSG_LMLIST_DCD),
 		dcmd_Lm_list, dcmd_Lm_list_help},
@@ -1557,8 +1506,6 @@ static const mdb_dcmd_t dcmds[] = {
 static const mdb_walker_t walkers[] = {
 	{ MSG_ORIG(MSG_RTMAPS_STR), MSG_ORIG(MSG_WWD_RTMAP),
 		walk_rtmap_init, walk_rtmap_step, NULL, NULL },
-	{ MSG_ORIG(MSG_LIST_STR), MSG_ORIG(MSG_WWD_LIST),
-		walk_List_init, walk_List_step, NULL, NULL },
 	{ NULL }
 };
 

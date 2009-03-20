@@ -111,7 +111,7 @@ libld_malloc(size_t size)
 	 * If this is the first allocation, or the allocation request is greater
 	 * than the current free space available, allocate a new heap.
 	 */
-	if ((chp == 0) ||
+	if ((chp == NULL) ||
 	    (((size_t)chp->lh_end - (size_t)chp->lh_free) <= asize)) {
 		Ld_heap	*nhp;
 		size_t	hsize = (size_t)S_ROUND(sizeof (Ld_heap), HEAPALIGN);
@@ -171,7 +171,7 @@ libld_realloc(void *ptr, size_t size)
 	if (size <= psize)
 		return (ptr);
 
-	if ((vptr = libld_malloc(size)) != 0)
+	if ((vptr = libld_malloc(size)) != NULL)
 		(void) memcpy(vptr, ptr, psize);
 
 	return (vptr);
@@ -181,137 +181,6 @@ void
 /* ARGSUSED 0 */
 libld_free(void *ptr)
 {
-}
-
-/*
- * Append an item to the specified list, and return a pointer to the list
- * node created.
- */
-Listnode *
-list_appendc(List *lst, const void *item)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = libld_malloc(sizeof (Listnode))) == NULL)
-		return (NULL);
-
-	_lnp->data = (void *)item;
-	_lnp->next = NULL;
-
-	if (lst->head == NULL)
-		lst->tail = lst->head = _lnp;
-	else {
-		lst->tail->next = _lnp;
-		lst->tail = lst->tail->next;
-	}
-	return (_lnp);
-}
-
-/*
- * Add an item after the specified listnode, and return a pointer to the list
- * node created.
- */
-Listnode *
-list_insertc(List *lst, const void *item, Listnode *lnp)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = libld_malloc(sizeof (Listnode))) == NULL)
-		return (NULL);
-
-	_lnp->data = (void *)item;
-	_lnp->next = lnp->next;
-	if (_lnp->next == NULL)
-		lst->tail = _lnp;
-	lnp->next = _lnp;
-	return (_lnp);
-}
-
-/*
- * Prepend an item to the specified list, and return a pointer to the
- * list node created.
- */
-Listnode *
-list_prependc(List *lst, const void *item)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = libld_malloc(sizeof (Listnode))) == NULL)
-		return (NULL);
-
-	_lnp->data = (void *)item;
-
-	if (lst->head == NULL) {
-		_lnp->next = NULL;
-		lst->tail = lst->head = _lnp;
-	} else {
-		_lnp->next = lst->head;
-		lst->head = _lnp;
-	}
-	return (_lnp);
-}
-
-/*
- * Find out where to insert the node for reordering.  List of insect structures
- * is traversed and the is_txtndx field of the insect structure is examined
- * and that determines where the new input section should be inserted.
- * All input sections which have a non zero is_txtndx value will be placed
- * in ascending order before sections with zero is_txtndx value.  This
- * implies that any section that does not appear in the map file will be
- * placed at the end of this list as it will have a is_txtndx value of 0.
- * Returns:  NULL if the input section should be inserted at beginning
- * of list else A pointer to the entry AFTER which this new section should
- * be inserted.
- */
-Listnode *
-list_where(List *lst, Word num)
-{
-	Listnode	*ln, *pln;	/* Temp list node ptr */
-	Is_desc		*isp;		/* Temp Insect structure */
-	Word		n;
-
-	/*
-	 * No input sections exist, so add at beginning of list
-	 */
-	if (lst->head == NULL)
-		return (NULL);
-
-	for (ln = lst->head, pln = ln; ln != NULL; pln = ln, ln = ln->next) {
-		isp = (Is_desc *)ln->data;
-		/*
-		 *  This should never happen, but if it should we
-		 *  try to do the right thing.  Insert at the
-		 *  beginning of list if no other items exist, else
-		 *  end of already existing list, prior to this null
-		 *  item.
-		 */
-		if (isp == NULL) {
-			if (ln == pln) {
-				return (NULL);
-			} else {
-				return (pln);
-			}
-		}
-		/*
-		 *  We have reached end of reorderable items.  All
-		 *  following items have is_txtndx values of zero
-		 *  So insert at end of reorderable items.
-		 */
-		if ((n = isp->is_txtndx) > num || n == 0) {
-			if (ln == pln) {
-				return (NULL);
-			} else {
-				return (pln);
-			}
-		}
-		/*
-		 *  We have reached end of list, so insert
-		 *  at the end of this list.
-		 */
-		if ((n != 0) && (ln->next == NULL))
-			return (ln);
-	}
-	return (NULL);
 }
 
 /*
@@ -341,12 +210,12 @@ list_where(List *lst, Word num)
  *	input file.
  */
 Sdf_desc *
-sdf_find(const char *name, List *lst)
+sdf_find(const char *name, APlist *alp)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	Sdf_desc	*sdf;
 
-	for (LIST_TRAVERSE(lst, lnp, sdf))
+	for (APLIST_TRAVERSE(alp, idx, sdf))
 		if (strcmp(name, sdf->sdf_name) == 0)
 			return (sdf);
 
@@ -354,19 +223,19 @@ sdf_find(const char *name, List *lst)
 }
 
 Sdf_desc *
-sdf_add(const char *name, List *lst)
+sdf_add(const char *name, APlist **alpp)
 {
 	Sdf_desc	*sdf;
 
-	if (!(sdf = libld_calloc(sizeof (Sdf_desc), 1)))
+	if ((sdf = libld_calloc(sizeof (Sdf_desc), 1)) == NULL)
 		return ((Sdf_desc *)S_ERROR);
 
 	sdf->sdf_name = name;
 
-	if (list_appendc(lst, sdf) == 0)
+	if (aplist_append(alpp, sdf, AL_CNT_OFL_LIBS) == NULL)
 		return ((Sdf_desc *)S_ERROR);
-	else
-		return (sdf);
+
+	return (sdf);
 }
 
 /*

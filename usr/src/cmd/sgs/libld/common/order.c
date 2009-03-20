@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +66,9 @@ is_keylink_ok(Ifl_desc *ifl, Word keylink, Word limit)
 static Word
 get_shfordered_dest(Ofl_desc *ofl, Ifl_desc *ifl, Word ndx, Word limit)
 {
-	Word t1_link = ndx, t2_link, ret_link;
+	Word	t1_link = ndx, t2_link, ret_link;
 	Is_desc *isp, *isp1, *isp2;
-	int error = 0;
+	int	error = 0;
 
 	/*
 	 * Check the sh_info of myself.
@@ -149,13 +149,13 @@ get_shfordered_dest(Ofl_desc *ofl, Ifl_desc *ifl, Word ndx, Word limit)
 uintptr_t
 ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 {
-	Is_desc *	isp2, * isp = ifl->ifl_isdesc[ndx];
+	Is_desc		*isp2, *isp = ifl->ifl_isdesc[ndx];
 	Xword		shflags = isp->is_shdr->sh_flags;
 	uint_t		keylink;
-	Os_desc *	osp2, * osp;
+	Os_desc		*osp2, *osp;
 	Word		dest_ndx;
-	Sort_desc *	st;
-	Listnode *	lnp;
+	Sort_desc	*st;
+	Aliste		idx;
 	int		error = 0;
 
 	/*
@@ -216,28 +216,26 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	}
 
 	/*
-	 * If the output section is not yet on the ordered
-	 * list - place it on the list.
+	 * If the output section is not yet on the ordered list, place it on
+	 * the list.
 	 */
 	osp2 = NULL;
-	for (LIST_TRAVERSE(&ofl->ofl_ordered, lnp, osp2)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ordered, idx, osp2)) {
 		if (osp2 == osp)
 			break;
 	}
 
-	if (osp != osp2) {
-		if (list_appendc(&(ofl->ofl_ordered), osp) == 0)
-			return ((uintptr_t)S_ERROR);
-	}
+	if ((osp != osp2) && (aplist_append(&(ofl->ofl_ordered),
+	    osp, AL_CNT_OFL_ORDERED) == NULL))
+		return ((uintptr_t)S_ERROR);
 
 	/*
-	 * Output section has been found - set up it's
-	 * sorting information.
+	 * Output section has been found - set up it's sorting information.
 	 */
-	if (osp->os_sort == 0) {
-		if ((osp->os_sort = libld_calloc(1, sizeof (Sort_desc))) == 0)
-			return (S_ERROR);
-	}
+	if ((osp->os_sort == NULL) &&
+	    ((osp->os_sort = libld_calloc(1, sizeof (Sort_desc))) == NULL))
+		return (S_ERROR);
+
 	st = osp->os_sort;
 
 	if (keylink == SHN_BEFORE) {
@@ -285,16 +283,16 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 void
 ld_sec_validate(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
+	Aliste		idx1;
 	Sg_desc		*sgp;
 	Word 		key = 1;
 
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Sec_order	*scop;
 		Os_desc		*osp;
-		Aliste		idx;
+		Aliste		idx2;
 
-		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop)) {
+		for (APLIST_TRAVERSE(sgp->sg_secorder, idx2, scop)) {
 			if ((scop->sco_flags & FLG_SGO_USED) == 0) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MAP_SECORDER),
@@ -304,14 +302,14 @@ ld_sec_validate(Ofl_desc *ofl)
 		if ((sgp->sg_flags & FLG_SG_KEY) == 0)
 			continue;
 
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
-			Listnode	*lnp2;
-			Is_desc		*isp;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			Aliste	idx3;
+			Is_desc	*isp;
 
 			if ((osp->os_flags & FLG_OS_KEY) == 0)
 				continue;
 
-			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
+			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
 				if (isp->is_flags & FLG_IS_KEY)
 					isp->is_keyident = key++;
 			}
@@ -324,7 +322,7 @@ setup_sortbuf(Os_desc *osp)
 {
 	Sort_desc	*st = osp->os_sort;
 	Word		num_after = 0, num_before = 0, num_order = 0;
-	Listnode	*lnp1;
+	Aliste		idx;
 	Is_desc		*isp;
 
 	if ((st == NULL) ||
@@ -334,26 +332,22 @@ setup_sortbuf(Os_desc *osp)
 	/*
 	 * Get memory
 	 */
-	if (st->st_beforecnt != 0) {
-		if ((st->st_before =
-		    libld_calloc(st->st_beforecnt, sizeof (Is_desc *))) == 0)
-			return (0);
-	}
-	if (st->st_ordercnt != 0) {
-		if ((st->st_order =
-		    libld_calloc(st->st_ordercnt, sizeof (Is_desc *))) == 0)
-			return (0);
-	}
-	if (st->st_aftercnt != 0) {
-		if ((st->st_after =
-		    libld_calloc(st->st_aftercnt, sizeof (Is_desc *))) == 0)
-			return (0);
-	}
+	if (st->st_beforecnt && ((st->st_before = libld_calloc(st->st_beforecnt,
+	    sizeof (Is_desc *))) == NULL))
+		return (0);
+
+	if (st->st_ordercnt && ((st->st_order = libld_calloc(st->st_ordercnt,
+	    sizeof (Is_desc *))) == NULL))
+		return (0);
+
+	if (st->st_aftercnt && ((st->st_after = libld_calloc(st->st_aftercnt,
+	    sizeof (Is_desc *))) == NULL))
+		return (0);
 
 	/*
 	 * Set info.
 	 */
-	for (LIST_TRAVERSE(&(osp->os_isdescs), lnp1, isp)) {
+	for (APLIST_TRAVERSE(osp->os_isdescs, idx, isp)) {
 		Word	keylink = 0;
 
 		if ((isp->is_flags & FLG_IS_ORDERED) == 0)
@@ -405,7 +399,7 @@ comp(const void *ss1, const void *ss2)
 uintptr_t
 ld_sort_ordered(Ofl_desc *ofl)
 {
-	Listnode *lnp1;
+	Aliste	idx1;
 	Os_desc *osp;
 
 	DBG_CALL(Dbg_sec_order_list(ofl, 0));
@@ -413,19 +407,18 @@ ld_sort_ordered(Ofl_desc *ofl)
 	/*
 	 * Sort Sections
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_ordered, lnp1, osp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_ordered, idx1, osp)) {
 		int		i;
-		List		islist;
-		Listnode *	lnp2;
-		Is_desc *	isp;
-		Sort_desc *	st = osp->os_sort;
+		APlist		*islist = NULL;
+		Aliste		idx2;
+		Is_desc		*isp;
+		Sort_desc	*st = osp->os_sort;
 
 		if (setup_sortbuf(osp) == 0)
 			return (S_ERROR);
 
 		islist = osp->os_isdescs;
-		osp->os_isdescs.head = 0;
-		osp->os_isdescs.tail = 0;
+		osp->os_isdescs = NULL;
 
 		/*
 		 * Sorting.
@@ -455,15 +448,15 @@ ld_sort_ordered(Ofl_desc *ofl)
 		 * Now we list any sections which have no sorting
 		 * specifications - in the order they were input.
 		 *
-		 * We use list_appendc() here instead of ld_append_isp(),
+		 * We use aplist_append() here instead of ld_append_isp(),
 		 * because these items have already been inserted once, and
 		 * we don't want any duplicate entries in osp->os_mstridescs.
 		 */
-		for (LIST_TRAVERSE(&islist, lnp2, isp)) {
+		for (APLIST_TRAVERSE(islist, idx2, isp)) {
 			if (isp->is_flags & FLG_IS_ORDERED)
 				continue;
-			if (list_appendc(&(osp->os_isdescs),
-			    isp) == 0)
+			if (aplist_append(&(osp->os_isdescs),
+			    isp, AL_CNT_OS_ISDESCS) == NULL)
 				return (S_ERROR);
 		}
 
@@ -474,6 +467,9 @@ ld_sort_ordered(Ofl_desc *ofl)
 			if (ld_append_isp(ofl, osp, st->st_after[i], 0) == 0)
 				return (S_ERROR);
 		}
+
+		if (islist)
+			free(islist);
 	}
 	DBG_CALL(Dbg_sec_order_list(ofl, 1));
 	return (0);

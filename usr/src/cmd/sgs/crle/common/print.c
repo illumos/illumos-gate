@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,9 +54,9 @@
  * don't bother printing anything.
  */
 static void
-printcmd(Crle_desc * crle, Rtc_head * head, List * cmdline)
+printcmd(Crle_desc *crle, Rtc_head * head, APlist *cmdline)
 {
-	Listnode	*lnp;
+	Aliste		idx, lidx;
 	const char	*fmto, *fmtb, *fmtm, *fmte;
 	char		*cmd;
 	int		output = 0;
@@ -79,14 +79,16 @@ printcmd(Crle_desc * crle, Rtc_head * head, List * cmdline)
 	}
 
 	(void) printf(MSG_INTL(MSG_DMP_CMD_TITLE));
-	for (LIST_TRAVERSE(cmdline, lnp, cmd)) {
+
+	lidx = aplist_nitems(cmdline) - 1;
+	for (APLIST_TRAVERSE(cmdline, idx, cmd)) {
 		if (output++ == 0) {
-			if (lnp->next)
+			if (idx < lidx)
 				(void) printf(fmtb, cmd);
 			else
 				(void) printf(fmto, cmd);
 		} else {
-			if (lnp->next)
+			if (idx < lidx)
 				(void) printf(fmtm, cmd);
 			else
 				(void) printf(fmte, cmd);
@@ -220,14 +222,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	Rtc_head	*head;
 	Rtc_dir		*dirtbl;
 	Rtc_file	*filetbl;
-	Rtc_obj		*objtbl, * obj;
-	Word		*hash, * chain;
+	Rtc_obj		*objtbl, *obj;
+	Word		*hash, *chain;
 	const char	*strtbl;
 	int		ndx, bkts;
-	List		cmdline = { 0 };
-	char		_cmd[PATH_MAX], * cmd;
-	char		_objdir[PATH_MAX], * objdir = 0;
-
+	APlist		*cmdline = NULL;
+	char		_cmd[PATH_MAX], *cmd;
+	char		_objdir[PATH_MAX], *objdir = NULL;
 
 	/*
 	 * If there is an Rtc_id present, the Rtc_head follows it.
@@ -346,7 +347,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		 * Construct the original command line argument.
 		 */
 		cmd = strcpy(alloca(MSG_CMD_64_SIZE + 1), MSG_ORIG(MSG_CMD_64));
-		if (list_append(&cmdline, cmd) == 0)
+		if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 			return (INSCFG_RET_FAIL);
 	}
 
@@ -383,7 +384,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_CONF),
 		    crle->c_confil);
 		cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-		if (list_append(&cmdline, cmd) == 0)
+		if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 			return (INSCFG_RET_FAIL);
 
 		/*
@@ -395,7 +396,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALT_CRLE,
 			    &dl_flag_buf));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
 	} else {
@@ -443,13 +444,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_OUTPUT), crle->c_objdir);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_DUMPGRP), (strtbl + obj->co_name));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
 	}
@@ -488,7 +489,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_EDLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
 	} else {
@@ -555,7 +556,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_ESLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
 	} else {
@@ -607,7 +608,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_ADLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
 	} else {
@@ -647,7 +648,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_ASLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-			if (list_append(&cmdline, cmd) == 0)
+			if (aplist_append(&cmdline, cmd, AL_CNT_CRLE) == NULL)
 				return (INSCFG_RET_FAIL);
 		}
 	} else {
@@ -679,7 +680,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	 * Display any environment variables.
 	 */
 	if ((head->ch_version >= RTC_VER_THREE) && head->ch_env) {
-		Rtc_env *	envtbl;
+		Rtc_env	*envtbl;
 
 		if ((crle->c_flags & CRLE_UPDATE) == 0)
 			(void) printf(MSG_INTL(MSG_ENV_TITLE));
@@ -707,7 +708,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 				(void) printf(pfmt, str);
 				(void) snprintf(_cmd, PATH_MAX, sfmt, str);
 				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-				if (list_append(&cmdline, cmd) == 0)
+				if (aplist_append(&cmdline, cmd,
+				    AL_CNT_CRLE) == NULL)
 					return (INSCFG_RET_FAIL);
 			}
 		}
@@ -718,8 +720,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	 */
 	if ((head->ch_version >= RTC_VER_FOUR) && head->ch_fltr) {
 		if ((crle->c_flags & CRLE_UPDATE) == 0) {
-			Rtc_fltr *	fltrtbl;
-			Rtc_flte *	fltetbl;
+			Rtc_fltr	*fltrtbl;
+			Rtc_flte	*fltetbl;
 
 			/* LINTED */
 			fltrtbl = (Rtc_fltr *)
@@ -770,7 +772,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	 */
 	if (head->ch_hash == 0) {
 		if ((crle->c_flags & CRLE_UPDATE) == 0)
-			printcmd(crle, head, &cmdline);
+			printcmd(crle, head, cmdline);
 		return (INSCFG_RET_OK);
 	}
 
@@ -807,7 +809,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 				(void) snprintf(_cmd, PATH_MAX,
 				    getformat(dobj->co_flags), str);
 				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-				if (list_append(&cmdline, cmd) == 0)
+				if (aplist_append(&cmdline, cmd,
+				    AL_CNT_CRLE) == NULL)
 					return (INSCFG_RET_FAIL);
 			}
 		}
@@ -847,8 +850,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		}
 
 		for (; filetbl->cf_obj; filetbl++) {
-			Rtc_obj *	fobj;
-			Half		flags;
+			Rtc_obj	*fobj;
+			Half	flags;
 
 			fobj = (Rtc_obj *)(filetbl->cf_obj + addr);
 			str = strtbl + fobj->co_name;
@@ -864,7 +867,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			    ((fobj->co_flags & RTC_OBJ_APP) == 0)) ||
 			    ((head->ch_version == RTC_VER_ONE) &&
 			    ((dobj->co_flags & RTC_OBJ_ALLENTS) == 0))) {
-				char	*alter = 0, altdir[PATH_MAX];
+				char	*alter = NULL, altdir[PATH_MAX];
 
 				/*
 				 * Determine whether this file requires an
@@ -878,13 +881,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 					alter = strrchr(altdir, '/');
 					*alter = '\0';
 
-					if ((objdir == 0) ||
+					if ((objdir == NULL) ||
 					    (strcmp(objdir, altdir) != 0)) {
 						(void) strcpy(_objdir, altdir);
 						crle->c_objdir = alter =
 						    objdir = _objdir;
 					} else
-						alter = 0;
+						alter = NULL;
 				}
 
 				if (crle->c_flags & CRLE_UPDATE) {
@@ -900,7 +903,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 					    crle->c_objdir);
 					cmd = strcpy(alloca(strlen(_cmd) + 1),
 					    _cmd);
-					if (list_append(&cmdline, cmd) == 0)
+					if (aplist_append(&cmdline, cmd,
+					    AL_CNT_CRLE) == NULL)
 						return (INSCFG_RET_FAIL);
 				}
 
@@ -908,7 +912,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 				(void) snprintf(_cmd, PATH_MAX,
 				    getformat(flags), str);
 				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
-				if (list_append(&cmdline, cmd) == 0)
+				if (aplist_append(&cmdline, cmd,
+				    AL_CNT_CRLE) == NULL)
 					return (INSCFG_RET_FAIL);
 			}
 
@@ -949,7 +954,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	}
 
 	if ((crle->c_flags & CRLE_UPDATE) == 0)
-		printcmd(crle, head, &cmdline);
+		printcmd(crle, head, cmdline);
 
 	if ((crle->c_flags & CRLE_VERBOSE) == 0)
 		return (INSCFG_RET_OK);
@@ -974,7 +979,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		const char		*str;
 		Word			_ndx;
 
-		if (*hash == 0)
+		if (*hash == NULL)
 			continue;
 
 		obj = objtbl + *hash;

@@ -182,7 +182,7 @@ ld_open_outfile(Ofl_desc * ofl)
 static uintptr_t
 pad_outfile(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Aliste		idx1;
 	off_t		offset;
 	Elf_Scn		*oscn = 0;
 	Sg_desc		*sgp;
@@ -212,10 +212,10 @@ pad_outfile(Ofl_desc *ofl)
 	/*
 	 * Traverse the segment list looking for loadable segments.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Phdr	*phdr = &(sgp->sg_phdr);
 		Os_desc	*osp;
-		Aliste	idx;
+		Aliste	idx2;
 
 		/*
 		 * If we've already processed a loadable segment, the `scn'
@@ -250,7 +250,7 @@ pad_outfile(Ofl_desc *ofl)
 		 * offset of each section. Retain the final section descriptor
 		 * as this will be where any padding buffer will be added.
 		 */
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Shdr	*shdr = osp->os_shdr;
 
 			offset = (off_t)S_ROUND(offset, shdr->sh_addralign);
@@ -337,7 +337,8 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
 	 */
 	if ((ofl->ofl_flags & FLG_OF_TLSPHDR) &&
 	    (osp->os_shdr->sh_flags & SHF_TLS) &&
-	    (list_appendc(&ofl->ofl_ostlsseg, osp) == 0))
+	    (aplist_append(&ofl->ofl_ostlsseg, osp,
+	    AL_CNT_OFL_OSTLSSEG) == NULL))
 		return (S_ERROR);
 
 	return (0);
@@ -364,18 +365,17 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
 uintptr_t
 ld_create_outfile(Ofl_desc *ofl)
 {
-	Listnode	*lnp1;
 	Sg_desc		*sgp;
 	Os_desc		*osp;
 	Is_desc		*isp;
 	Elf_Data	*tlsdata = 0;
-	Aliste		idx;
+	Aliste		idx1;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	ofl_flag_t	flags1 = ofl->ofl_flags1;
-	size_t		ndx = 0, fndx = 0;
+	size_t		ndx;
 	Elf_Cmd		cmd;
 	Boolean		fixalign = FALSE;
-	int		fd, nseg = 0, shidx = 0, dataidx = 0, ptloadidx = 0;
+	int		fd, nseg = 0, shidx, dataidx, ptloadidx = 0;
 
 	/*
 	 * If DF_1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
@@ -397,7 +397,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	/*
 	 * If there are any ordered sections, handle them here.
 	 */
-	if ((ofl->ofl_ordered.head != NULL) &&
+	if ((ofl->ofl_ordered != NULL) &&
 	    (ld_sort_ordered(ofl) == S_ERROR))
 		return (S_ERROR);
 
@@ -421,10 +421,11 @@ ld_create_outfile(Ofl_desc *ofl)
 	ofl->ofl_nehdr->e_machine = ofl->ofl_dehdr->e_machine;
 
 	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		int	frst = 0;
 		Phdr	*phdr = &(sgp->sg_phdr);
 		Word	ptype = phdr->p_type;
+		Aliste	idx2;
 
 		/*
 		 * Count the number of segments that will go in the program
@@ -499,13 +500,13 @@ ld_create_outfile(Ofl_desc *ofl)
 		}
 
 		shidx = 0;
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
-			Listnode	*lnp2;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			Aliste	idx3;
 
 			dataidx = 0;
-			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
-				Elf_Data *	data;
-				Ifl_desc *	ifl = isp->is_file;
+			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
+				Elf_Data	*data;
+				Ifl_desc	*ifl = isp->is_file;
 
 				/*
 				 * An input section in the list that has
@@ -744,13 +745,14 @@ ld_create_outfile(Ofl_desc *ofl)
 	 * output data buffer pointers (these will be used to perform any
 	 * relocations).
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+	ndx = 0;
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Phdr	*_phdr = &(sgp->sg_phdr);
 		Os_desc	*osp;
-		Aliste	idx;
+		Aliste	idx2;
 		Boolean	recorded = FALSE;
 
-		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			/*
 			 * Make sure that an output section was originally
 			 * created.  Input sections that had been marked as
@@ -760,25 +762,25 @@ ld_create_outfile(Ofl_desc *ofl)
 			 * have to compensate for this empty section.
 			 */
 			if (osp->os_scn == NULL) {
-				aplist_delete(sgp->sg_osdescs, &idx);
+				aplist_delete(sgp->sg_osdescs, &idx2);
 				continue;
 			}
-
-			if ((osp->os_scn = elf_getscn(ofl->ofl_elf, ++ndx)) ==
-			    NULL) {
+			if ((osp->os_scn =
+			    elf_getscn(ofl->ofl_elf, ++ndx)) == NULL) {
 				eprintf(ofl->ofl_lml, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETSCN), ofl->ofl_name,
 				    ndx);
 				return (S_ERROR);
 			}
-			if ((osp->os_shdr = elf_getshdr(osp->os_scn)) ==
-			    NULL) {
+			if ((osp->os_shdr =
+			    elf_getshdr(osp->os_scn)) == NULL) {
 				eprintf(ofl->ofl_lml, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
 				return (S_ERROR);
 			}
-			if ((fixalign == TRUE) && (sgp->sg_fscn != 0) &&
+			if ((fixalign == TRUE) && sgp->sg_fscn &&
 			    (recorded == FALSE)) {
+				size_t	fndx;
 				Elf_Scn *scn;
 
 				scn = sgp->sg_fscn;

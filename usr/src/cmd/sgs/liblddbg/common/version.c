@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,14 +111,14 @@ Dbg_ver_desc_entry(Lm_list *lml, Ver_desc *vdp)
 	Conv_ver_flags_buf_t	ver_flags_buf;
 	const char		*dep;
 	Ver_desc		*_vdp, *__vdp;
-	Listnode 		*lnp;
+	Aliste 			idx;
 	char			index[10];
 
 	if (DBG_NOTCLASS(DBG_C_VERSIONS))
 		return;
 
-	if (vdp->vd_deps.head) {
-		_vdp = (Ver_desc *)vdp->vd_deps.head->data;
+	if (vdp->vd_deps) {
+		_vdp = (Ver_desc *)vdp->vd_deps->apl_data[0];
 		dep = _vdp->vd_name;
 	} else {
 		_vdp = 0;
@@ -132,7 +132,7 @@ Dbg_ver_desc_entry(Lm_list *lml, Ver_desc *vdp)
 	 * Loop through the dependency list in case there are more that one
 	 * dependency.
 	 */
-	for (LIST_TRAVERSE(&vdp->vd_deps, lnp, __vdp)) {
+	for (APLIST_TRAVERSE(vdp->vd_deps, idx, __vdp)) {
 		if (_vdp == __vdp)
 			continue;
 		Elf_ver_line_4(lml, __vdp->vd_name);
