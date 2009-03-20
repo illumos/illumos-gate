@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the callback handler logic common to send and receive
@@ -214,7 +211,8 @@ ibmf_i_callback_clients(ib_guid_t hca_guid, ibmf_async_event_t evt)
 
 	/* empty counting loop */
 	for (clientp = cip->ci_clients, nclients = 0; clientp != NULL;
-	    clientp = clientp->ic_next, nclients++);
+	    clientp = clientp->ic_next, nclients++)
+		;
 
 	IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
 	    ibmf_i_callback_clients, IBMF_TNF_TRACE, "",
@@ -234,13 +232,13 @@ ibmf_i_callback_clients(ib_guid_t hca_guid, ibmf_async_event_t evt)
 	/* allocate callback, args, and client arrays */
 
 	cb_array = kmem_zalloc(
-		nclients * sizeof (ibmf_async_event_cb_t), KM_NOSLEEP);
+	    nclients * sizeof (ibmf_async_event_cb_t), KM_NOSLEEP);
 
 	cb_args_array = kmem_zalloc(
-		nclients * sizeof (void*), KM_NOSLEEP);
+	    nclients * sizeof (void*), KM_NOSLEEP);
 
 	client_array = kmem_zalloc(
-		nclients * sizeof (ibmf_handle_t), KM_NOSLEEP);
+	    nclients * sizeof (ibmf_handle_t), KM_NOSLEEP);
 
 	if (cb_array == NULL || cb_args_array == NULL ||
 	    client_array == NULL) {
@@ -332,8 +330,19 @@ ibmf_i_mad_completions(ibt_cq_hdl_t cq_handle, void *arg)
 		status = ibt_poll_cq(cq_handle, &cqe, 1, NULL);
 		ASSERT(status != IBT_CQ_HDL_INVALID &&
 		    status != IBT_HCA_HDL_INVALID);
-		if (status == IBT_CQ_EMPTY)
+		/*
+		 * Check if the status is IBT_SUCCESS or IBT_CQ_EMPTY
+		 * either which can return from ibt_poll_cq(). In other
+		 * cases, log the status for the further investigation.
+		 */
+		if (status != IBT_SUCCESS) {
+			if (status != IBT_CQ_EMPTY) {
+				cmn_err(CE_NOTE, "!ibmf_i_mad_completions got "
+				    "an error status (0x%x) from ibt_poll_cq.",
+				    status);
+			}
 			break;
+		}
 
 		/* process the completion */
 		ibmf_i_process_completion(ibmf_cip, &cqe);
@@ -349,8 +358,19 @@ ibmf_i_mad_completions(ibt_cq_hdl_t cq_handle, void *arg)
 		status = ibt_poll_cq(cq_handle, &cqe, 1, NULL);
 		ASSERT(status != IBT_CQ_HDL_INVALID &&
 		    status != IBT_HCA_HDL_INVALID);
-		if (status == IBT_CQ_EMPTY)
+		/*
+		 * Check if the status is IBT_SUCCESS or IBT_CQ_EMPTY
+		 * either which can return from ibt_poll_cq(). In other
+		 * cases, log the status for the further investigation.
+		 */
+		if (status != IBT_SUCCESS) {
+			if (status != IBT_CQ_EMPTY) {
+				cmn_err(CE_NOTE, "!ibmf_i_mad_completions got "
+				    "an error status (0x%x) from ibt_poll_cq.",
+				    status);
+			}
 			break;
+		}
 
 		/* process the completion */
 		ibmf_i_process_completion(ibmf_cip, &cqe);

@@ -556,7 +556,8 @@ typedef enum ibt_port_caps_e {
 	IBT_PORT_CAP_SM_DISABLED	= 1 << 1,
 	IBT_PORT_CAP_SNMP_TUNNEL	= 1 << 2,	/* SNMP Tunneling */
 	IBT_PORT_CAP_DM			= 1 << 3,	/* DM supported */
-	IBT_PORT_CAP_VENDOR		= 1 << 4	/* Vendor Class */
+	IBT_PORT_CAP_VENDOR		= 1 << 4,	/* Vendor Class */
+	IBT_PORT_CAP_CLNT_REREG		= 1 << 5	/* Client Rereg */
 } ibt_port_caps_t;
 
 
@@ -1467,7 +1468,8 @@ typedef enum ibt_async_code_e {
 	IBT_EVENT_EMPTY_CHAN			= 0x040000,
 	IBT_ERROR_CATASTROPHIC_SRQ		= 0x080000,
 
-	IBT_PORT_CHANGE_EVENT			= 0x100000
+	IBT_PORT_CHANGE_EVENT			= 0x100000,
+	IBT_CLNT_REREG_EVENT			= 0x200000
 } ibt_async_code_t;
 
 typedef enum ibt_port_change_e {
