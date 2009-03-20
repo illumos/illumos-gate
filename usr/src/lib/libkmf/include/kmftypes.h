@@ -2,14 +2,12 @@
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _KMFTYPES_H
 #define	_KMFTYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -789,7 +787,8 @@ typedef enum {
 	KMF_PLAINTEXT_DATA_ATTR,
 	KMF_CIPHERTEXT_DATA_ATTR,
 	KMF_VALIDATE_RESULT_ATTR,
-	KMF_KEY_DATA_ATTR
+	KMF_KEY_DATA_ATTR,
+	KMF_PK11_USER_TYPE_ATTR
 } KMF_ATTR_TYPE;
 
 typedef struct {

@@ -509,6 +509,30 @@
 6300:AUE_nwam_attach:attach nwam user:ss
 6301:AUE_nwam_detach:detach nwam user:ss
 #
+# TCSD(8) events
+#
+6400:AUE_tpm_takeownership:take ownership of TPM:as
+6401:AUE_tpm_clearowner:clear ownership of TPM:as
+6402:AUE_tpm_setoperatorauth:set TPM operator authorization:as
+6403:AUE_tpm_setownerinstall:set TPM ownership flag:as
+6404:AUE_tpm_selftestfull:test all TPM protected capabilities:as
+6405:AUE_tpm_certifyselftest:perform full TPM self-test:as
+6406:AUE_tpm_continueselftest:complete TPM self-test:as
+6407:AUE_tpm_ownersetdisable:change the status of TPM disable flag:as
+6408:AUE_tpm_ownerclear:perform the clear operation under TPM owner auth:as
+6409:AUE_tpm_disableownerclear:disable TPM_OwnerClear command permanently:as
+6410:AUE_tpm_forceclear:perform TPM clear operation under physical access:as
+6411:AUE_tpm_disableforceclear:disable ForceClear execution until next startup:as
+6412:AUE_tpm_physicaldisable:disable TPM physical presence:as
+6413:AUE_tpm_physicalenable:enable TPM physical presence:as
+6414:AUE_tpm_physicaldeactivate:set TPM deactivated flag:as
+6415:AUE_tpm_settempdeactivated:set volatile TPM deactivated flag to TRUE:as
+6416:AUE_tpm_settempdeactivated2:set volatile TPM deactivated flag TRUE with auth:as
+6417:AUE_tpm_physicalpresence:set the TPM physical presence flag:as
+6418:AUE_tpm_fieldupgrade:update TPM protected capabilities:as
+6419:AUE_tpm_resetlockvalue:reset TPM failed authorization attempt lock:as
+
+#
 # Trusted Extensions events:
 #
 9035:AUE_sl_change:Workspace label change:ap

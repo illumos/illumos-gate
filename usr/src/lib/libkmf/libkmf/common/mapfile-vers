@@ -21,7 +21,6 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 #
 # MAPFILE HEADER START
 #
@@ -271,6 +270,7 @@ SUNW_1.1 {
 	kmf_oid_to_string;
 	kmf_pem_to_der;
 	kmf_pk11_token_lookup;
+	kmf_pk11_init_token;
 	kmf_read_input_file;
 	kmf_set_attr;
 	kmf_set_attr_at_index;

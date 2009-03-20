@@ -1838,3 +1838,5 @@ NTXN_OBJS =	unm_nic_init.o unm_gem.o unm_nic_hw.o unm_ndd.o	\
 #	nulldriver module
 #
 NULLDRIVER_OBJS =	nulldriver.o
+
+TPM_OBJS =	tpm.o

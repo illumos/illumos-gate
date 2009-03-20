@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *
@@ -29,8 +29,6 @@
 
 #ifndef _KMFAPI_H
 #define	_KMFAPI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kmftypes.h>
 #include <security/cryptoki.h>
@@ -325,6 +323,8 @@ extern void kmf_free_crl_dist_pts(KMF_X509EXT_CRLDISTPOINTS *);
 
 /* APIs for PKCS#11 token */
 extern KMF_RETURN kmf_pk11_token_lookup(KMF_HANDLE_T, char *, CK_SLOT_ID *);
+extern KMF_RETURN kmf_pk11_init_token(KMF_HANDLE_T,
+	char *, char *, CK_UTF8CHAR_PTR, CK_ULONG);
 extern KMF_RETURN kmf_set_token_pin(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 extern CK_SESSION_HANDLE kmf_get_pk11_handle(KMF_HANDLE_T);
 

@@ -1258,6 +1258,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/hxge/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # SVM
 #
@@ -2184,4 +2188,7 @@ $(LINTS_DIR)/zlib_obj.ln:	$(ZLIB_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 	    $(UTSBASE)/common/zmod/zlib_lint.c $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/hxge/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/tpm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

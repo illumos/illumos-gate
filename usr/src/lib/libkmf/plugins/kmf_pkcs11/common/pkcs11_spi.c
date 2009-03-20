@@ -21,11 +21,9 @@
 /*
  * PKCS11 token KMF Plugin
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h> /* debugging only */
 #include <errno.h>
@@ -3448,6 +3446,7 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle,
 	KMF_CREDENTIAL	*oldcred;
 	KMF_CREDENTIAL	*newcred;
 	CK_SLOT_ID	slotid;
+	CK_USER_TYPE	user = CKU_USER;
 
 	if (handle == NULL || attrlist == NULL || numattr == 0)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -3477,12 +3476,31 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle,
 		if (rv != KMF_OK)
 			return (rv);
 	}
+	rv = kmf_get_attr(KMF_PK11_USER_TYPE_ATTR, attrlist, numattr,
+	    (void *)&user, NULL);
+	if (rv != CKR_OK)
+		user = CKU_USER;
 
 	rv = C_OpenSession(slotid, CKF_SERIAL_SESSION | CKF_RW_SESSION,
 	    NULL, NULL, &session);
 	if (rv != CKR_OK) {
 		SET_ERROR(kmfh, rv);
 		ret = KMF_ERR_UNINITIALIZED;
+		goto end;
+	}
+
+	rv = C_Login(session, user, (CK_BYTE *)oldcred->cred,
+	    oldcred->credlen);
+	if (rv != CKR_OK) {
+		SET_ERROR(kmfh, rv);
+		if (rv == CKR_PIN_INCORRECT ||
+		    rv == CKR_PIN_INVALID ||
+		    rv == CKR_PIN_EXPIRED ||
+		    rv == CKR_PIN_LOCKED)
+			ret = KMF_ERR_AUTH_FAILED;
+		else
+			ret = KMF_ERR_INTERNAL;
+
 		goto end;
 	}
 

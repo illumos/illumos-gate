@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the setpin operation for this tool.
@@ -111,7 +109,7 @@ setpin_nss(KMF_HANDLE_T handle,
 }
 
 static int
-setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec)
+setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 {
 	CK_SLOT_ID		slot_id;
 	CK_FLAGS		pin_state;
@@ -124,6 +122,7 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec)
 	KMF_CREDENTIAL		oldcred = {NULL, 0};
 	KMF_KEYSTORE_TYPE	kstype = KMF_KEYSTORE_PK11TOKEN;
 	KMF_ATTRIBUTE		attrlist[6];
+	CK_USER_TYPE		user = CKU_USER;
 	int			numattr = 0;
 
 	/* If nothing is specified, default is to use softtoken. */
@@ -208,6 +207,14 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec)
 	    &newpincred, sizeof (newpincred));
 	numattr++;
 
+	if (souser) {
+		user = CKU_SO;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_PK11_USER_TYPE_ATTR,
+		    &user, sizeof (user));
+		numattr++;
+	}
+
 	rv = kmf_set_token_pin(handle, numattr, attrlist);
 
 	/* Clean up. */
@@ -233,13 +240,15 @@ pk_setpin(int argc, char *argv[])
 	char		*token_spec = NULL;
 	char		*dir = NULL;
 	char		*prefix = NULL;
+	char		*utype = NULL;
 	KMF_HANDLE_T	handle;
 	KMF_KEYSTORE_TYPE	kstype = KMF_KEYSTORE_PK11TOKEN;
+	boolean_t	souser = 0;
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,
 		"T:(token)k:(keystore)d:(dir)"
-		"p:(prefix)")) != EOF) {
+		"p:(prefix)u:(usertype)")) != EOF) {
 		switch (opt) {
 			case 'k':
 				kstype = KS2Int(optarg_av);
@@ -260,6 +269,9 @@ pk_setpin(int argc, char *argv[])
 				if (prefix)
 					return (PK_ERR_USAGE);
 				prefix = optarg_av;
+				break;
+			case 'u':
+				utype = optarg_av;
 				break;
 			default:
 				return (PK_ERR_USAGE);
@@ -284,9 +296,18 @@ pk_setpin(int argc, char *argv[])
 	if ((rv = kmf_initialize(&handle, NULL, NULL)) != KMF_OK)
 		return (rv);
 
+	if (utype != NULL) {
+		if (strcmp(utype, "so") == 0)
+			souser = 1;
+		else if (strcmp(utype, "user") == 0)
+			souser = 0;
+		else /* Wrong option string */
+			return (PK_ERR_USAGE);
+	}
+
 	switch (kstype) {
 		case KMF_KEYSTORE_PK11TOKEN:
-			rv = setpin_pkcs11(handle, token_spec);
+			rv = setpin_pkcs11(handle, token_spec, souser);
 			break;
 		case KMF_KEYSTORE_NSS:
 			rv = setpin_nss(handle, token_spec, dir, prefix);

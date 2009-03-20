@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -151,6 +151,10 @@ f none usr/lib/security/amd64/pkcs11_kernel.so.1 755 root bin
 s none usr/lib/security/amd64/pkcs11_kernel.so=./pkcs11_kernel.so.1
 f none usr/lib/security/amd64/pkcs11_softtoken.so.1 755 root bin
 s none usr/lib/security/amd64/pkcs11_softtoken.so=./pkcs11_softtoken.so.1
+f none usr/lib/security/amd64/pkcs11_tpm.so.1 755 root bin
+s none usr/lib/security/amd64/pkcs11_tpm.so=./pkcs11_tpm.so.1
+f none usr/lib/security/pkcs11_tpm.so.1 755 root bin
+s none usr/lib/security/pkcs11_tpm.so=./pkcs11_tpm.so.1
 s none usr/lib/64=amd64
 d none usr/lib/amd64 755 root bin
 f none usr/lib/amd64/libadutils.so.1 755 root bin

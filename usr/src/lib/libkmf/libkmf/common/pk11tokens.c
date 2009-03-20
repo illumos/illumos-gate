@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -552,4 +552,43 @@ CK_SESSION_HANDLE
 kmf_get_pk11_handle(KMF_HANDLE_T kmfh)
 {
 	return (kmfh->pk11handle);
+}
+
+KMF_RETURN
+kmf_pk11_init_token(KMF_HANDLE_T handle,
+	char *currlabel, char *newlabel,
+	CK_UTF8CHAR_PTR sopin, CK_ULONG sopinlen)
+{
+	KMF_RETURN ret = KMF_OK;
+	CK_RV ckrv;
+	CK_SLOT_ID slot_id = 0;
+
+	CLEAR_ERROR(handle, ret);
+	if (ret != KMF_OK)
+		return (ret);
+
+	/*
+	 * It is best to try and lookup tokens by label.
+	 */
+	if (currlabel != NULL) {
+		ret = kmf_pk11_token_lookup(handle, currlabel, &slot_id);
+		if (ret != KMF_OK)
+			return (ret);
+	} else {
+		/* We can't determine which slot to initialize */
+		return (KMF_ERR_TOKEN_NOT_PRESENT);
+	}
+
+	/* Initialize and set the new label (if given) */
+	ckrv = C_InitToken(slot_id, sopin, sopinlen,
+	    (CK_UTF8CHAR_PTR)(newlabel ? newlabel : currlabel));
+
+	if (ckrv != CKR_OK) {
+		if (ckrv == CKR_PIN_INCORRECT)
+			return (KMF_ERR_AUTH_FAILED);
+		else
+			return (KMF_ERR_INTERNAL);
+	}
+
+	return (ret);
 }

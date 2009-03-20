@@ -19,10 +19,8 @@ version 1.0
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Device tree database
 #      - Records in this file can be in an arbitrary order.
@@ -126,6 +124,7 @@ PNP0501 asy com all none "16550A-compatible COM port"
 # PNP0510 asy com all none "Generic IRDA-compatible device"
 PNP0700 fdc oth all none "PC standard floppy disk controller"
 PNP0701 fdc oth all none "Standard floppy controller supporting MS Device Bay Spec"
+PNP0C31|ATM1200|IFX0102|BCM0101|NSC1200 tpm oth all none "Generic Trusted Platform Module"
 PNP0F00 msm ptr all none "Microsoft bus mouse"
 PNP0F01 mouse ptr all none "Microsoft Serial Mouse"
 PNP0F02 mouse ptr all none "Microsoft InPort Mouse"

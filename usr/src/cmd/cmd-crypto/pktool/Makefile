@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =	pktool
@@ -32,6 +30,7 @@ OBJS =	pktool.o \
 	list.o \
 	delete.o \
 	import.o \
+	inittoken.o \
 	export.o \
 	tokens.o \
 	gencert.o \
@@ -51,7 +50,7 @@ MSGFILES=$(SRCS:%.c=%.i)
 CPPFLAGS += -I. -I$(KMFDIR)/include -I/usr/include/libxml2
 CFLAGS += $(CCVERBOSE) -DDEBUG
 
-LDFLAGS += -L$(SRC)/lib/libkmf/libkmf/$(MACH)
+#LDFLAGS += -L$(SRC)/lib/libkmf/libkmf/$(MACH)
 LDLIBS +=  -lkmf -lpkcs11 -lcryptoutil 
 
 .KEEP_STATE:

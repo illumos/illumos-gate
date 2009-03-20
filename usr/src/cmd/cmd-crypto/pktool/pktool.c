@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file comprises the main driver for this tool.
@@ -68,6 +66,7 @@ extern int	pk_gencsr(int argc, char *argv[]);
 extern int	pk_download(int argc, char *argv[]);
 extern int	pk_genkey(int argc, char *argv[]);
 extern int	pk_signcsr(int argc, char *argv[]);
+extern int	pk_inittoken(int argc, char *argv[]);
 
 /* Forward declarations for "built-in" verb actions. */
 static int	pk_help(int argc, char *argv[]);
@@ -83,7 +82,9 @@ static int	pk_help(int argc, char *argv[]);
 	"for keystore access")
 #define	SETPIN_SYN \
 	"setpin [ keystore=pkcs11 ]\n\t\t" \
-	"[ token=token[:manuf[:serial]]]\n\t" \
+	"[ token=token[:manuf[:serial]]]\n\t\t" \
+	"[ usertype=so|user ]\n\t" \
+\
 	"setpin keystore=nss\n\t\t" \
 	"[ token=token ]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
@@ -467,7 +468,15 @@ static int	pk_help(int argc, char *argv[]);
 	"[ dir=directory-path ]\n\t\t" \
 	"[ prefix=DBprefix ]\n\t"
 
-#define	HELP_IDX 11
+#define	INITTOKEN_IDX 11
+#define	INITTOKEN_VERB "inittoken"
+#define	INITTOKEN_SUMM gettext("Initialize a PKCS11 token")
+#define	INITTOKEN_SYN \
+	"inittoken \n\t\t" \
+	"[ currlabel=token[:manuf[:serial]]]\n\t\t" \
+	"[ newlabel=new token label ]\n\t"
+
+#define	HELP_IDX 12
 #define	HELP_VERB "help"
 #define	HELP_SUMM gettext("displays help message")
 #define	HELP_SYN "help\t(help and usage)"
@@ -485,6 +494,7 @@ static verbcmd	cmds[] = {
 	{ NULL,	pk_download, 0, NULL, NULL},
 	{ NULL,	pk_genkey, 0, NULL, NULL},
 	{ NULL, pk_signcsr, 0, NULL, NULL},
+	{ NULL, pk_inittoken, 0, NULL, NULL},
 	{ NULL,	pk_help, 0, NULL, NULL}
 };
 
@@ -539,6 +549,10 @@ init_command_list()
 	cmds[SIGNCSR_IDX].verb = SIGNCSR_VERB;
 	cmds[SIGNCSR_IDX].summary = SIGNCSR_SUMM;
 	cmds[SIGNCSR_IDX].synopsis = SIGNCSR_SYN;
+
+	cmds[INITTOKEN_IDX].verb = INITTOKEN_VERB;
+	cmds[INITTOKEN_IDX].summary = INITTOKEN_SUMM;
+	cmds[INITTOKEN_IDX].synopsis = INITTOKEN_SYN;
 
 	cmds[HELP_IDX].verb = HELP_VERB;
 	cmds[HELP_IDX].summary = HELP_SUMM;

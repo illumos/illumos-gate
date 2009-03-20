@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1003,18 +1003,24 @@ get_token_password(KMF_KEYSTORE_TYPE kstype,
 	char	temptoken[32];
 	char	*p = NULL;
 	char	*t = NULL;
+	int	len;
 
+	(void) memset(temptoken, 0, sizeof (temptoken));
 	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		p = strchr(token_spec, ':');
 		if (p != NULL)
 			*p = 0;
 	}
-	(void) strncpy(temptoken, token_spec, sizeof (temptoken));
+	len = strlen(token_spec);
+	if (len > sizeof (temptoken))
+		len = sizeof (temptoken);
+
+	(void) strncpy(temptoken, token_spec, len);
 
 	/*
 	 * Strip trailing whitespace
 	 */
-	t = temptoken + (strlen(temptoken) - 1);
+	t = temptoken + (len - 1);
 	while (isspace(*t) && t >= temptoken) {
 		*t = 0x00;
 		t--;

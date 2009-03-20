@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.cmd
@@ -34,6 +31,11 @@ SUBDIRS1 = \
 	elfsign \
 	pktool \
 	kmfcfg
+
+#
+# tpmadm is x86 only until we have SPARC support for the TSS and TPM
+#
+i386_SUBDIRS = tpmadm
 
 $(CLOSED_BUILD)SUBDIRS1 += \
 	$(CLOSED)/cmd/cmd-crypto/kcfd
@@ -54,11 +56,11 @@ _msg:=          TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber lint _msg: $(SUBDIRS1)
+all clean clobber lint _msg: $(SUBDIRS1) $($(MACH)_SUBDIRS)
 
-install: $(SUBDIRS1) $(SUBDIRS2)
+install: $(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS)
 
-$(SUBDIRS1) $(SUBDIRS2): FRC
+$(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS) : FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
 FRC:
