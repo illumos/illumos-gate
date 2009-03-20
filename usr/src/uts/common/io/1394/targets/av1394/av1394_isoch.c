@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 isochronous module
@@ -59,7 +56,7 @@ static uint_t av1394_isoch_softintr(caddr_t);
 static struct devmap_callback_ctl av1394_isoch_devmap_ops = {
 	DEVMAP_OPS_REV,		/* rev */
 	NULL,			/* map */
-	devmap_default_access,	/* access */
+	NULL,			/* access */
 	NULL,			/* dup */
 	NULL,			/* unmap */
 };
@@ -320,8 +317,8 @@ av1394_isoch_create_minor_node(av1394_inst_t *avp)
 	int	ret;
 
 	ret = ddi_create_minor_node(avp->av_dip, "isoch",
-		S_IFCHR, AV1394_ISOCH_INST2MINOR(avp->av_instance),
-		DDI_NT_AV_ISOCH, NULL);
+	    S_IFCHR, AV1394_ISOCH_INST2MINOR(avp->av_instance),
+	    DDI_NT_AV_ISOCH, NULL);
 	if (ret != DDI_SUCCESS) {
 		TNF_PROBE_0(av1394_isoch_create_minor_node_error,
 		    AV1394_TNF_ISOCH_ERROR, "");
@@ -403,7 +400,7 @@ av1394_isoch_find_seg(av1394_inst_t *avp, offset_t off, size_t len)
 
 	/* find a segment */
 	pool = (icp->ic_dir == AV1394_IR) ?
-			&icp->ic_ir.ir_data_pool : &icp->ic_it.it_data_pool;
+	    &icp->ic_ir.ir_data_pool : &icp->ic_it.it_data_pool;
 	for (segoff = 0, i = 0; i < pool->ip_nsegs; i++) {
 		isp = &pool->ip_seg[i];
 		if (off == segoff) {
@@ -555,6 +552,14 @@ av1394_ioctl_isoch_init(av1394_inst_t *avp, void *arg, int mode)
 
 	if (ret != 0) {
 		AV1394_TNF_EXIT(av1394_ioctl_isoch_init);
+#ifdef _MULTI_DATAMODEL
+		if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+			bcopy(&ii, &ii32, sizeof (ii32));
+			ii32.ii_error = ii.ii_error;
+			(void) ddi_copyout(&ii32, arg, sizeof (ii32), mode);
+		} else
+#endif
+		(void) ddi_copyout(&ii, arg, sizeof (ii), mode);
 		return (ret);
 	}
 
@@ -584,7 +589,7 @@ av1394_ioctl_isoch_handle2ic(av1394_inst_t *avp, void *arg)
 	int		num = (int)(intptr_t)arg;
 	av1394_isoch_t	*ip = &avp->av_i;
 
-	if (num >= sizeof (ip->i_ic)) {
+	if (num >= (sizeof (ip->i_ic) / sizeof (av1394_ic_t))) {
 		TNF_PROBE_0(av1394_ioctl_isoch_handle2ic_error_range,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		return (NULL);
@@ -660,7 +665,7 @@ av1394_ioctl_recv(av1394_inst_t *avp, void *arg, int mode)
 		return (EFAULT);
 	}
 	num = recv.rx_handle;
-	if (num >= sizeof (ip->i_ic)) {
+	if (num >= (sizeof (ip->i_ic) / sizeof (av1394_ic_t))) {
 		TNF_PROBE_0(av1394_ioctl_recv_error_range,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);
@@ -702,7 +707,7 @@ av1394_ioctl_xmit(av1394_inst_t *avp, void *arg, int mode)
 		return (EFAULT);
 	}
 	num = xmit.tx_handle;
-	if (num >= sizeof (ip->i_ic)) {
+	if (num >= (sizeof (ip->i_ic) / sizeof (av1394_ic_t))) {
 		TNF_PROBE_0(av1394_ioctl_xmit_error_range,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);

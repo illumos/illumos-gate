@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -154,8 +154,7 @@ ROOTDIR=	$(ROOT)/usr/include/sys
 ROOTDKTPDIR=	$(ROOTDIR)/dktp
 
 sparc_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters \
-		$(ROOTDIR)/scsi/targets \
-		$(ROOTDIR)/av
+		$(ROOTDIR)/scsi/targets
 
 i386_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters $(ROOTDIR)/scsi/targets \
 		$(ROOTDIR)/agp $(ROOTDIR)/sata
@@ -163,6 +162,7 @@ i386_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters $(ROOTDIR)/scsi/targets \
 ROOTDIRS=			\
 	$(ROOTDIR)		\
 	$(ROOTDIR)/audio	\
+	$(ROOTDIR)/av		\
 	$(ROOTDIR)/hotplug	\
 	$(ROOTDIR)/hotplug/pci	\
 	$(ROOTDIR)/crypto	\

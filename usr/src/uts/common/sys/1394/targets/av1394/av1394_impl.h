@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_1394_TARGETS_AV1394_IMPL_H
 #define	_SYS_1394_TARGETS_AV1394_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 driver definitions
@@ -46,6 +43,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * byte swapping support, stolen from SBP2
+ */
+#ifdef _LITTLE_ENDIAN
+#define	AV_SWAP16(data) \
+	((((data) & 0xff) << 8) | ((data) >> 8))
+
+#define	AV_SWAP32(data) \
+	(((uint32_t)AV_SWAP16((uint16_t)((data) & 0xffff)) << 16) |   \
+	(uint32_t)AV_SWAP16((uint16_t)((data) >> 16)))
+#else
+#define	AV_SWAP16(data)	(data)
+#define	AV_SWAP32(data)	(data)
+#endif
+
 
 /*
  * double-linked list

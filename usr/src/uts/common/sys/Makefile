@@ -54,16 +54,12 @@ i386_HDRS=			\
 	vuidmice.h		\
 	ucode.h
 
-AVHDRS=				\
-	av/iec61883.h
-
 sparc_HDRS= 			\
 	audio/audiots.h		\
 	audio/am_src2.h		\
 	mouse.h			\
 	scsi/targets/ssddef.h	\
-	$(MDESCHDRS)		\
-	$(AVHDRS)
+	$(MDESCHDRS)
 
 # Generated headers
 GENHDRS=			\
@@ -665,6 +661,9 @@ AUDIOHDRS=			\
 	audio_trace.h		\
 	g711.h
 
+AVHDRS=				\
+	iec61883.h
+
 BSCHDRS=			\
 	bscbus.h		\
 	bscv_impl.h		\
@@ -1096,6 +1095,7 @@ dcam/%.check:	dcam/%.h
 CHECKHDRS=						\
 	$($(MACH)_HDRS:%.h=%.check)			\
 	$(AUDIOHDRS:%.h=audio/%.check)			\
+	$(AVHDRS:%.h=av/%.check)			\
 	$(BSCHDRS:%.h=%.check)				\
 	$(CHKHDRS:%.h=%.check)				\
 	$(CPUDRVHDRS:%.h=%.check)			\
@@ -1156,6 +1156,7 @@ CHECKHDRS=						\
 	$(CHECKHDRS)		\
 	$(ROOTHDRS)		\
 	$(ROOTAUDHDRS)		\
+	$(ROOTAVHDRS)		\
 	$(ROOTCRYPTOHDRS)	\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
@@ -1213,6 +1214,7 @@ install_h:			\
 	.WAIT			\
 	$(ROOTHDRS)		\
 	$(ROOTAUDHDRS)		\
+	$(ROOTAVHDRS)		\
 	$(ROOTCRYPTOHDRS)	\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\

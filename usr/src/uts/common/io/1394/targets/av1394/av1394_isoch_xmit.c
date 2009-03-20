@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 isochronous transmit module
@@ -100,7 +97,7 @@ av1394_it_init(av1394_ic_t *icp, int *error)
 	AV1394_TNF_ENTER(av1394_it_init);
 
 	nframes = av1394_ic_alloc_pool(pool, icp->ic_framesz, icp->ic_nframes,
-					AV1394_IT_NFRAMES_MIN);
+	    AV1394_IT_NFRAMES_MIN);
 	if (nframes == 0) {
 		*error = IEC61883_ERR_NOMEM;
 		AV1394_TNF_EXIT(av1394_it_init);
@@ -185,7 +182,7 @@ av1394_it_start_common(av1394_ic_t *icp)
 	ASSERT(icp->ic_state == AV1394_IC_IDLE);
 
 	err = t1394_start_isoch_dma(avp->av_t1394_hdl, icp->ic_isoch_hdl,
-				&idma_ctrlinfo, 0, &result);
+	    &idma_ctrlinfo, 0, &result);
 	if (err == DDI_SUCCESS) {
 		icp->ic_state = AV1394_IC_DMA;
 	} else {
@@ -261,7 +258,7 @@ av1394_it_xmit(av1394_ic_t *icp, iec61883_xmit_t *xmit)
 
 	/* wait for new empty frames */
 	ret = av1394_it_wait_frames(icp, &xmit->tx_xfer.xf_empty_idx,
-		&xmit->tx_xfer.xf_empty_cnt, &xmit->tx_miss_cnt);
+	    &xmit->tx_xfer.xf_empty_cnt, &xmit->tx_miss_cnt);
 	mutex_exit(&icp->ic_mutex);
 
 	return (ret);
@@ -287,7 +284,7 @@ av1394_it_write(av1394_ic_t *icp, struct uio *uiop)
 		/* must have at least one empty frame */
 		if (itp->it_write_cnt == 0) {
 			ret = av1394_it_wait_frames(icp, &itp->it_write_idx,
-						&itp->it_write_cnt, &miss_cnt);
+			    &itp->it_write_cnt, &miss_cnt);
 			if (ret != 0) {
 				break;
 			}
@@ -306,7 +303,7 @@ av1394_it_write(av1394_ic_t *icp, struct uio *uiop)
 		/* add full frames to the pool */
 		if (full_cnt > 0) {
 			ret = av1394_it_add_frames(icp,
-						itp->it_write_idx, full_cnt);
+			    itp->it_write_idx, full_cnt);
 			if (ret != 0) {
 				break;
 			}
@@ -383,7 +380,7 @@ av1394_it_bld_ixl(av1394_ic_t *icp)
 		itp->it_ixlp = (ixl1394_command_t *)&itp->it_ixl_begin;
 	} else {
 		itp->it_ixlp = (ixl1394_command_t *)
-			&((av1394_it_ixl_buf_t *)itp->it_ixl_data)->tb_label;
+		    &((av1394_it_ixl_buf_t *)itp->it_ixl_data)->tb_label;
 	}
 
 	if (av1394_it_dump_ixl) {
@@ -426,7 +423,7 @@ av1394_it_ixl_bld_data(av1394_ic_t *icp)
 	int			tb_flags;
 
 	itp->it_frame_info = kmem_zalloc(icp->ic_nframes *
-				sizeof (av1394_it_frame_info_t), KM_SLEEP);
+	    sizeof (av1394_it_frame_info_t), KM_SLEEP);
 
 	bufsz_max = AV1394_IXL_BUFSZ_MAX / icp->ic_pktsz;
 	n = icp->ic_param.cp_n;
@@ -480,7 +477,7 @@ av1394_it_ixl_bld_data(av1394_ic_t *icp)
 				tb_flags |= AV1394_IT_IXL_BUF_EOF;
 			}
 			bp = av1394_it_ixl_bld_buf(icp, nfull, segnum, segoff,
-						tb_flags, framenum);
+			    tb_flags, framenum);
 
 			if (itp->it_ixl_data == NULL) {
 				itp->it_ixl_data = &bp->tb_common;
@@ -499,7 +496,7 @@ av1394_it_ixl_bld_data(av1394_ic_t *icp)
 			if (segoff == segsz) {
 				if (++segnum < pool->ip_nsegs) {
 					segsz = pool->ip_seg[segnum].is_size /
-						icp->ic_pktsz;
+					    icp->ic_pktsz;
 				}
 				segoff = 0;
 			}
@@ -523,12 +520,12 @@ av1394_it_ixl_bld_data(av1394_ic_t *icp)
 			av1394_it_ixl_complete_buf(bp, ep);
 		}
 		av1394_it_ixl_complete_empty_cip(ep,
-				(av1394_it_ixl_buf_t *)itp->it_ixl_data);
+		    (av1394_it_ixl_buf_t *)itp->it_ixl_data);
 		ep->te_jump.next_ixlp = NULL;
 		ep->te_common.tc_next = NULL;
 	} else {
 		bp->tb_jump.label = (ixl1394_command_t *)
-			&(((av1394_it_ixl_buf_t *)itp->it_ixl_data)->tb_label);
+		    &(((av1394_it_ixl_buf_t *)itp->it_ixl_data)->tb_label);
 	}
 
 	return (DDI_SUCCESS);
@@ -547,7 +544,7 @@ av1394_it_ixl_destroy_data(av1394_ic_t *icp)
 	itp->it_ixl_data = NULL;
 
 	kmem_free(itp->it_frame_info,
-			icp->ic_nframes * sizeof (av1394_it_frame_info_t));
+	    icp->ic_nframes * sizeof (av1394_it_frame_info_t));
 }
 
 static av1394_it_ixl_buf_t *
@@ -573,7 +570,7 @@ av1394_it_ixl_bld_buf(av1394_ic_t *icp, int cnt, int segnum, off_t off,
 	bp->tb_buf.pkt_size = pktsz;
 	bp->tb_buf.size = cnt * pktsz;
 	bp->tb_buf.ixl_buf._dmac_ll =
-			isp->is_dma_cookie.dmac_laddress + off * pktsz;
+	    isp->is_dma_cookie[0].dmac_laddress + off * pktsz;
 	bp->tb_buf.mem_bufp = isp->is_kaddr + off * pktsz;
 
 	if (flags & AV1394_IT_IXL_BUF_EOF) {
@@ -602,7 +599,7 @@ av1394_it_ixl_bld_buf(av1394_ic_t *icp, int cnt, int segnum, off_t off,
 	if (flags & AV1394_IT_IXL_BUF_SOF) {
 		itp->it_frame_info[framenum].fi_first_buf = bp;
 		itp->it_frame_info[framenum].fi_ts_off = bp->tb_buf.mem_bufp +
-			AV1394_TS_MODE_GET_OFF(icp->ic_param.cp_ts_mode);
+		    AV1394_TS_MODE_GET_OFF(icp->ic_param.cp_ts_mode);
 	} else if (flags & AV1394_IT_IXL_BUF_EOF) {
 		itp->it_frame_info[framenum].fi_last_buf = bp;
 	}
@@ -617,7 +614,7 @@ av1394_it_ixl_complete_buf(av1394_it_ixl_buf_t *bp,
 {
 	bp->tb_common.tc_next = &ep->te_common;
 	bp->tb_jump.label = bp->tb_jump.next_ixlp =
-			(ixl1394_command_t *)&ep->te_label;
+	    (ixl1394_command_t *)&ep->te_label;
 }
 
 static void
@@ -626,7 +623,7 @@ av1394_it_ixl_complete_buf2(av1394_it_ixl_buf_t *bp,
 {
 	bp->tb_common.tc_next = &nextbp->tb_common;
 	bp->tb_jump.label = bp->tb_jump.next_ixlp =
-			(ixl1394_command_t *)&nextbp->tb_label;
+	    (ixl1394_command_t *)&nextbp->tb_label;
 }
 
 static av1394_it_ixl_empty_cip_t *
@@ -672,7 +669,7 @@ av1394_it_ixl_complete_empty_cip(av1394_it_ixl_empty_cip_t *ep,
 	ep->te_pkt.mem_bufp = bp->tb_buf.mem_bufp;
 
 	ep->te_jump.label = ep->te_jump.next_ixlp =
-			(ixl1394_command_t *)&bp->tb_label;
+	    (ixl1394_command_t *)&bp->tb_label;
 }
 
 static void
@@ -704,13 +701,13 @@ av1394_it_ixl_bld_begin(av1394_ic_t *icp)
 		bep->be_empty_post[i].ixl_opcode = IXL1394_OP_SEND_PKT_ST;
 		bep->be_empty_post[i].size = AV1394_CIPSZ;
 		bep->be_empty_post[i].ixl_buf._dmac_ll =
-						bp->tb_buf.ixl_buf._dmac_ll;
+		    bp->tb_buf.ixl_buf._dmac_ll;
 		bep->be_empty_post[i].mem_bufp = bp->tb_buf.mem_bufp;
 		bep->be_empty_post[i].next_ixlp =
-			(ixl1394_command_t *)&bep->be_empty_post[i + 1];
+		    (ixl1394_command_t *)&bep->be_empty_post[i + 1];
 	}
 	bep->be_empty_post[AV1394_IT_IXL_BEGIN_NPOST - 1].next_ixlp =
-					(ixl1394_command_t *)&bep->be_jump;
+	    (ixl1394_command_t *)&bep->be_jump;
 
 	bep->be_jump.ixl_opcode = IXL1394_OP_JUMP_U;
 	bep->be_jump.label = (ixl1394_command_t *)&bp->tb_label;
@@ -726,7 +723,7 @@ av1394_it_ixl_begin_update_pkts(av1394_ic_t *icp, av1394_it_ixl_buf_t *bp)
 
 	for (i = 0; i < AV1394_IT_IXL_BEGIN_NPOST; i++) {
 		bep->be_empty_post[i].ixl_buf._dmac_ll =
-						bp->tb_buf.ixl_buf._dmac_ll;
+		    bp->tb_buf.ixl_buf._dmac_ll;
 		bep->be_empty_post[i].mem_bufp = bp->tb_buf.mem_bufp;
 	}
 }
@@ -783,7 +780,7 @@ static void
 av1394_it_dma_sync_frames(av1394_ic_t *icp, int idx, int cnt)
 {
 	av1394_ic_dma_sync_frames(icp, idx, cnt,
-			&icp->ic_it.it_data_pool, DDI_DMA_SYNC_FORDEV);
+	    &icp->ic_it.it_data_pool, DDI_DMA_SYNC_FORDEV);
 }
 
 /*
@@ -818,9 +815,9 @@ av1394_it_ixl_begin_cb(opaque_t arg, struct ixl1394_callback *cb)
 	ASSERT(itp->it_nfull <= icp->ic_nframes);
 
 	syt = av1394_it_ts_syt_inc(itp->it_ts_init.ts_syt,
-				AV1394_IT_IXL_BEGIN_NPOST + av1394_it_syt_off);
+	    AV1394_IT_IXL_BEGIN_NPOST + av1394_it_syt_off);
 	first = (itp->it_last_full + icp->ic_nframes - itp->it_nfull + 1) %
-								icp->ic_nframes;
+	    icp->ic_nframes;
 	av1394_it_update_frame_syt(icp, first, itp->it_nfull, syt);
 	mutex_exit(&icp->ic_mutex);
 
@@ -860,7 +857,7 @@ av1394_it_ixl_eof_cb(av1394_it_ixl_buf_t *bp)
 	if ((itp->it_nempty >= itp->it_hiwat) &&
 	    (icp->ic_state == AV1394_IC_DMA)) {
 		av1394_ic_trigger_softintr(icp, icp->ic_num,
-						AV1394_PREQ_IT_UNDERRUN);
+		    AV1394_PREQ_IT_UNDERRUN);
 	}
 	mutex_exit(&icp->ic_mutex);
 	mutex_exit(&ip->i_mutex);

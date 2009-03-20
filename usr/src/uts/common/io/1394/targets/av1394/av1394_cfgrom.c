@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 configuration ROM
@@ -261,8 +259,8 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 		if (ddi_copyout(&tl32, arg, sizeof (tl32), mode) != 0) {
 			ret = EFAULT;
 		} else if (bp && ddi_copyout(bp->b_rptr,
-			    (void *)(uintptr_t)tl32.tl_data,
-			    4 * min(tl32.tl_len, tl32.tl_rlen), mode) != 0) {
+		    (void *)(uintptr_t)tl32.tl_data,
+		    4 * min(tl32.tl_len, tl32.tl_rlen), mode) != 0) {
 			ret = EFAULT;
 		}
 	} else {
@@ -275,7 +273,7 @@ av1394_ioctl_node_get_text_leaf(av1394_inst_t *avp, void *arg, int mode)
 	if (ddi_copyout(&tl, arg, sizeof (tl), mode) != 0) {
 		ret = EFAULT;
 	} else if (bp && ddi_copyout(bp->b_rptr, tl.tl_data,
-		    4 * min(tl.tl_len, tl.tl_rlen), mode) != 0) {
+	    4 * min(tl.tl_len, tl.tl_rlen), mode) != 0) {
 		ret = EFAULT;
 	}
 #ifdef _MULTI_DATAMODEL
@@ -318,8 +316,10 @@ av1394_cfgrom_parse_rom(av1394_inst_t *avp)
 
 	/* skip info_len quadlets to get root dir address and length */
 	AV1394_CFGROM_RQ(avp, cmd, AV1394_CFGROM_INFO_LEN_ADDR, &val);
+	val = AV_SWAP32(val);
 	root_addr = IEEE1394_CONFIG_ROM_ADDR + 4 + (val >> 24) * 4;
 	AV1394_CFGROM_RQ(avp, cmd, root_addr, &val);
+	val = AV_SWAP32(val);
 	root_len = IEEE1212_DIR_LEN(val);
 
 	/* parse root dir and everything underneath */
@@ -377,6 +377,7 @@ av1394_cfgrom_parse_dir(av1394_inst_t *avp, cmd1394_cmd_t *cmd,
 	entry_addr = pa->pa_addr;
 	for (i = 0; i < pa->pa_len; i++) {
 		AV1394_CFGROM_RQ(avp, cmd, entry_addr, &entry);
+		entry = AV_SWAP32(entry);
 
 		CFGROM_TYPE_KEY_VALUE(entry, t, k, v);
 		if ((t == IEEE1212_LEAF_TYPE) &&
@@ -384,10 +385,11 @@ av1394_cfgrom_parse_dir(av1394_inst_t *avp, cmd1394_cmd_t *cmd,
 			/* save this leaf */
 			leaf_addr = entry_addr + 4 * v;
 			av1394_cfgrom_add_text_leaf(avp, pa->pa_dir,
-					leaf_addr, this_pa.pa_desc_entry);
+			    leaf_addr, this_pa.pa_desc_entry);
 		} else if (t == IEEE1212_DIRECTORY_TYPE) {
 			dir_addr = entry_addr + 4 * v;
 			AV1394_CFGROM_RQ(avp, cmd, dir_addr, &val);
+			val = AV_SWAP32(val);
 			dir_len = IEEE1212_DIR_LEN(val);
 
 			/* parse this dir */
@@ -499,6 +501,7 @@ av1394_cfgrom_read_leaf(av1394_inst_t *avp, uint64_t leaf_addr, mblk_t **bpp)
 
 	/* read leaf length */
 	AV1394_CFGROM_RQ(avp, cmd, leaf_addr, &val);
+	val = AV_SWAP32(val);
 	leaf_len = IEEE1212_DIR_LEN(val);
 
 	if (leaf_len < 3) {

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 isochronous receive module
@@ -37,7 +34,8 @@ static int	av1394_ir_build_ixl(av1394_ic_t *);
 static void	av1394_ir_ixl_label_init(av1394_ir_ixl_data_t *,
 		ixl1394_command_t *);
 static void	av1394_ir_ixl_buf_init(av1394_ic_t *, ixl1394_xfer_buf_t *,
-		av1394_isoch_seg_t *, off_t, uint16_t, ixl1394_command_t *);
+		av1394_isoch_seg_t *, off_t, uint64_t, uint16_t,
+		ixl1394_command_t *);
 static void	av1394_ir_ixl_cb_init(av1394_ic_t *, av1394_ir_ixl_data_t *,
 		int);
 static void	av1394_ir_ixl_jump_init(av1394_ic_t *, av1394_ir_ixl_data_t *,
@@ -80,7 +78,7 @@ av1394_ir_init(av1394_ic_t *icp, int *error)
 	AV1394_TNF_ENTER(av1394_ir_init);
 
 	nframes = av1394_ic_alloc_pool(pool, icp->ic_framesz, icp->ic_nframes,
-					AV1394_IR_NFRAMES_MIN);
+	    AV1394_IR_NFRAMES_MIN);
 	if (nframes == 0) {
 		*error = IEC61883_ERR_NOMEM;
 		AV1394_TNF_EXIT(av1394_ir_init);
@@ -155,7 +153,7 @@ av1394_ir_start(av1394_ic_t *icp)
 	mutex_exit(&icp->ic_mutex);
 
 	err = t1394_start_isoch_dma(avp->av_t1394_hdl, icp->ic_isoch_hdl,
-				&idma_ctrlinfo, 0, &result);
+	    &idma_ctrlinfo, 0, &result);
 	if (err == DDI_SUCCESS) {
 		mutex_enter(&icp->ic_mutex);
 		icp->ic_state = AV1394_IC_DMA;
@@ -218,7 +216,7 @@ av1394_ir_recv(av1394_ic_t *icp, iec61883_recv_t *recv)
 
 	/* wait for new frames to arrive */
 	ret = av1394_ir_wait_frames(icp,
-		&recv->rx_xfer.xf_full_idx, &recv->rx_xfer.xf_full_cnt);
+	    &recv->rx_xfer.xf_full_idx, &recv->rx_xfer.xf_full_cnt);
 	mutex_exit(&icp->ic_mutex);
 
 	return (ret);
@@ -239,7 +237,7 @@ av1394_ir_read(av1394_ic_t *icp, struct uio *uiop)
 		if (irp->ir_read_cnt == 0) {
 			irp->ir_read_off = 0;
 			ret = av1394_ir_wait_frames(icp,
-					&irp->ir_read_idx, &irp->ir_read_cnt);
+			    &irp->ir_read_idx, &irp->ir_read_cnt);
 			if (ret != 0) {
 				mutex_exit(&icp->ic_mutex);
 				AV1394_TNF_EXIT(av1394_ir_read);
@@ -254,7 +252,7 @@ av1394_ir_read(av1394_ic_t *icp, struct uio *uiop)
 		if (empty_cnt > 0) {
 			av1394_ir_zero_pkts(icp, irp->ir_read_idx, empty_cnt);
 			ret = av1394_ir_add_frames(icp, irp->ir_read_idx,
-								empty_cnt);
+			    empty_cnt);
 			irp->ir_read_idx += empty_cnt;
 			irp->ir_read_idx %= icp->ic_nframes;
 			irp->ir_read_cnt -= empty_cnt;
@@ -337,81 +335,167 @@ av1394_ir_build_ixl(av1394_ic_t *icp)
 {
 	av1394_ir_t		*irp = &icp->ic_ir;
 	av1394_isoch_pool_t	*pool = &irp->ir_data_pool;
-	size_t			segsz;
-	av1394_ir_ixl_data_t	*dp;
-	int			i;	/* frame index */
-	int			j;	/* buffer index */
-	int			k;
-	int			spf;	/* segments per frame */
-	int			bpf;	/* buffers per frame */
+	int			i;	/* segment index */
+	int			j;
+	int			fi;	/* frame index */
+	int			bi;	/* buffer index */
 
 	AV1394_TNF_ENTER(av1394_ir_build_ixl);
 
 	/* allocate space for IXL data blocks */
 	irp->ir_ixl_data = kmem_zalloc(icp->ic_nframes *
-				sizeof (av1394_ir_ixl_data_t), KM_SLEEP);
+	    sizeof (av1394_ir_ixl_data_t), KM_SLEEP);
 
 	/*
-	 * calculate and allocate space for buf commands
+	 * We have a bunch of segments, and each is divided into cookies.  We
+	 * need to cover the segments with RECV_BUFs such that they
+	 *   - don't span cookies
+	 *   - don't span frames
+	 *   - are at most AV1394_IXL_BUFSZ_MAX
+	 *
+	 * The straightforward algorithm is to start from the beginning, find
+	 * the next lowest frame or cookie boundary, and either make a buf for
+	 * it if it is smaller than AV1394_IXL_BUFSZ_MAX, or make multiple
+	 * bufs for it as with av1394_ic_ixl_seg_decomp().  And repeat.
 	 */
-	segsz = pool->ip_seg[0].is_size;
-	ASSERT(segsz * pool->ip_nsegs == pool->ip_size); /* equal-size segs */
-	ASSERT(segsz % icp->ic_pktsz == 0);	/* packet-aligned */
-	ASSERT(segsz >= icp->ic_framesz);	/* 1+ full frames per segment */
 
-	if (icp->ic_framesz <= AV1394_IXL_BUFSZ_MAX) {
-		/* RECV_BUF == frame, one or more frames per segment */
-		irp->ir_ixl_tailsz = irp->ir_ixl_bufsz = icp->ic_framesz;
-		irp->ir_ixl_bpf = 0;
-	} else {
-		/* segment == frame, several RECV_BUF's per segment */
-		ASSERT(segsz == icp->ic_framesz);
-		/* calculate the best decomposition of a segment into buffers */
-		irp->ir_ixl_bpf = av1394_ic_ixl_seg_decomp(segsz,
-			icp->ic_pktsz, &irp->ir_ixl_bufsz, &irp->ir_ixl_tailsz);
+	irp->ir_ixl_nbufs = 0;
+	for (i = 0; i < pool->ip_nsegs; ++i) {
+		av1394_isoch_seg_t *isp = &pool->ip_seg[i];
+		size_t dummy1, dummy2;
+
+		uint_t off = 0;
+		uint_t end;
+
+		uint_t frame_end = icp->ic_framesz;
+		int ci = 0;
+		uint_t cookie_end = isp->is_dma_cookie[ci].dmac_size;
+
+		for (;;) {
+			end = min(frame_end, cookie_end);
+
+			if (end - off <= AV1394_IXL_BUFSZ_MAX) {
+				++irp->ir_ixl_nbufs;
+			} else {
+				irp->ir_ixl_nbufs += av1394_ic_ixl_seg_decomp(
+				    end - off, icp->ic_pktsz, &dummy1, &dummy2);
+				/* count the tail buffer */
+				++irp->ir_ixl_nbufs;
+			}
+
+			off = end;
+			if (off >= isp->is_size)
+				break;
+
+			if (off == frame_end)
+				frame_end += icp->ic_framesz;
+			if (off == cookie_end) {
+				++ci;
+				cookie_end += isp->is_dma_cookie[ci].dmac_size;
+			}
+		}
 	}
-	spf = segsz / icp->ic_framesz;
-	bpf = irp->ir_ixl_bpf + 1;
 
-	irp->ir_ixl_nbufs = bpf * icp->ic_nframes;
 	irp->ir_ixl_buf = kmem_zalloc(irp->ir_ixl_nbufs *
-				sizeof (ixl1394_xfer_buf_t), KM_SLEEP);
+	    sizeof (ixl1394_xfer_buf_t), KM_SLEEP);
 
-	/* initialize data blocks and receive buffers */
-	for (i = 0; i < icp->ic_nframes; i++) {
-		dp = &irp->ir_ixl_data[i];
 
-		av1394_ir_ixl_label_init(dp,
-				(ixl1394_command_t *)&irp->ir_ixl_buf[i * bpf]);
+	fi = 0;
+	bi = 0;
 
-		/* regular buffers, if any */
-		for (j = 0; j < irp->ir_ixl_bpf; j++) {
-			k = j + i * bpf;
-			av1394_ir_ixl_buf_init(icp, &irp->ir_ixl_buf[k],
-				&pool->ip_seg[i], j * irp->ir_ixl_bufsz,
-				irp->ir_ixl_bufsz,
-				(ixl1394_command_t *)&irp->ir_ixl_buf[k + 1]);
+	for (i = 0; i < pool->ip_nsegs; ++i) {
+		av1394_isoch_seg_t *isp = &pool->ip_seg[i];
+
+		uint_t off = 0;		/* offset into segment */
+		uint_t end;
+		uint_t coff = 0;	/* offset into cookie */
+
+
+		uint_t frame_end = icp->ic_framesz;
+		int ci = 0;
+		uint_t cookie_end = isp->is_dma_cookie[ci].dmac_size;
+
+		ixl1394_command_t *nextp;
+
+		av1394_ir_ixl_label_init(&irp->ir_ixl_data[fi],
+		    (ixl1394_command_t *)&irp->ir_ixl_buf[bi]);
+
+		for (;;) {
+			end = min(frame_end, cookie_end);
+
+			if (end == frame_end)
+				nextp = (ixl1394_command_t *)
+				    &irp->ir_ixl_data[fi].rd_cb;
+			else
+				nextp = (ixl1394_command_t *)
+				    &irp->ir_ixl_buf[bi + 1];
+
+			if (end - off <= AV1394_IXL_BUFSZ_MAX) {
+				av1394_ir_ixl_buf_init(icp,
+				    &irp->ir_ixl_buf[bi], isp, off,
+				    isp->is_dma_cookie[ci].dmac_laddress + coff,
+				    end - off, nextp);
+				coff += end - off;
+				off = end;
+				++bi;
+			} else {
+				size_t reg, tail;
+				uint_t nbufs;
+
+				nbufs = av1394_ic_ixl_seg_decomp(end - off,
+				    icp->ic_pktsz, &reg, &tail);
+
+				for (j = 0; j < nbufs; ++j) {
+					av1394_ir_ixl_buf_init(icp,
+					    &irp->ir_ixl_buf[bi], isp, off,
+					    isp->is_dma_cookie[ci].
+					    dmac_laddress + coff, reg,
+					    (ixl1394_command_t *)
+					    &irp->ir_ixl_buf[bi + 1]);
+					++bi;
+					off += reg;
+					coff += reg;
+				}
+
+				av1394_ir_ixl_buf_init(icp,
+				    &irp->ir_ixl_buf[bi], isp, off,
+				    isp->is_dma_cookie[ci].dmac_laddress + coff,
+				    tail, nextp);
+				++bi;
+				off += tail;
+				coff += tail;
+			}
+
+			ASSERT((off == frame_end) || (off == cookie_end));
+
+			if (off >= isp->is_size)
+				break;
+
+			if (off == frame_end) {
+				av1394_ir_ixl_cb_init(icp,
+				    &irp->ir_ixl_data[fi], fi);
+				av1394_ir_ixl_jump_init(icp,
+				    &irp->ir_ixl_data[fi], fi);
+				++fi;
+				frame_end += icp->ic_framesz;
+				av1394_ir_ixl_label_init(&irp->ir_ixl_data[fi],
+				    (ixl1394_command_t *)&irp->ir_ixl_buf[bi]);
+			}
+
+			if (off == cookie_end) {
+				++ci;
+				cookie_end += isp->is_dma_cookie[ci].dmac_size;
+				coff = 0;
+			}
 		}
 
-		/* tail buffer */
-		if (icp->ic_framesz <= AV1394_IXL_BUFSZ_MAX) {
-			av1394_ir_ixl_buf_init(icp, &irp->ir_ixl_buf[i],
-				&pool->ip_seg[i / spf],
-				i * irp->ir_ixl_tailsz,
-				irp->ir_ixl_tailsz,
-				(ixl1394_command_t *)&dp->rd_cb);
-		} else {
-			k = irp->ir_ixl_bpf + i * bpf;
-			av1394_ir_ixl_buf_init(icp, &irp->ir_ixl_buf[k],
-				&pool->ip_seg[i],
-				irp->ir_ixl_bpf * irp->ir_ixl_bufsz,
-				irp->ir_ixl_tailsz,
-				(ixl1394_command_t *)&dp->rd_cb);
-		}
-
-		av1394_ir_ixl_cb_init(icp, dp, i);
-		av1394_ir_ixl_jump_init(icp, dp, i);
+		av1394_ir_ixl_cb_init(icp, &irp->ir_ixl_data[fi], fi);
+		av1394_ir_ixl_jump_init(icp, &irp->ir_ixl_data[fi], fi);
+		++fi;
 	}
+
+	ASSERT(fi == icp->ic_nframes);
+	ASSERT(bi == irp->ir_ixl_nbufs);
 
 	irp->ir_ixlp = (ixl1394_command_t *)irp->ir_ixl_data;
 
@@ -432,13 +516,13 @@ av1394_ir_ixl_label_init(av1394_ir_ixl_data_t *dp, ixl1394_command_t *nextp)
 
 static void
 av1394_ir_ixl_buf_init(av1394_ic_t *icp, ixl1394_xfer_buf_t *buf,
-	av1394_isoch_seg_t *isp, off_t offset, uint16_t size,
+	av1394_isoch_seg_t *isp, off_t offset, uint64_t addr, uint16_t size,
 	ixl1394_command_t *nextp)
 {
 	buf->ixl_opcode = IXL1394_OP_RECV_BUF;
 	buf->size = size;
 	buf->pkt_size = icp->ic_pktsz;
-	buf->ixl_buf._dmac_ll = isp->is_dma_cookie.dmac_laddress + offset;
+	buf->ixl_buf._dmac_ll = addr;
 	buf->mem_bufp = isp->is_kaddr + offset;
 	buf->next_ixlp = nextp;
 }
@@ -477,9 +561,9 @@ av1394_ir_destroy_ixl(av1394_ic_t *icp)
 
 	mutex_enter(&icp->ic_mutex);
 	kmem_free(irp->ir_ixl_buf,
-			irp->ir_ixl_nbufs * sizeof (ixl1394_xfer_buf_t));
+	    irp->ir_ixl_nbufs * sizeof (ixl1394_xfer_buf_t));
 	kmem_free(irp->ir_ixl_data,
-			icp->ic_nframes * sizeof (av1394_ir_ixl_data_t));
+	    icp->ic_nframes * sizeof (av1394_ir_ixl_data_t));
 
 	irp->ir_ixlp = NULL;
 	irp->ir_ixl_buf = NULL;
@@ -533,7 +617,7 @@ static void
 av1394_ir_dma_sync_frames(av1394_ic_t *icp, int idx, int cnt)
 {
 	av1394_ic_dma_sync_frames(icp, idx, cnt,
-			&icp->ic_ir.ir_data_pool, DDI_DMA_SYNC_FORCPU);
+	    &icp->ic_ir.ir_data_pool, DDI_DMA_SYNC_FORCPU);
 }
 
 /*
@@ -564,7 +648,7 @@ av1394_ir_ixl_frame_cb(opaque_t arg, struct ixl1394_callback *cb)
 		 */
 		if (irp->ir_nfull >= irp->ir_hiwat) {
 			av1394_ic_trigger_softintr(icp, icp->ic_num,
-					AV1394_PREQ_IR_OVERFLOW);
+			    AV1394_PREQ_IR_OVERFLOW);
 		}
 	}
 	mutex_exit(&icp->ic_mutex);

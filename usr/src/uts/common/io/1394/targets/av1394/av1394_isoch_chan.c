@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * routines common to isoch receive and isoch transmit
@@ -263,8 +260,7 @@ av1394_ic_validate_init_params(iec61883_isoch_init_t *ii)
 		return (EINVAL);
 	}
 	framesz = ii->ii_frame_size * ii->ii_pkt_size;
-	if ((framesz > AV1394_IC_FRAME_SIZE_MAX) ||
-	    (framesz < AV1394_IXL_BUFSZ_MAX)) {
+	if (framesz > AV1394_IC_FRAME_SIZE_MAX) {
 		TNF_PROBE_0(av1394_ic_validate_init_params_frsz_error,
 		    AV1394_TNF_ISOCH_ERROR, "");
 		ii->ii_error = IEC61883_ERR_NOMEM;
@@ -341,7 +337,7 @@ av1394_ic_set_params(av1394_inst_t *avp, iec61883_isoch_init_t *ii,
 	icp->ic_avp = avp;
 	icp->ic_num = num;
 	icp->ic_dir = (ii->ii_direction == IEC61883_DIR_RECV) ?
-			AV1394_IR : AV1394_IT;
+	    AV1394_IR : AV1394_IT;
 	icp->ic_pktsz = ii->ii_pkt_size;
 	icp->ic_npkts = ii->ii_frame_size;
 	icp->ic_framesz = icp->ic_pktsz * icp->ic_npkts;
@@ -388,7 +384,7 @@ av1394_ic_alloc_channel(av1394_ic_t *icp, uint64_t mask, int *num)
 	sii.si_speed		= icp->ic_param.cp_bus_speed;
 
 	ret = t1394_alloc_isoch_single(avp->av_t1394_hdl, &sii, 0, &so,
-			&icp->ic_sii_hdl, &result);
+	    &icp->ic_sii_hdl, &result);
 	if (ret != DDI_SUCCESS) {
 		TNF_PROBE_1(av1394_ic_alloc_channel_error,
 		    AV1394_TNF_ISOCH_ERROR, "", tnf_int, result, result);
@@ -454,8 +450,10 @@ av1394_ic_alloc_pool(av1394_isoch_pool_t *pool, size_t framesz, int cnt,
 	nsegs = cnt;
 	if (framesz < AV1394_IXL_BUFSZ_MAX / 2) {
 		fps = AV1394_IXL_BUFSZ_MAX / framesz;
-		segsz *= fps;
-		nsegs /= fps;
+		segsz = framesz * fps;
+		nsegs = totalsz / segsz;
+		if ((totalsz % segsz) != 0)
+			nsegs++;	/* remainder in non-full segment */
 	}
 	ASSERT(segsz * nsegs >= totalsz);
 
@@ -472,7 +470,7 @@ av1394_ic_alloc_pool(av1394_isoch_pool_t *pool, size_t framesz, int cnt,
 
 		seg->is_umem_size = ptob(btopr(segsz));
 		seg->is_kaddr = ddi_umem_alloc(seg->is_umem_size,
-					DDI_UMEM_SLEEP, &seg->is_umem_cookie);
+		    DDI_UMEM_SLEEP, &seg->is_umem_cookie);
 		if (seg->is_kaddr == NULL) {
 			TNF_PROBE_0(av1394_ic_alloc_pool_error_umem_alloc,
 			    AV1394_TNF_ISOCH_ERROR, "");
@@ -524,6 +522,7 @@ av1394_ic_dma_setup(av1394_ic_t *icp, av1394_isoch_pool_t *pool)
 	uint_t			dma_dir;
 	int			ret;
 	int			i;
+	int			j;
 
 	AV1394_TNF_ENTER(av1394_ic_dma_setup);
 
@@ -538,8 +537,8 @@ av1394_ic_dma_setup(av1394_ic_t *icp, av1394_isoch_pool_t *pool)
 		isp = &pool->ip_seg[i];
 
 		ret = ddi_dma_alloc_handle(avp->av_dip,
-			&avp->av_attachinfo.dma_attr, DDI_DMA_DONTWAIT, NULL,
-			&isp->is_dma_hdl);
+		    &avp->av_attachinfo.dma_attr, DDI_DMA_DONTWAIT, NULL,
+		    &isp->is_dma_hdl);
 		if (ret != DDI_SUCCESS) {
 			TNF_PROBE_0(av1394_ic_dma_setup_error_alloc_hdl,
 			    AV1394_TNF_ISOCH_ERROR, "");
@@ -549,9 +548,9 @@ av1394_ic_dma_setup(av1394_ic_t *icp, av1394_isoch_pool_t *pool)
 		}
 
 		ret = ddi_dma_addr_bind_handle(isp->is_dma_hdl, NULL,
-			isp->is_kaddr, isp->is_size,
-			dma_dir | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
-			&isp->is_dma_cookie, &isp->is_dma_ncookies);
+		    isp->is_kaddr, isp->is_size,
+		    dma_dir | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+		    &isp->is_dma_cookie[0], &isp->is_dma_ncookies);
 
 		if (ret != DDI_DMA_MAPPED) {
 			TNF_PROBE_0(av1394_ic_dma_setup_error_bind_hdl,
@@ -561,14 +560,17 @@ av1394_ic_dma_setup(av1394_ic_t *icp, av1394_isoch_pool_t *pool)
 			return (DDI_FAILURE);
 		}
 
-		/* multiple cookies not supported (yet) */
-		if (isp->is_dma_ncookies != 1) {
+		if (isp->is_dma_ncookies > COOKIES) {
 			TNF_PROBE_0(av1394_ic_dma_setup_error_ncookies,
 			    AV1394_TNF_ISOCH_ERROR, "");
 			av1394_ic_dma_cleanup(icp, pool);
 			AV1394_TNF_EXIT(av1394_ic_dma_setup);
 			return (DDI_FAILURE);
 		}
+
+		for (j = 1; j < isp->is_dma_ncookies; ++j)
+			ddi_dma_nextcookie(isp->is_dma_hdl,
+			    &isp->is_dma_cookie[j]);
 	}
 
 	AV1394_TNF_EXIT(av1394_ic_dma_setup);
@@ -604,13 +606,26 @@ void
 av1394_ic_dma_sync_frames(av1394_ic_t *icp, int idx, int cnt,
 		av1394_isoch_pool_t *pool, uint_t type)
 {
-	int		i;
-	int		j = idx;
+	int	fps;		/* frames per segment */
+	int	nsegs;		/* number of segments for indicated frames */
+	int	seg;		/* index of segment to sync */
 
-	for (i = cnt; i > 0; i--) {
-		(void) ddi_dma_sync(pool->ip_seg[j].is_dma_hdl, 0,
-				icp->ic_framesz, type);
-		j = (j + 1) % icp->ic_nframes;
+	fps = icp->ic_nframes / pool->ip_nsegs;
+
+	nsegs = (cnt / fps) + 1;
+
+		seg = idx / fps;
+		for (;;) {
+			(void) ddi_dma_sync(pool->ip_seg[seg].is_dma_hdl, 0,
+			    icp->ic_framesz, type);
+
+		--nsegs;
+		if (nsegs == 0)
+			break;
+
+		++seg;
+		if (seg == pool->ip_nsegs)
+			seg = 0;	/* wrap segment index */
 	}
 }
 
@@ -653,7 +668,7 @@ av1394_ic_rsrc_fail(t1394_isoch_single_handle_t t1394_sii_hdl, opaque_t arg,
 
 	/* XXX this could be handled more gracefully */
 	cmn_err(CE_CONT, "av1394: can't reallocate isochronous resources"
-			" after bus reset\n");
+	    " after bus reset\n");
 
 	AV1394_TNF_EXIT(av1394_ic_rsrc_fail);
 }
@@ -749,17 +764,17 @@ av1394_ic_ixl_dump(ixl1394_command_t *cmd)
 		case IXL1394_OP_CALLBACK_U:
 			cb = (ixl1394_callback_t *)cmd;
 			cmn_err(CE_CONT, "%p: CALLBACK %p\n", (void *)cmd,
-				(void *)cb->callback);
+			    (void *)cb->callback);
 			break;
 		case IXL1394_OP_JUMP:
 			jmp = (ixl1394_jump_t *)cmd;
 			cmn_err(CE_CONT, "%p: JUMP %p\n", (void *)cmd,
-				(void *)jmp->label);
+			    (void *)jmp->label);
 			break;
 		case IXL1394_OP_JUMP_U:
 			jmp = (ixl1394_jump_t *)cmd;
 			cmn_err(CE_CONT, "%p: JUMP_U %p\n", (void *)cmd,
-				(void *)jmp->label);
+			    (void *)jmp->label);
 			break;
 		case IXL1394_OP_STORE_TIMESTAMP:
 			cmn_err(CE_CONT, "%p: STORE_TIMESTAMP\n", (void *)cmd);
@@ -778,7 +793,7 @@ void
 av1394_ic_trigger_softintr(av1394_ic_t *icp, int num, int preq)
 {
 	av1394_isoch_t	*ip = &icp->ic_avp->av_i;
-	uint64_t	chmask = (1UL << num);
+	uint64_t	chmask = (1ULL << num);
 
 	if (((ip->i_softintr_ch & chmask) == 0) ||
 	    ((icp->ic_preq & preq) == 0)) {
@@ -799,7 +814,8 @@ av1394_ic_bitreverse(uint64_t x)
 	x = (((x >> 4) & 0x0f0f0f0f0f0f0f0f) | ((x & 0x0f0f0f0f0f0f0f0f) << 4));
 	x = (((x >> 8) & 0x00ff00ff00ff00ff) | ((x & 0x00ff00ff00ff00ff) << 8));
 	x = (((x >> 16) & 0x0000ffff0000ffff) |
-					((x & 0x0000ffff0000ffff) << 16));
+	    ((x & 0x0000ffff0000ffff) << 16));
+
 	return ((x >> 32) | (x << 32));
 }
 

@@ -658,6 +658,8 @@ f none usr/include/sys/auxv.h 644 root bin
 f none usr/include/sys/auxv_386.h 644 root bin
 f none usr/include/sys/auxv_SPARC.h 644 root bin
 f none usr/include/sys/avintr.h 644 root bin
+d none usr/include/sys/av 755 root bin
+f none usr/include/sys/av/iec61883.h 644 root bin
 f none usr/include/sys/avl.h 644 root bin
 f none usr/include/sys/avl_impl.h 644 root bin
 f none usr/include/sys/acpi_drv.h 644 root bin

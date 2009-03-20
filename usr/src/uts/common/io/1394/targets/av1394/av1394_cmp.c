@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 CMP (Connection Management Procedures)
@@ -117,10 +114,10 @@ av1394_cmp_bus_reset(av1394_inst_t *avp)
 		if (cmp->cmp_pcr[i]) {
 			if (i < AV1394_IMPR_IDX) {
 				cmp->cmp_pcr[i]->pcr_val &=
-						~AV1394_OPCR_BR_CLEAR_MASK;
+				    ~AV1394_OPCR_BR_CLEAR_MASK;
 			} else {
 				cmp->cmp_pcr[i]->pcr_val &=
-						~AV1394_IPCR_BR_CLEAR_MASK;
+				    ~AV1394_IPCR_BR_CLEAR_MASK;
 			}
 		}
 	}
@@ -245,11 +242,11 @@ av1394_ioctl_plug_reg_read(av1394_inst_t *avp, void *arg, int mode)
 		switch (av1394_pcr_ph2idx(ph)) {
 		case AV1394_OMPR_IDX:
 			ret = t1394_cmp_read(avp->av_t1394_hdl, T1394_CMP_OMPR,
-					&pr.pr_val);
+			    &pr.pr_val);
 			break;
 		case AV1394_IMPR_IDX:
 			ret = t1394_cmp_read(avp->av_t1394_hdl, T1394_CMP_IMPR,
-					&pr.pr_val);
+			    &pr.pr_val);
 			break;
 		default:
 			rw_enter(&cmp->cmp_pcr_rwlock, RW_READER);
@@ -290,16 +287,16 @@ av1394_ioctl_plug_reg_cas(av1394_inst_t *avp, void *arg, int mode)
 
 	if (av1394_pcr_ph_is_remote(ph)) {
 		ret = av1394_pcr_remote_cas(avp, ph,
-					&pl.pl_old, pl.pl_data, pl.pl_arg);
+		    &pl.pl_old, pl.pl_data, pl.pl_arg);
 	} else {
 		switch (av1394_pcr_ph2idx(ph)) {
 		case AV1394_OMPR_IDX:
 			ret = t1394_cmp_cas(avp->av_t1394_hdl, T1394_CMP_OMPR,
-					pl.pl_arg, pl.pl_data, &pl.pl_old);
+			    pl.pl_arg, pl.pl_data, &pl.pl_old);
 			break;
 		case AV1394_IMPR_IDX:
 			ret = t1394_cmp_cas(avp->av_t1394_hdl, T1394_CMP_IMPR,
-					pl.pl_arg, pl.pl_data, &pl.pl_old);
+			    pl.pl_arg, pl.pl_data, &pl.pl_old);
 			break;
 		default:
 			rw_enter(&cmp->cmp_pcr_rwlock, RW_WRITER);
@@ -367,7 +364,7 @@ av1394_ioctl_plug_init_local(av1394_inst_t *avp, iec61883_plug_init_t *pip)
 	if ((pip->pi_type == IEC61883_PLUG_MASTER_IN) ||
 	    (pip->pi_type == IEC61883_PLUG_MASTER_OUT)) {
 		pip->pi_handle = av1394_pcr_make_ph(pip->pi_loc,
-						pip->pi_type, 0);
+		    pip->pi_type, 0);
 		return (0);
 	}
 
@@ -410,7 +407,7 @@ av1394_ioctl_plug_init_local(av1394_inst_t *avp, iec61883_plug_init_t *pip)
 	}
 	pip->pi_rnum = av1394_pcr_idx2num(idx);
 	pip->pi_handle = av1394_pcr_make_ph(pip->pi_loc, pip->pi_type,
-							pip->pi_rnum);
+	    pip->pi_rnum);
 
 	return (0);
 }
@@ -652,7 +649,7 @@ av1394_pcr_recv_read_request(cmd1394_cmd_t *req)
 
 	if (req->cmd_type != CMD1394_ASYNCH_RD_QUAD) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
-	} if ((idx >= NELEM(cmp->cmp_pcr)) ||
+	} else if ((idx >= NELEM(cmp->cmp_pcr)) ||
 	    ((pcr = cmp->cmp_pcr[idx]) == NULL)) {
 		req->cmd_result = IEEE1394_RESP_ADDRESS_ERROR;
 	} else {
@@ -689,7 +686,7 @@ av1394_pcr_recv_lock_request(cmd1394_cmd_t *req)
 	if ((req->cmd_type != CMD1394_ASYNCH_LOCK_32) ||
 	    (req->cmd_u.l32.lock_type != CMD1394_LOCK_COMPARE_SWAP)) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
-	} if ((idx >= NELEM(cmp->cmp_pcr)) ||
+	} else if ((idx >= NELEM(cmp->cmp_pcr)) ||
 	    ((pcr = cmp->cmp_pcr[idx]) == NULL)) {
 		req->cmd_result = IEEE1394_RESP_ADDRESS_ERROR;
 	} else {
