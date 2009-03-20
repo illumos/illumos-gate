@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libprtdiag_psr/sparc/opl/Makefile
 
@@ -34,7 +32,7 @@ include ../Makefile.com
 
 IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../libprtdiag/inc
 IFLAGS += -I$(SRC)/uts/common/ -I$(SRC)/cmd/picl/plugins/inc
-LDLIBS += -lpicl -ldevinfo -lkstat
+LDLIBS += -lpicl -lkstat
 
 LINTFLAGS += $(IFLAGS)
 
