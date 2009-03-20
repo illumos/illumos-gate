@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - address spaces.
@@ -779,7 +777,7 @@ retry:
 }
 
 int
-as_dup(struct as *as, struct as **outas)
+as_dup(struct as *as, struct proc *forkedproc)
 {
 	struct as *newas;
 	struct seg *seg, *newseg;
@@ -789,7 +787,7 @@ as_dup(struct as *as, struct as **outas)
 	as_clearwatch(as);
 	newas = as_alloc();
 	newas->a_userlimit = as->a_userlimit;
-	newas->a_proc = as->a_proc->p_child;
+	newas->a_proc = forkedproc;
 
 	AS_LOCK_ENTER(newas, &newas->a_lock, RW_WRITER);
 
@@ -856,7 +854,7 @@ as_dup(struct as *as, struct as **outas)
 		as_free(newas);
 		return (error);
 	}
-	*outas = newas;
+	forkedproc->p_as = newas;
 	return (0);
 }
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
@@ -467,7 +465,7 @@ task_create(projid_t projid, zone_t *zone)
 	 */
 	(void) mod_hash_reserve(task_hash, &hndl);
 	mutex_enter(&task_hash_lock);
-	ASSERT(task_find(tkid, getzoneid()) == NULL);
+	ASSERT(task_find(tkid, zone->zone_id) == NULL);
 	if (mod_hash_insert_reserve(task_hash, (mod_hash_key_t)(uintptr_t)tkid,
 	    (mod_hash_val_t *)tk, hndl) != 0) {
 		mod_hash_cancel(task_hash, &hndl);
@@ -638,9 +636,9 @@ task_change(task_t *newtk, proc_t *p)
 	ASSERT(oldtk != NULL);
 	ASSERT(oldtk->tk_memb_list != NULL);
 
-	mutex_enter(&p->p_zone->zone_nlwps_lock);
+	mutex_enter(&oldtk->tk_zone->zone_nlwps_lock);
 	oldtk->tk_nlwps -= p->p_lwpcnt;
-	mutex_exit(&p->p_zone->zone_nlwps_lock);
+	mutex_exit(&oldtk->tk_zone->zone_nlwps_lock);
 
 	mutex_enter(&newtk->tk_zone->zone_nlwps_lock);
 	newtk->tk_nlwps += p->p_lwpcnt;

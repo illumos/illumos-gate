@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2908,6 +2908,13 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 
 	e.rcep_p.proj = projp;
 	e.rcep_t = RCENTITY_PROJECT;
+
+	/* check for overflow */
+	if ((projp->kpj_data.kpd_locked_mem + inc) <
+	    projp->kpj_data.kpd_locked_mem) {
+		ret = EAGAIN;
+		goto out;
+	}
 	if (projp->kpj_data.kpd_locked_mem + inc >
 	    projp->kpj_data.kpd_locked_mem_ctl) {
 		if (rctl_test_entity(rc_project_locked_mem, projp->kpj_rctls,
@@ -2918,6 +2925,12 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 	}
 	e.rcep_p.zone = zonep;
 	e.rcep_t = RCENTITY_ZONE;
+
+	/* Check for overflow */
+	if ((zonep->zone_locked_mem + inc) < zonep->zone_locked_mem) {
+		ret = EAGAIN;
+		goto out;
+	}
 	if (zonep->zone_locked_mem + inc > zonep->zone_locked_mem_ctl) {
 		if (rctl_test_entity(rc_zone_locked_mem, zonep->zone_rctls,
 		    p, &e, inc, 0) & RCT_DENY) {
@@ -3003,6 +3016,11 @@ rctl_incr_swap(proc_t *proc, zone_t *zone, size_t swap)
 
 	mutex_enter(&zone->zone_mem_lock);
 
+	/* Check for overflow */
+	if ((zone->zone_max_swap + swap) < zone->zone_max_swap) {
+		mutex_exit(&zone->zone_mem_lock);
+		return (EAGAIN);
+	}
 	if ((zone->zone_max_swap + swap) >
 	    zone->zone_max_swap_ctl) {
 

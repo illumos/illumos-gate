@@ -5149,6 +5149,8 @@ zone_enter(zoneid_t zoneid)
 	pp->p_task->tk_proj->kpj_data.kpd_crypto_mem -= pp->p_crypto_mem;
 	mutex_exit(&(pp->p_task->tk_proj->kpj_data.kpd_crypto_lock));
 
+	pp->p_flag |= SZONETOP;
+	pp->p_zone = zone;
 	mutex_exit(&pp->p_lock);
 	AS_LOCK_EXIT(pp->p_as, &pp->p_as->a_lock);
 
@@ -5188,9 +5190,6 @@ zone_enter(zoneid_t zoneid)
 	tk = task_create(0, zone);
 	oldtk = task_join(tk, 0);
 	mutex_exit(&cpu_lock);
-
-	pp->p_flag |= SZONETOP;
-	pp->p_zone = zone;
 
 	/*
 	 * call RCTLOP_SET functions on this proc

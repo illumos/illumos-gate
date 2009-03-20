@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -270,7 +268,7 @@ cfork(int isvfork, int isfork1, int flags)
 		p->p_flag |= SFORKING;
 		mutex_exit(&p->p_lock);
 
-		error = as_dup(p->p_as, &cp->p_as);
+		error = as_dup(p->p_as, cp);
 		if (error != 0) {
 			mutex_enter(&p->p_lock);
 			sprunlock(p);

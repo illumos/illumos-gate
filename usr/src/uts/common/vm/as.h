@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef	_VM_AS_H
 #define	_VM_AS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/watchpoint.h>
 #include <vm/seg.h>
@@ -253,7 +251,7 @@ void	as_rangelock(struct as *as);
 void	as_rangeunlock(struct as *as);
 struct	as *as_alloc();
 void	as_free(struct as *as);
-int	as_dup(struct as *as, struct as **outas);
+int	as_dup(struct as *as, struct proc *forkedproc);
 struct	seg *as_findseg(struct as *as, caddr_t addr, int tail);
 int	as_addseg(struct as *as, struct seg *newseg);
 struct	seg *as_removeseg(struct as *as, struct seg *seg);
