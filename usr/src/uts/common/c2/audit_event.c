@@ -1955,6 +1955,7 @@ aui_setpgrp(au_event_t e)
 	return (e);
 }
 
+/*ARGSUSED*/
 static void
 aus_setpgrp(struct t_audit_data *tad)
 {
