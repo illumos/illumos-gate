@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Disk Monitor
@@ -283,6 +281,8 @@ diskmon_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	} else if (fmd_nvl_class_match(hdl, nvl, FM_LIST_SUSPECT_CLASS)) {
 
 		diskmon_agent_suspect(hdl, nvl);
+		return;
+	} else if (fmd_nvl_class_match(hdl, nvl, FM_LIST_RESOLVED_CLASS)) {
 		return;
 	}
 

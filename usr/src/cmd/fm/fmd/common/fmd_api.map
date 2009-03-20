@@ -126,4 +126,5 @@
 	fmd_xprt_setspecific = FUNCTION extern;
 	fmd_xprt_suspend = FUNCTION extern;
 	fmd_xprt_translate = FUNCTION extern;
+	fmd_xprt_add_domain = FUNCTION extern;
 };

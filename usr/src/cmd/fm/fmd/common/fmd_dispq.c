@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <sys/bitmap.h>
@@ -330,6 +328,7 @@ fmd_dispq_dispatch_gid(fmd_dispq_t *dqp,
 	if (FMD_EVENT_TYPE(ep) == FMD_EVT_PROTOCOL &&
 	    (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0) &&
 	    nvlist_lookup_nvlist_array(FMD_EVENT_NVL(ep), FM_SUSPECT_FAULT_LIST,
 	    &nva, &nvc) == 0) {

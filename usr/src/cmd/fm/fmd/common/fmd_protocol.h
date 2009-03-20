@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FMD_PROTOCOL_H
 #define	_FMD_PROTOCOL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <libnvpair.h>
@@ -76,7 +74,7 @@ extern nvlist_t *fmd_protocol_list(const char *, nvlist_t *,
     struct timeval *);
 extern nvlist_t *fmd_protocol_rsrc_asru(const char *, nvlist_t *,
     const char *, const char *, boolean_t, boolean_t, boolean_t, nvlist_t *,
-    struct timeval *m, boolean_t, boolean_t, boolean_t);
+    struct timeval *m, boolean_t, boolean_t, boolean_t, nvlist_t *);
 extern nvlist_t *fmd_protocol_fmderror(int, const char *, va_list);
 extern nvlist_t *fmd_protocol_moderror(struct fmd_module *, int, const char *);
 extern nvlist_t *fmd_protocol_xprt_ctl(struct fmd_module *,
@@ -85,6 +83,10 @@ extern nvlist_t *fmd_protocol_xprt_sub(struct fmd_module *,
     const char *, uint8_t, const char *);
 extern nvlist_t *fmd_protocol_xprt_uuclose(struct fmd_module *,
     const char *, uint8_t, const char *);
+extern nvlist_t *fmd_protocol_xprt_uuresolved(struct fmd_module *,
+    const char *, uint8_t, const char *);
+extern nvlist_t *fmd_protocol_xprt_updated(struct fmd_module *,
+    const char *, uint8_t, const char *, uint8_t *, uint8_t *, uint_t);
 
 #ifdef	__cplusplus
 }

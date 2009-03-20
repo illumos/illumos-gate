@@ -129,6 +129,8 @@ extern "C" {
 #define	FM_RSRC_XPRT_VERSION		FM_RSRC_XPRT_VERS0
 #define	FM_RSRC_XPRT_UUID		"uuid"
 #define	FM_RSRC_XPRT_SUBCLASS		"subclass"
+#define	FM_RSRC_XPRT_FAULT_STATUS	"fault-status"
+#define	FM_RSRC_XPRT_FAULT_HAS_ASRU	"fault-has-asru"
 
 /*
  * FM ENA Format Macros

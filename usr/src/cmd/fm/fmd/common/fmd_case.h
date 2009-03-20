@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FMD_CASE_H
 #define	_FMD_CASE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <libnvpair.h>
@@ -62,6 +60,10 @@ typedef struct fmd_case_impl {
 	size_t ci_codelen;		/* size of ci_code buffer in bytes */
 	struct fmd_module *ci_mod;	/* module that owns this case */
 	fmd_xprt_t *ci_xprt;		/* transport for this case (or NULL) */
+	uint8_t ci_precanned;		/* precanned code from injection */
+	nvlist_t *ci_diag_de;		/* diag side de fmri */
+	uint8_t *ci_diag_asru;		/* is asru valid on diag side */
+	uint8_t *ci_proxy_asru;		/* is asru valid on proxy side */
 	void *ci_data;			/* data from fmd_case_setspecific() */
 	pthread_mutex_t ci_lock;	/* lock for remainder of contents */
 	uint_t ci_refs;			/* reference count */
@@ -91,9 +93,17 @@ typedef struct fmd_case_impl {
 #define	FMD_CF_SOLVED		0x02	/* case has been solved */
 #define	FMD_CF_ISOLATED		0x04	/* case has been isolated */
 #define	FMD_CF_REPAIRED		0x08	/* case has been repaired */
-#define	FMD_CF_REPAIRING	0x10	/* case repair in progress */
+#define	FMD_CF_RESOLVED		0x10	/* case has been resolved */
 #define	FMD_CF_INVISIBLE	0x20	/* case should be invisible */
 #define	FMD_CF_DELETING		0x40	/* case is about to be deleted */
+
+/*
+ * ci_proxy_asru flags record if we created a new asru on the proxy side and
+ * if so whether it is derived from the received asru or received resource.
+ */
+#define	FMD_PROXY_ASRU_NOT_NEEDED	0
+#define	FMD_PROXY_ASRU_FROM_ASRU	1
+#define	FMD_PROXY_ASRU_FROM_RSRC	2
 
 typedef struct fmd_case_hash {
 	pthread_rwlock_t ch_lock;	/* lock protecting case hash */
@@ -135,8 +145,15 @@ extern void fmd_case_clrdirty(fmd_case_t *);
 extern void fmd_case_commit(fmd_case_t *);
 extern void fmd_case_update(fmd_case_t *);
 extern void fmd_case_delete(fmd_case_t *);
-extern void fmd_case_discard(fmd_case_t *);
+extern void fmd_case_discard(fmd_case_t *, boolean_t);
 extern void fmd_case_settime(fmd_case_t *, time_t, suseconds_t);
+extern void fmd_case_setcode(fmd_case_t *, char *);
+extern void fmd_case_set_de_fmri(fmd_case_t *, nvlist_t *);
+extern void fmd_case_update_status(fmd_case_t *, uint8_t *, uint8_t *,
+    uint8_t *);
+extern void fmd_case_update_containees(fmd_case_t *);
+extern void fmd_case_xprt_updated(fmd_case_t *);
+extern void fmd_case_close_status(fmd_case_t *);
 
 extern int fmd_case_repair(fmd_case_t *);
 extern int fmd_case_acquit(fmd_case_t *);

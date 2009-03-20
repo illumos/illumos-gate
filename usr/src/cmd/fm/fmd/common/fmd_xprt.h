@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,8 @@ extern fmd_xprt_rule_f fmd_xprt_event_unsuback;
 extern fmd_xprt_rule_f fmd_xprt_event_uuclose;
 extern fmd_xprt_rule_f fmd_xprt_event_error;
 extern fmd_xprt_rule_f fmd_xprt_event_drop;
+extern fmd_xprt_rule_f fmd_xprt_event_uuresolved;
+extern fmd_xprt_rule_f fmd_xprt_event_updated;
 
 typedef struct fmd_xprt_rule {
 	const char *xr_class;		/* pattern to match */
@@ -123,11 +125,19 @@ typedef struct fmd_xprt_impl {
 #define	FMD_XPRT_RDWR		0x3	/* xprt is read-write */
 #define	FMD_XPRT_ACCEPT		0x4	/* xprt is accepting connection */
 #define	FMD_XPRT_SUSPENDED	0x8	/* xprt is suspended by user */
-#define	FMD_XPRT_CMASK		0xF	/* xprt create flag mask */
 #define	FMD_XPRT_SUBSCRIBER	0x10	/* xprt is actively subscribing */
 #define	FMD_XPRT_ISUSPENDED	0x20	/* xprt is waiting for _fmd_init */
 #define	FMD_XPRT_DSUSPENDED	0x40	/* xprt is suspended by fmd mechanism */
+#define	FMD_XPRT_EXTERNAL	0x80	/* xprt is external to a chassis */
+#define	FMD_XPRT_NO_REMOTE_REPAIR 0x100	/* xprt allows remote repair */
+#define	FMD_XPRT_CACHE_AS_LOCAL 0x200	/* xprt caches fault as if local */
+#define	FMD_XPRT_HCONLY		0x400	/* xprt only proxies hc-scheme faults */
+#define	FMD_XPRT_HC_PRESENT_ONLY 0x800	/* only locally present hc faults */
 
+#define	FMD_XPRT_CMASK /* xprt create flag mask */ \
+	(FMD_XPRT_RDWR | FMD_XPRT_ACCEPT | FMD_XPRT_SUSPENDED | \
+	FMD_XPRT_EXTERNAL | FMD_XPRT_NO_REMOTE_REPAIR | \
+	FMD_XPRT_CACHE_AS_LOCAL | FMD_XPRT_HCONLY | FMD_XPRT_HC_PRESENT_ONLY)
 #define	FMD_XPRT_SMASK	\
 	(FMD_XPRT_SUSPENDED | FMD_XPRT_ISUSPENDED | FMD_XPRT_DSUSPENDED)
 
@@ -138,6 +148,9 @@ extern void fmd_xprt_xresume(fmd_xprt_t *, uint_t);
 extern void fmd_xprt_send(fmd_xprt_t *);
 extern void fmd_xprt_recv(fmd_xprt_t *, nvlist_t *, hrtime_t, boolean_t);
 extern void fmd_xprt_uuclose(fmd_xprt_t *, const char *);
+extern void fmd_xprt_uuresolved(fmd_xprt_t *, const char *);
+extern void fmd_xprt_updated(fmd_xprt_t *, const char *, uint8_t *, uint8_t *,
+    uint_t);
 
 extern void fmd_xprt_subscribe(fmd_xprt_t *, const char *);
 extern void fmd_xprt_unsubscribe(fmd_xprt_t *, const char *);

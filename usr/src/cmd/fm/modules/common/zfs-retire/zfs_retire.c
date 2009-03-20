@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The ZFS retire agent is responsible for managing hot spares across all pools.
@@ -211,6 +209,7 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	nvlist_t *vdev;
 	char *uuid;
 	int repair_done = 0;
+	boolean_t retire;
 
 	/*
 	 * If this is a resource notifying us of device removal, then simply
@@ -233,6 +232,9 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return;
 	}
 
+	if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0)
+		return;
+
 	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
 		is_repair = B_TRUE;
 	else
@@ -250,6 +252,10 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 		fault_device = B_FALSE;
 		degrade_device = B_FALSE;
+
+		if (nvlist_lookup_boolean_value(fault, FM_SUSPECT_RETIRE,
+		    &retire) == 0 && retire == 0)
+			continue;
 
 		/*
 		 * While we subscribe to fault.fs.zfs.*, we only take action

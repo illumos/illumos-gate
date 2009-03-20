@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1057,11 +1057,19 @@ fmd_ckpt_restore_case(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 
 	/*
 	 * Once solved, treat suspects from resource cache as master copy.
+	 *
+	 * If !fmd.d_running, this module must be a builtin, and so we don't
+	 * want to restore suspects or call fmd_case_transition_update() at this
+	 * stage. The suspects will be added later from the resource cache.
+	 * Calling fmd_case_transition("SOLVED") is OK here as the state is
+	 * already solved, so all it does is update the case flags.
 	 */
-	if ((n = ((fmd_case_impl_t *)cp)->ci_nsuspects) == 0)
+	if (fmd.d_running && (n = ((fmd_case_impl_t *)cp)->ci_nsuspects) == 0)
 		n = fmd_ckpt_restore_suspects(ckp, cp, fcfc->fcfc_suspects);
 
-	if (fcfc->fcfc_state == FCF_CASE_SOLVED)
+	if (!fmd.d_running)
+		fmd_case_transition(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
+	else if (fcfc->fcfc_state == FCF_CASE_SOLVED)
 		fmd_case_transition_update(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
 	else if (fcfc->fcfc_state == FCF_CASE_CLOSE_WAIT && n != 0)
 		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_SOLVED);

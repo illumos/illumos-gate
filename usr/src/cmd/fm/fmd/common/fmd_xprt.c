@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,8 @@
  * FMA Class                     Payload
  * ---------                     -------
  * resource.fm.xprt.uuclose      string (uuid of case)
+ * resource.fm.xprt.uuresolved   string (uuid of case)
+ * resource.fm.xprt.updated      string (uuid of case)
  * resource.fm.xprt.subscribe    string (class pattern)
  * resource.fm.xprt.unsubscribe  string (class pattern)
  * resource.fm.xprt.unsuback     string (class pattern)
@@ -176,6 +178,8 @@ const fmd_xprt_rule_t _fmd_xprt_state_run[] = {
 { "resource.fm.xprt.unsubscribe", fmd_xprt_event_unsub },
 { "resource.fm.xprt.unsuback", fmd_xprt_event_unsuback },
 { "resource.fm.xprt.uuclose", fmd_xprt_event_uuclose },
+{ "resource.fm.xprt.uuresolved", fmd_xprt_event_uuresolved },
+{ "resource.fm.xprt.updated", fmd_xprt_event_updated },
 { "resource.fm.xprt.*", fmd_xprt_event_error },
 { NULL, NULL }
 };
@@ -510,8 +514,8 @@ fmd_xprt_send_case(fmd_case_t *cp, void *arg)
 	nvlist_t *nvl;
 	char *class;
 
-	if (cip->ci_state != FMD_CASE_SOLVED)
-		return; /* unsolved, or we'll get it during the ASRU pass */
+	if (cip->ci_state == FMD_CASE_UNSOLVED)
+		return;
 
 	nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
@@ -523,49 +527,12 @@ fmd_xprt_send_case(fmd_case_t *cp, void *arg)
 	fmd_dispq_dispatch_gid(fmd.d_disp, e, class, xip->xi_queue->eq_sgid);
 }
 
-/*
- * Upon transition to RUN, we take every ASRU which is in the degraded state
- * and resend a fault.* event for it to our remote peer, in case the peer is
- * running in the fault manager that knows how to disable this resource.  If
- * any new resources are added to the cache during our iteration, this is no
- * problem because our subscriptions are already proxied and so any new cases
- * will result in a list.suspect event being transported if that is needed.
- */
-static void
-fmd_xprt_send_asru(fmd_asru_t *ap, void *arg)
-{
-	fmd_xprt_impl_t *xip = arg;
-	nvlist_t *nvl = NULL;
-	fmd_event_t *e;
-	char *class;
-
-	(void) pthread_mutex_lock(&ap->asru_lock);
-
-	if ((ap->asru_flags & (FMD_ASRU_INTERNAL | FMD_ASRU_STATE)) ==
-	    FMD_ASRU_FAULTY && fmd_case_orphaned(ap->asru_case))
-		(void) nvlist_xdup(ap->asru_event, &nvl, &fmd.d_nva);
-
-	(void) pthread_mutex_unlock(&ap->asru_lock);
-
-	if (nvl == NULL)
-		return; /* asru is internal, unusable, or not faulty */
-
-	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
-	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
-
-	fmd_dprintf(FMD_DBG_XPRT, "re-send %s for %s to transport %u\n",
-	    class, ap->asru_name, xip->xi_id);
-
-	fmd_dispq_dispatch_gid(fmd.d_disp, e, class, xip->xi_queue->eq_sgid);
-}
-
 void
 fmd_xprt_event_run(fmd_xprt_impl_t *xip, nvlist_t *nvl)
 {
 	if (!fmd_xprt_vmismatch(xip, nvl, NULL)) {
 		fmd_xprt_transition(xip, _fmd_xprt_state_run, "RUN");
 		fmd_case_hash_apply(fmd.d_cases, fmd_xprt_send_case, xip);
-		fmd_asru_hash_apply(fmd.d_asrus, fmd_xprt_send_asru, xip);
 	}
 }
 
@@ -633,6 +600,9 @@ fmd_xprt_event_unsuback(fmd_xprt_impl_t *xip, nvlist_t *nvl)
 	(void) pthread_mutex_unlock(&xip->xi_lock);
 }
 
+/*
+ * on diagnosing side, receive a uuclose from the proxy.
+ */
 void
 fmd_xprt_event_uuclose(fmd_xprt_impl_t *xip, nvlist_t *nvl)
 {
@@ -644,7 +614,73 @@ fmd_xprt_event_uuclose(fmd_xprt_impl_t *xip, nvlist_t *nvl)
 
 	if (nvlist_lookup_string(nvl, FM_RSRC_XPRT_UUID, &uuid) == 0 &&
 	    (cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) != NULL) {
+		/*
+		 * update resource cache status and transition case
+		 */
+		fmd_case_close_status(cp);
 		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_ISOLATED);
+		fmd_case_rele(cp);
+	}
+}
+
+/*
+ * on diagnosing side, receive a uuresolved from the proxy.
+ */
+void
+fmd_xprt_event_uuresolved(fmd_xprt_impl_t *xip, nvlist_t *nvl)
+{
+	fmd_case_t *cp;
+	char *uuid;
+
+	if (fmd_xprt_vmismatch(xip, nvl, NULL))
+		return; /* transitioned to error state */
+
+	if (nvlist_lookup_string(nvl, FM_RSRC_XPRT_UUID, &uuid) == 0 &&
+	    (cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) != NULL) {
+		fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+		fmd_case_transition(cp, (cip->ci_state == FMD_CASE_REPAIRED) ?
+		    FMD_CASE_RESOLVED : (cip->ci_state == FMD_CASE_CLOSED) ?
+		    FMD_CASE_REPAIRED : FMD_CASE_CLOSE_WAIT, FMD_CF_RESOLVED);
+		fmd_case_rele(cp);
+	}
+}
+
+/*
+ * on diagnosing side, receive a repair/acquit from the proxy.
+ */
+void
+fmd_xprt_event_updated(fmd_xprt_impl_t *xip, nvlist_t *nvl)
+{
+	fmd_case_t *cp;
+	char *uuid;
+
+	if (fmd_xprt_vmismatch(xip, nvl, NULL))
+		return; /* transitioned to error state */
+
+	if (nvlist_lookup_string(nvl, FM_RSRC_XPRT_UUID, &uuid) == 0 &&
+	    (cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) != NULL) {
+		uint8_t *statusp, *proxy_asrup = NULL;
+		uint_t nelem = 0;
+
+		/*
+		 * Only update status with new repairs if "no remote repair"
+		 * is not set. Do the case_update anyway though (as this will
+		 * refresh the status on the proxy side).
+		 */
+		if (!(xip->xi_flags & FMD_XPRT_NO_REMOTE_REPAIR)) {
+			if (nvlist_lookup_uint8_array(nvl,
+			    FM_RSRC_XPRT_FAULT_STATUS, &statusp, &nelem) == 0 &&
+			    nelem != 0) {
+				(void) nvlist_lookup_uint8_array(nvl,
+				    FM_RSRC_XPRT_FAULT_HAS_ASRU, &proxy_asrup,
+				    &nelem);
+				fmd_case_update_status(cp, statusp,
+				    proxy_asrup, NULL);
+			}
+			fmd_case_update_containees(cp);
+		}
+		fmd_case_update(cp);
 		fmd_case_rele(cp);
 	}
 }
@@ -879,12 +915,13 @@ fmd_xprt_destroy(fmd_xprt_t *xp)
 	/*
 	 * Release every case handle in the module that was cached by this
 	 * transport.  This will result in these cases disappearing from the
-	 * local case hash so that fmd_case_uuclose() can no longer be used.
+	 * local case hash so that fmd_case_uuclose() and fmd_case_repaired()
+	 * etc can no longer be used.
 	 */
 	for (cip = fmd_list_next(&mp->mod_cases); cip != NULL; cip = nip) {
 		nip = fmd_list_next(cip);
 		if (cip->ci_xprt == xp)
-			fmd_case_discard((fmd_case_t *)cip);
+			fmd_case_discard((fmd_case_t *)cip, B_TRUE);
 	}
 
 	/*
@@ -998,6 +1035,351 @@ fmd_xprt_send(fmd_xprt_t *xp)
 	}
 }
 
+/*
+ * This function creates a local suspect list. This is used when a suspect list
+ * is created directly by an external source like fminject.
+ */
+static void
+fmd_xprt_list_suspect_local(fmd_xprt_t *xp, nvlist_t *nvl)
+{
+	nvlist_t **nvlp;
+	nvlist_t *de_fmri, *de_fmri_dup = NULL;
+	int64_t *diag_time;
+	char *code = NULL;
+	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
+	fmd_case_t *cp;
+	uint_t nelem = 0, nelem2 = 0, i;
+
+	fmd_module_lock(xip->xi_queue->eq_mod);
+	cp = fmd_case_create(xip->xi_queue->eq_mod, NULL);
+	if (cp == NULL) {
+		fmd_module_unlock(xip->xi_queue->eq_mod);
+		return;
+	}
+
+	/*
+	 * copy diag_code if present
+	 */
+	(void) nvlist_lookup_string(nvl, FM_SUSPECT_DIAG_CODE, &code);
+	if (code != NULL) {
+		fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+		cip->ci_precanned = 1;
+		fmd_case_setcode(cp, code);
+	}
+
+	/*
+	 * copy suspects
+	 */
+	(void) nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST, &nvlp,
+	    &nelem);
+	for (i = 0; i < nelem; i++) {
+		nvlist_t *flt_copy, *asru = NULL, *fru = NULL, *rsrc = NULL;
+		topo_hdl_t *thp;
+		char *loc = NULL;
+		int err;
+
+		thp = fmd_fmri_topo_hold(TOPO_VERSION);
+		(void) nvlist_xdup(nvlp[i], &flt_copy, &fmd.d_nva);
+		(void) nvlist_lookup_nvlist(nvlp[i], FM_FAULT_RESOURCE, &rsrc);
+
+		/*
+		 * If no fru specified, get it from topo
+		 */
+		if (nvlist_lookup_nvlist(nvlp[i], FM_FAULT_FRU, &fru) != 0 &&
+		    rsrc && topo_fmri_fru(thp, rsrc, &fru, &err) == 0)
+			(void) nvlist_add_nvlist(flt_copy, FM_FAULT_FRU, fru);
+		/*
+		 * If no asru specified, get it from topo
+		 */
+		if (nvlist_lookup_nvlist(nvlp[i], FM_FAULT_ASRU, &asru) != 0 &&
+		    rsrc && topo_fmri_asru(thp, rsrc, &asru, &err) == 0)
+			(void) nvlist_add_nvlist(flt_copy, FM_FAULT_ASRU, asru);
+		/*
+		 * If no location specified, get it from topo
+		 */
+		if (nvlist_lookup_string(nvlp[i], FM_FAULT_LOCATION,
+		    &loc) != 0) {
+			if (fru && topo_fmri_label(thp, fru, &loc, &err) == 0)
+				(void) nvlist_add_string(flt_copy,
+				    FM_FAULT_LOCATION, loc);
+			else if (rsrc && topo_fmri_label(thp, rsrc, &loc,
+			    &err) == 0)
+				(void) nvlist_add_string(flt_copy,
+				    FM_FAULT_LOCATION, loc);
+			if (loc)
+				topo_hdl_strfree(thp, loc);
+		}
+		if (fru)
+			nvlist_free(fru);
+		if (asru)
+			nvlist_free(asru);
+		if (rsrc)
+			nvlist_free(rsrc);
+		fmd_fmri_topo_rele(thp);
+		fmd_case_insert_suspect(cp, flt_copy);
+	}
+
+	/*
+	 * copy diag_time if present
+	 */
+	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME, &diag_time,
+	    &nelem2) == 0 && nelem2 >= 2)
+		fmd_case_settime(cp, diag_time[0], diag_time[1]);
+
+	/*
+	 * copy DE fmri if present
+	 */
+	if (nvlist_lookup_nvlist(nvl, FM_SUSPECT_DE, &de_fmri) == 0) {
+		(void) nvlist_xdup(de_fmri, &de_fmri_dup, &fmd.d_nva);
+		fmd_case_set_de_fmri(cp, de_fmri_dup);
+	}
+
+	fmd_case_transition(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
+	fmd_module_unlock(xip->xi_queue->eq_mod);
+}
+
+/*
+ * This function is called to create a proxy case on receipt of a list.suspect
+ * from the diagnosing side of the transport.
+ */
+static void
+fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
+{
+	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
+	nvlist_t **nvlp;
+	uint_t nelem = 0, nelem2 = 0, i;
+	int64_t *diag_time;
+	topo_hdl_t *thp;
+	char *class;
+	nvlist_t *rsrc, *asru, *de_fmri, *de_fmri_dup = NULL;
+	nvlist_t *flt_copy;
+	int err;
+	nvlist_t **asrua;
+	uint8_t *proxy_asru = NULL;
+	int got_proxy_asru = 0;
+	int got_hc_rsrc = 0;
+	int got_present_rsrc = 0;
+	uint8_t *diag_asru = NULL;
+	char *scheme;
+	uint8_t *statusp;
+	char *uuid, *code;
+	fmd_case_t *cp;
+	fmd_case_impl_t *cip;
+	int need_update = 0;
+
+	if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) != 0)
+		return;
+	if (nvlist_lookup_string(nvl, FM_SUSPECT_DIAG_CODE, &code) != 0)
+		return;
+	(void) nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST, &nvlp,
+	    &nelem);
+
+	/*
+	 * In order to implement FMD_XPRT_HCONLY and FMD_XPRT_HC_PRESENT_ONLY
+	 * etc we first scan the suspects to see if
+	 * - there was an asru in the received fault
+	 * - there was an hc-scheme resource in the received fault
+	 * - any hc-scheme resource in the received fault is present in the
+	 *   local topology
+	 * - any hc-scheme resource in the received fault has an asru in the
+	 *   local topology
+	 */
+	if (nelem > 0) {
+		asrua = fmd_zalloc(sizeof (nvlist_t *) * nelem, FMD_SLEEP);
+		proxy_asru = fmd_zalloc(sizeof (uint8_t) * nelem, FMD_SLEEP);
+		diag_asru = fmd_zalloc(sizeof (uint8_t) * nelem, FMD_SLEEP);
+		thp = fmd_fmri_topo_hold(TOPO_VERSION);
+		for (i = 0; i < nelem; i++) {
+			if (nvlist_lookup_nvlist(nvlp[i], FM_FAULT_ASRU,
+			    &asru) == 0 && asru != NULL)
+				diag_asru[i] = 1;
+			if (nvlist_lookup_string(nvlp[i], FM_CLASS,
+			    &class) != 0 || strncmp(class, "fault", 5) != 0)
+				continue;
+			/*
+			 * If there is an hc-scheme asru, use that to find the
+			 * real asru. Otherwise if there is an hc-scheme
+			 * resource, work out the old asru from that.
+			 * This order is to allow a two stage evaluation
+			 * of the asru where a fault in the diagnosing side
+			 * is in a component not visible to the proxy side,
+			 * but prevents a component that is visible from
+			 * working. So the diagnosing side sets the asru to
+			 * the latter component (in hc-scheme as the diagnosing
+			 * side doesn't know about the proxy side's virtual
+			 * schemes), and then the proxy side can convert that
+			 * to a suitable virtual scheme asru.
+			 */
+			if (nvlist_lookup_nvlist(nvlp[i], FM_FAULT_ASRU,
+			    &asru) == 0 && asru != NULL &&
+			    nvlist_lookup_string(asru, FM_FMRI_SCHEME,
+			    &scheme) == 0 &&
+			    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+				got_hc_rsrc = 1;
+				if (xip->xi_flags & FMD_XPRT_EXTERNAL)
+					continue;
+				if (topo_fmri_present(thp, asru, &err) == 0)
+					got_present_rsrc = 1;
+				if (topo_fmri_asru(thp, asru, &asrua[i],
+				    &err) == 0) {
+					proxy_asru[i] =
+					    FMD_PROXY_ASRU_FROM_ASRU;
+					got_proxy_asru = 1;
+				}
+			} else if (nvlist_lookup_nvlist(nvlp[i],
+			    FM_FAULT_RESOURCE, &rsrc) == 0 && rsrc != NULL &&
+			    nvlist_lookup_string(rsrc, FM_FMRI_SCHEME,
+			    &scheme) == 0 &&
+			    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+				got_hc_rsrc = 1;
+				if (xip->xi_flags & FMD_XPRT_EXTERNAL)
+					continue;
+				if (topo_fmri_present(thp, rsrc, &err) == 0)
+					got_present_rsrc = 1;
+				if (topo_fmri_asru(thp, rsrc, &asrua[i],
+				    &err) == 0) {
+					proxy_asru[i] =
+					    FMD_PROXY_ASRU_FROM_RSRC;
+					got_proxy_asru = 1;
+				}
+			}
+		}
+		fmd_fmri_topo_rele(thp);
+	}
+
+	/*
+	 * If we're set up only to report hc-scheme faults, and
+	 * there aren't any, then just drop the event.
+	 */
+	if (got_hc_rsrc == 0 && (xip->xi_flags & FMD_XPRT_HCONLY)) {
+		if (nelem > 0) {
+			fmd_free(proxy_asru, sizeof (uint8_t) * nelem);
+			fmd_free(diag_asru, sizeof (uint8_t) * nelem);
+			fmd_free(asrua, sizeof (nvlist_t *) * nelem);
+		}
+		return;
+	}
+
+	/*
+	 * If we're set up only to report locally present hc-scheme
+	 * faults, and there aren't any, then just drop the event.
+	 */
+	if (got_present_rsrc == 0 &&
+	    (xip->xi_flags & FMD_XPRT_HC_PRESENT_ONLY)) {
+		if (nelem > 0) {
+			for (i = 0; i < nelem; i++)
+				if (asrua[i])
+					nvlist_free(asrua[i]);
+			fmd_free(proxy_asru, sizeof (uint8_t) * nelem);
+			fmd_free(diag_asru, sizeof (uint8_t) * nelem);
+			fmd_free(asrua, sizeof (nvlist_t *) * nelem);
+		}
+		return;
+	}
+
+	/*
+	 * If fmd_case_recreate() returns NULL, UUID is already known.
+	 */
+	fmd_module_lock(xip->xi_queue->eq_mod);
+	if ((cp = fmd_case_recreate(xip->xi_queue->eq_mod, xp,
+	    FMD_CASE_UNSOLVED, uuid, code)) == NULL) {
+		if (nelem > 0) {
+			for (i = 0; i < nelem; i++)
+				if (asrua[i])
+					nvlist_free(asrua[i]);
+			fmd_free(proxy_asru, sizeof (uint8_t) * nelem);
+			fmd_free(diag_asru, sizeof (uint8_t) * nelem);
+			fmd_free(asrua, sizeof (nvlist_t *) * nelem);
+		}
+		fmd_module_unlock(xip->xi_queue->eq_mod);
+		return;
+	}
+
+	cip = (fmd_case_impl_t *)cp;
+	cip->ci_diag_asru = diag_asru;
+	cip->ci_proxy_asru = proxy_asru;
+	for (i = 0; i < nelem; i++) {
+		(void) nvlist_xdup(nvlp[i], &flt_copy, &fmd.d_nva);
+		if (proxy_asru[i] != FMD_PROXY_ASRU_NOT_NEEDED) {
+			/*
+			 * Copy suspects, but remove/replace asru first. Also if
+			 * the original asru was hc-scheme use that as resource.
+			 */
+			if (proxy_asru[i] == FMD_PROXY_ASRU_FROM_ASRU) {
+				(void) nvlist_remove(flt_copy,
+				    FM_FAULT_RESOURCE, DATA_TYPE_NVLIST);
+				(void) nvlist_lookup_nvlist(flt_copy,
+				    FM_FAULT_ASRU, &asru);
+				(void) nvlist_add_nvlist(flt_copy,
+				    FM_FAULT_RESOURCE, asru);
+			}
+			(void) nvlist_remove(flt_copy, FM_FAULT_ASRU,
+			    DATA_TYPE_NVLIST);
+			(void) nvlist_add_nvlist(flt_copy, FM_FAULT_ASRU,
+			    asrua[i]);
+			nvlist_free(asrua[i]);
+		} else if (nvlist_lookup_nvlist(flt_copy, FM_FAULT_ASRU,
+		    &asru) == 0 && asru != NULL) {
+			/*
+			 * keep asru from diag side, but but mark as no retire
+			 */
+			(void) nvlist_add_boolean_value(flt_copy,
+			    FM_SUSPECT_RETIRE, B_FALSE);
+		}
+		fmd_case_insert_suspect(cp, flt_copy);
+	}
+	/*
+	 * copy diag_time
+	 */
+	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME, &diag_time,
+	    &nelem2) == 0 && nelem2 >= 2)
+		fmd_case_settime(cp, diag_time[0], diag_time[1]);
+	/*
+	 * copy DE fmri
+	 */
+	if (nvlist_lookup_nvlist(nvl, FM_SUSPECT_DE, &de_fmri) == 0) {
+		(void) nvlist_xdup(de_fmri, &de_fmri_dup, &fmd.d_nva);
+		fmd_case_set_de_fmri(cp, de_fmri_dup);
+	}
+
+	/*
+	 * Transition to solved. This will log the suspect list and create
+	 * the resource cache entries.
+	 */
+	fmd_case_transition(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
+
+	/*
+	 * Update status if it is not simply "all faulty" (can happen if
+	 * list.suspects are being re-sent when the transport has reconnected).
+	 */
+	(void) nvlist_lookup_uint8_array(nvl, FM_SUSPECT_FAULT_STATUS, &statusp,
+	    &nelem);
+	for (i = 0; i < nelem; i++) {
+		if ((statusp[i] & (FM_SUSPECT_FAULTY | FM_SUSPECT_UNUSABLE |
+		    FM_SUSPECT_NOT_PRESENT | FM_SUSPECT_DEGRADED)) !=
+		    FM_SUSPECT_FAULTY)
+			need_update = 1;
+	}
+	if (need_update) {
+		fmd_case_update_status(cp, statusp, cip->ci_proxy_asru,
+		    cip->ci_diag_asru);
+		fmd_case_update_containees(cp);
+		fmd_case_update(cp);
+	}
+
+	/*
+	 * if asru on proxy side, send an update back to the diagnosing side to
+	 * update UNUSABLE/DEGRADED.
+	 */
+	if (got_proxy_asru)
+		fmd_case_xprt_updated(cp);
+
+	if (nelem > 0)
+		fmd_free(asrua, sizeof (nvlist_t *) * nelem);
+	fmd_module_unlock(xip->xi_queue->eq_mod);
+}
+
 void
 fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 {
@@ -1006,12 +1388,13 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 	fmd_t *dp = &fmd;
 
 	fmd_event_t *e;
-	char *class, *uuid, *code;
+	char *class, *uuid;
 	boolean_t isproto, isereport;
 
 	uint64_t *tod;
 	uint8_t ttl;
 	uint_t n;
+	fmd_case_t *cp;
 
 	/*
 	 * Grab the transport lock and set the busy flag to indicate we are
@@ -1165,20 +1548,100 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 
 	/*
 	 * If a list.suspect event is received, create a case for the specified
-	 * UUID in the case hash, with the transport module as its owner.  If
-	 * the UUID is already known, fmd_case_recreate() will return NULL and
-	 * we simply proceed to our normal event handling regardless.
+	 * UUID in the case hash, with the transport module as its owner.
 	 */
-	if (fmd_event_match(e, FMD_EVT_PROTOCOL, FM_LIST_SUSPECT_CLASS) &&
-	    nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0 &&
-	    nvlist_lookup_string(nvl, FM_SUSPECT_DIAG_CODE, &code) == 0) {
-		fmd_module_lock(xip->xi_queue->eq_mod);
-		(void) fmd_case_recreate(xip->xi_queue->eq_mod,
-		    xp, FMD_CASE_SOLVED, uuid, code);
-		fmd_module_unlock(xip->xi_queue->eq_mod);
+	if (fmd_event_match(e, FMD_EVT_PROTOCOL, FM_LIST_SUSPECT_CLASS)) {
+		if (xip->xi_flags & FMD_XPRT_CACHE_AS_LOCAL)
+			fmd_xprt_list_suspect_local(xp, nvl);
+		else
+			fmd_xprt_list_suspect(xp, nvl);
+		fmd_event_hold(e);
+		fmd_event_rele(e);
+		goto done;
 	}
 
-	if (logonly == FMD_B_TRUE) {
+	/*
+	 * If a list.updated or list.repaired event is received, update the
+	 * resource cache status and the local case.
+	 */
+	if (fmd_event_match(e, FMD_EVT_PROTOCOL, FM_LIST_REPAIRED_CLASS) ||
+	    fmd_event_match(e, FMD_EVT_PROTOCOL, FM_LIST_UPDATED_CLASS)) {
+		uint8_t *statusp;
+		uint_t nelem = 0;
+
+		(void) nvlist_lookup_uint8_array(nvl, FM_SUSPECT_FAULT_STATUS,
+		    &statusp, &nelem);
+		fmd_module_lock(xip->xi_queue->eq_mod);
+		if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0 &&
+		    (cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) != NULL) {
+			fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+			if (cip->ci_xprt != NULL) {
+				fmd_case_update_status(cp, statusp,
+				    cip->ci_proxy_asru, cip->ci_diag_asru);
+				fmd_case_update_containees(cp);
+				fmd_case_update(cp);
+			}
+			fmd_case_rele(cp);
+		}
+		fmd_module_unlock(xip->xi_queue->eq_mod);
+		fmd_event_hold(e);
+		fmd_event_rele(e);
+		goto done;
+	}
+
+	/*
+	 * If a list.isolated event is received, update resource cache status
+	 */
+	if (fmd_event_match(e, FMD_EVT_PROTOCOL, FM_LIST_ISOLATED_CLASS)) {
+		uint8_t *statusp;
+		uint_t nelem = 0;
+
+		(void) nvlist_lookup_uint8_array(nvl, FM_SUSPECT_FAULT_STATUS,
+		    &statusp, &nelem);
+		fmd_module_lock(xip->xi_queue->eq_mod);
+		if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0 &&
+		    (cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) != NULL) {
+			fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+			if (cip->ci_xprt != NULL)
+				fmd_case_update_status(cp, statusp,
+				    cip->ci_proxy_asru, cip->ci_diag_asru);
+			fmd_case_rele(cp);
+		}
+		fmd_module_unlock(xip->xi_queue->eq_mod);
+		fmd_event_hold(e);
+		fmd_event_rele(e);
+		goto done;
+	}
+
+	/*
+	 * If a list.resolved event is received, resolve the local case.
+	 */
+	if (fmd_event_match(e, FMD_EVT_PROTOCOL, FM_LIST_RESOLVED_CLASS)) {
+		fmd_module_lock(xip->xi_queue->eq_mod);
+		if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0 &&
+		    (cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) != NULL) {
+			fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+			if (cip->ci_xprt != NULL)
+				fmd_case_transition(cp, (cip->ci_state ==
+				    FMD_CASE_REPAIRED) ? FMD_CASE_RESOLVED :
+				    (cip->ci_state == FMD_CASE_CLOSED) ?
+				    FMD_CASE_REPAIRED : FMD_CASE_CLOSE_WAIT,
+				    FMD_CF_RESOLVED);
+			fmd_case_rele(cp);
+		}
+		fmd_module_unlock(xip->xi_queue->eq_mod);
+		fmd_event_hold(e);
+		fmd_event_rele(e);
+		goto done;
+	}
+
+	if (logonly == FMD_B_TRUE || (xip->xi_flags & FMD_XPRT_EXTERNAL)) {
+		/*
+		 * Don't proxy ereports on an EXTERNAL transport - we won't
+		 * know how to diagnose them with the wrong topology. Note
+		 * that here (and above) we have to hold/release the event in
+		 * order for it to be freed.
+		 */
 		fmd_event_hold(e);
 		fmd_event_rele(e);
 	} else if (isproto == FMD_B_TRUE)
@@ -1204,11 +1667,65 @@ fmd_xprt_uuclose(fmd_xprt_t *xp, const char *uuid)
 	nvlist_t *nvl;
 	char *s;
 
-	fmd_dprintf(FMD_DBG_XPRT,
-	    "xprt %u closing case %s\n", xip->xi_id, uuid);
+	if ((xip->xi_flags & FMD_XPRT_RDWR) == FMD_XPRT_RDONLY)
+		return; /* read-only transports do not proxy uuclose */
+
+	TRACE((FMD_DBG_XPRT, "xprt %u closing case %s\n", xip->xi_id, uuid));
 
 	nvl = fmd_protocol_xprt_uuclose(xip->xi_queue->eq_mod,
 	    "resource.fm.xprt.uuclose", xip->xi_version, uuid);
+
+	(void) nvlist_lookup_string(nvl, FM_CLASS, &s);
+	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, s);
+	fmd_eventq_insert_at_time(xip->xi_queue, e);
+}
+
+/*
+ * On proxy side, send back uuresolved request to diagnosing side
+ */
+void
+fmd_xprt_uuresolved(fmd_xprt_t *xp, const char *uuid)
+{
+	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
+
+	fmd_event_t *e;
+	nvlist_t *nvl;
+	char *s;
+
+	if ((xip->xi_flags & FMD_XPRT_RDWR) == FMD_XPRT_RDONLY)
+		return; /* read-only transports do not proxy uuresolved */
+
+	TRACE((FMD_DBG_XPRT, "xprt %u resolving case %s\n", xip->xi_id, uuid));
+
+	nvl = fmd_protocol_xprt_uuresolved(xip->xi_queue->eq_mod,
+	    "resource.fm.xprt.uuresolved", xip->xi_version, uuid);
+
+	(void) nvlist_lookup_string(nvl, FM_CLASS, &s);
+	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, s);
+	fmd_eventq_insert_at_time(xip->xi_queue, e);
+}
+
+/*
+ * On proxy side, send back repair/acquit/etc request to diagnosing side
+ */
+void
+fmd_xprt_updated(fmd_xprt_t *xp, const char *uuid, uint8_t *statusp,
+	uint8_t *has_asrup, uint_t nelem)
+{
+	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
+
+	fmd_event_t *e;
+	nvlist_t *nvl;
+	char *s;
+
+	if ((xip->xi_flags & FMD_XPRT_RDWR) == FMD_XPRT_RDONLY)
+		return; /* read-only transports do not support remote repairs */
+
+	TRACE((FMD_DBG_XPRT, "xprt %u updating case %s\n", xip->xi_id, uuid));
+
+	nvl = fmd_protocol_xprt_updated(xip->xi_queue->eq_mod,
+	    "resource.fm.xprt.updated", xip->xi_version, uuid, statusp,
+	    has_asrup, nelem);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &s);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, s);

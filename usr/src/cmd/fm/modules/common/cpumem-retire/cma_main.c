@@ -493,6 +493,9 @@ cma_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
 	fmd_hdl_debug(hdl, "received %s\n", class);
 
+	if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0)
+		return;
+
 	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0)

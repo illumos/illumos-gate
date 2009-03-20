@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
@@ -132,6 +130,7 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	di_retire_t	drt = {0};
 	int		retire;
 	int		rval = 0;
+	int		valid_suspect = 0;
 	int		error;
 	char		*snglfault = FM_FAULT_CLASS"."FM_ERROR_IO".";
 	boolean_t	rtr;
@@ -155,6 +154,8 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		retire = 0;
 	} else if (strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
 		retire = 0;
+	} else if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0) {
+		return;
 	} else if (strncmp(class, snglfault, strlen(snglfault)) == 0) {
 		retire = 1;
 		faults = &nvl;
@@ -200,6 +201,7 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			continue;
 		}
 
+		valid_suspect = 1;
 		if (retire) {
 			if (fmd_nvl_fmri_has_fault(hdl, asru,
 			    FMD_HAS_FAULT_ASRU, NULL) == 1) {
@@ -224,6 +226,13 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			}
 		}
 	}
+
+	/*
+	 * Don't send uuclose or uuresolved unless at least one suspect
+	 * was valid for this retire agent and no retires/unretires failed.
+	 */
+	if (valid_suspect == 0)
+		return;
 
 	/*
 	 * The fmd framework takes care of moving a case to the repaired

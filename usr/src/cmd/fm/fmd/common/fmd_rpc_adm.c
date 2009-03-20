@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <limits.h>
@@ -465,10 +463,41 @@ fmd_adm_rsrcinfo_1_svc(char *fmri,
 	return (TRUE);
 }
 
+static void
+fmd_adm_do_repair(char *name, struct svc_req *req, int *errp, uint8_t reason,
+    char *uuid)
+{
+	if (fmd_rpc_deny(req))
+		*errp = FMD_ADM_ERR_PERM;
+	else {
+		fmd_asru_rep_arg_t fara;
+
+		fara.fara_reason = reason;
+		fara.fara_rval = errp;
+		fara.fara_uuid = uuid;
+		fara.fara_bywhat = FARA_BY_ASRU;
+		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
+		    fmd_asru_repaired, &fara);
+		fara.fara_bywhat = FARA_BY_LABEL;
+		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
+		    fmd_asru_repaired, &fara);
+		fara.fara_bywhat = FARA_BY_FRU;
+		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
+		    fmd_asru_repaired, &fara);
+		fara.fara_bywhat = FARA_BY_RSRC;
+		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
+		    fmd_asru_repaired, &fara);
+	}
+}
+
 bool_t
 fmd_adm_rsrcflush_1_svc(char *name, int *rvp, struct svc_req *req)
 {
-	return (fmd_adm_rsrcrepaired_1_svc(name, rvp, req));
+	int err = FMD_ADM_ERR_RSRCNOTF;
+
+	fmd_adm_do_repair(name, req, &err, FMD_ASRU_REPAIRED, NULL);
+	*rvp = err;
+	return (TRUE);
 }
 
 bool_t
@@ -476,18 +505,7 @@ fmd_adm_rsrcrepaired_1_svc(char *name, int *rvp, struct svc_req *req)
 {
 	int err = FMD_ADM_ERR_RSRCNOTF;
 
-	if (fmd_rpc_deny(req))
-		err = FMD_ADM_ERR_PERM;
-	else {
-		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
-		    fmd_asru_repaired, &err);
-		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
-		    fmd_asru_repaired, &err);
-		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
-		    fmd_asru_repaired, &err);
-		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
-		    fmd_asru_repaired, &err);
-	}
+	fmd_adm_do_repair(name, req, &err, FMD_ASRU_REPAIRED, NULL);
 	*rvp = err;
 	return (TRUE);
 }
@@ -497,57 +515,17 @@ fmd_adm_rsrcreplaced_1_svc(char *name, int *rvp, struct svc_req *req)
 {
 	int err = FMD_ADM_ERR_RSRCNOTF;
 
-	if (fmd_rpc_deny(req))
-		err = FMD_ADM_ERR_PERM;
-	else {
-		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
-		    fmd_asru_replaced, &err);
-		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
-		    fmd_asru_replaced, &err);
-		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
-		    fmd_asru_replaced, &err);
-		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
-		    fmd_asru_replaced, &err);
-	}
+	fmd_adm_do_repair(name, req, &err, FMD_ASRU_REPLACED, NULL);
 	*rvp = err;
 	return (TRUE);
-}
-
-typedef struct {
-	int *errp;
-	char *uuid;
-} fmd_adm_ra_t;
-
-void
-fmd_asru_ra_cb(fmd_asru_link_t *alp, void *arg)
-{
-	fmd_adm_ra_t *farap = (fmd_adm_ra_t *)arg;
-
-	if (strcmp(farap->uuid, "") == 0 ||
-	    strcmp(farap->uuid, alp->al_case_uuid) == 0)
-		fmd_asru_acquit(alp, farap->errp);
 }
 
 bool_t
 fmd_adm_rsrcacquit_1_svc(char *name, char *uuid, int *rvp, struct svc_req *req)
 {
 	int err = FMD_ADM_ERR_RSRCNOTF;
-	fmd_adm_ra_t fara;
 
-	if (fmd_rpc_deny(req))
-		err = FMD_ADM_ERR_PERM;
-	else {
-		fara.errp = &err;
-		fara.uuid = uuid;
-		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
-		    fmd_asru_ra_cb, &fara);
-		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
-		    fmd_asru_ra_cb, &fara);
-		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
-		    fmd_asru_ra_cb, &fara);
-		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
-		    fmd_asru_ra_cb, &fara);
-	}
+	fmd_adm_do_repair(name, req, &err, FMD_ASRU_ACQUITTED, uuid);
 	*rvp = err;
 	return (TRUE);
 }

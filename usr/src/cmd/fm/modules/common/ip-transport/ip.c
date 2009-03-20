@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -94,6 +92,12 @@ static size_t ip_size;		/* default buffer size */
 static volatile int ip_quit;	/* signal to quit */
 static int ip_qlen;		/* queue length for listen(3SOCKET) */
 static int ip_mtbf;		/* mtbf for simulating packet drop */
+static int ip_external;		/* set transport to be "external" */
+static int ip_no_remote_repair;	/* disallow remote repair */
+static int ip_hconly;		/* only cache faults that are hc-scheme */
+static int ip_rdonly;		/* force transport to be rdonly */
+static int ip_hc_present_only;	/* only cache faults if hc-scheme and present */
+static char *ip_domain_name;	/* set domain name for received list.suspects */
 static hrtime_t ip_burp;	/* make mtbf slower by adding this much delay */
 static int ip_translate;	/* call fmd_xprt_translate() before sending */
 static char *ip_host;		/* host to connect to (or NULL if server) */
@@ -323,8 +327,11 @@ ip_xprt_recv_event(ip_xprt_t *ipx)
 		fmd_hdl_error(ip_hdl, "failed to unpack event from "
 		    "transport %p: %s\n", (void *)ipx->ipx_xprt, strerror(err));
 		ip_stat.ips_unpackfail.fmds_value.ui64++;
-	} else
+	} else {
+		if (ip_domain_name)
+			fmd_xprt_add_domain(ip_hdl, nvl, ip_domain_name);
 		fmd_xprt_post(ip_hdl, ipx->ipx_xprt, nvl, 0);
+	}
 
 	if (fmd_xprt_error(ip_hdl, ipx->ipx_xprt)) {
 		fmd_hdl_error(ip_hdl, "protocol error on transport %p",
@@ -466,10 +473,26 @@ ip_xprt_setup(fmd_hdl_t *hdl)
 	struct addrinfo *aip;
 	const char *s1, *s2;
 
+	/*
+	 * Set up flags as specified in the .conf file. Note that these are
+	 * mostly only used for testing purposes, allowing the transport to
+	 * be set up in various modes.
+	 */
 	if (ip_host != NULL)
-		xflags = FMD_XPRT_RDWR;
+		xflags = (ip_rdonly == FMD_B_TRUE) ? FMD_XPRT_RDONLY :
+		    FMD_XPRT_RDWR;
 	else
-		xflags = FMD_XPRT_RDWR | FMD_XPRT_ACCEPT;
+		xflags = ((ip_rdonly == FMD_B_TRUE) ? FMD_XPRT_RDONLY :
+		    FMD_XPRT_RDWR) | FMD_XPRT_ACCEPT;
+
+	if (ip_external == FMD_B_TRUE)
+		xflags |= FMD_XPRT_EXTERNAL;
+	if (ip_no_remote_repair == FMD_B_TRUE)
+		xflags |= FMD_XPRT_NO_REMOTE_REPAIR;
+	if (ip_hconly == FMD_B_TRUE)
+		xflags |= FMD_XPRT_HCONLY;
+	if (ip_hc_present_only == FMD_B_TRUE)
+		xflags |= FMD_XPRT_HC_PRESENT_ONLY;
 
 	for (aip = ip_ail; aip != NULL; aip = aip->ai_next) {
 		if (aip->ai_family != AF_INET && aip->ai_family != AF_INET6)
@@ -554,6 +577,12 @@ static const fmd_prop_t fmd_props[] = {
 	{ "ip_burp", FMD_TYPE_TIME, "0" },
 	{ "ip_enable", FMD_TYPE_BOOL, "false" },
 	{ "ip_mtbf", FMD_TYPE_INT32, "0" },
+	{ "ip_external", FMD_TYPE_BOOL, "true" },
+	{ "ip_no_remote_repair", FMD_TYPE_BOOL, "true" },
+	{ "ip_hconly", FMD_TYPE_BOOL, "false" },
+	{ "ip_rdonly", FMD_TYPE_BOOL, "false" },
+	{ "ip_hc_present_only", FMD_TYPE_BOOL, "false" },
+	{ "ip_domain_name", FMD_TYPE_STRING, NULL },
 	{ "ip_port", FMD_TYPE_STRING, "664" },
 	{ "ip_qlen", FMD_TYPE_INT32, "32" },
 	{ "ip_retry", FMD_TYPE_UINT32, "50" },
@@ -614,6 +643,12 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	ip_burp = fmd_prop_get_int64(hdl, "ip_burp");
 	ip_mtbf = fmd_prop_get_int32(hdl, "ip_mtbf");
+	ip_external = fmd_prop_get_int32(hdl, "ip_external");
+	ip_no_remote_repair = fmd_prop_get_int32(hdl, "ip_no_remote_repair");
+	ip_hconly = fmd_prop_get_int32(hdl, "ip_hconly");
+	ip_rdonly = fmd_prop_get_int32(hdl, "ip_rdonly");
+	ip_hc_present_only = fmd_prop_get_int32(hdl, "ip_hc_present_only");
+	ip_domain_name = fmd_prop_get_string(hdl, "ip_domain_name");
 	ip_qlen = fmd_prop_get_int32(hdl, "ip_qlen");
 	ip_retry = fmd_prop_get_int32(hdl, "ip_retry");
 	ip_sleep = fmd_prop_get_int64(hdl, "ip_sleep");

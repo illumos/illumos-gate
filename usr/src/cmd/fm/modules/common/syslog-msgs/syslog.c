@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <sys/strlog.h>
@@ -243,6 +241,13 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	char *olang = NULL;
 	int locale_c = 0;
 	size_t len;
+
+	/*
+	 * don't log updated and isolated events (for now)
+	 */
+	if (strcmp(class, FM_LIST_ISOLATED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0)
+		return;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_SUSPECT_VERSION) {
@@ -549,6 +554,8 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	fmd_prop_free_string(hdl, rootdir);
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_UPDATED_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_ISOLATED_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_RESOLVED_CLASS);
 }

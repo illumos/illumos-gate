@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <strings.h>
@@ -183,7 +181,7 @@ fmd_protocol_rsrc_asru(const char *class,
     nvlist_t *fmri, const char *uuid, const char *code,
     boolean_t faulty, boolean_t unusable, boolean_t message, nvlist_t *event,
     struct timeval *tvp, boolean_t repaired, boolean_t replaced,
-    boolean_t acquitted)
+    boolean_t acquitted, nvlist_t *diag_de)
 {
 	nvlist_t *nvl;
 	int64_t tod[2];
@@ -213,6 +211,9 @@ fmd_protocol_rsrc_asru(const char *class,
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_UNUSABLE, unusable);
 	err |= nvlist_add_boolean_value(nvl, FM_SUSPECT_MESSAGE, message);
 	err |= nvlist_add_int64_array(nvl, FM_SUSPECT_DIAG_TIME, tod, 2);
+
+	if (diag_de != NULL)
+		err |= nvlist_add_nvlist(nvl, FM_SUSPECT_DE, diag_de);
 
 	if (event != NULL)
 		err |= nvlist_add_nvlist(nvl, FM_RSRC_ASRU_EVENT, event);
@@ -329,6 +330,38 @@ fmd_protocol_xprt_uuclose(fmd_module_t *mp, const char *class, uint8_t version,
 {
 	nvlist_t *nvl = fmd_protocol_xprt_ctl(mp, class, version);
 	int err = nvlist_add_string(nvl, FM_RSRC_XPRT_UUID, uuid);
+
+	if (err != 0)
+		fmd_panic("failed to populate nvlist: %s\n", fmd_strerror(err));
+
+	return (nvl);
+}
+
+nvlist_t *
+fmd_protocol_xprt_uuresolved(fmd_module_t *mp, const char *class,
+    uint8_t version, const char *uuid)
+{
+	nvlist_t *nvl = fmd_protocol_xprt_ctl(mp, class, version);
+	int err = nvlist_add_string(nvl, FM_RSRC_XPRT_UUID, uuid);
+
+	if (err != 0)
+		fmd_panic("failed to populate nvlist: %s\n", fmd_strerror(err));
+
+	return (nvl);
+}
+
+nvlist_t *
+fmd_protocol_xprt_updated(fmd_module_t *mp, const char *class, uint8_t version,
+    const char *uuid, uint8_t *statusp, uint8_t *has_asrup, uint_t nelem)
+{
+	nvlist_t *nvl = fmd_protocol_xprt_ctl(mp, class, version);
+	int err = nvlist_add_string(nvl, FM_RSRC_XPRT_UUID, uuid);
+
+	err |= nvlist_add_uint8_array(nvl, FM_RSRC_XPRT_FAULT_STATUS, statusp,
+	    nelem);
+	if (has_asrup)
+		err |= nvlist_add_uint8_array(nvl, FM_RSRC_XPRT_FAULT_HAS_ASRU,
+		    has_asrup, nelem);
 
 	if (err != 0)
 		fmd_panic("failed to populate nvlist: %s\n", fmd_strerror(err));

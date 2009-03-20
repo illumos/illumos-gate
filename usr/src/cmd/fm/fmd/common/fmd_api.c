@@ -1142,7 +1142,15 @@ fmd_case_uuresolved(fmd_hdl_t *hdl, const char *uuid)
 	fmd_case_t *cp = fmd_case_hash_lookup(fmd.d_cases, uuid);
 
 	if (cp != NULL) {
-		fmd_case_transition(cp, FMD_CASE_RESOLVED, 0);
+		fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+		/*
+		 * For a proxy, we notify the diagnosing side, and then
+		 * wait for it to send us back a list.resolved.
+		 */
+		if (cip->ci_xprt != NULL)
+			fmd_xprt_uuresolved(cip->ci_xprt, cip->ci_uuid);
+		else
+			fmd_case_transition(cp, FMD_CASE_RESOLVED, 0);
 		fmd_case_rele(cp);
 	}
 
@@ -2458,6 +2466,44 @@ fmd_xprt_translate(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *ep)
 	}
 
 	return (fmd_xprt_xtranslate(FMD_EVENT_NVL(ep), xip->xi_auth));
+}
+
+/*ARGSUSED*/
+void
+fmd_xprt_add_domain(fmd_hdl_t *hdl, nvlist_t *nvl, char *domain)
+{
+	nvpair_t *nvp, *nvp2;
+	nvlist_t *nvl2, *nvl3;
+	char *class;
+
+	if (nvl == NULL || domain == NULL)
+		return;
+	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(nvl, nvp)) {
+		if (strcmp(nvpair_name(nvp), FM_CLASS) == 0) {
+			(void) nvpair_value_string(nvp, &class);
+			if (strcmp(class, FM_LIST_SUSPECT_CLASS) != 0)
+				return;
+		}
+	}
+	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(nvl, nvp)) {
+		if (strcmp(nvpair_name(nvp), FM_SUSPECT_DE) == 0) {
+			(void) nvpair_value_nvlist(nvp, &nvl2);
+			for (nvp2 = nvlist_next_nvpair(nvl2, NULL);
+			    nvp2 != NULL;
+			    nvp2 = nvlist_next_nvpair(nvl2, nvp2)) {
+				if (strcmp(nvpair_name(nvp2),
+				    FM_FMRI_AUTHORITY) == 0) {
+					(void) nvpair_value_nvlist(nvp2, &nvl3);
+					(void) nvlist_add_string(nvl3,
+					    FM_FMRI_AUTH_DOMAIN, domain);
+					break;
+				}
+			}
+			break;
+		}
+	}
 }
 
 void

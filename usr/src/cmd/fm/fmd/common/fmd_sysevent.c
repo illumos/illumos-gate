@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent.h>
@@ -464,7 +462,8 @@ sysev_init(fmd_hdl_t *hdl)
 		    "channel %s", sysev_channel);
 	}
 
-	sysev_xprt = fmd_xprt_open(hdl, FMD_XPRT_RDONLY, NULL, NULL);
+	sysev_xprt = fmd_xprt_open(hdl, FMD_XPRT_RDONLY |
+	    FMD_XPRT_CACHE_AS_LOCAL, NULL, NULL);
 	sysev_hdl = hdl;
 
 	/*

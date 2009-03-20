@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 #include <limits.h>
@@ -1053,6 +1051,63 @@ fmd_asru(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+al_walk_init(mdb_walk_state_t *wsp)
+{
+	fmd_asru_hash_t ah;
+	fmd_t F;
+
+	if (wsp->walk_addr == NULL && mdb_readvar(&F, "fmd") != sizeof (F)) {
+		mdb_warn("failed to read fmd meta-data");
+		return (WALK_ERR);
+	}
+
+	if (wsp->walk_addr == NULL)
+		wsp->walk_addr = (uintptr_t)F.d_asrus;
+
+	if (mdb_vread(&ah, sizeof (ah), wsp->walk_addr) != sizeof (ah)) {
+		mdb_warn("failed to read asru_hash at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	return (hash_walk_init(wsp, (uintptr_t)ah.ah_rsrc_hash, ah.ah_hashlen,
+	    "fmd_asru_link", sizeof (fmd_asru_link_t), OFFSETOF(fmd_asru_link_t,
+	    al_rsrc_next)));
+}
+
+static int
+fmd_asru_link(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	char uuid[48], name[PATH_MAX];
+	fmd_asru_link_t a;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("fmd_asru_link", "fmd_asru_link", argc,
+		    argv) != 0) {
+			mdb_warn("failed to walk fmd_asru_link hash");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&a, sizeof (a), addr) != sizeof (a)) {
+		mdb_warn("failed to read fmd_asru_link at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (DCMD_HDRSPEC(flags))
+		mdb_printf("%<u>%-8s %-36s %s%</u>\n", "ADDR", "UUID", "NAME");
+
+	if (mdb_readstr(uuid, sizeof (uuid), (uintptr_t)a.al_uuid) <= 0)
+		(void) mdb_snprintf(uuid, sizeof (uuid), "<%p>", a.al_uuid);
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)a.al_rsrc_name) <= 0)
+		(void) mdb_snprintf(name, sizeof (name), "<%p>",
+		    a.al_rsrc_name);
+
+	mdb_printf("%-8p %-36s %s\n", addr, uuid, name);
+	return (DCMD_OK);
+}
+
 /*ARGSUSED*/
 static int
 fcf_hdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -1522,6 +1577,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "fmd_buf", ":", "display buffer structure", fmd_buf },
 	{ "fmd_serd", "[:]", "display serd engine structure", fmd_serd },
 	{ "fmd_asru", "?", "display asru resource structure", fmd_asru },
+	{ "fmd_asru_link", "?", "display resource structure", fmd_asru_link },
 	{ "fmd_timer", "?", "display pending timer(s)", fmd_timer },
 	{ "fmd_xprt", "?[-lrsu]", "display event transport(s)", fmd_xprt },
 	{ NULL }
@@ -1546,6 +1602,8 @@ static const mdb_walker_t walkers[] = {
 		serd_walk_init, hash_walk_step, hash_walk_fini },
 	{ "fmd_asru", "walk asru resource hash",
 		asru_walk_init, hash_walk_step, hash_walk_fini },
+	{ "fmd_asru_link", "walk resource hash",
+		al_walk_init, hash_walk_step, hash_walk_fini },
 	{ "fmd_timerq", "walk timer queue",
 		tmq_walk_init, tmq_walk_step, NULL },
 	{ "fmd_xprt", "walk per-module list of transports",

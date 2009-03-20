@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,11 +161,15 @@ fmd_asru_hash_lookup(fmd_asru_hash_t *ahp, const char *name)
 	return (ap);
 }
 
+#define	HC_ONLY_FALSE	0
+#define	HC_ONLY_TRUE	1
+
 static int
-fmd_asru_replacement_state(nvlist_t *event)
+fmd_asru_replacement_state(nvlist_t *event, int hc_only)
 {
 	int ps = -1;
 	nvlist_t *asru, *fru, *rsrc;
+	char *s;
 
 	/*
 	 * Check if there is evidence that this object is no longer present.
@@ -177,34 +181,46 @@ fmd_asru_replacement_state(nvlist_t *event)
 	 * If we have checked all three and we still get -1 then nothing knows
 	 * whether it's present or not, so err on the safe side and treat it
 	 * as still present.
+	 *
+	 * Note that if hc_only is set, then we only check status using fmris
+	 * that are in hc-scheme.
 	 */
 	if (fmd_asru_fake_not_present)
 		return (fmd_asru_fake_not_present);
-	if (nvlist_lookup_nvlist(event, FM_FAULT_ASRU, &asru) == 0)
+	if (nvlist_lookup_nvlist(event, FM_FAULT_ASRU, &asru) == 0 &&
+	    (hc_only == HC_ONLY_FALSE || (nvlist_lookup_string(asru,
+	    FM_FMRI_SCHEME, &s) == 0 && strcmp(s, FM_FMRI_SCHEME_HC) == 0)))
 		ps = fmd_fmri_replaced(asru);
-	if (ps == -1) {
-		if (nvlist_lookup_nvlist(event, FM_FAULT_RESOURCE, &rsrc) == 0)
-			ps = fmd_fmri_replaced(rsrc);
-	} else if (ps == FMD_OBJ_STATE_UNKNOWN) {
-		/* see if we can improve on UNKNOWN */
+	if (ps == -1 || ps == FMD_OBJ_STATE_UNKNOWN) {
 		if (nvlist_lookup_nvlist(event, FM_FAULT_RESOURCE,
-		    &rsrc) == 0) {
-			int ps2 = fmd_fmri_replaced(rsrc);
-			if (ps2 == FMD_OBJ_STATE_STILL_PRESENT ||
-			    ps2 == FMD_OBJ_STATE_REPLACED)
-				ps = ps2;
+		    &rsrc) == 0 && (hc_only == HC_ONLY_FALSE ||
+		    (nvlist_lookup_string(rsrc, FM_FMRI_SCHEME, &s) == 0 &&
+		    strcmp(s, FM_FMRI_SCHEME_HC) == 0))) {
+			if (ps == -1) {
+				ps = fmd_fmri_replaced(rsrc);
+			} else {
+				/* see if we can improve on UNKNOWN */
+				int ps2 = fmd_fmri_replaced(rsrc);
+				if (ps2 == FMD_OBJ_STATE_STILL_PRESENT ||
+				    ps2 == FMD_OBJ_STATE_REPLACED)
+					ps = ps2;
+			}
 		}
 	}
-	if (ps == -1) {
-		if (nvlist_lookup_nvlist(event, FM_FAULT_FRU, &fru) == 0)
-			ps = fmd_fmri_replaced(fru);
-	} else if (ps == FMD_OBJ_STATE_UNKNOWN) {
-		/* see if we can improve on UNKNOWN */
-		if (nvlist_lookup_nvlist(event, FM_FAULT_FRU, &fru) == 0) {
-			int ps2 = fmd_fmri_replaced(fru);
-			if (ps2 == FMD_OBJ_STATE_STILL_PRESENT ||
-			    ps2 == FMD_OBJ_STATE_REPLACED)
-				ps = ps2;
+	if (ps == -1 || ps == FMD_OBJ_STATE_UNKNOWN) {
+		if (nvlist_lookup_nvlist(event, FM_FAULT_FRU, &fru) == 0 &&
+		    (hc_only == HC_ONLY_FALSE || (nvlist_lookup_string(fru,
+		    FM_FMRI_SCHEME, &s) == 0 &&
+		    strcmp(s, FM_FMRI_SCHEME_HC) == 0))) {
+			if (ps == -1) {
+				ps = fmd_fmri_replaced(fru);
+			} else {
+				/* see if we can improve on UNKNOWN */
+				int ps2 = fmd_fmri_replaced(fru);
+				if (ps2 == FMD_OBJ_STATE_STILL_PRESENT ||
+				    ps2 == FMD_OBJ_STATE_REPLACED)
+					ps = ps2;
+			}
 		}
 	}
 	if (ps == -1)
@@ -432,6 +448,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	fmd_asru_link_t *alp;
 	fmd_case_t *cp;
 	int64_t *diag_time;
+	nvlist_t *de_fmri, *de_fmri_dup;
 	uint_t nelem;
 	topo_hdl_t *thp;
 	char *class;
@@ -482,6 +499,10 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		fmd_case_settime(cp, diag_time[0], diag_time[1]);
 	else
 		fmd_case_settime(cp, lp->log_stat.st_ctime, 0);
+	if (nvlist_lookup_nvlist(nvl, FM_SUSPECT_DE, &de_fmri) == 0) {
+		(void) nvlist_xdup(de_fmri, &de_fmri_dup, &fmd.d_nva);
+		fmd_case_set_de_fmri(cp, de_fmri_dup);
+	}
 	(void) nvlist_xdup(flt, &flt_copy, &fmd.d_nva);
 
 	/*
@@ -511,7 +532,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	/*
 	 * Check to see if the resource is still present in the system.
 	 */
-	ps = fmd_asru_replacement_state(flt);
+	ps = fmd_asru_replacement_state(flt, HC_ONLY_FALSE);
 	if (ps == FMD_OBJ_STATE_REPLACED) {
 		replaced = FMD_B_TRUE;
 	} else if (ps == FMD_OBJ_STATE_STILL_PRESENT ||
@@ -689,18 +710,33 @@ fmd_asru_repair_if_aged(fmd_asru_link_t *alp, void *arg)
 	hrtime_t hrt;
 	int ps;
 	int err;
+	fmd_asru_rep_arg_t fara;
 
-	ps = fmd_asru_replacement_state(alp->al_event);
+	/*
+	 * Checking for aged resources only happens on the diagnosing side
+	 * not on a proxy.
+	 */
+	if (alp->al_flags & FMD_ASRU_PROXY)
+		return;
+
+	ps = fmd_asru_replacement_state(alp->al_event, HC_ONLY_FALSE);
 	if (ps == FMD_OBJ_STATE_REPLACED) {
-		fmd_asru_replaced(alp, &err);
+		fara.fara_reason = FMD_ASRU_REPLACED;
+		fara.fara_bywhat = FARA_ALL;
+		fara.fara_rval = &err;
+		fmd_asru_repaired(alp, &fara);
 	} else if (ps == FMD_OBJ_STATE_NOT_PRESENT) {
 		fmd_time_gettimeofday(&tv);
 		lp = fmd_log_open(alp->al_asru->asru_root, alp->al_uuid,
 		    FMD_LOG_ASRU);
 		hrt = (hrtime_t)(tv.tv_sec - lp->log_stat.st_mtime);
 		fmd_log_rele(lp);
-		if (hrt * NANOSEC >= fmd.d_asrus->ah_lifetime)
-			fmd_asru_removed(alp);
+		if (hrt * NANOSEC >= fmd.d_asrus->ah_lifetime) {
+			fara.fara_reason = FMD_ASRU_REMOVED;
+			fara.fara_bywhat = FARA_ALL;
+			fara.fara_rval = &err;
+			fmd_asru_repaired(alp, &fara);
+		}
 	}
 }
 
@@ -1103,7 +1139,7 @@ fmd_asru_hash_delete_case(fmd_asru_hash_t *ahp, fmd_case_t *cp)
 			 */
 			(void) snprintf(path, sizeof (path), "%s/%s",
 			    ahp->ah_dirpath, alp->al_uuid);
-			if (unlink(path) != 0)
+			if (cip->ci_xprt == NULL && unlink(path) != 0)
 				fmd_error(EFMD_ASRU_UNLINK,
 				    "failed to unlink asru %s", path);
 
@@ -1142,171 +1178,237 @@ fmd_asru_hash_delete_case(fmd_asru_hash_t *ahp, fmd_case_t *cp)
 	(void) pthread_rwlock_unlock(&ahp->ah_lock);
 }
 
+typedef struct {
+	nvlist_t *farc_parent_fmri;
+	uint8_t farc_reason;
+} fmd_asru_farc_t;
+
 static void
-fmd_asru_repair_containee(fmd_asru_link_t *alp, void *er)
+fmd_asru_repair_containee(fmd_asru_link_t *alp, void *arg)
 {
-	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
-	    alp->al_asru_fmri && fmd_fmri_contains(er,
-	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
-	    FMD_ASRU_REPAIRED))
-		fmd_case_update(alp->al_case);
-}
+	fmd_asru_farc_t *farcp = (fmd_asru_farc_t *)arg;
 
-void
-fmd_asru_repaired(fmd_asru_link_t *alp, void *er)
-{
-	int flags;
-	int rval;
-
-	/*
-	 * repair this asru cache entry
-	 */
-	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, FMD_ASRU_REPAIRED);
-
-	/*
-	 * now check if all entries associated with this asru are repaired and
-	 * if so repair containees
-	 */
-	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
-	flags = alp->al_asru->asru_flags;
-	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
-		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_repair_containee,
-		    alp->al_asru_fmri);
-
-	/*
-	 * if called from fmd_adm_repair() and we really did clear the bit then
-	 * we need to do a case update to see if the associated case can be
-	 * repaired. No need to do this if called from fmd_case_repair() (ie
-	 * when er is NULL) as the case will be explicitly repaired anyway.
-	 */
-	if (er) {
-		*(int *)er = 0;
-		if (rval)
-			fmd_case_update(alp->al_case);
+	if ((alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
+	    alp->al_asru_fmri &&
+	    fmd_fmri_contains(farcp->farc_parent_fmri, alp->al_asru_fmri) > 0) {
+		if (fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+		    farcp->farc_reason)) {
+			if (alp->al_flags & FMD_ASRU_PROXY)
+				fmd_case_xprt_updated(alp->al_case);
+			else
+				fmd_case_update(alp->al_case);
+		}
 	}
 }
 
 static void
-fmd_asru_acquit_containee(fmd_asru_link_t *alp, void *er)
-{
-	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
-	    alp->al_asru_fmri && fmd_fmri_contains(er,
-	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
-	    FMD_ASRU_ACQUITTED))
-		fmd_case_update(alp->al_case);
-}
-
-void
-fmd_asru_acquit(fmd_asru_link_t *alp, void *er)
+fmd_asru_do_repair_containees(fmd_asru_link_t *alp, uint8_t reason)
 {
 	int flags;
-	int rval;
 
 	/*
-	 * acquit this asru cache entry
+	 * Check if all entries associated with this asru are acquitted and
+	 * if so acquit containees. Don't try to repair containees on proxy
+	 * side unless we have local asru.
 	 */
-	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, FMD_ASRU_ACQUITTED);
+	if (alp->al_asru_fmri != NULL && (!(alp->al_flags & FMD_ASRU_PROXY) ||
+	    (alp->al_flags & FMD_ASRU_PROXY_WITH_ASRU))) {
+		(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
+		flags = alp->al_asru->asru_flags;
+		(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
+		if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE))) {
+			fmd_asru_farc_t farc;
 
-	/*
-	 * now check if all entries associated with this asru are acquitted and
-	 * if so acquit containees
-	 */
-	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
-	flags = alp->al_asru->asru_flags;
-	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
-		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_acquit_containee,
-		    alp->al_asru_fmri);
-
-	/*
-	 * if called from fmd_adm_acquit() and we really did clear the bit then
-	 * we need to do a case update to see if the associated case can be
-	 * repaired. No need to do this if called from fmd_case_acquit() (ie
-	 * when er is NULL) as the case will be explicitly repaired anyway.
-	 */
-	if (er) {
-		*(int *)er = 0;
-		if (rval)
-			fmd_case_update(alp->al_case);
+			farc.farc_parent_fmri = alp->al_asru_fmri;
+			farc.farc_reason = reason;
+			fmd_asru_al_hash_apply(fmd.d_asrus,
+			    fmd_asru_repair_containee, &farc);
+		}
 	}
 }
 
-static void
-fmd_asru_replaced_containee(fmd_asru_link_t *alp, void *er)
-{
-	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
-	    alp->al_asru_fmri && fmd_fmri_contains(er,
-	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
-	    FMD_ASRU_REPLACED))
-		fmd_case_update(alp->al_case);
-}
-
 void
-fmd_asru_replaced(fmd_asru_link_t *alp, void *er)
+fmd_asru_repaired(fmd_asru_link_t *alp, void *arg)
 {
-	int flags;
-	int rval;
-	int ps;
+	int cleared;
+	fmd_asru_rep_arg_t *farap = (fmd_asru_rep_arg_t *)arg;
 
-	ps = fmd_asru_replacement_state(alp->al_event);
-	if (ps == FMD_OBJ_STATE_STILL_PRESENT)
+	/*
+	 * don't allow remote repair over readonly transport
+	 */
+	if (alp->al_flags & FMD_ASRU_PROXY_RDONLY)
 		return;
 
 	/*
-	 * mark this cache entry as replaced
+	 * don't allow repair etc by asru on proxy unless asru is local
 	 */
-	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, FMD_ASRU_REPLACED);
+	if (farap->fara_bywhat == FARA_BY_ASRU &&
+	    (alp->al_flags & FMD_ASRU_PROXY) &&
+	    !(alp->al_flags & FMD_ASRU_PROXY_WITH_ASRU))
+		return;
+	/*
+	 * For acquit, need to check both name and uuid if specified
+	 */
+	if (farap->fara_reason == FMD_ASRU_ACQUITTED &&
+	    farap->fara_rval != NULL && strcmp(farap->fara_uuid, "") != 0 &&
+	    strcmp(farap->fara_uuid, alp->al_case_uuid) != 0)
+		return;
 
 	/*
-	 * now check if all entries associated with this asru are replaced and
-	 * if so replace containees
+	 * For replaced, verify it has been replaced if we have serial number
 	 */
-	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
-	flags = alp->al_asru->asru_flags;
-	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
-		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_replaced_containee,
-		    alp->al_asru_fmri);
+	if (farap->fara_reason == FMD_ASRU_REPLACED &&
+	    !(alp->al_flags & FMD_ASRU_PROXY_EXTERNAL) &&
+	    fmd_asru_replacement_state(alp->al_event,
+	    (alp->al_flags & FMD_ASRU_PROXY) ? HC_ONLY_TRUE : HC_ONLY_FALSE) ==
+	    FMD_OBJ_STATE_STILL_PRESENT) {
+		return;
+	}
 
-	*(int *)er = 0;
-	if (rval)
-		fmd_case_update(alp->al_case);
+	cleared = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, farap->fara_reason);
+	fmd_asru_do_repair_containees(alp, farap->fara_reason);
+
+	/*
+	 * if called from fmd_adm_*() and we really did clear the bit then
+	 * we need to do a case update to see if the associated case can be
+	 * repaired. No need to do this if called from fmd_case_*() (ie
+	 * when arg is NULL) as the case will be explicitly repaired anyway.
+	 */
+	if (farap->fara_rval) {
+		*farap->fara_rval = 0;
+		if (cleared) {
+			if (alp->al_flags & FMD_ASRU_PROXY)
+				fmd_case_xprt_updated(alp->al_case);
+			else
+				fmd_case_update(alp->al_case);
+		}
+	}
 }
 
-static void
-fmd_asru_removed_containee(fmd_asru_link_t *alp, void *er)
-{
-	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
-	    alp->al_asru_fmri && fmd_fmri_contains(er,
-	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
-	    0))
-		fmd_case_update(alp->al_case);
-}
-
+/*
+ * This is only called for proxied faults. Set various flags so we can
+ * find the nature of the transport from the resource cache code.
+ */
+/*ARGSUSED*/
 void
-fmd_asru_removed(fmd_asru_link_t *alp)
+fmd_asru_set_on_proxy(fmd_asru_link_t *alp, void *arg)
 {
-	int flags;
-	int rval;
+	fmd_asru_set_on_proxy_t *entryp = (fmd_asru_set_on_proxy_t *)arg;
+
+	if (*entryp->fasp_countp >= entryp->fasp_maxcount)
+		return;
 
 	/*
-	 * mark this cache entry as replacded
+	 * Note that this is a proxy fault and save whetehr transport is
+	 * RDONLY or EXTERNAL.
 	 */
-	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, 0);
+	alp->al_flags |= FMD_ASRU_PROXY;
+	alp->al_asru->asru_flags |= FMD_ASRU_PROXY;
+
+	if (entryp->fasp_proxy_external) {
+		alp->al_flags |= FMD_ASRU_PROXY_EXTERNAL;
+		alp->al_asru->asru_flags |= FMD_ASRU_PROXY_EXTERNAL;
+	}
+
+	if (entryp->fasp_proxy_rdonly)
+		alp->al_flags |= FMD_ASRU_PROXY_RDONLY;
 
 	/*
-	 * now check if all entries associated with this asru are removed and
-	 * if so replace containees
+	 * Save whether asru is accessible in local domain
 	 */
-	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
-	flags = alp->al_asru->asru_flags;
-	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
-		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_removed_containee,
-		    alp->al_asru_fmri);
-	if (rval)
-		fmd_case_update(alp->al_case);
+	if (entryp->fasp_proxy_asru[*entryp->fasp_countp]) {
+		alp->al_flags |= FMD_ASRU_PROXY_WITH_ASRU;
+		alp->al_asru->asru_flags |= FMD_ASRU_PROXY_WITH_ASRU;
+	}
+	(*entryp->fasp_countp)++;
+}
+
+/*ARGSUSED*/
+void
+fmd_asru_update_containees(fmd_asru_link_t *alp, void *arg)
+{
+	fmd_asru_do_repair_containees(alp, alp->al_reason);
+}
+
+/*
+ * This function is used for fault proxying. It updates the resource status in
+ * the resource cache based on information that has come from the other side of
+ * the transport. This can be called on either the proxy side or the
+ * diagnosing side.
+ */
+void
+fmd_asru_update_status(fmd_asru_link_t *alp, void *arg)
+{
+	fmd_asru_update_status_t *entryp = (fmd_asru_update_status_t *)arg;
+	uint8_t status;
+
+	if (*entryp->faus_countp >= entryp->faus_maxcount)
+		return;
+
+	status = entryp->faus_ba[*entryp->faus_countp];
+
+	/*
+	 * For proxy, if there is no asru on the proxy side, but there is on
+	 * the diag side, then take the diag side asru status.
+	 * For diag, if there is an asru on the proxy side, then take the proxy
+	 * side asru status.
+	 */
+	if (entryp->faus_is_proxy ?
+	    (entryp->faus_diag_asru[*entryp->faus_countp] &&
+	    !entryp->faus_proxy_asru[*entryp->faus_countp]) :
+	    entryp->faus_proxy_asru[*entryp->faus_countp]) {
+		if (status & FM_SUSPECT_DEGRADED)
+			alp->al_flags |= FMD_ASRU_DEGRADED;
+		else
+			alp->al_flags &= ~FMD_ASRU_DEGRADED;
+		if (status & FM_SUSPECT_UNUSABLE)
+			(void) fmd_asru_setflags(alp, FMD_ASRU_UNUSABLE);
+		else
+			(void) fmd_asru_clrflags(alp, FMD_ASRU_UNUSABLE, 0);
+	}
+
+	/*
+	 * Update the faulty status too.
+	 */
+	if (!(status & FM_SUSPECT_FAULTY))
+		(void) fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+		    (status & FM_SUSPECT_REPAIRED) ? FMD_ASRU_REPAIRED :
+		    (status & FM_SUSPECT_REPLACED) ? FMD_ASRU_REPLACED :
+		    (status & FM_SUSPECT_ACQUITTED) ? FMD_ASRU_ACQUITTED :
+		    FMD_ASRU_REMOVED);
+	else if (entryp->faus_is_proxy)
+		(void) fmd_asru_setflags(alp, FMD_ASRU_FAULTY);
+
+	/*
+	 * for proxy only, update the present status too.
+	 */
+	if (entryp->faus_is_proxy) {
+		if (!(status & FM_SUSPECT_NOT_PRESENT)) {
+			alp->al_flags |= FMD_ASRU_PRESENT;
+			alp->al_asru->asru_flags |= FMD_ASRU_PRESENT;
+		} else {
+			alp->al_flags &= ~FMD_ASRU_PRESENT;
+			alp->al_asru->asru_flags &= ~FMD_ASRU_PRESENT;
+		}
+	}
+	(*entryp->faus_countp)++;
+}
+
+/*
+ * This function is called on the diagnosing side when fault proxying is
+ * in use and the proxy has sent a uuclose. It updates the status of the
+ * resource cache entries.
+ */
+void
+fmd_asru_close_status(fmd_asru_link_t *alp, void *arg)
+{
+	fmd_asru_close_status_t *entryp = (fmd_asru_close_status_t *)arg;
+
+	if (*entryp->facs_countp >= entryp->facs_maxcount)
+		return;
+	alp->al_flags &= ~FMD_ASRU_DEGRADED;
+	(void) fmd_asru_setflags(alp, FMD_ASRU_UNUSABLE);
+	(*entryp->facs_countp)++;
 }
 
 static void
@@ -1330,6 +1432,12 @@ fmd_asru_logevent(fmd_asru_link_t *alp)
 	cip = (fmd_case_impl_t *)alp->al_case;
 	ASSERT(cip != NULL);
 
+	/*
+	 * Don't log to disk on proxy side
+	 */
+	if (cip->ci_xprt != NULL)
+		return;
+
 	if ((lp = alp->al_log) == NULL)
 		lp = fmd_log_open(ap->asru_root, alp->al_uuid, FMD_LOG_ASRU);
 
@@ -1338,7 +1446,8 @@ fmd_asru_logevent(fmd_asru_link_t *alp)
 
 	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[faulty | (unusable << 1)],
 	    alp->al_asru_fmri, cip->ci_uuid, cip->ci_code, faulty, unusable,
-	    message, alp->al_event, &cip->ci_tv, repaired, replaced, acquitted);
+	    message, alp->al_event, &cip->ci_tv, repaired, replaced, acquitted,
+	    cip->ci_diag_de == NULL ? cip->ci_mod->mod_fmri : cip->ci_diag_de);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -1446,45 +1555,65 @@ fmd_asru_clrflags(fmd_asru_link_t *alp, uint_t sflag, uint8_t reason)
 int
 fmd_asru_al_getstate(fmd_asru_link_t *alp)
 {
-	int us, st;
+	int us, st = (alp->al_flags & (FMD_ASRU_FAULTY | FMD_ASRU_UNUSABLE));
 	nvlist_t *asru;
-	int ps;
+	int ps = FMD_OBJ_STATE_UNKNOWN;
 
-	ps = fmd_asru_replacement_state(alp->al_event);
-	if (ps == FMD_OBJ_STATE_NOT_PRESENT)
-		return ((alp->al_flags & FMD_ASRU_FAULTY) | FMD_ASRU_UNUSABLE);
-	if (ps == FMD_OBJ_STATE_REPLACED) {
-		if (alp->al_reason < FMD_ASRU_REPLACED)
-			alp->al_reason = FMD_ASRU_REPLACED;
-		return ((alp->al_flags & FMD_ASRU_FAULTY) | FMD_ASRU_UNUSABLE);
+	/*
+	 * For fault proxying with an EXTERNAL transport, believe the presence
+	 * state as sent by the diagnosing side. Otherwise find the presence
+	 * state here. Note that if fault proxying with an INTERNAL transport
+	 * we can only trust the presence state where we are using hc-scheme
+	 * fmris which should be consistant across domains in the same system -
+	 * other schemes can refer to different devices in different domains.
+	 */
+	if (!(alp->al_flags & FMD_ASRU_PROXY_EXTERNAL)) {
+		ps = fmd_asru_replacement_state(alp->al_event, (alp->al_flags &
+		    FMD_ASRU_PROXY)? HC_ONLY_TRUE : HC_ONLY_FALSE);
+		if (ps == FMD_OBJ_STATE_NOT_PRESENT)
+			return (st | FMD_ASRU_UNUSABLE);
+		if (ps == FMD_OBJ_STATE_REPLACED) {
+			if (alp->al_reason < FMD_ASRU_REPLACED)
+				alp->al_reason = FMD_ASRU_REPLACED;
+			return (st | FMD_ASRU_UNUSABLE);
+		}
 	}
+	if (ps == FMD_OBJ_STATE_UNKNOWN && (alp->al_flags & FMD_ASRU_PROXY))
+		st |= (alp->al_flags & (FMD_ASRU_DEGRADED | FMD_ASRU_PRESENT));
+	else
+		st |= (alp->al_flags & (FMD_ASRU_DEGRADED)) | FMD_ASRU_PRESENT;
 
-	st = (alp->al_flags & FMD_ASRU_STATE) | FMD_ASRU_PRESENT;
-	if (nvlist_lookup_nvlist(alp->al_event, FM_FAULT_ASRU, &asru) == 0) {
+	/*
+	 * For fault proxying, unless we have a local ASRU, then believe the
+	 * service state sent by the diagnosing side. Otherwise find the service
+	 * state here. Try fmd_fmri_service_state() first, but if that's not
+	 * supported by the scheme then fall back to fmd_fmri_unusable().
+	 */
+	if ((!(alp->al_flags & FMD_ASRU_PROXY) ||
+	    (alp->al_flags & FMD_ASRU_PROXY_WITH_ASRU)) &&
+	    nvlist_lookup_nvlist(alp->al_event, FM_FAULT_ASRU, &asru) == 0) {
 		us = fmd_fmri_service_state(asru);
 		if (us == -1 || us == FMD_SERVICE_STATE_UNKNOWN) {
 			/* not supported by scheme - try fmd_fmri_unusable */
 			us = fmd_fmri_unusable(asru);
-		} else if (us == FMD_SERVICE_STATE_UNUSABLE) {
-			st |= FMD_ASRU_UNUSABLE;
-			return (st);
-		} else if (us == FMD_SERVICE_STATE_OK) {
-			st &= ~FMD_ASRU_UNUSABLE;
-			return (st);
-		} else if (us == FMD_SERVICE_STATE_ISOLATE_PENDING) {
-			st &= ~FMD_ASRU_UNUSABLE;
-			return (st);
-		} else if (us == FMD_SERVICE_STATE_DEGRADED) {
-			st &= ~FMD_ASRU_UNUSABLE;
-			st |= FMD_ASRU_DEGRADED;
-			return (st);
+			if (us > 0)
+				st |= FMD_ASRU_UNUSABLE;
+			else if (us == 0)
+				st &= ~FMD_ASRU_UNUSABLE;
+		} else {
+			if (us == FMD_SERVICE_STATE_UNUSABLE) {
+				st &= ~FMD_ASRU_DEGRADED;
+				st |= FMD_ASRU_UNUSABLE;
+			} else if (us == FMD_SERVICE_STATE_OK) {
+				st &= ~(FMD_ASRU_DEGRADED | FMD_ASRU_UNUSABLE);
+			} else if (us == FMD_SERVICE_STATE_ISOLATE_PENDING) {
+				st &= ~(FMD_ASRU_DEGRADED | FMD_ASRU_UNUSABLE);
+			} else if (us == FMD_SERVICE_STATE_DEGRADED) {
+				st &= ~FMD_ASRU_UNUSABLE;
+				st |= FMD_ASRU_DEGRADED;
+			}
 		}
-	} else
-		us = (alp->al_flags & FMD_ASRU_UNUSABLE);
-	if (us > 0)
-		st |= FMD_ASRU_UNUSABLE;
-	else if (us == 0)
-		st &= ~FMD_ASRU_UNUSABLE;
+	}
 	return (st);
 }
 
@@ -1499,20 +1628,43 @@ fmd_asru_al_getstate(fmd_asru_link_t *alp)
 int
 fmd_asru_getstate(fmd_asru_t *ap)
 {
-	int us, st;
+	int us, st, p = -1;
+	char *s;
 
-	if (!(ap->asru_flags & FMD_ASRU_INTERNAL) &&
-	    (fmd_asru_fake_not_present >= FMD_OBJ_STATE_REPLACED ||
-	    fmd_fmri_present(ap->asru_fmri) <= 0))
-		return (0); /* do not report non-fmd non-present resources */
+	/* do not report non-fmd non-present resources */
+	if (!(ap->asru_flags & FMD_ASRU_INTERNAL)) {
+		/*
+		 * As with fmd_asru_al_getstate(), we can only trust the
+		 * local presence state on a proxy if the transport is
+		 * internal and the scheme is hc. Otherwise we believe the
+		 * state as sent by the diagnosing side.
+		 */
+		if (!(ap->asru_flags & FMD_ASRU_PROXY) ||
+		    (!(ap->asru_flags & FMD_ASRU_PROXY_EXTERNAL) &&
+		    (nvlist_lookup_string(ap->asru_fmri, FM_FMRI_SCHEME,
+		    &s) == 0 && strcmp(s, FM_FMRI_SCHEME_HC) == 0))) {
+			if (fmd_asru_fake_not_present >=
+			    FMD_OBJ_STATE_REPLACED)
+				return (0);
+			p = fmd_fmri_present(ap->asru_fmri);
+		}
+		if (p == 0 || (p < 0 && !(ap->asru_flags & FMD_ASRU_PROXY) ||
+		    !(ap->asru_flags & FMD_ASRU_PRESENT)))
+			return (0);
+	}
 
-	us = fmd_fmri_unusable(ap->asru_fmri);
-	st = ap->asru_flags & FMD_ASRU_STATE;
-
-	if (us > 0)
-		st |= FMD_ASRU_UNUSABLE;
-	else if (us == 0)
-		st &= ~FMD_ASRU_UNUSABLE;
-
+	/*
+	 * As with fmd_asru_al_getstate(), we can only trust the local unusable
+	 * state on a proxy if there is a local ASRU.
+	 */
+	st = ap->asru_flags & (FMD_ASRU_FAULTY | FMD_ASRU_UNUSABLE);
+	if (!(ap->asru_flags & FMD_ASRU_PROXY) ||
+	    (ap->asru_flags & FMD_ASRU_PROXY_WITH_ASRU)) {
+		us = fmd_fmri_unusable(ap->asru_fmri);
+		if (us > 0)
+			st |= FMD_ASRU_UNUSABLE;
+		else if (us == 0)
+			st &= ~FMD_ASRU_UNUSABLE;
+	}
 	return (st);
 }

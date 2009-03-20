@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,6 +193,7 @@ typedef struct host_id {
 	char *chassis;
 	char *server;
 	char *platform;
+	char *domain;
 } hostid_t;
 
 typedef struct host_id_list {
@@ -265,7 +266,7 @@ format_date(char *buf, size_t len, uint64_t sec)
 }
 
 static hostid_t *
-find_hostid_in_list(char *platform, char *chassis, char *server)
+find_hostid_in_list(char *platform, char *chassis, char *server, char *domain)
 {
 	hostid_t *rt = NULL;
 	host_id_list_t *hostp;
@@ -281,7 +282,9 @@ find_hostid_in_list(char *platform, char *chassis, char *server)
 		    hostp->hostid.server &&
 		    strcmp(hostp->hostid.server, server) == 0 &&
 		    (chassis == NULL || hostp->hostid.chassis == NULL ||
-		    strcmp(chassis, hostp->hostid.chassis) == 0)) {
+		    strcmp(chassis, hostp->hostid.chassis) == 0) &&
+		    (domain == NULL || hostp->hostid.domain == NULL ||
+		    strcmp(domain, hostp->hostid.domain) == 0)) {
 			rt = &hostp->hostid;
 			break;
 		}
@@ -292,6 +295,7 @@ find_hostid_in_list(char *platform, char *chassis, char *server)
 		hostp->hostid.platform = strdup(platform);
 		hostp->hostid.server = strdup(server);
 		hostp->hostid.chassis = chassis ? strdup(chassis) : NULL;
+		hostp->hostid.domain = domain ? strdup(domain) : NULL;
 		hostp->next = host_list;
 		host_list = hostp;
 		rt = &hostp->hostid;
@@ -303,7 +307,7 @@ find_hostid_in_list(char *platform, char *chassis, char *server)
 static hostid_t *
 find_hostid(nvlist_t *nvl)
 {
-	char *platform = NULL, *chassis = NULL, *server = NULL;
+	char *platform = NULL, *chassis = NULL, *server = NULL, *domain = NULL;
 	nvlist_t *auth, *fmri;
 	hostid_t *rt = NULL;
 
@@ -314,7 +318,8 @@ find_hostid(nvlist_t *nvl)
 		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server);
 		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS,
 		    &chassis);
-		rt = find_hostid_in_list(platform, chassis, server);
+		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_DOMAIN, &domain);
+		rt = find_hostid_in_list(platform, chassis, server, domain);
 	}
 	return (rt);
 }
@@ -1367,6 +1372,33 @@ print_fru_status(int status, char *label)
 }
 
 static void
+print_rsrc_status(int status, char *label)
+{
+	char *msg = "";
+
+	if (status & FM_SUSPECT_NOT_PRESENT)
+		msg = dgettext("FMD", "not present");
+	else if (status & FM_SUSPECT_FAULTY) {
+		if (status & FM_SUSPECT_DEGRADED)
+			msg = dgettext("FMD",
+			    "faulted but still providing degraded service");
+		else if (status & FM_SUSPECT_UNUSABLE)
+			msg = dgettext("FMD",
+			    "faulted and taken out of service");
+		else
+			msg = dgettext("FMD", "faulted but still in service");
+	} else if (status & FM_SUSPECT_REPLACED)
+		msg = dgettext("FMD", "replaced");
+	else if (status & FM_SUSPECT_REPAIRED)
+		msg = dgettext("FMD", "repair attempted");
+	else if (status & FM_SUSPECT_ACQUITTED)
+		msg = dgettext("FMD", "acquitted");
+	else
+		msg = dgettext("FMD", "removed");
+	(void) printf("%s     %s\n", label, msg);
+}
+
+static void
 print_name_list(name_list_t *list, char *label, char *(func)(char *),
     int limit, int pct, void (func1)(int, char *), int full)
 {
@@ -1476,13 +1508,6 @@ serial_in_fru(name_list_t *fru, name_list_t *serial)
 }
 
 static void
-print_server_name(hostid_t *host, char *label)
-{
-	(void) printf("%s %s %s %s\n", label, host->server, host->platform,
-	    host->chassis ? host->chassis : "");
-}
-
-static void
 print_sup_record(status_record_t *srp, int opt_i, int full)
 {
 	char buf[32];
@@ -1521,8 +1546,15 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		n++;
 	}
 	(void) printf("\n");
-	if (n_server > 1)
-		print_server_name(srp->host, dgettext("FMD", "Host        :"));
+	(void) printf("%s %s", dgettext("FMD", "Host        :"),
+	    srp->host->server);
+	if (srp->host->domain)
+		(void) printf("\t%s %s", dgettext("FMD", "Domain      :"),
+		    srp->host->domain);
+	(void) printf("\n%s %s", dgettext("FMD", "Platform    :"),
+	    srp->host->platform);
+	(void) printf("\t%s %s\n\n", dgettext("FMD", "Chassis_id  :"),
+	    srp->host->chassis ? srp->host->chassis : "");
 	if (srp->class)
 		print_name_list(srp->class,
 		    dgettext("FMD", "Fault class :"), NULL, 0, srp->class->pct,
@@ -1539,11 +1571,11 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 			    dgettext("FMD", "Affects     :"), NULL,
 			    full ? 0 : max_display, 0, print_asru_status, full);
 	}
-	if (full || srp->fru == NULL) {
+	if (full || srp->fru == NULL || srp->asru == NULL) {
 		if (srp->resource) {
 			print_name_list(srp->resource,
 			    dgettext("FMD", "Problem in  :"),
-			    NULL, full ? 0 : max_display, 0, print_fru_status,
+			    NULL, full ? 0 : max_display, 0, print_rsrc_status,
 			    full);
 		}
 	}

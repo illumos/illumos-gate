@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -584,7 +584,7 @@ fmd_destroy(fmd_t *dp)
 	fmd_module_lock(dp->d_rmod);
 
 	while ((cp = fmd_list_next(&dp->d_rmod->mod_cases)) != NULL)
-		fmd_case_discard(cp);
+		fmd_case_discard(cp, B_FALSE);
 
 	fmd_module_unlock(dp->d_rmod);
 	fmd_free(dp->d_rmod->mod_stats, sizeof (fmd_modstat_t));

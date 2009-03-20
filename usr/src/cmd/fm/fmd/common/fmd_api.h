@@ -251,6 +251,11 @@ extern uint64_t fmd_event_ena_create(fmd_hdl_t *);
 #define	FMD_XPRT_RDWR		0x3	/* transport is read-write */
 #define	FMD_XPRT_ACCEPT		0x4	/* transport is accepting connection */
 #define	FMD_XPRT_SUSPENDED	0x8	/* transport starts suspended */
+#define	FMD_XPRT_EXTERNAL	0x80	/* xprt is external to a chassis */
+#define	FMD_XPRT_NO_REMOTE_REPAIR 0x100	/* xprt does not allow remote repair */
+#define	FMD_XPRT_CACHE_AS_LOCAL 0x200	/* xprt caches fault as if local */
+#define	FMD_XPRT_HCONLY		0x400	/* xprt only proxies hc-scheme faults */
+#define	FMD_XPRT_HC_PRESENT_ONLY 0x800	/* only locally present hc faults */
 
 extern fmd_xprt_t *fmd_xprt_open(fmd_hdl_t *, uint_t, nvlist_t *, void *);
 extern void fmd_xprt_close(fmd_hdl_t *, fmd_xprt_t *);
@@ -260,6 +265,7 @@ extern void fmd_xprt_suspend(fmd_hdl_t *, fmd_xprt_t *);
 extern void fmd_xprt_resume(fmd_hdl_t *, fmd_xprt_t *);
 extern int fmd_xprt_error(fmd_hdl_t *, fmd_xprt_t *);
 extern nvlist_t *fmd_xprt_translate(fmd_hdl_t *, fmd_xprt_t *, fmd_event_t *);
+extern void fmd_xprt_add_domain(fmd_hdl_t *, nvlist_t *, char *);
 extern void fmd_xprt_setspecific(fmd_hdl_t *, fmd_xprt_t *, void *);
 extern void *fmd_xprt_getspecific(fmd_hdl_t *, fmd_xprt_t *);
 

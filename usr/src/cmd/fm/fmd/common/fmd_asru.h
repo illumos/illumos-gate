@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FMD_ASRU_H
 #define	_FMD_ASRU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <pthread.h>
@@ -100,11 +98,16 @@ typedef struct fmd_asru_link {
 #define	FMD_ASRU_RECREATED	0x20	/* asru recreated by cache replay */
 #define	FMD_ASRU_PRESENT	0x40	/* asru present at last R$ update */
 #define	FMD_ASRU_DEGRADED	0x80	/* asru service is degraded */
+#define	FMD_ASRU_PROXY		0x100	/* asru on proxy */
+#define	FMD_ASRU_PROXY_WITH_ASRU 0x200	/* asru accessible locally on proxy */
+#define	FMD_ASRU_PROXY_EXTERNAL	0x400	/* proxy over external transport */
+#define	FMD_ASRU_PROXY_RDONLY	0x800	/* proxy over readonly transport */
 
 /*
  * Note the following are defined in order of increasing precedence and
  * this should not be changed
  */
+#define	FMD_ASRU_REMOVED	0	/* asru removed */
 #define	FMD_ASRU_ACQUITTED	1	/* asru acquitted */
 #define	FMD_ASRU_REPAIRED	2	/* asru repaired */
 #define	FMD_ASRU_REPLACED	3	/* asru replaced */
@@ -162,10 +165,56 @@ extern void fmd_asru_hash_release(fmd_asru_hash_t *, fmd_asru_t *);
 extern void fmd_asru_hash_delete_case(fmd_asru_hash_t *, fmd_case_t *);
 
 extern void fmd_asru_clear_aged_rsrcs();
+
+/*
+ * flags used in fara_bywhat field in fmd_asru_rep_arg_t
+ */
+#define	FARA_ALL	0
+#define	FARA_BY_CASE	1
+#define	FARA_BY_ASRU	2
+#define	FARA_BY_FRU	3
+#define	FARA_BY_RSRC	4
+#define	FARA_BY_LABEL	5
+
+/*
+ * The following structures are used to pass arguments to the corresponding
+ * function when walking the resource cache by case etc.
+ */
+typedef struct {
+	uint8_t fara_reason;	/* repaired, acquit, replaced, removed */
+	uint8_t fara_bywhat;	/* whether doing a walk by case, asru, etc */
+	int *fara_rval;		/* for return success or failure */
+	char *fara_uuid;	/* uuid can be passed in for comparison */
+} fmd_asru_rep_arg_t;
 extern void fmd_asru_repaired(fmd_asru_link_t *, void *);
-extern void fmd_asru_acquit(fmd_asru_link_t *, void *);
-extern void fmd_asru_replaced(fmd_asru_link_t *, void *);
-extern void fmd_asru_removed(fmd_asru_link_t *);
+
+typedef struct {
+	int	*faus_countp;
+	int	faus_maxcount;
+	uint8_t *faus_ba;		/* received status for each suspect */
+	uint8_t *faus_proxy_asru;	/* asru on proxy for each suspect? */
+	uint8_t *faus_diag_asru;	/* asru on diag for each suspect? */
+	boolean_t	faus_is_proxy;	/* are we on the proxy side? */
+} fmd_asru_update_status_t;
+extern void fmd_asru_update_status(fmd_asru_link_t *alp, void *arg);
+
+typedef struct {
+	int	*fasp_countp;
+	int	fasp_maxcount;
+	uint8_t *fasp_proxy_asru;	/* asru on proxy for each suspect? */
+	int	fasp_proxy_external;	/* is this an external transport? */
+	int	fasp_proxy_rdonly;	/* is this a rdonly transport? */
+} fmd_asru_set_on_proxy_t;
+extern void fmd_asru_set_on_proxy(fmd_asru_link_t *alp, void *arg);
+
+extern void fmd_asru_update_containees(fmd_asru_link_t *alp, void *arg);
+
+typedef struct {
+	int	*facs_countp;
+	int	facs_maxcount;
+} fmd_asru_close_status_t;
+extern void fmd_asru_close_status(fmd_asru_link_t *alp, void *arg);
+
 extern int fmd_asru_setflags(fmd_asru_link_t *, uint_t);
 extern int fmd_asru_clrflags(fmd_asru_link_t *, uint_t, uint8_t);
 extern int fmd_asru_al_getstate(fmd_asru_link_t *);
