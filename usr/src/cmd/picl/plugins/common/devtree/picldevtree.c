@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1870,7 +1870,7 @@ get_cpu_portid(picl_nodehdl_t modh, int *id)
 		return (get_int_propval_by_name(modh, OBP_PROP_CPUID, id));
 	}
 	if (strcmp(mach_name, "i86pc") == 0)
-		return (get_int_propval_by_name(modh, PICL_PROP_INSTANCE, id));
+		return (get_int_propval_by_name(modh, OBP_REG, id));
 
 	return (PICL_FAILURE);
 }
