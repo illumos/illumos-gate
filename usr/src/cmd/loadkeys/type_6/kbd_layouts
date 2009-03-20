@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -30,7 +30,11 @@
 # infomation.
 # To add the new keytable, the new layout name and number need be defined
 # below.
+# 
+# Note: all the entries in this file should be kept in alphabetical
+# order so that the kbd -s presents them in that way.
 #
+
 
 Albanian=264
 Belarusian=261
@@ -42,6 +46,7 @@ Croatian=259
 Czech=5
 Danish=6
 Dutch=18
+Dvorak=273
 Finnish=7
 French=8
 French-Canadian=4
@@ -60,18 +65,18 @@ Macedonian=267
 Malta_UK=263
 Malta_US=262
 Norwegian=19
-Polish=21	
+Polish=21
 Portuguese=22
 Russian=23
 Serbia-And-Montenegro=257
+Slovak=24
 Slovenian=256
-Slovakian=24
 Spanish=25
 Swedish=26
 Swiss-French=27
 Swiss-German=28
 Traditional-Chinese=30
-TurkishQ=31
 TurkishF=35
+TurkishQ=31
 UK-English=32
 US-English=33

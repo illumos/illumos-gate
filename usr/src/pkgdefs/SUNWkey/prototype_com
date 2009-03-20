@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -110,6 +110,7 @@ f none usr/share/lib/keytables/type_6/belgium 444 root bin
 f none usr/share/lib/keytables/type_6/brazil 444 root bin
 f none usr/share/lib/keytables/type_6/czech 444 root bin
 f none usr/share/lib/keytables/type_6/denmark  444 root bin
+f none usr/share/lib/keytables/type_6/dvorak 444 root bin
 f none usr/share/lib/keytables/type_6/finnish 444 root bin
 f none usr/share/lib/keytables/type_6/france 444 root bin
 f none usr/share/lib/keytables/type_6/germany 444 root bin
@@ -185,6 +186,7 @@ l none usr/share/lib/keytables/type_6/layout_107=../../../../../usr/share/lib/ke
 l none usr/share/lib/keytables/type_6/layout_108=../../../../../usr/share/lib/keytables/type_6/albania
 l none usr/share/lib/keytables/type_6/layout_10f=../../../../../usr/share/lib/keytables/type_6/japan
 l none usr/share/lib/keytables/type_6/layout_110=../../../../../usr/share/lib/keytables/type_6/brazil
+l none usr/share/lib/keytables/type_6/layout_111=../../../../../usr/share/lib/keytables/type_6/dvorak
 l none usr/share/lib/keytables/type_6/layout_04=../../../../../usr/share/lib/keytables/type_6/canadian_french
 l none usr/share/lib/keytables/type_6/layout_0a=../../../../../usr/share/lib/keytables/type_6/greece
 l none usr/share/lib/keytables/type_6/layout_0c=../../../../../usr/share/lib/keytables/type_6/hungary

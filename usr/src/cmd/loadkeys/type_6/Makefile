@@ -21,7 +21,7 @@
 #
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/loadkeys/type_6/Makefile
@@ -34,7 +34,7 @@ KEYTABLES = \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
         maltauk albania turkeyq turkeyf latvia lithuania macedonia russia \
-        latinamerica canadian_bilingual brazil
+        latinamerica canadian_bilingual brazil dvorak
 
 KEYTABLESCONFIG = kbd_layouts
 
@@ -55,7 +55,7 @@ LAYOUTS= \
 	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
 	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
 	layout_10f layout_1f layout_23 layout_15 layout_05 layout_11 \
-	layout_03 layout_110
+	layout_03 layout_110 layout_111
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -214,5 +214,8 @@ $(ROOTKEYDIR)/layout_23: $(ROOTKEYDIR)/turkeyf
 
 $(ROOTKEYDIR)/layout_110: $(ROOTKEYDIR)/brazil
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/brazil  $@
+
+$(ROOTKEYDIR)/layout_111: $(ROOTKEYDIR)/dvorak
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/dvorak  $@
 
 include ../../Makefile.targ
