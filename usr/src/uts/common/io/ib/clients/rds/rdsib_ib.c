@@ -769,7 +769,7 @@ rds_post_recv_buf(void *arg)
 		RDS_DPRINTF2(LABEL, "EP(%p): No Recv buffers available", ep);
 		/* try again later */
 		ret = ddi_taskq_dispatch(rds_taskq, rds_post_recv_buf,
-		    (void *)ep->ep_chanhdl, DDI_NOSLEEP);
+		    (void *)chanhdl, DDI_NOSLEEP);
 		if (ret != DDI_SUCCESS) {
 			RDS_DPRINTF2(LABEL, "ddi_taskq_dispatch failed: %d",
 			    ret);
@@ -842,7 +842,7 @@ rds_post_recv_buf(void *arg)
 	if (recvqp->qp_level == 0) {
 		mutex_exit(&recvqp->qp_lock);
 		ret = ddi_taskq_dispatch(rds_taskq,
-		    rds_post_recv_buf, (void *)ep->ep_chanhdl, DDI_NOSLEEP);
+		    rds_post_recv_buf, (void *)chanhdl, DDI_NOSLEEP);
 		if (ret != DDI_SUCCESS) {
 			RDS_DPRINTF2("rds_post_recv_buf",
 			    "ddi_taskq_dispatch failed: %d", ret);
