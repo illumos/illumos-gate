@@ -59,9 +59,9 @@
 
 # Define all global variables (required for strict)
 use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles $SkipDirectBindFiles);
-use vars  qw($SkipUndefFiles $SkipUnusedDirs);
+use vars  qw($SkipUndefFiles $SkipUnusedDeps);
 use vars  qw($SkipStabFiles $SkipNoExStkFiles $SkipCrleConf);
-use vars  qw($SkipUnusedSearchPath $SkipUnrefObject);
+use vars  qw($SkipUnusedSearchPath $SkipUnrefObject $SkipUnusedObject);
 use vars  qw($Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error $Gnuc);
 use vars  qw($UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
 use vars  qw($SkipDirectBindDirs $SkipInterps $SkipSymSort $OldDeps %opt);
@@ -123,10 +123,15 @@ $SkipUndefFiles = qr{ ^(?:
 }x;
 
 # Define any files that have unused dependencies.
-$SkipUnusedDirs = qr{
+$SkipUnusedDeps = qr{
 	lib/picl/plugins/ |		# require devtree dependencies
 	/lib/libp			# profile libc makes libm an unused
 }x;					#	dependency of standard libc
+
+# Define any objects that always look unused.
+$SkipUnusedObject = qr{
+	/libm_hwcap[0-9]+\.so\.2	# libm.so.2 dependency
+}x;
 
 # Define any files that should contain debugging information.
 $SkipStabFiles = qr{ ^(?:
@@ -776,8 +781,10 @@ DYN:
 		# Look for any unused dependencies.
 		if ($UnDep && ($Line =~ /unused/)) {
 			if (!$opt{a}) {
-				if ($RelPath =~ $SkipUnusedDirs) {
-					$UnDep = 0;
+				if ($RelPath =~ $SkipUnusedDeps) {
+					next;
+				}
+				if ($Line =~ $SkipUnusedObject) {
 					next;
 				}
 			}
