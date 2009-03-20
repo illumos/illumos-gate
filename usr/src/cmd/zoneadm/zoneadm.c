@@ -2774,7 +2774,8 @@ verify_details(int cmd_num, char *argv[])
 		zonecfg_fini_handle(handle);
 		return (Z_ERR);
 	}
-	if (validate_zonepath(zonepath, cmd_num) != Z_OK) {
+	if (cmd_num != CMD_ATTACH &&
+	    validate_zonepath(zonepath, cmd_num) != Z_OK) {
 		(void) fprintf(stderr, gettext("could not verify zonepath %s "
 		    "because of the above errors.\n"), zonepath);
 		return_code = Z_ERR;
@@ -4793,6 +4794,16 @@ attach_func(int argc, char *argv[])
 			assert(lockfd == -1);
 			return (Z_OK);
 		}
+	}
+
+	/* Now we can validate that the zonepath exists. */
+	if (validate_zonepath(zonepath, CMD_ATTACH) != Z_OK) {
+		(void) fprintf(stderr, gettext("could not verify zonepath %s "
+		    "because of the above errors.\n"), zonepath);
+
+		assert(zonecfg_lock_file_held(&lockfd));
+		zonecfg_release_lock_file(target_zone, lockfd);
+		return (Z_ERR);
 	}
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
