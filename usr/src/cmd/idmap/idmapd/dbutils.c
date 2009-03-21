@@ -41,6 +41,7 @@
 #include <pthread.h>
 #include <assert.h>
 #include <sys/u8_textprep.h>
+#include <alloca.h>
 
 #include "idmapd.h"
 #include "adutils.h"
@@ -2532,16 +2533,21 @@ ns_lookup_byname(const char *name, const char *lower_name, idmap_id *id)
 {
 	struct passwd	pwd, *pwdp;
 	struct group	grp, *grpp;
-	char		buf[1024];
+	char		*buf;
 	int		errnum;
 	const char	*me = "ns_lookup_byname";
+	static size_t	pwdbufsiz = 0;
+	static size_t	grpbufsiz = 0;
 
 	switch (id->idtype) {
 	case IDMAP_UID:
-		pwdp = getpwnam_r(name, &pwd, buf, sizeof (buf));
+		if (pwdbufsiz == 0)
+			pwdbufsiz = sysconf(_SC_GETPW_R_SIZE_MAX);
+		buf = alloca(pwdbufsiz);
+		pwdp = getpwnam_r(name, &pwd, buf, pwdbufsiz);
 		if (pwdp == NULL && errno == 0 && lower_name != NULL &&
 		    name != lower_name && strcmp(name, lower_name) != 0)
-			pwdp = getpwnam_r(lower_name, &pwd, buf, sizeof (buf));
+			pwdp = getpwnam_r(lower_name, &pwd, buf, pwdbufsiz);
 		if (pwdp == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
@@ -2555,10 +2561,13 @@ ns_lookup_byname(const char *name, const char *lower_name, idmap_id *id)
 		id->idmap_id_u.uid = pwd.pw_uid;
 		break;
 	case IDMAP_GID:
-		grpp = getgrnam_r(name, &grp, buf, sizeof (buf));
+		if (grpbufsiz == 0)
+			grpbufsiz = sysconf(_SC_GETGR_R_SIZE_MAX);
+		buf = alloca(grpbufsiz);
+		grpp = getgrnam_r(name, &grp, buf, grpbufsiz);
 		if (grpp == NULL && errno == 0 && lower_name != NULL &&
 		    name != lower_name && strcmp(name, lower_name) != 0)
-			grpp = getgrnam_r(lower_name, &grp, buf, sizeof (buf));
+			grpp = getgrnam_r(lower_name, &grp, buf, grpbufsiz);
 		if (grpp == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
@@ -2587,13 +2596,18 @@ ns_lookup_bypid(uid_t pid, int is_user, char **unixname)
 {
 	struct passwd	pwd;
 	struct group	grp;
-	char		buf[1024];
+	char		*buf;
 	int		errnum;
 	const char	*me = "ns_lookup_bypid";
+	static size_t	pwdbufsiz = 0;
+	static size_t	grpbufsiz = 0;
 
 	if (is_user) {
+		if (pwdbufsiz == 0)
+			pwdbufsiz = sysconf(_SC_GETPW_R_SIZE_MAX);
+		buf = alloca(pwdbufsiz);
 		errno = 0;
-		if (getpwuid_r(pid, &pwd, buf, sizeof (buf)) == NULL) {
+		if (getpwuid_r(pid, &pwd, buf, pwdbufsiz) == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
 			    "%s: getpwuid_r(%u) failed (%s).",
@@ -2605,8 +2619,11 @@ ns_lookup_bypid(uid_t pid, int is_user, char **unixname)
 		}
 		*unixname = strdup(pwd.pw_name);
 	} else {
+		if (grpbufsiz == 0)
+			grpbufsiz = sysconf(_SC_GETGR_R_SIZE_MAX);
+		buf = alloca(grpbufsiz);
 		errno = 0;
-		if (getgrgid_r(pid, &grp, buf, sizeof (buf)) == NULL) {
+		if (getgrgid_r(pid, &grp, buf, grpbufsiz) == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
 			    "%s: getgrgid_r(%u) failed (%s).",
