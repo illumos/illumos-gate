@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mman.h>
 #include <stdio.h>
@@ -83,13 +81,8 @@ _elf_outsync(int fd, char *p, size_t sz, unsigned int flag)
 {
 	if (flag != 0) {
 		int	err;
-		/*
-		 * The value of MS_SYNC changed from zero to non-zero
-		 * in SunOS 5.7.  This double call covers both cases.
-		 */
-		if ((fd = msync(p, sz, MS_SYNC)) == -1)
-			fd = msync(p, sz, 0);
-		if (fd == -1)
+
+		if ((fd = msync(p, sz, MS_ASYNC)) == -1)
 			err = errno;
 		(void) munmap(p, sz);
 		if (fd == 0)
@@ -98,7 +91,7 @@ _elf_outsync(int fd, char *p, size_t sz, unsigned int flag)
 		return (0);
 	}
 	if ((lseek(fd, 0L, SEEK_SET) == 0) &&
-	    (write(fd, p, sz) == sz) && (fsync(fd) == 0)) {
+	    (write(fd, p, sz) == sz)) {
 		(void) free(p);
 		return (sz);
 	}
