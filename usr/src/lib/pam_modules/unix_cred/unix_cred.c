@@ -261,17 +261,30 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		struct passwd	apwd;
 		char	apwbuf[NSS_BUFLEN_PASSWD];
 
+		errno = 0;
 		if ((rhost == NULL || *rhost == '\0')) {
 			if (adt_load_ttyname(tty, &termid) != 0) {
-				syslog(LOG_AUTH | LOG_ERR,
-				    "pam_unix_cred: cannot load ttyname %m");
+				if (errno != 0)
+					syslog(LOG_AUTH | LOG_ERR,
+					    "pam_unix_cred: cannot load "
+					    "ttyname: %m.");
+				else
+					syslog(LOG_AUTH | LOG_ERR,
+					    "pam_unix_cred: cannot load "
+					    "ttyname.");
 				ret = PAM_SYSTEM_ERR;
 				goto adt_done;
 			}
 		} else {
 			if (adt_load_hostname(rhost, &termid) != 0) {
-				syslog(LOG_AUTH | LOG_ERR,
-				    "pam_unix_cred: cannot load hostname %m");
+				if (errno != 0)
+					syslog(LOG_AUTH | LOG_ERR,
+					    "pam_unix_cred: cannot load "
+					    "hostname: %m.");
+				else
+					syslog(LOG_AUTH | LOG_ERR,
+					    "pam_unix_cred: cannot load "
+					    "hostname.");
 				ret = PAM_SYSTEM_ERR;
 				goto adt_done;
 			}
