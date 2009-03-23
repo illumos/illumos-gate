@@ -202,7 +202,9 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 			 * the socket case.
 			 */
 			if (vp->v_type == VSOCK) {
-				error = sosendfile64(fp, ffp, sfv, count);
+				error = sosendfile64(fp, ffp, sfv,
+				    (ssize32_t *)&cnt);
+				*count += cnt;
 				if (error)
 					return (error);
 				sfv++;
