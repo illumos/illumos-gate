@@ -3705,7 +3705,7 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
 	else
 		io_off = 0;
 	if (len > 0 && ISP2(blksz))
-		io_len = P2ROUNDUP_TYPED(len + (io_off - off), blksz, size_t);
+		io_len = P2ROUNDUP_TYPED(len + (off - io_off), blksz, size_t);
 	else
 		io_len = 0;
 
