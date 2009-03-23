@@ -3709,9 +3709,9 @@ ddi_is_pci_dip(dev_info_t *dip)
  * the ioc, look for minor node dhcp. If not found, pass ":dhcp"
  * to ioc's bus_config entry point.
  */
-static int
-parse_pathname(char *pathname,
-	dev_info_t **dipp, dev_t *devtp, int *spectypep, dev_info_t **pci_dipp)
+int
+resolve_pathname(char *pathname,
+	dev_info_t **dipp, dev_t *devtp, int *spectypep)
 {
 	int			error;
 	dev_info_t		*parent, *child;
@@ -3723,9 +3723,6 @@ parse_pathname(char *pathname,
 	int			spectype;
 	struct ddi_minor_data	*dmn;
 	int			circ;
-
-	if (pci_dipp)
-		*pci_dipp = NULL;
 
 	if (*pathname != '/')
 		return (EINVAL);
@@ -3769,10 +3766,6 @@ parse_pathname(char *pathname,
 			pn_free(&pn);
 			kmem_free(component, MAXNAMELEN);
 			kmem_free(config_name, MAXNAMELEN);
-			if (pci_dipp && *pci_dipp) {
-				ndi_rele_devi(*pci_dipp);
-				*pci_dipp = NULL;
-			}
 			return (-1);
 		}
 
@@ -3780,15 +3773,6 @@ parse_pathname(char *pathname,
 		ndi_rele_devi(parent);
 		parent = child;
 		pn_skipslash(&pn);
-		if (pci_dipp) {
-			if (ddi_is_pci_dip(child)) {
-				ndi_hold_devi(child);
-				if (*pci_dipp != NULL) {
-					ndi_rele_devi(*pci_dipp);
-				}
-				*pci_dipp = child;
-			}
-		}
 	}
 
 	/*
@@ -3806,10 +3790,6 @@ parse_pathname(char *pathname,
 			kmem_free(config_name, MAXNAMELEN);
 			NDI_CONFIG_DEBUG((CE_NOTE,
 			    "%s: minor node not found\n", pathname));
-			if (pci_dipp && *pci_dipp) {
-				ndi_rele_devi(*pci_dipp);
-				*pci_dipp = NULL;
-			}
 			return (-1);
 		}
 		minorname = NULL;	/* look for default minor */
@@ -3868,7 +3848,7 @@ parse_pathname(char *pathname,
 	 */
 	if (dipp != NULL)
 		*dipp = parent;
-	else if (pci_dipp == NULL) {
+	else {
 		/*
 		 * We should really keep the ref count to keep the node from
 		 * detaching but ddi_pathname_to_dev_t() specifies a NULL dipp,
@@ -3884,9 +3864,6 @@ parse_pathname(char *pathname,
 		 * In addition, the callers of this new interfaces would then
 		 * need to call ndi_rele_devi when the reference is complete.
 		 *
-		 * NOTE: If pci_dipp is non-NULL we are only interested
-		 * in the PCI parent which is returned held. No need to hold
-		 * the leaf dip.
 		 */
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, parent,
 		    DDI_NO_AUTODETACH, 1);
@@ -3894,19 +3871,6 @@ parse_pathname(char *pathname,
 	}
 
 	return (0);
-}
-
-int
-resolve_pathname(char *pathname,
-	dev_info_t **dipp, dev_t *devtp, int *spectypep)
-{
-	return (parse_pathname(pathname, dipp, devtp, spectypep, NULL));
-}
-
-int
-ddi_find_pci_parent(char *pathname, dev_info_t **pci_dipp)
-{
-	return (parse_pathname(pathname, NULL, NULL, NULL, pci_dipp));
 }
 
 /*
