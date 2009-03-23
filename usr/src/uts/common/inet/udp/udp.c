@@ -696,7 +696,6 @@ udp_tpi_bind(queue_t *q, mblk_t *mp)
 static void
 udp_tpi_connect(queue_t *q, mblk_t *mp)
 {
-	mblk_t	*mp1;
 	udp_t	*udp;
 	conn_t	*connp = Q_TO_CONN(q);
 	int	error;
@@ -762,44 +761,40 @@ udp_tpi_connect(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-	/*
-	 * We have to send a connection confirmation to
-	 * keep TLI happy.
-	 */
-	if (udp->udp_family == AF_INET) {
-		mp1 = mi_tpi_conn_con(NULL, (char *)sa,
-		    sizeof (sin_t), NULL, 0);
-	} else {
-		mp1 = mi_tpi_conn_con(NULL, (char *)sa,
-		    sizeof (sin6_t), NULL, 0);
-	}
-	if (mp1 == NULL) {
-		udp_err_ack(q, mp, TSYSERR, ENOMEM);
-		return;
-	}
-
-	/*
-	 * Allocate the largest primitive we need to send back
-	 * T_error_ack is > than T_ok_ack
-	 */
-	mp = reallocb(mp, sizeof (struct T_error_ack), 1);
-	if (mp == NULL) {
-		/* Unable to reuse the T_CONN_REQ for the ack. */
-		freemsg(mp1);
-		udp_err_ack_prim(q, mp1, T_CONN_REQ, TSYSERR, ENOMEM);
-		return;
-	}
-
 	error = udp_do_connect(connp, sa, len, cr);
 	if (error != 0) {
-		freeb(mp1);
 		if (error < 0)
 			udp_err_ack(q, mp, -error, 0);
 		else
 			udp_err_ack(q, mp, TSYSERR, error);
 	} else {
+		mblk_t	*mp1;
+		/*
+		 * We have to send a connection confirmation to
+		 * keep TLI happy.
+		 */
+		if (udp->udp_family == AF_INET) {
+			mp1 = mi_tpi_conn_con(NULL, (char *)sa,
+			    sizeof (sin_t), NULL, 0);
+		} else {
+			mp1 = mi_tpi_conn_con(NULL, (char *)sa,
+			    sizeof (sin6_t), NULL, 0);
+		}
+		if (mp1 == NULL) {
+			udp_err_ack(q, mp, TSYSERR, ENOMEM);
+			return;
+		}
+
+		/*
+		 * Send ok_ack for T_CONN_REQ
+		 */
 		mp = mi_tpi_ok_ack_alloc(mp);
-		ASSERT(mp != NULL);
+		if (mp == NULL) {
+			/* Unable to reuse the T_CONN_REQ for the ack. */
+			udp_err_ack_prim(q, mp1, T_CONN_REQ, TSYSERR, ENOMEM);
+			return;
+		}
+
 		putnext(connp->conn_rq, mp);
 		putnext(connp->conn_rq, mp1);
 	}

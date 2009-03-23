@@ -668,7 +668,6 @@ icmp_tpi_connect(queue_t *q, mblk_t *mp)
 			    sizeof (sin6_t), NULL, 0);
 		}
 		if (mp1 == NULL) {
-			rw_exit(&icmp->icmp_rwlock);
 			icmp_err_ack(q, mp, TSYSERR, ENOMEM);
 			return;
 		}
@@ -679,7 +678,6 @@ icmp_tpi_connect(queue_t *q, mblk_t *mp)
 		mp = mi_tpi_ok_ack_alloc(mp);
 		if (mp == NULL) {
 			/* Unable to reuse the T_CONN_REQ for the ack. */
-			freemsg(mp1);
 			icmp_err_ack_prim(q, mp1, T_CONN_REQ, TSYSERR, ENOMEM);
 			return;
 		}
