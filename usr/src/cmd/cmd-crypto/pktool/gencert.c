@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -224,11 +222,57 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 
 	kmfrv = kmf_store_cert(kmfhandle, numattr, attrlist);
 
-
 cleanup:
 	kmf_free_data(&x509DER);
 	kmf_free_dn(&certSubject);
 	kmf_free_dn(&certIssuer);
+
+	/*
+	 * If kmf_sign_cert or kmf_store_cert failed, then we need to clean up
+	 * the key pair from the token.
+	 */
+	if (kmfrv != KMF_OK) {
+		/* delete the public key */
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		numattr++;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEY_HANDLE_ATTR, &pubk, sizeof (KMF_KEY_HANDLE));
+		numattr++;
+
+		if (tokencred != NULL && tokencred->cred != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, tokencred,
+			    sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
+
+		(void) kmf_delete_key_from_keystore(kmfhandle, numattr,
+		    attrlist);
+
+		/* delete the private key */
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		numattr++;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEY_HANDLE_ATTR, &prik, sizeof (KMF_KEY_HANDLE));
+		numattr++;
+
+		if (tokencred != NULL && tokencred->cred != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, tokencred,
+			    sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
+
+		(void) kmf_delete_key_from_keystore(kmfhandle, numattr,
+		    attrlist);
+	}
+
 	return (kmfrv);
 }
 
