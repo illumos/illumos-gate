@@ -9,7 +9,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,8 +55,11 @@ static void add_one_listen_addr(ServerOptions *, char *, u_short);
 /* AF_UNSPEC or AF_INET or AF_INET6 */
 extern int IPv4or6;
 
-/* Initializes the server options to their default values. */
-
+/*
+ * Initializes the server options to their initial (unset) values. Some of those
+ * that stay unset after the command line options and configuration files are
+ * read are set to their default values in fill_default_server_options().
+ */
 void
 initialize_server_options(ServerOptions *options)
 {
@@ -146,6 +149,7 @@ initialize_server_options(ServerOptions *options)
 
 	options->lookup_client_hostnames = -1;
 	options->use_openssl_engine = -1;
+	options->chroot_directory = NULL;
 }
 
 #ifdef HAVE_DEFOPEN
@@ -413,7 +417,7 @@ typedef enum {
 	sHostbasedUsesNameFromPacketOnly, sClientAliveInterval,
 	sClientAliveCountMax, sAuthorizedKeysFile, sAuthorizedKeysFile2,
 	sMaxAuthTries, sMaxAuthTriesLog, sUsePrivilegeSeparation,
-	sLookupClientHostnames, sUseOpenSSLEngine,
+	sLookupClientHostnames, sUseOpenSSLEngine, sChrootDirectory,
 	sDeprecated
 } ServerOpCodes;
 
@@ -509,6 +513,7 @@ static struct {
 	{ "useprivilegeseparation", sUsePrivilegeSeparation},
 	{ "lookupclienthostnames", sLookupClientHostnames},
 	{ "useopensslengine", sUseOpenSSLEngine},
+	{ "chrootdirectory", sChrootDirectory},
 	{ NULL, sBadOption }
 };
 
@@ -574,6 +579,7 @@ process_server_config_line(ServerOptions *options, char *line,
 	char *cp, **charptr, *arg, *p;
 	int *intptr, value, i, n;
 	ServerOpCodes opcode;
+	size_t len;
 
 	cp = line;
 	arg = strdelim(&cp);
@@ -1020,6 +1026,21 @@ parse_flag:
 			fatal("%s line %d: Missing subsystem command.",
 			    filename, linenum);
 		options->subsystem_command[options->num_subsystems] = xstrdup(arg);
+
+		/*
+		 * Collect arguments (separate to executable), including the
+		 * name of the executable, in a way that is easier to parse
+		 * later.
+		 */
+		p = xstrdup(arg);
+		len = strlen(p) + 1;
+		while ((arg = strdelim(&cp)) != NULL && *arg != '\0') {
+			len += 1 + strlen(arg);
+			p = xrealloc(p, len);
+			strlcat(p, " ", len);
+			strlcat(p, arg, len);
+		}
+		options->subsystem_args[options->num_subsystems] = p;
 		options->num_subsystems++;
 		break;
 
@@ -1056,7 +1077,7 @@ parse_flag:
 	 */
 	case sAuthorizedKeysFile:
 	case sAuthorizedKeysFile2:
-		charptr = (opcode == sAuthorizedKeysFile ) ?
+		charptr = (opcode == sAuthorizedKeysFile) ?
 		    &options->authorized_keys_file :
 		    &options->authorized_keys_file2;
 		goto parse_filename;
@@ -1080,9 +1101,21 @@ parse_flag:
 	case sLookupClientHostnames:
 		intptr = &options->lookup_client_hostnames;
 		goto parse_flag;
+
 	case sUseOpenSSLEngine:
 		intptr = &options->use_openssl_engine;
 		goto parse_flag;
+
+	case sChrootDirectory:
+		charptr = &options->chroot_directory;
+
+		arg = strdelim(&cp);
+		if (arg == NULL || *arg == '\0')
+			fatal("%s line %d: missing directory name for "
+			    "ChrootDirectory.", filename, linenum);
+		if (*charptr == NULL)
+			*charptr = xstrdup(arg);
+		break;
 
 	case sDeprecated:
 		log("%s line %d: Deprecated option %s",
@@ -1126,4 +1159,15 @@ read_server_config(ServerOptions *options, const char *filename)
 	if (bad_options > 0)
 		fatal("%s: terminating, %d bad configuration options",
 		    filename, bad_options);
+}
+
+/*
+ * Note that "none" is a special path having the same affect on sshd
+ * configuration as not specifying ChrootDirectory at all.
+ */
+int
+chroot_requested(char *chroot_directory)
+{
+	return (chroot_directory != NULL &&
+	    strcasecmp(chroot_directory, "none") != 0);
 }

@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: misc.c,v 1.19 2002/03/04 17:27:39 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "misc.h"
 #include "log.h"
@@ -436,6 +434,68 @@ freeargs(arglist *args)
 		args->nalloc = args->num = 0;
 		args->list = NULL;
 	}
+}
+
+/*
+ * Expand a string with a set of %[char] escapes. A number of escapes may be
+ * specified as (char *escape_chars, char *replacement) pairs. The list must
+ * be terminated by a NULL escape_char. Returns replaced string in memory
+ * allocated by xmalloc.
+ */
+char *
+percent_expand(const char *string, ...)
+{
+#define EXPAND_MAX_KEYS	16
+	struct {
+		const char *key;
+		const char *repl;
+	} keys[EXPAND_MAX_KEYS];
+	u_int num_keys, i, j;
+	char buf[4096];
+	va_list ap;
+
+	/* Gather keys */
+	va_start(ap, string);
+	for (num_keys = 0; num_keys < EXPAND_MAX_KEYS; num_keys++) {
+		keys[num_keys].key = va_arg(ap, char *);
+		if (keys[num_keys].key == NULL)
+			break;
+		keys[num_keys].repl = va_arg(ap, char *);
+		if (keys[num_keys].repl == NULL)
+			fatal("percent_expand: NULL replacement");
+	}
+	va_end(ap);
+
+	if (num_keys >= EXPAND_MAX_KEYS)
+		fatal("percent_expand: too many keys");
+
+	/* Expand string */
+	*buf = '\0';
+	for (i = 0; *string != '\0'; string++) {
+		if (*string != '%') {
+ append:
+			buf[i++] = *string;
+			if (i >= sizeof(buf))
+				fatal("percent_expand: string too long");
+			buf[i] = '\0';
+			continue;
+		}
+		string++;
+		if (*string == '%')
+			goto append;
+		for (j = 0; j < num_keys; j++) {
+			if (strchr(keys[j].key, *string) != NULL) {
+				i = strlcat(buf, keys[j].repl, sizeof(buf));
+				if (i >= sizeof(buf))
+					fatal("percent_expand: string too long");
+				break;
+			}
+		}
+		if (j >= num_keys)
+			fatal("percent_expand: unknown key %%%c", *string);
+	}
+	return (xstrdup(buf));
+#undef EXPAND_MAX_KEYS
 }
 
 /*

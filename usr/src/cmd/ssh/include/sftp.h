@@ -1,15 +1,3 @@
-/*	$OpenBSD: sftp.h,v 1.4 2002/02/13 00:59:23 djm Exp $	*/
-
-#ifndef	_SFTP_H
-#define	_SFTP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -34,9 +22,18 @@ extern "C" {
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*	$OpenBSD: sftp.h,v 1.4 2002/02/13 00:59:23 djm Exp $	*/
+
 /*
  * draft-ietf-secsh-filexfer-01.txt
  */
+
+#ifndef	_SFTP_H
+#define	_SFTP_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* version */
 #define	SSH2_FILEXFER_VERSION		3
@@ -100,6 +97,10 @@ extern "C" {
 #define SSH2_FX_CONNECTION_LOST		7
 #define SSH2_FX_OP_UNSUPPORTED		8
 #define SSH2_FX_MAX			8
+
+struct passwd;
+
+int	sftp_server_main(int, char **, struct passwd *);
 
 #ifdef __cplusplus
 }

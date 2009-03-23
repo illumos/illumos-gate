@@ -20,18 +20,19 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../Makefile.cmd
 
+# libopenbsd-compat and libssh are used by all SSH binaries, and sftp-server is
+# also used as an internal part of sshd.
 SUBDIRS= \
 	etc \
 	libopenbsd-compat \
 	libssh \
+	sftp-server \
 	.WAIT \
 	ssh \
 	sshd \
@@ -41,7 +42,6 @@ SUBDIRS= \
 	ssh-keygen \
 	ssh-keysign \
 	ssh-keyscan \
-	sftp-server \
 	sftp \
 	ssh-http-proxy-connect \
 	ssh-socks5-proxy-connect

@@ -58,7 +58,7 @@ char *__progname;
 #define get_int()			buffer_get_int(&iqueue);
 #define get_string(lenp)		buffer_get_string(&iqueue, lenp);
 
-static void cleanup_exit(int i);
+void cleanup_exit(int i);
 
 /* Our verbosity */
 LogLevel log_level = SYSLOG_LEVEL_ERROR;
@@ -1195,8 +1195,11 @@ process(void)
 		buffer_consume(&iqueue, msg_len - consumed);
 }
 
-/* Cleanup handler that logs active handles upon normal exit */
-static void
+/*
+ * Cleanup handler that logs active handles upon normal exit. Not static since
+ * sftp-server-main.c file needs that as well.
+ */
+void
 cleanup_exit(int i)
 {
 	if (pw != NULL && client_addr != NULL) {
@@ -1216,7 +1219,7 @@ usage(void)
 }
 
 int
-main(int argc, char **argv)
+sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 {
 	fd_set *rset, *wset;
 	int in, out, max, ch, skipargs = 0, log_stderr = 0;
@@ -1225,9 +1228,6 @@ main(int argc, char **argv)
 	char *cp, buf[4*4096];
 
 	extern char *optarg;
-
-	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
-	sanitise_stdfd();
 
 	__progname = get_progname(argv[0]);
 
@@ -1274,9 +1274,7 @@ main(int argc, char **argv)
 	} else
 		client_addr = xstrdup("UNKNOWN");
 
-	if ((pw = getpwuid(getuid())) == NULL)
-		fatal("No user found for uid %lu", (u_long)getuid());
-	pw = pwcopy(pw);
+	pw = pwcopy(user_pw);
 
 	log("session opened for local user %s from [%s]",
 	    pw->pw_name, client_addr);

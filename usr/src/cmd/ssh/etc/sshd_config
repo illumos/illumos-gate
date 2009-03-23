@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Configuration file for sshd(1m)
@@ -126,7 +126,7 @@ PAMAuthenticationViaKBDInt yes
 PermitRootLogin no
 
 # sftp subsystem
-Subsystem	sftp	/usr/lib/ssh/sftp-server
+Subsystem	sftp	internal-sftp
 
 
 # SSH protocol v1 specific options

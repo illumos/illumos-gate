@@ -11,17 +11,18 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: uidswap.c,v 1.23 2002/07/15 17:15:31 stevesk Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <priv.h>
 
 #include "log.h"
 #include "uidswap.h"
+#include "servconf.h"
 
 /*
  * Note: all these functions must work in all of the following cases:
@@ -164,21 +165,82 @@ restore_uid(void)
 }
 
 /*
- * Permanently sets all uids to the given uid.  This cannot be
- * called while temporarily_use_uid is effective.
+ * Permanently sets all uids to the given uid. This cannot be called while
+ * temporarily_use_uid is effective. Note that when the ChrootDirectory option
+ * is in use we keep a few privileges so that we can call chroot(2) later while
+ * already running under UIDs of a connecting user.
  */
 void
-permanently_set_uid(struct passwd *pw)
+permanently_set_uid(struct passwd *pw, char *chroot_directory)
 {
+	priv_set_t *pset;
+
 	if (temporarily_use_uid_effective)
-		fatal("permanently_set_uid: temporarily_use_uid effective");
-	debug("permanently_set_uid: %u/%u", (u_int)pw->pw_uid,
-	    (u_int)pw->pw_gid);
+		fatal("%s: temporarily_use_uid effective", __func__);
+
+	debug("%s: %u/%u", __func__, (u_int)pw->pw_uid, (u_int)pw->pw_gid);
+
 	if (initgroups(pw->pw_name, pw->pw_gid) < 0)
 		fatal("initgroups: %s: %.100s", pw->pw_name,
 		    strerror(errno));
+
 	if (setgid(pw->pw_gid) < 0)
 		fatal("setgid %u: %.100s", (u_int)pw->pw_gid, strerror(errno));
+
+	/*
+	 * If root is connecting we are done now. Note that we must have called
+	 * setgid() in case that the SSH server was run under a group other than
+	 * root.
+	 */
+	if (pw->pw_uid == 0)
+		return;
+
+	/*
+	 * This means we will keep all privileges after the UID change.
+	 */
+	if (setpflags(PRIV_AWARE, 1) != 0)
+		fatal("setpflags: %s", strerror(errno));
+
+	/* Now we are running under UID of the user. */
 	if (setuid(pw->pw_uid) < 0)
 		fatal("setuid %u: %.100s", (u_int)pw->pw_uid, strerror(errno));
+
+	/*
+	 * We will run with the privileges from the Inheritable set as
+	 * we would have after exec(2) if we had stayed in NPA mode
+	 * before setuid(2) call (see privileges(5), user_attr(4), and
+	 * pam_unix_cred(5)). We want to run with P = E = I, with I as
+	 * set by pam_unix_cred(5). We also add PRIV_PROC_CHROOT,
+	 * obviously, and then PRIV_PROC_FORK and PRIV_PROC_EXEC, since
+	 * those two might have been removed from the I set. Note that
+	 * we are expected to finish the login process without them in
+	 * the I set, the important thing is that those not be passed on
+	 * to a shell or a subsystem later if they were not set in
+	 * pam_unix_cred(5).
+	 */
+	if ((pset = priv_allocset()) == NULL)
+		fatal("priv_allocset: %s", strerror(errno));
+	if (getppriv(PRIV_INHERITABLE, pset) != 0)
+		fatal("getppriv: %s", strerror(errno));
+
+	/* We do not need PRIV_PROC_CHROOT unless chroot()ing. */
+	if (chroot_requested(chroot_directory) &&
+	    priv_addset(pset, PRIV_PROC_CHROOT) == -1) {
+		fatal("%s: priv_addset failed", __func__);
+	}
+
+	if (priv_addset(pset, PRIV_PROC_FORK) == -1 ||
+	    priv_addset(pset, PRIV_PROC_EXEC) == -1) {
+		fatal("%s: priv_addset failed", __func__);
+	}
+
+	/* Set only P; this will also set E. */
+	if (setppriv(PRIV_SET, PRIV_PERMITTED, pset) == -1)
+		fatal("setppriv: %s", strerror(errno));
+
+	/* We don't need the PA flag anymore. */
+	if (setpflags(PRIV_AWARE, 0) == -1)
+		fatal("setpflags: %s", strerror(errno));
+
+	priv_freeset(pset);
 }

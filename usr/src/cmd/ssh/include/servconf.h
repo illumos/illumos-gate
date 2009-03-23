@@ -11,7 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,9 +40,12 @@ extern "C" {
 #define	PERMIT_NO_PASSWD	2
 #define	PERMIT_YES		3
 
+/* Magic name for internal sftp-server */
+#define	INTERNAL_SFTP_NAME	"internal-sftp"
+
 typedef struct {
-	u_int num_ports;
-	u_int ports_from_cmdline;
+	u_int	num_ports;
+	u_int	ports_from_cmdline;
 	u_short ports[MAX_PORTS];	/* Port number to listen on. */
 	char   *listen_addr;		/* Address on which the server listens. */
 	struct addrinfo *listen_addrs;	/* Addresses on which the server listens. */
@@ -116,18 +119,20 @@ typedef struct {
 	int     use_login;	/* If true, login(1) is used */
 	int     compression;	/* If true, compression is allowed */
 	int	allow_tcp_forwarding;
-	u_int num_allow_users;
+
+	u_int	num_allow_users;
 	char   *allow_users[MAX_ALLOW_USERS];
-	u_int num_deny_users;
+	u_int	num_deny_users;
 	char   *deny_users[MAX_DENY_USERS];
-	u_int num_allow_groups;
+	u_int	num_allow_groups;
 	char   *allow_groups[MAX_ALLOW_GROUPS];
-	u_int num_deny_groups;
+	u_int	num_deny_groups;
 	char   *deny_groups[MAX_DENY_GROUPS];
 
-	u_int num_subsystems;
+	u_int	num_subsystems;
 	char   *subsystem_name[MAX_SUBSYSTEMS];
 	char   *subsystem_command[MAX_SUBSYSTEMS];
+	char   *subsystem_args[MAX_SUBSYSTEMS];
 
 	int	max_startups_begin;
 	int	max_startups_rate;
@@ -157,6 +162,7 @@ typedef struct {
 
 	int	lookup_client_hostnames;
 	int	use_openssl_engine;
+	char   *chroot_directory;
 
 }       ServerOptions;
 
@@ -164,6 +170,7 @@ void	 initialize_server_options(ServerOptions *);
 void	 read_server_config(ServerOptions *, const char *);
 void	 fill_default_server_options(ServerOptions *);
 int	 process_server_config_line(ServerOptions *, char *, const char *, int);
+int	 chroot_requested(char *chroot_directory);
 
 #ifdef __cplusplus
 }

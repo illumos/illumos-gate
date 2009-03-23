@@ -1,15 +1,3 @@
-/*	$OpenBSD: uidswap.h,v 1.9 2001/06/26 17:27:25 markus Exp $	*/
-
-#ifndef	_UIDSWAP_H
-#define	_UIDSWAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -22,9 +10,18 @@ extern "C" {
  * called by a name other than "ssh" or "Secure Shell".
  */
 
+/*	$OpenBSD: uidswap.h,v 1.9 2001/06/26 17:27:25 markus Exp $	*/
+
+#ifndef	_UIDSWAP_H
+#define	_UIDSWAP_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void	 temporarily_use_uid(struct passwd *);
 void	 restore_uid(void);
-void	 permanently_set_uid(struct passwd *);
+void	 permanently_set_uid(struct passwd *, char *);
 
 #ifdef __cplusplus
 }

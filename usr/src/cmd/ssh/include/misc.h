@@ -10,7 +10,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -18,8 +18,6 @@
 #define	_MISC_H
 
 /*	$OpenBSD: misc.h,v 1.12 2002/03/19 10:49:35 markus Exp $	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +33,7 @@ char	*cleanhostname(char *);
 char	*hpdelim(char **);
 char	*colon(char *);
 long	 convtime(const char *);
+char	*percent_expand(const char *, ...);
 char	*tohex(const void *, size_t);
 void	 sanitise_stdfd(void);
 int	 get_yes_no_flag(int *option, const char *arg, const char *filename,

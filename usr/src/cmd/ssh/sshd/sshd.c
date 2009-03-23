@@ -1613,8 +1613,15 @@ authenticated:
 	 * contexts.
 	 */
 	debug2("Unprivileged server process dropping privileges");
-	permanently_set_uid(authctxt->pw);
+	permanently_set_uid(authctxt->pw, options.chroot_directory);
 	destroy_sensitive_data();
+
+	/* Just another safety check. */
+	if (getuid() != authctxt->pw->pw_uid || 
+	    geteuid() != authctxt->pw->pw_uid) {
+		fatal("Failed to set uids to %u.", (u_int)authctxt->pw->pw_uid);
+	}
+
 	ssh_gssapi_server_mechs(NULL); /* release cached mechs list */
 	packet_set_server();
 

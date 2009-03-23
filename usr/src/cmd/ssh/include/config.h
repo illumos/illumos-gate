@@ -289,7 +289,7 @@ extern "C" {
 #define	HAVE_GETPAGESIZE 1
 
 /* Define if xauth is found in your path */
-#define	XAUTH_PATH "/usr/openwin/bin/xauth"
+#define	XAUTH_PATH "/usr/X11/bin/xauth"
 
 /* Define if rsh is found in your path */
 #define	RSH_PATH "/usr/bin/rsh"
@@ -352,8 +352,13 @@ extern "C" {
 /* Define if you need to use IP address instead of hostname in $DISPLAY */
 /* #undef IPADDR_IN_DISPLAY */
 
-/* Specify default $PATH */
-#define	USER_PATH "/usr/bin"
+/*
+ * Specify the default $PATH. While /bin is a symbolic link to /usr/bin in
+ * Solaris, to include both of them there may help when users use
+ * ChrootDirectory options with plain SSH connections, without their own shell
+ * profiles.
+ */
+#define	USER_PATH "/usr/bin:/bin"
 
 /* Specify location of ssh.pid */
 #define	_PATH_SSH_PIDDIR "/var/run"

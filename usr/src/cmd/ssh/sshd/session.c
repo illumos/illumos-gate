@@ -48,6 +48,8 @@ RCSID("$OpenBSD: session.c,v 1.150 2002/09/16 19:55:33 stevesk Exp $");
 #include <libgen.h>
 #endif
 
+#include <priv.h>
+
 #include "ssh.h"
 #include "ssh1.h"
 #include "ssh2.h"
@@ -69,6 +71,9 @@ RCSID("$OpenBSD: session.c,v 1.150 2002/09/16 19:55:33 stevesk Exp $");
 #include "serverloop.h"
 #include "canohost.h"
 #include "session.h"
+#include "tildexpand.h"
+#include "misc.h"
+#include "sftp.h"
 
 #ifdef USE_PAM
 #include <security/pam_appl.h>
@@ -113,6 +118,8 @@ static void do_authenticated2(Authctxt *);
 static int  session_pty_req(Session *);
 static int  session_env_req(Session *s);
 static void session_free_env(char ***envp);
+static void safely_chroot(const char *path, uid_t uid);
+static void drop_privs(uid_t uid);
 
 #ifdef USE_PAM
 static void session_do_pam(Session *, int);
@@ -137,9 +144,9 @@ const char *original_command = NULL;
 #define MAX_SESSIONS 10
 Session	sessions[MAX_SESSIONS];
 
-#ifdef WITH_AIXAUTHENTICATE
-char *aixloginmsg;
-#endif /* WITH_AIXAUTHENTICATE */
+#define	SUBSYSTEM_NONE		0
+#define	SUBSYSTEM_EXT		1
+#define	SUBSYSTEM_INT_SFTP	2
 
 #ifdef HAVE_LOGIN_CAP
 login_cap_t *lc;
@@ -545,6 +552,7 @@ do_exec_no_pty(Session *s, const char *command)
 #endif
 	if (pid < 0)
 		packet_disconnect("fork failed: %.100s", strerror(errno));
+
 	s->pid = pid;
 	/* Set interactive/non-interactive mode. */
 	packet_set_interactive(s->display != NULL);
@@ -1315,68 +1323,75 @@ do_nologin(struct passwd *pw)
 	}
 }
 
-/* Set login name, uid, gid, and groups. */
+/* Chroot into ChrootDirectory if the option is set. */
 void
-do_setusercontext(struct passwd *pw)
+chroot_if_needed(struct passwd *pw)
 {
-#ifdef HAVE_CYGWIN
-	if (is_winnt) {
-#else /* HAVE_CYGWIN */
-	if (getuid() == 0 || geteuid() == 0) {
-#endif /* HAVE_CYGWIN */
-#ifdef HAVE_SETPCRED
-		setpcred(pw->pw_name);
-#endif /* HAVE_SETPCRED */
-#ifdef HAVE_LOGIN_CAP
-# ifdef __bsdi__
-		setpgid(0, 0);
-# endif
-		if (setusercontext(lc, pw, pw->pw_uid,
-		    (LOGIN_SETALL & ~LOGIN_SETPATH)) < 0) {
-			perror("unable to set user context");
-			exit(1);
-		}
-#else
-# if defined(HAVE_GETLUID) && defined(HAVE_SETLUID)
-		/* Sets login uid for accounting */
-		if (getluid() == -1 && setluid(pw->pw_uid) == -1)
-			error("setluid: %s", strerror(errno));
-# endif /* defined(HAVE_GETLUID) && defined(HAVE_SETLUID) */
+	char *chroot_path, *tmp;
 
-		if (setlogin(pw->pw_name) < 0)
-			error("setlogin failed: %s", strerror(errno));
-		if (setgid(pw->pw_gid) < 0) {
-			perror("setgid");
-			exit(1);
-		}
-		/* Initialize the group list. */
-		if (initgroups(pw->pw_name, pw->pw_gid) < 0) {
-			perror("initgroups");
-			exit(1);
-		}
-		endgrent();
-# if 0
-# ifdef USE_PAM
-		/*
-		 * PAM credentials may take the form of supplementary groups. 
-		 * These will have been wiped by the above initgroups() call.
-		 * Reestablish them here.
-		 */
-		do_pam_setcred(0);
-# endif /* USE_PAM */
-# endif /* 0 */
-# if defined(WITH_IRIX_PROJECT) || defined(WITH_IRIX_JOBS) || defined(WITH_IRIX_ARRAY)
-		irix_setusercontext(pw);
-#  endif /* defined(WITH_IRIX_PROJECT) || defined(WITH_IRIX_JOBS) || defined(WITH_IRIX_ARRAY) */
-# ifdef _AIX
-		aix_usrinfo(pw);
-# endif /* _AIX */
-		/* Permanently switch to the desired uid. */
-		permanently_set_uid(pw);
-#endif
+	if (chroot_requested(options.chroot_directory)) {
+		tmp = tilde_expand_filename(options.chroot_directory,
+		    pw->pw_uid);
+		chroot_path = percent_expand(tmp, "h", pw->pw_dir,
+		    "u", pw->pw_name, (char *)NULL);
+		safely_chroot(chroot_path, pw->pw_uid);
+		free(tmp);
+		free(chroot_path);
 	}
-	if (getuid() != pw->pw_uid || geteuid() != pw->pw_uid)
-		fatal("Failed to set uids to %u.", (u_int) pw->pw_uid);
+}
+
+/*
+ * Chroot into a directory after checking it for safety: all path components
+ * must be root-owned directories with strict permissions.
+ */
+static void
+safely_chroot(const char *path, uid_t uid)
+{
+	const char *cp;
+	char component[MAXPATHLEN];
+	struct stat st;
+
+	if (*path != '/')
+		fatal("chroot path does not begin at root");
+	if (strlen(path) >= sizeof(component))
+		fatal("chroot path too long");
+
+	/*
+	 * Descend the path, checking that each component is a
+	 * root-owned directory with strict permissions.
+	 */
+	for (cp = path; cp != NULL;) {
+		if ((cp = strchr(cp, '/')) == NULL)
+			strlcpy(component, path, sizeof(component));
+		else {
+			cp++;
+			memcpy(component, path, cp - path);
+			component[cp - path] = '\0';
+		}
+	
+		debug3("%s: checking '%s'", __func__, component);
+
+		if (stat(component, &st) != 0)
+			fatal("%s: stat(\"%s\"): %s", __func__,
+			    component, strerror(errno));
+		if (st.st_uid != 0 || (st.st_mode & 022) != 0)
+			fatal("bad ownership or modes for chroot "
+			    "directory %s\"%s\"", 
+			    cp == NULL ? "" : "component ", component);
+		if (!S_ISDIR(st.st_mode))
+			fatal("chroot path %s\"%s\" is not a directory",
+			    cp == NULL ? "" : "component ", component);
+	}
+
+	if (chdir(path) == -1)
+		fatal("Unable to chdir to chroot path \"%s\": "
+		    "%s", path, strerror(errno));
+	if (chroot(path) == -1)
+		fatal("chroot(\"%s\"): %s", path, strerror(errno));
+	if (chdir("/") == -1)
+		fatal("%s: chdir(/) after chroot: %s",
+		    __func__, strerror(errno));
+	verbose("Changed root directory to \"%s\"", path);
 }
 
 static void
@@ -1405,12 +1420,13 @@ launch_login(struct passwd *pw, const char *hostname)
  * environment, closing extra file descriptors, setting the user and group
  * ids, and executing the command or shell.
  */
+#define ARGV_MAX 10
 void
 do_child(Session *s, const char *command)
 {
 	extern char **environ;
 	char **env;
-	char *argv[10];
+	char *argv[ARGV_MAX];
 	const char *shell, *shell0, *hostname = NULL;
 	struct passwd *pw = s->pw;
 
@@ -1430,14 +1446,8 @@ do_child(Session *s, const char *command)
 	 * switch, so we let login(1) to this for us.
 	 */
 	if (!options.use_login) {
-#ifdef HAVE_OSF_SIA
-		session_setup_sia(pw->pw_name, s->ttyfd == -1 ? NULL : s->tty);
-		if (!check_quietlogin(s, command))
-			do_motd();
-#else /* HAVE_OSF_SIA */
 		do_nologin(pw);
-		do_setusercontext(pw);
-#endif /* HAVE_OSF_SIA */
+		chroot_if_needed(pw);
 	}
 
 	/*
@@ -1507,15 +1517,13 @@ do_child(Session *s, const char *command)
 	}
 #endif /* AFS */
 
-	/* Change current directory to the user\'s home directory. */
+	/* Change current directory to the user's home directory. */
 	if (chdir(pw->pw_dir) < 0) {
-		fprintf(stderr,
-		    gettext("Could not chdir to home directory %s: %s\n"),
-		    pw->pw_dir, strerror(errno));
-#ifdef HAVE_LOGIN_CAP
-		if (login_getcapbool(lc, "requirehome", 0))
-			exit(1);
-#endif
+		/* Suppress missing homedir warning for chroot case */
+		if (!chroot_requested(options.chroot_directory))
+			fprintf(stderr, "Could not chdir to home "
+			    "directory %s: %s\n", pw->pw_dir,
+			    strerror(errno));
 	}
 
 	if (!options.use_login)
@@ -1523,6 +1531,29 @@ do_child(Session *s, const char *command)
 
 	/* restore SIGPIPE for child */
 	signal(SIGPIPE,  SIG_DFL);
+
+	if (s->is_subsystem == SUBSYSTEM_INT_SFTP) {
+		int i;
+		char *p, *args;
+		extern int optind, optreset;
+
+		/* This will set the E/P sets here, simulating exec(2). */
+		drop_privs(pw->pw_uid);
+
+		setproctitle("%s@internal-sftp-server", s->pw->pw_name);
+		args = xstrdup(command ? command : "sftp-server");
+
+		i = 0;
+		for ((p = strtok(args, " ")); p != NULL; (p = strtok(NULL, " "))) {
+			if (i < ARGV_MAX - 1)
+				argv[i++] = p;
+		}
+
+		argv[i] = NULL;
+		optind = optreset = 1;
+		__progname = argv[0];
+		exit(sftp_server_main(i, argv, s->pw));
+	}
 
 	if (options.use_login) {
 		launch_login(pw, hostname);
@@ -1809,22 +1840,50 @@ session_subsystem_req(Session *s)
 	struct stat st;
 	u_int len;
 	int success = 0;
-	char *cmd, *subsys = packet_get_string(&len);
-	int i;
+	char *prog, *cmd, *subsys = packet_get_string(&len);
+	u_int i;
 
 	packet_check_eom();
 	log("subsystem request for %.100s", subsys);
 
 	for (i = 0; i < options.num_subsystems; i++) {
 		if (strcmp(subsys, options.subsystem_name[i]) == 0) {
-			cmd = options.subsystem_command[i];
-			if (stat(cmd, &st) < 0) {
-				error("subsystem: cannot stat %s: %s", cmd,
+			prog = options.subsystem_command[i];
+			cmd = options.subsystem_args[i];
+			if (strcmp(INTERNAL_SFTP_NAME, prog) == 0) {
+				s->is_subsystem = SUBSYSTEM_INT_SFTP;
+			/*
+			 * We must stat(2) the subsystem before we chroot in
+			 * order to be able to send a proper error message.
+			 */
+			} else if (chroot_requested(options.chroot_directory)) {
+				char chdirsub[MAXPATHLEN];
+
+				strlcpy(chdirsub, options.chroot_directory,
+				    sizeof (chdirsub));
+				strlcat(chdirsub, "/", sizeof (chdirsub));
+				strlcat(chdirsub, prog, sizeof (chdirsub));
+				if (stat(chdirsub, &st) < 0) {
+					error("subsystem: cannot stat %s under "
+					    "chroot directory %s: %s", prog,
+					    options.chroot_directory,
+					    strerror(errno));
+					if (strcmp(subsys, "sftp") == 0)
+						error("subsystem: please see "
+						    "the Subsystem option in "
+						    "sshd_config(4) for an "
+						    "explanation of '%s'.",
+						    INTERNAL_SFTP_NAME);
+					break;
+				}
+			} else if (stat(prog, &st) < 0) {
+				error("subsystem: cannot stat %s: %s", prog,
 				    strerror(errno));
 				break;
+			} else {
+				s->is_subsystem = SUBSYSTEM_EXT;
 			}
 			debug("subsystem: exec() %s", cmd);
-			s->is_subsystem = 1;
 			do_exec(s, cmd);
 			success = 1;
 			break;
@@ -2629,4 +2688,41 @@ static void
 do_authenticated2(Authctxt *authctxt)
 {
 	server_loop2(authctxt);
+}
+
+/*
+ * Drop the privileges. We need this for the in-process SFTP server only. For
+ * the shell and the external subsystem the exec(2) call will do the P = E = I
+ * assignment itself. Never change the privileges if the connecting user is
+ * root. See privileges(5) if the terminology used here is not known to you.
+ */
+static void
+drop_privs(uid_t uid)
+{
+	priv_set_t *priv_inherit;
+
+	/* If root is connecting we are done. */
+	if (uid == 0)
+		return;
+
+	if ((priv_inherit = priv_allocset()) == NULL)
+		fatal("priv_allocset: %s", strerror(errno));
+	if (getppriv(PRIV_INHERITABLE, priv_inherit) != 0)
+		fatal("getppriv: %s", strerror(errno));
+
+	/*
+	 * This will limit E as well. Note that before this P was a
+	 * superset of I, see permanently_set_uid().
+	 */
+	if (setppriv(PRIV_SET, PRIV_PERMITTED, priv_inherit) == -1)
+		fatal("setppriv: %s", strerror(errno));
+
+	priv_freeset(priv_inherit);
+
+	/*
+	 * By manipulating the P set above we entered a PA mode which we
+	 * do not need to retain in.
+	 */
+	if (setpflags(PRIV_AWARE, 0) == -1)
+		fatal("setpflags: %s", strerror(errno));
 }

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/ssh/sshd/Makefile
@@ -56,12 +56,13 @@ OBJS	= sshd.o \
 	  groupaccess.o \
 	  gss-serv.o \
 	  loginrec.o \
-	  md5crypt.o \
 	  servconf.o \
 	  serverloop.o \
 	  session.o \
 	  sshlogin.o \
-	  sshpty.o
+	  sshpty.o \
+	  ../sftp-server/sftp-server.o
+
 SRCS	= $(OBJS:.o=.c)
 
 include ../../Makefile.cmd
