@@ -104,6 +104,7 @@ check_for_login_inactivity(
 			    "pam_unix_acct: pam_sm_acct_mgmt: "
 			    "can't obtain last login info on uid %d "
 			    "(uid too large)", pw_uid);
+			(void) close(fdl);
 			return (0);
 		}
 
