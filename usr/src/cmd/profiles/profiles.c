@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +41,6 @@
 #define	EXIT_FATAL	1
 #define	EXIT_NON_FATAL	2
 
-#define	MAX_LINE_LEN	80		/* max 80 chars per line of output */
 #define	TMP_BUF_LEN	2048		/* size of temp string buffer */
 
 #define	PRINT_DEFAULT	0x0000
@@ -60,11 +57,11 @@
 static void usage();
 static int show_profs(char *, int);
 static int list_profs(userattr_t *, int);
-static void print_profs_long(void *, int);
+static void print_profs_long(execattr_t *);
 static void print_profs(char **, int, int);
-static void format_attr(int *, int, char *);
 static void getProfiles(char *, char **, int *);
 static void getDefaultProfiles(char *, char **, int *);
+static void print_profile_privs(const char *);
 
 static char *progname = "profiles";
 
@@ -96,11 +93,15 @@ main(int argc, char *argv[])
 		status = show_profs(NULL, print_flag);
 	} else {
 		do {
-			(void) printf("\n%s :\n", *argv);
+			(void) printf("%s:\n", *argv);
 			status = show_profs((char *)*argv,
 			    (print_flag | PRINT_NAME));
 			if (status == EXIT_FATAL) {
 				break;
+			}
+			if (argv[1] != NULL) {
+				/* seperate users with empty line */
+				(void) printf("\n");
 			}
 		} while (*++argv);
 	}
@@ -130,7 +131,7 @@ show_profs(char *username, int print_flag)
 		username = pw->pw_name;
 	} else if (getpwnam(username) == NULL) {
 		status = EXIT_NON_FATAL;
-		(void) fprintf(stderr, "%s: %s : ", progname, username);
+		(void) fprintf(stderr, "%s: %s: ", progname, username);
 		(void) fprintf(stderr, gettext("No such user\n"));
 		return (status);
 	}
@@ -145,7 +146,7 @@ show_profs(char *username, int print_flag)
 				if (print_flag & PRINT_LONG) {
 					exec = getexecuser(username, KV_COMMAND,
 					    NULL, GET_ALL);
-					print_profs_long(exec, print_flag);
+					print_profs_long(exec);
 					free_execattr(exec);
 				} else {
 					print_profs(profArray, print_flag,
@@ -156,7 +157,7 @@ show_profs(char *username, int print_flag)
 	}
 
 	if (status == EXIT_NON_FATAL) {
-		(void) fprintf(stderr, "%s: %s : ", progname, username);
+		(void) fprintf(stderr, "%s: %s: ", progname, username);
 		(void) fprintf(stderr, gettext("No profiles\n"));
 	}
 
@@ -191,7 +192,7 @@ list_profs(userattr_t *user, int print_flag)
 	}
 	if (status == EXIT_OK) {
 		if (print_flag & PRINT_LONG) {
-			print_profs_long(exec, print_flag);
+			print_profs_long(exec);
 			free_execattr(exec);
 		} else {
 			print_profs(profArray, print_flag, profcnt);
@@ -203,79 +204,79 @@ list_profs(userattr_t *user, int print_flag)
 }
 
 
+/*
+ * print extended profile information.
+ *
+ * output is "pretty printed" like
+ *   [6spaces]Profile Name1[ possible profile privileges]
+ *   [10spaces  ]execname1 [skip to ATTR_COL]exec1 attributes1
+ *   [      spaces to ATTR_COL              ]exec1 attributes2
+ *   [10spaces  ]execname2 [skip to ATTR_COL]exec2 attributes1
+ *   [      spaces to ATTR_COL              ]exec2 attributes2
+ *   [6spaces]Profile Name2[ possible profile privileges]
+ *   etc
+ */
+/*
+ * ATTR_COL is based on
+ *   10 leading spaces +
+ *   25 positions for the executable +
+ *    1 space seperating the execname from the attributes
+ * so attribute printing starts at column 37 (36 whitespaces)
+ *
+ *  25 spaces for the execname seems reasonable since currently
+ *  less than 3% of the shipped exec_attr would overflow this
+ */
+#define	ATTR_COL	37
+
 static void
-print_profs_long(void *data, int print_flag)
+print_profs_long(execattr_t *exec)
 {
+	char	*curprofile;
+	int	len;
+	kv_t	*kv_pair;
+	char	*key;
+	char	*val;
+	int	i;
 
-	int		i;
-	int		len;
-	int		outlen;
-	char		tmpstr[TMP_BUF_LEN];
-	char		*lastname = "";
-	char		*key;
-	char		*val;
-	kv_t		*kv_pair;
-	execattr_t	*exec;
-
-	if (!(print_flag & PRINT_NAME)) {
-		(void) printf("\n");
-	}
-	exec = (execattr_t *)data;
-	while (exec != (execattr_t *)NULL) {
-		if (strcmp(exec->name, lastname) != NULL) {
-			(void) snprintf(tmpstr, sizeof (tmpstr),
-			    "      %s:", exec->name);
-			(void) printf("%s\n", tmpstr);
-		}
-		(void) snprintf(tmpstr, sizeof (tmpstr),
-		    "          %s    ", exec->id);
-		outlen = strlen(tmpstr);
-		len = outlen;
-		(void) printf("%s", tmpstr);
-		if ((exec->attr == NULL) ||
-		    (kv_pair = exec->attr->data) == NULL) {
+	for (curprofile = ""; exec != NULL; exec = exec->next) {
+		/* print profile name if it is a new one */
+		if (strcmp(curprofile, exec->name) != 0) {
+			curprofile = exec->name;
+			(void) printf("      %s", curprofile);
+			print_profile_privs(curprofile);
 			(void) printf("\n");
-			lastname = exec->name;
-			exec = exec->next;
+		}
+		len = printf("          %s ", exec->id);
+
+		if ((exec->attr == NULL || exec->attr->data == NULL)) {
+			(void) printf("\n");
 			continue;
 		}
+
+		/*
+		 * if printing the name of the executable got us past the
+		 * ATTR_COLth column, skip to ATTR_COL on a new line to
+		 * print the attribues.
+		 * else, just skip to ATTR_COL column.
+		 */
+		if (len >= ATTR_COL)
+			(void) printf("\n%*s", ATTR_COL, " ");
+		else
+			(void) printf("%*s", ATTR_COL-len, " ");
+		len = ATTR_COL;
+
+		/* print all attributes of this profile */
+		kv_pair = exec->attr->data;
 		for (i = 0; i < exec->attr->length; i++) {
 			key = kv_pair[i].key;
 			val = kv_pair[i].value;
-			if ((key == NULL) || (val == NULL)) {
+			if (key == NULL || val == NULL)
 				break;
-			}
-			if (i > 0) {
-				(void) strlcpy(tmpstr, ", ", TMP_BUF_LEN);
-				format_attr(&outlen, len, tmpstr);
-			}
-			(void) snprintf(tmpstr, sizeof (tmpstr), "%s=%s",
-			    key, val);
-			format_attr(&outlen, len, tmpstr);
+			/* align subsequent attributes on the same column */
+			if (i > 0)
+				(void) printf("%*s", len, " ");
+			(void) printf("%s=%s\n", key, val);
 		}
-		(void) printf("\n");
-		lastname = exec->name;
-		exec = exec->next;
-	}
-}
-
-
-static void
-format_attr(int *outlen, int len, char *str)
-{
-	int newline = 0;
-
-	if ((MAX_LINE_LEN - *outlen) < strlen(str)) {
-		newline = 1;
-	}
-	if (newline) {
-		(void) printf("\n");
-		len += strlen(str);
-		(void) printf("%*s", len, str);
-		*outlen = len;
-	} else {
-		*outlen += strlen(str);
-		(void) printf("%s", str);
 	}
 }
 
@@ -302,6 +303,20 @@ getProfiles(char *profiles, char **profArray, int *profcnt) {
 }
 
 static void
+print_profile_privs(const char *profile)
+{
+	profattr_t *prof_entry = getprofnam(profile);
+	char *privs;
+
+	if (prof_entry) {
+		privs = kva_match(prof_entry->attr, PROFATTR_PRIVS_KW);
+		if (privs)
+			(void) printf(" privs=%s", privs);
+		free_profattr(prof_entry);
+	}
+}
+
+static void
 print_profs(char **profnames, int print_flag, int profcnt)
 {
 
@@ -313,7 +328,9 @@ print_profs(char **profnames, int print_flag, int profcnt)
 	}
 
 	for (i = 0; i < profcnt; i++) {
-		(void) printf("%s%s\n", indent, profnames[i]);
+		(void) printf("%s%s", indent, profnames[i]);
+		print_profile_privs(profnames[i]);
+		(void) printf("\n");
 	}
 
 	free_proflist(profnames, profcnt);
