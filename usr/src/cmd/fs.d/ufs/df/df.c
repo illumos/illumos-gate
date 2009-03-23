@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * df
@@ -284,6 +283,10 @@ main(int argc, char *argv[])
 		char **devnames;
 		char *cp;
 
+		/* Arguments are processed till optind, adjust the pointers */
+		argv += optind;
+		argc -= optind;
+
 		/*
 		 * Obtain stat64 information for each argument before
 		 * constructing the list of mounted file systems.  This
@@ -292,8 +295,6 @@ main(int argc, char *argv[])
 		 * corresponding mount table entries will exist when
 		 * we look for them.
 		 */
-		argv++;
-		argc--;
 		argstat = (struct stat64 *)xmalloc(argc * sizeof (*argstat));
 		devnames = (char **)xmalloc(argc * sizeof (char *));
 		for (i = 0; i < argc; i++) {
@@ -511,8 +512,9 @@ dfreedev(char *file)
 			(void) printf("%8ld", sblock.fs_cstotal.cs_nifree);
 		} else {
 			show_inode_usage(
-		(fsfilcnt64_t)sblock.fs_ncg * (fsfilcnt64_t)sblock.fs_ipg,
-			(fsfilcnt64_t)sblock.fs_cstotal.cs_nifree);
+			    (fsfilcnt64_t)sblock.fs_ncg *
+			    (fsfilcnt64_t)sblock.fs_ipg,
+			    (fsfilcnt64_t)sblock.fs_cstotal.cs_nifree);
 		}
 	} else {
 		totalblks = (fsblkcnt64_t)sblock.fs_dsize;
@@ -526,7 +528,7 @@ dfreedev(char *file)
 		avail = availblks > used ? availblks - used : (fsblkcnt64_t)0;
 		if (bflag) {
 			(void) printf("%8lld\n", dbtok(avail,
-					(fsblkcnt64_t)sblock.fs_fsize));
+			    (fsblkcnt64_t)sblock.fs_fsize));
 		} else {
 			(void) printf(" %7lld %7lld %7lld",
 			    dbtok(totalblks, (fsblkcnt64_t)sblock.fs_fsize),
@@ -539,7 +541,7 @@ dfreedev(char *file)
 		}
 		if (tflag) {
 			t_totalblks += dbtok(totalblks,
-					(fsblkcnt64_t)sblock.fs_fsize);
+			    (fsblkcnt64_t)sblock.fs_fsize);
 			t_used += dbtok(used, (fsblkcnt64_t)sblock.fs_fsize);
 			t_avail += dbtok(avail, (fsblkcnt64_t)sblock.fs_fsize);
 			t_free += free;
@@ -598,13 +600,13 @@ dfreemnt(char *file, struct mnttab *mnt)
 				avail = 0;
 			if (bflag) {
 				(void) printf("%8lld\n", dbtok(avail,
-				(fsblkcnt64_t)fs.f_frsize));
+				    (fsblkcnt64_t)fs.f_frsize));
 			} else {
 				(void) printf(" %7lld %7lld %7lld",
-				dbtok(totalblks,
-				(fsblkcnt64_t)fs.f_frsize),
-				dbtok(used, (fsblkcnt64_t)fs.f_frsize),
-				dbtok(avail, (fsblkcnt64_t)fs.f_frsize));
+				    dbtok(totalblks,
+				    (fsblkcnt64_t)fs.f_frsize),
+				    dbtok(used, (fsblkcnt64_t)fs.f_frsize),
+				    dbtok(avail, (fsblkcnt64_t)fs.f_frsize));
 				totalblks -= reserved;
 				(void) printf("%6.0f%%",
 				    totalblks == 0 ? 0.0 :
@@ -615,9 +617,9 @@ dfreemnt(char *file, struct mnttab *mnt)
 				    (fsblkcnt64_t)fs.f_bsize);
 				t_reserved += reserved;
 				t_used += dbtok(used,
-						(fsblkcnt64_t)fs.f_frsize);
+				    (fsblkcnt64_t)fs.f_frsize);
 				t_avail += dbtok(avail,
-						(fsblkcnt64_t)fs.f_frsize);
+				    (fsblkcnt64_t)fs.f_frsize);
 				t_free += free;
 				}
 			}
@@ -1074,11 +1076,11 @@ print_totals()
 	 * columns as the original items.
 	 */
 	(void) printf(gettext("Totals              %8lld %7lld %7lld"),
-		t_totalblks, t_used, t_avail);
+	    t_totalblks, t_used, t_avail);
 	(void) printf("%6.0f%%\n",
 	    (t_totalblks - t_reserved) == (fsblkcnt64_t)0 ?
-		0.0 :
-		(double)t_used / (double)(t_totalblks - t_reserved) * 100.0);
+	    0.0 :
+	    (double)t_used / (double)(t_totalblks - t_reserved) * 100.0);
 }
 
 void
