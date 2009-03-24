@@ -314,12 +314,14 @@ plat_ttypath(int inum)
 	if ((dip = devnamesp[major].dn_head) == NULL)
 		return (NULL);
 
-	while (inum-- > 0) {
-		if ((dip = ddi_get_next(dip)) == NULL)
+	for (; dip != NULL; dip = ddi_get_next(dip)) {
+		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
 			return (NULL);
-	}
 
-	if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
+		if (DEVI(dip)->devi_minor->ddm_name[0] == ('a' + (char)inum))
+			break;
+	}
+	if (dip == NULL)
 		return (NULL);
 
 	(void) ddi_pathname(dip, path);
