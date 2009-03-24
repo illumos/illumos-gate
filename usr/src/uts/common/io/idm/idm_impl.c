@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 		break;
 	case ISCSI_OP_ASYNC_EVENT:
 		async_evt = (iscsi_async_evt_hdr_t *)pdu->isp_hdr;
-		switch (async_evt->opcode) {
+		switch (async_evt->async_event) {
 		case ISCSI_ASYNC_EVENT_REQUEST_LOGOUT:
 			idm_conn_rx_pdu_event(ic, CE_ASYNC_LOGOUT_RCV,
 			    (uintptr_t)pdu);
@@ -330,6 +330,13 @@ idm_svc_conn_create(idm_svc_t *is, idm_transport_type_t tt,
 	idm_conn_t	*ic;
 	idm_status_t	rc;
 
+	mutex_enter(&is->is_mutex);
+	if (!is->is_online) {
+		mutex_exit(&is->is_mutex);
+		return (IDM_STATUS_FAIL);
+	}
+	mutex_exit(&is->is_mutex);
+
 	ic = idm_conn_create_common(CONN_TYPE_TGT, tt,
 	    &is->is_svc_req.sr_conn_ops);
 	ic->ic_svc_binding = is;
@@ -350,7 +357,7 @@ idm_svc_conn_create(idm_svc_t *is, idm_transport_type_t tt,
 	idm.idm_tgt_conn_count++;
 	mutex_exit(&idm.idm_global_mutex);
 
-	return (0);
+	return (IDM_STATUS_SUCCESS);
 }
 
 void
@@ -360,8 +367,6 @@ idm_svc_conn_destroy(idm_conn_t *ic)
 	list_remove(&idm.idm_tgt_conn_list, ic);
 	idm.idm_tgt_conn_count--;
 	mutex_exit(&idm.idm_global_mutex);
-
-	idm_conn_sm_fini(ic);
 
 	if (ic->ic_transport_private != NULL) {
 		ic->ic_transport_ops->it_tgt_conn_destroy(ic);
@@ -415,6 +420,7 @@ idm_conn_create_common(idm_conn_type_t conn_type, idm_transport_type_t tt,
 void
 idm_conn_destroy_common(idm_conn_t *ic)
 {
+	idm_conn_sm_fini(ic);
 	idm_refcnt_destroy(&ic->ic_refcnt);
 	cv_destroy(&ic->ic_cv);
 	mutex_destroy(&ic->ic_mutex);
@@ -515,6 +521,25 @@ idm_transport_setup(ldi_ident_t li)
 					it->it_ldi_hdl = NULL;
 				}
 			}
+		}
+	}
+}
+
+void
+idm_transport_teardown()
+{
+	idm_transport_type_t	type;
+	idm_transport_t		*it;
+
+	ASSERT(mutex_owned(&idm.idm_global_mutex));
+
+	/* Caller holds the IDM global mutex */
+	for (type = 0; type < IDM_TRANSPORT_NUM_TYPES; type++) {
+		it = &idm_transport_list[type];
+		/* If we have an open LDI handle on this driver, close it */
+		if (it->it_ldi_hdl != NULL) {
+			(void) ldi_close(it->it_ldi_hdl, FNDELAY, kcred);
+			it->it_ldi_hdl = NULL;
 		}
 	}
 }
@@ -933,6 +958,12 @@ idm_task_destructor(void *hdl, void *arg)
 	list_destroy(&idt->idt_inbufv);
 	list_destroy(&idt->idt_outbufv);
 
+	/*
+	 * The final call to idm_task_rele may happen with the task
+	 * mutex held which may invoke this destructor immediately.
+	 * Stall here until the task mutex owner lets go.
+	 */
+	mutex_enter(&idt->idt_mutex);
 	mutex_destroy(&idt->idt_mutex);
 }
 

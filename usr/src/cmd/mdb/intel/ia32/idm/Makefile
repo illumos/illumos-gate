@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,9 +29,11 @@ MDBTGT = kvm
 MODSRCS = idm.c
 
 ISCSITBASE = ../../../../../uts/common/io/comstar/port/iscsit
+ISCSIBASE = ../../../../../uts/common/io/scsi/adapters/iscsi
 
 include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
 
 CPPFLAGS += -I$(ISCSITBASE)
+CPPFLAGS += -I$(ISCSIBASE)

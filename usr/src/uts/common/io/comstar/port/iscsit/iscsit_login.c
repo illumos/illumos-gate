@@ -348,6 +348,15 @@ iscsit_login_sm_event_locked(iscsit_conn_t *ict, iscsit_login_event_t event,
 			    SAS_ISCSIT_LOGIN, (int)lsm->icl_login_state,
 			    (int)ctx->le_ctx_event, (uintptr_t)pdu);
 
+			/*
+			 * If the lsm is in a terminal state, just drain
+			 * any remaining events.
+			 */
+			if ((lsm->icl_login_state == ILS_LOGIN_ERROR) ||
+			    (lsm->icl_login_state == ILS_LOGIN_DONE)) {
+				kmem_free(ctx, sizeof (*ctx));
+				continue;
+			}
 			mutex_exit(&lsm->icl_mutex);
 			login_sm_event_dispatch(lsm, ict, ctx);
 			mutex_enter(&lsm->icl_mutex);
@@ -414,6 +423,7 @@ login_sm_event_dispatch(iscsit_conn_login_t *lsm, iscsit_conn_t *ict,
 			login_sm_build_login_response(ict);
 			login_sm_send_next_response(ict);
 			idm_pdu_complete(pdu, IDM_STATUS_SUCCESS);
+			kmem_free(ctx, sizeof (*ctx));
 			return;
 		}
 		break;
@@ -1538,19 +1548,19 @@ login_sm_set_auth(iscsit_conn_t *ict)
 	if (strcmp(chapuser, "") == 0) {
 		(void) strlcpy(lsm->icl_auth.ca_ini_chapuser,
 		    lsm->icl_initiator_name,
-		    min(iscsiAuthStringMaxLength, MAX_ISCSI_NODENAMELEN));
+		    min(iscsitAuthStringMaxLength, MAX_ISCSI_NODENAMELEN));
 	} else {
 		(void) strlcpy(lsm->icl_auth.ca_ini_chapuser, chapuser,
-		    iscsiAuthStringMaxLength);
+		    iscsitAuthStringMaxLength);
 	}
 	if ((lsm->icl_target_name != NULL) &&
 	    (strcmp(targetchapuser, "") == 0)) {
 		(void) strlcpy(lsm->icl_auth.ca_tgt_chapuser,
 		    lsm->icl_target_name,
-		    min(iscsiAuthStringMaxLength, MAX_ISCSI_NODENAMELEN));
+		    min(iscsitAuthStringMaxLength, MAX_ISCSI_NODENAMELEN));
 	} else {
 		(void) strlcpy(lsm->icl_auth.ca_tgt_chapuser,
-		    targetchapuser, iscsiAuthStringMaxLength);
+		    targetchapuser, iscsitAuthStringMaxLength);
 	}
 
 	/*
@@ -1561,8 +1571,8 @@ login_sm_set_auth(iscsit_conn_t *ict)
 		lsm->icl_auth.ca_ini_chapsecretlen = 0;
 	} else {
 		if (iscsi_base64_str_to_binary(chapsecret,
-		    strnlen(chapsecret, iscsiAuthStringMaxLength),
-		    lsm->icl_auth.ca_ini_chapsecret, iscsiAuthStringMaxLength,
+		    strnlen(chapsecret, iscsitAuthStringMaxLength),
+		    lsm->icl_auth.ca_ini_chapsecret, iscsitAuthStringMaxLength,
 		    &lsm->icl_auth.ca_ini_chapsecretlen) != 0) {
 			cmn_err(CE_WARN, "Corrupted CHAP secret"
 			    " for initiator %s", lsm->icl_initiator_name);
@@ -1573,8 +1583,8 @@ login_sm_set_auth(iscsit_conn_t *ict)
 		lsm->icl_auth.ca_tgt_chapsecretlen = 0;
 	} else {
 		if (iscsi_base64_str_to_binary(targetchapsecret,
-		    strnlen(targetchapsecret, iscsiAuthStringMaxLength),
-		    lsm->icl_auth.ca_tgt_chapsecret, iscsiAuthStringMaxLength,
+		    strnlen(targetchapsecret, iscsitAuthStringMaxLength),
+		    lsm->icl_auth.ca_tgt_chapsecret, iscsitAuthStringMaxLength,
 		    &lsm->icl_auth.ca_tgt_chapsecretlen) != 0) {
 			cmn_err(CE_WARN, "Corrupted CHAP secret"
 			    " for target %s", lsm->icl_target_name);
@@ -1585,8 +1595,8 @@ login_sm_set_auth(iscsit_conn_t *ict)
 		lsm->icl_auth.ca_radius_secretlen = 0;
 	} else {
 		if (iscsi_base64_str_to_binary(radiussecret,
-		    strnlen(radiussecret, iscsiAuthStringMaxLength),
-		    lsm->icl_auth.ca_radius_secret, iscsiAuthStringMaxLength,
+		    strnlen(radiussecret, iscsitAuthStringMaxLength),
+		    lsm->icl_auth.ca_radius_secret, iscsitAuthStringMaxLength,
 		    &lsm->icl_auth.ca_radius_secretlen) != 0) {
 			cmn_err(CE_WARN, "Corrupted RADIUS secret");
 			lsm->icl_auth.ca_radius_secretlen = 0;
@@ -2428,11 +2438,9 @@ iscsit_process_negotiated_values(iscsit_conn_t *ict)
 	boolean_t		boolean_val;
 	uint64_t		uint64_val;
 	int			nvrc;
-	idm_status_t		idmrc;
 
 	/* Let the IDM level activate its parameters first */
-	idmrc = idm_notice_key_values(ict->ict_ic, lsm->icl_negotiated_values);
-	ASSERT(idmrc == IDM_STATUS_SUCCESS);
+	idm_notice_key_values(ict->ict_ic, lsm->icl_negotiated_values);
 
 	/*
 	 * Initiator alias and target alias

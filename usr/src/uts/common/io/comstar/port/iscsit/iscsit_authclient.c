@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ iscsit_verify_chap_resp(iscsit_conn_login_t *lsm,
     uchar_t *chap_c, unsigned int challenge_len,
     uchar_t *chap_r, unsigned int resp_len)
 {
-	uchar_t		verifyData[iscsiAuthChapResponseLength];
+	uchar_t		verifyData[iscsitAuthChapResponseLength];
 	conn_auth_t	*auth = &lsm->icl_auth;
 
 	/* Check if RADIUS access is enabled */

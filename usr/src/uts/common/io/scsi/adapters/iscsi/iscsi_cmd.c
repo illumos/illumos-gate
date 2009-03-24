@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI command interfaces
@@ -35,6 +35,8 @@ static void iscsi_cmd_state_pending(iscsi_cmd_t *icmdp,
 static void iscsi_cmd_state_active(iscsi_cmd_t *icmdp,
     iscsi_cmd_event_t event, void *arg);
 static void iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp,
+    iscsi_cmd_event_t event, void *arg);
+static void iscsi_cmd_state_idm_aborting(iscsi_cmd_t *icmdp,
     iscsi_cmd_event_t event, void *arg);
 static void iscsi_cmd_state_completed(iscsi_cmd_t *icmdp,
     iscsi_cmd_event_t event, void *arg);
@@ -87,6 +89,8 @@ int	iscsi_cmd_timeout_factor = 1;
  *                        out or been requested to abort by an upper layer
  *                        driver.  At this point there is a task management
  *                        command in the active queue trying to abort the task.
+ *	C4': IDM ABORTING - SCSI command is owned by IDM and idm_task_abort
+ *                          has been called for this command.
  *      C5: COMPLETED	- Command which is ready to complete via pkt callback.
  *
  *      The state diagram is as follows:
@@ -100,39 +104,45 @@ int	iscsi_cmd_timeout_factor = 1;
  *    N+--------/ C2    \            |
  *    A|  E4/6/7\       /--------    |
  *    L|         ---+---  E4/6/7|    |
- *     |            |E2         |    |
+ *     |            |E2    E10  |    |
  *    C|            V           | S  |
  *    M|         _______        | C  |
  *    D+--------/ C3    \       | S  |
  *    S E3/4/6/7\       /-------+ I  |
- *               ---+---E3/4/6/7|    |
- *              E4/6|           | C  |
- *                  V           | M  |
- *               -------        | D  |
- *           - >/ C4    \       | S  |
- *          /   \       /-------+    |
- *          |    ---+---E3/6/7  |    |
- *          |  E4|              V   /E8
- *          ------           -------
- *                          / C5    \
- *                          \       /
- *                           ---+---
+ *              /---+---E3/4/6/7|    |
+ *             /    |      E9/10|    |
+ *      ------/ E4/6|           | C  |
+ *      |           V           | M  |
+ *    E7|        -------        | D  |
+ *  SCSI|    - >/ C4    \       | S  |
+ *      |   /   \       /-------+    |
+ *      |   |    ---+---E3/6/7/9|    |
+ *      |   |  E4|  |           V   /E8
+ *      |   ------  |        -------
+ *      +-\         /       / C5    \
+ *      V  \-------/  /---->\       /
+ *   -------    E7   /       ---+---
+ *  / C4'   \       /
+ *  \       /------/ E9
+ *   -------
  *
  * The state transition table is as follows:
  *
- *         +---------+---+---+-----+---------+
- *         |C1       |C2 |C3 |C4   |C5       |
- *      ---+---------+---+---+-----+---------+
- *       C1| -       |E1 | - | -   |         |
- *      ---+---------+---+---+-----+---------+
- *       C2|E4/6/7   |-  |E2 | -   |E4/6/7   |
- *      ---+---------+---+---+-----+---------+
- *       C3|E3/4/6/7 |-  |-  |E4/6 |E3/4/6/7 |
- *      ---+---------+---+---+-----+---------+
- *       C4|         |-  |-  |E4   |E3/6/7   |
- *      ---+---------+---+---+-----+---------+
- *       C5|E8       |   |   |     |         |
- *      ---+---------+---+---+-----+---------+
+ *         +---------+---+---+-----+----+--------------+
+ *         |C1       |C2 |C3 |C4   |C4' |C5            |
+ *      ---+---------+---+---+-----+----+--------------+
+ *       C1| -       |E1 | - | -   | -  |              |
+ *      ---+---------+---+---+-----+----+--------------+
+ *       C2|E4/6/7   |-  |E2 | -   | -  |E4/6/7/10     |
+ *      ---+---------+---+---+-----+----+--------------+
+ *       C3|E3/4/6/7 |-  |-  |E4/6 |E7  |E3/4/6/7/9/10 |
+ *      ---+---------+---+---+-----+----+--------------+
+ *       C4|         |-  |-  |E4   |E7  |E3/6/7/9      |
+ *      ---+---------+---+---+-----+----+--------------+
+ *      C4'|         |-  |-  |-    |-   |E9            |
+ *      ---+---------+---+---+-----+----+--------------+
+ *       C5|E8       |   |   |     |    |              |
+ *      ---+---------+---+---+-----+----+--------------+
  *
  * Event definitions:
  *
@@ -165,6 +175,8 @@ int	iscsi_cmd_timeout_factor = 1;
  * -E8:	Command has completed
  *	- Only SCSI cmds should receive these events
  *		and reach the command state.
+ * -E9: Callback received for previous idm_task_abort request
+ * -E10: The command this abort was associated with has terminated on its own
  */
 void
 iscsi_cmd_state_machine(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
@@ -179,6 +191,11 @@ iscsi_cmd_state_machine(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 	    char *, iscsi_cmd_event_str(event));
 
 	mutex_enter(&icmdp->cmd_mutex);
+
+	/* Audit event */
+	idm_sm_audit_event(&icmdp->cmd_state_audit,
+	    SAS_ISCSI_CMD, icmdp->cmd_state, event, (uintptr_t)arg);
+
 	icmdp->cmd_prev_state = icmdp->cmd_state;
 	switch (icmdp->cmd_state) {
 	case ISCSI_CMD_STATE_FREE:
@@ -197,6 +214,10 @@ iscsi_cmd_state_machine(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		iscsi_cmd_state_aborting(icmdp, event, arg);
 		break;
 
+	case ISCSI_CMD_STATE_IDM_ABORTING:
+		iscsi_cmd_state_idm_aborting(icmdp, event, arg);
+		break;
+
 	case ISCSI_CMD_STATE_COMPLETED:
 		iscsi_cmd_state_completed(icmdp, event, arg);
 
@@ -213,6 +234,10 @@ iscsi_cmd_state_machine(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 	}
 
 	if (release_lock == B_TRUE) {
+		/* Audit state if not completed */
+		idm_sm_audit_state_change(&icmdp->cmd_state_audit,
+		    SAS_ISCSI_CMD, icmdp->cmd_prev_state, icmdp->cmd_state);
+
 		if (!(icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_FREE) ||
 		    !(icmdp->cmd_misc_flags &
 		    ISCSI_CMD_MISCFLAG_INTERNAL)) {
@@ -239,6 +264,7 @@ iscsi_cmd_alloc(iscsi_conn_t *icp, int km_flags)
 		icmdp->cmd_state	= ISCSI_CMD_STATE_FREE;
 		icmdp->cmd_conn		= icp;
 		icmdp->cmd_misc_flags	|= ISCSI_CMD_MISCFLAG_INTERNAL;
+		idm_sm_audit_init(&icmdp->cmd_state_audit);
 		mutex_init(&icmdp->cmd_mutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&icmdp->cmd_completion, NULL, CV_DRIVER, NULL);
 	}
@@ -258,10 +284,7 @@ iscsi_cmd_free(iscsi_cmd_t *icmdp)
 	ASSERT(icmdp->cmd_next == NULL);
 	ASSERT(icmdp->cmd_prev == NULL);
 	ASSERT(icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_INTERNAL);
-
-	if (icmdp->cmd_type == ISCSI_CMD_TYPE_R2T)
-		ASSERT(icmdp->cmd_un.r2t.icmdp == NULL);
-	else if (icmdp->cmd_type == ISCSI_CMD_TYPE_ABORT)
+	if (icmdp->cmd_type == ISCSI_CMD_TYPE_ABORT)
 		ASSERT(icmdp->cmd_un.abort.icmdp == NULL);
 	else if (icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {
 		ASSERT(icmdp->cmd_un.scsi.r2t_icmdp == NULL);
@@ -277,8 +300,6 @@ iscsi_cmd_free(iscsi_cmd_t *icmdp)
  * | Internal Command Interfaces					|
  * +--------------------------------------------------------------------+
  */
-
-
 /*
  * iscsi_cmd_state_free -
  *
@@ -302,7 +323,7 @@ iscsi_cmd_state_free(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		if (icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {
 			/*
 			 * Establish absolute time when command should timeout.
-			 * For commands the depend on cmdsn window to go
+			 * For commands that depend on cmdsn window to go
 			 * active, the timeout will be ignored while on
 			 * the pending queue and a new timeout will be
 			 * established when the command goes active.
@@ -347,7 +368,6 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 	ASSERT(icmdp != NULL);
 	ASSERT(icmdp->cmd_state == ISCSI_CMD_STATE_PENDING);
 	ASSERT(isp != NULL);
-	ASSERT(mutex_owned(&isp->sess_queue_pending.mutex));
 
 	/* switch on event change */
 	switch (event) {
@@ -355,6 +375,7 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 	case ISCSI_CMD_EVENT_E2:
 
 		/* A connection should have already been assigned */
+		ASSERT(mutex_owned(&isp->sess_queue_pending.mutex));
 		ASSERT(icmdp->cmd_conn != NULL);
 
 		/*
@@ -376,7 +397,7 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			}
 
 			/* assign itt */
-			status = iscsi_sess_reserve_itt(isp, icmdp);
+			status = iscsi_sess_reserve_scsi_itt(icmdp);
 			if (!ISCSI_SUCCESS(status)) {
 				/* no available itt slots */
 				mutex_exit(&isp->sess_cmdsn_mutex);
@@ -433,10 +454,6 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				return;
 			}
 			mutex_exit(&isp->sess_cmdsn_mutex);
-			break;
-		case ISCSI_CMD_TYPE_R2T:
-			/* no additional resources required */
-			free_icmdp = B_TRUE;
 			break;
 		case ISCSI_CMD_TYPE_NOP:
 			/* assign itt, if needed */
@@ -519,7 +536,6 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 
 		/* remove command from pending queue */
 		iscsi_dequeue_pending_cmd(isp, icmdp);
-
 		/* check if expecting a response */
 		if (free_icmdp == B_FALSE) {
 			/* response expected, move to active queue */
@@ -556,8 +572,40 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		}
 		break;
 
+	/* -E10: Abort is no longer required for this command */
+	case ISCSI_CMD_EVENT_E10:
+		/*
+		 * Acquiring the sess_queue_pending lock while the
+		 * conn_queue_active lock is held conflicts with the
+		 * locking order in iscsi_cmd_state_pending where
+		 * conn_queue_active is acquired while sess_queue_pending
+		 * is held.  Normally this would be a dangerous lock
+		 * order conflict, except that we know that if we are
+		 * seeing ISCSI_CMD_EVENT_E10 then the command being
+		 * aborted is in "aborting" state and by extension
+		 * is not in "pending" state.  Therefore the code
+		 * path with that alternate lock order will not execute.
+		 * That's good because we can't drop the lock here without
+		 * risking a deadlock.
+		 */
+		ASSERT(mutex_owned(&icmdp->cmd_conn->conn_queue_active.mutex));
+		mutex_enter(&isp->sess_queue_pending.mutex);
+
+		icmdp->cmd_lbolt_aborting = ddi_get_lbolt();
+
+		iscsi_dequeue_pending_cmd(isp, icmdp);
+
+		icmdp->cmd_un.abort.icmdp->cmd_un.scsi.abort_icmdp = NULL;
+		icmdp->cmd_un.abort.icmdp = NULL;
+		icmdp->cmd_misc_flags |= ISCSI_CMD_MISCFLAG_FREE;
+		icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
+
+		mutex_exit(&isp->sess_queue_pending.mutex);
+		break;
+
 	/* -E4: Command has been requested to abort */
 	case ISCSI_CMD_EVENT_E4:
+		ASSERT(mutex_owned(&isp->sess_queue_pending.mutex));
 
 		icmdp->cmd_lbolt_aborting = ddi_get_lbolt();
 		ISCSI_CMD_SET_REASON_STAT(icmdp,
@@ -577,6 +625,7 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 
 	/* -E6: Command has timed out */
 	case ISCSI_CMD_EVENT_E6:
+		ASSERT(mutex_owned(&isp->sess_queue_pending.mutex));
 		iscsi_dequeue_pending_cmd(isp, icmdp);
 
 		switch (icmdp->cmd_type) {
@@ -590,25 +639,6 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				    CMD_TRAN_ERR, 0);
 			}
 			iscsi_enqueue_completed_cmd(isp, icmdp);
-			break;
-
-		case ISCSI_CMD_TYPE_R2T:
-			mutex_enter(&icmdp->cmd_un.r2t.icmdp->cmd_mutex);
-			icmdp->cmd_un.r2t.icmdp->
-			    cmd_un.scsi.r2t_icmdp = NULL;
-			cv_broadcast(&icmdp->cmd_un.r2t.icmdp->
-			    cmd_completion);
-			mutex_exit(&icmdp->cmd_un.r2t.icmdp->cmd_mutex);
-			icmdp->cmd_un.r2t.icmdp = NULL;
-
-			/*
-			 * If this command is timing out then
-			 * the SCSI command will be timing out
-			 * also.  Just free the memory.
-			 */
-			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-			icmdp->cmd_misc_flags |=
-			    ISCSI_CMD_MISCFLAG_FREE;
 			break;
 
 		case ISCSI_CMD_TYPE_NOP:
@@ -715,20 +745,9 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 
 		switch (icmdp->cmd_type) {
 		case ISCSI_CMD_TYPE_SCSI:
-			iscsi_sess_release_itt(isp, icmdp);
+			iscsi_sess_release_scsi_itt(icmdp);
 			mutex_exit(&isp->sess_cmdsn_mutex);
 			iscsi_enqueue_completed_cmd(isp, icmdp);
-			break;
-
-		case ISCSI_CMD_TYPE_R2T:
-			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-			mutex_exit(&isp->sess_cmdsn_mutex);
-			/*
-			 * R2T commands do not have responses
-			 * so these command should never be
-			 * placed in the active queue.
-			 */
-			ASSERT(FALSE);
 			break;
 
 		case ISCSI_CMD_TYPE_NOP:
@@ -756,20 +775,29 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			t_icmdp = icmdp->cmd_un.abort.icmdp;
 			ASSERT(t_icmdp != NULL);
 			mutex_enter(&t_icmdp->cmd_mutex);
+			t_icmdp->cmd_un.scsi.abort_icmdp = NULL;
 			if (t_icmdp->cmd_state != ISCSI_CMD_STATE_COMPLETED) {
-				mutex_enter(&isp->sess_cmdsn_mutex);
 				iscsi_dequeue_active_cmd(
 				    t_icmdp->cmd_conn, t_icmdp);
-				iscsi_sess_release_itt(isp, t_icmdp);
-				mutex_exit(&isp->sess_cmdsn_mutex);
+				mutex_enter(
+				    &icp->conn_queue_idm_aborting.mutex);
+				iscsi_enqueue_idm_aborting_cmd(
+				    t_icmdp->cmd_conn,
+				    t_icmdp);
+				mutex_exit(&icp->conn_queue_idm_aborting.mutex);
 
+				/*
+				 * Complete abort processing after IDM
+				 * calls us back.  Set the status to use
+				 * when we complete the command.
+				 */
 				ISCSI_CMD_SET_REASON_STAT(
 				    t_icmdp, CMD_TIMEOUT, STAT_TIMEOUT);
-				iscsi_enqueue_completed_cmd(isp, t_icmdp);
+				idm_task_abort(icp->conn_ic, t_icmdp->cmd_itp,
+				    AT_TASK_MGMT_ABORT);
+			} else {
+				cv_broadcast(&t_icmdp->cmd_completion);
 			}
-
-			t_icmdp->cmd_un.scsi.abort_icmdp = NULL;
-			cv_broadcast(&t_icmdp->cmd_completion);
 			mutex_exit(&t_icmdp->cmd_mutex);
 			icmdp->cmd_un.abort.icmdp = NULL;
 
@@ -821,7 +849,9 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		ASSERT(!mutex_owned(&isp->sess_cmdsn_mutex));
 		break;
 
-	/* -E4: Command has been requested to abort */
+	/* -E10,E4: Command has been requested to abort */
+	case ISCSI_CMD_EVENT_E10:
+		/* FALLTHRU */
 	case ISCSI_CMD_EVENT_E4:
 
 		/* E4 is only for resets and aborts */
@@ -836,15 +866,6 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		case ISCSI_CMD_TYPE_SCSI:
 			icmdp->cmd_state = ISCSI_CMD_STATE_ABORTING;
 			iscsi_handle_abort(icmdp);
-			break;
-
-		case ISCSI_CMD_TYPE_R2T:
-			mutex_enter(&isp->sess_cmdsn_mutex);
-			iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
-			mutex_exit(&isp->sess_cmdsn_mutex);
-
-			/* should never get in active queue */
-			ASSERT(FALSE);
 			break;
 
 		case ISCSI_CMD_TYPE_NOP:
@@ -869,42 +890,60 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			iscsi_sess_release_itt(isp, icmdp);
 			mutex_exit(&isp->sess_cmdsn_mutex);
 
+			/*
+			 * If this is an E4 then we may need to deal with
+			 * the abort's associated SCSI command.  If this
+			 * is an E10 then IDM is already cleaning up the
+			 * SCSI command and all we need to do is break the
+			 * linkage between them and free the abort command.
+			 */
 			t_icmdp = icmdp->cmd_un.abort.icmdp;
 			ASSERT(t_icmdp != NULL);
-			mutex_enter(&t_icmdp->cmd_mutex);
+			if (event != ISCSI_CMD_EVENT_E10) {
 
-			/*
-			 * If abort command is aborted then we should
-			 * not act on the parent scsi command.  If the
-			 * abort command timed out then we need to
-			 * complete the parent command if it still
-			 * exists with a timeout failure.
-			 */
-			if ((event == ISCSI_CMD_EVENT_E6) &&
-			    (t_icmdp->cmd_state != ISCSI_CMD_STATE_COMPLETED)) {
+				mutex_enter(&t_icmdp->cmd_mutex);
+				t_icmdp->cmd_un.scsi.abort_icmdp = NULL;
+				/*
+				 * If abort command is aborted then we should
+				 * not act on the parent scsi command.  If the
+				 * abort command timed out then we need to
+				 * complete the parent command if it still
+				 * exists with a timeout failure.
+				 */
+				if ((event == ISCSI_CMD_EVENT_E6) &&
+				    (t_icmdp->cmd_state !=
+				    ISCSI_CMD_STATE_IDM_ABORTING) &&
+				    (t_icmdp->cmd_state !=
+				    ISCSI_CMD_STATE_COMPLETED)) {
 
-				mutex_enter(&isp->sess_cmdsn_mutex);
-				iscsi_dequeue_active_cmd(
-				    t_icmdp->cmd_conn,
-				    t_icmdp);
-				iscsi_sess_release_itt(isp,
-				    t_icmdp);
-				mutex_exit(&isp->sess_cmdsn_mutex);
-
-				ISCSI_CMD_SET_REASON_STAT(t_icmdp,
-				    CMD_TIMEOUT, STAT_TIMEOUT);
-				iscsi_enqueue_completed_cmd(isp,
-				    t_icmdp);
+					iscsi_dequeue_active_cmd(
+					    t_icmdp->cmd_conn, t_icmdp);
+					mutex_enter(&icp->
+					    conn_queue_idm_aborting.mutex);
+					iscsi_enqueue_idm_aborting_cmd(
+					    t_icmdp->cmd_conn,  t_icmdp);
+					mutex_exit(&icp->
+					    conn_queue_idm_aborting.mutex);
+					/*
+					 * Complete abort processing after IDM
+					 * calls us back.  Set the status to use
+					 * when we complete the command.
+					 */
+					ISCSI_CMD_SET_REASON_STAT(t_icmdp,
+					    CMD_TIMEOUT, STAT_TIMEOUT);
+					idm_task_abort(icp->conn_ic,
+					    t_icmdp->cmd_itp,
+					    AT_TASK_MGMT_ABORT);
+				} else {
+					cv_broadcast(&t_icmdp->cmd_completion);
+				}
+				mutex_exit(&t_icmdp->cmd_mutex);
+			} else {
+				t_icmdp->cmd_un.scsi.abort_icmdp = NULL;
 			}
-
-			t_icmdp->cmd_un.scsi.abort_icmdp = NULL;
-			cv_broadcast(&t_icmdp->cmd_completion);
-			mutex_exit(&t_icmdp->cmd_mutex);
 			icmdp->cmd_un.abort.icmdp = NULL;
-
 			icmdp->cmd_misc_flags |=
 			    ISCSI_CMD_MISCFLAG_FREE;
-
 			break;
 
 		case ISCSI_CMD_TYPE_RESET:
@@ -958,7 +997,6 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			break;
 
 		default:
-			mutex_enter(&isp->sess_cmdsn_mutex);
 			ASSERT(FALSE);
 		}
 
@@ -967,26 +1005,19 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 
 	/* -E7: Connection has encountered a problem */
 	case ISCSI_CMD_EVENT_E7:
-
 		mutex_enter(&isp->sess_cmdsn_mutex);
 		iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
 
 		switch (icmdp->cmd_type) {
 		case ISCSI_CMD_TYPE_SCSI:
-			iscsi_sess_release_itt(isp, icmdp);
 			mutex_exit(&isp->sess_cmdsn_mutex);
+			mutex_enter(&icp->conn_queue_idm_aborting.mutex);
+			iscsi_enqueue_idm_aborting_cmd(icmdp->cmd_conn, icmdp);
+			mutex_exit(&icp->conn_queue_idm_aborting.mutex);
 
-			/* notify caller of error */
-			ISCSI_CMD_SET_REASON_STAT(icmdp,
-			    CMD_TRAN_ERR, 0);
-			iscsi_enqueue_completed_cmd(isp, icmdp);
-			break;
-
-		case ISCSI_CMD_TYPE_R2T:
-			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-			mutex_exit(&isp->sess_cmdsn_mutex);
-			/* should never get in active queue */
-			ASSERT(FALSE);
+			ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+			idm_task_abort(icp->conn_ic, icmdp->cmd_itp,
+			    AT_TASK_MGMT_ABORT);
 			break;
 
 		case ISCSI_CMD_TYPE_NOP:
@@ -1073,6 +1104,17 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		ASSERT(!mutex_owned(&isp->sess_cmdsn_mutex));
 		break;
 
+	/* -E9: IDM is no longer processing this command */
+	case ISCSI_CMD_EVENT_E9:
+		iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
+
+		iscsi_task_cleanup(ISCSI_OP_SCSI_RSP, icmdp);
+		iscsi_sess_release_scsi_itt(icmdp);
+
+		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+		iscsi_enqueue_completed_cmd(isp, icmdp);
+		break;
+
 	/* All other events are invalid for this state */
 	default:
 		ASSERT(FALSE);
@@ -1088,6 +1130,7 @@ static void
 iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 {
 	iscsi_sess_t	*isp	= (iscsi_sess_t *)arg;
+	iscsi_cmd_t	*a_icmdp;
 
 	ASSERT(icmdp != NULL);
 	ASSERT(icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI);
@@ -1104,7 +1147,7 @@ iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		 */
 		mutex_enter(&isp->sess_cmdsn_mutex);
 		iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
-		iscsi_sess_release_itt(isp, icmdp);
+		iscsi_sess_release_scsi_itt(icmdp);
 		mutex_exit(&isp->sess_cmdsn_mutex);
 
 		iscsi_enqueue_completed_cmd(isp, icmdp);
@@ -1132,15 +1175,113 @@ iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 
 	/* -E7: Connection has encountered a problem */
 	case ISCSI_CMD_EVENT_E7:
-		mutex_enter(&isp->sess_cmdsn_mutex);
 		iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
-		iscsi_sess_release_itt(isp, icmdp);
-		mutex_exit(&isp->sess_cmdsn_mutex);
+		mutex_enter(&icmdp->cmd_conn->conn_queue_idm_aborting.mutex);
+		iscsi_enqueue_idm_aborting_cmd(icmdp->cmd_conn, icmdp);
+		mutex_exit(&icmdp->cmd_conn->conn_queue_idm_aborting.mutex);
 
-		/* complete io with error */
-		ISCSI_CMD_SET_REASON_STAT(icmdp,
-		    CMD_TRAN_ERR, 0);
+		/*
+		 * Since we are in "aborting" state there is another command
+		 * representing the abort of this command.  This command
+		 * will cleanup at some indeterminate time after the call
+		 * to idm_task_abort so we can't leave the abort request
+		 * active.  An E10 event to the abort command will cause
+		 * it to complete immediately.
+		 */
+		if ((a_icmdp = icmdp->cmd_un.scsi.abort_icmdp) != NULL) {
+			iscsi_cmd_state_machine(a_icmdp,
+			    ISCSI_CMD_EVENT_E10, arg);
+		}
+
+		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+		idm_task_abort(icmdp->cmd_conn->conn_ic, icmdp->cmd_itp,
+		    AT_TASK_MGMT_ABORT);
+		break;
+
+	/* -E9: IDM is no longer processing this command */
+	case ISCSI_CMD_EVENT_E9:
+		iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
+
+		iscsi_task_cleanup(ISCSI_OP_SCSI_RSP, icmdp);
+		iscsi_sess_release_scsi_itt(icmdp);
+
+		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
 		iscsi_enqueue_completed_cmd(isp, icmdp);
+		break;
+
+	/* All other events are invalid for this state */
+	default:
+		ASSERT(FALSE);
+	}
+}
+
+static void
+iscsi_cmd_state_idm_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event,
+    void *arg)
+{
+	iscsi_sess_t	*isp	= (iscsi_sess_t *)arg;
+
+	ASSERT(icmdp != NULL);
+	ASSERT(icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI);
+	ASSERT(icmdp->cmd_state == ISCSI_CMD_STATE_IDM_ABORTING);
+	ASSERT(isp != NULL);
+
+	/* switch on event change */
+	switch (event) {
+	/* -E3: Command was successfully completed */
+	case ISCSI_CMD_EVENT_E3:
+		/*
+		 * iscsi_rx_process_cmd_rsp() and iscsi_rx_process_data_rsp()
+		 * are supposed to confirm the cmd state is appropriate before
+		 * generating an E3 event.  E3 is not allowed in this state.
+		 */
+		ASSERT(0);
+		break;
+
+	/* -E4: Command has been requested to abort */
+	case ISCSI_CMD_EVENT_E4:
+		/*
+		 * An upper level driver might attempt to
+		 * abort a command that we are already
+		 * aborting due to a nop.  Since we are
+		 * already in the process of aborting
+		 * ignore the request.
+		 */
+		break;
+
+	/* -E6: Command has timed out */
+	case ISCSI_CMD_EVENT_E6:
+		ASSERT(FALSE);
+		/*
+		 * Timeouts should not occur on aborting commands
+		 */
+		break;
+
+	/* -E7: Connection has encountered a problem */
+	case ISCSI_CMD_EVENT_E7:
+		/*
+		 * We have already requested IDM to stop processing this
+		 * command so ignore this request.
+		 */
+		break;
+
+	/* -E9: IDM is no longer processing this command */
+	case ISCSI_CMD_EVENT_E9:
+		mutex_enter(&icmdp->cmd_conn->conn_queue_idm_aborting.mutex);
+		iscsi_dequeue_idm_aborting_cmd(icmdp->cmd_conn, icmdp);
+		mutex_exit(&icmdp->cmd_conn->conn_queue_idm_aborting.mutex);
+
+		/* This is always an error so make sure an error has been set */
+		ASSERT(icmdp->cmd_un.scsi.pkt->pkt_reason != CMD_CMPLT);
+		iscsi_task_cleanup(ISCSI_OP_SCSI_RSP, icmdp);
+		iscsi_sess_release_scsi_itt(icmdp);
+
+		/*
+		 * Whoever called idm_task_abort should have set the completion
+		 * status beforehand.
+		 */
+		iscsi_enqueue_completed_cmd(isp, icmdp);
+		cv_broadcast(&icmdp->cmd_completion);
 		break;
 
 	/* All other events are invalid for this state */
@@ -1200,6 +1341,8 @@ iscsi_cmd_state_str(iscsi_cmd_state_t state)
 		return ("active");
 	case ISCSI_CMD_STATE_ABORTING:
 		return ("aborting");
+	case ISCSI_CMD_STATE_IDM_ABORTING:
+		return ("idm-aborting");
 	case ISCSI_CMD_STATE_COMPLETED:
 		return ("completed");
 	default:
@@ -1230,6 +1373,10 @@ iscsi_cmd_event_str(iscsi_cmd_event_t event)
 		return ("E7");
 	case ISCSI_CMD_EVENT_E8:
 		return ("E8");
+	case ISCSI_CMD_EVENT_E9:
+		return ("E9");
+	case ISCSI_CMD_EVENT_E10:
+		return ("E10");
 	default:
 		return ("unknown");
 	}
@@ -1246,8 +1393,6 @@ iscsi_cmd_type_str(iscsi_cmd_type_t type)
 	switch (type) {
 	case ISCSI_CMD_TYPE_SCSI:
 		return ("scsi");
-	case ISCSI_CMD_TYPE_R2T:
-		return ("r2t");
 	case ISCSI_CMD_TYPE_NOP:
 		return ("nop");
 	case ISCSI_CMD_TYPE_ABORT:

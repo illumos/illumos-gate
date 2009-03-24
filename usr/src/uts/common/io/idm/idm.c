@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +66,16 @@ static void idm_buf_unbind_out_locked(idm_task_t *idt, idm_buf_t *buf);
 static void idm_task_abort_one(idm_conn_t *ic, idm_task_t *idt,
     idm_abort_type_t abort_type);
 static void idm_task_aborted(idm_task_t *idt, idm_status_t status);
+static idm_pdu_t *idm_pdu_alloc_common(uint_t hdrlen, uint_t datalen,
+    int sleepflag);
 
 boolean_t idm_conn_logging = 0;
 boolean_t idm_svc_logging = 0;
+#ifdef DEBUG
+boolean_t idm_pattern_checking = 1;
+#else
+boolean_t idm_pattern_checking = 0;
+#endif
 
 /*
  * Potential tuneable for the maximum number of tasks.  Default to
@@ -228,14 +235,34 @@ retry:
  *
  */
 void
+idm_ini_conn_destroy_task(void *ic_void)
+{
+	idm_conn_t *ic = ic_void;
+
+	ic->ic_transport_ops->it_ini_conn_destroy(ic);
+	idm_conn_destroy_common(ic);
+}
+
+void
 idm_ini_conn_destroy(idm_conn_t *ic)
 {
+	/*
+	 * It's reasonable for the initiator to call idm_ini_conn_destroy
+	 * from within the context of the CN_CONNECT_DESTROY notification.
+	 * That's a problem since we want to destroy the taskq for the
+	 * state machine associated with the connection.  Remove the
+	 * connection from the list right away then handle the remaining
+	 * work via the idm_global_taskq.
+	 */
 	mutex_enter(&idm.idm_global_mutex);
 	list_remove(&idm.idm_ini_conn_list, ic);
 	mutex_exit(&idm.idm_global_mutex);
 
-	ic->ic_transport_ops->it_ini_conn_destroy(ic);
-	idm_conn_destroy_common(ic);
+	if (taskq_dispatch(idm.idm_global_taskq,
+	    &idm_ini_conn_destroy_task, ic, TQ_SLEEP) == NULL) {
+		cmn_err(CE_WARN,
+		    "idm_ini_conn_destroy: Couldn't dispatch task");
+	}
 }
 
 /*
@@ -243,24 +270,31 @@ idm_ini_conn_destroy(idm_conn_t *ic)
  *
  * Establish connection to the remote system identified in idm_conn_t.
  * The connection parameters including the remote IP address were established
- * in the call to idm_ini_conn_create.
+ * in the call to idm_ini_conn_create.  The IDM state machine will
+ * perform client notifications as necessary to prompt the initiator through
+ * the login process.  IDM also keeps a timer running so that if the login
+ * process doesn't complete in a timely manner it will fail.
  *
  * ic - idm_conn_t structure representing the relevant connection
  *
  * Returns success if the connection was established, otherwise some kind
  * of meaningful error code.
  *
- * Upon return the initiator can send a "login" request when it is ready.
+ * Upon return the login has either failed or is loggin in (ffp)
  */
 idm_status_t
 idm_ini_conn_connect(idm_conn_t *ic)
 {
-	idm_status_t	rc;
+	idm_status_t	rc = IDM_STATUS_SUCCESS;
 
 	rc = idm_conn_sm_init(ic);
 	if (rc != IDM_STATUS_SUCCESS) {
 		return (ic->ic_conn_sm_status);
 	}
+
+	/* Hold connection until we return */
+	idm_conn_hold(ic);
+
 	/* Kick state machine */
 	idm_conn_event(ic, CE_CONNECT_REQ, NULL);
 
@@ -274,6 +308,7 @@ idm_ini_conn_connect(idm_conn_t *ic)
 
 	if (ic->ic_state_flags & CF_ERROR) {
 		/* ic->ic_conn_sm_status will contains failure status */
+		idm_conn_rele(ic);
 		return (ic->ic_conn_sm_status);
 	}
 
@@ -281,21 +316,9 @@ idm_ini_conn_connect(idm_conn_t *ic)
 	ASSERT(ic->ic_state_flags & CF_LOGIN_READY);
 	(void) idm_notify_client(ic, CN_READY_FOR_LOGIN, NULL);
 
-	return (IDM_STATUS_SUCCESS);
-}
+	idm_conn_rele(ic);
 
-/*
- * idm_ini_conn_sm_fini_task()
- *
- * Dispatch a thread on the global taskq to tear down an initiator connection's
- * state machine. Note: We cannot do this from the disconnect thread as we will
- * end up in a situation wherein the thread is running on a taskq that it then
- * attempts to destroy.
- */
-static void
-idm_ini_conn_sm_fini_task(void *ic_void)
-{
-	idm_conn_sm_fini((idm_conn_t *)ic_void);
+	return (rc);
 }
 
 /*
@@ -306,30 +329,38 @@ idm_ini_conn_sm_fini_task(void *ic_void)
  *
  * ic - idm_conn_t structure representing the relevant connection
  *
- * This is synchronous and it will return when the connection has been
- * properly shutdown.
+ * This is asynchronous and will return before the connection is properly
+ * shutdown
  */
 /* ARGSUSED */
 void
 idm_ini_conn_disconnect(idm_conn_t *ic)
 {
+	idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
+}
+
+/*
+ * idm_ini_conn_disconnect_wait
+ *
+ * Forces a connection (previously established using idm_ini_conn_connect)
+ * to perform a controlled shutdown.  Blocks until the connection is
+ * disconnected.
+ *
+ * ic - idm_conn_t structure representing the relevant connection
+ */
+/* ARGSUSED */
+void
+idm_ini_conn_disconnect_sync(idm_conn_t *ic)
+{
 	mutex_enter(&ic->ic_state_mutex);
-
-	if (ic->ic_state_flags == 0) {
-		/* already disconnected */
-		mutex_exit(&ic->ic_state_mutex);
-		return;
+	if ((ic->ic_state != CS_S9_INIT_ERROR) &&
+	    (ic->ic_state != CS_S11_COMPLETE)) {
+		idm_conn_event_locked(ic, CE_TRANSPORT_FAIL, NULL, CT_NONE);
+		while ((ic->ic_state != CS_S9_INIT_ERROR) &&
+		    (ic->ic_state != CS_S11_COMPLETE))
+			cv_wait(&ic->ic_state_cv, &ic->ic_state_mutex);
 	}
-	ic->ic_state_flags = 0;
-	ic->ic_conn_sm_status = 0;
 	mutex_exit(&ic->ic_state_mutex);
-
-	/* invoke the transport-specific conn_destroy */
-	(void) ic->ic_transport_ops->it_ini_conn_disconnect(ic);
-
-	/* teardown the connection sm */
-	(void) taskq_dispatch(idm.idm_global_taskq, &idm_ini_conn_sm_fini_task,
-	    (void *)ic, TQ_SLEEP);
 }
 
 /*
@@ -425,13 +456,6 @@ idm_tgt_svc_destroy(idm_svc_t *is)
 	cv_broadcast(&idm.idm_tgt_svc_cv);
 	mutex_exit(&idm.idm_global_mutex);
 
-	/* tear down the svc resources */
-	idm_refcnt_destroy(&is->is_refcnt);
-	cv_destroy(&is->is_count_cv);
-	mutex_destroy(&is->is_count_mutex);
-	cv_destroy(&is->is_cv);
-	mutex_destroy(&is->is_mutex);
-
 	/* teardown each transport-specific service */
 	for (type = 0; type < IDM_TRANSPORT_NUM_TYPES; type++) {
 		it = &idm_transport_list[type];
@@ -441,6 +465,13 @@ idm_tgt_svc_destroy(idm_svc_t *is)
 
 		it->it_ops->it_tgt_svc_destroy(is);
 	}
+
+	/* tear down the svc resources */
+	idm_refcnt_destroy(&is->is_refcnt);
+	cv_destroy(&is->is_count_cv);
+	mutex_destroy(&is->is_count_mutex);
+	cv_destroy(&is->is_cv);
+	mutex_destroy(&is->is_mutex);
 
 	/* free the svc handle */
 	kmem_free(is, sizeof (idm_svc_t));
@@ -475,15 +506,13 @@ idm_status_t
 idm_tgt_svc_online(idm_svc_t *is)
 {
 
-	idm_transport_type_t	type;
+	idm_transport_type_t	type, last_type;
 	idm_transport_t		*it;
-	int			rc;
-	int			svc_found;
+	int			rc = IDM_STATUS_SUCCESS;
 
 	mutex_enter(&is->is_mutex);
-	/* Walk through each of the transports and online them */
 	if (is->is_online == 0) {
-		svc_found = 0;
+		/* Walk through each of the transports and online them */
 		for (type = 0; type < IDM_TRANSPORT_NUM_TYPES; type++) {
 			it = &idm_transport_list[type];
 			if (it->it_ops == NULL) {
@@ -494,19 +523,39 @@ idm_tgt_svc_online(idm_svc_t *is)
 			mutex_exit(&is->is_mutex);
 			rc = it->it_ops->it_tgt_svc_online(is);
 			mutex_enter(&is->is_mutex);
-			if (rc == IDM_STATUS_SUCCESS) {
-				/* We have at least one service running. */
-				svc_found = 1;
+			if (rc != IDM_STATUS_SUCCESS) {
+				last_type = type;
+				break;
 			}
 		}
+		if (rc != IDM_STATUS_SUCCESS) {
+			/*
+			 * The last transport failed to online.
+			 * Offline any transport onlined above and
+			 * do not online the target.
+			 */
+			for (type = 0; type < last_type; type++) {
+				it = &idm_transport_list[type];
+				if (it->it_ops == NULL) {
+					/* transport is not registered */
+					continue;
+				}
+
+				mutex_exit(&is->is_mutex);
+				it->it_ops->it_tgt_svc_offline(is);
+				mutex_enter(&is->is_mutex);
+			}
+		} else {
+			/* Target service now online */
+			is->is_online = 1;
+		}
 	} else {
-		svc_found = 1;
-	}
-	if (svc_found)
+		/* Target service already online, just bump the count */
 		is->is_online++;
+	}
 	mutex_exit(&is->is_mutex);
 
-	return (svc_found ? IDM_STATUS_SUCCESS : IDM_STATUS_FAIL);
+	return (rc);
 }
 
 /*
@@ -600,12 +649,11 @@ idm_negotiate_key_values(idm_conn_t *ic, nvlist_t *request_nvl,
  * Passes the set of key value pairs to the transport for activation.
  * This will be invoked as the connection is entering full-feature mode.
  */
-idm_status_t
+void
 idm_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl)
 {
 	ASSERT(ic->ic_transport_ops != NULL);
-	return (ic->ic_transport_ops->it_notice_key_values(ic,
-	    negotiated_nvl));
+	ic->ic_transport_ops->it_notice_key_values(ic, negotiated_nvl);
 }
 
 /*
@@ -640,6 +688,13 @@ idm_buf_tx_to_ini(idm_task_t *idt, idm_buf_t *idb,
 	idb->idb_xfer_len = xfer_len;
 	idb->idb_buf_cb = idb_buf_cb;
 	idb->idb_cb_arg = cb_arg;
+	gethrestime(&idb->idb_xfer_start);
+
+	/*
+	 * Buffer should not contain the pattern.  If the pattern is
+	 * present then we've been asked to transmit initialized data
+	 */
+	IDM_BUFPAT_CHECK(idb, xfer_len, BP_CHECK_ASSERT);
 
 	mutex_enter(&idt->idt_mutex);
 	switch (idt->idt_state) {
@@ -715,6 +770,7 @@ idm_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb,
 	idb->idb_xfer_len = xfer_len;
 	idb->idb_buf_cb = idb_buf_cb;
 	idb->idb_cb_arg = cb_arg;
+	gethrestime(&idb->idb_xfer_start);
 
 	/*
 	 * "In" buf list is for "Data In" PDU's, "Out" buf list is for
@@ -766,6 +822,7 @@ idm_buf_tx_to_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status)
 	idb->idb_in_transport = B_FALSE;
 	idb->idb_tx_thread = B_FALSE;
 	idt->idt_tx_to_ini_done++;
+	gethrestime(&idb->idb_xfer_done);
 
 	/*
 	 * idm_refcnt_rele may cause TASK_SUSPENDING --> TASK_SUSPENDED or
@@ -827,6 +884,7 @@ idm_buf_rx_from_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status)
 	ASSERT(mutex_owned(&idt->idt_mutex));
 	idb->idb_in_transport = B_FALSE;
 	idt->idt_rx_from_ini_done++;
+	gethrestime(&idb->idb_xfer_done);
 
 	/*
 	 * idm_refcnt_rele may cause TASK_SUSPENDING --> TASK_SUSPENDED or
@@ -835,6 +893,14 @@ idm_buf_rx_from_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status)
 	 */
 	idm_task_rele(idt);
 	idb->idb_status = status;
+
+	if (status == IDM_STATUS_SUCCESS) {
+		/*
+		 * Buffer should not contain the pattern.  If it does then
+		 * we did not get the data from the remote host.
+		 */
+		IDM_BUFPAT_CHECK(idb, idb->idb_xfer_len, BP_CHECK_ASSERT);
+	}
 
 	switch (idt->idt_state) {
 	case TASK_ACTIVE:
@@ -919,6 +985,8 @@ idm_buf_alloc(idm_conn_t *ic, void *bufptr, uint64_t buflen)
 	buf->idb_bufoffset	= 0;
 	buf->idb_xfer_len 	= 0;
 	buf->idb_magic		= IDM_BUF_MAGIC;
+	buf->idb_in_transport	= B_FALSE;
+	buf->idb_bufbcopy	= B_FALSE;
 
 	/*
 	 * If bufptr is NULL, we have an implicit request to allocate
@@ -945,8 +1013,13 @@ idm_buf_alloc(idm_conn_t *ic, void *bufptr, uint64_t buflen)
 		buf->idb_bufalloc = B_TRUE;
 	} else {
 		/*
-		 * Set the passed bufptr into the buf handle, and
-		 * register the handle with the transport layer.
+		 * For large transfers, Set the passed bufptr into
+		 * the buf handle, and register the handle with the
+		 * transport layer. As memory registration with the
+		 * transport layer is a time/cpu intensive operation,
+		 * for small transfers (up to a pre-defined bcopy
+		 * threshold), use pre-registered memory buffers
+		 * and bcopy data at the appropriate time.
 		 */
 		buf->idb_buf = bufptr;
 
@@ -956,12 +1029,15 @@ idm_buf_alloc(idm_conn_t *ic, void *bufptr, uint64_t buflen)
 			kmem_cache_free(idm.idm_buf_cache, buf);
 			return (NULL);
 		}
-		/* Ensure bufalloc'd flag is unset */
-		buf->idb_bufalloc = B_FALSE;
+		/*
+		 * The transport layer is now expected to set the idb_bufalloc
+		 * correctly to indicate if resources have been allocated.
+		 */
 	}
 
-	return (buf);
+	IDM_BUFPAT_SET(buf);
 
+	return (buf);
 }
 
 /*
@@ -1013,6 +1089,14 @@ idm_buf_bind_in_locked(idm_task_t *idt, idm_buf_t *buf)
 void
 idm_buf_bind_out(idm_task_t *idt, idm_buf_t *buf)
 {
+	/*
+	 * For small transfers, the iSER transport delegates the IDM
+	 * layer to bcopy the SCSI Write data for faster IOPS.
+	 */
+	if (buf->idb_bufbcopy == B_TRUE) {
+
+		bcopy(buf->idb_bufptr, buf->idb_buf, buf->idb_buflen);
+	}
 	mutex_enter(&idt->idt_mutex);
 	idm_buf_bind_out_locked(idt, buf);
 	mutex_exit(&idt->idt_mutex);
@@ -1029,6 +1113,14 @@ idm_buf_bind_out_locked(idm_task_t *idt, idm_buf_t *buf)
 void
 idm_buf_unbind_in(idm_task_t *idt, idm_buf_t *buf)
 {
+	/*
+	 * For small transfers, the iSER transport delegates the IDM
+	 * layer to bcopy the SCSI Read data into the read buufer
+	 * for faster IOPS.
+	 */
+	if (buf->idb_bufbcopy == B_TRUE) {
+		bcopy(buf->idb_buf, buf->idb_bufptr, buf->idb_buflen);
+	}
 	mutex_enter(&idt->idt_mutex);
 	idm_buf_unbind_in_locked(idt, buf);
 	mutex_exit(&idt->idt_mutex);
@@ -1080,6 +1172,66 @@ idm_buf_find(void *lbuf, size_t data_offset)
 	return (NULL);
 }
 
+void
+idm_bufpat_set(idm_buf_t *idb)
+{
+	idm_bufpat_t	*bufpat;
+	int		len, i;
+
+	len = idb->idb_buflen;
+	len = (len / sizeof (idm_bufpat_t)) * sizeof (idm_bufpat_t);
+
+	bufpat = idb->idb_buf;
+	for (i = 0; i < len; i += sizeof (idm_bufpat_t)) {
+		bufpat->bufpat_idb = idb;
+		bufpat->bufpat_bufmagic = IDM_BUF_MAGIC;
+		bufpat->bufpat_offset = i;
+		bufpat++;
+	}
+}
+
+boolean_t
+idm_bufpat_check(idm_buf_t *idb, int check_len, idm_bufpat_check_type_t type)
+{
+	idm_bufpat_t	*bufpat;
+	int		len, i;
+
+	len = (type == BP_CHECK_QUICK) ? sizeof (idm_bufpat_t) : check_len;
+	len = (len / sizeof (idm_bufpat_t)) * sizeof (idm_bufpat_t);
+	ASSERT(len <= idb->idb_buflen);
+	bufpat = idb->idb_buf;
+
+	/*
+	 * Don't check the pattern in buffers that came from outside IDM
+	 * (these will be buffers from the initiator that we opted not
+	 * to double-buffer)
+	 */
+	if (!idb->idb_bufalloc)
+		return (B_FALSE);
+
+	/*
+	 * Return true if we find the pattern anywhere in the buffer
+	 */
+	for (i = 0; i < len; i += sizeof (idm_bufpat_t)) {
+		if (BUFPAT_MATCH(bufpat, idb)) {
+			IDM_CONN_LOG(CE_WARN, "idm_bufpat_check found: "
+			    "idb %p bufpat %p "
+			    "bufpat_idb=%p bufmagic=%08x offset=%08x",
+			    (void *)idb, (void *)bufpat, bufpat->bufpat_idb,
+			    bufpat->bufpat_bufmagic, bufpat->bufpat_offset);
+			DTRACE_PROBE2(bufpat__pattern__found,
+			    idm_buf_t *, idb, idm_bufpat_t *, bufpat);
+			if (type == BP_CHECK_ASSERT) {
+				ASSERT(0);
+			}
+			return (B_TRUE);
+		}
+		bufpat++;
+	}
+
+	return (B_FALSE);
+}
+
 /*
  * idm_task_alloc
  *
@@ -1123,7 +1275,7 @@ idm_task_alloc(idm_conn_t *ic)
 /*
  * idm_task_start
  *
- * Add the task to an AVL tree to notify IDM about a new task. The caller
+ * Mark the task active and initialize some stats. The caller
  * sets up the idm_task_t structure with a prior call to idm_task_alloc().
  * The task service does not function as a task/work engine, it is the
  * responsibility of the initiator to start the data transfer and free the
@@ -1138,22 +1290,35 @@ idm_task_start(idm_task_t *idt, uintptr_t handle)
 	idt->idt_state = TASK_ACTIVE;
 	idt->idt_client_handle = handle;
 	idt->idt_tx_to_ini_start = idt->idt_tx_to_ini_done =
-	    idt->idt_rx_from_ini_start = idt->idt_rx_from_ini_done = 0;
+	    idt->idt_rx_from_ini_start = idt->idt_rx_from_ini_done =
+	    idt->idt_tx_bytes = idt->idt_rx_bytes = 0;
 }
 
 /*
  * idm_task_done
  *
- * This function will remove the task from the AVL tree indicating that the
- * task is no longer active.
+ * This function sets the state to indicate that the task is no longer active.
  */
 void
 idm_task_done(idm_task_t *idt)
 {
 	ASSERT(idt != NULL);
-	ASSERT(idt->idt_refcnt.ir_refcnt == 0);
 
+	mutex_enter(&idt->idt_mutex);
 	idt->idt_state = TASK_IDLE;
+	mutex_exit(&idt->idt_mutex);
+
+	/*
+	 * Although unlikely it is possible for a reference to come in after
+	 * the client has decided the task is over but before we've marked
+	 * the task idle.  One specific unavoidable scenario is the case where
+	 * received PDU with the matching ITT/TTT results in a successful
+	 * lookup of this task.  We are at the mercy of the remote node in
+	 * that case so we need to handle it.  Now that the task state
+	 * has changed no more references will occur so a simple call to
+	 * idm_refcnt_wait_ref should deal with the situation.
+	 */
+	idm_refcnt_wait_ref(&idt->idt_refcnt);
 	idm_refcnt_reset(&idt->idt_refcnt);
 }
 
@@ -1166,10 +1331,13 @@ idm_task_done(idm_task_t *idt)
 void
 idm_task_free(idm_task_t *idt)
 {
-	idm_conn_t *ic = idt->idt_ic;
+	idm_conn_t *ic;
 
 	ASSERT(idt != NULL);
+	ASSERT(idt->idt_refcnt.ir_refcnt == 0);
 	ASSERT(idt->idt_state == TASK_IDLE);
+
+	ic = idt->idt_ic;
 
 	/*
 	 * It's possible for items to still be in the idt_inbufv list if
@@ -1190,13 +1358,13 @@ idm_task_free(idm_task_t *idt)
 }
 
 /*
- * idm_task_find
- *
- * This function looks up a task by task tag
+ * idm_task_find_common
+ *	common code for idm_task_find() and idm_task_find_and_complete()
  */
 /*ARGSUSED*/
-idm_task_t *
-idm_task_find(idm_conn_t *ic, uint32_t itt, uint32_t ttt)
+static idm_task_t *
+idm_task_find_common(idm_conn_t *ic, uint32_t itt, uint32_t ttt,
+    boolean_t complete)
 {
 	uint32_t	tt, client_handle;
 	idm_task_t	*idt;
@@ -1224,21 +1392,56 @@ idm_task_find(idm_conn_t *ic, uint32_t itt, uint32_t ttt)
 	if (idt != NULL) {
 		mutex_enter(&idt->idt_mutex);
 		if ((idt->idt_state != TASK_ACTIVE) ||
+		    (idt->idt_ic != ic) ||
 		    (IDM_CONN_ISTGT(ic) &&
 		    (idt->idt_client_handle != client_handle))) {
 			/*
-			 * Task is aborting, we don't want any more references.
+			 * Task doesn't match or task is aborting and
+			 * we don't want any more references.
 			 */
+			if ((idt->idt_ic != ic) &&
+			    (idt->idt_state == TASK_ACTIVE) &&
+			    (IDM_CONN_ISINI(ic) || idt->idt_client_handle ==
+			    client_handle)) {
+				IDM_CONN_LOG(CE_WARN,
+				"idm_task_find: wrong connection %p != %p",
+				    (void *)ic, (void *)idt->idt_ic);
+			}
 			mutex_exit(&idt->idt_mutex);
 			rw_exit(&idm.idm_taskid_table_lock);
 			return (NULL);
 		}
 		idm_task_hold(idt);
+		/*
+		 * Set the task state to TASK_COMPLETE so it can no longer
+		 * be found or aborted.
+		 */
+		if (B_TRUE == complete)
+			idt->idt_state = TASK_COMPLETE;
 		mutex_exit(&idt->idt_mutex);
 	}
 	rw_exit(&idm.idm_taskid_table_lock);
 
 	return (idt);
+}
+
+/*
+ * This function looks up a task by task tag.
+ */
+idm_task_t *
+idm_task_find(idm_conn_t *ic, uint32_t itt, uint32_t ttt)
+{
+	return (idm_task_find_common(ic, itt, ttt, B_FALSE));
+}
+
+/*
+ * This function looks up a task by task tag. If found, the task state
+ * is atomically set to TASK_COMPLETE so it can longer be found or aborted.
+ */
+idm_task_t *
+idm_task_find_and_complete(idm_conn_t *ic, uint32_t itt, uint32_t ttt)
+{
+	return (idm_task_find_common(ic, itt, ttt, B_TRUE));
 }
 
 /*
@@ -1323,15 +1526,21 @@ idm_task_abort(idm_conn_t *ic, idm_task_t *idt, idm_abort_type_t abort_type)
 		rw_enter(&idm.idm_taskid_table_lock, RW_READER);
 		for (idx = 0; idx < idm.idm_taskid_max; idx++) {
 			task = idm.idm_taskid_table[idx];
-			if (task && (task->idt_state != TASK_IDLE) &&
+			if (task == NULL)
+				continue;
+			mutex_enter(&task->idt_mutex);
+			if ((task->idt_state != TASK_IDLE) &&
+			    (task->idt_state != TASK_COMPLETE) &&
 			    (task->idt_ic == ic)) {
 				rw_exit(&idm.idm_taskid_table_lock);
 				idm_task_abort_one(ic, task, abort_type);
 				rw_enter(&idm.idm_taskid_table_lock, RW_READER);
-			}
+			} else
+				mutex_exit(&task->idt_mutex);
 		}
 		rw_exit(&idm.idm_taskid_table_lock);
 	} else {
+		mutex_enter(&idt->idt_mutex);
 		idm_task_abort_one(ic, idt, abort_type);
 	}
 }
@@ -1360,11 +1569,15 @@ idm_task_abort_unref_cb(void *ref)
 	}
 }
 
+/*
+ * Abort the idm task.
+ *    Caller must hold the task mutex, which will be released before return
+ */
 static void
 idm_task_abort_one(idm_conn_t *ic, idm_task_t *idt, idm_abort_type_t abort_type)
 {
 	/* Caller must hold connection mutex */
-	mutex_enter(&idt->idt_mutex);
+	ASSERT(mutex_owned(&idt->idt_mutex));
 	switch (idt->idt_state) {
 	case TASK_ACTIVE:
 		switch (abort_type) {
@@ -1689,11 +1902,10 @@ idm_pdu_tx(idm_pdu_t *pdu)
 }
 
 /*
- * Allocates a PDU along with memory for header and data.
+ * Common allocation of a PDU along with memory for header and data.
  */
-
-idm_pdu_t *
-idm_pdu_alloc(uint_t hdrlen, uint_t datalen)
+static idm_pdu_t *
+idm_pdu_alloc_common(uint_t hdrlen, uint_t datalen, int sleepflag)
 {
 	idm_pdu_t *result;
 
@@ -1706,18 +1918,42 @@ idm_pdu_alloc(uint_t hdrlen, uint_t datalen)
 	 * length is assumed to be datalen.  isp_hdrlen and isp_datalen
 	 * can be adjusted after the PDU is returned if necessary.
 	 */
-	result = kmem_zalloc(sizeof (idm_pdu_t) + hdrlen + datalen, KM_SLEEP);
-	result->isp_flags |= IDM_PDU_ALLOC; /* For idm_pdu_free sanity check */
-	result->isp_hdr = (iscsi_hdr_t *)(result + 1); /* Ptr. Arithmetic */
-	result->isp_hdrlen = hdrlen;
-	result->isp_hdrbuflen = hdrlen;
-	result->isp_transport_hdrlen = 0;
-	result->isp_data = (uint8_t *)result->isp_hdr + hdrlen;
-	result->isp_datalen = datalen;
-	result->isp_databuflen = datalen;
-	result->isp_magic = IDM_PDU_MAGIC;
+	result = kmem_zalloc(sizeof (idm_pdu_t) + hdrlen + datalen, sleepflag);
+	if (result != NULL) {
+		/* For idm_pdu_free sanity check */
+		result->isp_flags |= IDM_PDU_ALLOC;
+		/* pointer arithmetic */
+		result->isp_hdr = (iscsi_hdr_t *)(result + 1);
+		result->isp_hdrlen = hdrlen;
+		result->isp_hdrbuflen = hdrlen;
+		result->isp_transport_hdrlen = 0;
+		result->isp_data = (uint8_t *)result->isp_hdr + hdrlen;
+		result->isp_datalen = datalen;
+		result->isp_databuflen = datalen;
+		result->isp_magic = IDM_PDU_MAGIC;
+	}
 
 	return (result);
+}
+
+/*
+ * Typical idm_pdu_alloc invocation, will block for resources.
+ */
+idm_pdu_t *
+idm_pdu_alloc(uint_t hdrlen, uint_t datalen)
+{
+	return (idm_pdu_alloc_common(hdrlen, datalen, KM_SLEEP));
+}
+
+/*
+ * Non-blocking idm_pdu_alloc implementation, returns NULL if resources
+ * are not available.  Needed for transport-layer allocations which may
+ * be invoking in interrupt context.
+ */
+idm_pdu_t *
+idm_pdu_alloc_nosleep(uint_t hdrlen, uint_t datalen)
+{
+	return (idm_pdu_alloc_common(hdrlen, datalen, KM_NOSLEEP));
 }
 
 /*
@@ -2030,8 +2266,12 @@ _idm_init(void)
 	cv_init(&idm.idm_tgt_svc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&idm.idm_wd_cv, NULL, CV_DEFAULT, NULL);
 
+	/*
+	 * The maximum allocation needs to be high here since there can be
+	 * many concurrent tasks using the global taskq.
+	 */
 	idm.idm_global_taskq = taskq_create("idm_global_taskq", 1, minclsyspri,
-	    4, 4, TASKQ_PREPOPULATE);
+	    128, 16384, TASKQ_PREPOPULATE);
 	if (idm.idm_global_taskq == NULL) {
 		cv_destroy(&idm.idm_wd_cv);
 		cv_destroy(&idm.idm_tgt_svc_cv);
@@ -2115,7 +2355,15 @@ _idm_fini(void)
 	thread_join(idm.idm_wd_thread_did);
 
 	idm_idpool_destroy(&idm.idm_conn_id_pool);
+
+	/* Close any LDI handles we have open on transport drivers */
+	mutex_enter(&idm.idm_global_mutex);
+	idm_transport_teardown();
+	mutex_exit(&idm.idm_global_mutex);
+
+	/* Teardown the native sockets transport */
 	idm_so_fini();
+
 	list_destroy(&idm.idm_ini_conn_list);
 	list_destroy(&idm.idm_tgt_conn_list);
 	list_destroy(&idm.idm_tgt_svc_list);

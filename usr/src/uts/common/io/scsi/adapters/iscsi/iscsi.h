@@ -47,11 +47,13 @@ extern "C" {
 #include <sys/nvpair.h>
 #include <sys/sdt.h>
 
-#include <sys/scsi/adapters/iscsi_if.h>
 #include <sys/iscsi_protocol.h>
+#include <sys/scsi/adapters/iscsi_if.h>
 #include <iscsiAuthClient.h>
 #include <iscsi_stats.h>
 #include <iscsi_thread.h>
+#include <sys/idm/idm.h>
+#include <sys/idm/idm_conn_sm.h>
 #include <nvfile.h>
 
 #ifndef MIN
@@ -68,12 +70,24 @@ extern "C" {
 
 #define	LOGIN_PDU_BUFFER_SIZE	(16 * 1024)	/* move somewhere else */
 
+extern boolean_t iscsi_conn_logging;
+extern boolean_t iscsi_io_logging;
+extern boolean_t iscsi_login_logging;
+extern boolean_t iscsi_logging;
+extern boolean_t iscsi_sess_logging;
+#define	ISCSI_CONN_LOG	if (iscsi_conn_logging) cmn_err
+#define	ISCSI_IO_LOG	if (iscsi_io_logging) cmn_err
+#define	ISCSI_LOGIN_LOG	if (iscsi_login_logging) cmn_err
+#define	ISCSI_LOG	if (iscsi_logging) cmn_err
+#define	ISCSI_SESS_LOG	if (iscsi_sess_logging) cmn_err
+
 /*
  * Name Format of the different Task Queues
  */
 #define	ISCSI_SESS_IOTH_NAME_FORMAT		"io_thrd_%d.%d"
 #define	ISCSI_SESS_WD_NAME_FORMAT		"wd_thrd_%d.%d"
 #define	ISCSI_SESS_LOGIN_TASKQ_NAME_FORMAT	"login_taskq_%d.%d"
+#define	ISCSI_CONN_CN_TASKQ_NAME_FORMAT		"conn_cn_taskq_%d.%d.%d"
 #define	ISCSI_CONN_RXTH_NAME_FORMAT		"rx_thrd_%d.%d.%d"
 #define	ISCSI_CONN_TXTH_NAME_FORMAT		"tx_thrd_%d.%d.%d"
 
@@ -175,7 +189,9 @@ typedef enum iscsi_status {
 	/* session/connection needs to shutdown */
 	ISCSI_STATUS_SHUTDOWN,
 	/* logical unit in use */
-	ISCSI_STATUS_BUSY
+	ISCSI_STATUS_BUSY,
+	/* Login on connection failed, retries exceeded */
+	ISCSI_STATUS_LOGIN_TIMED_OUT
 } iscsi_status_t;
 #define	ISCSI_SUCCESS(status) (status == ISCSI_STATUS_SUCCESS)
 
@@ -283,7 +299,6 @@ typedef struct iscsi_task {
  */
 typedef enum iscsi_cmd_type {
 	ISCSI_CMD_TYPE_SCSI = 1,	/* scsi cmd */
-	ISCSI_CMD_TYPE_R2T,		/* r2t */
 	ISCSI_CMD_TYPE_NOP,		/* nop / ping */
 	ISCSI_CMD_TYPE_ABORT,		/* abort */
 	ISCSI_CMD_TYPE_RESET,		/* reset */
@@ -296,32 +311,64 @@ typedef enum iscsi_cmd_type {
  * iscsi_cmd_state - (reference iscsi_cmd.c for state diagram)
  */
 typedef enum iscsi_cmd_state {
-	ISCSI_CMD_STATE_FREE,
+	ISCSI_CMD_STATE_FREE = 0,
 	ISCSI_CMD_STATE_PENDING,
 	ISCSI_CMD_STATE_ACTIVE,
 	ISCSI_CMD_STATE_ABORTING,
-	ISCSI_CMD_STATE_COMPLETED
+	ISCSI_CMD_STATE_IDM_ABORTING,
+	ISCSI_CMD_STATE_COMPLETED,
+	ISCSI_CMD_STATE_MAX
 } iscsi_cmd_state_t;
+
+#ifdef ISCSI_CMD_SM_STRINGS
+static const char *iscsi_cmd_state_names[ISCSI_CMD_STATE_MAX+1] = {
+	"ISCSI_CMD_STATE_FREE",
+	"ISCSI_CMD_STATE_PENDING",
+	"ISCSI_CMD_STATE_ACTIVE",
+	"ISCSI_CMD_STATE_ABORTING",
+	"ISCSI_CMD_STATE_IDM_ABORTING",
+	"ISCSI_CMD_STATE_COMPLETED",
+	"ISCSI_CMD_STATE_MAX"
+};
+#endif
 
 /*
  * iscsi command events
  */
 typedef enum iscsi_cmd_event {
-	ISCSI_CMD_EVENT_E1,
+	ISCSI_CMD_EVENT_E1 = 0,
 	ISCSI_CMD_EVENT_E2,
 	ISCSI_CMD_EVENT_E3,
 	ISCSI_CMD_EVENT_E4,
 	ISCSI_CMD_EVENT_E6,
 	ISCSI_CMD_EVENT_E7,
-	ISCSI_CMD_EVENT_E8
+	ISCSI_CMD_EVENT_E8,
+	ISCSI_CMD_EVENT_E9,
+	ISCSI_CMD_EVENT_E10,
+	ISCSI_CMD_EVENT_MAX
 } iscsi_cmd_event_t;
+
+#ifdef ISCSI_CMD_SM_STRINGS
+static const char *iscsi_cmd_event_names[ISCSI_CMD_EVENT_MAX+1] = {
+	"ISCSI_CMD_EVENT_E1",
+	"ISCSI_CMD_EVENT_E2",
+	"ISCSI_CMD_EVENT_E3",
+	"ISCSI_CMD_EVENT_E4",
+	"ISCSI_CMD_EVENT_E6",
+	"ISCSI_CMD_EVENT_E7",
+	"ISCSI_CMD_EVENT_E8",
+	"ISCSI_CMD_EVENT_E9",
+	"ISCSI_CMD_EVENT_E10",
+	"ISCSI_CMD_EVENT_MAX"
+};
+#endif
 
 /*
  * iscsi text command stages - these stages are used by iSCSI text
  * processing to manage long resonses.
  */
 typedef enum iscsi_cmd_text_stage {
-	ISCSI_CMD_TEXT_INITIAL_REQ,
+	ISCSI_CMD_TEXT_INITIAL_REQ = 0,
 	ISCSI_CMD_TEXT_CONTINUATION,
 	ISCSI_CMD_TEXT_FINAL_RSP
 } iscsi_cmd_text_stage_t;
@@ -349,12 +396,16 @@ typedef struct iscsi_cmd {
 	clock_t			cmd_lbolt_pending;
 	clock_t			cmd_lbolt_active;
 	clock_t			cmd_lbolt_aborting;
+	clock_t			cmd_lbolt_idm_aborting;
 	clock_t			cmd_lbolt_timeout;
 	uint8_t			cmd_misc_flags;
+	idm_task_t		*cmd_itp;
 
 	union {
 		/* ISCSI_CMD_TYPE_SCSI */
 		struct {
+			idm_buf_t		*ibp_ibuf;
+			idm_buf_t		*ibp_obuf;
 			struct scsi_pkt		*pkt;
 			struct buf		*bp;
 			int			cmdlen;
@@ -443,6 +494,9 @@ typedef struct iscsi_cmd {
 	kmutex_t		cmd_mutex;
 	kcondvar_t		cmd_completion;
 
+	idm_pdu_t		cmd_pdu;
+
+	sm_audit_buf_t		cmd_state_audit;
 } iscsi_cmd_t;
 
 
@@ -480,40 +534,6 @@ typedef struct iscsi_lun {
 #define	ISCSI_LUN_CAP_RESET   0x01
 
 /*
- * iscsi_conn_state - (reference iscsi_conn.c for state diagram)
- */
-typedef enum iscsi_conn_state {
-	ISCSI_CONN_STATE_FREE,
-	ISCSI_CONN_STATE_IN_LOGIN,
-	ISCSI_CONN_STATE_LOGGED_IN,
-	ISCSI_CONN_STATE_IN_LOGOUT,
-	ISCSI_CONN_STATE_FAILED,
-	ISCSI_CONN_STATE_POLLING
-} iscsi_conn_state_t;
-
-#define	ISCSI_CONN_STATE_FULL_FEATURE(state) \
-	((state == ISCSI_CONN_STATE_LOGGED_IN) || \
-	(state == ISCSI_CONN_STATE_IN_LOGOUT))
-
-/*
- * iscsi connection events - (reference iscsi_conn.c for state diagram)
- */
-typedef enum iscsi_conn_event {
-	ISCSI_CONN_EVENT_T1,
-	ISCSI_CONN_EVENT_T5,
-	ISCSI_CONN_EVENT_T7,
-	ISCSI_CONN_EVENT_T8,
-	ISCSI_CONN_EVENT_T9,
-	ISCSI_CONN_EVENT_T11,
-	ISCSI_CONN_EVENT_T12,
-	ISCSI_CONN_EVENT_T13,
-	ISCSI_CONN_EVENT_T14,
-	ISCSI_CONN_EVENT_T15,
-	ISCSI_CONN_EVENT_T17,
-	ISCSI_CONN_EVENT_T30
-} iscsi_conn_event_t;
-
-/*
  *
  *
  */
@@ -537,6 +557,61 @@ typedef union iscsi_sockaddr {
 #define	SIZEOF_SOCKADDR(so)	((so)->sa_family == AF_INET ? \
 	sizeof (struct sockaddr_in) : sizeof (struct sockaddr_in6))
 
+typedef enum {
+	LOGIN_START,
+	LOGIN_READY,
+	LOGIN_TX,
+	LOGIN_RX,
+	LOGIN_ERROR,
+	LOGIN_DONE,
+	LOGIN_FFP,
+	LOGIN_MAX
+} iscsi_login_state_t;
+
+#ifdef ISCSI_LOGIN_STATE_NAMES
+static const char *iscsi_login_state_names[LOGIN_MAX+1] = {
+	"LOGIN_START",
+	"LOGIN_READY",
+	"LOGIN_TX",
+	"LOGIN_RX",
+	"LOGIN_ERROR",
+	"LOGIN_DONE",
+	"LOGIN_FFP",
+	"LOGIN_MAX"
+};
+#endif
+
+/*
+ * iscsi_conn_state
+ */
+typedef enum iscsi_conn_state {
+	ISCSI_CONN_STATE_UNDEFINED = 0,
+	ISCSI_CONN_STATE_FREE,
+	ISCSI_CONN_STATE_IN_LOGIN,
+	ISCSI_CONN_STATE_LOGGED_IN,
+	ISCSI_CONN_STATE_IN_LOGOUT,
+	ISCSI_CONN_STATE_FAILED,
+	ISCSI_CONN_STATE_POLLING,
+	ISCSI_CONN_STATE_MAX
+} iscsi_conn_state_t;
+
+#ifdef ISCSI_ICS_NAMES
+static const char *iscsi_ics_name[ISCSI_CONN_STATE_MAX+1] = {
+	"ISCSI_CONN_STATE_UNDEFINED",
+	"ISCSI_CONN_STATE_FREE",
+	"ISCSI_CONN_STATE_IN_LOGIN",
+	"ISCSI_CONN_STATE_LOGGED_IN",
+	"ISCSI_CONN_STATE_IN_LOGOUT",
+	"ISCSI_CONN_STATE_FAILED",
+	"ISCSI_CONN_STATE_POLLING",
+	"ISCSI_CONN_STATE_MAX"
+};
+#endif
+
+#define	ISCSI_CONN_STATE_FULL_FEATURE(state) \
+	((state == ISCSI_CONN_STATE_LOGGED_IN) || \
+	(state == ISCSI_CONN_STATE_IN_LOGOUT))
+
 /*
  * iSCSI Connection Structure
  */
@@ -547,21 +622,23 @@ typedef struct iscsi_conn {
 
 	iscsi_conn_state_t	conn_state;	/* cur. conn. driver state */
 	iscsi_conn_state_t	conn_prev_state; /* prev. conn. driver state */
-	clock_t			conn_state_lbolt;
 	/* protects the session state and synchronizes the state machine */
 	kmutex_t		conn_state_mutex;
 	kcondvar_t		conn_state_change;
 	boolean_t		conn_state_destroy;
+	boolean_t		conn_state_ffp;
+	boolean_t		conn_state_idm_connected;
+	boolean_t		conn_async_logout;
+	ddi_taskq_t		*conn_cn_taskq;
 
-	void			*conn_socket;	/* kernel socket */
+	idm_conn_t		*conn_ic;
 
-	/* base connection information */
+	/* base connection information, may have been redirected */
 	iscsi_sockaddr_t	conn_base_addr;
 
 	/* current connection information, may have been redirected */
 	iscsi_sockaddr_t	conn_curr_addr;
 
-	/* current connection information, may have been redirected */
 	boolean_t		conn_bound;
 	iscsi_sockaddr_t	conn_bound_addr;
 
@@ -581,12 +658,12 @@ typedef struct iscsi_conn {
 	 * the session's pending queue or aborted.
 	 */
 	iscsi_queue_t		conn_queue_active;
+	iscsi_queue_t		conn_queue_idm_aborting;
 
 	/* lbolt from the last receive, used for nop processing */
 	clock_t			conn_rx_lbolt;
 	clock_t			conn_nop_lbolt;
 
-	iscsi_thread_t		*conn_rx_thread;
 	iscsi_thread_t		*conn_tx_thread;
 
 	/*
@@ -610,6 +687,19 @@ typedef struct iscsi_conn {
 	} stats;
 
 	/*
+	 * These fields are used to coordinate the asynchronous IDM
+	 * PDU operations with the synchronous login code.
+	 */
+	kmutex_t		conn_login_mutex;
+	kcondvar_t		conn_login_cv;
+	iscsi_login_state_t	conn_login_state;
+	iscsi_status_t		conn_login_status;
+	iscsi_hdr_t		conn_login_resp_hdr;
+	char			*conn_login_data;
+	int			conn_login_datalen;
+	int			conn_login_max_data_length;
+
+	/*
 	 * login min and max identify the amount of time
 	 * in lbolt that iscsi_start_login() should attempt
 	 * to log into a target portal.  The login will
@@ -621,19 +711,32 @@ typedef struct iscsi_conn {
 	 */
 	clock_t			conn_login_min;
 	clock_t			conn_login_max;
+	sm_audit_buf_t		conn_state_audit;
 } iscsi_conn_t;
 
 
 /*
- * iscsi_conn_state - (reference iscsi_sess.c for state diagram)
+ * iscsi_sess_state - (reference iscsi_sess.c for state diagram)
  */
 typedef enum iscsi_sess_state {
-	ISCSI_SESS_STATE_FREE,
+	ISCSI_SESS_STATE_FREE = 0,
 	ISCSI_SESS_STATE_LOGGED_IN,
 	ISCSI_SESS_STATE_FAILED,
 	ISCSI_SESS_STATE_IN_FLUSH,
-	ISCSI_SESS_STATE_FLUSHED
+	ISCSI_SESS_STATE_FLUSHED,
+	ISCSI_SESS_STATE_MAX
 } iscsi_sess_state_t;
+
+#ifdef ISCSI_SESS_SM_STRINGS
+static const char *iscsi_sess_state_names[ISCSI_SESS_STATE_MAX+1] = {
+	"ISCSI_SESS_STATE_FREE",
+	"ISCSI_SESS_STATE_LOGGED_IN",
+	"ISCSI_SESS_STATE_FAILED",
+	"ISCSI_SESS_STATE_IN_FLUSH",
+	"ISCSI_SESS_STATE_FLUSHED",
+	"ISCSI_SESS_STATE_MAX"
+};
+#endif
 
 #define	ISCSI_SESS_STATE_FULL_FEATURE(state) \
 	((state == ISCSI_SESS_STATE_LOGGED_IN) || \
@@ -641,15 +744,27 @@ typedef enum iscsi_sess_state {
 
 
 typedef enum iscsi_sess_event {
-	ISCSI_SESS_EVENT_N1,
+	ISCSI_SESS_EVENT_N1 = 0,
 	ISCSI_SESS_EVENT_N3,
 	ISCSI_SESS_EVENT_N5,
 	ISCSI_SESS_EVENT_N6,
-	ISCSI_SESS_EVENT_N7
+	ISCSI_SESS_EVENT_N7,
+	ISCSI_SESS_EVENT_MAX
 } iscsi_sess_event_t;
 
+#ifdef ISCSI_SESS_SM_STRINGS
+static const char *iscsi_sess_event_names[ISCSI_SESS_EVENT_MAX+1] = {
+	"ISCSI_SESS_EVENT_N1",
+	"ISCSI_SESS_EVENT_N3",
+	"ISCSI_SESS_EVENT_N5",
+	"ISCSI_SESS_EVENT_N6",
+	"ISCSI_SESS_EVENT_N7",
+	"ISCSI_SESS_EVENT_MAX"
+};
+#endif
+
 typedef enum iscsi_sess_type {
-	ISCSI_SESS_TYPE_NORMAL,
+	ISCSI_SESS_TYPE_NORMAL = 0,
 	ISCSI_SESS_TYPE_DISCOVERY
 } iscsi_sess_type_t;
 
@@ -841,6 +956,7 @@ typedef struct iscsi_sess {
 
 	iscsi_thread_t		*sess_wd_thread;
 
+	sm_audit_buf_t		sess_state_audit;
 } iscsi_sess_t;
 
 /*
@@ -851,6 +967,15 @@ typedef struct iscsi_sess_list {
 	iscsi_sess_t		*session;
 	struct iscsi_sess_list	*next;
 } iscsi_sess_list_t;
+
+/*
+ * iSCSI client notify task context for deferred IDM notifications processing
+ */
+typedef struct iscsi_cn_task {
+	idm_conn_t		*ct_ic;
+	idm_client_notify_t	ct_icn;
+	uintptr_t		ct_data;
+} iscsi_cn_task_t;
 
 /*
  * iscsi_network
@@ -906,6 +1031,7 @@ typedef struct iscsi_hba {
 	uint32_t		hba_sig;
 	dev_info_t		*hba_dip;	/* dev info ptr */
 	scsi_hba_tran_t		*hba_tran;	/* scsi tran ptr */
+	ldi_ident_t		hba_li;
 
 	struct iscsi_sess	*hba_sess_list;	/* sess. list for hba */
 	krwlock_t		hba_sess_list_rwlock; /* protect sess. list */
@@ -965,16 +1091,25 @@ typedef struct iscsi_hba {
  * +--------------------------------------------------------------------+
  */
 
+/* IDM client callback entry points */
+idm_rx_pdu_cb_t iscsi_rx_scsi_rsp;
+idm_rx_pdu_cb_t iscsi_rx_misc_pdu;
+idm_rx_pdu_error_cb_t iscsi_rx_error_pdu;
+idm_build_hdr_cb_t iscsi_build_hdr;
+idm_task_cb_t iscsi_task_aborted;
+idm_client_notify_cb_t iscsi_client_notify;
+
 /* iscsi_io.c */
 int iscsi_sna_lte(uint32_t n1, uint32_t n2);
 char *iscsi_get_next_text(char *data, int data_length, char *curr_text);
 
 void iscsi_ic_thread(iscsi_thread_t *thread, void *arg);
 void iscsi_tx_thread(iscsi_thread_t *thread, void *arg);
-void iscsi_rx_thread(iscsi_thread_t *thread, void *arg);
 void iscsi_wd_thread(iscsi_thread_t *thread, void *arg);
 
 iscsi_status_t iscsi_tx_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
+
+void iscsi_task_cleanup(int opcode, iscsi_cmd_t *icmdp);
 
 void iscsi_handle_abort(void *arg);
 iscsi_status_t iscsi_handle_reset(iscsi_sess_t *isp, int level,
@@ -999,6 +1134,8 @@ void iscsi_enqueue_pending_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 void iscsi_dequeue_pending_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 void iscsi_enqueue_active_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp);
 void iscsi_dequeue_active_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp);
+void iscsi_enqueue_idm_aborting_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp);
+void iscsi_dequeue_idm_aborting_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp);
 void iscsi_enqueue_completed_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 iscsi_status_t iscsi_dequeue_cmd(iscsi_cmd_t **, iscsi_cmd_t **, iscsi_cmd_t *);
 void iscsi_move_queue(iscsi_queue_t *src_queue, iscsi_queue_t *dst_queue);
@@ -1007,6 +1144,11 @@ void iscsi_enqueue_cmd_head(iscsi_cmd_t **, iscsi_cmd_t **,
 
 /* iscsi_login.c */
 iscsi_status_t iscsi_login_start(void *arg);
+void iscsi_login_update_state(iscsi_conn_t *icp,
+    iscsi_login_state_t next_state);
+void iscsi_login_update_state_locked(iscsi_conn_t *icp,
+    iscsi_login_state_t next_state);
+
 
 /* iscsi_stats.c */
 boolean_t iscsi_hba_kstat_init(struct iscsi_hba	*ihp);
@@ -1019,6 +1161,7 @@ void iscsi_conn_kstat_term(struct iscsi_conn *icp);
 /* iscsi_net.c */
 void iscsi_net_init();
 void iscsi_net_fini();
+iscsi_status_t iscsi_net_interface();
 
 /* iscsi_sess.c */
 iscsi_sess_t *iscsi_sess_create(iscsi_hba_t *ihp,
@@ -1031,6 +1174,8 @@ iscsi_status_t iscsi_sess_destroy(iscsi_sess_t *isp);
 void iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event);
 char *iscsi_sess_state_str(iscsi_sess_state_t state);
 boolean_t iscsi_sess_set_auth(iscsi_sess_t *isp);
+iscsi_status_t iscsi_sess_reserve_scsi_itt(iscsi_cmd_t *icmdp);
+void iscsi_sess_release_scsi_itt(iscsi_cmd_t *icmdp);
 iscsi_status_t iscsi_sess_reserve_itt(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 void iscsi_sess_release_itt(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 void iscsi_sess_redrive_io(iscsi_sess_t *isp);
@@ -1041,13 +1186,15 @@ int iscsi_sess_get_by_target(uint32_t target_oid, iscsi_hba_t *ihp,
 /* iscsi_conn.c */
 iscsi_status_t iscsi_conn_create(struct sockaddr *addr, iscsi_sess_t *isp,
     iscsi_conn_t **icpp);
+iscsi_status_t iscsi_conn_online(iscsi_conn_t *icp);
 iscsi_status_t iscsi_conn_offline(iscsi_conn_t *icp);
 iscsi_status_t iscsi_conn_destroy(iscsi_conn_t *icp);
-iscsi_status_t iscsi_conn_state_machine(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-char *iscsi_conn_state_str(iscsi_conn_state_t state);
 void iscsi_conn_set_login_min_max(iscsi_conn_t *icp, int min, int max);
 iscsi_status_t iscsi_conn_sync_params(iscsi_conn_t *icp);
+void iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp);
+void iscsi_conn_update_state(iscsi_conn_t *icp, iscsi_conn_state_t next_state);
+void iscsi_conn_update_state_locked(iscsi_conn_t *icp,
+			iscsi_conn_state_t next_state);
 
 /* iscsi_lun.c */
 iscsi_status_t iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num,

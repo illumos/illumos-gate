@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_IDM_CONN_SM_H_
@@ -224,7 +224,7 @@ typedef enum {
 typedef enum {
 	CA_TX_PROTOCOL_ERROR,	/* Send "protocol error" to state machine */
 	CA_RX_PROTOCOL_ERROR,	/* Send "protocol error" to state machine */
-	CA_FORWARD,		/* State machine event and foward to client */
+	CA_FORWARD,		/* State machine event and forward to client */
 	CA_DROP			/* Drop PDU */
 } idm_pdu_event_action_t;
 
@@ -233,6 +233,7 @@ typedef struct {
 	idm_conn_event_t	iec_event;
 	uintptr_t		iec_info;
 	idm_pdu_event_type_t	iec_pdu_event_type;
+	boolean_t		iec_pdu_forwarded;
 } idm_conn_event_ctx_t;
 
 idm_status_t
@@ -247,6 +248,13 @@ idm_notify_client(struct idm_conn_s *ic, idm_client_notify_t cn,
 
 void
 idm_conn_event(struct idm_conn_s *ic, idm_conn_event_t event, uintptr_t data);
+
+void
+idm_conn_event(struct idm_conn_s *ic, idm_conn_event_t event, uintptr_t data);
+
+void
+idm_conn_event_locked(struct idm_conn_s *ic, idm_conn_event_t event,
+    uintptr_t event_info, idm_pdu_event_type_t pdu_event_type);
 
 idm_status_t
 idm_conn_reinstate_event(struct idm_conn_s *old_ic, struct idm_conn_s *new_ic);

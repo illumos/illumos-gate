@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,14 +181,13 @@ extern	uint64_t ntohll(uint64_t);
 #define	BE_IN32(xa) htonl(*((uint32_t *)(void *)(xa)))
 #endif	/* !__i386 && !__amd64 */
 
-#if !defined(_LP64) && !defined(_LONGLONG_TYPE)
-#if (!defined(__i386) && !defined(__amd64)) /* sparc */
+#if (!defined(__i386) && !defined(__amd64)) || \
+	(!defined(_LP64) && !defined(_LONGLONG_TYPE))
 #define	BE_IN64(xa) \
 	(((uint64_t)BE_IN32(xa) << 32) | BE_IN32((uint8_t *)(xa) + 4))
 #else /* x86 */
 #define	BE_IN64(xa) htonll(*((uint64_t *)(void *)(xa)))
-#endif	/* (!__i386 && !__amd64) */
-#endif	/* !_LP64 && !_LONGLONG_TYPE */
+#endif /* (!__i386 && !__amd64) || (!_LP64 && !_LONGLONG_TYPE) */
 
 #define	LE_IN8(xa) \
 	*((uint8_t *)(xa))

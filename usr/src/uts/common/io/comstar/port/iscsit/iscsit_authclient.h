@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _ISCSIT_AUTHCLIENT_H_
@@ -28,17 +28,17 @@
 #define	ISCSI_AUTH_PASSED	0
 #define	ISCSI_AUTH_FAILED	1
 
-enum { iscsiAuthStringMaxLength = 256 };
+enum { iscsitAuthStringMaxLength = 256 };
 
 enum { AuthStringMaxLength = 256 };
 enum { AuthStringBlockMaxLength = 1024 };
 enum { AuthLargeBinaryMaxLength = 1024 };
 
-enum { iscsiAuthChapResponseLength = 16 };
+enum { iscsitAuthChapResponseLength = 16 };
 
-enum { iscsiAuthMethodMaxCount = 2 };
+enum { iscsitAuthMethodMaxCount = 2 };
 
-enum { iscsiAuthChapAlgorithmMd5 = 5 };
+enum { iscsitAuthChapAlgorithmMd5 = 5 };
 
 enum {
 	AKT_CHAP_A = 0,

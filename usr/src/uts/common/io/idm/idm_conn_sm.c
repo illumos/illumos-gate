@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,15 +34,12 @@
 #include <sys/sdt.h>
 
 #define	IDM_CONN_SM_STRINGS
+#define	IDM_CN_NOTIFY_STRINGS
 #include <sys/idm/idm.h>
 
 boolean_t	idm_sm_logging = B_FALSE;
 
 extern idm_global_t	idm; /* Global state */
-
-static void
-idm_conn_event_locked(idm_conn_t *ic, idm_conn_event_t event,
-    uintptr_t event_info, idm_pdu_event_type_t pdu_event_type);
 
 static void
 idm_conn_event_handler(void *event_ctx_opaque);
@@ -122,7 +119,7 @@ idm_conn_sm_init(idm_conn_t *ic)
 	(void) snprintf(taskq_name, sizeof (taskq_name) - 1, "conn_sm%08x",
 	    ic->ic_internal_cid);
 
-	ic->ic_state_taskq = taskq_create(taskq_name, 1, minclsyspri, 2, 2,
+	ic->ic_state_taskq = taskq_create(taskq_name, 1, minclsyspri, 4, 16384,
 	    TASKQ_PREPOPULATE);
 	if (ic->ic_state_taskq == NULL) {
 		return (IDM_STATUS_FAIL);
@@ -160,6 +157,7 @@ idm_conn_event(idm_conn_t *ic, idm_conn_event_t event, uintptr_t event_info)
 	idm_conn_event_locked(ic, event, event_info, CT_NONE);
 	mutex_exit(&ic->ic_state_mutex);
 }
+
 
 idm_status_t
 idm_conn_reinstate_event(idm_conn_t *old_ic, idm_conn_t *new_ic)
@@ -201,7 +199,7 @@ idm_conn_rx_pdu_event(idm_conn_t *ic, idm_conn_event_t event,
 	idm_conn_event_locked(ic, event, event_info, CT_RX_PDU);
 }
 
-static void
+void
 idm_conn_event_locked(idm_conn_t *ic, idm_conn_event_t event,
     uintptr_t event_info, idm_pdu_event_type_t pdu_event_type)
 {
@@ -263,7 +261,7 @@ idm_conn_event_handler(void *event_ctx_opaque)
 	    (void *)ic, idm_ce_name[event_ctx->iec_event],
 	    event_ctx->iec_event);
 	DTRACE_PROBE2(conn__event,
-	    idm_conn_t *, ic, smb_event_ctx_t *, event_ctx);
+	    idm_conn_t *, ic, idm_conn_event_ctx_t *, event_ctx);
 
 	/*
 	 * Validate event
@@ -285,6 +283,7 @@ idm_conn_event_handler(void *event_ctx_opaque)
 	 * CE_TX_PROTOCOL_ERROR and CE_RX_PROTOCOL_ERROR events since
 	 * no PDU's can be transmitted or received in that state.
 	 */
+	event_ctx->iec_pdu_forwarded = B_FALSE;
 	if (event_ctx->iec_pdu_event_type != CT_NONE) {
 		ASSERT(pdu != NULL);
 		action = idm_conn_sm_validate_pdu(ic, event_ctx, pdu);
@@ -378,10 +377,13 @@ idm_conn_event_handler(void *event_ctx_opaque)
 			idm_pdu_rx_protocol_error(ic, pdu);
 			break;
 		case CA_FORWARD:
-			if (event_ctx->iec_pdu_event_type == CT_RX_PDU) {
-				idm_pdu_rx_forward(ic, pdu);
-			} else {
-				idm_pdu_tx_forward(ic, pdu);
+			if (!event_ctx->iec_pdu_forwarded) {
+				if (event_ctx->iec_pdu_event_type ==
+				    CT_RX_PDU) {
+					idm_pdu_rx_forward(ic, pdu);
+				} else {
+					idm_pdu_tx_forward(ic, pdu);
+				}
 			}
 			break;
 		default:
@@ -553,6 +555,15 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		    idm_state_s4_in_login_fail_snd_done;
 		break;
 	case CE_LOGIN_FAIL_RCV:
+		/*
+		 * Need to deliver this PDU to the initiator now because after
+		 * we update the state to CS_S9_INIT_ERROR the initiator will
+		 * no longer be in an appropriate state.
+		 */
+		event_ctx->iec_pdu_forwarded = B_TRUE;
+		pdu = (idm_pdu_t *)event_ctx->iec_info;
+		idm_pdu_rx_forward(ic, pdu);
+		/* FALLTHROUGH */
 	case CE_TRANSPORT_FAIL:
 	case CE_LOGOUT_OTHER_CONN_SND:
 	case CE_LOGOUT_OTHER_CONN_RCV:
@@ -715,6 +726,15 @@ idm_state_s6_in_logout(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		}
 		break;
 	case CE_LOGOUT_SUCCESS_RCV:
+		/*
+		 * Need to deliver this PDU to the initiator now because after
+		 * we update the state to CS_S11_COMPLETE the initiator will
+		 * no longer be in an appropriate state.
+		 */
+		event_ctx->iec_pdu_forwarded = B_TRUE;
+		pdu = (idm_pdu_t *)event_ctx->iec_info;
+		idm_pdu_rx_forward(ic, pdu);
+		/* FALLTHROUGH */
 	case CE_LOGOUT_SESSION_SUCCESS:
 		/* T13 */
 
@@ -1126,12 +1146,31 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 			ic->ic_conn_sm_status = IDM_STATUS_FAIL;
 			cv_signal(&ic->ic_state_cv);
 			mutex_exit(&ic->ic_state_mutex);
-			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
+			if (ic->ic_last_state != CS_S1_FREE &&
+			    ic->ic_last_state != CS_S2_XPT_WAIT) {
+				ic->ic_transport_ops->it_ini_conn_disconnect(
+				    ic);
+			} else {
+				(void) idm_notify_client(ic, CN_CONNECT_FAIL,
+				    NULL);
+			}
 		}
 		/*FALLTHROUGH*/
 	case CS_S11_COMPLETE:
-		/* No more traffic on this connection */
-		(void) idm_notify_client(ic, CN_CONNECT_LOST, NULL);
+		/*
+		 * No more traffic on this connection.  If this is an
+		 * initiator connection and we weren't connected yet
+		 * then don't send the "connect lost" event.
+		 * It's useful to the initiator to know whether we were
+		 * logging in at the time so send that information in the
+		 * data field.
+		 */
+		if (IDM_CONN_ISTGT(ic) ||
+		    ((ic->ic_last_state != CS_S1_FREE) &&
+		    (ic->ic_last_state != CS_S2_XPT_WAIT))) {
+			(void) idm_notify_client(ic, CN_CONNECT_LOST,
+			    (uintptr_t)(ic->ic_last_state == CS_S4_IN_LOGIN));
+		}
 
 		/* Abort all tasks */
 		idm_task_abort(ic, NULL, AT_INTERNAL_ABORT);
@@ -1403,6 +1442,9 @@ idm_notify_client(idm_conn_t *ic, idm_client_notify_t cn, uintptr_t data)
 	 * for now lets just call the client's notify function and return
 	 * the status.
 	 */
+	cn = (cn > CN_MAX) ? CN_MAX : cn;
+	IDM_SM_LOG(CE_NOTE, "idm_notify_client: ic=%p %s(%d)\n",
+	    (void *)ic, idm_cn_strings[cn], cn);
 	return ((*ic->ic_conn_ops.icb_client_notify)(ic, cn, data));
 }
 

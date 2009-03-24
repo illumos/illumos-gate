@@ -676,7 +676,7 @@ iscsit_auth_gen_challenge(iscsit_conn_t *ict)
 	}
 
 	bin = &(client->auth_send_binary_block.largeBinary[0]);
-	len = iscsiAuthChapResponseLength;
+	len = iscsitAuthChapResponseLength;
 	auth_random_set_data(bin, len);
 	client_set_binary_data(&client->sendKeyBlock,
 	    AKT_CHAP_C,
@@ -707,7 +707,7 @@ iscsit_auth_gen_response(iscsit_conn_t *ict)
 	uint32_t		chap_id;
 	unsigned char		*chap_challenge;
 	unsigned int		challenge_len;
-	uchar_t			resp[iscsiAuthChapResponseLength];
+	uchar_t			resp[iscsitAuthChapResponseLength];
 
 	tgt_username = auth->ca_tgt_chapuser;
 	tgt_password = auth->ca_tgt_chapsecret;

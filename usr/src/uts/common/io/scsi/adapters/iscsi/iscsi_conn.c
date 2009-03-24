@@ -19,42 +19,29 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI connection interfaces
  */
 
+#define	ISCSI_ICS_NAMES
 #include "iscsi.h"
 #include "persistent.h"
 #include <sys/bootprops.h>
 
 extern ib_boot_prop_t   *iscsiboot_prop;
 
-/* interface connection interfaces */
-static iscsi_status_t iscsi_conn_state_free(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-static void iscsi_conn_state_in_login(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-static void iscsi_conn_state_logged_in(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-static void iscsi_conn_state_in_logout(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-static void iscsi_conn_state_failed(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-static void iscsi_conn_state_polling(iscsi_conn_t *icp,
-    iscsi_conn_event_t event);
-static char *iscsi_conn_event_str(iscsi_conn_event_t event);
-static void iscsi_conn_flush_active_cmds(iscsi_conn_t *icp);
+static void iscsi_client_notify_task(void *cn_task_void);
 
-static void iscsi_conn_logged_in(iscsi_sess_t *isp,
-    iscsi_conn_t *icp);
-static void iscsi_conn_retry(iscsi_sess_t *isp,
-    iscsi_conn_t *icp);
+static void iscsi_conn_flush_active_cmds(iscsi_conn_t *icp);
 
 #define	SHUTDOWN_TIMEOUT	180 /* seconds */
 
 extern int modrootloaded;
+
+boolean_t iscsi_conn_logging = B_FALSE;
+
 /*
  * +--------------------------------------------------------------------+
  * | External Connection Interfaces					|
@@ -105,16 +92,22 @@ iscsi_conn_create(struct sockaddr *addr, iscsi_sess_t *isp, iscsi_conn_t **icpp)
 	icp->conn_state			= ISCSI_CONN_STATE_FREE;
 	mutex_init(&icp->conn_state_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&icp->conn_state_change, NULL, CV_DRIVER, NULL);
+	mutex_init(&icp->conn_login_mutex, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&icp->conn_login_cv, NULL, CV_DRIVER, NULL);
 	icp->conn_state_destroy		= B_FALSE;
+	idm_sm_audit_init(&icp->conn_state_audit);
 	icp->conn_sess			= isp;
-	icp->conn_state_lbolt		= ddi_get_lbolt();
 
 	mutex_enter(&iscsi_oid_mutex);
 	icp->conn_oid = iscsi_oid++;
 	mutex_exit(&iscsi_oid_mutex);
 
-	/* Creation of the receive thread */
-	if (snprintf(th_name, sizeof (th_name) - 1, ISCSI_CONN_RXTH_NAME_FORMAT,
+	/*
+	 * IDM CN taskq
+	 */
+
+	if (snprintf(th_name, sizeof (th_name) - 1,
+	    ISCSI_CONN_CN_TASKQ_NAME_FORMAT,
 	    icp->conn_sess->sess_hba->hba_oid, icp->conn_sess->sess_oid,
 	    icp->conn_oid) >= sizeof (th_name)) {
 		cv_destroy(&icp->conn_state_change);
@@ -124,17 +117,25 @@ iscsi_conn_create(struct sockaddr *addr, iscsi_sess_t *isp, iscsi_conn_t **icpp)
 		return (ISCSI_STATUS_INTERNAL_ERROR);
 	}
 
-	icp->conn_rx_thread = iscsi_thread_create(isp->sess_hba->hba_dip,
-	    th_name, iscsi_rx_thread, icp);
+	icp->conn_cn_taskq =
+	    ddi_taskq_create(icp->conn_sess->sess_hba->hba_dip, th_name, 1,
+	    TASKQ_DEFAULTPRI, 0);
+	if (icp->conn_cn_taskq == NULL) {
+		cv_destroy(&icp->conn_state_change);
+		mutex_destroy(&icp->conn_state_mutex);
+		kmem_free(icp, sizeof (iscsi_conn_t));
+		*icpp = NULL;
+		return (ISCSI_STATUS_INTERNAL_ERROR);
+	}
 
 	/* Creation of the transfer thread */
 	if (snprintf(th_name, sizeof (th_name) - 1, ISCSI_CONN_TXTH_NAME_FORMAT,
 	    icp->conn_sess->sess_hba->hba_oid, icp->conn_sess->sess_oid,
 	    icp->conn_oid) >= sizeof (th_name)) {
-		iscsi_thread_destroy(icp->conn_rx_thread);
 		cv_destroy(&icp->conn_state_change);
 		mutex_destroy(&icp->conn_state_mutex);
 		kmem_free(icp, sizeof (iscsi_conn_t));
+		ddi_taskq_destroy(icp->conn_cn_taskq);
 		*icpp = NULL;
 		return (ISCSI_STATUS_INTERNAL_ERROR);
 	}
@@ -144,6 +145,7 @@ iscsi_conn_create(struct sockaddr *addr, iscsi_sess_t *isp, iscsi_conn_t **icpp)
 
 	/* setup connection queues */
 	iscsi_init_queue(&icp->conn_queue_active);
+	iscsi_init_queue(&icp->conn_queue_idm_aborting);
 
 	bcopy(addr, &icp->conn_base_addr, sizeof (icp->conn_base_addr));
 
@@ -164,6 +166,47 @@ iscsi_conn_create(struct sockaddr *addr, iscsi_sess_t *isp, iscsi_conn_t **icpp)
 	return (ISCSI_STATUS_SUCCESS);
 }
 
+/*
+ * iscsi_conn_online - This attempts to take a connection from
+ * ISCSI_CONN_STATE_FREE to ISCSI_CONN_STATE_LOGGED_IN.
+ */
+iscsi_status_t
+iscsi_conn_online(iscsi_conn_t *icp)
+{
+	iscsi_task_t	*itp;
+	iscsi_status_t	rval;
+
+	ASSERT(icp != NULL);
+	ASSERT(mutex_owned(&icp->conn_state_mutex));
+	ASSERT(icp->conn_state == ISCSI_CONN_STATE_FREE);
+
+	/*
+	 * If we are attempting to connect then for the purposes of the
+	 * other initiator code we are effectively in ISCSI_CONN_STATE_IN_LOGIN.
+	 */
+	iscsi_conn_update_state_locked(icp, ISCSI_CONN_STATE_IN_LOGIN);
+	mutex_exit(&icp->conn_state_mutex);
+
+	/*
+	 * Sync base connection information before login
+	 * A login redirection might have shifted the
+	 * current information from the base.
+	 */
+	bcopy(&icp->conn_base_addr, &icp->conn_curr_addr,
+	    sizeof (icp->conn_curr_addr));
+
+	itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
+	ASSERT(itp != NULL);
+
+	itp->t_arg = icp;
+	itp->t_blocking = B_TRUE;
+	rval = iscsi_login_start(itp);
+	kmem_free(itp, sizeof (iscsi_task_t));
+
+	mutex_enter(&icp->conn_state_mutex);
+
+	return (rval);
+}
 
 /*
  * iscsi_conn_offline - This attempts to take a connection from
@@ -184,34 +227,45 @@ iscsi_conn_offline(iscsi_conn_t *icp)
 	 * on the connection to influence the transitions
 	 * to quickly complete.  Then wait for a state
 	 * transition.
+	 *
+	 * ISCSI_CONN_STATE_LOGGED_IN is set immediately at the
+	 * start of CN_NOTIFY_FFP processing. icp->conn_state_ffp
+	 * is set to true at the end of ffp processing, at which
+	 * point any session updates are complete.  We don't
+	 * want to start offlining the connection before we're
+	 * done completing the FFP processing since this might
+	 * interrupt the discovery process.
 	 */
 	delay = ddi_get_lbolt() + SEC_TO_TICK(SHUTDOWN_TIMEOUT);
 	mutex_enter(&icp->conn_state_mutex);
 	icp->conn_state_destroy = B_TRUE;
-	while ((icp->conn_state != ISCSI_CONN_STATE_FREE) &&
-	    (icp->conn_state != ISCSI_CONN_STATE_LOGGED_IN) &&
+	while ((((icp->conn_state != ISCSI_CONN_STATE_FREE) &&
+	    (icp->conn_state != ISCSI_CONN_STATE_LOGGED_IN)) ||
+	    ((icp->conn_state == ISCSI_CONN_STATE_LOGGED_IN) &&
+	    !icp->conn_state_ffp)) &&
 	    (ddi_get_lbolt() < delay)) {
 		/* wait for transition */
 		(void) cv_timedwait(&icp->conn_state_change,
 		    &icp->conn_state_mutex, delay);
 	}
 
-	/* Final check whether we can destroy the connection */
 	switch (icp->conn_state) {
 	case ISCSI_CONN_STATE_FREE:
-		/* Easy case - Connection is dead */
 		break;
 	case ISCSI_CONN_STATE_LOGGED_IN:
-		/* Hard case - Force connection logout */
-		(void) iscsi_conn_state_machine(icp,
-		    ISCSI_CONN_EVENT_T9);
+		if (icp->conn_state_ffp)
+			(void) iscsi_handle_logout(icp);
+		else {
+			icp->conn_state_destroy = B_FALSE;
+			mutex_exit(&icp->conn_state_mutex);
+			return (ISCSI_STATUS_INTERNAL_ERROR);
+		}
 		break;
 	case ISCSI_CONN_STATE_IN_LOGIN:
 	case ISCSI_CONN_STATE_IN_LOGOUT:
 	case ISCSI_CONN_STATE_FAILED:
 	case ISCSI_CONN_STATE_POLLING:
 	default:
-		/* All other cases fail the destroy */
 		icp->conn_state_destroy = B_FALSE;
 		mutex_exit(&icp->conn_state_mutex);
 		return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -241,15 +295,16 @@ iscsi_conn_destroy(iscsi_conn_t *icp)
 		return (ISCSI_STATUS_INTERNAL_ERROR);
 	}
 
-	/* Destroy receive thread */
-	iscsi_thread_destroy(icp->conn_rx_thread);
-
 	/* Destroy transfer thread */
 	iscsi_thread_destroy(icp->conn_tx_thread);
+	ddi_taskq_destroy(icp->conn_cn_taskq);
 
 	/* Terminate connection queues */
+	iscsi_destroy_queue(&icp->conn_queue_idm_aborting);
 	iscsi_destroy_queue(&icp->conn_queue_active);
 
+	cv_destroy(&icp->conn_login_cv);
+	mutex_destroy(&icp->conn_login_mutex);
 	cv_destroy(&icp->conn_state_change);
 	mutex_destroy(&icp->conn_state_mutex);
 
@@ -317,185 +372,254 @@ iscsi_conn_set_login_min_max(iscsi_conn_t *icp, int min, int max)
 }
 
 
-
 /*
- * iscsi_conn_state_machine - This function is used to drive the
- * state machine of the iscsi connection.  It takes in a connection
- * and the associated event effecting the connection.
- *
- * 7.1.3  Connection State Diagram for an Initiator
- *      Symbolic Names for States:
- *      S1: FREE        - State on instantiation, or after successful
- *                        connection closure.
- *      S2: IN_LOGIN    - Waiting for login process to conclude,
- *                        possibly involving several PDU exchanges.
- *      S3: LOGGED_IN   - In Full Feature Phase, waiting for all internal,
- *                        iSCSI, and transport events
- *      S4: IN_LOGOUT   - Waiting for the Logout repsonse.
- *      S5: FAILED      - The connection has failed.  Attempting
- *			  to reconnect.
- *      S6: POLLING     - The connection reconnect attempts have
- *                        failed.  Continue to poll at a lower
- *                        frequency.
- *
- *      States S3, S4 constitute the Full Feature Phase
- *              of the connection.
- *
- *      The state diagram is as follows:
- *                 -------
- *      +-------->/ S1    \<------------------------------+
- *      |      +->\       /<---+            /---\         |
- *      |     /    ---+---     |T7/30     T7|   |         |
- *      |    +        |        |            \->------     |
- *      |  T8|        |T1     /      T5       / S6   \--->|
- *      |    |        |      /     +----------\      /T30 |
- *      |    |        V     /     /            ------     |
- *      |    |     ------- /     /               ^        |
- *      |    |    / S2    \     /   T5           |T7      |
- *      |    |    \       /    +-------------- --+---     |
- *      |    |     ---+---    /               / S5   \--->|
- *      |    |        |      /      T14/T15   \      /T30 |
- *      |    |        |T5   /  +-------------> ------     |
- *      |    |        |    /  /                           |
- *      |    |        |   /  /         T11                |
- *      |    |        |  /  /         +----+              |
- *      |    |        V V  /          |    |              |
- *      |    |      ------+       ----+--  |              |
- *      |    +-----/ S3    \T9/11/ S4    \<+              |
- *      +----------\       /---->\       /----------------+
- *                  -------       -------        T15/T17
- *
- * The state transition table is as follows:
- *
- *         +-----+---+---+------+------+---+
- *         |S1   |S2 |S3 |S4    |S5    |S6 |
- *      ---+-----+---+---+------+------+---+
- *       S1|T1   |T1 | - | -    | -    |   |
- *      ---+-----+---+---+------+------+---+
- *       S2|T7/30|-  |T5 | -    | -    |   |
- *      ---+-----+---+---+------+------+---+
- *       S3|T8   |-  | - |T9/11 |T14/15|   |
- *      ---+-----+---+---+------+------+---+
- *       S4|     |-  | - |T11   |T15/17|   |
- *      ---+-----+---+---+------+------+---+
- *       S5|T30  |   |T5 |      |      |T7 |
- *      ---+-----+---+---+------+------+---+
- *       S6|T30  |   |T5 |      |      |T7 |
- *      ---+-----+---+---+------+------+---+
- *
- * Events definitions:
- *
- * -T1: Transport connection request was made (e.g., TCP SYN sent).
- * -T5: The final iSCSI Login response with a Status-Class of zero was
- *      received.
- * -T7: One of the following events caused the transition:
- *      - Login timed out.
- *      - A transport disconnect indication was received.
- *      - A transport reset was received.
- *      - An internal event indicating a transport timeout was
- *        received.
- *      - An internal event of receiving a Logout repsonse (success)
- *        on another connection for a "close the session" Logout
- *        request was received.
- *      * In all these cases, the transport connection is closed.
- * -T8: An internal event of receiving a Logout response (success)
- *      on another connection for a "close the session" Logout request
- *      was received, thus closing this connection requiring no further
- *      cleanup.
- * -T9: An internal event that indicates the readiness to start the
- *      Logout process was received, thus prompting an iSCSI Logout to
- *      be sent by the initiator.
- * -T11: Async PDU with AsyncEvent "Request Logout" was received.
- * -T13: An iSCSI Logout response (success) was received, or an internal
- *      event of receiving a Logout response (success) on another
- *      connection was received.
- * -T14: One or more of the following events case this transition:
- *	- Header Digest Error
- *	- Protocol Error
- * -T15: One or more of the following events caused this transition:
- *      - Internal event that indicates a transport connection timeout
- *        was received thus prompting transport RESET or transport
- *        connection closure.
- *      - A transport RESET
- *      - A transport disconnect indication.
- *      - Async PDU with AsyncEvent "Drop connection" (for this CID)
- *      - Async PDU with AsyncEvent "Drop all connections"
- * -T17: One or more of the following events caused this transition:
- *      - Logout response, (failure i.e., a non-zero status) was
- *      received, or Logout timed out.
- *      - Any of the events specified for T15.
- * -T30: One of the following event caused the transition:
- *	- Thefinal iSCSI Login response was received with a non-zero
- *	  Status-Class.
+ * Process the idm notifications
  */
-iscsi_status_t
-iscsi_conn_state_machine(iscsi_conn_t *icp, iscsi_conn_event_t event)
+idm_status_t
+iscsi_client_notify(idm_conn_t *ic, idm_client_notify_t icn, uintptr_t data)
 {
-	iscsi_status_t	    status = ISCSI_STATUS_SUCCESS;
+	iscsi_cn_task_t		*cn;
+	iscsi_conn_t		*icp = ic->ic_handle;
+	iscsi_sess_t		*isp;
+
+	/*
+	 * Don't access icp if the notification is CN_CONNECT_DESTROY
+	 * since icp may have already been freed.
+	 *
+	 * Handle CN_FFP_ENABLED and CN_CONNECT_DESTROY immediately
+	 */
+	switch (icn) {
+	case CN_CONNECT_FAIL:
+	case CN_LOGIN_FAIL:
+		/*
+		 * Wakeup any thread waiting for login stuff to happen.
+		 */
+		ASSERT(icp != NULL);
+		iscsi_login_update_state(icp, LOGIN_ERROR);
+		return (IDM_STATUS_SUCCESS);
+	case CN_READY_FOR_LOGIN:
+		idm_conn_hold(ic); /* Released in CN_CONNECT_LOST */
+		mutex_enter(&icp->conn_state_mutex);
+		icp->conn_state_idm_connected = B_TRUE;
+		cv_broadcast(&icp->conn_state_change);
+		mutex_exit(&icp->conn_state_mutex);
+
+		iscsi_login_update_state(icp, LOGIN_READY);
+		return (IDM_STATUS_SUCCESS);
+	case CN_CONNECT_DESTROY:
+		/*
+		 * We released any dependecies we had on this object in
+		 * either CN_LOGIN_FAIL or CN_CONNECT_LOST so we just need
+		 * to destroy the IDM connection now.
+		 */
+		idm_ini_conn_destroy(ic);
+		return (IDM_STATUS_SUCCESS);
+	}
 
 	ASSERT(icp != NULL);
-	ASSERT(mutex_owned(&icp->conn_state_mutex));
+	isp = icp->conn_sess;
 
-	DTRACE_PROBE3(event, iscsi_conn_t *, icp,
-	    char *, iscsi_conn_state_str(icp->conn_state),
-	    char *, iscsi_conn_event_str(event));
+	/*
+	 * Dispatch notifications to the taskq since they often require
+	 * long blocking operations.  In the case of CN_CONNECT_DESTROY
+	 * we actually just want to destroy the connection which we
+	 * can't do in the IDM taskq context.
+	 */
+	cn = kmem_alloc(sizeof (*cn), KM_SLEEP);
 
-	icp->conn_prev_state = icp->conn_state;
-	icp->conn_state_lbolt = ddi_get_lbolt();
+	cn->ct_ic = ic;
+	cn->ct_icn = icn;
+	cn->ct_data = data;
 
-	switch (icp->conn_state) {
-	case ISCSI_CONN_STATE_FREE:
-		status = iscsi_conn_state_free(icp, event);
-		break;
-	case ISCSI_CONN_STATE_IN_LOGIN:
-		iscsi_conn_state_in_login(icp, event);
-		break;
-	case ISCSI_CONN_STATE_LOGGED_IN:
-		iscsi_conn_state_logged_in(icp, event);
-		break;
-	case ISCSI_CONN_STATE_IN_LOGOUT:
-		iscsi_conn_state_in_logout(icp, event);
-		break;
-	case ISCSI_CONN_STATE_FAILED:
-		iscsi_conn_state_failed(icp, event);
-		break;
-	case ISCSI_CONN_STATE_POLLING:
-		iscsi_conn_state_polling(icp, event);
-		break;
-	default:
-		ASSERT(FALSE);
-		status = ISCSI_STATUS_INTERNAL_ERROR;
+	idm_conn_hold(ic);
+
+	if (ddi_taskq_dispatch(icp->conn_cn_taskq,
+	    iscsi_client_notify_task, cn, DDI_SLEEP) != DDI_SUCCESS) {
+		idm_conn_rele(ic);
+		cmn_err(CE_WARN, "iscsi connection(%u) failure - "
+		    "unable to schedule notify task", icp->conn_oid);
+		iscsi_conn_update_state(icp, ISCSI_CONN_STATE_FREE);
+		mutex_enter(&isp->sess_state_mutex);
+		iscsi_sess_state_machine(isp,
+		    ISCSI_SESS_EVENT_N6);
+		mutex_exit(&isp->sess_state_mutex);
 	}
 
-	cv_broadcast(&icp->conn_state_change);
-	return (status);
+	return (IDM_STATUS_SUCCESS);
 }
 
-
-/*
- * iscsi_conn_state_str - converts state enum to a string
- */
-char *
-iscsi_conn_state_str(iscsi_conn_state_t state)
+static void
+iscsi_client_notify_task(void *cn_task_void)
 {
-	switch (state) {
-	case ISCSI_CONN_STATE_FREE:
-		return ("free");
-	case ISCSI_CONN_STATE_IN_LOGIN:
-		return ("in_login");
-	case ISCSI_CONN_STATE_LOGGED_IN:
-		return ("logged_in");
-	case ISCSI_CONN_STATE_IN_LOGOUT:
-		return ("in_logout");
-	case ISCSI_CONN_STATE_FAILED:
-		return ("failed");
-	case ISCSI_CONN_STATE_POLLING:
-		return ("polling");
-	default:
-		return ("unknown");
-	}
-}
+	iscsi_cn_task_t		*cn_task = cn_task_void;
+	iscsi_conn_t		*icp;
+	iscsi_sess_t		*isp;
+	idm_conn_t		*ic;
+	idm_client_notify_t	icn;
+	uintptr_t		data;
+	idm_ffp_disable_t	disable_type;
+	boolean_t		in_login;
 
+	ic = cn_task->ct_ic;
+	icn = cn_task->ct_icn;
+	data = cn_task->ct_data;
+
+	icp = ic->ic_handle;
+	ASSERT(icp != NULL);
+	isp = icp->conn_sess;
+
+	switch (icn) {
+	case CN_FFP_ENABLED:
+		mutex_enter(&icp->conn_state_mutex);
+		icp->conn_async_logout = B_FALSE;
+		icp->conn_state_ffp = B_TRUE;
+		cv_broadcast(&icp->conn_state_change);
+		mutex_exit(&icp->conn_state_mutex);
+
+		/*
+		 * This logic assumes that the IDM login-snooping code
+		 * and the initiator login code will agree on whether
+		 * the connection is in FFP.  The reason we do this
+		 * is that we don't want to process CN_FFP_DISABLED until
+		 * CN_FFP_ENABLED has been full handled.
+		 */
+		mutex_enter(&icp->conn_login_mutex);
+		while (icp->conn_login_state != LOGIN_FFP) {
+			cv_wait(&icp->conn_login_cv, &icp->conn_login_mutex);
+		}
+		mutex_exit(&icp->conn_login_mutex);
+		break;
+	case CN_FFP_DISABLED:
+		disable_type = (idm_ffp_disable_t)data;
+
+		mutex_enter(&icp->conn_state_mutex);
+		switch (disable_type) {
+		case FD_SESS_LOGOUT:
+		case FD_CONN_LOGOUT:
+			if (icp->conn_async_logout) {
+				/*
+				 * Our logout was in response to an
+				 * async logout request so treat this
+				 * like a connection failure (we will
+				 * try to re-establish the connection)
+				 */
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_FAILED);
+			} else {
+				/*
+				 * Logout due to to user config change,
+				 * we will not try to re-establish
+				 * the connection.
+				 */
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_IN_LOGOUT);
+				/*
+				 * Hold off generating the ISCSI_SESS_EVENT_N3
+				 * event until we get the CN_CONNECT_LOST
+				 * notification.  This matches the pre-IDM
+				 * implementation better.
+				 */
+			}
+			break;
+
+		case FD_CONN_FAIL:
+		default:
+			iscsi_conn_update_state_locked(icp,
+			    ISCSI_CONN_STATE_FAILED);
+			break;
+		}
+
+		icp->conn_state_ffp = B_FALSE;
+		cv_broadcast(&icp->conn_state_change);
+		mutex_exit(&icp->conn_state_mutex);
+
+		break;
+	case CN_CONNECT_LOST:
+		/*
+		 * We only care about CN_CONNECT_LOST if we've logged in.  IDM
+		 * sends a flag as the data payload to indicate whether we
+		 * were trying to login.  The CN_LOGIN_FAIL notification
+		 * gives us what we need to know for login failures and
+		 * otherwise we will need to keep a bunch of state to know
+		 * what CN_CONNECT_LOST means to us.
+		 */
+		in_login = (boolean_t)data;
+		if (in_login) {
+			mutex_enter(&icp->conn_state_mutex);
+
+			icp->conn_state_idm_connected = B_FALSE;
+			cv_broadcast(&icp->conn_state_change);
+			mutex_exit(&icp->conn_state_mutex);
+
+			/* Release connect hold from CN_READY_FOR_LOGIN */
+			idm_conn_rele(ic);
+			break;
+		}
+
+		/* Any remaining commands are never going to finish */
+		iscsi_conn_flush_active_cmds(icp);
+
+		/*
+		 * The connection is no longer active so cleanup any
+		 * references to the connection and release any holds so
+		 * that IDM can finish cleanup.
+		 */
+		mutex_enter(&icp->conn_state_mutex);
+		if (icp->conn_state != ISCSI_CONN_STATE_FAILED) {
+
+			mutex_enter(&isp->sess_state_mutex);
+			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N3);
+			mutex_exit(&isp->sess_state_mutex);
+
+			iscsi_conn_update_state_locked(icp,
+			    ISCSI_CONN_STATE_FREE);
+		} else {
+
+			mutex_enter(&isp->sess_state_mutex);
+			iscsi_sess_state_machine(isp,
+			    ISCSI_SESS_EVENT_N5);
+			mutex_exit(&isp->sess_state_mutex);
+
+			/*
+			 * If session type is NORMAL, try to reestablish the
+			 * connection.
+			 */
+			if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+				iscsi_conn_retry(isp, icp);
+			} else {
+
+				mutex_enter(&isp->sess_state_mutex);
+				iscsi_sess_state_machine(isp,
+				    ISCSI_SESS_EVENT_N6);
+				mutex_exit(&isp->sess_state_mutex);
+
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_FREE);
+			}
+		}
+
+		(void) iscsi_thread_stop(icp->conn_tx_thread);
+
+		icp->conn_state_idm_connected = B_FALSE;
+		cv_broadcast(&icp->conn_state_change);
+		mutex_exit(&icp->conn_state_mutex);
+
+		/* Release connect hold from CN_READY_FOR_LOGIN */
+		idm_conn_rele(ic);
+		break;
+	default:
+		ISCSI_CONN_LOG(CE_WARN,
+		    "iscsi_client_notify: unknown notification: "
+		    "%x: NOT IMPLEMENTED YET: icp: %p ic: %p ",
+		    icn, (void *)icp, (void *)ic);
+		break;
+	}
+	/* free the task notify structure we allocated in iscsi_client_notify */
+	kmem_free(cn_task, sizeof (*cn_task));
+
+	/* Release the hold we acquired in iscsi_client_notify */
+	idm_conn_rele(ic);
+}
 
 /*
  * iscsi_conn_sync_params - used to update connection parameters
@@ -562,7 +686,8 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 			break;
 		}
 		if (pp.p_bitmap & (1 << param_id)) {
-				switch (param_id) {
+
+			switch (param_id) {
 			/*
 			 * Boolean parameters
 			 */
@@ -762,488 +887,6 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
  * +--------------------------------------------------------------------+
  */
 
-
-/*
- * iscsi_conn_state_free -
- *
- * S1: FREE - State on instantiation, or after successful
- * connection closure.
- */
-static iscsi_status_t
-iscsi_conn_state_free(iscsi_conn_t *icp, iscsi_conn_event_t event)
-{
-	iscsi_sess_t		*isp;
-	iscsi_hba_t		*ihp;
-	iscsi_task_t		*itp;
-	iscsi_status_t		status = ISCSI_STATUS_SUCCESS;
-
-	ASSERT(icp != NULL);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-	ihp = isp->sess_hba;
-	ASSERT(ihp != NULL);
-	ASSERT(icp->conn_state == ISCSI_CONN_STATE_FREE);
-
-	/* switch on event change */
-	switch (event) {
-	/* -T1: Transport connection request was request */
-	case ISCSI_CONN_EVENT_T1:
-		icp->conn_state = ISCSI_CONN_STATE_IN_LOGIN;
-
-		/*
-		 * Release the connection state mutex cross the
-		 * the dispatch of the login task.  The login task
-		 * will reacquire the connection state mutex when
-		 * it pushes the connection successful or failed.
-		 */
-		mutex_exit(&icp->conn_state_mutex);
-
-		/* start login */
-		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
-		itp->t_arg = icp;
-		itp->t_blocking = B_TRUE;
-
-		/*
-		 * Sync base connection information before login
-		 * A login redirection might have shifted the
-		 * current information from the base.
-		 */
-		bcopy(&icp->conn_base_addr, &icp->conn_curr_addr,
-		    sizeof (icp->conn_curr_addr));
-
-		status = iscsi_login_start(itp);
-		kmem_free(itp, sizeof (iscsi_task_t));
-
-		mutex_enter(&icp->conn_state_mutex);
-		break;
-
-	/* All other events are invalid for this state */
-	default:
-		ASSERT(FALSE);
-		status = ISCSI_STATUS_INTERNAL_ERROR;
-	}
-	return (status);
-}
-
-/*
- * iscsi_conn_state_in_login - During this state we are trying to
- * connect the TCP connection and make a successful login to the
- * target.  To complete this we have a task queue item that is
- * trying this processing at this point in time.  When the task
- * queue completed its processing it will issue either a T5/7
- * event.
- */
-static void
-iscsi_conn_state_in_login(iscsi_conn_t *icp, iscsi_conn_event_t event)
-{
-	iscsi_sess_t	*isp;
-
-	ASSERT(icp != NULL);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-	ASSERT(icp->conn_state == ISCSI_CONN_STATE_IN_LOGIN);
-
-	/* switch on event change */
-	switch (event) {
-	/*
-	 * -T5: The final iSCSI Login response with a Status-Class of zero
-	 *	was received.
-	 */
-	case ISCSI_CONN_EVENT_T5:
-		iscsi_conn_logged_in(isp, icp);
-		break;
-
-	/*
-	 * -T30: One of the following event caused the transition:
-	 *	- Thefinal iSCSI Login response was received with a non-zero
-	 *	  Status-Class.
-	 */
-	case ISCSI_CONN_EVENT_T30:
-		/* FALLTHRU */
-
-	/*
-	 * -T7: One of the following events caused the transition:
-	 *	- Login timed out.
-	 *	- A transport disconnect indication was received.
-	 *	- A transport reset was received.
-	 *	- An internal event indicating a transport timeout was
-	 *	  received.
-	 *	- An internal event of receiving a Logout repsonse (success)
-	 *	  on another connection for a "close the session" Logout
-	 *	  request was received.
-	 *	* In all these cases, the transport connection is closed.
-	 */
-	case ISCSI_CONN_EVENT_T7:
-		icp->conn_state = ISCSI_CONN_STATE_FREE;
-		break;
-
-	/* All other events are invalid for this state */
-	default:
-		ASSERT(FALSE);
-	}
-}
-
-
-/*
- * iscsi_conn_state_logged_in -
- *
- */
-static void
-iscsi_conn_state_logged_in(iscsi_conn_t *icp, iscsi_conn_event_t event)
-{
-	iscsi_sess_t		*isp;
-	iscsi_hba_t		*ihp;
-
-	ASSERT(icp != NULL);
-	ASSERT(icp->conn_state == ISCSI_CONN_STATE_LOGGED_IN);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-	ihp = isp->sess_hba;
-	ASSERT(ihp != NULL);
-
-	/* switch on event change */
-	switch (event) {
-	/*
-	 * -T8: An internal event of receiving a Logout response (success)
-	 *	on another connection for a "close the session" Logout request
-	 *	was received, thus closing this connection requiring no further
-	 *	cleanup.
-	 */
-	case ISCSI_CONN_EVENT_T8:
-		icp->conn_state = ISCSI_CONN_STATE_FREE;
-
-		/* stop tx thread */
-		(void) iscsi_thread_stop(icp->conn_tx_thread);
-
-		/* Disconnect connection */
-		iscsi_net->close(icp->conn_socket);
-
-		/* Notify session that a connection logged out */
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(icp->conn_sess, ISCSI_SESS_EVENT_N3);
-		mutex_exit(&isp->sess_state_mutex);
-		break;
-
-	/*
-	 * -T9: An internal event that indicates the readiness to start the
-	 *	Logout process was received, thus prompting an iSCSI Logout
-	 *	to be sent by the initiator.
-	 */
-	case ISCSI_CONN_EVENT_T9:
-		/* FALLTHRU */
-
-	/*
-	 * -T11: Aync PDU with AsyncEvent "Request Logout" was recevied
-	 */
-	case ISCSI_CONN_EVENT_T11:
-		icp->conn_state = ISCSI_CONN_STATE_IN_LOGOUT;
-
-		(void) iscsi_handle_logout(icp);
-		break;
-
-	/*
-	 * -T14: One or more of the following events case this transition:
-	 *	- Header Digest Error
-	 *	- Protocol Error
-	 */
-	case ISCSI_CONN_EVENT_T14:
-		icp->conn_state = ISCSI_CONN_STATE_FAILED;
-
-		/* stop tx thread */
-		(void) iscsi_thread_stop(icp->conn_tx_thread);
-
-		/*
-		 * Error Recovery Level 0 states we should drop
-		 * the connection here.  Then we will fall through
-		 * and treat this event like a T15.
-		 */
-		iscsi_net->close(icp->conn_socket);
-
-		/* FALLTHRU */
-
-	/*
-	 * -T15: One or more of the following events caused this transition
-	 *	- Internal event that indicates a transport connection timeout
-	 *	  was received thus prompting transport RESET or transport
-	 *	  connection closure.
-	 *	- A transport RESET
-	 *	- A transport disconnect indication.
-	 *	- Async PDU with AsyncEvent "Drop connection" (for this CID)
-	 *	- Async PDU with AsyncEvent "Drop all connections"
-	 */
-	case ISCSI_CONN_EVENT_T15:
-		icp->conn_state = ISCSI_CONN_STATE_FAILED;
-
-		/* stop tx thread, no-op if already done for T14 */
-		(void) iscsi_thread_stop(icp->conn_tx_thread);
-
-		iscsi_conn_flush_active_cmds(icp);
-
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N5);
-		mutex_exit(&isp->sess_state_mutex);
-
-		/*
-		 * If session type is NORMAL, create a new login task
-		 * to get this connection reestablished.
-		 */
-		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
-			iscsi_conn_retry(isp, icp);
-		} else {
-			icp->conn_state = ISCSI_CONN_STATE_FREE;
-			mutex_enter(&isp->sess_state_mutex);
-			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
-			mutex_exit(&isp->sess_state_mutex);
-		}
-		break;
-
-	/* All other events are invalid for this state */
-	default:
-		ASSERT(FALSE);
-	}
-}
-
-
-/*
- * iscsi_conn_state_in_logout -
- *
- */
-static void
-iscsi_conn_state_in_logout(iscsi_conn_t *icp, iscsi_conn_event_t event)
-{
-	iscsi_sess_t	*isp	= NULL;
-
-	ASSERT(icp != NULL);
-	ASSERT(icp->conn_state == ISCSI_CONN_STATE_IN_LOGOUT);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-
-	/* switch on event change */
-	switch (event) {
-	/*
-	 * -T11: Async PDU with AsyncEvent "Request Logout" was received again
-	 */
-	case ISCSI_CONN_EVENT_T11:
-		icp->conn_state = ISCSI_CONN_STATE_IN_LOGOUT;
-
-		/* Already in LOGOUT ignore the request */
-		break;
-
-	/*
-	 * -T17: One or more of the following events caused this transition:
-	 *	- Logout response, (failure i.e., a non-zero status) was
-	 *	received, or logout timed out.
-	 *	- Any of the events specified for T15
-	 *
-	 * -T14: One or more of the following events case this transition:
-	 *	- Header Digest Error
-	 *	- Protocol Error
-	 *
-	 * -T15: One or more of the following events caused this transition
-	 *	- Internal event that indicates a transport connection timeout
-	 *	  was received thus prompting transport RESET or transport
-	 *	  connection closure.
-	 *	- A transport RESET
-	 *	- A transport disconnect indication.
-	 *	- Async PDU with AsyncEvent "Drop connection" (for this CID)
-	 *	- Async PDU with AsyncEvent "Drop all connections"
-	 */
-	case ISCSI_CONN_EVENT_T17:
-	case ISCSI_CONN_EVENT_T14:
-	case ISCSI_CONN_EVENT_T15:
-		icp->conn_state = ISCSI_CONN_STATE_FREE;
-
-		/* stop tx thread */
-		(void) iscsi_thread_stop(icp->conn_tx_thread);
-
-		/* Disconnect Connection */
-		iscsi_net->close(icp->conn_socket);
-
-		iscsi_conn_flush_active_cmds(icp);
-
-		/* Notify session of a failed logout */
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(icp->conn_sess, ISCSI_SESS_EVENT_N3);
-		mutex_exit(&isp->sess_state_mutex);
-		break;
-
-	/* All other events are invalid for this state */
-	default:
-		ASSERT(FALSE);
-	}
-}
-
-
-/*
- * iscsi_conn_state_failed -
- *
- */
-static void
-iscsi_conn_state_failed(iscsi_conn_t *icp, iscsi_conn_event_t event)
-{
-	iscsi_sess_t	*isp;
-
-	ASSERT(icp != NULL);
-	ASSERT(icp->conn_state == ISCSI_CONN_STATE_FAILED);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-
-	/* switch on event change */
-	switch (event) {
-
-	/*
-	 * -T5: The final iSCSI Login response with a Status-Class of zero
-	 *	was received.
-	 */
-	case ISCSI_CONN_EVENT_T5:
-		iscsi_conn_logged_in(isp, icp);
-		break;
-
-	/*
-	 * -T30: One of the following event caused the transition:
-	 *	- Thefinal iSCSI Login response was received with a non-zero
-	 *	  Status-Class.
-	 */
-	case ISCSI_CONN_EVENT_T30:
-		icp->conn_state = ISCSI_CONN_STATE_FREE;
-
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
-		mutex_exit(&isp->sess_state_mutex);
-
-		break;
-
-	/*
-	 * -T7: One of the following events caused the transition:
-	 *	- Login timed out.
-	 *	- A transport disconnect indication was received.
-	 *	- A transport reset was received.
-	 *	- An internal event indicating a transport timeout was
-	 *	  received.
-	 *	- An internal event of receiving a Logout repsonse (success)
-	 *	  on another connection for a "close the session" Logout
-	 *	  request was received.
-	 *	* In all these cases, the transport connection is closed.
-	 */
-	case ISCSI_CONN_EVENT_T7:
-		icp->conn_state = ISCSI_CONN_STATE_POLLING;
-
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
-		mutex_exit(&isp->sess_state_mutex);
-
-		iscsi_conn_retry(isp, icp);
-		break;
-
-	/* There are no valid transition out of this state. */
-	default:
-		ASSERT(FALSE);
-	}
-}
-
-/*
- * iscsi_conn_state_polling -
- *
- * S6: POLLING - State on instantiation, or after successful
- * connection closure.
- */
-static void
-iscsi_conn_state_polling(iscsi_conn_t *icp, iscsi_conn_event_t event)
-{
-	iscsi_sess_t *isp = NULL;
-
-	ASSERT(icp != NULL);
-	ASSERT(icp->conn_state == ISCSI_CONN_STATE_POLLING);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-
-	/* switch on event change */
-	switch (event) {
-	/*
-	 * -T5: The final iSCSI Login response with a Status-Class of zero
-	 *	was received.
-	 */
-	case ISCSI_CONN_EVENT_T5:
-		iscsi_conn_logged_in(isp, icp);
-		break;
-
-	/*
-	 * -T30: One of the following event caused the transition:
-	 *	- Thefinal iSCSI Login response was received with a non-zero
-	 *	  Status-Class.
-	 */
-	case ISCSI_CONN_EVENT_T30:
-		icp->conn_state = ISCSI_CONN_STATE_FREE;
-
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
-		mutex_exit(&isp->sess_state_mutex);
-
-		break;
-
-	/*
-	 * -T7: One of the following events caused the transition:
-	 *	- Login timed out.
-	 *	- A transport disconnect indication was received.
-	 *	- A transport reset was received.
-	 *	- An internal event indicating a transport timeout was
-	 *	  received.
-	 *	- An internal event of receiving a Logout repsonse (success)
-	 *	  on another connection for a "close the session" Logout
-	 *	  request was received.
-	 *	* In all these cases, the transport connection is closed.
-	 */
-	case ISCSI_CONN_EVENT_T7:
-		/*
-		 * If session type is NORMAL, create a new login task
-		 * to get this connection reestablished.
-		 */
-		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
-			iscsi_conn_retry(isp, icp);
-		} else {
-			icp->conn_state = ISCSI_CONN_STATE_FREE;
-		}
-		break;
-
-	/* All other events are invalid for this state */
-	default:
-		ASSERT(FALSE);
-	}
-}
-
-/*
- * iscsi_conn_event_str - converts event enum to a string
- */
-static char *
-iscsi_conn_event_str(iscsi_conn_event_t event)
-{
-	switch (event) {
-	case ISCSI_CONN_EVENT_T1:
-		return ("T1");
-	case ISCSI_CONN_EVENT_T5:
-		return ("T5");
-	case ISCSI_CONN_EVENT_T7:
-		return ("T7");
-	case ISCSI_CONN_EVENT_T8:
-		return ("T8");
-	case ISCSI_CONN_EVENT_T9:
-		return ("T9");
-	case ISCSI_CONN_EVENT_T11:
-		return ("T11");
-	case ISCSI_CONN_EVENT_T14:
-		return ("T14");
-	case ISCSI_CONN_EVENT_T15:
-		return ("T15");
-	case ISCSI_CONN_EVENT_T17:
-		return ("T17");
-	case ISCSI_CONN_EVENT_T30:
-		return ("T30");
-
-	default:
-		return ("unknown");
-	}
-}
-
 /*
  * iscsi_conn_flush_active_cmds - flush all active icmdps
  *	for a connection.
@@ -1273,52 +916,31 @@ iscsi_conn_flush_active_cmds(iscsi_conn_t *icp)
 		icmdp = icp->conn_queue_active.head;
 	}
 
+	/* Wait for active queue to drain */
+	while (icp->conn_queue_active.count) {
+		mutex_exit(&icp->conn_queue_active.mutex);
+		delay(drv_usectohz(100000));
+		mutex_enter(&icp->conn_queue_active.mutex);
+	}
+
 	if (lock_held == B_FALSE) {
 		mutex_exit(&icp->conn_queue_active.mutex);
 	}
-}
 
-
-/*
- * iscsi_conn_logged_in - connection has successfully logged in
- */
-static void
-iscsi_conn_logged_in(iscsi_sess_t *isp, iscsi_conn_t *icp)
-{
-	ASSERT(isp != NULL);
-	ASSERT(icp != NULL);
-
-	icp->conn_state = ISCSI_CONN_STATE_LOGGED_IN;
-	/*
-	 * We need to drop the connection state lock
-	 * before updating the session state.  On update
-	 * of the session state it will enumerate the
-	 * target.  If we hold the lock during enumeration
-	 * will block the watchdog thread from timing
-	 * a scsi_pkt, if required.  This will lead to
-	 * a possible hang condition.
-	 *
-	 * Also the lock is no longer needed once the
-	 * connection state was updated.
-	 */
-	mutex_exit(&icp->conn_state_mutex);
-
-	/* startup threads */
-	(void) iscsi_thread_start(icp->conn_rx_thread);
-	(void) iscsi_thread_start(icp->conn_tx_thread);
-
-	/* Notify the session that a connection is logged in */
-	mutex_enter(&isp->sess_state_mutex);
-	iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N1);
-	mutex_exit(&isp->sess_state_mutex);
-
-	mutex_enter(&icp->conn_state_mutex);
+	/* Wait for IDM abort queue to drain (if necessary) */
+	mutex_enter(&icp->conn_queue_idm_aborting.mutex);
+	while (icp->conn_queue_idm_aborting.count) {
+		mutex_exit(&icp->conn_queue_idm_aborting.mutex);
+		delay(drv_usectohz(100000));
+		mutex_enter(&icp->conn_queue_idm_aborting.mutex);
+	}
+	mutex_exit(&icp->conn_queue_idm_aborting.mutex);
 }
 
 /*
  * iscsi_conn_retry - retry connect/login
  */
-static void
+void
 iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 {
 	iscsi_task_t *itp;
@@ -1330,6 +952,10 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 	iscsi_conn_set_login_min_max(icp,
 	    ISCSI_CONN_DEFAULT_LOGIN_MIN,
 	    ISCSI_CONN_DEFAULT_LOGIN_MAX);
+
+	ISCSI_CONN_LOG(CE_NOTE, "DEBUG: iscsi_conn_retry: icp: %p icp: %p ",
+	    (void *)icp,
+	    (void *)icp->conn_ic);
 
 	/*
 	 * Sync base connection information before login.
@@ -1347,15 +973,54 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 	    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
 	    DDI_SUCCESS) {
 		kmem_free(itp, sizeof (iscsi_task_t));
-		cmn_err(CE_WARN,
-		    "iscsi connection(%u) failure - "
-		    "unable to schedule login task",
-		    icp->conn_oid);
+		cmn_err(CE_WARN, "iscsi connection(%u) failure - "
+		    "unable to schedule login task", icp->conn_oid);
 
-		icp->conn_state = ISCSI_CONN_STATE_FREE;
+		iscsi_conn_update_state(icp, ISCSI_CONN_STATE_FREE);
 		mutex_enter(&isp->sess_state_mutex);
 		iscsi_sess_state_machine(isp,
 		    ISCSI_SESS_EVENT_N6);
 		mutex_exit(&isp->sess_state_mutex);
+	}
+}
+
+void
+iscsi_conn_update_state(iscsi_conn_t *icp, iscsi_conn_state_t
+			    next_state)
+{
+	mutex_enter(&icp->conn_state_mutex);
+	(void) iscsi_conn_update_state_locked(icp, next_state);
+	mutex_exit(&icp->conn_state_mutex);
+}
+
+void
+iscsi_conn_update_state_locked(iscsi_conn_t *icp,
+	    iscsi_conn_state_t next_state)
+{
+	ASSERT(mutex_owned(&icp->conn_state_mutex));
+	next_state = (next_state > ISCSI_CONN_STATE_MAX) ?
+	    ISCSI_CONN_STATE_MAX : next_state;
+	idm_sm_audit_state_change(&icp->conn_state_audit,
+	    SAS_ISCSI_CONN, icp->conn_state, next_state);
+	switch (next_state) {
+	case ISCSI_CONN_STATE_FREE:
+	case ISCSI_CONN_STATE_IN_LOGIN:
+	case ISCSI_CONN_STATE_LOGGED_IN:
+	case ISCSI_CONN_STATE_IN_LOGOUT:
+	case ISCSI_CONN_STATE_FAILED:
+	case ISCSI_CONN_STATE_POLLING:
+		ISCSI_CONN_LOG(CE_NOTE,
+		    "iscsi_conn_update_state conn %p %s(%d) -> %s(%d)",
+		    (void *)icp,
+		    iscsi_ics_name[icp->conn_state], icp->conn_state,
+		    iscsi_ics_name[next_state], next_state);
+		icp->conn_prev_state = icp->conn_state;
+		icp->conn_state = next_state;
+		cv_broadcast(&icp->conn_state_change);
+		break;
+	default:
+		cmn_err(CE_WARN, "Update state found illegal state: %x "
+		    "prev_state: %x", next_state, icp->conn_prev_state);
+		ASSERT(0);
 	}
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,10 +189,10 @@ tgt_sm_event_locked(iscsit_tgt_t *tgt, iscsit_tgt_event_t event)
 
 	list_insert_tail(&tgt->target_events, ctx);
 	/*
-	 * Use the icl_busy flag to keep the state machine single threaded.
-	 * This also serves as recursion avoidance since this flag will
-	 * always be set if we call iscsit_tgt_sm_event from within the
-	 * state machine code.
+	 * Use the target_sm_busy flag to keep the state machine single
+	 * threaded.  This also serves as recursion avoidance since this
+	 * flag will always be set if we call iscsit_tgt_sm_event from
+	 * within the state machine code.
 	 */
 	if (!tgt->target_sm_busy) {
 		tgt->target_sm_busy = B_TRUE;
@@ -888,7 +888,11 @@ iscsit_tgt_create(it_tgt_t *cfg_tgt)
 	idm_refcnt_init(&result->target_sess_refcnt, result);
 
 	/* Finish initializing local port */
-	lport->lport_abort_timeout = 0xffffffff; /* seconds */
+	/*
+	 * Would like infinite timeout, but this is about as long as can
+	 * be specified to stmf on a 32 bit kernel.
+	 */
+	lport->lport_abort_timeout = 2000; /* seconds */
 	lport->lport_id = result->target_devid;
 	lport->lport_pp = iscsit_global.global_pp;
 	lport->lport_ds = iscsit_global.global_dbuf_store;

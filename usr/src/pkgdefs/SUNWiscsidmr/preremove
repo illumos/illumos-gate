@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -21,17 +22,13 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 
-include ../Makefile.com
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
 
-DATAFILES +=	i.iscsiconf i.manifest r.manifest
+DRVR_NAME=iser
 
-.KEEP_STATE:
+# Remove the driver entries but leave it attached.
+/usr/sbin/rem_drv -b ${BASEDIR} ${DRVR_NAME}
 
-all: $(FILES) depend preremove postinstall
-
-install: all pkg
-
-include ../Makefile.targ
-
+exit 0

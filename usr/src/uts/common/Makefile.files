@@ -556,6 +556,9 @@ RDS_OBJS +=	rdsddi.o rdssubr.o rds_opt.o rds_ioctl.o
 RDSIB_OBJS +=	rdsib.o rdsib_ib.o rdsib_cm.o rdsib_ep.o rdsib_buf.o \
 		rdsib_debug.o rdsib_sc.o
 
+ISER_OBJS +=	iser.o iser_cm.o iser_cq.o iser_ib.o iser_idm.o \
+		iser_resource.o iser_xfer.o
+
 UDP_OBJS +=	udpddi.o
 
 UDP6_OBJS +=	udp6ddi.o

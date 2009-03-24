@@ -76,6 +76,7 @@ static boolean_t iscsid_make_entry(ib_boot_prop_t *boot_prop_entry,
 extern int modrootloaded;
 int iscsi_configroot_retry = 20;
 static boolean_t iscsi_configroot_printed = FALSE;
+static int iscsi_net_up = 0;
 extern ib_boot_prop_t   *iscsiboot_prop;
 
 /*
@@ -706,6 +707,15 @@ iscsid_config_one(iscsi_hba_t *ihp, char *name, boolean_t protect)
 			    " iSCSI boot session...");
 			iscsi_configroot_printed = B_TRUE;
 		}
+		if (iscsi_net_up == 0) {
+			if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS) {
+				iscsi_net_up = 1;
+			} else {
+				cmn_err(CE_WARN, "Failed to configure interface"
+				    " for iSCSI boot session");
+				return;
+			}
+		}
 		while (rc == B_FALSE && retry <
 		    iscsi_configroot_retry) {
 			rc = iscsid_login_tgt(ihp, name,
@@ -786,6 +796,11 @@ iscsid_config_all(iscsi_hba_t *ihp, boolean_t protect)
 			cmn_err(CE_NOTE, "Configuring"
 			    " iSCSI boot session...");
 			iscsi_configroot_printed = B_TRUE;
+		}
+		if (iscsi_net_up == 0) {
+			if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS) {
+				iscsi_net_up = 1;
+			}
 		}
 		while (rc == B_FALSE && retry <
 		    iscsi_configroot_retry) {
@@ -1060,6 +1075,13 @@ iscsid_add(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
 
 		/* create or find matching connection */
 		if (!ISCSI_SUCCESS(iscsi_conn_create(addr_tgt, isp, &icp))) {
+			/*
+			 * Teardown the session we just created.  It can't
+			 * have any luns or connections associated with it
+			 * so this should always succeed (luckily since what
+			 * would we do if it failed?)
+			 */
+			(void) iscsi_sess_destroy(isp);
 			rtn = B_FALSE;
 			break;
 		}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,9 +43,14 @@
 #define	ISCSIT_TGT_SM_STRINGS
 #define	ISCSIT_SESS_SM_STRINGS
 #define	ISCSIT_LOGIN_SM_STRINGS
+#define	ISCSI_SESS_SM_STRINGS
+#define	ISCSI_CMD_SM_STRINGS
+#define	ISCSI_ICS_NAMES
+#define	ISCSI_LOGIN_STATE_NAMES
 #include <sys/idm/idm.h>
 #include <iscsit.h>
 #include <iscsit_isns.h>
+#include <iscsi.h>
 
 /*
  * We want to be able to print multiple levels of object hierarchy with a
@@ -106,6 +111,7 @@ typedef struct {
 } iscsi_dcmd_ctrl_t;
 
 static int iscsi_walk_all_sess(iscsi_dcmd_ctrl_t *idc);
+static int iscsi_walk_ini_sessions(uintptr_t array_addr);
 static int iscsi_walk_all_conn(iscsi_dcmd_ctrl_t *idc);
 static int iscsi_tgt_walk_cb(uintptr_t addr, const void *list_walker_data,
     void *idc_void);
@@ -140,19 +146,25 @@ static int iscsi_sm_audit_impl(uintptr_t addr);
 static int iscsi_isns(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv);
 
-static const char *iscsi_idm_conn_event(int event);
-static const char *iscsi_iscsit_tgt_event(int event);
-static const char *iscsi_iscsit_sess_event(int event);
-static const char *iscsi_iscsit_login_event(int event);
-static const char *iscsi_idm_conn_state(int state);
-static const char *iscsi_idm_task_state(int state);
-static const char *iscsi_iscsit_tgt_state(int state);
-static const char *iscsi_iscsit_sess_state(int state);
-static const char *iscsi_iscsit_login_state(int state);
+static const char *iscsi_idm_conn_event(unsigned int event);
+static const char *iscsi_iscsit_tgt_event(unsigned int event);
+static const char *iscsi_iscsit_sess_event(unsigned int event);
+static const char *iscsi_iscsit_login_event(unsigned int event);
+static const char *iscsi_iscsi_cmd_event(unsigned int event);
+static const char *iscsi_iscsi_sess_event(unsigned int event);
+static const char *iscsi_idm_conn_state(unsigned int state);
+static const char *iscsi_idm_task_state(unsigned int state);
+static const char *iscsi_iscsit_tgt_state(unsigned int state);
+static const char *iscsi_iscsit_sess_state(unsigned int state);
+static const char *iscsi_iscsit_login_state(unsigned int state);
+static const char *iscsi_iscsi_cmd_state(unsigned int state);
+static const char *iscsi_iscsi_sess_state(unsigned int state);
+static const char *iscsi_iscsi_conn_state(unsigned int state);
+static const char *iscsi_iscsi_login_state(unsigned int state);
 
 static void iscsi_format_timestamp(char *ts_str, int strlen,
     timespec_t *ts);
-static char *inet_ntop(int af, const void *addr, char *buf, int addrlen);
+static char *iscsi_inet_ntop(int af, const void *addr, char *buf, int addrlen);
 static void convert2ascii(char *, const in6_addr_t *);
 static int sa_to_str(struct sockaddr_storage *sa, char *addr);
 static int iscsi_isns_portal_cb(uintptr_t addr, const void *walker_data,
@@ -487,6 +499,59 @@ iscsi_states(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/*NOTREACHED*/
 }
 
+/*
+ * Helper function to list all the initiator sessions
+ */
+static int
+iscsi_walk_ini_sessions(uintptr_t array_vaddr)
+{
+	iscsi_hba_t ihp;
+	int i;
+	int array_size;
+	struct i_ddi_soft_state *ss;
+	iscsi_sess_t *isp;
+
+	ss = (struct i_ddi_soft_state *)mdb_alloc(sizeof (*ss),
+	    UM_SLEEP|UM_GC);
+	if (mdb_vread(ss, sizeof (*ss), array_vaddr) != sizeof (*ss)) {
+		mdb_warn("Cannot read softstate struct (Invalid pointer?).\n");
+		return (DCMD_ERR);
+	}
+	array_size = ss->n_items * (sizeof (void *));
+	array_vaddr = (uintptr_t)ss->array;
+	ss->array = mdb_alloc(array_size, UM_SLEEP|UM_GC);
+	if (mdb_vread(ss->array, array_size, array_vaddr) != array_size) {
+		mdb_warn("Corrupted softstate struct.\n");
+		return (DCMD_ERR);
+	}
+	for (i = 0; i < ss->n_items; i++) {
+		if (ss->array[i] == 0)
+		continue;
+
+		if (mdb_vread(&ihp, sizeof (ihp), (uintptr_t)ss->array[i])
+		    != sizeof (ihp)) {
+			mdb_warn("Corrupted softstate struct.\n");
+			return (DCMD_ERR);
+		}
+		mdb_printf("iscsi_hba %p sessions: \n", ihp);
+		mdb_printf("%<u>%-19s %-4s  %-8s%</u>\n",
+		    "Session", "Type", "State");
+		for (isp = ihp.hba_sess_list; isp; ) {
+			iscsi_sess_t sess;
+			if ((mdb_vread(&sess, sizeof (iscsi_sess_t),
+			    (uintptr_t)isp)) != sizeof (iscsi_sess_t)) {
+				mdb_warn("Failed to read session\n");
+				return (DCMD_ERR);
+			}
+			mdb_printf("%-19p %-4d %-8d\n", isp,
+			    sess.sess_type,
+			    sess.sess_state);
+			isp = sess.sess_next;
+		}
+	}
+	return (DCMD_OK);
+}
+
 static int
 iscsi_walk_all_sess(iscsi_dcmd_ctrl_t *idc)
 {
@@ -494,7 +559,18 @@ iscsi_walk_all_sess(iscsi_dcmd_ctrl_t *idc)
 	uintptr_t	avl_addr;
 	uintptr_t	list_addr;
 	GElf_Sym	sym;
+	uintptr_t adr;
+	/* Initiator sessions */
+	if (idc->idc_ini) {
+		if (mdb_readvar(&adr, "iscsi_state") == -1) {
 
+			mdb_warn("state variable iscsi_state not found.\n");
+			mdb_warn("Is the driver loaded ?\n");
+			return (DCMD_ERR);
+		}
+		return (iscsi_walk_ini_sessions(adr));
+	}
+	/* Target sessions */
 	/* Walk discovery sessions */
 	if (mdb_lookup_by_name("iscsit_global", &sym) == -1) {
 		mdb_warn("failed to find symbol 'iscsit_global'");
@@ -1719,6 +1795,18 @@ iscsi_sm_audit_impl(uintptr_t addr)
 				event_name =
 				    iscsi_iscsit_login_event(sar->sar_event);
 				break;
+			case SAS_ISCSI_CMD:
+				state_name =
+				    iscsi_iscsi_cmd_state(sar->sar_state);
+				event_name=
+				    iscsi_iscsi_cmd_event(sar->sar_event);
+				break;
+			case SAS_ISCSI_SESS:
+				state_name =
+				    iscsi_iscsi_sess_state(sar->sar_state);
+				event_name=
+				    iscsi_iscsi_sess_event(sar->sar_event);
+				break;
 			default:
 				state_name = event_name = "N/A";
 				break;
@@ -1762,6 +1850,30 @@ iscsi_sm_audit_impl(uintptr_t addr)
 				    iscsi_iscsit_login_state(
 				    sar->sar_new_state);
 				break;
+			case SAS_ISCSI_CMD:
+				state_name =
+				    iscsi_iscsi_cmd_state(sar->sar_state);
+				new_state_name=
+				    iscsi_iscsi_cmd_state(sar->sar_new_state);
+				break;
+			case SAS_ISCSI_SESS:
+				state_name =
+				    iscsi_iscsi_sess_state(sar->sar_state);
+				new_state_name=
+				    iscsi_iscsi_sess_state(sar->sar_new_state);
+				break;
+			case SAS_ISCSI_CONN:
+				state_name =
+				    iscsi_iscsi_conn_state(sar->sar_state);
+				new_state_name=
+				    iscsi_iscsi_conn_state(sar->sar_new_state);
+				break;
+			case SAS_ISCSI_LOGIN:
+				state_name =
+				    iscsi_iscsi_login_state(sar->sar_state);
+				new_state_name=
+				    iscsi_iscsi_login_state(sar->sar_new_state);
+				break;
 			default:
 				break;
 			}
@@ -1782,101 +1894,100 @@ iscsi_sm_audit_impl(uintptr_t addr)
 }
 
 static const char *
-iscsi_idm_conn_event(int event)
+iscsi_idm_conn_event(unsigned int event)
 {
-	const char *name = "N/A";
-
-	event = (event > CE_MAX_EVENT) ? CE_MAX_EVENT : event;
-	name = idm_ce_name[event];
-
-	return (name);
+	return ((event < CE_MAX_EVENT) ? idm_ce_name[event] : "N/A");
 }
 
 static const char *
-iscsi_iscsit_tgt_event(int event)
+iscsi_iscsit_tgt_event(unsigned int event)
 {
-	const char *name = "N/A";
-
-	event = (event > TE_MAX_EVENT) ? TE_MAX_EVENT : event;
-	name = iscsit_te_name[event];
-
-	return (name);
+	return ((event < TE_MAX_EVENT) ? iscsit_te_name[event] : "N/A");
 }
 
 static const char *
-iscsi_iscsit_sess_event(int event)
+iscsi_iscsit_sess_event(unsigned int event)
 {
-	const char *name = "N/A";
-
-	event = (event > SE_MAX_EVENT) ? SE_MAX_EVENT : event;
-	name = iscsit_se_name[event];
-
-	return (name);
+	return ((event < SE_MAX_EVENT) ? iscsit_se_name[event] : "N/A");
 }
 
 static const char *
-iscsi_iscsit_login_event(int event)
+iscsi_iscsit_login_event(unsigned int event)
 {
-	const char *name = "N/A";
-
-	event = (event > ILE_MAX_EVENT) ? ILE_MAX_EVENT : event;
-	name = iscsit_ile_name[event];
-
-	return (name);
+	return ((event < ILE_MAX_EVENT) ? iscsit_ile_name[event] : "N/A");
 }
 
 static const char *
-iscsi_idm_conn_state(int state)
+iscsi_iscsi_cmd_event(unsigned int event)
 {
-	const char *name = "N/A";
+	return ((event < ISCSI_CMD_EVENT_MAX) ?
+	    iscsi_cmd_event_names[event] : "N/A");
+}
 
-	state = (state > CS_MAX_STATE) ? CS_MAX_STATE : state;
-	name = idm_cs_name[state];
+static const char *
+iscsi_iscsi_sess_event(unsigned int event)
+{
 
-	return (name);
+	return ((event < ISCSI_SESS_EVENT_MAX) ?
+	    iscsi_sess_event_names[event] : "N/A");
+}
+
+static const char *
+iscsi_idm_conn_state(unsigned int state)
+{
+	return ((state < CS_MAX_STATE) ? idm_cs_name[state] : "N/A");
 }
 
 /*ARGSUSED*/
 static const char *
-iscsi_idm_task_state(int state)
+iscsi_idm_task_state(unsigned int state)
 {
-	const char *name = "N/A";
-	return (name);
+	return ("N/A");
 }
 
 static const char *
-iscsi_iscsit_tgt_state(int state)
+iscsi_iscsit_tgt_state(unsigned int state)
 {
-	const char *name = "N/A";
-
-	state = (state > TS_MAX_STATE) ? TS_MAX_STATE : state;
-	name = iscsit_ts_name[state];
-
-	return (name);
+	return ((state < TS_MAX_STATE) ? iscsit_ts_name[state] : "N/A");
 }
 
 static const char *
-iscsi_iscsit_sess_state(int state)
+iscsi_iscsit_sess_state(unsigned int state)
 {
-	const char *name = "N/A";
-
-	state = (state > SS_MAX_STATE) ? SS_MAX_STATE : state;
-	name = iscsit_ss_name[state];
-
-	return (name);
+	return ((state < SS_MAX_STATE) ? iscsit_ss_name[state] : "N/A");
 }
 
 static const char *
-iscsi_iscsit_login_state(int state)
+iscsi_iscsit_login_state(unsigned int state)
 {
-	const char *name = "N/A";
-
-	state = (state > ILS_MAX_STATE) ? ILS_MAX_STATE : state;
-	name = iscsit_ils_name[state];
-
-	return (name);
+	return ((state < ILS_MAX_STATE) ? iscsit_ils_name[state] : "N/A");
 }
 
+static const char *
+iscsi_iscsi_cmd_state(unsigned int state)
+{
+	return ((state < ISCSI_CMD_STATE_MAX) ?
+	    iscsi_cmd_state_names[state] : "N/A");
+}
+
+static const char *
+iscsi_iscsi_sess_state(unsigned int state)
+{
+	return ((state < ISCSI_SESS_STATE_MAX) ?
+	    iscsi_sess_state_names[state] : "N/A");
+}
+
+static const char *
+iscsi_iscsi_conn_state(unsigned int state)
+{
+	return ((state < ISCSI_CONN_STATE_MAX) ? iscsi_ics_name[state] : "N/A");
+}
+
+static const char *
+iscsi_iscsi_login_state(unsigned int state)
+{
+	return ((state < LOGIN_MAX) ? iscsi_login_state_names[state] : "N/A");
+}
 
 
 /*
@@ -1915,7 +2026,7 @@ sa_to_str(struct sockaddr_storage *sa, char *buf)
 
 	if (sa->ss_family == AF_INET) {
 		sin = (struct sockaddr_in *)sa;
-		bufp = inet_ntop(AF_INET,
+		bufp = iscsi_inet_ntop(AF_INET,
 		    (const void *)&(sin->sin_addr.s_addr),
 		    buf, PORTAL_STR_LEN);
 		if (bufp == NULL) {
@@ -1925,7 +2036,7 @@ sa_to_str(struct sockaddr_storage *sa, char *buf)
 	} else if (sa->ss_family == AF_INET6) {
 		strlcat(buf, "[", sizeof (buf));
 		sin6 = (struct sockaddr_in6 *)sa;
-		bufp = inet_ntop(AF_INET6,
+		bufp = iscsi_inet_ntop(AF_INET6,
 		    (const void *)&sin6->sin6_addr.s6_addr,
 		    &buf[1], PORTAL_STR_LEN - 1);
 		if (bufp == NULL) {
@@ -2262,14 +2373,14 @@ iscsi_isns(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 /*
- * inet_ntop -- Convert an IPv4 or IPv6 address in binary form into
+ * iscsi_inet_ntop -- Convert an IPv4 or IPv6 address in binary form into
  * printable form, and return a pointer to that string. Caller should
  * provide a buffer of correct length to store string into.
  * Note: this routine is kernel version of inet_ntop. It has similar
- * format as inet_ntop() defined in rfc2553. But it does not do
+ * format as iscsi_inet_ntop() defined in rfc2553. But it does not do
  * error handling operations exactly as rfc2553 defines. This function
  * is used by kernel inet directory routines only for debugging.
- * This inet_ntop() function, does not return NULL if third argument
+ * This iscsi_inet_ntop() function, does not return NULL if third argument
  * is NULL. The reason is simple that we don't want kernel to panic
  * as the output of this function is directly fed to ip<n>dbg macro.
  * Instead it uses a local buffer for destination address for
@@ -2287,7 +2398,7 @@ iscsi_isns(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 #endif
 
 char *
-inet_ntop(int af, const void *addr, char *buf, int addrlen)
+iscsi_inet_ntop(int af, const void *addr, char *buf, int addrlen)
 {
 	static char local_buf[PORTAL_STR_LEN];
 	static char *err_buf1 = "<badaddr>";
@@ -2297,7 +2408,7 @@ inet_ntop(int af, const void *addr, char *buf, int addrlen)
 	char		*caddr;
 
 	/*
-	 * We don't allow thread unsafe inet_ntop calls, they
+	 * We don't allow thread unsafe iscsi_inet_ntop calls, they
 	 * must pass a non-null buffer pointer. For DEBUG mode
 	 * we use the ASSERT() and for non-debug kernel it will
 	 * silently allow it for now. Someday we should remove

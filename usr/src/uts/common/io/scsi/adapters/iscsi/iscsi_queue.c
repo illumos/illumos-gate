@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -219,6 +219,51 @@ iscsi_dequeue_active_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp)
 	} else {
 		ASSERT(FALSE);
 	}
+}
+
+/*
+ * iscsi_enqueue_idm_aborting_cmd - used to add a command to the queue
+ * representing command waiting for a callback from IDM for aborting
+ *
+ * Not sorted
+ */
+void
+iscsi_enqueue_idm_aborting_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp)
+{
+	iscsi_sess_t		*isp    = NULL;
+
+	ASSERT(icp != NULL);
+	ASSERT(icmdp != NULL);
+	isp = icp->conn_sess;
+	ASSERT(isp != NULL);
+	ASSERT(icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI);
+	ASSERT(mutex_owned(&icp->conn_queue_idm_aborting.mutex));
+
+	icmdp->cmd_state = ISCSI_CMD_STATE_IDM_ABORTING;
+	icmdp->cmd_lbolt_idm_aborting = ddi_get_lbolt();
+	iscsi_enqueue_cmd_tail(&icp->conn_queue_idm_aborting.head,
+	    &icp->conn_queue_idm_aborting.tail, icmdp);
+	icp->conn_queue_idm_aborting.count++;
+}
+
+/*
+ * iscsi_dequeue_idm_aborting_cmd - used to remove a command from the queue
+ * representing commands waiting for a callback from IDM for aborting.
+ */
+void
+iscsi_dequeue_idm_aborting_cmd(iscsi_conn_t *icp, iscsi_cmd_t *icmdp)
+{
+	iscsi_sess_t	*isp	= NULL;
+
+	ASSERT(icp != NULL);
+	ASSERT(icmdp != NULL);
+	isp = icp->conn_sess;
+	ASSERT(isp != NULL);
+	ASSERT(mutex_owned(&icp->conn_queue_idm_aborting.mutex));
+
+	(void) iscsi_dequeue_cmd(&icp->conn_queue_idm_aborting.head,
+	    &icp->conn_queue_idm_aborting.tail, icmdp);
+	icp->conn_queue_idm_aborting.count--;
 }
 
 /*

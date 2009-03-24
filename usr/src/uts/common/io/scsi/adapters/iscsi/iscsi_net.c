@@ -153,12 +153,6 @@ extern int modrootloaded;
 extern ib_boot_prop_t   *iscsiboot_prop;
 
 /* prototypes */
-
-/* for iSCSI boot */
-static int net_up = 0;
-static iscsi_status_t iscsi_net_interface();
-/* boot prototypes end */
-
 static void * iscsi_net_socket(int domain, int type, int protocol);
 static int iscsi_net_bind(void *socket, struct sockaddr *
     name, int name_len, int backlog, int flags);
@@ -277,11 +271,6 @@ iscsi_net_socket(int domain, int type, int protocol)
 {
 	ksocket_t	socket;
 	int 		err	= 0;
-
-	if (!modrootloaded && !net_up && iscsiboot_prop) {
-		if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS)
-			net_up = 1;
-	}
 
 	err = ksocket_socket(&socket, domain, type, protocol, KSOCKET_SLEEP,
 	    CRED());
@@ -860,7 +849,7 @@ iscsi_prefixlentomask(int prefixlen, int maxlen, uchar_t *mask)
 	return (ISCSI_STATUS_SUCCESS);
 }
 
-static iscsi_status_t
+iscsi_status_t
 iscsi_net_interface()
 {
 	struct in_addr	braddr;

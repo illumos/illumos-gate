@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -425,7 +425,7 @@ sess_sm_event_locked(iscsit_sess_t *ist, iscsit_session_event_t event,
 
 	list_insert_tail(&ist->ist_events, ctx);
 	/*
-	 * Use the icl_busy flag to keep the state machine single threaded.
+	 * Use the ist_sm_busy to keep the state machine single threaded.
 	 * This also serves as recursion avoidance since this flag will
 	 * always be set if we call login_sm_event from within the
 	 * state machine code.

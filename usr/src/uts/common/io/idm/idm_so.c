@@ -70,7 +70,10 @@ static void idm_set_tgt_connect_options(ksocket_t so);
 static idm_status_t idm_i_so_tx(idm_pdu_t *pdu);
 
 static idm_status_t idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu);
-static idm_status_t idm_so_send_buf_region(idm_task_t *idt, uint8_t opcode,
+static void idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt,
+    idm_buf_t *idb, uint32_t offset, uint32_t length);
+static void idm_so_send_rtt_data_done(idm_task_t *idt, idm_buf_t *idb);
+static idm_status_t idm_so_send_buf_region(idm_task_t *idt,
     idm_buf_t *idb, uint32_t buf_region_offset, uint32_t buf_region_length);
 
 static uint32_t idm_fill_iov(idm_pdu_t *pdu, idm_buf_t *idb,
@@ -91,7 +94,7 @@ static void idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu);
 static idm_status_t idm_so_free_task_rsrc(idm_task_t *idt);
 static kv_status_t idm_so_negotiate_key_values(idm_conn_t *it,
     nvlist_t *request_nvl, nvlist_t *response_nvl, nvlist_t *negotiated_nvl);
-static idm_status_t idm_so_notice_key_values(idm_conn_t *it,
+static void idm_so_notice_key_values(idm_conn_t *it,
     nvlist_t *negotiated_nvl);
 static boolean_t idm_so_conn_is_capable(idm_conn_req_t *ic,
     idm_transport_caps_t *caps);
@@ -1128,6 +1131,12 @@ idm_so_free_task_rsrc(idm_task_t *idt)
 	idm_buf_t	*idb;
 
 	/*
+	 * There is nothing to cleanup on initiator connections
+	 */
+	if (IDM_CONN_ISINI(idt->idt_ic))
+		return (IDM_STATUS_SUCCESS);
+
+	/*
 	 * If this is a target connection, call idm_buf_rx_from_ini_done for
 	 * any buffer on the "outbufv" list with idb->idb_in_transport==B_TRUE.
 	 *
@@ -1187,7 +1196,7 @@ idm_so_negotiate_key_values(idm_conn_t *it, nvlist_t *request_nvl,
  * idm_so_notice_key_values() activates the negotiated key values for
  * this connection.
  */
-static idm_status_t
+static void
 idm_so_notice_key_values(idm_conn_t *it, nvlist_t *negotiated_nvl)
 {
 	char			*nvp_name;
@@ -1218,7 +1227,6 @@ idm_so_notice_key_values(idm_conn_t *it, nvlist_t *negotiated_nvl)
 			break;
 		}
 	}
-	return (IDM_STATUS_SUCCESS);
 }
 
 
@@ -1332,7 +1340,6 @@ idm_so_rx_datain(idm_conn_t *ic, idm_pdu_t *pdu)
 		idm_pdu_rx_protocol_error(ic, pdu);
 		return;
 	}
-	idm_task_rele(idt);
 
 	/*
 	 * PDUs in a sequence should be in continuously increasing
@@ -1340,11 +1347,15 @@ idm_so_rx_datain(idm_conn_t *ic, idm_pdu_t *pdu)
 	 */
 	if (offset != idb->idb_exp_offset) {
 		IDM_CONN_LOG(CE_WARN, "idm_so_rx_datain: unexpected offset");
+		idm_task_rele(idt);
 		idm_pdu_rx_protocol_error(ic, pdu);
 		return;
 	}
 	/* Expected next relative buffer offset */
 	idb->idb_exp_offset += n2h24(bhs->dlength);
+	idt->idt_rx_bytes += n2h24(bhs->dlength);
+
+	idm_task_rele(idt);
 
 	/*
 	 * For now call scsi_rsp which will process the data rsp
@@ -1414,6 +1425,7 @@ idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu)
 	}
 	/* Expected next relative offset */
 	idb->idb_exp_offset += ntoh24(bhs->dlength);
+	idt->idt_rx_bytes += n2h24(bhs->dlength);
 
 	/*
 	 * Call the buffer callback when the transfer is complete
@@ -1470,6 +1482,7 @@ idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu)
  * sequence of iSCSI PDUs and outputs the requested data. Each Data-Out
  * PDU is associated with the R2T by the Target Transfer Tag  (ttt).
  */
+
 static void
 idm_so_rx_rtt(idm_conn_t *ic, idm_pdu_t *pdu)
 {
@@ -1477,13 +1490,14 @@ idm_so_rx_rtt(idm_conn_t *ic, idm_pdu_t *pdu)
 	idm_buf_t		*idb;
 	iscsi_rtt_hdr_t		*rtt_hdr;
 	uint32_t		data_offset;
+	uint32_t		data_length;
 
 	ASSERT(ic != NULL);
 	ASSERT(pdu != NULL);
 
 	rtt_hdr	= (iscsi_rtt_hdr_t *)pdu->isp_hdr;
 	data_offset = ntohl(rtt_hdr->data_offset);
-
+	data_length = ntohl(rtt_hdr->data_length);
 	idt	= idm_task_find(ic, rtt_hdr->itt, rtt_hdr->ttt);
 
 	if (idt == NULL) {
@@ -1495,9 +1509,6 @@ idm_so_rx_rtt(idm_conn_t *ic, idm_pdu_t *pdu)
 	/* Find the buffer bound to the task by the iSCSI initiator */
 	mutex_enter(&idt->idt_mutex);
 	idb = idm_buf_find(&idt->idt_outbufv, data_offset);
-	idt->idt_r2t_ttt = rtt_hdr->ttt;
-	/* reset to zero */
-	idt->idt_exp_datasn = 0;
 	if (idb == NULL) {
 		mutex_exit(&idt->idt_mutex);
 		idm_task_rele(idt);
@@ -1506,8 +1517,22 @@ idm_so_rx_rtt(idm_conn_t *ic, idm_pdu_t *pdu)
 		return;
 	}
 
-	(void) idm_so_send_buf_region(idt, ISCSI_OP_SCSI_DATA, idb,
-	    data_offset, ntohl(rtt_hdr->data_length));
+	/* return buffer contains this data */
+	if (data_offset + data_length > idb->idb_buflen) {
+		/* Overflow */
+		mutex_exit(&idt->idt_mutex);
+		idm_task_rele(idt);
+		IDM_CONN_LOG(CE_WARN, "idm_so_rx_rtt: read from outside "
+		    "buffer");
+		idm_pdu_rx_protocol_error(ic, pdu);
+		return;
+	}
+
+	idt->idt_r2t_ttt = rtt_hdr->ttt;
+	idt->idt_exp_datasn = 0;
+
+	idm_so_send_rtt_data(ic, idt, idb, data_offset,
+	    ntohl(rtt_hdr->data_length));
 	mutex_exit(&idt->idt_mutex);
 
 	idm_pdu_complete(pdu, IDM_STATUS_SUCCESS);
@@ -1551,6 +1576,8 @@ idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu)
 		total_len		+= sizeof (data_digest_crc);
 		pdu->isp_iovlen++;
 	}
+
+	pdu->isp_data = (uint8_t *)(uintptr_t)pdu->isp_iov[0].iov_base;
 
 	if (idm_iov_sorecv(so_conn->ic_so, &pdu->isp_iov[0],
 	    pdu->isp_iovlen, total_len) != 0) {
@@ -1920,7 +1947,20 @@ idm_i_so_tx(idm_pdu_t *pdu)
 				mutex_enter(&idt->idt_mutex);
 				idb = idm_buf_find(&idt->idt_outbufv, 0);
 				mutex_exit(&idt->idt_mutex);
-				idb->idb_xfer_len += pdu->isp_datalen;
+				/*
+				 * If the initiator call to idm_buf_alloc
+				 * failed then we can get to this point
+				 * without a bound buffer.  The associated
+				 * connection failure will clean things up
+				 * later.  It would be nice to come up with
+				 * a cleaner way to handle this.  In
+				 * particular it seems absurd to look up
+				 * the task and the buffer just to update
+				 * this counter.
+				 */
+				if (idb)
+					idb->idb_xfer_len += pdu->isp_datalen;
+				idm_task_rele(idt);
 			}
 		}
 
@@ -2119,7 +2159,9 @@ idm_so_buf_alloc(idm_buf_t *idb, uint64_t buflen)
 static idm_status_t
 idm_so_buf_setup(idm_buf_t *idb)
 {
-	/* nothing to do here */
+	/* Ensure bufalloc'd flag is unset */
+	idb->idb_bufalloc = B_FALSE;
+
 	return (IDM_STATUS_SUCCESS);
 }
 
@@ -2136,8 +2178,95 @@ idm_so_buf_free(idm_buf_t *idb)
 	kmem_free(idb->idb_buf, idb->idb_buflen);
 }
 
-idm_status_t
-idm_so_send_buf_region(idm_task_t *idt, uint8_t opcode, idm_buf_t *idb,
+static void
+idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt, idm_buf_t *idb,
+    uint32_t offset, uint32_t length)
+{
+	idm_so_conn_t	*so_conn = ic->ic_transport_private;
+	idm_pdu_t	tmppdu;
+	idm_buf_t	*rtt_buf;
+
+	ASSERT(mutex_owned(&idt->idt_mutex));
+
+	/*
+	 * Allocate a buffer to represent the RTT transfer.  We could further
+	 * optimize this by allocating the buffers internally from an rtt
+	 * specific buffer cache since this is socket-specific code but for
+	 * now we will keep it simple.
+	 */
+	rtt_buf = idm_buf_alloc(ic, (uint8_t *)idb->idb_buf + offset, length);
+	if (rtt_buf == NULL) {
+		/*
+		 * If we're in FFP then the failure was likely a resource
+		 * allocation issue and we should close the connection by
+		 * sending a CE_TRANSPORT_FAIL event.
+		 *
+		 * If we're not in FFP then idm_buf_alloc will always
+		 * fail and the state is transitioning to "complete" anyway
+		 * so we won't bother to send an event.
+		 */
+		mutex_enter(&ic->ic_state_mutex);
+		if (ic->ic_ffp)
+			idm_conn_event_locked(ic, CE_TRANSPORT_FAIL,
+			    NULL, CT_NONE);
+		mutex_exit(&ic->ic_state_mutex);
+		return;
+	}
+
+	rtt_buf->idb_buf_cb = NULL;
+	rtt_buf->idb_cb_arg = NULL;
+	rtt_buf->idb_bufoffset = offset;
+	rtt_buf->idb_xfer_len = length;
+	rtt_buf->idb_ic = idt->idt_ic;
+	rtt_buf->idb_task_binding = idt;
+
+	/*
+	 * Put the idm_buf_t on the tx queue.  It will be transmitted by
+	 * idm_sotx_thread.
+	 */
+	mutex_enter(&so_conn->ic_tx_mutex);
+
+	if (!so_conn->ic_tx_thread_running) {
+		idm_buf_free(rtt_buf);
+		mutex_exit(&so_conn->ic_tx_mutex);
+		return;
+	}
+
+	/*
+	 * This new buffer represents an additional reference on the task
+	 */
+	idm_task_hold(idt);
+
+	/*
+	 * Build a template for the data PDU headers we will use so that
+	 * the SN values will stay consistent with other PDU's we are
+	 * transmitting like R2T and SCSI status.
+	 */
+	bzero(&rtt_buf->idb_data_hdr_tmpl, sizeof (iscsi_hdr_t));
+	tmppdu.isp_hdr = &rtt_buf->idb_data_hdr_tmpl;
+	(*idt->idt_ic->ic_conn_ops.icb_build_hdr)(idt, &tmppdu,
+	    ISCSI_OP_SCSI_DATA);
+	rtt_buf->idb_tx_thread = B_TRUE;
+	rtt_buf->idb_in_transport = B_TRUE;
+	list_insert_tail(&so_conn->ic_tx_list, (void *)rtt_buf);
+	cv_signal(&so_conn->ic_tx_cv);
+	mutex_exit(&so_conn->ic_tx_mutex);
+}
+
+static void
+idm_so_send_rtt_data_done(idm_task_t *idt, idm_buf_t *idb)
+{
+	/*
+	 * Don't worry about status -- we assume any error handling
+	 * is performed by the caller (idm_sotx_thread).
+	 */
+	idb->idb_in_transport = B_FALSE;
+	idm_task_rele(idt);
+	idm_buf_free(idb);
+}
+
+static idm_status_t
+idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
     uint32_t buf_region_offset, uint32_t buf_region_length)
 {
 	idm_conn_t		*ic;
@@ -2146,6 +2275,7 @@ idm_so_send_buf_region(idm_task_t *idt, uint8_t opcode, idm_buf_t *idb,
 	uint32_t		data_offset = buf_region_offset;
 	iscsi_data_hdr_t	*bhs;
 	idm_pdu_t		*pdu;
+	idm_status_t		tx_status;
 
 	ASSERT(mutex_owned(&idt->idt_mutex));
 
@@ -2173,30 +2303,13 @@ idm_so_send_buf_region(idm_task_t *idt, uint8_t opcode, idm_buf_t *idb,
 		pdu->isp_ic = ic;
 
 		/*
-		 * For target we've already built a build a header template
+		 * We've already built a build a header template
 		 * to use during the transfer.  Use this template so that
 		 * the SN values stay consistent with any unrelated PDU's
 		 * being transmitted.
 		 */
-		if (opcode == ISCSI_OP_SCSI_DATA_RSP) {
-			bcopy(&idb->idb_data_hdr_tmpl, pdu->isp_hdr,
-			    sizeof (iscsi_hdr_t));
-		} else {
-			/*
-			 * OK for now, but we should remove this bzero and
-			 * make sure the build_hdr function is initializing the
-			 * header properly
-			 */
-			bzero(pdu->isp_hdr, sizeof (iscsi_hdr_t));
-
-			/*
-			 * setup iscsi data hdr
-			 * callback to the iSCSI layer to fill in the BHS
-			 * CmdSN, StatSN, ExpCmdSN, MaxCmdSN, TTT, ITT and
-			 * opcode
-			 */
-			(*ic->ic_conn_ops.icb_build_hdr)(idt, pdu, opcode);
-		}
+		bcopy(&idb->idb_data_hdr_tmpl, pdu->isp_hdr,
+		    sizeof (iscsi_hdr_t));
 
 		/*
 		 * Set DataSN, data offset, and flags in BHS
@@ -2231,9 +2344,13 @@ idm_so_send_buf_region(idm_task_t *idt, uint8_t opcode, idm_buf_t *idb,
 		 * Transmit the PDU.  Call the internal routine directly
 		 * as there is already implicit ordering.
 		 */
-		(void) idm_i_so_tx(pdu);
+		if ((tx_status = idm_i_so_tx(pdu)) != IDM_STATUS_SUCCESS) {
+			mutex_enter(&idt->idt_mutex);
+			return (tx_status);
+		}
 
 		mutex_enter(&idt->idt_mutex);
+		idt->idt_tx_bytes += chunk;
 	}
 
 	return (IDM_STATUS_SUCCESS);
@@ -2372,17 +2489,23 @@ idm_sotx_thread(void *arg)
 
 			mutex_enter(&idt->idt_mutex);
 			status = idm_so_send_buf_region(idt,
-			    ISCSI_OP_SCSI_DATA_RSP, idb, 0, idb->idb_xfer_len);
+			    idb, 0, idb->idb_xfer_len);
 
 			/*
 			 * TX thread owns the buffer so we expect it to
 			 * be "in transport"
 			 */
 			ASSERT(idb->idb_in_transport);
-			/*
-			 * idm_buf_tx_to_ini_done releases idt->idt_mutex
-			 */
-			idm_buf_tx_to_ini_done(idt, idb, status);
+			if (IDM_CONN_ISTGT(ic)) {
+				/*
+				 * idm_buf_tx_to_ini_done releases
+				 * idt->idt_mutex
+				 */
+				idm_buf_tx_to_ini_done(idt, idb, status);
+			} else {
+				idm_so_send_rtt_data_done(idt, idb);
+				mutex_exit(&idt->idt_mutex);
+			}
 			break;
 		}
 
@@ -2428,10 +2551,17 @@ tx_bail:
 			 * be "in transport"
 			 */
 			ASSERT(idb->idb_in_transport);
-			/*
-			 * idm_buf_tx_to_ini_done releases idt->idt_mutex
-			 */
-			idm_buf_tx_to_ini_done(idt, idb, IDM_STATUS_ABORTED);
+			if (IDM_CONN_ISTGT(ic)) {
+				/*
+				 * idm_buf_tx_to_ini_done releases
+				 * idt->idt_mutex
+				 */
+				idm_buf_tx_to_ini_done(idt, idb,
+				    IDM_STATUS_ABORTED);
+			} else {
+				idm_so_send_rtt_data_done(idt, idb);
+				mutex_exit(&idt->idt_mutex);
+			}
 			mutex_enter(&so_conn->ic_tx_mutex);
 			break;
 		}

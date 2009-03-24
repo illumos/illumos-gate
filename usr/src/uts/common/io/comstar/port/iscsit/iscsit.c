@@ -971,6 +971,13 @@ iscsit_conn_accept(idm_conn_t *ic)
 	iscsit_conn_t *ict;
 
 	/*
+	 * We need to get a global hold here to ensure that the service
+	 * doesn't get shutdown prior to establishing a session. This
+	 * gets released in iscsit_conn_destroy().
+	 */
+	iscsit_global_hold();
+
+	/*
 	 * Allocate an associated iscsit structure to represent this
 	 * connection.  We shouldn't really create a session until we
 	 * get the first login PDU.
@@ -1128,6 +1135,8 @@ iscsit_conn_destroy(idm_conn_t *ic)
 	mutex_destroy(&ict->ict_mutex);
 	idm_refcnt_destroy(&ict->ict_refcnt);
 	kmem_free(ict, sizeof (*ict));
+
+	iscsit_global_rele();
 
 	return (IDM_STATUS_SUCCESS);
 }
@@ -1421,6 +1430,13 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 			    task->task_sense_length);
 			hton24(rsp->dlength, resp_datalen);
 		}
+
+		DTRACE_PROBE5(iscsi__scsi__response,
+		    iscsit_conn_t *, itask->it_ict,
+		    uint8_t, rsp->response,
+		    uint8_t, rsp->cmd_status,
+		    idm_pdu_t *, pdu,
+		    scsi_task_t *, task);
 
 		iscsit_pdu_tx(pdu);
 
@@ -1830,6 +1846,8 @@ iscsit_send_direct_scsi_resp(iscsit_conn_t *ict, idm_pdu_t *rx_pdu,
 	idm_pdu_t			*rsp_pdu;
 	idm_conn_t			*ic;
 	iscsi_scsi_rsp_hdr_t		*resp;
+	iscsi_scsi_cmd_hdr_t		*req =
+	    (iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr;
 
 	ic = ict->ict_ic;
 
@@ -1841,7 +1859,20 @@ iscsit_send_direct_scsi_resp(iscsit_conn_t *ict, idm_pdu_t *rx_pdu,
 	resp->flags = ISCSI_FLAG_FINAL;
 	resp->response = response;
 	resp->cmd_status = cmd_status;
-	resp->itt = rx_pdu->isp_hdr->itt;
+	resp->itt = req->itt;
+	if ((response == ISCSI_STATUS_CMD_COMPLETED) &&
+	    (req->data_length != 0) &&
+	    ((req->flags & ISCSI_FLAG_CMD_READ) ||
+	    (req->flags & ISCSI_FLAG_CMD_WRITE))) {
+		resp->flags |= ISCSI_FLAG_CMD_UNDERFLOW;
+		resp->residual_count = req->data_length;
+	}
+
+	DTRACE_PROBE4(iscsi__scsi__direct__response,
+	    iscsit_conn_t *, ict,
+	    uint8_t, resp->response,
+	    uint8_t, resp->cmd_status,
+	    idm_pdu_t *, rsp_pdu);
 
 	iscsit_pdu_tx(rsp_pdu);
 }
@@ -1853,6 +1884,11 @@ iscsit_send_task_mgmt_resp(idm_pdu_t *tm_resp_pdu, uint8_t tm_status)
 
 	tm_resp = (iscsi_scsi_task_mgt_rsp_hdr_t *)tm_resp_pdu->isp_hdr;
 	tm_resp->response = tm_status;
+
+	DTRACE_PROBE3(iscsi__scsi__tm__response,
+	    iscsit_conn_t *, tm_resp_pdu->isp_ic->ic_handle,
+	    uint8_t, tm_resp->response,
+	    idm_pdu_t *, tm_resp_pdu);
 	iscsit_pdu_tx(tm_resp_pdu);
 }
 
@@ -1889,6 +1925,11 @@ iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	/*
 	 * Figure out what we're being asked to do.
 	 */
+	DTRACE_PROBE4(iscsi__scsi__tm__request,
+	    iscsit_conn_t *, ict,
+	    uint8_t, (iscsi_tm->function & ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK),
+	    uint32_t, iscsi_tm->rtt,
+	    idm_pdu_t *, rx_pdu);
 	switch (iscsi_tm->function & ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK) {
 	case ISCSI_TM_FUNC_ABORT_TASK:
 		/*

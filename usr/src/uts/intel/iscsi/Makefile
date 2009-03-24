@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -62,6 +62,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/scsi/adapters/iscsi
 # Note dependancy on misc/scsi.
 #
 LDFLAGS += -dy -N"misc/scsi" -N"fs/sockfs" -N"sys/doorfs" -Nmisc/md5 -Nmisc/ksocket
+LDFLAGS += -N"misc/idm"
 
 LINTFLAGS += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW
 LINTFLAGS64 += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW

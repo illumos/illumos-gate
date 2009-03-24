@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
  */
 
+#define	ISCSI_ICS_NAMES
 #include "iscsi.h"	/* main header */
 
 kstat_item_t	kstat_items_hba[KN_HBA_IDX_MAX] = {
@@ -279,8 +280,8 @@ iscsi_sess_kstat_update(kstat_t *ks, int rw)
 		/* String indicating the state of the session */
 		ptr = iscsi_sess_state_str(isp->sess_state);
 		len =  strlen(ptr);
-		if (len > sizeof (iss->state_str)) {
-			len = sizeof (iss->state_str);
+		if (len > (sizeof (iss->state_str) - 1)) {
+			len = sizeof (iss->state_str) - 1;
 		}
 		bzero(iss->state_str, sizeof (iss->state_str));
 		bcopy(ptr, iss->state_str, len);
@@ -410,17 +411,15 @@ iscsi_conn_kstat_update(kstat_t *ks, int rw)
 {
 	iscsi_conn_t	*icp = (iscsi_conn_t *)ks->ks_private;
 	iscsi_conn_stats_t	*ics = &icp->stats.ks_data;
-	char			*ptr;
 	int			len;
 
 	if (rw == KSTAT_READ) {
-		ptr = iscsi_conn_state_str(icp->conn_state);
-		len =  strlen(ptr);
-		if (len > sizeof (ics->state_str)) {
-			len = sizeof (ics->state_str);
+		len =  strlen(iscsi_ics_name[icp->conn_state]);
+		if (len > (sizeof (ics->state_str) - 1)) {
+			len = sizeof (ics->state_str) - 1;
 		}
 		bzero(ics->state_str, sizeof (ics->state_str));
-		bcopy(ptr, ics->state_str, len);
+		bcopy(iscsi_ics_name[icp->conn_state], ics->state_str, len);
 		kstat_named_setstr(&ics->kn[KN_CONN_IDX_STATE],
 		    (const char *)ics->state_str);
 

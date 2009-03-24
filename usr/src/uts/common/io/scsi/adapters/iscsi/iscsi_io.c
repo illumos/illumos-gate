@@ -37,44 +37,61 @@
 #include "iscsi.h"		/* iscsi driver */
 #include <sys/iscsi_protocol.h>	/* iscsi protocol */
 
+#define	ISCSI_INI_TASK_TTT	0xffffffff
+
+boolean_t iscsi_io_logging = B_FALSE;
+
+#define	ISCSI_CHECK_SCSI_READ(ICHK_CMD, ICHK_HDR, ICHK_LEN, ICHK_TYPE)	\
+	if (idm_pattern_checking)  {					\
+		struct scsi_pkt *pkt = (ICHK_CMD)->cmd_un.scsi.pkt;	\
+		if (((ICHK_HDR)->response == 0) && 			\
+		    ((ICHK_HDR)->cmd_status == 0) &&			\
+		    ((pkt->pkt_cdbp[0] == SCMD_READ_G1) ||		\
+		    (pkt->pkt_cdbp[0] == SCMD_READ_G4) || 		\
+		    (pkt->pkt_cdbp[0] == SCMD_READ) || 			\
+		    (pkt->pkt_cdbp[0] == SCMD_READ_G5))) {		\
+			idm_buf_t *idb = (ICHK_CMD)->cmd_un.scsi.ibp_ibuf; \
+			IDM_BUFPAT_CHECK(idb, ICHK_LEN, ICHK_TYPE); \
+		}						\
+	}
+
 /* generic io helpers */
 static uint32_t n2h24(uchar_t *ptr);
 static int iscsi_sna_lt(uint32_t n1, uint32_t n2);
-static void iscsi_update_flow_control(iscsi_sess_t *isp,
+void iscsi_update_flow_control(iscsi_sess_t *isp,
     uint32_t max, uint32_t exp);
-
-/* receivers */
-static iscsi_status_t iscsi_rx_process_hdr(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data, int data_size);
-static iscsi_status_t iscsi_rx_process_nop(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
-static iscsi_status_t iscsi_rx_process_data_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp);
-static iscsi_status_t iscsi_rx_process_cmd_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
-static iscsi_status_t iscsi_rx_process_rtt_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
-static iscsi_status_t iscsi_rx_process_reject_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
-static iscsi_status_t iscsi_rx_process_rejected_tsk_mgt(iscsi_conn_t *icp,
-    iscsi_hdr_t *old_ihp);
+static iscsi_status_t iscsi_rx_process_scsi_itt_to_icmdp(iscsi_sess_t *isp,
+    idm_conn_t *ic, iscsi_scsi_rsp_hdr_t *ihp, iscsi_cmd_t **icmdp);
 static iscsi_status_t iscsi_rx_process_itt_to_icmdp(iscsi_sess_t *isp,
     iscsi_hdr_t *ihp, iscsi_cmd_t **icmdp);
-static iscsi_status_t iscsi_rx_process_task_mgt_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, void *data);
-static iscsi_status_t iscsi_rx_process_logout_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
-static iscsi_status_t iscsi_rx_process_async_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
-static iscsi_status_t iscsi_rx_process_text_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data);
+static void iscsi_process_rsp_status(iscsi_sess_t *isp, iscsi_conn_t *icp,
+    idm_status_t status);
+static void iscsi_drop_conn_cleanup(iscsi_conn_t *icp);
 
+/* callbacks from idm */
+static idm_pdu_cb_t iscsi_tx_done;
+
+/* receivers */
+static idm_status_t iscsi_rx_process_nop(idm_conn_t *ic, idm_pdu_t *pdu);
+static idm_status_t iscsi_rx_process_data_rsp(idm_conn_t *ic,
+    idm_pdu_t *pdu);
+static idm_status_t iscsi_rx_process_cmd_rsp(idm_conn_t *ic, idm_pdu_t *pdu);
+static idm_status_t iscsi_rx_process_reject_rsp(idm_conn_t *ic,
+    idm_pdu_t *pdu);
+
+static idm_status_t iscsi_rx_process_rejected_tsk_mgt(idm_conn_t *ic,
+    iscsi_hdr_t *old_ihp);
+static idm_status_t iscsi_rx_process_task_mgt_rsp(idm_conn_t *ic,
+    idm_pdu_t *pdu);
+static idm_status_t iscsi_rx_process_logout_rsp(idm_conn_t *ic,
+    idm_pdu_t *pdu);
+static idm_status_t iscsi_rx_process_async_rsp(idm_conn_t *ic,
+    idm_pdu_t *pdu);
+static idm_status_t iscsi_rx_process_text_rsp(idm_conn_t *ic,
+    idm_pdu_t *pdu);
 
 /* senders */
 static iscsi_status_t iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
-static iscsi_status_t iscsi_tx_r2t(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
-static iscsi_status_t iscsi_tx_data(iscsi_sess_t *isp, iscsi_conn_t *icp,
-    iscsi_cmd_t *icmdp, uint32_t ttt, size_t datalen, size_t offset);
 static iscsi_status_t iscsi_tx_nop(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 static iscsi_status_t iscsi_tx_abort(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 static iscsi_status_t iscsi_tx_reset(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
@@ -83,18 +100,12 @@ static iscsi_status_t iscsi_tx_text(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 
 
 /* helpers */
-static void iscsi_handle_r2t(iscsi_conn_t *icp, iscsi_cmd_t *icmdp,
-    uint32_t offset, uint32_t length, uint32_t ttt);
+static void iscsi_logout_start(void *arg);
 static void iscsi_handle_passthru_callback(struct scsi_pkt *pkt);
 static void iscsi_handle_nop(iscsi_conn_t *icp, uint32_t itt, uint32_t ttt);
 
 static void iscsi_timeout_checks(iscsi_sess_t *isp);
 static void iscsi_nop_checks(iscsi_sess_t *isp);
-
-
-#define	ISCSI_CONN_TO_NET_DIGEST(icp)					    \
-	((icp->conn_params.header_digest ? ISCSI_NET_HEADER_DIGEST : 0) |   \
-	(icp->conn_params.data_digest ? ISCSI_NET_DATA_DIGEST : 0))
 
 /*
  * This file contains the main guts of the iSCSI protocol layer.
@@ -198,7 +209,7 @@ iscsi_sna_lte(uint32_t n1, uint32_t n2)
  * iscsi_update_flow_control - Update expcmdsn and maxcmdsn iSCSI
  * flow control information for a session
  */
-static void
+void
 iscsi_update_flow_control(iscsi_sess_t *isp, uint32_t max, uint32_t exp)
 {
 	ASSERT(isp != NULL);
@@ -232,268 +243,613 @@ iscsi_update_flow_control(iscsi_sess_t *isp, uint32_t max, uint32_t exp)
  */
 
 /*
- * iscsi_rx_thread - The connection creates a thread of this
- * function during login.  After which point this thread is
- * used to receive and process all iSCSI PDUs on this connection.
- * The PDUs received on this connection are used to drive the
- * commands through their state machine.  This thread will
- * continue processing while the connection is on a LOGGED_IN
- * or IN_LOGOUT state.  Once the connection moves out of this
- * state the thread will die.
+ * iscsi_rx_scsi_rsp - called from idm
+ * For each opcode type fan out the processing.
  */
 void
-iscsi_rx_thread(iscsi_thread_t *thread, void *arg)
+iscsi_rx_scsi_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
-	iscsi_conn_t		*icp		= (iscsi_conn_t *)arg;
-	iscsi_sess_t		*isp		= NULL;
-	char			*hdr		= NULL;
-	int			hdr_size	= 0;
-	char			*data		= NULL;
-	int			data_size	= 0;
-	iscsi_hdr_t		*ihp;
+	iscsi_conn_t	*icp;
+	iscsi_sess_t	*isp;
+	iscsi_hdr_t	*ihp;
+	idm_status_t	status;
 
+	ASSERT(ic != NULL);
+	ASSERT(pdu != NULL);
+	icp		= ic->ic_handle;
 	ASSERT(icp != NULL);
-	isp = icp->conn_sess;
+	ihp		= (iscsi_hdr_t *)pdu->isp_hdr;
+	ASSERT(ihp != NULL);
+	isp		= icp->conn_sess;
 	ASSERT(isp != NULL);
 
-	/* pre-alloc recv header buffer for common actions */
-	hdr_size = sizeof (iscsi_hdr_t) + 255; /* 255 = one byte hlength */
-	hdr = (char *)kmem_zalloc(hdr_size, KM_SLEEP);
-	ihp = (iscsi_hdr_t *)hdr;
-	ASSERT(ihp != NULL);
-
-	/* pre-alloc max_recv_size buffer for common actions */
-	data_size = icp->conn_params.max_recv_data_seg_len;
-	data = (char *)kmem_zalloc(data_size, KM_SLEEP);
-	ASSERT(data != NULL);
-
-	do {
-		/* Wait for the next iSCSI header */
-		rval = iscsi_net->recvhdr(icp->conn_socket,
-		    ihp, hdr_size, 0, (icp->conn_params.header_digest ?
-		    ISCSI_NET_HEADER_DIGEST : 0));
-		if (ISCSI_SUCCESS(rval)) {
-			isp->sess_rx_lbolt =
-			    icp->conn_rx_lbolt =
-			    ddi_get_lbolt();
-
-			/* Perform specific hdr handling */
-			rval = iscsi_rx_process_hdr(icp, ihp,
-			    data, data_size);
-		}
-
-		/*
-		 * handle failures
-		 */
-		switch (rval) {
-		case ISCSI_STATUS_SUCCESS:
-			/*
-			 * If we successfully completed a receive
-			 * and we are in an IN_FLUSH state then
-			 * check the active queue count to see
-			 * if its empty.  If its empty then force
-			 * a disconnect event on the connection.
-			 * This will move the session from IN_FLUSH
-			 * to FLUSHED and complete the login
-			 * parameter update.
-			 */
-			if ((isp->sess_state == ISCSI_SESS_STATE_IN_FLUSH) &&
-			    (icp->conn_queue_active.count == 0)) {
-				mutex_enter(&icp->conn_state_mutex);
-				(void) iscsi_conn_state_machine(icp,
-				    ISCSI_CONN_EVENT_T14);
-				mutex_exit(&icp->conn_state_mutex);
-			}
-			break;
-		case ISCSI_STATUS_TCP_RX_ERROR:
-			/* connection had an error */
-			mutex_enter(&icp->conn_state_mutex);
-			/*
-			 * recvmsg may return after the closing of socket
-			 * with this error
-			 */
-			if (ISCSI_CONN_STATE_FULL_FEATURE(icp->conn_state)) {
-				(void) iscsi_conn_state_machine(icp,
-				    ISCSI_CONN_EVENT_T15);
-			}
-			mutex_exit(&icp->conn_state_mutex);
-			break;
-		case ISCSI_STATUS_HEADER_DIGEST_ERROR:
-			/*
-			 * If we encounter a digest error we have to restart
-			 * all the connections on this session. per iSCSI
-			 * Level 0 Recovery.
-			 */
-			KSTAT_INC_CONN_ERR_HEADER_DIGEST(icp);
-			mutex_enter(&icp->conn_state_mutex);
-			(void) iscsi_conn_state_machine(icp,
-			    ISCSI_CONN_EVENT_T14);
-			mutex_exit(&icp->conn_state_mutex);
-			break;
-		case ISCSI_STATUS_DATA_DIGEST_ERROR:
-			/*
-			 * We can continue with a data digest error.  The
-			 * icmdp was flaged as having a crc problem.  It
-			 * will be aborted when all data is received.  This
-			 * saves us from restarting the session when we
-			 * might be able to keep it going.  If the data
-			 * digest issue was really bad we will hit a
-			 * status protocol error on the next pdu, which
-			 * will force a connection retstart.
-			 */
-			KSTAT_INC_CONN_ERR_DATA_DIGEST(icp);
-			break;
-		case ISCSI_STATUS_PROTOCOL_ERROR:
-			/*
-			 * A protocol problem was encountered.  Reset
-			 * session to try and repair issue.
-			 */
-			KSTAT_INC_CONN_ERR_PROTOCOL(icp);
-			mutex_enter(&icp->conn_state_mutex);
-			(void) iscsi_conn_state_machine(icp,
-			    ISCSI_CONN_EVENT_T14);
-			mutex_exit(&icp->conn_state_mutex);
-			break;
-		case ISCSI_STATUS_INTERNAL_ERROR:
-			/*
-			 * These should have all been handled before now.
-			 */
-			break;
-		default:
-			cmn_err(CE_WARN, "iscsi connection(%u) encountered "
-			    "unknown error(%d) on a receive", icp->conn_oid,
-			    rval);
-			ASSERT(B_FALSE);
-		}
-
-	} while ((ISCSI_CONN_STATE_FULL_FEATURE(icp->conn_state)) &&
-	    (iscsi_thread_wait(thread, 0) != 0));
-
-	kmem_free(hdr, hdr_size);
-	kmem_free(data, data_size);
-}
-
-
-/*
- * iscsi_rx_process_hdr - This function collects data for all PDUs
- * that do not have data that will be mapped to a specific scsi_pkt.
- * Then for each hdr type fan out the processing.
- */
-static iscsi_status_t
-iscsi_rx_process_hdr(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
-    char *data, int data_size)
-{
-	iscsi_status_t	rval	= ISCSI_STATUS_SUCCESS;
-	iscsi_sess_t	*isp	= NULL;
-
-	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
-	ASSERT(data != NULL);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-
-	/* If this is not a SCSI_DATA_RSP we can go ahead and get the data */
-	if ((ihp->opcode & ISCSI_OPCODE_MASK) != ISCSI_OP_SCSI_DATA_RSP) {
-		rval = iscsi_net->recvdata(icp->conn_socket, ihp,
-		    data, data_size, 0, (icp->conn_params.data_digest) ?
-		    ISCSI_NET_DATA_DIGEST : 0);
-		if (!ISCSI_SUCCESS(rval)) {
-			return (rval);
-		}
-		isp->sess_rx_lbolt = icp->conn_rx_lbolt = ddi_get_lbolt();
-	}
+	/* reset the session timer when we receive the response */
+	isp->sess_rx_lbolt = icp->conn_rx_lbolt = ddi_get_lbolt();
 
 	/* fan out the hdr processing */
 	switch (ihp->opcode & ISCSI_OPCODE_MASK) {
 	case ISCSI_OP_SCSI_DATA_RSP:
-		rval = iscsi_rx_process_data_rsp(icp, ihp);
+		status = iscsi_rx_process_data_rsp(ic, pdu);
 		break;
 	case ISCSI_OP_SCSI_RSP:
-		rval = iscsi_rx_process_cmd_rsp(icp, ihp, data);
-		break;
-	case ISCSI_OP_RTT_RSP:
-		rval = iscsi_rx_process_rtt_rsp(icp, ihp, data);
-		break;
-	case ISCSI_OP_NOOP_IN:
-		rval = iscsi_rx_process_nop(icp, ihp, data);
-		break;
-	case ISCSI_OP_REJECT_MSG:
-		rval = iscsi_rx_process_reject_rsp(icp, ihp, data);
-		break;
-	case ISCSI_OP_SCSI_TASK_MGT_RSP:
-		rval = iscsi_rx_process_task_mgt_rsp(icp, ihp, data);
-		break;
-	case ISCSI_OP_LOGOUT_RSP:
-		rval = iscsi_rx_process_logout_rsp(icp, ihp, data);
-		break;
-	case ISCSI_OP_ASYNC_EVENT:
-		rval = iscsi_rx_process_async_rsp(icp, ihp, data);
-		break;
-	case ISCSI_OP_TEXT_RSP:
-		rval = iscsi_rx_process_text_rsp(icp, ihp, data);
+		status = iscsi_rx_process_cmd_rsp(ic, pdu);
+		idm_pdu_complete(pdu, status);
 		break;
 	default:
 		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
-		    "received an unsupported opcode 0x%02x",
+		    "received pdu with unsupported opcode 0x%02x",
 		    icp->conn_oid, ihp->opcode);
-		rval = ISCSI_STATUS_PROTOCOL_ERROR;
+		status = IDM_STATUS_PROTOCOL_ERROR;
 	}
-
-	return (rval);
+	iscsi_process_rsp_status(isp, icp, status);
 }
 
-
-/*
- * iscsi_rx_process_data_rsp - Processed received data header.  Once
- * header is processed we read data off the connection directly into
- * the scsi_pkt to avoid duplicate bcopy of a large amount of data.
- * If this is the final data sequence denoted by the data response
- * PDU Status bit being set.  We will not receive the SCSI response.
- * This bit denotes that the PDU is the successful completion of the
- * command.  In this case complete the command.  If This bit isn't
- * set we wait for more data or a scsi command response.
- */
-static iscsi_status_t
-iscsi_rx_process_data_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp)
+void
+iscsi_task_cleanup(int opcode, iscsi_cmd_t *icmdp)
 {
-	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
-	iscsi_sess_t		*isp		= NULL;
-	iscsi_data_rsp_hdr_t	*idrhp		= (iscsi_data_rsp_hdr_t *)ihp;
-	iscsi_cmd_t		*icmdp		= NULL;
-	struct scsi_pkt		*pkt		= NULL;
-	struct buf		*bp		= NULL;
-	uint32_t		offset		= 0;
-	uint32_t		dlength		= 0;
-	char			*bcp		= NULL;
+	struct buf 	*bp;
+	idm_buf_t	*ibp, *obp;
+	idm_task_t	*itp;
 
-	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
+	itp = icmdp->cmd_itp;
+	ASSERT(itp != NULL);
+	ASSERT((opcode == ISCSI_OP_SCSI_DATA_RSP) ||
+	    (opcode == ISCSI_OP_SCSI_RSP));
 
-	if (idrhp->flags & ISCSI_FLAG_DATA_STATUS) {
-		/* make sure we got status in order */
-		if (icp->conn_expstatsn == ntohl(idrhp->statsn)) {
-			icp->conn_expstatsn++;
-		} else {
-			cmn_err(CE_WARN, "iscsi connection(%u) protocol error "
-			    "- received status out of order itt:0x%x "
-			    "statsn:0x%x expstatsn:0x%x", icp->conn_oid,
-			    idrhp->itt, ntohl(idrhp->statsn),
-			    icp->conn_expstatsn);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+	bp = icmdp->cmd_un.scsi.bp;
+	ibp = icmdp->cmd_un.scsi.ibp_ibuf;
+	obp = icmdp->cmd_un.scsi.ibp_obuf;
+	ISCSI_IO_LOG(CE_NOTE, "DEBUG: task_cleanup: itp: %p opcode: %d "
+	    "icmdp: %p bp: %p ibp: %p", (void *)itp, opcode,
+	    (void *)icmdp, (void *)bp, (void *)ibp);
+	if (bp && bp->b_bcount) {
+		if (ibp != NULL && bp->b_flags & B_READ) {
+			idm_buf_unbind_in(itp, ibp);
+			idm_buf_free(ibp);
+			icmdp->cmd_un.scsi.ibp_ibuf = NULL;
+		} else if (obp != NULL && !(bp->b_flags & B_READ)) {
+			idm_buf_unbind_out(itp, obp);
+			idm_buf_free(obp);
+			icmdp->cmd_un.scsi.ibp_obuf = NULL;
 		}
 	}
 
-	/* match itt in the session's command table */
-	mutex_enter(&icp->conn_queue_active.mutex);
+	idm_task_done(itp);
+}
+
+idm_status_t
+iscsi_rx_chk(iscsi_conn_t *icp, iscsi_sess_t *isp,
+    iscsi_scsi_rsp_hdr_t *irhp, iscsi_cmd_t **icmdp)
+{
+	iscsi_status_t rval;
+
 	mutex_enter(&isp->sess_cmdsn_mutex);
-	if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(isp, ihp, &icmdp))) {
+
+	if (icp->conn_expstatsn == ntohl(irhp->statsn)) {
+		icp->conn_expstatsn++;
+	} else {
+		cmn_err(CE_WARN, "iscsi connection(%u/%x) protocol error - "
+		    "received status out of order itt:0x%x statsn:0x%x "
+		    "expstatsn:0x%x", icp->conn_oid, irhp->opcode,
+		    irhp->itt, ntohl(irhp->statsn), icp->conn_expstatsn);
 		mutex_exit(&isp->sess_cmdsn_mutex);
-		mutex_exit(&icp->conn_queue_active.mutex);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
+
+	/* get icmdp so we can cleanup on error */
+	if ((irhp->opcode == ISCSI_OP_SCSI_DATA_RSP) ||
+	    (irhp->opcode == ISCSI_OP_SCSI_RSP)) {
+		rval = iscsi_rx_process_scsi_itt_to_icmdp(isp, icp->conn_ic,
+		    irhp, icmdp);
+	} else {
+		rval = iscsi_rx_process_itt_to_icmdp(isp,
+		    (iscsi_hdr_t *)irhp, icmdp);
+	}
+
+	if (!ISCSI_SUCCESS(rval)) {
+		mutex_exit(&isp->sess_cmdsn_mutex);
+		return (IDM_STATUS_PROTOCOL_ERROR);
+	}
+
+	/* update expcmdsn and maxcmdsn */
+	iscsi_update_flow_control(isp, ntohl(irhp->maxcmdsn),
+	    ntohl(irhp->expcmdsn));
+	mutex_exit(&isp->sess_cmdsn_mutex);
+	return (IDM_STATUS_SUCCESS);
+}
+
+static void
+iscsi_cmd_rsp_chk(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp)
+{
+	struct scsi_pkt *pkt;
+	size_t data_transferred;
+
+	pkt = icmdp->cmd_un.scsi.pkt;
+	pkt->pkt_resid = 0;
+	data_transferred = icmdp->cmd_un.scsi.data_transferred;
+	/* Check the residual count */
+	if ((icmdp->cmd_un.scsi.bp) &&
+	    (data_transferred != icmdp->cmd_un.scsi.bp->b_bcount)) {
+		/*
+		 * We didn't xfer the expected amount of data -
+		 * the residual_count in the header is only
+		 * valid if the underflow flag is set.
+		 */
+		if (issrhp->flags & ISCSI_FLAG_CMD_UNDERFLOW) {
+			pkt->pkt_resid = ntohl(issrhp->residual_count);
+		} else {
+			if (icmdp->cmd_un.scsi.bp->b_bcount >
+			    data_transferred) {
+				/*
+				 * Some data fell on the floor
+				 * somehow - probably a CRC error
+				 */
+				pkt->pkt_resid =
+				    icmdp->cmd_un.scsi.bp->b_bcount -
+				    data_transferred;
+			}
+		}
+		ISCSI_IO_LOG(CE_NOTE,
+		    "DEBUG: iscsi_rx_cmd_rsp_chk: itt: %u"
+		    "data_trans != b_count data_transferred: %lu "
+		    "b_count: %lu cmd_status: %d flags: %d resid: %lu",
+		    issrhp->itt, data_transferred,
+		    icmdp->cmd_un.scsi.bp->b_bcount,
+		    issrhp->cmd_status & STATUS_MASK,
+		    issrhp->flags, pkt->pkt_resid);
+	}
+	/* set flags that tell SCSA that the command is complete */
+	if (icmdp->cmd_crc_error_seen == B_FALSE) {
+		/* Set successful completion */
+		pkt->pkt_reason = CMD_CMPLT;
+		if (icmdp->cmd_un.scsi.bp) {
+			pkt->pkt_state |= (STATE_XFERRED_DATA |
+			    STATE_GOT_STATUS);
+		} else {
+			pkt->pkt_state |= STATE_GOT_STATUS;
+		}
+	} else {
+		/*
+		 * Some of the data was found to have an incorrect
+		 * error at the protocol error.
+		 */
+		pkt->pkt_reason = CMD_PER_FAIL;
+		pkt->pkt_statistics |= STAT_PERR;
+		if (icmdp->cmd_un.scsi.bp) {
+			pkt->pkt_resid =
+			    icmdp->cmd_un.scsi.bp->b_bcount;
+		} else {
+			pkt->pkt_resid = 0;
+		}
+	}
+}
+
+static void
+iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
+    uint8_t *data)
+{
+	uint32_t		dlength	= 0;
+	struct scsi_arq_status	*arqstat	= NULL;
+	size_t			senselen	= 0;
+	int			statuslen	= 0;
+	struct scsi_pkt		*pkt;
+
+	pkt = icmdp->cmd_un.scsi.pkt;
+	dlength = n2h24(issrhp->dlength);
+
+	/*
+	 * Process iSCSI Cmd Response Status
+	 * RFC 3720 Sectionn 10.4.2.
+	 */
+	switch (issrhp->cmd_status & STATUS_MASK) {
+	case STATUS_GOOD:
+		/* pass SCSI status up stack */
+		if (pkt->pkt_scbp) {
+			pkt->pkt_scbp[0] = issrhp->cmd_status;
+		}
+		break;
+	case STATUS_CHECK:
+		/*
+		 * Verify we received a sense buffer and
+		 * that there is the correct amount of
+		 * request sense space to copy it to.
+		 */
+		if ((dlength > 1) &&
+		    (pkt->pkt_scbp != NULL) &&
+		    (icmdp->cmd_un.scsi.statuslen >=
+		    sizeof (struct scsi_arq_status))) {
+			/*
+			 * If a bad command status is received we
+			 * need to reset the pkt_resid to zero.
+			 * The target driver compares its value
+			 * before checking other error flags.
+			 * (ex. check conditions)
+			 */
+			pkt->pkt_resid = 0;
+
+			/* get sense length from first 2 bytes */
+			senselen = ((data[0] << 8) | data[1]) &
+			    (size_t)0xFFFF;
+			ISCSI_IO_LOG(CE_NOTE,
+			    "DEBUG: iscsi_rx_cmd_rsp_cmd_status status_check: "
+			    "dlen: %d scbp: %p statuslen: %d arq: %d senselen:"
+			    " %lu", dlength, (void *)pkt->pkt_scbp,
+			    icmdp->cmd_un.scsi.statuslen,
+			    (int)sizeof (struct scsi_arq_status),
+			    senselen);
+
+			/* Sanity-check on the sense length */
+			if ((senselen + 2) > dlength) {
+				senselen = dlength - 2;
+			}
+
+			/*
+			 * If there was a Data Digest error then
+			 * the sense data cannot be trusted.
+			 */
+			if (icmdp->cmd_crc_error_seen) {
+				senselen = 0;
+			}
+
+			/* automatic request sense */
+			arqstat =
+			    (struct scsi_arq_status *)pkt->pkt_scbp;
+
+			/* pass SCSI status up stack */
+			*((uchar_t *)&arqstat->sts_status) =
+			    issrhp->cmd_status;
+
+			/*
+			 * Set the status for the automatic
+			 * request sense command
+			 */
+			arqstat->sts_rqpkt_state = (STATE_GOT_BUS |
+			    STATE_GOT_TARGET | STATE_SENT_CMD |
+			    STATE_XFERRED_DATA | STATE_GOT_STATUS |
+			    STATE_ARQ_DONE);
+
+			*((uchar_t *)&arqstat->sts_rqpkt_status) =
+			    STATUS_GOOD;
+
+			arqstat->sts_rqpkt_reason = CMD_CMPLT;
+
+			statuslen = icmdp->cmd_un.scsi.statuslen;
+
+			if (senselen == 0) {
+				/* auto request sense failed */
+				arqstat->sts_rqpkt_status.sts_chk = 1;
+				arqstat->sts_rqpkt_resid = statuslen;
+			} else if (senselen < statuslen) {
+				/* auto request sense short */
+				arqstat->sts_rqpkt_resid = statuslen - senselen;
+			} else {
+				/* auto request sense complete */
+				arqstat->sts_rqpkt_resid = 0;
+			}
+			arqstat->sts_rqpkt_statistics = 0;
+			pkt->pkt_state |= STATE_ARQ_DONE;
+
+			if (icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_XARQ) {
+				pkt->pkt_state |= STATE_XARQ_DONE;
+			}
+
+			/* copy auto request sense */
+			dlength = min(senselen, statuslen);
+			if (dlength) {
+				bcopy(&data[2], (uchar_t *)&arqstat->
+				    sts_sensedata, dlength);
+			}
+			break;
+		}
+		/* FALLTHRU */
+	case STATUS_BUSY:
+	case STATUS_RESERVATION_CONFLICT:
+	case STATUS_QFULL:
+	case STATUS_ACA_ACTIVE:
+	default:
+		/*
+		 * If a bad command status is received we need to
+		 * reset the pkt_resid to zero.  The target driver
+		 * compares its value before checking other error
+		 * flags. (ex. check conditions)
+		 */
+		ISCSI_IO_LOG(CE_NOTE,
+		    "DEBUG: iscsi_rx_cmd_rsp_cmd_status: status: "
+		    "%d cmd_status: %d dlen: %u scbp: %p statuslen: %d "
+		    "arg_len: %d", issrhp->cmd_status & STATUS_MASK,
+		    issrhp->cmd_status, dlength, (void *)pkt->pkt_scbp,
+		    icmdp->cmd_un.scsi.statuslen,
+		    (int)sizeof (struct scsi_arq_status));
+		pkt->pkt_resid = 0;
+		/* pass SCSI status up stack */
+		if (pkt->pkt_scbp) {
+			pkt->pkt_scbp[0] = issrhp->cmd_status;
+		}
+	}
+}
+
+/*
+ * iscsi_rx_process_login_pdup - Process login response PDU.  This function
+ * copies the data into the connection context so that the login code can
+ * interpret it.
+ */
+
+idm_status_t
+iscsi_rx_process_login_pdu(idm_conn_t *ic, idm_pdu_t *pdu)
+{
+	iscsi_conn_t 		*icp;
+
+	icp = ic->ic_handle;
+
+	/*
+	 * Copy header and data into connection structure so iscsi_login()
+	 * can process it.
+	 */
+	mutex_enter(&icp->conn_login_mutex);
+	/*
+	 * If conn_login_state != LOGIN_TX then we are not ready to handle
+	 * this login response and we should just  drop it.
+	 */
+	if (icp->conn_login_state == LOGIN_TX) {
+		icp->conn_login_datalen = pdu->isp_datalen;
+		bcopy(pdu->isp_hdr, &icp->conn_login_resp_hdr,
+		    sizeof (iscsi_hdr_t));
+		/*
+		 * Login code is sloppy with it's NULL handling so make sure
+		 * we don't leave any stale data in there.
+		 */
+		bzero(icp->conn_login_data, icp->conn_login_max_data_length);
+		bcopy(pdu->isp_data, icp->conn_login_data,
+		    MIN(pdu->isp_datalen, icp->conn_login_max_data_length));
+		iscsi_login_update_state_locked(icp, LOGIN_RX);
+	}
+	mutex_exit(&icp->conn_login_mutex);
+
+	return (IDM_STATUS_SUCCESS);
+}
+
+/*
+ * iscsi_rx_process_cmd_rsp - Process received scsi command response.  This
+ * will contain sense data if the command was not successful.  This data needs
+ * to be copied into the scsi_pkt.  Otherwise we just complete the IO.
+ */
+static idm_status_t
+iscsi_rx_process_cmd_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
+{
+	iscsi_conn_t		*icp	= ic->ic_handle;
+	iscsi_sess_t		*isp	= icp->conn_sess;
+	iscsi_scsi_rsp_hdr_t	*issrhp	= (iscsi_scsi_rsp_hdr_t *)pdu->isp_hdr;
+	uint8_t			*data	= pdu->isp_data;
+	iscsi_cmd_t		*icmdp	= NULL;
+	struct scsi_pkt		*pkt	= NULL;
+	idm_status_t		rval;
+	struct buf		*bp;
+
+	/* make sure we get status in order */
+	mutex_enter(&icp->conn_queue_active.mutex);
+
+	if ((rval = iscsi_rx_chk(icp, isp, issrhp,
+	    &icmdp)) != IDM_STATUS_SUCCESS) {
+		if (icmdp != NULL) {
+			iscsi_task_cleanup(issrhp->opcode, icmdp);
+		}
+		mutex_exit(&icp->conn_queue_active.mutex);
+		return (rval);
+	}
+
+	/*
+	 * If we are in "idm aborting" state then we shouldn't continue
+	 * to process this command.  By definition this command is no longer
+	 * on the active queue so we shouldn't try to remove it either.
+	 */
+	mutex_enter(&icmdp->cmd_mutex);
+	if (icmdp->cmd_state == ISCSI_CMD_STATE_IDM_ABORTING) {
+		mutex_exit(&icmdp->cmd_mutex);
+		mutex_exit(&icp->conn_queue_active.mutex);
+		return (IDM_STATUS_SUCCESS);
+	}
+	mutex_exit(&icmdp->cmd_mutex);
+
+	/* Get the IDM buffer and bytes transferred */
+	bp = icmdp->cmd_un.scsi.bp;
+	if (ic->ic_conn_flags & IDM_CONN_USE_SCOREBOARD) {
+		/* Transport tracks bytes transferred so use those counts */
+		if (bp && (bp->b_flags & B_READ)) {
+			icmdp->cmd_un.scsi.data_transferred +=
+			    icmdp->cmd_itp->idt_rx_bytes;
+		} else {
+			icmdp->cmd_un.scsi.data_transferred +=
+			    icmdp->cmd_itp->idt_tx_bytes;
+		}
+	} else {
+		/*
+		 * Some transports cannot track the bytes transferred on
+		 * the initiator side (like iSER) so we have to use the
+		 * status info.  If the response field indicates that
+		 * the command actually completed then we will assume
+		 * the data_transferred value represents the entire buffer
+		 * unless the resid field says otherwise.  This is a bit
+		 * unintuitive but it's really impossible to know what
+		 * has been transferred without detailed consideration
+		 * of the SCSI status and sense key and that is outside
+		 * the scope of the transport.  Instead the target/class driver
+		 * can consider these values along with the resid and figure
+		 * it out.  The data_transferred concept is just belt and
+		 * suspenders anyway -- RFC 3720 actually explicitly rejects
+		 * scoreboarding ("Initiators SHOULD NOT keep track of the
+		 * data transferred to or from the target (scoreboarding)")
+		 * perhaps for this very reason.
+		 */
+		if (issrhp->response != 0) {
+			icmdp->cmd_un.scsi.data_transferred = 0;
+		} else {
+			icmdp->cmd_un.scsi.data_transferred =
+			    (bp == NULL) ? 0 : bp->b_bcount;
+			if (issrhp->flags & ISCSI_FLAG_CMD_UNDERFLOW) {
+				icmdp->cmd_un.scsi.data_transferred -=
+				    ntohl(issrhp->residual_count);
+			}
+		}
+	}
+
+	ISCSI_CHECK_SCSI_READ(icmdp, issrhp,
+	    icmdp->cmd_un.scsi.data_transferred,
+	    BP_CHECK_THOROUGH);
+
+	ISCSI_IO_LOG(CE_NOTE, "DEBUG: rx_process_cmd_rsp: ic: %p pdu: %p itt:"
+	    " %x expcmdsn: %x sess_cmd: %x sess_expcmdsn: %x data_transfered:"
+	    " %lu ibp: %p obp: %p", (void *)ic, (void *)pdu, issrhp->itt,
+	    issrhp->expcmdsn, isp->sess_cmdsn, isp->sess_expcmdsn,
+	    icmdp->cmd_un.scsi.data_transferred,
+	    (void *)icmdp->cmd_un.scsi.ibp_ibuf,
+	    (void *)icmdp->cmd_un.scsi.ibp_obuf);
+
+	iscsi_task_cleanup(issrhp->opcode, icmdp);
+
+	if (issrhp->response) {
+		/* The target failed the command. */
+		ISCSI_IO_LOG(CE_NOTE, "DEBUG: rx_process_cmd_rsp: ic: %p pdu:"
+		    " %p response: %d bcount: %lu", (void *)ic, (void *)pdu,
+		    issrhp->response, icmdp->cmd_un.scsi.bp->b_bcount);
+		pkt = icmdp->cmd_un.scsi.pkt;
+		pkt->pkt_reason = CMD_TRAN_ERR;
+		if (icmdp->cmd_un.scsi.bp) {
+			pkt->pkt_resid = icmdp->cmd_un.scsi.bp->b_bcount;
+		} else {
+			pkt->pkt_resid = 0;
+		}
+	} else {
+		/* success */
+		iscsi_cmd_rsp_chk(icmdp, issrhp);
+		iscsi_cmd_rsp_cmd_status(icmdp, issrhp, data);
+	}
+
+	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E3, isp);
+	mutex_exit(&icp->conn_queue_active.mutex);
+	return (IDM_STATUS_SUCCESS);
+}
+
+static void
+iscsi_data_rsp_pkt(iscsi_cmd_t *icmdp, iscsi_data_rsp_hdr_t *idrhp)
+{
+	struct buf		*bp	= NULL;
+	size_t			data_transferred;
+	struct scsi_pkt		*pkt;
+
+	bp = icmdp->cmd_un.scsi.bp;
+	pkt = icmdp->cmd_un.scsi.pkt;
+	data_transferred = icmdp->cmd_un.scsi.data_transferred;
+	/*
+	 * The command* must be completed now, since we won't get a command
+	 * response PDU. The cmd_status and residual_count are
+	 * not meaningful unless status_present is set.
+	 */
+	pkt->pkt_resid = 0;
+	/* Check the residual count */
+	if (bp && (data_transferred != bp->b_bcount)) {
+		/*
+		 * We didn't xfer the expected amount of data -
+		 * the residual_count in the header is only valid
+		 * if the underflow flag is set.
+		 */
+		if (idrhp->flags & ISCSI_FLAG_DATA_UNDERFLOW) {
+			pkt->pkt_resid = ntohl(idrhp->residual_count);
+			ISCSI_IO_LOG(CE_NOTE, "DEBUG: iscsi_data_rsp_pkt: "
+			    "underflow: itt: %d "
+			    "transferred: %lu count: %lu", idrhp->itt,
+			    data_transferred, bp->b_bcount);
+		} else {
+			if (bp->b_bcount > data_transferred) {
+				/* Some data fell on the floor somehw */
+				ISCSI_IO_LOG(CE_NOTE, "DEBUG: "
+				    "iscsi_data_rsp_pkt: data fell: itt: %d "
+				    "transferred: %lu count: %lu", idrhp->itt,
+				    data_transferred, bp->b_bcount);
+				pkt->pkt_resid =
+				    bp->b_bcount - data_transferred;
+			}
+		}
+	}
+
+	pkt->pkt_reason = CMD_CMPLT;
+	pkt->pkt_state |= (STATE_XFERRED_DATA | STATE_GOT_STATUS);
+
+	if (((idrhp->cmd_status & STATUS_MASK) != STATUS_GOOD) &&
+	    (icmdp->cmd_un.scsi.statuslen >=
+	    sizeof (struct scsi_arq_status)) && pkt->pkt_scbp) {
+
+		/*
+		 * Not supposed to get exception status here!
+		 * We have no request sense data so just do the
+		 * best we can
+		 */
+		struct scsi_arq_status *arqstat =
+		    (struct scsi_arq_status *)pkt->pkt_scbp;
+
+
+		bzero(arqstat, sizeof (struct scsi_arq_status));
+
+		*((uchar_t *)&arqstat->sts_status) =
+		    idrhp->cmd_status;
+
+		arqstat->sts_rqpkt_resid =
+		    sizeof (struct scsi_extended_sense);
+		ISCSI_IO_LOG(CE_NOTE, "DEBUG: iscsi_data_rsp_pkt: "
+		    "exception status: itt: %d resid: %d",
+		    idrhp->itt, arqstat->sts_rqpkt_resid);
+
+	} else if (pkt->pkt_scbp) {
+		/* just pass along the status we got */
+		pkt->pkt_scbp[0] = idrhp->cmd_status;
+	}
+}
+
+/*
+ * iscsi_rx_process_data_rsp -
+ * This currently processes the final data sequence denoted by the data response
+ * PDU Status bit being set.  We will not receive the SCSI response.
+ * This bit denotes that the PDU is the successful completion of the
+ * command.
+ */
+static idm_status_t
+iscsi_rx_process_data_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
+{
+	iscsi_sess_t		*isp	= NULL;
+	iscsi_data_rsp_hdr_t	*idrhp	= (iscsi_data_rsp_hdr_t *)pdu->isp_hdr;
+	iscsi_cmd_t		*icmdp	= NULL;
+	struct buf		*bp	= NULL;
+	iscsi_conn_t		*icp	= ic->ic_handle;
+	idm_buf_t		*ibp;
+	idm_status_t		rval;
+
+
+	/* should only call this when the data rsp contains final rsp */
+	ASSERT(idrhp->flags & ISCSI_FLAG_DATA_STATUS);
+	isp = icp->conn_sess;
+
+	mutex_enter(&icp->conn_queue_active.mutex);
+	if ((rval = iscsi_rx_chk(icp, isp, (iscsi_scsi_rsp_hdr_t *)idrhp,
+	    &icmdp)) != IDM_STATUS_SUCCESS) {
+		if (icmdp != NULL) {
+			iscsi_task_cleanup(idrhp->opcode, icmdp);
+		}
+		mutex_exit(&icp->conn_queue_active.mutex);
+		return (rval);
+	}
+
+	/*
+	 * If we are in "idm aborting" state then we shouldn't continue
+	 * to process this command.  By definition this command is no longer
+	 * on the active queue so we shouldn't try to remove it either.
+	 */
+	mutex_enter(&icmdp->cmd_mutex);
+	if (icmdp->cmd_state == ISCSI_CMD_STATE_IDM_ABORTING) {
+		mutex_exit(&icmdp->cmd_mutex);
+		mutex_exit(&icp->conn_queue_active.mutex);
+		return (IDM_STATUS_SUCCESS);
+	}
+	mutex_exit(&icmdp->cmd_mutex);
+
 	/*
 	 * Holding the pending/active queue locks across the
 	 * iscsi_rx_data call later in this function may cause
@@ -505,17 +861,10 @@ iscsi_rx_process_data_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp)
 	 */
 	iscsi_dequeue_active_cmd(icp, icmdp);
 
-	/* update expcmdsn and maxcmdsn */
-	iscsi_update_flow_control(isp, ntohl(idrhp->maxcmdsn),
-	    ntohl(idrhp->expcmdsn));
-	mutex_exit(&isp->sess_cmdsn_mutex);
 	mutex_exit(&icp->conn_queue_active.mutex);
 
 	/* shorthand some values */
-	pkt = icmdp->cmd_un.scsi.pkt;
 	bp = icmdp->cmd_un.scsi.bp;
-	offset = ntohl(idrhp->offset);
-	dlength = n2h24(idrhp->dlength);
 
 	/*
 	 * some poorly behaved targets have been observed
@@ -531,425 +880,58 @@ iscsi_rx_process_data_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp)
 			mutex_enter(&icp->conn_queue_active.mutex);
 			iscsi_enqueue_active_cmd(icp, icmdp);
 			mutex_exit(&icp->conn_queue_active.mutex);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+			return (IDM_STATUS_PROTOCOL_ERROR);
 		}
-
-		/*
-		 * We can't tolerate the target sending too much
-		 * data for our buffer
-		 */
-		if ((dlength >
-		    (bp->b_bcount - icmdp->cmd_un.scsi.data_transferred)) ||
-		    (dlength > (bp->b_bcount - offset))) {
-			cmn_err(CE_WARN,
-			    "iscsi connection(%u) protocol error - "
-			    "received too much data itt:0x%x",
-			    icp->conn_oid, idrhp->itt);
-			mutex_enter(&icp->conn_queue_active.mutex);
-			iscsi_enqueue_active_cmd(icp, icmdp);
-			mutex_exit(&icp->conn_queue_active.mutex);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
-		}
-
-		bcp = ((char *)bp->b_un.b_addr) + offset;
-
-		/*
-		 * Get the rest of the data and copy it directly into
-		 * the scsi_pkt.
-		 */
-		rval = iscsi_net->recvdata(icp->conn_socket, ihp,
-		    bcp, dlength, 0, (icp->conn_params.data_digest ?
-		    ISCSI_NET_DATA_DIGEST : 0));
-		if (ISCSI_SUCCESS(rval)) {
-			KSTAT_ADD_CONN_RX_BYTES(icp, dlength);
-		} else {
-			/* If digest error flag icmdp with a crc error */
-			if (rval == ISCSI_STATUS_DATA_DIGEST_ERROR) {
-				icmdp->cmd_crc_error_seen = B_TRUE;
-			}
-			mutex_enter(&icp->conn_queue_active.mutex);
-			iscsi_enqueue_active_cmd(icp, icmdp);
-			mutex_exit(&icp->conn_queue_active.mutex);
-			return (rval);
-		}
-		isp->sess_rx_lbolt = icp->conn_rx_lbolt = ddi_get_lbolt();
-
-		/* update icmdp statistics */
-		icmdp->cmd_un.scsi.data_transferred += dlength;
 	}
 
-	/*
-	 * We got status. This should only happen if we have
-	 * received all the data with no errors.  The command
-	 * must be completed now, since we won't get a command
-	 * response PDU. The cmd_status and residual_count are
-	 * not meaningful unless status_present is set.
-	 */
-	if (idrhp->flags & ISCSI_FLAG_DATA_STATUS) {
-		pkt->pkt_resid = 0;
-		/* Check the residual count */
-		if (bp &&
-		    (icmdp->cmd_un.scsi.data_transferred !=
-		    bp->b_bcount)) {
-			/*
-			 * We didn't xfer the expected amount of data -
-			 * the residual_count in the header is only valid
-			 * if the underflow flag is set.
-			 */
-			if (idrhp->flags & ISCSI_FLAG_DATA_UNDERFLOW) {
-				pkt->pkt_resid = ntohl(idrhp->residual_count);
-			} else {
-				if (bp->b_bcount >
-				    icmdp->cmd_un.scsi.data_transferred) {
-					/* Some data fell on the floor somehw */
-					pkt->pkt_resid =
-					    bp->b_bcount -
-					    icmdp->cmd_un.scsi.data_transferred;
-				}
-			}
-		}
-
-		pkt->pkt_reason = CMD_CMPLT;
-		pkt->pkt_state |= (STATE_XFERRED_DATA | STATE_GOT_STATUS);
-
-		if (((idrhp->cmd_status & STATUS_MASK) != STATUS_GOOD) &&
-		    (icmdp->cmd_un.scsi.statuslen >=
-		    sizeof (struct scsi_arq_status)) && pkt->pkt_scbp) {
-
-			/*
-			 * Not supposed to get exception status here!
-			 * We have no request sense data so just do the
-			 * best we can
-			 */
-			struct scsi_arq_status *arqstat =
-			    (struct scsi_arq_status *)pkt->pkt_scbp;
-
-
-			bzero(arqstat, sizeof (struct scsi_arq_status));
-
-			*((uchar_t *)&arqstat->sts_status) =
-			    idrhp->cmd_status;
-
-			arqstat->sts_rqpkt_resid =
-			    sizeof (struct scsi_extended_sense);
-
-		} else if (pkt->pkt_scbp) {
-			/* just pass along the status we got */
-			pkt->pkt_scbp[0] = idrhp->cmd_status;
-		}
-
-		mutex_enter(&icp->conn_queue_active.mutex);
-		iscsi_enqueue_active_cmd(icp, icmdp);
-		iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E3, isp);
-		mutex_exit(&icp->conn_queue_active.mutex);
-	} else {
+	ibp = icmdp->cmd_un.scsi.ibp_ibuf;
+	if (ibp == NULL) {
+		/*
+		 * After the check of bp above we *should* have a corresponding
+		 * idm_buf_t (ibp).  It's possible that the original call
+		 * to idm_buf_alloc failed due to a pending connection state
+		 * transition in which case this value can be NULL.  It's
+		 * highly unlikely that the connection would be shutting down
+		 * *and* we manage to process a data response and get to this
+		 * point in the code but just in case we should check for it.
+		 * This isn't really a protocol error -- we are almost certainly
+		 * closing the connection anyway so just return a generic error.
+		 */
 		mutex_enter(&icp->conn_queue_active.mutex);
 		iscsi_enqueue_active_cmd(icp, icmdp);
 		mutex_exit(&icp->conn_queue_active.mutex);
+		return (IDM_STATUS_FAIL);
 	}
 
-	return (ISCSI_STATUS_SUCCESS);
-}
-
-
-/*
- * iscsi_rx_process_cmd_rsp - Process received scsi command response.  This
- * will contain sense data if the command was not successful.  This data needs
- * to be copied into the scsi_pkt.  Otherwise we just complete the IO.
- */
-static iscsi_status_t
-iscsi_rx_process_cmd_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
-{
-	iscsi_sess_t		*isp		= icp->conn_sess;
-	iscsi_scsi_rsp_hdr_t	*issrhp		= (iscsi_scsi_rsp_hdr_t *)ihp;
-	iscsi_cmd_t		*icmdp		= NULL;
-	struct scsi_pkt		*pkt		= NULL;
-	uint32_t		dlength		= 0;
-	struct scsi_arq_status	*arqstat	= NULL;
-	size_t			senselen	= 0;
-	int			statuslen	= 0;
-
-	/* make sure we get status in order */
-	if (icp->conn_expstatsn == ntohl(issrhp->statsn)) {
-		icp->conn_expstatsn++;
+	if (ic->ic_conn_flags & IDM_CONN_USE_SCOREBOARD) {
+		icmdp->cmd_un.scsi.data_transferred =
+		    icmdp->cmd_itp->idt_rx_bytes;
 	} else {
-		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
-		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, issrhp->itt,
-		    ntohl(issrhp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		icmdp->cmd_un.scsi.data_transferred = bp->b_bcount;
+		if (idrhp->flags & ISCSI_FLAG_CMD_UNDERFLOW) {
+			icmdp->cmd_un.scsi.data_transferred -=
+			    ntohl(idrhp->residual_count);
+		}
 	}
+
+	ISCSI_IO_LOG(CE_NOTE, "DEBUG: rx_process_data_rsp: icp: %p pdu: %p "
+	    "itt: %d ibp: %p icmdp: %p xfer_len: %lu transferred: %lu dlen: %u",
+	    (void *)icp, (void *)pdu, idrhp->itt, (void *)bp, (void *)icmdp,
+	    (ibp == NULL) ? 0 : ibp->idb_xfer_len,
+	    icmdp->cmd_un.scsi.data_transferred,
+	    n2h24(idrhp->dlength));
+
+	iscsi_task_cleanup(idrhp->opcode, icmdp);
+
+	iscsi_data_rsp_pkt(icmdp, idrhp);
 
 	mutex_enter(&icp->conn_queue_active.mutex);
-	mutex_enter(&isp->sess_cmdsn_mutex);
-	if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(isp, ihp, &icmdp))) {
-		mutex_exit(&isp->sess_cmdsn_mutex);
-		mutex_exit(&icp->conn_queue_active.mutex);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
-	}
-
-	/* update expcmdsn and maxcmdsn */
-	iscsi_update_flow_control(isp, ntohl(issrhp->maxcmdsn),
-	    ntohl(issrhp->expcmdsn));
-	mutex_exit(&isp->sess_cmdsn_mutex);
-
-	pkt = icmdp->cmd_un.scsi.pkt;
-
-	if (issrhp->response) {
-		/* The target failed the command. */
-		pkt->pkt_reason = CMD_TRAN_ERR;
-		if (icmdp->cmd_un.scsi.bp) {
-			pkt->pkt_resid = icmdp->cmd_un.scsi.bp->b_bcount;
-		} else {
-			pkt->pkt_resid = 0;
-		}
-	} else {
-		/* success */
-		pkt->pkt_resid = 0;
-		/* Check the residual count */
-		if ((icmdp->cmd_un.scsi.bp) &&
-		    (icmdp->cmd_un.scsi.data_transferred !=
-		    icmdp->cmd_un.scsi.bp->b_bcount)) {
-			/*
-			 * We didn't xfer the expected amount of data -
-			 * the residual_count in the header is only
-			 * valid if the underflow flag is set.
-			 */
-			if (issrhp->flags & ISCSI_FLAG_CMD_UNDERFLOW) {
-				pkt->pkt_resid = ntohl(issrhp->residual_count);
-			} else {
-				if (icmdp->cmd_un.scsi.bp->b_bcount >
-				    icmdp->cmd_un.scsi.data_transferred) {
-					/*
-					 * Some data fell on the floor
-					 * somehow - probably a CRC error
-					 */
-					pkt->pkt_resid =
-					    icmdp->cmd_un.scsi.bp->b_bcount -
-					    icmdp->cmd_un.scsi.data_transferred;
-				}
-			}
-		}
-
-		/* set flags that tell SCSA that the command is complete */
-		if (icmdp->cmd_crc_error_seen == B_FALSE) {
-			/* Set successful completion */
-			pkt->pkt_reason = CMD_CMPLT;
-			if (icmdp->cmd_un.scsi.bp) {
-				pkt->pkt_state |= (STATE_XFERRED_DATA |
-				    STATE_GOT_STATUS);
-			} else {
-				pkt->pkt_state |= STATE_GOT_STATUS;
-			}
-		} else {
-			/*
-			 * Some of the data was found to have an incorrect
-			 * error at the protocol error.
-			 */
-			pkt->pkt_reason = CMD_PER_FAIL;
-			pkt->pkt_statistics |= STAT_PERR;
-			if (icmdp->cmd_un.scsi.bp) {
-				pkt->pkt_resid =
-				    icmdp->cmd_un.scsi.bp->b_bcount;
-			} else {
-				pkt->pkt_resid = 0;
-			}
-		}
-
-		dlength = n2h24(issrhp->dlength);
-
-		/*
-		 * Process iSCSI Cmd Response Status
-		 * RFC 3720 Sectionn 10.4.2.
-		 */
-		switch (issrhp->cmd_status & STATUS_MASK) {
-		case STATUS_GOOD:
-			/* pass SCSI status up stack */
-			if (pkt->pkt_scbp) {
-				pkt->pkt_scbp[0] = issrhp->cmd_status;
-			}
-			break;
-		case STATUS_CHECK:
-			/*
-			 * Verify we received a sense buffer and
-			 * that there is the correct amount of
-			 * request sense space to copy it to.
-			 */
-			if ((dlength > 1) &&
-			    (pkt->pkt_scbp != NULL) &&
-			    (icmdp->cmd_un.scsi.statuslen >=
-			    sizeof (struct scsi_arq_status))) {
-				/*
-				 * If a bad command status is received we
-				 * need to reset the pkt_resid to zero.
-				 * The target driver compares its value
-				 * before checking other error flags.
-				 * (ex. check conditions)
-				 */
-				pkt->pkt_resid = 0;
-
-				/* get sense length from first 2 bytes */
-				senselen = ((data[0] << 8) | data[1]) &
-				    (size_t)0xFFFF;
-
-				/* Sanity-check on the sense length */
-				if ((senselen + 2) > dlength) {
-					senselen = dlength - 2;
-				}
-
-				/*
-				 * If there was a Data Digest error then
-				 * the sense data cannot be trusted.
-				 */
-				if (icmdp->cmd_crc_error_seen) {
-					senselen = 0;
-				}
-
-				/* automatic request sense */
-				arqstat =
-				    (struct scsi_arq_status *)pkt->pkt_scbp;
-
-				/* pass SCSI status up stack */
-				*((uchar_t *)&arqstat->sts_status) =
-				    issrhp->cmd_status;
-
-				/*
-				 * Set the status for the automatic
-				 * request sense command
-				 */
-				arqstat->sts_rqpkt_state = (STATE_GOT_BUS |
-				    STATE_GOT_TARGET | STATE_SENT_CMD |
-				    STATE_XFERRED_DATA | STATE_GOT_STATUS |
-				    STATE_ARQ_DONE);
-
-				*((uchar_t *)&arqstat->sts_rqpkt_status) =
-				    STATUS_GOOD;
-
-				arqstat->sts_rqpkt_reason = CMD_CMPLT;
-
-				statuslen = icmdp->cmd_un.scsi.statuslen;
-
-				if (senselen == 0) {
-					/* auto request sense failed */
-					arqstat->sts_rqpkt_status.sts_chk = 1;
-					arqstat->sts_rqpkt_resid =
-					    statuslen;
-				} else if (senselen <
-				    statuslen) {
-					/* auto request sense short */
-					arqstat->sts_rqpkt_resid =
-					    statuslen
-					    - senselen;
-				} else {
-					/* auto request sense complete */
-					arqstat->sts_rqpkt_resid = 0;
-				}
-				arqstat->sts_rqpkt_statistics = 0;
-				pkt->pkt_state |= STATE_ARQ_DONE;
-
-				if (icmdp->cmd_misc_flags &
-				    ISCSI_CMD_MISCFLAG_XARQ) {
-					pkt->pkt_state |= STATE_XARQ_DONE;
-				}
-
-				/* copy auto request sense */
-				dlength = min(senselen,
-				    statuslen);
-				if (dlength) {
-					bcopy(&data[2], (uchar_t *)&arqstat->
-					    sts_sensedata, dlength);
-				}
-				break;
-			}
-			/* FALLTHRU */
-		case STATUS_BUSY:
-		case STATUS_RESERVATION_CONFLICT:
-		case STATUS_QFULL:
-		case STATUS_ACA_ACTIVE:
-		default:
-			/*
-			 * If a bad command status is received we need to
-			 * reset the pkt_resid to zero.  The target driver
-			 * compares its value before checking other error
-			 * flags. (ex. check conditions)
-			 */
-			pkt->pkt_resid = 0;
-			/* pass SCSI status up stack */
-			if (pkt->pkt_scbp) {
-				pkt->pkt_scbp[0] = issrhp->cmd_status;
-			}
-		}
-	}
-
+	iscsi_enqueue_active_cmd(icp, icmdp);
 	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E3, isp);
 	mutex_exit(&icp->conn_queue_active.mutex);
 
-	return (ISCSI_STATUS_SUCCESS);
+	return (IDM_STATUS_SUCCESS);
 }
-
-/*
- * iscsi_rx_process_rtt_rsp - Process received RTT.  This means the target is
- * requesting data.
- */
-/* ARGSUSED */
-static iscsi_status_t
-iscsi_rx_process_rtt_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
-{
-	iscsi_sess_t		*isp = (iscsi_sess_t *)icp->conn_sess;
-	iscsi_rtt_hdr_t		*irhp		= (iscsi_rtt_hdr_t *)ihp;
-	iscsi_cmd_t		*icmdp		= NULL;
-	struct buf		*bp		= NULL;
-	uint32_t		data_length;
-	iscsi_status_t		status = ISCSI_STATUS_PROTOCOL_ERROR;
-
-
-	mutex_enter(&isp->sess_queue_pending.mutex);
-	mutex_enter(&icp->conn_queue_active.mutex);
-	mutex_enter(&isp->sess_cmdsn_mutex);
-	if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(isp, ihp, &icmdp))) {
-		mutex_exit(&isp->sess_cmdsn_mutex);
-		mutex_exit(&icp->conn_queue_active.mutex);
-		mutex_exit(&isp->sess_queue_pending.mutex);
-		return (status);
-	}
-
-	/* update expcmdsn and maxcmdsn */
-	iscsi_update_flow_control(isp, ntohl(irhp->maxcmdsn),
-	    ntohl(irhp->expcmdsn));
-	mutex_enter(&icmdp->cmd_mutex);
-	mutex_exit(&isp->sess_cmdsn_mutex);
-
-	bp = icmdp->cmd_un.scsi.bp;
-	data_length = ntohl(irhp->data_length);
-
-	/*
-	 * Perform boundary-checks per RFC 3720 (section 10.8.4).
-	 * The Desired Data Transfer Length must satisfy this relation:
-	 *
-	 *	0 < Desired Data Transfer Length <= MaxBurstLength
-	 */
-	if ((bp == NULL) || (data_length == 0)) {
-		cmn_err(CE_WARN, "iscsi connection(%u) received r2t but pkt "
-		    "has no data itt:0x%x - protocol error", icp->conn_oid,
-		    irhp->itt);
-	} else if (data_length > icp->conn_params.max_burst_length) {
-		cmn_err(CE_WARN, "iscsi connection(%u) received r2t but pkt "
-		    "is larger than MaxBurstLength itt:0x%x len:0x%x - "
-		    "protocol error",
-		    icp->conn_oid, irhp->itt, data_length);
-	} else {
-		iscsi_handle_r2t(icp, icmdp, ntohl(irhp->data_offset),
-		    data_length, irhp->ttt);
-		status = ISCSI_STATUS_SUCCESS;
-	}
-
-	mutex_exit(&icmdp->cmd_mutex);
-	mutex_exit(&icp->conn_queue_active.mutex);
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	return (status);
-}
-
 
 /*
  * iscsi_rx_process_nop - Process a received nop.  If nop is in response
@@ -957,38 +939,36 @@ iscsi_rx_process_rtt_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
  * to response back to the target with a nop.  Schedule the response.
  */
 /* ARGSUSED */
-static iscsi_status_t
-iscsi_rx_process_nop(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
+static idm_status_t
+iscsi_rx_process_nop(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_status_t		rval	= ISCSI_STATUS_SUCCESS;
 	iscsi_sess_t		*isp	= NULL;
-	iscsi_nop_in_hdr_t	*inihp	= (iscsi_nop_in_hdr_t *)ihp;
+	iscsi_nop_in_hdr_t	*inihp	= (iscsi_nop_in_hdr_t *)pdu->isp_hdr;
 	iscsi_cmd_t		*icmdp	= NULL;
-
-	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
-	/* ASSERT(data != NULL) data is allowed to be NULL */
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
+	iscsi_conn_t		*icp	= ic->ic_handle;
 
 	if (icp->conn_expstatsn != ntohl(inihp->statsn)) {
-		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
+		cmn_err(CE_WARN, "iscsi connection(%u/%x) protocol error - "
 		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, inihp->itt,
+		    "expstatsn:0x%x", icp->conn_oid, inihp->opcode, inihp->itt,
 		    ntohl(inihp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
-
+	isp = icp->conn_sess;
+	ASSERT(isp != NULL);
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	mutex_enter(&icp->conn_queue_active.mutex);
 	mutex_enter(&isp->sess_cmdsn_mutex);
 	if (inihp->itt != ISCSI_RSVD_TASK_TAG) {
 		if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(
-		    isp, ihp, &icmdp))) {
+		    isp, (iscsi_hdr_t *)inihp, &icmdp))) {
+			cmn_err(CE_WARN, "iscsi connection(%u) protocol error "
+			    "- can not find cmd for itt:0x%x",
+			    icp->conn_oid, inihp->itt);
 			mutex_exit(&isp->sess_cmdsn_mutex);
 			mutex_exit(&icp->conn_queue_active.mutex);
 			mutex_exit(&isp->sess_queue_pending.mutex);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+			return (IDM_STATUS_PROTOCOL_ERROR);
 		}
 	}
 
@@ -1022,48 +1002,41 @@ iscsi_rx_process_nop(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 	mutex_exit(&icp->conn_queue_active.mutex);
 	mutex_exit(&isp->sess_queue_pending.mutex);
 
-	return (rval);
+	return (IDM_STATUS_SUCCESS);
 }
 
 
 /*
  * iscsi_rx_process_reject_rsp - The server rejected a PDU
  */
-static iscsi_status_t
-iscsi_rx_process_reject_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, char *data)
+static idm_status_t
+iscsi_rx_process_reject_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_reject_rsp_hdr_t		*irrhp = (iscsi_reject_rsp_hdr_t *)ihp;
-	iscsi_sess_t			*isp		= NULL;
-	uint32_t			dlength		= 0;
-	iscsi_hdr_t			*old_ihp	= NULL;
+	iscsi_reject_rsp_hdr_t	*irrhp = (iscsi_reject_rsp_hdr_t *)pdu->isp_hdr;
+	iscsi_sess_t		*isp		= NULL;
+	uint32_t		dlength		= 0;
+	iscsi_hdr_t		*old_ihp	= NULL;
+	iscsi_conn_t		*icp		= ic->ic_handle;
+	uint8_t			*data 		= pdu->isp_data;
+	iscsi_hdr_t		*ihp		= (iscsi_hdr_t *)irrhp;
+	idm_status_t		status;
+	iscsi_cmd_t		*icmdp	= NULL;
 
-	ASSERT(icp != NULL);
-	isp = icp->conn_sess;
-	ASSERT(ihp != NULL);
 	ASSERT(data != NULL);
+	isp = icp->conn_sess;
+	ASSERT(isp != NULL);
 
-	/* make sure we only Ack Status numbers that we've actually received. */
-	if (icp->conn_expstatsn == ntohl(irrhp->statsn)) {
-		icp->conn_expstatsn++;
-	} else {
-		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
-		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, ihp->itt,
-		    ntohl(irrhp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+	mutex_enter(&icp->conn_queue_active.mutex);
+	if ((status = iscsi_rx_chk(icp, isp, (iscsi_scsi_rsp_hdr_t *)irrhp,
+	    &icmdp)) != IDM_STATUS_SUCCESS) {
+		mutex_exit(&icp->conn_queue_active.mutex);
+		return (status);
 	}
-
-	/* update expcmdsn and maxcmdsn */
-	mutex_enter(&isp->sess_cmdsn_mutex);
-	iscsi_update_flow_control(isp, ntohl(irrhp->maxcmdsn),
-	    ntohl(irrhp->expcmdsn));
-	mutex_exit(&isp->sess_cmdsn_mutex);
 
 	/* If we don't have the rejected header we can't do anything */
 	dlength = n2h24(irrhp->dlength);
 	if (dlength < sizeof (iscsi_hdr_t)) {
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
 
 	/* map old ihp */
@@ -1083,7 +1056,7 @@ iscsi_rx_process_reject_rsp(iscsi_conn_t *icp,
 		 */
 		if (!(old_ihp->opcode & ISCSI_OP_IMMEDIATE)) {
 			/* Rejecting IMM but old old_hdr wasn't IMM */
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+			return (IDM_STATUS_PROTOCOL_ERROR);
 		}
 
 		/*
@@ -1099,15 +1072,15 @@ iscsi_rx_process_reject_rsp(iscsi_conn_t *icp,
 			 */
 			break;
 		case ISCSI_OP_SCSI_TASK_MGT_MSG:
-			(void) iscsi_rx_process_rejected_tsk_mgt(icp,
-			    old_ihp);
+			(void) iscsi_rx_process_rejected_tsk_mgt(ic, old_ihp);
 			break;
 		default:
 			cmn_err(CE_WARN, "iscsi connection(%u) protocol error "
 			    "- received a reject for a command(0x%02x) not "
 			    "sent as an immediate", icp->conn_oid,
 			    old_ihp->opcode);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+			status = IDM_STATUS_PROTOCOL_ERROR;
+			break;
 		}
 		break;
 
@@ -1130,27 +1103,28 @@ iscsi_rx_process_reject_rsp(iscsi_conn_t *icp,
 		cmn_err(CE_WARN, "iscsi connection(%u) closing connection - "
 		    "target requested itt:0x%x reason:0x%x",
 		    icp->conn_oid, ihp->itt, irrhp->reason);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		status = IDM_STATUS_PROTOCOL_ERROR;
+		break;
 	}
 
-	return (ISCSI_STATUS_SUCCESS);
+	return (IDM_STATUS_SUCCESS);
 }
 
 
 /*
  * iscsi_rx_process_rejected_tsk_mgt -
  */
-static iscsi_status_t
-iscsi_rx_process_rejected_tsk_mgt(iscsi_conn_t *icp,
-    iscsi_hdr_t *old_ihp)
+/* ARGSUSED */
+static idm_status_t
+iscsi_rx_process_rejected_tsk_mgt(idm_conn_t *ic, iscsi_hdr_t *old_ihp)
 {
-	iscsi_sess_t			*isp	= NULL;
-	iscsi_cmd_t			*icmdp	= NULL;
+	iscsi_sess_t		*isp	= NULL;
+	iscsi_cmd_t		*icmdp	= NULL;
+	iscsi_conn_t		*icp 	= NULL;
 
-	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
 	ASSERT(old_ihp != NULL);
-	ASSERT(icp->conn_sess != NULL);
+	ASSERT(isp != NULL);
 
 	mutex_enter(&icp->conn_queue_active.mutex);
 	mutex_enter(&isp->sess_cmdsn_mutex);
@@ -1158,7 +1132,7 @@ iscsi_rx_process_rejected_tsk_mgt(iscsi_conn_t *icp,
 	    isp, old_ihp, &icmdp))) {
 		mutex_exit(&isp->sess_cmdsn_mutex);
 		mutex_exit(&icp->conn_queue_active.mutex);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
 	mutex_exit(&isp->sess_cmdsn_mutex);
 
@@ -1175,7 +1149,7 @@ iscsi_rx_process_rejected_tsk_mgt(iscsi_conn_t *icp,
 	}
 	mutex_exit(&icp->conn_queue_active.mutex);
 
-	return (ISCSI_STATUS_SUCCESS);
+	return (IDM_STATUS_SUCCESS);
 }
 
 
@@ -1183,43 +1157,24 @@ iscsi_rx_process_rejected_tsk_mgt(iscsi_conn_t *icp,
  * iscsi_rx_process_task_mgt_rsp -
  */
 /* ARGSUSED */
-static iscsi_status_t
-iscsi_rx_process_task_mgt_rsp(iscsi_conn_t *icp,
-    iscsi_hdr_t *ihp, void *data)
+static idm_status_t
+iscsi_rx_process_task_mgt_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 {
 	iscsi_sess_t			*isp		= NULL;
 	iscsi_scsi_task_mgt_rsp_hdr_t	*istmrhp	= NULL;
 	iscsi_cmd_t			*icmdp		= NULL;
+	iscsi_conn_t			*icp		= ic->ic_handle;
+	idm_status_t			status = IDM_STATUS_SUCCESS;
 
-	ASSERT(ihp != NULL);
-	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-	istmrhp = (iscsi_scsi_task_mgt_rsp_hdr_t *)ihp;
+	istmrhp = (iscsi_scsi_task_mgt_rsp_hdr_t *)pdu->isp_hdr;
 
-	if (icp->conn_expstatsn == ntohl(istmrhp->statsn)) {
-		icp->conn_expstatsn++;
-	} else {
-		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
-		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, istmrhp->itt,
-		    ntohl(istmrhp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
-	}
-
-	/* make sure we only Ack Status numbers that we've actually received. */
 	mutex_enter(&icp->conn_queue_active.mutex);
-	mutex_enter(&isp->sess_cmdsn_mutex);
-	if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(isp, ihp, &icmdp))) {
-		mutex_exit(&isp->sess_cmdsn_mutex);
+	if ((status = iscsi_rx_chk(icp, isp, (iscsi_scsi_rsp_hdr_t *)istmrhp,
+	    &icmdp)) != IDM_STATUS_SUCCESS) {
 		mutex_exit(&icp->conn_queue_active.mutex);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (status);
 	}
-
-	/* update expcmdsn and maxcmdn */
-	iscsi_update_flow_control(isp, ntohl(istmrhp->maxcmdsn),
-	    ntohl(istmrhp->expcmdsn));
-	mutex_exit(&isp->sess_cmdsn_mutex);
 
 	switch (icmdp->cmd_type) {
 	case ISCSI_CMD_TYPE_ABORT:
@@ -1258,8 +1213,7 @@ iscsi_rx_process_task_mgt_rsp(iscsi_conn_t *icp,
 			 * the connection to try and recover
 			 * to a known state.
 			 */
-			mutex_exit(&icp->conn_queue_active.mutex);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+			status = IDM_STATUS_PROTOCOL_ERROR;
 		}
 		break;
 
@@ -1268,49 +1222,48 @@ iscsi_rx_process_task_mgt_rsp(iscsi_conn_t *icp,
 		    "received a task mgt response for a non-task mgt "
 		    "cmd itt:0x%x type:%d", icp->conn_oid, istmrhp->itt,
 		    icmdp->cmd_type);
-		mutex_exit(&icp->conn_queue_active.mutex);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		status = IDM_STATUS_PROTOCOL_ERROR;
+		break;
 	}
 
 	mutex_exit(&icp->conn_queue_active.mutex);
-	return (ISCSI_STATUS_SUCCESS);
+	return (status);
 }
 
 
 /*
- * iscsi_rx_process_logout -
+ * iscsi_rx_process_logout_rsp -
  *
  */
 /* ARGSUSED */
-static iscsi_status_t
-iscsi_rx_process_logout_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
+idm_status_t
+iscsi_rx_process_logout_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_status_t		rval	= ISCSI_STATUS_SUCCESS;
-	iscsi_sess_t		*isp	= icp->conn_sess;
-	iscsi_logout_rsp_hdr_t	*ilrhp	= (iscsi_logout_rsp_hdr_t *)ihp;
+	iscsi_conn_t		*icp	= ic->ic_handle;
+	iscsi_logout_rsp_hdr_t	*ilrhp	=
+	    (iscsi_logout_rsp_hdr_t *)pdu->isp_hdr;
 	iscsi_cmd_t		*icmdp	= NULL;
+	iscsi_sess_t		*isp;
+	idm_status_t		status = IDM_STATUS_SUCCESS;
 
-	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
 	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
 
 	if (icp->conn_expstatsn != ntohl(ilrhp->statsn)) {
-		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
+		cmn_err(CE_WARN, "iscsi connection(%u/%x) protocol error - "
 		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, ilrhp->itt,
+		    "expstatsn:0x%x", icp->conn_oid, ilrhp->opcode, ilrhp->itt,
 		    ntohl(ilrhp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
 
 	mutex_enter(&icp->conn_queue_active.mutex);
 	mutex_enter(&isp->sess_cmdsn_mutex);
 	if (ilrhp->itt != ISCSI_RSVD_TASK_TAG) {
 		if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(
-		    isp, ihp, &icmdp))) {
+		    isp, (iscsi_hdr_t *)ilrhp, &icmdp))) {
 			mutex_exit(&isp->sess_cmdsn_mutex);
 			mutex_exit(&icp->conn_queue_active.mutex);
-			return (ISCSI_STATUS_PROTOCOL_ERROR);
+			return (IDM_STATUS_PROTOCOL_ERROR);
 		}
 	}
 
@@ -1319,6 +1272,9 @@ iscsi_rx_process_logout_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 	    ntohl(ilrhp->expcmdsn));
 	mutex_exit(&isp->sess_cmdsn_mutex);
 
+	ISCSI_IO_LOG(CE_NOTE,
+	    "DEBUG: iscsi_rx_process_logout_rsp: response: %d",
+	    ilrhp->response);
 	switch (ilrhp->response) {
 	case ISCSI_LOGOUT_CID_NOT_FOUND:
 		/*
@@ -1343,42 +1299,48 @@ iscsi_rx_process_logout_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 	case ISCSI_LOGOUT_SUCCESS:
 		iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E3, isp);
 		mutex_exit(&icp->conn_queue_active.mutex);
-		/* logout completed successfully notify the conn */
-		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T17);
-		mutex_exit(&icp->conn_state_mutex);
+		iscsi_drop_conn_cleanup(icp);
 		break;
 	default:
 		mutex_exit(&icp->conn_queue_active.mutex);
-		rval = ISCSI_STATUS_PROTOCOL_ERROR;
-	}
+		status = IDM_STATUS_PROTOCOL_ERROR;
+		break;
 
-	return (rval);
+	}
+	return (status);
 }
 
-
 /*
- * iscsi_rx_process_logout -
+ * iscsi_rx_process_async_rsp
  *
  */
 /* ARGSUSED */
-static iscsi_status_t
-iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
+static idm_status_t
+iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_status_t		rval	= ISCSI_STATUS_SUCCESS;
-	iscsi_async_evt_hdr_t	*iaehp	= (iscsi_async_evt_hdr_t *)ihp;
+	iscsi_conn_t		*icp	= ic->ic_handle;
+	iscsi_sess_t		*isp	= icp->conn_sess;
+	idm_status_t		rval	= IDM_STATUS_SUCCESS;
+	iscsi_task_t		*itp;
+	iscsi_async_evt_hdr_t	*iaehp	=
+	    (iscsi_async_evt_hdr_t *)pdu->isp_hdr;
 
 	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
-	ASSERT(icp->conn_sess != NULL);
+	ASSERT(pdu != NULL);
+	ASSERT(isp != NULL);
 
-	if (icp->conn_expstatsn != ntohl(iaehp->statsn)) {
+	mutex_enter(&isp->sess_cmdsn_mutex);
+	if (icp->conn_expstatsn == ntohl(iaehp->statsn)) {
+		icp->conn_expstatsn++;
+	} else {
 		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
-		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, ihp->itt,
+		    "received status out of order statsn:0x%x "
+		    "expstatsn:0x%x", icp->conn_oid,
 		    ntohl(iaehp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		mutex_exit(&isp->sess_cmdsn_mutex);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
+	mutex_exit(&isp->sess_cmdsn_mutex);
 
 	switch (iaehp->async_event) {
 	case ISCSI_ASYNC_EVENT_SCSI_EVENT:
@@ -1402,16 +1364,35 @@ iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		 * action to these events of dis/reconnecting.
 		 * Once reconnected we perform a reenumeration.
 		 */
-		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T14);
-		mutex_exit(&icp->conn_state_mutex);
+		idm_ini_conn_disconnect(ic);
 		break;
 
 	case ISCSI_ASYNC_EVENT_REQUEST_LOGOUT:
-		/* Target has requested this connection to logout. */
+		/*
+		 * We've been asked to logout by the target --
+		 * we need to treat this differently from a normal logout
+		 * due to a discovery failure.  Normal logouts result in
+		 * an N3 event to the session state machine and an offline
+		 * of the lun.  In this case we want to put the connection
+		 * into "failed" state and generate N5 to the session state
+		 * machine since the initiator logged out at the target's
+		 * request.  To track this we set a flag indicating we
+		 * received this async logout request from the tharget
+		 */
 		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T14);
+		icp->conn_async_logout = B_TRUE;
 		mutex_exit(&icp->conn_state_mutex);
+
+		/* Target has requested this connection to logout. */
+		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
+		itp->t_arg = icp;
+		itp->t_blocking = B_FALSE;
+		if (ddi_taskq_dispatch(isp->sess_taskq,
+		    (void(*)())iscsi_logout_start, itp, DDI_SLEEP) !=
+		    DDI_SUCCESS) {
+			/* Disconnect if we couldn't dispatch the task */
+			idm_ini_conn_disconnect(ic);
+		}
 		break;
 
 	case ISCSI_ASYNC_EVENT_DROPPING_CONNECTION:
@@ -1427,10 +1408,9 @@ iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		 * we need to check the CID and drop that
 		 * specific connection.
 		 */
-		iscsi_conn_set_login_min_max(icp, iaehp->param2, iaehp->param3);
-		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T14);
-		mutex_exit(&icp->conn_state_mutex);
+		iscsi_conn_set_login_min_max(icp, iaehp->param2,
+		    iaehp->param3);
+		idm_ini_conn_disconnect(ic);
 		break;
 
 	case ISCSI_ASYNC_EVENT_DROPPING_ALL_CONNECTIONS:
@@ -1445,10 +1425,9 @@ iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		 * then we need to drop all connections on the
 		 * session.
 		 */
-		iscsi_conn_set_login_min_max(icp, iaehp->param2, iaehp->param3);
-		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T14);
-		mutex_exit(&icp->conn_state_mutex);
+		iscsi_conn_set_login_min_max(icp, iaehp->param2,
+		    iaehp->param3);
+		idm_ini_conn_disconnect(ic);
 		break;
 
 	case ISCSI_ASYNC_EVENT_PARAM_NEGOTIATION:
@@ -1460,9 +1439,15 @@ iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		 * now we will request a logout.  We can't
 		 * just ignore this or it might force corruption?
 		 */
-		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T14);
-		mutex_exit(&icp->conn_state_mutex);
+		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
+		itp->t_arg = icp;
+		itp->t_blocking = B_FALSE;
+		if (ddi_taskq_dispatch(isp->sess_taskq,
+		    (void(*)())iscsi_logout_start, itp, DDI_SLEEP) !=
+		    DDI_SUCCESS) {
+			/* Disconnect if we couldn't dispatch the task */
+			idm_ini_conn_disconnect(ic);
+		}
 		break;
 
 	case ISCSI_ASYNC_EVENT_VENDOR_SPECIFIC:
@@ -1471,12 +1456,10 @@ iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		 * specific async events.  So just ignore
 		 * the request.
 		 */
-		mutex_enter(&icp->conn_state_mutex);
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T14);
-		mutex_exit(&icp->conn_state_mutex);
+		idm_ini_conn_disconnect(ic);
 		break;
 	default:
-		rval = ISCSI_STATUS_PROTOCOL_ERROR;
+		rval = IDM_STATUS_PROTOCOL_ERROR;
 	}
 
 	return (rval);
@@ -1488,50 +1471,33 @@ iscsi_rx_process_async_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
  * status value instead of returning the status value.  The return value
  * is SUCCESS in order to let iscsi_handle_text control the operation of
  * a text request.
- * Test requests are a handled a little different than other types of
+ * Text requests are a handled a little different than other types of
  * iSCSI commands because the initiator sends additional empty text requests
  * in order to obtain the remaining responses required to complete the
  * request.  iscsi_handle_text controls the operation of text request, while
  * iscsi_rx_process_text_rsp just process the current response.
  */
-static iscsi_status_t
-iscsi_rx_process_text_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
+static idm_status_t
+iscsi_rx_process_text_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 {
 	iscsi_sess_t		*isp	= NULL;
-	iscsi_text_rsp_hdr_t	*ithp	= (iscsi_text_rsp_hdr_t *)ihp;
+	iscsi_text_rsp_hdr_t	*ithp	=
+	    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr;
+	iscsi_conn_t		*icp	= ic->ic_handle;
 	iscsi_cmd_t		*icmdp	= NULL;
 	boolean_t		final	= B_FALSE;
 	uint32_t		data_len;
-
-	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
-	ASSERT(data != NULL);
+	uint8_t			*data = pdu->isp_data;
+	idm_status_t		rval;
 
 	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-
-	if (icp->conn_expstatsn == ntohl(ithp->statsn)) {
-		icp->conn_expstatsn++;
-	} else {
-		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
-		    "received status out of order itt:0x%x statsn:0x%x "
-		    "expstatsn:0x%x", icp->conn_oid, ithp->itt,
-		    ntohl(ithp->statsn), icp->conn_expstatsn);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
-	}
 
 	mutex_enter(&icp->conn_queue_active.mutex);
-	mutex_enter(&isp->sess_cmdsn_mutex);
-	if (!ISCSI_SUCCESS(iscsi_rx_process_itt_to_icmdp(isp, ihp, &icmdp))) {
-		mutex_exit(&isp->sess_cmdsn_mutex);
+	if ((rval = iscsi_rx_chk(icp, isp, (iscsi_scsi_rsp_hdr_t *)ithp,
+	    &icmdp)) != IDM_STATUS_SUCCESS) {
 		mutex_exit(&icp->conn_queue_active.mutex);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (rval);
 	}
-
-	/* update expcmdsn and maxcmdsn */
-	iscsi_update_flow_control(isp, ntohl(ithp->maxcmdsn),
-	    ntohl(ithp->expcmdsn));
-	mutex_exit(&isp->sess_cmdsn_mutex);
 
 	/* update local final response flag */
 	if (ithp->flags & ISCSI_FLAG_FINAL) {
@@ -1553,7 +1519,7 @@ iscsi_rx_process_text_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		cmn_err(CE_WARN, "iscsi connection(%u) protocol error - "
 		    "received text response with invalid flags:0x%x or "
 		    "ttt:0x%x", icp->conn_oid, ithp->flags, ithp->itt);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
 
 	if ((icmdp->cmd_un.text.stage == ISCSI_CMD_TEXT_INITIAL_REQ) &&
@@ -1566,7 +1532,7 @@ iscsi_rx_process_text_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 		cmn_err(CE_WARN, "iscsi connection(%u) protocol "
 		    "error - received text response with invalid "
 		    "ttt:0x%x", icp->conn_oid, ithp->ttt);
-		return (ISCSI_STATUS_PROTOCOL_ERROR);
+		return (IDM_STATUS_PROTOCOL_ERROR);
 	}
 
 	/*
@@ -1610,7 +1576,36 @@ iscsi_rx_process_text_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 
 	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E3, isp);
 	mutex_exit(&icp->conn_queue_active.mutex);
+	return (IDM_STATUS_SUCCESS);
+}
+
+/*
+ * iscsi_rx_process_scsi_itt_to_icmdp - Lookup itt using IDM to find matching
+ * icmdp.  Verify itt in hdr and icmdp are the same.
+ */
+static iscsi_status_t
+iscsi_rx_process_scsi_itt_to_icmdp(iscsi_sess_t *isp, idm_conn_t *ic,
+    iscsi_scsi_rsp_hdr_t *ihp, iscsi_cmd_t **icmdp)
+{
+	idm_task_t *itp;
+
+	ASSERT(isp != NULL);
+	ASSERT(ihp != NULL);
+	ASSERT(icmdp != NULL);
+	ASSERT(mutex_owned(&isp->sess_cmdsn_mutex));
+	itp = idm_task_find_and_complete(ic, ihp->itt, ISCSI_INI_TASK_TTT);
+	if (itp == NULL) {
+		cmn_err(CE_WARN, "iscsi session(%u) protocol error - "
+		    "received unknown itt:0x%x - protocol error",
+		    isp->sess_oid, ihp->itt);
+		return (ISCSI_STATUS_INTERNAL_ERROR);
+	}
+	*icmdp = itp->idt_private;
+
+	idm_task_rele(itp);
+
 	return (ISCSI_STATUS_SUCCESS);
+
 }
 
 /*
@@ -1630,7 +1625,7 @@ iscsi_rx_process_itt_to_icmdp(iscsi_sess_t *isp, iscsi_hdr_t *ihp,
 	ASSERT(mutex_owned(&isp->sess_cmdsn_mutex));
 
 	/* try to find an associated iscsi_pkt */
-	cmd_table_idx = ihp->itt % ISCSI_CMD_TABLE_SIZE;
+	cmd_table_idx = (ihp->itt - IDM_TASKIDS_MAX) % ISCSI_CMD_TABLE_SIZE;
 	if (isp->sess_cmd_table[cmd_table_idx] == NULL) {
 		cmn_err(CE_WARN, "iscsi session(%u) protocol error - "
 		    "received unknown itt:0x%x - protocol error",
@@ -1662,7 +1657,6 @@ iscsi_rx_process_itt_to_icmdp(iscsi_sess_t *isp, iscsi_hdr_t *ihp,
 	return (ISCSI_STATUS_SUCCESS);
 }
 
-
 /*
  * +--------------------------------------------------------------------+
  * | End of protocol receive routines					|
@@ -1678,7 +1672,7 @@ iscsi_rx_process_itt_to_icmdp(iscsi_sess_t *isp, iscsi_hdr_t *ihp,
 
 /*
  * iscsi_tx_thread - This thread is the driving point for all
- * iSCSI PDUs after login.  No PDUs should call sendpdu()
+ * iSCSI PDUs after login.  No PDUs should call idm_pdu_tx()
  * directly they should be funneled through iscsi_tx_thread.
  */
 void
@@ -1703,7 +1697,6 @@ iscsi_tx_thread(iscsi_thread_t *thread, void *arg)
 	while (ret != 0) {
 
 		isp->sess_window_open = B_TRUE;
-
 		/*
 		 * While the window is open, there are commands available
 		 * to send and the session state allows those commands to
@@ -1762,9 +1755,6 @@ iscsi_tx_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	case ISCSI_CMD_TYPE_SCSI:
 		rval = iscsi_tx_scsi(isp, icmdp);
 		break;
-	case ISCSI_CMD_TYPE_R2T:
-		rval = iscsi_tx_r2t(isp, icmdp);
-		break;
 	case ISCSI_CMD_TYPE_NOP:
 		rval = iscsi_tx_nop(isp, icmdp);
 		break;
@@ -1781,6 +1771,8 @@ iscsi_tx_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 		rval = iscsi_tx_text(isp, icmdp);
 		break;
 	default:
+		cmn_err(CE_WARN, "iscsi_tx_cmd: invalid cmdtype: %d",
+		    icmdp->cmd_type);
 		ASSERT(FALSE);
 	}
 
@@ -1803,71 +1795,36 @@ iscsi_tx_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 #define	ADDLHDRSZ(x)		(sizeof (iscsi_addl_hdr_t) + (x) - \
 					16 - 4)
 
-/*
- * iscsi_tx_scsi -
- *
- */
-static iscsi_status_t
-iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
+static void
+iscsi_tx_init_hdr(iscsi_sess_t *isp, iscsi_conn_t *icp,
+    iscsi_text_hdr_t *ihp, int opcode, uint32_t cmd_itt)
 {
-	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
-	iscsi_conn_t		*icp		= NULL;
-	struct scsi_pkt		*pkt		= NULL;
-	struct buf		*bp		= NULL;
-	union {
-		iscsi_scsi_cmd_hdr_t	isch;
-		iscsi_addl_hdr_t	iah;
-		uchar_t			arr[ADDLHDRSZ(DEF_CDB_LEN)];
-	} hdr_un;
-	iscsi_scsi_cmd_hdr_t	*ihp		=
-	    (iscsi_scsi_cmd_hdr_t *)&hdr_un.isch;
-	int			cdblen		= 0;
-	size_t			buflen		= 0;
-	uint32_t		imdata		= 0;
-	uint32_t		first_burst_length = 0;
-
-	ASSERT(isp != NULL);
-	ASSERT(icmdp != NULL);
-	pkt = icmdp->cmd_un.scsi.pkt;
-	ASSERT(pkt != NULL);
-	bp = icmdp->cmd_un.scsi.bp;
-	icp = icmdp->cmd_conn;
-	ASSERT(icp != NULL);
-
-	/* Reset counts in case we are on a retry */
-	icmdp->cmd_un.scsi.data_transferred = 0;
-
-	if (icmdp->cmd_un.scsi.cmdlen > DEF_CDB_LEN) {
-		cdblen = icmdp->cmd_un.scsi.cmdlen;
-		ihp = kmem_zalloc(ADDLHDRSZ(cdblen), KM_SLEEP);
-	} else {
-		/*
-		 * only bzero the basic header; the additional header
-		 * will be set up correctly later, if needed
-		 */
-		bzero(ihp, sizeof (iscsi_scsi_cmd_hdr_t));
-	}
-	ihp->opcode		= ISCSI_OP_SCSI_CMD;
-	ihp->itt		= icmdp->cmd_itt;
+	ihp->opcode		= opcode;
+	ihp->itt		= cmd_itt;
 	mutex_enter(&isp->sess_cmdsn_mutex);
 	ihp->cmdsn		= htonl(isp->sess_cmdsn);
 	isp->sess_cmdsn++;
 	mutex_exit(&isp->sess_cmdsn_mutex);
 	ihp->expstatsn		= htonl(icp->conn_expstatsn);
 	icp->conn_laststatsn = icp->conn_expstatsn;
+}
 
-	pkt->pkt_state = (STATE_GOT_BUS | STATE_GOT_TARGET);
-	pkt->pkt_reason = CMD_INCOMPLETE;
 
-	/*
-	 * Sestion 12.11 of the iSCSI specification has a good table
-	 * describing when uncolicited data and/or immediate data
-	 * should be sent.
-	 */
+static void
+iscsi_tx_scsi_data(iscsi_cmd_t *icmdp, iscsi_scsi_cmd_hdr_t *ihp,
+    iscsi_conn_t *icp, idm_pdu_t *pdu)
+{
+	struct buf		*bp		= NULL;
+	size_t			buflen		= 0;
+	uint32_t		first_burst_length = 0;
+	struct scsi_pkt		*pkt;
+
+	pkt = icmdp->cmd_un.scsi.pkt;
 	bp = icmdp->cmd_un.scsi.bp;
 	if ((bp != NULL) && bp->b_bcount) {
 		buflen = bp->b_bcount;
-		first_burst_length = icp->conn_params.first_burst_length;
+		first_burst_length =
+		    icp->conn_params.first_burst_length;
 
 		if (bp->b_flags & B_READ) {
 			ihp->flags = ISCSI_FLAG_FINAL;
@@ -1897,7 +1854,11 @@ iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 
 			/* Check if we should send ImmediateData */
 			if (icp->conn_params.immediate_data) {
-				imdata = MIN(MIN(buflen,
+				pdu->isp_data =
+				    (uint8_t *)icmdp->
+				    cmd_un.scsi.bp->b_un.b_addr;
+
+				pdu->isp_datalen = MIN(MIN(buflen,
 				    first_burst_length),
 				    icmdp->cmd_conn->conn_params.
 				    max_xmit_data_seg_len);
@@ -1907,21 +1868,63 @@ iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 				 * we can send all burst data immediate
 				 * (not unsol), set F
 				 */
-				if ((imdata == buflen) ||
-				    (imdata == first_burst_length)) {
+				/*
+				 * XXX This doesn't look right -- it's not
+				 * clear how we can handle transmitting
+				 * any unsolicited data.  It looks like
+				 * we only support immediate data.  So what
+				 * happens if we don't set ISCSI_FLAG_FINAL?
+				 *
+				 * Unless there's magic code somewhere that
+				 * is sending the remaining PDU's we should
+				 * simply set ISCSI_FLAG_FINAL and forget
+				 * about sending unsolicited data.  The big
+				 * win is the immediate data anyway for small
+				 * PDU's.
+				 */
+				if ((pdu->isp_datalen == buflen) ||
+				    (pdu->isp_datalen == first_burst_length)) {
 					ihp->flags |= ISCSI_FLAG_FINAL;
 				}
 
-				hton24(ihp->dlength, imdata);
+				hton24(ihp->dlength, pdu->isp_datalen);
 			}
-
 			/* total data transfer length */
 			ihp->data_length = htonl(buflen);
 		}
 	} else {
 		ihp->flags = ISCSI_FLAG_FINAL;
-		buflen = 0;
 	}
+	icmdp->cmd_un.scsi.data_transferred += pdu->isp_datalen;
+	/* XXX How is this different from the code above? */
+	/* will idm send the next data command up to burst length? */
+	/* send the burstlen if we haven't sent immediate data */
+	/* CRM: should idm send difference min(buflen, first_burst) and  imm? */
+	/*    (MIN(first_burst_length, buflen) - imdata > 0) */
+	/* CRM_LATER: change this to generate unsolicited pdu */
+	if ((buflen > 0) &&
+	    ((bp->b_flags & B_READ) == 0) &&
+	    (icp->conn_params.initial_r2t == 0) &&
+	    pdu->isp_datalen == 0) {
+
+		pdu->isp_datalen = MIN(first_burst_length, buflen);
+		if ((pdu->isp_datalen == buflen) ||
+		    (pdu->isp_datalen == first_burst_length)) {
+			ihp->flags |= ISCSI_FLAG_FINAL;
+		}
+		pdu->isp_data = (uint8_t *)icmdp->cmd_un.scsi.bp->b_un.b_addr;
+		hton24(ihp->dlength, pdu->isp_datalen);
+	}
+}
+
+static void
+iscsi_tx_scsi_init_pkt(iscsi_cmd_t *icmdp, iscsi_scsi_cmd_hdr_t *ihp)
+{
+	struct scsi_pkt *pkt;
+
+	pkt = icmdp->cmd_un.scsi.pkt;
+	pkt->pkt_state = (STATE_GOT_BUS | STATE_GOT_TARGET);
+	pkt->pkt_reason = CMD_INCOMPLETE;
 
 	/* tagged queuing */
 	if (pkt->pkt_flags & FLAG_HTAG) {
@@ -1962,204 +1965,169 @@ iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	 * Update all values before transfering.
 	 * We should never touch the icmdp after
 	 * transfering if there is no more data
-	 * to send.  The only case the sendpdu()
+	 * to send.  The only case the idm_pdu_tx()
 	 * will fail is a on a connection disconnect
 	 * in that case the command will be flushed.
 	 */
 	pkt->pkt_state |= STATE_SENT_CMD;
-
-	icmdp->cmd_un.scsi.data_transferred += imdata;
-
-	/*
-	 * Check if there is additional data to transfer beyond what
-	 * will be sent as part of the initial command.  If InitialR2T
-	 * is disabled then we should fake up a R2T so all the data,
-	 * up to first burst length, is sent in an unsolicited
-	 * fashion.  We have already sent as much immediate data
-	 * as possible.
-	 */
-	if ((buflen > 0) &&
-	    ((bp->b_flags & B_READ) == 0) &&
-	    (icp->conn_params.initial_r2t == 0) &&
-	    (MIN(first_burst_length, buflen) - imdata > 0)) {
-
-		uint32_t xfer_len = MIN(first_burst_length, buflen) - imdata;
-		/* data will be chunked at tx */
-		iscsi_handle_r2t(icp, icmdp, imdata,
-		    xfer_len, ISCSI_RSVD_TASK_TAG);
-	}
-
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	/* Transfer Cmd PDU */
-	if (imdata) {
-		rval = iscsi_net->sendpdu(icp->conn_socket,
-		    (iscsi_hdr_t *)ihp, icmdp->cmd_un.scsi.bp->b_un.b_addr,
-		    ISCSI_CONN_TO_NET_DIGEST(icp));
-		if (ISCSI_SUCCESS(rval)) {
-			KSTAT_ADD_CONN_TX_BYTES(icp, imdata);
-		}
-	} else {
-		rval = iscsi_net->sendpdu(icp->conn_socket,
-		    (iscsi_hdr_t *)ihp, NULL,
-		    ISCSI_CONN_TO_NET_DIGEST(icp));
-	}
-	if (cdblen) {
-		kmem_free(ihp, ADDLHDRSZ(cdblen));
-	}
-
-	return (rval);
 }
 
+static void
+iscsi_tx_scsi_init_task(iscsi_cmd_t *icmdp, iscsi_conn_t *icp,
+    iscsi_scsi_cmd_hdr_t *ihp)
+{
+	idm_task_t		*itp;
+	struct buf		*bp		= NULL;
+	uint32_t		data_length;
+
+	bp = icmdp->cmd_un.scsi.bp;
+
+	itp = icmdp->cmd_itp;
+	ASSERT(itp != NULL);
+	data_length = ntohl(ihp->data_length);
+	ISCSI_IO_LOG(CE_NOTE,
+	    "DEBUG: iscsi_tx_init_task: task_start: %p idt_tt: %x cmdsn: %x "
+	    "sess_cmdsn: %x cmd: %p "
+	    "cmdtype: %d datalen: %u",
+	    (void *)itp, itp->idt_tt, ihp->cmdsn, icp->conn_sess->sess_cmdsn,
+	    (void *)icmdp, icmdp->cmd_type, data_length);
+	if (data_length > 0) {
+		if (bp->b_flags & B_READ) {
+			icmdp->cmd_un.scsi.ibp_ibuf =
+			    idm_buf_alloc(icp->conn_ic,
+			    bp->b_un.b_addr, bp->b_bcount);
+			if (icmdp->cmd_un.scsi.ibp_ibuf)
+				idm_buf_bind_in(itp,
+				    icmdp->cmd_un.scsi.ibp_ibuf);
+		} else {
+			icmdp->cmd_un.scsi.ibp_obuf =
+			    idm_buf_alloc(icp->conn_ic,
+			    bp->b_un.b_addr, bp->b_bcount);
+			if (icmdp->cmd_un.scsi.ibp_obuf)
+				idm_buf_bind_out(itp,
+				    icmdp->cmd_un.scsi.ibp_obuf);
+		}
+		ISCSI_IO_LOG(CE_NOTE,
+		    "DEBUG: pdu_tx: task_start(%s): %p ic: %p idt_tt: %x "
+		    "cmdsn: %x sess_cmdsn: %x sess_expcmdsn: %x obuf: %p "
+		    "cmdp: %p cmdtype: %d "
+		    "buflen: %lu " "bpaddr: %p datalen: %u ",
+		    bp->b_flags & B_READ ? "B_READ" : "B_WRITE",
+		    (void *)itp, (void *)icp->conn_ic,
+		    itp->idt_tt, ihp->cmdsn,
+		    icp->conn_sess->sess_cmdsn,
+		    icp->conn_sess->sess_expcmdsn,
+		    (void *)icmdp->cmd_un.scsi.ibp_ibuf,
+		    (void *)icmdp, icmdp->cmd_type, bp->b_bcount,
+		    (void *)bp->b_un.b_addr,
+		    data_length);
+	}
+
+	/*
+	 * Task is now active
+	 */
+	idm_task_start(itp, ISCSI_INI_TASK_TTT);
+}
 
 /*
- * iscsi_tx_r2t -
+ * iscsi_tx_scsi -
  *
  */
 static iscsi_status_t
-iscsi_tx_r2t(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
+iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 {
-	iscsi_status_t	rval		= ISCSI_STATUS_SUCCESS;
-	iscsi_conn_t	*icp		= NULL;
-	iscsi_cmd_t	*orig_icmdp	= NULL;
+	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
+	iscsi_conn_t		*icp		= NULL;
+	struct scsi_pkt		*pkt		= NULL;
+	iscsi_scsi_cmd_hdr_t	*ihp		= NULL;
+	int			cdblen		= 0;
+	idm_pdu_t		*pdu;
+	int			len;
 
 	ASSERT(isp != NULL);
 	ASSERT(icmdp != NULL);
+
+	pdu = kmem_zalloc(sizeof (idm_pdu_t), KM_SLEEP);
+
+	pkt = icmdp->cmd_un.scsi.pkt;
+	ASSERT(pkt != NULL);
 	icp = icmdp->cmd_conn;
-	ASSERT(icp);
-	orig_icmdp = icmdp->cmd_un.r2t.icmdp;
-	ASSERT(orig_icmdp);
+	ASSERT(icp != NULL);
 
-	/* validate the offset and length against the buffer size */
-	if ((icmdp->cmd_un.r2t.offset + icmdp->cmd_un.r2t.length) >
-	    orig_icmdp->cmd_un.scsi.bp->b_bcount) {
-		cmn_err(CE_WARN, "iscsi session(%u) ignoring invalid r2t "
-		    "for icmd itt:0x%x offset:0x%x length:0x%x bufsize:0x%lx",
-		    isp->sess_oid, icmdp->cmd_itt, icmdp->cmd_un.r2t.offset,
-		    icmdp->cmd_un.r2t.length, orig_icmdp->cmd_un.scsi.bp->
-		    b_bcount);
-		mutex_exit(&isp->sess_queue_pending.mutex);
-		return (ISCSI_STATUS_INTERNAL_ERROR);
+	/* Reset counts in case we are on a retry */
+	icmdp->cmd_un.scsi.data_transferred = 0;
+
+	if (icmdp->cmd_un.scsi.cmdlen > DEF_CDB_LEN) {
+		cdblen = icmdp->cmd_un.scsi.cmdlen;
+		ihp = kmem_zalloc(ADDLHDRSZ(cdblen), KM_SLEEP);
+		len = ADDLHDRSZ(cdblen);
+	} else {
+		/*
+		 * only bzero the basic header; the additional header
+		 * will be set up correctly later, if needed
+		 */
+		ihp = kmem_zalloc(sizeof (iscsi_scsi_cmd_hdr_t), KM_SLEEP);
+		len = sizeof (iscsi_scsi_cmd_hdr_t);
 	}
-	ASSERT(orig_icmdp->cmd_un.scsi.r2t_icmdp);
 
-	rval = iscsi_tx_data(isp, icp, orig_icmdp, icmdp->cmd_ttt,
-	    icmdp->cmd_un.r2t.length, icmdp->cmd_un.r2t.offset);
+	iscsi_tx_init_hdr(isp, icp, (iscsi_text_hdr_t *)ihp,
+	    ISCSI_OP_SCSI_CMD, icmdp->cmd_itt);
 
-	mutex_enter(&orig_icmdp->cmd_mutex);
-	orig_icmdp->cmd_un.scsi.r2t_icmdp = NULL;
-	icmdp->cmd_un.r2t.icmdp = NULL;
+	idm_pdu_init(pdu, icp->conn_ic, (void *)icmdp, &iscsi_tx_done);
+	idm_pdu_init_hdr(pdu, (uint8_t *)ihp, len);
+	pdu->isp_data = NULL;
+	pdu->isp_datalen = 0;
+
 	/*
-	 * we're finished with this r2t; there could be another r2t
-	 * waiting on us to finish, so signal it.
+	 * Sestion 12.11 of the iSCSI specification has a good table
+	 * describing when uncolicited data and/or immediate data
+	 * should be sent.
 	 */
-	cv_broadcast(&orig_icmdp->cmd_completion);
-	mutex_exit(&orig_icmdp->cmd_mutex);
-	/*
-	 * the parent command may be waiting for us to finish; if so,
-	 * wake the _ic_ thread
-	 */
-	if ((orig_icmdp->cmd_state == ISCSI_CMD_STATE_COMPLETED) &&
-	    (ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)) &&
-	    (orig_icmdp->cmd_un.scsi.r2t_more == B_FALSE))
-		iscsi_thread_send_wakeup(isp->sess_ic_thread);
-	ASSERT(!mutex_owned(&isp->sess_queue_pending.mutex));
+
+	iscsi_tx_scsi_data(icmdp, ihp, icp, pdu);
+
+	iscsi_tx_scsi_init_pkt(icmdp, ihp);
+
+	/* Calls idm_task_start */
+	iscsi_tx_scsi_init_task(icmdp, icp, ihp);
+
+	mutex_exit(&isp->sess_queue_pending.mutex);
+
+	idm_pdu_tx(pdu);
+
 	return (rval);
 }
 
 
-/*
- * iscsi_tx_data -
- */
-static iscsi_status_t
-iscsi_tx_data(iscsi_sess_t *isp, iscsi_conn_t *icp, iscsi_cmd_t *icmdp,
-    uint32_t ttt, size_t datalen, size_t offset)
+/* ARGSUSED */
+static void
+iscsi_tx_done(idm_pdu_t *pdu, idm_status_t status)
 {
-	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
-	struct buf		*bp		= NULL;
-	size_t			remainder	= 0;
-	size_t			chunk		= 0;
-	char			*data		= NULL;
-	uint32_t		data_sn		= 0;
-	iscsi_data_hdr_t	idhp;
-	uint32_t		itt;
-	uint32_t		lun;
+	kmem_free((iscsi_hdr_t *)pdu->isp_hdr, pdu->isp_hdrlen);
+	kmem_free(pdu, sizeof (idm_pdu_t));
+}
 
-	ASSERT(isp != NULL);
-	ASSERT(icp != NULL);
-	ASSERT(icmdp != NULL);
-	bp = icmdp->cmd_un.scsi.bp;
 
-	/* verify there is data to send */
-	if (bp == NULL) {
-		mutex_exit(&isp->sess_queue_pending.mutex);
-		return (ISCSI_STATUS_INTERNAL_ERROR);
+static void
+iscsi_tx_pdu(iscsi_conn_t *icp, int opcode, void *hdr, int hdrlen,
+    iscsi_cmd_t *icmdp)
+{
+	idm_pdu_t	*tx_pdu;
+	iscsi_hdr_t	*ihp = (iscsi_hdr_t *)hdr;
+
+	tx_pdu = kmem_zalloc(sizeof (idm_pdu_t), KM_SLEEP);
+	ASSERT(tx_pdu != NULL);
+
+	idm_pdu_init(tx_pdu, icp->conn_ic, icmdp, &iscsi_tx_done);
+	idm_pdu_init_hdr(tx_pdu, hdr, hdrlen);
+	if (opcode == ISCSI_OP_TEXT_CMD) {
+		idm_pdu_init_data(tx_pdu,
+		    (uint8_t *)icmdp->cmd_un.text.buf,
+		    ntoh24(ihp->dlength));
 	}
 
-	itt = icmdp->cmd_itt;
-	lun = icmdp->cmd_un.scsi.lun;
-
-	/*
-	 * update the LUN with the amount of data we will
-	 * transfer.  If there is a failure it's because of
-	 * a network fault and the command will get flushed.
-	 */
-	icmdp->cmd_un.scsi.data_transferred += datalen;
-
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	remainder = datalen;
-	while (remainder) {
-
-		/* Check so see if we need to chunk the data */
-		if ((icp->conn_params.max_xmit_data_seg_len > 0) &&
-		    (remainder > icp->conn_params.max_xmit_data_seg_len)) {
-			chunk = icp->conn_params.max_xmit_data_seg_len;
-		} else {
-			chunk = remainder;
-		}
-
-		/* setup iscsi data hdr */
-		bzero(&idhp, sizeof (iscsi_data_hdr_t));
-		idhp.opcode	= ISCSI_OP_SCSI_DATA;
-		idhp.itt	= itt;
-		idhp.ttt	= ttt;
-		ISCSI_LUN_BYTE_COPY(idhp.lun, lun);
-		idhp.expstatsn	= htonl(icp->conn_expstatsn);
-		icp->conn_laststatsn = icp->conn_expstatsn;
-		idhp.datasn	= htonl(data_sn);
-		data_sn++;
-		idhp.offset	= htonl(offset);
-		hton24(idhp.dlength, chunk);
-
-		if (chunk == remainder) {
-			idhp.flags = ISCSI_FLAG_FINAL; /* final chunk */
-		}
-
-		/* setup data */
-		data = bp->b_un.b_addr + offset;
-
-		/*
-		 * Keep track of how much data we have
-		 * transfer so far and how much is remaining.
-		 */
-		remainder -= chunk;
-		offset += chunk;
-
-		rval = iscsi_net->sendpdu(icp->conn_socket,
-		    (iscsi_hdr_t *)&idhp, data,
-		    ISCSI_CONN_TO_NET_DIGEST(icp));
-
-		if (ISCSI_SUCCESS(rval)) {
-			KSTAT_ADD_CONN_TX_BYTES(icp, chunk);
-		} else {
-			break;
-		}
-	}
-
-	return (rval);
+	mutex_exit(&icp->conn_sess->sess_queue_pending.mutex);
+	idm_pdu_tx(tx_pdu);
 }
 
 
@@ -2172,31 +2140,27 @@ iscsi_tx_nop(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 {
 	iscsi_status_t		rval	= ISCSI_STATUS_SUCCESS;
 	iscsi_conn_t		*icp	= NULL;
-	iscsi_nop_out_hdr_t	inohp;
+	iscsi_nop_out_hdr_t	*inohp;
 
 	ASSERT(isp != NULL);
 	ASSERT(icmdp != NULL);
 	icp = icmdp->cmd_conn;
 	ASSERT(icp != NULL);
 
-	bzero(&inohp, sizeof (iscsi_nop_out_hdr_t));
-	inohp.opcode	= ISCSI_OP_NOOP_OUT | ISCSI_OP_IMMEDIATE;
-	inohp.flags	= ISCSI_FLAG_FINAL;
-	inohp.itt	= icmdp->cmd_itt;
-	inohp.ttt	= icmdp->cmd_ttt;
+	inohp = kmem_zalloc(sizeof (iscsi_nop_out_hdr_t), KM_SLEEP);
+	ASSERT(inohp != NULL);
+
+	inohp->opcode	= ISCSI_OP_NOOP_OUT | ISCSI_OP_IMMEDIATE;
+	inohp->flags	= ISCSI_FLAG_FINAL;
+	inohp->itt	= icmdp->cmd_itt;
+	inohp->ttt	= icmdp->cmd_ttt;
 	mutex_enter(&isp->sess_cmdsn_mutex);
-	inohp.cmdsn	= htonl(isp->sess_cmdsn);
+	inohp->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
-	inohp.expstatsn	= htonl(icp->conn_expstatsn);
+	inohp->expstatsn	= htonl(icp->conn_expstatsn);
 	icp->conn_laststatsn = icp->conn_expstatsn;
-
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	rval = iscsi_net->sendpdu(icp->conn_socket,
-	    (iscsi_hdr_t *)&inohp, NULL,
-	    ISCSI_CONN_TO_NET_DIGEST(icp));
-
+	iscsi_tx_pdu(icp, ISCSI_OP_NOOP_OUT, inohp,
+	    sizeof (iscsi_nop_out_hdr_t), icmdp);
 	return (rval);
 }
 
@@ -2210,32 +2174,28 @@ iscsi_tx_abort(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 {
 	iscsi_status_t			rval	= ISCSI_STATUS_SUCCESS;
 	iscsi_conn_t			*icp	= NULL;
-	iscsi_scsi_task_mgt_hdr_t	istmh;
+	iscsi_scsi_task_mgt_hdr_t	*istmh;
 
 	ASSERT(isp != NULL);
 	ASSERT(icmdp != NULL);
 	icp = icmdp->cmd_conn;
 	ASSERT(icp != NULL);
 
-	bzero(&istmh, sizeof (iscsi_scsi_task_mgt_hdr_t));
+	istmh = kmem_zalloc(sizeof (iscsi_scsi_task_mgt_hdr_t), KM_SLEEP);
+	ASSERT(istmh != NULL);
 	mutex_enter(&isp->sess_cmdsn_mutex);
-	istmh.cmdsn	= htonl(isp->sess_cmdsn);
+	istmh->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
-	istmh.expstatsn = htonl(icp->conn_expstatsn);
+	istmh->expstatsn = htonl(icp->conn_expstatsn);
 	icp->conn_laststatsn = icp->conn_expstatsn;
-	istmh.itt	= icmdp->cmd_itt;
-	istmh.opcode	= ISCSI_OP_SCSI_TASK_MGT_MSG | ISCSI_OP_IMMEDIATE;
-	istmh.function	= ISCSI_FLAG_FINAL | ISCSI_TM_FUNC_ABORT_TASK;
-	ISCSI_LUN_BYTE_COPY(istmh.lun,
+	istmh->itt	= icmdp->cmd_itt;
+	istmh->opcode	= ISCSI_OP_SCSI_TASK_MGT_MSG | ISCSI_OP_IMMEDIATE;
+	istmh->function	= ISCSI_FLAG_FINAL | ISCSI_TM_FUNC_ABORT_TASK;
+	ISCSI_LUN_BYTE_COPY(istmh->lun,
 	    icmdp->cmd_un.abort.icmdp->cmd_un.scsi.lun);
-	istmh.rtt	= icmdp->cmd_un.abort.icmdp->cmd_itt;
-
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	rval = iscsi_net->sendpdu(icp->conn_socket,
-	    (iscsi_hdr_t *)&istmh, NULL,
-	    ISCSI_CONN_TO_NET_DIGEST(icp));
+	istmh->rtt	= icmdp->cmd_un.abort.icmdp->cmd_itt;
+	iscsi_tx_pdu(icp, ISCSI_OP_SCSI_TASK_MGT_MSG, istmh,
+	    sizeof (iscsi_scsi_task_mgt_hdr_t), icmdp);
 
 	return (rval);
 }
@@ -2250,30 +2210,31 @@ iscsi_tx_reset(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 {
 	iscsi_status_t			rval	= ISCSI_STATUS_SUCCESS;
 	iscsi_conn_t			*icp	= NULL;
-	iscsi_scsi_task_mgt_hdr_t	istmh;
+	iscsi_scsi_task_mgt_hdr_t	*istmh;
 
 	ASSERT(isp != NULL);
 	ASSERT(icmdp != NULL);
 	icp = icmdp->cmd_conn;
 	ASSERT(icp != NULL);
 
-	bzero(&istmh, sizeof (iscsi_scsi_task_mgt_hdr_t));
-	istmh.opcode	= ISCSI_OP_SCSI_TASK_MGT_MSG | ISCSI_OP_IMMEDIATE;
+	istmh = kmem_zalloc(sizeof (iscsi_scsi_task_mgt_hdr_t), KM_SLEEP);
+	ASSERT(istmh != NULL);
+	istmh->opcode	= ISCSI_OP_SCSI_TASK_MGT_MSG | ISCSI_OP_IMMEDIATE;
 	mutex_enter(&isp->sess_cmdsn_mutex);
-	istmh.cmdsn	= htonl(isp->sess_cmdsn);
+	istmh->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
-	istmh.expstatsn	= htonl(icp->conn_expstatsn);
-	istmh.itt	= icmdp->cmd_itt;
+	istmh->expstatsn	= htonl(icp->conn_expstatsn);
+	istmh->itt	= icmdp->cmd_itt;
 
 	switch (icmdp->cmd_un.reset.level) {
 	case RESET_LUN:
-		istmh.function	= ISCSI_FLAG_FINAL |
+		istmh->function	= ISCSI_FLAG_FINAL |
 		    ISCSI_TM_FUNC_LOGICAL_UNIT_RESET;
-		ISCSI_LUN_BYTE_COPY(istmh.lun, icmdp->cmd_lun->lun_num);
+		ISCSI_LUN_BYTE_COPY(istmh->lun, icmdp->cmd_lun->lun_num);
 		break;
 	case RESET_TARGET:
 	case RESET_BUS:
-		istmh.function	= ISCSI_FLAG_FINAL |
+		istmh->function	= ISCSI_FLAG_FINAL |
 		    ISCSI_TM_FUNC_TARGET_WARM_RESET;
 		break;
 	default:
@@ -2282,12 +2243,8 @@ iscsi_tx_reset(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 		break;
 	}
 
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	rval = iscsi_net->sendpdu(icp->conn_socket,
-	    (iscsi_hdr_t *)&istmh, NULL,
-	    ISCSI_CONN_TO_NET_DIGEST(icp));
+	iscsi_tx_pdu(icp, ISCSI_OP_SCSI_TASK_MGT_MSG, istmh,
+	    sizeof (iscsi_scsi_task_mgt_hdr_t), icmdp);
 
 	return (rval);
 }
@@ -2302,29 +2259,24 @@ iscsi_tx_logout(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 {
 	iscsi_status_t		rval	= ISCSI_STATUS_SUCCESS;
 	iscsi_conn_t		*icp	= NULL;
-	iscsi_logout_hdr_t	ilh;
+	iscsi_logout_hdr_t	*ilh;
 
 	ASSERT(isp != NULL);
 	ASSERT(icmdp != NULL);
 	icp = icmdp->cmd_conn;
 	ASSERT(icp != NULL);
 
-	bzero(&ilh, sizeof (iscsi_logout_hdr_t));
-	ilh.opcode	= ISCSI_OP_LOGOUT_CMD | ISCSI_OP_IMMEDIATE;
-	ilh.flags	= ISCSI_FLAG_FINAL | ISCSI_LOGOUT_REASON_CLOSE_SESSION;
-	ilh.itt		= icmdp->cmd_itt;
-	ilh.cid		= icp->conn_cid;
+	ilh = kmem_zalloc(sizeof (iscsi_logout_hdr_t), KM_SLEEP);
+	ilh->opcode	= ISCSI_OP_LOGOUT_CMD | ISCSI_OP_IMMEDIATE;
+	ilh->flags	= ISCSI_FLAG_FINAL | ISCSI_LOGOUT_REASON_CLOSE_SESSION;
+	ilh->itt		= icmdp->cmd_itt;
+	ilh->cid		= icp->conn_cid;
 	mutex_enter(&isp->sess_cmdsn_mutex);
-	ilh.cmdsn	= htonl(isp->sess_cmdsn);
+	ilh->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
-	ilh.expstatsn	= htonl(icp->conn_expstatsn);
-
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	rval = iscsi_net->sendpdu(icp->conn_socket,
-	    (iscsi_hdr_t *)&ilh, NULL,
-	    ISCSI_CONN_TO_NET_DIGEST(icp));
+	ilh->expstatsn	= htonl(icp->conn_expstatsn);
+	iscsi_tx_pdu(icp, ISCSI_OP_LOGOUT_CMD, ilh,
+	    sizeof (iscsi_logout_hdr_t), icmdp);
 
 	return (rval);
 }
@@ -2346,32 +2298,23 @@ iscsi_tx_text(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 {
 	iscsi_status_t		rval	= ISCSI_STATUS_SUCCESS;
 	iscsi_conn_t		*icp	= NULL;
-	iscsi_text_hdr_t	ith;
+	iscsi_text_hdr_t	*ith;
 
-	ASSERT(isp != NULL);
 	ASSERT(icmdp != NULL);
 	icp = icmdp->cmd_conn;
 	ASSERT(icp != NULL);
 
-	bzero(&ith, sizeof (iscsi_text_hdr_t));
-	ith.opcode	= ISCSI_OP_TEXT_CMD;
-	ith.flags	= ISCSI_FLAG_FINAL;
-	hton24(ith.dlength, icmdp->cmd_un.text.data_len);
-	ith.itt		= icmdp->cmd_itt;
-	ith.ttt		= icmdp->cmd_un.text.ttt;
-	mutex_enter(&isp->sess_cmdsn_mutex);
-	ith.cmdsn	= htonl(isp->sess_cmdsn);
-	isp->sess_cmdsn++;
-	ith.expstatsn	= htonl(icp->conn_expstatsn);
-	mutex_exit(&isp->sess_cmdsn_mutex);
-	bcopy(icmdp->cmd_un.text.lun, ith.rsvd4, sizeof (ith.rsvd4));
+	ith = kmem_zalloc(sizeof (iscsi_text_hdr_t), KM_SLEEP);
+	ASSERT(ith != NULL);
+	ith->flags	= ISCSI_FLAG_FINAL;
+	hton24(ith->dlength, icmdp->cmd_un.text.data_len);
+	ith->ttt		= icmdp->cmd_un.text.ttt;
+	iscsi_tx_init_hdr(isp, icp, (iscsi_text_hdr_t *)ith,
+	    ISCSI_OP_TEXT_CMD, icmdp->cmd_itt);
+	bcopy(icmdp->cmd_un.text.lun, ith->rsvd4, sizeof (ith->rsvd4));
 
-	/* release pending queue mutex across the network call */
-	mutex_exit(&isp->sess_queue_pending.mutex);
-
-	rval = iscsi_net->sendpdu(icp->conn_socket,
-	    (iscsi_hdr_t *)&ith, icmdp->cmd_un.text.buf,
-	    ISCSI_CONN_TO_NET_DIGEST(icp));
+	iscsi_tx_pdu(icp, ISCSI_OP_TEXT_CMD, ith, sizeof (iscsi_text_hdr_t),
+	    icmdp);
 
 	return (rval);
 }
@@ -2381,86 +2324,6 @@ iscsi_tx_text(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
  * | End of protocol send routines					|
  * +--------------------------------------------------------------------+
  */
-
-/*
- * iscsi_handle_r2t - Create a R2T and put it into the pending queue.
- *
- * Since the rx thread can hold the pending mutex, the tx thread or wd
- * thread may not have chance to check the commands in the pending queue.
- * So if the previous R2T is still there, we will release the related
- * mutex and wait for its completion in case of deadlock.
- */
-static void
-iscsi_handle_r2t(iscsi_conn_t *icp, iscsi_cmd_t *icmdp,
-    uint32_t offset, uint32_t length, uint32_t ttt)
-{
-	iscsi_sess_t	*isp		= NULL;
-	iscsi_cmd_t	*new_icmdp	= NULL;
-	int		owned		= 0;
-
-	ASSERT(icp != NULL);
-	isp = icp->conn_sess;
-	ASSERT(isp != NULL);
-
-	if (icmdp->cmd_un.scsi.r2t_icmdp != NULL) {
-		/*
-		 * Occasionally the tx thread doesn't have a chance to
-		 * send commands when we hold the pending mutex.
-		 * So we should mark this scsi command with more R2T
-		 * and release the mutex. Then wait for completion.
-		 */
-		icmdp->cmd_un.scsi.r2t_more = B_TRUE;
-
-		mutex_exit(&icmdp->cmd_mutex);
-		owned = mutex_owned(&icp->conn_queue_active.mutex);
-		if (owned != 0) {
-			mutex_exit(&icp->conn_queue_active.mutex);
-		}
-		mutex_exit(&isp->sess_queue_pending.mutex);
-
-		/*
-		 * the transmission from a previous r2t can be
-		 * slow to return; the array may have sent
-		 * another r2t at this point, so wait until
-		 * the first one finishes and signals us.
-		 */
-		mutex_enter(&icmdp->cmd_mutex);
-		while (icmdp->cmd_un.scsi.r2t_icmdp != NULL) {
-			ASSERT(icmdp->cmd_state != ISCSI_CMD_STATE_COMPLETED);
-			cv_wait(&icmdp->cmd_completion, &icmdp->cmd_mutex);
-		}
-		mutex_exit(&icmdp->cmd_mutex);
-
-		mutex_enter(&isp->sess_queue_pending.mutex);
-		if (owned != 0) {
-			mutex_enter(&icp->conn_queue_active.mutex);
-		}
-		mutex_enter(&icmdp->cmd_mutex);
-	}
-
-	/*
-	 * try to create an R2T task to send it later.  If we can't,
-	 * we're screwed, and the command will eventually time out
-	 * and be retried by the SCSI layer.
-	 */
-	new_icmdp = iscsi_cmd_alloc(icp, KM_SLEEP);
-	new_icmdp->cmd_type		= ISCSI_CMD_TYPE_R2T;
-	new_icmdp->cmd_un.r2t.icmdp	= icmdp;
-	new_icmdp->cmd_un.r2t.offset	= offset;
-	new_icmdp->cmd_un.r2t.length	= length;
-	new_icmdp->cmd_ttt		= ttt;
-	new_icmdp->cmd_itt		= icmdp->cmd_itt;
-	new_icmdp->cmd_lun		= icmdp->cmd_lun;
-	icmdp->cmd_un.scsi.r2t_icmdp	= new_icmdp;
-	icmdp->cmd_un.scsi.r2t_more	= B_FALSE;
-
-	/*
-	 * pending queue mutex is already held by the
-	 * tx_thread or rtt_rsp function.
-	 */
-	iscsi_cmd_state_machine(new_icmdp, ISCSI_CMD_EVENT_E1, isp);
-}
-
 
 /*
  * iscsi_handle_abort -
@@ -2494,6 +2357,40 @@ iscsi_handle_abort(void *arg)
 	iscsi_cmd_state_machine(new_icmdp, ISCSI_CMD_EVENT_E1, isp);
 }
 
+/*
+ * Callback from IDM indicating that the task has been suspended or aborted.
+ */
+void
+iscsi_task_aborted(idm_task_t *idt, idm_status_t status)
+{
+	iscsi_cmd_t *icmdp = idt->idt_private;
+	iscsi_conn_t *icp = icmdp->cmd_conn;
+	iscsi_sess_t *isp = icp->conn_sess;
+
+	ASSERT(icmdp->cmd_conn != NULL);
+
+	switch (status) {
+	case IDM_STATUS_SUSPENDED:
+		/*
+		 * If the task is suspended, it may be aborted later,
+		 * so we can ignore this notification.
+		 */
+		break;
+
+	case IDM_STATUS_ABORTED:
+		mutex_enter(&icp->conn_queue_active.mutex);
+		iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E9, isp);
+		mutex_exit(&icp->conn_queue_active.mutex);
+		break;
+
+	default:
+		/*
+		 * Unexpected status.
+		 */
+		ASSERT(0);
+	}
+
+}
 
 /*
  * iscsi_handle_nop -
@@ -2604,6 +2501,21 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 	return (rval);
 }
 
+/*
+ * iscsi_lgoout_start - task handler for deferred logout
+ */
+static void
+iscsi_logout_start(void *arg)
+{
+	iscsi_task_t		*itp = (iscsi_task_t *)arg;
+	iscsi_conn_t		*icp;
+
+	icp = (iscsi_conn_t *)itp->t_arg;
+
+	mutex_enter(&icp->conn_state_mutex);
+	(void) iscsi_handle_logout(icp);
+	mutex_exit(&icp->conn_state_mutex);
+}
 
 /*
  * iscsi_handle_logout - This function will issue a logout for
@@ -2613,13 +2525,23 @@ iscsi_status_t
 iscsi_handle_logout(iscsi_conn_t *icp)
 {
 	iscsi_sess_t	*isp;
+	idm_conn_t	*ic;
 	iscsi_cmd_t	*icmdp;
 	int		rval;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
+	ic = icp->conn_ic;
 	ASSERT(isp != NULL);
 	ASSERT(isp->sess_hba != NULL);
+	ASSERT(mutex_owned(&icp->conn_state_mutex));
+
+	/*
+	 * We may want to explicitly disconnect if something goes wrong so
+	 * grab a hold to ensure that the IDM connection context can't
+	 * disappear.
+	 */
+	idm_conn_hold(ic);
 
 	icmdp = iscsi_cmd_alloc(icp, KM_SLEEP);
 	ASSERT(icmdp != NULL);
@@ -2651,20 +2573,32 @@ iscsi_handle_logout(iscsi_conn_t *icp)
 	/* copy rval */
 	rval = icmdp->cmd_result;
 
-	/*
-	 * another way to do this would be to send t17 unconditionally,
-	 * but then the _rx_ thread would get bumped out with a receive
-	 * error, and send another t17.
-	 */
-	if (rval != ISCSI_STATUS_SUCCESS) {
-		(void) iscsi_conn_state_machine(icp, ISCSI_CONN_EVENT_T17);
-	}
-
 	/* clean up */
 	iscsi_cmd_free(icmdp);
 
+	if (rval != 0) {
+		/* If the logout failed then drop the connection */
+		idm_ini_conn_disconnect(icp->conn_ic);
+	}
+
+	/* stall until connection settles */
+	while ((icp->conn_state != ISCSI_CONN_STATE_FREE) &&
+	    (icp->conn_state != ISCSI_CONN_STATE_FAILED) &&
+	    (icp->conn_state != ISCSI_CONN_STATE_POLLING)) {
+		/* wait for transition */
+		cv_wait(&icp->conn_state_change, &icp->conn_state_mutex);
+	}
+
+	idm_conn_rele(ic);
+
+	/*
+	 * Return value reflects whether the logout command completed --
+	 * regardless of the return value the connection is closed and
+	 * ready for reconnection.
+	 */
 	return (rval);
 }
+
 
 /*
  * iscsi_handle_text - main control function for iSCSI text requests.  This
@@ -2930,6 +2864,132 @@ iscsi_handle_passthru_callback(struct scsi_pkt *pkt)
 }
 
 /*
+ * IDM callbacks
+ */
+void
+iscsi_build_hdr(idm_task_t *idm_task, idm_pdu_t *pdu, uint8_t opcode)
+{
+	iscsi_cmd_t *icmdp = idm_task->idt_private;
+	iscsi_conn_t *icp = icmdp->cmd_conn;
+	iscsi_data_hdr_t *ihp = (iscsi_data_hdr_t *)pdu->isp_hdr;
+
+	mutex_enter(&icmdp->cmd_mutex);
+	if (opcode == ISCSI_OP_SCSI_DATA) {
+		uint32_t	data_sn;
+		uint32_t	lun;
+		icmdp = idm_task->idt_private;
+		icp = icmdp->cmd_conn;
+		ihp->opcode	= opcode;
+		ihp->itt	= icmdp->cmd_itt;
+		ihp->ttt	= idm_task->idt_r2t_ttt;
+		ihp->expstatsn	= htonl(icp->conn_expstatsn);
+		icp->conn_laststatsn = icp->conn_expstatsn;
+		data_sn = ntohl(ihp->datasn);
+		data_sn++;
+		lun = icmdp->cmd_un.scsi.lun;
+		ISCSI_LUN_BYTE_COPY(ihp->lun, lun);
+		/* CRM: upate_flow_control */
+		ISCSI_IO_LOG(CE_NOTE, "DEBUG: iscsi_build_hdr"
+		    "(ISCSI_OP_SCSI_DATA): task: %p icp: %p ic: %p itt: %x "
+		    "exp: %d data_sn: %d", (void *)idm_task, (void *)icp,
+		    (void *)icp->conn_ic, ihp->itt, icp->conn_expstatsn,
+		    data_sn);
+	} else {
+		cmn_err(CE_WARN, "iscsi_build_hdr: unprocessed build "
+		    "header opcode: %x", opcode);
+	}
+	mutex_exit(&icmdp->cmd_mutex);
+}
+
+static void
+iscsi_process_rsp_status(iscsi_sess_t *isp, iscsi_conn_t *icp,
+    idm_status_t status)
+{
+	switch (status) {
+	case IDM_STATUS_SUCCESS:
+		if ((isp->sess_state == ISCSI_SESS_STATE_IN_FLUSH) &&
+		    (icp->conn_queue_active.count == 0)) {
+			iscsi_drop_conn_cleanup(icp);
+		}
+		break;
+	case IDM_STATUS_PROTOCOL_ERROR:
+		KSTAT_INC_CONN_ERR_PROTOCOL(icp);
+		iscsi_drop_conn_cleanup(icp);
+		break;
+	default:
+		break;
+	}
+}
+
+static void
+iscsi_drop_conn_cleanup(iscsi_conn_t *icp) {
+	mutex_enter(&icp->conn_state_mutex);
+	idm_ini_conn_disconnect(icp->conn_ic);
+	mutex_exit(&icp->conn_state_mutex);
+}
+
+void
+iscsi_rx_error_pdu(idm_conn_t *ic, idm_pdu_t *pdu, idm_status_t status)
+{
+	iscsi_conn_t *icp = (iscsi_conn_t *)ic->ic_handle;
+	iscsi_sess_t *isp;
+
+	ASSERT(icp != NULL);
+	isp = icp->conn_sess;
+	ASSERT(isp != NULL);
+	iscsi_process_rsp_status(isp, icp, status);
+	idm_pdu_complete(pdu, status);
+}
+
+void
+iscsi_rx_misc_pdu(idm_conn_t *ic, idm_pdu_t *pdu)
+{
+	iscsi_conn_t 		*icp;
+	iscsi_hdr_t		*ihp	= (iscsi_hdr_t *)pdu->isp_hdr;
+	iscsi_sess_t		*isp;
+	idm_status_t		status;
+
+	icp = ic->ic_handle;
+	isp = icp->conn_sess;
+	isp->sess_rx_lbolt = icp->conn_rx_lbolt = ddi_get_lbolt();
+	switch (ihp->opcode & ISCSI_OPCODE_MASK) {
+	case ISCSI_OP_LOGIN_RSP:
+		status = iscsi_rx_process_login_pdu(ic, pdu);
+		idm_pdu_complete(pdu, status);
+		break;
+	case ISCSI_OP_LOGOUT_RSP:
+		status = iscsi_rx_process_logout_rsp(ic, pdu);
+		idm_pdu_complete(pdu, status);
+		break;
+	case ISCSI_OP_REJECT_MSG:
+		status = iscsi_rx_process_reject_rsp(ic, pdu);
+		break;
+	case ISCSI_OP_SCSI_TASK_MGT_RSP:
+		status = iscsi_rx_process_task_mgt_rsp(ic, pdu);
+		idm_pdu_complete(pdu, status);
+		break;
+	case ISCSI_OP_NOOP_IN:
+		status = iscsi_rx_process_nop(ic, pdu);
+		idm_pdu_complete(pdu, status);
+		break;
+	case ISCSI_OP_ASYNC_EVENT:
+		status = iscsi_rx_process_async_rsp(ic, pdu);
+		break;
+	case ISCSI_OP_TEXT_RSP:
+		status = iscsi_rx_process_text_rsp(ic, pdu);
+		idm_pdu_complete(pdu, status);
+		break;
+	default:
+		cmn_err(CE_WARN, "iscsi connection(%u) protocol error "
+		    "- received misc unsupported opcode 0x%02x",
+		    icp->conn_oid, ihp->opcode);
+		status = IDM_STATUS_PROTOCOL_ERROR;
+		break;
+	}
+	iscsi_process_rsp_status(isp, icp, status);
+}
+
+/*
  * +--------------------------------------------------------------------+
  * | Beginning of completion routines					|
  * +--------------------------------------------------------------------+
@@ -2973,12 +3033,10 @@ iscsi_ic_thread(iscsi_thread_t *thread, void *arg)
 			mutex_enter(&icmdp->cmd_mutex);
 			/*
 			 * check if the associated r2t/abort has finished
-			 * yet, and make sure this command has no R2T
-			 * to handle. If not, don't complete this command.
+			 * yet.  If not, don't complete the command.
 			 */
 			if ((icmdp->cmd_un.scsi.r2t_icmdp == NULL) &&
-			    (icmdp->cmd_un.scsi.abort_icmdp == NULL) &&
-			    (icmdp->cmd_un.scsi.r2t_more == B_FALSE)) {
+			    (icmdp->cmd_un.scsi.abort_icmdp == NULL)) {
 				mutex_exit(&icmdp->cmd_mutex);
 				(void) iscsi_dequeue_cmd(&isp->
 				    sess_queue_completion.head,
@@ -2987,8 +3045,9 @@ iscsi_ic_thread(iscsi_thread_t *thread, void *arg)
 				--isp->sess_queue_completion.count;
 				iscsi_enqueue_cmd_head(&q.head,
 				    &q.tail, icmdp);
-			} else
+			} else {
 				mutex_exit(&icmdp->cmd_mutex);
+			}
 			icmdp = next_icmdp;
 		}
 		mutex_exit(&isp->sess_queue_completion.mutex);
@@ -3105,8 +3164,8 @@ static void
 iscsi_timeout_checks(iscsi_sess_t *isp)
 {
 	clock_t		now = ddi_get_lbolt();
-	iscsi_cmd_t	*icmdp, *nicmdp;
 	iscsi_conn_t	*icp;
+	iscsi_cmd_t	*icmdp, *nicmdp;
 
 	ASSERT(isp != NULL);
 

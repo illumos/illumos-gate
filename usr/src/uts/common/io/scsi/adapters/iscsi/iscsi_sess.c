@@ -33,6 +33,7 @@
 #define	ISCSI_SESS_ENUM_TIMEOUT_DEFAULT	60
 #define	SCSI_INQUIRY_PQUAL_MASK 0xE0
 
+boolean_t iscsi_sess_logging = B_FALSE;
 /*
  * used to store report lun information found
  *
@@ -214,6 +215,7 @@ clean_failed_sess:
 	isp->sess_last_err		= NoError;
 	isp->sess_tsid			= 0;
 	isp->sess_type			= type;
+	idm_sm_audit_init(&isp->sess_state_audit);
 
 	/* copy default driver login parameters */
 	bcopy(&ihp->hba_params, &isp->sess_params,
@@ -398,9 +400,7 @@ iscsi_sess_online(void *arg)
 		 * in our list until end of the list.
 		 */
 		while (icp != NULL) {
-			if (iscsi_conn_state_machine(
-			    icp, ISCSI_CONN_EVENT_T1) ==
-			    ISCSI_STATUS_SUCCESS) {
+			if (iscsi_conn_online(icp) == ISCSI_STATUS_SUCCESS) {
 				mutex_exit(&icp->conn_state_mutex);
 				break;
 			} else {
@@ -491,6 +491,7 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 	}
 
 	/* The next step is to logout of the connections. */
+	rw_enter(&isp->sess_conn_list_rwlock, RW_WRITER);
 	icp = isp->sess_conn_list;
 	while (icp != NULL) {
 		rval = iscsi_conn_offline(icp);
@@ -503,13 +504,15 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 			return (rval);
 		}
 	}
+	rw_exit(&isp->sess_conn_list_rwlock);
 
 	/*
 	 * At this point all connections should be in
 	 * a FREE state which will have pushed the session
 	 * to a FREE state.
 	 */
-	ASSERT(isp->sess_state == ISCSI_SESS_STATE_FREE);
+	ASSERT(isp->sess_state == ISCSI_SESS_STATE_FREE ||
+	    isp->sess_state == ISCSI_SESS_STATE_FAILED);
 
 	/* Stop watchdog before destroying connections */
 	if (isp->sess_wd_thread) {
@@ -794,6 +797,31 @@ iscsi_sess_set_auth(iscsi_sess_t *isp)
 	return (B_TRUE);
 }
 
+/*
+ * iscsi_sess_reserve_itt - Used to reserve an ITT hash slot
+ */
+iscsi_status_t
+iscsi_sess_reserve_scsi_itt(iscsi_cmd_t *icmdp)
+{
+	idm_task_t *itp;
+	iscsi_conn_t *icp = icmdp->cmd_conn;
+	itp = idm_task_alloc(icp->conn_ic);
+	if (itp == NULL)
+		return (ISCSI_STATUS_INTERNAL_ERROR);
+	itp->idt_private = icmdp;
+	icmdp->cmd_itp = itp;
+	icmdp->cmd_itt = itp->idt_tt;
+	return (ISCSI_STATUS_SUCCESS);
+}
+
+/*
+ * iscsi_sess_release_scsi_itt - Used to release ITT hash slot
+ */
+void
+iscsi_sess_release_scsi_itt(iscsi_cmd_t *icmdp)
+{
+	idm_task_free(icmdp->cmd_itp);
+}
 
 /*
  * iscsi_sess_reserve_itt - Used to reserve an ITT hash slot
@@ -805,6 +833,12 @@ iscsi_sess_reserve_itt(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	if (isp->sess_cmd_table_count >= ISCSI_CMD_TABLE_SIZE) {
 		return (ISCSI_STATUS_ITT_TABLE_FULL);
 	}
+
+	/*
+	 * Keep itt values out of the range used by IDM
+	 */
+	if (isp->sess_itt < IDM_TASKIDS_MAX)
+		isp->sess_itt = IDM_TASKIDS_MAX;
 
 	/*
 	 * Find the next available slot.  Normally its the
@@ -821,7 +855,7 @@ iscsi_sess_reserve_itt(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 
 	/* reserve slot and update counters */
 	icmdp->cmd_itt = isp->sess_itt;
-	isp->sess_cmd_table[icmdp->cmd_itt %
+	isp->sess_cmd_table[isp->sess_itt %
 	    ISCSI_CMD_TABLE_SIZE] = icmdp;
 	isp->sess_cmd_table_count++;
 	isp->sess_itt++;
@@ -947,9 +981,16 @@ iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	    char *, iscsi_sess_state_str(isp->sess_state),
 	    char *, iscsi_sess_event_str(event));
 
+	/* Audit event */
+	idm_sm_audit_event(&isp->sess_state_audit,
+	    SAS_ISCSI_SESS, isp->sess_state, event, NULL);
+
 	isp->sess_prev_state = isp->sess_state;
 	isp->sess_state_lbolt = ddi_get_lbolt();
 
+	ISCSI_SESS_LOG(CE_NOTE,
+	    "DEBUG: sess_state: isp: %p state: %d event: %d",
+	    (void *)isp, isp->sess_state, event);
 	switch (isp->sess_state) {
 	case ISCSI_SESS_STATE_FREE:
 		iscsi_sess_state_free(isp, event);
@@ -968,6 +1009,12 @@ iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event)
 		break;
 	default:
 		ASSERT(FALSE);
+	}
+
+	/* Audit state change */
+	if (isp->sess_prev_state != isp->sess_state) {
+		idm_sm_audit_state_change(&isp->sess_state_audit,
+		    SAS_ISCSI_SESS, isp->sess_prev_state, isp->sess_state);
 	}
 }
 
@@ -1755,13 +1802,13 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	for (ilp = isp->sess_lun_list; ilp; ilp = ilp_next) {
 		ilp_next = ilp->lun_next;
 
-		for (lun_count = lun_start;
-		    lun_count < lun_total; lun_count++) {
-		/*
-		 * if the first lun in saved_replun_ptr buffer has already
-		 * been found we can move on and do not have to check this lun
-		 * in the future
-		 */
+		for (lun_count = lun_start; lun_count < lun_total;
+		    lun_count++) {
+			/*
+			 * if the first lun in saved_replun_ptr buffer has
+			 * already been found we can move on and do not
+			 * have to check this lun in the future
+			 */
 			if (lun_count == lun_start &&
 			    saved_replun_ptr[lun_start].lun_found) {
 				lun_start++;
@@ -1812,10 +1859,10 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 			saved_replun_ptr[lun_count].lun_valid = B_TRUE;
 			saved_replun_ptr[lun_count].lun_num = lun_num;
 			if (ilp->lun_num == lun_num) {
-			/*
-			 * lun is found in the SCSI Report Lun buffer
-			 * make sure the lun is in the ONLINE state
-			 */
+				/*
+				 * lun is found in the SCSI Report Lun buffer
+				 * make sure the lun is in the ONLINE state
+				 */
 				saved_replun_ptr[lun_count].lun_found = B_TRUE;
 					if ((ilp->lun_state &
 					    ISCSI_LUN_STATE_OFFLINE) ||
@@ -1837,10 +1884,10 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 		}
 
 		if (lun_count == lun_total) {
-		/*
-		 * this lun we found in the sess->lun_list does not exist
-		 * anymore, need to offline this lun
-		 */
+			/*
+			 * this lun we found in the sess->lun_list does
+			 * not exist anymore, need to offline this lun
+			 */
 
 			DTRACE_PROBE2(sess_reportluns_lun_no_longer_exists,
 			    int, ilp->lun_num, int, ilp->lun_state);
@@ -1866,10 +1913,11 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 				continue;
 			}
 		} else {
-		/*
-		 * lun information is in the saved_replun buffer
-		 *    if this lun has been found already, then we can move on
-		 */
+			/*
+			 * lun information is in the saved_replun buffer
+			 * if this lun has been found already,
+			 * then we can move on
+			 */
 			if (saved_replun_ptr[lun_count].lun_found == B_TRUE) {
 				continue;
 			}

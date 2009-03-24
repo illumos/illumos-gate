@@ -18,57 +18,40 @@
 #
 # CDDL HEADER END
 #
-
+# usr/src/uts/sparc/iser/Makefile
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 
 #
-# This makefile drives the production of iSCSI initiator Driver
-# sparc architecture dependent
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
+UTSBASE	= ../..
 
 #
-#	Paths to the base of the uts directory trees
+#	Define the module and object file sets.
 #
-UTSBASE   = ../..
-
-#
-# Define the module and object file sets.
-#
-MODULE		= iscsi
-OBJECTS		= $(ISCSI_INITIATOR_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(ISCSI_INITIATOR_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= iser
+OBJECTS		= $(ISER_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(ISER_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/iscsi
+LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/ibcm -Nmisc/idm
+CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/iser
 
 #
-# Include common rules.
+#	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
 #
-# Define targets.
+#	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-# includes
-INC_PATH	+= -I$(UTSBASE)/common/io/scsi/adapters/iscsi
-
 #
-# Note dependancy on misc/scsi.
-#
-LDFLAGS += -dy -N"misc/scsi" -N"fs/sockfs" -N"sys/doorfs" -N"misc/md5" -Nmisc/ksocket
-LDFLAGS += -N"misc/idm"
-
-LINTFLAGS += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW
-LINTFLAGS64 += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW
-
-#
-# Default build targets.
+#	Default build targets.
 #
 .KEEP_STATE:
 
@@ -89,6 +72,6 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 install:	$(INSTALL_DEPS)
 
 #
-# Include common targets.
+#	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,18 +41,37 @@ typedef enum {
 	IDM_STATUS_SUSPENDED,
 	IDM_STATUS_HEADER_DIGEST,
 	IDM_STATUS_DATA_DIGEST,
-	IDM_STATUS_PROTOCOL_ERROR
+	IDM_STATUS_PROTOCOL_ERROR,
+	IDM_STATUS_LOGIN_FAIL
 } idm_status_t;
+
 
 typedef enum {
 	CN_CONNECT_ACCEPT = 1,	/* Target only */
-	CN_LOGIN_FAIL,		/* Target only */
+	CN_LOGIN_FAIL,
 	CN_READY_FOR_LOGIN,	/* Initiator only */
 	CN_FFP_ENABLED,
 	CN_FFP_DISABLED,
 	CN_CONNECT_LOST,
-	CN_CONNECT_DESTROY
+	CN_CONNECT_DESTROY,
+	CN_CONNECT_FAIL,
+	CN_MAX
 } idm_client_notify_t;
+
+#ifdef IDM_CN_NOTIFY_STRINGS
+static const char *idm_cn_strings[CN_MAX + 1] = {
+	"CN_UNDEFINED",
+	"CN_CONNECT_ACCEPT",
+	"CN_LOGIN_FAIL",
+	"CN_READY_FOR_LOGIN",
+	"CN_FFP_ENABLED",
+	"CN_FFP_DISABLED",
+	"CN_CONNECT_LOST",
+	"CN_CONNECT_DESTROY",
+	"CN_CONNECT_FAIL",
+	"CN_MAX"
+};
+#endif
 
 typedef enum {
 	FD_CONN_FAIL,
@@ -211,7 +230,11 @@ typedef enum {
 	SAS_IDM_TASK,
 	SAS_ISCSIT_TGT,
 	SAS_ISCSIT_SESS,
-	SAS_ISCSIT_LOGIN
+	SAS_ISCSIT_LOGIN,
+	SAS_ISCSI_CMD,
+	SAS_ISCSI_SESS,
+	SAS_ISCSI_CONN,
+	SAS_ISCSI_LOGIN
 } sm_audit_sm_type_t;
 
 typedef struct {
@@ -267,6 +290,9 @@ idm_ini_conn_connect(idm_conn_t *ic);
 
 void
 idm_ini_conn_disconnect(idm_conn_t *ic);
+
+void
+idm_ini_conn_disconnect_sync(idm_conn_t *ic);
 
 void
 idm_ini_conn_destroy(idm_conn_t *ic);
@@ -337,7 +363,7 @@ kv_status_t
 idm_negotiate_key_values(idm_conn_t *ic, nvlist_t *request_nvl,
     nvlist_t *response_nvl, nvlist_t *negotiated_nvl);
 
-idm_status_t
+void
 idm_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl);
 
 /*
@@ -365,6 +391,24 @@ idm_buf_unbind_out(idm_task_t *idt, idm_buf_t *buf);
 idm_buf_t *
 idm_buf_find(void *lbuf, size_t data_offset);
 
+void
+idm_bufpat_set(idm_buf_t *idb);
+
+boolean_t
+idm_bufpat_check(idm_buf_t *idb, int check_len, idm_bufpat_check_type_t type);
+
+extern boolean_t idm_pattern_checking;
+
+#define	IDM_BUFPAT_SET(CHK_BUF) 				\
+	if (idm_pattern_checking && (CHK_BUF)->idb_bufalloc) {	\
+		idm_bufpat_set(CHK_BUF);			\
+	}
+
+#define	IDM_BUFPAT_CHECK(CHK_BUF, CHK_LEN, CHK_TYPE) 		\
+	if (idm_pattern_checking) {				\
+		(void) idm_bufpat_check(CHK_BUF, CHK_LEN, CHK_TYPE);	\
+	}
+
 /*
  * Task services
  */
@@ -389,6 +433,9 @@ idm_task_free(idm_task_t *idt);
 idm_task_t *
 idm_task_find(idm_conn_t *ic, uint32_t itt, uint32_t ttt);
 
+idm_task_t *
+idm_task_find_and_complete(idm_conn_t *ic, uint32_t itt, uint32_t ttt);
+
 void *
 idm_task_find_by_handle(idm_conn_t *ic, uintptr_t handle);
 
@@ -404,6 +451,9 @@ idm_task_rele(idm_task_t *idt);
 
 idm_pdu_t *
 idm_pdu_alloc(uint_t hdrlen, uint_t datalen);
+
+idm_pdu_t *
+idm_pdu_alloc_nosleep(uint_t hdrlen, uint_t datalen);
 
 void
 idm_pdu_free(idm_pdu_t *pdu);

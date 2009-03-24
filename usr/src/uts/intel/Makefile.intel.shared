@@ -464,7 +464,7 @@ DRV_KMODS	+= dcam1394
 #
 #	InfiniBand pseudo drivers
 #
-DRV_KMODS	+= ib ibd rdsib sdp
+DRV_KMODS	+= ib ibd rdsib sdp iser
 
 #
 #	LVM modules

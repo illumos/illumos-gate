@@ -29,11 +29,10 @@
 /*
  * Framework interface routines for iSCSI
  */
-#include "iscsi.h"		/* main header */
-#include <sys/scsi/adapters/iscsi_if.h>		/* ioctl interfaces */
-#include <sys/iscsi_protocol.h>
-/* protocol structs and defines */
 
+#include "iscsi.h"				/* main header */
+#include <sys/iscsi_protocol.h>	/* protocol structs */
+#include <sys/scsi/adapters/iscsi_if.h>		/* ioctl interfaces */
 #include "iscsi_targetparam.h"
 #include "persistent.h"
 #include <sys/scsi/adapters/iscsi_door.h>
@@ -60,6 +59,7 @@ uint32_t	iscsi_oid;
 int		iscsi_nop_delay		= ISCSI_DEFAULT_NOP_DELAY;
 int		iscsi_rx_window		= ISCSI_DEFAULT_RX_WINDOW;
 int		iscsi_rx_max_window	= ISCSI_DEFAULT_RX_MAX_WINDOW;
+boolean_t	iscsi_logging		= B_FALSE;
 
 extern ib_boot_prop_t	*iscsiboot_prop;
 
@@ -386,6 +386,10 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			mutex_init(&ihp->hba_discovery_events_mutex, NULL,
 			    MUTEX_DRIVER, NULL);
 
+			/* Get LDI ident */
+			rval = ldi_ident_from_dip(dip, &ihp->hba_li);
+			ASSERT(rval == 0); /* Failure indicates invalid arg */
+
 			/*
 			 * init SendTargets semaphore that is used to allow
 			 * only one operation at a time
@@ -686,6 +690,9 @@ iscsi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_remove_minor_node(dip, NULL);
 
 		ddi_prop_remove_all(ihp->hba_dip);
+
+		ldi_ident_release(ihp->hba_li);
+
 		mutex_destroy(&ihp->hba_discovery_events_mutex);
 		rw_destroy(&ihp->hba_sess_list_rwlock);
 		(void) iscsi_hba_kstat_term(ihp);
@@ -822,6 +829,9 @@ iscsi_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		if (flags & PKT_XARQ) {
 			icmdp->cmd_misc_flags |= ISCSI_CMD_MISCFLAG_XARQ;
 		}
+
+
+		idm_sm_audit_init(&icmdp->cmd_state_audit);
 
 		mutex_init(&icmdp->cmd_mutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&icmdp->cmd_completion, NULL, CV_DRIVER, NULL);

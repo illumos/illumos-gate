@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_IDM_IMPL_H_
@@ -223,6 +223,8 @@ typedef struct idm_task_s {
 	int			idt_tx_to_ini_done;
 	int			idt_rx_from_ini_start;
 	int			idt_rx_from_ini_done;
+	int			idt_tx_bytes;	/* IDM_CONN_USE_SCOREBOARD */
+	int			idt_rx_bytes;	/* IDM_CONN_USE_SCOREBOARD */
 
 	uint32_t		idt_exp_datasn;	/* expected datasn */
 	uint32_t		idt_exp_rttsn;	/* expected rttsn */
@@ -267,14 +269,35 @@ typedef struct idm_buf_s {
 	size_t		idb_xfer_len;	/* Current requested xfer len */
 	void		*idb_buf_private; /* transport-specific buf handle */
 	void		*idb_reg_private; /* transport-specific reg handle */
+	void		*idb_bufptr; /* transport-specific bcopy pointer */
+	boolean_t	idb_bufbcopy;	/* true if bcopy required */
+
 	idm_buf_cb_t	*idb_buf_cb;	/* Data Completion Notify, tgt only */
 	void		*idb_cb_arg;	/* Client private data */
 	idm_task_t	*idb_task_binding;
+	timespec_t	idb_xfer_start;
+	timespec_t	idb_xfer_done;
 	boolean_t	idb_in_transport;
 	boolean_t	idb_tx_thread;		/* Sockets only */
 	iscsi_hdr_t	idb_data_hdr_tmpl;	/* Sockets only */
 	idm_status_t	idb_status;
 } idm_buf_t;
+
+typedef enum {
+	BP_CHECK_QUICK,
+	BP_CHECK_THOROUGH,
+	BP_CHECK_ASSERT
+} idm_bufpat_check_type_t;
+
+#define	BUFPAT_MATCH(bc_bufpat, bc_idb) 		\
+	((bufpat->bufpat_idb == bc_idb) &&		\
+	    (bufpat->bufpat_bufmagic == IDM_BUF_MAGIC))
+
+typedef struct idm_bufpat_s {
+	void		*bufpat_idb;
+	uint32_t	bufpat_bufmagic;
+	uint32_t	bufpat_offset;
+} idm_bufpat_t;
 
 #define	PDU_MAX_IOVLEN	12
 #define	IDM_PDU_MAGIC	0x49504455	/* "IPDU" */

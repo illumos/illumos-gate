@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _ISCSIT_H_
@@ -204,22 +204,22 @@ typedef struct {
  * iSCSI Auth Information
  */
 typedef struct conn_auth {
-	char			ca_tgt_chapuser[iscsiAuthStringMaxLength];
-	uint8_t			ca_tgt_chapsecret[iscsiAuthStringMaxLength];
+	char			ca_tgt_chapuser[iscsitAuthStringMaxLength];
+	uint8_t			ca_tgt_chapsecret[iscsitAuthStringMaxLength];
 	int			ca_tgt_chapsecretlen;
 
-	char			ca_ini_chapuser[iscsiAuthStringMaxLength];
-	uint8_t			ca_ini_chapsecret[iscsiAuthStringMaxLength];
+	char			ca_ini_chapuser[iscsitAuthStringMaxLength];
+	uint8_t			ca_ini_chapsecret[iscsitAuthStringMaxLength];
 	int			ca_ini_chapsecretlen;
 
 	/* RADIUS authentication information   	*/
 	boolean_t		ca_use_radius;
 	struct sockaddr_storage	ca_radius_server;
-	uint8_t			ca_radius_secret[iscsiAuthStringMaxLength];
+	uint8_t			ca_radius_secret[iscsitAuthStringMaxLength];
 	int			ca_radius_secretlen;
 
 	/* authentication method list */
-	iscsit_auth_method_t	ca_method_valid_list[iscsiAuthMethodMaxCount];
+	iscsit_auth_method_t	ca_method_valid_list[iscsitAuthMethodMaxCount];
 
 	/* Target alias */
 	char			ca_tgt_alias[MAX_ISCSI_NODENAMELEN];

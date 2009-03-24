@@ -30,11 +30,12 @@
 #include <sys/iscsi_protocol.h>
 #include <sys/scsi/adapters/iscsi_door.h>
 
+boolean_t iscsi_login_logging = B_FALSE;
+
 /* internal login protocol interfaces */
 static iscsi_status_t iscsi_login(iscsi_conn_t *icp,
-    char *buffer, size_t bufsize, uint8_t *status_class,
-    uint8_t *status_detail);
-static int iscsi_add_text(iscsi_hdr_t *ihp, char *data,
+    uint8_t *status_class, uint8_t *status_detail);
+static int iscsi_add_text(idm_pdu_t *text_pdu,
     int max_data_length, char *param, char *value);
 static int iscsi_find_key_value(char *param, char *ihp, char *pdu_end,
     char **value_start, char **value_end);
@@ -43,14 +44,16 @@ static void iscsi_null_callback(void *user_handle, void *message_handle,
 static iscsi_status_t iscsi_process_login_response(iscsi_conn_t *icp,
     iscsi_login_rsp_hdr_t *ilrhp, char *data, int max_data_length);
 static iscsi_status_t iscsi_make_login_pdu(iscsi_conn_t *icp,
-    iscsi_hdr_t *text_pdu, char *data, int max_data_length);
+    idm_pdu_t *text_pdu, char *data, int max_data_length);
 static iscsi_status_t iscsi_update_address(iscsi_conn_t *icp,
     char *address);
 static char *iscsi_login_failure_str(uchar_t status_class,
     uchar_t status_detail);
 static void iscsi_login_end(iscsi_conn_t *icp,
-    iscsi_conn_event_t event, iscsi_task_t *itp);
+    iscsi_status_t status, iscsi_task_t *itp);
 static iscsi_status_t iscsi_login_connect(iscsi_conn_t *icp);
+static void iscsi_login_disconnect(iscsi_conn_t *icp);
+static void iscsi_notice_key_values(iscsi_conn_t *icp);
 
 #define	ISCSI_LOGIN_RETRY_DELAY		5	/* seconds */
 #define	ISCSI_LOGIN_POLLING_DELAY	60	/* seconds */
@@ -72,10 +75,8 @@ iscsi_login_start(void *arg)
 	iscsi_conn_t		*icp;
 	iscsi_sess_t		*isp;
 	iscsi_hba_t		*ihp;
-	char			*buf;
 	unsigned char		status_class;
 	unsigned char		status_detail;
-	int			login_buf_size;
 	clock_t			lbolt;
 
 	ASSERT(itp != NULL);
@@ -87,6 +88,12 @@ iscsi_login_start(void *arg)
 	ASSERT(ihp != NULL);
 
 login_start:
+	ASSERT((icp->conn_state == ISCSI_CONN_STATE_IN_LOGIN) ||
+	    (icp->conn_state == ISCSI_CONN_STATE_FAILED) ||
+	    (icp->conn_state == ISCSI_CONN_STATE_POLLING));
+
+	icp->conn_state_ffp = B_FALSE;
+
 	/* reset connection statsn */
 	icp->conn_expstatsn = 0;
 	icp->conn_laststatsn = 0;
@@ -97,7 +104,7 @@ login_start:
 	/* sync up login and session parameters */
 	if (!ISCSI_SUCCESS(iscsi_conn_sync_params(icp))) {
 		/* unable to sync params.  fail connection attempts */
-		iscsi_login_end(icp, ISCSI_CONN_EVENT_T30, itp);
+		iscsi_login_end(icp, ISCSI_STATUS_LOGIN_FAILED, itp);
 		return (ISCSI_STATUS_LOGIN_FAILED);
 	}
 
@@ -107,7 +114,11 @@ login_start:
 		delay(icp->conn_login_min - lbolt);
 	}
 
-	/* Attempt to open TCP connection */
+	/*
+	 * Attempt to open TCP connection, associated IDM connection will
+	 * have a hold on it that must be released after the call to
+	 * iscsi_login() below.
+	 */
 	if (!ISCSI_SUCCESS(iscsi_login_connect(icp))) {
 		/* retry this failure */
 		goto login_retry;
@@ -117,19 +128,25 @@ login_start:
 	 * allocate response buffer with based on default max
 	 * transfer size.  This size might shift during login.
 	 */
-	login_buf_size = icp->conn_params.max_xmit_data_seg_len;
-	buf = kmem_zalloc(login_buf_size, KM_SLEEP);
+	icp->conn_login_max_data_length =
+	    icp->conn_params.max_xmit_data_seg_len;
+	icp->conn_login_data = kmem_zalloc(icp->conn_login_max_data_length,
+	    KM_SLEEP);
 
-	/* Start protocol login */
-	rval = iscsi_login(icp, buf, login_buf_size,
-	    &status_class, &status_detail);
+	/*
+	 * Start protocol login, upon return we will be either logged in
+	 * or disconnected
+	 */
+	rval = iscsi_login(icp, &status_class, &status_detail);
 
 	/* done with buffer */
-	kmem_free(buf, login_buf_size);
+	kmem_free(icp->conn_login_data, icp->conn_login_max_data_length);
+
+	/* Release connection hold */
+	idm_conn_rele(icp->conn_ic);
 
 	/* hard failure in login */
 	if (!ISCSI_SUCCESS(rval)) {
-		iscsi_net->close(icp->conn_socket);
 		/*
 		 * We should just give up retry if these failures are
 		 * detected.
@@ -144,7 +161,7 @@ login_start:
 		case ISCSI_STATUS_VERSION_MISMATCH:
 		case ISCSI_STATUS_NEGO_FAIL:
 			/* we don't want to retry this failure */
-			iscsi_login_end(icp, ISCSI_CONN_EVENT_T30, itp);
+			iscsi_login_end(icp, ISCSI_STATUS_LOGIN_FAILED, itp);
 			return (ISCSI_STATUS_LOGIN_FAILED);
 		default:
 			/* retry this failure */
@@ -156,11 +173,10 @@ login_start:
 	switch (status_class) {
 	case ISCSI_STATUS_CLASS_SUCCESS:
 		/* login was successful */
-		iscsi_login_end(icp, ISCSI_CONN_EVENT_T5, itp);
+		iscsi_login_end(icp, ISCSI_STATUS_SUCCESS, itp);
 		return (ISCSI_STATUS_SUCCESS);
 	case ISCSI_STATUS_CLASS_REDIRECT:
 		/* Retry at the redirected address */
-		iscsi_net->close(icp->conn_socket);
 		goto login_start;
 	case ISCSI_STATUS_CLASS_TARGET_ERR:
 		/* retry this failure */
@@ -168,8 +184,6 @@ login_start:
 		    "%s (0x%02x/0x%02x)", icp->conn_oid,
 		    iscsi_login_failure_str(status_class, status_detail),
 		    status_class, status_detail);
-
-		iscsi_net->close(icp->conn_socket);
 		goto login_retry;
 	case ISCSI_STATUS_CLASS_INITIATOR_ERR:
 	default:
@@ -181,12 +195,11 @@ login_start:
 		    status_class, status_detail, isp->sess_name,
 		    isp->sess_tpgt_conf);
 
-		iscsi_net->close(icp->conn_socket);
-
 		/* we don't want to retry this failure */
-		iscsi_login_end(icp, ISCSI_CONN_EVENT_T30, itp);
+		iscsi_login_end(icp, ISCSI_STATUS_LOGIN_FAILED, itp);
 		break;
 	}
+
 	return (ISCSI_STATUS_LOGIN_FAILED);
 
 login_retry:
@@ -208,20 +221,20 @@ login_retry:
 			    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
 			    DDI_SUCCESS) {
 				iscsi_login_end(icp,
-				    ISCSI_CONN_EVENT_T7, itp);
+				    ISCSI_STATUS_LOGIN_TIMED_OUT, itp);
 			}
 			return (ISCSI_STATUS_SUCCESS);
 		}
 	} else {
 		/* Retries exceeded */
-		iscsi_login_end(icp, ISCSI_CONN_EVENT_T7, itp);
+		iscsi_login_end(icp, ISCSI_STATUS_LOGIN_TIMED_OUT, itp);
 	}
+
 	return (ISCSI_STATUS_LOGIN_FAILED);
 }
 
 static void
-iscsi_login_end(iscsi_conn_t *icp, iscsi_conn_event_t event,
-    iscsi_task_t *itp)
+iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 {
 	iscsi_sess_t	*isp;
 
@@ -229,13 +242,85 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_conn_event_t event,
 	isp = icp->conn_sess;
 	ASSERT(isp != NULL);
 
-	mutex_enter(&icp->conn_state_mutex);
-	(void) iscsi_conn_state_machine(icp, event);
-	mutex_exit(&icp->conn_state_mutex);
+	if (status == ISCSI_STATUS_SUCCESS) {
+		/* Inform IDM of the relevant negotiated values */
+		iscsi_notice_key_values(icp);
 
-	/* If login failed reset nego tpgt */
-	if (event != ISCSI_CONN_EVENT_T5) {
+		/* We are now logged in */
+		iscsi_conn_update_state(icp, ISCSI_CONN_STATE_LOGGED_IN);
+
+		/* startup TX thread */
+		(void) iscsi_thread_start(icp->conn_tx_thread);
+
+		/*
+		 * Move login state machine to LOGIN_FFP.  This will
+		 * release the taskq thread handling the CN_FFP_ENABLED
+		 * allowing the IDM connection state machine to resume
+		 * processing events
+		 */
+		iscsi_login_update_state(icp, LOGIN_FFP);
+
+		/* Notify the session that a connection is logged in */
+		mutex_enter(&isp->sess_state_mutex);
+		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N1);
+		mutex_exit(&isp->sess_state_mutex);
+	} else {
+		/* If login failed reset nego tpgt */
 		isp->sess_tpgt_nego = ISCSI_DEFAULT_TPGT;
+
+		mutex_enter(&icp->conn_state_mutex);
+		switch (icp->conn_state) {
+		case ISCSI_CONN_STATE_IN_LOGIN:
+			iscsi_conn_update_state_locked(icp,
+			    ISCSI_CONN_STATE_FREE);
+			mutex_exit(&icp->conn_state_mutex);
+			break;
+		case ISCSI_CONN_STATE_FAILED:
+			if (status == ISCSI_STATUS_LOGIN_FAILED) {
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_FREE);
+			} else {
+				/* ISCSI_STATUS_LOGIN_TIMED_OUT */
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_POLLING);
+			}
+			mutex_exit(&icp->conn_state_mutex);
+
+			mutex_enter(&isp->sess_state_mutex);
+			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
+			mutex_exit(&isp->sess_state_mutex);
+
+			if (status == ISCSI_STATUS_LOGIN_TIMED_OUT) {
+				iscsi_conn_retry(isp, icp);
+			}
+			break;
+		case ISCSI_CONN_STATE_POLLING:
+			if (status == ISCSI_STATUS_LOGIN_FAILED) {
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_FREE);
+				mutex_exit(&icp->conn_state_mutex);
+
+				mutex_enter(&isp->sess_state_mutex);
+				iscsi_sess_state_machine(isp,
+				    ISCSI_SESS_EVENT_N6);
+				mutex_exit(&isp->sess_state_mutex);
+			} else {
+				/* ISCSI_STATUS_LOGIN_TIMED_OUT */
+				if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+					mutex_exit(&icp->conn_state_mutex);
+
+					iscsi_conn_retry(isp, icp);
+				} else {
+					iscsi_conn_update_state_locked(icp,
+					    ISCSI_CONN_STATE_FREE);
+					mutex_exit(&icp->conn_state_mutex);
+				}
+			}
+			break;
+		default:
+			ASSERT(0);
+			break;
+		}
 	}
 
 	if (itp->t_blocking == B_FALSE) {
@@ -257,17 +342,22 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_conn_event_t event,
  * allows the caller to decide whether or not to retry logins, so
  * that we don't have any policy logic here.
  */
-static iscsi_status_t
-iscsi_login(iscsi_conn_t *icp, char *buffer, size_t bufsize,
-    uint8_t *status_class, uint8_t *status_detail)
+iscsi_status_t
+iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 {
 	iscsi_status_t		rval		= ISCSI_STATUS_INTERNAL_ERROR;
 	struct iscsi_sess	*isp		= NULL;
 	IscsiAuthClient		*auth_client	= NULL;
 	int			max_data_length	= 0;
-	iscsi_hdr_t		ihp;
-	iscsi_login_rsp_hdr_t	*ilrhp = (iscsi_login_rsp_hdr_t *)&ihp;
 	char			*data		= NULL;
+	idm_pdu_t		*text_pdu;
+	char			*buffer;
+	size_t			bufsize;
+	iscsi_login_rsp_hdr_t	*ilrhp;
+	clock_t			response_timeout, timeout_result;
+
+	buffer = icp->conn_login_data;
+	bufsize = icp->conn_login_max_data_length;
 
 	ASSERT(icp != NULL);
 	ASSERT(buffer != NULL);
@@ -277,7 +367,7 @@ iscsi_login(iscsi_conn_t *icp, char *buffer, size_t bufsize,
 	ASSERT(isp != NULL);
 
 	/*
-	 * prepare the connection
+	 * prepare the connection, hold IDM connection until login completes
 	 */
 	icp->conn_current_stage = ISCSI_INITIAL_LOGIN_STAGE;
 	icp->conn_partial_response = 0;
@@ -298,6 +388,8 @@ iscsi_login(iscsi_conn_t *icp, char *buffer, size_t bufsize,
 			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
 			    "unable to initialize authentication",
 			    icp->conn_oid);
+			iscsi_login_disconnect(icp);
+			iscsi_login_update_state(icp, LOGIN_DONE);
 			return (ISCSI_STATUS_INTERNAL_ERROR);
 		}
 
@@ -353,62 +445,76 @@ iscsi_login(iscsi_conn_t *icp, char *buffer, size_t bufsize,
 		max_data_length = bufsize;
 		rval = ISCSI_STATUS_INTERNAL_ERROR;
 
+		text_pdu = idm_pdu_alloc(sizeof (iscsi_hdr_t), 0);
+		idm_pdu_init(text_pdu, icp->conn_ic, NULL, NULL);
+
 		/*
 		 * fill in the PDU header and text data based on the
 		 * login stage that we're in
 		 */
-		rval = iscsi_make_login_pdu(icp, &ihp, data, max_data_length);
+		rval = iscsi_make_login_pdu(icp, text_pdu, data,
+		    max_data_length);
 		if (!ISCSI_SUCCESS(rval)) {
 			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
 			    "unable to make login pdu", icp->conn_oid);
 			goto iscsi_login_done;
 		}
 
-		/* send a PDU to the target */
-		rval = iscsi_net->sendpdu(icp->conn_socket, &ihp, data, 0);
-		if (!ISCSI_SUCCESS(rval)) {
-			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
-			    "failed to transfer login", icp->conn_oid);
+		mutex_enter(&icp->conn_login_mutex);
+		/*
+		 * Make sure we are still in LOGIN_START or LOGIN_RX
+		 * state before switching to LOGIN_TX.  It's possible
+		 * for a connection failure to move us to LOGIN_ERROR
+		 * before we get to this point.
+		 */
+		if (((icp->conn_login_state != LOGIN_READY) &&
+		    (icp->conn_login_state != LOGIN_RX)) ||
+		    !icp->conn_state_idm_connected) {
+			/* Error occurred */
+			mutex_exit(&icp->conn_login_mutex);
+			rval = (ISCSI_STATUS_INTERNAL_ERROR);
 			goto iscsi_login_done;
 		}
 
-		/* read the target's response into the same buffer */
-		bzero(buffer, bufsize);
-		rval = iscsi_net->recvhdr(icp->conn_socket, &ihp,
-		    sizeof (ihp), ISCSI_RX_TIMEOUT_VALUE, 0);
-		if (!ISCSI_SUCCESS(rval)) {
-			if (rval == ISCSI_STATUS_RX_TIMEOUT) {
-#define	STRING_FTRLRT "failed to receive login response - timeout"
-				cmn_err(CE_WARN,
-				    "iscsi connection(%u) login failed - "
-				    STRING_FTRLRT,
-				    icp->conn_oid);
-#undef STRING_FTRLRT
-			} else {
-				cmn_err(CE_WARN,
-				    "iscsi connection(%u) login failed - "
-				    "failed to receive login response",
-				    icp->conn_oid);
-			}
-			goto iscsi_login_done;
-		}
-		isp->sess_rx_lbolt = icp->conn_rx_lbolt = ddi_get_lbolt();
+		iscsi_login_update_state_locked(icp, LOGIN_TX);
+		icp->conn_login_data = data;
+		icp->conn_login_max_data_length = max_data_length;
 
-		rval = iscsi_net->recvdata(icp->conn_socket, &ihp,
-		    data, max_data_length, ISCSI_RX_TIMEOUT_VALUE, 0);
-		if (!ISCSI_SUCCESS(rval)) {
-			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
-			    "failed to receive login response",
-			    icp->conn_oid);
+		/*
+		 * send a PDU to the target.  This is asynchronous but
+		 * we don't have any particular need for a TX completion
+		 * notification since we are going to block waiting for the
+		 * receive.
+		 */
+		response_timeout = ddi_get_lbolt() +
+		    SEC_TO_TICK(ISCSI_RX_TIMEOUT_VALUE);
+		idm_pdu_tx(text_pdu);
+
+		/*
+		 * Wait for login failure indication or login RX.
+		 * Handler for login response PDU will copy any data into
+		 * the buffer pointed to by icp->conn_login_data
+		 */
+		while (icp->conn_login_state == LOGIN_TX) {
+			timeout_result = cv_timedwait(&icp->conn_login_cv,
+			    &icp->conn_login_mutex, response_timeout);
+			if (timeout_result == -1)
+				break;
+		}
+
+		if (icp->conn_login_state != LOGIN_RX) {
+			mutex_exit(&icp->conn_login_mutex);
+			rval = (ISCSI_STATUS_INTERNAL_ERROR);
 			goto iscsi_login_done;
 		}
-		isp->sess_rx_lbolt = icp->conn_rx_lbolt = ddi_get_lbolt();
+		mutex_exit(&icp->conn_login_mutex);
 
 		/* check the PDU response type */
-		if (ihp.opcode != ISCSI_OP_LOGIN_RSP) {
+		ilrhp = (iscsi_login_rsp_hdr_t *)&icp->conn_login_resp_hdr;
+		if (ilrhp->opcode != ISCSI_OP_LOGIN_RSP) {
 			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
 			    "received invalid login response (0x%02x)",
-			    icp->conn_oid, ihp.opcode);
+			    icp->conn_oid, ilrhp->opcode);
 			rval = (ISCSI_STATUS_PROTOCOL_ERROR);
 			goto iscsi_login_done;
 		}
@@ -431,8 +537,8 @@ iscsi_login(iscsi_conn_t *icp, char *buffer, size_t bufsize,
 			 * sending PDUs
 			 */
 			rval = iscsi_process_login_response(icp,
-			    ilrhp, data, max_data_length);
-
+			    ilrhp, (char *)icp->conn_login_data,
+			    icp->conn_login_max_data_length);
 			/* pass back whatever error we discovered */
 			if (!ISCSI_SUCCESS(rval)) {
 				goto iscsi_login_done;
@@ -445,8 +551,9 @@ iscsi_login(iscsi_conn_t *icp, char *buffer, size_t bufsize,
 			 * TargetAddress of the redirect, but we don't
 			 * care about the return code.
 			 */
-			(void) iscsi_process_login_response(icp, ilrhp,
-			    data, max_data_length);
+			(void) iscsi_process_login_response(icp,
+			    ilrhp, (char *)icp->conn_login_data,
+			    icp->conn_login_max_data_length);
 			rval = ISCSI_STATUS_SUCCESS;
 			goto iscsi_login_done;
 		case ISCSI_STATUS_CLASS_INITIATOR_ERR:
@@ -484,6 +591,20 @@ iscsi_login_done:
 				rval = ISCSI_STATUS_INTERNAL_ERROR;
 		}
 	}
+
+	if (ISCSI_SUCCESS(rval) &&
+	    (*status_class == ISCSI_STATUS_CLASS_SUCCESS)) {
+		mutex_enter(&icp->conn_state_mutex);
+		while (!icp->conn_state_ffp)
+			cv_wait(&icp->conn_state_change,
+			    &icp->conn_state_mutex);
+		mutex_exit(&icp->conn_state_mutex);
+	} else {
+		iscsi_login_disconnect(icp);
+	}
+
+	iscsi_login_update_state(icp, LOGIN_DONE);
+
 	return (rval);
 }
 
@@ -493,20 +614,21 @@ iscsi_login_done:
  *
  */
 static iscsi_status_t
-iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
+iscsi_make_login_pdu(iscsi_conn_t *icp, idm_pdu_t *text_pdu,
     char *data, int max_data_length)
 {
 	struct iscsi_sess	*isp		= NULL;
 	int			transit		= 0;
-	iscsi_login_hdr_t	*ilhp		= (iscsi_login_hdr_t *)ihp;
+	iscsi_hdr_t		*ihp		= text_pdu->isp_hdr;
+	iscsi_login_hdr_t	*ilhp		=
+	    (iscsi_login_hdr_t *)text_pdu->isp_hdr;
 	IscsiAuthClient		*auth_client	= NULL;
 	int			keytype		= 0;
 	int			rc		= 0;
 	char			value[iscsiAuthStringMaxLength];
 
 	ASSERT(icp != NULL);
-	ASSERT(ihp != NULL);
-	ASSERT(data != NULL);
+	ASSERT(text_pdu != NULL);
 	isp = icp->conn_sess;
 	ASSERT(isp != NULL);
 
@@ -522,6 +644,12 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 	ilhp->cid = icp->conn_cid;
 	bcopy(&isp->sess_isid[0], &ilhp->isid[0], sizeof (isp->sess_isid));
 	ilhp->tsid = 0;
+
+	/*
+	 * Set data buffer pointer.  The calls to iscsi_add_text will update the
+	 * data length.
+	 */
+	text_pdu->isp_data = (uint8_t *)data;
 
 	/* don't increment on immediate */
 	ilhp->cmdsn = htonl(isp->sess_cmdsn);
@@ -541,7 +669,7 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 	if (icp->conn_current_stage == ISCSI_INITIAL_LOGIN_STAGE) {
 		if ((isp->sess_hba->hba_name) &&
 		    (isp->sess_hba->hba_name[0])) {
-			if (!iscsi_add_text(ihp, data, max_data_length,
+			if (!iscsi_add_text(text_pdu, max_data_length,
 			    "InitiatorName",
 			    (char *)isp->sess_hba->hba_name)) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -555,7 +683,7 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 
 		if ((isp->sess_hba->hba_alias) &&
 		    (isp->sess_hba->hba_alias[0])) {
-			if (!iscsi_add_text(ihp, data, max_data_length,
+			if (!iscsi_add_text(text_pdu, max_data_length,
 			    "InitiatorAlias",
 			    (char *)isp->sess_hba->hba_alias)) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -564,18 +692,18 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 
 		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
 			if (isp->sess_name[0] != '\0') {
-				if (!iscsi_add_text(ihp, data, max_data_length,
+				if (!iscsi_add_text(text_pdu, max_data_length,
 				    "TargetName", (char *)isp->sess_name)) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 			}
 
-			if (!iscsi_add_text(ihp, data, max_data_length,
+			if (!iscsi_add_text(text_pdu, max_data_length,
 			    "SessionType", "Normal")) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
 		} else if (isp->sess_type == ISCSI_SESS_TYPE_DISCOVERY) {
-			if (!iscsi_add_text(ihp, data, max_data_length,
+			if (!iscsi_add_text(text_pdu, max_data_length,
 			    "SessionType", "Discovery")) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
@@ -620,20 +748,20 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 			 */
 			switch (icp->conn_params.header_digest) {
 			case ISCSI_DIGEST_NONE:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "HeaderDigest", "None")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 				break;
 			case ISCSI_DIGEST_CRC32C:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length,
 				    "HeaderDigest", "CRC32C")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 				break;
 			case ISCSI_DIGEST_CRC32C_NONE:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "HeaderDigest",
 				    "CRC32C,None")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -641,7 +769,7 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 				break;
 			default:
 			case ISCSI_DIGEST_NONE_CRC32C:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "HeaderDigest",
 				    "None,CRC32C")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -651,19 +779,19 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 
 			switch (icp->conn_params.data_digest) {
 			case ISCSI_DIGEST_NONE:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "DataDigest", "None")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 				break;
 			case ISCSI_DIGEST_CRC32C:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "DataDigest", "CRC32C")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 				break;
 			case ISCSI_DIGEST_CRC32C_NONE:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "DataDigest",
 				    "CRC32C,None")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -671,7 +799,7 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 				break;
 			default:
 			case ISCSI_DIGEST_NONE_CRC32C:
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "DataDigest",
 				    "None,CRC32C")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -681,39 +809,39 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 
 			(void) sprintf(value, "%d",
 			    icp->conn_params.max_recv_data_seg_len);
-			if (!iscsi_add_text(ihp, data, max_data_length,
+			if (!iscsi_add_text(text_pdu, max_data_length,
 			    "MaxRecvDataSegmentLength", value)) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
 
 			(void) sprintf(value, "%d",
 			    icp->conn_params.default_time_to_wait);
-			if (!iscsi_add_text(ihp, data,
+			if (!iscsi_add_text(text_pdu,
 			    max_data_length, "DefaultTime2Wait", value)) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
 
 			(void) sprintf(value, "%d",
 			    icp->conn_params.default_time_to_retain);
-			if (!iscsi_add_text(ihp, data,
+			if (!iscsi_add_text(text_pdu,
 			    max_data_length, "DefaultTime2Retain", value)) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
 
 			(void) sprintf(value, "%d",
 			    icp->conn_params.error_recovery_level);
-			if (!iscsi_add_text(ihp, data,
+			if (!iscsi_add_text(text_pdu,
 			    max_data_length, "ErrorRecoveryLevel", "0")) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
 
-			if (!iscsi_add_text(ihp, data,
+			if (!iscsi_add_text(text_pdu,
 			    max_data_length, "IFMarker",
 			    icp->conn_params.ifmarker ? "Yes" : "No")) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
 			}
 
-			if (!iscsi_add_text(ihp, data,
+			if (!iscsi_add_text(text_pdu,
 			    max_data_length, "OFMarker",
 			    icp->conn_params.ofmarker ? "Yes" : "No")) {
 				return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -725,14 +853,14 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 			 */
 			if (isp->sess_type != ISCSI_SESS_TYPE_DISCOVERY) {
 
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "InitialR2T",
 				    icp->conn_params.initial_r2t ?
 				    "Yes" : "No")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "ImmediateData",
 				    icp->conn_params.immediate_data ?
 				    "Yes" : "No")) {
@@ -741,40 +869,40 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 
 				(void) sprintf(value, "%d",
 				    icp->conn_params.max_burst_length);
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "MaxBurstLength", value)) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 
 				(void) sprintf(value, "%d",
 				    icp->conn_params.first_burst_length);
-				if (!iscsi_add_text(ihp, data, max_data_length,
+				if (!iscsi_add_text(text_pdu, max_data_length,
 				    "FirstBurstLength", value)) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 
 				(void) sprintf(value, "%d",
 				    icp->conn_params.max_outstanding_r2t);
-				if (!iscsi_add_text(ihp, data, max_data_length,
+				if (!iscsi_add_text(text_pdu, max_data_length,
 				    "MaxOutstandingR2T", value)) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 
 				(void) sprintf(value, "%d",
 				    icp->conn_params.max_connections);
-				if (!iscsi_add_text(ihp, data, max_data_length,
+				if (!iscsi_add_text(text_pdu, max_data_length,
 				    "MaxConnections", value)) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "DataPDUInOrder",
 				    icp->conn_params.data_pdu_in_order ?
 				    "Yes" : "No")) {
 					return (ISCSI_STATUS_INTERNAL_ERROR);
 				}
 
-				if (!iscsi_add_text(ihp, data,
+				if (!iscsi_add_text(text_pdu,
 				    max_data_length, "DataSequenceInOrder",
 				    icp->conn_params.data_sequence_in_order ?
 				    "Yes" : "No")) {
@@ -811,7 +939,7 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 			int present = 0;
 			char *key = (char *)iscsiAuthClientGetKeyName(keytype);
 			int key_length = key ? strlen(key) : 0;
-			int pdu_length = ntoh24(ihp->dlength);
+			int pdu_length = text_pdu->isp_datalen;
 			char *auth_value = data + pdu_length + key_length + 1;
 			unsigned int max_length = max_data_length -
 			    (pdu_length + key_length + 1);
@@ -837,6 +965,7 @@ iscsi_make_login_pdu(iscsi_conn_t *icp, iscsi_hdr_t *ihp,
 				 * include the value and trailing NULL
 				 */
 				pdu_length += strlen(auth_value) + 1;
+				text_pdu->isp_datalen = pdu_length;
 				hton24(ihp->dlength, pdu_length);
 			}
 		}
@@ -1638,7 +1767,7 @@ more_text:
  * terminated strings
  */
 int
-iscsi_add_text(iscsi_hdr_t *ihp, char *data, int max_data_length,
+iscsi_add_text(idm_pdu_t *text_pdu, int max_data_length,
     char *param, char *value)
 {
 	int	param_len	= 0;
@@ -1648,8 +1777,7 @@ iscsi_add_text(iscsi_hdr_t *ihp, char *data, int max_data_length,
 	char	*text		= NULL;
 	char	*end		= NULL;
 
-	ASSERT(ihp != NULL);
-	ASSERT(data != NULL);
+	ASSERT(text_pdu != NULL);
 	ASSERT(param != NULL);
 	ASSERT(value != NULL);
 
@@ -1657,9 +1785,9 @@ iscsi_add_text(iscsi_hdr_t *ihp, char *data, int max_data_length,
 	value_len = strlen(value);
 	/* param, separator, value, and trailing NULL */
 	length		= param_len + 1 + value_len + 1;
-	pdu_length	= ntoh24(ihp->dlength);
-	text		= data + pdu_length;
-	end		= data + max_data_length;
+	pdu_length	= text_pdu->isp_datalen;
+	text		= (char *)text_pdu->isp_data + pdu_length;
+	end		= (char *)text_pdu->isp_data + max_data_length;
 	pdu_length	+= length;
 
 	if (text + length >= end) {
@@ -1681,7 +1809,8 @@ iscsi_add_text(iscsi_hdr_t *ihp, char *data, int max_data_length,
 	*text++ = '\0';
 
 	/* update the length in the PDU header */
-	hton24(ihp->dlength, pdu_length);
+	text_pdu->isp_datalen = pdu_length;
+	hton24(text_pdu->isp_hdr->dlength, pdu_length);
 
 	return (1);
 }
@@ -1832,6 +1961,31 @@ iscsi_update_address(iscsi_conn_t *icp, char *in)
 	return (ISCSI_STATUS_SUCCESS);
 }
 
+void
+iscsi_login_update_state(iscsi_conn_t *icp, iscsi_login_state_t next_state)
+{
+	mutex_enter(&icp->conn_login_mutex);
+	(void) iscsi_login_update_state_locked(icp, next_state);
+	mutex_exit(&icp->conn_login_mutex);
+}
+
+void
+iscsi_login_update_state_locked(iscsi_conn_t *icp,
+    iscsi_login_state_t next_state)
+{
+	ASSERT(mutex_owned(&icp->conn_login_mutex));
+	next_state = (next_state > LOGIN_MAX) ? LOGIN_MAX : next_state;
+	idm_sm_audit_state_change(&icp->conn_state_audit,
+	    SAS_ISCSI_LOGIN, icp->conn_login_state, next_state);
+
+	ISCSI_LOGIN_LOG(CE_NOTE, "iscsi_login_update_state conn %p %d -> %d",
+	    (void *)icp, icp->conn_login_state, next_state);
+
+	icp->conn_login_state = next_state;
+	cv_broadcast(&icp->conn_login_cv);
+}
+
+
 
 /*
  * iscsi_null_callback - This callback may be used under certain
@@ -1937,9 +2091,8 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	iscsi_hba_t		*ihp;
 	iscsi_sess_t		*isp;
 	struct sockaddr		*addr;
-	struct sockaddr_in6	t_addr;
-	struct sonode		*so = NULL;
-	socklen_t		t_addrlen;
+	idm_conn_req_t		cr;
+	idm_status_t		rval;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
@@ -1948,49 +2101,150 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	ASSERT(ihp != NULL);
 	addr = &icp->conn_curr_addr.sin;
 
-	t_addrlen = sizeof (struct sockaddr_in6);
-	bzero(&t_addr, sizeof (struct sockaddr_in6));
-	so = iscsi_net->socket(addr->sa_family, SOCK_STREAM, 0);
-	if (so == NULL) {
-		cmn_err(CE_WARN, "iscsi connection(%u) unable "
-		    "to acquire socket resources", icp->conn_oid);
-		return (ISCSI_STATUS_INTERNAL_ERROR);
-	}
-
-	/* bind if enabled */
-	if (icp->conn_bound == B_TRUE) {
-		/* bind socket */
-		if (iscsi_net->bind(so, &icp->conn_bound_addr.sin,
-		    SIZEOF_SOCKADDR(addr), 0, 0)) {
-			cmn_err(CE_NOTE, "iscsi connection(%u) - "
-			    "bind failed\n", icp->conn_oid);
-		}
-	}
-
 	/* Make sure that scope_id is zero if it is an IPv6 address */
 	if (addr->sa_family == AF_INET6) {
 		((struct sockaddr_in6 *)addr)->sin6_scope_id = 0;
 	}
 
-	/* connect socket to target portal (ip,port) */
-	if (!ISCSI_SUCCESS(iscsi_net->connect(so, addr,
-	    SIZEOF_SOCKADDR(addr), 0, 0))) {
+	/* delay the connect process if required */
+	lbolt = ddi_get_lbolt();
+	if (lbolt < icp->conn_login_min) {
+		delay(icp->conn_login_min - lbolt);
+	}
 
+	/* Create IDM connection context */
+	cr.cr_domain = addr->sa_family;
+	cr.cr_type = SOCK_STREAM;
+	cr.cr_protocol = 0;
+	cr.cr_bound = icp->conn_bound;
+	cr.cr_li = icp->conn_sess->sess_hba->hba_li;
+	cr.icr_conn_ops.icb_rx_misc = &iscsi_rx_misc_pdu;
+	cr.icr_conn_ops.icb_rx_error = &iscsi_rx_error_pdu;
+	cr.icr_conn_ops.icb_rx_scsi_rsp = &iscsi_rx_scsi_rsp;
+	cr.icr_conn_ops.icb_client_notify = &iscsi_client_notify;
+	cr.icr_conn_ops.icb_build_hdr = &iscsi_build_hdr;
+	cr.icr_conn_ops.icb_task_aborted = &iscsi_task_aborted;
+	bcopy(addr, &cr.cr_ini_dst_addr,
+	    sizeof (cr.cr_ini_dst_addr));
+	bcopy(&icp->conn_bound_addr, &cr.cr_bound_addr,
+	    sizeof (cr.cr_bound_addr));
+
+	/*
+	 * Allocate IDM connection context
+	 */
+	rval = idm_ini_conn_create(&cr, &icp->conn_ic);
+	if (rval != IDM_STATUS_SUCCESS) {
+		return (ISCSI_STATUS_LOGIN_FAILED);
+	}
+
+	icp->conn_ic->ic_handle = icp;
+
+	/*
+	 * About to initiate connect, reset login state.
+	 */
+	iscsi_login_update_state(icp, LOGIN_START);
+
+	/*
+	 * Make sure the connection doesn't go away until we are done with it.
+	 * This hold will prevent us from receiving a CN_CONNECT_DESTROY
+	 * notification on this connection until we are ready.
+	 */
+	idm_conn_hold(icp->conn_ic);
+
+	/*
+	 * Attempt connection.  Upon return we will either be ready to
+	 * login or disconnected.  If idm_ini_conn_connect fails we
+	 * will eventually receive a CN_CONNECT_DESTROY at which point
+	 * we will destroy the connection allocated above (so there
+	 * is no need to explicitly free it here).
+	 */
+	rval = idm_ini_conn_connect(icp->conn_ic);
+
+	if (rval != IDM_STATUS_SUCCESS) {
 		cmn_err(CE_NOTE, "iscsi connection(%u) unable to "
 		    "connect to target %s", icp->conn_oid,
 		    icp->conn_sess->sess_name);
-
-		/* ---- 2 indicates both cantsend and cantrecv ---- */
-		iscsi_net->shutdown(so, 2);
-		return (ISCSI_STATUS_INTERNAL_ERROR);
+		idm_conn_rele(icp->conn_ic);
 	}
 
-	icp->conn_socket = so;
-	if (iscsi_net->getsockname(icp->conn_socket,
-	    (struct sockaddr *)&t_addr, &t_addrlen) != 0) {
-		cmn_err(CE_NOTE, "iscsi connection(%u) failed to get "
-		    "socket information", icp->conn_oid);
-	}
+	return (rval == IDM_STATUS_SUCCESS ?
+	    ISCSI_STATUS_SUCCESS : ISCSI_STATUS_INTERNAL_ERROR);
+}
 
-	return (ISCSI_STATUS_SUCCESS);
+/*
+ * iscsi_login_disconnect
+ */
+static void
+iscsi_login_disconnect(iscsi_conn_t *icp)
+{
+	/* Tell IDM to disconnect is if we are not already disconnect */
+	idm_ini_conn_disconnect_sync(icp->conn_ic);
+
+	/*
+	 * The function above may return before the CN_CONNECT_LOST
+	 * notification.  Wait for it.
+	 */
+	mutex_enter(&icp->conn_state_mutex);
+	while (icp->conn_state_idm_connected)
+		cv_wait(&icp->conn_state_change,
+		    &icp->conn_state_mutex);
+	mutex_exit(&icp->conn_state_mutex);
+}
+
+/*
+ * iscsi_notice_key_values - Create an nvlist containing the values
+ * that have been negotiated for this connection and pass them down to
+ * IDM so it can pick up any values that are important.
+ */
+static void
+iscsi_notice_key_values(iscsi_conn_t *icp)
+{
+	nvlist_t	*neg_nvl;
+	int		rc;
+
+	rc = nvlist_alloc(&neg_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	ASSERT(rc == 0);
+
+	/* Only crc32c is supported so the digest logic is simple */
+	if (icp->conn_params.header_digest) {
+		rc = nvlist_add_string(neg_nvl, "HeaderDigest", "crc32c");
+	} else {
+		rc = nvlist_add_string(neg_nvl, "HeaderDigest", "none");
+	}
+	ASSERT(rc == 0);
+
+	if (icp->conn_params.data_digest) {
+		rc = nvlist_add_string(neg_nvl, "DataDigest", "crc32c");
+	} else {
+		rc = nvlist_add_string(neg_nvl, "DataDigest", "none");
+	}
+	ASSERT(rc == 0);
+
+	rc = nvlist_add_uint64(neg_nvl, "MaxRecvDataSegmentLength",
+	    (uint64_t)icp->conn_params.max_recv_data_seg_len);
+	ASSERT(rc == 0);
+
+	rc = nvlist_add_uint64(neg_nvl, "MaxBurstLength",
+	    (uint64_t)icp->conn_params.max_burst_length);
+	ASSERT(rc == 0);
+
+	rc = nvlist_add_uint64(neg_nvl, "MaxOutstandingR2T",
+	    (uint64_t)icp->conn_params.max_outstanding_r2t);
+	ASSERT(rc == 0);
+
+	rc = nvlist_add_uint64(neg_nvl, "ErrorRecoveryLevel",
+	    (uint64_t)icp->conn_params.error_recovery_level);
+	ASSERT(rc == 0);
+
+	rc = nvlist_add_uint64(neg_nvl, "DefaultTime2Wait",
+	    (uint64_t)icp->conn_params.default_time_to_wait);
+	ASSERT(rc == 0);
+
+	rc = nvlist_add_uint64(neg_nvl, "DefaultTime2Retain",
+	    (uint64_t)icp->conn_params.default_time_to_retain);
+	ASSERT(rc == 0);
+
+	/* Pass the list to IDM to examine, then free it */
+	idm_notice_key_values(icp->conn_ic, neg_nvl);
+	nvlist_free(neg_nvl);
 }

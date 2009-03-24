@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,7 +106,7 @@ typedef kv_status_t (transport_negotiate_key_values_op_t)(struct
     nvlist_t *negotiated_nvl);
 
 /* Activate the negotiated key value pairs */
-typedef idm_status_t (transport_notice_key_values_op_t)(struct idm_conn_s *ic,
+typedef void (transport_notice_key_values_op_t)(struct idm_conn_s *ic,
     nvlist_t *negotiated_nvl);
 
 /* Transport capability probe */
@@ -213,6 +213,9 @@ idm_transport_lookup(idm_conn_req_t *cr);
 
 void
 idm_transport_setup(ldi_ident_t li);
+
+void
+idm_transport_teardown();
 
 #ifdef	__cplusplus
 }
