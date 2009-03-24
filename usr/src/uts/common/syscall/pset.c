@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -307,7 +305,7 @@ pset_bind_process(proc_t *pp, psetid_t pset, psetid_t *oldpset, void *projbuf,
 	/* skip kernel processes */
 	if ((pset != PS_QUERY) && pp->p_flag & SSYS) {
 		*oldpset = PS_NONE;
-		return (0);
+		return (ENOTSUP);
 	}
 
 	mutex_enter(&pp->p_lock);
@@ -344,9 +342,12 @@ pset_bind_task(task_t *tk, psetid_t pset, psetid_t *oldpset, void *projbuf,
 	do {
 		int rval;
 
-		rval = pset_bind_process(pp, pset, oldpset, projbuf, zonebuf);
-		if (error == 0)
-			error = rval;
+		if (!(pp->p_flag & SSYS)) {
+			rval = pset_bind_process(pp, pset, oldpset, projbuf,
+			    zonebuf);
+			if (error == 0)
+				error = rval;
+		}
 	} while ((pp = pp->p_tasknext) != tk->tk_memb_list);
 
 	return (error);
@@ -364,7 +365,7 @@ pset_bind_project(kproject_t *kpj, psetid_t pset, psetid_t *oldpset,
 	for (pp = practive; pp != NULL; pp = pp->p_next) {
 		if (pp->p_tlist == NULL)
 			continue;
-		if (pp->p_task->tk_proj == kpj) {
+		if (pp->p_task->tk_proj == kpj && !(pp->p_flag & SSYS)) {
 			int rval;
 
 			rval = pset_bind_process(pp, pset, oldpset, projbuf,
@@ -387,7 +388,7 @@ pset_bind_zone(zone_t *zptr, psetid_t pset, psetid_t *oldpset, void *projbuf,
 	ASSERT(MUTEX_HELD(&pidlock));
 
 	for (pp = practive; pp != NULL; pp = pp->p_next) {
-		if (pp->p_zone == zptr) {
+		if (pp->p_zone == zptr && !(pp->p_flag & SSYS)) {
 			int rval;
 
 			rval = pset_bind_process(pp, pset, oldpset, projbuf,

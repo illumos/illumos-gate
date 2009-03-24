@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,7 +59,7 @@ cpu_bind_process(proc_t *pp, processorid_t bind, processorid_t *obind,
 	/* skip kernel processes */
 	if (pp->p_flag & SSYS) {
 		*obind = PBIND_NONE;
-		*error = EPERM;
+		*error = ENOTSUP;
 		return (0);
 	}
 
@@ -97,9 +95,11 @@ cpu_bind_task(task_t *tk, processorid_t bind, processorid_t *obind,
 		return (ESRCH);
 
 	do {
-		i = cpu_bind_process(p, bind, obind, error);
-		if (err == 0)
-			err = i;
+		if (!(p->p_flag & SSYS)) {
+			i = cpu_bind_process(p, bind, obind, error);
+			if (err == 0)
+				err = i;
+		}
 	} while ((p = p->p_tasknext) != tk->tk_memb_list);
 
 	return (err);
@@ -121,7 +121,7 @@ cpu_bind_project(kproject_t *kpj, processorid_t bind, processorid_t *obind,
 	for (p = practive; p != NULL; p = p->p_next) {
 		if (p->p_tlist == NULL)
 			continue;
-		if (p->p_task->tk_proj == kpj) {
+		if (p->p_task->tk_proj == kpj && !(p->p_flag & SSYS)) {
 			i = cpu_bind_process(p, bind, obind, error);
 			if (err == 0)
 				err = i;
@@ -146,7 +146,7 @@ cpu_bind_zone(zone_t *zptr, processorid_t bind, processorid_t *obind,
 	for (p = practive; p != NULL; p = p->p_next) {
 		if (p->p_tlist == NULL)
 			continue;
-		if (p->p_zone == zptr) {
+		if (p->p_zone == zptr && !(p->p_flag & SSYS)) {
 			i = cpu_bind_process(p, bind, obind, error);
 			if (err == 0)
 				err = i;
