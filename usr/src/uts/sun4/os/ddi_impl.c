@@ -2469,7 +2469,7 @@ e_ddi_branch_create(
 int
 e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp, uint_t flags)
 {
-	int		circ, rv;
+	int		rv;
 	char		*devnm;
 	dev_info_t	*pdip;
 
@@ -2481,10 +2481,10 @@ e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp, uint_t flags)
 
 	pdip = ddi_get_parent(rdip);
 
-	ndi_devi_enter(pdip, &circ);
+	ndi_hold_devi(pdip);
 
 	if (!e_ddi_branch_held(rdip)) {
-		ndi_devi_exit(pdip, circ);
+		ndi_rele_devi(pdip);
 		cmn_err(CE_WARN, "e_ddi_branch_configure: "
 		    "dip(%p) not held", (void *)rdip);
 		return (EINVAL);
@@ -2497,7 +2497,7 @@ e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp, uint_t flags)
 		 * types (CPUs) may not have a driver)
 		 */
 		if (ndi_devi_bind_driver(rdip, 0) != NDI_SUCCESS) {
-			ndi_devi_exit(pdip, circ);
+			ndi_rele_devi(pdip);
 			return (0);
 		}
 
@@ -2521,11 +2521,11 @@ e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp, uint_t flags)
 
 	kmem_free(devnm, MAXNAMELEN + 1);
 out:
-	if (rv != NDI_SUCCESS && dipp) {
+	if (rv != NDI_SUCCESS && dipp && rdip) {
 		ndi_hold_devi(rdip);
 		*dipp = rdip;
 	}
-	ndi_devi_exit(pdip, circ);
+	ndi_rele_devi(pdip);
 	return (ndi2errno(rv));
 }
 
