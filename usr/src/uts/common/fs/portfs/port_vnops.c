@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/vnode.h>
@@ -320,7 +318,6 @@ port_getattr(struct vnode *vp, struct vattr *vap, int flags, cred_t *cr,
 
 	pp = VTOEP(vp);
 
-	vap->va_mask = 0;		/* bit-mask of attributes */
 	vap->va_type = vp->v_type;	/* vnode type (for create) */
 	vap->va_mode = 0;		/* file access mode */
 	vap->va_uid = pp->port_uid;	/* owner user id */
