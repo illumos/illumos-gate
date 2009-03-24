@@ -140,6 +140,23 @@ populate_job_request(service_t *svc, papi_attribute_t ***request,
 
 	/* add the job attributes group to the request */
 	if (job != NULL) {
+		/*
+		 * Add job-originating-host-name to attributes
+		 * if not already set.
+		 */
+		char *hostname = NULL;
+
+		papiAttributeListGetString(job, NULL,
+		    "job-originating-host-name", &hostname);
+
+		if (hostname == NULL) {
+			char host[BUFSIZ];
+
+			if (gethostname(host, sizeof (host)) == 0)
+				papiAttributeListAddString(&job, PAPI_ATTR_EXCL,
+				    "job-originating-host-name", host);
+		}
+
 		papiAttributeListAddCollection(request, PAPI_ATTR_REPLACE,
 		    "job-attributes-group", job);
 		papiAttributeListFree(job);

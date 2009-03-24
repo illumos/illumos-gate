@@ -118,8 +118,24 @@ create_request(papi_service_t svc, char *printer, papi_attribute_t **attributes)
 	REQUEST *r;
 
 	if ((r = calloc(1, sizeof (*r))) != NULL) {
+		char *hostname = NULL;
+
 		r->priority = -1;
 		r->destination = printer_name_from_uri_id(printer, -1);
+
+		papiAttributeListGetString(attributes, NULL,
+		    "job-originating-host-name", &hostname);
+
+		if (hostname == NULL) {
+			char host[BUFSIZ];
+
+			if (gethostname(host, sizeof (host)) == 0)
+				papiAttributeListAddString(&attributes,
+				    PAPI_ATTR_REPLACE,
+				    "job-originating-host-name",
+				    host);
+		}
+
 		job_attributes_to_lpsched_request(svc, r, attributes);
 	}
 

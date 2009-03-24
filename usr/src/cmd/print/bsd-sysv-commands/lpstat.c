@@ -700,6 +700,8 @@ report_job(papi_job_t job, int show_rank, int verbose)
 
 	char *destination = "unknown";
 	int32_t id = -1;
+	static int check = 0;
+	static char *uri = NULL;
 
 	(void) papiAttributeListGetString(attrs, NULL,
 	    "job-originating-user-name", &user);
@@ -710,11 +712,75 @@ report_job(papi_job_t job, int show_rank, int verbose)
 	(void) papiAttributeListGetString(attrs, NULL,
 	    "job-originating-host-name", &host);
 
-	if (host)
-		snprintf(User, sizeof (User), "%s@%s", user, host);
-	else
-		snprintf(User, sizeof (User), "%s", user);
+	if (check == 0) {
+		/*
+		 * Read the attribute "job-printer-uri"
+		 * just once
+		 */
+		(void) papiAttributeListGetString(attrs, NULL,
+		    "job-printer-uri", &uri);
+		check = 1;
+	}
 
+	if (host) {
+		/* Check if it is local printer or remote printer */
+		uri_t *u = NULL;
+
+		if ((uri != NULL) && (uri_from_string(uri, &u) == 0)) {
+			char *nodename = localhostname();
+
+			if ((u->host == NULL) ||
+			    (strcasecmp(u->host, "localhost") == 0) ||
+			    (strcasecmp(u->host, nodename) == 0)) {
+
+				if (strcasecmp(host, nodename) == 0) {
+					/*
+					 * Request submitted locally
+					 * for the local queue.
+					 * Hostname will not be displayed
+					 */
+					snprintf(User, sizeof (User), "%s",
+					    user);
+				}
+				else
+					snprintf(User, sizeof (User), "%s@%s",
+					    user, host);
+			} else if (uri != NULL) {
+				/*
+				 * It's a remote printer.
+				 * In case of remote printers hostname is
+				 * always displayed.
+				 */
+				snprintf(User, sizeof (User), "%s@%s",
+				    user, host);
+			}
+			uri_free(u);
+		} else {
+			/*
+			 * If attribute "job-printer-uri"
+			 * cannot be read
+			 * by default append the hostname
+			 */
+			snprintf(User, sizeof (User), "%s@%s", user, host);
+		}
+	} else {
+		/*
+		 * When print server is s10u4 and ipp service is used
+		 * "job-originating-hostname" attribute is not set
+		 * So get the host information from the uri
+		 */
+		uri_t *u = NULL;
+		if ((uri != NULL) && (uri_from_string(uri, &u) == 0)) {
+			if ((u != NULL) && (u->host != NULL))
+				snprintf(User, sizeof (User), "%s@%s",
+				    user, u->host);
+			else
+				snprintf(User, sizeof (User), "%s", user);
+
+			uri_free(u);
+		} else
+			snprintf(User, sizeof (User), "%s", user);
+	}
 	(void) papiAttributeListGetInteger(attrs, NULL, "job-k-octets", &size);
 	size *= 1024;	/* for the approximate byte size */
 	(void) papiAttributeListGetInteger(attrs, NULL, "job-octets", &size);
