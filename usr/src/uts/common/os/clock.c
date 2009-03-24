@@ -1660,17 +1660,15 @@ clkset(time_t approx)
 		}
 	} else {
 		/*
-		 * If the TOD chip isn't giving correct time, then set it to
-		 * the time that was passed in as a rough estimate.  If we
-		 * don't have an estimate, then set the clock back to a time
-		 * when Oliver North, ALF and Dire Straits were all on the
-		 * collective brain:  1987.
+		 * If the TOD chip isn't giving correct time, set it to the
+		 * greater of i) approx and ii) 1987. That way if approx
+		 * is negative or is earlier than 1987, we set the clock
+		 * back to a time when Oliver North, ALF and Dire Straits
+		 * were all on the collective brain:  1987.
 		 */
 		timestruc_t tmp;
-		if (approx == -1)
-			ts.tv_sec = (1987 - 1970) * 365 * SECONDS_PER_DAY;
-		else
-			ts.tv_sec = approx;
+		time_t diagnose_date = (1987 - 1970) * 365 * SECONDS_PER_DAY;
+		ts.tv_sec = (approx > diagnose_date ? approx : diagnose_date);
 		ts.tv_nsec = 0;
 
 		/*
@@ -1685,8 +1683,7 @@ clkset(time_t approx)
 		if (tmp.tv_sec != ts.tv_sec && tmp.tv_sec != ts.tv_sec + 1) {
 			tod_broken = 1;
 			dosynctodr = 0;
-			cmn_err(CE_WARN, "Time-of-day chip unresponsive;"
-			    " dead batteries?");
+			cmn_err(CE_WARN, "Time-of-day chip unresponsive.");
 		} else {
 			cmn_err(CE_WARN, "Time-of-day chip had "
 			    "incorrect date; check and reset.");
