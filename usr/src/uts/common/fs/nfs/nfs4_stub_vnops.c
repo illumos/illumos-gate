@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,8 @@
 #include <sys/int_fmtio.h>
 
 #include <sys/sunddi.h>
+
+#include <sys/priv_names.h>
 
 /*
  * The automatic unmounter thread stuff!
@@ -197,7 +199,7 @@ extern int	nfs4_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
 extern int	nfs4_fid(vnode_t *, fid_t *, caller_context_t *);
 extern int	nfs4_realvp(vnode_t *, vnode_t **, caller_context_t *);
 
-static int	nfs4_trigger_mount(vnode_t *, vnode_t **);
+static int	nfs4_trigger_mount(vnode_t *, cred_t *, vnode_t **);
 static int	nfs4_trigger_domount(vnode_t *, domount_args_t *, vfs_t **,
     cred_t *);
 static domount_args_t  *nfs4_trigger_domount_args_create(vnode_t *);
@@ -356,7 +358,7 @@ nfs4_trigger_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	int error;
 	vnode_t *newvp;
 
-	error = nfs4_trigger_mount(*vpp, &newvp);
+	error = nfs4_trigger_mount(*vpp, cr, &newvp);
 	if (error)
 		return (error);
 
@@ -386,7 +388,7 @@ nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	if (flags & ATTR_TRIGGER) {
 		vnode_t	*newvp;
 
-		error = nfs4_trigger_mount(vp, &newvp);
+		error = nfs4_trigger_mount(vp, cr, &newvp);
 		if (error)
 			return (error);
 
@@ -406,7 +408,7 @@ nfs4_trigger_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	int error;
 	vnode_t *newvp;
 
-	error = nfs4_trigger_mount(vp, &newvp);
+	error = nfs4_trigger_mount(vp, cr, &newvp);
 	if (error)
 		return (error);
 
@@ -423,7 +425,7 @@ nfs4_trigger_access(vnode_t *vp, int mode, int flags, cred_t *cr,
 	int error;
 	vnode_t *newvp;
 
-	error = nfs4_trigger_mount(vp, &newvp);
+	error = nfs4_trigger_mount(vp, cr, &newvp);
 	if (error)
 		return (error);
 
@@ -456,7 +458,7 @@ nfs4_trigger_lookup(vnode_t *dvp, char *nm, vnode_t **vpp,
 		return (nfs4_lookup(dvp, nm, vpp, pnp, flags, rdir, cr,
 		    ct, deflags, rpnp));
 
-	error = nfs4_trigger_mount(dvp, &newdvp);
+	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
 		return (error);
 
@@ -475,7 +477,7 @@ nfs4_trigger_create(vnode_t *dvp, char *nm, struct vattr *va,
 	int error;
 	vnode_t *newdvp;
 
-	error = nfs4_trigger_mount(dvp, &newdvp);
+	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
 		return (error);
 
@@ -493,7 +495,7 @@ nfs4_trigger_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	int error;
 	vnode_t *newdvp;
 
-	error = nfs4_trigger_mount(dvp, &newdvp);
+	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
 		return (error);
 
@@ -510,7 +512,7 @@ nfs4_trigger_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr,
 	int error;
 	vnode_t *newtdvp;
 
-	error = nfs4_trigger_mount(tdvp, &newtdvp);
+	error = nfs4_trigger_mount(tdvp, cr, &newtdvp);
 	if (error)
 		return (error);
 
@@ -551,7 +553,7 @@ nfs4_trigger_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	if (RP_ISSTUB(tdrp) && !VN_CMP(sdvp, tdvp))
 		return (EXDEV);
 
-	error = nfs4_trigger_mount(sdvp, &newsdvp);
+	error = nfs4_trigger_mount(sdvp, cr, &newsdvp);
 	if (error)
 		return (error);
 
@@ -570,7 +572,7 @@ nfs4_trigger_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	int error;
 	vnode_t *newdvp;
 
-	error = nfs4_trigger_mount(dvp, &newdvp);
+	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
 		return (error);
 
@@ -587,7 +589,7 @@ nfs4_trigger_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 	int error;
 	vnode_t *newdvp;
 
-	error = nfs4_trigger_mount(dvp, &newdvp);
+	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
 		return (error);
 
@@ -604,7 +606,7 @@ nfs4_trigger_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm,
 	int error;
 	vnode_t *newdvp;
 
-	error = nfs4_trigger_mount(dvp, &newdvp);
+	error = nfs4_trigger_mount(dvp, cr, &newdvp);
 	if (error)
 		return (error);
 
@@ -621,7 +623,7 @@ nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr,
 	int error;
 	vnode_t *newvp;
 
-	error = nfs4_trigger_mount(vp, &newvp);
+	error = nfs4_trigger_mount(vp, cr, &newvp);
 	if (error)
 		return (error);
 
@@ -632,7 +634,6 @@ nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr,
 }
 
 /* end of trigger vnode ops */
-
 
 /*
  * Mount upon a trigger vnode; for mirror-mounts, etc.
@@ -647,7 +648,7 @@ nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr,
  * The caller is responsible for passing the VOP onto the covering fs.
  */
 static int
-nfs4_trigger_mount(vnode_t *vp, vnode_t **newvpp)
+nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 {
 	int			 error;
 	vfs_t			*vfsp;
@@ -660,7 +661,7 @@ nfs4_trigger_mount(vnode_t *vp, vnode_t **newvpp)
 	bool_t			must_unlock = FALSE;
 	bool_t			is_building = FALSE;
 
-	cred_t			*zcred;
+	cred_t			*mcred = NULL;
 
 	nfs4_trigger_globals_t	*ntg;
 
@@ -767,22 +768,23 @@ nfs4_trigger_mount(vnode_t *vp, vnode_t **newvpp)
 	}
 
 	/*
-	 * Need to be root for this call to make mount work.
 	 * Note that since we define mirror mounts to work
-	 * for any user, we allow the mount to proceed. And
-	 * we realize that the server will perform security
-	 * checks to make sure that the client is allowed
-	 * access. Finally, once the mount takes place,
-	 * directory permissions will ensure that the
-	 * content is secure.
+	 * for any user, we simply extend the privileges of
+	 * the user's credentials to allow the mount to
+	 * proceed.
 	 */
-	zcred = zone_get_kcred(getzoneid());
-	ASSERT(zcred != NULL);
+	mcred = crdup(cr);
+	if (mcred == NULL) {
+		error = EINVAL;
+		goto done;
+	}
 
-	error = nfs4_trigger_domount(vp, dma, &vfsp, zcred);
+	crset_zone_privall(mcred);
+
+	error = nfs4_trigger_domount(vp, dma, &vfsp, mcred);
 	nfs4_trigger_domount_args_destroy(dma, vp);
 
-	crfree(zcred);
+	crfree(mcred);
 
 	if (!error)
 		error = VFS_ROOT(vfsp, newvpp);
@@ -1230,12 +1232,14 @@ nfs4_trigger_domount(vnode_t *stubvp, domount_args_t *dma, vfs_t **vfsp,
 		retval = EINVAL;
 		goto done;
 	}
+
 	/* domount() expects us to count the trailing NUL */
 	uap->optlen = strlen(uap->optptr) + 1;
 
 	retval = domount(NULL, uap, stubvp, cr, vfsp);
 	if (retval == 0)
 		VFS_RELE(*vfsp);
+
 done:
 	if (uap->optptr)
 		nfs4_trigger_destroy_mntopts(uap->optptr);

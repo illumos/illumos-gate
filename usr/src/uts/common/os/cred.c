@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -1278,6 +1276,25 @@ crsetpriv(cred_t *cr, ...)
 	priv_adjust_PA(cr);
 	va_end(ap);
 	return (0);
+}
+
+/*
+ * Interface to effectively set the PRIV_ALL for
+ * a credential; this interface does no security checks and is
+ * intended for kernel (file)servers to extend the user credentials
+ * to be ALL, like either kcred or zcred.
+ */
+void
+crset_zone_privall(cred_t *cr)
+{
+	zone_t	*zone = crgetzone(cr);
+
+	priv_fillset(&CR_LPRIV(cr));
+	CR_EPRIV(cr) = CR_PPRIV(cr) = CR_IPRIV(cr) = CR_LPRIV(cr);
+	priv_intersect(zone->zone_privset, &CR_LPRIV(cr));
+	priv_intersect(zone->zone_privset, &CR_EPRIV(cr));
+	priv_intersect(zone->zone_privset, &CR_IPRIV(cr));
+	priv_intersect(zone->zone_privset, &CR_PPRIV(cr));
 }
 
 struct credklpd *
