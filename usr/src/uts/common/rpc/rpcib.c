@@ -85,13 +85,21 @@
 #define	NFS_RDMA_PORT	2050
 
 /*
- * Convenience structure used by rpcib_get_ib_addresses()
+ * Convenience structures for connection management
  */
 typedef struct rpcib_ipaddrs {
 	void	*ri_list;	/* pointer to list of addresses */
 	uint_t	ri_count;	/* number of addresses in list */
 	uint_t	ri_size;	/* size of ri_list in bytes */
 } rpcib_ipaddrs_t;
+
+
+typedef struct rpcib_ping {
+	rib_hca_t  *hca;
+	ibt_path_info_t path;
+	ibt_ip_addr_t srcip;
+	ibt_ip_addr_t dstip;
+} rpcib_ping_t;
 
 /*
  * Prototype declarations for driver ops
@@ -278,7 +286,7 @@ static rdma_stat rib_post_recv(CONN *conn, struct clist *cl);
 static rdma_stat rib_recv(CONN *conn, struct clist **clp, uint32_t msgid);
 static rdma_stat rib_read(CONN *conn, struct clist *cl, int wait);
 static rdma_stat rib_write(CONN *conn, struct clist *cl, int wait);
-static rdma_stat rib_ping_srv(int addr_type, struct netbuf *, rib_hca_t **);
+static rdma_stat rib_ping_srv(int addr_type, struct netbuf *, rpcib_ping_t *);
 static rdma_stat rib_conn_get(struct netbuf *, int addr_type, void *, CONN **);
 static rdma_stat rib_conn_release(CONN *conn);
 static rdma_stat rib_getinfo(rdma_info_t *info);
@@ -344,8 +352,7 @@ static rdma_stat rib_reg_mem(rib_hca_t *, caddr_t adsp, caddr_t, uint_t,
 	ibt_mr_flags_t, ibt_mr_hdl_t *, ibt_mr_desc_t *);
 static rdma_stat rib_reg_mem_user(rib_hca_t *, caddr_t, uint_t, ibt_mr_flags_t,
 	ibt_mr_hdl_t *, ibt_mr_desc_t *, caddr_t);
-static rdma_stat rib_conn_to_srv(rib_hca_t *, rib_qp_t *, ibt_path_info_t *,
-	ibt_ip_addr_t *, ibt_ip_addr_t *);
+static rdma_stat rib_conn_to_srv(rib_hca_t *, rib_qp_t *, rpcib_ping_t *);
 static rdma_stat rib_clnt_create_chan(rib_hca_t *, struct netbuf *,
 	rib_qp_t **);
 static rdma_stat rib_svc_create_chan(rib_hca_t *, caddr_t, uint8_t,
@@ -367,8 +374,6 @@ static struct recv_wid *rib_create_wid(rib_qp_t *, ibt_wr_ds_t *, uint32_t);
 static void rib_free_wid(struct recv_wid *);
 static rdma_stat rib_disconnect_channel(CONN *, rib_conn_list_t *);
 static void rib_detach_hca(rib_hca_t *);
-static rdma_stat rib_chk_srv_ibaddr(struct netbuf *, int,
-	ibt_path_info_t *, ibt_ip_addr_t *, ibt_ip_addr_t *);
 
 /*
  * Registration with IBTF as a consumer
@@ -1367,23 +1372,24 @@ rib_async_handler(void *clnt_private, ibt_hca_hdl_t hca_hdl,
 static rdma_stat
 rib_reachable(int addr_type, struct netbuf *raddr, void **handle)
 {
-	rib_hca_t	*hca;
 	rdma_stat	status;
+	rpcib_ping_t	rpt;
 
 	/*
 	 * First check if a hca is still attached
 	 */
-	*handle = NULL;
 	rw_enter(&rib_stat->hca->state_lock, RW_READER);
 	if (rib_stat->hca->state != HCA_INITED) {
 		rw_exit(&rib_stat->hca->state_lock);
 		return (RDMA_FAILED);
 	}
-	status = rib_ping_srv(addr_type, raddr, &hca);
+
+	bzero(&rpt, sizeof (rpcib_ping_t));
+	status = rib_ping_srv(addr_type, raddr, &rpt);
 	rw_exit(&rib_stat->hca->state_lock);
 
 	if (status == RDMA_SUCCESS) {
-		*handle = (void *)hca;
+		*handle = (void *)rpt.hca;
 		return (RDMA_SUCCESS);
 	} else {
 		*handle = NULL;
@@ -1616,82 +1622,11 @@ rib_clnt_cm_handler(void *clnt_hdl, ibt_cm_event_t *event,
 	return (IBT_CM_ACCEPT);
 }
 
-/* Check server ib address */
-rdma_stat
-rib_chk_srv_ibaddr(struct netbuf *raddr,
-	int addr_type, ibt_path_info_t *path, ibt_ip_addr_t *s_ip,
-	ibt_ip_addr_t *d_ip)
-{
-	struct sockaddr_in	*sin4;
-	struct sockaddr_in6	*sin6;
-	ibt_status_t		ibt_status;
-	ibt_ip_path_attr_t	ipattr;
-	uint8_t npaths = 0;
-	ibt_path_ip_src_t	srcip;
-
-	ASSERT(raddr->buf != NULL);
-
-	(void) bzero(path, sizeof (ibt_path_info_t));
-
-	switch (addr_type) {
-	case AF_INET:
-		sin4 = (struct sockaddr_in *)raddr->buf;
-		d_ip->family = AF_INET;
-		d_ip->un.ip4addr = sin4->sin_addr.s_addr;
-		break;
-
-	case AF_INET6:
-		sin6 = (struct sockaddr_in6 *)raddr->buf;
-		d_ip->family = AF_INET6;
-		d_ip->un.ip6addr = sin6->sin6_addr;
-		break;
-
-	default:
-		return (RDMA_INVAL);
-	}
-
-	bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
-	bzero(&srcip, sizeof (ibt_path_ip_src_t));
-
-	ipattr.ipa_dst_ip 	= d_ip;
-	ipattr.ipa_hca_guid 	= rib_stat->hca->hca_guid;
-	ipattr.ipa_ndst		= 1;
-	ipattr.ipa_max_paths	= 1;
-	npaths = 0;
-
-	ibt_status = ibt_get_ip_paths(rib_stat->ibt_clnt_hdl,
-	    IBT_PATH_NO_FLAGS,
-	    &ipattr,
-	    path,
-	    &npaths,
-	    &srcip);
-
-	if (ibt_status != IBT_SUCCESS ||
-	    npaths < 1 ||
-	    path->pi_hca_guid != rib_stat->hca->hca_guid) {
-
-		bzero(s_ip, sizeof (ibt_path_ip_src_t));
-		return (RDMA_FAILED);
-	}
-
-	if (srcip.ip_primary.family == AF_INET) {
-		s_ip->family = AF_INET;
-		s_ip->un.ip4addr = srcip.ip_primary.un.ip4addr;
-	} else {
-		s_ip->family = AF_INET6;
-		s_ip->un.ip6addr = srcip.ip_primary.un.ip6addr;
-	}
-
-	return (RDMA_SUCCESS);
-}
-
-
 /*
  * Connect to the server.
  */
 rdma_stat
-rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, ibt_path_info_t *path,
-		ibt_ip_addr_t *s_ip, ibt_ip_addr_t *d_ip)
+rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, rpcib_ping_t *rptp)
 {
 	ibt_chan_open_args_t	chan_args;	/* channel args */
 	ibt_chan_sizes_t	chan_sizes;
@@ -1707,21 +1642,23 @@ rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, ibt_path_info_t *path,
 	(void) bzero(&qp_attr, sizeof (ibt_rc_chan_alloc_args_t));
 	(void) bzero(&ipcm_info, sizeof (ibt_ip_cm_info_t));
 
-	switch (ipcm_info.src_addr.family = s_ip->family) {
+	ipcm_info.src_addr.family = rptp->srcip.family;
+	switch (ipcm_info.src_addr.family) {
 	case AF_INET:
-		ipcm_info.src_addr.un.ip4addr = s_ip->un.ip4addr;
+		ipcm_info.src_addr.un.ip4addr = rptp->srcip.un.ip4addr;
 		break;
 	case AF_INET6:
-		ipcm_info.src_addr.un.ip6addr = s_ip->un.ip6addr;
+		ipcm_info.src_addr.un.ip6addr = rptp->srcip.un.ip6addr;
 		break;
 	}
 
-	switch (ipcm_info.dst_addr.family = d_ip->family) {
+	ipcm_info.dst_addr.family = rptp->srcip.family;
+	switch (ipcm_info.dst_addr.family) {
 	case AF_INET:
-		ipcm_info.dst_addr.un.ip4addr = d_ip->un.ip4addr;
+		ipcm_info.dst_addr.un.ip4addr = rptp->dstip.un.ip4addr;
 		break;
 	case AF_INET6:
-		ipcm_info.dst_addr.un.ip6addr = d_ip->un.ip6addr;
+		ipcm_info.dst_addr.un.ip6addr = rptp->dstip.un.ip6addr;
 		break;
 	}
 
@@ -1735,7 +1672,7 @@ rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, ibt_path_info_t *path,
 		return (-1);
 	}
 
-	qp_attr.rc_hca_port_num = path->pi_prim_cep_path.cep_hca_port_num;
+	qp_attr.rc_hca_port_num = rptp->path.pi_prim_cep_path.cep_hca_port_num;
 	/* Alloc a RC channel */
 	qp_attr.rc_scq = hca->clnt_scq->rib_cq_hdl;
 	qp_attr.rc_rcq = hca->clnt_rcq->rib_cq_hdl;
@@ -1748,8 +1685,8 @@ rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, ibt_path_info_t *path,
 	qp_attr.rc_control = IBT_CEP_RDMA_RD | IBT_CEP_RDMA_WR;
 	qp_attr.rc_flags = IBT_WR_SIGNALED;
 
-	path->pi_sid = ibt_get_ip_sid(IPPROTO_TCP, NFS_RDMA_PORT);
-	chan_args.oc_path = path;
+	rptp->path.pi_sid = ibt_get_ip_sid(IPPROTO_TCP, NFS_RDMA_PORT);
+	chan_args.oc_path = &rptp->path;
 	chan_args.oc_cm_handler = rib_clnt_cm_handler;
 	chan_args.oc_cm_clnt_private = (void *)rib_stat;
 	chan_args.oc_rdma_ra_out = 4;
@@ -1812,14 +1749,12 @@ refresh:
 }
 
 rdma_stat
-rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
+rib_ping_srv(int addr_type, struct netbuf *raddr, rpcib_ping_t *rptp)
 {
 	uint_t			i;
-	ibt_path_info_t		path;
 	ibt_status_t		ibt_status;
 	uint8_t			num_paths_p;
 	ibt_ip_path_attr_t	ipattr;
-	ibt_ip_addr_t		dstip;
 	ibt_path_ip_src_t	srcip;
 	rpcib_ipaddrs_t		addrs4;
 	rpcib_ipaddrs_t		addrs6;
@@ -1827,12 +1762,9 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
 	struct sockaddr_in6	*sin6p;
 	rdma_stat		retval = RDMA_SUCCESS;
 
-	*hca = NULL;
 	ASSERT(raddr->buf != NULL);
 
-	bzero(&path, sizeof (ibt_path_info_t));
 	bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
-	bzero(&srcip, sizeof (ibt_path_ip_src_t));
 
 	if (!rpcib_get_ib_addresses(&addrs4, &addrs6) ||
 	    (addrs4.ri_count == 0 && addrs6.ri_count == 0)) {
@@ -1844,26 +1776,30 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
 	switch (addr_type) {
 	case AF_INET:
 		sinp = (struct sockaddr_in *)raddr->buf;
-		dstip.family = AF_INET;
-		dstip.un.ip4addr = sinp->sin_addr.s_addr;
+		rptp->dstip.family = AF_INET;
+		rptp->dstip.un.ip4addr = sinp->sin_addr.s_addr;
 		sinp = addrs4.ri_list;
 
+		ipattr.ipa_dst_ip 	= &rptp->dstip;
+		ipattr.ipa_hca_guid	= rib_stat->hca->hca_guid;
+		ipattr.ipa_ndst		= 1;
+		ipattr.ipa_max_paths	= 1;
+		ipattr.ipa_src_ip.family = rptp->dstip.family;
 		for (i = 0; i < addrs4.ri_count; i++) {
 			num_paths_p = 0;
-			ipattr.ipa_dst_ip 	= &dstip;
-			ipattr.ipa_hca_guid	= rib_stat->hca->hca_guid;
-			ipattr.ipa_ndst		= 1;
-			ipattr.ipa_max_paths	= 1;
-			ipattr.ipa_src_ip.family = dstip.family;
 			ipattr.ipa_src_ip.un.ip4addr = sinp[i].sin_addr.s_addr;
+			bzero(&srcip, sizeof (ibt_path_ip_src_t));
 
 			ibt_status = ibt_get_ip_paths(rib_stat->ibt_clnt_hdl,
-			    IBT_PATH_NO_FLAGS, &ipattr, &path, &num_paths_p,
-			    &srcip);
+			    IBT_PATH_NO_FLAGS, &ipattr, &rptp->path,
+			    &num_paths_p, &srcip);
 			if (ibt_status == IBT_SUCCESS &&
 			    num_paths_p != 0 &&
-			    path.pi_hca_guid == rib_stat->hca->hca_guid) {
-				*hca = rib_stat->hca;
+			    rptp->path.pi_hca_guid == rib_stat->hca->hca_guid) {
+				rptp->hca = rib_stat->hca;
+				rptp->srcip.family = AF_INET;
+				rptp->srcip.un.ip4addr =
+				    srcip.ip_primary.un.ip4addr;
 				goto done;
 			}
 		}
@@ -1872,26 +1808,30 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
 
 	case AF_INET6:
 		sin6p = (struct sockaddr_in6 *)raddr->buf;
-		dstip.family = AF_INET6;
-		dstip.un.ip6addr = sin6p->sin6_addr;
+		rptp->dstip.family = AF_INET6;
+		rptp->dstip.un.ip6addr = sin6p->sin6_addr;
 		sin6p = addrs6.ri_list;
 
+		ipattr.ipa_dst_ip 	= &rptp->dstip;
+		ipattr.ipa_hca_guid	= rib_stat->hca->hca_guid;
+		ipattr.ipa_ndst		= 1;
+		ipattr.ipa_max_paths	= 1;
+		ipattr.ipa_src_ip.family = rptp->dstip.family;
 		for (i = 0; i < addrs6.ri_count; i++) {
 			num_paths_p = 0;
-			ipattr.ipa_dst_ip 	= &dstip;
-			ipattr.ipa_hca_guid	= rib_stat->hca->hca_guid;
-			ipattr.ipa_ndst		= 1;
-			ipattr.ipa_max_paths	= 1;
-			ipattr.ipa_src_ip.family = dstip.family;
 			ipattr.ipa_src_ip.un.ip6addr = sin6p[i].sin6_addr;
+			bzero(&srcip, sizeof (ibt_path_ip_src_t));
 
 			ibt_status = ibt_get_ip_paths(rib_stat->ibt_clnt_hdl,
-			    IBT_PATH_NO_FLAGS, &ipattr, &path, &num_paths_p,
-			    &srcip);
+			    IBT_PATH_NO_FLAGS, &ipattr, &rptp->path,
+			    &num_paths_p, &srcip);
 			if (ibt_status == IBT_SUCCESS &&
 			    num_paths_p != 0 &&
-			    path.pi_hca_guid == rib_stat->hca->hca_guid) {
-				*hca = rib_stat->hca;
+			    rptp->path.pi_hca_guid == rib_stat->hca->hca_guid) {
+				rptp->hca = rib_stat->hca;
+				rptp->srcip.family = AF_INET6;
+				rptp->srcip.un.ip6addr =
+				    srcip.ip_primary.un.ip6addr;
 				goto done;
 			}
 		}
@@ -1903,6 +1843,7 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
 		break;
 	}
 done:
+
 	if (addrs4.ri_size > 0)
 		kmem_free(addrs4.ri_list, addrs4.ri_size);
 	if (addrs6.ri_size > 0)
@@ -3923,8 +3864,7 @@ rib_conn_get(struct netbuf *svcaddr, int addr_type, void *handle, CONN **conn)
 	rib_hca_t *hca = rib_stat->hca;
 	rib_qp_t *qp;
 	clock_t cv_stat, timout;
-	ibt_path_info_t path;
-	ibt_ip_addr_t s_ip, d_ip;
+	rpcib_ping_t rpt;
 
 	if (hca == NULL)
 		return (RDMA_FAILED);
@@ -4016,11 +3956,9 @@ again:
 	}
 	rw_exit(&hca->cl_conn_list.conn_lock);
 
-	bzero(&path, sizeof (ibt_path_info_t));
-	bzero(&s_ip, sizeof (ibt_ip_addr_t));
-	bzero(&d_ip, sizeof (ibt_ip_addr_t));
+	bzero(&rpt, sizeof (rpcib_ping_t));
 
-	status = rib_chk_srv_ibaddr(svcaddr, addr_type, &path, &s_ip, &d_ip);
+	status = rib_ping_srv(addr_type, svcaddr, &rpt);
 	if (status != RDMA_SUCCESS) {
 		return (RDMA_FAILED);
 	}
@@ -4046,7 +3984,7 @@ again:
 	 * WRITER lock.
 	 */
 	(void) rib_add_connlist(cn, &hca->cl_conn_list);
-	status = rib_conn_to_srv(hca, qp, &path, &s_ip, &d_ip);
+	status = rib_conn_to_srv(hca, qp, &rpt);
 	mutex_enter(&cn->c_lock);
 	if (status == RDMA_SUCCESS) {
 		cn->c_state = C_CONNECTED;
