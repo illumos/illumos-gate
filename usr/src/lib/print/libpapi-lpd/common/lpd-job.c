@@ -362,11 +362,11 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 	/* Handling */
 	s = NULL;
 	papiAttributeListGetString(attributes, NULL, "job-hold-until", &s);
-	if ((s != NULL) && (strcmp(s, "indefinite"))) {
+	if ((s != NULL) && (strcmp(s, "indefinite") == 0)) {
 		add_svr4_control_line(metadata, 'H', "hold");
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
 		    "job-hold-until", "indefinite");
-	} else if ((s != NULL) && (strcmp(s, "no-hold"))) {
+	} else if ((s != NULL) && (strcmp(s, "no-hold") == 0)) {
 		add_svr4_control_line(metadata, 'H', "immediate");
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
 		    "job-hold-until", "no-hold");
