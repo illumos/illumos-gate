@@ -24,11 +24,9 @@
  * Copyright (c) 1989 AT&T
  * All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -155,7 +153,7 @@ static void parsename(char *);
 static void parse_fn_and_print(const char *, char *);
 static char d_buf[512];
 static char p_buf[512];
-static int exotic(char *s);
+static int exotic(const char *s);
 static void set_A_header(char *);
 static char *FormatName(char *, const char *);
 
@@ -1367,9 +1365,39 @@ FormatName(char *OldName, const char *NewName)
  * the exotic name, if exists, is saved in d_buf.
  */
 static int
-exotic(char *s)
+exotic(const char *in_str)
 {
-	int tag = 0;
+	static char	*buff = 0;
+	static size_t	buf_size;
+
+	size_t		sym_len = strlen(in_str) + 1;
+	int		tag = 0;
+	char		*s;
+
+	/*
+	 * We will need to modify the symbol (in_str) as we are analyzing it,
+	 * so copy it into a buffer so that we can play around with it.
+	 */
+	if (buff == NULL) {
+		buff = malloc(DEF_MAX_SYM_SIZE);
+		buf_size = DEF_MAX_SYM_SIZE;
+	}
+
+	if (sym_len > buf_size) {
+		if (buff)
+			free(buff);
+		buff = malloc(sym_len);
+		buf_size = sym_len;
+	}
+
+	if (buff == NULL) {
+		(void) fprintf(stderr, gettext(
+		    "%s: cannot malloc space\n"), prog_name);
+		exit(NOALLOC);
+	}
+	s = strcpy(buff, in_str);
+
+
 	if (strncmp(s, "__sti__", 7) == 0) {
 		s += 7; tag = 1;
 		parse_fn_and_print(ctor_str, s);
@@ -1471,33 +1499,7 @@ void
 parse_fn_and_print(const char *str, char *s)
 {
 	char		c, *p1, *p2;
-	size_t		sym_len = strlen(s);
 	int		yes = 1;
-	static char	*buff = 0;
-	static size_t	buf_size;
-
-	/*
-	 * We will need to modify the symbol (s) as we are analyzing it,
-	 * so copy it into a buffer so that we can play around with it.
-	 */
-	if (buff == NULL) {
-	buff = malloc(DEF_MAX_SYM_SIZE);
-	buf_size = DEF_MAX_SYM_SIZE;
-	}
-
-	if (++sym_len > buf_size) {
-	if (buff)
-		free(buff);
-	buff = malloc(sym_len);
-	buf_size = sym_len;
-	}
-
-	if (buff == NULL) {
-		(void) fprintf(stderr, gettext(
-		    "%s: cannot malloc space\n"), prog_name);
-		exit(NOALLOC);
-	}
-	s = strcpy(buff, s);
 
 	if ((p1 = p2 =  strstr(s, "_c_")) == NULL)
 		if ((p1 = p2 =  strstr(s, "_C_")) == NULL)

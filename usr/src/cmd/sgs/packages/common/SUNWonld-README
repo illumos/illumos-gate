@@ -1457,3 +1457,4 @@ Bugid   Risk Synopsis
 6813909 generalize eh_frame support to non-amd64 platforms
 6801536 ld: mapfile processing oddities unveiled through mmapobj(2) observations
 6802452 libelf shouldn't use MS_SYNC
+6818012 nm tries to modify readonly segment and dumps core
