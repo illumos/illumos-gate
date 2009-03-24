@@ -688,6 +688,7 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	ACPI_OBJECT *obj;
 	ACPI_INTEGER cnt;
 	cpu_acpi_cstate_t *cstate, *p;
+	size_t alloc_size;
 	int i, count;
 
 	CPU_ACPI_OBJ_IS_NOT_CACHED(handle, CPU_ACPI_CST_CACHED);
@@ -721,8 +722,8 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	}
 
 	CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)cnt;
-	CPU_ACPI_CSTATES(handle) = kmem_zalloc(CPU_ACPI_CSTATES_SIZE(cnt),
-	    KM_SLEEP);
+	alloc_size = CPU_ACPI_CSTATES_SIZE(cnt);
+	CPU_ACPI_CSTATES(handle) = kmem_zalloc(alloc_size, KM_SLEEP);
 	CPU_ACPI_BM_INFO(handle) = 0;
 	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
 	p = cstate;
@@ -775,6 +776,9 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	if (count < 2) {
 		cmn_err(CE_NOTE, "!cpu_acpi: _CST invalid count %d < 2",
 		    count);
+		kmem_free(CPU_ACPI_CSTATES(handle), alloc_size);
+		CPU_ACPI_CSTATES(handle) = NULL;
+		CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)0;
 		AcpiOsFree(abuf.Pointer);
 		return (-1);
 	}
@@ -782,12 +786,23 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	if (cstate[0].cs_type != CPU_ACPI_C1) {
 		cmn_err(CE_NOTE, "!cpu_acpi: _CST first element type not C1: "
 		    "%d", (int)cstate->cs_type);
+		kmem_free(CPU_ACPI_CSTATES(handle), alloc_size);
+		CPU_ACPI_CSTATES(handle) = NULL;
+		CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)0;
 		AcpiOsFree(abuf.Pointer);
 		return (-1);
 	}
 
-	if (count != cnt)
+	if (count != cnt) {
+		void	*orig = CPU_ACPI_CSTATES(handle);
+
 		CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)count;
+		CPU_ACPI_CSTATES(handle) = kmem_zalloc(
+		    CPU_ACPI_CSTATES_SIZE(count), KM_SLEEP);
+		(void) memcpy(CPU_ACPI_CSTATES(handle), orig,
+		    CPU_ACPI_CSTATES_SIZE(count));
+		kmem_free(orig, alloc_size);
+	}
 
 	AcpiOsFree(abuf.Pointer);
 	CPU_ACPI_OBJ_IS_CACHED(handle, CPU_ACPI_CST_CACHED);
