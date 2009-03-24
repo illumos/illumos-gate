@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,8 @@ struct pci_bus_resource *pci_bus_res;
 size_t dma_max_copybuf_size = 0x101000;		/* 1M + 4K */
 
 uint64_t ramdisk_start, ramdisk_end;
+
+int pseudo_isa = 0;
 
 /*
  * Forward declarations
@@ -203,10 +205,17 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	 * isa is "kind of" a pseudo node
 	 */
 #if defined(__xpv)
-	if (DOMAIN_IS_INITDOMAIN(xen_info))
-		(void) i_ddi_attach_pseudo_node("isa");
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		if (pseudo_isa)
+			(void) i_ddi_attach_pseudo_node("isa");
+		else
+			(void) i_ddi_attach_hw_nodes("isa");
+	}
 #else
-	(void) i_ddi_attach_pseudo_node("isa");
+	if (pseudo_isa)
+		(void) i_ddi_attach_pseudo_node("isa");
+	else
+		(void) i_ddi_attach_hw_nodes("isa");
 #endif
 
 	/* reprogram devices not set up by firmware (BIOS) */
@@ -2530,13 +2539,15 @@ impl_setup_ddi(void)
 	ASSERT(err == 0);
 
 	/* isa node */
-	ndi_devi_alloc_sleep(ddi_root_node(), "isa",
-	    (pnode_t)DEVI_SID_NODEID, &isa_dip);
-	(void) ndi_prop_update_string(DDI_DEV_T_NONE, isa_dip,
-	    "device_type", "isa");
-	(void) ndi_prop_update_string(DDI_DEV_T_NONE, isa_dip,
-	    "bus-type", "isa");
-	(void) ndi_devi_bind_driver(isa_dip, 0);
+	if (pseudo_isa) {
+		ndi_devi_alloc_sleep(ddi_root_node(), "isa",
+		    (pnode_t)DEVI_SID_NODEID, &isa_dip);
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, isa_dip,
+		    "device_type", "isa");
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, isa_dip,
+		    "bus-type", "isa");
+		(void) ndi_devi_bind_driver(isa_dip, 0);
+	}
 
 	/*
 	 * Read in the properties from the boot.

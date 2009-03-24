@@ -20,10 +20,8 @@
 #
 #
 # uts/i86pc/isa/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the ISA nexus driver
 #
@@ -63,7 +61,7 @@ CFLAGS += $(CCVERBOSE)
 
 #
 #       Dependency
-LDFLAGS         += -dy -Nmisc/acpica -Nmisc/busra
+LDFLAGS         += -dy -Nmisc/acpica -Nmisc/busra -Nmisc/pci_autoconfig
 
 #
 # Define our version of dma_engine and i8237A interfaces

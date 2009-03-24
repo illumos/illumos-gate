@@ -4168,6 +4168,24 @@ fixup_mpxio()
 	fi
 }
 
+fixup_isa_bkbfu()
+{
+	aliasfile=$rootprefix/etc/driver_aliases
+	parentalias=$rootprefix/bfu.parent/etc/driver_aliases
+	isaalias="pciclass,060100"
+
+	if [ $target_isa != i386 ]; then
+		return;
+	fi
+
+	# bfu forwards, just return
+	egrep -s "\"$isaalias\"" $parentalias && return
+
+	# remove the pciclass,060100 entry for isa when going backwards
+	egrep -s "\"$isaalias\"" $aliasfile || return
+	/tmp/bfubin/update_drv -b $root -d -i "$isaalias" isa >/dev/null 2>&1
+}
+
 #
 # Check to see if root in $1 has a mounted boot, and that
 # it's mounted at the right place for bfu to handle it.
@@ -8129,6 +8147,8 @@ mondo_loop() {
 	update_policy_conf
 
 	tx_check_bkbfu
+
+	fixup_isa_bkbfu
 
 	update_aac_conf
 

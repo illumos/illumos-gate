@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,17 +43,45 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/acpi/acpi_enum.h>
+#include <sys/mach_intr.h>
+#include <sys/pci.h>
+#include <sys/note.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
 #endif
 
-
+extern int pseudo_isa;
 extern int isa_resource_setup(void);
+extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+    psm_intr_op_t, int *);
+extern void pci_remove_isa_resources(int, uint32_t, uint32_t);
 static char USED_RESOURCES[] = "used-resources";
 static void isa_alloc_nodes(dev_info_t *);
 static void enumerate_BIOS_serial(dev_info_t *);
+static void isa_postattach(dev_info_t *);
 
+/*
+ * The following typedef is used to represent an entry in the "ranges"
+ * property of a pci-isa bridge device node.
+ */
+typedef struct {
+	uint32_t child_high;
+	uint32_t child_low;
+	uint32_t parent_high;
+	uint32_t parent_mid;
+	uint32_t parent_low;
+	uint32_t size;
+} pib_ranges_t;
+
+typedef struct {
+	uint32_t base;
+	uint32_t len;
+} used_ranges_t;
+
+#define	USED_CELL_SIZE	2	/* 1 byte addr, 1 byte size */
+#define	ISA_ADDR_IO	1	/* IO address space */
+#define	ISA_ADDR_MEM	0	/* memory adress space */
 #define	BIOS_DATA_AREA	0x400
 /*
  * #define ISA_DEBUG 1
@@ -98,6 +126,10 @@ static ddi_dma_attr_t ISA_dma_attr = {
  */
 
 static int
+isa_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
+    off_t offset, off_t len, caddr_t *vaddrp);
+
+static int
 isa_dma_allochdl(dev_info_t *, dev_info_t *, ddi_dma_attr_t *,
     int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *);
 
@@ -108,9 +140,13 @@ isa_dma_mctl(dev_info_t *, dev_info_t *, ddi_dma_handle_t, enum ddi_dma_ctlops,
 static int
 isa_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *);
 
+static int
+isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
+    ddi_intr_handle_impl_t *hdlp, void *result);
+
 struct bus_ops isa_bus_ops = {
 	BUSO_REV,
-	i_ddi_bus_map,
+	isa_bus_map,
 	NULL,
 	NULL,
 	NULL,
@@ -137,7 +173,7 @@ struct bus_ops isa_bus_ops = {
 	NULL,		/* (*bus_fm_access_enter)(); */
 	NULL,		/* (*bus_fm_access_exit)(); */
 	NULL,		/* (*bus_power)(); */
-	i_ddi_intr_ops	/* (*bus_intr_op)(); */
+	isa_intr_ops	/* (*bus_intr_op)(); */
 };
 
 
@@ -155,7 +191,7 @@ struct dev_ops isa_ops = {
 	nulldev,		/* identify */
 	nulldev,		/* probe */
 	isa_attach,		/* attach */
-	nodev,			/* detach */
+	nulldev,		/* detach */
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
 	&isa_bus_ops,		/* bus operations */
@@ -213,8 +249,14 @@ isa_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 #endif
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	if ((rval = i_dmae_init(devi)) == DDI_SUCCESS) {
 		ddi_report_dev(devi);
@@ -225,7 +267,208 @@ isa_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 */
 		isa_alloc_nodes(devi);
 	}
+
+	if (!pseudo_isa)
+		isa_postattach(devi);
+
 	return (rval);
+}
+
+#define	SET_RNGS(rng_p, used_p, ctyp, ptyp) do {			\
+		(rng_p)->child_high = (ctyp);				\
+		(rng_p)->child_low = (rng_p)->parent_low = (used_p)->base; \
+		(rng_p)->parent_high = (ptyp);				\
+		(rng_p)->parent_mid = 0;				\
+		(rng_p)->size = (used_p)->len;				\
+		_NOTE(CONSTCOND) } while (0)
+static uint_t
+isa_used_to_ranges(int ctype, int *array, uint_t size, pib_ranges_t *ranges)
+{
+	used_ranges_t *used_p;
+	pib_ranges_t *rng_p = ranges;
+	uint_t	i, ptype;
+
+	ptype = (ctype == ISA_ADDR_IO) ? PCI_ADDR_IO : PCI_ADDR_MEM32;
+	ptype |= PCI_REG_REL_M;
+	size /= USED_CELL_SIZE;
+	used_p = (used_ranges_t *)array;
+	SET_RNGS(rng_p, used_p, ctype, ptype);
+	for (i = 1, used_p++; i < size; i++, used_p++) {
+		/* merge ranges record if applicable */
+		if (rng_p->child_low + rng_p->size == used_p->base)
+			rng_p->size += used_p->len;
+		else {
+			rng_p++;
+			SET_RNGS(rng_p, used_p, ctype, ptype);
+		}
+	}
+	return (rng_p - ranges + 1);
+}
+
+void
+isa_remove_res_from_pci(int type, int *array, uint_t size)
+{
+	int i;
+	used_ranges_t *used_p;
+
+	size /= USED_CELL_SIZE;
+	used_p = (used_ranges_t *)array;
+	for (i = 0; i < size; i++, used_p++)
+		pci_remove_isa_resources(type, used_p->base, used_p->len);
+}
+
+static void
+isa_postattach(dev_info_t *dip)
+{
+	dev_info_t *used;
+	int *ioarray, *memarray, status;
+	uint_t nio = 0, nmem = 0, nrng = 0, n;
+	pib_ranges_t *ranges;
+
+	used = ddi_find_devinfo("used-resources", -1, 0);
+	if (used == NULL) {
+		cmn_err(CE_WARN, "Failed to find used-resources <%s>\n",
+		    ddi_get_name(dip));
+		return;
+	}
+	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, used,
+	    DDI_PROP_DONTPASS, "io-space", &ioarray, &nio);
+	if (status != DDI_PROP_SUCCESS && status != DDI_PROP_NOT_FOUND) {
+		cmn_err(CE_WARN, "io-space property failure for %s (%x)\n",
+		    ddi_get_name(used), status);
+		return;
+	}
+	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, used,
+	    DDI_PROP_DONTPASS, "device-memory", &memarray, &nmem);
+	if (status != DDI_PROP_SUCCESS && status != DDI_PROP_NOT_FOUND) {
+		cmn_err(CE_WARN, "device-memory property failure for %s (%x)\n",
+		    ddi_get_name(used), status);
+		return;
+	}
+	n = (nio + nmem) / USED_CELL_SIZE;
+	ranges =  (pib_ranges_t *)kmem_zalloc(sizeof (pib_ranges_t) * n,
+	    KM_SLEEP);
+
+	if (nio != 0) {
+		nrng = isa_used_to_ranges(ISA_ADDR_IO, ioarray, nio, ranges);
+		isa_remove_res_from_pci(ISA_ADDR_IO, ioarray, nio);
+		ddi_prop_free(ioarray);
+	}
+	if (nmem != 0) {
+		nrng += isa_used_to_ranges(ISA_ADDR_MEM, memarray, nmem,
+		    ranges + nrng);
+		isa_remove_res_from_pci(ISA_ADDR_MEM, memarray, nmem);
+		ddi_prop_free(memarray);
+	}
+
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "ranges",
+	    (int *)ranges, nrng * sizeof (pib_ranges_t) / sizeof (int));
+	kmem_free(ranges, sizeof (pib_ranges_t) * n);
+}
+
+/*ARGSUSED*/
+static int
+isa_apply_range(dev_info_t *dip, struct regspec *isa_reg_p,
+    pci_regspec_t *pci_reg_p)
+{
+	pib_ranges_t *ranges, *rng_p;
+	int len, i, offset, nrange;
+	static char out_of_range[] =
+	    "Out of range register specification from device node <%s>";
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "ranges", (caddr_t)&ranges, &len) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Can't get %s ranges property",
+		    ddi_get_name(dip));
+		return (DDI_ME_REGSPEC_RANGE);
+	}
+	nrange = len / sizeof (pib_ranges_t);
+	rng_p = ranges;
+	for (i = 0; i < nrange; i++, rng_p++) {
+		/* Check for correct space */
+		if (isa_reg_p->regspec_bustype != rng_p->child_high)
+			continue;
+
+		/* Detect whether request entirely fits within a range */
+		if (isa_reg_p->regspec_addr < rng_p->child_low)
+			continue;
+		if ((isa_reg_p->regspec_addr + isa_reg_p->regspec_size) >
+		    (rng_p->child_low + rng_p->size))
+			continue;
+
+		offset = isa_reg_p->regspec_addr - rng_p->child_low;
+
+		pci_reg_p->pci_phys_hi = rng_p->parent_high;
+		pci_reg_p->pci_phys_mid = 0;
+		pci_reg_p->pci_phys_low = rng_p->parent_low + offset;
+		pci_reg_p->pci_size_hi = 0;
+		pci_reg_p->pci_size_low = isa_reg_p->regspec_size;
+
+		break;
+	}
+	kmem_free(ranges, len);
+	if (i == nrange) {
+		cmn_err(CE_WARN, out_of_range, ddi_get_name(dip));
+		return (DDI_ME_REGSPEC_RANGE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
+isa_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
+    off_t offset, off_t len, caddr_t *vaddrp)
+{
+	struct regspec tmp_reg, *rp;
+	pci_regspec_t vreg;
+	ddi_map_req_t mr = *mp;		/* Get private copy of request */
+	int error;
+
+	if (pseudo_isa)
+		return (i_ddi_bus_map(dip, rdip, mp, offset, len, vaddrp));
+
+	mp = &mr;
+
+	/*
+	 * First, if given an rnumber, convert it to a regspec...
+	 */
+	if (mp->map_type == DDI_MT_RNUMBER)  {
+
+		int rnumber = mp->map_obj.rnumber;
+
+		rp = i_ddi_rnumber_to_regspec(rdip, rnumber);
+		if (rp == (struct regspec *)0)
+			return (DDI_ME_RNUMBER_RANGE);
+
+		/*
+		 * Convert the given ddi_map_req_t from rnumber to regspec...
+		 */
+		mp->map_type = DDI_MT_REGSPEC;
+		mp->map_obj.rp = rp;
+	}
+
+	/*
+	 * Adjust offset and length correspnding to called values...
+	 * XXX: A non-zero length means override the one in the regspec.
+	 * XXX: (Regardless of what's in the parent's range)
+	 */
+
+	tmp_reg = *(mp->map_obj.rp);		/* Preserve underlying data */
+	rp = mp->map_obj.rp = &tmp_reg;		/* Use tmp_reg in request */
+
+	rp->regspec_addr += (uint_t)offset;
+	if (len != 0)
+		rp->regspec_size = (uint_t)len;
+
+	if ((error = isa_apply_range(dip, rp, &vreg)) != 0)
+		return (error);
+	mp->map_obj.rp = (struct regspec *)&vreg;
+
+	/*
+	 * Call my parents bus_map function with modified values...
+	 */
+
+	return (ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp));
 }
 
 static int
@@ -372,6 +615,9 @@ static int
 isa_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
+	int rn;
+	struct ddi_parent_private_data *pdp;
+
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
 		if (rdip == (dev_info_t *)0)
@@ -408,9 +654,188 @@ isa_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		else
 			return (DDI_FAILURE);
 
+	case DDI_CTLOPS_REGSIZE:
+	case DDI_CTLOPS_NREGS:
+		if (rdip == (dev_info_t *)0)
+			return (DDI_FAILURE);
+
+		if ((pdp = ddi_get_parent_data(rdip)) == NULL)
+			return (DDI_FAILURE);
+
+		if (ctlop == DDI_CTLOPS_NREGS) {
+			*(int *)result = pdp->par_nreg;
+		} else {
+			rn = *(int *)arg;
+			if (rn >= pdp->par_nreg)
+				return (DDI_FAILURE);
+			*(off_t *)result = (off_t)pdp->par_reg[rn].regspec_size;
+		}
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_ATTACH:
+	case DDI_CTLOPS_DETACH:
+	case DDI_CTLOPS_PEEK:
+	case DDI_CTLOPS_POKE:
+		return (DDI_FAILURE);
+
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 	}
+}
+
+static struct intrspec *
+isa_get_ispec(dev_info_t *rdip, int inum)
+{
+	struct ddi_parent_private_data *pdp = ddi_get_parent_data(rdip);
+
+	/* Validate the interrupt number */
+	if (inum >= pdp->par_nintr)
+		return (NULL);
+
+	/* Get the interrupt structure pointer and return that */
+	return ((struct intrspec *)&pdp->par_intr[inum]);
+}
+
+static int
+isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
+    ddi_intr_handle_impl_t *hdlp, void *result)
+{
+	struct intrspec *ispec;
+
+	if (pseudo_isa)
+		return (i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result));
+
+
+	/* Process the interrupt operation */
+	switch (intr_op) {
+	case DDI_INTROP_GETCAP:
+		/* First check with pcplusmp */
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_GET_CAP, result)) {
+			*(int *)result = 0;
+			return (DDI_FAILURE);
+		}
+		break;
+	case DDI_INTROP_SETCAP:
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_SET_CAP, result))
+			return (DDI_FAILURE);
+		break;
+	case DDI_INTROP_ALLOC:
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+		hdlp->ih_pri = ispec->intrspec_pri;
+		*(int *)result = hdlp->ih_scratch1;
+		break;
+	case DDI_INTROP_FREE:
+		break;
+	case DDI_INTROP_GETPRI:
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+		*(int *)result = ispec->intrspec_pri;
+		break;
+	case DDI_INTROP_SETPRI:
+		/* Validate the interrupt priority passed to us */
+		if (*(int *)result > LOCK_LEVEL)
+			return (DDI_FAILURE);
+
+		/* Ensure that PSM is all initialized and ispec is ok */
+		if ((psm_intr_ops == NULL) ||
+		    ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL))
+			return (DDI_FAILURE);
+
+		/* update the ispec with the new priority */
+		ispec->intrspec_pri =  *(int *)result;
+		break;
+	case DDI_INTROP_ADDISR:
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+		ispec->intrspec_func = hdlp->ih_cb_func;
+		break;
+	case DDI_INTROP_REMISR:
+		if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
+			return (DDI_FAILURE);
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+		ispec->intrspec_func = (uint_t (*)()) 0;
+		break;
+	case DDI_INTROP_ENABLE:
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+
+		/* Call psmi to translate irq with the dip */
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR,
+		    (int *)&hdlp->ih_vector);
+
+		/* Add the interrupt handler */
+		if (!add_avintr((void *)hdlp, ispec->intrspec_pri,
+		    hdlp->ih_cb_func, DEVI(rdip)->devi_name, hdlp->ih_vector,
+		    hdlp->ih_cb_arg1, hdlp->ih_cb_arg2, NULL, rdip))
+			return (DDI_FAILURE);
+		break;
+	case DDI_INTROP_DISABLE:
+		if ((ispec = isa_get_ispec(rdip, hdlp->ih_inum)) == NULL)
+			return (DDI_FAILURE);
+
+		/* Call psm_ops() to translate irq with the dip */
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+		(void) (*psm_intr_ops)(rdip, hdlp,
+		    PSM_INTR_OP_XLATE_VECTOR, (int *)&hdlp->ih_vector);
+
+		/* Remove the interrupt handler */
+		rem_avintr((void *)hdlp, ispec->intrspec_pri,
+		    hdlp->ih_cb_func, hdlp->ih_vector);
+		break;
+	case DDI_INTROP_SETMASK:
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_SET_MASK, NULL))
+			return (DDI_FAILURE);
+		break;
+	case DDI_INTROP_CLRMASK:
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_CLEAR_MASK, NULL))
+			return (DDI_FAILURE);
+		break;
+	case DDI_INTROP_GETPENDING:
+		if (psm_intr_ops == NULL)
+			return (DDI_FAILURE);
+
+		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_GET_PENDING,
+		    result)) {
+			*(int *)result = 0;
+			return (DDI_FAILURE);
+		}
+		break;
+	case DDI_INTROP_NAVAIL:
+	case DDI_INTROP_NINTRS:
+		*(int *)result = i_ddi_get_intx_nintrs(rdip);
+		if (*(int *)result == 0) {
+			return (DDI_FAILURE);
+		}
+		break;
+	case DDI_INTROP_SUPPORTED_TYPES:
+		*(int *)result = DDI_INTR_TYPE_FIXED;	/* Always ... */
+		break;
+	default:
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
 }
 
 static void

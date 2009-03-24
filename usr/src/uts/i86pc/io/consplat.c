@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * isa-specific console configuration routines
@@ -48,6 +46,8 @@
 #include <sys/hypervisor.h>
 #include <sys/boot_console.h>
 #endif
+
+extern int pseudo_isa;
 
 /* The names of currently supported graphics drivers on x86 */
 static char *
@@ -156,17 +156,48 @@ plat_stdout_is_framebuffer(void)
 	return (console_type() == CONS_SCREEN);
 }
 
+static char *
+plat_devpath(char *name, char *path)
+{
+	major_t major;
+	dev_info_t *dip, *pdip;
+
+	if ((major = ddi_name_to_major(name)) == (major_t)-1)
+		return (NULL);
+
+	if ((dip = devnamesp[major].dn_head) == NULL)
+		return (NULL);
+
+	pdip = ddi_get_parent(dip);
+	if (i_ddi_attach_node_hierarchy(pdip) != DDI_SUCCESS)
+		return (NULL);
+	if (ddi_initchild(pdip, dip) != DDI_SUCCESS)
+		return (NULL);
+
+	(void) ddi_pathname(dip, path);
+
+	return (path);
+}
+
 /*
  * Return generic path to keyboard device from the alias.
  */
 char *
 plat_kbdpath(void)
 {
+	static char kbpath[MAXPATHLEN];
+
 	/*
 	 * Hardcode to isa keyboard path
 	 * XXX make it settable via bootprop?
 	 */
-	return ("/isa/i8042@1,60/keyboard@0");
+	if (pseudo_isa)
+		return ("/isa/i8042@1,60/keyboard@0");
+
+	if (plat_devpath("kb8042", kbpath) == NULL)
+		return (NULL);
+
+	return (kbpath);
 }
 
 /*
@@ -225,11 +256,19 @@ plat_fbpath(void)
 char *
 plat_mousepath(void)
 {
+	static char mpath[MAXPATHLEN];
+
 	/*
 	 * Hardcode to isa mouse path
 	 * XXX make it settable via bootprop?
 	 */
-	return ("/isa/i8042@1,60/mouse@1");
+	if (pseudo_isa)
+		return ("/isa/i8042@1,60/mouse@1");
+
+	if (plat_devpath("mouse8042", mpath) == NULL)
+		return (NULL);
+
+	return (mpath);
 }
 
 /* return path of first usb serial device */
@@ -254,6 +293,42 @@ plat_usbser_path(void)
 	return (us_path);
 }
 
+static char *
+plat_ttypath(int inum)
+{
+	static char *defaultpath[] = {
+	    "/isa/asy@1,3f8:a",
+	    "/isa/asy@1,2f8:b"
+	};
+	static char path[MAXPATHLEN];
+	char *bp;
+	major_t major;
+	dev_info_t *dip;
+
+	if (pseudo_isa)
+		return (defaultpath[inum]);
+
+	if ((major = ddi_name_to_major("asy")) == (major_t)-1)
+		return (NULL);
+
+	if ((dip = devnamesp[major].dn_head) == NULL)
+		return (NULL);
+
+	while (inum-- > 0) {
+		if ((dip = ddi_get_next(dip)) == NULL)
+			return (NULL);
+	}
+
+	if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
+		return (NULL);
+
+	(void) ddi_pathname(dip, path);
+	bp = path + strlen(path);
+	(void) snprintf(bp, 3, ":%s", DEVI(dip)->devi_minor->ddm_name);
+
+	return (path);
+}
+
 /*
  * Lacking support for com2 and com3, if that matters.
  * Another possible enhancement could be to use properties
@@ -268,9 +343,9 @@ plat_stdinpath(void)
 		return ("/xpvd/xencons@0");
 #endif /* __xpv */
 	case CONS_TTYA:
-		return ("/isa/asy@1,3f8:a");
+		return (plat_ttypath(0));
 	case CONS_TTYB:
-		return ("/isa/asy@1,2f8:b");
+		return (plat_ttypath(1));
 	case CONS_USBSER:
 		return (plat_usbser_path());
 	case CONS_SCREEN:
@@ -289,9 +364,9 @@ plat_stdoutpath(void)
 		return ("/xpvd/xencons@0");
 #endif /* __xpv */
 	case CONS_TTYA:
-		return ("/isa/asy@1,3f8:a");
+		return (plat_ttypath(0));
 	case CONS_TTYB:
-		return ("/isa/asy@1,2f8:b");
+		return (plat_ttypath(1));
 	case CONS_USBSER:
 		return (plat_usbser_path());
 	case CONS_SCREEN:
