@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
  * File Name: exioctso.h
@@ -29,7 +29,7 @@
  * ***********************************************************************
  * *                                                                    **
  * *                            NOTICE                                  **
- * *            COPYRIGHT (C) 2008 QLOGIC CORPORATION                   **
+ * *            COPYRIGHT (C) 2009 QLOGIC CORPORATION                   **
  * *                    ALL RIGHTS RESERVED                             **
  * *                                                                    **
  * ***********************************************************************
@@ -38,10 +38,6 @@
 
 #ifndef _EXIOCTSO_H_
 #define	_EXIOCTSO_H_
-
-/*
- * Ident section
- */
 
 #include <sys/int_types.h>
 

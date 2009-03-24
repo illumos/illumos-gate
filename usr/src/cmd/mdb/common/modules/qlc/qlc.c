@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) qlc mdb source file.
@@ -27,19 +27,20 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
  *
  */
 
-
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_mdb.c"
 
 #include <sys/mdb_modapi.h>
-#include "ql_apps.h"
-#include "ql_api.h"
-#include "ql_init.h"
+#include <ql_apps.h>
+#include <ql_api.h>
+#include <ql_init.h>
+#include <ql_debug.h>
 
 /*
  * local prototypes
@@ -49,10 +50,12 @@ static void ql_dump_flags(uint64_t, int8_t **);
 static int qlclinks_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int qlcstate_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int qlc_osc_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
-static int qlc_wdog_dcmd(uintptr_t addr, uint_t flags, int argc,
-    const mdb_arg_t *argv);
-static int qlc_dump_dcmd(uintptr_t, uint_t flags, int argc,
-    const mdb_arg_t *argv);
+static int qlc_wdog_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int qlc_getdump_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int qlc_gettrace_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
+#if 0
+static int qlc_triggerdump_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
+#endif
 static int qlcver_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int qlstates_walk_init(mdb_walk_state_t *);
 static int qlstates_walk_step(mdb_walk_state_t *);
@@ -79,7 +82,7 @@ int8_t *adapter_state_flags[] = {
 	"QL_OPENED",
 	"ONLINE",
 	"INTERRUPTS_ENABLED",
-	"COMMAND_ABORT_TIMEOUT",
+	"ABORT_CMDS_LOOP_DOWN_TMO",
 	"POINT_TO_POINT",
 	"IP_ENABLED",
 	"IP_INITIALIZED",
@@ -124,6 +127,7 @@ int8_t *adapter_config_flags[] = {
 	"ENABLE_FWFCETRACE",
 	"FW_MISMATCH",
 	"CTRL_MENLO",
+	"DISABLE_EXTENDED_LOGGING_TRACE",
 	NULL
 };
 
@@ -215,6 +219,13 @@ int8_t *qltgt_flags[] = {
 	"TQF_NEED_AUTHENTICATION",
 	"TQF_PLOGI_PROGRS",
 	"TQF_IIDMA_NEEDED",
+	NULL
+};
+
+int8_t *qldump_flags[] = {
+	"QL_DUMPING",
+	"QL_DUMP_VALID",
+	"QL_DUMP_UPLOADED",
 	NULL
 };
 
@@ -310,8 +321,8 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			while (vhbaptr != NULL) {
 
 				if (mdb_vread(vqlstate,
-				    sizeof (ql_adapter_state_t),
-				    vhbaptr) == -1) {
+				    sizeof (ql_adapter_state_t), vhbaptr) ==
+				    -1) {
 					mdb_free(vqlstate,
 					    sizeof (ql_adapter_state_t));
 					mdb_free(qlstate,
@@ -368,20 +379,111 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 qlcver_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	int8_t	qlcversion[100];
+	int8_t		qlcversion[100];
+	struct fw_table	fw_table[10], *fwt = NULL;
+	uint8_t		*fwverptr = NULL;
+	ql_head_t	ql_hba;
+	uint32_t	found = 0;
 
 	if ((flags & DCMD_ADDRSPEC) || argc != 0) {
 		return (DCMD_USAGE);
 	}
 
-	mdb_printf("qlc mdb library compiled with %s version: %s\n",
-	    QL_NAME, QL_VERSION);
-
 	if (mdb_readvar(&qlcversion, "qlc_driver_version") == -1) {
 		mdb_warn("unable to read qlc driver version\n");
 	} else {
-		mdb_printf("%s version currently loaded is: %s\n",
+		mdb_printf("\n%s version currently loaded is: %s\n",
 		    QL_NAME, qlcversion);
+	}
+
+	mdb_printf("qlc mdb library compiled with %s version: %s\n",
+	    QL_NAME, QL_VERSION);
+
+	if ((fwverptr = (uint8_t *)(mdb_alloc(50, UM_SLEEP))) == NULL) {
+		mdb_warn("unable to alloc fwverptr\n");
+		return (DCMD_OK);
+	}
+
+	if (mdb_readvar(&fw_table, "fw_table") == -1) {
+		mdb_warn("unable to read firmware table\n");
+	} else {
+		ql_adapter_state_t	*qlstate;
+		uintptr_t		hbaptr = NULL;
+
+		if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
+			mdb_warn("failed to read ql_hba structure");
+			return (DCMD_ERR);
+		}
+
+		if ((qlstate = (ql_adapter_state_t *)mdb_alloc(
+		    sizeof (ql_adapter_state_t), UM_SLEEP)) == NULL) {
+			mdb_warn("Unable to allocate memory for "
+			    "ql_adapter_state\n");
+			return (DCMD_OK);
+		}
+
+		mdb_printf("\n%-8s%-11s%s\n", "f/w", "compiled", "loaded");
+		mdb_printf("%<u>%-8s%-11s%-13s%s%</u>\n\n", "class", "version",
+		    "version", "instance list");
+
+		for (fwt = &fw_table[0]; fwt->fw_class; fwt++) {
+
+			if (mdb_vread(fwverptr, sizeof (void *),
+			    (uintptr_t)fwt->fw_version) == -1) {
+				mdb_warn("unable to read fwverptr\n");
+				mdb_free(fwverptr, sizeof (void *));
+				mdb_free(qlstate, sizeof (ql_adapter_state_t));
+				return (DCMD_OK);
+			}
+
+			mdb_printf("%x\t%-11s", fwt->fw_class, fwverptr);
+
+			if (&ql_hba == NULL) {
+				mdb_warn("failed to read ql_hba structure");
+				hbaptr = NULL;
+			} else {
+				hbaptr = (uintptr_t)ql_hba.first;
+			}
+
+			found = 0;
+			while (hbaptr != NULL) {
+
+				if (mdb_vread(qlstate,
+				    sizeof (ql_adapter_state_t), hbaptr) ==
+				    -1) {
+					mdb_warn("failed to read "
+					    "ql_adapter_state at %p", hbaptr);
+					break;
+				}
+
+				if (qlstate->fw_class == fwt->fw_class) {
+					if (found == 0) {
+						mdb_printf("%x.%02x.%02x\t",
+						    qlstate->fw_major_version,
+						    qlstate->fw_minor_version,
+						    qlstate->
+						    fw_subminor_version);
+						mdb_printf("%d",
+						    qlstate->instance);
+					} else {
+						mdb_printf(", %d",
+						    qlstate->instance);
+					}
+					found = 1;
+				}
+
+				hbaptr = (uintptr_t)qlstate->hba.next;
+			}
+
+			if (found == 1) {
+				mdb_printf("\n");
+			} else {
+				mdb_printf("not loaded\n");
+			}
+		}
+
+		mdb_free(qlstate, sizeof (ql_adapter_state_t));
+		mdb_free(fwverptr, sizeof (void *));
 	}
 
 	return (DCMD_OK);
@@ -507,8 +609,8 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 				if (mdb_vread(qlstate, qlsize, hbaptr) == -1) {
 					mdb_free(qlstate, qlsize);
-					mdb_warn("failed to read ql_adapter"
-					    "_state " "at %p", hbaptr);
+					mdb_warn("failed to read "
+					    "ql_adapter_state at %p", hbaptr);
 					return (DCMD_OK);
 				}
 
@@ -555,7 +657,6 @@ ql_elog_common(ql_adapter_state_t *qlstate, boolean_t elswitch)
 	uintptr_t	hbaptr = (uintptr_t)qlstate->hba.base_address;
 	size_t		qlsize = sizeof (ql_adapter_state_t);
 
-#if 0
 	if (elswitch) {
 		if ((qlstate->cfg_flags & CFG_ENABLE_EXTENDED_LOGGING) == 0) {
 
@@ -591,7 +692,6 @@ ql_elog_common(ql_adapter_state_t *qlstate, boolean_t elswitch)
 			    "already off\n", qlstate->instance);
 		}
 	}
-#endif
 }
 
 /*
@@ -1457,11 +1557,164 @@ qltgtq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 /*
- * ql_dump_dcmd
+ * ql_triggerdump_dcmd
+ *	Triggers the driver to take a firmware dump
+ *
+ * Input:
+ *	addr  = User supplied address (optional)
+ *	flags = mdb flags.
+ *	argc  = Number of user supplied args.
+ *	argv  = Arg array (instance #, optional).
+ *
+ * Returns:
+ *	DCMD_OK or DCMD_ERR
+ *
+ * Context:
+ *	User context.
+ *
+ */
+
+#if 0
+
+/*ARGSUSED*/
+static int
+qlc_triggerdump_dcmd(uintptr_t addr, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	ql_adapter_state_t	*qlstate;
+	uintptr_t		hbaptr = NULL;
+	ql_head_t		ql_hba;
+	uint32_t		qlsize = sizeof (ql_adapter_state_t);
+	int			mdbs;
+
+	if ((mdbs = mdb_get_state()) == MDB_STATE_DEAD) {
+		mdb_warn("Cannot change core file data (state=%xh)\n", mdbs);
+		return (DCMD_OK);
+	}
+
+	if ((qlstate = (ql_adapter_state_t *)mdb_alloc(qlsize,
+	    UM_SLEEP)) == NULL) {
+		mdb_warn("Unable to allocate memory for ql_adapter_state\n");
+		return (DCMD_OK);
+	}
+
+	if (addr == NULL) {
+		char		*tptr;
+		uint32_t	instance;
+
+		if (argc == 0) {
+			mdb_warn("must specify either the ha addr or "
+			    "the instance number\n");
+			mdb_free(qlstate, qlsize);
+			return (DCMD_OK);
+		}
+
+		/*
+		 * find the specified instance in the ha list
+		 */
+
+		instance = (uint32_t)strtol(argv[1].a_un.a_str, &tptr, 16);
+		if (tptr == argv[1].a_un.a_str) {
+			mdb_printf("instance # is illegal: '%s'\n",
+			    argv[1].a_un.a_str);
+			mdb_free(qlstate, qlsize);
+			return (DCMD_OK);
+		}
+
+		if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
+			mdb_warn("failed to read ql_hba structure");
+			mdb_free(qlstate, qlsize);
+			return (DCMD_ERR);
+		}
+
+		if (&ql_hba == NULL) {
+			mdb_warn("failed to read ql_hba structure - "
+			    "is qlc loaded?");
+			mdb_free(qlstate, qlsize);
+			return (DCMD_ERR);
+		}
+
+		hbaptr = (uintptr_t)ql_hba.first;
+		while (hbaptr != NULL) {
+
+			if (mdb_vread(qlstate, qlsize, hbaptr) == -1) {
+				mdb_free(qlstate, qlsize);
+				mdb_warn("failed to read "
+				    "ql_adapter_state at %p", hbaptr);
+				return (DCMD_OK);
+			}
+
+			if (qlstate->instance == instance) {
+				break;
+			}
+
+			hbaptr = (uintptr_t)qlstate->hba.next;
+		}
+	} else {
+
+		/*
+		 * verify the addr specified
+		 */
+
+		if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
+			mdb_warn("failed to read ql_hba structure");
+			mdb_free(qlstate, qlsize);
+			return (DCMD_ERR);
+		}
+
+		if (&ql_hba == NULL) {
+			mdb_warn("failed to read ql_hba structure - "
+			    "is qlc loaded?");
+			mdb_free(qlstate, qlsize);
+			return (DCMD_ERR);
+		}
+
+		hbaptr = (uintptr_t)ql_hba.first;
+		while (hbaptr != NULL) {
+
+			if (mdb_vread(qlstate, qlsize, hbaptr) == -1) {
+				mdb_free(qlstate, qlsize);
+				mdb_warn("failed to read "
+				    "ql_adapter_state at %p", hbaptr);
+				return (DCMD_OK);
+			}
+
+			if (hbaptr == addr) {
+				break;
+			}
+
+			hbaptr = (uintptr_t)qlstate->hba.next;
+		}
+	}
+
+	if (hbaptr == NULL) {
+		mdb_free(qlstate, qlsize);
+		if (argc == 0) {
+			mdb_warn("addr specified is not in the hba list\n");
+		} else {
+			mdb_warn("instance specified does not exist\n");
+		}
+		return (DCMD_OK);
+	}
+
+	if (((qlstate->ql_dump_state & QL_DUMP_VALID) != 0) ||
+	    (qlstate->ql_dump_ptr != NULL)) {
+		mdb_warn("instance %d already has a valid dump\n",
+		    qlstate->instance);
+		mdb_free(qlstate, qlsize);
+		return (DCMD_OK);
+	}
+
+
+}
+#endif
+
+/*
+ * ql_getdump_dcmd
  *	prints out the firmware dump buffer
  *
  * Input:
- *	addr  = User supplied address. (NB: nust be an ha)
+ *	addr  = User supplied address. (NB: must be an ha)
  *	flags = mdb flags.
  *	argc  = Number of user supplied args.
  *	argv  = Arg array.
@@ -1474,12 +1727,20 @@ qltgtq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  *
  */
 static int
-qlc_dump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ql_adapter_state_t	*ha;
+	ql_head_t		ql_hba;
+	uintptr_t		hbaptr = NULL;
+	int			verbose = 0;
 
 	if ((!(flags & DCMD_ADDRSPEC)) || addr == NULL) {
 		mdb_warn("ql_adapter_state structure addr is required");
+		return (DCMD_USAGE);
+	}
+
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose) !=
+	    argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -1492,8 +1753,64 @@ qlc_dump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
+	/*
+	 * show user which instances have valid f/w dumps available if
+	 * user has specified verbose option
+	 */
+	if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
+		mdb_warn("failed to read ql_hba structure");
+	} else if (&ql_hba == NULL) {
+		mdb_warn("failed to read ql_hba structure -- is qlc loaded?");
+	} else if (verbose) {
+		hbaptr = (uintptr_t)ql_hba.first;
+		while (hbaptr != NULL) {
+
+			if (mdb_vread(ha, sizeof (ql_adapter_state_t),
+			    hbaptr) == -1) {
+				mdb_free(ha, sizeof (ql_adapter_state_t));
+				mdb_warn("failed read ql_adapter_state at %p",
+				    hbaptr);
+				return (DCMD_OK);
+			}
+
+			mdb_printf("instance %d:\n", ha->instance);
+			(void) mdb_inc_indent((ulong_t)4);
+
+			if (ha->ql_dump_state == 0) {
+				mdb_printf("no dump flags\n");
+			} else {
+				ql_dump_flags((uint64_t)ha->ql_dump_state,
+				    qldump_flags);
+			}
+
+			if (ha->ql_dump_ptr == NULL) {
+				mdb_printf("no dump address\n");
+			} else {
+				mdb_printf("dump address is: %p\n",
+				    ha->ql_dump_ptr);
+			}
+
+			(void) mdb_dec_indent((ulong_t)4);
+
+			hbaptr = (uintptr_t)ha->hba.next;
+		}
+		mdb_printf("\n");
+	}
+
 	if (mdb_vread(ha, sizeof (ql_adapter_state_t), addr) == -1) {
 		mdb_warn("failed to read ql_adapter_state at %p", addr);
+		mdb_free(ha, sizeof (ql_adapter_state_t));
+		return (DCMD_OK);
+	}
+
+	/*
+	 * If its not a valid dump or there's not a f/w dump binary (???)
+	 * then bail out
+	 */
+	if (((ha->ql_dump_state & QL_DUMP_VALID) == 0) ||
+	    (ha->ql_dump_ptr == NULL)) {
+		mdb_warn("dump does not exist for instance %d (%x, %p)\n",
+		    ha->instance, ha->ql_dump_state, ha->ql_dump_ptr);
 		mdb_free(ha, sizeof (ql_adapter_state_t));
 		return (DCMD_OK);
 	}
@@ -1533,21 +1850,16 @@ static int
 ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
-	void		*ql_dump_ptr;
 	ql_fw_dump_t	*fw;
 	uint32_t	cnt = 0;
 	int		mbox_cnt;
 
-	/* Get the ql_dump_ptr as ql_23xx_fw_dump_t from the system */
-	if (mdb_readvar(&ql_dump_ptr, "ql_dump_ptr") == -1) {
-		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
-		return (DCMD_ERR);
-	}
+	fw = (ql_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
 
-	fw = (ql_fw_dump_t *)mdb_alloc(sizeof (ql_fw_dump_t), UM_SLEEP);
-	if (mdb_vread(fw, sizeof (ql_fw_dump_t),
-	    (uintptr_t)ql_dump_ptr) == -1) {
-		mdb_free(fw, sizeof (ql_dump_ptr));
+	if (mdb_vread(fw, ha->ql_dump_size,
+	    (uintptr_t)ha->ql_dump_ptr) == -1) {
+		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
+		mdb_free(fw, ha->ql_dump_size);
 		return (DCMD_OK);
 	}
 
@@ -1734,6 +2046,27 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		}
 
 		mdb_printf("\n\n[<==END] ISP Debug Dump.\n");
+
+		mdb_printf("\n\nRequest Queue");
+
+		for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+			if (cnt % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt);
+			}
+			mdb_printf("%08x ", fw->req_q[cnt]);
+		}
+
+		mdb_printf("\n\nResponse Queue");
+
+		for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+			if (cnt % 8 == 0) {
+				mdb_printf("\n%08x: ", cnt);
+			}
+			mdb_printf("%08x ", fw->rsp_q[cnt]);
+		}
+
+		mdb_printf("\n");
+
 	} else {
 		mdb_printf("\n\nRISC SRAM:");
 		for (cnt = 0; cnt < 0xf000; cnt++) {
@@ -1743,6 +2076,8 @@ ql_23xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 			mdb_printf("%04x  ", fw->risc_ram[cnt]);
 		}
 	}
+
+	mdb_free(fw, ha->ql_dump_size);
 
 	return (DCMD_OK);
 }
@@ -1769,23 +2104,15 @@ static int
 ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
-	void			*ql_dump_ptr;
 	ql_24xx_fw_dump_t	*fw;
 	uint32_t		cnt = 0;
 
-	/* Get the ql_dump_ptr as ql_24xx_fw_dump_t from the system */
-	if (mdb_readvar(&ql_dump_ptr, "ql_dump_ptr") == -1) {
+	fw = (ql_24xx_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
+
+	if (mdb_vread(fw, ha->ql_dump_size,
+	    (uintptr_t)ha->ql_dump_ptr) == -1) {
 		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
-		return (DCMD_ERR);
-	}
-
-	fw = (ql_24xx_fw_dump_t *)mdb_alloc(sizeof (ql_24xx_fw_dump_t) +
-	    ha->fw_ext_memory_size, UM_SLEEP);
-
-	if (mdb_vread(fw, (sizeof (ql_24xx_fw_dump_t) +
-	    ha->fw_ext_memory_size), (uintptr_t)ql_dump_ptr) == -1) {
-		mdb_free(fw, sizeof (ql_24xx_fw_dump_t) +
-		    ha->fw_ext_memory_size);
+		mdb_free(fw, ha->ql_dump_size);
 		return (DCMD_OK);
 	}
 
@@ -1816,7 +2143,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xseq_gp_reg[cnt]);
 	}
 
@@ -1825,7 +2151,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xseq_0_reg[cnt]);
 	}
 
@@ -1834,7 +2159,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xseq_1_reg[cnt]);
 	}
 
@@ -1843,7 +2167,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_gp_reg[cnt]);
 	}
 
@@ -1852,7 +2175,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_0_reg[cnt]);
 	}
 
@@ -1861,7 +2183,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_1_reg[cnt]);
 	}
 
@@ -1870,7 +2191,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_2_reg[cnt]);
 	}
 
@@ -1879,7 +2199,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->cmd_dma_reg[cnt]);
 	}
 
@@ -1888,7 +2207,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->req0_dma_reg[cnt]);
 	}
 
@@ -1897,7 +2215,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->resp0_dma_reg[cnt]);
 	}
 
@@ -1906,7 +2223,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->req1_dma_reg[cnt]);
 	}
 
@@ -1915,7 +2231,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt0_dma_reg[cnt]);
 	}
 
@@ -1924,7 +2239,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt1_dma_reg[cnt]);
 	}
 
@@ -1933,7 +2247,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt2_dma_reg[cnt]);
 	}
 
@@ -1942,7 +2255,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt3_dma_reg[cnt]);
 	}
 
@@ -1951,7 +2263,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt4_dma_reg[cnt]);
 	}
 
@@ -1960,7 +2271,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt_data_dma_reg[cnt]);
 	}
 
@@ -1969,7 +2279,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rcvt0_data_dma_reg[cnt]);
 	}
 
@@ -1978,7 +2287,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rcvt1_data_dma_reg[cnt]);
 	}
 
@@ -1987,7 +2295,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->risc_gp_reg[cnt]);
 	}
 
@@ -1996,7 +2303,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->shadow_reg[cnt]);
 	}
 
@@ -2005,7 +2311,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->lmc_reg[cnt]);
 	}
 
@@ -2014,7 +2319,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->fpm_hdw_reg[cnt]);
 	}
 
@@ -2023,7 +2327,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->fb_hdw_reg[cnt]);
 	}
 
@@ -2032,7 +2335,6 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n%08x: ", cnt + 0x20000);
 		}
-
 		mdb_printf("%08x ", fw->code_ram[cnt]);
 	}
 
@@ -2046,7 +2348,56 @@ ql_24xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 
 	mdb_printf("\n[<==END] ISP Debug Dump");
 
-	mdb_free(fw, sizeof (ql_24xx_fw_dump_t) + ha->fw_ext_memory_size);
+	mdb_printf("\n\nRequest Queue");
+
+	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt);
+		}
+		mdb_printf("%08x ", fw->req_q[cnt]);
+	}
+
+	mdb_printf("\n\nResponse Queue");
+
+	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt);
+		}
+		mdb_printf("%08x ", fw->rsp_q[cnt]);
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+	    (ha->fwexttracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint32_t *w32 = ha->fwexttracebuf.bp;
+
+		mdb_printf("\n\nExtended Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->ext_trace_buf[cnt]);
+		}
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+	    (ha->fwfcetracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint32_t *w32 = ha->fwfcetracebuf.bp;
+
+		mdb_printf("\n\nFC Event Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->fce_trace_buf[cnt]);
+		}
+	}
+	mdb_free(fw, ha->ql_dump_size);
 
 	return (DCMD_OK);
 }
@@ -2073,35 +2424,25 @@ static int
 ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
-	void			*ql_dump_ptr;
 	ql_25xx_fw_dump_t	*fw;
 	uint32_t		cnt = 0;
 
-	mdb_printf("in 25xx dump routine\n");
+	fw = (ql_25xx_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
 
-	/* Get the ql_dump_ptr as ql_25xx_fw_dump_t from the system */
-	if (mdb_readvar(&ql_dump_ptr, "ql_dump_ptr") == -1) {
+	if (mdb_vread(fw, ha->ql_dump_size,
+	    (uintptr_t)ha->ql_dump_ptr) == -1) {
 		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
-		return (DCMD_ERR);
-	}
-
-	fw = (ql_25xx_fw_dump_t *)mdb_alloc(sizeof (ql_25xx_fw_dump_t) +
-	    ha->fw_ext_memory_size, UM_SLEEP);
-
-	if (mdb_vread(fw, (sizeof (ql_25xx_fw_dump_t) +
-	    ha->fw_ext_memory_size), (uintptr_t)ql_dump_ptr) == -1) {
-		mdb_free(fw, sizeof (ql_25xx_fw_dump_t) +
-		    ha->fw_ext_memory_size);
+		mdb_free(fw, ha->ql_dump_size);
 		return (DCMD_OK);
 	}
 
-	mdb_printf("ISP FW Version %d.%02d.%02d Attributes %X\n",
+	mdb_printf("\nISP FW Version %d.%02d.%02d Attributes %X\n",
 	    ha->fw_major_version, ha->fw_minor_version,
 	    ha->fw_subminor_version, ha->fw_attributes);
 
 	mdb_printf("\nR2H Register\n%08x\n", fw->r2h_status);
 
-	mdb_printf("\nHostRisc Registers");
+	mdb_printf("\n\nHostRisc Registers");
 	for (cnt = 0; cnt < sizeof (fw->hostrisc_reg) / 4; cnt++) {
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
@@ -2109,7 +2450,7 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		mdb_printf("%08x ", fw->hostrisc_reg[cnt]);
 	}
 
-	mdb_printf("\nPCIe Registers");
+	mdb_printf("\n\nPCIe Registers");
 	for (cnt = 0; cnt < sizeof (fw->pcie_reg) / 4; cnt++) {
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
@@ -2117,12 +2458,21 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		mdb_printf("%08x ", fw->pcie_reg[cnt]);
 	}
 
-	mdb_printf("\nHost Interface Registers");
+	mdb_printf("\n\nHost Interface Registers");
 	for (cnt = 0; cnt < sizeof (fw->host_reg) / 4; cnt++) {
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
 		mdb_printf("%08x ", fw->host_reg[cnt]);
+	}
+
+	mdb_printf("\n\nShadow Registers");
+	for (cnt = 0; cnt < sizeof (fw->shadow_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+
+		mdb_printf("%08x ", fw->shadow_reg[cnt]);
 	}
 
 	mdb_printf("\n\nMailbox Registers");
@@ -2138,7 +2488,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xseq_gp_reg[cnt]);
 	}
 
@@ -2147,7 +2496,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xseq_0_reg[cnt]);
 	}
 
@@ -2156,7 +2504,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xseq_1_reg[cnt]);
 	}
 
@@ -2165,7 +2512,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_gp_reg[cnt]);
 	}
 
@@ -2174,7 +2520,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_0_reg[cnt]);
 	}
 
@@ -2183,7 +2528,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_1_reg[cnt]);
 	}
 
@@ -2192,7 +2536,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rseq_2_reg[cnt]);
 	}
 
@@ -2201,7 +2544,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->aseq_gp_reg[cnt]);
 	}
 
@@ -2228,7 +2570,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->aseq_2_reg[cnt]);
 	}
 
@@ -2237,7 +2578,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->cmd_dma_reg[cnt]);
 	}
 
@@ -2246,7 +2586,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->req0_dma_reg[cnt]);
 	}
 
@@ -2255,7 +2594,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->resp0_dma_reg[cnt]);
 	}
 
@@ -2264,7 +2602,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->req1_dma_reg[cnt]);
 	}
 
@@ -2273,7 +2610,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt0_dma_reg[cnt]);
 	}
 
@@ -2282,7 +2618,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt1_dma_reg[cnt]);
 	}
 
@@ -2291,7 +2626,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt2_dma_reg[cnt]);
 	}
 
@@ -2300,7 +2634,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt3_dma_reg[cnt]);
 	}
 
@@ -2309,7 +2642,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt4_dma_reg[cnt]);
 	}
 
@@ -2318,7 +2650,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->xmt_data_dma_reg[cnt]);
 	}
 
@@ -2327,7 +2658,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rcvt0_data_dma_reg[cnt]);
 	}
 
@@ -2336,7 +2666,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->rcvt1_data_dma_reg[cnt]);
 	}
 
@@ -2345,17 +2674,7 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->risc_gp_reg[cnt]);
-	}
-
-	mdb_printf("\n\nShadow Registers");
-	for (cnt = 0; cnt < sizeof (fw->shadow_reg) / 4; cnt++) {
-		if (cnt % 8 == 0) {
-			mdb_printf("\n");
-		}
-
-		mdb_printf("%08x ", fw->shadow_reg[cnt]);
 	}
 
 	mdb_printf("\n\nRISC IO Register\n%08x", fw->risc_io);
@@ -2365,7 +2684,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->lmc_reg[cnt]);
 	}
 
@@ -2374,7 +2692,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->fpm_hdw_reg[cnt]);
 	}
 
@@ -2383,7 +2700,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n");
 		}
-
 		mdb_printf("%08x ", fw->fb_hdw_reg[cnt]);
 	}
 
@@ -2392,7 +2708,6 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 		if (cnt % 8 == 0) {
 			mdb_printf("\n%08x: ", cnt + 0x20000);
 		}
-
 		mdb_printf("%08x ", fw->code_ram[cnt]);
 	}
 
@@ -2406,14 +2721,217 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 
 	mdb_printf("\n[<==END] ISP Debug Dump");
 
-	mdb_free(fw, sizeof (ql_25xx_fw_dump_t));
-	mdb_free(ha, sizeof (ql_adapter_state_t));
+	mdb_printf("\n\nRequest Queue");
 
-	mdb_printf("return exit\n");
+	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt);
+		}
+		mdb_printf("%08x ", fw->req_q[cnt]);
+	}
+
+	mdb_printf("\n\nResponse Queue");
+
+	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt);
+		}
+		mdb_printf("%08x ", fw->rsp_q[cnt]);
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+	    (ha->fwexttracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint32_t *w32 = ha->fwexttracebuf.bp;
+
+		mdb_printf("\n\nExtended Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->ext_trace_buf[cnt]);
+		}
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+	    (ha->fwfcetracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint32_t *w32 = ha->fwfcetracebuf.bp;
+
+		mdb_printf("\n\nFC Event Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->fce_trace_buf[cnt]);
+		}
+	}
+
+	mdb_free(fw, ha->ql_dump_size);
+
+	mdb_printf("\n\nreturn exit\n");
 
 	return (DCMD_OK);
 }
 
+/*
+ * ql_gettrace_dcmd
+ *	prints out the Extended Logging trace buffer
+ *
+ * Input:
+ *	addr  = User supplied address. (NB: must be an ha)
+ *	flags = mdb flags.
+ *	argc  = Number of user supplied args.
+ *	argv  = Arg array.
+ *
+ * Returns:
+ *	DCMD_OK or DCMD_ERR
+ *
+ * Context:
+ *	User context.
+ *
+ */
+static int
+qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	ql_adapter_state_t	*ha;
+	int			verbose = 0;
+	int			wrapped = 0;
+	char			*trace_start;
+	char			*trace_end;
+	char			*dump_start = 0;
+	char			*trace_next  = 0;
+	char			*dump_current  = 0;
+	el_trace_desc_t		*trace_desc;
+
+	if ((!(flags & DCMD_ADDRSPEC)) || addr == NULL) {
+		mdb_warn("ql_adapter_state structure addr is required");
+		return (DCMD_USAGE);
+	}
+
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose) !=
+	    argc) {
+		return (DCMD_USAGE);
+	}
+
+	/*
+	 * Get the adapter state struct which was passed
+	 */
+	if ((ha = (ql_adapter_state_t *)mdb_alloc(sizeof (ql_adapter_state_t),
+	    UM_SLEEP)) == NULL) {
+		mdb_warn("failed to allocate memory for ql_adapter_state\n");
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(ha, sizeof (ql_adapter_state_t), addr) == -1) {
+		mdb_warn("failed to read ql_adapter_state at %p", addr);
+		mdb_free(ha, sizeof (ql_adapter_state_t));
+		return (DCMD_OK);
+	}
+
+	/*
+	 * If its not a valid trace descriptor then bail out
+	 */
+	if (ha->el_trace_desc == NULL) {
+		mdb_warn("trace descriptor does not exist for instance %d\n",
+		    ha->instance);
+		mdb_free(ha, sizeof (ql_adapter_state_t));
+		return (DCMD_OK);
+	} else {
+		trace_desc = (el_trace_desc_t *)
+		    mdb_alloc(sizeof (el_trace_desc_t), UM_SLEEP);
+		if (mdb_vread(trace_desc, sizeof (el_trace_desc_t),
+		    (uintptr_t)ha->el_trace_desc) == -1) {
+			mdb_warn("failed to read ql_adapter_state at %p",
+			    addr);
+			mdb_free(trace_desc, sizeof (el_trace_desc_t));
+			mdb_free(ha, sizeof (ql_adapter_state_t));
+			return (DCMD_OK);
+		}
+		if (trace_desc->trace_buffer == NULL) {
+			mdb_warn("trace buffer does not exist for "
+			    "instance %d\n", ha->instance);
+			mdb_free(trace_desc, sizeof (el_trace_desc_t));
+			mdb_free(ha, sizeof (ql_adapter_state_t));
+			return (DCMD_OK);
+		}
+	}
+
+	/* Get the trace buffer */
+
+	trace_start = (char *)
+	    mdb_zalloc(trace_desc->trace_buffer_size, UM_SLEEP);
+
+	if (mdb_vread(trace_start, trace_desc->trace_buffer_size,
+	    (uintptr_t)trace_desc->trace_buffer) == -1) {
+		mdb_warn("failed to read trace buffer?)");
+		mdb_free(trace_start, trace_desc->trace_buffer_size);
+		mdb_free(ha, sizeof (ql_adapter_state_t));
+		return (DCMD_OK);
+	}
+
+	/* set the end of the trace buffer. */
+	trace_end = trace_start + trace_desc->trace_buffer_size;
+
+	/* Find the start point of trace. */
+	trace_next = trace_start + trace_desc->next;
+
+	/*
+	 * If the buffer has not wrapped next will point at a null so
+	 * start is the begining of the buffer.  If next points at a char
+	 * then we must traverse the buffer further until a null is detected.
+	 * The location after the null will be the beginning of the oldest
+	 * whole object in the buffer, which we use as the start.
+	 */
+
+	if ((trace_next + EL_BUFFER_RESERVE) >= trace_end) {
+		dump_start = trace_start;
+	} else if (*trace_next != NULL) {
+		dump_start = trace_next + (strlen(trace_next) + 1);
+	} else {
+		dump_start = trace_start;
+	}
+
+	dump_current = dump_start;
+
+	mdb_printf("\nExtended Logging trace buffer @%x, start @%x, "
+	    "size=%d\n\n", trace_start, dump_current,
+	    trace_desc->trace_buffer_size);
+
+	/* Don't run off the end, no matter what. */
+	while (((uintptr_t)dump_current - (uintptr_t)trace_start) <=
+	    (uintptr_t)trace_desc->trace_buffer_size) {
+		/* Show it... */
+		mdb_printf("%s", dump_current);
+		/* Calculate the next and make it the current */
+		dump_current += (strlen(dump_current) + 1);
+		/* check for wrap */
+		if ((dump_current + EL_BUFFER_RESERVE) >= trace_end) {
+			mdb_printf("Wraping %x\n", dump_current);
+			dump_current = trace_start;
+			wrapped = 1;
+		} else if (wrapped) {
+			/*   Don't go past next. */
+			if ((trace_start + trace_desc->next) <= dump_current) {
+				mdb_printf("Done %x", dump_current);
+				break;
+			}
+		} else if (*dump_current == NULL) {
+			mdb_printf("Done %x(null)", dump_current);
+			break;
+		}
+	}
+
+	mdb_free(ha, sizeof (ql_adapter_state_t));
+	mdb_free(trace_start, trace_desc->trace_buffer_size);
+	mdb_free(trace_desc, sizeof (el_trace_desc_t));
+
+	return (DCMD_OK);
+}
 /*
  * ql_doprint
  *	ql generic function to call the print dcmd
@@ -2509,7 +3027,10 @@ static const mdb_dcmd_t dcmds[] = {
 	    qlcstate_dcmd },
 	{ "qlctgtq", NULL, "Prints qlc target queues", qltgtq_dcmd },
 	{ "qlcwdog", NULL, "Prints out watchdog linked list", qlc_wdog_dcmd},
-	{ "qlcdump", NULL, "Retrieves the ASCII f/w dump", qlc_dump_dcmd },
+	{ "qlcgetdump", ":[-v]", "Retrieves the ASCII f/w dump",
+	    qlc_getdump_dcmd },
+	{ "qlcgettrace", ":[-v]", "Retrieves the ASCII Extended Logging trace",
+	    qlc_gettrace_dcmd },
 	{ NULL }
 };
 

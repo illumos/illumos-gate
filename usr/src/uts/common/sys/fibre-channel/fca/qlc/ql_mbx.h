@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_QL_MBX_H
 #define	_QL_MBX_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -286,6 +285,18 @@ typedef struct ql_mbx_data {
 #define	MBX_1		BIT_1
 #define	MBX_0		BIT_0
 
+#define	MBX_0_THRU_1	MBX_0|MBX_1
+#define	MBX_0_THRU_2	MBX_0_THRU_1|MBX_2
+#define	MBX_0_THRU_3	MBX_0_THRU_2|MBX_3
+#define	MBX_0_THRU_4	MBX_0_THRU_3|MBX_4
+#define	MBX_0_THRU_5	MBX_0_THRU_4|MBX_5
+#define	MBX_0_THRU_6	MBX_0_THRU_5|MBX_6
+#define	MBX_0_THRU_7	MBX_0_THRU_6|MBX_7
+#define	MBX_0_THRU_8	MBX_0_THRU_7|MBX_8
+#define	MBX_0_THRU_9	MBX_0_THRU_8|MBX_9
+#define	MBX_0_THRU_10	MBX_0_THRU_9|MBX_10
+
+
 /*
  * Firmware state codes from get firmware state mailbox command
  */
@@ -322,12 +333,15 @@ typedef struct ql_mbx_data {
 #define	FO13_LESB_NO_RESET		BIT_0
 
 /*
- * f/w trace options
+ * f/w trace opcodes - mailbox 1(bits 7-0)
  */
-#define	FTO_EXTENABLE		4
-#define	FTO_EXTDISABLE		5
-#define	FTO_FCEENABLE		8
-#define	FTO_FCEDISABLE		9
+#define	FTO_INSERT_TIME_STAMP	1
+#define	FTO_RESERVED_2		2
+#define	FTO_RESERVED_3		3
+#define	FTO_EXT_TRACE_ENABLE	4
+#define	FTO_EXT_TRACE_DISABLE	5
+#define	FTO_FCE_TRACE_ENABLE	8
+#define	FTO_FCE_TRACE_DISABLE	9
 #define	FTO_FCEMAXTRACEBUF	0x840	/* max frame size */
 
 /*
@@ -485,9 +499,13 @@ typedef struct port_database_24 {
 #define	PD_STATE_WAIT_DISCOVERY_ACK		1
 #define	PD_STATE_PORT_LOGIN			2
 #define	PD_STATE_WAIT_PORT_LOGIN_ACK		3
+#define	PD_STATE_PLOGI_PENDING			3
 #define	PD_STATE_PROCESS_LOGIN			4
+#define	PD_STATE_PLOGI_COMPLETED		4
 #define	PD_STATE_WAIT_PROCESS_LOGIN_ACK		5
+#define	PD_STATE_PRLI_PENDING			5
 #define	PD_STATE_PORT_LOGGED_IN			6
+#define	PD_STATE_PLOGI_PRLI_COMPLETED		6
 #define	PD_STATE_PORT_UNAVAILABLE		7
 #define	PD_STATE_PROCESS_LOGOUT			8
 #define	PD_STATE_WAIT_PROCESS_LOGOUT_ACK	9
@@ -597,6 +615,82 @@ int ql_read_sfp(ql_adapter_state_t *, dma_mem_t *, uint16_t, uint16_t);
 int ql_iidma_rate(ql_adapter_state_t *, uint16_t, uint32_t *, uint32_t);
 int ql_fw_etrace(ql_adapter_state_t *, dma_mem_t *, uint16_t);
 int ql_reset_menlo(ql_adapter_state_t *, ql_mbx_data_t *, uint16_t);
+/*
+ * Mailbox command table initializer
+ */
+#define	MBOX_CMD_TABLE()						\
+{									\
+	{MBC_LOAD_RAM, "MBC_LOAD_RAM"},					\
+	{MBC_EXECUTE_FIRMWARE, "MBC_EXECUTE_FIRMWARE"},			\
+	{MBC_DUMP_RAM, "MBC_DUMP_RAM"},					\
+	{MBC_WRITE_RAM_WORD, "MBC_WRITE_RAM_WORD"},			\
+	{MBC_READ_RAM_WORD, "MBC_READ_RAM_WORD"},			\
+	{MBC_MAILBOX_REGISTER_TEST, "MBC_MAILBOX_REGISTER_TEST"},	\
+	{MBC_VERIFY_CHECKSUM, "MBC_VERIFY_CHECKSUM"},			\
+	{MBC_ABOUT_FIRMWARE, "MBC_ABOUT_FIRMWARE"},			\
+	{MBC_DUMP_RISC_RAM, "MBC_DUMP_RISC_RAM"},			\
+	{MBC_LOAD_RAM_EXTENDED, "MBC_LOAD_RAM_EXTENDED"},		\
+	{MBC_DUMP_RAM_EXTENDED, "MBC_DUMP_RAM_EXTENDED"},		\
+	{MBC_READ_RAM_EXTENDED, "MBC_READ_RAM_EXTENDED"},		\
+	{MBC_SERDES_TRANSMIT_PARAMETERS, "MBC_SERDES_TRANSMIT_PARAMETERS"},\
+	{MBC_2300_EXECUTE_IOCB, "MBC_2300_EXECUTE_IOCB"},		\
+	{MBC_GET_IO_STATUS, "MBC_GET_IO_STATUS"},			\
+	{MBC_STOP_FIRMWARE, "MBC_STOP_FIRMWARE"},			\
+	{MBC_ABORT_COMMAND_IOCB, "MBC_ABORT_COMMAND_IOCB"},		\
+	{MBC_ABORT_DEVICE, "MBC_ABORT_DEVICE"},				\
+	{MBC_ABORT_TARGET, "MBC_ABORT_TARGET"},				\
+	{MBC_RESET, "MBC_RESET"},					\
+	{MBC_XMIT_PARM, "MBC_XMIT_PARM"},				\
+	{MBC_PORT_PARAM, "MBC_PORT_PARAM"},				\
+	{MBC_GET_ID, "MBC_GET_ID"},					\
+	{MBC_GET_TIMEOUT_PARAMETERS, "MBC_GET_TIMEOUT_PARAMETERS"},	\
+	{MBC_TRACE_CONTROL, "MBC_TRACE_CONTROL"},			\
+	{MBC_READ_SFP, "MBC_READ_SFP"},					\
+	{MBC_GET_FIRMWARE_OPTIONS, "MBC_GET_FIRMWARE_OPTIONS"},		\
+	{MBC_SET_FIRMWARE_OPTIONS, "MBC_SET_FIRMWARE_OPTIONS"},		\
+	{MBC_LOOP_PORT_BYPASS, "MBC_LOOP_PORT_BYPASS"},			\
+	{MBC_LOOP_PORT_ENABLE, "MBC_LOOP_PORT_ENABLE"},			\
+	{MBC_GET_RESOURCE_COUNTS, "MBC_GET_RESOURCE_COUNTS"},		\
+	{MBC_NON_PARTICIPATE, "MBC_NON_PARTICIPATE"},			\
+	{MBC_ECHO, "MBC_ECHO"},						\
+	{MBC_DIAGNOSTIC_LOOP_BACK, "MBC_DIAGNOSTIC_LOOP_BACK"},		\
+	{MBC_ONLINE_SELF_TEST, "MBC_ONLINE_SELF_TEST"},			\
+	{MBC_ENHANCED_GET_PORT_DATABASE, "MBC_ENHANCED_GET_PORT_DATABASE"},\
+	{MBC_INITIALIZE_MULTI_ID_FW, "MBC_INITIALIZE_MULTI_ID_FW"},	\
+	{MBC_RESET_LINK_STATUS, "MBC_RESET_LINK_STATUS"},		\
+	{MBC_EXECUTE_IOCB, "MBC_EXECUTE_IOCB"},				\
+	{MBC_SEND_RNID_ELS, "MBC_SEND_RNID_ELS"},			\
+	{MBC_SET_PARAMETERS, "MBC_SET_PARAMETERS"},			\
+	{MBC_GET_PARAMETERS, "MBC_GET_PARAMETERS"},			\
+	{MBC_DATA_RATE, "MBC_DATA_RATE"},				\
+	{MBC_INITIALIZE_FIRMWARE, "MBC_INITIALIZE_FIRMWARE"},		\
+	{MBC_INITIATE_LIP, "MBC_INITIATE_LIP"},				\
+	{MBC_GET_FC_AL_POSITION_MAP, "MBC_GET_FC_AL_POSITION_MAP"},	\
+	{MBC_GET_PORT_DATABASE, "MBC_GET_PORT_DATABASE"},		\
+	{MBC_CLEAR_ACA, "MBC_CLEAR_ACA"},				\
+	{MBC_TARGET_RESET, "MBC_TARGET_RESET"},				\
+	{MBC_CLEAR_TASK_SET, "MBC_CLEAR_TASK_SET"},			\
+	{MBC_ABORT_TASK_SET, "MBC_ABORT_TASK_SET"},			\
+	{MBC_GET_FIRMWARE_STATE, "MBC_GET_FIRMWARE_STATE"},		\
+	{MBC_GET_PORT_NAME, "MBC_GET_PORT_NAME"},			\
+	{MBC_GET_LINK_STATUS, "MBC_GET_LINK_STATUS"},			\
+	{MBC_LIP_RESET, "MBC_LIP_RESET"},				\
+	{MBC_GET_STATUS_COUNTS, "MBC_GET_STATUS_COUNTS"},		\
+	{MBC_SEND_SNS_COMMAND, "MBC_SEND_SNS_COMMAND"},			\
+	{MBC_LOGIN_FABRIC_PORT, "MBC_LOGIN_FABRIC_PORT"},		\
+	{MBC_SEND_CHANGE_REQUEST, "MBC_SEND_CHANGE_REQUEST"},		\
+	{MBC_LOGOUT_FABRIC_PORT, "MBC_LOGOUT_FABRIC_PORT"},		\
+	{MBC_LIP_FULL_LOGIN, "MBC_LIP_FULL_LOGIN"},			\
+	{MBC_LOGIN_LOOP_PORT, "MBC_LOGIN_LOOP_PORT"},			\
+	{MBC_PORT_NODE_NAME_LIST, "MBC_PORT_NODE_NAME_LIST"},		\
+	{MBC_INITIALIZE_IP, "MBC_INITIALIZE_IP"},			\
+	{MBC_SEND_FARP_REQ_COMMAND, "MBC_SEND_FARP_REQ_COMMAND"},	\
+	{MBC_UNLOAD_IP, "MBC_UNLOAD_IP"},				\
+	{MBC_GET_ID_LIST, "MBC_GET_ID_LIST"},				\
+	{MBC_SEND_LFA_COMMAND, "MBC_SEND_LFA_COMMAND"},			\
+	{MBC_LUN_RESET, "MBC_LUN_RESET"},				\
+	{NULL, "Unsupported"}						\
+}
 
 #ifdef	__cplusplus
 }

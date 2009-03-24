@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_ioctl.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_ioctl.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -122,16 +122,12 @@ ql_open(dev_t *dev_p, int flags, int otyp, cred_t *cred_p)
 		return (EINVAL);
 	}
 
-	/* Acquire adapter state lock. */
 	ADAPTER_STATE_LOCK(ha);
 	if (flags & FEXCL && ha->flags & QL_OPENED) {
-		/* Release adapter state lock. */
 		ADAPTER_STATE_UNLOCK(ha);
 		rval = EBUSY;
 	} else {
 		ha->flags |= QL_OPENED;
-
-		/* Release adapter state lock. */
 		ADAPTER_STATE_UNLOCK(ha);
 	}
 
@@ -181,12 +177,8 @@ ql_close(dev_t dev, int flags, int otyp, cred_t *cred_p)
 		return (EINVAL);
 	}
 
-	/* Acquire adapter state lock. */
 	ADAPTER_STATE_LOCK(ha);
-
 	ha->flags &= ~QL_OPENED;
-
-	/* Release adapter state lock. */
 	ADAPTER_STATE_UNLOCK(ha);
 
 	if (rval != 0) {
@@ -256,8 +248,7 @@ ql_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	rval = ql_xioctl(ha, cmd, arg, mode, cred_p, rval_p);
 	if (rval == ENOPROTOOPT || rval == EINVAL) {
 		switch (cmd) {
-		case QL_GET_ADAPTER_FEATURE_BITS:
-		{
+		case QL_GET_ADAPTER_FEATURE_BITS: {
 			uint16_t bits;
 
 			rval = ql_get_feature_bits(ha, &bits);
@@ -269,8 +260,7 @@ ql_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 			break;
 		}
 
-		case QL_SET_ADAPTER_FEATURE_BITS:
-		{
+		case QL_SET_ADAPTER_FEATURE_BITS: {
 			uint16_t bits;
 
 			if (ddi_copyin((void *)arg, (void *)&bits,
@@ -1728,8 +1718,7 @@ ql_adm_adapter_info(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 
 	/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
 	rval = ddi_getlongprop(DDI_DEV_T_ANY, ha->dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "version", (caddr_t)&dp,
-	    &i);
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "version", (caddr_t)&dp, &i);
 	length = i;
 	if (rval != DDI_PROP_SUCCESS) {
 		EL(ha, "failed, ddi_getlongprop=%xh\n", rval);
@@ -1742,8 +1731,7 @@ ql_adm_adapter_info(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 	}
 
 	if (ddi_copyout((void *)&hba, (void *)(uintptr_t)dop->buffer,
-	    dop->length, mode)
-	    != 0) {
+	    dop->length, mode) != 0) {
 		EL(ha, "failed, ddi_copyout\n");
 		return (EFAULT);
 	}
@@ -1881,8 +1869,7 @@ ql_adm_device_list(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 	}
 
 	if (ddi_copyout((void *)&dev, (void *)(uintptr_t)dop->buffer,
-	    dop->length, mode)
-	    != 0) {
+	    dop->length, mode) != 0) {
 		EL(ha, "failed, ddi_copyout\n");
 		return (EFAULT);
 	}
@@ -2030,7 +2017,7 @@ ql_adm_fw_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, void *udop, int mode)
 		return (EINVAL);
 	}
 
-	if (ql_dump_state & QL_DUMP_VALID) {
+	if (ha->ql_dump_state & QL_DUMP_VALID) {
 		dmp = kmem_zalloc(ha->risc_dump_size, KM_SLEEP);
 		if (dmp == NULL) {
 			EL(ha, "failed, kmem_zalloc\n");
@@ -2046,7 +2033,7 @@ ql_adm_fw_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, void *udop, int mode)
 		}
 
 		kmem_free(dmp, ha->risc_dump_size);
-		ql_dump_state |= QL_DUMP_UPLOADED;
+		ha->ql_dump_state |= QL_DUMP_UPLOADED;
 
 	} else {
 		EL(ha, "failed, no dump file\n");
@@ -2235,8 +2222,8 @@ ql_adm_vpd_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 		return (EINVAL);
 	}
 
-	if ((rval = ql_vpd_dump(ha, (void *)(uintptr_t)dop->buffer,
-	    mode)) != 0) {
+	if ((rval = ql_vpd_dump(ha, (void *)(uintptr_t)dop->buffer, mode))
+	    != 0) {
 		EL(ha, "failed, ql_vpd_dump\n");
 	} else {
 		/*EMPTY*/
@@ -2278,8 +2265,8 @@ ql_adm_vpd_load(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 		return (EINVAL);
 	}
 
-	if ((rval = ql_vpd_load(ha, (void *)(uintptr_t)dop->buffer,
-	    mode)) != 0) {
+	if ((rval = ql_vpd_load(ha, (void *)(uintptr_t)dop->buffer, mode))
+	    != 0) {
 		EL(ha, "failed, ql_vpd_dump\n");
 	} else {
 		/*EMPTY*/

@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_mbx.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_mbx.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -91,6 +91,7 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 	uint32_t		set_flags = 0;
 	uint32_t		reset_flags = 0;
 	ql_adapter_state_t	*ha = vha->pha;
+	int			mbx_cmd = mcp->mb[0];
 
 	ASSERT(!MUTEX_HELD(&ha->mutex));
 
@@ -114,7 +115,7 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 		timer = ddi_get_lbolt();
 		timer += (mcp->timeout + 20) * drv_usectohz(1000000);
 		cv_stat = cv_timedwait_sig(&ha->cv_mbx_wait,
-		    &ha->mbx_mutex, timer);
+		    &ha->pha->mbx_mutex, timer);
 		if (cv_stat == -1 || cv_stat == 0) {
 			/*
 			 * The timeout time 'timer' was
@@ -169,7 +170,7 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 			/* 30 seconds from now */
 			timer = ddi_get_lbolt();
 			timer += mcp->timeout * drv_usectohz(1000000);
-			if (cv_timedwait(&ha->cv_mbx_intr, &ha->mbx_mutex,
+			if (cv_timedwait(&ha->cv_mbx_intr, &ha->pha->mbx_mutex,
 			    timer) == -1) {
 				/*
 				 * The timeout time 'timer' was
@@ -225,12 +226,23 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 	} else {
 		ha->mailbox_flags = (uint8_t)
 		    (ha->mailbox_flags & ~MBX_INTERRUPT);
-
+		/*
+		 * This is the expected completion path so
+		 * return the actual mbx cmd completion status.
+		 */
 		rval = mcp->mb[0];
 	}
 
-	/* reset outbound to risc mailbox registers. */
-	data = (mcp->out_mb >> 1);
+	/*
+	 * Clear outbound to risc mailbox registers per spec. The exception
+	 * is on 2200 mailbox 4 and 5 affect the req and resp que indexes
+	 * so avoid writing them.
+	 */
+	if (ha->cfg_flags & CFG_CTRL_2200) {
+		data = ((mcp->out_mb & ~(MBX_4 | MBX_5)) >> 1);
+	} else {
+		data = (mcp->out_mb >> 1);
+	}
 	for (cnt = 1; cnt < ha->reg_off->mbox_cnt && data; cnt++) {
 		if (data & MBX_0) {
 			WRT16_IO_REG(ha, mailbox[cnt], (uint16_t)0);
@@ -258,8 +270,8 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 	}
 
 	if (rval != QL_SUCCESS) {
-		EL(vha, "failed, rval=%xh, mcp->mb[0]=%xh\n", rval,
-		    mcp->mb[0]);
+		EL(vha, "%s failed, rval=%xh, mcp->mb[0]=%xh\n",
+		    mbx_cmd_text(mbx_cmd), rval, mcp->mb[0]);
 	} else {
 		/*EMPTY*/
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
@@ -323,7 +335,7 @@ ql_setup_mbox_dma_resources(ql_adapter_state_t *ha, dma_mem_t *mem_desc,
 	int	rval = QL_SUCCESS;
 
 	if ((rval = ql_get_dma_mem(ha, mem_desc, size, LITTLE_ENDIAN_DMA,
-	    MEM_RING_ALIGN)) != QL_SUCCESS) {
+	    QL_DMA_RING_ALIGN)) != QL_SUCCESS) {
 		EL(ha, "failed, ql_get_dma_mem FC_NOMEM\n");
 		rval = QL_MEMORY_ALLOC_FAILED;
 	}
@@ -1907,14 +1919,16 @@ ql_get_port_database(ql_adapter_state_t *ha, ql_tgt_t *tq, uint8_t opt)
 			EL(ha, "d_id=%xh, loop_id=%xh, not logged in "
 			    "master=%xh, slave=%xh\n", tq->d_id.b24,
 			    tq->loop_id, tq->master_state, tq->slave_state);
-			rval = QL_FUNCTION_FAILED;
+			rval = QL_NOT_LOGGED_IN;
 		} else {
-			tq->flags = tq->prli_svc_param_word_3 & BIT_4 ?
+			tq->flags = tq->prli_svc_param_word_3 &
+			    PRLI_W3_TARGET_FUNCTION ?
 			    tq->flags & ~TQF_INITIATOR_DEVICE :
 			    tq->flags | TQF_INITIATOR_DEVICE;
 
 			if ((tq->flags & TQF_INITIATOR_DEVICE) == 0) {
-				tq->flags = tq->prli_svc_param_word_3 & BIT_8 ?
+				tq->flags = tq->prli_svc_param_word_3 &
+				    PRLI_W3_RETRY ?
 				    tq->flags | TQF_TAPE_DEVICE :
 				    tq->flags & ~TQF_TAPE_DEVICE;
 			} else {
@@ -1925,7 +1939,7 @@ ql_get_port_database(ql_adapter_state_t *ha, ql_tgt_t *tq, uint8_t opt)
 
 	kmem_free(pd23, PORT_DATABASE_SIZE);
 
-	if (rval != QL_SUCCESS) {
+	if ((rval != QL_SUCCESS) && (rval != QL_PARAMETER_ERROR)) {
 		EL(ha, "d_id=%xh, loop_id=%xh, failed=%xh\n", tq->d_id.b24,
 		    tq->loop_id, rval);
 	} else {
@@ -2074,8 +2088,6 @@ ql_send_rnid_els(ql_adapter_state_t *ha, uint16_t loop_id, uint8_t opt,
 	mbx_cmd_t	*mcp = &mc;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	bzero((caddr_t)mcp, sizeof (mbx_cmd_t));
 
 	if ((rval = ql_setup_mbox_dma_resources(ha, &mem_desc,
 	    (uint32_t)size)) != QL_SUCCESS) {
@@ -3355,9 +3367,14 @@ ql_get_adapter_id(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 	if (ha->flags & VP_ENABLED) {
 		mcp->mb[9] = ha->vp_index;
 		mcp->out_mb |= MBX_9;
+	} else {
+		mcp->mb[9] = 0;
+		mcp->out_mb |= MBX_9;
 	}
+
 	mcp->in_mb = MBX_7|MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
+
 	rval = ql_mailbox_command(ha, mcp);
 
 	/* Return mailbox data. */
@@ -3944,11 +3961,7 @@ ql_set_xmit_parms(ql_adapter_state_t *ha)
  * Input:
  *	ha:	adapter state pointer.
  *	mem:	pointer to dma memory object for command.
- *	opt:	options.
- *		FTO_EXTENABLE
- *		FTO_EXTDISABLE
- *		FTO_FCEENABLE
- *		FTO_FCEDISABLE
+ *	opt:	options and opcode.
  *
  * Returns:
  *	ql local function return status code.
@@ -3962,39 +3975,66 @@ ql_fw_etrace(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t opt)
 	int		rval = QL_SUCCESS;
 	mbx_cmd_t	mc = {0};
 	mbx_cmd_t	*mcp = &mc;
+	uint16_t	op_code;
+	uint64_t	time;
 
 	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
 
+	/* currently no supported options */
+	op_code = (uint16_t)(opt & ~0xFF00);
+
 	mcp->mb[0] = MBC_TRACE_CONTROL;
-	mcp->mb[1] = opt;
-	mcp->out_mb = MBX_1|MBX_0;
+	mcp->mb[1] = op_code;
 	mcp->in_mb = MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 
-	switch (opt) {
-	case FTO_FCEENABLE:
-	case FTO_EXTENABLE:
+	switch (op_code) {
+	case FTO_INSERT_TIME_STAMP:
+
+		(void) drv_getparm(TIME, &time);
+
+		EL(ha, "insert time: %x %xh\n", MSD(time), LSD(time));
+
+		mcp->mb[2] = LSW(LSD(time));
+		mcp->mb[3] = MSW(LSD(time));
+		mcp->mb[4] = LSW(MSD(time));
+		mcp->mb[5] = MSW(MSD(time));
+		mcp->out_mb = MBX_0_THRU_5;
+		break;
+
+	case FTO_FCE_TRACE_ENABLE:
+		/* Firmware Fibre Channel Event Trace Buffer */
 		mcp->mb[2] = LSW(mem->cookies->dmac_address);
 		mcp->mb[3] = MSW(mem->cookies->dmac_address);
 		mcp->mb[4] = LSW(mem->cookies->dmac_notused);
 		mcp->mb[5] = MSW(mem->cookies->dmac_notused);
 		mcp->mb[6] = (uint16_t)(mem->size / 0x4000);	/* 16kb blks */
 		mcp->mb[7] = 0;
-		mcp->out_mb |= MBX_7|MBX_6|MBX_5|MBX_4|MBX_3|MBX_2;
-		if (opt == FTO_FCEENABLE) {
-			mcp->mb[8] = (uint16_t)ha->fwfcetraceopt;
-			mcp->mb[9] = FTO_FCEMAXTRACEBUF;
-			mcp->mb[10] = FTO_FCEMAXTRACEBUF;
-			mcp->out_mb |= MBX_10|MBX_9|MBX_8;
-		}
+		mcp->mb[8] = (uint16_t)ha->fwfcetraceopt;
+		mcp->mb[9] = FTO_FCEMAXTRACEBUF;
+		mcp->mb[10] = FTO_FCEMAXTRACEBUF;
+		mcp->out_mb = MBX_0_THRU_10;
 		break;
 
-	case FTO_FCEDISABLE:
+	case FTO_EXT_TRACE_ENABLE:
+		/* Firmware Extended Trace Buffer */
+		mcp->mb[2] = LSW(mem->cookies->dmac_address);
+		mcp->mb[3] = MSW(mem->cookies->dmac_address);
+		mcp->mb[4] = LSW(mem->cookies->dmac_notused);
+		mcp->mb[5] = MSW(mem->cookies->dmac_notused);
+		mcp->mb[6] = (uint16_t)(mem->size / 0x4000);	/* 16kb blks */
+		mcp->mb[7] = 0;
+		mcp->out_mb = MBX_0_THRU_7;
+		break;
+
+	case FTO_FCE_TRACE_DISABLE:
+		/* also causes ISP25xx to flush its internal FCE buffer. */
 		mcp->mb[2] = BIT_0;
-		mcp->out_mb = MBX_2;
+		mcp->out_mb = MBX_0_THRU_2;
 		break;
 
-	case FTO_EXTDISABLE:
+	case FTO_EXT_TRACE_DISABLE:
+		/* just sending the opcode disables it */
 		break;
 
 	default:

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,6 +41,6 @@ CPPFLAGS += -I$(SRC)/uts/common/sys/fibre-channel/impl
 LINTFLAGS64 +=  -erroff=E_STATIC_UNUSED -erroff=E_FUNC_SET_NOT_USED
 LINTFLAGS64 +=  -erroff=E_STATIC_UNUSED -erroff=E_FUNC_ARG_UNUSED
 
-#C99MODE=	-xc99=%all
-#C99LMODE=	-Xc99=%all
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 

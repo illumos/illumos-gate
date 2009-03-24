@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_iocb.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_iocb.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -83,8 +83,8 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 
 	if (sp != NULL) {
 		/*
-		 * Start any pending ones before this one.
-		 * Add command to pending command queue if not empty.
+		 * If the pending queue is not empty maintain order
+		 * by puting this srb at the tail and geting the head.
 		 */
 		if ((link = ha->pending_cmds.first) != NULL) {
 			ql_add_link_b(&ha->pending_cmds, &sp->cmd);
@@ -106,7 +106,7 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 		ql_remove_link(&ha->pending_cmds, &sp->cmd);
 	}
 
-	/* start as many as possible */
+	/* start this request and as many others as possible */
 	for (;;) {
 		if (ha->req_q_cnt < sp->req_cnt) {
 			/* Calculate number of free request entries. */
@@ -122,7 +122,10 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 				ha->req_q_cnt--;
 			}
 
-			/* If no room for request in request ring. */
+			/*
+			 * If no room in request ring put this srb at
+			 * the head of the pending queue and exit.
+			 */
 			if (ha->req_q_cnt < sp->req_cnt) {
 				QL_PRINT_8(CE_CONT, "(%d): request ring full,"
 				    " req_q_cnt=%d, req_ring_index=%d\n",
@@ -143,7 +146,10 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 				break;
 			}
 		}
-
+		/*
+		 * If no room in outstanding array put this srb at
+		 * the head of the pending queue and exit.
+		 */
 		if (cnt == MAX_OUTSTANDING_COMMANDS) {
 			QL_PRINT_8(CE_CONT, "(%d): no room in outstanding "
 			    "array\n", ha->instance);
@@ -151,11 +157,14 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 			break;
 		}
 
-		/* If room for request in request ring. */
+		/* nothing to stop us now. */
 		ha->outstanding_cmds[ha->osc_index] = sp;
+		/* create and save a unique response identifier in the srb */
 		sp->handle = ha->adapter_stats->ncmds << OSC_INDEX_SHIFT |
 		    ha->osc_index;
 		ha->req_q_cnt -= sp->req_cnt;
+
+		/* build the iocb in the request ring */
 		pkt = ha->request_ring_ptr;
 		sp->flags |= SRB_IN_TOKEN_ARRAY;
 
@@ -169,10 +178,11 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 		/* Setup IOCB common data. */
 		pkt->entry_count = (uint8_t)sp->req_cnt;
 		pkt->sys_define = (uint8_t)ha->req_ring_index;
+		/* mark the iocb with the response identifier */
 		ddi_put32(ha->hba_buf.acc_handle, &pkt->handle,
 		    (uint32_t)sp->handle);
 
-		/* Setup remaining IOCB data. */
+		/* Setup IOCB unique data. */
 		(sp->iocb)(vha, sp, pkt);
 
 		sp->flags |= SRB_ISP_STARTED;
@@ -199,12 +209,18 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 		/* Reset watchdog timer */
 		sp->wdg_q_time = sp->init_wdg_q_time;
 
-		/* Set chip new ring index. */
+		/*
+		 * Send it by setting the new ring index in the ISP Request
+		 * Ring In Pointer register.  This is the mechanism
+		 * used to notify the isp that a new iocb has been
+		 * placed on the request ring.
+		 */
 		WRT16_IO_REG(ha, req_in, ha->req_ring_index);
 
 		/* Update outstanding command count statistic. */
 		ha->adapter_stats->ncmds++;
 
+		/* if there is a pending command, try to start it. */
 		if ((link = ha->pending_cmds.first) == NULL) {
 			break;
 		}
@@ -324,6 +340,9 @@ ql_req_pkt(ql_adapter_state_t *vha, request_t **pktp)
 /*
  * ql_isp_cmd
  *	Function is responsible for modifying ISP input pointer.
+ *	This action notifies the isp that a new request has been
+ *	added to the request ring.
+ *
  *	Releases ring lock.
  *
  * Input:
@@ -1104,7 +1123,7 @@ void
 ql_isp_rcvbuf(ql_adapter_state_t *ha)
 {
 	rcvbuf_t	*container;
-	int16_t		rcv_q_cnt;
+	uint16_t	rcv_q_cnt;
 	uint16_t	index = 0;
 	uint16_t	index1 = 1;
 	int		debounce_count = QL_MAX_DEBOUNCE;
@@ -1148,7 +1167,7 @@ ql_isp_rcvbuf(ql_adapter_state_t *ha)
 
 	/* Load all free buffers in ISP receive buffer ring. */
 	index = 0;
-	while (rcv_q_cnt >= (uint16_t)0 && index < QL_UB_LIMIT) {
+	while (rcv_q_cnt > (uint16_t)0 && index < QL_UB_LIMIT) {
 		/* Locate a buffer to give. */
 		QL_UB_LOCK(ha);
 		while (index < QL_UB_LIMIT) {

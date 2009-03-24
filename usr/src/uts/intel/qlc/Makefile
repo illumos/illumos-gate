@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This makefile drives the production of qlc driver kernel module.
@@ -109,6 +109,7 @@ $(SRC)/uts/common/io/fibre-channel/fca/qlc/ql_fw_table.c: $(FWMODULES_SRC)
 	sed 's/.*ql_fw_/{ 0x/'                  |\
 	sed 's/.c:#define/,/'                   |\
 	sed 's/FW_VERSION_STRING//'             >> $@
+	echo '{ 0, NULL }'                      >> $@
 	echo '};'                               >> $@
 
 #

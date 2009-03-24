@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_isr.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_isr.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -53,6 +53,8 @@
 /*
  * Local Function Prototypes.
  */
+static void ql_handle_uncommon_risc_intr(ql_adapter_state_t *, uint32_t,
+    uint32_t *);
 static void ql_spurious_intr(ql_adapter_state_t *, int);
 static void ql_mbx_completion(ql_adapter_state_t *, uint16_t, uint32_t *,
     uint32_t *, int);
@@ -334,7 +336,8 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			}
 		}
 	} else {
-		while ((stat = RD32_IO_REG(ha, intr_info_lo)) & BIT_15) {
+		while ((stat = RD32_IO_REG(ha, intr_info_lo)) & RH_RISC_INT) {
+			/* Capture FW defined interrupt info */
 			mbx = MSW(stat);
 
 			/* Reset idle timer. */
@@ -450,58 +453,8 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 				break;
 
 			default:
-				mbx = RD16_IO_REG(ha, hccr);
-				if (stat & BIT_8 ||
-				    mbx & (BIT_15 | BIT_13 | BIT_11 | BIT_8)) {
-
-					ADAPTER_STATE_LOCK(ha);
-					ha->flags |= PARITY_ERROR;
-					ADAPTER_STATE_UNLOCK(ha);
-
-					if (ha->parity_pause_errors == 0 ||
-					    ha->parity_hccr_err != mbx ||
-					    ha->parity_stat_err != stat) {
-						cmn_err(CE_WARN, "qlc(%d): "
-						    "isr, Internal Parity/"
-						    "Pause Error - hccr=%xh, "
-						    "stat=%xh, count=%d",
-						    ha->instance, mbx, stat,
-						    ha->parity_pause_errors);
-						ha->parity_hccr_err = mbx;
-						ha->parity_stat_err = stat;
-					}
-
-					EL(ha, "parity/pause error, "
-					    "isp_abort_needed\n");
-
-					if (ql_binary_fw_dump(ha, FALSE) !=
-					    QL_SUCCESS) {
-						/* Reset ISP chip. */
-						ql_reset_chip(ha);
-					}
-
-					if (ha->parity_pause_errors == 0) {
-						(void) ql_flash_errlog(ha,
-						    FLASH_ERRLOG_PARITY_ERR, 0,
-						    MSW(stat), LSW(stat));
-					}
-
-					if (ha->parity_pause_errors <
-					    0xffffffff) {
-						ha->parity_pause_errors++;
-					}
-
-					set_flags |= ISP_ABORT_NEEDED;
-
-					/* Disable ISP interrupts. */
-					WRT16_IO_REG(ha, ictrl, 0);
-					ADAPTER_STATE_LOCK(ha);
-					ha->flags &= ~INTERRUPTS_ENABLED;
-					ADAPTER_STATE_UNLOCK(ha);
-				} else {
-					EL(ha, "UNKNOWN interrupt status=%xh,"
-					    " hccr=%xh\n", stat, mbx);
-				}
+				ql_handle_uncommon_risc_intr(ha, stat,
+				    &set_flags);
 				intr = B_TRUE;
 				break;
 			}
@@ -563,6 +516,71 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 	QL_PM_UNLOCK(ha);
 
 	return (rval);
+}
+
+/*
+ * ql_handle_uncommon_risc_intr
+ *	Handle an uncommon RISC interrupt.
+ *
+ * Input:
+ *	ha:		adapter state pointer.
+ *	stat:		interrupt status
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+static void
+ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, uint32_t stat,
+    uint32_t *set_flags)
+{
+	uint16_t	hccr_reg;
+
+	hccr_reg = RD16_IO_REG(ha, hccr);
+
+	if (stat & RH_RISC_PAUSED ||
+	    (hccr_reg & (BIT_15 | BIT_13 | BIT_11 | BIT_8))) {
+
+		ADAPTER_STATE_LOCK(ha);
+		ha->flags |= PARITY_ERROR;
+		ADAPTER_STATE_UNLOCK(ha);
+
+		if (ha->parity_pause_errors == 0 ||
+		    ha->parity_hccr_err != hccr_reg ||
+		    ha->parity_stat_err != stat) {
+			cmn_err(CE_WARN, "qlc(%d): isr, Internal Parity/"
+			    "Pause Error - hccr=%xh, stat=%xh, count=%d",
+			    ha->instance, hccr_reg, stat,
+			    ha->parity_pause_errors);
+			ha->parity_hccr_err = hccr_reg;
+			ha->parity_stat_err = stat;
+		}
+
+		EL(ha, "parity/pause error, isp_abort_needed\n");
+
+		if (ql_binary_fw_dump(ha, FALSE) != QL_SUCCESS) {
+			ql_reset_chip(ha);
+		}
+
+		if (ha->parity_pause_errors == 0) {
+			(void) ql_flash_errlog(ha, FLASH_ERRLOG_PARITY_ERR,
+			    0, MSW(stat), LSW(stat));
+		}
+
+		if (ha->parity_pause_errors < 0xffffffff) {
+			ha->parity_pause_errors++;
+		}
+
+		*set_flags |= ISP_ABORT_NEEDED;
+
+		/* Disable ISP interrupts. */
+		WRT16_IO_REG(ha, ictrl, 0);
+		ADAPTER_STATE_LOCK(ha);
+		ha->flags &= ~INTERRUPTS_ENABLED;
+		ADAPTER_STATE_UNLOCK(ha);
+	} else {
+		EL(ha, "UNKNOWN interrupt status=%xh, hccr=%xh\n",
+		    stat, hccr_reg);
+	}
 }
 
 /*
@@ -1008,14 +1026,12 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 				break;
 			}
 		}
-
 		if (vha == NULL) {
 			break;
 		}
-
 		if (FC_PORT_STATE_MASK(vha->state) != FC_STATE_OFFLINE ||
-		    (CFG_IST(ha, CFG_CTRL_2425) && (mb[1] != 0xffff ||
-		    mb[2] != 6 || mb[3] != 0))) {
+		    (CFG_IST(ha, CFG_CTRL_2425) &&
+		    (mb[1] != 0xffff || mb[2] != 6 || mb[3] != 0))) {
 			EL(ha, "%xh Port Database Update, Login/Logout "
 			    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh\n",
 			    mb[0], mb[1], mb[2], mb[3]);
@@ -1033,7 +1049,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			vha->task_daemon_flags &= ~LOOP_DOWN;
 			TASK_DAEMON_UNLOCK(ha);
 			ADAPTER_STATE_LOCK(ha);
-			vha->flags &= ~COMMAND_ABORT_TIMEOUT;
+			vha->flags &= ~ABORT_CMDS_LOOP_DOWN_TMO;
 			ADAPTER_STATE_UNLOCK(ha);
 		}
 
@@ -1796,21 +1812,24 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
     ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
 {
 	ql_srb_t		*sp;
-	uint32_t		index, cnt;
+	uint32_t		index;
+	uint32_t		resp_identifier;
 	uint16_t		comp_status;
 	int			rval = 0;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
-	index = cnt & OSC_INDEX_MASK;
+	/* Get the response identifier. */
+	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
 
-	/* Validate handle. */
+	/* extract the outstanding cmds index */
+	index = resp_identifier & OSC_INDEX_MASK;
+
+	/* Validate the index and get the associated srb pointer */
 	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
 	    NULL;
 
-	if (sp != NULL && sp->handle == cnt) {
+	if (sp != NULL && sp->handle == resp_identifier) {
 		comp_status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
 		    &pkt->comp_status);
 
@@ -1883,10 +1902,10 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 		    set_flags, reset_flags);
 	} else {
 		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
+			EL(ha, "unknown IOCB handle=%xh\n", resp_identifier);
 		} else {
 			EL(sp->ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
+			    resp_identifier, sp->handle);
 		}
 
 		(void) ql_binary_fw_dump(ha, FALSE);
@@ -3407,7 +3426,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 			cnt = ddi_get32(ha->hba_buf.acc_handle,
 			    &pkt24->resp_byte_count);
 			if (cnt < sizeof (fc_ct_header_t)) {
-				EL(ha, "Data underrrun\n");
+				EL(ha, "Data underrun\n");
 			} else {
 				sp->pkt->pkt_reason = CS_COMPLETE;
 			}

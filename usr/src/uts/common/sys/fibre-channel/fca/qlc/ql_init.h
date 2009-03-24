@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_QL_INIT_H
 #define	_QL_INIT_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -510,8 +509,8 @@ typedef struct nvram_24xx {
 #define	QL_2200_FW_DUMP_SIZE	0x68000		/* bytes */
 #define	QL_2300_FW_DUMP_SIZE	0xE2000		/* bytes */
 #define	QL_6322_FW_DUMP_SIZE	0xE2000		/* bytes */
-#define	QL_24XX_FW_DUMP_SIZE	0x02b0000	/* bytes */
-#define	QL_25XX_FW_DUMP_SIZE	0x02df000	/* bytes */
+#define	QL_24XX_FW_DUMP_SIZE	0x0330000	/* bytes */
+#define	QL_25XX_FW_DUMP_SIZE	0x0330000	/* bytes */
 
 #define	QL_24XX_VPD_SIZE	0x200		/* bytes */
 #define	QL_24XX_SFP_SIZE	0x200		/* bytes */
@@ -542,6 +541,8 @@ typedef struct ql_fw_dump {
 	uint16_t risc_ram[0xf800];	/* 2200 needs only 0xf000 */
 	uint16_t stack_ram[0x800];	/* 2300 only */
 	uint16_t data_ram[0xf800];	/* 2300 only */
+	uint32_t req_q[REQUEST_QUEUE_SIZE / 4];
+	uint32_t rsp_q[RESPONSE_QUEUE_SIZE / 4];
 } ql_fw_dump_t;
 
 typedef struct ql_24xx_fw_dump {
@@ -573,6 +574,10 @@ typedef struct ql_24xx_fw_dump {
 	uint32_t fpm_hdw_reg[192];
 	uint32_t fb_hdw_reg[176];
 	uint32_t code_ram[0x2000];
+	uint32_t req_q[REQUEST_QUEUE_SIZE / 4];
+	uint32_t rsp_q[RESPONSE_QUEUE_SIZE / 4];
+	uint32_t ext_trace_buf[FWEXTSIZE / 4];
+	uint32_t fce_trace_buf[FWFCESIZE / 4];
 	uint32_t ext_mem[1];
 } ql_24xx_fw_dump_t;
 
@@ -612,7 +617,10 @@ typedef struct ql_25xx_fw_dump {
 	uint32_t fpm_hdw_reg[192];
 	uint32_t fb_hdw_reg[192];
 	uint32_t code_ram[0x2000];
-	uint16_t req_rsp_q[(REQUEST_QUEUE_SIZE + RESPONSE_QUEUE_SIZE) / 2];
+	uint32_t req_q[REQUEST_QUEUE_SIZE / 4];
+	uint32_t rsp_q[RESPONSE_QUEUE_SIZE / 4];
+	uint32_t ext_trace_buf[FWEXTSIZE / 4];
+	uint32_t fce_trace_buf[FWFCESIZE / 4];
 	uint32_t ext_mem[1];
 } ql_25xx_fw_dump_t;
 

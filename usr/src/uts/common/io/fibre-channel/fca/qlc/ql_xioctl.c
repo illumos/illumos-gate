@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_xioctl.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_xioctl.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -375,13 +375,15 @@ ql_sdm_ioctl(ql_adapter_state_t *ha, int ioctl_code, void *arg, int mode)
 	}
 
 	/*
-	 * If driver is suspended or stalled, rtn BUSY so caller
-	 * can try again at some later time
+	 * If driver is suspended, stalled, or powered down rtn BUSY
 	 */
 	if (ha->flags & ADAPTER_SUSPENDED ||
-	    ha->task_daemon_flags & DRIVER_STALL) {
-		EL(ha, "driver %s\n",
-		    ha->flags & ADAPTER_SUSPENDED ? "suspended" : "stalled");
+	    ha->task_daemon_flags & DRIVER_STALL ||
+	    ha->power_level != PM_LEVEL_D0) {
+		EL(ha, " %s\n", ha->flags & ADAPTER_SUSPENDED ?
+		    "driver suspended" :
+		    (ha->task_daemon_flags & DRIVER_STALL ? "driver stalled" :
+		    "FCA powered down"));
 		cmd->Status = EXT_STATUS_BUSY;
 		cmd->ResponseLen = 0;
 		rval = EBUSY;
@@ -1298,7 +1300,8 @@ ql_qry_fw(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	fw_info.Attrib = mr.mb[6];
 
-	if (ddi_copyout((void *)&fw_info, (void *)(uintptr_t)(cmd->ResponseAdr),
+	if (ddi_copyout((void *)&fw_info,
+	    (void *)(uintptr_t)(cmd->ResponseAdr),
 	    sizeof (EXT_FW), mode) != 0) {
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -1351,7 +1354,8 @@ ql_qry_chip(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	chip.MemAddrLen = 0x100;
 	chip.ChipRevID = ha->rev_id;
 
-	if (ddi_copyout((void *)&chip, (void *)(uintptr_t)(cmd->ResponseAdr),
+	if (ddi_copyout((void *)&chip,
+	    (void *)(uintptr_t)(cmd->ResponseAdr),
 	    sizeof (EXT_CHIP), mode) != 0) {
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -1519,7 +1523,7 @@ ql_fcct(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	/* Get DMA memory for the IOCB */
 	if (ql_get_dma_mem(ha, dma_mem, pkt_size, LITTLE_ENDIAN_DMA,
-	    MEM_RING_ALIGN) != QL_SUCCESS) {
+	    QL_DMA_RING_ALIGN) != QL_SUCCESS) {
 		cmn_err(CE_WARN, "%s(%d): DMA memory "
 		    "alloc failed", QL_NAME, ha->instance);
 		kmem_free(pkt, pkt_size);
@@ -1718,7 +1722,7 @@ ql_aen_reg(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): entered\n", ha->instance);
 
-	rval = ddi_copyin((void*)(uintptr_t)(cmd->RequestAdr), &reg_struct,
+	rval = ddi_copyin((void*)(uintptr_t)cmd->RequestAdr, &reg_struct,
 	    cmd->RequestLen, mode);
 
 	if (rval == 0) {
@@ -2012,8 +2016,8 @@ ql_scsi_passthru(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	if (ddi_copyin((const void *)(uintptr_t)(uintptr_t)cmd->RequestAdr,
-	    &pt_req, pld_size, mode) != 0) {
+	if (ddi_copyin((void *)(uintptr_t)cmd->RequestAdr, &pt_req,
+	    pld_size, mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -2117,7 +2121,7 @@ ql_scsi_passthru(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 		/* Get DMA memory for the IOCB */
 		if (ql_get_dma_mem(ha, dma_mem, pld_size, LITTLE_ENDIAN_DMA,
-		    MEM_DATA_ALIGN) != QL_SUCCESS) {
+		    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): request queue DMA memory "
 			    "alloc failed", QL_NAME, ha->instance);
 			kmem_free(pkt, pkt_size);
@@ -2663,7 +2667,7 @@ ql_wwpn_to_scsiaddr(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	status = ddi_copyin((void*)(uintptr_t)(cmd->RequestAdr), wwpn,
+	status = ddi_copyin((void*)(uintptr_t)cmd->RequestAdr, wwpn,
 	    cmd->RequestLen, mode);
 
 	if (status != 0) {
@@ -2773,7 +2777,8 @@ ql_host_drvname(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	if (ddi_copyout((void *)&drvname, (void *)(uintptr_t)(cmd->ResponseAdr),
+	if (ddi_copyout((void *)&drvname,
+	    (void *)(uintptr_t)(cmd->ResponseAdr),
 	    qlnamelen, mode) != 0) {
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -2819,8 +2824,8 @@ ql_read_nvram(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	}
 
 	/* Get NVRAM data. */
-	if (ql_nv_util_dump(ha,
-	    (void *)(uintptr_t)(cmd->ResponseAdr), mode) != 0) {
+	if (ql_nv_util_dump(ha, (void *)(uintptr_t)(cmd->ResponseAdr),
+	    mode) != 0) {
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
 		EL(ha, "failed, copy error\n");
@@ -3028,8 +3033,8 @@ ql_get_fcache(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 			cpsize = (fptr->buflen < 100 ? fptr->buflen : 100);
 
 			if (ddi_copyout(fptr->buf,
-			    (void *)(uintptr_t)(cmd->ResponseAdr +
-			    boff), cpsize, mode) != 0) {
+			    (void *)(uintptr_t)(cmd->ResponseAdr + boff),
+			    cpsize, mode) != 0) {
 				CACHE_UNLOCK(ha);
 				EL(ha, "ddicopy failed, exiting\n");
 				cmd->Status = EXT_STATUS_COPY_ERR;
@@ -3063,8 +3068,8 @@ ql_get_fcache(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		    fptr->buflen - hsize : 100);
 
 		if (ddi_copyout(fptr->buf+hsize,
-		    (void *)(uintptr_t)(cmd->ResponseAdr +
-		    300), cpsize, mode) != 0) {
+		    (void *)(uintptr_t)(cmd->ResponseAdr + 300),
+		    cpsize, mode) != 0) {
 			CACHE_UNLOCK(ha);
 			EL(ha, "fw ddicopy failed, exiting\n");
 			cmd->Status = EXT_STATUS_COPY_ERR;
@@ -3311,9 +3316,8 @@ ql_diagnostic_loopback(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	QL_PRINT_9(CE_CONT, "(%d): entered\n", ha->instance);
 
 	/* Get loop back request. */
-	if (ddi_copyin((const void *)(uintptr_t)cmd->RequestAdr,
-	    (void *)&plbreq,
-	    sizeof (EXT_LOOPBACK_REQ), mode) != 0) {
+	if (ddi_copyin((void *)(uintptr_t)cmd->RequestAdr,
+	    (void *)&plbreq, sizeof (EXT_LOOPBACK_REQ), mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -3422,7 +3426,7 @@ ql_diagnostic_loopback(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		plbrsp.IterationCountLastError = (mr.mb[19] >> 16) | mr.mb[18];
 	}
 
-	rval = ddi_copyout((void *)(uintptr_t)&plbrsp,
+	rval = ddi_copyout((void *)&plbrsp,
 	    (void *)(uintptr_t)cmd->ResponseAdr,
 	    sizeof (EXT_LOOPBACK_RSP), mode);
 	if (rval != 0) {
@@ -3483,9 +3487,8 @@ ql_send_els_rnid(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	if (ddi_copyin((void*)(uintptr_t)(cmd->RequestAdr),
-	    &tmp_rnid, cmd->RequestLen,
-	    mode) != 0) {
+	if (ddi_copyin((void*)(uintptr_t)cmd->RequestAdr,
+	    &tmp_rnid, cmd->RequestLen, mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -3895,7 +3898,7 @@ ql_report_lun(ql_adapter_state_t *ha, ql_tgt_t *tq)
 
 	/* Get DMA memory for the IOCB */
 	if (ql_get_dma_mem(ha, &dma_mem, sizeof (ql_rpt_lun_lst_t),
-	    LITTLE_ENDIAN_DMA, MEM_RING_ALIGN) != QL_SUCCESS) {
+	    LITTLE_ENDIAN_DMA, QL_DMA_RING_ALIGN) != QL_SUCCESS) {
 		cmn_err(CE_WARN, "%s(%d): DMA memory "
 		    "alloc failed", QL_NAME, ha->instance);
 		kmem_free(pkt, pkt_size);
@@ -4226,7 +4229,7 @@ ql_inq(ql_adapter_state_t *ha, ql_tgt_t *tq, int lun, ql_mbx_iocb_t *pkt,
 
 	/* Get DMA memory for the IOCB */
 	if (ql_get_dma_mem(ha, &dma_mem, inq_len,
-	    LITTLE_ENDIAN_DMA, MEM_RING_ALIGN) != QL_SUCCESS) {
+	    LITTLE_ENDIAN_DMA, QL_DMA_RING_ALIGN) != QL_SUCCESS) {
 		cmn_err(CE_WARN, "%s(%d): DMA memory "
 		    "alloc failed", QL_NAME, ha->instance);
 		return (0);
@@ -4682,8 +4685,7 @@ ql_setup_flash(ql_adapter_state_t *ha)
 		 */
 		ha->xioctl->fdesc.flash_size = 0x200000;
 		if (ql_24xx_flash_desc(ha) == QL_SUCCESS) {
-			QL_PRINT_9(CE_CONT, "(%d): flash_desc exit\n",
-			    ha->instance);
+			EL(ha, "flash desc table ok, exit\n");
 			return (rval);
 		}
 		(void) ql_24xx_flash_id(ha);
@@ -4888,11 +4890,12 @@ ql_setup_flash(ql_adapter_state_t *ha)
 	}
 
 	if (rval == QL_SUCCESS) {
-		EL(ha, "man_id = %xh, size = %xh\n",
-		    xp->fdesc.flash_manuf, xp->fdesc.flash_size);
+		EL(ha, "man_id=%xh, flash_id=%xh, size=%xh\n",
+		    xp->fdesc.flash_manuf, xp->fdesc.flash_id,
+		    xp->fdesc.flash_size);
 	} else {
-		EL(ha, "unsupported mfr / type: man_id = %xh, flash_id = "
-		    "%xh\n", xp->fdesc.flash_manuf, xp->fdesc.flash_id);
+		EL(ha, "unsupported mfr / type: man_id=%xh, flash_id=%xh\n",
+		    xp->fdesc.flash_manuf, xp->fdesc.flash_id);
 	}
 
 	return (rval);
@@ -5249,7 +5252,7 @@ ql_set_rnid_parameters(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	rval = ddi_copyin((void*)(uintptr_t)(cmd->RequestAdr), &tmp_set,
+	rval = ddi_copyin((void*)(uintptr_t)cmd->RequestAdr, &tmp_set,
 	    cmd->RequestLen, mode);
 	if (rval != 0) {
 		EL(ha, "failed, ddi_copyin\n");
@@ -5496,7 +5499,7 @@ ql_get_statistics(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		ps.InvalidTransmissionWordCount = LE_32(ls->inv_xmit_cnt);
 		ps.InvalidCRCCount = LE_32(ls->inv_crc_cnt);
 
-		rval = ddi_copyout((void *)(uintptr_t)&ps,
+		rval = ddi_copyout((void *)&ps,
 		    (void *)(uintptr_t)cmd->ResponseAdr,
 		    sizeof (EXT_HBA_PORT_STAT), mode);
 		if (rval != 0) {
@@ -5542,9 +5545,8 @@ ql_get_statistics_fc(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): entered\n", ha->instance);
 
-	if (ddi_copyin((const void *)(uintptr_t)cmd->RequestAdr,
-	    (void *)&pextdestaddr,
-	    sizeof (EXT_DEST_ADDR), mode) != 0) {
+	if (ddi_copyin((void *)(uintptr_t)cmd->RequestAdr,
+	    (void *)&pextdestaddr, sizeof (EXT_DEST_ADDR), mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -5606,7 +5608,7 @@ ql_get_statistics_fc(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		ps.InvalidTransmissionWordCount = LE_32(ls->inv_xmit_cnt);
 		ps.InvalidCRCCount = LE_32(ls->inv_crc_cnt);
 
-		rval = ddi_copyout((void *)(uintptr_t)&ps,
+		rval = ddi_copyout((void *)&ps,
 		    (void *)(uintptr_t)cmd->ResponseAdr,
 		    sizeof (EXT_HBA_PORT_STAT), mode);
 
@@ -5710,7 +5712,7 @@ ql_set_led_state(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	rval = ddi_copyin((void*)(uintptr_t)(cmd->RequestAdr), &bstate,
+	rval = ddi_copyin((void*)(uintptr_t)cmd->RequestAdr, &bstate,
 	    cmd->RequestLen, mode);
 
 	if (rval != 0) {
@@ -6068,8 +6070,7 @@ ql_get_port_summary(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	 * We ignore this for now.
 	 */
 	rval = ddi_copyin((void *)(uintptr_t)cmd->RequestAdr,
-	    (void *)&dev_type,
-	    sizeof (dev_type), mode);
+	    (void *)&dev_type, sizeof (dev_type), mode);
 	if (rval != 0) {
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -6203,8 +6204,8 @@ ql_get_target_id(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): entered\n", ha->instance);
 
-	if (ddi_copyin((const void *)(uintptr_t)cmd->RequestAdr, wwpn,
-	    sizeof (EXT_DEST_ADDR), mode) != 0) {
+	if (ddi_copyin((void *)(uintptr_t)cmd->RequestAdr,
+	    (void*)wwpn, sizeof (EXT_DEST_ADDR), mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -6228,8 +6229,7 @@ ql_get_target_id(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	bcopy(tq->port_name, (caddr_t)&extdestaddr.DestAddr.ScsiAddr.Target, 8);
 
 	rval = ddi_copyout((void *)&extdestaddr,
-	    (void *)(uintptr_t)cmd->ResponseAdr,
-	    sizeof (EXT_DEST_ADDR), mode);
+	    (void *)(uintptr_t)cmd->ResponseAdr, sizeof (EXT_DEST_ADDR), mode);
 	if (rval != 0) {
 		EL(ha, "failed, ddi_copyout\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
@@ -6633,10 +6633,8 @@ ql_check_pci(ql_adapter_state_t *ha, ql_fcache_t *fcache, uint32_t *nextpos)
 
 		fcache->type = FTYPE_FW;
 
-		/* TODO: check offsets are correct! */
-
 		(void) snprintf(fcache->verstr, FCHBA_OPTION_ROM_VERSION_LEN,
-		    "%d.%d.%d", fcache->buf[19], fcache->buf[23],
+		    "%d.%02d.%02d", fcache->buf[19], fcache->buf[23],
 		    fcache->buf[27]);
 
 		*nextpos = 0;
@@ -6772,7 +6770,7 @@ ql_dump_sfp(ql_adapter_state_t *ha, void *bp, int mode)
 	/* Get memory for SFP. */
 
 	if ((rval2 = ql_get_dma_mem(ha, &mem, 64, LITTLE_ENDIAN_DMA,
-	    MEM_DATA_ALIGN)) != QL_SUCCESS) {
+	    QL_DMA_DATA_ALIGN)) != QL_SUCCESS) {
 		EL(ha, "failed, ql_get_dma_mem=%xh\n", rval2);
 		return (ENOMEM);
 	}
@@ -6848,9 +6846,8 @@ ql_port_param(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	if (ddi_copyin((const void *)(uintptr_t)cmd->RequestAdr,
-	    (void*)&port_param,
-	    sizeof (EXT_PORT_PARAM), mode) != 0) {
+	if (ddi_copyin((void *)(uintptr_t)cmd->RequestAdr,
+	    (void*)&port_param, sizeof (EXT_PORT_PARAM), mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -6924,8 +6921,7 @@ ql_port_param(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 			/* Copy back the data */
 			rval = ddi_copyout((void *)&port_param,
 			    (void *)(uintptr_t)cmd->ResponseAdr,
-			    sizeof (EXT_PORT_PARAM),
-			    mode);
+			    sizeof (EXT_PORT_PARAM), mode);
 
 			if (rval != 0) {
 				cmd->Status = EXT_STATUS_COPY_ERR;
@@ -7004,6 +7000,9 @@ ql_port_param(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 static void
 ql_get_fwexttrace(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 {
+	int	rval;
+	caddr_t	payload;
+
 	QL_PRINT_9(CE_CONT, "(%d): entered\n", ha->instance);
 
 	if (CFG_IST(ha, CFG_CTRL_2425) == 0) {
@@ -7015,16 +7014,74 @@ ql_get_fwexttrace(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	if ((CFG_IST(ha, CFG_ENABLE_FWEXTTRACE) == 0) ||
 	    (ha->fwexttracebuf.bp == NULL)) {
-		EL(ha, "f/w extrended trace is not enabled\n");
+		EL(ha, "f/w extended trace is not enabled\n");
 		cmd->Status = EXT_STATUS_INVALID_REQUEST;
 		cmd->ResponseLen = 0;
 		return;
 	}
+
+	if (cmd->ResponseLen < FWEXTSIZE) {
+		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
+		cmd->DetailStatus = FWEXTSIZE;
+		EL(ha, "failed, ResponseLen (%xh) < %xh (FWEXTSIZE)\n",
+		    cmd->ResponseLen, FWEXTSIZE);
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Time Stamp */
+	rval = ql_fw_etrace(ha, &ha->fwexttracebuf, FTO_INSERT_TIME_STAMP);
+	if (rval != QL_SUCCESS) {
+		EL(ha, "f/w extended trace insert"
+		    "time stamp failed: %xh\n", rval);
+		cmd->Status = EXT_STATUS_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Disable Tracing */
+	rval = ql_fw_etrace(ha, &ha->fwexttracebuf, FTO_EXT_TRACE_DISABLE);
+	if (rval != QL_SUCCESS) {
+		EL(ha, "f/w extended trace disable failed: %xh\n", rval);
+		cmd->Status = EXT_STATUS_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Allocate payload buffer */
+	payload = kmem_zalloc(FWEXTSIZE, KM_SLEEP);
+	if (payload == NULL) {
+		EL(ha, "failed, kmem_zalloc\n");
+		cmd->Status = EXT_STATUS_NO_MEMORY;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Sync DMA buffer. */
+	(void) ddi_dma_sync(ha->fwexttracebuf.dma_handle, 0,
+	    FWEXTSIZE, DDI_DMA_SYNC_FORKERNEL);
+
+	/* Copy trace buffer data. */
+	ddi_rep_get8(ha->fwexttracebuf.acc_handle, (uint8_t *)payload,
+	    (uint8_t *)ha->fwexttracebuf.bp, FWEXTSIZE,
+	    DDI_DEV_AUTOINCR);
+
+	/* Send payload to application. */
+	if (ql_send_buffer_data(payload, (caddr_t)(uintptr_t)cmd->ResponseAdr,
+	    cmd->ResponseLen, mode) != cmd->ResponseLen) {
+		EL(ha, "failed, send_buffer_data\n");
+		cmd->Status = EXT_STATUS_COPY_ERR;
+		cmd->ResponseLen = 0;
+	} else {
+		cmd->Status = EXT_STATUS_OK;
+	}
+
+	kmem_free(payload, FWEXTSIZE);
 }
 
 /*
  * ql_get_fwfcetrace
- *	Dumps f/w fibre channel trace buffer
+ *	Dumps f/w fibre channel event trace buffer
  *
  * Input:
  *	ha:	adapter state pointer.
@@ -7040,6 +7097,8 @@ ql_get_fwexttrace(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 static void
 ql_get_fwfcetrace(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 {
+	int	rval;
+	caddr_t	payload;
 
 	QL_PRINT_9(CE_CONT, "(%d): entered\n", ha->instance);
 
@@ -7057,6 +7116,54 @@ ql_get_fwfcetrace(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		cmd->ResponseLen = 0;
 		return;
 	}
+
+	if (cmd->ResponseLen < FWFCESIZE) {
+		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
+		cmd->DetailStatus = FWFCESIZE;
+		EL(ha, "failed, ResponseLen (%xh) < %xh (FWFCESIZE)\n",
+		    cmd->ResponseLen, FWFCESIZE);
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Disable Tracing */
+	rval = ql_fw_etrace(ha, &ha->fwfcetracebuf, FTO_FCE_TRACE_DISABLE);
+	if (rval != QL_SUCCESS) {
+		EL(ha, "f/w FCE trace disable failed: %xh\n", rval);
+		cmd->Status = EXT_STATUS_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Allocate payload buffer */
+	payload = kmem_zalloc(FWEXTSIZE, KM_SLEEP);
+	if (payload == NULL) {
+		EL(ha, "failed, kmem_zalloc\n");
+		cmd->Status = EXT_STATUS_NO_MEMORY;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Sync DMA buffer. */
+	(void) ddi_dma_sync(ha->fwfcetracebuf.dma_handle, 0,
+	    FWFCESIZE, DDI_DMA_SYNC_FORKERNEL);
+
+	/* Copy trace buffer data. */
+	ddi_rep_get8(ha->fwfcetracebuf.acc_handle, (uint8_t *)payload,
+	    (uint8_t *)ha->fwfcetracebuf.bp, FWFCESIZE,
+	    DDI_DEV_AUTOINCR);
+
+	/* Send payload to application. */
+	if (ql_send_buffer_data(payload, (caddr_t)(uintptr_t)cmd->ResponseAdr,
+	    cmd->ResponseLen, mode) != cmd->ResponseLen) {
+		EL(ha, "failed, send_buffer_data\n");
+		cmd->Status = EXT_STATUS_COPY_ERR;
+		cmd->ResponseLen = 0;
+	} else {
+		cmd->Status = EXT_STATUS_OK;
+	}
+
+	kmem_free(payload, FWFCESIZE);
 }
 
 /*
@@ -7116,8 +7223,7 @@ ql_get_pci_data(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	/* Dump PCI config data. */
 	if ((ql_pci_dump(ha, (void *)(uintptr_t)(cmd->ResponseAdr),
-	    buf_size, mode))
-	    != 0) {
+	    buf_size, mode)) != 0) {
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->DetailStatus = 0;
 		EL(ha, "failed, copy err pci_dump\n");
@@ -7227,8 +7333,8 @@ ql_menlo_reset(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	}
 
 	/* Get reset request. */
-	if (ddi_copyin((const void *)(uintptr_t)cmd->RequestAdr, (void *)&rst,
-	    sizeof (MENLO_RESET), mode) != 0) {
+	if (ddi_copyin((void *)(uintptr_t)cmd->RequestAdr,
+	    (void *)&rst, sizeof (MENLO_RESET), mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -7429,7 +7535,7 @@ ql_menlo_update_fw(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	/* Get DMA memory for the IOCB */
 	if (ql_get_dma_mem(ha, dma_mem, fw.TotalByteCount, LITTLE_ENDIAN_DMA,
-	    MEM_DATA_ALIGN) != QL_SUCCESS) {
+	    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 		cmn_err(CE_WARN, "%s(%d): request queue DMA memory "
 		    "alloc failed", QL_NAME, ha->instance);
 		kmem_free(pkt, sizeof (ql_mbx_iocb_t));
@@ -7538,8 +7644,8 @@ ql_menlo_manage_info(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	}
 
 	/* Get manage info request. */
-	if (ddi_copyin((caddr_t)(uintptr_t)cmd->RequestAdr, (caddr_t)&info,
-	    sizeof (MENLO_MANAGE_INFO), mode) != 0) {
+	if (ddi_copyin((caddr_t)(uintptr_t)cmd->RequestAdr,
+	    (caddr_t)&info, sizeof (MENLO_MANAGE_INFO), mode) != 0) {
 		EL(ha, "failed, ddi_copyin\n");
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
@@ -7576,7 +7682,7 @@ ql_menlo_manage_info(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 			return;
 		}
 		if (ql_get_dma_mem(ha, dma_mem, info.TotalByteCount,
-		    LITTLE_ENDIAN_DMA, MEM_DATA_ALIGN) != QL_SUCCESS) {
+		    LITTLE_ENDIAN_DMA, QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): request queue DMA memory "
 			    "alloc failed", QL_NAME, ha->instance);
 			kmem_free(dma_mem, sizeof (dma_mem_t));

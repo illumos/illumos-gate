@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_QL_IOCB_H
 #define	_QL_IOCB_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -496,6 +495,71 @@ typedef struct ct_passthru_entry {
 	uint32_t dseg_1_address[2];	/* Data segment 1 address. */
 	uint32_t dseg_1_length;		/* Data segment 1 length. */
 } ct_passthru_entry_t;
+
+/*
+ * ISP24xx queue - ELS Pass-Through IOCB structure definition.
+ */
+#define	ELS_PASSTHRU_TYPE		0x53
+typedef struct els_passthru_entry {
+	uint8_t  entry_type;		/* Entry type. */
+	uint8_t  entry_count;		/* Entry count. */
+	uint8_t  sys_define;		/* System defined. */
+	uint8_t  entry_status;		/* Entry Status. */
+	uint32_t handle;		/* System handle */
+	uint16_t reserved_8_9;
+	uint16_t n_port_hdl;
+	uint16_t xmt_dseg_count;	/* Only one allowed */
+	uint8_t  vp_index;
+	uint8_t  sof_type;
+	uint32_t rcv_exch_address;
+	uint16_t rcv_dseg_count;
+	uint8_t  els_cmd_opcode;
+	uint8_t  reserved_17;
+	uint8_t  d_id_7_0;
+	uint8_t  d_id_15_8;
+	uint8_t  d_id_23_16;
+	uint8_t  s_id_23_16;
+	uint8_t  s_id_7_0;
+	uint8_t  s_id_15_8;
+	uint16_t control_flags;
+	uint32_t rcv_payld_data_bcnt;
+	uint32_t xmt_payld_data_bcnt;
+	uint32_t xmt_dseg_0_address[2];	/* Tx Data segment 0 address. */
+	uint32_t xmt_dseg_0_length;	/* Tx Data segment 0 length.  */
+	uint32_t rcv_dseg_0_address[2];	/* Rx Data segment 0 address. */
+	uint32_t rcv_dseg_0_length;	/* Rx Data segment 0 length.  */
+} els_passthru_entry_t;
+
+/*
+ * ISP24x queue - ELS Pass-Through IOCB response.
+ */
+typedef struct els_passthru_entry_rsp {
+	uint8_t  entry_type;		/* Entry type. */
+	uint8_t  entry_count;		/* Entry count. */
+	uint8_t  sys_define;		/* System defined. */
+	uint8_t  entry_status;		/* Entry Status. */
+	uint32_t handle;		/* System handle */
+	uint16_t comp_status;
+	uint16_t n_port_hdl;
+	uint16_t reserved_c_d;
+	uint8_t  vp_index;
+	uint8_t  sof_type;
+	uint32_t rcv_exch_addr;
+	uint16_t reserved_14_15;
+	uint8_t  els_cmd_opcode;
+	uint8_t  reserved_17;
+	uint8_t  d_id_7_0;
+	uint8_t  d_id_15_8;
+	uint8_t  d_id_23_16;
+	uint8_t  s_id_23_16;
+	uint8_t  s_id_7_0;
+	uint8_t  s_id_15_8;
+	uint16_t control_flags;
+	uint32_t total_data_bcnt;
+	uint32_t error_subcode1;
+	uint32_t error_subcode2;
+	uint8_t  reserved_2c_3f[20];
+} els_passthru_entry_rsp_t;
 
 /*
  * ISP24xx queue - Task Management IOCB structure definition.

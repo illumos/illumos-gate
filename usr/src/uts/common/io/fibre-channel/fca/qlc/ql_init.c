@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_init.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_init.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -104,7 +104,7 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 
 		ha->loop_down_timer = LOOP_DOWN_TIMER_OFF;
 		ADAPTER_STATE_LOCK(ha);
-		ha->flags |= COMMAND_ABORT_TIMEOUT;
+		ha->flags |= ABORT_CMDS_LOOP_DOWN_TMO;
 		ha->flags &= ~ONLINE;
 		ADAPTER_STATE_UNLOCK(ha);
 
@@ -385,7 +385,7 @@ ql_set_max_read_req(ql_adapter_state_t *ha)
 			    "default\n", tmp);
 		}
 	} else if ((ha->device_id == 0x2432) || ((ha->device_id & 0xff00) ==
-	    0x2500)) {
+	    0x2500) || (ha->device_id == 0x8432)) {
 		/* check for vaild override value */
 		if (tmp == 128 || tmp == 256 || tmp == 512 ||
 		    tmp == 1024 || tmp == 2048 || tmp == 4096) {
@@ -979,12 +979,12 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		idpromlen = 32;
 
 		/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
-		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ha->dip,
+		if (rval = ddi_getlongprop_buf(DDI_DEV_T_ANY, ha->dip,
 		    DDI_PROP_CANSLEEP, "idprom", (caddr_t)idprombuf,
 		    &idpromlen) != DDI_PROP_SUCCESS) {
 
 			cmn_err(CE_WARN, "%s(%d) : Unable to read idprom "
-			    "property", QL_NAME, ha->instance);
+			    "property, rval=%x", QL_NAME, ha->instance, rval);
 
 			nv->port_name[0] = 33;
 			nv->port_name[3] = 224;
@@ -1411,7 +1411,8 @@ ql_23_properties(ql_adapter_state_t *ha, nvram_t *nv)
 		nv->hard_address[0] = (uint8_t)data;
 	} else if (data != 0xffffffff) {
 		EL(ha, "invalid parameter value for 'adapter-hard-loop-ID': "
-		    "%d; using nvram value of %d\n", data, nv->hard_address[0]);
+		    "%d; using nvram value of %d\n",
+		    data, nv->hard_address[0]);
 	}
 
 	/* Get LIP reset. */
@@ -1563,6 +1564,57 @@ ql_common_properties(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
+	/* Get extended logging trace buffer size. */
+	if ((data = ql_get_prop(ha, "set-ext-log-buffer-size")) !=
+	    0xffffffff && data != 0) {
+		char		*new_trace;
+		uint32_t	new_size;
+
+		if (ha->el_trace_desc->trace_buffer != NULL) {
+			new_size = 1024 * data;
+			new_trace = (char *)kmem_zalloc(new_size, KM_SLEEP);
+
+			if (new_trace == NULL) {
+				cmn_err(CE_WARN, "%s(%d): can't get new"
+				    " trace buffer",
+				    QL_NAME, ha->instance);
+			} else {
+				/* free the previous */
+				kmem_free(ha->el_trace_desc->trace_buffer,
+				    ha->el_trace_desc->trace_buffer_size);
+				/* Use the new one */
+				ha->el_trace_desc->trace_buffer = new_trace;
+				ha->el_trace_desc->trace_buffer_size = new_size;
+			}
+		}
+
+	}
+
+	/* Get extended logging enable. */
+	if ((data = ql_get_prop(ha, "extended-logging")) == 0xffffffff ||
+	    data == 0) {
+		ha->cfg_flags &= ~CFG_ENABLE_EXTENDED_LOGGING;
+	} else if (data == 1) {
+		ha->cfg_flags |= CFG_ENABLE_EXTENDED_LOGGING;
+	} else {
+		EL(ha, "invalid parameter value for 'extended-logging': %d;"
+		    " using default value of 0\n", data);
+		ha->cfg_flags &= ~CFG_ENABLE_EXTENDED_LOGGING;
+	}
+
+	/* Get extended logging trace disable. */
+	if ((data = ql_get_prop(ha, "disable-extended-logging-trace")) ==
+	    0xffffffff || data == 0) {
+		ha->cfg_flags &= ~CFG_DISABLE_EXTENDED_LOGGING_TRACE;
+	} else if (data == 1) {
+		ha->cfg_flags |= CFG_DISABLE_EXTENDED_LOGGING_TRACE;
+	} else {
+		EL(ha, "invalid parameter value for "
+		    "'disable-extended-logging-trace': %d;"
+		    " using default value of 0\n", data);
+		ha->cfg_flags &= ~CFG_DISABLE_EXTENDED_LOGGING_TRACE;
+	}
+
 	/* Get FCP 2 Error Recovery. */
 	if ((data = ql_get_prop(ha, "enable-FCP-2-error-recovery")) ==
 	    0xffffffff || data == 1) {
@@ -1579,17 +1631,6 @@ ql_common_properties(ql_adapter_state_t *ha)
 	/* Get target mode enable. */
 	ha->cfg_flags &= ~CFG_TARGET_MODE_ENABLE;
 
-	/* Get extended logging enable. */
-	if ((data = ql_get_prop(ha, "extended-logging")) == 0xffffffff ||
-	    data == 0) {
-		ha->cfg_flags &= ~CFG_ENABLE_EXTENDED_LOGGING;
-	} else if (data == 1) {
-		ha->cfg_flags |= CFG_ENABLE_EXTENDED_LOGGING;
-	} else {
-		EL(ha, "invalid parameter value for 'extended-logging': %d;"
-		    " using default value of 0\n", data);
-		ha->cfg_flags &= ~CFG_ENABLE_EXTENDED_LOGGING;
-	}
 
 #ifdef QL_DEBUG_LEVEL_2
 	ha->cfg_flags |= CFG_ENABLE_EXTENDED_LOGGING;
@@ -1961,13 +2002,28 @@ uint32_t
 ql_get_prop(ql_adapter_state_t *ha, char *string)
 {
 	char		buf[256];
-	uint32_t	data;
+	uint32_t	data = 0xffffffff;
 
-	/* Get adapter instance parameter. */
-	(void) sprintf(buf, "hba%d-%s", ha->instance, string);
-	/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
-	data = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, ha->dip, 0, buf,
-	    (int)0xffffffff);
+	/*
+	 * Look for a adapter instance NPIV (virtual port) specific parameter
+	 */
+	if (CFG_IST(ha, CFG_CTRL_2425)) {
+		(void) sprintf(buf, "hba%d-vp%d-%s", ha->instance,
+		    ha->vp_index, string);
+		/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
+		data = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, ha->dip, 0,
+		    buf, (int)0xffffffff);
+	}
+
+	/*
+	 * Get adapter instance parameter if a vp specific one isn't found.
+	 */
+	if (data == 0xffffffff) {
+		(void) sprintf(buf, "hba%d-%s", ha->instance, string);
+		/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
+		data = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, ha->dip,
+		    0, buf, (int)0xffffffff);
+	}
 
 	/* Adapter instance parameter found? */
 	if (data == 0xffffffff) {
@@ -2414,7 +2470,8 @@ ql_start_firmware(ql_adapter_state_t *vha)
 		ha->fw_attributes = mr.mb[6];
 
 		/* Set Serdes Transmit Parameters. */
-		if (ha->serdes_param[0] & BIT_0) {
+		if (!ha->cfg_flags & CFG_CTRL_2200 &&
+		    ha->serdes_param[0] & BIT_0) {
 			mr.mb[1] = ha->serdes_param[0];
 			mr.mb[2] = ha->serdes_param[1];
 			mr.mb[3] = ha->serdes_param[2];
@@ -2554,13 +2611,13 @@ ql_init_rings(ql_adapter_state_t *vha2)
 	}
 
 	if ((rval == QL_SUCCESS) && (CFG_IST(ha, CFG_ENABLE_FWFCETRACE))) {
-		if ((rval2 = ql_get_dma_mem(ha, &ha->fwfcetracebuf,
-		    FWFCESIZE, LITTLE_ENDIAN_DMA, MEM_RING_ALIGN))
-		    != QL_SUCCESS) {
+		/* Firmware Fibre Channel Event Trace Buffer */
+		if ((rval2 = ql_get_dma_mem(ha, &ha->fwfcetracebuf, FWFCESIZE,
+		    LITTLE_ENDIAN_DMA, QL_DMA_RING_ALIGN)) != QL_SUCCESS) {
 			EL(ha, "fcetrace buffer alloc failed: %xh\n", rval2);
 		} else {
 			if ((rval2 = ql_fw_etrace(ha, &ha->fwfcetracebuf,
-			    FTO_FCEENABLE)) != QL_SUCCESS) {
+			    FTO_FCE_TRACE_ENABLE)) != QL_SUCCESS) {
 				EL(ha, "fcetrace enable failed: %xh\n", rval2);
 				ql_free_phys(ha, &ha->fwfcetracebuf);
 			}
@@ -2568,13 +2625,13 @@ ql_init_rings(ql_adapter_state_t *vha2)
 	}
 
 	if ((rval == QL_SUCCESS) && (CFG_IST(ha, CFG_ENABLE_FWEXTTRACE))) {
-		if ((rval2 = ql_get_dma_mem(ha, &ha->fwexttracebuf,
-		    FWEXTSIZE, LITTLE_ENDIAN_DMA, MEM_RING_ALIGN))
-		    != QL_SUCCESS) {
+		/* Firmware Extended Trace Buffer */
+		if ((rval2 = ql_get_dma_mem(ha, &ha->fwexttracebuf, FWEXTSIZE,
+		    LITTLE_ENDIAN_DMA, QL_DMA_RING_ALIGN)) != QL_SUCCESS) {
 			EL(ha, "exttrace buffer alloc failed: %xh\n", rval2);
 		} else {
 			if ((rval2 = ql_fw_etrace(ha, &ha->fwexttracebuf,
-			    FTO_EXTENABLE)) != QL_SUCCESS) {
+			    FTO_EXT_TRACE_ENABLE)) != QL_SUCCESS) {
 				EL(ha, "exttrace enable failed: %xh\n", rval2);
 				ql_free_phys(ha, &ha->fwexttracebuf);
 			}
@@ -2898,6 +2955,9 @@ ql_configure_hba(ql_adapter_state_t *ha)
 			state = FC_STATE_FULL_SPEED;
 		}
 		ha->state = FC_PORT_STATE_MASK(ha->state) | state;
+	} else if (rval == MBS_COMMAND_ERROR) {
+		EL(ha, "mbox cmd error, rval = %xh, mr.mb[1]=%hx\n",
+		    rval, mr.mb[1]);
 	}
 
 	if (rval != QL_SUCCESS) {
@@ -3014,6 +3074,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 			d_id.b24 = 0xfffffe;
 			tq = ql_dev_init(ha, d_id, FL_PORT_24XX_HDL);
 			if (tq != NULL) {
+				tq->flags |= TQF_FABRIC_DEVICE;
 				ADAPTER_STATE_UNLOCK(ha);
 				(void) ql_get_port_database(ha, tq, PDF_NONE);
 				ADAPTER_STATE_LOCK(ha);
@@ -3021,6 +3082,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 			d_id.b24 = 0xfffffc;
 			tq = ql_dev_init(ha, d_id, SNS_24XX_HDL);
 			if (tq != NULL) {
+				tq->flags |= TQF_FABRIC_DEVICE;
 				ADAPTER_STATE_UNLOCK(ha);
 				if (ha->vp_index != 0) {
 					(void) ql_login_fport(ha, tq,
@@ -3039,6 +3101,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 			    (CFG_IST(ha, CFG_CTRL_2425) ?
 			    FL_PORT_24XX_HDL : FL_PORT_LOOP_ID));
 			if (tq != NULL) {
+				tq->flags |= TQF_FABRIC_DEVICE;
 				ADAPTER_STATE_UNLOCK(ha);
 				(void) ql_get_port_database(ha, tq, PDF_NONE);
 				ADAPTER_STATE_LOCK(ha);
@@ -3433,14 +3496,6 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags &
 	    ~(MBX_BUSY_FLG | MBX_WANT_FLG | MBX_ABORT | MBX_INTERRUPT));
 	ha->mcp = NULL;
-
-	if (ha->fwfcetracebuf.bp != NULL) {
-		ql_free_phys(ha, &ha->fwfcetracebuf);
-	}
-
-	if (ha->fwexttracebuf.bp != NULL) {
-		ql_free_phys(ha, &ha->fwexttracebuf);
-	}
 
 	/*
 	 * Set flash write-protection.

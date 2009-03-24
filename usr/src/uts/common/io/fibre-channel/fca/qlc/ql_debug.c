@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_debug.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_debug.c"
 
 /*
  * Qlogic ISP22xx/ISP23xx/ISP24xx FCA driver source
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -46,6 +46,8 @@
 #include <ql_debug.h>
 
 static int ql_flash_errlog_store(ql_adapter_state_t *, uint32_t *);
+int ql_validate_trace_desc(ql_adapter_state_t *ha);
+char *ql_find_trace_start(ql_adapter_state_t *ha);
 
 /*
  * Global Data.
@@ -145,7 +147,106 @@ void
 ql_el_msg(ql_adapter_state_t *ha, const char *fn, int ce, ...)
 {
 	uint32_t	el_msg_num;
-	char		*s, fmt[EL_BUF_LEN];
+	char		*s, *fmt = 0, *fmt1 = 0;
+	char		fmt2[256];
+	int		rval, tmp;
+	int		tracing = 0;
+	va_list		vl;
+
+	/* Tracing is the default but it can be disabled. */
+	if (((ha->cfg_flags & CFG_DISABLE_EXTENDED_LOGGING_TRACE) == 0) &&
+	    (rval = ql_validate_trace_desc(ha) == DDI_SUCCESS)) {
+		tracing = 1;
+
+		TRACE_BUFFER_LOCK(ha);
+
+		/*
+		 * Ensure enough space for the string. Wrap to
+		 * start when default message allocation size
+		 * would overrun the end.
+		 */
+		if ((ha->el_trace_desc->next + EL_BUFFER_RESERVE) >=
+		    ha->el_trace_desc->trace_buffer_size) {
+			fmt = ha->el_trace_desc->trace_buffer;
+			ha->el_trace_desc->next = 0;
+		} else {
+			fmt = ha->el_trace_desc->trace_buffer +
+			    ha->el_trace_desc->next;
+		}
+	}
+	/* if no buffer use the stack */
+	if (fmt == NULL) {
+		fmt = fmt2;
+	}
+
+	va_start(vl, ce);
+
+	s = va_arg(vl, char *);
+
+	if (ql_enable_ellock) {
+		/*
+		 * Used when messages are *maybe* being lost.  Adds
+		 * a unique number to the message so one can see if
+		 * any messages have been dropped. NB: This slows
+		 * down the driver, which may make the issue disappear.
+		 */
+		GLOBAL_EL_LOCK();
+		el_msg_num = ++el_message_number;
+		GLOBAL_EL_UNLOCK();
+
+		rval = (int)snprintf(fmt, (size_t)EL_BUFFER_RESERVE,
+		    QL_BANG "QEL%d %s(%d,%d): %s, %s", el_msg_num, QL_NAME,
+		    ha->instance, ha->vp_index, fn, s);
+		fmt1 = fmt + rval;
+		tmp = (int)vsnprintf(fmt1,
+		    (size_t)(uint32_t)((int)EL_BUFFER_RESERVE - rval), s, vl);
+		rval += tmp;
+	} else {
+		rval = (int)snprintf(fmt, (size_t)EL_BUFFER_RESERVE,
+		    QL_BANG "QEL %s(%d,%d): %s, ", QL_NAME, ha->instance,
+		    ha->vp_index, fn);
+		fmt1 = fmt + rval;
+		tmp = (int)vsnprintf(fmt1,
+		    (size_t)(uint32_t)((int)EL_BUFFER_RESERVE - rval), s, vl);
+		rval += tmp;
+	}
+
+	/*
+	 * Calculate the offset where the next message will go,
+	 * skipping the NULL.
+	 */
+	if (tracing) {
+		rval += 1;
+		ha->el_trace_desc->next = (uint16_t)rval;
+		TRACE_BUFFER_UNLOCK(ha);
+	}
+
+	if (ha->cfg_flags & CFG_ENABLE_EXTENDED_LOGGING) {
+		cmn_err(ce, fmt);
+	}
+
+	va_end(vl);
+}
+
+/*
+ * ql_el_msg
+ *	Extended logging message
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	fn:	function name.
+ *	ce:	level
+ *	...:	Variable argument list.
+ *
+ * Context:
+ *	Kernel/Interrupt context.
+ */
+void
+ql_dbg_msg(const char *fn, int ce, ...)
+{
+	uint32_t	el_msg_num;
+	char		*s;
+	char		fmt[256];
 	va_list		vl;
 
 	va_start(vl, ce);
@@ -162,19 +263,11 @@ ql_el_msg(ql_adapter_state_t *ha, const char *fn, int ce, ...)
 		GLOBAL_EL_LOCK();
 		el_msg_num = ++el_message_number;
 		GLOBAL_EL_UNLOCK();
-
-		ha == NULL ?
-		    (void) snprintf(fmt, EL_BUF_LEN, "QLP%d: %s %s, %s",
-		    el_msg_num, QL_NAME, fn, s) :
-		    (void) snprintf(fmt, EL_BUF_LEN, QL_BANG "QEL%d %s(%d,%d)"
-		    ": %s, %s", el_msg_num, QL_NAME, ha->instance,
-		    ha->vp_index, fn, s);
+		(void) snprintf(fmt, EL_BUFFER_RESERVE, "QLP%d: %s %s, %s",
+		    el_msg_num, QL_NAME, fn, s);
 	} else {
-		ha == NULL ?
-		    (void) snprintf(fmt, EL_BUF_LEN, "QLP: %s %s, %s",
-		    QL_NAME, fn, s) :
-		    (void) snprintf(fmt, EL_BUF_LEN, QL_BANG "QEL %s(%d,%d): "
-		    "%s, %s", QL_NAME, ha->instance, ha->vp_index, fn, s);
+		(void) snprintf(fmt, EL_BUFFER_RESERVE, "QLP: %s %s, %s",
+		    QL_NAME, fn, s);
 	}
 
 	vcmn_err(ce, fmt, vl);
@@ -391,4 +484,126 @@ ql_flash_errlog_store(ql_adapter_state_t *ha, uint32_t *fdata)
 	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
 
 	return (QL_SUCCESS);
+}
+
+/*
+ * ql_dump_el_trace_buffer
+ *	 Outputs extended logging trace buffer.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ */
+void
+ql_dump_el_trace_buffer(ql_adapter_state_t *ha)
+{
+	char		*dump_start = NULL;
+	char		*dump_current = NULL;
+	char		*trace_start;
+	char		*trace_end;
+	int		wrapped = 0;
+	int		rval;
+
+	TRACE_BUFFER_LOCK(ha);
+
+	rval = ql_validate_trace_desc(ha);
+	if (rval != NULL) {
+		cmn_err(CE_CONT, "%s(%d) Dump EL trace - invalid desc\n",
+		    QL_NAME, ha->instance);
+	} else if ((dump_start = ql_find_trace_start(ha)) != NULL) {
+		dump_current = dump_start;
+		trace_start = ha->el_trace_desc->trace_buffer;
+		trace_end = trace_start +
+		    ha->el_trace_desc->trace_buffer_size;
+
+		cmn_err(CE_CONT, "%s(%d) Dump EL trace - start %p %p\n",
+		    QL_NAME, ha->instance,
+		    (void *)dump_start, (void *)trace_start);
+
+		while (((uintptr_t)dump_current - (uintptr_t)trace_start) <=
+		    ha->el_trace_desc->trace_buffer_size) {
+			/* Show it... */
+			cmn_err(CE_CONT, "%p - %s", (void *)dump_current,
+			    dump_current);
+			/* Make the next the current */
+			dump_current += (strlen(dump_current) + 1);
+			/* check for wrap */
+			if ((dump_current + EL_BUFFER_RESERVE) >= trace_end) {
+				dump_current = trace_start;
+				wrapped = 1;
+			} else if (wrapped) {
+				/* Don't go past next. */
+				if ((trace_start + ha->el_trace_desc->next) <=
+				    dump_current) {
+					break;
+				}
+			} else if (*dump_current == NULL) {
+				break;
+			}
+		}
+	}
+	TRACE_BUFFER_UNLOCK(ha);
+}
+
+/*
+ * ql_validate_trace_desc
+ *	 Ensures the extended logging trace descriptor is good
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Returns:
+ *	ql local function return status code.
+ */
+int
+ql_validate_trace_desc(ql_adapter_state_t *ha)
+{
+	int	rval = DDI_SUCCESS;
+
+	if (ha->el_trace_desc == NULL) {
+		rval = DDI_FAILURE;
+	} else if (ha->el_trace_desc->trace_buffer == NULL) {
+		rval = DDI_FAILURE;
+	}
+	return (rval);
+}
+
+/*
+ * ql_find_trace_start
+ *	 Locate the oldest extended logging trace entry.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Returns:
+ *	Pointer to a string.
+ *
+ * Context:
+ *	Kernel/Interrupt context.
+ */
+char *
+ql_find_trace_start(ql_adapter_state_t *ha)
+{
+	char	*trace_start = 0;
+	char	*trace_next  = 0;
+
+	trace_next = ha->el_trace_desc->trace_buffer + ha->el_trace_desc->next;
+
+	/*
+	 * if the buffer has not wrapped next will point at a null so
+	 * start is the beginning of the buffer.  if next points at a char
+	 * then we must traverse the buffer until a null is detected and
+	 * that will be the beginning of the oldest whole object in the buffer
+	 * which is the start.
+	 */
+
+	if ((trace_next + EL_BUFFER_RESERVE) >=
+	    (ha->el_trace_desc->trace_buffer +
+	    ha->el_trace_desc->trace_buffer_size)) {
+		trace_start = ha->el_trace_desc->trace_buffer;
+	} else if (*trace_next != NULL) {
+		trace_start = trace_next + (strlen(trace_next) + 1);
+	} else {
+		trace_start = ha->el_trace_desc->trace_buffer;
+	}
+	return (trace_start);
 }

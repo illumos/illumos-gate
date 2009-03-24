@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_QL_API_H
 #define	_QL_API_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -310,8 +309,8 @@ typedef struct {
  */
 #define	MAX_22_FIBRE_DEVICES	256
 #define	MAX_24_FIBRE_DEVICES	2048
-#define	MAX_24_VIRTUAL_PORTS	63
-#define	MAX_25_VIRTUAL_PORTS	255
+#define	MAX_24_VIRTUAL_PORTS	127
+#define	MAX_25_VIRTUAL_PORTS	254
 
 #define	LAST_LOCAL_LOOP_ID		 0x7d
 #define	FL_PORT_LOOP_ID			 0x7e /* FFFFFE Fabric F_Port */
@@ -866,7 +865,7 @@ typedef struct ql_init_24xx_cb {
 	 */
 	uint8_t		global_vp_option[2];
 
-	ql_vp_cfg_t	vpc[MAX_25_VIRTUAL_PORTS];
+	ql_vp_cfg_t	vpc[MAX_25_VIRTUAL_PORTS+1];
 } ql_init_24xx_cb_t;
 
 typedef union ql_comb_init_cb {
@@ -961,8 +960,8 @@ typedef enum mem_alloc_type {
  * DMA memory alignment type.
  */
 typedef enum men_align_type {
-	MEM_DATA_ALIGN,
-	MEM_RING_ALIGN
+	QL_DMA_DATA_ALIGN,
+	QL_DMA_RING_ALIGN,
 } mem_alignment_t;
 
 /*
@@ -1292,6 +1291,14 @@ typedef struct fw_code {
 #define	FWEXTSIZE		(0x4000 * 4)	/* bytes - 16kb multiples */
 #define	FWFCESIZE		(0x4000 * 4)	/* bytes - 16kb multiples */
 
+typedef struct el_trace_desc {
+	kmutex_t	mutex;
+	uint16_t	next;
+	uint32_t	trace_buffer_size;
+	char		*trace_buffer;
+} el_trace_desc_t;
+
+
 /*
  * ql attach progress indication
  */
@@ -1416,7 +1423,7 @@ typedef struct ql_adapter_state {
 	dev_info_t		*dip;
 	ddi_iblock_cookie_t	iblock_cookie;
 	fc_fca_tran_t		*tran;
-	int			instance;
+	uint32_t		instance;
 	int8_t			*devpath;
 	uint32_t   		fru_hba_index;
 	uint32_t   		fru_port_index;
@@ -1506,9 +1513,16 @@ typedef struct ql_adapter_state {
 	kmutex_t		portmutex;
 	uint16_t		maximum_luns_per_target;
 
+	/* f/w dump mutex */
+	uint32_t		ql_dump_size;
+	uint32_t		ql_dump_state;
+	void			*ql_dump_ptr;
+	kmutex_t		dump_mutex;
+
 	uint8_t			fwwait;
-	dma_mem_t		fwexttracebuf;
-	dma_mem_t		fwfcetracebuf;
+
+	dma_mem_t		fwexttracebuf;		/* extended trace  */
+	dma_mem_t		fwfcetracebuf;		/* event trace */
 	uint32_t		fwfcetraceopt;
 	uint32_t		flash_errlog_start;	/* 32bit word addr */
 	uint32_t		flash_errlog_ptr;	/* 32bit word addr */
@@ -1521,6 +1535,7 @@ typedef struct ql_adapter_state {
 
 	uint16_t		free_loop_id;
 
+	el_trace_desc_t		*el_trace_desc;
 } ql_adapter_state_t;
 
 /*
@@ -1530,7 +1545,7 @@ typedef struct ql_adapter_state {
 #define	QL_OPENED			BIT_1
 #define	ONLINE				BIT_2
 #define	INTERRUPTS_ENABLED		BIT_3
-#define	COMMAND_ABORT_TIMEOUT		BIT_4
+#define	ABORT_CMDS_LOOP_DOWN_TMO	BIT_4
 #define	POINT_TO_POINT			BIT_5
 #define	IP_ENABLED			BIT_6
 #define	IP_INITIALIZED			BIT_7
@@ -1575,47 +1590,49 @@ typedef struct ql_adapter_state {
 #define	PORT_RETRY_NEEDED		BIT_26
 #define	TASK_DAEMON_POWERING_DOWN	BIT_27
 #define	TD_IIDMA_NEEDED			BIT_28
+#define	SEND_PLOGI			BIT_29
 
 /*
  * Mailbox flags
  */
-#define	MBX_WANT_FLG			BIT_0
-#define	MBX_BUSY_FLG			BIT_1
-#define	MBX_INTERRUPT			BIT_2
-#define	MBX_ABORT			BIT_3
+#define	MBX_WANT_FLG				BIT_0
+#define	MBX_BUSY_FLG				BIT_1
+#define	MBX_INTERRUPT				BIT_2
+#define	MBX_ABORT				BIT_3
 
 /*
  * Configuration flags
  */
-#define	CFG_ENABLE_HARD_ADDRESS		BIT_0
-#define	CFG_ENABLE_64BIT_ADDRESSING	BIT_1
-#define	CFG_ENABLE_LIP_RESET		BIT_2
-#define	CFG_ENABLE_FULL_LIP_LOGIN	BIT_3
-#define	CFG_ENABLE_TARGET_RESET		BIT_4
-#define	CFG_ENABLE_LINK_DOWN_REPORTING	BIT_5
-#define	CFG_ENABLE_TARGET_MODE		BIT_6
-#define	CFG_ENABLE_FCP_2_SUPPORT	BIT_7
-#define	CFG_MULTI_CHIP_ADAPTER		BIT_8
-#define	CFG_SBUS_CARD			BIT_9
-#define	CFG_CTRL_2300			BIT_10
-#define	CFG_CTRL_6322			BIT_11
-#define	CFG_CTRL_2200			BIT_12
-#define	CFG_CTRL_2422			BIT_13
-#define	CFG_CTRL_25XX			BIT_14
-#define	CFG_ENABLE_EXTENDED_LOGGING	BIT_15
-#define	CFG_DISABLE_RISC_CODE_LOAD	BIT_16
-#define	CFG_SET_CACHE_LINE_SIZE_1	BIT_17
-#define	CFG_TARGET_MODE_ENABLE		BIT_18
-#define	CFG_EXT_FW_INTERFACE		BIT_19
-#define	CFG_LOAD_FLASH_FW		BIT_20
-#define	CFG_DUMP_MAILBOX_TIMEOUT	BIT_21
-#define	CFG_DUMP_ISP_SYSTEM_ERROR	BIT_22
-#define	CFG_DUMP_DRIVER_COMMAND_TIMEOUT	BIT_23
-#define	CFG_DUMP_LOOP_OFFLINE_TIMEOUT	BIT_24
-#define	CFG_ENABLE_FWEXTTRACE		BIT_25
-#define	CFG_ENABLE_FWFCETRACE		BIT_26
-#define	CFG_FW_MISMATCH			BIT_27
-#define	CFG_CTRL_MENLO			BIT_28
+#define	CFG_ENABLE_HARD_ADDRESS			BIT_0
+#define	CFG_ENABLE_64BIT_ADDRESSING		BIT_1
+#define	CFG_ENABLE_LIP_RESET			BIT_2
+#define	CFG_ENABLE_FULL_LIP_LOGIN		BIT_3
+#define	CFG_ENABLE_TARGET_RESET			BIT_4
+#define	CFG_ENABLE_LINK_DOWN_REPORTING		BIT_5
+#define	CFG_ENABLE_TARGET_MODE			BIT_6
+#define	CFG_ENABLE_FCP_2_SUPPORT		BIT_7
+#define	CFG_MULTI_CHIP_ADAPTER			BIT_8
+#define	CFG_SBUS_CARD				BIT_9
+#define	CFG_CTRL_2300				BIT_10
+#define	CFG_CTRL_6322				BIT_11
+#define	CFG_CTRL_2200				BIT_12
+#define	CFG_CTRL_2422				BIT_13
+#define	CFG_CTRL_25XX				BIT_14
+#define	CFG_ENABLE_EXTENDED_LOGGING		BIT_15
+#define	CFG_DISABLE_RISC_CODE_LOAD		BIT_16
+#define	CFG_SET_CACHE_LINE_SIZE_1		BIT_17
+#define	CFG_TARGET_MODE_ENABLE			BIT_18
+#define	CFG_EXT_FW_INTERFACE			BIT_19
+#define	CFG_LOAD_FLASH_FW			BIT_20
+#define	CFG_DUMP_MAILBOX_TIMEOUT		BIT_21
+#define	CFG_DUMP_ISP_SYSTEM_ERROR		BIT_22
+#define	CFG_DUMP_DRIVER_COMMAND_TIMEOUT		BIT_23
+#define	CFG_DUMP_LOOP_OFFLINE_TIMEOUT		BIT_24
+#define	CFG_ENABLE_FWEXTTRACE			BIT_25
+#define	CFG_ENABLE_FWFCETRACE			BIT_26
+#define	CFG_FW_MISMATCH				BIT_27
+#define	CFG_CTRL_MENLO				BIT_28
+#define	CFG_DISABLE_EXTENDED_LOGGING_TRACE	BIT_29
 
 #define	CFG_CTRL_2425			(CFG_CTRL_2422 | CFG_CTRL_25XX)
 #define	CFG_IST(ha, cfgflags)		(ha->cfg_flags & cfgflags)
@@ -1623,10 +1640,10 @@ typedef struct ql_adapter_state {
 /*
  * Interrupt configuration flags
  */
-#define	IFLG_INTR_LEGACY		BIT_0
-#define	IFLG_INTR_FIXED			BIT_1
-#define	IFLG_INTR_MSI			BIT_2
-#define	IFLG_INTR_MSIX			BIT_3
+#define	IFLG_INTR_LEGACY			BIT_0
+#define	IFLG_INTR_FIXED				BIT_1
+#define	IFLG_INTR_MSI				BIT_2
+#define	IFLG_INTR_MSIX				BIT_3
 
 #define	IFLG_INTR_AIF	(IFLG_INTR_MSI | IFLG_INTR_FIXED | IFLG_INTR_MSIX)
 
@@ -1764,6 +1781,9 @@ typedef struct ql_adapter_state {
 #define	ADAPTER_STATE_LOCK(ha)		mutex_enter(&ha->pha->mutex)
 #define	ADAPTER_STATE_UNLOCK(ha)	mutex_exit(&ha->pha->mutex)
 
+#define	QL_DUMP_LOCK(ha)		mutex_enter(&ha->pha->dump_mutex)
+#define	QL_DUMP_UNLOCK(ha)		mutex_exit(&ha->pha->dump_mutex)
+
 #define	QL_PM_LOCK(ha)			mutex_enter(&ha->pha->pm_mutex)
 #define	QL_PM_UNLOCK(ha)		mutex_exit(&ha->pha->pm_mutex)
 
@@ -1845,7 +1865,8 @@ typedef struct ql_config_space {
 #define	QL_MEMORY_FULL			0x10d
 #define	QL_FW_NOT_SUPPORTED		0x10e
 #define	QL_FWMODLOAD_FAILED		0x10f
-#define	QL_FWSYM_NOT_FOUND		0x10e
+#define	QL_FWSYM_NOT_FOUND		0x110
+#define	QL_LOGIN_NOT_SUPPORTED		0x111
 
 /*
  * SBus card FPGA register offsets.
@@ -1873,6 +1894,97 @@ typedef struct ql_config_space {
 					(((uint64_t)((addr)[5])) << 16) | \
 					(((uint64_t)((addr)[6])) << 8) | \
 					(((uint64_t)((addr)[7])))))
+/*
+ * Structure used to associate cmds with strings which describe them.
+ */
+typedef struct cmd_table_entry {
+	uint16_t cmd;
+	char    *string;
+} cmd_table_t;
+
+/*
+ * ELS command table initializer
+ */
+#define	ELS_CMD_TABLE()					\
+{							\
+	{LA_ELS_RJT, "LA_ELS_RJT"},			\
+	{LA_ELS_ACC, "LA_ELS_ACC"},			\
+	{LA_ELS_PLOGI, "LA_ELS_PLOGI"},			\
+	{LA_ELS_PDISC, "LA_ELS_PDISC"},			\
+	{LA_ELS_FLOGI, "LA_ELS_FLOGI"},			\
+	{LA_ELS_FDISC, "LA_ELS_FDISC"},			\
+	{LA_ELS_LOGO, "LA_ELS_LOGO"},			\
+	{LA_ELS_PRLI, "LA_ELS_PRLI"},			\
+	{LA_ELS_PRLO, "LA_ELS_PRLO"},			\
+	{LA_ELS_ADISC, "LA_ELS_ADISC"},			\
+	{LA_ELS_LINIT, "LA_ELS_LINIT"},			\
+	{LA_ELS_LPC, "LA_ELS_LPC"},			\
+	{LA_ELS_LSTS, "LA_ELS_LSTS"},			\
+	{LA_ELS_SCR, "LA_ELS_SCR"},			\
+	{LA_ELS_RSCN, "LA_ELS_RSCN"},			\
+	{LA_ELS_FARP_REQ, "LA_ELS_FARP_REQ"},		\
+	{LA_ELS_FARP_REPLY, "LA_ELS_FARP_REPLY"},	\
+	{LA_ELS_RLS, "LA_ELS_RLS"},			\
+	{LA_ELS_RNID, "LA_ELS_RNID"},			\
+	{NULL, NULL}					\
+}
+
+/*
+ * ELS Passthru IOCB data segment descriptor.
+ */
+typedef struct data_seg_desc {
+	uint32_t addr[2];
+	uint32_t length;
+} data_seg_desc_t;
+
+/*
+ * ELS descriptor used to abstract the hosts fibre channel packet
+ * from the ISP ELS code.
+ */
+typedef struct els_desc {
+	uint8_t			els;		/* the ELS command code */
+	ddi_acc_handle_t	els_handle;
+	uint16_t		n_port_handle;
+	port_id_t		d_id;
+	port_id_t		s_id;
+	uint16_t		control_flags;
+	uint32_t		cmd_byte_count;
+	uint32_t		rsp_byte_count;
+	data_seg_desc_t		tx_dsd;		/* FC frame payload */
+	data_seg_desc_t		rx_dsd;		/* ELS resp payload buffer */
+} els_descriptor_t;
+
+typedef struct prli_svc_pram_resp_page {
+	uint8_t		type_code;
+	uint8_t		type_code_ext;
+	uint16_t	prli_resp_flags;
+	uint32_t	orig_process_associator;
+	uint32_t	resp_process_associator;
+	uint32_t	common_parameters;
+} prli_svc_pram_resp_page_t;
+
+/*
+ * PRLI accept Service Parameter Page Word 3
+ */
+#define	PRLI_W3_WRITE_FCP_XFR_RDY_DISABLED	BIT_0
+#define	PRLI_W3_READ_FCP_XFR_RDY_DISABLED	BIT_1
+#define	PRLI_W3_OBSOLETE_BIT_2			BIT_2
+#define	PRLI_W3_OBSOLETE_BIT_3			BIT_3
+#define	PRLI_W3_TARGET_FUNCTION			BIT_4
+#define	PRLI_W3_INITIATOR_FUNCTION		BIT_5
+#define	PRLI_W3_DATA_OVERLAY_ALLOWED		BIT_6
+#define	PRLI_W3_CONFIRMED_COMP_ALLOWED		BIT_7
+#define	PRLI_W3_RETRY				BIT_8
+#define	PRLI_W3_TASK_RETRY_ID_REQUESTED		BIT_9
+
+typedef struct prli_acc_resp {
+	uint8_t				ls_code;
+	uint8_t				page_length;
+	uint16_t			payload_length;
+	struct prli_svc_pram_resp_page	svc_params;
+} prli_acc_resp_t;
+
+#define	EL_TRACE_BUF_SIZE	8192
 
 /*
  * Global Data in ql_api.c source file.
@@ -1883,7 +1995,6 @@ extern ql_head_t	ql_hba;
 extern kmutex_t		ql_global_mutex;
 extern kmutex_t		ql_global_hw_mutex;
 extern kmutex_t		ql_global_el_mutex;
-extern volatile uint32_t ql_dump_state;
 extern uint8_t		ql_ip_fast_post_count;
 extern uint32_t		ql_ip_buffer_count;
 extern uint32_t		ql_ip_low_water;
@@ -1943,6 +2054,9 @@ void ql_free_dma_resource(ql_adapter_state_t *, dma_mem_t *);
 uint8_t ql_pci_config_get8(ql_adapter_state_t *, off_t);
 void ql_pci_config_put32(ql_adapter_state_t *, off_t, uint32_t);
 void ql_24xx_unprotect_flash(ql_adapter_state_t *);
+char *els_cmd_text(int);
+char *mbx_cmd_text(int);
+char *cmd_text(cmd_table_t *, int);
 uint32_t ql_fwmodule_resolve(ql_adapter_state_t *);
 void ql_port_state(ql_adapter_state_t *, uint32_t, uint32_t);
 

@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_api.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_api.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -51,9 +51,6 @@
 #include <ql_mbx.h>
 #include <ql_xioctl.h>
 
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-
 /*
  * Solaris external defines.
  */
@@ -67,6 +64,7 @@ static int ql_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int ql_attach(dev_info_t *, ddi_attach_cmd_t);
 static int ql_detach(dev_info_t *, ddi_detach_cmd_t);
 static int ql_power(dev_info_t *, int, int);
+static int ql_quiesce(dev_info_t *);
 
 /*
  * FCA functions prototypes exported by means of the transport table
@@ -179,6 +177,8 @@ static int ql_init_mutex(ql_adapter_state_t *);
 static void ql_destroy_mutex(ql_adapter_state_t *);
 static void ql_iidma(ql_adapter_state_t *);
 
+int ql_el_trace_desc_ctor(ql_adapter_state_t *ha);
+int ql_el_trace_desc_dtor(ql_adapter_state_t *ha);
 /*
  * Global data
  */
@@ -204,13 +204,6 @@ ql_head_t ql_hba = {
 
 /* Global hba index */
 uint32_t ql_gfru_hba_index = 1;
-
-/*
- * Firmware dump context.
- */
-void			*ql_dump_ptr = NULL;
-uint32_t		ql_dump_size = 0;
-volatile uint32_t	ql_dump_state;
 
 /*
  * Some IP defines and globals
@@ -388,33 +381,6 @@ static	ddi_dma_attr_t	ql_64fcp_rsp_dma_attr;
 static	ddi_dma_attr_t	ql_32fcp_data_dma_attr;
 static	ddi_dma_attr_t	ql_64fcp_data_dma_attr;
 
-#if 0
-/* I/O DMA limit structures. */
-static ddi_dma_lim_t ql_32bit_dma_limit = {
-	QL_DMA_LOW_ADDRESS,		/* low range of 32 bit addressing */
-					/* capability */
-	QL_DMA_HIGH_32BIT_ADDRESS,	/* inclusive upper bound of addr */
-					/* capability */
-	QL_DMA_SEGMENT_BOUNDARY,	/* inclusive upper bound of dma */
-					/* engine's address limit */
-	QL_DMA_BURSTSIZES,		/* binary encoded dma burst sizes */
-	QL_DMA_GRANULARITY,		/* minimum effective dma xfer size */
-	0				/* average dma data rate (kb/s) */
-};
-
-static ddi_dma_lim_t ql_64bit_dma_limit = {
-	QL_DMA_LOW_ADDRESS,		/* low range of 32 bit addressing */
-					/* capability */
-	QL_DMA_HIGH_64BIT_ADDRESS,	/* inclusive upper bound of addr */
-					/* capability */
-	QL_DMA_SEGMENT_BOUNDARY,	/* inclusive upper bound of dma */
-					/* engine's address limit */
-	QL_DMA_BURSTSIZES,		/* binary encoded dma burst sizes */
-	QL_DMA_GRANULARITY,		/* minimum effective dma xfer size */
-	0				/* average dma data rate (kb/s) */
-};
-#endif
-
 /* Static declarations of cb_ops entry point functions... */
 static struct cb_ops ql_cb_ops = {
 	ql_open,			/* b/c open */
@@ -449,9 +415,14 @@ static struct dev_ops ql_devops = {
 	nodev,				/* reset */
 	&ql_cb_ops,			/* char/block ops */
 	NULL,				/* bus operations */
-	ql_power			/* power management */
+	ql_power,			/* power management */
+	ql_quiesce			/* quiesce device */
 };
 
+/* ELS command code to text converter */
+cmd_table_t els_cmd_tbl[] = ELS_CMD_TABLE();
+/* Mailbox command code to text converter */
+cmd_table_t mbox_cmd_tbl[] = MBOX_CMD_TABLE();
 
 char qlc_driver_version[] = QL_VERSION;
 
@@ -657,7 +628,6 @@ ql_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 	int			minor;
 	int			rval = DDI_FAILURE;
 
-
 	minor = (int)(getminor((dev_t)arg));
 	ha = ddi_get_soft_state(ql_state, minor);
 	if (ha == NULL) {
@@ -675,7 +645,7 @@ ql_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 		rval = DDI_SUCCESS;
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*resultp = (void*)(uintptr_t)ha->instance;
+		*resultp = (void *)(uintptr_t)(ha->instance);
 		rval = DDI_SUCCESS;
 		break;
 	default:
@@ -715,6 +685,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ushort_t		caps_ptr, cap;
 	fc_fca_tran_t		*tran;
 	ql_adapter_state_t	*ha = NULL;
+
 	static char *pmcomps[] = {
 		NULL,
 		PM_LEVEL_D3_STR,		/* Device OFF */
@@ -775,10 +746,17 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ha->hba.base_address = ha;
 		ha->pha = ha;
 
+		if (ql_el_trace_desc_ctor(ha) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "%s(%d): can't setup el tracing",
+			    QL_NAME, instance);
+			goto attach_failed;
+		}
+
 		/* Get extended logging and dump flags. */
 		ql_common_properties(ha);
 
-		if (strcmp(ddi_driver_name(ddi_get_parent(dip)), "sbus") == 0) {
+		if (strcmp(ddi_driver_name(ddi_get_parent(dip)),
+		    "sbus") == 0) {
 			EL(ha, "%s SBUS card detected", QL_NAME);
 			ha->cfg_flags |= CFG_SBUS_CARD;
 		}
@@ -983,6 +961,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			} else {
 				ha->flags |= VP_ENABLED;
 			}
+
 			ha->reg_off = &reg_off_2400_2500;
 			ha->fw_class = 0x2400;
 			if (ql_fwmodule_resolve(ha) != QL_SUCCESS) {
@@ -1031,7 +1010,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    RCVBUF_QUEUE_SIZE);
 
 		if (ql_get_dma_mem(ha, &ha->hba_buf, size, LITTLE_ENDIAN_DMA,
-		    MEM_RING_ALIGN) != QL_SUCCESS) {
+		    QL_DMA_RING_ALIGN) != QL_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): request queue DMA memory "
 			    "alloc failed", QL_NAME, instance);
 			goto attach_failed;
@@ -1201,8 +1180,6 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* dmaattr are static, set elsewhere. */
 		if (CFG_IST(ha, CFG_ENABLE_64BIT_ADDRESSING)) {
-/* XXX need to remove */
-/*			tran->fca_dma_lim = &ql_64bit_dma_limit; */
 			tran->fca_dma_attr = &ql_64bit_io_dma_attr;
 			tran->fca_dma_fcp_cmd_attr = &ql_64fcp_cmd_dma_attr;
 			tran->fca_dma_fcp_rsp_attr = &ql_64fcp_rsp_dma_attr;
@@ -1212,7 +1189,6 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			tran->fca_dma_fcip_cmd_attr = &ql_64fcip_cmd_dma_attr;
 			tran->fca_dma_fcip_rsp_attr = &ql_64fcip_rsp_dma_attr;
 		} else {
-/*			tran->fca_dma_lim = &ql_32bit_dma_limit; */
 			tran->fca_dma_attr = &ql_32bit_io_dma_attr;
 			tran->fca_dma_fcp_cmd_attr = &ql_32fcp_cmd_dma_attr;
 			tran->fca_dma_fcp_rsp_attr = &ql_32fcp_rsp_dma_attr;
@@ -1558,7 +1534,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		ADAPTER_STATE_LOCK(ha);
-		ha->flags |= (ADAPTER_SUSPENDED | COMMAND_ABORT_TIMEOUT);
+		ha->flags |= (ADAPTER_SUSPENDED | ABORT_CMDS_LOOP_DOWN_TMO);
 		ADAPTER_STATE_UNLOCK(ha);
 
 		/* Acquire task daemon lock. */
@@ -1732,8 +1708,8 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		kmem_free(ha->ub_array, sizeof (*ha->ub_array) * QL_UB_LIMIT);
 
-		kmem_free(ha->outstanding_cmds, sizeof (*ha->outstanding_cmds) *
-		    MAX_OUTSTANDING_COMMANDS);
+		kmem_free(ha->outstanding_cmds,
+		    sizeof (*ha->outstanding_cmds) * MAX_OUTSTANDING_COMMANDS);
 
 		if (ha->devpath != NULL) {
 			kmem_free(ha->devpath, strlen(ha->devpath) + 1);
@@ -1743,7 +1719,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		EL(ha, "detached\n");
 
-		ddi_soft_state_free(ql_state, ha->instance);
+		ddi_soft_state_free(ql_state, (int)ha->instance);
 
 		break;
 
@@ -1876,7 +1852,10 @@ ql_power(dev_info_t *dip, int component, int level)
 		return (rval);
 	}
 
+	GLOBAL_HW_LOCK();
 	csr = (uint8_t)ql_pci_config_get8(ha, PCI_CONF_CAP_PTR) + PCI_PMCSR;
+	GLOBAL_HW_UNLOCK();
+
 	ASSERT(csr == QL_PM_CS_REG);
 
 	(void) snprintf(buf, sizeof (buf),
@@ -1900,13 +1879,17 @@ ql_power(dev_info_t *dip, int component, int level)
 		ha->power_level = PM_LEVEL_D0;
 		QL_PM_UNLOCK(ha);
 
+		GLOBAL_HW_LOCK();
+
 		ql_pci_config_put16(ha, csr, PCI_PMCSR_D0);
 
 		/*
 		 * Delay after reset, for chip to recover.
 		 * Otherwise causes system PANIC
 		 */
-		drv_usecwait(20000);
+		drv_usecwait(200000);
+
+		GLOBAL_HW_UNLOCK();
 
 		if (ha->config_saved) {
 			ha->config_saved = 0;
@@ -1985,7 +1968,12 @@ ql_power(dev_info_t *dip, int component, int level)
 		ha->power_level = PM_LEVEL_D3;
 		QL_PM_UNLOCK(ha);
 
+		/*
+		 * Wait for ISR to complete.
+		 */
+		INTR_LOCK(ha);
 		ql_pci_config_put16(ha, csr, PCI_PMCSR_D3HOT);
+		INTR_UNLOCK(ha);
 
 		cmn_err(CE_NOTE, QL_BANG "ql_power(%d): %s is powered OFF\n",
 		    ha->instance, QL_NAME);
@@ -2001,6 +1989,71 @@ ql_power(dev_info_t *dip, int component, int level)
 
 	return (rval);
 }
+
+/*
+ * ql_quiesce
+ *	quiesce a device attached to the system.
+ *
+ * Input:
+ *	dip = pointer to device information structure.
+ *
+ * Returns:
+ *	DDI_SUCCESS
+ *
+ * Context:
+ *	Kernel context.
+ */
+/* ARGSUSED */
+static int
+ql_quiesce(dev_info_t *dip)
+{
+	ql_adapter_state_t	*ha;
+	uint32_t		timer;
+	uint32_t		stat;
+
+	ha = ddi_get_soft_state(ql_state, ddi_get_instance(dip));
+	if (ha == NULL) {
+		/* Oh well.... */
+		return (DDI_SUCCESS);
+	}
+
+	if (CFG_IST(ha, CFG_CTRL_2425)) {
+		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		WRT16_IO_REG(ha, mailbox[0], MBC_STOP_FIRMWARE);
+		WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
+		for (timer = 0; timer < 30000; timer++) {
+			stat = RD32_IO_REG(ha, intr_info_lo);
+			if (stat & BIT_15) {
+				if ((stat & 0xff) < 0x12) {
+					WRT32_IO_REG(ha, hccr,
+					    HC24_CLR_RISC_INT);
+					break;
+				}
+				WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+			}
+			drv_usecwait(100);
+		}
+		/* Reset the chip. */
+		WRT32_IO_REG(ha, ctrl_status, ISP_RESET | DMA_SHUTDOWN |
+		    MWB_4096_BYTES);
+		drv_usecwait(100);
+
+	} else {
+		/* Disable ISP interrupts. */
+		WRT16_IO_REG(ha, ictrl, 0);
+		/* Select RISC module registers. */
+		WRT16_IO_REG(ha, ctrl_status, 0);
+		/* Reset ISP semaphore. */
+		WRT16_IO_REG(ha, semaphore, 0);
+		/* Reset RISC module. */
+		WRT16_IO_REG(ha, hccr, HC_RESET_RISC);
+		/* Release RISC module. */
+		WRT16_IO_REG(ha, hccr, HC_RELEASE_RISC);
+	}
+
+	return (DDI_SUCCESS);
+}
+
 
 /* ************************************************************************ */
 /*		Fibre Channel Adapter (FCA) Transport Functions.	    */
@@ -2150,10 +2203,9 @@ ql_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 				}
 			} else if (ha->init_ctrl_blk.cb.firmware_options[0] &
 			    BIT_0) {
-					d_id.b.al_pa = ql_index_to_alpa[ha->
-					    init_ctrl_blk.cb.hard_address[0]];
-					port_info->pi_hard_addr.hard_addr =
-					    d_id.b24;
+				d_id.b.al_pa = ql_index_to_alpa[ha->
+				    init_ctrl_blk.cb.hard_address[0]];
+				port_info->pi_hard_addr.hard_addr = d_id.b24;
 			}
 
 			/* Set the node id data */
@@ -2239,7 +2291,7 @@ ql_unbind_port(opaque_t fca_handle)
 					    NULL);
 				}
 				(void) ql_vport_control(ha,
-				    VPC_DISABLE_LOGOUT);
+				    VPC_DISABLE_INIT);
 				flgs = FCA_BOUND | VP_ENABLED;
 			} else {
 				flgs = FCA_BOUND;
@@ -3004,8 +3056,8 @@ ql_ub_alloc(opaque_t fca_handle, uint64_t tokens[], uint32_t size,
 #ifdef	__sparc
 					if (ql_get_dma_mem(ha,
 					    &sp->ub_buffer, size,
-					    BIG_ENDIAN_DMA, MEM_DATA_ALIGN) !=
-					    QL_SUCCESS) {
+					    BIG_ENDIAN_DMA,
+					    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 						rval = FC_FAILURE;
 						kmem_free(ubp,
 						    sizeof (fc_unsol_buf_t));
@@ -3018,8 +3070,8 @@ ql_ub_alloc(opaque_t fca_handle, uint64_t tokens[], uint32_t size,
 #else
 					if (ql_get_dma_mem(ha,
 					    &sp->ub_buffer, size,
-					    LITTLE_ENDIAN_DMA, MEM_DATA_ALIGN) !=
-					    QL_SUCCESS) {
+					    LITTLE_ENDIAN_DMA,
+					    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 						rval = FC_FAILURE;
 						kmem_free(ubp,
 						    sizeof (fc_unsol_buf_t));
@@ -3851,21 +3903,23 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 	}
 
 	case FC_PORT_GET_DUMP:
+		QL_DUMP_LOCK(pha);
 		if (cmd->pm_data_len < (size_t)pha->risc_dump_size) {
 			EL(ha, "failed, FC_PORT_GET_DUMP incorrect "
 			    "length=%lxh\n", cmd->pm_data_len);
 			cmd->pm_data_len = pha->risc_dump_size;
 			rval = FC_FAILURE;
-		} else if (ql_dump_state & QL_DUMPING) {
+		} else if (pha->ql_dump_state & QL_DUMPING) {
 			EL(ha, "failed, FC_PORT_GET_DUMP FC_TRAN_BUSY\n");
 			rval = FC_TRAN_BUSY;
-		} else if (ql_dump_state & QL_DUMP_VALID) {
+		} else if (pha->ql_dump_state & QL_DUMP_VALID) {
 			(void) ql_ascii_fw_dump(ha, cmd->pm_data_buf);
-			ql_dump_state |= QL_DUMP_UPLOADED;
+			pha->ql_dump_state |= QL_DUMP_UPLOADED;
 		} else {
 			EL(ha, "failed, FC_PORT_GET_DUMP no dump file\n");
 			rval = FC_FAILURE;
 		}
+		QL_DUMP_UNLOCK(pha);
 		break;
 	case FC_PORT_FORCE_DUMP:
 		PORTMANAGE_LOCK(ha);
@@ -4001,26 +4055,27 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 				rval = FC_INVALID_REQUEST;
 				break;
 			}
+			/*
+			 * Don't do the wrap test on a 2200 when the
+			 * firmware is running.
+			 */
+			if (!CFG_IST(ha, CFG_CTRL_2200)) {
+				mcp = (app_mbx_cmd_t *)cmd->pm_data_buf;
+				mr.mb[1] = mcp->mb[1];
+				mr.mb[2] = mcp->mb[2];
+				mr.mb[3] = mcp->mb[3];
+				mr.mb[4] = mcp->mb[4];
+				mr.mb[5] = mcp->mb[5];
+				mr.mb[6] = mcp->mb[6];
+				mr.mb[7] = mcp->mb[7];
 
-			mcp = (app_mbx_cmd_t *)cmd->pm_data_buf;
-			mr.mb[1] = mcp->mb[1];
-			mr.mb[2] = mcp->mb[2];
-			mr.mb[3] = mcp->mb[3];
-			mr.mb[4] = RD16_IO_REG(pha, mailbox[4]);
-			mr.mb[5] = RD16_IO_REG(pha, mailbox[5]);
-			mr.mb[6] = mcp->mb[6];
-			mr.mb[7] = mcp->mb[7];
-
-			bcopy(&mr.mb[0], &mr.mb[10], sizeof (uint16_t) * 8);
-			if (ql_mbx_wrap_test(ha, &mr) != QL_SUCCESS) {
-				EL(ha, "failed, QL_DIAG_LPBMBX FC_FAILURE\n");
-				rval = FC_FAILURE;
-				break;
-			}
-
-			for (i0 = 1; i0 < 8; i0++) {
-				if (i0 == 4) {
-					i0 = 6;
+				bcopy(&mr.mb[0], &mr.mb[10],
+				    sizeof (uint16_t) * 8);
+				if (ql_mbx_wrap_test(ha, &mr) != QL_SUCCESS) {
+					EL(ha, "failed, QL_DIAG_LPBMBX "
+					    "FC_FAILURE\n");
+					rval = FC_FAILURE;
+					break;
 				}
 				if (mr.mb[i0] != mr.mb[i0 + 10]) {
 					EL(ha, "failed, QL_DIAG_LPBMBX "
@@ -4057,14 +4112,14 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			}
 			if (ql_get_dma_mem(ha, &buffer_xmt,
 			    (uint32_t)cmd->pm_data_len, LITTLE_ENDIAN_DMA,
-			    MEM_DATA_ALIGN) != QL_SUCCESS) {
+			    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 				EL(ha, "failed, QL_DIAG_LPBDTA FC_NOMEM\n");
 				rval = FC_NOMEM;
 				break;
 			}
 			if (ql_get_dma_mem(ha, &buffer_rcv,
 			    (uint32_t)cmd->pm_data_len, LITTLE_ENDIAN_DMA,
-			    MEM_DATA_ALIGN) != QL_SUCCESS) {
+			    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 				EL(ha, "failed, QL_DIAG_LPBDTA FC_NOMEM-2\n");
 				rval = FC_NOMEM;
 				break;
@@ -4203,7 +4258,8 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			 */
 			if (ql_get_dma_mem(ha, &buffer_xmt,
 			    (uint32_t)(cmd->pm_data_len + 4),
-			    LITTLE_ENDIAN_DMA, MEM_DATA_ALIGN) != QL_SUCCESS) {
+			    LITTLE_ENDIAN_DMA,
+			    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 				EL(ha, "failed, QL_DIAG_ECHO FC_NOMEM\n");
 				rval = FC_NOMEM;
 				break;
@@ -4213,7 +4269,8 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			/* Next the input buffer */
 			if (ql_get_dma_mem(ha, &buffer_rcv,
 			    (uint32_t)(cmd->pm_data_len + 4),
-			    LITTLE_ENDIAN_DMA, MEM_DATA_ALIGN) != QL_SUCCESS) {
+			    LITTLE_ENDIAN_DMA,
+			    QL_DMA_DATA_ALIGN) != QL_SUCCESS) {
 				/*
 				 * since we could not allocate
 				 * DMA space for the input
@@ -4928,7 +4985,7 @@ ql_els_plogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 static int
 ql_els_flogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 {
-	ql_tgt_t		*tq;
+	ql_tgt_t		*tq = NULL;
 	port_id_t		d_id;
 	la_els_logi_t		acc;
 	class_svc_param_t	*class3_param;
@@ -5273,7 +5330,7 @@ ql_els_adisc(ql_adapter_state_t *ha, fc_packet_t *pkt)
 
 		DEVICE_QUEUE_LOCK(tq);
 		tq->flags &= ~TQF_NEED_AUTHENTICATION;
-		if (tq->prli_svc_param_word_3 & BIT_8) {
+		if (tq->prli_svc_param_word_3 & PRLI_W3_RETRY) {
 			for (link = tq->lun_queues.first; link != NULL;
 			    link = link->next) {
 				lq = link->base_address;
@@ -7192,7 +7249,7 @@ ql_start_cmd(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 		ASSERT(poll_wait != 0);
 	}
 
-	if (ha->pha->flags & COMMAND_ABORT_TIMEOUT &&
+	if (ha->pha->flags & ABORT_CMDS_LOOP_DOWN_TMO &&
 	    (CFG_IST(ha, CFG_ENABLE_LINK_DOWN_REPORTING))) {
 		/* Set ending status. */
 		sp->pkt->pkt_reason = CS_PORT_UNAVAILABLE;
@@ -7687,15 +7744,7 @@ ql_done(ql_link_t *link)
 				case CS_TRANSPORT:
 					sp->pkt->pkt_state = FC_PKT_LOCAL_RJT;
 					sp->pkt->pkt_reason =
-					    FC_REASON_XCHG_DROPPED;
-					EL(ha, "state=rjt, reason=dropped\n");
-					break;
-
-				case CS_FCP_RESPONSE_ERROR:
-					sp->pkt->pkt_state = FC_PKT_LOCAL_RJT;
-					sp->pkt->pkt_reason =
-					    FC_REASON_CRC_ERROR;
-					EL(ha, "state=rjt, reason=crc\n");
+					    FC_PKT_TRAN_ERROR;
 					break;
 
 				case CS_DATA_UNDERRUN:
@@ -7884,7 +7933,6 @@ ql_task_daemon(void *arg)
 static void
 ql_task_thread(ql_adapter_state_t *ha)
 {
-/*LINTED*/
 	int			loop_again;
 	ql_srb_t		*sp;
 	ql_head_t		*head;
@@ -8882,7 +8930,7 @@ ql_process_rscn_for_device(ql_adapter_state_t *ha, ql_tgt_t *tq)
 	 * with their low level recoveries.
 	 */
 	if (((tq->flags & TQF_INITIATOR_DEVICE) == 0) &&
-	    (tq->prli_svc_param_word_3 & BIT_8)) {
+	    (tq->prli_svc_param_word_3 & PRLI_W3_RETRY)) {
 		/*
 		 * Cause ADISC to go out
 		 */
@@ -9328,6 +9376,10 @@ ql_timer(void *arg)
 		if (LOOP_RECONFIGURE(ha) == 0) {
 			if (ha->loop_down_timer > LOOP_DOWN_TIMER_END) {
 				ha->loop_down_timer--;
+				/*
+				 * give the firmware loop down dump flag
+				 * a chance to work.
+				 */
 				if (ha->loop_down_timer == LOOP_DOWN_RESET) {
 					if (CFG_IST(ha,
 					    CFG_DUMP_LOOP_OFFLINE_TIMEOUT)) {
@@ -9344,7 +9396,7 @@ ql_timer(void *arg)
 				if (ha->loop_down_timer ==
 				    ha->loop_down_abort_time) {
 					ADAPTER_STATE_LOCK(ha);
-					ha->flags |= COMMAND_ABORT_TIMEOUT;
+					ha->flags |= ABORT_CMDS_LOOP_DOWN_TMO;
 					ADAPTER_STATE_UNLOCK(ha);
 					set_flags |= ABORT_QUEUES_NEEDED;
 					EL(ha, "loop_down_abort_time, "
@@ -9724,7 +9776,8 @@ ql_cmd_wait(ql_adapter_state_t *ha)
 			    link = link->next) {
 				tq = link->base_address;
 				if (tq &&
-				    !(tq->prli_svc_param_word_3 & BIT_8)) {
+				    (!(tq->prli_svc_param_word_3 &
+				    PRLI_W3_RETRY))) {
 					(void) ql_abort_device(vha, tq, 0);
 				}
 			}
@@ -10850,7 +10903,8 @@ ql_24xx_load_flash(ql_adapter_state_t *vha, uint8_t *dp, uint32_t size,
 		/* Allocate DMA buffer */
 		if (CFG_IST(ha, CFG_CTRL_25XX)) {
 			if ((rval = ql_get_dma_mem(ha, &dmabuf, 0xffff,
-			    LITTLE_ENDIAN_DMA, MEM_DATA_ALIGN)) != QL_SUCCESS) {
+			    LITTLE_ENDIAN_DMA,
+			    QL_DMA_DATA_ALIGN)) != QL_SUCCESS) {
 				EL(ha, "dma alloc failed, rval=%xh\n", rval);
 				return (rval);
 			}
@@ -11193,11 +11247,17 @@ ql_dump_firmware(ql_adapter_state_t *vha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (ql_dump_state & QL_DUMPING || (ql_dump_state & QL_DUMP_VALID &&
-	    !(ql_dump_state & QL_DUMP_UPLOADED))) {
+	QL_DUMP_LOCK(ha);
+
+	if (ha->ql_dump_state & QL_DUMPING ||
+	    (ha->ql_dump_state & QL_DUMP_VALID &&
+	    !(ha->ql_dump_state & QL_DUMP_UPLOADED))) {
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+		QL_DUMP_UNLOCK(ha);
 		return (QL_SUCCESS);
 	}
+
+	QL_DUMP_UNLOCK(ha);
 
 	ql_awaken_task_daemon(ha, NULL, DRIVER_STALL, 0);
 
@@ -11272,14 +11332,31 @@ ql_binary_fw_dump(ql_adapter_state_t *vha, int lock_needed)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (ql_dump_state & QL_DUMPING || (ql_dump_state & QL_DUMP_VALID &&
-	    !(ql_dump_state & QL_DUMP_UPLOADED))) {
-		EL(ha, "dump already done, qds=%x\n", ql_dump_state);
+	QL_DUMP_LOCK(ha);
+
+	if (ha->ql_dump_state & QL_DUMPING ||
+	    (ha->ql_dump_state & QL_DUMP_VALID &&
+	    !(ha->ql_dump_state & QL_DUMP_UPLOADED))) {
+		EL(ha, "dump already done, qds=%x\n", ha->ql_dump_state);
+		QL_DUMP_UNLOCK(ha);
 		return (QL_DATA_EXISTS);
 	}
 
-	ql_dump_state &= ~(QL_DUMP_VALID | QL_DUMP_UPLOADED);
-	ql_dump_state |= QL_DUMPING;
+	ha->ql_dump_state &= ~(QL_DUMP_VALID | QL_DUMP_UPLOADED);
+	ha->ql_dump_state |= QL_DUMPING;
+
+	QL_DUMP_UNLOCK(ha);
+
+	if (ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) {
+
+		/* Insert Time Stamp */
+		rval = ql_fw_etrace(ha, &ha->fwexttracebuf,
+		    FTO_INSERT_TIME_STAMP);
+		if (rval != QL_SUCCESS) {
+			EL(ha, "f/w extended trace insert"
+			    "time stamp failed: %xh\n", rval);
+		}
+	}
 
 	if (lock_needed == TRUE) {
 		/* Acquire mailbox register lock. */
@@ -11322,51 +11399,57 @@ ql_binary_fw_dump(ql_adapter_state_t *vha, int lock_needed)
 	}
 
 	/* Free previous dump buffer. */
-	if (ql_dump_ptr != NULL) {
-		kmem_free(ql_dump_ptr, ql_dump_size);
-		ql_dump_ptr = NULL;
+	if (ha->ql_dump_ptr != NULL) {
+		kmem_free(ha->ql_dump_ptr, ha->ql_dump_size);
+		ha->ql_dump_ptr = NULL;
 	}
 
 	if (CFG_IST(ha, CFG_CTRL_2422)) {
-		ql_dump_size = (uint32_t)(sizeof (ql_24xx_fw_dump_t) +
+		ha->ql_dump_size = (uint32_t)(sizeof (ql_24xx_fw_dump_t) +
 		    ha->fw_ext_memory_size);
 	} else if (CFG_IST(ha, CFG_CTRL_25XX)) {
-		ql_dump_size = (uint32_t)(sizeof (ql_25xx_fw_dump_t) +
+		ha->ql_dump_size = (uint32_t)(sizeof (ql_25xx_fw_dump_t) +
 		    ha->fw_ext_memory_size);
 	} else {
-		ql_dump_size = sizeof (ql_fw_dump_t);
+		ha->ql_dump_size = sizeof (ql_fw_dump_t);
 	}
 
-	if ((ql_dump_ptr = kmem_zalloc(ql_dump_size, KM_NOSLEEP)) == NULL) {
+	if ((ha->ql_dump_ptr = kmem_zalloc(ha->ql_dump_size, KM_NOSLEEP)) ==
+	    NULL) {
 		rval = QL_MEMORY_ALLOC_FAILED;
 	} else {
 		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
-			rval = ql_2300_binary_fw_dump(ha, ql_dump_ptr);
+			rval = ql_2300_binary_fw_dump(ha, ha->ql_dump_ptr);
 		} else if (CFG_IST(ha, CFG_CTRL_25XX)) {
-			rval = ql_25xx_binary_fw_dump(ha, ql_dump_ptr);
+			rval = ql_25xx_binary_fw_dump(ha, ha->ql_dump_ptr);
 		} else if (CFG_IST(ha, CFG_CTRL_2422)) {
-			rval = ql_24xx_binary_fw_dump(ha, ql_dump_ptr);
+			rval = ql_24xx_binary_fw_dump(ha, ha->ql_dump_ptr);
 		} else {
-			rval = ql_2200_binary_fw_dump(ha, ql_dump_ptr);
+			rval = ql_2200_binary_fw_dump(ha, ha->ql_dump_ptr);
 		}
 	}
 
 	/* Reset ISP chip. */
 	ql_reset_chip(ha);
 
+	QL_DUMP_LOCK(ha);
+
 	if (rval != QL_SUCCESS) {
-		if (ql_dump_ptr != NULL) {
-			kmem_free(ql_dump_ptr, ql_dump_size);
-			ql_dump_ptr = NULL;
+		if (ha->ql_dump_ptr != NULL) {
+			kmem_free(ha->ql_dump_ptr, ha->ql_dump_size);
+			ha->ql_dump_ptr = NULL;
 		}
-		ql_dump_state &= ~(QL_DUMPING | QL_DUMP_VALID |
+		ha->ql_dump_state &= ~(QL_DUMPING | QL_DUMP_VALID |
 		    QL_DUMP_UPLOADED);
 		EL(ha, "failed, rval = %xh\n", rval);
 	} else {
-		ql_dump_state &= ~(QL_DUMPING | QL_DUMP_UPLOADED);
-		ql_dump_state |= QL_DUMP_VALID;
+		ha->ql_dump_state &= ~(QL_DUMPING | QL_DUMP_UPLOADED);
+		ha->ql_dump_state |= QL_DUMP_VALID;
 		EL(ha, "done\n");
 	}
+
+	QL_DUMP_UNLOCK(ha);
+
 	return (rval);
 }
 
@@ -11389,9 +11472,9 @@ ql_ascii_fw_dump(ql_adapter_state_t *vha, caddr_t bufp)
 {
 	uint32_t		cnt;
 	caddr_t			bp;
-	ql_fw_dump_t		*fw = ql_dump_ptr;
 	int			mbox_cnt;
 	ql_adapter_state_t	*ha = vha->pha;
+	ql_fw_dump_t		*fw = ha->ql_dump_ptr;
 
 	if (CFG_IST(ha, CFG_CTRL_2422)) {
 		return (ql_24xx_ascii_fw_dump(ha, bufp));
@@ -11627,8 +11710,6 @@ ql_ascii_fw_dump(ql_adapter_state_t *vha, caddr_t bufp)
 			(void) sprintf(bp, "%04x  ", fw->data_ram[cnt]);
 			bp = bp + 6;
 		}
-
-		(void) strcat(bp, "\n\n[<==END] ISP Debug Dump.");
 	} else {
 		(void) strcat(bp, "\n\nRISC SRAM:");
 		bp = bufp + strlen(bufp);
@@ -11641,6 +11722,33 @@ ql_ascii_fw_dump(ql_adapter_state_t *vha, caddr_t bufp)
 			bp = bp + 6;
 		}
 	}
+
+	(void) strcat(bp, "\n\n[<==END] ISP Debug Dump.");
+	bp += strlen(bp);
+
+	(void) sprintf(bp, "\n\nRequest Queue");
+	bp += strlen(bp);
+	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp, "\n%08x: ", cnt);
+			bp += strlen(bp);
+		}
+		(void) sprintf(bp, "%08x ", fw->req_q[cnt]);
+		bp += strlen(bp);
+	}
+
+	(void) sprintf(bp, "\n\nResponse Queue");
+	bp += strlen(bp);
+	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp, "\n%08x: ", cnt);
+			bp += strlen(bp);
+		}
+		(void) sprintf(bp, "%08x ", fw->rsp_q[cnt]);
+		bp += strlen(bp);
+	}
+
+	(void) sprintf(bp, "\n");
 
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
@@ -11666,7 +11774,7 @@ ql_24xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 {
 	uint32_t		cnt;
 	caddr_t			bp = bufp;
-	ql_24xx_fw_dump_t	*fw = ql_dump_ptr;
+	ql_24xx_fw_dump_t	*fw = ha->ql_dump_ptr;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
@@ -11989,6 +12097,73 @@ ql_24xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 	(void) sprintf(bp, "\n[<==END] ISP Debug Dump");
 	bp += strlen(bp);
 
+	(void) sprintf(bp, "\n\nRequest Queue");
+	bp += strlen(bp);
+	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp, "\n%08x: ", cnt);
+			bp += strlen(bp);
+		}
+		(void) sprintf(bp, "%08x ", fw->req_q[cnt]);
+		bp += strlen(bp);
+	}
+
+	(void) sprintf(bp, "\n\nResponse Queue");
+	bp += strlen(bp);
+	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp, "\n%08x: ", cnt);
+			bp += strlen(bp);
+		}
+		(void) sprintf(bp, "%08x ", fw->rsp_q[cnt]);
+		bp += strlen(bp);
+	}
+
+
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+	    (ha->fwexttracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint64_t w64 = (uintptr_t)ha->fwexttracebuf.bp;
+
+		(void) sprintf(bp, "\n\nExtended Trace Buffer Memory");
+		bp += strlen(bp);
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				(void) sprintf(bp, "\n%08x: ",
+				    (int)(w64 + cnt_b));
+				bp += 11;
+			}
+			(void) sprintf(bp, "%08x ", fw->ext_trace_buf[cnt]);
+			bp += 9;
+		}
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+	    (ha->fwfcetracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint64_t w64 = (uintptr_t)ha->fwfcetracebuf.bp;
+
+		(void) sprintf(bp, "\n\nFC Event Trace Buffer Memory");
+		bp += strlen(bp);
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				(void) sprintf(bp, "\n%08x: ",
+				    (int)(w64 + cnt_b));
+				bp += 11;
+			}
+			(void) sprintf(bp, "%08x ", fw->fce_trace_buf[cnt]);
+			bp += 9;
+		}
+	}
+
+	(void) sprintf(bp, "\n\n");
+	bp += strlen(bp);
+
 	cnt = (uintptr_t)bp - (uintptr_t)bufp;
 
 	QL_PRINT_3(CE_CONT, "(%d): done=%xh\n", ha->instance, cnt);
@@ -12015,18 +12190,19 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 {
 	uint32_t		cnt;
 	caddr_t			bp = bufp;
-	ql_25xx_fw_dump_t	*fw = ql_dump_ptr;
+	ql_25xx_fw_dump_t	*fw = ha->ql_dump_ptr;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	(void) sprintf(bp, "ISP FW Version %d.%02d.%02d Attributes %X\n",
+	(void) sprintf(bp, "\nISP FW Version %d.%02d.%02d Attributes %X\n",
 	    ha->fw_major_version, ha->fw_minor_version,
 	    ha->fw_subminor_version, ha->fw_attributes);
 	bp += strlen(bp);
 
 	(void) sprintf(bp, "\nR2H Status Register\n%08x\n", fw->r2h_status);
+	bp += strlen(bp);
 
-	(void) sprintf(bp, "\n\nHostRisc Registers");
+	(void) sprintf(bp, "\nHostRisc Registers");
 	bp += strlen(bp);
 	for (cnt = 0; cnt < sizeof (fw->hostrisc_reg) / 4; cnt++) {
 		if (cnt % 8 == 0) {
@@ -12046,16 +12222,29 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		bp += 9;
 	}
 
-	(void) strcat(bp, "\nHost Interface Registers");
+	(void) strcat(bp, "\n\nHost Interface Registers");
 	bp += strlen(bp);
 	for (cnt = 0; cnt < sizeof (fw->host_reg) / 4; cnt++) {
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->host_reg[cnt]);
 		bp += 9;
 	}
+
+	(void) sprintf(bufp + strlen(bufp), "\n\nShadow Registers");
+	bp += strlen(bp);
+	for (cnt = 0; cnt < sizeof (fw->shadow_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp++, "\n");
+		}
+		(void) sprintf(bp, "%08x ", fw->shadow_reg[cnt]);
+		bp += 9;
+	}
+
+	(void) sprintf(bufp + strlen(bufp), "\n\nRISC IO Register\n%08x",
+	    fw->risc_io);
+	bp += strlen(bp);
 
 	(void) sprintf(bp, "\n\nMailbox Registers");
 	bp += strlen(bp);
@@ -12063,7 +12252,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 16 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%04x ", fw->mailbox_reg[cnt]);
 		bp += 5;
 	}
@@ -12074,7 +12262,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xseq_gp_reg[cnt]);
 		bp += 9;
 	}
@@ -12085,7 +12272,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xseq_0_reg[cnt]);
 		bp += 9;
 	}
@@ -12096,7 +12282,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xseq_1_reg[cnt]);
 		bp += 9;
 	}
@@ -12107,7 +12292,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->rseq_gp_reg[cnt]);
 		bp += 9;
 	}
@@ -12118,7 +12302,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->rseq_0_reg[cnt]);
 		bp += 9;
 	}
@@ -12129,7 +12312,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->rseq_1_reg[cnt]);
 		bp += 9;
 	}
@@ -12140,7 +12322,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->rseq_2_reg[cnt]);
 		bp += 9;
 	}
@@ -12151,7 +12332,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->aseq_gp_reg[cnt]);
 		bp += 9;
 	}
@@ -12162,7 +12342,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->aseq_0_reg[cnt]);
 		bp += 9;
 	}
@@ -12173,7 +12352,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->aseq_1_reg[cnt]);
 		bp += 9;
 	}
@@ -12184,7 +12362,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->aseq_2_reg[cnt]);
 		bp += 9;
 	}
@@ -12195,7 +12372,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void)  sprintf(bp, "%08x ", fw->cmd_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12206,7 +12382,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->req0_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12217,7 +12392,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->resp0_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12228,7 +12402,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->req1_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12239,7 +12412,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xmt0_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12250,7 +12422,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xmt1_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12261,7 +12432,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xmt2_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12272,7 +12442,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xmt3_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12283,7 +12452,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xmt4_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12294,7 +12462,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->xmt_data_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12305,7 +12472,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->rcvt0_data_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12316,7 +12482,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->rcvt1_data_dma_reg[cnt]);
 		bp += 9;
 	}
@@ -12327,25 +12492,9 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->risc_gp_reg[cnt]);
 		bp += 9;
 	}
-
-	(void) sprintf(bufp + strlen(bufp), "\n\nShadow Registers");
-	bp += strlen(bp);
-	for (cnt = 0; cnt < sizeof (fw->shadow_reg) / 4; cnt++) {
-		if (cnt % 8 == 0) {
-			(void) sprintf(bp++, "\n");
-		}
-
-		(void) sprintf(bp, "%08x ", fw->shadow_reg[cnt]);
-		bp += 9;
-	}
-
-	(void) sprintf(bufp + strlen(bufp), "\n\nRISC IO Register\n%08x",
-	    fw->risc_io);
-	bp += strlen(bp);
 
 	(void) sprintf(bp, "\n\nLMC Registers");
 	bp += strlen(bp);
@@ -12353,7 +12502,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->lmc_reg[cnt]);
 		bp += 9;
 	}
@@ -12364,7 +12512,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->fpm_hdw_reg[cnt]);
 		bp += 9;
 	}
@@ -12375,7 +12522,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 		if (cnt % 8 == 0) {
 			(void) sprintf(bp++, "\n");
 		}
-
 		(void) sprintf(bp, "%08x ", fw->fb_hdw_reg[cnt]);
 		bp += 9;
 	}
@@ -12387,7 +12533,6 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 			(void) sprintf(bp, "\n%08x: ", cnt + 0x20000);
 			bp += 11;
 		}
-
 		(void) sprintf(bp, "%08x ", fw->code_ram[cnt]);
 		bp += 9;
 	}
@@ -12408,24 +12553,68 @@ ql_25xx_ascii_fw_dump(ql_adapter_state_t *ha, caddr_t bufp)
 
 	(void) sprintf(bp, "\n\nRequest Queue");
 	bp += strlen(bp);
-	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 2; cnt++) {
-		if (cnt % 16 == 0) {
-			(void) sprintf(bp++, "\n");
+	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp, "\n%08x: ", cnt);
+			bp += strlen(bp);
 		}
-		(void) sprintf(bp, "%04x ", fw->req_rsp_q[cnt]);
-		bp += 5;
+		(void) sprintf(bp, "%08x ", fw->req_q[cnt]);
+		bp += strlen(bp);
 	}
 
 	(void) sprintf(bp, "\n\nResponse Queue");
 	bp += strlen(bp);
-	for (cnt = (REQUEST_QUEUE_SIZE / 2);
-	    cnt < (REQUEST_QUEUE_SIZE + RESPONSE_QUEUE_SIZE) / 2; cnt++) {
-		if (cnt % 16 == 0) {
-			(void) sprintf(bp++, "\n");
+	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			(void) sprintf(bp, "\n%08x: ", cnt);
+			bp += strlen(bp);
 		}
-		(void) sprintf(bp, "%04x ", fw->req_rsp_q[cnt]);
-		bp += 5;
+		(void) sprintf(bp, "%08x ", fw->rsp_q[cnt]);
+		bp += strlen(bp);
 	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+	    (ha->fwexttracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint64_t w64 = (uintptr_t)ha->fwexttracebuf.bp;
+
+		(void) sprintf(bp, "\n\nExtended Trace Buffer Memory");
+		bp += strlen(bp);
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				(void) sprintf(bp, "\n%08x: ",
+				    (int)(w64 + cnt_b));
+				bp += 11;
+			}
+			(void) sprintf(bp, "%08x ", fw->ext_trace_buf[cnt]);
+			bp += 9;
+		}
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+	    (ha->fwfcetracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint64_t w64 = (uintptr_t)ha->fwfcetracebuf.bp;
+
+		(void) sprintf(bp, "\n\nFC Event Trace Buffer Memory");
+		bp += strlen(bp);
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				(void) sprintf(bp, "\n%08x: ",
+				    (int)(w64 + cnt_b));
+				bp += 11;
+			}
+			(void) sprintf(bp, "%08x ", fw->fce_trace_buf[cnt]);
+			bp += 9;
+		}
+	}
+
+	(void) sprintf(bp, "\n\n");
+	bp += strlen(bp);
 
 	cnt = (uintptr_t)bp - (uintptr_t)bufp;
 
@@ -12829,9 +13018,9 @@ ql_24xx_binary_fw_dump(ql_adapter_state_t *ha, ql_24xx_fw_dump_t *fw)
 
 	/* Pause RISC. */
 	if ((RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0) {
+		/* Disable ISP interrupts. */
+		WRT16_IO_REG(ha, ictrl, 0);
 
-		WRT32_IO_REG(ha, hccr, HC24_RESET_RISC | HC24_CLR_HOST_INT);
-		RD32_IO_REG(ha, hccr);		/* PCI Posting. */
 		WRT32_IO_REG(ha, hccr, HC24_PAUSE_RISC);
 		for (timer = 30000;
 		    (RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0 &&
@@ -12856,191 +13045,11 @@ ql_24xx_binary_fw_dump(ql_adapter_state_t *ha, ql_24xx_fw_dump_t *fw)
 		ha->flags &= ~INTERRUPTS_ENABLED;
 		ADAPTER_STATE_UNLOCK(ha);
 
-		/* Mailbox registers. */
-		(void) ql_read_regs(ha, fw->mailbox_reg, ha->iobase + 0x80,
-		    sizeof (fw->mailbox_reg) / 2, 16);
-
-		/* Transfer sequence registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0xBF00);
-		bp = ql_read_regs(ha, fw->xseq_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF10);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF20);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF30);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF40);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF50);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF60);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF70);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBFE0);
-		(void) ql_read_regs(ha, fw->xseq_0_reg, ha->iobase + 0xC0,
-		    sizeof (fw->xseq_0_reg) / 4, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBFF0);
-		(void) ql_read_regs(ha, fw->xseq_1_reg, ha->iobase + 0xC0,
-		    sizeof (fw->xseq_1_reg) / 4, 32);
-
-		/* Receive sequence registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0xFF00);
-		bp = ql_read_regs(ha, fw->rseq_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF10);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF20);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF30);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF40);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF50);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF60);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF70);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFD0);
-		(void) ql_read_regs(ha, fw->rseq_0_reg, ha->iobase + 0xC0,
-		    sizeof (fw->rseq_0_reg) / 4, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFE0);
-		(void) ql_read_regs(ha, fw->rseq_1_reg, ha->iobase + 0xC0,
-		    sizeof (fw->rseq_1_reg) / 4, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFF0);
-		(void) ql_read_regs(ha, fw->rseq_2_reg, ha->iobase + 0xC0,
-		    sizeof (fw->rseq_2_reg) / 4, 32);
-
-		/* Command DMA registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7100);
-		(void) ql_read_regs(ha, fw->cmd_dma_reg, ha->iobase + 0xC0,
-		    sizeof (fw->cmd_dma_reg) / 4, 32);
-
-		/* Queues. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7200);
-		bp = ql_read_regs(ha, fw->req0_dma_reg, ha->iobase + 0xC0,
-		    8, 32);
-
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7300);
-		bp = ql_read_regs(ha, fw->resp0_dma_reg, ha->iobase + 0xC0,
-		    8, 32);
-
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7400);
-		bp = ql_read_regs(ha, fw->req1_dma_reg, ha->iobase + 0xC0,
-		    8, 32);
-
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
-
-		/* Transmit DMA registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7600);
-		bp = ql_read_regs(ha, fw->xmt0_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7610);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7620);
-		bp = ql_read_regs(ha, fw->xmt1_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7630);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7640);
-		bp = ql_read_regs(ha, fw->xmt2_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7650);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7660);
-		bp = ql_read_regs(ha, fw->xmt3_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7670);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7680);
-		bp = ql_read_regs(ha, fw->xmt4_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7690);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x76A0);
-		(void) ql_read_regs(ha, fw->xmt_data_dma_reg,
-		    ha->iobase + 0xC0, sizeof (fw->xmt_data_dma_reg) / 4, 32);
-
-		/* Receive DMA registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7700);
-		bp = ql_read_regs(ha, fw->rcvt0_data_dma_reg,
-		    ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7710);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7720);
-		bp = ql_read_regs(ha, fw->rcvt1_data_dma_reg,
-		    ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7730);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		/* RISC registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x0F00);
-		bp = ql_read_regs(ha, fw->risc_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F10);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F20);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F30);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F40);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F50);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F60);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F70);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		/* Shadow registers. */
 
 		WRT32_IO_REG(ha, io_base_addr, 0x0F70);
 		RD32_IO_REG(ha, io_base_addr);
+
 		reg32 = (uint32_t *)((caddr_t)ha->iobase + 0xF0);
 		WRT_REG_DWORD(ha, reg32, 0xB0000000);
 		reg32 = (uint32_t *)((caddr_t)ha->iobase + 0xFC);
@@ -13076,102 +13085,289 @@ ql_24xx_binary_fw_dump(ql_adapter_state_t *ha, ql_24xx_fw_dump_t *fw)
 		reg32 = (uint32_t *)((caddr_t)ha->iobase + 0xFC);
 		fw->shadow_reg[6] = RD_REG_DWORD(ha, reg32);
 
+		/* Mailbox registers. */
+		(void) ql_read_regs(ha, fw->mailbox_reg, ha->iobase + 0x80,
+		    sizeof (fw->mailbox_reg) / 2, 16);
+
+		/* Transfer sequence registers. */
+
+		/* XSEQ GP */
+		WRT32_IO_REG(ha, io_base_addr, 0xBF00);
+		bp = ql_read_regs(ha, fw->xseq_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF10);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF20);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF30);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF40);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF50);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF60);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF70);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XSEQ-0 */
+		WRT32_IO_REG(ha, io_base_addr, 0xBFE0);
+		(void) ql_read_regs(ha, fw->xseq_0_reg, ha->iobase + 0xC0,
+		    sizeof (fw->xseq_0_reg) / 4, 32);
+
+		/* XSEQ-1 */
+		WRT32_IO_REG(ha, io_base_addr, 0xBFF0);
+		(void) ql_read_regs(ha, fw->xseq_1_reg, ha->iobase + 0xC0,
+		    sizeof (fw->xseq_1_reg) / 4, 32);
+
+		/* Receive sequence registers. */
+
+		/* RSEQ GP */
+		WRT32_IO_REG(ha, io_base_addr, 0xFF00);
+		bp = ql_read_regs(ha, fw->rseq_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF10);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF20);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF30);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF40);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF50);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF60);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF70);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RSEQ-0 */
+		WRT32_IO_REG(ha, io_base_addr, 0xFFD0);
+		(void) ql_read_regs(ha, fw->rseq_0_reg, ha->iobase + 0xC0,
+		    sizeof (fw->rseq_0_reg) / 4, 32);
+
+		/* RSEQ-1 */
+		WRT32_IO_REG(ha, io_base_addr, 0xFFE0);
+		(void) ql_read_regs(ha, fw->rseq_1_reg, ha->iobase + 0xC0,
+		    sizeof (fw->rseq_1_reg) / 4, 32);
+
+		/* RSEQ-2 */
+		WRT32_IO_REG(ha, io_base_addr, 0xFFF0);
+		(void) ql_read_regs(ha, fw->rseq_2_reg, ha->iobase + 0xC0,
+		    sizeof (fw->rseq_2_reg) / 4, 32);
+
+		/* Command DMA registers. */
+
+		WRT32_IO_REG(ha, io_base_addr, 0x7100);
+		(void) ql_read_regs(ha, fw->cmd_dma_reg, ha->iobase + 0xC0,
+		    sizeof (fw->cmd_dma_reg) / 4, 32);
+
+		/* Queues. */
+
+		/* RequestQ0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7200);
+		bp = ql_read_regs(ha, fw->req0_dma_reg, ha->iobase + 0xC0,
+		    8, 32);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
+
+		/* ResponseQ0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7300);
+		bp = ql_read_regs(ha, fw->resp0_dma_reg, ha->iobase + 0xC0,
+		    8, 32);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
+
+		/* RequestQ1 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7400);
+		bp = ql_read_regs(ha, fw->req1_dma_reg, ha->iobase + 0xC0,
+		    8, 32);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
+
+		/* Transmit DMA registers. */
+
+		/* XMT0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7600);
+		bp = ql_read_regs(ha, fw->xmt0_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7610);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT1 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7620);
+		bp = ql_read_regs(ha, fw->xmt1_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7630);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT2 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7640);
+		bp = ql_read_regs(ha, fw->xmt2_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7650);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT3 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7660);
+		bp = ql_read_regs(ha, fw->xmt3_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7670);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT4 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7680);
+		bp = ql_read_regs(ha, fw->xmt4_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7690);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT Common */
+		WRT32_IO_REG(ha, io_base_addr, 0x76A0);
+		(void) ql_read_regs(ha, fw->xmt_data_dma_reg,
+		    ha->iobase + 0xC0, sizeof (fw->xmt_data_dma_reg) / 4, 32);
+
+		/* Receive DMA registers. */
+
+		/* RCVThread0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7700);
+		bp = ql_read_regs(ha, fw->rcvt0_data_dma_reg,
+		    ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7710);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RCVThread1 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7720);
+		bp = ql_read_regs(ha, fw->rcvt1_data_dma_reg,
+		    ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7730);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RISC registers. */
+
+		/* RISC GP */
+		WRT32_IO_REG(ha, io_base_addr, 0x0F00);
+		bp = ql_read_regs(ha, fw->risc_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F10);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F20);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F30);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F40);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F50);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F60);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F70);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
 		/* Local memory controller registers. */
+
+		/* LMC */
 		WRT32_IO_REG(ha, io_base_addr, 0x3000);
 		bp = ql_read_regs(ha, fw->lmc_reg, ha->iobase + 0xC0,
 		    16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3010);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3020);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3030);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3040);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3050);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3060);
 		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 
 		/* Fibre Protocol Module registers. */
+
+		/* FPM hardware */
 		WRT32_IO_REG(ha, io_base_addr, 0x4000);
 		bp = ql_read_regs(ha, fw->fpm_hdw_reg, ha->iobase + 0xC0,
 		    16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4010);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4020);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4030);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4040);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4050);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4060);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4070);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4080);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4090);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x40A0);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x40B0);
 		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 
 		/* Frame Buffer registers. */
+
+		/* FB hardware */
 		WRT32_IO_REG(ha, io_base_addr, 0x6000);
 		bp = ql_read_regs(ha, fw->fb_hdw_reg, ha->iobase + 0xC0,
 		    16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6010);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6020);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6030);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6040);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6100);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6130);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6150);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6170);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6190);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x61B0);
 		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+	}
 
+	/* Get the request queue */
+	if (rval == QL_SUCCESS) {
+		uint32_t	cnt;
+		uint32_t	*w32 = (uint32_t *)ha->request_ring_bp;
+
+		/* Sync DMA buffer. */
+		(void) ddi_dma_sync(ha->hba_buf.dma_handle,
+		    REQUEST_Q_BUFFER_OFFSET, sizeof (fw->req_q),
+		    DDI_DMA_SYNC_FORKERNEL);
+
+		for (cnt = 0; cnt < sizeof (fw->req_q) / 4; cnt++) {
+			fw->req_q[cnt] = *w32++;
+			LITTLE_ENDIAN_32(&fw->req_q[cnt]);
+		}
+	}
+
+	/* Get the respons queue */
+	if (rval == QL_SUCCESS) {
+		uint32_t	cnt;
+		uint32_t	*w32 = (uint32_t *)ha->response_ring_bp;
+
+		/* Sync DMA buffer. */
+		(void) ddi_dma_sync(ha->hba_buf.dma_handle,
+		    RESPONSE_Q_BUFFER_OFFSET, sizeof (fw->rsp_q),
+		    DDI_DMA_SYNC_FORKERNEL);
+
+		for (cnt = 0; cnt < sizeof (fw->rsp_q) / 4; cnt++) {
+			fw->rsp_q[cnt] = *w32++;
+			LITTLE_ENDIAN_32(&fw->rsp_q[cnt]);
+		}
 	}
 
 	/* Reset RISC. */
@@ -13187,6 +13383,40 @@ ql_24xx_binary_fw_dump(ql_adapter_state_t *ha, ql_24xx_fw_dump_t *fw)
 		/* External Memory. */
 		rval = ql_read_risc_ram(ha, 0x100000,
 		    ha->fw_ext_memory_size / 4, fw->ext_mem);
+	}
+
+	/* Get the extended trace buffer */
+	if (rval == QL_SUCCESS) {
+		if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+		    (ha->fwexttracebuf.bp != NULL)) {
+			uint32_t	cnt;
+			uint32_t	*w32 = ha->fwexttracebuf.bp;
+
+			/* Sync DMA buffer. */
+			(void) ddi_dma_sync(ha->fwexttracebuf.dma_handle, 0,
+			    FWEXTSIZE, DDI_DMA_SYNC_FORKERNEL);
+
+			for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+				fw->ext_trace_buf[cnt] = *w32++;
+			}
+		}
+	}
+
+	/* Get the FC event trace buffer */
+	if (rval == QL_SUCCESS) {
+		if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+		    (ha->fwfcetracebuf.bp != NULL)) {
+			uint32_t	cnt;
+			uint32_t	*w32 = ha->fwfcetracebuf.bp;
+
+			/* Sync DMA buffer. */
+			(void) ddi_dma_sync(ha->fwfcetracebuf.dma_handle, 0,
+			    FWFCESIZE, DDI_DMA_SYNC_FORKERNEL);
+
+			for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+				fw->fce_trace_buf[cnt] = *w32++;
+			}
+		}
 	}
 
 	if (rval != QL_SUCCESS) {
@@ -13221,20 +13451,24 @@ ql_25xx_binary_fw_dump(ql_adapter_state_t *ha, ql_25xx_fw_dump_t *fw)
 	int		rval = QL_SUCCESS;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	EL(ha, " started\n");
 
 	fw->r2h_status = RD32_IO_REG(ha, intr_info_lo);
 
 	/* Pause RISC. */
 	if ((RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0) {
+		/* Disable ISP interrupts. */
+		WRT16_IO_REG(ha, ictrl, 0);
 
-		WRT32_IO_REG(ha, hccr, HC24_RESET_RISC | HC24_CLR_HOST_INT);
-		RD32_IO_REG(ha, hccr);		/* PCI Posting. */
 		WRT32_IO_REG(ha, hccr, HC24_PAUSE_RISC);
 		for (timer = 30000;
 		    (RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0 &&
 		    rval == QL_SUCCESS; timer--) {
 			if (timer) {
 				drv_usecwait(100);
+				if (timer % 10000 == 0) {
+					EL(ha, "risc pause %d\n", timer);
+				}
 			} else {
 				EL(ha, "risc pause timeout\n");
 				rval = QL_FUNCTION_TIMEOUT;
@@ -13243,6 +13477,8 @@ ql_25xx_binary_fw_dump(ql_adapter_state_t *ha, ql_25xx_fw_dump_t *fw)
 	}
 
 	if (rval == QL_SUCCESS) {
+
+		/* Host Interface registers */
 
 		/* HostRisc registers. */
 		WRT32_IO_REG(ha, io_base_addr, 0x7000);
@@ -13264,244 +13500,14 @@ ql_25xx_binary_fw_dump(ql_adapter_state_t *ha, ql_25xx_fw_dump_t *fw)
 		    sizeof (fw->host_reg) / 4, 32);
 
 		/* Disable ISP interrupts. */
+
 		WRT32_IO_REG(ha, ictrl, 0);
 		RD32_IO_REG(ha, ictrl);
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags &= ~INTERRUPTS_ENABLED;
 		ADAPTER_STATE_UNLOCK(ha);
 
-		/* Mailbox registers. */
-		(void) ql_read_regs(ha, fw->mailbox_reg, ha->iobase + 0x80,
-		    sizeof (fw->mailbox_reg) / 2, 16);
-
-		/* Transfer sequence registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0xBF00);
-		bp = ql_read_regs(ha, fw->xseq_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF10);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF20);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF30);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF40);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF50);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF60);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBF70);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBFC0);
-		bp = ql_read_regs(ha, fw->xseq_0_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBFD0);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBFE0);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xBFF0);
-		(void) ql_read_regs(ha, fw->xseq_1_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		/* Receive sequence registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0xFF00);
-		bp = ql_read_regs(ha, fw->rseq_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF10);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF20);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF30);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF40);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF50);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF60);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFF70);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFC0);
-		bp = ql_read_regs(ha, fw->rseq_0_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFD0);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFE0);
-		(void) ql_read_regs(ha, fw->rseq_1_reg, ha->iobase + 0xC0,
-		    sizeof (fw->rseq_1_reg) / 4, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xFFF0);
-		(void) ql_read_regs(ha, fw->rseq_2_reg, ha->iobase + 0xC0,
-		    sizeof (fw->rseq_2_reg) / 4, 32);
-
-		/* Auxiliary sequencer registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0xB000);
-		bp = ql_read_regs(ha, fw->aseq_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB010);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB020);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB030);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB040);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB050);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB060);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB070);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB0C0);
-		bp = ql_read_regs(ha, fw->aseq_0_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB0D0);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB0E0);
-		(void) ql_read_regs(ha, fw->aseq_1_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0xB0F0);
-		(void) ql_read_regs(ha, fw->aseq_2_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		/* Command DMA registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7100);
-		(void) ql_read_regs(ha, fw->cmd_dma_reg, ha->iobase + 0xC0,
-		    sizeof (fw->cmd_dma_reg) / 4, 32);
-
-		/* Queues. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7200);
-		bp = ql_read_regs(ha, fw->req0_dma_reg, ha->iobase + 0xC0,
-		    8, 32);
-
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7300);
-		bp = ql_read_regs(ha, fw->resp0_dma_reg, ha->iobase + 0xC0,
-		    8, 32);
-
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7400);
-		bp = ql_read_regs(ha, fw->req1_dma_reg, ha->iobase + 0xC0,
-		    8, 32);
-
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
-
-		/* Transmit DMA registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7600);
-		bp = ql_read_regs(ha, fw->xmt0_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7610);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7620);
-		bp = ql_read_regs(ha, fw->xmt1_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7630);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7640);
-		bp = ql_read_regs(ha, fw->xmt2_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7650);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7660);
-		bp = ql_read_regs(ha, fw->xmt3_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7670);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7680);
-		bp = ql_read_regs(ha, fw->xmt4_dma_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7690);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x76A0);
-		(void) ql_read_regs(ha, fw->xmt_data_dma_reg,
-		    ha->iobase + 0xC0, sizeof (fw->xmt_data_dma_reg) / 4, 32);
-
-		/* Receive DMA registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x7700);
-		bp = ql_read_regs(ha, fw->rcvt0_data_dma_reg,
-		    ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7710);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7720);
-		bp = ql_read_regs(ha, fw->rcvt1_data_dma_reg,
-		    ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x7730);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		/* RISC registers. */
-		WRT32_IO_REG(ha, io_base_addr, 0x0F00);
-		bp = ql_read_regs(ha, fw->risc_gp_reg, ha->iobase + 0xC0,
-		    16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F10);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F20);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F30);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F40);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F50);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F60);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
-		WRT32_IO_REG(ha, io_base_addr, 0x0F70);
-		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		/* Shadow registers. */
 
 		WRT32_IO_REG(ha, io_base_addr, 0x0F70);
 		RD32_IO_REG(ha, io_base_addr);
@@ -13561,118 +13567,352 @@ ql_25xx_binary_fw_dump(ql_adapter_state_t *ha, ql_25xx_fw_dump_t *fw)
 		reg32 = (uint32_t *)((caddr_t)ha->iobase + 0xFC);
 		fw->shadow_reg[0xa] = RD_REG_DWORD(ha, reg32);
 
-		/* RISC IO register. */
+		/* RISC I/O register. */
+
 		WRT32_IO_REG(ha, io_base_addr, 0x0010);
 		(void) ql_read_regs(ha, &fw->risc_io, ha->iobase + 0xC0,
 		    1, 32);
 
+		/* Mailbox registers. */
+
+		(void) ql_read_regs(ha, fw->mailbox_reg, ha->iobase + 0x80,
+		    sizeof (fw->mailbox_reg) / 2, 16);
+
+		/* Transfer sequence registers. */
+
+		/* XSEQ GP */
+		WRT32_IO_REG(ha, io_base_addr, 0xBF00);
+		bp = ql_read_regs(ha, fw->xseq_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF10);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF20);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF30);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF40);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF50);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF60);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBF70);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XSEQ-0 */
+		WRT32_IO_REG(ha, io_base_addr, 0xBFC0);
+		bp = ql_read_regs(ha, fw->xseq_0_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBFD0);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xBFE0);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XSEQ-1 */
+		WRT32_IO_REG(ha, io_base_addr, 0xBFF0);
+		(void) ql_read_regs(ha, fw->xseq_1_reg, ha->iobase + 0xC0,
+		    16, 32);
+
+		/* Receive sequence registers. */
+
+		/* RSEQ GP */
+		WRT32_IO_REG(ha, io_base_addr, 0xFF00);
+		bp = ql_read_regs(ha, fw->rseq_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF10);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF20);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF30);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF40);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF50);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF60);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFF70);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RSEQ-0 */
+		WRT32_IO_REG(ha, io_base_addr, 0xFFC0);
+		bp = ql_read_regs(ha, fw->rseq_0_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xFFD0);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RSEQ-1 */
+		WRT32_IO_REG(ha, io_base_addr, 0xFFE0);
+		(void) ql_read_regs(ha, fw->rseq_1_reg, ha->iobase + 0xC0,
+		    sizeof (fw->rseq_1_reg) / 4, 32);
+
+		/* RSEQ-2 */
+		WRT32_IO_REG(ha, io_base_addr, 0xFFF0);
+		(void) ql_read_regs(ha, fw->rseq_2_reg, ha->iobase + 0xC0,
+		    sizeof (fw->rseq_2_reg) / 4, 32);
+
+		/* Auxiliary sequencer registers. */
+
+		/* ASEQ GP */
+		WRT32_IO_REG(ha, io_base_addr, 0xB000);
+		bp = ql_read_regs(ha, fw->aseq_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB010);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB020);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB030);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB040);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB050);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB060);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB070);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* ASEQ-0 */
+		WRT32_IO_REG(ha, io_base_addr, 0xB0C0);
+		bp = ql_read_regs(ha, fw->aseq_0_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0xB0D0);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* ASEQ-1 */
+		WRT32_IO_REG(ha, io_base_addr, 0xB0E0);
+		(void) ql_read_regs(ha, fw->aseq_1_reg, ha->iobase + 0xC0,
+		    16, 32);
+
+		/* ASEQ-2 */
+		WRT32_IO_REG(ha, io_base_addr, 0xB0F0);
+		(void) ql_read_regs(ha, fw->aseq_2_reg, ha->iobase + 0xC0,
+		    16, 32);
+
+		/* Command DMA registers. */
+
+		WRT32_IO_REG(ha, io_base_addr, 0x7100);
+		(void) ql_read_regs(ha, fw->cmd_dma_reg, ha->iobase + 0xC0,
+		    sizeof (fw->cmd_dma_reg) / 4, 32);
+
+		/* Queues. */
+
+		/* RequestQ0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7200);
+		bp = ql_read_regs(ha, fw->req0_dma_reg, ha->iobase + 0xC0,
+		    8, 32);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
+
+		/* ResponseQ0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7300);
+		bp = ql_read_regs(ha, fw->resp0_dma_reg, ha->iobase + 0xC0,
+		    8, 32);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
+
+		/* RequestQ1 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7400);
+		bp = ql_read_regs(ha, fw->req1_dma_reg, ha->iobase + 0xC0,
+		    8, 32);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xE4, 7, 32);
+
+		/* Transmit DMA registers. */
+
+		/* XMT0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7600);
+		bp = ql_read_regs(ha, fw->xmt0_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7610);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT1 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7620);
+		bp = ql_read_regs(ha, fw->xmt1_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7630);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT2 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7640);
+		bp = ql_read_regs(ha, fw->xmt2_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7650);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT3 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7660);
+		bp = ql_read_regs(ha, fw->xmt3_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7670);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT4 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7680);
+		bp = ql_read_regs(ha, fw->xmt4_dma_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7690);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* XMT Common */
+		WRT32_IO_REG(ha, io_base_addr, 0x76A0);
+		(void) ql_read_regs(ha, fw->xmt_data_dma_reg,
+		    ha->iobase + 0xC0, sizeof (fw->xmt_data_dma_reg) / 4, 32);
+
+		/* Receive DMA registers. */
+
+		/* RCVThread0 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7700);
+		bp = ql_read_regs(ha, fw->rcvt0_data_dma_reg,
+		    ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7710);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RCVThread1 */
+		WRT32_IO_REG(ha, io_base_addr, 0x7720);
+		bp = ql_read_regs(ha, fw->rcvt1_data_dma_reg,
+		    ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x7730);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
+		/* RISC registers. */
+
+		/* RISC GP */
+		WRT32_IO_REG(ha, io_base_addr, 0x0F00);
+		bp = ql_read_regs(ha, fw->risc_gp_reg, ha->iobase + 0xC0,
+		    16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F10);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F20);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F30);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F40);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F50);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F60);
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+		WRT32_IO_REG(ha, io_base_addr, 0x0F70);
+		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
+
 		/* Local memory controller (LMC) registers. */
+
+		/* LMC */
 		WRT32_IO_REG(ha, io_base_addr, 0x3000);
 		bp = ql_read_regs(ha, fw->lmc_reg, ha->iobase + 0xC0,
 		    16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3010);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3020);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3030);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3040);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3050);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x3060);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 		WRT32_IO_REG(ha, io_base_addr, 0x3070);
 		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 
 		/* Fibre Protocol Module registers. */
+
+		/* FPM hardware */
 		WRT32_IO_REG(ha, io_base_addr, 0x4000);
 		bp = ql_read_regs(ha, fw->fpm_hdw_reg, ha->iobase + 0xC0,
 		    16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4010);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4020);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4030);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4040);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4050);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4060);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4070);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4080);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x4090);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x40A0);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x40B0);
 		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 
 		/* Frame Buffer registers. */
+
+		/* FB hardware */
 		WRT32_IO_REG(ha, io_base_addr, 0x6000);
 		bp = ql_read_regs(ha, fw->fb_hdw_reg, ha->iobase + 0xC0,
 		    16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6010);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6020);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6030);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6040);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6100);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6130);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6150);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6170);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x6190);
 		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
 		WRT32_IO_REG(ha, io_base_addr, 0x61B0);
-		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
-
+		bp = ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 		WRT32_IO_REG(ha, io_base_addr, 0x6F00);
 		(void) ql_read_regs(ha, bp, ha->iobase + 0xC0, 16, 32);
 	}
 
+	/* Get the request queue */
+	if (rval == QL_SUCCESS) {
+		uint32_t	cnt;
+		uint32_t	*w32 = (uint32_t *)ha->request_ring_bp;
+
+		/* Sync DMA buffer. */
+		(void) ddi_dma_sync(ha->hba_buf.dma_handle,
+		    REQUEST_Q_BUFFER_OFFSET, sizeof (fw->req_q),
+		    DDI_DMA_SYNC_FORKERNEL);
+
+		for (cnt = 0; cnt < sizeof (fw->req_q) / 4; cnt++) {
+			fw->req_q[cnt] = *w32++;
+			LITTLE_ENDIAN_32(&fw->req_q[cnt]);
+		}
+	}
+
+	/* Get the respons queue */
+	if (rval == QL_SUCCESS) {
+		uint32_t	cnt;
+		uint32_t	*w32 = (uint32_t *)ha->response_ring_bp;
+
+		/* Sync DMA buffer. */
+		(void) ddi_dma_sync(ha->hba_buf.dma_handle,
+		    RESPONSE_Q_BUFFER_OFFSET, sizeof (fw->rsp_q),
+		    DDI_DMA_SYNC_FORKERNEL);
+
+		for (cnt = 0; cnt < sizeof (fw->rsp_q) / 4; cnt++) {
+			fw->rsp_q[cnt] = *w32++;
+			LITTLE_ENDIAN_32(&fw->rsp_q[cnt]);
+		}
+	}
+
 	/* Reset RISC. */
+
 	ql_reset_chip(ha);
 
 	/* Memory. */
+
 	if (rval == QL_SUCCESS) {
 		/* Code RAM. */
 		rval = ql_read_risc_ram(ha, 0x20000,
@@ -13684,14 +13924,37 @@ ql_25xx_binary_fw_dump(ql_adapter_state_t *ha, ql_25xx_fw_dump_t *fw)
 		    ha->fw_ext_memory_size / 4, fw->ext_mem);
 	}
 
-	/* Get the request and response queues */
+	/* Get the FC event trace buffer */
 	if (rval == QL_SUCCESS) {
-		uint32_t	cnt;
-		uint16_t	*w16 = ha->hba_buf.bp;
+		if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+		    (ha->fwfcetracebuf.bp != NULL)) {
+			uint32_t	cnt;
+			uint32_t	*w32 = ha->fwfcetracebuf.bp;
 
-		for (cnt = 0; cnt < sizeof (fw->req_rsp_q) / 2; cnt++) {
-			fw->req_rsp_q[cnt] = *w16++;
-			LITTLE_ENDIAN_16(&fw->req_rsp_q[cnt]);
+			/* Sync DMA buffer. */
+			(void) ddi_dma_sync(ha->fwfcetracebuf.dma_handle, 0,
+			    FWFCESIZE, DDI_DMA_SYNC_FORKERNEL);
+
+			for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+				fw->fce_trace_buf[cnt] = *w32++;
+			}
+		}
+	}
+
+	/* Get the extended trace buffer */
+	if (rval == QL_SUCCESS) {
+		if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+		    (ha->fwexttracebuf.bp != NULL)) {
+			uint32_t	cnt;
+			uint32_t	*w32 = ha->fwexttracebuf.bp;
+
+			/* Sync DMA buffer. */
+			(void) ddi_dma_sync(ha->fwexttracebuf.dma_handle, 0,
+			    FWEXTSIZE, DDI_DMA_SYNC_FORKERNEL);
+
+			for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+				fw->ext_trace_buf[cnt] = *w32++;
+			}
 		}
 	}
 
@@ -14182,10 +14445,10 @@ ql_get_dma_mem(ql_adapter_state_t *ha, dma_mem_t *mem, uint32_t size,
 	mem->cookie_count = 1;
 
 	switch (alignment) {
-	case MEM_DATA_ALIGN:
+	case QL_DMA_DATA_ALIGN:
 		mem->alignment = QL_DMA_ALIGN_8_BYTE_BOUNDARY;
 		break;
-	case MEM_RING_ALIGN:
+	case QL_DMA_RING_ALIGN:
 		mem->alignment = QL_DMA_ALIGN_64_BYTE_BOUNDARY;
 		break;
 	default:
@@ -15147,7 +15410,8 @@ ql_setup_msix(ql_adapter_state_t *ha)
 	int32_t		avail = 0;
 	int32_t		actual = 0;
 	int32_t		msitype = DDI_INTR_TYPE_MSIX;
-	int32_t		ret, i;
+	int32_t		ret;
+	uint32_t	i;
 	ql_ifunc_t	itrfun[QL_MSIX_MAXAIF] = {0};
 
 	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
@@ -15161,7 +15425,8 @@ ql_setup_msix(ql_adapter_state_t *ha)
 	 * MSI-X support is only available on 24xx HBA's that have
 	 * rev A2 parts (revid = 3) or greater.
 	 */
-	if (!((ha->device_id == 0x2532) || (ha->device_id == 0x2432))) {
+	if (!((ha->device_id == 0x2532) || (ha->device_id == 0x2432) ||
+	    (ha->device_id == 0x8432))) {
 		EL(ha, "HBA does not support MSI-X\n");
 		return (DDI_FAILURE);
 	}
@@ -15243,8 +15508,7 @@ ql_setup_msix(ql_adapter_state_t *ha)
 	/* Add the interrupt handlers */
 	for (i = 0; i < actual; i++) {
 		if ((ret = ddi_intr_add_handler(ha->htable[i], itrfun[i].ifunc,
-		    (caddr_t)(uintptr_t)ha, (caddr_t)(uintptr_t)i))
-		    != DDI_SUCCESS) {
+		    (void *)ha, (void *)((ulong_t)i))) != DDI_SUCCESS) {
 			EL(ha, "failed, addh#=%xh, act=%xh, ret=%xh\n", i,
 			    actual, ret);
 			ql_release_intr(ha);
@@ -15258,7 +15522,7 @@ ql_setup_msix(ql_adapter_state_t *ha)
 	 */
 #ifdef __sparc
 	for (i = actual; i < hwvect; i++) {
-		if ((ret = ddi_intr_dup_handler(ha->htable[0], i,
+		if ((ret = ddi_intr_dup_handler(ha->htable[0], (int)i,
 		    &ha->htable[i])) != DDI_SUCCESS) {
 			EL(ha, "failed, intr_dup#=%xh, act=%xh, ret=%xh\n",
 			    i, actual, ret);
@@ -15322,7 +15586,8 @@ ql_setup_fixed(ql_adapter_state_t *ha)
 {
 	int32_t		count = 0;
 	int32_t		actual = 0;
-	int32_t		ret, i;
+	int32_t		ret;
+	uint32_t	i;
 
 	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
 
@@ -15362,9 +15627,8 @@ ql_setup_fixed(ql_adapter_state_t *ha)
 	/* Add the interrupt handlers */
 	for (i = 0; i < ha->intr_cnt; i++) {
 		if ((ret = ddi_intr_add_handler(ha->htable[i], &ql_isr_aif,
-		    (caddr_t)(uintptr_t)ha,
-		    (caddr_t)(uintptr_t)i)) != DDI_SUCCESS) {
-		    EL(ha, "failed, intr_add ret=%xh\n", ret);
+		    (void *)ha, (void *)((ulong_t)(i)))) != DDI_SUCCESS) {
+			EL(ha, "failed, intr_add ret=%xh\n", ret);
 			ql_release_intr(ha);
 			return (ret);
 		}
@@ -15618,6 +15882,9 @@ ql_init_mutex(ql_adapter_state_t *ha)
 	/* mutex to protect diag port manage interface */
 	mutex_init(&ha->portmutex, NULL, MUTEX_DRIVER, intr);
 
+	/* mutex to protect per instance f/w dump flags and buffer */
+	mutex_init(&ha->dump_mutex, NULL, MUTEX_DRIVER, intr);
+
 	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
 
 	return (DDI_SUCCESS);
@@ -15655,6 +15922,7 @@ ql_destroy_mutex(ql_adapter_state_t *ha)
 	mutex_destroy(&ha->mutex);
 	mutex_destroy(&ha->ql_nack_mtx);
 	mutex_destroy(&ha->cache_mutex);
+	mutex_destroy(&ha->dump_mutex);
 
 	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
 }
@@ -15853,7 +16121,7 @@ ql_fwmodule_resolve(ql_adapter_state_t *ha)
 
 /*
  * ql_port_state
- *	Set state on all adapter ports.
+ *	Set the state on all adapter ports.
  *
  * Input:
  *	ha:	parent adapter state pointer.
@@ -15878,4 +16146,124 @@ ql_port_state(ql_adapter_state_t *ha, uint32_t state, uint32_t flags)
 	}
 	ha->pha->task_daemon_flags |= flags & LOOP_DOWN;
 	TASK_DAEMON_UNLOCK(ha);
+}
+
+
+/*
+ * ql_el_trace_desc_ctor - Construct an extended logging trace descriptor.
+ *
+ * Input:	Pointer to the adapter state structure.
+ * Returns:	Success or Failure.
+ * Context:	Kernel context.
+ */
+int
+ql_el_trace_desc_ctor(ql_adapter_state_t *ha)
+{
+	int	rval;
+
+	rval = DDI_SUCCESS;
+
+	ha->el_trace_desc =
+	    (el_trace_desc_t *)kmem_zalloc(sizeof (el_trace_desc_t), KM_SLEEP);
+
+	if (ha->el_trace_desc == NULL) {
+		cmn_err(CE_WARN, "%s(%d): can't construct trace descriptor",
+		    QL_NAME, ha->instance);
+		rval = DDI_FAILURE;
+	} else {
+		ha->el_trace_desc->next		= 0;
+		ha->el_trace_desc->trace_buffer =
+		    (char *)kmem_zalloc(EL_TRACE_BUF_SIZE, KM_SLEEP);
+
+		if (ha->el_trace_desc->trace_buffer == NULL) {
+			cmn_err(CE_WARN, "%s(%d): can't get trace buffer",
+			    QL_NAME, ha->instance);
+			kmem_free(ha->el_trace_desc, sizeof (el_trace_desc_t));
+			rval = DDI_FAILURE;
+		} else {
+			ha->el_trace_desc->trace_buffer_size =
+			    EL_TRACE_BUF_SIZE;
+			mutex_init(&ha->el_trace_desc->mutex, NULL,
+			    MUTEX_DRIVER, NULL);
+		}
+	}
+	return (rval);
+}
+
+/*
+ * ql_el_trace_desc_dtor - Destroy an extended logging trace descriptor.
+ *
+ * Input:	Pointer to the adapter state structure.
+ * Returns:	Success or Failure.
+ * Context:	Kernel context.
+ */
+int
+ql_el_trace_desc_dtor(ql_adapter_state_t *ha)
+{
+	int	rval;
+
+	rval = DDI_SUCCESS;
+
+	if (ha->el_trace_desc == NULL) {
+		cmn_err(CE_WARN, "%s(%d): can't destroy el trace descriptor",
+		    QL_NAME, ha->instance);
+		rval = DDI_FAILURE;
+	} else {
+		if (ha->el_trace_desc->trace_buffer != NULL) {
+			kmem_free(ha->el_trace_desc->trace_buffer,
+			    ha->el_trace_desc->trace_buffer_size);
+		}
+		mutex_destroy(&ha->el_trace_desc->mutex);
+		kmem_free(ha->el_trace_desc, sizeof (el_trace_desc_t));
+	}
+	return (rval);
+}
+
+/*
+ * els_cmd_text	- Return a pointer to a string describing the command
+ *
+ * Input:	els_cmd = the els command opcode.
+ * Returns:	pointer to a string.
+ * Context:	Kernel context.
+ */
+char *
+els_cmd_text(int els_cmd)
+{
+	cmd_table_t *entry = &els_cmd_tbl[0];
+
+	return (cmd_text(entry, els_cmd));
+}
+
+/*
+ * mbx_cmd_text - Return a pointer to a string describing the command
+ *
+ * Input:	mbx_cmd = the mailbox command opcode.
+ * Returns:	pointer to a string.
+ * Context:	Kernel context.
+ */
+char *
+mbx_cmd_text(int mbx_cmd)
+{
+	cmd_table_t *entry = &mbox_cmd_tbl[0];
+
+	return (cmd_text(entry, mbx_cmd));
+}
+
+/*
+ * cmd_text	Return a pointer to a string describing the command
+ *
+ * Input:	entry = the command table
+ *		cmd = the command.
+ * Returns:	pointer to a string.
+ * Context:	Kernel context.
+ */
+char *
+cmd_text(cmd_table_t *entry, int cmd)
+{
+	for (; entry->cmd != 0; entry++) {
+		if (entry->cmd == cmd) {
+			break;
+		}
+	}
+	return (entry->string);
 }
