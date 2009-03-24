@@ -695,8 +695,8 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	abuf.Length = ACPI_ALLOCATE_BUFFER;
 	abuf.Pointer = NULL;
 
-	if (ACPI_FAILURE(AcpiEvaluateObject(handle->cs_handle, "_CST",
-	    NULL, &abuf))) {
+	if (ACPI_FAILURE(AcpiEvaluateObjectTyped(handle->cs_handle, "_CST",
+	    NULL, &abuf, ACPI_TYPE_PACKAGE))) {
 		cmn_err(CE_NOTE, "!cpu_acpi: _CST evaluate failure");
 		return (-1);
 	}
