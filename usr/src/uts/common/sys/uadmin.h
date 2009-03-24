@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@ extern "C" {
 #define	A_SWAPCTL	16
 /*			17-21	   reserved for obsolete interface */
 #define	A_SDTTEST	22	/* DTrace sdt:::test */
+#define	A_CONFIG	23	/* For system configuration */
 
 #define	AD_UNKNOWN	-1	/* no method */
 #define	AD_HALT		0	/* halt the processor */
@@ -60,7 +61,6 @@ extern "C" {
 #define	AD_NOSYNC	7	/* do not sync filesystems on next A_DUMP */
 #define	AD_FASTREBOOT	8	/* bypass firmware and boot loader */
 #define	AD_FASTREBOOT_DRYRUN	9	/* Fast reboot Dry run */
-
 
 /*
  * Functions reserved for A_FREEZE (may not be available on all platforms)
@@ -94,11 +94,54 @@ extern "C" {
 #define	AD_FTRACE_STOP	2
 
 /*
+ * Functions of A_CONFIG.  Unstable interface.
+ */
+#define	AD_UPDATE_BOOT_CONFIG	1	/* Update boot config variables */
+
+/*
  * When 'mdep' (the second argument to uadmin(2)) is initialized for A_REBOOT,
  * A_SHUTDOWN or A_DUMP, it represents the boot arguments string of at most
  * 256 characters.
  */
 #define	BOOTARGS_MAX	256
+
+#if !defined(_KERNEL)
+/*
+ * FMRI for boot-config service.
+ */
+#define	FMRI_BOOT_CONFIG \
+	"svc:/system/boot-config:default"
+
+/*
+ * Property group that contains all Fast Reboot configuration properties.
+ */
+#define	BOOT_CONFIG_PG_PARAMS		"config"
+
+/*
+ * Property group that contains all Fast Reboot blacklisting information.
+ */
+#define	BOOT_CONFIG_PG_FBBLACKLIST	"fastreboot_blacklist"
+
+#endif	/* _KERNEL */
+
+/*
+ * Flag representations of fastboot configuration.
+ */
+#define	UA_FASTREBOOT_DEFAULT	0x01
+#define	UA_FASTREBOOT_ONPANIC	0x02
+
+#define	FASTREBOOT_ONPANIC		"fastreboot_onpanic"
+#define	FASTREBOOT_ONPANIC_CMDLINE	"fastreboot_onpanic_cmdline"
+
+#define	FASTREBOOT_ONPANIC_NOTSET(p)	\
+	(strcmp((p), "false") == 0 ||	\
+	strcmp((p), "no") == 0 ||	\
+	strcmp((p), "0") == 0)
+
+#define	FASTREBOOT_ONPANIC_ISSET(p)	\
+	(strcmp((p), "true") == 0 ||	\
+	strcmp((p), "yes") == 0 ||	\
+	strcmp((p), "1") == 0)
 
 #if !defined(_ASM)
 

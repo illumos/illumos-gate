@@ -304,6 +304,7 @@ f none usr/include/libelf.h 644 root bin
 f none usr/include/libfstyp.h 644 root bin
 f none usr/include/libfstyp_module.h 644 root bin
 f none usr/include/libgen.h 644 root bin
+f none usr/include/libgrubmgmt.h 644 root bin
 f none usr/include/libintl.h 644 root bin
 f none usr/include/libipmi.h 644 root bin
 f none usr/include/libnvpair.h 644 root bin

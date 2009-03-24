@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -60,6 +60,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <libscf.h>
+#include <libscf_priv.h>
 #include <limits.h>
 #include <locale.h>
 #include <libintl.h>
@@ -79,6 +80,9 @@
 #include <spawn.h>
 
 #include <libzfs.h>
+#if defined(__i386)
+#include <libgrubmgmt.h>
+#endif
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
@@ -118,12 +122,21 @@ static ctid_t startdct = -1;
 #define	LUUMOUNT_PROG	"/usr/sbin/luumount"
 #define	LUMOUNT_PROG	"/usr/sbin/lumount"
 
+#define	BOOTADM_PROG	"/sbin/bootadm"
 /*
  * The length of FASTBOOT_MOUNTPOINT must be less than MAXPATHLEN.
  */
 #define	FASTBOOT_MOUNTPOINT	"/tmp/.fastboot.root"
 
+/*
+ * Fast Reboot related variables
+ */
 static char	fastboot_mounted[MAXPATHLEN];
+#if defined(__i386)
+static grub_boot_args_t	fbarg;
+static grub_boot_args_t	*fbarg_used;
+static int fbarg_entnum = GRUB_ENTRY_DEFAULT;
+#endif	/* __i386 */
 
 static int validate_ufs_disk(char *, char *);
 static int validate_zfs_pool(char *, char *);
@@ -542,29 +555,30 @@ validate_disk(char *arg, char *mountpoint)
 {
 	static char root_dev_path[] = "/dev/dsk";
 	char kernpath[MAXPATHLEN];
-	struct stat buf;
 	struct stat64 statbuf;
 	int rc = 0;
 
 	if (strlen(arg) > MAXPATHLEN) {
 		(void) fprintf(stderr,
-		    gettext("%s: argument is too long\n"), cmdname);
+		    gettext("%s: Argument is too long\n"), cmdname);
 		return (-1);
 	}
 
 	bcopy(FASTBOOT_MOUNTPOINT, mountpoint, sizeof (FASTBOOT_MOUNTPOINT));
 
-	/*
-	 * Do a force umount just in case some other filesystem has
-	 * been mounted there.
-	 */
-	(void) umount2(mountpoint, MS_FORCE);
+	if (strstr(arg, mountpoint) == NULL) {
+		/*
+		 * Do a force umount just in case some other filesystem has
+		 * been mounted there.
+		 */
+		(void) umount2(mountpoint, MS_FORCE);
+	}
 
 	/* Create the directory if it doesn't already exist */
-	if (lstat(mountpoint, &buf) != 0) {
+	if (lstat64(mountpoint, &statbuf) != 0) {
 		if (mkdirp(mountpoint, 0755) != 0) {
 			(void) fprintf(stderr,
-			    gettext("failed to create mountpoint %s\n"),
+			    gettext("Failed to create mountpoint %s\n"),
 			    mountpoint);
 			return (-1);
 		}
@@ -608,7 +622,7 @@ validate_ufs_disk(char *arg, char *mountpoint)
 	    mntopts, sizeof (mntopts)) != 0) {
 		perror(cmdname);
 		(void) fprintf(stderr,
-		    gettext("%s: failed to mount %s\n"), cmdname, arg);
+		    gettext("%s: Failed to mount %s\n"), cmdname, arg);
 		return (-1);
 	}
 
@@ -623,7 +637,7 @@ validate_zfs_pool(char *arg, char *mountpoint)
 	int rc = 0;
 
 	if ((g_zfs = libzfs_init()) == NULL) {
-		(void) fprintf(stderr, gettext("internal error: failed to "
+		(void) fprintf(stderr, gettext("Internal error: failed to "
 		    "initialize ZFS library\n"));
 		return (-1);
 	}
@@ -634,11 +648,11 @@ validate_zfs_pool(char *arg, char *mountpoint)
 		return (-1);
 
 	/* perform the mount */
-	if (mount(zfs_get_name(zhp), mountpoint, MS_DATA|MS_OPTIONSTR,
+	if (mount(zfs_get_name(zhp), mountpoint, MS_DATA|MS_OPTIONSTR|MS_RDONLY,
 	    MNTTYPE_ZFS, NULL, 0, mntopts, sizeof (mntopts)) != 0) {
 		perror(cmdname);
 		(void) fprintf(stderr,
-		    gettext("%s: failed to mount %s\n"), cmdname, arg);
+		    gettext("%s: Failed to mount %s\n"), cmdname, arg);
 		rc = -1;
 	}
 
@@ -665,12 +679,13 @@ get_zfs_bootfs_arg(const char *arg, const char ** fpth, int *is_zfs,
 	FILE *mtabp = NULL;
 	struct mnttab mnt;
 	char *poolname = NULL;
-	char physpath[MAXNAMELEN];
+	char physpath[MAXPATHLEN];
 	char mntsp[ZPOOL_MAXNAMELEN];
 	char bootfs[ZPOOL_MAXNAMELEN];
 	int rc = 0;
 	size_t mntlen = 0;
 	size_t msz;
+	static char fmt[] = "-B zfs-bootfs=%s,bootpath=\"%s\"";
 
 	*fpth = arg;
 	*is_zfs = 0;
@@ -705,7 +720,7 @@ get_zfs_bootfs_arg(const char *arg, const char ** fpth, int *is_zfs,
 	/* Try to open the dataset */
 	if ((zhp = zfs_open(g_zfs, mntsp,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_DATASET)) == NULL) {
-		(void) fprintf(stderr, gettext("cannot open %s\n"), mntsp);
+		(void) fprintf(stderr, gettext("Cannot open %s\n"), mntsp);
 		rc = -1;
 		goto validate_zfs_err_out;
 	}
@@ -718,26 +733,28 @@ get_zfs_bootfs_arg(const char *arg, const char ** fpth, int *is_zfs,
 	}
 
 	if ((zpoolp = zpool_open(g_zfs, poolname)) == NULL) {
-		(void) fprintf(stderr, gettext("cannot open %s\n"), poolname);
+		(void) fprintf(stderr, gettext("Cannot open %s\n"), poolname);
 		rc = -1;
 		goto validate_zfs_err_out;
 	}
 
-	if (zpool_get_physpath(zpoolp, physpath) != 0) {
-		(void) fprintf(stderr, gettext("cannot find phys_path\n"));
+	if (zpool_get_physpath(zpoolp, physpath, sizeof (physpath)) != 0) {
+		(void) fprintf(stderr, gettext("Cannot find phys_path\n"));
 		rc = -1;
 		goto validate_zfs_err_out;
 	}
 
-	if (zpool_set_prop(zpoolp, "bootfs", bootfs) != 0) {
-		(void) fprintf(stderr, gettext("cannot set bootfs to %s\n"),
-		    bootfs);
-		rc = -1;
-		goto validate_zfs_err_out;
+	/*
+	 * For the mirror physpath would contain the list of all
+	 * bootable devices, pick up the first one.
+	 */
+	(void) strtok(physpath, " ");
+	if (snprintf(bootfs_arg, BOOTARGS_MAX, fmt, bootfs, physpath) >=
+	    BOOTARGS_MAX) {
+		rc = E2BIG;
+		(void) fprintf(stderr,
+		    gettext("Boot arguments are too long\n"));
 	}
-
-	(void) snprintf(bootfs_arg, BOOTARGS_MAX,
-	    "-B zfs-bootfs=%s,bootpath=\"%s\"", bootfs, physpath);
 
 validate_zfs_err_out:
 	if (zhp != NULL)
@@ -768,7 +785,7 @@ validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
 	if ((sz = resolvepath(arg, physpath, sizeof (physpath) - 1)) ==
 	    (size_t)-1) {
 		(void) fprintf(stderr,
-		    gettext("cannot resolve path for %s: %s\n"),
+		    gettext("Cannot resolve path for %s: %s\n"),
 		    arg, strerror(errno));
 		return (-1);
 	}
@@ -776,13 +793,13 @@ validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
 
 	if (strlen(arg) > MAXPATHLEN) {
 		(void) fprintf(stderr,
-		    gettext("%s: new kernel name is too long\n"), cmdname);
+		    gettext("%s: New kernel name is too long\n"), cmdname);
 		return (-1);
 	}
 
 	if (strncmp(basename(arg), "unix", 4) != 0) {
 		(void) fprintf(stderr,
-		    gettext("%s: %s: kernel name must be unix\n"),
+		    gettext("%s: %s: Kernel name must be unix\n"),
 		    cmdname, arg);
 		return (-1);
 	}
@@ -798,7 +815,7 @@ validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
 		*failsafe = 0;
 	else	{
 		(void) fprintf(stderr,
-		    gettext("%s: %s: no /boot/platform or /platform in"
+		    gettext("%s: %s: No /boot/platform or /platform in"
 		    " file name\n"), cmdname, arg);
 			goto err_out;
 	}
@@ -813,18 +830,16 @@ validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
 	class = ident[EI_CLASS];
 
 	if ((class != ELFCLASS32 && class != ELFCLASS64) ||
-	    ident[EI_MAG0] != ELFMAG0 || ident[EI_MAG1] != ELFMAG1 ||
-	    ident[EI_MAG2] != ELFMAG2 || ident[EI_MAG3] != ELFMAG3) {
+	    memcmp(&ident[EI_MAG0], ELFMAG, 4) != 0) {
 		(void) fprintf(stderr,
-		    gettext("%s: %s: not a valid ELF file\n"),
-		    cmdname, arg);
+		    gettext("%s: %s: Not a valid ELF file\n"), cmdname, arg);
 		goto err_out;
 	}
 
 	format = ident[EI_DATA];
 
 	if (format != CUR_ELFDATA) {
-		(void) fprintf(stderr, gettext("%s: %s: invalid data format\n"),
+		(void) fprintf(stderr, gettext("%s: %s: Invalid data format\n"),
 		    cmdname, arg);
 		goto err_out;
 	}
@@ -837,28 +852,6 @@ err_out:
 		elffd = -1;
 	}
 	return (-1);
-}
-
-#ifndef	__i386
-/* ARGSUSED */
-#endif	/* __i386 */
-static int
-is_fastboot_default(uid_t uid)
-{
-#if defined(__i386)
-	int		ret;
-	struct stat	st;
-	static const char	fastboot_default[] = "/etc/fastreboot";
-
-	ret = (lstat(fastboot_default, &st) == 0 &&
-	    S_ISREG(st.st_mode) &&
-	    (st.st_mode & S_IRUSR) != 0 &&
-	    uid == st.st_uid);
-
-	return (ret);
-#else
-	return (0);
-#endif	/* __i386 */
 }
 
 static int
@@ -891,7 +884,7 @@ halt_exec(const char *path, ...)
 		va_end(vp);
 
 		(void) execve(path, (char * const *)argv, NULL);
-		(void) fprintf(stderr, gettext("cannot execute %s: %s\n"),
+		(void) fprintf(stderr, gettext("Cannot execute %s: %s\n"),
 		    path, strerror(errno));
 		exit(-1);
 	} else {
@@ -918,7 +911,7 @@ fastboot_bename(const char *bename, char *mountpoint, size_t mpsz)
 
 	if ((rc = halt_exec(LUMOUNT_PROG, "-n", bename, FASTBOOT_MOUNTPOINT,
 	    NULL)) != 0)
-		(void) fprintf(stderr, gettext("%s: cannot mount BE %s\n"),
+		(void) fprintf(stderr, gettext("%s: Cannot mount BE %s\n"),
 		    cmdname, bename);
 	else
 		(void) strlcpy(mountpoint, FASTBOOT_MOUNTPOINT, mpsz);
@@ -928,11 +921,12 @@ fastboot_bename(const char *bename, char *mountpoint, size_t mpsz)
 
 /*
  * Returns 0 on successful parsing of the arguments;
- * retuens non-zero on failure.
+ * returns EINVAL on parsing failures that should abort the reboot attempt;
+ * returns other error code to fall back to regular reboot.
  */
 static int
-parse_fastboot_args(char *bootargs_buf, int *is_dryrun, const char *bename,
-    int *failsafe)
+parse_fastboot_args(char *bootargs_buf, size_t buf_size,
+    int *is_dryrun, const char *bename, int *failsafe)
 {
 	char mountpoint[MAXPATHLEN];
 	char bootargs_saved[BOOTARGS_MAX];
@@ -965,11 +959,6 @@ parse_fastboot_args(char *bootargs_buf, int *is_dryrun, const char *bename,
 	bzero(&bootargs_scratch[buflen], sizeof (bootargs_scratch) - buflen);
 	head = &bootargs_scratch[0];
 
-	/* Zero out the boot argument buffer as we will reconstruct it */
-	bzero(bootargs_buf, BOOTARGS_MAX);
-	bzero(bootfs_arg, BOOTARGS_MAX);
-	bzero(unixfile, sizeof (unixfile));
-
 	/* Get the first argument */
 	newarg = strtok(bootargs_scratch, " ");
 
@@ -988,22 +977,72 @@ parse_fastboot_args(char *bootargs_buf, int *is_dryrun, const char *bename,
 	 */
 	if (uadmin(A_SHUTDOWN, AD_FASTREBOOT_DRYRUN,
 	    (uintptr_t)bootargs_saved) != 0) {
-		(void) fprintf(stderr, gettext("%s: not all drivers "
-		    "have implemented quiesce(9E)\n"), cmdname);
+		(void) fprintf(stderr, gettext("%s: Not all drivers "
+		    "have implemented quiesce(9E)\n"
+		    "\tPlease see /var/adm/messages for drivers that haven't\n"
+		    "\timplemented quiesce(9E).\n"), cmdname);
 	} else if (*is_dryrun) {
-		(void) fprintf(stderr, gettext("%s: all drivers have "
+		(void) fprintf(stderr, gettext("%s: All drivers have "
 		    "implemented quiesce(9E)\n"), cmdname);
 	}
 
-	/*
-	 * Return if it is a true dry run.
-	 */
+	/* Return if it is a true dry run. */
 	if (*is_dryrun)
 		return (rc);
 
+#if defined(__i386)
+	/* Read boot args from GRUB menu */
+	if ((bootargs_buf[0] == 0 || isdigit(bootargs_buf[0])) &&
+	    bename == NULL) {
+		/*
+		 * If no boot arguments are given, or a GRUB menu entry
+		 * number is provided, process the GRUB menu.
+		 */
+		int entnum;
+		if (bootargs_buf[0] == 0)
+			entnum = GRUB_ENTRY_DEFAULT;
+		else {
+			errno = 0;
+			entnum = strtoul(bootargs_buf, NULL, 10);
+			rc = errno;
+		}
+
+		if (rc == 0 && (rc = grub_get_boot_args(&fbarg, NULL,
+		    entnum)) == 0) {
+			if (strlcpy(bootargs_buf, fbarg.gba_bootargs,
+			    buf_size) >= buf_size) {
+				grub_cleanup_boot_args(&fbarg);
+				bcopy(bootargs_saved, bootargs_buf, buf_size);
+				rc = E2BIG;
+			}
+		}
+		/* Failed to read GRUB menu, fall back to normal reboot */
+		if (rc != 0) {
+			(void) fprintf(stderr,
+			    gettext("%s: Failed to process GRUB menu "
+			    "entry for fast reboot.\n\t%s\n"),
+			    cmdname, grub_strerror(rc));
+			(void) fprintf(stderr,
+			    gettext("%s: Falling back to regular reboot.\n"),
+			    cmdname);
+			return (-1);
+		}
+		/* No need to process further */
+		fbarg_used = &fbarg;
+		fbarg_entnum = entnum;
+		return (0);
+	}
+#endif	/* __i386 */
+
+	/* Zero out the boot argument buffer as we will reconstruct it */
+	bzero(bootargs_buf, buf_size);
+	bzero(bootfs_arg, sizeof (bootfs_arg));
+	bzero(unixfile, sizeof (unixfile));
+
 	if (bename && (rc = fastboot_bename(bename, mountpoint,
 	    sizeof (mountpoint))) != 0)
-		return (rc);
+		return (EINVAL);
+
 
 	/*
 	 * If BE is not specified, look for disk argument to construct
@@ -1070,7 +1109,7 @@ parse_fastboot_args(char *bootargs_buf, int *is_dryrun, const char *bename,
 			    "/platform/i86pc/kernel/unix");
 		} else {
 			(void) fprintf(stderr,
-			    gettext("%s: unknown architecture"), cmdname);
+			    gettext("%s: Unknown architecture"), cmdname);
 			return (EINVAL);
 		}
 	}
@@ -1163,9 +1202,9 @@ main(int argc, char *argv[])
 {
 	char *ttyn = ttyname(STDERR_FILENO);
 
-	uid_t	euid;
 	int qflag = 0, needlog = 1, nosync = 0;
 	int fast_reboot = 0;
+	int prom_reboot = 0;
 	uintptr_t mdep = NULL;
 	int cmd, fcn, c, aval, r;
 	const char *usage;
@@ -1198,8 +1237,8 @@ main(int argc, char *argv[])
 	} else if (strcmp(cmdname, "reboot") == 0) {
 		(void) audit_reboot_setup();
 #if defined(__i386)
-		optstring = "dlnqfe:";
-		usage = gettext("usage: %s [ -dlnqfe: ] [ boot args ]\n");
+		optstring = "dlnqpfe:";
+		usage = gettext("usage: %s [ -dlnq(p|fe:) ] [ boot args ]\n");
 #else
 		optstring = "dlnq";
 		usage = gettext("usage: %s [ -dlnq ] [ boot args ]\n");
@@ -1237,6 +1276,9 @@ main(int argc, char *argv[])
 			ttyn = NULL;
 			break;
 #if defined(__i386)
+		case 'p':
+			prom_reboot = 1;
+			break;
 		case 'f':
 			fast_reboot = 1;
 			break;
@@ -1280,24 +1322,31 @@ main(int argc, char *argv[])
 		bzero(bootargs_buf, sizeof (bootargs_buf));
 	}
 
-	if ((euid = geteuid()) != 0) {
+	if (geteuid() != 0) {
 		(void) fprintf(stderr,
 		    gettext("%s: permission denied\n"), cmdname);
 		goto fail;
 	}
 
+	if (fast_reboot && prom_reboot) {
+		(void) fprintf(stderr,
+		    gettext("%s: -p and -f are mutually exclusive\n"),
+		    cmdname);
+		return (EINVAL);
+	}
+
 	/*
-	 * Check whether fast  reboot is the default operating mode
+	 * Check whether fast reboot is the default operating mode
 	 */
-	if (fcn == AD_BOOT && !fast_reboot)
-		fast_reboot = is_fastboot_default(euid);
+	if (fcn == AD_BOOT && !fast_reboot && !prom_reboot &&
+	    zoneid == GLOBAL_ZONEID)
+		fast_reboot = scf_is_fastboot_default();
 
 	if (bename && !fast_reboot)	{
 		(void) fprintf(stderr, gettext("%s: -e only valid with -f\n"),
 		    cmdname);
 		return (EINVAL);
 	}
-
 
 	/*
 	 * If fast reboot, do some sanity check on the argument
@@ -1308,25 +1357,28 @@ main(int argc, char *argv[])
 
 		if (zoneid != GLOBAL_ZONEID)	{
 			(void) fprintf(stderr,
-			    gettext("%s: fast reboot only valid from global"
+			    gettext("%s: Fast reboot only valid from global"
 			    " zone\n"), cmdname);
 			return (EINVAL);
 		}
 
-		rc = parse_fastboot_args(bootargs_buf, &is_dryrun,
-		    bename, &failsafe);
+		rc = parse_fastboot_args(bootargs_buf, sizeof (bootargs_buf),
+		    &is_dryrun, bename, &failsafe);
 
 		/*
 		 * If dry run, or if arguments are invalid, return.
 		 */
 		if (is_dryrun)
 			return (rc);
-		else if (rc != 0)
+		else if (rc == EINVAL)
 			goto fail;
+		else if (rc != 0)
+			fast_reboot = 0;
 
 		/*
 		 * For all the other errors, we continue on in case user
-		 * user want to force fast reboot.
+		 * user want to force fast reboot, or fall back to regular
+		 * reboot.
 		 */
 		if (strlen(bootargs_buf) != 0)
 			mdep = (uintptr_t)bootargs_buf;
@@ -1395,8 +1447,16 @@ main(int argc, char *argv[])
 		need_check_zones = halt_zones();
 	}
 
-	/* if we're dumping, do the archive update here and don't defer it */
+#if defined(__i386)
+	/* set new default entry in the GRUB entry */
+	if (fbarg_entnum != GRUB_ENTRY_DEFAULT) {
+		char buf[32];
+		(void) snprintf(buf, sizeof (buf), "default=%u", fbarg_entnum);
+		(void) halt_exec(BOOTADM_PROG, "set-menu", buf, NULL);
+	}
+#endif	/* __i386 */
 
+	/* if we're dumping, do the archive update here and don't defer it */
 	if (cmd == A_DUMP && zoneid == GLOBAL_ZONEID && !nosync)
 		do_archives_update(fast_reboot);
 
@@ -1539,6 +1599,10 @@ fail:
 
 		} else if (strlen(fastboot_mounted) != 0) {
 			(void) umount(fastboot_mounted);
+#if defined(__i386)
+		} else if (fbarg_used != NULL) {
+			grub_cleanup_boot_args(fbarg_used);
+#endif	/* __i386 */
 		}
 	}
 

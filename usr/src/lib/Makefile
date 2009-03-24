@@ -249,6 +249,7 @@ SUBDIRS += \
 	libipmi		\
 	libexacct/demo	\
 	libvscan	\
+	libgrubmgmt	\
 	smbsrv		\
 	scsi		\
 	mms		\
@@ -311,6 +312,7 @@ MSGSUBDIRS=		\
 	libdiskmgt	\
 	libdladm	\
 	libdll		\
+	libgrubmgmt	\
 	libgss		\
 	libidmap	\
 	libinetcfg	\
@@ -464,6 +466,7 @@ HDRSUBDIRS=		\
 	libshare	\
 	libidmap	\
 	libvscan	\
+	libgrubmgmt	\
 	smbsrv		\
 	scsi		\
 	hbaapi		\
@@ -590,7 +593,7 @@ libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
 pam_modules:	libproject passwdutil $(SMARTCARD) smbsrv
-libscf:		libuutil libmd libgen
+libscf:		libuutil libmd libgen libsmbios
 libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
@@ -611,6 +614,7 @@ smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 libvscan:	libscf
 scsi:		libnvpair
 mpapi:		libpthread libdevinfo libsysevent libnvpair
+libgrubmgmt:	libdevinfo libzfs libfstyp
 
 #
 # The reason this rule checks for the existence of the

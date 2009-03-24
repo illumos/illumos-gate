@@ -313,6 +313,8 @@ SUNWprivate_1.1 {
 	scf_write_propvec;
 	scf_clean_propvec;
 	scf_instance_delete_prop;
+	scf_get_boot_config;
+	scf_is_fastboot_default;
     local:
 	*;
 };

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,8 +166,6 @@ extern void pm_cfb_rele(void);
 
 extern fastboot_info_t newkernel;
 
-int quiesce_active = 0;
-
 /*
  * Machine dependent code to reboot.
  * "mdep" is interpreted as a character pointer; if non-null, it is a pointer
@@ -186,6 +184,7 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	static int is_first_quiesce = 1;
 	static int is_first_reset = 1;
 	int reset_status = 0;
+	static char fallback_str[] = "Falling back to regular reboot.\n";
 
 	if (fcn == AD_FASTREBOOT && !newkernel.fi_valid)
 		fcn = AD_BOOT;
@@ -267,6 +266,14 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	}
 
 	/*
+	 * If the system is panicking, the preloaded kernel is valid,
+	 * and fastreboot_onpanic has been set, choose Fast Reboot.
+	 */
+	if (fcn == AD_BOOT && panicstr && newkernel.fi_valid &&
+	    fastreboot_onpanic)
+		fcn = AD_FASTREBOOT;
+
+	/*
 	 * Try to quiesce devices.
 	 */
 	if (is_first_quiesce) {
@@ -282,8 +289,10 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 		if (reset_status == -1) {
 			if (fcn == AD_FASTREBOOT && !force_fastreboot) {
 				prom_printf("Driver(s) not capable of fast "
-				    "reboot. Fall back to regular reboot.\n");
+				    "reboot.\n");
+				prom_printf(fallback_str);
 				fastreboot_capable = 0;
+				fcn = AD_BOOT;
 			} else if (fcn != AD_FASTREBOOT)
 				fastreboot_capable = 0;
 		}
@@ -308,15 +317,30 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 		reset_leaves();
 	}
 
-	(void) spl8();
-	(*psm_shutdownf)(cmd, fcn);
+	/* Verify newkernel checksum */
+	if (fastreboot_capable && fcn == AD_FASTREBOOT &&
+	    fastboot_cksum_verify(&newkernel) != 0) {
+		fastreboot_capable = 0;
+		prom_printf("Fast reboot: checksum failed for the new "
+		    "kernel.\n");
+		prom_printf(fallback_str);
+	}
 
-	if (fcn == AD_FASTREBOOT && !panicstr && fastreboot_capable)
+	(void) spl8();
+
+	if (fastreboot_capable && fcn == AD_FASTREBOOT) {
+		/*
+		 * psm_shutdown is called within fast_reboot()
+		 */
 		fast_reboot();
-	else if (fcn == AD_HALT || fcn == AD_POWEROFF)
-		halt((char *)NULL);
-	else
-		prom_reboot("");
+	} else {
+		(*psm_shutdownf)(cmd, fcn);
+
+		if (fcn == AD_HALT || fcn == AD_POWEROFF)
+			halt((char *)NULL);
+		else
+			prom_reboot("");
+	}
 	/*NOTREACHED*/
 }
 
@@ -328,14 +352,15 @@ mdpreboot(int cmd, int fcn, char *mdep)
 	if (fcn == AD_FASTREBOOT && !fastreboot_capable) {
 		fcn = AD_BOOT;
 #ifdef	__xpv
-		cmn_err(CE_WARN, "Fast reboot not supported on xVM");
+		cmn_err(CE_WARN, "Fast reboot is not supported on xVM");
 #else
-		cmn_err(CE_WARN, "Fast reboot not supported on this platform");
+		cmn_err(CE_WARN,
+		    "Fast reboot is not supported on this platform");
 #endif
 	}
 
 	if (fcn == AD_FASTREBOOT) {
-		load_kernel(mdep);
+		fastboot_load_kernel(mdep);
 		if (!newkernel.fi_valid)
 			fcn = AD_BOOT;
 	}

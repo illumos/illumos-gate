@@ -19,31 +19,50 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG = halt
-ROOTLINKS = $(ROOTUSRSBIN)/poweroff $(ROOTUSRSBIN)/reboot
-ROOTSYMLINKS= $(ROOTETC)/halt $(ROOTETC)/reboot
-
-lint := LINTFLAGS = -u
 
 include ../Makefile.cmd
+
+#
+# Currently Fast Reboot is only supported on x86.
+#
+sparc_SUBDIRS =
+i386_SUBDIRS = smf
+SUBDIRS = $($(MACH)_SUBDIRS)
+
+ROOTLINKS = $(ROOTUSRSBIN)/poweroff $(ROOTUSRSBIN)/reboot
+ROOTSYMLINKS= $(ROOTETC)/halt $(ROOTETC)/reboot
 
 FILEMODE = 0755
 GROUP = bin
 
 .KEEP_STATE:
 
-all: $(PROG) 
-
 CPPFLAGS += -I../../lib/libzpool/common
+CPPFLAGS += -I../../lib/libscf/inc
 CPPFLAGS += -I../../uts/common/fs/zfs
 
 LDLIBS += -lbsm -lscf -lzfs -lgen
+LDLIBS_i386 +=	-lgrubmgmt
+LDLIBS +=	$(LDLIBS_$(MACH))
 
-install: all $(ROOTUSRSBINPROG) $(ROOTLINKS) $(ROOTSYMLINKS)
+CLOBBERFILES += $(ROOTLINKS) $(ROOTSYMLINKS)
+
+all     :=	TARGET = all
+install :=	TARGET = install
+clean   :=	TARGET = clean
+clobber :=	TARGET = clobber
+lint    :=	TARGET = lint
+lint	:=	LINTFLAGS = -u
+
+
+all: $(PROG) 
+
+install: all $(ROOTUSRSBINPROG) $(ROOTLINKS) $(ROOTSYMLINKS) $(SUBDIRS)
 
 $(ROOTLINKS): $(ROOTUSRSBINPROG)
 	$(RM) $@
@@ -53,8 +72,17 @@ $(ROOTSYMLINKS):
 	$(RM) $@
 	$(SYMLINK) ../usr/sbin/$(PROG) $@
 
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
 clean:
 
+clobber: $(SUBDIRS)
+
 lint:	lint_PROG
+
+check: $(CHKMANIFEST)
+
+FRC:
 
 include ../Makefile.targ

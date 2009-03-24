@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -74,6 +74,9 @@ LDLIBS += \
 	-lsysevent \
 	-lumem \
 	-luutil
+
+LDLIBS_i386 +=	-lgrubmgmt
+LDLIBS +=	$(LDLIBS_$(MACH))
 
 FILEMODE = 0555
 OWNER = root

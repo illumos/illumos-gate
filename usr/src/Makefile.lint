@@ -358,6 +358,7 @@ COMMON_SUBDIRS = \
 	lib/libexacct \
 	lib/libfcoe \
 	lib/libgen \
+	lib/libgrubmgmt \
 	lib/libgss \
 	lib/libidmap \
 	lib/libinetcfg \

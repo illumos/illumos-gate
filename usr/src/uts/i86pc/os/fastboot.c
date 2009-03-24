@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,14 +29,18 @@
  * reboot which bypasses the firmware and bootloader, considerably
  * reducing downtime.
  *
- * load_kernel(): This function is invoked by mdpreboot() in the reboot
- * path.  It loads the new kernel and boot archive into memory, builds
+ * fastboot_load_kernel(): This function is invoked by mdpreboot() in the
+ * reboot path.  It loads the new kernel and boot archive into memory, builds
  * the data structure containing sufficient information about the new
  * kernel and boot archive to be passed to the fast reboot switcher
  * (see fb_swtch_src.s for details).  When invoked the switcher relocates
  * the new kernel and boot archive to physically contiguous low memory,
  * similar to where the boot loader would have loaded them, and jumps to
  * the new kernel.
+ *
+ * If fastreboot_onpanic is enabled, fastboot_load_kernel() is called
+ * by fastreboot_post_startup() to load the back up kernel in case of
+ * panic.
  *
  * The physical addresses of the memory allocated for the new kernel, boot
  * archive and their page tables must be above where the boot archive ends
@@ -45,7 +49,8 @@
  *
  * fast_reboot(): This function is invoked by mdboot() once it's determined
  * that the system is capable of fast reboot.  It jumps to the fast reboot
- * switcher with the data structure built by load_kernel() as the argument.
+ * switcher with the data structure built by fastboot_load_kernel() as the
+ * argument.
  */
 
 #include <sys/types.h>
@@ -83,17 +88,28 @@
 #include <sys/machsystm.h>
 #include <sys/mman.h>
 #include <sys/x86_archext.h>
+#include <sys/smp_impldefs.h>
+#include <sys/spl.h>
 
 #include <sys/fastboot.h>
 #include <sys/machelf.h>
 #include <sys/kobj.h>
 #include <sys/multiboot.h>
+#include <sys/kobj_lex.h>
+
+/*
+ * Macro to determine how many pages are needed for PTEs to map a particular
+ * file.  Allocate one extra page table entry for terminating the list.
+ */
+#define	FASTBOOT_PTE_LIST_SIZE(fsize)	\
+	P2ROUNDUP((((fsize) >> PAGESHIFT) + 1) * sizeof (x86pte_t), PAGESIZE)
 
 /*
  * Data structure containing necessary information for the fast reboot
  * switcher to jump to the new kernel.
  */
 fastboot_info_t newkernel = { 0 };
+char		fastboot_args[OBP_MAXPATHLEN];
 
 static char fastboot_filename[2][OBP_MAXPATHLEN] = { { 0 }, { 0 }};
 static x86pte_t ptp_bits = PT_VALID | PT_REF | PT_USER | PT_WRITABLE;
@@ -110,8 +126,28 @@ int fastboot_contig = 0;
 static uintptr_t fake_va = FASTBOOT_FAKE_VA;
 
 /*
- * Below 1G for page tables as we are using 2G as the fake virtual address for
- * the new kernel and boot archive.
+ * Reserve memory below PA 1G in preparation of fast reboot.
+ *
+ * This variable is only checked when fastreboot_capable is set, but
+ * fastreboot_onpanic is not set.  The amount of memory reserved
+ * is negligible, but just in case we are really short of low memory,
+ * this variable will give us a backdoor to not consume memory at all.
+ */
+int reserve_mem_enabled = 1;
+
+/*
+ * Amount of memory below PA 1G to reserve for constructing the multiboot
+ * data structure and the page tables as we tend to run out of those
+ * when more drivers are loaded.
+ */
+static size_t fastboot_mbi_size = 0x2000;	/* 8K */
+static size_t fastboot_pagetable_size = 0x5000;	/* 20K */
+
+/*
+ * Use below 1G for page tables as
+ *	1. we are only doing 1:1 mapping of the bottom 1G of physical memory.
+ *	2. we are using 2G as the fake virtual address for the new kernel and
+ *	boot archive.
  */
 static ddi_dma_attr_t fastboot_below_1G_dma_attr = {
 	DMA_ATTR_V0,
@@ -156,6 +192,7 @@ extern mb_memory_map_t saved_mmap[FASTBOOT_SAVED_MMAP_COUNT];
 extern struct sol_netinfo saved_drives[FASTBOOT_SAVED_DRIVES_COUNT];
 extern char saved_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 extern int saved_cmdline_len;
+extern size_t saved_file_size[];
 
 extern void* contig_alloc(size_t size, ddi_dma_attr_t *attr,
     uintptr_t align, int cansleep);
@@ -171,14 +208,17 @@ extern void vprintf(const char *, va_list);
  */
 #define	BOOTARCHIVE64	"/platform/i86pc/amd64/boot_archive"
 #define	BOOTARCHIVE32	"/platform/i86pc/boot_archive"
-#define	BOOTARCHIVE_FAILSAFE	"/boot/x86.miniroot-safe"
-#define	FAILSAFE_BOOTFILE	"/boot/platform/i86pc/kernel/unix"
+#define	BOOTARCHIVE32_FAILSAFE	"/boot/x86.miniroot-safe"
+#define	BOOTARCHIVE64_FAILSAFE	"/boot/amd64/x86.miniroot-safe"
+#define	FAILSAFE_BOOTFILE32	"/boot/platform/i86pc/kernel/unix"
+#define	FAILSAFE_BOOTFILE64	"/boot/platform/i86pc/kernel/amd64/unix"
 
 static uint_t fastboot_vatoindex(fastboot_info_t *, uintptr_t, int);
 static void fastboot_map_with_size(fastboot_info_t *, uintptr_t,
     paddr_t, size_t, int);
 static void fastboot_build_pagetables(fastboot_info_t *);
 static int fastboot_build_mbi(char *, fastboot_info_t *);
+static void fastboot_free_file(fastboot_file_t *);
 
 static const char fastboot_enomem_msg[] = "Fastboot: Couldn't allocate 0x%"
 	PRIx64" bytes below %s to do fast reboot";
@@ -395,10 +435,9 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 	mb_module_t	*mbp;
 	uintptr_t	next_addr;
 	uintptr_t	new_mbi_pa;
-	size_t		size;
-	void		*buf = NULL;
 	size_t		arglen;
 	char		bootargs[OBP_MAXPATHLEN];
+	size_t		size;
 
 	bzero(bootargs, OBP_MAXPATHLEN);
 
@@ -409,18 +448,50 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 	}
 
 	size = PAGESIZE + P2ROUNDUP(arglen, PAGESIZE);
-	buf = contig_alloc(size, &fastboot_below_1G_dma_attr, PAGESIZE, 0);
-	if (buf == NULL) {
-		cmn_err(CE_WARN, fastboot_enomem_msg, (uint64_t)size, "1G");
-		return (-1);
+	if (nk->fi_mbi_size && nk->fi_mbi_size < size) {
+		contig_free((void *)nk->fi_new_mbi_va, nk->fi_mbi_size);
+		nk->fi_mbi_size = 0;
 	}
 
-	bzero(buf, size);
+	if (nk->fi_mbi_size == 0) {
+		if ((nk->fi_new_mbi_va =
+		    (uintptr_t)contig_alloc(size, &fastboot_below_1G_dma_attr,
+		    PAGESIZE, 0)) == NULL) {
+			cmn_err(CE_WARN, fastboot_enomem_msg,
+			    (uint64_t)size, "1G");
+			return (-1);
+		}
+		/*
+		 * fi_mbi_size must be set after the allocation succeeds
+		 * as it's used to determine how much memory to free.
+		 */
+		nk->fi_mbi_size = size;
+	}
 
-	new_mbi_pa = mmu_ptob((uint64_t)hat_getpfnum(kas.a_hat, (caddr_t)buf));
+	bzero((void *)nk->fi_new_mbi_va, nk->fi_mbi_size);
 
-	hat_devload(kas.a_hat, (caddr_t)new_mbi_pa, size,
-	    mmu_btop(new_mbi_pa), PROT_READ | PROT_WRITE, HAT_LOAD_NOCONSIST);
+	new_mbi_pa = mmu_ptob((uint64_t)hat_getpfnum(kas.a_hat,
+	    (caddr_t)nk->fi_new_mbi_va));
+
+	/*
+	 * Map the address into both the current proc's address
+	 * space and the kernel's address space in case the panic
+	 * is forced by kmdb.
+	 */
+	AS_LOCK_ENTER(&kas, &kas.a_lock, RW_WRITER);
+	hat_devload(kas.a_hat, (caddr_t)new_mbi_pa, nk->fi_mbi_size,
+	    mmu_btop(new_mbi_pa), PROT_READ | PROT_WRITE,
+	    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
+	AS_LOCK_EXIT(&kas, &kas.a_lock);
+
+	if (&kas != curproc->p_as) {
+		struct as *asp = curproc->p_as;
+		AS_LOCK_ENTER(asp, &asp->a_lock, RW_WRITER);
+		hat_devload(asp->a_hat, (caddr_t)new_mbi_pa, nk->fi_mbi_size,
+		    mmu_btop(new_mbi_pa), PROT_READ | PROT_WRITE,
+		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
+		AS_LOCK_EXIT(asp, &asp->a_lock);
+	}
 
 	nk->fi_new_mbi_pa = (paddr_t)new_mbi_pa;
 
@@ -429,8 +500,8 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 	next_addr = new_mbi_pa + sizeof (multiboot_info_t);
 	((multiboot_info_t *)new_mbi_pa)->mods_addr = next_addr;
 	mbp = (mb_module_t *)(uintptr_t)next_addr;
-	mbp->mod_start = newkernel.fi_files[FASTBOOT_BOOTARCHIVE].fb_dest_pa;
-	mbp->mod_end = newkernel.fi_files[FASTBOOT_BOOTARCHIVE].fb_next_pa;
+	mbp->mod_start = nk->fi_files[FASTBOOT_BOOTARCHIVE].fb_dest_pa;
+	mbp->mod_end = nk->fi_files[FASTBOOT_BOOTARCHIVE].fb_next_pa;
 
 	next_addr += sizeof (mb_module_t);
 	bcopy(fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE], (void *)next_addr,
@@ -542,20 +613,202 @@ fastboot_parse_mdep(char *mdep, char *kern_bootpath, int *bootpath_len,
 }
 
 /*
- * Free up the memory we have allocated for this file
+ * Reserve memory under PA 1G for mapping the new kernel and boot archive.
+ * This function is only called if fastreboot_onpanic is *not* set.
+ */
+static void
+fastboot_reserve_mem(fastboot_info_t *nk)
+{
+	int i;
+
+	/*
+	 * A valid kernel is in place.  No need to reserve any memory.
+	 */
+	if (nk->fi_valid)
+		return;
+
+	/*
+	 * Reserve memory under PA 1G for PTE lists.
+	 */
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		fastboot_file_t *fb = &nk->fi_files[i];
+		size_t fsize_roundup, size;
+
+		fsize_roundup = P2ROUNDUP_TYPED(saved_file_size[i],
+		    PAGESIZE, size_t);
+		size = FASTBOOT_PTE_LIST_SIZE(fsize_roundup);
+		if ((fb->fb_pte_list_va = contig_alloc(size,
+		    &fastboot_below_1G_dma_attr, PAGESIZE, 0)) == NULL) {
+			return;
+		}
+		fb->fb_pte_list_size = size;
+	}
+
+	/*
+	 * Reserve memory under PA 1G for page tables.
+	 */
+	if ((nk->fi_pagetable_va =
+	    (uintptr_t)contig_alloc(fastboot_pagetable_size,
+	    &fastboot_below_1G_dma_attr, PAGESIZE, 0)) == NULL) {
+		return;
+	}
+	nk->fi_pagetable_size = fastboot_pagetable_size;
+
+	/*
+	 * Reserve memory under PA 1G for multiboot structure.
+	 */
+	if ((nk->fi_new_mbi_va = (uintptr_t)contig_alloc(fastboot_mbi_size,
+	    &fastboot_below_1G_dma_attr, PAGESIZE, 0)) == NULL) {
+		return;
+	}
+	nk->fi_mbi_size = fastboot_mbi_size;
+}
+
+/*
+ * Calculate MD5 digest for the given fastboot_file.
+ * Assumes that the file is allready loaded properly.
+ */
+static void
+fastboot_cksum_file(fastboot_file_t *fb, uchar_t *md5_hash)
+{
+	MD5_CTX md5_ctx;
+
+	MD5Init(&md5_ctx);
+	MD5Update(&md5_ctx, (void *)fb->fb_va, fb->fb_size);
+	MD5Final(md5_hash, &md5_ctx);
+}
+
+/*
+ * Free up the memory we have allocated for a file
  */
 static void
 fastboot_free_file(fastboot_file_t *fb)
 {
-	size_t	fsize_roundup, pt_size;
-	int	pt_entry_count;
+	size_t	fsize_roundup;
 
 	fsize_roundup = P2ROUNDUP_TYPED(fb->fb_size, PAGESIZE, size_t);
-	contig_free((void *)fb->fb_va, fsize_roundup);
+	if (fsize_roundup) {
+		contig_free((void *)fb->fb_va, fsize_roundup);
+		fb->fb_va = NULL;
+		fb->fb_size = 0;
+	}
+}
 
-	pt_entry_count = (fsize_roundup >> PAGESHIFT) + 1;
-	pt_size = P2ROUNDUP(pt_entry_count * 8, PAGESIZE);
-	contig_free((void *)fb->fb_pte_list_va, pt_size);
+/*
+ * Free up memory used by the PTEs for a file.
+ */
+static void
+fastboot_free_file_pte(fastboot_file_t *fb, uint64_t endaddr)
+{
+	if (fb->fb_pte_list_size && fb->fb_pte_list_pa < endaddr) {
+		contig_free((void *)fb->fb_pte_list_va, fb->fb_pte_list_size);
+		fb->fb_pte_list_va = 0;
+		fb->fb_pte_list_pa = 0;
+		fb->fb_pte_list_size = 0;
+	}
+}
+
+/*
+ * Free up all the memory used for representing a kernel with
+ * fastboot_info_t.
+ */
+static void
+fastboot_free_mem(fastboot_info_t *nk, uint64_t endaddr)
+{
+	int i;
+
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		fastboot_free_file(nk->fi_files + i);
+		fastboot_free_file_pte(nk->fi_files + i, endaddr);
+	}
+
+	if (nk->fi_pagetable_size && nk->fi_pagetable_pa < endaddr) {
+		contig_free((void *)nk->fi_pagetable_va, nk->fi_pagetable_size);
+		nk->fi_pagetable_va = 0;
+		nk->fi_pagetable_pa = 0;
+		nk->fi_pagetable_size = 0;
+	}
+
+	if (nk->fi_mbi_size && nk->fi_new_mbi_pa < endaddr) {
+		contig_free((void *)nk->fi_new_mbi_va, nk->fi_mbi_size);
+		nk->fi_new_mbi_va = 0;
+		nk->fi_new_mbi_pa = 0;
+		nk->fi_mbi_size = 0;
+	}
+}
+
+/*
+ * Only free up the memory allocated for the kernel and boot archive,
+ * but not for the page tables.
+ */
+void
+fastboot_free_newkernel(fastboot_info_t *nk)
+{
+	int i;
+
+	nk->fi_valid = 0;
+	/*
+	 * Free the memory we have allocated
+	 */
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		fastboot_free_file(&(nk->fi_files[i]));
+	}
+}
+
+static void
+fastboot_cksum_cdata(fastboot_info_t *nk, uchar_t *md5_hash)
+{
+	int i;
+	MD5_CTX md5_ctx;
+
+	MD5Init(&md5_ctx);
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		MD5Update(&md5_ctx, nk->fi_files[i].fb_pte_list_va,
+		    nk->fi_files[i].fb_pte_list_size);
+	}
+	MD5Update(&md5_ctx, (void *)nk->fi_pagetable_va, nk->fi_pagetable_size);
+	MD5Update(&md5_ctx, (void *)nk->fi_new_mbi_va, nk->fi_mbi_size);
+
+	MD5Final(md5_hash, &md5_ctx);
+}
+
+/*
+ * Generate MD5 checksum of the given kernel.
+ */
+static void
+fastboot_cksum_generate(fastboot_info_t *nk)
+{
+	int i;
+
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		fastboot_cksum_file(nk->fi_files + i, nk->fi_md5_hash[i]);
+	}
+	fastboot_cksum_cdata(nk, nk->fi_md5_hash[i]);
+}
+
+/*
+ * Calculate MD5 checksum of the given kernel and verify that
+ * it matches with what was calculated before.
+ */
+int
+fastboot_cksum_verify(fastboot_info_t *nk)
+{
+	int i;
+	uchar_t md5_hash[MD5_DIGEST_LENGTH];
+
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		fastboot_cksum_file(nk->fi_files + i, md5_hash);
+		if (bcmp(nk->fi_md5_hash[i], md5_hash,
+		    sizeof (nk->fi_md5_hash[i])) != 0)
+			return (i + 1);
+	}
+
+	fastboot_cksum_cdata(nk, md5_hash);
+	if (bcmp(nk->fi_md5_hash[i], md5_hash,
+	    sizeof (nk->fi_md5_hash[i])) != 0)
+		return (i + 1);
+
+	return (0);
 }
 
 /*
@@ -572,22 +825,26 @@ fastboot_free_file(fastboot_file_t *fb)
  * - Mark the data structure as valid if all steps have succeeded.
  */
 void
-load_kernel(char *mdep)
+fastboot_load_kernel(char *mdep)
 {
 	void		*buf = NULL;
 	int		i;
 	fastboot_file_t	*fb;
 	uint32_t	dboot_start_offset;
 	char		kern_bootpath[OBP_MAXPATHLEN];
-	char		bootargs[OBP_MAXPATHLEN];
 	extern uintptr_t postbootkernelbase;
-	extern char	fb_swtch_image[];
+	uintptr_t	saved_kernelbase;
 	int		bootpath_len = 0;
 	int		is_failsafe = 0;
 	int		is_retry = 0;
 	uint64_t	end_addr;
 
 	ASSERT(fastreboot_capable);
+
+	if (newkernel.fi_valid)
+		fastboot_free_newkernel(&newkernel);
+
+	saved_kernelbase = postbootkernelbase;
 
 	postbootkernelbase = 0;
 
@@ -601,8 +858,8 @@ load_kernel(char *mdep)
 	/*
 	 * Process the boot argument
 	 */
-	bzero(bootargs, OBP_MAXPATHLEN);
-	fastboot_parse_mdep(mdep, kern_bootpath, &bootpath_len, bootargs);
+	bzero(fastboot_args, OBP_MAXPATHLEN);
+	fastboot_parse_mdep(mdep, kern_bootpath, &bootpath_len, fastboot_args);
 
 	/*
 	 * Make sure we get the null character
@@ -616,8 +873,10 @@ load_kernel(char *mdep)
 	bcopy(kern_bootpath, fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE],
 	    bootpath_len);
 
-	if (bcmp(kern_bootfile, FAILSAFE_BOOTFILE,
-	    (sizeof (FAILSAFE_BOOTFILE) - 1)) == 0) {
+	if (bcmp(kern_bootfile, FAILSAFE_BOOTFILE32,
+	    (sizeof (FAILSAFE_BOOTFILE32) - 1)) == 0 ||
+	    bcmp(kern_bootfile, FAILSAFE_BOOTFILE64,
+	    (sizeof (FAILSAFE_BOOTFILE64) - 1)) == 0) {
 		is_failsafe = 1;
 	}
 
@@ -633,7 +892,6 @@ load_kernel_retry:
 		size_t		fsize_roundup, pt_size;
 		int		page_index;
 		uintptr_t	offset;
-		int		pt_entry_count;
 		ddi_dma_attr_t dma_attr = fastboot_dma_attr;
 
 
@@ -682,8 +940,6 @@ load_kernel_retry:
 				    "Fastboot: boot archive is too big");
 				goto err_out;
 			} else {
-				int j;
-
 				/* Set the flag so we don't keep retrying */
 				is_retry++;
 
@@ -697,9 +953,7 @@ load_kernel_retry:
 				 * whose physical addresses might not fit
 				 * the new lo and hi constraints.
 				 */
-				for (j = 0; j < i; j++)
-					fastboot_free_file(
-					    &newkernel.fi_files[j]);
+				fastboot_free_mem(&newkernel, end_addr);
 				goto load_kernel_retry;
 			}
 		}
@@ -728,22 +982,35 @@ load_kernel_retry:
 		fb->fb_size = fsize;
 		fb->fb_sectcnt = 0;
 
-		/*
-		 * Allocate one extra page table entry for terminating
-		 * the list.
-		 */
-		pt_entry_count = (fsize_roundup >> PAGESHIFT) + 1;
-		pt_size = P2ROUNDUP(pt_entry_count * 8, PAGESIZE);
+		pt_size = FASTBOOT_PTE_LIST_SIZE(fsize_roundup);
 
-		if ((fb->fb_pte_list_va =
-		    (x86pte_t *)contig_alloc(pt_size,
-		    &fastboot_below_1G_dma_attr, PAGESIZE, 0)) == NULL) {
-			cmn_err(CE_WARN, fastboot_enomem_msg,
-			    (uint64_t)pt_size, "1G");
-			goto err_out;
+		/*
+		 * If we have reserved memory but it not enough, free it.
+		 */
+		if (fb->fb_pte_list_size && fb->fb_pte_list_size < pt_size) {
+			contig_free((void *)fb->fb_pte_list_va,
+			    fb->fb_pte_list_size);
+			fb->fb_pte_list_size = 0;
 		}
 
-		bzero((void *)(fb->fb_pte_list_va), pt_size);
+		if (fb->fb_pte_list_size == 0) {
+			if ((fb->fb_pte_list_va =
+			    (x86pte_t *)contig_alloc(pt_size,
+			    &fastboot_below_1G_dma_attr, PAGESIZE, 0))
+			    == NULL) {
+				cmn_err(CE_WARN, fastboot_enomem_msg,
+				    (uint64_t)pt_size, "1G");
+				goto err_out;
+			}
+			/*
+			 * fb_pte_list_size must be set after the allocation
+			 * succeeds as it's used to determine how much memory to
+			 * free.
+			 */
+			fb->fb_pte_list_size = pt_size;
+		}
+
+		bzero((void *)(fb->fb_pte_list_va), fb->fb_pte_list_size);
 
 		fb->fb_pte_list_pa = mmu_ptob((uint64_t)hat_getpfnum(kas.a_hat,
 		    (caddr_t)fb->fb_pte_list_va));
@@ -805,11 +1072,11 @@ load_kernel_retry:
 
 				if (is_failsafe) {
 					/* Failsafe boot_archive */
-					bcopy(BOOTARCHIVE_FAILSAFE,
+					bcopy(BOOTARCHIVE32_FAILSAFE,
 					    &fastboot_filename
 					    [FASTBOOT_NAME_BOOTARCHIVE]
 					    [bootpath_len],
-					    sizeof (BOOTARCHIVE_FAILSAFE));
+					    sizeof (BOOTARCHIVE32_FAILSAFE));
 				} else {
 					bcopy(BOOTARCHIVE32,
 					    &fastboot_filename
@@ -839,10 +1106,20 @@ load_kernel_retry:
 					goto err_out;
 				}
 
-				bcopy(BOOTARCHIVE64,
-				    &fastboot_filename
-				    [FASTBOOT_NAME_BOOTARCHIVE][bootpath_len],
-				    sizeof (BOOTARCHIVE64));
+				if (is_failsafe) {
+					/* Failsafe boot_archive */
+					bcopy(BOOTARCHIVE64_FAILSAFE,
+					    &fastboot_filename
+					    [FASTBOOT_NAME_BOOTARCHIVE]
+					    [bootpath_len],
+					    sizeof (BOOTARCHIVE64_FAILSAFE));
+				} else {
+					bcopy(BOOTARCHIVE64,
+					    &fastboot_filename
+					    [FASTBOOT_NAME_BOOTARCHIVE]
+					    [bootpath_len],
+					    sizeof (BOOTARCHIVE64));
+				}
 			} else {
 				cmn_err(CE_WARN, "Fastboot: Unknown ELF type");
 				goto err_out;
@@ -862,33 +1139,21 @@ load_kernel_retry:
 	}
 
 	/*
-	 * Set fb_va to fake_va
-	 */
-	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
-		newkernel.fi_files[i].fb_va = fake_va;
-
-	}
-
-	/*
 	 * Add the function that will switch us to 32-bit protected mode
 	 */
 	fb = &newkernel.fi_files[FASTBOOT_SWTCH];
 	fb->fb_va = fb->fb_dest_pa = FASTBOOT_SWTCH_PA;
 	fb->fb_size = MMU_PAGESIZE;
 
-	/*
-	 * Map in FASTBOOT_SWTCH_PA
-	 */
-	hat_devload(kas.a_hat, (caddr_t)fb->fb_va, MMU_PAGESIZE,
-	    mmu_btop(fb->fb_dest_pa),
-	    PROT_READ | PROT_WRITE | PROT_EXEC, HAT_LOAD_NOCONSIST);
-
-	bcopy((void *)fb_swtch_image, (void *)fb->fb_va, fb->fb_size);
+	hat_devload(kas.a_hat, (caddr_t)fb->fb_va,
+	    MMU_PAGESIZE, mmu_btop(fb->fb_dest_pa),
+	    PROT_READ | PROT_WRITE | PROT_EXEC,
+	    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
 
 	/*
 	 * Build the new multiboot_info structure
 	 */
-	if (fastboot_build_mbi(bootargs, &newkernel) != 0) {
+	if (fastboot_build_mbi(fastboot_args, &newkernel) != 0) {
 		goto err_out;
 	}
 
@@ -909,12 +1174,27 @@ load_kernel_retry:
 		size_t size = MMU_PAGESIZE * 4;
 #endif	/* __amd64 */
 
-		if ((newkernel.fi_pagetable_va = (uintptr_t)
-		    contig_alloc(size, &fastboot_below_1G_dma_attr,
-		    MMU_PAGESIZE, 0)) == NULL) {
-			cmn_err(CE_WARN, fastboot_enomem_msg,
-			    (uint64_t)size, "1G");
-			goto err_out;
+		if (newkernel.fi_pagetable_size && newkernel.fi_pagetable_size
+		    < size) {
+			contig_free((void *)newkernel.fi_pagetable_va,
+			    newkernel.fi_pagetable_size);
+			newkernel.fi_pagetable_size = 0;
+		}
+
+		if (newkernel.fi_pagetable_size == 0) {
+			if ((newkernel.fi_pagetable_va = (uintptr_t)
+			    contig_alloc(size, &fastboot_below_1G_dma_attr,
+			    MMU_PAGESIZE, 0)) == NULL) {
+				cmn_err(CE_WARN, fastboot_enomem_msg,
+				    (uint64_t)size, "1G");
+				goto err_out;
+			}
+			/*
+			 * fi_pagetable_size must be set after the allocation
+			 * succeeds as it's used to determine how much memory to
+			 * free.
+			 */
+			newkernel.fi_pagetable_size = size;
 		}
 
 		bzero((void *)(newkernel.fi_pagetable_va), size);
@@ -935,14 +1215,55 @@ load_kernel_retry:
 	}
 
 
+	/* Generate MD5 checksums */
+	fastboot_cksum_generate(&newkernel);
+
 	/* Mark it as valid */
 	newkernel.fi_valid = 1;
 	newkernel.fi_magic = FASTBOOT_MAGIC;
 
+	postbootkernelbase = saved_kernelbase;
 	return;
 
 err_out:
+	postbootkernelbase = saved_kernelbase;
 	newkernel.fi_valid = 0;
+	fastboot_free_newkernel(&newkernel);
+}
+
+
+/* ARGSUSED */
+static int
+fastboot_xc_func(fastboot_info_t *nk, xc_arg_t unused2, xc_arg_t unused3)
+{
+	void (*fastboot_func)(fastboot_info_t *);
+	fastboot_file_t	*fb = &nk->fi_files[FASTBOOT_SWTCH];
+	fastboot_func = (void (*)())(fb->fb_va);
+	kthread_t *t_intr = curthread->t_intr;
+
+	if (&kas != curproc->p_as) {
+		hat_devload(curproc->p_as->a_hat, (caddr_t)fb->fb_va,
+		    MMU_PAGESIZE, mmu_btop(fb->fb_dest_pa),
+		    PROT_READ | PROT_WRITE | PROT_EXEC,
+		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
+	}
+
+	/*
+	 * If we have pinned a thread, make sure the address is mapped
+	 * in the address space of the pinned thread.
+	 */
+	if (t_intr && t_intr->t_procp->p_as->a_hat != curproc->p_as->a_hat &&
+	    t_intr->t_procp->p_as != &kas)
+		hat_devload(t_intr->t_procp->p_as->a_hat, (caddr_t)fb->fb_va,
+		    MMU_PAGESIZE, mmu_btop(fb->fb_dest_pa),
+		    PROT_READ | PROT_WRITE | PROT_EXEC,
+		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
+
+	(*psm_shutdownf)(A_SHUTDOWN, AD_FASTREBOOT);
+	(*fastboot_func)(nk);
+
+	/*NOTREACHED*/
+	return (0);
 }
 
 /*
@@ -951,8 +1272,144 @@ err_out:
 void
 fast_reboot()
 {
-	void (*fastboot_func)(fastboot_info_t *);
+	processorid_t bootcpuid = 0;
+	extern uintptr_t postbootkernelbase;
+	extern char	fb_swtch_image[];
+	fastboot_file_t	*fb;
+	int i;
 
-	fastboot_func = (void (*)())(newkernel.fi_files[FASTBOOT_SWTCH].fb_va);
-	(*fastboot_func)(&newkernel);
+	postbootkernelbase = 0;
+
+	fb = &newkernel.fi_files[FASTBOOT_SWTCH];
+
+	/*
+	 * Map the address into both the current proc's address
+	 * space and the kernel's address space in case the panic
+	 * is forced by kmdb.
+	 */
+	if (&kas != curproc->p_as) {
+		hat_devload(curproc->p_as->a_hat, (caddr_t)fb->fb_va,
+		    MMU_PAGESIZE, mmu_btop(fb->fb_dest_pa),
+		    PROT_READ | PROT_WRITE | PROT_EXEC,
+		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
+	}
+
+	bcopy((void *)fb_swtch_image, (void *)fb->fb_va, fb->fb_size);
+
+
+	/*
+	 * Set fb_va to fake_va
+	 */
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		newkernel.fi_files[i].fb_va = fake_va;
+
+	}
+
+	if (panicstr && CPU->cpu_id != bootcpuid &&
+	    CPU_ACTIVE(cpu_get(bootcpuid))) {
+		cpuset_t cpuset;
+
+		CPUSET_ZERO(cpuset);
+		CPUSET_ADD(cpuset, bootcpuid);
+		xc_trycall((xc_arg_t)&newkernel, 0, 0, cpuset,
+		    (xc_func_t)fastboot_xc_func);
+
+		/* Do what panic_idle() does */
+		splx(ipltospl(CLOCK_LEVEL));
+		(void) setjmp(&curthread->t_pcb);
+		for (;;)
+			;
+	} else
+		(void) fastboot_xc_func(&newkernel, 0, 0);
+}
+
+
+/*
+ * Get boot property value for fastreboot_onpanic.
+ *
+ * NOTE: If fastreboot_onpanic is set to non-zero in /etc/system,
+ * new setting passed in via "-B fastreboot_onpanic" is ignored.
+ * This order of precedence is to enable developers debugging panics
+ * that occur early in boot to utilize Fast Reboot on panic.
+ */
+static void
+fastboot_get_bootprop(void)
+{
+	int		val = 0xaa, len, ret;
+	dev_info_t	*devi;
+	char		*propstr = NULL;
+
+	devi = ddi_root_node();
+
+	ret = ddi_prop_lookup_string(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	    FASTREBOOT_ONPANIC, &propstr);
+
+	if (ret == DDI_PROP_SUCCESS) {
+		if (FASTREBOOT_ONPANIC_NOTSET(propstr))
+			val = 0;
+		else if (FASTREBOOT_ONPANIC_ISSET(propstr))
+			val = UA_FASTREBOOT_ONPANIC;
+
+		/*
+		 * Only set fastreboot_onpanic to the value passed in
+		 * if it's not already set to non-zero, and the value
+		 * has indeed been passed in via command line.
+		 */
+		if (!fastreboot_onpanic && val != 0xaa)
+			fastreboot_onpanic = val;
+		ddi_prop_free(propstr);
+	} else if (ret != DDI_PROP_NOT_FOUND && ret != DDI_PROP_UNDEFINED) {
+		cmn_err(CE_WARN, "%s value is invalid, will be ignored",
+		    FASTREBOOT_ONPANIC);
+	}
+
+	len = sizeof (fastreboot_onpanic_cmdline);
+	ret = ddi_getlongprop_buf(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	    FASTREBOOT_ONPANIC_CMDLINE, fastreboot_onpanic_cmdline, &len);
+
+	if (ret == DDI_PROP_BUF_TOO_SMALL)
+		cmn_err(CE_WARN, "%s value is too long, will be ignored",
+		    FASTREBOOT_ONPANIC_CMDLINE);
+}
+
+/*
+ * This function is called by main() to either load the backup kernel for panic
+ * fast reboot, or to reserve low physical memory for fast reboot.
+ */
+void
+fastboot_post_startup()
+{
+	if (!fastreboot_capable)
+		return;
+
+	fastboot_get_bootprop();
+
+	if (fastreboot_onpanic)
+		fastboot_load_kernel(fastreboot_onpanic_cmdline);
+	else if (reserve_mem_enabled)
+		fastboot_reserve_mem(&newkernel);
+}
+
+/*
+ * Update boot configuration settings.
+ * If the new fastreboot_onpanic setting is false, and a kernel has
+ * been preloaded, free the memory;
+ * if the new fastreboot_onpanic setting is true and newkernel is
+ * not valid, load the new kernel.
+ */
+void
+fastboot_update_config(const char *mdep)
+{
+	uint8_t boot_config = (uint8_t)*mdep;
+	int cur_fastreboot_onpanic = fastreboot_onpanic;
+
+	if (!fastreboot_capable)
+		return;
+
+	fastreboot_onpanic = boot_config & UA_FASTREBOOT_ONPANIC;
+	if (fastreboot_onpanic && (!cur_fastreboot_onpanic ||
+	    !newkernel.fi_valid))
+		fastboot_load_kernel(fastreboot_onpanic_cmdline);
+	if (cur_fastreboot_onpanic && !fastreboot_onpanic)
+		fastboot_free_newkernel(&newkernel);
 }

@@ -123,14 +123,13 @@ static void build_firmware_properties(void);
 
 static int early_allocation = 1;
 
+int force_fastreboot = 0;
+int fastreboot_onpanic = 0;
+int post_fastreboot = 0;
 #ifdef	__xpv
 int fastreboot_capable = 0;
-int force_fastreboot = 0;
-int post_fastreboot = 0;
 #else
 int fastreboot_capable = 1;
-int force_fastreboot = 0;
-int post_fastreboot = 0;
 #endif
 
 /*
@@ -143,6 +142,13 @@ mb_memory_map_t saved_mmap[FASTBOOT_SAVED_MMAP_COUNT];
 struct sol_netinfo saved_drives[FASTBOOT_SAVED_DRIVES_COUNT];
 char saved_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 int saved_cmdline_len = 0;
+size_t saved_file_size[FASTBOOT_MAX_FILES_MAP];
+
+/*
+ * Turn off fastreboot_onpanic to avoid panic loop.
+ */
+char fastreboot_onpanic_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
+static const char fastreboot_onpanic_args[] = " -B fastreboot_onpanic=0";
 
 /*
  * Pointers to where System Resource Affinity Table (SRAT) and
@@ -1019,6 +1025,108 @@ setup_rarp_props(struct sol_netinfo *sip)
 
 #endif	/* __xpv */
 
+static void
+build_panic_cmdline(const char *cmd, int cmdlen)
+{
+	int proplen;
+	size_t arglen;
+
+	arglen = sizeof (fastreboot_onpanic_args);
+	/*
+	 * If we allready have fastreboot-onpanic set to zero,
+	 * don't add them again.
+	 */
+	if ((proplen = do_bsys_getproplen(NULL, FASTREBOOT_ONPANIC)) > 0 &&
+	    proplen <=  sizeof (fastreboot_onpanic_cmdline)) {
+		(void) do_bsys_getprop(NULL, FASTREBOOT_ONPANIC,
+		    fastreboot_onpanic_cmdline);
+		if (FASTREBOOT_ONPANIC_NOTSET(fastreboot_onpanic_cmdline))
+			arglen = 1;
+	}
+
+	/*
+	 * construct fastreboot_onpanic_cmdline
+	 */
+	if (cmdlen + arglen > sizeof (fastreboot_onpanic_cmdline)) {
+		DBG_MSG("Command line too long: clearing "
+		    FASTREBOOT_ONPANIC "\n");
+		fastreboot_onpanic = 0;
+	} else {
+		bcopy(cmd, fastreboot_onpanic_cmdline, cmdlen);
+		if (arglen != 1)
+			bcopy(fastreboot_onpanic_args,
+			    fastreboot_onpanic_cmdline + cmdlen, arglen);
+		else
+			fastreboot_onpanic_cmdline[cmdlen] = 0;
+	}
+}
+
+
+#ifndef	__xpv
+/*
+ * Construct boot command line for Fast Reboot
+ */
+static void
+build_fastboot_cmdline(void)
+{
+	saved_cmdline_len =  strlen(xbootp->bi_cmdline) + 1;
+	if (saved_cmdline_len > FASTBOOT_SAVED_CMDLINE_LEN) {
+		DBG(saved_cmdline_len);
+		DBG_MSG("Command line too long: clearing fastreboot_capable\n");
+		fastreboot_capable = 0;
+	} else {
+		bcopy((void *)(xbootp->bi_cmdline), (void *)saved_cmdline,
+		    saved_cmdline_len);
+		saved_cmdline[saved_cmdline_len - 1] = '\0';
+		build_panic_cmdline(saved_cmdline, saved_cmdline_len - 1);
+	}
+}
+
+/*
+ * Save memory layout, disk drive information, unix and boot archive sizes for
+ * Fast Reboot.
+ */
+static void
+save_boot_info(multiboot_info_t *mbi)
+{
+	mb_module_t *mbp;
+	int i;
+
+	bcopy(mbi, &saved_mbi, sizeof (multiboot_info_t));
+	if (mbi->mmap_length > sizeof (saved_mmap)) {
+		DBG_MSG("mbi->mmap_length too big: clearing "
+		    "fastreboot_capable\n");
+		fastreboot_capable = 0;
+	} else {
+		bcopy((void *)(uintptr_t)mbi->mmap_addr, (void *)saved_mmap,
+		    mbi->mmap_length);
+	}
+
+	if (mbi->drives_length > sizeof (saved_drives)) {
+		DBG(mbi->drives_length);
+		DBG_MSG("mbi->drives_length too big: clearing "
+		    "fastreboot_capable\n");
+		fastreboot_capable = 0;
+	} else {
+		bcopy((void *)(uintptr_t)mbi->drives_addr, (void *)saved_drives,
+		    mbi->drives_length);
+	}
+
+	/*
+	 * Current file sizes.  Used by fastboot.c to figure out how much
+	 * memory to reserve for panic reboot.
+	 */
+	saved_file_size[FASTBOOT_NAME_UNIX] = FOUR_MEG - PAGESIZE;
+	for (i = 0, mbp = (mb_module_t *)(uintptr_t)mbi->mods_addr;
+	    i < mbi->mods_count; i++, mbp += sizeof (mb_module_t)) {
+		saved_file_size[FASTBOOT_NAME_BOOTARCHIVE] +=
+		    mbp->mod_end - mbp->mod_start;
+	}
+
+}
+#endif	/* __xpv */
+
+
 /*
  * 1st pass at building the table of boot properties. This includes:
  * - values set on the command line: -B a=x,b=y,c=z ....
@@ -1073,20 +1181,6 @@ build_boot_properties(void)
 	boot_args = do_bsys_alloc(NULL, NULL, boot_arg_len, MMU_PAGESIZE);
 	boot_args[0] = 0;
 	boot_arg_len = 0;
-
-#ifndef	__xpv
-	saved_cmdline_len =  strlen(xbootp->bi_cmdline) + 1;
-	if (saved_cmdline_len > FASTBOOT_SAVED_CMDLINE_LEN) {
-		DBG(saved_cmdline_len);
-		DBG_MSG("Command line too long: clearing fastreboot_capable\n");
-		fastreboot_capable = 0;
-	} else {
-		bcopy((void *)(xbootp->bi_cmdline), (void *)saved_cmdline,
-		    saved_cmdline_len);
-		saved_cmdline[saved_cmdline_len - 1] = '\0';
-	}
-#endif
-
 
 #ifdef __xpv
 	/*
@@ -1276,25 +1370,16 @@ build_boot_properties(void)
 	 */
 	netboot = 0;
 	mbi = xbootp->bi_mb_info;
-	bcopy(mbi, &saved_mbi, sizeof (multiboot_info_t));
-	if (mbi->mmap_length > sizeof (saved_mmap)) {
-		DBG_MSG("mbi->mmap_length too big: clearing "
-		    "fastreboot_capable\n");
-		fastreboot_capable = 0;
-	} else {
-		bcopy((void *)(uintptr_t)mbi->mmap_addr, (void *)saved_mmap,
-		    mbi->mmap_length);
-	}
 
-	if (mbi->drives_length > sizeof (saved_drives)) {
-		DBG(mbi->drives_length);
-		DBG_MSG("mbi->drives_length too big: clearing "
-		    "fastreboot_capable\n");
-		fastreboot_capable = 0;
-	} else {
-		bcopy((void *)(uintptr_t)mbi->drives_addr, (void *)saved_drives,
-		    mbi->drives_length);
-	}
+	/*
+	 * Build boot command line for Fast Reboot
+	 */
+	build_fastboot_cmdline();
+
+	/*
+	 * Save various boot information for Fast Reboot
+	 */
+	save_boot_info(mbi);
 
 	if (mbi != NULL && mbi->flags & 0x2) {
 		boot_device = mbi->boot_device >> 24;

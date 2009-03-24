@@ -126,6 +126,9 @@
 #include <sys/statvfs.h>
 #include <sys/uadmin.h>
 #include <zone.h>
+#if defined(__i386)
+#include <libgrubmgmt.h>
+#endif	/* __i386 */
 
 #include "startd.h"
 #include "protocol.h"
@@ -3479,19 +3482,53 @@ kill_user_procs(void)
 static void
 do_uadmin(void)
 {
+	const char * const resetting = "/etc/svc/volatile/resetting";
 	int fd;
 	struct statvfs vfs;
 	time_t now;
 	struct tm nowtm;
 	char down_buf[256], time_buf[256];
+	uintptr_t mdep;
+#if defined(__i386)
+	grub_boot_args_t fbarg;
+#endif	/* __i386 */
 
-	const char * const resetting = "/etc/svc/volatile/resetting";
-
+	mdep = NULL;
 	fd = creat(resetting, 0777);
 	if (fd >= 0)
 		startd_close(fd);
 	else
 		uu_warn("Could not create \"%s\"", resetting);
+
+	/*
+	 * Right now, fast reboot is supported only on i386.
+	 * scf_is_fastboot_default() should take care of it.
+	 * If somehow we got there on unsupported platform -
+	 * print warning and fall back to regular reboot.
+	 */
+	if (halting == AD_FASTREBOOT) {
+#if defined(__i386)
+		int rc;
+
+		if ((rc = grub_get_boot_args(&fbarg, NULL,
+		    GRUB_ENTRY_DEFAULT)) == 0) {
+			mdep = (uintptr_t)&fbarg.gba_bootargs;
+		} else {
+			/*
+			 * Failed to read GRUB menu, fall back to normal reboot
+			 */
+			halting = AD_BOOT;
+			uu_warn("Failed to process GRUB menu entry "
+			    "for fast reboot.\n\t%s\n"
+			    "Falling back to regular reboot.\n",
+			    grub_strerror(rc));
+		}
+#else	/* __i386 */
+		halting = AD_BOOT;
+		uu_warn("Fast reboot configured, but not supported by "
+		    "this ISA\n");
+#endif	/* __i386 */
+	}
 
 	/* Kill dhcpagent if we're not using nfs for root */
 	if ((statvfs("/", &vfs) == 0) &&
@@ -3578,8 +3615,14 @@ do_uadmin(void)
 	}
 	(void) printf("%s%s\n", down_buf, time_buf);
 
-	(void) uadmin(A_SHUTDOWN, halting, NULL);
+	(void) uadmin(A_SHUTDOWN, halting, mdep);
 	uu_warn("uadmin() failed");
+
+#if defined(__i386)
+	/* uadmin fail, cleanup grub_boot_args */
+	if (halting == AD_FASTREBOOT)
+		grub_cleanup_boot_args(&fbarg);
+#endif	/* __i386 */
 
 	if (remove(resetting) != 0 && errno != ENOENT)
 		uu_warn("Could not remove \"%s\"", resetting);
@@ -5066,8 +5109,10 @@ dgraph_set_runlevel(scf_propertygroup_t *pg, scf_property_t *prop)
 	case '6':
 		halting_time = time(NULL);
 		fork_rc_script(rl, stop, B_TRUE);
-		halting = AD_BOOT;
-		goto uadmin;
+		if (scf_is_fastboot_default() && getzoneid() == GLOBAL_ZONEID)
+			halting = AD_FASTREBOOT;
+		else
+			halting = AD_BOOT;
 
 uadmin:
 		uu_warn("The system is coming down.  Please wait.\n");

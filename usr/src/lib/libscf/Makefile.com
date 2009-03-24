@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -30,6 +30,7 @@ OBJECTS = \
 	error.o			\
 	lowlevel.o		\
 	midlevel.o		\
+	highlevel.o		\
 	scf_tmpl.o		\
 	scf_type.o
 
@@ -42,7 +43,9 @@ $(NOT_NATIVE)NATIVE_BUILD = $(POUND_SIGN)
 $(NATIVE_BUILD)VERS =
 $(NATIVE_BUILD)LIBS = $(DYNLIB)
 
+LDLIBS_i386 += -lsmbios
 LDLIBS +=	-luutil -lc -lgen
+LDLIBS +=	$(LDLIBS_$(MACH))
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
@@ -50,7 +53,8 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 COMDIR =	../../../common/svc
 
 CFLAGS +=	$(CCVERBOSE) -Wp,-xc99=%all
-CPPFLAGS +=	-I../inc -I../../common/inc -I$(COMDIR)
+CPPFLAGS +=	-I../inc -I../../common/inc -I$(COMDIR) -I$(ROOTHDRDIR)
+$(NOT_RELEASE_BUILD) CPPFLAGS += -DFASTREBOOT_DEBUG
 
 #
 # For native builds, we compile and link against the native version
@@ -59,9 +63,11 @@ CPPFLAGS +=	-I../inc -I../../common/inc -I$(COMDIR)
 LIBUUTIL =	$(SRC)/lib/libuutil
 MY_NATIVE_CPPFLAGS =\
 		-DNATIVE_BUILD $(DTEXTDOM) \
-		-I../inc -I$(COMDIR) -I$(LIBUUTIL)/common
-MY_NATIVE_LDLIBS = -L$(LIBUUTIL)/native -R$(LIBUUTIL)/native -luutil -ldoor -lc \
-		-lgen
+		-I../inc -I$(COMDIR) -I$(LIBUUTIL)/common -I$(ROOTHDRDIR)
+MY_NATIVE_LDLIBS = -L$(LIBUUTIL)/native -R$(LIBUUTIL)/native -luutil -ldoor \
+		-lc -lgen
+MY_NATIVE_LDLIBS_i386 = -lsmbios
+MY_NATIVE_LDLIBS += $(MY_NATIVE_LDLIBS_$(MACH))
 
 .KEEP_STATE:
 

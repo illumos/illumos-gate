@@ -905,6 +905,17 @@ fcnname/**/_info:							\
 #endif
 
 /*
+ * Stubs for MD5
+ */
+#ifndef MD5_MODULE
+	MODULE(md5,misc);
+	WSTUB(md5, MD5Init,		nomod_zero);
+	WSTUB(md5, MD5Update,		nomod_zero);
+	WSTUB(md5, MD5Final,		nomod_zero);
+	END_MODULE(md5);
+#endif
+
+/*
  * Stubs for idmap
  */
 #ifndef IDMAP_MODULE

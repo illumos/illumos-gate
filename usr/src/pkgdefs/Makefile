@@ -128,6 +128,7 @@ i386_SUBDIRS= \
 	SUNWdrmr \
 	SUNWgrub \
 	SUNWgrubS \
+	SUNWgrubu \
 	SUNWdcopy \
 	SUNWipw \
 	SUNWiwh	\

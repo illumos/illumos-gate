@@ -1233,7 +1233,7 @@ Use is subject to license terms.
 	</entry>
     </event>
     <!-- uadmin ftrace and swapctl are not documented in uadmin(2) -->
-    <event id="AUE_uadmin_ftrace" instance_of="AUE_uadmin_generic_fcn"
+    <event id="AUE_uadmin_ftrace" instance_of="AUE_uadmin_generic"
         header="0" idNo="56" omit="JNI">
     	<title>uadmin ftrace</title>
 	<program>/sbin/uadmin</program>
@@ -1265,6 +1265,14 @@ Use is subject to license terms.
 	    <internal token="return"/>
 	    <external opt="none"/>
 	</entry>
+    </event>
+    <!-- uadmin config is not documented in uadmin(2) -->
+    <event id="AUE_uadmin_config" instance_of="AUE_uadmin_generic"
+        header="0" idNo="119" omit="JNI">
+    	<title>uadmin config</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
     </event>
 
 <!-- smbd service event; smbd session setup -->
@@ -2005,7 +2013,7 @@ Use is subject to license terms.
     </event>
 
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 118, so next is 119, then fix this comment -->
+<!-- Highest idNo is 119, so next is 120, then fix this comment -->
 <!-- end of C Only events -->
 
 <!--
@@ -2299,6 +2307,7 @@ Use is subject to license terms.
 	<msg id="AD_NOSYNC">Do not sync filesystems on next A_DUMP</msg>
 	<msg id="AD_FASTREBOOT">Reboot bypassing BIOS and boot loader</msg>
 	<msg id="AD_FASTREBOOT_DRYRUN">Check if system supports reboot bypassing BIOS and boot loader</msg>
+	<msg id="AD_UPDATE_BOOT_CONFIG">Update boot configuration parameters</msg>
 	<msg id="AD_REUSEINIT">Prepare for AD_REUSABLE</msg>
 	<msg id="AD_REUSABLE">Create reusable statefile</msg>
 	<msg id="AD_REUSEFINI">Revert to normal CPR mode (not reusable)</msg>

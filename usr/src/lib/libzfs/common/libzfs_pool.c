@@ -1504,78 +1504,122 @@ vdev_online(nvlist_t *nv)
 }
 
 /*
- * Get phys_path for a root pool
- * Return 0 on success; non-zeron on failure.
+ * Helper function for zpool_get_config_physpath().
  */
-int
-zpool_get_physpath(zpool_handle_t *zhp, char *physpath)
+static int
+vdev_get_physpath(nvlist_t *config, char *physpath, size_t physpath_size,
+    size_t *bytes_written)
 {
+	size_t bytes_left, pos, rsz;
+	char *tmppath;
+	const char *format;
+
+	if (nvlist_lookup_string(config, ZPOOL_CONFIG_PHYS_PATH,
+	    &tmppath) != 0)
+		return (EZFS_NODEVICE);
+
+	pos = *bytes_written;
+	bytes_left = physpath_size - pos;
+	format = (pos == 0) ? "%s" : " %s";
+
+	rsz = snprintf(physpath + pos, bytes_left, format, tmppath);
+	*bytes_written += rsz;
+
+	if (rsz >= bytes_left) {
+		/* if physpath was not copied properly, clear it */
+		if (bytes_left != 0) {
+			physpath[pos] = 0;
+		}
+		return (EZFS_NOSPC);
+	}
+	return (0);
+}
+
+/*
+ * Get phys_path for a root pool config.
+ * Return 0 on success; non-zero on failure.
+ */
+static int
+zpool_get_config_physpath(nvlist_t *config, char *physpath, size_t phypath_size)
+{
+	size_t rsz;
 	nvlist_t *vdev_root;
 	nvlist_t **child;
+	nvlist_t **child2;
 	uint_t count;
-	int i;
+	char *type;
+	int j, ret;
+
+	rsz = 0;
+
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &vdev_root) != 0)
+		return (EZFS_INVALCONFIG);
+
+	if (nvlist_lookup_string(vdev_root, ZPOOL_CONFIG_TYPE, &type) != 0 ||
+	    nvlist_lookup_nvlist_array(vdev_root, ZPOOL_CONFIG_CHILDREN,
+	    &child, &count) != 0)
+		return (EZFS_INVALCONFIG);
 
 	/*
-	 * Make sure this is a root pool, as phys_path doesn't mean
-	 * anything to a non-root pool.
+	 * root pool can not have EFI labeled disks and can only have
+	 * a single top-level vdev.
 	 */
-	if (!pool_is_bootable(zhp))
-		return (-1);
+	if (strcmp(type, VDEV_TYPE_ROOT) != 0 || count != 1 ||
+	    pool_uses_efi(vdev_root))
+		return (EZFS_POOL_INVALARG);
 
-	verify(nvlist_lookup_nvlist(zhp->zpool_config,
-	    ZPOOL_CONFIG_VDEV_TREE, &vdev_root) == 0);
+	if (nvlist_lookup_string(child[0], ZPOOL_CONFIG_TYPE, &type) != 0)
+		return (EZFS_INVALCONFIG);
 
-	if (nvlist_lookup_nvlist_array(vdev_root, ZPOOL_CONFIG_CHILDREN,
-	    &child, &count) != 0)
-		return (-2);
-
-	for (i = 0; i < count; i++) {
-		nvlist_t **child2;
-		uint_t count2;
-		char *type;
-		char *tmppath;
-		int j;
-
-		if (nvlist_lookup_string(child[i], ZPOOL_CONFIG_TYPE, &type)
-		    != 0)
-			return (-3);
-
-		if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-			if (!vdev_online(child[i]))
-				return (-8);
-			verify(nvlist_lookup_string(child[i],
-			    ZPOOL_CONFIG_PHYS_PATH, &tmppath) == 0);
-			(void) strncpy(physpath, tmppath, strlen(tmppath));
-		} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
-			if (nvlist_lookup_nvlist_array(child[i],
-			    ZPOOL_CONFIG_CHILDREN, &child2, &count2) != 0)
-				return (-4);
-
-			for (j = 0; j < count2; j++) {
-				if (!vdev_online(child2[j]))
-					return (-8);
-				if (nvlist_lookup_string(child2[j],
-				    ZPOOL_CONFIG_PHYS_PATH, &tmppath) != 0)
-					return (-5);
-
-				if ((strlen(physpath) + strlen(tmppath)) >
-				    MAXNAMELEN)
-					return (-6);
-
-				if (strlen(physpath) == 0) {
-					(void) strncpy(physpath, tmppath,
-					    strlen(tmppath));
-				} else {
-					(void) strcat(physpath, " ");
-					(void) strcat(physpath, tmppath);
-				}
-			}
-		} else {
-			return (-7);
+	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
+		if (vdev_online(child[0])) {
+			if ((ret = vdev_get_physpath(child[0], physpath,
+			    phypath_size, &rsz)) != 0)
+				return (ret);
 		}
+	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
+
+		if (nvlist_lookup_nvlist_array(child[0],
+		    ZPOOL_CONFIG_CHILDREN, &child2, &count) != 0)
+			return (EZFS_INVALCONFIG);
+
+		for (j = 0; j < count; j++) {
+			if (nvlist_lookup_string(child2[j], ZPOOL_CONFIG_TYPE,
+			    &type) != 0)
+				return (EZFS_INVALCONFIG);
+
+			if (strcmp(type, VDEV_TYPE_DISK) != 0)
+				return (EZFS_POOL_INVALARG);
+
+			if (vdev_online(child2[j])) {
+				ret = vdev_get_physpath(child2[j],
+				    physpath, phypath_size, &rsz);
+
+				if (ret == EZFS_NOSPC)
+					return (ret);
+			}
+		}
+	} else {
+		return (EZFS_POOL_INVALARG);
 	}
 
+	/* No online devices */
+	if (rsz == 0)
+		return (EZFS_NODEVICE);
+
 	return (0);
+}
+
+/*
+ * Get phys_path for a root pool
+ * Return 0 on success; non-zero on failure.
+ */
+int
+zpool_get_physpath(zpool_handle_t *zhp, char *physpath, size_t phypath_size)
+{
+	return (zpool_get_config_physpath(zhp->zpool_config, physpath,
+	    phypath_size));
 }
 
 /*

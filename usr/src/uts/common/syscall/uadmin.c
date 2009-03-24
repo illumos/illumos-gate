@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,6 +149,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	case A_FREEZE:
 	case A_DUMP:
 	case A_SDTTEST:
+	case A_CONFIG:
 		if (secpolicy_sys_config(credp, B_FALSE) != 0)
 			return (EPERM);
 		break;
@@ -164,10 +165,11 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	 * functioning of A_REBOOT relies on being able to interrupt blocked
 	 * userland callers.
 	 *
-	 * We only clear ua_shutdown_thread after A_REMOUNT, because A_SHUTDOWN
-	 * and A_REBOOT should never return.
+	 * We only clear ua_shutdown_thread after A_REMOUNT or A_CONFIG.
+	 * Other commands should never return.
 	 */
-	if (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_REMOUNT) {
+	if (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_REMOUNT ||
+	    cmd == A_CONFIG) {
 		mutex_enter(&ualock);
 		while (ua_shutdown_thread != NULL) {
 			if (cv_wait_sig(&uacond, &ualock) == 0) {
@@ -300,6 +302,28 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		/* no return expected */
 		break;
 
+	case A_CONFIG:
+		switch (fcn) {
+		case AD_UPDATE_BOOT_CONFIG:
+#ifndef	__sparc
+		{
+			extern int fastreboot_capable;
+			extern void fastboot_update_config(const char *);
+
+			if (fastreboot_capable)
+				fastboot_update_config(mdep);
+		}
+#endif
+
+			break;
+		}
+		/* Let other threads enter the shutdown path now */
+		mutex_enter(&ualock);
+		ua_shutdown_thread = NULL;
+		cv_signal(&uacond);
+		mutex_exit(&ualock);
+		break;
+
 	case A_REMOUNT:
 		(void) VFS_MOUNTROOT(rootvfs, ROOT_REMOUNT);
 		/* Let other threads enter the shutdown path now */
@@ -353,6 +377,25 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 			    NULL, &buflen);
 		} else
 			panic_bootstr = mdep;
+
+#ifndef	__sparc
+		extern int fastreboot_onpanic;
+		if (fcn != AD_FASTREBOOT) {
+			extern void fastboot_update_config(const char *);
+			/*
+			 * If user has explicitly requested reboot to prom,
+			 * or uadmin(1M) was invoked with other functions,
+			 * don't try to fast reboot after dumping.
+			 */
+			fastreboot_onpanic = 0;
+			fastboot_update_config((char *)&fastreboot_onpanic);
+		}
+
+		if (fastreboot_onpanic) {
+			extern void fastboot_load_kernel(char *);
+			fastboot_load_kernel(mdep);
+		}
+#endif
 
 		panic("forced crash dump initiated at user request");
 		/*NOTREACHED*/
@@ -410,7 +453,7 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	 */
 	if (mdep != NULL &&
 	    (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_DUMP ||
-	    cmd == A_FREEZE)) {
+	    cmd == A_FREEZE || cmd == A_CONFIG)) {
 		bootargs = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);
 		if ((error = copyinstr((const char *)mdep, bootargs,
 		    BOOTARGS_MAX, &nbytes)) != 0) {

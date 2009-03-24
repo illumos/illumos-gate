@@ -5761,6 +5761,7 @@ zone_kadmin(int cmd, int fcn, const char *mdep, cred_t *credp)
 	case A_REMOUNT:
 	case A_FREEZE:
 	case A_DUMP:
+	case A_CONFIG:
 		return (ENOTSUP);
 	default:
 		ASSERT(cmd != A_SWAPCTL);	/* handled by uadmin() */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,12 +126,11 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 				head = bargs_scratch;
 				newarg = strtok(bargs_scratch, " ");
 
-				if (newarg == NULL)
+				if (newarg == NULL || newarg[0] == '-')
 					break;
 
 				/* First argument is rootdir */
-				if (newarg[0] != '-' &&
-				    strncmp(&newarg[strlen(newarg)-4],
+				if (strncmp(&newarg[strlen(newarg)-4],
 				    "unix", 4) != 0) {
 					newarg = strtok(NULL, " ");
 					off = newarg - head;

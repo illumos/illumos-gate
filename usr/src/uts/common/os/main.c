@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -378,6 +378,7 @@ main(void)
 	extern void	lgrp_main_mp_init(void);
 #if defined(__x86)
 	extern void	cpupm_post_startup(void);
+	extern void	fastboot_post_startup(void);
 #endif
 	/*
 	 * In the horrible world of x86 in-lines, you can't get symbolic
@@ -574,6 +575,7 @@ main(void)
 	pm_cfb_setup_intr();
 #if defined(__x86)
 	cpupm_post_startup();
+	fastboot_post_startup();
 #endif
 
 	/*

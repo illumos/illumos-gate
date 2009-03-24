@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@ extern "C" {
 #ifndef	_ASM
 #include <sys/types.h>
 #include <sys/mach_mmu.h>
+#include <sys/md5.h>
 #endif	/* _ASM */
 
 #define	FASTBOOT_NAME_UNIX		0
@@ -46,6 +47,8 @@ extern "C" {
 
 #define	FASTBOOT_MAX_FILES_MAP	2 /* max number of files that needs mapping */
 #define	FASTBOOT_MAX_FILES_TOTAL	3 /* max number of files */
+
+#define	FASTBOOT_MAX_MD5_HASH	(FASTBOOT_MAX_FILES_MAP + 1)
 
 #define	FASTBOOT_SWTCH_PA		0x5000	/* low memory */
 #define	FASTBOOT_STACK_OFFSET		0xe00	/* where the stack starts */
@@ -103,6 +106,7 @@ typedef struct _fastboot_file {
 	uintptr_t		fb_va;	/* virtual address */
 	x86pte_t		*fb_pte_list_va;	/* VA for PTE list */
 	paddr_t			fb_pte_list_pa;		/* PA for PTE list */
+	size_t			fb_pte_list_size;	/* size of PTE list */
 	uintptr_t		fb_dest_pa;	/* destination PA */
 	size_t			fb_size;	/* file size */
 	uintptr_t		fb_next_pa;
@@ -113,6 +117,10 @@ typedef struct _fastboot_file {
 /*
  * Data structure containing all the information the switching routine needs
  * for fast rebooting to the new kernel.
+ *
+ * NOTE: There is limited stack space (0x200 bytes) in the switcher to
+ * copy in the data structure.  Fields that are not absolutely necessary for
+ * the switcher should be added after the fi_valid field.
  */
 typedef struct _fastboot_info {
 	uint32_t		fi_magic; /* magic for fast reboot */
@@ -129,13 +137,37 @@ typedef struct _fastboot_info {
 	uint_t			fi_ptes_per_table;
 	uint_t			fi_lpagesize;
 	int			fi_top_level;	/* top level of page tables */
+	size_t			fi_pagetable_size; /* size allocated for pt */
+	uintptr_t		fi_new_mbi_va;	/* new multiboot info VA */
+	size_t			fi_mbi_size;	/* size allocated for mbi */
+	uchar_t		fi_md5_hash[FASTBOOT_MAX_MD5_HASH][MD5_DIGEST_LENGTH];
 } fastboot_info_t;
 
-extern void fast_reboot();
-extern void load_kernel(char *);
 
+/*
+ * Fast reboot core functions
+ */
+extern void fast_reboot();	/* Entry point for fb_switch */
+extern void fastboot_load_kernel(char *); /* Load a new kernel */
+
+extern int fastboot_cksum_verify(fastboot_info_t *);
+
+/*
+ * Fast reboot tunables
+ */
+
+/* If set, the system is capable of fast reboot */
 extern int fastreboot_capable;
+
+/*
+ * If set, force fast reboot even if the system has
+ * drivers without quiesce(9E) implementation.
+ */
 extern int force_fastreboot;
+
+/* If set, fast reboot after panic. */
+extern int fastreboot_onpanic;
+extern char fastreboot_onpanic_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 
 #endif	/* _ASM */
 

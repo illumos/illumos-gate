@@ -1,0 +1,77 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	grub_errno_start
+#define	grub_errno_start(num)
+#endif	/* grub_errno_start */
+
+#ifndef	grub_errno_def
+#define	grub_errno_def(num, desc)
+#endif	/* grub_errno_def */
+
+#ifndef	grub_errno_end
+#define	grub_errno_end(num)
+#endif	/* grub_errno_end */
+
+/*
+ * !!! Should ALWAYS be the first one
+ */
+grub_errno_start(EG_START = -10000)
+
+grub_errno_def(EG_INVALIDCMD,	"Invalid GRUB command")
+grub_errno_def(EG_INVALIDMENU,	"Invalid GRUB menu")
+grub_errno_def(EG_INVALIDENT,	"Invalid GRUB entry")
+grub_errno_def(EG_INVALIDLINE,	"Invalid GRUB line")
+grub_errno_def(EG_INVALIDBARG,	"Invalid GRUB boot arguments")
+grub_errno_def(EG_FINDROOTFMT,	"Invalid format for findroot")
+grub_errno_def(EG_FINDROOTPRT,	"Invalid partition number for findroot")
+grub_errno_def(EG_FINDROOTSLC,	"Invalid slice number for findroot")
+grub_errno_def(EG_UNKNOWNFS,	"Unknown file system")
+grub_errno_def(EG_NOTZFS,	"File system is not ZFS")
+grub_errno_def(EG_OPENZFS,	"Failed to open ZFS file system")
+grub_errno_def(EG_INITFS,	"Initialize file system")
+grub_errno_def(EG_MOUNTFS,	"Failed to mount file system")
+grub_errno_def(EG_OPENFILE,	"Failed to open file")
+grub_errno_def(EG_NOTUNIX,	"Kernel file is not unix")
+grub_errno_def(EG_NOTABSPATH,	"Kernel path is not absolute")
+grub_errno_def(EG_OPENKERNFILE,	"Failed to open kernel file")
+grub_errno_def(EG_OPENMNTTAB,	"Failed to open mnttab")
+grub_errno_def(EG_GETMNTTAB,	"Failed to get mnttab")
+grub_errno_def(EG_CURROOT,	"Failed to get current root info")
+grub_errno_def(EG_NUMTOOBIG,	"Requested entry number is too big")
+grub_errno_def(EG_NOENTRY,	"No such entry found")
+grub_errno_def(EG_XVMNOTSUP,	"xVM is not supported")
+grub_errno_def(EG_BOOTSIGN,	"Bootsign not found")
+grub_errno_def(EG_UNKBOOTFS,	"Unknown bootfs filesystem")
+
+/*
+ * !!! Should ALWAYS be the last one
+ */
+grub_errno_end(EG_END)
+
+#undef	grub_errno_start
+#undef	grub_errno_def
+#undef	grub_errno_end

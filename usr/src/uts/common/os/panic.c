@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * When the operating system detects that it is in an invalid state, a panic
@@ -196,6 +194,11 @@ int panic_forced = 0;
 int panic_quiesce;			/* trigger for CALM    -> QUIESCE */
 int panic_sync;				/* trigger for QUIESCE -> SYNC */
 int panic_dump;				/* trigger for SYNC    -> DUMP */
+
+/*
+ * Variable signifying quiesce(9E) is in progress.
+ */
+volatile int quiesce_active = 0;
 
 void
 panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)

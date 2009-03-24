@@ -465,6 +465,7 @@
 6252:AUE_cpu_performance:set max CPU freq governor:ss
 6253:AUE_cpu_threshold:set CPU freq threshold:ss
 6254:AUE_uadmin_thaw:uadmin(1m) - thaw after freeze:ss,na
+6255:AUE_uadmin_config:uadmin(1m) - config:ss
 
 #
 # SMF(5) svc.configd events (svcadm(1M) related)

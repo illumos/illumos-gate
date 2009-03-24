@@ -107,6 +107,7 @@ MANIFEST_SUBDIRS=			\
 	gss/gssd			\
 	hal/addons/network-devices	\
 	hal/hald/solaris		\
+	halt/smf			\
 	hostid/smf			\
 	idmap/idmapd			\
 	ipf/svc				\

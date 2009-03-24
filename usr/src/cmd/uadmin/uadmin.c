@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,9 @@
 #include <strings.h>
 #include <signal.h>
 #include <unistd.h>
+#ifdef	__i386
+#include <libscf_priv.h>
+#endif /* __i386 */
 
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -64,6 +67,10 @@ main(int argc, char *argv[])
 	adt_event_data_t *event = NULL; /* event to be generated */
 	au_event_t event_id;
 	enum adt_uadmin_fcn fcn_id;
+#ifdef	__i386
+	uint8_t boot_config = 0;
+#endif /* __i386 */
+
 
 	if (argc < 3 || argc > 4) {
 		(void) fprintf(stderr, Usage, argv[0]);
@@ -111,6 +118,9 @@ main(int argc, char *argv[])
 	case A_FTRACE:
 		event_id = ADT_uadmin_ftrace;
 		break;
+	case A_CONFIG:
+		event_id = ADT_uadmin_config;
+		break;
 	case A_SWAPCTL:
 		event_id = ADT_uadmin_swapctl;
 		break;
@@ -148,7 +158,7 @@ main(int argc, char *argv[])
 #ifdef __i386
 		fcn_id = ADT_UADMIN_FCN_AD_FASTREBOOT;
 		mdep = NULL;	/* Ignore all arguments */
-#else
+#else /* __i386 */
 		fcn = AD_BOOT;
 		fcn_id = ADT_UADMIN_FCN_AD_BOOT;
 #endif /* __i386 */
@@ -196,6 +206,16 @@ main(int argc, char *argv[])
 			fcn_id = ADT_UADMIN_FCN_AD_FTRACE_STOP;
 			break;
 		}
+#ifdef	__i386
+	} else if (cmd == A_CONFIG) {
+		switch (fcn) {
+		case AD_UPDATE_BOOT_CONFIG:
+			fcn_id = ADT_UADMIN_FCN_AD_UPDATE_BOOT_CONFIG;
+			scf_get_boot_config(&boot_config);
+			mdep = (uintptr_t)(&boot_config);
+			break;
+		}
+#endif /* __i386 */
 	}
 
 	if (geteuid() == 0) {
@@ -222,6 +242,11 @@ main(int argc, char *argv[])
 				break;
 			case A_FTRACE:
 				event->adt_uadmin_ftrace.fcn = fcn_id;
+				event->adt_uadmin_ftrace.mdep = (char *)mdep;
+				break;
+			case A_CONFIG:
+				event->adt_uadmin_config.fcn = fcn_id;
+				event->adt_uadmin_config.mdep = (char *)mdep;
 				break;
 			case A_SWAPCTL:
 				event->adt_uadmin_swapctl.fcn = fcn_id;
@@ -302,6 +327,7 @@ closeout_audit(int cmd, int fcn)
 	case A_REMOUNT:
 	case A_SWAPCTL:
 	case A_FTRACE:
+	case A_CONFIG:
 		/* No system discontinuity, don't turn off auditd */
 		return (0);
 	case A_FREEZE:

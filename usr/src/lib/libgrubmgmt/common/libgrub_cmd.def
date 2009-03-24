@@ -1,0 +1,65 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	menu_cmd
+#define	menu_cmd(cmd, num, flag, parsef)
+#endif	/* menu_cmd */
+
+#ifndef	menu_cmd_end
+#define	menu_cmd_end(num)
+#endif	/* menu_cmd */
+
+/*
+ * Menu commands related info:
+ * first field - command,
+ * second field - enum for command
+ * third field - command flags
+ * forth field -  parse function
+ */
+
+/*
+ * NOTE: bootadm likes to have GRBM_KERNEL_DOLLAR_CMD == GRBM_KERNEL_CMD + 1
+ * and GRBM_MODULE_DOLLAR_CMD == GRBM_MODULE_CMD + 1
+ */
+menu_cmd("", GRBM_EMPTY_CMD, GRUB_LINE_EMPTY, skip_line)
+menu_cmd(" ", GRBM_SEP_CMD, GRUB_LINE_INVALID, error_line)
+menu_cmd("#", GRBM_COMMENT_CMD, GRUB_LINE_COMMENT, skip_line)
+menu_cmd("default", GRBM_DEFAULT_CMD, GRUB_LINE_GLOBAL, error_line)
+menu_cmd("timeout", GRBM_TIMEOUT_CMD, GRUB_LINE_GLOBAL, error_line)
+menu_cmd("title", GRBM_TITLE_CMD, GRUB_LINE_TITLE, skip_line)
+menu_cmd("root", GRBM_ROOT_CMD, GRUB_LINE_ENTRY, error_line)
+menu_cmd("kernel", GRBM_KERNEL_CMD, GRUB_LINE_ENTRY, kernel)
+menu_cmd("kernel$", GRBM_KERNEL_DOLLAR_CMD, GRUB_LINE_ENTRY, dollar_kernel)
+menu_cmd("module", GRBM_MODULE_CMD, GRUB_LINE_ENTRY, module)
+menu_cmd("module$", GRBM_MODULE_DOLLAR_CMD, GRUB_LINE_ENTRY, dollar_module)
+menu_cmd("chainloader", GRBM_CHAINLOADER_CMD, GRUB_LINE_ENTRY, error_line)
+menu_cmd("args", GRBM_ARGS_CMD, GRUB_LINE_ENTRY, error_line)
+menu_cmd("findroot", GRBM_FINDROOT_CMD, GRUB_LINE_ENTRY, findroot)
+menu_cmd("bootfs", GRBM_BOOTFS_CMD, GRUB_LINE_ENTRY, bootfs)
+
+menu_cmd_end(GRBM_CMD_NUM) /* Should be the last one */
+
+#undef	menu_cmd
+#undef	menu_cmd_end

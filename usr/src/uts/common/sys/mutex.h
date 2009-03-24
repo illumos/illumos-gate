@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MUTEX_H
 #define	_SYS_MUTEX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_ASM
 #include <sys/types.h>
@@ -74,7 +72,7 @@ typedef struct mutex {
 #ifdef _KERNEL
 
 #define	MUTEX_HELD(x)		(mutex_owned(x))
-#define	MUTEX_NOT_HELD(x)	(!mutex_owned(x) || panicstr)
+#define	MUTEX_NOT_HELD(x)	(!mutex_owned(x) || panicstr || quiesce_active)
 
 extern	void	mutex_init(kmutex_t *, char *, kmutex_type_t, void *);
 extern	void	mutex_destroy(kmutex_t *);
