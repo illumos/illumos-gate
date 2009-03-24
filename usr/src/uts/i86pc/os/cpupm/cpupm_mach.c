@@ -208,7 +208,7 @@ cpupm_init(cpu_t *cp)
 			char err_msg[128];
 			int p_res;
 			p_res =	snprintf(err_msg, sizeof (err_msg),
-			    "!cpupm_init: processor %d: unable to initialize "
+			    "cpupm_init: processor %d: unable to initialize "
 			    "T-state support", cp->cpu_id);
 			if (p_res >= 0)
 				DTRACE_PROBE1(cpu_ts_err_msg, char *, err_msg);
