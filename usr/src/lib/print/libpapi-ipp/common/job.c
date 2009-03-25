@@ -272,6 +272,14 @@ internal_job_submit(papi_service_t handle, char *printer,
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)
 		return (PAPI_TEMPORARY_ERROR);
 
+	/*
+	 * before creating IPP request
+	 * add the job-name
+	 */
+	if ((files != NULL) && (files[0] != NULL))
+		papiAttributeListAddString(&job_attributes, PAPI_ATTR_EXCL,
+		    "job-name", files[0]);
+
 	/* create IPP request */
 	populate_job_request(svc, &request, job_attributes, printer, req_type);
 

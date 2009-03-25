@@ -20,13 +20,11 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /* $Id: job.c 179 2006-07-17 18:24:07Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,6 +69,11 @@ papiJobSubmit(papi_service_t handle, char *name, papi_attribute_t **attributes,
 		    gettext("calloc() failed"));
 		return (PAPI_TEMPORARY_ERROR);
 	}
+
+	/* before creating a control file add the job-name */
+	if ((files != NULL) && (files[0] != NULL))
+		papiAttributeListAddString(&attributes, PAPI_ATTR_EXCL,
+		    "job-name", files[0]);
 
 	/* create a control file */
 	(void) lpd_job_add_attributes(svc, attributes, &metadata,
