@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,11 +107,21 @@ struct scsi_address {
 #define	a_sublun	a.spi._a_sublun
 
 /* Device unit-address property names */
-#define	SCSI_ADDR_PROP_TARGET		"target"
-#define	SCSI_ADDR_PROP_LUN		"lun"
-#define	SCSI_ADDR_PROP_TARGET_UA	"target-ua"	/* string */
-#define	SCSI_ADDR_PROP_LUN64		"lun64"
-#define	SCSI_ADDR_PROP_SFUNC		"sfunc"
+#define	SCSI_ADDR_PROP_TARGET		"target"	/* int */
+#define	SCSI_ADDR_PROP_LUN		"lun"		/* int */
+
+#define	SCSI_ADDR_PROP_TARGET_PORT	"target-port"	/* string */
+#define	SCSI_ADDR_PROP_LUN64		"lun64"		/* int64 */
+#define	SCSI_ADDR_PROP_SFUNC		"sfunc"		/* int */
+
+/*
+ * Addressing property names, values are in string form compatible
+ * with the SCSI_ADDR_PROP_TARGET_PORT part of the related
+ * IEEE-1275 OpenFirmware binding unit-address string.
+ */
+#define	SCSI_ADDR_PROP_INITIATOR_PORT	"initiator-port"
+#define	SCSI_ADDR_PROP_ATTACHED_PORT	"attached-port"
+#define	SCSI_ADDR_PROP_BRIDGE_PORT	"bridge-port"
 
 /*
  * Normalized representation of a scsi_lun (with SCSI-2 lun positioned

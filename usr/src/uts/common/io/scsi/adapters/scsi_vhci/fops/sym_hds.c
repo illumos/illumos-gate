@@ -22,7 +22,7 @@
 /* Portions Copyright 2008 Hitachi Ltd. */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,12 +141,14 @@ hds_sym_init()
 /* ARGSUSED */
 static int
 hds_sym_device_probe(struct scsi_device *sd, struct scsi_inquiry *stdinq,
-    void **ctpriv)
+    void **ctprivp)
 {
-	char	**dt;
-	char	*dftype;
+	char		**dt;
+	char		*dftype;
 	unsigned char	len;
 	unsigned char	*inq_data = (unsigned char *)stdinq;
+	unsigned char	pv;
+	int		ret;
 
 	VHCI_DEBUG(6, (CE_NOTE, NULL, "hds_sym_device_probe: vidpid %s\n",
 	    stdinq->inq_vid));
@@ -160,27 +162,46 @@ hds_sym_device_probe(struct scsi_device *sd, struct scsi_inquiry *stdinq,
 			    stdinq->inq_vid, len);
 			return (SFO_DEVICE_PROBE_PHCI);
 		}
-		*ctpriv = kmem_alloc(sizeof (unsigned char), KM_SLEEP);
+
 		dftype = (char *)&inq_data[128];
 		if (*dftype == 0) {
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
 			    "hds_sym_device_probe: vidpid %s"
 			    " ASYM_ACTIVE_ACTIVE\n", stdinq->inq_vid));
-			*((unsigned char *)*ctpriv) = ASYM_ACTIVE_ACTIVE;
-			return (SFO_DEVICE_PROBE_VHCI);
-		}
-		if (strncmp(dftype, HDS_SAA_TYPE, strlen(HDS_SAA_TYPE)) == 0) {
-			*((unsigned char *)*ctpriv) = SYM_ACTIVE_ACTIVE;
+			pv = ASYM_ACTIVE_ACTIVE;
+			ret = SFO_DEVICE_PROBE_VHCI;
+		} else if (strncmp(dftype, HDS_SAA_TYPE,
+		    strlen(HDS_SAA_TYPE)) == 0) {
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
 			    "hds_sym_device_probe: vidpid %s"
 			    " SYM_ACTIVE_ACTIVE\n", stdinq->inq_vid));
-			return (SFO_DEVICE_PROBE_VHCI);
+			pv = SYM_ACTIVE_ACTIVE;
+			ret = SFO_DEVICE_PROBE_VHCI;
+		} else
+			ret = SFO_DEVICE_PROBE_PHCI;
+
+		if (ret == SFO_DEVICE_PROBE_VHCI) {
+			/* ctprivp is NULL for vhci_is_dev_supported() probe */
+			if (ctprivp) {
+				/*
+				 * Allocate failover module's 'client' private
+				 * data on the first successfull path probe.
+				 * NOTE: 'client' private means per lun guid,
+				 * not per-path.
+				 */
+				if (*ctprivp == NULL)
+					*ctprivp = kmem_alloc(sizeof (pv),
+					    KM_SLEEP);
+
+				/* update private data */
+				*((unsigned char *)*ctprivp) = pv;
+			}
+		} else {
+			VHCI_DEBUG(4, (CE_NOTE, NULL,
+			    "hds_sym_device_probe: vidpid %s"
+			    " - unknown dftype: %d\n",
+			    stdinq->inq_vid, *dftype));
 		}
-		VHCI_DEBUG(4, (CE_NOTE, NULL,
-		    "hds_sym_device_probe: vidpid %s"
-		    " - unknown dftype: %d\n", stdinq->inq_vid, *dftype));
-		kmem_free(*ctpriv, sizeof (unsigned char));
-		*ctpriv = NULL;
 		return (SFO_DEVICE_PROBE_PHCI);
 
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -374,7 +374,9 @@ mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
 {
 	mdi_vhci_t		*vh = NULL;
 
-	ASSERT(vops->vo_revision == MDI_VHCI_OPS_REV);
+	/* Registrant can't be older */
+	ASSERT(vops->vo_revision <= MDI_VHCI_OPS_REV);
+
 #ifdef DEBUG
 	/*
 	 * IB nexus driver is loaded only when IB hardware is present.
@@ -771,6 +773,7 @@ static mdi_phci_t *
 i_devi_get_phci(dev_info_t *pdip)
 {
 	mdi_phci_t	*ph = NULL;
+
 	if (MDI_PHCI(pdip)) {
 		ph = (mdi_phci_t *)DEVI(pdip)->devi_mdi_xhci;
 	}
@@ -827,6 +830,30 @@ mdi_devi_enter(dev_info_t *phci_dip, int *circular)
 
 	ndi_devi_enter(phci_dip, &pcircular);
 	*circular = (vcircular << 16) | (pcircular & 0xFFFF);
+}
+
+/*
+ * Attempt to mdi_devi_enter.
+ */
+int
+mdi_devi_tryenter(dev_info_t *phci_dip, int *circular)
+{
+	dev_info_t	*vdip;
+	int		vcircular, pcircular;
+
+	/* Verify calling context */
+	ASSERT(MDI_PHCI(phci_dip));
+	vdip = mdi_devi_get_vdip(phci_dip);
+	ASSERT(vdip);			/* A pHCI always has a vHCI */
+
+	if (ndi_devi_tryenter(vdip, &vcircular)) {
+		if (ndi_devi_tryenter(phci_dip, &pcircular)) {
+			*circular = (vcircular << 16) | (pcircular & 0xFFFF);
+			return (1);	/* locked */
+		}
+		ndi_devi_exit(vdip, vcircular);
+	}
+	return (0);			/* busy */
 }
 
 /*
@@ -2130,7 +2157,7 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			/*
 			 * No need to explicitly check if the path is disabled.
 			 * Since we are checking for state == ONLINE and the
-			 * same veriable is used for DISABLE/ENABLE information.
+			 * same variable is used for DISABLE/ENABLE information.
 			 */
 			if ((MDI_PI(pip)->pi_state  ==
 				MDI_PATHINFO_STATE_ONLINE) &&
@@ -2300,7 +2327,7 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			/*
 			 * No need to explicitly check if the path is disabled.
 			 * Since we are checking for state == ONLINE and the
-			 * same veriable is used for DISABLE/ENABLE information.
+			 * same variable is used for DISABLE/ENABLE information.
 			 */
 			if (cond) {
 				/*
@@ -2901,7 +2928,7 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
         mutex_enter(&mdi_pathmap_mutex);
 	(void) ddi_pathname(ph->ph_dip, path);
 	(void) sprintf(path + strlen(path), "/%s@%s", 
-	    ddi_node_name(ct->ct_dip), MDI_PI(pip)->pi_addr);
+	    mdi_pi_get_node_name(pip), mdi_pi_get_addr(pip));
         if (mod_hash_find(mdi_pathmap_bypath, (mod_hash_key_t)path, &hv) == 0) {
                 path_instance = (uint_t)(intptr_t)hv;
         } else {
@@ -3873,6 +3900,27 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 	return (rv);
 }
 
+/*
+ * mdi_pi_get_node_name():
+ *              Get the name associated with a mdi_pathinfo node.
+ *              Since pathinfo nodes are not directly named, we
+ *              return the node_name of the client.
+ *
+ * Return Values:
+ *              char *
+ */
+char *
+mdi_pi_get_node_name(mdi_pathinfo_t *pip)
+{
+	mdi_client_t    *ct;
+
+	if (pip == NULL)
+		return (NULL);
+	ct = MDI_PI(pip)->pi_client;
+	if ((ct == NULL) || (ct->ct_dip == NULL))
+		return (NULL);
+	return (ddi_node_name(ct->ct_dip));
+}
 
 /*
  * mdi_pi_get_addr():
@@ -4667,7 +4715,7 @@ i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 
 	if (dip) {
 		(void) snprintf(name, MAXNAMELEN, "%s%d: ",
-		    ddi_node_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 	} else {
 		name[0] = 0;
 	}
@@ -6163,7 +6211,7 @@ i_mdi_pm_hold_pip(mdi_pathinfo_t *pip)
 
 	ph_dip = mdi_pi_get_phci(pip);
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_hold_pip for %s%d %p\n",
-	    ddi_get_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
+	    ddi_driver_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
 	if (ph_dip == NULL) {
 		return;
 	}
@@ -6203,7 +6251,7 @@ i_mdi_pm_rele_pip(mdi_pathinfo_t *pip)
 
 	MDI_PI_UNLOCK(pip);
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_rele_pip for %s%d %p\n",
-	    ddi_get_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
+	    ddi_driver_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
 
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt was %d\n",
 	    DEVI(ph_dip)->devi_pm_kidsupcnt));
@@ -6290,7 +6338,7 @@ i_mdi_power_one_phci(mdi_pathinfo_t *pip)
 
 	/* bring all components of phci to full power */
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_power_one_phci "
-	    "pm_powerup for %s%d %p\n", ddi_get_name(ph_dip),
+	    "pm_powerup for %s%d %p\n", ddi_driver_name(ph_dip),
 	    ddi_get_instance(ph_dip), (void *)pip));
 
 	ret = pm_powerup(ph_dip);
@@ -6298,7 +6346,7 @@ i_mdi_power_one_phci(mdi_pathinfo_t *pip)
 	if (ret == DDI_FAILURE) {
 		MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_power_one_phci "
 		    "pm_powerup FAILED for %s%d %p\n",
-		    ddi_get_name(ph_dip), ddi_get_instance(ph_dip),
+		    ddi_driver_name(ph_dip), ddi_get_instance(ph_dip),
 		    (void *)pip));
 
 		MDI_PI_LOCK(pip);
@@ -9274,4 +9322,81 @@ mdi_free_phci_driver_list(char **driver_list, int ndrivers)
 			kmem_free(*p, strlen(*p) + 1);
 		kmem_free(driver_list, sizeof (char *) * ndrivers);
 	}
+}
+
+/*
+ * mdi_is_dev_supported():
+ *		function called by pHCI bus config operation to determine if a
+ *		device should be represented as a child of the vHCI or the
+ *		pHCI.  This decision is made by the vHCI, using cinfo idenity
+ *		information passed by the pHCI - specifics of the cinfo
+ *		representation are by agreement between the pHCI and vHCI.
+ * Return Values:
+ *		MDI_SUCCESS
+ *		MDI_FAILURE
+ */
+int
+mdi_is_dev_supported(char *class, dev_info_t *pdip, void *cinfo)
+{
+	mdi_vhci_t	*vh;
+
+	ASSERT(class && pdip);
+
+	/*
+	 * For dev_supported, mdi_phci_register() must have established pdip as
+	 * a pHCI.
+	 *
+	 * NOTE: mdi_phci_register() does "mpxio-disable" processing, and
+	 * MDI_PHCI(pdip) will return false if mpxio is disabled.
+	 */
+	if (!MDI_PHCI(pdip))
+		return (MDI_FAILURE);
+
+	/* Return MDI_FAILURE if vHCI does not support asking the question. */
+	vh = (mdi_vhci_t *)i_mdi_vhci_class2vhci(class);
+	if ((vh == NULL) || (vh->vh_ops->vo_is_dev_supported == NULL)) {
+		return (MDI_FAILURE);
+	}
+
+	/* Return vHCI answer */
+	return (vh->vh_ops->vo_is_dev_supported(vh->vh_dip, pdip, cinfo));
+}
+
+int
+mdi_dc_return_dev_state(mdi_pathinfo_t *pip, struct devctl_iocdata *dcp)
+{
+	uint_t devstate = 0;
+	dev_info_t *cdip;
+
+	if ((pip == NULL) || (dcp == NULL))
+		return (MDI_FAILURE);
+
+	cdip = mdi_pi_get_client(pip);
+
+	switch (mdi_pi_get_state(pip)) {
+	case MDI_PATHINFO_STATE_INIT:
+		devstate = DEVICE_DOWN;
+		break;
+	case MDI_PATHINFO_STATE_ONLINE:
+		devstate = DEVICE_ONLINE;
+		if ((cdip) && (devi_stillreferenced(cdip) == DEVI_REFERENCED))
+			devstate |= DEVICE_BUSY;
+		break;
+	case MDI_PATHINFO_STATE_STANDBY:
+		devstate = DEVICE_ONLINE;
+		break;
+	case MDI_PATHINFO_STATE_FAULT:
+		devstate = DEVICE_DOWN;
+		break;
+	case MDI_PATHINFO_STATE_OFFLINE:
+		devstate = DEVICE_OFFLINE;
+		break;
+	default:
+		ASSERT(MDI_PI(pip)->pi_state);
+	}
+
+	if (copyout(&devstate, dcp->cpyout_buf, sizeof (uint_t)) != 0)
+		return (MDI_FAILURE);
+
+	return (MDI_SUCCESS);
 }

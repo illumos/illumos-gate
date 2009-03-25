@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/sunmdi.h>
 #include <sys/modhash.h>
 #include <sys/callb.h>
+#include <sys/devctl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -214,11 +215,7 @@ extern const char			*mdi_load_balance_lba;
  * Each vHCI driver registers the following callbacks from attach(9e).
  */
 #define	MDI_VHCI_OPS_REV_1		1
-/*
- * Change MDI_VHCI_OPS_REV_NAME as per MDI_VHCI_OPS_REV
- */
-#define	MDI_VHCI_OPS_REV	MDI_VHCI_OPS_REV_1
-#define	MDI_VHCI_OPS_REV_NAME	"1"
+#define	MDI_VHCI_OPS_REV		MDI_VHCI_OPS_REV_1
 
 typedef struct mdi_vhci_ops {
 	/* revision management */
@@ -240,6 +237,10 @@ typedef struct mdi_vhci_ops {
 
 	/* Client attached callback */
 	void	(*vo_client_attached)(dev_info_t *cdip);
+
+	/* Ask vHCI if 'cinfo' device is support as a client */
+	int	(*vo_is_dev_supported)(dev_info_t *vdip, dev_info_t *pdip,
+		    void *cinfo);
 } mdi_vhci_ops_t;
 
 /*
@@ -497,7 +498,7 @@ typedef struct mdi_phci {
  *
  * This framework identifies the client device in three distinct states:
  *
- * OPTIMAL	- Client device has atleast one redundant path.
+ * OPTIMAL	- Client device has at least one redundant path.
  * DEGRADED	- No redundant paths (critical).  Failure in the current active
  *		  path would result in data access failures.
  * FAILED 	- No paths are available to access this device.
@@ -541,7 +542,7 @@ typedef struct mdi_client {
 	short			ct_powercnt_unconfig;
 					/* held in pre/post unconfig */
 	int			ct_powercnt_reset;
-					/* ct_power_cnt was resetted */
+					/* ct_power_cnt was reset */
 
 	void			*ct_cprivate;	/* client driver private */
 	void			*ct_vprivate;	/* vHCI driver private	*/
@@ -1118,7 +1119,7 @@ dev_info_t	*mdi_phci_path2devinfo(dev_info_t *, caddr_t);
  * will be selected in a round robin fashion).  The load balancing scheme
  * can be configured in the vHCI driver's configuration file (driver.conf).
  *
- * vHCI drivers may override this default behaviour by specifying appropriate
+ * vHCI drivers may override this default behavior by specifying appropriate
  * flags.  If start_pip is specified (non NULL), it is used as the routine's
  * starting point; it starts walking from there to find the next appropriate
  * path.
@@ -1185,8 +1186,19 @@ int mdi_failover(dev_info_t *, dev_info_t *, int);
 /*
  * Client device failover mode of operation
  */
-#define	MDI_FAILOVER_SYNC	1	/* Syncronous Failover		*/
-#define	MDI_FAILOVER_ASYNC	2	/* Asyncronous Failover		*/
+#define	MDI_FAILOVER_SYNC	1	/* Synchronous Failover		*/
+#define	MDI_FAILOVER_ASYNC	2	/* Asynchronous Failover	*/
+
+/*
+ * mdi_is_dev_supported: The pHCI driver bus_config implementation calls
+ * mdi_is_dev_supported to determine if a child device should is supported as
+ * a vHCI child (i.e. as a client). The method used to specify the child
+ * device, via the cinfo argument, is by agreement between the pHCI and the
+ * vHCI.  In the case of SCSA and scsi_vhci cinfo is a pointer to the pHCI
+ * probe dev_info node, which is decorated with the device idenity information
+ * necessary to determine scsi_vhci support.
+ */
+int mdi_is_dev_supported(char *class, dev_info_t *pdip, void *cinfo);
 
 /*
  * mdi_pathinfo node kstat functions.
@@ -1216,6 +1228,7 @@ void *mdi_phci_get_vhci_private(dev_info_t *);
 void mdi_phci_set_vhci_private(dev_info_t *, void *);
 void *mdi_pi_get_vhci_private(mdi_pathinfo_t *);
 void mdi_pi_set_vhci_private(mdi_pathinfo_t *, void *);
+int mdi_dc_return_dev_state(mdi_pathinfo_t *pip, struct devctl_iocdata *dcp);
 
 /*
  * mdi_pathinfo Property utilities

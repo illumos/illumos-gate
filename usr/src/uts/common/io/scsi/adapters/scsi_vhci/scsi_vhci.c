@@ -63,7 +63,6 @@ int vhci_prout_not_ready_retry = 180;
 #define	VHCI_PGR_ILLEGALOP	-2
 #define	VHCI_NUM_UPDATE_TASKQ	8
 /* changed to 132 to accomodate HDS */
-#define	VHCI_STD_INQ_SIZE	132
 
 /*
  * Version Macros
@@ -150,6 +149,8 @@ static int vhci_scsi_bus_config(dev_info_t *, uint_t, ddi_bus_config_op_t,
     void *, dev_info_t **);
 static int vhci_scsi_bus_unconfig(dev_info_t *, uint_t, ddi_bus_config_op_t,
     void *);
+static struct scsi_failover_ops *vhci_dev_fo(dev_info_t *, struct scsi_device *,
+    void **, char **);
 
 /*
  * functions registered with the mpxio framework via mdi_vhci_ops_t
@@ -157,11 +158,12 @@ static int vhci_scsi_bus_unconfig(dev_info_t *, uint_t, ddi_bus_config_op_t,
 static int vhci_pathinfo_init(dev_info_t *, mdi_pathinfo_t *, int);
 static int vhci_pathinfo_uninit(dev_info_t *, mdi_pathinfo_t *, int);
 static int vhci_pathinfo_state_change(dev_info_t *, mdi_pathinfo_t *,
-    mdi_pathinfo_state_t, uint32_t, int);
+		mdi_pathinfo_state_t, uint32_t, int);
 static int vhci_pathinfo_online(dev_info_t *, mdi_pathinfo_t *, int);
 static int vhci_pathinfo_offline(dev_info_t *, mdi_pathinfo_t *, int);
 static int vhci_failover(dev_info_t *, dev_info_t *, int);
 static void vhci_client_attached(dev_info_t *);
+static int vhci_is_dev_supported(dev_info_t *, dev_info_t *, void *);
 
 static int vhci_ctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int vhci_devctl(dev_t, int, intptr_t, int, cred_t *, int *);
@@ -299,11 +301,12 @@ static struct modlinkage modlinkage = {
 
 static mdi_vhci_ops_t vhci_opinfo = {
 	MDI_VHCI_OPS_REV,
-	vhci_pathinfo_init,		/* Pathinfo node init callback	*/
-	vhci_pathinfo_uninit,		/* Pathinfo uninit callback	*/
-	vhci_pathinfo_state_change,	/* Pathinfo node state change	*/
-	vhci_failover,			/* failover callback		*/
-	vhci_client_attached		/* client attached callback	*/
+	vhci_pathinfo_init,		/* Pathinfo node init callback */
+	vhci_pathinfo_uninit,		/* Pathinfo uninit callback */
+	vhci_pathinfo_state_change,	/* Pathinfo node state change */
+	vhci_failover,			/* failover callback */
+	vhci_client_attached,		/* client attached callback	*/
+	vhci_is_dev_supported		/* is device supported by mdi */
 };
 
 /*
@@ -311,11 +314,11 @@ static mdi_vhci_ops_t vhci_opinfo = {
  * by scsi_vhci.  Currently, initialize this table from the 'ddi-forceload'
  * property specified in scsi_vhci.conf.
  */
-struct scsi_failover {
+static struct scsi_failover {
 	ddi_modhandle_t			sf_mod;
 	struct scsi_failover_ops	*sf_sfo;
 } *scsi_failover_table;
-uint_t	scsi_nfailover;
+static uint_t	scsi_nfailover;
 
 int
 _init(void)
@@ -695,11 +698,11 @@ vhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	tran->tran_get_eventcookie = NULL;
 	tran->tran_add_eventcall = NULL;
 	tran->tran_remove_eventcall = NULL;
-	tran->tran_post_event = NULL;
+	tran->tran_post_event	= NULL;
 
-	tran->tran_bus_power = vhci_scsi_bus_power;
+	tran->tran_bus_power	= vhci_scsi_bus_power;
 
-	tran->tran_bus_config = vhci_scsi_bus_config;
+	tran->tran_bus_config	= vhci_scsi_bus_config;
 	tran->tran_bus_unconfig	= vhci_scsi_bus_unconfig;
 
 	/*
@@ -4049,8 +4052,6 @@ vhci_pathinfo_init(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 
 	svp->svp_new_path = 1;
 
-	psd->sd_inq = NULL;
-
 	VHCI_DEBUG(4, (CE_NOTE, NULL, "!vhci_pathinfo_init: path:%p\n",
 	    (void *)pip));
 	return (MDI_SUCCESS);
@@ -4127,6 +4128,13 @@ vhci_pathinfo_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	}
 
 	mdi_pi_set_vhci_private(pip, NULL);
+
+	/*
+	 * Free the pathinfo related scsi_device inquiry data. Note that this
+	 * matches what happens for scsi_hba.c devinfo case at uninitchild time.
+	 */
+	if (psd->sd_inq)
+		kmem_free((caddr_t)psd->sd_inq, sizeof (struct scsi_inquiry));
 	kmem_free((caddr_t)psd, sizeof (*psd));
 
 	mutex_destroy(&svp->svp_mutex);
@@ -4507,7 +4515,7 @@ vhci_parse_mpxio_options(dev_info_t *dip, dev_info_t *cdip,
 }
 
 /*
- * Check the inquriy string returned from the device wiith the device-type
+ * Check the inquriy string returned from the device with the device-type
  * Check for the existence of the device-type-mpxio-options-list and
  * if found parse the list checking for a match with the device-type
  * value and the inquiry string returned from the device. If a match
@@ -4718,7 +4726,7 @@ vhci_update_pathinfo(struct scsi_device *psd,  mdi_pathinfo_t *pip,
 		/*
 		 * Initiate auto-failback, if enabled, for path if path-state
 		 * is transitioning from OFFLINE->STANDBY and pathclass is the
-		 * prefered pathclass for this storage.
+		 * preferred pathclass for this storage.
 		 * NOTE: In case where opinfo_path_state is SCSI_PATH_ACTIVE
 		 * (above), where the pi state is set to STANDBY, we don't
 		 * initiate auto-failback as the next IO shall take care of.
@@ -4801,7 +4809,7 @@ vhci_kstat_create_pathinfo(mdi_pathinfo_t *pip)
 
 	/* determine 'target-port' */
 	if (mdi_prop_lookup_string(pip,
-	    "target-port", &target_port) == MDI_SUCCESS) {
+	    SCSI_ADDR_PROP_TARGET_PORT, &target_port) == MDI_SUCCESS) {
 		target_port_dup = i_ddi_strdup(target_port, KM_SLEEP);
 		(void) mdi_prop_free(target_port);
 		by_id = 1;
@@ -4875,21 +4883,18 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	struct scsi_device		*psd = NULL;
 	scsi_vhci_lun_t			*vlun = NULL;
 	dev_info_t			*pdip = NULL;
+	dev_info_t			*cdip;
 	dev_info_t			*tgt_dip;
 	struct scsi_vhci		*vhci;
 	char				*guid;
-	struct scsi_failover		*sf;
 	struct scsi_failover_ops	*sfo;
-	char				*sfo_name;
-	char				*override;
 	scsi_vhci_priv_t		*svp = NULL;
-	struct buf			*bp;
 	struct scsi_address		*ap;
 	struct scsi_pkt			*pkt;
 	int				rval = MDI_FAILURE;
-	uint_t				inq_size = VHCI_STD_INQ_SIZE;
 	mpapi_item_list_t		*list_ptr;
 	mpapi_lu_data_t			*ld;
+	int				ce_type;
 
 	ASSERT(vdip != NULL);
 	ASSERT(pip != NULL);
@@ -4904,16 +4909,16 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 	ASSERT(svp != NULL);
 
-	tgt_dip = mdi_pi_get_client(pip);
-	ASSERT(tgt_dip != NULL);
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, tgt_dip, PROPFLAGS,
+	cdip = mdi_pi_get_client(pip);
+	ASSERT(cdip != NULL);
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, cdip, PROPFLAGS,
 	    MDI_CLIENT_GUID_PROP, &guid) != DDI_SUCCESS) {
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_path_online: lun guid "
 		    "property failed"));
 		goto failure;
 	}
 
-	vlun = vhci_lun_lookup(tgt_dip);
+	vlun = vhci_lun_lookup(cdip);
 	ASSERT(vlun != NULL);
 
 	ddi_prop_free(guid);
@@ -4925,127 +4930,66 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	ASSERT(psd != NULL);
 
 	/*
-	 * For INQUIRY response buffer size, we use VHCI_STD_INQ_SIZE(132bytes)
-	 * instead of SUN_INQSIZE(48bytes) which is used in sd layer. This is
-	 * because we could get the Vendor specific parameters(present 97th
-	 * byte onwards) which are required to process Vendor specific data
-	 * based on array type.
-	 * This INQUIRY buffer is freed in vhci_pathinfo_offline but NEVER
-	 * in a different layer like sd/phci transport. In other words, vhci
-	 * maintains its own copy of scsi_device and scsi_inquiry data on a
-	 * per-path basis.
+	 * Get inquiry data into pathinfo related scsi_device structure.
+	 * Free sq_inq when pathinfo related scsi_device structure is destroyed
+	 * by vhci_pathinfo_uninit(). In other words, vhci maintains its own
+	 * copy of scsi_device and scsi_inquiry data on a per-path basis.
 	 */
-	if (psd->sd_inq == NULL) {
-		psd->sd_inq = (struct scsi_inquiry *)
-		    kmem_zalloc(inq_size, KM_SLEEP);
-	}
-
-	tgt_dip = psd->sd_dev;
-	ASSERT(tgt_dip != NULL);
-
-	/*
-	 * do inquiry to pass into probe routine; this
-	 * will avoid each probe routine doing scsi inquiry
-	 */
-	bp = getrbuf(KM_SLEEP);
-	bp->b_un.b_addr = (caddr_t)psd->sd_inq;
-	bp->b_flags = B_READ;
-	bp->b_bcount = inq_size;
-	bp->b_resid = 0;
-
-	ap = &psd->sd_address;
-	pkt = scsi_init_pkt(ap, NULL, bp, CDB_GROUP0,
-	    sizeof (struct scsi_arq_status), 0, 0, SLEEP_FUNC, NULL);
-	if (pkt == NULL) {
+	if (scsi_probe(psd, SLEEP_FUNC) != SCSIPROBE_EXISTS) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_pathinfo_online: "
-		    "Inquiry init_pkt failed :%p\n", (void *)pip));
-		rval = MDI_FAILURE;
-		goto failure;
-	}
-	pkt->pkt_cdbp[0] = SCMD_INQUIRY;
-	pkt->pkt_cdbp[4] = (uchar_t)inq_size;
-	pkt->pkt_time = 60;
-
-	rval = vhci_do_scsi_cmd(pkt);
-	scsi_destroy_pkt(pkt);
-	freerbuf(bp);
-	if (rval == 0) {
-		VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_pathinfo_online: "
-		    "Failover Inquiry failed path:%p rval:%x\n",
-		    (void *)pip, rval));
+		    "scsi_probe failed path:%p rval:%x\n", (void *)pip, rval));
 		rval = MDI_FAILURE;
 		goto failure;
 	}
 
 	/*
-	 * Determine if device is supported under scsi_vhci, and select
-	 * failover module.
+	 * See if we have a failover module to support the device.
 	 *
-	 * See if there is a scsi_vhci.conf file override for this devices's
-	 * VID/PID. The following values can be returned:
+	 * We re-probe to determine the failover ops for each path. This
+	 * is done in case there are any path-specific side-effects associated
+	 * with the sfo_device_probe implementation.
 	 *
-	 * NULL		If the NULL is returned then there is no scsi_vhci.conf
-	 *		override.  For NULL, we determine the failover_ops for
-	 *		this device by checking the sfo_device_probe entry
-	 *		point for each 'fops' module, in order.
+	 * Give the first successfull sfo_device_probe the opportunity to
+	 * establish 'ctpriv', vlun/client private data. The ctpriv will
+	 * then be passed into the failover module on all other sfo_device_*()
+	 * operations (and must be freed by sfo_device_unprobe implementation).
 	 *
-	 *		NOTE: Correct operation may depend on module ordering
-	 *		of 'specific' (failover modules that are completely
-	 *		VID/PID table based) to 'generic' (failover modules
-	 *		that based on T10 standards like TPGS).  Currently,
-	 *		the value of 'ddi-forceload' in scsi_vhci.conf is used
-	 *		to establish the module list and probe order.
+	 * NOTE: While sfo_device_probe is done once per path,
+	 * sfo_device_unprobe only occurs once - when the vlun is destroyed.
 	 *
-	 * "NONE"	If value "NONE" is returned then there is a
-	 *		scsi_vhci.conf VID/PID override to indicate the device
-	 *		should not be supported under scsi_vhci (even if there
-	 *		is an 'fops' module supporting the device).
-	 *
-	 * "<other>"	If another value is returned then that value is the
-	 *		name of the 'fops' module that should be used.
+	 * NOTE: We don't currently support per-path fops private data
+	 * mechanism.
 	 */
-	sfo = NULL;	/* "NONE" */
-	sfo_name = NULL;
-	override = scsi_get_device_type_string(
-	    "scsi-vhci-failover-override", vdip, psd);
+	sfo = vhci_dev_fo(vdip, psd,
+	    &vlun->svl_fops_ctpriv, &vlun->svl_fops_name);
 
-	if (override == NULL) {
-		/* NULL: default: select based on sfo_device_probe results */
-		for (sf = scsi_failover_table; sf->sf_mod; sf++) {
-			if ((sf->sf_sfo == NULL) ||
-			    sf->sf_sfo->sfo_device_probe(psd, psd->sd_inq,
-			    &vlun->svl_fops_ctpriv) == SFO_DEVICE_PROBE_PHCI)
-				continue;
-
-			/* found failover module, supported under scsi_vhci */
-			sfo = sf->sf_sfo;
-			sfo_name = i_ddi_strdup(sfo->sfo_name, KM_SLEEP);
-			break;
-		}
-	} else if (strcasecmp(override, "NONE")) {
-		/* !"NONE": select based on driver.conf specified name */
-		for (sf = scsi_failover_table, sfo = NULL; sf->sf_mod; sf++) {
-			if ((sf->sf_sfo == NULL) ||
-			    (sf->sf_sfo->sfo_name == NULL) ||
-			    strcmp(override, sf->sf_sfo->sfo_name))
-				continue;
-
-			/* found failover module, supported under scsi_vhci */
-			sfo = sf->sf_sfo;
-			sfo_name = kmem_alloc(strlen("conf ") +
-			    strlen(sfo->sfo_name) + 1, KM_SLEEP);
-			(void) sprintf(sfo_name, "conf %s", sfo->sfo_name);
-			break;
-		}
-	}
-	if (override)
-		kmem_free(override, strlen(override) + 1);
-
-	if (sfo == NULL) {
-		/* no failover module - device not supported */
+	/* check path configuration result with current vlun state */
+	if (((sfo && vlun->svl_fops) && (sfo != vlun->svl_fops)) ||
+	    (sfo && vlun->svl_not_supported) ||
+	    ((sfo == NULL) && vlun->svl_fops)) {
+		/* Getting different results for different paths. */
+		VHCI_DEBUG(1, (CE_NOTE, vhci->vhci_dip,
+		    "!vhci_pathinfo_online: dev (path 0x%p) contradiction\n",
+		    (void *)pip));
+#ifdef	DEBUG
+		ce_type = CE_PANIC;
+#else	/* DEBUG */
+		ce_type = CE_WARN;
+#endif	/* DEBUG */
+		cmn_err(ce_type, "scsi_vhci: failover contradiction: "
+		    "'%s'.vs.'%s': path %s\n",
+		    vlun->svl_fops ? vlun->svl_fops->sfo_name : "NULL",
+		    sfo ? sfo->sfo_name : "NULL", mdi_pi_pathname(pip));
+		vlun->svl_not_supported = 1;
+		rval = MDI_NOT_SUPPORTED;
+		goto done;
+	} else if (sfo == NULL) {
+		/* No failover module - device not supported under vHCI.  */
 		VHCI_DEBUG(1, (CE_NOTE, vhci->vhci_dip,
 		    "!vhci_pathinfo_online: dev (path 0x%p) not "
 		    "supported\n", (void *)pip));
+
+		/* XXX does this contradict vhci_is_dev_supported ? */
 		vlun->svl_not_supported = 1;
 		rval = MDI_NOT_SUPPORTED;
 		goto done;
@@ -5053,16 +4997,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 
 	/* failover supported for device - save failover_ops in vlun */
 	vlun->svl_fops = sfo;
-	ASSERT(sfo_name != NULL);
-	/* to avoid memory leak, free the fops_name if it has already */
-	/* been set one, a vlun has more than one path, the function */
-	/* vhci_pathinfo_online() will be invoked when each path comes */
-	/* online, so the fops name might be set more than one times. */
-	if (vlun->svl_fops_name) {
-		kmem_free(vlun->svl_fops_name,
-		    strlen(vlun->svl_fops_name) + 1);
-	}
-	vlun->svl_fops_name = sfo_name;
+	ASSERT(vlun->svl_fops_name != NULL);
 
 	/*
 	 * Obtain the device-type based mpxio options as specified in
@@ -5071,6 +5006,8 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	 * NOTE: currently, the end result is a call to
 	 * mdi_set_lb_region_size().
 	 */
+	tgt_dip = psd->sd_dev;
+	ASSERT(tgt_dip != NULL);
 	vhci_get_device_type_mpxio_options(vdip, tgt_dip, psd);
 
 	/*
@@ -5180,10 +5117,6 @@ done:
 	    (void *)pip));
 
 failure:
-	if ((rval != MDI_SUCCESS) && psd->sd_inq) {
-		kmem_free((caddr_t)psd->sd_inq, inq_size);
-		psd->sd_inq = (struct scsi_inquiry *)NULL;
-	}
 	return (rval);
 }
 
@@ -5203,7 +5136,6 @@ vhci_pathinfo_offline(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	dev_info_t		*pdip = NULL;
 	dev_info_t		*cdip = NULL;
 	scsi_vhci_priv_t	*svp = NULL;
-	uint_t			inq_size = VHCI_STD_INQ_SIZE;
 
 	ASSERT(vdip != NULL);
 	ASSERT(pip != NULL);
@@ -5296,10 +5228,6 @@ vhci_pathinfo_offline(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	}
 
 	mdi_pi_set_state(pip, MDI_PATHINFO_STATE_OFFLINE);
-	if (psd->sd_inq) {
-		kmem_free((caddr_t)psd->sd_inq, inq_size);
-		psd->sd_inq = (struct scsi_inquiry *)NULL;
-	}
 	vhci_mpapi_set_path_state(vdip, pip, MP_DRVR_PATH_STATE_REMOVED);
 
 	VHCI_DEBUG(1, (CE_NOTE, NULL,
@@ -7852,7 +7780,7 @@ vhci_initiate_auto_failback(void *arg)
 
 	/*
 	 * Perform a final check to see if the active path class is indeed
-	 * not the prefered path class.  As in the time the auto failback
+	 * not the preferred path class.  As in the time the auto failback
 	 * was dispatched, an external failover could have been detected.
 	 * [Some other host could have detected this condition and triggered
 	 *  the auto failback before].
@@ -8533,8 +8461,118 @@ vhci_uscsi_iostart(struct buf *bp)
 	return (rval);
 }
 
-#ifdef DEBUG
+/* ARGSUSED */
+static struct scsi_failover_ops *
+vhci_dev_fo(dev_info_t *vdip, struct scsi_device *psd,
+    void **ctprivp, char **fo_namep)
+{
+	struct scsi_failover_ops	*sfo;
+	char				*sfo_name;
+	char				*override;
+	struct scsi_failover		*sf;
 
+	ASSERT(psd && psd->sd_inq);
+	if ((psd == NULL) || (psd->sd_inq == NULL)) {
+		VHCI_DEBUG(1, (CE_NOTE, NULL,
+		    "!vhci_dev_fo:return NULL no scsi_device or inquiry"));
+		return (NULL);
+	}
+
+	/*
+	 * Determine if device is supported under scsi_vhci, and select
+	 * failover module.
+	 *
+	 * See if there is a scsi_vhci.conf file override for this devices's
+	 * VID/PID. The following values can be returned:
+	 *
+	 * NULL		If the NULL is returned then there is no scsi_vhci.conf
+	 *		override.  For NULL, we determine the failover_ops for
+	 *		this device by checking the sfo_device_probe entry
+	 *		point for each 'fops' module, in order.
+	 *
+	 *		NOTE: Correct operation may depend on module ordering
+	 *		of 'specific' (failover modules that are completely
+	 *		VID/PID table based) to 'generic' (failover modules
+	 *		that based on T10 standards like TPGS).  Currently,
+	 *		the value of 'ddi-forceload' in scsi_vhci.conf is used
+	 *		to establish the module list and probe order.
+	 *
+	 * "NONE"	If value "NONE" is returned then there is a
+	 *		scsi_vhci.conf VID/PID override to indicate the device
+	 *		should not be supported under scsi_vhci (even if there
+	 *		is an 'fops' module supporting the device).
+	 *
+	 * "<other>"	If another value is returned then that value is the
+	 *		name of the 'fops' module that should be used.
+	 */
+	sfo = NULL;	/* "NONE" */
+	override = scsi_get_device_type_string(
+	    "scsi-vhci-failover-override", vdip, psd);
+	if (override == NULL) {
+		/* NULL: default: select based on sfo_device_probe results */
+		for (sf = scsi_failover_table; sf->sf_mod; sf++) {
+			if ((sf->sf_sfo == NULL) ||
+			    sf->sf_sfo->sfo_device_probe(psd, psd->sd_inq,
+			    ctprivp) == SFO_DEVICE_PROBE_PHCI)
+				continue;
+
+			/* found failover module, supported under scsi_vhci */
+			sfo = sf->sf_sfo;
+			if (fo_namep && (*fo_namep == NULL)) {
+				sfo_name = i_ddi_strdup(sfo->sfo_name,
+				    KM_SLEEP);
+				*fo_namep = sfo_name;
+			}
+			break;
+		}
+	} else if (strcasecmp(override, "NONE")) {
+		/* !"NONE": select based on driver.conf specified name */
+		for (sf = scsi_failover_table, sfo = NULL; sf->sf_mod; sf++) {
+			if ((sf->sf_sfo == NULL) ||
+			    (sf->sf_sfo->sfo_name == NULL) ||
+			    strcmp(override, sf->sf_sfo->sfo_name))
+				continue;
+
+			/*
+			 * NOTE: If sfo_device_probe() has side-effects,
+			 * including setting *ctprivp, these are not going
+			 * to occur with override config.
+			 */
+
+			/* found failover module, supported under scsi_vhci */
+			sfo = sf->sf_sfo;
+			if (fo_namep && (*fo_namep == NULL)) {
+				sfo_name = kmem_alloc(strlen("conf ") +
+				    strlen(sfo->sfo_name) + 1, KM_SLEEP);
+				(void) sprintf(sfo_name, "conf %s",
+				    sfo->sfo_name);
+				*fo_namep = sfo_name;
+			}
+			break;
+		}
+	}
+	if (override)
+		kmem_free(override, strlen(override) + 1);
+	return (sfo);
+}
+
+/*
+ * Determine the device described by cinfo should be enumerated under
+ * the vHCI or the pHCI - if there is a failover ops then device is
+ * supported under vHCI.  By agreement with SCSA cinfo is a pointer
+ * to a scsi_device structure associated with a decorated pHCI probe node.
+ */
+/* ARGSUSED */
+int
+vhci_is_dev_supported(dev_info_t *vdip, dev_info_t *pdip, void *cinfo)
+{
+	struct scsi_device	*psd = (struct scsi_device *)cinfo;
+
+	return (vhci_dev_fo(vdip, psd, NULL, NULL) ? MDI_SUCCESS : MDI_FAILURE);
+}
+
+
+#ifdef DEBUG
 extern struct scsi_key_strings scsi_cmds[];
 
 static char *

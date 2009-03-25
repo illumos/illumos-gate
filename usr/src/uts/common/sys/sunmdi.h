@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,6 +142,7 @@ void mdi_phci_unretire(dev_info_t *dip);
  * MDI devinfo locking functions.
  */
 void mdi_devi_enter(dev_info_t *, int *);
+int mdi_devi_tryenter(dev_info_t *, int *);
 void mdi_devi_exit_phci(dev_info_t *, int);
 void mdi_devi_enter_phci(dev_info_t *, int *);
 void mdi_devi_exit(dev_info_t *, int);
@@ -224,6 +225,7 @@ void mdi_pi_lock(mdi_pathinfo_t *);
 void mdi_pi_unlock(mdi_pathinfo_t *);
 dev_info_t *mdi_pi_get_client(mdi_pathinfo_t *);
 dev_info_t *mdi_pi_get_phci(mdi_pathinfo_t *);
+char *mdi_pi_get_node_name(mdi_pathinfo_t *);
 char *mdi_pi_get_addr(mdi_pathinfo_t *);
 mdi_pathinfo_state_t mdi_pi_get_state(mdi_pathinfo_t *);
 int mdi_pi_get_path_instance(mdi_pathinfo_t *);

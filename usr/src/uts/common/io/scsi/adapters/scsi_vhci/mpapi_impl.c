@@ -2740,8 +2740,9 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			iport = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 			(void) ddi_pathname(mdi_pi_get_phci(pip), iport);
 
-			if (mdi_prop_lookup_string(pip, "target-port",
-			    &tport) != DDI_PROP_SUCCESS) {
+			if (mdi_prop_lookup_string(pip,
+			    SCSI_ADDR_PROP_TARGET_PORT, &tport) !=
+			    DDI_PROP_SUCCESS) {
 				/* XXX: target-port prop not found */
 				tport = (char *)mdi_pi_get_addr(pip);
 				VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_"
@@ -2929,8 +2930,8 @@ vhci_update_mpapi_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 	 * So try getting Target Port's WWN which is unique per port.
 	 */
 	tmp_wwn = NULL;
-	if (mdi_prop_lookup_string(pip, "target-port", &tmp_wwn)
-	    != DDI_PROP_SUCCESS) {
+	if (mdi_prop_lookup_string(pip, SCSI_ADDR_PROP_TARGET_PORT,
+	    &tmp_wwn) != DDI_PROP_SUCCESS) {
 		/* XXX: target-port prop not found */
 		tmp_wwn = (char *)mdi_pi_get_addr(pip);
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_update_mpapi_data: "
@@ -3163,8 +3164,8 @@ vhci_mpapi_synthesize_tpg_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 	 * Build Target Port Group list
 	 * Start by finding out the affected Target Port.
 	 */
-	if (mdi_prop_lookup_string(pip, "target-port", &tmp_wwn)
-	    != DDI_PROP_SUCCESS) {
+	if (mdi_prop_lookup_string(pip, SCSI_ADDR_PROP_TARGET_PORT,
+	    &tmp_wwn) != DDI_PROP_SUCCESS) {
 		/* XXX: target-port prop not found */
 		tmp_wwn = (char *)mdi_pi_get_addr(pip);
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_synthesize_tpg_data: "
@@ -3300,12 +3301,11 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 {
 	struct scsi_vhci_lun	*vlun;
 	struct scsi_vhci	*vhci;
-	struct scsi_device	*psd;
+	struct scsi_device	*psd = NULL;
 	scsi_vhci_priv_t	*svp;
 	mdi_pathinfo_t		*pip;
 	dev_info_t		*pdip;
 	char			tpg_id[16], *tgt_port, *init = NULL;
-	unsigned char		*inqbuf;
 	uint32_t		int_tpg_id, rel_tid, as;
 	int			i, rel_tport_cnt;
 	mpapi_item_list_t	*path_list, *init_list;
@@ -3349,10 +3349,17 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 		psd = scsi_address_device(ap);
 	else if (ap->a_hba_tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE)
 		psd = ap->a_hba_tran->tran_sd;
-	else
-		psd = NULL;
-	inqbuf = (unsigned char *)psd->sd_inq;
-	pip = (mdi_pathinfo_t *)(uintptr_t)(psd->sd_pathinfo);
+	ASSERT(psd);
+	pip = (mdi_pathinfo_t *)psd->sd_pathinfo;
+
+	/*
+	 * It is possable for this code to be called without the sd_pathinfo
+	 * being set. This may happen as part of a probe to see if a device
+	 * should be mapped under mdi. At this point we know enough to answer
+	 * correctly so we can return.
+	 */
+	if (pip == NULL)
+		return;
 	svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 	vlun = svp->svp_svl;
 
@@ -3368,7 +3375,7 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 	    (void *)pip, (void *)ap, (void *)ptr, as, tpg_id,
 	    (void *)(vlun ? vlun->svl_fops : NULL)));
 
-	if ((vhci == NULL) || (vlun == NULL) || (pip == NULL) ||
+	if ((vhci == NULL) || (vlun == NULL) ||
 	    !SCSI_FAILOVER_IS_TPGS(vlun->svl_fops)) {
 		/* Cant help, unfortunate situation */
 		return;
@@ -3498,13 +3505,16 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 	 * Set explicitFailover for TPG -
 	 * based on tpgs_bits setting in Std Inquiry response.
 	 */
-	if ((((inqbuf[5] & 0x30) >> 4) == 2) ||
-	    (((inqbuf[5] & 0x30) >> 4) == 3)) {
+	switch (psd->sd_inq->inq_tpgs) {
+	case TPGS_FAILOVER_EXPLICIT:
+	case TPGS_FAILOVER_BOTH:
 		tpg_data->prop.explicitFailover = 1;
-	} else if (((inqbuf[5] & 0x30) >> 4) == 1) {
+		break;
+	case TPGS_FAILOVER_IMPLICIT:
 		tpg_data->prop.explicitFailover = 0;
-	} else if (((inqbuf[5] & 0x30) >> 4) == 0) {
-		tpg_data->prop.explicitFailover = 0;
+		break;
+	default:
+		return;
 	}
 
 	/*
@@ -3540,8 +3550,8 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 	 * Just find out the main Target Port property here.
 	 */
 	tgt_port = NULL;
-	if (mdi_prop_lookup_string(pip, "target-port", &tgt_port)
-	    != DDI_PROP_SUCCESS) {
+	if (mdi_prop_lookup_string(pip, SCSI_ADDR_PROP_TARGET_PORT,
+	    &tgt_port) != DDI_PROP_SUCCESS) {
 		/* XXX: target-port prop not found */
 		tgt_port = (char *)mdi_pi_get_addr(pip);
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_update_tpg_data: "
@@ -3802,11 +3812,10 @@ vhci_mpapi_sync_init_port_list(dev_info_t *pdip, void *arg)
 	mpapi_item_list_t	*init_list;
 	mpapi_initiator_data_t	*initd;
 
-	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
-	    DDI_PROP_DONTPASS, "initiator-port", &init) != DDI_PROP_SUCCESS)) {
-		/* XXX: initiator-port prop not found */
+	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
+	    SCSI_ADDR_PROP_INITIATOR_PORT, &init) != DDI_PROP_SUCCESS)) {
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_sync_init_port_list: "
-		    "initiator-port prop not found"));
+		    SCSI_ADDR_PROP_INITIATOR_PORT " prop not found"));
 		init = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 		init_not_ddi_alloced = 1;
 		(void) ddi_pathname(pdip, init);
@@ -3954,8 +3963,8 @@ vhci_mpapi_match_pip(struct scsi_vhci *vhci, mpapi_item_list_t *ilist,
 	this_iport = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 	(void) ddi_pathname(mdi_pi_get_phci(this_pip), this_iport);
 
-	if (mdi_prop_lookup_string(this_pip, "target-port", &this_tport)
-	    != DDI_PROP_SUCCESS) {
+	if (mdi_prop_lookup_string(this_pip, SCSI_ADDR_PROP_TARGET_PORT,
+	    &this_tport) != DDI_PROP_SUCCESS) {
 		/* XXX: target-port prop not found */
 		this_tport = (char *)mdi_pi_get_addr(this_pip);
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_match_pip: "

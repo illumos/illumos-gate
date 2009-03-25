@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,8 +113,14 @@ tape_device_probe(struct scsi_device *sd, struct scsi_inquiry *inquiry,
 	}
 done:
 	if (rval == SFO_DEVICE_PROBE_VHCI) {
-		if (mdi_set_lb_policy(sd->sd_dev, LOAD_BALANCE_NONE) !=
-		    MDI_SUCCESS) {
+		/*
+		 * Policy only applies to 'client' probe, not
+		 * vhci_is_dev_supported() pHCI probe.  Detect difference
+		 * based on ctpriv.
+		 */
+		if (ctpriv &&
+		    (mdi_set_lb_policy(sd->sd_dev, LOAD_BALANCE_NONE) !=
+		    MDI_SUCCESS)) {
 			VHCI_DEBUG(6, (CE_NOTE, NULL, "!fail load balance none"
 			    ": %s\n", inquiry->inq_vid));
 			return (SFO_DEVICE_PROBE_PHCI);
