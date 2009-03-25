@@ -16831,6 +16831,22 @@ st_recover(void *arg)
 		}
 
 		/*
+		 * If reservation conflict and do a preempt, fail it.
+		 */
+		if ((un->un_rsvd_status &
+		    (ST_APPLICATION_RESERVATIONS | ST_RESERVE)) != 0) {
+			if ((errinfo->ei_failed_pkt.pkt_cdbp[0] ==
+			    SCMD_PERSISTENT_RESERVE_OUT) &&
+			    (errinfo->ei_failed_pkt.pkt_cdbp[1] ==
+			    ST_SA_SCSI3_PREEMPT) &&
+			    (SCBP_C(&errinfo->ei_failed_pkt) ==
+			    STATUS_RESERVATION_CONFLICT)) {
+				st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
+				return;
+			}
+		}
+
+		/*
 		 * If scsi II lost reserve try and get it back.
 		 */
 		if ((((un->un_rsvd_status &
