@@ -1870,6 +1870,8 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5722:
 	case DEVICE_ID_5723:
+	case DEVICE_ID_5761:
+	case DEVICE_ID_5761E:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
 	case DEVICE_ID_5715C:
@@ -2136,7 +2138,9 @@ bge_chip_id_init(bge_t *bgep)
 		break;
 
 	case DEVICE_ID_5723:
-		cidp->chip_label = 5723;
+	case DEVICE_ID_5761:
+	case DEVICE_ID_5761E:
+		cidp->chip_label = cidp->device == DEVICE_ID_5723 ? 5723: 5761;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->msi_enabled = bge_enable_msi;
 		cidp->pci_type = BGE_PCI_E;
@@ -2438,7 +2442,7 @@ bge_chip_id_init(bge_t *bgep)
 	 * chip on (the motherboard of) a supported platform?
 	 *
 	 * Possible problems here:
-	 * 1)	it's a completely unheard-of chip (e.g. 5761)
+	 * 1)	it's a completely unheard-of chip
 	 * 2)	it's a recognised but unsupported chip (e.g. 5701, 5703C-A0)
 	 * 3)	it's a chip we would support if it were on the motherboard
 	 *	of a Sun platform, but this one isn't ;-(
@@ -2638,7 +2642,8 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 				    PCI_CONF_DEV_STUS, DEVICE_ERROR_STUS);
 			}
 
-			if (bgep->chipid.chip_label == 5723) {
+			if ((bgep->chipid.chip_label == 5723) ||
+			    (bgep->chipid.chip_label == 5761)) {
 				pci_config_put16(bgep->cfg_handle,
 				    PCI_CONF_DEV_CTRL_5723, READ_REQ_SIZE_MAX);
 				pci_config_put16(bgep->cfg_handle,

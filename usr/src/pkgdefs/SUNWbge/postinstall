@@ -167,6 +167,8 @@ then
 	"pciex14e4,167a"
 	"pciex14e4,167b"
 	"pci14e4,167d"
+	"pciex14e4,1680"
+	"pciex14e4,1681"
 	"pci14e4,1693"
 	"pci14e4,169b"
 	"pciex14e4,16fd"
