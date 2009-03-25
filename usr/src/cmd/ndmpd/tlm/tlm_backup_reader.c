@@ -1184,7 +1184,7 @@ zfs_put_prop_cb(int prop, void *pp)
 
 	(void) strlcpy(mpp->mp_name, zfs_prop_to_name(prop), NAME_MAX);
 	(void) zfs_prop_get(mhp->nh_handle,
-	    prop, buf, sizeof (buf), &stype, sbuf, sizeof (sbuf), FALSE);
+	    prop, buf, sizeof (buf), &stype, sbuf, sizeof (sbuf), B_TRUE);
 	(void) strlcpy(mpp->mp_value, buf, NAME_MAX);
 
 	switch (stype) {

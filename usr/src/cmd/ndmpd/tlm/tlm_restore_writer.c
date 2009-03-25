@@ -1324,7 +1324,7 @@ restore_xattr_hdr(int *fp,
 	error = 0;
 	xhdr = (struct xattr_hdr *)get_read_buffer(size, &error,
 	    &actual_size, local_commands);
-	if (error) {
+	if (xhdr == NULL || error != 0) {
 		NDMP_LOG(LOG_DEBUG,
 		    "Could not read xattr [%s:%s] for restore. ",
 		    name, fname);
@@ -1362,7 +1362,7 @@ restore_xattr_hdr(int *fp,
 	/* Get the actual extended attribute file */
 	tar_hdr = (tlm_tar_hdr_t *)get_read_buffer(sizeof (*tar_hdr),
 	    &error, &actual_size, local_commands);
-	if (error) {
+	if (tar_hdr == NULL || error != 0) {
 		NDMP_LOG(LOG_DEBUG,
 		    "Could not read xattr data [%s:%s] for restore. ",
 		    fname, xattrname);

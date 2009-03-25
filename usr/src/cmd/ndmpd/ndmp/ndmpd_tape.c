@@ -945,7 +945,7 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 
 		NDMP_LOG(LOG_DEBUG, "Checking EOM: nread %d [%s]", n, buf);
 
-		if (strncmp(buf, NDMP_EOM_MAGIC, len) == 0 || n == 0) {
+		if (strncmp(buf, NDMP_EOM_MAGIC, len) == 0) {
 			reply.error = NDMP_EOM_ERR;
 			NDMP_LOG(LOG_DEBUG, "NDMP_EOM_ERR");
 		} else {
