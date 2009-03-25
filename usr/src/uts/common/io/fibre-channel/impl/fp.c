@@ -81,20 +81,21 @@ static struct cb_ops fp_cb_ops = {
 };
 
 static struct dev_ops fp_ops = {
-	DEVO_REV,	/* build revision */
-	0,		/* reference count */
-	fp_getinfo,	/* getinfo */
-	nulldev,	/* identify - Obsoleted */
-	nulldev,	/* probe */
-	fp_attach,	/* attach */
-	fp_detach,	/* detach */
-	nodev,		/* reset */
-	&fp_cb_ops,	/* cb_ops */
-	NULL,		/* bus_ops */
-	fp_power	/* power */
+	DEVO_REV,			/* build revision */
+	0,				/* reference count */
+	fp_getinfo,			/* getinfo */
+	nulldev,			/* identify - Obsoleted */
+	nulldev,			/* probe */
+	fp_attach,			/* attach */
+	fp_detach,			/* detach */
+	nodev,				/* reset */
+	&fp_cb_ops,			/* cb_ops */
+	NULL,				/* bus_ops */
+	fp_power,			/* power */
+	ddi_quiesce_not_needed 		/* quiesce */
 };
 
-#define	FP_VERSION		"1.98"
+#define	FP_VERSION		"1.99"
 #define	FP_NAME_VERSION		"SunFC Port v" FP_VERSION
 
 char *fp_version = FP_NAME_VERSION;
