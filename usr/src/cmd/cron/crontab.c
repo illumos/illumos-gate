@@ -43,7 +43,6 @@
 #include <nl_types.h>
 #include <langinfo.h>
 #include <libintl.h>
-#include <spawn.h>
 #include <security/pam_appl.h>
 #include <limits.h>
 #include <libzoneinfo.h>
@@ -96,7 +95,6 @@
 #define	BAD_HOME	"Unable to access directory: %s\t%s\n"
 
 extern int	per_errno;
-extern char 	**environ;
 
 extern int	audit_crontab_modify(char *, char *, int);
 extern int	audit_crontab_delete(char *, int);
@@ -138,9 +136,8 @@ main(int argc, char **argv)
 	int tmpfd = -1;
 	pam_handle_t *pamh;
 	int pam_error;
-	pid_t cpid;
-	int cstatus;
-	char *argvec[3];
+	char *buf;
+	size_t buflen;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -304,38 +301,14 @@ main(int argc, char **argv)
 #ifdef _XPG_NOTDEFINED
 			}
 #endif
-			argvec[0] = strdup(editor);
-			argvec[1] = strdup(edtemp);
-			argvec[2] = NULL;
-
-			if (argvec[0] == NULL || argvec[1] == NULL)
-				crabort("Insufficient memory");
+			buflen = strlen(editor) + strlen(edtemp) + 2;
+			buf = xmalloc(buflen);
+			(void) snprintf(buf, buflen, "%s %s", editor, edtemp);
 
 			sleep(1);
 
 			while (1) {
-				/*
-				 * posix_spawnp() allows the file pointed to
-				 * by the 'EDITOR' variable to be searched in
-				 * the PATH environment variable
-				 */
-
-				ret = posix_spawnp(&cpid, editor, NULL, NULL,
-				    (char *const *)argvec,
-				    (char *const *)environ);
-				if (ret) {
-					(void) fprintf(stderr,
-					    gettext("crontab: %s: %s\n"),
-					    editor, strerror(errno));
-					cstatus = -1;
-				} else {
-					pid_t wpid = 0;
-					while ((wpid = waitpid(cpid, &cstatus,
-					    0)) == -1 && errno == EINTR)
-						;
-					if (wpid  == -1)
-						cstatus = -1;
-				}
+				ret = system(buf);
 
 				/* sanity checks */
 				if ((tmpfp = fopen(edtemp, "r")) == NULL)
@@ -351,7 +324,7 @@ main(int argc, char **argv)
 					    " changed.\n"));
 					exit(1);
 				}
-				if ((cstatus) && (errno != EINTR)) {
+				if ((ret) && (errno != EINTR)) {
 					/*
 					 * Some editors (like 'vi') can return
 					 * a non-zero exit status even though
