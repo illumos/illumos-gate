@@ -56,8 +56,13 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 LDFLAGS		+= -dy
 
-CFLAGS		+= -xCC -I/usr/include
-LINTFLAGS	+= -I/usr/include
+CFLAGS		+= -xCC
+
+# This is for everything except /usr/include/tss/
+CPPFLAGS	+= -I$(ROOT)/usr/include
+
+# This is for /usr/include/tss/, which is not built in the ON consolidation
+CPPFLAGS	+= -I/usr/include
 
 #
 #	Default build targets.
