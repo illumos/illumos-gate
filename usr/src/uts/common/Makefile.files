@@ -1665,6 +1665,8 @@ RAL_OBJS += rt2560.o ral_rate.o
 
 RUM_OBJS += rum.o
 
+RWN_OBJS += rt2860.o
+
 URAL_OBJS += ural.o
 
 RTW_OBJS += rtw.o smc93cx6.o rtwphy.o rtwphyio.o
