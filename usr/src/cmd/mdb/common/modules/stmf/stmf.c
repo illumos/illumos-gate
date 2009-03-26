@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1124,6 +1124,274 @@ fct_icmds(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/*
+ * Walker to list the addresses of all the active STMF scsi tasks (scsi_task_t),
+ * given a stmf_worker address
+ *
+ * To list all the active STMF scsi tasks, use
+ * "::walk stmf_worker |::walk stmf_scsi_task"
+ * To list the active tasks of a particular worker, use
+ * <stmf_worker addr>::walk stmf_scsi_task
+ */
+static int
+stmf_scsi_task_walk_init(mdb_walk_state_t *wsp)
+{
+	stmf_worker_t	worker;
+
+	/*
+	 * Input should be a stmf_worker, so read it to get the
+	 * worker_task_head to get the start of the task list
+	 */
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("<worker addr>::walk stmf_scsi_task\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&worker, sizeof (stmf_worker_t), wsp->walk_addr) !=
+	    sizeof (stmf_worker_t)) {
+		mdb_warn("failed to read in the task address\n");
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)(worker.worker_task_head);
+	wsp->walk_data = mdb_alloc(sizeof (scsi_task_t), UM_SLEEP);
+
+	return (WALK_NEXT);
+}
+
+static int
+stmf_scsi_task_walk_step(mdb_walk_state_t *wsp)
+{
+	stmf_i_scsi_task_t	itask;
+	int			status;
+
+	if (wsp->walk_addr == NULL) {
+		return (WALK_DONE);
+	}
+
+	/* Save the stmf_i_scsi_task for use later to get the next entry */
+	if (mdb_vread(&itask, sizeof (stmf_i_scsi_task_t),
+	    wsp->walk_addr) != sizeof (stmf_i_scsi_task_t)) {
+		mdb_warn("failed to read stmf_i_scsi_task at %p",
+		    wsp->walk_addr);
+		return (WALK_DONE);
+	}
+
+	wsp->walk_addr = (uintptr_t)itask.itask_task;
+
+	if (mdb_vread(wsp->walk_data, sizeof (scsi_task_t),
+	    wsp->walk_addr) != sizeof (scsi_task_t)) {
+		mdb_warn("failed to read scsi_task_t at %p", wsp->walk_addr);
+		return (DCMD_ERR);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)(itask.itask_worker_next);
+
+	return (status);
+}
+
+static void
+stmf_scsi_task_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (scsi_task_t));
+}
+
+/*ARGSUSED*/
+static int
+stmf_scsi_task(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	stmf_worker_t		worker;
+	stmf_i_scsi_task_t	itask;
+	scsi_task_t		*task_addr, task;
+
+	/*
+	 * A stmf_worker address is given to the left of ::stmf_scsi_task
+	 * i.e. display the scsi_task for the given worker
+	 */
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("stmf_worker", "stmf_scsi_task", argc,
+		    argv) == -1) {
+			mdb_warn("Failed to walk the stmf_scsi_task entries");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (DCMD_HDRSPEC(flags) && (!(flags & DCMD_PIPE_OUT))) {
+		mdb_printf("%<u>%-19s %-10s %-19s%</u>\n",
+		    "scsi_task_t", "Flags", "LPort");
+	}
+
+	if (mdb_vread(&worker, sizeof (stmf_worker_t),
+	    addr) != sizeof (stmf_worker_t)) {
+		mdb_warn("failed to read in the worker address");
+		return (DCMD_ERR);
+	}
+
+	/* Read the scsi_task */
+	if (worker.worker_task_head == NULL) {
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&itask, sizeof (stmf_i_scsi_task_t),
+	    (uintptr_t)worker.worker_task_head) == -1) {
+		mdb_warn("failed to read stmf_i_scsi_task_t at %p",
+		    worker.worker_task_head);
+		return (DCMD_ERR);
+	}
+
+	task_addr = itask.itask_task;
+
+	if (mdb_vread(&task, sizeof (scsi_task_t),
+	    (uintptr_t)task_addr) != sizeof (scsi_task_t)) {
+		mdb_warn("failed to read scsi_task_t at %p", task_addr);
+		return (DCMD_ERR);
+	}
+
+	if ((flags & DCMD_PIPE_OUT)) {
+		mdb_printf("%p\n", task_addr);
+	} else {
+		/* pretty print */
+		mdb_printf("%-19p %-10x %-19p\n",
+		    task_addr, task.task_flags, task.task_lport);
+	}
+
+	return (DCMD_OK);
+}
+
+/*
+ * Walker to list the addresses of all the stmf_worker in the queue
+ */
+typedef struct stmf_worker_walk_data {
+	int		worker_current;
+	int		worker_count;
+} stmf_worker_walk_data_t;
+
+/* stmf_workers_state definition from stmf.c (static) */
+enum {
+	STMF_WORKERS_DISABLED = 0,
+	STMF_WORKERS_ENABLING,
+	STMF_WORKERS_ENABLED
+} stmf_workers_state;
+
+/*
+ * Initialize the stmf_worker_t walker by either using the given starting
+ * address, or reading the value of the kernel's global stmf_workers pointer.
+ */
+/*ARGSUSED*/
+static int
+stmf_worker_walk_init(mdb_walk_state_t *wsp)
+{
+	int			worker_state;
+	int			nworkers;
+	stmf_worker_t		*worker;
+	stmf_worker_walk_data_t	*walk_data;
+
+	if (mdb_readvar(&worker_state, "stmf_workers_state") == -1) {
+		mdb_warn("failed to read stmf_workers_state");
+		return (WALK_ERR);
+	}
+	if (worker_state != STMF_WORKERS_ENABLED) {
+		mdb_warn("stmf_workers_state not initialized");
+		return (WALK_ERR);
+	}
+
+	/*
+	 * Look up the stmf_nworkers_accepting_cmds to
+	 * determine number of entries in the worker queue
+	 */
+	if (mdb_readvar(&nworkers, "stmf_nworkers_accepting_cmds") == -1) {
+		mdb_warn("failed to read stmf_nworkers_accepting_cmds");
+		return (WALK_ERR);
+	}
+
+	if (mdb_readvar(&worker, "stmf_workers") == -1) {
+		mdb_warn("failed to read stmf_workers");
+		return (WALK_ERR);
+	}
+
+	walk_data = mdb_alloc(sizeof (stmf_worker_walk_data_t), UM_SLEEP);
+	walk_data->worker_current	= 0;
+	walk_data->worker_count		= nworkers;
+
+	wsp->walk_addr = (uintptr_t)worker;
+	wsp->walk_data = walk_data;
+
+	return (WALK_NEXT);
+}
+
+static int
+stmf_worker_walk_step(mdb_walk_state_t *wsp)
+{
+	stmf_worker_walk_data_t	*walk_data = wsp->walk_data;
+	int			status;
+
+	if (wsp->walk_addr == NULL) {
+		return (WALK_DONE);
+	}
+
+	if (walk_data->worker_current >= walk_data->worker_count) {
+		return (WALK_DONE);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	walk_data->worker_current++;
+	wsp->walk_addr += sizeof (stmf_worker_t);
+
+	return (status);
+}
+
+static void
+stmf_worker_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (stmf_worker_walk_data_t));
+}
+
+int
+stmf_worker(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	stmf_worker_t		worker;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("stmf_worker", "stmf_worker", argc,
+		    argv) == -1) {
+			mdb_warn("Failed to walk the stmf_worker entries");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&worker, sizeof (stmf_worker_t),
+	    addr) != sizeof (stmf_worker_t)) {
+		mdb_warn("failed to read stmf_worker at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (flags & DCMD_PIPE_OUT) {
+		mdb_printf("%-19p\n", addr);
+	} else {
+		/* pretty print */
+		if (DCMD_HDRSPEC(flags)) {
+			mdb_printf("%<u>%-19s %-10s %-10s %-10s%</u>\n",
+			    "stmf_worker_t", "State", "Ref_Count", "Tasks");
+		}
+
+		mdb_printf("%-19p %-10s %-10d %-5d%\n", addr,
+		    (worker.worker_flags == STMF_WORKER_STARTED) ? "STARTED" :
+		    (worker.worker_flags == STMF_WORKER_ACTIVE) ?
+		    "ACTIVE" : "TERMINATED",
+		    worker.worker_ref_count,
+		    worker.worker_queue_depth);
+	}
+
+	return (DCMD_OK);
+}
+
 struct find_options *
 parse_options(int argc, const mdb_arg_t *argv)
 {
@@ -1270,6 +1538,7 @@ stmf_find_fct_irp_help(void)
 	    "    stmf_find_fct_irp rpname=<wwn.12345678 or 12345678>\n"
 	    "    stmf_find_fct_irp rp=<3000586778734>\n");
 }
+
 void
 stmf_find_tasks_help(void)
 {
@@ -1280,6 +1549,14 @@ stmf_find_tasks_help(void)
 	    "    stmf_find_tasks rpname=<wwn.12345678 or 12345678>\n"
 	    "    stmf_find_tasks lpname=<wwn.12345678 or 12345678> "
 	    "show=task_flags,lport\n");
+}
+
+void
+stmf_scsi_task_help(void)
+{
+	mdb_printf(
+	    "List all active scsi_task_t on a given stmf_worker_t. Example\n"
+	    "    addr::stmf_scsi_task\n");
 }
 
 static const mdb_dcmd_t dcmds[] = {
@@ -1314,10 +1591,19 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "stmf_find_tasks", "lpname|rpname [show]",
 	    "Find all pending task for a local port or remote port",
 	    stmf_find_tasks, stmf_find_tasks_help},
+	{ "stmf_worker", "?", "List all the stmf_worker entries", stmf_worker},
+	{ "stmf_scsi_task", ":",
+	    "List all the active STMF SCSI tasks per worker", stmf_scsi_task,
+	    stmf_scsi_task_help},
 	{ NULL }
 };
 
 static const mdb_walker_t walkers[] = {
+	{ "stmf_worker", "Walk STMF worker queue", stmf_worker_walk_init,
+	    stmf_worker_walk_step, stmf_worker_walk_fini},
+	{ "stmf_scsi_task", "Walk active STMF SCSI tasks per worker",
+	    stmf_scsi_task_walk_init,
+	    stmf_scsi_task_walk_step, stmf_scsi_task_walk_fini },
 	{ NULL }
 };
 
