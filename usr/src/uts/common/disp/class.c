@@ -85,6 +85,12 @@ int
 scheduler_load(char *clname, sclass_t *clp)
 {
 	int rv = 0;
+	char *tmp = clname + 1;
+
+	/* Check if class name is  "",  ".",  ".."  or  "`"  */
+	if (*clname == '\0' || *clname == '`' || (*clname == '.' && *tmp == '\0') ||
+	    (*clname == '.' && *tmp == '.' && *(++tmp) == '\0'))
+		return (EINVAL);
 
 	if (LOADABLE_SCHED(clp)) {
 		rw_enter(clp->cl_lock, RW_READER);
