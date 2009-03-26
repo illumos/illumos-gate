@@ -31,6 +31,7 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #include <inet/ip.h>
+#include <inet/ip2mac.h>
 
 /*
  * Internal definitions for the kernel implementation of the IPv6
@@ -43,7 +44,23 @@ extern "C" {
 
 #ifdef _KERNEL
 #define	NCE_TABLE_SIZE	256
-/* NDP Cache Entry */
+/*
+ * callbacks set up with ip2mac interface, waiting for result
+ * of neighbor resolution.
+ */
+typedef struct nce_cb_s {
+	list_node_t		nce_cb_node;
+	void			*nce_cb_id;
+	uint32_t		nce_cb_flags;
+	ip2mac_callback_t	*nce_cb_func;
+	void			*nce_cb_arg;
+} nce_cb_t;
+
+#define	NCE_CB_DISPATCHED	0x00000001
+
+/*
+ * NDP Cache Entry
+ */
 typedef struct nce_s {
 	struct	nce_s	*nce_next;	/* Hash chain next pointer */
 	struct	nce_s	**nce_ptpn;	/* Pointer to previous next */
@@ -77,6 +94,8 @@ typedef struct nce_s {
 	uint_t		nce_defense_time;	/* last time defended (secs) */
 	uint64_t	nce_init_time;  /* time when it was set to ND_INITIAL */
 	boolean_t	nce_trace_disable;	/* True when alloc fails */
+	list_t		nce_cb;
+	uint_t		nce_cb_walker_cnt;
 } nce_t;
 
 /*
@@ -350,6 +369,7 @@ extern	int	ndp_lookup_then_add_v6(ill_t *, boolean_t, uchar_t *,
     uint16_t, uint16_t, nce_t **);
 extern	int	ndp_lookup_then_add_v4(ill_t *,
     const in_addr_t *, uint16_t, nce_t **, nce_t *);
+extern void	ip_ndp_resolve(nce_t *);
 
 #ifdef DEBUG
 extern	void	nce_trace_ref(nce_t *);

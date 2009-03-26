@@ -64,6 +64,7 @@
 #include <inet/ipsec_impl.h>
 #include <inet/ipsec_info.h>
 #include <inet/sctp_ip.h>
+#include <inet/ip2mac_impl.h>
 
 /*
  * Function names with nce_ prefix are static while function
@@ -93,7 +94,7 @@ static	void	nce_queue_mp(nce_t *nce, mblk_t *mp);
 static	mblk_t	*nce_udreq_alloc(ill_t *ill);
 static	void	nce_update(nce_t *nce, uint16_t new_state,
     uchar_t *new_ll_addr);
-static	uint32_t	nce_solicit(nce_t *nce, mblk_t *mp);
+static	uint32_t	nce_solicit(nce_t *nce, in6_addr_t src);
 static	boolean_t	nce_xmit(ill_t *ill, uint8_t type,
     boolean_t use_lla_addr, const in6_addr_t *sender,
     const in6_addr_t *target, int flag);
@@ -221,6 +222,8 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 
 	nce->nce_trace_disable = B_FALSE;
 
+	list_create(&nce->nce_cb, sizeof (nce_cb_t),
+	    offsetof(nce_cb_t, nce_cb_node));
 	/*
 	 * Atomically ensure that the ill is not CONDEMNED, before
 	 * adding the NCE.
@@ -404,6 +407,9 @@ ndp_delete(nce_t *nce)
 
 	nce_fastpath_list_delete(nce);
 
+	/* Complete any waiting callbacks */
+	nce_cb_dispatch(nce);
+
 	/*
 	 * Cancel any running timer. Timeout can't be restarted
 	 * since CONDEMNED is set. Can't hold nce_lock across untimeout.
@@ -472,6 +478,13 @@ ndp_inactive(nce_t *nce)
 		}
 	} while (mpp++ != &nce->nce_last_mp_to_free);
 
+	if (nce->nce_ipversion == IPV6_VERSION) {
+		/*
+		 * must have been cleaned up in nce_delete
+		 */
+		ASSERT(list_is_empty(&nce->nce_cb));
+		list_destroy(&nce->nce_cb);
+	}
 #ifdef DEBUG
 	nce_trace_cleanup(nce);
 #endif
@@ -789,6 +802,7 @@ nce_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 		}
 		mutex_exit(&nce->nce_lock);
 		nce_fastpath(nce);
+		nce_cb_dispatch(nce); /* complete callbacks */
 		mutex_enter(&nce->nce_lock);
 		mp = nce->nce_qd_mp;
 		nce->nce_qd_mp = NULL;
@@ -854,6 +868,7 @@ nce_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 		if (ll_changed)
 			nce_update(nce, ND_STALE, hw_addr);
 		mutex_exit(&nce->nce_lock);
+		nce_cb_dispatch(nce);
 		return;
 	}
 	if (!(flag & ND_NA_FLAG_OVERRIDE) && ll_changed) {
@@ -862,6 +877,7 @@ nce_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 			nce_update(nce, ND_STALE, NULL);
 		}
 		mutex_exit(&nce->nce_lock);
+		nce_cb_dispatch(nce);
 		return;
 	} else {
 		if (ll_changed) {
@@ -896,7 +912,9 @@ nce_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 				ire_delete(ire);
 				ire_refrele(ire);
 			}
-			ndp_delete(nce);
+			ndp_delete(nce); /* will do nce_cb_dispatch */
+		} else {
+			nce_cb_dispatch(nce);
 		}
 	}
 }
@@ -1067,7 +1085,6 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 	int		err;
 	ill_t		*ipmp_ill;
 	uint16_t	nce_flags;
-	uint32_t	ms;
 	mblk_t		*mp_nce = NULL;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	uchar_t		*hwaddr = NULL;
@@ -1137,6 +1154,13 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 			NCE_REFRELE(nce);
 			return (0);
 		}
+		if (nce->nce_rcnt == 0) {
+			/* The caller will free mp */
+			mutex_exit(&nce->nce_lock);
+			ndp_delete(nce);
+			NCE_REFRELE(nce);
+			return (ESRCH);
+		}
 		mp_nce = ip_prepend_zoneid(mp, zoneid, ipst);
 		if (mp_nce == NULL) {
 			/* The caller will free mp */
@@ -1145,17 +1169,9 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 			NCE_REFRELE(nce);
 			return (ENOMEM);
 		}
-		if ((ms = nce_solicit(nce, mp_nce)) == 0) {
-			/* The caller will free mp */
-			if (mp_nce != mp)
-				freeb(mp_nce);
-			mutex_exit(&nce->nce_lock);
-			ndp_delete(nce);
-			NCE_REFRELE(nce);
-			return (EBUSY);
-		}
+		nce_queue_mp(nce, mp_nce);
+		ip_ndp_resolve(nce);
 		mutex_exit(&nce->nce_lock);
-		NDP_RESTART_TIMER(nce, (clock_t)ms);
 		NCE_REFRELE(nce);
 		return (EINPROGRESS);
 	case EEXIST:
@@ -1410,6 +1426,53 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 	return (0);
 }
 
+
+/*
+ * Send out a NS for resolving the ip address in nce.
+ */
+void
+ip_ndp_resolve(nce_t *nce)
+{
+	in6_addr_t	sender6 = ipv6_all_zeros;
+	uint32_t	ms;
+	mblk_t		*mp;
+	ip6_t		*ip6h;
+
+	ASSERT(MUTEX_HELD(&nce->nce_lock));
+	/*
+	 * Pick the src from outgoing packet, if one is available.
+	 * Otherwise let nce_xmit figure out the src.
+	 */
+	if ((mp = nce->nce_qd_mp) != NULL) {
+		/* Handle ip_newroute_v6 giving us IPSEC packets */
+		if (mp->b_datap->db_type == M_CTL)
+			mp = mp->b_cont;
+		ip6h = (ip6_t *)mp->b_rptr;
+		if (ip6h->ip6_nxt == IPPROTO_RAW) {
+			/*
+			 * This message should have been pulled up already in
+			 * ip_wput_v6. We can't do pullups here because
+			 * the message could be from the nce_qd_mp which could
+			 * have b_next/b_prev non-NULL.
+			 */
+			ASSERT(MBLKL(mp) >= sizeof (ip6i_t) + IPV6_HDR_LEN);
+			ip6h = (ip6_t *)(mp->b_rptr + sizeof (ip6i_t));
+		}
+		sender6 = ip6h->ip6_src;
+	}
+	ms = nce_solicit(nce, sender6);
+	mutex_exit(&nce->nce_lock);
+	if (ms == 0) {
+		if (nce->nce_state != ND_REACHABLE) {
+			nce_resolv_failed(nce);
+			ndp_delete(nce);
+		}
+	} else {
+		NDP_RESTART_TIMER(nce, (clock_t)ms);
+	}
+	mutex_enter(&nce->nce_lock);
+}
+
 /*
  * Send a neighbor solicitation.
  * Returns number of milliseconds after which we should either rexmit or abort.
@@ -1418,48 +1481,18 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
  *
  * NOTE: This routine drops nce_lock (and later reacquires it) when sending
  * the packet.
- * NOTE: This routine does not consume mp.
  */
 uint32_t
-nce_solicit(nce_t *nce, mblk_t *mp)
+nce_solicit(nce_t *nce, in6_addr_t sender)
 {
-	ip6_t		*ip6h;
-	in6_addr_t	sender;
 	boolean_t	dropped;
 
+	ASSERT(nce->nce_ipversion == IPV6_VERSION);
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
 
 	if (nce->nce_rcnt == 0)
 		return (0);
 
-	if (mp == NULL) {
-		ASSERT(nce->nce_qd_mp != NULL);
-		mp = nce->nce_qd_mp;
-	} else {
-		nce_queue_mp(nce, mp);
-	}
-
-	/* Handle ip_newroute_v6 giving us IPSEC packets */
-	if (mp->b_datap->db_type == M_CTL)
-		mp = mp->b_cont;
-
-	ip6h = (ip6_t *)mp->b_rptr;
-	if (ip6h->ip6_nxt == IPPROTO_RAW) {
-		/*
-		 * This message should have been pulled up already in
-		 * ip_wput_v6. We can't do pullups here because the message
-		 * could be from the nce_qd_mp which could have b_next/b_prev
-		 * non-NULL.
-		 */
-		ASSERT(MBLKL(mp) >= sizeof (ip6i_t) + IPV6_HDR_LEN);
-		ip6h = (ip6_t *)(mp->b_rptr + sizeof (ip6i_t));
-	}
-
-	/*
-	 * Need to copy the sender address into a local since `mp' can
-	 * go away once we drop nce_lock.
-	 */
-	sender = ip6h->ip6_src;
 	nce->nce_rcnt--;
 	mutex_exit(&nce->nce_lock);
 	dropped = nce_xmit_solicit(nce, B_TRUE, &sender, 0);
@@ -2568,7 +2601,6 @@ ndp_timer(void *arg)
 {
 	nce_t		*nce = arg;
 	ill_t		*ill = nce->nce_ill;
-	uint32_t	ms;
 	char		addrbuf[INET6_ADDRSTRLEN];
 	boolean_t	dropped = B_FALSE;
 	ip_stack_t	*ipst = ill->ill_ipst;
@@ -2730,26 +2762,7 @@ ndp_timer(void *arg)
 				prevmpp = &mp->b_next;
 			}
 		}
-
-		/*
-		 * Must be resolver's retransmit timer.
-		 */
-		if (nce->nce_qd_mp != NULL) {
-			if ((ms = nce_solicit(nce, NULL)) == 0) {
-				if (nce->nce_state != ND_REACHABLE) {
-					mutex_exit(&nce->nce_lock);
-					nce_resolv_failed(nce);
-					ndp_delete(nce);
-				} else {
-					mutex_exit(&nce->nce_lock);
-				}
-			} else {
-				mutex_exit(&nce->nce_lock);
-				NDP_RESTART_TIMER(nce, (clock_t)ms);
-			}
-			NCE_REFRELE(nce);
-			return;
-		}
+		ip_ndp_resolve(nce);
 		mutex_exit(&nce->nce_lock);
 		NCE_REFRELE(nce);
 		break;
@@ -3041,6 +3054,7 @@ nce_resolv_failed(nce_t *nce)
 		    ICMP6_DST_UNREACH_ADDR, B_FALSE, B_FALSE, zoneid, ipst);
 		mp = nxt_mp;
 	}
+	nce_cb_dispatch(nce);
 }
 
 /*
