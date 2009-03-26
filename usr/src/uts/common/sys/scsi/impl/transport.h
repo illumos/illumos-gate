@@ -462,22 +462,29 @@ void		scsi_hba_pkt_comp(
  *				established during tran_tgt_init(9F) based on
  *				property values.
  *
+ * SCSI_HBA_TRAN_PHCI		The host adapter is an mpxio/scsi_vhci pHCI.
+ *				The framework should take care of
+ *				mdi_phci_register() stuff.
+ *
  * SCSI_HBA_TRAN_CLONE		Consider using SCSI_HBA_ADDR_COMPLEX instead.
  *				SCSI_HBA_TRAN_CLONE is a KLUDGE to address
  *				limitations of the scsi_address(9S) structure
  *				via duplication of scsi_hba_tran(9S) and
  *				use of tran_tgt_private.
+ *
  */
-#define	SCSI_HBA_TRAN_CLONE	0x01		/* clone scsi_hba_tran(9S) */
-						/* structure per scsi_device */
-#define	SCSI_HBA_TRAN_ALLOC	0x02		/* set if scsi_hba_tran_alloc */
-						/* is called */
-#define	SCSI_HBA_TRAN_CDB	0x04		/* allocate cdb */
-#define	SCSI_HBA_TRAN_SCB	0x08		/* allocate sense */
-#define	SCSI_HBA_TRAN_FMSCSA	0x10		/* using common ddi_fm_* */
+#define	SCSI_HBA_TRAN_CLONE	0x01	/* Deprecated */
+#define	SCSI_HBA_TRAN_PHCI	0x02	/* treat HBA as mpxio 'pHCI' */
+#define	SCSI_HBA_TRAN_CDB	0x04	/* allocate cdb */
+#define	SCSI_HBA_TRAN_SCB	0x08	/* allocate sense */
 
-#define	SCSI_HBA_ADDR_SPI	0x20		/* scsi_address in SPI form */
-#define	SCSI_HBA_ADDR_COMPLEX	0x40		/* scsi_address is COMPLEX */
+#define	SCSI_HBA_ADDR_SPI	0x20	/* scsi_address in SPI form */
+#define	SCSI_HBA_ADDR_COMPLEX	0x40	/* scsi_address is COMPLEX */
+
+/* upper bits used to record SCSA configuration state */
+#define	SCSI_HBA_SCSA_PHCI	0x10000	/* need mdi_phci_unregister */
+#define	SCSI_HBA_SCSA_TA	0x20000	/* scsi_hba_tran_alloc used */
+#define	SCSI_HBA_SCSA_FM	0x40000	/* using common ddi_fm_* */
 
 /*
  * Flags for scsi_hba allocation functions

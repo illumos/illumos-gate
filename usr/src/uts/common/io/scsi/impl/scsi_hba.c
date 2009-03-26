@@ -39,12 +39,9 @@
 extern struct scsi_pkt *scsi_init_cache_pkt(struct scsi_address *,
 		    struct scsi_pkt *, struct buf *, int, int, int, int,
 		    int (*)(caddr_t), caddr_t);
-extern void scsi_free_cache_pkt(struct scsi_address *,
-		    struct scsi_pkt *);
-extern void scsi_cache_dmafree(struct scsi_address *,
-		    struct scsi_pkt *);
-extern void scsi_sync_cache_pkt(struct scsi_address *,
-		    struct scsi_pkt *);
+extern void scsi_free_cache_pkt(struct scsi_address *, struct scsi_pkt *);
+extern void scsi_cache_dmafree(struct scsi_address *, struct scsi_pkt *);
+extern void scsi_sync_cache_pkt(struct scsi_address *, struct scsi_pkt *);
 
 /*
  * Round up all allocations so that we can guarantee
@@ -134,7 +131,7 @@ static int	scsi_hba_fm_init_child(
 			int			cap,
 			ddi_iblock_cookie_t	*ibc);
 
-static int scsi_hba_bus_power(
+static int	scsi_hba_bus_power(
 			dev_info_t		*self,
 			void			*impl_arg,
 			pm_bus_power_op_t	op,
@@ -196,16 +193,17 @@ static struct cb_ops scsi_hba_cbops = {
 };
 
 /*
- * SCSI_HBA_LOG is used for all messages. Both a logging level and a component
- * are specified when generating a message. Some levels correspond directly to
- * cmn_err levels, the others are associated with increasing levels diagnostic.
- * The component is used to identify groups of messages by utility, typically
- * the entry point. Filtering is provided for both the level and component.
- * Messages with cmn_err levels or not associated with a component
- * (SCSI_HBA_LOG_NC) are never filtered.
+ * SCSI_HBA_LOG is used for all messages. A logging level is specified when
+ * generating a message. Some levels correspond directly to cmn_err levels,
+ * the others are associated with increasing levels diagnostic/debug output.
+ * For _LOG() messages, a __func__ prefix will identify the function origin
+ * of the message. For _LOG_NF messages, there is no function prefix or
+ * self/child context. Filtering of messages is provided based on logging
+ * level, but messages with cmn_err logging level and messages generated
+ * generated with _LOG_NF() are never filtered.
  *
  * For debugging, more complete information can be displayed with each message
- * (full device path and pointer values).
+ * (full device path and pointer values) by adjusting scsi_hba_log_info.
  */
 /* logging levels */
 #define	SCSI_HBA_LOGCONT	CE_CONT
@@ -213,183 +211,119 @@ static struct cb_ops scsi_hba_cbops = {
 #define	SCSI_HBA_LOGWARN	CE_WARN
 #define	SCSI_HBA_LOGPANIC	CE_PANIC
 #define	SCSI_HBA_LOGIGNORE	CE_IGNORE
-#define	SCSI_HBA_LOG_CE_MASK	0x0000000F	/* no filter */
-#define	SCSI_HBA_LOGDIAG1	0x00000010
-#define	SCSI_HBA_LOGDIAG2	0x00000020
-#define	SCSI_HBA_LOGDIAG3	0x00000040
-#define	SCSI_HBA_LOGDIAG4	0x00000080
-#define	SCSI_HBA_LOGTRACE	0x00000100
+#define	SCSI_HBA_LOG_CE_MASK	0x0000000F	/* no filter for these levels */
+#define	SCSI_HBA_LOG1		0x00000010	/* DIAG1 level enable */
+#define	SCSI_HBA_LOG2		0x00000020	/* DIAG2 level enable */
+#define	SCSI_HBA_LOG3		0x00000040	/* DIAG3 level enable */
+#define	SCSI_HBA_LOG4		0x00000080	/* DIAG4 level enable */
+#define	SCSI_HBA_LOGTRACE	0x00000100	/* TRACE enable */
 #if (CE_CONT | CE_NOTE | CE_WARN | CE_PANIC | CE_IGNORE) > SCSI_HBA_LOG_CE_MASK
 Error, problem with CE_ definitions
 #endif
 
-/* logging components */
-#define	SCSI_HBA_LOG_NC				0x00000000 /* no filter */
-#define	SCSI_HBA_LOG_INITIALIZE_HBA_INTERFACE	0x00000001
-#define	SCSI_HBA_LOG_ATTACH_SETUP		0x00000002
-#define	SCSI_HBA_LOG_BUS_CTL			0x00000004
-
-#define	SCSI_HBA_LOG_BUS_CONFIG			0x00000010
-#define	SCSI_HBA_LOG_BUS_CONFIGONE		0x00000020
-#define	SCSI_HBA_LOG_BUS_CONFIGALL_SPI		0x00000040
-#define	SCSI_HBA_LOG_ENUM_LUNS_ON_TGT		0x00000080
-
-#define	SCSI_HBA_LOG_DEVICE_REPORTLUNS		0x00000100
-#define	SCSI_HBA_LOG_DEVICE_CONFIG		0x00000200
-#define	SCSI_HBA_LOG_DEVICE_CONFIGCHILD		0x00000400
-#define	SCSI_HBA_LOG_DEVICE_CREATECHILD		0x00000800
-
-#define	SCSI_HBA_LOG_DEVICE_INITCHILD		0x00001000
-
-#define	SCSI_HBA_LOG_BUS_UNCONFIG		0x00010000
-#define	SCSI_HBA_LOG_BUS_UNCONFIGONE		0x00020000
-#define	SCSI_HBA_LOG_BUS_UNCONFIGALL_SPI	0x00040000
-#define	SCSI_HBA_LOG_DEVICE_UNINITCHILD		0x00080000
-
-#define	SCSI_HBA_LOG_REMOVE_NODE		0x00100000
-
-#define	SCSI_HBA_LOG_MSCSI_BUS_CONFIG_PORT	0x01000000
-#define	SCSI_HBA_LOG_MSCSI_DEFINE_PORT		0x02000000
-
-#define	SCSI_HBA_LOG_BADLUN			0x10000000
-#define	SCSI_HBA_LOG_PKT_ALLOC			0x20000000
-#define	SCSI_HBA_LOG_DEVI_FIND			0x40000000
-
-
-#define	SCSI_HBA_LOG_ASCII {			\
-	"scsi_hba_initialize_hba_interface",	\
-	"scsi_hba_attach_setup",		\
-	"scsi_hba_bus_ctl",			\
-	"-",					\
-						\
-	"scsi_hba_bus_config",			\
-	"scsi_hba_bus_configone",		\
-	"scsi_hba_bus_configall_spi",		\
-	"scsi_hba_enum_luns_on_tgt",		\
-						\
-	"scsi_hba_device_reportluns",		\
-	"scsi_hba_device_config",		\
-	"scsi_hba_device_configchild",		\
-	"scsi_hba_device_createchild",		\
-						\
-	"scsi_busctl_initchild",		\
-	"-",					\
-	"-",					\
-	"-",					\
-						\
-	"scsi_hba_bus_unconfig",		\
-	"scsi_hba_bus_unconfigone",		\
-	"scsi_hba_bus_unconfigall_spi",		\
-	"scsi_busctl_uninitchild",		\
-						\
-	"scsi_hba_remove_node",			\
-	"-",					\
-	"-",					\
-	"-",					\
-						\
-	"scsi_hba_mscsi_bus_config_port",	\
-	"scsi_hba_mscsi_define_port",		\
-	"-",					\
-	"-",					\
-						\
-	"scsi_hba_badlun",			\
-	"scsi_hba_pkt_alloc",			\
-	"scsi_hba_devi_find",			\
-	NULL }
-
 /*
  * Tunable log message augmentation and filters: filters do not apply to
- * SCSI_HBA_LOG_CE_MASK level or SCSI_HBA_LOG_NC component messages.
+ * SCSI_HBA_LOG_CE_MASK level messages or LOG_NF() messages.
  *
- * An example set of /etc/system tunings to debug a SCSA HBA driver called
- * "fp" might be:
- *	echo "set scsi:scsi_hba_log_filter_level=0xff"	>> /etc/system
- *	echo "set scsi:scsi_hba_log_filter_hba=\"fp\""	>> /etc/system
- *	echo "set scsi:scsi_hba_log_info=0x5"		>> /etc/system
- *	echo "set scsi:scsi_hba_log_mt_disable=0x6"	>> /etc/system
+ * An example set of /etc/system tunings to simplify debug a SCSA pHCI HBA
+ * driver called "pmcs", including "scsi_vhci" operation, might be:
+ *
+ * echo "set scsi:scsi_hba_log_filter_level=0xf0"		>> /etc/system
+ * echo "set scsi:scsi_hba_log_filter_phci=\"pmcs\""		>> /etc/system
+ * echo "set scsi:scsi_hba_log_filter_vhci=\"scsi_vhci\""	>> /etc/system
+ * echo "set scsi:scsi_hba_log_align=1"				>> /etc/system
+ * echo "set scsi:scsi_hba_log_fcif=0x21"			>> /etc/system
+ * echo "set scsi:scsi_hba_log_mt_disable=0x6"			>> /etc/system
+ * echo "set mtc_off=1"						>> /etc/system
+ * echo "set mdi_mtc_off=1"					>> /etc/system
  */
 int		scsi_hba_log_filter_level =
-			SCSI_HBA_LOGDIAG1 |
+			SCSI_HBA_LOG1 |
 			0;
-int		scsi_hba_log_filter_component =
-			-1;		/* all components */
-char		*scsi_hba_log_filter_hba = "\0\0\0\0\0\0\0\0\0\0\0\0";
-int		scsi_hba_log_info =	/* augmentation: extra info to print */
+char		*scsi_hba_log_filter_phci = "\0\0\0\0\0\0\0\0\0\0\0\0";
+char		*scsi_hba_log_filter_vhci = "\0\0\0\0\0\0\0\0\0\0\0\0";
+int		scsi_hba_log_align = 0;	/* NOTE: will not cause truncation */
+int		scsi_hba_log_fcif = '\0';	/* "^!?" first char in format */
+						/* ^==0x5e, !==0x21, ?==0x3F */
+						/* See cmn_err(9F) */
+int		scsi_hba_log_info =	/* augmentation: extra info output */
 			(0 << 0) |	/* 0x0001: process information */
-			(0 << 1) |	/* 0x0002: full devices path */
+			(0 << 1) |	/* 0x0002: full /devices path */
 			(0 << 2);	/* 0x0004: devinfo pointer */
+
 int		scsi_hba_log_mt_disable =
-			/* SCSI_ENUMERATION_MT_LUN_DISABLE | */
-			/* SCSI_ENUMERATION_MT_TARGET_DISABLE | */
+			/* SCSI_ENUMERATION_MT_LUN_DISABLE |	(ie 0x02) */
+			/* SCSI_ENUMERATION_MT_TARGET_DISABLE |	(ie 0x04) */
 			0;
 
 /* static data for HBA logging subsystem */
 static kmutex_t	scsi_hba_log_mutex;
 static char	scsi_hba_log_i[512];
 static char	scsi_hba_log_buf[512];
-static char	scsi_hba_fmt[64];
-static char	*scsi_hba_log_lab[] = SCSI_HBA_LOG_ASCII;
+static char	scsi_hba_fmt[512];
 
-/* Macros to use in source code */
-#define	_LOG(level, component)	SCSI_HBA_LOG##level, SCSI_HBA_LOG_##component
+/* Macros to use in scsi_hba.c source code below */
 #define	SCSI_HBA_LOG(x)	scsi_hba_log x
+#define	_LOG(level)	SCSI_HBA_LOG##level, __func__
+#define	_LOG_NF(level)	SCSI_HBA_LOG##level, NULL, NULL, NULL
+#define	_LOG_TRACE	_LOG(TRACE)
 
 /*PRINTFLIKE5*/
 void
-scsi_hba_log(int level, int component,
-    dev_info_t *self, dev_info_t *child, const char *fmt, ...)
+scsi_hba_log(int level, const char *func, dev_info_t *self, dev_info_t *child,
+    const char *fmt, ...)
 {
 	va_list		ap;
 	int		clevel;
+	int		align;
 	char		*info;
-	char		*clabel;
 	char		*f;
-	int		i;
+	char		*ua;
 
 	/* derive self from child's parent */
 	if ((self == NULL) && child)
 		self = ddi_get_parent(child);
 
-	/* always allow filtering on TRACE calls */
-	if ((level & SCSI_HBA_LOGTRACE) &&
-	    ((scsi_hba_log_filter_level & SCSI_HBA_LOGTRACE) == 0))
-		return;
-
-	/* no filtering of SCSI_HBA_LOG_CE_MASK or NC messages */
-	if (((level & SCSI_HBA_LOG_CE_MASK) != level) &&
-	    (component != SCSI_HBA_LOG_NC)) {
-		/* filter on level */
+	/* no filtering of SCSI_HBA_LOG_CE_MASK or LOG_NF messages */
+	if (((level & SCSI_HBA_LOG_CE_MASK) != level) && (func != NULL)) {
+		/* scsi_hba_log_filter_level: filter on level as bitmask */
 		if ((level & scsi_hba_log_filter_level) == 0)
 			return;
 
-		/* filter on component */
-		if ((component & scsi_hba_log_filter_component) == 0)
-			return;
+		/* scsi_hba_log_filter_phci/vhci: on name of driver */
+		if (*scsi_hba_log_filter_phci &&
+		    ((self == NULL) ||
+		    (ddi_driver_name(self) == NULL) ||
+		    strcmp(ddi_driver_name(self), scsi_hba_log_filter_phci))) {
+			/* does not match pHCI, check vHCI */
+			if (*scsi_hba_log_filter_vhci &&
+			    ((self == NULL) ||
+			    (ddi_driver_name(self) == NULL) ||
+			    strcmp(ddi_driver_name(self),
+			    scsi_hba_log_filter_vhci))) {
+				/* does not match vHCI */
+				return;
+			}
+		}
 
-		/* filter on self */
-		if (self && scsi_hba_log_filter_hba &&
-		    *scsi_hba_log_filter_hba &&
-		    ((ddi_driver_name(self) == NULL) ||
-		    strcmp(ddi_driver_name(self), scsi_hba_log_filter_hba)))
-			return;
+
+		/* passed filters, determine align */
+		align = scsi_hba_log_align;
+
+		/* shorten func for filtered output */
+		if (strncmp(func, "scsi_hba_", 9) == 0)
+			func += 9;
+		if (strncmp(func, "scsi_", 5) == 0)
+			func += 5;
+	} else {
+		/* don't align output that is never filtered */
+		align = 0;
 	}
 
-
-	/* determine the cmn_err form */
+	/* determine the cmn_err form from the level */
 	clevel = ((level & SCSI_HBA_LOG_CE_MASK) == level) ? level : CE_CONT;
 
-	/* determine the component label, SCSI_HBA_LOG_NC has none */
-	clabel = NULL;
-	for (i = 0; scsi_hba_log_lab[i]; i++) {
-		if (component & (1 << i)) {
-			clabel = scsi_hba_log_lab[i];
-			break;
-		}
-	}
-
-	if ((clabel == NULL) && (level & SCSI_HBA_LOGTRACE))
-		clabel = "trace";
-
+	/* protect common buffers used to format output */
 	mutex_enter(&scsi_hba_log_mutex);
 
 	/* skip special first characters, we add them back below */
@@ -400,7 +334,7 @@ scsi_hba_log(int level, int component,
 	(void) vsprintf(scsi_hba_log_buf, f, ap);
 	va_end(ap);
 
-	/* augment message */
+	/* augment message with 'information' */
 	info = scsi_hba_log_i;
 	*info = '\0';
 	if ((scsi_hba_log_info & 0x0001) && curproc && PTOU(curproc)->u_comm) {
@@ -418,30 +352,46 @@ scsi_hba_log(int level, int component,
 			(void) ddi_pathname(child ? child : self, info);
 			(void) strcat(info, " ");
 			info += strlen(info);
-		} else {
-			(void) sprintf(info, "%s%d: ",
-			    ddi_driver_name(self), ddi_get_instance(self));
+		}
+
+		/* always provide 'default' information about self &child */
+		(void) sprintf(info, "%s%d ", ddi_driver_name(self),
+		    ddi_get_instance(self));
+		info += strlen(info);
+		if (child) {
+			ua = ddi_get_name_addr(child);
+			(void) sprintf(info, "%s@%s ",
+			    ddi_node_name(child), (ua && *ua) ? ua : "");
 			info += strlen(info);
-			if (child) {
-				if (i_ddi_node_state(child) < DS_INITIALIZED)
-					(void) sprintf(info, "%s ",
-					    ddi_node_name(child));
-				else
-					(void) sprintf(info, "%s@%s ",
-					    ddi_node_name(child),
-					    ddi_get_name_addr(child));
-				info += strlen(info);
-			}
 		}
 	}
 
-	/* special first characters must be in format string itself */
+	/* turn off alignment if truncation would occur */
+	if (align && ((strlen(func) > 18) || (strlen(scsi_hba_log_i) > 36)))
+		align = 0;
+
+	/* adjust for aligned output */
+	if (align) {
+		if (func == NULL)
+			func = "";
+		/* remove trailing blank with align output */
+		if ((info != scsi_hba_log_i) && (*(info -1) == '\b'))
+			*(info - 1) = '\0';
+	}
+
+	/* special "first character in format" must be in format itself */
 	f = scsi_hba_fmt;
 	if (fmt[0] && strchr("^!?", fmt[0]))
 		*f++ = fmt[0];
-	(void) sprintf(f, "%s", clabel ? "%s: %s%s%s" : "%s%s%s");
-	if (clabel)
-		cmn_err(clevel, scsi_hba_fmt, clabel, scsi_hba_log_i,
+	else if (scsi_hba_log_fcif)
+		*f++ = (char)scsi_hba_log_fcif;		/* add global fcif */
+	if (align)
+		(void) sprintf(f, "%s", "%-18.18s: %36.36s: %s%s");
+	else
+		(void) sprintf(f, "%s", func ? "%s: %s%s%s" : "%s%s%s");
+
+	if (func)
+		cmn_err(clevel, scsi_hba_fmt, func, scsi_hba_log_i,
 		    scsi_hba_log_buf, clevel == CE_CONT ? "\n" : "");
 	else
 		cmn_err(clevel, scsi_hba_fmt, scsi_hba_log_i,
@@ -455,8 +405,7 @@ scsi_hba_log(int level, int component,
 void
 scsi_initialize_hba_interface()
 {
-	SCSI_HBA_LOG((_LOG(TRACE, NC), NULL, NULL,
-	    "scsi_initialize_hba_interface"));
+	SCSI_HBA_LOG((_LOG_TRACE, NULL, NULL, __func__));
 
 	mutex_init(&scsi_log_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&scsi_flag_nointr_mutex, NULL, MUTEX_DRIVER, NULL);
@@ -568,7 +517,7 @@ scsi_hba_init(struct modlinkage *modlp)
 {
 	struct dev_ops *hba_dev_ops;
 
-	SCSI_HBA_LOG((_LOG(TRACE, NC), NULL, NULL, "scsi_hba_init"));
+	SCSI_HBA_LOG((_LOG_TRACE, NULL, NULL, __func__));
 
 	/*
 	 * Get a pointer to the dev_ops structure of the HBA and plumb our
@@ -606,16 +555,17 @@ scsi_hba_tran_alloc(
 {
 	scsi_hba_tran_t		*tran;
 
+	SCSI_HBA_LOG((_LOG_TRACE, self, NULL, __func__));
+
 	/* allocate SCSA flavors for self */
 	ndi_flavorv_alloc(self, SCSA_NFLAVORS);
 
-	SCSI_HBA_LOG((_LOG(TRACE, NC), self, NULL, "scsi_hba_tran_alloc"));
 	tran = kmem_zalloc(sizeof (scsi_hba_tran_t),
 	    (flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP);
 
 	if (tran) {
 		tran->tran_interconnect_type = INTERCONNECT_PARALLEL;
-		tran->tran_hba_flags |= SCSI_HBA_TRAN_ALLOC;
+		tran->tran_hba_flags |= SCSI_HBA_SCSA_TA;
 	}
 
 	return (tran);
@@ -628,7 +578,7 @@ void
 scsi_hba_tran_free(
 	scsi_hba_tran_t		*tran)
 {
-	SCSI_HBA_LOG((_LOG(TRACE, NC), NULL, NULL, "scsi_hba_tran_free"));
+	SCSI_HBA_LOG((_LOG_TRACE, tran->tran_hba_dip, NULL, __func__));
 
 	kmem_free(tran, sizeof (scsi_hba_tran_t));
 }
@@ -700,7 +650,7 @@ scsi_hba_attach_setup(
 	int			capable;
 	static const char	*interconnect[] = INTERCONNECT_TYPE_ASCII;
 
-	SCSI_HBA_LOG((_LOG(TRACE, NC), self, NULL, "scsi_hba_attach_setup"));
+	SCSI_HBA_LOG((_LOG_TRACE, self, NULL, __func__));
 
 	/*
 	 * Verify correct scsi_hba_tran_t form:
@@ -708,9 +658,6 @@ scsi_hba_attach_setup(
 	 */
 	if ((tran->tran_get_name == NULL) ^
 	    (tran->tran_get_bus_addr == NULL)) {
-		SCSI_HBA_LOG((_LOG(WARN, ATTACH_SETUP), self, NULL,
-		    "should support both or neither: "
-		    "tran_get_name, tran_get_bus_addr"));
 		return (DDI_FAILURE);
 	}
 
@@ -719,8 +666,8 @@ scsi_hba_attach_setup(
 	 * later by scsi_hba_bus_ctl(), and scsi_hba_map().
 	 */
 	tran->tran_hba_dip = self;
-	tran->tran_hba_flags &= SCSI_HBA_TRAN_ALLOC;
-	tran->tran_hba_flags |= (flags & ~SCSI_HBA_TRAN_ALLOC);
+	tran->tran_hba_flags &= SCSI_HBA_SCSA_TA;
+	tran->tran_hba_flags |= (flags & ~SCSI_HBA_SCSA_TA);
 
 	/*
 	 * Note: we only need dma_attr_minxfer and dma_attr_burstsizes
@@ -774,8 +721,8 @@ scsi_hba_attach_setup(
 	    (ndi_prop_update_int(DDI_DEV_T_NONE, s, p,			\
 	    ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(s),		\
 	    DDI_PROP_NOTPROM, p, dv)) != DDI_PROP_SUCCESS))		\
-		SCSI_HBA_LOG((_LOG(WARN, ATTACH_SETUP), NULL, s,	\
-		    "cannot create property '%s'", p));			\
+		SCSI_HBA_LOG((_LOG(WARN), NULL, s,	\
+		    "can't create property '%s'", p));			\
 	}
 
 	/*
@@ -791,7 +738,7 @@ scsi_hba_attach_setup(
 	CONFIG_INT_PROP(self, "scsi-selection-timeout", scsi_selection_timeout);
 
 	/*
-	 * cache the scsi-initiator-id as a property defined further up
+	 * cache the scsi-initiator-id as an property defined further up
 	 * the tree or defined by OBP on the HBA node so can use
 	 * "DDI_PROP_NOTPROM | DDI_PROP_DONTPASS" during enumeration.
 	 * We perform the same type of operation that an HBA driver would
@@ -805,14 +752,14 @@ scsi_hba_attach_setup(
 		CONFIG_INT_PROP(self, "scsi-initiator-id", id);
 
 	/* Establish 'initiator-interconnect-type' */
-	if ((tran->tran_hba_flags & SCSI_HBA_TRAN_ALLOC) &&
+	if ((tran->tran_hba_flags & SCSI_HBA_SCSA_TA) &&
 	    (tran->tran_interconnect_type > 0) &&
 	    (tran->tran_interconnect_type < INTERCONNECT_MAX)) {
 		if (ndi_prop_update_string(DDI_DEV_T_NONE, self,
 		    "initiator-interconnect-type",
 		    (char *)interconnect[tran->tran_interconnect_type])
 		    != DDI_PROP_SUCCESS) {
-			SCSI_HBA_LOG((_LOG(WARN, ATTACH_SETUP), NULL, self,
+			SCSI_HBA_LOG((_LOG(WARN), self, NULL,
 			    "failed to establish "
 			    "'initiator-interconnect-type'"));
 			return (DDI_FAILURE);
@@ -846,8 +793,8 @@ scsi_hba_attach_setup(
 		    DDI_NT_SCSI_ATTACHMENT_POINT, 0) != DDI_SUCCESS)) {
 			ddi_remove_minor_node(self, "devctl");
 			ddi_remove_minor_node(self, "scsi");
-			SCSI_HBA_LOG((_LOG(WARN, ATTACH_SETUP), self, NULL,
-			    "cannot create devctl/scsi minor nodes"));
+			SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+			    "can't create devctl/scsi minor nodes"));
 		}
 	}
 
@@ -890,14 +837,14 @@ scsi_hba_attach_setup(
 		ddi_fm_init(self, &capable, NULL);
 
 		/*
-		 * Set SCSI_HBA_TRAN_FMSCSA bit to mark us as usiung the
+		 * Set SCSI_HBA_SCSA_FM bit to mark us as usiung the
 		 * common minimal SCSA fm implementation -  we called
 		 * ddi_fm_init(), so we are responsible for calling
 		 * ddi_fm_fini() in scsi_hba_detach().
 		 * NOTE: if ddi_fm_init fails in any reason, SKIP.
 		 */
 		if (DEVI(self)->devi_fmhdl)
-			tran->tran_hba_flags |= SCSI_HBA_TRAN_FMSCSA;
+			tran->tran_hba_flags |= SCSI_HBA_SCSA_FM;
 	}
 
 	return (DDI_SUCCESS);
@@ -912,7 +859,7 @@ scsi_hba_detach(dev_info_t *self)
 	struct dev_ops		*hba_dev_ops;
 	scsi_hba_tran_t		*tran;
 
-	SCSI_HBA_LOG((_LOG(TRACE, NC), self, NULL, "scsi_hba_detach"));
+	SCSI_HBA_LOG((_LOG_TRACE, self, NULL, __func__));
 
 	tran = ddi_get_driver_private(self);
 	ASSERT(tran);
@@ -928,7 +875,7 @@ scsi_hba_detach(dev_info_t *self)
 	 * If we are taking care of mininal default fma implementation,
 	 * call ddi_fm_fini(9F).
 	 */
-	if (tran->tran_hba_flags & SCSI_HBA_TRAN_FMSCSA) {
+	if (tran->tran_hba_flags & SCSI_HBA_SCSA_FM) {
 		ddi_fm_fini(self);
 	}
 
@@ -967,7 +914,7 @@ scsi_hba_fini(struct modlinkage *modlp)
 {
 	struct dev_ops *hba_dev_ops;
 
-	SCSI_HBA_LOG((_LOG(TRACE, NC), NULL, NULL, "scsi_hba_fini"));
+	SCSI_HBA_LOG((_LOG_TRACE, NULL, NULL, __func__));
 
 	/* Get the devops structure of this module and clear bus_ops vector. */
 	hba_dev_ops = ((struct modldrv *)(modlp->ml_linkage[0]))->drv_dev_ops;
@@ -1030,11 +977,9 @@ smp_busctl_reportdev(dev_info_t *child)
 	    SMP_WWN, &smp_wwn) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
-	cmn_err(CE_CONT,
-	    "?%s%d at %s%d: wwn %s\n",
+	SCSI_HBA_LOG((_LOG_NF(CONT), "?%s%d at %s%d: wwn %s\n",
 	    ddi_driver_name(child), ddi_get_instance(child),
-	    ddi_driver_name(self), ddi_get_instance(self),
-	    smp_wwn);
+	    ddi_driver_name(self), ddi_get_instance(self), smp_wwn));
 	ddi_prop_free(smp_wwn);
 	return (DDI_SUCCESS);
 }
@@ -1130,8 +1075,7 @@ scsi_busctl_reportdev(dev_info_t *child)
 	char			ua[SCSI_MAXNAMELEN];
 	char			ba[SCSI_MAXNAMELEN];
 
-	SCSI_HBA_LOG((_LOG(TRACE, BUS_CTL), NULL, child,
-	    "scsi_hba_bus_ctl REPORTDEV"));
+	SCSI_HBA_LOG((_LOG_TRACE, NULL, child, __func__));
 
 	ASSERT(tran && sd);
 	if ((tran == NULL) || (sd == NULL))
@@ -1140,22 +1084,19 @@ scsi_busctl_reportdev(dev_info_t *child)
 	/* get the unit_address and bus_addr information */
 	if ((scsi_get_name(sd, ua, sizeof (ua)) == 0) ||
 	    (scsi_get_bus_addr(sd, ba, sizeof (ba)) == 0)) {
-		SCSI_HBA_LOG((_LOG(DIAG1, BUS_CTL),
-		    NULL, child, "REPORTDEV failure"));
+		SCSI_HBA_LOG((_LOG(WARN), NULL, child, "REPORTDEV failure"));
 		return (DDI_FAILURE);
 	}
 
 	if (tran->tran_get_name == NULL)
-		SCSI_HBA_LOG((_LOG(CONT, NC), NULL, NULL,
-		    "?%s%d at %s%d: %s",
+		SCSI_HBA_LOG((_LOG_NF(CONT), "?%s%d at %s%d: %s",
 		    ddi_driver_name(child), ddi_get_instance(child),
 		    ddi_driver_name(self), ddi_get_instance(self), ba));
 	else
-		SCSI_HBA_LOG((_LOG(CONT, NC), NULL, NULL,
-		    "?%s%d at %s%d: name %s, bus address %s",
+		SCSI_HBA_LOG((_LOG_NF(CONT),
+		    "?%s%d at %s%d: unit-address %s: %s",
 		    ddi_driver_name(child), ddi_get_instance(child),
-		    ddi_driver_name(self), ddi_get_instance(self),
-		    ua, ba));
+		    ddi_driver_name(self), ddi_get_instance(self), ua, ba));
 	return (DDI_SUCCESS);
 }
 
@@ -1210,8 +1151,7 @@ scsi_busctl_initchild(dev_info_t *child)
 	char			addr[SCSI_MAXNAMELEN];
 
 	ASSERT(DEVI_BUSY_OWNED(self));
-	SCSI_HBA_LOG((_LOG(DIAG4, DEVICE_INITCHILD),
-	    NULL, child, "begin initchild"));
+	SCSI_HBA_LOG((_LOG(4), NULL, child, "init begin"));
 
 	/*
 	 * For a driver like fp with multiple upper-layer-protocols
@@ -1239,8 +1179,8 @@ scsi_busctl_initchild(dev_info_t *child)
 	if ((DEVI(child)->devi_hw_prop_ptr == NULL) &&
 	    (DEVI(child)->devi_drv_prop_ptr == NULL) &&
 	    (DEVI(child)->devi_sys_prop_ptr == NULL)) {
-		SCSI_HBA_LOG((_LOG(DIAG4, DEVICE_INITCHILD),
-		    NULL, child, "no properties"));
+		SCSI_HBA_LOG((_LOG(4), NULL, child,
+		    "init failed: no properties"));
 		return (DDI_NOT_WELL_FORMED);
 	}
 
@@ -1261,8 +1201,8 @@ scsi_busctl_initchild(dev_info_t *child)
 		 * that pathological devid resolution works.
 		 */
 		if (ndi_dev_is_persistent_node(child) == 0) {
-			SCSI_HBA_LOG((_LOG(DIAG4, DEVICE_INITCHILD),
-			    NULL, child, "stub driver.conf node"));
+			SCSI_HBA_LOG((_LOG(4), NULL, child,
+			    "init failed: stub .conf node"));
 			return (DDI_NOT_WELL_FORMED);
 		}
 	}
@@ -1275,8 +1215,8 @@ scsi_busctl_initchild(dev_info_t *child)
 	 */
 	if ((tran->tran_get_name == NULL) &&
 	    ((tgt >= USHRT_MAX) || (lun >= 256))) {
-		SCSI_HBA_LOG((_LOG(DIAG1, DEVICE_INITCHILD),
-		    NULL, child, "illegal or missing addressing properties"));
+		SCSI_HBA_LOG((_LOG(1), NULL, child,
+		    "init failed: illegal/missing properties"));
 		return (DDI_NOT_WELL_FORMED);
 	}
 
@@ -1366,14 +1306,14 @@ scsi_busctl_initchild(dev_info_t *child)
 		 * to their nexus representation of target) to their stub
 		 * nodes, causing the check above to not filter them.
 		 */
-		SCSI_HBA_LOG((_LOG(DIAG3, DEVICE_INITCHILD),
-		    NULL, child, "failed name_child"));
+		SCSI_HBA_LOG((_LOG(3), NULL, child,
+		    "init failed: scsi_busctl_ua call"));
 		err = DDI_NOT_WELL_FORMED;
 		goto failure;
 	}
 	if (*addr == '\0') {
-		SCSI_HBA_LOG((_LOG(DIAG2, DEVICE_INITCHILD),
-		    NULL, child, "failed to establish @addr"));
+		SCSI_HBA_LOG((_LOG(2), NULL, child, "init failed: ua"));
+		ndi_devi_set_hidden(child);
 		err = DDI_NOT_WELL_FORMED;
 		goto failure;
 	}
@@ -1384,23 +1324,23 @@ scsi_busctl_initchild(dev_info_t *child)
 	/* prevent sibling duplicates */
 	dup = ndi_devi_find(self, ddi_node_name(child), addr);
 	if (dup && (dup != child)) {
-		SCSI_HBA_LOG((_LOG(DIAG4, DEVICE_INITCHILD),
-		    NULL, child, "@%s duplicate %p", addr, (void *)dup));
+		SCSI_HBA_LOG((_LOG(4), NULL, child,
+		    "init failed: detected duplicate %p", (void *)dup));
 		goto failure;
 	}
 
 	/* call HBA's target init entry point if it exists */
 	if (tran->tran_tgt_init != NULL) {
+		SCSI_HBA_LOG((_LOG(4), NULL, child, "init tran_tgt_init"));
 		if ((*tran->tran_tgt_init)
 		    (self, child, tran, sd) != DDI_SUCCESS) {
-			SCSI_HBA_LOG((_LOG(DIAG2, DEVICE_INITCHILD),
-			    NULL, child, "@%s failed tran_tgt_init", addr));
+			SCSI_HBA_LOG((_LOG(2), NULL, child,
+			    "init failed: tran_tgt_init failed"));
 			goto failure;
 		}
 	}
 
-	SCSI_HBA_LOG((_LOG(DIAG3, DEVICE_INITCHILD),
-	    NULL, child, "@%s ok", addr));
+	SCSI_HBA_LOG((_LOG(3), NULL, child, "init successful"));
 	return (DDI_SUCCESS);
 
 failure:
@@ -1428,10 +1368,8 @@ scsi_busctl_uninitchild(dev_info_t *child)
 	if ((tran == NULL) || (sd == NULL))
 		return (DDI_FAILURE);
 
-	SCSI_HBA_LOG((_LOG(DIAG3, DEVICE_UNINITCHILD),
-	    NULL, child, "uninitchild %d %s@%s", i_ddi_node_state(child),
-	    ddi_node_name(child),
-	    ddi_get_name_addr(child) ? ddi_get_name_addr(child) : "XXX"));
+
+	SCSI_HBA_LOG((_LOG(3), NULL, child, "uninit begin"));
 
 	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
 		tran_clone = sd->sd_address.a_hba_tran;
@@ -1444,10 +1382,9 @@ scsi_busctl_uninitchild(dev_info_t *child)
 			 * Complain so things get fixed and hack can, at
 			 * some point in time, be removed.
 			 */
-			cmn_err(CE_WARN, "scsi_busctl_uninitchild: '%s' is "
-			    "corrupting a_hba_tran",
-			    sd->sd_dev ? ddi_driver_name(sd->sd_dev) :
-			    "unknown_driver");
+			SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+			    "'%s' is corrupting a_hba_tran", sd->sd_dev ?
+			    ddi_driver_name(sd->sd_dev) : "unknown_driver"));
 #endif	/* DEBUG */
 		}
 
@@ -1487,8 +1424,7 @@ scsi_busctl_uninitchild(dev_info_t *child)
 	kmem_free(sd, sizeof (*sd));
 
 	ddi_set_driver_private(child, NULL);
-	SCSI_HBA_LOG((_LOG(DIAG3, DEVICE_UNINITCHILD),
-	    NULL, child, "complete"));
+	SCSI_HBA_LOG((_LOG(3), NULL, child, "uninit complete"));
 	ddi_set_name_addr(child, NULL);
 	return (DDI_SUCCESS);
 }
@@ -1580,8 +1516,7 @@ scsi_hba_bus_ctl(
 	case DDI_CTLOPS_AFFINITY:
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
-		SCSI_HBA_LOG((_LOG(WARN, BUS_CTL), NULL, child,
-		    "invalid op (%d)", op));
+		SCSI_HBA_LOG((_LOG(WARN), self, NULL, "invalid op (%d)", op));
 		return (DDI_FAILURE);
 
 	/* Everything else we pass up */
@@ -1631,8 +1566,8 @@ scsi_hba_pkt_alloc(
 
 	/* Sanity check */
 	if (callback != SLEEP_FUNC && callback != NULL_FUNC)
-		SCSI_HBA_LOG((_LOG(WARN, PKT_ALLOC), dip, NULL,
-		    "callback must be either SLEEP_FUNC or NULL_FUNC"));
+		SCSI_HBA_LOG((_LOG(WARN), dip, NULL,
+		    "callback must be SLEEP_FUNC or NULL_FUNC"));
 
 	/*
 	 * Round up so everything gets allocated on long-word boundaries
@@ -1767,15 +1702,15 @@ scsi_pkt_allocated_correctly(struct scsi_pkt *pkt)
 
 	/*
 	 * Special case crossing a page boundary. If the scsi_pkt was not
-	 * allocated correctly, then accross a page boundary we have a
-	 * fault hazzard.
+	 * allocated correctly, then across a page boundary we have a
+	 * fault hazard.
 	 */
 	if ((((uintptr_t)(&hba_pkt->scsi_pkt)) & MMU_PAGEMASK) ==
 	    (((uintptr_t)(&hba_pkt->pkt_wrapper_magic)) & MMU_PAGEMASK)) {
-		/* fastpath, no cross-page hazzard */
+		/* fastpath, no cross-page hazard */
 		magic = hba_pkt->pkt_wrapper_magic;
 	} else {
-		/* add protection for cross-page hazzard */
+		/* add protection for cross-page hazard */
 		if (ddi_peek32((dev_info_t *)NULL,
 		    &hba_pkt->pkt_wrapper_magic, &magic) == DDI_FAILURE) {
 			return (0);	/* violation */
@@ -1835,7 +1770,8 @@ scsi_size_clean(dev_info_t *dip)
 	major = ddi_driver_major(dip);
 	ASSERT(major < devcnt);
 	if (major >= devcnt) {
-		cmn_err(CE_WARN, "scsi_pkt_size: bogus major: %d", major);
+		SCSI_HBA_LOG((_LOG(WARN), dip, NULL,
+		    "scsi_pkt_size: bogus major: %d", major));
 		return;
 	}
 
@@ -2351,7 +2287,7 @@ scsi_lun_to_lun64(scsi_lun_t lun)
 		}
 
 		/* Oops, we got a bad scsi_lun_t. Leave it in 64-bit form */
-		SCSI_HBA_LOG((_LOG(DIAG1, BADLUN), NULL, NULL,
+		SCSI_HBA_LOG((_LOG(WARN), NULL, NULL,
 		    "lun_to_lun64 bad lun %" PRIx64, *(scsi_lun64_t *)&lun));
 	}
 
@@ -2399,7 +2335,7 @@ scsi_lun64_to_lun(scsi_lun64_t lun64)
 
 		/* Oops, bad LUN -- this is required to be nonzero */
 		if (lun.sl_lun1_msb == 0)
-			SCSI_HBA_LOG((_LOG(DIAG1, BADLUN), NULL, NULL,
+			SCSI_HBA_LOG((_LOG(WARN), NULL, NULL,
 			    "lun64_to_lun bad lun %" PRIlun64, lun64));
 	}
 	return (lun);
@@ -2443,7 +2379,7 @@ scsi_addr_to_lun64(char *addr)
 		lun64 = SCSI_LUN64_ILLEGAL;
 
 	if (lun64 == SCSI_LUN64_ILLEGAL)
-		SCSI_HBA_LOG((_LOG(DIAG2, BADLUN), NULL, NULL,
+		SCSI_HBA_LOG((_LOG(2), NULL, NULL,
 		    "addr_to_lun64 %s lun %" PRIlun64,
 		    addr ? addr : "NULL", lun64));
 	return (lun64);
