@@ -53,6 +53,7 @@ struct zfsvfs {
 	avl_tree_t	z_fuid_domain;	/* fuid tree keyed by domain */
 	krwlock_t	z_fuid_lock;	/* fuid lock */
 	boolean_t	z_fuid_loaded;	/* fuid tables are loaded */
+	boolean_t	z_fuid_dirty;   /* need to sync fuid table ? */
 	struct zfs_fuid_info	*z_fuid_replay; /* fuid info for replay */
 	zilog_t		*z_log;		/* intent log pointer */
 	uint_t		z_acl_mode;	/* acl chmod/mode behavior */

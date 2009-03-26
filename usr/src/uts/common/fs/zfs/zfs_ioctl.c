@@ -3078,6 +3078,7 @@ zfs_ioc_smb_acl(zfs_cmd_t *zc)
 		    nvlist_lookup_string(nvlist, ZFS_SMB_ACL_TARGET,
 		    &target)) {
 			VN_RELE(vp);
+			VN_RELE(ZTOV(sharedir));
 			ZFS_EXIT(zfsvfs);
 			return (error);
 		}

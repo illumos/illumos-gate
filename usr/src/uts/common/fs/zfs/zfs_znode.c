@@ -429,6 +429,7 @@ zfs_create_op_tables()
 int
 zfs_create_share_dir(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 {
+	zfs_acl_ids_t acl_ids;
 	vattr_t vattr;
 	znode_t *sharezp;
 	vnode_t *vp;
@@ -450,8 +451,10 @@ zfs_create_share_dir(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 	vn_reinit(vp);
 	vp->v_type = VDIR;
 
+	VERIFY(0 == zfs_acl_ids_create(sharezp, IS_ROOT_NODE, &vattr,
+	    kcred, NULL, &acl_ids));
 	zfs_mknode(sharezp, &vattr, tx, kcred, IS_ROOT_NODE,
-	    &zp, 0, NULL, NULL);
+	    &zp, 0, &acl_ids);
 	ASSERT3P(zp, ==, sharezp);
 	ASSERT(!vn_in_dnlc(ZTOV(sharezp))); /* not valid to move */
 	POINTER_INVALIDATE(&sharezp->z_zfsvfs);
@@ -459,6 +462,7 @@ zfs_create_share_dir(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 	    ZFS_SHARES_DIR, 8, 1, &sharezp->z_id, tx);
 	zfsvfs->z_shares_dir = sharezp->z_id;
 
+	zfs_acl_ids_free(&acl_ids);
 	ZTOV(sharezp)->v_count = 0;
 	dmu_buf_rele(sharezp->z_dbuf, NULL);
 	sharezp->z_dbuf = NULL;
@@ -780,8 +784,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz)
  */
 void
 zfs_mknode(znode_t *dzp, vattr_t *vap, dmu_tx_t *tx, cred_t *cr,
-    uint_t flag, znode_t **zpp, int bonuslen, zfs_acl_t *setaclp,
-    zfs_fuid_info_t **fuidp)
+    uint_t flag, znode_t **zpp, int bonuslen, zfs_acl_ids_t *acl_ids)
 {
 	dmu_buf_t	*db;
 	znode_phys_t	*pzp;
@@ -906,7 +909,12 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, dmu_tx_t *tx, cred_t *cr,
 		 */
 		*zpp = dzp;
 	}
-	zfs_perm_init(*zpp, dzp, flag, vap, tx, cr, setaclp, fuidp);
+	pzp->zp_uid = acl_ids->z_fuid;
+	pzp->zp_gid = acl_ids->z_fgid;
+	pzp->zp_mode = acl_ids->z_mode;
+	VERIFY(0 == zfs_aclset_common(*zpp, acl_ids->z_aclp, cr, tx));
+	if (vap->va_mask & AT_XVATTR)
+		zfs_xvattr_set(*zpp, (xvattr_t *)vap);
 }
 
 void
@@ -1543,6 +1551,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	vnode_t		*vp;
 	vattr_t		vattr;
 	znode_t		*zp;
+	zfs_acl_ids_t	acl_ids;
 
 	/*
 	 * First attempt to create master node.
@@ -1635,11 +1644,14 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 
 	ASSERT(!POINTER_IS_VALID(rootzp->z_zfsvfs));
 	rootzp->z_zfsvfs = &zfsvfs;
-	zfs_mknode(rootzp, &vattr, tx, cr, IS_ROOT_NODE, &zp, 0, NULL, NULL);
+	VERIFY(0 == zfs_acl_ids_create(rootzp, IS_ROOT_NODE, &vattr,
+	    cr, NULL, &acl_ids));
+	zfs_mknode(rootzp, &vattr, tx, cr, IS_ROOT_NODE, &zp, 0, &acl_ids);
 	ASSERT3P(zp, ==, rootzp);
 	ASSERT(!vn_in_dnlc(ZTOV(rootzp))); /* not valid to move */
 	error = zap_add(os, moid, ZFS_ROOT_OBJ, 8, 1, &rootzp->z_id, tx);
 	ASSERT(error == 0);
+	zfs_acl_ids_free(&acl_ids);
 	POINTER_INVALIDATE(&rootzp->z_zfsvfs);
 
 	ZTOV(rootzp)->v_count = 0;
@@ -1652,6 +1664,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	 */
 
 	error = zfs_create_share_dir(&zfsvfs, tx);
+
 	ASSERT(error == 0);
 }
 

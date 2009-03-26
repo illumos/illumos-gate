@@ -922,6 +922,7 @@ dump_uidgid(objset_t *os, znode_phys_t *zp)
 		/* first find the fuid object.  It lives in the master node */
 		VERIFY(zap_lookup(os, MASTER_NODE_OBJ, ZFS_FUID_TABLES,
 		    8, 1, &fuid_obj) == 0);
+		zfs_fuid_avl_tree_create(&idx_tree, &domain_tree);
 		(void) zfs_fuid_table_load(os, fuid_obj,
 		    &idx_tree, &domain_tree);
 		fuid_table_loaded = B_TRUE;
