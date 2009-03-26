@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1937,6 +1937,7 @@ register_lock(mutex_t *mp)
 	uberdata_t *udp = curthread->ul_uberdata;
 	uint_t hash = LOCK_HASH(mp);
 	robust_t *rlp;
+	robust_t *invalid;
 	robust_t **rlpp;
 	robust_t **table;
 
@@ -1967,6 +1968,7 @@ register_lock(mutex_t *mp)
 	 */
 	lmutex_lock(&udp->tdb_hash_lock);
 
+	invalid = NULL;
 	for (rlpp = &table[hash];
 	    (rlp = *rlpp) != NULL;
 	    rlpp = &rlp->robust_next) {
@@ -1974,17 +1976,75 @@ register_lock(mutex_t *mp)
 			lmutex_unlock(&udp->tdb_hash_lock);
 			return;
 		}
+		/* remember the first invalid entry, if any */
+		if (rlp->robust_lock == INVALID_ADDR && invalid == NULL)
+			invalid = rlp;
 	}
 
 	/*
 	 * The lock has never been registered.
-	 * Register it now and add it to the table.
+	 * Add it to the table and register it now.
 	 */
+	if (invalid != NULL) {
+		/*
+		 * Reuse the invalid entry we found above.
+		 * The linkages are still correct.
+		 */
+		invalid->robust_lock = mp;
+		membar_producer();
+	} else {
+		/*
+		 * Allocate a new entry and add it to
+		 * the hash table and to the global list.
+		 */
+		rlp = lmalloc(sizeof (*rlp));
+		rlp->robust_lock = mp;
+		rlp->robust_next = NULL;
+		rlp->robust_list = udp->robustlist;
+		udp->robustlist = rlp;
+		membar_producer();
+		*rlpp = rlp;
+	}
+
+	lmutex_unlock(&udp->tdb_hash_lock);
+
 	(void) ___lwp_mutex_register(mp);
-	rlp = lmalloc(sizeof (*rlp));
-	rlp->robust_lock = mp;
-	membar_producer();
-	*rlpp = rlp;
+}
+
+/*
+ * This is called from mmap(), munmap() and shmdt() to unregister
+ * all robust locks contained in the mapping that is going away.
+ * We don't delete the entries in the hash table, since the hash table
+ * is constrained never to shrink; we just invalidate the addresses.
+ */
+void
+unregister_locks(caddr_t addr, size_t len)
+{
+	static size_t pagesize = 0;
+	uberdata_t *udp = curthread->ul_uberdata;
+	robust_t *rlp;
+	caddr_t eaddr;
+	caddr_t maddr;
+
+	/*
+	 * Round up len to a multiple of pagesize.
+	 */
+	if (pagesize == 0)	/* do this once */
+		pagesize = _sysconf(_SC_PAGESIZE);
+	eaddr = addr + ((len + pagesize - 1) & -pagesize);
+
+	lmutex_lock(&udp->tdb_hash_lock);
+
+	/*
+	 * Do this by traversing the global list, not the hash table.
+	 * The hash table is large (32K buckets) and sparsely populated.
+	 * The global list contains all of the registered entries.
+	 */
+	for (rlp = udp->robustlist; rlp != NULL; rlp = rlp->robust_list) {
+		maddr = (caddr_t)rlp->robust_lock;
+		if (addr <= maddr && maddr < eaddr)
+			rlp->robust_lock = INVALID_ADDR;
+	}
 
 	lmutex_unlock(&udp->tdb_hash_lock);
 }
@@ -1995,26 +2055,32 @@ register_lock(mutex_t *mp)
  * No locks are needed because all other threads are suspended or gone.
  */
 void
-unregister_locks(void)
+unregister_all_locks(void)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
-	uint_t hash;
 	robust_t **table;
 	robust_t *rlp;
 	robust_t *next;
 
-	if ((table = udp->robustlocks) != NULL) {
-		for (hash = 0; hash < LOCKHASHSZ; hash++) {
-			rlp = table[hash];
-			while (rlp != NULL) {
-				next = rlp->robust_next;
-				lfree(rlp, sizeof (*rlp));
-				rlp = next;
-			}
-		}
-		lfree(table, LOCKHASHSZ * sizeof (robust_t *));
-		udp->robustlocks = NULL;
+	/*
+	 * Do this first, before calling lfree().
+	 * lfree() may call munmap(), which calls unregister_locks().
+	 */
+	table = udp->robustlocks;
+	udp->robustlocks = NULL;
+	rlp = udp->robustlist;
+	udp->robustlist = NULL;
+
+	/*
+	 * As above, do this by traversing the global list, not the hash table.
+	 */
+	while (rlp != NULL) {
+		next = rlp->robust_list;
+		lfree(rlp, sizeof (*rlp));
+		rlp = next;
 	}
+	if (table != NULL)
+		lfree(table, LOCKHASHSZ * sizeof (robust_t *));
 }
 
 /*

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 #include <procfs.h>
@@ -834,12 +832,17 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    prt_addr(uberdata.ulwp_lastfree, 1),
 	    prt_addr(uberdata.ulwp_replace_free, 0));
 
-	HD("ulwp_replace_last     atforklist            robustlocks");
-	mdb_printf(OFFSTR "%s %s %s\n",
+	HD("ulwp_replace_last     atforklist");
+	mdb_printf(OFFSTR "%s %s\n",
 	    OFFSET(ulwp_replace_last),
 	    prt_addr(uberdata.ulwp_replace_last, 1),
-	    prt_addr(uberdata.atforklist, 1),
-	    prt_addr(uberdata.robustlocks, 0));
+	    prt_addr(uberdata.atforklist, 0));
+
+	HD("robustlocks           robustlist");
+	mdb_printf(OFFSTR "%s %s\n",
+	    OFFSET(robustlocks),
+	    prt_addr(uberdata.robustlocks, 1),
+	    prt_addr(uberdata.robustlist, 0));
 
 	HD("tdb_bootstrap         tdb_sync_addr_hash    tdb_'count tdb_'fail");
 	mdb_printf(OFFSTR "%s %s %-10d %d\n",

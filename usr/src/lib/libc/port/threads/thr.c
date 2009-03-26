@@ -132,6 +132,7 @@ uberdata_t __uberdata = {
 	NULL,			/* ulwp_replace_last */
 	NULL,			/* atforklist */
 	NULL,			/* robustlocks */
+	NULL,			/* robustlist */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */

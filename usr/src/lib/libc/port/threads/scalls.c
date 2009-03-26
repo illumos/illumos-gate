@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,7 +243,7 @@ forkx(int flags)
 		self->ul_siginfo.si_signo = 0;
 		udp->pid = getpid();
 		/* reset the library's data structures to reflect one thread */
-		unregister_locks();
+		unregister_all_locks();
 		postfork1_child();
 		restore_signals(self);
 		(void) mutex_unlock(&udp->fork_lock);
@@ -321,7 +321,7 @@ forkallx(int flags)
 		self->ul_cursig = 0;
 		self->ul_siginfo.si_signo = 0;
 		udp->pid = getpid();
-		unregister_locks();
+		unregister_all_locks();
 		continue_fork(1);
 	} else {
 		continue_fork(0);

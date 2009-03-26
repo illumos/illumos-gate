@@ -20,24 +20,24 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-	.file	"munmap.s"
+	.file	"__munmap.s"
 
-/* C library -- munmap						*/
-/* int munmap(caddr_t addr, size_t len)				*/
-
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(munmap,function)
+/*
+ * Raw system call:
+ * int __munmap(caddr_t addr, size_t len)
+ */
 
 #include "SYS.h"
 
-	SYSCALL_RVAL1(munmap)
+	ENTRY(__munmap)
+	SYSTRAP_RVAL1(munmap)
+	SYSCERROR
 	RETC
-	SET_SIZE(munmap)
+	SET_SIZE(__munmap)

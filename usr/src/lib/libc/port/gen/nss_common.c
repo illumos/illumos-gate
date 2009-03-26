@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Shared code used by the name-service-switch frontends (e.g. getpwnam_r())
@@ -2056,7 +2054,7 @@ _nsc_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		 */
 		if (doorptr != (void *)pbuf) {
 			_nsc_resizedoorbuf(bufsize);
-			munmap((void *)doorptr, bufsize);
+			(void) munmap((void *)doorptr, bufsize);
 		}
 		return (NSS_TRYLOCAL);
 	}
@@ -2071,7 +2069,7 @@ _nsc_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	 */
 	if (doorptr != (void *)pbuf) {
 		_nsc_resizedoorbuf(bufsize);
-		munmap((void *)doorptr, bufsize);
+		(void) munmap((void *)doorptr, bufsize);
 	}
 	return (status);
 }
@@ -2153,7 +2151,7 @@ _nsc_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	 */
 	if (doorptr != (void *)pbuf) {
 		_nsc_resizedoorbuf(bufsize);
-		munmap((void *)doorptr, bufsize);
+		(void) munmap((void *)doorptr, bufsize);
 	}
 	return (status);
 }
@@ -2220,7 +2218,7 @@ _nsc_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	 */
 	if (doorptr != (void *)pbuf) {
 		_nsc_resizedoorbuf(bufsize);
-		munmap((void *)doorptr, bufsize);
+		(void) munmap((void *)doorptr, bufsize);
 	}
 	return (status);
 }
@@ -2270,7 +2268,7 @@ _nsc_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	 */
 	if (doorptr != (void *)pbuf) {
 		_nsc_resizedoorbuf(bufsize);
-		munmap((void *)doorptr, bufsize);
+		(void) munmap((void *)doorptr, bufsize);
 	}
 
 	/* clean up initf setup */

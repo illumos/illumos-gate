@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _shmat = shmat
 #pragma weak _shmctl = shmctl
@@ -37,6 +35,7 @@
 #pragma weak _shmids = shmids
 
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/ipc_impl.h>
@@ -45,16 +44,92 @@
 #include <sys/syscall.h>
 #include <errno.h>
 
+/*
+ * List of all shared memory segments.
+ * We need this to keep track of the sizes so that we can unregister
+ * any robust locks that are contained in a segment that is detached.
+ */
+static struct shm_size {
+	void		*shm_addr;
+	size_t		shm_size;
+	struct shm_size	*shm_next;
+} *shm_list = NULL;
+
+static mutex_t shm_lock = DEFAULTMUTEX;		/* protects shm_list */
+
+extern void unregister_locks(caddr_t, size_t);
+
+/*
+ * Add a shared memory address and size to the remembered list.
+ */
+static void
+add_shm_size(void *addr, size_t size)
+{
+	struct shm_size **list;
+	struct shm_size *elem;
+
+	lmutex_lock(&shm_lock);
+
+	for (list = &shm_list; (elem = *list) != NULL; list = &elem->shm_next) {
+		if (elem->shm_addr == addr) {	/* won't happen? */
+			elem->shm_size = size;
+			lmutex_unlock(&shm_lock);
+			return;
+		}
+	}
+	elem = lmalloc(sizeof (*elem));
+	elem->shm_addr = addr;
+	elem->shm_size = size;
+	elem->shm_next = NULL;
+	*list = elem;
+
+	lmutex_unlock(&shm_lock);
+}
+
+/*
+ * Delete the shared memory address from the remembered list
+ * and unregister all of the robust locks contained therein.
+ */
+static void
+delete_shm_size(void *addr)
+{
+	struct shm_size **list;
+	struct shm_size *elem;
+	size_t size = 0;
+
+	lmutex_lock(&shm_lock);
+
+	for (list = &shm_list; (elem = *list) != NULL; list = &elem->shm_next) {
+		if (elem->shm_addr == addr) {
+			size = elem->shm_size;
+			*list = elem->shm_next;
+			lfree(elem, sizeof (*elem));
+			break;
+		}
+	}
+
+	lmutex_unlock(&shm_lock);
+
+	if (size != 0)
+		unregister_locks(addr, size);
+}
+
 void *
 shmat(int shmid, const void *shmaddr, int shmflg)
 {
 	sysret_t rval;
 	int error;
+	void *addr;
+	struct shmid_ds shmds;
 
 	error = __systemcall(&rval, SYS_shmsys, SHMAT, shmid, shmaddr, shmflg);
-	if (error)
+	addr = (void *)rval.sys_rval1;
+	if (error) {
 		(void) __set_errno(error);
-	return ((void *)rval.sys_rval1);
+	} else if (shmctl(shmid, IPC_STAT, &shmds) == 0) {
+		add_shm_size(addr, shmds.shm_segsz);
+	}
+	return (addr);
 }
 
 int
@@ -80,7 +155,10 @@ shmctl64(int shmid, int cmd, struct shmid_ds64 *buf)
 int
 shmdt(char *shmaddr)
 {
-	return (syscall(SYS_shmsys, SHMDT, shmaddr));
+	int rval = syscall(SYS_shmsys, SHMDT, shmaddr);
+	if (rval == 0)
+		delete_shm_size(shmaddr);
+	return (rval);
 }
 
 int

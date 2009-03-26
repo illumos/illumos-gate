@@ -546,6 +546,15 @@ thr_min_stack()
 }
 
 /*
+ * munmap() calls this.  It is unnecessary in the dynamic linker.
+ */
+/* ARGSUSED */
+void
+unregister_locks(caddr_t addr, size_t len)
+{
+}
+
+/*
  * The following functions are cancellation points in libc.
  * They are called from other functions in libc that we extract
  * and use directly.  We don't do cancellation while we are in

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -705,14 +705,21 @@ typedef struct atfork {
 } atfork_t;
 
 /*
- * Element in the table of registered process robust locks.
- * We keep track of these to make sure that we only call
- * ___lwp_mutex_register() once for each such lock.
+ * Element in the table and in the list of registered process
+ * robust locks.  We keep track of these to make sure that we
+ * only call ___lwp_mutex_register() once for each such lock
+ * after it is first mapped in (or newly mapped in).
  */
 typedef struct robust {
-	struct robust	*robust_next;
+	struct robust	*robust_next;	/* hash table list */
+	struct robust	*robust_list;	/* global list */
 	mutex_t		*robust_lock;
 } robust_t;
+
+/*
+ * Invalid address, used to mark an unused element in the hash table.
+ */
+#define	INVALID_ADDR	((void *)(uintptr_t)(-1L))
 
 /*
  * Parameters of the lock registration hash table.
@@ -888,6 +895,7 @@ typedef struct uberdata {
 	ulwp_t	*ulwp_replace_last;
 	atfork_t	*atforklist;	/* circular Q for fork handlers */
 	robust_t	**robustlocks;	/* table of registered robust locks */
+	robust_t	*robustlist;	/* list of registered robust locks */
 	struct uberdata **tdb_bootstrap;
 	tdb_t	tdb;		/* thread debug interfaces (for libc_db) */
 } uberdata_t;
@@ -1096,6 +1104,7 @@ typedef struct uberdata32 {
 	caddr32_t	ulwp_replace_last;
 	caddr32_t	atforklist;
 	caddr32_t	robustlocks;
+	caddr32_t	robustlist;
 	caddr32_t	tdb_bootstrap;
 	tdb32_t		tdb;
 } uberdata32_t;
@@ -1207,7 +1216,8 @@ extern	void	record_spin_locks(ulwp_t *);
 extern	void	remember_lock(mutex_t *);
 extern	void	forget_lock(mutex_t *);
 extern	void	register_lock(mutex_t *);
-extern	void	unregister_locks(void);
+extern	void	unregister_locks(caddr_t, size_t);
+extern	void	unregister_all_locks(void);
 #if defined(__sparc)
 extern	void	_flush_windows(void);
 #else

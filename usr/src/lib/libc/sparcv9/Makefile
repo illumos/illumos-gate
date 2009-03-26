@@ -164,6 +164,8 @@ SYSOBJS64=
 COMSYSOBJS=			\
 	__clock_timer.o		\
 	__getloadavg.o		\
+	__mmap.o		\
+	__munmap.o		\
 	__rusagesys.o		\
 	__signotify.o		\
 	__sigrt.o		\
@@ -248,12 +250,10 @@ COMSYSOBJS=			\
 	mincore.o		\
 	mkdir.o			\
 	mknod.o			\
-	mmap.o			\
 	mmapobjsys.o		\
 	modctl.o		\
 	mount.o			\
 	mprotect.o		\
-	munmap.o		\
 	nice.o			\
 	ntp_adjtime.o		\
 	ntp_gettime.o		\
@@ -489,10 +489,12 @@ PORTGEN=			\
 	mktemp.o		\
 	mlock.o			\
 	mlockall.o		\
+	mmap.o			\
 	mon.o			\
 	msync.o			\
 	munlock.o		\
 	munlockall.o		\
+	munmap.o		\
 	ndbm.o			\
 	nftw.o			\
 	nlspath_checks.o	\

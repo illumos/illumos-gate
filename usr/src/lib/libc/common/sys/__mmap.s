@@ -20,22 +20,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	All Rights Reserved	*/
 
-	.file	"mmap.s"
-
-#include <sys/asm_linkage.h>
-
-#if !defined(_LARGEFILE_SOURCE)
-	ANSI_PRAGMA_WEAK(mmap,function)
-#else
-	ANSI_PRAGMA_WEAK(mmap64,function)
-#endif
+	.file	"__mmap.s"
 
 #include "SYS.h"
 #include <sys/mman.h>		/* Need _MAP_NEW definition     */
@@ -43,12 +35,12 @@
 #if !defined(_LARGEFILE_SOURCE)
 
 /*
- * C library -- mmap
- * caddr_t mmap(caddr_t addr, size_t len, int prot,
+ * Raw system call, private to libc:
+ * caddr_t __mmap(caddr_t addr, size_t len, int prot,
  *	int flags, int fd, off_t off)
  */
 
-	ENTRY(mmap)
+	ENTRY(__mmap)
 #if defined(__sparc)
 	/* this depends upon the _MAP_NEW flag being in the top bits */
 	sethi	%hi(_MAP_NEW), %g1
@@ -57,17 +49,17 @@
 	SYSTRAP_RVAL1(mmap)
 	SYSCERROR
 	RET
-	SET_SIZE(mmap)
+	SET_SIZE(__mmap)
 
 #else
 
 /*
- * C library -- mmap64
- * caddr_t mmap64(caddr_t addr, size_t len, int prot,
+ * Raw system call, private to libc:
+ * caddr_t __mmap64(caddr_t addr, size_t len, int prot,
  *	int flags, int fd, off64_t off)
  */
 
-	ENTRY(mmap64)
+	ENTRY(__mmap64)
 #if defined(__sparc)
 	/* this depends upon the _MAP_NEW flag being in the top bits */
 	sethi	%hi(_MAP_NEW), %g1
@@ -76,6 +68,6 @@
 	SYSTRAP_RVAL1(mmap64)
 	SYSCERROR
 	RET
-	SET_SIZE(mmap64)
+	SET_SIZE(__mmap64)
 
 #endif
