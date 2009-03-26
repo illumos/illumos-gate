@@ -2841,12 +2841,15 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 			 * We have the same pkg on the src and dst
 			 * but the dst pkg has patches and the src
 			 * pkg does not.   Just replace the pkg.
+			 *
+			 * We don't want to actually add the original pkg
+			 * to the list of pkgs to remove here since the
+			 * pkginstall command relies on the presence of the
+			 * installed pkg with the same version number to set
+			 * the UPDATE environment variable for the Class Action
+			 * Scripts.  Instead, we just re-install the pkg so the
+			 * right thing happens.
 			 */
-			if (fprintf(fp_rm, "%s\n", dst_pkg->zpe_name) < 0) {
-				zperror(gettext("could not save list of "
-				    "packages to remove"), B_FALSE);
-				goto fatal;
-			}
 			if (fprintf(fp_add, "%s\n", dst_pkg->zpe_name) < 0) {
 				zperror(gettext("could not save list of "
 				    "packages to add"), B_FALSE);
@@ -2874,13 +2877,10 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 				 * We have the same pkg on the src and dst but
 				 * the dst pkg has a patch that the src pkg
 				 * does not.  Just replace the pkg.
+				 *
+				 * See the comment above for why we don't want
+				 * to actually remove the pkg.
 				 */
-				if (fprintf(fp_rm, "%s\n", dst_pkg->zpe_name)
-				    < 0) {
-					zperror(gettext("could not save list "
-					    "of packages to remove"), B_FALSE);
-					goto fatal;
-				}
 				if (fprintf(fp_add, "%s\n", dst_pkg->zpe_name)
 				    < 0) {
 					zperror(gettext("could not save list "
@@ -2898,13 +2898,10 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 				 * We have a patch on the dst with higher rev
 				 * than the patch on the src.  Just replace the
 				 * pkg.
+				 *
+				 * See the comment above for why we don't want
+				 * to actually remove the pkg.
 				 */
-				if (fprintf(fp_rm, "%s\n", dst_pkg->zpe_name)
-				    < 0) {
-					zperror(gettext("could not save list "
-					    "of packages to remove"), B_FALSE);
-					goto fatal;
-				}
 				if (fprintf(fp_add, "%s\n", dst_pkg->zpe_name)
 				    < 0) {
 					zperror(gettext("could not save list "
