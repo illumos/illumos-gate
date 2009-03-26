@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,9 +31,16 @@
  */
 #include <sys/bustypes.h>
 
+#if defined(_KERNEL)
+#if defined(__GNUC__) && defined(_ASM_INLINES)
+#include <asm/cpu.h>
+#endif
+#endif	/* _KERNEL */
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
 
 /*
  * Global kernel variables of interest
@@ -69,22 +76,6 @@ extern int vac;
 #pragma	weak	cpu_smt_pause
 extern  void	cpu_smt_pause();
 #define	SMT_PAUSE()	{ if (&cpu_smt_pause) cpu_smt_pause(); }
-
-/*
- * used to preload L2 cache
- */
-#if !defined(__lint) && defined(__GNUC__)
-
-extern __inline__ void
-prefetch64(caddr_t addr)
-{
-	__asm__ __volatile__(
-	    "prefetch	[%0], #n_writes\n\t"
-	    : "=r" (addr)
-	    : "0" (addr));
-}
-
-#endif	/* !__lint && __GNUC__ */
 
 #endif /* defined(_KERNEL) && !defined(_ASM) */
 

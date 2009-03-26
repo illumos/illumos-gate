@@ -100,13 +100,33 @@
 	rdtsc
 	.end
 
-/
-/ prefetch 64 bytes
-/ prefetch is an SSE extension which is not supported on older 32-bit processors
-/ so define this as a no-op for now
-/
-	.inline	prefetch64, 4
+/*
+ * prefetch 64 bytes
+ *
+ * prefetch is an SSE extension which is not supported on older 32-bit processors
+ * so define this as a no-op for now
+ */
+
+ 	.inline	prefetch_read_many, 4
 /	movl  (%esp), %eax
-/	prefetcht0 (%eax)
-/	prefetcht0 32(%eax)
+/	prefetcht0	(%eax)
+/	prefetcht0	32(%eax)
+	.end
+
+ 	.inline	prefetch_read_once, 4
+/	movl  (%esp), %eax
+/	prefetchnta	(%eax)
+/	prefetchnta	32(%eax)
+	.end
+
+ 	.inline	prefetch_write_many, 4
+/	movl  (%esp), %eax
+/	prefetcht0	(%eax)
+/	prefetcht0	32(%eax)
+	.end
+
+ 	.inline	prefetch_write_once, 4
+/	movl  (%esp), %eax
+/	prefetcht0	(%eax)
+/	prefetcht0	32(%eax)
 	.end

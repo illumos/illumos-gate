@@ -12988,12 +12988,8 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 
 	/* multiple mblks of tcp data? */
 	if ((mp1 = mp->b_cont) != NULL) {
-		/* more then two? */
-		if (mp1->b_cont != NULL) {
-			IP_STAT(ipst, ip_multipkttcp);
-			goto multipkttcp;
-		}
-		len += mp1->b_wptr - mp1->b_rptr;
+		IP_STAT(ipst, ip_multipkttcp);
+		len += msgdsize(mp1);
 	}
 
 	up = (uint16_t *)(rptr + IP_SIMPLE_HDR_LENGTH + TCP_PORTS_OFFSET);
@@ -13301,10 +13297,8 @@ tcpoptions:
 	}
 
 	/* Get the total packet length in len, including headers. */
-	if (mp->b_cont) {
-multipkttcp:
+	if (mp->b_cont)
 		len = msgdsize(mp);
-	}
 
 	/*
 	 * Check the TCP checksum by pulling together the pseudo-

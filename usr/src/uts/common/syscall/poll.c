@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -997,8 +997,8 @@ pcacheset_cmp(pollfd_t *current, pollfd_t *cached, pollfd_t *newlist, int n)
 	for (ix = 0; ix < n; ix++) {
 		/* Prefetch 64 bytes worth of 8-byte elements */
 		if ((ix & 0x7) == 0) {
-			prefetch64((caddr_t)&current[ix + 8]);
-			prefetch64((caddr_t)&cached[ix + 8]);
+			prefetch_write_many((caddr_t)&current[ix + 8]);
+			prefetch_write_many((caddr_t)&cached[ix + 8]);
 		}
 		if (current[ix].fd == cached[ix].fd) {
 			/*

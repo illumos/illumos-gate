@@ -7499,11 +7499,21 @@ retry:
 		 * If a streams message is likely to consist
 		 * of many small mblks, it is pulled up into
 		 * one continuous chunk of memory.
+		 * The size of the first mblk may be bogus because
+		 * successive read() calls on the socket reduce
+		 * the size of this mblk until it is exhausted
+		 * and then the code walks on to the next. Thus
+		 * the size of the mblk may not be the original size
+		 * that was passed up, it's simply a remainder
+		 * and hence can be very small without any
+		 * implication that the packet is badly fragmented.
+		 * So the size of the possible second mblk is
+		 * used to spot a badly fragmented packet.
 		 * see longer comment at top of page
 		 * by mblk_pull_len declaration.
 		 */
 
-		if (MBLKL(bp) < mblk_pull_len) {
+		if (bp->b_cont != NULL && MBLKL(bp->b_cont) < mblk_pull_len) {
 			(void) pullupmsg(bp, -1);
 		}
 

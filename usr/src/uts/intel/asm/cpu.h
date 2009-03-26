@@ -40,6 +40,57 @@ extern __inline__ void ht_pause(void)
 	    "pause");
 }
 
+/*
+ * prefetch 64 bytes
+ *
+ * prefetch is an SSE extension which is not supported on
+ * older 32-bit processors, so define this as a no-op for now
+ */
+
+extern __inline__ void prefetch_read_many(void *addr)
+{
+#if defined(__amd64)
+	__asm__(
+	    "prefetcht0 (%0);"
+	    "prefetcht0 32(%0);"
+	    : /* no output */
+	    : "r" (addr));
+#endif	/* __amd64 */
+}
+
+extern __inline__ void prefetch_read_once(void *addr)
+{
+#if defined(__amd64)
+	__asm__(
+	    "prefetchnta (%0);"
+	    "prefetchnta 32(%0);"
+	    : /* no output */
+	    : "r" (addr));
+#endif	/* __amd64 */
+}
+
+extern __inline__ void prefetch_write_many(void *addr)
+{
+#if defined(__amd64)
+	__asm__(
+	    "prefetcht0 (%0);"
+	    "prefetcht0 32(%0);"
+	    : /* no output */
+	    : "r" (addr));
+#endif	/* __amd64 */
+}
+
+extern __inline__ void prefetch_write_once(void *addr)
+{
+#if defined(__amd64)
+	__asm__(
+	    "prefetcht0 (%0);"
+	    "prefetcht0 32(%0);"
+	    : /* no output */
+	    : "r" (addr));
+#endif	/* __amd64 */
+}
+
 #if !defined(__xpv)
 
 extern __inline__ void cli(void)
@@ -109,31 +160,6 @@ extern __inline__ void __swapgs(void)
 #endif /* !__xpv */
 
 #endif	/* __amd64 */
-
-#endif	/* !__lint && __GNUC__ */
-
-#if !defined(__lint) && defined(__GNUC__)
-
-#if defined(__i386) || defined(__amd64)
-
-/*
- * prefetch 64 bytes
- * prefetch is an SSE extension which is not supported on
- * older 32-bit processors, so define this as a no-op for now
- */
-
-extern __inline__ void prefetch64(caddr_t addr)
-{
-#if defined(__amd64)
-	__asm__ __volatile__(
-	    "prefetcht0 (%0);"
-	    "prefetcht0 32(%0)"
-	    : /* no output */
-	    : "r" (addr));
-#endif	/* __amd64 */
-}
-
-#endif	/* __i386 || __amd64 */
 
 #endif	/* !__lint && __GNUC__ */
 

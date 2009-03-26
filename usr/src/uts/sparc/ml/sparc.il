@@ -1,5 +1,5 @@
 !
-! Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+! Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 ! Use is subject to license terms.
 !
 ! CDDL HEADER START
@@ -53,6 +53,18 @@
 
 ! prefetch 64 bytes into L2-cache
 
-	.inline	prefetch64,8
+	.inline prefetch_read_many,8
+	prefetch [%o0], #n_reads
+	.end
+
+	.inline prefetch_read_once,8
+	prefetch [%o0], #one_read
+	.end
+
+	.inline prefetch_write_many,8
 	prefetch [%o0], #n_writes
+	.end
+
+	.inline prefetch_write_once,8
+	prefetch [%o0], #one_write
 	.end
