@@ -23,13 +23,13 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.5";
+static char igb_version[] = "igb 1.1.6";
 
 /*
  * Local function protoypes
@@ -889,6 +889,11 @@ igb_init_driver_settings(igb_t *igb)
 	if (e1000_get_bus_info(hw) != E1000_SUCCESS) {
 		return (IGB_FAILURE);
 	}
+
+	/*
+	 * Get the system page size
+	 */
+	igb->page_size = ddi_ptob(igb->dip, (ulong_t)1);
 
 	/*
 	 * Set rx buffer size
@@ -2109,19 +2114,16 @@ igb_setup_tx_ring(igb_tx_ring_t *tx_ring)
 	}
 
 	/*
-	 * Initialize hardware checksum offload settings
-	 */
-	tx_ring->hcksum_context.hcksum_flags = 0;
-	tx_ring->hcksum_context.ip_hdr_len = 0;
-	tx_ring->hcksum_context.mac_hdr_len = 0;
-	tx_ring->hcksum_context.l4_proto = 0;
-
-	/*
 	 * Enable TXDCTL per queue
 	 */
 	reg_val = E1000_READ_REG(hw, E1000_TXDCTL(tx_ring->index));
 	reg_val |= E1000_TXDCTL_QUEUE_ENABLE;
 	E1000_WRITE_REG(hw, E1000_TXDCTL(tx_ring->index), reg_val);
+
+	/*
+	 * Initialize hardware checksum offload settings
+	 */
+	bzero(&tx_ring->tx_context, sizeof (tx_context_t));
 }
 
 static void
@@ -2694,9 +2696,16 @@ igb_get_conf(igb_t *igb)
 	igb->rx_hcksum_enable = igb_get_prop(igb, PROP_RX_HCKSUM_ENABLE,
 	    0, 1, 1);
 	igb->lso_enable = igb_get_prop(igb, PROP_LSO_ENABLE,
-	    0, 1, 0);
+	    0, 1, 1);
 	igb->tx_head_wb_enable = igb_get_prop(igb, PROP_TX_HEAD_WB_ENABLE,
 	    0, 1, 1);
+
+	/*
+	 * igb LSO needs the tx h/w checksum support.
+	 * Here LSO will be disabled if tx h/w checksum has been disabled.
+	 */
+	if (igb->tx_hcksum_enable == B_FALSE)
+		igb->lso_enable = B_FALSE;
 
 	igb->tx_copy_thresh = igb_get_prop(igb, PROP_TX_COPY_THRESHOLD,
 	    MIN_TX_COPY_THRESHOLD, MAX_TX_COPY_THRESHOLD,

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -925,6 +925,17 @@ igb_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 		*tx_hcksum_flags = HCKSUM_INET_PARTIAL | HCKSUM_IPHDRCKSUM;
 		break;
+	}
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		if (igb->lso_enable) {
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_basic_tcp_ipv4.lso_max = IGB_LSO_MAXLEN;
+			break;
+		} else {
+			return (B_FALSE);
+		}
 	}
 	case MAC_CAPAB_RINGS: {
 		mac_capab_rings_t *cap_rings = cap_data;

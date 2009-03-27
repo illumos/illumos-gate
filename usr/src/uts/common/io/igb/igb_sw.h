@@ -23,7 +23,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #ifndef	_IGB_SW_H
@@ -60,6 +60,7 @@ extern "C" {
 #include <sys/netlb.h>
 #include <sys/random.h>
 #include <inet/common.h>
+#include <inet/tcp.h>
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
@@ -94,7 +95,7 @@ extern "C" {
 
 #define	MAX_NUM_UNICAST_ADDRESSES	E1000_RAR_ENTRIES
 #define	MAX_NUM_MULTICAST_ADDRESSES	256
-#define	MAX_COOKIE			16
+#define	MAX_COOKIE			18
 #define	MIN_NUM_TX_DESC			2
 
 /*
@@ -158,9 +159,11 @@ extern "C" {
 #define	DEFAULT_TX_INTR_ABS_DELAY	0
 #define	DEFAULT_RX_COPY_THRESHOLD	128
 #define	DEFAULT_TX_COPY_THRESHOLD	512
-#define	DEFAULT_TX_RECYCLE_THRESHOLD	MAX_COOKIE
+#define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
 #define	DEFAULT_TX_OVERLOAD_THRESHOLD	MIN_NUM_TX_DESC
 #define	DEFAULT_TX_RESCHED_THRESHOLD	128
+
+#define	IGB_LSO_MAXLEN			65535
 
 #define	TX_DRAIN_TIME			200
 #define	RX_DRAIN_TIME			200
@@ -270,8 +273,12 @@ enum ioc_reply {
 	IOC_REPLY	/* OK, just send reply */
 };
 
-#define	MBLK_LEN(mp)		((uintptr_t)(mp)->b_wptr - \
-				(uintptr_t)(mp)->b_rptr)
+/*
+ * For s/w context extraction from a tx frame
+ */
+#define	TX_CXT_SUCCESS		0
+#define	TX_CXT_E_LSO_CSUM	(-1)
+#define	TX_CXT_E_ETHER_TYPE	(-2)
 
 #define	DMA_SYNC(area, flag)	((void) ddi_dma_sync((area)->dma_handle, \
 				    0, 0, (flag)))
@@ -457,12 +464,15 @@ typedef enum {
 	RCB_SENDUP
 } rcb_state_t;
 
-typedef struct hcksum_context {
+typedef struct tx_context {
 	uint32_t		hcksum_flags;
 	uint32_t		ip_hdr_len;
 	uint32_t		mac_hdr_len;
 	uint32_t		l4_proto;
-} hcksum_context_t;
+	uint32_t		mss;
+	uint32_t		l4_hdr_len;
+	boolean_t		lso_flag;
+} tx_context_t;
 
 /* Hold address/length of each DMA segment */
 typedef struct sw_desc {
@@ -543,9 +553,9 @@ typedef struct igb_tx_ring {
 	uint32_t		(*tx_recycle)(struct igb_tx_ring *);
 
 	/*
-	 * TCP/UDP checksum offload
+	 * s/w context structure for TCP/UDP checksum offload and LSO.
 	 */
-	hcksum_context_t	hcksum_context;
+	tx_context_t		tx_context;
 
 	/*
 	 * Tx ring settings and status
@@ -738,6 +748,7 @@ typedef struct igb {
 	 */
 	int			fm_capabilities;
 
+	ulong_t			page_size;
 } igb_t;
 
 typedef struct igb_stat {

@@ -23,7 +23,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #include "igb_sw.h"
@@ -33,20 +33,20 @@ static int igb_tx_copy(igb_tx_ring_t *, tx_control_block_t *, mblk_t *,
     uint32_t, boolean_t);
 static int igb_tx_bind(igb_tx_ring_t *, tx_control_block_t *, mblk_t *,
     uint32_t);
-static int igb_tx_fill_ring(igb_tx_ring_t *, link_list_t *, hcksum_context_t *);
+static int igb_tx_fill_ring(igb_tx_ring_t *, link_list_t *, tx_context_t *,
+    size_t);
 static void igb_save_desc(tx_control_block_t *, uint64_t, size_t);
 static tx_control_block_t *igb_get_free_list(igb_tx_ring_t *);
-
-static void igb_get_hcksum_context(mblk_t *, hcksum_context_t *);
-static boolean_t igb_check_hcksum_context(igb_tx_ring_t *, hcksum_context_t *);
-static void igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *,
-    hcksum_context_t *, uint32_t);
+static int igb_get_tx_context(mblk_t *, tx_context_t *);
+static boolean_t igb_check_tx_context(igb_tx_ring_t *, tx_context_t *);
+static void igb_fill_tx_context(struct e1000_adv_tx_context_desc *,
+    tx_context_t *, uint32_t);
 
 #ifndef IGB_DEBUG
 #pragma inline(igb_save_desc)
-#pragma inline(igb_get_hcksum_context)
-#pragma inline(igb_check_hcksum_context)
-#pragma inline(igb_fill_hcksum_context)
+#pragma inline(igb_get_tx_context)
+#pragma inline(igb_check_tx_context)
+#pragma inline(igb_fill_tx_context)
 #endif
 
 mblk_t *
@@ -100,23 +100,49 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	boolean_t copy_done, eop;
 	mblk_t *current_mp, *next_mp, *nmp;
 	tx_control_block_t *tcb;
-	hcksum_context_t hcksum_context, *hcksum;
+	tx_context_t tx_context, *ctx;
 	link_list_t pending_list;
+	mblk_t *new_mp;
+	mblk_t *previous_mp;
+	uint32_t hdr_frag_len;
+	uint32_t hdr_len, len;
+	uint32_t copy_thresh;
+
+	copy_thresh = tx_ring->copy_thresh;
 
 	/* Get the mblk size */
 	mbsize = 0;
 	for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
-		mbsize += MBLK_LEN(nmp);
+		mbsize += MBLKL(nmp);
 	}
 
-	/*
-	 * If the mblk size exceeds the max frame size,
-	 * discard this mblk, and return B_TRUE
-	 */
-	if (mbsize > (igb->max_frame_size - ETHERFCSL)) {
-		freemsg(mp);
-		IGB_DEBUGLOG_0(igb, "igb_tx: packet oversize");
-		return (B_TRUE);
+	if (igb->tx_hcksum_enable) {
+		ctx = &tx_context;
+		/*
+		 * Retrieve offloading context information from the mblk
+		 * that will be used to decide whether/how to fill the
+		 * context descriptor.
+		 */
+		if (igb_get_tx_context(mp, ctx) != TX_CXT_SUCCESS) {
+			freemsg(mp);
+			return (B_TRUE);
+		}
+
+		if ((ctx->lso_flag &&
+		    (mbsize > (ctx->mac_hdr_len + IGB_LSO_MAXLEN))) ||
+		    (!ctx->lso_flag &&
+		    (mbsize > (igb->max_frame_size - ETHERFCSL)))) {
+			freemsg(mp);
+			IGB_DEBUGLOG_0(igb, "igb_tx: packet oversize");
+			return (B_TRUE);
+		}
+	} else {
+		ctx = NULL;
+		if (mbsize > (igb->max_frame_size - ETHERFCSL)) {
+			freemsg(mp);
+			IGB_DEBUGLOG_0(igb, "igb_tx: packet oversize");
+			return (B_TRUE);
+		}
 	}
 
 	/*
@@ -138,6 +164,86 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	}
 
 	/*
+	 * The software should guarantee LSO packet header(MAC+IP+TCP)
+	 * to be within one descriptor - this is required by h/w.
+	 * Here will reallocate and refill the header if
+	 * the headers(MAC+IP+TCP) is physical memory non-contiguous.
+	 */
+	if (ctx && ctx->lso_flag) {
+		hdr_len = ctx->mac_hdr_len + ctx->ip_hdr_len +
+		    ctx->l4_hdr_len;
+		len = MBLKL(mp);
+		current_mp = mp;
+		previous_mp = NULL;
+		while (len < hdr_len) {
+			previous_mp = current_mp;
+			current_mp = current_mp->b_cont;
+			len += MBLKL(current_mp);
+		}
+
+		/*
+		 * If len is larger than copy_thresh, we do not
+		 * need to do anything since igb's tx copy mechanism
+		 * will ensure that the headers will be handled
+		 * in one descriptor.
+		 */
+		if (len > copy_thresh) {
+			if (len != hdr_len) {
+				/*
+				 * If the header and the payload are in
+				 * different mblks, we simply force the
+				 * header to be copied into a
+				 * new-allocated buffer.
+				 */
+				hdr_frag_len = hdr_len -
+				    (len - MBLKL(current_mp));
+
+				/*
+				 * There are two cases we will reallocate
+				 * a mblk for the last header fragment.
+				 * 1. the header is in multiple mblks and
+				 *    the last fragment shares the same mblk
+				 *    with the payload
+				 * 2. the header is in a single mblk shared
+				 *    with the payload but the header crosses
+				 *    a page.
+				 */
+				if ((current_mp != mp) ||
+				    (P2NPHASE((uintptr_t)current_mp->b_rptr,
+				    igb->page_size) < hdr_len)) {
+					/*
+					 * reallocate the mblk for the last
+					 * header fragment, expect it to be
+					 * copied into pre-allocated
+					 * page-aligned buffer
+					 */
+					new_mp = allocb(hdr_frag_len, NULL);
+					if (!new_mp) {
+						return (B_FALSE);
+					}
+
+					/*
+					 * Insert the new mblk
+					 */
+					bcopy(current_mp->b_rptr,
+					    new_mp->b_rptr, hdr_frag_len);
+					new_mp->b_wptr = new_mp->b_rptr +
+					    hdr_frag_len;
+					new_mp->b_cont = current_mp;
+					if (previous_mp)
+						previous_mp->b_cont = new_mp;
+					else
+						mp = new_mp;
+					current_mp->b_rptr += hdr_frag_len;
+				}
+			}
+
+			if (copy_thresh < hdr_len)
+				copy_thresh = hdr_len;
+		}
+	}
+
+	/*
 	 * The pending_list is a linked list that is used to save
 	 * the tx control blocks that have packet data processed
 	 * but have not put the data to the tx descriptor ring.
@@ -148,11 +254,11 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	desc_total = 0;
 
 	current_mp = mp;
-	current_len = MBLK_LEN(current_mp);
+	current_len = MBLKL(current_mp);
 	/*
 	 * Decide which method to use for the first fragment
 	 */
-	current_flag = (current_len <= tx_ring->copy_thresh) ?
+	current_flag = (current_len <= copy_thresh) ?
 	    USE_COPY : USE_DMA;
 	/*
 	 * If the mblk includes several contiguous small fragments,
@@ -172,7 +278,7 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	while (current_mp) {
 		next_mp = current_mp->b_cont;
 		eop = (next_mp == NULL); /* Last fragment of the packet? */
-		next_len = eop ? 0: MBLK_LEN(next_mp);
+		next_len = eop ? 0: MBLKL(next_mp);
 
 		/*
 		 * When the current fragment is an empty fragment, if
@@ -188,7 +294,7 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 		if ((current_len == 0) && (copy_done)) {
 			current_mp = next_mp;
 			current_len = next_len;
-			current_flag = (current_len <= tx_ring->copy_thresh) ?
+			current_flag = (current_len <= copy_thresh) ?
 			    USE_COPY : USE_DMA;
 			continue;
 		}
@@ -236,10 +342,10 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 				 * copied to the current tx buffer, we need
 				 * to complete the current copy processing.
 				 */
-				next_flag = (next_len > tx_ring->copy_thresh) ?
+				next_flag = (next_len > copy_thresh) ?
 				    USE_DMA: USE_COPY;
 				copy_done = B_TRUE;
-			} else if (next_len > tx_ring->copy_thresh) {
+			} else if (next_len > copy_thresh) {
 				/*
 				 * The next fragment needs to be processed with
 				 * DMA binding. So the copy prcessing will be
@@ -263,7 +369,7 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 			 * Check whether to use bcopy or DMA binding to process
 			 * the next fragment.
 			 */
-			next_flag = (next_len > tx_ring->copy_thresh) ?
+			next_flag = (next_len > copy_thresh) ?
 			    USE_DMA: USE_COPY;
 			ASSERT(copy_done == B_TRUE);
 
@@ -287,17 +393,6 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 	ASSERT(tcb);
 	ASSERT(tcb->mp == NULL);
 	tcb->mp = mp;
-
-	if (igb->tx_hcksum_enable) {
-		/*
-		 * Retrieve checksum context information from the mblk that will
-		 * be used to decide whether/how to fill the context descriptor.
-		 */
-		hcksum = &hcksum_context;
-		igb_get_hcksum_context(mp, hcksum);
-	} else {
-		hcksum = NULL;
-	}
 
 	/*
 	 * Before fill the tx descriptor ring with the data, we need to
@@ -324,7 +419,7 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 		goto tx_failure;
 	}
 
-	desc_num = igb_tx_fill_ring(tx_ring, &pending_list, hcksum);
+	desc_num = igb_tx_fill_ring(tx_ring, &pending_list, ctx, mbsize);
 
 	ASSERT((desc_num == desc_total) || (desc_num == (desc_total + 1)));
 
@@ -472,15 +567,17 @@ igb_tx_bind(igb_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 }
 
 /*
- * igb_get_hcksum_context
+ * igb_get_tx_context
  *
- * Get the hcksum context information from the mblk
+ * Get the tx context information from the mblk
  */
-static void
-igb_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
+static int
+igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 {
 	uint32_t start;
 	uint32_t flags;
+	uint32_t lso_flag;
+	uint32_t mss;
 	uint32_t len;
 	uint32_t size;
 	uint32_t offset;
@@ -488,15 +585,34 @@ igb_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 	ushort_t etype;
 	uint32_t mac_hdr_len;
 	uint32_t l4_proto;
+	uint32_t l4_hdr_len;
 
 	ASSERT(mp != NULL);
 
 	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &flags);
+	bzero(ctx, sizeof (tx_context_t));
 
-	hcksum->hcksum_flags = flags;
+	ctx->hcksum_flags = flags;
 
 	if (flags == 0)
-		return;
+		return (TX_CXT_SUCCESS);
+
+	lso_info_get(mp, &mss, &lso_flag);
+	ctx->mss = mss;
+	ctx->lso_flag = (lso_flag == HW_LSO);
+
+	/*
+	 * LSO relies on tx h/w checksum, so here the packet will be
+	 * dropped if the h/w checksum flags are not set.
+	 */
+	if (ctx->lso_flag) {
+		if (!((ctx->hcksum_flags & HCK_PARTIALCKSUM) &&
+		    (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM))) {
+			IGB_DEBUGLOG_0(NULL, "igb_tx: h/w "
+			    "checksum flags are not set for LSO");
+			return (TX_CXT_E_LSO_CSUM);
+		}
+	}
 
 	etype = 0;
 	mac_hdr_len = 0;
@@ -508,12 +624,12 @@ igb_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 	 * in one mblk fragment, so we go thourgh the fragments to parse
 	 * the ether type.
 	 */
-	size = len = MBLK_LEN(mp);
+	size = len = MBLKL(mp);
 	offset = offsetof(struct ether_header, ether_type);
 	while (size <= offset) {
 		mp = mp->b_cont;
 		ASSERT(mp != NULL);
-		len = MBLK_LEN(mp);
+		len = MBLKL(mp);
 		size += len;
 	}
 	pos = mp->b_rptr + offset + len - size;
@@ -527,7 +643,7 @@ igb_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
+			len = MBLKL(mp);
 			size += len;
 		}
 		pos = mp->b_rptr + offset + len - size;
@@ -539,29 +655,43 @@ igb_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 	}
 
 	/*
-	 * Here we don't assume the IP(V6) header is fully included in
-	 * one mblk fragment, so we go thourgh the fragments to parse
-	 * the protocol type.
+	 * Here we assume the IP(V6) header is fully included in one
+	 * mblk fragment.
 	 */
 	switch (etype) {
 	case ETHERTYPE_IP:
-		offset = offsetof(ipha_t, ipha_protocol) + mac_hdr_len;
+		offset = mac_hdr_len;
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
+			len = MBLKL(mp);
 			size += len;
 		}
 		pos = mp->b_rptr + offset + len - size;
 
-		l4_proto = *(uint8_t *)pos;
+		if (ctx->lso_flag) {
+			*((uint16_t *)(uintptr_t)(pos + offsetof(ipha_t,
+			    ipha_length))) = 0;
+
+			/*
+			 * To utilize igb LSO, here need to fill
+			 * the tcp checksum field of the packet with the
+			 * following pseudo-header checksum:
+			 * (ip_source_addr, ip_destination_addr, l4_proto)
+			 * and also need to fill the ip header checksum
+			 * with zero. Currently the tcp/ip stack has done
+			 * these.
+			 */
+		}
+
+		l4_proto = *(uint8_t *)(pos + offsetof(ipha_t, ipha_protocol));
 		break;
 	case ETHERTYPE_IPV6:
 		offset = offsetof(ip6_t, ip6_nxt) + mac_hdr_len;
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
+			len = MBLKL(mp);
 			size += len;
 		}
 		pos = mp->b_rptr + offset + len - size;
@@ -570,47 +700,72 @@ igb_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 		break;
 	default:
 		/* Unrecoverable error */
-		IGB_DEBUGLOG_0(NULL, "Ether type error with tx hcksum");
-		return;
+		IGB_DEBUGLOG_0(NULL, "Ethernet type field error with "
+		    "tx hcksum flag set");
+		return (TX_CXT_E_ETHER_TYPE);
 	}
 
-	hcksum->mac_hdr_len = mac_hdr_len;
-	hcksum->ip_hdr_len = start;
-	hcksum->l4_proto = l4_proto;
+	if (ctx->lso_flag) {
+		offset = mac_hdr_len + start;
+		while (size <= offset) {
+			mp = mp->b_cont;
+			ASSERT(mp != NULL);
+			len = MBLKL(mp);
+			size += len;
+		}
+		pos = mp->b_rptr + offset + len - size;
+
+		l4_hdr_len = TCP_HDR_LENGTH((tcph_t *)pos);
+	} else {
+		/*
+		 * l4 header length is only required for LSO
+		 */
+		l4_hdr_len = 0;
+	}
+
+	ctx->mac_hdr_len = mac_hdr_len;
+	ctx->ip_hdr_len = start;
+	ctx->l4_proto = l4_proto;
+	ctx->l4_hdr_len = l4_hdr_len;
+
+	return (TX_CXT_SUCCESS);
 }
 
 /*
- * igb_check_hcksum_context
+ * igb_check_tx_context
  *
  * Check if a new context descriptor is needed
  */
 static boolean_t
-igb_check_hcksum_context(igb_tx_ring_t *tx_ring, hcksum_context_t *hcksum)
+igb_check_tx_context(igb_tx_ring_t *tx_ring, tx_context_t *ctx)
 {
-	hcksum_context_t *last;
+	tx_context_t *last;
 
-	if (hcksum == NULL)
+	if (ctx == NULL)
 		return (B_FALSE);
 
 	/*
-	 * Compare the checksum data retrieved from the mblk and the
-	 * stored checksum data of the last context descriptor. The data
+	 * Compare the context data retrieved from the mblk and the
+	 * stored context data of the last context descriptor. The data
 	 * need to be checked are:
 	 *	hcksum_flags
 	 *	l4_proto
-	 *	mac_hdr_len
+	 *	mss (only check for LSO)
+	 *	l4_hdr_len (only check for LSO)
 	 *	ip_hdr_len
+	 *	mac_hdr_len
 	 * Either one of the above data is changed, a new context descriptor
 	 * will be needed.
 	 */
-	last = &tx_ring->hcksum_context;
+	last = &tx_ring->tx_context;
 
-	if (hcksum->hcksum_flags != 0) {
-		if ((hcksum->hcksum_flags != last->hcksum_flags) ||
-		    (hcksum->l4_proto != last->l4_proto) ||
-		    (hcksum->mac_hdr_len != last->mac_hdr_len) ||
-		    (hcksum->ip_hdr_len != last->ip_hdr_len)) {
-
+	if (ctx->hcksum_flags != 0) {
+		if ((ctx->hcksum_flags != last->hcksum_flags) ||
+		    (ctx->l4_proto != last->l4_proto) ||
+		    (ctx->lso_flag && ((ctx->mss != last->mss) ||
+		    (ctx->l4_hdr_len != last->l4_hdr_len))) ||
+		    (ctx->ip_hdr_len != last->ip_hdr_len) ||
+		    (ctx->mac_hdr_len != last->mac_hdr_len)) {
 			return (B_TRUE);
 		}
 	}
@@ -619,30 +774,30 @@ igb_check_hcksum_context(igb_tx_ring_t *tx_ring, hcksum_context_t *hcksum)
 }
 
 /*
- * igb_fill_hcksum_context
+ * igb_fill_tx_context
  *
  * Fill the context descriptor with hardware checksum informations
  */
 static void
-igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *ctx_tbd,
-    hcksum_context_t *hcksum, uint32_t ring_index)
+igb_fill_tx_context(struct e1000_adv_tx_context_desc *ctx_tbd,
+    tx_context_t *ctx, uint32_t ring_index)
 {
 	/*
 	 * Fill the context descriptor with the checksum
 	 * context information we've got
 	 */
-	ctx_tbd->vlan_macip_lens = hcksum->ip_hdr_len;
-	ctx_tbd->vlan_macip_lens |= hcksum->mac_hdr_len <<
+	ctx_tbd->vlan_macip_lens = ctx->ip_hdr_len;
+	ctx_tbd->vlan_macip_lens |= ctx->mac_hdr_len <<
 	    E1000_ADVTXD_MACLEN_SHIFT;
 
 	ctx_tbd->type_tucmd_mlhl =
 	    E1000_ADVTXD_DCMD_DEXT | E1000_ADVTXD_DTYP_CTXT;
 
-	if (hcksum->hcksum_flags & HCK_IPV4_HDRCKSUM)
+	if (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM)
 		ctx_tbd->type_tucmd_mlhl |= E1000_ADVTXD_TUCMD_IPV4;
 
-	if (hcksum->hcksum_flags & HCK_PARTIALCKSUM) {
-		switch (hcksum->l4_proto) {
+	if (ctx->hcksum_flags & HCK_PARTIALCKSUM) {
+		switch (ctx->l4_proto) {
 		case IPPROTO_TCP:
 			ctx_tbd->type_tucmd_mlhl |= E1000_ADVTXD_TUCMD_L4T_TCP;
 			break;
@@ -663,6 +818,11 @@ igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *ctx_tbd,
 
 	ctx_tbd->seqnum_seed = 0;
 	ctx_tbd->mss_l4len_idx = ring_index << 4;
+	if (ctx->lso_flag) {
+		ctx_tbd->mss_l4len_idx |=
+		    (ctx->l4_hdr_len << E1000_ADVTXD_L4LEN_SHIFT) |
+		    (ctx->mss << E1000_ADVTXD_MSS_SHIFT);
+	}
 }
 
 /*
@@ -672,7 +832,7 @@ igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *ctx_tbd,
  */
 static int
 igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
-    hcksum_context_t *hcksum)
+    tx_context_t *ctx, size_t mbsize)
 {
 	struct e1000_hw *hw = &tx_ring->igb->hw;
 	boolean_t load_context;
@@ -680,7 +840,6 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	union e1000_adv_tx_desc *tbd, *first_tbd;
 	tx_control_block_t *tcb, *first_tcb;
 	uint32_t hcksum_flags;
-	uint32_t pay_len;
 	int i;
 	igb_t *igb = tx_ring->igb;
 
@@ -691,7 +850,6 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	first_tcb = NULL;
 	desc_num = 0;
 	hcksum_flags = 0;
-	pay_len = 0;
 	load_context = B_FALSE;
 
 	/*
@@ -703,13 +861,13 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	index = tx_ring->tbd_tail;
 	tcb_index = tx_ring->tbd_tail;
 
-	if (hcksum != NULL) {
-		hcksum_flags = hcksum->hcksum_flags;
+	if (ctx != NULL) {
+		hcksum_flags = ctx->hcksum_flags;
 
 		/*
 		 * Check if a new context descriptor is needed for this packet
 		 */
-		load_context = igb_check_hcksum_context(tx_ring, hcksum);
+		load_context = igb_check_tx_context(tx_ring, ctx);
 		if (load_context) {
 			first_tcb = (tx_control_block_t *)
 			    LIST_GET_HEAD(pending_list);
@@ -719,9 +877,9 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 * Fill the context descriptor with the
 			 * hardware checksum offload informations.
 			 */
-			igb_fill_hcksum_context(
-			    (struct e1000_adv_tx_context_desc *)tbd, hcksum,
-			    tx_ring->index);
+			igb_fill_tx_context(
+			    (struct e1000_adv_tx_context_desc *)tbd,
+			    ctx, tx_ring->index);
 
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
@@ -730,7 +888,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 * Store the checksum context data if
 			 * a new context descriptor is added
 			 */
-			tx_ring->hcksum_context = *hcksum;
+			tx_ring->tx_context = *ctx;
 		}
 	}
 
@@ -763,8 +921,6 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 
 			tbd->read.olinfo_status = 0;
 
-			pay_len += tcb->desc[i].length;
-
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
 		}
@@ -791,13 +947,20 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	/*
 	 * The Insert Ethernet CRC (IFCS) bit and the checksum fields are only
 	 * valid in the first descriptor of the packet.
-	 * 82576 also requires the payload length setting even without TSO
+	 * 82576 also requires the payload length setting even without LSO
 	 */
 	ASSERT(first_tbd != NULL);
 	first_tbd->read.cmd_type_len |= E1000_ADVTXD_DCMD_IFCS;
-	if (hw->mac.type == e1000_82576) {
-		first_tbd->read.olinfo_status =
-		    (pay_len << E1000_ADVTXD_PAYLEN_SHIFT);
+	if (ctx != NULL && ctx->lso_flag) {
+		first_tbd->read.cmd_type_len |= E1000_ADVTXD_DCMD_TSE;
+		first_tbd->read.olinfo_status |=
+		    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
+		    - ctx->l4_hdr_len) << E1000_ADVTXD_PAYLEN_SHIFT;
+	} else {
+		if (hw->mac.type == e1000_82576) {
+			first_tbd->read.olinfo_status |=
+			    (mbsize << E1000_ADVTXD_PAYLEN_SHIFT);
+		}
 	}
 
 	/* Set hardware checksum bits */
