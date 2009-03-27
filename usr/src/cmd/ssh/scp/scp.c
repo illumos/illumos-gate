@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -80,8 +80,6 @@
 
 #include "includes.h"
 RCSID("$OpenBSD: scp.c,v 1.91 2002/06/19 00:27:55 deraadt Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "xmalloc.h"
 #include "atomicio.h"
@@ -1263,7 +1261,7 @@ progressmeter(int flag)
 	}
 	i = 0;
 	abbrevsize = cursize;
-	while (abbrevsize >= 100000 && i < sizeof (prefixes)) {
+	while (abbrevsize >= 100000 && i < strlen(prefixes) - 1) {
 		i++;
 		abbrevsize >>= 10;
 	}
