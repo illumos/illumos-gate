@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MACHPCB_H
 #define	_SYS_MACHPCB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stack.h>
 #include <sys/regset.h>
@@ -77,6 +75,7 @@ typedef struct machpcb {
 	struct	fq mpcb_fpu_q[MAXFPQ]; /* fpu exception queue */
 	caddr_t	mpcb_illexcaddr; /* address of last illegal instruction */
 	uint_t	mpcb_illexcinsn; /* last illegal instruction */
+	uint_t	mpcb_illexccnt; /* count of illegal instruction attempts */
 	int	mpcb_flags;	/* various state flags */
 	int	mpcb_wocnt;	/* window overflow count */
 	int	mpcb_wucnt;	/* window underflow count */

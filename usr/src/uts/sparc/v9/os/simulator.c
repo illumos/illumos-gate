@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -925,8 +925,22 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 			return (do_unaligned(rp, badaddr));
 	}
 
-	if (nomatch)
+	/* This is a new instruction so illexccnt should also be set. */
+	if (nomatch) {
+		mpcb->mpcb_illexccnt = 0;
 		return (SIMU_RETRY);
+	}
+
+	/*
+	 * In order to keep us from entering into an infinite loop while
+	 * attempting to clean up faulty instructions, we will return
+	 * SIMU_ILLEGAL once we've cleaned up the instruction as much
+	 * as we can, and still end up here.
+	 */
+	if (mpcb->mpcb_illexccnt >= 3)
+		return (SIMU_ILLEGAL);
+
+	mpcb->mpcb_illexccnt += 1;
 
 	/*
 	 * The rest of the code handles v8 binaries with instructions
