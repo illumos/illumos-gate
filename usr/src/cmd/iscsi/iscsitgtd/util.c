@@ -439,6 +439,8 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 	char		param_rsp[32];
 	int		plen;		/* pair length */
 	Boolean_t	rval		= True;
+	char		*target_name    = NULL;
+	char		*initiator_name = NULL;
 	char		param_buf[16];
 
 	if ((p = (char *)malloc(dlen)) == NULL)
@@ -581,29 +583,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 		} else if (strcmp("TargetName", cur_pair) == 0) {
 
 			send_named_msg(c, msg_target_name, n);
-
-			/*
-			 * Had to wait until now before loading any parameters
-			 * because they are based on the TargetName which
-			 * hasn't been known until now. This might fail
-			 * because the target doesn't exist or the initiator
-			 * doesn't have permission to access this target.
-			 */
-			if ((rval = connection_parameters_get(c, n)) == False) {
-				*errcode =
-				    (ISCSI_STATUS_CLASS_INITIATOR_ERR << 8) |
-				    ISCSI_LOGIN_STATUS_TGT_FORBIDDEN;
-			} else if ((rval = add_text(text, text_length,
-			    "TargetAlias", c->c_targ_alias)) == True) {
-
-				/*
-				 * Add TPGT now
-				 */
-				(void) snprintf(param_buf, sizeof (param_buf),
-				    "%d", c->c_tpgt);
-				rval = add_text(text, text_length,
-				    "TargetPortalGroupTag", param_buf);
-			}
+			target_name = n;
 
 		/*
 		 * 12.5 -- IntiatorName
@@ -612,6 +592,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 		} else if (strcmp("InitiatorName", cur_pair) == 0) {
 
 			send_named_msg(c, msg_initiator_name, n);
+			initiator_name = n;
 
 		/* ---- Section 12.6 is handled within TargetName ---- */
 
@@ -824,6 +805,35 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 			    "CON%x  Unknown parameter %s=%s\n",
 			    c->c_num, cur_pair, n);
+		}
+
+		/*
+		 * If parsed both Initiator and Target names have been parsed,
+		 * then it is now time to load the connection parameters.
+		 *
+		 * This may fail because the target doesn't exist or the
+		 * initiator doesn't have permission to access this target.
+		 */
+		if ((target_name != NULL) && (initiator_name != NULL)) {
+			if ((rval = connection_parameters_get(c, target_name))
+			    == False) {
+				if ((errcode != NULL) && (*errcode == 0))
+					*errcode =
+					    (ISCSI_STATUS_CLASS_INITIATOR_ERR
+					    << 8) |
+					    ISCSI_LOGIN_STATUS_TGT_FORBIDDEN;
+			} else if ((rval = add_text(text, text_length,
+			    "TargetAlias", c->c_targ_alias)) == True) {
+
+				/*
+				 * Add TPGT now
+				 */
+				(void) snprintf(param_buf, sizeof (param_buf),
+				    "%d", c->c_tpgt);
+				rval = add_text(text, text_length,
+				    "TargetPortalGroupTag", param_buf);
+				target_name = initiator_name = NULL;
+			}
 		}
 
 		if (rval == False) {
