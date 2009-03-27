@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,7 @@ static mxfe_card_t mxfe_cards[] = {
 static int	mxfe_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	mxfe_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	mxfe_resume(dev_info_t *);
+static int	mxfe_quiesce(dev_info_t *);
 static int	mxfe_m_unicst(void *, const uint8_t *);
 static int	mxfe_m_multicst(void *, boolean_t, const uint8_t *);
 static int	mxfe_m_promisc(void *, boolean_t);
@@ -160,7 +161,7 @@ static void	mxfe_checklinknway(mxfe_t *);
 static void	mxfe_disableinterrupts(mxfe_t *);
 static void	mxfe_enableinterrupts(mxfe_t *);
 static void	mxfe_reclaim(mxfe_t *);
-static mblk_t	*mxfe_receive(mxfe_t *);
+static boolean_t	mxfe_receive(mxfe_t *, mblk_t **);
 
 #ifdef	DEBUG
 static void	mxfe_dprintf(mxfe_t *, const char *, int, char *, ...);
@@ -189,7 +190,7 @@ static mac_callbacks_t mxfe_m_callbacks = {
  * Stream information
  */
 DDI_DEFINE_STREAM_OPS(mxfe_devops, nulldev, nulldev, mxfe_attach, mxfe_detach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, mxfe_quiesce);
 
 /*
  * Module linkage information.
@@ -629,6 +630,21 @@ mxfe_resume(dev_info_t *dip)
 	/* drop locks */
 	mutex_exit(&mxfep->mxfe_xmtlock);
 	mutex_exit(&mxfep->mxfe_intrlock);
+
+	return (DDI_SUCCESS);
+}
+
+int
+mxfe_quiesce(dev_info_t *dip)
+{
+	mxfe_t	*mxfep;
+
+	if ((mxfep = ddi_get_driver_private(dip)) == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	/* just do a hard reset of everything */
+	SETBIT(mxfep, CSR_PAR, PAR_RESET);
 
 	return (DDI_SUCCESS);
 }
@@ -2146,6 +2162,7 @@ mxfe_intr(caddr_t arg)
 	mxfe_t		*mxfep = (void *)arg;
 	uint32_t	status;
 	mblk_t		*mp = NULL;
+	boolean_t	error = B_FALSE;
 
 	mutex_enter(&mxfep->mxfe_intrlock);
 
@@ -2175,7 +2192,9 @@ mxfe_intr(caddr_t arg)
 
 	if (status & INT_RXOK) {
 		/* receive packets */
-		mp = mxfe_receive(mxfep);
+		if (mxfe_receive(mxfep, &mp)) {
+			error = B_TRUE;
+		}
 	}
 
 	if (status & INT_TXOK) {
@@ -2200,10 +2219,8 @@ mxfe_intr(caddr_t arg)
 		if (status & (INT_RXJABBER | INT_TXJABBER)) {
 			mxfep->mxfe_jabber++;
 		}
-		DBG(DWARN, "resetting mac, status %x", status);
-		mutex_enter(&mxfep->mxfe_xmtlock);
-		mxfe_resetall(mxfep);
-		mutex_exit(&mxfep->mxfe_xmtlock);
+		DBG(DWARN, "error interrupt: status %x", status);
+		error = B_TRUE;
 	}
 
 	if (status & INT_BUSERR) {
@@ -2222,6 +2239,10 @@ mxfe_intr(caddr_t arg)
 			break;
 		}
 
+		error = B_TRUE;
+	}
+
+	if (error) {
 		/* reset the chip in an attempt to fix things */
 		mutex_enter(&mxfep->mxfe_xmtlock);
 		mxfe_resetall(mxfep);
@@ -2499,8 +2520,8 @@ mxfe_reclaim(mxfe_t *mxfep)
 	}
 }
 
-mblk_t *
-mxfe_receive(mxfe_t *mxfep)
+boolean_t
+mxfe_receive(mxfe_t *mxfep, mblk_t **rxchain)
 {
 	unsigned		len;
 	mxfe_rxbuf_t		*rxb;
@@ -2508,6 +2529,7 @@ mxfe_receive(mxfe_t *mxfep)
 	uint32_t		status;
 	mblk_t			*mpchain, **mpp, *mp;
 	int			head, cnt;
+	boolean_t		error = B_FALSE;
 
 	mpchain = NULL;
 	mpp = &mpchain;
@@ -2543,12 +2565,15 @@ mxfe_receive(mxfe_t *mxfep)
 			 */
 			if ((status & (RXSTAT_LAST|RXSTAT_FIRST)) !=
 			    (RXSTAT_LAST|RXSTAT_FIRST)) {
+				/* someone trying to send jumbo frames? */
 				DBG(DRECV, "rx packet overspill");
 				if (status & RXSTAT_FIRST) {
 					mxfep->mxfe_toolong_errors++;
 				}
 			} else if (status & RXSTAT_DESCERR) {
+				/* this should never occur! */
 				mxfep->mxfe_macrcv_errors++;
+				error = B_TRUE;
 
 			} else if (status & RXSTAT_RUNT) {
 				mxfep->mxfe_runt++;
@@ -2564,7 +2589,9 @@ mxfe_receive(mxfe_t *mxfep)
 				mxfep->mxfe_fcs_errors++;
 
 			} else if (status & RXSTAT_OFLOW) {
+				/* this is a MAC FIFO error, need to reset */
 				mxfep->mxfe_overflow++;
+				error = B_TRUE;
 			}
 		}
 
@@ -2614,7 +2641,8 @@ skip:
 
 	mxfep->mxfe_rxhead = head;
 
-	return (mpchain);
+	*rxchain = mpchain;
+	return (error);
 }
 
 int
