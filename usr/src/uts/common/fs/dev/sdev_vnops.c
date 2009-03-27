@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -423,11 +423,8 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred, ct)) != 0) {
-		if (error == EACCES)
-			error = ENXIO;		/* unix standards compliance */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
 		return (error);
-	}
 
 	/* check existing name */
 /* XXXci - We may need to translate the C-I flags on VOP_LOOKUP */
@@ -472,6 +469,13 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 	/* bail out early */
 	if (error != ENOENT)
 		return (error);
+
+	/* verify write access - compliance specifies ENXIO */
+	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred, ct)) != 0) {
+		if (error == EACCES)
+			error = ENXIO;
+		return (error);
+	}
 
 	/*
 	 * For memory-based (ROFS) directory:
