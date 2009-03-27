@@ -662,3 +662,8 @@ Notes on packaging:
   This version has the following fixes:
    6812227 e1000g(intel 82571 adapter) must support MTU size of 9216
 
+5.3.8
+======
+  This version has the following fixes:
+   6775380 the e1000g link hung at "up" state after down and unplumb the interface
+   6816786 e1000g panics on Lenovo X301 with snv_109

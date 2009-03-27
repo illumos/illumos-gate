@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.7";
+static char e1000g_version[] = "Driver Ver. 5.3.8";
 
 /*
  * Proto types for DDI entry points
@@ -1032,7 +1032,7 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 	}
 
 	mutex_enter(&e1000g_rx_detach_lock);
-	if (e1000g_force_detach) {
+	if (e1000g_force_detach && (Adapter->priv_devi_node != NULL)) {
 		devi_node = Adapter->priv_devi_node;
 		devi_node->flag |= E1000G_PRIV_DEVI_DETACH;
 
@@ -1825,6 +1825,11 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 				atomic_inc_32(&Adapter->pending_rx_count);
 		}
 		mutex_exit(&e1000g_rx_detach_lock);
+	}
+
+	if (Adapter->link_state == LINK_STATE_UP) {
+		Adapter->link_state = LINK_STATE_UNKNOWN;
+		mac_link_update(Adapter->mh, Adapter->link_state);
 	}
 }
 
