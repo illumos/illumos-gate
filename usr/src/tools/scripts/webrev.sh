@@ -882,7 +882,7 @@ function framed_sdiff
 	print "$HTML<head>$STDHEAD" > $WDIR/$DIR/$TNAME.lhs.html
 
 	cat >> $WDIR/$DIR/$TNAME.lhs.html <<-EOF
-	    <script type="text/javascript" src="$RTOP/ancnav.js"></script>
+	    <script type="text/javascript" src="${RTOP}ancnav.js"></script>
 	    </head>
 	    <body id="SUNWwebrev" onkeypress="keypress(event);">
 	    <a name="0"></a>
@@ -908,7 +908,7 @@ function framed_sdiff
 	      <frame src="$TNAME.lhs.html" scrolling="auto" name="lhs"></frame>
 	      <frame src="$TNAME.rhs.html" scrolling="auto" name="rhs"></frame>
 	    </frameset>
-	  <frame src="$RTOP/ancnav.html" scrolling="no" marginwidth="0"
+	  <frame src="${RTOP}ancnav.html" scrolling="no" marginwidth="0"
 	   marginheight="0" name="nav"></frame>
 	  <noframes>
             <body id="SUNWwebrev">
@@ -1052,29 +1052,42 @@ function insert_anchors
 #
 function relative_dir
 {
-	typeset cur="${1##$2?(/)}"
-	typeset ret=""
-	if [[ $2 == $cur ]]; then   # Should never happen.
-		# Should never happen.
-		print -u2 "\nWARNING: relative_dir: \"$1\" not relative "
-		print -u2 "to \"$2\".  Check input paths.  Framed webrev "
-		print -u2 "will not be relocatable!"
-		print $2
-		return
-	fi
+        typeset cur="${1##$2?(/)}"
 
-	while [[ -n ${cur} ]];
-	do
-		cur=${cur%%*(/)*([!/])}
-		if [[ -z $ret ]]; then
-			ret=".."
-		else
-			ret="../$ret"
-		fi
-	done
-	print $ret
+        #
+        # If the first path was specified absolutely, and it does
+        # not start with the second path, it's an error.
+        #
+        if [[ $1 =~ '^/.+' && "$cur" == "$1" ]]; then
+                # Should never happen.
+                print -u2 "\nWARNING: relative_dir: \"$1\" not relative "
+                print -u2 "to \"$2\".  Check input paths.  Framed webrev "
+                print -u2 "will not be relocatable!"
+                print $2
+                return
+        fi
+
+	#
+	# This is kind of ugly.  The sed script will do the following:
+	#
+	# 1. Strip off a leading "." or "./": this is important to get
+	#    the correct arcnav links for files in $WDIR.
+	# 2. Strip off a trailing "/": this is not strictly necessary, 
+	#    but is kind of nice, since it doesn't end up in "//" at
+	#    the end of a relative path.
+	# 3. Replace all remaining sequences of non-"/" with "..": the
+	#    assumption here is that each dirname represents another
+	#    level of relative separation.
+	# 4. Append a trailing "/" only for non-empty paths: this way
+	#    the caller doesn't need to duplicate this logic, and does
+	#    not end up using $RTOP/file for files in $WDIR.
+	#
+	print $(print $cur | $SED -e '{
+			s:^\./*::
+			s:/$::
+			s:[^/][^/]*:..:g
+		}' -e 's:^\(..*\)$:\1/:')
 }
-
 
 #
 # frame_nav_js
