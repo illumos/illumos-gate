@@ -599,8 +599,12 @@ so_prepend_msg(struct sonode *so, mblk_t *mp, mblk_t *last_tail)
 #endif
 }
 
-static void
-process_new_message(struct sonode *so, mblk_t *mp_head, mblk_t *mp_last_head)
+/*
+ * Move a mblk chain (mp_head, mp_last_head) to the sonode's rcv queue so it
+ * can be processed by so_dequeue_msg().
+ */
+void
+so_process_new_message(struct sonode *so, mblk_t *mp_head, mblk_t *mp_last_head)
 {
 	ASSERT(mp_head->b_prev != NULL);
 	if (so->so_rcv_q_head  == NULL) {
@@ -711,7 +715,7 @@ again1:
 		reset_atmark = B_TRUE;
 	}
 	if (new_msg_head != NULL) {
-		process_new_message(so, new_msg_head, new_msg_last_head);
+		so_process_new_message(so, new_msg_head, new_msg_last_head);
 	}
 	savemp = savemptail = NULL;
 	rvalp->r_val1 = 0;
@@ -1009,6 +1013,15 @@ done:
 	return (error);
 }
 
+/*
+ * Enqueue data from the protocol on the socket's rcv queue.
+ *
+ * We try to hook new M_DATA mblks onto an existing chain, however,
+ * that cannot be done if the existing chain has already been
+ * processed by I/OAT. Non-M_DATA mblks are just linked together via
+ * b_next. In all cases the b_prev of the enqueued mblk is set to
+ * point to the last mblk in its b_cont chain.
+ */
 void
 so_enqueue_msg(struct sonode *so, mblk_t *mp, size_t msg_size)
 {

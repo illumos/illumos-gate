@@ -182,6 +182,7 @@ extern void	socket_sendsig(struct sonode *, int);
 extern int	so_dequeue_msg(struct sonode *, mblk_t **, struct uio *,
     rval_t *, int);
 extern void	so_enqueue_msg(struct sonode *, mblk_t *, size_t);
+extern void	so_process_new_message(struct sonode *, mblk_t *, mblk_t *);
 
 extern mblk_t	*socopyinuio(uio_t *, ssize_t, size_t, ssize_t, size_t, int *,
     cred_t *);

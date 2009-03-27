@@ -1711,6 +1711,8 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		 */
 		error = solookup(so->so_family, SOCK_STREAM, so->so_protocol,
 		    &sp);
+		if (error != 0)
+			return (error);
 
 		/*
 		 * Allocate the user fd.
@@ -1751,12 +1753,21 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 			mutex_exit(&so->so_lock);
 			goto err;
 		}
-		/* cannot fail, only inheriting properties */
-		(void) sosctp_init(nso, so, CRED(), 0);
 		nvp = SOTOV(nso);
 		so_lock_single(so);
 		mutex_exit(&so->so_lock);
-		us.sus_handle = SOTOSSO(nso);
+
+		/* cannot fail, only inheriting properties */
+		(void) sosctp_init(nso, so, CRED(), 0);
+
+		/*
+		 * We have a single ref on the new socket. This is normally
+		 * handled by socket_{create,newconn}, but since they are not
+		 * used we have to do it here.
+		 */
+		nso->so_count = 1;
+
+		us.sus_handle = nso;
 		us.sus_upcalls = &sosctp_sock_upcalls;
 
 		/*

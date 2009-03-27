@@ -505,7 +505,7 @@ sosctp_so_inherit(struct sctp_sonode *lss, struct sctp_sonode *nss)
 
 /*
  * Branching association to it's own socket. Inherit properties from
- * the parent, and move data from RX queue to TX.
+ * the parent, and move data for the association to the new socket.
  */
 void
 sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
@@ -526,12 +526,35 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 	nss->ss_wrsize = ssa->ssa_wrsize;
 	nss->ss_so.so_rcv_queued = ssa->ssa_rcv_queued;
 	nss->ss_so.so_proto_handle = (sock_lower_handle_t)ssa->ssa_conn;
+	/* The peeled off socket is connection oriented */
+	nss->ss_so.so_mode |= SM_CONNREQUIRED;
+
+	/* Consolidate all data on a single rcv list */
+	if (ss->ss_so.so_rcv_head != NULL) {
+		so_process_new_message(&ss->ss_so, ss->ss_so.so_rcv_head,
+		    ss->ss_so.so_rcv_last_head);
+		ss->ss_so.so_rcv_head = NULL;
+		ss->ss_so.so_rcv_last_head = NULL;
+	}
 
 	if (nss->ss_so.so_rcv_queued > 0) {
 		nmp = &ss->ss_so.so_rcv_q_head;
 		last_mp = NULL;
 		while ((mp = *nmp) != NULL) {
 			tmp = *(struct sctp_soassoc **)DB_BASE(mp);
+#ifdef DEBUG
+			{
+				/*
+				 * Verify that b_prev points to the last
+				 * mblk in the b_cont chain (as mandated
+				 * by so_dequeue_msg().)
+				 */
+				mblk_t *mp1 = mp;
+				while (mp1->b_cont != NULL)
+					mp1 = mp1->b_cont;
+				VERIFY(mp->b_prev == mp1);
+			}
+#endif /* DEBUG */
 			if (tmp == ssa) {
 				*nmp = mp->b_next;
 				ASSERT(DB_TYPE(mp) != M_DATA);
@@ -542,15 +565,14 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 					    mp;
 				}
 				nss->ss_so.so_rcv_q_last_head = mp;
-				nss->ss_so.so_rcv_q_last_head->b_prev = last_mp;
 				mp->b_next = NULL;
 			} else {
 				nmp = &mp->b_next;
 				last_mp = mp;
 			}
 		}
+
 		ss->ss_so.so_rcv_q_last_head = last_mp;
-		ss->ss_so.so_rcv_q_last_head->b_prev = last_mp;
 	}
 }
 

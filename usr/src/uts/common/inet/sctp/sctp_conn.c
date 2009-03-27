@@ -151,10 +151,6 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	acceptor->sctp_irwnd = acceptor->sctp_rwnd;
 	acceptor->sctp_pd_point = acceptor->sctp_rwnd;
 	acceptor->sctp_upcalls = listener->sctp_upcalls;
-#if 0
-	bcopy(&listener->sctp_upcalls, &acceptor->sctp_upcalls,
-	    sizeof (sctp_upcalls_t));
-#endif
 
 	return (0);
 }
