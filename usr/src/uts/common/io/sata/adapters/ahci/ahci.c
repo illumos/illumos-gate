@@ -2991,6 +2991,14 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_32BIT_DMA;
 	}
 
+	/* ASUS M3N-HT (NVidia 780a) does not support MSI */
+	if (venid == 0x10de && devid == 0x0ad4) {
+		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
+		    "ASUS M3N-HT (NVidia 780a) does not support MSI "
+		    "interrupts, so force it to use fixed interrupts.");
+		ahci_msi_enabled = B_FALSE;
+	}
+
 	/*
 	 * Check if capabilities list is supported and if so,
 	 * get initial capabilities pointer and clear bits 0,1.
