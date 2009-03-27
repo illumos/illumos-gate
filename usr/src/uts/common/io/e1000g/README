@@ -657,3 +657,8 @@ Notes on packaging:
    6809729 Panic in function 'e1000g_rxfree_func' on T2000
    6809877 e1000g E1000G_IPALIGNROOM code can be rewritten
 
+5.3.7
+======
+  This version has the following fixes:
+   6812227 e1000g(intel 82571 adapter) must support MTU size of 9216
+
