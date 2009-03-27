@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2505,7 +2505,7 @@ pcmcia_generic_name(int socket, struct pcm_device_info *info,
 				    &funce, TPLFUNC_LAN);
 				if (i == SUCCESS) {
 					i = funce.data.lan.tech;
-					if (i > sizeof (pcmcia_lan_types) /
+					if (i >= sizeof (pcmcia_lan_types) /
 					    sizeof (char *)) {
 						break;
 					}
