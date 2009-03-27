@@ -18,11 +18,11 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH webrev 1 "5 Dec 2008"
+.TH webrev 1 "24 Mar 2009"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -89,10 +89,10 @@ For example:
 .fi
 .PP
 In the index file, each file is listed on a line with a link to the
-relevant review materials.  Comments for each delta will be included
-automatically.  Bug numbers (any sequence of 5 or more digits) and ARC
-cases (ARC name followed by year/number, e.g. PSARC/2003/436) in the
-comment will become hyperlinks in the associated web interface.
+relevant review materials.  Comments for each change will be included
+automatically.  Cross references to bug (or other information) tracking
+databases in the comments will become hyperlinks in the associated web
+interface, according to the rules in CROSS REFERENCING below.
 
 As a review aid, content may be added to the \fIindex\fR file in two ways.
 First, the author may manually edit the file (for example by including
@@ -185,7 +185,23 @@ from the
 .PP
 The file list will be created from the output of the "svn status" command.
 
+.SH CROSS REFERENCING
+.PP
+After extracting comments (see FILE LIST below),
+.B webrev
+will translate cross references into hyperlinks.  By default, information
+about available information tracking systems can be found in
+/opt/onbld/etc/its.reg, and the specification of a local domain and
+selection and prioritization of systems
+in /opt/onbld/etc/its.conf.  These file formats are self documenting.  Also
+see the -I and -C options below.
 .SH OPTIONS
+.TP 10
+.BI "-C " priority-file
+In addition to the system default and an optional user-supplied ~/.its.conf,
+use the specified file to specify a local domain list and prioritize the list
+of information tracking systems to be searched automatically when resolving cross
+references.
 .TP 10
 .BI "-D"
 Delete remote webrev via SFTP. Default remote host is \fIcr.opensolaris.org\fR,
@@ -198,6 +214,9 @@ moving the webrev to special directory in user's home directory. It is
 expected that the remote host periodically runs a script which deletes
 the contents of this directory. See the ENVIRONMENT VARIABLES section for
 more details about this directory.
+.TP 10
+.BI "-I " information-file
+Use the specified file to seed the list of information tracking systems.
 .TP 10
 .BI "-i " include-file
 Include the specified file into the index.html file which is generated
@@ -220,10 +239,10 @@ Suppress all comments from all output forms html, txt and pdf.
 Do not generate webrev. Useful whenever only upload is needed.
 .TP 10
 .B -O
-Enable \fIOpenSolaris\fR mode: bug links are generated relative to
-\fIbugs.opensolaris.org\fR, SAC links are generated relative to
-\fIwww.opensolaris.org\fR, and sources which appear in \fIusr/closed\fR
-are automatically elided from the review.
+Enable \fIOpenSolaris\fR mode: information tracking system hyperlinks
+are generated using the EXTERNAL_URL field from the specified its.reg entry,
+instead of the default INTERNAL_URL_domain field, and sources which appear in
+\fIusr/closed\fR are automatically elided from the review.
 .TP 10
 .BI "-o " output-dir
 Place output from running the script in the directory specified.  If
@@ -348,10 +367,6 @@ respectively; their default values are "diff -b -C 5" and "diff -b -U
 5".  To generate diffs with more (or less) than 5 lines of context or
 with more (or less) strict whitespace handling, set one or both of
 these variables in the user environment accordingly.
-
-\fBWEBREV_BUGURL\fR may be set to an alternate bug-to-HTML interface
-(providing the BUG number can be appended to the URL).  The default
-URL is "http://monaco.sfbay.sun.com/detail.jsp?cr=".
 
 \fBWDIR\fR sets the output directory.  It is functionally equivalent to
 the \fI-o\fR option.

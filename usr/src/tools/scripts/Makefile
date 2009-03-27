@@ -112,7 +112,9 @@ MAKEFILES= \
 	xref.mk
 
 ETCFILES= \
-	hgstyle
+	hgstyle \
+	its.conf \
+	its.reg
 
 CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1
 

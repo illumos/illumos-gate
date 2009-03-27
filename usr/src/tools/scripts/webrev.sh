@@ -511,30 +511,14 @@ html_quote()
 }
 
 #
-# input_cmd | bug2url | output_cmd
+# input_cmd | its2url | output_cmd
 #
-# Scan for bugids and insert <a> links to the relevent bug database.
+# Scan for information tracking system references and insert <a> links to the
+# relevant databases.
 #
-bug2url()
+its2url()
 {
-	$SED -e 's|[0-9]\{5,\}|<a href=\"'$BUGURL'&\">&</a>|g'
-}
-
-#
-# input_cmd | sac2url | output_cmd
-#
-# Scan for ARC cases and insert <a> links to the relevent SAC database.
-# This is slightly complicated because inside the SWAN, SAC cases are
-# grouped by ARC: PSARC/2006/123.  But on OpenSolaris.org, they are
-# referenced as 2006/123 (without labelling the ARC).
-#
-sac2url()
-{
-	if [[ -z "$Oflag" ]]; then
-	    $SED -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\1/\2/\3\">\1 \2/\3</a>|g'
-	else
-	    $SED -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\2/\3\">\1 \2/\3</a>|g'
-	fi
+	$SED -f ${its_sed_script}
 }
 
 #
@@ -1058,7 +1042,7 @@ function relative_dir
         # If the first path was specified absolutely, and it does
         # not start with the second path, it's an error.
         #
-        if [[ $1 =~ '^/.+' && "$cur" == "$1" ]]; then
+        if [[ "$cur" = "/${1#/}" ]]; then
                 # Should never happen.
                 print -u2 "\nWARNING: relative_dir: \"$1\" not relative "
                 print -u2 "to \"$2\".  Check input paths.  Framed webrev "
@@ -1082,11 +1066,12 @@ function relative_dir
 	#    the caller doesn't need to duplicate this logic, and does
 	#    not end up using $RTOP/file for files in $WDIR.
 	#
-	print $(print $cur | $SED -e '{
-			s:^\./*::
-			s:/$::
-			s:[^/][^/]*:..:g
-		}' -e 's:^\(..*\)$:\1/:')
+	print $cur | $SED -e '{
+		s:^\./*::
+		s:/$::
+		s:[^/][^/]*:..:g
+		s:^\(..*\)$:\1/:
+	}'
 }
 
 #
@@ -1474,7 +1459,7 @@ comments_from_teamware()
 		fi
 
 		$SCCS prs -l -r$sid1 $cfile  2>/dev/null | \
-		    html_quote | bug2url | sac2url | $AWK "$nawkprg"
+		    html_quote | its2url | $AWK "$nawkprg"
 	fi
 }
 
@@ -1510,7 +1495,7 @@ comments_from_wx()
 		return
 	fi
 
-	print -- "$comm" | html_quote | bug2url | sac2url
+	print -- "$comm" | html_quote | its2url
 
 }
 
@@ -2093,8 +2078,10 @@ function usage
 	webrev [common-options] -w <wx file>
 
 Options:
+	-C <filename>: Use <filename> for the information tracking configuration.
 	-D: delete remote webrev
 	-i <filename>: Include <filename> in the index.html file.
+	-I <filename>: Use <filename> for the information tracking registry.
 	-n: do not generate the webrev (useful with -U)
 	-O: Print bugids/arc cases suitable for OpenSolaris.
 	-o <outdir>: Output webrev to specified directory.
@@ -2105,8 +2092,6 @@ Options:
 
 Environment:
 	WDIR: Control the output directory.
-	WEBREV_BUGURL: Control the URL prefix for bugids.
-	WEBREV_SACURL: Control the URL prefix for ARC cases.
 	WEBREV_TRASH_DIR: Set directory for webrev delete.
 
 SCM Specific Options:
@@ -2183,10 +2168,12 @@ typeset -r DEFAULT_REMOTE_HOST="cr.opensolaris.org"
 typeset -r rsync_prefix="rsync://"
 typeset -r ssh_prefix="ssh://"
 
+Cflag=
 Dflag=
 flist_mode=
 flist_file=
 iflag=
+Iflag=
 lflag=
 Nflag=
 nflag=
@@ -2203,13 +2190,19 @@ remote_target=
 # NOTE: when adding/removing options it is necessary to sync the list
 # 	with usr/src/tools/onbld/hgext/cdm.py
 #
-while getopts "i:o:p:lwONnt:UD" opt
+while getopts "C:tDi:I:lnNo:Op::Uw" opt
 do
 	case $opt in
+	C)	Cflag=1
+		ITSCONF=$OPTARG;;
+
 	D)	Dflag=1;;
 
 	i)	iflag=1
 		INCLUDE_FILE=$OPTARG;;
+
+	I)	Iflag=1
+		ITSREG=$OPTARG;;
 
 	#
 	# If -l has been specified, we need to abort further options
@@ -2258,6 +2251,22 @@ fi
 if [[ -n $tflag && -z $Uflag && -z $Dflag ]]; then
 	echo "remote target has to be used only for upload or delete"
 	exit 1
+fi
+
+#
+# If the command line options indicate no webrev generation, either
+# explicitly (-n) or implicitly (-D but not -U), then there's a whole
+# ton of logic we can skip.
+#
+# Instead of increasing indentation, we intentionally leave this loop
+# body open here, and exit via break from multiple points within.
+# Search for DO_EVERYTHING below to find the break points and closure.
+#
+for do_everything in 1; do
+
+# DO_EVERYTHING: break point
+if [[ -n $nflag || ( -z $Uflag && -n $Dflag ) ]]; then
+	break
 fi
 
 #
@@ -2620,6 +2629,131 @@ if [[ -n $iflag ]]; then
 	fi
 fi
 
+# DO_EVERYTHING: break point
+if [[ -n $Nflag ]]; then
+	break
+fi
+
+typeset -A itsinfo
+typeset -r its_sed_script=/tmp/$$.its_sed
+valid_prefixes=
+if [[ -z $nflag ]]; then
+	DEFREGFILE="$(dirname $(whence $0))/../etc/its.reg"
+	if [[ -n $Iflag ]]; then
+		REGFILE=$ITSREG
+	elif [[ -r $HOME/.its.reg ]]; then
+		REGFILE=$HOME/.its.reg
+	else
+		REGFILE=$DEFREGFILE
+	fi
+	if [[ ! -r $REGFILE ]]; then
+		print "ERROR: Unable to read database registry file $REGFILE"
+		exit 1
+	elif [[ $REGFILE != $DEFREGFILE ]]; then
+		print "   its.reg from: $REGFILE"
+	fi
+
+	$SED -e '/^#/d' -e '/^[ 	]*$/d' $REGFILE | while read LINE; do
+		
+		name=${LINE%%=*}
+		value="${LINE#*=}"
+
+		if [[ $name == PREFIX ]]; then
+			p=${value}
+			valid_prefixes="${p} ${valid_prefixes}"
+		else
+			itsinfo["${p}_${name}"]="${value}"
+		fi
+	done
+
+
+	DEFCONFFILE="$(dirname $(whence $0))/../etc/its.conf"
+	CONFFILES=$DEFCONFFILE
+	if [[ -r $HOME/.its.conf ]]; then
+		CONFFILES="${CONFFILES} $HOME/.its.conf"
+	fi
+	if [[ -n $Cflag ]]; then
+		CONFFILES="${CONFFILES} ${ITSCONF}"
+	fi
+	its_domain=
+	its_priority=
+	for cf in ${CONFFILES}; do
+		if [[ ! -r $cf ]]; then
+			print "ERROR: Unable to read database configuration file $cf"
+			exit 1
+		elif [[ $cf != $DEFCONFFILE ]]; then
+			print "       its.conf: reading $cf"
+		fi
+		$SED -e '/^#/d' -e '/^[ 	]*$/d' $cf | while read LINE; do
+		    eval "${LINE}"
+		done
+	done
+
+	#
+	# If an information tracking system is explicitly identified by prefix,
+	# we want to disregard the specified priorities and resolve it accordingly.
+	#
+	# To that end, we'll build a sed script to do each valid prefix in turn.
+	#
+	for p in ${valid_prefixes}; do
+		#
+		# When an informational URL was provided, translate it to a
+		# hyperlink.  When omitted, simply use the prefix text.
+		#
+		if [[ -z ${itsinfo["${p}_INFO"]} ]]; then
+			itsinfo["${p}_INFO"]=${p}
+		else
+			itsinfo["${p}_INFO"]="<a href=\\\"${itsinfo["${p}_INFO"]}\\\">${p}</a>"
+		fi
+
+		#
+		# Assume that, for this invocation of webrev, all references
+		# to this information tracking system should resolve through
+		# the same URL.
+		#
+		# If the caller specified -O, then always use EXTERNAL_URL.
+		#
+		# Otherwise, look in the list of domains for a matching
+		# INTERNAL_URL.
+		#
+		[[ -z $Oflag ]] && for d in ${its_domain}; do
+			if [[ -n ${itsinfo["${p}_INTERNAL_URL_${d}"]} ]]; then
+				itsinfo["${p}_URL"]="${itsinfo[${p}_INTERNAL_URL_${d}]}"
+				break
+			fi
+		done
+		if [[ -z ${itsinfo["${p}_URL"]} ]]; then
+			itsinfo["${p}_URL"]="${itsinfo[${p}_EXTERNAL_URL]}"
+		fi
+
+		#
+		# Turn the destination URL into a hyperlink
+		#
+		itsinfo["${p}_URL"]="<a href=\\\"${itsinfo[${p}_URL]}\\\">&</a>"
+
+		print "/^${p}[ 	]/ {
+				s;${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
+				s;^${p};${itsinfo[${p}_INFO]};
+			}" >> ${its_sed_script}
+	done
+
+	#
+	# The previous loop took care of explicit specification.  Now use
+	# the configured priorities to attempt implicit translations.
+	#
+	for p in ${its_priority}; do
+		print "/^${itsinfo[${p}_REGEX]}[ 	]/ {
+				s;${itsinfo[${p}_REGEX]};${itsinfo[${p}_URL]};g
+			}" >> ${its_sed_script}
+	done
+fi
+
+#
+# Search for DO_EVERYTHING above for matching "for" statement
+# and explanation of this terminator.
+#
+done
+
 #
 # Output directory.
 #
@@ -2740,27 +2874,6 @@ print "      Output to: $WDIR"
 # Save the file list in the webrev dir
 #
 [[ ! $FLIST -ef $WDIR/file.list ]] && cp $FLIST $WDIR/file.list
-
-#
-#    Bug IDs will be replaced by a URL.  Order of precedence
-#    is: default location, $WEBREV_BUGURL, the -O flag.
-#
-BUGURL='http://monaco.sfbay.sun.com/detail.jsp?cr='
-[[ -n $WEBREV_BUGURL ]] && BUGURL="$WEBREV_BUGURL"
-[[ -n "$Oflag" ]] && \
-    BUGURL='http://bugs.opensolaris.org/bugdatabase/view_bug.do?bug_id='
-
-#
-#    Likewise, ARC cases will be replaced by a URL.  Order of precedence
-#    is: default, $WEBREV_SACURL, the -O flag.
-#
-#    Note that -O also triggers different substitution behavior for
-#    SACURL.  See sac2url().
-#
-SACURL='http://sac.eng.sun.com'
-[[ -n $WEBREV_SACURL ]] && SACURL="$WEBREV_SACURL"
-[[ -n "$Oflag" ]] && \
-    SACURL='http://www.opensolaris.org/os/community/arc/caselog'
 
 rm -f $WDIR/$WNAME.patch
 rm -f $WDIR/$WNAME.ps

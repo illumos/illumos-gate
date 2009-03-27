@@ -1,0 +1,156 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+
+#
+# This file constitutes an informal registry for information tracking
+# systems.  Its intended use is to facilitate resolving references to
+# multiple such systems in SCM-embedded comments.
+#
+# Systems are listed alphabetically by unique PREFIX.  No priority of
+# reference should be inferred from this ordering.  Applications
+# using this information should provide their own methods to prioritize
+# systems of record.
+#
+
+
+
+#
+# The following fields are valid for each information tracking system.
+# Fields not designated as required are optional.
+#
+# PREFIX (required)
+#
+#     A unique, three-character abbreviation.  Please avoid generic
+#   terms like "bug," and instead use something derivative of the name
+#   or URL of the actual system.
+#
+# INFO
+#
+#     A URL for additional information about the system.  Should be the
+#   home page, essentially.
+#
+# EXTERNAL_URL (required)
+#
+#     A URL to resolve reference to a unique key.  See NOTES below.
+#
+# INTERNAL_URL_domain
+#
+#     A URL that is valid only in the specified domain.  Arbitrarily many
+#   INTERNAL_URLs may be provided.  Define only if different from EXTERNAL_URL
+#   in specified domain.
+#
+# REGEX (required)
+#
+#     A regexp(5) to tokenize a valid, unique key.  See NOTES below.
+#
+# CONTACT
+#
+#     A valid e-mail address for support of the system.
+#
+
+
+
+#
+# NOTES
+#
+# REGEX should use parenthesization via \(\) to provide one or more
+# tokens to be substituted in *_URLs.  See regexp(5) for syntax.
+#
+# A REGEX for a particular system is required to match any unique keys
+# that are valid for that system.  For the common case, where such a key
+# is numeric, it may be matched by the REGEX entries for multiple systems.
+# Resolution of such ambiguity may be accomplished through prioritization
+# or use of PREFIX, and is left to individual applications.
+#
+
+
+
+#
+# The case logs for Sun Microsystems, Inc. Architecture Review Committees.
+# The database for this system is inside Sun's firewall, so the access URLs
+# are different on- and off-SWAN.  The off-SWAN URL actually references a
+# redacted, external mirror of the internal database.
+#
+PREFIX=arc
+INFO=http://opensolaris.org/os/community/arc/
+EXTERNAL_URL=http://arc.opensolaris.org/caselog/\\1/\\2/\\3
+INTERNAL_URL_sun.com=http://sac.eng.sun.com/Archives/CaseLog/arc/\\1/\\2/\\3
+REGEX=\\([A-Z]\\{1\,2\\}ARC\\)[ \\/]\\([0-9]\\{4\\}\\)\\/\\([0-9]\\{3\\}\\)
+CONTACT=arc-discuss@opensolaris.org
+
+#
+# grommit is maintained by stevel, and was used for early tools work
+# in the scm-migration project.
+#
+PREFIX=bgc
+INFO=http://bugs.grommit.com/
+EXTERNAL_URL=http://bugs.grommit.com/show_bug.cgi?id=\\1
+REGEX=\\([0-9]\\{1\,5\\}\\)
+CONTACT=
+
+#
+# This is the bugzilla instance on opensolaris.org.
+#
+PREFIX=doo
+INFO=http://defect.opensolaris.org/bz/
+EXTERNAL_URL=http://defect.opensolaris.org/bz/show_bug.cgi?id=\\1
+REGEX=\\([0-9]\\{1\,6\\}\\)
+CONTACT=tools-discuss@opensolaris.org
+
+#
+# This is the bugzilla instance on freedesktop.org, used by X.Org and a
+# variety of open source desktop modules shared by multiple desktops.
+#
+PREFIX=fdo
+INFO=http://bugs.freedesktop.org/
+EXTERNAL_URL=http://bugs.freedesktop.org/show_bug.cgi?id=\\1
+REGEX=\\([0-9]\\{1\,6\\}\\)
+CONTACT=sitewranglers@lists.freedesktop.org
+
+#
+# The Roundup instance used at Selenic to track defects in Mercurial.
+#
+PREFIX=mer
+INFO=http://roundup.sourceforge.net/doc-1.0/
+EXTERNAL_URL=http://www.selenic.com/mercurial/bts/issue\\1
+REGEX=\\([0-9]\\{1\,5\\}\\)
+CONTACT=
+
+#
+# The proprietary defect tracking system used by Sun Microsystems, Inc.
+# The database for this system is inside Sun's firewall, so the access URLs
+# are different on- and off-SWAN.  The off-SWAN URL provides restricted,
+# redacted access to the internal database through a controlled boundary
+# system.
+#
+PREFIX=sun
+INFO=http://bugs.opensolaris.org/
+EXTERNAL_URL=http://bugs.opensolaris.org/bugdatabase/view_bug.do?bug_id=\\1
+INTERNAL_URL_sun.com=http://monaco.sfbay.sun.com/detail.jsf?cr=\\1
+REGEX=\\([0-9]\\{7\\}\\)
+CONTACT=opendev-discuss@opensolaris.org

@@ -165,6 +165,8 @@ f none opt/onbld/etc/abi/exceptions 444 root bin
 f none opt/onbld/etc/abi/ABI_i386.db 444 root bin
 f none opt/onbld/etc/abi/ABI_sparc.db 444 root bin
 f none opt/onbld/etc/hgstyle 644 root bin
+f none opt/onbld/etc/its.conf 644 root bin
+f none opt/onbld/etc/its.reg 644 root bin
 d none opt/onbld/gk 755 root bin
 f none opt/onbld/gk/.cshrc 644 root bin
 f none opt/onbld/gk/.login 644 root bin
