@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +171,11 @@ static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
 	{						/* 0x00008000 */
 		AV_SPARC_IMA, STRDESC("AV_SPARC_IMA"),
 		STRDESC("IMA"), STRDESC("ima"),
+	},
+	{						/* 0x00010000 */
+		AV_SPARC_ASI_CACHE_SPARING,
+		STRDESC("AV_SPARC_ASI_CACHE_SPARING"),
+		STRDESC("CSPARE"), STRDESC("cspare"),
 	}
 };
 

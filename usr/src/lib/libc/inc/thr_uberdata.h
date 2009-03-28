@@ -251,6 +251,9 @@ typedef struct {
 #if defined(__x86)
 extern	void	ht_pause(void);		/* "pause" instruction */
 #define	SMT_PAUSE()	ht_pause()
+#elif defined(SMT_PAUSE_FUNCTION)
+extern	void	SMT_PAUSE_FUNCTION(void);
+#define	SMT_PAUSE()	SMT_PAUSE_FUNCTION()
 #else
 #define	SMT_PAUSE()
 #endif	/* __x86 */

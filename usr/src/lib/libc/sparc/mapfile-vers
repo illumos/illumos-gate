@@ -587,12 +587,8 @@ SYSVABI_1.3 {
 	memccpy;
 	_memccpy;
 	memchr;
-	memcmp = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	memcntl;
 	_memcntl;
-	memcpy = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
-	memmove = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
-	memset = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	mkdir;
 	_mkdir;
 	mkfifo;
@@ -951,11 +947,6 @@ SUNWprivate_1.1 {
 	install_utrap;
 	_install_utrap;
 	__lshrdi3;
-	_memcmp = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
-	_memcpy = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
-	_memcpy = NODYNSORT;
-	_memmove = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
-	_memset = AUXILIARY /platform/$PLATFORM/lib/libc_psr.so.1;
 	__moddi3;
 	__muldi3;
 	nop;

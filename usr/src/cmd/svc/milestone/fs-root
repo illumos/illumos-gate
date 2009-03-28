@@ -20,13 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
-# All rights reserved.
 #
 
 # Make sure that the libraries essential to this stage of booting can be found.
@@ -37,11 +34,21 @@ libc_mount() {
 	# If there is an optimized libc available in /usr that fits this
 	# processor, mount it on top of the base libc.
 	#
-	MOE=`/usr/bin/moe -32 '/usr/lib/libc/$HWCAP'`
-	if [ -n "$MOE" ]; then
+	LIBC_MOE_32=`/usr/bin/moe -32 '/usr/lib/libc/$HWCAP'`
+	if [ -n "$LIBC_MOE_32" ]; then
 		/usr/sbin/mount | egrep -s "^/lib/libc.so.1 on "
 		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $MOE /lib/libc.so.1
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 /lib/libc.so.1
+		fi
+	fi
+
+	ARCH64=`isainfo | awk '{print $1}'`
+	LIBC_MOE_64=`/usr/bin/moe -64 /usr/lib/$ARCH64/libc/'$HWCAP'`
+	if [ -n "$LIBC_MOE_64" ]; then
+		/usr/sbin/mount | egrep -s "^/lib/$ARCH64/libc.so.1 on "
+		if [ $? -ne 0 ]; then
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
+				/lib/$ARCH64/libc.so.1
 		fi
 	fi
 }
@@ -134,7 +141,12 @@ libc_psr_mount() {
 	PLAT=`/usr/bin/uname -i` 
 	ARCH=`/usr/bin/uname -m` 
 	if [ "$ARCH" = "sun4v" ]; then 
-		sun4v_libc_psr_mount 
+		# Check if we already loaded libc_hwcapX.so.1 thru libc_mount
+		# We can get rid of this check (and the libc_psr mount),
+		# if all the sun4v platforms start using libc_hwcap.
+		if [ ! -n "$LIBC_MOE_32" ]; then
+			sun4v_libc_psr_mount
+		fi
 	elif [ "$ARCH" = "sun4u" ]; then 
 		if [ -h /platform/$PLAT/lib/libc_psr.so.1 ]; then 
 			LINKSTO=`/usr/bin/ls -l \

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -42,6 +42,10 @@
 #
 # SUNWcsl
 #
+d none usr/lib/libc 755 root bin
+f none usr/lib/libc/libc_hwcap1.so.1 755 root bin
+d none usr/lib/sparcv9/libc 755 root bin
+f none usr/lib/sparcv9/libc/libc_hwcap1.so.1 755 root bin
 d none usr/ccs/lib/sparcv9 755 root bin
 s none usr/ccs/lib/sparcv9/libcurses.so=../../../../lib/sparcv9/libcurses.so.1
 s none usr/ccs/lib/sparcv9/libform.so=../../../lib/sparcv9/libform.so.1

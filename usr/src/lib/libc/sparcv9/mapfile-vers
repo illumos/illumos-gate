@@ -436,12 +436,8 @@ SUNW_0.7 {
 	memccpy;
 	_memccpy;
 	memchr;
-	memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	memcntl;
 	_memcntl;
-	memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	memset = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	mkdir;
 	_mkdir;
 	mkfifo;
@@ -806,11 +802,6 @@ SUNWprivate_1.1 {
 	__fseterror_u;
 	install_utrap;
 	_install_utrap;
-	_memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	_memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	_memcpy = NODYNSORT;
-	_memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
-	_memset = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	nop;
 	_Q_cplx_div;
 	_Q_cplx_div_ix;

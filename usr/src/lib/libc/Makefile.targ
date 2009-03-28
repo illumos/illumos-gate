@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # libc build rules
@@ -285,7 +284,7 @@ $(UNICODEOBJS:%=pics/%): $(SRC)/common/unicode/$$(@F:.o=.c)
 	$(POST_PROCESS_O)
 
 # DTrace rules
-pics/%.o: ../port/threads/%.d $(THREADSOBJS:%=pics/%)
+pics/%.o: $(LIBCBASE)/../port/threads/%.d $(THREADSOBJS:%=pics/%)
 	$(COMPILE.d) -C -xlazyload -s $< -o $@ $(THREADSOBJS:%=pics/%)
 	$(POST_PROCESS_O)
 

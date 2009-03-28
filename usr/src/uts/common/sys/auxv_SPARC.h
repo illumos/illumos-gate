@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,9 +52,11 @@ extern "C" {
 #define	AV_SPARC_TRANS	0x2000  /* transactions supported */
 #define	AV_SPARC_FJFMAU	0x4000	/* Fujitsu Unfused Multiply-Add */
 #define	AV_SPARC_IMA	0x8000	/* Integer Multiply-add */
+#define	AV_SPARC_ASI_CACHE_SPARING	0x10000
 
 #define	FMT_AV_SPARC	\
 	"\20" \
+	"\21cspare"	\
 	"\20ima\17fjfmau\16trans\15random\14hpc\13vis3\12fmau\11fmaf" 	\
 	"\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
 

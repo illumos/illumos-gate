@@ -135,6 +135,7 @@ cpu_setup(void)
 	if (cpu_hwcap_flags == 0)
 		cmn_err(CE_WARN, "hwcap-list missing from MD");
 #endif
+	cpu_hwcap_flags |= AV_SPARC_ASI_CACHE_SPARING;
 
 	cache |= (CACHE_PTAG | CACHE_IOCOHERENT);
 

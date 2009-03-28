@@ -37,6 +37,7 @@ usr/src/cmd/sgs/rtld/common/mapfile-order-*
 usr/src/common/bignum/*/cap_mapfile
 usr/src/lib/README.mapfiles
 usr/src/lib/libc/*_hwcap*/mapfile
+usr/src/lib/libc/sparc_hwcap1/sparc*/mapfile
 usr/src/lib/libc_psr/*_hwcap*/mapfile
 usr/src/psm/stand/boot/sparc/common/mapfile
 usr/src/psm/stand/bootlst/sparc/mapfile
