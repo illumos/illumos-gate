@@ -482,6 +482,7 @@ i386_SUBDIRS=		\
 	addbadsec	\
 	biosdev		\
 	diskscan	\
+	lms		\
 	OWconfig	\
 	rtc		\
 	ucodeadm	\
