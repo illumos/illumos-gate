@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,6 +210,7 @@ extern "C" {
 #define	AHCI_TFD_STS_DRQ	(0x1 << 3)
 #define	AHCI_TFD_STS_ERR	(0x1 << 0)
 #define	AHCI_TFD_ERR_SHIFT	8
+#define	AHCI_TFD_ERR_SGS	(0x1 << 0) /* DDR1: Send_good_status */
 
 #define	AHCI_SERROR_CLEAR_ALL			0xffffffff
 

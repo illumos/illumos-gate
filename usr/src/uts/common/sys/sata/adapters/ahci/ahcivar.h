@@ -212,6 +212,7 @@ typedef struct ahci_ctl {
 	 * AHCI_CAP_NCQ
 	 * AHCI_CAP_PM
 	 * AHCI_CAP_32BIT_DMA
+	 * AHCI_CAP_SCLO
 	 */
 	int			ahcictl_cap;
 
@@ -284,11 +285,12 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_PM			0x8
 /* 32-bit DMA addressing */
 #define	AHCI_CAP_32BIT_DMA		0x10
+/* Supports Command List Override */
+#define	AHCI_CAP_SCLO			0x20
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
-#define	AHCI_PORT_INIT		0x0002	/* Initialize port */
-#define	AHCI_RESET_NO_EVENTS_UP	0x0004	/* Don't send reset events up */
+#define	AHCI_RESET_NO_EVENTS_UP	0x0002	/* Don't send reset events up */
 
 #define	ERR_RETRI_CMD_IN_PROGRESS(ahci_portp)		\
 	(ahci_portp->ahciport_flags &			\
@@ -323,7 +325,9 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 ms */
 #define	AHCI_1MS_TICKS	(drv_usectohz(1000))	/* ticks in 1 ms */
 #define	AHCI_100US_TICKS	(drv_usectohz(100))	/* ticks in 100 us */
-#define	AHCI_1MS_USECS	(1000)			/* usecs in 1 millisec */
+#define	AHCI_10MS_USECS		(10000)		/* microsecs in 10 millisec */
+#define	AHCI_1MS_USECS		(1000)		/* microsecs in 1 millisec */
+#define	AHCI_100US_USECS	(100)
 
 /*
  * The following values are the numbers of times to retry polled requests.
@@ -364,7 +368,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_UNDERFLOW	0x10000
 #define	AHCIDBG_MSI		0x20000
 
-extern int ahci_debug_flag;
+extern uint32_t ahci_debug_flags;
 
 #define	AHCIDBG0(flag, ahci_ctlp, format)			\
 	if (ahci_debug_flags & (flag)) {			\

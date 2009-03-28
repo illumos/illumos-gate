@@ -637,6 +637,13 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "hba does not support 64-bit addressing");
 	}
 
+	/* Checking for Support Command List Override */
+	if (cap_status & AHCI_HBA_CAP_SCLO) {
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_SCLO;
+		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
+		    "hba supports command list override.");
+	}
+
 	if (pci_config_setup(dip, &ahci_ctlp->ahcictl_pci_conf_handle)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "!ahci%d: Cannot set up pci configure space",
@@ -2842,7 +2849,8 @@ static int
 ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
     ahci_port_t *ahci_portp, uint8_t port)
 {
-	uint32_t port_cmd_status;
+	uint32_t port_sstatus, port_task_file, port_cmd_status;
+	int ret;
 
 	port_cmd_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
@@ -2854,22 +2862,63 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
 	 * Check whether the port is in NotRunning state, if not,
 	 * put the port in NotRunning state
 	 */
-	if (!(port_cmd_status &
+	if (port_cmd_status &
 	    (AHCI_CMD_STATUS_ST |
 	    AHCI_CMD_STATUS_CR |
 	    AHCI_CMD_STATUS_FRE |
-	    AHCI_CMD_STATUS_FR))) {
-
-		goto next;
+	    AHCI_CMD_STATUS_FR)) {
+		(void) ahci_put_port_into_notrunning_state(ahci_ctlp,
+		    ahci_portp, port);
 	}
 
-	if (ahci_restart_port_wait_till_ready(ahci_ctlp, ahci_portp,
-	    port, AHCI_RESET_NO_EVENTS_UP|AHCI_PORT_INIT, NULL) != AHCI_SUCCESS)
-		return (AHCI_FAILURE);
+	/* Device is unknown at first */
+	ahci_portp->ahciport_device_type = SATA_DTYPE_UNKNOWN;
 
-next:
-	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
-	    "port %d is in NotRunning state now", port);
+	port_sstatus = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxSSTS(ahci_ctlp, port));
+	port_task_file = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
+
+	/* Check physcial link status */
+	if (SSTATUS_GET_IPM(port_sstatus) == SSTATUS_IPM_NODEV_NOPHYCOM ||
+	    SSTATUS_GET_DET(port_sstatus) == SSTATUS_DET_DEVPRE_NOPHYCOM ||
+
+	    /* Check interface status */
+	    port_task_file & AHCI_TFD_STS_BSY ||
+	    port_task_file & AHCI_TFD_STS_DRQ) {
+
+		/* Incorrect task file state, we need to reset port */
+		ret = ahci_port_reset(ahci_ctlp, ahci_portp, port);
+
+		/* Does port reset succeed on HBA port? */
+		if (ret != AHCI_SUCCESS) {
+			AHCIDBG1(AHCIDBG_INIT|AHCIDBG_ERRS, ahci_ctlp,
+			    "ahci_initialize_port:"
+			    "port reset faild at port %d", port);
+			return (AHCI_FAILURE);
+		}
+
+		/* Is port failed? */
+		if (ahci_portp->ahciport_port_state & SATA_PSTATE_FAILED) {
+			AHCIDBG2(AHCIDBG_INIT|AHCIDBG_ERRS, ahci_ctlp,
+			    "ahci_initialize_port: port %d state 0x%x",
+			    port, ahci_portp->ahciport_port_state);
+			return (AHCI_FAILURE);
+		}
+
+		/* Is there any device attached? */
+		if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
+
+			/* Do not waste time on empty port */
+			AHCIDBG1(AHCIDBG_INIT|AHCIDBG_INFO, ahci_ctlp,
+			    "ahci_initialize_port: No device is found "
+			    "at port %d", port);
+			goto out;
+		}
+	}
+	ahci_portp->ahciport_port_state = SATA_STATE_READY;
+
+	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "port %d is ready now.", port);
 
 	/*
 	 * At the time being, only probe ports/devices and get the types of
@@ -2878,7 +2927,10 @@ next:
 	 * don't support the situation.
 	 */
 	if (ahci_ctlp->ahcictl_flags & AHCI_ATTACH) {
-		/* Try to get the device signature */
+		/*
+		 * Till now we can assure a device attached to that HBA port
+		 * and work correctly. Now try to get the device signature.
+		 */
 		ahci_find_dev_signature(ahci_ctlp, ahci_portp, port);
 	} else {
 
@@ -3143,16 +3195,18 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	ahci_cmd_header_t *cmd_header;
 	uint32_t port_cmd_status, port_cmd_issue, port_task_file;
 	int slot, loop_count;
+	int rval = AHCI_FAILURE;
 
 	AHCIDBG1(AHCIDBG_ENTRY, ahci_ctlp,
 	    "Port %d device resetting", port);
 
-	/* First clear PxCMD.ST */
-	(void) ahci_put_port_into_notrunning_state(ahci_ctlp,
-	    ahci_portp, port);
-
-	/* Then re-set PxCMD.ST */
-	(void) ahci_start_port(ahci_ctlp, ahci_portp, port);
+	/* First clear PxCMD.ST (AHCI v1.2 10.4.1) */
+	if (ahci_put_port_into_notrunning_state(ahci_ctlp, ahci_portp,
+	    port) != AHCI_SUCCESS) {
+		AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+		    "ahci_software_reset: cannot stop HBA port %d.", port);
+		goto out;
+	}
 
 	/* Check PxTFD.STS.BSY and PxTFD.STS.DRQ */
 	port_task_file = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
@@ -3160,23 +3214,74 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 	if (port_task_file & AHCI_TFD_STS_BSY ||
 	    port_task_file & AHCI_TFD_STS_DRQ) {
+		if (!(ahci_ctlp->ahcictl_cap & AHCI_CAP_SCLO)) {
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+			    "PxTFD.STS.BSY/DRQ is set (PxTFD=0x%x), "
+			    "cannot issue a software reset.", port_task_file);
+			goto out;
+		}
+
+		/*
+		 * If HBA Support CLO, as Command List Override (CAP.SCLO is
+		 * set), PxCMD.CLO bit should be set before set PxCMD.ST, in
+		 * order to clear PxTFD.STS.BSY and PxTFD.STS.DRQ.
+		 */
+		AHCIDBG0(AHCIDBG_ERRS, ahci_ctlp,
+		    "PxTFD.STS.BSY/DRQ is set, try SCLO.")
+
 		port_cmd_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 		    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
-		if (!(port_cmd_status & AHCI_CMD_STATUS_CLO)) {
-			AHCIDBG0(AHCIDBG_ERRS, ahci_ctlp,
-			    "PxTFD.STS.BSY or PxTFD.STS.DRQ is still set, "
-			    "but PxCMD.CLO isn't supported, so a port "
-			    "reset is needed.");
-			return (AHCI_FAILURE);
+		ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port),
+		    port_cmd_status|AHCI_CMD_STATUS_CLO);
+
+		/* Waiting till PxCMD.SCLO bit is cleared */
+		loop_count = 0;
+		do {
+			/* Wait for 10 millisec */
+			drv_usecwait(AHCI_10MS_USECS);
+
+			/* We are effectively timing out after 1 sec. */
+			if (loop_count++ > 100) {
+				AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+				    "SCLO time out. port %d is busy.", port);
+				goto out;
+			}
+
+			port_cmd_status =
+			    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+			    (uint32_t *)AHCI_PORT_PxCMD(ahci_ctlp, port));
+		} while (port_cmd_status & AHCI_CMD_STATUS_CLO);
+
+		/* Re-check */
+		port_task_file = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
+		if (port_task_file & AHCI_TFD_STS_BSY ||
+		    port_task_file & AHCI_TFD_STS_DRQ) {
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+			    "SCLO cannot clear PxTFD.STS.BSY/DRQ (PxTFD=0x%x)",
+			    port_task_file);
+			goto out;
 		}
 	}
 
-	slot = ahci_claim_free_slot(ahci_ctlp, ahci_portp, AHCI_NON_NCQ_CMD);
-	if (slot == AHCI_FAILURE) {
-		AHCIDBG0(AHCIDBG_INFO, ahci_ctlp,
-		    "ahci_software_reset: no free slot");
-		return (AHCI_FAILURE);
+	/* Then start port */
+	if (ahci_start_port(ahci_ctlp, ahci_portp, port)
+	    != AHCI_SUCCESS) {
+		AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+		    "ahci_software_reset: cannot start AHCI port %d.", port);
+		goto out;
 	}
+
+	/*
+	 * When ahci_port.ahciport_mop_in_progress is set, A non-zero
+	 * ahci_port.ahciport_pending_ncq_tags may fail
+	 * ahci_claim_free_slot(). Actually according to spec, by clearing
+	 * PxCMD.ST there is no command outstanding while executing software
+	 * reseting. Hence we directly use slot 0 instead of
+	 * ahci_claim_free_slot().
+	 */
+	slot = 0;
 
 	/* Now send the first H2D Register FIS with SRST set to 1 */
 	cmd_table = ahci_portp->ahciport_cmd_tables[slot];
@@ -3186,7 +3291,6 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    &(cmd_table->ahcict_command_fis.ahcifc_fis.ahcifc_h2d_register);
 
 	SET_FIS_TYPE(h2d_register_fisp, AHCI_H2D_REGISTER_FIS_TYPE);
-	SET_FIS_PMP(h2d_register_fisp, AHCI_PORTMULT_CONTROL_PORT);
 	SET_FIS_DEVCTL(h2d_register_fisp, SATA_DEVCTL_SRST);
 
 	/* Set Command Header in Command List */
@@ -3223,7 +3327,7 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 		/* We are effectively timing out after 1 sec. */
 		if (loop_count++ > AHCI_POLLRATE_PORT_SOFTRESET) {
-			break;
+			goto out;
 		}
 		/* Wait for 10 millisec */
 		delay(AHCI_10MS_TICKS);
@@ -3234,8 +3338,6 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    "port_cmd_issue = 0x%x, slot = 0x%x",
 	    loop_count, port_cmd_issue, slot);
 
-	CLEAR_BIT(ahci_portp->ahciport_pending_tags, slot);
-
 	/* Now send the second H2D Register FIS with SRST cleard to zero */
 	cmd_table = ahci_portp->ahciport_cmd_tables[slot];
 	bzero((void *)cmd_table, ahci_cmd_table_size);
@@ -3244,7 +3346,6 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    &(cmd_table->ahcict_command_fis.ahcifc_fis.ahcifc_h2d_register);
 
 	SET_FIS_TYPE(h2d_register_fisp, AHCI_H2D_REGISTER_FIS_TYPE);
-	SET_FIS_PMP(h2d_register_fisp, AHCI_PORTMULT_CONTROL_PORT);
 
 	/* Set Command Header in Command List */
 	cmd_header = &ahci_portp->ahciport_cmd_list[slot];
@@ -3278,7 +3379,7 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 		/* We are effectively timing out after 1 sec. */
 		if (loop_count++ > AHCI_POLLRATE_PORT_SOFTRESET) {
-			break;
+			goto out;
 		}
 		/* Wait for 10 millisec */
 		delay(AHCI_10MS_TICKS);
@@ -3291,7 +3392,14 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 	CLEAR_BIT(ahci_portp->ahciport_pending_tags, slot);
 
-	return (AHCI_SUCCESS);
+	rval = AHCI_SUCCESS;
+out:
+	AHCIDBG2(AHCIDBG_ERRS, ahci_ctlp,
+	    "ahci_software_reset: %s at port %d",
+	    rval == AHCI_SUCCESS ? "succeed" : "failed",
+	    port);
+
+	return (rval);
 }
 
 /*
@@ -3318,18 +3426,16 @@ static int
 ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 {
 	uint32_t cap_status, port_cmd_status;
-	uint32_t port_scontrol, port_sstatus;
+	uint32_t port_scontrol, port_sstatus, port_serror;
 	uint32_t port_intr_status, port_task_file;
-#if AHCI_DEBUG
-	uint32_t port_signature;
-#endif
+
 	int loop_count;
-	int rval = AHCI_SUCCESS;
 	int instance = ddi_get_instance(ahci_ctlp->ahcictl_dip);
 
 	AHCIDBG1(AHCIDBG_INIT|AHCIDBG_ENTRY, ahci_ctlp,
 	    "Port %d port resetting...", port);
 	ahci_portp->ahciport_port_state = 0;
+	ahci_portp->ahciport_device_type = SATA_DTYPE_UNKNOWN;
 
 	cap_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_GLOBAL_CAP(ahci_ctlp));
@@ -3495,21 +3601,26 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 		 * is no device present.
 		 */
 		ahci_portp->ahciport_device_type = SATA_DTYPE_NONE;
-		goto out;
+		return (AHCI_SUCCESS);
 	}
 
 	/* Now we can make sure there is a device connected to the port */
 	port_intr_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxIS(ahci_ctlp, port));
+	port_serror = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port));
 
-	/* a COMINIT signal is supposed to be received */
-	if (!(port_intr_status & AHCI_INTR_STATUS_PCS)) {
+	/*
+	 * A COMINIT signal is supposed to be received
+	 * PxSERR.DIAG.X or PxIS.PCS should be set
+	 */
+	if (!(port_intr_status & AHCI_INTR_STATUS_PCS) &&
+	    !(port_serror & SERROR_EXCHANGED_ERR)) {
 		cmn_err(CE_WARN, "!ahci%d: ahci_port_reset port %d "
 		    "COMINIT signal from the device not received",
 		    instance, port);
 		ahci_portp->ahciport_port_state |= SATA_PSTATE_FAILED;
-		rval = AHCI_FAILURE;
-		goto out;
+		return (AHCI_FAILURE);
 	}
 
 	/*
@@ -3539,95 +3650,72 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 	    SERROR_EXCHANGED_ERR);
 
 	/*
-	 * Next check whether COMRESET is completed successfully
+	 * Devices should return a FIS contains its signature to HBA after
+	 * COMINIT signal. Check whether a D2H FIS is received by polling
+	 * PxTFD.STS.ERR bit.
 	 */
 	loop_count = 0;
 	do {
-		port_task_file =
-		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
-
-		/*
-		 * The Error bit '1' means COMRESET is finished successfully
-		 * The device hardware has been initialized and the power-up
-		 * diagnostics successfully completed.
-		 */
-		if (((port_task_file & AHCI_TFD_ERR_MASK)
-		    >> AHCI_TFD_ERR_SHIFT) == 0x1) {
-#if AHCI_DEBUG
-			port_signature = ddi_get32(
-			    ahci_ctlp->ahcictl_ahci_acc_handle,
-			    (uint32_t *)AHCI_PORT_PxSIG(ahci_ctlp, port));
-			AHCIDBG2(AHCIDBG_INFO, ahci_ctlp,
-			    "COMRESET success, D2H register FIS "
-			    "post to received FIS structure "
-			    "port %d signature = 0x%x",
-			    port, port_signature);
-#endif
-			goto out_check;
-		}
+		/* Wait for 10 millisec */
+		delay(AHCI_10MS_TICKS);
 
 		if (loop_count++ > AHCI_POLLRATE_PORT_TFD_ERROR) {
 			/*
 			 * We are effectively timing out after 11 sec.
 			 */
+			cmn_err(CE_WARN, "!ahci%d: ahci_port_reset port %d "
+			    "the device hardware has been initialized and "
+			    "the power-up diagnostics failed",
+			    instance, port);
+
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp, "ahci_port_reset: "
+			    "port %d PxTFD.STS.ERR is not set, we need another "
+			    "software reset.", port);
+
+			/* Clear port serror register for the port */
+			ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+			    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port),
+			    AHCI_SERROR_CLEAR_ALL);
+
+			/* Try another software reset. */
+			if (ahci_software_reset(ahci_ctlp, ahci_portp,
+			    port) != AHCI_SUCCESS) {
+				ahci_portp->ahciport_port_state |=
+				    SATA_PSTATE_FAILED;
+				return (AHCI_FAILURE);
+			}
 			break;
 		}
 
-		/* Wait for 10 millisec */
-		delay(AHCI_10MS_TICKS);
+		/*
+		 * The Error bit '1' means COMRESET is finished successfully
+		 * The device hardware has been initialized and the power-up
+		 * diagnostics successfully completed. The device requests
+		 * that the Transport layer transmit a Register - D2H FIS to
+		 * the host. (SATA spec 11.5, v2.6)
+		 */
+		port_task_file =
+		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
 	} while (((port_task_file & AHCI_TFD_ERR_MASK)
-	    >> AHCI_TFD_ERR_SHIFT) != 0x1);
+	    >> AHCI_TFD_ERR_SHIFT) != AHCI_TFD_ERR_SGS);
 
-	AHCIDBG3(AHCIDBG_ERRS, ahci_ctlp, "ahci_port_reset: 2nd loop "
-	    "count: %d, port_task_file = 0x%x port %d",
+	AHCIDBG3(AHCIDBG_INIT|AHCIDBG_POLL_LOOP, ahci_ctlp,
+	    "ahci_port_reset: 2nd loop count: %d, "
+	    "port_task_file = 0x%x port %d",
 	    loop_count, port_task_file, port);
 
-	cmn_err(CE_WARN, "!ahci%d: ahci_port_reset port %d the device hardware "
-	    "has been initialized and the power-up diagnostics failed",
-	    instance, port);
-
-	ahci_portp->ahciport_port_state |= SATA_PSTATE_FAILED;
-	rval = AHCI_FAILURE;
-
-out:
 	/* Clear port serror register for the port */
 	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSERR(ahci_ctlp, port),
 	    AHCI_SERROR_CLEAR_ALL);
 
-	return (rval);
+	/* Set port as ready */
+	ahci_portp->ahciport_port_state |= SATA_STATE_READY;
 
-out_check:
-	/*
-	 * Check device status, if keep busy or COMRESET error
-	 * do device reset to patch some SATA disks' issue
-	 *
-	 * For VT8251, sometimes need to do the device reset
-	 */
-	if ((port_task_file & AHCI_TFD_STS_BSY) ||
-	    (port_task_file & AHCI_TFD_STS_DRQ)) {
-		AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp, "port %d keep BSY/DRQ set "
-		    "need to do device reset", port);
-
-		(void) ahci_software_reset(ahci_ctlp, ahci_portp, port);
-
-		port_task_file =
-		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
-		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
-
-		if (port_task_file & AHCI_TFD_STS_BSY ||
-		    port_task_file & AHCI_TFD_STS_DRQ) {
-			cmn_err(CE_WARN, "!ahci%d: ahci_port_reset: port %d "
-			    "BSY/DRQ still set after device reset "
-			    "port_task_file = 0x%x", instance,
-			    port, port_task_file);
-			ahci_portp->ahciport_port_state |= SATA_PSTATE_FAILED;
-			rval = AHCI_FAILURE;
-		}
-	}
-
-	goto out;
+	AHCIDBG1(AHCIDBG_INFO|AHCIDBG_ERRS, ahci_ctlp,
+	    "ahci_port_reset: succeed at port %d.", port);
+	return (AHCI_SUCCESS);
 }
 
 /*
@@ -3734,9 +3822,12 @@ ahci_hba_reset(ahci_ctl_t *ahci_ctlp)
 
 /*
  * This routine is only called from AHCI_ATTACH or phyrdy change
- * case. It first calls port reset to initialize port, probe port and probe
- * device, then try to read PxSIG register to find the type of device
- * attached to the port.
+ * case. It first calls software reset, then stop the port and try to
+ * read PxSIG register to find the type of device attached to the port.
+ *
+ * The caller should make sure a valid device exists on specified port and
+ * physical communication has been established so that the signature could
+ * be retrieved by software reset.
  *
  * WARNING!!! ahciport_mutex should be acquired before the function
  * is called. And the port interrupt is disabled.
@@ -3752,24 +3843,29 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp,
 
 	ahci_portp->ahciport_device_type = SATA_DTYPE_UNKNOWN;
 
-	/* Call port reset to check link status and get device signature */
-	(void) ahci_port_reset(ahci_ctlp, ahci_portp, port);
-
-	if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
+	/* Issue a software reset to get the signature */
+	if (ahci_software_reset(ahci_ctlp, ahci_portp, port)
+	    != AHCI_SUCCESS) {
 		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
-		    "ahci_find_dev_signature: No device is found "
-		    "at port %d", port);
+		    "ahci_find_dev_signature: software reset failed "
+		    "at port %d. cannot get signature.", port);
+		ahci_portp->ahciport_port_state = SATA_PSTATE_FAILED;
 		return;
 	}
 
-	/* Check the port state */
-	if (ahci_portp->ahciport_port_state & SATA_PSTATE_FAILED) {
-		AHCIDBG2(AHCIDBG_ERRS, ahci_ctlp,
-		    "ahci_find_dev_signature: port %d state 0x%x",
-		    port, ahci_portp->ahciport_port_state);
+	/*
+	 * ahci_software_reset has started the port, so we need manually stop
+	 * the port again.
+	 */
+	if (ahci_put_port_into_notrunning_state(ahci_ctlp, ahci_portp, port)
+	    != AHCI_SUCCESS) {
+		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
+		    "ahci_find_dev_signature: cannot stop port %d.", port);
+		ahci_portp->ahciport_port_state = SATA_PSTATE_FAILED;
 		return;
 	}
 
+	/* Now we can make sure that a valid signature is received. */
 	signature = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSIG(ahci_ctlp, port));
 
@@ -3892,6 +3988,9 @@ ahci_start_port(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 	    port_cmd_status);
 
 	ahci_portp->ahciport_flags |= AHCI_PORT_FLAG_STARTED;
+
+	AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp, "ahci_start_port: "
+	    "PxCMD.ST set to '1' at port %d", port);
 
 	return (AHCI_SUCCESS);
 }
@@ -5085,6 +5184,7 @@ ahci_intr_phyrdy_change(ahci_ctl_t *ahci_ctlp,
 			    "device link established", port);
 
 			/* A new device has been detected. */
+			(void) ahci_port_reset(ahci_ctlp, ahci_portp, port);
 			ahci_find_dev_signature(ahci_ctlp, ahci_portp, port);
 
 			/* Try to start the port */
@@ -6001,13 +6101,12 @@ ahci_put_port_into_notrunning_state(ahci_ctl_t *ahci_ctlp,
  * The fifth argument returns whether the port reset is involved during
  * the process.
  *
- * The routine will be called under six scenarios:
- *	1. Initialize the port
- *	2. To abort the packet(s)
- *	3. To reset the port
- *	4. To activate the port
- *	5. Fatal error recovery
- *	6. To abort the timeout packet(s)
+ * The routine will be called under following scenarios:
+ *	+ To abort the packet(s)
+ *	+ To reset the port
+ *	+ To activate the port
+ *	+ Fatal error recovery
+ *	+ To abort the timeout packet(s)
  *
  * WARNING!!! ahciport_mutex should be acquired before the function
  * is called. And ahciport_mutex will be released before the reset
@@ -6039,8 +6138,7 @@ ahci_restart_port_wait_till_ready(ahci_ctl_t *ahci_ctlp,
 	AHCIDBG1(AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_restart_port_wait_till_ready: port %d enter", port);
 
-	if ((flag != AHCI_PORT_INIT) &&
-	    (ahci_portp->ahciport_device_type != SATA_DTYPE_NONE))
+	if (ahci_portp->ahciport_device_type != SATA_DTYPE_NONE)
 		dev_exists_begin = 1;
 
 	/* First clear PxCMD.ST */
@@ -6112,10 +6210,6 @@ reset:
 	}
 
 out:
-	/* Start the port if not in initialization phase */
-	if (flag & AHCI_PORT_INIT)
-		return (rval);
-
 	(void) ahci_start_port(ahci_ctlp, ahci_portp, port);
 
 	/* SStatus tells the presence of device. */
