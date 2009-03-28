@@ -298,7 +298,8 @@ i_ddi_irm_insert(dev_info_t *dip, int type, int count)
 		irm_flag = B_TRUE;
 
 	/* Determine request size */
-	nreq = (irm_flag) ? count : i_ddi_intr_get_current_navail(dip, type);
+	nreq = (irm_flag) ? count :
+	    MIN(count, i_ddi_intr_get_current_navail(dip, type));
 	nmin = (irm_flag) ? 1 : nreq;
 	npartial = MIN(nreq, pool_p->ipool_defsz);
 
