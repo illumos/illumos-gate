@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,8 @@ IMA_STATUS SUN_IMA_GetBootMpxio(
 	IMA_BOOL *pMpxioEnabled);
 IMA_STATUS SUN_IMA_GetBootIscsi(
 	IMA_BOOL *pIscsiBoot);
+IMA_STATUS SUN_IMA_GetSvcStatus(
+	IMA_BOOL *pSvcEnabled);
 
 #ifdef	__cplusplus
 }

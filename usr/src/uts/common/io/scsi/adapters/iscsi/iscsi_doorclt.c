@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -52,10 +52,6 @@ typedef struct _mybuffer {
 	size_t		signature;
 	size_t		size;
 } mybuffer_t;
-
-static
-void
-iscsi_door_unbind(void);
 
 /*
  * iscsi_door_ini
@@ -142,7 +138,6 @@ iscsi_door_bind(
  *
  * This function releases the current door handle.
  */
-static
 void
 iscsi_door_unbind(void)
 {

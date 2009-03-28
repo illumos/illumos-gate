@@ -29,7 +29,7 @@ DATAFILES +=	i.iscsiconf i.manifest r.manifest
 
 .KEEP_STATE:
 
-all: $(FILES) depend preremove postinstall
+all: $(FILES) depend preinstall preremove postinstall
 
 install: all pkg
 

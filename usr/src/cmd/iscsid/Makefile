@@ -19,28 +19,33 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 # cmd/iscsid/Makefile
 #
 
-PROG= 		iscsid
-MANIFEST=	iscsi_initiator.xml
-SVCMETHOD=	iscsid
+PROG= 		iscsi-initiator
+MANIFEST=	iscsi-initiator.xml
+SVCMETHOD=	iscsi-initiator
 
 PRODUCT=	$(PROG)
 OBJS=		iscsid.o
 SRCS=		$(OBJS:%.o=./%.c)
 LLOBJS=		$(OBJS:%.o=%.ll)
+POFILES= $(OBJS:%.o=%.po)
+POFILE= iscsi-initiator.po
 
 include ../Makefile.cmd
 
 CCVERBOSE	=
 LDLIBS += -ldoor -lnsl
 
-ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
+ROOTMANIFESTDIR=	$(ROOTSVCNETWORKISCSI)
+$(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := OWNER = root
+$(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := GROUP = bin
+$(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := FILEMODE = 0444
 
 .KEEP_STATE:
 
@@ -59,6 +64,10 @@ clean:
 	$(RM) $(PROG) $(OBJS) $(LLOBJS)
 
 lint:	lint_SRCS
+
+$(POFILE): $(POFILES)
+	$(RM) $@
+	cat $(POFILES) > $@
 
 install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 

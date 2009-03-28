@@ -5310,6 +5310,36 @@ listCHAPName(IMA_OID oid)
 	}
 }
 
+static boolean_t
+checkServiceStatus(void)
+{
+	IMA_STATUS	status	=	IMA_ERROR_UNKNOWN_ERROR;
+	IMA_BOOL	enabled =	0;
+
+	status = SUN_IMA_GetSvcStatus(&enabled);
+
+	if (status != IMA_STATUS_SUCCESS) {
+		(void) fprintf(stdout, "%s\n%s\n",
+		    gettext("Unable to query the service status of"
+		    " iSCSI initiator."),
+		    gettext("For more information, please refer to"
+		    " iscsi(7D)."));
+		return (B_FALSE);
+	}
+
+	if (enabled == 0) {
+		(void) fprintf(stdout, "%s\n%s\n",
+		    gettext("iSCSI Initiator Service is disabled,"
+		    " try 'svcadm enable network/iscsi/initiator' to"
+		    " enable the service."),
+		    gettext("For more information, please refer to"
+		    " iscsi(7D)."));
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 /*
  * Prints out see manual page.
  * Called out through atexit(3C) so is always last thing displayed.
@@ -5358,6 +5388,10 @@ main(int argc, char *argv[])
 
 	if (geteuid() != 0) {
 		(void) fprintf(stderr, "%s\n", gettext("permission denied"));
+		return (1);
+	}
+
+	if (checkServiceStatus() == B_FALSE) {
 		return (1);
 	}
 

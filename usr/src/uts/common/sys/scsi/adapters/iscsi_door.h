@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,9 @@ iscsi_door_bind(
 );
 
 void
+iscsi_door_unbind(void);
+
+void
 kfreehostent(
 	struct hostent	*hptr
 );
@@ -148,6 +151,13 @@ kgetipnodebyname(
 #define	kgetipnodebyname	getipnodebyname
 
 #endif	/* _KERNEL */
+
+/*
+ * iSCSI initiator SMF service status in kernel
+ */
+#define	ISCSI_SERVICE_ENABLED		0x0
+#define	ISCSI_SERVICE_DISABLED		0x1
+#define	ISCSI_SERVICE_TRANSITION	0x2
 
 #ifdef __cplusplus
 }

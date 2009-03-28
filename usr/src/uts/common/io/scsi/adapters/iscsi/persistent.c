@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,24 +223,28 @@ persistent_static_addr_upgrade_to_v2()
 /*
  * persistent_init -- initialize use of the persistent store
  */
-boolean_t
-persistent_init(boolean_t restart)
+void
+persistent_init()
 {
-	boolean_t rval;
+	nvf_init();
+	mutex_init(&static_addr_data_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&disc_addr_data_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&isns_addr_data_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&param_data_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&chap_data_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&auth_data_lock, NULL, MUTEX_DRIVER, NULL);
+}
 
-	if (restart == B_FALSE) {
-		nvf_init();
-		mutex_init(&static_addr_data_lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_init(&disc_addr_data_lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_init(&isns_addr_data_lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_init(&param_data_lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_init(&chap_data_lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_init(&auth_data_lock, NULL, MUTEX_DRIVER, NULL);
-	}
+/*
+ * persistent_load -- load the persistent store
+ */
+boolean_t
+persistent_load()
+{
+	boolean_t	rval = B_FALSE;
 
 	rval = nvf_load();
-
-	if (rval) {
+	if (rval == B_TRUE) {
 		persistent_init_disc_addr_oids();
 		persistent_init_static_addr_oids();
 	}

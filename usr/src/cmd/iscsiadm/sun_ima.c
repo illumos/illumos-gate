@@ -40,6 +40,7 @@
 #include <libdevinfo.h>
 
 #include <sys/scsi/adapters/iscsi_if.h>
+#include <sys/scsi/adapters/iscsi_door.h>
 #include <sys/iscsi_protocol.h>
 #include <ima.h>
 #include "iscsiadm.h"
@@ -3180,6 +3181,38 @@ IMA_STATUS SUN_IMA_GetBootIscsi(
 	}
 
 	*pIscsiBoot = bootProp.iscsiboot;
+
+	(void) close(fd);
+	return (IMA_STATUS_SUCCESS);
+}
+
+IMA_STATUS SUN_IMA_GetSvcStatus(
+    IMA_BOOL *pSvcEnabled)
+{
+	int		fd;
+	uint32_t	status = ISCSI_SERVICE_DISABLED;
+
+	if (pSvcEnabled == NULL)
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	*pSvcEnabled = 0;
+
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Unable to open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (ioctl(fd, ISCSI_SMF_GET, &status) != 0) {
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_SVC_GET ioctl failed, errno: %d",
+		    errno);
+		(void) close(fd);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (status == ISCSI_SERVICE_ENABLED) {
+		*pSvcEnabled = 1;
+	}
 
 	(void) close(fd);
 	return (IMA_STATUS_SUCCESS);

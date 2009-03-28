@@ -41,6 +41,8 @@
 #include "isns_client.h"
 #include "isns_protocol.h"
 #include <sys/bootprops.h>
+#include <sys/types.h>
+#include <sys/bootconf.h>
 
 #define	ISCSI_NAME_VERSION	"iSCSI Initiator v-1.55"
 
@@ -62,6 +64,8 @@ int		iscsi_rx_max_window	= ISCSI_DEFAULT_RX_MAX_WINDOW;
 boolean_t	iscsi_logging		= B_FALSE;
 
 extern ib_boot_prop_t	*iscsiboot_prop;
+extern int		modrootloaded;
+extern struct bootobj	rootfs;
 
 /*
  * +--------------------------------------------------------------------+
@@ -124,8 +128,7 @@ static int iscsi_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 /* cb_ops prototypes */
 static int iscsi_open(dev_t *devp, int flags, int otyp, cred_t *credp);
 static int iscsi_close(dev_t dev, int flag, int otyp, cred_t *credp);
-/* --- iscsi_ioctl is called by the discovery code so needs to be global --- */
-int iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+static int iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp);
 
 int iscsi_get_persisted_param(uchar_t *name,
@@ -144,6 +147,11 @@ static int iscsi_i_commoncap(struct scsi_address *ap, char *cap,
 static void iscsi_get_name_to_iqn(char *name, int name_max_len);
 static void iscsi_get_name_from_iqn(char *name, int name_max_len);
 static boolean_t iscsi_cmp_boot_sess_oid(iscsi_hba_t *ihp, uint32_t oid);
+
+/* iscsi initiator service helpers */
+static boolean_t iscsi_enter_service_zone(iscsi_hba_t *ihp, uint32_t status);
+static void iscsi_exit_service_zone(iscsi_hba_t *ihp, uint32_t status);
+static void iscsi_check_miniroot(iscsi_hba_t *ihp);
 
 /* struct helpers prototypes */
 
@@ -390,6 +398,11 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			rval = ldi_ident_from_dip(dip, &ihp->hba_li);
 			ASSERT(rval == 0); /* Failure indicates invalid arg */
 
+			/* init HBA mutex used to protect service status */
+			mutex_init(&ihp->hba_service_lock, NULL,
+			    MUTEX_DRIVER, NULL);
+			cv_init(&ihp->hba_service_cv, NULL, CV_DRIVER, NULL);
+
 			/*
 			 * init SendTargets semaphore that is used to allow
 			 * only one operation at a time
@@ -412,6 +425,8 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			ihp->hba_sig	= ISCSI_SIG_HBA;
 			ihp->hba_tran	= tran;
 			ihp->hba_dip	= dip;
+			ihp->hba_service_status = ISCSI_SERVICE_DISABLED;
+			ihp->hba_service_client_count = 0;
 
 			mutex_enter(&iscsi_oid_mutex);
 			ihp->hba_oid		  = iscsi_oid++;
@@ -536,11 +551,11 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			isns_client_init();
 
 			/*
-			 * initialize the discovery processes and
-			 * persistent store.
+			 * initialize persistent store,
+			 * or boot target info in case of iscsi boot
 			 */
-			ihp->persistent_loaded = B_FALSE;
-			if (iscsid_init(ihp, B_FALSE) == B_FALSE) {
+			ihp->hba_persistent_loaded = B_FALSE;
+			if (iscsid_init(ihp) == B_FALSE) {
 				goto iscsi_attach_failed0;
 			}
 
@@ -582,6 +597,8 @@ iscsi_attach_failed1:
 		ddi_prop_remove_all(ihp->hba_dip);
 		scsi_hba_tran_free(tran);
 iscsi_attach_failed2:
+		cv_destroy(&ihp->hba_service_cv);
+		mutex_destroy(&ihp->hba_service_lock);
 		mutex_destroy(&ihp->hba_discovery_events_mutex);
 		sema_destroy(&ihp->hba_sendtgts_semaphore);
 		rw_destroy(&ihp->hba_sess_list_rwlock);
@@ -693,6 +710,8 @@ iscsi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		ldi_ident_release(ihp->hba_li);
 
+		cv_destroy(&ihp->hba_service_cv);
+		mutex_destroy(&ihp->hba_service_lock);
 		mutex_destroy(&ihp->hba_discovery_events_mutex);
 		rw_destroy(&ihp->hba_sess_list_rwlock);
 		(void) iscsi_hba_kstat_term(ihp);
@@ -1130,12 +1149,24 @@ iscsi_tran_bus_config(dev_info_t *parent, uint_t flags,
 	int		iflags	= flags;
 	char		*name	= NULL;
 	char		*ptr	= NULL;
+	boolean_t	config_root = B_FALSE;
 
 	/* get reference to soft state */
 	ihp = (iscsi_hba_t *)ddi_get_soft_state(iscsi_state,
 	    ddi_get_instance(parent));
 	if (ihp == NULL) {
 		return (NDI_FAILURE);
+	}
+
+	iscsi_check_miniroot(ihp);
+	if ((modrootloaded == 0) && (iscsiboot_prop != NULL)) {
+		config_root = B_TRUE;
+	}
+
+	if (config_root == B_FALSE) {
+		if (iscsi_client_request_service(ihp) == B_FALSE) {
+			return (NDI_FAILURE);
+		}
 	}
 
 	/* lock so only one config operation occrs */
@@ -1198,6 +1229,10 @@ iscsi_tran_bus_config(dev_info_t *parent, uint_t flags,
 	}
 	sema_v(&iscsid_config_semaphore);
 
+	if (config_root == B_FALSE) {
+		iscsi_client_release_service(ihp);
+	}
+
 	return (rval);
 }
 
@@ -1212,7 +1247,25 @@ static int
 iscsi_tran_bus_unconfig(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *arg)
 {
-	return (ndi_busop_bus_unconfig(parent, flag, op, arg));
+	int		rval = NDI_SUCCESS;
+	iscsi_hba_t	*ihp = NULL;
+
+	/* get reference to soft state */
+	ihp = (iscsi_hba_t *)ddi_get_soft_state(iscsi_state,
+	    ddi_get_instance(parent));
+	if (ihp == NULL) {
+		return (NDI_FAILURE);
+	}
+
+	if (iscsi_client_request_service(ihp) == B_FALSE) {
+		return (NDI_FAILURE);
+	}
+
+	rval = ndi_busop_bus_unconfig(parent, flag, op, arg);
+
+	iscsi_client_release_service(ihp);
+
+	return (rval);
 }
 
 
@@ -1372,7 +1425,7 @@ iscsi_close(dev_t dev, int flags, int otyp, cred_t *credp)
  * iscsi_ioctl -
  */
 /* ARGSUSED */
-int
+static int
 iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp)
 {
@@ -1439,6 +1492,15 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	ihp = (iscsi_hba_t *)ddi_get_soft_state(iscsi_state, instance);
 	if (ihp == NULL)
 		return (EFAULT);
+
+	iscsi_check_miniroot(ihp);
+	if ((cmd != ISCSI_SMF_ONLINE) && (cmd != ISCSI_SMF_OFFLINE) &&
+	    (cmd != ISCSI_SMF_GET)) {
+		/* other cmd needs to acquire the service */
+		if (iscsi_client_request_service(ihp) == B_FALSE) {
+			return (EFAULT);
+		}
+	}
 
 	switch (cmd) {
 	/*
@@ -1664,7 +1726,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		kmem_free(ils, sizeof (*ils));
 		if (rtn != 0) {
 			kmem_free(initiator_node_name, ISCSI_MAX_NAME_LEN);
-			return (rtn);
+			break;
 		}
 
 		(void) snprintf(init_port_name, MAX_NAME_PROP_SIZE,
@@ -3581,16 +3643,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		break;
 
 	/*
-	 * ISCSI_DB_RELOAD -
-	 */
-	case ISCSI_DB_RELOAD:
-		/* ---- database will be closed and reread ---- */
-		if (iscsid_init(ihp, B_TRUE) == B_FALSE) {
-			rtn = EFAULT;
-		}
-		break;
-
-	/*
 	 * ISCSI_DB_DUMP -
 	 */
 	case ISCSI_DB_DUMP:
@@ -3789,16 +3841,68 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		rw_exit(&ihp->hba_sess_list_rwlock);
 		break;
 
-	/*
-	 * ISCSI_DOOR_HANDLE_SET -
-	 */
-	case ISCSI_DOOR_HANDLE_SET:
+	case ISCSI_SMF_ONLINE:
 		if (ddi_copyin((caddr_t)arg, &did, sizeof (int), mode) != 0) {
 			rtn = EFAULT;
+			break;
 		}
-		if (iscsi_door_bind(did) == B_FALSE) {
+		/* just a theoretical case */
+		if (ihp->hba_persistent_loaded == B_FALSE) {
+			rtn = EFAULT;
+			break;
+		}
+
+		if (iscsi_enter_service_zone(ihp, ISCSI_SERVICE_ENABLED) ==
+		    B_FALSE) {
+			break;
+		}
+
+		rval = iscsi_door_bind(did);
+		if (rval == B_TRUE) {
+			rval = iscsid_start(ihp);
+			if (rval == B_FALSE) {
+				iscsi_door_unbind();
+			}
+		}
+
+		if (rval == B_TRUE) {
+			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_ENABLED);
+		} else {
+			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_DISABLED);
 			rtn = EFAULT;
 		}
+
+		break;
+
+	case ISCSI_SMF_OFFLINE:
+		if (iscsi_enter_service_zone(ihp, ISCSI_SERVICE_DISABLED)
+		    == B_FALSE) {
+			break;
+		}
+
+		rval = iscsid_stop(ihp);
+
+		if (rval == B_TRUE) {
+			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_DISABLED);
+		} else {
+			iscsi_door_unbind();
+			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_ENABLED);
+			rtn = EFAULT;
+		}
+		break;
+
+	case ISCSI_SMF_GET:
+		mutex_enter(&ihp->hba_service_lock);
+		while (ihp->hba_service_status ==
+		    ISCSI_SERVICE_TRANSITION) {
+			cv_wait(&ihp->hba_service_cv,
+			    &ihp->hba_service_lock);
+		}
+		if (ddi_copyout((void *)&ihp->hba_service_status,
+		    (caddr_t)arg, sizeof (boolean_t), mode) != 0) {
+			rtn = EFAULT;
+		}
+		mutex_exit(&ihp->hba_service_lock);
 		break;
 
 	case ISCSI_DISCOVERY_EVENTS:
@@ -4172,6 +4276,12 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		rtn = ENOTTY;
 		cmn_err(CE_NOTE, "unrecognized ioctl 0x%x", cmd);
 	} /* end of ioctl type switch/cases */
+
+	if ((cmd != ISCSI_SMF_ONLINE) && (cmd != ISCSI_SMF_OFFLINE) &&
+	    (cmd != ISCSI_SMF_GET)) {
+		/* other cmds need to release the service */
+		iscsi_client_release_service(ihp);
+	}
 
 	return (rtn);
 }
@@ -4984,4 +5094,101 @@ iscsi_cmp_boot_sess_oid(iscsi_hba_t *ihp, uint32_t oid)
 		}
 	}
 	return (B_FALSE);
+}
+
+/*
+ * iscsi_client_request_service - request the iSCSI service
+ *     returns true if the service is enabled and increases the count
+ *     returns false if the service is disabled
+ *     blocks until the service status is either enabled or disabled
+ */
+boolean_t
+iscsi_client_request_service(iscsi_hba_t *ihp) {
+	boolean_t	rval = B_TRUE;
+
+	mutex_enter(&ihp->hba_service_lock);
+	while ((ihp->hba_service_status == ISCSI_SERVICE_TRANSITION) ||
+	    (ihp->hba_service_client_count == UINT_MAX)) {
+		cv_wait(&ihp->hba_service_cv, &ihp->hba_service_lock);
+	}
+	if (ihp->hba_service_status == ISCSI_SERVICE_ENABLED) {
+		ihp->hba_service_client_count++;
+	} else {
+		rval = B_FALSE;
+	}
+	mutex_exit(&ihp->hba_service_lock);
+
+	return (rval);
+}
+
+/*
+ * iscsi_client_release_service - decrease the count and wake up
+ *     blocking threads if the count reaches zero
+ */
+void
+iscsi_client_release_service(iscsi_hba_t *ihp) {
+	mutex_enter(&ihp->hba_service_lock);
+	ASSERT(ihp->hba_service_client_count > 0);
+	ihp->hba_service_client_count--;
+	if (ihp->hba_service_client_count == 0) {
+		cv_broadcast(&ihp->hba_service_cv);
+	}
+	mutex_exit(&ihp->hba_service_lock);
+}
+
+/*
+ * iscsi_enter_service_zone - enter the service zone, should be called
+ * before doing any modifications to the service status
+ * return TRUE if the zone is entered
+ *	  FALSE if no need to enter the zone
+ */
+static boolean_t
+iscsi_enter_service_zone(iscsi_hba_t *ihp, uint32_t status) {
+	if ((status != ISCSI_SERVICE_ENABLED) &&
+	    (status != ISCSI_SERVICE_DISABLED)) {
+		return (B_FALSE);
+	}
+
+	mutex_enter(&ihp->hba_service_lock);
+	while (ihp->hba_service_status == ISCSI_SERVICE_TRANSITION) {
+		cv_wait(&ihp->hba_service_cv, &ihp->hba_service_lock);
+	}
+	if (ihp->hba_service_status == status) {
+		mutex_exit(&ihp->hba_service_lock);
+		return (B_FALSE);
+	}
+	ihp->hba_service_status = ISCSI_SERVICE_TRANSITION;
+	while (ihp->hba_service_client_count > 0) {
+		cv_wait(&ihp->hba_service_cv, &ihp->hba_service_lock);
+	}
+	mutex_exit(&ihp->hba_service_lock);
+	return (B_TRUE);
+}
+
+/*
+ * iscsi_exit_service_zone - exits the service zone and wakes up waiters
+ */
+static void
+iscsi_exit_service_zone(iscsi_hba_t *ihp, uint32_t status) {
+	if ((status != ISCSI_SERVICE_ENABLED) &&
+	    (status != ISCSI_SERVICE_DISABLED)) {
+		return;
+	}
+
+	mutex_enter(&ihp->hba_service_lock);
+	ASSERT(ihp->hba_service_status == ISCSI_SERVICE_TRANSITION);
+	ihp->hba_service_status = status;
+	cv_broadcast(&ihp->hba_service_cv);
+	mutex_exit(&ihp->hba_service_lock);
+}
+
+static void
+iscsi_check_miniroot(iscsi_hba_t *ihp) {
+	if (strncmp(rootfs.bo_name, "/ramdisk", 8) == 0) {
+		/*
+		 * in miniroot we don't have the persistent store
+		 * so just to need to ensure an enabled status
+		 */
+		ihp->hba_service_status = ISCSI_SERVICE_ENABLED;
+	}
 }

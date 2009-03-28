@@ -22,7 +22,7 @@
 
  CDDL HEADER END
 
-	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
 	Service manifests for the iSCSI Initiator
@@ -66,29 +66,30 @@ potential to specialize all the properties/methods.
 
 -->
 
-<service_bundle type='manifest' name='SUNWiscsiu:iscsi_initiator'>
+<service_bundle type='manifest' name='SUNWiscsir:iscsi-initiator'>
 
 <service
-    name='network/iscsi_initiator'
+    name='network/iscsi/initiator'
     type='service'
     version='1'>
 
     <single_instance/>
 
     <dependency
-        name='startup'
+        name='net'
         grouping='require_all'
         restart_on='none'
         type='service'>
-        <service_fmri value='svc:/network/physical' />
+        <service_fmri value='svc:/network/service' />
     </dependency>
 
-    <dependent
-        name='iscsi_initiator'
-        grouping='optional_all'
-        restart_on='none'>
-        <service_fmri value='svc:/system/metainit' />
-    </dependent>
+    <dependency
+        name='loopback'
+        grouping='require_any'
+        restart_on='error'
+        type='service'>
+        <service_fmri value='svc:/network/loopback' />
+    </dependency>
 
 	<!--
 	   Set a timeout of -1 to signify to inetd that we don't want
@@ -99,31 +100,39 @@ potential to specialize all the properties/methods.
 	   off a process to handle the request and return a success code.
 	-->
 	<exec_method
-        type='method'
-        name='start'
-        exec='/lib/svc/method/iscsid'
-        timeout_seconds='-1'>
+		type='method'
+		name='start'
+		exec='/lib/svc/method/iscsi-initiator'
+		timeout_seconds='600'>
 		<method_context>
-			<method_credential user='root' group='root' />
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic,sys_devices'
+			/>
 		</method_context>
 	</exec_method>
         
 	<exec_method
-        type='method'
-        name='stop'
-        exec=':kill'
-        timeout_seconds='5'>
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='600'>
 		<method_context>
-			<method_credential user='root' group='root' />
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic,sys_devices'
+			/>
 		</method_context>
 	</exec_method>
         
 	<!--
-	    Create a disabled instance.
+	    Create an enabled instance.
 	-->
 	<instance
         name='default'
-        enabled='false' >
+        enabled='true' >
 	</instance>
 
 	<stability value='Evolving' />
@@ -137,8 +146,8 @@ potential to specialize all the properties/methods.
 
 		<documentation>
 			<manpage
-				title='iscsid'
-				section='1M'
+				title='iscsi'
+				section='7D'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

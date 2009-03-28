@@ -1069,7 +1069,8 @@ typedef struct iscsi_hba {
 	boolean_t		hba_discovery_in_progress;
 
 	boolean_t		hba_mpxio_enabled; /* mpxio-enabled */
-	boolean_t		persistent_loaded; /* persistent_loaded */
+	/* if the persistent store is loaded */
+	boolean_t		hba_persistent_loaded;
 
 	/*
 	 * Ensures only one SendTargets operation occurs at a time
@@ -1083,6 +1084,50 @@ typedef struct iscsi_hba {
 		kstat_t			*ks;
 		iscsi_hba_stats_t	ks_data;
 	} stats;
+
+	/*
+	 * track/control the service status and client
+	 *
+	 * service- service online ensures the operational of cli
+	 *	  - and the availability of iSCSI discovery/devices
+	 *	  - so obviously offline means the unusable of cli
+	 *	  - , disabling of all discovery methods and to offline
+	 *	  - all discovered devices
+	 *
+	 * client - here the client actually means 'exclusive client'
+	 *	  - for operations these clients take may conflict
+	 *	  - with the changing of service status and therefore
+	 *	  - need to be exclusive
+	 *
+	 * The service has three status:
+	 * 	ISCSI_SERVICE_ENABLED	 -	client is permitted to
+	 *				 -	request service
+	 *
+	 *	ISCSI_SERVICE_DISABLED	 -	client is not permitted to
+	 *				 -	request service
+	 *
+	 *	ISCSI_SERVICE_TRANSITION -	client must wait for
+	 *				 -	one of above two statuses
+	 *
+	 * The hba_service_client_count tracks the number of
+	 * current clients, it increases with new clients and decreases
+	 * with leaving clients. It stops to increase once the
+	 * ISCSI_SERVICE_TRANSITION is set, and causes later clients be
+	 * blocked there.
+	 *
+	 * The status of the service can only be changed when the number
+	 * of current clients reaches zero.
+	 *
+	 * Clients include:
+	 *	iscsi_ioctl
+	 *	iscsi_tran_bus_config
+	 *	iscsi_tran_bus_unconfig
+	 *	isns_scn_callback
+	 */
+	kmutex_t		hba_service_lock;
+	kcondvar_t		hba_service_cv;
+	uint32_t		hba_service_status;
+	uint32_t		hba_service_client_count;
 } iscsi_hba_t;
 
 /*
@@ -1213,7 +1258,6 @@ iscsi_cmd_t	*iscsi_cmd_alloc(iscsi_conn_t *icp, int km_flags);
 void		iscsi_cmd_free(iscsi_cmd_t *icmdp);
 
 /* iscsi_ioctl.c */
-int iscsi_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 void * iscsi_ioctl_copyin(caddr_t arg, int mode, size_t size);
 int iscsi_ioctl_copyout(void *data, size_t size, caddr_t arg, int mode);
 iscsi_conn_list_t *iscsi_ioctl_conn_oid_list_get_copyin(caddr_t, int);
@@ -1237,7 +1281,9 @@ int iscsi_get_param(iscsi_login_params_t *params,
     iscsi_param_get_t *ipgp);
 
 /* iscsid.c */
-boolean_t iscsid_init(iscsi_hba_t *ihp, boolean_t restart);
+boolean_t iscsid_init(iscsi_hba_t *ihp);
+boolean_t iscsid_start(iscsi_hba_t *ihp);
+boolean_t iscsid_stop(iscsi_hba_t *ihp);
 void iscsid_fini();
 void iscsid_props(iSCSIDiscoveryProperties_t *props);
 boolean_t iscsid_enable_discovery(iscsi_hba_t *ihp,
@@ -1265,6 +1311,8 @@ boolean_t iscsi_reconfig_boot_sess(iscsi_hba_t *ihp);
 boolean_t iscsi_chk_bootlun_mpxio(iscsi_hba_t *ihp);
 boolean_t iscsi_cmp_boot_ini_name(char *name);
 boolean_t iscsi_cmp_boot_tgt_name(char *name);
+boolean_t iscsi_client_request_service(iscsi_hba_t *ihp);
+void iscsi_client_release_service(iscsi_hba_t *ihp);
 
 extern void bcopy(const void *s1, void *s2, size_t n);
 extern void bzero(void *s, size_t n);

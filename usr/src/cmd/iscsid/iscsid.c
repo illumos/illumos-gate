@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <signal.h>
 #include <locale.h>
 #include <syslog.h>
 #include <netdb.h>
@@ -81,6 +82,7 @@ static	int		iscsi_kernel_door_handle;
 static	void		call_child_door(int value);
 static	void		sigchld_handler(int sig);
 static	boolean_t	discovery_event_wait(int did);
+static	void		signone(int, siginfo_t *, void *);
 
 static
 void
@@ -122,7 +124,10 @@ main(
 	char	*argv[]
 )
 {
-	int		i;
+	int			i;
+	int			sig;
+	sigset_t		sigs, allsigs;
+	struct sigaction	act;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -183,11 +188,10 @@ main(
 	 */
 
 	/*
-	 * Block out the usual signals so we don't get killed unintentionally.
+	 * Block out all signals
 	 */
-	(void) signal(SIGHUP, SIG_IGN);
-	(void) signal(SIGINT, SIG_IGN);
-	(void) signal(SIGQUIT, SIG_IGN);
+	(void) sigfillset(&allsigs);
+	(void) pthread_sigmask(SIG_BLOCK, &allsigs, NULL);
 
 	/* setup the door handle */
 	iscsi_kernel_door_handle = door_create(iscsi_kernel_door, NULL, 0);
@@ -209,23 +213,67 @@ main(
 
 	if (ioctl(
 	    iscsi_dev_handle,
-	    ISCSI_DOOR_HANDLE_SET,
+	    ISCSI_SMF_ONLINE,
 	    &iscsi_kernel_door_handle) == -1) {
 		(void) close(iscsi_dev_handle);
-		perror(gettext("ioctl: set door handle"));
+		perror(gettext("ioctl: enable iscsi initiator"));
 		exit(SMF_EXIT_ERR_OTHER);
 	}
+
+	/*
+	 * Keep the dev open, so to keep iscsi module from unloaded.
+	 * This is crutial to guarantee the consistency of the
+	 * door_handle and service state in kernel.
+	 */
 
 	/* We have to wait for the discovery process to finish. */
 	(void) discovery_event_wait(iscsi_dev_handle);
 
-	/* We don't need to keep the device opened. */
-	(void) close(iscsi_dev_handle);
-
-	/* We let know the parent that everything is ok. */
+	/* We let the parent know that everything is ok. */
 	call_child_door(SMF_EXIT_OK);
+
+	/* now set up signals we care about */
+
+	(void) sigemptyset(&sigs);
+	(void) sigaddset(&sigs, SIGTERM);
+	(void) sigaddset(&sigs, SIGINT);
+	(void) sigaddset(&sigs, SIGQUIT);
+
+	/* make sure signals to be enqueued */
+	act.sa_flags = SA_SIGINFO;
+	act.sa_sigaction = signone;
+
+	(void) sigaction(SIGTERM, &act, NULL);
+	(void) sigaction(SIGINT, &act, NULL);
+	(void) sigaction(SIGQUIT, &act, NULL);
+
+	/* wait and process signals */
 	for (;;) {
-		(void) pause();
+		sig = sigwait(&sigs);
+		if (sig < 0)
+			continue;
+		switch (sig) {
+		case SIGQUIT:
+		case SIGINT:
+		case SIGTERM:
+			if (ioctl(
+			    iscsi_dev_handle,
+			    ISCSI_SMF_OFFLINE,
+			    NULL) == -1) {
+				perror(gettext("ioctl: disable"
+				    " iscsi initiator"));
+				/*
+				 * Keep running if unable
+				 * to stop
+				 */
+				break;
+			}
+			(void) close(iscsi_dev_handle);
+			return (0);
+			break;
+		default:
+			break;
+		}
 	}
 }
 
@@ -616,4 +664,10 @@ discovery_event_wait(
 		lun_timer += ISCSI_DISCOVERY_POLL_DELAY1;
 	}
 	return (rc);
+}
+
+/*ARGSUSED*/
+static void
+signone(int sig, siginfo_t *sip, void *utp)
+{
 }

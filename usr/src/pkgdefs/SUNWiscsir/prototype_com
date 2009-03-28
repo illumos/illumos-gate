@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -37,6 +37,7 @@
 i copyright
 i pkginfo 
 i depend
+i preinstall
 i postinstall
 i preremove
 i i.manifest
@@ -50,11 +51,12 @@ d none var 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
 d none var/svc/manifest/network 755 root sys
-f manifest var/svc/manifest/network/iscsi_initiator.xml 0444 root sys
+d none var/svc/manifest/network/iscsi 755 root sys
+f manifest var/svc/manifest/network/iscsi/iscsi-initiator.xml 0444 root sys
 d none lib 755 root bin
 d none lib/svc 755 root bin
 d none lib/svc/method 755 root bin
-f none lib/svc/method/iscsid 0555 root bin
+f none lib/svc/method/iscsi-initiator 0555 root bin
 d none etc 755 root sys
 d none etc/iscsi 0755 root sys
 d none etc/security 755 root sys

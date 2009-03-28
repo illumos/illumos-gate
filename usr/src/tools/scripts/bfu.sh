@@ -303,7 +303,7 @@ superfluous_nonglobal_zone_files="
 	lib/libmeta.so
 	lib/libmeta.so.1
 	lib/svc/method/fc-fabric
-	lib/svc/method/iscsid
+	lib/svc/method/iscsi-initiator
 	lib/svc/method/npivconfig
 	lib/svc/method/fcoeconfig
 	lib/svc/method/sf880dr
@@ -361,7 +361,7 @@ superfluous_nonglobal_zone_files="
 	usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp
 	var/adm/pool
 	var/log/pool
-	var/svc/manifest/network/iscsi_initiator.xml
+	var/svc/manifest/network/iscsi/iscsi-initiator.xml
 	var/svc/manifest/network/npiv_config.xml
 	var/svc/manifest/network/fcoe_config.xml
 	var/svc/manifest/network/rpc/mdcomm.xml
@@ -1446,6 +1446,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/aggregation.xml
 	var/svc/manifest/network/datalink.xml
 	var/svc/manifest/network/datalink-init.xml
+	var/svc/manifest/network/iscsi_initiator.xml
 "
 
 # smf services whose manifests have been renamed
@@ -1467,6 +1468,7 @@ smf_obsolete_methods="
 	lib/svc/method/svc-kdc.master
 	lib/svc/method/svc-kdc.slave
 	lib/svc/share/krb_include.sh
+	lib/svc/method/iscsid
 "
 
 smf_cleanup () {

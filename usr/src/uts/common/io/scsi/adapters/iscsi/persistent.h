@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,8 @@ typedef struct persistent_param {
 /*
  * Function Prototypes
  */
-boolean_t	persistent_init(boolean_t restart);
+void		persistent_init();
+boolean_t	persistent_load();
 void		persistent_fini(void);
 boolean_t	persistent_disc_meth_set(iSCSIDiscoveryMethod_t method);
 iSCSIDiscoveryMethod_t	persistent_disc_meth_get(void);
