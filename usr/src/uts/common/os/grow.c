@@ -18,16 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/inttypes.h>
@@ -652,6 +650,9 @@ smmap_common(caddr_t *addrp, size_t len,
 
 	if (fp == NULL) {
 		ASSERT(flags & MAP_ANON);
+		/* discard lwpchan mappings, like munmap() */
+		if ((flags & MAP_FIXED) && curproc->p_lcp != NULL)
+			lwpchan_delete_mapping(curproc, *addrp, *addrp + len);
 		as_rangelock(as);
 		error = zmap(as, addrp, len, uprot, flags, pos);
 		as_rangeunlock(as);
@@ -754,6 +755,10 @@ smmap_common(caddr_t *addrp, size_t len,
 			goto done;
 		}
 	}
+
+	/* discard lwpchan mappings, like munmap() */
+	if ((flags & MAP_FIXED) && curproc->p_lcp != NULL)
+		lwpchan_delete_mapping(curproc, *addrp, *addrp + len);
 
 	/*
 	 * Ok, now let the vnode map routine do its thing to set things up.
