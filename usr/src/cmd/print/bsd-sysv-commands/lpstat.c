@@ -382,11 +382,12 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 				int flag = 0;
 
 				for (i = 0; j[i] != NULL; ++i) {
-					attrs = papiJobGetAttributeList(j[i]);
+					papi_attribute_t **attr =
+					    papiJobGetAttributeList(j[i]);
 
-					papiAttributeListGetInteger(attrs,
+					papiAttributeListGetInteger(attr,
 					    NULL, "job-state", &jstate);
-					papiAttributeListGetInteger(attrs,
+					papiAttributeListGetInteger(attr,
 					    NULL, "job-id", &jobid);
 
 					/*

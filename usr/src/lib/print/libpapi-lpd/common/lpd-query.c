@@ -66,7 +66,9 @@ regvalue(regmatch_t match, char *string)
  *   above.  The regular expression below makes whitespace optional in some
  *   places.
  */
-static char *job_expr = "^(.*[[:alnum:]]):[[:space:]]+([[:alnum:]]+)[[:space:]]+[[][[:space:]]*job[[:space:]]*([[:digit:]]+)[[:space:]]*(.*)]";
+static char *job_expr = "^(.*[[:alnum:]]):[[:space:]]+([[:alnum:]]+)"\
+	"[[:space:]]+[[][[:space:]]*job[[:space:]]*([[:digit:]]+)"\
+	"[[:space:]]*(.*)]";
 static regex_t job_re;
 
 /*
@@ -85,7 +87,10 @@ static regex_t job_re;
  *    Pages is the number of pages of the job
  *    Priority is the job-priority
  */
-static char *wjob_expr = "^([[:alnum:]]+)[[:space:]]*[(](.*)[)]*[[:space:]]+([[:alnum:]]+)[[:space:]]+(.*)([[:alnum:]]+)(.*)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)";
+static char *wjob_expr = "^([[:alnum:]]+)[[:space:]]*[(](.*)[)]*[[:space:]]"\
+	"+([[:alnum:]]+)[[:space:]]+(.*)([[:alnum:]]+)(.*)[[:space:]]+"\
+	"([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)"\
+	"[[:space:]]+([[:digit:]]+)";
 static regex_t wjob_re;
 
 /*
@@ -93,7 +98,8 @@ static regex_t wjob_re;
  * Owner  Status    Jobname      Job-Id    Size   Pages  Priority
  * --------------------------------------------------------------
  */
-static char *whjob_expr = "Owner       Status         Jobname          Job-Id    Size   Pages  Priority";
+static char *whjob_expr = "Owner       Status         Jobname          Job-Id"\
+	"    Size   Pages  Priority";
 static regex_t whjob_re;
 
 static char *wline_expr = "----------";
@@ -103,8 +109,9 @@ static regex_t wline_re;
  * status line(s) for "processing" printers will contain one of the following:
  *	ready and printing
  *	Printing
+ *	processing
  */
-static char *proc_expr = "(ready and printing|printing)";
+static char *proc_expr = "(ready and printing|printing|processing)";
 static regex_t proc_re;
 
 /*
@@ -117,7 +124,7 @@ static char *idle_expr = "(no entries|is ready| idle)";
 static regex_t idle_re;
 
 /*
- * Printer state reason
+ * Printer state reason (For Windows remote printers)
  *	Paused
  */
 static char *state_reason_expr = "(Paused)";
@@ -132,10 +139,15 @@ static regex_t state_reason_re;
  *   (name) is the name of the document: /etc/motd, ...
  *   (size) is the number of bytes in the document data
  */
-static char *doc1_expr = "[[:space:]]+(([[:digit:]]+) copies of )([^[:space:]]+)[[:space:]]*([[:digit:]]+) bytes";
-static char *doc2_expr = "[[:space:]]+()([^[:space:]]+)[[:space:]]*([[:digit:]]+) bytes";
+static char *doc1_expr = "[[:space:]]+(([[:digit:]]+) copies of )"\
+	"([^[:space:]]+)[[:space:]]*([[:digit:]]+) bytes";
+static char *doc2_expr = "[[:space:]]+()([^[:space:]]+)[[:space:]]*"\
+	"([[:digit:]]+) bytes";
 static regex_t doc1_re;
 static regex_t doc2_re;
+
+/* Printer-state for Windows */
+static int win_state = 0x03; /* Idle */
 
 static void
 parse_lpd_job(service_t *svc, job_t **job, int fd, char *line, int len)
@@ -163,6 +175,7 @@ parse_lpd_job(service_t *svc, job_t **job, int fd, char *line, int len)
 	if (flag == 1) {
 		/* Windows job */
 		/* first match is job-id */
+
 		if ((s = regvalue(matches[1], line)) == NULL)
 			s = "nobody";
 		papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
@@ -186,6 +199,12 @@ parse_lpd_job(service_t *svc, job_t **job, int fd, char *line, int len)
 		papiAttributeListAddInteger(&attributes,
 		    PAPI_ATTR_APPEND, "job-file-sizes", atoi(s));
 
+		/*
+		 * Since a job has been found so the printer state is either
+		 * 'stopped' or 'processing'
+		 * By default it is "processing"
+		 */
+		win_state = 0x04;
 	} else {
 		/* Solaris job */
 		if ((s = regvalue(matches[1], line)) == NULL)
@@ -262,6 +281,7 @@ parse_lpd_query(service_t *svc, int fd)
 	char line[128];
 	char status[1024];
 	char *s;
+	int win_flag = 0;
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
 	    "printer-name", queue_name_from_uri(svc->uri));
@@ -302,7 +322,8 @@ parse_lpd_query(service_t *svc, int fd)
 		 * -----------------------------------------------
 		 */
 		if ((regexec(&whjob_re, line, (size_t)0, NULL, 0)
-		    == REG_NOMATCH) && (regexec(&wline_re, line, (size_t)0, NULL, 0)
+		    == REG_NOMATCH) &&
+		    (regexec(&wline_re, line, (size_t)0, NULL, 0)
 		    == REG_NOMATCH))
 			strlcat(status, line, sizeof (status));
 	}
@@ -315,22 +336,32 @@ parse_lpd_query(service_t *svc, int fd)
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
 	    "printer-state-reasons", status);
 
-	(void) regcomp(&proc_re, proc_expr, REG_EXTENDED|REG_ICASE);
-	(void) regcomp(&idle_re, idle_expr, REG_EXTENDED|REG_ICASE);
-	(void) regcomp(&state_reason_re, state_reason_expr,
-	    REG_EXTENDED|REG_ICASE);
+	/* Check if this is for Windows remote printers */
+	if (strstr(status, "Windows")) {
+		/*
+		 * It is a remote windows printer
+		 * By default set the status as idle
+		 * Set the printer-state after call to "parse_lpd_job"
+		 */
+		win_flag = 1;
+		(void) regcomp(&state_reason_re, state_reason_expr,
+		    REG_EXTENDED|REG_ICASE);
 
-	if ((regexec(&proc_re, status, (size_t)0, NULL, 0) == 0) ||
-	    (regexec(&state_reason_re, status, (size_t)0, NULL, 0) ==
-	    REG_NOMATCH))
-		state = 0x04; /* processing */
-	else if (regexec(&idle_re, status, (size_t)0, NULL, 0) == 0)
-		state = 0x03; /* idle */
-	else
-		state = 0x05; /* stopped */
+		if (regexec(&state_reason_re, status, (size_t)0, NULL, 0) == 0)
+			state = 0x05; /* stopped */
+	} else {
+		(void) regcomp(&proc_re, proc_expr, REG_EXTENDED|REG_ICASE);
+		(void) regcomp(&idle_re, idle_expr, REG_EXTENDED|REG_ICASE);
 
-	papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
-	    "printer-state", state);
+		if (regexec(&proc_re, status, (size_t)0, NULL, 0) == 0)
+			state = 0x04; /* processing */
+		else if (regexec(&idle_re, status, (size_t)0, NULL, 0) == 0)
+			state = 0x03; /* idle */
+		else
+			state = 0x05; /* stopped */
+		papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
+		    "printer-state", state);
+	}
 
 	if ((cache = (cache_t *)calloc(1, sizeof (*cache))) == NULL)
 		return;
@@ -354,6 +385,17 @@ parse_lpd_query(service_t *svc, int fd)
 		list_append(&cache->jobs, job);
 	}
 
+	/*
+	 * For remote windows printer set the printer-state
+	 * after parse_lpd_job
+	 */
+	if (win_flag) {
+		if (state == 0x05)
+			win_state = state;
+
+		papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
+	    "printer-state", win_state);
+	}
 	time(&cache->timestamp);
 }
 
