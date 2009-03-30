@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,13 +33,16 @@
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
 #include <libdevinfo.h>
+#include <sys/pci.h>
 #include "pi_impl.h"
 
-#define	TOPO_PGROUP_PCIEX	"pciex"
-#define	TOPO_PCIEX_DRIVER	"px"
 #define	PCIEX_MAX_DEVICE	255
+#define	PCIEX_MAX_BDF_SIZE	23	/* '0x' + sizeof (UNIT64_MAX) + '\0' */
 
-#define	_ENUM_NAME	"enum_pciexrc"
+#define	TOPO_PGROUP_PCIEX	"pciex"
+#define	_ENUM_NAME		"enum_pciexrc"
+
+static char *drv_name = NULL;
 
 static const topo_pgroup_info_t io_pgroup =
 	{ TOPO_PGROUP_IO, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
@@ -49,8 +52,8 @@ static const topo_pgroup_info_t pci_pgroup =
 
 static int pi_enum_pciexrc_finddev(topo_mod_t *, md_t *, mde_cookie_t,
     tnode_t *);
-static int pi_enum_pciexrc_update(topo_mod_t *, md_t *, mde_cookie_t,
-    tnode_t *, tnode_t *);
+
+static char *pi_enum_pciexrc_findbdf(topo_mod_t *, di_node_t);
 
 static int pi_enum_pciexrc_defer(topo_mod_t *, md_t *, mde_cookie_t,
     topo_instance_t, tnode_t *, const char *, tnode_t *, void *);
@@ -80,16 +83,19 @@ pi_enum_pciexrc(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	if (result != 0 || *t_node == NULL) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to create topo node: %s\n",
-		    _ENUM_NAME, topo_strerror(topo_mod_errno(mod)));
+		    _ENUM_NAME, (uint64_t)mde_node,
+		    topo_strerror(topo_mod_errno(mod)));
 		return (result);
 	}
 
 	/* Update the topo node with more specific information */
-	result = pi_enum_pciexrc_update(mod, mdp, mde_node, t_parent, *t_node);
+	result = pi_enum_update(mod, mdp, mde_node, t_parent, *t_node,
+	    hc_name);
 	if (result != 0) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to create node properites: %s\n",
-		    _ENUM_NAME, topo_strerror(topo_mod_errno(mod)));
+		    _ENUM_NAME, (uint64_t)mde_node,
+		    topo_strerror(topo_mod_errno(mod)));
 		return (result);
 	}
 
@@ -174,87 +180,115 @@ pi_enum_pciexrc_defer(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 
 
 /*
- * Update a PCIEXRC topo node with node-specific information
+ * Update PCIEXRC/HOSTBRIDGE topo node with node-specific information
  *
  * The following is mostly a duplicate of code contained in:
  *	usr/src/lib/fm/topo/modules/sun4v/cpuboard/
  *	    cpuboard_hostbridge.c:cpuboard_rc_node_create
  */
-static int
-pi_enum_pciexrc_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
-    tnode_t *t_parent, tnode_t *t_node)
+int
+pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
+    tnode_t *t_parent, tnode_t *t_node, const char *hc_name)
 {
 	int		result;
 	int		err;
-	char		dnpath[MAXPATHLEN];
-	uint64_t	cfg_handle;
+	int		is_hbridge = 0;
+	int		is_pciexrc = 0;
+	char		*path = NULL;
+	char		*bdf = NULL;
+	char		*_enum_name;
 	nvlist_t	*modfmri;
 	nvlist_t	*devfmri;
+	di_node_t	dnode;
+
+	/*
+	 * Determine if decorating a PCIE root complex or a hostbridge
+	 * node.
+	 */
+	if (strncmp(hc_name, PCIEX_ROOT, strlen(hc_name)) == 0) {
+		is_pciexrc = 1;
+		_enum_name = "enum_pciexrc";
+	} else if (strncmp(hc_name, HOSTBRIDGE, strlen(hc_name)) == 0) {
+		is_hbridge = 1;
+		_enum_name = "enum_hostbridge";
+	} else {
+		topo_mod_dprintf(mod,
+		    "pi_enum_update node_0x%llx unknown hc name %s\n",
+		    (uint64_t)mde_node, hc_name);
+		return (-1);
+	}
 
 	if (t_parent == NULL || t_node == NULL) {
 		topo_mod_dprintf(mod, "%s node_0x%llx has no parent\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		return (-1);
 	}
 
 	/*
 	 * Calculate the device path for this root complex node.
 	 */
-	result = pi_get_cfg_handle(mod, mdp, mde_node, &cfg_handle);
-	if (result != 0) {
-		topo_mod_dprintf(mod, "node_0x%llx has no cfg-handle\n",
-		    (uint64_t)mde_node);
-		return (result);
+	path = pi_get_path(mod, mdp, mde_node);
+	if (path == NULL) {
+		if (is_hbridge == 1) {
+			/* "path" not required for hostbridge */
+			return (0);
+		}
+		topo_mod_dprintf(mod, "%s node_0x%llx has no path\n",
+		    _enum_name, (uint64_t)mde_node);
+		return (-1);
 	}
-	(void) snprintf(dnpath, sizeof (dnpath), "/pci@%llx", cfg_handle);
 
 	/*
 	 * Set the ASRU for this node using the dev scheme
 	 */
-	devfmri = topo_mod_devfmri(mod, FM_DEV_SCHEME_VERSION, dnpath, NULL);
+	devfmri = topo_mod_devfmri(mod, FM_DEV_SCHEME_VERSION, path, NULL);
 	if (devfmri == NULL) {
 		topo_mod_dprintf(mod, "%s node_0x%llx fmri creation failed\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
-		return (-1);
+		    _enum_name, (uint64_t)mde_node);
+		result = -1;
+		goto out;
 	}
 
 	result = topo_node_asru_set(t_node, devfmri, 0, &err);
 	nvlist_free(devfmri);
 	if (result != 0) {
 		topo_mod_dprintf(mod, "%s node_0x%llx failed to set ASRU\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (-1);
+		goto out;
 	}
 
 	/*
-	 * Set PCIEXRC properties for root complex nodes
+	 * Create property groups.
 	 */
 	result = topo_pgroup_create(t_node, &io_pgroup, &err);
 	if (result < 0) {
-		topo_mod_dprintf(mod,
-		    "%s node_0x%llx topo_pgroup_create for io pgroup failed\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		topo_mod_dprintf(mod, "%s node_0x%llx "
+		    "topo_pgroup_create for io pgroup failed\n",
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (result);
+		goto out;
 	}
-	result = topo_pgroup_create(t_node, &pci_pgroup, &err);
-	if (result < 0) {
-		topo_mod_dprintf(mod,
-		    "%s node_0x%llx topo_pgroup_create for pci pgroup failed\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
-		return (result);
+
+	if (is_pciexrc == 1) {
+		result = topo_pgroup_create(t_node, &pci_pgroup, &err);
+		if (result < 0) {
+			topo_mod_dprintf(mod, "%s node_0x%llx "
+			    "topo_pgroup_create for pci pgroup failed\n",
+			    _enum_name, (uint64_t)mde_node);
+			topo_mod_seterrno(mod, err);
+			goto out;
+		}
 	}
 
 	result = topo_prop_set_string(t_node, TOPO_PGROUP_IO, TOPO_IO_DEV,
-	    TOPO_PROP_IMMUTABLE, dnpath, &err);
+	    TOPO_PROP_IMMUTABLE, path, &err);
 	if (result != 0) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set DEV property\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (result);
+		goto out;
 	}
 
 	/* device type is always "pciex" */
@@ -263,32 +297,65 @@ pi_enum_pciexrc_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	if (result < 0) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set DEVTYPE property\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (result);
+		goto out;
 	}
 
 	/*
-	 * driver is always "px"
+	 * Derived the driver name from the device path.
 	 */
+	dnode = di_init(path, DIIOC);
+	if (dnode == DI_NODE_NIL) {
+		topo_mod_dprintf(mod, "%s node_0x%llx failed to get node\n",
+		    _enum_name, (uint64_t)mde_node);
+		result = -1;
+		goto out;
+	}
+	drv_name = di_driver_name(dnode);
+	if (drv_name == NULL) {
+		topo_mod_dprintf(mod, "%s node_0x%llx failed to get driver "
+		    " name\n", _enum_name, (uint64_t)mde_node);
+		di_fini(dnode);
+		result = -1;
+		goto out;
+	}
+
+	if (is_pciexrc == 1) {
+		/*
+		 * Derived the BDF property from the devinfo node.
+		 */
+		bdf = pi_enum_pciexrc_findbdf(mod, dnode);
+		if (bdf == NULL) {
+			topo_mod_dprintf(mod, "%s: node_0x%llx failed to "
+			    "find BDF", _enum_name, (uint64_t)mde_node);
+			di_fini(dnode);
+			result = -1;
+			goto out;
+		}
+	}
+	di_fini(dnode);
+	topo_mod_dprintf(mod, "%s node_0x%llx driver name is %s\n",
+	    _enum_name, (uint64_t)mde_node, drv_name);
+
 	result = topo_prop_set_string(t_node, TOPO_PGROUP_IO, TOPO_IO_DRIVER,
-	    TOPO_PROP_IMMUTABLE, TOPO_PCIEX_DRIVER, &err);
+	    TOPO_PROP_IMMUTABLE, drv_name, &err);
 	if (result < 0) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set DRIVER property\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (result);
+		goto out;
 	}
 
-	modfmri = topo_mod_modfmri(mod, FM_MOD_SCHEME_VERSION,
-	    TOPO_PCIEX_DRIVER);
+	modfmri = topo_mod_modfmri(mod, FM_MOD_SCHEME_VERSION, drv_name);
 	if (modfmri == NULL) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to create module fmri\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (result);
+		result = -1;
+		goto out;
 	}
 	result = topo_prop_set_fmri(t_node, TOPO_PGROUP_IO, TOPO_IO_MODULE,
 	    TOPO_PROP_IMMUTABLE, modfmri, &err);
@@ -296,26 +363,54 @@ pi_enum_pciexrc_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	if (result < 0) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to set MODULE property\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
+		    _enum_name, (uint64_t)mde_node);
 		topo_mod_seterrno(mod, err);
-		return (result);
+		goto out;
 	}
 
-	/* This is a PCIEX root complex */
-	result = topo_prop_set_string(t_node, TOPO_PGROUP_PCI, TOPO_PCI_EXCAP,
-	    TOPO_PROP_IMMUTABLE, PCIEX_ROOT, &err);
-	if (result < 0) {
-		topo_mod_dprintf(mod,
-		    "%s node_0x%llx failed to set EXCAP property\n",
-		    _ENUM_NAME, (uint64_t)mde_node);
-		topo_mod_seterrno(mod, err);
-		return (result);
+	if (is_pciexrc == 1) {
+		/* This is a PCIEX root complex */
+		result = topo_prop_set_string(t_node, TOPO_PGROUP_PCI,
+		    TOPO_PCI_EXCAP, TOPO_PROP_IMMUTABLE, PCIEX_ROOT, &err);
+		if (result < 0) {
+			topo_mod_dprintf(mod,
+			    "%s node_0x%llx failed to set EXCAP property\n",
+			    _enum_name, (uint64_t)mde_node);
+			topo_mod_seterrno(mod, err);
+			return (result);
+		}
+
+		/* Set BDF for root complex */
+		result = topo_prop_set_string(t_node, TOPO_PGROUP_PCI,
+		    TOPO_PCI_BDF, TOPO_PROP_IMMUTABLE, bdf, &err);
+		if (result < 0) {
+			topo_mod_dprintf(mod,
+			    "%s node_0x%llx failed to set BDF property\n",
+			    _enum_name, (uint64_t)mde_node);
+			topo_mod_seterrno(mod, err);
+			goto out;
+		}
+
+		/* Create a node range for the children of this root complex */
+		result = topo_node_range_create(mod, t_node, PCIEX_BUS, 0,
+		    PCIEX_MAX_DEVICE);
+		if (result != 0) {
+			topo_mod_dprintf(mod,
+			    "%s node_0x%llx failed to create %s range\n",
+			    _enum_name, (uint64_t)mde_node, PCIEX_BUS);
+			result = -1;
+			goto out;
+		}
 	}
 
-	/* Create a node range for the children of this root complex */
-	topo_node_range_create(mod, t_node, PCIEX_BUS, 0, PCIEX_MAX_DEVICE);
-
-	return (0);
+out:
+	if (path != NULL) {
+		topo_mod_strfree(mod, path);
+	}
+	if (bdf != NULL) {
+		topo_mod_strfree(mod, bdf);
+	}
+	return (result);
 }
 
 
@@ -323,10 +418,9 @@ static int
 pi_enum_pciexrc_finddev(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
     tnode_t *t_node)
 {
-	int		result;
 	di_node_t	devtree;
 	di_node_t	dnode;
-	uint64_t	cfg_handle;
+	char		*path;
 
 	/* Initialize the device information structure for this module */
 	devtree = topo_mod_devinfo(mod);
@@ -336,32 +430,28 @@ pi_enum_pciexrc_finddev(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	}
 
 	/*
-	 * Find the PRI node cfg-handle.  This will be used to associate the
-	 * PRI node with the device node
+	 * Find the PRI node path property. This will be used to associate
+	 * the PRI node with the device node.
 	 */
-	result = pi_get_cfg_handle(mod, mdp, mde_node, &cfg_handle);
-	if (result != 0) {
-		topo_mod_dprintf(mod, "node_0x%llx has no cfg-handle\n",
+	path = pi_get_path(mod, mdp, mde_node);
+	if (path == NULL) {
+		topo_mod_dprintf(mod, "node_0x%llx has no path\n",
 		    (uint64_t)mde_node);
-		return (result);
+		return (-1);
 	}
-	topo_mod_dprintf(mod, "node_0x%llx has cfg-handle = /pci@%llx\n",
-	    (uint64_t)mde_node, cfg_handle);
 
 	/*
 	 * Scan the device node list and find the node associated with
-	 * the given PRI node.  Equality is defined as the PRI cfg-handle
-	 * equalling the device node bus address.
+	 * the given PRI node.  Equality is defined when the PRI path
+	 * is the same as the device node path.
 	 */
-	dnode = di_drv_first_node(TOPO_PCIEX_DRIVER, devtree);
+	dnode = di_drv_first_node(drv_name, devtree);
 	while (dnode != DI_NODE_NIL) {
-		uint64_t	bus_addr;
-		char		*addr;
+		char	*devfs_path;
 
-		addr = di_bus_addr(dnode);
-		if (addr != NULL) {
-			bus_addr = strtoull(addr, NULL, 16);
-			if (bus_addr == cfg_handle) {
+		devfs_path = di_devfs_path(dnode);
+		if (devfs_path != NULL) {
+			if (strncmp(devfs_path, path, strlen(path)) == 0) {
 				/* We have found the matching dnode */
 				break;
 			}
@@ -371,8 +461,8 @@ pi_enum_pciexrc_finddev(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		dnode = di_drv_next_node(dnode);
 	}
 	if (dnode != DI_NODE_NIL) {
-		topo_mod_dprintf(mod, "%s node_0x%llx found bus 0x%llx\n",
-		    _ENUM_NAME, (uint64_t)mde_node, cfg_handle);
+		topo_mod_dprintf(mod, "%s node_0x%llx found dev path %s\n",
+		    _ENUM_NAME, (uint64_t)mde_node, path);
 
 		/*
 		 * Associate this dnode with the topo node.  The PCI
@@ -381,5 +471,93 @@ pi_enum_pciexrc_finddev(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		topo_node_setspecific(t_node, (void *)dnode);
 	}
 
+	topo_mod_strfree(mod, path);
 	return (0);
+}
+
+
+/*
+ * Find the BDF property and return as a string.
+ *
+ * The string must be freed with topo_mod_strfree()
+ */
+static char *
+pi_enum_pciexrc_findbdf(topo_mod_t *mod, di_node_t dnode)
+{
+	uint_t		 reg;
+	uint_t		 bdf;
+	char		 bdf_str[PCIEX_MAX_BDF_SIZE];
+	unsigned char	 *buf;
+	di_prop_t	 di_prop;
+	di_prom_handle_t di_prom_hdl;
+	di_prom_prop_t	 di_prom_prop;
+
+	/*
+	 * Look for the "reg" property from the devinfo node.
+	 */
+	for (di_prop = di_prop_next(dnode, DI_PROP_NIL);
+	    di_prop != DI_PROP_NIL;
+	    di_prop = di_prop_next(dnode, di_prop)) {
+		if (strncmp(di_prop_name(di_prop), "reg",
+		    sizeof (reg)) == 0) {
+			if (di_prop_bytes(di_prop, &buf) < sizeof (uint_t)) {
+				continue;
+			}
+			bcopy(buf, &reg, sizeof (uint_t));
+			break;
+		}
+	}
+
+	/*
+	 * If the "reg" property is not found in the di_node; look for it in
+	 * OBP prom data.
+	 */
+	if (di_prop == DI_PROP_NIL) {
+		if ((di_prom_hdl = topo_mod_prominfo(mod)) ==
+		    DI_PROM_HANDLE_NIL) {
+			topo_mod_dprintf(mod,
+			    "%s failed to get prom handle\n", _ENUM_NAME);
+			return (NULL);
+		}
+		for (di_prom_prop =
+		    di_prom_prop_next(di_prom_hdl, dnode, DI_PROM_PROP_NIL);
+		    di_prom_prop != DI_PROM_PROP_NIL;
+		    di_prom_prop =
+		    di_prom_prop_next(di_prom_hdl, dnode, di_prom_prop)) {
+			if (strncmp(di_prom_prop_name(di_prom_prop), "reg",
+			    sizeof (reg)) == 0) {
+				if (di_prom_prop_data(di_prom_prop, &buf) <
+				    sizeof (uint_t)) {
+					continue;
+				}
+				bcopy(buf, &reg, sizeof (uint_t));
+				break;
+			}
+		}
+		if (di_prom_prop == DI_PROP_NIL) {
+			topo_mod_dprintf(mod,
+			    "%s failed to get reg property\n", _ENUM_NAME);
+			return (NULL);
+		}
+	}
+
+	/*
+	 * Caculate BDF
+	 *
+	 * The reg property is divided like this:
+	 * -----------------------------------------------------
+	 * | 23  Bus  16 | 15  Dev  11 | 10  Fn  8 | 7  Reg  0 |
+	 * -----------------------------------------------------
+	 *
+	 * PCI_REG_* macros strip off Reg and shift to get individual
+	 * Bus/Dev/Fn bits. Shift and OR each to get bdf value.
+	 */
+	bdf = (PCI_REG_BUS_G(reg) << 8) | (PCI_REG_DEV_G(reg) << 3) |
+	    PCI_REG_FUNC_G(reg);
+
+	/* Pass BDF back as a string */
+	(void) snprintf(bdf_str, PCIEX_MAX_BDF_SIZE, "0x%x", bdf);
+	topo_mod_dprintf(mod, "%s found BDF %s\n", _ENUM_NAME, bdf_str);
+
+	return (topo_mod_strdup(mod, bdf_str));
 }

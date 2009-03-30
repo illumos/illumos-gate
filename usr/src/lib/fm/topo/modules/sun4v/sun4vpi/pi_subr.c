@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Subroutines used by various components of the Sun4v PI enumerator
@@ -33,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
+#include <string.h>
 #include <strings.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_mod.h>
@@ -41,6 +41,8 @@
 #include <libnvpair.h>
 
 #include "pi_impl.h"
+
+#define	MAX_PATH_DEPTH	(MAXPATHLEN / 256)	/* max pci path = 256 */
 
 static const topo_pgroup_info_t sys_pgroup = {
 	TOPO_PGROUP_SYSTEM,
@@ -139,29 +141,6 @@ pi_skip_node(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 		return (1);
 	}
 	return (0);
-}
-
-
-/*
- * Get the cfg-handle property value from the given PRI node
- */
-int
-pi_get_cfg_handle(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
-    uint64_t *cfg_handle)
-{
-	int		result;
-
-	if (cfg_handle == NULL) {
-		return (-1);
-	}
-
-	result = md_get_prop_val(mdp, mde_node, MD_STR_CFG_HANDLE, cfg_handle);
-	if (result != 0) {
-		topo_mod_dprintf(mod,
-		    "failed to get property %s from node_0x%llx\n",
-		    MD_STR_CFG_HANDLE, (uint64_t)mde_node);
-	}
-	return (result);
 }
 
 
@@ -375,6 +354,98 @@ pi_get_part(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 	}
 
 	return (buf);
+}
+
+
+/*
+ * Return the path string to the caller.
+ *
+ * The string must be freed with topo_mod_strfree()
+ */
+char *
+pi_get_path(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
+{
+	int	result;
+	int	i = 0;
+	size_t	max_addrs;
+	size_t	path_len = 0;
+	char	*propbuf = NULL;
+	char	*buf = NULL;
+	char	*path = NULL;
+	char	*token;
+	char	*dev_addr[MAX_PATH_DEPTH] = { NULL };
+	char	*dev_path[MAX_PATH_DEPTH] = { NULL };
+	char	*lastp;
+
+	/*
+	 * Get the path property from PRI; should look something
+	 * like "/@600/@0".
+	 */
+	result = md_get_prop_str(mdp, mde_node, MD_STR_PATH, &propbuf);
+	if (result != 0 || propbuf == NULL || strlen(propbuf) == 0) {
+		topo_mod_dprintf(mod, "pi_get_path: failed to get path\n");
+		return (NULL);
+	}
+	buf = topo_mod_strdup(mod, propbuf);
+
+	/*
+	 * Grab the address(es) from the path property.
+	 */
+	if ((token = strtok_r(buf, "/@", &lastp)) != NULL) {
+		dev_addr[i] = topo_mod_strdup(mod, token);
+		while ((token = strtok_r(NULL, "/@", &lastp)) != NULL) {
+			if (++i < MAX_PATH_DEPTH) {
+				dev_addr[i] = topo_mod_strdup(mod, token);
+			} else {
+				topo_mod_dprintf(mod, "pi_get_path: path "
+				    "too long (%d)\n", i);
+				return (NULL);
+			}
+		}
+	} else {
+		topo_mod_dprintf(mod, "pi_get_path: path wrong\n");
+		return (NULL);
+	}
+	max_addrs = ++i;
+
+	/*
+	 * Construct the path to look something like "/pci@600/pci@0".
+	 */
+	for (i = 0; i < max_addrs; i++) {
+		int len = strlen(dev_addr[i]) + strlen("/pci@") + 1;
+		path_len += len;
+		dev_path[i] = (char *)topo_mod_alloc(mod, len);
+		result = snprintf(dev_path[i], len, "/pci@%s", dev_addr[i]);
+		if (result < 0) {
+			return (NULL);
+		}
+	}
+
+	path_len -= (i - 1); /* leave room for one null char */
+	path = (char *)topo_mod_alloc(mod, path_len);
+	path = strcpy(path, dev_path[0]);
+
+	/* put the parts together */
+	for (i = 1; i < max_addrs; i++) {
+		path = strncat(path, dev_path[i], strlen(dev_path[i]) + 1);
+	}
+
+	/*
+	 * Cleanup
+	 */
+	for (i = 0; i < max_addrs; i++) {
+		if (dev_addr[i] != NULL) {
+			topo_mod_free(mod, dev_addr[i],
+			    strlen(dev_addr[i]) + 1);
+		}
+		if (dev_path[i] != NULL) {
+			topo_mod_free(mod, dev_path[i],
+			    strlen(dev_path[i]) + 1);
+		}
+	}
+
+	topo_mod_dprintf(mod, "pi_get_path: path = (%s)\n", path);
+	return (path);
 }
 
 

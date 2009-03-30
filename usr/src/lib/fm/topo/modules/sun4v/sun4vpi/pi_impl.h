@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ extern "C" {
 #define	MD_STR_NAC		"nac"			/* FWARC/2008/300 */
 #define	MD_STR_NAME		"name"
 #define	MD_STR_PART_NUMBER	"part_number"		/* FWARC/2008/300 */
+#define	MD_STR_PATH		"path"
 #define	MD_STR_PLATFORM		"platform"
 #define	MD_STR_REVISION_NUMBER	"rev_number"		/* FWARC/2008/300 */
 #define	MD_STR_SERIAL_NUMBER	"serial_number"		/* FWARC/2008/300 */
@@ -103,6 +104,7 @@ pi_enum_fn_t	pi_enum_cpu;		/* Enumerate a CHIP/CORE/CPU node */
 pi_enum_fn_t	pi_enum_mem;		/* Enumerate a DIMM node */
 pi_enum_fn_t	pi_enum_generic;	/* Enumerate a generic PRI node */
 pi_enum_fn_t	pi_enum_niu;		/* Enumerate an NIU node */
+pi_enum_fn_t	pi_enum_hostbridge;	/* Enumerate a hostbridge node */
 pi_enum_fn_t	pi_enum_pciexrc;	/* Enumerate a PCIEX root complex */
 pi_enum_fn_t	pi_enum_top;		/* Enumerate a top-level PRI node */
 
@@ -123,6 +125,9 @@ int pi_defer_add(topo_mod_t *, mde_cookie_t, tnode_t *, tnode_t *,
     pi_deferenum_fn_t, void *);
 int pi_defer_exec(topo_mod_t *, md_t *);
 
+/* Decorate a PCI-E node. */
+int pi_enum_update(topo_mod_t *, md_t *, mde_cookie_t, tnode_t *, tnode_t *,
+    const char *);
 
 /* Functions to handle LDOM PRI sessions */
 int  pi_ldompri_open(topo_mod_t *, pi_enum_t *);
@@ -139,11 +144,11 @@ void pi_walker_fini(topo_mod_t *);
 int	pi_find_mdenodes(topo_mod_t *, md_t *, mde_cookie_t, char *, char *,
     mde_cookie_t **, size_t *);
 int	pi_skip_node(topo_mod_t *, md_t *, mde_cookie_t);
-int	pi_get_cfg_handle(topo_mod_t *, md_t *, mde_cookie_t, uint64_t *);
 char   *pi_get_chassisid(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_topo_hc_name(topo_mod_t *, md_t *, mde_cookie_t);
 int	pi_get_instance(topo_mod_t *, md_t *, mde_cookie_t, topo_instance_t *);
 char   *pi_get_part(topo_mod_t *, md_t *, mde_cookie_t);
+char   *pi_get_path(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_productid(topo_mod_t *, md_t *);
 char   *pi_get_revision(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_serial(topo_mod_t *, md_t *, mde_cookie_t);

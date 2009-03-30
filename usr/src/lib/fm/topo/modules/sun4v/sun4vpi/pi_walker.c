@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@ static pi_enum_functions_t pi_enum_fns_builtin[] = {
 	{pi_enum_mem,		DIMM},
 	{pi_enum_cpu,		CORE},
 	{pi_enum_cpu,		CHIP},
+	{pi_enum_hostbridge,	HOSTBRIDGE},
 	{pi_enum_pciexrc,	PCIEX_ROOT},
 	{pi_enum_niu,		NIU},
 	{NULL, NULL}
