@@ -427,26 +427,40 @@ fastboot_elf32_find_loadables(void *img, off_t imgsz, fastboot_section_t *sectp,
 }
 
 /*
- * Create multiboot info structure
+ * Create multiboot info structure (mbi) base on the saved mbi.
+ * Recalculate values of the pointer type fields in the data
+ * structure based on the new starting physical address of the
+ * data structure.
  */
 static int
 fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 {
 	mb_module_t	*mbp;
-	uintptr_t	next_addr;
-	uintptr_t	new_mbi_pa;
-	size_t		arglen;
-	char		bootargs[OBP_MAXPATHLEN];
-	size_t		size;
+	multiboot_info_t	*mbi;	/* pointer to multiboot structure */
+	uintptr_t	start_addr_va;	/* starting VA of mbi */
+	uintptr_t	start_addr_pa;	/* starting PA of mbi */
+	size_t		offs = 0;	/* offset from the starting address */
+	size_t		arglen;		/* length of the command line arg */
+	size_t		size;	/* size of the memory reserved for mbi */
+	size_t		mdnsz;	/* length of the boot archive name */
 
-	bzero(bootargs, OBP_MAXPATHLEN);
-
+	/*
+	 * If mdep is not NULL or empty, use the length of mdep + 1
+	 * (for NULL terminating) as the length of the new command
+	 * line; else use the saved command line length as the
+	 * length for the new command line.
+	 */
 	if (mdep != NULL && strlen(mdep) != 0) {
 		arglen = strlen(mdep) + 1;
 	} else {
 		arglen = saved_cmdline_len;
 	}
 
+	/*
+	 * Allocate memory for the new multiboot info structure (mbi).
+	 * If we have reserved memory for mbi but it's not enough,
+	 * free it and reallocate.
+	 */
 	size = PAGESIZE + P2ROUNDUP(arglen, PAGESIZE);
 	if (nk->fi_mbi_size && nk->fi_mbi_size < size) {
 		contig_free((void *)nk->fi_new_mbi_va, nk->fi_mbi_size);
@@ -468,72 +482,81 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 		nk->fi_mbi_size = size;
 	}
 
+	/*
+	 * Initalize memory
+	 */
 	bzero((void *)nk->fi_new_mbi_va, nk->fi_mbi_size);
 
-	new_mbi_pa = mmu_ptob((uint64_t)hat_getpfnum(kas.a_hat,
-	    (caddr_t)nk->fi_new_mbi_va));
+	/*
+	 * Get PA for the new mbi
+	 */
+	start_addr_va = nk->fi_new_mbi_va;
+	start_addr_pa = mmu_ptob((uint64_t)hat_getpfnum(kas.a_hat,
+	    (caddr_t)start_addr_va));
+	nk->fi_new_mbi_pa = (paddr_t)start_addr_pa;
 
 	/*
-	 * Map the address into both the current proc's address
-	 * space and the kernel's address space in case the panic
-	 * is forced by kmdb.
+	 * Populate the rest of the fields in the data structure
 	 */
-	AS_LOCK_ENTER(&kas, &kas.a_lock, RW_WRITER);
-	hat_devload(kas.a_hat, (caddr_t)new_mbi_pa, nk->fi_mbi_size,
-	    mmu_btop(new_mbi_pa), PROT_READ | PROT_WRITE,
-	    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
-	AS_LOCK_EXIT(&kas, &kas.a_lock);
 
-	if (&kas != curproc->p_as) {
-		struct as *asp = curproc->p_as;
-		AS_LOCK_ENTER(asp, &asp->a_lock, RW_WRITER);
-		hat_devload(asp->a_hat, (caddr_t)new_mbi_pa, nk->fi_mbi_size,
-		    mmu_btop(new_mbi_pa), PROT_READ | PROT_WRITE,
-		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
-		AS_LOCK_EXIT(asp, &asp->a_lock);
-	}
+	/*
+	 * Copy from the saved mbi to preserve all non-pointer type fields.
+	 */
+	mbi = (multiboot_info_t *)start_addr_va;
+	bcopy(&saved_mbi, mbi, sizeof (*mbi));
 
-	nk->fi_new_mbi_pa = (paddr_t)new_mbi_pa;
-
-	bcopy(&saved_mbi, (void *)new_mbi_pa, sizeof (multiboot_info_t));
-
-	next_addr = new_mbi_pa + sizeof (multiboot_info_t);
-	((multiboot_info_t *)new_mbi_pa)->mods_addr = next_addr;
-	mbp = (mb_module_t *)(uintptr_t)next_addr;
+	/*
+	 * Recalculate mods_addr.  Set mod_start and mod_end based on
+	 * the physical address of the new boot archive.  Set mod_name
+	 * to the name of the new boto archive.
+	 */
+	offs += sizeof (multiboot_info_t);
+	mbi->mods_addr = start_addr_pa + offs;
+	mbp = (mb_module_t *)(start_addr_va + offs);
 	mbp->mod_start = nk->fi_files[FASTBOOT_BOOTARCHIVE].fb_dest_pa;
 	mbp->mod_end = nk->fi_files[FASTBOOT_BOOTARCHIVE].fb_next_pa;
 
-	next_addr += sizeof (mb_module_t);
-	bcopy(fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE], (void *)next_addr,
-	    strlen(fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE]));
-
-	mbp->mod_name = next_addr;
+	offs += sizeof (mb_module_t);
+	mdnsz = strlen(fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE]) + 1;
+	bcopy(fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE],
+	    (void *)(start_addr_va + offs), mdnsz);
+	mbp->mod_name = start_addr_pa + offs;
 	mbp->reserved = 0;
-	next_addr += strlen(fastboot_filename[FASTBOOT_NAME_BOOTARCHIVE]);
-	*(char *)next_addr = '\0';
-	next_addr++;
-	next_addr = P2ROUNDUP_TYPED(next_addr, 16, uintptr_t);
 
-	((multiboot_info_t *)new_mbi_pa)->mmap_addr = next_addr;
-	bcopy((void *)(uintptr_t)saved_mmap, (void *)next_addr,
+	/*
+	 * Make sure the offset is 16-byte aligned to avoid unaligned access.
+	 */
+	offs += mdnsz;
+	offs = P2ROUNDUP_TYPED(offs, 16, size_t);
+
+	/*
+	 * Recalculate mmap_addr
+	 */
+	mbi->mmap_addr = start_addr_pa + offs;
+	bcopy((void *)(uintptr_t)saved_mmap, (void *)(start_addr_va + offs),
 	    saved_mbi.mmap_length);
-	next_addr += saved_mbi.mmap_length;
+	offs += saved_mbi.mmap_length;
 
-	((multiboot_info_t *)new_mbi_pa)->drives_addr = next_addr;
-	bcopy((void *)(uintptr_t)saved_drives, (void *)next_addr,
+	/*
+	 * Recalculate drives_addr
+	 */
+	mbi->drives_addr = start_addr_pa + offs;
+	bcopy((void *)(uintptr_t)saved_drives, (void *)(start_addr_va + offs),
 	    saved_mbi.drives_length);
-	next_addr += saved_mbi.drives_length;
+	offs += saved_mbi.drives_length;
 
-	((multiboot_info_t *)new_mbi_pa)->cmdline = next_addr;
+	/*
+	 * Recalculate the address of cmdline.  Set cmdline to contain the
+	 * new boot argument.
+	 */
+	mbi->cmdline = start_addr_pa + offs;
 
 	if (mdep != NULL && strlen(mdep) != 0) {
-		bcopy(mdep, (void *)(uintptr_t)
-		    (((multiboot_info_t *)new_mbi_pa)->cmdline), (arglen - 1));
+		bcopy(mdep, (void *)(start_addr_va + offs), arglen);
 	} else {
-		bcopy((void *)saved_cmdline, (void *)next_addr, (arglen - 1));
+		bcopy((void *)saved_cmdline, (void *)(start_addr_va + offs),
+		    arglen);
 	}
-	/* Terminate the string */
-	((char *)(intptr_t)next_addr)[arglen - 1] = '\0';
 
 	return (0);
 }
