@@ -511,7 +511,7 @@ typedef struct laggr_args_s {
 	dladm_aggr_grp_attr_t	*laggr_ginfop;
 	dladm_status_t		*laggr_status;
 	pktsum_t		*laggr_pktsumtot; /* -s only */
-	pktsum_t		*laggr_prevstats; /* -s only */
+	pktsum_t		*laggr_diffstats; /* -s only */
 	boolean_t		laggr_parsable;
 } laggr_args_t;
 
@@ -2588,9 +2588,8 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	int 			portnum;
 	boolean_t		is_port = (l->laggr_lport >= 0);
 	dladm_aggr_port_attr_t	*portp;
-	dladm_phys_attr_t	dpa;
 	dladm_status_t		*stat, status;
-	pktsum_t		port_stat, diff_stats;
+	pktsum_t		*diff_stats;
 
 	stat = l->laggr_status;
 	*stat = DLADM_STATUS_OK;
@@ -2598,20 +2597,13 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	if (is_port) {
 		portnum = l->laggr_lport;
 		portp = &(l->laggr_ginfop->lg_ports[portnum]);
-		if ((status = dladm_phys_info(handle, portp->lp_linkid,
-		    &dpa, DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
-			goto err;
-		}
-
-		get_mac_stats(dpa.dp_dev, &port_stat);
 
 		if ((status = dladm_datalink_id2info(handle,
 		    portp->lp_linkid, NULL, NULL, NULL, buf, bufsize)) !=
 		    DLADM_STATUS_OK) {
 			goto err;
 		}
-
-		dladm_stats_diff(&diff_stats, &port_stat, l->laggr_prevstats);
+		diff_stats = l->laggr_diffstats;
 	}
 
 	switch (ofarg->ofmt_id) {
@@ -2629,7 +2621,7 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case AGGR_S_IPKTS:
 		if (is_port) {
 			(void) snprintf(buf, bufsize, "%llu",
-			    diff_stats.ipackets);
+			    diff_stats->ipackets);
 		} else {
 			(void) snprintf(buf, bufsize, "%llu",
 			    l->laggr_pktsumtot->ipackets);
@@ -2639,7 +2631,7 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case AGGR_S_RBYTES:
 		if (is_port) {
 			(void) snprintf(buf, bufsize, "%llu",
-			    diff_stats.rbytes);
+			    diff_stats->rbytes);
 		} else {
 			(void) snprintf(buf, bufsize, "%llu",
 			    l->laggr_pktsumtot->rbytes);
@@ -2649,7 +2641,7 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case AGGR_S_OPKTS:
 		if (is_port) {
 			(void) snprintf(buf, bufsize, "%llu",
-			    diff_stats.opackets);
+			    diff_stats->opackets);
 		} else {
 			(void) snprintf(buf, bufsize, "%llu",
 			    l->laggr_pktsumtot->opackets);
@@ -2658,7 +2650,7 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case AGGR_S_OBYTES:
 		if (is_port) {
 			(void) snprintf(buf, bufsize, "%llu",
-			    diff_stats.obytes);
+			    diff_stats->obytes);
 		} else {
 			(void) snprintf(buf, bufsize, "%llu",
 			    l->laggr_pktsumtot->obytes);
@@ -2668,14 +2660,14 @@ print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case AGGR_S_IPKTDIST:
 		if (is_port) {
 			(void) snprintf(buf, bufsize, "%-6.1f",
-			    (double)diff_stats.opackets/
+			    (double)diff_stats->ipackets/
 			    (double)l->laggr_pktsumtot->ipackets * 100);
 		}
 		break;
 	case AGGR_S_OPKTDIST:
 		if (is_port) {
 			(void) snprintf(buf, bufsize, "%-6.1f",
-			    (double)diff_stats.opackets/
+			    (double)diff_stats->opackets/
 			    (double)l->laggr_pktsumtot->opackets * 100);
 		}
 		break;
@@ -2693,13 +2685,21 @@ print_aggr_stats(show_grp_state_t *state, const char *link,
 {
 	dladm_phys_attr_t	dpa;
 	dladm_aggr_port_attr_t	*portp;
-	pktsum_t		pktsumtot, port_stat;
+	pktsum_t		pktsumtot, *port_stat;
 	dladm_status_t		status;
 	int			i;
 	laggr_args_t		largs;
 
 	/* sum the ports statistics */
 	bzero(&pktsumtot, sizeof (pktsumtot));
+
+	/* Allocate memory to keep stats of each port */
+	port_stat = malloc(ginfop->lg_nports * sizeof (pktsum_t));
+	if (port_stat == NULL) {
+		/* Bail out; no memory */
+		return (DLADM_STATUS_NOMEM);
+	}
+
 
 	for (i = 0; i < ginfop->lg_nports; i++) {
 
@@ -2709,8 +2709,17 @@ print_aggr_stats(show_grp_state_t *state, const char *link,
 			goto done;
 		}
 
-		get_mac_stats(dpa.dp_dev, &port_stat);
-		dladm_stats_total(&pktsumtot, &port_stat,
+		get_mac_stats(dpa.dp_dev, &port_stat[i]);
+
+		/*
+		 * Let's re-use gs_prevstats[] to store the difference of the
+		 * counters since last use. We will store the new stats from
+		 * port_stat[] once we have the stats displayed.
+		 */
+
+		dladm_stats_diff(&state->gs_prevstats[i], &port_stat[i],
+		    &state->gs_prevstats[i]);
+		dladm_stats_total(&pktsumtot, &pktsumtot,
 		    &state->gs_prevstats[i]);
 	}
 
@@ -2727,14 +2736,18 @@ print_aggr_stats(show_grp_state_t *state, const char *link,
 
 	for (i = 0; i < ginfop->lg_nports; i++) {
 		largs.laggr_lport = i;
-		largs.laggr_prevstats = &state->gs_prevstats[i];
+		largs.laggr_diffstats = &state->gs_prevstats[i];
 		ofmt_print(state->gs_ofmt, &largs);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 	}
 
 	status = DLADM_STATUS_OK;
+	for (i = 0; i < ginfop->lg_nports; i++)
+		state->gs_prevstats[i] = port_stat[i];
+
 done:
+	free(port_stat);
 	return (status);
 }
 
@@ -2969,8 +2982,6 @@ do_show_aggr(int argc, char *argv[], const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = 0;
-
-	bzero(&state, sizeof (state));
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":LpPxsi:o:",

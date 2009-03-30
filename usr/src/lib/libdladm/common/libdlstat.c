@@ -677,15 +677,18 @@ dladm_stats_total(pktsum_t *s1, pktsum_t *s2, pktsum_t *s3)
 	s1->snaptime  = s2->snaptime;
 }
 
+#define	DIFF_STAT(s2, s3) ((s2) > (s3) ? (s2 - s3) : 0)
+
+
 /* Compute differences between 2 pktsums (s1 = s2 - s3) */
 void
 dladm_stats_diff(pktsum_t *s1, pktsum_t *s2, pktsum_t *s3)
 {
-	s1->rbytes    = s2->rbytes    - s3->rbytes;
-	s1->ipackets  = s2->ipackets  - s3->ipackets;
-	s1->ierrors   = s2->ierrors   - s3->ierrors;
-	s1->obytes    = s2->obytes    - s3->obytes;
-	s1->opackets  = s2->opackets  - s3->opackets;
-	s1->oerrors   = s2->oerrors   - s3->oerrors;
-	s1->snaptime  = s2->snaptime  - s3->snaptime;
+	s1->rbytes    = DIFF_STAT(s2->rbytes,   s3->rbytes);
+	s1->ipackets  = DIFF_STAT(s2->ipackets, s3->ipackets);
+	s1->ierrors   = DIFF_STAT(s2->ierrors,  s3->ierrors);
+	s1->obytes    = DIFF_STAT(s2->obytes,   s3->obytes);
+	s1->opackets  = DIFF_STAT(s2->opackets, s3->opackets);
+	s1->oerrors   = DIFF_STAT(s2->oerrors,  s3->oerrors);
+	s1->snaptime  = DIFF_STAT(s2->snaptime, s3->snaptime);
 }
