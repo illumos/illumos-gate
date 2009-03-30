@@ -523,7 +523,7 @@ zfsctl_unmount_snap(zfs_snapentry_t *sep, int fflags, cred_t *cr)
 		VN_RELE(svp);
 		return (error);
 	}
-	VFS_RELE(svp->v_vfsp);
+
 	/*
 	 * We can't use VN_RELE(), as that will try to invoke
 	 * zfsctl_snapdir_inactive(), which would cause us to destroy
@@ -777,9 +777,6 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 
 	ASSERT(dvp->v_type == VDIR);
 
-	if (gfs_lookup_dot(vpp, dvp, zfsvfs->z_ctldir, nm) == 0)
-		return (0);
-
 	/*
 	 * If we get a recursive call, that means we got called
 	 * from the domount() code while it was trying to look up the
@@ -790,6 +787,11 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 		return (ENOENT);
 
 	ZFS_ENTER(zfsvfs);
+
+	if (gfs_lookup_dot(vpp, dvp, zfsvfs->z_ctldir, nm) == 0) {
+		ZFS_EXIT(zfsvfs);
+		return (0);
+	}
 
 	if (flags & FIGNORECASE) {
 		boolean_t conflict = B_FALSE;
@@ -889,7 +891,7 @@ domount:
 		 * Return the mounted root rather than the covered mount point.
 		 * Takes the GFS vnode at .zfs/snapshot/<snapname> and returns
 		 * the ZFS vnode mounted on top of the GFS node.  This ZFS
-		 * vnode is the root the newly created vfsp.
+		 * vnode is the root of the newly created vfsp.
 		 */
 		VFS_RELE(vfsp);
 		err = traverse(vpp);
@@ -1169,7 +1171,6 @@ zfsctl_snapshot_mknode(vnode_t *pvp, uint64_t objset)
 	    zfsctl_ops_snapshot, NULL, NULL, MAXNAMELEN, NULL, NULL);
 	zcp = vp->v_data;
 	zcp->zc_id = objset;
-	VFS_HOLD(vp->v_vfsp);
 
 	return (vp);
 }
@@ -1208,7 +1209,6 @@ zfsctl_snapshot_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 
 	mutex_exit(&sdp->sd_lock);
 	VN_RELE(dvp);
-	VFS_RELE(vp->v_vfsp);
 
 	/*
 	 * Dispose of the vnode for the snapshot mount point.

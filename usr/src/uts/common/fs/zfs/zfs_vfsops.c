@@ -1070,6 +1070,13 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	error = zfs_domount(vfsp, osname);
 
+	/*
+	 * Add an extra VFS_HOLD on our parent vfs so that it can't
+	 * disappear due to a forced unmount.
+	 */
+	if (((zfsvfs_t *)vfsp->vfs_data)->z_issnap)
+		VFS_HOLD(mvp->v_vfsp);
+
 out:
 	pn_free(&spn);
 	return (error);
@@ -1502,6 +1509,14 @@ zfs_freevfs(vfs_t *vfsp)
 		mutex_destroy(&zfsvfs->z_hold_mtx[i]);
 
 	zfs_fuid_destroy(zfsvfs);
+
+	/*
+	 * If this is a snapshot, we have an extra VFS_HOLD on our parent
+	 * from zfs_mount().  Release it here.
+	 */
+	if (zfsvfs->z_issnap)
+		VFS_RELE(zfsvfs->z_parent->z_vfs);
+
 	zfs_freezfsvfs(zfsvfs);
 
 	atomic_add_32(&zfs_active_fs_count, -1);
