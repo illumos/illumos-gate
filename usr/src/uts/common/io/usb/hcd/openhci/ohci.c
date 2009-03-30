@@ -11307,6 +11307,10 @@ ohci_quiesce(dev_info_t *dip)
 	if (ohcip == NULL)
 		return (DDI_FAILURE);
 
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
+
 	if (ohcip->ohci_flags & OHCI_INTR) {
 
 		/* Disable all HC ED list processing */
@@ -11352,6 +11356,9 @@ ohci_quiesce(dev_info_t *dip)
 		Set_OpReg(hcr_cmd_status, HCR_STATUS_RESET);
 	}
 
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
 	return (DDI_SUCCESS);
 }
 #endif	/* __sparc */
