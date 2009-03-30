@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,8 +76,8 @@ typedef struct nv_ctl {
 	 * sata registers in bar 5 which are shared on all devices
 	 * on the channel.
 	 */
-	uint32_t	*nvc_mcp55_ctl;
-	uint32_t	*nvc_mcp55_ncq; /* NCQ status control bits */
+	uint32_t	*nvc_mcp5x_ctl;
+	uint32_t	*nvc_mcp5x_ncq; /* NCQ status control bits */
 
 	kmutex_t	nvc_mutex; /* ctrl level lock */
 
@@ -87,7 +87,7 @@ typedef struct nv_ctl {
 	size_t		nvc_intr_size;	/* Size of intr array to */
 	uint_t		nvc_intr_pri;   /* Interrupt priority */
 	int		nvc_intr_cap;	/* Interrupt capabilities */
-	uint8_t		*nvc_mcp04_int_status; /* interrupt status mcp04 */
+	uint8_t		*nvc_ck804_int_status; /* interrupt status ck804 */
 
 	sata_hba_tran_t	nvc_sata_hba_tran; /* sata_hba_tran for ctrl */
 
@@ -99,7 +99,7 @@ typedef struct nv_ctl {
 	uint8_t		nvc_revid;	/* PCI revid of device */
 
 #ifdef SGPIO_SUPPORT
-	int		nvc_mcp55_flag;	/* is the controller MCP55 or CK804 */
+	int		nvc_mcp5x_flag;	/* is the controller MCP51/MCP55 */
 	uint8_t		nvc_ctlr_num;	/* controller number within the part */
 	uint32_t	nvc_sgp_csr;	/* SGPIO CSR i/o address */
 	volatile nv_sgp_cb_t *nvc_sgp_cbp; /* SGPIO Command Block */
@@ -176,8 +176,8 @@ struct nv_port {
 
 	int		nvp_state; /* state of port. flags defined below */
 
-	uint16_t	*nvp_mcp55_int_status;
-	uint16_t	*nvp_mcp55_int_ctl;
+	uint16_t	*nvp_mcp5x_int_status;
+	uint16_t	*nvp_mcp5x_int_ctl;
 
 #ifdef SGPIO_SUPPORT
 	uint8_t		nvp_sgp_ioctl_mod; /* LEDs modified by ioctl */
@@ -188,7 +188,7 @@ struct nv_port {
 typedef struct nv_device_table {
 	ushort_t vendor_id;	/* vendor id */
 	ushort_t device_id;	/* device id */
-	ushort_t type;		/* chipset type, mcp04 or mcp55 */
+	ushort_t type;		/* chipset type, ck804 or mcp51/mcp55 */
 } nv_device_table_t;
 
 
@@ -313,10 +313,10 @@ struct nv_sgp_cmn {
 #define	ATDC_HOB	0x80	/* high order byte to read 48-bit values */
 
 
-#define	MCP55_CTL		0x400 /* queuing control */
-#define	MCP55_INT_STATUS	0x440 /* status bits for interrupt */
-#define	MCP55_INT_CTL		0x444 /* enable bits for interrupt */
-#define	MCP55_NCQ		0x448 /* NCQ status and ctrl bits */
+#define	MCP5X_CTL		0x400 /* queuing control */
+#define	MCP5X_INT_STATUS	0x440 /* status bits for interrupt */
+#define	MCP5X_INT_CTL		0x444 /* enable bits for interrupt */
+#define	MCP5X_NCQ		0x448 /* NCQ status and ctrl bits */
 
 /*
  * if either of these bits are set, when using NCQ, if no other commands are
@@ -337,25 +337,25 @@ struct nv_sgp_cmn {
 
 
 /*
- * Bits for NV_MCP55_INT_CTL and NV_MCP55_INT_STATUS
+ * Bits for NV_MCP5X_INT_CTL and NV_MCP5X_INT_STATUS
  */
-#define	MCP55_INT_SNOTIFY	0x200	/* snotification set */
-#define	MCP55_INT_SERROR	0x100	/* serror set */
-#define	MCP55_INT_DMA_SETUP	0x80	/* DMA to be programmed */
-#define	MCP55_INT_DH_REGFIS	0x40	/* REGFIS received */
-#define	MCP55_INT_SDB_FIS	0x20	/* SDB FIS */
-#define	MCP55_INT_TX_BACKOUT	0x10	/* TX backout */
-#define	MCP55_INT_REM		0x08	/* device removed */
-#define	MCP55_INT_ADD		0x04	/* device added */
-#define	MCP55_INT_PM		0x02	/* power changed */
-#define	MCP55_INT_COMPLETE	0x01	/* device interrupt */
+#define	MCP5X_INT_SNOTIFY	0x200	/* snotification set */
+#define	MCP5X_INT_SERROR	0x100	/* serror set */
+#define	MCP5X_INT_DMA_SETUP	0x80	/* DMA to be programmed */
+#define	MCP5X_INT_DH_REGFIS	0x40	/* REGFIS received */
+#define	MCP5X_INT_SDB_FIS	0x20	/* SDB FIS */
+#define	MCP5X_INT_TX_BACKOUT	0x10	/* TX backout */
+#define	MCP5X_INT_REM		0x08	/* device removed */
+#define	MCP5X_INT_ADD		0x04	/* device added */
+#define	MCP5X_INT_PM		0x02	/* power changed */
+#define	MCP5X_INT_COMPLETE	0x01	/* device interrupt */
 
 /*
  * Bits above that are not used for now.
  */
-#define	MCP55_INT_IGNORE (MCP55_INT_DMA_SETUP|MCP55_INT_DH_REGFIS|\
-	MCP55_INT_SDB_FIS|MCP55_INT_TX_BACKOUT|MCP55_INT_PM|\
-	MCP55_INT_SNOTIFY|MCP55_INT_SERROR)
+#define	MCP5X_INT_IGNORE (MCP5X_INT_DMA_SETUP|MCP5X_INT_DH_REGFIS|\
+	MCP5X_INT_SDB_FIS|MCP5X_INT_TX_BACKOUT|MCP5X_INT_PM|\
+	MCP5X_INT_SNOTIFY|MCP5X_INT_SERROR)
 
 /*
  * Bits for MCP_SATA_AE_CTL
@@ -380,7 +380,7 @@ struct nv_sgp_cmn {
 #define	NV_SIG_NOTREADY	0x00000000
 
 /*
- * These bar5 offsets are common to mcp55/mcp04 and thus
+ * These bar5 offsets are common to mcp51/mcp55/ck804 and thus
  * prefixed with NV.
  */
 #define	NV_SSTATUS	0x00
@@ -395,43 +395,43 @@ struct nv_sgp_cmn {
 
 /*
  * The following config space offsets are needed to enable
- * bar 5 register access in mcp04/mcp55
+ * bar 5 register access in ck804/mcp51/mcp55
  */
 #define	NV_SATA_CFG_20		0x50
 #define	NV_BAR5_SPACE_EN	0x04
 #define	NV_40BIT_PRD		0x20
 
 /*
- * mcp04 interrupt status register
+ * ck804 interrupt status register
  */
 
 /*
  * offsets to bar 5 registers
  */
-#define	MCP04_SATA_INT_STATUS	0x440
-#define	MCP04_SATA_INT_EN	0x441
+#define	CK804_SATA_INT_STATUS	0x440
+#define	CK804_SATA_INT_EN	0x441
 
 
 /*
  * bit fields for int status and int enable
  * registers
  */
-#define	MCP04_INT_PDEV_INT	0x01 /* completion interrupt */
-#define	MCP04_INT_PDEV_PM	0x02 /* power change */
-#define	MCP04_INT_PDEV_ADD	0x04 /* hot plug */
-#define	MCP04_INT_PDEV_REM	0x08 /* hot remove */
-#define	MCP04_INT_PDEV_HOT	MCP04_INT_PDEV_ADD|MCP04_INT_PDEV_REM
+#define	CK804_INT_PDEV_INT	0x01 /* completion interrupt */
+#define	CK804_INT_PDEV_PM	0x02 /* power change */
+#define	CK804_INT_PDEV_ADD	0x04 /* hot plug */
+#define	CK804_INT_PDEV_REM	0x08 /* hot remove */
+#define	CK804_INT_PDEV_HOT	CK804_INT_PDEV_ADD|CK804_INT_PDEV_REM
 
-#define	MCP04_INT_SDEV_INT	0x10 /* completion interrupt */
-#define	MCP04_INT_SDEV_PM	0x20 /* power change */
-#define	MCP04_INT_SDEV_ADD	0x40 /* hot plug */
-#define	MCP04_INT_SDEV_REM	0x80 /* hot remove */
-#define	MCP04_INT_SDEV_HOT	MCP04_INT_SDEV_ADD|MCP04_INT_SDEV_REM
+#define	CK804_INT_SDEV_INT	0x10 /* completion interrupt */
+#define	CK804_INT_SDEV_PM	0x20 /* power change */
+#define	CK804_INT_SDEV_ADD	0x40 /* hot plug */
+#define	CK804_INT_SDEV_REM	0x80 /* hot remove */
+#define	CK804_INT_SDEV_HOT	CK804_INT_SDEV_ADD|CK804_INT_SDEV_REM
 
-#define	MCP04_INT_PDEV_ALL	MCP04_INT_PDEV_INT|MCP04_INT_PDEV_HOT|\
-				MCP04_INT_PDEV_PM
-#define	MCP04_INT_SDEV_ALL	MCP04_INT_SDEV_INT|MCP04_INT_SDEV_HOT|\
-				MCP04_INT_SDEV_PM
+#define	CK804_INT_PDEV_ALL	CK804_INT_PDEV_INT|CK804_INT_PDEV_HOT|\
+				CK804_INT_PDEV_PM
+#define	CK804_INT_SDEV_ALL	CK804_INT_SDEV_INT|CK804_INT_SDEV_HOT|\
+				CK804_INT_SDEV_PM
 
 /*
  * config space offset 42
@@ -442,27 +442,27 @@ struct nv_sgp_cmn {
  * bit in CFG_42 which delays hotplug interrupt until
  * PHY ready
  */
-#define	MCP04_CFG_DELAY_HOTPLUG_INTR	(0x1 << 12)
+#define	CK804_CFG_DELAY_HOTPLUG_INTR	(0x1 << 12)
 
 
 /*
  * bar 5 offsets for SATA registers in ck804
  */
-#define	MCP04_CH1_SSTATUS	0x00
-#define	MCP04_CH1_SERROR	0x04
-#define	MCP04_CH1_SCTRL		0x08
-#define	MCP04_CH1_SACTIVE	0x0c
-#define	MCP04_CH1_SNOTIFICATION	0x10
+#define	CK804_CH1_SSTATUS	0x00
+#define	CK804_CH1_SERROR	0x04
+#define	CK804_CH1_SCTRL		0x08
+#define	CK804_CH1_SACTIVE	0x0c
+#define	CK804_CH1_SNOTIFICATION	0x10
 
-#define	MCP04_CH2_SSTATUS	0x40
-#define	MCP04_CH2_SERROR	0x44
-#define	MCP04_CH2_SCTRL		0x48
-#define	MCP04_CH2_SACTIVE	0x4c
-#define	MCP04_CH2_SNOTIFICATION	0x50
+#define	CK804_CH2_SSTATUS	0x40
+#define	CK804_CH2_SERROR	0x44
+#define	CK804_CH2_SCTRL		0x48
+#define	CK804_CH2_SACTIVE	0x4c
+#define	CK804_CH2_SNOTIFICATION	0x50
 
 
 /*
- * bar 5 offsets for ADMACTL settings for both mcp04/mcp55
+ * bar 5 offsets for ADMACTL settings for both ck804/mcp51/mcp/55
  */
 #define	NV_ADMACTL_X	0x4C0
 #define	NV_ADMACTL_Y	0x5C0
@@ -475,15 +475,15 @@ struct nv_sgp_cmn {
 
 
 /*
- * bar 5 offset for ADMASTAT regs for mcp04
+ * bar 5 offset for ADMASTAT regs for ck804
  */
-#define	MCP04_ADMASTAT_X	0x4C4
-#define	MCP04_ADMASTAT_Y	0x5C4
+#define	CK804_ADMASTAT_X	0x4C4
+#define	CK804_ADMASTAT_Y	0x5C4
 
 /*
- * Bits for MCP04_ADMASTAT_X and MCP04_ADMASTAT_Y
+ * Bits for CK804_ADMASTAT_X and CK804_ADMASTAT_Y
  */
-#define	MCP04_HPIRQ	0x4
+#define	CK804_HPIRQ	0x4
 #define	MCP05_HUIRQ	0x2
 
 
@@ -618,7 +618,7 @@ typedef struct prde {
 
 
 /*
- * flags for mcp04_set_intr/mcp55_set_intr
+ * flags for ck804_set_intr/mcp5x_set_intr
  */
 #define	NV_INTR_DISABLE		0x1
 #define	NV_INTR_ENABLE		0x2
@@ -636,7 +636,7 @@ typedef struct prde {
 #define	NV_WAIT_REG_CHECK	10	/* 10 microseconds */
 #define	NV_ATA_NUM_CMDS		256	/* max num ATA cmds possible, 8 bits */
 #define	NV_PRINT_INTERVAL	40	/* throttle debug msg from flooding */
-#define	MCP55_INT_CLEAR		0xffff	/* clear all interrupts */
+#define	MCP5X_INT_CLEAR		0xffff	/* clear all interrupts */
 
 /*
  * definition labels for the BAR registers

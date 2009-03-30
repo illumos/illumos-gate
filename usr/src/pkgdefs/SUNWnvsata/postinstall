@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 ROOT=${PKG_INSTALL_ROOT:-/}
 SYSTEM=${ROOT}/etc/system
@@ -41,7 +39,7 @@ POWER_CONF_BAK=${NVSATA_TMP}/power.conf.${BAK}
 UPGRADE_LOG=${ROOT}/var/sadm/system/logs/upgrade_log
 LIVEUPGRADE_TMP_LOG=$TMP/.luupgrade.pfinstall.log.*
 DEVMAP_TABLE=${TMP}/devmap_table
-DRIVER_ALIASES='"pci10de,37f" "pci10de,55" "pci10de,54"'
+DRIVER_ALIASES='"pci10de,37f" "pci10de,55" "pci10de,54" "pci10de,266" "pci10de,267"'
 ETC_DEV_DIR=${ROOT}/etc/dev
 ENUMERATE_RESERVED=${ETC_DEV_DIR}/reserved_devnames
 DEVLINK_DB=${ETC_DEV_DIR}/.devlink_db
@@ -162,7 +160,7 @@ get_properties()
     fi
 
     path=`echo $1|${GREP} -v storage`
-    ${PRTCONF} -vp "/devices"$path >${PRTCONF_OUT}
+    ${PRTCONF} -v "/devices"$path >${PRTCONF_OUT}
     if [ $? -eq 0 ]
     then
 	vendor_id=`get_devinfo_prop ${PRTCONF_OUT} "vendor-id" | ${SED} "s/^0x//"`
@@ -1301,7 +1299,7 @@ check_add_drv()
 #
 # Main program starts here.
 #
-check_add_drv -b ${ROOT} -i '"pci10de,37f" "pci10de,55" "pci10de,54"' -m '* 0644 root sys' -c scsi-self-identifying nv_sata
+check_add_drv -b ${ROOT} -i '"pci10de,37f" "pci10de,55" "pci10de,54" "pci10de,266" "pci10de,267"' -m '* 0644 root sys' -c scsi-self-identifying nv_sata
 
 #
 # Create temporary directory for node migration 

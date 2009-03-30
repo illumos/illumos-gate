@@ -20,13 +20,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  *
- * nv_sata is a combo SATA HBA driver for ck804/mcp55 based chipsets.
+ * nv_sata is a combo SATA HBA driver for ck804/mcp5x (mcp5x = mcp55/mcp51)
+ * based chipsets.
  *
  * NCQ
  * ---
@@ -40,7 +41,7 @@
  *
  * Normally power management would be responsible for ensuring the device
  * is quiescent and then changing power states to the device, such as
- * powering down parts or all of the device.  mcp55/ck804 is unique in
+ * powering down parts or all of the device.  mcp5x/ck804 is unique in
  * that it is only available as part of a larger southbridge chipset, so
  * removing power to the device isn't possible.  Switches to control
  * power management states D0/D3 in the PCI configuration space appear to
@@ -101,8 +102,8 @@ static int nv_sata_deactivate(dev_info_t *dip, sata_device_t *sd);
 /*
  * Local function prototypes
  */
-static uint_t mcp55_intr(caddr_t arg1, caddr_t arg2);
-static uint_t mcp04_intr(caddr_t arg1, caddr_t arg2);
+static uint_t mcp5x_intr(caddr_t arg1, caddr_t arg2);
+static uint_t ck804_intr(caddr_t arg1, caddr_t arg2);
 static int nv_add_legacy_intrs(nv_ctl_t *nvc);
 #ifdef NV_MSI_SUPPORTED
 static int nv_add_msi_intrs(nv_ctl_t *nvc);
@@ -121,29 +122,29 @@ static int nv_start_dma(nv_port_t *nvp, int slot);
 static void nv_intr_dma(nv_port_t *nvp, struct nv_slot *spkt);
 static void nv_log(uint_t flag, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...);
 static void nv_uninit_ctl(nv_ctl_t *nvc);
-static void mcp55_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
-static void mcp04_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
+static void mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
+static void ck804_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
 static void nv_uninit_port(nv_port_t *nvp);
 static int nv_init_port(nv_port_t *nvp);
 static int nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
-static int mcp55_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp);
+static int mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp);
 #ifdef NCQ
-static int mcp55_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp);
+static int mcp5x_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp);
 #endif
 static void nv_start_dma_engine(nv_port_t *nvp, int slot);
 static void nv_port_state_change(nv_port_t *nvp, int event, uint8_t addr_type,
     int state);
 static boolean_t nv_check_link(uint32_t sstatus);
 static void nv_common_reg_init(nv_ctl_t *nvc);
-static void mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status);
+static void ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status);
 static void nv_reset(nv_port_t *nvp);
 static void nv_complete_io(nv_port_t *nvp,  sata_pkt_t *spkt, int slot);
 static void nv_timeout(void *);
 static int nv_poll_wait(nv_port_t *nvp, sata_pkt_t *spkt);
 static void nv_cmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...);
 static void nv_read_signature(nv_port_t *nvp);
-static void mcp55_set_intr(nv_port_t *nvp, int flag);
-static void mcp04_set_intr(nv_port_t *nvp, int flag);
+static void mcp5x_set_intr(nv_port_t *nvp, int flag);
+static void ck804_set_intr(nv_port_t *nvp, int flag);
 static void nv_resume(nv_port_t *nvp);
 static void nv_suspend(nv_port_t *nvp);
 static int nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt);
@@ -297,7 +298,7 @@ extern struct mod_ops mod_driverops;
 
 static  struct modldrv modldrv = {
 	&mod_driverops,	/* driverops */
-	"Nvidia ck804/mcp55 HBA",
+	"Nvidia ck804/mcp51/mcp55 HBA",
 	&nv_dev_ops,	/* driver ops */
 };
 
@@ -2190,31 +2191,31 @@ nv_reset(nv_port_t *nvp)
 
 
 /*
- * Initialize register handling specific to mcp55
+ * Initialize register handling specific to mcp51/mcp55
  */
 /* ARGSUSED */
 static void
-mcp55_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
+mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 {
 	nv_port_t *nvp;
 	uchar_t *bar5  = nvc->nvc_bar_addr[5];
 	uint8_t off, port;
 
-	nvc->nvc_mcp55_ctl = (uint32_t *)(bar5 + MCP55_CTL);
-	nvc->nvc_mcp55_ncq = (uint32_t *)(bar5 + MCP55_NCQ);
+	nvc->nvc_mcp5x_ctl = (uint32_t *)(bar5 + MCP5X_CTL);
+	nvc->nvc_mcp5x_ncq = (uint32_t *)(bar5 + MCP5X_NCQ);
 
 	for (port = 0, off = 0; port < NV_MAX_PORTS(nvc); port++, off += 2) {
 		nvp = &(nvc->nvc_port[port]);
-		nvp->nvp_mcp55_int_status =
-		    (uint16_t *)(bar5 + MCP55_INT_STATUS + off);
-		nvp->nvp_mcp55_int_ctl =
-		    (uint16_t *)(bar5 + MCP55_INT_CTL + off);
+		nvp->nvp_mcp5x_int_status =
+		    (uint16_t *)(bar5 + MCP5X_INT_STATUS + off);
+		nvp->nvp_mcp5x_int_ctl =
+		    (uint16_t *)(bar5 + MCP5X_INT_CTL + off);
 
 		/*
 		 * clear any previous interrupts asserted
 		 */
-		nv_put16(nvc->nvc_bar_hdl[5], nvp->nvp_mcp55_int_status,
-		    MCP55_INT_CLEAR);
+		nv_put16(nvc->nvc_bar_hdl[5], nvp->nvp_mcp5x_int_status,
+		    MCP5X_INT_CLEAR);
 
 		/*
 		 * These are the interrupts to accept for now.  The spec
@@ -2225,8 +2226,8 @@ mcp55_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		 * register, so that needs to be considered in the interrupt
 		 * handler.
 		 */
-		nv_put16(nvc->nvc_bar_hdl[5], nvp->nvp_mcp55_int_ctl,
-		    ~(MCP55_INT_IGNORE));
+		nv_put16(nvc->nvc_bar_hdl[5], nvp->nvp_mcp5x_int_ctl,
+		    ~(MCP5X_INT_IGNORE));
 	}
 
 	/*
@@ -2235,9 +2236,9 @@ mcp55_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 */
 #ifdef NCQ
 	flags = MCP_SATA_AE_NCQ_PDEV_FIRST_CMD | MCP_SATA_AE_NCQ_SDEV_FIRST_CMD;
-	nv_put32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp55_ncq, flags);
+	nv_put32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp5x_ncq, flags);
 	flags = MCP_SATA_AE_CTL_PRI_SWNCQ | MCP_SATA_AE_CTL_SEC_SWNCQ;
-	nv_put32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp55_ctl, flags);
+	nv_put32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp5x_ctl, flags);
 #endif
 
 
@@ -2273,10 +2274,10 @@ mcp55_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 
 /*
- * Initialize register handling specific to mcp04
+ * Initialize register handling specific to ck804
  */
 static void
-mcp04_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
+ck804_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 {
 	uchar_t *bar5  = nvc->nvc_bar_addr[5];
 	uint32_t reg32;
@@ -2289,7 +2290,7 @@ mcp04_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 */
 	reg32 = pci_config_get32(pci_conf_handle, NV_SATA_CFG_42);
 	pci_config_put32(pci_conf_handle, NV_SATA_CFG_42,
-	    reg32 | MCP04_CFG_DELAY_HOTPLUG_INTR);
+	    reg32 | CK804_CFG_DELAY_HOTPLUG_INTR);
 
 	/*
 	 * enable hot plug interrupts for channel x and y
@@ -2305,7 +2306,7 @@ mcp04_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	nv_put16(nvc->nvc_bar_hdl[5], (uint16_t *)(bar5 + NV_ADMACTL_Y),
 	    NV_HIRQ_EN | reg16);
 
-	nvc->nvc_mcp04_int_status = (uint8_t *)(bar5 + MCP04_SATA_INT_STATUS);
+	nvc->nvc_ck804_int_status = (uint8_t *)(bar5 + CK804_SATA_INT_STATUS);
 
 	/*
 	 * clear any existing interrupt pending then enable
@@ -2322,7 +2323,7 @@ mcp04_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 /*
  * Initialize the controller and set up driver data structures.
- * determine if ck804 or mcp55 class.
+ * determine if ck804 or mcp5x class.
  */
 static int
 nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
@@ -2340,7 +2341,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	ck804 = B_TRUE;
 #ifdef SGPIO_SUPPORT
-	nvc->nvc_mcp55_flag = B_FALSE;
+	nvc->nvc_mcp5x_flag = B_FALSE;
 #endif
 
 	/*
@@ -2352,11 +2353,11 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	    reg32 | NV_BAR5_SPACE_EN);
 
 	/*
-	 * Determine if this is ck804 or mcp55.  ck804 will map in the
-	 * task file registers into bar5 while mcp55 won't.  The offset of
-	 * the task file registers in mcp55's space is unused, so it will
+	 * Determine if this is ck804 or mcp5x.  ck804 will map in the
+	 * task file registers into bar5 while mcp5x won't.  The offset of
+	 * the task file registers in mcp5x's space is unused, so it will
 	 * return zero.  So check one of the task file registers to see if it is
-	 * writable and reads back what was written.  If it's mcp55 it will
+	 * writable and reads back what was written.  If it's mcp5x it will
 	 * return back 0xff whereas ck804 will return the value written.
 	 */
 	reg8_save = nv_get8(bar5_hdl,
@@ -2371,7 +2372,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 		if (reg8 != j) {
 			ck804 = B_FALSE;
-			nvc->nvc_mcp55_flag = B_TRUE;
+			nvc->nvc_mcp5x_flag = B_TRUE;
 			break;
 		}
 	}
@@ -2380,14 +2381,14 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	if (ck804 == B_TRUE) {
 		NVLOG((NVDBG_INIT, nvc, NULL, "controller is CK804"));
-		nvc->nvc_interrupt = mcp04_intr;
-		nvc->nvc_reg_init = mcp04_reg_init;
-		nvc->nvc_set_intr = mcp04_set_intr;
+		nvc->nvc_interrupt = ck804_intr;
+		nvc->nvc_reg_init = ck804_reg_init;
+		nvc->nvc_set_intr = ck804_set_intr;
 	} else {
-		NVLOG((NVDBG_INIT, nvc, NULL, "controller is MCP55"));
-		nvc->nvc_interrupt = mcp55_intr;
-		nvc->nvc_reg_init = mcp55_reg_init;
-		nvc->nvc_set_intr = mcp55_set_intr;
+		NVLOG((NVDBG_INIT, nvc, NULL, "controller is MCP51/MCP55"));
+		nvc->nvc_interrupt = mcp5x_intr;
+		nvc->nvc_reg_init = mcp5x_reg_init;
+		nvc->nvc_set_intr = mcp5x_set_intr;
 	}
 
 
@@ -2688,25 +2689,25 @@ nv_uninit_ctl(nv_ctl_t *nvc)
 
 
 /*
- * mcp04 interrupt.  This is a wrapper around mcp04_intr_process so
+ * ck804 interrupt.  This is a wrapper around ck804_intr_process so
  * that interrupts from other devices can be disregarded while dtracing.
  */
 /* ARGSUSED */
 static uint_t
-mcp04_intr(caddr_t arg1, caddr_t arg2)
+ck804_intr(caddr_t arg1, caddr_t arg2)
 {
 	nv_ctl_t *nvc = (nv_ctl_t *)arg1;
 	uint8_t intr_status;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
 
-	intr_status = ddi_get8(bar5_hdl, nvc->nvc_mcp04_int_status);
+	intr_status = ddi_get8(bar5_hdl, nvc->nvc_ck804_int_status);
 
 	if (intr_status == 0) {
 
 		return (DDI_INTR_UNCLAIMED);
 	}
 
-	mcp04_intr_process(nvc, intr_status);
+	ck804_intr_process(nvc, intr_status);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -2718,7 +2719,7 @@ mcp04_intr(caddr_t arg1, caddr_t arg2)
  *
  */
 static void
-mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
+ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 {
 
 	int port, i;
@@ -2732,14 +2733,14 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
 	uint32_t sstatus;
 	int port_mask_hot[] = {
-		MCP04_INT_PDEV_HOT, MCP04_INT_SDEV_HOT,
+		CK804_INT_PDEV_HOT, CK804_INT_SDEV_HOT,
 	};
 	int port_mask_pm[] = {
-		MCP04_INT_PDEV_PM, MCP04_INT_SDEV_PM,
+		CK804_INT_PDEV_PM, CK804_INT_SDEV_PM,
 	};
 
 	NVLOG((NVDBG_INTR, nvc, NULL,
-	    "mcp04_intr_process entered intr_status=%x", intr_status));
+	    "ck804_intr_process entered intr_status=%x", intr_status));
 
 	/*
 	 * For command completion interrupt, explicit clear is not required.
@@ -2747,14 +2748,14 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 	 */
 	for (port = 0; port < NV_MAX_PORTS(nvc); port++) {
 
-		int port_mask[] = {MCP04_INT_PDEV_INT, MCP04_INT_SDEV_INT};
+		int port_mask[] = {CK804_INT_PDEV_INT, CK804_INT_SDEV_INT};
 
 		if ((port_mask[port] & intr_status) == 0) {
 			continue;
 		}
 
 		NVLOG((NVDBG_INTR, nvc, NULL,
-		    "mcp04_intr_process interrupt on port %d", port));
+		    "ck804_intr_process interrupt on port %d", port));
 
 		nvp = &(nvc->nvc_port[port]);
 
@@ -2777,7 +2778,7 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 			/*
 			 * clear interrupt bits
 			 */
-			nv_put8(bar5_hdl, nvc->nvc_mcp04_int_status,
+			nv_put8(bar5_hdl, nvc->nvc_ck804_int_status,
 			    port_mask[port]);
 
 			continue;
@@ -2792,7 +2793,7 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 			/*
 			 * clear interrupt bits
 			 */
-			nv_put8(bar5_hdl, nvc->nvc_mcp04_int_status,
+			nv_put8(bar5_hdl, nvc->nvc_ck804_int_status,
 			    port_mask[port]);
 
 			continue;
@@ -2849,7 +2850,7 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 	}
 
 	/*
-	 * mcp04 often doesn't correctly distinguish hot add/remove
+	 * ck804 often doesn't correctly distinguish hot add/remove
 	 * interrupts.  Frequently both the ADD and the REMOVE bits
 	 * are asserted, whether it was a remove or add.  Use sstatus
 	 * to distinguish hot add from hot remove.
@@ -2898,14 +2899,14 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 		 * clear interrupt bits.  explicit interrupt clear is
 		 * required for hotplug interrupts.
 		 */
-		nv_put8(bar5_hdl, nvc->nvc_mcp04_int_status, clear_bits);
+		nv_put8(bar5_hdl, nvc->nvc_ck804_int_status, clear_bits);
 
 		/*
 		 * make sure it's flushed and cleared.  If not try
 		 * again.  Sometimes it has been observed to not clear
 		 * on the first try.
 		 */
-		intr_status = nv_get8(bar5_hdl, nvc->nvc_mcp04_int_status);
+		intr_status = nv_get8(bar5_hdl, nvc->nvc_ck804_int_status);
 
 		/*
 		 * make 10 additional attempts to clear the interrupt
@@ -2914,10 +2915,10 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 			NVLOG((NVDBG_ALWAYS, nvc, nvp, "inst_status=%x "
 			    "still not clear try=%d", intr_status,
 			    ++nvcleared));
-			nv_put8(bar5_hdl, nvc->nvc_mcp04_int_status,
+			nv_put8(bar5_hdl, nvc->nvc_ck804_int_status,
 			    clear_bits);
 			intr_status = nv_get8(bar5_hdl,
-			    nvc->nvc_mcp04_int_status);
+			    nvc->nvc_ck804_int_status);
 		}
 
 		/*
@@ -2942,12 +2943,12 @@ mcp04_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 
 
 /*
- * Interrupt handler for mcp55.  It is invoked by the wrapper for each port
+ * Interrupt handler for mcp5x.  It is invoked by the wrapper for each port
  * on the controller, to handle completion and hot plug and remove events.
  *
  */
 static uint_t
-mcp55_intr_port(nv_port_t *nvp)
+mcp5x_intr_port(nv_port_t *nvp)
 {
 	nv_ctl_t *nvc = nvp->nvp_ctlp;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
@@ -2955,22 +2956,22 @@ mcp55_intr_port(nv_port_t *nvp)
 	int ret = DDI_INTR_UNCLAIMED;
 	uint16_t int_status;
 
-	NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_intr_port entered"));
+	NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_intr_port entered"));
 
 	for (;;) {
 		/*
 		 * read current interrupt status
 		 */
-		int_status = nv_get16(bar5_hdl, nvp->nvp_mcp55_int_status);
+		int_status = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_status);
 
 		NVLOG((NVDBG_INTR, nvc, nvp, "int_status = %x", int_status));
 
 		/*
-		 * MCP55_INT_IGNORE interrupts will show up in the status,
+		 * MCP5X_INT_IGNORE interrupts will show up in the status,
 		 * but are masked out from causing an interrupt to be generated
 		 * to the processor.  Ignore them here by masking them out.
 		 */
-		int_status &= ~(MCP55_INT_IGNORE);
+		int_status &= ~(MCP5X_INT_IGNORE);
 
 		/*
 		 * exit the loop when no more interrupts to process
@@ -2980,9 +2981,9 @@ mcp55_intr_port(nv_port_t *nvp)
 			break;
 		}
 
-		if (int_status & MCP55_INT_COMPLETE) {
+		if (int_status & MCP5X_INT_COMPLETE) {
 			NVLOG((NVDBG_INTR, nvc, nvp,
-			    "mcp55_packet_complete_intr"));
+			    "mcp5x_packet_complete_intr"));
 			/*
 			 * since int_status was set, return DDI_INTR_CLAIMED
 			 * from the DDI's perspective even though the packet
@@ -2991,40 +2992,40 @@ mcp55_intr_port(nv_port_t *nvp)
 			 * clearing is implicit.
 			 */
 			ret = DDI_INTR_CLAIMED;
-			if (mcp55_packet_complete_intr(nvc, nvp) ==
+			if (mcp5x_packet_complete_intr(nvc, nvp) ==
 			    NV_FAILURE) {
-				clear = MCP55_INT_COMPLETE;
+				clear = MCP5X_INT_COMPLETE;
 			} else {
 				intr_cycles = 0;
 			}
 		}
 
-		if (int_status & MCP55_INT_DMA_SETUP) {
-			NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_dma_setup_intr"));
+		if (int_status & MCP5X_INT_DMA_SETUP) {
+			NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_dma_setup_intr"));
 
 			/*
 			 * Needs to be cleared before starting the BM, so do it
 			 * now.  make sure this is still working.
 			 */
-			nv_put16(bar5_hdl, nvp->nvp_mcp55_int_status,
-			    MCP55_INT_DMA_SETUP);
+			nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_status,
+			    MCP5X_INT_DMA_SETUP);
 #ifdef NCQ
-			ret = mcp55_dma_setup_intr(nvc, nvp);
+			ret = mcp5x_dma_setup_intr(nvc, nvp);
 #endif
 		}
 
-		if (int_status & MCP55_INT_REM) {
-			NVLOG((NVDBG_INTR, nvc, nvp, "mcp55 device removed"));
-			clear = MCP55_INT_REM;
+		if (int_status & MCP5X_INT_REM) {
+			NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x device removed"));
+			clear = MCP5X_INT_REM;
 			ret = DDI_INTR_CLAIMED;
 
 			mutex_enter(&nvp->nvp_mutex);
 			nv_report_add_remove(nvp, NV_PORT_HOTREMOVED);
 			mutex_exit(&nvp->nvp_mutex);
 
-		} else if (int_status & MCP55_INT_ADD) {
-			NVLOG((NVDBG_HOT, nvc, nvp, "mcp55 device added"));
-			clear = MCP55_INT_ADD;
+		} else if (int_status & MCP5X_INT_ADD) {
+			NVLOG((NVDBG_HOT, nvc, nvp, "mcp5x device added"));
+			clear = MCP5X_INT_ADD;
 			ret = DDI_INTR_CLAIMED;
 
 			mutex_enter(&nvp->nvp_mutex);
@@ -3033,7 +3034,7 @@ mcp55_intr_port(nv_port_t *nvp)
 		}
 
 		if (clear) {
-			nv_put16(bar5_hdl, nvp->nvp_mcp55_int_status, clear);
+			nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_status, clear);
 			clear = 0;
 		}
 
@@ -3051,7 +3052,7 @@ mcp55_intr_port(nv_port_t *nvp)
 		}
 	}
 
-	NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_intr_port: finished ret=%d", ret));
+	NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_intr_port: finished ret=%d", ret));
 
 	return (ret);
 }
@@ -3059,13 +3060,13 @@ mcp55_intr_port(nv_port_t *nvp)
 
 /* ARGSUSED */
 static uint_t
-mcp55_intr(caddr_t arg1, caddr_t arg2)
+mcp5x_intr(caddr_t arg1, caddr_t arg2)
 {
 	nv_ctl_t *nvc = (nv_ctl_t *)arg1;
 	int ret;
 
-	ret = mcp55_intr_port(&(nvc->nvc_port[0]));
-	ret |= mcp55_intr_port(&(nvc->nvc_port[1]));
+	ret = mcp5x_intr_port(&(nvc->nvc_port[0]));
+	ret |= mcp5x_intr_port(&(nvc->nvc_port[1]));
 
 	return (ret);
 }
@@ -3073,7 +3074,7 @@ mcp55_intr(caddr_t arg1, caddr_t arg2)
 
 #ifdef NCQ
 /*
- * with software driven NCQ on mcp55, an interrupt occurs right
+ * with software driven NCQ on mcp5x, an interrupt occurs right
  * before the drive is ready to do a DMA transfer.  At this point,
  * the PRD table needs to be programmed and the DMA engine enabled
  * and ready to go.
@@ -3086,7 +3087,7 @@ mcp55_intr(caddr_t arg1, caddr_t arg2)
  * -- set bit 0 of the bus master command register
  */
 static int
-mcp55_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
+mcp5x_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 {
 	int slot;
 	ddi_acc_handle_t bmhdl = nvp->nvp_bm_hdl;
@@ -3100,16 +3101,16 @@ mcp55_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 
 	mutex_enter(&nvp->nvp_mutex);
 
-	slot = nv_get32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp55_ncq);
+	slot = nv_get32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp5x_ncq);
 
 	slot = (slot >> tag_shift[port]) & MCP_SATA_AE_NCQ_DMA_SETUP_TAG_MASK;
 
-	NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_dma_setup_intr slot %d"
+	NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_dma_setup_intr slot %d"
 	    " nvp_slot_sactive %X", slot, nvp->nvp_sactive_cache));
 
 	/*
 	 * halt the DMA engine.  This step is necessary according to
-	 * the mcp55 spec, probably since there may have been a "first" packet
+	 * the mcp5x spec, probably since there may have been a "first" packet
 	 * that already programmed the DMA engine, but may not turn out to
 	 * be the first one processed.
 	 */
@@ -3138,7 +3139,7 @@ mcp55_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
  * the packet completion callback.
  */
 static int
-mcp55_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp)
+mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 {
 	uint8_t status, bmstatus;
 	ddi_acc_handle_t bmhdl = nvp->nvp_bm_hdl;
@@ -5182,21 +5183,21 @@ nv_timeout(void *arg)
  * interested in: completion, add and remove.
  */
 static void
-mcp04_set_intr(nv_port_t *nvp, int flag)
+ck804_set_intr(nv_port_t *nvp, int flag)
 {
 	nv_ctl_t *nvc = nvp->nvp_ctlp;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
 	uchar_t *bar5  = nvc->nvc_bar_addr[5];
-	uint8_t intr_bits[] = { MCP04_INT_PDEV_HOT|MCP04_INT_PDEV_INT,
-	    MCP04_INT_SDEV_HOT|MCP04_INT_SDEV_INT };
-	uint8_t clear_all_bits[] = { MCP04_INT_PDEV_ALL, MCP04_INT_SDEV_ALL };
+	uint8_t intr_bits[] = { CK804_INT_PDEV_HOT|CK804_INT_PDEV_INT,
+	    CK804_INT_SDEV_HOT|CK804_INT_SDEV_INT };
+	uint8_t clear_all_bits[] = { CK804_INT_PDEV_ALL, CK804_INT_SDEV_ALL };
 	uint8_t int_en, port = nvp->nvp_port_num, intr_status;
 
 	if (flag & NV_INTR_DISABLE_NON_BLOCKING) {
 		int_en = nv_get8(bar5_hdl,
-		    (uint8_t *)(bar5 + MCP04_SATA_INT_EN));
+		    (uint8_t *)(bar5 + CK804_SATA_INT_EN));
 		int_en &= ~intr_bits[port];
-		nv_put8(bar5_hdl, (uint8_t *)(bar5 + MCP04_SATA_INT_EN),
+		nv_put8(bar5_hdl, (uint8_t *)(bar5 + CK804_SATA_INT_EN),
 		    int_en);
 		return;
 	}
@@ -5211,15 +5212,15 @@ mcp04_set_intr(nv_port_t *nvp, int flag)
 
 	if (flag & NV_INTR_CLEAR_ALL) {
 		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "mcp04_set_intr: NV_INTR_CLEAR_ALL"));
+		    "ck804_set_intr: NV_INTR_CLEAR_ALL"));
 
 		intr_status = nv_get8(nvc->nvc_bar_hdl[5],
-		    (uint8_t *)(nvc->nvc_mcp04_int_status));
+		    (uint8_t *)(nvc->nvc_ck804_int_status));
 
 		if (intr_status & clear_all_bits[port]) {
 
 			nv_put8(nvc->nvc_bar_hdl[5],
-			    (uint8_t *)(nvc->nvc_mcp04_int_status),
+			    (uint8_t *)(nvc->nvc_ck804_int_status),
 			    clear_all_bits[port]);
 
 			NVLOG((NVDBG_INTR, nvc, nvp,
@@ -5230,20 +5231,20 @@ mcp04_set_intr(nv_port_t *nvp, int flag)
 
 	if (flag & NV_INTR_DISABLE) {
 		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "mcp04_set_intr: NV_INTR_DISABLE"));
+		    "ck804_set_intr: NV_INTR_DISABLE"));
 		int_en = nv_get8(bar5_hdl,
-		    (uint8_t *)(bar5 + MCP04_SATA_INT_EN));
+		    (uint8_t *)(bar5 + CK804_SATA_INT_EN));
 		int_en &= ~intr_bits[port];
-		nv_put8(bar5_hdl, (uint8_t *)(bar5 + MCP04_SATA_INT_EN),
+		nv_put8(bar5_hdl, (uint8_t *)(bar5 + CK804_SATA_INT_EN),
 		    int_en);
 	}
 
 	if (flag & NV_INTR_ENABLE) {
-		NVLOG((NVDBG_INTR, nvc, nvp, "mcp04_set_intr: NV_INTR_ENABLE"));
+		NVLOG((NVDBG_INTR, nvc, nvp, "ck804_set_intr: NV_INTR_ENABLE"));
 		int_en = nv_get8(bar5_hdl,
-		    (uint8_t *)(bar5 + MCP04_SATA_INT_EN));
+		    (uint8_t *)(bar5 + CK804_SATA_INT_EN));
 		int_en |= intr_bits[port];
-		nv_put8(bar5_hdl, (uint8_t *)(bar5 + MCP04_SATA_INT_EN),
+		nv_put8(bar5_hdl, (uint8_t *)(bar5 + CK804_SATA_INT_EN),
 		    int_en);
 	}
 
@@ -5256,18 +5257,18 @@ mcp04_set_intr(nv_port_t *nvp, int flag)
  * completion interrupt, hot add, and hot remove interrupt.
  */
 static void
-mcp55_set_intr(nv_port_t *nvp, int flag)
+mcp5x_set_intr(nv_port_t *nvp, int flag)
 {
 	nv_ctl_t *nvc = nvp->nvp_ctlp;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
 	uint16_t intr_bits =
-	    MCP55_INT_ADD|MCP55_INT_REM|MCP55_INT_COMPLETE;
+	    MCP5X_INT_ADD|MCP5X_INT_REM|MCP5X_INT_COMPLETE;
 	uint16_t int_en;
 
 	if (flag & NV_INTR_DISABLE_NON_BLOCKING) {
-		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp55_int_ctl);
+		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_ctl);
 		int_en &= ~intr_bits;
-		nv_put16(bar5_hdl, nvp->nvp_mcp55_int_ctl, int_en);
+		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_ctl, int_en);
 		return;
 	}
 
@@ -5277,23 +5278,23 @@ mcp55_set_intr(nv_port_t *nvp, int flag)
 
 	if (flag & NV_INTR_CLEAR_ALL) {
 		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "mcp55_set_intr: NV_INTR_CLEAR_ALL"));
-		nv_put16(bar5_hdl, nvp->nvp_mcp55_int_status, MCP55_INT_CLEAR);
+		    "mcp5x_set_intr: NV_INTR_CLEAR_ALL"));
+		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_status, MCP5X_INT_CLEAR);
 	}
 
 	if (flag & NV_INTR_ENABLE) {
-		NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_set_intr: NV_INTR_ENABLE"));
-		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp55_int_ctl);
+		NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_set_intr: NV_INTR_ENABLE"));
+		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_ctl);
 		int_en |= intr_bits;
-		nv_put16(bar5_hdl, nvp->nvp_mcp55_int_ctl, int_en);
+		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_ctl, int_en);
 	}
 
 	if (flag & NV_INTR_DISABLE) {
 		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "mcp55_set_intr: NV_INTR_DISABLE"));
-		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp55_int_ctl);
+		    "mcp5x_set_intr: NV_INTR_DISABLE"));
+		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_ctl);
 		int_en &= ~intr_bits;
-		nv_put16(bar5_hdl, nvp->nvp_mcp55_int_ctl, int_en);
+		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_ctl, int_en);
 	}
 }
 
@@ -5759,7 +5760,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 * CK804 can pass the sgpio_detect test even though it does not support
 	 * SGPIO, so don't even look at a CK804.
 	 */
-	if (nvc->nvc_mcp55_flag != B_TRUE)
+	if (nvc->nvc_mcp5x_flag != B_TRUE)
 		return;
 
 	/*
@@ -5793,7 +5794,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	if (nvc->nvc_ctlr_num == 0) {
 		/*
-		 * Controller 0 on the MCP55/IO55 initialized the SGPIO
+		 * Controller 0 on the MCP5X/IO55 initialized the SGPIO
 		 * and the data that is shared between the controllers.
 		 * The clever thing to do would be to let the first controller
 		 * that comes up be the one that initializes all this.
