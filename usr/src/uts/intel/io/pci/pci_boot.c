@@ -837,11 +837,34 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 		}
 
 		if (pci_bus_res[secbus].mem_reprogram) {
-			/* reprogram PPB regs */
+			/* reprogram PPB MEM regs */
 			pci_putw(bus, dev, func, PCI_BCNF_MEM_BASE,
 			    (uint16_t)((mem_base>>16) & 0xfff0));
 			pci_putw(bus, dev, func, PCI_BCNF_MEM_LIMIT,
 			    (uint16_t)((mem_limit>>16) & 0xfff0));
+			/*
+			 * Disable PMEM window by setting base > limit.
+			 * We currently don't reprogram the PMEM like we've
+			 * done for I/O and MEM. (Devices that support prefetch
+			 * can use non-prefetch MEM.) Anyway, if the MEM access
+			 * bit is initially disabled by BIOS, we disable the
+			 * PMEM window manually by setting PMEM base > PMEM
+			 * limit here, in case there are incorrect values in
+			 * them from BIOS, so that we won't get in trouble once
+			 * the MEM access bit is enabled at the end of this
+			 * function.
+			 */
+			if (!(cmd_reg & PCI_COMM_MAE)) {
+				pci_putw(bus, dev, func, PCI_BCNF_PF_BASE_LOW,
+				    0xfff0);
+				pci_putw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW,
+				    0x0);
+				pci_putl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH,
+				    0xffffffff);
+				pci_putl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH,
+				    0x0);
+			}
+
 			add_ranges_prop(secbus, 1);
 
 			cmn_err(CE_NOTE, "!reprogram mem-range on"
