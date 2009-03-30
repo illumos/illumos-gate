@@ -82,6 +82,9 @@ static void vblank_disable_fn(void *arg)
 	struct drm_device *dev = (struct drm_device *)arg;
 	int i;
 
+	if (!dev->vblank_disable_allowed)
+		return;
+
 	for (i = 0; i < dev->num_crtcs; i++) {
 		if (atomic_read(&dev->vblank_refcount[i]) == 0 &&
 		    atomic_read(&dev->vblank_enabled[i]) == 1) {
@@ -94,12 +97,13 @@ static void vblank_disable_fn(void *arg)
 	}
 }
 
-static void drm_vblank_cleanup(struct drm_device *dev)
+void
+drm_vblank_cleanup(struct drm_device *dev)
 {
+
 	/* Bail if the driver didn't call drm_vblank_init() */
 	if (dev->num_crtcs == 0)
 		return;
-
 
 	vblank_disable_fn((void *)dev);
 
@@ -161,9 +165,9 @@ drm_vblank_init(struct drm_device *dev, int num_crtcs)
 		TAILQ_INIT(&dev->vbl_sigs[i]);
 		atomic_set(&dev->_vblank_count[i], 0);
 		atomic_set(&dev->vblank_refcount[i], 0);
-		atomic_set(&dev->vblank_enabled[i], 1);
 	}
-	vblank_disable_fn((void *)dev);
+
+	dev->vblank_disable_allowed = 1;
 	return (0);
 
 err:
@@ -257,16 +261,25 @@ drm_uninstall_irq_handle(drm_device_t *dev)
 int
 drm_irq_uninstall(drm_device_t *dev)
 {
-
+	int i;
 	if (!dev->irq_enabled) {
 		return (EINVAL);
 	}
 	dev->irq_enabled = 0;
+
+	/*
+	 * Wake up any waiters so they don't hang.
+	 */
+	DRM_SPINLOCK(&dev->vbl_lock);
+	for (i = 0; i < dev->num_crtcs; i++) {
+		DRM_WAKEUP(&dev->vbl_queues[i]);
+		dev->vblank_enabled[i] = 0;
+	}
+	DRM_SPINUNLOCK(&dev->vbl_lock);
+
 	dev->driver->irq_uninstall(dev);
 	drm_uninstall_irq_handle(dev);
 	dev->locked_tasklet_func = NULL;
-
-	drm_vblank_cleanup(dev);
 
 	return (DDI_SUCCESS);
 }

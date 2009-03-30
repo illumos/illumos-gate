@@ -279,7 +279,7 @@ enum {
 #endif
 
 #define	PAGE_ALIGN(addr)	(((addr) + DRM_PAGE_SIZE - 1) & DRM_PAGE_MASK)
-#define	DRM_SUSER(p)		(crgetgid(p) == 0 || crgetuid(p) == 0)
+#define	DRM_SUSER(p)		(crgetsgid(p) == 0 || crgetsuid(p) == 0)
 
 /*
  * wait for 400 milliseconds

@@ -50,6 +50,8 @@
 #define spinlock_t kmutex_t 
 #endif
 
+#define I915_NUM_PIPE  2
+
 /* Interface history:
  *
  * 1.1: Original.

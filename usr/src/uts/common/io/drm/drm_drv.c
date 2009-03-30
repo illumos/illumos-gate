@@ -371,6 +371,8 @@ drm_unload(drm_device_t *dev)
 {
 	drm_local_map_t *map;
 
+	drm_vblank_cleanup(dev);
+
 	drm_ctxbitmap_cleanup(dev);
 
 	DRM_LOCK();

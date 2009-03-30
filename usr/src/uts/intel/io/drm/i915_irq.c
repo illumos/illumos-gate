@@ -959,7 +959,6 @@ int i915_driver_irq_preinstall(drm_device_t * dev)
 void i915_driver_irq_postinstall(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
-	int ret, num_pipes=2;
 
 	INIT_LIST_HEAD(&dev_priv->vbl_swaps.head);
 	dev_priv->swaps_pending = 0;
@@ -967,9 +966,6 @@ void i915_driver_irq_postinstall(drm_device_t * dev)
 	dev_priv->user_irq_refcount = 0;
 	dev_priv->irq_mask_reg = 0xffffffff;
 
-	ret = drm_vblank_init(dev, num_pipes);
-	if (ret)
-		return;
 	dev_priv->vblank_pipe = DRM_I915_VBLANK_PIPE_A | DRM_I915_VBLANK_PIPE_B;
 	dev->max_vblank_count = 0xffffff; /* only 24 bits of frame count */
 
