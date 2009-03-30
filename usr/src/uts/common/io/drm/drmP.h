@@ -652,6 +652,8 @@ struct drm_device {
 	drm_vbl_sig_list_t vbl_sig_list;
 	drm_vbl_sig_list_t vbl_sig_list2;
 
+	int vblank_disable_allowed;
+
 	wait_queue_head_t	vbl_queue;	/* vbl wait channel */
 	/* vbl wait channel array */
 	wait_queue_head_t	*vbl_queues;
@@ -766,6 +768,7 @@ int	drm_vblank_get(struct drm_device *dev, int crtc);
 void	drm_vblank_put(struct drm_device *dev, int crtc);
 int	drm_vblank_init(struct drm_device *dev, int num_crtcs);
 void    drm_locked_tasklet(drm_device_t *, void(*func)(drm_device_t *));
+void	drm_vblank_cleanup(struct drm_device *dev);
 
 /* AGP/GART support (drm_agpsupport.c) */
 int	drm_device_is_agp(drm_device_t *);
