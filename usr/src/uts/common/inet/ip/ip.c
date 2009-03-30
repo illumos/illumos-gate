@@ -869,7 +869,8 @@ static void ipobs_fini(ip_stack_t *);
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
 /* How long, in seconds, we allow frags to hang around. */
-#define	IP_FRAG_TIMEOUT	15
+#define	IP_FRAG_TIMEOUT		15
+#define	IPV6_FRAG_TIMEOUT	60
 
 /*
  * Threshold which determines whether MDT should be used when
@@ -6043,6 +6044,8 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 
 	ipst->ips_ip_g_frag_timeout = IP_FRAG_TIMEOUT;
 	ipst->ips_ip_g_frag_timo_ms = IP_FRAG_TIMEOUT * 1000;
+	ipst->ips_ipv6_frag_timeout = IPV6_FRAG_TIMEOUT;
+	ipst->ips_ipv6_frag_timo_ms = IPV6_FRAG_TIMEOUT * 1000;
 
 	ipst->ips_ip_multirt_log_interval = 1000;
 
@@ -17322,6 +17325,7 @@ ill_frag_timer(void *arg)
 	ill_t	*ill = (ill_t *)arg;
 	boolean_t frag_pending;
 	ip_stack_t	*ipst = ill->ill_ipst;
+	time_t	timeout;
 
 	mutex_enter(&ill->ill_lock);
 	ASSERT(!ill->ill_fragtimer_executing);
@@ -17333,7 +17337,12 @@ ill_frag_timer(void *arg)
 	ill->ill_fragtimer_executing = 1;
 	mutex_exit(&ill->ill_lock);
 
-	frag_pending = ill_frag_timeout(ill, ipst->ips_ip_g_frag_timeout);
+	if (ill->ill_isv6)
+		timeout = ipst->ips_ipv6_frag_timeout;
+	else
+		timeout = ipst->ips_ip_g_frag_timeout;
+
+	frag_pending = ill_frag_timeout(ill, timeout);
 
 	/*
 	 * Restart the timer, if we have fragments pending or if someone
@@ -17351,6 +17360,7 @@ void
 ill_frag_timer_start(ill_t *ill)
 {
 	ip_stack_t	*ipst = ill->ill_ipst;
+	clock_t	timeo_ms;
 
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 
@@ -17370,13 +17380,17 @@ ill_frag_timer_start(ill_t *ill)
 	}
 
 	if (ill->ill_frag_timer_id == 0) {
+		if (ill->ill_isv6)
+			timeo_ms = ipst->ips_ipv6_frag_timo_ms;
+		else
+			timeo_ms = ipst->ips_ip_g_frag_timo_ms;
 		/*
 		 * The timer is neither running nor is the timeout handler
 		 * executing. Post a timeout so that ill_frag_timer will be
 		 * called
 		 */
 		ill->ill_frag_timer_id = timeout(ill_frag_timer, ill,
-		    MSEC_TO_TICK(ipst->ips_ip_g_frag_timo_ms >> 1));
+		    MSEC_TO_TICK(timeo_ms >> 1));
 		ill->ill_fragtimer_needrestart = 0;
 	}
 }

@@ -279,6 +279,8 @@ struct ip_stack {
 
 	time_t		ips_ip_g_frag_timeout;
 	clock_t		ips_ip_g_frag_timo_ms;
+	time_t		ips_ipv6_frag_timeout;
+	clock_t		ips_ipv6_frag_timo_ms;
 
 	struct conn_s	*ips_ip_g_mrouter;
 
