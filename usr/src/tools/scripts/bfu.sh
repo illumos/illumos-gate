@@ -4170,18 +4170,26 @@ fixup_mpxio()
 	fi
 }
 
-fixup_isa_bkbfu()
+fixup_isa_bfu()
 {
 	aliasfile=$rootprefix/etc/driver_aliases
 	parentalias=$rootprefix/bfu.parent/etc/driver_aliases
+	pathtoinst=$rootprefix/etc/path_to_inst
+	tmppath=/tmp/path_to_inst
 	isaalias="pciclass,060100"
 
 	if [ $target_isa != i386 ]; then
 		return;
 	fi
+	egrep -s "\"\/isa[\"\/]" $pathtoinst && child_pseudo_isa=1
+	egrep -s "\"$isaalias\"" $parentalias || parent_pseudo_isa=1
+	if [ "$child_pseudo_isa" != "$parent_pseudo_isa" ]; then
+		sed -e '/\/isa[\"\/@]/d' <$pathtoinst >$tmppath
+		mv $tmppath $pathtoinst
+	fi
 
 	# bfu forwards, just return
-	egrep -s "\"$isaalias\"" $parentalias && return
+	[[ "$parent_pseudo_isa" != 1 ]] && return
 
 	# remove the pciclass,060100 entry for isa when going backwards
 	egrep -s "\"$isaalias\"" $aliasfile || return
@@ -8150,7 +8158,7 @@ mondo_loop() {
 
 	tx_check_bkbfu
 
-	fixup_isa_bkbfu
+	fixup_isa_bfu
 
 	update_aac_conf
 

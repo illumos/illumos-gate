@@ -124,6 +124,15 @@ extern int pci_slot_names_prop(int, char *, int);
 int pci_bus_always_renumber = 0;
 
 /*
+ * used to register ISA resource usage which must not be made
+ * "available" from other PCI node' resource maps
+ */
+static struct {
+	struct memlist *io_ports_used;
+	struct memlist *mem_space_used;
+} isa_res;
+
+/*
  * Enumerate all PCI devices
  */
 void
@@ -299,21 +308,11 @@ pci_renumber_root_busses(void)
 }
 
 void
-pci_remove_isa_resources(int type, uint32_t base, uint32_t size)
+pci_register_isa_resources(int type, uint32_t base, uint32_t size)
 {
-	int bus;
-	struct memlist  **list;
-
-	for (bus = 0; bus <= pci_bios_nbus; bus++) {
-		if (type == 1)
-			list = &pci_bus_res[bus].io_ports;
-		else
-			list = &pci_bus_res[bus].mem_space;
-		/* skip if list is or has become empty */
-		if (*list == NULL)
-			continue;
-		(void) memlist_remove(list, base, size);
-	}
+	(void) memlist_insert(
+	    (type == 1) ?  &isa_res.io_ports_used : &isa_res.mem_space_used,
+	    base, size);
 }
 
 /*
@@ -908,7 +907,7 @@ pci_reprogram(void)
 
 
 		/*
-		 * 2. Remove the used resource lists from the bus resources
+		 * 2. Remove used PCI and ISA resources from bus resource map
 		 */
 
 		memlist_remove_list(&pci_bus_res[bus].io_ports,
@@ -921,8 +920,15 @@ pci_reprogram(void)
 		    pci_bus_res[bus].pmem_space_used);
 		memlist_remove_list(&pci_bus_res[bus].pmem_space,
 		    pci_bus_res[bus].mem_space_used);
+
+		memlist_remove_list(&pci_bus_res[bus].io_ports,
+		    isa_res.io_ports_used);
+		memlist_remove_list(&pci_bus_res[bus].mem_space,
+		    isa_res.mem_space_used);
 	}
 
+	memlist_free_all(&isa_res.io_ports_used);
+	memlist_free_all(&isa_res.mem_space_used);
 
 	/* add bus-range property for root/peer bus nodes */
 	for (i = 0; i <= pci_bios_nbus; i++) {

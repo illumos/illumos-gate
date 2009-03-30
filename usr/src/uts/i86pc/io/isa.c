@@ -55,10 +55,11 @@ extern int pseudo_isa;
 extern int isa_resource_setup(void);
 extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
     psm_intr_op_t, int *);
-extern void pci_remove_isa_resources(int, uint32_t, uint32_t);
+extern void pci_register_isa_resources(int, uint32_t, uint32_t);
 static char USED_RESOURCES[] = "used-resources";
 static void isa_alloc_nodes(dev_info_t *);
 static void enumerate_BIOS_serial(dev_info_t *);
+static void adjust_prtsz(dev_info_t *isa_dip);
 static void isa_postattach(dev_info_t *);
 
 /*
@@ -86,6 +87,15 @@ typedef struct {
 /*
  * #define ISA_DEBUG 1
  */
+
+/*
+ * For serial ports not enumerated by ACPI, and parallel ports with
+ * illegal size. Typically, a system can have as many as 4 serial
+ * ports and 3 parallel ports.
+ */
+#define	MAX_EXTRA_RESOURCE	7
+static struct regspec isa_extra_resource[MAX_EXTRA_RESOURCE];
+static int isa_extra_count = 0;
 
 /*
  *      Local data
@@ -258,6 +268,8 @@ isa_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	bzero(isa_extra_resource, MAX_EXTRA_RESOURCE * sizeof (struct regspec));
+
 	if ((rval = i_dmae_init(devi)) == DDI_SUCCESS) {
 		ddi_report_dev(devi);
 		/*
@@ -268,8 +280,7 @@ isa_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		isa_alloc_nodes(devi);
 	}
 
-	if (!pseudo_isa)
-		isa_postattach(devi);
+	isa_postattach(devi);
 
 	return (rval);
 }
@@ -314,7 +325,7 @@ isa_remove_res_from_pci(int type, int *array, uint_t size)
 	size /= USED_CELL_SIZE;
 	used_p = (used_ranges_t *)array;
 	for (i = 0; i < size; i++, used_p++)
-		pci_remove_isa_resources(type, used_p->base, used_p->len);
+		pci_register_isa_resources(type, used_p->base, used_p->len);
 }
 
 static void
@@ -361,8 +372,9 @@ isa_postattach(dev_info_t *dip)
 		ddi_prop_free(memarray);
 	}
 
-	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "ranges",
-	    (int *)ranges, nrng * sizeof (pib_ranges_t) / sizeof (int));
+	if (!pseudo_isa)
+		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "ranges",
+		    (int *)ranges, nrng * sizeof (pib_ranges_t) / sizeof (int));
 	kmem_free(ranges, sizeof (pib_ranges_t) * n);
 }
 
@@ -373,8 +385,6 @@ isa_apply_range(dev_info_t *dip, struct regspec *isa_reg_p,
 {
 	pib_ranges_t *ranges, *rng_p;
 	int len, i, offset, nrange;
-	static char out_of_range[] =
-	    "Out of range register specification from device node <%s>";
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "ranges", (caddr_t)&ranges, &len) != DDI_SUCCESS) {
@@ -407,12 +417,44 @@ isa_apply_range(dev_info_t *dip, struct regspec *isa_reg_p,
 		break;
 	}
 	kmem_free(ranges, len);
-	if (i == nrange) {
-		cmn_err(CE_WARN, out_of_range, ddi_get_name(dip));
-		return (DDI_ME_REGSPEC_RANGE);
-	}
 
-	return (DDI_SUCCESS);
+	if (i < nrange)
+		return (DDI_SUCCESS);
+
+	/*
+	 * Check extra resource range specially for serial and parallel
+	 * devices, which are treated differently from all other ISA
+	 * devices. On some machines, serial ports are not enumerated
+	 * by ACPI but by BIOS, with io base addresses noted in legacy
+	 * BIOS data area. Parallel port on some machines comes with
+	 * illegal size.
+	 */
+	if (isa_reg_p->regspec_bustype != ISA_ADDR_IO)
+		goto out_of_range;
+
+	for (i = 0; i < isa_extra_count; i++) {
+		struct regspec *reg_p = &isa_extra_resource[i];
+
+		if (isa_reg_p->regspec_addr < reg_p->regspec_addr)
+			continue;
+		if ((isa_reg_p->regspec_addr + isa_reg_p->regspec_size) >
+		    (reg_p->regspec_addr + reg_p->regspec_size))
+			continue;
+
+		pci_reg_p->pci_phys_hi = PCI_ADDR_IO | PCI_REG_REL_M;
+		pci_reg_p->pci_phys_mid = 0;
+		pci_reg_p->pci_phys_low = isa_reg_p->regspec_addr;
+		pci_reg_p->pci_size_hi = 0;
+		pci_reg_p->pci_size_low = isa_reg_p->regspec_size;
+		break;
+	}
+	if (i < isa_extra_count)
+		return (DDI_SUCCESS);
+
+out_of_range:
+	cmn_err(CE_WARN, "isa_apply_range: Out of range base <0x%x>, size <%d>",
+	    isa_reg_p->regspec_addr, isa_reg_p->regspec_size);
+	return (DDI_ME_REGSPEC_RANGE);
 }
 
 static int
@@ -1041,6 +1083,9 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 			/* serial ports? */
 			enumerate_BIOS_serial(isa_dip);
+
+			/* adjust parallel port size  */
+			adjust_prtsz(isa_dip);
 			return;
 		}
 		cmn_err(CE_NOTE, "!Solaris did not detect ACPI BIOS");
@@ -1164,6 +1209,12 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
 			    "interrupts", default_asy_intrs[i]);
 			(void) ndi_devi_bind_driver(xdip, 0);
+
+			ASSERT(isa_extra_count < MAX_EXTRA_RESOURCE);
+			bcopy(tmp_asy_regs,
+			    isa_extra_resource + isa_extra_count,
+			    sizeof (struct regspec));
+			isa_extra_count++;
 		}
 	}
 #if defined(__xpv)
@@ -1209,4 +1260,44 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 #endif	/* __xpv */
 
 	psm_unmap((caddr_t)bios_data, size);
+}
+
+/*
+ * Some machine comes with an illegal parallel port size of 3
+ * bytes in ACPI, even parallel port mode is ECP.
+ */
+#define	DEFAULT_PRT_SIZE	8
+static void
+adjust_prtsz(dev_info_t *isa_dip)
+{
+	dev_info_t *cdip;
+	struct regspec *regs_p, *extreg_p;
+	int regs_len, nreg, i;
+	char *name;
+
+	for (cdip = ddi_get_child(isa_dip); cdip != NULL;
+	    cdip = ddi_get_next_sibling(cdip)) {
+		name = ddi_node_name(cdip);
+		if ((strncmp(name, "lp", 2) != 0) || (strnlen(name, 3) != 2))
+			continue;	/* skip non parallel */
+
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, cdip,
+		    DDI_PROP_DONTPASS, "reg", (int **)&regs_p,
+		    (uint_t *)&regs_len) != DDI_PROP_SUCCESS)
+			continue;
+
+		nreg = regs_len / (sizeof (struct regspec) / sizeof (int));
+		for (i = 0; i < nreg; i++) {
+			if (regs_p[i].regspec_size == DEFAULT_PRT_SIZE)
+				continue;
+
+			ASSERT(isa_extra_count < MAX_EXTRA_RESOURCE);
+			extreg_p = &isa_extra_resource[isa_extra_count++];
+			extreg_p->regspec_bustype = ISA_ADDR_IO;
+			extreg_p->regspec_addr = regs_p[i].regspec_addr;
+			extreg_p->regspec_size = DEFAULT_PRT_SIZE;
+		}
+
+		ddi_prop_free(regs_p);
+	}
 }
