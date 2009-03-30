@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,14 +738,12 @@ ip_squeue_cpu_setup(cpu_setup_t what, int id, void *arg)
 	case CPU_ON:
 	case CPU_INIT:
 	case CPU_CPUPART_IN:
-		if (cp->cpu_squeue_set == NULL)
+		if (CPU_ISON(cp) && cp->cpu_squeue_set == NULL)
 			cp->cpu_squeue_set = ip_squeue_set_create(cp->cpu_id);
 		break;
 	case CPU_UNCONFIG:
 	case CPU_OFF:
 	case CPU_CPUPART_OUT:
-		ASSERT((cp->cpu_squeue_set != NULL) ||
-		    (cp->cpu_flags & CPU_OFFLINE));
 		if (cp->cpu_squeue_set != NULL) {
 			ip_squeue_set_destroy(cp);
 			cp->cpu_squeue_set = NULL;
