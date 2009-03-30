@@ -1364,7 +1364,8 @@ check_again:
 			 */
 			if (mac_srs->srs_state & SRS_LATENCY_OPT) {
 				mac_srs->srs_drain_func(mac_srs, SRS_POLL_PROC);
-				if (srs_rx->sr_poll_pkt_cnt <=
+				if (!(mac_srs->srs_state & SRS_PAUSE) &&
+				    srs_rx->sr_poll_pkt_cnt <=
 				    srs_rx->sr_lowat) {
 					srs_rx->sr_poll_again++;
 					goto check_again;

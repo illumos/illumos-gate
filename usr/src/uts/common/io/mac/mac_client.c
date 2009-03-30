@@ -2165,12 +2165,6 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	rw_exit(&mip->mi_rw_lock);
 
 	/*
-	 * Update the multicast group for this vid.
-	 */
-	mac_client_bcast_refresh(mcip, mac_client_update_mcast, (void *)flent,
-	    B_FALSE);
-
-	/*
 	 * Don't use FLOW_MARK with FE_MC_NO_DATAPATH, as the flow might
 	 * contain other flags, such as FE_CONDEMNED, which we need to
 	 * cleared. We don't call mac_flow_cleanup() for this unicast
