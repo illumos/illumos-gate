@@ -3338,6 +3338,9 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    "port_cmd_issue = 0x%x, slot = 0x%x",
 	    loop_count, port_cmd_issue, slot);
 
+	/* According to ATA spec, we need wait at least 5 microsecs here. */
+	drv_usecwait(AHCI_1MS_USECS);
+
 	/* Now send the second H2D Register FIS with SRST cleard to zero */
 	cmd_table = ahci_portp->ahciport_cmd_tables[slot];
 	bzero((void *)cmd_table, ahci_cmd_table_size);
@@ -5401,6 +5404,8 @@ ahci_intr_non_fatal_error(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 			    ahci_ctlp, "ahci_intr_non_fatal_error: "
 			    "port %d, satapkt 0x%p is outstanding when "
 			    "error occurs", port, (void *)satapkt);
+
+			CLEAR_BIT(current_tags, current_slot);
 		}
 	}
 out:
