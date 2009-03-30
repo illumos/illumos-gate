@@ -230,6 +230,7 @@ static char *bam_opt;
 static char **bam_argv;
 static int bam_argc;
 static int bam_check;
+static int bam_saved_check;
 static int bam_smf_check;
 static int bam_lock_fd = -1;
 static int bam_zfs;
@@ -644,6 +645,17 @@ parse_args_internal(int argc, char *argv[])
 			break;
 		case 'n':
 			bam_check = 1;
+			/*
+			 * We save the original value of bam_check. The new
+			 * approach in case of a read-only filesystem is to
+			 * behave as a check, so we need a way to restore the
+			 * original value after the evaluation of the read-only
+			 * filesystem has been done.
+			 * Even if we don't allow at the moment a check with
+			 * update_all, this approach is more robust than
+			 * simply resetting bam_check to zero.
+			 */
+			bam_saved_check = 1;
 			break;
 		case 'o':
 			if (bam_opt) {
@@ -3378,6 +3390,12 @@ update_archive(char *root, char *opt)
 		return (BAM_SUCCESS);
 
 	/*
+	 * Don't generate archive on ramdisk.
+	 */
+	if (is_ramdisk(root))
+		return (BAM_SUCCESS);
+
+	/*
 	 * root must be writable. This check applies to alternate
 	 * root (-R option); bam_root_readonly applies to '/' only.
 	 * The behaviour translates into being the one of a 'check'.
@@ -3386,12 +3404,6 @@ update_archive(char *root, char *opt)
 		set_flag(RDONLY_FSCHK);
 		bam_check = 1;
 	}
-
-	/*
-	 * Don't generate archive on ramdisk.
-	 */
-	if (is_ramdisk(root))
-		return (BAM_SUCCESS);
 
 	/*
 	 * Now check if an update is really needed.
@@ -3406,6 +3418,7 @@ update_archive(char *root, char *opt)
 	 */
 	if (bam_nowrite()) {
 		if (is_flag_on(RDONLY_FSCHK)) {
+			bam_check = bam_saved_check;
 			if (ret > 0)
 				bam_error(RDONLY_FS, root);
 			if (bam_update_all)
@@ -3597,17 +3610,6 @@ menu_sync:
 		return (BAM_ERROR);
 	}
 	BAM_DPRINTF((D_PROPAGATED_CKSUM_FILE, fcn, LU_MENU_CKSUM));
-
-	(void) snprintf(cmdline, sizeof (cmdline),
-	    "/bin/sh -c '. %s > /dev/null; %s %s no > /dev/null'",
-	    LULIB, LULIB_PROPAGATE_FILE, BOOTADM);
-	ret = exec_cmd(cmdline, NULL);
-	INJECT_ERROR1("PROPAGATE_BOOTADM_FILE", ret = 1);
-	if (ret != 0) {
-		bam_error(BOOTADM_PROP_FAIL, BOOTADM);
-		return (BAM_ERROR);
-	}
-	BAM_DPRINTF((D_PROPAGATED_BOOTADM, fcn, BOOTADM));
 
 	return (BAM_SUCCESS);
 }
