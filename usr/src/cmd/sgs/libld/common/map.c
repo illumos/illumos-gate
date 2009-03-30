@@ -2218,8 +2218,8 @@ ld_sort_seg_list(Ofl_desc *ofl)
 			continue;
 
 		/*
-		 * If the loadable segment does not contain a vaddr, then it is
-		 * already inserted in the segment list in the correct order.
+		 * If the loadable segment does not contain a vaddr, simply
+		 * append it to the new list.
 		 */
 		if ((sgp1->sg_flags & FLG_SG_VADDR) == 0) {
 			if (aplist_append(&seg2, sgp1, AL_CNT_SEGMENTS) == NULL)
@@ -2235,25 +2235,38 @@ ld_sort_seg_list(Ofl_desc *ofl)
 			 * for a segment that defines a vaddr.
 			 */
 			for (APLIST_TRAVERSE(seg2, idx2, sgp2)) {
-				if ((sgp2->sg_flags & FLG_SG_VADDR) == 0)
+				/*
+				 * Any real segments that contain vaddr's need
+				 * to be sorted.  Any reservation segments also
+				 * need to be sorted.  However, any reservation
+				 * segments should be placed after any real
+				 * segments.
+				 */
+				if (((sgp2->sg_flags &
+				    (FLG_SG_VADDR | FLG_SG_EMPTY)) == 0) &&
+				    (sgp1->sg_flags & FLG_SG_EMPTY))
 					continue;
 
-				if (sgp1->sg_phdr.p_vaddr ==
-				    sgp2->sg_phdr.p_vaddr) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_SEGSAME),
-					    sgp1->sg_name, sgp2->sg_name);
-					return (S_ERROR);
+				if ((sgp2->sg_flags & FLG_SG_VADDR) &&
+				    ((sgp2->sg_flags & FLG_SG_EMPTY) ==
+				    (sgp1->sg_flags & FLG_SG_EMPTY))) {
+					if (sgp1->sg_phdr.p_vaddr ==
+					    sgp2->sg_phdr.p_vaddr) {
+						eprintf(ofl->ofl_lml, ERR_FATAL,
+						    MSG_INTL(MSG_MAP_SEGSAME),
+						    sgp1->sg_name,
+						    sgp2->sg_name);
+						return (S_ERROR);
+					}
+
+					if (sgp1->sg_phdr.p_vaddr >
+					    sgp2->sg_phdr.p_vaddr)
+						continue;
 				}
 
-				if (sgp1->sg_phdr.p_vaddr >
-				    sgp2->sg_phdr.p_vaddr)
-					continue;
-
 				/*
-				 * The segment being inspected has a lower vaddr
-				 * than the present list segment, thus insert
-				 * this segment before the segment on the list.
+				 * Insert this segment before the segment on
+				 * the seg2 list.
 				 */
 				if (aplist_insert(&seg2, sgp1, AL_CNT_SEGMENTS,
 				    idx2) == NULL)

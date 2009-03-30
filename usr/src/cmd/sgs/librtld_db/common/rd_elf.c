@@ -693,11 +693,13 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 	LOG(ps_plog(MSG_ORIG(MSG_DB_LOADOBJITER), rap->rd_dmodel, cb,
 	    client_data));
 
-	if (cb == NULL) {
-		LOG(ps_plog(MSG_ORIG(MSG_DB_NULLITER)));
-		return (RD_ERR);
-	}
-
+	/*
+	 * First, determine whether the link-map information has been
+	 * established.  Some debuggers have made an initial call to this
+	 * function with a null call back function (cb), but expect a
+	 * RD_NOMAPS error return rather than a RD_ERR return when the
+	 * link-maps aren't available.
+	 */
 	if (ps_pread(rap->rd_psp, rap->rd_rtlddbpriv, (char *)&db_priv,
 	    sizeof (Rtld_db_priv)) != PS_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_1),
@@ -724,6 +726,19 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 		return (RD_NOMAPS);
 	}
 
+	/*
+	 * Having determined we have link-maps, ensure we have an iterator
+	 * call back function.
+	 */
+	if (cb == NULL) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_NULLITER)));
+		return (RD_ERR);
+	}
+
+	/*
+	 * Read the initial APlist information that contains the link-map list
+	 * entries.
+	 */
 	if (ps_pread(rap->rd_psp, (psaddr_t)addr, (char *)&apl,
 	    sizeof (TAPlist)) != PS_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_4),
