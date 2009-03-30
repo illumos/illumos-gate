@@ -610,7 +610,7 @@ typedef struct l2arc_write_callback {
 struct l2arc_buf_hdr {
 	/* protected by arc_buf_hdr  mutex */
 	l2arc_dev_t	*b_dev;			/* L2ARC device */
-	daddr_t		b_daddr;		/* disk address, offset byte */
+	uint64_t	b_daddr;		/* disk address, offset byte */
 };
 
 typedef struct l2arc_data_free {
@@ -2604,7 +2604,7 @@ top:
 		uint64_t size = BP_GET_LSIZE(bp);
 		arc_callback_t	*acb;
 		vdev_t *vd = NULL;
-		daddr_t addr;
+		uint64_t addr;
 		boolean_t devw = B_FALSE;
 
 		if (hdr == NULL) {
