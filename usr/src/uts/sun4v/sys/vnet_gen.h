@@ -70,10 +70,9 @@ extern "C" {
 #define	LDC_TO_VGEN(ldcp)  ((ldcp)->portp->vgenp)
 
 /* receive thread flags */
-#define	VGEN_WTHR_RUNNING 	0x01	/* worker thread running */
-#define	VGEN_WTHR_DATARCVD 	0x02	/* data received */
-#define	VGEN_WTHR_STOP 		0x04	/* stop worker thread request */
-#define	VGEN_WTHR_PROCESSING	0x08	/* worker thread awake & processing */
+#define	VGEN_WTHR_DATARCVD 	0x01	/* data received */
+#define	VGEN_WTHR_STOP 		0x02	/* stop worker thread request */
+#define	VGEN_WTHR_PROCESSING	0x04	/* worker thread awake & processing */
 
 #define	VGEN_LDC_UP_DELAY	100	/* usec delay between ldc_up retries */
 #define	VGEN_LDC_CLOSE_DELAY	100	/* usec delay between ldc_cl retries */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,14 @@ typedef struct vnet_dds_info {
 
 #define	VLAN_ID_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
 
+typedef enum {
+		AST_init = 0x0, AST_vnet_alloc = 0x1,
+		AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
+		AST_vgen_init = 0x8, AST_fdbh_alloc = 0x10,
+		AST_vdds_init = 0x20, AST_taskq_create = 0x40,
+		AST_vnet_list = 0x80, AST_macreg = 0x100
+} vnet_attach_progress_t;
+
 /*
  * vnet instance state information
  */
@@ -150,6 +158,7 @@ typedef struct vnet {
 	int			instance;	/* instance # */
 	dev_info_t		*dip;		/* dev_info */
 	uint64_t		reg;		/* reg prop value */
+	vnet_attach_progress_t	attach_progress; /* attach progress flags */
 	struct vnet		*nextp;		/* next in list */
 	mac_handle_t		mh;		/* handle to GLDv3 mac module */
 	uchar_t			vendor_addr[ETHERADDRL]; /* orig macadr */

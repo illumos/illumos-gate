@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,9 +339,8 @@ typedef struct vsw_ldc {
 } vsw_ldc_t;
 
 /* worker thread flags */
-#define	VSW_WTHR_RUNNING 	0x01	/* worker thread running */
-#define	VSW_WTHR_DATARCVD 	0x02	/* data received */
-#define	VSW_WTHR_STOP 		0x04	/* stop worker thread request */
+#define	VSW_WTHR_DATARCVD 	0x01	/* data received */
+#define	VSW_WTHR_STOP 		0x02	/* stop worker thread request */
 
 /* list of ldcs per port */
 typedef struct vsw_ldc_list {

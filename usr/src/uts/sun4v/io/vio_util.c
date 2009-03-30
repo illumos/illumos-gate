@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
-#include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/ksynch.h>
@@ -35,14 +34,19 @@
 #include <sys/sunddi.h>
 #include <sys/vio_util.h>
 
+static int vio_pool_cleanup_retries = 10;	/* Max retries to free pool */
+static int vio_pool_cleanup_delay = 10000;	/* 10ms */
+
 /*
  * Create a pool of mblks from which future vio_allocb() requests
  * will be serviced.
  *
  * NOTE: num_mblks has to non-zero and a power-of-2
  *
- * Returns 0 on success or EINVAL if num_mblks is zero or not
- * a power of 2.
+ * Returns
+ *	0 on success
+ *	EINVAL if num_mblks is zero or not a power of 2.
+ *	ENOSPC if the pool could not be created due to alloc failures.
  */
 int
 vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
@@ -87,8 +91,19 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 		vmp->mp = desballoc(vmp->datap, mblk_size, BPRI_MED,
 		    &vmp->reclaim);
 
-		if (vmp->mp == NULL)
-			continue;
+		if (vmp->mp == NULL) {
+			/* reset tail */
+			vmplp->tail = vmplp->head;
+
+			/*
+			 * vio_destroy_mblks() frees mblks that have been
+			 * allocated so far and then destroys the pool.
+			 */
+			vio_destroy_mblks(vmplp);
+
+			*poolp = NULL;
+			return (ENOSPC);
+		}
 
 		/* put this vmp on the free stack */
 		vmplp->quep[vmplp->tail] = vmp;
@@ -114,9 +129,11 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 int
 vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 {
-	uint64_t i;
-	uint64_t num_mblks;
-	vio_mblk_t *vmp;
+	uint64_t	i;
+	uint64_t	num_mblks;
+	vio_mblk_t	*vmp;
+	int		pool_cleanup_retries = 0;
+
 
 	if (vmplp == NULL)
 		return (EINVAL);
@@ -125,8 +142,16 @@ vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 	 * We can only destroy the pool once all the mblks have
 	 * been reclaimed.
 	 */
-	if (vmplp->head != vmplp->tail) {
+	do {
+		if (vmplp->head == vmplp->tail) {
+			break;
+		}
+
 		/* some mblks still in use */
+		drv_usecwait(vio_pool_cleanup_delay);
+	} while (++pool_cleanup_retries < vio_pool_cleanup_retries);
+
+	if (vmplp->head != vmplp->tail) {
 		return (EBUSY);
 	}
 
@@ -142,7 +167,14 @@ vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 	vmplp->flag |= VMPL_FLAG_DESTROYING;
 	for (i = 0; i < num_mblks; i++) {
 		vmp = &(vmplp->basep[i]);
-		if (vmp->mp)
+		/*
+		 * It is possible that mblks have been allocated only upto
+		 * a certain index and the entire quelen has not been
+		 * initialized. This might happen due to desballoc() failure
+		 * while creating the pool. The below check handles this
+		 * condition.
+		 */
+		if (vmp->mp != NULL)
 			freeb(vmp->mp);
 	}
 	vmplp->flag &= ~(VMPL_FLAG_DESTROYING);
@@ -309,7 +341,8 @@ vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp)
 			}
 		}
 	}
-	kmem_free(vmultip->bufsz_tbl, vmultip->tbsz);
+	if (vmultip->tbsz != 0)
+		kmem_free(vmultip->bufsz_tbl, vmultip->tbsz);
 	vmultip->bufsz_tbl = NULL;
 	vmultip->nbuf_tbl = NULL;
 	vmultip->vmpp = NULL;

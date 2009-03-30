@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -313,6 +313,7 @@ vsw_hio_free_share(vsw_share_t *vsharep)
 	RW_EXIT(&portp->maccl_rwlock);
 	vsharep->vs_state = VSW_SHARE_FREE;
 	vsharep->vs_macaddr = 0;
+	vsharep->vs_portp = NULL;
 
 	/* DERR only for printing by default */
 	DERR(vswp, "Share freed for ldc_id=0x%lx Cookie=0x%lX",

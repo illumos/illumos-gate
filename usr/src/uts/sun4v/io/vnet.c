@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,7 @@ static int vnet_m_unicst(void *, const uint8_t *);
 mblk_t *vnet_m_tx(void *, mblk_t *);
 
 /* vnet internal functions */
+static int vnet_unattach(vnet_t *vnetp);
 static int vnet_mac_register(vnet_t *);
 static int vnet_read_mac_address(vnet_t *vnetp);
 
@@ -109,6 +110,9 @@ extern int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
     const uint8_t *macaddr, void **vgenhdl);
 extern int vgen_uninit(void *arg);
 extern int vgen_dds_tx(void *arg, void *dmsg);
+extern void vgen_mod_init(void);
+extern int vgen_mod_cleanup(void);
+extern void vgen_mod_fini(void);
 
 /* Externs that are imported from vnet_dds */
 extern void vdds_mod_init(void);
@@ -285,6 +289,7 @@ _init(void)
 		mac_fini_ops(&vnetops);
 	}
 	vdds_mod_init();
+	vgen_mod_init();
 	DBG1(NULL, "exit(%d)\n", status);
 	return (status);
 }
@@ -293,14 +298,19 @@ _init(void)
 int
 _fini(void)
 {
-	int status;
+	int		status;
 
 	DBG1(NULL, "enter\n");
+
+	status = vgen_mod_cleanup();
+	if (status != 0)
+		return (status);
 
 	status = mod_remove(&modlinkage);
 	if (status != 0)
 		return (status);
 	mac_fini_ops(&vnetops);
+	vgen_mod_fini();
 	vdds_mod_fini();
 
 	DBG1(NULL, "exit(%d)\n", status);
@@ -321,18 +331,14 @@ _info(struct modinfo *modinfop)
 static int
 vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	vnet_t		*vnetp;
-	int		status;
-	int		instance;
-	uint64_t	reg;
-	char		qname[TASKQ_NAMELEN];
-	enum	{ AST_init = 0x0, AST_vnet_alloc = 0x1,
-		AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
-		AST_vgen_init = 0x8, AST_fdbh_alloc = 0x10,
-		AST_vdds_init = 0x20, AST_taskq_create = 0x40,
-		AST_vnet_list = 0x80 } attach_state;
+	vnet_t			*vnetp;
+	int			status;
+	int			instance;
+	uint64_t		reg;
+	char			qname[TASKQ_NAMELEN];
+	vnet_attach_progress_t	attach_progress;
 
-	attach_state = AST_init;
+	attach_progress = AST_init;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -352,13 +358,13 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnetp->instance = instance;
 	rw_init(&vnetp->vrwlock, NULL, RW_DRIVER, NULL);
 	rw_init(&vnetp->vsw_fp_rw, NULL, RW_DRIVER, NULL);
-	attach_state |= AST_vnet_alloc;
+	attach_progress |= AST_vnet_alloc;
 
 	status = vdds_init(vnetp);
 	if (status != 0) {
 		goto vnet_attach_fail;
 	}
-	attach_state |= AST_vdds_init;
+	attach_progress |= AST_vdds_init;
 
 	/* setup links to vnet_t from both devinfo and mac_t */
 	ddi_set_driver_private(dip, (caddr_t)vnetp);
@@ -368,7 +374,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (status != DDI_SUCCESS) {
 		goto vnet_attach_fail;
 	}
-	attach_state |= AST_read_macaddr;
+	attach_progress |= AST_read_macaddr;
 
 	reg = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "reg", -1);
@@ -378,7 +384,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnetp->reg = reg;
 
 	vnet_fdb_create(vnetp);
-	attach_state |= AST_fdbh_alloc;
+	attach_progress |= AST_fdbh_alloc;
 
 	(void) snprintf(qname, TASKQ_NAMELEN, "vnet_taskq%d", instance);
 	if ((vnetp->taskqp = ddi_taskq_create(dip, qname, 1,
@@ -387,7 +393,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    instance);
 		goto vnet_attach_fail;
 	}
-	attach_state |= AST_taskq_create;
+	attach_progress |= AST_taskq_create;
 
 	/* add to the list of vnet devices */
 	WRITE_ENTER(&vnet_rw);
@@ -395,7 +401,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnet_headp = vnetp;
 	RW_EXIT(&vnet_rw);
 
-	attach_state |= AST_vnet_list;
+	attach_progress |= AST_vnet_list;
 
 	/*
 	 * Initialize the generic vnet plugin which provides
@@ -409,7 +415,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		DERR(vnetp, "vgen_init() failed\n");
 		goto vnet_attach_fail;
 	}
-	attach_state |= AST_vgen_init;
+	attach_progress |= AST_vgen_init;
 
 	/* register with MAC layer */
 	status = vnet_mac_register(vnetp);
@@ -417,42 +423,16 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto vnet_attach_fail;
 	}
 
+	attach_progress |= AST_macreg;
+
+	vnetp->attach_progress = attach_progress;
+
 	DBG1(NULL, "instance(%d) exit\n", instance);
 	return (DDI_SUCCESS);
 
 vnet_attach_fail:
-
-	if (attach_state & AST_vnet_list) {
-		vnet_t		**vnetpp;
-		/* unlink from instance(vnet_t) list */
-		WRITE_ENTER(&vnet_rw);
-		for (vnetpp = &vnet_headp; *vnetpp;
-		    vnetpp = &(*vnetpp)->nextp) {
-			if (*vnetpp == vnetp) {
-				*vnetpp = vnetp->nextp;
-				break;
-			}
-		}
-		RW_EXIT(&vnet_rw);
-	}
-
-	if (attach_state & AST_vdds_init) {
-		vdds_cleanup(vnetp);
-	}
-	if (attach_state & AST_taskq_create) {
-		ddi_taskq_destroy(vnetp->taskqp);
-	}
-	if (attach_state & AST_fdbh_alloc) {
-		vnet_fdb_destroy(vnetp);
-	}
-	if (attach_state & AST_vgen_init) {
-		(void) vgen_uninit(vnetp->vgenhdl);
-	}
-	if (attach_state & AST_vnet_alloc) {
-		rw_destroy(&vnetp->vrwlock);
-		rw_destroy(&vnetp->vsw_fp_rw);
-		KMEM_FREE(vnetp);
-	}
+	vnetp->attach_progress = attach_progress;
+	vnet_unattach(vnetp);
 	return (DDI_FAILURE);
 }
 
@@ -463,9 +443,7 @@ static int
 vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	vnet_t		*vnetp;
-	vnet_t		**vnetpp;
 	int		instance;
-	int		rv;
 
 	instance = ddi_get_instance(dip);
 	DBG1(NULL, "instance(%d) enter\n", instance);
@@ -484,42 +462,98 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		goto vnet_detach_fail;
 	}
 
-	(void) vdds_cleanup(vnetp);
-	rv = vgen_uninit(vnetp->vgenhdl);
-	if (rv != DDI_SUCCESS) {
+	if (vnet_unattach(vnetp) != 0) {
 		goto vnet_detach_fail;
 	}
-
-	/*
-	 * Unregister from the MAC subsystem.  This can fail, in
-	 * particular if there are DLPI style-2 streams still open -
-	 * in which case we just return failure.
-	 */
-	if (mac_unregister(vnetp->mh) != 0)
-		goto vnet_detach_fail;
-
-	/* unlink from instance(vnet_t) list */
-	WRITE_ENTER(&vnet_rw);
-	for (vnetpp = &vnet_headp; *vnetpp; vnetpp = &(*vnetpp)->nextp) {
-		if (*vnetpp == vnetp) {
-			*vnetpp = vnetp->nextp;
-			break;
-		}
-	}
-	RW_EXIT(&vnet_rw);
-
-	ddi_taskq_destroy(vnetp->taskqp);
-	/* destroy fdb */
-	vnet_fdb_destroy(vnetp);
-
-	rw_destroy(&vnetp->vrwlock);
-	rw_destroy(&vnetp->vsw_fp_rw);
-	KMEM_FREE(vnetp);
 
 	return (DDI_SUCCESS);
 
 vnet_detach_fail:
 	return (DDI_FAILURE);
+}
+
+/*
+ * Common routine to handle vnetattach() failure and vnetdetach(). Note that
+ * the only reason this function could fail is if mac_unregister() fails.
+ * Otherwise, this function must ensure that all resources are freed and return
+ * success.
+ */
+static int
+vnet_unattach(vnet_t *vnetp)
+{
+	vnet_attach_progress_t	attach_progress;
+
+	attach_progress = vnetp->attach_progress;
+
+	/*
+	 * Unregister from the gldv3 subsystem. This can fail, in particular
+	 * if there are still any open references to this mac device; in which
+	 * case we just return failure without continuing to detach further.
+	 */
+	if (attach_progress & AST_macreg) {
+		if (mac_unregister(vnetp->mh) != 0) {
+			return (1);
+		}
+		attach_progress &= ~AST_macreg;
+	}
+
+	/*
+	 * Now that we have unregistered from gldv3, we must finish all other
+	 * steps and successfully return from this function; otherwise we will
+	 * end up leaving the device in a broken/unusable state.
+	 *
+	 * First, release any hybrid resources assigned to this vnet device.
+	 */
+	if (attach_progress & AST_vdds_init) {
+		vdds_cleanup(vnetp);
+		attach_progress &= ~AST_vdds_init;
+	}
+
+	/*
+	 * Uninit vgen. This stops further mdeg callbacks to this vnet
+	 * device and/or its ports; and detaches any existing ports.
+	 */
+	if (attach_progress & AST_vgen_init) {
+		vgen_uninit(vnetp->vgenhdl);
+		attach_progress &= ~AST_vgen_init;
+	}
+
+	/* Destroy the taskq. */
+	if (attach_progress & AST_taskq_create) {
+		ddi_taskq_destroy(vnetp->taskqp);
+		attach_progress &= ~AST_taskq_create;
+	}
+
+	/* Destroy fdb. */
+	if (attach_progress & AST_fdbh_alloc) {
+		vnet_fdb_destroy(vnetp);
+		attach_progress &= ~AST_fdbh_alloc;
+	}
+
+	/* Remove from the device list */
+	if (attach_progress & AST_vnet_list) {
+		vnet_t		**vnetpp;
+		/* unlink from instance(vnet_t) list */
+		WRITE_ENTER(&vnet_rw);
+		for (vnetpp = &vnet_headp; *vnetpp;
+		    vnetpp = &(*vnetpp)->nextp) {
+			if (*vnetpp == vnetp) {
+				*vnetpp = vnetp->nextp;
+				break;
+			}
+		}
+		RW_EXIT(&vnet_rw);
+		attach_progress &= ~AST_vnet_list;
+	}
+
+	if (attach_progress & AST_vnet_alloc) {
+		rw_destroy(&vnetp->vrwlock);
+		rw_destroy(&vnetp->vsw_fp_rw);
+		attach_progress &= ~AST_vnet_list;
+		KMEM_FREE(vnetp);
+	}
+
+	return (0);
 }
 
 /* enable the device for transmit/receive */

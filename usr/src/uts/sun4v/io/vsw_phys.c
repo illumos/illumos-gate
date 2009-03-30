@@ -924,11 +924,13 @@ vsw_tx_msg(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *port)
 	mch = (caller == VSW_LOCALDEV) ? vswp->mch : port->p_mch;
 	muh = (caller == VSW_LOCALDEV) ? vswp->muh : port->p_muh;
 
-	if ((mch != NULL) && (muh != NULL)) {
-		/* packets are sent or dropped */
-		(void) mac_tx(mch, mp, 0, MAC_DROP_ON_NO_DESC, NULL);
+	if (mch == NULL || muh == NULL) {
+		RW_MACCL_EXIT(vswp, port, caller);
+		return (mp);
 	}
 
+	/* packets are sent or dropped */
+	(void) mac_tx(mch, mp, 0, MAC_DROP_ON_NO_DESC, NULL);
 	RW_MACCL_EXIT(vswp, port, caller);
 	return (NULL);
 }

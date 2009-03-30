@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,18 @@ typedef enum {
 	VSW_SWTHR_STOP = 0x1
 } sw_thr_flags_t;
 
+typedef enum {
+	PROG_init = 0x00,
+	PROG_locks = 0x01,
+	PROG_readmd = 0x02,
+	PROG_fdb = 0x04,
+	PROG_mfdb = 0x08,
+	PROG_taskq = 0x10,
+	PROG_swmode = 0x20,
+	PROG_macreg = 0x40,
+	PROG_mdreg = 0x80
+} vsw_attach_progress_t;
+
 /*
  * vlan-id information.
  */
@@ -108,6 +120,7 @@ typedef struct	vsw {
 	int			instance;	/* instance # */
 	dev_info_t		*dip;		/* associated dev_info */
 	uint64_t		regprop;	/* "reg" property */
+	vsw_attach_progress_t	attach_progress; /* attach progress flags */
 	struct vsw		*next;		/* next in list */
 	char			physname[LIFNAMSIZ];	/* phys-dev */
 	uint8_t			smode;		/* switching mode */

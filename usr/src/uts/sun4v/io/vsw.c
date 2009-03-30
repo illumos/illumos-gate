@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,8 +77,10 @@
  */
 static	int vsw_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int vsw_detach(dev_info_t *, ddi_detach_cmd_t);
+static	int vsw_unattach(vsw_t *vswp);
 static	int vsw_get_md_physname(vsw_t *, md_t *, mde_cookie_t, char *);
 static	int vsw_get_md_smodes(vsw_t *, md_t *, mde_cookie_t, uint8_t *);
+static	int vsw_mod_cleanup(void);
 
 /* MDEG routines */
 static	int vsw_mdeg_register(vsw_t *vswp);
@@ -128,7 +130,7 @@ extern int vsw_add_mcst(vsw_t *, uint8_t, uint64_t, void *);
 extern int vsw_del_mcst(vsw_t *, uint8_t, uint64_t, void *);
 extern void vsw_del_mcst_vsw(vsw_t *);
 extern mcst_addr_t *vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr);
-extern int vsw_detach_ports(vsw_t *vswp);
+extern void vsw_detach_ports(vsw_t *vswp);
 extern int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
 extern int vsw_port_detach(vsw_t *vswp, int p_instance);
 static int vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
@@ -175,6 +177,8 @@ int	vsw_mac_open_retries = 300;	/* max # of mac_open() retries */
 					/* 300*3 = 900sec(15min) of max tmout */
 int	vsw_ldc_tx_delay = 5;		/* delay(ticks) for tx retries */
 int	vsw_ldc_tx_retries = 10;	/* # of ldc tx retries */
+int	vsw_ldc_retries = 5;		/* # of ldc_close() retries */
+int	vsw_ldc_delay = 1000;		/* 1 ms delay for ldc_close() */
 boolean_t vsw_ldc_rxthr_enabled = B_TRUE;	/* LDC Rx thread enabled */
 boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
 
@@ -343,6 +347,7 @@ static void	*vsw_state;
  * Linked list of "vsw_t" structures - one per instance.
  */
 vsw_t		*vsw_head = NULL;
+vio_mblk_pool_t	*vsw_rx_poolp = NULL;
 krwlock_t	vsw_rw;
 
 /*
@@ -474,6 +479,10 @@ _fini(void)
 {
 	int status;
 
+	status = vsw_mod_cleanup();
+	if (status != 0)
+		return (status);
+
 	status = mod_remove(&modlinkage);
 	if (status != 0)
 		return (status);
@@ -494,23 +503,12 @@ _info(struct modinfo *modinfop)
 static int
 vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	vsw_t		*vswp;
-	int		instance;
-	char		hashname[MAXNAMELEN];
-	char		qname[TASKQ_NAMELEN];
-	enum		{ PROG_init = 0x00,
-				PROG_locks = 0x01,
-				PROG_readmd = 0x02,
-				PROG_fdb = 0x04,
-				PROG_mfdb = 0x08,
-				PROG_taskq = 0x10,
-				PROG_swmode = 0x20,
-				PROG_macreg = 0x40,
-				PROG_mdreg = 0x80}
-			progress;
-
-	progress = PROG_init;
-	int		rv;
+	vsw_t			*vswp;
+	int			instance;
+	char			hashname[MAXNAMELEN];
+	char			qname[TASKQ_NAMELEN];
+	vsw_attach_progress_t	progress = PROG_init;
+	int			rv;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -639,6 +637,8 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	progress |= PROG_mdreg;
 
+	vswp->attach_progress = progress;
+
 	WRITE_ENTER(&vsw_rw);
 	vswp->next = vsw_head;
 	vsw_head = vswp;
@@ -650,52 +650,8 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 vsw_attach_fail:
 	DERR(NULL, "vsw_attach: failed");
 
-	if (progress & PROG_mdreg) {
-		vsw_mdeg_unregister(vswp);
-		(void) vsw_detach_ports(vswp);
-	}
-
-	if (progress & PROG_macreg)
-		(void) vsw_mac_unregister(vswp);
-
-	if (progress & PROG_swmode) {
-		vsw_setup_switching_stop(vswp);
-		vsw_hio_cleanup(vswp);
-		mutex_enter(&vswp->mac_lock);
-		vsw_mac_close(vswp);
-		mutex_exit(&vswp->mac_lock);
-	}
-
-	if (progress & PROG_taskq)
-		ddi_taskq_destroy(vswp->taskq_p);
-
-	if (progress & PROG_mfdb)
-		mod_hash_destroy_hash(vswp->mfdb);
-
-	if (progress & PROG_fdb) {
-		vsw_destroy_vlans(vswp, VSW_LOCALDEV);
-		mod_hash_destroy_hash(vswp->fdb_hashp);
-	}
-
-	if (progress & PROG_readmd) {
-		if (VSW_PRI_ETH_DEFINED(vswp)) {
-			kmem_free(vswp->pri_types,
-			    sizeof (uint16_t) * vswp->pri_num_types);
-		}
-		(void) vio_destroy_mblks(vswp->pri_tx_vmp);
-	}
-
-	if (progress & PROG_locks) {
-		rw_destroy(&vswp->plist.lockrw);
-		rw_destroy(&vswp->mfdbrw);
-		rw_destroy(&vswp->if_lockrw);
-		rw_destroy(&vswp->maccl_rwlock);
-		cv_destroy(&vswp->sw_thr_cv);
-		mutex_destroy(&vswp->sw_thr_lock);
-		mutex_destroy(&vswp->mca_lock);
-		mutex_destroy(&vswp->mac_lock);
-	}
-
+	vswp->attach_progress = progress;
+	(void) vsw_unattach(vswp);
 	ddi_soft_state_free(vsw_state, instance);
 	return (DDI_FAILURE);
 }
@@ -703,7 +659,6 @@ vsw_attach_fail:
 static int
 vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	vio_mblk_pool_t		*poolp, *npoolp;
 	vsw_t			**vswpp, *vswp;
 	int 			instance;
 
@@ -725,107 +680,12 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	D2(vswp, "detaching instance %d", instance);
 
-	/* Stop any pending thread to setup switching mode. */
-	vsw_setup_switching_stop(vswp);
-
-	/* Cleanup the interface's mac client */
-	vsw_mac_client_cleanup(vswp, NULL, VSW_LOCALDEV);
-
-	if (vswp->if_state & VSW_IF_REG) {
-		if (vsw_mac_unregister(vswp) != 0) {
-			cmn_err(CE_WARN, "!vsw%d: Unable to detach from "
-			    "MAC layer", vswp->instance);
-			return (DDI_FAILURE);
-		}
-	}
-
-	vsw_mdeg_unregister(vswp);
-
-	/* cleanup HybridIO */
-	vsw_hio_cleanup(vswp);
-
-	if (vsw_detach_ports(vswp) != 0) {
-		cmn_err(CE_WARN, "!vsw%d: Unable to unconfigure ports",
-		    vswp->instance);
+	if (vsw_unattach(vswp) != 0) {
 		return (DDI_FAILURE);
-	}
-
-	rw_destroy(&vswp->if_lockrw);
-
-	vsw_mac_cleanup_ports(vswp);
-
-	/*
-	 * Now that the ports have been deleted, stop and close
-	 * the physical device.
-	 */
-	mutex_enter(&vswp->mac_lock);
-	vsw_mac_close(vswp);
-	mutex_exit(&vswp->mac_lock);
-
-	mutex_destroy(&vswp->mac_lock);
-	cv_destroy(&vswp->sw_thr_cv);
-	mutex_destroy(&vswp->sw_thr_lock);
-	rw_destroy(&vswp->maccl_rwlock);
-
-	/*
-	 * Destroy any free pools that may still exist.
-	 */
-	poolp = vswp->rxh;
-	while (poolp != NULL) {
-		npoolp = vswp->rxh = poolp->nextp;
-		if (vio_destroy_mblks(poolp) != 0) {
-			vswp->rxh = poolp;
-			return (DDI_FAILURE);
-		}
-		poolp = npoolp;
-	}
-
-	/*
-	 * Remove this instance from any entries it may be on in
-	 * the hash table by using the list of addresses maintained
-	 * in the vsw_t structure.
-	 */
-	vsw_del_mcst_vsw(vswp);
-
-	vswp->mcap = NULL;
-	mutex_destroy(&vswp->mca_lock);
-
-	/*
-	 * By now any pending tasks have finished and the underlying
-	 * ldc's have been destroyed, so its safe to delete the control
-	 * message taskq.
-	 */
-	if (vswp->taskq_p != NULL)
-		ddi_taskq_destroy(vswp->taskq_p);
-
-	/*
-	 * At this stage all the data pointers in the hash table
-	 * should be NULL, as all the ports have been removed and will
-	 * have deleted themselves from the port lists which the data
-	 * pointers point to. Hence we can destroy the table using the
-	 * default destructors.
-	 */
-	D2(vswp, "vsw_detach: destroying hash tables..");
-	vsw_destroy_vlans(vswp, VSW_LOCALDEV);
-	mod_hash_destroy_hash(vswp->fdb_hashp);
-	vswp->fdb_hashp = NULL;
-
-	WRITE_ENTER(&vswp->mfdbrw);
-	mod_hash_destroy_hash(vswp->mfdb);
-	vswp->mfdb = NULL;
-	RW_EXIT(&vswp->mfdbrw);
-	rw_destroy(&vswp->mfdbrw);
-
-	/* free pri_types table */
-	if (VSW_PRI_ETH_DEFINED(vswp)) {
-		kmem_free(vswp->pri_types,
-		    sizeof (uint16_t) * vswp->pri_num_types);
-		(void) vio_destroy_mblks(vswp->pri_tx_vmp);
 	}
 
 	ddi_remove_minor_node(dip, NULL);
 
-	rw_destroy(&vswp->plist.lockrw);
 	WRITE_ENTER(&vsw_rw);
 	for (vswpp = &vsw_head; *vswpp; vswpp = &(*vswpp)->next) {
 		if (*vswpp == vswp) {
@@ -834,9 +694,175 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 	}
 	RW_EXIT(&vsw_rw);
+
 	ddi_soft_state_free(vsw_state, instance);
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Common routine to handle vsw_attach() failure and vsw_detach(). Note that
+ * the only reason this function could fail is if mac_unregister() fails.
+ * Otherwise, this function must ensure that all resources are freed and return
+ * success.
+ */
+static int
+vsw_unattach(vsw_t *vswp)
+{
+	vio_mblk_pool_t		*poolp, *npoolp;
+	vsw_attach_progress_t	progress;
+
+	progress = vswp->attach_progress;
+
+	/*
+	 * Unregister from the gldv3 subsystem. This can fail, in particular
+	 * if there are still any open references to this mac device; in which
+	 * case we just return failure without continuing to detach further.
+	 */
+	if (progress & PROG_macreg) {
+		if (vsw_mac_unregister(vswp) != 0) {
+			cmn_err(CE_WARN, "!vsw%d: Unable to detach from "
+			    "MAC layer", vswp->instance);
+			return (1);
+		}
+		progress &= ~PROG_macreg;
+	}
+
+	/*
+	 * Now that we have unregistered from gldv3, we must finish all other
+	 * steps and successfully return from this function; otherwise we will
+	 * end up leaving the device in a broken/unusable state.
+	 *
+	 * If we have registered with mdeg, unregister now to stop further
+	 * callbacks to this vsw device and/or its ports. Then, detach any
+	 * existing ports.
+	 */
+	if (progress & PROG_mdreg) {
+		vsw_mdeg_unregister(vswp);
+		vsw_detach_ports(vswp);
+
+		/*
+		 * At this point, we attempt to free receive mblk pools that
+		 * couldn't be destroyed when the ports were detached; if this
+		 * attempt also fails, we hook up the pool(s) to the module so
+		 * they can be cleaned up in _fini().
+		 */
+		poolp = vswp->rxh;
+		while (poolp != NULL) {
+			npoolp = vswp->rxh = poolp->nextp;
+			if (vio_destroy_mblks(poolp) != 0) {
+				WRITE_ENTER(&vsw_rw);
+				poolp->nextp = vsw_rx_poolp;
+				vsw_rx_poolp = poolp;
+				RW_EXIT(&vsw_rw);
+			}
+			poolp = npoolp;
+		}
+		progress &= ~PROG_mdreg;
+	}
+
+	/*
+	 * If we have started a thread to setup the switching mode, stop it, if
+	 * it is still running. If it has finished setting up the switching
+	 * mode, then we need to clean up some additional things if we are
+	 * running in L2 mode: first free up any hybrid resources; then stop
+	 * and close the underlying physical device. Note that we would have
+	 * already released all per mac_client resources (ucast, mcast addrs,
+	 * hio-shares etc) as all the ports are detached and if the vsw device
+	 * itself was in use as an interface, it has been unplumbed (otherwise
+	 * mac_unregister() above would fail).
+	 */
+	if (progress & PROG_swmode) {
+
+		vsw_setup_switching_stop(vswp);
+
+		if (vswp->hio_capable == B_TRUE) {
+			vsw_hio_cleanup(vswp);
+			vswp->hio_capable = B_FALSE;
+		}
+
+		mutex_enter(&vswp->mac_lock);
+		vsw_mac_close(vswp);
+		mutex_exit(&vswp->mac_lock);
+
+		progress &= ~PROG_swmode;
+	}
+
+	/*
+	 * By now any pending tasks have finished and the underlying
+	 * ldc's have been destroyed, so its safe to delete the control
+	 * message taskq.
+	 */
+	if (progress & PROG_taskq) {
+		ddi_taskq_destroy(vswp->taskq_p);
+		progress &= ~PROG_taskq;
+	}
+
+	/* Destroy the multicast hash table */
+	if (progress & PROG_mfdb) {
+		mod_hash_destroy_hash(vswp->mfdb);
+		progress &= ~PROG_mfdb;
+	}
+
+	/* Destroy the vlan hash table and fdb */
+	if (progress & PROG_fdb) {
+		vsw_destroy_vlans(vswp, VSW_LOCALDEV);
+		mod_hash_destroy_hash(vswp->fdb_hashp);
+		progress &= ~PROG_fdb;
+	}
+
+	if (progress & PROG_readmd) {
+		if (VSW_PRI_ETH_DEFINED(vswp)) {
+			kmem_free(vswp->pri_types,
+			    sizeof (uint16_t) * vswp->pri_num_types);
+			(void) vio_destroy_mblks(vswp->pri_tx_vmp);
+		}
+		progress &= ~PROG_readmd;
+	}
+
+	if (progress & PROG_locks) {
+		rw_destroy(&vswp->plist.lockrw);
+		rw_destroy(&vswp->mfdbrw);
+		rw_destroy(&vswp->if_lockrw);
+		rw_destroy(&vswp->maccl_rwlock);
+		cv_destroy(&vswp->sw_thr_cv);
+		mutex_destroy(&vswp->sw_thr_lock);
+		mutex_destroy(&vswp->mca_lock);
+		mutex_destroy(&vswp->mac_lock);
+		progress &= ~PROG_locks;
+	}
+
+	vswp->attach_progress = progress;
+
+	return (0);
+}
+
+/*
+ * one time cleanup.
+ */
+static int
+vsw_mod_cleanup(void)
+{
+	vio_mblk_pool_t		*poolp, *npoolp;
+
+	/*
+	 * If any rx mblk pools are still in use, return
+	 * error and stop the module from unloading.
+	 */
+	WRITE_ENTER(&vsw_rw);
+	poolp = vsw_rx_poolp;
+	while (poolp != NULL) {
+		npoolp = vsw_rx_poolp = poolp->nextp;
+		if (vio_destroy_mblks(poolp) != 0) {
+			vsw_rx_poolp = poolp;
+			RW_EXIT(&vsw_rw);
+			return (EBUSY);
+		}
+		poolp = npoolp;
+	}
+	RW_EXIT(&vsw_rw);
+
+	return (0);
 }
 
 /*

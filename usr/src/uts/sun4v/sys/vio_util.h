@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_VIO_UTIL_H
 #define	_VIO_UTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stream.h>
 #include <sys/vio_mailbox.h>
@@ -141,6 +139,7 @@ void vio_freeb(void *arg);
 int vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...);
 void vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp);
 mblk_t *vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size);
+int vio_check_pending_pools(vio_multi_pool_t *vmultip);
 
 /* VIO versioning helpers */
 #define	VIO_VER_IS_NEGOTIATED(ver, maj, min)		\

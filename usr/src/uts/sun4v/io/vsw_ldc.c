@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,18 +72,18 @@
 #include <sys/vlan.h>
 
 /* Port add/deletion/etc routines */
-static	int vsw_port_delete(vsw_port_t *port);
+static	void vsw_port_delete(vsw_port_t *port);
 static	int vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id);
-static	int vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id);
+static	void vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id);
 static	int vsw_init_ldcs(vsw_port_t *port);
-static	int vsw_uninit_ldcs(vsw_port_t *port);
+static	void vsw_uninit_ldcs(vsw_port_t *port);
 static	int vsw_ldc_init(vsw_ldc_t *ldcp);
-static	int vsw_ldc_uninit(vsw_ldc_t *ldcp);
-static	int vsw_drain_ldcs(vsw_port_t *port);
-static	int vsw_drain_port_taskq(vsw_port_t *port);
+static	void vsw_ldc_uninit(vsw_ldc_t *ldcp);
+static	void vsw_drain_ldcs(vsw_port_t *port);
+static	void vsw_drain_port_taskq(vsw_port_t *port);
 static	void vsw_marker_task(void *);
 static	int vsw_plist_del_node(vsw_t *, vsw_port_t *port);
-int vsw_detach_ports(vsw_t *vswp);
+void vsw_detach_ports(vsw_t *vswp);
 int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
 mcst_addr_t *vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr);
 int vsw_port_detach(vsw_t *vswp, int p_instance);
@@ -218,6 +218,8 @@ extern int vsw_desc_delay;
 extern int vsw_read_attempts;
 extern int vsw_ldc_tx_delay;
 extern int vsw_ldc_tx_retries;
+extern int vsw_ldc_retries;
+extern int vsw_ldc_delay;
 extern boolean_t vsw_ldc_rxthr_enabled;
 extern boolean_t vsw_ldc_txthr_enabled;
 extern uint32_t vsw_ntxds;
@@ -442,9 +444,7 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 	/* Remove any multicast addresses.. */
 	vsw_del_mcst_port(port);
 
-	if (vsw_port_delete(port)) {
-		return (1);
-	}
+	vsw_port_delete(port);
 
 	D1(vswp, "%s: exit: p_instance(%d)", __func__, p_instance);
 	return (0);
@@ -452,10 +452,8 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 
 /*
  * Detach all active ports.
- *
- * Returns 0 on success, 1 on failure.
  */
-int
+void
 vsw_detach_ports(vsw_t *vswp)
 {
 	vsw_port_list_t 	*plist = &vswp->plist;
@@ -466,12 +464,10 @@ vsw_detach_ports(vsw_t *vswp)
 	WRITE_ENTER(&plist->lockrw);
 
 	while ((port = plist->head) != NULL) {
-		if (vsw_plist_del_node(vswp, port)) {
-			DERR(vswp, "%s: Error deleting port %d"
-			    " from port list", __func__, port->p_instance);
-			RW_EXIT(&plist->lockrw);
-			return (1);
-		}
+		(void) vsw_plist_del_node(vswp, port);
+
+		/* cleanup any HybridIO for this port */
+		vsw_hio_stop_port(port);
 
 		/* Cleanup and close the mac client */
 		vsw_mac_client_cleanup(vswp, port, VSW_VNETPORT);
@@ -489,26 +485,18 @@ vsw_detach_ports(vsw_t *vswp)
 		 * list.
 		 */
 		RW_EXIT(&plist->lockrw);
-		if (vsw_port_delete(port)) {
-			DERR(vswp, "%s: Error deleting port %d",
-			    __func__, port->p_instance);
-			return (1);
-		}
+		vsw_port_delete(port);
 		WRITE_ENTER(&plist->lockrw);
 	}
 	RW_EXIT(&plist->lockrw);
 
 	D1(vswp, "%s: exit", __func__);
-
-	return (0);
 }
 
 /*
  * Delete the specified port.
- *
- * Returns 0 on success, 1 on failure.
  */
-static int
+static void
 vsw_port_delete(vsw_port_t *port)
 {
 	vsw_ldc_list_t 		*ldcl;
@@ -517,32 +505,24 @@ vsw_port_delete(vsw_port_t *port)
 
 	D1(vswp, "%s: enter : port id %d", __func__, port->p_instance);
 
-	(void) vsw_uninit_ldcs(port);
+	vsw_uninit_ldcs(port);
 
 	/*
 	 * Wait for any pending ctrl msg tasks which reference this
 	 * port to finish.
 	 */
-	if (vsw_drain_port_taskq(port))
-		return (1);
+	vsw_drain_port_taskq(port);
 
 	/*
 	 * Wait for any active callbacks to finish
 	 */
-	if (vsw_drain_ldcs(port))
-		return (1);
+	vsw_drain_ldcs(port);
 
 	ldcl = &port->p_ldclist;
 	num_ldcs = port->num_ldcs;
 	WRITE_ENTER(&ldcl->lockrw);
 	while (num_ldcs > 0) {
-		if (vsw_ldc_detach(port, ldcl->head->ldc_id) != 0) {
-			cmn_err(CE_WARN, "!vsw%d: unable to detach ldc %ld",
-			    vswp->instance, ldcl->head->ldc_id);
-			RW_EXIT(&ldcl->lockrw);
-			port->num_ldcs = num_ldcs;
-			return (1);
-		}
+		vsw_ldc_detach(port, ldcl->head->ldc_id);
 		num_ldcs--;
 	}
 	RW_EXIT(&ldcl->lockrw);
@@ -568,8 +548,6 @@ vsw_port_delete(vsw_port_t *port)
 	kmem_free(port, sizeof (vsw_port_t));
 
 	D1(vswp, "%s: exit", __func__);
-
-	return (0);
 }
 
 static int
@@ -859,16 +837,15 @@ ldc_attach_fail:
 /*
  * Detach a logical domain channel (ldc) belonging to a
  * particular port.
- *
- * Returns 0 on success, 1 on failure.
  */
-static int
+static void
 vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 {
 	vsw_t 		*vswp = port->p_vswp;
 	vsw_ldc_t 	*ldcp, *prev_ldcp;
 	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
 	int 		rv;
+	int		retries = 0;
 
 	prev_ldcp = ldcl->head;
 	for (; (ldcp = prev_ldcp) != NULL; prev_ldcp = ldcp->ldc_next) {
@@ -878,10 +855,7 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	}
 
 	/* specified ldc id not found */
-	if (ldcp == NULL) {
-		DERR(vswp, "%s: ldcp = NULL", __func__);
-		return (1);
-	}
+	ASSERT(ldcp != NULL);
 
 	D2(vswp, "%s: detaching channel %lld", __func__, ldcp->ldc_id);
 
@@ -916,13 +890,18 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	vsw_free_lane_resources(ldcp, OUTBOUND);
 
 	/*
-	 * If the close fails we are in serious trouble, as won't
-	 * be able to delete the parent port.
+	 * Close the channel, retry on EAAGIN.
 	 */
-	if ((rv = ldc_close(ldcp->ldc_handle)) != 0) {
-		DERR(vswp, "%s: error %d closing channel %lld",
-		    __func__, rv, ldcp->ldc_id);
-		return (1);
+	while ((rv = ldc_close(ldcp->ldc_handle)) == EAGAIN) {
+		if (++retries > vsw_ldc_retries) {
+			break;
+		}
+		drv_usecwait(vsw_ldc_delay);
+	}
+	if (rv != 0) {
+		cmn_err(CE_NOTE,
+		    "!vsw%d: Error(%d) closing the channel(0x%lx)\n",
+		    vswp->instance, rv, ldcp->ldc_id);
 	}
 
 	(void) ldc_fini(ldcp->ldc_handle);
@@ -954,8 +933,6 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	rw_destroy(&ldcp->lane_out.dlistrw);
 
 	kmem_free(ldcp, sizeof (vsw_ldc_t));
-
-	return (0);
 }
 
 /*
@@ -1047,7 +1024,7 @@ vsw_ldc_init(vsw_ldc_t *ldcp)
 }
 
 /* disable callbacks on the channel */
-static int
+static void
 vsw_ldc_uninit(vsw_ldc_t *ldcp)
 {
 	vsw_t	*vswp = ldcp->ldc_vswp;
@@ -1059,10 +1036,8 @@ vsw_ldc_uninit(vsw_ldc_t *ldcp)
 
 	rv = ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_DISABLE);
 	if (rv != 0) {
-		DERR(vswp, "vsw_ldc_uninit(%lld): error disabling "
+		cmn_err(CE_NOTE, "!vsw_ldc_uninit(%ld): error disabling "
 		    "interrupts (rv = %d)\n", ldcp->ldc_id, rv);
-		LDC_EXIT_LOCK(ldcp);
-		return (1);
 	}
 
 	mutex_enter(&ldcp->status_lock);
@@ -1072,8 +1047,6 @@ vsw_ldc_uninit(vsw_ldc_t *ldcp)
 	LDC_EXIT_LOCK(ldcp);
 
 	D1(vswp, "vsw_ldc_uninit: exit: id(%lx)", ldcp->ldc_id);
-
-	return (0);
 }
 
 static int
@@ -1092,7 +1065,7 @@ vsw_init_ldcs(vsw_port_t *port)
 	return (0);
 }
 
-static int
+static void
 vsw_uninit_ldcs(vsw_port_t *port)
 {
 	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
@@ -1103,13 +1076,11 @@ vsw_uninit_ldcs(vsw_port_t *port)
 	READ_ENTER(&ldcl->lockrw);
 	ldcp =  ldcl->head;
 	for (; ldcp  != NULL; ldcp = ldcp->ldc_next) {
-		(void) vsw_ldc_uninit(ldcp);
+		vsw_ldc_uninit(ldcp);
 	}
 	RW_EXIT(&ldcl->lockrw);
 
 	D1(NULL, "vsw_uninit_ldcs: exit\n");
-
-	return (0);
 }
 
 /*
@@ -1147,7 +1118,7 @@ vsw_uninit_ldcs(vsw_port_t *port)
  * the case where the callback has finished but the ldc framework has not yet
  * cleared the active flag. In this case we would never get a cv_signal.
  */
-static int
+static void
 vsw_drain_ldcs(vsw_port_t *port)
 {
 	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
@@ -1202,7 +1173,6 @@ vsw_drain_ldcs(vsw_port_t *port)
 	RW_EXIT(&ldcl->lockrw);
 
 	D1(vswp, "%s: exit", __func__);
-	return (0);
 }
 
 /*
@@ -1211,7 +1181,7 @@ vsw_drain_ldcs(vsw_port_t *port)
  * Prior to this function being invoked each channel under this port
  * should have been quiesced via ldc_set_cb_mode(DISABLE).
  */
-static int
+static void
 vsw_drain_port_taskq(vsw_port_t *port)
 {
 	vsw_t		*vswp = port->p_vswp;
@@ -1229,10 +1199,10 @@ vsw_drain_port_taskq(vsw_port_t *port)
 	if ((vswp->taskq_p == NULL) ||
 	    (ddi_taskq_dispatch(vswp->taskq_p, vsw_marker_task,
 	    port, DDI_NOSLEEP) != DDI_SUCCESS)) {
-		DERR(vswp, "%s: unable to dispatch marker task",
-		    __func__);
+		cmn_err(CE_NOTE, "!vsw%d: unable to dispatch marker task",
+		    vswp->instance);
 		mutex_exit(&port->state_lock);
-		return (1);
+		return;
 	}
 
 	/*
@@ -1244,8 +1214,6 @@ vsw_drain_port_taskq(vsw_port_t *port)
 	mutex_exit(&port->state_lock);
 
 	D1(vswp, "%s: exit", __func__);
-
-	return (0);
 }
 
 static void
@@ -4943,10 +4911,13 @@ vsw_create_dring_info_pkt(vsw_ldc_t *ldcp)
 	/* Allocate pools of receive mblks */
 	rv = vsw_init_multipools(ldcp, vswp);
 	if (rv) {
+		/*
+		 * We do not return failure if receive mblk pools can't be
+		 * allocated, instead allocb(9F) will be used to dynamically
+		 * allocate buffers during receive.
+		 */
 		DWARN(vswp, "%s: unable to create free mblk pools for"
 		    " channel %ld (rv %d)", __func__, ldcp->ldc_id, rv);
-		vsw_free_lane_resources(ldcp, OUTBOUND);
-		return (NULL);
 	}
 
 	mp = kmem_zalloc(sizeof (vio_dring_reg_msg_t), KM_SLEEP);
@@ -5868,7 +5839,6 @@ vsw_ldc_rx_worker(void *arg)
 	CALLB_CPR_INIT(&cprinfo, &ldcp->rx_thr_lock, callb_generic_cpr,
 	    "vsw_rx_thread");
 	mutex_enter(&ldcp->rx_thr_lock);
-	ldcp->rx_thr_flags |= VSW_WTHR_RUNNING;
 	while (!(ldcp->rx_thr_flags & VSW_WTHR_STOP)) {
 
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
@@ -5904,8 +5874,8 @@ vsw_ldc_rx_worker(void *arg)
 	 * Update the run status and wakeup the thread that
 	 * has sent the stop request.
 	 */
-	ldcp->rx_thr_flags &= ~VSW_WTHR_RUNNING;
-	cv_signal(&ldcp->rx_thr_cv);
+	ldcp->rx_thr_flags &= ~VSW_WTHR_STOP;
+	ldcp->rx_thread = NULL;
 	CALLB_CPR_EXIT(&cprinfo);
 	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
 	thread_exit();
@@ -5915,7 +5885,8 @@ vsw_ldc_rx_worker(void *arg)
 static void
 vsw_stop_rx_thread(vsw_ldc_t *ldcp)
 {
-	vsw_t *vswp = ldcp->ldc_vswp;
+	kt_did_t	tid = 0;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s(%lld):enter\n", __func__, ldcp->ldc_id);
 	/*
@@ -5923,15 +5894,16 @@ vsw_stop_rx_thread(vsw_ldc_t *ldcp)
 	 * wait until the receive thread stops.
 	 */
 	mutex_enter(&ldcp->rx_thr_lock);
-	if (ldcp->rx_thr_flags & VSW_WTHR_RUNNING) {
+	if (ldcp->rx_thread != NULL) {
+		tid = ldcp->rx_thread->t_did;
 		ldcp->rx_thr_flags |= VSW_WTHR_STOP;
 		cv_signal(&ldcp->rx_thr_cv);
-		while (ldcp->rx_thr_flags & VSW_WTHR_RUNNING) {
-			cv_wait(&ldcp->rx_thr_cv, &ldcp->rx_thr_lock);
-		}
 	}
 	mutex_exit(&ldcp->rx_thr_lock);
-	ldcp->rx_thread = NULL;
+
+	if (tid != 0) {
+		thread_join(tid);
+	}
 	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
 }
 
@@ -5953,7 +5925,6 @@ vsw_ldc_tx_worker(void *arg)
 	CALLB_CPR_INIT(&cprinfo, &ldcp->tx_thr_lock, callb_generic_cpr,
 	    "vnet_tx_thread");
 	mutex_enter(&ldcp->tx_thr_lock);
-	ldcp->tx_thr_flags |= VSW_WTHR_RUNNING;
 	while (!(ldcp->tx_thr_flags & VSW_WTHR_STOP)) {
 
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
@@ -5994,8 +5965,8 @@ vsw_ldc_tx_worker(void *arg)
 	 * Update the run status and wakeup the thread that
 	 * has sent the stop request.
 	 */
-	ldcp->tx_thr_flags &= ~VSW_WTHR_RUNNING;
-	cv_signal(&ldcp->tx_thr_cv);
+	ldcp->tx_thr_flags &= ~VSW_WTHR_STOP;
+	ldcp->tx_thread = NULL;
 	CALLB_CPR_EXIT(&cprinfo);
 	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
 	thread_exit();
@@ -6005,7 +5976,8 @@ vsw_ldc_tx_worker(void *arg)
 static void
 vsw_stop_tx_thread(vsw_ldc_t *ldcp)
 {
-	vsw_t *vswp = ldcp->ldc_vswp;
+	kt_did_t	tid = 0;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s(%lld):enter\n", __func__, ldcp->ldc_id);
 	/*
@@ -6013,15 +5985,17 @@ vsw_stop_tx_thread(vsw_ldc_t *ldcp)
 	 * wait until the receive thread stops.
 	 */
 	mutex_enter(&ldcp->tx_thr_lock);
-	if (ldcp->tx_thr_flags & VSW_WTHR_RUNNING) {
+	if (ldcp->tx_thread != NULL) {
+		tid = ldcp->tx_thread->t_did;
 		ldcp->tx_thr_flags |= VSW_WTHR_STOP;
 		cv_signal(&ldcp->tx_thr_cv);
-		while (ldcp->tx_thr_flags & VSW_WTHR_RUNNING) {
-			cv_wait(&ldcp->tx_thr_cv, &ldcp->tx_thr_lock);
-		}
 	}
 	mutex_exit(&ldcp->tx_thr_lock);
-	ldcp->tx_thread = NULL;
+
+	if (tid != 0) {
+		thread_join(tid);
+	}
+
 	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
 }
 
