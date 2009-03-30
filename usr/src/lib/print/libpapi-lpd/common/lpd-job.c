@@ -518,7 +518,12 @@ lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
 			return (PAPI_NOT_AUTHORIZED);
 		}
 		if (strcmp("standard input", files[i]) != 0) {
-			stat(files[i], &statbuf);
+			if (stat(files[i], &statbuf) < 0) {
+				detailed_error(svc,
+				    gettext("Cannot access file: %s: %s"),
+				    files[i], strerror(errno));
+				return (PAPI_DOCUMENT_ACCESS_ERROR);
+			}
 			if (statbuf.st_size == 0) {
 				detailed_error(svc,
 				    gettext("Zero byte (empty) file: %s"),

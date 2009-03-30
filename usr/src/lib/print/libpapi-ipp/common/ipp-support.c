@@ -536,7 +536,12 @@ ipp_send_request_with_file(service_t *svc, papi_attribute_t **request,
 			detailed_error(svc, "%s: %s", file, strerror(errno));
 			return (PAPI_DOCUMENT_ACCESS_ERROR);
 		} else if (strcmp("standard input", file) != 0) {
-			stat(file, &statbuf);
+			if (stat(file, &statbuf) < 0) {
+				detailed_error(svc,
+				    gettext("Cannot access file: %s: %s"),
+				    file, strerror(errno));
+				return (PAPI_DOCUMENT_ACCESS_ERROR);
+			}
 			if (statbuf.st_size == 0) {
 				detailed_error(svc,
 				    "Zero byte (empty) file: %s", file);

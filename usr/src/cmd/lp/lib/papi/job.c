@@ -456,7 +456,12 @@ papiJobSubmit(papi_service_t handle, char *printer,
 				    files[file_no], strerror(errno));
 				return (PAPI_BAD_ARGUMENT);
 			}
-			stat(files[file_no], &statbuf);
+			if (stat(files[file_no], &statbuf) < 0) {
+				detailed_error(svc,
+				    gettext("Cannot access file: %s: %s"),
+				    files[file_no], strerror(errno));
+				return (PAPI_DOCUMENT_ACCESS_ERROR);
+			}
 			if (statbuf.st_size == 0) {
 				detailed_error(svc,
 				    gettext("Zero byte (empty) file: %s"),
@@ -570,7 +575,12 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 				    files[file_no], strerror(errno));
 				return (PAPI_DOCUMENT_ACCESS_ERROR);
 			}
-			stat(files[file_no], &statbuf);
+			if (stat(files[file_no], &statbuf) < 0) {
+				detailed_error(svc,
+				    gettext("Cannot access file: %s: %s"),
+				    files[file_no], strerror(errno));
+				return (PAPI_DOCUMENT_ACCESS_ERROR);
+			}
 			if (statbuf.st_size == 0) {
 				detailed_error(svc,
 				    gettext("Zero byte (empty) file: %s"),

@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <libintl.h>
 
 #ifndef OPID_CUPS_MOVE_JOB
 #define	OPID_CUPS_MOVE_JOB 0x400D
@@ -249,7 +250,14 @@ internal_job_submit(papi_service_t handle, char *printer,
 				}
 
 				if (strcmp("standard input", files[i]) != 0) {
-					stat(files[i], &statbuf);
+					if (stat(files[i], &statbuf) < 0) {
+						detailed_error(svc, gettext(
+						    "Cannot access file: %s:"
+						    " %s"), files[i],
+						    strerror(errno));
+						return (
+						    PAPI_DOCUMENT_ACCESS_ERROR);
+					}
 					if (statbuf.st_size == 0) {
 						detailed_error(svc,
 						    "Zero byte (empty) file: "
