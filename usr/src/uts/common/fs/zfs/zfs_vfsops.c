@@ -1088,7 +1088,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * Add an extra VFS_HOLD on our parent vfs so that it can't
 	 * disappear due to a forced unmount.
 	 */
-	if (((zfsvfs_t *)vfsp->vfs_data)->z_issnap)
+	if (error == 0 && ((zfsvfs_t *)vfsp->vfs_data)->z_issnap)
 		VFS_HOLD(mvp->v_vfsp);
 
 out:
