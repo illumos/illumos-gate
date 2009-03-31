@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -964,4 +964,106 @@ nxge_check_guest_state_exit:
 	NXGE_DEBUG_MSG((nxge, SYSERR_CTL, "<== nxge_check_guest_state"));
 }
 
+nxge_status_t
+nxge_hio_rdc_intr_arm(p_nxge_t nxge, boolean_t arm)
+{
+	nxge_grp_t	*group;
+	uint32_t	channel;
+	nxge_hio_dc_t	*dc;
+	nxge_ldg_t	*ldgp;
+
+	/*
+	 * Validate state of guest interface before
+	 * proceeeding.
+	 */
+	if (!isLDOMguest(nxge))
+		return (NXGE_ERROR);
+	if (nxge->nxge_mac_state != NXGE_MAC_STARTED)
+		return (NXGE_ERROR);
+
+	/*
+	 * In guest domain, always and only dealing with
+	 * group 0 for an instance of nxge.
+	 */
+	group = nxge->rx_set.group[0];
+
+	/*
+	 * Look to arm the the RDCs for the group.
+	 */
+	for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
+		if ((1 << channel) & group->map) {
+			/*
+			 * Get the RDC.
+			 */
+			dc = nxge_grp_dc_find(nxge, VP_BOUND_RX, channel);
+			if (dc == NULL)
+				return (NXGE_ERROR);
+
+			/*
+			 * Get the RDC's ldg group.
+			 */
+			ldgp = &nxge->ldgvp->ldgp[dc->ldg.vector];
+			if (ldgp == NULL)
+				return (NXGE_ERROR);
+
+			/*
+			 * Set the state of the group.
+			 */
+			ldgp->arm = arm;
+
+			nxge_hio_ldgimgn(nxge, ldgp);
+		}
+	}
+
+	return (NXGE_OK);
+}
+
+nxge_status_t
+nxge_hio_rdc_enable(p_nxge_t nxge)
+{
+	nxge_grp_t	*group;
+	npi_handle_t	handle;
+	uint32_t	channel;
+	npi_status_t	rval;
+
+	/*
+	 * Validate state of guest interface before
+	 * proceeeding.
+	 */
+	if (!isLDOMguest(nxge))
+		return (NXGE_ERROR);
+	if (nxge->nxge_mac_state != NXGE_MAC_STARTED)
+		return (NXGE_ERROR);
+
+	/*
+	 * In guest domain, always and only dealing with
+	 * group 0 for an instance of nxge.
+	 */
+	group = nxge->rx_set.group[0];
+
+	/*
+	 * Get the PIO handle.
+	 */
+	handle = NXGE_DEV_NPI_HANDLE(nxge);
+
+	for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
+		/*
+		 * If this channel is in the map, then enable
+		 * it.
+		 */
+		if ((1 << channel) & group->map) {
+			/*
+			 * Enable the RDC and clear the empty bit.
+			 */
+			rval = npi_rxdma_cfg_rdc_enable(handle, channel);
+			if (rval != NPI_SUCCESS)
+				return (NXGE_ERROR);
+
+			(void) npi_rxdma_channel_rbr_empty_clear(handle,
+			    channel);
+		}
+	}
+
+	return (NXGE_OK);
+}
 #endif	/* defined(sun4v) */

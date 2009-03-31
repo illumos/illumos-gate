@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -381,8 +381,14 @@ nxge_hio_intr_add(
 
 	interrupts->intr_enabled = B_TRUE;
 
-	/* Finally, arm the interrupt. */
-	nxge_hio_ldgimgn(nxge, group);
+	/*
+	 * Note: RDC interrupts will be armed in nxge_m_start(). This
+	 * prevents us from getting an interrupt before we are ready
+	 * to process packets.
+	 */
+	if (type == VP_BOUND_TX) {
+		nxge_hio_ldgimgn(nxge, group);
+	}
 
 	dc->interrupting = B_TRUE;
 

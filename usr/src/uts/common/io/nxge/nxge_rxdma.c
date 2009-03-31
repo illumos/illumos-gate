@@ -619,16 +619,21 @@ nxge_enable_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 		return (NXGE_ERROR | rs);
 	}
 
-	/* Enable the DMA */
-	rs = npi_rxdma_cfg_rdc_enable(handle, channel);
-	if (rs != NPI_SUCCESS) {
-		return (NXGE_ERROR | rs);
+	if (!isLDOMguest(nxgep)) {
+		/* Enable the DMA */
+		rs = npi_rxdma_cfg_rdc_enable(handle, channel);
+		if (rs != NPI_SUCCESS) {
+			return (NXGE_ERROR | rs);
+		}
 	}
 
 	/* Kick the DMA engine. */
 	npi_rxdma_rdc_rbr_kick(handle, channel, rbr_p->rbb_max);
-	/* Clear the rbr empty bit */
-	(void) npi_rxdma_channel_rbr_empty_clear(handle, channel);
+
+	if (!isLDOMguest(nxgep)) {
+		/* Clear the rbr empty bit */
+		(void) npi_rxdma_channel_rbr_empty_clear(handle, channel);
+	}
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_enable_rxdma_channel"));
 
@@ -1826,15 +1831,10 @@ nxge_rx_intr(void *arg1, void *arg2)
 	p_rx_rcr_ring_t		rcr_ring;
 	mblk_t			*mp;
 
-#ifdef	NXGE_DEBUG
-	rxdma_cfig1_t		cfg;
-#endif
-
 	if (ldvp == NULL) {
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
 		    "<== nxge_rx_intr: arg2 $%p arg1 $%p",
 		    nxgep, ldvp));
-
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -1854,11 +1854,13 @@ nxge_rx_intr(void *arg1, void *arg2)
 	    nxgep, ldvp));
 
 	/*
-	 * This interrupt handler is for a specific
-	 * receive dma channel.
+	 * Get the PIO handle.
 	 */
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
+	/*
+	 * Get the ring to enable us to process packets.
+	 */
 	rcr_ring = nxgep->rx_rcr_rings->rcr_rings[ldvp->vdma_index];
 
 	/*
@@ -1877,13 +1879,41 @@ nxge_rx_intr(void *arg1, void *arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 
-	if (!isLDOMguest(nxgep)) {
-		if (!nxgep->rx_channel_started[channel]) {
-			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			    "<== nxge_rx_intr: channel is not started"));
-			MUTEX_EXIT(&rcr_ring->lock);
-			return (DDI_INTR_CLAIMED);
+	if (!isLDOMguest(nxgep) && (!nxgep->rx_channel_started[channel])) {
+		NXGE_DEBUG_MSG((nxgep, INT_CTL,
+		    "<== nxge_rx_intr: channel is not started"));
+
+		/*
+		 * We received an interrupt before the ring is started.
+		 */
+		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
+		    &cs.value);
+		cs.value &= RX_DMA_CTL_STAT_WR1C;
+		cs.bits.hdw.mex = 1;
+		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
+		    cs.value);
+
+		/*
+		 * Rearm this logical group if this is a single device
+		 * group.
+		 */
+		if (ldgp->nldvs == 1) {
+			if (isLDOMguest(nxgep)) {
+				nxge_hio_ldgimgn(nxgep, ldgp);
+			} else {
+				ldgimgm_t mgm;
+
+				mgm.value = 0;
+				mgm.bits.ldw.arm = 1;
+				mgm.bits.ldw.timer = ldgp->ldg_timer;
+
+				NXGE_REG_WR64(handle,
+				    LDGIMGN_REG + LDSV_OFFSET(ldgp->ldg),
+				    mgm.value);
+			}
 		}
+		MUTEX_EXIT(&rcr_ring->lock);
+		return (DDI_INTR_CLAIMED);
 	}
 
 	ASSERT(rcr_ring->ldgp == ldgp);
@@ -4975,8 +5005,8 @@ nxge_rxdma_databuf_free(p_rx_rbr_ring_t rbr_p)
 	}
 
 	if (rbr_p->rbr_alloc_type == DDI_MEM_ALLOC) {
-		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
-		    "==> nxge_rxdma_databuf_free: DDI"));
+		NXGE_DEBUG_MSG((NULL, DMA_CTL,
+		    "<== nxge_rxdma_databuf_free: DDI"));
 		return;
 	}
 

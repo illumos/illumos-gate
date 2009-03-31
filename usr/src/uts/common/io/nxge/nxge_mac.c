@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -909,8 +909,10 @@ nxge_mac_init(p_nxge_t nxgep)
 	if ((status = nxge_tx_mac_enable(nxgep)) != NXGE_OK)
 		goto fail;
 
-	if ((status = nxge_rx_mac_enable(nxgep)) != NXGE_OK)
-		goto fail;
+	if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
+		if ((status = nxge_rx_mac_enable(nxgep)) != NXGE_OK)
+			goto fail;
+	}
 
 	/* Initialize MAC control configuration */
 	if ((status = nxge_mac_ctrl_init(nxgep)) != NXGE_OK) {

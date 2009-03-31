@@ -259,6 +259,10 @@ static int nxge_init_common_dev(p_nxge_t);
 static void nxge_uninit_common_dev(p_nxge_t);
 extern int nxge_param_set_mac(p_nxge_t, queue_t *, mblk_t *,
     char *, caddr_t);
+#if defined(sun4v)
+extern nxge_status_t nxge_hio_rdc_enable(p_nxge_t nxgep);
+extern nxge_status_t nxge_hio_rdc_intr_arm(p_nxge_t nxge, boolean_t arm);
+#endif
 
 /*
  * The next declarations are for the GLDv3 interface.
@@ -1627,12 +1631,11 @@ nxge_init(p_nxge_t nxgep)
 		goto nxge_init_fail5;
 	}
 
-	nxge_intrs_enable(nxgep); /* XXX What changes do I need to make here? */
-
 	/*
-	 * Enable hardware interrupts.
+	 * Enable the interrrupts for DDI.
 	 */
-	nxge_intr_hw_enable(nxgep);
+	nxge_intrs_enable(nxgep);
+
 	nxgep->drv_state |= STATE_HW_INITIALIZED;
 
 	goto nxge_init_exit;
@@ -1691,6 +1694,18 @@ nxge_uninit(p_nxge_t nxgep)
 		return;
 	}
 
+	if (!isLDOMguest(nxgep)) {
+		/*
+		 * Reset the receive MAC side.
+		 */
+		(void) nxge_rx_mac_disable(nxgep);
+
+		/*
+		 * Drain the IPP.
+		 */
+		(void) nxge_ipp_drain(nxgep);
+	}
+
 	/* stop timer */
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
@@ -1700,10 +1715,6 @@ nxge_uninit(p_nxge_t nxgep)
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
 	(void) nxge_intr_hw_disable(nxgep);
 
-	/*
-	 * Reset the receive MAC side.
-	 */
-	(void) nxge_rx_mac_disable(nxgep);
 
 	/* Disable and soft reset the IPP */
 	if (!isLDOMguest(nxgep))
@@ -3687,11 +3698,32 @@ nxge_m_start(void *arg)
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_start"));
 
+	/*
+	 * Are we already started?
+	 */
+	if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
+		return (0);
+	}
+
 	if (nxge_peu_reset_enable && !nxgep->nxge_link_poll_timerid) {
 		(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	}
 
+	/*
+	 * Make sure RX MAC is disabled while we initialize.
+	 */
+	if (!isLDOMguest(nxgep)) {
+		(void) nxge_rx_mac_disable(nxgep);
+	}
+
+	/*
+	 * Grab the global lock.
+	 */
 	MUTEX_ENTER(nxgep->genlock);
+
+	/*
+	 * Initialize the driver and hardware.
+	 */
 	if (nxge_init(nxgep) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "<== nxge_m_start: initialization failed"));
@@ -3699,29 +3731,63 @@ nxge_m_start(void *arg)
 		return (EIO);
 	}
 
-	if (nxgep->nxge_mac_state == NXGE_MAC_STARTED)
-		goto nxge_m_start_exit;
 	/*
 	 * Start timer to check the system error and tx hangs
 	 */
 	if (!isLDOMguest(nxgep))
 		nxgep->nxge_timerid = nxge_start_timer(nxgep,
 		    nxge_check_hw_state, NXGE_CHECK_TIMER);
-#if	defined(sun4v)
+#if defined(sun4v)
 	else
 		nxge_hio_start_timer(nxgep);
 #endif
 
 	nxgep->link_notify = B_TRUE;
-
 	nxgep->nxge_mac_state = NXGE_MAC_STARTED;
 
-nxge_m_start_exit:
+	/*
+	 * Let the global lock go, since we are intialized.
+	 */
 	MUTEX_EXIT(nxgep->genlock);
+
+	/*
+	 * Let the MAC start receiving packets, now that
+	 * we are initialized.
+	 */
+	if (!isLDOMguest(nxgep)) {
+		if (nxge_rx_mac_enable(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_m_start: enable of RX mac failed"));
+			return (EIO);
+		}
+
+		/*
+		 * Enable hardware interrupts.
+		 */
+		nxge_intr_hw_enable(nxgep);
+	}
+#if defined(sun4v)
+	else {
+		/*
+		 * In guest domain we enable RDCs and their interrupts as
+		 * the last step.
+		 */
+		if (nxge_hio_rdc_enable(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_m_start: enable of RDCs failed"));
+			return (EIO);
+		}
+
+		if (nxge_hio_rdc_intr_arm(nxgep, B_TRUE) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_m_start: intrs enable for RDCs failed"));
+			return (EIO);
+		}
+	}
+#endif
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "<== nxge_m_start"));
 	return (0);
 }
-
 
 static boolean_t
 nxge_check_groups_stopped(p_nxge_t nxgep)
@@ -3747,31 +3813,61 @@ nxge_m_stop(void *arg)
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_stop"));
 
+	/*
+	 * Are the groups stopped?
+	 */
 	groups_stopped = nxge_check_groups_stopped(nxgep);
-#ifdef later
-	ASSERT(groups_stopped == B_FALSE);
-#endif
-
+	ASSERT(groups_stopped == B_TRUE);
 	if (!groups_stopped) {
 		cmn_err(CE_WARN, "nxge(%d): groups are not stopped!\n",
 		    nxgep->instance);
 		return;
 	}
 
-	MUTEX_ENTER(nxgep->genlock);
-	nxgep->nxge_mac_state = NXGE_MAC_STOPPING;
+	if (!isLDOMguest(nxgep)) {
+		/*
+		 * Disable the RX mac.
+		 */
+		(void) nxge_rx_mac_disable(nxgep);
 
+		/*
+		 * Wait for the IPP to drain.
+		 */
+		(void) nxge_ipp_drain(nxgep);
+
+		/*
+		 * Disable hardware interrupts.
+		 */
+		nxge_intr_hw_disable(nxgep);
+	}
+#if defined(sun4v)
+	else {
+		(void) nxge_hio_rdc_intr_arm(nxgep, B_FALSE);
+	}
+#endif
+
+	/*
+	 * Grab the global lock.
+	 */
+	MUTEX_ENTER(nxgep->genlock);
+
+	nxgep->nxge_mac_state = NXGE_MAC_STOPPING;
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
 		nxgep->nxge_timerid = 0;
 	}
 
+	/*
+	 * Clean up.
+	 */
 	nxge_uninit(nxgep);
 
 	nxgep->nxge_mac_state = NXGE_MAC_STOPPED;
 
+	/*
+	 * Let go of the global lock.
+	 */
 	MUTEX_EXIT(nxgep->genlock);
-
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "<== nxge_m_stop"));
 }
 
