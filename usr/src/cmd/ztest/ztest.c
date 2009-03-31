@@ -205,12 +205,12 @@ ztest_info_t ztest_info[] = {
 	{ ztest_dsl_prop_get_set,		1,	&zopt_sometimes	},
 	{ ztest_dmu_objset_create_destroy,	1,	&zopt_sometimes },
 	{ ztest_dmu_snapshot_create_destroy,	1,	&zopt_sometimes },
-	{ ztest_dsl_dataset_promote_busy,	1,	&zopt_sometimes },
 	{ ztest_spa_create_destroy,		1,	&zopt_sometimes },
 	{ ztest_fault_inject,			1,	&zopt_sometimes	},
 	{ ztest_spa_rename,			1,	&zopt_rarely	},
 	{ ztest_vdev_attach_detach,		1,	&zopt_rarely	},
 	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
+	{ ztest_dsl_dataset_promote_busy,	1,	&zopt_rarely	},
 	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime	},
 	{ ztest_vdev_aux_add_remove,		1,	&zopt_vdevtime	},
 	{ ztest_scrub,				1,	&zopt_vdevtime	},
@@ -1482,10 +1482,13 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 		fatal(0, "dmu_objset_destroy() = %d", error);
 
 	error = dmu_objset_snapshot(osname, strchr(snap1name, '@')+1, FALSE);
-	if (error == ENOSPC)
-		ztest_record_enospc("dmu_take_snapshot");
-	else if (error != 0 && error != EEXIST)
-		fatal(0, "dmu_take_snapshot = %d", error);
+	if (error && error != EEXIST) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_take_snapshot");
+			goto out;
+		}
+		fatal(0, "dmu_take_snapshot(%s) = %d", snap1name, error);
+	}
 
 	error = dmu_objset_open(snap1name, DMU_OST_OTHER,
 	    DS_MODE_USER | DS_MODE_READONLY, &clone);
@@ -1494,23 +1497,34 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 
 	error = dmu_objset_create(clone1name, DMU_OST_OTHER, clone, 0,
 	    NULL, NULL);
-	if (error)
-		fatal(0, "dmu_objset_create(%s) = %d", clone1name, error);
 	dmu_objset_close(clone);
+	if (error) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_objset_create");
+			goto out;
+		}
+		fatal(0, "dmu_objset_create(%s) = %d", clone1name, error);
+	}
 
 	error = dmu_objset_snapshot(clone1name, strchr(snap2name, '@')+1,
 	    FALSE);
-	if (error == ENOSPC)
-		ztest_record_enospc("dmu_take_snapshot");
-	else if (error != 0 && error != EEXIST)
-		fatal(0, "dmu_take_snapshot = %d", error);
+	if (error && error != EEXIST) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_take_snapshot");
+			goto out;
+		}
+		fatal(0, "dmu_open_snapshot(%s) = %d", snap2name, error);
+	}
 
 	error = dmu_objset_snapshot(clone1name, strchr(snap3name, '@')+1,
 	    FALSE);
-	if (error == ENOSPC)
-		ztest_record_enospc("dmu_take_snapshot");
-	else if (error != 0 && error != EEXIST)
-		fatal(0, "dmu_take_snapshot = %d", error);
+	if (error && error != EEXIST) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_take_snapshot");
+			goto out;
+		}
+		fatal(0, "dmu_open_snapshot(%s) = %d", snap3name, error);
+	}
 
 	error = dmu_objset_open(snap3name, DMU_OST_OTHER,
 	    DS_MODE_USER | DS_MODE_READONLY, &clone);
@@ -1519,9 +1533,14 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 
 	error = dmu_objset_create(clone2name, DMU_OST_OTHER, clone, 0,
 	    NULL, NULL);
-	if (error)
-		fatal(0, "dmu_objset_create(%s) = %d", clone2name, error);
 	dmu_objset_close(clone);
+	if (error) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_objset_create");
+			goto out;
+		}
+		fatal(0, "dmu_objset_create(%s) = %d", clone2name, error);
+	}
 
 	error = dsl_dataset_own(snap1name, DS_MODE_READONLY, FTAG, &ds);
 	if (error)
@@ -1532,23 +1551,21 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 		    error);
 	dsl_dataset_disown(ds, FTAG);
 
+out:
 	error = dmu_objset_destroy(clone2name);
-	if (error)
+	if (error && error != ENOENT)
 		fatal(0, "dmu_objset_destroy(%s) = %d", clone2name, error);
-
 	error = dmu_objset_destroy(snap3name);
-	if (error)
+	if (error && error != ENOENT)
 		fatal(0, "dmu_objset_destroy(%s) = %d", snap3name, error);
-
 	error = dmu_objset_destroy(snap2name);
-	if (error)
+	if (error && error != ENOENT)
 		fatal(0, "dmu_objset_destroy(%s) = %d", snap2name, error);
-
 	error = dmu_objset_destroy(clone1name);
-	if (error)
+	if (error && error != ENOENT)
 		fatal(0, "dmu_objset_destroy(%s) = %d", clone1name, error);
 	error = dmu_objset_destroy(snap1name);
-	if (error)
+	if (error && error != ENOENT)
 		fatal(0, "dmu_objset_destroy(%s) = %d", snap1name, error);
 
 	(void) rw_unlock(&ztest_shared->zs_name_lock);
