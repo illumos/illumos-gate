@@ -3082,7 +3082,7 @@ ztest_resume(spa_t *spa)
 		spa_vdev_state_enter(spa);
 		vdev_clear(spa, NULL);
 		(void) spa_vdev_state_exit(spa, NULL, 0);
-		zio_resume(spa);
+		(void) zio_resume(spa);
 	}
 }
 

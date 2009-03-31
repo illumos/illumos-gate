@@ -683,10 +683,10 @@ spa_unload(spa_t *spa)
 	/*
 	 * Wait for any outstanding async I/O to complete.
 	 */
-	mutex_enter(&spa->spa_async_root_lock);
-	while (spa->spa_async_root_count != 0)
-		cv_wait(&spa->spa_async_root_cv, &spa->spa_async_root_lock);
-	mutex_exit(&spa->spa_async_root_lock);
+	if (spa->spa_async_zio_root != NULL) {
+		(void) zio_wait(spa->spa_async_zio_root);
+		spa->spa_async_zio_root = NULL;
+	}
 
 	/*
 	 * Close the dsl pool.
@@ -1105,6 +1105,14 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	}
 
 	spa->spa_load_guid = pool_guid;
+
+	/*
+	 * Create "The Godfather" zio to hold all async IOs
+	 */
+	if (spa->spa_async_zio_root == NULL)
+		spa->spa_async_zio_root = zio_root(spa, NULL, NULL,
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE |
+		    ZIO_FLAG_GODFATHER);
 
 	/*
 	 * Parse the configuration into a vdev tree.  We explicitly set the
@@ -2008,6 +2016,14 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	ASSERT(version <= SPA_VERSION);
 	spa->spa_uberblock.ub_version = version;
 	spa->spa_ubsync = spa->spa_uberblock;
+
+	/*
+	 * Create "The Godfather" zio to hold all async IOs
+	 */
+	if (spa->spa_async_zio_root == NULL)
+		spa->spa_async_zio_root = zio_root(spa, NULL, NULL,
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE |
+		    ZIO_FLAG_GODFATHER);
 
 	/*
 	 * Create the root vdev.

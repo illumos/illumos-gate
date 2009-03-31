@@ -67,6 +67,8 @@ static major_t zfs_major;
 static minor_t zfs_minor;
 static kmutex_t	zfs_dev_mtx;
 
+extern int sys_shutdown;
+
 static int zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr);
 static int zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr);
 static int zfs_mountroot(vfs_t *vfsp, enum whymountroot);
@@ -145,12 +147,24 @@ zfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 		 * Sync a specific filesystem.
 		 */
 		zfsvfs_t *zfsvfs = vfsp->vfs_data;
+		dsl_pool_t *dp;
 
 		ZFS_ENTER(zfsvfs);
+		dp = dmu_objset_pool(zfsvfs->z_os);
+
+		/*
+		 * If the system is shutting down, then skip any
+		 * filesystems which may exist on a suspended pool.
+		 */
+		if (sys_shutdown && spa_suspended(dp->dp_spa)) {
+			ZFS_EXIT(zfsvfs);
+			return (0);
+		}
+
 		if (zfsvfs->z_log != NULL)
 			zil_commit(zfsvfs->z_log, UINT64_MAX, 0);
 		else
-			txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
+			txg_wait_synced(dp, 0);
 		ZFS_EXIT(zfsvfs);
 	} else {
 		/*

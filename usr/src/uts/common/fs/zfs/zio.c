@@ -529,21 +529,11 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 static void
 zio_destroy(zio_t *zio)
 {
-	spa_t *spa = zio->io_spa;
-	uint8_t async_root = zio->io_async_root;
-
 	list_destroy(&zio->io_parent_list);
 	list_destroy(&zio->io_child_list);
 	mutex_destroy(&zio->io_lock);
 	cv_destroy(&zio->io_cv);
 	kmem_cache_free(zio_cache, zio);
-
-	if (async_root) {
-		mutex_enter(&spa->spa_async_root_lock);
-		if (--spa->spa_async_root_count == 0)
-			cv_broadcast(&spa->spa_async_root_cv);
-		mutex_exit(&spa->spa_async_root_lock);
-	}
 }
 
 zio_t *
@@ -1092,14 +1082,12 @@ zio_nowait(zio_t *zio)
 	    zio_unique_parent(zio) == NULL) {
 		/*
 		 * This is a logical async I/O with no parent to wait for it.
-		 * Track how many outstanding I/Os of this type exist so
-		 * that spa_unload() knows when they are all done.
+		 * We add it to the spa_async_root_zio "Godfather" I/O which
+		 * will ensure they complete prior to unloading the pool.
 		 */
 		spa_t *spa = zio->io_spa;
-		zio->io_async_root = B_TRUE;
-		mutex_enter(&spa->spa_async_root_lock);
-		spa->spa_async_root_count++;
-		mutex_exit(&spa->spa_async_root_lock);
+
+		zio_add_child(spa->spa_async_zio_root, zio);
 	}
 
 	zio_execute(zio);
@@ -1161,8 +1149,11 @@ zio_reexecute(zio_t *pio)
 
 	/*
 	 * Now that all children have been reexecuted, execute the parent.
+	 * We don't reexecute "The Godfather" I/O here as it's the
+	 * responsibility of the caller to wait on him.
 	 */
-	zio_execute(pio);
+	if (!(pio->io_flags & ZIO_FLAG_GODFATHER))
+		zio_execute(pio);
 }
 
 void
@@ -1178,11 +1169,14 @@ zio_suspend(spa_t *spa, zio_t *zio)
 	mutex_enter(&spa->spa_suspend_lock);
 
 	if (spa->spa_suspend_zio_root == NULL)
-		spa->spa_suspend_zio_root = zio_root(spa, NULL, NULL, 0);
+		spa->spa_suspend_zio_root = zio_root(spa, NULL, NULL,
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE |
+		    ZIO_FLAG_GODFATHER);
 
 	spa->spa_suspended = B_TRUE;
 
 	if (zio != NULL) {
+		ASSERT(!(zio->io_flags & ZIO_FLAG_GODFATHER));
 		ASSERT(zio != spa->spa_suspend_zio_root);
 		ASSERT(zio->io_child_type == ZIO_CHILD_LOGICAL);
 		ASSERT(zio_unique_parent(zio) == NULL);
@@ -1193,10 +1187,10 @@ zio_suspend(spa_t *spa, zio_t *zio)
 	mutex_exit(&spa->spa_suspend_lock);
 }
 
-void
+int
 zio_resume(spa_t *spa)
 {
-	zio_t *pio, *cio, *cio_next;
+	zio_t *pio;
 
 	/*
 	 * Reexecute all previously suspended i/o.
@@ -1209,18 +1203,10 @@ zio_resume(spa_t *spa)
 	mutex_exit(&spa->spa_suspend_lock);
 
 	if (pio == NULL)
-		return;
+		return (0);
 
-	for (cio = zio_walk_children(pio); cio != NULL; cio = cio_next) {
-		zio_link_t *zl = pio->io_walk_link;
-		cio_next = zio_walk_children(pio);
-		zio_remove_child(pio, cio, zl);
-		zio_reexecute(cio);
-	}
-
-	ASSERT(pio->io_children[ZIO_CHILD_LOGICAL][ZIO_WAIT_DONE] == 0);
-
-	(void) zio_wait(pio);
+	zio_reexecute(pio);
+	return (zio_wait(pio));
 }
 
 void
@@ -2219,7 +2205,7 @@ zio_done(zio_t *zio)
 	 */
 	zio_inherit_child_errors(zio, ZIO_CHILD_LOGICAL);
 
-	if (zio->io_reexecute) {
+	if (zio->io_reexecute && !(zio->io_flags & ZIO_FLAG_GODFATHER)) {
 		/*
 		 * This is a logical I/O that wants to reexecute.
 		 *
@@ -2243,6 +2229,24 @@ zio_done(zio_t *zio)
 		mutex_enter(&zio->io_lock);
 		zio->io_state[ZIO_WAIT_DONE] = 1;
 		mutex_exit(&zio->io_lock);
+
+		/*
+		 * "The Godfather" I/O monitors its children but is
+		 * not a true parent to them. It will track them through
+		 * the pipeline but severs its ties whenever they get into
+		 * trouble (e.g. suspended). This allows "The Godfather"
+		 * I/O to return status without blocking.
+		 */
+		for (pio = zio_walk_parents(zio); pio != NULL; pio = pio_next) {
+			zio_link_t *zl = zio->io_walk_link;
+			pio_next = zio_walk_parents(zio);
+
+			if ((pio->io_flags & ZIO_FLAG_GODFATHER) &&
+			    (zio->io_reexecute & ZIO_REEXECUTE_SUSPEND)) {
+				zio_remove_child(pio, zio, zl);
+				zio_notify_parent(pio, zio, ZIO_WAIT_DONE);
+			}
+		}
 
 		if ((pio = zio_unique_parent(zio)) != NULL) {
 			/*
@@ -2271,7 +2275,7 @@ zio_done(zio_t *zio)
 	}
 
 	ASSERT(zio_walk_children(zio) == NULL);
-	ASSERT(zio->io_reexecute == 0);
+	ASSERT(zio->io_reexecute == 0 || (zio->io_flags & ZIO_FLAG_GODFATHER));
 	ASSERT(zio->io_error == 0 || (zio->io_flags & ZIO_FLAG_CANFAIL));
 
 	/*

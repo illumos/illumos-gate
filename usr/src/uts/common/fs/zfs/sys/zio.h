@@ -140,6 +140,7 @@ enum zio_compress {
 #define	ZIO_FLAG_PROBE			0x10000
 #define	ZIO_FLAG_GANG_CHILD		0x20000
 #define	ZIO_FLAG_RAW			0x40000
+#define	ZIO_FLAG_GODFATHER		0x80000
 
 #define	ZIO_FLAG_GANG_INHERIT		\
 	(ZIO_FLAG_CANFAIL |		\
@@ -281,7 +282,6 @@ struct zio {
 	int		io_cmd;
 	uint8_t		io_priority;
 	uint8_t		io_reexecute;
-	uint8_t		io_async_root;
 	uint8_t		io_state[ZIO_WAIT_TYPES];
 	uint64_t	io_txg;
 	spa_t		*io_spa;
@@ -415,7 +415,7 @@ extern uint8_t zio_checksum_select(uint8_t child, uint8_t parent);
 extern uint8_t zio_compress_select(uint8_t child, uint8_t parent);
 
 extern void zio_suspend(spa_t *spa, zio_t *zio);
-extern void zio_resume(spa_t *spa);
+extern int zio_resume(spa_t *spa);
 extern void zio_resume_wait(spa_t *spa);
 
 /*

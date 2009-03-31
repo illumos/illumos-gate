@@ -364,6 +364,11 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case ENOTSUP:
 		zfs_verror(hdl, EZFS_BADVERSION, fmt, ap);
 		break;
+	case EAGAIN:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "pool I/O is currently suspended"));
+		zfs_verror(hdl, EZFS_POOLUNAVAIL, fmt, ap);
+		break;
 	default:
 		zfs_error_aux(hdl, strerror(errno));
 		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
@@ -437,6 +442,11 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case EDQUOT:
 		zfs_verror(hdl, EZFS_NOSPC, fmt, ap);
 		return (-1);
+	case EAGAIN:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "pool I/O is currently suspended"));
+		zfs_verror(hdl, EZFS_POOLUNAVAIL, fmt, ap);
+		break;
 
 	default:
 		zfs_error_aux(hdl, strerror(error));
