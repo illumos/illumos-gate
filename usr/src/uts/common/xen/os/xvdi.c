@@ -1362,7 +1362,9 @@ xvdi_remove_xb_watch_handlers(dev_info_t *dip)
 	mutex_enter(&pdp->xd_ndi_lk);
 
 	while ((xxwp = list_remove_head(&pdp->xd_xb_watches)) != NULL) {
+		mutex_exit(&pdp->xd_ndi_lk);
 		unregister_xenbus_watch(&xxwp->xxw_watch);
+		mutex_enter(&pdp->xd_ndi_lk);
 		i_xvdi_xb_watch_release(xxwp);
 	}
 	ASSERT(list_is_empty(&pdp->xd_xb_watches));
