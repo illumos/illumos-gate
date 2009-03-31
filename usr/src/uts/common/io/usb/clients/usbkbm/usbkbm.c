@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +78,9 @@ static enum kbtrans_message_response usbkbm_ioctl(queue_t *, mblk_t *);
 static int usbkbm_kioccmd(usbkbm_state_t *, mblk_t *, char, size_t *);
 static void	usbkbm_usb2pc_xlate(usbkbm_state_t *, int, enum keystate);
 static void	usbkbm_wrap_kbtrans(usbkbm_state_t *, int, enum keystate);
-static int 	usbkbm_set_protocol(usbkbm_state_t *, uint16_t);
-static int 	usbkbm_get_vid_pid(usbkbm_state_t *);
+static int	usbkbm_get_protocol(usbkbm_state_t *);
+static int	usbkbm_set_protocol(usbkbm_state_t *, uint16_t);
+static int	usbkbm_get_vid_pid(usbkbm_state_t *);
 
 /* stream qinit functions defined here */
 static int	usbkbm_open(queue_t *, dev_t *, int, int, cred_t *);
@@ -113,7 +114,7 @@ struct kbtrans_callbacks kbd_usb_callbacks = {
  */
 
 /* This variable saves the LED state across hotplugging. */
-static uchar_t  usbkbm_led_state = 0;
+static uchar_t	usbkbm_led_state = 0;
 
 /* This variable saves the layout state */
 static uint16_t usbkbm_layout = 0;
@@ -490,14 +491,20 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	qprocson(q);
 
-	/*
-	 * The hid module already configured this keyboard for report mode,
-	 * but usbkbm only knows how to deal with boot-protocol mode,
-	 * so switch into boot-protocol mode now.
-	 */
-	if (ret = usbkbm_set_protocol(usbkbmd, SET_BOOT_PROTOCOL)) {
+	if (ret = usbkbm_get_protocol(usbkbmd)) {
 
 		return (ret);
+	}
+
+	if (usbkbmd->protocol != SET_BOOT_PROTOCOL) {
+	/*
+	 * The current usbkbm only knows how to deal with boot-protocol mode,
+	 * so switch into boot-protocol mode now.
+	 */
+		if (ret = usbkbm_set_protocol(usbkbmd, SET_BOOT_PROTOCOL)) {
+
+			return (ret);
+		}
 	}
 
 	/*
@@ -1134,15 +1141,11 @@ static void
 usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 {
 	register usbkbm_state_t *usbkbmd = (usbkbm_state_t *)q->q_ptr;
-	register struct iocblk *iocp, mctlmsg;
+	register struct iocblk *iocp;
 	caddr_t  data = NULL;
-	mblk_t	*reply_mp, *mctl_ptr;
+	mblk_t	*reply_mp;
 	uchar_t	new_buffer[USBKBM_MAXPKTSIZE];
-	size_t   size;
-	hid_req_t buf;
-	size_t len = sizeof (buf);
-
-
+	size_t	 size;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	if (mp->b_cont != NULL)
@@ -1259,21 +1262,6 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 
 		break;
 	case HID_CONNECT_EVENT:
-		mctlmsg.ioc_cmd = HID_SET_PROTOCOL;
-		mctlmsg.ioc_count = 0;
-		buf.hid_req_version_no = HID_VERSION_V_0;
-		buf.hid_req_wValue = SET_BOOT_PROTOCOL;
-		buf.hid_req_wLength = 0;
-		mctl_ptr = usba_mk_mctl(mctlmsg, &buf, len);
-		if (mctl_ptr == NULL) {
-			USB_DPRINTF_L2(PRINT_MASK_ALL, usbkbm_log_handle,
-			    "usbkbm_mctl_receive HID_CONNECT_EVENT: "
-			    "Set protocol failed");
-		} else {
-			putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
-		}
-
-		/* FALLTHRU */
 	case HID_FULL_POWER :
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 		    "usbkbm_mctl_receive restore LEDs");
@@ -1283,6 +1271,15 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		    usbkbm_led_state);
 
 		freemsg(mp);
+
+		break;
+	case HID_GET_PROTOCOL:
+		if ((data != NULL) && (iocp->ioc_count == 1) &&
+		    (MBLKL(mp->b_cont) == iocp->ioc_count)) {
+			bcopy(data, &usbkbmd->protocol, iocp->ioc_count);
+		}
+		freemsg(mp);
+		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
 
 		break;
 	default:
@@ -1455,7 +1452,7 @@ static ushort_t	usbkbm_get_state(usbkbm_state_t *usbkbmd)
  *	get called with an unpacked key (scancode) and state (press/release).
  *	We pass it to the generic keyboard module.
  *
- * 	'index' and the function pointers:
+ *	'index' and the function pointers:
  *	Map USB scancodes to PC scancodes by lookup table.
  *	This fix is mainly meant for x86 platforms. For SPARC systems
  *	this fix doesn't change the way in which the scancodes are processed.
@@ -1957,6 +1954,45 @@ usbkbm_get_vid_pid(usbkbm_state_t *usbkbmd)
 	queue_t *q = usbkbmd->usbkbm_readq;
 
 	mctlmsg.ioc_cmd = HID_GET_VID_PID;
+	mctlmsg.ioc_count = 0;
+
+	mctl_ptr = usba_mk_mctl(mctlmsg, NULL, 0);
+	if (mctl_ptr == NULL) {
+		(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
+		qprocsoff(q);
+		kmem_free(usbkbmd, sizeof (usbkbm_state_t));
+
+		return (ENOMEM);
+	}
+
+	putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
+	usbkbmd->usbkbm_flags |= USBKBM_QWAIT;
+	while (usbkbmd->usbkbm_flags & USBKBM_QWAIT) {
+		if (qwait_sig(q) == 0) {
+			usbkbmd->usbkbm_flags = 0;
+			(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
+			qprocsoff(q);
+			kmem_free(usbkbmd, sizeof (usbkbm_state_t));
+
+			return (EINTR);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * usbkbm_get_protocol
+ *	Issue a M_CTL to hid to get the device info
+ */
+static int
+usbkbm_get_protocol(usbkbm_state_t *usbkbmd)
+{
+	struct iocblk mctlmsg;
+	mblk_t *mctl_ptr;
+	queue_t *q = usbkbmd->usbkbm_readq;
+
+	mctlmsg.ioc_cmd = HID_GET_PROTOCOL;
 	mctlmsg.ioc_count = 0;
 
 	mctl_ptr = usba_mk_mctl(mctlmsg, NULL, 0);

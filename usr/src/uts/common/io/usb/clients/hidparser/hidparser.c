@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -731,6 +731,75 @@ hidparser_get_main_item_data_descr_main(entity_item_t *parser_handle,
 	*main_item_descr_value = (uint_t)NULL;
 
 	return (HIDPARSER_NOT_FOUND);
+}
+
+/*
+ * hidparser_lookup_usage_collection:
+ *	Look up the collection specified by the usage page and usage id
+ */
+int
+hidparser_lookup_usage_collection(hidparser_handle_t parse_handle,
+			uint_t lusage_page,
+			uint_t lusage_id)
+{
+	entity_item_t *current;
+	entity_attribute_t *attribute;
+	int found_usage_id = 0;
+	int found_page = 0;
+	uint32_t usage;
+	uint_t usage_page;
+	uint_t usage_id;
+
+	if ((parse_handle == NULL) ||
+	    (parse_handle->hidparser_handle_parse_tree == NULL))
+		return (HIDPARSER_FAILURE);
+
+	current = parse_handle->hidparser_handle_parse_tree;
+	while (current != NULL) {
+
+		if (current->entity_item_type != R_ITEM_COLLECTION) {
+			current = current->entity_item_right_sibling;
+			continue;
+		}
+
+		attribute = current->entity_item_attributes;
+		found_usage_id = 0;
+		found_page = 0;
+
+		while (attribute != NULL) {
+			if (attribute->entity_attribute_tag == R_ITEM_USAGE) {
+				found_usage_id = 1;
+				usage = hidparser_find_unsigned_val(attribute);
+				usage_id = HID_USAGE_ID(usage);
+				if (attribute->entity_attribute_length == 3) {
+					if (HID_USAGE_PAGE(usage)) {
+						found_page = 1;
+						usage_page =
+						    HID_USAGE_PAGE(usage);
+					}
+				}
+				if (found_page) {
+					goto check_usage;
+				}
+			} else if (attribute->entity_attribute_tag ==
+			    R_ITEM_USAGE_PAGE) {
+				found_page = 1;
+				usage_page =
+				    attribute->entity_attribute_value[0];
+				if (found_usage_id) {
+					goto check_usage;
+				}
+			}
+			attribute = attribute->entity_attribute_next;
+		}
+check_usage:
+		if ((usage_page == lusage_page) && (usage_id == lusage_id))
+			return (HIDPARSER_SUCCESS);
+		else
+			current = current->entity_item_right_sibling;
+	}
+
+	return (HIDPARSER_FAILURE);
 }
 
 

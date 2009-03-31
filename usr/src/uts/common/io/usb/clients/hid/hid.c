@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -583,6 +583,19 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		break;
 	default:
+		/*
+		 * If the report descriptor has the GD mouse collection in
+		 * its multiple collection, create a minor node and support it.
+		 * It is used on some advanced keyboard/mouse set.
+		 */
+		if (hidparser_lookup_usage_collection(
+		    hidp->hid_report_descr, HID_GENERIC_DESKTOP,
+		    HID_GD_MOUSE) != HIDPARSER_FAILURE) {
+			(void) strcpy(minor_name, "mouse");
+
+			break;
+		}
+
 		if (hidparser_get_top_level_collection_usage(
 		    hidp->hid_report_descr, &usage_page, &usage) !=
 		    HIDPARSER_FAILURE) {

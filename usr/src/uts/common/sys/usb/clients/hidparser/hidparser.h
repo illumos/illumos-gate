@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ typedef struct hidparser_handle_impl *hidparser_handle_t;
 #define	HID_REPORT_ID_UNDEFINED	0
 
 
-#define	USAGE_MAX	20	/* Max no. of usages in a report */
+#define	USAGE_MAX	100	/* Max no. of usages in a report */
 
 typedef struct hidparser_usage_info {
 	uint16_t	usage_page;

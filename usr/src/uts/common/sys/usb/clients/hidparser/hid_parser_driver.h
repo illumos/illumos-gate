@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,12 +94,30 @@ int hidparser_free_report_descriptor_handle(hidparser_handle_t parse_handle);
  *
  * Return values:
  *	HID_PARSER_SUCCESS - no errors
- *	HID_PARSER_FAIOURE - unspecified error
+ *	HID_PARSER_FAILURE - unspecified error
  *
  */
 int hidparser_get_top_level_collection_usage(hidparser_handle_t parse_handle,
 					uint_t *usage_page,
 					uint_t *usage);
+
+/*
+ * hidparser_lookup_usage_collection:
+ *	Look up the collection specified by the usage page and usage id.
+ *
+ * Arguments:
+ *	parse_handle:  parser handle
+ *	lusage_page:   specified usage page
+ *	lusage_id:     specified usage
+ *
+ * Return values:
+ *	HID_PARSER_SUCCESS - found the specified collection
+ *	HID_PARSER_FAILURE - error or not found
+ */
+int
+hidparser_lookup_usage_collection(hidparser_handle_t parse_handle,
+					uint_t lusage_page,
+					uint_t lusage_id);
 
 
 #ifdef __cplusplus
