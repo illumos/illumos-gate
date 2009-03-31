@@ -291,7 +291,8 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 		return (NULL);
 	}
 
-	thp->th_di = di_init("/", DI_CACHE_SNAPSHOT_FLAGS | DINFOCLEANUP);
+	thp->th_di = di_init("/",
+	    DINFOFORCE | DINFOSUBTREE | DINFOMINOR | DINFOPROP | DINFOPATH);
 	thp->th_pi = di_prom_init();
 
 	if (topo_tree_enum_all(thp) < 0) {
