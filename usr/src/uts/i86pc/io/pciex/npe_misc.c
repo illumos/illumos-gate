@@ -49,7 +49,6 @@ int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
 void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
 boolean_t npe_is_child_pci(dev_info_t *dip);
-boolean_t check_and_set_mmcfg(dev_info_t *dip);
 
 /*
  * Default ecfga base address
@@ -284,11 +283,11 @@ npe_child_is_pci(dev_info_t *dip) {
 }
 
 /*
- * Checks to see if MMCFG is supported and enables it if necessary.
- * Returns: TRUE is MMCFG is support, FLASE is not.
+ * Checks to see if MMCFG is supported.
+ * Returns: TRUE if MMCFG is supported, FALSE if not.
  *
- * In general if a device sits below a parent who's "dev_type" is "pciex" the
- * support MMCFG.  Otherwise, default back to legacy IOCFG access.
+ * If a device is attached to a parent whose "dev_type" is "pciex",
+ * the device will support MMCFG access.  Otherwise, use legacy IOCFG access.
  *
  * Enable Legacy PCI config space access for AMD K8 north bridges.
  *	Host bridge: AMD HyperTransport Technology Configuration
@@ -296,27 +295,16 @@ npe_child_is_pci(dev_info_t *dip) {
  *	Host bridge: AMD DRAM Controller
  *	Host bridge: AMD Miscellaneous Control
  * These devices do not support MMCFG access.
- *
- * Enable MMCFG via msr for AMD K10 north bridges
  */
 boolean_t
-npe_check_and_set_mmcfg(dev_info_t *dip)
+npe_is_mmcfg_supported(dev_info_t *dip)
 {
 	int vendor_id, device_id;
-	int64_t data;
 
 	vendor_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "vendor-id", -1);
 	device_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "device-id", -1);
-
-	if (IS_K10_AMD_NTBRIDGE(vendor_id, device_id)) {
-		data = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
-		    "ecfga-base-address", 0);
-		data &= AMD_MMIO_CFG_BADDR_ADDR_MASK;
-		data |= AMD_MMIO_CFG_BADDR_ENA_ON;
-		wrmsr(MSR_AMD_NB_MMIO_CFG_BADDR, data);
-	}
 
 	return !(npe_child_is_pci(dip) ||
 	    IS_BAD_AMD_NTBRIDGE(vendor_id, device_id));

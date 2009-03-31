@@ -45,6 +45,17 @@
 #include <io/pciex/pcie_nvidia.h>
 
 /*
+ * Helper Macros
+ */
+#define	NPE_IS_HANDLE_FOR_STDCFG_ACC(hp) \
+	((hp) != NULL &&						\
+	((ddi_acc_hdl_t *)(hp))->ah_platform_private != NULL &&		\
+	(((ddi_acc_impl_t *)((ddi_acc_hdl_t *)(hp))->			\
+	ah_platform_private)->						\
+	    ahi_acc_attr &(DDI_ACCATTR_CPU_VADDR|DDI_ACCATTR_CONFIG_SPACE)) \
+		== DDI_ACCATTR_CONFIG_SPACE)
+
+/*
  * Bus Operation functions
  */
 static int	npe_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
@@ -170,7 +181,7 @@ extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 extern void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
 extern void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
-extern boolean_t npe_check_and_set_mmcfg(dev_info_t *dip);
+extern boolean_t npe_is_mmcfg_supported(dev_info_t *dip);
 
 /*
  * Module linkage information for the kernel.
@@ -332,6 +343,29 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	}
 }
 
+/*
+ * Configure the access handle for standard configuration space
+ * access (see pci_fm_acc_setup for code that initializes the
+ * access-function pointers).
+ */
+static int
+npe_setup_std_pcicfg_acc(dev_info_t *rdip, ddi_map_req_t *mp,
+    ddi_acc_hdl_t *hp, off_t offset, off_t len)
+{
+	int ret;
+
+	if ((ret = pci_fm_acc_setup(hp, offset, len)) ==
+	    DDI_SUCCESS) {
+		if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
+		    mp->map_handlep->ah_acc.devacc_attr_access
+		    != DDI_DEFAULT_ACC) {
+			ndi_fmc_insert(rdip, ACC_HANDLE,
+			    (void *)mp->map_handlep, NULL);
+		}
+	}
+	return (ret);
+}
+
 static int
 npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
     off_t offset, off_t len, caddr_t *vaddrp)
@@ -419,8 +453,14 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			break;
 
 		case PCI_ADDR_CONFIG:
-			/* Check and see if MMCFG is supported */
-			if (!npe_check_and_set_mmcfg(rdip)) {
+			/*
+			 * If this is an unmap/unlock of a standard config
+			 * space mapping (memory-mapped config space mappings
+			 * would have the DDI_ACCATTR_CPU_VADDR bit set in the
+			 * acc_attr), undo that setup here.
+			 */
+			if (NPE_IS_HANDLE_FOR_STDCFG_ACC(mp->map_handlep)) {
+
 				if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
 				    mp->map_handlep->ah_acc.devacc_attr_access
 				    != DDI_DEFAULT_ACC) {
@@ -485,6 +525,7 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	 * ii) register with FMA
 	 */
 	if (space == PCI_ADDR_CONFIG) {
+
 		/* Can't map config space without a handle */
 		hp = (ddi_acc_hdl_t *)mp->map_handlep;
 		if (hp == NULL)
@@ -499,47 +540,44 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		*vaddrp = (caddr_t)offset;
 
 		/* Check if MMCFG is supported */
-		if (!npe_check_and_set_mmcfg(rdip)) {
-			int ret;
-
-			if ((ret = pci_fm_acc_setup(hp, offset, len)) ==
-			    DDI_SUCCESS) {
-				if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
-				    mp->map_handlep->ah_acc.devacc_attr_access
-				    != DDI_DEFAULT_ACC) {
-					ndi_fmc_insert(rdip, ACC_HANDLE,
-					    (void *)mp->map_handlep, NULL);
-				}
-			}
-			return (ret);
+		if (!npe_is_mmcfg_supported(rdip)) {
+			return (npe_setup_std_pcicfg_acc(rdip, mp, hp,
+			    offset, len));
 		}
+
 
 		if (ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, rdip, 0,
 		    "ecfg", &ecfginfo, &nelem) == DDI_PROP_SUCCESS) {
 
-			if (nelem != 4) {
-				/* invalid property; give up */
-				ddi_prop_free(ecfginfo);
-				return (DDI_FAILURE);
-			}
-
-			if (cfp->c_busnum < ecfginfo[2] ||
+			if (nelem != 4 ||
+			    cfp->c_busnum < ecfginfo[2] ||
 			    cfp->c_busnum > ecfginfo[3]) {
-				/* Doesn't contain our bus; give up */
+				/*
+				 * Invalid property or Doesn't contain the
+				 * requested bus; fall back to standard
+				 * (I/O-based) config access.
+				 */
 				ddi_prop_free(ecfginfo);
-				return (DDI_FAILURE);
+				return (npe_setup_std_pcicfg_acc(rdip, mp, hp,
+				    offset, len));
+			} else {
+				pci_rp->pci_phys_low = ecfginfo[0];
+
+				ddi_prop_free(ecfginfo);
+
+				pci_rp->pci_phys_low += ((cfp->c_busnum << 20) |
+				    (cfp->c_devnum) << 15 |
+				    (cfp->c_funcnum << 12));
+
+				pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
 			}
-
-			pci_rp->pci_phys_low = ecfginfo[0];
-
-			ddi_prop_free(ecfginfo);
-
-			pci_rp->pci_phys_low += ((cfp->c_busnum << 20) |
-			    (cfp->c_devnum) << 15 | (cfp->c_funcnum << 12));
-
-			pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
 		} else {
-			return (DDI_FAILURE);
+			/*
+			 * Couldn't find the MMCFG property -- fall back to
+			 * standard config access
+			 */
+			return (npe_setup_std_pcicfg_acc(rdip, mp, hp,
+			    offset, len));
 		}
 	}
 
