@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile for system source
@@ -284,6 +284,7 @@ EXPORT_SRC:
 	@cd uts/intel; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/sun4u; pwd; $(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/uts/sun4v/io/ncp;	pwd;	$(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4v/io/n2cp; pwd;	$(MAKE) EXPORT_SRC
 	@cd pkgdefs;	pwd; $(MAKE) EXPORT_SRC
 	$(RM) -r $(XMOD_DELETE_FILES)
 	$(RM) Targetdirs+
