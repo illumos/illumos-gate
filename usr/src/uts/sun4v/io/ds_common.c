@@ -2432,12 +2432,16 @@ ds_ucap_init(ds_capability_t *cap, ds_clnt_ops_t *ops, uint32_t flags,
 	svc->drv_psp = NULL;
 
 	/*
-	 * Check for loopback.
+	 * Check for loopback.  "pri" is a legacy service that assumes it
+	 * will never use loopback mode.
 	 */
-	if (i_ds_hdl_lookup(cap->svc_id, is_client == 0, &lb_hdl, 1) == 1) {
+	if (strcmp(cap->svc_id, "pri") == 0) {
+		is_loopback = 0;
+	} else if (i_ds_hdl_lookup(cap->svc_id, is_client == 0, &lb_hdl, 1)
+	    == 1) {
 		if ((rv = ds_loopback_set_svc(svc, cap, &lb_hdl)) != 0) {
-			cmn_err(CE_WARN, "%s: ds_loopback_set_svc err (%d)"
-			    DS_EOL, __func__, rv);
+			DS_DBG_USR(CE_NOTE, "%s: ds_loopback_set_svc '%s' err "
+			    " (%d)" DS_EOL, __func__, cap->svc_id, rv);
 			mutex_exit(&ds_svcs.lock);
 			return (rv);
 		}
@@ -3138,6 +3142,7 @@ ds_portset_del_active_clients(char *service, ds_portset_t *portsp)
 	ds_portset_t ports = *portsp;
 	int idx;
 	ds_svc_t *svc;
+	ds_svc_hdl_t hdl;
 
 	ASSERT(MUTEX_HELD(&ds_svcs.lock));
 
@@ -3151,6 +3156,18 @@ ds_portset_del_active_clients(char *service, ds_portset_t *portsp)
 		    svc->port != NULL) {
 			DS_PORTSET_DEL(ports, PORTID(svc->port));
 		}
+	}
+
+	/*
+	 * Legacy "pri" client service should not try to make a
+	 * connection to the SP if the existing "pri" provider
+	 * service has a connection.
+	 */
+	if (strcmp(service, "pri") == 0 &&
+	    i_ds_hdl_lookup(service, 0, &hdl, 1) == 1 &&
+	    (svc = ds_get_svc(hdl)) != NULL && svc->state == DS_SVC_ACTIVE &&
+	    svc->port != NULL) {
+		DS_PORTSET_DEL(ports, PORTID(svc->port));
 	}
 	*portsp = ports;
 }
