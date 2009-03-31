@@ -55,6 +55,7 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 	vio_mblk_t		*vmp;
 	uint8_t			*datap;
 	int			i;
+	int			rv;
 
 	if (!(num_mblks) || (!ISP2(num_mblks))) {
 		*poolp = 0;
@@ -99,7 +100,8 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 			 * vio_destroy_mblks() frees mblks that have been
 			 * allocated so far and then destroys the pool.
 			 */
-			vio_destroy_mblks(vmplp);
+			rv = vio_destroy_mblks(vmplp);
+			ASSERT(rv == 0);
 
 			*poolp = NULL;
 			return (ENOSPC);

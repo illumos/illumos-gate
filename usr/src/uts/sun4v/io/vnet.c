@@ -108,7 +108,7 @@ int vnet_send_dds_msg(vnet_t *vnetp, void *dmsg);
 /* Externs that are imported from vnet_gen */
 extern int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
     const uint8_t *macaddr, void **vgenhdl);
-extern int vgen_uninit(void *arg);
+extern void vgen_uninit(void *arg);
 extern int vgen_dds_tx(void *arg, void *dmsg);
 extern void vgen_mod_init(void);
 extern int vgen_mod_cleanup(void);
@@ -432,7 +432,8 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 vnet_attach_fail:
 	vnetp->attach_progress = attach_progress;
-	vnet_unattach(vnetp);
+	status = vnet_unattach(vnetp);
+	ASSERT(status == 0);
 	return (DDI_FAILURE);
 }
 

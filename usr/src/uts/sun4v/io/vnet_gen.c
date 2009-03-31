@@ -73,7 +73,7 @@
 /* vgen proxy entry points */
 int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
     const uint8_t *macaddr, void **vgenhdl);
-int vgen_uninit(void *arg);
+void vgen_uninit(void *arg);
 int vgen_dds_tx(void *arg, void *dmsg);
 void vgen_mod_init(void);
 int vgen_mod_cleanup(void);
@@ -533,7 +533,7 @@ vgen_init_fail:
  * Called by vnet to undo the initializations done by vgen_init().
  * The handle provided by generic transport during vgen_init() is the argument.
  */
-int
+void
 vgen_uninit(void *arg)
 {
 	vgen_t		*vgenp = (vgen_t *)arg;
@@ -541,7 +541,7 @@ vgen_uninit(void *arg)
 	vio_mblk_pool_t	*nrp;
 
 	if (vgenp == NULL) {
-		return (DDI_FAILURE);
+		return;
 	}
 
 	DBG1(vgenp, NULL, "enter\n");
@@ -587,8 +587,6 @@ vgen_uninit(void *arg)
 
 	DBG1(vgenp, NULL, "exit\n");
 	KMEM_FREE(vgenp);
-
-	return (DDI_SUCCESS);
 }
 
 /*
