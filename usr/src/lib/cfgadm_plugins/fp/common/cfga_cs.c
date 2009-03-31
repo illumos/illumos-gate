@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,9 +48,9 @@ static fpcfga_ret_t dev_unconf(apid_t *, char **, uchar_t *);
 static fpcfga_ret_t is_xport_phys_in_pathlist(apid_t *, char **);
 static void copy_pwwn_data_to_str(char *, const uchar_t *);
 static fpcfga_ret_t unconf_vhci_nodes(di_path_t, di_node_t, char *,
-			char *, int *, int *, char **, cfga_flags_t);
+			char *, int, int *, int *, char **, cfga_flags_t);
 static fpcfga_ret_t unconf_non_vhci_nodes(di_node_t, char *, char *,
-			int *, int *, char **, cfga_flags_t);
+			int, int *, int *, char **, cfga_flags_t);
 static fpcfga_ret_t unconf_any_devinfo_nodes(apid_t *, cfga_flags_t, char **,
 			int *, int *);
 static fpcfga_ret_t handle_devs(cfga_cmd_t, apid_t *, cfga_flags_t,
@@ -1058,7 +1058,8 @@ copy_pwwn_data_to_str(char *to_ptr, const uchar_t *from_ptr)
 
 static fpcfga_ret_t
 unconf_vhci_nodes(di_path_t pnode, di_node_t fp_node, char *xport_phys,
-	char *dyncomp, int *num_devs, int *failure_count, char **errstring,
+	char *dyncomp, int unusable_flag,
+	int *num_devs, int *failure_count, char **errstring,
 	cfga_flags_t flags)
 {
 	int		iret1, iret2, *lunnump;
@@ -1138,25 +1139,69 @@ unconf_vhci_nodes(di_path_t pnode, di_node_t fp_node, char *xport_phys,
 		 * Try to offline in RCM first and if that is successful,
 		 * unconfigure the LUN. If offlining in RCM fails, then
 		 * update the failure_count which gets passed back to caller
+		 *
+		 * Here we got to check if unusable_flag is set or not.
+		 * If set, then unconfigure only those luns which are in
+		 * node_state DI_PATH_STATE_OFFLINE. If not set, unconfigure
+		 * all luns.
 		 */
-		if (fp_rcm_offline(pathname, errstring, flags) != 0) {
-			(*failure_count)++;
-			pnode = di_path_next_client(fp_node, pnode);
-			continue;
-		} else if (lun_unconf(pathname, *lunnump, xport_phys,
-				dyncomp, errstring) != FPCFGA_OK) {
-			(void) fp_rcm_online(pathname, NULL, flags);
-			(*failure_count)++;
-			pnode = di_path_next_client(fp_node, pnode);
-			continue;
-		} else if (fp_rcm_remove(pathname, errstring, flags) != 0) {
-			/*
-			 * Bring everything back online in rcm and continue
-			 */
-			(void) fp_rcm_online(pathname, NULL, flags);
-			(*failure_count)++;
-			pnode = di_path_next_client(fp_node, pnode);
-			continue;
+		if ((unusable_flag & FLAG_REMOVE_UNUSABLE_FCP_DEV) ==
+		    FLAG_REMOVE_UNUSABLE_FCP_DEV) {
+			if (pnode->path_state == DI_PATH_STATE_OFFLINE) {
+				if (fp_rcm_offline(pathname, errstring,
+				    flags) != 0) {
+					(*failure_count)++;
+					pnode = di_path_next_client(fp_node,
+					    pnode);
+					continue;
+				} else if (lun_unconf(pathname, *lunnump,
+				    xport_phys,dyncomp, errstring)
+				    != FPCFGA_OK) {
+					(void) fp_rcm_online(pathname,
+					    NULL, flags);
+					(*failure_count)++;
+					pnode = di_path_next_client(fp_node,
+					    pnode);
+					continue;
+				} else if (fp_rcm_remove(pathname, errstring,
+				    flags) != 0) {
+					/*
+					 * Bring everything back online
+					 * in rcm and continue
+					 */
+					(void) fp_rcm_online(pathname,
+					    NULL, flags);
+					(*failure_count)++;
+					pnode = di_path_next_client(fp_node,
+					    pnode);
+					continue;
+				}
+			} else {
+				pnode = di_path_next(fp_node, pnode);
+				continue;
+			}
+		} else {
+			if (fp_rcm_offline(pathname, errstring, flags) != 0) {
+				(*failure_count)++;
+				pnode = di_path_next_client(fp_node, pnode);
+				continue;
+			} else if (lun_unconf(pathname, *lunnump, xport_phys,
+			    dyncomp, errstring) != FPCFGA_OK) {
+				(void) fp_rcm_online(pathname, NULL, flags);
+				(*failure_count)++;
+				pnode = di_path_next_client(fp_node, pnode);
+				continue;
+			} else if (fp_rcm_remove(pathname, errstring,
+			    flags) != 0) {
+				/*
+				 * Bring everything back online
+				 * in rcm and continue
+				 */
+				(void) fp_rcm_online(pathname, NULL, flags);
+				(*failure_count)++;
+				pnode = di_path_next_client(fp_node, pnode);
+				continue;
+			}
 		}
 
 		/* Update the repository only on a successful unconfigure */
@@ -1192,7 +1237,8 @@ unconf_vhci_nodes(di_path_t pnode, di_node_t fp_node, char *xport_phys,
 
 static fpcfga_ret_t
 unconf_non_vhci_nodes(di_node_t dnode, char *xport_phys, char *dyncomp,
-	int *num_devs, int *failure_count, char **errstring, cfga_flags_t flags)
+	int unusable_flag, int *num_devs, int *failure_count,
+	char **errstring, cfga_flags_t flags)
 {
 	int	ret1, ret2, *lunnump;
 	char	pathname[MAXPATHLEN];
@@ -1261,25 +1307,67 @@ unconf_non_vhci_nodes(di_node_t dnode, char *xport_phys, char *dyncomp,
 		 * Try to offline in RCM first and if that is successful,
 		 * unconfigure the LUN. If offlining in RCM fails, then
 		 * update the failure count
+		 *
+		 * Here we got to check if unusable_flag is set or not.
+		 * If set, then unconfigure only those luns which are in
+		 * node_state DI_DEVICE_OFFLINE or DI_DEVICE_DOWN.
+		 * If not set, unconfigure all luns.
 		 */
-		if (fp_rcm_offline(pathname, errstring, flags) != 0) {
-			(*failure_count)++;
-			dnode = di_sibling_node(dnode);
-			continue;
-		} else if (lun_unconf(pathname, *lunnump, xport_phys,
-					dyncomp, errstring) != FPCFGA_OK) {
-			(void) fp_rcm_online(pathname, NULL, flags);
-			(*failure_count)++;
-			dnode = di_sibling_node(dnode);
-			continue;
-		} else if (fp_rcm_remove(pathname, errstring, flags) != 0) {
-			/*
-			 * Bring everything back online in rcm and continue
-			 */
-			(void) fp_rcm_online(pathname, NULL, flags);
-			(*failure_count)++;
-			dnode = di_sibling_node(dnode);
-			continue;
+		if ((unusable_flag & FLAG_REMOVE_UNUSABLE_FCP_DEV) ==
+		    FLAG_REMOVE_UNUSABLE_FCP_DEV) {
+			if ((dnode->node_state == DI_DEVICE_OFFLINE) ||
+			    (dnode->node_state == DI_DEVICE_DOWN)) {
+				if (fp_rcm_offline(pathname, errstring,
+				    flags) != 0) {
+					(*failure_count)++;
+					dnode = di_sibling_node(dnode);
+					continue;
+				} else if (lun_unconf(pathname, *lunnump,
+				    xport_phys,dyncomp, errstring)
+				    != FPCFGA_OK) {
+					(void) fp_rcm_online(pathname,
+					    NULL, flags);
+					(*failure_count)++;
+					dnode = di_sibling_node(dnode);
+					continue;
+				} else if (fp_rcm_remove(pathname, errstring,
+				    flags) != 0) {
+					/*
+					 * Bring everything back online
+					 * in rcm and continue
+					 */
+					(void) fp_rcm_online(pathname,
+					    NULL, flags);
+					(*failure_count)++;
+					dnode = di_sibling_node(dnode);
+					continue;
+				}
+			} else {
+				dnode = di_sibling_node(dnode);
+				continue;
+			}
+		} else {
+			if (fp_rcm_offline(pathname, errstring, flags) != 0) {
+				(*failure_count)++;
+				dnode = di_sibling_node(dnode);
+				continue;
+			} else if (lun_unconf(pathname, *lunnump, xport_phys,
+			    dyncomp, errstring) != FPCFGA_OK) {
+				(void) fp_rcm_online(pathname, NULL, flags);
+				(*failure_count)++;
+				dnode = di_sibling_node(dnode);
+				continue;
+			} else if (fp_rcm_remove(pathname, errstring,
+			    flags) != 0) {
+				/*
+				 * Bring everything back online
+				 * in rcm and continue
+				 */
+				(void) fp_rcm_online(pathname, NULL, flags);
+				(*failure_count)++;
+				dnode = di_sibling_node(dnode);
+				continue;
+			}
 		}
 
 		/* Update the repository only on a successful unconfigure */
@@ -1405,7 +1493,7 @@ unconf_any_devinfo_nodes(apid_t *apidt, cfga_flags_t flags, char **errstring,
 
 	/* First unconfigure any non-MPXIO nodes */
 	unconf_non_vhci_nodes(direct_node, apidt->xport_phys, apidt->dyncomp,
-				num_devs, failure_count, errstring, flags);
+	    apidt->flags, num_devs, failure_count, errstring, flags);
 
 	/*
 	 * Now we will traverse any path info nodes that are there
@@ -1413,7 +1501,7 @@ unconf_any_devinfo_nodes(apid_t *apidt, cfga_flags_t flags, char **errstring,
 	 * Only MPXIO devices have pathinfo nodes
 	 */
 	unconf_vhci_nodes(path_node, fp_node, apidt->xport_phys, apidt->dyncomp,
-				num_devs, failure_count, errstring, flags);
+	    apidt->flags, num_devs, failure_count, errstring, flags);
 
 	di_fini(root_node);
 
