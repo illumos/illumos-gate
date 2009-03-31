@@ -60,6 +60,7 @@ extern "C" {
 #define	SHOPT_AD_CONTAINER	"ad-container"
 #define	SHOPT_NAME		"name"	/* name is a pseudo property */
 #define	SHOPT_CSC		"csc"	/* client-side caching (CSC) options */
+#define	SHOPT_CATIA		"catia"	/* CATIA character substitution */
 /* next three properties use access-list a al NFS */
 #define	SHOPT_RO		"ro"	/* share is read-only */
 #define	SHOPT_RW		"rw"	/* share defaults to read-write */
@@ -103,6 +104,7 @@ extern "C" {
  * SMB_SHRF_ACC_RW	"rw" (read/write) property set
  * SMB_SHRF_ACC_ALL	All of the access bits
  * SMB_SHRF_ADMIN	Admin share
+ * SMB_SHRF_CATIA	CATIA character translation on/off
  *
  * All autohome shares are transient but not all transient shares are autohome.
  * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
@@ -127,6 +129,7 @@ extern "C" {
 #define	SMB_SHRF_ACC_ALL	0x0F00
 
 #define	SMB_SHRF_ADMIN		0x1000
+#define	SMB_SHRF_CATIA		0x2000
 
 
 /*
@@ -222,6 +225,7 @@ boolean_t smb_shr_chkname(char *);
 sa_handle_t smb_shr_sa_enter(void);
 void smb_shr_sa_exit(void);
 void smb_shr_sa_csc_option(const char *, smb_share_t *);
+void smb_shr_sa_catia_option(const char *, smb_share_t *);
 
 /*
  * CIFS share management API exported for other processes

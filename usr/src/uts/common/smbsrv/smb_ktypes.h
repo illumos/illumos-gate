@@ -493,6 +493,7 @@ typedef struct smb_node {
 	struct smb_node		*unnamed_stream_node; /* set in stream nodes */
 	/* Credentials for delayed delete */
 	cred_t			*delete_on_close_cred;
+	uint32_t		n_delete_on_close_flags;
 	char			od_name[MAXNAMELEN];
 	vnode_t			*vp;
 	smb_audit_buf_node_t	*n_audit_buf;
@@ -815,6 +816,7 @@ typedef struct smb_user {
 #define	SMB_TREE_ACEMASKONACCESS	0x00000800
 #define	SMB_TREE_NFS_MOUNTED		0x00001000
 #define	SMB_TREE_UNICODE_ON_DISK	0x00002000
+#define	SMB_TREE_CATIA			0x00004000
 
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,
@@ -868,6 +870,10 @@ typedef struct smb_tree {
 	((sr) == NULL ? ACE_ALL_PERMS : (				\
 	(((sr) && (sr)->tid_tree) ?					\
 	(((sr)->tid_tree->t_access) & (acemask)) : 0)))
+
+#define	SMB_TREE_SUPPORTS_CATIA(sr)            				\
+	(((sr) && (sr)->tid_tree) ?                                     \
+	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_CATIA) : 0)
 
 /*
  * SMB_TREE_CONTAINS_NODE is used to check that a node is in the same
@@ -1005,6 +1011,12 @@ typedef struct smb_ofile {
 #define	SMB_ODIR_MAGIC 		0x4F444952	/* 'ODIR' */
 #define	SMB_ODIR_BUFSIZE	(8 * 1024)
 
+#define	SMB_ODIR_FLAG_WILDCARDS		0x0001
+#define	SMB_ODIR_FLAG_IGNORE_CASE	0x0002
+#define	SMB_ODIR_FLAG_XATTR		0x0004
+#define	SMB_ODIR_FLAG_EDIRENT		0x0008
+#define	SMB_ODIR_FLAG_CATIA		0x0010
+
 typedef enum {
 	SMB_ODIR_STATE_OPEN = 0,
 	SMB_ODIR_STATE_CLOSING,
@@ -1038,12 +1050,8 @@ typedef struct smb_odir {
 	uint16_t		d_opened_by_pid;
 	uint16_t		d_sattr;
 	uint32_t		d_refcnt;
-
-	boolean_t		d_wildcards;
-	boolean_t		d_ignore_case;
-	boolean_t		d_xat;
+	uint32_t		d_flags;
 	boolean_t		d_eof;
-	boolean_t		d_is_edp;
 	int			d_bufsize;
 	uint64_t		d_offset;
 	union {

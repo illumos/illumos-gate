@@ -44,9 +44,95 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_incl.h>
 
+/*
+ * CATIA support
+ *
+ * CATIA V4 is a UNIX product and uses characters in filenames that
+ * are considered invalid by Windows. CATIA V5 is available on both
+ * UNIX and Windows.  Thus, as CATIA customers migrate from V4 to V5,
+ * some V4 files could become inaccessible to windows clients if the
+ * filename contains the characters that are considered illegal in
+ * Windows.  In order to address this issue an optional character
+ * translation is applied to filenames at the smb_vop interface.
+ *
+ * Character Translation Table
+ * ----------------------------------
+ * Unix-char (v4) | Windows-char (v5)
+ * ----------------------------------
+ *        *       |  0x00a4  Currency Sign
+ *        |       |  0x00a6  Broken Bar
+ *        "       |  0x00a8  Diaeresis
+ *        <       |  0x00ab  Left-Pointing Double Angle Quotation Mark
+ *        >       |  0x00bb  Right-Pointing Double Angle Quotation Mark
+ *        ?       |  0x00bf  Inverted Question mark
+ *        :       |  0x00f7  Division Sign
+ *        /       |  0x00f8  Latin Small Letter o with stroke
+ *        \       |  0x00ff  Latin Small Letter Y with Diaeresis
+ *
+ *
+ * Two lookup tables are used to perform the character translation:
+ *
+ * smb_catia_v5_lookup - provides the mapping between UNIX ASCII (v4)
+ * characters and equivalent or translated wide characters.
+ * It is indexed by the decimal value of the ASCII character (0-127).
+ *
+ * smb_catia_v4_lookup - provides the mapping between wide characters
+ * in the range from 0x00A4 to 0x00FF and their UNIX (v4) equivalent
+ * (in wide character format).  It is indexed by the decimal value of
+ * the wide character (164-255) with an offset of -164.
+ * If this translation produces a filename containing a '/' create, mkdir
+ * or rename (to the '/' name)  operations will not be permitted. It is
+ * not valid to create a filename with a '/' in it. However, if such a
+ * file already exists other operations (e.g, lookup, delete, rename)
+ * are permitted on it.
+ */
+
+/* number of characters mapped */
+#define	SMB_CATIA_NUM_MAPS		9
+
+/* Windows Characters used in special character mapping */
+#define	SMB_CATIA_WIN_CURRENCY		0x00a4
+#define	SMB_CATIA_WIN_BROKEN_BAR	0x00a6
+#define	SMB_CATIA_WIN_DIAERESIS		0x00a8
+#define	SMB_CATIA_WIN_LEFT_ANGLE	0x00ab
+#define	SMB_CATIA_WIN_RIGHT_ANGLE	0x00bb
+#define	SMB_CATIA_WIN_INVERTED_QUESTION	0x00bf
+#define	SMB_CATIA_WIN_DIVISION		0x00f7
+#define	SMB_CATIA_WIN_LATIN_O		0x00f8
+#define	SMB_CATIA_WIN_LATIN_Y		0x00ff
+
+#define	SMB_CATIA_V4_LOOKUP_LOW		SMB_CATIA_WIN_CURRENCY
+#define	SMB_CATIA_V4_LOOKUP_UPPER	SMB_CATIA_WIN_LATIN_Y
+#define	SMB_CATIA_V4_LOOKUP_MAX		\
+	(SMB_CATIA_V4_LOOKUP_UPPER - SMB_CATIA_V4_LOOKUP_LOW + 1)
+#define	SMB_CATIA_V5_LOOKUP_MAX		0x0080
+
+typedef struct smb_catia_map
+{
+	unsigned char unixchar;	/* v4 */
+	mts_wchar_t winchar;	/* v5 */
+} smb_catia_map_t;
+
+smb_catia_map_t catia_maps[SMB_CATIA_NUM_MAPS] =
+{
+	{'"',  SMB_CATIA_WIN_DIAERESIS},
+	{'*',  SMB_CATIA_WIN_CURRENCY},
+	{':',  SMB_CATIA_WIN_DIVISION},
+	{'<',  SMB_CATIA_WIN_LEFT_ANGLE},
+	{'>',  SMB_CATIA_WIN_RIGHT_ANGLE},
+	{'?',  SMB_CATIA_WIN_INVERTED_QUESTION},
+	{'\\', SMB_CATIA_WIN_LATIN_Y},
+	{'/',  SMB_CATIA_WIN_LATIN_O},
+	{'|',  SMB_CATIA_WIN_BROKEN_BAR}
+};
+
+static mts_wchar_t smb_catia_v5_lookup[SMB_CATIA_V5_LOOKUP_MAX];
+static mts_wchar_t smb_catia_v4_lookup[SMB_CATIA_V4_LOOKUP_MAX];
+
 static void smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
 static void smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp);
 static callb_cpr_t *smb_lock_frlock_callback(flk_cb_when_t, void *);
+static void smb_vop_catia_init();
 
 extern sysid_t lm_alloc_sysidt();
 
@@ -97,6 +183,7 @@ smb_vop_init(void)
 	smb_ct.cc_caller_id = fs_new_caller_id();
 	smb_ct.cc_pid = IGN_PID;
 	smb_ct.cc_flags = 0;
+	smb_vop_catia_init();
 
 	smb_vop_initialized = B_TRUE;
 	return (0);
@@ -126,7 +213,6 @@ smb_vop_fini(void)
  * only one pid is used for operations originating from the
  * CIFS server (to represent CIFS in the VOP_FRLOCK routines).
  */
-
 int
 smb_vop_open(vnode_t **vpp, int mode, cred_t *cred)
 {
@@ -336,7 +422,6 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
  * NULL unnamed_vp, which allows callers to synchronize stream ownership
  * with the (unnamed stream) file.
  */
-
 int
 smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
     int flags, cred_t *cr)
@@ -433,8 +518,8 @@ smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp, cred_t *cr)
  * rootvp:	vnode of the tree root (in)
  *		This parameter is always passed in non-NULL except at the time
  *		of share set up.
+ * direntflags:	dirent flags returned from VOP_LOOKUP
  */
-
 int
 smb_vop_lookup(
     vnode_t		*dvp,
@@ -442,18 +527,22 @@ smb_vop_lookup(
     vnode_t		**vpp,
     char		*od_name,
     int			flags,
+    int			*direntflags,
     vnode_t		*rootvp,
     cred_t		*cr)
 {
 	int error = 0;
 	int option_flags = 0;
 	pathname_t rpn;
+	char *np = name;
+	char namebuf[MAXNAMELEN];
 
 	if (*name == '\0')
 		return (EINVAL);
 
 	ASSERT(vpp);
 	*vpp = NULL;
+	*direntflags = 0;
 
 	if ((name[0] == '.') && (name[1] == '.') && (name[2] == 0)) {
 		if (rootvp && (dvp == rootvp)) {
@@ -482,22 +571,25 @@ smb_vop_lookup(
 		}
 	}
 
-
-
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
 
+	if (flags & SMB_CATIA)
+		np = smb_vop_catia_v5tov4(name, namebuf, sizeof (namebuf));
+
 	pn_alloc(&rpn);
 
-	error = VOP_LOOKUP(dvp, name, vpp, NULL, option_flags, NULL, cr,
-	    &smb_ct, NULL, &rpn);
+	error = VOP_LOOKUP(dvp, np, vpp, NULL, option_flags, NULL, cr,
+	    &smb_ct, direntflags, &rpn);
 
 	if ((error == 0) && od_name) {
 		bzero(od_name, MAXNAMELEN);
-		if (option_flags == FIGNORECASE)
-			(void) strlcpy(od_name, rpn.pn_buf, MAXNAMELEN);
+		np = (option_flags == FIGNORECASE) ? rpn.pn_buf : name;
+
+		if (flags & SMB_CATIA)
+			smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
 		else
-			(void) strlcpy(od_name, name, MAXNAMELEN);
+			(void) strlcpy(od_name, np, MAXNAMELEN);
 	}
 
 	pn_free(&rpn);
@@ -512,6 +604,8 @@ smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 	int option_flags = 0;
 	xvattr_t xvattr;
 	vattr_t *vap;
+	char *np = name;
+	char namebuf[MAXNAMELEN];
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
@@ -526,7 +620,13 @@ smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 		vap = &attr->sa_vattr;
 	}
 
-	error = VOP_CREATE(dvp, name, vap, EXCL, attr->sa_vattr.va_mode,
+	if (flags & SMB_CATIA) {
+		np = smb_vop_catia_v5tov4(name, namebuf, sizeof (namebuf));
+		if (strchr(np, '/') != NULL)
+			return (EILSEQ);
+	}
+
+	error = VOP_CREATE(dvp, np, vap, EXCL, attr->sa_vattr.va_mode,
 	    vpp, cr, option_flags, &smb_ct, vsap);
 
 	return (error);
@@ -537,11 +637,16 @@ smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr)
 {
 	int error;
 	int option_flags = 0;
+	char *np = name;
+	char namebuf[MAXNAMELEN];
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
 
-	error = VOP_REMOVE(dvp, name, cr, &smb_ct, option_flags);
+	if (flags & SMB_CATIA)
+		np = smb_vop_catia_v5tov4(name, namebuf, sizeof (namebuf));
+
+	error = VOP_REMOVE(dvp, np, cr, &smb_ct, option_flags);
 
 	return (error);
 }
@@ -551,17 +656,35 @@ smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr)
  *
  * The rename is for files in the same tree (identical TID) only.
  */
-
 int
 smb_vop_rename(vnode_t *from_dvp, char *from_name, vnode_t *to_dvp,
     char *to_name, int flags, cred_t *cr)
 {
 	int error;
 	int option_flags = 0;
-
+	char *from, *to, *fbuf, *tbuf;
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
+
+	if (flags & SMB_CATIA) {
+		tbuf = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+		to = smb_vop_catia_v5tov4(to_name, tbuf, MAXNAMELEN);
+		if (strchr(to, '/') != NULL) {
+			kmem_free(tbuf, MAXNAMELEN);
+			return (EILSEQ);
+		}
+
+		fbuf = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+		from = smb_vop_catia_v5tov4(from_name, fbuf, MAXNAMELEN);
+
+		error = VOP_RENAME(from_dvp, from, to_dvp, to, cr,
+		    &smb_ct, option_flags);
+
+		kmem_free(tbuf, MAXNAMELEN);
+		kmem_free(fbuf, MAXNAMELEN);
+		return (error);
+	}
 
 	error = VOP_RENAME(from_dvp, from_name, to_dvp, to_name, cr,
 	    &smb_ct, option_flags);
@@ -577,6 +700,8 @@ smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 	int option_flags = 0;
 	xvattr_t xvattr;
 	vattr_t *vap;
+	char *np = name;
+	char namebuf[MAXNAMELEN];
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
@@ -591,8 +716,13 @@ smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 		vap = &attr->sa_vattr;
 	}
 
-	error = VOP_MKDIR(dvp, name, vap, vpp, cr, &smb_ct,
-	    option_flags, vsap);
+	if (flags & SMB_CATIA) {
+		np = smb_vop_catia_v5tov4(name, namebuf, sizeof (namebuf));
+		if (strchr(np, '/') != NULL)
+			return (EILSEQ);
+	}
+
+	error = VOP_MKDIR(dvp, np, vap, vpp, cr, &smb_ct, option_flags, vsap);
 
 	return (error);
 }
@@ -603,30 +733,27 @@ smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
  * Only simple rmdir supported, consistent with NT semantics
  * (can only remove an empty directory).
  *
+ * The third argument to VOP_RMDIR  is the current directory of
+ * the process.  It allows rmdir wants to EINVAL if one tries to
+ * remove ".".  Since SMB servers do not know what their clients'
+ * current directories are, we fake it by supplying a vnode known
+ * to exist and illegal to remove (rootdir).
  */
-
 int
 smb_vop_rmdir(vnode_t *dvp, char *name, int flags, cred_t *cr)
 {
 	int error;
 	int option_flags = 0;
+	char *np = name;
+	char namebuf[MAXNAMELEN];
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
 
-	/*
-	 * Comments adapted from rfs_rmdir().
-	 *
-	 * VOP_RMDIR now takes a new third argument (the current
-	 * directory of the process).  That's because rmdir
-	 * wants to return EINVAL if one tries to remove ".".
-	 * Of course, SMB servers do not know what their
-	 * clients' current directories are.  We fake it by
-	 * supplying a vnode known to exist and illegal to
-	 * remove.
-	 */
+	if (flags & SMB_CATIA)
+		np = smb_vop_catia_v5tov4(name, namebuf, sizeof (namebuf));
 
-	error = VOP_RMDIR(dvp, name, rootdir, cr, &smb_ct, option_flags);
+	error = VOP_RMDIR(dvp, np, rootdir, cr, &smb_ct, option_flags);
 	return (error);
 }
 
@@ -723,9 +850,6 @@ smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
  * If the file system supports extended directory entries (has features
  * VFSFT_DIRENTFLAGS), set V_RDDIR_ENTFLAGS to cause the buffer to be
  * filled with edirent_t structures, instead of dirent64_t structures.
- *
- * Some file systems can have directories larger than SMB_MAXDIRSIZE.
- * After VOP_READDIR, if offset is larger than SMB_MAXDIRSIZE treat as EOF.
  */
 int
 smb_vop_readdir(vnode_t *vp, uint32_t offset,
@@ -763,9 +887,6 @@ smb_vop_readdir(vnode_t *vp, uint32_t offset,
 	error = VOP_READDIR(vp, &auio, cr, eof, &smb_ct, rdirent_flags);
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
 
-	if (auio.uio_loffset > SMB_MAXDIRSIZE)
-		*eof = 1;
-
 	if (error == 0)
 		*count = *count - auio.uio_resid;
 
@@ -779,7 +900,6 @@ smb_vop_readdir(vnode_t *vp, uint32_t offset,
  * setting those bits that correspond to the SMB_AT_* bits
  * set in sa_mask.
  */
-
 void
 smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp)
 {
@@ -802,7 +922,6 @@ smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp)
  * SMB_STREAM_PREFIX stripped off.  od_name should be allocated to MAXNAMELEN
  * by the caller.
  */
-
 int
 smb_vop_stream_lookup(
     vnode_t		*fvp,
@@ -816,7 +935,7 @@ smb_vop_stream_lookup(
 {
 	char *solaris_stream_name;
 	char *name;
-	int error;
+	int error, tmpflgs;
 
 	if ((error = smb_vop_lookup_xattrdir(fvp, xattrdirvpp,
 	    LOOKUP_XATTR | CREATE_XATTR_DIR, cr)) != 0)
@@ -838,7 +957,7 @@ smb_vop_stream_lookup(
 	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 
 	if ((error = smb_vop_lookup(*xattrdirvpp, solaris_stream_name, vpp,
-	    name, flags, rootvp, cr)) != 0) {
+	    name, flags, &tmpflgs, rootvp, cr)) != 0) {
 		VN_RELE(*xattrdirvpp);
 	} else {
 		(void) strlcpy(od_name, &(name[SMB_STREAM_PREFIX_LEN]),
@@ -924,7 +1043,6 @@ smb_vop_lookup_xattrdir(vnode_t *fvp, vnode_t **xattrdirvpp, int flags,
  * mounted on it.  If it does, the mount point is "traversed" and the
  * vnode for the root of the file system is returned.
  */
-
 int
 smb_vop_traverse_check(vnode_t **vpp)
 {
@@ -1122,7 +1240,6 @@ smb_vop_eaccess(vnode_t *vp, int *mode, int flags, vnode_t *dir_vp, cred_t *cr)
  *
  * See comments for smb_fsop_shrlock()
  */
-
 int
 smb_vop_shrlock(vnode_t *vp, uint32_t uniq_fid, uint32_t desired_access,
     uint32_t share_access, cred_t *cr)
@@ -1223,4 +1340,164 @@ static callb_cpr_t *
 smb_lock_frlock_callback(flk_cb_when_t when, void *error)
 {
 	return (0);
+}
+
+/*
+ * smb_vop_catia_init_v4_lookup
+ * Initialize  mapping between wide characters in the range from
+ * 0x00A4 to 0x00FF and their UNIX (v4) equivalent (wide character).
+ * Indexed by the decimal value of the wide character (164-255)
+ * with an offset of -164.
+ */
+static void
+smb_vop_catia_init_v4_lookup()
+{
+	int i, idx, offset = SMB_CATIA_V4_LOOKUP_LOW;
+
+	for (i = 0; i < SMB_CATIA_V4_LOOKUP_MAX; i++)
+		smb_catia_v4_lookup[i] = (mts_wchar_t)(i + offset);
+
+	for (i = 0; i < SMB_CATIA_NUM_MAPS; i++) {
+		idx = (int)catia_maps[i].winchar - offset;
+		smb_catia_v4_lookup[idx] = (mts_wchar_t)catia_maps[i].unixchar;
+	}
+}
+
+/*
+ * smb_vop_catia_init_v5_lookup
+ * Initialize mapping between UNIX ASCII (v4) characters and equivalent
+ * or translated wide characters.
+ * Indexed by the decimal value of the ASCII character (0-127).
+ */
+static void
+smb_vop_catia_init_v5_lookup()
+{
+	int i, idx;
+
+	for (i = 0; i < SMB_CATIA_V5_LOOKUP_MAX; i++)
+		smb_catia_v5_lookup[i] = (mts_wchar_t)i;
+
+	for (i = 0; i < SMB_CATIA_NUM_MAPS; i++) {
+		idx = (int)catia_maps[i].unixchar;
+		smb_catia_v5_lookup[idx] = catia_maps[i].winchar;
+	}
+}
+
+static void
+smb_vop_catia_init()
+{
+	smb_vop_catia_init_v4_lookup();
+	smb_vop_catia_init_v5_lookup();
+}
+
+/*
+ * smb_vop_catia_v5tov4
+ * (windows (v5) to unix (v4))
+ *
+ * Traverse each character in the given source filename and convert the
+ * multibyte that is equivalent to any special Windows character listed
+ * in the catia_maps table to the Unix ASCII character if any is
+ * encountered in the filename. The translated name is returned in buf.
+ *
+ * If an error occurs the conversion terminates and name is returned,
+ * otherwise buf is returned.
+ */
+char *
+smb_vop_catia_v5tov4(char *name, char *buf, int buflen)
+{
+	int v4_idx, numbytes, inc;
+	int space_left = buflen - 1; /* one byte reserved for null */
+	mts_wchar_t wc;
+	char mbstring[MTS_MB_CHAR_MAX];
+	char *p, *src = name, *dst = buf;
+
+	ASSERT(name);
+	ASSERT(buf);
+
+	if (!buf || !name)
+		return (name);
+
+	bzero(buf, buflen);
+
+	while (*src) {
+		if ((numbytes = mts_mbtowc(&wc, src, MTS_MB_CHAR_MAX)) < 0)
+			return (name);
+
+		if (wc < SMB_CATIA_V4_LOOKUP_LOW ||
+		    wc > SMB_CATIA_V4_LOOKUP_UPPER) {
+			inc = numbytes;
+			p = src;
+		} else {
+			/* Lookup required. */
+			v4_idx = (int)wc - SMB_CATIA_V4_LOOKUP_LOW;
+			inc = mts_wctomb(mbstring, smb_catia_v4_lookup[v4_idx]);
+			p = mbstring;
+		}
+
+		if (space_left < inc)
+			return (name);
+
+		(void) strncpy(dst, p, inc);
+		dst += inc;
+		space_left -= inc;
+		src += numbytes;
+	}
+
+	return (buf);
+}
+
+/*
+ * smb_vop_catia_v4tov5
+ * (unix (v4) to windows (v5))
+ *
+ * Traverse each character in the given filename 'srcbuf' and convert
+ * the special Unix character that is listed in the catia_maps table to
+ * the UTF-8 encoding of the corresponding Windows character if any is
+ * encountered in the filename.
+ *
+ * The translated name is returned in buf.
+ * If an error occurs the conversion terminates and the original name
+ * is returned in buf.
+ */
+void
+smb_vop_catia_v4tov5(char *name, char *buf, int buflen)
+{
+	int v5_idx, numbytes;
+	int space_left = buflen - 1; /* one byte reserved for null */
+	mts_wchar_t wc;
+	char mbstring[MTS_MB_CHAR_MAX];
+	char *src = name, *dst = buf;
+
+	ASSERT(name);
+	ASSERT(buf);
+
+	if (!buf || !name)
+		return;
+
+	(void) bzero(buf, buflen);
+	while (*src) {
+		if (mts_isascii(*src)) {
+			/* Lookup required */
+			v5_idx = (int)*src++;
+			numbytes = mts_wctomb(mbstring,
+			    smb_catia_v5_lookup[v5_idx]);
+			if (space_left < numbytes)
+				break;
+			(void) strncpy(dst, mbstring, numbytes);
+		} else {
+			if ((numbytes = mts_mbtowc(&wc, src,
+			    MTS_MB_CHAR_MAX)) < 0)
+				break;
+			if (space_left < numbytes)
+				break;
+			(void) strncpy(dst, src, numbytes);
+			src += numbytes;
+		}
+
+		dst += numbytes;
+		space_left -= numbytes;
+	}
+
+	if (*src)
+		(void) strlcpy(buf, name, buflen);
 }

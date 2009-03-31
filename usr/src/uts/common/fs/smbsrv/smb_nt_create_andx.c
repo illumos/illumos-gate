@@ -293,7 +293,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		}
 
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
-			smb_preset_delete_on_close(sr->fid_ofile);
+			smb_ofile_set_delete_on_close(sr->fid_ofile);
 
 		/*
 		 * Set up the directory flag and ensure that

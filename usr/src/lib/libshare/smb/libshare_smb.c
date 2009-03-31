@@ -160,6 +160,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_RO,		OPT_TYPE_ACCLIST },
 	{ SHOPT_RW,		OPT_TYPE_ACCLIST },
 	{ SHOPT_NONE,		OPT_TYPE_ACCLIST },
+	{ SHOPT_CATIA,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_CSC,		OPT_TYPE_CSC },
 	{ NULL, NULL }
 };
@@ -1987,6 +1988,19 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
 			(void) strlcpy(si->shr_container, val,
 			    sizeof (si->shr_container));
+			free(val);
+		}
+	}
+
+	prop = sa_get_property(opts, SHOPT_CATIA);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			if ((strcasecmp(val, "true") == 0) ||
+			    (strcmp(val, "1") == 0)) {
+				si->shr_flags |= SMB_SHRF_CATIA;
+			} else {
+				si->shr_flags &= ~SMB_SHRF_CATIA;
+			}
 			free(val);
 		}
 	}

@@ -180,16 +180,16 @@ int smb_tcon_mute = 0;
 
 static smb_tree_t *smb_tree_connect_disk(smb_request_t *, const char *);
 static smb_tree_t *smb_tree_connect_ipc(smb_request_t *, const char *);
-static smb_tree_t *smb_tree_alloc(smb_user_t *, const char *, const char *,
+static smb_tree_t *smb_tree_alloc(smb_user_t *, const smb_share_t *,
     int32_t, smb_node_t *, uint32_t);
 static void smb_tree_dealloc(smb_tree_t *);
-static boolean_t smb_tree_is_connected(smb_tree_t *);
+static boolean_t smb_tree_is_connected_locked(smb_tree_t *);
 static boolean_t smb_tree_is_disconnected(smb_tree_t *);
 static const char *smb_tree_get_sharename(const char *);
 static int smb_tree_get_stype(const char *, const char *, int32_t *);
-static int smb_tree_getattr(smb_node_t *, smb_tree_t *);
+static int smb_tree_getattr(const smb_share_t *, smb_node_t *, smb_tree_t *);
 static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
-static void smb_tree_get_flags(vfs_t *, smb_tree_t *);
+static void smb_tree_get_flags(const smb_share_t *, vfs_t *, smb_tree_t *);
 static void smb_tree_log(smb_request_t *, const char *, const char *, ...);
 static void smb_tree_close_odirs(smb_tree_t *, uint16_t);
 static smb_odir_t *smb_tree_get_odir(smb_tree_t *, smb_odir_t *);
@@ -251,7 +251,7 @@ smb_tree_disconnect(
 	mutex_enter(&tree->t_mutex);
 	ASSERT(tree->t_refcnt);
 
-	if (smb_tree_is_connected(tree)) {
+	if (smb_tree_is_connected_locked(tree)) {
 		/*
 		 * Indicate that the disconnect process has started.
 		 */
@@ -286,7 +286,7 @@ smb_tree_hold(
 
 	mutex_enter(&tree->t_mutex);
 
-	if (smb_tree_is_connected(tree)) {
+	if (smb_tree_is_connected_locked(tree)) {
 		tree->t_refcnt++;
 		mutex_exit(&tree->t_mutex);
 		return (B_TRUE);
@@ -506,8 +506,9 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	    last_component);
 
 	if (rc == 0) {
-		rc = smb_fsop_lookup(sr, u_cred, SMB_FOLLOW_LINKS, 0,
-		    dir_snode, last_component, &snode, &attr, 0, 0);
+		rc = smb_fsop_lookup(sr, u_cred, SMB_FOLLOW_LINKS,
+		    sr->sr_server->si_root_smb_node, dir_snode, last_component,
+		    &snode, &attr);
 
 		smb_node_release(dir_snode);
 	}
@@ -550,8 +551,9 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	 * is done during the alloc.
 	 */
 
-	tree = smb_tree_alloc(user, sharename, si->shr_path, STYPE_DISKTREE,
-	    snode, hostaccess & aclaccess);
+	(void) strlcpy(si->shr_name, sharename, MAXNAMELEN);
+	tree = smb_tree_alloc(user, si, STYPE_DISKTREE, snode,
+	    hostaccess & aclaccess);
 
 	if (tree == NULL)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
@@ -567,8 +569,9 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 static smb_tree_t *
 smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 {
-	smb_user_t *user = sr->uid_user;
-	smb_tree_t *tree;
+	smb_user_t	*user = sr->uid_user;
+	smb_tree_t	*tree;
+	smb_share_t	*si;
 
 	ASSERT(user);
 
@@ -581,12 +584,18 @@ smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 
 	sr->arg.tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
 
-	tree = smb_tree_alloc(user, name, name, STYPE_IPC, NULL, ACE_ALL_PERMS);
+	si = kmem_zalloc(sizeof (smb_share_t), KM_SLEEP);
+	(void) strlcpy(si->shr_name, name, MAXNAMELEN);
+	(void) strlcpy(si->shr_path, name, MAXPATHLEN);
+	si->shr_type = STYPE_IPC | STYPE_SPECIAL;
+
+	tree = smb_tree_alloc(user, si, STYPE_IPC, NULL, ACE_ALL_PERMS);
 	if (tree == NULL) {
 		smb_tree_log(sr, name, "access denied");
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 	}
 
+	kmem_free(si, sizeof (smb_share_t));
 	return (tree);
 }
 
@@ -596,8 +605,7 @@ smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 static smb_tree_t *
 smb_tree_alloc(
     smb_user_t		*user,
-    const char		*sharename,
-    const char		*resource,
+    const smb_share_t	*si,
     int32_t		stype,
     smb_node_t		*snode,
     uint32_t access)
@@ -612,7 +620,7 @@ smb_tree_alloc(
 	bzero(tree, sizeof (smb_tree_t));
 
 	if (STYPE_ISDSK(stype)) {
-		if (smb_tree_getattr(snode, tree) != 0) {
+		if (smb_tree_getattr(si, snode, tree) != 0) {
 			smb_idpool_free(&user->u_tid_pool, tid);
 			kmem_cache_free(user->u_server->si_cache_tree, tree);
 			return (NULL);
@@ -638,9 +646,10 @@ smb_tree_alloc(
 	smb_llist_constructor(&tree->t_odir_list, sizeof (smb_odir_t),
 	    offsetof(smb_odir_t, d_lnd));
 
-	(void) strlcpy(tree->t_sharename, sharename,
+	(void) strlcpy(tree->t_sharename, si->shr_name,
 	    sizeof (tree->t_sharename));
-	(void) strlcpy(tree->t_resource, resource, sizeof (tree->t_resource));
+	(void) strlcpy(tree->t_resource, si->shr_path,
+	    sizeof (tree->t_resource));
 
 	mutex_init(&tree->t_mutex, NULL, MUTEX_DEFAULT, NULL);
 
@@ -723,7 +732,7 @@ smb_tree_dealloc(smb_tree_t *tree)
  * This function must be called with the tree mutex held.
  */
 static boolean_t
-smb_tree_is_connected(smb_tree_t *tree)
+smb_tree_is_connected_locked(smb_tree_t *tree)
 {
 	switch (tree->t_state) {
 	case SMB_TREE_STATE_CONNECTED:
@@ -836,7 +845,7 @@ smb_tree_get_stype(const char *sharename, const char *service,
  * Obtain the tree attributes: volume name, typename and flags.
  */
 static int
-smb_tree_getattr(smb_node_t *node, smb_tree_t *tree)
+smb_tree_getattr(const smb_share_t *si, smb_node_t *node, smb_tree_t *tree)
 {
 	vfs_t *vfsp = SMB_NODE_VFS(node);
 
@@ -846,7 +855,7 @@ smb_tree_getattr(smb_node_t *node, smb_tree_t *tree)
 		return (ESTALE);
 
 	smb_tree_get_volname(vfsp, tree);
-	smb_tree_get_flags(vfsp, tree);
+	smb_tree_get_flags(si, vfsp, tree);
 
 	VFS_RELE(vfsp);
 	return (0);
@@ -882,7 +891,7 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
  * File system types are hardcoded in uts/common/os/vfs_conf.c.
  */
 static void
-smb_tree_get_flags(vfs_t *vfsp, smb_tree_t *tree)
+smb_tree_get_flags(const smb_share_t *si, vfs_t *vfsp, smb_tree_t *tree)
 {
 	typedef struct smb_mtype {
 		char		*mt_name;
@@ -900,6 +909,9 @@ smb_tree_get_flags(vfs_t *vfsp, smb_tree_t *tree)
 	char		*name;
 	uint32_t	flags = SMB_TREE_SUPPORTS_ACLS;
 	int		i;
+
+	if (si->shr_flags & SMB_SHRF_CATIA)
+		flags |= SMB_TREE_CATIA;
 
 	if (vfsp->vfs_flag & VFS_RDONLY)
 		flags |= SMB_TREE_READONLY;
@@ -1012,6 +1024,17 @@ smb_tree_lookup_odir(smb_tree_t *tree, uint16_t odid)
 
 	smb_llist_exit(od_list);
 	return (od);
+}
+
+boolean_t
+smb_tree_is_connected(smb_tree_t *tree)
+{
+	boolean_t	rb;
+
+	mutex_enter(&tree->t_mutex);
+	rb = smb_tree_is_connected_locked(tree);
+	mutex_exit(&tree->t_mutex);
+	return (rb);
 }
 
 /*

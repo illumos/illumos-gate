@@ -257,6 +257,7 @@ smb_ofile_open(
 
 		smb_node_inc_open_ofiles(node);
 		smb_node_add_ofile(node, of);
+		smb_node_ref(node);
 	}
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
 	smb_llist_insert_tail(&tree->t_ofile_list, of);
@@ -279,6 +280,7 @@ smb_ofile_close(
 {
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
+	uint32_t flags = 0;
 
 	mutex_enter(&of->f_mutex);
 	ASSERT(of->f_refcnt);
@@ -304,7 +306,14 @@ smb_ofile_close(
 
 			smb_ofile_close_timestamp_update(of, last_wtime);
 			(void) smb_sync_fsattr(NULL, of->f_cr, of->f_node);
-			smb_commit_delete_on_close(of);
+			if (of->f_flags & SMB_OFLAGS_SET_DELETE_ON_CLOSE) {
+				if (smb_tree_has_feature(of->f_tree,
+				    SMB_TREE_CATIA)) {
+					flags |= SMB_CATIA;
+				}
+				(void) smb_node_set_delete_on_close(of->f_node,
+				    of->f_cr, flags);
+			}
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
@@ -938,4 +947,25 @@ cred_t *
 smb_ofile_getcred(smb_ofile_t *of)
 {
 	return (of->f_cr);
+}
+
+/*
+ * smb_ofile_set_delete_on_close
+ *
+ * Set the DeleteOnClose flag on the smb file. When the file is closed,
+ * the flag will be transferred to the smb node, which will commit the
+ * delete operation and inhibit subsequent open requests.
+ *
+ * When DeleteOnClose is set on an smb_node, the common open code will
+ * reject subsequent open requests for the file. Observation of Windows
+ * 2000 indicates that subsequent opens should be allowed (assuming
+ * there would be no sharing violation) until the file is closed using
+ * the fid on which the DeleteOnClose was requested.
+ */
+void
+smb_ofile_set_delete_on_close(smb_ofile_t *of)
+{
+	mutex_enter(&of->f_mutex);
+	of->f_flags |= SMB_OFLAGS_SET_DELETE_ON_CLOSE;
+	mutex_exit(&of->f_mutex);
 }

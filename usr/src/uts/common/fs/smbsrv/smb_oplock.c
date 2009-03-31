@@ -24,6 +24,17 @@
  */
 /*
  * SMB Locking library functions.
+ *
+ * You will notice that the functions in this file exit the lock of the session
+ * and reenter it before returning. They even assume that the lock has been
+ * entered in READER mode. The reason for that is a potential deadlock that may
+ * occur when an oplock needs to be broken and the function
+ * smb_session_break_oplock() is called. It should be noticed that the mutex of
+ * the smb node, the oplock of which needs to be broken, is also exited before
+ * calling smb_session_break_oplock(). The reason for that is the same: avoiding
+ * a deadlock. That complexity is due to the fact that the lock of the session
+ * is held during the treatment of a request. That complexity will go away when
+ * that is not the case anymore.
  */
 
 #include <smbsrv/smb_incl.h>
@@ -208,8 +219,11 @@ smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
 			if (SMB_SESSION_GET_ID(session) == ol->ol_sess_id)
 				break;
 			node->n_state = SMB_NODE_STATE_OPLOCK_BREAKING;
+			mutex_exit(&node->n_mutex);
 			smb_session_oplock_break(
 			    SMB_OFILE_GET_SESSION(ol->ol_ofile), ol->ol_ofile);
+			mutex_enter(&node->n_mutex);
+			continue;
 		}
 
 		ASSERT(node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING);
@@ -287,6 +301,7 @@ smb_oplock_break(smb_node_t *node, smb_session_t *session, boolean_t nowait)
 			smb_session_oplock_break(
 			    SMB_OFILE_GET_SESSION(ol->ol_ofile), ol->ol_ofile);
 			mutex_enter(&node->n_mutex);
+			continue;
 		}
 
 		ASSERT(node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING);

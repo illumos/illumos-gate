@@ -146,8 +146,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, info->name, &ret_snode, &ret_attr,
-	    0, 0);
+	    sr->tid_tree->t_snode, dir_node, info->name, &ret_snode, &ret_attr);
 
 	smb_node_release(dir_node);
 

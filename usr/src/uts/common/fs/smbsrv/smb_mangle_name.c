@@ -645,103 +645,101 @@ int smb_mangle_name(
  * smb_unmangle_name
  *
  * Given a mangled name, try to find the real file name as it appears
- * in the directory entry. If the name does not contain a ~, it is most
- * likely not a mangled name but the caller can still try to get the
- * actual on-disk name by setting the "od" parameter.
+ * in the directory entry.
  *
- * Returns 0 if a name has been returned in real_name. There are three
- * possible scenarios:
- *  1. Name did not contain a ~ and "od" was not set, in which
- *     case, real_name contains name.
- *  2. Name did not contain a ~ and "od" was set, in which
- *     case, real_name contains the actual directory entry name.
- *  3. Name did contain a ~, in which case, name was mangled and
- *     real_name contains the actual directory entry name.
+ * smb_unmangle_name should only be called on names for which
+ * smb_maybe_mangled_name() is true
  *
- * EINVAL: a parameter was invalid.
- * ENOENT: an unmangled name could not be found.
+ * File systems which support VFSFT_EDIRENT_FLAGS will return the
+ * directory entries as a buffer of edirent_t structure. Others will
+ * return a buffer of dirent64_t structures. A union is used for the
+ * the pointer into the buffer (bufptr, edp and dp).
+ * The ed_name/d_name is NULL terminated by the file system.
+ *
+ * Returns:
+ *   0       - SUCCESS. Unmangled name is returned in namebuf.
+ *   EINVAL  - a parameter was invalid.
+ *   ENOTDIR - dnode is not a directory node.
+ *   ENOENT  - an unmangled name could not be found.
  */
-
+#define	SMB_UNMANGLE_BUFSIZE	(4 * 1024)
 int
-smb_unmangle_name(struct smb_request *sr, cred_t *cred, smb_node_t *dir_node,
-	char *name, char *real_name, int realname_size, char *shortname,
-	char *name83, int ondisk)
+smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf, int buflen)
 {
-	int err;
-	struct smb_node *snode = NULL;
-	smb_attr_t ret_attr;
-	char namebuf[SMB_SHORTNAMELEN];
-	char  *path;
-	uint16_t odid;
-	smb_odir_t *od;
-	smb_odirent_t *odirent;
-	boolean_t eos;
+	int		err, eof, bufsize, reclen;
+	uint64_t	offset;
+	ino64_t		ino;
+	boolean_t	is_edp;
+	char		*namep, *buf;
+	char		shortname[SMB_SHORTNAMELEN];
+	char		name83[SMB_SHORTNAMELEN];
+	vnode_t		*vp;
+	union {
+		char		*bufptr;
+		edirent_t	*edp;
+		dirent64_t	*dp;
+	} u;
+#define	bufptr	u.bufptr
+#define	edp		u.edp
+#define	dp		u.dp
 
-	if (dir_node == NULL || name == NULL || real_name == NULL ||
-	    realname_size == 0)
+	if (dnode == NULL || name == NULL || namebuf == NULL || buflen == 0)
 		return (EINVAL);
 
-	*real_name = '\0';
-	snode = NULL;
+	ASSERT(smb_maybe_mangled_name(name) != 0);
 
-	if (smb_maybe_mangled_name(name) == 0) {
-		if (ondisk == 0) {
-			(void) strlcpy(real_name, name, realname_size);
-			return (0);
-		}
+	vp = dnode->vp;
+	if (vp->v_type != VDIR)
+		return (ENOTDIR);
 
-		err = smb_fsop_lookup(sr, cred, 0, sr->tid_tree->t_snode,
-		    dir_node, name, &snode, &ret_attr, NULL, NULL);
+	*namebuf = '\0';
+	is_edp = vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS);
 
-		if (err != 0)
-			return (err);
+	buf = kmem_alloc(SMB_UNMANGLE_BUFSIZE, KM_SLEEP);
+	bufsize = SMB_UNMANGLE_BUFSIZE;
+	offset = 0;
 
-		(void) strlcpy(real_name, snode->od_name, realname_size);
-		smb_node_release(snode);
-		return (0);
-	}
-
-	if (shortname == 0)
-		shortname = namebuf;
-	if (name83 == 0)
-		name83 = namebuf;
-
-	/* determine the pathname and open an smb_odir_t */
-	path =  kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	if ((err = vnodetopath(sr->tid_tree->t_snode->vp, dir_node->vp, path,
-	    MAXNAMELEN, kcred)) != 0)
-		return (err);
-
-	if ((strlcat(path, "/*", MAXNAMELEN) >= MAXNAMELEN) ||
-	    ((odid = smb_odir_open(sr, path, SMB_SEARCH_ATTRIBUTES)) == 0) ||
-	    ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)) {
-		err = ENOENT;
-	}
-	kmem_free(path, MAXNAMELEN);
-	if (err != 0)
-		return (err);
-
-	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
-	for (;;) {
-		err = smb_odir_read(sr, od, odirent, &eos);
-		if ((err != 0) || (eos))
+	while ((err = smb_vop_readdir(vp, offset, buf, &bufsize,
+	    &eof, kcred)) == 0) {
+		if (bufsize == 0) {
+			err = ENOENT;
 			break;
-
-		(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
-		    shortname, name83, 1);
-
-		if (utf8_strcasecmp(name, shortname) == 0) {
-			(void) strlcpy(real_name, odirent->od_name,
-			    realname_size);
-			kmem_free(odirent, sizeof (smb_odirent_t));
-			smb_odir_release(od);
-			smb_odir_close(od);
-			return (0);
 		}
+
+		bufptr = buf;
+		reclen = 0;
+
+		while ((bufptr += reclen) < buf + bufsize) {
+			if (is_edp) {
+				reclen = edp->ed_reclen;
+				offset = edp->ed_off;
+				ino = edp->ed_ino;
+				namep = edp->ed_name;
+			} else {
+				reclen = dp->d_reclen;
+				offset = dp->d_off;
+				ino = dp->d_ino;
+				namep = dp->d_name;
+			}
+
+			(void) smb_mangle_name(ino, namep,
+			    shortname, name83, 1);
+
+			if (utf8_strcasecmp(name, shortname) == 0) {
+				(void) strlcpy(namebuf, namep, buflen);
+				kmem_free(buf, SMB_UNMANGLE_BUFSIZE);
+				return (0);
+			}
+		}
+
+		if (eof) {
+			err = ENOENT;
+			break;
+		}
+
+		bufsize = SMB_UNMANGLE_BUFSIZE;
 	}
 
-	kmem_free(odirent, sizeof (smb_odirent_t));
-	smb_odir_release(od);
-	smb_odir_close(od);
-	return (ENOENT);
+	kmem_free(buf, SMB_UNMANGLE_BUFSIZE);
+	return (err);
 }

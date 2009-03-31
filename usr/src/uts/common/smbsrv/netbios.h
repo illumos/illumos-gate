@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_NETBIOS_H
 #define	_SMBSRV_NETBIOS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NetBIOS over TCP/IP interface definitions. NetBIOS over TCP/IP is
@@ -109,22 +107,23 @@ extern "C" {
 #define	DATAGRAM_INVALID_SOURCE_NAME_FORMAT		0x83
 #define	DATAGRAM_INVALID_DESTINATION_NAME_FORMAT	0x84
 
-#define	NAME_SERVICE_TCP_PORT	137
-#define	NAME_SERVICE_UDP_PORT	137
-#define	DGM_SRVC_UDP_PORT	138
-#define	SSN_SRVC_TCP_PORT	139
-#define	MAX_DATAGRAM_LENGTH	576
-#define	DATAGRAM_HEADER_LENGTH	14
-#define	MAX_NAME_LENGTH		256
-#define	BCAST_REQ_RETRY_COUNT	2
-#define	UCAST_REQ_RETRY_COUNT	2
-#define	BCAST_REQ_RETRY_TIMEOUT	(500 * MILLISECONDS)
-#define	UCAST_REQ_RETRY_TIMEOUT	(500 * MILLISECONDS)
-#define	CONFLICT_TIMER		(1 * SECONDS)
-#define	INFINITE_TTL		0
-#define	DEFAULT_TTL		(600 * SECONDS)
-#define	SSN_RETRY_COUNT		4
-#define	SSN_CLOSE_TIMEOUT	(30 * SECONDS)
+#define	NAME_SERVICE_TCP_PORT		137
+#define	NAME_SERVICE_UDP_PORT		137
+#define	DGM_SRVC_UDP_PORT		138
+#define	SSN_SRVC_TCP_PORT		139
+#define	MAX_DATAGRAM_LENGTH		576
+#define	DATAGRAM_HEADER_LENGTH		14
+#define	DATAGRAM_ERR_HEADER_LENGTH	11
+#define	MAX_NAME_LENGTH			256
+#define	BCAST_REQ_RETRY_COUNT		2
+#define	UCAST_REQ_RETRY_COUNT		2
+#define	BCAST_REQ_RETRY_TIMEOUT		(500 * MILLISECONDS)
+#define	UCAST_REQ_RETRY_TIMEOUT		(500 * MILLISECONDS)
+#define	CONFLICT_TIMER			(1 * SECONDS)
+#define	INFINITE_TTL			0
+#define	DEFAULT_TTL			(600 * SECONDS)
+#define	SSN_RETRY_COUNT			4
+#define	SSN_CLOSE_TIMEOUT		(30 * SECONDS)
 /*
  * K.L. The keep alive time out use to be default to
  * 900 seconds. It is not long enough for some applications

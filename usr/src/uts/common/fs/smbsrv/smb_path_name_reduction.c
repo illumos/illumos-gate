@@ -28,6 +28,11 @@
 #include <sys/pathname.h>
 #include <sys/sdt.h>
 
+static char *smb_pathname_catia_v5tov4(smb_request_t *, char *, char *, int);
+static char *smb_pathname_catia_v4tov5(smb_request_t *, char *, char *, int);
+static int smb_pathname_lookup(pathname_t *, pathname_t *, int,
+    vnode_t **, vnode_t *, vnode_t *, cred_t *);
+
 uint32_t
 smb_is_executable(char *path)
 {
@@ -85,7 +90,7 @@ smbd_fs_query(smb_request_t *sr, smb_fqi_t *fqi, int fqm)
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
 	    sr->tid_tree->t_snode, fqi->dir_snode, fqi->last_comp,
-	    &fqi->last_snode, &fqi->last_attr, 0, 0);
+	    &fqi->last_snode, &fqi->last_attr);
 
 	if (rc == 0) {
 		fqi->last_comp_was_found = 1;
@@ -345,7 +350,8 @@ smb_pathname_reduce(
 }
 
 /*
- * smb_pathname() - wrapper to lookuppnvp().  Handles name unmangling.
+ * smb_pathname()
+ * wrapper to lookuppnvp().  Handles name unmangling.
  *
  * *dir_node is the true directory of the target *node.
  *
@@ -356,37 +362,36 @@ smb_pathname_reduce(
  * created for each component.  This allows the dir_snode field in the
  * smb_node to be properly populated.
  *
- * Mangle checking is also done on each component.
+ * Because of the above, links are also processed in this routine
+ * (i.e., we do not pass the FOLLOW flag to lookuppnvp()).  This
+ * will allow smb_nodes to be created for each component of a link.
+ *
+ * Mangle checking is per component. If a name is mangled, when the
+ * unmangled name is passed to smb_pathname_lookup() do not pass
+ * FIGNORECASE, since the unmangled name is the real on-disk name.
+ * Otherwise pass FIGNORECASE if it's set in flags. This will cause the
+ * file system to return "first match" in the event of a case collision.
+ *
+ * If CATIA character translation is enabled it is applied to each
+ * component before passing the component to smb_pathname_lookup().
+ * After smb_pathname_lookup() the reverse translation is applied.
  */
 
 int
-smb_pathname(
-    smb_request_t	*sr,
-    char		*path,
-    int			flags,
-    smb_node_t		*root_node,
-    smb_node_t		*cur_node,
-    smb_node_t		**dir_node,
-    smb_node_t		**ret_node,
-    cred_t		*cred)
+smb_pathname(smb_request_t *sr, char *path, int flags,
+    smb_node_t *root_node, smb_node_t *cur_node, smb_node_t **dir_node,
+    smb_node_t **ret_node, cred_t *cred)
 {
-	char		*component = NULL;
-	char		*real_name = NULL;
-	char		*namep;
-	pathname_t	pn;
-	pathname_t	rpn;
-	pathname_t	upn;
-	pathname_t	link_pn;
-	smb_node_t	*dnode = NULL;
-	smb_node_t	*fnode = NULL;
-	vnode_t		*rootvp;
-	vnode_t		*dvp;
-	vnode_t		*vp = NULL;
+	char		*component, *real_name, *namep;
+	pathname_t	pn, rpn, upn, link_pn;
+	smb_node_t	*dnode, *fnode;
+	vnode_t		*rootvp, *vp;
 	smb_attr_t	attr;
 	size_t		pathleft;
 	int		err = 0;
 	int		nlink = 0;
 	int		local_flags;
+	char		namebuf[MAXNAMELEN];
 
 	if (path == NULL)
 		return (EINVAL);
@@ -413,22 +418,10 @@ smb_pathname(
 	component = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	real_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
+	fnode = NULL;
 	dnode = cur_node;
 	smb_node_ref(dnode);
-
-	rootvp = (vnode_t *)root_node->vp;
-
-	/*
-	 * Path components are processed one at a time so that smb_nodes
-	 * can be created for each component.  This allows the dir_snode
-	 * field in the smb_node to be properly populated.
-	 *
-	 * Because of the above, links are also processed in this routine
-	 * (i.e., we do not pass the FOLLOW flag to lookuppnvp()).  This
-	 * will allow smb_nodes to be created for each component of a link.
-	 *
-	 * Mangle checking is per component.
-	 */
+	rootvp = root_node->vp;
 
 	while ((pathleft = pn_pathleft(&upn)) != 0) {
 		if (fnode) {
@@ -440,57 +433,42 @@ smb_pathname(
 		if ((err = pn_getcomponent(&upn, component)) != 0)
 			break;
 
-		/*
-		 * This mangled name handling is in the wrong place.
-		 * The name must be looked up prior to any mangled
-		 * name checking.
-		 *
-		 * Temporary: check for ~ to keep smbtorture quiet.
-		 */
-		if (*component != '~' && smb_maybe_mangled_name(component)) {
-			if ((err = smb_unmangle_name(sr, cred, dnode,
-			    component, real_name, MAXNAMELEN, 0, 0, 1)) != 0)
-				break;
-			/*
-			 * Do not pass FIGNORECASE to lookuppnvp().
-			 * This is because we would like to do a lookup
-			 * on the real name just obtained (which
-			 * corresponds to the mangled name).
-			 */
-
-			namep = real_name;
-			local_flags = 0;
-		} else {
-			/*
-			 * Pass FIGNORECASE to lookuppnvp().
-			 * This will cause the file system to
-			 * return "first match" in the event of
-			 * a case collision.
-			 */
-			namep = component;
-			local_flags = flags & FIGNORECASE;
+		if ((namep = smb_pathname_catia_v5tov4(sr, component,
+		    namebuf, sizeof (namebuf))) == NULL) {
+			err = EILSEQ;
+			break;
 		}
 
 		if ((err = pn_set(&pn, namep)) != 0)
 			break;
 
-		/*
-		 * Holds on dvp and rootvp (if not rootdir) are
-		 * required by lookuppnvp() and will be released within
-		 * that routine.
-		 */
-		vp = NULL;
-		dvp = dnode->vp;
+		local_flags = flags & FIGNORECASE;
+		err = smb_pathname_lookup(&pn, &rpn, local_flags,
+		    &vp, rootvp, dnode->vp, cred);
 
-		VN_HOLD(dvp);
-		if (rootvp != rootdir)
-			VN_HOLD(rootvp);
+		if (err) {
+			if (smb_maybe_mangled_name(component) == 0)
+				break;
 
-		err = lookuppnvp(&pn, &rpn, local_flags, NULL, &vp, rootvp, dvp,
-		    cred);
+			if ((err = smb_unmangle_name(dnode, component,
+			    real_name, MAXNAMELEN)) != 0)
+				break;
 
-		if (err)
-			break;
+			if ((namep = smb_pathname_catia_v5tov4(sr, real_name,
+			    namebuf, sizeof (namebuf))) == NULL) {
+				err = EILSEQ;
+				break;
+			}
+
+			if ((err = pn_set(&pn, namep)) != 0)
+				break;
+
+			local_flags = 0;
+			err = smb_pathname_lookup(&pn, &rpn, local_flags,
+			    &vp, rootvp, dnode->vp, cred);
+			if (err)
+				break;
+		}
 
 		if ((vp->v_type == VLNK) &&
 		    ((flags & FOLLOW) || pn_pathleft(&upn))) {
@@ -505,14 +483,12 @@ smb_pathname(
 			err = pn_getsymlink(vp, &link_pn, cred);
 			VN_RELE(vp);
 
-			if (err) {
-				pn_free(&link_pn);
-				break;
+			if (err == 0) {
+				if (pn_pathleft(&link_pn) == 0)
+					(void) pn_set(&link_pn, ".");
+				err = pn_insert(&upn, &link_pn,
+				    strlen(component));
 			}
-
-			if (pn_pathleft(&link_pn) == 0)
-				(void) pn_set(&link_pn, ".");
-			err = pn_insert(&upn, &link_pn, strlen(namep));
 			pn_free(&link_pn);
 
 			if (err)
@@ -535,10 +511,13 @@ smb_pathname(
 			if (flags & FIGNORECASE) {
 				if (strcmp(rpn.pn_path, "/") != 0)
 					pn_setlast(&rpn);
-
 				namep = rpn.pn_path;
-			} else
+			} else {
 				namep = pn.pn_path;
+			}
+
+			namep = smb_pathname_catia_v4tov5(sr, namep,
+			    namebuf, sizeof (namebuf));
 
 			fnode = smb_node_lookup(sr, NULL, cred, vp, namep,
 			    dnode, NULL, &attr);
@@ -556,11 +535,6 @@ smb_pathname(
 		}
 
 	}
-
-	/*
-	 * Since no parent vp was passed to lookuppnvp(), all
-	 * ENOENT errors are returned as ENOENT
-	 */
 
 	if ((pathleft) && (err == ENOENT))
 		err = ENOTDIR;
@@ -586,6 +560,63 @@ smb_pathname(
 	(void) pn_free(&upn);
 
 	return (err);
+}
+
+/*
+ * Holds on dvp and rootvp (if not rootdir) are required by lookuppnvp()
+ * and will be released within lookuppnvp().
+ */
+static int
+smb_pathname_lookup(pathname_t *pn, pathname_t *rpn, int flags,
+    vnode_t **vp, vnode_t *rootvp, vnode_t *dvp, cred_t *cred)
+{
+	int err;
+
+	*vp = NULL;
+	VN_HOLD(dvp);
+	if (rootvp != rootdir)
+		VN_HOLD(rootvp);
+
+	err = lookuppnvp(pn, rpn, flags, NULL, vp, rootvp, dvp, cred);
+	return (err);
+}
+
+/*
+ * CATIA Translation of a pathname component prior to passing it to lookuppnvp
+ *
+ * If the translated component name contains a '/' NULL is returned.
+ * The caller should treat this as error EILSEQ. It is not valid to
+ * have a directory name with a '/'.
+ */
+static char *
+smb_pathname_catia_v5tov4(smb_request_t *sr, char *name,
+    char *namebuf, int buflen)
+{
+	char *namep;
+
+	if (SMB_TREE_SUPPORTS_CATIA(sr)) {
+		namep = smb_vop_catia_v5tov4(name, namebuf, buflen);
+		if (strchr(namep, '/') != NULL)
+			return (NULL);
+		return (namep);
+	}
+
+	return (name);
+}
+
+/*
+ * CATIA translation of a pathname component after returning from lookuppnvp
+ */
+static char *
+smb_pathname_catia_v4tov5(smb_request_t *sr, char *name,
+    char *namebuf, int buflen)
+{
+	if (SMB_TREE_SUPPORTS_CATIA(sr)) {
+		smb_vop_catia_v4tov5(name, namebuf, buflen);
+		return (namebuf);
+	}
+
+	return (name);
 }
 
 /*

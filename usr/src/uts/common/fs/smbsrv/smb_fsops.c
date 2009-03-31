@@ -166,6 +166,8 @@ smb_fsop_create_with_sd(
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
 
 	ASSERT(cr);
 
@@ -320,10 +322,8 @@ smb_fsop_create(
 	vnode_t		*xattrdirvp;
 	vnode_t		*vp;
 	char		*longname = NULL;
-	char		*namep;
 	char		*fname;
 	char		*sname;
-	int		is_stream;
 	int		flags = 0;
 	int		rc = 0;
 	smb_fssd_t	fs_sd;
@@ -353,62 +353,23 @@ smb_fsop_create(
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
 
-	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	if (smb_is_stream_name(name)) {
+		fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	is_stream = smb_stream_parse_name(name, fname, sname);
-	if (is_stream == -1) {
-		kmem_free(fname, MAXNAMELEN);
-		kmem_free(sname, MAXNAMELEN);
-		return (EINVAL);
-	}
-
-	if (is_stream)
-		namep = fname;
-	else
-		namep = name;
-
-	if (smb_maybe_mangled_name(namep)) {
-		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-
-		rc = smb_unmangle_name(sr, cr, dir_snode, namep, longname,
-		    MAXNAMELEN, NULL, NULL, 1);
-
-		if ((is_stream == 0) && (rc == 0))
-			rc = EEXIST;
-
-		if ((is_stream && rc) ||
-		    ((is_stream == 0) && (rc != ENOENT))) {
-			kmem_free(longname, MAXNAMELEN);
+		if (smb_stream_parse_name(name, fname, sname) == -1) {
 			kmem_free(fname, MAXNAMELEN);
 			kmem_free(sname, MAXNAMELEN);
-			return (rc);
+			return (EINVAL);
 		}
 
-		if (is_stream)
-			namep = longname;
-		else
-			kmem_free(longname, MAXNAMELEN);
-	}
-
-	if (is_stream) {
-		/*
-		 * Look up the unnamed stream.
-		 *
-		 * Mangle processing in smb_fsop_lookup() for the unnamed
-		 * stream won't be needed (as it was done above), but
-		 * it may be needed on any link target (which
-		 * smb_fsop_lookup() will provide).
-		 */
+		/* Look up the unnamed stream.  */
 		rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-		    sr->tid_tree->t_snode, dir_snode, namep, &fnode, &file_attr,
-		    0, 0);
-
-		if (longname) {
-			kmem_free(longname, MAXNAMELEN);
-			namep = NULL;
-		}
+		    sr->tid_tree->t_snode, dir_snode, fname,
+		    &fnode, &file_attr);
 
 		if (rc != 0) {
 			kmem_free(fname, MAXNAMELEN);
@@ -454,65 +415,76 @@ smb_fsop_create(
 		VN_RELE(xattrdirvp);
 		VN_RELE(vp);
 
-		if (*ret_snode == NULL) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (ENOMEM);
-		}
-	} else {
-		if (op->sd) {
-			/*
-			 * SD sent by client in Windows format. Needs to be
-			 * converted to FS format. No inheritance.
-			 */
-			secinfo = smb_sd_get_secinfo(op->sd);
-			smb_fssd_init(&fs_sd, secinfo, 0);
+		if (*ret_snode == NULL)
+			rc = ENOMEM;
 
-			status = smb_sd_tofs(op->sd, &fs_sd);
-			if (status == NT_STATUS_SUCCESS) {
-				rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
-				    name, attr, ret_snode, ret_attr, &fs_sd);
-			}
-			else
-				rc = EINVAL;
-			smb_fssd_term(&fs_sd);
-		} else if (sr->tid_tree->t_acltype == ACE_T) {
-			/*
-			 * No incoming SD and filesystem is ZFS
-			 * Server applies Windows inheritance rules,
-			 * see smb_fsop_sdinherit() comments as to why.
-			 */
-			smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, 0);
-			rc = smb_fsop_sdinherit(sr, dir_snode, &fs_sd);
-			if (rc == 0) {
-				rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
-				    name, attr, ret_snode, ret_attr, &fs_sd);
-			}
-
-			smb_fssd_term(&fs_sd);
-		} else {
-			/*
-			 * No incoming SD and filesystem is not ZFS
-			 * let the filesystem handles the inheritance.
-			 */
-			rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
-			    flags, cr, NULL);
-
-			if (rc == 0) {
-				*ret_snode = smb_node_lookup(sr, op, cr, vp,
-				    name, dir_snode, NULL, ret_attr);
-
-				if (*ret_snode == NULL)
-					rc = ENOMEM;
-
-				VN_RELE(vp);
-			}
-
-		}
+		kmem_free(fname, MAXNAMELEN);
+		kmem_free(sname, MAXNAMELEN);
+		return (rc);
 	}
 
-	kmem_free(fname, MAXNAMELEN);
-	kmem_free(sname, MAXNAMELEN);
+	/* Not a named stream */
+	if (smb_maybe_mangled_name(name)) {
+		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
+		kmem_free(longname, MAXNAMELEN);
+
+		if (rc == 0)
+			rc = EEXIST;
+		if (rc != ENOENT)
+			return (rc);
+	}
+
+	if (op->sd) {
+		/*
+		 * SD sent by client in Windows format. Needs to be
+		 * converted to FS format. No inheritance.
+		 */
+		secinfo = smb_sd_get_secinfo(op->sd);
+		smb_fssd_init(&fs_sd, secinfo, 0);
+
+		status = smb_sd_tofs(op->sd, &fs_sd);
+		if (status == NT_STATUS_SUCCESS) {
+			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
+			    name, attr, ret_snode, ret_attr, &fs_sd);
+		} else {
+			rc = EINVAL;
+		}
+		smb_fssd_term(&fs_sd);
+	} else if (sr->tid_tree->t_acltype == ACE_T) {
+		/*
+		 * No incoming SD and filesystem is ZFS
+		 * Server applies Windows inheritance rules,
+		 * see smb_fsop_sdinherit() comments as to why.
+		 */
+		smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, 0);
+		rc = smb_fsop_sdinherit(sr, dir_snode, &fs_sd);
+		if (rc == 0) {
+			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
+			    name, attr, ret_snode, ret_attr, &fs_sd);
+		}
+
+		smb_fssd_term(&fs_sd);
+	} else {
+		/*
+		 * No incoming SD and filesystem is not ZFS
+		 * let the filesystem handles the inheritance.
+		 */
+		rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
+		    flags, cr, NULL);
+
+		if (rc == 0) {
+			*ret_snode = smb_node_lookup(sr, op, cr, vp,
+			    name, dir_snode, NULL, ret_attr);
+
+			if (*ret_snode == NULL)
+				rc = ENOMEM;
+
+			VN_RELE(vp);
+		}
+
+	}
+
 	return (rc);
 }
 
@@ -567,12 +539,12 @@ smb_fsop_mkdir(
 
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
 
 	if (smb_maybe_mangled_name(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(sr, cr, dir_snode, name, longname,
-		    MAXNAMELEN, NULL, NULL, 1);
-
+		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
 		kmem_free(longname, MAXNAMELEN);
 
 		/*
@@ -652,24 +624,21 @@ smb_fsop_mkdir(
  *
  * It is assumed that a reference exists on snode coming into this routine.
  *
- * od: This means that the name passed in is an on-disk name.
  * A null smb_request might be passed to this function.
  */
-
 int
 smb_fsop_remove(
     smb_request_t	*sr,
     cred_t		*cr,
     smb_node_t		*dir_snode,
     char		*name,
-    int			od)
+    uint32_t		flags)
 {
 	smb_node_t	*fnode;
 	smb_attr_t	file_attr;
 	char		*longname;
 	char		*fname;
 	char		*sname;
-	int		flags = 0;
 	int		rc;
 
 	ASSERT(cr);
@@ -691,20 +660,6 @@ smb_fsop_remove(
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	/*
-	 * If the passed-in name is an on-disk name,
-	 * then we need to do a case-sensitive remove.
-	 * This is important if the on-disk name
-	 * corresponds to a mangled name passed in by
-	 * the client.  We want to make sure to remove
-	 * the exact file specified by the client,
-	 * instead of letting the underlying file system
-	 * do a remove on the "first match."
-	 */
-
-	if ((od == 0) && SMB_TREE_IS_CASEINSENSITIVE(sr))
-		flags = SMB_IGNORE_CASE;
-
 	if (dir_snode->flags & NODE_XATTR_DIR) {
 		rc = smb_vop_stream_remove(dir_snode->dir_snode->vp,
 		    name, flags, cr);
@@ -716,22 +671,14 @@ smb_fsop_remove(
 		}
 
 		/*
-		 * It is assumed that "name" corresponds to the path
-		 * passed in by the client, and no need of suppressing
-		 * case-insensitive lookups is needed.
-		 */
-
-		ASSERT(od == 0);
-
-		/*
 		 * Look up the unnamed stream (i.e. fname).
 		 * Unmangle processing will be done on fname
 		 * as well as any link target.
 		 */
 
 		rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-		    sr->tid_tree->t_snode, dir_snode, fname, &fnode, &file_attr,
-		    0, 0);
+		    sr->tid_tree->t_snode, dir_snode, fname,
+		    &fnode, &file_attr);
 
 		if (rc != 0) {
 			kmem_free(fname, MAXNAMELEN);
@@ -758,14 +705,13 @@ smb_fsop_remove(
 			}
 			longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-			rc = smb_unmangle_name(sr, cr, dir_snode, name,
-			    longname, MAXNAMELEN, NULL, NULL, 1);
+			rc = smb_unmangle_name(dir_snode, name,
+			    longname, MAXNAMELEN);
 
 			if (rc == 0) {
 				/*
-				 * We passed "1" as the "od" parameter
-				 * to smb_unmangle_name(), such that longname
-				 * is the real (case-sensitive) on-disk name.
+				 * longname is the real (case-sensitive)
+				 * on-disk name.
 				 * We make sure we do a remove on this exact
 				 * name, as the name was mangled and denotes
 				 * a unique file.
@@ -815,8 +761,9 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
 
-	/* TBD - error codes */
 	if ((odid = smb_odir_openat(sr, fnode)) == 0)
 		return (ENOENT);
 	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)
@@ -846,20 +793,16 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
  * for avoiding this wrapper.
  *
  * It is assumed that a reference exists on snode coming into this routine.
- *
- * od: This means that the name passed in is an on-disk name.
  */
-
 int
 smb_fsop_rmdir(
     smb_request_t	*sr,
     cred_t		*cr,
     smb_node_t		*dir_snode,
     char		*name,
-    int			od)
+    uint32_t		flags)
 {
 	int		rc;
-	int		flags = 0;
 	char		*longname;
 
 	ASSERT(cr);
@@ -878,20 +821,6 @@ smb_fsop_rmdir(
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	/*
-	 * If the passed-in name is an on-disk name,
-	 * then we need to do a case-sensitive rmdir.
-	 * This is important if the on-disk name
-	 * corresponds to a mangled name passed in by
-	 * the client.  We want to make sure to remove
-	 * the exact directory specified by the client,
-	 * instead of letting the underlying file system
-	 * do a rmdir on the "first match."
-	 */
-
-	if ((od == 0) && SMB_TREE_IS_CASEINSENSITIVE(sr))
-		flags = SMB_IGNORE_CASE;
-
 	rc = smb_vop_rmdir(dir_snode->vp, name, flags, cr);
 
 	if (rc == ENOENT) {
@@ -899,16 +828,12 @@ smb_fsop_rmdir(
 			return (rc);
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-
-		rc = smb_unmangle_name(sr, cr, dir_snode,
-		    name, longname, MAXNAMELEN, NULL,
-		    NULL, 1);
+		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
 
 		if (rc == 0) {
 			/*
-			 * We passed "1" as the "od" parameter
-			 * to smb_unmangle_name(), such that longname
-			 * is the real (case-sensitive) on-disk name.
+			 * longname is the real (case-sensitive)
+			 * on-disk name.
 			 * We make sure we do a rmdir on this exact
 			 * name, as the name was mangled and denotes
 			 * a unique directory.
@@ -1009,7 +934,7 @@ smb_fsop_rename(
 	smb_node_t *from_snode;
 	smb_attr_t tmp_attr;
 	vnode_t *from_vp;
-	int flags = 0;
+	int flags = 0, ret_flags;
 	int rc;
 	boolean_t isdir;
 
@@ -1046,12 +971,15 @@ smb_fsop_rename(
 	 * on this on-disk name, possibly resulting in the wrong file).
 	 */
 
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
+
 	/*
 	 * XXX: Lock required through smb_node_release() below?
 	 */
 
-	rc = smb_vop_lookup(from_dir_snode->vp, from_name, &from_vp, NULL, 0,
-	    NULL, cr);
+	rc = smb_vop_lookup(from_dir_snode->vp, from_name, &from_vp, NULL,
+	    flags, &ret_flags, NULL, cr);
 
 	if (rc != 0)
 		return (rc);
@@ -1571,7 +1499,7 @@ smb_fsop_lookup_name(
 		 * as well as any link target.
 		 */
 		rc = smb_fsop_lookup(sr, cr, flags, root_node, dir_snode, fname,
-		    &fnode, &file_attr, NULL, NULL);
+		    &fnode, &file_attr);
 
 		if (rc != 0) {
 			kmem_free(fname, MAXNAMELEN);
@@ -1616,7 +1544,7 @@ smb_fsop_lookup_name(
 		}
 	} else {
 		rc = smb_fsop_lookup(sr, cr, flags, root_node, dir_snode, name,
-		    ret_snode, ret_attr, NULL, NULL);
+		    ret_snode, ret_attr);
 	}
 
 	if (rc == 0) {
@@ -1653,9 +1581,6 @@ smb_fsop_lookup_name(
  * Note: The returned ret_snode may be in a child mount.  This is ok for
  * readdir.
  *
- * ret_shortname and ret_name83 must each point to buffers of at least
- * SMB_SHORTNAMELEN bytes.
- *
  * Other smb_fsop_* routines will call SMB_TREE_CONTAINS_NODE() to prevent
  * operations on files not in the parent mount.
  */
@@ -1668,9 +1593,7 @@ smb_fsop_lookup(
     smb_node_t	*dir_snode,
     char	*name,
     smb_node_t	**ret_snode,
-    smb_attr_t	*ret_attr,
-    char	*ret_shortname,
-    char	*ret_name83)
+    smb_attr_t	*ret_attr)
 {
 	smb_node_t *lnk_target_node;
 	smb_node_t *lnk_dnode;
@@ -1678,6 +1601,7 @@ smb_fsop_lookup(
 	char *od_name;
 	vnode_t *vp;
 	int rc;
+	int ret_flags;
 
 	ASSERT(cr);
 	ASSERT(dir_snode);
@@ -1692,11 +1616,13 @@ smb_fsop_lookup(
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags |= SMB_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
 
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	rc = smb_vop_lookup(dir_snode->vp, name, &vp, od_name, flags,
-	    root_node ? root_node->vp : NULL, cr);
+	    &ret_flags, root_node ? root_node->vp : NULL, cr);
 
 	if (rc != 0) {
 		if (smb_maybe_mangled_name(name) == 0) {
@@ -1705,10 +1631,7 @@ smb_fsop_lookup(
 		}
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-
-		rc = smb_unmangle_name(sr, cr, dir_snode, name, longname,
-		    MAXNAMELEN, ret_shortname, ret_name83, 1);
-
+		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
 		if (rc != 0) {
 			kmem_free(od_name, MAXNAMELEN);
 			kmem_free(longname, MAXNAMELEN);
@@ -1716,9 +1639,8 @@ smb_fsop_lookup(
 		}
 
 		/*
-		 * We passed "1" as the "od" parameter
-		 * to smb_unmangle_name(), such that longname
-		 * is the real (case-sensitive) on-disk name.
+		 * longname is the real (case-sensitive)
+		 * on-disk name.
 		 * We make sure we do a lookup on this exact
 		 * name, as the name was mangled and denotes
 		 * a unique file.
@@ -1728,7 +1650,7 @@ smb_fsop_lookup(
 			flags &= ~SMB_IGNORE_CASE;
 
 		rc = smb_vop_lookup(dir_snode->vp, longname, &vp, od_name,
-		    flags, root_node ? root_node->vp : NULL, cr);
+		    flags, &ret_flags, root_node ? root_node->vp : NULL, cr);
 
 		kmem_free(longname, MAXNAMELEN);
 

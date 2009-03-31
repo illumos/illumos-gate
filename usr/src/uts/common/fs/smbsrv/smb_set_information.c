@@ -107,7 +107,7 @@ smb_com_set_information(smb_request_t *sr)
 	}
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, name, &node, &attr, 0, 0);
+	    sr->tid_tree->t_snode, dir_node, name, &node, &attr);
 	if (rc != 0) {
 		smb_node_release(dir_node);
 		kmem_free(name, MAXNAMELEN);

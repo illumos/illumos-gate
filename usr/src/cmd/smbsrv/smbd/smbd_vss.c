@@ -63,6 +63,11 @@
  * The 3 iterator functions
  */
 
+/*
+ * The maximum number of snapshots returned per request.
+ */
+#define	SMBD_VSS_SNAPSHOT_MAX	725
+
 static void smbd_vss_time2gmttoken(time_t time, char *gmttoken);
 static int smbd_vss_cmp_time(const void *a, const void *b);
 static int smbd_vss_iterate_count(zfs_handle_t *zhp, void *data);
@@ -119,6 +124,9 @@ smbd_vss_get_count(const char *path, uint32_t *count)
 	(void) zfs_iter_snapshots(zfshd, smbd_vss_iterate_count,
 	    (void *)&vss_count);
 
+	if (vss_count.vc_count > SMBD_VSS_SNAPSHOT_MAX)
+		vss_count.vc_count = SMBD_VSS_SNAPSHOT_MAX;
+
 	*count = vss_count.vc_count;
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
@@ -148,58 +156,62 @@ smbd_vss_get_snapshots(const char *path, uint32_t count,
 	*return_count = 0;
 	*num_gmttokens = 0;
 
-	if (smb_getdataset(path, dataset, MAXPATHLEN) != 0)
+	if (count == 0)
 		return;
 
-	if ((libhd = libzfs_init()) == NULL)
-		return;
-
-	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_DATASET)) == NULL) {
-		libzfs_fini(libhd);
-		return;
-	}
+	if (count > SMBD_VSS_SNAPSHOT_MAX)
+		count = SMBD_VSS_SNAPSHOT_MAX;
 
 	vss_uint64_date.gd_count = count;
 	vss_uint64_date.gd_return_count = 0;
 	vss_uint64_date.gd_gmt_array = malloc(count * sizeof (uint64_t));
+	if (vss_uint64_date.gd_gmt_array == NULL)
+		return;
 
-	if (vss_uint64_date.gd_gmt_array != NULL) {
-		(void) zfs_iter_snapshots(zfshd,
-		    smbd_vss_iterate_get_uint64_date,
-		    (void *)&vss_uint64_date);
-
-		*num_gmttokens = vss_uint64_date.gd_return_count;
-		*return_count = vss_uint64_date.gd_return_count;
-
-		if (vss_uint64_date.gd_return_count <= count) {
-			/*
-			 * Sort the list since neither
-			 * zfs nor the client sorts it.
-			 */
-			qsort((char *)vss_uint64_date.gd_gmt_array,
-			    vss_uint64_date.gd_return_count,
-			    sizeof (uint64_t), smbd_vss_cmp_time);
-
-			timep = vss_uint64_date.gd_gmt_array;
-
-			for (i = 0; i < vss_uint64_date.gd_return_count; i++) {
-				*gmttokenp = malloc(SMB_VSS_GMT_SIZE);
-
-				if (*gmttokenp) {
-					smbd_vss_time2gmttoken(*timep,
-					    *gmttokenp);
-				} else {
-					vss_uint64_date.gd_return_count = 0;
-				}
-
-				timep++;
-				gmttokenp++;
-			}
-		}
-
+	if (smb_getdataset(path, dataset, MAXPATHLEN) != 0) {
 		free(vss_uint64_date.gd_gmt_array);
+		return;
 	}
 
+	if ((libhd = libzfs_init()) == NULL) {
+		free(vss_uint64_date.gd_gmt_array);
+		return;
+	}
+
+	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_DATASET)) == NULL) {
+		free(vss_uint64_date.gd_gmt_array);
+		libzfs_fini(libhd);
+		return;
+	}
+
+	(void) zfs_iter_snapshots(zfshd, smbd_vss_iterate_get_uint64_date,
+	    (void *)&vss_uint64_date);
+
+	*num_gmttokens = vss_uint64_date.gd_return_count;
+	*return_count = vss_uint64_date.gd_return_count;
+
+	/*
+	 * Sort the list since neither zfs nor the client sorts it.
+	 */
+	qsort((char *)vss_uint64_date.gd_gmt_array,
+	    vss_uint64_date.gd_return_count,
+	    sizeof (uint64_t), smbd_vss_cmp_time);
+
+	timep = vss_uint64_date.gd_gmt_array;
+
+	for (i = 0; i < vss_uint64_date.gd_return_count; i++) {
+		*gmttokenp = malloc(SMB_VSS_GMT_SIZE);
+
+		if (*gmttokenp)
+			smbd_vss_time2gmttoken(*timep, *gmttokenp);
+		else
+			vss_uint64_date.gd_return_count = 0;
+
+		timep++;
+		gmttokenp++;
+	}
+
+	free(vss_uint64_date.gd_gmt_array);
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
 }
@@ -284,43 +296,62 @@ smbd_vss_cmp_time(const void *a, const void *b)
 	return (-1);
 }
 
+/*
+ * ZFS snapshot iterator to count snapshots.
+ * Note: libzfs expects us to close the handle.
+ * Return 0 to continue iterating or non-zreo to terminate the iteration.
+ */
 static int
 smbd_vss_iterate_count(zfs_handle_t *zhp, void *data)
 {
-	smbd_vss_count_t *vss_data;
-	vss_data = data;
-	vss_data->vc_count++;
-	/* libzfs expects us to close the handle */
+	smbd_vss_count_t *vss_data = data;
+
+	if (vss_data->vc_count < SMBD_VSS_SNAPSHOT_MAX) {
+		vss_data->vc_count++;
+		zfs_close(zhp);
+		return (0);
+	}
+
 	zfs_close(zhp);
-	return (0);
+	return (-1);
 }
 
+/*
+ * ZFS snapshot iterator to get snapshot creation time.
+ * Note: libzfs expects us to close the handle.
+ * Return 0 to continue iterating or non-zreo to terminate the iteration.
+ */
 static int
 smbd_vss_iterate_get_uint64_date(zfs_handle_t *zhp, void *data)
 {
-	smbd_vss_get_uint64_date_t *vss_data;
+	smbd_vss_get_uint64_date_t *vss_data = data;
+	int count;
 
-	vss_data = data;
+	count = vss_data->gd_return_count;
 
-	if (vss_data->gd_return_count < vss_data->gd_count) {
-		vss_data->gd_gmt_array[vss_data->gd_return_count] =
+	if (count < vss_data->gd_count) {
+		vss_data->gd_gmt_array[count] =
 		    zfs_prop_get_int(zhp, ZFS_PROP_CREATION);
+		vss_data->gd_return_count++;
+		zfs_close(zhp);
+		return (0);
 	}
 
-	vss_data->gd_return_count += 1;
-	/* libzfs expects us to close the handle */
 	zfs_close(zhp);
-	return (0);
+	return (-1);
 }
 
+/*
+ * ZFS snapshot iterator to map a snapshot creation time to a token.
+ * Note: libzfs expects us to close the handle.
+ * Return 0 to continue iterating or non-zreo to terminate the iteration.
+ */
 static int
 smbd_vss_iterate_map_gmttoken(zfs_handle_t *zhp, void *data)
 {
-	smbd_vss_map_gmttoken_t *vss_data;
+	smbd_vss_map_gmttoken_t *vss_data = data;
 	time_t time;
 	char gmttoken[SMB_VSS_GMT_SIZE];
-
-	vss_data = data;
 
 	time = (time_t)zfs_prop_get_int(zhp, ZFS_PROP_CREATION);
 	smbd_vss_time2gmttoken(time, gmttoken);
@@ -329,14 +360,11 @@ smbd_vss_iterate_map_gmttoken(zfs_handle_t *zhp, void *data)
 		(void) strlcpy(vss_data->mg_snapname, zfs_get_name(zhp),
 		    MAXPATHLEN);
 
-		/* libzfs expects us to close the handle */
-		zfs_close(zhp);
-
 		/* we found a match, do not process anymore snapshots */
+		zfs_close(zhp);
 		return (-1);
 	}
 
-	/* libzfs expects us to close the handle */
 	zfs_close(zhp);
 	return (0);
 }

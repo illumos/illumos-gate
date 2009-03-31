@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,7 +391,8 @@ smb_set_disposition_info(
     smb_trans2_setinfo_t	*info,
     smb_error_t			*smberr)
 {
-	unsigned char		mark_delete;
+	unsigned char	mark_delete;
+	uint32_t	flags = 0;
 
 	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "b", &mark_delete) != 0)
 		return (NT_STATUS_DATA_ERROR);
@@ -405,8 +406,11 @@ smb_set_disposition_info(
 	}
 
 	if (mark_delete) {
+		if (SMB_TREE_SUPPORTS_CATIA(sr))
+			flags |= SMB_CATIA;
+
 		if (smb_node_set_delete_on_close(info->node,
-		    sr->user_cr)) {
+		    sr->user_cr, flags)) {
 			smberr->status = NT_STATUS_CANNOT_DELETE;
 			smberr->errcls = ERRDOS;
 			smberr->errcode = ERROR_ACCESS_DENIED;

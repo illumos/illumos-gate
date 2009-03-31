@@ -350,7 +350,7 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 	if (od == NULL)
 		return (0);
 
-	od->d_xat = B_TRUE;
+	od->d_flags |= SMB_ODIR_FLAG_XATTR;
 	return (od->d_odid);
 }
 
@@ -453,7 +453,8 @@ int
 smb_odir_read(smb_request_t *sr, smb_odir_t *od,
     smb_odirent_t *odirent, boolean_t *eof)
 {
-	int rc;
+	int		rc;
+	boolean_t	ignore_case;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -469,11 +470,13 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
 		return (-1);
 	}
 
+	ignore_case = (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE);
+
 	for (;;) {
 		if ((rc = smb_odir_next_odirent(od, odirent)) != 0)
 			break;
 		if (smb_match_name(odirent->od_ino, odirent->od_name,
-		    od->d_pattern, od->d_ignore_case))
+		    od->d_pattern, ignore_case))
 			break;
 	}
 
@@ -521,6 +524,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 {
 	int		rc;
 	smb_odirent_t	*odirent;
+	boolean_t	ignore_case;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -536,7 +540,9 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (-1);
 	}
 
-	if (!od->d_wildcards) {
+	ignore_case = (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE);
+
+	if (!(od->d_flags & SMB_ODIR_FLAG_WILDCARDS)) {
 		if (od->d_eof)
 			rc = ENOENT;
 		else
@@ -550,7 +556,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 				break;
 
 			if (!smb_match_name(odirent->od_ino, odirent->od_name,
-			    od->d_pattern, od->d_ignore_case))
+			    od->d_pattern, ignore_case))
 				continue;
 
 			rc = smb_odir_wildcard_fileinfo(sr, od, odirent,
@@ -582,6 +588,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
  * Find the next directory entry whose name begins with SMB_STREAM_PREFIX,
  * and thus represents an NTFS named stream.
  * No search attribute matching is performed.
+ * No case conflict name mangling is required for NTFS named stream names.
  *
  * Returns:
  *  0 - success.
@@ -598,6 +605,7 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 	smb_odirent_t	*odirent;
 	vnode_t		*vp;
 	smb_attr_t	attr;
+	int		tmpflg;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -614,7 +622,7 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 	}
 
 	/* Check that odir represents an xattr directory */
-	if (!od->d_xat) {
+	if (!(od->d_flags & SMB_ODIR_FLAG_XATTR)) {
 		*eof = B_TRUE;
 		mutex_exit(&od->d_mutex);
 		return (0);
@@ -637,7 +645,8 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 		 * pass the vp of the unnamed stream file to smb_vop_getattr
 		 */
 		rc = smb_vop_lookup(od->d_dnode->vp, odirent->od_name, &vp,
-		    NULL, 0, od->d_tree->t_snode->vp, od->d_user->u_cred);
+		    NULL, 0, &tmpflg, od->d_tree->t_snode->vp,
+		    od->d_user->u_cred);
 		if (rc == 0) {
 			rc = smb_vop_getattr(vp, NULL, &attr, 0,
 			    od->d_user->u_cred);
@@ -783,10 +792,15 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	od->d_odid = odid;
 	od->d_sattr = sattr;
 	(void) strlcpy(od->d_pattern, pattern, sizeof (od->d_pattern));
-	od->d_wildcards = (smb_convert_wildcards(od->d_pattern) != 0);
-	od->d_is_edp = vfs_has_feature(dnode->vp->v_vfsp, VFSFT_DIRENTFLAGS);
-	od->d_ignore_case =
-	    smb_tree_has_feature(tree, SMB_TREE_CASEINSENSITIVE);
+	od->d_flags = 0;
+	if (smb_convert_wildcards(od->d_pattern) != 0)
+		od->d_flags |= SMB_ODIR_FLAG_WILDCARDS;
+	if (vfs_has_feature(dnode->vp->v_vfsp, VFSFT_DIRENTFLAGS))
+		od->d_flags |= SMB_ODIR_FLAG_EDIRENT;
+	if (smb_tree_has_feature(tree, SMB_TREE_CASEINSENSITIVE))
+		od->d_flags |= SMB_ODIR_FLAG_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		od->d_flags |= SMB_ODIR_FLAG_CATIA;
 	od->d_eof = B_FALSE;
 
 	smb_llist_enter(&tree->t_odir_list, RW_WRITER);
@@ -838,7 +852,8 @@ smb_odir_delete(smb_odir_t *od)
  * The ed_name/d_name in d_buf is NULL terminated by the file system.
  *
  * Some file systems can have directories larger than SMB_MAXDIRSIZE.
- * If the odirent offset >= SMB_MAXDIRSIZE return ENOENT.
+ * If the odirent offset >= SMB_MAXDIRSIZE return ENOENT and set d_eof
+ * to true to stop subsequent calls to smb_vop_readdir.
  *
  * Returns:
  *      0 - success. odirent is populated with the next directory entry
@@ -853,12 +868,15 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 	int		eof;
 	dirent64_t	*dp;
 	edirent_t	*edp;
+	char		*np;
 
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 
 	if (od->d_bufptr != NULL) {
-		reclen = od->d_is_edp ?
-		    od->d_edp->ed_reclen : od->d_dp->d_reclen;
+		if (od->d_flags & SMB_ODIR_FLAG_EDIRENT)
+			reclen = od->d_edp->ed_reclen;
+		else
+			reclen = od->d_dp->d_reclen;
 
 		if (reclen == 0) {
 			od->d_bufptr = NULL;
@@ -891,24 +909,36 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 		od->d_bufptr = od->d_buf;
 	}
 
-	od->d_offset = (od->d_is_edp) ? od->d_edp->ed_off : od->d_dp->d_off;
+	if (od->d_flags & SMB_ODIR_FLAG_EDIRENT)
+		od->d_offset = od->d_edp->ed_off;
+	else
+		od->d_offset = od->d_dp->d_off;
+
 	if (od->d_offset >= SMB_MAXDIRSIZE) {
 		od->d_bufptr = NULL;
 		od->d_bufsize = 0;
+		od->d_eof = B_TRUE;
 		return (ENOENT);
 	}
 
-	if (od->d_is_edp) {
+	if (od->d_flags & SMB_ODIR_FLAG_EDIRENT) {
 		edp = od->d_edp;
 		odirent->od_ino = edp->ed_ino;
 		odirent->od_eflags = edp->ed_eflags;
-		(void) strlcpy(odirent->od_name, edp->ed_name,
-		    sizeof (odirent->od_name));
+		np = edp->ed_name;
 	} else {
 		dp = od->d_dp;
 		odirent->od_ino = dp->d_ino;
 		odirent->od_eflags = 0;
-		(void) strlcpy(odirent->od_name, dp->d_name,
+		np =  dp->d_name;
+	}
+
+	if ((od->d_flags & SMB_ODIR_FLAG_CATIA) &&
+	    ((od->d_flags & SMB_ODIR_FLAG_XATTR) == 0)) {
+		smb_vop_catia_v4tov5(np, odirent->od_name,
+		    sizeof (odirent->od_name));
+	} else {
+		(void) strlcpy(odirent->od_name, np,
 		    sizeof (odirent->od_name));
 	}
 
@@ -940,6 +970,9 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	ino64_t		ino;
 	char		*name;
 	uint32_t	dosattr;
+	boolean_t	case_conflict = B_FALSE;
+	int		lookup_flags, flags = 0;
+	vnode_t		*vp;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -950,20 +983,40 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	bzero(fileinfo, sizeof (smb_fileinfo_t));
 
 	rc = smb_fsop_lookup(sr, od->d_user->u_cred, 0, od->d_tree->t_snode,
-	    od->d_dnode, od->d_pattern, &fnode, &attr, 0, 0);
+	    od->d_dnode, od->d_pattern, &fnode, &attr);
 	if (rc != 0)
 		return (rc);
 
-	name = fnode->od_name;
+	/*
+	 * If case sensitive, do a case insensitive smb_vop_lookup to
+	 * check for case conflict
+	 */
+	if (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) {
+		lookup_flags = SMB_IGNORE_CASE;
+		if (od->d_flags & SMB_ODIR_FLAG_CATIA)
+			lookup_flags |= SMB_CATIA;
 
-	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
+		rc = smb_vop_lookup(od->d_dnode->vp, fnode->od_name, &vp,
+		    NULL, lookup_flags, &flags, od->d_tree->t_snode->vp,
+		    od->d_user->u_cred);
+		if (rc != 0)
+			return (rc);
+		VN_RELE(vp);
+
+		if (flags & ED_CASE_CONFLICT)
+			case_conflict = B_TRUE;
+	}
+
 	ino = attr.sa_vattr.va_nodeid;
-	(void) smb_mangle_name(ino, name,
-	    fileinfo->fi_shortname, fileinfo->fi_name83, 0);
+	(void) smb_mangle_name(ino, fnode->od_name,
+	    fileinfo->fi_shortname, fileinfo->fi_name83, case_conflict);
+	name = (case_conflict) ? fileinfo->fi_shortname : fnode->od_name;
+	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	/* follow link to get target node & attr */
 	if ((fnode->vp->v_type == VLNK) &&
-	    (smb_odir_lookup_link(sr, od, name, &tgt_node, &tgt_attr))) {
+	    (smb_odir_lookup_link(sr, od, fnode->od_name,
+	    &tgt_node, &tgt_attr))) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
 		fattr = &tgt_attr;
@@ -1039,7 +1092,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 	bzero(fileinfo, sizeof (smb_fileinfo_t));
 
-	case_conflict = ((od->d_ignore_case) &&
+	case_conflict = ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
 	    (odirent->od_eflags & ED_CASE_CONFLICT));
 	(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
 	    fileinfo->fi_shortname, fileinfo->fi_name83, case_conflict);
@@ -1047,7 +1100,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	rc = smb_fsop_lookup(sr, od->d_user->u_cred, 0, od->d_tree->t_snode,
-	    od->d_dnode, name, &fnode, &attr, 0, 0);
+	    od->d_dnode, name, &fnode, &attr);
 	if (rc != 0)
 		return (rc);
 
@@ -1110,7 +1163,7 @@ smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
 	int rc;
 
 	rc = smb_fsop_lookup(sr, od->d_user->u_cred, SMB_FOLLOW_LINKS,
-	    od->d_tree->t_snode, od->d_dnode, fname, tgt_node, tgt_attr, 0, 0);
+	    od->d_tree->t_snode, od->d_dnode, fname, tgt_node, tgt_attr);
 	if (rc != 0) {
 		*tgt_node = NULL;
 		return (B_FALSE);

@@ -896,8 +896,8 @@ smb_server_share_export(char *path)
 		return (error);
 	}
 
-	error = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, NULL, dnode,
-	    last_comp, &fnode, &ret_attr, NULL, NULL);
+	error = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
+	    sv->si_root_smb_node, dnode, last_comp, &fnode, &ret_attr);
 
 	smb_node_release(dnode);
 
@@ -987,8 +987,8 @@ smb_server_share_unexport(char *path, char *sharename)
 		return (rc);
 	}
 
-	rc = smb_fsop_lookup(sr, kcred, SMB_FOLLOW_LINKS, NULL, dnode,
-	    last_comp, &fnode, &ret_attr, NULL, NULL);
+	rc = smb_fsop_lookup(sr, kcred, SMB_FOLLOW_LINKS, sv->si_root_smb_node,
+	    dnode, last_comp, &fnode, &ret_attr);
 
 	smb_node_release(dnode);
 	smb_request_free(sr);

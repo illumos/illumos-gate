@@ -111,7 +111,7 @@ int smb_vop_getattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
 int smb_vop_setattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
 int smb_vop_access(vnode_t *, int, int, vnode_t *, cred_t *);
 void smb_vop_eaccess(vnode_t *, int *, int, vnode_t *, cred_t *);
-int smb_vop_lookup(vnode_t *, char *, vnode_t **, char *, int, vnode_t *,
+int smb_vop_lookup(vnode_t *, char *, vnode_t **, char *, int, int *, vnode_t *,
     cred_t *);
 int smb_vop_create(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
     vsecattr_t *);
@@ -139,6 +139,9 @@ int smb_vop_shrlock(vnode_t *, uint32_t, uint32_t, uint32_t, cred_t *);
 int smb_vop_unshrlock(vnode_t *, uint32_t, cred_t *);
 
 int smb_vop_frlock(vnode_t *, cred_t *, int, flock64_t *);
+
+void smb_vop_catia_v4tov5(char *, char *, int);
+char *smb_vop_catia_v5tov4(char *, char *, int);
 
 #ifdef __cplusplus
 }

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_opipe.c	1.10	08/08/08 SMI"
 
 /*
  * This module provides the interface to NDR RPC.
@@ -73,7 +71,7 @@ static void smb_user_context_fini(smb_opipe_context_t *);
 int
 smb_opipe_open(smb_request_t *sr)
 {
-	struct open_param *op = &sr->arg.open;
+	open_param_t *op = &sr->arg.open;
 	smb_ofile_t *of;
 	smb_opipe_t *opipe;
 	smb_opipe_hdr_t hdr;
@@ -87,8 +85,15 @@ smb_opipe_open(smb_request_t *sr)
 
 	of = smb_ofile_open(sr->tid_tree, NULL, sr->smb_pid, op,
 	    SMB_FTYPE_MESG_PIPE, SMB_UNIQ_FID(), &err);
+
 	if (of == NULL)
 		return (err.status);
+
+	if (!smb_tree_is_connected(sr->tid_tree)) {
+		smb_ofile_close(of, 0);
+		smb_ofile_release(of);
+		return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
+	}
 
 	op->dsize = 0x01000;
 	op->dattr = FILE_ATTRIBUTE_NORMAL;
@@ -128,7 +133,6 @@ smb_opipe_open(smb_request_t *sr)
 		smb_ofile_close(of, 0);
 		return (NT_STATUS_NO_MEMORY);
 	}
-
 	smb_opipe_exit(opipe);
 	return (NT_STATUS_SUCCESS);
 }

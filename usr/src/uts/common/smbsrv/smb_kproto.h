@@ -216,14 +216,11 @@ void smb_lock_range_error(smb_request_t *, uint32_t);
 DWORD smb_range_check(smb_request_t *, smb_node_t *, uint64_t, uint64_t,
     boolean_t);
 
-int smb_mangle_name(ino64_t fileid, char *name, char *shortname,
-    char *name83, int force);
-int smb_unmangle_name(struct smb_request *sr, cred_t *cred,
-    smb_node_t *dir_node, char *name, char *real_name, int realname_size,
-    char *shortname, char *name83, int od);
-int smb_maybe_mangled_name(char *name);
-int smb_maybe_mangled_path(const char *path, size_t pathlen);
-int smb_needs_mangle(char *name, char **dot_pos);
+int smb_mangle_name(ino64_t, char *, char *, char *, int);
+int smb_unmangle_name(smb_node_t *, char *, char *, int);
+int smb_maybe_mangled_name(char *);
+int smb_maybe_mangled_path(const char *, size_t);
+int smb_needs_mangle(char *, char **);
 boolean_t smb_is_invalid_filename(const char *);
 
 void smbsr_cleanup(struct smb_request *sr);
@@ -390,7 +387,7 @@ timestruc_t *smb_node_get_ctime(struct smb_node *node);
 timestruc_t *smb_node_get_mtime(struct smb_node *node);
 void smb_node_set_dosattr(struct smb_node *, uint32_t);
 uint32_t smb_node_get_dosattr(struct smb_node *node);
-int smb_node_set_delete_on_close(smb_node_t *, cred_t *);
+int smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
 void smb_node_reset_delete_on_close(smb_node_t *);
 
 /*
@@ -450,8 +447,6 @@ void	*smbsr_realloc(void *, size_t);
 void	smbsr_free_malloc_list(smb_malloc_list *);
 
 unsigned short smb_worker_getnum();
-void smb_preset_delete_on_close(struct smb_ofile *file);
-void smb_commit_delete_on_close(struct smb_ofile *file);
 
 boolean_t smb_is_stream_name(char *);
 uint32_t smb_validate_stream_name(char *);
@@ -528,6 +523,7 @@ uint32_t smb_ofile_rename_check(smb_ofile_t *);
 uint32_t smb_ofile_delete_check(smb_ofile_t *);
 cred_t *smb_ofile_getcred(smb_ofile_t *);
 void smb_ofile_set_oplock_granted(smb_ofile_t *);
+void smb_ofile_set_delete_on_close(smb_ofile_t *);
 
 #define	SMB_OFILE_GET_SESSION(of)	((of)->f_session)
 #define	SMB_OFILE_GET_TREE(of)		((of)->f_tree)
@@ -589,6 +585,7 @@ boolean_t smb_tree_hold(smb_tree_t *);
 void smb_tree_release(smb_tree_t *);
 void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
 smb_odir_t *smb_tree_lookup_odir(smb_tree_t *, uint16_t);
+boolean_t smb_tree_is_connected(smb_tree_t *);
 #define	SMB_TREE_GET_TID(tree)		((tree)->t_tid)
 
 /*

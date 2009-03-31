@@ -357,6 +357,7 @@ smb_com_delete_directory(smb_request_t *sr)
 	smb_node_t *dnode;
 	smb_attr_t *attr;
 	int rc;
+	uint32_t flags = 0;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -400,8 +401,11 @@ smb_com_delete_directory(smb_request_t *sr)
 
 	dnode = sr->arg.dirop.fqi.dir_snode;
 
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
+
 	rc = smb_fsop_rmdir(sr, sr->user_cr, dnode,
-	    sr->arg.dirop.fqi.last_comp_od, 1);
+	    sr->arg.dirop.fqi.last_comp_od, flags);
 	if (rc != 0) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);

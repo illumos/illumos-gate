@@ -58,10 +58,10 @@ int smb_fsop_mkdir(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
     char *name, smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr);
 
 int smb_fsop_remove(struct smb_request *sr, cred_t *cr, smb_node_t *dir_snode,
-    char *name, int od);
+    char *name, uint32_t flags);
 
 int smb_fsop_rmdir(struct smb_request *sr, cred_t *cr, smb_node_t *dir_snode,
-    char *name, int od);
+    char *name, uint32_t flags);
 
 int smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
     smb_attr_t *attr);
@@ -99,8 +99,7 @@ int smb_fsop_lookup_name(struct smb_request *sr, cred_t *cr, int flags,
 
 int smb_fsop_lookup(struct smb_request *sr, cred_t *cr, int flags,
     smb_node_t *root_node, smb_node_t *dir_snode, char *name,
-    smb_node_t **ret_snode, smb_attr_t *ret_attr, char *ret_shortname,
-    char *ret_name83);
+    smb_node_t **ret_snode, smb_attr_t *ret_attr);
 
 int smb_fsop_commit(smb_request_t *sr, cred_t *cr, struct smb_node *snode);
 
@@ -121,10 +120,12 @@ int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
  *
  * SMB_FOLLOW_LINKS	Follow symbolic links.
  * SMB_IGNORE_CASE	Perform case-insensitive lookup.
+ * SMB_CATIA		Perform CATIA character substitution
  */
 
 #define	SMB_FOLLOW_LINKS	0x00000001
 #define	SMB_IGNORE_CASE		0x00000002
+#define	SMB_CATIA		0x00000004
 
 #ifdef	__cplusplus
 }

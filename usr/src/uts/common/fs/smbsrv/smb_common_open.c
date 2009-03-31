@@ -39,22 +39,8 @@
 volatile uint32_t smb_fids = 0;
 
 static uint32_t smb_open_subr(smb_request_t *);
-
 extern uint32_t smb_is_executable(char *);
-
-/*
- * This macro is used to delete a newly created object
- * if any error happens after creation of object.
- */
-#define	SMB_DEL_NEWOBJ(obj) \
-	if (created) {							\
-		if (is_dir)						\
-			(void) smb_fsop_rmdir(sr, sr->user_cr,		\
-			    obj.dir_snode, obj.last_comp, 0);		\
-		else							\
-			(void) smb_fsop_remove(sr, sr->user_cr,		\
-			    obj.dir_snode, obj.last_comp, 0);		\
-	}
+static void smb_delete_new_object(smb_request_t *);
 
 /*
  * smb_access_generic_to_file
@@ -750,7 +736,8 @@ smb_open_subr(smb_request_t *sr)
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
 				smb_node_unlock(node);
-				SMB_DEL_NEWOBJ(op->fqi);
+				if (created)
+					smb_delete_new_object(sr);
 				smb_node_release(node);
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
@@ -805,19 +792,13 @@ smb_open_subr(smb_request_t *sr)
 		(void) smb_sync_fsattr(sr, sr->user_cr, node);
 	}
 
-	/*
-	 * smb_ofile_open() will copy node to of->node.  Hence
-	 * the hold on node (i.e. op->fqi.last_snode) will be "transferred"
-	 * to the "of" structure.
-	 */
-
 	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op, SMB_FTYPE_DISK,
 	    uniq_fid, &err);
 
 	if (of == NULL) {
 		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
-
-		SMB_DEL_NEWOBJ(op->fqi);
+		if (created)
+			smb_delete_new_object(sr);
 		smb_node_unlock(node);
 		smb_node_release(node);
 		if (created)
@@ -826,6 +807,21 @@ smb_open_subr(smb_request_t *sr)
 		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_error(sr, err.status, err.errcls, err.errcode);
 		return (err.status);
+	}
+
+	if (!smb_tree_is_connected(sr->tid_tree)) {
+		smb_ofile_close(of, 0);
+		smb_ofile_release(of);
+		if (created)
+			smb_delete_new_object(sr);
+		smb_node_unlock(node);
+		smb_node_release(node);
+		if (created)
+			smb_node_unlock(dnode);
+		smb_node_release(dnode);
+		SMB_NULL_FQI_NODES(op->fqi);
+		smbsr_error(sr, 0, ERRSRV, ERRinvnid);
+		return (NT_STATUS_UNSUCCESSFUL);
 	}
 
 	/*
@@ -846,7 +842,6 @@ smb_open_subr(smb_request_t *sr)
 	sr->fid_ofile = of;
 
 	smb_node_unlock(node);
-
 	if (created)
 		smb_node_unlock(dnode);
 
@@ -858,6 +853,7 @@ smb_open_subr(smb_request_t *sr)
 		op->dsize = 0;
 	}
 
+	smb_node_release(node);
 	smb_node_release(dnode);
 	SMB_NULL_FQI_NODES(op->fqi);
 
@@ -907,23 +903,27 @@ smb_validate_object_name(char *path, unsigned int ftype)
 	return (0);
 }
 
+
 /*
- * smb_preset_delete_on_close
- *
- * Set the DeleteOnClose flag on the smb file. When the file is closed,
- * the flag will be transferred to the smb node, which will commit the
- * delete operation and inhibit subsequent open requests.
- *
- * When DeleteOnClose is set on an smb_node, the common open code will
- * reject subsequent open requests for the file. Observation of Windows
- * 2000 indicates that subsequent opens should be allowed (assuming
- * there would be no sharing violation) until the file is closed using
- * the fid on which the DeleteOnClose was requested.
+ * This function is used to delete a newly created object (file or
+ * directory) if an error occurs after creation of the object.
  */
-void
-smb_preset_delete_on_close(smb_ofile_t *file)
+static void
+smb_delete_new_object(smb_request_t *sr)
 {
-	mutex_enter(&file->f_mutex);
-	file->f_flags |= SMB_OFLAGS_SET_DELETE_ON_CLOSE;
-	mutex_exit(&file->f_mutex);
+	open_param_t	*op = &sr->arg.open;
+	smb_fqi_t	*fqi = &(op->fqi);
+	uint32_t	flags = 0;
+
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
+		flags |= SMB_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
+
+	if (op->create_options & FILE_DIRECTORY_FILE)
+		(void) smb_fsop_rmdir(sr, sr->user_cr, fqi->dir_snode,
+		    fqi->last_comp, flags);
+	else
+		(void) smb_fsop_remove(sr, sr->user_cr, fqi->dir_snode,
+		    fqi->last_comp, flags);
 }

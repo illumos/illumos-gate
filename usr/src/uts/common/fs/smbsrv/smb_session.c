@@ -1195,7 +1195,10 @@ smb_session_oplocks_enable(smb_session_t *session)
  * smb_session_breaking_oplock
  *
  * This MUST be a cross-session call, i.e. the caller must be in a different
- * context than the one passed.
+ * context than the one passed. The mutex of the SMB node requiring an oplock
+ * break MUST be dropped before calling this function. This last requirement is
+ * due to a potential deadlock that can occur when trying to enter the lock of
+ * the session passed in.
  */
 void
 smb_session_oplock_break(smb_session_t *session, smb_ofile_t *of)

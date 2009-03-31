@@ -527,18 +527,20 @@ smb_node_delete_on_close(smb_node_t *node)
 {
 	smb_node_t	*d_snode;
 	int		rc = 0;
+	uint32_t	flags = 0;
 
 	d_snode = node->dir_snode;
 	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
-
 		node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
+		flags = node->n_delete_on_close_flags;
 		ASSERT(node->od_name != NULL);
+
 		if (node->attr.sa_vattr.va_type == VDIR)
 			rc = smb_fsop_rmdir(0, node->delete_on_close_cred,
-			    d_snode, node->od_name, 1);
+			    d_snode, node->od_name, flags);
 		else
 			rc = smb_fsop_remove(0, node->delete_on_close_cred,
-			    d_snode, node->od_name, 1);
+			    d_snode, node->od_name, flags);
 		smb_cred_rele(node->delete_on_close_cred);
 	}
 	if (rc != 0)
@@ -805,8 +807,20 @@ smb_node_get_dosattr(smb_node_t *node)
 	return (dosattr);
 }
 
+/*
+ * When DeleteOnClose is set on an smb_node, the common open code will
+ * reject subsequent open requests for the file. Observation of Windows
+ * 2000 indicates that subsequent opens should be allowed (assuming
+ * there would be no sharing violation) until the file is closed using
+ * the fid on which the DeleteOnClose was requested.
+ *
+ * If there are multiple opens with delete-on-close create options,
+ * whichever the first file handle is closed will trigger the node to be
+ * marked as delete-on-close. The credentials of that ofile will be used
+ * as the delete-on-close credentials of the node.
+ */
 int
-smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr)
+smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 {
 	int	rc = -1;
 
@@ -815,6 +829,7 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr)
 	    !(node->flags & NODE_FLAGS_DELETE_ON_CLOSE)) {
 		crhold(cr);
 		node->delete_on_close_cred = cr;
+		node->n_delete_on_close_flags = flags;
 		node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
 		rc = 0;
 	}
@@ -830,6 +845,7 @@ smb_node_reset_delete_on_close(smb_node_t *node)
 		node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
 		crfree(node->delete_on_close_cred);
 		node->delete_on_close_cred = NULL;
+		node->n_delete_on_close_flags = 0;
 	}
 	mutex_exit(&node->n_mutex);
 }
@@ -1107,6 +1123,7 @@ smb_node_alloc(
 	node->dir_snode = NULL;
 	node->unnamed_stream_node = NULL;
 	node->delete_on_close_cred = NULL;
+	node->n_delete_on_close_flags = 0;
 
 	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
 	if (strcmp(od_name, XATTR_DIR) == 0)

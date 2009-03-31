@@ -126,6 +126,8 @@ static short datagram_id = 1;
 static struct datagram_queue smb_datagram_queue;
 static mutex_t smb_dgq_mtx;
 
+static void smb_netbios_datagram_error(unsigned char *buf);
+
 /*
  * Function:  smb_netbios_datagram_tick(void)
  *
@@ -478,54 +480,91 @@ smb_datagram_decode(struct datagram *datagram, int bytes)
 	unsigned char *ha_dest;
 	unsigned char *data;
 
-	if (bytes < DATAGRAM_HEADER_LENGTH) {
-		syslog(LOG_ERR, "NbtDatagramDecode[%d]: too small packet",
-		    bytes);
+	if (bytes == DATAGRAM_ERR_HEADER_LENGTH) {
+		if (datagram->rawbuf[0] == DATAGRAM_TYPE_ERROR_DATAGRAM)
+			smb_netbios_datagram_error(datagram->rawbuf);
 		return (-1);
+
 	}
 
-	ha_src = &datagram->rawbuf[DATAGRAM_HEADER_LENGTH];
-	ha_dest = ha_src + strlen((char *)ha_src) + 1;
-	data = ha_dest + strlen((char *)ha_dest) + 1;
+	if (bytes >= DATAGRAM_HEADER_LENGTH) {
+		ha_src = &datagram->rawbuf[DATAGRAM_HEADER_LENGTH];
+		ha_dest = ha_src + strlen((char *)ha_src) + 1;
+		data = ha_dest + strlen((char *)ha_dest) + 1;
 
-	bzero(&datagram->src, sizeof (struct name_entry));
-	bzero(&datagram->dest, sizeof (struct name_entry));
+		bzero(&datagram->src, sizeof (struct name_entry));
+		bzero(&datagram->dest, sizeof (struct name_entry));
 
-	datagram->rawbytes = bytes;
-	datagram->packet_type = datagram->rawbuf[0];
-	datagram->flags = datagram->rawbuf[1];
-	datagram->datagram_id = BE_IN16(&datagram->rawbuf[2]);
+		datagram->rawbytes = bytes;
+		datagram->packet_type = datagram->rawbuf[0];
+		datagram->flags = datagram->rawbuf[1];
+		datagram->datagram_id = BE_IN16(&datagram->rawbuf[2]);
 
-	datagram->src.addr_list.sinlen = sizeof (struct sockaddr_in);
-	(void) memcpy(&datagram->src.addr_list.sin.sin_addr.s_addr,
-	    &datagram->rawbuf[4], sizeof (uint32_t));
-	(void) memcpy(&datagram->src.addr_list.sin.sin_port,
-	    &datagram->rawbuf[8], sizeof (uint16_t));
-	datagram->src.addr_list.forw = datagram->src.addr_list.back =
-	    &datagram->src.addr_list;
+		datagram->src.addr_list.sinlen = sizeof (struct sockaddr_in);
+		(void) memcpy(&datagram->src.addr_list.sin.sin_addr.s_addr,
+		    &datagram->rawbuf[4], sizeof (uint32_t));
+		(void) memcpy(&datagram->src.addr_list.sin.sin_port,
+		    &datagram->rawbuf[8], sizeof (uint16_t));
+		datagram->src.addr_list.forw = datagram->src.addr_list.back =
+		    &datagram->src.addr_list;
 
-	datagram->data = data;
-	datagram->data_length = BE_IN16(&datagram->rawbuf[10]);
-	datagram->offset = BE_IN16(&datagram->rawbuf[12]);
+		datagram->data = data;
+		datagram->data_length = BE_IN16(&datagram->rawbuf[10]);
+		datagram->offset = BE_IN16(&datagram->rawbuf[12]);
 
-	if (smb_first_level_name_decode(ha_src, &datagram->src) < 0) {
-		syslog(LOG_DEBUG, "NbtDatagram[%s]: invalid calling name",
-		    inet_ntoa(datagram->src.addr_list.sin.sin_addr));
-		syslog(LOG_DEBUG, "Calling name: <%02X>%32.32s",
-		    ha_src[0], &ha_src[1]);
+		if (smb_first_level_name_decode(ha_src, &datagram->src) < 0) {
+			smb_tracef("NbtDatagram[%s]: invalid calling name",
+			    inet_ntoa(datagram->src.addr_list.sin.sin_addr));
+			smb_tracef("Calling name: <%02X>%32.32s",
+			    ha_src[0], &ha_src[1]);
+		}
+
+		datagram->dest.addr_list.forw = datagram->dest.addr_list.back =
+		    &datagram->dest.addr_list;
+
+		if (smb_first_level_name_decode(ha_dest, &datagram->dest) < 0) {
+			smb_tracef("NbtDatagram[%s]: invalid called name",
+			    inet_ntoa(datagram->src.addr_list.sin.sin_addr));
+			smb_tracef("Called name: <%02X>%32.32s", ha_dest[0],
+			    &ha_dest[1]);
+		}
+
+		return (0);
 	}
 
-	datagram->dest.addr_list.forw = datagram->dest.addr_list.back =
-	    &datagram->dest.addr_list;
+	/* ignore other malformed datagram packets */
+	return (-1);
+}
 
-	if (smb_first_level_name_decode(ha_dest, &datagram->dest) < 0) {
-		syslog(LOG_DEBUG, "NbtDatagram[%s]: invalid called name",
-		    inet_ntoa(datagram->src.addr_list.sin.sin_addr));
-		syslog(LOG_DEBUG, "Called name: <%02X>%32.32s", ha_dest[0],
-		    &ha_dest[1]);
+/*
+ * 4.4.3. Datagram Error Packet
+ */
+static void
+smb_netbios_datagram_error(unsigned char *buf)
+{
+	int error;
+	int datagram_id;
+
+	if (buf[0] != DATAGRAM_TYPE_ERROR_DATAGRAM)
+		return;
+
+	datagram_id = BE_IN16(&buf[2]);
+	error = buf[DATAGRAM_ERR_HEADER_LENGTH - 1];
+	switch (error) {
+	case DATAGRAM_INVALID_SOURCE_NAME_FORMAT:
+		smb_tracef("NbtDatagramError[%d]: invalid source name format",
+		    datagram_id);
+		break;
+
+	case DATAGRAM_INVALID_DESTINATION_NAME_FORMAT:
+		smb_tracef("NbtDatagramError[%d]: invalid destination name "
+		    "format", datagram_id);
+		break;
+
+	case DATAGRAM_DESTINATION_NAME_NOT_PRESENT:
+	default:
+		break;
 	}
-
-	return (0);
 }
 
 
@@ -1041,7 +1080,7 @@ ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
 
 	(void) close(datagram_sock);
 	smb_netbios_datagram_fini();
-	syslog(LOG_DEBUG, "smbd: Netbios Datagram Service is down\n");
+	smb_tracef("smbd: Netbios Datagram Service is down\n");
 	return (0);
 }
 

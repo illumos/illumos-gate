@@ -549,6 +549,7 @@ smb_shr_modify(smb_share_t *new_si)
 	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
 	char old_container[MAXPATHLEN];
+	uint32_t catia;
 	uint32_t cscopt;
 	uint32_t access;
 
@@ -578,6 +579,10 @@ smb_shr_modify(smb_share_t *new_si)
 		(void) strlcpy(si->shr_container, new_si->shr_container,
 		    sizeof (si->shr_container));
 	}
+
+	catia = (new_si->shr_flags & SMB_SHRF_CATIA);
+	si->shr_flags &= ~SMB_SHRF_CATIA;
+	si->shr_flags |= catia;
 
 	cscopt = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
 	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
@@ -1369,6 +1374,14 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		}
 	}
 
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_CATIA);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_catia_option(val, si);
+			free(val);
+		}
+	}
+
 	prop = (sa_property_t)sa_get_property(opts, SHOPT_CSC);
 	if (prop != NULL) {
 		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
@@ -1455,6 +1468,19 @@ smb_shr_sa_csc_option(const char *value, smb_share_t *si)
 		syslog(LOG_INFO, "csc option conflict: 0x%08x",
 		    si->shr_flags & SMB_SHRF_CSC_MASK);
 		break;
+	}
+}
+
+/*
+ * set SMB_SHRF_CATIA in accordance with catia property value
+ */
+void
+smb_shr_sa_catia_option(const char *value, smb_share_t *si)
+{
+	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0)) {
+		si->shr_flags |= SMB_SHRF_CATIA;
+	} else {
+		si->shr_flags &= ~SMB_SHRF_CATIA;
 	}
 }
 

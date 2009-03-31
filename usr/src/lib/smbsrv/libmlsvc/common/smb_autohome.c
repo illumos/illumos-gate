@@ -442,6 +442,11 @@ smb_autohome_parse_options(smb_share_t *si)
 	for (ap = argv; *ap != NULL; ++ap) {
 		value = *ap;
 
+		if (strncasecmp(value, "catia=", 6) == 0) {
+			smb_shr_sa_catia_option((value + 6), si);
+			continue;
+		}
+
 		if (strncasecmp(value, "csc=", 4) == 0) {
 			smb_shr_sa_csc_option((value + 4), si);
 			continue;

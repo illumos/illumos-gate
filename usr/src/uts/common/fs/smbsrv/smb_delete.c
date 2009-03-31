@@ -387,7 +387,8 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
 	}
 
 	/* if case conflict, force mangle and use shortname */
-	if ((od->d_ignore_case) && (odirent->od_eflags & ED_CASE_CONFLICT)) {
+	if ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
+	    (odirent->od_eflags & ED_CASE_CONFLICT)) {
 		(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
 		    shortname, name83, 1);
 		name = shortname;
@@ -480,6 +481,7 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	uint32_t status;
 	smb_fqi_t *fqi;
 	smb_node_t *node;
+	uint32_t flags = 0;
 
 	fqi = &sr->arg.dirop.fqi;
 	node = fqi->last_snode;
@@ -504,8 +506,11 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 		return (-1);
 	}
 
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
+
 	rc = smb_fsop_remove(sr, sr->user_cr, node->dir_snode,
-	    node->od_name, 1);
+	    node->od_name, flags);
 	if (rc != 0) {
 		if (rc == ENOENT)
 			smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,

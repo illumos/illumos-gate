@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -56,3 +55,4 @@ P SUNWsmbsr	SMB Server (Root)
 P SUNWlxml	The XML library
 P SUNWgss	GSSAPI V2
 P SUNWkrbu	Kerberos version 5 support (Usr)
+P SUNWzfsr	ZFS (Root)

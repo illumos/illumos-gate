@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,7 +114,7 @@ smb_com_query_information(smb_request_t *sr)
 	}
 
 	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, name, &node, &attr, 0, 0)) != 0) {
+	    sr->tid_tree->t_snode, dir_node, name, &node, &attr)) != 0) {
 		smb_node_release(dir_node);
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);

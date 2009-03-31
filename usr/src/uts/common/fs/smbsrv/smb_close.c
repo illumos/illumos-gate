@@ -110,34 +110,3 @@ smb_com_close_and_tree_disconnect(smb_request_t *sr)
 
 	return (SDRC_SUCCESS);
 }
-
-/*
- * smb_commit_delete_on_close()
- *
- * Check for the DeleteOnClose flag on the smb file and set it on the
- * smb node if it is not already set. This will inhibit subsequent
- * open requests. The delete-on-close credentials should be set to the
- * user credentials of the current open file instance.
- *
- * When DeleteOnClose is set on an smb_node, the common open code will
- * reject subsequent open requests for the file. Observation of Windows
- * 2000 indicates that subsequent opens should be allowed (assuming
- * there would be no sharing violation) until the file is closed using
- * the fid on which the DeleteOnClose was requested.
- *
- * If there are multiple opens with delete-on-close create options,
- * whichever the first file handle is closed will trigger the node to be
- * marked as delete-on-close. The credentials of that ofile will be used
- * as the delete-on-close credentials of the node.
- */
-void
-smb_commit_delete_on_close(struct smb_ofile *ofile)
-{
-	struct smb_node *node = ofile->f_node;
-
-	if (!(node->flags & NODE_FLAGS_DELETE_ON_CLOSE) &&
-	    (ofile->f_flags & SMB_OFLAGS_SET_DELETE_ON_CLOSE))	{
-		node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
-		crhold(node->delete_on_close_cred = ofile->f_cr);
-	}
-}
