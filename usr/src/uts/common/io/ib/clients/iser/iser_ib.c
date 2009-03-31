@@ -76,6 +76,8 @@ static void iser_ib_handle_portdown_event(ibt_hca_hdl_t hdl,
 static void iser_ib_handle_hca_detach_event(ibt_hca_hdl_t hdl,
     ibt_async_event_t *event);
 
+static void iser_ib_post_recv_task(void *arg);
+
 static struct ibt_clnt_modinfo_s iser_ib_modinfo = {
 	IBTI_V_CURR,
 	IBT_STORAGE_DEV,
@@ -635,10 +637,42 @@ iser_ib_free_rc_channel(iser_chan_t *chan)
  * current fill level of the RQ, and post as many WRs as necessary
  * to fill it again.
  */
-void
-iser_ib_post_recv(void *arg)
+
+int
+iser_ib_post_recv_async(ibt_channel_hdl_t chanhdl)
 {
-	ibt_channel_hdl_t chanhdl;
+	iser_chan_t	*chan;
+	int		status;
+
+	/* Pull our iSER channel handle from the private data */
+	chan = (iser_chan_t *)ibt_get_chan_private(chanhdl);
+
+	idm_conn_hold(chan->ic_conn->ic_idmc);
+	status = ddi_taskq_dispatch(iser_taskq, iser_ib_post_recv_task,
+	    (void *)chanhdl, DDI_NOSLEEP);
+	if (status != DDI_SUCCESS) {
+		idm_conn_rele(chan->ic_conn->ic_idmc);
+	}
+
+	return (status);
+}
+
+static void
+iser_ib_post_recv_task(void *arg)
+{
+	ibt_channel_hdl_t	chanhdl = arg;
+	iser_chan_t		*chan;
+
+	/* Pull our iSER channel handle from the private data */
+	chan = (iser_chan_t *)ibt_get_chan_private(chanhdl);
+
+	iser_ib_post_recv(chanhdl);
+	idm_conn_rele(chan->ic_conn->ic_idmc);
+}
+
+void
+iser_ib_post_recv(ibt_channel_hdl_t chanhdl)
+{
 	iser_chan_t	*chan;
 	iser_hca_t	*hca;
 	iser_msg_t	*msg;
@@ -650,15 +684,11 @@ iser_ib_post_recv(void *arg)
 	iser_qp_t	*iser_qp;
 	ib_gid_t	lgid;
 
-	chanhdl = (ibt_channel_hdl_t)arg;
-
 	/* Pull our iSER channel handle from the private data */
 	chan = (iser_chan_t *)ibt_get_chan_private(chanhdl);
 
-	/* It is possible to run after the channel has been freed */
-	if (chan == NULL) {
-		return;
-	}
+	ASSERT(chan != NULL);
+
 	mutex_enter(&chan->ic_conn->ic_lock);
 
 	/* Bail out if the connection is closed; no need for more recv WRs */
@@ -710,8 +740,7 @@ iser_ib_post_recv(void *arg)
 		 * second, then try again.
 		 */
 		delay(drv_usectohz(ISER_DELAY_HALF_SECOND));
-		status = ddi_taskq_dispatch(iser_taskq, iser_ib_post_recv,
-		    (void *)chanhdl, DDI_NOSLEEP);
+		status = iser_ib_post_recv_async(chanhdl);
 		if (status != DDI_SUCCESS) {
 			ISER_LOG(CE_NOTE, "iser_ib_post_recv: failed to "
 			    "redispatch routine");
@@ -784,8 +813,7 @@ iser_ib_post_recv(void *arg)
 	 */
 	if (iser_qp->rq_level == 0) {
 		mutex_exit(&iser_qp->qp_lock);
-		status = ddi_taskq_dispatch(iser_taskq, iser_ib_post_recv,
-		    (void *)chanhdl, DDI_NOSLEEP);
+		status = iser_ib_post_recv_async(chanhdl);
 		if (status != DDI_SUCCESS) {
 			ISER_LOG(CE_NOTE, "iser_ib_post_recv: failed to "
 			    "dispatch followup routine");

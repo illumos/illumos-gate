@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +32,23 @@ extern "C" {
 
 #include <sys/idm/idm_transport.h>
 #include <sys/ksocket.h>
+
 /*
  * Define TCP window size (send and receive buffer sizes)
  */
 
 #define	IDM_RCVBUF_SIZE		(256 * 1024)
 #define	IDM_SNDBUF_SIZE		(256 * 1024)
+
+/*
+ * Lower and upper bounds to use the 128k buffer cache.  Below the lower bound
+ * allocations will use the built-in Solaris buffer caches.  We don't expect
+ * to see allocations above the upper bound because SBD currently allocates
+ * 128k buffers.
+ */
+
+#define	IDM_SO_BUF_CACHE_LB	(32 * 1024)
+#define	IDM_SO_BUF_CACHE_UB	(128 * 1024)
 
 /* sockets-specific portion of idm_svc_t */
 typedef struct idm_so_svc_s {

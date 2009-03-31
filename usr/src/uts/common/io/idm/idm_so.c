@@ -167,6 +167,10 @@ idm_so_init(idm_transport_t *it)
 	    sizeof (idm_pdu_t) + IDM_SORX_CACHE_HDRLEN, 8,
 	    &idm_sorx_pdu_constructor, NULL, NULL, NULL, NULL, KM_SLEEP);
 
+	/* 128k buffer cache */
+	idm.idm_so_128k_buf_cache = kmem_cache_create("idm_128k_buf_cache",
+	    IDM_SO_BUF_CACHE_UB, 8, NULL, NULL, NULL, NULL, NULL, KM_SLEEP);
+
 	/* Set the sockets transport ops */
 	it->it_ops = &idm_so_transport_ops;
 }
@@ -178,6 +182,7 @@ idm_so_init(idm_transport_t *it)
 void
 idm_so_fini(void)
 {
+	kmem_cache_destroy(idm.idm_so_128k_buf_cache);
 	kmem_cache_destroy(idm.idm_sotx_pdu_cache);
 	kmem_cache_destroy(idm.idm_sorx_pdu_cache);
 }
@@ -2146,12 +2151,21 @@ idm_so_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb)
 static idm_status_t
 idm_so_buf_alloc(idm_buf_t *idb, uint64_t buflen)
 {
-	idb->idb_buf = kmem_alloc(buflen, KM_NOSLEEP);
+	if ((buflen > IDM_SO_BUF_CACHE_LB) && (buflen <= IDM_SO_BUF_CACHE_UB)) {
+		idb->idb_buf = kmem_cache_alloc(idm.idm_so_128k_buf_cache,
+		    KM_NOSLEEP);
+		idb->idb_buf_private = idm.idm_so_128k_buf_cache;
+	} else {
+		idb->idb_buf = kmem_alloc(buflen, KM_NOSLEEP);
+		idb->idb_buf_private = NULL;
+	}
+
 	if (idb->idb_buf == NULL) {
 		IDM_CONN_LOG(CE_NOTE,
 		    "idm_so_buf_alloc: failed buffer allocation");
 		return (IDM_STATUS_FAIL);
 	}
+
 	return (IDM_STATUS_SUCCESS);
 }
 
@@ -2175,7 +2189,11 @@ idm_so_buf_teardown(idm_buf_t *idb)
 static void
 idm_so_buf_free(idm_buf_t *idb)
 {
-	kmem_free(idb->idb_buf, idb->idb_buflen);
+	if (idb->idb_buf_private == NULL) {
+		kmem_free(idb->idb_buf, idb->idb_buflen);
+	} else {
+		kmem_cache_free(idb->idb_buf_private, idb->idb_buf);
+	}
 }
 
 static void

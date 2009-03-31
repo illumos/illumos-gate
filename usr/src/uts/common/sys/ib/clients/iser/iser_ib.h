@@ -187,7 +187,9 @@ void iser_ib_close_rc_channel(iser_chan_t *chan);
 
 void iser_ib_free_rc_channel(iser_chan_t *chan);
 
-void iser_ib_post_recv(void *arg);
+int iser_ib_post_recv_async(ibt_channel_hdl_t chanhdl);
+
+void iser_ib_post_recv(ibt_channel_hdl_t chanhdl);
 
 void iser_ib_recvcq_handler(ibt_cq_hdl_t cq_hdl, void *arg);
 

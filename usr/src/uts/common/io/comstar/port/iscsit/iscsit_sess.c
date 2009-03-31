@@ -45,8 +45,6 @@
 #define	ISCSIT_SESS_SM_STRINGS
 #include <iscsit.h>
 
-
-
 typedef struct {
 	list_node_t		se_ctx_node;
 	iscsit_session_event_t	se_ctx_event;
@@ -678,6 +676,17 @@ sess_sm_q6_done(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 {
 	/* Terminal state */
 	switch (ctx->se_ctx_event) {
+	case SE_CONN_LOGGED_IN:
+		/*
+		 * It's possible to get this event if we encountered
+		 * an SE_SESSION_REINSTATE_EVENT while we were in
+		 * SS_Q2_ACTIVE state.  If so we want to update
+		 * ist->ist_ffp_conn_count because we know an
+		 * SE_CONN_FFP_FAIL or SE_CONN_FFP_DISABLE is on the
+		 * way.
+		 */
+		ist->ist_ffp_conn_count++;
+		break;
 	case SE_CONN_FFP_FAIL:
 	case SE_CONN_FFP_DISABLE:
 		ASSERT(ist->ist_ffp_conn_count >= 1);

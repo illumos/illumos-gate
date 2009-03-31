@@ -337,6 +337,7 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 	 * to see if we need to fill the RQ back up (or if
 	 * we are already on the taskq).
 	 */
+	mutex_enter(&iser_chan->ic_conn->ic_lock);
 	mutex_enter(&iser_qp->qp_lock);
 	iser_qp->rq_level--;
 
@@ -346,8 +347,7 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 		iser_qp->rq_taskqpending = B_TRUE;
 		mutex_exit(&iser_qp->qp_lock);
 
-		status = ddi_taskq_dispatch(iser_taskq, iser_ib_post_recv,
-		    (void *)iser_chan->ic_chanhdl, DDI_NOSLEEP);
+		status = iser_ib_post_recv_async(iser_chan->ic_chanhdl);
 
 		if (status != DDI_SUCCESS) {
 			ISER_LOG(CE_NOTE, "iser_ib_poll_recv_completions: "
@@ -360,6 +360,7 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 	} else {
 		mutex_exit(&iser_qp->qp_lock);
 	}
+	mutex_exit(&iser_chan->ic_conn->ic_lock);
 
 	DTRACE_PROBE3(iser__recv__cqe, iser_chan_t *, iser_chan,
 	    ibt_wc_t *, &wc, ibt_wc_status_t, wc.wc_status);

@@ -421,6 +421,7 @@ typedef struct {
 	idm_idpool_t	idm_conn_id_pool;
 	kmem_cache_t	*idm_sotx_pdu_cache;
 	kmem_cache_t	*idm_sorx_pdu_cache;
+	kmem_cache_t	*idm_so_128k_buf_cache;
 } idm_global_t;
 
 idm_global_t	idm; /* Global state */
