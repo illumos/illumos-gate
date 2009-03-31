@@ -2985,7 +2985,7 @@ nextfreebin:
 				if (page_trylock(pp, SE_EXCL) == 0) {
 					pp = pp->p_next;
 					if (pp == first_pp)
-						break;
+						pp = NULL;
 					continue;
 				}
 				ASSERT(pp->p_vnode);
