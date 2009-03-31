@@ -70,8 +70,8 @@
 int zio_taskq_threads[ZIO_TYPES][ZIO_TASKQ_TYPES] = {
 	/*	ISSUE	INTR					*/
 	{	1,	1	},	/* ZIO_TYPE_NULL	*/
-	{	1,	8	},	/* ZIO_TYPE_READ	*/
-	{	8,	1	},	/* ZIO_TYPE_WRITE	*/
+	{	8,	8	},	/* ZIO_TYPE_READ	*/
+	{	8,	8	},	/* ZIO_TYPE_WRITE	*/
 	{	1,	1	},	/* ZIO_TYPE_FREE	*/
 	{	1,	1	},	/* ZIO_TYPE_CLAIM	*/
 	{	1,	1	},	/* ZIO_TYPE_IOCTL	*/
