@@ -42,6 +42,8 @@ extern "C" {
 
 #define	PATH_EXEC_PERMS gettext("%s is others or group writable, skipping\n")
 
+#define	UPDATE_CACHE_OLD gettext("archive cache is out of sync. Rebuilding.\n")
+
 #define	MUST_BE_ROOT gettext("you must be root to run this command\n")
 
 #define	NOT_ARCHIVE_BOOT \
@@ -139,6 +141,9 @@ extern "C" {
 #define	LOCK_FAIL gettext("failed to lock file: %s: %s\n")
 
 #define	UNLOCK_FAIL gettext("failed to unlock file: %s: %s\n")
+
+#define	TIMESTAMP_FAIL gettext("failed to update the timestamp file, next\
+    archive update may experience reduced performance\n")
 
 #define	MMAP_FAIL gettext("failed to mmap file: %s: %s\n")
 
