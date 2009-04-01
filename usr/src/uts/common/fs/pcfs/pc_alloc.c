@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines to allocate and deallocate data blocks on the disk
@@ -341,8 +339,7 @@ pc_freeclusters(struct pcfs *fsp)
 	/*
 	 * make sure the FAT is in core
 	 */
-	for (cn = PCF_FIRSTCLUSTER;
-	    (int)cn < fsp->pcfs_ncluster; cn++) {
+	for (cn = PCF_FIRSTCLUSTER; pc_validcl(fsp, cn); cn++) {
 		if (pc_getcluster(fsp, cn) == PCF_FREECLUSTER) {
 			free++;
 		}
@@ -463,8 +460,7 @@ pc_alloccluster(
 	if (fsp->pcfs_fatp == (uchar_t *)0)
 		panic("pc_addcluster: no FAT");
 
-	for (cn = fsp->pcfs_nxfrecls;
-	    (int)cn < fsp->pcfs_ncluster; cn++) {
+	for (cn = fsp->pcfs_nxfrecls; pc_validcl(fsp, cn); cn++) {
 		if (pc_getcluster(fsp, cn) == PCF_FREECLUSTER) {
 			struct buf *bp;
 

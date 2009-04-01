@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_PC_FS_H
 #define	_SYS_FS_PC_FS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/thread.h>
 #include <sys/ksynch.h>
@@ -569,7 +567,7 @@ struct pcfs_args {
  */
 #define	pc_validcl(PCFS, CL)		/* check that cluster no is legit */ \
 	((int)(CL) >= PCF_FIRSTCLUSTER && \
-	    (int)(CL) <= (PCFS)->pcfs_ncluster)
+	    (int)(CL) < (PCFS)->pcfs_ncluster + PCF_FIRSTCLUSTER)
 
 /*
  * external routines.
