@@ -2757,14 +2757,15 @@ smb_ads_lookup_msdcs(char *fqdn, char *server, char *buf, uint32_t buflen)
 	if (!fqdn || !buf)
 		return (B_FALSE);
 
+	ipstr[0] = '\0';
 	*buf = '\0';
 	sought_host = (*server == 0 ? NULL : server);
 	if ((hinfo = smb_ads_find_host(fqdn, sought_host)) == NULL)
 		return (B_FALSE);
 
-	smb_tracef("msdcsLookupADS: %s [%s]", hinfo->name,
-	    smb_inet_ntop(&hinfo->ipaddr, ipstr,
-	    SMB_IPSTRLEN(hinfo->ipaddr.a_family)));
+	(void) smb_inet_ntop(&hinfo->ipaddr, ipstr,
+	    SMB_IPSTRLEN(hinfo->ipaddr.a_family));
+	smb_tracef("msdcsLookupADS: %s [%s]", hinfo->name, ipstr);
 
 	(void) strlcpy(buf, hinfo->name, buflen);
 	/*
