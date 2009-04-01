@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1132,11 +1132,9 @@ qcn_receive_read(void)
 
 			case H_BREAK :
 				/*
-				 * on break, unless alternate break sequence is
-				 * enabled, enter the debugger
+				 * on break enter the debugger
 				 */
-				if (abort_enable != KIOCABORTALTERNATE)
-					abort_sequence_enter((char *)NULL);
+				abort_sequence_enter((char *)NULL);
 				break;
 
 			case H_HUP :
@@ -1173,8 +1171,7 @@ qcn_receive_getchr(void)
 			}
 		} else {
 			if (rv == H_BREAK) {
-				if (abort_enable != KIOCABORTALTERNATE)
-					abort_sequence_enter((char *)NULL);
+				abort_sequence_enter((char *)NULL);
 			}
 
 			if (rv == H_HUP)  {
@@ -1199,8 +1196,7 @@ qcn_poll_handler(void *unused)
 	while (1) {
 		rv = hv_cngetchar(&buf);
 		if (rv == H_BREAK) {
-			if (abort_enable != KIOCABORTALTERNATE)
-				abort_sequence_enter((char *)NULL);
+			abort_sequence_enter((char *)NULL);
 		}
 
 		if (rv == H_HUP)  {

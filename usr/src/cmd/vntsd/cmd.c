@@ -40,12 +40,13 @@
  * NOP
  *
  * Vntsd special commands are:
- *  Send break		(~#)
- *  Exit		(~.)
- *  Force write access	(~w)
- *  Console next	(~n)
- *  Console previous	(~p)
- *  Help		(~?)
+ *  Send break			(~#)
+ *  Send alternate break	(~^B)
+ *  Exit			(~.)
+ *  Force write access		(~w)
+ *  Console next		(~n)
+ *  Console previous		(~p)
+ *  Help			(~?)
  */
 
 #include <stdio.h>
@@ -100,6 +101,40 @@ genbrk(vntsd_client_t *clientp)
 	}
 
 	return (VNTSD_STATUS_CONTINUE);
+}
+
+
+/* genaltbrk() - handle the alternate break sequence */
+static int
+genaltbrk(vntsd_client_t *clientp)
+{
+	vntsd_cons_t *consp;
+	char brkseq[2] = { '~', CNTRL('B')};
+
+	assert(clientp);
+	assert(clientp->cons);
+
+	consp = clientp->cons;
+	D1(stderr, "t@%d genaltbrk fd=%d sockfd %d\n", thr_self(),
+	    consp->vcc_fd, clientp->sockfd);
+
+	assert(consp->clientpq != NULL);
+	if (consp->clientpq->handle != clientp) {
+		/* reader */
+		return (vntsd_write_line(clientp,
+		    gettext(VNTSD_NO_WRITE_ACCESS_MSG)));
+	}
+
+	/*
+	 * Unlike the genbrk() function we will just forward the break sequence
+	 * on to vcc and subsequently the underlying console driver. This will
+	 * involve sending the characters '~' and CNTRL('B').
+	 */
+	if ((vntsd_write_fd(clientp->cons->vcc_fd, brkseq, sizeof (brkseq))) ==
+	    VNTSD_SUCCESS)
+		return (VNTSD_STATUS_CONTINUE);
+	else
+		return (VNTSD_STATUS_VCC_IO_ERR);
 }
 
 /*
@@ -211,6 +246,9 @@ static esctable_t  etable[] = {
 	/* send a break to vcc */
 	{'#', "Send break",  genbrk},
 
+	/* alternate break sequence */
+	{CNTRL('B'), "Send alternate break", genaltbrk},
+
 	/* exit */
 	{'.', "Exit from this console",  (e_func_t)client_exit},
 
@@ -263,8 +301,14 @@ daemon_cmd_help(vntsd_client_t *clientp)
 	}
 
 	for (p = etable; p->e_char; p++) {
-		(void) snprintf(buf, sizeof (buf),
-		    "~%c --%s", p->e_char, p->e_help);
+
+		if (p->e_char == CNTRL('B')) {
+			(void) snprintf(buf, sizeof (buf), "~^B --%s",
+			    p->e_help);
+		} else {
+			(void) snprintf(buf, sizeof (buf),
+			    "~%c --%s", p->e_char, p->e_help);
+		}
 
 		if ((rv = vntsd_write_line(clientp, buf)) != VNTSD_SUCCESS) {
 			return (rv);
