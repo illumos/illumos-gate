@@ -169,6 +169,7 @@ extern	ill_t	*ill_lookup_on_name(char *, boolean_t,
     ip_stack_t *);
 extern uint_t	ill_get_next_ifindex(uint_t, boolean_t, ip_stack_t *);
 extern uint_t	ill_get_ifindex_by_name(char *, ip_stack_t *);
+extern	void	ill_grp_cache_delete(ire_t *, char *);
 extern	void	ill_ipif_cache_delete(ire_t *, char *);
 extern	void	ill_stq_cache_delete(ire_t *, char *);
 extern	void	ill_delete(ill_t *);

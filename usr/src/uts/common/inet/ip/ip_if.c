@@ -14974,6 +14974,24 @@ ill_stq_cache_delete(ire_t *ire, char *ill_arg)
 }
 
 /*
+ * Delete all the IREs whose ire_stq's reference any ill in the same IPMP
+ * group as `ill_arg'.  Used by ipmp_ill_deactivate() to flush all IRE_CACHE
+ * entries for the illgrp.
+ */
+void
+ill_grp_cache_delete(ire_t *ire, char *ill_arg)
+{
+	ill_t	*ill = (ill_t *)ill_arg;
+
+	ASSERT(IAM_WRITER_ILL(ill));
+
+	if (ire->ire_type == IRE_CACHE &&
+	    IS_IN_SAME_ILLGRP((ill_t *)ire->ire_stq->q_ptr, ill)) {
+		ire_delete(ire);
+	}
+}
+
+/*
  * Delete all broadcast IREs with a source address on `ill_arg'.
  */
 static void

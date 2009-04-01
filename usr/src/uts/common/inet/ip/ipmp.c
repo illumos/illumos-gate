@@ -1581,10 +1581,16 @@ ipmp_ill_deactivate(ill_t *ill)
 	ASSERT(IS_UNDER_IPMP(ill));
 
 	/*
-	 * Delete IRE_CACHE entries tied to this ill before they become stale.
+	 * Delete all IRE_CACHE entries for the group.  (We cannot restrict
+	 * ourselves to entries with ire_stq == ill since there may be other
+	 * IREs that are backed by ACEs that are tied to this ill -- and thus
+	 * when those ACEs are deleted, the IREs will be adrift without any
+	 * AR_CN_ANNOUNCE notification from ARP.)
 	 */
-	ire_walk_ill(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
-	    ill_stq_cache_delete, ill, ill);
+	if (ill->ill_isv6)
+		ire_walk_v6(ill_grp_cache_delete, ill, ALL_ZONES, ipst);
+	else
+		ire_walk_v4(ill_grp_cache_delete, ill, ALL_ZONES, ipst);
 
 	/*
 	 * Pull the interface out of the active list.
