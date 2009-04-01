@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,8 +286,6 @@ static int si_intr_crc_err_threshold(si_ctl_state_t *, si_port_state_t *, int);
 static int si_intr_handshake_err_threshold(si_ctl_state_t *,
 					si_port_state_t *, int);
 static int si_intr_set_devbits_notify(si_ctl_state_t *, si_port_state_t *, int);
-static	void si_handle_attention_raised(si_ctl_state_t *,
-					si_port_state_t *, int);
 
 static	void si_enable_port_interrupts(si_ctl_state_t *, int);
 static	void si_enable_all_interrupts(si_ctl_state_t *);
@@ -305,7 +303,9 @@ static	int si_initialize_port_wait_till_ready(si_ctl_state_t *, int);
 static void si_timeout_pkts(si_ctl_state_t *, si_port_state_t *, int, uint32_t);
 static	void si_watchdog_handler(si_ctl_state_t *);
 
+#if SI_DEBUG
 static	void si_log(si_ctl_state_t *, uint_t, char *, ...);
+#endif	/* SI_DEBUG */
 
 static	void si_copy_out_regs(sata_cmd_t *, fis_reg_h2d_t *);
 
@@ -396,7 +396,9 @@ static  struct modlinkage modlinkage = {
 
 /* The following are needed for si_log() */
 static kmutex_t si_log_mutex;
+#if SI_DEBUG
 static char si_log_buf[512];
+#endif	/* SI_DEBUG */
 uint32_t si_debug_flags = 0x0;
 static int is_msi_supported = 0;
 
@@ -582,11 +584,14 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				attach_state |= ATTACH_PROGRESS_INTR_ADDED;
 				SIDBG0(SIDBG_INIT, NULL,
 				    "MSI interrupt setup done");
-			} else {
+			}
+#if SI_DEBUG
+			else {
 				SIDBG0(SIDBG_INIT, NULL,
 				    "MSI registration failed "
 				    "will try Legacy interrupts");
 			}
+#endif	/* SI_DEBUG */
 		}
 
 		if (!(attach_state & ATTACH_PROGRESS_INTR_ADDED) &&
@@ -842,7 +847,9 @@ si_power(dev_info_t *dip, int component, int level)
 	si_ctl_state_t *si_ctlp;
 	int instance = ddi_get_instance(dip);
 	int rval = DDI_SUCCESS;
+#if SI_DEBUG
 	int old_level;
+#endif	/* SI_DEBUG */
 	sata_device_t sdevice;
 
 	si_ctlp = ddi_get_soft_state(si_statep, instance);
@@ -854,7 +861,9 @@ si_power(dev_info_t *dip, int component, int level)
 	SIDBG0(SIDBG_ENTRY, NULL, "si_power enter");
 
 	mutex_enter(&si_ctlp->sictl_mutex);
+#if SI_DEBUG
 	old_level = si_ctlp->sictl_power_level;
+#endif	/* SI_DEBUG */
 
 	switch (level) {
 	case PM_LEVEL_D0: /* fully on */
@@ -862,7 +871,7 @@ si_power(dev_info_t *dip, int component, int level)
 		    PM_CSR(si_ctlp->sictl_devid), PCI_PMCSR_D0);
 #ifndef __lock_lint
 		delay(drv_usectohz(10000));
-#endif /* __lock_lint */
+#endif  /* __lock_lint */
 		si_ctlp->sictl_power_level = PM_LEVEL_D0;
 		(void) pci_restore_config_regs(si_ctlp->sictl_devinfop);
 
@@ -1379,7 +1388,8 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		 * Read the modified FIS to obtain the Error & Status.
 		 */
 		prb =  &(si_portp->siport_prbpool[tmpslot]);
-		prb_word_ptr = (uint32_t *)prb;
+
+		prb_word_ptr = (uint32_t *)(void *)prb;
 		for (i = 0; i < (sizeof (si_prb_t)/4); i++) {
 			prb_word_ptr[i] = ddi_get32(
 			    si_ctlp->sictl_port_acc_handle,
@@ -2625,7 +2635,7 @@ si_deliver_satapkt(
 
 			sgep->sge_addr_low = cookie._dmu._dmac_la[0];
 			sgep->sge_addr_high = cookie._dmu._dmac_la[1];
-			sgep->sge_data_count = cookie.dmac_size;
+			sgep->sge_data_count = (uint32_t)cookie.dmac_size;
 		}
 
 		/*
@@ -2645,7 +2655,7 @@ si_deliver_satapkt(
 
 			sgep->sge_addr_low = cookie._dmu._dmac_la[0];
 			sgep->sge_addr_high = cookie._dmu._dmac_la[1];
-			sgep->sge_data_count = cookie.dmac_size;
+			sgep->sge_data_count = (uint32_t)cookie.dmac_size;
 			SET_SGE_TRM((*sgep));
 
 			break; /* we break the loop */
@@ -2722,7 +2732,7 @@ sgl_fill_done:
 			si_sge_t *tmpsgep;
 			int j;
 
-			ptr = (int *)prb;
+			ptr = (int *)(void *)prb;
 			cmn_err(CE_WARN, "si_deliver_satpkt prb: ");
 			for (j = 0; j < (sizeof (si_prb_t)/4); j++) {
 				cmn_err(CE_WARN, "%x ", ptr[j]);
@@ -2735,7 +2745,7 @@ sgl_fill_done:
 			    &si_portp->siport_sgbpool[slot];
 			    j < (sizeof (si_sgblock_t)/ sizeof (si_sge_t));
 			    j++, tmpsgep++) {
-				ptr = (int *)tmpsgep;
+				ptr = (int *)(void *)tmpsgep;
 				cmn_err(CE_WARN, "%x %x %x %x",
 				    ptr[0],
 				    ptr[1],
@@ -3245,7 +3255,7 @@ si_read_portmult_reg(
 		int *ptr;
 		int j;
 
-		ptr = (int *)prb;
+		ptr = (int *)(void *)prb;
 		cmn_err(CE_WARN, "read_port_mult_reg, prb: ");
 		for (j = 0; j < (sizeof (si_prb_t)/4); j++) {
 			cmn_err(CE_WARN, "%x ", ptr[j]);
@@ -3285,7 +3295,7 @@ si_read_portmult_reg(
 	CLEAR_BIT(si_portp->siport_pending_tags, slot);
 
 	/* Now inspect the port LRAM for the modified FIS. */
-	prb_word_ptr = (uint32_t *)prb;
+	prb_word_ptr = (uint32_t *)(void *)prb;
 	for (i = 0; i < (sizeof (si_prb_t)/4); i++) {
 		prb_word_ptr[i] = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_LRAM(si_ctlp, port, slot)+i*4));
@@ -3365,7 +3375,7 @@ si_write_portmult_reg(
 		int *ptr;
 		int j;
 
-		ptr = (int *)prb;
+		ptr = (int *)(void *)prb;
 		cmn_err(CE_WARN, "read_port_mult_reg, prb: ");
 		for (j = 0; j < (sizeof (si_prb_t)/4); j++) {
 			cmn_err(CE_WARN, "%x ", ptr[j]);
@@ -3405,7 +3415,7 @@ si_write_portmult_reg(
 	CLEAR_BIT(si_portp->siport_pending_tags, slot);
 
 	/* Now inspect the port LRAM for the modified FIS. */
-	prb_word_ptr = (uint32_t *)prb;
+	prb_word_ptr = (uint32_t *)(void *)prb;
 	for (i = 0; i < (sizeof (si_prb_t)/4); i++) {
 		prb_word_ptr[i] = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_LRAM(si_ctlp, port, slot)+i*4));
@@ -3468,8 +3478,7 @@ si_set_sense_data(sata_pkt_t *satapkt, int reason)
 static uint_t
 si_intr(caddr_t arg1, caddr_t arg2)
 {
-
-	si_ctl_state_t *si_ctlp = (si_ctl_state_t *)arg1;
+	si_ctl_state_t *si_ctlp = (si_ctl_state_t *)(void *)arg1;
 	si_port_state_t *si_portp;
 	uint32_t global_intr_status;
 	uint32_t mask, port_intr_status;
@@ -4094,7 +4103,7 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 		int *ptr;
 		int j;
 
-		ptr = (int *)prb;
+		ptr = (int *)(void *)prb;
 		cmn_err(CE_WARN, "read_port_mult_reg, prb: ");
 		for (j = 0; j < (sizeof (si_prb_t)/4); j++) {
 			cmn_err(CE_WARN, "%x ", ptr[j]);
@@ -4146,7 +4155,7 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 	 * The LRAM contains the the modified FIS.
 	 * Read the modified FIS to obtain the Error.
 	 */
-	prb_word_ptr = (uint32_t *)prb;
+	prb_word_ptr = (uint32_t *)(void *)prb;
 	for (i = 0; i < (sizeof (si_prb_t)/4); i++) {
 		prb_word_ptr[i] = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_LRAM(si_ctlp, port, slot)+i*4));
@@ -4165,6 +4174,12 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 static void
 si_log_error_message(si_ctl_state_t *si_ctlp, int port, uint32_t command_error)
 {
+#if SI_DEBUG
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(si_ctlp))
+	_NOTE(ARGUNUSED(port))
+#endif  /* __lock_lint */
+
 	char *errstr;
 
 	switch (command_error) {
@@ -4269,7 +4284,14 @@ si_log_error_message(si_ctl_state_t *si_ctlp, int port, uint32_t command_error)
 	    "command error: port: 0x%x, error: %s",
 	    port,
 	    errstr);
+#else
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(si_ctlp))
+	_NOTE(ARGUNUSED(port))
+	_NOTE(ARGUNUSED(command_error))
+#endif  /* __lock_lint */
 
+#endif	/* SI_DEBUG */
 }
 
 
@@ -4346,7 +4368,8 @@ si_intr_phy_ready_change(
 	}
 
 	bzero((void *)&sdevice, sizeof (sata_device_t));
-	sdevice.satadev_addr.cport = port;
+
+	sdevice.satadev_addr.cport = (uint8_t)port;
 	sdevice.satadev_addr.pmport = PORTMULT_CONTROL_PORT;
 
 	/* we don't have a way of determining the exact port-mult port. */
@@ -4414,12 +4437,15 @@ si_intr_phy_ready_change(
 			}
 			si_portp->siport_port_type = PORT_TYPE_NODEV;
 
-		} else {
+		}
+#if SI_DEBUG
+		else {
 
 			/* spurious interrupt */
 			SIDBG0(SIDBG_INTR, NULL,
 			    "spurious phy ready interrupt");
 		}
+#endif	/* SI_DEBUG */
 	}
 
 	mutex_exit(&si_portp->siport_mutex);
@@ -4780,11 +4806,13 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 		return (DDI_FAILURE);
 	}
 
+#if SI_DEBUG
 	if (avail < count) {
 		SIDBG2(SIDBG_INIT, si_ctlp,
 		    "ddi_intr_get_nvail returned %d, navail() returned %d",
 		    count, avail);
 	}
+#endif	/* SI_DEBUG */
 
 	/* Allocate an array of interrupt handles. */
 	si_ctlp->sictl_intr_size = count * sizeof (ddi_intr_handle_t);
@@ -4801,11 +4829,13 @@ si_add_msi_intrs(si_ctl_state_t *si_ctlp)
 		return (DDI_FAILURE);
 	}
 
+#if SI_DEBUG
 	/* use interrupt count returned */
 	if (actual < count) {
 		SIDBG2(SIDBG_INIT, si_ctlp,
 		    "Requested: %d, Received: %d", count, actual);
 	}
+#endif	/* SI_DEBUG */
 
 	si_ctlp->sictl_intr_cnt = actual;
 
@@ -5081,7 +5111,8 @@ si_reset_dport_wait_till_ready(
 	if (!(flag & SI_RESET_NO_EVENTS_UP)) {
 
 		bzero((void *)&sdevice, sizeof (sata_device_t));
-		sdevice.satadev_addr.cport = port;
+
+		sdevice.satadev_addr.cport = (uint8_t)port;
 		sdevice.satadev_addr.pmport = PORTMULT_CONTROL_PORT;
 
 		if (si_portp->siport_port_type == PORT_TYPE_MULTIPLIER) {
@@ -5339,7 +5370,7 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 	mutex_exit(&si_ctlp->sictl_mutex);
 }
 
-
+#if SI_DEBUG
 /*
  * Logs the message.
  */
@@ -5366,6 +5397,7 @@ si_log(si_ctl_state_t *si_ctlp, uint_t level, char *fmt, ...)
 	mutex_exit(&si_log_mutex);
 
 }
+#endif	/* SI_DEBUG */
 
 static void
 si_copy_out_regs(sata_cmd_t *scmd, fis_reg_h2d_t *fisp)

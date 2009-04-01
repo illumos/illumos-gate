@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SI3124VAR_H
 #define	_SI3124VAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -222,7 +220,7 @@ _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 
 #if DEBUG
 
-#define	SI_DBUG		1
+#define	SI_DEBUG	1
 
 #define	SIDBG_TEST	0x0001
 #define	SIDBG_INIT	0x0002
