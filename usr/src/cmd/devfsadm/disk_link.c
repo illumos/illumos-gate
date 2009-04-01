@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <devfsadm.h>
 #include <stdio.h>
@@ -54,6 +52,7 @@ static int disk_callback_nchan(di_minor_t minor, di_node_t node);
 static int disk_callback_wwn(di_minor_t minor, di_node_t node);
 static int disk_callback_xvmd(di_minor_t minor, di_node_t node);
 static int disk_callback_fabric(di_minor_t minor, di_node_t node);
+static int disk_callback_sas(di_minor_t minor, di_node_t node);
 static void disk_common(di_minor_t minor, di_node_t node, char *disk,
 				int flags);
 static char *diskctrl(di_node_t node, di_minor_t minor);
@@ -72,6 +71,9 @@ static devfsadm_create_t disk_cbt[] = {
 	},
 	{ "disk", "ddi_block:wwn", NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_wwn
+	},
+	{ "disk", "ddi_block:sas", NULL,
+	    TYPE_EXACT, ILEVEL_0, disk_callback_sas
 	},
 	{ "disk", "ddi_block:cdrom", NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_nchan
@@ -216,6 +218,51 @@ disk_callback_fabric(di_minor_t minor, di_node_t node)
 	}
 
 	(void) snprintf(disk, DISK_SUBPATH_MAX, "t%sd%d", ascii_wwn, lun);
+
+	disk_common(minor, node, disk, RM_STALE);
+
+	return (DEVFSADM_CONTINUE);
+}
+
+static int
+disk_callback_sas(di_minor_t minor, di_node_t node)
+{
+	char disk[DISK_SUBPATH_MAX];
+	int lun;
+	int *intp;
+	char *str;
+	char *wwn;
+
+	/*
+	 * get LUN property
+	 */
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    "lun", &intp) > 0) {
+		lun = *intp;
+	} else {
+		lun = 0;
+	}
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    "target-port", &wwn) > 0) {
+		/*
+		 * If the target-port property exist
+		 * we use wwn format naming
+		 */
+		for (str = wwn; *str != '\0'; str++) {
+			*str = DISK_LINK_TO_UPPER(*str);
+		}
+		(void) snprintf(disk, DISK_SUBPATH_MAX, "t%sd%d", wwn, lun);
+
+	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    "sata-phy", &intp) > 0) {
+		/*
+		 * For direct attached SATA device without Device Name,
+		 * no wwn exist, we use phy format naming
+		 */
+		(void) snprintf(disk, DISK_SUBPATH_MAX, "t%dd%d", *intp, lun);
+	} else {
+		return (DEVFSADM_CONTINUE);
+	}
 
 	disk_common(minor, node, disk, RM_STALE);
 

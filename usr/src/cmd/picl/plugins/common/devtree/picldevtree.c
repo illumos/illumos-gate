@@ -527,6 +527,8 @@ get_minor_class(char *classbuf, di_node_t dn)
 		(void) strcpy(classbuf, PICL_CLASS_FLOPPY);
 	else if (DDI_NODETYPE(mi_nodetype, DDI_NT_BLOCK_FABRIC))
 		(void) strcpy(classbuf, PICL_CLASS_FABRIC);
+	else if (DDI_NODETYPE(mi_nodetype, DDI_NT_BLOCK_SAS))
+		(void) strcpy(classbuf, PICL_CLASS_SAS);
 	else if (DDI_NODETYPE(mi_nodetype, DDI_NT_BLOCK))
 		(void) strcpy(classbuf, PICL_CLASS_BLOCK);
 	else if (DDI_NODETYPE(mi_nodetype, DDI_NT_MOUSE))

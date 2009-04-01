@@ -775,10 +775,13 @@ static const int sd_disk_table_size =
 #define	SD_INTERCONNECT_FIBRE		2
 #define	SD_INTERCONNECT_SSA		3
 #define	SD_INTERCONNECT_SATA		4
+#define	SD_INTERCONNECT_SAS		5
+
 #define	SD_IS_PARALLEL_SCSI(un)		\
 	((un)->un_interconnect_type == SD_INTERCONNECT_PARALLEL)
 #define	SD_IS_SERIAL(un)		\
-	((un)->un_interconnect_type == SD_INTERCONNECT_SATA)
+	(((un)->un_interconnect_type == SD_INTERCONNECT_SATA) ||\
+	((un)->un_interconnect_type == SD_INTERCONNECT_SAS))
 
 /*
  * Definitions used by device id registration routines
@@ -7018,6 +7021,13 @@ sd_unit_attach(dev_info_t *devi)
 		un->un_interconnect_type = SD_INTERCONNECT_PARALLEL;
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
 		    "sd_unit_attach: un:0x%p SD_INTERCONNECT_PARALLEL\n", un);
+		break;
+	case INTERCONNECT_SAS:
+		un->un_f_is_fibre = FALSE;
+		un->un_interconnect_type = SD_INTERCONNECT_SAS;
+		un->un_node_type = DDI_NT_BLOCK_SAS;
+		SD_INFO(SD_LOG_ATTACH_DETACH, un,
+		    "sd_unit_attach: un:0x%p SD_INTERCONNECT_SAS\n", un);
 		break;
 	case INTERCONNECT_SATA:
 		un->un_f_is_fibre = FALSE;

@@ -279,6 +279,13 @@ struct scsi_hba_tran {
 	 */
 	int		tran_fm_capable;
 
+	/*
+	 * Ptr to the device info structure for initiator port. If a SCSA HBA
+	 * driver separates initiator port function from HBA function, this
+	 * field still refers to the initiator port.
+	 */
+	dev_info_t	*tran_iport_dip;
+
 #ifdef	SCSI_SIZE_CLEAN_VERIFY
 	/*
 	 * Must be last: Building a driver with-and-without
@@ -445,6 +452,20 @@ int		scsi_hba_prop_update_inqstring(
 
 void		scsi_hba_pkt_comp(
 				struct scsi_pkt		*pkt);
+
+char		*scsi_hba_iport_unit_address(
+				dev_info_t		*self);
+
+int		scsi_hba_iport_register(
+				dev_info_t		*dip,
+				char			*port);
+
+int		scsi_hba_iport_exist(
+				dev_info_t		*dip);
+
+dev_info_t	*scsi_hba_iport_find(
+				dev_info_t		*pdip,
+				char			*portnm);
 /*
  * Flags for scsi_hba_attach
  *
@@ -466,6 +487,15 @@ void		scsi_hba_pkt_comp(
  *				The framework should take care of
  *				mdi_phci_register() stuff.
  *
+ * SCSI_HBA_HBA			The host adapter node (associated with a PCI
+ *				function) is just an HBA, all SCSI initiator
+ *				port function is provided by separate 'iport'
+ *				children of the host adapter node.  These iport
+ *				children bind to the same driver as the host
+ *				adapter node. Both nodes are managed by the
+ *				same driver. The driver can distinguish context
+ *				by calling scsi_hba_iport_unit_address().
+ *
  * SCSI_HBA_TRAN_CLONE		Consider using SCSI_HBA_ADDR_COMPLEX instead.
  *				SCSI_HBA_TRAN_CLONE is a KLUDGE to address
  *				limitations of the scsi_address(9S) structure
@@ -480,6 +510,7 @@ void		scsi_hba_pkt_comp(
 
 #define	SCSI_HBA_ADDR_SPI	0x20	/* scsi_address in SPI form */
 #define	SCSI_HBA_ADDR_COMPLEX	0x40	/* scsi_address is COMPLEX */
+#define	SCSI_HBA_HBA		0x80	/* all HBA children are iport */
 
 /* upper bits used to record SCSA configuration state */
 #define	SCSI_HBA_SCSA_PHCI	0x10000	/* need mdi_phci_unregister */
@@ -498,6 +529,11 @@ void		scsi_hba_pkt_comp(
 #define	SCSA_FLAVOR_IPORT	1
 #define	SCSA_FLAVOR_SMP		2
 #define	SCSA_NFLAVORS		3
+
+/*
+ * Maximum number of iport nodes under PCI function
+ */
+#define	SCSI_HBA_MAX_IPORTS	32
 
 /*
  * For minor nodes created by the SCSA framework, minor numbers are

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_scsi.h"
 
@@ -68,6 +66,7 @@ static scfga_devtype_t device_list[] = {
 	{ DTYPE_DIRECT,		DDI_NT_BLOCK,		"disk"},
 	{ DTYPE_DIRECT,		DDI_NT_BLOCK_WWN,	"disk"},
 	{ DTYPE_DIRECT,		DDI_NT_BLOCK_FABRIC,	"disk"},
+	{ DTYPE_DIRECT,		DDI_NT_BLOCK_SAS,	"disk"},
 	{ DTYPE_SEQUENTIAL,	DDI_NT_TAPE,		"tape"},
 	{ DTYPE_PRINTER,	NULL,			"printer"},
 	{ DTYPE_PROCESSOR,	NULL,			"processor"},

@@ -49,6 +49,7 @@ extern "C" {
 #define	PICL_CLASS_FLOPPY		"floppy"
 #define	PICL_CLASS_TAPE			"tape"
 #define	PICL_CLASS_FABRIC		"fabric"
+#define	PICL_CLASS_SAS			"sas"
 #define	PICL_CLASS_ATTACHMENT_POINT	"attachment-point"
 #define	PICL_CLASS_DISPLAY		"display"
 #define	PICL_CLASS_SERIAL		"serial"

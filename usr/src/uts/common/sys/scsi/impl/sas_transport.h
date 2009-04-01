@@ -91,6 +91,7 @@ struct sas_hba_tran {
 
 extern sas_hba_tran_t *sas_hba_tran_alloc(dev_info_t *dip, int flags);
 extern int	sas_hba_attach_setup(dev_info_t *dip, sas_hba_tran_t *smp);
+extern int	sas_hba_detach(dev_info_t *self);
 extern void	sas_hba_tran_free(sas_hba_tran_t *smp);
 
 extern int	sas_smp_transport(struct smp_pkt *pkt);

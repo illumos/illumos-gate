@@ -613,100 +613,330 @@ scsi_tran_ext_free(
 }
 
 /*
- * Obsolete: Called by an HBA to attach an instance of the driver
- * Implement this older interface in terms of the new.
+ * Return the unit-address of an 'iport' node, or NULL for non-iport node.
  */
-/*ARGSUSED*/
-int
-scsi_hba_attach(
-	dev_info_t		*self,
-	ddi_dma_lim_t		*hba_lim,
-	scsi_hba_tran_t		*tran,
-	int			flags,
-	void			*hba_options)
+char *
+scsi_hba_iport_unit_address(dev_info_t *self)
 {
-	ddi_dma_attr_t		hba_dma_attr;
-
-	bzero(&hba_dma_attr, sizeof (ddi_dma_attr_t));
-
-	hba_dma_attr.dma_attr_burstsizes = hba_lim->dlim_burstsizes;
-	hba_dma_attr.dma_attr_minxfer = hba_lim->dlim_minxfer;
-
-	return (scsi_hba_attach_setup(self, &hba_dma_attr, tran, flags));
+	/*
+	 * NOTE: Since 'self' could be a SCSA iport node or a SCSA HBA node,
+	 * we can't use SCSA flavors: the flavor of a SCSA HBA node is not
+	 * established/owned by SCSA, it is established by the nexus that
+	 * created the SCSA HBA node (PCI) as a child.
+	 *
+	 * NOTE: If we want to support a node_name other than "iport" for
+	 * an iport node then we can add support for a "scsa-iport-node-name"
+	 * property on the SCSA HBA node.  A SCSA HBA driver would set this
+	 * property on the SCSA HBA node prior to using the iport API.
+	 */
+	if (strcmp(ddi_node_name(self), "iport") == 0)
+		return (ddi_get_name_addr(self));
+	else
+		return (NULL);
 }
 
 /*
- * Called by an HBA to attach an instance of the driver.
+ * Define a SCSI initiator port (bus/channel) for an HBA card that needs to
+ * support multiple SCSI ports, but only has a single HBA devinfo node. This
+ * function should be called from the HBA's attach(9E) implementation (when
+ * processing the HBA devinfo node attach) after the number of SCSI ports on
+ * the card is known or DR handler once DR handler detects a new port added.
+ * The function returns 0 on failure and 1 on success.
+ *
+ * The implementation will add the port value into the "scsi-iports" property
+ * value maintained on the HBA node as. These properties are used by the generic
+ * scsi bus_config implementation to dynamicaly enumerate the specified iport
+ * children. The enumeration code will, on demand, create the appropriate
+ * iport children with a "scsi-iport" unit address. This node will bind to the
+ * same driver as the HBA node itself. This means that an HBA driver that
+ * uses iports should expect probe(9E), attach(9E), and detach(9E) calls on
+ * the iport children of the HBA.  If configuration for all ports was already
+ * done during HBA node attach, the driver should just return DDI_SUCCESS when
+ * confronted with an iport node.
+ *
+ * A maximum of 32 iport ports are supported per HBA devinfo node.
+ *
+ * A NULL "port" can be used to indicate that the framework should enumerate
+ * target children on the HBA node itself, in addition to enumerating target
+ * children on any iport nodes declared. There are two reasons that an HBA may
+ * wish to have target children enumerated on both the HBA node and iport
+ * node(s):
+ *
+ *   o  If, in the past, HBA hardware had only a single physical port but now
+ *      supports multiple physical ports, the updated driver that supports
+ *      multiple physical ports may want to avoid /devices path upgrade issues
+ *      by enumerating the first physical port under the HBA instead of as a
+ *      iport.
+ *
+ *   o  Some hardware RAID HBA controllers (mlx, chs, etc) support multiple
+ *      SCSI physical ports configured so that various physical devices on
+ *      the physical ports are amalgamated into virtual devices on a virtual
+ *      port.  Amalgamated physical devices no longer appear to the host OS
+ *      on the physical ports, but other non-amalgamated devices may still be
+ *      visible on the physical ports.  These drivers use a model where the
+ *      physical ports are iport nodes and the HBA node is the virtual port to
+ *      the configured virtual devices.
+ *
  */
+
 int
-scsi_hba_attach_setup(
-	dev_info_t		*self,
-	ddi_dma_attr_t		*hba_dma_attr,
-	scsi_hba_tran_t		*tran,
-	int			flags)
+scsi_hba_iport_register(dev_info_t *self, char *port)
 {
-	struct dev_ops		*hba_dev_ops;
-	int			id;
-	int			capable;
-	static const char	*interconnect[] = INTERCONNECT_TYPE_ASCII;
+	unsigned int ports = 0;
+	int rval, i;
+	char **iports, **newiports;
 
-	SCSI_HBA_LOG((_LOG_TRACE, self, NULL, __func__));
+	ASSERT(self);
+	if (self == NULL)
+		return (DDI_FAILURE);
 
-	/*
-	 * Verify correct scsi_hba_tran_t form:
-	 *   o	both or none of tran_get_name/tran_get_addr.
-	 */
-	if ((tran->tran_get_name == NULL) ^
-	    (tran->tran_get_bus_addr == NULL)) {
+	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, self,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-iports", &iports,
+	    &ports);
+
+	if (ports == SCSI_HBA_MAX_IPORTS) {
+		ddi_prop_free(iports);
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * Save all the important HBA information that must be accessed
-	 * later by scsi_hba_bus_ctl(), and scsi_hba_map().
-	 */
-	tran->tran_hba_dip = self;
-	tran->tran_hba_flags &= SCSI_HBA_SCSA_TA;
-	tran->tran_hba_flags |= (flags & ~SCSI_HBA_SCSA_TA);
+	if (rval == DDI_PROP_SUCCESS) {
+		for (i = 0; i < ports; i++) {
+			if (strcmp(port, iports[i]) == 0) {
+				ddi_prop_free(iports);
+				return (DDI_SUCCESS);
+			}
+		}
+	}
+
+	newiports = kmem_alloc((sizeof (char *) * (ports + 1)), KM_SLEEP);
+
+	for (i = 0; i < ports; i++) {
+		newiports[i] = strdup(iports[i]);
+	}
+	newiports[ports] = strdup(port);
+	ports++;
+
+	rval = 1;
+
+	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, self,
+	    "scsi-iports", newiports, ports) != DDI_PROP_SUCCESS) {
+		SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+		    "Failed to establish scsi-iport %s", port));
+		rval = DDI_FAILURE;
+	} else {
+		rval = DDI_SUCCESS;
+	}
+
+	/* If there is iport exist, free property */
+	if (ports > 1)
+		ddi_prop_free(iports);
+	for (i = 0; i < ports; i++) {
+		strfree(newiports[i]);
+	}
+	kmem_free(newiports, (sizeof (char *)) * ports);
+
+	return (rval);
+}
+
+/*
+ * Check if the HBA is with scsi-iport under it
+ */
+int
+scsi_hba_iport_exist(dev_info_t *self)
+{
+	unsigned int ports = 0;
+	char **iports;
+	int rval;
+
+	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, self,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-iports", &iports,
+	    &ports);
+
+	if (rval != DDI_PROP_SUCCESS)
+		return (0);
+
+	/* If there is now at least 1 iport, then iports is valid */
+	if (ports > 0) {
+		rval = 1;
+	} else
+		rval = 0;
+	ddi_prop_free(iports);
+
+	return (rval);
+}
+
+dev_info_t *
+scsi_hba_iport_find(dev_info_t *self, char *portnm)
+{
+	char		*addr = NULL;
+	char		**iports;
+	unsigned int	num_iports = 0;
+	int		rval = DDI_FAILURE;
+	int		i = 0;
+	dev_info_t	*child = NULL;
+
+	/* check to see if this is an HBA that defined scsi iports */
+	rval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, self,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-iports", &iports,
+	    &num_iports);
+
+	if (rval != DDI_SUCCESS) {
+		return (NULL);
+	}
+	ASSERT(num_iports > 0);
+
+	/* check to see if this port was registered */
+	for (i = 0; i < num_iports; i++) {
+		if (strcmp(iports[i], portnm) == 0)
+			break;
+	}
+
+	if (i == num_iports) {
+		child = NULL;
+		goto out;
+	}
+
+	addr = kmem_zalloc(SCSI_MAXNAMELEN, KM_SLEEP);
+	(void) sprintf(addr, "iport@%s", portnm);
+	rval = ndi_devi_config_one(self, addr, &child, NDI_NO_EVENT);
+	kmem_free(addr, SCSI_MAXNAMELEN);
+
+	if (rval != DDI_SUCCESS) {
+		child = NULL;
+	}
+out:
+	ddi_prop_free(iports);
+	return (child);
+}
+
+/*
+ * Common nexus teardown code: used by both scsi_hba_detach() on SCSA HBA node
+ * and iport_devctl_uninitchild() on a SCSA HBA iport node (and for failure
+ * cleanup). Undo scsa_nexus_setup in reverse order.
+ */
+static void
+scsa_nexus_teardown(dev_info_t *self, scsi_hba_tran_t	*tran)
+{
+	if ((self == NULL) || (tran == NULL))
+		return;
+	/* Teardown FMA. */
+	if (tran->tran_hba_flags & SCSI_HBA_SCSA_FM) {
+		ddi_fm_fini(self);
+		tran->tran_hba_flags &= SCSI_HBA_SCSA_FM;
+	}
+}
+
+/*
+ * Common nexus setup code: used by both scsi_hba_attach_setup() on SCSA HBA
+ * node and iport_devctl_initchild() on a SCSA HBA iport node.
+ *
+ * This code makes no assumptions about tran use by scsi_device children.
+ */
+static int
+scsa_nexus_setup(dev_info_t *self, scsi_hba_tran_t *tran)
+{
+	int		capable;
+	int		scsa_minor;
 
 	/*
-	 * Note: we only need dma_attr_minxfer and dma_attr_burstsizes
-	 * from the DMA attributes. scsi_hba_attach(9f) only
-	 * guarantees that these two fields are initialized properly.
-	 * If this changes, be sure to revisit the implementation
-	 * of scsi_hba_attach(9F).
+	 * NOTE: SCSA maintains an 'fm-capable' domain, in tran_fm_capable,
+	 * that is not dependent (limited by) the capabilities of its parents.
+	 * For example a devinfo node in a branch that is not
+	 * DDI_FM_EREPORT_CAPABLE may report as capable, via tran_fm_capable,
+	 * to its scsi_device children.
+	 *
+	 * Get 'fm-capable' property from driver.conf, if present. If not
+	 * present, default to the scsi_fm_capable global (which has
+	 * DDI_FM_EREPORT_CAPABLE set by default).
 	 */
-	(void) memcpy(&tran->tran_dma_attr, hba_dma_attr,
-	    sizeof (ddi_dma_attr_t));
+	if (tran->tran_fm_capable == DDI_FM_NOT_CAPABLE)
+		tran->tran_fm_capable = ddi_prop_get_int(DDI_DEV_T_ANY, self,
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    "fm-capable", scsi_fm_capable);
+	/*
+	 * If an HBA is *not* doing its own fma support by calling
+	 * ddi_fm_init() prior to scsi_hba_attach_setup(), we provide a
+	 * minimal common SCSA implementation so that scsi_device children
+	 * can generate ereports via scsi_fm_ereport_post().  We use
+	 * ddi_fm_capable() to detect an HBA calling ddi_fm_init() prior to
+	 * scsi_hba_attach_setup().
+	 */
+	if (tran->tran_fm_capable &&
+	    (ddi_fm_capable(self) == DDI_FM_NOT_CAPABLE)) {
+		/*
+		 * We are capable of something, pass our capabilities up
+		 * the tree, but use a local variable so our parent can't
+		 * limit our capabilities (we don't want our parent to
+		 * clear DDI_FM_EREPORT_CAPABLE).
+		 *
+		 * NOTE: iblock cookies are not important because scsi
+		 * HBAs always interrupt below LOCK_LEVEL.
+		 */
+		capable = tran->tran_fm_capable;
+		ddi_fm_init(self, &capable, NULL);
 
-	/* create kmem_cache, if needed */
-	if (tran->tran_setup_pkt) {
-		char tmp[96];
-		int hbalen;
-		int cmdlen = 0;
-		int statuslen = 0;
+		/*
+		 * Set SCSI_HBA_SCSA_FM bit to mark us as usiung the
+		 * common minimal SCSA fm implementation -  we called
+		 * ddi_fm_init(), so we are responsible for calling
+		 * ddi_fm_fini() in scsi_hba_detach().
+		 * NOTE: if ddi_fm_init fails in any reason, SKIP.
+		 */
+		if (DEVI(self)->devi_fmhdl)
+			tran->tran_hba_flags |= SCSI_HBA_SCSA_FM;
+	}
 
-		ASSERT(tran->tran_init_pkt == NULL);
-		ASSERT(tran->tran_destroy_pkt == NULL);
+	/* If SCSA responsible for for minor nodes, create :devctl minor. */
+	scsa_minor = (ddi_get_driver(self)->devo_cb_ops->cb_open ==
+	    scsi_hba_open) ? 1 : 0;
+	if (scsa_minor && ((ddi_create_minor_node(self, "devctl", S_IFCHR,
+	    INST2DEVCTL(ddi_get_instance(self)), DDI_NT_SCSI_NEXUS, 0) !=
+	    DDI_SUCCESS))) {
+		SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+		    "can't create devctl minor nodes"));
+		scsa_nexus_teardown(self, tran);
+		return (DDI_FAILURE);
+	}
 
-		tran->tran_init_pkt = scsi_init_cache_pkt;
-		tran->tran_destroy_pkt = scsi_free_cache_pkt;
-		tran->tran_sync_pkt = scsi_sync_cache_pkt;
-		tran->tran_dmafree = scsi_cache_dmafree;
+	return (DDI_SUCCESS);
+}
 
-		hbalen = ROUNDUP(tran->tran_hba_len);
-		if (flags & SCSI_HBA_TRAN_CDB)
-			cmdlen = ROUNDUP(DEFAULT_CDBLEN);
-		if (flags & SCSI_HBA_TRAN_SCB)
-			statuslen = ROUNDUP(DEFAULT_SCBLEN);
+/*
+ * Common tran teardown code: used by iport_devctl_uninitchild() on a SCSA HBA
+ * iport node and (possibly) by scsi_hba_detach() on SCSA HBA node (and for
+ * failure cleanup). Undo scsa_tran_setup in reverse order.
+ */
+/*ARGSUSED*/
+static void
+scsa_tran_teardown(dev_info_t *self, scsi_hba_tran_t *tran)
+{
+	if (tran == NULL)
+		return;
+	tran->tran_iport_dip = NULL;
 
-		(void) snprintf(tmp, sizeof (tmp), "pkt_cache_%s_%d",
-		    ddi_driver_name(self), ddi_get_instance(self));
-		tran->tran_pkt_cache_ptr = kmem_cache_create(tmp,
-		    sizeof (struct scsi_pkt_cache_wrapper) +
-		    hbalen + cmdlen + statuslen, 8,
-		    scsi_hba_pkt_constructor, scsi_hba_pkt_destructor,
-		    NULL, tran, NULL, 0);
+	/*
+	 * In the future, if PHCI was registered in the SCSA
+	 * scsa_tran_teardown is able to unregiter PHCI
+	 */
+}
+
+static int
+scsa_tran_setup(dev_info_t *self, scsi_hba_tran_t *tran)
+{
+	int			scsa_minor;
+	int			id;
+	static const char	*interconnect[] = INTERCONNECT_TYPE_ASCII;
+
+	/* If SCSA responsible for for minor nodes, create ":scsi" */
+	scsa_minor = (ddi_get_driver(self)->devo_cb_ops->cb_open ==
+	    scsi_hba_open) ? 1 : 0;
+	if (scsa_minor && (ddi_create_minor_node(self, "scsi", S_IFCHR,
+	    INST2SCSI(ddi_get_instance(self)),
+	    DDI_NT_SCSI_ATTACHMENT_POINT, 0) != DDI_SUCCESS)) {
+		SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+		    "can't create scsi minor nodes"));
+		scsa_nexus_teardown(self, tran);
+		goto fail;
 	}
 
 	/*
@@ -766,88 +996,145 @@ scsi_hba_attach_setup(
 		}
 	}
 
-	/* SCSA iport driver_private (devi_driver_data) points to tran */
-	ddi_set_driver_private(self, tran);
-
+	tran->tran_iport_dip = self;
 	/*
-	 * Create :devctl and :scsi minor nodes unless driver supplied its own
-	 * open/close entry points
+	 * In the future SCSA v3, PHCI could be registered in the SCSA
+	 * here.
 	 */
-	hba_dev_ops = ddi_get_driver(self);
-	ASSERT(hba_dev_ops != NULL);
-	if (hba_dev_ops == NULL)
+	return (DDI_SUCCESS);
+fail:
+	scsa_tran_teardown(self, tran);
+	return (DDI_FAILURE);
+}
+
+/*
+ * Obsolete: Called by an HBA to attach an instance of the driver
+ * Implement this older interface in terms of the new.
+ */
+/*ARGSUSED*/
+int
+scsi_hba_attach(
+	dev_info_t		*self,
+	ddi_dma_lim_t		*hba_lim,
+	scsi_hba_tran_t		*tran,
+	int			flags,
+	void			*hba_options)
+{
+	ddi_dma_attr_t		hba_dma_attr;
+
+	bzero(&hba_dma_attr, sizeof (ddi_dma_attr_t));
+
+	hba_dma_attr.dma_attr_burstsizes = hba_lim->dlim_burstsizes;
+	hba_dma_attr.dma_attr_minxfer = hba_lim->dlim_minxfer;
+
+	return (scsi_hba_attach_setup(self, &hba_dma_attr, tran, flags));
+}
+
+/*
+ * Called by an HBA to attach an instance of the driver.
+ */
+int
+scsi_hba_attach_setup(
+	dev_info_t		*self,
+	ddi_dma_attr_t		*hba_dma_attr,
+	scsi_hba_tran_t		*tran,
+	int			flags)
+{
+	SCSI_HBA_LOG((_LOG_TRACE, self, NULL, __func__));
+
+	/* Verify that we are a driver */
+	if (ddi_get_driver(self) == NULL)
 		return (DDI_FAILURE);
-	if (hba_dev_ops->devo_cb_ops->cb_open == scsi_hba_open) {
-		/*
-		 * Make sure that instance number doesn't overflow
-		 * when forming minor numbers.
-		 */
-		ASSERT(ddi_get_instance(self) <=
-		    (L_MAXMIN >> INST_MINOR_SHIFT));
 
-		if ((ddi_create_minor_node(self, "devctl", S_IFCHR,
-		    INST2DEVCTL(ddi_get_instance(self)),
-		    DDI_NT_SCSI_NEXUS, 0) != DDI_SUCCESS) ||
-		    (ddi_create_minor_node(self, "scsi", S_IFCHR,
-		    INST2SCSI(ddi_get_instance(self)),
-		    DDI_NT_SCSI_ATTACHMENT_POINT, 0) != DDI_SUCCESS)) {
-			ddi_remove_minor_node(self, "devctl");
-			ddi_remove_minor_node(self, "scsi");
-			SCSI_HBA_LOG((_LOG(WARN), self, NULL,
-			    "can't create devctl/scsi minor nodes"));
-		}
+	ASSERT(scsi_hba_iport_unit_address(self) == NULL);
+	if (scsi_hba_iport_unit_address(self))
+		return (DDI_FAILURE);
+
+	ASSERT(tran);
+	if (tran == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * Verify correct scsi_hba_tran_t form:
+	 *   o	both or none of tran_get_name/tran_get_addr.
+	 */
+	if ((tran->tran_get_name == NULL) ^
+	    (tran->tran_get_bus_addr == NULL)) {
+		return (DDI_FAILURE);
 	}
 
 	/*
-	 * NOTE: SCSA maintains an 'fm-capable' domain, in tran_fm_capable,
-	 * that is not dependent (limited by) the capabilities of its parents.
-	 * For example a dip in a branch that is not DDI_FM_EREPORT_CAPABLE
-	 * may report as capable, via tran_fm_capable, to its scsi_device
-	 * children.
-	 *
-	 * Get 'fm-capable' property from driver.conf, if present. If not
-	 * present, default to the scsi_fm_capable global (which has
-	 * DDI_FM_EREPORT_CAPABLE set by default).
+	 * Save all the important HBA information that must be accessed
+	 * later by scsi_hba_bus_ctl(), and scsi_hba_map().
 	 */
-	if (tran->tran_fm_capable == DDI_FM_NOT_CAPABLE)
-		tran->tran_fm_capable = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
-		    "fm-capable", scsi_fm_capable);
+	tran->tran_hba_dip = self;
+	tran->tran_hba_flags &= SCSI_HBA_SCSA_TA;
+	tran->tran_hba_flags |= (flags & ~SCSI_HBA_SCSA_TA);
+
+	/* Establish flavor of transport (and ddi_get_driver_private()) */
+	ndi_flavorv_set(self, SCSA_FLAVOR_SCSI_DEVICE, tran);
 
 	/*
-	 * If an HBA is *not* doing its own fma support by calling
-	 * ddi_fm_init() prior to scsi_hba_attach_setup(), we provide a
-	 * minimal common SCSA implementation so that scsi_device children
-	 * can generate ereports via scsi_fm_ereport_post().  We use
-	 * ddi_fm_capable() to detect an HBA calling ddi_fm_init() prior to
-	 * scsi_hba_attach_setup().
+	 * Note: we only need dma_attr_minxfer and dma_attr_burstsizes
+	 * from the DMA attributes. scsi_hba_attach(9f) only
+	 * guarantees that these two fields are initialized properly.
+	 * If this changes, be sure to revisit the implementation
+	 * of scsi_hba_attach(9F).
 	 */
-	if (tran->tran_fm_capable &&
-	    (ddi_fm_capable(self) == DDI_FM_NOT_CAPABLE)) {
-		/*
-		 * We are capable of something, pass our capabilities up
-		 * the tree, but use a local variable so our parent can't
-		 * limit our capabilities (we don't want our parent to
-		 * clear DDI_FM_EREPORT_CAPABLE).
-		 *
-		 * NOTE: iblock cookies are not important because scsi
-		 * HBAs always interrupt below LOCK_LEVEL.
-		 */
-		capable = tran->tran_fm_capable;
-		ddi_fm_init(self, &capable, NULL);
+	(void) memcpy(&tran->tran_dma_attr, hba_dma_attr,
+	    sizeof (ddi_dma_attr_t));
 
-		/*
-		 * Set SCSI_HBA_SCSA_FM bit to mark us as usiung the
-		 * common minimal SCSA fm implementation -  we called
-		 * ddi_fm_init(), so we are responsible for calling
-		 * ddi_fm_fini() in scsi_hba_detach().
-		 * NOTE: if ddi_fm_init fails in any reason, SKIP.
-		 */
-		if (DEVI(self)->devi_fmhdl)
-			tran->tran_hba_flags |= SCSI_HBA_SCSA_FM;
+	/* create kmem_cache, if needed */
+	if (tran->tran_setup_pkt) {
+		char tmp[96];
+		int hbalen;
+		int cmdlen = 0;
+		int statuslen = 0;
+
+		ASSERT(tran->tran_init_pkt == NULL);
+		ASSERT(tran->tran_destroy_pkt == NULL);
+
+		tran->tran_init_pkt = scsi_init_cache_pkt;
+		tran->tran_destroy_pkt = scsi_free_cache_pkt;
+		tran->tran_sync_pkt = scsi_sync_cache_pkt;
+		tran->tran_dmafree = scsi_cache_dmafree;
+
+		hbalen = ROUNDUP(tran->tran_hba_len);
+		if (flags & SCSI_HBA_TRAN_CDB)
+			cmdlen = ROUNDUP(DEFAULT_CDBLEN);
+		if (flags & SCSI_HBA_TRAN_SCB)
+			statuslen = ROUNDUP(DEFAULT_SCBLEN);
+
+		(void) snprintf(tmp, sizeof (tmp), "pkt_cache_%s_%d",
+		    ddi_driver_name(self), ddi_get_instance(self));
+		tran->tran_pkt_cache_ptr = kmem_cache_create(tmp,
+		    sizeof (struct scsi_pkt_cache_wrapper) +
+		    hbalen + cmdlen + statuslen, 8,
+		    scsi_hba_pkt_constructor, scsi_hba_pkt_destructor,
+		    NULL, tran, NULL, 0);
 	}
+
+	/* Perform node setup independent of initiator role */
+	if (scsa_nexus_setup(self, tran) != DDI_SUCCESS)
+		goto fail;
+
+	/*
+	 * The SCSI_HBA_HBA flag is passed to scsi_hba_attach_setup when the
+	 * HBA driver knows that *all* children of the SCSA HBA node will be
+	 * 'iports'. If the SCSA HBA node can have iport children and also
+	 * function as an initiator for xxx_device children then it should
+	 * not specify SCSI_HBA_HBA in its scsi_hba_attach_setup call. An
+	 * HBA driver that does not manage iports should not set SCSA_HBA_HBA.
+	 */
+	if (!(tran->tran_hba_flags & SCSI_HBA_HBA) &&
+	    (scsa_tran_setup(self, tran) != DDI_SUCCESS))
+		goto fail;
 
 	return (DDI_SUCCESS);
+
+fail:
+	(void) scsi_hba_detach(self);
+	return (DDI_FAILURE);
 }
 
 /*
@@ -856,38 +1143,26 @@ scsi_hba_attach_setup(
 int
 scsi_hba_detach(dev_info_t *self)
 {
-	struct dev_ops		*hba_dev_ops;
-	scsi_hba_tran_t		*tran;
+	scsi_hba_tran_t	*tran;
 
 	SCSI_HBA_LOG((_LOG_TRACE, self, NULL, __func__));
 
-	tran = ddi_get_driver_private(self);
+	ASSERT(scsi_hba_iport_unit_address(self) == NULL);
+	if (scsi_hba_iport_unit_address(self))
+		return (DDI_FAILURE);
+
+	tran = ndi_flavorv_get(self, SCSA_FLAVOR_SCSI_DEVICE);
 	ASSERT(tran);
 	if (tran == NULL)
 		return (DDI_FAILURE);
+
 	ASSERT(tran->tran_open_flag == 0);
 	if (tran->tran_open_flag)
 		return (DDI_FAILURE);
 
-	ddi_set_driver_private(self, NULL);
-
-	/*
-	 * If we are taking care of mininal default fma implementation,
-	 * call ddi_fm_fini(9F).
-	 */
-	if (tran->tran_hba_flags & SCSI_HBA_SCSA_FM) {
-		ddi_fm_fini(self);
-	}
-
-	hba_dev_ops = ddi_get_driver(self);
-	ASSERT(hba_dev_ops != NULL);
-	if (hba_dev_ops == NULL)
-		return (DDI_FAILURE);
-	if (hba_dev_ops->devo_cb_ops->cb_open == scsi_hba_open) {
-		ddi_remove_minor_node(self, "devctl");
-		ddi_remove_minor_node(self, "scsi");
-	}
-
+	if (!(tran->tran_hba_flags & SCSI_HBA_HBA))
+		scsa_tran_teardown(self, tran);
+	scsa_nexus_teardown(self, tran);
 
 	/*
 	 * XXX - scsi_transport.h states that these data fields should not be
@@ -902,6 +1177,9 @@ scsi_hba_detach(dev_info_t *self)
 		kmem_cache_destroy(tran->tran_pkt_cache_ptr);
 		tran->tran_pkt_cache_ptr = NULL;
 	}
+
+	/* Teardown flavor of transport (and ddi_get_driver_private()) */
+	ndi_flavorv_set(self, SCSA_FLAVOR_SCSI_DEVICE, NULL);
 
 	return (DDI_SUCCESS);
 }
@@ -954,6 +1232,9 @@ sas_hba_attach_setup(
 	dev_info_t		*self,
 	sas_hba_tran_t		*tran)
 {
+	ASSERT(scsi_hba_iport_unit_address(self) == NULL);
+	if (scsi_hba_iport_unit_address(self))
+		return (DDI_FAILURE);
 	/*
 	 * The owner of the this devinfo_t was responsible
 	 * for informing the framework already about
@@ -962,6 +1243,18 @@ sas_hba_attach_setup(
 	ndi_flavorv_set(self, SCSA_FLAVOR_SMP, tran);
 	return (DDI_SUCCESS);
 }
+
+int
+sas_hba_detach(dev_info_t *self)
+{
+	ASSERT(scsi_hba_iport_unit_address(self) == NULL);
+	if (scsi_hba_iport_unit_address(self))
+		return (DDI_FAILURE);
+
+	ndi_flavorv_set(self, SCSA_FLAVOR_SMP, NULL);
+	return (DDI_SUCCESS);
+}
+
 /*
  * SMP child flavored functions
  */
@@ -1429,6 +1722,176 @@ scsi_busctl_uninitchild(dev_info_t *child)
 	return (DDI_SUCCESS);
 }
 
+static int
+iport_busctl_reportdev(dev_info_t *child)
+{
+	dev_info_t	*self = ddi_get_parent(child);
+	char		*iport;
+
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "scsi-iport", &iport) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	SCSI_HBA_LOG((_LOG_NF(CONT), "?%s%d at %s%d: iport %s\n",
+	    ddi_driver_name(child), ddi_get_instance(child),
+	    ddi_driver_name(self), ddi_get_instance(self),
+	    iport));
+
+	ddi_prop_free(iport);
+	return (DDI_SUCCESS);
+}
+
+/* uninitchild SCSA iport 'child' node */
+static int
+iport_busctl_uninitchild(dev_info_t *child)
+{
+	ddi_set_name_addr(child, NULL);
+	return (DDI_SUCCESS);
+}
+
+/* initchild SCSA iport 'child' node */
+static int
+iport_busctl_initchild(dev_info_t *child)
+{
+	dev_info_t	*self = ddi_get_parent(child);
+	dev_info_t	*dup = NULL;
+	char		addr[SCSI_MAXNAMELEN];
+	char		*iport;
+
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "scsi-iport", &iport) != DDI_SUCCESS) {
+		return (DDI_NOT_WELL_FORMED);
+	}
+
+	(void) snprintf(addr, SCSI_MAXNAMELEN, "%s", iport);
+	ddi_prop_free(iport);
+
+
+	/* set the node @addr string */
+	ddi_set_name_addr(child, addr);
+
+	/* Prevent duplicate nodes.  */
+	dup = ndi_devi_find(self, ddi_node_name(child), addr);
+	if (dup && (dup != child)) {
+		ddi_set_name_addr(child, NULL);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/* Uninitialize scsi_device flavor of transport on SCSA iport 'child' node. */
+static void
+iport_postdetach_tran_scsi_device(dev_info_t *child)
+{
+	scsi_hba_tran_t		*tran;
+
+	tran = ndi_flavorv_get(child, SCSA_FLAVOR_SCSI_DEVICE);
+	if (tran == NULL)
+		return;
+
+	scsa_tran_teardown(child, tran);
+	scsa_nexus_teardown(child, tran);
+
+	ndi_flavorv_set(child, SCSA_FLAVOR_SCSI_DEVICE, NULL);
+	scsi_hba_tran_free(tran);
+}
+
+/*
+ * Initialize scsi_device flavor of transport on SCSA iport 'child' node.
+ *
+ * NOTE: Given our past history with SCSI_HBA_TRAN_CLONE (structure-copy tran
+ * per scsi_device), using structure-copy of tran at the iport level should
+ * not be a problem (the most risky thing is likely tran_hba_dip).
+ */
+static void
+iport_preattach_tran_scsi_device(dev_info_t *child)
+{
+	dev_info_t	*hba = ddi_get_parent(child);
+	scsi_hba_tran_t	*htran;
+	scsi_hba_tran_t	*tran;
+
+	/* parent HBA node scsi_device tran is required */
+	htran = ndi_flavorv_get(hba, SCSA_FLAVOR_SCSI_DEVICE);
+	ASSERT(htran != NULL);
+	if (htran == NULL)
+		return;
+
+	/* Allocate iport child's scsi_device transport vector */
+	tran = scsi_hba_tran_alloc(child, SCSI_HBA_CANSLEEP);
+	if (tran == NULL)
+		return;
+
+	/* Structure-copy scsi_device transport of HBA to iport. */
+	*tran = *htran;
+
+	/*
+	 * Reset scsi_device transport fields not shared with the
+	 * parent, and not established below.
+	 */
+	tran->tran_open_flag = 0;
+	tran->tran_hba_private = NULL;
+	tran->tran_iport_dip = child;
+
+	/* Clear SCSI_HBA_SCSA flags (except TA) */
+	tran->tran_hba_flags &= ~SCSI_HBA_SCSA_FM;	/* clear parent state */
+	tran->tran_hba_flags |= SCSI_HBA_SCSA_TA;
+	tran->tran_hba_flags &= ~SCSI_HBA_HBA;		/* never HBA */
+
+	/* Establish flavor of transport (and ddi_get_driver_private()) */
+	ndi_flavorv_set(child, SCSA_FLAVOR_SCSI_DEVICE, tran);
+
+	/* Setup iport node */
+	if ((scsa_nexus_setup(child, tran) != DDI_SUCCESS) ||
+	    (scsa_tran_setup(child, tran) != DDI_SUCCESS)) {
+		iport_postdetach_tran_scsi_device(child);
+	}
+}
+
+/* Uninitialize smp_device flavor of transport on SCSA iport 'child' node. */
+static void
+iport_postdetach_tran_smp_device(dev_info_t *child)
+{
+	sas_hba_tran_t	*tran;
+
+	tran = ndi_flavorv_get(child, SCSA_FLAVOR_SMP);
+	if (tran == NULL)
+		return;
+
+	ndi_flavorv_set(child, SCSA_FLAVOR_SMP, NULL);
+	sas_hba_tran_free(tran);
+}
+
+/* Initialize smp_device flavor of transport on SCSA iport 'child' node. */
+static void
+iport_preattach_tran_smp_device(dev_info_t *child)
+{
+	dev_info_t	*hba = ddi_get_parent(child);
+	sas_hba_tran_t	*htran;
+	sas_hba_tran_t	*tran;
+
+	/* parent HBA node smp_device tran is optional */
+	htran = ndi_flavorv_get(hba, SCSA_FLAVOR_SMP);
+	if (htran == NULL) {
+		ndi_flavorv_set(child, SCSA_FLAVOR_SMP, NULL);
+		return;
+	}
+
+	/* Allocate iport child's smp_device transport vector */
+	tran = sas_hba_tran_alloc(child, 0);
+
+	/* Structure-copy smp_device transport of HBA to iport. */
+	*tran = *htran;
+
+	/* Establish flavor of transport */
+	ndi_flavorv_set(child, SCSA_FLAVOR_SMP, tran);
+}
+
+
 /*
  * Generic bus_ctl operations for SCSI HBA's,
  * hiding the busctl interface from the HBA.
@@ -1442,37 +1905,80 @@ scsi_hba_bus_ctl(
 	void			*arg,
 	void			*result)
 {
-	int			child_flavor_smp = 0;
+	int			child_flavor = 0;
 	int			val;
 	ddi_dma_attr_t		*attr;
 	scsi_hba_tran_t		*tran;
+	struct attachspec	*as;
+	struct detachspec	*ds;
 
 	/* For some ops, child is 'arg'. */
 	if ((op == DDI_CTLOPS_INITCHILD) || (op == DDI_CTLOPS_UNINITCHILD))
 		child = (dev_info_t *)arg;
 
 	/* Determine the flavor of the child: smp .vs. scsi */
-	child_flavor_smp = (ndi_flavor_get(child) == SCSA_FLAVOR_SMP);
+	child_flavor = ndi_flavor_get(child);
 
 	switch (op) {
 	case DDI_CTLOPS_INITCHILD:
-		if (child_flavor_smp)
+		switch (child_flavor) {
+		case SCSA_FLAVOR_IPORT:
+			return (iport_busctl_initchild(child));
+		case SCSA_FLAVOR_SMP:
 			return (smp_busctl_initchild(child));
-		else
+		default:
 			return (scsi_busctl_initchild(child));
-
+		}
 	case DDI_CTLOPS_UNINITCHILD:
-		if (child_flavor_smp)
+		switch (child_flavor) {
+		case SCSA_FLAVOR_IPORT:
+			return (iport_busctl_uninitchild(child));
+		case SCSA_FLAVOR_SMP:
 			return (smp_busctl_uninitchild(child));
-		else
+		default:
 			return (scsi_busctl_uninitchild(child));
-
+		}
 	case DDI_CTLOPS_REPORTDEV:
-		if (child_flavor_smp)
+		switch (child_flavor) {
+		case SCSA_FLAVOR_IPORT:
+			return (iport_busctl_reportdev(child));
+		case SCSA_FLAVOR_SMP:
 			return (smp_busctl_reportdev(child));
-		else
+		default:
 			return (scsi_busctl_reportdev(child));
+		}
+	case DDI_CTLOPS_ATTACH:
+		as = (struct attachspec *)arg;
 
+		if (child_flavor != SCSA_FLAVOR_IPORT)
+			return (DDI_SUCCESS);
+
+		/* iport processing */
+		if (as->when == DDI_PRE) {
+			/* setup pre attach(9E) */
+			iport_preattach_tran_scsi_device(child);
+			iport_preattach_tran_smp_device(child);
+		} else if ((as->when == DDI_POST) &&
+		    (as->result != DDI_SUCCESS)) {
+			/* cleanup if attach(9E) failed */
+			iport_postdetach_tran_scsi_device(child);
+			iport_postdetach_tran_smp_device(child);
+		}
+		return (DDI_SUCCESS);
+	case DDI_CTLOPS_DETACH:
+		ds = (struct detachspec *)arg;
+
+		if (child_flavor != SCSA_FLAVOR_IPORT)
+			return (DDI_SUCCESS);
+
+		/* iport processing */
+		if ((ds->when == DDI_POST) &&
+		    (ds->result == DDI_SUCCESS)) {
+			/* cleanup if detach(9E) was successful */
+			iport_postdetach_tran_scsi_device(child);
+			iport_postdetach_tran_smp_device(child);
+		}
+		return (DDI_SUCCESS);
 	case DDI_CTLOPS_IOMIN:
 		tran = ddi_get_driver_private(self);
 		ASSERT(tran);
@@ -1500,8 +2006,6 @@ scsi_hba_bus_ctl(
 
 	/* XXX these should be handled */
 	case DDI_CTLOPS_POWER:
-	case DDI_CTLOPS_ATTACH:		/* DDI_PRE / DDI_POST attach */
-	case DDI_CTLOPS_DETACH:		/* DDI_PRE / DDI_POST detach */
 		return (DDI_SUCCESS);
 
 	/*
@@ -3418,15 +3922,279 @@ scsi_device_prop_free(struct scsi_device *sd, uint_t flags, void *data)
 		ddi_prop_free(data);
 }
 
+/*ARGSUSED*/
+/*
+ * Search/create the specified iport node
+ */
+static dev_info_t *
+scsi_hba_bus_config_port(dev_info_t *self, char *nameaddr)
+{
+	dev_info_t	*child;
+	char		*mcompatible, *addr;
+
+	/*
+	 * See if the iport node already exists.
+	 */
+
+	if (child = ndi_devi_findchild(self, nameaddr)) {
+		return (child);
+	}
+
+	/* allocate and initialize a new "iport" node */
+	ndi_devi_alloc_sleep(self, "iport", DEVI_SID_NODEID, &child);
+	ASSERT(child);
+	/*
+	 * Set the flavor of the child to be IPORT flavored
+	 */
+	ndi_flavor_set(child, SCSA_FLAVOR_IPORT);
+
+	/*
+	 * Add the "scsi-iport" addressing property for this child. This
+	 * property is used to identify a iport node, and to represent the
+	 * nodes @addr form via node properties.
+	 *
+	 * Add "compatible" property to the "scsi-iport" node to cause it bind
+	 * to the same driver as the HBA  driver.
+	 *
+	 * Give the HBA a chance, via tran_set_name_prop, to set additional
+	 * iport node properties or to change the "compatible" binding
+	 * prior to init_child.
+	 *
+	 * NOTE: the order of these operations is important so that
+	 * scsi_hba_iport works when called.
+	 */
+	mcompatible = ddi_binding_name(self);
+	addr = nameaddr + strlen("iport@");
+
+	if ((ndi_prop_update_string(DDI_DEV_T_NONE, child,
+	    "scsi-iport", addr) != DDI_PROP_SUCCESS) ||
+	    (ndi_prop_update_string_array(DDI_DEV_T_NONE, child,
+	    "compatible", &mcompatible, 1) != DDI_PROP_SUCCESS) ||
+	    ddi_pathname_obp_set(child, NULL) != DDI_SUCCESS) {
+		SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+		    "scsi_hba_bus_config_port:%s failed dynamic decoration",
+		    nameaddr));
+		(void) ddi_remove_child(child, 0);
+		child = NULL;
+	} else {
+		if (ddi_initchild(self, child) != DDI_SUCCESS) {
+			ndi_prop_remove_all(child);
+			(void) ndi_devi_free(child);
+			child = NULL;
+		}
+	}
+
+	return (child);
+}
+
+#ifdef	sparc
+/* ARGSUSED */
+static int
+scsi_hba_bus_config_prom_node(dev_info_t *self, uint_t flags,
+    void *arg, dev_info_t **childp)
+{
+	char		**iports;
+	int		circ, i;
+	int		ret = NDI_FAILURE;
+	unsigned int	num_iports = 0;
+	dev_info_t	*pdip = NULL;
+	char		*addr = NULL;
+
+	/* check to see if this is an HBA that defined scsi iports */
+	ret = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, self,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-iports", &iports,
+	    &num_iports);
+
+	if (ret != DDI_SUCCESS) {
+		return (ret);
+	}
+
+	ASSERT(num_iports > 0);
+
+	addr = kmem_zalloc(SCSI_MAXNAMELEN, KM_SLEEP);
+
+	ret = NDI_FAILURE;
+
+	ndi_devi_enter(self, &circ);
+
+	/* create iport nodes for each scsi port/bus */
+	for (i = 0; i < num_iports; i++) {
+		bzero(addr, SCSI_MAXNAMELEN);
+		/* Prepend the iport name */
+		(void) snprintf(addr, SCSI_MAXNAMELEN, "iport@%s",
+		    iports[i]);
+		if (pdip = scsi_hba_bus_config_port(self, addr)) {
+			if (ndi_busop_bus_config(self, NDI_NO_EVENT,
+			    BUS_CONFIG_ONE, addr, &pdip, 0) !=
+			    NDI_SUCCESS) {
+				continue;
+			}
+			/*
+			 * Try to configure child under iport see wehter
+			 * request node is the child of the iport node
+			 */
+			if (ndi_devi_config_one(pdip, arg, childp,
+			    NDI_NO_EVENT) == NDI_SUCCESS) {
+				ret = NDI_SUCCESS;
+				break;
+			}
+		}
+	}
+
+	ndi_devi_exit(self, circ);
+
+	kmem_free(addr, SCSI_MAXNAMELEN);
+
+	ddi_prop_free(iports);
+
+	return (ret);
+}
+#endif
+
+/*
+ * Perform iport port/bus bus_config.
+ */
+static int
+scsi_hba_bus_config_iports(dev_info_t *self, uint_t flags,
+    ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
+{
+	char		*nameaddr, *addr;
+	char		**iports;
+	int		circ, i;
+	int		ret = NDI_FAILURE;
+	unsigned int	num_iports = 0;
+
+	/* check to see if this is an HBA that defined scsi iports */
+	ret = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, self,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-iports", &iports,
+	    &num_iports);
+
+	if (ret != DDI_SUCCESS) {
+		return (ret);
+	}
+
+	ASSERT(num_iports > 0);
+
+	ndi_devi_enter(self, &circ);
+
+	switch (op) {
+	case BUS_CONFIG_ONE:
+		/* return if this operation is not against an iport node */
+		nameaddr = (char *)arg;
+		if ((nameaddr == NULL) ||
+		    (strncmp(nameaddr, "iport@", strlen("iport@")) != 0)) {
+			ret = NDI_FAILURE;
+			ndi_devi_exit(self, circ);
+			return (ret);
+		}
+
+		/*
+		 * parse the port number from "iport@%x"
+		 * XXX use atoi (hex)
+		 */
+		addr = nameaddr + strlen("iport@");
+
+		/* check to see if this port was registered */
+		for (i = 0; i < num_iports; i++) {
+			if (strcmp((iports[i]), addr) == 0)
+				break;
+		}
+
+		if (i == num_iports) {
+			ret = NDI_FAILURE;
+			break;
+		}
+
+		/* create the iport node */
+		if (scsi_hba_bus_config_port(self, nameaddr)) {
+			ret = NDI_SUCCESS;
+		}
+		break;
+	case BUS_CONFIG_ALL:
+	case BUS_CONFIG_DRIVER:
+		addr = kmem_zalloc(SCSI_MAXNAMELEN, KM_SLEEP);
+		/* create iport nodes for each scsi port/bus */
+		for (i = 0; i < num_iports; i++) {
+			bzero(addr, SCSI_MAXNAMELEN);
+			/* Prepend the iport name */
+			(void) snprintf(addr, SCSI_MAXNAMELEN, "iport@%s",
+			    iports[i]);
+			(void) scsi_hba_bus_config_port(self, addr);
+		}
+
+		kmem_free(addr, SCSI_MAXNAMELEN);
+		ret = NDI_SUCCESS;
+		break;
+	}
+	if (ret == NDI_SUCCESS) {
+#ifdef sparc
+		/*
+		 * Mask NDI_PROMNAME since PROM doesn't have iport
+		 * node at all.
+		 */
+		flags &= (~NDI_PROMNAME);
+#endif
+		ret = ndi_busop_bus_config(self, flags, op,
+		    arg, childp, 0);
+	}
+	ndi_devi_exit(self, circ);
+
+	ddi_prop_free(iports);
+
+	return (ret);
+}
+
 
 /*ARGSUSED*/
 static int
 scsi_hba_bus_config(dev_info_t *self, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **childp)
 {
-	scsi_hba_tran_t	*tran;
+	scsi_hba_tran_t	*tran = NULL;
 
 	tran = ddi_get_driver_private(self);
+
+	if (tran && (tran->tran_hba_flags & SCSI_HBA_HBA)) {
+#ifdef	sparc
+		char *nameaddr = NULL;
+		nameaddr = (char *)arg;
+		switch (op) {
+		case BUS_CONFIG_ONE:
+			if (nameaddr == NULL)
+				return (NDI_FAILURE);
+			if (strncmp(nameaddr, "iport", strlen("iport")) == 0) {
+				break;
+			}
+			/*
+			 * If this operation is not against an iport node, it's
+			 * possible the operation is requested to configure
+			 * root disk by OBP. Unfortunately, prom path is without
+			 * iport string in the boot path.
+			 */
+			if (strncmp(nameaddr, "disk@", strlen("disk@")) == 0) {
+				return (scsi_hba_bus_config_prom_node(self,
+				    flag, arg, childp));
+			}
+			break;
+		default:
+			break;
+		}
+#endif
+		/*
+		 * The request is to configure multi-port HBA.
+		 * Now start to configure iports, for the end
+		 * devices attached to iport, should be configured
+		 * by bus_configure routine of iport
+		 */
+		return (scsi_hba_bus_config_iports(self, flag, op, arg,
+		    childp));
+	}
+
+#ifdef sparc
+	if (scsi_hba_iport_unit_address(self)) {
+		flag &= (~NDI_PROMNAME);
+	}
+#endif
 	if (tran && tran->tran_bus_config) {
 		return (tran->tran_bus_config(self, flag, op, arg, childp));
 	}
@@ -3447,9 +4215,10 @@ static int
 scsi_hba_bus_unconfig(dev_info_t *self, uint_t flag, ddi_bus_config_op_t op,
     void *arg)
 {
-	scsi_hba_tran_t	*tran;
+	scsi_hba_tran_t	*tran = NULL;
 
 	tran = ddi_get_driver_private(self);
+
 	if (tran && tran->tran_bus_unconfig) {
 		return (tran->tran_bus_unconfig(self, flag, op, arg));
 	}

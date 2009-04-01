@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +156,8 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 #define	INTERCONNECT_ISCSI		8
 #define	INTERCONNECT_IBSRP		9
 #define	INTERCONNECT_SATA		10
-#define	INTERCONNECT_MAX		11	/* Change this appropriately, */
+#define	INTERCONNECT_SAS		11
+#define	INTERCONNECT_MAX		12	/* Change this appropriately, */
 						/* as new one(s) are added.   */
 						/* Is always the last & max.  */
 
@@ -171,6 +172,7 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 #define	INTERCONNECT_ISCSI_STR		"iSCSI"
 #define	INTERCONNECT_IBSRP_STR		"IB"
 #define	INTERCONNECT_SATA_STR		"SATA"
+#define	INTERCONNECT_SAS_STR		"SAS"
 
 #define	INTERCONNECT_TYPE_ASCII		{				\
 					"",				\
@@ -184,6 +186,7 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 					INTERCONNECT_ISCSI_STR,		\
 					INTERCONNECT_IBSRP_STR,		\
 					INTERCONNECT_SATA_STR,		\
+					INTERCONNECT_SAS_STR,		\
 					NULL				\
 					};
 

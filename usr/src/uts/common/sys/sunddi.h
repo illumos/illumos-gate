@@ -170,6 +170,8 @@ extern "C" {
 #define	DDI_NT_ENCLOSURE	"ddi_enclosure"
 #define	DDI_NT_SCSI_ENCLOSURE	"ddi_enclosure:scsi"
 
+#define	DDI_NT_BLOCK_SAS	"ddi_block:sas"
+
 /*
  * xVM virtual block devices
  */
