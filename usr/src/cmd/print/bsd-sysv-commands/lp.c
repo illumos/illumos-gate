@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lp.c 179 2006-07-17 18:24:07Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,12 +51,12 @@ usage(char *program)
 		name++;
 
 	fprintf(stdout,
-		gettext("Usage: %s [-c] [-m] [-p] [-s] [-w] [-d destination]  "
-			"[-f form-name] [-H special-handling] [-n number] "
-			"[-o option] [-P page-list] [-q priority-level]  "
-			"[-S character-set | print-wheel]  [-t title] [-v] "
-			"[-T content-type [-r]] [-y mode-list] [file...]\n"),
-		name);
+	    gettext("Usage: %s [-c] [-m] [-p] [-s] [-w] [-d destination]  "
+	    "[-f form-name] [-H special-handling] [-n number] "
+	    "[-o option] [-P page-list] [-q priority-level]  "
+	    "[-S character-set | print-wheel]  [-t title] [-v] "
+	    "[-T content-type [-r]] [-y mode-list] [file...]\n"),
+	    name);
 	exit(1);
 }
 
@@ -89,33 +87,33 @@ main(int ac, char *av[])
 		case 'H':	/* handling */
 			if (strcasecmp(optarg, "hold") == 0)
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_EXCL,
-					"job-hold-until", "indefinite");
+				    PAPI_ATTR_EXCL,
+				    "job-hold-until", "indefinite");
 			else if (strcasecmp(optarg, "immediate") == 0)
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_EXCL,
-					"job-hold-until", "no-hold");
+				    PAPI_ATTR_EXCL,
+				    "job-hold-until", "no-hold");
 			else
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_EXCL,
-					"job-hold-until", optarg);
+				    PAPI_ATTR_EXCL,
+				    "job-hold-until", optarg);
 			break;
 		case 'P': {	/* page list */
 			char buf[BUFSIZ];
 
 			snprintf(buf, sizeof (buf), "page-ranges=%s", optarg);
 			papiAttributeListFromString(&list,
-					PAPI_ATTR_EXCL, buf);
+			    PAPI_ATTR_EXCL, buf);
 			}
 			break;
 		case 'S':	/* charset */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"lp-charset", optarg);
+			    "lp-charset", optarg);
 			break;
 		case 'T':	/* type */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"document-format",
-					lp_type_to_mime_type(optarg));
+			    "document-format",
+			    lp_type_to_mime_type(optarg));
 			break;
 		case 'D':	/* dump */
 			dump = 1;
@@ -128,32 +126,32 @@ main(int ac, char *av[])
 			break;
 		case 'f':	/* form */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"form", optarg);
+			    "form", optarg);
 			break;
 		case 'i':	/* modify job */
 			if ((get_printer_id(optarg, &printer, &modify) < 0) ||
 			    (modify < 0)) {
 				fprintf(stderr,
-					gettext("invalid request id: %s\n"),
-					optarg);
+				    gettext("invalid request id: %s\n"),
+				    optarg);
 				exit(1);
 			}
 			break;
 		case 'm':	/* mail when complete */
 			papiAttributeListAddBoolean(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-mail", 1);
+			    "rfc-1179-mail", 1);
 			break;
 		case 'n':	/* copies */
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"copies", atoi(optarg));
+			    "copies", atoi(optarg));
 			break;
 		case 'o':	/* lp "options" */
 			papiAttributeListFromString(&list,
-					PAPI_ATTR_REPLACE, optarg);
+			    PAPI_ATTR_REPLACE, optarg);
 			break;
 		case 'p':	/* Solaris - notification */
 			papiAttributeListAddBoolean(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-mail", 1);
+			    "rfc-1179-mail", 1);
 			break;
 		case 'q': {	/* priority */
 			int i = atoi(optarg);
@@ -165,33 +163,33 @@ main(int ac, char *av[])
 				exit(1);
 			}
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"job-priority", i);
+			    "job-priority", i);
 			}
 			break;
 		case 'r':	/* "raw" mode */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"document-format",
-					"application/octet-stream");
+			    "document-format",
+			    "application/octet-stream");
 			papiAttributeListAddString(&list, PAPI_ATTR_APPEND,
-					"stty", "raw");
+			    "stty", "raw");
 			break;
 		case 's':	/* suppress message */
 			silent = 1;
 			break;
 		case 't':	/* title */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"job-name", optarg);
+			    "job-name", optarg);
 			break;
 		case 'V':	/* validate */
 			validate = 1;
 			break;
 		case 'w':
 			papiAttributeListAddBoolean(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-mail", 1);
+			    "rfc-1179-mail", 1);
 			break;
 		case 'y':	/* lp "modes" */
 			papiAttributeListAddString(&list, PAPI_ATTR_APPEND,
-					"lp-modes", optarg);
+			    "lp-modes", optarg);
 			break;
 		case 'E':
 			encryption = PAPI_ENCRYPT_REQUIRED;
@@ -205,7 +203,7 @@ main(int ac, char *av[])
 		(void) papiAttributeListDelete(&list, "banner");
 		if (b == PAPI_FALSE)
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-						"job-sheets", "none");
+			    "job-sheets", "none");
 	}
 
 	if ((printer == NULL) &&
@@ -234,23 +232,23 @@ main(int ac, char *av[])
 #endif
 		} else {
 			if (is_postscript_stream(0, prefetch, &prefetch_len)
-						== 1)
+			    == 1)
 				document_format = "application/postscript";
 		}
 
 		papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL, "copies", 1);
 		papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"document-format", document_format);
+		    "document-format", document_format);
 		papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"job-sheets", "standard");
+		    "job-sheets", "standard");
 	}
 
 	status = papiServiceCreate(&svc, printer, NULL, NULL, cli_auth_callback,
-					encryption, NULL);
+	    encryption, NULL);
 	if (status != PAPI_OK) {
 		fprintf(stderr, gettext(
-			"Failed to contact service for %s: %s\n"), printer,
-			verbose_papi_message(svc, status));
+		    "Failed to contact service for %s: %s\n"), printer,
+		    verbose_papi_message(svc, status));
 		exit(1);
 	}
 
@@ -264,22 +262,22 @@ main(int ac, char *av[])
 		status = papiJobModify(svc, printer, modify, list, &job);
 	else if (optind == ac)	/* no file list, use stdin */
 		status = jobSubmitSTDIN(svc, printer, prefetch, prefetch_len,
-					list, &job);
+		    list, &job);
 	else if (validate == 1)	/* validate the request can be processed */
 		status = papiJobValidate(svc, printer, list,
-					NULL, &av[optind], &job);
+		    NULL, &av[optind], &job);
 	else if (copy == 0)	/* reference the files in the job, default */
 		status = papiJobSubmitByReference(svc, printer, list,
-					NULL, &av[optind], &job);
+		    NULL, &av[optind], &job);
 	else			/* copy the files before return, -c */
 		status = papiJobSubmit(svc, printer, list,
-					NULL, &av[optind], &job);
+		    NULL, &av[optind], &job);
 
 	papiAttributeListFree(list);
 
 	if (status != PAPI_OK) {
 		fprintf(stderr, gettext("%s: %s\n"), printer,
-			verbose_papi_message(svc, status));
+		    verbose_papi_message(svc, status));
 		papiJobFree(job);
 		papiServiceDestroy(svc);
 		exit(1);
@@ -289,8 +287,10 @@ main(int ac, char *av[])
 	    ((list = papiJobGetAttributeList(job)) != NULL)) {
 		int32_t id = 0;
 
-		papiAttributeListGetString(list, NULL,
-					"printer-name", &printer);
+		if (printer == NULL)
+			papiAttributeListGetString(list, NULL,
+			    "printer-name", &printer);
+
 		papiAttributeListGetInteger(list, NULL, "job-id", &id);
 		printf(gettext("request id is %s-%d "), printer, id);
 		if (ac != optind)

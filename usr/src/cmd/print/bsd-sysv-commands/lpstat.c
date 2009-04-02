@@ -687,7 +687,7 @@ match_user(char *user, char **list)
 static char **users = NULL;
 
 static int
-report_job(papi_job_t job, int show_rank, int verbose)
+report_job(char *printer, papi_job_t job, int show_rank, int verbose)
 {
 	papi_attribute_t **attrs = papiJobGetAttributeList(job);
 	time_t clock = 0;
@@ -797,7 +797,8 @@ report_job(papi_job_t job, int show_rank, int verbose)
 	    "printer-name", &destination);
 	(void) papiAttributeListGetInteger(attrs, NULL,
 	    "job-id", &id);
-	snprintf(request, sizeof (request), "%s-%d", destination, id);
+
+	snprintf(request, sizeof (request), "%s-%d", printer, id);
 
 	if (show_rank != 0) {
 		int32_t rank = -1;
@@ -841,7 +842,7 @@ report_job(papi_job_t job, int show_rank, int verbose)
 }
 
 static int
-job_query(char *request, int (*report)(papi_job_t, int, int),
+job_query(char *request, int (*report)(char *, papi_job_t, int, int),
 		papi_encryption_t encryption, int show_rank, int verbose)
 {
 	int result = 0;
@@ -910,8 +911,9 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 				int i;
 
 				for (i = 0; jobs[i] != NULL; i++)
-					result += report(jobs[i],
-					    show_rank, verbose);
+					result += report(printer,
+					    jobs[i], show_rank,
+					    verbose);
 			}
 
 			papiJobListFree(jobs);
@@ -934,7 +936,8 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 			}
 
 			if (job != NULL)
-				result = report(job, show_rank, verbose);
+				result = report(printer, job,
+				    show_rank, verbose);
 
 			papiJobFree(job);
 		}
