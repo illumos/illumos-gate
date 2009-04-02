@@ -296,6 +296,8 @@ void dm_sigterm(void);
 void dm_sigusr1(void);
 void dm_sigusr2(void);
 void dm_to_upper(char *vp);
+void dm_trace_drv_flags(void);
+void dm_trace_mnt_flags(void);
 void dm_trim_tail(char *str);
 void drv_disallowed(void);
 void drv_mk_prsv_key(void);

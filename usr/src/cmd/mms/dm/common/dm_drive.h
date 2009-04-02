@@ -119,7 +119,7 @@ typedef	struct	drv_mount {
 
 #define	MNT_FIXED		(1LL << 0)	/* fixed block */
 #define	MNT_VARIABLE		(1LL << 1)	/* variable block */
-#define	MNT_MMS		(1LL << 2)	/* MMS mode or raw mode */
+#define	MNT_MMS			(1LL << 2)	/* MMS mode or raw mode */
 #define	MNT_NOT_USED		(1LL << 3)
 #define	MNT_NOREWIND		(1LL << 4)	/* rewind/norewind at close */
 #define	MNT_AVAIL_0		(1LL << 5)
@@ -154,6 +154,11 @@ typedef	struct	drv_mount {
 #define	MNT_READWRITE		(1LL << 34)	/* readwrite */
 #define	MNT_OLD			(1LL << 35)
 #define	MNT_CREAT		(1LL << 36)
+
+/*
+ * If you add a new flag, make sure you also add it to the          *
+ * function dm_trace_mnt_flags().                                   *
+ */
 
 #define	DRV_IOBUF_LEN		10240
 #define	DRV_LBN_LEN		17
@@ -494,11 +499,24 @@ typedef	struct	drv_drive {
 #define	DRV_APPEND		(1LL << 40)	/* append file */
 #define	DRV_USE_PRSV		(1LL << 41)	/* Use persistent reservation */
 
+/*
+ * If you add a new flag, make sure you also add it to the          *
+ * function dm_trace_drv_flags().                                   *
+ *                                                                  *
+ * Also add it to DRV_LOAD_FLAGS below if it must be kept across    *
+ * cartridge load/unload.                                           *
+ */
+
+#define	DRV_LOAD_FLAGS	(DRV_ENABLED | DRV_ATTACHED | \
+    DRV_RESERVED | DRV_WRITEOVER | DRV_ASK_WRITEOVER | DRV_SWITCH_LBL | \
+    DRV_VALIDATE_FNAME | DRV_VALIDATE_VID | DRV_VALIDATE_XDATE | \
+    DRV_CREAT | DRV_APPEND | DRV_USE_PRSV)
+
+#define	DRV_MOVE_FLAGS		(DRV_BOM | DRV_BOF | DRV_TM | DRV_EOF | DRV_EOM)
+
 #define	drv_capacity		drv_cap.mms_max
 #define	drv_avail		drv_cap.mms_avail
 #define	drv_pc_avail		drv_cap.mms_pc_avail
-
-#define	DRV_MOVE_FLAGS		(DRV_BOM | DRV_BOF | DRV_TM | DRV_EOF | DRV_EOM)
 
 #define	DRV_SAVE_STAT		1
 

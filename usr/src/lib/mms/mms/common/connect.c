@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,7 @@ mms_intrp(char *rsp, char **pass, char **cert, char **auth, int *err_code)
 		mms_list_foreach(&err_list, err) {
 			mms_trace(MMS_ERR,
 			    "mms_mmconnect mms_mmp_parse, line %d, "
-			    "col %d, near token \"%s\", err code %d, %s\n",
+			    "col %d, near token %s, err code %d, %s\n",
 			    err->pe_line,
 			    err->pe_col,
 			    err->pe_token,

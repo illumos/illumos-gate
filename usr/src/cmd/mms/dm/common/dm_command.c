@@ -118,7 +118,7 @@ dm_parse_err(mms_par_node_t *root, mms_list_t *err_list)
 	}
 	mms_list_foreach(err_list, err) {
 		TRACE((MMS_ERR, "Parse error: %s command, line %d, col %d, "
-		    "near token \"%s\", err code %d, %s",
+		    "near token %s, err code %d, %s",
 		    node == NULL ? "Unknown" : mms_pn_token(node),
 		    err->pe_line,
 		    err->pe_col,
@@ -3186,8 +3186,8 @@ dm_attach_cmd(dm_command_t *cmd)
 	ioctl(wka->dm_drm_fd, DRM_MMS_MODE,
 	    (mnt->mnt_flags & MNT_MMS) ? 1 : 0);
 
-	TRACE((MMS_DEBUG, "drv_flags %16.16llx, mnt_flags %16.16llx",
-	    drv->drv_flags, mnt->mnt_flags));
+	dm_trace_drv_flags();
+	dm_trace_mnt_flags();
 
 	/*
 	 * get tape capacity from DB
@@ -3401,9 +3401,9 @@ dm_load_cmd(dm_command_t *cmd)
 	}
 
 	/*
-	 * Save DRV_ATTACH flag and reserved flag
+	 * Save DRV_LOAD_FLAGS
 	 */
-	drv->drv_flags &= (DRV_ATTACHED | DRV_RESERVED);
+	drv->drv_flags &= DRV_LOAD_FLAGS;
 
 	/* issue a load command */
 	if (DRV_CALL(drv_load, ()) != 0) {
@@ -3713,7 +3713,7 @@ dm_unload_cmd(dm_command_t *cmd)
 	/*
 	 * Save DRV_ATTACH flag
 	 */
-	drv->drv_flags &= DRV_ATTACHED;
+	drv->drv_flags &= DRV_LOAD_FLAGS;
 
 	return (DM_COMPLETE);
 }
@@ -4566,4 +4566,119 @@ dm_sym_in(mms_sym_t *arr, char *token)
 	 * Symbol not in array
 	 */
 	return (NULL);
+}
+
+void
+dm_trace_drv_flags(void)
+{
+	char	on[] = "on";
+	char	off[] = "off";
+	char	*buf = NULL;
+
+#define	DM_DRV_FLAGS(f)						\
+	buf = mms_strapp(buf, "\n" #f " - %s",			\
+	    (drv->drv_flags & f) ? on : off);
+
+	buf = mms_strapp(buf, "drv_flags =\n");
+
+	DM_DRV_FLAGS(DRV_LOADED);
+	DM_DRV_FLAGS(DRV_IDENTIFIED);
+	DM_DRV_FLAGS(DRV_MMS_LBL);
+	DM_DRV_FLAGS(DRV_VALIDATED_FNAME);
+	DM_DRV_FLAGS(DRV_VOL1);
+	DM_DRV_FLAGS(DRV_HDR1);
+	DM_DRV_FLAGS(DRV_HDR2);
+	DM_DRV_FLAGS(DRV_TERM_FILE);
+	DM_DRV_FLAGS(DRV_OPENED);
+	DM_DRV_FLAGS(DRV_UDATA);
+	DM_DRV_FLAGS(DRV_FATAL);
+	DM_DRV_FLAGS(DRV_ENABLED);
+	DM_DRV_FLAGS(DRV_BOF);
+	DM_DRV_FLAGS(DRV_EOF);
+	DM_DRV_FLAGS(DRV_TM);
+	DM_DRV_FLAGS(DRV_BLANK);
+	DM_DRV_FLAGS(DRV_ATTACHED);
+	DM_DRV_FLAGS(DRV_BOM);
+	DM_DRV_FLAGS(DRV_EOM);
+	DM_DRV_FLAGS(DRV_FIXED);
+	DM_DRV_FLAGS(DRV_VARIABLE);
+	DM_DRV_FLAGS(DRV_EOF1);
+	DM_DRV_FLAGS(DRV_EOF2);
+	DM_DRV_FLAGS(DRV_VALID_BOF_POS);
+	DM_DRV_FLAGS(DRV_LOST_POS);
+	DM_DRV_FLAGS(DRV_VALID_STAT);
+	DM_DRV_FLAGS(DRV_VALID_EOF_POS);
+	DM_DRV_FLAGS(DRV_UPDATE_EOF_POS);
+	DM_DRV_FLAGS(DRV_UPDATE_CAPACITY);
+	DM_DRV_FLAGS(DRV_READONLY);
+	DM_DRV_FLAGS(DRV_RESERVED);
+	DM_DRV_FLAGS(DRV_WRITEOVER);
+	DM_DRV_FLAGS(DRV_ASK_WRITEOVER);
+	DM_DRV_FLAGS(DRV_SWITCH_LBL);
+	DM_DRV_FLAGS(DRV_ASK_SWITCH_LBL);
+	DM_DRV_FLAGS(DRV_VALIDATE_FNAME);
+	DM_DRV_FLAGS(DRV_VALIDATE_VID);
+	DM_DRV_FLAGS(DRV_VALIDATE_XDATE);
+	DM_DRV_FLAGS(DRV_WRITEPROTECTED);
+	DM_DRV_FLAGS(DRV_CREAT);
+	DM_DRV_FLAGS(DRV_APPEND);
+	DM_DRV_FLAGS(DRV_USE_PRSV);
+
+	TRACE((MMS_DEBUG, buf));
+	free(buf);
+}
+
+void
+dm_trace_mnt_flags(void)
+{
+	char	on[] = "on";
+	char	off[] = "off";
+	char	*buf = NULL;
+
+#define	DM_MNT_FLAGS(f)						\
+	buf = mms_strapp(buf, "\n" #f " - %s",			\
+	    (mnt->mnt_flags & f) ? on : off);
+
+	buf = mms_strapp(buf, "mnt_flags =\n");
+
+	DM_MNT_FLAGS(MNT_FIXED);
+	DM_MNT_FLAGS(MNT_VARIABLE);
+	DM_MNT_FLAGS(MNT_MMS);
+	DM_MNT_FLAGS(MNT_NOT_USED);
+	DM_MNT_FLAGS(MNT_NOREWIND);
+	DM_MNT_FLAGS(MNT_AVAIL_0);
+	DM_MNT_FLAGS(MNT_COMPRESSION);
+	DM_MNT_FLAGS(MNT_AVAIL_1);
+	DM_MNT_FLAGS(MNT_LOW);
+	DM_MNT_FLAGS(MNT_MEDIUM);
+	DM_MNT_FLAGS(MNT_HIGH);
+	DM_MNT_FLAGS(MNT_ULTRA);
+	DM_MNT_FLAGS(MNT_AUTO_DEN);
+	DM_MNT_FLAGS(MNT_BSD);
+	DM_MNT_FLAGS(MNT_NOBSD);
+	DM_MNT_FLAGS(MNT_MMS_TM);
+	DM_MNT_FLAGS(MNT_NOLOAD);
+	DM_MNT_FLAGS(MNT_PRIVILEGED);
+	DM_MNT_FLAGS(MNT_VALIDATE_VID);
+	DM_MNT_FLAGS(MNT_NO_VALIDATE_VID);
+	DM_MNT_FLAGS(MNT_VALIDATE_XDATE);
+	DM_MNT_FLAGS(MNT_NO_VALIDATE_XDATE);
+	DM_MNT_FLAGS(MNT_VALIDATE_FNAME);
+	DM_MNT_FLAGS(MNT_NO_VALIDATE_FNAME);
+	DM_MNT_FLAGS(MNT_PREEMPT_RSV);
+	DM_MNT_FLAGS(MNT_ASK_PREEMPT_RSV);
+	DM_MNT_FLAGS(MNT_NO_PREEMPT_RSV);
+	DM_MNT_FLAGS(MNT_SWITCH_LBL);
+	DM_MNT_FLAGS(MNT_ASK_SWITCH_LBL);
+	DM_MNT_FLAGS(MNT_NO_SWITCH_LBL);
+	DM_MNT_FLAGS(MNT_WRITEOVER);
+	DM_MNT_FLAGS(MNT_ASK_WRITEOVER);
+	DM_MNT_FLAGS(MNT_NO_WRITEOVER);
+	DM_MNT_FLAGS(MNT_READONLY);
+	DM_MNT_FLAGS(MNT_READWRITE);
+	DM_MNT_FLAGS(MNT_OLD);
+	DM_MNT_FLAGS(MNT_CREAT);
+
+	TRACE((MMS_DEBUG, buf));
+	free(buf);
 }

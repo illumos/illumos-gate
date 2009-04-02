@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,6 @@ dm_msg_add_aux(int tail, int class, int code, char *fmt, va_list args)
 	char		*text;
 	dm_msg_t	*msg;
 	dm_msg_hdr_t	*mh;
-	int		i;
 
 	assert(fmt != NULL);
 
@@ -120,12 +119,6 @@ dm_msg_add_aux(int tail, int class, int code, char *fmt, va_list args)
 	msg->msg_class = class;
 	msg->msg_code = code;
 	msg->msg_text = text;
-	/* Replace single quotes (') with double quotes (") */
-	for (i = 0; msg->msg_text[i] != 0; i++) {
-		if (msg->msg_text[i] == '\'') {
-			msg->msg_text[i] = '\"';
-		}
-	}
 	mh = dm_msg_get_hdr();
 	if (tail) {
 		mms_list_insert_tail(&mh->msg_msglist, msg);

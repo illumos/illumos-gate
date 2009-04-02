@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,6 @@ mms_mmp_parse(mms_par_node_t **cmd_node, mms_list_t *msg_list, char *buf)
 	if (*cmd_node != NULL) {
 		mms_pn_fini(*cmd_node);
 	}
-	mms_mmsp_allow_quote(1);		/* allow quote in string */
 	(void) mutex_unlock(wka->par_wka_lock);
 	free(wka->par_wka_token[0]);
 	free(wka->par_wka_token[1]);
@@ -214,6 +213,7 @@ mms_dmpm_parse(mms_par_node_t **cmd_node, mms_list_t *msg_list, char *buf)
 	wka->par_wka_flags |= MMS_PW_DEPEND;	/* Look in depend tab 1st */
 	wka->par_wka_lock = &mmsp_mutex;
 	(void) mutex_lock(wka->par_wka_lock);
+	mms_mmsp_allow_quote(0);		/* no quote in string */
 	mms_mmsp_scan_string(buf);
 	if (yyparse(wka) || wka->par_wka_err_count) {
 		rc = 1;
@@ -256,6 +256,7 @@ mms_dmpd_parse(mms_par_node_t **cmd_node, mms_list_t *msg_list, char *buf)
 	wka->par_wka_flags |= MMS_PW_DEPEND;	/* Look in depend tab 1st */
 	wka->par_wka_lock = &mmsp_mutex;
 	(void) mutex_lock(wka->par_wka_lock);
+	mms_mmsp_allow_quote(0);		/* no quote in string */
 	mms_mmsp_scan_string(buf);
 	if (yyparse(wka) || wka->par_wka_err_count) {
 		rc = 1;
@@ -296,6 +297,7 @@ mms_lmpm_parse(mms_par_node_t **cmd_node, mms_list_t *msg_list, char *buf)
 	wka->par_wka_flags |= MMS_PW_DEPEND;	/* Look in depend tab 1st */
 	wka->par_wka_lock = &mmsp_mutex;
 	(void) mutex_lock(wka->par_wka_lock);
+	mms_mmsp_allow_quote(0);		/* no quote in string */
 	mms_mmsp_scan_string(buf);
 	if (yyparse(wka) || wka->par_wka_err_count) {
 		rc = 1;
@@ -336,6 +338,7 @@ mms_lmpl_parse(mms_par_node_t **cmd_node, mms_list_t *msg_list, char *buf)
 	wka->par_wka_flags |= MMS_PW_DEPEND;	/* Look in depend tab 1st */
 	wka->par_wka_lock = &mmsp_mutex;
 	(void) mutex_lock(wka->par_wka_lock);
+	mms_mmsp_allow_quote(0);		/* no quote in string */
 	mms_mmsp_scan_string(buf);
 	if (yyparse(wka) || wka->par_wka_err_count) {
 		rc = 1;

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,7 @@ drv_load(void)
 		/* Load rewind to BOT */
 		return (-1);
 	}
-	drv->drv_flags &= DRV_ATTACHED;
+	drv->drv_flags &= DRV_LOAD_FLAGS;
 	if (drv->drv_vid || drv->drv_vid[0] != '\0') {
 		TRACE((MMS_DEBUG, "Cartridge \"%s\" loaded", mnt->mnt_vid));
 	}

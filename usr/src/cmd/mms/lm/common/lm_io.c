@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -688,7 +688,7 @@ lm_handle_parser_error(mms_par_node_t *cmd, mms_list_t *err_list)
 					/* Determine type of errors detected */
 	mms_list_foreach(err_list, err) {
 		mms_trace(MMS_ERR, "lm_handle_parser_error: lmp_parse error, \
-		    line %d, col %d, near token \"%s\", err code %d, %s",
+		    line %d, col %d, near token %s, err code %d, %s",
 		    err->pe_line,
 		    err->pe_col,
 		    err->pe_token,

@@ -482,7 +482,7 @@ dm_read_cfg(char *cfgname)
 	if (i < 0) {
 		mms_list_foreach(&err_list, err) {
 			syslog(LOG_ERR,
-			    "line %d, col %d, near token \"%s\", "
+			    "line %d, col %d, near token %s, "
 			    "err code %d, %s\n",
 			    err->pe_line,
 			    err->pe_col,

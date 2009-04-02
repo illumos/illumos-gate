@@ -152,7 +152,7 @@ dm_get_target_pathname(void)
 	}
 	if (dm_verify_target_dev(val) != 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
-		    "invalid device pathname \"%s\"", val));
+		    "invalid device pathname %s", val));
 		dm_destroy_cmd(cmd);
 		return (-1);
 	}
@@ -369,7 +369,7 @@ dm_probe_dir(char *dirname)
 		if (nument == i) {
 			DM_MSG_PREPEND(("dm_probe_dir: "
 			    "cannot find a matching drive "
-			    "with serial num %s in \"%s\": ",
+			    "with serial num %s in %s: ",
 			    drv->drv_serial_num, dirname));
 		}
 	}
@@ -632,7 +632,7 @@ dm_reserve_target_prsv(void)
 		status = serr->se_dsreg;
 		char_to_uint64((uchar_t *)DRV_PRSV_KEY, 8, &key);
 		TRACE((MMS_DEVP, "Can't register PRSV "
-		    "reservation key: \"%16.16llx\": %s",
+		    "reservation key: %16.16llx: %s",
 		    key, mms_scsi_status(status)));
 		if (status == STATUS_RESERVATION_CONFLICT) {
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
