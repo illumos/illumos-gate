@@ -71,6 +71,9 @@
 	}\
 }
 
+#define	IS_IQN_NAME(s) (strncmp((s), "iqn.", 4) == 0)
+
+
 static struct option itadm_long[] = {
 	{"alias",		required_argument,	NULL, 'l'},
 	{"auth-method",		required_argument,	NULL, 'a'},
@@ -218,6 +221,12 @@ list_defaults(boolean_t script);
 
 static void
 tag_name_to_num(char *tagname, uint16_t *tagnum);
+
+static char *
+canonical_target_name(char *tgt);
+
+static char *
+strduplc(char *s);
 
 /* prototype from iscsit_common.h */
 extern int
@@ -606,13 +615,14 @@ create_target(char *tgt, nvlist_t *proplist)
 	uint16_t	tagid = 0;
 	it_tpgt_t	*tpgt;
 	char		*sec = "solaris.smf.modify.stmf";
+	char		*canonical_tgt = NULL;
+	boolean_t	did_it_config_load = B_FALSE;
 
 	ITADM_CHKAUTH(sec);
 
 	if (tgt) {
 		/*
-		 * validate input name - what are the rules for EUI
-		 * and IQN values?
+		 * Validate target name.
 		 */
 		if ((strncmp(tgt, "eui.", 4) != 0) &&
 		    (strncmp(tgt, "iqn.", 4) != 0)) {
@@ -621,6 +631,8 @@ create_target(char *tgt, nvlist_t *proplist)
 			(void) fprintf(stderr, "\n");
 			return (EINVAL);
 		}
+
+		canonical_tgt = canonical_target_name(tgt);
 	}
 
 	ret = it_config_load(&cfg);
@@ -629,10 +641,12 @@ create_target(char *tgt, nvlist_t *proplist)
 		    gettext("Error retrieving iSCSI target configuration: %d"),
 		    ret);
 		(void) fprintf(stderr, "\n");
-		return (ret);
+		goto done;
 	}
 
-	ret = it_tgt_create(cfg, &tgtp, tgt);
+	did_it_config_load = B_TRUE;
+
+	ret = it_tgt_create(cfg, &tgtp, canonical_tgt);
 	if (ret != 0) {
 		if (ret == EFAULT) {
 			(void) fprintf(stderr,
@@ -754,7 +768,11 @@ done:
 		(void) printf("\n");
 	}
 
-	it_config_free(cfg);
+	if (did_it_config_load)
+		it_config_free(cfg);
+
+	if (canonical_tgt != NULL)
+		free(canonical_tgt);
 
 	return (ret);
 }
@@ -809,7 +827,11 @@ list_target(char *tgt, boolean_t verbose, boolean_t script)
 		}
 
 		if (tgt) {
-			if (strcmp(tgt, ptr->tgt_name) != 0) {
+			/*
+			 * We do a case-insensitive match in case
+			 * a non-lower case value got stored.
+			 */
+			if (strcasecmp(tgt, ptr->tgt_name) != 0) {
 				continue;
 			} else {
 				found = B_TRUE;
@@ -964,7 +986,11 @@ delete_target(char *tgt, boolean_t force)
 
 	ptr = cfg->config_tgt_list;
 	while (ptr) {
-		if (strcmp(ptr->tgt_name, tgt) == 0) {
+		/*
+		 * We do a case-insensitive match in case
+		 * a non-lower case value got stored.
+		 */
+		if (strcasecmp(ptr->tgt_name, tgt) == 0) {
 			break;
 		}
 
@@ -1015,6 +1041,8 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	uint16_t	tagid;
 	it_tpgt_t	*tpgt = NULL;
 	char		*sec = "solaris.smf.modify.stmf";
+	char 		*canonical_newname = NULL;
+	boolean_t	did_it_config_load = B_FALSE;
 
 	ITADM_CHKAUTH(sec);
 
@@ -1023,7 +1051,8 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	if (!tgt) {
 		(void) fprintf(stderr, "%s\n",
 		    gettext("Error, no target specified"));
-		return (EINVAL);
+		ret = EINVAL;
+		goto done;
 	}
 
 	ret = it_config_load(&cfg);
@@ -1032,19 +1061,25 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 		    gettext("Error retrieving iSCSI target configuration: %d"),
 		    ret);
 		(void) fprintf(stderr, "\n");
-		return (ret);
+		goto done;
 	}
 
+	did_it_config_load = B_TRUE;
+
 	/*
-	 * If newname is specified, ensure it is a valid name
+	 * If newname is specified, ensure it is a valid name,
+	 * and generate its canonical form.
 	 */
 	if (newname) {
 		if (!validate_iscsi_name(newname)) {
 			(void) fprintf(stderr,
 			    gettext("Invalid iSCSI name %s"), newname);
 			(void) fprintf(stderr, "\n");
-			return (1);
+			ret = 1;
+			goto done;
 		}
+
+		canonical_newname = canonical_target_name(newname);
 	}
 
 	/*
@@ -1054,7 +1089,11 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	 */
 	ptr = cfg->config_tgt_list;
 	while (ptr) {
-		if (newname && (strcmp(newname, ptr->tgt_name) == 0)) {
+		/*
+		 * Does a target with the new name already exist?
+		 */
+		if (newname &&
+		    (strcmp(canonical_newname, ptr->tgt_name) == 0)) {
 			(void) fprintf(stderr,
 			    gettext("A target with name %s already exists"),
 			    newname);
@@ -1063,7 +1102,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 			goto done;
 		}
 
-		if (strcmp(ptr->tgt_name, tgt) == 0) {
+		if (strcasecmp(ptr->tgt_name, tgt) == 0) {
 			tgtp = ptr;
 		}
 
@@ -1074,8 +1113,8 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 		(void) fprintf(stderr,
 		    gettext("Target %s not found"), tgt);
 		(void) fprintf(stderr, "\n");
-		it_config_free(cfg);
-		return (EINVAL);
+		ret = EINVAL;
+		goto done;
 	}
 
 	/* set the target portal group tags */
@@ -1098,7 +1137,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	}
 
 	for (i = 0; i < count; i++) {
-		if (!tags[i]) {
+		if (!tags || !tags[i]) {
 			continue;
 		}
 
@@ -1153,7 +1192,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 
 	/* see if there are any left to add */
 	for (i = 0; i < count; i++) {
-		if (!tags[i]) {
+		if (!tags || !tags[i]) {
 			continue;
 		}
 
@@ -1191,7 +1230,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 			    gettext("Error renaming target."));
 			goto done;
 		}
-		(void) strlcpy(tgtp->tgt_name, newname,
+		(void) strlcpy(tgtp->tgt_name, canonical_newname,
 		    sizeof (tgtp->tgt_name));
 	}
 
@@ -1235,7 +1274,11 @@ done:
 		(void) printf("\n");
 	}
 
-	it_config_free(cfg);
+	if (did_it_config_load)
+		it_config_free(cfg);
+
+	if (canonical_newname != NULL)
+		free(canonical_newname);
 
 	return (ret);
 }
@@ -2135,4 +2178,39 @@ tag_name_to_num(char *tagname, uint16_t *tagnum)
 	if ((id <= UINT16_MAX) && (id > 1)) {
 		*tagnum = (uint16_t)id;
 	}
+}
+
+/*
+ * Return a new string containing the canonical (lower-case)
+ * form of the target name.
+ */
+static char *
+canonical_target_name(char *tgt)
+{
+	if (IS_IQN_NAME(tgt)) {
+		/* lowercase iqn names */
+		return (strduplc(tgt));
+	} else {
+		return (strdup(tgt));
+	}
+}
+
+/*
+ * Duplicate a string, converting it to lower case in the process.
+ * Returns NULL if no memory.
+ */
+static char *
+strduplc(char *s)
+{
+	char *lc = strdup(s);
+
+	if (lc != NULL) {
+		char *l = lc;
+		while (*s) {
+			*l = tolower(*s);
+			s++; l++;
+		}
+	}
+
+	return (lc);
 }
