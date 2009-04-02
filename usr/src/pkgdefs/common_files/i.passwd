@@ -61,7 +61,7 @@ do
 		# assign it to a regular user and confuse themselves
 		#
 		NOBODY4_LINE="nobody4:x:65534:65534:SunOS 4.x NFS Anoymous Access User:/:"
-		if grep "^nobody4:" $dest 2>&1 >/dev/null; then
+		if grep "^nobody4:" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^noaccess:x/ a\
@@ -73,7 +73,7 @@ do
 		# Add the 'smmsp' user for sendmail 8.12
 		#
 		SMMSP_LIN="smmsp:x:25:25:SendMail Message Submission Program:/:"
-		if grep "$SMMSP_LIN" $dest 2>&1 >/dev/null; then
+		if grep "$SMMSP_LIN" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^nobody4:x/ a\
@@ -84,13 +84,17 @@ do
 		#
 		# Add the 'gdm' user if it doesn't exist.
 		#
-		GDM_LINE="gdm:x:50:50:GDM Reserved UID:/:"
+		GDM_LINE="gdm:x:50:50:GDM Reserved UID:/var/lib/gdm:"
+		OLD_GDM_LINE="gdm:x:50:50:GDM Reserved UID:/:"
 		cur_name=`awk -F: '$3 == 50 { print $1 }' $dest`
 		if [ ! -z "$cur_name" -a "$cur_name" != "gdm" ]; then
 			echo "ERROR: Reserved UID 50 already assigned" \
 				"to '$cur_name'" >> /tmp/CLEANUP
-		elif grep "$GDM_LINE" $dest 2>&1 >/dev/null; then
+		elif grep "$GDM_LINE" $dest >/dev/null 2>&1; then
 			:
+		elif grep "$OLD_GDM_LINE" $dest > /dev/null 2>&1; then
+			sed '/^gdm:/s/:\/:/:\/var\/lib\/gdm:/' $dest > $TEMPF
+			mv -f $TEMPF $dest
 		else
 			sed '/^listen:x/ a\
 '"$GDM_LINE"'' $dest > $TEMPF
@@ -105,7 +109,7 @@ do
 		if [ ! -z "$cur_name" -a "$cur_name" != "webservd" ]; then
 			echo "ERROR: Reserved UID 80 already assigned" \
 				"to '$cur_name'" >> /tmp/CLEANUP
-		elif grep "$WEBSERVD_LIN" $dest 2>&1 >/dev/null; then
+		elif grep "$WEBSERVD_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^gdm:x/ a\
@@ -125,7 +129,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "90" ]; then
 			echo "NOTE: postgres username already assigned" \
 			    "to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$POSTGRES_LIN" $dest 2>&1 >/dev/null; then
+		elif grep "$POSTGRES_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^webservd:x/ a\
@@ -145,7 +149,7 @@ do
                 elif [ ! -z "$cur_id" -a "$cur_id" != "70" ]; then
                         echo "NOTE: mysql username already assigned" \
                             "to id '$cur_id'" >> /tmp/CLEANUP
-                elif grep "$MYSQL_LIN" $dest 2>&1 >/dev/null; then
+                elif grep "$MYSQL_LIN" $dest > /dev/null 2>&1; then
                         :
                 else
                         sed '/^postgres:x/ a\
@@ -165,7 +169,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "95" ]; then
 			echo "NOTE: svctag username already assigned" \
 			    "to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$SVCTAG_LIN" $dest 2>&1 >/dev/null; then
+		elif grep "$SVCTAG_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^postgres:x/ a\
@@ -181,7 +185,7 @@ do
 		if [ ! -z "$cur_name" -a "$cur_name" != "dladm" ]; then
 			echo "ERROR: Reserved UID 15 already assigned" \
 				"to '$cur_name'" >> /tmp/CLEANUP
-		elif grep "$DLADM_LIN" $dest 2>&1 >/dev/null; then
+		elif grep "$DLADM_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^nuucp:x/ a\
@@ -201,7 +205,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "60" ]; then
 			echo "NOTE: xvm username already assigned" \
 			    "to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$XVM_LIN" $dest 2>&1 >/dev/null; then
+		elif grep "$XVM_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^gdm:x/ a\
@@ -220,7 +224,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "75" ]; then
 			echo "NOTE: openldap username already assigned" \
 			    "to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$OPENLDAP_LIN" $dest 2>&1 >/dev/null; then
+		elif grep "$OPENLDAP_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^mysql:x/ a\
@@ -240,7 +244,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "51" ]; then
 			echo "NOTE: zfssnap username already assigned" \
 			    "to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$ZSNAP_LIN" $dest 2>&1 > /dev/null; then
+		elif grep "$ZSNAP_LIN" $dest > /dev/null 2>&1; then
 			:
 		else
 			sed '/^gdm:x/ a\
