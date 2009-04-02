@@ -1219,8 +1219,7 @@ extern	void	record_spin_locks(ulwp_t *);
 extern	void	remember_lock(mutex_t *);
 extern	void	forget_lock(mutex_t *);
 extern	void	register_lock(mutex_t *);
-extern	void	unregister_locks(caddr_t, size_t);
-extern	void	unregister_all_locks(void);
+extern	void	unregister_locks(void);
 #if defined(__sparc)
 extern	void	_flush_windows(void);
 #else
@@ -1412,7 +1411,7 @@ extern	id_t	getparam(idtype_t, id_t, int *, struct sched_param *);
 /*
  * System call wrappers (direct interfaces to the kernel)
  */
-extern	int	___lwp_mutex_register(mutex_t *);
+extern	int	___lwp_mutex_register(mutex_t *, mutex_t **);
 extern	int	___lwp_mutex_trylock(mutex_t *);
 extern	int	___lwp_mutex_timedlock(mutex_t *, timespec_t *);
 extern	int	___lwp_mutex_unlock(mutex_t *);

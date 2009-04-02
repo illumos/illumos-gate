@@ -1985,12 +1985,12 @@ register_lock(mutex_t *mp)
 	 * The lock has never been registered.
 	 * Add it to the table and register it now.
 	 */
-	if (invalid != NULL) {
+	if ((rlp = invalid) != NULL) {
 		/*
 		 * Reuse the invalid entry we found above.
 		 * The linkages are still correct.
 		 */
-		invalid->robust_lock = mp;
+		rlp->robust_lock = mp;
 		membar_producer();
 	} else {
 		/*
@@ -2008,45 +2008,7 @@ register_lock(mutex_t *mp)
 
 	lmutex_unlock(&udp->tdb_hash_lock);
 
-	(void) ___lwp_mutex_register(mp);
-}
-
-/*
- * This is called from mmap(), munmap() and shmdt() to unregister
- * all robust locks contained in the mapping that is going away.
- * We don't delete the entries in the hash table, since the hash table
- * is constrained never to shrink; we just invalidate the addresses.
- */
-void
-unregister_locks(caddr_t addr, size_t len)
-{
-	static size_t pagesize = 0;
-	uberdata_t *udp = curthread->ul_uberdata;
-	robust_t *rlp;
-	caddr_t eaddr;
-	caddr_t maddr;
-
-	/*
-	 * Round up len to a multiple of pagesize.
-	 */
-	if (pagesize == 0)	/* do this once */
-		pagesize = _sysconf(_SC_PAGESIZE);
-	eaddr = addr + ((len + pagesize - 1) & -pagesize);
-
-	lmutex_lock(&udp->tdb_hash_lock);
-
-	/*
-	 * Do this by traversing the global list, not the hash table.
-	 * The hash table is large (32K buckets) and sparsely populated.
-	 * The global list contains all of the registered entries.
-	 */
-	for (rlp = udp->robustlist; rlp != NULL; rlp = rlp->robust_list) {
-		maddr = (caddr_t)rlp->robust_lock;
-		if (addr <= maddr && maddr < eaddr)
-			rlp->robust_lock = INVALID_ADDR;
-	}
-
-	lmutex_unlock(&udp->tdb_hash_lock);
+	(void) ___lwp_mutex_register(mp, &rlp->robust_lock);
 }
 
 /*
@@ -2055,7 +2017,7 @@ unregister_locks(caddr_t addr, size_t len)
  * No locks are needed because all other threads are suspended or gone.
  */
 void
-unregister_all_locks(void)
+unregister_locks(void)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	robust_t **table;
@@ -2064,7 +2026,6 @@ unregister_all_locks(void)
 
 	/*
 	 * Do this first, before calling lfree().
-	 * lfree() may call munmap(), which calls unregister_locks().
 	 */
 	table = udp->robustlocks;
 	udp->robustlocks = NULL;
@@ -2072,7 +2033,7 @@ unregister_all_locks(void)
 	udp->robustlist = NULL;
 
 	/*
-	 * As above, do this by traversing the global list, not the hash table.
+	 * Do this by traversing the global list, not the hash table.
 	 */
 	while (rlp != NULL) {
 		next = rlp->robust_list;

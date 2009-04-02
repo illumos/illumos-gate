@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -472,7 +472,7 @@ const struct systable systable[] = {
 {"ntp_adjtime",	1, DEC, NOV, HEX},				/* 249 */
 {"lwp_mutex_unlock", 1, DEC, NOV, HEX},				/* 250 */
 {"lwp_mutex_trylock", 1, DEC, NOV, HEX},			/* 251 */
-{"lwp_mutex_register", 1, DEC, NOV, HEX},			/* 252 */
+{"lwp_mutex_register", 2, DEC, NOV, HEX, HEX},			/* 252 */
 {"cladm",	3, DEC, NOV, CLC, CLF, HEX},			/* 253 */
 {"uucopy",	3, DEC, NOV, HEX, HEX, UNS},			/* 254 */
 {"umount2",	2, DEC, NOV, STG, MTF},				/* 255 */

@@ -27,17 +27,19 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-	.file	"__munmap.s"
+	.file	"munmap.s"
 
 /*
- * Raw system call:
- * int __munmap(caddr_t addr, size_t len)
+ * C library -- munmap
+ * int munmap(caddr_t addr, size_t len)
  */
+
+#include <sys/asm_linkage.h>
+
+	ANSI_PRAGMA_WEAK(munmap,function)
 
 #include "SYS.h"
 
-	ENTRY(__munmap)
-	SYSTRAP_RVAL1(munmap)
-	SYSCERROR
+	SYSCALL_RVAL1(munmap)
 	RETC
-	SET_SIZE(__munmap)
+	SET_SIZE(munmap)

@@ -21,7 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -772,7 +772,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
 	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
-	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	1),
+	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	2),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
 	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
 	/* 255 */ SYSENT_CI("umount2",		umount2,	2)
@@ -1118,7 +1118,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
 	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
-	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	1),
+	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	2),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
 	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
 	/* 255 */ SYSENT_CI("umount2",		umount2,	2)

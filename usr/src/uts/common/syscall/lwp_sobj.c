@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@ static kthread_t *lwpsobj_owner(caddr_t);
 static void lwp_unsleep(kthread_t *t);
 static void lwp_change_pri(kthread_t *t, pri_t pri, pri_t *t_prip);
 static void lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg);
+static void lwp_mutex_unregister(void *uaddr);
 
 extern int lwp_cond_signal(lwp_cond_t *cv);
 
@@ -185,6 +186,12 @@ lwpchan_delete_mapping(proc_t *p, caddr_t start, caddr_t end)
 				if (ent->lwpchan_pool == LWPCHAN_MPPOOL &&
 				    (ent->lwpchan_type & USYNC_PROCESS_ROBUST))
 					lwp_mutex_cleanup(ent, LOCK_UNMAPPED);
+				/*
+				 * If there is a user-level robust lock
+				 * registration, mark it as invalid.
+				 */
+				if ((addr = ent->lwpchan_uaddr) != NULL)
+					lwp_mutex_unregister(addr);
 				kmem_free(ent, sizeof (*ent));
 				atomic_add_32(&lcp->lwpchan_entries, -1);
 			} else {
@@ -395,7 +402,7 @@ lwpchan_cache_mapping(caddr_t addr, int type, int pool, lwpchan_t *lwpchan,
  * a virtual address to lwpchan mapping into the cache.
  */
 static int
-lwpchan_get_mapping(struct as *as, caddr_t addr,
+lwpchan_get_mapping(struct as *as, caddr_t addr, caddr_t uaddr,
 	int type, lwpchan_t *lwpchan, int pool)
 {
 	proc_t *p = curproc;
@@ -453,6 +460,7 @@ top:
 		goto top;
 	}
 	ent->lwpchan_addr = addr;
+	ent->lwpchan_uaddr = uaddr;
 	ent->lwpchan_type = (uint16_t)type;
 	ent->lwpchan_pool = (uint16_t)pool;
 	ent->lwpchan_lwpchan = *lwpchan;
@@ -484,7 +492,7 @@ get_lwpchan(struct as *as, caddr_t addr, int type, lwpchan_t *lwpchan, int pool)
 		return (1);
 	}
 
-	return (lwpchan_get_mapping(as, addr, type, lwpchan, pool));
+	return (lwpchan_get_mapping(as, addr, NULL, type, lwpchan, pool));
 }
 
 static void
@@ -2958,7 +2966,7 @@ out:
  * Register a process-shared robust mutex in the lwpchan cache.
  */
 int
-lwp_mutex_register(lwp_mutex_t *lp)
+lwp_mutex_register(lwp_mutex_t *lp, caddr_t uaddr)
 {
 	int error = 0;
 	volatile int watched;
@@ -2984,8 +2992,8 @@ lwp_mutex_register(lwp_mutex_t *lp)
 		if ((type & (USYNC_PROCESS|LOCK_ROBUST))
 		    != (USYNC_PROCESS|LOCK_ROBUST)) {
 			error = EINVAL;
-		} else if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
-		    &lwpchan, LWPCHAN_MPPOOL)) {
+		} else if (!lwpchan_get_mapping(curproc->p_as, (caddr_t)lp,
+		    uaddr, type, &lwpchan, LWPCHAN_MPPOOL)) {
 			error = EFAULT;
 		}
 	}
@@ -2995,6 +3003,22 @@ lwp_mutex_register(lwp_mutex_t *lp)
 	if (error)
 		return (set_errno(error));
 	return (0);
+}
+
+/*
+ * There is a user-level robust lock registration in libc.
+ * Mark it as invalid by storing -1 into the location of the pointer.
+ */
+static void
+lwp_mutex_unregister(void *uaddr)
+{
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		(void) sulword(uaddr, (ulong_t)-1);
+#ifdef _SYSCALL32_IMPL
+	} else {
+		(void) suword32(uaddr, (uint32_t)-1);
+#endif
+	}
 }
 
 int

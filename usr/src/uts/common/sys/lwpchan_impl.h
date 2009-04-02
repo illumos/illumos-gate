@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_LCHAN_IMPL_H
 #define	_SYS_LCHAN_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,6 +44,7 @@ extern "C" {
  */
 typedef struct lwpchan_entry {
 	caddr_t lwpchan_addr;		/* virtual address */
+	caddr_t lwpchan_uaddr;		/* address of lock registration */
 	uint16_t lwpchan_type;		/* sync object type field */
 	uint16_t lwpchan_pool;		/* LWPCHAN_CVPOOL/LWPCHAN_MPPOOL */
 	lwpchan_t lwpchan_lwpchan;	/* unique logical address */

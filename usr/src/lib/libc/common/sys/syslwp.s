@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,7 @@
 
 /*
  * int
- * ___lwp_mutex_register(lwp_mutex_t *mp)
+ * ___lwp_mutex_register(lwp_mutex_t *mp, lwp_mutex_t **uaddr)
  */
 	ENTRY(___lwp_mutex_register)
 	SYSTRAP_RVAL1(lwp_mutex_register)

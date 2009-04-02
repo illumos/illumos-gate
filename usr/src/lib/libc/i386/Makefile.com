@@ -145,7 +145,6 @@ GENOBJS=			\
 
 # sysobjs that contain large-file interfaces
 COMSYSOBJS64=			\
-	__mmap64.o		\
 	creat64.o		\
 	fstat64.o		\
 	fstatvfs64.o		\
@@ -153,6 +152,7 @@ COMSYSOBJS64=			\
 	getrlimit64.o		\
 	lseek64.o		\
 	lstat64.o		\
+	mmap64.o		\
 	open64.o		\
 	pread64.o		\
 	pwrite64.o		\
@@ -165,8 +165,6 @@ SYSOBJS64=
 COMSYSOBJS=			\
 	__clock_timer.o		\
 	__getloadavg.o		\
-	__mmap.o		\
-	__munmap.o		\
 	__rusagesys.o		\
 	__signotify.o		\
 	__sigrt.o		\
@@ -252,9 +250,11 @@ COMSYSOBJS=			\
 	mincore.o		\
 	mkdir.o			\
 	mknod.o			\
+	mmap.o			\
 	modctl.o		\
 	mount.o			\
 	mprotect.o		\
+	munmap.o		\
 	nice.o			\
 	ntp_adjtime.o		\
 	ntp_gettime.o		\
@@ -347,7 +347,6 @@ PORTGEN64=			\
 	attropen64.o		\
 	ftw64.o			\
 	mkstemp64.o		\
-	mmap64.o		\
 	nftw64.o		\
 	tell64.o		\
 	truncate64.o
@@ -505,12 +504,10 @@ PORTGEN=			\
 	mktemp.o		\
 	mlock.o			\
 	mlockall.o		\
-	mmap.o			\
 	mon.o			\
 	msync.o			\
 	munlock.o		\
 	munlockall.o		\
-	munmap.o		\
 	ndbm.o			\
 	nftw.o			\
 	nlspath_checks.o	\
