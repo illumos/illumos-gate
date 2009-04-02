@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,8 +15,6 @@
 
 /*	Portions Copyright(c) 1988, Sun Microsystems, Inc.	*/
 /*	All Rights Reserved.					*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * script: Produce a record of a terminal session.
@@ -103,6 +101,7 @@ main(int argc, char *argv[])
 		perror(fname);
 		fail();
 	}
+	setbuf(fscript, NULL);
 	chown(fname, ruidt, gidt);
 	getmaster();
 	printf(gettext("Script started, file is %s\n"), fname);
