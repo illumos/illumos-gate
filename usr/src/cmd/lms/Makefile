@@ -38,9 +38,6 @@ LMSOBJS=	ConfigConnection.o     Protocol.o             main.o \
 		tools/ATNetworkTool.o tools/ATVersion.o \
 		tools/daemonize.o
 
-LDLIBS += -lsocket -lnsl
-LDFLAGS += $(ZIGNORE) -norunpath
-
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 ROOTMETHOD=		$(ROOTLIBSVCMETHOD)/svc-lms
 $(ROOTMANIFEST)		:= FILEMODE= 444
@@ -50,14 +47,20 @@ SYNCLIB_HDRDIR=SyncLib/Include
 HECI_DIR=heci
 TOOLS_DIR=tools
 
-CPPFLAGS=	-DBSD_COMP -compat=5 -features=zla -I. -I$(SYNCLIB_HDRDIR) -I$(HECI_DIR) -I$(TOOLS_DIR) -D_REMOTE_SUPPORT
+CPPFLAGS=	-DBSD_COMP -D_REMOTE_SUPPORT \
+		-I. -I$(SYNCLIB_HDRDIR) -I$(HECI_DIR) -I$(TOOLS_DIR)
+CCFLAGS +=	-compat=5 -features=zla
+CCNEEDED=	-lCrun -lCstd
+$(__GNUC)CCNEEDED = -L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++ -lgcc_s
+LDFLAGS += $(ZIGNORE) -norunpath
+LDLIBS += -lsocket -lnsl
 
 .KEEP_STATE:
 
 all:		$(PROG)
 
 $(PROG):	$(LMSOBJS)
-		$(CCC) $(LDFLAGS) $(CPPFLAGS) -o $@ $(LMSOBJS) $(LDLIBS)
+		$(LINK.cc) -o $@ $(LMSOBJS) $(LDLIBS) -lc
 		$(POST_PROCESS)
 
 %.o:		%.cpp
