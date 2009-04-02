@@ -1148,20 +1148,12 @@ dr_cpu_unconfigure(processorid_t cpuid, int *status, boolean_t force)
 	cp = cpu_get(cpuid);
 
 	if (cp == NULL) {
-
 		/*
-		 * The OS CPU structures are already torn down,
-		 * Attempt to deprobe the CPU to make sure the
-		 * device tree is up to date.
+		 * As OS CPU structures are already torn down proceed
+		 * to deprobe device tree to make sure the device tree
+		 * is up do date.
 		 */
-		if (dr_cpu_deprobe(cpuid) != 0) {
-			DR_DBG_CPU("failed to deprobe CPU %d\n", cpuid);
-			rv = DR_CPU_RES_FAILURE;
-			*status = DR_CPU_STAT_UNCONFIGURED;
-			goto done;
-		}
-
-		goto done;
+		goto deprobe;
 	}
 
 	ASSERT(cp->cpu_id == cpuid);
@@ -1189,7 +1181,8 @@ dr_cpu_unconfigure(processorid_t cpuid, int *status, boolean_t force)
 
 			rv = DR_CPU_RES_FAILURE;
 			*status = DR_CPU_STAT_CONFIGURED;
-			goto done;
+			mutex_exit(&cpu_lock);
+			return (rv);
 		}
 
 		DR_DBG_CPU("CPU %d offline\n", cpuid);
@@ -1206,7 +1199,8 @@ dr_cpu_unconfigure(processorid_t cpuid, int *status, boolean_t force)
 			    cpuid, rv);
 			rv = DR_CPU_RES_FAILURE;
 			*status = DR_CPU_STAT_CONFIGURED;
-			goto done;
+			mutex_exit(&cpu_lock);
+			return (rv);
 		}
 
 		DR_DBG_CPU("CPU %d powered off\n", cpuid);
@@ -1219,11 +1213,14 @@ dr_cpu_unconfigure(processorid_t cpuid, int *status, boolean_t force)
 		DR_DBG_CPU("failed to unconfigure CPU %d (%d)\n", cpuid, rv);
 		rv = DR_CPU_RES_FAILURE;
 		*status = DR_CPU_STAT_UNCONFIGURED;
-		goto done;
+		mutex_exit(&cpu_lock);
+		return (rv);
 	}
 
 	DR_DBG_CPU("CPU %d unconfigured\n", cpuid);
 
+deprobe:
+	mutex_exit(&cpu_lock);
 	/*
 	 * Tear down device tree.
 	 */
@@ -1231,14 +1228,11 @@ dr_cpu_unconfigure(processorid_t cpuid, int *status, boolean_t force)
 		DR_DBG_CPU("failed to deprobe CPU %d (%d)\n", cpuid, rv);
 		rv = DR_CPU_RES_FAILURE;
 		*status = DR_CPU_STAT_UNCONFIGURED;
-		goto done;
+		return (rv);
 	}
 
 	rv = DR_CPU_RES_OK;
 	*status = DR_CPU_STAT_UNCONFIGURED;
-
-done:
-	mutex_exit(&cpu_lock);
 
 	return (rv);
 }
