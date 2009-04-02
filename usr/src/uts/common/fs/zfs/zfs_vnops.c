@@ -3878,7 +3878,8 @@ zfs_frlock(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
  * If we can't find a page in the cache, we will create a new page
  * and fill it with file data.  For efficiency, we may try to fill
  * multiple pages at once (klustering) to fill up the supplied page
- * list.
+ * list.  Note that the pages to be filled are held with an exclusive
+ * lock to prevent access by other threads while they are being filled.
  */
 static int
 zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
@@ -3897,7 +3898,8 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 		 */
 		io_off = off;
 		io_len = PAGESIZE;
-		pp = page_create_va(vp, io_off, io_len, PG_WAIT, seg, addr);
+		pp = page_create_va(vp, io_off, io_len,
+		    PG_EXCL | PG_WAIT, seg, addr);
 	} else {
 		/*
 		 * Try to find enough pages to fill the page list
@@ -4000,7 +4002,7 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 		*protp = PROT_ALL;
 
 	/*
-	 * Loop through the requested range [off, off + len] looking
+	 * Loop through the requested range [off, off + len) looking
 	 * for pages.  If we don't find a page, we will need to create
 	 * a new page and fill it with data from the file.
 	 */
