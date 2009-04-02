@@ -2038,8 +2038,9 @@ graph_change_restarter(graph_vertex_t *v, const char *fmri_arg, scf_handle_t *h,
 	assert(err == 0 || err == EEXIST);
 
 	if (rv->gv_delegate_initialized == 0) {
-		rv->gv_delegate_channel = restarter_protocol_init_delegate(
-		    rv->gv_name);
+		if ((rv->gv_delegate_channel = restarter_protocol_init_delegate(
+		    rv->gv_name)) == NULL)
+			return (EINVAL);
 		rv->gv_delegate_initialized = 1;
 	}
 	v->gv_restarter_id = rv->gv_id;
@@ -3367,7 +3368,7 @@ init_state:
 
 		if (err == EINVAL) {
 			log_framework(LOG_ERR, emsg_invalid_restarter,
-			    v->gv_name);
+			    v->gv_name, restarter_fmri);
 			reason = "invalid_restarter";
 		} else {
 			handle_cycle(v->gv_name, path);

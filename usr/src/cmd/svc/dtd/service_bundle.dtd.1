@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -444,10 +444,10 @@
 
 <!ATTLIST method_credential
 	user		CDATA #REQUIRED
-	group		CDATA ":default"
-	supp_groups	CDATA ":default"
-	privileges	CDATA ":default"
-	limit_privileges CDATA ":default" >
+	group		CDATA #IMPLIED
+	supp_groups	CDATA #IMPLIED
+	privileges	CDATA #IMPLIED
+	limit_privileges CDATA #IMPLIED >
 
 <!--
   method_context
@@ -478,9 +478,9 @@
 	( (method_profile | method_credential)?, method_environment? ) >
 
 <!ATTLIST method_context
-	working_directory	CDATA ":default"
-	project			CDATA ":default"
-	resource_pool		CDATA ":default" >
+	working_directory	CDATA #IMPLIED
+	project			CDATA #IMPLIED
+	resource_pool		CDATA #IMPLIED >
 
 <!-- Restarter delegation, methods, and monitors -->
 

@@ -140,24 +140,13 @@ free_restarter_event_handle(struct restarter_event_handle *h)
 	free(h);
 }
 
-static const char *
-last_part(const char *fmri)
-{
-	char *last_part;
-
-	last_part = strrchr(fmri, '/');
-	last_part++;
-	assert(last_part != NULL);
-
-	return (last_part);
-}
-
 char *
 _restarter_get_channel_name(const char *fmri, int type)
 {
-	const char *name;
+	char *name;
 	char *chan_name = malloc(MAX_CHNAME_LEN);
 	char prefix_name[3];
+	int i;
 
 	if (chan_name == NULL)
 		return (NULL);
@@ -171,7 +160,31 @@ _restarter_get_channel_name(const char *fmri, int type)
 		return (NULL);
 	}
 
-	name = last_part(fmri);
+	/*
+	 * Create a unique name
+	 *
+	 * Use the entire name, using a replacement of the /
+	 * characters to get a better name.
+	 *
+	 * Remove the svc:/ from the beginning as this really
+	 * isn't going to provide any uniqueness...
+	 *
+	 * An fmri name greater than MAX_CHNAME_LEN is going
+	 * to be rejected as too long for the chan_name below
+	 * in the snprintf call.
+	 */
+	if ((name = strdup(strchr(fmri, '/') + 1)) == NULL) {
+		free(chan_name);
+		return (NULL);
+	}
+	i = 0;
+	while (name[i]) {
+		if (name[i] == '/') {
+			name[i] = '_';
+		}
+
+		i++;
+	}
 
 	/*
 	 * Should check for [a-z],[A-Z],[0-9],.,_,-,:
@@ -180,9 +193,10 @@ _restarter_get_channel_name(const char *fmri, int type)
 	if (snprintf(chan_name, MAX_CHNAME_LEN, "com.sun:scf:%s%s",
 	    prefix_name, name) > MAX_CHNAME_LEN) {
 		free(chan_name);
-		return (NULL);
+		chan_name = NULL;
 	}
 
+	free(name);
 	return (chan_name);
 }
 
@@ -1585,6 +1599,9 @@ get_astring_val(scf_propertygroup_t *pg, const char *name, char *buf,
 {
 	ssize_t szret;
 
+	if (pg == NULL)
+		return (-1);
+
 	if (scf_pg_get_property(pg, name, prop) != SCF_SUCCESS) {
 		if (scf_error() == SCF_ERROR_CONNECTION_BROKEN)
 			uu_die(rcbroken);
@@ -1965,8 +1982,9 @@ get_groups(char *str, struct method_context *ci)
  * encoded in the failure string.
  */
 static const char *
-get_profile(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
-    const char *cmdline, struct method_context *ci)
+get_profile(scf_propertygroup_t *methpg, scf_propertygroup_t *instpg,
+    scf_property_t *prop, scf_value_t *val, const char *cmdline,
+    struct method_context *ci)
 {
 	char *buf = ci->vbuf;
 	ssize_t buf_sz = ci->vbuf_sz;
@@ -1974,10 +1992,11 @@ get_profile(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 	char *cp, *value;
 	const char *cmdp;
 	execattr_t *eap;
-	char *errstr = NULL;
+	const char *errstr = NULL;
 
-	if (get_astring_val(pg, SCF_PROPERTY_PROFILE, buf, buf_sz, prop, val) !=
-	    0)
+	if (!(get_astring_val(methpg, SCF_PROPERTY_PROFILE, buf, buf_sz, prop,
+	    val) == 0 || get_astring_val(instpg, SCF_PROPERTY_PROFILE, buf,
+	    buf_sz, prop, val) == 0))
 		return ("Could not get profile property.");
 
 	/* Extract the command from the command line. */
@@ -2069,16 +2088,28 @@ out:
  * encoded in the failure string.
  */
 static const char *
-get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
-    struct method_context *ci)
+get_ids(scf_propertygroup_t *methpg, scf_propertygroup_t *instpg,
+    scf_property_t *prop, scf_value_t *val, struct method_context *ci)
 {
-	const char *errstr = NULL;
+	char *errstr = NULL;
 	char *vbuf = ci->vbuf;
 	ssize_t vbuf_sz = ci->vbuf_sz;
 	int r;
 
-	if (get_astring_val(pg, SCF_PROPERTY_USER, vbuf, vbuf_sz, prop, val) !=
-	    0) {
+	/*
+	 * This should never happen because the caller should fall through
+	 * another path of just setting the ids to defaults, instead of
+	 * attempting to get the ids here.
+	 */
+	if (methpg == NULL && instpg == NULL) {
+		errstr = "No property groups to get ids from.";
+		goto out;
+	}
+
+	if (!(get_astring_val(methpg, SCF_PROPERTY_USER,
+	    vbuf, vbuf_sz, prop, val) == 0 || get_astring_val(instpg,
+	    SCF_PROPERTY_USER, vbuf, vbuf_sz, prop,
+	    val) == 0)) {
 		errstr = "Could not get user property.";
 		goto out;
 	}
@@ -2089,10 +2120,15 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 		goto out;
 	}
 
-	if (get_astring_val(pg, SCF_PROPERTY_GROUP, vbuf, vbuf_sz, prop, val) !=
-	    0) {
-		errstr = "Could not get group property.";
-		goto out;
+	if (!(get_astring_val(methpg, SCF_PROPERTY_GROUP, vbuf, vbuf_sz, prop,
+	    val) == 0 || get_astring_val(instpg, SCF_PROPERTY_GROUP, vbuf,
+	    vbuf_sz, prop, val) == 0)) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			(void) strcpy(vbuf, ":default");
+		} else {
+			errstr = "Could not get group property.";
+			goto out;
+		}
 	}
 
 	if (strcmp(vbuf, ":default") != 0) {
@@ -2127,10 +2163,15 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 		}
 	}
 
-	if (get_astring_val(pg, SCF_PROPERTY_SUPP_GROUPS, vbuf, vbuf_sz, prop,
-	    val) != 0) {
-		errstr = "Could not get supplemental groups property.";
-		goto out;
+	if (!(get_astring_val(methpg, SCF_PROPERTY_SUPP_GROUPS, vbuf, vbuf_sz,
+	    prop, val) == 0 || get_astring_val(instpg,
+	    SCF_PROPERTY_SUPP_GROUPS, vbuf, vbuf_sz, prop, val) == 0)) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			(void) strcpy(vbuf, ":default");
+		} else {
+			errstr = "Could not get supplemental groups property.";
+			goto out;
+		}
 	}
 
 	if (strcmp(vbuf, ":default") != 0) {
@@ -2154,10 +2195,15 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 		ci->ngroups = -1;
 	}
 
-	if (get_astring_val(pg, SCF_PROPERTY_PRIVILEGES, vbuf, vbuf_sz, prop,
-	    val) != 0) {
-		errstr = "Could not get privileges property.";
-		goto out;
+	if (!(get_astring_val(methpg, SCF_PROPERTY_PRIVILEGES, vbuf, vbuf_sz,
+	    prop, val) == 0 || get_astring_val(instpg, SCF_PROPERTY_PRIVILEGES,
+	    vbuf, vbuf_sz, prop, val) == 0)) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			(void) strcpy(vbuf, ":default");
+		} else {
+			errstr = "Could not get privileges property.";
+			goto out;
+		}
 	}
 
 	/*
@@ -2170,17 +2216,22 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 			if (errno != EINVAL) {
 				errstr = ALLOCFAIL;
 			} else {
-				errstr = "Could not interpret privileges "
-				    "property.";
+				errstr =
+				    "Could not interpret privileges property.";
 			}
 			goto out;
 		}
 	}
 
-	if (get_astring_val(pg, SCF_PROPERTY_LIMIT_PRIVILEGES, vbuf, vbuf_sz,
-	    prop, val) != 0) {
-		errstr = "Could not get limit_privileges property.";
-		goto out;
+	if (!(get_astring_val(methpg, SCF_PROPERTY_LIMIT_PRIVILEGES, vbuf,
+	    vbuf_sz, prop, val) == 0 || get_astring_val(instpg,
+	    SCF_PROPERTY_LIMIT_PRIVILEGES, vbuf, vbuf_sz, prop, val) == 0)) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			(void) strcpy(vbuf, ":default");
+		} else {
+			errstr = "Could not get limit_privileges property.";
+			goto out;
+		}
 	}
 
 	if (strcmp(vbuf, ":default") == 0)
@@ -2196,8 +2247,8 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 		if (errno != EINVAL)
 			errstr = ALLOCFAIL;
 		else {
-			errstr = "Could not interpret limit_privileges "
-			    "property.";
+			errstr =
+			    "Could not interpret limit_privileges property.";
 		}
 		goto out;
 	}
@@ -2280,6 +2331,10 @@ out:
  * a method_context structure, return it in *mcpp, and return NULL.  On error,
  * return a human-readable string which indicates the error.
  *
+ * If no method_context is defined, original init context is provided, where
+ * the working directory is '/', and uid/gid are 0/0.  But if a method_context
+ * is defined at any level the smf_method(5) method_context defaults are used.
+ *
  * Eventually, we will return a structured error in the case of
  * retryable or abortable failures such as memory allocation errors and
  * repository connection failures.  For now, these failures are just
@@ -2299,9 +2354,9 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 	scf_type_t ty;
 	uint8_t use_profile;
 	int ret;
+	int mc_used = 0;
 	const char *errstr = NULL;
 	struct method_context *cip;
-
 
 	if (version != RESTARTER_METHOD_CONTEXT_VERSION)
 		return ("Unknown method_context version.");
@@ -2358,6 +2413,8 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		}
 		scf_pg_destroy(instpg);
 		instpg = NULL;
+	} else {
+		mc_used++;
 	}
 
 	ret = get_environment(h, methpg, cip, prop, val);
@@ -2367,6 +2424,8 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 
 	switch (ret) {
 	case 0:
+		mc_used++;
+		break;
 	case ENOENT:
 		break;
 	case ENOMEM:
@@ -2384,18 +2443,18 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 
 	ret = scf_pg_get_property(pg, SCF_PROPERTY_USE_PROFILE, prop);
 	if (ret && scf_error() == SCF_ERROR_NOT_FOUND && instpg != NULL) {
-		pg = instpg;
-		ret = scf_pg_get_property(pg, SCF_PROPERTY_USE_PROFILE, prop);
+		pg = NULL;
+		ret = scf_pg_get_property(instpg, SCF_PROPERTY_USE_PROFILE,
+		    prop);
 	}
 
 	if (ret) {
 		switch (scf_error()) {
 		case SCF_ERROR_NOT_FOUND:
-			/* No context: use defaults */
+			/* No profile context: use default credentials */
 			cip->uid = 0;
 			cip->gid = 0;
-			*mcpp = cip;
-			goto out;
+			break;
 
 		case SCF_ERROR_CONNECTION_BROKEN:
 			errstr = RCBROKEN;
@@ -2411,69 +2470,122 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		default:
 			bad_fail("scf_pg_get_property", scf_error());
 		}
-	}
+	} else {
+		if (scf_property_type(prop, &ty) != SCF_SUCCESS) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				errstr = RCBROKEN;
+				break;
 
-	if (scf_property_type(prop, &ty) != SCF_SUCCESS) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			errstr = RCBROKEN;
-			break;
+			case SCF_ERROR_DELETED:
+				errstr = "\"use profile\" property deleted.";
+				break;
 
-		case SCF_ERROR_DELETED:
-			errstr = "\"use profile\" property deleted.";
-			break;
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_fail("scf_property_type", scf_error());
+			}
 
-		case SCF_ERROR_NOT_SET:
-		default:
-			bad_fail("scf_property_type", scf_error());
+			goto out;
 		}
 
-		goto out;
-	}
-
-	if (ty != SCF_TYPE_BOOLEAN) {
-		errstr = "\"use profile\" property is not boolean.";
-		goto out;
-	}
-
-	if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			errstr = RCBROKEN;
-			break;
-
-		case SCF_ERROR_CONSTRAINT_VIOLATED:
-			errstr =
-			    "\"use profile\" property has multiple values.";
-			break;
-
-		case SCF_ERROR_NOT_FOUND:
-			errstr = "\"use profile\" property has no values.";
-			break;
-
-		default:
-			bad_fail("scf_property_get_value", scf_error());
+		if (ty != SCF_TYPE_BOOLEAN) {
+			errstr = "\"use profile\" property is not boolean.";
+			goto out;
 		}
 
-		goto out;
+		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				errstr = RCBROKEN;
+				break;
+
+			case SCF_ERROR_CONSTRAINT_VIOLATED:
+				errstr =
+				    "\"use profile\" property has multiple "
+				    "values.";
+				break;
+
+			case SCF_ERROR_NOT_FOUND:
+				errstr = "\"use profile\" property has no "
+				    "values.";
+				break;
+
+			default:
+				bad_fail("scf_property_get_value", scf_error());
+			}
+
+			goto out;
+		}
+
+		mc_used++;
+		ret = scf_value_get_boolean(val, &use_profile);
+		assert(ret == SCF_SUCCESS);
+
+		/* get ids & privileges */
+		if (use_profile)
+			errstr = get_profile(pg, instpg, prop, val, cmdline,
+			    cip);
+		else
+			errstr = get_ids(pg, instpg, prop, val, cip);
+
+		if (errstr != NULL)
+			goto out;
 	}
-
-	ret = scf_value_get_boolean(val, &use_profile);
-	assert(ret == SCF_SUCCESS);
-
-	/* get ids & privileges */
-	if (use_profile)
-		errstr = get_profile(pg, prop, val, cmdline, cip);
-	else
-		errstr = get_ids(pg, prop, val, cip);
-	if (errstr != NULL)
-		goto out;
 
 	/* get working directory */
-	if (get_astring_val(pg, SCF_PROPERTY_WORKING_DIRECTORY, cip->vbuf,
-	    cip->vbuf_sz, prop, val) != 0) {
-		errstr = "Could not get value for working directory.";
-		goto out;
+	if ((methpg != NULL && scf_pg_get_property(methpg,
+	    SCF_PROPERTY_WORKING_DIRECTORY, prop) == SCF_SUCCESS) ||
+	    (instpg != NULL && scf_pg_get_property(instpg,
+	    SCF_PROPERTY_WORKING_DIRECTORY, prop) == SCF_SUCCESS)) {
+		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				errstr = RCBROKEN;
+				break;
+
+			case SCF_ERROR_CONSTRAINT_VIOLATED:
+				errstr =
+				    "\"working directory\" property has "
+				    "multiple values.";
+				break;
+
+			case SCF_ERROR_NOT_FOUND:
+				errstr = "\"working directory\" property has "
+				    "no values.";
+				break;
+
+			default:
+				bad_fail("scf_property_get_value", scf_error());
+			}
+
+			goto out;
+		}
+
+		mc_used++;
+		ret = scf_value_get_astring(val, cip->vbuf, cip->vbuf_sz);
+		assert(ret != -1);
+	} else {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			/* okay if missing. */
+			(void) strcpy(cip->vbuf, ":default");
+			break;
+
+		case SCF_ERROR_CONNECTION_BROKEN:
+			errstr = RCBROKEN;
+			goto out;
+
+		case SCF_ERROR_DELETED:
+			errstr = "\"working_directory\" property deleted.";
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_fail("scf_pg_get_property", scf_error());
+		}
 	}
 
 	if (strcmp(cip->vbuf, ":default") == 0 ||
@@ -2511,19 +2623,45 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 	}
 
 	/* get (optional) corefile pattern */
-	if (scf_pg_get_property(pg, SCF_PROPERTY_COREFILE_PATTERN, prop) ==
-	    SCF_SUCCESS) {
-		if (get_astring_val(pg, SCF_PROPERTY_COREFILE_PATTERN,
-		    cip->vbuf, cip->vbuf_sz, prop, val) != 0) {
-			errstr = "Could not get value for corefile pattern.";
-			goto out;
+	if ((methpg != NULL && scf_pg_get_property(methpg,
+	    SCF_PROPERTY_COREFILE_PATTERN, prop) == SCF_SUCCESS) ||
+	    (instpg != NULL && scf_pg_get_property(instpg,
+	    SCF_PROPERTY_COREFILE_PATTERN, prop) == SCF_SUCCESS)) {
+		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				errstr = RCBROKEN;
+				break;
+
+			case SCF_ERROR_CONSTRAINT_VIOLATED:
+				errstr =
+				    "\"core_pattern\" property has multiple "
+				    "values.";
+				break;
+
+			case SCF_ERROR_NOT_FOUND:
+				errstr = "\"core_pattern\" property has no "
+				    "values.";
+				break;
+
+			default:
+				bad_fail("scf_property_get_value", scf_error());
+			}
+
+		} else {
+
+			ret = scf_value_get_astring(val, cip->vbuf,
+			    cip->vbuf_sz);
+			assert(ret != -1);
+
+			cip->corefile_pattern = strdup(cip->vbuf);
+			if (cip->corefile_pattern == NULL) {
+				errstr = ALLOCFAIL;
+				goto out;
+			}
 		}
 
-		cip->corefile_pattern = strdup(cip->vbuf);
-		if (cip->corefile_pattern == NULL) {
-			errstr = ALLOCFAIL;
-			goto out;
-		}
+		mc_used++;
 	} else {
 		switch (scf_error()) {
 		case SCF_ERROR_NOT_FOUND:
@@ -2548,10 +2686,42 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 
 	if (restarter_rm_libs_loadable()) {
 		/* get project */
-		if (get_astring_val(pg, SCF_PROPERTY_PROJECT, cip->vbuf,
-		    cip->vbuf_sz, prop, val) != 0) {
-			errstr = "Could not get project.";
-			goto out;
+		if ((methpg != NULL && scf_pg_get_property(methpg,
+		    SCF_PROPERTY_PROJECT, prop) == SCF_SUCCESS) ||
+		    (instpg != NULL && scf_pg_get_property(instpg,
+		    SCF_PROPERTY_PROJECT, prop) == SCF_SUCCESS)) {
+			if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+				switch (scf_error()) {
+				case SCF_ERROR_CONNECTION_BROKEN:
+					errstr = RCBROKEN;
+					break;
+
+				case SCF_ERROR_CONSTRAINT_VIOLATED:
+					errstr =
+					    "\"project\" property has "
+					    "multiple values.";
+					break;
+
+				case SCF_ERROR_NOT_FOUND:
+					errstr = "\"project\" property has "
+					    "no values.";
+					break;
+
+				default:
+					bad_fail("scf_property_get_value",
+					    scf_error());
+				}
+
+				(void) strcpy(cip->vbuf, ":default");
+			} else {
+				ret = scf_value_get_astring(val, cip->vbuf,
+				    cip->vbuf_sz);
+				assert(ret != -1);
+			}
+
+			mc_used++;
+		} else {
+			(void) strcpy(cip->vbuf, ":default");
 		}
 
 		switch (ret = get_projid(cip->vbuf, cip)) {
@@ -2596,10 +2766,61 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		}
 
 		/* get resource pool */
-		if (get_astring_val(pg, SCF_PROPERTY_RESOURCE_POOL, cip->vbuf,
-		    cip->vbuf_sz, prop, val) != 0) {
-			errstr = "Could not get value of resource pool.";
-			goto out;
+		if ((methpg != NULL && scf_pg_get_property(methpg,
+		    SCF_PROPERTY_RESOURCE_POOL, prop) == SCF_SUCCESS) ||
+		    (instpg != NULL && scf_pg_get_property(instpg,
+		    SCF_PROPERTY_RESOURCE_POOL, prop) == SCF_SUCCESS)) {
+			if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+				switch (scf_error()) {
+				case SCF_ERROR_CONNECTION_BROKEN:
+					errstr = RCBROKEN;
+					break;
+
+				case SCF_ERROR_CONSTRAINT_VIOLATED:
+					errstr =
+					    "\"resource_pool\" property has "
+					    "multiple values.";
+					break;
+
+				case SCF_ERROR_NOT_FOUND:
+					errstr = "\"resource_pool\" property "
+					    "has no values.";
+					break;
+
+				default:
+					bad_fail("scf_property_get_value",
+					    scf_error());
+				}
+
+				(void) strcpy(cip->vbuf, ":default");
+			} else {
+				ret = scf_value_get_astring(val, cip->vbuf,
+				    cip->vbuf_sz);
+				assert(ret != -1);
+			}
+
+			mc_used++;
+		} else {
+			switch (scf_error()) {
+			case SCF_ERROR_NOT_FOUND:
+				/* okay if missing. */
+				(void) strcpy(cip->vbuf, ":default");
+				break;
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+				errstr = RCBROKEN;
+				goto out;
+
+			case SCF_ERROR_DELETED:
+				errstr = "\"resource_pool\" property deleted.";
+				goto out;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_fail("scf_pg_get_property", scf_error());
+			}
 		}
 
 		if (strcmp(cip->vbuf, ":default") != 0) {
@@ -2609,6 +2830,19 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 				goto out;
 			}
 		}
+	}
+
+	/*
+	 * A method_context was not used for any configurable
+	 * elements or attributes, so reset and use the simple
+	 * defaults that provide historic init behavior.
+	 */
+	if (mc_used == 0) {
+		(void) memset(cip, 0, sizeof (*cip));
+		cip->uid = 0;
+		cip->gid = 0;
+		cip->euid = (uid_t)-1;
+		cip->egid = (gid_t)-1;
 	}
 
 	*mcpp = cip;
@@ -2758,23 +2992,6 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 		goto out;
 	}
 
-	*fp = "setppriv";
-
-	if (cip->lpriv_set != NULL) {
-		if (setppriv(PRIV_SET, PRIV_LIMIT, cip->lpriv_set) != 0) {
-			ret = errno;
-			assert(ret == EFAULT || ret == EPERM);
-			goto out;
-		}
-	}
-	if (cip->priv_set != NULL) {
-		if (setppriv(PRIV_SET, PRIV_INHERITABLE, cip->priv_set) != 0) {
-			ret = errno;
-			assert(ret == EFAULT || ret == EPERM);
-			goto out;
-		}
-	}
-
 	if (cip->corefile_pattern != NULL) {
 		mypid = getpid();
 
@@ -2880,6 +3097,34 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 	 * We can do this by setting P as well, which keeps
 	 * PA status (see priv_can_clear_PA()).
 	 */
+
+	*fp = "setppriv";
+
+	if (cip->lpriv_set != NULL) {
+		if (setppriv(PRIV_SET, PRIV_LIMIT, cip->lpriv_set) != 0) {
+			ret = errno;
+			assert(ret == EFAULT || ret == EPERM);
+			goto out;
+		}
+	}
+	if (cip->priv_set != NULL) {
+		if (setppriv(PRIV_SET, PRIV_INHERITABLE, cip->priv_set) != 0) {
+			ret = errno;
+			assert(ret == EFAULT || ret == EPERM);
+			goto out;
+		}
+	}
+
+	/*
+	 * If the limit privset is already set, then must be privilege
+	 * aware.  Otherwise, don't assume anything, and force privilege
+	 * aware status.
+	 */
+
+	if (cip->lpriv_set == NULL && cip->priv_set != NULL) {
+		ret = setpflags(PRIV_AWARE, 1);
+		assert(ret == 0);
+	}
 
 	*fp = "setreuid";
 	if (setreuid(cip->uid,

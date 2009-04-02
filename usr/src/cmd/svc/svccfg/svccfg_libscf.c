@@ -7995,7 +7995,7 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	int err = 0, nonenv, ret;
 	uint8_t use_profile;
 	struct pg_elts elts;
-	xmlNodePtr ctxt;
+	xmlNodePtr ctxt = NULL;
 
 	n = xmlNewNode(NULL, (xmlChar *)"exec_method");
 
@@ -8042,9 +8042,6 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		return;
 	}
 
-	ctxt = xmlNewNode(NULL, (xmlChar *)"method_context");
-	if (ctxt == NULL)
-		uu_die(emsg_create_xml);
 
 	/*
 	 * If we're going to have a method_context child, we need to know
@@ -8064,6 +8061,26 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	    SCF_SUCCESS;
 
 	if (nonenv) {
+		ctxt = xmlNewNode(NULL, (xmlChar *)"method_context");
+		if (ctxt == NULL)
+			uu_die(emsg_create_xml);
+
+		if (pg_get_prop(pg, SCF_PROPERTY_WORKING_DIRECTORY, exp_prop) ==
+		    0 &&
+		    set_attr_from_prop_default(exp_prop, ctxt,
+		    "working_directory", ":default") != 0)
+			err = 1;
+
+		if (pg_get_prop(pg, SCF_PROPERTY_PROJECT, exp_prop) == 0 &&
+		    set_attr_from_prop_default(exp_prop, ctxt, "project",
+		    ":default") != 0)
+			err = 1;
+
+		if (pg_get_prop(pg, SCF_PROPERTY_RESOURCE_POOL, exp_prop) ==
+		    0 &&
+		    set_attr_from_prop_default(exp_prop, ctxt,
+		    "resource_pool", ":default") != 0)
+			err = 1;
 		/*
 		 * We only want to complain about profile or credential
 		 * properties if we will use them.  To determine that we must
@@ -8073,91 +8090,76 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		    prop_check_type(exp_prop, SCF_TYPE_BOOLEAN) == 0 &&
 		    prop_get_val(exp_prop, exp_val) == 0) {
 			if (scf_value_get_boolean(exp_val, &use_profile) !=
-			    SCF_SUCCESS)
+			    SCF_SUCCESS) {
 				scfdie();
-		} else
-			/*
-			 * USE_PROFILE is misconfigured.  Since we should have
-			 * complained just now, we don't want to complain
-			 * about any of the other properties, so don't look
-			 * for them.
-			 */
-			nonenv = 0;
-	}
+			}
 
-	if (nonenv) {
+			if (use_profile) {
+				xmlNodePtr prof;
 
-		if (pg_get_prop(pg, SCF_PROPERTY_WORKING_DIRECTORY, exp_prop) !=
-		    0 ||
-		    set_attr_from_prop_default(exp_prop, ctxt,
-		    "working_directory", ":default") != 0)
-			err = 1;
+				prof = xmlNewChild(ctxt, NULL,
+				    (xmlChar *)"method_profile", NULL);
+				if (prof == NULL)
+					uu_die(emsg_create_xml);
 
-		if (pg_get_prop(pg, SCF_PROPERTY_PROJECT, exp_prop) != 0 ||
-		    set_attr_from_prop_default(exp_prop, ctxt, "project",
-		    ":default") != 0)
-			err = 1;
+				if (pg_get_prop(pg, SCF_PROPERTY_PROFILE,
+				    exp_prop) != 0 ||
+				    set_attr_from_prop(exp_prop, prof,
+				    name_attr) != 0)
+					err = 1;
+			} else {
+				xmlNodePtr cred;
 
-		if (pg_get_prop(pg, SCF_PROPERTY_RESOURCE_POOL, exp_prop) !=
-		    0 ||
-		    set_attr_from_prop_default(exp_prop, ctxt,
-		    "resource_pool", ":default") != 0)
-			err = 1;
+				cred = xmlNewChild(ctxt, NULL,
+				    (xmlChar *)"method_credential", NULL);
+				if (cred == NULL)
+					uu_die(emsg_create_xml);
 
-		if (use_profile) {
-			xmlNodePtr prof;
+				if (pg_get_prop(pg, SCF_PROPERTY_USER,
+				    exp_prop) != 0 ||
+				    set_attr_from_prop(exp_prop, cred,
+				    "user") != 0) {
+					err = 1;
+				}
 
-			prof = xmlNewChild(ctxt, NULL,
-			    (xmlChar *)"method_profile", NULL);
-			if (prof == NULL)
-				uu_die(emsg_create_xml);
+				if (pg_get_prop(pg, SCF_PROPERTY_GROUP,
+				    exp_prop) == 0 &&
+				    set_attr_from_prop_default(exp_prop, cred,
+				    "group", ":default") != 0)
+					err = 1;
 
-			if (pg_get_prop(pg, SCF_PROPERTY_PROFILE, exp_prop) !=
-			    0 || set_attr_from_prop(exp_prop, prof,
-			    name_attr) != 0)
-				err = 1;
-		} else {
-			xmlNodePtr cred;
+				if (pg_get_prop(pg, SCF_PROPERTY_SUPP_GROUPS,
+				    exp_prop) == 0 &&
+				    set_attr_from_prop_default(exp_prop, cred,
+				    "supp_groups", ":default") != 0)
+					err = 1;
 
-			cred = xmlNewChild(ctxt, NULL,
-			    (xmlChar *)"method_credential", NULL);
-			if (cred == NULL)
-				uu_die(emsg_create_xml);
+				if (pg_get_prop(pg, SCF_PROPERTY_PRIVILEGES,
+				    exp_prop) == 0 &&
+				    set_attr_from_prop_default(exp_prop, cred,
+				    "privileges", ":default") != 0)
+					err = 1;
 
-			if (pg_get_prop(pg, SCF_PROPERTY_USER, exp_prop) != 0 ||
-			    set_attr_from_prop(exp_prop, cred, "user") != 0)
-				err = 1;
-
-			if (pg_get_prop(pg, SCF_PROPERTY_GROUP, exp_prop) !=
-			    0 ||
-			    set_attr_from_prop_default(exp_prop, cred,
-			    "group", ":default") != 0)
-				err = 1;
-
-			if (pg_get_prop(pg, SCF_PROPERTY_SUPP_GROUPS,
-			    exp_prop) != 0 ||
-			    set_attr_from_prop_default(exp_prop, cred,
-			    "supp_groups", ":default") != 0)
-				err = 1;
-
-			if (pg_get_prop(pg, SCF_PROPERTY_PRIVILEGES,
-			    exp_prop) != 0 ||
-			    set_attr_from_prop_default(exp_prop, cred,
-			    "privileges", ":default") != 0)
-				err = 1;
-
-			if (pg_get_prop(pg, SCF_PROPERTY_LIMIT_PRIVILEGES,
-			    exp_prop) != 0 ||
-			    set_attr_from_prop_default(exp_prop, cred,
-			    "limit_privileges", ":default") != 0)
-				err = 1;
+				if (pg_get_prop(pg,
+				    SCF_PROPERTY_LIMIT_PRIVILEGES,
+				    exp_prop) == 0 &&
+				    set_attr_from_prop_default(exp_prop, cred,
+				    "limit_privileges", ":default") != 0)
+					err = 1;
+			}
 		}
 	}
 
-	if ((env = export_method_environment(pg)) != NULL)
+	if ((env = export_method_environment(pg)) != NULL) {
+		if (ctxt == NULL) {
+			ctxt = xmlNewNode(NULL, (xmlChar *)"method_context");
+			if (ctxt == NULL)
+				uu_die(emsg_create_xml);
+		}
 		(void) xmlAddChild(ctxt, env);
+	}
 
-	if (env != NULL || err == 0)
+	if (env != NULL || (nonenv && err == 0))
 		(void) xmlAddChild(n, ctxt);
 	else
 		xmlFreeNode(ctxt);
@@ -8350,27 +8352,21 @@ export_method_context(scf_propertygroup_t *pg, struct entity_elts *elts)
 	env = export_method_environment(pg);
 
 	/* Need to know whether we'll use a profile or not. */
-	if (pg_get_prop(pg, SCF_PROPERTY_USE_PROFILE, exp_prop) != 0 ||
-	    prop_check_type(exp_prop, SCF_TYPE_BOOLEAN) != 0 ||
-	    prop_get_val(exp_prop, exp_val) != 0) {
-		if (env != NULL) {
-			(void) xmlAddChild(n, env);
-			elts->method_context = n;
-		} else {
-			xmlFreeNode(n);
-			export_pg(pg, elts, 0);
-		}
-		return;
+	if (pg_get_prop(pg, SCF_PROPERTY_USE_PROFILE, exp_prop) == 0 &&
+	    prop_check_type(exp_prop, SCF_TYPE_BOOLEAN) == 0 &&
+	    prop_get_val(exp_prop, exp_val) == 0) {
+		if (scf_value_get_boolean(exp_val, &use_profile) != SCF_SUCCESS)
+			scfdie();
+
+		if (use_profile)
+			prof =
+			    xmlNewChild(n, NULL, (xmlChar *)"method_profile",
+			    NULL);
+		else
+			cred =
+			    xmlNewChild(n, NULL, (xmlChar *)"method_credential",
+			    NULL);
 	}
-
-	if (scf_value_get_boolean(exp_val, &use_profile) != SCF_SUCCESS)
-		scfdie();
-
-	if (use_profile)
-		prof = xmlNewChild(n, NULL, (xmlChar *)"method_profile", NULL);
-	else
-		cred =
-		    xmlNewChild(n, NULL, (xmlChar *)"method_credential", NULL);
 
 	if (env != NULL)
 		(void) xmlAddChild(n, env);

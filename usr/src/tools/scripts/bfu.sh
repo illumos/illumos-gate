@@ -513,7 +513,7 @@ enable_next_boot () {
 	if [ -x /tmp/bfubin/svccfg ]; then
 	    svcadm disable -t $1
 	    [ $? = 0 ] || echo "warning: unable to temporarily disable $1"
-	    svccfg -s $1 setprop general/enabled = true
+	    eval $BFUSVCCFG -s $1 setprop general/enabled = true
 	    [ $? = 0 ] || echo "warning: unable to enable $1 for next boot"
 	fi
 }
@@ -538,12 +538,12 @@ smf_import_service() {
 			echo "not work, reboot your alternate root to fix it."
 		elif [[ -x /tmp/bfubin/svccfg ]]; then
 			if [[ "${2}a" == a ]]; then
-				/tmp/bfubin/svccfg import /var/svc/manifest/$1
+				eval $BFUSVCCFG import /var/svc/manifest/$1
 			else
 				tmpfile=/tmp/`echo "$1" | tr / :`.$$
 				sed -e "s/enabled='true'/enabled='false'/" \
 				    /var/svc/manifest/$1 > "$tmpfile"
-				/tmp/bfubin/svccfg import "$tmpfile"
+				eval $BFUSVCCFG import "$tmpfile"
 				#
 				# Make sure the service is enabled after reboot.
 				#
@@ -1152,16 +1152,16 @@ migrate_acctadm_conf()
 		. /etc/acctadm.conf
 
 		fmri="svc:/system/extended-accounting:flow"
-		svccfg -s $fmri setprop config/file = \
+		eval $BFUSVCCFG -s $fmri setprop config/file = \
 		    ${ACCTADM_FLOW_FILE:="none"}
-		svccfg -s $fmri setprop config/tracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/tracked = \
 		    ${ACCTADM_FLOW_TRACKED:="none"}
-		svccfg -s $fmri setprop config/untracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/untracked = \
 		    ${ACCTADM_FLOW_UNTRACKED:="extended"}
 		if [ ${ACCTADM_FLOW_ENABLE:="no"} = "yes" ]; then
-			svccfg -s $fmri setprop config/enabled = "true"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "true"
 		else
-			svccfg -s $fmri setprop config/enabled = "false"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "false"
 		fi
 		if [ $ACCTADM_FLOW_ENABLE = "yes" -o \
 		    $ACCTADM_FLOW_FILE != "none" -o \
@@ -1170,16 +1170,16 @@ migrate_acctadm_conf()
 		fi
 
 		fmri="svc:/system/extended-accounting:process"
-		svccfg -s $fmri setprop config/file = \
+		eval $BFUSVCCFG -s $fmri setprop config/file = \
 		    ${ACCTADM_PROC_FILE:="none"}
-		svccfg -s $fmri setprop config/tracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/tracked = \
 		    ${ACCTADM_PROC_TRACKED:="none"}
-		svccfg -s $fmri setprop config/untracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/untracked = \
 		    ${ACCTADM_PROC_UNTRACKED:="extended"}
 		if [ ${ACCTADM_PROC_ENABLE:="no"} = "yes" ]; then
-			svccfg -s $fmri setprop config/enabled = "true"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "true"
 		else
-			svccfg -s $fmri setprop config/enabled = "false"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "false"
 		fi
 		if [ $ACCTADM_PROC_ENABLE = "yes" -o \
 		    $ACCTADM_PROC_FILE != "none" -o \
@@ -1188,16 +1188,16 @@ migrate_acctadm_conf()
 		fi
 
 		fmri="svc:/system/extended-accounting:task"
-		svccfg -s $fmri setprop config/file = \
+		eval $BFUSVCCFG -s $fmri setprop config/file = \
 		    ${ACCTADM_TASK_FILE:="none"}
-		svccfg -s $fmri setprop config/tracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/tracked = \
 		    ${ACCTADM_TASK_TRACKED:="none"}
-		svccfg -s $fmri setprop config/untracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/untracked = \
 		    ${ACCTADM_TASK_UNTRACKED:="extended"}
 		if [ ${ACCTADM_TASK_ENABLE:="no"} = "yes" ]; then
-			svccfg -s $fmri setprop config/enabled = "true"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "true"
 		else
-			svccfg -s $fmri setprop config/enabled = "false"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "false"
 		fi
 		if [ $ACCTADM_TASK_ENABLE = "yes" -o \
 		    $ACCTADM_TASK_FILE != "none" -o \
@@ -1206,16 +1206,16 @@ migrate_acctadm_conf()
 		fi
 
 		fmri="svc:/system/extended-accounting:net"
-		svccfg -s $fmri setprop config/file = \
+		eval $BFUSVCCFG -s $fmri setprop config/file = \
 		    ${ACCTADM_NET_FILE:="none"}
-		svccfg -s $fmri setprop config/tracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/tracked = \
 		    ${ACCTADM_NET_TRACKED:="none"}
-		svccfg -s $fmri setprop config/untracked = \
+		eval $BFUSVCCFG -s $fmri setprop config/untracked = \
 		    ${ACCTADM_NET_UNTRACKED:="extended"}
 		if [ ${ACCTADM_NET_ENABLE:="no"} = "yes" ]; then
-			svccfg -s $fmri setprop config/enabled = "true"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "true"
 		else
-			svccfg -s $fmri setprop config/enabled = "false"
+			eval $BFUSVCCFG -s $fmri setprop config/enabled = "false"
 		fi
 		if [ $ACCTADM_NET_ENABLE = "yes" -o \
 		    $ACCTADM_NET_FILE != "none" -o \
@@ -1499,7 +1499,7 @@ smf_new_profiles () {
 			    SUNW_Sun_Fire_V890 \
 			    SUNW_Sun_Fire_15000 \
 			    SUNW_UltraEnterprise_10000; do
-				svccfg -f - <<EOF
+				eval $BFUSVCCFG -f - <<EOF
 select smf/manifest
 delpg ${pfx}ar_svc_profile_platform_${plname}_xml
 exit
@@ -1580,13 +1580,13 @@ smf_delete_manifest() {
 	cd $root
 	[[ -f $mfst ]] || return;
 	if [ -r /etc/svc/volatile/repository_door ]; then
-		ENTITIES=`/tmp/bfubin/svccfg inventory $mfst`
+		ENTITIES=`eval $BFUSVCCFG inventory $mfst`
 		for fmri in $ENTITIES; do
 			if [[ -n $root && $root != "/" ]]; then
 				SVCCFG_REPOSITORY=$root/etc/svc/repository.db
 				export SVCCFG_REPOSITORY
 			fi
-			/tmp/bfubin/svccfg delete -f $fmri >/dev/null 2>&1
+			eval $BFUSVCCFG delete -f $fmri >/dev/null 2>&1
 			if [[ -n $root && $root != "/" ]]; then
 				unset SVCCFG_REPOSITORY
 			fi
@@ -1620,9 +1620,9 @@ smf_cleanup_dlmgmtd() {
 
 	if [[ -n $root && $root != "/" ]]; then
 		export SVCCFG_REPOSITORY=$root/etc/svc/repository.db
-		/tmp/bfubin/svccfg -s svc:/network/physical:nwam refresh
-		/tmp/bfubin/svccfg -s svc:/network/physical:default refresh
-		/tmp/bfubin/svccfg -s svc:/system/device/local:default refresh
+		eval $BFUSVCCFG -s svc:/network/physical:nwam refresh
+		eval $BFUSVCCFG -s svc:/network/physical:default refresh
+		eval $BFUSVCCFG -s svc:/system/device/local:default refresh
 		unset SVCCFG_REPOSITORY
 	fi
 	cd $root
@@ -1641,7 +1641,7 @@ smf_cleanup_vt() {
 		vt_conslogin_instances=`/tmp/bfubin/svcs -o FMRI | \
 		    grep console-login:vt`
 		for i in $vt_conslogin_instances; do
-			/tmp/bfubin/svccfg delete -f $i
+			eval $BFUSVCCFG delete -f $i
 		done
 	)
 }
@@ -1787,10 +1787,10 @@ smf_bkbfu_repair_sysconfig() {
 	# since its introduction preceded 5090532 (and this routine wouldn't
 	# be called unless the machine is running post-5090532 bits).
 	#
-	/tmp/bfubin/svccfg -s system/sysidtool:net delpg single-user
-	/tmp/bfubin/svccfg -s system/sysidtool:system delpg single-user
-	/tmp/bfubin/svccfg -s system/sysidtool:net delpg filesystem_local
-	/tmp/bfubin/svccfg -s system/sysidtool:system delpg filesystem_local
+	eval $BFUSVCCFG -s system/sysidtool:net delpg single-user
+	eval $BFUSVCCFG -s system/sysidtool:system delpg single-user
+	eval $BFUSVCCFG -s system/sysidtool:net delpg filesystem_local
+	eval $BFUSVCCFG -s system/sysidtool:system delpg filesystem_local
 
 	#
 	# On a live system, issue the refresh; For alternate root or non-global
@@ -1881,7 +1881,7 @@ smf_fix_i86pc_profile () {
 	#
 	[[ -n "$rootprefix" ]] &&
 	    export SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db
-	/tmp/bfubin/svccfg delete -f platform/i86pc/eeprom
+	eval $BFUSVCCFG delete -f platform/i86pc/eeprom
 	[[ -n "$rootprefix" ]] && unset SVCCFG_REPOSITORY
 }
 
@@ -2274,8 +2274,8 @@ EOF
 		case \$restarter in
 			*network/inetd:default)
 				kken=\`svcprop -c -p general/enabled \$kkfmri\`
-				svccfg delete -f \$kpfmri
-				svccfg import \$lkpmani 
+				eval $BFUSVCCFG delete -f \$kpfmri
+				eval $BFUSVCCFG import \$lkpmani 
 				# Enable kpropd if krb5kdc is enabled, since
 				# krb5kdc would have run kpropd
 				if [ \$kken = "true" ]; then
@@ -2309,8 +2309,8 @@ EOF
 	case \$restarter in
 		*network/inetd:default)
 			en=\`svcprop -c -p general/enabled \$dcsfmri\`
-			svccfg delete -f \$dcsfmri
-			svccfg import \$dcsmani
+			eval $BFUSVCCFG delete -f \$dcsfmri
+			eval $BFUSVCCFG import \$dcsmani
 			if [ \$en = "true" ]; then
 				svcadm enable \$dcsfmri
 			fi
@@ -3156,6 +3156,14 @@ bfulib="
 	/lib/ld.so.1
 	/usr/lib/nss_*
 "
+
+# add svccfg dtd rules
+bfulib="
+	$bfulib
+	/usr/share/lib/xml/dtd/service_bundle.dtd.1
+"
+
+BFUSVCCFG="SVCCFG_DTD=/tmp/bfulib/service_bundle.dtd.1 /tmp/bfubin/svccfg"
 
 # add libc_psr.so.1, if available and not empty
 if [ -s /platform/`uname -i`/lib/libc_psr.so.1 ]; then

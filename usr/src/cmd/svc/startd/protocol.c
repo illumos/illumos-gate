@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * protocol.c - protocols between graph engine and restarters
@@ -327,47 +325,92 @@ restarter_protocol_init_delegate(char *fmri)
 {
 	char *delegate_channel_name, *master_channel_name, *sid;
 	evchan_t *delegate_channel, *master_channel;
+	int r = 0;
 
 	/* master restarter -- nothing to do */
-	if (strcmp(fmri, SCF_SERVICE_STARTD) == 0)
+	if (strcmp(fmri, SCF_SERVICE_STARTD) == 0) {
+		uu_warn("Attempt to initialize restarter protocol delegate "
+		    "with %s\n", fmri);
 		return (NULL);
+	}
 
 	log_framework(LOG_DEBUG, "%s: Intializing protocol for delegate\n",
 	    fmri);
 
+	delegate_channel_name = master_channel_name = NULL;
 	if ((delegate_channel_name = _restarter_get_channel_name(fmri,
 	    RESTARTER_CHANNEL_DELEGATE)) == NULL ||
 	    (master_channel_name = _restarter_get_channel_name(fmri,
 	    RESTARTER_CHANNEL_MASTER)) == NULL ||
-	    (sid = strdup("svc.startd")) == NULL)
-		uu_die("Allocation failure\n");
+	    (sid = strdup("svc.startd")) == NULL) {
+		if (delegate_channel_name) {
+			free(delegate_channel_name);
+		}
+		if (master_channel_name) {
+			free(master_channel_name);
+		}
+		uu_warn("Allocation of channel name failed");
 
-	if (sysevent_evc_bind(delegate_channel_name, &delegate_channel,
-	    EVCH_CREAT|EVCH_HOLD_PEND) != 0)
-		uu_die("%s: sysevent_evc_bind failed: %s\n",
+		return (NULL);
+	}
+
+	if ((r = sysevent_evc_bind(delegate_channel_name, &delegate_channel,
+	    EVCH_CREAT|EVCH_HOLD_PEND)) != 0) {
+		uu_warn("%s: sysevent_evc_bind failed: %s\n",
 		    delegate_channel_name, strerror(errno));
-	if (sysevent_evc_bind(master_channel_name, &master_channel,
-	    EVCH_CREAT|EVCH_HOLD_PEND) != 0)
-		uu_die("%s: sysevent_evc_bind failed: %s\n",
+		goto out;
+	}
+
+	if ((r = sysevent_evc_bind(master_channel_name, &master_channel,
+	    EVCH_CREAT|EVCH_HOLD_PEND)) != 0) {
+		uu_warn("%s: sysevent_evc_bind failed: %s\n",
 		    master_channel_name, strerror(errno));
+		goto out;
+	}
+
 	log_framework(LOG_DEBUG,
 	    "%s: Bound to channel %s (delegate), %s (master)\n", fmri,
 	    delegate_channel_name, master_channel_name);
 
-	if (sysevent_evc_subscribe(master_channel, sid, EC_ALL,
-	    state_cb, fmri, EVCH_SUB_KEEP) != 0)
-		uu_die("%s: Failed to subscribe to channel %s with "
-		    "subscriber id %s: %s\n", fmri,
-		    master_channel_name, sid, strerror(errno));
-	log_framework(LOG_DEBUG,
-	    "%s: Subscribed to channel %s with subscriber id %s\n", fmri,
-	    master_channel_name, "svc.startd");
+	if ((r = sysevent_evc_subscribe(master_channel, sid, EC_ALL,
+	    state_cb, fmri, EVCH_SUB_KEEP)) != 0) {
+		/*
+		 * The following errors can be returned in this
+		 * case :
+		 * 	EINVAL : inappropriate flags or dump flag
+		 * 		and the dump failed.
+		 * 	EEXIST : svc.startd already has a channel
+		 * 		named as the master channel name
+		 * 	ENOMEM : too many subscribers to the channel
+		 */
+		uu_warn("Failed to subscribe to restarter %s, channel %s with "
+		    "subscriber id %s : \n", fmri, master_channel_name, sid);
+		switch (r) {
+		case EEXIST:
+			uu_warn("Channel name already exists\n");
+			break;
+		case ENOMEM:
+			uu_warn("Too many subscribers for the channel\n");
+			break;
+		default:
+			uu_warn("%s\n", strerror(errno));
+		}
+	} else {
+		log_framework(LOG_DEBUG,
+		    "%s: Subscribed to channel %s with subscriber id %s\n",
+		    fmri, master_channel_name, "svc.startd");
+	}
 
+
+out:
 	free(delegate_channel_name);
 	free(master_channel_name);
 	free(sid);
 
-	return (delegate_channel);
+	if (r == 0)
+		return (delegate_channel);
+
+	return (NULL);
 }
 
 void

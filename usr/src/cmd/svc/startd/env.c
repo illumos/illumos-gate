@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <libuutil.h>
@@ -215,9 +213,16 @@ find_dup(const char *var, char **env, const restarter_inst_t *inst)
 	if (*p == NULL)
 		return (NULL);
 
-	if (inst != NULL)
+	/*
+	 * The first entry in the array can be ignored when it is the
+	 * default path.
+	 */
+	if (inst != NULL && p != env &&
+	    strncmp(*p, DEF_PATH, strlen(DEF_PATH)) != 0) {
 		log_instance(inst, B_FALSE, "Ignoring duplicate "
 		    "environment variable \"%s\".", *p);
+	}
+
 	return (p);
 }
 

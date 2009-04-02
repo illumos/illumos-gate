@@ -223,7 +223,7 @@ struct method_context {
 	uid_t		uid, euid;
 	gid_t		gid, egid;
 	int		ngroups;		/* -1 means use initgroups(). */
-	gid_t		groups[NGROUPS_MAX-1];
+	gid_t		groups[NGROUPS_MAX];
 	priv_set_t	*lpriv_set, *priv_set;
 	char		*corefile_pattern;	/* Optional. */
 	char		*project;		/* NULL for no change */

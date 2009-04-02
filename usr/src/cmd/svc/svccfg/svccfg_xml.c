@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -784,24 +784,24 @@ lxml_get_method_credential(pgroup_t *pg, xmlNodePtr cred)
 	if (internal_attach_property(pg, p) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_USER, SCF_TYPE_ASTRING,
-	    cred, "user") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_USER, SCF_TYPE_ASTRING,
+	    cred, "user", NULL) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_GROUP, SCF_TYPE_ASTRING,
-	    cred, "group") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_GROUP, SCF_TYPE_ASTRING,
+	    cred, "group", NULL) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_SUPP_GROUPS,
-	    SCF_TYPE_ASTRING, cred, "supp_groups") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_SUPP_GROUPS,
+	    SCF_TYPE_ASTRING, cred, "supp_groups", NULL) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_PRIVILEGES,
-	    SCF_TYPE_ASTRING, cred, "privileges") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_PRIVILEGES,
+	    SCF_TYPE_ASTRING, cred, "privileges", NULL) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_LIMIT_PRIVILEGES,
-	    SCF_TYPE_ASTRING, cred, "limit_privileges") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_LIMIT_PRIVILEGES,
+	    SCF_TYPE_ASTRING, cred, "limit_privileges", NULL) != 0)
 		return (-1);
 
 	return (0);
@@ -875,16 +875,16 @@ lxml_get_method_context(pgroup_t *pg, xmlNodePtr ctx)
 {
 	xmlNodePtr cursor;
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_WORKING_DIRECTORY,
-	    SCF_TYPE_ASTRING, ctx, "working_directory") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_WORKING_DIRECTORY,
+	    SCF_TYPE_ASTRING, ctx, "working_directory", NULL) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_PROJECT, SCF_TYPE_ASTRING,
-	    ctx, "project") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_PROJECT,
+	    SCF_TYPE_ASTRING, ctx, "project", NULL) != 0)
 		return (-1);
 
-	if (new_str_prop_from_attr(pg, SCF_PROPERTY_RESOURCE_POOL,
-	    SCF_TYPE_ASTRING, ctx, "resource_pool") != 0)
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_RESOURCE_POOL,
+	    SCF_TYPE_ASTRING, ctx, "resource_pool", NULL) != 0)
 		return (-1);
 
 	for (cursor = ctx->xmlChildrenNode; cursor != NULL;
