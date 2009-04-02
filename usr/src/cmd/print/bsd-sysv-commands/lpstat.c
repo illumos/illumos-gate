@@ -391,13 +391,10 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 					    NULL, "job-id", &jobid);
 
 					/*
-					 * If the job-state is not
-					 * "held", "cancelled" or
-					 * "completed" then only print.
+					 * If the job-state is in
+					 * RS_PRINTING then only print.
 					 */
-					if ((jstate != 0x04) &&
-					    (jstate != 0x07) &&
-					    (jstate != 0x09)) {
+					if (jstate == 0x0008) {
 						if (flag == 0)
 							printf(gettext
 							    ("now printing"\
@@ -814,12 +811,25 @@ report_job(char *printer, papi_job_t job, int show_rank, int verbose)
 
 	(void) papiAttributeListGetInteger(attrs, NULL,
 	    "job-state", &jstate);
-	if (jstate == 0x04)
-		printf(gettext(", being held"));
-	else if (jstate == 0x07)
-		printf(gettext(", cancelled"));
-	else if (jstate == 0x09)
-		printf(gettext(", complete"));
+
+	if (jstate == 0x0001)
+		printf(gettext(" being held"));
+	else if (jstate == 0x0800)
+		printf(gettext(" notifying user"));
+	else if (jstate == 0x0040)
+		printf(gettext(" cancelled"));
+	else if (jstate == 0x0010)
+		printf(gettext(" finished printing"));
+	else if (jstate == 0x0008)
+		printf(gettext(" on %s"), destination);
+	else if (jstate == 0x2000)
+		printf(gettext(" held by admin"));
+	else if (jstate == 0x0002)
+		printf(gettext(" being filtered"));
+	else if (jstate == 0x0004)
+		printf(gettext(" filtered"));
+	else if (jstate == 0x0020)
+		printf(gettext(" held for change"));
 
 	if (verbose == 1) {
 		char *form = NULL;

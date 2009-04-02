@@ -304,42 +304,60 @@ lpsched_request_outcome_to_attributes(papi_attribute_t ***attributes,
 	if (attributes == NULL)
 		return;
 
-	if (state & (RS_HELD|RS_ADMINHELD)) {
+	if (state & RS_NOTIFYING) {
 		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
-		    "job-state", 0x04);	/* held */
+		    "job-state", 0x0800);   /* notifying user */
+		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
+		    "job-state-reasons", "job-notifying");
+	} else if (state & RS_HELD) {
+		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
+		    "job-state", 0x0001);   /* held */
 		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
 		    "job-state-reasons", "job-hold-until-specified");
-	} else if (state & RS_ACTIVE) {
-		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
-		    "job-state", 0x05);
-		if (state & RS_FILTERING)
-			papiAttributeListAddString(attributes,
-			    PAPI_ATTR_REPLACE,
-			    "job-state-reasons", "job-transforming");
-		else if (state & RS_PRINTING)
-			papiAttributeListAddString(attributes,
-			    PAPI_ATTR_REPLACE,
-			    "job-state-reasons", "job-printing");
-		else
-			papiAttributeListAddString(attributes,
-			    PAPI_ATTR_REPLACE,
-			    "job-state-reasons", "job-processing");
 	} else if (state & RS_CANCELLED) {
 		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
-		    "job-state", 0x07);
+		    "job-state", 0x0040);   /* job cancelled */
 		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
 		    "job-state-reasons", "job-canceled-by-user");
 	} else if (state & RS_PRINTED) {
 		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
-		    "job-state", 0x09);
+		    "job-state", 0x0010);   /* finished printing job */
 		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
 		    "job-state-reasons", "job-complete");
+	} else if (state & RS_PRINTING) {
+		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
+		    "job-state", 0x0008);   /* printing job */
+		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
+		    "job-state-reasons", "job-printing");
+	} else if (state & RS_ADMINHELD) {
+		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
+		    "job-state", 0x2000);   /* held by admin */
+		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
+		    "job-state-reasons", "job-hold-until-specified");
+	} else if (state & RS_FILTERED) {
+		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
+		    "job-state", 0x0004);   /* filtered */
+		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
+		    "job-state-reasons", "job-filtered");
+	} else if (state & RS_CHANGING) {
+		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
+		    "job-state", 0x0020);   /* job held for changing */
+		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
+		    "job-state-reasons", "job-held-for-change");
+	} else if (state & RS_FILTERING) {
+		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
+		    "job-state", 0x0002);   /* being filtered */
+		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
+		    "job-state-reasons", "job-being-filtered");
 	} else {
 		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
-		    "job-state", 0x03);
+		    "job-state", 0x4000);   /* else */
 		papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
 		    "job-state-reasons", "job-queued");
 	}
+
+
+
 	papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
 	    "job-hold-until",
 	    ((state & RS_HELD) ? "indefinite" : "no-hold"));

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -66,11 +65,11 @@ papiPrintersList(papi_service_t handle, char **requested_attrs,
 	printer_t *p = NULL;
 	short status = MOK;
 	char *printer = NULL,
-		*form = NULL,
-		*request_id = NULL,
-		*character_set = NULL,
-		*reject_reason = NULL,
-		*disable_reason = NULL;
+	    *form = NULL,
+	    *request_id = NULL,
+	    *character_set = NULL,
+	    *reject_reason = NULL,
+	    *disable_reason = NULL;
 	short printer_status = 0;
 	long enable_date = 0, reject_date = 0;
 
@@ -86,22 +85,22 @@ papiPrintersList(papi_service_t handle, char **requested_attrs,
 
 		do {
 			if (rcv_msg(svc, R_INQUIRE_PRINTER_STATUS, &status,
-					&printer, &form, &character_set,
-					&disable_reason, &reject_reason,
-					&printer_status, &request_id,
-					&enable_date, &reject_date) < 0)
+			    &printer, &form, &character_set,
+			    &disable_reason, &reject_reason,
+			    &printer_status, &request_id,
+			    &enable_date, &reject_date) < 0)
 				return (PAPI_SERVICE_UNAVAILABLE);
 
 			if ((p = calloc(1, sizeof (*p))) == NULL)
 				return (PAPI_TEMPORARY_ERROR);
 
 			lpsched_printer_configuration_to_attributes(svc, p,
-					printer);
+			    printer);
 
 			printer_status_to_attributes(p, printer, form,
-					character_set, disable_reason,
-					reject_reason, printer_status,
-					request_id, enable_date, reject_date);
+			    character_set, disable_reason,
+			    reject_reason, printer_status,
+			    request_id, enable_date, reject_date);
 
 			list_append(printers, p);
 
@@ -117,18 +116,18 @@ papiPrintersList(papi_service_t handle, char **requested_attrs,
 
 		do {
 			if (rcv_msg(svc, R_INQUIRE_CLASS, &status, &printer,
-					&printer_status, &reject_reason,
-					&reject_date) < 0)
+			    &printer_status, &reject_reason,
+			    &reject_date) < 0)
 				return (PAPI_SERVICE_UNAVAILABLE);
 
 			if ((p = calloc(1, sizeof (*p))) == NULL)
 				return (PAPI_TEMPORARY_ERROR);
 
 			lpsched_class_configuration_to_attributes(svc, p,
-					printer);
+			    printer);
 
 			class_status_to_attributes(p, printer, printer_status,
-					reject_reason, reject_date);
+			    reject_reason, reject_date);
 
 			list_append(printers, p);
 
@@ -150,11 +149,11 @@ papiPrinterQuery(papi_service_t handle, char *name,
 	char *dest;
 	short status = MOK;
 	char *pname = NULL,
-		*form = NULL,
-		*request_id = NULL,
-		*character_set = NULL,
-		*reject_reason = NULL,
-		*disable_reason = NULL;
+	    *form = NULL,
+	    *request_id = NULL,
+	    *character_set = NULL,
+	    *reject_reason = NULL,
+	    *disable_reason = NULL;
 	short printer_status = 0;
 	long enable_date = 0, reject_date = 0;
 
@@ -192,14 +191,14 @@ papiPrinterQuery(papi_service_t handle, char *name,
 			return (PAPI_SERVICE_UNAVAILABLE);
 
 		if (rcv_msg(svc, R_INQUIRE_PRINTER_STATUS, &status, &pname,
-				&form, &character_set, &disable_reason,
-				&reject_reason, &printer_status, &request_id,
-				&enable_date, &reject_date) < 0)
+		    &form, &character_set, &disable_reason,
+		    &reject_reason, &printer_status, &request_id,
+		    &enable_date, &reject_date) < 0)
 			return (PAPI_SERVICE_UNAVAILABLE);
 
 		printer_status_to_attributes(p, pname, form, character_set,
-				disable_reason, reject_reason, printer_status,
-				request_id, enable_date, reject_date);
+		    disable_reason, reject_reason, printer_status,
+		    request_id, enable_date, reject_date);
 	} else if (isclass(dest) != 0) {
 		pst = lpsched_class_configuration_to_attributes(svc, p, dest);
 		if (pst != PAPI_OK)
@@ -210,12 +209,12 @@ papiPrinterQuery(papi_service_t handle, char *name,
 			return (PAPI_SERVICE_UNAVAILABLE);
 
 		if (rcv_msg(svc, R_INQUIRE_CLASS, &status, &pname,
-				&printer_status, &reject_reason,
-				&reject_date) < 0)
+		    &printer_status, &reject_reason,
+		    &reject_date) < 0)
 			return (PAPI_SERVICE_UNAVAILABLE);
 
 		class_status_to_attributes(p, pname, printer_status,
-				reject_reason, reject_date);
+		    reject_reason, reject_date);
 	} else if (strcmp(dest, "PrintService") == 0) {
 		/* fill the printer object with service information */
 		lpsched_service_information(&p->attributes);
@@ -242,11 +241,11 @@ papiPrinterAdd(papi_service_t handle, char *name,
 
 	if (isprinter(dest) != 0) {
 		status = lpsched_add_modify_printer(handle, dest,
-							attributes, 0);
+		    attributes, 0);
 
 		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
 			lpsched_printer_configuration_to_attributes(handle, p,
-									dest);
+			    dest);
 		else
 			status = PAPI_TEMPORARY_ERROR;
 
@@ -255,7 +254,7 @@ papiPrinterAdd(papi_service_t handle, char *name,
 
 		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
 			lpsched_class_configuration_to_attributes(handle, p,
-									dest);
+			    dest);
 		else
 			status = PAPI_TEMPORARY_ERROR;
 
@@ -282,11 +281,11 @@ papiPrinterModify(papi_service_t handle, char *name,
 
 	if (isprinter(dest) != 0) {
 		status = lpsched_add_modify_printer(handle, dest,
-							attributes, 1);
+		    attributes, 1);
 
 		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
 			lpsched_printer_configuration_to_attributes(handle, p,
-									dest);
+			    dest);
 		else
 			status = PAPI_TEMPORARY_ERROR;
 	} else if (isclass(dest) != 0) {
@@ -294,7 +293,7 @@ papiPrinterModify(papi_service_t handle, char *name,
 
 		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
 			lpsched_class_configuration_to_attributes(handle, p,
-									dest);
+			    dest);
 		else
 			status = PAPI_TEMPORARY_ERROR;
 	} else
@@ -406,23 +405,23 @@ papiPrinterPurgeJobs(papi_service_t handle, char *name, papi_job_t **jobs)
 	switch (status) {
 	case MOK:
 		papiAttributeListAddString(&svc->attributes, PAPI_ATTR_APPEND,
-				"canceled-jobs", req_id);
+		    "canceled-jobs", req_id);
 		break;
 	case M2LATE:
 	case MUNKNOWN:
 	case MNOINFO:
 		papiAttributeListAddString(&svc->attributes, PAPI_ATTR_APPEND,
-				"cancel-failed", req_id);
+		    "cancel-failed", req_id);
 		result = PAPI_DEVICE_ERROR;
 		break;
 	case MNOPERM:
 		papiAttributeListAddString(&svc->attributes, PAPI_ATTR_APPEND,
-				"cancel-failed", req_id);
+		    "cancel-failed", req_id);
 		result = PAPI_NOT_AUTHORIZED;
 		break;
 	default:
 		detailed_error(svc, gettext("cancel failed, bad status (%d)\n"),
-			status);
+		    status);
 		return (PAPI_DEVICE_ERROR);
 	}
 	} while (more == MOKMORE);
@@ -453,20 +452,20 @@ papiPrinterListJobs(papi_service_t handle, char *name,
 	do {
 		job_t *job = NULL;
 		char *dest = NULL,
-			*ptr,
-			*form = NULL,
-			*req_id = NULL,
-			*charset = NULL,
-			*owner = NULL,
-			*slabel = NULL,
-			*file = NULL;
+		    *ptr,
+		    *form = NULL,
+		    *req_id = NULL,
+		    *charset = NULL,
+		    *owner = NULL,
+		    *slabel = NULL,
+		    *file = NULL;
 		time_t date = 0;
 		size_t size = 0;
 		short  rank = 0, state = 0;
 
 		if (rcv_msg(svc, R_INQUIRE_REQUEST_RANK, &rc, &req_id,
-				&owner, &slabel, &size, &date, &state, &dest,
-				&form, &charset, &rank, &file) < 0)
+		    &owner, &slabel, &size, &date, &state, &dest,
+		    &form, &charset, &rank, &file) < 0)
 			return (PAPI_SERVICE_UNAVAILABLE);
 
 		if ((rc != MOK) && (rc != MOKMORE))
@@ -483,15 +482,15 @@ papiPrinterListJobs(papi_service_t handle, char *name,
 		if ((job = calloc(1, sizeof (*job))) == NULL)
 			continue;
 
-		job_status_to_attributes(job, req_id, owner, slabel, size,
-				date, state, dest, form, charset, rank, file);
-
 		if ((ptr = strrchr(file, '-')) != NULL) {
 			*++ptr = '0';
 			*++ptr = NULL;
 		}
 
 		lpsched_read_job_configuration(svc, job, file);
+
+		job_status_to_attributes(job, req_id, owner, slabel, size,
+		    date, state, dest, form, charset, rank, file);
 
 		list_append(jobs, job);
 

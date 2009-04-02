@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: disable.c 146 2006-03-24 00:26:54Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +48,8 @@ usage(char *program)
 		name++;
 
 	fprintf(stdout,
-		gettext("Usage: %s [-c] [-W] [-r reason] destination ...\n"),
-		name);
+	    gettext("Usage: %s [-c] [-W] [-r reason] destination ...\n"),
+	    name);
 	exit(1);
 }
 
@@ -73,8 +72,8 @@ cancel_active_job(papi_service_t svc, char *dest)
 				continue;
 
 			(void) papiAttributeListGetInteger(a, NULL,
-					"job-state", &state);
-			if (state == 0x05) { /* processing */
+			    "job-state", &state);
+			if (state & 0x082A) { /* If state is RS_ACTIVE */
 				int32_t id = papiJobGetId(j[i]);
 
 				(void) papiJobCancel(svc, dest, id);
@@ -124,18 +123,18 @@ main(int ac, char *av[])
 		char *printer = av[optind++];
 
 		status = papiServiceCreate(&svc, printer, NULL, NULL,
-					cli_auth_callback, encryption, NULL);
+		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
 			fprintf(stderr, gettext(
-				"Failed to contact service for %s: %s\n"),
-				printer, verbose_papi_message(svc, status));
+			    "Failed to contact service for %s: %s\n"),
+			    printer, verbose_papi_message(svc, status));
 			exit_status = 1;
 		}
 
 		status = papiPrinterDisable(svc, printer, reason);
 		if (status != PAPI_OK) {
 			fprintf(stderr, gettext("disable: %s: %s\n"), printer,
-				verbose_papi_message(svc, status));
+			    verbose_papi_message(svc, status));
 			exit_status = 1;
 		}
 
