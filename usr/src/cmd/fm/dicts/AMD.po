@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -48,13 +48,13 @@ msgstr "Fault"
 msgid "AMD-8000-2F.severity"
 msgstr "Major"
 msgid "AMD-8000-2F.description"
-msgstr "Correctable errors associated with this memory module have exceeded acceptable levels.  Refer to %s for more information."
+msgstr "The number of correctable errors associated with this memory module has exceeded acceptable levels.  Refer to %s for more information."
 msgid "AMD-8000-2F.response"
-msgstr "\n\nIf Solaris is running on bare-metal (native) then affected memory pages associated with this memory module will be removed from service.\n"
+msgstr "Pages of memory associated with this memory module may have been removed from service, up to a limit which has now been reached."
 msgid "AMD-8000-2F.impact"
-msgstr "\n\nPage retirement (where supported) is capped at a small fraction of memory to avoid performance impact.\n"
+msgstr "Total system memory capacity has been reduced (where supported)."
 msgid "AMD-8000-2F.action"
-msgstr "Schedule a repair procedure to replace the affected memory module.  Use 'fmadm faulty' to identify the module."
+msgstr "Schedule a repair procedure to replace the affected memory module. Use 'fmadm faulty' to identify the memory module."
 #
 # code: AMD-8000-3K
 # keys: fault.memory.dimm_ck
@@ -64,13 +64,13 @@ msgstr "Fault"
 msgid "AMD-8000-3K.severity"
 msgstr "Major"
 msgid "AMD-8000-3K.description"
-msgstr "The number of errors associated with this memory module has exceeded acceptable levels.  Refer to %s for more information."
+msgstr "The number of correctable errors associated with this memory module has exceeded acceptable levels.  Refer to %s for more information."
 msgid "AMD-8000-3K.response"
-msgstr "\n\nIf Solaris is running on bare-metal (native) then affected memory pages associated with this memory module will be removed from service.\n"
+msgstr "Pages of memory associated with this memory module may have been removed from service, up to a limit which has now been reached."
 msgid "AMD-8000-3K.impact"
-msgstr "\n\nPage retirement (where supported) is capped at a small fraction of memory to avoid performance impact.\n"
+msgstr "Total system memory capacity has been reduced (where supported)."
 msgid "AMD-8000-3K.action"
-msgstr "Schedule a repair procedure to replace the affected memory module.  Use 'fmadm faulty' to identify the module."
+msgstr "Schedule a repair procedure to replace the affected memory module. Use 'fmadm faulty' to identify the memory module."
 #
 # code: AMD-8000-48
 # keys: fault.memory.dimm_ue

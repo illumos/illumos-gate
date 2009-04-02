@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -49,13 +49,13 @@ msgstr "Fault"
 msgid "SUN4U-8000-2S.severity"
 msgstr "Major"
 msgid "SUN4U-8000-2S.description"
-msgstr "The number of errors associated with this memory module has exceeded acceptable levels.  Refer to %s for more information."
+msgstr "The number of correctable errors associated with this memory module has exceeded acceptable levels.  Refer to %s for more information."
 msgid "SUN4U-8000-2S.response"
-msgstr "Pages of memory associated with this memory module are being removed from service as errors are reported."
+msgstr "Pages of memory associated with this memory module have been removed from service, up to a limit which has now been reached."
 msgid "SUN4U-8000-2S.impact"
-msgstr "Total system memory capacity will be reduced as pages are retired."
+msgstr "Total system memory capacity has been reduced."
 msgid "SUN4U-8000-2S.action"
-msgstr "Schedule a repair procedure to replace the affected memory module. Use fmdump -v -u <EVENT_ID> to identify the module."
+msgstr "Schedule a repair procedure to replace the affected memory module. Use 'fmadm faulty' to identify the memory module."
 #
 # code: SUN4U-8000-35
 # keys: fault.memory.bank
