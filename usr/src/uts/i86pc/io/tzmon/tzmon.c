@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -471,8 +471,9 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 				(void) snprintf(abuf, 5, "_AL%d", level);
 				tzp->al[level].Length = ACPI_ALLOCATE_BUFFER;
 				tzp->al[level].Pointer = NULL;
-				if (AcpiEvaluateObject(obj, abuf, NULL,
-				    &tzp->al[level]) != AE_OK) {
+				if (AcpiEvaluateObjectTyped(obj, abuf, NULL,
+				    &tzp->al[level], ACPI_TYPE_PACKAGE) !=
+				    AE_OK) {
 					DTRACE_PROBE2(alx__missing, int, level,
 					    char *, (char *)tzp->zone_name);
 
@@ -484,7 +485,8 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 
 		tzp->psl.Length = ACPI_ALLOCATE_BUFFER;
 		tzp->psl.Pointer = NULL;
-		(void) AcpiEvaluateObject(obj, "_PSL", NULL, &tzp->psl);
+		(void) AcpiEvaluateObjectTyped(obj, "_PSL", NULL, &tzp->psl,
+		    ACPI_TYPE_PACKAGE);
 	}
 
 	tzmon_eval_int(obj, "_TC1", &tzp->tc1);
@@ -608,19 +610,14 @@ tzmon_set_power_device(ACPI_HANDLE dev, int on_off, char *tz_name)
 
 	rb.Length = ACPI_ALLOCATE_BUFFER;
 	rb.Pointer = NULL;
-	status = AcpiEvaluateObject(dev, "_PR0", NULL, &rb);
+	status = AcpiEvaluateObjectTyped(dev, "_PR0", NULL, &rb,
+	    ACPI_TYPE_PACKAGE);
 	if (status != AE_OK) {
 		DTRACE_PROBE2(alx__error, int, 2, char *, tz_name);
 		return;
 	}
 
 	pr0 = ((ACPI_OBJECT *)rb.Pointer);
-	if (pr0->Type != ACPI_TYPE_PACKAGE) {
-		DTRACE_PROBE2(alx__error, int, 3, char *, tz_name);
-		AcpiOsFree(rb.Pointer);
-		return;
-	}
-
 	for (i = 0; i < pr0->Package.Count; i++) {
 		status = AcpiEvaluateObject(
 		    pr0->Package.Elements[i].Reference.Handle,
