@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,8 @@ typedef struct {
 	pid_t			pid;
 	instance_t		*inst;	/* pointer to associated instance */
 	instance_method_t	method;	/* the method type running */
+	/* associated endpoint protocol name if known, else NULL */
+	char			*proto_name;
 	uu_list_node_t		link;
 } method_el_t;
 
@@ -160,7 +162,7 @@ method_timeout(iu_tq_t *tq, void *arg)
 	mp->inst->timer_id = -1;
 
 	if (mp->method == IM_START) {
-		process_start_term(mp->inst);
+		process_start_term(mp->inst, mp->proto_name);
 	} else {
 		process_non_start_term(mp->inst, IMRET_FAILURE);
 	}
@@ -178,7 +180,8 @@ method_timeout(iu_tq_t *tq, void *arg)
  * memory allocation failed; else 0.
  */
 int
-register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
+register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd,
+    char *proto_name)
 {
 	char		path[MAXPATHLEN];
 	int		fd;
@@ -214,6 +217,15 @@ register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 	me->method = mthd;
 	me->pid = pid;
 	me->cid = cid;
+	if (proto_name != NULL) {
+		if ((me->proto_name = strdup(proto_name)) == NULL) {
+			error_msg(strerror(errno));
+			free(me);
+			(void) close(fd);
+			return (-1);
+		}
+	} else
+		me->proto_name = NULL;
 
 	/* register a timeout for the method, if required */
 	if (mthd != IM_START) {
@@ -226,6 +238,8 @@ register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 			if (ins->timer_id == -1) {
 				error_msg(gettext(
 				    "Failed to schedule method timeout"));
+				if (me->proto_name != NULL)
+					free(me->proto_name);
 				free(me);
 				(void) close(fd);
 				return (-1);
@@ -239,6 +253,8 @@ register_method(instance_t *ins, pid_t pid, ctid_t cid, instance_method_t mthd)
 	 */
 	if (set_pollfd(fd, 0) == -1) {
 		cancel_inst_timer(ins);
+		if (me->proto_name != NULL)
+			free(me->proto_name);
 		free(me);
 		(void) close(fd);
 		return (-1);
@@ -268,6 +284,8 @@ unregister_method(method_el_t *me)
 	/* remove method record from list */
 	uu_list_remove(method_list, me);
 
+	if (me->proto_name != NULL)
+		free(me->proto_name);
 	free(me);
 }
 
@@ -385,7 +403,7 @@ process_terminated_methods(void)
 		if (me->method != IM_START) {
 			process_non_start_term(me->inst, ret);
 		} else {
-			process_start_term(me->inst);
+			process_start_term(me->inst, me->proto_name);
 		}
 
 		if (me->cid != -1)

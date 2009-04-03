@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INETD_IMPL_H
 #define	_INETD_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Header file containing inetd's shared types/data structures and
@@ -345,7 +342,7 @@ extern int abandon_contract(ctid_t);
  */
 extern void process_offline_inst(instance_t *);
 extern void process_non_start_term(instance_t *, int);
-extern void process_start_term(instance_t *);
+extern void process_start_term(instance_t *, char *);
 extern void remove_method_ids(instance_t *, pid_t, ctid_t, instance_method_t);
 
 /*
@@ -356,7 +353,8 @@ char **set_smf_env(struct method_context *, instance_t *, const char *);
 /*
  * wait.c
  */
-extern int register_method(instance_t *, pid_t, ctid_t cid, instance_method_t);
+extern int register_method(instance_t *, pid_t, ctid_t cid, instance_method_t,
+    char *);
 extern int method_init(void);
 extern void method_fini(void);
 extern void process_terminated_methods(void);

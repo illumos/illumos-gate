@@ -813,11 +813,12 @@ retry_bind(iu_tq_t *tq, void *arg)
 
 /*
  * For each of the fds for the given instance that are bound, if 'listen' is
- * set add them to the poll set, else remove them from it. If any additions
- * fail, returns -1, else 0 on success.
+ * set add them to the poll set, else remove them from it. If proto_name is
+ * not NULL then apply the change only to this specific protocol endpoint.
+ * If any additions fail, returns -1, else 0 on success.
  */
 int
-poll_bound_fds(instance_t *instance, boolean_t listen)
+poll_bound_fds(instance_t *instance, boolean_t listen, char *proto_name)
 {
 	basic_cfg_t	*cfg = instance->config->basic;
 	proto_info_t	*pi;
@@ -826,10 +827,14 @@ poll_bound_fds(instance_t *instance, boolean_t listen)
 	for (pi = uu_list_first(cfg->proto_list); pi != NULL;
 	    pi = uu_list_next(cfg->proto_list, pi)) {
 		if (pi->listen_fd != -1) {	/* fd bound */
-			if (!listen) {
-				clear_pollfd(pi->listen_fd);
-			} else if (set_pollfd(pi->listen_fd, POLLIN) == -1) {
-				ret = -1;
+			if (proto_name == NULL ||
+			    strcmp(pi->proto, proto_name) == 0) {
+				if (listen == B_FALSE) {
+					clear_pollfd(pi->listen_fd);
+				} else if (set_pollfd(pi->listen_fd,
+				    POLLIN) == -1) {
+					ret = -1;
+				}
 			}
 		}
 	}
@@ -1134,7 +1139,7 @@ create_bound_fds(instance_t *instance)
 		 * We're 'online', so start polling on any bound fds we're
 		 * currently not.
 		 */
-		if (poll_bound_fds(instance, B_TRUE) != 0) {
+		if (poll_bound_fds(instance, B_TRUE, NULL) != 0) {
 			failure = B_TRUE;
 		} else if (!failure) {
 			/*
@@ -1443,7 +1448,7 @@ retrieve_method_pids(instance_t *inst)
 	rv = uu_list_first(inst->start_pids);
 	while (rv != NULL) {
 		if (register_method(inst, (pid_t)rv->val, (ctid_t)-1,
-		    IM_START) == 0) {
+		    IM_START, NULL) == 0) {
 			inst->copies++;
 			rv = uu_list_next(inst->start_pids, rv);
 		} else if (errno == ENOENT) {
@@ -2147,10 +2152,11 @@ fail:
 
 /*
  * Do the state machine processing associated with the termination of instance
- * 'inst''s start method.
+ * 'inst''s start method for the 'proto_name' protocol if this parameter is not
+ * NULL.
  */
 void
-process_start_term(instance_t *inst)
+process_start_term(instance_t *inst, char *proto_name)
 {
 	basic_cfg_t	*cfg;
 
@@ -2166,6 +2172,7 @@ process_start_term(instance_t *inst)
 
 	if (cfg->iswait) {
 		proto_info_t	*pi;
+		boolean_t	listen;
 
 		switch (inst->cur_istate) {
 		case IIS_ONLINE:
@@ -2179,19 +2186,25 @@ process_start_term(instance_t *inst)
 			 * the latter, mark the service offline and let bind
 			 * attempts commence.
 			 */
+			listen = B_FALSE;
 			for (pi = uu_list_first(cfg->proto_list); pi != NULL;
 			    pi = uu_list_next(cfg->proto_list, pi)) {
 				/*
 				 * If a bound fd exists, the method was fired
 				 * off during this inetd's lifetime.
 				 */
-				if (pi->listen_fd != -1)
-					break;
+				if (pi->listen_fd != -1) {
+					listen = B_TRUE;
+					if (proto_name == NULL ||
+					    strcmp(pi->proto, proto_name) == 0)
+						break;
+				}
 			}
 			if (pi != NULL) {
-				if (poll_bound_fds(inst, B_TRUE) != 0)
+				if (poll_bound_fds(inst, B_TRUE, proto_name) !=
+				    0)
 					handle_bind_failure(inst);
-			} else {
+			} else if (listen == B_FALSE) {
 				update_state(inst, IIS_OFFLINE, RERR_RESTART);
 				create_bound_fds(inst);
 			}
@@ -2324,7 +2337,7 @@ process_non_start_term(instance_t *inst, int status)
 		 * this method, so now we're online start listening for
 		 * connections on them.
 		 */
-		if (poll_bound_fds(inst, B_TRUE) != 0)
+		if (poll_bound_fds(inst, B_TRUE, NULL) != 0)
 			handle_bind_failure(inst);
 	}
 
@@ -3080,7 +3093,8 @@ run_method(instance_t *instance, instance_method_t method,
 		 * the state transition this method participates in is
 		 * continued.
 		 */
-		if (register_method(instance, child_pid, cid, method) != 0) {
+		if (register_method(instance, child_pid, cid, method,
+		    start_info->proto) != 0) {
 			/*
 			 * Since we will never find out about the termination
 			 * of this method, if it's a non-start method treat
@@ -3391,7 +3405,7 @@ process_wait_request(instance_t *instance, const proto_info_t *pi)
 		 * Stop listening for connections now we've fired off the
 		 * server for a wait type instance.
 		 */
-		(void) poll_bound_fds(instance, B_FALSE);
+		(void) poll_bound_fds(instance, B_FALSE, pi->proto);
 	}
 }
 
