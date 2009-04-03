@@ -2923,6 +2923,7 @@ arc_release(arc_buf_t *buf, void *tag)
 	kmutex_t *hash_lock;
 	l2arc_buf_hdr_t *l2hdr;
 	uint64_t buf_size;
+	boolean_t released = B_FALSE;
 
 	rw_enter(&buf->b_lock, RW_WRITER);
 	hdr = buf->b_hdr;
@@ -2938,11 +2939,11 @@ arc_release(arc_buf_t *buf, void *tag)
 		ASSERT(buf->b_efunc == NULL);
 		arc_buf_thaw(buf);
 		rw_exit(&buf->b_lock);
-		return;
+		released = B_TRUE;
+	} else {
+		hash_lock = HDR_LOCK(hdr);
+		mutex_enter(hash_lock);
 	}
-
-	hash_lock = HDR_LOCK(hdr);
-	mutex_enter(hash_lock);
 
 	l2hdr = hdr->b_l2hdr;
 	if (l2hdr) {
@@ -2950,6 +2951,9 @@ arc_release(arc_buf_t *buf, void *tag)
 		hdr->b_l2hdr = NULL;
 		buf_size = hdr->b_size;
 	}
+
+	if (released)
+		goto out;
 
 	/*
 	 * Do we have more than one buf?
@@ -3018,6 +3022,7 @@ arc_release(arc_buf_t *buf, void *tag)
 	buf->b_efunc = NULL;
 	buf->b_private = NULL;
 
+out:
 	if (l2hdr) {
 		list_remove(l2hdr->b_dev->l2ad_buflist, hdr);
 		kmem_free(l2hdr, sizeof (l2arc_buf_hdr_t));
