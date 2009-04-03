@@ -20,9 +20,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -255,13 +257,8 @@ prwritectl(vnode_t *vp, uio_t *uiop, cred_t *cr)
 			arg_t *argp = (arg_t *)&bufp[1];
 
 			size = ctlsize(cmd, resid, argp);
-			if (size == 0) {  /* incomplete or invalid command */
-				if (locked) {
-					prunlock(pnp);
-					locked = 0;
-				}
-				return (resid? EINVAL : 0);
-			}
+			if (size == 0)	/* incomplete or invalid command */
+				break;
 			/*
 			 * Perform the specified control operation.
 			 */
@@ -671,13 +668,8 @@ prwritectl32(struct vnode *vp, struct uio *uiop, cred_t *cr)
 			arg32_t *argp = (arg32_t *)&bufp[1];
 
 			size = ctlsize32(cmd, resid, argp);
-			if (size == 0) {  /* incomplete or invalid command */
-				if (locked) {
-					prunlock(pnp);
-					locked = 0;
-				}
-				return (resid? EINVAL : 0);
-			}
+			if (size == 0)	/* incomplete or invalid command */
+				break;
 			/*
 			 * Perform the specified control operation.
 			 */
