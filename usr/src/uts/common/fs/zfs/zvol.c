@@ -1468,6 +1468,8 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		break;
 
 	case DKIOCDUMPFINI:
+		if (!(zv->zv_flags & ZVOL_DUMPIFIED))
+			break;
 		rl = zfs_range_lock(&zv->zv_znode, 0, zv->zv_volsize,
 		    RL_WRITER);
 		error = zvol_dump_fini(zv);
