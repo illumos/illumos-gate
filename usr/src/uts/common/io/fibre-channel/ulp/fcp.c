@@ -2871,6 +2871,7 @@ fcp_is_reconfig_needed(struct fcp_tgt *ptgt,
 			switch (lun_string[0] & 0xC0) {
 			case FCP_LUN_ADDRESSING:
 			case FCP_PD_ADDRESSING:
+			case FCP_VOLUME_ADDRESSING:
 				lun_num = ((lun_string[0] & 0x3F) << 8)
 				    | lun_string[1];
 				if (fcp_should_mask(&ptgt->tgt_port_wwn,
@@ -2908,6 +2909,7 @@ fcp_is_reconfig_needed(struct fcp_tgt *ptgt,
 		switch (lun_string[0] & 0xC0) {
 		case FCP_LUN_ADDRESSING:
 		case FCP_PD_ADDRESSING:
+		case FCP_VOLUME_ADDRESSING:
 			lun_num = ((lun_string[0] & 0x3F) << 8) | lun_string[1];
 
 			if ((fcp_lun_blacklist != NULL) && (fcp_should_mask(
@@ -7568,6 +7570,7 @@ fcp_handle_reportlun(fc_packet_t *fpkt, struct fcp_ipkt *icmd)
 			switch (lun_string[0] & 0xC0) {
 			case FCP_LUN_ADDRESSING:
 			case FCP_PD_ADDRESSING:
+			case FCP_VOLUME_ADDRESSING:
 				lun_num = ((lun_string[0] & 0x3F) << 8) |
 				    lun_string[1];
 				if (plun->lun_num == lun_num) {
@@ -7662,6 +7665,7 @@ fcp_handle_reportlun(fc_packet_t *fpkt, struct fcp_ipkt *icmd)
 		switch (lun_string[0] & 0xC0) {
 		case FCP_LUN_ADDRESSING:
 		case FCP_PD_ADDRESSING:
+		case FCP_VOLUME_ADDRESSING:
 			lun_num = ((lun_string[0] & 0x3F) << 8) | lun_string[1];
 
 			/* We will skip masked LUNs because of the blacklist. */
@@ -7738,8 +7742,6 @@ fcp_handle_reportlun(fc_packet_t *fpkt, struct fcp_ipkt *icmd)
 			}
 			break;
 
-		case FCP_VOLUME_ADDRESSING:
-			/* FALLTHROUGH */
 		default:
 			fcp_log(CE_WARN, NULL,
 			    "!Unsupported LUN Addressing method %x "
