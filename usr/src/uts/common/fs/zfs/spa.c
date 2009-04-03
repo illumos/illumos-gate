@@ -1140,16 +1140,19 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 
 	/*
-	 * Validate the labels for all leaf vdevs.  We need to grab the config
-	 * lock because all label I/O is done with ZIO_FLAG_CONFIG_WRITER.
+	 * We need to validate the vdev labels against the configuration that
+	 * we have in hand, which is dependent on the setting of mosconfig. If
+	 * mosconfig is true then we're validating the vdev labels based on
+	 * that config. Otherwise, we're validating against the cached config
+	 * (zpool.cache) that was read when we loaded the zfs module, and then
+	 * later we will recursively call spa_load() and validate against
+	 * the vdev config.
 	 */
-	if (mosconfig) {
-		spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
-		error = vdev_validate(rvd);
-		spa_config_exit(spa, SCL_ALL, FTAG);
-		if (error != 0)
-			goto out;
-	}
+	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
+	error = vdev_validate(rvd);
+	spa_config_exit(spa, SCL_ALL, FTAG);
+	if (error != 0)
+		goto out;
 
 	if (rvd->vdev_state <= VDEV_STATE_CANT_OPEN) {
 		error = ENXIO;
