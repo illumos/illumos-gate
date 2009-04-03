@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	"rtld.h"
@@ -60,24 +59,24 @@
 const char *
 conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
 {
-	static Val_desc vda[] = {
-		{ GPH_ZERO,		MSG_ORIG(MSG_GPH_ZERO) },
-		{ GPH_LDSO,		MSG_ORIG(MSG_GPH_LDSO) },
-		{ GPH_FIRST,		MSG_ORIG(MSG_GPH_FIRST) },
-		{ GPH_FILTEE,		MSG_ORIG(MSG_GPH_FILTEE) },
-		{ GPH_INITIAL,		MSG_ORIG(MSG_GPH_INITIAL) },
-		{ GPH_NOPENDLAZY,	MSG_ORIG(MSG_GPH_NOPENDLAZY) },
+	static const Val_desc vda[] = {
+		{ GPH_ZERO,		MSG_GPH_ZERO },
+		{ GPH_LDSO,		MSG_GPH_LDSO },
+		{ GPH_FIRST,		MSG_GPH_FIRST },
+		{ GPH_FILTEE,		MSG_GPH_FILTEE },
+		{ GPH_INITIAL,		MSG_GPH_INITIAL },
+		{ GPH_NOPENDLAZY,	MSG_GPH_NOPENDLAZY },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (grphdl_flags_buf->buf), vda };
+	    NULL, sizeof (grphdl_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
 	conv_arg.buf = grphdl_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, 0);
+	(void) conv_expn_field(&conv_arg, vda, 0);
 
 	return ((const char *)grphdl_flags_buf->buf);
 }
@@ -113,25 +112,25 @@ conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
 const char *
 conv_grpdesc_flags(uint_t flags, Conv_grpdesc_flags_buf_t *grpdesc_flags_buf)
 {
-	static Val_desc vda[] = {
-		{ GPD_DLSYM,		MSG_ORIG(MSG_GPD_DLSYM) },
-		{ GPD_RELOC,		MSG_ORIG(MSG_GPD_RELOC) },
-		{ GPD_ADDEPS,		MSG_ORIG(MSG_GPD_ADDEPS) },
-		{ GPD_PARENT,		MSG_ORIG(MSG_GPD_PARENT) },
-		{ GPD_FILTER,		MSG_ORIG(MSG_GPD_FILTER) },
-		{ GPD_PROMOTE,		MSG_ORIG(MSG_GPD_PROMOTE) },
-		{ GPD_REMOVE,		MSG_ORIG(MSG_GPD_REMOVE) },
+	static const Val_desc vda[] = {
+		{ GPD_DLSYM,		MSG_GPD_DLSYM },
+		{ GPD_RELOC,		MSG_GPD_RELOC },
+		{ GPD_ADDEPS,		MSG_GPD_ADDEPS },
+		{ GPD_PARENT,		MSG_GPD_PARENT },
+		{ GPD_FILTER,		MSG_GPD_FILTER },
+		{ GPD_PROMOTE,		MSG_GPD_PROMOTE },
+		{ GPD_REMOVE,		MSG_GPD_REMOVE },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (grpdesc_flags_buf->buf), vda };
+	    NULL, sizeof (grpdesc_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
 	conv_arg.buf = grpdesc_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, 0);
+	(void) conv_expn_field(&conv_arg, vda, 0);
 
 	return ((const char *)grpdesc_flags_buf->buf);
 }

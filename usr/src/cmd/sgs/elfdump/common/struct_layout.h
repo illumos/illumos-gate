@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_STRUCT_LAYOUT_H
 #define	_STRUCT_LAYOUT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<conv.h>
 #include	<_machelf.h>
@@ -108,7 +106,7 @@ typedef union {
 /*
  * Buffer large enough to format any integral value in a field
  */
-typedef char sl_fmtbuf_t[CONV64_INV_BUFSIZE * 2];
+typedef char sl_fmtbuf_t[CONV_INV_BUFSIZE * 2];
 
 /*
  * Types of formatting done by fmt_num()

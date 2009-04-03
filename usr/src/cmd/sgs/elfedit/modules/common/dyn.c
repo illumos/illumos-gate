@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,6 @@
 /*
  * Dynamic section
  */
-
-
-
 
 /*
  * This module uses shared code for several of the commands.
@@ -187,11 +184,12 @@ set_null_ndx(ARGSTATE *argstate)
  *	this routine does not return to the caller.
  */
 static Word
-convert_dt_null(ARGSTATE *argstate, Word d_tag, Xword d_val)
+convert_dt_null(ARGSTATE *argstate, Xword d_tag, Xword d_val)
 {
 	Conv_inv_buf_t inv_buf;
 	Word	ndx;
 	Dyn	*dyn;
+	Ehdr	*ehdr;
 
 	/* If we lack an extra element, we can't continue */
 	if (argstate->dyn.num_null_ndx <= 1)
@@ -199,10 +197,11 @@ convert_dt_null(ARGSTATE *argstate, Word d_tag, Xword d_val)
 		    EC_WORD(argstate->dyn.sec->sec_shndx),
 		    argstate->dyn.sec->sec_name);
 
+	ehdr = argstate->obj_state->os_ehdr;
 	elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_CONVNULL),
 	    EC_WORD(argstate->dyn.sec->sec_shndx), argstate->dyn.sec->sec_name,
 	    EC_WORD(argstate->dyn.null_ndx), conv_dyn_tag(d_tag,
-	    argstate->obj_state->os_ehdr->e_machine, 0, &inv_buf));
+	    ehdr->e_ident[EI_OSABI], ehdr->e_machine, 0, &inv_buf));
 
 	ndx = argstate->dyn.null_ndx;
 	dyn = &argstate->dyn.data[ndx];
@@ -268,8 +267,6 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 	set_null_ndx(argstate);
 }
 
-
-
 /*
  * Print ELF header values, taking the calling command, and output style
  * into account.
@@ -280,7 +277,7 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
  *		autoprint flag is set. If False, output is always produced.
  *	argstate - Argument state block
  *	print_type - Specifies which dynamic elements to display.
- *	ndx = If print_type is PRINT_DYN_T_NDX, displays the index specified.
+ *	arg - If print_type is PRINT_DYN_T_NDX, displays the index specified.
  *		Otherwise ignored.
  */
 typedef enum {
@@ -303,9 +300,13 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	int	header_done = 0;
 	Xword	last_d_val;
 	int	one_shot;
+	int	osabi_solaris;
 
 	if (autoprint && ((elfedit_flags() & ELFEDIT_F_AUTOPRINT) == 0))
 		return;
+
+	osabi_solaris =
+	    elfedit_test_osabi(argstate->obj_state, ELFOSABI_SOLARIS, 0);
 
 	/*
 	 * Pick an output style. dyn:dump is required to use the default
@@ -427,10 +428,14 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 		case DT_USED:
 		case DT_DEPAUDIT:
 		case DT_AUDIT:
-		case DT_SUNW_AUXILIARY:
-		case DT_SUNW_FILTER:
 			name = elfedit_offset_to_str(argstate->strsec,
 			    dyn->d_un.d_val, ELFEDIT_MSG_DEBUG, 0);
+			break;
+		case DT_SUNW_AUXILIARY:
+		case DT_SUNW_FILTER:
+			if (osabi_solaris)
+				name = elfedit_offset_to_str(argstate->strsec,
+				    dyn->d_un.d_val, ELFEDIT_MSG_DEBUG, 0);
 			break;
 
 		case DT_FLAGS:
@@ -481,20 +486,24 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 			name = MSG_INTL(MSG_STR_DEPRECATED);
 			break;
 		case DT_SUNW_LDMACH:
-			name = conv_ehdr_mach((Half)dyn->d_un.d_val, 0,
-			    &c_buf.inv);
+			if (osabi_solaris)
+				name = conv_ehdr_mach((Half)dyn->d_un.d_val, 0,
+				    &c_buf.inv);
 			break;
 		}
 
 		if (outstyle == ELFEDIT_OUTSTYLE_DEFAULT) {
+			Ehdr	*ehdr;
+
 			if (header_done == 0) {
 				header_done = 1;
 				Elf_dyn_title(0);
 			}
 			if (name == NULL)
 				name = MSG_ORIG(MSG_STR_EMPTY);
+			ehdr = argstate->obj_state->os_ehdr;
 			Elf_dyn_entry(0, dyn, ndx, name,
-			    argstate->obj_state->os_ehdr->e_machine);
+			    ehdr->e_ident[EI_OSABI], ehdr->e_machine);
 		} else {
 			/*
 			 * In simple or numeric mode under a print type
@@ -557,13 +566,14 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	 */
 	if (!printed) {
 		if (print_type == PRINT_DYN_T_TAG) {
-			Conv_inv_buf_t inv_buf;
+			Conv_inv_buf_t	inv_buf;
+			Ehdr		*ehdr = argstate->obj_state->os_ehdr;
 
 			elfedit_msg(ELFEDIT_MSG_ERR,
 			    MSG_INTL(MSG_ERR_NODYNELT),
 			    EC_WORD(argstate->dyn.sec->sec_shndx),
 			    argstate->dyn.sec->sec_name, conv_dyn_tag(arg,
-			    argstate->obj_state->os_ehdr->e_machine,
+			    ehdr->e_ident[EI_OSABI], ehdr->e_machine,
 			    0, &inv_buf));
 		}
 
@@ -613,7 +623,8 @@ static Word
 arg_to_index(ARGSTATE *argstate, const char *arg,
     int print_request, PRINT_DYN_T *print_type)
 {
-	Word	ndx, dt_value;
+	Word	ndx;
+	Xword	dt_value;
 	Dyn	*dyn;
 
 
@@ -647,15 +658,17 @@ arg_to_index(ARGSTATE *argstate, const char *arg,
 		ndx = ((Word) elfedit_atoui_range(argstate->dyn_elt_str,
 		    MSG_ORIG(MSG_STR_INDEX), 0, argstate->dyn.num - 1, NULL));
 		if (argstate->dyn.data[ndx].d_tag != dt_value) {
-			Half	mach = argstate->obj_state->os_ehdr->e_machine;
+			Ehdr	*ehdr = argstate->obj_state->os_ehdr;
+			uchar_t	osabi = ehdr->e_ident[EI_OSABI];
+			Half	mach = ehdr->e_machine;
 			Conv_inv_buf_t	is, want;
 
 			elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_WRONGTAG),
 			    EC_WORD(argstate->dyn.sec->sec_shndx),
 			    argstate->dyn.sec->sec_name, ndx,
-			    conv_dyn_tag(dt_value, mach, 0, &want),
-			    conv_dyn_tag(argstate->dyn.data[ndx].d_tag, mach,
-			    0, &is));
+			    conv_dyn_tag(dt_value, osabi, mach, 0, &want),
+			    conv_dyn_tag(argstate->dyn.data[ndx].d_tag,
+			    osabi, mach, 0, &is));
 		}
 		return (ndx);
 	}
@@ -757,8 +770,8 @@ cmd_body_value(ARGSTATE *argstate, Word *ret_ndx)
 	Dyn	*dyn = argstate->dyn.data;
 	Word	numdyn = argstate->dyn.num;
 	int	minus_add, minus_s, minus_dynndx;
-	Word	arg1, tmp_val;
-	Xword	arg2;
+	Word	tmp_val;
+	Xword	arg1, arg2;
 	int	arg2_known = 1;
 
 	minus_add = ((argstate->optmask & DYN_OPT_F_ADD) != 0);
@@ -791,7 +804,8 @@ cmd_body_value(ARGSTATE *argstate, Word *ret_ndx)
 
 		/* Locate DT_SUNW_STRPAD element if present */
 		strpad_elt.dn_dyn.d_un.d_val = 0;
-		(void) elfedit_dynstr_getpad(argstate->dyn.sec, &strpad_elt);
+		(void) elfedit_dynstr_getpad(argstate->obj_state,
+		    argstate->dyn.sec, &strpad_elt);
 
 		/*
 		 * Look up the string: If the user specified the -dynndx
@@ -972,7 +986,9 @@ cmd_body_runpath(ARGSTATE *argstate)
 			break;
 
 		case DT_SUNW_STRPAD:
-			elfedit_dyn_elt_save(&strpad_elt, i, &dyn[i]);
+			if (elfedit_test_osabi(argstate->obj_state,
+			    ELFOSABI_SOLARIS, 0))
+				elfedit_dyn_elt_save(&strpad_elt, i, &dyn[i]);
 			break;
 		}
 	}
@@ -1229,6 +1245,9 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 	case DYN_CMD_T_SUNW_LDMACH:
 		if (argstate.argc > 1)
 			elfedit_command_usage();
+		/* DT_SUNW_LDMACH is an ELFOSABI_SOLARIS feature */
+		(void) elfedit_test_osabi(argstate.obj_state,
+		    ELFOSABI_SOLARIS, 1);
 		print_only = (argstate.argc == 0);
 		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
 		    ELFEDIT_CONST_DT, DT_SUNW_LDMACH, 1),
@@ -1257,19 +1276,20 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 
 	case DYN_CMD_T_TAG:
 		{
+			Ehdr		*ehdr = argstate.obj_state->os_ehdr;
+			uchar_t		osabi = ehdr->e_ident[EI_OSABI];
+			Half		mach = ehdr->e_machine;
 			Conv_inv_buf_t	inv_buf1, inv_buf2;
-			Half	mach = argstate.obj_state->os_ehdr->e_machine;
-			Word d_tag = (Word) elfedit_atoconst(argstate.argv[1],
+			Xword d_tag = (Xword) elfedit_atoconst(argstate.argv[1],
 			    ELFEDIT_CONST_DT);
 
 			if (dyn[ndx].d_tag == d_tag) {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
-				    MSG_INTL(MSG_DEBUG_S_OK),
-				    dyn_ndx,
-				    dyn_name, EC_WORD(ndx),
-				    conv_dyn_tag(d_tag, mach, 0, &inv_buf1));
+				    MSG_INTL(MSG_DEBUG_S_OK), dyn_ndx, dyn_name,
+				    EC_WORD(ndx), conv_dyn_tag(d_tag, osabi,
+				    mach, 0, &inv_buf1));
 			} else {
-				Word orig_d_tag = dyn[ndx].d_tag;
+				Xword orig_d_tag = dyn[ndx].d_tag;
 
 				ret = ELFEDIT_CMDRET_MOD;
 				dyn[ndx].d_tag = d_tag;
@@ -1287,9 +1307,8 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 					elfedit_msg(ELFEDIT_MSG_DEBUG,
 					    MSG_INTL(MSG_DEBUG_NULLTERM),
 					    dyn_ndx, dyn_name,
-					    EC_WORD(ndx),
-					    conv_dyn_tag(d_tag, mach,
-					    0, &inv_buf1));
+					    EC_WORD(ndx), conv_dyn_tag(d_tag,
+					    osabi, mach, 0, &inv_buf1));
 
 				/*
 				 * Warning if
@@ -1305,25 +1324,26 @@ cmd_body(DYN_CMD_T cmd, elfedit_obj_state_t *obj_state,
 						    MSG_INTL(MSG_DEBUG_NULCLIP),
 						    dyn_ndx, dyn_name,
 						    EC_WORD(ndx),
-						    conv_dyn_tag(d_tag, mach,
-						    0, &inv_buf1));
+						    conv_dyn_tag(d_tag, osabi,
+						    mach, 0, &inv_buf1));
 				} else {
 					if ((ndx + 1) > argstate.dyn.null_ndx)
 						elfedit_msg(ELFEDIT_MSG_DEBUG,
 						    MSG_INTL(MSG_DEBUG_NULHIDE),
 						    dyn_ndx, dyn_name,
 						    EC_WORD(ndx),
-						    conv_dyn_tag(d_tag, mach,
-						    0, &inv_buf1));
+						    conv_dyn_tag(d_tag, osabi,
+						    mach, 0, &inv_buf1));
 				}
 
 				/* Debug message that we changed it */
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_CHG),
 				    dyn_ndx, dyn_name, EC_WORD(ndx),
-				    conv_dyn_tag(orig_d_tag, mach, 0,
+				    conv_dyn_tag(orig_d_tag, osabi, mach, 0,
 				    &inv_buf1),
-				    conv_dyn_tag(d_tag, mach, 0, &inv_buf2));
+				    conv_dyn_tag(d_tag, osabi, mach, 0,
+				    &inv_buf2));
 			}
 		}
 		break;

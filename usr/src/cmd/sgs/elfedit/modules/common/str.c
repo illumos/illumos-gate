@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<ctype.h>
@@ -364,7 +363,7 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 		    dynsec->sec_shdr->sh_link)) {
 			argstate->dyn.sec = elfedit_sec_getdyn(obj_state,
 			    &argstate->dyn.data, &argstate->dyn.n);
-			(void) elfedit_dynstr_getpad(dynsec,
+			(void) elfedit_dynstr_getpad(obj_state, dynsec,
 			    &argstate->dyn.strpad);
 
 			/*

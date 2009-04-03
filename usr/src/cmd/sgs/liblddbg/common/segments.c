@@ -32,7 +32,8 @@
  * Print out a single `segment descriptor' entry.
  */
 void
-Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
+Dbg_seg_desc_entry(Lm_list *lml, uchar_t osabi, Half mach, int ndx,
+    Sg_desc *sgp)
 {
 	Conv_seg_flags_buf_t	seg_flags_buf;
 	const char		*str;
@@ -45,7 +46,7 @@ Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_ORIG(MSG_SEG_NAME), ndx, str);
 
-	Elf_phdr(lml, mach, &sgp->sg_phdr);
+	Elf_phdr(lml, osabi, mach, &sgp->sg_phdr);
 
 	dbg_print(lml, MSG_ORIG(MSG_SEG_LENGTH), EC_ADDR(sgp->sg_length));
 	dbg_print(lml, MSG_ORIG(MSG_SEG_FLAGS),
@@ -83,14 +84,15 @@ Dbg_seg_entry(Ofl_desc *ofl, int ndx, Sg_desc *sgp)
 	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
 
-	Dbg_seg_desc_entry(ofl->ofl_lml, ofl->ofl_dehdr->e_machine, ndx, sgp);
+	Dbg_seg_desc_entry(ofl->ofl_lml, ofl->ofl_dehdr->e_ident[EI_OSABI],
+	    ofl->ofl_dehdr->e_machine, ndx, sgp);
 }
 
 /*
  * Print out the available segment descriptors.
  */
 void
-Dbg_seg_list(Lm_list *lml, Half mach, APlist *apl)
+Dbg_seg_list(Lm_list *lml, uchar_t osabi, Half mach, APlist *apl)
 {
 	Aliste		idx;
 	Sg_desc		*sgp;
@@ -102,7 +104,7 @@ Dbg_seg_list(Lm_list *lml, Half mach, APlist *apl)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SEG_DESC_AVAIL));
 	for (APLIST_TRAVERSE(apl, idx, sgp))
-		Dbg_seg_desc_entry(lml, mach, ndx++, sgp);
+		Dbg_seg_desc_entry(lml, osabi, mach, ndx++, sgp);
 }
 
 /*
@@ -125,7 +127,8 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 		return;
 
 	dbg_print(lml, MSG_ORIG(MSG_SEC_NAME), ndx, osp->os_name);
-	Elf_shdr(lml, ofl->ofl_dehdr->e_machine, osp->os_shdr);
+	Elf_shdr(lml, ofl->ofl_dehdr->e_ident[EI_OSABI],
+	    ofl->ofl_dehdr->e_machine, osp->os_shdr);
 	dbg_print(lml, MSG_INTL(MSG_EDATA_TITLE));
 
 	shdr = osp->os_shdr;

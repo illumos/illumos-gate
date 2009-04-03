@@ -34,10 +34,6 @@
  * allows other tools to use dwarf_ehe without also pulling this in.
  */
 
-/* Instantiate a local copy of conv_map2str() from _conv.h */
-DEFINE_conv_map2str
-
-
 /*
  * Translate DW_CFA_ codes, used to identify Call Frame Instructions.
  */
@@ -58,10 +54,20 @@ conv_dwarf_cfa(uchar_t op, Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf)
 		MSG_DW_CFA_VAL_OFFSET,		MSG_DW_CFA_VAL_OFFSET_SF,
 		MSG_DW_CFA_VAL_EXPRESSION
 	};
-	static const Msg	gnu[] = {
+	static const Msg	cfa_mips[] = {	MSG_DW_CFA_MIPS_ADV_LOC8 };
+	static const Msg	cfa_gnu[] = {
 		MSG_DW_CFA_GNU_WINDOW_SAVE,	MSG_DW_CFA_GNU_ARGS_SIZE,
 		MSG_DW_CFA_GNU_NEGATIVE_OFF_X
 	};
+	static const conv_ds_msg_t ds_msg_cfa = {
+	    CONV_DS_MSG_INIT(0, cfa) };
+	static const conv_ds_msg_t ds_msg_cfa_mips = {
+	    CONV_DS_MSG_INIT(0x1d, cfa_mips) };
+	static const conv_ds_msg_t ds_msg_cfa_gnu = {
+	    CONV_DS_MSG_INIT(0x2d, cfa_gnu) };
+	static const conv_ds_t	*ds_cfa[] = { CONV_DS_ADDR(ds_msg_cfa),
+	    CONV_DS_ADDR(ds_msg_cfa_mips), CONV_DS_ADDR(ds_msg_cfa_gnu), NULL };
+
 
 	/*
 	 * DWARF CFA opcodes are bytes. The top 2 bits are a primary
@@ -76,14 +82,8 @@ conv_dwarf_cfa(uchar_t op, Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf)
 		return (MSG_ORIG(MSG_DW_CFA_RESTORE));
 	}
 
-	if (op == 0x1d)
-		return (MSG_ORIG(MSG_DW_CFA_MIPS_ADV_LOC8));
-
-	if ((op >= 0x2d) && (op <= 0x2f))
-		return (conv_map2str(inv_buf, (op - 0x2d),
-		    fmt_flags, ARRAY_NELTS(gnu), gnu));
-
-	return (conv_map2str(inv_buf, op, fmt_flags, ARRAY_NELTS(cfa), cfa));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, op, ds_cfa,
+	    fmt_flags, inv_buf));
 }
 
 /*
@@ -142,6 +142,10 @@ conv_dwarf_regname(Half mach, Word regno, Conv_fmt_flags_t fmt_flags,
 		MSG_REG_PERMXCSR,	MSG_REG_PERFCW,
 		MSG_REG_PERFSW
 	};
+	static const conv_ds_msg_t ds_msg_reg_amd64 = {
+	    CONV_DS_MSG_INIT(0, reg_amd64) };
+	static const conv_ds_t	*ds_reg_amd64[] = {
+	    CONV_DS_ADDR(ds_msg_reg_amd64), NULL };
 
 	static const Msg	reg_i386[8] = {
 		MSG_REG_EAX,		MSG_REG_ECX,
@@ -149,6 +153,10 @@ conv_dwarf_regname(Half mach, Word regno, Conv_fmt_flags_t fmt_flags,
 		MSG_REG_UESP,		MSG_REG_EBP,
 		MSG_REG_ESI,		MSG_REG_EDI
 	};
+	static const conv_ds_msg_t ds_msg_reg_i386 = {
+	    CONV_DS_MSG_INIT(0, reg_i386) };
+	static const conv_ds_t	*ds_reg_i386[] = {
+	    CONV_DS_ADDR(ds_msg_reg_i386), NULL };
 
 	static const Msg	reg_sparc[64] = {
 		MSG_REG_G0,		MSG_REG_G1,
@@ -184,6 +192,10 @@ conv_dwarf_regname(Half mach, Word regno, Conv_fmt_flags_t fmt_flags,
 		MSG_REG_F28,		MSG_REG_F29,
 		MSG_REG_F30,		MSG_REG_F31
 	};
+	static const conv_ds_msg_t ds_msg_reg_sparc = {
+	    CONV_DS_MSG_INIT(0, reg_sparc) };
+	static const conv_ds_t	*ds_reg_sparc[] = {
+	    CONV_DS_ADDR(ds_msg_reg_sparc), NULL };
 
 	switch (mach) {
 	case EM_AMD64:
@@ -197,23 +209,23 @@ conv_dwarf_regname(Half mach, Word regno, Conv_fmt_flags_t fmt_flags,
 			    (regno != 56) && (regno != 57) &&
 			    (regno != 60) && (regno != 61) &&
 			    (regno < ARRAY_NELTS(reg_amd64));
-		return (conv_map2str(inv_buf, regno,
-		    fmt_flags, ARRAY_NELTS(reg_amd64), reg_amd64));
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, regno,
+		    ds_reg_amd64, fmt_flags, inv_buf));
 
 	case EM_386:
 	case EM_486:
 		if (good_name)
 			*good_name = (regno < ARRAY_NELTS(reg_i386));
-		return (conv_map2str(inv_buf, regno,
-		    fmt_flags, ARRAY_NELTS(reg_i386), reg_i386));
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, regno,
+		    ds_reg_i386, fmt_flags, inv_buf));
 
 	case EM_SPARC:
 	case EM_SPARC32PLUS:
 	case EM_SPARCV9:
 		if (good_name)
 			*good_name = (regno < ARRAY_NELTS(reg_sparc));
-		return (conv_map2str(inv_buf, regno,
-		    fmt_flags, ARRAY_NELTS(reg_sparc), reg_sparc));
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, regno,
+		    ds_reg_sparc, fmt_flags, inv_buf));
 	}
 
 	if (good_name)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,19 +62,19 @@
 const char *
 conv_dl_mode(int mode, int fabricate, Conv_dl_mode_buf_t *dl_mode_buf)
 {
-	static Val_desc vda[] = {
-		{ RTLD_NOLOAD,		MSG_ORIG(MSG_RTLD_NOLOAD) },
-		{ RTLD_PARENT,		MSG_ORIG(MSG_RTLD_PARENT) },
-		{ RTLD_GROUP,		MSG_ORIG(MSG_RTLD_GROUP) },
-		{ RTLD_WORLD,		MSG_ORIG(MSG_RTLD_WORLD) },
-		{ RTLD_NODELETE,	MSG_ORIG(MSG_RTLD_NODELETE) },
-		{ RTLD_FIRST,		MSG_ORIG(MSG_RTLD_FIRST) },
-		{ RTLD_CONFGEN,		MSG_ORIG(MSG_RTLD_CONFGEN) },
+	static const Val_desc vda[] = {
+		{ RTLD_NOLOAD,		MSG_RTLD_NOLOAD },
+		{ RTLD_PARENT,		MSG_RTLD_PARENT },
+		{ RTLD_GROUP,		MSG_RTLD_GROUP },
+		{ RTLD_WORLD,		MSG_RTLD_WORLD },
+		{ RTLD_NODELETE,	MSG_RTLD_NODELETE },
+		{ RTLD_FIRST,		MSG_RTLD_FIRST },
+		{ RTLD_CONFGEN,		MSG_RTLD_CONFGEN },
 		{ 0,			0 }
 	};
 	static const char *leading_str_arr[3];
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (dl_mode_buf->buf), vda, leading_str_arr };
+	    NULL, sizeof (dl_mode_buf->buf), leading_str_arr };
 
 	const char **lstr = leading_str_arr;
 
@@ -96,7 +96,7 @@ conv_dl_mode(int mode, int fabricate, Conv_dl_mode_buf_t *dl_mode_buf)
 	conv_arg.oflags = mode;
 	conv_arg.rflags = mode & ~(RTLD_LAZY | RTLD_NOW | RTLD_GLOBAL);
 
-	(void) conv_expn_field(&conv_arg, 0);
+	(void) conv_expn_field(&conv_arg, vda, 0);
 
 	return ((const char *)dl_mode_buf->buf);
 }
@@ -145,22 +145,22 @@ const char *
 conv_dl_flag(int flags, Conv_fmt_flags_t fmt_flags,
     Conv_dl_flag_buf_t *dl_flag_buf)
 {
-	static Val_desc vda[] = {
-		{ RTLD_REL_RELATIVE,	MSG_ORIG(MSG_RTLD_REL_RELATIVE) },
-		{ RTLD_REL_EXEC,	MSG_ORIG(MSG_RTLD_REL_EXEC) },
-		{ RTLD_REL_DEPENDS,	MSG_ORIG(MSG_RTLD_REL_DEPENDS) },
-		{ RTLD_REL_PRELOAD,	MSG_ORIG(MSG_RTLD_REL_PRELOAD) },
-		{ RTLD_REL_SELF,	MSG_ORIG(MSG_RTLD_REL_SELF) },
-		{ RTLD_REL_WEAK,	MSG_ORIG(MSG_RTLD_REL_WEAK) },
-		{ RTLD_MEMORY,		MSG_ORIG(MSG_RTLD_MEMORY) },
-		{ RTLD_STRIP,		MSG_ORIG(MSG_RTLD_STRIP) },
-		{ RTLD_NOHEAP,		MSG_ORIG(MSG_RTLD_NOHEAP) },
-		{ RTLD_CONFSET,		MSG_ORIG(MSG_RTLD_CONFSET) },
+	static const Val_desc vda[] = {
+		{ RTLD_REL_RELATIVE,	MSG_RTLD_REL_RELATIVE },
+		{ RTLD_REL_EXEC,	MSG_RTLD_REL_EXEC },
+		{ RTLD_REL_DEPENDS,	MSG_RTLD_REL_DEPENDS },
+		{ RTLD_REL_PRELOAD,	MSG_RTLD_REL_PRELOAD },
+		{ RTLD_REL_SELF,	MSG_RTLD_REL_SELF },
+		{ RTLD_REL_WEAK,	MSG_RTLD_REL_WEAK },
+		{ RTLD_MEMORY,		MSG_RTLD_MEMORY },
+		{ RTLD_STRIP,		MSG_RTLD_STRIP },
+		{ RTLD_NOHEAP,		MSG_RTLD_NOHEAP },
+		{ RTLD_CONFSET,		MSG_RTLD_CONFSET },
 		{ 0,			0 }
 	};
 	static const char *leading_str_arr[2];
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (dl_flag_buf->buf), vda, leading_str_arr };
+	    NULL, sizeof (dl_flag_buf->buf), leading_str_arr };
 
 	const char **lstr = leading_str_arr;
 
@@ -182,7 +182,7 @@ conv_dl_flag(int flags, Conv_fmt_flags_t fmt_flags,
 	*lstr = NULL;
 	conv_arg.oflags = conv_arg.rflags = flags;
 
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)dl_flag_buf->buf);
 }

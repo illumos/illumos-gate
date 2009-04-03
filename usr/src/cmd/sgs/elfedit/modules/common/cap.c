@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include	<elfedit.h>
@@ -291,7 +290,8 @@ print_cap(CAP_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_NOCAELT),
 		    EC_WORD(argstate->cap.sec->sec_shndx),
-		    argstate->cap.sec->sec_name, conv_cap_tag(arg, &inv_buf));
+		    argstate->cap.sec->sec_name,
+		    conv_cap_tag(arg, 0, &inv_buf));
 	}
 }
 
@@ -523,13 +523,13 @@ cmd_body(CAP_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_OK),
 				    cap_ndx, cap_name, EC_WORD(ndx),
-				    conv_cap_tag(c_tag, &inv_buf1));
+				    conv_cap_tag(c_tag, 0, &inv_buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_CHG),
 				    cap_ndx, cap_name, EC_WORD(ndx),
-				    conv_cap_tag(cap[ndx].c_tag, &inv_buf1),
-				    conv_cap_tag(c_tag, &inv_buf2));
+				    conv_cap_tag(cap[ndx].c_tag, 0, &inv_buf1),
+				    conv_cap_tag(c_tag, 0, &inv_buf2));
 				cap[ndx].c_tag = c_tag;
 				ret = ELFEDIT_CMDRET_MOD;
 			}
@@ -607,7 +607,7 @@ cmd_body(CAP_CMD_T cmd, elfedit_obj_state_t *obj_state,
 			Xword	hw1;
 
 			hw1 = flag_bitop(&argstate, cap[ndx].c_un.c_val,
-			    elfedit_mach_sunw_hw1_to_atoui(mach));
+			    elfedit_const_to_atoui(ELFEDIT_CONST_AV));
 
 			/* Set the value */
 			if (cap[ndx].c_un.c_val == hw1) {
@@ -732,28 +732,9 @@ static void
 cpl_hw1(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
     const char *argv[], int num_opt)
 {
-	elfedit_atoui_sym_t *sym_const;
-
 	/* This routine allows multiple flags to be specified */
 
-	/*
-	 * If there is no object, then supply all the hardware
-	 * capabilities we know of.
-	 */
-	if (obj_state == NULL) {
-		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_AV_386);
-		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_AV_SPARC);
-		return;
-	}
-
-	/*
-	 * Supply the hardware capabilities for the type of
-	 * machine the object is for, if we know any.
-	 */
-	sym_const = elfedit_mach_sunw_hw1_to_atoui(
-	    obj_state->os_ehdr->e_machine);
-	if (sym_const != NULL)
-		elfedit_cpl_atoui(cpldata, sym_const);
+	elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_AV);
 }
 
 /*ARGSUSED*/

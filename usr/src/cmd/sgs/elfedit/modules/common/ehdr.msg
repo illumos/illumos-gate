@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
 
@@ -41,8 +40,6 @@
 @ MSG_DEBUG_E_LLX_CHG	"ehdr.%s: change from %#llx to %#llx\n"
 @ MSG_DEBUG_EI_S_S_OK	"ehdr.e_ident[%s]: value unchanged: %s\n";
 @ MSG_DEBUG_EI_S_S_CHG	"ehdr.e_ident[%s]: change from %s to %s\n"
-@ MSG_DEBUG_EI_S_X_OK	"ehdr.e_ident[%s]: value unchanged: %#x\n";
-@ MSG_DEBUG_EI_S_X_CHG	"ehdr.e_ident[%s]: change from %#x to %#x\n"
 @ MSG_DEBUG_EI_D_X_OK	"ehdr.e_ident[%d]: value unchanged: %#x\n"
 @ MSG_DEBUG_EI_D_X_CHG	"ehdr.e_ident[%d]: change from %#x to %#x\n"
 @ MSG_DEBUG_SHDR0_D_OK	"shdr[0].%s: value unchanged: %d\n"

@@ -19,34 +19,38 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
- *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_DUMP_H
-#define	_DUMP_H
+#ifndef	_SGSMSG_DOT_H
+#define	_SGSMSG_DOT_H
 
-#include	<sys/elf.h>
-#include	<sys/machelf.h>
-#include	<gelf.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifndef	__lint
 
 /*
- * DUMP_CONVFMT defines the libconv formatting options we want to use:
- *	- Unknown items to be printed as integers using decimal formatting
- *	- The "Dump Style" versions of strings.
+ * In normal operation, sgsmsg generates an ELF-format string table
+ * for strings, and Msg is an integer offset into that table.
  */
-#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALT_DUMP)
+typedef int	Msg;
 
-#define	DATESIZE 60
+#else	/* __lint */
 
-typedef struct scntab {
-	char		*scn_name;
-	Elf_Scn		*p_sd;
-	GElf_Shdr	p_shdr;
-} SCNTAB;
+/*
+ * When __lint is defined, Msg is a char *.  This allows lint to
+ * check our format strings against its arguments.
+ */
+typedef char	*Msg;
 
-#endif	/* _DUMP_H */
+#endif	/* __lint */
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _SGSMSG_DOT_H */

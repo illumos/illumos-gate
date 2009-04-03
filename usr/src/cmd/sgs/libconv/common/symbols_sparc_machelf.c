@@ -18,35 +18,34 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
- *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_DUMP_H
-#define	_DUMP_H
-
-#include	<sys/elf.h>
-#include	<sys/machelf.h>
-#include	<gelf.h>
+#include <stdio.h>
+#include "_conv.h"
+#include "symbols_sparc_msg.h"
+#include <sys/elf_SPARC.h>
 
 /*
- * DUMP_CONVFMT defines the libconv formatting options we want to use:
- *	- Unknown items to be printed as integers using decimal formatting
- *	- The "Dump Style" versions of strings.
+ * SPARC specific register symbols
  */
-#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALT_DUMP)
 
-#define	DATESIZE 60
+static const Msg registers[] = { 0,
+	MSG_STO_REGISTERG1,	MSG_STO_REGISTERG2, 	MSG_STO_REGISTERG3,
+	MSG_STO_REGISTERG4,	MSG_STO_REGISTERG5, 	MSG_STO_REGISTERG6,
+	MSG_STO_REGISTERG7
+};
 
-typedef struct scntab {
-	char		*scn_name;
-	Elf_Scn		*p_sd;
-	GElf_Shdr	p_shdr;
-} SCNTAB;
-
-#endif	/* _DUMP_H */
+const char *
+conv_sym_SPARC_value(Addr val, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
+{
+	if ((val < STO_SPARC_REGISTER_G1) || (val > STO_SPARC_REGISTER_G7)) {
+		return (conv_invalid_val(inv_buf, val, fmt_flags));
+	} else {
+		return (MSG_ORIG(registers[val]));
+	}
+}

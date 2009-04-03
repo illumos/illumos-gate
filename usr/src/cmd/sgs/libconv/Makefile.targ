@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 pics/%.o:	../common/%.c
@@ -58,10 +56,11 @@ pics/elfcap.o:	$(ELFCAP)/elfcap.c
 report_bufsize.h:	../Makefile.targ
 		perl ../../tools/libconv_mk_report_bufsize.pl 8000
 
-../common/%.c:	%_msg.h
+../common/%.c ../common/%_machelf.c:	%_msg.h
 
-%_msg.h:	$(SGSMSG) ../common/%.msg report_bufsize.h
-		$(SGSMSG) $(SGSMSGFLAGS) -l -h $@ -d $@ $<
+%_msg.h %_msg.c: $(SGSMSG) ../common/%.msg report_bufsize.h
+		$(SGSMSG) $(SGSMSGFLAGS) -h $*_msg.h -d $*_msg.c \
+			-n sgs_msg_libconv_$* $<
 
 $(SGSMSG):	FRC
 		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog

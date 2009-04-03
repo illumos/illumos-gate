@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sgs.h>
 #include	<_debug.h>
@@ -39,6 +38,8 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	Byte			*byte =	&(ehdr->e_ident[0]);
 	const char		*flgs;
 	int			xshdr = 0;
+	uchar_t			osabi = ehdr->e_ident[EI_OSABI];
+	Half			mach = ehdr->e_machine;
 
 	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	dbg_print(lml, MSG_INTL(MSG_ELF_HEADER));
@@ -50,18 +51,22 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	dbg_print(lml, MSG_ORIG(MSG_ELF_CLASS),
 	    conv_ehdr_class(ehdr->e_ident[EI_CLASS], 0, &inv_buf1),
 	    conv_ehdr_data(ehdr->e_ident[EI_DATA], 0, &inv_buf2));
+	dbg_print(lml, MSG_ORIG(MSG_ELF_OSABI),
+	    conv_ehdr_osabi(ehdr->e_ident[EI_OSABI], 0, &inv_buf1),
+	    conv_ehdr_abivers(ehdr->e_ident[EI_OSABI],
+	    ehdr->e_ident[EI_ABIVERSION], CONV_FMT_DECIMAL, &inv_buf2));
 	dbg_print(lml, MSG_ORIG(MSG_ELF_MACHINE),
-	    conv_ehdr_mach(ehdr->e_machine, 0, &inv_buf1),
+	    conv_ehdr_mach(mach, 0, &inv_buf1),
 	    conv_ehdr_vers(ehdr->e_version, 0, &inv_buf2));
 	dbg_print(lml, MSG_ORIG(MSG_ELF_TYPE),
-	    conv_ehdr_type(ehdr->e_type, 0, &inv_buf1));
+	    conv_ehdr_type(osabi, ehdr->e_type, 0, &inv_buf1));
 
 	/*
 	 * Line up the flags differently depending on whether we received a
 	 * numeric (e.g. "0x200") or text representation (e.g.
 	 * "[ EF_SPARC_SUN_US1 ]").
 	 */
-	flgs = conv_ehdr_flags(ehdr->e_machine, ehdr->e_flags, 0, &flags_buf);
+	flgs = conv_ehdr_flags(mach, ehdr->e_flags, 0, &flags_buf);
 	if (flgs[0] == '[')
 		dbg_print(lml, MSG_ORIG(MSG_ELF_FLAGS_FMT), flgs);
 	else
@@ -104,9 +109,9 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_TITLE));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_ADDR), EC_ADDR(shdr0->sh_addr),
-	    conv_sec_flags(shdr0->sh_flags, 0, &sec_flags_buf));
+	    conv_sec_flags(osabi, mach, shdr0->sh_flags, 0, &sec_flags_buf));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
-	    conv_sec_type(ehdr->e_machine, shdr0->sh_type, 0, &inv_buf1));
+	    conv_sec_type(osabi, mach, shdr0->sh_type, 0, &inv_buf1));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_OFFSET), EC_OFF(shdr0->sh_offset),
 	    EC_XWORD(shdr0->sh_entsize));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_LINK), EC_WORD(shdr0->sh_link),

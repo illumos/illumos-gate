@@ -50,8 +50,8 @@ extern "C" {
  * To simplify masking these categories, they are assigned bit ranges
  * as follows:
  *	SHOW: Bottom 24-bits
- *	CALC: Upper nibble of most significant byte
- *	CTL: Lower nibble of most significant byte
+ *	CALC: Upper 2 bits of most significant byte
+ *	CTL: Lower 6 bits of most significant byte
  */
 #define	FLG_SHOW_DYNAMIC	0x00000001
 #define	FLG_SHOW_EHDR		0x00000002
@@ -75,13 +75,14 @@ extern "C" {
 #define	FLG_CTL_DEMANGLE	0x02000000
 #define	FLG_CTL_FAKESHDR	0x04000000
 #define	FLG_CTL_MATCH		0x08000000
+#define	FLG_CTL_OSABI		0x10000000
 
-#define	FLG_CALC_CHECKSUM	0x10000000
+#define	FLG_CALC_CHECKSUM	0x40000000
 
 /* Bitmasks that isolate the parts of a flag value */
 #define	FLG_MASK_SHOW		0x00ffffff
-#define	FLG_MASK_CTL		0x0f000000
-#define	FLG_MASK_CALC		0xf0000000
+#define	FLG_MASK_CTL		0x3f000000
+#define	FLG_MASK_CALC		0xc0000000
 
 /*
  * Mask that selects the show flags that do not require the ELF
@@ -234,8 +235,10 @@ extern	int	fake_shdr_cache64(const char *, int, Elf *, Elf64_Ehdr *,
 extern	void	fake_shdr_cache_free32(Cache *, size_t);
 extern	void	fake_shdr_cache_free64(Cache *, size_t);
 
-extern	int	regular32(const char *, int, Elf *, uint_t, const char *, int);
-extern	int	regular64(const char *, int, Elf *, uint_t, const char *, int);
+extern	int	regular32(const char *, int, Elf *, uint_t, const char *, int,
+		    uchar_t);
+extern	int	regular64(const char *, int, Elf *, uint_t, const char *, int,
+		    uchar_t);
 
 #ifdef	__cplusplus
 }

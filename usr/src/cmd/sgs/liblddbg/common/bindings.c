@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,17 +83,24 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
     Pltbindtype pbtype, Rt_map *tlmp, Addr tabs, Off toff,
     const char *sym, uint_t binfo)
 {
+	/*
+	 * MSG_ORIG(MSG_BINFO_DIRECT)
+	 * MSG_ORIG(MSG_BINFO_INTERPOSE)
+	 * MSG_ORIG(MSG_BINFO_COPYREF)
+	 * MSG_ORIG(MSG_BINFO_FILTEE)
+	 * MSG_ORIG(MSG_BINFO_PLTADDR)
+	 */
 	static char binfostr[BINFOSZ];
 	static Val_desc vda[] = {
-		{ DBG_BINFO_DIRECT,	MSG_ORIG(MSG_BINFO_DIRECT) },
-		{ DBG_BINFO_INTERPOSE,	MSG_ORIG(MSG_BINFO_INTERPOSE) },
-		{ DBG_BINFO_COPYREF,	MSG_ORIG(MSG_BINFO_COPYREF) },
-		{ DBG_BINFO_FILTEE,	MSG_ORIG(MSG_BINFO_FILTEE) },
-		{ DBG_BINFO_PLTADDR,	MSG_ORIG(MSG_BINFO_PLTADDR) },
+		{ DBG_BINFO_DIRECT,	MSG_BINFO_DIRECT },
+		{ DBG_BINFO_INTERPOSE,	MSG_BINFO_INTERPOSE },
+		{ DBG_BINFO_COPYREF,	MSG_BINFO_COPYREF },
+		{ DBG_BINFO_FILTEE,	MSG_BINFO_FILTEE },
+		{ DBG_BINFO_PLTADDR,	MSG_BINFO_PLTADDR },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = { binfostr, sizeof (binfostr),
-		vda, NULL, 0, 0, MSG_ORIG(MSG_BINFO_START),
+		NULL, 0, 0, MSG_ORIG(MSG_BINFO_START),
 		MSG_ORIG(MSG_BINFO_SEP), MSG_ORIG(MSG_BINFO_END) };
 
 	const char	*ffile = NAME(flmp);
@@ -117,7 +124,7 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
 	binfo &= DBG_BINFO_MSK;
 	if (binfo) {
 		conv_arg.oflags = conv_arg.rflags = binfo;
-		(void) conv_expn_field(&conv_arg, 0);
+		(void) conv_expn_field(&conv_arg, vda, 0);
 	} else {
 		binfostr[0] = '\0';
 	}

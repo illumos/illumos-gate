@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,21 +56,21 @@ const char *
 conv_ver_flags(Half flags, Conv_fmt_flags_t fmt_flags,
     Conv_ver_flags_buf_t *ver_flags_buf)
 {
-	static Val_desc vda[] = {
-		{ VER_FLG_WEAK,		MSG_ORIG(MSG_VER_FLG_WEAK) },
-		{ VER_FLG_BASE,		MSG_ORIG(MSG_VER_FLG_BASE) },
-		{ VER_FLG_INFO,		MSG_ORIG(MSG_VER_FLG_INFO) },
+	static const Val_desc vda[] = {
+		{ VER_FLG_WEAK,		MSG_VER_FLG_WEAK },
+		{ VER_FLG_BASE,		MSG_VER_FLG_BASE },
+		{ VER_FLG_INFO,		MSG_VER_FLG_INFO },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (ver_flags_buf->buf), vda };
+	    NULL, sizeof (ver_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
 	conv_arg.buf = ver_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)ver_flags_buf->buf);
 }

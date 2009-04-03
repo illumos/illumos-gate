@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<unistd.h>
@@ -186,6 +185,17 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 
 
 /*
+ * Options for deciding which items print_shdr() displays.
+ */
+typedef enum {
+	PRINT_SHDR_ALL,		/* Print all shdr[ndx:ndx+cnt-1] */
+	PRINT_SHDR_TYPE,	/* Print all shdr[ndx:ndx+cnt-1] with type */
+				/*	 of shdr[ndx] */
+	PRINT_SHDR_NAME,	/* Print all shdr[ndx:ndx+cnt-1] with name */
+				/*	 of shdr[ndx] */
+} PRINT_SHDR_T;
+
+/*
  * Print section header values, taking the calling command, and output style
  * into account.
  *
@@ -196,12 +206,18 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
  *	argstate - State block for section header array
  *	ndx - Index of first section to display
  *	cnt - Number of sections to display
+ *	print_type - Specifies which items are shown
  */
 static void
 print_shdr(SHDR_CMD_T cmd, int autoprint, ARGSTATE *argstate,
-    Word ndx, Word cnt)
+    Word ndx, Word cnt, PRINT_SHDR_T print_type)
 {
 	elfedit_outstyle_t	outstyle;
+	Ehdr			*ehdr = argstate->obj_state->os_ehdr;
+	uchar_t			osabi = ehdr->e_ident[EI_OSABI];
+	Half			mach = ehdr->e_machine;
+	elfedit_section_t 	*ref_sec = &argstate->obj_state->os_secarr[ndx];
+
 
 	if ((autoprint && ((elfedit_flags() & ELFEDIT_F_AUTOPRINT) == 0)) ||
 	    (cnt == 0))
@@ -214,152 +230,112 @@ print_shdr(SHDR_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	outstyle = (cmd == SHDR_CMD_T_DUMP) ?
 	    ELFEDIT_OUTSTYLE_DEFAULT : elfedit_outstyle();
 
-	/*
-	 * If doing default output, use elfdump style where we
-	 * show all section header attributes. In this case, the
-	 * command that called us doesn't matter
-	 */
-	if (outstyle == ELFEDIT_OUTSTYLE_DEFAULT) {
-		Half mach = argstate->obj_state->os_ehdr->e_machine;
+	for (; cnt--; ndx++) {
+		elfedit_section_t *sec = &argstate->obj_state->os_secarr[ndx];
+		Shdr *shdr = sec->sec_shdr;
 
-		for (; cnt--; ndx++) {
-			elfedit_section_t *sec =
-			    &argstate->obj_state->os_secarr[ndx];
+		switch (print_type) {
+		case PRINT_SHDR_TYPE:
+			if (shdr->sh_type != ref_sec->sec_shdr->sh_type)
+				continue;
+			break;
 
+		case PRINT_SHDR_NAME:
+			if (strcmp(sec->sec_name, ref_sec->sec_name) != 0)
+				continue;
+			break;
+		}
+
+		/*
+		 * If doing default output, use elfdump style where we
+		 * show all section header attributes. In this case, the
+		 * command that called us doesn't matter
+		 */
+		if (outstyle == ELFEDIT_OUTSTYLE_DEFAULT) {
 			elfedit_printf(MSG_ORIG(MSG_STR_NL));
 			elfedit_printf(MSG_INTL(MSG_ELF_SHDR), ndx,
 			    sec->sec_name);
-			Elf_shdr(NULL, mach, sec->sec_shdr);
+			Elf_shdr(NULL, osabi, mach, sec->sec_shdr);
+			continue;
 		}
-		return;
-	}
 
-
-	switch (cmd) {
-	case SHDR_CMD_T_SH_ADDR:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		/* Non-default output is handled case by case */
+		switch (cmd) {
+		case SHDR_CMD_T_SH_ADDR:
 			elfedit_printf(MSG_ORIG(MSG_FMT_XWORDHEXNL),
 			    EC_XWORD(shdr->sh_addr));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_ADDRALIGN:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		case SHDR_CMD_T_SH_ADDRALIGN:
 			elfedit_printf(MSG_ORIG(MSG_FMT_XWORDHEXNL),
 			    EC_XWORD(shdr->sh_addralign));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_ENTSIZE:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		case SHDR_CMD_T_SH_ENTSIZE:
 			elfedit_printf(MSG_ORIG(MSG_FMT_XWORDHEXNL),
 			    EC_XWORD(shdr->sh_entsize));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_FLAGS:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
+		case SHDR_CMD_T_SH_FLAGS:
 			if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
 				Conv_sec_flags_buf_t sec_flags_buf;
 
 				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-				    conv_sec_flags(shdr->sh_flags,
+				    conv_sec_flags(osabi, mach, shdr->sh_flags,
 				    CONV_FMT_NOBKT, &sec_flags_buf));
 			} else {
 				elfedit_printf(MSG_ORIG(MSG_FMT_XWORDHEXNL),
 				    EC_XWORD(shdr->sh_flags));
 			}
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_INFO:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		case SHDR_CMD_T_SH_INFO:
 			elfedit_printf(MSG_ORIG(MSG_FMT_WORDVALNL),
 			    EC_WORD(shdr->sh_info));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_LINK:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		case SHDR_CMD_T_SH_LINK:
 			elfedit_printf(MSG_ORIG(MSG_FMT_WORDVALNL),
 			    EC_WORD(shdr->sh_link));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_NAME:
-		/*
-		 * In simple output mode, we show the string. In numeric
-		 * mode, we show the string table offset.
-		 */
-		for (; cnt--; ndx++) {
-			elfedit_section_t *shdr_sec =
-			    &argstate->obj_state->os_secarr[ndx];
-
+		case SHDR_CMD_T_SH_NAME:
+			/*
+			 * In simple output mode, we show the string. In
+			 * numeric mode, we show the string table offset.
+			 */
 			if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
 				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-				    shdr_sec->sec_name);
+				    sec->sec_name);
 			} else {
 				elfedit_printf(MSG_ORIG(MSG_FMT_WORDVALNL),
-				    EC_WORD(shdr_sec->sec_shdr->sh_name));
+				    EC_WORD(shdr->sh_name));
 			}
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_OFFSET:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		case SHDR_CMD_T_SH_OFFSET:
 			elfedit_printf(MSG_ORIG(MSG_FMT_XWORDHEXNL),
 			    EC_XWORD(shdr->sh_offset));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_SIZE:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-
+		case SHDR_CMD_T_SH_SIZE:
 			elfedit_printf(MSG_ORIG(MSG_FMT_XWORDHEXNL),
 			    EC_XWORD(shdr->sh_size));
-		}
-		return;
+			break;
 
-	case SHDR_CMD_T_SH_TYPE:
-		for (; cnt--; ndx++) {
-			Shdr *shdr =
-			    argstate->obj_state->os_secarr[ndx].sec_shdr;
-			Conv_inv_buf_t inv_buf;
+		case SHDR_CMD_T_SH_TYPE:
 			if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
-				Half mach =
-				    argstate->obj_state->os_ehdr->e_machine;
+				Conv_inv_buf_t inv_buf;
 
 				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-				    conv_sec_type(mach, shdr->sh_type, 0,
+				    conv_sec_type(osabi, mach, shdr->sh_type, 0,
 				    &inv_buf));
 			} else {
 				elfedit_printf(MSG_ORIG(MSG_FMT_WORDHEXNL),
 				    EC_WORD(shdr->sh_type));
 			}
+			break;
 		}
-		return;
 	}
 }
 
@@ -379,17 +355,22 @@ static elfedit_cmdret_t
 cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
     int argc, const char *argv[])
 {
+	Ehdr			*ehdr = obj_state->os_ehdr;
+	uchar_t			osabi = ehdr->e_ident[EI_OSABI];
+	Half			mach = ehdr->e_machine;
 	ARGSTATE		argstate;
 	Word			ndx;
 	elfedit_section_t	*shdr_sec;
 	Shdr			*shdr;
 	elfedit_cmdret_t	ret = ELFEDIT_CMDRET_NONE;
+	PRINT_SHDR_T		print_type;
 
 	process_args(obj_state, argc, argv, cmd, &argstate);
 
 	/* If there are no arguments, dump the whole table and return */
 	if (argstate.argc == 0) {
-		print_shdr(cmd, 0, &argstate, 0, obj_state->os_shnum);
+		print_shdr(cmd, 0, &argstate, 0, obj_state->os_shnum,
+		    PRINT_SHDR_ALL);
 		return (ELFEDIT_CMDRET_NONE);
 	}
 
@@ -398,25 +379,33 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 	 * name (default), section index, or section type, depending on
 	 * the options used.
 	 */
-	if (argstate.optmask & SHDR_OPT_F_SHNDX)
+	if (argstate.optmask & SHDR_OPT_F_SHNDX) {
 		ndx = elfedit_atoshndx(argstate.argv[0], obj_state->os_shnum);
-	else if (argstate.optmask & SHDR_OPT_F_SHTYP)
+		print_type = PRINT_SHDR_ALL;
+	} else if (argstate.optmask & SHDR_OPT_F_SHTYP) {
 		ndx = elfedit_type_to_shndx(obj_state,
 		    elfedit_atoconst(argstate.argv[0], ELFEDIT_CONST_SHT));
-	else
+		print_type = PRINT_SHDR_TYPE;
+	} else {
 		ndx = elfedit_name_to_shndx(obj_state, argstate.argv[0]);
+		print_type = PRINT_SHDR_NAME;
+	}
 
 	/* If there is a single argument, display that item and return */
 	if (argstate.argc == 1) {
-		print_shdr(cmd, 0, &argstate, ndx, 1);
+		Word	cnt;
+
+		cnt = (print_type == PRINT_SHDR_ALL) ?
+		    1 : obj_state->os_shnum - ndx;
+		print_shdr(cmd, 0, &argstate, ndx, cnt, print_type);
 		return (ELFEDIT_CMDRET_NONE);
 	}
 
 	/*
 	 * Section [0] is supposed to be all zero unless extended sections
 	 * are in force. Rather than setting extended values directly,
-	 * it is expected to be handled by the ELF header module. So, a
-	 * direct change here is probably not what was intended.
+	 * it is expected to be handled by libelf. So, a direct change here
+	 * is probably not what was intended.
 	 */
 	if (ndx == 0)
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_CHGSHDR0));
@@ -533,14 +522,17 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				    MSG_INTL(MSG_DEBUG_S_OK),
 				    ndx, shdr_sec->sec_name,
 				    MSG_ORIG(MSG_CMD_SH_FLAGS),
-				    conv_sec_flags(shdr->sh_flags, 0, &buf1));
+				    conv_sec_flags(osabi, mach,
+				    shdr->sh_flags, 0, &buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_CHG),
 				    ndx, shdr_sec->sec_name,
 				    MSG_ORIG(MSG_CMD_SH_FLAGS),
-				    conv_sec_flags(shdr->sh_flags, 0, &buf1),
-				    conv_sec_flags(sh_flags, 0, &buf2));
+				    conv_sec_flags(osabi, mach,
+				    shdr->sh_flags, 0, &buf1),
+				    conv_sec_flags(osabi, mach,
+				    sh_flags, 0, &buf2));
 				ret = ELFEDIT_CMDRET_MOD;
 				shdr->sh_flags = sh_flags;
 			}
@@ -704,7 +696,6 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 
 	case SHDR_CMD_T_SH_TYPE:
 		{
-			Half mach = obj_state->os_ehdr->e_machine;
 			Word sh_type = elfedit_atoconst(argstate.argv[1],
 			    ELFEDIT_CONST_SHT);
 			Conv_inv_buf_t inv_buf1, inv_buf2;
@@ -714,16 +705,17 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				    MSG_INTL(MSG_DEBUG_S_OK),
 				    ndx, shdr_sec->sec_name,
 				    MSG_ORIG(MSG_CMD_SH_TYPE),
-				    conv_sec_type(mach, shdr->sh_type,
+				    conv_sec_type(osabi, mach, shdr->sh_type,
 				    0, &inv_buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_CHG),
 				    ndx, shdr_sec->sec_name,
 				    MSG_ORIG(MSG_CMD_SH_TYPE),
-				    conv_sec_type(mach, shdr->sh_type, 0,
-				    &inv_buf1),
-				    conv_sec_type(mach, sh_type, 0, &inv_buf2));
+				    conv_sec_type(osabi, mach, shdr->sh_type,
+				    0, &inv_buf1),
+				    conv_sec_type(osabi, mach, sh_type,
+				    0, &inv_buf2));
 				ret = ELFEDIT_CMDRET_MOD;
 				shdr->sh_type = sh_type;
 			}
@@ -738,7 +730,7 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		elfedit_modified_shdr(shdr_sec);
 
 	/* Do autoprint */
-	print_shdr(cmd, 1, &argstate, ndx, 1);
+	print_shdr(cmd, 1, &argstate, ndx, 1, PRINT_SHDR_ALL);
 
 	return (ret);
 }

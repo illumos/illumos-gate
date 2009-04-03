@@ -700,7 +700,8 @@ Dbg_file_generic(Lm_list *lml, Ifl_desc *ifl)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_BASIC), ifl->ifl_name,
-	    conv_ehdr_type(ifl->ifl_ehdr->e_type, 0, &inv_buf));
+	    conv_ehdr_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
+	    ifl->ifl_ehdr->e_type, 0, &inv_buf));
 }
 
 static const Msg

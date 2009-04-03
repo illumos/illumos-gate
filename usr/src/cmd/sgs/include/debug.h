@@ -665,8 +665,8 @@ extern	void	Dbg_cap_val_hw1(Lm_list *, Xword, Half);
 extern	const char *
 		Dbg_demangle_name(const char *);
 
-extern	void	Dbg_ent_entry(Lm_list *, Half, Ent_desc *);
-extern	void	Dbg_ent_print(Lm_list *, Half, Alist *, Boolean);
+extern	void	Dbg_ent_entry(Lm_list *, uchar_t, Half, Ent_desc *);
+extern	void	Dbg_ent_print(Lm_list *, uchar_t, Half, Alist *, Boolean);
 
 extern	void	Dbg_file_analyze(Rt_map *);
 extern	void	Dbg_file_aout(Lm_list *, const char *, Addr, size_t,
@@ -790,14 +790,14 @@ extern	void	Dbg_sec_redirected(Lm_list *, const char *, const char *);
 extern	void	Dbg_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 extern	void	Dbg_sec_unsup_strmerge(Lm_list *, Is_desc *);
 
-extern	void	Dbg_seg_desc_entry(Lm_list *, Half, int, Sg_desc *);
+extern	void	Dbg_seg_desc_entry(Lm_list *, uchar_t, Half, int, Sg_desc *);
 extern	void	Dbg_seg_entry(Ofl_desc *, int, Sg_desc *);
-extern	void	Dbg_seg_list(Lm_list *, Half, APlist *);
+extern	void	Dbg_seg_list(Lm_list *, uchar_t, Half, APlist *);
 extern	void	Dbg_seg_os(Ofl_desc *, Os_desc *, int);
 extern	void	Dbg_seg_title(Lm_list *);
 
-extern	void	Dbg_shdr_modified(Lm_list *, const char *, Half, Shdr *, Shdr *,
-		    const char *);
+extern	void	Dbg_shdr_modified(Lm_list *, const char *, uchar_t, Half,
+		    Shdr *, Shdr *, const char *);
 
 extern	void	Dbg_statistics_ar(Ofl_desc *);
 extern	void	Dbg_statistics_ld(Ofl_desc *);
@@ -984,7 +984,8 @@ extern	void	Elf_cap_title(Lm_list *);
 
 extern	const char \
 		*Elf_demangle_name(const char *);
-extern	void	Elf_dyn_entry(Lm_list *, Dyn *, int, const char *, Half);
+extern	void	Elf_dyn_entry(Lm_list *, Dyn *, int, const char *,
+		    uchar_t, Half);
 extern	void	Elf_dyn_null_entry(Lm_list *, Dyn *, int, int);
 extern	void	Elf_dyn_title(Lm_list *);
 
@@ -994,7 +995,7 @@ extern	void	Elf_got_entry(Lm_list *, Sword, Addr, Xword, Half,
 		    uchar_t, uchar_t, Word, void *, const char *);
 extern	void	Elf_got_title(Lm_list *);
 
-extern	void	Elf_phdr(Lm_list *, Half, Phdr *);
+extern	void	Elf_phdr(Lm_list *, uchar_t, Half, Phdr *);
 
 extern	void	Elf_reloc_apply_val(Lm_list *, int, Xword, Xword);
 extern	void	Elf_reloc_apply_reg(Lm_list *, int, Half, Xword, Xword);
@@ -1005,10 +1006,10 @@ extern	void	Elf_reloc_entry_2(Lm_list *, int, const char *, Word,
 		    const char *);
 extern	void	Elf_reloc_title(Lm_list *, int, Word);
 
-extern	void	Elf_shdr(Lm_list *, Half, Shdr *);
+extern	void	Elf_shdr(Lm_list *, uchar_t, Half, Shdr *);
 
-extern	void	Elf_syms_table_entry(Lm_list *, int, const char *, Half, Sym *,
-		    Versym, int, const char *, const char *);
+extern	void	Elf_syms_table_entry(Lm_list *, int, const char *, uchar_t,
+		    Half, Sym *, Versym, int, const char *, const char *);
 extern	void	Elf_syms_table_title(Lm_list *, int);
 
 extern	void	Elf_ver_def_title(Lm_list *);

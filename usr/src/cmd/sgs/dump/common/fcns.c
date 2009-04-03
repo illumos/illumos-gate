@@ -23,11 +23,9 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -35,6 +33,7 @@
 #include	<string.h>
 #include	<libelf.h>
 #include	<limits.h>
+#include	"conv.h"
 #include	"dump.h"
 
 extern int	p_flag;
@@ -52,7 +51,7 @@ ar_sym_read(Elf *elf, char *filename)
 
 	if ((arsym = elf_getarsym(elf, &ptr)) == NULL) {
 		(void) fprintf(stderr, "%s: %s: no archive symbol table\n",
-			prog_name, filename);
+		    prog_name, filename);
 		return;
 	}
 
@@ -109,66 +108,36 @@ dump_exec_header(Elf *elf_file, unsigned nseg, char *filename)
 
 		if (gelf_getphdr(elf_file, counter, &p_phdr) == 0) {
 			(void) fprintf(stderr,
-			"%s: %s: premature EOF on program exec header\n",
-				prog_name, filename);
+			    "%s: %s: premature EOF on program exec header\n",
+			    prog_name, filename);
 			return;
 		}
 
 		if (!v_flag) {
 			(void) printf(
 	"%-*d%-#*llx%-#*llx%-#*llx\n%-#*llx%-#*llx%-*u%-#*llx\n\n",
-				field, EC_WORD(p_phdr.p_type),
-				field, EC_OFF(p_phdr.p_offset),
-				field, EC_ADDR(p_phdr.p_vaddr),
-				field, EC_ADDR(p_phdr.p_paddr),
-				field, EC_XWORD(p_phdr.p_filesz),
-				field, EC_XWORD(p_phdr.p_memsz),
-				field, EC_WORD(p_phdr.p_flags),
-				field, EC_XWORD(p_phdr.p_align));
+			    field, EC_WORD(p_phdr.p_type),
+			    field, EC_OFF(p_phdr.p_offset),
+			    field, EC_ADDR(p_phdr.p_vaddr),
+			    field, EC_ADDR(p_phdr.p_paddr),
+			    field, EC_XWORD(p_phdr.p_filesz),
+			    field, EC_XWORD(p_phdr.p_memsz),
+			    field, EC_WORD(p_phdr.p_flags),
+			    field, EC_XWORD(p_phdr.p_align));
 		} else {
-			switch (p_phdr.p_type) {
-			case PT_NULL:
-				(void) printf("%-*s", field, "NULL");
-				break;
-			case PT_LOAD:
-				(void) printf("%-*s", field, "LOAD");
-				break;
-			case PT_DYNAMIC:
-				(void) printf("%-*s", field, "DYN");
-				break;
-			case PT_INTERP:
-				(void) printf("%-*s", field, "INTERP");
-				break;
-			case PT_NOTE:
-				(void) printf("%-*s", field, "NOTE");
-				break;
-			case PT_SHLIB:
-				(void) printf("%-*s", field, "SHLIB");
-				break;
-			case PT_PHDR:
-				(void) printf("%-*s", field, "PHDR");
-				break;
-			case PT_TLS:
-				(void) printf("%-*s", field, "TLS");
-				break;
-			case PT_SUNWBSS:
-				(void) printf("%-*s", field, "SUNWBSS");
-				break;
-			case PT_SUNWSTACK:
-				(void) printf("%-*s", field, "SUNWSTACK");
-				break;
-			default:
-				(void) printf("%-*d", field,
-					(int)p_phdr.p_type);
-				break;
-			}
+			Conv_inv_buf_t	inv_buf;
+
+			(void) printf("%-*s", field,
+			    conv_phdr_type(ehdr.e_ident[EI_OSABI],
+			    ehdr.e_machine, p_phdr.p_type, DUMP_CONVFMT,
+			    &inv_buf));
 			(void) printf(
-				"%-#*llx%-#*llx%-#*llx\n%-#*llx%-#*llx",
-				field, EC_OFF(p_phdr.p_offset),
-				field, EC_ADDR(p_phdr.p_vaddr),
-				field, EC_ADDR(p_phdr.p_paddr),
-				field, EC_XWORD(p_phdr.p_filesz),
-				field, EC_XWORD(p_phdr.p_memsz));
+			    "%-#*llx%-#*llx%-#*llx\n%-#*llx%-#*llx",
+			    field, EC_OFF(p_phdr.p_offset),
+			    field, EC_ADDR(p_phdr.p_vaddr),
+			    field, EC_ADDR(p_phdr.p_paddr),
+			    field, EC_XWORD(p_phdr.p_filesz),
+			    field, EC_XWORD(p_phdr.p_memsz));
 
 			switch (p_phdr.p_flags) {
 			case 0: (void) printf("%-*s", field, "---"); break;
@@ -198,7 +167,7 @@ dump_exec_header(Elf *elf_file, unsigned nseg, char *filename)
 				break;
 			}
 			(void) printf(
-				"%-#*llx\n\n", field, EC_XWORD(p_phdr.p_align));
+			    "%-#*llx\n\n", field, EC_XWORD(p_phdr.p_align));
 		}
 	}
 }

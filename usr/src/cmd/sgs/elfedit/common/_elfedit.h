@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__ELFEDIT_H
 #define	__ELFEDIT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<setjmp.h>
 #include	<libtecla.h>
@@ -183,6 +181,8 @@ typedef struct {
 	} input;
 	struct {		/* ELF file state */
 		int elfclass;		/* ELFCLASS of file being edited */
+		int elfconst_ehdr_change;	/* ELF header has changed. */
+						/*	Recheck elfconst strs */
 		/*
 		 * Information for the ELF object being edited.
 		 * The value of elfclass determines which of these

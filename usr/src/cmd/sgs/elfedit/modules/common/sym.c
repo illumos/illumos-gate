@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	ELF_TARGET_AMD64	/* SHN_AMD64_LCOMMON */
 
@@ -250,6 +249,7 @@ dump_symtab(ARGSTATE *argstate, SYMSTATE *symstate, Word ndx, Word cnt)
 	elfedit_section_t	*strsec;
 	Sym			*sym;
 	elfedit_obj_state_t	*obj_state = argstate->obj_state;
+	uchar_t			osabi = obj_state->os_ehdr->e_ident[EI_OSABI];
 	Half			mach = obj_state->os_ehdr->e_machine;
 	const char		*symname;
 	Versym			versym;
@@ -281,7 +281,7 @@ dump_symtab(ARGSTATE *argstate, SYMSTATE *symstate, Word ndx, Word cnt)
 		if ((shndx == SHN_XINDEX) && (symstate->xshndx.sec != NULL))
 			shndx = symstate->xshndx.data[ndx];
 		shndx_name = elfedit_shndx_to_name(obj_state, shndx);
-		Elf_syms_table_entry(NULL, ELF_DBG_ELFDUMP, index, mach,
+		Elf_syms_table_entry(NULL, ELF_DBG_ELFDUMP, index, osabi, mach,
 		    sym, versym, 0, shndx_name, symname);
 	}
 }
@@ -449,7 +449,7 @@ print_symstate(SYM_CMD_T cmd, ARGSTATE *argstate, SYMSTATE *symstate,
 				if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
 					elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
 					    conv_sym_info_bind(value,
-					    CONV_FMT_ALT_FULLNAME, &inv_buf));
+					    CONV_FMT_ALT_CF, &inv_buf));
 				} else {
 					elfedit_printf(
 					    MSG_ORIG(MSG_FMT_WORDVALNL),
@@ -532,7 +532,7 @@ print_symstate(SYM_CMD_T cmd, ARGSTATE *argstate, SYMSTATE *symstate,
 				if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
 					elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
 					    conv_sym_info_type(mach, value,
-					    CONV_FMT_ALT_FULLNAME, &inv_buf));
+					    CONV_FMT_ALT_CF, &inv_buf));
 				} else {
 					elfedit_printf(
 					    MSG_ORIG(MSG_FMT_WORDVALNL),
@@ -561,7 +561,7 @@ print_symstate(SYM_CMD_T cmd, ARGSTATE *argstate, SYMSTATE *symstate,
 				if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
 					elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
 					    conv_sym_other_vis(value,
-					    CONV_FMT_ALT_FULLNAME, &inv_buf));
+					    CONV_FMT_ALT_CF, &inv_buf));
 				} else {
 					elfedit_printf(
 					    MSG_ORIG(MSG_FMT_WORDVALNL),
@@ -702,7 +702,7 @@ cmd_body_set_st_bind(ARGSTATE *argstate, SYMSTATE *symstate)
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_S_OK),
 		    symstate->sym.sec->sec_shndx, symstate->sym.sec->sec_name,
 		    EC_WORD(symstate->ndx), MSG_ORIG(MSG_CMD_ST_BIND),
-		    conv_sym_info_bind(bind, CONV_FMT_ALT_FULLNAME, &inv_buf1));
+		    conv_sym_info_bind(bind, CONV_FMT_ALT_CF, &inv_buf1));
 	} else {
 		/*
 		 * The sh_info field of the symbol table section header
@@ -726,9 +726,9 @@ cmd_body_set_st_bind(ARGSTATE *argstate, SYMSTATE *symstate)
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_S_CHG),
 		    symstate->sym.sec->sec_shndx, symstate->sym.sec->sec_name,
 		    EC_WORD(symstate->ndx), MSG_ORIG(MSG_CMD_ST_BIND),
-		    conv_sym_info_bind(old_bind, CONV_FMT_ALT_FULLNAME,
+		    conv_sym_info_bind(old_bind, CONV_FMT_ALT_CF,
 		    &inv_buf1),
-		    conv_sym_info_bind(bind, CONV_FMT_ALT_FULLNAME, &inv_buf2));
+		    conv_sym_info_bind(bind, CONV_FMT_ALT_CF, &inv_buf2));
 		ret = ELFEDIT_CMDRET_MOD;
 		sym->st_info = ELF_ST_INFO(bind, type);
 	}
@@ -956,15 +956,15 @@ cmd_body_set_st_type(ARGSTATE *argstate, SYMSTATE *symstate)
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_S_OK),
 		    symstate->sym.sec->sec_shndx, symstate->sym.sec->sec_name,
 		    EC_WORD(symstate->ndx), MSG_ORIG(MSG_CMD_ST_TYPE),
-		    conv_sym_info_type(mach, type, CONV_FMT_ALT_FULLNAME,
+		    conv_sym_info_type(mach, type, CONV_FMT_ALT_CF,
 		    &inv_buf1));
 	} else {
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_S_CHG),
 		    symstate->sym.sec->sec_shndx, symstate->sym.sec->sec_name,
 		    EC_WORD(symstate->ndx), MSG_ORIG(MSG_CMD_ST_TYPE),
-		    conv_sym_info_type(mach, old_type, CONV_FMT_ALT_FULLNAME,
+		    conv_sym_info_type(mach, old_type, CONV_FMT_ALT_CF,
 		    &inv_buf1),
-		    conv_sym_info_type(mach, type, CONV_FMT_ALT_FULLNAME,
+		    conv_sym_info_type(mach, type, CONV_FMT_ALT_CF,
 		    &inv_buf2));
 		ret = ELFEDIT_CMDRET_MOD;
 		sym->st_info = ELF_ST_INFO(bind, type);
@@ -995,15 +995,15 @@ cmd_body_set_st_visibility(ARGSTATE *argstate, SYMSTATE *symstate)
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_S_OK),
 		    symstate->sym.sec->sec_shndx, symstate->sym.sec->sec_name,
 		    EC_WORD(symstate->ndx), MSG_ORIG(MSG_CMD_ST_VISIBILITY),
-		    conv_sym_other_vis(old_vis, CONV_FMT_ALT_FULLNAME,
+		    conv_sym_other_vis(old_vis, CONV_FMT_ALT_CF,
 		    &inv_buf1));
 	} else {
 		elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_S_CHG),
 		    symstate->sym.sec->sec_shndx, symstate->sym.sec->sec_name,
 		    EC_WORD(symstate->ndx), MSG_ORIG(MSG_CMD_ST_VISIBILITY),
-		    conv_sym_other_vis(old_vis, CONV_FMT_ALT_FULLNAME,
+		    conv_sym_other_vis(old_vis, CONV_FMT_ALT_CF,
 		    &inv_buf1),
-		    conv_sym_other_vis(vis, CONV_FMT_ALT_FULLNAME, &inv_buf2));
+		    conv_sym_other_vis(vis, CONV_FMT_ALT_CF, &inv_buf2));
 		ret = ELFEDIT_CMDRET_MOD;
 		st_other = (st_other & ~MSK_SYM_VISIBILITY) |
 		    ELF_ST_VISIBILITY(vis);
@@ -1110,12 +1110,11 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_NEEDEXPSYMTAB));
 
 	/*
-	 * If a section was explicitly specified, it needs
-	 * be a symbol table.
+	 * If a section was explicitly specified, it must be a symbol table.
 	 */
 	if (explicit)
-		(void) elfedit_sec_issymtab(&obj_state->os_secarr[index],
-		    1, NULL);
+		(void) elfedit_sec_issymtab(obj_state,
+		    &obj_state->os_secarr[index], 1, NULL);
 
 	/* If there may be an arbitrary amount of output, use a pager */
 	if (argc == 0)
@@ -1141,9 +1140,21 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 	symstate = argstate->symstate;
 	for (tblndx = 0; tblndx < obj_state->os_symtabnum;
 	    tblndx++, symtab++) {
-		/* If explicit table specified, only that table is considered */
-		if (explicit && (symtab->symt_shndx != index))
+		/*
+		 * If an explicit table is specified, only that table is
+		 * considered.
+		 *
+		 * If no explicit table is specified, verify that table
+		 * is considered to be a symbol table by the current osabi,
+		 * and quietly skip it if not.
+		 */
+		if (explicit) {
+			if (symtab->symt_shndx != index)
+				continue;
+		} else if (elfedit_sec_issymtab(obj_state,
+		    &obj_state->os_secarr[symtab->symt_shndx], 0, NULL) == 0) {
 			continue;
+		}
 
 		symstate->sym.sec = elfedit_sec_getsymtab(obj_state, 1,
 		    symtab->symt_shndx, NULL, &symstate->sym.data,
@@ -1503,7 +1514,8 @@ cpl_sh_opt(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 			{
 				elfedit_atoui_sym_t *cpl_list;
 
-				(void) elfedit_sec_issymtab(sec, 1, &cpl_list);
+				(void) elfedit_sec_issymtab(obj_state,
+				    sec, 1, &cpl_list);
 				elfedit_cpl_atoui(cpldata, cpl_list);
 			}
 			break;

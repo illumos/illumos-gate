@@ -280,6 +280,11 @@ typedef struct {
 #define	ELFOSABI_ARM		97	/* ARM */
 #define	ELFOSABI_STANDALONE	255	/* standalone (embedded) application */
 
+#define	EAV_SUNW_NONE		0	/* EI_ABIVERSION */
+#define	EAV_SUNW_CURRENT	1
+#define	EAV_SUNW_NUM		2
+
+
 /*
  *	Program header
  */

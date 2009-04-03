@@ -20,13 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
 /* PROTOLIB1 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Supplemental Pseudo-code to get lint to consider these symbols used.
@@ -104,7 +102,6 @@ foo()
 	(void) elfedit_modified_ehdr(NULL);
 	(void) elfedit_modified_phdr(NULL);
 	(void) elfedit_modified_shdr(NULL);
-	(void) elfedit_mach_sunw_hw1_to_atoui(0);
 	(void) elfedit_name_to_shndx(NULL, NULL);
 	(void) elfedit_name_to_symndx(NULL, NULL, NULL, ELFEDIT_MSG_ERR, NULL);
 	(void) elfedit_outstyle();

@@ -92,7 +92,7 @@ Dbg_cap_sec_entry(Lm_list *lml, uint_t type, Xword tag, Xword val, Half mach)
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_CAP_SEC_ENTRY), MSG_INTL(captype[type]),
-	    conv_cap_tag(tag, &inv_buf), conv_cap_val(tag, val, mach,
+	    conv_cap_tag(tag, 0, &inv_buf), conv_cap_val(tag, val, mach,
 	    &cap_val_buf));
 }
 
@@ -121,6 +121,6 @@ Elf_cap_entry(Lm_list *lml, Cap *cap, int ndx, Half mach)
 
 	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_FMT_INDEX), ndx);
 	dbg_print(lml, MSG_INTL(MSG_CAP_ELF_ENTRY), index,
-	    conv_cap_tag(cap->c_tag, &inv_buf),
+	    conv_cap_tag(cap->c_tag, 0, &inv_buf),
 	    conv_cap_val(cap->c_tag, cap->c_un.c_val, mach, &cap_val_buf));
 }

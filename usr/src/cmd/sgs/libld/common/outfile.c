@@ -432,6 +432,13 @@ ld_create_outfile(Ofl_desc *ofl)
 		 * header table. If a segment is empty, ignore it.
 		 */
 		if (!(flags & FLG_OF_RELOBJ)) {
+			/*
+			 * If the program header type belongs to the os range,
+			 * the resulting object is ELFOSABI_SOLARIS.
+			 */
+			if ((ptype >= PT_LOOS) && (ptype <= PT_HIOS))
+				ofl->ofl_flags |= FLG_OF_OSABI;
+
 			if (ptype == PT_PHDR) {
 				/*
 				 * If we are generating an interp section (and
@@ -665,6 +672,16 @@ ld_create_outfile(Ofl_desc *ofl)
 			 */
 			osp->os_szoutrels = 0;
 		}
+	}
+
+	/*
+	 * Did we use ELF features from the osabi range? If so,
+	 * update the ELF header osabi fields. If this doesn't happen,
+	 * those fields remain 0, reflecting a generic System V ELF ABI.
+	 */
+	if (ofl->ofl_flags & FLG_OF_OSABI) {
+		ofl->ofl_nehdr->e_ident[EI_OSABI] = ELFOSABI_SOLARIS;
+		ofl->ofl_nehdr->e_ident[EI_ABIVERSION] = EAV_SUNW_CURRENT;
 	}
 
 	/*

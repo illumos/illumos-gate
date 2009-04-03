@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_ELFEDIT_H
 #define	_ELFEDIT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -305,7 +303,9 @@ typedef uintptr_t elfedit_i18nhdl_t;
 typedef enum {
 	ELFEDIT_CMDRET_NONE = 0,	/* Nothing to report */
 	ELFEDIT_CMDRET_MOD = 1,		/* Command modified output ELF file */
-	ELFEDIT_CMDRET_FLUSH = 2	/* Output file flushed: elf_update() */
+	ELFEDIT_CMDRET_MOD_OS_MACH = 2, /* As per _MOD, include ELF header */
+					/*	osabi or machine change */
+	ELFEDIT_CMDRET_FLUSH = 3	/* Output file flushed: elf_update() */
 } elfedit_cmdret_t;
 
 /*
@@ -705,14 +705,14 @@ typedef enum {
 	ELFEDIT_CONST_OUTSTYLE =	0,	/* elfedit output styles  */
 	ELFEDIT_CONST_OUTSTYLE_MO =	1,	/* ostyles with -o prefix */
 	ELFEDIT_CONST_BOOL =		2,	/* boolean names */
-	ELFEDIT_CONST_SHN =		3,	/* ELF SHN_ section indexes  */
-	ELFEDIT_CONST_SHT =		4,	/* ELF SHT_ section types  */
-	ELFEDIT_CONST_SHT_STRTAB =	5,	/* ELF SHT_STRTAB */
-	ELFEDIT_CONST_SHT_ALLSYMTAB =	6,	/* ELF SHT_ symbol table */
+	ELFEDIT_CONST_SHT_STRTAB =	3,	/* ELF SHT_STRTAB */
+	ELFEDIT_CONST_SHT_SYMTAB =	4,	/* ELF SHT_SYMTAB */
+	ELFEDIT_CONST_SHT_DYNSYM =	5,	/* ELF SHT_DYNSYM */
+	ELFEDIT_CONST_SHT_LDYNSYM =	6,	/* ELF SHT_SUNW_LDYNSYM */
+	ELFEDIT_CONST_SHN =		7,	/* ELF SHN_ section indexes  */
+	ELFEDIT_CONST_SHT =		8,	/* ELF SHT_ section types  */
+	ELFEDIT_CONST_SHT_ALLSYMTAB =	9,	/* ELF SHT_ symbol table */
 						/*	section types */
-	ELFEDIT_CONST_SHT_SYMTAB =	7,	/* ELF SHT_SYMTAB */
-	ELFEDIT_CONST_SHT_DYNSYM =	8,	/* ELF SHT_DYNSYM */
-	ELFEDIT_CONST_SHT_LDYNSYM =	9,	/* ELF SHT_SUNW_LDYNSYM */
 	ELFEDIT_CONST_DT =		10,	/* Dynamic tags: DT_ */
 	ELFEDIT_CONST_DF =		11,	/* DT_FLAGS bits */
 	ELFEDIT_CONST_DF_P1 =		12,	/* DF_POSFLAG_1 bits */
@@ -726,18 +726,20 @@ typedef enum {
 	ELFEDIT_CONST_EV =		20,	/* Ehdr version */
 	ELFEDIT_CONST_EM =		21,	/* Ehdr machine */
 	ELFEDIT_CONST_ELFOSABI =	22,	/* Ehdr ABI */
-	ELFEDIT_CONST_PT =		23,	/* Phdr type */
-	ELFEDIT_CONST_PF =		24,	/* Phdr flags */
-	ELFEDIT_CONST_SHF =		25,	/* Shdr flags */
-	ELFEDIT_CONST_STB =		26,	/* Sym binding */
-	ELFEDIT_CONST_STT =		27,	/* Sym type */
-	ELFEDIT_CONST_STV =		28,	/* Sym visibility */
-	ELFEDIT_CONST_SYMINFO_BT =	29,	/* Syminfo boundto */
-	ELFEDIT_CONST_SYMINFO_FLG =	30,	/* Syminfo flags */
-	ELFEDIT_CONST_CA =		31,	/* Capabilities tags: CA_ */
-	ELFEDIT_CONST_AV_386 =		32,	/* X86 hardware caps */
-	ELFEDIT_CONST_AV_SPARC =	33,	/* sparc hardware caps */
+	ELFEDIT_CONST_EAV =		23,	/* Ehdr ABI version */
+	ELFEDIT_CONST_PT =		24,	/* Phdr type */
+	ELFEDIT_CONST_PF =		25,	/* Phdr flags */
+	ELFEDIT_CONST_SHF =		26,	/* Shdr flags */
+	ELFEDIT_CONST_STB =		27,	/* Sym binding */
+	ELFEDIT_CONST_STT =		28,	/* Sym type */
+	ELFEDIT_CONST_STV =		29,	/* Sym visibility */
+	ELFEDIT_CONST_SYMINFO_BT =	30,	/* Syminfo boundto */
+	ELFEDIT_CONST_SYMINFO_FLG =	31,	/* Syminfo flags */
+	ELFEDIT_CONST_CA =		32,	/* Capabilities tags */
+	ELFEDIT_CONST_AV =		33,	/* hardware capabilities */
 	ELFEDIT_CONST_SF1_SUNW =	34,	/* software capabilities */
+
+	ELFEDIT_CONST_NUM =		35,	/* # of constant types */
 } elfedit_const_t;
 
 /*
@@ -745,13 +747,6 @@ typedef enum {
  * entries that it represents.
  */
 extern elfedit_atoui_sym_t *elfedit_const_to_atoui(elfedit_const_t const_type);
-
-/*
- * Return the elfedit_atoui_t array that corresponds to the
- * CA_SUNW_HW_1 hardware capabiliies field for a given
- * machine type.
- */
-extern elfedit_atoui_sym_t *elfedit_mach_sunw_hw1_to_atoui(int mach);
 
 /*
  * ato[u]i and const routines, used to turn strings into numeric values,
@@ -882,10 +877,10 @@ const char *elfedit32_dyn_offset_to_str(elfedit32_section_t *strsec,
 const char *elfedit64_dyn_offset_to_str(elfedit64_section_t *strsec,
     elfedit64_dyn_elt_t *dynelt);
 
-extern int elfedit32_dynstr_getpad(elfedit32_section_t *dynsec,
-    elfedit32_dyn_elt_t *dyn_strpad);
-extern int elfedit64_dynstr_getpad(elfedit64_section_t *dynsec,
-    elfedit64_dyn_elt_t *dyn_strpad);
+extern int elfedit32_dynstr_getpad(elfedit32_obj_state_t *obj_state,
+    elfedit32_section_t *dynsec, elfedit32_dyn_elt_t *dyn_strpad);
+extern int elfedit64_dynstr_getpad(elfedit64_obj_state_t *obj_state,
+    elfedit64_section_t *dynsec, elfedit64_dyn_elt_t *dyn_strpad);
 
 extern Elf32_Word elfedit32_dynstr_insert(elfedit32_section_t *dynsec,
     elfedit32_section_t *strsec, elfedit32_dyn_elt_t *dyn_strpad,
@@ -910,11 +905,6 @@ extern Elf32_Word elfedit32_name_to_shndx(elfedit32_obj_state_t *obj_state,
     const char *shnam);
 extern Elf64_Word elfedit64_name_to_shndx(elfedit64_obj_state_t *obj_state,
     const char *shnam);
-
-extern Elf32_Word elfedit32_type_to_shndx(elfedit32_obj_state_t *obj_state,
-    Elf32_Word shtype);
-extern Elf64_Word elfedit64_type_to_shndx(elfedit64_obj_state_t *obj_state,
-    Elf64_Word shtype);
 
 extern int elfedit32_name_to_symndx(elfedit32_section_t *symsec,
     elfedit32_section_t *strsec, const char *name, elfedit_msg_t msg_type,
@@ -981,10 +971,10 @@ extern elfedit64_section_t *elfedit64_sec_getxshndx(
     elfedit64_obj_state_t *obj_state, elfedit64_section_t *symsec,
     Elf64_Word **xshndx, Elf64_Word *num);
 
-extern int elfedit32_sec_issymtab(elfedit32_section_t *sec, int issue_err,
-    elfedit_atoui_sym_t **atoui_list);
-extern int elfedit64_sec_issymtab(elfedit64_section_t *sec, int issue_err,
-    elfedit_atoui_sym_t **atoui_list);
+extern int elfedit32_sec_issymtab(elfedit32_obj_state_t *obj_state,
+    elfedit32_section_t *sec, int issue_err, elfedit_atoui_sym_t **atoui_list);
+extern int elfedit64_sec_issymtab(elfedit64_obj_state_t *obj_state,
+    elfedit64_section_t *sec, int issue_err, elfedit_atoui_sym_t **atoui_list);
 
 extern const char *elfedit32_sec_msgprefix(elfedit32_section_t *sec);
 extern const char *elfedit64_sec_msgprefix(elfedit64_section_t *sec);
@@ -1003,6 +993,11 @@ extern void elfedit32_strtab_insert_test(elfedit32_obj_state_t *obj_state,
     elfedit32_section_t *strsec, elfedit32_section_t *dynsec, const char *str);
 extern void elfedit64_strtab_insert_test(elfedit64_obj_state_t *obj_state,
     elfedit64_section_t *strsec, elfedit64_section_t *dynsec, const char *str);
+
+extern int elfedit32_test_osabi(elfedit32_obj_state_t *obj_state, uchar_t osabi,
+    int issue_err);
+extern int elfedit64_test_osabi(elfedit64_obj_state_t *obj_state, uchar_t osabi,
+    int issue_err);
 
 extern Elf32_Word elfedit32_type_to_shndx(elfedit32_obj_state_t *obj_state,
     Elf32_Word shtype);
@@ -1042,6 +1037,7 @@ extern Elf64_Word elfedit64_type_to_shndx(elfedit64_obj_state_t *obj_state,
 #define	elfedit_sec_msgprefix		elfedit64_sec_msgprefix
 #define	elfedit_strtab_insert		elfedit64_strtab_insert
 #define	elfedit_strtab_insert_test	elfedit64_strtab_insert_test
+#define	elfedit_test_osabi		elfedit64_test_osabi
 #define	elfedit_type_to_shndx		elfedit64_type_to_shndx
 #else
 #define	elfedit_dyn_elt_init		elfedit32_dyn_elt_init
@@ -1070,6 +1066,7 @@ extern Elf64_Word elfedit64_type_to_shndx(elfedit64_obj_state_t *obj_state,
 #define	elfedit_sec_msgprefix		elfedit32_sec_msgprefix
 #define	elfedit_strtab_insert		elfedit32_strtab_insert
 #define	elfedit_strtab_insert_test	elfedit32_strtab_insert_test
+#define	elfedit_test_osabi		elfedit32_test_osabi
 #define	elfedit_type_to_shndx		elfedit32_type_to_shndx
 #endif
 

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdlib.h>
 #include	<stdio.h>
@@ -164,7 +163,9 @@ elfedit_type_to_shndx(elfedit_obj_state_t *obj_state, Word shtype)
 			elfedit_msg(ELFEDIT_MSG_DEBUG,
 			    MSG_INTL(MSG_DEBUG_SHNAM2NDX),
 			    EC_WORD(sec->sec_shndx), sec->sec_name,
-			    conv_sec_type(obj_state->os_ehdr->e_machine,
+			    conv_sec_type(
+			    obj_state->os_ehdr->e_ident[EI_OSABI],
+			    obj_state->os_ehdr->e_machine,
 			    shtype, 0, &inv_buf));
 			return (ndx);
 		}
@@ -172,7 +173,8 @@ elfedit_type_to_shndx(elfedit_obj_state_t *obj_state, Word shtype)
 
 	/* If didn't return in loop above, the name doesn't match */
 	elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_NOSECTYP),
-	    conv_sec_type(obj_state->os_ehdr->e_machine, shtype, 0, &inv_buf));
+	    conv_sec_type(obj_state->os_ehdr->e_ident[EI_OSABI],
+	    obj_state->os_ehdr->e_machine, shtype, 0, &inv_buf));
 	/*NOTREACHED*/
 	return (SHN_UNDEF);
 }
@@ -262,34 +264,8 @@ elfedit_shndx_to_name(elfedit_obj_state_t *obj_state, Word shndx)
 	 * without requiring the caller to supply a buffer (the size of
 	 * which they don't know).
 	 */
-	static char buf1[64], buf2[64];
-	static char *buf;
-
-	if ((obj_state->os_ehdr->e_machine == EM_AMD64) &&
-	    (shndx == SHN_AMD64_LCOMMON))
-		return (MSG_ORIG(MSG_SHN_AMD64_LCOMMON));
-
-	switch (shndx) {
-	case SHN_UNDEF:
-		return (MSG_ORIG(MSG_SHN_UNDEF));
-	case SHN_SUNW_IGNORE:
-		return (MSG_ORIG(MSG_SHN_SUNW_IGNORE));
-	case SHN_BEFORE:
-		return (MSG_ORIG(MSG_SHN_BEFORE));
-	case SHN_AFTER:
-		return (MSG_ORIG(MSG_SHN_AFTER));
-	case SHN_AMD64_LCOMMON:
-		if (obj_state->os_ehdr->e_machine == EM_AMD64)
-			return (MSG_ORIG(MSG_SHN_AMD64_LCOMMON));
-		break;
-	case SHN_ABS:
-		return (MSG_ORIG(MSG_SHN_ABS));
-	case SHN_COMMON:
-		return (MSG_ORIG(MSG_SHN_COMMON));
-	case SHN_XINDEX:
-		return (MSG_ORIG(MSG_SHN_XINDEX));
-	}
-
+	static Conv_inv_buf_t	buf1, buf2;
+	static Conv_inv_buf_t	*buf;
 
 	/*
 	 * If it is outside of the reserved area, and inside the
@@ -297,19 +273,18 @@ elfedit_shndx_to_name(elfedit_obj_state_t *obj_state, Word shndx)
 	 * the section name.
 	 */
 	if ((shndx < obj_state->os_shnum) &&
-	    ((shndx < SHN_LORESERVE) || (shndx > SHN_HIRESERVE)))
+	    ((shndx < SHN_LORESERVE) || (shndx > SHN_HIRESERVE)) &&
+	    (shndx != SHN_UNDEF))
 		return (obj_state->os_secarr[shndx].sec_name);
 
-	/* Switch buffers */
-	buf = (buf == buf1) ? buf2 : buf1;
-
 	/*
-	 * If we haven't identified it by now, format the
-	 * number in a static buffer and return that.
+	 * Anything else is handled by libconv. It will return standard
+	 * names for known items, or format as a number otherwise.
 	 */
-	(void) snprintf(buf, sizeof (buf1),
-	    MSG_ORIG(MSG_FMT_WORDVAL), shndx);
-	return (buf);
+	buf = (buf == &buf1) ? &buf2 : &buf1;	/* Switch buffers */
+	return (conv_sym_shndx(obj_state->os_ehdr->e_ident[EI_OSABI],
+	    obj_state->os_ehdr->e_machine, shndx,
+	    CONV_FMT_ALT_CF | CONV_FMT_DECIMAL, buf));
 }
 
 
@@ -336,6 +311,44 @@ elfedit_sec_get(elfedit_obj_state_t *obj_state, Word shndx)
 }
 
 
+
+/*
+ * Compare the a specified osabi with that of the current object.
+ *
+ * entry:
+ *	obj_state - Object state for open object to query.
+ *	issue_err - True if this routine should issue an error and
+ *		not return to the caller if osabi is not native.
+ *
+ * exit:
+ *	If current osabi is the one specified, True (1) is returned.
+ *
+ *	Otherwise, if issue_err is True, an error is issued and this
+ *	routine does not return to the caller. If issue_err is False,
+ *	False (0) is returned.
+ *
+ * note:
+ *	ELFOSABI_NONE is considered to be equivalent to ELFOSABI_SOLARIS.
+ */
+int
+elfedit_test_osabi(elfedit_obj_state_t *obj_state, uchar_t osabi,
+    int issue_err)
+{
+	uchar_t		obj_osabi = obj_state->os_ehdr->e_ident[EI_OSABI];
+	Conv_inv_buf_t	inv_buf;
+
+	if (obj_osabi == ELFOSABI_NONE)
+		obj_osabi = ELFOSABI_SOLARIS;
+
+	if (osabi == obj_osabi)
+		return (1);
+
+	if (issue_err)
+		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_BADOSABI),
+		    conv_ehdr_osabi(osabi, 0, &inv_buf));
+	return (0);
+}
+
 /*
  * Locate the capabilities section for this object
  *
@@ -356,6 +369,8 @@ elfedit_sec_getcap(elfedit_obj_state_t *obj_state, Cap **cap, Word *num)
 {
 	Word cnt;
 	elfedit_section_t *cache;
+
+	(void) elfedit_test_osabi(obj_state, ELFOSABI_SOLARIS, 1);
 
 	for (cnt = 1; cnt < obj_state->os_shnum; cnt++) {
 		cache = &obj_state->os_secarr[cnt];
@@ -462,6 +477,7 @@ elfedit_sec_getsyminfo(elfedit_obj_state_t *obj_state, Syminfo **syminfo,
  * Check the given section to see if it is a known symbol table type.
  *
  * entry:
+ *	obj_state - Object state for open object to query.
  *	sec - Section to check
  *	issue_err - True if this routine should issue an error and
  *		not return to the caller if sec is not a symbol table.
@@ -483,8 +499,8 @@ elfedit_sec_getsyminfo(elfedit_obj_state_t *obj_state, Syminfo **syminfo,
  *		- False (0) is returned
  */
 int
-elfedit_sec_issymtab(elfedit_section_t *sec, int issue_err,
-    elfedit_atoui_sym_t **atoui_list)
+elfedit_sec_issymtab(elfedit_obj_state_t *obj_state, elfedit_section_t *sec,
+    int issue_err, elfedit_atoui_sym_t **atoui_list)
 {
 	elfedit_const_t		const_type;
 	int			ret = 1;
@@ -498,8 +514,15 @@ elfedit_sec_issymtab(elfedit_section_t *sec, int issue_err,
 		const_type = ELFEDIT_CONST_SHT_DYNSYM;
 		break;
 	case SHT_SUNW_LDYNSYM:
-		const_type = ELFEDIT_CONST_SHT_LDYNSYM;
-		break;
+		/*
+		 * These sections are only known to be symbol tables
+		 * if the osabi is Solaris.
+		 */
+		if (elfedit_test_osabi(obj_state, ELFOSABI_SOLARIS, 0)) {
+			const_type = ELFEDIT_CONST_SHT_LDYNSYM;
+			break;
+		}
+		/*FALLTHROUGH*/
 	default:
 		if (issue_err)
 			elfedit_msg(ELFEDIT_MSG_ERR,
@@ -577,7 +600,7 @@ elfedit_sec_getsymtab(elfedit_obj_state_t *obj_state, int by_index,
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_NOSYMTAB));
 
 	/* Got it. Report to the user and return the necessary data */
-	(void) elfedit_sec_issymtab(symsec, 1, NULL);
+	(void) elfedit_sec_issymtab(obj_state, symsec, 1, NULL);
 	type_name = elfedit_atoconst_value_to_str(ELFEDIT_CONST_SHT_ALLSYMTAB,
 	    symsec->sec_shdr->sh_type, 1);
 	elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_FNDSYMTAB),
@@ -625,7 +648,7 @@ elfedit_sec_getxshndx(elfedit_obj_state_t *obj_state,
 	Word			ndx;
 
 	/* Sanity check: symsec must be a symbol table */
-	(void) elfedit_sec_issymtab(symsec, 1, NULL);
+	(void) elfedit_sec_issymtab(obj_state, symsec, 1, NULL);
 
 	symtab = obj_state->os_symtab;
 	for (ndx = 0; ndx < obj_state->os_symtabnum; ndx++, symtab++)
@@ -688,7 +711,7 @@ elfedit_sec_getversym(elfedit_obj_state_t *obj_state,
 	Word			ndx;
 
 	/* Sanity check: symsec must be a symbol table */
-	(void) elfedit_sec_issymtab(symsec, 1, NULL);
+	(void) elfedit_sec_issymtab(obj_state, symsec, 1, NULL);
 
 	symtab = obj_state->os_symtab;
 	for (ndx = 0; ndx < obj_state->os_symtabnum; ndx++, symtab++)
@@ -825,6 +848,7 @@ elfedit_sec_findstr(elfedit_section_t *sec, Word tail_ign,
  * it exists.
  *
  * entry:
+ *	obj_state - Object state for open object to query.
  *	dynsec - Dynamic section descriptor
  *	dyn_strpad - Address of variable to receive the results.
  *		The caller is responsible for calling elfedit_dyn_elt_init()
@@ -838,11 +862,19 @@ elfedit_sec_findstr(elfedit_section_t *sec, Word tail_ign,
  *	Returns the final value of dyn_strpad->dn_seen.
  */
 int
-elfedit_dynstr_getpad(elfedit_section_t *dynsec, elfedit_dyn_elt_t *dyn_strpad)
+elfedit_dynstr_getpad(elfedit_obj_state_t *obj_state, elfedit_section_t *dynsec,
+    elfedit_dyn_elt_t *dyn_strpad)
 {
-	Dyn	*dyn = (Dyn *) dynsec->sec_data->d_buf;
 	Word numdyn = dynsec->sec_shdr->sh_size / dynsec->sec_shdr->sh_entsize;
-	Word i;
+	Dyn	*dyn = (Dyn *) dynsec->sec_data->d_buf;
+	Word	i;
+
+	/*
+	 * DT_SUNW_STRPAD is specific to the Solaris OSABI.
+	 * If the object is tagged otherwise, don't even look.
+	 */
+	if (!elfedit_test_osabi(obj_state, ELFOSABI_SOLARIS, 0))
+		return (dyn_strpad->dn_seen);
 
 	/* Go through dynamic section tags and find the STRPAD entry */
 	for (i = 0; i < numdyn; i++) {
@@ -995,7 +1027,7 @@ elfedit_strtab_insert_test(elfedit_obj_state_t *obj_state,
 
 		/* Determine the size of the STRPAD area, if any */
 		elfedit_dyn_elt_init(&dyn_strpad);
-		if (elfedit_dynstr_getpad(dynsec, &dyn_strpad) != 0)
+		if (elfedit_dynstr_getpad(obj_state, dynsec, &dyn_strpad) != 0)
 			tail_ign = dyn_strpad.dn_dyn.d_un.d_val;
 	}
 
@@ -1077,7 +1109,7 @@ elfedit_strtab_insert(elfedit_obj_state_t *obj_state, elfedit_section_t *strsec,
 
 	if (is_dynstr) {
 		elfedit_dyn_elt_init(&dyn_strpad);
-		(void) elfedit_dynstr_getpad(dynsec, &dyn_strpad);
+		(void) elfedit_dynstr_getpad(obj_state, dynsec, &dyn_strpad);
 		return (elfedit_dynstr_insert(dynsec, strsec,
 		    &dyn_strpad, str));
 	}

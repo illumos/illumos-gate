@@ -18,35 +18,30 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
- *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_DUMP_H
-#define	_DUMP_H
-
-#include	<sys/elf.h>
-#include	<sys/machelf.h>
-#include	<gelf.h>
-
 /*
- * DUMP_CONVFMT defines the libconv formatting options we want to use:
- *	- Unknown items to be printed as integers using decimal formatting
- *	- The "Dump Style" versions of strings.
+ * String conversion routines for symbol attributes.
  */
-#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALT_DUMP)
+#include	<stdio.h>
+#include	<_machelf.h>
+#include	<sys/elf_SPARC.h>
+#include	<sys/elf_amd64.h>
+#include	"_conv.h"
+#include	"symbols_msg.h"
 
-#define	DATESIZE 60
+const char *
+conv_sym_value(Half mach, uchar_t type, Addr value, Conv_inv_buf_t *inv_buf)
+{
+	if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
+	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER))
+		return (conv_sym_SPARC_value(value, 0, inv_buf));
 
-typedef struct scntab {
-	char		*scn_name;
-	Elf_Scn		*p_sd;
-	GElf_Shdr	p_shdr;
-} SCNTAB;
-
-#endif	/* _DUMP_H */
+	(void) snprintf(inv_buf->buf, sizeof (inv_buf->buf),
+	    MSG_ORIG(MSG_SYM_FMT_VAL), EC_ADDR(value));
+	return (inv_buf->buf);
+}

@@ -1467,3 +1467,5 @@ Bugid   Risk Synopsis
 6821646 xVM dom0 doesn't boot on daily.0324 and beyond
 6822828 librtld_db can return RD_ERR before RD_NOMAPS, which compromises dbx
 	expectations.
+6821619 Solaris linkers need systematic approach to ELF OSABI
+	PSARC/2009/196 ELF objects to set OSABI / elfdump -O option

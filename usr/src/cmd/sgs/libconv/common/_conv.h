@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__CONV_DOT_H
 #define	__CONV_DOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Local include file for conversion library.
@@ -59,52 +57,40 @@ extern "C" {
 #endif
 
 
-
 /*
- * Map an integer into a descriptive string.
+ * There are routines in libconv that are built once for each ELFCLASS
+ * because they are formatting Xword values. However, all ELF constants
+ * lie in 32-bit ranges, due to the need be usable for ELFCLASS32. Hence,
+ * the value of the ELFCLASS64 support here is purely to detect unexpected
+ * garbage values above the 32-bit range.
  *
- * entry:
- *	buf - A buffer into which this routine can format
- *		a result string, if necessary.
- *	bufsize - sizeof(buf)
- *	val - The value for which a string is desired.
- *	flags - CONV_FMT_* values to be passed to conv_invalid_val() if
- *		necessary. The caller is reponsible for having examined
- *		the CONV_FMT_ALT_* part of flags and passing the proper
- *		msg array.
- *	num_msg - # of Msg entries in msg.
- *	msg - Array of num_msg Msg items corresponding to the possible
- *		strings corresponding to val.
- *
- * exit:
- *	If val lies in the range [0-(num_msg-1)], then the string
- *	corresponding to it is returned. If val is outside the range,
- *	conv_invalid_val() is called to format an ASCII representation
- *	of it into string, and that is returned.
- *
- * note:
- *	Ideally, this would be a function defined in globals.c.
- *	However, it uses the MSG_ORIG macro, which uses an array
- *	that is local to each module. Hence, this is a static function,
- *	defined by this macro. Once defined by a module, the routine
- *	is called normally.
+ * The CONV_XWORD_64TEST() macro tests the upper half of an ELFCLASS64 Xword,
+ * and formats the value in hex if non-zero bits are seen. For ELFCLASS32,
+ * it is a no-op.
  */
-#define	DEFINE_conv_map2str \
-static \
-const char * \
-conv_map2str(Conv_inv_buf_t *inv_buf, int val, Conv_fmt_flags_t flags, \
-    int num_msg, const Msg *msg) \
-{ \
-	if ((val >= 0) && (val < num_msg)) \
-		return (MSG_ORIG(msg[val])); \
-\
-	/* If we get here, it's an unknown value */ \
-	return (conv_invalid_val(inv_buf, val, flags)); \
-}
+#ifdef _ELF64
+#define	CONV_XWORD_64TEST(_value, _fmt_flags, _inv_buf) \
+	if (_value & 0xffffffff00000000) \
+	    return (conv_invalid_val(_inv_buf, _value, _fmt_flags))
+#else
+#define	CONV_XWORD_64TEST(_value, _fmt_flags, _inv_buf)
+#endif
+
 
 /* # of elements in an array */
 #define	ARRAY_NELTS(arr) (sizeof (arr) / sizeof (*arr))
 
+/*
+ * Functions intended for use inter-file, within libconv only
+ */
+extern	const conv_ds_t	**conv_cap_tag_strings(Conv_fmt_flags_t);
+extern	const Val_desc	*conv_dyn_feature1_strings(Conv_fmt_flags_t);
+extern	const Val_desc	*conv_dyn_flag_strings(Conv_fmt_flags_t);
+extern	const Val_desc	*conv_dyn_flag1_strings(Conv_fmt_flags_t);
+extern	const Val_desc	*conv_dyn_posflag1_strings(Conv_fmt_flags_t);
+extern	const conv_ds_t	**conv_dyn_tag_strings(conv_iter_osabi_t, Half,
+			    Conv_fmt_flags_t);
+extern	const Val_desc2	*conv_sec_flags_strings(Conv_fmt_flags_t);
 
 
 #ifdef	__cplusplus

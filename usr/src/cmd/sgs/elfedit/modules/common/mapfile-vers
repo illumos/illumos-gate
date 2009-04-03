@@ -76,7 +76,6 @@ SUNWprivate_1.1 {
 
 		# ato[u]i routines
 		elfedit_const_to_atoui =	PARENT;
-		elfedit_mach_sunw_hw1_to_atoui = PARENT;
 
 		elfedit_atoi =			PARENT;
 		elfedit_atoui =			PARENT;
@@ -200,6 +199,9 @@ SUNWprivate_1.1 {
 
 		elfedit32_strtab_insert_test =	PARENT;
 		elfedit64_strtab_insert_test =	PARENT;
+
+		elfedit32_test_osabi =		PARENT;
+		elfedit64_test_osabi =		PARENT;
 
 		elfedit32_type_to_shndx =	PARENT;
 		elfedit64_type_to_shndx =	PARENT;

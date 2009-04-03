@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -2196,6 +2195,14 @@ dispatch_user_cmds()
 			elfedit_pager_cleanup();
 
 			switch (cmd_ret) {
+			case ELFEDIT_CMDRET_MOD_OS_MACH:
+				/*
+				 * Inform the elfconst module that the machine
+				 * or osabi has has changed. It may be necessary
+				 * to fetch new strings from libconv.
+				 */
+				state.elf.elfconst_ehdr_change = 1;
+				/*FALLTHROUGH*/
 			case ELFEDIT_CMDRET_MOD:
 				/*
 				 * Command modified the output ELF image,

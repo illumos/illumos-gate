@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * String conversion routines the system structs found in
@@ -39,21 +37,17 @@
 #include	<_conv.h>
 #include	<corenote_msg.h>
 
-/* Instantiate a local copy of conv_map2str() from _conv.h */
-DEFINE_conv_map2str
-
 const char *
 conv_cnote_type(Word type, Conv_fmt_flags_t fmt_flags,
     Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	types[] = {
-		NULL,
 		MSG_NT_PRSTATUS,	MSG_NT_PRFPREG,
 		MSG_NT_PRPSINFO,	MSG_NT_PRXREG,
 		MSG_NT_PLATFORM,	MSG_NT_AUXV,
 		MSG_NT_GWINDOWS,	MSG_NT_ASRS,
 		MSG_NT_LDT,		MSG_NT_PSTATUS,
-		NULL,			NULL,
+		0,			0,
 		MSG_NT_PSINFO,		MSG_NT_PRCRED,
 		MSG_NT_UTSNAME,		MSG_NT_LWPSTATUS,
 		MSG_NT_LWPSINFO,	MSG_NT_PRPRIV,
@@ -63,12 +57,13 @@ conv_cnote_type(Word type, Conv_fmt_flags_t fmt_flags,
 #if NT_NUM != NT_ZONENAME
 #error "NT_NUM has grown. Update core note types[]"
 #endif
+	static const conv_ds_msg_t ds_types = {
+	    CONV_DS_MSG_INIT(NT_PRSTATUS, types) };
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_types), NULL };
 
-	if ((type < 1) || (type > NT_NUM) || (type == 11) || (type == 12))
-		return (conv_invalid_val(inv_buf, type, fmt_flags));
 
-	return (conv_map2str(inv_buf, type, fmt_flags,
-	    ARRAY_NELTS(types), types));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, type, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -90,6 +85,9 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_AUXV_AT_ICACHEBSIZE,	MSG_AUXV_AT_UCACHEBSIZE,
 		MSG_AUXV_AT_IGNOREPPC
 	};
+	static const conv_ds_msg_t ds_types_0_22 = {
+	    CONV_DS_MSG_INIT(0, types_0_22) };
+
 	static const Msg	types_2000_2011[] = {
 		MSG_AUXV_AT_SUN_UID,		MSG_AUXV_AT_SUN_RUID,
 		MSG_AUXV_AT_SUN_GID,		MSG_AUXV_AT_SUN_RGID,
@@ -98,6 +96,9 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_AUXV_AT_SUN_PLATFORM,	MSG_AUXV_AT_SUN_HWCAP,
 		MSG_AUXV_AT_SUN_IFLUSH,		MSG_AUXV_AT_SUN_CPU
 	};
+	static const conv_ds_msg_t ds_types_2000_2011 = {
+	    CONV_DS_MSG_INIT(2000, types_2000_2011) };
+
 	static const Msg	types_2014_2022[] = {
 		MSG_AUXV_AT_SUN_EXECNAME,	MSG_AUXV_AT_SUN_MMU,
 		MSG_AUXV_AT_SUN_LDDATA,		MSG_AUXV_AT_SUN_AUXFLAGS,
@@ -105,20 +106,15 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_AUXV_AT_SUN_BRAND_AUX1,	MSG_AUXV_AT_SUN_BRAND_AUX2,
 		MSG_AUXV_AT_SUN_BRAND_AUX3
 	};
+	static const conv_ds_msg_t ds_types_2014_2022 = {
+	    CONV_DS_MSG_INIT(2014, types_2014_2022) };
 
-	if (type <= 22)
-		return (conv_map2str(inv_buf, type, fmt_flags,
-		    ARRAY_NELTS(types_0_22), types_0_22));
+	static const conv_ds_t	*ds[] = {
+		CONV_DS_ADDR(ds_types_0_22), CONV_DS_ADDR(ds_types_2000_2011),
+		CONV_DS_ADDR(ds_types_2014_2022), NULL };
 
-	if ((type >= AT_SUN_UID) && (type <= AT_SUN_CPU))
-		return (conv_map2str(inv_buf, type - AT_SUN_UID, fmt_flags,
-		    ARRAY_NELTS(types_2000_2011), types_2000_2011));
-
-	if ((type >= AT_SUN_EXECNAME) && (type <= AT_SUN_BRAND_AUX3))
-		return (conv_map2str(inv_buf, type - AT_SUN_EXECNAME, fmt_flags,
-		    ARRAY_NELTS(types_2014_2022), types_2014_2022));
-
-	return (conv_invalid_val(inv_buf, type, fmt_flags));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, type, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -148,12 +144,13 @@ conv_cnote_signal(Word sig, Conv_fmt_flags_t fmt_flags,
 		MSG_SIGLOST,		MSG_SIGXRES,
 		MSG_SIGJVM1,		MSG_SIGJVM2,
 	};
+	static const conv_ds_msg_t ds_sigarr = {
+	    CONV_DS_MSG_INIT(SIGHUP, sigarr) };
 
-	if ((sig == 0) || (sig > SIGJVM2))
-		return (conv_invalid_val(inv_buf, sig, fmt_flags));
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_sigarr), NULL };
 
-	return (conv_map2str(inv_buf, sig - 1, fmt_flags,
-	    ARRAY_NELTS(sigarr), sigarr));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, sig, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -171,12 +168,13 @@ conv_cnote_fault(Word flt, Conv_fmt_flags_t fmt_flags,
 		MSG_FLTCPCOVF
 
 	};
+	static const conv_ds_msg_t ds_fltarr = {
+	    CONV_DS_MSG_INIT(FLTILL, fltarr) };
 
-	if ((flt == 0) || (flt > FLTCPCOVF))
-		return (conv_invalid_val(inv_buf, flt, fmt_flags));
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_fltarr), NULL };
 
-	return (conv_map2str(inv_buf, flt - 1, fmt_flags,
-	    ARRAY_NELTS(fltarr), fltarr));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, flt, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -314,6 +312,10 @@ conv_cnote_syscall(Word sysnum, Conv_fmt_flags_t fmt_flags,
 		MSG_SYS_CLADM,			MSG_SYS_UUCOPY,
 		MSG_SYS_UMOUNT2
 	};
+	static const conv_ds_msg_t ds_sysnumarr = {
+	    CONV_DS_MSG_INIT(1, sysnumarr) };
+
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_sysnumarr), NULL };
 
 	int	use_num = 0;
 
@@ -344,8 +346,8 @@ conv_cnote_syscall(Word sysnum, Conv_fmt_flags_t fmt_flags,
 	if (use_num)
 		return (conv_invalid_val(inv_buf, sysnum, fmt_flags));
 
-	return (conv_map2str(inv_buf, sysnum - 1, fmt_flags,
-	    ARRAY_NELTS(sysnumarr), sysnumarr));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, sysnum, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -392,6 +394,9 @@ conv_cnote_errno(int errno_val, Conv_fmt_flags_t fmt_flags,
 		MSG_ERRNO_EPROTO,		MSG_ERRNO_ELOCKUNMAPPED,
 		MSG_ERRNO_ENOTACTIVE,		MSG_ERRNO_EMULTIHOP
 	};
+	static const conv_ds_msg_t ds_errarr_1_74 = {
+	    CONV_DS_MSG_INIT(1, errarr_1_74) };
+
 	static const Msg	errarr_77_99[23] = {
 		MSG_ERRNO_EBADMSG,		MSG_ERRNO_ENAMETOOLONG,
 		MSG_ERRNO_EOVERFLOW,		MSG_ERRNO_ENOTUNIQ,
@@ -406,6 +411,9 @@ conv_cnote_errno(int errno_val, Conv_fmt_flags_t fmt_flags,
 		MSG_ERRNO_EMSGSIZE,		MSG_ERRNO_EPROTOTYPE,
 		MSG_ERRNO_ENOPROTOOPT
 	};
+	static const conv_ds_msg_t ds_errarr_77_99 = {
+	    CONV_DS_MSG_INIT(77, errarr_77_99) };
+
 	static const Msg	errarr_120_134[15] = {
 		MSG_ERRNO_EPROTONOSUPPORT,	MSG_ERRNO_ESOCKTNOSUPPORT,
 		MSG_ERRNO_EOPNOTSUPP,		MSG_ERRNO_EPFNOSUPPORT,
@@ -416,6 +424,9 @@ conv_cnote_errno(int errno_val, Conv_fmt_flags_t fmt_flags,
 		MSG_ERRNO_ENOBUFS,		MSG_ERRNO_EISCONN,
 		MSG_ERRNO_ENOTCONN
 	};
+	static const conv_ds_msg_t ds_errarr_120_134 = {
+	    CONV_DS_MSG_INIT(120, errarr_120_134) };
+
 	static const Msg	errarr_143_151[9] = {
 		MSG_ERRNO_ESHUTDOWN,		MSG_ERRNO_ETOOMANYREFS,
 		MSG_ERRNO_ETIMEDOUT,		MSG_ERRNO_ECONNREFUSED,
@@ -423,28 +434,16 @@ conv_cnote_errno(int errno_val, Conv_fmt_flags_t fmt_flags,
 		MSG_ERRNO_EALREADY,		MSG_ERRNO_EINPROGRESS,
 		MSG_ERRNO_ESTALE
 	};
+	static const conv_ds_msg_t ds_errarr_143_151 = {
+	    CONV_DS_MSG_INIT(143, errarr_143_151) };
 
-	if ((errno_val >= 1) && (errno_val <= 74)) {
-		return (conv_map2str(inv_buf, errno_val - 1, fmt_flags,
-		    ARRAY_NELTS(errarr_1_74), errarr_1_74));
-	}
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_errarr_1_74),
+		CONV_DS_ADDR(ds_errarr_77_99), CONV_DS_ADDR(ds_errarr_120_134),
+		CONV_DS_ADDR(ds_errarr_143_151), NULL };
 
-	if ((errno_val >= 77) && (errno_val <= 99)) {
-		return (conv_map2str(inv_buf, errno_val - 77, fmt_flags,
-		    ARRAY_NELTS(errarr_77_99), errarr_77_99));
-	}
 
-	if ((errno_val >= 120) && (errno_val <= 134)) {
-		return (conv_map2str(inv_buf, errno_val - 120, fmt_flags,
-		    ARRAY_NELTS(errarr_120_134), errarr_120_134));
-	}
-
-	if ((errno_val >= 143) && (errno_val <= 151)) {
-		return (conv_map2str(inv_buf, errno_val - 143, fmt_flags,
-		    ARRAY_NELTS(errarr_143_151), errarr_143_151));
-	}
-
-	return (conv_invalid_val(inv_buf, errno_val, fmt_flags));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, errno_val, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -457,12 +456,12 @@ conv_cnote_pr_dmodel(Word dmodel, Conv_fmt_flags_t fmt_flags,
 		MSG_PR_MODEL_ILP32,
 		MSG_PR_MODEL_LP64
 	};
+	static const conv_ds_msg_t ds_models = {
+	    CONV_DS_MSG_INIT(PR_MODEL_UNKNOWN, models) };
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_models), NULL };
 
-	if (dmodel > PR_MODEL_LP64)
-		return (conv_invalid_val(inv_buf, dmodel, fmt_flags));
-
-	return (conv_map2str(inv_buf, dmodel, fmt_flags,
-	    ARRAY_NELTS(models), models));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, dmodel, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -480,12 +479,12 @@ conv_cnote_pr_why(short why, Conv_fmt_flags_t fmt_flags,
 		MSG_PR_WHY_SUSPENDED,
 		MSG_PR_WHY_CHECKPOINT
 	};
+	static const conv_ds_msg_t ds_why_arr = {
+	    CONV_DS_MSG_INIT(1, why_arr) };
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_why_arr), NULL };
 
-	if ((why == 0) || (why > PR_CHECKPOINT))
-		return (conv_invalid_val(inv_buf, why, fmt_flags));
-
-	return (conv_map2str(inv_buf, why - 1, fmt_flags,
-	    ARRAY_NELTS(why_arr), why_arr));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, why, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -538,16 +537,25 @@ conv_cnote_pr_regname(Half mach, int regno, Conv_fmt_flags_t fmt_flags,
 		MSG_REG_SPARC_I4,		MSG_REG_SPARC_I5,
 		MSG_REG_SPARC_I6,		MSG_REG_SPARC_I7
 	};
+	static const conv_ds_msg_t ds_sparc_gen_reg = {
+	    CONV_DS_MSG_INIT(0, sparc_gen_reg) };
+
 	static const Msg	sparc_32_37_reg[6] = {
 		MSG_REG_SPARC_PSR,		MSG_REG_SPARC_PC,
 		MSG_REG_SPARC_nPC,		MSG_REG_SPARC_Y,
 		MSG_REG_SPARC_WIM,		MSG_REG_SPARC_TBR
 	};
+	static const conv_ds_msg_t ds_sparc_32_37_reg = {
+	    CONV_DS_MSG_INIT(32, sparc_32_37_reg) };
+
 	static const Msg	sparcv9_32_37_reg[6] = {
 		MSG_REG_SPARC_CCR,		MSG_REG_SPARC_PC,
 		MSG_REG_SPARC_nPC,		MSG_REG_SPARC_Y,
 		MSG_REG_SPARC_ASI,		MSG_REG_SPARC_FPRS
 	};
+	static const conv_ds_msg_t ds_sparcv9_32_37_reg = {
+	    CONV_DS_MSG_INIT(32, sparcv9_32_37_reg) };
+
 	static const Msg	amd64_reg[28] = {
 		MSG_REG_AMD64_R15,		MSG_REG_AMD64_R14,
 		MSG_REG_AMD64_R13,		MSG_REG_AMD64_R12,
@@ -564,9 +572,12 @@ conv_cnote_pr_regname(Half mach, int regno, Conv_fmt_flags_t fmt_flags,
 		MSG_REG_AMD64_ES,		MSG_REG_AMD64_DS,
 		MSG_REG_AMD64_FSBASE,		MSG_REG_AMD64_GSBASE
 	};
+	static const conv_ds_msg_t ds_amd64_reg = {
+	    CONV_DS_MSG_INIT(0, amd64_reg) };
+
 	static const Msg	i86_reg[19] = {
-		MSG_REG_I86_GS,		MSG_REG_I86_FS,
-		MSG_REG_I86_ES,		MSG_REG_I86_DS,
+		MSG_REG_I86_GS,			MSG_REG_I86_FS,
+		MSG_REG_I86_ES,			MSG_REG_I86_DS,
 		MSG_REG_I86_EDI,		MSG_REG_I86_ESI,
 		MSG_REG_I86_EBP,		MSG_REG_I86_ESP,
 		MSG_REG_I86_EBX,		MSG_REG_I86_EDX,
@@ -576,41 +587,51 @@ conv_cnote_pr_regname(Half mach, int regno, Conv_fmt_flags_t fmt_flags,
 		MSG_REG_I86_EFL,		MSG_REG_I86_UESP,
 		MSG_REG_I86_SS
 	};
+	static const conv_ds_msg_t ds_i86_reg = {
+	    CONV_DS_MSG_INIT(0, i86_reg) };
+
+
+	static const conv_ds_t	*ds_sparc[] = {
+		CONV_DS_ADDR(ds_sparc_gen_reg),
+		CONV_DS_ADDR(ds_sparc_32_37_reg),
+		NULL
+	};
+	static const conv_ds_t	*ds_sparcv9[] = {
+		CONV_DS_ADDR(ds_sparc_gen_reg),
+		CONV_DS_ADDR(ds_sparcv9_32_37_reg),
+		NULL
+	};
+	static const conv_ds_t	*ds_amd64[] = {
+		CONV_DS_ADDR(ds_amd64_reg), NULL };
+	static const conv_ds_t	*ds_i86[] = {
+		CONV_DS_ADDR(ds_i86_reg), NULL };
+
+	const conv_ds_t **ds;
 
 	switch (mach) {
 	case EM_386:
-		if (regno < (sizeof (i86_reg) / sizeof (i86_reg[0])))
-			return (conv_map2str(inv_buf, regno, fmt_flags,
-			    ARRAY_NELTS(i86_reg), i86_reg));
+		ds = ds_i86;
 		break;
 
 	case EM_AMD64:
-		if (regno < (sizeof (amd64_reg) / sizeof (amd64_reg[0])))
-			return (conv_map2str(inv_buf, regno, fmt_flags,
-			    ARRAY_NELTS(amd64_reg), amd64_reg));
+		ds = ds_amd64;
 		break;
 
 	case EM_SPARC:
 	case EM_SPARC32PLUS:
-		if (regno <= 31)
-			return (conv_map2str(inv_buf, regno, fmt_flags,
-			    ARRAY_NELTS(sparc_gen_reg), sparc_gen_reg));
-		if (regno <= 37)
-			return (conv_map2str(inv_buf, regno - 32, fmt_flags,
-			    ARRAY_NELTS(sparc_32_37_reg), sparc_32_37_reg));
+		ds = ds_sparc;
 		break;
+
 	case EM_SPARCV9:
-		if (regno <= 31)
-			return (conv_map2str(inv_buf, regno, fmt_flags,
-			    ARRAY_NELTS(sparc_gen_reg), sparc_gen_reg));
-		if (regno <= 37)
-			return (conv_map2str(inv_buf, regno - 32, fmt_flags,
-			    ARRAY_NELTS(sparcv9_32_37_reg), sparcv9_32_37_reg));
+		ds = ds_sparcv9;
 		break;
+
+	default:
+		return (conv_invalid_val(inv_buf, regno, fmt_flags));
 	}
 
-	/* If not recognized, format as a number */
-	return (conv_invalid_val(inv_buf, regno, fmt_flags));
+	return (conv_map_ds(ELFOSABI_NONE, mach, regno, ds, fmt_flags,
+	    inv_buf));
 }
 
 const char *
@@ -623,12 +644,12 @@ conv_cnote_pr_stype(Word stype, Conv_fmt_flags_t fmt_flags,
 		MSG_SOBJ_SEMA,		MSG_SOBJ_USER,
 		MSG_SOBJ_USER_PI,	MSG_SOBJ_SHUTTLE
 	};
+	static const conv_ds_msg_t ds_types = { CONV_DS_MSG_INIT(0, types) };
+	static const conv_ds_t	*ds[] = { CONV_DS_ADDR(ds_types), NULL };
 
-	if (stype < ARRAY_NELTS(types))
-		return (conv_map2str(inv_buf, stype, fmt_flags,
-		    ARRAY_NELTS(types), types));
 
-	return (conv_invalid_val(inv_buf, stype, fmt_flags));
+	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, stype, ds, fmt_flags,
+	    inv_buf));
 }
 
 
@@ -644,7 +665,7 @@ conv_cnote_priv(int priv, Conv_fmt_flags_t fmt_flags,
 	 * built around the Word type, which is unsigned. Rather than
 	 * modify libconv for this one case, we simply handle
 	 * these constants differently that the usual approach,
-	 * and stay away from conv_invalid_val() and conv_map2str().
+	 * and stay away from conv_invalid_val() and conv_map_ds().
 	 */
 	switch (priv) {
 	case PRIV_ALL:
@@ -678,7 +699,7 @@ conv_cnote_psetid(int id, Conv_fmt_flags_t fmt_flags,
 	 * built around the Word type, which is unsigned. Rather than
 	 * modify libconv for this one case, we simply handle
 	 * these constants differently that the usual approach,
-	 * and stay away from conv_invalid_val() and conv_map2str().
+	 * and stay away from conv_invalid_val() and conv_map_ds().
 	 */
 	switch (id) {
 	case PS_NONE:
@@ -713,7 +734,6 @@ const char *
 conv_cnote_si_code(Half mach, int sig, int si_code,
     Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-#define	NELTS(_arr) (sizeof (_arr) / sizeof (_arr[0]))
 
 	/* Values of si_code for user generated signals */
 	static const Msg	user_arr[6] = {
@@ -721,6 +741,11 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		MSG_SI_QUEUE,		MSG_SI_TIMER,
 		MSG_SI_ASYNCIO,		MSG_SI_MESGQ
 	};
+	static const conv_ds_msg_t ds_msg_user_arr = {
+	    CONV_DS_MSG_INIT(0, user_arr) };
+	static const conv_ds_t	*ds_user_arr[] = {
+		CONV_DS_ADDR(ds_msg_user_arr), NULL };
+
 
 	/*
 	 * Architecture dependent system generated signals. All
@@ -731,16 +756,30 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		MSG_SI_TRAP_RWATCH,	MSG_SI_TRAP_WWATCH,
 		MSG_SI_TRAP_XWATCH,	MSG_SI_TRAP_DTRACE
 	};
+	static const conv_ds_msg_t ds_msg_trap_arr = {
+	    CONV_DS_MSG_INIT(1, trap_arr) };
+	static const conv_ds_t	*ds_trap_arr[] = {
+		CONV_DS_ADDR(ds_msg_trap_arr), NULL };
+
 	static const Msg	cld_arr[6] = {
 		MSG_SI_CLD_EXITED,	MSG_SI_CLD_KILLED,
 		MSG_SI_CLD_DUMPED,	MSG_SI_CLD_TRAPPED,
 		MSG_SI_CLD_STOPPED,	MSG_SI_CLD_CONTINUED
 	};
+	static const conv_ds_msg_t ds_msg_cld_arr = {
+	    CONV_DS_MSG_INIT(1, cld_arr) };
+	static const conv_ds_t	*ds_cld_arr[] = {
+		CONV_DS_ADDR(ds_msg_cld_arr), NULL };
+
 	static const Msg	poll_arr[6] = {
 		MSG_SI_POLL_IN,		MSG_SI_POLL_OUT,
 		MSG_SI_POLL_MSG,	MSG_SI_POLL_ERR,
 		MSG_SI_POLL_PRI,	MSG_SI_POLL_HUP
 	};
+	static const conv_ds_msg_t ds_msg_poll_arr = {
+	    CONV_DS_MSG_INIT(1, poll_arr) };
+	static const conv_ds_t	*ds_poll_arr[] = {
+		CONV_DS_ADDR(ds_msg_poll_arr), NULL };
 
 	/*
 	 * Architecture dependent system generated signals.
@@ -758,14 +797,28 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		MSG_SI_ILL_PRVOPC,	MSG_SI_ILL_PRVREG,
 		MSG_SI_ILL_COPROC,	MSG_SI_ILL_BADSTK
 	};
+	static const conv_ds_msg_t ds_msg_ill_arr = {
+	    CONV_DS_MSG_INIT(1, ill_arr) };
+	static const conv_ds_t	*ds_ill_arr[] = {
+		CONV_DS_ADDR(ds_msg_ill_arr), NULL };
 
 	/* EMT */
 	static const Msg	emt_arr_sparc[2] = {
 		MSG_SI_EMT_TAGOVF,	MSG_SI_EMT_CPCOVF
 	};
+	static const conv_ds_msg_t ds_msg_emt_arr_sparc = {
+	    CONV_DS_MSG_INIT(1, emt_arr_sparc) };
+	static const conv_ds_t	*ds_emt_arr_sparc[] = {
+		CONV_DS_ADDR(ds_msg_emt_arr_sparc), NULL };
+
 	static const Msg	emt_arr_x86[1] = {
 		MSG_SI_EMT_CPCOVF
 	};
+	static const conv_ds_msg_t ds_msg_emt_arr_x86 = {
+	    CONV_DS_MSG_INIT(1, emt_arr_x86) };
+	static const conv_ds_t	*ds_emt_arr_x86[] = {
+		CONV_DS_ADDR(ds_msg_emt_arr_x86), NULL };
+
 
 	/* FPE */
 	static const Msg	fpe_arr_sparc[8] = {
@@ -774,6 +827,11 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		MSG_SI_FPE_FLTUND,	MSG_SI_FPE_FLTRES,
 		MSG_SI_FPE_FLTINV,	MSG_SI_FPE_FLTSUB
 	};
+	static const conv_ds_msg_t ds_msg_fpe_arr_sparc = {
+	    CONV_DS_MSG_INIT(1, fpe_arr_sparc) };
+	static const conv_ds_t	*ds_fpe_arr_sparc[] = {
+		CONV_DS_ADDR(ds_msg_fpe_arr_sparc), NULL };
+
 	static const Msg	fpe_arr_x86[9] = {
 		MSG_SI_FPE_INTDIV,	MSG_SI_FPE_INTOVF,
 		MSG_SI_FPE_FLTDIV,	MSG_SI_FPE_FLTOVF,
@@ -781,17 +839,29 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		MSG_SI_FPE_FLTINV,	MSG_SI_FPE_FLTSUB,
 		MSG_SI_FPE_FLTDEN
 	};
+	static const conv_ds_msg_t ds_msg_fpe_arr_x86 = {
+	    CONV_DS_MSG_INIT(1, fpe_arr_x86) };
+	static const conv_ds_t	*ds_fpe_arr_x86[] = {
+		CONV_DS_ADDR(ds_msg_fpe_arr_x86), NULL };
 
 	/* SEGV */
 	static const Msg	segv_arr[2] = {
 		MSG_SI_SEGV_MAPERR,	MSG_SI_SEGV_ACCERR
 	};
+	static const conv_ds_msg_t ds_msg_segv_arr = {
+	    CONV_DS_MSG_INIT(1, segv_arr) };
+	static const conv_ds_t	*ds_segv_arr[] = {
+		CONV_DS_ADDR(ds_msg_segv_arr), NULL };
 
 	/* BUS */
 	static const Msg	bus_arr[3] = {
 		MSG_SI_BUS_ADRALN,	MSG_SI_BUS_ADRERR,
 		MSG_SI_BUS_OBJERR
 	};
+	static const conv_ds_msg_t ds_msg_bus_arr = {
+	    CONV_DS_MSG_INIT(1, bus_arr) };
+	static const conv_ds_t	*ds_bus_arr[] = {
+		CONV_DS_ADDR(ds_msg_bus_arr), NULL };
 
 	enum { ARCH_NONE, ARCH_X86, ARCH_SPARC } arch;
 
@@ -816,7 +886,7 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 			if ((si_code == 0) && (sig == 0))
 				return (MSG_ORIG(MSG_GBL_ZERO));
 
-			if (ndx >= NELTS(user_arr)) {
+			if (ndx >= ARRAY_NELTS(user_arr)) {
 				const char *fmt;
 
 				fmt = (fmt_flags & CONV_FMT_DECIMAL) ?
@@ -827,8 +897,8 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 				    sizeof (inv_buf->buf), fmt, si_code);
 				return (inv_buf->buf);
 			}
-			return (conv_map2str(inv_buf, ndx, fmt_flags,
-			    ARRAY_NELTS(user_arr), user_arr));
+			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, ndx,
+			    ds_user_arr, fmt_flags, inv_buf));
 		}
 	}
 
@@ -857,81 +927,55 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 
 	switch (sig) {
 	case SIGTRAP:
-		if (si_code <= NELTS(trap_arr))
-		return (conv_map2str(inv_buf, si_code - 1, fmt_flags,
-		    ARRAY_NELTS(trap_arr), trap_arr));
-		break;
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+		    ds_trap_arr, fmt_flags, inv_buf));
 
 	case SIGCLD:
-		if (si_code <= NELTS(cld_arr))
-		return (conv_map2str(inv_buf, si_code - 1, fmt_flags,
-		    ARRAY_NELTS(cld_arr), cld_arr));
-		break;
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+		    ds_cld_arr, fmt_flags, inv_buf));
 
 	case SIGPOLL:
-		if (si_code <= NELTS(poll_arr))
-		return (conv_map2str(inv_buf, si_code - 1, fmt_flags,
-		    ARRAY_NELTS(poll_arr), poll_arr));
-		break;
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+		    ds_poll_arr, fmt_flags, inv_buf));
 
 	case SIGILL:
-		if (si_code <= NELTS(ill_arr))
-		return (conv_map2str(inv_buf, si_code - 1, fmt_flags,
-		    ARRAY_NELTS(ill_arr), ill_arr));
-		break;
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+		    ds_ill_arr, fmt_flags, inv_buf));
 
 	case SIGEMT:
 		switch (arch) {
 		case ARCH_SPARC:
-			if (si_code <= NELTS(emt_arr_sparc))
-				return (conv_map2str(inv_buf, si_code - 1,
-				    fmt_flags, ARRAY_NELTS(emt_arr_sparc),
-				    emt_arr_sparc));
-			break;
+			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+			    ds_emt_arr_sparc, fmt_flags, inv_buf));
 		case ARCH_X86:
-			if (si_code <= NELTS(emt_arr_x86))
-				return (conv_map2str(inv_buf, si_code - 1,
-				    fmt_flags, ARRAY_NELTS(emt_arr_x86),
-				    emt_arr_x86));
-			break;
+			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+			    ds_emt_arr_x86, fmt_flags, inv_buf));
 		}
 		break;
 
 	case SIGFPE:
 		switch (arch) {
 		case ARCH_SPARC:
-			if (si_code <= NELTS(fpe_arr_sparc))
-				return (conv_map2str(inv_buf, si_code - 1,
-				    fmt_flags, ARRAY_NELTS(fpe_arr_sparc),
-				    fpe_arr_sparc));
-			break;
+			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+			    ds_fpe_arr_sparc, fmt_flags, inv_buf));
 		case ARCH_X86:
-			if (si_code <= NELTS(fpe_arr_x86))
-				return (conv_map2str(inv_buf, si_code - 1,
-				    fmt_flags, ARRAY_NELTS(fpe_arr_x86),
-				    fpe_arr_x86));
-			break;
+			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+			    ds_fpe_arr_x86, fmt_flags, inv_buf));
 		}
 		break;
 
 	case SIGSEGV:
-		if (si_code <= NELTS(segv_arr))
-		return (conv_map2str(inv_buf, si_code - 1, fmt_flags,
-		    ARRAY_NELTS(segv_arr), segv_arr));
-		break;
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+		    ds_segv_arr, fmt_flags, inv_buf));
 
 	case SIGBUS:
-		if (si_code <= NELTS(bus_arr))
-		return (conv_map2str(inv_buf, si_code - 1, fmt_flags,
-		    ARRAY_NELTS(bus_arr), bus_arr));
-		break;
-
+		return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
+		    ds_bus_arr, fmt_flags, inv_buf));
 	}
 
 	/* If not recognized, format as a number */
 	return (conv_invalid_val(inv_buf, si_code, fmt_flags));
 
-#undef NELTS
 }
 
 
@@ -961,21 +1005,21 @@ const char *
 conv_cnote_auxv_af(Word flags, Conv_fmt_flags_t fmt_flags,
     Conv_cnote_auxv_af_buf_t *cnote_auxv_af_buf)
 {
-	static Val_desc vda[] = {
-		{ AF_SUN_SETUGID,	MSG_ORIG(MSG_AUXV_AF_SUN_SETUGID) },
-		{ AF_SUN_HWCAPVERIFY,	MSG_ORIG(MSG_AUXV_AF_SUN_HWCAPVERIFY) },
-		{ AF_SUN_NOPLM,		MSG_ORIG(MSG_AUXV_AF_SUN_NOPLM) },
+	static const Val_desc vda[] = {
+		{ AF_SUN_SETUGID,	MSG_AUXV_AF_SUN_SETUGID },
+		{ AF_SUN_HWCAPVERIFY,	MSG_AUXV_AF_SUN_HWCAPVERIFY },
+		{ AF_SUN_NOPLM,		MSG_AUXV_AF_SUN_NOPLM },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_auxv_af_buf->buf), vda };
+	    NULL, sizeof (cnote_auxv_af_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_auxv_af_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_auxv_af_buf->buf);
 }
@@ -1031,31 +1075,31 @@ conv_cnote_cc_content(Lword flags, Conv_fmt_flags_t fmt_flags,
 	 * that can only occur via core file corruption, which presumably
 	 * would be evident in other ways.
 	 */
-	static Val_desc vda[] = {
-		{ (Word) CC_CONTENT_STACK, MSG_ORIG(MSG_CC_CONTENT_STACK) },
-		{ (Word) CC_CONTENT_HEAP,	MSG_ORIG(MSG_CC_CONTENT_HEAP) },
-		{ (Word) CC_CONTENT_SHFILE, MSG_ORIG(MSG_CC_CONTENT_SHFILE) },
-		{ (Word) CC_CONTENT_SHANON, MSG_ORIG(MSG_CC_CONTENT_SHANON) },
-		{ (Word) CC_CONTENT_TEXT,	MSG_ORIG(MSG_CC_CONTENT_TEXT) },
-		{ (Word) CC_CONTENT_DATA,	MSG_ORIG(MSG_CC_CONTENT_DATA) },
-		{ (Word) CC_CONTENT_RODATA, MSG_ORIG(MSG_CC_CONTENT_RODATA) },
-		{ (Word) CC_CONTENT_ANON,	MSG_ORIG(MSG_CC_CONTENT_ANON) },
-		{ (Word) CC_CONTENT_SHM,	MSG_ORIG(MSG_CC_CONTENT_SHM) },
-		{ (Word) CC_CONTENT_ISM,	MSG_ORIG(MSG_CC_CONTENT_ISM) },
-		{ (Word) CC_CONTENT_DISM,	MSG_ORIG(MSG_CC_CONTENT_DISM) },
-		{ (Word) CC_CONTENT_CTF,	MSG_ORIG(MSG_CC_CONTENT_CTF) },
-		{ (Word) CC_CONTENT_SYMTAB, MSG_ORIG(MSG_CC_CONTENT_SYMTAB) },
+	static const Val_desc vda[] = {
+		{ (Word) CC_CONTENT_STACK,	MSG_CC_CONTENT_STACK },
+		{ (Word) CC_CONTENT_HEAP,	MSG_CC_CONTENT_HEAP },
+		{ (Word) CC_CONTENT_SHFILE,	MSG_CC_CONTENT_SHFILE },
+		{ (Word) CC_CONTENT_SHANON,	MSG_CC_CONTENT_SHANON },
+		{ (Word) CC_CONTENT_TEXT,	MSG_CC_CONTENT_TEXT },
+		{ (Word) CC_CONTENT_DATA,	MSG_CC_CONTENT_DATA },
+		{ (Word) CC_CONTENT_RODATA,	MSG_CC_CONTENT_RODATA },
+		{ (Word) CC_CONTENT_ANON,	MSG_CC_CONTENT_ANON },
+		{ (Word) CC_CONTENT_SHM,	MSG_CC_CONTENT_SHM },
+		{ (Word) CC_CONTENT_ISM,	MSG_CC_CONTENT_ISM },
+		{ (Word) CC_CONTENT_DISM,	MSG_CC_CONTENT_DISM },
+		{ (Word) CC_CONTENT_CTF,	MSG_CC_CONTENT_CTF },
+		{ (Word) CC_CONTENT_SYMTAB,	MSG_CC_CONTENT_SYMTAB },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_cc_content_buf->buf), vda };
+	    NULL, sizeof (cnote_cc_content_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_cc_content_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_cc_content_buf->buf);
 }
@@ -1108,42 +1152,42 @@ const char *
 conv_cnote_pr_flags(int flags, Conv_fmt_flags_t fmt_flags,
     Conv_cnote_pr_flags_buf_t *cnote_pr_flags_buf)
 {
-	static Val_desc vda[] = {
-		{ PR_STOPPED, 		MSG_ORIG(MSG_PR_FLAGS_STOPPED) },
-		{ PR_ISTOP,		MSG_ORIG(MSG_PR_FLAGS_ISTOP) },
-		{ PR_DSTOP,		MSG_ORIG(MSG_PR_FLAGS_DSTOP) },
-		{ PR_STEP,		MSG_ORIG(MSG_PR_FLAGS_STEP) },
-		{ PR_ASLEEP,		MSG_ORIG(MSG_PR_FLAGS_ASLEEP) },
-		{ PR_PCINVAL,		MSG_ORIG(MSG_PR_FLAGS_PCINVAL) },
-		{ PR_ASLWP,		MSG_ORIG(MSG_PR_FLAGS_ASLWP) },
-		{ PR_AGENT,		MSG_ORIG(MSG_PR_FLAGS_AGENT) },
-		{ PR_DETACH,		MSG_ORIG(MSG_PR_FLAGS_DETACH) },
-		{ PR_DAEMON,		MSG_ORIG(MSG_PR_FLAGS_DAEMON) },
-		{ PR_IDLE,		MSG_ORIG(MSG_PR_FLAGS_IDLE) },
-		{ PR_ISSYS,		MSG_ORIG(MSG_PR_FLAGS_ISSYS) },
-		{ PR_VFORKP,		MSG_ORIG(MSG_PR_FLAGS_VFORKP) },
-		{ PR_ORPHAN,		MSG_ORIG(MSG_PR_FLAGS_ORPHAN) },
-		{ PR_NOSIGCHLD,		MSG_ORIG(MSG_PR_FLAGS_NOSIGCHLD) },
-		{ PR_WAITPID,		MSG_ORIG(MSG_PR_FLAGS_WAITPID) },
-		{ PR_FORK,		MSG_ORIG(MSG_PR_FLAGS_FORK) },
-		{ PR_RLC,		MSG_ORIG(MSG_PR_FLAGS_RLC) },
-		{ PR_KLC,		MSG_ORIG(MSG_PR_FLAGS_KLC) },
-		{ PR_ASYNC,		MSG_ORIG(MSG_PR_FLAGS_ASYNC) },
-		{ PR_MSACCT,		MSG_ORIG(MSG_PR_FLAGS_MSACCT) },
-		{ PR_BPTADJ,		MSG_ORIG(MSG_PR_FLAGS_BPTADJ) },
-		{ PR_PTRACE,		MSG_ORIG(MSG_PR_FLAGS_PTRACE) },
-		{ PR_MSFORK,		MSG_ORIG(MSG_PR_FLAGS_MSFORK) },
+	static const Val_desc vda[] = {
+		{ PR_STOPPED, 		MSG_PR_FLAGS_STOPPED },
+		{ PR_ISTOP,		MSG_PR_FLAGS_ISTOP },
+		{ PR_DSTOP,		MSG_PR_FLAGS_DSTOP },
+		{ PR_STEP,		MSG_PR_FLAGS_STEP },
+		{ PR_ASLEEP,		MSG_PR_FLAGS_ASLEEP },
+		{ PR_PCINVAL,		MSG_PR_FLAGS_PCINVAL },
+		{ PR_ASLWP,		MSG_PR_FLAGS_ASLWP },
+		{ PR_AGENT,		MSG_PR_FLAGS_AGENT },
+		{ PR_DETACH,		MSG_PR_FLAGS_DETACH },
+		{ PR_DAEMON,		MSG_PR_FLAGS_DAEMON },
+		{ PR_IDLE,		MSG_PR_FLAGS_IDLE },
+		{ PR_ISSYS,		MSG_PR_FLAGS_ISSYS },
+		{ PR_VFORKP,		MSG_PR_FLAGS_VFORKP },
+		{ PR_ORPHAN,		MSG_PR_FLAGS_ORPHAN },
+		{ PR_NOSIGCHLD,		MSG_PR_FLAGS_NOSIGCHLD },
+		{ PR_WAITPID,		MSG_PR_FLAGS_WAITPID },
+		{ PR_FORK,		MSG_PR_FLAGS_FORK },
+		{ PR_RLC,		MSG_PR_FLAGS_RLC },
+		{ PR_KLC,		MSG_PR_FLAGS_KLC },
+		{ PR_ASYNC,		MSG_PR_FLAGS_ASYNC },
+		{ PR_MSACCT,		MSG_PR_FLAGS_MSACCT },
+		{ PR_BPTADJ,		MSG_PR_FLAGS_BPTADJ },
+		{ PR_PTRACE,		MSG_PR_FLAGS_PTRACE },
+		{ PR_MSFORK,		MSG_PR_FLAGS_MSFORK },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_pr_flags_buf->buf), vda };
+	    NULL, sizeof (cnote_pr_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_pr_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_pr_flags_buf->buf);
 }
@@ -1194,34 +1238,34 @@ conv_cnote_old_pr_flags(int flags, Conv_fmt_flags_t fmt_flags,
 	 * values. To avoid confusion, we don't include <sys/old_procfs.h>,
 	 * and specify the values directly.
 	 */
-	static Val_desc vda[] = {
-		{ 0x0001,		MSG_ORIG(MSG_PR_FLAGS_STOPPED) },
-		{ 0x0002,		MSG_ORIG(MSG_PR_FLAGS_ISTOP) },
-		{ 0x0004,		MSG_ORIG(MSG_PR_FLAGS_DSTOP) },
-		{ 0x0008,		MSG_ORIG(MSG_PR_FLAGS_ASLEEP) },
-		{ 0x0010,		MSG_ORIG(MSG_PR_FLAGS_FORK) },
-		{ 0x0020,		MSG_ORIG(MSG_PR_FLAGS_RLC) },
-		{ 0x0040,		MSG_ORIG(MSG_PR_FLAGS_PTRACE) },
-		{ 0x0080,		MSG_ORIG(MSG_PR_FLAGS_PCINVAL) },
-		{ 0x0100,		MSG_ORIG(MSG_PR_FLAGS_ISSYS) },
-		{ 0x0200,		MSG_ORIG(MSG_PR_FLAGS_STEP) },
-		{ 0x0400,		MSG_ORIG(MSG_PR_FLAGS_KLC) },
-		{ 0x0800,		MSG_ORIG(MSG_PR_FLAGS_ASYNC) },
-		{ 0x1000,		MSG_ORIG(MSG_PR_FLAGS_PCOMPAT) },
-		{ 0x2000,		MSG_ORIG(MSG_PR_FLAGS_MSACCT) },
-		{ 0x4000,		MSG_ORIG(MSG_PR_FLAGS_BPTADJ) },
-		{ 0x8000,		MSG_ORIG(MSG_PR_FLAGS_ASLWP) },
+	static const Val_desc vda[] = {
+		{ 0x0001,		MSG_PR_FLAGS_STOPPED },
+		{ 0x0002,		MSG_PR_FLAGS_ISTOP },
+		{ 0x0004,		MSG_PR_FLAGS_DSTOP },
+		{ 0x0008,		MSG_PR_FLAGS_ASLEEP },
+		{ 0x0010,		MSG_PR_FLAGS_FORK },
+		{ 0x0020,		MSG_PR_FLAGS_RLC },
+		{ 0x0040,		MSG_PR_FLAGS_PTRACE },
+		{ 0x0080,		MSG_PR_FLAGS_PCINVAL },
+		{ 0x0100,		MSG_PR_FLAGS_ISSYS },
+		{ 0x0200,		MSG_PR_FLAGS_STEP },
+		{ 0x0400,		MSG_PR_FLAGS_KLC },
+		{ 0x0800,		MSG_PR_FLAGS_ASYNC },
+		{ 0x1000,		MSG_PR_FLAGS_PCOMPAT },
+		{ 0x2000,		MSG_PR_FLAGS_MSACCT },
+		{ 0x4000,		MSG_PR_FLAGS_BPTADJ },
+		{ 0x8000,		MSG_PR_FLAGS_ASLWP },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_old_pr_flags_buf->buf), vda };
+	    NULL, sizeof (cnote_old_pr_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_old_pr_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_old_pr_flags_buf->buf);
 }
@@ -1267,20 +1311,20 @@ conv_cnote_proc_flag(int flags, Conv_fmt_flags_t fmt_flags,
 	 * SMSACCT and SSYS are stable public values, we simply use
 	 * their numeric value.
 	 */
-	static Val_desc vda[] = {
-		{ 0x00000001, 		MSG_ORIG(MSG_PROC_FLAG_SSYS) },
-		{ 0x02000000,		MSG_ORIG(MSG_PROC_FLAG_SMSACCT) },
+	static const Val_desc vda[] = {
+		{ 0x00000001, 		MSG_PROC_FLAG_SSYS },
+		{ 0x02000000,		MSG_PROC_FLAG_SMSACCT },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_proc_flag_buf->buf), vda };
+	    NULL, sizeof (cnote_proc_flag_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_proc_flag_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_proc_flag_buf->buf);
 }
@@ -1316,25 +1360,25 @@ const char *
 conv_cnote_sa_flags(int flags, Conv_fmt_flags_t fmt_flags,
     Conv_cnote_sa_flags_buf_t *cnote_sa_flags_buf)
 {
-	static Val_desc vda[] = {
-		{ SA_ONSTACK,		MSG_ORIG(MSG_SA_ONSTACK) },
-		{ SA_RESETHAND,		MSG_ORIG(MSG_SA_RESETHAND) },
-		{ SA_RESTART,		MSG_ORIG(MSG_SA_RESTART) },
-		{ SA_SIGINFO,		MSG_ORIG(MSG_SA_SIGINFO) },
-		{ SA_NODEFER,		MSG_ORIG(MSG_SA_NODEFER) },
-		{ SA_NOCLDWAIT,		MSG_ORIG(MSG_SA_NOCLDWAIT) },
-		{ SA_NOCLDSTOP,		MSG_ORIG(MSG_SA_NOCLDSTOP) },
+	static const Val_desc vda[] = {
+		{ SA_ONSTACK,		MSG_SA_ONSTACK },
+		{ SA_RESETHAND,		MSG_SA_RESETHAND },
+		{ SA_RESTART,		MSG_SA_RESTART },
+		{ SA_SIGINFO,		MSG_SA_SIGINFO },
+		{ SA_NODEFER,		MSG_SA_NODEFER },
+		{ SA_NOCLDWAIT,		MSG_SA_NOCLDWAIT },
+		{ SA_NOCLDSTOP,		MSG_SA_NOCLDSTOP },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_sa_flags_buf->buf), vda };
+	    NULL, sizeof (cnote_sa_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_sa_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_sa_flags_buf->buf);
 }
@@ -1365,20 +1409,20 @@ const char *
 conv_cnote_ss_flags(int flags, Conv_fmt_flags_t fmt_flags,
     Conv_cnote_ss_flags_buf_t *cnote_ss_flags_buf)
 {
-	static Val_desc vda[] = {
-		{ SS_ONSTACK,		MSG_ORIG(MSG_SS_ONSTACK) },
-		{ SS_DISABLE,		MSG_ORIG(MSG_SS_DISABLE) },
+	static const Val_desc vda[] = {
+		{ SS_ONSTACK,		MSG_SS_ONSTACK },
+		{ SS_DISABLE,		MSG_SS_DISABLE },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (cnote_ss_flags_buf->buf), vda };
+	    NULL, sizeof (cnote_ss_flags_buf->buf) };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = cnote_ss_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg, fmt_flags);
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)cnote_ss_flags_buf->buf);
 }
@@ -1396,7 +1440,7 @@ conv_cnote_ss_flags(int flags, Conv_fmt_flags_t fmt_flags,
  */
 
 typedef struct {
-	Val_desc	*vdp;		/* NULL, or bitmask description */
+	const Val_desc	*vdp;		/* NULL, or bitmask description */
 	uint32_t	unused_bits;	/* Mask of undefined bits */
 } conv_bitmaskset_desc_t;
 
@@ -1413,7 +1457,7 @@ typedef struct {
  */
 static const char *
 conv_bitmaskset(uint32_t *maskarr, int n_mask,
-    conv_bitmaskset_desc_t *bitmask_descarr, Conv_fmt_flags_t fmt_flags,
+    const conv_bitmaskset_desc_t *bitmask_descarr, Conv_fmt_flags_t fmt_flags,
     char *conv_buf, size_t conv_buf_size)
 {
 	CONV_EXPN_FIELD_ARG	conv_arg;
@@ -1465,7 +1509,6 @@ conv_bitmaskset(uint32_t *maskarr, int n_mask,
 
 		if (mask != 0) {
 
-			conv_arg.vdp = bitmask_descarr[i].vdp;
 			conv_arg.oflags = conv_arg.rflags = mask;
 			if (need_sep) {
 				*conv_arg.buf++ = ' ';
@@ -1473,7 +1516,7 @@ conv_bitmaskset(uint32_t *maskarr, int n_mask,
 			}
 			need_sep = 1;
 			(void) conv_expn_field(&conv_arg,
-			    fmt_flags | CONV_FMT_NOBKT);
+			    bitmask_descarr[i].vdp, fmt_flags | CONV_FMT_NOBKT);
 			n = strlen(conv_arg.buf);
 			conv_arg.bufsize -= n;
 			conv_arg.buf += n;
@@ -1599,53 +1642,53 @@ conv_cnote_sigset(uint32_t *maskarr, int n_mask,
 {
 #define	N_MASK 4
 
-	static Val_desc vda0[] = {
-		{ 0x00000001,		MSG_ORIG(MSG_SIGHUP_ALT) },
-		{ 0x00000002,		MSG_ORIG(MSG_SIGINT_ALT) },
-		{ 0x00000004,		MSG_ORIG(MSG_SIGQUIT_ALT) },
-		{ 0x00000008,		MSG_ORIG(MSG_SIGILL_ALT) },
-		{ 0x00000010,		MSG_ORIG(MSG_SIGTRAP_ALT) },
-		{ 0x00000020,		MSG_ORIG(MSG_SIGABRT_ALT) },
-		{ 0x00000040,		MSG_ORIG(MSG_SIGEMT_ALT) },
-		{ 0x00000080,		MSG_ORIG(MSG_SIGFPE_ALT) },
-		{ 0x00000100,		MSG_ORIG(MSG_SIGKILL_ALT) },
-		{ 0x00000200,		MSG_ORIG(MSG_SIGBUS_ALT) },
-		{ 0x00000400,		MSG_ORIG(MSG_SIGSEGV_ALT) },
-		{ 0x00000800,		MSG_ORIG(MSG_SIGSYS_ALT) },
-		{ 0x00001000,		MSG_ORIG(MSG_SIGPIPE_ALT) },
-		{ 0x00002000,		MSG_ORIG(MSG_SIGALRM_ALT) },
-		{ 0x00004000,		MSG_ORIG(MSG_SIGTERM_ALT) },
-		{ 0x00008000,		MSG_ORIG(MSG_SIGUSR1_ALT) },
-		{ 0x00010000,		MSG_ORIG(MSG_SIGUSR2_ALT) },
-		{ 0x00020000,		MSG_ORIG(MSG_SIGCHLD_ALT) },
-		{ 0x00040000,		MSG_ORIG(MSG_SIGPWR_ALT) },
-		{ 0x00080000,		MSG_ORIG(MSG_SIGWINCH_ALT) },
-		{ 0x00100000,		MSG_ORIG(MSG_SIGURG_ALT) },
-		{ 0x00200000,		MSG_ORIG(MSG_SIGPOLL_ALT) },
-		{ 0x00400000,		MSG_ORIG(MSG_SIGSTOP_ALT) },
-		{ 0x00800000,		MSG_ORIG(MSG_SIGTSTP_ALT) },
-		{ 0x01000000,		MSG_ORIG(MSG_SIGCONT_ALT) },
-		{ 0x02000000,		MSG_ORIG(MSG_SIGTTIN_ALT) },
-		{ 0x04000000,		MSG_ORIG(MSG_SIGTTOU_ALT) },
-		{ 0x08000000,		MSG_ORIG(MSG_SIGVTALRM_ALT) },
-		{ 0x10000000,		MSG_ORIG(MSG_SIGPROF_ALT) },
-		{ 0x20000000,		MSG_ORIG(MSG_SIGXCPU_ALT) },
-		{ 0x40000000,		MSG_ORIG(MSG_SIGXFSZ_ALT) },
-		{ 0x80000000,		MSG_ORIG(MSG_SIGWAITING_ALT) },
+	static const Val_desc vda0[] = {
+		{ 0x00000001,		MSG_SIGHUP_ALT },
+		{ 0x00000002,		MSG_SIGINT_ALT },
+		{ 0x00000004,		MSG_SIGQUIT_ALT },
+		{ 0x00000008,		MSG_SIGILL_ALT },
+		{ 0x00000010,		MSG_SIGTRAP_ALT },
+		{ 0x00000020,		MSG_SIGABRT_ALT },
+		{ 0x00000040,		MSG_SIGEMT_ALT },
+		{ 0x00000080,		MSG_SIGFPE_ALT },
+		{ 0x00000100,		MSG_SIGKILL_ALT },
+		{ 0x00000200,		MSG_SIGBUS_ALT },
+		{ 0x00000400,		MSG_SIGSEGV_ALT },
+		{ 0x00000800,		MSG_SIGSYS_ALT },
+		{ 0x00001000,		MSG_SIGPIPE_ALT },
+		{ 0x00002000,		MSG_SIGALRM_ALT },
+		{ 0x00004000,		MSG_SIGTERM_ALT },
+		{ 0x00008000,		MSG_SIGUSR1_ALT },
+		{ 0x00010000,		MSG_SIGUSR2_ALT },
+		{ 0x00020000,		MSG_SIGCHLD_ALT },
+		{ 0x00040000,		MSG_SIGPWR_ALT },
+		{ 0x00080000,		MSG_SIGWINCH_ALT },
+		{ 0x00100000,		MSG_SIGURG_ALT },
+		{ 0x00200000,		MSG_SIGPOLL_ALT },
+		{ 0x00400000,		MSG_SIGSTOP_ALT },
+		{ 0x00800000,		MSG_SIGTSTP_ALT },
+		{ 0x01000000,		MSG_SIGCONT_ALT },
+		{ 0x02000000,		MSG_SIGTTIN_ALT },
+		{ 0x04000000,		MSG_SIGTTOU_ALT },
+		{ 0x08000000,		MSG_SIGVTALRM_ALT },
+		{ 0x10000000,		MSG_SIGPROF_ALT },
+		{ 0x20000000,		MSG_SIGXCPU_ALT },
+		{ 0x40000000,		MSG_SIGXFSZ_ALT },
+		{ 0x80000000,		MSG_SIGWAITING_ALT },
 		{ 0,			0 }
 	};
-	static Val_desc vda1[] = {
-		{ 0x00000001,		MSG_ORIG(MSG_SIGLWP_ALT) },
-		{ 0x00000002,		MSG_ORIG(MSG_SIGFREEZE_ALT) },
-		{ 0x00000004,		MSG_ORIG(MSG_SIGTHAW_ALT) },
-		{ 0x00000008,		MSG_ORIG(MSG_SIGCANCEL_ALT) },
-		{ 0x00000010,		MSG_ORIG(MSG_SIGLOST_ALT) },
-		{ 0x00000020,		MSG_ORIG(MSG_SIGXRES_ALT) },
-		{ 0x00000040,		MSG_ORIG(MSG_SIGJVM1_ALT) },
-		{ 0x00000080,		MSG_ORIG(MSG_SIGJVM2_ALT) },
+	static const Val_desc vda1[] = {
+		{ 0x00000001,		MSG_SIGLWP_ALT },
+		{ 0x00000002,		MSG_SIGFREEZE_ALT },
+		{ 0x00000004,		MSG_SIGTHAW_ALT },
+		{ 0x00000008,		MSG_SIGCANCEL_ALT },
+		{ 0x00000010,		MSG_SIGLOST_ALT },
+		{ 0x00000020,		MSG_SIGXRES_ALT },
+		{ 0x00000040,		MSG_SIGJVM1_ALT },
+		{ 0x00000080,		MSG_SIGJVM2_ALT },
 		{ 0,			0 }
 	};
-	static conv_bitmaskset_desc_t bitmask_desc[N_MASK] = {
+	static const conv_bitmaskset_desc_t bitmask_desc[N_MASK] = {
 		{ vda0, 0 },
 		{ vda1, 0xffffff00 },
 		{ NULL, 0xffffffff },
@@ -1725,23 +1768,23 @@ conv_cnote_fltset(uint32_t *maskarr, int n_mask,
 {
 #define	N_MASK 4
 
-	static Val_desc vda0[] = {
-		{ 0x00000001,		MSG_ORIG(MSG_FLTILL_ALT) },
-		{ 0x00000002,		MSG_ORIG(MSG_FLTPRIV_ALT) },
-		{ 0x00000004,		MSG_ORIG(MSG_FLTBPT_ALT) },
-		{ 0x00000008,		MSG_ORIG(MSG_FLTTRACE_ALT) },
-		{ 0x00000010,		MSG_ORIG(MSG_FLTACCESS_ALT) },
-		{ 0x00000020,		MSG_ORIG(MSG_FLTBOUNDS_ALT) },
-		{ 0x00000040,		MSG_ORIG(MSG_FLTIOVF_ALT) },
-		{ 0x00000080,		MSG_ORIG(MSG_FLTIZDIV_ALT) },
-		{ 0x00000100,		MSG_ORIG(MSG_FLTFPE_ALT) },
-		{ 0x00000200,		MSG_ORIG(MSG_FLTSTACK_ALT) },
-		{ 0x00000400,		MSG_ORIG(MSG_FLTPAGE_ALT) },
-		{ 0x00000800,		MSG_ORIG(MSG_FLTWATCH_ALT) },
-		{ 0x00001000,		MSG_ORIG(MSG_FLTCPCOVF_ALT) },
+	static const Val_desc vda0[] = {
+		{ 0x00000001,		MSG_FLTILL_ALT },
+		{ 0x00000002,		MSG_FLTPRIV_ALT },
+		{ 0x00000004,		MSG_FLTBPT_ALT },
+		{ 0x00000008,		MSG_FLTTRACE_ALT },
+		{ 0x00000010,		MSG_FLTACCESS_ALT },
+		{ 0x00000020,		MSG_FLTBOUNDS_ALT },
+		{ 0x00000040,		MSG_FLTIOVF_ALT },
+		{ 0x00000080,		MSG_FLTIZDIV_ALT },
+		{ 0x00000100,		MSG_FLTFPE_ALT },
+		{ 0x00000200,		MSG_FLTSTACK_ALT },
+		{ 0x00000400,		MSG_FLTPAGE_ALT },
+		{ 0x00000800,		MSG_FLTWATCH_ALT },
+		{ 0x00001000,		MSG_FLTCPCOVF_ALT },
 		{ 0,			0 }
 	};
-	static conv_bitmaskset_desc_t bitmask_desc[N_MASK] = {
+	static const conv_bitmaskset_desc_t bitmask_desc[N_MASK] = {
 		{ vda0, 0xffffe000 },
 		{ NULL, 0xffffffff },
 		{ NULL, 0xffffffff },
@@ -2081,287 +2124,287 @@ conv_cnote_sysset(uint32_t *maskarr, int n_mask,
 {
 #define	N_MASK 16
 
-	static Val_desc vda0[] = {	/* System Calls [1 - 32] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_EXIT_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_FORKALL_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_READ_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_WRITE_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_OPEN_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_CLOSE_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_WAIT_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_CREAT_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_LINK_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_UNLINK_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_EXEC_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_CHDIR_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_TIME_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_MKNOD_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_CHMOD_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_CHOWN_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_BRK_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_STAT_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_LSEEK_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_GETPID_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_MOUNT_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_UMOUNT_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_SETUID_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_GETUID_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_STIME_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_PCSAMPLE_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_ALARM_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_FSTAT_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_PAUSE_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_UTIME_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_STTY_ALT) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_GTTY_ALT) },
+	static const Val_desc vda0[] = {	/* System Calls [1 - 32] */
+		{ 0x00000001,	MSG_SYS_EXIT_ALT },
+		{ 0x00000002,	MSG_SYS_FORKALL_ALT },
+		{ 0x00000004,	MSG_SYS_READ_ALT },
+		{ 0x00000008,	MSG_SYS_WRITE_ALT },
+		{ 0x00000010,	MSG_SYS_OPEN_ALT },
+		{ 0x00000020,	MSG_SYS_CLOSE_ALT },
+		{ 0x00000040,	MSG_SYS_WAIT_ALT },
+		{ 0x00000080,	MSG_SYS_CREAT_ALT },
+		{ 0x00000100,	MSG_SYS_LINK_ALT },
+		{ 0x00000200,	MSG_SYS_UNLINK_ALT },
+		{ 0x00000400,	MSG_SYS_EXEC_ALT },
+		{ 0x00000800,	MSG_SYS_CHDIR_ALT },
+		{ 0x00001000,	MSG_SYS_TIME_ALT },
+		{ 0x00002000,	MSG_SYS_MKNOD_ALT },
+		{ 0x00004000,	MSG_SYS_CHMOD_ALT },
+		{ 0x00008000,	MSG_SYS_CHOWN_ALT },
+		{ 0x00010000,	MSG_SYS_BRK_ALT },
+		{ 0x00020000,	MSG_SYS_STAT_ALT },
+		{ 0x00040000,	MSG_SYS_LSEEK_ALT },
+		{ 0x00080000,	MSG_SYS_GETPID_ALT },
+		{ 0x00100000,	MSG_SYS_MOUNT_ALT },
+		{ 0x00200000,	MSG_SYS_UMOUNT_ALT },
+		{ 0x00400000,	MSG_SYS_SETUID_ALT },
+		{ 0x00800000,	MSG_SYS_GETUID_ALT },
+		{ 0x01000000,	MSG_SYS_STIME_ALT },
+		{ 0x02000000,	MSG_SYS_PCSAMPLE_ALT },
+		{ 0x04000000,	MSG_SYS_ALARM_ALT },
+		{ 0x08000000,	MSG_SYS_FSTAT_ALT },
+		{ 0x10000000,	MSG_SYS_PAUSE_ALT },
+		{ 0x20000000,	MSG_SYS_UTIME_ALT },
+		{ 0x40000000,	MSG_SYS_STTY_ALT },
+		{ 0x80000000,	MSG_SYS_GTTY_ALT },
 		{ 0,		0 }
 	};
-	static Val_desc vda1[] = {	/* System Calls [33 - 64] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_ACCESS_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_NICE_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_STATFS_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_SYNC_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_KILL_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_FSTATFS_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_PGRPSYS_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_UUCOPYSTR_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_DUP_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_PIPE_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_TIMES_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_PROFIL_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_PLOCK_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_SETGID_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_GETGID_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_SIGNAL_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_MSGSYS_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_SYSI86_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_ACCT_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_SHMSYS_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_SEMSYS_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_IOCTL_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_UADMIN_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_56) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_UTSSYS_ALT) },
-		{ 0x0200000,	MSG_ORIG(MSG_SYS_FDSYNC_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_EXECVE_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_UMASK_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_CHROOT_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_FCNTL_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_ULIMIT_ALT) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_64) },
+	static const Val_desc vda1[] = {	/* System Calls [33 - 64] */
+		{ 0x00000001,	MSG_SYS_ACCESS_ALT },
+		{ 0x00000002,	MSG_SYS_NICE_ALT },
+		{ 0x00000004,	MSG_SYS_STATFS_ALT },
+		{ 0x00000008,	MSG_SYS_SYNC_ALT },
+		{ 0x00000010,	MSG_SYS_KILL_ALT },
+		{ 0x00000020,	MSG_SYS_FSTATFS_ALT },
+		{ 0x00000040,	MSG_SYS_PGRPSYS_ALT },
+		{ 0x00000080,	MSG_SYS_UUCOPYSTR_ALT },
+		{ 0x00000100,	MSG_SYS_DUP_ALT },
+		{ 0x00000200,	MSG_SYS_PIPE_ALT },
+		{ 0x00000400,	MSG_SYS_TIMES_ALT },
+		{ 0x00000800,	MSG_SYS_PROFIL_ALT },
+		{ 0x00001000,	MSG_SYS_PLOCK_ALT },
+		{ 0x00002000,	MSG_SYS_SETGID_ALT },
+		{ 0x00004000,	MSG_SYS_GETGID_ALT },
+		{ 0x00008000,	MSG_SYS_SIGNAL_ALT },
+		{ 0x00010000,	MSG_SYS_MSGSYS_ALT },
+		{ 0x00020000,	MSG_SYS_SYSI86_ALT },
+		{ 0x00040000,	MSG_SYS_ACCT_ALT },
+		{ 0x00080000,	MSG_SYS_SHMSYS_ALT },
+		{ 0x00100000,	MSG_SYS_SEMSYS_ALT },
+		{ 0x00200000,	MSG_SYS_IOCTL_ALT },
+		{ 0x00400000,	MSG_SYS_UADMIN_ALT },
+		{ 0x00800000,	MSG_SYS_56 },
+		{ 0x01000000,	MSG_SYS_UTSSYS_ALT },
+		{ 0x0200000,	MSG_SYS_FDSYNC_ALT },
+		{ 0x04000000,	MSG_SYS_EXECVE_ALT },
+		{ 0x08000000,	MSG_SYS_UMASK_ALT },
+		{ 0x10000000,	MSG_SYS_CHROOT_ALT },
+		{ 0x20000000,	MSG_SYS_FCNTL_ALT },
+		{ 0x40000000,	MSG_SYS_ULIMIT_ALT },
+		{ 0x80000000,	MSG_SYS_64 },
 		{ 0,		0 }
 	};
-	static Val_desc vda2[] = {	/* System Calls [65 - 96] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_65) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_66) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_67) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_68) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_69) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_TASKSYS_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_ACCTCTL_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_EXACCTSYS_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_GETPAGESIZES_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_RCTLSYS_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_SIDSYS_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_FSAT_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_LWP_PARK_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_SENDFILEV_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_RMDIR_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_MKDIR_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_GETDENTS_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_PRIVSYS_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_UCREDSYS_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_SYSFS_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_GETMSG_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_PUTMSG_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_POLL_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_LSTAT_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_SYMLINK_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_READLINK_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_SETGROUPS_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_GETGROUPS_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_FCHMOD_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_FCHOWN_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_SIGPROCMASK_ALT) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_SIGSUSPEND_ALT) },
+	static const Val_desc vda2[] = {	/* System Calls [65 - 96] */
+		{ 0x00000001,	MSG_SYS_65 },
+		{ 0x00000002,	MSG_SYS_66 },
+		{ 0x00000004,	MSG_SYS_67 },
+		{ 0x00000008,	MSG_SYS_68 },
+		{ 0x00000010,	MSG_SYS_69 },
+		{ 0x00000020,	MSG_SYS_TASKSYS_ALT },
+		{ 0x00000040,	MSG_SYS_ACCTCTL_ALT },
+		{ 0x00000080,	MSG_SYS_EXACCTSYS_ALT },
+		{ 0x00000100,	MSG_SYS_GETPAGESIZES_ALT },
+		{ 0x00000200,	MSG_SYS_RCTLSYS_ALT },
+		{ 0x00000400,	MSG_SYS_SIDSYS_ALT },
+		{ 0x00000800,	MSG_SYS_FSAT_ALT },
+		{ 0x00001000,	MSG_SYS_LWP_PARK_ALT },
+		{ 0x00002000,	MSG_SYS_SENDFILEV_ALT },
+		{ 0x00004000,	MSG_SYS_RMDIR_ALT },
+		{ 0x00008000,	MSG_SYS_MKDIR_ALT },
+		{ 0x00010000,	MSG_SYS_GETDENTS_ALT },
+		{ 0x00020000,	MSG_SYS_PRIVSYS_ALT },
+		{ 0x00040000,	MSG_SYS_UCREDSYS_ALT },
+		{ 0x00080000,	MSG_SYS_SYSFS_ALT },
+		{ 0x00100000,	MSG_SYS_GETMSG_ALT },
+		{ 0x00200000,	MSG_SYS_PUTMSG_ALT },
+		{ 0x00400000,	MSG_SYS_POLL_ALT },
+		{ 0x00800000,	MSG_SYS_LSTAT_ALT },
+		{ 0x01000000,	MSG_SYS_SYMLINK_ALT },
+		{ 0x02000000,	MSG_SYS_READLINK_ALT },
+		{ 0x04000000,	MSG_SYS_SETGROUPS_ALT },
+		{ 0x08000000,	MSG_SYS_GETGROUPS_ALT },
+		{ 0x10000000,	MSG_SYS_FCHMOD_ALT },
+		{ 0x20000000,	MSG_SYS_FCHOWN_ALT },
+		{ 0x40000000,	MSG_SYS_SIGPROCMASK_ALT },
+		{ 0x80000000,	MSG_SYS_SIGSUSPEND_ALT },
 		{ 0,		0 }
 	};
-	static Val_desc vda3[] = {	/* System Calls [97 - 128] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_SIGALTSTACK_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_SIGACTION_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_SIGPENDING_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_CONTEXT_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_EVSYS_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_EVTRAPRET_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_STATVFS_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_FSTATVFS_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_GETLOADAVG_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_NFSSYS_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_WAITID_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_SIGSENDSYS_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_HRTSYS_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_110) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_SIGRESEND_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_PRIOCNTLSYS_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_PATHCONF_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_MINCORE_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_MMAP_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_MPROTECT_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_MUNMAP_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_FPATHCONF_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_VFORK_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_FCHDIR_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_READV_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_WRITEV_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_XSTAT_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_LXSTAT_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_FXSTAT_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_XMKNOD_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_127) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_SETRLIMIT_ALT) },
+	static const Val_desc vda3[] = {	/* System Calls [97 - 128] */
+		{ 0x00000001,	MSG_SYS_SIGALTSTACK_ALT },
+		{ 0x00000002,	MSG_SYS_SIGACTION_ALT },
+		{ 0x00000004,	MSG_SYS_SIGPENDING_ALT },
+		{ 0x00000008,	MSG_SYS_CONTEXT_ALT },
+		{ 0x00000010,	MSG_SYS_EVSYS_ALT },
+		{ 0x00000020,	MSG_SYS_EVTRAPRET_ALT },
+		{ 0x00000040,	MSG_SYS_STATVFS_ALT },
+		{ 0x00000080,	MSG_SYS_FSTATVFS_ALT },
+		{ 0x00000100,	MSG_SYS_GETLOADAVG_ALT },
+		{ 0x00000200,	MSG_SYS_NFSSYS_ALT },
+		{ 0x00000400,	MSG_SYS_WAITID_ALT },
+		{ 0x00000800,	MSG_SYS_SIGSENDSYS_ALT },
+		{ 0x00001000,	MSG_SYS_HRTSYS_ALT },
+		{ 0x00002000,	MSG_SYS_110 },
+		{ 0x00004000,	MSG_SYS_SIGRESEND_ALT },
+		{ 0x00008000,	MSG_SYS_PRIOCNTLSYS_ALT },
+		{ 0x00010000,	MSG_SYS_PATHCONF_ALT },
+		{ 0x00020000,	MSG_SYS_MINCORE_ALT },
+		{ 0x00040000,	MSG_SYS_MMAP_ALT },
+		{ 0x00080000,	MSG_SYS_MPROTECT_ALT },
+		{ 0x00100000,	MSG_SYS_MUNMAP_ALT },
+		{ 0x00200000,	MSG_SYS_FPATHCONF_ALT },
+		{ 0x00400000,	MSG_SYS_VFORK_ALT },
+		{ 0x00800000,	MSG_SYS_FCHDIR_ALT },
+		{ 0x01000000,	MSG_SYS_READV_ALT },
+		{ 0x02000000,	MSG_SYS_WRITEV_ALT },
+		{ 0x04000000,	MSG_SYS_XSTAT_ALT },
+		{ 0x08000000,	MSG_SYS_LXSTAT_ALT },
+		{ 0x10000000,	MSG_SYS_FXSTAT_ALT },
+		{ 0x20000000,	MSG_SYS_XMKNOD_ALT },
+		{ 0x40000000,	MSG_SYS_127 },
+		{ 0x80000000,	MSG_SYS_SETRLIMIT_ALT },
 		{ 0,			0 }
 	};
-	static Val_desc vda4[] = {	/* System Calls [129 - 160] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_GETRLIMIT_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_LCHOWN_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_MEMCNTL_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_GETPMSG_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_PUTPMSG_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_RENAME_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_UNAME_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_SETEGID_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_SYSCONFIG_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_ADJTIME_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_SYSTEMINFO_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_SHAREFS_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_SETEUID_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_FORKSYS_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_FORK1_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_SIGTIMEDWAIT_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_LWP_INFO_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_YIELD_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_LWP_SEMA_WAIT_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_LWP_SEMA_POST_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_LWP_SEMA_TRYWAIT_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_LWP_DETACH_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_CORECTL_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_MODCTL_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_FCHROOT_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_UTIMES_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_VHANGUP_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_GETTIMEOFDAY_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_GETITIMER_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_SETITIMER_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_LWP_CREATE_ALT) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_LWP_EXIT_ALT) },
+	static const Val_desc vda4[] = {	/* System Calls [129 - 160] */
+		{ 0x00000001,	MSG_SYS_GETRLIMIT_ALT },
+		{ 0x00000002,	MSG_SYS_LCHOWN_ALT },
+		{ 0x00000004,	MSG_SYS_MEMCNTL_ALT },
+		{ 0x00000008,	MSG_SYS_GETPMSG_ALT },
+		{ 0x00000010,	MSG_SYS_PUTPMSG_ALT },
+		{ 0x00000020,	MSG_SYS_RENAME_ALT },
+		{ 0x00000040,	MSG_SYS_UNAME_ALT },
+		{ 0x00000080,	MSG_SYS_SETEGID_ALT },
+		{ 0x00000100,	MSG_SYS_SYSCONFIG_ALT },
+		{ 0x00000200,	MSG_SYS_ADJTIME_ALT },
+		{ 0x00000400,	MSG_SYS_SYSTEMINFO_ALT },
+		{ 0x00000800,	MSG_SYS_SHAREFS_ALT },
+		{ 0x00001000,	MSG_SYS_SETEUID_ALT },
+		{ 0x00002000,	MSG_SYS_FORKSYS_ALT },
+		{ 0x00004000,	MSG_SYS_FORK1_ALT },
+		{ 0x00008000,	MSG_SYS_SIGTIMEDWAIT_ALT },
+		{ 0x00010000,	MSG_SYS_LWP_INFO_ALT },
+		{ 0x00020000,	MSG_SYS_YIELD_ALT },
+		{ 0x00040000,	MSG_SYS_LWP_SEMA_WAIT_ALT },
+		{ 0x00080000,	MSG_SYS_LWP_SEMA_POST_ALT },
+		{ 0x00100000,	MSG_SYS_LWP_SEMA_TRYWAIT_ALT },
+		{ 0x00200000,	MSG_SYS_LWP_DETACH_ALT },
+		{ 0x00400000,	MSG_SYS_CORECTL_ALT },
+		{ 0x00800000,	MSG_SYS_MODCTL_ALT },
+		{ 0x01000000,	MSG_SYS_FCHROOT_ALT },
+		{ 0x02000000,	MSG_SYS_UTIMES_ALT },
+		{ 0x04000000,	MSG_SYS_VHANGUP_ALT },
+		{ 0x08000000,	MSG_SYS_GETTIMEOFDAY_ALT },
+		{ 0x10000000,	MSG_SYS_GETITIMER_ALT },
+		{ 0x20000000,	MSG_SYS_SETITIMER_ALT },
+		{ 0x40000000,	MSG_SYS_LWP_CREATE_ALT },
+		{ 0x80000000,	MSG_SYS_LWP_EXIT_ALT },
 		{ 0,		0 }
 	};
-	static Val_desc vda5[] = {	/* System Calls [161 - 192] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_LWP_SUSPEND_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_LWP_CONTINUE_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_LWP_KILL_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_LWP_SELF_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_LWP_SIGMASK_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_LWP_PRIVATE_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_LWP_WAIT_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_LWP_MUTEX_WAKEUP_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_LWP_MUTEX_LOCK_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_LWP_COND_WAIT_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_LWP_COND_SIGNAL_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_LWP_COND_BROADCAST_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_PREAD_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_PWRITE_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_LLSEEK_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_INST_SYNC_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_BRAND_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_KAIO_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_CPC_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_LGRPSYS_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_RUSAGESYS_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_PORT_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_POLLSYS_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_LABELSYS_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_ACL_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_AUDITSYS_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_PROCESSOR_BIND_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_PROCESSOR_INFO_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_P_ONLINE_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_SIGQUEUE_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_CLOCK_GETTIME_ALT) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_CLOCK_SETTIME_ALT) },
+	static const Val_desc vda5[] = {	/* System Calls [161 - 192] */
+		{ 0x00000001,	MSG_SYS_LWP_SUSPEND_ALT },
+		{ 0x00000002,	MSG_SYS_LWP_CONTINUE_ALT },
+		{ 0x00000004,	MSG_SYS_LWP_KILL_ALT },
+		{ 0x00000008,	MSG_SYS_LWP_SELF_ALT },
+		{ 0x00000010,	MSG_SYS_LWP_SIGMASK_ALT },
+		{ 0x00000020,	MSG_SYS_LWP_PRIVATE_ALT },
+		{ 0x00000040,	MSG_SYS_LWP_WAIT_ALT },
+		{ 0x00000080,	MSG_SYS_LWP_MUTEX_WAKEUP_ALT },
+		{ 0x00000100,	MSG_SYS_LWP_MUTEX_LOCK_ALT },
+		{ 0x00000200,	MSG_SYS_LWP_COND_WAIT_ALT },
+		{ 0x00000400,	MSG_SYS_LWP_COND_SIGNAL_ALT },
+		{ 0x00000800,	MSG_SYS_LWP_COND_BROADCAST_ALT },
+		{ 0x00001000,	MSG_SYS_PREAD_ALT },
+		{ 0x00002000,	MSG_SYS_PWRITE_ALT },
+		{ 0x00004000,	MSG_SYS_LLSEEK_ALT },
+		{ 0x00008000,	MSG_SYS_INST_SYNC_ALT },
+		{ 0x00010000,	MSG_SYS_BRAND_ALT },
+		{ 0x00020000,	MSG_SYS_KAIO_ALT },
+		{ 0x00040000,	MSG_SYS_CPC_ALT },
+		{ 0x00080000,	MSG_SYS_LGRPSYS_ALT },
+		{ 0x00100000,	MSG_SYS_RUSAGESYS_ALT },
+		{ 0x00200000,	MSG_SYS_PORT_ALT },
+		{ 0x00400000,	MSG_SYS_POLLSYS_ALT },
+		{ 0x00800000,	MSG_SYS_LABELSYS_ALT },
+		{ 0x01000000,	MSG_SYS_ACL_ALT },
+		{ 0x02000000,	MSG_SYS_AUDITSYS_ALT },
+		{ 0x04000000,	MSG_SYS_PROCESSOR_BIND_ALT },
+		{ 0x08000000,	MSG_SYS_PROCESSOR_INFO_ALT },
+		{ 0x10000000,	MSG_SYS_P_ONLINE_ALT },
+		{ 0x20000000,	MSG_SYS_SIGQUEUE_ALT },
+		{ 0x40000000,	MSG_SYS_CLOCK_GETTIME_ALT },
+		{ 0x80000000,	MSG_SYS_CLOCK_SETTIME_ALT },
 		{ 0,		0 }
 	};
-	static Val_desc vda6[] = {	/* System Calls [193 - 224] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_CLOCK_GETRES_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_TIMER_CREATE_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_TIMER_DELETE_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_TIMER_SETTIME_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_TIMER_GETTIME_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_TIMER_GETOVERRUN_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_NANOSLEEP_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_FACL_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_DOOR_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_SETREUID_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_SETREGID_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_INSTALL_UTRAP_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_SIGNOTIFY_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_SCHEDCTL_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_PSET_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_SPARC_UTRAP_INSTALL_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_RESOLVEPATH_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_LWP_MUTEX_TIMEDLOCK_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_LWP_SEMA_TIMEDWAIT_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_LWP_RWLOCK_SYS_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_GETDENTS64_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_MMAP64_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_STAT64_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_LSTAT64_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_FSTAT64_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_STATVFS64_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_FSTATVFS64_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_SETRLIMIT64_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_GETRLIMIT64_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_PREAD64_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_PWRITE64_ALT) },
-		{ 0x80000000,	MSG_ORIG(MSG_SYS_CREAT64_ALT) },
+	static const Val_desc vda6[] = {	/* System Calls [193 - 224] */
+		{ 0x00000001,	MSG_SYS_CLOCK_GETRES_ALT },
+		{ 0x00000002,	MSG_SYS_TIMER_CREATE_ALT },
+		{ 0x00000004,	MSG_SYS_TIMER_DELETE_ALT },
+		{ 0x00000008,	MSG_SYS_TIMER_SETTIME_ALT },
+		{ 0x00000010,	MSG_SYS_TIMER_GETTIME_ALT },
+		{ 0x00000020,	MSG_SYS_TIMER_GETOVERRUN_ALT },
+		{ 0x00000040,	MSG_SYS_NANOSLEEP_ALT },
+		{ 0x00000080,	MSG_SYS_FACL_ALT },
+		{ 0x00000100,	MSG_SYS_DOOR_ALT },
+		{ 0x00000200,	MSG_SYS_SETREUID_ALT },
+		{ 0x00000400,	MSG_SYS_SETREGID_ALT },
+		{ 0x00000800,	MSG_SYS_INSTALL_UTRAP_ALT },
+		{ 0x00001000,	MSG_SYS_SIGNOTIFY_ALT },
+		{ 0x00002000,	MSG_SYS_SCHEDCTL_ALT },
+		{ 0x00004000,	MSG_SYS_PSET_ALT },
+		{ 0x00008000,	MSG_SYS_SPARC_UTRAP_INSTALL_ALT },
+		{ 0x00010000,	MSG_SYS_RESOLVEPATH_ALT },
+		{ 0x00020000,	MSG_SYS_LWP_MUTEX_TIMEDLOCK_ALT },
+		{ 0x00040000,	MSG_SYS_LWP_SEMA_TIMEDWAIT_ALT },
+		{ 0x00080000,	MSG_SYS_LWP_RWLOCK_SYS_ALT },
+		{ 0x00100000,	MSG_SYS_GETDENTS64_ALT },
+		{ 0x00200000,	MSG_SYS_MMAP64_ALT },
+		{ 0x00400000,	MSG_SYS_STAT64_ALT },
+		{ 0x00800000,	MSG_SYS_LSTAT64_ALT },
+		{ 0x01000000,	MSG_SYS_FSTAT64_ALT },
+		{ 0x02000000,	MSG_SYS_STATVFS64_ALT },
+		{ 0x04000000,	MSG_SYS_FSTATVFS64_ALT },
+		{ 0x08000000,	MSG_SYS_SETRLIMIT64_ALT },
+		{ 0x10000000,	MSG_SYS_GETRLIMIT64_ALT },
+		{ 0x20000000,	MSG_SYS_PREAD64_ALT },
+		{ 0x40000000,	MSG_SYS_PWRITE64_ALT },
+		{ 0x80000000,	MSG_SYS_CREAT64_ALT },
 		{ 0,			0 }
 	};
-	static Val_desc vda7[] = {	/* System Calls [225 - 256] */
-		{ 0x00000001,	MSG_ORIG(MSG_SYS_OPEN64_ALT) },
-		{ 0x00000002,	MSG_ORIG(MSG_SYS_RPCSYS_ALT) },
-		{ 0x00000004,	MSG_ORIG(MSG_SYS_ZONE_ALT) },
-		{ 0x00000008,	MSG_ORIG(MSG_SYS_AUTOFSSYS_ALT) },
-		{ 0x00000010,	MSG_ORIG(MSG_SYS_GETCWD_ALT) },
-		{ 0x00000020,	MSG_ORIG(MSG_SYS_SO_SOCKET_ALT) },
-		{ 0x00000040,	MSG_ORIG(MSG_SYS_SO_SOCKETPAIR_ALT) },
-		{ 0x00000080,	MSG_ORIG(MSG_SYS_BIND_ALT) },
-		{ 0x00000100,	MSG_ORIG(MSG_SYS_LISTEN_ALT) },
-		{ 0x00000200,	MSG_ORIG(MSG_SYS_ACCEPT_ALT) },
-		{ 0x00000400,	MSG_ORIG(MSG_SYS_CONNECT_ALT) },
-		{ 0x00000800,	MSG_ORIG(MSG_SYS_SHUTDOWN_ALT) },
-		{ 0x00001000,	MSG_ORIG(MSG_SYS_RECV_ALT) },
-		{ 0x00002000,	MSG_ORIG(MSG_SYS_RECVFROM_ALT) },
-		{ 0x00004000,	MSG_ORIG(MSG_SYS_RECVMSG_ALT) },
-		{ 0x00008000,	MSG_ORIG(MSG_SYS_SEND_ALT) },
-		{ 0x00010000,	MSG_ORIG(MSG_SYS_SENDMSG_ALT) },
-		{ 0x00020000,	MSG_ORIG(MSG_SYS_SENDTO_ALT) },
-		{ 0x00040000,	MSG_ORIG(MSG_SYS_GETPEERNAME_ALT) },
-		{ 0x00080000,	MSG_ORIG(MSG_SYS_GETSOCKNAME_ALT) },
-		{ 0x00100000,	MSG_ORIG(MSG_SYS_GETSOCKOPT_ALT) },
-		{ 0x00200000,	MSG_ORIG(MSG_SYS_SETSOCKOPT_ALT) },
-		{ 0x00400000,	MSG_ORIG(MSG_SYS_SOCKCONFIG_ALT) },
-		{ 0x00800000,	MSG_ORIG(MSG_SYS_NTP_GETTIME_ALT) },
-		{ 0x01000000,	MSG_ORIG(MSG_SYS_NTP_ADJTIME_ALT) },
-		{ 0x02000000,	MSG_ORIG(MSG_SYS_LWP_MUTEX_UNLOCK_ALT) },
-		{ 0x04000000,	MSG_ORIG(MSG_SYS_LWP_MUTEX_TRYLOCK_ALT) },
-		{ 0x08000000,	MSG_ORIG(MSG_SYS_LWP_MUTEX_REGISTER_ALT) },
-		{ 0x10000000,	MSG_ORIG(MSG_SYS_CLADM_ALT) },
-		{ 0x20000000,	MSG_ORIG(MSG_SYS_UUCOPY_ALT) },
-		{ 0x40000000,	MSG_ORIG(MSG_SYS_UMOUNT2_ALT) },
+	static const Val_desc vda7[] = {	/* System Calls [225 - 256] */
+		{ 0x00000001,	MSG_SYS_OPEN64_ALT },
+		{ 0x00000002,	MSG_SYS_RPCSYS_ALT },
+		{ 0x00000004,	MSG_SYS_ZONE_ALT },
+		{ 0x00000008,	MSG_SYS_AUTOFSSYS_ALT },
+		{ 0x00000010,	MSG_SYS_GETCWD_ALT },
+		{ 0x00000020,	MSG_SYS_SO_SOCKET_ALT },
+		{ 0x00000040,	MSG_SYS_SO_SOCKETPAIR_ALT },
+		{ 0x00000080,	MSG_SYS_BIND_ALT },
+		{ 0x00000100,	MSG_SYS_LISTEN_ALT },
+		{ 0x00000200,	MSG_SYS_ACCEPT_ALT },
+		{ 0x00000400,	MSG_SYS_CONNECT_ALT },
+		{ 0x00000800,	MSG_SYS_SHUTDOWN_ALT },
+		{ 0x00001000,	MSG_SYS_RECV_ALT },
+		{ 0x00002000,	MSG_SYS_RECVFROM_ALT },
+		{ 0x00004000,	MSG_SYS_RECVMSG_ALT },
+		{ 0x00008000,	MSG_SYS_SEND_ALT },
+		{ 0x00010000,	MSG_SYS_SENDMSG_ALT },
+		{ 0x00020000,	MSG_SYS_SENDTO_ALT },
+		{ 0x00040000,	MSG_SYS_GETPEERNAME_ALT },
+		{ 0x00080000,	MSG_SYS_GETSOCKNAME_ALT },
+		{ 0x00100000,	MSG_SYS_GETSOCKOPT_ALT },
+		{ 0x00200000,	MSG_SYS_SETSOCKOPT_ALT },
+		{ 0x00400000,	MSG_SYS_SOCKCONFIG_ALT },
+		{ 0x00800000,	MSG_SYS_NTP_GETTIME_ALT },
+		{ 0x01000000,	MSG_SYS_NTP_ADJTIME_ALT },
+		{ 0x02000000,	MSG_SYS_LWP_MUTEX_UNLOCK_ALT },
+		{ 0x04000000,	MSG_SYS_LWP_MUTEX_TRYLOCK_ALT },
+		{ 0x08000000,	MSG_SYS_LWP_MUTEX_REGISTER_ALT },
+		{ 0x10000000,	MSG_SYS_CLADM_ALT },
+		{ 0x20000000,	MSG_SYS_UUCOPY_ALT },
+		{ 0x40000000,	MSG_SYS_UMOUNT2_ALT },
 		/* 256 (unused) */
 		{ 0,		0 }
 	};
-	static conv_bitmaskset_desc_t bitmask_desc[N_MASK] = {
+	static const conv_bitmaskset_desc_t bitmask_desc[N_MASK] = {
 		{ vda0, 0x00000000 },
 		{ vda1, 0x00000000 },
 		{ vda2, 0x00000000 },

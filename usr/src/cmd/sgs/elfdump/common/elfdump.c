@@ -115,6 +115,7 @@ typedef struct {
 	const char	*file;		/* Name of file */
 	Ehdr		*ehdr;		/* ELF header for file */
 	Cache		*cache;		/* Cache of all section headers */
+	uchar_t		osabi;		/* OSABI to use */
 	Word		shnum;		/* # of sections in cache */
 	Cache		*seccache;	/* Cache of symbol table section hdr */
 	Word		secndx;		/* Index of symbol table section hdr */
@@ -370,7 +371,7 @@ symlookup(const char *name, Cache *cache, Word shnum, Sym **sym,
  * Print section headers.
  */
 static void
-sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr)
+sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi)
 {
 	size_t	seccnt;
 
@@ -406,7 +407,7 @@ sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr)
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SHDR), EC_WORD(seccnt), secname);
-		Elf_shdr(0, ehdr->e_machine, shdr);
+		Elf_shdr(0, osabi, ehdr->e_machine, shdr);
 	}
 }
 
@@ -434,8 +435,8 @@ getphdr(Word phnum, Word *type_arr, Word type_cnt, const char *file, Elf *elf)
 }
 
 static void
-unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
-    Elf *elf, uint_t flags)
+unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
+    const char *file, Elf *elf, uint_t flags)
 {
 #if	defined(_ELF64)
 #define	MSG_UNW_BINSRTAB2	MSG_UNW_BINSRTAB2_64
@@ -486,23 +487,19 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 		uint_t		vers, frame_ptr_enc, fde_cnt_enc, table_enc;
 
 		/*
-		 * Skip sections of the wrong type. On amd64, Solaris tags
-		 * these as SHT_AMD64_UNWIND, while gcc started out issuing
-		 * them as SHT_PROGBITS and switched over when the amd64 ABI
-		 * was finalized. On non-amd64, they're all SHT_PROGBITS.
+		 * Skip sections of the wrong type.
+		 *
+		 * On Solaris, these are SHT_AMD64_UNWIND for amd64,
+		 * and SHT_PROGBITS for other platforms. For Linux, and
+		 * presumably other operating systems that use the GNU
+		 * toolchain, SHT_PROGBITS is used on all platforms.
+		 *
+		 * Skip anything other than these two types. The name
+		 * test below will thin out the SHT_PROGBITS that don't apply.
 		 */
-		switch (shdr->sh_type) {
-		case SHT_PROGBITS:
-			if (ehdr->e_machine == EM_AMD64)
-				continue;
-			break;
-		case SHT_AMD64_UNWIND:
-			if (ehdr->e_machine != EM_AMD64)
-				continue;
-			break;
-		default:
+		if ((shdr->sh_type != SHT_PROGBITS) &&
+		    (shdr->sh_type != SHT_AMD64_UNWIND))
 			continue;
-		}
 
 		/*
 		 * Only sections with names starting with .eh_frame or
@@ -596,7 +593,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_WARN_MULTEHFRM), file,
 				    EC_WORD(cnt), _cache->c_name,
-				    conv_ehdr_type(ehdr->e_type, 0, &inv_buf));
+				    conv_ehdr_type(osabi, ehdr->e_type,
+				    0, &inv_buf));
 			}
 			dump_eh_frame(data, datasize, shdr->sh_addr,
 			    ehdr->e_machine, ehdr->e_ident);
@@ -1290,13 +1288,15 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
  */
 static int
 init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
-    Ehdr *ehdr, VERSYM_STATE *versym, const char *file, uint_t flags)
+    Ehdr *ehdr, uchar_t osabi, VERSYM_STATE *versym, const char *file,
+    uint_t flags)
 {
 	Shdr *shdr;
 
 	state->file = file;
 	state->ehdr = ehdr;
 	state->cache = cache;
+	state->osabi = osabi;
 	state->shnum = shnum;
 	state->seccache = &cache[secndx];
 	state->secndx = secndx;
@@ -1461,7 +1461,8 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 		 * The section names are not available, so all we can
 		 * do is to display them in numeric form.
 		 */
-		sec = conv_sym_shndx(sym->st_shndx, &inv_buf);
+		sec = conv_sym_shndx(state->osabi, state->ehdr->e_machine,
+		    sym->st_shndx, CONV_FMT_DECIMAL, &inv_buf);
 	} else if ((sym->st_shndx < SHN_LORESERVE) &&
 	    (sym->st_shndx < state->shnum)) {
 		shndx = sym->st_shndx;
@@ -1621,7 +1622,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 
 	(void) snprintf(index, MAXNDXSIZE,
 	    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(disp_symndx));
-	Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index,
+	Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index, state->osabi,
 	    state->ehdr->e_machine, sym, verndx, gnuver, sec, symname);
 }
 
@@ -1629,8 +1630,8 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
  * Search for and process any symbol tables.
  */
 void
-symbols(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
-    const char *file, uint_t flags)
+symbols(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi,
+    VERSYM_STATE *versym, const char *file, uint_t flags)
 {
 	SYMTBL_STATE state;
 	Cache *_cache;
@@ -1645,13 +1646,14 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 
 		if ((shdr->sh_type != SHT_SYMTAB) &&
 		    (shdr->sh_type != SHT_DYNSYM) &&
-		    (shdr->sh_type != SHT_SUNW_LDYNSYM))
+		    ((shdr->sh_type != SHT_SUNW_LDYNSYM) ||
+		    (osabi != ELFOSABI_SOLARIS)))
 			continue;
 		if (!match(MATCH_F_ALL, _cache->c_name, secndx, shdr->sh_type))
 			continue;
 
 		if (!init_symtbl_state(&state, cache, shnum, secndx, ehdr,
-		    versym, file, flags))
+		    osabi, versym, file, flags))
 			continue;
 		/*
 		 * Loop through the symbol tables entries.
@@ -1671,8 +1673,8 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
  * These sections are always associated with the .SUNW_ldynsym./.dynsym pair.
  */
 static void
-sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
-    const char *file, uint_t flags)
+sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi,
+    VERSYM_STATE *versym, const char *file, uint_t flags)
 {
 	SYMTBL_STATE	ldynsym_state,	dynsym_state;
 	Cache		*sortcache,	*symcache;
@@ -1716,7 +1718,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 		switch (symshdr->sh_type) {
 		case SHT_SUNW_LDYNSYM:
 			if (!init_symtbl_state(&ldynsym_state, cache, shnum,
-			    symsecndx, ehdr, versym, file, flags))
+			    symsecndx, ehdr, osabi, versym, file, flags))
 				continue;
 			ldynsym_cnt = ldynsym_state.symn;
 			/*
@@ -1742,13 +1744,14 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 			/* FALLTHROUGH */
 		case SHT_DYNSYM:
 			if (!init_symtbl_state(&dynsym_state, cache, shnum,
-			    symsecndx, ehdr, versym, file, flags))
+			    symsecndx, ehdr, osabi, versym, file, flags))
 				continue;
 			break;
 		default:
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADNDXSEC),
-			    file, sortcache->c_name, conv_sec_type(
-			    ehdr->e_machine, symshdr->sh_type, 0, &inv_buf));
+			    file, sortcache->c_name,
+			    conv_sec_type(osabi, ehdr->e_machine,
+			    symshdr->sh_type, 0, &inv_buf));
 			continue;
 		}
 
@@ -1958,7 +1961,7 @@ typedef enum { DYN_TEST_ADDR, DYN_TEST_SIZE, DYN_TEST_ENTSIZE } dyn_test_t;
  */
 static void
 dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
-    Word dynsec_cnt, Ehdr *ehdr, const char *file)
+    Word dynsec_cnt, Ehdr *ehdr, uchar_t osabi, const char *file)
 {
 	Conv_inv_buf_t	buf1, buf2;
 
@@ -2007,12 +2010,13 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 			name = MSG_ORIG(MSG_ELF_FINI);
 			break;
 		default:
-			name = conv_sec_type(ehdr->e_machine, sh_type,
-			    0, &buf1);
+			name = conv_sec_type(osabi, ehdr->e_machine,
+			    sh_type, 0, &buf1);
 			break;
 		}
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_DYNNOBCKSEC), file,
-		    name, conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf2));
+		    name, conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
+		    0, &buf2));
 		return;
 	}
 
@@ -2023,9 +2027,9 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 		if (dyn->d_un.d_val != sec_cache->c_shdr->sh_addr)
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_DYNBADADDR), file,
-			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf1),
-			    EC_ADDR(dyn->d_un.d_val), sec_cache->c_ndx,
-			    sec_cache->c_name,
+			    conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
+			    0, &buf1), EC_ADDR(dyn->d_un.d_val),
+			    sec_cache->c_ndx, sec_cache->c_name,
 			    EC_ADDR(sec_cache->c_shdr->sh_addr));
 		break;
 
@@ -2034,8 +2038,8 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 		if (dyn->d_un.d_val != sec_cache->c_shdr->sh_size)
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_DYNBADSIZE), file,
-			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf1),
-			    EC_XWORD(dyn->d_un.d_val),
+			    conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
+			    0, &buf1), EC_XWORD(dyn->d_un.d_val),
 			    sec_cache->c_ndx, sec_cache->c_name,
 			    EC_XWORD(sec_cache->c_shdr->sh_size));
 		break;
@@ -2045,8 +2049,8 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 		if (dyn->d_un.d_val != sec_cache->c_shdr->sh_entsize)
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_DYNBADENTSIZE), file,
-			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf1),
-			    EC_XWORD(dyn->d_un.d_val),
+			    conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
+			    0, &buf1), EC_XWORD(dyn->d_un.d_val),
 			    sec_cache->c_ndx, sec_cache->c_name,
 			    EC_XWORD(sec_cache->c_shdr->sh_entsize));
 		break;
@@ -2073,7 +2077,7 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 static void
 dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
     Cache *dynsym_cache, Cache *ldynsym_cache, Cache *cache,
-    Word shnum, Ehdr *ehdr, const char *file)
+    Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 {
 	Conv_inv_buf_t	buf;
 	int		i;
@@ -2097,8 +2101,8 @@ dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
 		    symlookup(symname, cache, shnum, &sym, _cache, file) &&
 		    (sym->st_value != dyn->d_un.d_val))
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DYNSYMVAL),
-			    file, _cache->c_name,
-			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf),
+			    file, _cache->c_name, conv_dyn_tag(dyn->d_tag,
+			    osabi, ehdr->e_machine, 0, &buf),
 			    symname, EC_ADDR(sym->st_value));
 	}
 }
@@ -2108,7 +2112,7 @@ dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
  * Search for and process a .dynamic section.
  */
 static void
-dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
+dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 {
 	struct {
 		Cache	*symtab;
@@ -2136,6 +2140,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 	Word	dynsec_num;
 	int	dynsec_cnt;
 	Word	cnt;
+	int	osabi_solaris = osabi == ELFOSABI_SOLARIS;
 
 	/*
 	 * Make a pass over all the sections, gathering section information
@@ -2367,10 +2372,15 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			case DT_USED:
 			case DT_DEPAUDIT:
 			case DT_AUDIT:
-			case DT_SUNW_AUXILIARY:
-			case DT_SUNW_FILTER:
 				name = string(_cache, ndx, strsec,
 				    file, dyn->d_un.d_ptr);
+				break;
+
+			case DT_SUNW_AUXILIARY:
+			case DT_SUNW_FILTER:
+				if (osabi_solaris)
+					name = string(_cache, ndx, strsec,
+					    file, dyn->d_un.d_ptr);
 				break;
 
 			case DT_FLAGS:
@@ -2394,8 +2404,10 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				break;
 
 			case DT_SUNW_LDMACH:
-				name = conv_ehdr_mach((Half)dyn->d_un.d_val, 0,
-				    &c_buf.inv);
+				if (!osabi_solaris)
+					break;
+				name = conv_ehdr_mach((Half)dyn->d_un.d_val,
+				    0, &c_buf.inv);
 				break;
 
 			/*
@@ -2406,18 +2418,21 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			 */
 #define	TEST_ADDR(_sh_type, _sec_field) \
 				dyn_test(DYN_TEST_ADDR, _sh_type, \
-				    sec._sec_field, dyn, dynsec_cnt, ehdr, file)
+				    sec._sec_field, dyn, dynsec_cnt, ehdr, \
+				    osabi, file)
 #define	TEST_SIZE(_sh_type, _sec_field) \
 				dyn_test(DYN_TEST_SIZE, _sh_type, \
-				    sec._sec_field, dyn, dynsec_cnt, ehdr, file)
+				    sec._sec_field, dyn, dynsec_cnt, ehdr, \
+				    osabi, file)
 #define	TEST_ENTSIZE(_sh_type, _sec_field) \
 				dyn_test(DYN_TEST_ENTSIZE, _sh_type, \
-				    sec._sec_field, dyn, dynsec_cnt, ehdr, file)
+				    sec._sec_field, dyn, dynsec_cnt, ehdr, \
+				    osabi, file)
 
 			case DT_FINI:
 				dyn_symtest(dyn, MSG_ORIG(MSG_SYM_FINI),
 				    sec.symtab, sec.dynsym, sec.sunw_ldynsym,
-				    cache, shnum, ehdr, file);
+				    cache, shnum, ehdr, osabi, file);
 				TEST_ADDR(SHT_PROGBITS, fini);
 				break;
 
@@ -2436,7 +2451,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			case DT_INIT:
 				dyn_symtest(dyn, MSG_ORIG(MSG_SYM_INIT),
 				    sec.symtab, sec.dynsym, sec.sunw_ldynsym,
-				    cache, shnum, ehdr, file);
+				    cache, shnum, ehdr, osabi, file);
 				TEST_ADDR(SHT_PROGBITS, init);
 				break;
 
@@ -2527,7 +2542,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				 * This entry is related to both the symsort and
 				 * tlssort sections.
 				 */
-				{
+				if (osabi_solaris) {
 					int test_tls =
 					    (sec.sunw_tlssort != NULL);
 					int test_sym =
@@ -2544,19 +2559,27 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 
 
 			case DT_SUNW_SYMSORT:
-				TEST_ADDR(SHT_SUNW_symsort, sunw_symsort);
+				if (osabi_solaris)
+					TEST_ADDR(SHT_SUNW_symsort,
+					    sunw_symsort);
 				break;
 
 			case DT_SUNW_SYMSORTSZ:
-				TEST_SIZE(SHT_SUNW_symsort, sunw_symsort);
+				if (osabi_solaris)
+					TEST_SIZE(SHT_SUNW_symsort,
+					    sunw_symsort);
 				break;
 
 			case DT_SUNW_TLSSORT:
-				TEST_ADDR(SHT_SUNW_tlssort, sunw_tlssort);
+				if (osabi_solaris)
+					TEST_ADDR(SHT_SUNW_tlssort,
+					    sunw_tlssort);
 				break;
 
 			case DT_SUNW_TLSSORTSZ:
-				TEST_SIZE(SHT_SUNW_tlssort, sunw_tlssort);
+				if (osabi_solaris)
+					TEST_SIZE(SHT_SUNW_tlssort,
+					    sunw_tlssort);
 				break;
 
 			case DT_VERDEF:
@@ -2577,7 +2600,8 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 
 			if (name == NULL)
 				name = MSG_ORIG(MSG_STR_EMPTY);
-			Elf_dyn_entry(0, dyn, ndx, name, ehdr->e_machine);
+			Elf_dyn_entry(0, dyn, ndx, name,
+			    osabi, ehdr->e_machine);
 		}
 	}
 }
@@ -2696,6 +2720,128 @@ move(Cache *cache, Word shnum, const char *file, uint_t flags)
 }
 
 /*
+ * parse_note_t is used to track the state used by parse_note_entry()
+ * between calls, and also to return the results of each call.
+ */
+typedef struct {
+	/* pns_ fields track progress through the data */
+	const char	*pns_file;	/* File name */
+	Cache		*pns_cache;	/* Note section cache entry */
+	size_t		pns_size;	/* # unprocessed data bytes */
+	Word		*pns_data;	/* # to next unused data byte */
+
+	/* pn_ fields return the results for a single call */
+	Word		pn_namesz;	/* Value of note namesz field */
+	Word		pn_descsz;	/* Value of note descsz field */
+	Word		pn_type;	/* Value of note type field */
+	const char	*pn_name;	/* if (namesz > 0) ptr to name bytes */
+	const char	*pn_desc;	/* if (descsx > 0) ptr to data bytes */
+} parse_note_t;
+
+/*
+ * Extract the various sub-parts of a note entry, and advance the
+ * data pointer past it.
+ *
+ * entry:
+ *	The state pns_ fields contain current values for the Note section
+ *
+ * exit:
+ *	On success, True (1) is returned, the state pns_ fields have been
+ *	advanced to point at the start of the next entry, and the information
+ *	for the recovered note entry is found in the state pn_ fields.
+ *
+ *	On failure, False (0) is returned. The values contained in state
+ *	are undefined.
+ */
+static int
+parse_note_entry(parse_note_t *state)
+{
+	size_t	pad, noteoff;
+
+	noteoff = (Word)state->pns_cache->c_data->d_size - state->pns_size;
+	/*
+	 * Make sure we can at least reference the 3 initial entries
+	 * (4-byte words) of the note information block.
+	 */
+	if (state->pns_size >= (sizeof (Word) * 3)) {
+		state->pns_size -= (sizeof (Word) * 3);
+	} else {
+		(void) fprintf(stderr, MSG_INTL(MSG_NOTE_BADDATASZ),
+		    state->pns_file, state->pns_cache->c_name,
+		    EC_WORD(noteoff));
+		return (0);
+	}
+
+	/*
+	 * Make sure any specified name string can be referenced.
+	 */
+	if ((state->pn_namesz = *state->pns_data++) != 0) {
+		if (state->pns_size >= state->pn_namesz) {
+			state->pns_size -= state->pn_namesz;
+		} else {
+			(void) fprintf(stderr, MSG_INTL(MSG_NOTE_BADNMSZ),
+			    state->pns_file, state->pns_cache->c_name,
+			    EC_WORD(noteoff), EC_WORD(state->pn_namesz));
+			return (0);
+		}
+	}
+
+	/*
+	 * Make sure any specified descriptor can be referenced.
+	 */
+	if ((state->pn_descsz = *state->pns_data++) != 0) {
+		/*
+		 * If namesz isn't a 4-byte multiple, account for any
+		 * padding that must exist before the descriptor.
+		 */
+		if ((pad = (state->pn_namesz & (sizeof (Word) - 1))) != 0) {
+			pad = sizeof (Word) - pad;
+			state->pns_size -= pad;
+		}
+		if (state->pns_size >= state->pn_descsz) {
+			state->pns_size -= state->pn_descsz;
+		} else {
+			(void) fprintf(stderr, MSG_INTL(MSG_NOTE_BADDESZ),
+			    state->pns_file, state->pns_cache->c_name,
+			    EC_WORD(noteoff), EC_WORD(state->pn_namesz));
+			return (0);
+		}
+	}
+
+	state->pn_type = *state->pns_data++;
+
+	/* Name */
+	if (state->pn_namesz) {
+		state->pn_name = (char *)state->pns_data;
+		pad = (state->pn_namesz +
+		    (sizeof (Word) - 1)) & ~(sizeof (Word) - 1);
+		/* LINTED */
+		state->pns_data = (Word *)(state->pn_name + pad);
+	}
+
+	/*
+	 * If multiple information blocks exist within a .note section
+	 * account for any padding that must exist before the next
+	 * information block.
+	 */
+	if ((pad = (state->pn_descsz & (sizeof (Word) - 1))) != 0) {
+		pad = sizeof (Word) - pad;
+		if (state->pns_size > pad)
+			state->pns_size -= pad;
+	}
+
+	/* Data */
+	if (state->pn_descsz) {
+		state->pn_desc = (const char *)state->pns_data;
+		/* LINTED */
+		state->pns_data = (Word *)(state->pn_desc +
+		    state->pn_descsz + pad);
+	}
+
+	return (1);
+}
+
+/*
  * Callback function for use with conv_str_to_c_literal() below.
  */
 /*ARGSUSED2*/
@@ -2713,97 +2859,50 @@ c_literal_cb(const void *ptr, size_t size, void *uvalue)
 void
 note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 {
-	size_t		bsize = size;
 	int		cnt = 0;
 	int		is_corenote;
 	int		do_swap;
 	Conv_inv_buf_t	inv_buf;
+	parse_note_t	pnstate;
 
-	do_swap =  _elf_sys_encoding() != ehdr->e_ident[EI_DATA];
+	pnstate.pns_file = file;
+	pnstate.pns_cache = cache;
+	pnstate.pns_size = size;
+	pnstate.pns_data = data;
+	do_swap = _elf_sys_encoding() != ehdr->e_ident[EI_DATA];
 
 	/*
 	 * Print out a single `note' information block.
 	 */
-	while (size > 0) {
-		size_t	namesz, descsz, type, pad, noteoff;
+	while (pnstate.pns_size > 0) {
 
-		noteoff = bsize - size;
-		/*
-		 * Make sure we can at least reference the 3 initial entries
-		 * (4-byte words) of the note information block.
-		 */
-		if (size >= (sizeof (Word) * 3))
-			size -= (sizeof (Word) * 3);
-		else {
-			(void) fprintf(stderr, MSG_INTL(MSG_NOTE_BADDATASZ),
-			    file, cache->c_name, EC_WORD(noteoff));
+		if (parse_note_entry(&pnstate) == 0)
 			return;
-		}
-
-		/*
-		 * Make sure any specified name string can be referenced.
-		 */
-		if ((namesz = *data++) != 0) {
-			if (size >= namesz)
-				size -= namesz;
-			else {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_NOTE_BADNMSZ), file,
-				    cache->c_name, EC_WORD(noteoff),
-				    EC_WORD(namesz));
-				return;
-			}
-		}
-
-		/*
-		 * Make sure any specified descriptor can be referenced.
-		 */
-		if ((descsz = *data++) != 0) {
-			/*
-			 * If namesz isn't a 4-byte multiple, account for any
-			 * padding that must exist before the descriptor.
-			 */
-			if ((pad = (namesz & (sizeof (Word) - 1))) != 0) {
-				pad = sizeof (Word) - pad;
-				size -= pad;
-			}
-			if (size >= descsz)
-				size -= descsz;
-			else {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_NOTE_BADDESZ), file,
-				    cache->c_name, EC_WORD(noteoff),
-				    EC_WORD(namesz));
-				return;
-			}
-		}
-
-		type = *data++;
 
 		/*
 		 * Is this a Solaris core note? Such notes all have
 		 * the name "CORE".
 		 */
 		is_corenote = (ehdr->e_type == ET_CORE) &&
-		    (namesz == (MSG_STR_CORE_SIZE + 1)) &&
-		    (strncmp(MSG_ORIG(MSG_STR_CORE), (char *)data,
+		    (pnstate.pn_namesz == (MSG_STR_CORE_SIZE + 1)) &&
+		    (strncmp(MSG_ORIG(MSG_STR_CORE), pnstate.pn_name,
 		    MSG_STR_CORE_SIZE + 1) == 0);
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_FMT_NOTEENTNDX), EC_WORD(cnt));
 		cnt++;
-		dbg_print(0, MSG_ORIG(MSG_NOTE_NAMESZ), EC_WORD(namesz));
-		dbg_print(0, MSG_ORIG(MSG_NOTE_DESCSZ), EC_WORD(descsz));
+		dbg_print(0, MSG_ORIG(MSG_NOTE_NAMESZ),
+		    EC_WORD(pnstate.pn_namesz));
+		dbg_print(0, MSG_ORIG(MSG_NOTE_DESCSZ),
+		    EC_WORD(pnstate.pn_descsz));
 
 		if (is_corenote)
 			dbg_print(0, MSG_ORIG(MSG_NOTE_TYPE_STR),
-			    conv_cnote_type(type, 0, &inv_buf));
+			    conv_cnote_type(pnstate.pn_type, 0, &inv_buf));
 		else
-			dbg_print(0, MSG_ORIG(MSG_NOTE_TYPE), EC_WORD(type));
-		if (namesz) {
-			char	*name = (char *)data;
-
-
+			dbg_print(0, MSG_ORIG(MSG_NOTE_TYPE),
+			    EC_WORD(pnstate.pn_type));
+		if (pnstate.pn_namesz) {
 			dbg_print(0, MSG_ORIG(MSG_NOTE_NAME));
 			/*
 			 * The name string can contain embedded 'null'
@@ -2818,28 +2917,13 @@ note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 			 */
 			(void) fwrite(MSG_ORIG(MSG_STR_8SP),
 			    MSG_STR_8SP_SIZE, 1, stdout);
-			conv_str_to_c_literal(name, namesz, c_literal_cb, NULL);
-			name = name + ((namesz + (sizeof (Word) - 1)) &
-			    ~(sizeof (Word) - 1));
-			/* LINTED */
-			data = (Word *)name;
+			conv_str_to_c_literal(pnstate.pn_name,
+			    pnstate.pn_namesz, c_literal_cb, NULL);
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		}
 
-		/*
-		 * If multiple information blocks exist within a .note section
-		 * account for any padding that must exist before the next
-		 * information block.
-		 */
-		if ((pad = (descsz & (sizeof (Word) - 1))) != 0) {
-			pad = sizeof (Word) - pad;
-			if (size > pad)
-				size -= pad;
-		}
-
-		if (descsz) {
+		if (pnstate.pn_descsz) {
 			int		hexdump = 1;
-			const char	*desc = (const char *)data;
 
 			/*
 			 * If this is a core note, let the corenote()
@@ -2851,7 +2935,8 @@ note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 				corenote_ret_t	corenote_ret;
 
 				corenote_ret = corenote(ehdr->e_machine,
-				    do_swap, type, desc, descsz);
+				    do_swap, pnstate.pn_type, pnstate.pn_desc,
+				    pnstate.pn_descsz);
 				switch (corenote_ret) {
 				case CORENOTE_R_OK:
 					hexdump = 0;
@@ -2879,12 +2964,9 @@ note_entry(Cache *cache, Word *data, size_t size, Ehdr *ehdr, const char *file)
 			 */
 			if (hexdump) {
 				dbg_print(0, MSG_ORIG(MSG_NOTE_DESC));
-				dump_hex_bytes(desc, descsz, 8, 4, 4);
+				dump_hex_bytes(pnstate.pn_desc,
+				    pnstate.pn_descsz, 8, 4, 4);
 			}
-			desc += descsz + pad;
-
-			/* LINTED */
-			data = (Word *)desc;
 		}
 	}
 }
@@ -2938,6 +3020,72 @@ note(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 	}
 
 	return (note_cnt);
+}
+
+/*
+ * The Linux Standard Base defines a special note named .note.ABI-tag
+ * that is used to maintain Linux ABI information. Presence of this section
+ * is a strong indication that the object should be considered to be
+ * ELFOSABI_LINUX.
+ *
+ * This function returns True (1) if such a note is seen, and False (0)
+ * otherwise.
+ */
+static int
+has_linux_abi_note(Cache *cache, Word shnum, const char *file)
+{
+	Word	cnt;
+
+	for (cnt = 1; cnt < shnum; cnt++) {
+		parse_note_t	pnstate;
+		Cache		*_cache = &cache[cnt];
+		Shdr		*shdr = _cache->c_shdr;
+
+		/*
+		 * Section must be SHT_NOTE, must have the name
+		 * .note.ABI-tag, and must have data.
+		 */
+		if ((shdr->sh_type != SHT_NOTE) ||
+		    (strcmp(MSG_ORIG(MSG_STR_NOTEABITAG),
+		    _cache->c_name) != 0) || (_cache->c_data == NULL))
+			continue;
+
+		pnstate.pns_file = file;
+		pnstate.pns_cache = _cache;
+		pnstate.pns_size = _cache->c_data->d_size;
+		pnstate.pns_data = (Word *)_cache->c_data->d_buf;
+
+		while (pnstate.pns_size > 0) {
+			Word *w;
+
+			if (parse_note_entry(&pnstate) == 0)
+				break;
+
+			/*
+			 * The type must be 1, and the name must be "GNU".
+			 * The descsz must be at least 16 bytes.
+			 */
+			if ((pnstate.pn_type != 1) ||
+			    (pnstate.pn_namesz != (MSG_STR_GNU_SIZE + 1)) ||
+			    (strncmp(MSG_ORIG(MSG_STR_GNU), pnstate.pn_name,
+			    MSG_STR_CORE_SIZE + 1) != 0) ||
+			    (pnstate.pn_descsz < 16))
+				continue;
+
+			/*
+			 * desc contains 4 32-bit fields. Field 0 must be 0,
+			 * indicating Linux. The second, third, and fourth
+			 * fields represent the earliest Linux kernel
+			 * version compatible with this object.
+			 */
+			/*LINTED*/
+			w = (Word *) pnstate.pn_desc;
+			if (*w == 0)
+				return (1);
+		}
+	}
+
+	return (0);
 }
 
 /*
@@ -3786,10 +3934,45 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 
 
 
+/*
+ * Generate a cache of section headers and related information
+ * for use by the rest of elfdump. If requested (or the file
+ * contains no section headers), we generate a fake set of
+ * headers from the information accessible from the program headers.
+ * Otherwise, we use the real section headers contained in the file.
+ */
+static int
+create_cache(const char *file, int fd, Elf *elf, Ehdr *ehdr, Cache **cache,
+    size_t shstrndx, size_t *shnum, uint_t *flags)
+{
+	/*
+	 * If there are no section headers, then resort to synthesizing
+	 * section headers from the program headers. This is normally
+	 * only done by explicit request, but in this case there's no
+	 * reason not to go ahead, since the alternative is simply to quit.
+	 */
+	if ((*shnum <= 1) && ((*flags & FLG_CTL_FAKESHDR) == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOSHDR), file);
+		*flags |= FLG_CTL_FAKESHDR;
+	}
+
+	if (*flags & FLG_CTL_FAKESHDR) {
+		if (fake_shdr_cache(file, fd, elf, ehdr, cache, shnum) == 0)
+			return (0);
+	} else {
+		if (shdr_cache(file, elf, ehdr, shstrndx, *shnum,
+		    cache, *flags) == 0)
+			return (0);
+	}
+
+	return (1);
+}
+
 int
 regular(const char *file, int fd, Elf *elf, uint_t flags,
-    const char *wname, int wfd)
+    const char *wname, int wfd, uchar_t osabi)
 {
+	enum { CACHE_NEEDED, CACHE_OK, CACHE_FAIL} cache_state = CACHE_NEEDED;
 	Elf_Scn		*scn;
 	Ehdr		*ehdr;
 	size_t		ndx, shstrndx, shnum, phnum;
@@ -3864,6 +4047,73 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 	if (ehdr->e_shoff & (addr_align - 1))
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHDRALIGN), file);
 
+
+	/*
+	 * Determine the Operating System ABI (osabi) we will use to
+	 * interpret the object.
+	 */
+	if (flags & FLG_CTL_OSABI) {
+		/*
+		 * If the user explicitly specifies '-O none', we need
+		 * to display a completely generic view of the file.
+		 * However, libconv is written to assume that ELFOSABI_NONE
+		 * is equivalent to ELFOSABI_SOLARIS. To get the desired
+		 * effect, we use an osabi that libconv has no knowledge of.
+		 */
+		if (osabi == ELFOSABI_NONE)
+			osabi = ELFOSABI_UNKNOWN4;
+	} else {
+		/* Determine osabi from file */
+		osabi = ehdr->e_ident[EI_OSABI];
+		if (osabi == ELFOSABI_NONE) {
+			/*
+			 * Chicken/Egg scenario:
+			 *
+			 * Ideally, we wait to create the section header cache
+			 * until after the program headers are printed. If we
+			 * only output program headers, we can skip building
+			 * the cache entirely.
+			 *
+			 * Proper interpretation of program headers requires
+			 * the osabi, which is supposed to be in the ELF header.
+			 * However, many systems (Solaris and Linux included)
+			 * have a history of setting the osabi to the generic
+			 * SysV ABI (ELFOSABI_NONE). We assume ELFOSABI_SOLARIS
+			 * in such cases, but would like to check the object
+			 * to see if it has a Linux .note.ABI-tag section,
+			 * which implies ELFOSABI_LINUX. This requires a
+			 * section header cache.
+			 *
+			 * To break the cycle, we create section headers now
+			 * if osabi is ELFOSABI_NONE, and later otherwise.
+			 * If it succeeds, we use them, if not, we defer
+			 * exiting until after the program headers are out.
+			 */
+			if (create_cache(file, fd, elf, ehdr, &cache,
+			    shstrndx, &shnum, &flags) == 0) {
+				cache_state = CACHE_FAIL;
+			} else {
+				cache_state = CACHE_OK;
+				if (has_linux_abi_note(cache, shnum, file)) {
+					Conv_inv_buf_t	ibuf1, ibuf2;
+
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_INFO_LINUXOSABI), file,
+					    conv_ehdr_osabi(osabi, 0, &ibuf1),
+					    conv_ehdr_osabi(ELFOSABI_LINUX,
+					    0, &ibuf2));
+					osabi = ELFOSABI_LINUX;
+				}
+			}
+		}
+		/*
+		 * We treat ELFOSABI_NONE identically to ELFOSABI_SOLARIS.
+		 * Mapping NONE to SOLARIS simplifies the required test.
+		 */
+		if (osabi == ELFOSABI_NONE)
+			osabi = ELFOSABI_SOLARIS;
+	}
+
 	/*
 	 * Print the program headers.
 	 */
@@ -3882,7 +4132,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 			dbg_print(0, MSG_INTL(MSG_ELF_PHDR), EC_WORD(ndx));
-			Elf_phdr(0, ehdr->e_machine, phdr);
+			Elf_phdr(0, osabi, ehdr->e_machine, phdr);
 		}
 	}
 
@@ -3896,37 +4146,21 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		return (ret);
 
 	/*
-	 * If there are no section headers, then resort to synthesizing
-	 * section headers from the program headers. This is normally
-	 * only done by explicit request, but in this case there's no
-	 * reason not to go ahead, since the alternative is simply to quit.
-	 */
-	if ((shnum <= 1) && ((flags & FLG_CTL_FAKESHDR) == 0)) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOSHDR), file);
-		flags |= FLG_CTL_FAKESHDR;
-	}
-
-	/*
-	 * Generate a cache of section headers and related information
-	 * for use by the rest of elfdump. If requested (or the file
-	 * contains no section headers), we generate a fake set of
-	 * headers from the information accessible from the program headers.
-	 * Otherwise, we use the real section headers contained in the file.
-	 */
-
-	if (flags & FLG_CTL_FAKESHDR) {
-		if (fake_shdr_cache(file, fd, elf, ehdr, &cache, &shnum) == 0)
-			return (ret);
-	} else {
-		if (shdr_cache(file, elf, ehdr, shstrndx, shnum,
-		    &cache, flags) == 0)
-			return (ret);
-	}
-
-	/*
 	 * Everything from this point on requires section headers.
 	 * If we have no section headers, there is no reason to continue.
+	 *
+	 * If we tried above to create the section header cache and failed,
+	 * it is time to exit. Otherwise, create it if needed.
 	 */
+	switch (cache_state) {
+	case CACHE_NEEDED:
+		if (create_cache(file, fd, elf, ehdr, &cache, shstrndx,
+		    &shnum, &flags) == 0)
+			return (ret);
+		break;
+	case CACHE_FAIL:
+		return (ret);
+	}
 	if (shnum <= 1)
 		goto done;
 
@@ -4063,18 +4297,19 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 
 
 	if (flags & FLG_SHOW_SHDR)
-		sections(file, cache, shnum, ehdr);
+		sections(file, cache, shnum, ehdr, osabi);
 
 	if (flags & FLG_SHOW_INTERP)
 		interp(file, cache, shnum, phnum, elf);
 
-	versions(cache, shnum, file, flags, &versym);
+	if ((osabi == ELFOSABI_SOLARIS) || (osabi == ELFOSABI_LINUX))
+		versions(cache, shnum, file, flags, &versym);
 
 	if (flags & FLG_SHOW_SYMBOLS)
-		symbols(cache, shnum, ehdr, &versym, file, flags);
+		symbols(cache, shnum, ehdr, osabi, &versym, file, flags);
 
-	if (flags & FLG_SHOW_SORT)
-		sunw_sort(cache, shnum, ehdr, &versym, file, flags);
+	if ((flags & FLG_SHOW_SORT) && (osabi == ELFOSABI_SOLARIS))
+		sunw_sort(cache, shnum, ehdr, osabi, &versym, file, flags);
 
 	if (flags & FLG_SHOW_HASH)
 		hash(cache, shnum, file, flags);
@@ -4092,7 +4327,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		reloc(cache, shnum, ehdr, file);
 
 	if (flags & FLG_SHOW_DYNAMIC)
-		dynamic(cache, shnum, ehdr, file);
+		dynamic(cache, shnum, ehdr, osabi, file);
 
 	if (flags & FLG_SHOW_NOTE) {
 		Word	note_cnt;
@@ -4126,17 +4361,18 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		}
 	}
 
-	if (flags & FLG_SHOW_MOVE)
+	if ((flags & FLG_SHOW_MOVE) && (osabi == ELFOSABI_SOLARIS))
 		move(cache, shnum, file, flags);
 
 	if (flags & FLG_CALC_CHECKSUM)
 		checksum(elf);
 
-	if (flags & FLG_SHOW_CAP)
+	if ((flags & FLG_SHOW_CAP) && (osabi == ELFOSABI_SOLARIS))
 		cap(file, cache, shnum, phnum, ehdr, elf);
 
-	if (flags & FLG_SHOW_UNWIND)
-		unwind(cache, shnum, phnum, ehdr, file, elf, flags);
+	if ((flags & FLG_SHOW_UNWIND) &&
+	    ((osabi == ELFOSABI_SOLARIS) || (osabi == ELFOSABI_LINUX)))
+		unwind(cache, shnum, phnum, ehdr, osabi, file, elf, flags);
 
 
 	/* Release the memory used to cache section headers */

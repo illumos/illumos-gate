@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,13 +21,15 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Message file for cmd/sgs/libconv/common/cap.c
 
-@ MSG_CA_SUNW_NULL	"CA_SUNW_NULL"
-@ MSG_CA_SUNW_HW_1	"CA_SUNW_HW_1"
-@ MSG_CA_SUNW_SF_1	"CA_SUNW_SF_1"
+@ MSG_CA_SUNW_NULL_CF		"CA_SUNW_NULL"			# 0
+@ MSG_CA_SUNW_NULL_NF			"null"
+@ MSG_CA_SUNW_HW_1_CF		"CA_SUNW_HW_1"			# 1
+@ MSG_CA_SUNW_HW_1_NF			"hw_1"
+@ MSG_CA_SUNW_SF_1_CF		"CA_SUNW_SF_1"			# 2
+@ MSG_CA_SUNW_SF_1_NF			"sf_1"
 
 @ MSG_GBL_ZERO		"0"
 @ MSG_GBL_OSQBRKT	"0x%llx  [ "

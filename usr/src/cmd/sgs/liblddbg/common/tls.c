@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<link.h>
 #include	<libc_int.h>
@@ -41,19 +39,21 @@
 static void
 Dbg_tls_modent(Lm_list *lml, TLS_modinfo * tmodent)
 {
+	/*
+	 * MSG_ORIG(MSG_TLS_FLAG_STATIC)
+	 */
 	static char	flagstr[FLAGSZ];
 	static Val_desc	vda[] = {
-		{ TM_FLG_STATICTLS,	MSG_ORIG(MSG_TLS_FLAG_STATIC) },
+		{ TM_FLG_STATICTLS,	MSG_TLS_FLAG_STATIC },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { flagstr,
-		sizeof (flagstr), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = { flagstr, sizeof (flagstr) };
 
 	ulong_t	flags;
 
 	if ((flags = tmodent->tm_flags) != 0) {
 		conv_arg.oflags = conv_arg.rflags = flags;
-		(void) conv_expn_field(&conv_arg, 0);
+		(void) conv_expn_field(&conv_arg, vda, 0);
 	} else {
 		flagstr[0] = '\0';
 	}

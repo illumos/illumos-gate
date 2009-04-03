@@ -1346,7 +1346,7 @@ dcmd_ElfDyn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_TITLE), addr);
-	dynstr = conv_dyn_tag(dyn.d_tag, M_MACH, 0, &inv_buf);
+	dynstr = conv_dyn_tag(dyn.d_tag, ELFOSABI_SOLARIS, M_MACH, 0, &inv_buf);
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_LINE1), addr, dynstr, dyn.d_un.d_ptr);
 
 	mdb_set_dot(addr + sizeof (Dyn));
@@ -1394,7 +1394,7 @@ dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    conv_ehdr_mach(ehdr.e_machine, 0, &inv_buf1),
 	    conv_ehdr_vers(ehdr.e_version, 0, &inv_buf2));
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4),
-	    conv_ehdr_type(ehdr.e_type, 0, &inv_buf1));
+	    conv_ehdr_type(ehdr.e_ident[EI_OSABI], ehdr.e_type, 0, &inv_buf1));
 
 	/*
 	 * Line up the flags differently depending on whether we
@@ -1445,9 +1445,10 @@ dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf(MSG_ORIG(MSG_EPHDR_TITLE), addr);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE1), phdr.p_vaddr,
-	    conv_phdr_flags(phdr.p_flags, 0, &phdr_flags_buf));
+	    conv_phdr_flags(ELFOSABI_SOLARIS, phdr.p_flags, 0,
+	    &phdr_flags_buf));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE2), phdr.p_paddr,
-	    conv_phdr_type(M_MACH, phdr.p_type, 0, &inv_buf));
+	    conv_phdr_type(ELFOSABI_SOLARIS, M_MACH, phdr.p_type, 0, &inv_buf));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE3), phdr.p_filesz, phdr.p_memsz);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE4), phdr.p_offset, phdr.p_align);
 

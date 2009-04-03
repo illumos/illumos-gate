@@ -455,7 +455,11 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		break;
 
 	case SHT_DYNSYM:
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_SYM, SHF_ALLOC, sizeof (Sym))
+		break;
+
 	case SHT_SUNW_LDYNSYM:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		SET_SEC_INFO_WORD_ALIGN(ELF_T_SYM, SHF_ALLOC, sizeof (Sym))
 		break;
 
@@ -488,8 +492,12 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		break;
 
 	case SHT_HASH:
+		SET_SEC_INFO_WORD_ALIGN(ELF_T_WORD, SHF_ALLOC, sizeof (Word))
+		break;
+
 	case SHT_SUNW_symsort:
 	case SHT_SUNW_tlssort:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		SET_SEC_INFO_WORD_ALIGN(ELF_T_WORD, SHF_ALLOC, sizeof (Word))
 		break;
 
@@ -530,10 +538,12 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		break;
 
 	case SHT_SUNW_cap:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		SET_SEC_INFO_WORD_ALIGN(ELF_T_CAP, SHF_ALLOC, sizeof (Cap));
 		break;
 
 	case SHT_SUNW_move:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		/*
 		 * The sh_info field of the SHT_*_syminfo section points
 		 * to the header index of the associated .dynamic section,
@@ -544,6 +554,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		break;
 
 	case SHT_SUNW_syminfo:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		/*
 		 * The sh_info field of the SHT_*_syminfo section points
 		 * to the header index of the associated .dynamic section,
@@ -555,6 +566,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 
 	case SHT_SUNW_verneed:
 	case SHT_SUNW_verdef:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		/*
 		 * The info for verneed and versym happen to be the same.
 		 * The entries in these sections are not of uniform size,
@@ -564,6 +576,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 		break;
 
 	case SHT_SUNW_versym:
+		ofl->ofl_flags |= FLG_OF_OSABI;
 		SET_SEC_INFO_WORD_ALIGN(ELF_T_BYTE, SHF_ALLOC,
 		    sizeof (Versym));
 		break;
@@ -1219,6 +1232,15 @@ make_dynamic(Ofl_desc *ofl)
 
 	shdr->sh_size = (Xword)size;
 	data->d_size = size;
+
+	/*
+	 * There are several tags that are specific to the Solaris osabi
+	 * range which we unconditionally put into any dynamic section
+	 * we create (e.g. DT_SUNW_STRPAD or DT_SUNW_LDMACH). As such,
+	 * any Solaris object with a dynamic section should be tagged as
+	 * ELFOSABI_SOLARIS.
+	 */
+	ofl->ofl_flags |= FLG_OF_OSABI;
 
 	return ((uintptr_t)ofl->ofl_osdynamic);
 }

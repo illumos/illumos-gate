@@ -543,8 +543,9 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Conv_inv_buf_t inv_buf;
 
 	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
-	    ifl->ifl_name, name, conv_sec_type(ifl->ifl_ehdr->e_machine,
-	    shdr->sh_type, 0, &inv_buf));
+	    ifl->ifl_name, name,
+	    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
+	    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
 	return (1);
 }
 
@@ -1393,8 +1394,8 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (shdr->sh_type != ld_targ.t_m.m_rel_sht_type) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
 		    ifl->ifl_name, isc->is_name,
-		    conv_sec_type(ifl->ifl_ehdr->e_machine,
-		    shdr->sh_type, 0, &inv_buf));
+		    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
+		    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1710,8 +1711,9 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
-				    name,
-				    conv_sec_type(ifl->ifl_ehdr->e_machine,
+				    name, conv_sec_type(
+				    ifl->ifl_ehdr->e_ident[EI_OSABI],
+				    ifl->ifl_ehdr->e_machine,
 				    shdr->sh_type, 0, &inv_buf));
 			}
 

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<ctype.h>
@@ -337,9 +336,10 @@ print_ehdr(EHDR_CMD_T cmd, int e_ident_ndx, int autoprint,
 			case EI_ABIVERSION:
 				ndx = elfedit_atoconst_value_to_str(
 				    ELFEDIT_CONST_EI, EI_ABIVERSION, 1);
-				value = value_buf;
-				(void) snprintf(value_buf, sizeof (value_buf),
-				    MSG_ORIG(MSG_FMT_HEXNUM), ehdr->e_ident[i]);
+				value = conv_ehdr_abivers(
+				    ehdr->e_ident[EI_OSABI],
+				    ehdr->e_ident[EI_ABIVERSION],
+				    CONV_FMT_DECIMAL, &inv_buf);
 				break;
 			default:
 				value = value_buf;
@@ -382,7 +382,7 @@ print_ehdr(EHDR_CMD_T cmd, int e_ident_ndx, int autoprint,
 				 * print a simple hex value.
 				 */
 				if ((outstyle == ELFEDIT_OUTSTYLE_NUM) ||
-				    (i >= EI_ABIVERSION)) {
+				    (i > EI_ABIVERSION)) {
 					elfedit_printf(
 					    MSG_ORIG(MSG_FMT_HEXNUMNL),
 					    ehdr->e_ident[i]);
@@ -422,6 +422,13 @@ print_ehdr(EHDR_CMD_T cmd, int e_ident_ndx, int autoprint,
 					    ehdr->e_ident[EI_OSABI], 0,
 					    &inv_buf));
 					continue;
+				case EI_ABIVERSION:
+					elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
+					    conv_ehdr_abivers(
+					    ehdr->e_ident[EI_OSABI],
+					    ehdr->e_ident[EI_ABIVERSION],
+					    CONV_FMT_DECIMAL, &inv_buf));
+					continue;
 				}
 			}
 		}
@@ -430,7 +437,8 @@ print_ehdr(EHDR_CMD_T cmd, int e_ident_ndx, int autoprint,
 	case EHDR_CMD_T_E_TYPE:
 		if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE)
 			elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-			    conv_ehdr_type(ehdr->e_type, 0, &inv_buf));
+			    conv_ehdr_type(ehdr->e_ident[EI_OSABI],
+			    ehdr->e_type, 0, &inv_buf));
 		else
 			elfedit_printf(MSG_ORIG(MSG_FMT_DECNUMNL),
 			    ehdr->e_type);
@@ -601,8 +609,15 @@ print_ehdr(EHDR_CMD_T cmd, int e_ident_ndx, int autoprint,
 		return;
 
 	case EHDR_CMD_T_EI_ABIVERSION:
-		elfedit_printf(MSG_ORIG(MSG_FMT_HEXNUMNL),
-		    EC_WORD(ehdr->e_ident[EI_ABIVERSION]));
+		c = ehdr->e_ident[EI_ABIVERSION];
+		if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
+			elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
+			    conv_ehdr_abivers(ehdr->e_ident[EI_OSABI],
+			    c, CONV_FMT_DECIMAL, &inv_buf));
+		} else {
+			elfedit_printf(MSG_ORIG(MSG_FMT_HEXNUMNL),
+			    EC_WORD(c));
+		}
 		return;
 	}
 }
@@ -757,12 +772,15 @@ cmd_body(EHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 			if (ehdr->e_type == type) {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_E_S_OK), name,
-				    conv_ehdr_type(ehdr->e_type, 0, &inv_buf1));
+				    conv_ehdr_type(ehdr->e_ident[EI_OSABI],
+				    ehdr->e_type, 0, &inv_buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_E_S_CHG), name,
-				    conv_ehdr_type(ehdr->e_type, 0, &inv_buf1),
-				    conv_ehdr_type(type, 0, &inv_buf2));
+				    conv_ehdr_type(ehdr->e_ident[EI_OSABI],
+				    ehdr->e_type, 0, &inv_buf1),
+				    conv_ehdr_type(ehdr->e_ident[EI_OSABI],
+				    type, 0, &inv_buf2));
 				ret = ELFEDIT_CMDRET_MOD;
 				ehdr->e_type = type;
 			}
@@ -787,8 +805,9 @@ cmd_body(EHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				    conv_ehdr_mach(ehdr->e_machine, 0,
 				    &inv_buf1),
 				    conv_ehdr_mach(mach, 0, &inv_buf2));
-				ret = ELFEDIT_CMDRET_MOD;
+				ret = ELFEDIT_CMDRET_MOD_OS_MACH;
 				ehdr->e_machine = mach;
+
 			}
 		}
 		break;
@@ -1285,7 +1304,7 @@ cmd_body(EHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				    conv_ehdr_osabi(ehdr->e_ident[EI_OSABI],
 				    0, &inv_buf1),
 				    conv_ehdr_osabi(osabi, 0, &inv_buf2));
-				ret = ELFEDIT_CMDRET_MOD;
+				ret = ELFEDIT_CMDRET_MOD_OS_MACH;
 				ehdr->e_ident[EI_OSABI] = osabi;
 			}
 		}
@@ -1294,20 +1313,25 @@ cmd_body(EHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 	case EHDR_CMD_T_EI_ABIVERSION:
 		{
 			/* The argument gives the ABI version  */
-			int abiver = (int)elfedit_atoui_range(argstate.argv[0],
-			    MSG_ORIG(MSG_STR_VALUE), 0, 255, NULL);
+			int abiver = (int)elfedit_atoconst_range(
+			    argstate.argv[0], MSG_ORIG(MSG_STR_VALUE), 0, 255,
+			    ELFEDIT_CONST_EAV);
 			const char *name = elfedit_atoconst_value_to_str(
 			    ELFEDIT_CONST_EI, EI_ABIVERSION, 1);
 
 			if (ehdr->e_ident[EI_ABIVERSION] == abiver) {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
-				    MSG_INTL(MSG_DEBUG_EI_S_X_OK), name,
-				    EC_WORD(abiver));
+				    MSG_INTL(MSG_DEBUG_EI_S_S_OK), name,
+				    conv_ehdr_abivers(ehdr->e_ident[EI_OSABI],
+				    abiver, CONV_FMT_DECIMAL, &inv_buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
-				    MSG_INTL(MSG_DEBUG_EI_S_X_CHG), name,
-				    EC_WORD(ehdr->e_ident[EI_ABIVERSION]),
-				    EC_WORD(abiver));
+				    MSG_INTL(MSG_DEBUG_EI_S_S_CHG), name,
+				    conv_ehdr_abivers(ehdr->e_ident[EI_OSABI],
+				    ehdr->e_ident[EI_ABIVERSION],
+				    CONV_FMT_DECIMAL, &inv_buf1),
+				    conv_ehdr_abivers(ehdr->e_ident[EI_OSABI],
+				    abiver, CONV_FMT_DECIMAL, &inv_buf2));
 				ret = ELFEDIT_CMDRET_MOD;
 				ehdr->e_ident[EI_ABIVERSION] = abiver;
 			}
@@ -1539,6 +1563,22 @@ cpl_ei_osabi(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 
 	if (argc == 1)
 		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_ELFOSABI);
+}
+
+/*ARGSUSED*/
+static void
+cpl_ei_abiversion(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
+    const char *argv[], int num_opt)
+{
+	/*
+	 * This command doesn't accept options, so num_opt should be
+	 * 0. This is a defensive measure, in case that should change.
+	 */
+	argc -= num_opt;
+	argv += num_opt;
+
+	if (argc == 1)
+		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_EAV);
 }
 
 
@@ -2200,7 +2240,7 @@ elfedit_init(elfedit_module_version_t version)
 		    opt_std, arg_ei_osabi },
 
 		/* ehdr:ei_abiversion */
-		{ cmd_ei_abiversion, NULL, name_ei_abiversion,
+		{ cmd_ei_abiversion, cpl_ei_abiversion, name_ei_abiversion,
 		    /* MSG_INTL(MSG_DESC_EI_ABIVERSION) */
 		    ELFEDIT_I18NHDL(MSG_DESC_EI_ABIVERSION),
 		    /* MSG_INTL(MSG_HELP_EI_ABIVERSION) */

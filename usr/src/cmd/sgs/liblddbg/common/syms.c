@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,7 +240,7 @@ Dbg_syms_entered(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
-	    ofl->ofl_dehdr->e_machine, sym,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine, sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
@@ -255,7 +255,8 @@ Dbg_syms_process(Lm_list *lml, Ifl_desc *ifl)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SYM_PROCESS), ifl->ifl_name,
-	    conv_ehdr_type(ifl->ifl_ehdr->e_type, 0, &inv_buf));
+	    conv_ehdr_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
+	    ifl->ifl_ehdr->e_type, 0, &inv_buf));
 }
 
 void
@@ -324,8 +325,8 @@ Dbg_syms_ignore(Ofl_desc *ofl, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_INTL(MSG_STR_IGNORE),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym, 0, 0, NULL,
-	    MSG_INTL(MSG_STR_UNUSED));
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, 0, 0, NULL, MSG_INTL(MSG_STR_UNUSED));
 }
 
 void
@@ -337,8 +338,9 @@ Dbg_syms_old(Ofl_desc *ofl, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_INTL(MSG_STR_OLD),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
-	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL, sdp->sd_name);
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0,
+	    0, NULL, sdp->sd_name);
 }
 
 void
@@ -352,7 +354,7 @@ Dbg_syms_new(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_INTL(MSG_STR_NEW),
-	    ofl->ofl_dehdr->e_machine, sym,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine, sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
@@ -372,8 +374,8 @@ Dbg_syms_updated(Ofl_desc *ofl, Sym_desc *sdp, const char *name)
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_ORIG(MSG_STR_EMPTY),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
-	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
@@ -391,6 +393,7 @@ Dbg_syms_resolving(Ofl_desc *ofl, Word ndx, const char *name, int row,
     int col, Sym *osym, Sym *nsym, Sym_desc *sdp, Ifl_desc *ifl)
 {
 	Lm_list	*lml = ofl->ofl_lml;
+	uchar_t	osabi = ofl->ofl_dehdr->e_ident[EI_OSABI];
 	Half	mach = ofl->ofl_dehdr->e_machine;
 
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
@@ -403,11 +406,11 @@ Dbg_syms_resolving(Ofl_desc *ofl, Word ndx, const char *name, int row,
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_INTL(MSG_STR_OLD),
-	    mach, osym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    sdp->sd_file->ifl_name);
+	    osabi, mach, osym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0,
+	    0, NULL, sdp->sd_file->ifl_name);
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_INTL(MSG_STR_NEW),
-	    mach, nsym, 0, 0, NULL, ifl->ifl_name);
+	    osabi, mach, nsym, 0, 0, NULL, ifl->ifl_name);
 }
 
 void
@@ -421,7 +424,8 @@ Dbg_syms_resolved(Ofl_desc *ofl, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD,
-	    MSG_INTL(MSG_STR_RESOLVED), ofl->ofl_dehdr->e_machine, sdp->sd_sym,
+	    MSG_INTL(MSG_STR_RESOLVED), ofl->ofl_dehdr->e_ident[EI_OSABI],
+	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
@@ -449,8 +453,8 @@ Dbg_syms_reloc(Ofl_desc *ofl, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_ORIG(MSG_SYM_COPY),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
-	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
@@ -491,8 +495,8 @@ Dbg_syms_reduce(Ofl_desc *ofl, int which, Sym_desc *sdp, int idx,
 		return;
 
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_ORIG(MSG_SYM_LOCAL),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
-	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    sdp->sd_file->ifl_name);
 }
 
@@ -569,8 +573,9 @@ Elf_syms_table_title(Lm_list *lml, int caller)
 }
 
 void
-Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
-    Sym *sym, Versym verndx, int gnuver, const char *sec, const char *poststr)
+Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr,
+    uchar_t osabi, Half mach, Sym *sym, Versym verndx, int gnuver,
+    const char *sec, const char *poststr)
 {
 	Conv_inv_buf_t	inv_buf1, inv_buf2, inv_buf3;
 	Conv_inv_buf_t	inv_buf4, inv_buf5, inv_buf6;
@@ -585,13 +590,16 @@ Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
 		else
 			msg = MSG_INTL(MSG_SYM_EFL_ENTRY);
 
+		if (sec == NULL)
+			sec = conv_sym_shndx(osabi, mach, sym->st_shndx,
+			    CONV_FMT_DECIMAL, &inv_buf6);
+
 		dbg_print(lml, msg, prestr,
 		    conv_sym_value(mach, type, sym->st_value, &inv_buf1),
 		    sym->st_size, conv_sym_info_type(mach, type, 0, &inv_buf2),
 		    conv_sym_info_bind(bind, 0, &inv_buf3),
 		    conv_sym_other(sym->st_other, &inv_buf4),
 		    conv_ver_index(verndx, gnuver, &inv_buf5),
-		    sec ? sec : conv_sym_shndx(sym->st_shndx, &inv_buf6),
-		    Elf_demangle_name(poststr));
+		    sec, Elf_demangle_name(poststr));
 	}
 }

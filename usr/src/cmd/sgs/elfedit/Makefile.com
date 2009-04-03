@@ -20,18 +20,14 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		elfedit
 
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
-
-ELFCAP = $(SRC)/common/elfcap
 
 COMOBJ =	elfedit.o sys.o util.o elfconst.o
 
@@ -41,13 +37,13 @@ COMOBJ64 =	elfedit_machelf64.o util_machelf64.o
 
 BLTOBJ =	msg.o
 
-OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) elfcap.o
+OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64)
 
 MAPFILE=	../common/mapfile-vers
 
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
 		-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/$(ARCH)/sys \
-		-I$(ELFCAP) $(CPPFLAGS.master)
+		$(CPPFLAGS.master)
 LLDFLAGS =	$(VAR_ELFEDIT_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_ELFEDIT_LLDFLAGS64)
 LDFLAGS +=	$(VERSREF) $(USE_PROTO) -M$(MAPFILE) $(LLDFLAGS)
@@ -70,7 +66,7 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfedit_msg
 
 SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(COMOBJ32:%32.o=../common/%.c) \
-		$(BLTDATA) $(ELFCAP)/elfcap.c
+		$(BLTDATA)
 LINTSRCS =	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

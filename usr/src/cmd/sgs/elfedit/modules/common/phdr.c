@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<elfedit.h>
 #include	<strings.h>
@@ -224,6 +223,9 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 			argstate->ndx_set = 1;
 		} else {
 			Conv_inv_buf_t inv_buf;
+			Ehdr		*ehdr = obj_state->os_ehdr;
+			Half		mach = ehdr->e_machine;
+			uchar_t		osabi = ehdr->e_ident[EI_OSABI];
 			Word		i;
 			Phdr		*phdr;
 
@@ -236,17 +238,15 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 					argstate->ndx_set = 1;
 					elfedit_msg(ELFEDIT_MSG_DEBUG,
 					    MSG_INTL(MSG_DEBUG_PHDR),
-					    EC_WORD(i), conv_phdr_type(
-					    obj_state->os_ehdr->e_machine,
-					    phdr->p_type, 0, &inv_buf));
+					    EC_WORD(i), conv_phdr_type(osabi,
+					    mach, phdr->p_type, 0, &inv_buf));
 					break;
 				}
 			}
 			if (i == argstate->obj_state->os_phnum)
 				elfedit_msg(ELFEDIT_MSG_ERR,
 				    MSG_INTL(MSG_ERR_NOPHDR), conv_phdr_type(
-				    obj_state->os_ehdr->e_machine,
-				    argstate->ndx, 0, &inv_buf));
+				    osabi, mach, argstate->ndx, 0, &inv_buf));
 		}
 	}
 
@@ -340,26 +340,50 @@ locate_interp(elfedit_obj_state_t *obj_state, INTERP_STATE *interp)
  *	autoprint - If True, output is only produced if the elfedit
  *		autoprint flag is set. If False, output is always produced.
  *	cmd - PHDR_CMD_T_* value giving identify of caller
- *	argstate - State block for section header array
- *	ndx - Index of first program header to display
- *	cnt - Number of program headers to display
+ *	argstate - State block for section header array. The following
+ *		fields are examined in order to determine the form
+ *		of output: ndx_set, ndx, print_req.
  */
 static void
 print_phdr(PHDR_CMD_T cmd, int autoprint, ARGSTATE *argstate)
 {
 	elfedit_outstyle_t	outstyle;
-	Word			ndx, cnt;
+	Ehdr			*ehdr = argstate->obj_state->os_ehdr;
+	uchar_t			osabi = ehdr->e_ident[EI_OSABI];
+	Half			mach = ehdr->e_machine;
+	Word			ndx, cnt, by_type, type;
+	Phdr			*phdr;
 
 	if (autoprint && ((elfedit_flags() & ELFEDIT_F_AUTOPRINT) == 0))
 		return;
 
+	/*
+	 * Determine which indexes to display:
+	 *
+	 * -	If the user specified an index, the display starts
+	 *	with that item. If it was a print_request, and the
+	 *	index was specified by type, then all items of the
+	 *	same type are shown. If not a print request, or the index
+	 *	was given numerically, then just the single item is shown.
+	 *
+	 * -	If no index is specified, every program header is shown.
+	 */
+	by_type = 0;
 	if (argstate->ndx_set) {
 		ndx = argstate->ndx;
-		cnt = 1;
+		if (argstate->print_req &&
+		    ((argstate->optmask & PHDR_OPT_F_PHNDX) == 0)) {
+			by_type = 1;
+			type = argstate->obj_state->os_phdr[ndx].p_type;
+			cnt = argstate->obj_state->os_phnum - ndx;
+		} else {
+			cnt = 1;
+		}
 	} else {
 		ndx = 0;
 		cnt = argstate->obj_state->os_phnum;
 	}
+	phdr = argstate->obj_state->os_phdr + ndx;
 
 	/*
 	 * Pick an output style. phdr:dump is required to use the default
@@ -373,120 +397,105 @@ print_phdr(PHDR_CMD_T cmd, int autoprint, ARGSTATE *argstate)
 	 * show all program header attributes. In this case, the
 	 * command that called us doesn't matter.
 	 *
-	 * Let PHDR_CMD_T_INTERP fall through: It isn't per-phdr like
+	 * Exclude PHDR_CMD_T_INTERP from this: It isn't per-phdr like
 	 * the other commands.
 	 */
 	if ((outstyle == ELFEDIT_OUTSTYLE_DEFAULT) &&
 	    (cmd != PHDR_CMD_T_INTERP)) {
-		Half	mach = argstate->obj_state->os_ehdr->e_machine;
-		Phdr	*phdr = argstate->obj_state->os_phdr + ndx;
-
 		for (; cnt--; ndx++, phdr++) {
+			if (by_type && (type != phdr->p_type))
+				continue;
+
 			elfedit_printf(MSG_ORIG(MSG_STR_NL));
 			elfedit_printf(MSG_INTL(MSG_ELF_PHDR), EC_WORD(ndx));
-			Elf_phdr(0, mach, phdr);
+			Elf_phdr(0, osabi, mach, phdr);
 		}
 		return;
 	}
 
-	switch (cmd) {
-	case PHDR_CMD_T_P_TYPE:
-		for (; cnt--; ndx++) {
-			Word p_type = argstate->obj_state->os_phdr[ndx].p_type;
-			Conv_inv_buf_t inv_buf;
+	if (cmd == PHDR_CMD_T_INTERP) {
+		INTERP_STATE interp;
 
-			if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
-				Half mach =
-				    argstate->obj_state->os_ehdr->e_machine;
-
-				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-				    conv_phdr_type(mach, p_type, 0, &inv_buf));
-			} else {
-				elfedit_printf(MSG_ORIG(MSG_FMT_X_NL),
-				    EC_WORD(p_type));
-			}
+		(void) locate_interp(argstate->obj_state, &interp);
+		switch (outstyle) {
+		case ELFEDIT_OUTSTYLE_DEFAULT:
+			elfedit_printf(MSG_INTL(MSG_FMT_ELF_INTERP),
+			    interp.sec->sec_name, interp.str);
+			break;
+		case ELFEDIT_OUTSTYLE_SIMPLE:
+			elfedit_printf(MSG_ORIG(MSG_FMT_STRNL), interp.str);
+			break;
+		case ELFEDIT_OUTSTYLE_NUM:
+			elfedit_printf(MSG_ORIG(MSG_FMT_U_NL),
+			    EC_WORD(interp.stroff));
+			break;
 		}
 		return;
+	}
 
-	case PHDR_CMD_T_P_OFFSET:
-		for (; cnt--; ndx++)
+	/* Handle the remaining commands */
+	for (; cnt--; ndx++, phdr++) {
+		if (by_type && (type != phdr->p_type))
+			continue;
+
+		switch (cmd) {
+		case PHDR_CMD_T_P_TYPE:
+			if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
+				Conv_inv_buf_t inv_buf;
+
+				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
+				    conv_phdr_type(osabi,
+				    argstate->obj_state->os_ehdr->e_machine,
+				    phdr->p_type, 0, &inv_buf));
+			} else {
+				elfedit_printf(MSG_ORIG(MSG_FMT_X_NL),
+				    EC_WORD(phdr->p_type));
+			}
+			break;
+
+		case PHDR_CMD_T_P_OFFSET:
 			elfedit_printf(MSG_ORIG(MSG_FMT_LLX_NL),
-			    EC_OFF(argstate->obj_state->os_phdr[ndx].p_offset));
-		return;
+			    EC_OFF(phdr->p_offset));
+			break;
 
-	case PHDR_CMD_T_P_VADDR:
-		for (; cnt--; ndx++)
+		case PHDR_CMD_T_P_VADDR:
 			elfedit_printf(MSG_ORIG(MSG_FMT_LLX_NL),
-			    EC_ADDR(argstate->obj_state->os_phdr[ndx].p_vaddr));
-		return;
+			    EC_ADDR(phdr->p_vaddr));
+			break;
 
-	case PHDR_CMD_T_P_PADDR:
-		for (; cnt--; ndx++)
+		case PHDR_CMD_T_P_PADDR:
 			elfedit_printf(MSG_ORIG(MSG_FMT_LLX_NL),
-			    EC_ADDR(argstate->obj_state->os_phdr[ndx].p_paddr));
-		return;
+			    EC_ADDR(phdr->p_paddr));
+			break;
 
-	case PHDR_CMD_T_P_FILESZ:
-		for (; cnt--; ndx++)
+		case PHDR_CMD_T_P_FILESZ:
 			elfedit_printf(MSG_ORIG(MSG_FMT_LLX_NL),
-			    EC_XWORD(argstate->obj_state->
-			    os_phdr[ndx].p_filesz));
-		return;
+			    EC_XWORD(phdr->p_filesz));
+			break;
 
-	case PHDR_CMD_T_P_MEMSZ:
-		for (; cnt--; ndx++)
+		case PHDR_CMD_T_P_MEMSZ:
 			elfedit_printf(MSG_ORIG(MSG_FMT_LLX_NL),
-			    EC_XWORD(argstate->obj_state->
-			    os_phdr[ndx].p_memsz));
-		return;
+			    EC_XWORD(phdr->p_memsz));
+			break;
 
-	case PHDR_CMD_T_P_FLAGS:
-		for (; cnt--; ndx++) {
-			Word p_flags =
-			    argstate->obj_state->os_phdr[ndx].p_flags;
-
+		case PHDR_CMD_T_P_FLAGS:
 			if (outstyle == ELFEDIT_OUTSTYLE_SIMPLE) {
 				Conv_phdr_flags_buf_t phdr_flags_buf;
 
 				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-				    conv_phdr_flags(p_flags, CONV_FMT_NOBKT,
-				    &phdr_flags_buf));
+				    conv_phdr_flags(osabi, phdr->p_flags,
+				    CONV_FMT_NOBKT, &phdr_flags_buf));
 			} else {
 				elfedit_printf(MSG_ORIG(MSG_FMT_X_NL),
-				    EC_WORD(p_flags));
+				    EC_WORD(phdr->p_flags));
 			}
-		}
-		return;
+			break;
 
-	case PHDR_CMD_T_P_ALIGN:
-		for (; cnt--; ndx++)
+		case PHDR_CMD_T_P_ALIGN:
 			elfedit_printf(MSG_ORIG(MSG_FMT_LLX_NL),
-			    EC_XWORD(argstate->obj_state->
-			    os_phdr[ndx].p_align));
-		return;
-
-	case PHDR_CMD_T_INTERP:
-		{
-			INTERP_STATE interp;
-
-			(void) locate_interp(argstate->obj_state, &interp);
-			switch (outstyle) {
-
-			case ELFEDIT_OUTSTYLE_DEFAULT:
-				elfedit_printf(MSG_INTL(MSG_FMT_ELF_INTERP),
-				    interp.sec->sec_name, interp.str);
-				break;
-			case ELFEDIT_OUTSTYLE_SIMPLE:
-				elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
-				    interp.str);
-				break;
-			case ELFEDIT_OUTSTYLE_NUM:
-				elfedit_printf(MSG_ORIG(MSG_FMT_U_NL),
-				    EC_WORD(interp.stroff));
-				break;
-			}
+			    EC_XWORD(phdr->p_align));
+			break;
 		}
-		return;
 	}
 }
 
@@ -678,7 +687,9 @@ cmd_body(PHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 
 	case PHDR_CMD_T_P_TYPE:
 		{
-			Half mach = obj_state->os_ehdr->e_machine;
+			Ehdr	*ehdr = obj_state->os_ehdr;
+			uchar_t	osabi = ehdr->e_ident[EI_OSABI];
+			Half	mach = ehdr->e_machine;
 			Word p_type = elfedit_atoconst(argstate.argv[1],
 			    ELFEDIT_CONST_PT);
 			Conv_inv_buf_t inv_buf1, inv_buf2;
@@ -687,15 +698,16 @@ cmd_body(PHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_OK),
 				    argstate.ndx, MSG_ORIG(MSG_CMD_P_TYPE),
-				    conv_phdr_type(mach, phdr->p_type,
+				    conv_phdr_type(osabi, mach, phdr->p_type,
 				    0, &inv_buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_CHG),
 				    argstate.ndx, MSG_ORIG(MSG_CMD_P_TYPE),
-				    conv_phdr_type(mach, phdr->p_type, 0,
-				    &inv_buf1),
-				    conv_phdr_type(mach, p_type, 0, &inv_buf2));
+				    conv_phdr_type(osabi, mach,
+				    phdr->p_type, 0, &inv_buf1),
+				    conv_phdr_type(osabi, mach,
+				    p_type, 0, &inv_buf2));
 				ret = ELFEDIT_CMDRET_MOD;
 				phdr->p_type = p_type;
 			}
@@ -808,6 +820,8 @@ cmd_body(PHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 
 	case PHDR_CMD_T_P_FLAGS:
 		{
+			Ehdr	*ehdr = obj_state->os_ehdr;
+			uchar_t	osabi = ehdr->e_ident[EI_OSABI];
 			Conv_phdr_flags_buf_t buf1, buf2;
 			Word	p_flags = 0;
 			int	i;
@@ -833,13 +847,15 @@ cmd_body(PHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_OK),
 				    argstate.ndx, MSG_ORIG(MSG_CMD_P_FLAGS),
-				    conv_phdr_flags(phdr->p_flags, 0, &buf1));
+				    conv_phdr_flags(osabi, phdr->p_flags,
+				    0, &buf1));
 			} else {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
 				    MSG_INTL(MSG_DEBUG_S_CHG),
 				    argstate.ndx, MSG_ORIG(MSG_CMD_P_FLAGS),
-				    conv_phdr_flags(phdr->p_flags, 0, &buf1),
-				    conv_phdr_flags(p_flags, 0, &buf2));
+				    conv_phdr_flags(osabi, phdr->p_flags,
+				    0, &buf1),
+				    conv_phdr_flags(osabi, p_flags, 0, &buf2));
 				ret = ELFEDIT_CMDRET_MOD;
 				phdr->p_flags = p_flags;
 			}
@@ -1249,7 +1265,7 @@ elfedit_init(elfedit_module_version_t version)
 		{ MSG_ORIG(MSG_STR_ELEMENT),
 		    /* MSG_INTL(MSG_A1_ELEMENT) */
 		    ELFEDIT_I18NHDL(MSG_A1_ELEMENT),
-		    ELFEDIT_CMDOA_F_OPT },
+		    0 },
 		{ MSG_ORIG(MSG_STR_COUNT),
 		    /* MSG_INTL(MSG_A2_DELETE_COUNT) */
 		    ELFEDIT_I18NHDL(MSG_A2_DELETE_COUNT),

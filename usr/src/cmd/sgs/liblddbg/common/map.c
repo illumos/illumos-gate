@@ -103,8 +103,8 @@ Dbg_map_size_old(Ofl_desc *ofl, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_UP_2),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
-	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
@@ -120,8 +120,8 @@ Dbg_map_symbol(Ofl_desc *ofl, Sym_desc *sdp)
 		return;
 
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
-	    ofl->ofl_dehdr->e_machine, sdp->sd_sym, sdp->sd_aux ?
-	    sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI],  ofl->ofl_dehdr->e_machine,
+	    sdp->sd_sym, sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
 	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
@@ -191,7 +191,8 @@ Dbg_map_ent(Lm_list *lml, Boolean new, Ent_desc *enp, Ofl_desc *ofl)
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_MAP_MAP_DIR));
-	Dbg_ent_entry(lml, ofl->ofl_dehdr->e_machine, enp);
+	Dbg_ent_entry(lml, ofl->ofl_dehdr->e_ident[EI_OSABI],
+	    ofl->ofl_dehdr->e_machine, enp);
 	if (new)
 		Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_3);
 }
@@ -217,6 +218,7 @@ Dbg_map_seg(Ofl_desc *ofl, int ndx, Sg_desc *sgp)
 	if (Dbg_decl) {
 		dbg_print(lml, MSG_ORIG(MSG_FMT_STR), Dbg_decl);
 		Dbg_seg_desc_entry(ofl->ofl_lml,
+		    ofl->ofl_dehdr->e_ident[EI_OSABI],
 		    ofl->ofl_dehdr->e_machine, ndx, sgp);
 		Dbg_util_nl(lml, DBG_NL_STD);
 		Dbg_decl = NULL;

@@ -155,7 +155,7 @@ demangle_symname(const char *name, const char *symtab_name, Word symndx)
 		len = strlen(name) + 2;   /* Include room for quotes */
 	} else {
 		name = MSG_ORIG(MSG_STR_EMPTY);
-		len = strlen(symtab_name) + 2 + CONV32_INV_BUFSIZE;
+		len = strlen(symtab_name) + 2 + CONV_INV_BUFSIZE;
 	}
 	len++;			/* Null termination */
 
@@ -1815,6 +1815,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	char		*strs;
 	uchar_t		type, bind;
 	Word		ndx, hash, local, total;
+	uchar_t		osabi = ifl->ifl_ehdr->e_ident[EI_OSABI];
+	Half		mach = ifl->ifl_ehdr->e_machine;
 	Half		etype = ifl->ifl_ehdr->e_type;
 	int		etype_rel;
 	const char	*symsecname, *strsecname;
@@ -1945,7 +1947,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, isc->is_name, ndx),
 				    ifl->ifl_name,
-				    conv_sym_shndx(sym->st_shndx, &inv_buf));
+				    conv_sym_shndx(osabi, mach, sym->st_shndx,
+				    CONV_FMT_DECIMAL, &inv_buf));
 				continue;
 			}
 
@@ -2070,7 +2073,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					    MSG_INTL(MSG_SYM_INVSHNDX),
 					    demangle_symname(name, isc->is_name,
 					    ndx), ifl->ifl_name,
-					    conv_sym_shndx(sym->st_shndx,
+					    conv_sym_shndx(osabi, mach,
+					    sym->st_shndx, CONV_FMT_DECIMAL,
 					    &inv_buf));
 				}
 				continue;
@@ -2155,7 +2159,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, isc->is_name, ndx),
 				    ifl->ifl_name,
-				    conv_sym_shndx(sym->st_shndx, &inv_buf));
+				    conv_sym_shndx(osabi, mach, sym->st_shndx,
+				    CONV_FMT_DECIMAL, &inv_buf));
 				sdp->sd_isc = NULL;
 				sdp->sd_flags |= FLG_SY_INVALID;
 				continue;
@@ -2246,7 +2251,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    MSG_INTL(MSG_SYM_INVSHNDX),
 			    demangle_symname(name, isc->is_name, ndx),
 			    ifl->ifl_name,
-			    conv_sym_shndx(sym->st_shndx, &inv_buf));
+			    conv_sym_shndx(osabi, mach, sym->st_shndx,
+			    CONV_FMT_DECIMAL, &inv_buf));
 			continue;
 		}
 
@@ -2314,7 +2320,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, isc->is_name, ndx),
 				    ifl->ifl_name,
-				    conv_sym_shndx(sym->st_shndx, &inv_buf));
+				    conv_sym_shndx(osabi, mach, sym->st_shndx,
+				    CONV_FMT_DECIMAL, &inv_buf));
 				continue;
 			}
 

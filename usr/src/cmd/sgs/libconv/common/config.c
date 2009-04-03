@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdlib.h>
 #include	<sys/types.h>
@@ -65,24 +64,24 @@
 const char *
 conv_config_feat(int features, Conv_config_feat_buf_t *config_feat_buf)
 {
-	static Val_desc	vda[] = {
-		{ CONF_EDLIBPATH,	MSG_ORIG(MSG_CONF_EDLIBPATH) },
-		{ CONF_ESLIBPATH,	MSG_ORIG(MSG_CONF_ESLIBPATH) },
-		{ CONF_ADLIBPATH,	MSG_ORIG(MSG_CONF_ADLIBPATH) },
-		{ CONF_ASLIBPATH,	MSG_ORIG(MSG_CONF_ASLIBPATH) },
-		{ CONF_DIRCFG,		MSG_ORIG(MSG_CONF_DIRCFG) },
-		{ CONF_OBJALT,		MSG_ORIG(MSG_CONF_OBJALT) },
-		{ CONF_MEMRESV,		MSG_ORIG(MSG_CONF_MEMRESV) },
-		{ CONF_ENVS,		MSG_ORIG(MSG_CONF_ENVS) },
-		{ CONF_FLTR,		MSG_ORIG(MSG_CONF_FLTR) },
+	static const Val_desc	vda[] = {
+		{ CONF_EDLIBPATH,	MSG_CONF_EDLIBPATH },
+		{ CONF_ESLIBPATH,	MSG_CONF_ESLIBPATH },
+		{ CONF_ADLIBPATH,	MSG_CONF_ADLIBPATH },
+		{ CONF_ASLIBPATH,	MSG_CONF_ASLIBPATH },
+		{ CONF_DIRCFG,		MSG_CONF_DIRCFG },
+		{ CONF_OBJALT,		MSG_CONF_OBJALT },
+		{ CONF_MEMRESV,		MSG_CONF_MEMRESV },
+		{ CONF_ENVS,		MSG_CONF_ENVS },
+		{ CONF_FLTR,		MSG_CONF_FLTR },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (config_feat_buf->buf), vda };
+	    NULL, sizeof (config_feat_buf->buf) };
 
 	conv_arg.buf = config_feat_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = features;
-	(void) conv_expn_field(&conv_arg, 0);
+	(void) conv_expn_field(&conv_arg, vda, 0);
 
 	return ((const char *)config_feat_buf->buf);
 }
@@ -125,25 +124,25 @@ conv_config_feat(int features, Conv_config_feat_buf_t *config_feat_buf)
 const char *
 conv_config_obj(ushort_t flags, Conv_config_obj_buf_t *config_obj_buf)
 {
-	static Val_desc vda[] = {
-		{ RTC_OBJ_DIRENT,	MSG_ORIG(MSG_CONF_DIRENT) },
-		{ RTC_OBJ_ALLENTS,	MSG_ORIG(MSG_CONF_ALLENTS) },
-		{ RTC_OBJ_NOEXIST,	MSG_ORIG(MSG_CONF_NOEXIST) },
-		{ RTC_OBJ_EXEC,		MSG_ORIG(MSG_CONF_EXEC) },
-		{ RTC_OBJ_ALTER,	MSG_ORIG(MSG_CONF_ALTER) },
-		{ RTC_OBJ_DUMP,		MSG_ORIG(MSG_CONF_DUMP) },
-		{ RTC_OBJ_NOALTER,	MSG_ORIG(MSG_CONF_NOALTER) },
-		{ RTC_OBJ_REALPTH,	MSG_ORIG(MSG_CONF_REALPATH) },
-		{ RTC_OBJ_GROUP,	MSG_ORIG(MSG_CONF_GROUP) },
-		{ RTC_OBJ_APP,		MSG_ORIG(MSG_CONF_APP) },
-		{ RTC_OBJ_CMDLINE,	MSG_ORIG(MSG_CONF_CMDLINE) },
-		{ RTC_OBJ_FILTER,	MSG_ORIG(MSG_CONF_FILTER) },
-		{ RTC_OBJ_FILTEE,	MSG_ORIG(MSG_CONF_FILTEE) },
+	static const Val_desc vda[] = {
+		{ RTC_OBJ_DIRENT,	MSG_CONF_DIRENT },
+		{ RTC_OBJ_ALLENTS,	MSG_CONF_ALLENTS },
+		{ RTC_OBJ_NOEXIST,	MSG_CONF_NOEXIST },
+		{ RTC_OBJ_EXEC,		MSG_CONF_EXEC },
+		{ RTC_OBJ_ALTER,	MSG_CONF_ALTER },
+		{ RTC_OBJ_DUMP,		MSG_CONF_DUMP },
+		{ RTC_OBJ_NOALTER,	MSG_CONF_NOALTER },
+		{ RTC_OBJ_REALPTH,	MSG_CONF_REALPATH },
+		{ RTC_OBJ_GROUP,	MSG_CONF_GROUP },
+		{ RTC_OBJ_APP,		MSG_CONF_APP },
+		{ RTC_OBJ_CMDLINE,	MSG_CONF_CMDLINE },
+		{ RTC_OBJ_FILTER,	MSG_CONF_FILTER },
+		{ RTC_OBJ_FILTEE,	MSG_CONF_FILTEE },
 		{ 0,			0 }
 	};
 	static const char *leading_str_arr[2];
 	static CONV_EXPN_FIELD_ARG conv_arg = {
-	    NULL, sizeof (config_obj_buf->buf), vda, leading_str_arr };
+	    NULL, sizeof (config_obj_buf->buf), leading_str_arr };
 
 	const char **lstr = leading_str_arr;
 
@@ -164,7 +163,7 @@ conv_config_obj(ushort_t flags, Conv_config_obj_buf_t *config_obj_buf)
 	*lstr = NULL;
 	conv_arg.oflags = conv_arg.rflags &= ~RTC_OBJ_OPTINAL;
 
-	(void) conv_expn_field(&conv_arg, 0);
+	(void) conv_expn_field(&conv_arg, vda, 0);
 
 	return ((const char *)config_obj_buf->buf);
 }

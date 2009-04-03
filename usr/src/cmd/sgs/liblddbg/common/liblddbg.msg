@@ -1271,8 +1271,9 @@
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 
 @ MSG_ELF_MAGIC		"  ei_magic:   { 0x%x, %c, %c, %c }"
-@ MSG_ELF_CLASS		"  ei_class:   %-18s  ei_data:      %s"
-@ MSG_ELF_MACHINE	"  e_machine:  %-18s  e_version:    %s"
+@ MSG_ELF_CLASS		"  ei_class:   %-18s  ei_data:       %s"
+@ MSG_ELF_OSABI		"  ei_osabi:   %-18s  ei_abiversion: %s"
+@ MSG_ELF_MACHINE	"  e_machine:  %-18s  e_version:     %s"
 @ MSG_ELF_TYPE		"  e_type:     %s"
 @ MSG_ELF_FLAGS		"  e_flags:    %18s"
 @ MSG_ELF_FLAGS_FMT	"  e_flags:    %s"

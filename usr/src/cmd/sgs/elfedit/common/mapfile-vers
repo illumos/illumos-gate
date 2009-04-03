@@ -70,7 +70,6 @@
 
 		# ato[u]i routines
 		elfedit_const_to_atoui;
-		elfedit_mach_sunw_hw1_to_atoui;
 
 		elfedit_atoi;
 		elfedit_atoui;
@@ -194,6 +193,9 @@
 
 		elfedit32_strtab_insert_test;
 		elfedit64_strtab_insert_test;
+
+		elfedit32_test_osabi;
+		elfedit64_test_osabi;
 
 		elfedit32_type_to_shndx;
 		elfedit64_type_to_shndx;

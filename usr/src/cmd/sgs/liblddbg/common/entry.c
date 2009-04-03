@@ -32,7 +32,7 @@
  * Print out a single `entry descriptor' entry.
  */
 void
-Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
+Dbg_ent_entry(Lm_list *lml, uchar_t osabi, Half mach, Ent_desc *enp)
 {
 	Conv_inv_buf_t		inv_buf;
 	Conv_sec_flags_buf_t	sec_flags_buf;
@@ -41,15 +41,15 @@ Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_NAME),
 	    (enp->ec_name ? enp->ec_name : MSG_INTL(MSG_STR_NULL)),
-	    conv_sec_flags(enp->ec_attrmask, 0, &sec_flags_buf));
+	    conv_sec_flags(osabi, mach, enp->ec_attrmask, 0, &sec_flags_buf));
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_SEGMENT),
 	    (enp->ec_segment->sg_name ? enp->ec_segment->sg_name :
 	    MSG_INTL(MSG_STR_NULL)),
-	    conv_sec_flags(enp->ec_attrbits, 0, &sec_flags_buf));
+	    conv_sec_flags(osabi, mach, enp->ec_attrbits, 0, &sec_flags_buf));
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX), EC_WORD(enp->ec_ordndx),
-	    conv_sec_type(mach, enp->ec_type, 0, &inv_buf));
+	    conv_sec_type(osabi, mach, enp->ec_type, 0, &inv_buf));
 
 	if (enp->ec_files) {
 		dbg_print(lml, MSG_ORIG(MSG_ECR_FILES));
@@ -62,7 +62,7 @@ Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
  * Print out all `entrance descriptor' entries.
  */
 void
-Dbg_ent_print(Lm_list *lml, Half mach, Alist *alp, Boolean dmode)
+Dbg_ent_print(Lm_list *lml, uchar_t osabi, Half mach, Alist *alp, Boolean dmode)
 {
 	Ent_desc	*enp;
 	Aliste		ndx;
@@ -76,6 +76,6 @@ Dbg_ent_print(Lm_list *lml, Half mach, Alist *alp, Boolean dmode)
 
 	for (ALIST_TRAVERSE(alp, ndx, enp)) {
 		dbg_print(lml, MSG_INTL(MSG_ECR_DESC), EC_WORD(ndx));
-		Dbg_ent_entry(lml, mach, enp);
+		Dbg_ent_entry(lml, osabi, mach, enp);
 	}
 }

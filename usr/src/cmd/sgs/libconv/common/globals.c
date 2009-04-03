@@ -20,202 +20,341 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<strings.h>
+#include	<ctype.h>
 #include	<_machelf.h>
 #include	"_conv.h"
 #include	"globals_msg.h"
 
 
 /*
- * Given an integer value, generate an ASCII representation of it.
+ * Map an integer into a descriptive string.
  *
  * entry:
- *	inv_buf - Buffer into which the resulting string is generated.
- *	value - Value to be formatted.
- *	fmt_flags - CONV_FMT_* values, used to specify formatting details.
+ *	inv_buf - A buffer into which this routine can format
+ *		a result string, if necessary.
+ *	val - The value for which a string is desired.
+ *	flags - CONV_FMT_* values to be passed to conv_invalid_val() if
+ *		necessary. The caller is reponsible for having examined
+ *		the CONV_FMT_ALT_* part of flags and passing the proper
+ *		msg array.
+ *	num_msg - # of Msg entries in msg.
+ *	msg - Array of num_msg Msg items corresponding to the possible
+ *		strings corresponding to val.
+ *	local_sgs_msg - Message string table from module from which
+ *		this function is called.
  *
  * exit:
- *	The formatted string is placed into inv_buf. The pointer
- *	to the string is returned.
+ *	If val lies in the range [0-(num_msg-1)], then the string
+ *	corresponding to it is returned. If val is outside the range,
+ *	conv_invalid_val() is called to format an ASCII representation
+ *	of it into inv_buf, and that is returned.
+ */
+/*ARGSUSED5*/
+static const char *
+map_msg2str(Conv_inv_buf_t *inv_buf, Conv_elfvalue_t val,
+    Conv_fmt_flags_t flags, size_t num_msg, const Msg *msg,
+    const char *local_sgs_msg)
+{
+	if ((val < num_msg) && (msg[val] != 0))
+		return (MSG_ORIG_STRTAB(msg[val], local_sgs_msg));
+
+	/* If we get here, it's an unknown value */
+	return (conv_invalid_val(inv_buf, val, flags));
+}
+
+/*
+ * Map an integer into a descriptive string from a NULL terminated
+ * array of Val_desc or Val_desc2 descriptors.
+ *
+ * entry:
+ *	inv_buf - A buffer into which this routine can format
+ *		a result string, if necessary.
+ *	osabi,mach (_conv_vd22str only) - The osab/mach under which
+ *		val is to be interpreted. Items with a non-0 osabi or machine
+ *		that do not match are quietly ignored.
+ *	val - The value for which a string is desired.
+ *	flags - CONV_FMT_* values to be passed to conv_invalid_val() if
+ *		necessary. The caller is reponsible for having examined
+ *		the CONV_FMT_ALT_* part of flags and passing the proper
+ *		descriptor array.
+ *	vdp - Pointer to NULL terminated array of Val_desc descriptors.
+ *	local_sgs_msg - Message string table from module from which
+ *		this function is called.
+ *
+ * exit:
+ *	If val is found in the vdp array, and in the osabi version of
+ *	this function if the osabi matches, then the string corresponding
+ *	val is returned. If a string for val is not found, conv_invalid_val()
+ *	is called to format an ASCII representation of it into inv_buf, and
+ *	that is returned.
+ */
+/*ARGSUSED4*/
+static const char *
+map_vd2str(Conv_inv_buf_t *inv_buf, Conv_elfvalue_t val,
+    Conv_fmt_flags_t flags, const Val_desc *vdp, const char *local_sgs_msg)
+{
+	for (; vdp->v_msg; vdp++) {
+		if (val == vdp->v_val)
+			return (MSG_ORIG_STRTAB(vdp->v_msg, local_sgs_msg));
+	}
+
+	/* If we get here, it's an unknown value */
+	return (conv_invalid_val(inv_buf, val, flags));
+}
+
+/*ARGSUSED6*/
+static const char *
+map_vd22str(Conv_inv_buf_t *inv_buf, uchar_t osabi, Half mach,
+    Conv_elfvalue_t val, Conv_fmt_flags_t flags, const Val_desc2 *vdp,
+    const char *local_sgs_msg)
+{
+	for (; vdp->v_msg; vdp++) {
+		if (CONV_VD2_SKIP(osabi, mach, vdp))
+			continue;
+
+		if (val == vdp->v_val)
+			return (MSG_ORIG_STRTAB(vdp->v_msg, local_sgs_msg));
+	}
+
+	/* If we get here, it's an unknown value */
+	return (conv_invalid_val(inv_buf, val, flags));
+}
+
+/*
+ * Process an array of conv_ds_XXX_t structures and call the appropriate
+ * map functions for the format of the strings given.
  */
 const char *
-conv_invalid_val(Conv_inv_buf_t *inv_buf, Xword value,
-    Conv_fmt_flags_t fmt_flags)
+_conv_map_ds(uchar_t osabi, Half mach, Conv_elfvalue_t value,
+    const conv_ds_t **dsp, Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf,
+    const char *local_sgs_msg)
 {
-	const char	*fmt;
+	const conv_ds_t *ds;
 
-	if (fmt_flags & CONV_FMT_DECIMAL) {
-		if (fmt_flags & CONV_FMT_SPACE)
-			fmt = MSG_ORIG(MSG_GBL_FMT_DECS);
-		else
-			fmt = MSG_ORIG(MSG_GBL_FMT_DEC);
-	} else {
-		if (fmt_flags & CONV_FMT_SPACE)
-			fmt = MSG_ORIG(MSG_GBL_FMT_HEXS);
-		else
-			fmt = MSG_ORIG(MSG_GBL_FMT_HEX);
-	}
-	(void) snprintf(inv_buf->buf, sizeof (inv_buf->buf), fmt, value);
-	return ((const char *)inv_buf->buf);
-}
+	for (ds = *dsp; ds != NULL; ds = *(++dsp)) {
+		if ((value < ds->ds_baseval) || (value > ds->ds_topval))
+			continue;
 
+		switch (ds->ds_type) {
+		case CONV_DS_MSGARR:
+			return (map_msg2str(inv_buf, value - ds->ds_baseval,
+			    fmt_flags, ds->ds_topval - ds->ds_baseval + 1,
+			    /*LINTED*/
+			    ((conv_ds_msg_t *)ds)->ds_msg,
+			    local_sgs_msg));
 
+		case CONV_DS_VD:
+			return (map_vd2str(inv_buf, value, fmt_flags,
+			    /*LINTED*/
+			    ((conv_ds_vd_t *)ds)->ds_vd,
+			    local_sgs_msg));
 
-/*
- * cef_cp() is used by conv_expn_field() to fill in the output buffer.
- * A CONV_EXPN_FIELD_STATE variable is used to maintain the buffer state
- * as the operation progresses.
- *
- * entry:
- *	arg - As passed to conv_expn_field().
- *	state - Variable used to maintain buffer state between calls.
- *	list_item - TRUE(1) if this is a list item, and FALSE(0)
- *		if it is something else.
- *	str - String to be added to the buffer.
- *
- * exit:
- *	On Success:
- *		buffer contains the output string, including a list
- *		separator if appropriate. state has been updated.
- *		TRUE(1) is returned.
- *	On Failure:
- *		Buffer contains the numeric representation for the flags,
- *		and FALSE(0) is returned.
- */
-typedef struct {
-	char *cur;		/* Current output position in buf */
-	size_t room;		/* # of bytes left in buf */
-	int list_cnt;		/* # of list items output into buf  */
-	const char *sep_str;	/* String used as list separator */
-	int sep_str_len;	/* strlen(sep_str) */
-} CONV_EXPN_FIELD_STATE;
-
-static int
-cef_cp(CONV_EXPN_FIELD_ARG *arg, CONV_EXPN_FIELD_STATE *state,
-	int list_item, const char *str)
-{
-	Conv_inv_buf_t inv_buf;
-	int n;
-
-	if (list_item) {	/* This is a list item */
-		/*
-		 * If list is non-empty, and the buffer has room,
-		 * then insert the separator.
-		 */
-		if (state->list_cnt != 0) {
-			if (state->sep_str_len < state->room) {
-				(void) memcpy(state->cur, state->sep_str,
-				    state->sep_str_len);
-				state->cur += state->sep_str_len;
-				state->room -= state->sep_str_len;
-			} else {
-				/* Ensure code below will catch lack of room */
-				state->room = 0;
-			}
+		case CONV_DS_VD2:
+			return (map_vd22str(inv_buf, osabi, mach, value,
+			    fmt_flags,
+			    /*LINTED*/
+			    ((conv_ds_vd2_t *)ds)->ds_vd2,
+			    local_sgs_msg));
 		}
-		state->list_cnt++;
 	}
 
-	n = strlen(str);
-	if (n < state->room) {
-		(void) memcpy(state->cur, str, n);
-		state->cur += n;
-		state->room -= n;
-		return (TRUE);
-	}
-
-	/* Buffer too small. Fill in the numeric value and report failure */
-	(void) conv_invalid_val(&inv_buf, arg->oflags, 0);
-	(void) strlcpy(arg->buf, inv_buf.buf, arg->bufsize);
-	return (FALSE);
+	return (conv_invalid_val(inv_buf, value, fmt_flags));
 }
 
-
-
 /*
- * Provide a focal point for expanding bit-fields values into
- * their corresponding strings.
+ * Iterate over every message string in a given array of Msg codes,
+ * calling a user supplied callback for each one.
  *
  * entry:
- *	arg - Specifies the operation to be carried out. See the
- *		definition of CONV_EXPN_FIELD_ARG in conv.h for details.
+ *	basevalue - Value corresponding to the first Msg in the array.
+ *	local_sgs_msg - Pointer to the __sgs_msg array for the
+ *		libconv module making the call.
+ *	num_msg - # of items in array referenced by msg
+ *	msg - Array of Msg indexes for the strings to iterate over.
+ *		The value corresponding to each element of msg must be:
+ *			value[i] = basevalue + i
+ *	func, uvalue - User supplied function to be called for each
+ *		string in msg. uvalue is an arbitrary user supplied pointer
+ *		to be passed to func.
+ *	local_sgs_msg - Pointer to the __sgs_msg array for the
+ *		libconv module making the call.
  *
  * exit:
- *	arg->buf contains the formatted result. True (1) is returned if there
- *	was no error, and False (0) if the buffer was too small. In the failure
- *	case, arg->buf contains a numeric representation of the value.
+ *	The callback function is called for every non-zero item in
+ *	msg[]. If any callback returns CONV_ITER_DONE, execution stops
+ *	with that item and the function returns immediately. Otherwise,
+ *	it continues to the end of the array.
+ *
+ *	The value from the last callback is returned.
+ */
+/*ARGSUSED5*/
+static conv_iter_ret_t
+_conv_iter_msgarr(uint32_t basevalue, const Msg *msg, size_t num_msg,
+    conv_iter_cb_t func, void *uvalue, const char *local_sgs_msg)
+{
+	for (; num_msg-- > 0; basevalue++, msg++) {
+		if (*msg != 0)
+			if ((* func)(MSG_ORIG_STRTAB(*msg, local_sgs_msg),
+			    basevalue, uvalue) == CONV_ITER_DONE)
+				return (CONV_ITER_DONE);
+	}
+
+	return (CONV_ITER_CONT);
+}
+
+/*
+ * Iterate over every message string in a given array of Val_desc or
+ * Val_desc2 descriptors, calling a user supplied callback for each one.
+ *
+ * entry:
+ *	osabi,mach (_conv_iter_vd2 only) - The osabi/mach for which
+ *		strings are desired. Strings with a non-0 osabi or machine
+ *		that do not match are quietly ignored.
+ *	vdp - Pointer to NULL terminated array of Val_desc descriptors.
+ *	func, uvalue - User supplied function to be called for each
+ *		string in msg. uvalue is an arbitrary user supplied pointer
+ *		to be passed to func.
+ *	local_sgs_msg - Pointer to the __sgs_msg array for the
+ *		libconv module making the call.
+ *
+ * exit:
+ *	The callback function is called for every descriptor referenced by
+ *	vdp. In the case of the OSABI-version of this function, strings from
+ *	the wrong osabi are not used. If any callback returns CONV_ITER_DONE,
+ *	execution stops with that item and the function returns immediately.
+ *	Otherwise, it continues to the end of the array.
+ *
+ *	The value from the last callback is returned.
+ */
+/*ARGSUSED3*/
+conv_iter_ret_t
+_conv_iter_vd(const Val_desc *vdp, conv_iter_cb_t func, void *uvalue,
+    const char *local_sgs_msg)
+{
+	for (; vdp->v_msg; vdp++) {
+		if ((* func)(MSG_ORIG_STRTAB(vdp->v_msg, local_sgs_msg),
+		    vdp->v_val, uvalue) == CONV_ITER_DONE)
+			return (CONV_ITER_DONE);
+	}
+
+	return (CONV_ITER_CONT);
+}
+
+/*ARGSUSED5*/
+conv_iter_ret_t
+_conv_iter_vd2(conv_iter_osabi_t osabi, Half mach, const Val_desc2 *vdp,
+    conv_iter_cb_t func, void *uvalue, const char *local_sgs_msg)
+{
+	for (; vdp->v_msg; vdp++) {
+		if (CONV_ITER_VD2_SKIP(osabi, mach, vdp))
+			continue;
+
+		if ((* func)(MSG_ORIG_STRTAB(vdp->v_msg, local_sgs_msg),
+		    vdp->v_val, uvalue) == CONV_ITER_DONE)
+			return (CONV_ITER_DONE);
+	}
+
+	return (CONV_ITER_CONT);
+}
+
+/*
+ * Process an array of conv_ds_XXX_t structures and call the appropriate
+ * iteration functions for the format of the strings given.
+ */
+conv_iter_ret_t
+_conv_iter_ds(conv_iter_osabi_t osabi, Half mach, const conv_ds_t **dsp,
+    conv_iter_cb_t func, void *uvalue, const char *local_sgs_msg)
+{
+	const conv_ds_t *ds;
+
+	for (ds = *dsp; ds != NULL; ds = *(++dsp)) {
+		switch (ds->ds_type) {
+		case CONV_DS_MSGARR:
+			if (_conv_iter_msgarr(ds->ds_baseval,
+			    /*LINTED*/
+			    ((conv_ds_msg_t *)ds)->ds_msg,
+			    ds->ds_topval - ds->ds_baseval + 1, func, uvalue,
+			    local_sgs_msg) == CONV_ITER_DONE)
+				return (CONV_ITER_DONE);
+			break;
+
+		case CONV_DS_VD:
+			/*LINTED*/
+			if (_conv_iter_vd(((conv_ds_vd_t *)ds)->ds_vd,
+			    func, uvalue, local_sgs_msg) == CONV_ITER_DONE)
+				return (CONV_ITER_DONE);
+			break;
+
+		case CONV_DS_VD2:
+			if (_conv_iter_vd2(osabi, mach,
+			    /*LINTED*/
+			    ((conv_ds_vd2_t *)ds)->ds_vd2,
+			    func, uvalue, local_sgs_msg) == CONV_ITER_DONE)
+				return (CONV_ITER_DONE);
+			break;
+		}
+	}
+
+	return (CONV_ITER_CONT);
+}
+
+/*
+ * Initialize the uvalue block prior to use of an interation function
+ * employing conv_iter_strtol().
+ *
+ * entry:
+ *	str - String to be matched to a value
+ *	uvalue - Pointer to uninitialized uvalue block
+ *
+ * exit:
+ *	Initializes the uvalue block for use. Returns True (1) if a non-empty
+ *	string was supplied, and False (0).
  */
 int
-conv_expn_field(CONV_EXPN_FIELD_ARG *arg, Conv_fmt_flags_t fmt_flags)
+conv_iter_strtol_init(const char *str, conv_strtol_uvalue_t *uvalue)
 {
-	const Val_desc *vde;
-	CONV_EXPN_FIELD_STATE state;
-	Xword rflags = arg->rflags;
-	const char **lead_str;
+	const char	*tail;
 
+	while (isspace(*str))
+		str++;
+	uvalue->csl_str = str;
+	uvalue->csl_found = 0;
 
-	/* Initialize buffer state */
-	state.cur = arg->buf;
-	state.room = arg->bufsize;
-	state.list_cnt = 0;
-	state.sep_str = arg->sep ? arg->sep : MSG_ORIG(MSG_GBL_SEP);
-	state.sep_str_len = strlen(state.sep_str);
+	tail = str + strlen(str);
+	while ((tail > str) && isspace(*(tail - 1)))
+		tail--;
+	uvalue->csl_strlen = tail - str;
 
-	/* Prefix string */
-	if ((fmt_flags & CONV_FMT_NOBKT) == 0)
-		if (!cef_cp(arg, &state, FALSE,
-		    (arg->prefix ? arg->prefix : MSG_ORIG(MSG_GBL_OSQBRKT))))
-			return (FALSE);
+	return (uvalue->csl_strlen > 0);
+}
 
-	/* Any strings in the lead_str array go at the head of the list */
-	lead_str = arg->lead_str;
-	if (lead_str) {
-		while (*lead_str) {
-			if (!cef_cp(arg, &state, TRUE, *lead_str++))
-				return (FALSE);
-		}
+/*
+ * conv_iter_strtol() is used with iteration functions to map a string
+ * to the value of its corresponding ELF constant.
+ *
+ * entry:
+ *	str - String supplied by this iteration
+ *	value - Value of ELF constant corresponding to str
+ *	uvalue - Pointer to conv_strtol_uvalue_t block previously
+ *		initialized by a call to conv_iter_strtol_init().
+ */
+conv_iter_ret_t
+conv_iter_strtol(const char *str, uint32_t value, void *uvalue)
+{
+	conv_strtol_uvalue_t *state = (conv_strtol_uvalue_t *)uvalue;
+
+	if ((strlen(str) == state->csl_strlen) &&
+	    (strncasecmp(str, state->csl_str, state->csl_strlen) == 0)) {
+		state->csl_found = 1;
+		state->csl_value = value;
+		return (CONV_ITER_DONE);	/* Found it. Stop now. */
 	}
 
-	/*
-	 * Traverse the callers Val_desc array and determine if the value
-	 * corresponds to any array item and add those that are to the list.
-	 */
-	for (vde = arg->vdp; vde->v_msg; vde++) {
-		if (arg->oflags & vde->v_val) {
-			if (!cef_cp(arg, &state, TRUE, vde->v_msg))
-				return (FALSE);
-
-			/* Indicate this item has been collected */
-			rflags &= ~(vde->v_val);
-		}
-	}
-
-	/*
-	 * If any flags remain, then they are unidentified.  Add the numeric
-	 * representation of these flags to the users output buffer.
-	 */
-	if (rflags) {
-		Conv_inv_buf_t inv_buf;
-
-		(void) conv_invalid_val(&inv_buf, rflags, fmt_flags);
-		if (!cef_cp(arg, &state, TRUE, inv_buf.buf))
-			return (FALSE);
-	}
-
-	/* Suffix string */
-	if ((fmt_flags & CONV_FMT_NOBKT) == 0)
-		if (!cef_cp(arg, &state, FALSE,
-		    (arg->suffix ? arg->suffix : MSG_ORIG(MSG_GBL_CSQBRKT))))
-			return (FALSE);
-
-	/* Terminate the buffer */
-	*state.cur = '\0';
-
-	return (TRUE);
+	return (CONV_ITER_CONT);		/* Keep looking */
 }

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<unistd.h>
@@ -492,7 +491,9 @@ needed_to_boundto(ARGSTATE *argstate, const char *arg)
 			break;
 
 		case DT_SUNW_STRPAD:
-			elfedit_dyn_elt_save(&strpad_elt, ndx, dyn);
+			if (elfedit_test_osabi(argstate->obj_state,
+			    ELFOSABI_SOLARIS, 0))
+				elfedit_dyn_elt_save(&strpad_elt, ndx, dyn);
 			break;
 		}
 	}
@@ -537,7 +538,9 @@ needed_to_boundto(ARGSTATE *argstate, const char *arg)
 	ndx = null_elt.dn_ndx;
 	elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_CONVNULL),
 	    EC_WORD(dynsec->sec_shndx), dynsec->sec_name, EC_WORD(ndx),
-	    conv_dyn_tag(DT_NEEDED, argstate->obj_state->os_ehdr->e_machine,
+	    conv_dyn_tag(DT_NEEDED,
+	    argstate->obj_state->os_ehdr->e_ident[EI_OSABI],
+	    argstate->obj_state->os_ehdr->e_machine,
 	    0, &inv_buf));
 	dyn = argstate->dynamic.data + ndx;
 	dyn->d_tag = DT_NEEDED;

@@ -94,183 +94,6 @@ static struct {
 
 
 
-/* Map names to their integer value */
-typedef struct {
-	const char	*sym_name;
-	uint32_t	sym_value;
-} atoui_sym_t;
-
-/*
- * ELF section types.
- */
-static atoui_sym_t sym_sht[] = {
-	{ MSG_ORIG(MSG_SHT_NULL),		SHT_NULL },
-	{ MSG_ORIG(MSG_SHT_NULL_ALT1),		SHT_NULL },
-
-	{ MSG_ORIG(MSG_SHT_PROGBITS),		SHT_PROGBITS },
-	{ MSG_ORIG(MSG_SHT_PROGBITS_ALT1),	SHT_PROGBITS },
-
-	{ MSG_ORIG(MSG_SHT_SYMTAB),		SHT_SYMTAB },
-	{ MSG_ORIG(MSG_SHT_SYMTAB_ALT1),	SHT_SYMTAB },
-
-	{ MSG_ORIG(MSG_SHT_STRTAB),		SHT_STRTAB },
-	{ MSG_ORIG(MSG_SHT_STRTAB_ALT1),	SHT_STRTAB },
-
-	{ MSG_ORIG(MSG_SHT_RELA),		SHT_RELA },
-	{ MSG_ORIG(MSG_SHT_RELA_ALT1),		SHT_RELA },
-
-	{ MSG_ORIG(MSG_SHT_HASH),		SHT_HASH },
-	{ MSG_ORIG(MSG_SHT_HASH_ALT1),		SHT_HASH },
-
-	{ MSG_ORIG(MSG_SHT_DYNAMIC),		SHT_DYNAMIC },
-	{ MSG_ORIG(MSG_SHT_DYNAMIC_ALT1),	SHT_DYNAMIC },
-
-	{ MSG_ORIG(MSG_SHT_NOTE),		SHT_NOTE },
-	{ MSG_ORIG(MSG_SHT_NOTE_ALT1),		SHT_NOTE },
-
-	{ MSG_ORIG(MSG_SHT_NOBITS),		SHT_NOBITS },
-	{ MSG_ORIG(MSG_SHT_NOBITS_ALT1),	SHT_NOBITS },
-
-	{ MSG_ORIG(MSG_SHT_REL),		SHT_REL },
-	{ MSG_ORIG(MSG_SHT_REL_ALT1),		SHT_REL },
-
-	{ MSG_ORIG(MSG_SHT_SHLIB),		SHT_SHLIB },
-	{ MSG_ORIG(MSG_SHT_SHLIB_ALT1),		SHT_SHLIB },
-
-	{ MSG_ORIG(MSG_SHT_DYNSYM),		SHT_DYNSYM },
-	{ MSG_ORIG(MSG_SHT_DYNSYM_ALT1),	SHT_DYNSYM },
-
-	{ MSG_ORIG(MSG_SHT_INIT_ARRAY),		SHT_INIT_ARRAY },
-	{ MSG_ORIG(MSG_SHT_INIT_ARRAY_ALT1),	SHT_INIT_ARRAY },
-
-	{ MSG_ORIG(MSG_SHT_FINI_ARRAY),		SHT_FINI_ARRAY },
-	{ MSG_ORIG(MSG_SHT_FINI_ARRAY_ALT1),	SHT_FINI_ARRAY },
-
-	{ MSG_ORIG(MSG_SHT_PREINIT_ARRAY),	SHT_PREINIT_ARRAY },
-	{ MSG_ORIG(MSG_SHT_PREINIT_ARRAY_ALT1),	SHT_PREINIT_ARRAY },
-
-	{ MSG_ORIG(MSG_SHT_GROUP),		SHT_GROUP },
-	{ MSG_ORIG(MSG_SHT_GROUP_ALT1),		SHT_GROUP },
-
-	{ MSG_ORIG(MSG_SHT_SYMTAB_SHNDX),	SHT_SYMTAB_SHNDX },
-	{ MSG_ORIG(MSG_SHT_SYMTAB_SHNDX_ALT1),	SHT_SYMTAB_SHNDX },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_SYMSORT),	SHT_SUNW_symsort },
-	{ MSG_ORIG(MSG_SHT_SUNW_SYMSORT_ALT1),	SHT_SUNW_symsort },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_TLSSORT),	SHT_SUNW_tlssort },
-	{ MSG_ORIG(MSG_SHT_SUNW_TLSSORT_ALT1),	SHT_SUNW_tlssort },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_LDYNSYM),	SHT_SUNW_LDYNSYM },
-	{ MSG_ORIG(MSG_SHT_SUNW_LDYNSYM_ALT1),	SHT_SUNW_LDYNSYM },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_DOF),		SHT_SUNW_dof },
-	{ MSG_ORIG(MSG_SHT_SUNW_DOF_ALT1),	SHT_SUNW_dof },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_CAP),		SHT_SUNW_cap },
-	{ MSG_ORIG(MSG_SHT_SUNW_CAP_ALT1),	SHT_SUNW_cap },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_SIGNATURE),	SHT_SUNW_SIGNATURE },
-	{ MSG_ORIG(MSG_SHT_SUNW_SIGNATURE_ALT1), SHT_SUNW_SIGNATURE },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_ANNOTATE),	SHT_SUNW_ANNOTATE },
-	{ MSG_ORIG(MSG_SHT_SUNW_ANNOTATE_ALT1),	SHT_SUNW_ANNOTATE },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_DEBUGSTR),	SHT_SUNW_DEBUGSTR },
-	{ MSG_ORIG(MSG_SHT_SUNW_DEBUGSTR_ALT1),	SHT_SUNW_DEBUGSTR },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_DEBUG),		SHT_SUNW_DEBUG },
-	{ MSG_ORIG(MSG_SHT_SUNW_DEBUG_ALT1),	SHT_SUNW_DEBUG },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_MOVE),		SHT_SUNW_move },
-	{ MSG_ORIG(MSG_SHT_SUNW_MOVE_ALT1),	SHT_SUNW_move },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_COMDAT),	SHT_SUNW_COMDAT },
-	{ MSG_ORIG(MSG_SHT_SUNW_COMDAT_ALT1),	SHT_SUNW_COMDAT },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_SYMINFO),	SHT_SUNW_syminfo },
-	{ MSG_ORIG(MSG_SHT_SUNW_SYMINFO_ALT1),	SHT_SUNW_syminfo },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_VERDEF),	SHT_SUNW_verdef },
-	{ MSG_ORIG(MSG_SHT_SUNW_VERDEF_ALT1),	SHT_SUNW_verdef },
-
-	{ MSG_ORIG(MSG_SHT_GNU_VERDEF),		SHT_GNU_verdef },
-	{ MSG_ORIG(MSG_SHT_GNU_VERDEF_ALT1),	SHT_GNU_verdef },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_VERNEED),	SHT_SUNW_verneed },
-	{ MSG_ORIG(MSG_SHT_SUNW_VERNEED_ALT1),	SHT_SUNW_verneed },
-
-	{ MSG_ORIG(MSG_SHT_GNU_VERNEED),	SHT_GNU_verneed },
-	{ MSG_ORIG(MSG_SHT_GNU_VERNEED_ALT1),	SHT_GNU_verneed },
-
-	{ MSG_ORIG(MSG_SHT_SUNW_VERSYM),	SHT_SUNW_versym },
-	{ MSG_ORIG(MSG_SHT_SUNW_VERSYM_ALT1),	SHT_SUNW_versym },
-
-	{ MSG_ORIG(MSG_SHT_GNU_VERSYM),		SHT_GNU_versym },
-	{ MSG_ORIG(MSG_SHT_GNU_VERSYM_ALT1),	SHT_GNU_versym },
-
-	{ MSG_ORIG(MSG_SHT_SPARC_GOTDATA),	SHT_SPARC_GOTDATA },
-	{ MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT1),	SHT_SPARC_GOTDATA },
-
-	{ MSG_ORIG(MSG_SHT_AMD64_UNWIND),	SHT_AMD64_UNWIND },
-	{ MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT1),	SHT_AMD64_UNWIND },
-
-	{ NULL }
-};
-
-/*
- * Program header PT_* type values
- */
-static atoui_sym_t sym_pt[] = {
-	{ MSG_ORIG(MSG_PT_NULL),		PT_NULL },
-	{ MSG_ORIG(MSG_PT_NULL_ALT1),		PT_NULL },
-
-	{ MSG_ORIG(MSG_PT_LOAD),		PT_LOAD },
-	{ MSG_ORIG(MSG_PT_LOAD_ALT1),		PT_LOAD },
-
-	{ MSG_ORIG(MSG_PT_DYNAMIC),		PT_DYNAMIC },
-	{ MSG_ORIG(MSG_PT_DYNAMIC_ALT1),	PT_DYNAMIC },
-
-	{ MSG_ORIG(MSG_PT_INTERP),		PT_INTERP },
-	{ MSG_ORIG(MSG_PT_INTERP_ALT1),		PT_INTERP },
-
-	{ MSG_ORIG(MSG_PT_NOTE),		PT_NOTE },
-	{ MSG_ORIG(MSG_PT_NOTE_ALT1),		PT_NOTE },
-
-	{ MSG_ORIG(MSG_PT_SHLIB),		PT_SHLIB },
-	{ MSG_ORIG(MSG_PT_SHLIB_ALT1),		PT_SHLIB },
-
-	{ MSG_ORIG(MSG_PT_PHDR),		PT_PHDR },
-	{ MSG_ORIG(MSG_PT_PHDR_ALT1),		PT_PHDR },
-
-	{ MSG_ORIG(MSG_PT_TLS),			PT_TLS },
-	{ MSG_ORIG(MSG_PT_TLS_ALT1),		PT_TLS },
-
-	{ MSG_ORIG(MSG_PT_SUNW_UNWIND),		PT_SUNW_UNWIND },
-	{ MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT1),	PT_SUNW_UNWIND },
-
-	{ MSG_ORIG(MSG_PT_SUNW_EH_FRAME),	PT_SUNW_EH_FRAME },
-	{ MSG_ORIG(MSG_PT_SUNW_EH_FRAME_ALT1),	PT_SUNW_EH_FRAME },
-
-	{ MSG_ORIG(MSG_PT_SUNWBSS),		PT_SUNWBSS },
-	{ MSG_ORIG(MSG_PT_SUNWBSS_ALT1),	PT_SUNWBSS },
-
-	{ MSG_ORIG(MSG_PT_SUNWSTACK),		PT_SUNWSTACK },
-	{ MSG_ORIG(MSG_PT_SUNWSTACK_ALT1),	PT_SUNWSTACK },
-
-	{ MSG_ORIG(MSG_PT_SUNWDTRACE),		PT_SUNWDTRACE },
-	{ MSG_ORIG(MSG_PT_SUNWDTRACE_ALT1),	PT_SUNWDTRACE },
-
-	{ MSG_ORIG(MSG_PT_SUNWCAP),		PT_SUNWCAP },
-	{ MSG_ORIG(MSG_PT_SUNWCAP_ALT1),	PT_SUNWCAP },
-
-	{ NULL }
-};
-
-
-
-
-
 const char *
 _elfdump_msg(Msg mid)
 {
@@ -330,6 +153,7 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL23));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL24));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL25));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL26));
 }
 
 /*
@@ -466,66 +290,62 @@ process_index_opt(const char *str, match_rec_t *rec)
 }
 
 /*
- * Process the symbolic name to value mappings passed to the
- * atoui() function.
- *
- * entry:
- *	sym - NULL terminated array of name->value mappings.
- *	value - Address of variable to receive corresponding value.
- *
- * exit:
- *	If a mapping is found, *value is set to it, and True is returned.
- *	Otherwise False is returned.
- */
-static int
-atoui_sym_process(const char *str, const atoui_sym_t *sym, uint32_t *value)
-{
-	size_t		cmp_len;
-	const char	*tail;
-
-	while (isspace(*str))
-		str++;
-
-	tail = str + strlen(str);
-	while ((tail > str) && isspace(*(tail - 1)))
-		tail--;
-
-	cmp_len = tail - str;
-
-	for (; sym->sym_name != NULL; sym++) {
-		if ((strlen(sym->sym_name) == cmp_len) &&
-		    (strncasecmp(sym->sym_name, str, cmp_len) == 0)) {
-			*value = sym->sym_value;
-			return (1);
-		}
-	}
-
-	/* No symbolic mapping was found */
-	return (0);
-}
-
-
-/*
- * Convert a string to a numeric value. Strings starting with '0'
+ * Convert a string containing a specific type of ELF constant, or an ASCII
+ * representation of a number, to an integer. Strings starting with '0'
  * are taken to be octal, those staring with '0x' are hex, and all
  * others are decimal.
  *
  * entry:
  *	str - String to be converted
- *	sym - NULL, or NULL terminated array of name/value pairs.
+ *	ctype - Constant type
  *	v - Address of variable to receive resulting value.
  *
  * exit:
  *	On success, returns True (1) and *v is set to the value.
  *	On failure, returns False (0) and *v is undefined.
  */
-static int
-atoui(const char *str, const atoui_sym_t *sym, uint32_t *v)
-{
-	char		*endptr;
+typedef enum {
+	ATOUI_PT,
+	ATOUI_SHT,
+	ATOUI_OSABI
+} atoui_type_t;
 
-	if (sym && atoui_sym_process(str, sym, v))
-		return (1);
+static int
+atoui(const char *str, atoui_type_t type, uint32_t *v)
+{
+	conv_strtol_uvalue_t	uvalue;
+	char			*endptr;
+
+	if (conv_iter_strtol_init(str, &uvalue) != 0) {
+		switch (type) {
+		case ATOUI_PT:
+			if (conv_iter_phdr_type(CONV_OSABI_ALL, CONV_FMT_ALT_CF,
+			    conv_iter_strtol, &uvalue) == CONV_ITER_DONE)
+				break;
+			(void) conv_iter_phdr_type(CONV_OSABI_ALL,
+			    CONV_FMT_ALT_NF, conv_iter_strtol, &uvalue);
+			break;
+		case ATOUI_SHT:
+			if (conv_iter_sec_type(CONV_OSABI_ALL, CONV_MACH_ALL,
+			    CONV_FMT_ALT_CF, conv_iter_strtol, &uvalue) ==
+			    CONV_ITER_DONE)
+				break;
+			(void) conv_iter_sec_type(CONV_OSABI_ALL, CONV_MACH_ALL,
+			    CONV_FMT_ALT_NF, conv_iter_strtol, &uvalue);
+			break;
+		case ATOUI_OSABI:
+			if (conv_iter_ehdr_osabi(CONV_FMT_ALT_CF,
+			    conv_iter_strtol, &uvalue) == CONV_ITER_DONE)
+				break;
+			(void) conv_iter_ehdr_osabi(CONV_FMT_ALT_NF,
+			    conv_iter_strtol, &uvalue);
+			break;
+		}
+		if (uvalue.csl_found) {
+			*v = uvalue.csl_value;
+			return (1);
+		}
+	}
 
 	*v = strtoull(str, &endptr, 0);
 
@@ -547,10 +367,10 @@ atoui(const char *str, const atoui_sym_t *sym, uint32_t *v)
 static int
 match_prepare(char *argv0, uint_t flags)
 {
-	atoui_sym_t	*sym;
 	match_rec_t	*list;
 	const char	*str;
 	int		minus_p = (flags & FLG_SHOW_PHDR) != 0;
+	atoui_type_t	atoui_type;
 
 	/*
 	 * Flag ambiguous attempt to use match option with both -p and
@@ -566,10 +386,10 @@ match_prepare(char *argv0, uint_t flags)
 	/* Set the match type, based on the presence of the -p option */
 	if (minus_p) {
 		match_state.item_type = MATCH_ITEM_PT;
-		sym = sym_pt;
+		atoui_type = ATOUI_PT;
 	} else {
 		match_state.item_type = MATCH_ITEM_SHT;
-		sym = sym_sht;
+		atoui_type = ATOUI_SHT;
 	}
 
 	/*
@@ -591,7 +411,7 @@ match_prepare(char *argv0, uint_t flags)
 			continue;
 
 		str = list->value.name;
-		if (atoui(str, sym, &list->value.type) == 0) {
+		if (atoui(str, atoui_type, &list->value.type) == 0) {
 			const char *fmt = minus_p ?
 			    MSG_INTL(MSG_ERR_BAD_T_PT) :
 			    MSG_INTL(MSG_ERR_BAD_T_SHT);
@@ -726,21 +546,21 @@ add_match_record(char *argv0, match_rec_t *data)
 
 static int
 decide(const char *file, int fd, Elf *elf, uint_t flags,
-    const char *wname, int wfd)
+    const char *wname, int wfd, uchar_t osabi)
 {
 	int r;
 
 	if (gelf_getclass(elf) == ELFCLASS64)
-		r = regular64(file, fd, elf, flags, wname, wfd);
+		r = regular64(file, fd, elf, flags, wname, wfd, osabi);
 	else
-		r = regular32(file, fd, elf, flags, wname, wfd);
+		r = regular32(file, fd, elf, flags, wname, wfd, osabi);
 
 	return (r);
 }
 
 static int
 archive(const char *file, int fd, Elf *elf, uint_t flags,
-    const char *wname, int wfd)
+    const char *wname, int wfd, uchar_t osabi)
 {
 	Elf_Cmd		cmd = ELF_C_READ;
 	Elf_Arhdr	*arhdr;
@@ -866,12 +686,12 @@ archive(const char *file, int fd, Elf *elf, uint_t flags,
 			switch (elf_kind(_elf)) {
 			case ELF_K_AR:
 				if (archive(name, fd, _elf, flags,
-				    wname, wfd) == 1)
+				    wname, wfd, osabi) == 1)
 					return (1);
 				break;
 			case ELF_K_ELF:
 				if (decide(name, fd, _elf, flags,
-				    wname, wfd) == 1)
+				    wname, wfd, osabi) == 1)
 					return (1);
 				break;
 			default:
@@ -897,6 +717,7 @@ main(int argc, char **argv, char **envp)
 	uint_t		flags = 0;
 	match_rec_t	match_data;
 	int		ret;
+	uchar_t		osabi;
 
 	/*
 	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
@@ -968,6 +789,26 @@ main(int argc, char **argv, char **envp)
 			break;
 		case 'n':
 			flags |= FLG_SHOW_NOTE;
+			break;
+		case 'O':
+			{
+				uint32_t val;
+
+				/*
+				 * osabi is a uchar_t in the ELF header.
+				 * Don't accept any value that exceeds
+				 * that range.
+				 */
+				if ((atoui(optarg, ATOUI_OSABI, &val) == 0) ||
+				    (val > 255)) {
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ERR_BAD_T_OSABI),
+					    basename(argv[0]), optarg);
+					return (1);
+				}
+				osabi = val;
+			}
+			flags |= FLG_CTL_OSABI;
 			break;
 		case 'P':
 			flags |= FLG_CTL_FAKESHDR;
@@ -1111,10 +952,10 @@ main(int argc, char **argv, char **envp)
 
 		switch (elf_kind(elf)) {
 		case ELF_K_AR:
-			ret = archive(file, fd, elf, flags, wname, wfd);
+			ret = archive(file, fd, elf, flags, wname, wfd, osabi);
 			break;
 		case ELF_K_ELF:
-			ret = decide(file, fd, elf, flags, wname, wfd);
+			ret = decide(file, fd, elf, flags, wname, wfd, osabi);
 			break;
 		default:
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADFILE), file);

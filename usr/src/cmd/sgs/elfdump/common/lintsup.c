@@ -20,13 +20,11 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
 /* PROTOLIB1 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Supplemental Pseudo-code to get lint to consider these symbols used.
@@ -46,15 +44,15 @@ foo()
 #if	defined(_ELF64)
 int
 regular32(const char *file, int fd, Elf *elf, uint_t flags,
-    const char *wname, int wfd)
+    const char *wname, int wfd, uchar_t osabi)
 {
-	return (regular64(file, fd, elf, flags, wname, wfd));
+	return (regular64(file, fd, elf, flags, wname, wfd, osabi));
 }
 #else
 int
 regular64(const char *file, int fd, Elf *elf, uint_t flags,
-    const char *wname, int wfd)
+    const char *wname, int wfd, uchar_t osabi)
 {
-	return (regular32(file, fd, elf, flags, wname, wfd));
+	return (regular32(file, fd, elf, flags, wname, wfd, osabi));
 }
 #endif

@@ -26,43 +26,50 @@
 
 LIBRARY =	libconv.a
 
-COMOBJS32 =	cap32.o			dynamic32.o \
-		elf32.o			globals32.o \
-		phdr32.o		\
-		relocate_i38632.o	relocate_amd6432.o \
-		relocate_sparc32.o	sections32.o \
-		symbols32.o		symbols_sparc32.o \
-		syminfo32.o
+COMOBJS32 =	cap_machelf32.o		dynamic_machelf32.o \
+		globals_machelf32.o 	sections_machelf32.o \
+		symbols_machelf32.o	symbols_sparc_machelf32.o
 
-COMOBJS64 =	cap64.o			dynamic64.o \
-		elf64.o			globals64.o \
-		phdr64.o		\
-		relocate_i38664.o	relocate_amd6464.o \
-		relocate_sparc64.o	sections64.o \
-		symbols64.o		symbols_sparc64.o \
-		syminfo64.o
+COMOBJS64 =	cap_machelf64.o		dynamic_machelf64.o \
+		globals_machelf64.o	sections_machelf64.o \
+		symbols_machelf64.o	symbols_sparc_machelf64.o
 
 COMOBJS=	arch.o			c_literal.o \
-		config.o		corenote.o \
-		data.o			deftag.o \
-		demangle.o		dl.o \
-		dwarf.o			dwarf_ehe.o \
-		group.o			lddstub.o \
-		segments.o		version.o
-
-COMOBJS_NOMSG =	tokens.o
-
-COMOBJS_NOMSG32 = \
-		relocate32.o
-COMOBJS_NOMSG64 = \
-		relocate64.o
+		cap.o			config.o \
+		corenote.o 		data.o \
+		deftag.o 		demangle.o \
+		dl.o			dwarf.o \
+		dwarf_ehe.o 		dynamic.o \
+		elf.o			globals.o \
+		group.o 		lddstub.o \
+		phdr.o			relocate.o \
+ 		relocate_i386.o 	relocate_amd64.o \
+ 		relocate_sparc.o 	sections.o \
+   		segments.o    		symbols.o \
+ 		syminfo.o  		tokens.o \
+ 		version.o
 
 ELFCAP_OBJS=	elfcap.o
 
 ASOBJS=		vernote.o
 
-OBJECTS =	$(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(COMOBJS_NOMSG) \
-		$(COMOBJS_NOMSG32) $(COMOBJS_NOMSG64) $(ELFCAP_OBJS) $(ASOBJS)
+BLTOBJS=	arch_msg.o		c_literal_msg.o \
+		cap_msg.o		config_msg.o \
+		corenote_msg.o		data_msg.o \
+		deftag_msg.o		demangle_msg.o \
+		dl_msg.o		dwarf_msg.o \
+		dwarf_ehe_msg.o 	dynamic_msg.o \
+		elf_msg.o 		globals_msg.o \
+		group_msg.o 		lddstub_msg.o \
+		phdr_msg.o 		relocate_amd64_msg.o \
+		relocate_i386_msg.o 	relocate_sparc_msg.o \
+		sections_msg.o 		segments_msg.o \
+		symbols_msg.o 		symbols_sparc_msg.o \
+		syminfo_msg.o 		version_msg.o
+
+
+OBJECTS =	$(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(ELFCAP_OBJS) \
+		$(ASOBJS) $(BLTOBJS)
 
 ELFCAP=		$(SRC)/common/elfcap
 
@@ -91,8 +98,7 @@ ARFLAGS=	cr
 
 AS_CPPFLAGS=	-P -D_ASM $(CPPFLAGS)
 
-BLTDATA=	$(COMOBJS:%.o=%_msg.h) \
-		    $(COMOBJS32:%.o=%_msg.h) $(COMOBJS64:%.o=%_msg.h)
+BLTDATA=	$(BLTOBJS:%.o=%.c) $(BLTOBJS:%.o=%.h) report_bufsize.h
 
 SRCS=		../common/llib-lconv
 LINTSRCS=	$(COMOBJS:%.o=../common/%.c) \
@@ -110,9 +116,7 @@ LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c)
 VERNOTE_DEBUG= -d
 $(INTERNAL_RELEASE_BUILD)VERNOTE_DEBUG=
 
-SGSMSGTARG=	$(COMOBJS:%.o=../common/%.msg) \
-		    $(COMOBJS32:%32.o=../common/%.msg) \
-		    $(COMOBJS64:%64.o=../common/%.msg)
+SGSMSGTARG=	$(BLTOBJS:%_msg.o=../common/%.msg)
 
 LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u

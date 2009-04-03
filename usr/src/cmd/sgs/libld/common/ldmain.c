@@ -204,9 +204,11 @@ ld_main(int argc, char **argv, Half mach)
 	}
 	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
-	DBG_CALL(Dbg_ent_print(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
+	DBG_CALL(Dbg_ent_print(ofl->ofl_lml,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
 	    ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC) != 0));
-	DBG_CALL(Dbg_seg_list(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
+	DBG_CALL(Dbg_seg_list(ofl->ofl_lml,
+	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
 	    ofl->ofl_segs));
 
 	/*

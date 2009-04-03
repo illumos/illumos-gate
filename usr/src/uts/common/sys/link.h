@@ -145,7 +145,7 @@ typedef struct {
  */
 #define	DT_SUNW_ENCODING	0x60000013	/* DT_* encoding rules resume */
 						/*	after this */
-#define	DT_SUNW_SORTENT		0x60000013	/* sizeof [SYM|TLS]SORT entrt */
+#define	DT_SUNW_SORTENT		0x60000013	/* sizeof [SYM|TLS]SORT entry */
 #define	DT_SUNW_SYMSORT		0x60000014	/* sym indices sorted by addr */
 #define	DT_SUNW_SYMSORTSZ	0x60000015	/* size of SUNW_SYMSORT */
 #define	DT_SUNW_TLSSORT		0x60000016	/* tls sym ndx sort by offset */
@@ -455,7 +455,9 @@ typedef struct {
  */
 #define	SYMINFO_FLG_DIRECT	0x0001	/* symbol ref has direct association */
 					/*	to object containing defn. */
-#define	SYMINFO_FLG_PASSTHRU	0x0002	/* ignored - see SYMINFO_FLG_FILTER */
+#define	SYMINFO_FLG_FILTER	0x0002	/* symbol ref is associated to a */
+					/* 	standard filter */
+#define	SYMINFO_FLG_PASSTHRU	SYMINFO_FLG_FILTER /* unused historical name */
 #define	SYMINFO_FLG_COPY	0x0004	/* symbol is a copy-reloc */
 #define	SYMINFO_FLG_LAZYLOAD	0x0008	/* object containing defn. should be */
 					/*	lazily-loaded */
@@ -463,8 +465,8 @@ typedef struct {
 					/*	object containing defn. */
 #define	SYMINFO_FLG_NOEXTDIRECT	0x0020	/* don't let an external reference */
 					/*	directly bind to this symbol */
-#define	SYMINFO_FLG_FILTER	0x0002	/* symbol ref is associated to a */
-#define	SYMINFO_FLG_AUXILIARY	0x0040	/* 	standard or auxiliary filter */
+#define	SYMINFO_FLG_AUXILIARY	0x0040	/* symbol ref is associated to a */
+					/* 	auxiliary filter */
 #define	SYMINFO_FLG_INTERPOSE	0x0080	/* symbol defines an interposer */
 
 /*

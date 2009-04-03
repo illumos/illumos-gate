@@ -23,11 +23,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Get definitions for the relocation types supported. */
 #define	ELF_TARGET_ALL
@@ -50,13 +48,6 @@
 
 
 #define	OPTSTR	"agcd:fhn:oprstvCLT:V?"		/* option string for getopt() */
-
-/*
- * DUMP_CONVFMT defines the libconv formatting options we want to use:
- *	- Unknown items to be printed as integers using decimal formatting
- *	- The "Dump Style" versions of strings.
- */
-#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALT_DUMP)
 
 const char *UNKNOWN = "<unknown>";
 
@@ -617,7 +608,9 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 
 			if (specsec)
 				(void) printf("%s",
-				    conv_sym_shndx(shndx, &inv_buf));
+				    conv_sym_shndx(p_ehdr.e_ident[EI_OSABI],
+				    p_ehdr.e_machine, shndx,
+				    CONV_FMT_DECIMAL, &inv_buf));
 			else
 				(void) printf("%d", EC_WORD(shndx));
 			(void) printf("\t");
@@ -676,7 +669,8 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 			Conv_inv_buf_t inv_buf;
 
 			/*LINTED: E_SEC_PRINTF_VAR_FMT*/
-			(void) printf(conv_sec_type(p_ehdr.e_machine,
+			(void) printf(conv_sec_type(
+			    p_ehdr.e_ident[EI_OSABI], p_ehdr.e_machine,
 			    p->p_shdr.sh_type, DUMP_CONVFMT, &inv_buf));
 			(void) printf("    ");
 
@@ -1128,7 +1122,8 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			} conv_buf;
 
 			(void) printf("[%d]\t%-15.15s ", index++,
-			    conv_dyn_tag(p_dyn.d_tag, p_ehdr.e_machine,
+			    conv_dyn_tag(p_dyn.d_tag,
+			    p_ehdr.e_ident[EI_OSABI], p_ehdr.e_machine,
 			    DUMP_CONVFMT, &conv_buf.inv));
 
 			/*
@@ -1372,7 +1367,8 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 		    conv_ehdr_data(elf_head_p->e_ident[5], DUMP_CONVFMT,
 		    &inv_buf));
 		(void) printf("%-*s", field,
-		    conv_ehdr_type(elf_head_p->e_type, DUMP_CONVFMT, &inv_buf));
+		    conv_ehdr_type(elf_head_p->e_ident[EI_OSABI],
+		    elf_head_p->e_type, DUMP_CONVFMT, &inv_buf));
 		(void) printf("%-12s",
 		    conv_ehdr_mach(elf_head_p->e_machine, DUMP_CONVFMT,
 		    &inv_buf));
