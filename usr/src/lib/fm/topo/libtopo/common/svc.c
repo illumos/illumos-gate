@@ -107,29 +107,41 @@ svc_error(topo_mod_t *mod)
 	}
 }
 
-int
-svc_init(topo_mod_t *mod, topo_version_t version)
+static scf_handle_t *
+svc_get_handle(topo_mod_t *mod)
 {
-	scf_handle_t *hdl;
+	scf_handle_t *hdl = topo_mod_getspecific(mod);
 
-	if (version != SVC_VERSION)
-		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+	if (hdl != NULL)
+		return (hdl);
 
-	if ((hdl = scf_handle_create(SCF_VERSION)) == NULL)
-		return (svc_error(mod));
+	if ((hdl = scf_handle_create(SCF_VERSION)) == NULL) {
+		(void) svc_error(mod);
+		return (NULL);
+	}
 
 	if (scf_handle_bind(hdl) != 0) {
 		scf_handle_destroy(hdl);
-		return (svc_error(mod));
+		(void) svc_error(mod);
+		return (NULL);
 	}
+
+	topo_mod_setspecific(mod, hdl);
+
+	return (hdl);
+}
+
+int
+svc_init(topo_mod_t *mod, topo_version_t version)
+{
+	if (version != SVC_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
 	if (topo_mod_register(mod, &svc_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register svc_info: "
 		    "%s\n", topo_mod_errmsg(mod));
 		return (-1);
 	}
-
-	topo_mod_setspecific(mod, hdl);
 
 	return (0);
 }
@@ -139,7 +151,8 @@ svc_fini(topo_mod_t *mod)
 {
 	scf_handle_t *hdl = topo_mod_getspecific(mod);
 
-	scf_handle_destroy(hdl);
+	if (hdl != NULL)
+		scf_handle_destroy(hdl);
 
 	topo_mod_unregister(mod);
 }
@@ -412,7 +425,7 @@ static int
 svc_get_state(topo_mod_t *mod, nvlist_t *fmri, boolean_t presence_only,
     int *ret)
 {
-	scf_handle_t *hdl = topo_mod_getspecific(mod);
+	scf_handle_t *hdl;
 	uint8_t fmversion;
 	char *instance, *name;
 	scf_service_t *svc = NULL;
@@ -425,6 +438,9 @@ svc_get_state(topo_mod_t *mod, nvlist_t *fmri, boolean_t presence_only,
 	int err, retval = 0;
 	ssize_t len;
 	char *state;
+
+	if ((hdl = svc_get_handle(mod)) == NULL)
+		return (-1);
 
 	if (nvlist_lookup_uint8(fmri, FM_VERSION, &fmversion) != 0 ||
 	    fmversion > FM_SVC_SCHEME_VERSION ||
