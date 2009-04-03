@@ -338,6 +338,8 @@ int non_ncq_commands = 0;
  */
 static void *nv_statep	= NULL;
 
+/* This can be disabled if there are any problems with 40-bit DMA */
+int nv_sata_40bit_dma = B_TRUE;
 
 static sata_tran_hotplug_ops_t nv_hotplug_ops = {
 	SATA_TRAN_HOTPLUG_OPS_REV_1,	/* structure version */
@@ -2241,35 +2243,31 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	nv_put32(nvc->nvc_bar_hdl[5], nvc->nvc_mcp5x_ctl, flags);
 #endif
 
-
-#if 0
-	/*
-	 * This caused problems on some but not all mcp55 based systems.
-	 * DMA writes would never complete.  This happens even on small
-	 * mem systems, and only setting NV_40BIT_PRD below and not
-	 * buffer_dma_attr.dma_attr_addr_hi, so it seems to be a hardware
-	 * issue that needs further investigation.
-	 */
-
 	/*
 	 * mcp55 rev A03 and above supports 40-bit physical addressing.
 	 * Enable DMA to take advantage of that.
 	 *
 	 */
 	if (nvc->nvc_revid >= 0xa3) {
-		uint32_t reg32;
-		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "rev id is %X and"
-		    " is capable of 40-bit addressing", nvc->nvc_revid));
-		buffer_dma_attr.dma_attr_addr_hi = 0xffffffffffull;
-		reg32 = pci_config_get32(pci_conf_handle, NV_SATA_CFG_20);
-		pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
-		    reg32 |NV_40BIT_PRD);
+		if (nv_sata_40bit_dma == B_TRUE) {
+			uint32_t reg32;
+			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
+			    "rev id is %X and"
+			    " is capable of 40-bit addressing",
+			    nvc->nvc_revid));
+			buffer_dma_attr.dma_attr_addr_hi = 0xffffffffffull;
+			reg32 = pci_config_get32(pci_conf_handle,
+			    NV_SATA_CFG_20);
+			pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
+			    reg32 |NV_40BIT_PRD);
+		} else {
+			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
+			    "40-bit dma disabled by nv_sata_40bit_dma"));
+		}
 	} else {
 		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "rev is %X and is "
 		    "not capable of 40-bit addressing", nvc->nvc_revid));
 	}
-#endif
-
 }
 
 
