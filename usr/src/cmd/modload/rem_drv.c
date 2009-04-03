@@ -248,7 +248,7 @@ static int
 cleanup_minor_walker(void *cb_arg, const char *minor_path)
 {
 	if (unlink(minor_path) == -1) {
-		(void) fprintf(stderr, "rem_drv: error removing %s\n",
+		(void) fprintf(stderr, "rem_drv: error removing %s - %s\n",
 		    minor_path, strerror(errno));
 	}
 	return (DI_WALK_CONTINUE);
@@ -257,6 +257,7 @@ cleanup_minor_walker(void *cb_arg, const char *minor_path)
 /*
  * Callback for each device registered in the binding file (path_to_inst)
  */
+/*ARGSUSED*/
 static int
 cleanup_device_walker(void *cb_arg, const char *inst_path,
     int inst_number, const char *inst_driver)
@@ -278,7 +279,6 @@ cleanup_device_walker(void *cb_arg, const char *inst_path,
 static void
 cleanup_devfs_attributes(char *basedir, char *driver_name)
 {
-	int rv;
 	cleanup_arg_t arg;
 	char binding_path[MAXPATHLEN+1];
 

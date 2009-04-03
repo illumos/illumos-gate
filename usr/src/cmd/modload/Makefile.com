@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/modload/Makefile.com
@@ -51,15 +48,28 @@ DRVCOMMONSRC = $(DRVCOMMONOBJ:%.o=../%.c)
 OBJECTS = $(MODCOMMONOBJ) $(DRVCOMMONOBJ) $(PROG:%=%.o)
 SRCS = $(OBJECTS:%.o=../%.c)
 
+COMMONSRC = $(DRVCOMMONSRC) $(MODCOMMONSRC)
+
 CLOBBERFILES = $(PROG)
+
+# lint is complicated here by the fact that we
+# build multiple commands and with differing
+# common source, drvsubr vs modsubr/plcysubr
+#
+LINT_PROG= $(PROG:%=lint_%.c)
+LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 
 # install specifics
 
 $(ROOTDRVPROG) := FILEMODE = 0555
 
-add_drv		:= LDLIBS += -ldevinfo -lelf
-rem_drv		:= LDLIBS += -ldevinfo
-update_drv	:= LDLIBS += -ldevinfo
+add_drv			:= LDLIBS += -ldevinfo -lelf
+rem_drv			:= LDLIBS += -ldevinfo
+update_drv		:= LDLIBS += -ldevinfo
+
+lint_add_drv.c		:= LDLIBS += -ldevinfo -lelf
+lint_rem_drv.c		:= LDLIBS += -ldevinfo
+lint_update_drv.c	:= LDLIBS += -ldevinfo
 
 .KEEP_STATE:
 
@@ -95,6 +105,9 @@ modinfo:	modinfo.o $(MODCOMMONOBJ)
 clean:
 	$(RM) $(OBJECTS) core
 
-lint: lint_SRCS
+lint_%.c:
+	$(LINT.c) $(@:lint_%.c=../%.c) $(COMMONSRC) $(LDLIBS)
+
+lint:	$(LINT_PROG)
 
 include ../../Makefile.targ

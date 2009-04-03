@@ -442,7 +442,7 @@ done:
 			 * can continue on to update the kernel.
 			 */
 			error = NOERR;
-			rval = aliases_exist(driver_name, aliases);
+			rval = aliases_exist(aliases);
 			if (rval == ERROR && (force_flag == 0)) {
 				(void) fprintf(stderr,
 				    gettext(ERR_ALIAS_NOT_BOUND),

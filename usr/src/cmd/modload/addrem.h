@@ -136,7 +136,7 @@ extern int update_name_to_major(char *, major_t *, int);
 extern int do_the_update(char *, char *);
 extern int fill_n2m_array(char *, char **, int *);
 extern int aliases_unique(char *);
-extern int aliases_exist(char *, char *);
+extern int aliases_exist(char *);
 extern int aliases_paths_exist(char *);
 extern int update_driver_aliases(char *, char *);
 extern int unique_driver_name(char *, char *, int *);

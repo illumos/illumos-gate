@@ -257,13 +257,36 @@ delete_entry(
 	FILE		*fp, *newfp;
 	struct group	*sysgrp;
 	char		*copy;		/* same size as line */
+	char		*match2 = NULL;	/* match with quotes cleaned up */
 
 	/*
-	 * check if match is specified and if it equals " "
+	 * if match is specified, sanity check it and clean it
+	 * up by removing surrounding quotes as we require
+	 * an exact match.
 	 */
-	if (match && (*match == ' ' && strlen(match) == 1)) {
-		(void) fprintf(stderr, gettext(ERR_INT_UPDATE), oldfile);
-		return (ERROR);
+	if (match) {
+		cp = match;
+		while (*cp && (*cp == '"' || *cp == '\''))
+			cp++;
+		i = strlen(cp);
+		if (i > 0) {
+			if ((match2 = strdup(cp)) == NULL) {
+				perror(NULL);
+				(void) fprintf(stderr, gettext(ERR_NO_MEM));
+				return (ERROR);
+			}
+			if ((cp = strchr(match2, '\'')) != NULL)
+				*cp = 0;
+			if ((cp = strchr(match2, '"')) != NULL)
+				*cp = 0;
+			if ((cp = strchr(match2, ' ')) != NULL)
+				*cp = 0;
+		}
+		if (match2 == NULL || (strlen(match2) == 0)) {
+			(void) fprintf(stderr,
+			    gettext(ERR_INT_UPDATE), oldfile);
+			return (ERROR);
+		}
 	}
 
 	if ((fp = fopen(oldfile, "r")) == NULL) {
@@ -325,6 +348,7 @@ delete_entry(
 		}
 
 		/* get the driver name */
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		if (sscanf(copy, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
@@ -344,7 +368,7 @@ delete_entry(
 			}
 		} else {
 			drvr_found++;
-			if (match) {	/* Just delete one entry */
+			if (match2) {	/* Just delete one entry */
 				/* for now delete just minor_perm and aliases */
 				if ((strcmp(oldfile, minor_perm) == 0) ||
 				    (strcmp(oldfile, extra_privs) == 0) ||
@@ -359,7 +383,7 @@ delete_entry(
 						status = ERROR;
 						break;
 					}
-					if (match_entry(copy, match)) {
+					if (match_entry(copy, match2)) {
 						nomatch = B_FALSE;
 					} else {
 						if ((fputs(line, newfp)) ==
@@ -381,6 +405,8 @@ delete_entry(
 	(void) fclose(fp);
 	free(tptr);
 	free(copy);
+	if (match2)
+		free(match2);
 
 	/* Make sure that the file is on disk */
 	if (fflush(newfp) != 0 || fsync(fileno(newfp)) != 0)
@@ -516,6 +542,7 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 			if (is_blank(line))
 				continue;
 			/* sanity-check */
+			/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 			if (sscanf(line, "%s%s", drv, entry) != 2) {
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    filename, line);
@@ -557,6 +584,7 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 			if (is_blank(line))
 				continue;
 			/* sanity-check */
+			/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 			if (sscanf(line, "%s%s", drv, entry) != 2) {
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    filename, line);
@@ -913,7 +941,17 @@ check_name_to_major(int mode)
 int
 build_filenames(char *basedir)
 {
-	int len;
+	int	len;
+	int	driver_aliases_len;
+	int	driver_classes_len;
+	int	minor_perm_len;
+	int	name_to_major_len;
+	int	rem_name_to_major_len;
+	int	add_rem_lock_len;
+	int	tmphold_len;
+	int	devfs_root_len;
+	int	device_policy_len;
+	int	extra_privs_len;
 
 	if (basedir == NULL) {
 		driver_aliases = DRIVER_ALIAS;
@@ -928,19 +966,29 @@ build_filenames(char *basedir)
 		extra_privs = EXTRA_PRIVS;
 
 	} else {
-		len = strlen(basedir);
+		len = strlen(basedir) + 1;
 
-		driver_aliases = malloc(len + sizeof (DRIVER_ALIAS));
-		driver_classes = malloc(len + sizeof (DRIVER_CLASSES));
-		minor_perm = malloc(len + sizeof (MINOR_PERM));
-		name_to_major = malloc(len + sizeof (NAM_TO_MAJ));
-		rem_name_to_major = malloc(len + sizeof (REM_NAM_TO_MAJ));
-		add_rem_lock = malloc(len + sizeof (ADD_REM_LOCK));
-		tmphold = malloc(len + sizeof (TMPHOLD));
-		devfs_root = malloc(len + sizeof (DEVFS_ROOT));
-		device_policy = malloc(len + sizeof (DEV_POLICY));
-		extra_privs = malloc(len + sizeof (EXTRA_PRIVS));
+		driver_aliases_len = len + sizeof (DRIVER_ALIAS);
+		driver_classes_len = len + sizeof (DRIVER_CLASSES);
+		minor_perm_len = len + sizeof (MINOR_PERM);
+		name_to_major_len = len + sizeof (NAM_TO_MAJ);
+		rem_name_to_major_len = len + sizeof (REM_NAM_TO_MAJ);
+		add_rem_lock_len = len + sizeof (ADD_REM_LOCK);
+		tmphold_len = len + sizeof (TMPHOLD);
+		devfs_root_len = len + sizeof (DEVFS_ROOT);
+		device_policy_len = len + sizeof (DEV_POLICY);
+		extra_privs_len = len + sizeof (EXTRA_PRIVS);
 
+		driver_aliases = malloc(driver_aliases_len);
+		driver_classes = malloc(driver_classes_len);
+		minor_perm = malloc(minor_perm_len);
+		name_to_major = malloc(name_to_major_len);
+		rem_name_to_major = malloc(rem_name_to_major_len);
+		add_rem_lock = malloc(add_rem_lock_len);
+		tmphold = malloc(tmphold_len);
+		devfs_root = malloc(devfs_root_len);
+		device_policy = malloc(device_policy_len);
+		extra_privs = malloc(extra_privs_len);
 
 		if ((driver_aliases == NULL) ||
 		    (driver_classes == NULL) ||
@@ -956,17 +1004,26 @@ build_filenames(char *basedir)
 			return (ERROR);
 		}
 
-		(void) sprintf(driver_aliases, "%s%s", basedir, DRIVER_ALIAS);
-		(void) sprintf(driver_classes, "%s%s", basedir, DRIVER_CLASSES);
-		(void) sprintf(minor_perm, "%s%s", basedir, MINOR_PERM);
-		(void) sprintf(name_to_major, "%s%s", basedir, NAM_TO_MAJ);
-		(void) sprintf(rem_name_to_major, "%s%s", basedir,
-		    REM_NAM_TO_MAJ);
-		(void) sprintf(add_rem_lock, "%s%s", basedir, ADD_REM_LOCK);
-		(void) sprintf(tmphold, "%s%s", basedir, TMPHOLD);
-		(void) sprintf(devfs_root, "%s%s", basedir, DEVFS_ROOT);
-		(void) sprintf(device_policy, "%s%s", basedir, DEV_POLICY);
-		(void) sprintf(extra_privs, "%s%s", basedir, EXTRA_PRIVS);
+		(void) snprintf(driver_aliases, driver_aliases_len,
+		    "%s%s", basedir, DRIVER_ALIAS);
+		(void) snprintf(driver_classes, driver_classes_len,
+		    "%s%s", basedir, DRIVER_CLASSES);
+		(void) snprintf(minor_perm, minor_perm_len,
+		    "%s%s", basedir, MINOR_PERM);
+		(void) snprintf(name_to_major, name_to_major_len,
+		    "%s%s", basedir, NAM_TO_MAJ);
+		(void) snprintf(rem_name_to_major, rem_name_to_major_len,
+		    "%s%s", basedir, REM_NAM_TO_MAJ);
+		(void) snprintf(add_rem_lock, add_rem_lock_len,
+		    "%s%s", basedir, ADD_REM_LOCK);
+		(void) snprintf(tmphold, tmphold_len,
+		    "%s%s", basedir, TMPHOLD);
+		(void) snprintf(devfs_root, devfs_root_len,
+		    "%s%s", basedir, DEVFS_ROOT);
+		(void) snprintf(device_policy, device_policy_len,
+		    "%s%s", basedir, DEV_POLICY);
+		(void) snprintf(extra_privs, extra_privs_len,
+		    "%s%s", basedir, EXTRA_PRIVS);
 	}
 
 	return (NOERR);
@@ -1023,7 +1080,6 @@ exec_devfsadm(
 	char maj_num[128];
 	char *previous;
 	char *current;
-	int exec_status;
 	int len;
 	int rv;
 
@@ -1045,7 +1101,7 @@ exec_devfsadm(
 	cmdline[n++] = "-i";
 	cmdline[n++] = driver_name;
 	cmdline[n++] = "-m";
-	(void) sprintf(maj_num, "%lu", major_num);
+	(void) snprintf(maj_num, sizeof (maj_num), "%lu", major_num);
 	cmdline[n++] = maj_num;
 
 	if (aliases != NULL) {
@@ -1249,6 +1305,7 @@ update_minor_entry(char *driver_name, char *perm_list)
 		return (ERROR);
 	}
 
+	/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 	if (sscanf(perm_list, "%s%s%s%s", minor, perm, own, grp) != 4) {
 		status = ERROR;
 	}
@@ -1276,6 +1333,7 @@ update_minor_entry(char *driver_name, char *perm_list)
 		}
 
 		/* get the driver name */
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		if (sscanf(dup, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    minor_perm, line);
@@ -1311,10 +1369,12 @@ update_minor_entry(char *driver_name, char *perm_list)
 			/* if it has a comment, keep it */
 			if (cp != NULL) {
 				cp++; /* skip a terminator */
-				(void) sprintf(line, "%s:%s %s %s %s #%s\n",
+				(void) snprintf(line, sizeof (line),
+				    "%s:%s %s %s %s #%s\n",
 				    drv, minor, perm, own, grp, cp);
 			} else {
-				(void) sprintf(line, "%s:%s %s %s %s\n",
+				(void) snprintf(line, sizeof (line),
+				    "%s:%s %s %s %s\n",
 				    drv, minor, perm, own, grp);
 			}
 			match = 1;
@@ -1331,7 +1391,8 @@ update_minor_entry(char *driver_name, char *perm_list)
 
 	if (!match) {
 		(void) bzero(line, sizeof (&line[0]));
-		(void) sprintf(line, "%s:%s %s %s %s\n",
+		(void) snprintf(line, sizeof (line),
+		    "%s:%s %s %s %s\n",
 		    driver_name, minor, perm, own, grp);
 
 		/* add the new entry */
@@ -1419,6 +1480,7 @@ list_entry(
 		if (is_blank(line))
 			continue;
 		/* sanity-check */
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		if (sscanf(line, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
@@ -1501,6 +1563,7 @@ check_perm_opts(char *perm_list)
 		current_head = get_entry(previous_head, one_entry, ',', 0);
 
 		previous_head = current_head;
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		scan_stat = sscanf(one_entry, "%s%s%s%s%s", minor, perm, own,
 		    grp, dumb);
 
@@ -1598,14 +1661,12 @@ err_out:
  *	exist as alias name in /etc/driver_aliases
  */
 int
-aliases_exist(char *drvname, char *aliases)
+aliases_exist(char *aliases)
 {
 	char *current_head;
 	char *previous_head;
 	char *one_entry;
 	int len;
-	int is_unique;
-	int err;
 
 	len = strlen(aliases);
 
@@ -1622,7 +1683,7 @@ aliases_exist(char *drvname, char *aliases)
 		current_head = get_entry(previous_head, one_entry, ' ', 1);
 		previous_head = current_head;
 
-		if ((err = unique_drv_alias(one_entry)) != NOT_UNIQUE)
+		if (unique_drv_alias(one_entry) != NOT_UNIQUE)
 			goto err_out;
 
 		if (!is_token(one_entry)) {
@@ -1735,6 +1796,7 @@ unique_drv_alias(char *drv_alias)
 			if (is_blank(line))
 				continue;
 			/* sanity-check */
+			/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 			if (sscanf(line, "%s %s", drv, alias) != 2)
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    driver_aliases, line);
@@ -1827,6 +1889,7 @@ check_duplicate_driver_alias(char *driver_name, char *drv_alias)
 		if (is_blank(line))
 			continue;
 		/* sanity-check */
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		if (sscanf(line, "%s %s", drv, alias) != 2)
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    driver_aliases, line);
@@ -2130,7 +2193,8 @@ update_name_to_major(char *driver_name, major_t *major_num, int server)
 		return (ERROR);
 	}
 
-	(void) sprintf(drv_majnum_str, "%d", new_maj);
+	(void) snprintf(drv_majnum_str, sizeof (drv_majnum_str),
+	    "%d", new_maj);
 	if (do_the_update(driver_name, drv_majnum_str) == ERROR) {
 		return (ERROR);
 	}
@@ -2167,6 +2231,7 @@ fill_n2m_array(char *filename, char **array, int *nelems)
 		if (is_blank(line))
 			continue;
 		/* sanity-check */
+		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
 		if (sscanf(line, "%s %llu", drv, &dnum) != 2) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    filename, line);

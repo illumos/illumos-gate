@@ -66,7 +66,7 @@ static struct dev_list *conflict_lst = NULL;
 static int module_not_found(char *, char *, int, char **, int *);
 static void usage();
 static int update_minor_perm(char *, char *);
-static int devfs_update_minor_perm(char *, char *, char *);
+static int devfs_update_minor_perm(char *, char *);
 static int update_driver_classes(char *, char *);
 static int drv_name_conflict(di_node_t);
 static int devfs_node(di_node_t node, void *arg);
@@ -427,7 +427,7 @@ main(int argc, char *argv[])
 		}
 		if (m_flag) {
 			if (devfs_update_minor_perm(basedir,
-			    driver_name, perms) == ERROR) {
+			    driver_name) == ERROR) {
 				err_exit();
 			}
 		}
@@ -547,8 +547,7 @@ update_minor_perm(
 static int
 devfs_update_minor_perm(
 	char *basedir,
-	char *driver_name,
-	char *perm_list)
+	char *driver_name)
 {
 	int rval = 0;
 
@@ -657,7 +656,8 @@ devfs_node(di_node_t node, void *arg)
 	 */
 	if (drv_name_match(compat_names, n_names, binding_name, new_drv)) {
 		devfsnm = di_devfs_path(node);
-		(void) sprintf(strbuf, "%s%s", DEVFS_ROOT, devfsnm);
+		(void) snprintf(strbuf, sizeof (strbuf),
+		    "%s%s", DEVFS_ROOT, devfsnm);
 		di_devfs_path_free(devfsnm);
 		new_entry = (struct dev_list *)calloc(1,
 		    sizeof (struct dev_list));
