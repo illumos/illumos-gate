@@ -17,7 +17,7 @@
 #
 # CDDL HEADER END
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 include ../../Makefile.cmd
@@ -42,6 +42,7 @@ SUNPERF = $(SPRO_VROOT)/prod/lib
 SUNPV9B = $(SUNPERF)/v9b
 SUNPV9  = $(SUNPERF)/v9
 VISARCH = -m64 -xarch=sparcvis2
+SHELL = /bin/ksh
 
 CHIP = -xchip=ultra3
 
@@ -49,10 +50,10 @@ INCLUDES = -I. -I$(SPRO_VROOT)/prod/include/cc \
            -I../../fm/modules/sun4u/fps-transport
 
 CFLAGS64 += $(INCLUDES) -D_sparc64 -DV9B -g -xO3 -xildoff -_cc=-W2,-whole \
-            $(CHIP) -_cc=-fsimple=0 $(VISARCH) \
+            $(CHIP) -_cc=-fsimple=0 $(VISARCH) -_gcc="-D__SUNPRO_C=1"\
             -erroff=E_ASM_DISABLES_OPTIMIZATION
 
-LDLIBS  += -lc -lsysevent -lnvpair -lkstat -lm -lnsl
+LDLIBS  += -lc -lsysevent -lnvpair -lkstat -lm -lnsl -lpicl
 
 FBEFLAGS = -xildoff -D_sparc64 -DV9B $(VISARCH)
 
@@ -77,7 +78,14 @@ FPUOBJS = $(SDCOBJS) fputest.o fpu_fsr_test.o fsr_test.o \
           benchmarks.o fps_ereport_mod.o util.o
 
 AS_FLAGS += $(VISARCH) -P -D_ASM -D_sparc64
-LINTFLAGS64 += $(INCLUDES) -D_sparc64 -DV9B
+
+VER:sh = \
+	if [ -f ../compilercheck/compilercheck ]; \
+	then \
+	../compilercheck/compilercheck; echo $?; \
+	fi
+
+LINTFLAGS64 += $(INCLUDES) -D_sparc64 -DV9B -DLAPA_COMP_PERF_$(VER)
 
 .KEEP_STATE:
 
@@ -86,7 +94,7 @@ LINTFLAGS64 += $(INCLUDES) -D_sparc64 -DV9B
 all: $(PROG)
 
 .c.o:
-	$(COMPILE.c) $<
+	$(COMPILE.c) -DLAPA_COMP_PERF_$(VER) $<
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)
 

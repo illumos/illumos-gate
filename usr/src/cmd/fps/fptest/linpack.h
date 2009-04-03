@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LINPACK_H
 #define	_LINPACK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,26 +82,32 @@ struct LinpVals {
 #undef FPS_LAPA_LIB10
 #undef FPS_LAPA_LIB11
 #undef FPS_LAPA_LIB12
+#undef FPS_LAPA_LIB13
 #undef FPS_LAPA_UNK
 
 
+/* SS13 */
+#if (LAPA_COMP_PERF_5 == 1)
+#define	FPS_LAPA_LIB13
+
+/* QA SS12 */
+#elif (LAPA_COMP_PERF_4 == 1)
+#define	FPS_LAPA_LIB13
+
 /* SS12 */
-#if (__SUNPRO_C == 0x590)
+#elif (LAPA_COMP_PERF_3 == 1)
 #define	FPS_LAPA_LIB12
 
 /* SS11 */
-#elif (__SUNPRO_C == 0x580)
+#elif (LAPA_COMP_PERF_2 == 1)
 #define	FPS_LAPA_LIB11
 
-/* SOS10 */
-#elif (__SUNPRO_C == 0x570)
-#define	FPS_LAPA_LIB10
-
 /* SOS8 */
-#elif (__SUNPRO_C == 0x550)
+#elif (LAPA_COMP_PERF_0 == 1)
 #define	FPS_LAPA_LIB8
 
 #else
+
 #define	FPS_LAPA_UNK
 #endif
 
@@ -127,6 +131,10 @@ struct LinpVals {
 #include <singdoub64v9b_ss12.h>
 #endif
 
+#ifdef FPS_LAPA_LIB13
+#include <singdoub64v9b_ss13.h>
+#endif
+
 #else
 
 #ifdef FPS_LAPA_LIB8
@@ -144,6 +152,10 @@ struct LinpVals {
 
 #ifdef FPS_LAPA_LIB12
 #include <singdoub64_ss12.h>
+#endif
+
+#ifdef FPS_LAPA_LIB13
+#include <singdoub64_ss13.h>
 #endif
 
 #endif /* V9B */

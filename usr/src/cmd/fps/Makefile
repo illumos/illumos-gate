@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.cmd
 
@@ -36,7 +35,7 @@ lint := TARGET = lint
 _msg := TARGET = _msg
 check := TARGET = check
 
-SUBDIRS = fpsd fptest
+SUBDIRS = fpsd compilercheck fptest
 
 all clean clobber install lint _msg: $(SUBDIRS)
 
