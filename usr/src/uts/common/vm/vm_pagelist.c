@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2570,8 +2570,9 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
 			 * If pfnhi is not PFNNULL, look for large page below
 			 * pfnhi. PFNNULL signifies no pfn requirement.
 			 */
-			if ((pfnhi != PFNNULL && pp->p_pagenum >= pfnhi) ||
-			    (pfnlo != PFNNULL && pp->p_pagenum < pfnlo)) {
+			if (pp &&
+			    ((pfnhi != PFNNULL && pp->p_pagenum >= pfnhi) ||
+			    (pfnlo != PFNNULL && pp->p_pagenum < pfnlo))) {
 				do {
 					pp = pp->p_vpnext;
 					if (pp == firstpp) {
