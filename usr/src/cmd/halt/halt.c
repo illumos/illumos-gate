@@ -772,8 +772,7 @@ validate_zfs_err_out:
  * Returns 0 on success, -1 on failure.
  */
 static int
-validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
-    int *failsafe)
+validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg)
 {
 	const char *location;
 	int class, format;
@@ -809,15 +808,18 @@ validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
 
 	*mplen = location - arg;
 
-	if ((strstr(location, "/boot/platform")) == location)
-		*failsafe = 1;
-	else if ((strstr(location, "/platform")) == location)
-		*failsafe = 0;
-	else	{
+	if (strstr(location, "/boot/platform") == location) {
+		/*
+		 * Rebooting to failsafe.
+		 * Clear bootfs_arg and is_zfs flag.
+		 */
+		bootfs_arg[0] = 0;
+		*is_zfs = 0;
+	} else if (strstr(location, "/platform") != location) {
 		(void) fprintf(stderr,
-		    gettext("%s: %s: No /boot/platform or /platform in"
-		    " file name\n"), cmdname, arg);
-			goto err_out;
+		    gettext("%s: %s: No /platform in file name\n"),
+		    cmdname, arg);
+		goto err_out;
 	}
 
 	if ((elffd = open64(arg, O_RDONLY)) < 0 ||
@@ -926,7 +928,7 @@ fastboot_bename(const char *bename, char *mountpoint, size_t mpsz)
  */
 static int
 parse_fastboot_args(char *bootargs_buf, size_t buf_size,
-    int *is_dryrun, const char *bename, int *failsafe)
+    int *is_dryrun, const char *bename)
 {
 	char mountpoint[MAXPATHLEN];
 	char bootargs_saved[BOOTARGS_MAX];
@@ -1125,7 +1127,7 @@ parse_fastboot_args(char *bootargs_buf, size_t buf_size,
 	unixlen = strlen(unixfile);
 	if (unixlen > 0) {
 		if (validate_unix(unixfile, &mplen, &is_zfs,
-		    bootfs_arg, failsafe) != 0) {
+		    bootfs_arg) != 0) {
 			/* Not a valid unix file */
 			return (EINVAL);
 		} else {
@@ -1212,7 +1214,6 @@ main(int argc, char *argv[])
 	zoneid_t zoneid = getzoneid();
 	int need_check_zones = 0;
 	char bootargs_buf[BOOTARGS_MAX];
-	int failsafe = 0;
 	char *bename = NULL;
 
 	const char * const resetting = "/etc/svc/volatile/resetting";
@@ -1363,7 +1364,7 @@ main(int argc, char *argv[])
 		}
 
 		rc = parse_fastboot_args(bootargs_buf, sizeof (bootargs_buf),
-		    &is_dryrun, bename, &failsafe);
+		    &is_dryrun, bename);
 
 		/*
 		 * If dry run, or if arguments are invalid, return.
@@ -1548,14 +1549,8 @@ main(int argc, char *argv[])
 	if (cmd == A_DUMP && nosync != 0)
 		(void) uadmin(A_DUMP, AD_NOSYNC, NULL);
 
-	if (fast_reboot) {
-		if (failsafe)
-			(void) fprintf(stderr, "Fast reboot - failsafe.\n");
-		else
-			(void) fprintf(stderr, "Fast reboot.\n");
-
+	if (fast_reboot)
 		fcn = AD_FASTREBOOT;
-	}
 
 	if (uadmin(cmd, fcn, mdep) == -1)
 		(void) fprintf(stderr, "%s: uadmin failed: %s\n",
