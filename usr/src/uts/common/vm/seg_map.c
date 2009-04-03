@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,7 +400,7 @@ segmap_create(struct seg *seg, void *argsp)
 	 * knowledge that no locks are needed here.
 	 */
 	smd_smap = smd->smd_sm =
-		kmem_alloc(sizeof (struct smap) * npages, KM_SLEEP);
+	    kmem_alloc(sizeof (struct smap) * npages, KM_SLEEP);
 
 	for (smp = &smd->smd_sm[MAP_PAGES(seg) - 1];
 	    smp >= smd->smd_sm; smp--) {
@@ -455,7 +455,7 @@ segmap_create(struct seg *seg, void *argsp)
 	 * smap element so there is no need to check for NULL.
 	 */
 	smd_cpu =
-		kmem_zalloc(sizeof (union segmap_cpu) * max_ncpus, KM_SLEEP);
+	    kmem_zalloc(sizeof (union segmap_cpu) * max_ncpus, KM_SLEEP);
 	for (i = 0, scpu = smd_cpu; i < max_ncpus; i++, scpu++) {
 		int j;
 		for (j = 0; j < smd_ncolor; j++)
@@ -463,9 +463,7 @@ segmap_create(struct seg *seg, void *argsp)
 		scpu->scpu.scpu_last_smap = smd_smap;
 	}
 
-	if (vpm_enable) {
-		vpm_init();
-	}
+	vpm_init();
 
 #ifdef DEBUG
 	/*
@@ -544,8 +542,7 @@ segmap_unlock(
 			hat_setrefmod(pp);
 		} else if (rw != S_OTHER) {
 			TRACE_3(TR_FAC_VM, TR_SEGMAP_FAULT,
-				"segmap_fault:pp %p vp %p offset %llx",
-				pp, vp, off);
+			"segmap_fault:pp %p vp %p offset %llx", pp, vp, off);
 			hat_setref(pp);
 		}
 
@@ -629,7 +626,7 @@ segmap_fault(
 		newpage = smp->sm_flags & SM_KPM_NEWPAGE;
 		if (newpage) {
 			cmn_err(CE_WARN, "segmap_fault: newpage? smp %p",
-				(void *)smp);
+			    (void *)smp);
 		}
 
 		if (type != F_SOFTUNLOCK) {
@@ -668,8 +665,8 @@ segmap_fault(
 			hat_setrefmod(pp);
 		} else {
 			TRACE_3(TR_FAC_VM, TR_SEGMAP_FAULT,
-				"segmap_fault:pp %p vp %p offset %llx",
-				pp, vp, off);
+			    "segmap_fault:pp %p vp %p offset %llx",
+			    pp, vp, off);
 			hat_setref(pp);
 		}
 
@@ -703,7 +700,7 @@ segmap_fault(
 	}
 
 	TRACE_3(TR_FAC_VM, TR_SEGMAP_GETPAGE,
-		"segmap_getpage:seg %p addr %p vp %p", seg, addr, vp);
+	    "segmap_getpage:seg %p addr %p vp %p", seg, addr, vp);
 	err = VOP_GETPAGE(vp, (offset_t)off, len, &prot, pl, MAXBSIZE,
 	    seg, addr, rw, CRED(), NULL);
 
@@ -823,7 +820,7 @@ segmap_faulta(struct seg *seg, caddr_t addr)
 	}
 
 	TRACE_3(TR_FAC_VM, TR_SEGMAP_GETPAGE,
-		"segmap_getpage:seg %p addr %p vp %p", seg, addr, vp);
+	    "segmap_getpage:seg %p addr %p vp %p", seg, addr, vp);
 
 	err = VOP_GETPAGE(vp, (offset_t)(off + ((offset_t)((uintptr_t)addr
 	    & MAXBOFFSET))), PAGESIZE, (uint_t *)NULL, (page_t **)NULL, 0,
@@ -858,9 +855,9 @@ segmap_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
 	if (pgno != 0) {
-		do
+		do {
 			protv[--pgno] = smd->smd_prot;
-		while (pgno != 0);
+		} while (pgno != 0);
 	}
 	return (0);
 }
@@ -1253,7 +1250,7 @@ skip_queue:
 			sm->sm_want++;
 			mutex_exit(&sm->sm_freeq[1].smq_mtx);
 			cv_wait(&sm->sm_free_cv,
-				&sm->sm_freeq[0].smq_mtx);
+			    &sm->sm_freeq[0].smq_mtx);
 			sm->sm_want--;
 			mutex_exit(&sm->sm_freeq[0].smq_mtx);
 			sm = &smd_free[free_ndx];
@@ -1846,7 +1843,7 @@ vrfy_smp:
 				    pp->p_offset == baseoff)) {
 					page_unlock(pp);
 					pp = page_lookup(vp, baseoff,
-						SE_SHARED);
+					    SE_SHARED);
 				}
 			} else {
 				pp = page_lookup(vp, baseoff, SE_SHARED);
@@ -2004,8 +2001,8 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 		}
 
 		TRACE_3(TR_FAC_VM, TR_SEGMAP_RELMAP,
-			"segmap_relmap:seg %p addr %p smp %p",
-			seg, addr, smp);
+		    "segmap_relmap:seg %p addr %p smp %p",
+		    seg, addr, smp);
 
 		smtx = SMAPMTX(smp);
 
@@ -2031,8 +2028,8 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 		smp = GET_SMAP(seg, addr);
 
 		TRACE_3(TR_FAC_VM, TR_SEGMAP_RELMAP,
-			"segmap_relmap:seg %p addr %p smp %p",
-			seg, addr, smp);
+		    "segmap_relmap:seg %p addr %p smp %p",
+		    seg, addr, smp);
 
 		smtx = SMAPMTX(smp);
 		mutex_enter(smtx);
@@ -2092,7 +2089,7 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 				if (smp->sm_flags & SM_NOTKPM_RELEASED) {
 					smp->sm_flags &= ~SM_NOTKPM_RELEASED;
 					hat_unload(kas.a_hat, addr, MAXBSIZE,
-						HAT_UNLOAD);
+					    HAT_UNLOAD);
 				}
 
 			} else {
@@ -2101,7 +2098,7 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 
 				smp->sm_flags &= ~SM_NOTKPM_RELEASED;
 				hat_unload(kas.a_hat, addr, MAXBSIZE,
-					HAT_UNLOAD);
+				    HAT_UNLOAD);
 			}
 		}
 		segmap_smapadd(smp);	/* add to free list */
@@ -2163,7 +2160,7 @@ segmap_dump(struct seg *seg)
 				if (pp) {
 					pfn = page_pptonum(pp);
 					dump_addpage(seg->s_as,
-						addr + off, pfn);
+					    addr + off, pfn);
 					if (we_own_it)
 						page_unlock(pp);
 				}

@@ -550,6 +550,8 @@ extern void	sfmmu_clear_utsbinfo(void);
 
 static void	sfmmu_ctx_wrap_around(mmu_ctx_t *);
 
+extern int vpm_enable;
+
 /* kpm globals */
 #ifdef	DEBUG
 /*
@@ -7118,6 +7120,13 @@ retry_xhat:
 		sfmmu_kpm_pageunload(pp);
 	ASSERT(!PP_ISMAPPED_KPM(pp));
 #endif
+	/*
+	 * Clear vpm reference. Since the page is exclusively locked
+	 * vpm cannot be referencing it.
+	 */
+	if (vpm_enable) {
+		pp->p_vpmref = 0;
+	}
 
 	index = PP_MAPINDEX(pp);
 	cons = TTE8K;
@@ -8207,6 +8216,9 @@ hat_page_getshare(page_t *pp)
 	if (kpm_enable)
 		cnt += spp->p_kpmref;
 #endif
+	if (vpm_enable && pp->p_vpmref) {
+		cnt += 1;
+	}
 
 	/*
 	 * If we have any large mappings, we count the number of
@@ -8242,8 +8254,14 @@ hat_page_checkshare(page_t *pp, ulong_t sh_thresh)
 
 	pml = sfmmu_mlist_enter(pp);
 
+#ifdef VAC
 	if (kpm_enable)
 		cnt = pp->p_kpmref;
+#endif
+
+	if (vpm_enable && pp->p_vpmref) {
+		cnt += 1;
+	}
 
 	if (pp->p_share + cnt > sh_thresh) {
 		sfmmu_mlist_exit(pml);

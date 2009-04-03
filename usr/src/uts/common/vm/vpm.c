@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - generic vnode page mapping interfaces.
@@ -62,10 +61,20 @@
 #include <vm/rm.h>
 #include <vm/vpm.h>
 
+
+#ifdef	SEGKPM_SUPPORT
 /*
- * Needs to be enabled by each platform.
+ * VPM can be disabled by setting vpm_enable = 0 in
+ * /etc/system.
+ *
  */
+int vpm_enable = 1;
+
+#else
+
 int vpm_enable = 0;
+
+#endif
 
 #ifdef	SEGKPM_SUPPORT
 
@@ -162,7 +171,11 @@ vpm_init()
 	int i, ndx;
 	extern void prefetch_smap_w(void *);
 
-	if (!vpm_cache_enable) {
+	if (!kpm_enable) {
+		vpm_enable = 0;
+	}
+
+	if (!vpm_enable || !vpm_cache_enable) {
 		return;
 	}
 
@@ -172,6 +185,10 @@ vpm_init()
 	vpm_cache_size = mmu_ptob((physmem * vpm_cache_percent)/100);
 	if (vpm_cache_size < VPMAP_MINCACHE) {
 		vpm_cache_size = VPMAP_MINCACHE;
+	}
+
+	if (vpm_cache_size > VPMAP_MAXCACHE) {
+		vpm_cache_size = VPMAP_MAXCACHE;
 	}
 
 	/*
@@ -209,7 +226,7 @@ vpm_init()
 	 * Allocate and initialize the freelist.
 	 */
 	vpmd_free = kmem_zalloc(vpm_nfreelist * sizeof (struct vpmfree),
-				KM_SLEEP);
+	    KM_SLEEP);
 	for (i = 0; i < vpm_nfreelist; i++) {
 
 		vpmflp = &vpmd_free[i];
@@ -225,10 +242,12 @@ vpm_init()
 
 
 	/*
-	 * Allocate and initialize the vpmap structs.
+	 * Allocate and initialize the vpmap structs. We need to
+	 * walk the array backwards as the prefetch happens in reverse
+	 * order.
 	 */
-	vpmd_vpmap = kmem_zalloc(sizeof (struct vpmap) * npages, KM_SLEEP);
-	for (vpm = vpmd_vpmap; vpm <= &vpmd_vpmap[npages - 1]; vpm++) {
+	vpmd_vpmap = kmem_alloc(sizeof (struct vpmap) * npages, KM_SLEEP);
+	for (vpm = &vpmd_vpmap[npages - 1]; vpm >= vpmd_vpmap; vpm--) {
 		struct vpmfree *vpmflp;
 		union vpm_freeq *releq;
 		struct vpmap *vpmapf;
@@ -236,11 +255,15 @@ vpm_init()
 		/*
 		 * Use prefetch as we have to walk thru a large number of
 		 * these data structures. We just use the smap's prefetch
-		 * routine as it does the same. This should work fine
-		 * for x64(this needs to be modified when enabled on sparc).
+		 * routine as it does the same.
 		 */
 		prefetch_smap_w((void *)vpm);
 
+		vpm->vpm_vp = NULL;
+		vpm->vpm_off = 0;
+		vpm->vpm_pp = NULL;
+		vpm->vpm_refcnt = 0;
+		mutex_init(&vpm->vpm_mtx, NULL, MUTEX_DEFAULT, NULL);
 		vpm->vpm_free_ndx = VPMAP2VMF_NDX(vpm);
 
 		vpmflp = VPMAP2VMF(vpm);
@@ -392,7 +415,7 @@ skip_queue:
 			vpmflp->vpm_want++;
 			mutex_exit(&vpmflp->vpm_freeq[1].vpmq_mtx);
 			cv_wait(&vpmflp->vpm_free_cv,
-				&vpmflp->vpm_freeq[0].vpmq_mtx);
+			    &vpmflp->vpm_freeq[0].vpmq_mtx);
 			vpmflp->vpm_want--;
 			mutex_exit(&vpmflp->vpm_freeq[0].vpmq_mtx);
 			vpmflp = &vpmd_free[free_ndx];
@@ -486,12 +509,12 @@ next_vpmap:
 			vpm->vpm_prev = vpm->vpm_next = NULL;
 
 			/*
-			 * Disassociate the previous page. On x64 systems
+			 * Disassociate the previous page.
 			 * p_vpmref is used as a mapping reference to the page.
 			 */
 			if ((pp = vpm->vpm_pp) != NULL &&
-				vpm->vpm_vp == pp->p_vnode &&
-				vpm->vpm_off == pp->p_offset) {
+			    vpm->vpm_vp == pp->p_vnode &&
+			    vpm->vpm_off == pp->p_offset) {
 
 				pmtx = PPMTX(pp);
 				if (page_trylock(pp, SE_SHARED)) {
@@ -502,9 +525,9 @@ next_vpmap:
 					 */
 					mutex_enter(pmtx);
 					if (PP_ISFREE(pp) ||
-						vpm->vpm_vp != pp->p_vnode ||
-						vpm->vpm_off != pp->p_offset ||
-						pp->p_vpmref != VPMID(vpm)) {
+					    vpm->vpm_vp != pp->p_vnode ||
+					    vpm->vpm_off != pp->p_offset ||
+					    pp->p_vpmref != VPMID(vpm)) {
 						mutex_exit(pmtx);
 
 						page_unlock(pp);
@@ -514,8 +537,6 @@ next_vpmap:
 						 */
 						pp->p_vpmref = 0;
 						mutex_exit(pmtx);
-						hat_kpm_mapout(pp, 0,
-							hat_kpm_page2va(pp, 1));
 						(void) page_release(pp, 1);
 					}
 				} else {
@@ -730,7 +751,7 @@ vpm_pagecreate(
 	caddr_t base;
 	u_offset_t off = baseoff;
 	int i;
-	ASSERT(nseg >= MINVMAPS && nseg < MAXVMAPS);
+	ASSERT(nseg >= MINVMAPS && nseg <= MAXVMAPS);
 
 	for (i = 0; len > 0; len -= PAGESIZE, i++) {
 		struct vpmap *vpm;
@@ -785,9 +806,6 @@ vpm_pagecreate(
  * the page addresses are returned in the SGL vml (vmap_t) array passed in.
  * The nseg is the number of vmap_t entries in the array.
  *
- * Currently max len allowed is MAXBSIZE therefore, it will either
- * fetch/create one or two pages depending on what is the PAGESIZE.
- *
  * The segmap's SM_LOCKPROTO  usage is not supported by these interfaces.
  * For such cases, use the seg_map interfaces.
  */
@@ -809,21 +827,30 @@ vpm_map_pages(
 	page_t *pp, *pplist[MAXVMAPS];
 	struct vpmap *vpm;
 	int i, error = 0;
+	size_t tlen;
 
-	ASSERT(nseg >= MINVMAPS && nseg < MAXVMAPS);
+	ASSERT(nseg >= MINVMAPS && nseg <= MAXVMAPS);
 	baseoff = off & (offset_t)PAGEMASK;
 	vml[0].vs_data = NULL;
 	vml[0].vs_addr = (caddr_t)NULL;
+
+	tlen = P2ROUNDUP(off + len, PAGESIZE) - baseoff;
 	/*
-	 * For now, lets restrict it to MAXBSIZE. XXX - We can allow
-	 * len longer then MAXBSIZE, but there should be a limit
-	 * which should be determined by how many pages the VOP_GETPAGE()
-	 * can fetch.
+	 * Restrict it to VPMMAXLEN.
 	 */
-	if (off + len > baseoff + MAXBSIZE) {
-		panic("vpm_map_pages bad len");
-		/*NOTREACHED*/
+	if (tlen > (VPMMAXPGS * PAGESIZE)) {
+		tlen = VPMMAXPGS * PAGESIZE;
 	}
+	/*
+	 * Ensure length fits within the vml[] array. One element of
+	 * the array is used to mark the end of the scatter/gather list
+	 * of valid mappings by setting its vs_addr = NULL. Leave space
+	 * for this element.
+	 */
+	if (tlen > ((nseg - 1) * PAGESIZE)) {
+		tlen = ((nseg - 1) * PAGESIZE);
+	}
+	len = tlen;
 
 	/*
 	 * If this is a block device we have to be sure to use the
@@ -832,10 +859,6 @@ vpm_map_pages(
 	if (vp->v_type == VBLK)
 		vp = common_specvp(vp);
 
-	/*
-	 * round up len to a multiple of PAGESIZE.
-	 */
-	len = ((off + len - baseoff + PAGESIZE - 1) & (uintptr_t)PAGEMASK);
 
 	if (!fetchpage)
 		return (vpm_pagecreate(vp, baseoff, len, vml, nseg, newpage));
@@ -846,18 +869,30 @@ vpm_map_pages(
 
 		/*
 		 * If we did not find the page or if this page was not
-		 * in our cache, then let VOP_GETPAGE get all the pages.
+		 * in vpm cache(p_vpmref == 0), then let VOP_GETPAGE get
+		 * all the pages.
 		 * We need to call VOP_GETPAGE so that filesytems can do some
 		 * (un)necessary tracking for sequential access.
 		 */
 
 		if (pp == NULL || (vpm_cache_enable && pp->p_vpmref == 0) ||
-			(rw == S_WRITE && hat_page_getattr(pp, P_MOD | P_REF)
-							!= (P_MOD | P_REF))) {
+		    (rw == S_WRITE && hat_page_getattr(pp, P_MOD | P_REF)
+		    != (P_MOD | P_REF))) {
+			int j;
 			if (pp != NULL) {
 				page_unlock(pp);
 			}
+			/*
+			 * If we did not find the desired set of pages,
+			 * from the page cache, just call VOP_GETPAGE to get
+			 * all the pages.
+			 */
+			for (j = 0; j < i; j++) {
+				page_unlock(pplist[j]);
+			}
 
+
+			baseoff = off & (offset_t)PAGEMASK;
 			/*
 			 * Pass a dummy address as it will be required
 			 * by page_create_va(). We pass segkmap as the seg
@@ -865,11 +900,11 @@ vpm_map_pages(
 			 */
 			base = segkpm_create_va(baseoff);
 
-			error = VOP_GETPAGE(vp, baseoff, len, &prot, &pplist[i],
-			len, segkmap, base, rw, CRED(), NULL);
+			error = VOP_GETPAGE(vp, baseoff, tlen, &prot, pplist,
+			    tlen, segkmap, base, rw, CRED(), NULL);
 			if (error) {
 				VPM_DEBUG(vpmd_getpagefailed);
-				pplist[i] = NULL;
+				pplist[0] = NULL;
 			}
 			break;
 		} else {
@@ -942,9 +977,10 @@ vpm_unmap_pages(vmap_t vml[], enum seg_rw rw)
 		}
 
 		if (vpm_cache_enable) {
-			page_unlock(pp);
 			vpm = (struct vpmap *)((char *)vml[i].vs_data
-					- offsetof(struct vpmap, vpm_pp));
+			    - offsetof(struct vpmap, vpm_pp));
+			hat_kpm_mapout(pp, 0, vml[i].vs_addr);
+			page_unlock(pp);
 			mtx = VPMAPMTX(vpm);
 			mutex_enter(mtx);
 
@@ -992,7 +1028,7 @@ vpm_data_copy(struct vnode *vp,
 	 * page boundary.
 	 */
 	error = vpm_map_pages(vp, off, (uint_t)len,
-		fetchpage, vml, MINVMAPS, &npages,  rw);
+	    fetchpage, vml, MINVMAPS, &npages,  rw);
 
 	if (newpage != NULL)
 		*newpage = npages;
@@ -1010,10 +1046,10 @@ vpm_data_copy(struct vnode *vp,
 		}
 
 		for (i = 0; !error && slen > 0 &&
-				vml[i].vs_addr != NULL; i++) {
+		    vml[i].vs_addr != NULL; i++) {
 			pn = (int)MIN(slen, (PAGESIZE - pon));
 			error = uiomove(vml[i].vs_addr + pon,
-				    (long)pn, uiorw, uio);
+			    (long)pn, uiorw, uio);
 			slen -= pn;
 			pon = 0;
 		}
@@ -1023,7 +1059,7 @@ vpm_data_copy(struct vnode *vp,
 		 * page we did not copy to.
 		 */
 		if (!fetchpage && npages &&
-			uio->uio_loffset < roundup(off + len, PAGESIZE)) {
+		    uio->uio_loffset < roundup(off + len, PAGESIZE)) {
 			int nzero;
 
 			pon = (uio->uio_loffset & PAGEOFFSET);

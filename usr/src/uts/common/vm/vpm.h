@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_VM_VPM_H
 #define	_VM_VPM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,17 +37,17 @@ extern "C" {
  * to change without notice. Use them at your own risk.
  *
  * At this stage these interfaces are provided only to utilize the
- * segkpm mappings and are enabled for solaris x64. Therefore these
- * interfaces have to be used under the 'vpm_enable' check as an
- * alternative to segmap interfaces where applicable.
+ * segkpm mappings. Therefore these interfaces have to be used under
+ * the 'vpm_enable' check as an alternative to segmap interfaces where
+ * applicable.
  *
  * The VPM interfaces provide temporary mappings to file pages. They
  * return the mappings in a scatter gather list(SGL).
  * The SGL elements are the structure 'vmap_t'.
  *
  *	typedef struct vmap {
- *		caddr_t	vs_addr;        / public /
- *		size_t	vs_len;         / public - Currently not used /
+ *		caddr_t	vs_addr;        / public - mapped address /
+ *		size_t	vs_len;         / public - length of mapping /
  *		void	*vs_data;	/ opaque - private data /
  *	} vmap_t;
  *
@@ -65,15 +64,9 @@ extern "C" {
  * and the caller should not access or modify it.
  *
  * Using a scatter gather list to return the mappings and length makes it
- * possible to provide mappings of variable length. Currently mapping length
- * of only 'PAGESIZE' per vmap_t is possible. Also, similar to the segmap
- * interfaces, on each request, the max length of 'MAXBSIZE' is supported
- * for now. The MAXBSIZE mappings will be returned in 1 or 2 vmap_t elements
- * of the SGL depending on the PAGESIZE. The scatter gather list array size
- * needs to be a minimum of MINVMAPS elements to accommodate MAXBSIZE.
- * The MAXBSIZE restriction exists because the filesystems are not capable
- * of handling more(disk block allocations at a time) for now.
- *
+ * possible to provide mappings of variable length. Mapping length upto
+ * VPMMAXLEN is supported.  The scatter gather list array size needs to
+ * be a minimum of MINVMAPS elements.
  *
  * Interfaces:
  *
@@ -84,11 +77,11 @@ extern "C" {
  * This function returns mappings to vnode pages.
  *
  * It takes a vnode, offset and length and returns mappings to the  pages
- * covering the range [off, off +len) in the vmap_t SGL array 'vml'.
- * Currently these interfaces are subject to restrictions similar to the segmap
- * interfaces. The length passed in should satisfy the following criteria.
- * '(off + len)  <= ((off & PAGEMASK) + MAXBSIZE)'
- * The mapped address returned, in 'vs_addr', are for the page boundary.
+ * covering the range [off, off + len) in the vmap_t SGL array 'vml'.
+ * The length passed in should satisfy the following criteria
+ * '(off + len)  <= ((off & PAGEMASK) + VPMMAXLEN)'
+ * The mapped address returned, in 'vs_addr', of first vml[] entry
+ * is at begining of page containing 'off'.
  *
  * The 'vmlsz' is the size(# elements) of the 'vml' array.
  *
@@ -102,10 +95,10 @@ extern "C" {
  * The 'seg_rw rw' indicates the intended operation on these mappings
  * (S_WRITE or S_READ).
  *
- * Currently these interfaces only return segkpm mappings. Therefore the
- * vnode pages that are being accessed will be locked(at least SHARED locked)
- * for the duration these mappings are in use. After use, the  unmap
- * function, vpm_unmap_pages(), has to be called and the same SGL array
+ * Currently these interfaces only return segkpm mappings. The vnode pages
+ * that are being accessed will be locked(at least SHARED locked) for the
+ * duration these mappings are in use. After use, the  unmap function,
+ * vpm_unmap_pages(), has to be called and the same SGL array
  * needs to be passed to the unmap function.
  *
  *
@@ -169,8 +162,6 @@ extern "C" {
  * The 'fetchpage' and 'newpagecreated' are same as explained before.
  * The 'zerostart' flag when set will zero fill start of the page till the
  * offset 'off' in the first page. i.e  from 'off & PAGEMASK' to 'off'.
- * Here too the MAXBSIZE restriction mentioned above applies to the length
- * requested.
  *
  *
  * int vpm_sync_pages(struct vnode *vp, u_offset_t off,
@@ -191,6 +182,8 @@ extern "C" {
  * vpm cache related definitions.
  */
 #define	VPMAP_MINCACHE		(64 * 1024 * 1024)
+#define	VPMAP_MAXCACHE		(256L * 1024L * 1024L * 1024L)  /* 256G */
+
 
 /*
  * vpm caching mode
@@ -256,12 +249,30 @@ typedef struct vmap {
 	void	*vs_data;	/* opaque - private data */
 } vmap_t;
 
+#define	VPM_FETCHPAGE 0x01	/* fault in pages */
+
+/*
+ * Max request length - Needs to be a multiple of
+ * 8192 (PAGESIZE on sparc) so it works properly on both
+ * x86 & sparc systems. Max set to 128k.
+ */
+#define	VPMMAXLEN	(128*1024)
+
 /*
  * The minimum and maximum number of array elements in the scatter
  * gather list.
  */
 #define	MINVMAPS   3		/* ((MAXBSIZE/4096 + 1)  min # mappings */
-#define	MAXVMAPS   10		/* Max # the scatter gather list */
+#if defined(__sparc)
+#define	VPMMAXPGS	(VPMMAXLEN/8192)	/* Max # pages at a time */
+#else
+#define	VPMMAXPGS	(VPMMAXLEN/4096)
+#endif
+#define	MAXVMAPS	(VPMMAXPGS + 1)		/* Max # elements in the */
+						/* scatter gather list */
+						/* +1 element to mark the */
+						/* end of the list of valid */
+						/*  mappings */
 
 #ifdef _KERNEL
 

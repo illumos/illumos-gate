@@ -1969,7 +1969,6 @@ startup_vm(void)
 	if (kpm_desired) {
 		kpm_init();
 		kpm_enable = 1;
-		vpm_enable = 1;
 	}
 
 	/*
