@@ -1385,7 +1385,7 @@ set_devpm_d0(uchar_t bus, uchar_t dev, uchar_t func)
 
 	header = pci_getb(bus, dev, func, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M;
 	if (header == PCI_HEADER_CARDBUS)
-		cap_ptr = pci_getb(bus, dev, func, PCI_CBUS_RESERVED1);
+		cap_ptr = pci_getb(bus, dev, func, PCI_CBUS_CAP_PTR);
 	else
 		cap_ptr = pci_getb(bus, dev, func, PCI_CONF_CAP_PTR);
 	/*

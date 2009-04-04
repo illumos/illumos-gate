@@ -31,11 +31,9 @@
 #include <sys/pci_cap.h>
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Generic PCI Capabilites Interface for all pci platforms
@@ -126,6 +124,7 @@ found:
 int
 pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 {
+	uint8_t header;
 	uint16_t status, base;
 
 	status = pci_config_get16(h, PCI_CONF_STAT);
@@ -133,7 +132,24 @@ pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
 		return (DDI_FAILURE);
 
-	for (base = pci_config_get8(h, PCI_CONF_CAP_PTR); base;
+	header = pci_config_get8(h, PCI_CONF_HEADER);
+	switch (header & PCI_HEADER_TYPE_M) {
+	case PCI_HEADER_ZERO:
+		base = PCI_CONF_CAP_PTR;
+		break;
+	case PCI_HEADER_PPB:
+		base = PCI_BCNF_CAP_PTR;
+		break;
+	case PCI_HEADER_CARDBUS:
+		base = PCI_CBUS_CAP_PTR;
+		break;
+	default:
+		cmn_err(CE_WARN, "%s: unexpected pci header type:%x",
+			__func__, header);
+		return (DDI_FAILURE);
+	}
+
+	for (base = pci_config_get8(h, base); base;
 		base = pci_config_get8(h, base + PCI_CAP_NEXT_PTR)) {
 		if (pci_config_get8(h, base) == id) {
 			*base_p = base;

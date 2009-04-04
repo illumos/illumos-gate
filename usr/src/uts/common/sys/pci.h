@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PCI_H
 #define	_SYS_PCI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -113,7 +111,8 @@ extern "C" {
  * Header type 2 (Cardbus) offsets
  */
 #define	PCI_CBUS_SOCK_REG	0x10	/* Cardbus socket regs, 4 bytes */
-#define	PCI_CBUS_RESERVED1	0x14	/* Reserved, 2 bytes */
+#define	PCI_CBUS_CAP_PTR	0x14	/* Capability ptr, 1 byte */
+#define	PCI_CBUS_RESERVED1	0x15	/* Reserved, 1 byte */
 #define	PCI_CBUS_SEC_STATUS	0x16	/* Secondary status, 2 bytes */
 #define	PCI_CBUS_PCI_BUS_NO	0x18	/* PCI bus number, 1 byte */
 #define	PCI_CBUS_CBUS_NO	0x19	/* Cardbus bus number, 1 byte */
