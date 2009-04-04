@@ -239,7 +239,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= llc2
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mpt
 $(CLOSED_BUILD)CLOSED_DRV_KMODS += qus
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= se
-$(CLOSED_BUILD)CLOSED_DRV_KMODS += rtls
 
 #
 #       Hardware Drivers in common space
@@ -252,6 +251,7 @@ DRV_KMODS	+= mxfe
 DRV_KMODS	+= pcan
 DRV_KMODS	+= pcwl
 DRV_KMODS	+= rge
+DRV_KMODS	+= rtls
 DRV_KMODS	+= sfe
 DRV_KMODS	+= aac
 DRV_KMODS	+= igb
