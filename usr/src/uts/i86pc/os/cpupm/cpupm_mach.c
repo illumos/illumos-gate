@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/cpu_pm.h>
 #include <sys/x86_archext.h>
@@ -237,12 +241,14 @@ cpupm_init(cpu_t *cp)
 			mcpu->max_cstates = cpu_acpi_get_max_cstates(
 			    mach_state->ms_acpi_handle);
 			if (mcpu->max_cstates > CPU_ACPI_C1) {
-				hpet.callback(CST_EVENT_MULTIPLE_CSTATES);
+				(void) cstate_timer_callback(
+				    CST_EVENT_MULTIPLE_CSTATES);
 				CPU->cpu_m.mcpu_idle_cpu = cpu_acpi_idle;
 				mcpu->mcpu_idle_type = CPU_ACPI_C1;
 				disp_enq_thread = cstate_wakeup;
 			} else {
-				hpet.callback(CST_EVENT_ONE_CSTATE);
+				(void) cstate_timer_callback(
+				    CST_EVENT_ONE_CSTATE);
 			}
 			mach_state->ms_caps |= CPUPM_C_STATES;
 		} else {

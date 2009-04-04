@@ -1225,7 +1225,6 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 	cpu_sid = CPU->cpu_seqid;
 
 	ASSERT(CPU->cpu_thread == CPU->cpu_idle_thread);
-	ASSERT(interrupts_enabled());
 
 	/*
 	 * A critical section exists between when the HPET is programmed
@@ -1237,8 +1236,7 @@ hpet_use_hpet_timer(hrtime_t *lapic_expire)
 	 * a deadlock with the ISR if the ISR runs on this CPU after the
 	 * idle thread acquires the mutex but before it clears interrupts.
 	 */
-	cli();
-
+	ASSERT(!interrupts_enabled());
 	lapic_count = apic_timer_stop_count();
 	now = gethrtime();
 	dead = now + hpet_idle_spin_timeout;
@@ -1360,8 +1358,6 @@ hpet_use_lapic_timer(hrtime_t expire)
 	 */
 	if (expire != HPET_INFINITY)
 		apic_timer_restart(expire);
-
-	sti();
 }
 
 /*

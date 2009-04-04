@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/x86_archext.h>
 #include <sys/machsystm.h>
@@ -39,6 +43,9 @@
 #include <sys/sdt.h>
 #include <sys/callb.h>
 
+#define	CSTATE_USING_HPET		1
+#define	CSTATE_USING_LAT		2
+
 extern void cpu_idle_adaptive(void);
 extern uint32_t cpupm_next_cstate(cma_c_state_t *cs_data,
     cpu_acpi_cstate_t *cstates, uint32_t cs_count, hrtime_t start);
@@ -48,6 +55,15 @@ static void cpu_idle_fini(cpu_t *);
 static boolean_t cpu_deep_idle_callb(void *arg, int code);
 static boolean_t cpu_idle_cpr_callb(void *arg, int code);
 static void acpi_cpu_cstate(cpu_acpi_cstate_t *cstate);
+
+static boolean_t cstate_use_timer(hrtime_t *lapic_expire, int timer);
+
+/*
+ * the flag of always-running local APIC timer.
+ * the flag of HPET Timer use in deep cstate.
+ */
+static boolean_t cpu_cstate_arat = B_FALSE;
+static boolean_t cpu_cstate_hpet = B_FALSE;
 
 /*
  * Interfaces for modules implementing Intel's deep c-state.
@@ -99,6 +115,50 @@ cpu_idle_kstat_update(kstat_t *ksp, int flag)
 	cpu_idle_kstat.cs_power.value.ui32 = cstate->cs_power;
 
 	return (0);
+}
+
+/*
+ * Used during configuration callbacks to manage implementation specific
+ * details of the hardware timer used during Deep C-state.
+ */
+boolean_t
+cstate_timer_callback(int code)
+{
+	if (cpu_cstate_arat) {
+		return (B_TRUE);
+	} else if (cpu_cstate_hpet) {
+		return (hpet.callback(code));
+	}
+	return (B_FALSE);
+}
+
+/*
+ * Some Local APIC Timers do not work during Deep C-states.
+ * The Deep C-state idle function uses this function to ensure it is using a
+ * hardware timer that works during Deep C-states.  This function also
+ * switches the timer back to the LACPI Timer after Deep C-state.
+ */
+static boolean_t
+cstate_use_timer(hrtime_t *lapic_expire, int timer)
+{
+	if (cpu_cstate_arat)
+		return (B_TRUE);
+
+	/*
+	 * We have to return B_FALSE if no arat or hpet support
+	 */
+	if (!cpu_cstate_hpet)
+		return (B_FALSE);
+
+	switch (timer) {
+	case CSTATE_USING_HPET:
+		return (hpet.use_hpet_timer(lapic_expire));
+	case CSTATE_USING_LAT:
+		hpet.use_lapic_timer(*lapic_expire);
+		return (B_TRUE);
+	default:
+		return (B_FALSE);
+	}
 }
 
 /*
@@ -206,7 +266,7 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	uint8_t			type = cstate->cs_addrspace_id;
 	uint32_t		cs_type = cstate->cs_type;
 	int			hset_update = 1;
-	boolean_t		using_hpet_timer;
+	boolean_t		using_timer;
 
 	/*
 	 * Set our mcpu_mwait here, so we can tell if anyone tries to
@@ -270,15 +330,17 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	 * We're on our way to being halted.
 	 *
 	 * The local APIC timer can stop in ACPI C2 and deeper c-states.
-	 * Program the HPET hardware to substitute for this CPU's lAPIC timer.
-	 * hpet.use_hpet_timer() disables the LAPIC Timer.  Make sure to
-	 * start the LAPIC Timer again before leaving this function.
+	 * Try to program the HPET hardware to substitute for this CPU's
+	 * LAPIC timer.
+	 * cstate_use_timer() could disable the LAPIC Timer.  Make sure
+	 * to start the LAPIC Timer again before leaving this function.
 	 *
-	 * hpet.use_hpet_timer disables interrupts, so we will awaken
-	 * immediately after halting if someone tries to poke us between now
-	 * and the time we actually halt.
+	 * Disable interrupts here so we will awaken immediately after halting
+	 * if someone tries to poke us between now and the time we actually
+	 * halt.
 	 */
-	using_hpet_timer = hpet.use_hpet_timer(&lapic_expire);
+	cli();
+	using_timer = cstate_use_timer(&lapic_expire, CSTATE_USING_HPET);
 
 	/*
 	 * We check for the presence of our bit after disabling interrupts.
@@ -293,7 +355,9 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	 * acpi_cpu_cstate() must disable interrupts, then check for the bit.
 	 */
 	if (hset_update && bitset_in_set(&cp->cp_haltset, cpu_sid) == 0) {
-		hpet.use_lapic_timer(lapic_expire);
+		(void) cstate_use_timer(&lapic_expire,
+		    CSTATE_USING_LAT);
+		sti();
 		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 		return;
 	}
@@ -305,7 +369,9 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	 * is anything runnable we won't have to wait for the poke.
 	 */
 	if (cpup->cpu_disp->disp_nrunnable != 0) {
-		hpet.use_lapic_timer(lapic_expire);
+		(void) cstate_use_timer(&lapic_expire,
+		    CSTATE_USING_LAT);
+		sti();
 		if (hset_update) {
 			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 			bitset_atomic_del(&cp->cp_haltset, cpu_sid);
@@ -313,14 +379,16 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 		return;
 	}
 
-	if (using_hpet_timer == B_FALSE) {
+	if (using_timer == B_FALSE) {
 
-		hpet.use_lapic_timer(lapic_expire);
+		(void) cstate_use_timer(&lapic_expire,
+		    CSTATE_USING_LAT);
+		sti();
 
 		/*
 		 * We are currently unable to program the HPET to act as this
-		 * CPU's proxy lAPIC timer.  This CPU cannot enter C2 or deeper
-		 * because no timer is set to wake it up while its lAPIC timer
+		 * CPU's proxy LAPIC timer.  This CPU cannot enter C2 or deeper
+		 * because no timer is set to wake it up while its LAPIC timer
 		 * stalls in deep C-States.
 		 * Enter C1 instead.
 		 *
@@ -381,10 +449,11 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	}
 
 	/*
-	 * The lAPIC timer may have stopped in deep c-state.
-	 * Reprogram this CPU's lAPIC here before enabling interrupts.
+	 * The LAPIC timer may have stopped in deep c-state.
+	 * Reprogram this CPU's LAPIC here before enabling interrupts.
 	 */
-	hpet.use_lapic_timer(lapic_expire);
+	(void) cstate_use_timer(&lapic_expire, CSTATE_USING_LAT);
+	sti();
 
 	cpu_dtrace_idle_probe(CPU_ACPI_C0);
 
@@ -527,10 +596,18 @@ cpu_deep_cstates_supported(void)
 	if (!cpuid_deep_cstates_supported())
 		return (B_FALSE);
 
-	if ((hpet.supported != HPET_FULL_SUPPORT) || !hpet.install_proxy())
-		return (B_FALSE);
+	if (cpuid_arat_supported()) {
+		cpu_cstate_arat = B_TRUE;
+		return (B_TRUE);
+	}
 
-	return (B_TRUE);
+	if ((hpet.supported == HPET_FULL_SUPPORT) &&
+	    hpet.install_proxy()) {
+		cpu_cstate_hpet = B_TRUE;
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 /*
@@ -672,7 +749,7 @@ cpu_deep_idle_callb(void *arg, int code)
 		if ((cpu_idle_cfg_state & CPU_IDLE_DEEP_CFG) == 0)
 			break;
 
-		if (hpet.callback(PM_ENABLE_CPU_DEEP_IDLE)) {
+		if (cstate_timer_callback(PM_ENABLE_CPU_DEEP_IDLE)) {
 			disp_enq_thread = cstate_wakeup;
 			idle_cpu = cpu_idle_adaptive;
 			cpu_idle_cfg_state &= ~CPU_IDLE_DEEP_CFG;
@@ -686,7 +763,7 @@ cpu_deep_idle_callb(void *arg, int code)
 			break;
 
 		idle_cpu = non_deep_idle_cpu;
-		if (hpet.callback(PM_DISABLE_CPU_DEEP_IDLE)) {
+		if (cstate_timer_callback(PM_DISABLE_CPU_DEEP_IDLE)) {
 			disp_enq_thread = non_deep_idle_disp_enq_thread;
 			cpu_idle_cfg_state |= CPU_IDLE_DEEP_CFG;
 		}
@@ -710,7 +787,7 @@ cpu_idle_cpr_callb(void *arg, int code)
 	mutex_enter(&cpu_idle_callb_mutex);
 	switch (code) {
 	case CB_CODE_CPR_RESUME:
-		if (hpet.callback(CB_CODE_CPR_RESUME)) {
+		if (cstate_timer_callback(CB_CODE_CPR_RESUME)) {
 			/*
 			 * Do not enable dispatcher hooks if disabled by user.
 			 */
@@ -727,7 +804,7 @@ cpu_idle_cpr_callb(void *arg, int code)
 	case CB_CODE_CPR_CHKPT:
 		idle_cpu = non_deep_idle_cpu;
 		disp_enq_thread = non_deep_idle_disp_enq_thread;
-		hpet.callback(CB_CODE_CPR_CHKPT);
+		(void) cstate_timer_callback(CB_CODE_CPR_CHKPT);
 		break;
 
 	default:
@@ -793,13 +870,14 @@ cpuidle_cstate_instance(cpu_t *cp)
 		mcpu = &(cp->cpu_m);
 		mcpu->max_cstates = cpu_acpi_get_max_cstates(handle);
 		if (mcpu->max_cstates > CPU_ACPI_C1) {
-			hpet.callback(CST_EVENT_MULTIPLE_CSTATES);
+			(void) cstate_timer_callback(
+			    CST_EVENT_MULTIPLE_CSTATES);
 			disp_enq_thread = cstate_wakeup;
 			cp->cpu_m.mcpu_idle_cpu = cpu_acpi_idle;
 		} else if (mcpu->max_cstates == CPU_ACPI_C1) {
 			disp_enq_thread = non_deep_idle_disp_enq_thread;
 			cp->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
-			hpet.callback(CST_EVENT_ONE_CSTATE);
+			(void) cstate_timer_callback(CST_EVENT_ONE_CSTATE);
 		}
 		mutex_exit(&cpu_lock);
 

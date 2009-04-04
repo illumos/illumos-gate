@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #ifndef	_CPUIDLE_H
 #define	_CPUIDLE_H
@@ -62,6 +66,7 @@ extern void cpu_wakeup(cpu_t *, int);
 extern void cpu_wakeup_mwait(cpu_t *, int);
 extern void cpu_dtrace_idle_probe(uint_t);
 extern void cpuidle_manage_cstates(void *);
+extern boolean_t cstate_timer_callback(int code);
 
 #ifdef __cplusplus
 }

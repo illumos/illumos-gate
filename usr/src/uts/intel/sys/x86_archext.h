@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #ifndef _SYS_X86_ARCHEXT_H
 #define	_SYS_X86_ARCHEXT_H
@@ -371,6 +375,11 @@ extern "C" {
 #define	CPUID_TSC_CSTATE_INVARIANCE	(0x100)
 
 /*
+ * Intel Deep C-state always-running local APIC timer
+ */
+#define	CPUID_CSTATE_ARAT	(0x4)
+
+/*
  * x86_type is a legacy concept; this is supplanted
  * for most purposes by x86_feature; modern CPUs
  * should be X86_TYPE_OTHER
@@ -620,6 +629,7 @@ extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
 extern uint32_t *cpuid_mwait_alloc(struct cpu *);
 extern void cpuid_mwait_free(struct cpu *);
 extern int cpuid_deep_cstates_supported(void);
+extern int cpuid_arat_supported(void);
 extern int vmware_platform(void);
 #endif
 

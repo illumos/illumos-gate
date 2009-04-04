@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * Various routines to handle identification
@@ -3956,6 +3960,40 @@ post_startup_cpu_fixups(void)
 		no_trap();
 	}
 #endif	/* !__xpv */
+}
+
+/*
+ * Starting with the Westmere processor the local
+ * APIC timer will continue running in all C-states,
+ * including the deepest C-states.
+ */
+int
+cpuid_arat_supported(void)
+{
+	struct cpuid_info *cpi;
+	struct cpuid_regs regs;
+
+	ASSERT(cpuid_checkpass(CPU, 1));
+	ASSERT(x86_feature & X86_CPUID);
+
+	cpi = CPU->cpu_m.mcpu_cpi;
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		/*
+		 * Always-running Local APIC Timer is
+		 * indicated by CPUID.6.EAX[2].
+		 */
+		if (cpi->cpi_maxeax >= 6) {
+			regs.cp_eax = 6;
+			(void) cpuid_insn(NULL, &regs);
+			return (regs.cp_eax & CPUID_CSTATE_ARAT);
+		} else {
+			return (0);
+		}
+	default:
+		return (0);
+	}
 }
 
 #if defined(__amd64) && !defined(__xpv)
