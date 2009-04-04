@@ -121,7 +121,7 @@ main(int ac, char *av[])
 
 			snprintf(message, sizeof (message), "moved jobs to %s",
 			    destination);
-			status = papiPrinterDisable(svc, printer, message);
+			status = papiPrinterPause(svc, printer, message);
 			if (status != PAPI_OK) {
 				/*
 				 * If the user is denied the permission
@@ -152,7 +152,7 @@ main(int ac, char *av[])
 						exit_code = 1;
 					} else {
 						fprintf(stderr, gettext(
-						    "Disable %s: %s\n"),
+						    "Reject %s: %s\n"),
 						    printer,
 						    verbose_papi_message(
 						    svc, status));
@@ -160,7 +160,7 @@ main(int ac, char *av[])
 					}
 				} else {
 					fprintf(stderr, gettext(
-					    "Disable %s: %s\n"),
+					    "Reject %s: %s\n"),
 					    printer,
 					    verbose_papi_message(svc, status));
 					exit_code = 1;
