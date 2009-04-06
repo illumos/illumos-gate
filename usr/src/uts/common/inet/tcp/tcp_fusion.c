@@ -111,7 +111,7 @@ boolean_t do_tcp_fusion = B_TRUE;
  * Enabling this flag allows sockfs to retrieve data directly
  * from a fused tcp endpoint using synchronous streams interface.
  */
-boolean_t do_tcp_direct_sockfs = B_TRUE;
+boolean_t do_tcp_direct_sockfs = B_FALSE;
 
 /*
  * This is the minimum amount of outstanding writes allowed on
