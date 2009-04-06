@@ -584,6 +584,12 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	dmu_objset_set_user(zfsvfs->z_os, zfsvfs);
 	mutex_exit(&zfsvfs->z_os->os->os_user_ptr_lock);
 
+	zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
+	if (zil_disable) {
+		zil_destroy(zfsvfs->z_log, 0);
+		zfsvfs->z_log = NULL;
+	}
+
 	/*
 	 * If we are not mounting (ie: online recv), then we don't
 	 * have to worry about replaying the log as we blocked all
@@ -602,11 +608,7 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		else
 			zfs_unlinked_drain(zfsvfs);
 
-		zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
-		if (zil_disable) {
-			zil_destroy(zfsvfs->z_log, 0);
-			zfsvfs->z_log = NULL;
-		} else {
+		if (zfsvfs->z_log) {
 			/*
 			 * Parse and replay the intent log.
 			 *
