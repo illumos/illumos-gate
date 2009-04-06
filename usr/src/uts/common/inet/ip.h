@@ -1278,7 +1278,8 @@ typedef struct ipif_s {
 		ipif_was_dup : 1,	/* DAD had failed */
 
 		ipif_joined_allhosts : 1, /* allhosts joined */
-		ipif_pad_to_31 : 27;
+		ipif_added_nce:1,	/* nce added for local address */
+		ipif_pad_to_31 : 26;
 
 	uint_t	ipif_seqid;		/* unique index across all ills */
 	uint_t	ipif_state_flags;	/* See IPIF_* flag defs above */

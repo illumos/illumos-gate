@@ -1565,11 +1565,13 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 			flags |= NCE_F_UNSOL_ADV;
 		}
 		/*
-		 * NOTE: for IPMP, local addresses are always associated with
-		 * the ill they're bound to, so don't match across the illgrp.
+		 * Create an nce for the local address. We pass a match_illgrp
+		 * of B_TRUE because the local address must be unique across
+		 * the illgrp, and the existence of an nce with nce_ill set
+		 * to any ill in the group is indicative of a duplicate address
 		 */
 		err = ndp_lookup_then_add_v6(bound_ill,
-		    B_FALSE,
+		    B_TRUE,
 		    hw_addr,
 		    &ipif->ipif_v6lcl_addr,
 		    &ipv6_all_ones,
@@ -1583,10 +1585,12 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 			ip1dbg(("ipif_ndp_up: NCE created for %s\n",
 			    ill->ill_name));
 			ipif->ipif_addr_ready = 1;
+			ipif->ipif_added_nce = 1;
 			break;
 		case EINPROGRESS:
 			ip1dbg(("ipif_ndp_up: running DAD now for %s\n",
 			    ill->ill_name));
+			ipif->ipif_added_nce = 1;
 			break;
 		case EEXIST:
 			NCE_REFRELE(nce);
@@ -1635,15 +1639,16 @@ ipif_ndp_down(ipif_t *ipif)
 		else
 			bound_ill = ill;
 
-		if (bound_ill != NULL) {
+		if (bound_ill != NULL && ipif->ipif_added_nce) {
 			nce = ndp_lookup_v6(bound_ill,
-			    B_FALSE,	/* see comment in ipif_ndp_up() */
+			    B_TRUE,
 			    &ipif->ipif_v6lcl_addr,
 			    B_FALSE);
 			if (nce != NULL) {
 				ndp_delete(nce);
 				NCE_REFRELE(nce);
 			}
+			ipif->ipif_added_nce = 0;
 		}
 
 		/*
@@ -3214,6 +3219,10 @@ ipif_up_done_v6(ipif_t *ipif)
 		 * ip_addr_availability_check() identifies this case for us and
 		 * returns EADDRINUSE; we need to turn it into EADDRNOTAVAIL
 		 * which is the expected error code.
+		 *
+		 * Note that, for the non-XRESOLV case, ipif_ndp_down() will
+		 * only delete an nce in the case when one was actually created
+		 * by ipif_ndp_up(), as indicated by the ipif_added_nce bit.
 		 */
 		if (err == EADDRINUSE) {
 			if (ipif->ipif_ill->ill_flags & ILLF_XRESOLV) {

@@ -5639,7 +5639,24 @@ retry_nce:
 		DTRACE_PROBE2(nce__init__fail, ill_t *, ire_ill, int, err);
 		return (EINVAL);
 	}
+	/*
+	 * IRE_BROADCAST ire's must be linked to NCE_F_BCAST nce's and
+	 * vice-versa (IRE_CACHE <-> unicast nce entries). We may have found an
+	 * existing unicast (or bcast) nce when trying to add a BROADCAST (or
+	 * unicast) ire, e.g., when address/netmask modifications were in
+	 * progress, and the ipif_ndp_down() call to quiesce existing state
+	 * during the addr/mask modification may have skipped the ndp_delete()
+	 * because the ipif being affected was not the last one on the ill.  We
+	 * recover from the missed ndp_delete() now, by deleting the old nce and
+	 * adding a new one with the correct NCE_F_BCAST state.
+	 */
 	if (ire->ire_type == IRE_BROADCAST) {
+		if ((nce->nce_flags & NCE_F_BCAST) == 0) {
+			/* IRE_BROADCAST needs NCE_F_BCAST */
+			ndp_delete(nce);
+			NCE_REFRELE(nce);
+			goto retry_nce;
+		}
 		/*
 		 * Two bcast ires are created for each interface;
 		 * 1. loopback copy (which does not  have an
@@ -5661,6 +5678,12 @@ retry_nce:
 		 */
 		NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
 	} else {
+		if ((nce->nce_flags & NCE_F_BCAST) != 0) {
+			/* IRE_CACHE needs unicast nce */
+			ndp_delete(nce);
+			NCE_REFRELE(nce);
+			goto retry_nce;
+		}
 		/*
 		 * We are not using this nce_t just yet so release
 		 * the ref taken in ndp_lookup_then_add_v4()

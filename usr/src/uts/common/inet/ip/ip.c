@@ -27849,7 +27849,6 @@ nak:
 		nce = ire->ire_nce;
 		DTRACE_PROBE2(ire__arpresolve__type,
 		    ire_t *, ire, nce_t *, nce);
-		ASSERT(nce->nce_state != ND_INITIAL);
 		mutex_enter(&nce->nce_lock);
 		nce->nce_last = TICK_TO_MSEC(lbolt64);
 		if (nce->nce_state == ND_REACHABLE) {
