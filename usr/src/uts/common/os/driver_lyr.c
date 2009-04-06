@@ -232,7 +232,7 @@ ident_alloc(char *mod_name, dev_info_t *dip, dev_t dev, major_t major)
 	lipp = ident_find_ref_nolock(modid, dip, dev, major);
 
 	if (*lipp != NULL) {
-		/* we found an indent in the hash */
+		/* we found an ident in the hash */
 		ASSERT(strcmp((*lipp)->li_modname, mod_name) == 0);
 		(*lipp)->li_ref++;
 		mutex_exit(&ldi_ident_hash_lock[index]);
