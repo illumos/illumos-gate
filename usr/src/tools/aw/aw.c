@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Wrapper for the GNU assembler to make it accept the Sun assembler
@@ -540,8 +539,24 @@ main(int argc, char *argv[])
 	 * This is a support hack to rewrite code for the compiler
 	 * which should probably cause an assembler programmer to recode
 	 * - so, generate a warning in this case.
+	 *
+	 * -K was dropped begining with version 2.18.
 	 */
-	newae(as, "-K");
+	{
+		struct aelist *as_ver = newael();
+		struct aelist *ggrep = newael();
+
+		newae(as_ver, as_pgm);
+		newae(as_ver, "--version");
+		newae(ggrep, "/usr/bin/ggrep");
+		newae(ggrep, "-q");
+		newae(ggrep, "-E");
+		newae(ggrep, "2.1[567]");
+		code = pipeline(aeltoargv(as_ver), aeltoargv(ggrep));
+		if (code == 0) {
+			newae(as, "-K");
+		}
+	}
 
 	/*
 	 * Walk the argument list, translating as we go ..

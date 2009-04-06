@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(__lint)
 
@@ -80,7 +79,7 @@ lx_brand_int80_callback(void)
 	xchgq	(%rsp), %rax			/* swap %rax and stack value */
 	movq	32(%rsp), %r15			/* re-load the lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab the lwp brand data */
-	movl	%gs, BR_UGS(%r15)		/* save user %gs */
+	mov	%gs, BR_UGS(%r15)		/* save user %gs */
 
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
 	cmpq	(%rsp), %rax			/* is 0 <= syscall <= MAX? */

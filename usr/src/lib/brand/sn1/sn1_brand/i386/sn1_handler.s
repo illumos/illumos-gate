@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,11 +63,11 @@ sn1_handler(void)
 	movl	%edx, EH_LOCALS_GREG(EDX)(%ebp)
 	movl	%edi, EH_LOCALS_GREG(EDI)(%ebp)
 	movl	%esi, EH_LOCALS_GREG(ESI)(%ebp)
-	movl	%cs, EH_LOCALS_GREG(CS)(%ebp)
-	movl	%ds, EH_LOCALS_GREG(DS)(%ebp)
-	movl	%es, EH_LOCALS_GREG(ES)(%ebp)
-	movl	%fs, EH_LOCALS_GREG(FS)(%ebp)
-	movl	%gs, EH_LOCALS_GREG(GS)(%ebp)
+	mov	%cs, EH_LOCALS_GREG(CS)(%ebp)
+	mov	%ds, EH_LOCALS_GREG(DS)(%ebp)
+	mov	%es, EH_LOCALS_GREG(ES)(%ebp)
+	mov	%fs, EH_LOCALS_GREG(FS)(%ebp)
+	mov	%gs, EH_LOCALS_GREG(GS)(%ebp)
 	pushfl					/* save syscall flags */
 	popl	%ecx
 	movl	%ecx, EH_LOCALS_GREG(EFL)(%ebp)

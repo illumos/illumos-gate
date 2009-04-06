@@ -1249,13 +1249,21 @@ efi_reset(void)
 #else	/* __lint */
 
 	ENTRY(wait_500ms)
+#if defined(__amd64)
+	pushq	%rbx
+#elif defined(__i386)
 	push	%ebx
+#endif
 	movl	$50000, %ebx
 1:
 	call	tenmicrosec
 	decl	%ebx
 	jnz	1b
+#if defined(__amd64)
+	popq	%rbx
+#elif defined(__i386)
 	pop	%ebx
+#endif
 	ret	
 	SET_SIZE(wait_500ms)
 
