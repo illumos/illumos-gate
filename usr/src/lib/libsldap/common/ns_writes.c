@@ -63,6 +63,9 @@
 
 static int send_to_cachemgr(const char *,
     ns_ldap_attr_t **, ns_ldap_error_t **);
+
+static int escape_str(char *, char *);
+
 /*
  * If the rdn is a mapped attr:
  * 	return NS_LDAP_SUCCESS and a new_dn.
@@ -1602,6 +1605,39 @@ __s_cvt_passwd(const void *data, char **rdn,
 }
 
 /*
+ * escape_str function escapes special characters in str and
+ * copies to escstr string.
+ *
+ * return 0 for successful
+ *        1 for fail
+ */
+static int escape_str(char *escstr, char *str)
+{
+	int	index = 0;
+
+	while ((*str != '\0') && (index < (RDNSIZE - 1))) {
+		if (*str == '+' || *str == ';' || *str == '>' ||
+		    *str == '<' || *str == ',' || *str == '"' ||
+		    *str == '\\' || *str == '=' ||
+		    (*str == '#' && index == 0)) {
+			*escstr++ = '\\';
+			*escstr++ = *str++;
+			index += 2;
+		} else {
+			*escstr++ = *str++;
+			index++;
+		}
+	}
+
+	if (*str == '\0') {
+		*escstr = '\0';
+		return (0);
+	} else {
+		return (1);
+	}
+}
+
+/*
  * Conversion:			project
  * Input format:		struct project
  * Exported objectclass:	SolarisProject
@@ -2265,6 +2301,7 @@ __s_cvt_services(const void *data, char **rdn,
 	ns_ldap_entry_t	*e;
 	int		rc;
 	char		trdn[RDNSIZE];
+	char		esc_str[RDNSIZE];
 	/* routine specific */
 	struct servent	*ptr;
 	int		max_attr = 4;
@@ -2292,9 +2329,19 @@ __s_cvt_services(const void *data, char **rdn,
 		return (NS_LDAP_INVALID_PARAM);
 	}
 
+	/*
+	 * Escape special characters in service name.
+	 */
+	if (escape_str(esc_str, ptr->s_name) != 0) {
+		__ns_ldap_freeEntry(e);
+		*entry = NULL;
+		return (NS_LDAP_INVALID_PARAM);
+	}
+
 	/* Create an appropriate rdn */
 	(void) snprintf(trdn, RDNSIZE, "cn=%s+ipServiceProtocol=%s",
-	    ptr->s_name, ptr->s_proto);
+	    esc_str, ptr->s_proto);
+
 	*rdn = strdup(trdn);
 	if (*rdn == NULL) {
 		__ns_ldap_freeEntry(e);
@@ -3203,6 +3250,7 @@ __s_cvt_execattr(const void *data, char **rdn,
 	ns_ldap_entry_t	*e;
 	int		rc;
 	char		trdn[RDNSIZE];
+	char		esc_str[RDNSIZE];
 	/* routine specific */
 	execstr_t	*ptr;
 	int		max_attr = 7;
@@ -3232,10 +3280,20 @@ __s_cvt_execattr(const void *data, char **rdn,
 		return (NS_LDAP_INVALID_PARAM);
 	}
 
+	/*
+	 * Escape special characters in ProfileID.
+	 */
+	if (escape_str(esc_str, ptr->id) != 0) {
+		__ns_ldap_freeEntry(e);
+		*entry = NULL;
+		return (NS_LDAP_INVALID_PARAM);
+	}
+
 	/* Create an appropriate rdn */
 	(void) snprintf(trdn, RDNSIZE, "cn=%s+SolarisKernelSecurityPolicy=%s"
 	    "+SolarisProfileType=%s+SolarisProfileId=%s",
-	    ptr->name, ptr->policy, ptr->type, ptr->id);
+	    ptr->name, ptr->policy, ptr->type, esc_str);
+
 	*rdn = strdup(trdn);
 	if (*rdn == NULL) {
 		__ns_ldap_freeEntry(e);
@@ -3536,6 +3594,7 @@ __s_cvt_tnrhtp(const void *data, char **rdn,
 	ns_ldap_entry_t	*e;
 	int		rc;
 	char		trdn[RDNSIZE];
+	char		esc_str[RDNSIZE];
 	/* routine specific */
 	int		max_attr = 2;
 	tsol_tpstr_t	*ptr;
@@ -3561,8 +3620,17 @@ __s_cvt_tnrhtp(const void *data, char **rdn,
 		return (NS_LDAP_INVALID_PARAM);
 	}
 
+	/*
+	 * Escape special characters in Template name.
+	 */
+	if (escape_str(esc_str, ptr->template) != 0) {
+		__ns_ldap_freeEntry(e);
+		*entry = NULL;
+		return (NS_LDAP_INVALID_PARAM);
+	}
+
 	/* Create an appropriate rdn */
-	(void) snprintf(trdn, RDNSIZE, "ipTnetTemplateName=%s", ptr->template);
+	(void) snprintf(trdn, RDNSIZE, "ipTnetTemplateName=%s", esc_str);
 	*rdn = strdup(trdn);
 	if (*rdn == NULL) {
 		__ns_ldap_freeEntry(e);

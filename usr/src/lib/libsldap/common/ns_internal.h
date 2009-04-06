@@ -114,7 +114,7 @@ extern "C" {
 #define	NS_DEFAULT_SEARCH_TIMEOUT	30 /* timeout value in seconds */
 
 /* max rdn length in conversion routines used by __ns_ldap_addTypedEntry() */
-#define	RDNSIZE			256
+#define	RDNSIZE			512
 
 /*
  * special service used by ldap_cachemgr to indicate a shadow update
