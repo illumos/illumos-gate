@@ -411,7 +411,8 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 		bcopy(tempout, ptr, size);
 		if (len < HASHSIZE) {
 			leftover_bytes = HASHSIZE - bytes;
-			bcopy(tempout + bytes, leftover, leftover_bytes);
+			bcopy((uint8_t *)tempout + bytes, leftover,
+			    leftover_bytes);
 		}
 
 		ptr += size;
