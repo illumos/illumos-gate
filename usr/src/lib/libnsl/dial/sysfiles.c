@@ -23,11 +23,9 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include "uucp.h"
@@ -160,8 +158,36 @@ static void
 scansys(const char *service)
 {	FILE *f;
 	char *tok, buf[BUFSIZ];
+	char **tptr;
 
-	Systems[0] = Devices[0] = Dialers[0] = NULL;
+	/*
+	 * Release and Initialize previously allocated memory
+	 * for Systems, Devices and Dialers.
+	 */
+	nsystems = 0;
+	tptr = Systems;
+	while (*tptr) {
+		free(*tptr);
+		*tptr = NULL;
+		tptr++;
+	}
+
+	ndevices = 0;
+	tptr = Devices;
+	while (*tptr) {
+		free(*tptr);
+		*tptr = NULL;
+		tptr++;
+	}
+
+	ndialers = 0;
+	tptr = Dialers;
+	while (*tptr) {
+		free(*tptr);
+		*tptr = NULL;
+		tptr++;
+	}
+
 	if ((f = fopen(SYSFILES, "rF")) != 0) {
 		while (getline(f, buf) > 0) {
 			/* got a (logical) line from Sysfiles */
@@ -351,7 +377,7 @@ nameparse(void)
 			char errformat[BUFSIZ];
 
 			(void) snprintf(errformat, sizeof (errformat),
-						"unrecognized label %s", *line);
+			    "unrecognized label %s", *line);
 			logent(errformat, "Sysfiles|Devconfig");
 		}
 	}
@@ -379,7 +405,7 @@ setfile(char **type, char *line)
 		if (*tok != '/')
 			/* by default, file names are relative to SYSDIR */
 			(void) snprintf(expandpath, sizeof (expandpath),
-								"%s/", SYSDIR);
+			    "%s/", SYSDIR);
 		(void) strcat(expandpath, tok);
 		if (eaccess(expandpath, R_OK) != 0)
 			/* if we can't read it, no point in adding to list */
@@ -388,6 +414,7 @@ setfile(char **type, char *line)
 		ASSERT(*tptr != NULL, "Ct_ALLOCATE", "setfile: tptr", 0);
 		tptr++;
 	}
+	*tptr = NULL;
 }
 
 /*
@@ -471,7 +498,7 @@ getsysline(char *buf, int len)
 	for (;;) {
 		while (fgets(buf, len, fsystems) != NULL)
 			if ((*buf != '#') && (*buf != ' ') &&
-				(*buf != '\t') && (*buf != '\n'))
+			    (*buf != '\t') && (*buf != '\n'))
 			return (TRUE);
 		if (nextsystems() == FALSE)
 			return (FALSE);
@@ -634,8 +661,8 @@ pop_push(int fd)
 	/*	check for streams modules to pop	*/
 	while (getpop(strmod, sizeof (strmod), &optional)) {
 		DEBUG(5, (optional ?
-			(const char *)"pop_push: optionally POPing %s\n" :
-			(const char *)"pop_push: POPing %s\n"), strmod);
+		    (const char *)"pop_push: optionally POPing %s\n" :
+		    (const char *)"pop_push: POPing %s\n"), strmod);
 		if (ioctl(fd, I_LOOK, onstream) == -1) {
 			DEBUG(5, "pop_push: I_LOOK on fd %d failed ", fd);
 			DEBUG(5, "errno %d\n", errno);
@@ -717,22 +744,22 @@ setconfig(void)
 			 * the list of configurable parameters grows.
 			 */
 			if (strncmp("Protocol=", tok, strlen("Protocol=")) ==
-								SAME) {
+			    SAME) {
 				tok += strlen("Protocol=");
 				if (*tok != '\0') {
 					if (_ProtoCfg[0] != '\0') {
 						/*EMPTY*/
 						DEBUG(7, "Protocol string %s ",
-								tok);
+						    tok);
 						DEBUG(7, "overrides %s\n",
-								_ProtoCfg);
+						    _ProtoCfg);
 					}
 					(void) strcpy(_ProtoCfg, tok);
 				}
 			} else {
 				/*EMPTY*/
 				DEBUG(7, "Unknown configuration parameter %s\n",
-								tok);
+				    tok);
 			}
 		}
 	}
