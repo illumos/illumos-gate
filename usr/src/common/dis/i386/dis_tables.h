@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _DIS_TABLES_H
 #define	_DIS_TABLES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Constants and prototypes for the IA32 disassembler backend.  See dis_tables.c
@@ -54,7 +52,7 @@ extern "C" {
 
 #define	OPLEN	256
 #define	PFIXLEN	  8
-#define	NCPS	12	/* number of chars per symbol	*/
+#define	NCPS	20	/* number of chars per symbol	*/
 
 /*
  * data structures that must be provided to dtrace_dis86()

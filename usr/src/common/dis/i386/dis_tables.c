@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"dis_tables.h"
 
 /* BEGIN CSTYLED */
@@ -894,8 +892,8 @@ const instable_t dis_op0F38[256] = {
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		TNSZ("aesimc",XMM_66r,16),
+/*  [DC]  */	TNSZ("aesenc",XMM_66r,16),TNSZ("aesenclast",XMM_66r,16),TNSZ("aesdec",XMM_66r,16),TNSZ("aesdeclast",XMM_66r,16),
 
 /*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -929,7 +927,7 @@ const instable_t dis_op0F3A[256] = {
 /*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [40]  */	TNSZ("dpps",XMMP_66r,16),TNSZ("dppd",XMMP_66r,16),TNSZ("mpsadbw",XMMP_66r,16),INVALID,
-/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [44]  */	TNSZ("pclmulqdq",XMMP_66r,16),INVALID,		INVALID,		INVALID,
 /*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
@@ -976,7 +974,7 @@ const instable_t dis_op0F3A[256] = {
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		TNSZ("aeskeygenassist",XMMP_66r,16),
 
 /*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
