@@ -107,7 +107,7 @@ typedef struct zvol_state {
 	uint64_t	zv_volblocksize; /* volume block size */
 	minor_t		zv_minor;	/* minor number */
 	uint8_t		zv_min_bs;	/* minimum addressable block shift */
-	uint8_t		zv_flags;	/* readonly; dumpified */
+	uint8_t		zv_flags;	/* readonly, dumpified, etc. */
 	objset_t	*zv_objset;	/* objset handle */
 	uint32_t	zv_mode;	/* DS_MODE_* flags at open time */
 	uint32_t	zv_open_count[OTYPCNT];	/* open counts */
@@ -123,6 +123,7 @@ typedef struct zvol_state {
 #define	ZVOL_RDONLY	0x1
 #define	ZVOL_DUMPIFIED	0x2
 #define	ZVOL_EXCL	0x4
+#define	ZVOL_WCE	0x8
 
 /*
  * zvol maximum transfer in one DMU tx.
@@ -1165,7 +1166,8 @@ zvol_strategy(buf_t *bp)
 	if ((bp->b_resid = resid) == bp->b_bcount)
 		bioerror(bp, off > volsize ? EINVAL : error);
 
-	if (!(bp->b_flags & B_ASYNC) && !doread && !zil_disable && !is_dump)
+	if (!(bp->b_flags & B_ASYNC) && !doread && !zil_disable &&
+	    !is_dump && !(zv->zv_flags & ZVOL_WCE))
 		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
 	biodone(bp);
 
@@ -1324,7 +1326,7 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 			break;
 	}
 	zfs_range_unlock(rl);
-	if (!zil_disable)
+	if (!zil_disable && !(zv->zv_flags & ZVOL_WCE))
 		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
 	return (error);
 }
@@ -1408,6 +1410,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
+	ASSERT(zv->zv_total_opens > 0);
 
 	switch (cmd) {
 
@@ -1444,12 +1447,40 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 
 	case DKIOCFLUSHWRITECACHE:
 		dkc = (struct dk_callback *)arg;
+		mutex_exit(&zvol_state_lock);
 		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
 		if ((flag & FKIOCTL) && dkc != NULL && dkc->dkc_callback) {
 			(*dkc->dkc_callback)(dkc->dkc_cookie, error);
 			error = 0;
 		}
-		break;
+		return (error);
+
+	case DKIOCGETWCE:
+		{
+			int wce = (zv->zv_flags & ZVOL_WCE) ? 1 : 0;
+			if (ddi_copyout(&wce, (void *)arg, sizeof (int),
+			    flag))
+				error = EFAULT;
+			break;
+		}
+	case DKIOCSETWCE:
+		{
+			int wce;
+			if (ddi_copyin((void *)arg, &wce, sizeof (int),
+			    flag)) {
+				error = EFAULT;
+				break;
+			}
+			if (wce) {
+				zv->zv_flags |= ZVOL_WCE;
+				mutex_exit(&zvol_state_lock);
+			} else {
+				zv->zv_flags &= ~ZVOL_WCE;
+				mutex_exit(&zvol_state_lock);
+				zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
+			}
+			return (0);
+		}
 
 	case DKIOCGGEOM:
 	case DKIOCGVTOC:
