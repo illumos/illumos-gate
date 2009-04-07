@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 
 #include <stdio.h>
 #include <poll.h>
@@ -67,7 +61,7 @@ struct  Gdef Gdef[MAXDEFS];	/* array to hold entries in /etc/ttydefs */
 int	Ndefs = 0;		/* highest index to Gdef that was used   */
 long	Mtime = 0;		/* last modification time of ttydefs	 */
 
-struct pollfd *Pollp;		/* ptr to an array of poll struct 	 */
+struct pollfd *Pollp;		/* ptr to an array of poll struct	*/
 int	Npollfd;		/* size of the pollfd array		 */
 
 struct Gdef DEFAULT = {		/* default terminal settings	*/
@@ -75,9 +69,9 @@ struct Gdef DEFAULT = {		/* default terminal settings	*/
 	"9600",
 	"9600 sane",
 	0,
-	/* 
+	/*
 	 * next label is set to 4800 so we can start searching ttydefs.
-	 * if 4800 is not in ttydefs, we will loop back to use DEFAULT 
+	 * if 4800 is not in ttydefs, we will loop back to use DEFAULT
 	 */
 	"4800"
 };
@@ -103,6 +97,7 @@ struct	sigaction	Sigalrm;	/* SIGALRM */
 struct	sigaction	Sigcld;		/* SIGCLD */
 struct	sigaction	Sigint;		/* SIGINT */
 struct	sigaction	Sigpoll;	/* SIGPOLL */
+struct	sigaction	Sigquit;	/* SIGQUIT */
 struct	sigaction	Sigterm;	/* SIGTERM */
 #ifdef	DEBUG
 struct	sigaction	Sigusr1;	/* SIGUSR1 */

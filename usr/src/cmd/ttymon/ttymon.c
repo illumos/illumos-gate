@@ -19,16 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -101,23 +97,32 @@ main(int argc, char *argv[])
 	 * Only the superuser should execute this command.
 	 */
 	if (getuid() != 0)
-		return (1);	/*NOTREACHED*/
+		return (1);
+
+	/* remember original signal mask and dispositions */
+	(void) sigprocmask(SIG_SETMASK, NULL, &Origmask);
+	(void) sigaction(SIGINT, NULL, &Sigint);
+	(void) sigaction(SIGALRM, NULL, &Sigalrm);
+	(void) sigaction(SIGPOLL, NULL, &Sigpoll);
+	(void) sigaction(SIGQUIT, NULL, &Sigquit);
+	(void) sigaction(SIGCLD, NULL, &Sigcld);
+	(void) sigaction(SIGTERM, NULL, &Sigterm);
+#ifdef	DEBUG
+	(void) sigaction(SIGUSR1, NULL, &Sigusr1);
+	(void) sigaction(SIGUSR2, NULL, &Sigusr2);
+#endif
+
+	/*
+	 * SIGQUIT needs to be ignored. Otherwise, hitting ^\ from
+	 * console kills ttymon.
+	 */
+	(void) signal(SIGQUIT, SIG_IGN);
 
 	if ((argc > 1) || (strcmp(lastname(argv[0]), "getty") == 0)) {
 		ttymon_express(argc, argv);
 		return (1);	/*NOTREACHED*/
 	}
-	/* remember original signal mask and dispositions */
-	(void) sigprocmask(SIG_SETMASK, NULL, &Origmask);
-	(void) sigaction(SIGINT, &Sigint, NULL);
-	(void) sigaction(SIGALRM, &Sigalrm, NULL);
-	(void) sigaction(SIGPOLL, &Sigpoll, NULL);
-	(void) sigaction(SIGCLD, &Sigcld, NULL);
-	(void) sigaction(SIGTERM, &Sigterm, NULL);
-#ifdef	DEBUG
-	(void) sigaction(SIGUSR1, &Sigusr1, NULL);
-	(void) sigaction(SIGUSR2, &Sigusr2, NULL);
-#endif
+
 	initialize();
 
 	for (;;) {
