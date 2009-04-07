@@ -81,6 +81,16 @@
 #define	ASSERT	assert
 #endif	/* _KERNEL */
 
+#ifdef __amd64
+#ifdef _KERNEL
+#include <sys/x86_archext.h>	/* cpuid_getvendor() */
+#include <sys/cpuvar.h>
+#else
+#include <sys/auxv.h>		/* getisax() */
+#endif  /* _KERNEL */
+#endif  /* __amd64 */
+
+
 #ifdef	_LP64 /* truncate 64-bit size_t to 32-bits */
 #define	UI32(ui)	((uint32_t)ui)
 #else /* size_t already 32-bits */
@@ -92,6 +102,13 @@
 #define	big_malloc(size)	kmem_alloc(size, KM_NOSLEEP)
 #define	big_free(ptr, size)	kmem_free(ptr, size)
 
+/*
+ * big_realloc()
+ * Allocate memory of newsize bytes and copy oldsize bytes
+ * to the newly-allocated memory, then free the
+ * previously-allocated memory.
+ * Note: newsize must be > oldsize
+ */
 void *
 big_realloc(void *from, size_t oldsize, size_t newsize)
 {
@@ -161,6 +178,24 @@ printbignum(char *aname, BIGNUM *a)
 }
 
 #endif	/* _KERNEL */
+
+
+#ifdef  __amd64
+/*
+ * Return 1 if executing on Intel, otherwise 0 (e.g., AMD64).
+ */
+static int
+bignum_on_intel(void)
+{
+#ifdef _KERNEL
+	return (cpuid_getvendor(CPU) == X86_VENDOR_Intel);
+#else
+	uint_t  ui;
+	(void) getisax(&ui, 1);
+	return ((ui & AV_386_AMD_MMX) == 0);
+#endif  /* _KERNEL */
+}
+#endif  /* __amd64 */
 
 
 /*
@@ -362,6 +397,10 @@ big_bitlength(BIGNUM *a)
 }
 
 
+/*
+ * big_copy()
+ * Copy BIGNUM src to dest, allocating memory if needed.
+ */
 BIG_ERR_CODE
 big_copy(BIGNUM *dest, BIGNUM *src)
 {
@@ -401,6 +440,11 @@ big_copy(BIGNUM *dest, BIGNUM *src)
 }
 
 
+/*
+ * big_extend()
+ * Allocate memory to extend BIGNUM number to size bignum chunks,
+ * if not at least that size already.
+ */
 BIG_ERR_CODE
 big_extend(BIGNUM *number, int size)
 {
@@ -1599,16 +1643,30 @@ big_mul(BIGNUM *result, BIGNUM *aa, BIGNUM *bb)
 
 
 /*
- * caller must ensure that  a < n,  b < n  and  ret->size >=  2 * n->len + 1
- * and that ret is not n
+ * big_mont_mul()
+ * Montgomery multiplication.
+ *
+ * Caller must ensure that  a < n,  b < n,  ret->size >=  2 * n->len + 1,
+ * and that ret is not n.
  */
 BIG_ERR_CODE
 big_mont_mul(BIGNUM *ret, BIGNUM *a, BIGNUM *b, BIGNUM *n, BIG_CHUNK_TYPE n0)
 {
-	int	i, j, nlen, needsubtract;
-	BIG_CHUNK_TYPE	*nn, *rr;
+	int		i, j, nlen, needsubtract;
+	BIG_CHUNK_TYPE	*nn, *rr, *rrplusi;
 	BIG_CHUNK_TYPE	digit, c;
 	BIG_ERR_CODE	err;
+#ifdef	__amd64
+#define	BIG_CPU_UNKNOWN	0
+#define	BIG_CPU_AMD	1
+#define	BIG_CPU_INTEL	2
+	static int	big_cpu = BIG_CPU_UNKNOWN;
+	BIG_CHUNK_TYPE	carry[BIGTMPSIZE];
+
+	if (big_cpu == BIG_CPU_UNKNOWN) {
+		big_cpu = 1 + bignum_on_intel();
+	}
+#endif	/* __amd64 */
 
 	nlen = n->len;
 	nn = n->value;
@@ -1623,17 +1681,40 @@ big_mont_mul(BIGNUM *ret, BIGNUM *a, BIGNUM *b, BIGNUM *n, BIG_CHUNK_TYPE n0)
 	for (i = ret->len; i < 2 * nlen + 1; i++) {
 		rr[i] = 0;
 	}
-	for (i = 0; i < nlen; i++) {
-		digit = rr[i];
-		digit = digit * n0;
 
-		c = BIG_MUL_ADD_VEC(rr + i, nn, nlen, digit);
-		j = i + nlen;
-		rr[j] += c;
-		while (rr[j] < c) {
-			rr[j + 1] += 1;
-			j++;
-			c = 1;
+#ifdef	__amd64	/* pipelining optimization for Intel 64, but not AMD64 */
+	if ((big_cpu == BIG_CPU_INTEL) && (nlen <= BIGTMPSIZE)) {
+		/*
+		 * Perform the following in two for loops to reduce the
+		 * dependency between computing the carryover bits with
+		 * BIG_MUL_ADD_VEC() and adding them, thus improving pipelining.
+		 */
+		for (i = 0; i < nlen; i++) {
+			rrplusi = rr + i;
+			digit = *rrplusi * n0;
+			carry[i] = BIG_MUL_ADD_VEC(rrplusi, nn, nlen, digit);
+		}
+		for (i = 0; i < nlen; i++) {
+			j = i + nlen;
+			rr[j] += carry[i];
+			while (rr[j] < carry[i]) {
+				rr[++j] += 1;
+				carry[i] = 1;
+			}
+		}
+	} else
+#endif	/* __amd64 */
+	{ /* no pipelining optimization */
+		for (i = 0; i < nlen; i++) {
+			rrplusi = rr + i;
+			digit = *rrplusi * n0;
+			c = BIG_MUL_ADD_VEC(rrplusi, nn, nlen, digit);
+			j = i + nlen;
+			rr[j] += c;
+			while (rr[j] < c) {
+				rr[++j] += 1;
+				c = 1;
+			}
 		}
 	}
 
