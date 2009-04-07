@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,7 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
 	nvlist_t *nvl, *args, *props;
-	boolean_t value, asserted;
+	boolean_t value;
 	uint64_t status;
 	uint32_t state;
 	ses_node_t *np;
@@ -333,26 +333,20 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
 		status = SES_ESC_UNSUPPORTED;
 
-	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
-		status = SES_ESC_UNSUPPORTED;
-
 	state = 0;
 	if (nvlist_lookup_string(args, TOPO_METH_SES_STATE_PROP,
 	    &prop) == 0) {
 		/* discrete (fault) sensor */
 
-		asserted = B_FALSE;
-		if (nvlist_lookup_boolean_value(props, prop, &value) == 0 &&
-		    value)
-			asserted = B_TRUE;
-		if (status == SES_ESC_UNRECOVERABLE ||
-		    status == SES_ESC_CRITICAL)
-			asserted = B_TRUE;
-
-		if (asserted)
-			state |= TOPO_SENSOR_STATE_GENERIC_STATE_ASSERTED;
+		if (status == SES_ESC_UNRECOVERABLE)
+			state |= TOPO_SENSOR_STATE_GENERIC_FAIL_NONRECOV;
+		else if (status == SES_ESC_CRITICAL)
+			state |= TOPO_SENSOR_STATE_GENERIC_FAIL_CRITICAL;
+		else if (nvlist_lookup_boolean_value(props, prop,
+		    &value) == 0 && value)
+			state |= TOPO_SENSOR_STATE_GENERIC_FAIL_NONRECOV;
 		else
-			state |= TOPO_SENSOR_STATE_GENERIC_STATE_DEASSERTED;
+			state |= TOPO_SENSOR_STATE_GENERIC_FAIL_DEASSERTED;
 	} else {
 		/* threshold sensor */
 		if (nvlist_lookup_boolean_value(props,
@@ -697,7 +691,7 @@ ses_add_discrete(topo_mod_t *mod, tnode_t *pnode, uint64_t nodeid,
 
 	if ((tn = ses_add_sensor_common(mod, pnode, nodeid, name,
 	    TOPO_SENSOR_CLASS_DISCRETE,
-	    TOPO_SENSOR_TYPE_GENERIC_STATE)) == NULL)
+	    TOPO_SENSOR_TYPE_GENERIC_FAILURE)) == NULL)
 		return (-1);
 
 	nvl = NULL;

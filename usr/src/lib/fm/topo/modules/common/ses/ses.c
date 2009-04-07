@@ -20,10 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#include <alloca.h>
 #include <dirent.h>
 #include <devid.h>
 #include <fm/libdiskstatus.h>
@@ -832,11 +833,14 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	char *manufacturer = NULL, *model = NULL, *product = NULL;
 	char *revision = NULL;
 	char *serial;
+	char **paths;
 	size_t prodlen;
 	tnode_t *tn;
 	nvlist_t *fmri = NULL, *auth = NULL;
 	int ret = -1;
 	ses_enum_node_t *snp;
+	ses_enum_target_t *stp;
+	int i, err;
 
 	/*
 	 * Ignore any internal enclosures.
@@ -939,6 +943,31 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 		goto error;
 
 	/*
+	 * For enclosures, we want to include all possible targets (for upgrade
+	 * purposes).
+	 */
+	for (i = 0, stp = topo_list_next(&cp->sec_targets); stp != NULL;
+	    stp = topo_list_next(stp), i++)
+		;
+
+	verify(i != 0);
+	paths = alloca(i * sizeof (char *));
+
+	for (i = 0, stp = topo_list_next(&cp->sec_targets); stp != NULL;
+	    stp = topo_list_next(stp), i++)
+		paths[i] = stp->set_devpath;
+
+
+	if (topo_prop_set_string_array(tn, TOPO_PGROUP_SES,
+	    TOPO_PROP_PATHS, TOPO_PROP_IMMUTABLE, (const char **)paths,
+	    i, &err) != 0) {
+		topo_mod_dprintf(mod,
+		    "failed to create property %s: %s\n",
+		    TOPO_PROP_PATHS, topo_strerror(err));
+		goto error;
+	}
+
+	/*
 	 * Create the nodes for power supplies, fans, and devices.
 	 */
 	if (ses_create_children(sdp, tn, SES_ET_POWER_SUPPLY,
@@ -953,8 +982,8 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	    BAY, "BAY", cp, B_TRUE) != 0)
 		goto error;
 
-	snp->sen_target->set_refcount++;
-	topo_node_setspecific(tn, snp->sen_target);
+	cp->sec_target->set_refcount++;
+	topo_node_setspecific(tn, cp->sec_target);
 
 	ret = 0;
 error:
@@ -1017,7 +1046,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 	char *csn;
 	uint64_t instance, type;
 	uint64_t prevstatus, status;
-	boolean_t report, internal;
+	boolean_t report, internal, ident;
 
 	if (ses_node_type(np) == SES_NODE_ENCLOSURE) {
 		/*
@@ -1062,6 +1091,23 @@ ses_enum_gather(ses_node_t *np, void *data)
 			cp->sec_target = sdp->sed_target;
 			cp->sec_instance = sdp->sed_instance++;
 			topo_list_append(&sdp->sed_chassis, cp);
+		} else {
+			/*
+			 * For the enclosure node, it is possible to have
+			 * multiple targets, only one of which support an
+			 * enclosure element descriptor.  We assume that this
+			 * is the one that is responsible for managing the
+			 * enclosure itself, so we prefer one with the
+			 * SES_PROP_IDENT property (which is only present for a
+			 * target that has an enclosure element descriptor).
+			 */
+			if (nvlist_lookup_boolean_value(props, SES_PROP_IDENT,
+			    &ident) == 0) {
+				topo_mod_dprintf(mod,
+				    "overriding enclosure node");
+				cp->sec_enclosure = np;
+				cp->sec_target = sdp->sed_target;
+			}
 		}
 
 		topo_list_append(&cp->sec_targets, sdp->sed_target);

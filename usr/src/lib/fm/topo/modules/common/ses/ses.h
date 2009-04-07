@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ typedef struct ses_enum_target {
 #define	TOPO_PROP_NODE_ID	"node-id"
 #define	TOPO_PROP_TARGET_PATH	"target-path"
 #define	TOPO_PROP_SAS_ADDR	"sas-address"
+#define	TOPO_PROP_PATHS		"paths"
 
 #ifndef	NDEBUG
 #define	verify(x)	assert(x)
