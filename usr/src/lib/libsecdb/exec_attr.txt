@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # /etc/security/exec_attr
@@ -150,6 +150,8 @@ Maintenance and Repair:solaris:cmd:::/usr/sbin/ucodeadm:privs=all
 Media Backup:suser:cmd:::/usr/bin/mt:euid=0
 Media Backup:suser:cmd:::/usr/lib/fs/ufs/ufsdump:euid=0;gid=sys
 Media Backup:suser:cmd:::/usr/sbin/tar:euid=0
+Media Catalog:solaris:cmd:::/usr/bin/bart:\
+	privs=file_dac_read,file_dac_search
 Media Restore:suser:cmd:::/usr/bin/cpio:euid=0
 Media Restore:suser:cmd:::/usr/bin/mt:euid=0
 Media Restore:suser:cmd:::/usr/lib/fs/ufs/ufsrestore:euid=0

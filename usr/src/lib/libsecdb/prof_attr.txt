@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -54,6 +54,7 @@ Inetd Management:::Manage inetd configuration parameters:auths=solaris.smf.manag
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range,solaris.smf.manage.coreadm,solaris.smf.value.coreadm;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:profiles=NDMP Management;help=RtMediaBkup.html
+Media Catalog:::Catalog files and file systems:help=RtMediaCtlg.html
 Media Restore:::Restore files and file systems from backups:profiles=NDMP Management;help=RtMediaRestore.html
 MMS Administrator:::MMS Media Manager Administrator:auths=solaris.smf.manage.mms,solaris.smf.value.mms,solaris.mms.*;help=RtMMSAdmin.html
 MMS Operator:::MMS Media Manager Operator:auths=solaris.smf.manage.mms,solaris.mms.media.*,solaris.mms.request.*,solaris.mms.device.state.*,solaris.mms.device.log.*;help=RtMMSOper.html

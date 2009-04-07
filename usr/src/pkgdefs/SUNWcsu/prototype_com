@@ -588,6 +588,7 @@ f none usr/lib/help/profiles/locale/C/RtMailMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMaintAndRepair.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNDMPMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMediaBkup.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtMediaCtlg.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNameServiceAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNameServiceSecure.html 444 root bin

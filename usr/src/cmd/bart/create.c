@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <signal.h>
 #include <unistd.h>
@@ -54,7 +53,7 @@ static int	walker(const char *name, const struct stat64 *sp,
 static int		compute_chksum = 1, eval_err = 0;
 static struct rule	*subtree_root;
 static char		reloc_root[PATH_MAX];
-static struct statvfs	parent_vfs;
+static struct statvfs64	parent_vfs;
 
 int
 bart_create(int argc, char **argv)
@@ -251,7 +250,7 @@ create_manifest_rule(char *reloc_root, FILE *rule_fp)
 		 * the parameters to walker() are defined by nftw(),
 		 * the globals are really a backdoor mechanism.
 		 */
-		ret_status = statvfs(root->subtree, &parent_vfs);
+		ret_status = statvfs64(root->subtree, &parent_vfs);
 		if (ret_status < 0) {
 			perror(root->subtree);
 			continue;
@@ -343,10 +342,10 @@ output_manifest(void)
 static int
 walker(const char *name, const struct stat64 *sp, int type, struct FTW *ftwx)
 {
-	int		ret;
-	struct statvfs	path_vfs;
-	boolean_t	dir_flag = B_FALSE;
-	struct rule	*rule;
+	int			ret;
+	struct statvfs64	path_vfs;
+	boolean_t		dir_flag = B_FALSE;
+	struct rule		*rule;
 
 	switch (type) {
 	case FTW_F:	/* file 		*/
@@ -365,7 +364,7 @@ walker(const char *name, const struct stat64 *sp, int type, struct FTW *ftwx)
 		break;
 	case FTW_D:	/* enter directory 		*/
 		dir_flag = B_TRUE;
-		ret = statvfs(name, &path_vfs);
+		ret = statvfs64(name, &path_vfs);
 		if (ret < 0)
 			eval_err = WARNING_EXIT;
 		break;
@@ -410,8 +409,8 @@ static int
 eval_file(const char *fname, const struct stat64 *statb)
 {
 	int	fd, ret, err_code, i;
-	char	last_field[PATH_MAX], ftype, *acl_str,
-		*quoted_name;
+	char	last_field[PATH_MAX], ftype, *acl_str;
+	char	*quoted_name;
 
 	err_code = EXIT;
 
@@ -594,7 +593,8 @@ sanitized_fname(const char *fname, boolean_t canon_path)
 /*
  * Function responsible for generating the ACL information for a given
  * file.  Note, the string is put into buffer malloc'd by this function.
- * Its the responsibility of the caller to free the buffer.
+ * It's the responsibility of the caller to free the buffer.  This function
+ * should never return a NULL pointer.
  */
 static char *
 get_acl_string(const char *fname, const struct stat64 *statb, int *err_code)
@@ -619,7 +619,10 @@ get_acl_string(const char *fname, const struct stat64 *statb, int *err_code)
 	} else {
 		acltext = acl_totext(aclp, 0);
 		acl_free(aclp);
-		return (acltext);
+		if (acltext == NULL)
+			return (safe_strdup("-"));
+		else
+			return (acltext);
 	}
 }
 
