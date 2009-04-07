@@ -2153,6 +2153,16 @@ snf_direct_io(file_t *fp, file_t *rfp, u_offset_t fileoff, u_offset_t size,
 	return (error);
 }
 
+#define	SNF_VPMMAXPGS	(VPMMAXPGS/2)
+#define	SNF_MAXVMAPS	(SNF_VPMMAXPGS + 1)
+
+typedef struct {
+	volatile unsigned int	ref;
+	frtn_t			snfv_frtn;
+	vnode_t			*snfv_vp;
+	struct vmap		vml[SNF_MAXVMAPS];
+} snf_vmap_desbinfo;
+
 typedef struct {
 	frtn_t		snfi_frtn;
 	caddr_t		snfi_base;
@@ -2160,6 +2170,17 @@ typedef struct {
 	size_t		snfi_len;
 	vnode_t		*snfi_vp;
 } snf_smap_desbinfo;
+
+void
+snf_vmap_desbfree(snf_vmap_desbinfo *snfv)
+{
+	if (atomic_add_32_nv(&snfv->ref, -1) < 1) {
+		if (snfv->vml)
+			vpm_unmap_pages(snfv->vml, S_READ);
+		VN_RELE(snfv->snfv_vp);
+		kmem_free(snfv, sizeof (snf_vmap_desbinfo));
+	}
+}
 
 /*
  * The callback function when the last ref of the mblk is dropped,
@@ -2204,11 +2225,17 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	int mapoff;
 	vnode_t *vp;
 	mblk_t *mp;
+	mblk_t *mp1;
+	int maxsize;
 	int iosize;
+	int iosz;
+	int i;
 	int error;
 	short fflag;
 	int ksize;
 	snf_smap_desbinfo *snfi;
+	snf_vmap_desbinfo *snfv;
+	struct vmap *vml;
 	struct vattr va;
 	boolean_t dowait = B_FALSE;
 	struct nmsghdr msg;
@@ -2224,63 +2251,123 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			break;
 		}
 
-		mapoff = fileoff & MAXBOFFSET;
-		iosize = MAXBSIZE - mapoff;
-		if (iosize > size)
-			iosize = size;
-		/*
-		 * we don't forcefault because we'll call
-		 * segmap_fault(F_SOFTLOCK) next.
-		 *
-		 * S_READ will get the ref bit set (by either
-		 * segmap_getmapflt() or segmap_fault()) and page
-		 * shared locked.
-		 */
-		base = segmap_getmapflt(segkmap, fvp, fileoff, iosize,
-		    segmap_kpm ? SM_FAULT : 0, S_READ);
+		if (vpm_enable) { /* Use vpm page mappings */
+			mapoff = fileoff & PAGEOFFSET;
+			maxsize = MIN((SNF_VPMMAXPGS * PAGESIZE), size);
 
-		snfi = kmem_alloc(sizeof (*snfi), KM_SLEEP);
-		snfi->snfi_len = (size_t)roundup(mapoff+iosize,
-		    PAGESIZE)- (mapoff & PAGEMASK);
-		/*
-		 * We must call segmap_fault() even for segmap_kpm
-		 * because that's how error gets returned.
-		 * (segmap_getmapflt() never fails but segmap_fault()
-		 * does.)
-		 */
-		if (segmap_fault(kas.a_hat, segkmap,
-		    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff) & PAGEMASK),
-		    snfi->snfi_len, F_SOFTLOCK, S_READ) != 0) {
-			(void) segmap_release(segkmap, base, 0);
-			kmem_free(snfi, sizeof (*snfi));
-			error = EIO;
-			goto out;
-		}
-		snfi->snfi_frtn.free_func = snf_smap_desbfree;
-		snfi->snfi_frtn.free_arg = (caddr_t)snfi;
-		snfi->snfi_base = base;
-		snfi->snfi_mapoff = mapoff;
-		mp = esballoca((uchar_t *)base + mapoff, iosize, BPRI_HI,
-		    &snfi->snfi_frtn);
+			snfv = kmem_alloc(sizeof (snf_vmap_desbinfo), KM_SLEEP);
+			vml = snfv->vml;
+			if (vpm_map_pages(fvp, fileoff, (size_t)maxsize,
+			    (VPM_FETCHPAGE), vml, SNF_MAXVMAPS,
+			    NULL, S_READ) != 0) {
+				kmem_free(snfv, sizeof (snf_vmap_desbinfo));
+				error = EIO;
+				goto out;
+			}
+			snfv->snfv_frtn.free_func = snf_vmap_desbfree;
+			snfv->snfv_frtn.free_arg = (caddr_t)snfv;
+			iosz = MIN(vml[0].vs_len - mapoff, size);
+			mp = esballoca((uchar_t *)vml[0].vs_addr + mapoff,
+			    iosz, BPRI_HI, &snfv->snfv_frtn);
 
-		if (mp == NULL) {
-			(void) segmap_fault(kas.a_hat, segkmap,
+			if (mp == NULL) {
+				vpm_unmap_pages(vml, S_READ);
+				kmem_free(snfv, sizeof (snf_vmap_desbinfo));
+				error = EAGAIN;
+				goto out;
+			}
+			/* Mark this dblk with the zero-copy flag */
+			mp->b_datap->db_struioflag |= STRUIO_ZC;
+			mp->b_wptr += iosz;
+			iosize = iosz;
+			fileoff	+= iosz;
+			size -= iosz;
+			snfv->ref = 1;
+
+			for (i = 1; (vml[i].vs_data != NULL) &&
+			    (iosize < maxsize) && (size > 0); i++) {
+				iosz = MIN(vml[i].vs_len, size);
+				mp1 = esballoca((uchar_t *)vml[i].vs_addr,
+				    iosz, BPRI_HI, &snfv->snfv_frtn);
+
+				if (mp1 == NULL) {
+					error = EAGAIN;
+					goto part;
+				}
+				mp1->b_datap->db_struioflag |= STRUIO_ZC;
+				mp1->b_wptr += iosz;
+				iosize += iosz;
+				fileoff += iosz;
+				size -= iosz;
+				snfv->ref++;
+				linkb(mp, mp1);
+			}
+part:
+			VN_HOLD(fvp);
+			snfv->snfv_vp = fvp;
+		} else {
+
+			/* vpm not supported. fallback to segmap */
+			mapoff = fileoff & MAXBOFFSET;
+			iosize = MAXBSIZE - mapoff;
+			if (iosize > size)
+				iosize = size;
+			/*
+			 * we don't forcefault because we'll call
+			 * segmap_fault(F_SOFTLOCK) next.
+			 *
+			 * S_READ will get the ref bit set (by either
+			 * segmap_getmapflt() or segmap_fault()) and page
+			 * shared locked.
+			 */
+			base = segmap_getmapflt(segkmap, fvp, fileoff, iosize,
+			    segmap_kpm ? SM_FAULT : 0, S_READ);
+
+			snfi = kmem_alloc(sizeof (*snfi), KM_SLEEP);
+			snfi->snfi_len = (size_t)roundup(mapoff+iosize,
+			    PAGESIZE)- (mapoff & PAGEMASK);
+			/*
+			 * We must call segmap_fault() even for segmap_kpm
+			 * because that's how error gets returned.
+			 * (segmap_getmapflt() never fails but segmap_fault()
+			 * does.)
+			 */
+			if (segmap_fault(kas.a_hat, segkmap,
 			    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff)
-			    & PAGEMASK), snfi->snfi_len, F_SOFTUNLOCK, S_OTHER);
-			(void) segmap_release(segkmap, base, 0);
-			kmem_free(snfi, sizeof (*snfi));
-			freemsg(mp);
-			error = EAGAIN;
-			goto out;
-		}
-		VN_HOLD(fvp);
-		snfi->snfi_vp = fvp;
-		mp->b_wptr += iosize;
+			    & PAGEMASK), snfi->snfi_len,
+			    F_SOFTLOCK, S_READ) != 0) {
+				(void) segmap_release(segkmap, base, 0);
+				kmem_free(snfi, sizeof (*snfi));
+				error = EIO;
+				goto out;
+			}
+			snfi->snfi_frtn.free_func = snf_smap_desbfree;
+			snfi->snfi_frtn.free_arg = (caddr_t)snfi;
+			snfi->snfi_base = base;
+			snfi->snfi_mapoff = mapoff;
+			mp = esballoca((uchar_t *)base + mapoff, iosize,
+			    BPRI_HI, &snfi->snfi_frtn);
 
-		/* Mark this dblk with the zero-copy flag */
-		mp->b_datap->db_struioflag |= STRUIO_ZC;
-		fileoff += iosize;
-		size -= iosize;
+			if (mp == NULL) {
+				(void) segmap_fault(kas.a_hat, segkmap,
+				    (caddr_t)(uintptr_t)(((uintptr_t)base
+				    + mapoff) & PAGEMASK), snfi->snfi_len,
+				    F_SOFTUNLOCK, S_OTHER);
+				(void) segmap_release(segkmap, base, 0);
+				kmem_free(snfi, sizeof (*snfi));
+				freemsg(mp);
+				error = EAGAIN;
+				goto out;
+			}
+			VN_HOLD(fvp);
+			snfi->snfi_vp = fvp;
+			mp->b_wptr += iosize;
+
+			/* Mark this dblk with the zero-copy flag */
+			mp->b_datap->db_struioflag |= STRUIO_ZC;
+			fileoff += iosize;
+			size -= iosize;
+		}
 
 		if (size == 0 && !nowait) {
 			ASSERT(!dowait);
@@ -2290,7 +2377,17 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		VOP_RWUNLOCK(fvp, V_WRITELOCK_FALSE, NULL);
 		error = socket_sendmblk(VTOSO(vp), &msg, fflag, CRED(), &mp);
 		if (error != 0) {
-			*count = ksize;
+			if (error == EAGAIN) {
+				iosz = 0;
+				mp1 = mp;
+				while (mp1 != NULL) {
+					iosz += MBLKL(mp1);
+					mp1 = mp1->b_cont;
+				}
+				*count = ksize + (iosize - iosz);
+			} else {
+				*count = ksize;
+			}
 			if (mp != NULL)
 				freemsg(mp);
 			return (error);
