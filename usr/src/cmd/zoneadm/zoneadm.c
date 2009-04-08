@@ -201,16 +201,6 @@ static char *locale;
 char *target_zone;
 static char *target_uuid;
 
-/* used in do_subproc() and signal handler */
-static volatile boolean_t child_killed;
-static int do_subproc_cnt = 0;
-
-/*
- * Used to indicate whether this zoneadm instance has another zoneadm
- * instance in its ancestry.
- */
-static boolean_t zoneadm_is_nested = B_FALSE;
-
 char *
 cmd_to_str(int cmd_num)
 {
@@ -1451,68 +1441,14 @@ list_func(int argc, char *argv[])
 	return (output ? Z_OK : Z_ERR);
 }
 
-static void
-sigterm(int sig)
-{
-	/*
-	 * Ignore SIG{INT,TERM}, so we don't end up in an infinite loop,
-	 * then propagate the signal to our process group.
-	 */
-	assert(sig == SIGINT || sig == SIGTERM);
-	(void) sigset(SIGINT, SIG_IGN);
-	(void) sigset(SIGTERM, SIG_IGN);
-	(void) kill(0, sig);
-	child_killed = B_TRUE;
-}
-
-static int
-do_subproc(char *cmdbuf)
-{
-	char inbuf[1024];	/* arbitrary large amount */
-	FILE *file;
-
-	do_subproc_cnt++;
-	child_killed = B_FALSE;
-	/*
-	 * We use popen(3c) to launch child processes for [un]install;
-	 * this library call does not return a PID, so we have to kill
-	 * the whole process group.  To avoid killing our parent, we
-	 * become a process group leader here.  But doing so can wreak
-	 * havoc with reading from stdin when launched by a non-job-control
-	 * shell, so we close stdin and reopen it as /dev/null first.
-	 */
-	(void) close(STDIN_FILENO);
-	(void) openat(STDIN_FILENO, "/dev/null", O_RDONLY);
-	if (!zoneadm_is_nested)
-		(void) setpgid(0, 0);
-	(void) sigset(SIGINT, sigterm);
-	(void) sigset(SIGTERM, sigterm);
-	file = popen(cmdbuf, "r");
-	for (;;) {
-		if (child_killed || fgets(inbuf, sizeof (inbuf), file) == NULL)
-			break;
-		(void) fputs(inbuf, stdout);
-	}
-	(void) sigset(SIGINT, SIG_DFL);
-	(void) sigset(SIGTERM, SIG_DFL);
-	return (pclose(file));
-}
-
 int
-do_subproc_interactive(char *cmdbuf)
+do_subproc(char *cmdbuf)
 {
 	void (*saveint)(int);
 	void (*saveterm)(int);
 	void (*savequit)(int);
 	void (*savehup)(int);
 	int pid, child, status;
-
-	/*
-	 * do_subproc() links stdin to /dev/null, which would break any
-	 * interactive subprocess we try to launch here.  Similarly, we
-	 * can't have been launched as a subprocess ourselves.
-	 */
-	assert(do_subproc_cnt == 0 && !zoneadm_is_nested);
 
 	if ((child = vfork()) == 0) {
 		(void) execl("/bin/sh", "sh", "-c", cmdbuf, (char *)NULL);
@@ -1939,10 +1875,7 @@ verify_brand(zone_dochandle_t handle, int cmd_num, char *argv[])
 			return (Z_ERR);
 	}
 
-	if (zoneadm_is_nested)
-		status = do_subproc(cmdbuf);
-	else
-		status = do_subproc_interactive(cmdbuf);
+	status = do_subproc(cmdbuf);
 	err = subproc_status(gettext("brand-specific verification"),
 	    status, B_FALSE);
 
@@ -3008,7 +2941,7 @@ install_func(int argc, char *argv[])
 			create_zfs_zonepath(zonepath);
 	}
 
-	status = do_subproc_interactive(cmdbuf);
+	status = do_subproc(cmdbuf);
 	if ((subproc_err =
 	    subproc_status(gettext("brand-specific installation"), status,
 	    B_FALSE)) != ZONE_SUBPROC_OK) {
@@ -3800,7 +3733,7 @@ clone_func(int argc, char *argv[])
 	 */
 	if (cmdbuf[0] != '\0') {
 		/* Run the clone hook */
-		status = do_subproc_interactive(cmdbuf);
+		status = do_subproc(cmdbuf);
 		if ((status = subproc_status(gettext("brand-specific clone"),
 		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
 			if (status == ZONE_SUBPROC_USAGE && !brand_help)
@@ -4393,7 +4326,7 @@ detach_func(int argc, char *argv[])
 
 	if (cmdbuf[0] != '\0') {
 		/* Run the detach hook */
-		status = do_subproc_interactive(cmdbuf);
+		status = do_subproc(cmdbuf);
 		if ((status = subproc_status(gettext("brand-specific detach"),
 		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
 			if (status == ZONE_SUBPROC_USAGE && !brand_help)
@@ -5043,7 +4976,7 @@ uninstall_func(int argc, char *argv[])
 	 */
 	if (cmdbuf[0] != '\0') {
 		/* Run the uninstall hook */
-		status = do_subproc_interactive(cmdbuf);
+		status = do_subproc(cmdbuf);
 		if ((status = subproc_status(gettext("brand-specific "
 		    "uninstall"), status, B_FALSE)) != ZONE_SUBPROC_OK) {
 			if (status == ZONE_SUBPROC_USAGE && !brand_help)
@@ -5636,8 +5569,6 @@ main(int argc, char **argv)
 	 * indicate it.  If not, make that explicit in our environment.
 	 */
 	zonecfg_init_lock_file(target_zone, &zone_lock_env);
-	if (zone_lock_env != NULL)
-		zoneadm_is_nested = B_TRUE;
 
 	/*
 	 * If we are going to be operating on a single zone, retrieve its

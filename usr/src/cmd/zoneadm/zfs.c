@@ -206,7 +206,7 @@ pre_snapshot(char *presnapbuf)
 		return (Z_OK);
 
 	/* Run the hook */
-	status = do_subproc_interactive(presnapbuf);
+	status = do_subproc(presnapbuf);
 	if ((status = subproc_status(gettext("brand-specific presnapshot"),
 	    status, B_FALSE)) != ZONE_SUBPROC_OK)
 		return (Z_ERR);
@@ -227,7 +227,7 @@ post_snapshot(char *postsnapbuf)
 		return (Z_OK);
 
 	/* Run the hook */
-	status = do_subproc_interactive(postsnapbuf);
+	status = do_subproc(postsnapbuf);
 	if ((status = subproc_status(gettext("brand-specific postsnapshot"),
 	    status, B_FALSE)) != ZONE_SUBPROC_OK)
 		return (Z_ERR);
@@ -333,7 +333,7 @@ validate_snapshot(char *snapshot_name, char *snap_path, char *validsnapbuf)
 	}
 
 	/* Run the hook */
-	status = do_subproc_interactive(cmdbuf);
+	status = do_subproc(cmdbuf);
 	if ((status = subproc_status(gettext("brand-specific validatesnapshot"),
 	    status, B_FALSE)) != ZONE_SUBPROC_OK)
 		return (Z_ERR);

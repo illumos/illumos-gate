@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ZONEADM_H
 #define	_ZONEADM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	CMD_HELP	0
 #define	CMD_BOOT	1
@@ -69,7 +67,7 @@ extern char *target_zone;
 
 extern int clone_copy(char *source_zonepath, char *zonepath);
 extern char *cmd_to_str(int cmd_num);
-extern int do_subproc_interactive(char *cmdbuf);
+extern int do_subproc(char *cmdbuf);
 extern int subproc_status(const char *cmd, int status,
     boolean_t verbose_failure);
 extern void zerror(const char *fmt, ...);
