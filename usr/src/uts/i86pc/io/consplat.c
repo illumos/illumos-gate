@@ -42,22 +42,13 @@
 #include <sys/promif.h>
 #include <sys/modctl.h>
 #include <sys/termios.h>
+#include <sys/pci.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <sys/boot_console.h>
 #endif
 
 extern int pseudo_isa;
-
-/* The names of currently supported graphics drivers on x86 */
-static char *
-gfxdrv_name[] = {
-	"radeon",
-	"vgatext",
-	"i915",
-	"atiatom",
-	"nvidia",
-};
 
 int
 plat_use_polled_debug() {
@@ -200,56 +191,121 @@ plat_kbdpath(void)
 	return (kbpath);
 }
 
+static int
+find_fb_dev(dev_info_t *dip, void *found_dip)
+{
+	char *dev_type;
+	dev_info_t *pdip;
+	char *parent_type;
+
+	if (dip == ddi_root_node())
+		return (DDI_WALK_CONTINUE);
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "device_type", &dev_type) != DDI_SUCCESS)
+		return (DDI_WALK_PRUNECHILD);
+
+	if ((strcmp(dev_type, "isa") == 0) || (strcmp(dev_type, "eisa") == 0)) {
+		ddi_prop_free(dev_type);
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if ((strcmp(dev_type, "pci") == 0) ||
+	    (strcmp(dev_type, "pciex") == 0)) {
+		ddi_acc_handle_t pci_conf;
+		uint16_t data16;
+
+		ddi_prop_free(dev_type);
+
+		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
+			return (DDI_WALK_CONTINUE);
+
+		if (pci_config_setup(dip, &pci_conf) != DDI_SUCCESS) {
+			/* This happends when it's the host bridge */
+			return (DDI_WALK_CONTINUE);
+		}
+
+		data16 = pci_config_get16(pci_conf, PCI_BCNF_BCNTRL);
+		pci_config_teardown(&pci_conf);
+
+		if (data16 & PCI_BCNF_BCNTRL_VGA_ENABLE)
+			return (DDI_WALK_CONTINUE);
+
+		return (DDI_WALK_PRUNECHILD);
+	}
+
+	if (strcmp(dev_type, "display") != 0) {
+		ddi_prop_free(dev_type);
+		return (DDI_WALK_CONTINUE);
+	}
+
+	ddi_prop_free(dev_type);
+
+	if ((pdip = ddi_get_parent(dip)) == NULL)
+		return (DDI_WALK_CONTINUE);
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
+	    "device_type", &parent_type) != DDI_SUCCESS)
+		return (DDI_WALK_CONTINUE);
+
+	if ((strcmp(parent_type, "isa") == 0) ||
+	    (strcmp(parent_type, "eisa") == 0)) {
+		*(dev_info_t **)found_dip = dip;
+		ddi_prop_free(parent_type);
+		return (DDI_WALK_TERMINATE);
+	}
+
+	if ((strcmp(parent_type, "pci") == 0) ||
+	    (strcmp(parent_type, "pciex") == 0)) {
+		ddi_acc_handle_t pci_conf;
+		uint16_t data16;
+
+		ddi_prop_free(parent_type);
+
+		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
+			return (DDI_WALK_CONTINUE);
+
+		if (pci_config_setup(dip, &pci_conf) != DDI_SUCCESS)
+			return (DDI_WALK_CONTINUE);
+
+		data16 = pci_config_get16(pci_conf, PCI_CONF_COMM);
+		pci_config_teardown(&pci_conf);
+
+		if (!(data16 & PCI_COMM_IO))
+			return (DDI_WALK_CONTINUE);
+
+		*(dev_info_t **)found_dip = dip;
+		return (DDI_WALK_TERMINATE);
+	}
+
+	ddi_prop_free(parent_type);
+	return (DDI_WALK_CONTINUE);
+}
+
 /*
- * Return generic path to display device from the alias.
+ * Conduct a width-first traverse searching for a display device which
+ * has either:
+ * 1) a VGA device.
+ * 2) a PCI VGA compatible device whose IO space is enabled
+ *    and the VGA Enable bit of any PCI-PCI bridge above it is set.
+ *
+ * Return the device path as the console fb path.
  */
 char *
 plat_fbpath(void)
 {
+	dev_info_t *fb_dip = NULL;
 	static char *fbpath = NULL;
 	static char fbpath_buf[MAXPATHLEN];
-	major_t major;
-	dev_info_t *dip, *dip_pseudo = NULL;
-	int i;
 
-	/* lookup the dip for the pseudo device */
-	(void) resolve_pathname("/pseudo", &dip_pseudo, NULL, NULL);
+	ddi_walk_devs(ddi_root_node(), find_fb_dev, &fb_dip);
 
-	for (i = 0; i < A_CNT(gfxdrv_name); i++) {
-		/*
-		 * look for first instance of each driver
-		 */
-		if ((major = ddi_name_to_major(gfxdrv_name[i])) == (major_t)-1)
-			continue;
+	if (fb_dip == NULL)
+		return (NULL);
 
-		if ((dip = devnamesp[major].dn_head) == NULL)
-			continue;
+	(void) ddi_pathname(fb_dip, fbpath_buf);
+	fbpath = fbpath_buf;
 
-		/*
-		 * We're looking for a real hardware device here so skip
-		 * any pseudo devices.  When could a framebuffer hardware
-		 * driver also have a pseudo node?  Well, some framebuffer
-		 * hardware drivers (nvidia) also create pseudo nodes for
-		 * administration purposes, and these nodes will exist
-		 * regardless of if the actual associated hardware
-		 * is present or not.
-		 */
-		if (ddi_get_parent(dip) == dip_pseudo)
-			continue;
-
-		if (i_ddi_attach_node_hierarchy(dip) == DDI_SUCCESS) {
-			(void) ddi_pathname(dip, fbpath_buf);
-			fbpath = fbpath_buf;
-		}
-
-		if (fbpath)
-			break;
-	}
-
-	if (dip_pseudo != NULL)
-		ddi_release_devi(dip_pseudo);
-
-	/* No screen found */
 	return (fbpath);
 }
 
