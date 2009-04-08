@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ vhci_tpgs_set_target_groups(struct scsi_address *ap, int set_state,
 	struct buf			*bp;
 	int				len, rval, ss = SCSI_SENSE_UNKNOWN;
 	char				*bufp;
-	struct scsi_extended_sense	*sns;
+	uint8_t				*sns, skey, asc, ascq;
 
 	len = 8;
 
@@ -124,34 +124,35 @@ vhci_tpgs_set_target_groups(struct scsi_address *ap, int set_state,
 	} else if ((pkt->pkt_reason == CMD_CMPLT) &&
 	    (SCBP_C(pkt) == STATUS_CHECK) &&
 	    (pkt->pkt_state & STATE_ARQ_DONE)) {
-		sns = &(((struct scsi_arq_status *)(uintptr_t)
+		sns = (uint8_t *)
+		    &(((struct scsi_arq_status *)(uintptr_t)
 		    (pkt->pkt_scbp))->sts_sensedata);
+		skey = scsi_sense_key(sns);
+		asc = scsi_sense_asc(sns);
+		ascq = scsi_sense_ascq(sns);
 
-		if ((sns->es_key == KEY_UNIT_ATTENTION) &&
-		    (sns->es_add_code == STD_SCSI_ASC_STATE_CHG) &&
-		    (sns->es_qual_code == STD_SCSI_ASCQ_STATE_CHG_SUCC)) {
+		if ((skey == KEY_UNIT_ATTENTION) &&
+		    (asc == STD_SCSI_ASC_STATE_CHG) &&
+		    (ascq == STD_SCSI_ASCQ_STATE_CHG_SUCC)) {
 			ss = SCSI_SENSE_STATE_CHANGED;
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
 			    "!vhci_tpgs_set_target_groups:"
 			    " sense:%x, add_code: %x, qual_code:%x"
-			    " sense:%x\n", sns->es_key, sns->es_add_code,
-			    sns->es_qual_code, ss));
-		} else if ((sns->es_key == KEY_ILLEGAL_REQUEST) &&
-		    (sns->es_add_code == STD_SCSI_ASC_INVAL_PARAM_LIST)) {
+			    " sense:%x\n", skey, asc, ascq, ss));
+		} else if ((skey == KEY_ILLEGAL_REQUEST) &&
+		    (asc == STD_SCSI_ASC_INVAL_PARAM_LIST)) {
 			ss = SCSI_SENSE_NOFAILOVER;
 			VHCI_DEBUG(1, (CE_NOTE, NULL,
 			    "!vhci_tpgs_set_target_groups:"
 			    " sense:%x, add_code: %x, qual_code:%x"
-			    " sense:%x\n", sns->es_key, sns->es_add_code,
-			    sns->es_qual_code, ss));
-		} else if ((sns->es_key == KEY_ILLEGAL_REQUEST) &&
-		    (sns->es_add_code == STD_SCSI_ASC_INVAL_CMD_OPCODE)) {
+			    " sense:%x\n", skey, asc, ascq, ss));
+		} else if ((skey == KEY_ILLEGAL_REQUEST) &&
+		    (asc == STD_SCSI_ASC_INVAL_CMD_OPCODE)) {
 			ss = SCSI_SENSE_NOFAILOVER;
 			VHCI_DEBUG(1, (CE_NOTE, NULL,
 			    "!vhci_tpgs_set_target_groups:"
 			    " sense_key:%x, add_code: %x, qual_code:%x"
-			    " sense:%x\n", sns->es_key, sns->es_add_code,
-			    sns->es_qual_code, rval));
+			    " sense:%x\n", skey, asc, ascq, rval));
 		} else {
 			/*
 			 * At this point sns data may be for power-on-reset
@@ -162,7 +163,7 @@ vhci_tpgs_set_target_groups(struct scsi_address *ap, int set_state,
 			VHCI_DEBUG(1, (CE_NOTE, NULL,
 			    "!vhci_tpgs_set_target_groups: "
 			    " sense UNKNOWN: sense key:%x, ASC:%x, ASCQ:%x\n",
-			    sns->es_key, sns->es_add_code, sns->es_qual_code));
+			    skey, asc, ascq));
 		}
 
 		if (ss == SCSI_SENSE_STATE_CHANGED) {

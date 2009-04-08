@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,7 @@ void *ctpriv)
 	struct scsi_address	*ap;
 	int			err, retry_cnt, retry_cmd_cnt;
 	int			mode, ownership, retval, xlf;
-	struct scsi_extended_sense	*sns;
+	uint8_t			*sns, skey, asc, ascq;
 
 	ap = &sd->sd_address;
 
@@ -315,18 +315,20 @@ retry:
 			 */
 			retry_cmd_cnt = 0;
 			if (pkt->pkt_state & STATE_ARQ_DONE) {
-				sns = &(((struct scsi_arq_status *)(uintptr_t)
+				sns = (uint8_t *)
+				    &(((struct scsi_arq_status *)(uintptr_t)
 				    (pkt->pkt_scbp))->sts_sensedata);
-				if (sns->es_key == KEY_UNIT_ATTENTION) {
+				skey = scsi_sense_key(sns);
+				asc = scsi_sense_asc(sns);
+				ascq = scsi_sense_ascq(sns);
+				if (skey == KEY_UNIT_ATTENTION) {
 					/*
 					 * swallow unit attention
 					 */
 					goto retry;
-				} else if ((sns->es_key == KEY_NOT_READY) &&
-				    (sns->es_add_code ==
-				    T3_SCSI_ASC_FO_IN_PROGRESS) &&
-				    (sns->es_qual_code ==
-				    T3_SCSI_ASCQ_PATH_INACT2ACT)) {
+				} else if ((skey == KEY_NOT_READY) &&
+				    (asc == T3_SCSI_ASC_FO_IN_PROGRESS) &&
+				    (ascq == T3_SCSI_ASCQ_PATH_INACT2ACT)) {
 					if (retry_cnt++ >=
 					    PURPLE_FO_MAX_RETRIES) {
 						cmn_err(CE_WARN, "!T3 failover"
@@ -345,8 +347,7 @@ retry:
 				}
 				cmn_err(CE_NOTE, "!T3 failover failed;"
 				    " sense key:%x, ASC: %x, "
-				    "ASCQ:%x", sns->es_key,
-				    sns->es_add_code, sns->es_qual_code);
+				    "ASCQ:%x", skey, asc, ascq);
 				scsi_destroy_pkt(pkt);
 				scsi_free_consistent_buf(bp);
 				return (1);
@@ -507,18 +508,23 @@ static int purple_path_ping(struct scsi_device *sd, void *ctpriv)
 
 /* ARGSUSED */
 static int
-purple_analyze_sense(struct scsi_device *sd, struct scsi_extended_sense
-*sense, void *ctpriv)
+purple_analyze_sense(struct scsi_device *sd, uint8_t *sense,
+void *ctpriv)
 {
-	if (sense->es_key == KEY_NOT_READY) {
-		if (sense->es_add_code == T3_SCSI_ASC_FO_IN_PROGRESS) {
-			if (sense->es_qual_code == T3_SCSI_ASCQ_PATH_INACT2ACT)
+	uint8_t skey, asc, ascq;
+
+	skey = scsi_sense_key(sense);
+	asc = scsi_sense_asc(sense);
+	ascq = scsi_sense_ascq(sense);
+
+	if (skey == KEY_NOT_READY) {
+		if (asc == T3_SCSI_ASC_FO_IN_PROGRESS) {
+			if (ascq == T3_SCSI_ASCQ_PATH_INACT2ACT)
 				return (SCSI_SENSE_INACT2ACT);
-			else if (sense->es_qual_code ==
-			    T3_SCSI_ASCQ_PATH_ACT2INACT)
+			else if (ascq == T3_SCSI_ASCQ_PATH_ACT2INACT)
 				return (SCSI_SENSE_ACT2INACT);
-		} else if ((sense->es_add_code == T3_SCSI_ASC_PATH_INACTIVE) &&
-		    (sense->es_qual_code == T3_SCSI_ASCQ_PATH_INACTIVE)) {
+		} else if ((asc == T3_SCSI_ASC_PATH_INACTIVE) &&
+		    (ascq == T3_SCSI_ASCQ_PATH_INACTIVE)) {
 			return (SCSI_SENSE_INACTIVE);
 		}
 	}
@@ -529,8 +535,7 @@ purple_analyze_sense(struct scsi_device *sd, struct scsi_extended_sense
 	 * return SCSI_SENSE_UNKNOWN.
 	 */
 	VHCI_DEBUG(6, (CE_NOTE, NULL, "!T3 analyze sense UNKNOWN:"
-	    " sense key:%x, ASC: %x, ASCQ:%x\n", sense->es_key,
-	    sense->es_add_code, sense->es_qual_code));
+	    " sense key:%x, ASC: %x, ASCQ:%x\n", skey, asc, ascq));
 	return (SCSI_SENSE_UNKNOWN);
 }
 

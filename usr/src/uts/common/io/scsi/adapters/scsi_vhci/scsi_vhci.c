@@ -2469,7 +2469,7 @@ vhci_do_prout(scsi_vhci_priv_t *svp)
 	struct buf			*bp;
 	scsi_vhci_lun_t			*vlun = svp->svp_svl;
 	int				rval, retry, nr_retry, ua_retry;
-	struct scsi_extended_sense	*sns;
+	uint8_t				*sns, skey;
 
 	bp = getrbuf(KM_SLEEP);
 	bp->b_flags = B_WRITE;
@@ -2504,10 +2504,12 @@ again:
 		if ((new_pkt->pkt_reason == CMD_CMPLT) &&
 		    (SCBP_C(new_pkt) == STATUS_CHECK) &&
 		    (new_pkt->pkt_state & STATE_ARQ_DONE)) {
-			sns = &(((struct scsi_arq_status *)(uintptr_t)
+			sns = (uint8_t *)
+			    &(((struct scsi_arq_status *)(uintptr_t)
 			    (new_pkt->pkt_scbp))->sts_sensedata);
-			if ((sns->es_key == KEY_UNIT_ATTENTION) ||
-			    (sns->es_key == KEY_NOT_READY)) {
+			skey = scsi_sense_key(sns);
+			if ((skey == KEY_UNIT_ATTENTION) ||
+			    (skey == KEY_NOT_READY)) {
 				int max_retry;
 				struct scsi_failover_ops *fops;
 				fops = vlun->svl_fops;
@@ -2552,7 +2554,7 @@ again:
 				    new_pkt->pkt_cdbp[0],
 				    new_pkt->pkt_cdbp[1],
 				    new_pkt->pkt_cdbp[2]));
-			} else if (sns->es_key == KEY_ILLEGAL_REQUEST)
+			} else if (skey == KEY_ILLEGAL_REQUEST)
 				rval = VHCI_PGR_ILLEGALOP;
 		}
 	} else {
@@ -3047,7 +3049,7 @@ vhci_intr(struct scsi_pkt *pkt)
 	scsi_vhci_lun_t		*vlun;
 	int			rval, held;
 	struct scsi_failover_ops	*fops;
-	struct scsi_extended_sense	*sns;
+	uint8_t			*sns, skey, asc, ascq;
 	mdi_pathinfo_t		*lpath;
 	static char		*timeout_err = "Command Timeout";
 	static char		*parity_err = "Parity Error";
@@ -3111,14 +3113,17 @@ vhci_intr(struct scsi_pkt *pkt)
 		switch (*(pkt->pkt_scbp)) {
 		case STATUS_CHECK:
 			if (pkt->pkt_state & STATE_ARQ_DONE) {
-				sns = &(((struct scsi_arq_status *)(uintptr_t)
+				sns = (uint8_t *)
+				    &(((struct scsi_arq_status *)(uintptr_t)
 				    (pkt->pkt_scbp))->sts_sensedata);
+				skey = scsi_sense_key(sns);
+				asc = scsi_sense_asc(sns);
+				ascq = scsi_sense_ascq(sns);
 				fops = vlun->svl_fops;
 				ASSERT(fops != NULL);
 				VHCI_DEBUG(4, (CE_NOTE, NULL, "vhci_intr: "
 				    "Received sns key %x  esc %x  escq %x\n",
-				    sns->es_key, sns->es_add_code,
-				    sns->es_qual_code));
+				    skey, asc, ascq));
 
 				if (vlun->svl_waiting_for_activepath == 1) {
 					/*
@@ -3134,7 +3139,7 @@ vhci_intr(struct scsi_pkt *pkt)
 					    vpkt->vpkt_tgt_init_scblen);
 					break;
 				}
-				if (sns->es_add_code == VHCI_SCSI_PERR) {
+				if (asc == VHCI_SCSI_PERR) {
 					/*
 					 * parity error
 					 */
@@ -3530,7 +3535,7 @@ static int
 vhci_efo_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 {
 	struct scsi_status		*statusp = resultp->statusp;
-	struct scsi_extended_sense	*sensep = resultp->sensep;
+	uint8_t				*sensep = (uint8_t *)resultp->sensep;
 	struct scsi_pkt			*pkt = resultp->pkt;
 	scsi_vhci_swarg_t		*swarg;
 	scsi_vhci_priv_t		*svp;
@@ -6840,11 +6845,15 @@ check_path_again:
 			}
 			if (check_condition &&
 			    (pkt->pkt_state & STATE_ARQ_DONE)) {
-				struct scsi_extended_sense *sns =
+				uint8_t *sns, skey, asc, ascq;
+				sns = (uint8_t *)
 				    &(((struct scsi_arq_status *)(uintptr_t)
 				    (pkt->pkt_scbp))->sts_sensedata);
-				if (sns->es_key == KEY_UNIT_ATTENTION &&
-				    sns->es_add_code == 0x29) {
+				skey = scsi_sense_key(sns);
+				asc = scsi_sense_asc(sns);
+				ascq = scsi_sense_ascq(sns);
+				if (skey == KEY_UNIT_ATTENTION &&
+				    asc == 0x29) {
 					/* Already failed over */
 					VHCI_DEBUG(1, (CE_NOTE, NULL,
 					    "!vhci_failover(7)(%s): "
@@ -6859,9 +6868,8 @@ check_path_again:
 					VHCI_DEBUG(1, (CE_NOTE, NULL,
 					    "!vhci_failover(%s): path 0x%p "
 					    "unhandled chkcond %x %x %x\n",
-					    guid, (void *)npip, sns->es_key,
-					    sns->es_add_code,
-					    sns->es_qual_code));
+					    guid, (void *)npip, skey,
+					    asc, ascq));
 				}
 			}
 			scsi_destroy_pkt(pkt);
@@ -7218,7 +7226,7 @@ vhci_do_scsi_cmd(struct scsi_pkt *pkt)
 {
 	int	err = 0;
 	int	retry_cnt = 0;
-	struct scsi_extended_sense	*sns;
+	uint8_t	*sns, skey;
 
 #ifdef DEBUG
 	if (vhci_debug > 5) {
@@ -7246,12 +7254,14 @@ retry:
 			if ((pkt->pkt_reason == CMD_CMPLT) &&
 			    (SCBP_C(pkt) == STATUS_CHECK) &&
 			    (pkt->pkt_state & STATE_ARQ_DONE)) {
-				sns = &(((struct scsi_arq_status *)(uintptr_t)
+				sns = (uint8_t *)
+				    &(((struct scsi_arq_status *)(uintptr_t)
 				    (pkt->pkt_scbp))->sts_sensedata);
+				skey = scsi_sense_key(sns);
 				VHCI_DEBUG(1, (CE_WARN, NULL,
 				    "!v_s_do_s_c:retry "
 				    "packet 0x%p  sense data %s", (void *)pkt,
-				    scsi_sname(sns->es_key)));
+				    scsi_sname(skey)));
 			}
 			goto retry;
 		}
@@ -7272,14 +7282,15 @@ retry:
 					break;
 				case STATUS_CHECK:
 					if (pkt->pkt_state & STATE_ARQ_DONE) {
-						sns = &(((
+						sns = (uint8_t *)&(((
 						    struct scsi_arq_status *)
 						    (uintptr_t)
 						    (pkt->pkt_scbp))->
 						    sts_sensedata);
-						if ((sns->es_key ==
+						skey = scsi_sense_key(sns);
+						if ((skey ==
 						    KEY_UNIT_ATTENTION) ||
-						    (sns->es_key ==
+						    (skey ==
 						    KEY_NOT_READY)) {
 							/*
 							 * clear unit attn.
@@ -7293,7 +7304,7 @@ retry:
 							    "data %s",
 							    (void *)pkt,
 							    scsi_sname
-							    (sns->es_key)));
+							    (skey)));
 							goto retry;
 						}
 						VHCI_DEBUG(4, (CE_WARN, NULL,

@@ -180,17 +180,23 @@ tape_path_ping(struct scsi_device *sd, void *ctpriv)
 
 /* ARGSUSED */
 static int
-tape_analyze_sense(struct scsi_device *sd, struct scsi_extended_sense *sense,
+tape_analyze_sense(struct scsi_device *sd, uint8_t *sense,
     void *ctpriv)
 {
-	if (sense->es_key == KEY_ABORTED_COMMAND &&
-	    sense->es_add_code == 0x4b &&
-	    sense->es_qual_code == 0x83) {
+	uint8_t skey, asc, ascq;
+
+	skey = scsi_sense_key(sense);
+	asc = scsi_sense_asc(sense);
+	ascq = scsi_sense_ascq(sense);
+
+	if (skey == KEY_ABORTED_COMMAND &&
+	    asc == 0x4b &&
+	    ascq == 0x83) {
 		return (SCSI_SENSE_INACTIVE);
 	}
-	if (sense->es_key == KEY_NOT_READY &&
-	    sense->es_add_code == 0x4 &&
-	    sense->es_qual_code == 0x1) {
+	if (skey == KEY_NOT_READY &&
+	    asc == 0x4 &&
+	    ascq == 0x1) {
 		return (SCSI_SENSE_NOT_READY);
 	}
 	return (SCSI_SENSE_NOFAILOVER);

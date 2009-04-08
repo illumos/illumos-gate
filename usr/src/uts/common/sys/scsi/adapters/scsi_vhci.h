@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -600,9 +600,9 @@ struct scsi_failover_ops {
 	 * failovers
 	 */
 	int	(*sfo_analyze_sense)(
-			struct scsi_device		*sd,
-			struct scsi_extended_sense	*sense,
-			void				*ctpriv);
+			struct scsi_device	*sd,
+			uint8_t			*sense,
+			void			*ctpriv);
 
 	/*
 	 * return the next pathclass in order of preference
@@ -663,7 +663,7 @@ struct scsi_failover_ops {
 				struct scsi_device *, void *);		\
 	static int	local_name##_analyze_sense(			\
 				struct scsi_device *,			\
-				struct scsi_extended_sense *, void *);	\
+				uint8_t *, void *);			\
 	static int	local_name##_pathclass_next(			\
 				char *, char **, void *);		\
 	struct scsi_failover_ops ops_name##_failover_ops = {		\

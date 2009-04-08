@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,7 +137,7 @@ static int
 std_process_cmplt_pkt(struct scsi_device *sd, struct scsi_pkt *pkt,
     int *retry_cnt)
 {
-	struct scsi_extended_sense	*sns;
+	uint8_t *sns, skey, asc, ascq;
 
 	/*
 	 * Re-initialize retry_cmd_cnt. Allow transport and
@@ -149,20 +149,24 @@ std_process_cmplt_pkt(struct scsi_device *sd, struct scsi_pkt *pkt,
 	 * while waiting for the fo to complete.
 	 */
 	if (pkt->pkt_state & STATE_ARQ_DONE) {
-		sns = &(((struct scsi_arq_status *)(uintptr_t)
+		sns = (uint8_t *)
+		    &(((struct scsi_arq_status *)(uintptr_t)
 		    (pkt->pkt_scbp))->sts_sensedata);
-		if (sns->es_key == KEY_UNIT_ATTENTION) {
+		skey = scsi_sense_key(sns);
+		asc = scsi_sense_asc(sns);
+		ascq = scsi_sense_ascq(sns);
+		if (skey == KEY_UNIT_ATTENTION) {
 			/*
 			 * tpgs access state changed
 			 */
-			if (sns->es_add_code == STD_SCSI_ASC_STATE_CHG &&
-			    sns->es_qual_code == STD_SCSI_ASCQ_STATE_CHG_SUCC) {
+			if (asc == STD_SCSI_ASC_STATE_CHG &&
+			    ascq == STD_SCSI_ASCQ_STATE_CHG_SUCC) {
 				/* XXX: update path info? */
 				cmn_err(CE_WARN, "!Device failover"
 				    " state change");
 			}
 			return (1);
-		} else if (sns->es_key == KEY_NOT_READY) {
+		} else if (skey == KEY_NOT_READY) {
 			if ((*retry_cnt)++ >=
 			    STD_FO_MAX_RETRIES) {
 				cmn_err(CE_WARN, "!Device failover"
@@ -178,8 +182,7 @@ std_process_cmplt_pkt(struct scsi_device *sd, struct scsi_pkt *pkt,
 		}
 		cmn_err(CE_NOTE, "!Failover failed;"
 		    " sense key:%x, ASC: %x, "
-		    "ASCQ:%x", sns->es_key,
-		    sns->es_add_code, sns->es_qual_code);
+		    "ASCQ:%x", skey, asc, ascq);
 		return (0);
 	}
 	switch (SCBP_C(pkt)) {
@@ -413,41 +416,43 @@ static int std_path_ping(struct scsi_device *sd, void *ctpriv)
  */
 /* ARGSUSED */
 static int
-std_analyze_sense(struct scsi_device *sd, struct scsi_extended_sense *sense,
+std_analyze_sense(struct scsi_device *sd, uint8_t *sense,
     void *ctpriv)
 {
 	int rval = SCSI_SENSE_UNKNOWN;
 
-	if ((sense->es_key == KEY_UNIT_ATTENTION) &&
-	    (sense->es_add_code == STD_SCSI_ASC_STATE_CHG) &&
-	    (sense->es_qual_code == STD_SCSI_ASCQ_STATE_CHG_SUCC)) {
+	uint8_t skey, asc, ascq;
+
+	skey = scsi_sense_key(sense);
+	asc = scsi_sense_asc(sense);
+	ascq = scsi_sense_ascq(sense);
+
+	if ((skey == KEY_UNIT_ATTENTION) &&
+	    (asc == STD_SCSI_ASC_STATE_CHG) &&
+	    (ascq == STD_SCSI_ASCQ_STATE_CHG_SUCC)) {
 		rval = SCSI_SENSE_STATE_CHANGED;
 		VHCI_DEBUG(4, (CE_NOTE, NULL, "!std_analyze_sense:"
 		    " sense_key:%x, add_code: %x, qual_code:%x"
-		    " sense:%x\n", sense->es_key, sense->es_add_code,
-		    sense->es_qual_code, rval));
-	} else if ((sense->es_key == KEY_NOT_READY) &&
-	    (sense->es_add_code == STD_LOGICAL_UNIT_NOT_ACCESSIBLE) &&
-	    (sense->es_qual_code == STD_TGT_PORT_UNAVAILABLE)) {
+		    " sense:%x\n", skey, asc, ascq, rval));
+	} else if ((skey == KEY_NOT_READY) &&
+	    (asc == STD_LOGICAL_UNIT_NOT_ACCESSIBLE) &&
+	    (ascq == STD_TGT_PORT_UNAVAILABLE)) {
 		rval = SCSI_SENSE_INACTIVE;
 		VHCI_DEBUG(4, (CE_NOTE, NULL, "!std_analyze_sense:"
 		    " sense_key:%x, add_code: %x, qual_code:%x"
-		    " sense:%x\n", sense->es_key, sense->es_add_code,
-		    sense->es_qual_code, rval));
-	} else if ((sense->es_key == KEY_ILLEGAL_REQUEST) &&
-	    (sense->es_add_code == STD_SCSI_ASC_INVAL_PARAM_LIST)) {
+		    " sense:%x\n", skey, asc, ascq, rval));
+	} else if ((skey == KEY_ILLEGAL_REQUEST) &&
+	    (asc == STD_SCSI_ASC_INVAL_PARAM_LIST)) {
 		rval = SCSI_SENSE_NOFAILOVER;
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!std_analyze_sense:"
 		    " sense_key:%x, add_code: %x, qual_code:%x"
-		    " sense:%x\n", sense->es_key, sense->es_add_code,
-		    sense->es_qual_code, rval));
-	} else if ((sense->es_key == KEY_ILLEGAL_REQUEST) &&
-	    (sense->es_add_code == STD_SCSI_ASC_INVAL_CMD_OPCODE)) {
+		    " sense:%x\n", skey, asc, ascq, rval));
+	} else if ((skey == KEY_ILLEGAL_REQUEST) &&
+	    (asc == STD_SCSI_ASC_INVAL_CMD_OPCODE)) {
 		rval = SCSI_SENSE_NOFAILOVER;
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!std_analyze_sense:"
 		    " sense_key:%x, add_code: %x, qual_code:%x"
-		    " sense:%x\n", sense->es_key, sense->es_add_code,
-		    sense->es_qual_code, rval));
+		    " sense:%x\n", skey, asc, ascq, rval));
 	} else {
 		/*
 		 * At this point sense data may be for power-on-reset
@@ -455,8 +460,7 @@ std_analyze_sense(struct scsi_device *sd, struct scsi_extended_sense *sense,
 		 * For all these cases, return SCSI_SENSE_UNKNOWN.
 		 */
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!Analyze sense UNKNOWN:"
-		    " sense key:%x, ASC:%x, ASCQ:%x\n", sense->es_key,
-		    sense->es_add_code, sense->es_qual_code));
+		    " sense key:%x, ASC:%x, ASCQ:%x\n", skey, asc, ascq));
 	}
 
 	return (rval);

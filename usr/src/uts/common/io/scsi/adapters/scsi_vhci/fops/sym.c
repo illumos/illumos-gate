@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,7 +157,7 @@ symmetric_path_ping(struct scsi_device *sd, void *ctpriv)
 /* ARGSUSED */
 static int
 symmetric_analyze_sense(struct scsi_device *sd,
-struct scsi_extended_sense *sense, void *ctpriv)
+uint8_t *sense, void *ctpriv)
 {
 	return (SCSI_SENSE_NOFAILOVER);
 }
