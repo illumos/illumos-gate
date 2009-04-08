@@ -19,7 +19,7 @@
     information: Portions Copyright [yyyy] [name of copyright owner]
 
     CDDL HEADER END
-    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 -->
 
@@ -235,16 +235,17 @@
             </node>
         </path>
         <path from="APPLICATION" to="LM">
-            <node from="APPLICATION" to="AI">
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="APPLICATION" to="BAY">
@@ -286,18 +287,16 @@
             </node>
         </path>
         <path from="APPLICATION" to="SLOTCONFIG">
-            <node from="APPLICATION" to="AI">
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="LM" to="SLOTCONFIG">
+            <node from="LIBRARY" to="SLOTCONFIG">
                 <att value="LibraryName"/>
                 <att value="LMName"/>
             </node>
@@ -363,31 +362,25 @@
             </node>
         </path>
         <path from="APPLICATION" to="DMBITFORMAT">
-            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
-                <att value="CartridgeGroupName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="PARTITION">
-                <att value="CartridgeID"/>
-            </node>
-            <node from="PARTITION" to="DMBITFORMAT">
-                <att value="PartitionBitFormat" to_value="DMBitFormatName"/>
+           <node from="DRIVE" to="DMBITFORMAT">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="APPLICATION" to="DMBITFORMATTOKEN">
-            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
-                <att value="CartridgeGroupName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="PARTITION">
-                <att value="CartridgeID"/>
-            </node>
-            <node from="PARTITION" to="DMBITFORMAT">
-                <att value="PartitionBitFormat" to_value="DMBitFormatName"/>
+           <node from="DRIVE" to="DMBITFORMAT">
+                <att value="DriveName"/>
             </node>
             <node from="DMBITFORMAT" to="DMBITFORMATTOKEN">
                 <att value="DriveName"/>
@@ -396,11 +389,14 @@
             </node>
         </path>
         <path from="APPLICATION" to="DMCAPABILITY">
-            <node from="APPLICATION" to="MOUNTLOGICAL">
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="MOUNTLOGICAL" to="DMCAPABILITY">
-                <att value="DMCapabilityName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITY">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="APPLICATION" to="DMCAPABILITYTOKEN">
@@ -426,32 +422,25 @@
             </node>
         </path>
         <path from="APPLICATION" to="DMCAPABILITYGROUP">
-            <node from="APPLICATION" to="MOUNTLOGICAL">
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="MOUNTLOGICAL" to="DM">
-                <att value="DriveName"/>
-                <att value="DMName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYGROUP">
-                <att value="DMName"/>
+            <node from="DRIVE" to="DMCAPABILITYGROUP">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="APPLICATION" to="DMCAPABILITYGROUPTOKEN">
-            <node from="APPLICATION" to="MOUNTLOGICAL">
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="MOUNTLOGICAL" to="DM">
-                <att value="DriveName"/>
-                <att value="DMName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYGROUP">
-                <att value="DMName"/>
-            </node>
-            <node from="DMCAPABILITYGROUP" to="DMCAPABILITYGROUPTOKEN">
+            <node from="DRIVE" to="DMCAPABILITYGROUPTOKEN">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMCapabilityGroupName"/>
             </node>
         </path>
         <path from="APPLICATION" to="CARTRIDGE">
@@ -653,27 +642,31 @@
             </node>
         </path>
         <path from="AI" to="LM">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="AI" to="BAY">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="LM" to="BAY">
+            <node from="CARTRIDGE" to="BAY">
                 <att value="LibraryName"/>
-                <att value="LMName"/>
             </node>
         </path>
         <path from="AI" to="SLOT">
@@ -710,13 +703,20 @@
             </node>
         </path>
         <path from="AI" to="SLOTCONFIG">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
             <node from="LM" to="SLOTCONFIG">
                 <att value="LibraryName"/>
@@ -791,36 +791,48 @@
             </node>
         </path>
         <path from="AI" to="DM">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="AI" to="DMBITFORMAT">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
             </node>
             <node from="DM" to="DMBITFORMAT">
                 <att value="DMName"/>
             </node>
         </path>
         <path from="AI" to="DMBITFORMATTOKEN">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+             <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
             </node>
             <node from="DM" to="DMBITFORMAT">
                 <att value="DMName"/>
@@ -835,11 +847,14 @@
             <node from="AI" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="APPLICATION" to="MOUNTLOGICAL">
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
                 <att value="ApplicationName"/>
             </node>
-            <node from="MOUNTLOGICAL" to="DMCAPABILITY">
-                <att value="DMCapabilityName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITY">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="AI" to="DMCAPABILITYTOKEN">
@@ -857,47 +872,45 @@
             </node>
         </path>
         <path from="AI" to="DMCAPABILITYDEFAULTTOKEN">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYDEFAULTTOKEN">
-                <att value="DMName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITYDEFAULTTOKEN">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="AI" to="DMCAPABILITYGROUP">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYGROUP">
-                <att value="DMName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITYGROUP">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="AI" to="DMCAPABILITYGROUPTOKEN">
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="APPLICATION" to="DRIVEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYGROUP">
-                <att value="DMName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="DMCAPABILITYGROUP" to="DMCAPABILITYGROUPTOKEN">
+            <node from="DRIVE" to="DMCAPABILITYGROUPTOKEN">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMCapabilityGroupName"/>
             </node>
         </path>
         <path from="AI" to="CARTRIDGE">
@@ -1081,16 +1094,17 @@
             </node>
         </path>
         <path from="LIBRARY" to="AI">
-            <node from="LIBRARY" to="LM">
+            <node from="LIBRARY" to="CARTRIDGE">
                 <att value="LibraryName"/>
             </node>
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="LIBRARY" to="LIBRARYACCESS">
@@ -1436,16 +1450,17 @@
             </node>
         </path>
         <path from="LIBRARYACCESS" to="AI">
-            <node from="LIBRARYACCESS" to="LM">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
                 <att value="LibraryName"/>
             </node>
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="LIBRARYACCESS" to="LIBRARY">
@@ -1805,13 +1820,20 @@
             </node>
         </path>
         <path from="LM" to="AI">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="LIBRARY" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="LM" to="LIBRARY">
@@ -1918,45 +1940,34 @@
         <path from="LM" to="DM">
             <node from="LM" to="LIBRARY">
                 <att value="LibraryName"/>
-                <att value="LMName"/>
             </node>
             <node from="LIBRARY" to="DRIVE">
                 <att value="LibraryName"/>
             </node>
             <node from="DRIVE" to="DM">
-                <att value="DMName"/>
                 <att value="DriveName"/>
             </node>
         </path>
         <path from="LM" to="DMBITFORMAT">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="LIBRARY" to="DRIVE">
+                <att value="LibraryName"/>
             </node>
-            <node from="DM" to="DMBITFORMAT">
-                <att value="DMName"/>
+            <node from="DRIVE" to="DMBITFORMAT">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="LM" to="DMBITFORMATTOKEN">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="LIBRARY" to="DRIVE">
+                <att value="LibraryName"/>
             </node>
-            <node from="DM" to="DMBITFORMAT">
-                <att value="DMName"/>
-            </node>
-            <node from="DMBITFORMAT" to="DMBITFORMATTOKEN">
+            <node from="DRIVE" to="DMBITFORMATTOKEN">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMBitFormatName"/>
             </node>
         </path>
         <path from="LM" to="DMCAPABILITY">
@@ -1993,34 +2004,25 @@
             </node>
         </path>
         <path from="LM" to="DMCAPABILITYGROUP">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="LIBRARY" to="DRIVE">
+                <att value="LibraryName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYGROUP">
-                <att value="DMName"/>
+            <node from="DRIVE" to="DMCAPABILITYGROUP">
+                <att value="DriveName"/>
             </node>
         </path>
         <path from="LM" to="DMCAPABILITYGROUPTOKEN">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="DM">
-                <att value="ConnectionClientInstance" to_value="DMName"/>
-                <att value="ConnectionClientName" to_value="DriveName"/>
+            <node from="LIBRARY" to="DRIVE">
+                <att value="LibraryName"/>
             </node>
-            <node from="DM" to="DMCAPABILITYGROUP">
-                <att value="DMName"/>
-            </node>
-            <node from="DMCAPABILITYGROUP" to="DMCAPABILITYGROUPTOKEN">
+            <node from="DRIVE" to="DMCAPABILITYGROUPTOKEN">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMCapabilityGroupName"/>
             </node>
         </path>
         <path from="LM" to="CARTRIDGE">
@@ -2141,17 +2143,14 @@
             </node>
         </path>
         <path from="LM" to="TASK">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="LIBRARY" to="TASKLIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="AI" to="TASK">
-                <att value="AIName"/>
-                <att value="ApplicationName"/>
+            <node from="TASKLIBRARY" to="TASK">
+                <att value="TaskID"/>
             </node>
         </path>
         <path from="LM" to="TASKCARTRIDGE">
@@ -2177,20 +2176,11 @@
             </node>
         </path>
         <path from="LM" to="TASKLIBRARY">
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
-            </node>
-            <node from="AI" to="TASK">
-                <att value="AIName"/>
-                <att value="ApplicationName"/>
-            </node>
-            <node from="TASK" to="TASKLIBRARY">
-                <att value="TaskID"/>
+            <node from="LIBRARY" to="TASKLIBRARY">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="LM" to="REQUEST">
@@ -2223,17 +2213,14 @@
             </node>
         </path>
         <path from="BAY" to="AI">
-            <node from="BAY" to="LM">
+            <node from="BAY" to="CARTRIDGE">
                 <att value="LibraryName"/>
-                <att value="LMName"/>
             </node>
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="BAY" to="LIBRARY">
@@ -2644,21 +2631,14 @@
             </node>
         </path>
         <path from="BAY" to="TASK">
-            <node from="BAY" to="LM">
-                <att value="LibraryName"/>
-                <att value="LMName"/>
+            <node from="BAY" to="DRIVE">
+                <att value="BayName"/>
             </node>
-            <node from="LM" to="CONNECTION">
-                <att value="LibraryName" to_value="ConnectionClientName"/>
-                <att value="LMName" to_value="ConnectionClientInstance"/>
+            <node from="DRIVE" to="TASKDRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
-            </node>
-            <node from="AI" to="TASK">
-                <att value="AIName"/>
-                <att value="ApplicationName"/>
+            <node from="TASKDRIVE" to="TASK">
+                <att value="TaskID"/>
             </node>
         </path>
         <path from="BAY" to="TASKCARTRIDGE">
@@ -5687,12 +5667,17 @@
             </node>
         </path>
         <path from="DM" to="AI">
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DM" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DM" to="LIBRARY">
@@ -6053,35 +6038,28 @@
             </node>
         </path>
         <path from="DMBITFORMAT" to="APPLICATION">
-            <node from="DMBITFORMAT" to="DM">
-                <att value="DMName"/>
-            </node>
-            <node from="DM" to="DRIVE">
+            <node from="DMBITFORMAT" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="LIBRARY">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="LIBRARY" to="CARTRIDGE">
-                <att value="LibraryName"/>
-            </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMBITFORMAT" to="AI">
-            <node from="DMBITFORMAT" to="DM">
-                <att value="DMName"/>
+            <node from="DMBITFORMAT" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMBITFORMAT" to="LIBRARY">
@@ -6107,15 +6085,14 @@
             </node>
         </path>
         <path from="DMBITFORMAT" to="LM">
-            <node from="DMBITFORMAT" to="DM">
-                <att value="DMName"/>
+            <node from="DMBITFORMAT" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="DMBITFORMAT" to="BAY">
@@ -6541,45 +6518,28 @@
             </node>
         </path>
         <path from="DMBITFORMATTOKEN" to="APPLICATION">
-            <node from="DMBITFORMATTOKEN" to="DMBITFORMAT">
-                <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMBitFormatName"/>
-            </node>
-            <node from="DMBITFORMAT" to="DM">
-                <att value="DMName"/>
-            </node>
-            <node from="DM" to="DRIVE">
+            <node from="DMBITFORMATTOKEN" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="LIBRARY">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="LIBRARY" to="CARTRIDGE">
-                <att value="LibraryName"/>
-            </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMBITFORMATTOKEN" to="AI">
-            <node from="DMBITFORMATTOKEN" to="DMBITFORMAT">
+            <node from="DMBITFORMATTOKEN" to="DRIVE">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMBitFormatName"/>
             </node>
-            <node from="DMBITFORMAT" to="DM">
-                <att value="DMName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMBITFORMATTOKEN" to="LIBRARY">
@@ -6615,20 +6575,14 @@
             </node>
         </path>
         <path from="DMBITFORMATTOKEN" to="LM">
-            <node from="DMBITFORMATTOKEN" to="DMBITFORMAT">
+            <node from="DMBITFORMATTOKEN" to="DRIVE">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMBitFormatName"/>
             </node>
-            <node from="DMBITFORMAT" to="DM">
-                <att value="DMName"/>
+            <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
-            </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="DMBITFORMATTOKEN" to="BAY">
@@ -7219,32 +7173,28 @@
             </node>
         </path>
         <path from="DMCAPABILITY" to="APPLICATION">
-            <node from="DMCAPABILITY" to="DM">
-                <att value="DMName"/>
-            </node>
-            <node from="DM" to="DRIVE">
+            <node from="DMCAPABILITY" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="CARTRIDGE">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITY" to="AI">
-            <node from="DMCAPABILITY" to="DM">
-                <att value="DMName"/>
+            <node from="DMCAPABILITY" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITY" to="LIBRARY">
@@ -7642,32 +7592,28 @@
             </node>
         </path>
         <path from="DMCAPABILITYTOKEN" to="APPLICATION">
-            <node from="DMCAPABILITYTOKEN" to="DM">
-                <att value="DMName"/>
-            </node>
-            <node from="DM" to="DRIVE">
+            <node from="DMCAPABILITYTOKEN" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="CARTRIDGE">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYTOKEN" to="AI">
-            <node from="DMCAPABILITYTOKEN" to="DM">
-                <att value="DMName"/>
+            <node from="DMCAPABILITYTOKEN" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYTOKEN" to="LIBRARY">
@@ -8060,32 +8006,28 @@
             </node>
         </path>
         <path from="DMCAPABILITYDEFAULTTOKEN" to="APPLICATION">
-            <node from="DMCAPABILITYDEFAULTTOKEN" to="DM">
-                <att value="DMName"/>
-            </node>
-            <node from="DM" to="DRIVE">
+            <node from="DMCAPABILITYDEFAULTTOKEN" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="CARTRIDGE">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYDEFAULTTOKEN" to="AI">
-            <node from="DMCAPABILITYDEFAULTTOKEN" to="DM">
-                <att value="DMName"/>
+            <node from="DMCAPABILITYDEFAULTTOKEN" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYDEFAULTTOKEN" to="LIBRARY">
@@ -8487,26 +8429,25 @@
             <node from="DMCAPABILITYGROUP" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="CARTRIDGE">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYGROUP" to="AI">
-            <node from="DMCAPABILITYGROUP" to="DM">
-                <att value="DMName"/>
+            <node from="DMCAPABILITYGROUP" to="DRIVE">
+                <att value="DriveName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYGROUP" to="LIBRARY">
@@ -8875,39 +8816,28 @@
             </node>
         </path>
         <path from="DMCAPABILITYGROUPTOKEN" to="APPLICATION">
-            <node from="DMCAPABILITYGROUPTOKEN" to="DMCAPABILITYGROUP">
-                <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMCapabilityGroupName"/>
-            </node>
-            <node from="DMCAPABILITYGROUP" to="DRIVE">
+            <node from="DMCAPABILITYGROUPTOKEN" to="DRIVE">
                 <att value="DriveName"/>
             </node>
-            <node from="DRIVE" to="CARTRIDGE">
-                <att value="LibraryName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
-                <att value="CartridgeGroupName"/>
-            </node>
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
                 <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYGROUPTOKEN" to="AI">
-            <node from="DMCAPABILITYGROUPTOKEN" to="DMCAPABILITYGROUP">
+            <node from="DMCAPABILITYGROUPTOKEN" to="DRIVE">
                 <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMCapabilityGroupName"/>
             </node>
-            <node from="DMCAPABILITYGROUP" to="DM">
-                <att value="DMName"/>
+            <node from="DRIVE" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
             </node>
-            <node from="DM" to="CONNECTION">
-                <att value="DMHost" to_value="ConnectionClientHost"/>
+            <node from="DRIVEGROUPAPPLICATION" to="APPLICATION">
+                <att value="ApplicationName"/>
             </node>
-            <node from="CONNECTION" to="AI">
-                <att value="ConnectionClientInstance" to_value="AIName"/>
-                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            <node from="APPLICATION" to="AI">
+                <att value="ApplicationName"/>
             </node>
         </path>
         <path from="DMCAPABILITYGROUPTOKEN" to="LIBRARY">
@@ -8937,12 +8867,7 @@
             </node>
         </path>
         <path from="DMCAPABILITYGROUPTOKEN" to="LM">
-            <node from="DMCAPABILITYGROUPTOKEN" to="DMCAPABILITYGROUP">
-                <att value="DriveName"/>
-                <att value="DMName"/>
-                <att value="DMCapabilityGroupName"/>
-            </node>
-            <node from="DMCAPABILITYGROUP" to="DRIVE">
+            <node from="DMCAPABILITYGROUPTOKEN" to="DRIVE">
                 <att value="DriveName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
@@ -10290,19 +10215,14 @@
             </node>
         </path>
         <path from="CARTRIDGEGROUPAPPLICATION" to="LM">
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
-                <att value="ApplicationName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="APPLICATION" to="AI">
-                <att value="ApplicationName"/>
+            <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
-            </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="CARTRIDGEGROUPAPPLICATION" to="BAY">
@@ -10341,21 +10261,13 @@
             </node>
         </path>
         <path from="CARTRIDGEGROUPAPPLICATION" to="SLOTCONFIG">
-            <node from="CARTRIDGEGROUPAPPLICATION" to="APPLICATION">
-                <att value="ApplicationName"/>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
             </node>
-            <node from="APPLICATION" to="AI">
-                <att value="ApplicationName"/>
+            <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
             </node>
-            <node from="AI" to="CONNECTION">
-                <att value="AIName" to_value="ConnectionClientInstance"/>
-                <att value="ApplicationName" to_value="ConnectionClientName"/>
-            </node>
-            <node from="CONNECTION" to="LM">
-                <att value="ConnectionClientInstance" to_value="LMName"/>
-                <att value="ConnectionClientName" to_value="LibraryName"/>
-            </node>
-            <node from="LM" to="SLOTCONFIG">
+            <node from="LIBRARY" to="SLOTCONFIG">
                 <att value="LibraryName"/>
                 <att value="LMName"/>
             </node>
@@ -15418,12 +15330,14 @@
             </node>
         </path>
         <path from="TASK" to="LM">
-            <node from="TASK" to="REQUEST">
-                <att value="TaskID" to_value="RequestID"/>
+            <node from="TASK" to="TASKLIBRARY">
+                <att value="TaskID"/>
             </node>
-            <node from="REQUEST" to="LM">
-                <att value="RequestingClient" to_value="LibraryName"/>
-                <att value="RequestingInstance" to_value="LMName"/>
+            <node from="TASKLIBRARY" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LIBRARY" to="LM">
+                <att value="LibraryName"/>
             </node>
         </path>
         <path from="TASK" to="BAY">
