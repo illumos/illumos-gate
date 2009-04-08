@@ -4185,12 +4185,11 @@ emlxs_dump_drv_event(
 }  /* emlxs_dump_drv_event() */
 
 
+/* ARGSUSED */
 extern void
-emlxs_dump_drv_thread(
-	void *arg)
+emlxs_dump_drv_thread(emlxs_hba_t *hba,
+	void *arg1, void *arg2)
 {
-	emlxs_hba_t *hba = (emlxs_hba_t *)arg;
-
 	(void) emlxs_dump_drv_event(hba);
 
 	/* Clear the Dump flag */
@@ -4198,17 +4197,16 @@ emlxs_dump_drv_thread(
 	hba->flag &= ~FC_DUMP_ACTIVE;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	thread_exit();
+	return;
 
 }  /* emlxs_dump_drv_thread() */
 
 
+/* ARGSUSED */
 extern void
-emlxs_dump_user_thread(
-	void *arg)
+emlxs_dump_user_thread(emlxs_hba_t *hba,
+	void *arg1, void *arg2)
 {
-	emlxs_hba_t *hba = (emlxs_hba_t *)arg;
-
 	(void) emlxs_dump_user_event(hba);
 
 	/* Clear the Dump flag */
@@ -4216,17 +4214,17 @@ emlxs_dump_user_thread(
 	hba->flag &= ~FC_DUMP_ACTIVE;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	thread_exit();
+	return;
 
 }  /* emlxs_dump_user_thread() */
 
 
+/* ARGSUSED */
 extern void
-emlxs_dump_temp_thread(
-	void *arg)
+emlxs_dump_temp_thread(emlxs_hba_t *hba,
+	void *arg1, void *arg2)
 {
-	dump_temp_event_t *temp_event = (dump_temp_event_t *)arg;
-	emlxs_hba_t *hba = temp_event->hba;
+	dump_temp_event_t *temp_event = (dump_temp_event_t *)arg1;
 
 	(void) emlxs_dump_temp_event(temp_event->hba, temp_event->type,
 	    temp_event->temp);
@@ -4239,7 +4237,7 @@ emlxs_dump_temp_thread(
 	hba->flag &= ~FC_DUMP_ACTIVE;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
-	thread_exit();
+	return;
 
 }  /* emlxs_dump_temp_thread() */
 
@@ -4315,21 +4313,16 @@ emlxs_dump(emlxs_hba_t *hba, uint32_t type, uint32_t temp_type, uint32_t temp)
 	/* Create a separate thread to run the dump event */
 	switch (type) {
 	case EMLXS_DRV_DUMP:
-		thread_create(NULL, 0, emlxs_dump_drv_thread,
-		    (char *)hba, 0, &p0, TS_RUN,
-		    v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_dump_drv_thread, NULL, NULL);
 		break;
 
 	case EMLXS_TEMP_DUMP:
-		thread_create(NULL, 0, emlxs_dump_temp_thread,
-		    (char *)temp_event, 0, &p0, TS_RUN,
-		    v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_dump_temp_thread,
+		    (void *)temp_event, NULL);
 		break;
 
 	case EMLXS_USER_DUMP:
-		thread_create(NULL, 0, emlxs_dump_user_thread,
-		    (char *)hba, 0, &p0, TS_RUN,
-		    v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_dump_user_thread, NULL, NULL);
 		break;
 	}
 

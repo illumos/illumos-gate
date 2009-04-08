@@ -470,7 +470,7 @@ emlxs_msg_t emlxs_message[] =
 		"communicate.", \
 		ACTION_NONE, \
 		NULL, \
-		DDI_SERVICE_RESTORED)
+		0)
 
 	DEFINE_MSG(230, \
 		emlxs_offline_msg, \
@@ -481,7 +481,7 @@ emlxs_msg_t emlxs_message[] =
 		"communicate.", \
 		ACTION_NONE, \
 		NULL, \
-		DDI_SERVICE_LOST)
+		0)
 
 	DEFINE_MSG(231, \
 		emlxs_shutdown_msg, \
@@ -502,7 +502,7 @@ emlxs_msg_t emlxs_message[] =
 		"This indicates that an attempt to reset the adapter has " \
 		"failed.", \
 		ACTION_CHK_HCFG, \
-		NULL, \
+		DDI_FM_DEVICE_INVAL_STATE, \
 		DDI_SERVICE_LOST)
 
 
@@ -638,7 +638,7 @@ emlxs_msg_t emlxs_message[] =
 		"attention interrupt.", \
 		ACTION_NONE, \
 		NULL, \
-		DDI_SERVICE_RESTORED)
+		0)
 
 	DEFINE_MSG(413, \
 		emlxs_linkdown_atten_msg, \
@@ -649,7 +649,7 @@ emlxs_msg_t emlxs_message[] =
 		"attention interrupt.", \
 		ACTION_NONE, \
 		NULL, \
-		DDI_SERVICE_LOST)
+		0)
 
 	DEFINE_MSG(420, \
 		emlxs_hardware_error_msg, \
@@ -888,7 +888,7 @@ emlxs_msg_t emlxs_message[] =
 		"This error could indicate a hardware or firmware problem.", \
 		ACTION_NONE_REP, \
 		DDI_FM_DEVICE_NO_RESPONSE, \
-		0)
+		DDI_SERVICE_LOST)
 
 
 	/* GROUP:  NODE		600 - 699 */

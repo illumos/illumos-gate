@@ -195,38 +195,6 @@ emlxs_msg_log_destroy(emlxs_hba_t *hba)
 
 }  /* emlxs_msg_log_destroy() */
 
-void
-emlxs_setup_abts_ct(emlxs_thread_t *et, void (*func) (),
-    emlxs_port_t *port, uint32_t rxid)
-{
-	et->func = func;
-	et->arg1 = (void *)port;
-	et->arg2 = (void *)((unsigned long)rxid);
-
-}  /* emlxs_setup_abts_ct */
-
-void
-emlxs_abts_ct_thread(void *arg)
-{
-	emlxs_thread_t *et = (emlxs_thread_t *)arg;
-	emlxs_port_t *port;
-	void (*func) ();
-	uint32_t rxid = 0;
-
-	func = et->func;
-	port = (emlxs_port_t *)et->arg1;
-	rxid = (uint32_t)((unsigned long)et->arg2);
-
-	func(port, rxid);
-
-	/*
-	 * Allocated by the emlxs_msg_log()
-	 */
-	kmem_free(et, sizeof (emlxs_thread_t));
-
-	thread_exit();
-
-}  /* emlxs_abts_ct_thread */
 
 uint32_t
 emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
@@ -241,7 +209,6 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 	uint32_t mask;
 	emlxs_msg_t *msg2;
 	uint32_t rxid = 0;
-	emlxs_thread_t *abts_ct_thread = NULL;
 	uint32_t i;
 
 	/* Get the log file for this instance */
@@ -436,20 +403,8 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 	mutex_exit(&log->lock);
 
 	if (rxid) {
-		if (abts_ct_thread = (emlxs_thread_t *)
-		    kmem_alloc(sizeof (emlxs_thread_t), KM_NOSLEEP)) {
-
-			emlxs_setup_abts_ct(abts_ct_thread,
-			    emlxs_abort_ct_exchange, port, rxid);
-
-			/*
-			 * The abts_ct_thread will be released by
-			 * the emlxs_abts_ct_thread().
-			 */
-			thread_create(NULL, 0, emlxs_abts_ct_thread,
-			    (char *)abts_ct_thread, 0,
-			    &p0, TS_RUN, v.v_maxsyspri - 2);
-		}
+		emlxs_thread_spawn(hba, emlxs_abort_ct_exchange,
+		    (void *)port, (void *)((unsigned long)rxid));
 	}
 
 	return (0);
@@ -590,9 +545,6 @@ emlxs_msg_printf(emlxs_port_t *port, const uint32_t fileno,
     const char *fmt, ...)
 {
 	emlxs_hba_t *hba = HBA;
-#ifdef FMA_SUPPORT
-	emlxs_port_t *phyport = &PPORT;
-#endif	/* FMA_SUPPORT */
 	va_list valist;
 	char va_str[256];
 	char msg_str[512];
@@ -615,14 +567,12 @@ emlxs_msg_printf(emlxs_port_t *port, const uint32_t fileno,
 	 * Don't post fault event or/and error event to fmd
 	 * if physical port was not bounded yet.
 	 */
-	if (phyport->flag & EMLXS_PORT_BOUND) {
-		if (msg->fm_ereport_code) {
-			emlxs_fm_ereport(hba, msg->fm_ereport_code);
-		}
+	if (msg->fm_ereport_code) {
+		emlxs_fm_ereport(hba, msg->fm_ereport_code);
+	}
 
-		if (msg->fm_impact_code) {
-			ddi_fm_service_impact(hba->dip, msg->fm_impact_code);
-		}
+	if (msg->fm_impact_code) {
+		emlxs_fm_service_impact(hba, msg->fm_impact_code);
 	}
 #endif	/* FMA_SUPPORT */
 

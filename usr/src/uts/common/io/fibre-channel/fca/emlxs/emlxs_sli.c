@@ -3018,12 +3018,10 @@ emlxs_handle_ff_error(emlxs_hba_t *hba)
 	emlxs_ffstate_change(hba, FC_ERROR);
 
 	if (status & HS_FFER6) {
-		thread_create(NULL, 0, emlxs_restart_thread, (char *)hba, 0,
-		    &p0, TS_RUN, v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_restart_thread, NULL, NULL);
 	} else {
 go_shutdown:
-		thread_create(NULL, 0, emlxs_shutdown_thread, (char *)hba, 0,
-		    &p0, TS_RUN, v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_shutdown_thread, NULL, NULL);
 	}
 
 }  /* emlxs_handle_ff_error() */
@@ -4530,44 +4528,51 @@ emlxs_mb_handle_cmd(emlxs_hba_t *hba, MAILBOX *mb)
 	case MBX_READ_SPARM:	/* a READ SPARAM command completed */
 	case MBX_READ_SPARM64:	/* a READ SPARAM command completed */
 	{
+		uint8_t null_wwn[8];
+
 		if (mp) {
 			bcopy((caddr_t)mp->virt, (caddr_t)&hba->sparam,
 			    sizeof (SERV_PARM));
 
-			bcopy((caddr_t)&hba->sparam.nodeName,
-			    (caddr_t)&hba->wwnn, sizeof (NAME_TYPE));
+			bzero(null_wwn, 8);
+			/* Initialize thenode name and port name only once */
+			if ((bcmp((caddr_t)&hba->wwnn, (caddr_t)null_wwn, 8) ==
+			    0) && (bcmp((caddr_t)&hba->wwpn,
+			    (caddr_t)null_wwn, 8) == 0)) {
+				bcopy((caddr_t)&hba->sparam.nodeName,
+				    (caddr_t)&hba->wwnn, sizeof (NAME_TYPE));
 
-			bcopy((caddr_t)&hba->sparam.portName,
-			    (caddr_t)&hba->wwpn, sizeof (NAME_TYPE));
+				bcopy((caddr_t)&hba->sparam.portName,
+				    (caddr_t)&hba->wwpn, sizeof (NAME_TYPE));
 
 				/* Initialize the physical port */
-			bcopy((caddr_t)&hba->sparam,
-			    (caddr_t)&port->sparam, sizeof (SERV_PARM));
-			bcopy((caddr_t)&hba->wwpn, (caddr_t)&port->wwpn,
-			    sizeof (NAME_TYPE));
-			bcopy((caddr_t)&hba->wwnn, (caddr_t)&port->wwnn,
-			    sizeof (NAME_TYPE));
+				bcopy((caddr_t)&hba->sparam,
+				    (caddr_t)&port->sparam, sizeof (SERV_PARM));
+				bcopy((caddr_t)&hba->wwpn, (caddr_t)&port->wwpn,
+				    sizeof (NAME_TYPE));
+				bcopy((caddr_t)&hba->wwnn, (caddr_t)&port->wwnn,
+				    sizeof (NAME_TYPE));
 
 				/* Initialize the virtual ports */
-			for (i = 1; i < MAX_VPORTS; i++) {
-				vport = &VPORT(i);
-				if (vport->flag & EMLXS_PORT_BOUND) {
-					continue;
+				for (i = 1; i < MAX_VPORTS; i++) {
+					vport = &VPORT(i);
+					if (vport->flag & EMLXS_PORT_BOUND) {
+						continue;
+					}
+
+					bcopy((caddr_t)&hba->sparam,
+					    (caddr_t)&vport->sparam,
+					    sizeof (SERV_PARM));
+
+					bcopy((caddr_t)&vport->wwnn,
+					    (caddr_t)&vport->sparam.nodeName,
+					    sizeof (NAME_TYPE));
+
+					bcopy((caddr_t)&vport->wwpn,
+					    (caddr_t)&vport->sparam.portName,
+					    sizeof (NAME_TYPE));
 				}
-
-				bcopy((caddr_t)&hba->sparam,
-				    (caddr_t)&vport->sparam,
-				    sizeof (SERV_PARM));
-
-				bcopy((caddr_t)&vport->wwnn,
-				    (caddr_t)&vport->sparam.nodeName,
-				    sizeof (NAME_TYPE));
-
-				bcopy((caddr_t)&vport->wwpn,
-				    (caddr_t)&vport->sparam.portName,
-				    sizeof (NAME_TYPE));
 			}
-
 		}
 		break;
 	}
@@ -4905,10 +4910,9 @@ emlxs_mb_handle_cmd(emlxs_hba_t *hba, MAILBOX *mb)
 
 				/* Check FCoE attention bit */
 				if (la.fa == 1) {
-					thread_create(NULL, 0,
+					emlxs_thread_spawn(hba,
 					    emlxs_fcoe_attention_thread,
-					    (char *)hba, 0, &p0, TS_RUN,
-					    v.v_maxsyspri - 2);
+					    NULL, NULL);
 				}
 			}
 #endif /* MENLO_SUPPORT */
@@ -5127,8 +5131,7 @@ emlxs_timer_check_mbox(emlxs_hba_t *hba)
 	emlxs_mb_fini(hba, NULL, MBX_TIMEOUT);
 
 	/* Trigger adapter shutdown */
-	thread_create(NULL, 0, emlxs_shutdown_thread, (char *)hba, 0,
-	    &p0, TS_RUN, v.v_maxsyspri - 2);
+	emlxs_thread_spawn(hba, emlxs_shutdown_thread, NULL, NULL);
 
 	return;
 

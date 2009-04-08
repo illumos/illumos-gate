@@ -1429,7 +1429,7 @@ typedef struct emlxs_hba
 
 #define	FC_RESET_MASK		0x0003001F	/* Bits to protect during */
 						/* a hard reset */
-#define	FC_LINKDOWN_MASK	0xFFF0001F	/* Bits to protect during */
+#define	FC_LINKDOWN_MASK	0xFFF3001F	/* Bits to protect during */
 						/* a linkdown */
 
 
@@ -1487,6 +1487,10 @@ typedef struct emlxs_hba
 	emlxs_buf_t	*iodone_list;	/* fc_packet being deferred */
 	emlxs_buf_t	*iodone_tail;	/* fc_packet being deferred */
 	emlxs_thread_t	iodone_thread;
+	emlxs_thread_t	*spawn_thread_head;
+	emlxs_thread_t	*spawn_thread_tail;
+	kmutex_t	spawn_lock;
+	uint32_t	spawn_open;
 
 	/* Ring management */
 	int32_t		ring_count;

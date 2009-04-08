@@ -1,4 +1,9 @@
 /*
+ * Copyright 2009 Emulex.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * COPYRIGHT (c) 2004-2009 Emulex. All rights reserved.
  * Copying, access, use or distribution is under the terms
  * given in License 2 of LICENSE.txt file.
@@ -6,6 +11,10 @@
 
 #ifndef	_FW_LP10000_H
 #define	_FW_LP10000_H
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #define	emlxs_lp10000_label		"LP10000-S: v1.92a1 (td192a1.all)"
 #define	emlxs_lp10000_kern		0xFF801416
@@ -47038,5 +47047,9 @@ static uint8_t emlxs_lp10000_image[] =
 #define	emlxs_lp10000_size		0
 
 #endif	/* EMLXS_FW_IMAGE_DEF */
+
+#ifdef	__cplusplus
+}
+#endif
 
 #endif	/* _FW_LP10000_H */

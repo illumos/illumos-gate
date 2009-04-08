@@ -36,13 +36,12 @@
  *******************************************************************************
  */
 
+#ifndef _EMLXS_HBAAPI_H
+#define _EMLXS_HBAAPI_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-
-#ifndef _EMLXS_HBAAPI_H
-#define _EMLXS_HBAAPI_H
 
 /* Library version string */
 #define HBA_LIBVERSION 2
@@ -952,10 +951,8 @@ HBA_API HBA_UINT32 HBA_GetWrapperLibraryAttributes (
 );
 #endif /* ifndef _KERNEL */
 
-#endif /* _EMLXS_HBAAPI_H */
-
 #ifdef __cplusplus
 }
 #endif
 
-
+#endif /* _EMLXS_HBAAPI_H */

@@ -3438,9 +3438,8 @@ emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
 
 
 void
-emlxs_abort_ct_exchange(emlxs_port_t *port, uint32_t rxid)
+emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 {
-	emlxs_hba_t *hba = HBA;
 	RING *rp;
 	IOCBQ *iocbq;
 
@@ -3454,8 +3453,9 @@ emlxs_abort_ct_exchange(emlxs_port_t *port, uint32_t rxid)
 	} else {
 		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, rp);
 	}
-	iocbq->port = port;
-	emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
+	if (iocbq) {
+		emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
+	}
 }
 
 

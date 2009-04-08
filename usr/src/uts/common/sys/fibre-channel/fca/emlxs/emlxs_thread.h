@@ -37,6 +37,9 @@ extern "C" {
 
 typedef struct emlxs_thread
 {
+	struct emlxs_thread	*next;
+	struct emlxs_thread	*prev;
+
 	struct emlxs_hba	*hba;
 
 	kthread_t		*thread;
@@ -91,6 +94,7 @@ typedef struct emlxs_taskq
 #define	EMLXS_THREAD_KILLED	0x00000010
 #define	EMLXS_THREAD_ENDED	0x00000020
 #define	EMLXS_THREAD_TRIGGERED	0x80000000
+#define	EMLXS_THREAD_RUN_ONCE	0x00000100
 
 #ifdef	__cplusplus
 }

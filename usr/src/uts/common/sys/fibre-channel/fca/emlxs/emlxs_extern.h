@@ -147,7 +147,8 @@ extern uint32_t			emlxs_get_key(emlxs_hba_t *hba, MAILBOX *mb);
 extern int			emlxs_pm_busy_component(dev_info_t *dip);
 extern int			emlxs_pm_idle_component(dev_info_t *dip);
 extern void			emlxs_pm_idle_timer(dev_info_t *dip);
-extern void			emlxs_shutdown_thread(void *arg);
+extern void			emlxs_shutdown_thread(emlxs_hba_t *hba,
+					void *arg1, void *arg2);
 extern uint32_t			emlxs_set_parm(emlxs_hba_t *hba, uint32_t index,
 					uint32_t new_value);
 extern void			emlxs_ub_destroy(emlxs_port_t *port,
@@ -170,12 +171,14 @@ extern char			*emlxs_menlo_rsp_xlate(uint32_t rsp);
 #ifdef FMA_SUPPORT
 extern void			emlxs_fm_init(emlxs_hba_t *hba);
 extern void			emlxs_fm_fini(emlxs_hba_t *hba);
-extern int			emlxs_fm_check_acc_handle(
+extern int			emlxs_fm_check_acc_handle(emlxs_hba_t *hba,
 					ddi_acc_handle_t handle);
-extern int			emlxs_fm_check_dma_handle(
+extern int			emlxs_fm_check_dma_handle(emlxs_hba_t *hba,
 					ddi_dma_handle_t handle);
 extern void			emlxs_fm_ereport(emlxs_hba_t *hba,
 					char *detail);
+extern void			emlxs_fm_service_impact(emlxs_hba_t *hba,
+					int impact);
 extern int			emlxs_fm_error_cb(dev_info_t *dip,
 					ddi_fm_error_t *err,
 					const void *impl_data);
@@ -292,7 +295,8 @@ extern int32_t			emlxs_els_reply(emlxs_port_t *port,
 					uint32_t explain);
 extern void			emlxs_send_logo(emlxs_port_t *port,
 					uint32_t d_id);
-extern void			emlxs_reset_link_thread(void *arg);
+extern void			emlxs_reset_link_thread(emlxs_hba_t *hba,
+					void *arg1, void *arg2);
 extern uint32_t			emlxs_process_unsol_flogi(emlxs_port_t *port,
 					IOCBQ *iocbq, MATCHMAP *mp,
 					uint32_t size, char *buffer);
@@ -443,7 +447,8 @@ extern void			emlxs_proc_ring(emlxs_hba_t *hba,
 					RING *rp, void *arg2);
 extern void			emlxs_pcix_mxr_update(emlxs_hba_t *hba,
 					uint32_t verbose);
-extern void			emlxs_restart_thread(void *arg);
+extern void			emlxs_restart_thread(emlxs_hba_t *hba,
+					void *arg1, void *arg2);
 extern void			emlxs_fw_show(emlxs_hba_t *hba);
 extern void			emlxs_proc_ring_event(emlxs_hba_t *hba,
 					RING *rp, IOCBQ *iocbq);
@@ -626,8 +631,8 @@ extern IOCBQ			*emlxs_create_abort_xri_cx(emlxs_port_t *port,
 					uint8_t class, int32_t flag);
 extern IOCBQ			*emlxs_create_close_xri_cx(emlxs_port_t *port,
 					NODELIST *ndlp, uint16_t xid, RING *rp);
-extern void			emlxs_abort_ct_exchange(emlxs_port_t *port,
-					uint32_t rxid);
+extern void			emlxs_abort_ct_exchange(emlxs_hba_t *hba,
+					emlxs_port_t *port, uint32_t rxid);
 
 extern emlxs_buf_t		*emlxs_chipq_get(RING *rp, uint16_t iotag);
 extern void			emlxs_chipq_put(RING *rp, emlxs_buf_t *sbp);
@@ -686,6 +691,11 @@ extern void			emlxs_thread_trigger1(emlxs_thread_t *ethread,
 					void (*func) ());
 extern void			emlxs_thread_trigger2(emlxs_thread_t *ethread,
 					void (*func) (), RING *rp);
+extern void			emlxs_thread_spawn(emlxs_hba_t *hba,
+					void (*func) (), void *arg1,
+					void *arg2);
+extern void			emlxs_thread_spawn_create(emlxs_hba_t *hba);
+extern void			emlxs_thread_spawn_destroy(emlxs_hba_t *hba);
 
 /* Module emlxs_dfc.c External Routine Declarations */
 extern int32_t			emlxs_dfc_manage(emlxs_hba_t *hba, void *dfc,
@@ -695,7 +705,8 @@ extern int32_t			emlxs_dfc_handle_event(emlxs_hba_t *hba,
 extern int			emlxs_dfc_handle_unsol_req(emlxs_port_t *port,
 					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
 					uint32_t size);
-extern void		emlxs_fcoe_attention_thread(void *arg);
+extern void			emlxs_fcoe_attention_thread(emlxs_hba_t *hba,
+					void *arg1, void *arg2);
 extern uint32_t		emlxs_set_hba_mode(emlxs_hba_t *hba, uint32_t mode);
 extern uint32_t		emlxs_get_dump_region(emlxs_hba_t *hba, uint32_t region,
 			    uint8_t *buffer, uint32_t *psize);
@@ -769,9 +780,12 @@ extern uint32_t		emlxs_dump_drv_event(emlxs_hba_t *hba);
 extern uint32_t		emlxs_dump_user_event(emlxs_hba_t *hba);
 extern uint32_t		emlxs_dump_temp_event(emlxs_hba_t *hba,
 				uint32_t tempType, uint32_t temp);
-extern void		emlxs_dump_drv_thread(void *arg);
-extern void		emlxs_dump_user_thread(void *arg);
-extern void		emlxs_dump_temp_thread(void *arg);
+extern void		emlxs_dump_drv_thread(emlxs_hba_t *hba,
+				void *arg1, void *arg2);
+extern void		emlxs_dump_user_thread(emlxs_hba_t *hba,
+				void *arg1, void *arg2);
+extern void		emlxs_dump_temp_thread(emlxs_hba_t *hba,
+				void *arg1, void *arg2);
 extern uint32_t		emlxs_ftell(emlxs_file_t *fp);
 extern uint32_t		emlxs_get_dump(emlxs_hba_t *hba, uint8_t *buffer,
 			    uint32_t *buflen);

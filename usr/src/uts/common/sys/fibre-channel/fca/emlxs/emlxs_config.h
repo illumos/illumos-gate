@@ -373,8 +373,8 @@ emlxs_config_t  emlxs_cfg[] = {
 
 #ifdef FMA_SUPPORT
 	/* CFG_FM_CAPS */
-	{"fm-cap",
-		0, 0xF, 0xF, 0,
+	{"fm-capable",
+		0, 0xF, 0, 0,
 		PARM_HIDDEN,
 	"Sets FMA capabilities."},
 #endif	/* FMA_SUPPORT */

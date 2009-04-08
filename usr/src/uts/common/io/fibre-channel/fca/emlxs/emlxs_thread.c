@@ -267,54 +267,89 @@ emlxs_taskq_destroy(emlxs_taskq_t *taskq)
 static void
 emlxs_thread(emlxs_thread_t *ethread)
 {
+	emlxs_hba_t *hba;
 	void (*func) ();
 	void *arg1;
 	void *arg2;
 
-	/*
-	 * If the thread lock can be acquired,
-	 * it is in one of these states:
-	 * 1. Thread not started.
-	 * 2. Thread asleep.
-	 * 3. Thread busy.
-	 * 4. Thread ended.
-	 */
-	mutex_enter(&ethread->lock);
-	ethread->flags |= EMLXS_THREAD_STARTED;
+	if (ethread->flags & EMLXS_THREAD_RUN_ONCE) {
+		hba = ethread->hba;
+		ethread->flags |= EMLXS_THREAD_STARTED;
 
-	while (!(ethread->flags & EMLXS_THREAD_KILLED)) {
-		if (!(ethread->flags & EMLXS_THREAD_TRIGGERED)) {
-			ethread->flags |= EMLXS_THREAD_ASLEEP;
-			cv_wait(&ethread->cv_flag, &ethread->lock);
-		}
-
-		ethread->flags &=
-		    ~(EMLXS_THREAD_ASLEEP | EMLXS_THREAD_TRIGGERED);
-
-		if (ethread->func) {
+		if (!(ethread->flags & EMLXS_THREAD_KILLED)) {
 			func = ethread->func;
 			arg1 = ethread->arg1;
 			arg2 = ethread->arg2;
-			ethread->func = NULL;
-			ethread->arg1 = NULL;
-			ethread->arg2 = NULL;
 
-			ethread->flags |= EMLXS_THREAD_BUSY;
-			mutex_exit(&ethread->lock);
-
-			func(ethread->hba, arg1, arg2);
-
-			mutex_enter(&ethread->lock);
-			ethread->flags &= ~EMLXS_THREAD_BUSY;
+			func(hba, arg1, arg2);
 		}
+
+		ethread->flags |= EMLXS_THREAD_ENDED;
+		ethread->flags &= ~EMLXS_THREAD_INITD;
+
+		/* Remove the thread from the spawn thread list */
+		mutex_enter(&hba->spawn_lock);
+		if (hba->spawn_thread_head == ethread)
+			hba->spawn_thread_head = ethread->next;
+		if (hba->spawn_thread_tail == ethread)
+			hba->spawn_thread_tail = ethread->prev;
+
+		if (ethread->prev)
+			ethread->prev->next = ethread->next;
+		if (ethread->next)
+			ethread->next->prev = ethread->prev;
+
+		ethread->next = ethread->prev = NULL;
+
+		kmem_free(ethread, sizeof (emlxs_thread_t));
+
+		mutex_exit(&hba->spawn_lock);
+	}
+	else
+	{
+		/*
+		 * If the thread lock can be acquired,
+		 * it is in one of these states:
+		 * 1. Thread not started.
+		 * 2. Thread asleep.
+		 * 3. Thread busy.
+		 * 4. Thread ended.
+		 */
+		mutex_enter(&ethread->lock);
+		ethread->flags |= EMLXS_THREAD_STARTED;
+
+		while (!(ethread->flags & EMLXS_THREAD_KILLED)) {
+			if (!(ethread->flags & EMLXS_THREAD_TRIGGERED)) {
+				ethread->flags |= EMLXS_THREAD_ASLEEP;
+				cv_wait(&ethread->cv_flag, &ethread->lock);
+			}
+
+			ethread->flags &=
+			    ~(EMLXS_THREAD_ASLEEP | EMLXS_THREAD_TRIGGERED);
+
+			if (ethread->func) {
+				func = ethread->func;
+				arg1 = ethread->arg1;
+				arg2 = ethread->arg2;
+				ethread->func = NULL;
+				ethread->arg1 = NULL;
+				ethread->arg2 = NULL;
+
+				ethread->flags |= EMLXS_THREAD_BUSY;
+				mutex_exit(&ethread->lock);
+
+				func(ethread->hba, arg1, arg2);
+
+				mutex_enter(&ethread->lock);
+				ethread->flags &= ~EMLXS_THREAD_BUSY;
+			}
+		}
+
+		ethread->flags |= EMLXS_THREAD_ENDED;
+		mutex_exit(&ethread->lock);
 	}
 
-	ethread->flags |= EMLXS_THREAD_ENDED;
-	mutex_exit(&ethread->lock);
-
 	thread_exit();
-
-	return;
 
 }  /* emlxs_thread() */
 
@@ -372,6 +407,7 @@ emlxs_thread_destroy(emlxs_thread_t *ethread)
 	mutex_enter(&ethread->lock);
 
 	if (ethread->flags & EMLXS_THREAD_ENDED) {
+		mutex_exit(&ethread->lock);
 		return;
 	}
 
@@ -493,3 +529,109 @@ emlxs_thread_trigger2(emlxs_thread_t *ethread, void (*func) (), RING *rp)
 	return;
 
 }  /* emlxs_thread_trigger2() */
+
+
+void
+emlxs_thread_spawn(emlxs_hba_t *hba, void (*func) (), void *arg1, void *arg2)
+{
+	emlxs_port_t	*port = &PPORT;
+	emlxs_thread_t	*ethread;
+
+	/* Create a thread */
+	ethread = (emlxs_thread_t *)kmem_alloc(sizeof (emlxs_thread_t),
+	    KM_NOSLEEP);
+
+	if (ethread == NULL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
+		    "Unable to allocate thread object.");
+
+		return;
+	}
+
+	bzero(ethread, sizeof (emlxs_thread_t));
+	ethread->hba = hba;
+	ethread->flags = EMLXS_THREAD_INITD | EMLXS_THREAD_RUN_ONCE;
+	ethread->func = func;
+	ethread->arg1 = arg1;
+	ethread->arg2 = arg2;
+
+	/* Queue the thread on the spawn thread list */
+	mutex_enter(&hba->spawn_lock);
+
+	/* Dont spawn the thread if the spawn list is closed */
+	if (hba->spawn_open == 0) {
+		mutex_exit(&hba->spawn_lock);
+
+		/* destroy the thread */
+		kmem_free(ethread, sizeof (emlxs_thread_t));
+		return;
+	}
+
+	if (hba->spawn_thread_head == NULL) {
+		hba->spawn_thread_head = ethread;
+	}
+	else
+	{
+		hba->spawn_thread_tail->next = ethread;
+		ethread->prev = hba->spawn_thread_tail;
+	}
+
+	hba->spawn_thread_tail = ethread;
+	mutex_exit(&hba->spawn_lock);
+
+	(void) thread_create(NULL, 0, &emlxs_thread, (char *)ethread, 0, &p0,
+	    TS_RUN, v.v_maxsyspri - 2);
+
+}
+
+
+void
+emlxs_thread_spawn_create(emlxs_hba_t *hba)
+{
+	char	buf[64];
+
+	if (hba->spawn_open)
+		return;
+
+	(void) sprintf(buf, "%s%d_thread_lock mutex", DRIVER_NAME,
+	    hba->ddiinst);
+	mutex_init(&hba->spawn_lock, buf, MUTEX_DRIVER, (void *)hba->intr_arg);
+
+	hba->spawn_thread_head = NULL;
+	hba->spawn_thread_tail = NULL;
+
+	mutex_enter(&hba->spawn_lock);
+	hba->spawn_open = 1;
+	mutex_exit(&hba->spawn_lock);
+
+}
+
+
+void
+emlxs_thread_spawn_destroy(emlxs_hba_t *hba)
+{
+	emlxs_thread_t	*ethread;
+
+	if (hba->spawn_open == 0) {
+		return;
+	}
+
+	mutex_enter(&hba->spawn_lock);
+	hba->spawn_open = 0;
+
+	for (ethread = hba->spawn_thread_head; ethread;
+	    ethread = ethread->next) {
+		ethread->flags |= EMLXS_THREAD_KILLED;
+	}
+
+	/* Wait for all the spawned threads to complete */
+	while (hba->spawn_thread_head) {
+		mutex_exit(&hba->spawn_lock);
+		delay(drv_usectohz(10000));
+		mutex_enter(&hba->spawn_lock);
+	}
+
+	mutex_exit(&hba->spawn_lock);
+	mutex_destroy(&hba->spawn_lock);
+
+}

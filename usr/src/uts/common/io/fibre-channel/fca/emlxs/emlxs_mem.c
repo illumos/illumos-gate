@@ -1297,9 +1297,8 @@ top:
 
 				mutex_exit(&EMLXS_MEMGET_LOCK);
 
-				thread_create(NULL, 0, emlxs_shutdown_thread,
-				    (char *)hba, 0, &p0, TS_RUN,
-				    v.v_maxsyspri - 2);
+				emlxs_thread_spawn(hba, emlxs_shutdown_thread,
+				    NULL, NULL);
 
 				return (NULL);
 			}
@@ -1504,8 +1503,8 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg, uint8_t *bp)
 
 			mutex_exit(&EMLXS_MEMPUT_LOCK);
 
-			thread_create(NULL, 0, emlxs_shutdown_thread,
-			    (char *)hba, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
+			    NULL, NULL);
 
 			return (NULL);
 		}
@@ -1524,8 +1523,8 @@ emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg, uint8_t *bp)
 
 			mutex_exit(&EMLXS_MEMPUT_LOCK);
 
-			thread_create(NULL, 0, emlxs_shutdown_thread,
-			    (char *)hba, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
+			    NULL, NULL);
 
 			return (NULL);
 		}

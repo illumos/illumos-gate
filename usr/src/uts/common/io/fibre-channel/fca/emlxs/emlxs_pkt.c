@@ -40,11 +40,12 @@ typedef struct _emlxs_pkt_cookie_t
 #endif /* >= EMLXS_MODREV3 */
 
 
+/* ARGSUSED */
 static void
-emlxs_pkt_thread(void *arg)
+emlxs_pkt_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 {
 	emlxs_port_t *port;
-	fc_packet_t *pkt = (fc_packet_t *)arg;
+	fc_packet_t *pkt = (fc_packet_t *)arg1;
 	int32_t rval;
 	emlxs_buf_t *sbp;
 
@@ -76,14 +77,15 @@ emlxs_pkt_thread(void *arg)
 extern int32_t
 emlxs_pkt_send(fc_packet_t *pkt, uint32_t now)
 {
+	emlxs_port_t *port = (emlxs_port_t *)pkt->pkt_ulp_private;
+	emlxs_hba_t *hba = HBA;
 	int32_t rval;
 
 	if (now) {
-		rval = emlxs_transport((opaque_t)pkt->pkt_ulp_private, pkt);
+		rval = emlxs_transport((opaque_t)port, pkt);
 	} else {
 		/* Spawn a thread to send the pkt */
-		thread_create(NULL, 0, emlxs_pkt_thread, (char *)pkt, 0, &p0,
-		    TS_RUN, v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_pkt_thread, (char *)pkt, NULL);
 
 		rval = FC_SUCCESS;
 	}

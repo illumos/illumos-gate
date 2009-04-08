@@ -529,12 +529,10 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 
 	if (rc == 1) {
 		/* Spawn a thread to reset the link */
-		thread_create(NULL, 0, emlxs_reset_link_thread, (char *)hba,
-		    0, &p0, TS_RUN, v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_reset_link_thread, NULL, NULL);
 	} else if (rc == 2) {
 		/* Spawn a thread to reset the adapter */
-		thread_create(NULL, 0, emlxs_restart_thread, (char *)hba, 0,
-		    &p0, TS_RUN, v.v_maxsyspri - 2);
+		emlxs_thread_spawn(hba, emlxs_restart_thread, NULL, NULL);
 	}
 
 	return (rc);

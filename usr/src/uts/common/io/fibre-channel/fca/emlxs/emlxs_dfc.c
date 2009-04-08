@@ -827,6 +827,7 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	fc_hba_port_attributes_t	*port_attrs;
 	emlxs_node_t			*ndlp;
 	uint8_t				*wwpn;
+	uint32_t			use32 = 0;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_detail_msg, "%s: %s: requested.",
 	    emlxs_dfc_xlate(dfc->cmd), emlxs_fcio_xlate(dfc->data1));
@@ -938,6 +939,12 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		}
 	}
 
+#ifdef _MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		use32 = 1;
+	}
+#endif /* _MULTI_DATAMODEL */
+
 	/* FCIO command */
 	switch (fcio->fcio_cmd) {
 	case FCIO_DIAG:
@@ -972,37 +979,75 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	case FCIO_GET_HOST_PARAMS:
 	{
-		fc_port_dev_t *port_dev;
 		uint32_t i;
 
-		if (fcio->fcio_xfer != FCIO_XFER_READ ||
-		    fcio->fcio_olen != sizeof (fc_port_dev_t)) {
-			rval = EINVAL;
-			break;
-		}
+		if (use32) {
+			fc_port_dev32_t *port_dev;
 
-		port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
-		port_dev->dev_did.port_id		= port->did;
-		port_dev->dev_hard_addr.hard_addr	=
-		    cfg[CFG_ASSIGN_ALPA].current;
-		port_dev->dev_state			= port->ulp_statec;
-		bcopy((caddr_t)&port->wwpn, (caddr_t)&port_dev->dev_pwwn,
-		    8);
-		bcopy((caddr_t)&port->wwnn, (caddr_t)&port_dev->dev_nwwn,
-		    8);
+			if (fcio->fcio_xfer != FCIO_XFER_READ ||
+			    fcio->fcio_olen != sizeof (fc_port_dev32_t)) {
+				rval = EINVAL;
+				break;
+			}
 
-		if (hba->topology == TOPOLOGY_LOOP) {
-			for (i = 0; i < port->alpa_map[0]; i++) {
-				if (port->alpa_map[i + 1] == port->did) {
-					port_dev->dev_did.priv_lilp_posit =
-					    (uint8_t)(i & 0xff);
-					break;
+			port_dev = (fc_port_dev32_t *)fcio->fcio_obuf;
+			port_dev->dev_did.port_id = port->did;
+			port_dev->dev_hard_addr.hard_addr =
+			    cfg[CFG_ASSIGN_ALPA].current;
+			port_dev->dev_state = port->ulp_statec;
+			bcopy((caddr_t)&port->wwpn,
+			    (caddr_t)&port_dev->dev_pwwn, 8);
+			bcopy((caddr_t)&port->wwnn,
+			    (caddr_t)&port_dev->dev_nwwn, 8);
+
+			if (hba->topology == TOPOLOGY_LOOP) {
+				for (i = 0; i < port->alpa_map[0]; i++) {
+					if (port->alpa_map[i + 1] ==
+					    port->did) {
+						port_dev->
+						    dev_did.priv_lilp_posit =
+						    (uint8_t)(i & 0xff);
+						break;
+					}
 				}
 			}
-		}
 
-		port_dev->dev_type[0] = SWAP_DATA32(0x00000120);
-		port_dev->dev_type[1] = SWAP_DATA32(0x00000001);
+			port_dev->dev_type[0] = SWAP_DATA32(0x00000120);
+			port_dev->dev_type[1] = SWAP_DATA32(0x00000001);
+		} else {
+			fc_port_dev_t *port_dev;
+
+			if (fcio->fcio_xfer != FCIO_XFER_READ ||
+			    fcio->fcio_olen != sizeof (fc_port_dev_t)) {
+				rval = EINVAL;
+				break;
+			}
+
+			port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
+			port_dev->dev_did.port_id = port->did;
+			port_dev->dev_hard_addr.hard_addr =
+			    cfg[CFG_ASSIGN_ALPA].current;
+			port_dev->dev_state = port->ulp_statec;
+			bcopy((caddr_t)&port->wwpn,
+			    (caddr_t)&port_dev->dev_pwwn, 8);
+			bcopy((caddr_t)&port->wwnn,
+			    (caddr_t)&port_dev->dev_nwwn, 8);
+
+			if (hba->topology == TOPOLOGY_LOOP) {
+				for (i = 0; i < port->alpa_map[0]; i++) {
+					if (port->alpa_map[i + 1] ==
+					    port->did) {
+						port_dev->
+						    dev_did.priv_lilp_posit =
+						    (uint8_t)(i & 0xff);
+						break;
+					}
+				}
+			}
+
+			port_dev->dev_type[0] = SWAP_DATA32(0x00000120);
+			port_dev->dev_type[1] = SWAP_DATA32(0x00000001);
+		}
 
 		break;
 	}
@@ -1150,161 +1195,349 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	case FCIO_GET_ADAPTER_ATTRIBUTES:
 	{
-		fc_hba_adapter_attributes_t	*hba_attrs;
+		if (use32) {
+			fc_hba_adapter_attributes32_t	*hba_attrs;
 
-		if (fcio->fcio_xfer != FCIO_XFER_READ ||
-		    fcio->fcio_olen < sizeof (fc_hba_adapter_attributes_t)) {
-			rval = EINVAL;
-			break;
+			if (fcio->fcio_xfer != FCIO_XFER_READ ||
+			    fcio->fcio_olen <
+			    sizeof (fc_hba_adapter_attributes32_t)) {
+				rval = EINVAL;
+				break;
+			}
+
+			hba_attrs =
+			    (fc_hba_adapter_attributes32_t *)fcio->fcio_obuf;
+
+			hba_attrs->version = FC_HBA_ADAPTER_ATTRIBUTES_VERSION;
+			(void) strncpy(hba_attrs->Manufacturer, "Emulex",
+			    sizeof (hba_attrs->Manufacturer));
+			(void) strncpy(hba_attrs->SerialNumber, vpd->serial_num,
+			    sizeof (hba_attrs->SerialNumber));
+			(void) strncpy(hba_attrs->Model, hba->model_info.model,
+			    sizeof (hba_attrs->Model));
+			(void) strncpy(hba_attrs->ModelDescription,
+			    hba->model_info.model_desc,
+			    sizeof (hba_attrs->ModelDescription));
+			bcopy((caddr_t)&port->wwnn,
+			    (caddr_t)&hba_attrs->NodeWWN, 8);
+			(void) strncpy((caddr_t)hba_attrs->NodeSymbolicName,
+			    (caddr_t)port->snn,
+			    sizeof (hba_attrs->NodeSymbolicName));
+			(void) sprintf(hba_attrs->HardwareVersion, "%x",
+			    vpd->biuRev);
+			(void) sprintf(hba_attrs->DriverVersion, "%s (%s)",
+			    emlxs_version, emlxs_revision);
+			(void) strncpy(hba_attrs->OptionROMVersion,
+			    vpd->fcode_version,
+			    sizeof (hba_attrs->OptionROMVersion));
+			(void) sprintf(hba_attrs->FirmwareVersion, "%s (%s)",
+			    vpd->fw_version, vpd->fw_label);
+			(void) strncpy(hba_attrs->DriverName, DRIVER_NAME,
+			    sizeof (hba_attrs->DriverName));
+			hba_attrs->VendorSpecificID =
+			    ((hba->model_info.device_id << 16) |
+			    PCI_VENDOR_ID_EMULEX);
+			hba_attrs->NumberOfPorts = hba->num_of_ports;
+		} else {
+			fc_hba_adapter_attributes_t	*hba_attrs;
+
+			if (fcio->fcio_xfer != FCIO_XFER_READ ||
+			    fcio->fcio_olen <
+			    sizeof (fc_hba_adapter_attributes_t)) {
+				rval = EINVAL;
+				break;
+			}
+
+			hba_attrs =
+			    (fc_hba_adapter_attributes_t *)fcio->fcio_obuf;
+
+			hba_attrs->version = FC_HBA_ADAPTER_ATTRIBUTES_VERSION;
+			(void) strncpy(hba_attrs->Manufacturer, "Emulex",
+			    sizeof (hba_attrs->Manufacturer));
+			(void) strncpy(hba_attrs->SerialNumber, vpd->serial_num,
+			    sizeof (hba_attrs->SerialNumber));
+			(void) strncpy(hba_attrs->Model, hba->model_info.model,
+			    sizeof (hba_attrs->Model));
+			(void) strncpy(hba_attrs->ModelDescription,
+			    hba->model_info.model_desc,
+			    sizeof (hba_attrs->ModelDescription));
+			bcopy((caddr_t)&port->wwnn,
+			    (caddr_t)&hba_attrs->NodeWWN, 8);
+			(void) strncpy((caddr_t)hba_attrs->NodeSymbolicName,
+			    (caddr_t)port->snn,
+			    sizeof (hba_attrs->NodeSymbolicName));
+			(void) sprintf(hba_attrs->HardwareVersion, "%x",
+			    vpd->biuRev);
+			(void) sprintf(hba_attrs->DriverVersion, "%s (%s)",
+			    emlxs_version, emlxs_revision);
+			(void) strncpy(hba_attrs->OptionROMVersion,
+			    vpd->fcode_version,
+			    sizeof (hba_attrs->OptionROMVersion));
+			(void) sprintf(hba_attrs->FirmwareVersion, "%s (%s)",
+			    vpd->fw_version, vpd->fw_label);
+			(void) strncpy(hba_attrs->DriverName, DRIVER_NAME,
+			    sizeof (hba_attrs->DriverName));
+			hba_attrs->VendorSpecificID =
+			    ((hba->model_info.device_id << 16) |
+			    PCI_VENDOR_ID_EMULEX);
+			hba_attrs->NumberOfPorts = hba->num_of_ports;
 		}
-
-		hba_attrs = (fc_hba_adapter_attributes_t *)fcio->fcio_obuf;
-
-		hba_attrs->version = FC_HBA_ADAPTER_ATTRIBUTES_VERSION;
-		(void) strncpy(hba_attrs->Manufacturer, "Emulex",
-		    sizeof (hba_attrs->Manufacturer));
-		(void) strncpy(hba_attrs->SerialNumber, vpd->serial_num,
-		    sizeof (hba_attrs->SerialNumber));
-		(void) strncpy(hba_attrs->Model, hba->model_info.model,
-		    sizeof (hba_attrs->Model));
-		(void) strncpy(hba_attrs->ModelDescription,
-		    hba->model_info.model_desc,
-		    sizeof (hba_attrs->ModelDescription));
-		bcopy((caddr_t)&port->wwnn, (caddr_t)&hba_attrs->NodeWWN,
-		    8);
-		(void) strncpy((caddr_t)hba_attrs->NodeSymbolicName,
-		    (caddr_t)port->snn,
-		    sizeof (hba_attrs->NodeSymbolicName));
-		(void) sprintf(hba_attrs->HardwareVersion, "%x", vpd->biuRev);
-		(void) sprintf(hba_attrs->DriverVersion, "%s (%s)",
-		    emlxs_version, emlxs_revision);
-		(void) strncpy(hba_attrs->OptionROMVersion, vpd->fcode_version,
-		    sizeof (hba_attrs->OptionROMVersion));
-		(void) sprintf(hba_attrs->FirmwareVersion, "%s (%s)",
-		    vpd->fw_version, vpd->fw_label);
-		(void) strncpy(hba_attrs->DriverName, DRIVER_NAME,
-		    sizeof (hba_attrs->DriverName));
-		hba_attrs->VendorSpecificID =
-		    ((hba->model_info.device_id << 16) | PCI_VENDOR_ID_EMULEX);
-		hba_attrs->NumberOfPorts = hba->num_of_ports;
 
 		break;
 	}
 
 	case FCIO_GET_ADAPTER_PORT_ATTRIBUTES:
 	{
-		fc_hba_port_attributes_t  *port_attrs;
 		uint32_t value1;
 		uint32_t value2;
 
-		if (fcio->fcio_xfer != FCIO_XFER_READ ||
-		    fcio->fcio_olen < sizeof (fc_hba_port_attributes_t)) {
-			rval = EINVAL;
-			break;
-		}
+		if (use32) {
+			fc_hba_port_attributes32_t  *port_attrs;
 
-		port_attrs = (fc_hba_port_attributes_t *)fcio->fcio_obuf;
+			if (fcio->fcio_xfer != FCIO_XFER_READ ||
+			    fcio->fcio_olen <
+			    sizeof (fc_hba_port_attributes32_t)) {
+				rval = EINVAL;
+				break;
+			}
 
-		port_attrs->version    = FC_HBA_PORT_ATTRIBUTES_VERSION;
-		port_attrs->lastChange = 0;
-		port_attrs->fp_minor   = 0;
-		bcopy((caddr_t)&port->wwnn, (caddr_t)&port_attrs->NodeWWN,
-		    8);
-		bcopy((caddr_t)&port->wwpn, (caddr_t)&port_attrs->PortWWN,
-		    8);
+			port_attrs =
+			    (fc_hba_port_attributes32_t *)fcio->fcio_obuf;
 
-		if (hba->state <= FC_LINK_DOWN) {
-			/* port_attrs->PortFcId   */
-		    /* port_attrs->PortType   */
-			/* port_attrs->PortSpeed  */
-			/* port_attrs->FabricName */
-			port_attrs->PortState = FC_HBA_PORTSTATE_OFFLINE;
-		} else {
-			port_attrs->PortFcId  = port->did;
-			port_attrs->PortState = FC_HBA_PORTSTATE_ONLINE;
+			port_attrs->version = FC_HBA_PORT_ATTRIBUTES_VERSION;
+			port_attrs->lastChange = 0;
+			port_attrs->fp_minor = 0;
+			bcopy((caddr_t)&port->wwnn,
+			    (caddr_t)&port_attrs->NodeWWN, 8);
+			bcopy((caddr_t)&port->wwpn,
+			    (caddr_t)&port_attrs->PortWWN, 8);
 
-			if (hba->topology == TOPOLOGY_LOOP) {
-				port_attrs->PortType = FC_HBA_PORTTYPE_LPORT;
+			if (hba->state <= FC_LINK_DOWN) {
+				/* port_attrs->PortFcId   */
+				/* port_attrs->PortType   */
+				/* port_attrs->PortSpeed  */
+				/* port_attrs->FabricName */
+				port_attrs->PortState =
+				    FC_HBA_PORTSTATE_OFFLINE;
 			} else {
-				port_attrs->PortType = FC_HBA_PORTTYPE_NPORT;
+				port_attrs->PortFcId  = port->did;
+				port_attrs->PortState = FC_HBA_PORTSTATE_ONLINE;
+
+				if (hba->topology == TOPOLOGY_LOOP) {
+					port_attrs->PortType =
+					    FC_HBA_PORTTYPE_LPORT;
+				} else {
+					port_attrs->PortType =
+					    FC_HBA_PORTTYPE_NPORT;
+				}
+
+				ndlp = emlxs_node_find_did(port, Fabric_DID);
+
+				if (ndlp) {
+					bcopy(&ndlp->nlp_portname,
+					    (caddr_t)&port_attrs->FabricName,
+					    sizeof (port_attrs->FabricName));
+				}
+
+				switch (hba->linkspeed) {
+				case 0:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_1GBIT;
+					break;
+				case LA_1GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_1GBIT;
+					break;
+				case LA_2GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_2GBIT;
+					break;
+				case LA_4GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_4GBIT;
+					break;
+				case LA_8GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_8GBIT;
+					break;
+				case LA_10GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_10GBIT;
+					break;
+				default:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_UNKNOWN;
+				}
 			}
 
-			ndlp = emlxs_node_find_did(port, Fabric_DID);
+			port_attrs->PortSupportedClassofService =
+			    SWAP_DATA32(FC_NS_CLASS3);
+			(void) strncpy((caddr_t)port_attrs->PortSymbolicName,
+			    (caddr_t)port->spn,
+			    sizeof (port_attrs->PortSymbolicName));
 
-			if (ndlp) {
-				bcopy(&ndlp->nlp_portname,
-				    (caddr_t)&port_attrs->FabricName,
-				    sizeof (port_attrs->FabricName));
+			/* Set the hba speed limit */
+			if (vpd->link_speed & LMT_10GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_10GBIT;
+			}
+			if (vpd->link_speed & LMT_8GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_8GBIT;
+			}
+			if (vpd->link_speed & LMT_4GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_4GBIT;
+			}
+			if (vpd->link_speed & LMT_2GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_2GBIT;
+			}
+			if (vpd->link_speed & LMT_1GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_1GBIT;
 			}
 
-			switch (hba->linkspeed) {
-			case 0:
-				port_attrs->PortSpeed = HBA_PORTSPEED_1GBIT;
-				break;
-			case LA_1GHZ_LINK:
-				port_attrs->PortSpeed = HBA_PORTSPEED_1GBIT;
-				break;
-			case LA_2GHZ_LINK:
-				port_attrs->PortSpeed = HBA_PORTSPEED_2GBIT;
-				break;
-			case LA_4GHZ_LINK:
-				port_attrs->PortSpeed = HBA_PORTSPEED_4GBIT;
-				break;
-			case LA_8GHZ_LINK:
-				port_attrs->PortSpeed = HBA_PORTSPEED_8GBIT;
-				break;
-			case LA_10GHZ_LINK:
-				port_attrs->PortSpeed = HBA_PORTSPEED_10GBIT;
-				break;
-			default:
-				port_attrs->PortSpeed = HBA_PORTSPEED_UNKNOWN;
+			value1 = 0x00000120;
+			value2 = 0x00000001;
 
+			bcopy((caddr_t)&value1,
+			    (caddr_t)&port_attrs->PortSupportedFc4Types[0], 4);
+			bcopy((caddr_t)&value2,
+			    (caddr_t)&port_attrs->PortSupportedFc4Types[4], 4);
+
+			bcopy((caddr_t)&value1,
+			    (caddr_t)&port_attrs->PortActiveFc4Types[0], 4);
+			bcopy((caddr_t)&value2,
+			    (caddr_t)&port_attrs->PortActiveFc4Types[4], 4);
+
+			port_attrs->PortMaxFrameSize = FF_FRAME_SIZE;
+			port_attrs->NumberofDiscoveredPorts =
+			    emlxs_nport_count(port);
+		} else {
+			fc_hba_port_attributes_t  *port_attrs;
+
+			if (fcio->fcio_xfer != FCIO_XFER_READ ||
+			    fcio->fcio_olen <
+			    sizeof (fc_hba_port_attributes_t)) {
+				rval = EINVAL;
+				break;
 			}
-		}
 
-		port_attrs->PortSupportedClassofService =
-		    SWAP_DATA32(FC_NS_CLASS3);
-		(void) strncpy((caddr_t)port_attrs->PortSymbolicName,
-		    (caddr_t)port->spn,
-		    sizeof (port_attrs->PortSymbolicName));
+			port_attrs =
+			    (fc_hba_port_attributes_t *)fcio->fcio_obuf;
 
-		/* Set the hba speed limit */
-		if (vpd->link_speed & LMT_10GB_CAPABLE) {
-			port_attrs->PortSupportedSpeed |=
-			    FC_HBA_PORTSPEED_10GBIT;
-		}
-		if (vpd->link_speed & LMT_8GB_CAPABLE) {
-			port_attrs->PortSupportedSpeed |=
-			    FC_HBA_PORTSPEED_8GBIT;
-		}
-		if (vpd->link_speed & LMT_4GB_CAPABLE) {
-			port_attrs->PortSupportedSpeed |=
-			    FC_HBA_PORTSPEED_4GBIT;
-		}
-		if (vpd->link_speed & LMT_2GB_CAPABLE) {
-			port_attrs->PortSupportedSpeed |=
-			    FC_HBA_PORTSPEED_2GBIT;
-		}
-		if (vpd->link_speed & LMT_1GB_CAPABLE) {
-			port_attrs->PortSupportedSpeed |=
-			    FC_HBA_PORTSPEED_1GBIT;
-		}
+			port_attrs->version = FC_HBA_PORT_ATTRIBUTES_VERSION;
+			port_attrs->lastChange = 0;
+			port_attrs->fp_minor = 0;
+			bcopy((caddr_t)&port->wwnn,
+			    (caddr_t)&port_attrs->NodeWWN, 8);
+			bcopy((caddr_t)&port->wwpn,
+			    (caddr_t)&port_attrs->PortWWN, 8);
 
-		value1 = 0x00000120;
-		value2 = 0x00000001;
+			if (hba->state <= FC_LINK_DOWN) {
+				/* port_attrs->PortFcId   */
+				/* port_attrs->PortType   */
+				/* port_attrs->PortSpeed  */
+				/* port_attrs->FabricName */
+				port_attrs->PortState =
+				    FC_HBA_PORTSTATE_OFFLINE;
+			} else {
+				port_attrs->PortFcId  = port->did;
+				port_attrs->PortState = FC_HBA_PORTSTATE_ONLINE;
 
-		bcopy((caddr_t)&value1,
-		    (caddr_t)&port_attrs->PortSupportedFc4Types[0], 4);
-		bcopy((caddr_t)&value2,
-		    (caddr_t)&port_attrs->PortSupportedFc4Types[4], 4);
+				if (hba->topology == TOPOLOGY_LOOP) {
+					port_attrs->PortType =
+					    FC_HBA_PORTTYPE_LPORT;
+				} else {
+					port_attrs->PortType =
+					    FC_HBA_PORTTYPE_NPORT;
+				}
 
-		bcopy((caddr_t)&value1,
-		    (caddr_t)&port_attrs->PortActiveFc4Types[0], 4);
-		bcopy((caddr_t)&value2,
-		    (caddr_t)&port_attrs->PortActiveFc4Types[4], 4);
+				ndlp = emlxs_node_find_did(port, Fabric_DID);
 
-		port_attrs->PortMaxFrameSize = FF_FRAME_SIZE;
-		port_attrs->NumberofDiscoveredPorts = emlxs_nport_count(port);
+				if (ndlp) {
+					bcopy(&ndlp->nlp_portname,
+					    (caddr_t)&port_attrs->FabricName,
+					    sizeof (port_attrs->FabricName));
+				}
+
+				switch (hba->linkspeed) {
+				case 0:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_1GBIT;
+					break;
+				case LA_1GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_1GBIT;
+					break;
+				case LA_2GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_2GBIT;
+					break;
+				case LA_4GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_4GBIT;
+					break;
+				case LA_8GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_8GBIT;
+					break;
+				case LA_10GHZ_LINK:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_10GBIT;
+					break;
+				default:
+					port_attrs->PortSpeed =
+					    HBA_PORTSPEED_UNKNOWN;
+				}
+			}
+
+			port_attrs->PortSupportedClassofService =
+			    SWAP_DATA32(FC_NS_CLASS3);
+			(void) strncpy((caddr_t)port_attrs->PortSymbolicName,
+			    (caddr_t)port->spn,
+			    sizeof (port_attrs->PortSymbolicName));
+
+			/* Set the hba speed limit */
+			if (vpd->link_speed & LMT_10GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_10GBIT;
+			}
+			if (vpd->link_speed & LMT_8GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_8GBIT;
+			}
+			if (vpd->link_speed & LMT_4GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_4GBIT;
+			}
+			if (vpd->link_speed & LMT_2GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_2GBIT;
+			}
+			if (vpd->link_speed & LMT_1GB_CAPABLE) {
+				port_attrs->PortSupportedSpeed |=
+				    FC_HBA_PORTSPEED_1GBIT;
+			}
+
+			value1 = 0x00000120;
+			value2 = 0x00000001;
+
+			bcopy((caddr_t)&value1,
+			    (caddr_t)&port_attrs->PortSupportedFc4Types[0], 4);
+			bcopy((caddr_t)&value2,
+			    (caddr_t)&port_attrs->PortSupportedFc4Types[4], 4);
+
+			bcopy((caddr_t)&value1,
+			    (caddr_t)&port_attrs->PortActiveFc4Types[0], 4);
+			bcopy((caddr_t)&value2,
+			    (caddr_t)&port_attrs->PortActiveFc4Types[4], 4);
+
+			port_attrs->PortMaxFrameSize = FF_FRAME_SIZE;
+			port_attrs->NumberofDiscoveredPorts =
+			    emlxs_nport_count(port);
+		}
 
 		break;
 	}
@@ -1376,7 +1609,6 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	case FCIO_GET_DEV_LIST:
 	{
-		fc_port_dev_t *port_dev;
 		uint32_t max_count;
 		uint32_t i;
 		uint32_t j;
@@ -1389,45 +1621,51 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			break;
 		}
 
-		port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
-		max_count = fcio->fcio_olen / sizeof (fc_port_dev_t);
+		if (use32) {
+			fc_port_dev32_t *port_dev;
 
-		rw_enter(&port->node_rwlock, RW_READER);
+			port_dev = (fc_port_dev32_t *)fcio->fcio_obuf;
+			max_count = fcio->fcio_olen / sizeof (fc_port_dev32_t);
 
-		nport_count = emlxs_nport_count(port);
-		*(uint32_t *)fcio->fcio_abuf = nport_count;
+			rw_enter(&port->node_rwlock, RW_READER);
 
-		if (nport_count == 0) {
-			rw_exit(&port->node_rwlock);
+			nport_count = emlxs_nport_count(port);
+			*(uint32_t *)fcio->fcio_abuf = nport_count;
 
-			fcio->fcio_errno = FC_NO_MAP;
-			rval = EIO;
-			break;
-		}
+			if (nport_count == 0) {
+				rw_exit(&port->node_rwlock);
 
-		if (nport_count > max_count) {
-			rw_exit(&port->node_rwlock);
+				fcio->fcio_errno = FC_NO_MAP;
+				rval = EIO;
+				break;
+			}
 
-			fcio->fcio_errno = FC_TOOMANY;
-			rval = EIO;
-			break;
-		}
+			if (nport_count > max_count) {
+				rw_exit(&port->node_rwlock);
 
-		for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
-			nlp = port->node_table[i];
-			while (nlp != NULL) {
-				if ((nlp->nlp_DID & 0xFFF000) != 0xFFF000) {
-					port_dev->dev_dtype = 0;
-					port_dev->dev_type[0] =
-					    SWAP_LONG(0x00000100);
-					port_dev->dev_state =
-					    PORT_DEVICE_LOGGED_IN;
-					port_dev->dev_did.port_id =
-					    nlp->nlp_DID;
-					port_dev->dev_did.priv_lilp_posit = 0;
-					port_dev->dev_hard_addr.hard_addr = 0;
+				fcio->fcio_errno = FC_TOOMANY;
+				rval = EIO;
+				break;
+			}
 
-					if (hba->topology == TOPOLOGY_LOOP) {
+			for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+				nlp = port->node_table[i];
+				while (nlp != NULL) {
+					if ((nlp->nlp_DID & 0xFFF000) !=
+					    0xFFF000) {
+						port_dev->dev_dtype = 0;
+						port_dev->dev_type[0] =
+						    SWAP_LONG(0x00000100);
+						port_dev->dev_state =
+						    PORT_DEVICE_LOGGED_IN;
+						port_dev->dev_did.port_id =
+						    nlp->nlp_DID;
+						port_dev->
+						    dev_did.priv_lilp_posit = 0;
+						port_dev->
+						    dev_hard_addr.hard_addr = 0;
+
+if (hba->topology == TOPOLOGY_LOOP) {
 	for (j = 1; j < port->alpa_map[0]; j++) {
 		if (nlp->nlp_DID == port->alpa_map[j]) {
 			port_dev->dev_did.priv_lilp_posit = j-1;
@@ -1435,21 +1673,99 @@ emlxs_fcio_manage(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		}
 	}
 
-						port_dev->dev_hard_addr.
-						    hard_addr = nlp->nlp_DID;
+	port_dev->dev_hard_addr.hard_addr = nlp->nlp_DID;
+}
+
+						bcopy((caddr_t)
+						    &nlp->nlp_portname,
+						    (caddr_t)
+						    &port_dev->dev_pwwn,
+						    8);
+						bcopy((caddr_t)
+						    &nlp->nlp_nodename,
+						    (caddr_t)
+						    &port_dev->dev_nwwn,
+						    8);
+						port_dev++;
 					}
 
-					bcopy((caddr_t)&nlp->nlp_portname,
-					    (caddr_t)&port_dev->dev_pwwn, 8);
-					bcopy((caddr_t)&nlp->nlp_nodename,
-					    (caddr_t)&port_dev->dev_nwwn, 8);
-					port_dev++;
+					nlp = (NODELIST *) nlp->nlp_list_next;
 				}
-
-				nlp = (NODELIST *) nlp->nlp_list_next;
 			}
+			rw_exit(&port->node_rwlock);
+		} else {
+			fc_port_dev_t *port_dev;
+
+			port_dev = (fc_port_dev_t *)fcio->fcio_obuf;
+			max_count = fcio->fcio_olen / sizeof (fc_port_dev_t);
+
+			rw_enter(&port->node_rwlock, RW_READER);
+
+			nport_count = emlxs_nport_count(port);
+			*(uint32_t *)fcio->fcio_abuf = nport_count;
+
+			if (nport_count == 0) {
+				rw_exit(&port->node_rwlock);
+
+				fcio->fcio_errno = FC_NO_MAP;
+				rval = EIO;
+				break;
+			}
+
+			if (nport_count > max_count) {
+				rw_exit(&port->node_rwlock);
+
+				fcio->fcio_errno = FC_TOOMANY;
+				rval = EIO;
+				break;
+			}
+
+			for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
+				nlp = port->node_table[i];
+				while (nlp != NULL) {
+					if ((nlp->nlp_DID & 0xFFF000) !=
+					    0xFFF000) {
+						port_dev->dev_dtype = 0;
+						port_dev->dev_type[0] =
+						    SWAP_LONG(0x00000100);
+						port_dev->dev_state =
+						    PORT_DEVICE_LOGGED_IN;
+						port_dev->dev_did.port_id =
+						    nlp->nlp_DID;
+						port_dev->
+						    dev_did.priv_lilp_posit = 0;
+						port_dev->
+						    dev_hard_addr.hard_addr = 0;
+
+if (hba->topology == TOPOLOGY_LOOP) {
+	for (j = 1; j < port->alpa_map[0]; j++) {
+		if (nlp->nlp_DID == port->alpa_map[j]) {
+			port_dev->dev_did.priv_lilp_posit = j-1;
+			break;
 		}
-		rw_exit(&port->node_rwlock);
+	}
+
+port_dev->dev_hard_addr.hard_addr = nlp->nlp_DID;
+}
+
+						bcopy((caddr_t)
+						    &nlp->nlp_portname,
+						    (caddr_t)
+						    &port_dev->dev_pwwn,
+						    8);
+						bcopy((caddr_t)
+						    &nlp->nlp_nodename,
+						    (caddr_t)&
+						    port_dev->dev_nwwn,
+						    8);
+						port_dev++;
+					}
+
+					nlp = (NODELIST *) nlp->nlp_list_next;
+				}
+			}
+			rw_exit(&port->node_rwlock);
+		}
 
 		break;
 	}
@@ -5528,12 +5844,11 @@ done:
 } /* emlxs_send_menlo_cmd() */
 
 
-
-
+/* ARGSUSED */
 extern void
-emlxs_fcoe_attention_thread(void *arg)
+emlxs_fcoe_attention_thread(emlxs_hba_t *hba,
+    void *arg1, void *arg2)
 {
-	emlxs_hba_t		*hba = (emlxs_hba_t *)arg;
 	emlxs_port_t		*port = &PPORT;
 	menlo_init_rsp_t	*rsp;
 	menlo_get_cmd_t		*cmd;
@@ -6180,8 +6495,8 @@ emlxs_dfc_get_linkinfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 				linkinfo.a_alpaCnt = 127;
 			}
 
-			bcopy((void *)&port->alpa_map[1], linkinfo.a_alpaMap,
-			    linkinfo.a_alpaCnt);
+			bcopy((void *)&port->alpa_map[0], linkinfo.a_alpaMap,
+			    linkinfo.a_alpaCnt + 1);
 		} else {
 			if (hba->flag & FC_FABRIC_ATTACHED) {
 				linkinfo.a_topology = LNK_FABRIC;

@@ -57,7 +57,7 @@ extern "C" {
 
 #define	DUMP_SUPPORT		/* 2.40 driver */
 #define	SAN_DIAG_SUPPORT	/* 2.40 driver */
-/* #define FMA_SUPPORT		2.40 driver - Not yet */
+/* #define	FMA_SUPPORT	2.40 driver - Not yet */
 
 /* #define	IDLE_TIMER	 Not yet - untested */
 
@@ -249,8 +249,8 @@ extern int ddi_intr_get_supported_types();
 
 #ifdef FMA_SUPPORT
 /* FMA Support */
-extern void ddi_fm_acc_err_clear(ddi_acc_handle_t, int);
 #pragma weak ddi_fm_acc_err_clear
+extern void ddi_fm_acc_err_clear();
 #endif	/* FMA_SUPPORT */
 
 #ifdef EMLXS_SPARC
@@ -328,14 +328,12 @@ extern void ddi_fm_acc_err_clear(ddi_acc_handle_t, int);
 	if (h)  { \
 		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
 			(off_t)(a), (size_t)(b), (uint_t)c); \
-		if (hba->fm_caps & DDI_FM_DMACHK_CAPABLE) { \
-			if (emlxs_fm_check_dma_handle(h) != DDI_SUCCESS) { \
-				EMLXS_MSGF(EMLXS_CONTEXT, \
-				    &emlxs_invalid_dma_handle_msg, \
-				    "ddi_dma_sync hdl=%p off=%x " \
-				    "size=%d dir=%x ", \
-				    h, a, b, c); \
-			} \
+		if (emlxs_fm_check_dma_handle(hba, h) != DDI_FM_OK) { \
+			EMLXS_MSGF(EMLXS_CONTEXT, \
+			    &emlxs_invalid_dma_handle_msg, \
+			    "ddi_dma_sync hdl=%p off=%x " \
+			    "size=%d dir=%x ", \
+			    h, a, b, c); \
 		} \
 	}
 #else	/* !FMA_SUPPORT */

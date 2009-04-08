@@ -215,18 +215,20 @@ ddi_dma_attr_t emlxs_dma_attr_fcip_rsp = {
  * DDI access attributes for device
  */
 ddi_device_acc_attr_t emlxs_dev_acc_attr = {
-	(uint16_t)DDI_DEVICE_ATTR_V0,	/* devacc_attr_version   */
-	(uint8_t)DDI_STRUCTURE_LE_ACC,	/* PCI is Little Endian  */
-	(uint8_t)DDI_STRICTORDER_ACC	/* devacc_attr_dataorder */
+	DDI_DEVICE_ATTR_V1,	/* devacc_attr_version		*/
+	DDI_STRUCTURE_LE_ACC,	/* PCI is Little Endian		*/
+	DDI_STRICTORDER_ACC,	/* devacc_attr_dataorder	*/
+	DDI_DEFAULT_ACC		/* devacc_attr_access		*/
 };
 
 /*
  * DDI access attributes for data
  */
 ddi_device_acc_attr_t emlxs_data_acc_attr = {
-	DDI_DEVICE_ATTR_V0,	/* devacc_attr_version   */
-	DDI_NEVERSWAP_ACC,	/* don't swap for Data   */
-	DDI_STRICTORDER_ACC	/* devacc_attr_dataorder */
+	DDI_DEVICE_ATTR_V1,	/* devacc_attr_version		*/
+	DDI_NEVERSWAP_ACC,	/* don't swap for Data		*/
+	DDI_STRICTORDER_ACC,	/* devacc_attr_dataorder	*/
+	DDI_DEFAULT_ACC		/* devacc_attr_access		*/
 };
 
 /*
@@ -5438,6 +5440,7 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 #define	ATTACH_DHCHAP		0x00008000
 #define	ATTACH_FM		0x00010000
 #define	ATTACH_MAP_SLI		0x00020000
+#define	ATTACH_SPAWN		0x00040000
 
 static void
 emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
@@ -5449,6 +5452,10 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 
 	if (init_flag & ATTACH_HBA) {
 		hba = ddi_get_soft_state(emlxs_soft_state, ddiinst);
+
+		if (init_flag & ATTACH_SPAWN) {
+			emlxs_thread_spawn_destroy(hba);
+		}
 
 		if (init_flag & ATTACH_ONLINE) {
 			(void) emlxs_offline(hba);
@@ -6131,6 +6138,9 @@ emlxs_hba_attach(dev_info_t *dip)
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, "pm-hardware-state",
 	    "needs-suspend-resume");
 	init_flag |= ATTACH_PROP;
+
+	emlxs_thread_spawn_create(hba);
+	init_flag |= ATTACH_SPAWN;
 
 	emlxs_thread_create(hba, &hba->iodone_thread);
 	init_flag |= ATTACH_THREAD;
@@ -10381,97 +10391,148 @@ emlxs_fm_init(emlxs_hba_t *hba)
 {
 	ddi_iblock_cookie_t iblk;
 
-	if (hba->fm_caps) {
-		emlxs_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
-		emlxs_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
-		emlxs_dma_attr_ro.dma_attr_flags = DDI_DMA_FLAGERR;
-		emlxs_dma_attr_1sg.dma_attr_flags = DDI_DMA_FLAGERR;
-		emlxs_dma_attr_fcip_rsp.dma_attr_flags = DDI_DMA_FLAGERR;
-
-		ddi_fm_init(hba->dip, &hba->fm_caps, &iblk);
-
-		if (DDI_FM_EREPORT_CAP(hba->fm_caps) ||
-		    DDI_FM_ERRCB_CAP(hba->fm_caps)) {
-			pci_ereport_setup(hba->dip);
-		}
-
-		if (DDI_FM_ERRCB_CAP(hba->fm_caps)) {
-			ddi_fm_handler_register(hba->dip, emlxs_fm_error_cb,
-			    (void *)hba);
-		}
+	if (hba->fm_caps == DDI_FM_NOT_CAPABLE) {
+		return;
 	}
+
+	if (DDI_FM_ACC_ERR_CAP(hba->fm_caps)) {
+		emlxs_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		emlxs_data_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+	} else {
+		emlxs_dev_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		emlxs_data_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+	}
+
+	if (DDI_FM_DMA_ERR_CAP(hba->fm_caps)) {
+		emlxs_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+		emlxs_dma_attr_ro.dma_attr_flags |= DDI_DMA_FLAGERR;
+		emlxs_dma_attr_1sg.dma_attr_flags |= DDI_DMA_FLAGERR;
+		emlxs_dma_attr_fcip_rsp.dma_attr_flags |= DDI_DMA_FLAGERR;
+	} else {
+		emlxs_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		emlxs_dma_attr_ro.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		emlxs_dma_attr_1sg.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		emlxs_dma_attr_fcip_rsp.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+	}
+
+	ddi_fm_init(hba->dip, &hba->fm_caps, &iblk);
+
+	if (DDI_FM_EREPORT_CAP(hba->fm_caps) ||
+	    DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+		pci_ereport_setup(hba->dip);
+	}
+
+	if (DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+		ddi_fm_handler_register(hba->dip, emlxs_fm_error_cb,
+		    (void *)hba);
+	}
+
 }  /* emlxs_fm_init() */
 
 
 extern void
 emlxs_fm_fini(emlxs_hba_t *hba)
 {
-	if (hba->fm_caps) {
-		if (DDI_FM_EREPORT_CAP(hba->fm_caps) ||
-		    DDI_FM_ERRCB_CAP(hba->fm_caps)) {
-			pci_ereport_teardown(hba->dip);
-		}
-
-		if (DDI_FM_ERRCB_CAP(hba->fm_caps)) {
-			ddi_fm_handler_unregister(hba->dip);
-		}
-
-		(void) ddi_fm_fini(hba->dip);
+	if (hba->fm_caps == DDI_FM_NOT_CAPABLE) {
+		return;
 	}
+
+	if (DDI_FM_EREPORT_CAP(hba->fm_caps) ||
+	    DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+		pci_ereport_teardown(hba->dip);
+	}
+
+	if (DDI_FM_ERRCB_CAP(hba->fm_caps)) {
+		ddi_fm_handler_unregister(hba->dip);
+	}
+
+	(void) ddi_fm_fini(hba->dip);
+
 }  /* emlxs_fm_fini() */
 
 
-int
-emlxs_fm_check_acc_handle(ddi_acc_handle_t handle)
+extern int
+emlxs_fm_check_acc_handle(emlxs_hba_t *hba, ddi_acc_handle_t handle)
 {
-	ddi_fm_error_t fe;
-	int rval = DDI_FM_OK;
+	ddi_fm_error_t err;
 
-	/* Some S10 versions do not define the ahi_err structure */
-	if (((ddi_acc_impl_t *)handle)->ahi_err != NULL) {
-		(void) ddi_fm_acc_err_get(handle, &fe, DDI_FME_VERSION);
-
-		/*
-		 * Some S10 versions do not define the
-		 * ddi_fm_acc_err_clear function
-		 */
-		if ((void *)&ddi_fm_acc_err_clear != NULL) {
-			(void) ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
-		}
-
-		rval = fe.fme_status;
+	if (!DDI_FM_ACC_ERR_CAP(hba->fm_caps)) {
+		return (DDI_FM_OK);
 	}
 
-	return (rval);
+	/* Some S10 versions do not define the ahi_err structure */
+	if (((ddi_acc_impl_t *)handle)->ahi_err == NULL) {
+		return (DDI_FM_OK);
+	}
+
+	err.fme_status = DDI_FM_OK;
+	(void) ddi_fm_acc_err_get(handle, &err, DDI_FME_VERSION);
+
+	/* Some S10 versions do not define the ddi_fm_acc_err_clear function */
+	if ((void *)&ddi_fm_acc_err_clear != NULL) {
+		(void) ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+	}
+
+	return (err.fme_status);
 
 }  /* emlxs_fm_check_acc_handle() */
 
 
-int
-emlxs_fm_check_dma_handle(ddi_dma_handle_t handle)
+extern int
+emlxs_fm_check_dma_handle(emlxs_hba_t *hba, ddi_dma_handle_t handle)
 {
-	ddi_fm_error_t fe;
+	ddi_fm_error_t err;
 
-	(void) ddi_fm_dma_err_get(handle, &fe, DDI_FME_VERSION);
+	if (!DDI_FM_ACC_ERR_CAP(hba->fm_caps)) {
+		return (DDI_FM_OK);
+	}
 
-	return (fe.fme_status);
+	err.fme_status = DDI_FM_OK;
+	(void) ddi_fm_dma_err_get(handle, &err, DDI_FME_VERSION);
+
+	return (err.fme_status);
 
 }  /* emlxs_fm_check_dma_handle() */
 
 
-void
+extern void
 emlxs_fm_ereport(emlxs_hba_t *hba, char *detail)
 {
 	uint64_t ena;
 	char buf[FM_MAX_CLASS];
 
+	if (!DDI_FM_EREPORT_CAP(hba->fm_caps)) {
+		return;
+	}
+
+	if (detail == NULL) {
+		return;
+	}
+
 	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
 	ena = fm_ena_generate(0, FM_ENA_FMT1);
-	if (DDI_FM_EREPORT_CAP(hba->fm_caps)) {
-		(void) ddi_fm_ereport_post(hba->dip, buf, ena, DDI_NOSLEEP,
-		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
-	}
+
+	ddi_fm_ereport_post(hba->dip, buf, ena, DDI_NOSLEEP,
+	    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+
 }  /* emlxs_fm_ereport() */
+
+
+extern void
+emlxs_fm_service_impact(emlxs_hba_t *hba, int impact)
+{
+	if (!DDI_FM_EREPORT_CAP(hba->fm_caps)) {
+		return;
+	}
+
+	if (impact == NULL) {
+		return;
+	}
+
+	ddi_fm_service_impact(hba->dip, impact);
+
+}
+
 
 /*
  * The I/O fault service error handling callback function
@@ -10488,5 +10549,6 @@ emlxs_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
 	 */
 	pci_ereport_post(dip, err, NULL);
 	return (err->fme_status);
+
 }  /* emlxs_fm_error_cb() */
 #endif	/* FMA_SUPPORT */

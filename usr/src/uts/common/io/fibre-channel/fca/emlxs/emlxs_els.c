@@ -1564,8 +1564,8 @@ emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 			    ELS_CMD_PRLO, 0, 0);
 
 			/* Spawn a thread to reset the link */
-			thread_create(NULL, 0, emlxs_reset_link_thread,
-			    (char *)hba, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+			emlxs_thread_spawn(hba, emlxs_reset_link_thread,
+			    NULL, NULL);
 
 			goto drop_it;
 
@@ -1695,8 +1695,8 @@ emlxs_handle_unsol_logo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 			    ELS_CMD_LOGO, 0, 0);
 
 			/* Spawn a thread to reset the link */
-			thread_create(NULL, 0, emlxs_reset_link_thread,
-			    (char *)hba, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+			emlxs_thread_spawn(hba, emlxs_reset_link_thread,
+			    NULL, NULL);
 
 			goto drop_it;
 		}
@@ -2791,7 +2791,7 @@ emlxs_ct_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	if (emlxs_log_ct_event(port, (uint8_t *)mp->virt, size,
 	    iocb->ulpContext)) {
 		/* Abort the exchange */
-		emlxs_abort_ct_exchange(port, iocb->ulpContext);
+		emlxs_abort_ct_exchange(hba, port, iocb->ulpContext);
 	}
 
 	return (0);
