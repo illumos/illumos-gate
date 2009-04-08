@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <syslog.h>
 #include <libfcoe.h>
+#include <libdllink.h>
 #include <fcoeio.h>
 
 #define	FCOE_DEV_PATH	 "/devices/fcoe:admin"
@@ -92,15 +93,37 @@ FCOE_CreatePort(
 	FCOE_PORT_WWN		nwwn,
 	FCOE_UINT8		promiscuous)
 {
-	FCOE_STATUS status = FCOE_STATUS_OK;
-	int fcoe_fd;
-	fcoeio_t	fcoeio;
+	FCOE_STATUS		status = FCOE_STATUS_OK;
+	int			fcoe_fd;
+	fcoeio_t		fcoeio;
 	fcoeio_create_port_param_t	param;
+	dladm_handle_t		handle;
+	datalink_id_t		linkid;
+	datalink_class_t	class;
 
 	bzero(&param, sizeof (fcoeio_create_port_param_t));
 
 	if (macLinkName == NULL) {
 		return (FCOE_STATUS_ERROR_INVAL_ARG);
+	}
+
+	if (strlen((char *)macLinkName) > MAXLINKNAMELEN-1) {
+		return (FCOE_STATUS_ERROR_MAC_LEN);
+	}
+
+	if (dladm_open(&handle) != DLADM_STATUS_OK) {
+		return (FCOE_STATUS_ERROR);
+	}
+
+	if (dladm_name2info(handle, (const char *)macLinkName,
+	    &linkid, NULL, &class, NULL) != DLADM_STATUS_OK) {
+		dladm_close(handle);
+		return (FCOE_STATUS_ERROR_GET_LINKINFO);
+	}
+	dladm_close(handle);
+
+	if (class != DATALINK_CLASS_PHYS) {
+		return (FCOE_STATUS_ERROR_CLASS_UNSUPPORT);
 	}
 
 	if (portType != FCOE_PORTTYPE_INITIATOR &&
@@ -124,12 +147,8 @@ FCOE_CreatePort(
 		return (FCOE_STATUS_ERROR_WWN_SAME);
 	}
 
-	if (strlen((char *)macLinkName) > FCOE_MAX_MAC_NAME_LEN-1) {
-		return (FCOE_STATUS_ERROR_MAC_LEN);
-	}
-
 	param.fcp_force_promisc = promiscuous;
-	(void) strcpy((char *)param.fcp_mac_name, (char *)macLinkName);
+	param.fcp_mac_linkid = linkid;
 	param.fcp_port_type = (fcoe_cli_type_t)portType;
 
 	if ((status = openFcoe(OPEN_FCOE, &fcoe_fd)) != FCOE_STATUS_OK) {
@@ -181,10 +200,6 @@ FCOE_CreatePort(
 			status = FCOE_STATUS_ERROR_NEED_JUMBO_FRAME;
 			break;
 
-		case FCOEIOE_VNIC_UNSUPPORT:
-			status = FCOE_STATUS_ERROR_VNIC_UNSUPPORT;
-			break;
-
 		default:
 			status = FCOE_STATUS_ERROR;
 		}
@@ -201,25 +216,41 @@ FCOE_DeletePort(const FCOE_UINT8 *macLinkName)
 	FCOE_STATUS status = FCOE_STATUS_OK;
 	int fcoe_fd;
 	fcoeio_t	fcoeio;
+	dladm_handle_t		handle;
+	datalink_id_t		linkid;
+	fcoeio_delete_port_param_t fc_del_port;
 
 	if (macLinkName == NULL) {
 		return (FCOE_STATUS_ERROR_INVAL_ARG);
 	}
 
-	if (strlen((char *)macLinkName) > FCOE_MAX_MAC_NAME_LEN-1) {
+	if (strlen((char *)macLinkName) > MAXLINKNAMELEN-1) {
 		return (FCOE_STATUS_ERROR_MAC_LEN);
 	}
+	if (dladm_open(&handle) != DLADM_STATUS_OK) {
+		return (FCOE_STATUS_ERROR);
+	}
+
+	if (dladm_name2info(handle, (const char *)macLinkName,
+	    &linkid, NULL, NULL, NULL) != DLADM_STATUS_OK) {
+		dladm_close(handle);
+		return (FCOE_STATUS_ERROR_GET_LINKINFO);
+	}
+	dladm_close(handle);
 
 	if ((status = openFcoe(OPEN_FCOE, &fcoe_fd)) != FCOE_STATUS_OK) {
 		return (status);
 	}
 
+	fc_del_port.fdp_mac_linkid = linkid;
+
 	(void) memset(&fcoeio, 0, sizeof (fcoeio));
 	fcoeio.fcoeio_cmd = FCOEIO_DELETE_FCOE_PORT;
 
-	fcoeio.fcoeio_ilen = strlen((char *)macLinkName)+1;
+	/* only 4 bytes here, need to change */
+	fcoeio.fcoeio_ilen = sizeof (fcoeio_delete_port_param_t);
 	fcoeio.fcoeio_xfer = FCOEIO_XFER_WRITE;
-	fcoeio.fcoeio_ibuf = (uintptr_t)macLinkName;
+	fcoeio.fcoeio_ibuf = (uintptr_t)&fc_del_port;
 
 	if (ioctl(fcoe_fd, FCOEIO_CMD, &fcoeio) != 0) {
 		switch (fcoeio.fcoeio_status) {
@@ -259,14 +290,16 @@ FCOE_GetPortList(
 	FCOE_PORT_ATTRIBUTE	**portlist)
 {
 	FCOE_STATUS	status = FCOE_STATUS_OK;
-	int	fcoe_fd;
+	int		fcoe_fd;
 	fcoeio_t	fcoeio;
-	fcoe_port_list_t		*inportlist = NULL;
+	fcoe_port_list_t	*inportlist = NULL;
 	FCOE_PORT_ATTRIBUTE	*outportlist = NULL;
-	int	i;
-	int	size = 64; /* default first attempt */
-	int	retry = 0;
-	int	bufsize;
+	int		i;
+	int		size = 64; /* default first attempt */
+	int		retry = 0;
+	int		bufsize;
+	dladm_handle_t	handle;
+	char		mac_name[MAXLINKNAMELEN];
 
 	if (port_num == NULL || portlist == NULL) {
 		return (FCOE_STATUS_ERROR_INVAL_ARG);
@@ -318,7 +351,11 @@ FCOE_GetPortList(
 		}
 	} while (retry <= 3 && status != FCOE_STATUS_OK);
 
-	if (status == FCOE_STATUS_OK) {
+	if (status == FCOE_STATUS_OK && inportlist->numPorts > 0) {
+		if (dladm_open(&handle) != DLADM_STATUS_OK) {
+			handle = NULL;
+		}
+
 		outportlist = (PFCOE_PORT_ATTRIBUTE)
 		    malloc(sizeof (FCOE_PORT_ATTRIBUTE) * inportlist->numPorts);
 
@@ -326,7 +363,17 @@ FCOE_GetPortList(
 			fcoe_port_instance_t *pi = &inportlist->ports[i];
 			FCOE_PORT_ATTRIBUTE *po = &outportlist[i];
 			bcopy(pi->fpi_pwwn, &po->port_wwn, 8);
-			bcopy(pi->fpi_mac_link_name, po->mac_link_name, 32);
+
+			if (handle == NULL ||
+			    dladm_datalink_id2info(handle, pi->fpi_mac_linkid,
+			    NULL, NULL, NULL, mac_name, sizeof (mac_name))
+			    != DLADM_STATUS_OK) {
+				(void) strcpy((char *)po->mac_link_name,
+				    "<unknown>");
+			} else {
+				(void) strcpy((char *)po->mac_link_name,
+				    mac_name);
+			}
 			bcopy(pi->fpi_mac_factory_addr,
 			    po->mac_factory_addr, 6);
 			bcopy(pi->fpi_mac_current_addr,
@@ -334,6 +381,10 @@ FCOE_GetPortList(
 			po->port_type = (FCOE_UINT8)pi->fpi_port_type;
 			po->mtu_size = pi->fpi_mtu_size;
 			po->mac_promisc = pi->fpi_mac_promisc;
+		}
+
+		if (handle != NULL) {
+			dladm_close(handle);
 		}
 		*port_num = inportlist->numPorts;
 		*portlist = outportlist;

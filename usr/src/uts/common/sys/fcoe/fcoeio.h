@@ -26,6 +26,7 @@
 #define	_FCOEIO_H_
 
 #include <sys/ethernet.h>
+#include <sys/types.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -72,8 +73,7 @@ typedef enum {
 	FCOEIOE_NEED_JUMBO_FRAME,
 	FCOEIOE_MAC_NOT_FOUND,
 	FCOEIOE_OFFLINE_FAILURE,
-	FCOEIOE_MORE_DATA,
-	FCOEIOE_VNIC_UNSUPPORT
+	FCOEIOE_MORE_DATA
 } fcoeio_stat_t;
 
 /* Biggest buffer length, can hold up to 1024 port instances */
@@ -112,15 +112,22 @@ typedef struct fcoeio_create_port_param {
 	uint32_t	fcp_pwwn_provided;
 	uint32_t	fcp_force_promisc;
 	fcoe_cli_type_t	fcp_port_type;
-	uchar_t		fcp_mac_name[MAXLINKNAMELEN];
+	datalink_id_t	fcp_mac_linkid;
+	uint32_t	fcp_rsvd0;
 } fcoeio_create_port_param_t;
+
+typedef struct fcoeio_delete_port_param {
+	datalink_id_t	fdp_mac_linkid;
+	uint32_t	fdp_rsvd0;
+} fcoeio_delete_port_param_t;
 
 /*
  * FCOE port instance
  */
 typedef struct fcoe_port_instance {
 	uchar_t			fpi_pwwn[FCOE_WWN_SIZE];
-	uchar_t			fpi_mac_link_name[MAXLINKNAMELEN];
+	datalink_id_t		fpi_mac_linkid;
+	uint32_t		fpi_rsvd0;
 	uint8_t			fpi_mac_factory_addr[ETHERADDRL];
 	uint16_t		fpi_mac_promisc;
 	uint8_t			fpi_mac_current_addr[ETHERADDRL];

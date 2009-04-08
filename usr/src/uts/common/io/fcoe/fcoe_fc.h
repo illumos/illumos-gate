@@ -36,7 +36,7 @@ extern fcoe_frame_t *fcoe_allocate_frame(fcoe_port_t *, uint32_t, void *);
 extern void fcoe_mac_notify_link_up(void *);
 extern void fcoe_mac_notify_link_down(void *);
 extern int fcoe_create_port(dev_info_t *, fcoe_mac_t *, int);
-extern int fcoe_delete_port(dev_info_t *, fcoeio_t *, uint8_t *);
+extern int fcoe_delete_port(dev_info_t *, fcoeio_t *, datalink_id_t);
 
 #endif	/* _KERNEL */
 

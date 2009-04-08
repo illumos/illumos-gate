@@ -70,22 +70,14 @@ fcoe_open_mac(fcoe_mac_t *mac, int force_promisc, fcoeio_stat_t *err_detail)
 	/*
 	 * Open MAC interface
 	 */
-	ret = mac_open_by_linkname(mac->fm_link_name, &mac->fm_handle);
+	ret = mac_open_by_linkid(mac->fm_linkid, &mac->fm_handle);
 	if (ret != 0) {
-		cmn_err(CE_WARN, "Open network interface %s failed",
-		    mac->fm_link_name);
-		FCOE_LOG("fcoe", "mac_open_by_linkname %s failed %x",
-		    mac->fm_link_name, ret);
+		FCOE_LOG("fcoe", "mac_open_by_linkname %d failed %x",
+		    mac->fm_linkid, ret);
 		return (FCOE_FAILURE);
 	}
 
-	if (mac_is_vnic(mac->fm_handle)) {
-		(void) mac_close(mac->fm_handle);
-		*err_detail = FCOEIOE_VNIC_UNSUPPORT;
-		return (FCOE_FAILURE);
-	}
-
-	(void) sprintf(cli_name, "%s-%s", mac->fm_link_name, "fcoe");
+	(void) sprintf(cli_name, "%s-%d", "fcoe", mac->fm_linkid);
 
 	ret = mac_client_open(mac->fm_handle,
 	    &mac->fm_cli_handle, cli_name, fm_open_flag);
@@ -194,10 +186,8 @@ fcoe_enable_callback(fcoe_mac_t *mac)
 		    &mac->fm_promisc_handle,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP);
 		if (ret != 0) {
-			cmn_err(CE_WARN, "Enable promisc mode on %s failed",
-			    mac->fm_link_name);
-			FCOE_LOG("foce", "mac_promisc_add on %s failed %x",
-			    mac->fm_link_name, ret);
+			FCOE_LOG("foce", "mac_promisc_add on %d failed %x",
+			    mac->fm_linkid, ret);
 			return (FCOE_FAILURE);
 		}
 	} else {
@@ -308,16 +298,18 @@ fcoe_mac_notify(void *arg, mac_notify_type_t type)
 			    mac->fm_eport.eport_efh_dst);
 
 			mac->fm_link_state = FCOE_MAC_LINK_STATE_UP;
-			FCOE_LOG(mac->fm_link_name,
-			    "fcoe_mac_notify: arg/%p LINK up", arg, type);
+			FCOE_LOG(NULL,
+			    "fcoe_mac_notify: link/%d arg/%p LINK up",
+			    mac->fm_linkid, arg, type);
 			fcoe_mac_notify_link_up(mac);
 		} else {
 			if (mac->fm_link_state == FCOE_MAC_LINK_STATE_DOWN) {
 				break;
 			}
 			mac->fm_link_state = FCOE_MAC_LINK_STATE_DOWN;
-			FCOE_LOG(mac->fm_link_name,
-			    "fcoe_mac_notify: arg/%p LINK down", arg, type);
+			FCOE_LOG(NULL,
+			    "fcoe_mac_notify: link/%d arg/%p LINK down",
+			    mac->fm_linkid, arg, type);
 			fcoe_mac_notify_link_down(mac);
 		}
 		break;
@@ -355,10 +347,8 @@ fcoe_mac_set_address(fcoe_port_t *eport, uint8_t *addr, boolean_t fc_assigned)
 		ret = mac_unicast_primary_set(mac->fm_handle, addr);
 		if (ret != 0) {
 			mutex_exit(&mac->fm_mutex);
-			cmn_err(CE_WARN, "Set primary unicast address on %s "
-			    "failed", mac->fm_link_name);
-			FCOE_LOG("fcoe", "mac_unicast_primary_set on %s "
-			    "failed %x", mac->fm_link_name, ret);
+			FCOE_LOG("fcoe", "mac_unicast_primary_set on %d "
+			    "failed %x", mac->fm_linkid, ret);
 			return (FCOE_FAILURE);
 		}
 	}

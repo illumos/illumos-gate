@@ -72,7 +72,7 @@ fcoe_register_client(fcoe_client_t *client)
 	fcoe_mac_t	*mac;
 	fcoe_port_t	*eport;
 
-	ASSERT(mutex_owned(&fcoe_global_ss->ss_ioctl_mutex));
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
 
 	/*
 	 * We will not come here, when someone is changing ss_mac_list,
@@ -80,8 +80,7 @@ fcoe_register_client(fcoe_client_t *client)
 	 */
 	for (mac = list_head(&fcoe_global_ss->ss_mac_list); mac;
 	    mac = list_next(&fcoe_global_ss->ss_mac_list, mac)) {
-		if (strcmp(client->ect_channel_name, mac->fm_link_name)
-		    == 0) {
+		if (client->ect_channelid == mac->fm_linkid) {
 			break;
 		}
 	}
@@ -132,7 +131,7 @@ fcoe_deregister_client(fcoe_port_t *eport)
 {
 	fcoe_mac_t	*mac = EPORT2MAC(eport);
 
-	ASSERT(mutex_owned(&fcoe_global_ss->ss_ioctl_mutex));
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
 
 	/*
 	 * Wait for all the related frame to be freed, this should be fast
@@ -425,7 +424,6 @@ fcoe_create_port(dev_info_t *parent, fcoe_mac_t *mac, int is_target)
 {
 	int		 rval	  = 0;
 	dev_info_t	*child	  = NULL;
-	char		*mac_name = mac->fm_link_name;
 	char *devname = is_target ? FCOET_DRIVER_NAME : FCOEI_DRIVER_NAME;
 
 	ndi_devi_alloc_sleep(parent, devname, DEVI_PSEUDO_NODEID, &child);
@@ -434,19 +432,19 @@ fcoe_create_port(dev_info_t *parent, fcoe_mac_t *mac, int is_target)
 		return (NDI_FAILURE);
 	}
 
-	if (ddi_prop_update_string(DDI_DEV_T_NONE, child,
-	    "mac_name", mac_name) != DDI_PROP_SUCCESS) {
+	if (ddi_prop_update_int(DDI_DEV_T_NONE, child,
+	    "mac_id", mac->fm_linkid) != DDI_PROP_SUCCESS) {
 		FCOE_LOG("fcoe",
-		    "fcoe%d: prop_update port mac name failed for mac %s",
-		    ddi_get_instance(parent), mac_name);
+		    "fcoe%d: prop_update port mac id failed for mac %d",
+		    ddi_get_instance(parent), mac->fm_linkid);
 		(void) ndi_devi_free(child);
 		return (NDI_FAILURE);
 	}
 
 	rval = ndi_devi_online(child, NDI_ONLINE_ATTACH);
 	if (rval != NDI_SUCCESS) {
-		FCOE_LOG("fcoe", "fcoe%d: online_driver failed for mac %s",
-		    ddi_get_instance(parent), mac->fm_link_name);
+		FCOE_LOG("fcoe", "fcoe%d: online_driver failed for mac %d",
+		    ddi_get_instance(parent), mac->fm_linkid);
 		return (NDI_FAILURE);
 	}
 	mac->fm_client_dev = child;
@@ -455,12 +453,12 @@ fcoe_create_port(dev_info_t *parent, fcoe_mac_t *mac, int is_target)
 }
 
 int
-fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, uint8_t *mac_name)
+fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, datalink_id_t linkid)
 {
 	int		 rval = 0;
 	fcoe_mac_t	*mac;
 
-	mac = fcoe_lookup_mac_by_name(mac_name);
+	mac = fcoe_lookup_mac_by_id(linkid);
 	if (mac == NULL) {
 		fcoeio->fcoeio_status = FCOEIOE_MAC_NOT_FOUND;
 		return (EINVAL);

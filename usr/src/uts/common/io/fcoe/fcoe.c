@@ -116,7 +116,7 @@ static int fcoe_initchild(dev_info_t *fcoe_dip, dev_info_t *client_dip);
 static int fcoe_uninitchild(dev_info_t *fcoe_dip, dev_info_t *client_dip);
 static void fcoe_init_wwn_from_mac(uint8_t *wwn, uint8_t *mac,
     int is_pwwn, uint8_t idx);
-static fcoe_mac_t *fcoe_create_mac_by_name(uint8_t *name);
+static fcoe_mac_t *fcoe_create_mac_by_id(datalink_id_t linkid);
 static int fcoe_cmp_wwn(fcoe_mac_t *checkedmac);
 static void fcoe_watchdog(void *arg);
 static void fcoe_worker_init();
@@ -682,7 +682,7 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 		}
 
 		mutex_enter(&ss->ss_ioctl_mutex);
-		fcoe_mac = fcoe_create_mac_by_name(param->fcp_mac_name);
+		fcoe_mac = fcoe_create_mac_by_id(param->fcp_mac_linkid);
 		if (fcoe_mac == NULL) {
 			mutex_exit(&ss->ss_ioctl_mutex);
 			fcoeio->fcoeio_status = FCOEIOE_CREATE_MAC;
@@ -762,9 +762,10 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 	}
 
 	case FCOEIO_DELETE_FCOE_PORT: {
-		uint8_t *mac_name = (uint8_t *)ibuf;
+		fcoeio_delete_port_param_t *del_port_param =
+		    (fcoeio_delete_port_param_t *)ibuf;
 
-		if (fcoeio->fcoeio_ilen > FCOE_MAX_MAC_NAME_LEN ||
+		if (fcoeio->fcoeio_ilen < sizeof (fcoeio_delete_port_param_t) ||
 		    fcoeio->fcoeio_xfer != FCOEIO_XFER_WRITE) {
 			fcoeio->fcoeio_status = FCOEIOE_INVAL_ARG;
 			ret = EINVAL;
@@ -772,7 +773,8 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 		}
 
 		mutex_enter(&ss->ss_ioctl_mutex);
-		ret = fcoe_delete_port(ss->ss_dip, fcoeio, mac_name);
+		ret = fcoe_delete_port(ss->ss_dip, fcoeio,
+		    del_port_param->fdp_mac_linkid);
 		if (ret != 0) {
 			FCOE_LOG("fcoe",
 			    "fcoe_delete_port failed: %d", ret);
@@ -935,14 +937,14 @@ fcoe_detach_uninit(fcoe_soft_state_t *ss)
  * Return mac instance if it exist, or else return NULL.
  */
 fcoe_mac_t *
-fcoe_lookup_mac_by_name(uint8_t *name)
+fcoe_lookup_mac_by_id(datalink_id_t linkid)
 {
 	fcoe_mac_t	*mac = NULL;
 
-	ASSERT(mutex_owned(&fcoe_global_ss->ss_ioctl_mutex));
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
 	for (mac = list_head(&fcoe_global_ss->ss_mac_list); mac;
 	    mac = list_next(&fcoe_global_ss->ss_mac_list, mac)) {
-		if (strcmp((char *)name, mac->fm_link_name)) {
+		if (linkid != mac->fm_linkid) {
 			continue;
 		}
 		return (mac);
@@ -967,24 +969,24 @@ fcoe_init_wwn_from_mac(uint8_t *wwn, uint8_t *mac, int is_pwwn, uint8_t idx)
  * Return fcoe_mac if it exists, otherwise create a new one
  */
 static fcoe_mac_t *
-fcoe_create_mac_by_name(uint8_t *name)
+fcoe_create_mac_by_id(datalink_id_t linkid)
 {
 	fcoe_mac_t	*mac = NULL;
-	ASSERT(mutex_owned(&fcoe_global_ss->ss_ioctl_mutex));
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
 
-	mac = fcoe_lookup_mac_by_name(name);
+	mac = fcoe_lookup_mac_by_id(linkid);
 	if (mac != NULL) {
-		FCOE_LOG("fcoe", "fcoe_create_mac_by_name found one mac %s",
-		    name);
+		FCOE_LOG("fcoe", "fcoe_create_mac_by_id found one mac %d",
+		    linkid);
 		return (mac);
 	}
 
 	mac = kmem_zalloc(sizeof (fcoe_mac_t), KM_SLEEP);
-	bcopy(name, mac->fm_link_name, strlen((char *)name) + 1);
+	mac->fm_linkid = linkid;
 	mac->fm_flags = 0;
 	mac->fm_ss = fcoe_global_ss;
 	list_insert_tail(&mac->fm_ss->ss_mac_list, mac);
-	FCOE_LOG("fcoe", "fcoe_create_mac_by_name created one mac %s", name);
+	FCOE_LOG("fcoe", "fcoe_create_mac_by_id created one mac %d", linkid);
 	return (mac);
 }
 
@@ -1232,7 +1234,7 @@ fcoe_cmp_wwn(fcoe_mac_t *checkedmac)
 
 	cnwwn = checkedmac->fm_eport.eport_nodewwn;
 	cpwwn = checkedmac->fm_eport.eport_portwwn;
-	ASSERT(mutex_owned(&fcoe_global_ss->ss_ioctl_mutex));
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
 
 	for (mac = list_head(&fcoe_global_ss->ss_mac_list); mac;
 	    mac = list_next(&fcoe_global_ss->ss_mac_list, mac)) {
@@ -1260,15 +1262,14 @@ fcoe_get_port_list(fcoe_port_instance_t *ports, int count)
 	int		i = 0;
 
 	ASSERT(ports != NULL);
-	ASSERT(mutex_owned(&fcoe_global_ss->ss_ioctl_mutex));
+	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
 
 	for (mac = list_head(&fcoe_global_ss->ss_mac_list); mac;
 	    mac = list_next(&fcoe_global_ss->ss_mac_list, mac)) {
 		if (i < count) {
 			bcopy(mac->fm_eport.eport_portwwn,
 			    ports[i].fpi_pwwn, 8);
-			bcopy(mac->fm_link_name,
-			    ports[i].fpi_mac_link_name, MAXLINKNAMELEN);
+			ports[i].fpi_mac_linkid = mac->fm_linkid;
 			bcopy(mac->fm_current_addr,
 			    ports[i].fpi_mac_current_addr, ETHERADDRL);
 			bcopy(mac->fm_primary_addr,

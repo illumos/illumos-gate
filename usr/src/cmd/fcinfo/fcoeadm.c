@@ -621,9 +621,16 @@ fcoe_adm_create_port(int objects, char *argv[],
 			    "port on the specified MAC link\n"));
 			break;
 
-		case  FCOE_STATUS_ERROR_VNIC_UNSUPPORT:
+		case  FCOE_STATUS_ERROR_CLASS_UNSUPPORT:
 			fprintf(stderr,
-			    gettext("Error: VNIC is not supported\n"));
+			    gettext("Error: Link class other than physical "
+			    "link is not supported\n"));
+			break;
+
+		case FCOE_STATUS_ERROR_GET_LINKINFO:
+			fprintf(stderr,
+			    gettext("Error: Failed to get link infomation "
+			    "for %s\n"), macLinkName);
 			break;
 
 		case FCOE_STATUS_ERROR:
@@ -700,6 +707,12 @@ fcoe_adm_delete_port(int objects, char *argv[])
 			fprintf(stderr,
 			    gettext("Error: Please use stmfadm to offline "
 			    "the FCoE target first\n"));
+			break;
+
+		case FCOE_STATUS_ERROR_GET_LINKINFO:
+			fprintf(stderr,
+			    gettext("Error: Failed to get link information "
+			    "for %s\n"), macLinkName);
 			break;
 
 		case FCOE_STATUS_ERROR:

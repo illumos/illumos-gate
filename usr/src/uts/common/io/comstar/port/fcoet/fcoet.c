@@ -437,7 +437,6 @@ fcoet_attach_init(fcoet_soft_state_t *ss)
 	fcoe_port_t		*eport;
 	fct_local_port_t	*port;
 	fct_dbuf_store_t	*fds;
-	char			 *mac_name;
 	char			 taskq_name[32];
 	int			 ret;
 
@@ -453,19 +452,16 @@ fcoet_attach_init(fcoet_soft_state_t *ss)
 	client_fcoet.ect_port_event = fcoet_port_event;
 	client_fcoet.ect_release_sol_frame = fcoet_release_sol_frame;
 	client_fcoet.ect_client_port_struct = ss;
-	ret = ddi_prop_lookup_string(DDI_DEV_T_ANY, ss->ss_dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "mac_name", &mac_name);
-	if (ret != DDI_PROP_SUCCESS) {
-		FCOET_LOG("fcoet_attach_init", "lookup_string failed");
+	ret = ddi_prop_get_int(DDI_DEV_T_ANY, ss->ss_dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "mac_id", -1);
+	if (ret == -1) {
+		FCOET_LOG("fcoet_attach_init", "get mac_id failed");
 		return (DDI_FAILURE);
 	} else {
-		bcopy(mac_name, client_fcoet.ect_channel_name,
-		    strlen(mac_name));
-		client_fcoet.ect_channel_name[strlen(mac_name)] = 0;
-		ddi_prop_free(mac_name);
+		client_fcoet.ect_channelid = ret;
 	}
-	FCOET_LOG("fcoet_attach_init", "channel_name is %s",
-	    client_fcoet.ect_channel_name);
+	FCOET_LOG("fcoet_attach_init", "channel_id is %d",
+	    client_fcoet.ect_channelid);
 
 	/*
 	 * It's FCoE's responsiblity to initialize eport's all elements

@@ -156,7 +156,7 @@ typedef struct fcoe_client {
 	uint32_t	 ect_eport_flags;
 	uint32_t	 ect_max_fc_frame_size;
 	uint32_t	 ect_private_frame_struct_size;
-	char		 ect_channel_name[32];
+	uint32_t	 ect_channelid;
 	void		*ect_client_port_struct;
 	void		 (*ect_rx_frame)(fcoe_frame_t *frame);
 	void		 (*ect_port_event)(fcoe_port_t *eport, uint32_t event);

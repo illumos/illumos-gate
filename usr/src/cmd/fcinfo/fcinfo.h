@@ -119,7 +119,6 @@ extern "C" {
 #define	TARGET_MODE	    0x00000010
 
 /* FCOE */
-#define	FCOE_MAX_MAC_NAME_LEN		32
 #define	FCOE_USER_RAW_FRAME_SIZE	224
 
 typedef struct _tgtPortWWNList {

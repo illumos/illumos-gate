@@ -123,7 +123,7 @@ typedef struct fcoe_soft_state {
 typedef struct fcoe_mac
 {
 	list_node_t		fm_ss_node;
-	char			fm_link_name[MAXLINKNAMELEN];
+	datalink_id_t		fm_linkid;
 	uint32_t		fm_flags;
 
 	fcoe_soft_state_t	*fm_ss;
@@ -235,7 +235,7 @@ typedef struct fcoe_worker {
 /*
  * fcoe driver common functions
  */
-extern fcoe_mac_t *fcoe_lookup_mac_by_name(uint8_t *);
+extern fcoe_mac_t *fcoe_lookup_mac_by_id(datalink_id_t);
 extern void fcoe_destroy_mac(fcoe_mac_t *);
 extern mblk_t *fcoe_get_mblk(fcoe_mac_t *, uint32_t);
 extern void fcoe_post_frame(fcoe_frame_t *);
