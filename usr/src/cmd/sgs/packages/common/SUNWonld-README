@@ -1469,3 +1469,4 @@ Bugid   Risk Synopsis
 	expectations.
 6821619 Solaris linkers need systematic approach to ELF OSABI
 	PSARC/2009/196 ELF objects to set OSABI / elfdump -O option
+6827468 6801536 breaks 'ld -s' if there are weak/strong symbol pairs

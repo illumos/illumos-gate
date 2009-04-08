@@ -1478,6 +1478,8 @@ update_osym(Ofl_desc *ofl)
 						    &symtab[symtab_ndx];
 						symtab_ndx++;
 					}
+				} else {
+					wk.wk_symtab = NULL;
 				}
 				if (dynsym) {
 					if (!local) {
@@ -1489,6 +1491,8 @@ update_osym(Ofl_desc *ofl)
 						    &ldynsym[ldynscopesym_ndx];
 						ldynscopesym_ndx++;
 					}
+				} else {
+					wk.wk_dynsym = NULL;
 				}
 				wk.wk_weak = sdp;
 				wk.wk_alias = _sdp;
@@ -1776,7 +1780,7 @@ update_osym(Ofl_desc *ofl)
 
 		sdp = wkp->wk_weak;
 		_sdp = wkp->wk_alias;
-		_sym = _sdp->sd_sym;
+		_sym = __sym = _sdp->sd_sym;
 
 		sdp->sd_flags |= FLG_SY_WEAKDEF;
 
@@ -1797,8 +1801,7 @@ update_osym(Ofl_desc *ofl)
 			bind = STB_WEAK;
 
 		DBG_CALL(Dbg_syms_old(ofl, sdp));
-		if ((sym = wkp->wk_symtab) != 0) {
-			sym = wkp->wk_symtab;
+		if ((sym = wkp->wk_symtab) != NULL) {
 			sym->st_value = _sym->st_value;
 			sym->st_size = _sym->st_size;
 			sym->st_other = _sym->st_other;
@@ -1807,8 +1810,7 @@ update_osym(Ofl_desc *ofl)
 			    ELF_ST_TYPE(sym->st_info));
 			__sym = sym;
 		}
-		if ((sym = wkp->wk_dynsym) != 0) {
-			sym = wkp->wk_dynsym;
+		if ((sym = wkp->wk_dynsym) != NULL) {
 			sym->st_value = _sym->st_value;
 			sym->st_size = _sym->st_size;
 			sym->st_other = _sym->st_other;
