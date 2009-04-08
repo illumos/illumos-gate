@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2186,7 +2186,6 @@ audiohd_release_dma_mem(audiohd_dma_t *pdma)
 {
 	if (pdma->ad_dmahdl != NULL) {
 		(void) ddi_dma_unbind_handle(pdma->ad_dmahdl);
-		pdma->ad_dmahdl = NULL;
 	}
 
 	if (pdma->ad_acchdl != NULL) {
