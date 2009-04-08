@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -544,6 +544,7 @@ i8042_wait_obf(struct i8042 *global)
 	}
 	return (0);
 }
+
 
 /*
  * Drain all queued bytes from the 8042.
@@ -1321,7 +1322,10 @@ i8042_do_intercept(ddi_acc_impl_t *handlep, struct i8042_port *port,
     uint8_t *oaddr, uint8_t byte, uint8_t retry_response)
 {
 	int 	timedout = 0;
+	struct i8042	*global;
 	clock_t	tval;
+
+	global = port->i8042_global;
 
 	/*
 	 * Intercept the command response so that the 8042 interrupt handler
@@ -1360,6 +1364,27 @@ i8042_do_intercept(ddi_acc_impl_t *handlep, struct i8042_port *port,
 	} while (!timedout && !port->intercept_complete);
 
 	port->intr_intercept_enabled = B_FALSE;
+
+	if (timedout && !port->intercept_complete) {
+		/*
+		 * Some keyboard controllers don't trigger an interrupt,
+		 * so check the status bits to see if there's input available
+		 */
+		if (ddi_get8(global->io_handle, global->io_addr + I8042_STAT) &
+		    I8042_STAT_OUTBF) {
+			byte = ddi_get8(global->io_handle,
+			    global->io_addr + I8042_DATA);
+
+			port->intercepted_byte = byte;
+
+			if (byte == retry_response)
+				return (B_TRUE);	/* Timed out */
+			else if (port->intercept[0] == byte) {
+				port->intercept_complete = B_TRUE;
+				return (B_FALSE);	/* Response OK */
+			}
+		}
+	}
 
 	return (timedout);
 }
