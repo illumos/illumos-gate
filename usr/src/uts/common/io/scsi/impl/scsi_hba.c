@@ -1302,7 +1302,7 @@ smp_busctl_initchild(dev_info_t *child)
 		goto failure;
 	}
 
-	if (ddi_devid_str_to_wwn(smp_wwn, &wwn)) {
+	if (scsi_wwnstr_to_wwn(smp_wwn, &wwn)) {
 		goto failure;
 	}
 
@@ -2747,102 +2747,6 @@ scsi_hba_bus_power(dev_info_t *self, void *impl_arg, pm_bus_power_op_t op,
 	}
 
 	return (pm_busop_bus_power(self, impl_arg, op, arg, result));
-}
-
-/*
- * Convert between normalized (SCSI-3) LUN format, as described by
- * scsi_lun_t, and a normalized lun64_t representation. The normalized
- * representation maps in a compatible way to SCSI-2 LUNs.
- *
- * SCSI-3 LUNs are 64 bits. SCSI-2 LUNs are 3 bits (up to 5 bits in
- * some non-compliant implementations). SCSI-3 will pass a (64-bit)
- * scsi_lun_t, but we need a representation from which we can for example,
- * make device names. For compatibility we represent 64-bit LUN numbers
- * in such a way that they appear like they would have under SCSI-2.
- * This means that the single level LUN number is in the lowest byte with
- * the second, third, and fourth level LUNs represented in successively
- * higher bytes. In particular, if (and only if) the first byte of a 64
- * bit LUN is zero, denoting "Peripheral Device Addressing Method" and
- * "Bus Identifier" zero, then the target implements LUNs compatible in
- * spirit with SCSI-2 LUNs (although under SCSI-3 there may be up to
- * 256 of them). Under SCSI-3 rules, a target is *required* to use
- * this format if it contains 256 or fewer Logical Units, none of which
- * are dependent logical units.
- *
- * These routines have knowledge of the structure and size of a scsi_lun_t.
- *
- * XXX Should these function be rewritten to take the scsi_lun_t *?
- */
-scsi_lun64_t
-scsi_lun_to_lun64(scsi_lun_t lun)
-{
-	scsi_lun64_t	lun64;
-
-	/* check address method and bus identifier */
-	if (lun.sl_lun1_msb == 0) {
-		/* single-level LUN */
-		lun64 = lun.sl_lun1_lsb;	/* extract the 8-bit LUN */
-
-		/* Ensure rest of LUN is zero, which it is supposed to be */
-		if ((lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
-		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
-		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
-			return (lun64);
-		}
-
-		/* Oops, we got a bad scsi_lun_t. Leave it in 64-bit form */
-		SCSI_HBA_LOG((_LOG(WARN), NULL, NULL,
-		    "lun_to_lun64 bad lun %" PRIx64, *(scsi_lun64_t *)&lun));
-	}
-
-	/*
-	 * We have a big LUN that is not backward compatible.
-	 * Construct a 64 bit number using the right byte order.
-	 */
-	lun64 =
-	    ((scsi_lun64_t)lun.sl_lun1_msb << 56) |
-	    ((scsi_lun64_t)lun.sl_lun1_lsb << 48) |
-	    ((scsi_lun64_t)lun.sl_lun2_msb << 40) |
-	    ((scsi_lun64_t)lun.sl_lun2_lsb << 32) |
-	    ((scsi_lun64_t)lun.sl_lun3_msb << 24) |
-	    ((scsi_lun64_t)lun.sl_lun3_lsb << 16) |
-	    ((scsi_lun64_t)lun.sl_lun4_msb <<  8) |
-	    (scsi_lun64_t)lun.sl_lun4_lsb;
-	return (lun64);
-}
-
-scsi_lun_t
-scsi_lun64_to_lun(scsi_lun64_t lun64)
-{
-	scsi_lun_t	lun;
-
-	if (lun64 < 256) {
-		/* This LUN is in compatibility format */
-		lun.sl_lun1_msb = 0;
-		lun.sl_lun1_lsb = (uchar_t)lun64;
-		lun.sl_lun2_msb = 0;
-		lun.sl_lun2_lsb = 0;
-		lun.sl_lun3_msb = 0;
-		lun.sl_lun3_lsb = 0;
-		lun.sl_lun4_msb = 0;
-		lun.sl_lun4_lsb = 0;
-	} else {
-		/* This in full 64 bit LUN format */
-		lun.sl_lun1_msb = (uchar_t)(lun64 >> 56);
-		lun.sl_lun1_lsb = (uchar_t)(lun64 >> 48);
-		lun.sl_lun2_msb = (uchar_t)(lun64 >> 40);
-		lun.sl_lun2_lsb = (uchar_t)(lun64 >> 32);
-		lun.sl_lun3_msb = (uchar_t)(lun64 >> 24);
-		lun.sl_lun3_lsb = (uchar_t)(lun64 >> 16);
-		lun.sl_lun4_msb = (uchar_t)(lun64 >>  8);
-		lun.sl_lun4_lsb = (uchar_t)(lun64);
-
-		/* Oops, bad LUN -- this is required to be nonzero */
-		if (lun.sl_lun1_msb == 0)
-			SCSI_HBA_LOG((_LOG(WARN), NULL, NULL,
-			    "lun64_to_lun bad lun %" PRIlun64, lun64));
-	}
-	return (lun);
 }
 
 /*

@@ -147,6 +147,27 @@ typedef	struct scsi_lun {
 	uchar_t	sl_lun4_lsb;	/* fourth level */
 } scsi_lun_t;
 
+/* SCSI standard defined lun addressing methods (in sl_lunX_msb) */
+#define	SCSI_LUN_AM_MASK	0xC0		/* Address Method Mask */
+#define	SCSI_LUN_AM_PDEV	0x00		/* Peripheral device AM */
+#define	SCSI_LUN_AM_FLAT	0x40		/* Flat space AM */
+#define	SCSI_LUN_AM_LUN		0x80		/* Logical unit AM */
+#define	SCSI_LUN_AM_EFLAT	0xC0		/* Extended flat space AM */
+#define	SCSI_LUN_AM_ELUN	0xC0		/* Extended logical unit AM */
+
+#ifdef	_KERNEL
+/* SCSI LUN conversion between SCSI_ADDR_PROP_LUN64 and SCSI standard forms */
+scsi_lun64_t	scsi_lun_to_lun64(scsi_lun_t lun);
+scsi_lun_t	scsi_lun64_to_lun(scsi_lun64_t lun64);
+
+/* SCSI WWN conversion (property values should be in unit_address form) */
+int		scsi_wwnstr_to_wwn(const char *wwnstr, uint64_t *wwnp);
+char		*scsi_wwn_to_wwnstr(uint64_t wwn,
+		    int unit_address_form, char *wwnstr);
+void		scsi_wwnstr_hexcase(char *wwnstr, int lower_case);
+void		scsi_free_wwnstr(char *wwnstr);
+#endif	/* _KERNEL */
+
 #ifdef	__cplusplus
 }
 #endif

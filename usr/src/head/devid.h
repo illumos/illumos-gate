@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DEVID_H
 #define	_DEVID_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_KERNEL
 #include <sys/types.h>
@@ -57,13 +55,6 @@ extern char	*devid_str_encode(ddi_devid_t devid, char *minor_name);
 extern int	devid_str_decode(char *devidstr,
 		    ddi_devid_t *retdevid, char **retminor_name);
 extern void	devid_str_free(char *devidstr);
-extern int	devid_scsi_encode(int version, char *driver_name,
-		    uchar_t *inq, size_t inq_len, uchar_t *inq80,
-		    size_t inq80_len, uchar_t *inq83, size_t inq83_len,
-		    ddi_devid_t *ret_devid);
-extern char	*devid_to_guid(ddi_devid_t devid);
-extern void	devid_free_guid(char *guid);
-extern int	devid_str_to_wwn(const char *string, uint64_t *wwn);
 
 #ifdef	__cplusplus
 }

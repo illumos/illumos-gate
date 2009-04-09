@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <locale.h>
 #include <libintl.h>
 #include <devid.h>
+#include <sys/libdevid.h>
 #include <sys/modctl.h> /* for MAXMODCONFNAME */
 #include <sys/scsi/adapters/scsi_vhci.h>
 

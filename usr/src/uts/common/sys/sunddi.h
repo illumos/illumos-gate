@@ -2012,9 +2012,6 @@ void
 ddi_devid_free_guid(char *guid);
 
 int
-ddi_devid_str_to_wwn(const char *string, uint64_t *wwn);
-
-int
 ddi_lyr_get_devid(dev_t dev, ddi_devid_t *ret_devid);
 
 int

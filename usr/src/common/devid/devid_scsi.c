@@ -29,6 +29,11 @@
  * Solaris devid / guid values.
  */
 
+#ifndef _KERNEL
+#include <stdio.h>
+#endif /* _KERNEL */
+
+#include <sys/inttypes.h>
 #include <sys/types.h>
 #include <sys/stropts.h>
 #include <sys/debug.h>
@@ -1214,38 +1219,233 @@ ctoi(char c)
 	return (c);
 }
 
+/* ====NOTE: The scsi_* interfaces are not related to devids :NOTE==== */
+
 /*
- *    Function: devid_str_to_wwn
+ *    Function: scsi_wwnstr_to_wwn
  *
- * Description: This routine translates wwn from string to uint64 type.
+ * Description: This routine translates wwn from wwnstr string to uint64 wwn.
  *
- *   Arguments: string - the string wwn to be transformed
- *              wwn - the pointer to 64 bit wwn
+ *   Arguments: wwnstr - the string wwn to be transformed
+ *              wwnp - the pointer to 64 bit wwn
  */
 int
-#ifdef  _KERNEL
-ddi_devid_str_to_wwn(const char *string, uint64_t *wwn)
-#else   /* !_KERNEL */
-devid_str_to_wwn(const char *string, uint64_t *wwn)
-#endif  /* _KERNEL */
+scsi_wwnstr_to_wwn(const char *wwnstr, uint64_t *wwnp)
 {
-	int i;
-	char cl, ch;
-	uint64_t tmp;
+	int		i;
+	char		cl, ch;
+	uint64_t	tmp;
 
-	if (wwn == NULL || strlen(string) != 16) {
+	if (wwnp == NULL)
 		return (DDI_FAILURE);
-	}
+	*wwnp = 0;
 
-	*wwn = 0;
+	if (wwnstr == NULL)
+		return (DDI_FAILURE);
+
+	/* Skip leading 'w' if wwnstr is in unit-address form */
+	if (*wwnstr == 'w')
+		wwnstr++;
+
+	if (strlen(wwnstr) != 16)
+		return (DDI_FAILURE);
+
 	for (i = 0; i < 8; i++) {
-		ch = ctoi(*string++);
-		cl = ctoi(*string++);
+		ch = ctoi(*wwnstr++);
+		cl = ctoi(*wwnstr++);
 		if (cl == -1 || ch == -1) {
 			return (DDI_FAILURE);
 		}
 		tmp = (ch << 4) + cl;
-		*wwn = (*wwn << 8) | tmp;
+		*wwnp = (*wwnp << 8) | tmp;
 	}
 	return (DDI_SUCCESS);
+}
+
+/*
+ *    Function: scsi_wwn_to_wwnstr
+ *
+ * Description: This routine translates from a uint64 wwn to a wwnstr
+ *
+ *   Arguments:
+ *              wwn - the 64 bit wwn
+ *		unit_address_form - do we want a leading 'w'?
+ *		wwnstr - allow caller to perform wwnstr allocation.
+ *			If non-NULL, don't use scsi_free_wwnstr(),
+ *			and make sure you provide 18/17 bytes of  space.
+ */
+char *
+scsi_wwn_to_wwnstr(uint64_t wwn, int unit_address_form, char *wwnstr)
+{
+	int	len;
+
+	/* make space for leading 'w' */
+	if (unit_address_form)
+		len = 1 + 16 + 1;	/* "w0123456789abcdef\0" */
+	else
+		len = 16 + 1;		/* "0123456789abcdef\0" */
+
+	if (wwnstr == NULL) {
+		/* We allocate, caller uses scsi_free_wwnstr(). */
+		if ((wwnstr = DEVID_MALLOC(len)) == NULL)
+			return (NULL);
+	}
+
+	if (unit_address_form)
+		(void) snprintf(wwnstr, len, "w%016" PRIx64, wwn);
+	else
+		(void) snprintf(wwnstr, len, "%016" PRIx64, wwn);
+	return (wwnstr);
+}
+
+/*
+ *    Function: scsi_wwnstr_hexcase
+ *
+ * Description: This routine switches a wwnstr to upper/lower case hex
+ *		(a wwnstr uses lower-case hex by default).
+ *
+ *   Arguments:
+ *              wwnstr - the pointer to the wwnstr string.
+ *		upper_case_hex - non-zero will convert to upper_case hex
+ *			zero will convert to lower case hex.
+ */
+void
+scsi_wwnstr_hexcase(char *wwnstr, int upper_case_hex)
+{
+	char	*s;
+	char	c;
+
+	for (s = wwnstr; *s; s++) {
+		c = *s;
+		if ((upper_case_hex != 0) &&
+		    ((c >= 'a') && (c <= 'f')))
+			c -= ('a' - 'A');	/* lower to upper */
+		else if ((upper_case_hex == 0) &&
+		    ((c >= 'A') && (c <= 'F')))
+			c += ('a' - 'A');	/* upper to lower */
+		*s = c;
+	}
+}
+
+/*
+ *    Function: scsi_wwnstr_free
+ *
+ * Description: This routine frees a wwnstr returned by a call
+ *		to scsi_wwn_to_strwwn with a NULL wwnstr argument.
+ *
+ *   Arguments:
+ *              wwnstr - the pointer to the wwnstr string to free.
+ */
+void
+scsi_free_wwnstr(char *wwnstr)
+{
+#ifdef	_KERNEL
+	kmem_free(wwnstr, strlen(wwnstr) + 1);
+#else	/* _KERNEL */
+	free(wwnstr);
+#endif	/* _KERNEL */
+}
+
+/*
+ *    Function: scsi_lun_to_lun64/scsi_lun64_to_lun
+ *
+ * Description: Convert between normalized (SCSI-3) LUN format, as
+ *		described by scsi_lun_t, and a normalized lun64_t
+ *              representation (used by Solaris SCSI_ADDR_PROP_LUN64
+ *		"lun64" property). The normalized representation maps
+ *		in a compatible way to SCSI-2 LUNs. See scsi_address.h
+ *
+ *              SCSI-3 LUNs are 64 bits. SCSI-2 LUNs are 3 bits (up to
+ *              5 bits in non-compliant implementations). SCSI-3 will
+ *              pass a (64-bit) scsi_lun_t, but we need a
+ *              representation from which we can for example, make
+ *              device names. For unit-address compatibility, we represent
+ *		64-bit LUN numbers in such a way that they appear like they
+ *		would have under SCSI-2. This means that the single level
+ *              LUN number is in the lowest byte with the second,
+ *              third, and fourth level LUNs represented in
+ *              successively higher bytes. In particular, if (and only
+ *              if) the first byte of a 64 bit LUN is zero, denoting
+ *              "Peripheral Device Addressing Method" and "Bus
+ *              Identifier" zero, then the target implements LUNs
+ *              compatible in spirit with SCSI-2 LUNs (although under
+ *              SCSI-3 there may be up to 256 of them). Under SCSI-3
+ *              rules, a target is *required* to use this format if it
+ *              contains 256 or fewer Logical Units, none of which are
+ *              dependent logical units. These routines have knowledge
+ *		of the structure and size of a scsi_lun_t.
+ *
+ * NOTE: We tolerate vendors that use "Single level LUN structure using
+ * peripheral device addressing method" with a non-zero bus identifier
+ * (spec says bus identifier must be zero).  Described another way, we let
+ * the non-'addressing method' bits of sl_lun1_msb contribute to our lun64
+ * value).
+ */
+scsi_lun64_t
+scsi_lun_to_lun64(scsi_lun_t lun)
+{
+	scsi_lun64_t    lun64;
+
+	/*
+	 * Check to see if we have a single level lun that uses the
+	 * "Peripheral Device" addressing method. If so, the lun64 value is
+	 * kept in Solaris 'unit-address compatibility' form.
+	 */
+	if (((lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
+	    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
+	    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) &&
+	    ((lun.sl_lun1_msb & SCSI_LUN_AM_MASK) == SCSI_LUN_AM_PDEV)) {
+		/*
+		 * LUN has Solaris 'unit-address compatibility' form, construct
+		 * lun64 value from non-'addressing method' bits of msb and lsb.
+		 */
+		lun64 = ((lun.sl_lun1_msb & ~SCSI_LUN_AM_MASK) << 8) |
+		    lun.sl_lun1_lsb;
+	} else {
+		/*
+		 * LUN does not have a Solaris 'unit-address compatibility'
+		 * form, construct lun64 value in full 64 bit LUN format.
+		 */
+		lun64 =
+		    ((scsi_lun64_t)lun.sl_lun1_msb << 56) |
+		    ((scsi_lun64_t)lun.sl_lun1_lsb << 48) |
+		    ((scsi_lun64_t)lun.sl_lun2_msb << 40) |
+		    ((scsi_lun64_t)lun.sl_lun2_lsb << 32) |
+		    ((scsi_lun64_t)lun.sl_lun3_msb << 24) |
+		    ((scsi_lun64_t)lun.sl_lun3_lsb << 16) |
+		    ((scsi_lun64_t)lun.sl_lun4_msb <<  8) |
+		    (scsi_lun64_t)lun.sl_lun4_lsb;
+	}
+	return (lun64);
+}
+
+scsi_lun_t
+scsi_lun64_to_lun(scsi_lun64_t lun64)
+{
+	scsi_lun_t	lun;
+
+	if (lun64 <= (((0xFF & ~SCSI_LUN_AM_MASK) << 8) | 0xFF)) {
+		/*
+		 * lun64 is in Solaris 'unit-address compatibility' form.
+		 */
+		lun.sl_lun1_msb = SCSI_LUN_AM_PDEV | (lun64 >> 8);
+		lun.sl_lun1_lsb = (uchar_t)lun64;
+		lun.sl_lun2_msb = 0;
+		lun.sl_lun2_lsb = 0;
+		lun.sl_lun3_msb = 0;
+		lun.sl_lun3_lsb = 0;
+		lun.sl_lun4_msb = 0;
+		lun.sl_lun4_lsb = 0;
+	} else {
+		/* lun64 is in full 64 bit LUN format. */
+		lun.sl_lun1_msb = (uchar_t)(lun64 >> 56);
+		lun.sl_lun1_lsb = (uchar_t)(lun64 >> 48);
+		lun.sl_lun2_msb = (uchar_t)(lun64 >> 40);
+		lun.sl_lun2_lsb = (uchar_t)(lun64 >> 32);
+		lun.sl_lun3_msb = (uchar_t)(lun64 >> 24);
+		lun.sl_lun3_lsb = (uchar_t)(lun64 >> 16);
+		lun.sl_lun4_msb = (uchar_t)(lun64 >>  8);
+		lun.sl_lun4_lsb = (uchar_t)(lun64);
+	}
+	return (lun);
 }
