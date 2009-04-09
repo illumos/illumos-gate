@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2000,6 +2000,7 @@ dnet_getp(gld_mac_info_t *macinfo)
 			uint32_t end_paddr;
 			/* attach the new buffer to the rx descriptor */
 			dnetp->rx_buf_vaddr[index] = newbuf;
+			dnetp->rx_buf_paddr[index] = rp->rbuf_paddr;
 			desc[index].buffer1 = rp->rbuf_paddr;
 			desc[index].desc1.buffer_size1 = rx_buf_size;
 			desc[index].desc1.buffer_size2 = 0;
@@ -2532,6 +2533,7 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 			if (rp == NULL)
 				return (FAILURE);
 			dnetp->rx_buf_vaddr[i] = rp->rbuf_vaddr;
+			dnetp->rx_buf_paddr[i] = rp->rbuf_paddr;
 		}
 	}
 
