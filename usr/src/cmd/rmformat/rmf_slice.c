@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,10 +187,10 @@ sup_prxfile(char *file_name, struct extvtoc *vt)
 		 */
 		if (status != SUP_STRING) {
 			(void) fprintf(stderr,
-				gettext("Expecting keyword, found '%s'"),
+			    gettext("Expecting keyword, found '%s'"),
 			    token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			continue;
 		}
 		/*
@@ -206,7 +206,7 @@ sup_prxfile(char *file_name, struct extvtoc *vt)
 			(void) fprintf(stderr, gettext("Unknown keyword '%s'"),
 			    cleaned);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			(void) fclose(data_file);
 			return (-1);
 		}
@@ -217,7 +217,7 @@ sup_prxfile(char *file_name, struct extvtoc *vt)
 	(void) fclose(data_file);
 
 	(void) fprintf(stderr,
-		gettext("Unexpected end of file (line no %d)\n"), data_lineno);
+	    gettext("Unexpected end of file (line no %d)\n"), data_lineno);
 	return (-1);
 }
 
@@ -301,7 +301,7 @@ sup_get_token(char *buf)
 		 * a token.
 		 */
 		if (!quoted && (c == '=' || c == ',' || c == ':' ||
-			c == '#' || c == '|' || c == '&' || c == '~'))
+		    c == '#' || c == '|' || c == '&' || c == '~'))
 				break;
 		/*
 		 * Store the character if there's room left.
@@ -409,7 +409,8 @@ clean_token(char *cleantoken, char *token)
 	 * Strip off leading white-space.
 	 */
 	for (ptr = token; isspace(*ptr) && (ptr <=
-	    (token + strlen(token) - 1)); ptr++);
+	    (token + strlen(token) - 1)); ptr++)
+		;
 
 	/*
 	 * Copy it into the clean buffer.
@@ -419,7 +420,7 @@ clean_token(char *cleantoken, char *token)
 	 * Strip off trailing white-space.
 	 */
 	for (ptr = cleantoken + strlen(cleantoken) - 1;
-			isspace(*ptr) && (ptr >= cleantoken); ptr--) {
+	    isspace(*ptr) && (ptr >= cleantoken); ptr--) {
 		*ptr = '\0';
 	}
 }
@@ -441,9 +442,9 @@ sup_setpart(struct extvtoc *vt)
 
 		if (status != SUP_COLON) {
 			(void) fprintf(stderr,
-				gettext("Expecting ':', found '%s'"), token);
+			    gettext("Expecting ':', found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 
@@ -451,24 +452,21 @@ sup_setpart(struct extvtoc *vt)
 		status = sup_gettoken(token);
 		if (status != SUP_STRING) {
 			(void) fprintf(stderr,
-				gettext("Expecting string, found '%s'"), token);
+			    gettext("Expecting string, found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 		clean_token(ident, token);
 		/*
-		 * Also make sure it is within the legal range of letters.
-		 */
-		/*
 		 * Here's the index of the partition we're dealing with
 		 */
 		index = (int32_t)my_atoll(ident);
-		if ((index < 0) || (index > NDKMAP)) {
+		if ((index < 0) || (index >= NDKMAP)) {
 			(void) fprintf(stderr,
-				gettext("Unknown partition '%s'"), index);
+			    gettext("Unknown partition %d"), index);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 		/*
@@ -496,9 +494,9 @@ sup_setpart(struct extvtoc *vt)
 		status = sup_gettoken(token);
 		if (status != SUP_EQL) {
 			(void) fprintf(stderr,
-				gettext("Expecting '=', found '%s'"), token);
+			    gettext("Expecting '=', found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 
 		}
@@ -510,9 +508,9 @@ sup_setpart(struct extvtoc *vt)
 		 */
 		if (status != SUP_STRING) {
 			(void) fprintf(stderr,
-				gettext("Expecting value, found '%s'"), token);
+			    gettext("Expecting value, found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 		clean_token(cleaned, token);
@@ -535,10 +533,10 @@ sup_setpart(struct extvtoc *vt)
 		val1 = str2sector(cleaned);
 		if (val1 == -1) {
 			(void) fprintf(stderr,
-				gettext("Invalid partition beggining %s \n"),
+			    gettext("Invalid partition beggining %s \n"),
 			    cleaned);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 		}
 
 		DPRINTF1(" begins %s", cleaned);
@@ -548,9 +546,9 @@ sup_setpart(struct extvtoc *vt)
 		status = sup_gettoken(token);
 		if (status != SUP_COMMA) {
 			(void) fprintf(stderr,
-				gettext("Expecting ', ', found '%s'"), token);
+			    gettext("Expecting ', ', found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 		/*
@@ -559,9 +557,9 @@ sup_setpart(struct extvtoc *vt)
 		status = sup_gettoken(token);
 		if (status != SUP_STRING) {
 			(void) fprintf(stderr,
-				gettext("Expecting value, found '%s'"), token);
+			    gettext("Expecting value, found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 		clean_token(cleaned, token);
@@ -569,10 +567,10 @@ sup_setpart(struct extvtoc *vt)
 		val2 = str2sector(cleaned);
 		if (val2 == -1) {
 			(void) fprintf(stderr,
-				gettext("Invalid partition size %s \n"),
+			    gettext("Invalid partition size %s \n"),
 			    cleaned);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 		}
 		DPRINTF1(" ends %s ", cleaned);
 
@@ -586,10 +584,10 @@ sup_setpart(struct extvtoc *vt)
 			status = sup_gettoken(token);
 			if (status != SUP_STRING) {
 				(void) fprintf(stderr,
-					gettext("Expecting value, found '%s'"),
+				    gettext("Expecting value, found '%s'"),
 				    token);
 				(void) fprintf(stderr,
-					gettext("Line no %d\n"), data_lineno);
+				    gettext("Line no %d\n"), data_lineno);
 				return (-1);
 			}
 			clean_token(cleaned, token);
@@ -606,18 +604,18 @@ sup_setpart(struct extvtoc *vt)
 				status = sup_gettoken(token);
 				if (status == SUP_COMMA) {
 					(void) fprintf(stderr,
-						gettext("Expecting : got %s\n"),
+					    gettext("Expecting : got %s\n"),
 					    token);
 					(void) fprintf(stderr,
-						gettext("Line no %d\n"),
+					    gettext("Line no %d\n"),
 					    data_lineno);
 					return (-1);
 				}
 			} else {
 				(void) fprintf(stderr,
-					gettext("Invalid flag or tag\n"));
+				    gettext("Invalid flag or tag\n"));
 				(void) fprintf(stderr,
-					gettext("Line no %d\n"), data_lineno);
+				    gettext("Line no %d\n"), data_lineno);
 				return (-1);
 			}
 
@@ -628,11 +626,11 @@ sup_setpart(struct extvtoc *vt)
 					status = sup_gettoken(token);
 					if (status != SUP_STRING) {
 						(void) fprintf(stderr,
-						    gettext(
-					"Expecting value, found '%s'"),
-						token);
+						    gettext("Expecting value"
+						    ", found '%s'"),
+						    token);
 						(void) fprintf(stderr,
-							gettext("Line no %d\n"),
+						    gettext("Line no %d\n"),
 						    data_lineno);
 						return (-1);
 					}
@@ -666,9 +664,9 @@ sup_setpart(struct extvtoc *vt)
 		}
 		if (status != SUP_COLON) {
 			(void) fprintf(stderr,
-				gettext("Expecting ':', found '%s'"), token);
+			    gettext("Expecting ':', found '%s'"), token);
 			(void) fprintf(stderr,
-				gettext("Line no %d\n"), data_lineno);
+			    gettext("Line no %d\n"), data_lineno);
 			return (-1);
 		}
 
@@ -748,8 +746,8 @@ str2sector(char *str)
 	s1 = str;
 	while (*s1) {
 		if ((*s1 != 'x') && ((*s1 < 'A') || (*s1 > 'F')) &&
-			((*s1 < 'a') || (*s1 > 'f')) && ((*s1 < '0') ||
-			(*s1 > '9'))) {
+		    ((*s1 < 'a') || (*s1 > 'f')) && ((*s1 < '0') ||
+		    (*s1 > '9'))) {
 			if (*s1 == 'G') {
 					mul_factor = 1024*1024*1024;
 					s1++;
@@ -762,7 +760,7 @@ str2sector(char *str)
 			}
 			if ((*s1 != 'B') || (*(++s1) != NULL)) {
 				(void) fprintf(stderr,
-					gettext("Extra chars at the end\n"));
+				    gettext("Extra chars at the end\n"));
 				free(base);
 				return (-1);
 			}
@@ -1008,7 +1006,7 @@ Solaris partitions found.\n"));
 	}
 	if (num_backup > 1) {
 		(void) fprintf(stderr,
-			gettext("Maximum one backup slice is allowed\n"));
+		    gettext("Maximum one backup slice is allowed\n"));
 		(void) smedia_release_handle(handle);
 		(void) close(fd);
 		exit(1);
@@ -1045,7 +1043,7 @@ Solaris partitions found.\n"));
 			"Backup slice extends beyond size of media\n"));
 			(void) fprintf(stderr,
 			    gettext("media size : %llu sectors \n"),
-				media_size);
+			    media_size);
 		} else {
 
 			(void) fprintf(stderr,
@@ -1084,9 +1082,9 @@ Solaris partition\n"));
 				    media_size);
 			} else {
 				(void) fprintf(stderr,
-				    gettext(
-		"Slice %d extends beyond FDISK Solaris partition size\n"),
-			part[num_slices -1].num);
+				    gettext("Slice %d extends beyond FDISK"
+				    " Solaris partition size\n"),
+				    part[num_slices -1].num);
 				(void) fprintf(stderr, gettext(
 				    "FDISK Solaris partition size : %llu "
 				    "sectors \n"), media_size);
@@ -1102,8 +1100,8 @@ Solaris partition\n"));
 			continue;
 		if (part[i].start <= part[i-1].end) {
 			(void) fprintf(stderr,
-				gettext("Overlap between slices %d and %d\n"),
-				part[i-1].num, part[i].num);
+			    gettext("Overlap between slices %d and %d\n"),
+			    part[i-1].num, part[i].num);
 			(void) smedia_release_handle(handle);
 			(void) close(fd);
 			exit(1);
@@ -1155,9 +1153,9 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 			if (errno == ENOTSUP) {
 				errno = 0;
 				if (lseek(fd, offset, SEEK_SET)) {
-				    PERROR("Seek failed:");
-				    free(buf);
-				    return (-1);
+					PERROR("Seek failed:");
+					free(buf);
+					return (-1);
 				}
 
 				/* Turn on privileges. */
@@ -1169,9 +1167,10 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 				(void) __priv_bracket(PRIV_OFF);
 
 				if (ret != sizeof (struct mboot)) {
-				    PERROR("Could not read master boot record");
-				    free(buf);
-				    return (-1);
+					PERROR("Could not read "
+					    "master boot record");
+					free(buf);
+					return (-1);
 				}
 			} else {
 				PERROR("Could not read master boot record");
@@ -1187,7 +1186,7 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 	if (les(boot_sec->signature) != MBB_MAGIC) {
 		DPRINTF("fdisk: Invalid master boot file \n");
 		DPRINTF2("Bad magic number: is %x, should be %x.\n",
-			les(boot_sec->signature), MBB_MAGIC);
+		    les(boot_sec->signature), MBB_MAGIC);
 		free(buf);
 		return (-1);
 	}
@@ -1298,7 +1297,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	    "%s cyl %d alt %d hd %d sec %d",
 	    asciilabel2, numcyl, acyl, nhead, nsect);
 	(void) memcpy(v_toc.v_asciilabel, asciilabel,
-		LEN_DKL_ASCII);
+	    LEN_DKL_ASCII);
 
 	errno = 0;
 
@@ -1430,16 +1429,16 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 			if (errno == ENOTSUP) {
 
 			    /* Turn on privileges. */
-			    (void) __priv_bracket(PRIV_ON);
+				(void) __priv_bracket(PRIV_ON);
 
-			    ret = write(fd, fdisk_buf, blocksize);
+				ret = write(fd, fdisk_buf, blocksize);
 
 			    /* Turn off privileges. */
-			    (void) __priv_bracket(PRIV_OFF);
+				(void) __priv_bracket(PRIV_OFF);
 
-			    if (ret != blocksize) {
+				if (ret != blocksize) {
 					return;
-			    }
+				}
 			} else {
 				return;
 			}
@@ -1467,7 +1466,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	    "%s cyl %d alt %d hd %d sec %d",
 	    asciilabel2, numcyl, acyl, nhead, nsect);
 	(void) memcpy(v_toc.v_asciilabel, asciilabel,
-		LEN_DKL_ASCII);
+	    LEN_DKL_ASCII);
 
 	errno = 0;
 
@@ -1529,7 +1528,7 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 			if (fdisk.part[i].numsect == 0)
 				continue;
 			if ((fdisk.part[i].systid == UNUSED) ||
-				(fdisk.part[i].systid == 0))
+			    (fdisk.part[i].systid == 0))
 				continue;
 #ifdef i386
 			if (fdisk.part[i].systid == SUNIXOS ||
@@ -1596,7 +1595,7 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 	for (i = 0; i < V_NUMPAR; i++) {
 		if (t_vtoc.v_part[i].p_size != 0) {
 			erase(handle, sol_offset + t_vtoc.v_part[i].p_start,
-				t_vtoc.v_part[i].p_size);
+			    t_vtoc.v_part[i].p_size);
 			/*
 			 * To make the udfs not recognise the partition we will
 			 * erase sectors 256, (p_size-256) and psize.
