@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -66,6 +64,7 @@
 #include <sys/nbmlock.h>
 #include <sys/fcntl.h>
 #include <fs/fs_subr.h>
+#include <sys/taskq.h>
 
 /* Determine if this vnode is a file that is read-only */
 #define	ISROFILE(vp)	\
@@ -863,6 +862,37 @@ vn_rele_stream(vnode_t *vp)
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
 		VOP_INACTIVE(vp, CRED(), NULL);
+		return;
+	}
+	vp->v_count--;
+	mutex_exit(&vp->v_lock);
+}
+
+static void
+vn_rele_inactive(vnode_t *vp)
+{
+	VOP_INACTIVE(vp, CRED(), NULL);
+}
+
+/*
+ * Like vn_rele() except if we are going to call VOP_INACTIVE() then do it
+ * asynchronously using a taskq. This can avoid deadlocks caused by re-entering
+ * the file system as a result of releasing the vnode. Note, file systems
+ * already have to handle the race where the vnode is incremented before the
+ * inactive routine is called and does its locking.
+ *
+ * Warning: Excessive use of this routine can lead to performance problems.
+ * This is because taskqs throttle back allocation if too many are created.
+ */
+void
+vn_rele_async(vnode_t *vp, taskq_t *taskq)
+{
+	VERIFY(vp->v_count > 0);
+	mutex_enter(&vp->v_lock);
+	if (vp->v_count == 1) {
+		mutex_exit(&vp->v_lock);
+		VERIFY(taskq_dispatch(taskq, (task_func_t *)vn_rele_inactive,
+		    vp, TQ_SLEEP) != NULL);
 		return;
 	}
 	vp->v_count--;

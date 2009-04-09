@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -778,6 +778,7 @@ struct page;
 struct seg;
 struct as;
 struct pollhead;
+struct taskq;
 
 #ifdef	_KERNEL
 
@@ -1206,6 +1207,7 @@ int	vn_rdwr(enum uio_rw rw, struct vnode *vp, caddr_t base, ssize_t len,
 		offset_t offset, enum uio_seg seg, int ioflag, rlim64_t ulimit,
 		cred_t *cr, ssize_t *residp);
 void	vn_rele(struct vnode *vp);
+void	vn_rele_async(struct vnode *vp, struct taskq *taskq);
 void	vn_rele_dnlc(struct vnode *vp);
 void	vn_rele_stream(struct vnode *vp);
 int	vn_link(char *from, char *to, enum uio_seg seg);
@@ -1282,6 +1284,10 @@ extern uint_t pvn_vmodsort_supported;
 
 #define	VN_RELE(vp)	{ \
 	vn_rele(vp); \
+}
+
+#define	VN_RELE_ASYNC(vp, taskq)	{ \
+	vn_rele_async(vp, taskq); \
 }
 
 #define	VN_SET_VFS_TYPE_DEV(vp, vfsp, type, dev)	{ \
