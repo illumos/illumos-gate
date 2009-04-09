@@ -370,10 +370,11 @@ procflow_createnwait(void *nothing)
 
 		(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 		/* if normal shutdown in progress, just quit */
-		if (filebench_shm->shm_f_abort)
+		if (filebench_shm->shm_f_abort) {
 			(void) ipc_mutex_unlock(
 			    &filebench_shm->shm_procflow_lock);
 			pthread_exit(0);
+		}
 
 		/* if nothing running, exit */
 		if (filebench_shm->shm_procs_running == 0) {
@@ -440,13 +441,17 @@ procflow_init(void)
 	pthread_t tid;
 	int ret = 0;
 
+	if (procflow == NULL) {
+		filebench_log(LOG_ERROR, "Workload has no processes");
+		return (FILEBENCH_ERROR);
+	}
+
 	filebench_log(LOG_DEBUG_IMPL,
 	    "procflow_init %s, %llu",
 	    procflow->pf_name,
 	    (u_longlong_t)avd_get_int(procflow->pf_instances));
 
 #ifdef USE_PROCESS_MODEL
-
 	if ((pthread_create(&tid, NULL, procflow_createnwait, NULL)) != 0)
 		return (ret);
 
@@ -644,8 +649,15 @@ procflow_shutdown(void)
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
+	if (filebench_shm->shm_f_abort == FILEBENCH_ABORT_FINI) {
+		(void) ipc_mutex_unlock(
+		    &filebench_shm->shm_procflow_lock);
+		return;
+	}
+
 	procflow = filebench_shm->shm_proclist;
-	filebench_shm->shm_f_abort = 1;
+	if (filebench_shm->shm_f_abort == FILEBENCH_OK)
+		filebench_shm->shm_f_abort = FILEBENCH_ABORT_DONE;
 
 	while (procflow) {
 		if (procflow->pf_instance &&
@@ -687,8 +699,7 @@ procflow_shutdown(void)
 			wait_cnt--;
 	}
 
-	filebench_shm->shm_f_abort = 0;
-
+	filebench_shm->shm_f_abort = FILEBENCH_ABORT_FINI;
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
 
 	/* indicate all processes are stopped, even if some are "stuck" */

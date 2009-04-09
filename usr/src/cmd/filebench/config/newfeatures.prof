@@ -73,14 +73,17 @@ CONFIG video_server_test {
 	repintval = 20;
 	passvidsname = bigfileset;
 	actvidsname = u2fileset;
+	warmuptime = 120;
 }
 
 CONFIG file_indexing_test {
         function = generic;
         personality = randomfileaccess;
+	warmuptime = 120;
 }
 
 CONFIG composite_flowop_test {
         function = generic;
         personality = compflow_demo;
+	warmuptime = 120;
 }

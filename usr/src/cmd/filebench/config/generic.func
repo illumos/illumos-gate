@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -50,6 +50,11 @@ sub post_run {
 sub bm_run {
         my $runtime = conf_reqval("runtime");
         my $fs = get_CONFNAME();
+	my $warmuptime = "";
+
+	if (conf_exists("warmuptime") == 1) {
+	    $warmuptime = conf_reqval("warmuptime");
+	}
 
 	# The following array must not contain empty values ! This causes the
 	# statistics scripts to miss arguments !
@@ -61,7 +66,7 @@ sub bm_run {
         # <stats>/<hostname>-<date-time>/<personality>
 
 	# create processes and start run, then collect statistics
-        op_stats($runtime,"stats.$fs",@ext_stats,@file_stats,@arg_stats);
+        op_stats($runtime,$warmuptime,"stats.$fs",@ext_stats,@file_stats,@arg_stats);
 }
 
 1;

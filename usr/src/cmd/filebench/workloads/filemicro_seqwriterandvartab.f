@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # Sequential write() of a 1G file, size picked from a table in
 # the [1K,64K] range with a mean of 5.5K, followed by close(), cached.
@@ -46,13 +44,14 @@ define process name=filewriter,instances=1
 {
   thread name=filewriterthread,memsize=10m,instances=$nthreads
   {
-    flowop appendfile name=write-file,dsync=$sync,filesetname=bigfileset,iosize=$iosize,fd=1,iters=$count
+    flowop openfile name=open-file,filesetname=bigfileset,fd=1
+    flowop appendfile name=write-file,dsync=$sync,iosize=$iosize,fd=1,iters=$count
     flowop closefile name=close,fd=1
     flowop finishoncount name=finish,value=1
   }
 }
 
-echo  "FileMicro-SeqWriteRandVarTab Version 1.0 personality successfully loaded"
+echo  "FileMicro-SeqWriteRandVarTab Version 1.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$cached=<bool>        defaults to $cached"
 usage "       set \$count=<value>        defaults to $count"

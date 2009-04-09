@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 set $dir=/tmp
 set $nfiles=50000
@@ -40,13 +38,13 @@ define process name=filecreate,instances=1
   thread name=filecreatethread,memsize=10m,instances=$nthreads
   {
     flowop createfile name=createfile1,filesetname=bigfileset,fd=1
-    flowop writewholefile name=writefile1,filesetname=bigfileset,fd=1,iosize=$iosize
+    flowop writewholefile name=writefile1,fd=1,iosize=$iosize
     flowop closefile name=closefile1,fd=1
     flowop opslimit name=limit
   }
 }
 
-echo  "Createfiles Version 2.4 personality successfully loaded"
+echo  "Createfiles Version 2.5 personality successfully loaded"
 usage "Usage: set \$dir=<dir>          defaults to $dir"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$iosize=<size>      defaults to $iosize"

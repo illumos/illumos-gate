@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 
 set $dir=/tmp
 set $nfiles=1000
@@ -44,13 +41,13 @@ define process name=filereader,instances=1
     flowop openfile name=openfile1,filesetname=srcfiles,fd=1
     flowop readwholefile name=readfile1,fd=1,iosize=$iosize
     flowop createfile name=createfile2,filesetname=destfiles,fd=2
-    flowop writewholefile name=writefile2,filesetname=destfiles,fd=2,srcfd=1,iosize=$iosize
+    flowop writewholefile name=writefile2,fd=2,srcfd=1,iosize=$iosize
     flowop closefile name=closefile1,fd=1
     flowop closefile name=closefile2,fd=2
   }
 }
 
-echo  "Bringover Version 2.4 personality successfully loaded"
+echo  "Bringover Version 2.5 personality successfully loaded"
 usage "Usage: set \$dir=<dir>         defaults to $dir"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$nfiles=<value>    defaults to $nfiles"

@@ -364,7 +364,7 @@ flowop_start(threadflow_t *threadflow)
 {
 	flowop_t *flowop;
 	size_t memsize;
-	int ret = 0;
+	int ret = FILEBENCH_OK;
 
 #ifdef HAVE_PROCFS
 	if (noproc == 0) {
@@ -447,8 +447,7 @@ flowop_start(threadflow_t *threadflow)
 #endif
 
 	/* Main filebench worker loop */
-	/* CONSTCOND */
-	while (1) {
+	while (ret == FILEBENCH_OK) {
 		int i, count;
 
 		/* Abort if asked */

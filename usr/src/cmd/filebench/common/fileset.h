@@ -131,6 +131,8 @@ typedef struct fileset {
 	avd_t		fs_paralloc;	/* Attr */
 	avd_t		fs_cached;	/* Attr */
 	avd_t		fs_reuse;	/* Attr */
+	avd_t		fs_readonly;	/* Attr */
+	avd_t		fs_trust_tree;	/* Attr */
 	double		fs_meandepth;	/* Computed mean depth */
 	double		fs_meanwidth;	/* Specified mean dir width */
 	double		fs_meansize;	/* Specified mean file size */

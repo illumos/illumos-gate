@@ -308,6 +308,7 @@ fileset_alloc_file(filesetentry_t *entry)
 	char *pathtmp;
 	off64_t seek;
 	fb_fdesc_t fdesc;
+	int trust_tree;
 
 	fileset = entry->fse_fileset;
 	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
@@ -320,7 +321,9 @@ fileset_alloc_file(filesetentry_t *entry)
 	filebench_log(LOG_DEBUG_IMPL, "Populated %s", entry->fse_path);
 
 	/* see if reusing and this file exists */
-	if ((entry->fse_flags & FSE_REUSING) && (FB_STAT(path, &sb) == 0)) {
+	trust_tree = avd_get_bool(fileset->fs_trust_tree);
+	if ((entry->fse_flags & FSE_REUSING) && (trust_tree ||
+	    (FB_STAT(path, &sb) == 0))) {
 		if (FB_OPEN(&fdesc, path, O_RDWR, 0) == FILEBENCH_ERROR) {
 			filebench_log(LOG_INFO,
 			    "Attempted but failed to Re-use file %s",
@@ -329,7 +332,7 @@ fileset_alloc_file(filesetentry_t *entry)
 			return (FILEBENCH_ERROR);
 		}
 
-		if (sb.st_size == (off64_t)entry->fse_size) {
+		if (trust_tree || (sb.st_size == (off64_t)entry->fse_size)) {
 			filebench_log(LOG_DEBUG_IMPL,
 			    "Re-using file %s", path);
 
@@ -1012,8 +1015,12 @@ fileset_create(fileset_t *fileset)
 	(void) fb_strlcat(path, "/", MAXPATHLEN);
 	(void) fb_strlcat(path, fileset_name, MAXPATHLEN);
 
+	/* if reusing and trusting to exist, just blindly reuse */
+	if (avd_get_bool(fileset->fs_trust_tree)) {
+		reusing = 1;
+
 	/* if exists and resusing, then don't create new */
-	if (((stat64(path, &sb) == 0)&& (strlen(path) > 3) &&
+	} else if (((stat64(path, &sb) == 0)&& (strlen(path) > 3) &&
 	    (strlen(avd_get_str(fileset->fs_path)) > 2)) &&
 	    avd_get_bool(fileset->fs_reuse)) {
 		reusing = 1;
