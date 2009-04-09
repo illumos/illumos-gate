@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,7 @@ static afe_card_t afe_cards[] = {
 static int	afe_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	afe_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	afe_resume(dev_info_t *);
+static int	afe_quiesce(dev_info_t *);
 static int	afe_m_unicst(void *, const uint8_t *);
 static int	afe_m_multicst(void *, boolean_t, const uint8_t *);
 static int	afe_m_promisc(void *, boolean_t);
@@ -197,7 +198,7 @@ static mac_callbacks_t afe_m_callbacks = {
  * Stream information
  */
 DDI_DEFINE_STREAM_OPS(afe_devops, nulldev, nulldev, afe_attach, afe_detach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, afe_quiesce);
 
 /*
  * Module linkage information.
@@ -650,6 +651,32 @@ afe_resume(dev_info_t *dip)
 	mutex_exit(&afep->afe_intrlock);
 
 	return (DDI_SUCCESS);
+}
+
+int
+afe_quiesce(dev_info_t *dip)
+{
+	afe_t	*afep;
+
+	if ((afep = ddi_get_driver_private(dip)) == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	SETBIT(afep, CSR_PAR, PAR_RESET);
+	/*
+	 * At 66 MHz it is 16 nsec per access or more (always more)
+	 * So we need 3,333 times to retry for 50 usec.  We just
+	 * round up to 5000 times.  Unless the hardware is horked,
+	 * it will always terminate *well* before that anyway.
+	 */
+	for (int i = 0; i < 5000; i++) {
+		if ((GETCSR(afep, CSR_PAR) & PAR_RESET) == 0) {
+			return (DDI_SUCCESS);
+		}
+	}
+
+	/* hardware didn't quiesce - force a full reboot (PCI reset) */
+	return (DDI_FAILURE);
 }
 
 void
