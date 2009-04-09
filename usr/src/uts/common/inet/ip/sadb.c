@@ -2794,7 +2794,8 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 		}
 		if (ipsapp->ipsap_psa_ptr != NULL) {
 			mutex_enter(&ipsapp->ipsap_psa_ptr->ipsa_lock);
-			if (sadb_msg_type == SADB_X_DELPAIR) {
+			if (sadb_msg_type == SADB_X_DELPAIR ||
+			    ipsapp->ipsap_psa_ptr->ipsa_haspeer) {
 				if (ipsapp->ipsap_psa_ptr->ipsa_flags &
 				    IPSA_F_INBOUND) {
 					sadb_delete_cluster(
