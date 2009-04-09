@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/atomic.h>
 #include <sys/callb.h>
@@ -342,19 +340,12 @@ timeout_execute(void *arg)
 			/* The handler is invoked without holding any locks */
 			(*req->handler)(req->arg);
 
-			/*
-			 * Set TM_COMPLETE and notify the request is complete
-			 * now.
-			 */
 			mutex_enter(&req->lock);
-			req->flags |= TM_COMPLETE;
-			if (req->flags & TM_COMPWAIT)
-				cv_signal(&req->cv);
 		}
 
 		/*
-		 * The handler is invoked at this point. If this request
-		 * is not canceled, prepare for the next fire.
+		 * Check if this request is canceled or not. If not, prepare
+		 * for the next fire.
 		 */
 		if (req->flags & TM_CANCEL) {
 			timer_tw_t *tw;
@@ -372,17 +363,6 @@ timeout_execute(void *arg)
 			mutex_enter(&tw->lock);
 			list_remove(&tw->req, req);
 			mutex_exit(&tw->lock);
-
-			/*
-			 * Wait until i_untimeout() can go ahead.
-			 * This prevents the request from being freed before
-			 * i_untimeout() is complete.
-			 */
-			mutex_enter(&req->lock);
-			while (req->flags & TM_COMPWAIT)
-				cv_wait(&req->cv, &req->lock);
-			mutex_exit(&req->lock);
-			ASSERT(!(req->flags & TM_COMPWAIT));
 
 			/* Free this request */
 			kmem_cache_free(req_cache, req);
@@ -790,13 +770,7 @@ timer_init(void)
  *    returns a non-zero opaque value (timeout_t) on success.
  *
  *  Caller's context
- *    i_timeout() can be called in user, kernel or interrupt context.
- *    It cannot be called in high interrupt context.
- *
- *  Note. This function is used by ddi_periodic_add(), which cannot
- *  be called in interrupt context. As a result, this function is called
- *  in user or kernel context only in practice.
- *
+ *    i_timeout() can be called in user or kernel context.
  */
 timeout_t
 i_timeout(void (*func)(void *), void *arg, hrtime_t interval, int level)
@@ -874,10 +848,7 @@ i_timeout(void (*func)(void *), void *arg, hrtime_t interval, int level)
  *
  *  Note. This function is used by ddi_periodic_delete(), which cannot
  *  be called in interrupt context. As a result, this function is called
- *  in user or kernel context only in practice. Also i_untimeout() sends
- *  the cv_signal to timeout_execute(), which runs in interrupt context.
- *  Make sure this function will not be blocked, otherwise the deadlock
- *  situation can occur. See timeout_execute().
+ *  in user or kernel context only in practice.
  */
 void
 i_untimeout(timeout_t timeout_req)
@@ -912,44 +883,11 @@ i_untimeout(timeout_t timeout_req)
 	/* Check if the handler is invoked */
 	if (req->flags & TM_INVOKING) {
 		/*
-		 * If this request is not yet executed or is already finished
-		 * then there is nothing to do but just return. Otherwise
-		 * we'll have to wait for the callback execution being complete.
+		 * This request will be removed by timeout_execute() later,
+		 * so that there is no extra thing to do any more.
 		 */
-		if (!(req->flags & TM_EXECUTING) || req->flags & TM_COMPLETE) {
-			/* There is nothing to do any more */
-			mutex_exit(&req->lock);
-			mutex_exit(&tid->lock);
-			return;
-		}
-
-		/*
-		 * If this is the recursive call, there is nothing
-		 * to do any more. This is the case that i_untimeout()
-		 * is called in the handler.
-		 */
-		if (req->h_thread == curthread) {
-			mutex_exit(&req->lock);
-			mutex_exit(&tid->lock);
-			return;
-		}
-
-		/*
-		 * Notify that i_untimeout() is waiting until this request
-		 * is complete.
-		 */
-		req->flags |= TM_COMPWAIT;
-		mutex_exit(&tid->lock);
-
-		/*
-		 * Wait for this timeout request being complete before
-		 * the return.
-		 */
-		while (!(req->flags & TM_COMPLETE))
-			cv_wait(&req->cv, &req->lock);
-		req->flags &= ~TM_COMPWAIT;
-		cv_signal(&req->cv);
 		mutex_exit(&req->lock);
+		mutex_exit(&tid->lock);
 		return;
 	}
 	mutex_exit(&req->lock);

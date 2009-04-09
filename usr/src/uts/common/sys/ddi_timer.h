@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DDI_TIMER_H
 #define	_SYS_DDI_TIMER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/list.h>
 
@@ -112,8 +110,6 @@ typedef struct tm_req {
 #define	TM_EXECUTING	0x00000002	/* timeout is executed now */
 #define	TM_CANCEL	0x00000004	/* request is canceled */
 #define	TM_TRANSFER	0x00000008	/* request is transfered */
-#define	TM_COMPLETE	0x00000010	/* request is complete */
-#define	TM_COMPWAIT	0x00000020	/* wait request completion */
 #define	TM_UTMCOMP	0x00000040	/* untimeout is complete */
 	uint_t cnt;		/* invoke counter */
 } tm_req_t;
