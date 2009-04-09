@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Combined mv/cp/ln command:
@@ -1006,9 +1004,9 @@ chkfiles(char *source, char **to)
 	}
 
 	/*
-	 * Get ACL info: don't bother with ln or mv'ing symlinks
+	 * Get ACL info: don't bother with ln or cp/mv'ing symlinks
 	 */
-	if ((!lnk) && !(mve && ISLNK(s1))) {
+	if (!lnk && !ISLNK(s1)) {
 		if (s1acl != NULL) {
 			acl_free(s1acl);
 			s1acl = NULL;
