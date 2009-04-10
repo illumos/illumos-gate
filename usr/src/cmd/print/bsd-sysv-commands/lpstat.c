@@ -794,6 +794,8 @@ report_job(char *printer, papi_job_t job, int show_rank, int verbose)
 	    "printer-name", &destination);
 	(void) papiAttributeListGetInteger(attrs, NULL,
 	    "job-id", &id);
+	(void) papiAttributeListGetInteger(attrs, NULL,
+	    "job-id-requested", &id);
 
 	snprintf(request, sizeof (request), "%s-%d", printer, id);
 
@@ -811,7 +813,6 @@ report_job(char *printer, papi_job_t job, int show_rank, int verbose)
 
 	(void) papiAttributeListGetInteger(attrs, NULL,
 	    "job-state", &jstate);
-
 	if (jstate == 0x0001)
 		printf(gettext(" being held"));
 	else if (jstate == 0x0800)

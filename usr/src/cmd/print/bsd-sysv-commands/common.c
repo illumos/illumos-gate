@@ -258,10 +258,10 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	if (status != PAPI_OK)
 		mesg = papiStatusString(status);
 
-	if (id != 0)
-		fprintf(fp, "%s-%d: %s\n", printer, id, mesg);
-	else
+	if (rid != 0)
 		fprintf(fp, "%s-%d: %s\n", printer, rid, mesg);
+	else
+		fprintf(fp, "%s-%d: %s\n", printer, id, mesg);
 }
 
 int

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*LINTLIBRARY*/
 
 #include <stdlib.h>
@@ -459,6 +458,7 @@ papiPrinterListJobs(papi_service_t handle, char *name,
 		    *owner = NULL,
 		    *slabel = NULL,
 		    *file = NULL;
+		char request_file[128];
 		time_t date = 0;
 		size_t size = 0;
 		short  rank = 0, state = 0;
@@ -482,12 +482,14 @@ papiPrinterListJobs(papi_service_t handle, char *name,
 		if ((job = calloc(1, sizeof (*job))) == NULL)
 			continue;
 
-		if ((ptr = strrchr(file, '-')) != NULL) {
-			*++ptr = '0';
-			*++ptr = NULL;
+		/* Request file is <req_id>-0 */
+		if ((ptr = strrchr(req_id, '-')) != NULL) {
+			++ptr;
+			snprintf(request_file, sizeof (request_file),
+			    "%s-0", ptr);
 		}
 
-		lpsched_read_job_configuration(svc, job, file);
+		lpsched_read_job_configuration(svc, job, request_file);
 
 		job_status_to_attributes(job, req_id, owner, slabel, size,
 		    date, state, dest, form, charset, rank, file);
