@@ -191,7 +191,8 @@ static struct dev_ops fcoe_ops = {
 	nodev,
 	&fcoe_cb_ops,
 	&fcoe_busops,
-	ddi_power
+	ddi_power,
+	ddi_quiesce_not_needed
 };
 
 #define	FCOE_VERSION	"20090311-1.00"

@@ -151,7 +151,8 @@ static struct dev_ops fcoet_ops = {
 	nodev,
 	&fcoet_cb_ops,
 	NULL,
-	ddi_power
+	ddi_power,
+	ddi_quiesce_not_needed
 };
 
 static struct modldrv modldrv = {
