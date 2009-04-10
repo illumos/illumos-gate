@@ -141,6 +141,7 @@ typedef struct vgen_handshake_params {
 	uint8_t			addr_type;	/* type of address */
 	uint8_t			xfer_mode;	/* SHM or PKT */
 	uint16_t		ack_freq;	/* dring data ack freq */
+	uint32_t		physlink_update; /* physlink updates */
 
 	/* descriptor ring params */
 	uint32_t		num_desc;	/* # of descriptors in ring */
@@ -189,6 +190,10 @@ typedef struct vgen_ldc {
 	vgen_ver_t		vgen_versions[VGEN_NUM_VER]; /* versions */
 	int			hphase;		/* handshake phase */
 	int			hstate;		/* handshake state bits */
+	link_state_t		link_state;	/* channel link state */
+#ifdef	VNET_IOC_DEBUG
+	boolean_t		link_down_forced; /* forced link down */
+#endif
 	uint32_t		local_sid;	/* local session id */
 	uint32_t		peer_sid;	/* session id of peer */
 	vgen_hparams_t		local_hparams;	/* local handshake params */
@@ -260,6 +265,7 @@ typedef struct vgen_port {
 	struct vgen_port	*nextp;		/* next port in the list */
 	struct vgen		*vgenp;		/* associated vgen_t */
 	int			port_num;	/* port number */
+	boolean_t		is_vsw_port;	/* connected to vswitch ? */
 	int			num_ldcs;	/* # of channels in this port */
 	uint64_t		*ldc_ids;	/* channel ids */
 	vgen_ldclist_t		ldclist;	/* list of ldcs for this port */
@@ -307,6 +313,8 @@ typedef struct vgen {
 	uint32_t		max_frame_size;	/* max frame size supported */
 
 	uint32_t		vsw_port_refcnt; /* refcnt for vsw_port */
+	boolean_t		pls_negotiated;	/* phys link state update ? */
+	link_state_t		phys_link_state; /* physical link state */
 } vgen_t;
 
 #ifdef __cplusplus

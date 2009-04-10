@@ -154,6 +154,7 @@ typedef struct	vsw {
 	krwlock_t		maccl_rwlock;	/* protect fields below */
 	mac_client_handle_t	mch;		/* mac client handle */
 	mac_unicast_handle_t	muh;		/* mac unicast handle */
+	mac_notify_handle_t	mnh;		/* mac notify handle */
 
 	boolean_t		recfg_reqd;	/* Reconfig of addrs needed */
 
@@ -191,6 +192,11 @@ typedef struct	vsw {
 	vsw_hio_t		vhio;		/* HybridIO info */
 	callb_id_t		hio_reboot_cb_id; /* Reboot callb ID */
 	callb_id_t		hio_panic_cb_id; /* Panic callb ID */
+
+	/* Link-state related fields */
+	boolean_t		phys_no_link_update; /* no link-update supp */
+	boolean_t		pls_update;	/* phys link state update ? */
+	link_state_t		phys_link_state;    /* physical link state */
 } vsw_t;
 
 /*

@@ -95,6 +95,8 @@ int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
 void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
 void vsw_reset_ports(vsw_t *vswp);
 void vsw_port_reset(vsw_port_t *portp);
+void vsw_physlink_update_ports(vsw_t *vswp);
+static	void vsw_port_physlink_update(vsw_port_t *portp);
 
 /* Interrupt routines */
 static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
@@ -119,6 +121,7 @@ static void vsw_process_ctrl_mcst_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_dring_unreg_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_rdx_pkt(vsw_ldc_t *, void *);
+static void vsw_process_physlink_msg(vsw_ldc_t *, void *);
 static void vsw_process_data_pkt(vsw_ldc_t *, void *, vio_msg_tag_t *,
 	uint32_t);
 static void vsw_process_data_dring_pkt(vsw_ldc_t *, void *);
@@ -141,6 +144,7 @@ static void vsw_send_attr(vsw_ldc_t *);
 static vio_dring_reg_msg_t *vsw_create_dring_info_pkt(vsw_ldc_t *);
 static void vsw_send_dring_info(vsw_ldc_t *);
 static void vsw_send_rdx(vsw_ldc_t *);
+static void vsw_send_physlink_msg(vsw_ldc_t *ldcp, link_state_t plink_state);
 
 /* Dring routines */
 static dring_info_t *vsw_create_dring(vsw_ldc_t *);
@@ -260,8 +264,23 @@ extern boolean_t vsw_jumbo_rxpools;
 	    ((ldcp)->lane_out.ver_major == (major) &&	\
 	    (ldcp)->lane_out.ver_minor >= (minor)))
 
-/* supported versions */
-static	ver_sup_t	vsw_versions[] = { {1, 4} };
+/*
+ * VIO Protocol Version Info:
+ *
+ * The version specified below represents the version of protocol currently
+ * supported in the driver. It means the driver can negotiate with peers with
+ * versions <= this version. Here is a summary of the feature(s) that are
+ * supported at each version of the protocol:
+ *
+ * 1.0			Basic VIO protocol.
+ * 1.1			vDisk protocol update (no virtual network update).
+ * 1.2			Support for priority frames (priority-ether-types).
+ * 1.3			VLAN and HybridIO support.
+ * 1.4			Jumbo Frame support.
+ * 1.5			Link State Notification support with optional support
+ * 			for Physical Link information.
+ */
+static	ver_sup_t	vsw_versions[] = { {1, 5} };
 
 /*
  * For the moment the state dump routines have their own
@@ -1377,6 +1396,77 @@ vsw_reset_ports(vsw_t *vswp)
 	RW_EXIT(&plist->lockrw);
 }
 
+static void
+vsw_send_physlink_msg(vsw_ldc_t *ldcp, link_state_t plink_state)
+{
+	vnet_physlink_msg_t	msg;
+	vnet_physlink_msg_t	*msgp = &msg;
+	uint32_t		physlink_info = 0;
+
+	if (plink_state == LINK_STATE_UP) {
+		physlink_info |= VNET_PHYSLINK_STATE_UP;
+	} else {
+		physlink_info |= VNET_PHYSLINK_STATE_DOWN;
+	}
+
+	msgp->tag.vio_msgtype = VIO_TYPE_CTRL;
+	msgp->tag.vio_subtype = VIO_SUBTYPE_INFO;
+	msgp->tag.vio_subtype_env = VNET_PHYSLINK_INFO;
+	msgp->tag.vio_sid = ldcp->local_session;
+	msgp->physlink_info = physlink_info;
+
+	(void) vsw_send_msg(ldcp, msgp, sizeof (msg), B_TRUE);
+}
+
+static void
+vsw_port_physlink_update(vsw_port_t *portp)
+{
+	vsw_ldc_list_t 	*ldclp;
+	vsw_ldc_t	*ldcp;
+	vsw_t		*vswp;
+
+	vswp = portp->p_vswp;
+	ldclp = &portp->p_ldclist;
+
+	READ_ENTER(&ldclp->lockrw);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->head == NULL) {
+		RW_EXIT(&ldclp->lockrw);
+		return;
+	}
+	ldcp = ldclp->head;
+
+	mutex_enter(&ldcp->ldc_cblock);
+
+	/*
+	 * If handshake has completed successfully and if the vnet device
+	 * has negotiated to get physical link state updates, send a message
+	 * with the current state.
+	 */
+	if (ldcp->hphase == VSW_MILESTONE4 && ldcp->pls_negotiated == B_TRUE) {
+		vsw_send_physlink_msg(ldcp, vswp->phys_link_state);
+	}
+
+	mutex_exit(&ldcp->ldc_cblock);
+
+	RW_EXIT(&ldclp->lockrw);
+}
+
+void
+vsw_physlink_update_ports(vsw_t *vswp)
+{
+	vsw_port_list_t	*plist = &vswp->plist;
+	vsw_port_t	*portp;
+
+	READ_ENTER(&plist->lockrw);
+	for (portp = plist->head; portp != NULL; portp = portp->p_next) {
+		vsw_port_physlink_update(portp);
+	}
+	RW_EXIT(&plist->lockrw);
+}
 
 /*
  * Search for and remove the specified port from the port
@@ -2015,6 +2105,18 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 				D2(vswp, "%s: start HybridIO setup", __func__);
 				vsw_hio_start(vswp, ldcp);
 			}
+
+			if (ldcp->pls_negotiated == B_TRUE) {
+				/*
+				 * The vnet device has negotiated to get phys
+				 * link updates. Now that the handshake with
+				 * the vnet device is complete, send an initial
+				 * update with the current physical link state.
+				 */
+				vsw_send_physlink_msg(ldcp,
+				    vswp->phys_link_state);
+			}
+
 		} else {
 			D2(vswp, "%s: still in milestone 3 (0x%llx : 0x%llx)",
 			    __func__, ldcp->lane_in.lstate,
@@ -2382,6 +2484,10 @@ vsw_process_ctrl_pkt(void *arg)
 	case VIO_DDS_INFO:
 		vsw_process_dds_msg(vswp, ldcp, &ctaskp->pktp);
 		break;
+
+	case VNET_PHYSLINK_INFO:
+		vsw_process_physlink_msg(ldcp, &ctaskp->pktp);
+		break;
 	default:
 		DERR(vswp, "%s: unknown vio_subtype_env (%x)\n", __func__, env);
 	}
@@ -2719,6 +2825,47 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		lane_in->addr_type = attr_pkt->addr_type;
 		lane_in->xfer_mode = attr_pkt->xfer_mode;
 		lane_in->ack_freq = attr_pkt->ack_freq;
+		lane_in->physlink_update = attr_pkt->physlink_update;
+
+		/*
+		 * Check if the client has requested physlink state updates.
+		 * If there is a physical device bound to this vswitch (L2
+		 * mode), set the ack bits to indicate it is supported.
+		 * Otherwise, set the nack bits.
+		 */
+		if (VSW_VER_GTEQ(ldcp, 1, 5)) {	/* Protocol ver >= 1.5 */
+
+			/* Does the vnet need phys link state updates ? */
+			if ((lane_in->physlink_update &
+			    PHYSLINK_UPDATE_STATE_MASK) ==
+			    PHYSLINK_UPDATE_STATE) {
+
+				if (vswp->smode & VSW_LAYER2) {
+					/* is a net-dev assigned to us ? */
+					attr_pkt->physlink_update =
+					    PHYSLINK_UPDATE_STATE_ACK;
+					ldcp->pls_negotiated = B_TRUE;
+				} else {
+					/* not in L2 mode */
+					attr_pkt->physlink_update =
+					    PHYSLINK_UPDATE_STATE_NACK;
+					ldcp->pls_negotiated = B_FALSE;
+				}
+
+			} else {
+				attr_pkt->physlink_update =
+				    PHYSLINK_UPDATE_NONE;
+				ldcp->pls_negotiated = B_FALSE;
+			}
+
+		} else {
+			/*
+			 * physlink_update bits are ignored
+			 * if set by clients < v1.5 protocol.
+			 */
+			attr_pkt->physlink_update = PHYSLINK_UPDATE_NONE;
+			ldcp->pls_negotiated = B_FALSE;
+		}
 
 		if (VSW_VER_GTEQ(ldcp, 1, 4)) {
 			/* save the MIN mtu in the msg to be replied */
@@ -3311,6 +3458,41 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 	default:
 		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
 		    rdx_pkt->tag.vio_subtype);
+	}
+
+	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
+}
+
+static void
+vsw_process_physlink_msg(vsw_ldc_t *ldcp, void *pkt)
+{
+	vnet_physlink_msg_t	*msgp;
+	vsw_t			*vswp = ldcp->ldc_vswp;
+
+	msgp = (vnet_physlink_msg_t *)pkt;
+
+	D1(vswp, "%s(%lld) enter", __func__, ldcp->ldc_id);
+
+	switch (msgp->tag.vio_subtype) {
+	case VIO_SUBTYPE_INFO:
+
+		/* vsw shouldn't recv physlink info */
+		DWARN(vswp, "%s: Unexpected VIO_SUBTYPE_INFO", __func__);
+		break;
+
+	case VIO_SUBTYPE_ACK:
+
+		D2(vswp, "%s: VIO_SUBTYPE_ACK", __func__);
+		break;
+
+	case VIO_SUBTYPE_NACK:
+
+		D2(vswp, "%s: VIO_SUBTYPE_NACK", __func__);
+		break;
+
+	default:
+		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
+		    msgp->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);

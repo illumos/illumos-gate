@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,6 +139,7 @@ extern int vsw_mac_multicast_add(vsw_t *vswp, vsw_port_t *port,
     mcst_addr_t *mcst_p, int type);
 extern void vsw_mac_multicast_remove(vsw_t *vswp, vsw_port_t *port,
     mcst_addr_t *mcst_p, int type);
+extern void vsw_physlink_state_update(vsw_t *vswp);
 
 /*
  * Tunables used in this file.
@@ -687,6 +688,9 @@ vsw_setup_layer2_post_process(vsw_t *vswp)
 
 		/* Start HIO for ports that have already connected */
 		vsw_hio_start_ports(vswp);
+
+		/* Update physical link info to any ports already connected */
+		vsw_physlink_state_update(vswp);
 	}
 }
 

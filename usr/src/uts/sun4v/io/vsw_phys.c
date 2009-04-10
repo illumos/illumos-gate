@@ -57,6 +57,7 @@
 #include <sys/modhash.h>
 #include <sys/mac_client.h>
 #include <sys/mac_provider.h>
+#include <sys/mac_client_priv.h>
 #include <sys/mac_ether.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
@@ -85,6 +86,10 @@ static void vsw_mac_add_vlans(vsw_t *vswp, mac_client_handle_t mch,
 static void vsw_mac_remove_vlans(mac_client_handle_t mch, vsw_vlanid_t *vids,
     int nvids);
 static	void vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu);
+static int vsw_notify_add(vsw_t *vswp);
+static int vsw_notify_rem(vsw_t *vswp);
+static void vsw_notify_cb(void *arg, mac_notify_type_t type);
+static void vsw_notify_link(vsw_t *vswp);
 
 /* Support functions */
 int vsw_set_hw(vsw_t *, vsw_port_t *, int);
@@ -119,6 +124,7 @@ extern void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
 extern uint32_t vsw_publish_macaddr_count;
 extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
 	mblk_t **npt);
+extern void vsw_physlink_state_update(vsw_t *vswp);
 static char mac_mtu_propname[] = "mtu";
 
 /*
@@ -277,7 +283,7 @@ vsw_mac_open(vsw_t *vswp)
 		if (rv == ENOENT || rv == EBADF) {
 			return (EAGAIN);
 		} else {
-			cmn_err(CE_WARN, "vsw%d: mac_open %s failed rv:%x",
+			cmn_err(CE_WARN, "!vsw%d: mac_open %s failed rv:%x\n",
 			    vswp->instance, vswp->physname, rv);
 			return (EIO);
 		}
@@ -285,6 +291,12 @@ vsw_mac_open(vsw_t *vswp)
 	vswp->mac_open_retries = 0;
 
 	vsw_mac_set_mtu(vswp, vswp->mtu);
+
+	rv = vsw_notify_add(vswp);
+	if (rv != 0) {
+		cmn_err(CE_CONT, "!vsw%d: mac_notify_add %s failed rv:%x\n",
+		    vswp->instance, vswp->physname, rv);
+	}
 
 	return (0);
 }
@@ -298,6 +310,10 @@ vsw_mac_close(vsw_t *vswp)
 	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 
 	if (vswp->mh != NULL) {
+		if (vswp->mnh != 0) {
+			(void) vsw_notify_rem(vswp);
+			vswp->mnh = 0;
+		}
 		if (vswp->mtu != vswp->mtu_physdev_orig) {
 			vsw_mac_set_mtu(vswp, vswp->mtu_physdev_orig);
 		}
@@ -1244,4 +1260,101 @@ vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu)
 
 	/* save the original mtu of physdev to reset it back later if needed */
 	vswp->mtu_physdev_orig = mtu_orig;
+}
+
+/*
+ * Register a callback with underlying mac layer for notifications.
+ * We are currently interested in only link-state events.
+ */
+static int
+vsw_notify_add(vsw_t *vswp)
+{
+	mac_notify_handle_t	mnh;
+	uint32_t		note;
+
+	/*
+	 * Check if the underlying MAC supports link update notification.
+	 */
+	note = mac_no_notification(vswp->mh);
+	if ((note & (DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN)) != 0) {
+		vswp->phys_no_link_update = B_TRUE;
+	} else {
+		vswp->phys_no_link_update = B_FALSE;
+	}
+
+	/*
+	 * Read the current link state of the device and cache it.
+	 */
+	vswp->phys_link_state = vswp->phys_no_link_update ? LINK_STATE_UP :
+	    mac_stat_get(vswp->mh, MAC_STAT_LINK_STATE);
+
+	/*
+	 * Add notify callback function, if link update is supported.
+	 */
+	if (vswp->phys_no_link_update == B_TRUE) {
+		return (0);
+	}
+
+	mnh = mac_notify_add(vswp->mh, vsw_notify_cb, vswp);
+	if (mnh == 0) {
+		/* failed */
+		return (1);
+	}
+
+	vswp->mnh = mnh;
+	return (0);
+}
+
+/*
+ * Remove notify callback.
+ */
+static int
+vsw_notify_rem(vsw_t *vswp)
+{
+	int	rv;
+
+	rv = mac_notify_remove(vswp->mnh, B_FALSE);
+	return (rv);
+}
+
+/*
+ * Notification callback invoked by the MAC service
+ * module. Note that we process only link state updates.
+ */
+static void
+vsw_notify_cb(void *arg, mac_notify_type_t type)
+{
+	vsw_t	*vswp = arg;
+
+	switch (type) {
+
+	case MAC_NOTE_LINK:
+		vsw_notify_link(vswp);
+		break;
+
+	default:
+		break;
+
+	}
+}
+
+/*
+ * Invoked upon receiving a MAC_NOTE_LINK
+ * notification for the underlying physical device.
+ */
+static void
+vsw_notify_link(vsw_t *vswp)
+{
+	link_state_t	link_state;
+
+	/* link state change  notification */
+	link_state = mac_stat_get(vswp->mh, MAC_STAT_LINK_STATE);
+
+	if (vswp->phys_link_state != link_state) {
+		D3(vswp, "%s: phys_link_state(%d)\n",
+		    __func__, vswp->phys_link_state);
+
+		vswp->phys_link_state = link_state;
+		vsw_physlink_state_update(vswp);
+	}
 }

@@ -270,6 +270,7 @@ typedef struct lane {
 	uint8_t		addr_type;	/* Only MAC address at moment */
 	uint8_t		xfer_mode;	/* Dring or Pkt based */
 	uint8_t		ack_freq;	/* Only non zero for Pkt based xfer */
+	uint32_t	physlink_update;	/* physlink updates */
 	krwlock_t	dlistrw;	/* Lock for dring list */
 	dring_info_t	*dringp;	/* List of drings for this lane */
 } lane_t;
@@ -310,6 +311,7 @@ typedef struct vsw_ldc {
 	lane_t			lane_in;	/* Inbound lane */
 	lane_t			lane_out;	/* Outbound lane */
 	uint8_t			dev_class;	/* Peer device class */
+	boolean_t		pls_negotiated;	/* phys link state update ? */
 	vio_multi_pool_t	vmp;		/* Receive mblk pools */
 	uint32_t		max_rxpool_size; /* max size of rxpool in use */
 	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */

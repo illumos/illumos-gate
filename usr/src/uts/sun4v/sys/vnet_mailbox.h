@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_VNET_MAILBOX_H
 #define	_SYS_VNET_MAILBOX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +42,7 @@ extern "C" {
  */
 #define	VNET_MCAST_INFO		0x0101
 #define	VNET_DDS_INFO		0x0102
+#define	VNET_PHYSLINK_INFO	0x0103	/* Physical Link Information */
 
 /*
  * Vnet/Vswitch device attributes information message.
@@ -56,6 +55,28 @@ extern "C" {
 /* Value for 'addr_type' in vnet attribute message */
 #define	ADDR_TYPE_MAC		0x1
 
+/*
+ * Physical link property updates to be negotiated as part of attribute message
+ * exchange, in protocol versions >= 1.5. This is only valid between a vnet
+ * client and the corresponding vswitch service; and not between peer vnets. A
+ * vnet device could negotiate with vswitch to obtain updates about certain
+ * physical link properties. Only 'physical link status' updates are supported
+ * for now. A vnet device that desires to get physical link status updates,
+ * sets the appropriate bit(s) in its ATTR/INFO message to the vswitch; the
+ * vswitch sets the relevant ack/nack bits in its response message. Whenever
+ * there is a change in the physical link props for which the vnet device has
+ * negotiated, vswitch updates it by sending a message with updated values
+ * of the relevant physical link properties (see vnet_physlink_msg_t below).
+ */
+enum {
+	PHYSLINK_UPDATE_NONE = 0,
+	PHYSLINK_UPDATE_STATE = 0x1,
+	PHYSLINK_UPDATE_STATE_ACK = 0x2,
+	PHYSLINK_UPDATE_STATE_NACK = 0x3
+};
+
+#define	PHYSLINK_UPDATE_STATE_MASK	0x3
+
 typedef struct vnet_attr_msg {
 	/* Common tag */
 	vio_msg_tag_t		tag;
@@ -64,13 +85,15 @@ typedef struct vnet_attr_msg {
 	uint8_t			xfer_mode;	/* data transfer mode */
 	uint8_t			addr_type;	/* device address type */
 	uint16_t		ack_freq;	/* ack after rcving # of pkts */
-	uint32_t		resv1;		/* padding */
+	uint8_t			physlink_update; /* physlink updates(s)? */
+	uint8_t			resv1;		/* reserved */
+	uint16_t		resv2;		/* reserved */
 
 	uint64_t		addr;		/* device address */
 	uint64_t		mtu;		/* maximum data xfer unit */
 
 	/* padding to align things */
-	uint64_t		resv2[3];
+	uint64_t		resv3[3];
 
 } vnet_attr_msg_t;
 
@@ -93,6 +116,38 @@ typedef struct vnet_mcast_msg {
 	struct ether_addr	mca[VNET_NUM_MCAST];	/* mcast addrs */
 	uint32_t		resv1;	/* padding */
 } vnet_mcast_msg_t;
+
+/*
+ * Values of the various physical link properties. We
+ * support only 'link state' property updates for now.
+ */
+enum {
+	VNET_PHYSLINK_STATE_DOWN = 0x1,
+	VNET_PHYSLINK_STATE_UP = 0x2,
+	VNET_PHYSLINK_STATE_UNKNOWN = 0x3
+};
+
+#define	VNET_PHYSLINK_STATE_MASK	0x3
+
+/*
+ * Vnet/Vswitch physical link info message.
+ * We only support link state information for now.
+ *
+ * tag.msgtype == VIO_TYPE_CTRL
+ * tag.subtype == VIO_SUBTYPE_{INFO|ACK|NACK}
+ * tag.subtype_env == VNET_PHYSLINK_INFO
+ */
+typedef struct vnet_physlink_msg {
+	/* Common tag */
+	vio_msg_tag_t		tag;
+
+	/* physical link information */
+	uint32_t		physlink_info;
+
+	/* padding to align things */
+	uint32_t		resv1;
+	uint64_t		resv2[5];
+} vnet_physlink_msg_t;
 
 #ifdef __cplusplus
 }

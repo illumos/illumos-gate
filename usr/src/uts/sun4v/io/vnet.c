@@ -71,6 +71,10 @@ static int vnet_m_promisc(void *, boolean_t);
 static int vnet_m_multicst(void *, boolean_t, const uint8_t *);
 static int vnet_m_unicst(void *, const uint8_t *);
 mblk_t *vnet_m_tx(void *, mblk_t *);
+static void vnet_m_ioctl(void *arg, queue_t *q, mblk_t *mp);
+#ifdef	VNET_IOC_DEBUG
+static void vnet_force_link_state(vnet_t *vnetp, queue_t *q, mblk_t *mp);
+#endif
 
 /* vnet internal functions */
 static int vnet_unattach(vnet_t *vnetp);
@@ -94,7 +98,10 @@ static void vnet_stop_resources(vnet_t *vnetp);
 static void vnet_dispatch_res_task(vnet_t *vnetp);
 static void vnet_res_start_task(void *arg);
 static void vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err);
+
+/* Exported to vnet_gen */
 int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
+void vnet_link_update(vnet_t *vnetp, link_state_t link_state);
 
 static kstat_t *vnet_hio_setup_kstats(char *ks_mod, char *ks_name,
     vnet_res_t *vresp);
@@ -135,8 +142,14 @@ extern void vdds_cleanup_hybrid_res(void *arg);
 	atomic_dec_32(&(p)->refcnt);					\
 }
 
+#ifdef	VNET_IOC_DEBUG
+#define	VNET_M_CALLBACK_FLAGS	(MC_IOCTL)
+#else
+#define	VNET_M_CALLBACK_FLAGS	(0)
+#endif
+
 static mac_callbacks_t vnet_m_callbacks = {
-	0,
+	VNET_M_CALLBACK_FLAGS,
 	vnet_m_stat,
 	vnet_m_start,
 	vnet_m_stop,
@@ -144,7 +157,7 @@ static mac_callbacks_t vnet_m_callbacks = {
 	vnet_m_multicst,
 	vnet_m_unicst,
 	vnet_m_tx,
-	NULL,
+	vnet_m_ioctl,
 	NULL,
 	NULL
 };
@@ -422,6 +435,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (status != DDI_SUCCESS) {
 		goto vnet_attach_fail;
 	}
+	vnetp->link_state = LINK_STATE_UNKNOWN;
 
 	attach_progress |= AST_macreg;
 
@@ -1172,6 +1186,27 @@ vnet_mtu_update(vnet_t *vnetp, uint32_t mtu)
 }
 
 /*
+ * Update the link state of vnet to the mac layer.
+ */
+void
+vnet_link_update(vnet_t *vnetp, link_state_t link_state)
+{
+	if (vnetp == NULL || vnetp->mh == NULL) {
+		return;
+	}
+
+	WRITE_ENTER(&vnetp->vrwlock);
+	if (vnetp->link_state == link_state) {
+		RW_EXIT(&vnetp->vrwlock);
+		return;
+	}
+	vnetp->link_state = link_state;
+	RW_EXIT(&vnetp->vrwlock);
+
+	mac_link_update(vnetp->mh, link_state);
+}
+
+/*
  * vio_net_resource_reg -- An interface called to register a resource
  *	with vnet.
  *	macp -- a GLDv3 mac_register that has all the details of
@@ -1629,3 +1664,81 @@ vnet_hio_get_stats(vnet_res_t *vresp, vnet_hio_stats_t *statsp)
 		}
 	}
 }
+
+#ifdef	VNET_IOC_DEBUG
+
+/*
+ * The ioctl entry point is used only for debugging for now. The ioctl commands
+ * can be used to force the link state of the channel connected to vsw.
+ */
+static void
+vnet_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
+{
+	struct iocblk	*iocp;
+	vnet_t		*vnetp;
+
+	iocp = (struct iocblk *)(uintptr_t)mp->b_rptr;
+	iocp->ioc_error = 0;
+	vnetp = (vnet_t *)arg;
+
+	if (vnetp == NULL) {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
+	switch (iocp->ioc_cmd) {
+
+	case VNET_FORCE_LINK_DOWN:
+	case VNET_FORCE_LINK_UP:
+		vnet_force_link_state(vnetp, q, mp);
+		break;
+
+	default:
+		iocp->ioc_error = EINVAL;
+		miocnak(q, mp, 0, iocp->ioc_error);
+		break;
+
+	}
+}
+
+static void
+vnet_force_link_state(vnet_t *vnetp, queue_t *q, mblk_t *mp)
+{
+	mac_register_t	*macp;
+	mac_callbacks_t	*cbp;
+	vnet_res_t	*vresp;
+
+	READ_ENTER(&vnetp->vsw_fp_rw);
+
+	vresp = vnetp->vsw_fp;
+	if (vresp == NULL) {
+		RW_EXIT(&vnetp->vsw_fp_rw);
+		return;
+	}
+
+	macp = &vresp->macreg;
+	cbp = macp->m_callbacks;
+	cbp->mc_ioctl(macp->m_driver, q, mp);
+
+	RW_EXIT(&vnetp->vsw_fp_rw);
+}
+
+#else
+
+static void
+vnet_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
+{
+	vnet_t		*vnetp;
+
+	vnetp = (vnet_t *)arg;
+
+	if (vnetp == NULL) {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
+	/* ioctl support only for debugging */
+	miocnak(q, mp, 0, ENOTSUP);
+}
+
+#endif

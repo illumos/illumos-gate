@@ -176,6 +176,8 @@ typedef struct vnet {
 	uint16_t		*vids;		/* vlan ids (tagged) */
 	uint16_t		nvids;		/* # of vids */
 
+	link_state_t		link_state;	/* link status */
+	boolean_t		pls_update;	/* phys link state update ? */
 	uint32_t		flags;		/* interface flags */
 	vnet_res_t		*hio_fp;	/* Hybrid IO resource */
 	vnet_res_t		*vres_list;	/* Resource list */
@@ -228,6 +230,13 @@ enum	{ DBG_LEVEL1 = 0x01, DBG_LEVEL2 = 0x02, DBG_WARN = 0x04,
 #define	DBG2(...)	if (0)	do { } while (0)
 #define	DWARN(...)	if (0)	do { } while (0)
 #define	DERR(...)	if (0)	do { } while (0)
+
+#endif
+
+#ifdef	VNET_IOC_DEBUG	/* Debug ioctls */
+
+#define	VNET_FORCE_LINK_DOWN	0x1
+#define	VNET_FORCE_LINK_UP	0x2
 
 #endif
 

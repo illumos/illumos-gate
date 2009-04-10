@@ -99,6 +99,8 @@ static	void vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp,
 static	void vsw_mtu_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 	uint32_t *mtu);
 static	int vsw_mtu_update(vsw_t *vswp, uint32_t mtu);
+static	void vsw_linkprop_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
+	boolean_t *pls);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 static boolean_t vsw_cmp_vids(vsw_vlanid_t *vids1,
@@ -114,8 +116,10 @@ static int vsw_m_unicst(void *arg, const uint8_t *);
 static int vsw_m_multicst(void *arg, boolean_t, const uint8_t *);
 static int vsw_m_promisc(void *arg, boolean_t);
 static mblk_t *vsw_m_tx(void *arg, mblk_t *);
+static void vsw_mac_link_update(vsw_t *vswp, link_state_t link_state);
 void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
     mblk_t *mp, vsw_macrx_flags_t flags);
+void vsw_physlink_state_update(vsw_t *vswp);
 
 /*
  * Functions imported from other files.
@@ -163,6 +167,7 @@ extern void vsw_if_mac_reconfig(vsw_t *vswp, boolean_t update_vlans,
     uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids);
 extern void vsw_reset_ports(vsw_t *vswp);
 extern void vsw_port_reset(vsw_port_t *portp);
+extern void vsw_physlink_update_ports(vsw_t *vswp);
 void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
 
 /*
@@ -371,6 +376,7 @@ static char port_pvid_propname[] = "remote-port-vlan-id";
 static char port_vid_propname[] = "remote-vlan-id";
 static char hybrid_propname[] = "hybrid";
 static char vsw_mtu_propname[] = "mtu";
+static char vsw_linkprop_propname[] = "linkprop";
 
 /*
  * Matching criteria passed to the MDEG to register interest
@@ -535,6 +541,7 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	vswp->dip = dip;
 	vswp->instance = instance;
+	vswp->phys_link_state = LINK_STATE_UNKNOWN;
 	ddi_set_driver_private(dip, (caddr_t)vswp);
 
 	mutex_init(&vswp->mac_lock, NULL, MUTEX_DRIVER, NULL);
@@ -1702,6 +1709,12 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		vswp->smode = VSW_LAYER2;
 	}
 
+	/*
+	 * Read the 'linkprop' property to know if this
+	 * vsw device wants to get physical link updates.
+	 */
+	vsw_linkprop_read(vswp, mdp, node, &vswp->pls_update);
+
 	/* read mtu */
 	vsw_mtu_read(vswp, mdp, node, &vswp->mtu);
 	if (vswp->mtu < ETHERMTU || vswp->mtu > VNET_MAX_MTU) {
@@ -1954,6 +1967,50 @@ vsw_mtu_update(vsw_t *vswp, uint32_t mtu)
 	return (0);
 }
 
+static void
+vsw_linkprop_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
+	boolean_t *pls)
+{
+	int		rv;
+	uint64_t	val;
+	char		*linkpropname;
+
+	linkpropname = vsw_linkprop_propname;
+
+	rv = md_get_prop_val(mdp, node, linkpropname, &val);
+	if (rv != 0) {
+		D3(vswp, "%s: prop(%s) not found", __func__, linkpropname);
+		*pls = B_FALSE;
+	} else {
+
+		*pls = (val & 0x1) ? B_TRUE : B_FALSE;
+		D2(vswp, "%s: %s(%d): (%d)\n", __func__, linkpropname,
+		    vswp->instance, *pls);
+	}
+}
+
+static void
+vsw_mac_link_update(vsw_t *vswp, link_state_t link_state)
+{
+	READ_ENTER(&vswp->if_lockrw);
+	if ((vswp->if_state & VSW_IF_UP) == 0) {
+		RW_EXIT(&vswp->if_lockrw);
+		return;
+	}
+	RW_EXIT(&vswp->if_lockrw);
+
+	mac_link_update(vswp->if_mh, link_state);
+}
+
+void
+vsw_physlink_state_update(vsw_t *vswp)
+{
+	if (vswp->pls_update == B_TRUE) {
+		vsw_mac_link_update(vswp, vswp->phys_link_state);
+	}
+	vsw_physlink_update_ports(vswp);
+}
+
 /*
  * Check to see if the relevant properties in the specified node have
  * changed, and if so take the appropriate action.
@@ -1980,12 +2037,14 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 				MD_macaddr = 0x4,
 				MD_smode = 0x8,
 				MD_vlans = 0x10,
-				MD_mtu = 0x20} updated;
+				MD_mtu = 0x20,
+				MD_pls = 0x40} updated;
 	int		rv;
 	uint16_t	pvid;
 	vsw_vlanid_t	*vids;
 	uint16_t	nvids;
 	uint32_t	mtu;
+	boolean_t	pls_update;
 
 	updated = MD_init;
 
@@ -2095,8 +2154,39 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	}
 
 	/*
+	 * Read the 'linkprop' property.
+	 */
+	vsw_linkprop_read(vswp, mdp, node, &pls_update);
+	if (pls_update != vswp->pls_update) {
+		updated |= MD_pls;
+	}
+
+	/*
 	 * Now make any changes which are needed...
 	 */
+	if (updated & MD_pls) {
+
+		/* save the updated property. */
+		vswp->pls_update = pls_update;
+
+		if (pls_update == B_FALSE) {
+			/*
+			 * Phys link state update is now disabled for this vsw
+			 * interface. If we had previously reported a link-down
+			 * to the stack, undo that by sending a link-up.
+			 */
+			if (vswp->phys_link_state == LINK_STATE_DOWN) {
+				vsw_mac_link_update(vswp, LINK_STATE_UP);
+			}
+		} else {
+			/*
+			 * Phys link state update is now enabled. Send up an
+			 * update based on the current phys link state.
+			 */
+			vsw_mac_link_update(vswp, vswp->phys_link_state);
+		}
+
+	}
 
 	if (updated & (MD_physname | MD_smode | MD_mtu)) {
 

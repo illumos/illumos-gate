@@ -86,7 +86,10 @@ static int vgen_multicst(void *arg, boolean_t add,
 static int vgen_promisc(void *arg, boolean_t on);
 static int vgen_unicst(void *arg, const uint8_t *mca);
 static int vgen_stat(void *arg, uint_t stat, uint64_t *val);
-static void vgen_ioctl(void *arg, queue_t *wq, mblk_t *mp);
+static void vgen_ioctl(void *arg, queue_t *q, mblk_t *mp);
+#ifdef	VNET_IOC_DEBUG
+static int vgen_force_link_state(vgen_port_t *portp, int link_state);
+#endif
 
 /* vgen internal functions */
 static int vgen_read_mdprops(vgen_t *vgenp);
@@ -95,6 +98,8 @@ static void vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp,
 	mde_cookie_t node);
 static void vgen_mtu_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node,
 	uint32_t *mtu);
+static void vgen_linkprop_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node,
+	boolean_t *pls);
 static void vgen_detach_ports(vgen_t *vgenp);
 static void vgen_port_detach(vgen_port_t *portp);
 static void vgen_port_list_insert(vgen_port_t *portp);
@@ -115,6 +120,8 @@ static void vgen_port_detach_mdeg(vgen_port_t *portp);
 static int vgen_update_port(vgen_t *vgenp, md_t *curr_mdp,
 	mde_cookie_t curr_mdex, md_t *prev_mdp, mde_cookie_t prev_mdex);
 static uint64_t	vgen_port_stat(vgen_port_t *portp, uint_t stat);
+static void vgen_port_reset(vgen_port_t *portp);
+static void vgen_reset_vsw_port(vgen_t *vgenp);
 
 static int vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id);
 static void vgen_ldc_detach(vgen_ldc_t *ldcp);
@@ -196,6 +203,7 @@ static void vgen_handle_evt_read(vgen_ldc_t *ldcp);
 static void vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp);
 static void vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp);
 static void vgen_reset_vnet_proto_ops(vgen_ldc_t *ldcp);
+static void vgen_link_update(vgen_t *vgenp, link_state_t link_state);
 
 /* VLAN routines */
 static void vgen_vlan_read_ids(void *arg, int type, md_t *mdp,
@@ -217,6 +225,7 @@ static int vgen_dds_rx(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 /* externs */
 extern void vnet_dds_rx(void *arg, void *dmsg);
 extern int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
+extern void vnet_link_update(vnet_t *vnetp, link_state_t link_state);
 
 /*
  * The handshake process consists of 5 phases defined below, with VH_PHASE0
@@ -318,9 +327,25 @@ static char vgen_dvid_propname[] = "default-vlan-id";
 static char port_pvid_propname[] = "remote-port-vlan-id";
 static char port_vid_propname[] = "remote-vlan-id";
 static char vgen_mtu_propname[] = "mtu";
+static char vgen_linkprop_propname[] = "linkprop";
 
-/* versions supported - in decreasing order */
-static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 4} };
+/*
+ * VIO Protocol Version Info:
+ *
+ * The version specified below represents the version of protocol currently
+ * supported in the driver. It means the driver can negotiate with peers with
+ * versions <= this version. Here is a summary of the feature(s) that are
+ * supported at each version of the protocol:
+ *
+ * 1.0			Basic VIO protocol.
+ * 1.1			vDisk protocol update (no virtual network update).
+ * 1.2			Support for priority frames (priority-ether-types).
+ * 1.3			VLAN and HybridIO support.
+ * 1.4			Jumbo Frame support.
+ * 1.5			Link State Notification support with optional support
+ * 			for Physical Link information.
+ */
+static vgen_ver_t vgen_versions[VGEN_NUM_VER] =  { {1, 5} };
 
 /* Tunables */
 uint32_t vgen_hwd_interval = 5;		/* handshake watchdog freq in sec */
@@ -416,8 +441,14 @@ static mdeg_prop_spec_t vgen_prop_template[] = {
 
 static int vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp);
 
+#ifdef	VNET_IOC_DEBUG
+#define	VGEN_M_CALLBACK_FLAGS	(MC_IOCTL)
+#else
+#define	VGEN_M_CALLBACK_FLAGS	(0)
+#endif
+
 static mac_callbacks_t vgen_m_callbacks = {
-	0,
+	VGEN_M_CALLBACK_FLAGS,
 	vgen_stat,
 	vgen_start,
 	vgen_stop,
@@ -425,7 +456,7 @@ static mac_callbacks_t vgen_m_callbacks = {
 	vgen_multicst,
 	vgen_unicst,
 	vgen_tx,
-	NULL,
+	vgen_ioctl,
 	NULL,
 	NULL
 };
@@ -489,6 +520,7 @@ vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
 	vgenp->regprop = regprop;
 	vgenp->vnetdip = vnetdip;
 	bcopy(macaddr, &(vgenp->macaddr), ETHERADDRL);
+	vgenp->phys_link_state = LINK_STATE_UNKNOWN;
 
 	/* allocate multicast table */
 	vgenp->mctab = kmem_zalloc(VGEN_INIT_MCTAB_SIZE *
@@ -1069,8 +1101,13 @@ vgen_ldcsend_dring(void *arg, mblk_t *mp)
 		DWARN(vgenp, ldcp, "status(%d), dropping packet\n",
 		    ldcp->ldc_status);
 		/* retry ldc_up() if needed */
-		if (ldcp->flags & CHANNEL_STARTED)
+#ifdef	VNET_IOC_DEBUG
+		if (ldcp->flags & CHANNEL_STARTED && !ldcp->link_down_forced) {
+#else
+		if (ldcp->flags & CHANNEL_STARTED) {
+#endif
 			(void) ldc_up(ldcp->ldc_handle);
+		}
 		goto send_dring_exit;
 	}
 
@@ -1356,12 +1393,6 @@ vgen_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
-static void
-vgen_ioctl(void *arg, queue_t *wq, mblk_t *mp)
-{
-	 _NOTE(ARGUNUSED(arg, wq, mp))
-}
-
 /* vgen internal functions */
 /* detach all ports from the device */
 static void
@@ -1624,6 +1655,13 @@ vgen_read_mdprops(vgen_t *vgenp)
 		/* is this the required instance of vnet? */
 		if (vgenp->regprop != cfgh)
 			continue;
+
+		/*
+		 * Read the 'linkprop' property to know if this vnet
+		 * device should get physical link updates from vswitch.
+		 */
+		vgen_linkprop_read(vgenp, mdp, listp[i],
+		    &vnetp->pls_update);
 
 		/*
 		 * Read the mtu. Note that we set the mtu of vnet device within
@@ -1959,6 +1997,28 @@ vgen_mtu_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node, uint32_t *mtu)
 	}
 }
 
+static void
+vgen_linkprop_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node,
+	boolean_t *pls)
+{
+	int		rv;
+	uint64_t	val;
+	char		*linkpropname;
+
+	linkpropname = vgen_linkprop_propname;
+
+	rv = md_get_prop_val(mdp, node, linkpropname, &val);
+	if (rv != 0) {
+		DWARN(vgenp, NULL, "prop(%s) not found", linkpropname);
+		*pls = B_FALSE;
+	} else {
+
+		*pls = (val & 0x1) ?  B_TRUE : B_FALSE;
+		DBG2(vgenp, NULL, "%s(%d): (%d)\n", linkpropname,
+		    vgenp->instance, *pls);
+	}
+}
+
 /* register with MD event generator */
 static int
 vgen_mdeg_reg(vgen_t *vgenp)
@@ -2236,9 +2296,11 @@ vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 	uint16_t	nvids;
 	vnet_t		*vnetp = vgenp->vnetp;
 	uint32_t	mtu;
+	boolean_t	pls_update;
 	enum		{ MD_init = 0x1,
 			    MD_vlans = 0x2,
-			    MD_mtu = 0x4 } updated;
+			    MD_mtu = 0x4,
+			    MD_pls = 0x8 } updated;
 	int		rv;
 
 	updated = MD_init;
@@ -2265,6 +2327,14 @@ vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 			    " as the specified value:%d is invalid\n",
 			    vnetp->instance, mtu);
 		}
+	}
+
+	/*
+	 * Read the 'linkprop' property.
+	 */
+	vgen_linkprop_read(vgenp, mdp, mdex, &pls_update);
+	if (pls_update != vnetp->pls_update) {
+		updated |= MD_pls;
 	}
 
 	/* Now process the updated props */
@@ -2303,6 +2373,14 @@ vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 			vgenp->max_frame_size = mtu +
 			    sizeof (struct ether_header) + VLAN_TAGSZ;
 		}
+	}
+
+	if (updated & MD_pls) {
+		/* enable/disable physical link state updates */
+		vnetp->pls_update = pls_update;
+
+		/* reset vsw-port to re-negotiate with the updated prop. */
+		vgen_reset_vsw_port(vgenp);
 	}
 }
 
@@ -2422,14 +2500,12 @@ vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
 		macaddr >>= 8;
 	}
 
-	if (vgenp->vsw_portp == NULL) {
-		if (!(md_get_prop_val(mdp, mdex, swport_propname, &val))) {
-			if (val == 0) {
-				(void) atomic_swap_32(
-				    &vgenp->vsw_port_refcnt, 0);
-				/* This port is connected to the vsw */
-				vgenp->vsw_portp = portp;
-			}
+	if (!(md_get_prop_val(mdp, mdex, swport_propname, &val))) {
+		if (val == 0) {
+			/* This port is connected to the vswitch */
+			portp->is_vsw_port = B_TRUE;
+		} else {
+			portp->is_vsw_port = B_FALSE;
 		}
 	}
 
@@ -2516,9 +2592,8 @@ vgen_port_attach(vgen_port_t *portp)
 	/* create vlan id hash table */
 	vgen_vlan_create_hash(portp);
 
-	if (portp == vgenp->vsw_portp) {
+	if (portp->is_vsw_port == B_TRUE) {
 		/* This port is connected to the switch port */
-		vgenp->vsw_portp = portp;
 		(void) atomic_swap_32(&portp->use_vsw_port, B_FALSE);
 		type = VIO_NET_RES_LDC_SERVICE;
 	} else {
@@ -2550,6 +2625,12 @@ vgen_port_attach(vgen_port_t *portp)
 		WRITE_ENTER(&plistp->rwlock);
 		vgen_port_list_insert(portp);
 		RW_EXIT(&plistp->rwlock);
+
+		if (portp->is_vsw_port == B_TRUE) {
+			/* We now have the vswitch port attached */
+			vgenp->vsw_portp = portp;
+			(void) atomic_swap_32(&vgenp->vsw_port_refcnt, 0);
+		}
 	} else {
 		DERR(vgenp, NULL, "vio_net_resource_reg failed for portp=0x%p",
 		    portp);
@@ -2911,6 +2992,10 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	*prev_ldcp = ldcp;
 	RW_EXIT(&ldclp->rwlock);
 
+	ldcp->link_state = LINK_STATE_UNKNOWN;
+#ifdef	VNET_IOC_DEBUG
+	ldcp->link_down_forced = B_FALSE;
+#endif
 	ldcp->flags |= CHANNEL_ATTACHED;
 	return (DDI_SUCCESS);
 
@@ -3766,10 +3851,19 @@ vgen_handle_evt_reset(vgen_ldc_t *ldcp)
 	}
 
 	/* try to bring the channel up */
+#ifdef	VNET_IOC_DEBUG
+	if (ldcp->link_down_forced == B_FALSE) {
+		rv = ldc_up(ldcp->ldc_handle);
+		if (rv != 0) {
+			DWARN(vgenp, ldcp, "ldc_up err rv(%d)\n", rv);
+		}
+	}
+#else
 	rv = ldc_up(ldcp->ldc_handle);
 	if (rv != 0) {
 		DWARN(vgenp, ldcp, "ldc_up err rv(%d)\n", rv);
 	}
+#endif
 
 	if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 		DWARN(vgenp, ldcp, "ldc_status err\n");
@@ -4218,6 +4312,7 @@ vgen_send_attr_info(vgen_ldc_t *ldcp)
 	attrmsg.addr_type = ldcp->local_hparams.addr_type;
 	attrmsg.xfer_mode = ldcp->local_hparams.xfer_mode;
 	attrmsg.ack_freq = ldcp->local_hparams.ack_freq;
+	attrmsg.physlink_update = ldcp->local_hparams.physlink_update;
 
 	rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (attrmsg), B_FALSE);
 	if (rv != VGEN_SUCCESS) {
@@ -4449,6 +4544,22 @@ vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp)
 	vgen_hparams_t	*lp = &ldcp->local_hparams;
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 
+	if (VGEN_VER_GTEQ(ldcp, 1, 5)) {
+		vgen_port_t	*portp = ldcp->portp;
+		vnet_t		*vnetp = vgenp->vnetp;
+		/*
+		 * If the version negotiated with vswitch is >= 1.5 (link
+		 * status update support), set the required bits in our
+		 * attributes if this vnet device has been configured to get
+		 * physical link state updates.
+		 */
+		if (portp == vgenp->vsw_portp && vnetp->pls_update == B_TRUE) {
+			lp->physlink_update = PHYSLINK_UPDATE_STATE;
+		} else {
+			lp->physlink_update = PHYSLINK_UPDATE_NONE;
+		}
+	}
+
 	if (VGEN_VER_GTEQ(ldcp, 1, 4)) {
 		/*
 		 * If the version negotiated with peer is >= 1.4(Jumbo Frame
@@ -4564,6 +4675,35 @@ vgen_vlan_unaware_port_reset(vgen_port_t *portp)
 }
 
 static void
+vgen_port_reset(vgen_port_t *portp)
+{
+	vgen_ldclist_t	*ldclp;
+	vgen_ldc_t	*ldcp;
+
+	ldclp = &portp->ldclist;
+
+	READ_ENTER(&ldclp->rwlock);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->headp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return;
+	}
+	ldcp = ldclp->headp;
+
+	mutex_enter(&ldcp->cblock);
+
+	ldcp->need_ldc_reset = B_TRUE;
+	vgen_handshake_retry(ldcp);
+
+	mutex_exit(&ldcp->cblock);
+
+	RW_EXIT(&ldclp->rwlock);
+}
+
+static void
 vgen_reset_vlan_unaware_ports(vgen_t *vgenp)
 {
 	vgen_port_t	*portp;
@@ -4579,6 +4719,16 @@ vgen_reset_vlan_unaware_ports(vgen_t *vgenp)
 	}
 
 	RW_EXIT(&plistp->rwlock);
+}
+
+static void
+vgen_reset_vsw_port(vgen_t *vgenp)
+{
+	vgen_port_t	*portp;
+
+	if ((portp = vgenp->vsw_portp) != NULL) {
+		vgen_port_reset(portp);
+	}
 }
 
 /*
@@ -4651,6 +4801,7 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	ldcp->local_hparams.addr_type = ADDR_TYPE_MAC;
 	ldcp->local_hparams.xfer_mode = VIO_DRING_MODE_V1_0;
 	ldcp->local_hparams.ack_freq = 0;	/* don't need acks */
+	ldcp->local_hparams.physlink_update = PHYSLINK_UPDATE_NONE;
 
 	/*
 	 * Note: dring is created, but not bound yet.
@@ -4666,7 +4817,11 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	bzero(&(ldcp->peer_hparams), sizeof (ldcp->peer_hparams));
 
 	/* reset the channel if required */
+#ifdef	VNET_IOC_DEBUG
+	if (ldcp->need_ldc_reset && !ldcp->link_down_forced) {
+#else
 	if (ldcp->need_ldc_reset) {
+#endif
 		DWARN(vgenp, ldcp, "Doing Channel Reset...\n");
 		ldcp->need_ldc_reset = B_FALSE;
 		(void) ldc_down(ldcp->ldc_handle);
@@ -4696,6 +4851,8 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 static void
 vgen_handshake_reset(vgen_ldc_t *ldcp)
 {
+	vgen_t  *vgenp = LDC_TO_VGEN(ldcp);
+
 	ASSERT(MUTEX_HELD(&ldcp->cblock));
 	mutex_enter(&ldcp->rxlock);
 	mutex_enter(&ldcp->wrlock);
@@ -4708,6 +4865,30 @@ vgen_handshake_reset(vgen_ldc_t *ldcp)
 	mutex_exit(&ldcp->txlock);
 	mutex_exit(&ldcp->wrlock);
 	mutex_exit(&ldcp->rxlock);
+
+	/*
+	 * As the connection is now reset, mark the channel
+	 * link_state as 'down' and notify the stack if needed.
+	 */
+	if (ldcp->link_state != LINK_STATE_DOWN) {
+		ldcp->link_state = LINK_STATE_DOWN;
+
+		if (ldcp->portp == vgenp->vsw_portp) { /* vswitch port ? */
+			/*
+			 * As the channel link is down, mark physical link also
+			 * as down. After the channel comes back up and
+			 * handshake completes, we will get an update on the
+			 * physlink state from vswitch (if this device has been
+			 * configured to get phys link updates).
+			 */
+			vgenp->phys_link_state = LINK_STATE_DOWN;
+
+			/* Now update the stack */
+			mutex_exit(&ldcp->cblock);
+			vgen_link_update(vgenp, ldcp->link_state);
+			mutex_enter(&ldcp->cblock);
+		}
+	}
 }
 
 /*
@@ -4717,10 +4898,10 @@ vgen_handshake_reset(vgen_ldc_t *ldcp)
 static void
 vgen_handshake(vgen_ldc_t *ldcp)
 {
-	uint32_t hphase = ldcp->hphase;
-	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
+	uint32_t	hphase = ldcp->hphase;
+	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 	ldc_status_t	istatus;
-	int	rv = 0;
+	int		rv = 0;
 
 	switch (hphase) {
 
@@ -4763,6 +4944,13 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		ldcp->hretries = 0;
 		DBG1(vgenp, ldcp, "Handshake Done\n");
 
+		/*
+		 * The channel is up and handshake is done successfully. Now we
+		 * can mark the channel link_state as 'up'. We also notify the
+		 * stack if the channel is connected to vswitch.
+		 */
+		ldcp->link_state = LINK_STATE_UP;
+
 		if (ldcp->portp == vgenp->vsw_portp) {
 			/*
 			 * If this channel(port) is connected to vsw,
@@ -4773,6 +4961,23 @@ vgen_handshake(vgen_ldc_t *ldcp)
 			mutex_enter(&vgenp->lock);
 			rv = vgen_send_mcast_info(ldcp);
 			mutex_exit(&vgenp->lock);
+
+			if (vgenp->pls_negotiated == B_FALSE) {
+				/*
+				 * We haven't negotiated with vswitch to get
+				 * physical link state updates. We can update
+				 * update the stack at this point as the
+				 * channel to vswitch is up and the handshake
+				 * is done successfully.
+				 *
+				 * If we have negotiated to get physical link
+				 * state updates, then we won't notify the
+				 * the stack here; we do that as soon as
+				 * vswitch sends us the initial phys link state
+				 * (see vgen_handle_physlink_info()).
+				 */
+				vgen_link_update(vgenp, ldcp->link_state);
+			}
 
 			mutex_enter(&ldcp->cblock);
 			if (rv != VGEN_SUCCESS)
@@ -4877,6 +5082,30 @@ vgen_handshake_retry(vgen_ldc_t *ldcp)
 			vgen_handshake(vh_nextphase(ldcp));
 		}
 	}
+}
+
+
+/*
+ * Link State Update Notes:
+ * The link state of the channel connected to vswitch is reported as the link
+ * state of the vnet device, by default. If the channel is down or reset, then
+ * the link state is marked 'down'. If the channel is 'up' *and* handshake
+ * between the vnet and vswitch is successful, then the link state is marked
+ * 'up'. If physical network link state is desired, then the vnet device must
+ * be configured to get physical link updates and the 'linkprop' property
+ * in the virtual-device MD node indicates this. As part of attribute exchange
+ * the vnet device negotiates with the vswitch to obtain physical link state
+ * updates. If it successfully negotiates, vswitch sends an initial physlink
+ * msg once the handshake is done and further whenever the physical link state
+ * changes. Currently we don't have mac layer interfaces to report two distinct
+ * link states - virtual and physical. Thus, if the vnet has been configured to
+ * get physical link updates, then the link status will be reported as 'up'
+ * only when both the virtual and physical links are up.
+ */
+static void
+vgen_link_update(vgen_t *vgenp, link_state_t link_state)
+{
+	vnet_link_update(vgenp->vnetp, link_state);
 }
 
 /*
@@ -5266,6 +5495,27 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 	case VIO_SUBTYPE_ACK:
 
+		if (VGEN_VER_GTEQ(ldcp, 1, 5) &&
+		    ldcp->portp == vgenp->vsw_portp) {
+			/*
+			 * Versions >= 1.5:
+			 * If the vnet device has been configured to get
+			 * physical link state updates, check the corresponding
+			 * bits in the ack msg, if the peer is vswitch.
+			 */
+			if (((lp->physlink_update &
+			    PHYSLINK_UPDATE_STATE_MASK) ==
+			    PHYSLINK_UPDATE_STATE) &&
+
+			    ((msg->physlink_update &
+			    PHYSLINK_UPDATE_STATE_MASK) ==
+			    PHYSLINK_UPDATE_STATE_ACK)) {
+				vgenp->pls_negotiated = B_TRUE;
+			} else {
+				vgenp->pls_negotiated = B_FALSE;
+			}
+		}
+
 		if (VGEN_VER_GTEQ(ldcp, 1, 4)) {
 			/*
 			 * Versions >= 1.4:
@@ -5572,6 +5822,87 @@ vgen_handle_mcast_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	return (VGEN_SUCCESS);
 }
 
+/*
+ * Physical link information message from the peer. Only vswitch should send
+ * us this message; if the vnet device has been configured to get physical link
+ * state updates. Note that we must have already negotiated this with the
+ * vswitch during attribute exchange phase of handshake.
+ */
+static int
+vgen_handle_physlink_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
+{
+	vgen_t			*vgenp = LDC_TO_VGEN(ldcp);
+	vnet_physlink_msg_t	*msgp = (vnet_physlink_msg_t *)tagp;
+	link_state_t		link_state;
+	int			rv;
+
+	if (ldcp->portp != vgenp->vsw_portp) {
+		/*
+		 * drop the message and don't process; as we should
+		 * receive physlink_info message from only vswitch.
+		 */
+		return (VGEN_SUCCESS);
+	}
+
+	if (vgenp->pls_negotiated == B_FALSE) {
+		/*
+		 * drop the message and don't process; as we should receive
+		 * physlink_info message only if physlink update is enabled for
+		 * the device and negotiated with vswitch.
+		 */
+		return (VGEN_SUCCESS);
+	}
+
+	switch (tagp->vio_subtype) {
+
+	case VIO_SUBTYPE_INFO:
+
+		if ((msgp->physlink_info & VNET_PHYSLINK_STATE_MASK) ==
+		    VNET_PHYSLINK_STATE_UP) {
+			link_state = LINK_STATE_UP;
+		} else {
+			link_state = LINK_STATE_DOWN;
+		}
+
+		if (vgenp->phys_link_state != link_state) {
+			vgenp->phys_link_state = link_state;
+			mutex_exit(&ldcp->cblock);
+
+			/* Now update the stack */
+			vgen_link_update(vgenp, link_state);
+
+			mutex_enter(&ldcp->cblock);
+		}
+
+		tagp->vio_subtype = VIO_SUBTYPE_ACK;
+		tagp->vio_sid = ldcp->local_sid;
+
+		/* send reply msg back to peer */
+		rv = vgen_sendmsg(ldcp, (caddr_t)tagp,
+		    sizeof (vnet_physlink_msg_t), B_FALSE);
+		if (rv != VGEN_SUCCESS) {
+			return (rv);
+		}
+		break;
+
+	case VIO_SUBTYPE_ACK:
+
+		/* vnet shouldn't recv physlink acks */
+		DWARN(vgenp, ldcp, "rcvd PHYSLINK_ACK \n");
+		break;
+
+	case VIO_SUBTYPE_NACK:
+
+		/* vnet shouldn't recv physlink nacks */
+		DWARN(vgenp, ldcp, "rcvd PHYSLINK_NACK \n");
+		break;
+
+	}
+	DBG1(vgenp, ldcp, "exit\n");
+
+	return (VGEN_SUCCESS);
+}
+
 /* handler for control messages received from the peer ldc end-point */
 static int
 vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
@@ -5604,6 +5935,10 @@ vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 	case VIO_DDS_INFO:
 		rv = vgen_dds_rx(ldcp, tagp);
+		break;
+
+	case VNET_PHYSLINK_INFO:
+		rv = vgen_handle_physlink_info(ldcp, tagp);
 		break;
 	}
 
@@ -6896,4 +7231,134 @@ debug_printf(const char *fname, vgen_t *vgenp,
 		cmn_err(CE_CONT, "%s\n", buf);
 	}
 }
+#endif
+
+#ifdef	VNET_IOC_DEBUG
+
+static void
+vgen_ioctl(void *arg, queue_t *q, mblk_t *mp)
+{
+	struct iocblk	*iocp;
+	vgen_port_t	*portp;
+	enum		ioc_reply {
+			IOC_INVAL = -1,		/* bad, NAK with EINVAL */
+			IOC_ACK			/* OK, just send ACK    */
+	}		status;
+	int		rv;
+
+	iocp = (struct iocblk *)(uintptr_t)mp->b_rptr;
+	iocp->ioc_error = 0;
+	portp = (vgen_port_t *)arg;
+
+	if (portp == NULL) {
+		status = IOC_INVAL;
+		goto vgen_ioc_exit;
+	}
+
+	mutex_enter(&portp->lock);
+
+	switch (iocp->ioc_cmd) {
+
+	case VNET_FORCE_LINK_DOWN:
+	case VNET_FORCE_LINK_UP:
+		rv = vgen_force_link_state(portp, iocp->ioc_cmd);
+		(rv == 0) ? (status = IOC_ACK) : (status = IOC_INVAL);
+		break;
+
+	default:
+		status = IOC_INVAL;
+		break;
+
+	}
+
+	mutex_exit(&portp->lock);
+
+vgen_ioc_exit:
+
+	switch (status) {
+	default:
+	case IOC_INVAL:
+		/* Error, reply with a NAK and EINVAL error */
+		miocnak(q, mp, 0, EINVAL);
+		break;
+	case IOC_ACK:
+		/* OK, reply with an ACK */
+		miocack(q, mp, 0, 0);
+		break;
+	}
+}
+
+static int
+vgen_force_link_state(vgen_port_t *portp, int cmd)
+{
+	ldc_status_t	istatus;
+	vgen_ldclist_t	*ldclp;
+	vgen_ldc_t	*ldcp;
+	vgen_t		*vgenp = portp->vgenp;
+	int		rv;
+
+	ldclp = &portp->ldclist;
+	READ_ENTER(&ldclp->rwlock);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->headp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return (1);
+	}
+	ldcp = ldclp->headp;
+	mutex_enter(&ldcp->cblock);
+
+	switch (cmd) {
+
+	case VNET_FORCE_LINK_DOWN:
+		(void) ldc_down(ldcp->ldc_handle);
+		ldcp->link_down_forced = B_TRUE;
+		break;
+
+	case VNET_FORCE_LINK_UP:
+		rv = ldc_up(ldcp->ldc_handle);
+		if (rv != 0) {
+			DWARN(vgenp, ldcp, "ldc_up err rv(%d)\n", rv);
+		}
+		ldcp->link_down_forced = B_FALSE;
+
+		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+			DWARN(vgenp, ldcp, "ldc_status err\n");
+		} else {
+			ldcp->ldc_status = istatus;
+		}
+
+		/* if channel is already UP - restart handshake */
+		if (ldcp->ldc_status == LDC_UP) {
+			vgen_handle_evt_up(ldcp);
+		}
+		break;
+
+	}
+
+	mutex_exit(&ldcp->cblock);
+	RW_EXIT(&ldclp->rwlock);
+
+	return (0);
+}
+
+#else
+
+static void
+vgen_ioctl(void *arg, queue_t *q, mblk_t *mp)
+{
+	vgen_port_t	*portp;
+
+	portp = (vgen_port_t *)arg;
+
+	if (portp == NULL) {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
+	miocnak(q, mp, 0, ENOTSUP);
+}
+
 #endif
