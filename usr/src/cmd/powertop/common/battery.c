@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -42,6 +42,8 @@
 #include <errno.h>
 #include "powertop.h"
 
+#define	mW2W(value)	((value) / 1000)
+
 typedef struct battery_state {
 	uint32_t exist;
 	uint32_t power_unit;
@@ -51,21 +53,41 @@ typedef struct battery_state {
 	double last_cap;
 } battery_state_t;
 
-battery_state_t battery;
+static char		*kstat_batt_mod[3] = {NULL, "battery", "acpi_drv"};
+static uint_t		kstat_batt_idx;
+static battery_state_t	battery_state;
 
-static	int	battery_stat_snapshot(void);
+static int		battery_stat_snapshot(void);
 
-#define	mW2W(value)	((value) / 1000)
+/*
+ * Checks if the kstat module for battery information is present and
+ * whether it's called 'battery' or 'acpi_drv'
+ */
+void
+battery_mod_lookup(void)
+{
+	kstat_ctl_t *kc = kstat_open();
+
+	if (kstat_lookup(kc, kstat_batt_mod[1], 0, NULL))
+		kstat_batt_idx = 1;
+	else
+		if (kstat_lookup(kc, kstat_batt_mod[2], 0, NULL))
+			kstat_batt_idx = 2;
+		else
+			kstat_batt_idx = 0;
+
+	(void) kstat_close(kc);
+}
 
 void
 print_battery(void)
 {
 	int err;
 
-	(void) memset(&battery, 0, sizeof (battery_state_t));
+	(void) memset(&battery_state, 0, sizeof (battery_state_t));
 
 	/*
-	 * The return value of battery_stat_snapsho() can be used for
+	 * The return value of battery_stat_snapshot() can be used for
 	 * debug or to show/hide the acpi power line. We currently don't
 	 * make the distinction of a system that runs only on AC and one
 	 * that runs on battery but has no kstat battery info.
@@ -83,8 +105,9 @@ print_battery(void)
 			    err);
 	}
 
-	show_acpi_power_line(battery.exist, battery.present_rate,
-	    battery.remain_cap, battery.last_cap, battery.bst_state);
+	show_acpi_power_line(battery_state.exist, battery_state.present_rate,
+	    battery_state.remain_cap, battery_state.last_cap,
+	    battery_state.bst_state);
 }
 
 static int
@@ -119,7 +142,7 @@ battery_stat_snapshot(void)
 		return (-1);
 	}
 
-	battery.power_unit = knp->value.ui32;
+	battery_state.power_unit = knp->value.ui32;
 
 	/*
 	 * Present rate:
@@ -143,10 +166,10 @@ battery_stat_snapshot(void)
 	}
 
 	if (knp->value.ui32 == 0xFFFFFFFF)
-		battery.present_rate = 0;
+		battery_state.present_rate = 0;
 	else {
-		battery.exist = 1;
-		battery.present_rate = mW2W((double)(knp->value.ui32));
+		battery_state.exist = 1;
+		battery_state.present_rate = mW2W((double)(knp->value.ui32));
 	}
 
 	/*
@@ -169,7 +192,7 @@ battery_stat_snapshot(void)
 		return (-1);
 	}
 
-	battery.last_cap = mW2W((double)(knp->value.ui32));
+	battery_state.last_cap = mW2W((double)(knp->value.ui32));
 
 	/*
 	 * Remaining capacity:
@@ -191,7 +214,7 @@ battery_stat_snapshot(void)
 		return (-1);
 	}
 
-	battery.remain_cap = mW2W((double)(knp->value.ui32));
+	battery_state.remain_cap = mW2W((double)(knp->value.ui32));
 
 	/*
 	 * Battery State:
@@ -215,7 +238,7 @@ battery_stat_snapshot(void)
 		return (-1);
 	}
 
-	battery.bst_state = knp->value.ui32;
+	battery_state.bst_state = knp->value.ui32;
 
 	(void) kstat_close(kc);
 

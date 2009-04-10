@@ -49,6 +49,7 @@
 #define	_(STRING)		gettext(STRING)
 
 #define	TITLE			"OpenSolaris PowerTOP version 1.1"
+#define	COPYRIGHT_INTEL		"(C) 2009 Intel Corporation"
 
 /*
  * Exit values. stdlib.h defines EXIT_SUCCESS as 0 and
@@ -57,13 +58,13 @@
 #define	EXIT_USAGE		2
 
 /*
- * PowerTop Features
+ * PowerTOP Features
  * These may not be available everywhere
  */
-#define	FEATURE_CSTATE		0x1
-#define	FEATURE_PSTATE		0x2
-#define	FEATURE_EVENTS		0x4
-#define	FEATURE_TURBO		0x8
+#define	FEATURE_CSTATE		0x01
+#define	FEATURE_PSTATE		0x02
+#define	FEATURE_EVENTS		0x04
+#define	FEATURE_TURBO		0x08
 
 #define	BIT_DEPTH_BUF		10
 
@@ -97,6 +98,21 @@
 #define	TITLE_LINE		1
 #define	BLANK_LINE		1
 #define	NEXT_LINE		1
+#define	PTOP_BAR_NSLOTS		10
+#define	PTOP_BAR_LENGTH		40
+
+/*
+ * Available op modes
+ */
+#define	PTOP_MODE_DEFAULT	0x01
+#define	PTOP_MODE_DUMP		0x02
+#define	PTOP_MODE_VERBOSE	0x04
+#define	PTOP_MODE_CPU		0x08
+
+#define	PTOP_ON_DEFAULT		(g_op_mode & PTOP_MODE_DEFAULT)
+#define	PTOP_ON_DUMP		(g_op_mode & PTOP_MODE_DUMP)
+#define	PTOP_ON_VERBOSE		(g_op_mode & PTOP_MODE_VERBOSE)
+#define	PTOP_ON_CPU		(g_op_mode & PTOP_MODE_CPU)
 
 /*
  * Structures and typedefs
@@ -122,10 +138,10 @@ typedef struct state_info {
 	double		events;
 } state_info_t;
 
-typedef struct pstate_info {
+typedef struct freq_state_info {
 	uint64_t	speed;
 	hrtime_t	total_time;
-} pstate_info_t;
+} freq_state_info_t;
 
 typedef struct cpu_power_info {
 	uint64_t	current_pstate;
@@ -134,75 +150,76 @@ typedef struct cpu_power_info {
 } cpu_power_info_t;
 
 /*
- * turbo information
+ * Turbo mode information
  */
 typedef struct turbo_info {
 	uint64_t	t_mcnt;
 	uint64_t	t_acnt;
 } turbo_info_t;
 
-
 typedef	void		(suggestion_func)(void);
 
 /*
  * Global variables
  */
-double			displaytime;
+extern double			g_displaytime;
 
-int			bit_depth;
+extern int			g_bit_depth;
 
 /*
  * Event accounting
  */
-int 			total_events;
-int 			top_events;
+extern int 			g_total_events;
+extern int 			g_tog_p_events;
 
 /*
  * Interval
  */
-double 			ticktime, ticktime_usr;
-double 			g_interval;
+extern double 			g_ticktime, g_ticktime_usr;
+extern double 			g_interval;
 
 /*
  * Command line arguments
  */
-int 			dump;
-char			event_mode;
-extern boolean_t	gui;
-
+extern uchar_t			g_op_mode;
+extern uint_t			g_observed_cpu;
+extern boolean_t		g_gui;
 /*
  * Event info array
  */
-event_info_t    	event_info[EVENT_NUM_MAX];
-event_info_t		*p_event;
+extern event_info_t    		g_event_info[EVENT_NUM_MAX];
+extern event_info_t		*g_p_event;
 
 /*
  * Lookup table, sequential CPU id to Solaris CPU id
  */
-processorid_t 		*cpu_table;
+extern processorid_t 		*g_cpu_table;
 
 /*
  * Number of idle/frequency states
  */
-int			npstates;
-int			max_cstate;
-int			longest_cstate;
+extern int			g_npstates;
+extern int			g_max_cstate;
+extern int			g_longest_cstate;
 
 /*
  * Total time, used to display different idle states
  */
-hrtime_t		total_c_time;
+extern hrtime_t			g_total_c_time;
 
 /*
  * P/C state info arrays
  */
-state_info_t		cstate_info[NSTATES];
-pstate_info_t		pstate_info[NSTATES];
+extern state_info_t		g_cstate_info[NSTATES];
+extern freq_state_info_t	g_pstate_info[NSTATES];
 
-/*
- * Per CPU power state information
- */
-cpu_power_info_t	*cpu_power_states;
+extern uint_t			g_ncpus;
+extern uint_t			g_ncpus_observed;
+
+extern char 			g_status_bar_slots[PTOP_BAR_NSLOTS]
+	[PTOP_BAR_LENGTH];
+
+extern cpu_power_info_t		*g_cpu_power_states;
 
 /*
  * Turbo mode related information
@@ -210,35 +227,28 @@ cpu_power_info_t	*cpu_power_states;
 extern boolean_t	g_turbo_supported;
 extern double		g_turbo_ratio;
 
-/*
- * Extern declarations
- */
-extern struct line	*lines;
-extern int		linehead;
-extern int		linesize;
-extern int		linectotal;
-
-extern	int		g_ncpus;
+extern char 			g_suggestion_key;
+extern suggestion_func 		*g_suggestion_activate;
 
 /*
- * kstat's battery module
+ * DTrace scripts for the events report
  */
-extern char		*kstat_batt_mod[3];
-extern uint_t		kstat_batt_idx;
+extern const char		*g_dtp_events;
+extern const char		*g_dtp_events_v;
+extern const char		*g_dtp_events_c;
 
-extern int 		topcstate;
-extern int 		topfreq;
-extern int 		dump;
+/*
+ * Arguments for dtrace_program_strcompile(). Contents vary according to
+ * the specified operation mode.
+ */
+extern uint_t			g_argc;
+extern char			**g_argv;
 
-extern char 		*prog;
-
-extern char 		status_bar_slots[10][40];
-
-extern const int	true, false;
-
-extern char 		suggestion_key;
-extern suggestion_func 	*suggestion_activate;
-
+/*
+ * Platform specific messages
+ */
+extern const char *g_msg_idle_state;
+extern const char *g_msg_freq_state;
 /*
  * Suggestions related
  */
@@ -250,51 +260,51 @@ extern void		suggest_as_root(void);
  */
 extern void 		pt_error(char *, ...);
 extern void 		pt_set_progname(char *);
-extern void		enumerate_cpus(void);
+extern uint_t		enumerate_cpus(void);
 extern void		usage(void);
-extern	int		get_bit_depth(void);
+extern int		get_bit_depth(void);
 extern void		battery_mod_lookup(void);
-extern	int		event_compare(const void *, const void *);
+extern int		event_compare(const void *, const void *);
 
 /*
  * Display/curses related
  */
-extern	void 		show_title_bar(void);
-extern	void 		setup_windows(void);
-extern	void 		initialize_curses(void);
-extern	void		show_acpi_power_line(uint32_t flag, double rate,
+extern void 		show_title_bar(void);
+extern void 		setup_windows(void);
+extern void 		initialize_curses(void);
+extern void		show_acpi_power_line(uint32_t flag, double rate,
     double rem_cap, double cap, uint32_t state);
-extern	void 		show_cstates();
-extern	void 		show_wakeups(double interval);
-extern	void 		show_eventstats(double interval);
-extern	void 		show_suggestion(char *sug);
-extern	void 		cleanup_curses(void);
-extern	void		update_windows(void);
+extern void 		show_cstates();
+extern void 		show_wakeups(double interval);
+extern void 		show_eventstats(double interval);
+extern void 		show_suggestion(char *sug);
+extern void 		cleanup_curses(void);
+extern void		update_windows(void);
 
 /*
  * Suggestions
  */
-extern	void 		pick_suggestion(void);
-extern	void 		add_suggestion(char *text, int weight, char key,
+extern void 		pick_suggestion(void);
+extern void 		add_suggestion(char *text, int weight, char key,
     char *keystring, suggestion_func *func);
-extern	void 		reset_suggestions(void);
-extern	void 		print_all_suggestions(void);
-extern	void 		print_battery(void);
+extern void 		reset_suggestions(void);
+extern void 		print_all_suggestions(void);
+extern void 		print_battery(void);
 
 /*
  * DTrace stats
  */
-extern	int 		pt_cpufreq_stat_prepare(void);
-extern	int 		pt_cpufreq_stat_collect(double interval);
-extern	int 		pt_cpuidle_stat_prepare(void);
-extern	int 		pt_cpuidle_stat_collect(double interval);
-extern	int 		pt_events_stat_prepare(void);
-extern	int 		pt_events_stat_collect(void);
+extern int 		pt_cpufreq_stat_prepare(void);
+extern int 		pt_cpufreq_stat_collect(double interval);
+extern int 		pt_cpuidle_stat_prepare(void);
+extern int 		pt_cpuidle_stat_collect(double interval);
+extern int 		pt_events_stat_prepare(void);
+extern int 		pt_events_stat_collect(void);
 
 /*
- * turbo related
+ * Turbo mode related routines
  */
-extern	int		pt_turbo_stat_prepare(void);
-extern	int		pt_turbo_stat_collect(void);
+extern int		pt_turbo_stat_prepare(void);
+extern int		pt_turbo_stat_collect(void);
 
 #endif /* __INCLUDE_GUARD_POWERTOP_H_ */

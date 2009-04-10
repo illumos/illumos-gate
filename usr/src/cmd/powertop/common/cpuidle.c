@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -41,12 +41,12 @@
 #include <dtrace.h>
 #include "powertop.h"
 
-static dtrace_hdl_t 	*g_dtp;
+static dtrace_hdl_t 	*dtp;
 
 /*
  * Buffer containing DTrace program to track CPU idle state transitions
  */
-static const char *pt_cpuidle_dtrace_prog =
+static const char *dtp_cpuidle =
 ":::idle-state-transition"
 "/arg0 != 0/"
 "{"
@@ -56,6 +56,28 @@ static const char *pt_cpuidle_dtrace_prog =
 ""
 ":::idle-state-transition"
 "/arg0 == 0 && self->start/"
+"{"
+"	@number[self->state] = count();"
+"	@times[self->state] = sum((timestamp - self->start)/1000000);"
+"	self->start = 0;"
+"	self->state = 0;"
+"}";
+
+/*
+ * Same as above but only for a specific CPU
+ */
+static const char *dtp_cpuidle_c =
+":::idle-state-transition"
+"/cpu == $0 &&"
+" arg0 != 0/"
+"{"
+"	self->start = timestamp;"
+"	self->state = arg0;"
+"}"
+""
+":::idle-state-transition"
+"/cpu == $0 &&"
+" arg0 == 0 && self->start/"
 "{"
 "	@number[self->state] = count();"
 "	@times[self->state] = sum((timestamp - self->start)/1000000);"
@@ -75,38 +97,56 @@ pt_cpuidle_stat_prepare(void)
 	dtrace_proginfo_t 	info;
 	dtrace_optval_t 	statustime;
 	int 			err;
+	char			*prog_ptr;
 
-	if ((g_dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
+	if ((dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
 		pt_error("%s : cannot open dtrace library: %s\n", __FILE__,
 		    dtrace_errmsg(NULL, err));
 		return (-1);
 	}
-	if ((prog = dtrace_program_strcompile(g_dtp, pt_cpuidle_dtrace_prog,
-	    DTRACE_PROBESPEC_NAME, 0, 0, NULL)) == NULL) {
+
+	/*
+	 * Execute different scripts (defined above) depending on
+	 * user specified options.
+	 */
+	if (PTOP_ON_CPU)
+		prog_ptr = (char *)dtp_cpuidle_c;
+	else
+		prog_ptr = (char *)dtp_cpuidle;
+
+	if ((prog = dtrace_program_strcompile(dtp, prog_ptr,
+	    DTRACE_PROBESPEC_NAME, 0, g_argc, g_argv)) == NULL) {
 		pt_error("%s : C-State DTrace probes unavailable\n", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
-	if (dtrace_program_exec(g_dtp, prog, &info) == -1) {
+
+	if (dtrace_program_exec(dtp, prog, &info) == -1) {
 		pt_error("%s : failed to enable C State probes\n", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
-	if (dtrace_setopt(g_dtp, "aggsize", "128k") == -1) {
+
+	if (dtrace_setopt(dtp, "aggsize", "128k") == -1) {
 		pt_error("%s : failed to set C-state 'aggsize'\n", __FILE__);
 	}
-	if (dtrace_setopt(g_dtp, "aggrate", "0") == -1) {
+
+	if (dtrace_setopt(dtp, "aggrate", "0") == -1) {
 		pt_error("%s : failed to set C-state'aggrate'\n", __FILE__);
 	}
-	if (dtrace_setopt(g_dtp, "aggpercpu", 0) == -1) {
+
+	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1) {
 		pt_error("%s : failed to set C-state 'aggpercpu'\n", __FILE__);
 	}
-	if (dtrace_go(g_dtp) != 0) {
+
+	if (dtrace_go(dtp) != 0) {
 		pt_error("%s : failed to start C-state observation", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
-	if (dtrace_getopt(g_dtp, "statusrate", &statustime) == -1) {
+
+	if (dtrace_getopt(dtp, "statusrate", &statustime) == -1) {
 		pt_error("%s : failed to get C-state 'statusrate'\n", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
+
 	return (0);
 }
 
@@ -114,7 +154,7 @@ pt_cpuidle_stat_prepare(void)
  * The DTrace probes have been enabled, and are tracking CPU idle state
  * transitions. Take a snapshot of the aggregations, and invoke the aggregation
  * walker to process any records. The walker does most of the accounting work
- * chalking up time spent into the cstate_info structure.
+ * chalking up time spent into the g_cstate_info structure.
  */
 int
 pt_cpuidle_stat_collect(double interval)
@@ -127,8 +167,8 @@ pt_cpuidle_stat_collect(double interval)
 	 * this interval
 	 */
 	for (i = 0; i < NSTATES; i++) {
-		cstate_info[i].total_time = 0;
-		cstate_info[i].events = 0;
+		g_cstate_info[i].total_time = 0;
+		g_cstate_info[i].events = 0;
 	}
 
 	/*
@@ -137,33 +177,34 @@ pt_cpuidle_stat_collect(double interval)
 	 * time out of the default bucket as it processes aggregation
 	 * records for time spent in other states.
 	 */
-	cstate_info[0].total_time = (long)(interval * g_ncpus * 1000);
+	g_cstate_info[0].total_time = (long)(interval * g_ncpus_observed *
+	    1000);
 
-	if (dtrace_status(g_dtp) == -1)
+	if (dtrace_status(dtp) == -1)
 		return (-1);
 
-	if (dtrace_aggregate_snap(g_dtp) != 0)
+	if (dtrace_aggregate_snap(dtp) != 0)
 		pt_error("%s : failed to add to aggregation", __FILE__);
 
-	if (dtrace_aggregate_walk_keyvarsorted(g_dtp, pt_cpuidle_dtrace_walk,
+	if (dtrace_aggregate_walk_keyvarsorted(dtp, pt_cpuidle_dtrace_walk,
 	    NULL) != 0)
 		pt_error("%s : failed to sort aggregation", __FILE__);
 
-	dtrace_aggregate_clear(g_dtp);
+	dtrace_aggregate_clear(dtp);
 
 	/*
-	 * Populate cstate_info with the correct amount of time spent
-	 * in each C state and update the number of C states in max_cstate
+	 * Populate g_cstate_info with the correct amount of time spent
+	 * in each C state and update the number of C states in g_max_cstate
 	 */
-	total_c_time = 0;
+	g_total_c_time = 0;
 	for (i = 0; i < NSTATES; i++) {
-		if (cstate_info[i].total_time > 0) {
-			total_c_time += cstate_info[i].total_time;
-			if (i > max_cstate)
-				max_cstate = i;
-			if (cstate_info[i].last_time > t) {
-				t = cstate_info[i].last_time;
-				longest_cstate = i;
+		if (g_cstate_info[i].total_time > 0) {
+			g_total_c_time += g_cstate_info[i].total_time;
+			if (i > g_max_cstate)
+				g_max_cstate = i;
+			if (g_cstate_info[i].last_time > t) {
+				t = g_cstate_info[i].last_time;
+				g_longest_cstate = i;
 			}
 		}
 	}
@@ -197,8 +238,8 @@ pt_cpuidle_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 			/* LINTED - alignment */
 			n += *((uint64_t *)(data->dtada_percpu[i]));
 		}
-		total_events += n;
-		cstate_info[state].events += n;
+		g_total_events += n;
+		g_cstate_info[state].events += n;
 	}
 	else
 		if (strcmp(aggdesc->dtagd_name, "times") == 0) {
@@ -206,10 +247,10 @@ pt_cpuidle_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 				/* LINTED - alignment */
 				n += *((uint64_t *)(data->dtada_percpu[i]));
 			}
-			cstate_info[state].last_time = n;
-			cstate_info[state].total_time += n;
-			if (cstate_info[0].total_time >= n)
-				cstate_info[0].total_time -= n;
+			g_cstate_info[state].last_time = n;
+			g_cstate_info[state].total_time += n;
+			if (g_cstate_info[0].total_time >= n)
+				g_cstate_info[0].total_time -= n;
 		}
 
 	return (DTRACE_AGGWALK_NEXT);

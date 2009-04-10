@@ -23,34 +23,36 @@
 #
 
 PROG = powertop
-OBJS = $(PROG).o display.o battery.o cpufreq.o cpuidle.o events.o util.o suggestions.o turbo.o
-SRCS = $(OBJS:%.o=../%.c)
+
+COMMON_OBJS = $(PROG).o \
+	display.o \
+	battery.o \
+	cpufreq.o \
+	cpuidle.o \
+	events.o \
+	util.o \
+	suggestions.o \
+	turbo.o
+
+SRCS		= $(COMMON_OBJS:%.o=../common/%.c)
 
 include ../../Makefile.cmd
-
-CFLAGS += $(CCVERBOSE)
-CFLAGS64 += $(CCVERBOSE)
-
-LDLIBS += -lcurses -ldtrace -lkstat
-
-FILEMODE = 0555
-GROUP = bin
-
-CLEANFILES += $(OBJS)
-
 .KEEP_STATE:
 
-all: $(PROG)
+CFLAGS		+= $(CCVERBOSE)
+CFLAGS64	+= $(CCVERBOSE)
+LDLIBS		+= -lcurses -ldtrace -lkstat
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
+FILEMODE	= 0555
+GROUP		= bin
+
+CLEANFILES	+= $(COMMON_OBJS)
+
+all:	$(PROG)
+
 clean:
 	$(RM) $(CLEANFILES)
 
 lint:	lint_SRCS
-
-%.o: ../%.c
-	$(COMPILE.c) $<
 
 include ../../Makefile.targ

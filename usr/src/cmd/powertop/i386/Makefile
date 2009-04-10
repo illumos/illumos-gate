@@ -18,10 +18,26 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.com
+
+MACH_OBJS	= pt_i386.o
+SRCS		+= $(MACH_OBJS:%.o=%.c)
+
+.KEEP_STATE:
+
+CLEANFILES	+= $(MACH_OBJS)
+
+all: $(PROG)
+
+$(PROG): $(MACH_OBJS) $(COMMON_OBJS)
+	$(LINK.c) -o $@ $(MACH_OBJS) $(COMMON_OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $<
 
 install: all $(ROOTPROG32)

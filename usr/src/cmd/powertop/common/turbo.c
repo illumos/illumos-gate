@@ -45,13 +45,13 @@
 #include "powertop.h"
 
 /*
- * global turbo related variables definitions
+ * Global turbo related variables definitions
  */
 boolean_t		g_turbo_supported;
 double			g_turbo_ratio;
 
 /*
- * the variables to store kstat snapshot
+ * The variables to store kstat snapshot
  */
 static turbo_info_t	*cpu_turbo_info = NULL;
 static turbo_info_t	*t_new = NULL;
@@ -92,7 +92,7 @@ pt_turbo_init(void)
 	}
 
 	/*
-	 * initialize turbo information structure if turbo mode is supported
+	 * Initialize turbo information structure if turbo mode is supported
 	 */
 	if (knp->value.ui32) {
 		g_turbo_supported = B_TRUE;
@@ -122,7 +122,7 @@ pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 
 	for (cpu = 0; cpu < g_ncpus; cpu++) {
 		turbo_info = &turbo_snapshot[cpu];
-		ksp = kstat_lookup(kc, "turbo", cpu_table[cpu], NULL);
+		ksp = kstat_lookup(kc, "turbo", g_cpu_table[cpu], NULL);
 		if (ksp == NULL) {
 			pt_error("%s : couldn't find turbo kstat for CPU "
 			"%d\n", __FILE__, cpu);
@@ -171,7 +171,7 @@ pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 }
 
 /*
- * turbo support checking and information initialization
+ * Turbo support checking and information initialization
  */
 int
 pt_turbo_stat_prepare(void)
@@ -194,7 +194,7 @@ pt_turbo_stat_prepare(void)
 }
 
 /*
- * when doing the statistics collection, we compare two kstat snapshot
+ * When doing the statistics collection, we compare two kstat snapshot
  * and get a delta. the final ratio of performance boost will be worked
  * out according to the kstat delta
  */
@@ -207,17 +207,17 @@ pt_turbo_stat_collect(void)
 	int		ret;
 
 	/*
-	 * take a snapshot of turbo information to setup turbo_info_t
+	 * Take a snapshot of turbo information to setup turbo_info_t
 	 * structure
 	 */
 	ret = pt_turbo_snapshot(t_new);
 	if (ret != 0) {
-		pt_error("%s : turbo stat collect failed\n", __FILE__);
+		pt_error("%s : turbo stat collection failed\n", __FILE__);
 		return (ret);
 	}
 
 	/*
-	 * calculate the kstat delta and work out the performance boost ratio
+	 * Calculate the kstat delta and work out the performance boost ratio
 	 */
 	for (cpu = 0; cpu < g_ncpus; cpu++) {
 		delta_mcnt = t_new[cpu].t_mcnt - cpu_turbo_info[cpu].t_mcnt;
@@ -233,7 +233,7 @@ pt_turbo_stat_collect(void)
 	g_turbo_ratio = g_turbo_ratio / (double)g_ncpus;
 
 	/*
-	 * update the structure of the kstat for the next time calculation
+	 * Update the structure of the kstat for the next time calculation
 	 */
 	(void) memcpy(cpu_turbo_info, t_new, g_ncpus * (sizeof (turbo_info_t)));
 

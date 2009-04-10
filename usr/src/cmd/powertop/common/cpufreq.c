@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -45,9 +45,12 @@
 #include "powertop.h"
 
 #define	HZ2MHZ(speed)	((speed) / 1000000)
+#define	DTP_ARG_COUNT	2
+#define	DTP_ARG_LENGTH	5
 
 static uint64_t		max_cpufreq = 0;
-static dtrace_hdl_t	*g_dtp;
+static dtrace_hdl_t	*dtp;
+static char		**dtp_argv;
 
 /*
  * Enabling PM through /etc/power.conf
@@ -61,9 +64,8 @@ static char cpupm_treshold[]	= " echo cpu-threshold 1s >> /etc/power.conf";
 /*
  * Buffer containing DTrace program to track CPU frequency transitions
  */
-static const char 	*pt_cpufreq_dtrace_prog =
-""
-"hrtime_t last[int];"
+static const char *dtp_cpufreq =
+"hrtime_t last[$0];"
 ""
 "BEGIN"
 "{"
@@ -87,8 +89,68 @@ static const char 	*pt_cpufreq_dtrace_prog =
 "	last[this->cpu] = timestamp;"
 "}";
 
+/*
+ * Same as above, but only for a specific CPU
+ */
+static const char *dtp_cpufreq_c =
+"hrtime_t last;"
+""
+"BEGIN"
+"{"
+"	begin = timestamp;"
+"}"
+""
+":::cpu-change-speed"
+"/(processorid_t)arg0 == $1 &&"
+" last != 0/"
+"{"
+"	this->cpu = (processorid_t)arg0;"
+"	this->oldspeed = (uint32_t)(arg1/1000000);"
+"	@times[this->cpu, this->oldspeed] = sum(timestamp - last);"
+"	last = timestamp;"
+"}"
+":::cpu-change-speed"
+"/(processorid_t)arg0 == $1 &&"
+" last == 0/"
+"{"
+"	this->cpu = (processorid_t)arg0;"
+"	this->oldspeed = (uint32_t)(arg1/1000000);"
+"	@times[this->cpu, this->oldspeed] = sum(timestamp - begin);"
+"	last = timestamp;"
+"}";
+
+static int	pt_cpufreq_setup(void);
 static int	pt_cpufreq_snapshot(void);
 static int	pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *, void *);
+static void	pt_cpufreq_stat_account(double, uint_t);
+static int	pt_cpufreq_snapshot_cpu(kstat_ctl_t *,
+    uint_t);
+
+static int
+pt_cpufreq_setup(void)
+{
+	if ((dtp_argv = malloc(sizeof (char *) * DTP_ARG_COUNT)) == NULL)
+		return (EXIT_FAILURE);
+
+	if ((dtp_argv[0] = malloc(sizeof (char) * DTP_ARG_LENGTH)) == NULL) {
+		free(dtp_argv);
+		return (EXIT_FAILURE);
+	}
+
+	(void) snprintf(dtp_argv[0], 5, "%d\0", g_ncpus_observed);
+
+	if (PTOP_ON_CPU) {
+		if ((dtp_argv[1] = malloc(sizeof (char) * DTP_ARG_LENGTH))
+		    == NULL) {
+			free(dtp_argv[0]);
+			free(dtp_argv);
+			return (EXIT_FAILURE);
+		}
+		(void) snprintf(dtp_argv[1], 5, "%d\0", g_observed_cpu);
+	}
+
+	return (0);
+}
 
 /*
  * Perform setup necessary to enumerate and track CPU speed changes
@@ -99,17 +161,22 @@ pt_cpufreq_stat_prepare(void)
 	dtrace_prog_t 		*prog;
 	dtrace_proginfo_t 	info;
 	dtrace_optval_t 	statustime;
-
 	kstat_ctl_t 		*kc;
 	kstat_t 		*ksp;
 	kstat_named_t 		*knp;
-
-	pstate_info_t 		*state;
-	char 			*s, *token;
+	freq_state_info_t 	*state;
+	char 			*s, *token, *prog_ptr;
 	int 			err;
 
-	state = pstate_info;
-	cpu_power_states = calloc((size_t)g_ncpus, sizeof (cpu_power_info_t));
+	if ((err = pt_cpufreq_setup()) != 0) {
+		pt_error("%s : failed to setup", __FILE__);
+		return (errno);
+	}
+
+	state = g_pstate_info;
+	if ((g_cpu_power_states = calloc((size_t)g_ncpus,
+	    sizeof (cpu_power_info_t))) == NULL)
+		return (-1);
 
 	/*
 	 * Enumerate the CPU frequencies
@@ -117,20 +184,23 @@ pt_cpufreq_stat_prepare(void)
 	if ((kc = kstat_open()) == NULL)
 		return (errno);
 
-	ksp = kstat_lookup(kc, "cpu_info", cpu_table[0], NULL);
+	ksp = kstat_lookup(kc, "cpu_info", g_cpu_table[g_observed_cpu], NULL);
 
-	if (ksp == NULL)
-		return (errno);
+	if (ksp == NULL) {
+		err = errno;
+		(void) kstat_close(kc);
+		return (err);
+	}
 
 	(void) kstat_read(kc, ksp, NULL);
 
 	knp = kstat_data_lookup(ksp, "supported_frequencies_Hz");
 	s = knp->value.str.addr.ptr;
 
-	npstates = 0;
+	g_npstates = 0;
 
 	for (token = strtok(s, ":"), s = NULL;
-	    NULL != token && npstates < NSTATES;
+	    NULL != token && g_npstates < NSTATES;
 	    token = strtok(NULL, ":")) {
 
 		state->speed = HZ2MHZ(atoll(token));
@@ -140,7 +210,7 @@ pt_cpufreq_stat_prepare(void)
 
 		state->total_time = (uint64_t)0;
 
-		npstates++;
+		g_npstates++;
 		state++;
 	}
 
@@ -152,42 +222,58 @@ pt_cpufreq_stat_prepare(void)
 	/*
 	 * Return if speed transition is not supported
 	 */
-	if (npstates < 2)
+	if (g_npstates < 2)
 		return (-1);
 
 	/*
 	 * Setup DTrace to look for CPU frequency changes
 	 */
-	if ((g_dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
+	if ((dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
 		pt_error("%s : cannot open dtrace library: %s\n", __FILE__,
 		    dtrace_errmsg(NULL, err));
 		return (-2);
 	}
-	if ((prog = dtrace_program_strcompile(g_dtp, pt_cpufreq_dtrace_prog,
-	    DTRACE_PROBESPEC_NAME, 0, 0, NULL)) == NULL) {
+
+	/*
+	 * Execute different scripts (defined above) depending on
+	 * user specified options. Default mode uses dtp_cpufreq.
+	 */
+	if (PTOP_ON_CPU)
+		prog_ptr = (char *)dtp_cpufreq_c;
+	else
+		prog_ptr = (char *)dtp_cpufreq;
+
+	if ((prog = dtrace_program_strcompile(dtp, prog_ptr,
+	    DTRACE_PROBESPEC_NAME, 0, (1 + g_argc), dtp_argv)) == NULL) {
 		pt_error("%s : cpu-change-speed probe unavailable\n", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
-	if (dtrace_program_exec(g_dtp, prog, &info) == -1) {
+
+	if (dtrace_program_exec(dtp, prog, &info) == -1) {
 		pt_error("%s : failed to enable speed probe\n", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
-	if (dtrace_setopt(g_dtp, "aggsize", "128k") == -1) {
+
+	if (dtrace_setopt(dtp, "aggsize", "128k") == -1) {
 		pt_error("%s : failed to set speed 'aggsize'\n", __FILE__);
 	}
-	if (dtrace_setopt(g_dtp, "aggrate", "0") == -1) {
+
+	if (dtrace_setopt(dtp, "aggrate", "0") == -1) {
 		pt_error("%s : failed to set speed 'aggrate'\n", __FILE__);
 	}
-	if (dtrace_setopt(g_dtp, "aggpercpu", 0) == -1) {
+
+	if (dtrace_setopt(dtp, "aggpercpu", 0) == -1) {
 		pt_error("%s : failed to set speed 'aggpercpu'\n", __FILE__);
 	}
-	if (dtrace_go(g_dtp) != 0) {
+
+	if (dtrace_go(dtp) != 0) {
 		pt_error("%s : failed to start speed observation", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
-	if (dtrace_getopt(g_dtp, "statusrate", &statustime) == -1) {
+
+	if (dtrace_getopt(dtp, "statusrate", &statustime) == -1) {
 		pt_error("%s : failed to get speed 'statusrate'\n", __FILE__);
-		return (dtrace_errno(g_dtp));
+		return (dtrace_errno(dtp));
 	}
 
 	return (0);
@@ -206,55 +292,68 @@ pt_cpufreq_stat_prepare(void)
 int
 pt_cpufreq_stat_collect(double interval)
 {
-	int 			cpu, i, ret;
-	uint64_t 		speed;
-	hrtime_t 		duration;
-	cpu_power_info_t 	*cpu_pow;
+	int	i, ret;
 
 	/*
 	 * Zero out the interval time reported by DTrace for
 	 * this interval
 	 */
-	for (i = 0; i < npstates; i++)
-		pstate_info[i].total_time = 0;
+	for (i = 0; i < g_npstates; i++)
+		g_pstate_info[i].total_time = 0;
 
 	for (i = 0; i < g_ncpus; i++)
-		cpu_power_states[i].dtrace_time = 0;
+		g_cpu_power_states[i].dtrace_time = 0;
 
-	if (dtrace_status(g_dtp) == -1)
+	if (dtrace_status(dtp) == -1)
 		return (-1);
 
-	if (dtrace_aggregate_snap(g_dtp) != 0)
+	if (dtrace_aggregate_snap(dtp) != 0)
 		pt_error("%s : failed to add to stats aggregation", __FILE__);
 
-	if (dtrace_aggregate_walk_keyvarsorted(g_dtp, pt_cpufreq_dtrace_walk,
+	if (dtrace_aggregate_walk_keyvarsorted(dtp, pt_cpufreq_dtrace_walk,
 	    NULL) != 0)
 		pt_error("%s : failed to sort stats aggregation", __FILE__);
 
-	dtrace_aggregate_clear(g_dtp);
+	dtrace_aggregate_clear(dtp);
 
 	if ((ret = pt_cpufreq_snapshot()) != 0) {
 		pt_error("%s : failed to add to stats aggregation", __FILE__);
 		return (ret);
 	}
 
-	for (cpu = 0; cpu < g_ncpus; cpu++) {
-		cpu_pow = &cpu_power_states[cpu];
-
-		speed = cpu_pow->current_pstate;
-
-		duration = (hrtime_t)((interval * NANOSEC)) -
-		    cpu_pow->dtrace_time;
-
-		for (i = 0; i < npstates; i++) {
-			if (pstate_info[i].speed == speed) {
-				pstate_info[i].total_time += duration;
-				cpu_pow->time_accounted += duration;
-			}
-		}
+	switch (g_op_mode) {
+	case PTOP_MODE_CPU:
+		pt_cpufreq_stat_account(interval, g_observed_cpu);
+		break;
+	case PTOP_MODE_DEFAULT:
+	default:
+		for (i = 0; i < g_ncpus_observed; i++)
+			pt_cpufreq_stat_account(interval, i);
+		break;
 	}
 
 	return (0);
+}
+
+static void
+pt_cpufreq_stat_account(double interval, uint_t cpu)
+{
+	uint64_t 		speed;
+	hrtime_t 		duration;
+	cpu_power_info_t 	*cpu_pow;
+	int			i;
+
+	cpu_pow = &g_cpu_power_states[cpu];
+	speed = cpu_pow->current_pstate;
+
+	duration = (hrtime_t)((interval * NANOSEC)) - cpu_pow->dtrace_time;
+
+	for (i = 0; i < g_npstates; i++) {
+		if (g_pstate_info[i].speed == speed) {
+			g_pstate_info[i].total_time += duration;
+			cpu_pow->time_accounted += duration;
+		}
+	}
 }
 
 /*
@@ -264,44 +363,57 @@ static int
 pt_cpufreq_snapshot(void)
 {
 	kstat_ctl_t 		*kc;
-	kstat_t 		*ksp;
-	kstat_named_t 		*knp;
-	int 			cpu;
-	cpu_power_info_t 	*state;
+	int 			ret;
+	uint_t			i;
 
 	if ((kc = kstat_open()) == NULL)
 		return (errno);
 
-	for (cpu = 0; cpu < g_ncpus; cpu++) {
-		ksp = kstat_lookup(kc, "cpu_info", cpu_table[cpu], NULL);
-		if (ksp == NULL) {
-			pt_error("%s : couldn't find cpu_info kstat for CPU "
-			"%d\n", __FILE__, cpu);
-			(void) kstat_close(kc);
-			return (1);
-		}
-
-		if (kstat_read(kc, ksp, NULL) == -1) {
-			pt_error("%s : couldn't read cpu_info kstat for "
-			    "CPU %d\n", __FILE__, cpu);
-			(void) kstat_close(kc);
-			return (2);
-		}
-
-		knp = kstat_data_lookup(ksp, "current_clock_Hz");
-		if (knp == NULL) {
-			pt_error("%s : couldn't find current_clock_Hz "
-			    "kstat for CPU %d\n", __FILE__, cpu);
-			(void) kstat_close(kc);
-			return (3);
-		}
-
-		state = &cpu_power_states[cpu];
-		state->current_pstate = HZ2MHZ(knp->value.ui64);
+	switch (g_op_mode) {
+	case PTOP_MODE_CPU:
+		ret = pt_cpufreq_snapshot_cpu(kc, g_observed_cpu);
+		break;
+	case PTOP_MODE_DEFAULT:
+	default:
+		for (i = 0; i < g_ncpus_observed; i++)
+			if ((ret = pt_cpufreq_snapshot_cpu(kc, i)) != 0)
+				break;
+		break;
 	}
 
 	if (kstat_close(kc) != 0)
 		pt_error("%s : couldn't close kstat\n", __FILE__);
+
+	return (ret);
+}
+
+static int
+pt_cpufreq_snapshot_cpu(kstat_ctl_t *kc, uint_t cpu)
+{
+	kstat_t 		*ksp;
+	kstat_named_t 		*knp;
+
+	ksp = kstat_lookup(kc, "cpu_info", g_cpu_table[cpu], NULL);
+	if (ksp == NULL) {
+		pt_error("%s : couldn't find cpu_info kstat for CPU "
+		"%d\n", __FILE__, cpu);
+		return (1);
+	}
+
+	if (kstat_read(kc, ksp, NULL) == -1) {
+		pt_error("%s : couldn't read cpu_info kstat for "
+		    "CPU %d\n", __FILE__, cpu);
+		return (2);
+	}
+
+	knp = kstat_data_lookup(ksp, "current_clock_Hz");
+	if (knp == NULL) {
+		pt_error("%s : couldn't find current_clock_Hz "
+		    "kstat for CPU %d\n", __FILE__, cpu);
+		return (3);
+	}
+
+	g_cpu_power_states[cpu].current_pstate = HZ2MHZ(knp->value.ui64);
 
 	return (0);
 }
@@ -349,13 +461,13 @@ pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 		 * notice during potentially infrequent firings of the
 		 * "speed change" DTrace probe. In this case powertop would
 		 * have already accounted for the portions of the interval
-		 * that happened during prior powertop sampings, so subtract
+		 * that happened during prior powertop samplings, so subtract
 		 * out time already accounted.
 		 */
-		cpu_pow = &cpu_power_states[cpu];
+		cpu_pow = &g_cpu_power_states[cpu];
 
-		for (i = 0; i < npstates; i++) {
-			if (pstate_info[i].speed == speed) {
+		for (i = 0; i < g_npstates; i++) {
+			if (g_pstate_info[i].speed == speed) {
 				if (cpu_pow->time_accounted > 0) {
 					if (dt_state_time == 0)
 						continue;
@@ -366,7 +478,7 @@ pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 						cpu_pow->time_accounted = 0;
 					}
 				}
-				pstate_info[i].total_time += dt_state_time;
+				g_pstate_info[i].total_time += dt_state_time;
 				cpu_pow->dtrace_time += dt_state_time;
 			}
 		}
@@ -398,7 +510,7 @@ suggest_p_state(void)
 	/*
 	 * Return if speed transition is not supported
 	 */
-	if (npstates < 2)
+	if (g_npstates < 2)
 		return;
 
 	file = fopen(default_conf, "r");

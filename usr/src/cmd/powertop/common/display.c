@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -51,13 +51,15 @@ static WINDOW 	*suggestion_window;
 static WINDOW 	*status_bar_window;
 
 #define	print(win, y, x, fmt, args...)				\
-	if (dump)						\
+	if (PTOP_ON_DUMP)					\
 		(void) printf(fmt, ## args);			\
 	else							\
 		(void) mvwprintw(win, y, x, fmt, ## args);
 
-char	status_bar_slots[10][40];
-int	maxx, maxy;
+char 		g_status_bar_slots[PTOP_BAR_NSLOTS][PTOP_BAR_LENGTH];
+char 		g_suggestion_key;
+
+static int	maxx, maxy;
 
 static void
 zap_windows(void)
@@ -119,7 +121,7 @@ setup_windows(void)
 
 	zap_windows();
 
-	cstate_lines 	= TITLE_LINE + max((max_cstate+1), npstates);
+	cstate_lines 	= TITLE_LINE + max((g_max_cstate+1), g_npstates);
 
 	pos_y = 0;
 	title_bar_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
@@ -144,8 +146,8 @@ setup_windows(void)
 	pos_y += BLANK_LINE + NEXT_LINE;
 	status_bar_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
 
-	(void) strcpy(status_bar_slots[0], _(" Q - Quit "));
-	(void) strcpy(status_bar_slots[1], _(" R - Refresh "));
+	(void) strcpy(g_status_bar_slots[0], _(" Q - Quit "));
+	(void) strcpy(g_status_bar_slots[1], _(" R - Refresh "));
 
 	(void) werase(stdscr);
 	(void) wrefresh(status_bar_window);
@@ -212,13 +214,13 @@ show_title_bar(void)
 	(void) wrefresh(title_bar_window);
 	(void) werase(status_bar_window);
 
-	for (i = 0; i < 10; i++) {
-		if (strlen(status_bar_slots[i]) == 0)
+	for (i = 0; i < PTOP_BAR_NSLOTS; i++) {
+		if (strlen(g_status_bar_slots[i]) == 0)
 			continue;
 		(void) wattron(status_bar_window, A_REVERSE);
-		print(status_bar_window, y, x, "%s", status_bar_slots[i]);
+		print(status_bar_window, y, x, "%s", g_status_bar_slots[i]);
 		(void) wattroff(status_bar_window, A_REVERSE);
-		x += strlen(status_bar_slots[i]) + 1;
+		x += strlen(g_status_bar_slots[i]) + 1;
 	}
 	(void) wnoutrefresh(status_bar_window);
 }
@@ -231,103 +233,103 @@ show_cstates(void)
 	double		total_pstates = 0.0, avg, res;
 	uint64_t	p0_speed, p1_speed;
 
-	if (!dump) {
+	if (!PTOP_ON_DUMP) {
 		(void) werase(cstate_window);
 		(void) wattrset(cstate_window, COLOR_PAIR(PT_COLOR_DEFAULT));
 		(void) wbkgd(cstate_window, COLOR_PAIR(PT_COLOR_DEFAULT));
 	}
 
-	print(cstate_window, 0, 0, "%s", "Cn\t\t\tAvg	residency\n");
-
-	res =  (((double)cstate_info[0].total_time / total_c_time)) * 100;
+	print(cstate_window, 0, 0, "%s\tAvg residency\n", g_msg_idle_state);
+	res =  (((double)g_cstate_info[0].total_time / g_total_c_time)) * 100;
 	(void) sprintf(c, "C0 (cpu running)\t\t(%.1f%%)\n", (float)res);
 	print(cstate_window, 1, 0, "%s", c);
 
-	for (i = 1; i <= max_cstate; i++) {
+	for (i = 1; i <= g_max_cstate; i++) {
 		/*
 		 * In situations where the load is too intensive, the system
 		 * might not transition at all.
 		 */
-		if (cstate_info[i].events > 0)
-			avg = (((double)cstate_info[i].total_time/g_ncpus)/
-			    cstate_info[i].events);
+		if (g_cstate_info[i].events > 0)
+			avg = (((double)g_cstate_info[i].total_time/
+			    g_ncpus_observed)/g_cstate_info[i].events);
 		else
 			avg = 0;
 
-		res = ((double)cstate_info[i].total_time/total_c_time) * 100;
+		res = ((double)g_cstate_info[i].total_time/g_total_c_time)
+		    * 100;
 
 		(void) sprintf(c, "C%d\t\t\t%.1fms\t(%.1f%%)\n", i, (float)avg,
 		    (float)res);
 		print(cstate_window, i + 1, 0, "%s", c);
 	}
 
-	print(cstate_window, 0, 48, "%s", "P-states (frequencies)\n");
+	print(cstate_window, 0, 48, "%s", g_msg_freq_state);
 
-	if (npstates < 2) {
+	if (g_npstates < 2) {
 		(void) sprintf(c, "%4lu Mhz\t%.1f%%",
-		    (long)pstate_info[0].speed, 100.0);
+		    (long)g_pstate_info[0].speed, 100.0);
 		print(cstate_window, 1, 48, "%s\n", c);
 	} else {
-		for (i = 0; i < npstates; i++) {
-			total_pstates += (double)(pstate_info[i].total_time/
-			    g_ncpus/1000000);
+		for (i = 0; i < g_npstates; i++) {
+			total_pstates += (double)(g_pstate_info[i].total_time/
+			    g_ncpus_observed/1000000);
 		}
 
 		/*
 		 * display ACPI_PSTATE from P(n) to P(1)
 		 */
-		for (i = 0;  i < npstates - 1; i++) {
+		for (i = 0;  i < g_npstates - 1; i++) {
 			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
-			    (long)pstate_info[i].speed,
-			    100 * (pstate_info[i].total_time/g_ncpus/1000000
-			    /total_pstates));
+			    (long)g_pstate_info[i].speed,
+			    100 * (g_pstate_info[i].total_time/g_ncpus_observed/
+			    1000000/total_pstates));
 			print(cstate_window, i+1, 48, "%s\n", c);
 		}
 
 		/*
-		 * display ACPI_PSTATE P0 according to if turbo
+		 * Display ACPI_PSTATE P0 according to if turbo
 		 * mode is supported
 		 */
 		if (g_turbo_supported) {
-			p1_speed = pstate_info[npstates - 2].speed;
+			p1_speed = g_pstate_info[g_npstates - 2].speed;
+
 			/*
-			 * if g_turbo_ratio <= 1.0, it will be ignored.
+			 * If g_turbo_ratio <= 1.0, it will be ignored.
 			 * we display P(0) as P(1) + 1.
 			 */
 			if (g_turbo_ratio <= 1.0) {
 				p0_speed = p1_speed + 1;
-			}
-			/*
-			 * if g_turbo_ratio > 1.0, that means turbo mode works.
-			 * So, P(0) = ratio * P(1);
-			 */
-			else {
+			} else {
+				/*
+				 * If g_turbo_ratio > 1.0, that means turbo
+				 * mode works. So, P(0) = ratio * P(1);
+				 */
 				p0_speed = (uint64_t)(p1_speed * g_turbo_ratio);
 				if (p0_speed < (p1_speed + 1))
 				p0_speed = p1_speed + 1;
 			}
 			/*
-			 * reset the ratio for the next round
+			 * Reset the ratio for the next round
 			 */
 			g_turbo_ratio = 0.0;
 
 			/*
-			 * setup the string for the display
+			 * Setup the string for the display
 			 */
 			(void) sprintf(c, "%4lu Mhz(turbo)\t%.1f%%",
 			    (long)p0_speed,
-			    100 * (pstate_info[i].total_time/g_ncpus/1000000
-			    /total_pstates));
+			    100 * (g_pstate_info[i].total_time/
+			    g_ncpus_observed/1000000/total_pstates));
 		} else {
 			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
-			    (long)pstate_info[i].speed,
-			    100 * (pstate_info[i].total_time/g_ncpus/1000000
-			    /total_pstates));
+			    (long)g_pstate_info[i].speed,
+			    100 * (g_pstate_info[i].total_time/
+			    g_ncpus_observed/1000000/total_pstates));
 		}
 		print(cstate_window, i+1, 48, "%s\n", c);
-
 	}
-	if (!dump)
+
+	if (!PTOP_ON_DUMP)
 		(void) wnoutrefresh(cstate_window);
 }
 
@@ -339,7 +341,7 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 
 	(void) sprintf(buffer,  _("no ACPI power usage estimate available"));
 
-	if (!dump)
+	if (!PTOP_ON_DUMP)
 		(void) werase(acpi_power_window);
 	if (flag) {
 		char *c;
@@ -354,11 +356,11 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 			break;
 		case 1:
 			(void) sprintf(c, "(discharging: %3.1f hours)",
-			    rem_cap/rate);
+			    (uint32_t)rem_cap/rate);
 			break;
 		case 2:
 			(void) sprintf(c, "(charging: %3.1f hours)",
-			    (cap - rem_cap)/rate);
+			    (uint32_t)(cap - rem_cap)/rate);
 			break;
 		case 4:
 			(void) sprintf(c, "(##critically low battery power##)");
@@ -367,24 +369,44 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 
 	}
 	print(acpi_power_window, 0, 0, "%s\n", buffer);
-	if (!dump)
+	if (!PTOP_ON_DUMP)
 		(void) wnoutrefresh(acpi_power_window);
 }
 
 void
 show_wakeups(double interval)
 {
-	char 	c[100];
+	char		c[100];
+	int		i, event_sum = 0;
+	event_info_t	*g_p_event = g_event_info;
 
-	if (!dump) {
+	if (!PTOP_ON_DUMP) {
 		(void) werase(wakeup_window);
 		(void) wbkgd(wakeup_window, COLOR_PAIR(PT_COLOR_RED));
 		(void) wattron(wakeup_window, A_BOLD);
 	}
+
+	/*
+	 * calculate the actual total event number
+	 */
+	for (i = 0; i < g_tog_p_events; i++, g_p_event++)
+		event_sum += g_p_event->total_count;
+
+	/*
+	 * g_total_events is the sum of the number of Cx->C0 transition,
+	 * So when the system is very busy, the idle thread will have no
+	 * chance or very seldom to be scheduled, this could cause >100%
+	 * event report. Re-assign g_total_events to the actual event
+	 * number is a way to avoid this issue.
+	 */
+	if (event_sum > g_total_events)
+		g_total_events = event_sum;
+
 	(void) sprintf(c, "Wakeups-from-idle per second: %4.1f\tinterval: "
-	    "%.1fs", (double)(total_events/interval), interval);
+	    "%.1fs", (double)(g_total_events/interval), interval);
 	print(wakeup_window, 0, 0, "%s\n", c);
-	if (!dump)
+
+	if (!PTOP_ON_DUMP)
 		(void) wnoutrefresh(wakeup_window);
 }
 
@@ -394,9 +416,9 @@ show_eventstats(double interval)
 	char		c[100];
 	int		i;
 	double		events;
-	event_info_t	*p_event = event_info;
+	event_info_t	*g_p_event = g_event_info;
 
-	if (!dump) {
+	if (!PTOP_ON_DUMP) {
 		(void) werase(eventstat_window);
 		(void) wattrset(eventstat_window, COLOR_PAIR(PT_COLOR_DEFAULT));
 		(void) wbkgd(eventstat_window, COLOR_PAIR(PT_COLOR_DEFAULT));
@@ -405,31 +427,38 @@ show_eventstats(double interval)
 	/*
 	 * Sort the event report list
 	 */
-	if (top_events > EVENT_NUM_MAX)
-		top_events = EVENT_NUM_MAX;
+	if (g_tog_p_events > EVENT_NUM_MAX)
+		g_tog_p_events = EVENT_NUM_MAX;
 
-	qsort((void *)event_info, top_events, sizeof (event_info_t),
+	qsort((void *)g_event_info, g_tog_p_events, sizeof (event_info_t),
 	    event_compare);
 
-	print(eventstat_window, 0, 0, "%s", "Top causes for wakeups:\n");
+	if (PTOP_ON_CPU)
+		(void) sprintf(c, "Top causes for wakeups on CPU %d:\n",
+		    g_observed_cpu);
+	else
+		(void) sprintf(c, "Top causes for wakeups:\n");
 
-	for (i = 0; i < top_events; i++, p_event++) {
+	print(eventstat_window, 0, 0, "%s", c);
 
-		if (total_events > 0)
-			events = (double)p_event->total_count/
-			    (double)total_events;
+	for (i = 0; i < g_tog_p_events; i++, g_p_event++) {
+
+		if (g_total_events > 0 && g_p_event->total_count > 0)
+			events = (double)g_p_event->total_count/
+			    (double)g_total_events;
 		else
-			events = 0;
+			continue;
 
 		(void) sprintf(c, "%4.1f%% (%5.1f)", 100 * events,
-		    (double)p_event->total_count/interval);
+		    (double)g_p_event->total_count/interval);
 		print(eventstat_window, i+1, 0, "%s", c);
 		print(eventstat_window, i+1, 16, "%20s :",
-		    p_event->offender_name);
+		    g_p_event->offender_name);
 		print(eventstat_window, i+1, 40, "%-64s\n",
-		    p_event->offense_name);
+		    g_p_event->offense_name);
 	}
-	if (!dump)
+
+	if (!PTOP_ON_DUMP)
 		(void) wnoutrefresh(eventstat_window);
 }
 

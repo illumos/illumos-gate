@@ -51,9 +51,6 @@ static char 	PROG_FMT[] = "%s: ";
 static char 	ERR_FMT[] = ": %s";
 static char 	*progname;
 
-char 	*kstat_batt_mod[3] = {"NULL", "battery", "acpi_drv"};
-uint_t	kstat_batt_idx;
-
 void
 pt_set_progname(char *name)
 {
@@ -67,7 +64,7 @@ pt_error(char *format, ...)
 	int 	err = errno;
 	va_list alist;
 
-	if (gui)
+	if (g_gui)
 		return;
 
 	if (progname != NULL)
@@ -81,30 +78,40 @@ pt_error(char *format, ...)
 		(void) fprintf(stderr, gettext(ERR_FMT), strerror(err));
 }
 
-void
+/*
+ * Returns the number of online CPUs.
+ */
+uint_t
 enumerate_cpus(void)
 {
 	int	cpuid;
-	int	ncpus = 0;
 	int	max, cpus_conf;
+	uint_t	ncpus = 0;
 
 	max 		= sysconf(_SC_CPUID_MAX);
 	cpus_conf	= sysconf(_SC_NPROCESSORS_CONF);
-	cpu_table 	= malloc(cpus_conf * sizeof (processorid_t));
+
+	/* Fall back to one CPU if any of the sysconf calls above failed */
+	if (max == -1 || cpus_conf == -1) {
+		max = cpus_conf = 1;
+	}
+
+	if ((g_cpu_table = malloc(cpus_conf * sizeof (processorid_t))) == NULL)
+		return (0);
 
 	for (cpuid = 0; cpuid < max; cpuid++) {
 		if (p_online(cpuid, P_STATUS) != -1) {
-			cpu_table[ncpus] = cpuid;
+			g_cpu_table[ncpus] = cpuid;
 			ncpus++;
 		}
 	}
-	g_ncpus = ncpus;
+	return (ncpus);
 }
 
 void
 usage(void)
 {
-	(void) fprintf(stderr, "%s   (C) 2009 Intel Corporation\n\n", TITLE);
+	(void) fprintf(stderr, "%s   %s\n\n", TITLE, COPYRIGHT_INTEL);
 	(void) fprintf(stderr, "Usage: powertop [option]\n");
 	(void) fprintf(stderr, "  -d, --dump [count]	Read wakeups count "
 	    "times and print list of top offenders\n");
@@ -112,6 +119,8 @@ usage(void)
 	    "data in seconds [1-100s]\n");
 	(void) fprintf(stderr, "  -v, --verbose		Verbose mode, reports "
 	    "kernel cyclic activity\n");
+	(void) fprintf(stderr, "  -c, --cpu [CPU]	Only observe a specific"
+	    " CPU\n");
 	(void) fprintf(stderr, "  -h, --help		Show this help "
 	    "message\n");
 
@@ -141,26 +150,6 @@ get_bit_depth(void)
 		return (64);
 
 	return (-3);
-}
-
-/*
- * Checks if the kstat module for battery information is present and
- * whether it's called 'battery' or 'acpi_drv'
- */
-void
-battery_mod_lookup(void)
-{
-	kstat_ctl_t *kc = kstat_open();
-
-	if (kstat_lookup(kc, kstat_batt_mod[1], 0, NULL))
-		kstat_batt_idx = 1;
-	else
-		if (kstat_lookup(kc, kstat_batt_mod[2], 0, NULL))
-			kstat_batt_idx = 2;
-		else
-			kstat_batt_idx = 0;
-
-	(void) kstat_close(kc);
 }
 
 /*

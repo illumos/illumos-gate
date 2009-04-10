@@ -1,6 +1,6 @@
 /*
- * Copyright 2008, Intel Corporation
- * Copyright 2008, Sun Microsystems, Inc
+ * Copyright 2009, Intel Corporation
+ * Copyright 2009, Sun Microsystems, Inc
  *
  * This file is part of PowerTOP
  *
@@ -43,9 +43,6 @@
 #include <string.h>
 #include "powertop.h"
 
-char 			suggestion_key;
-suggestion_func 	*suggestion_activate;
-
 struct suggestion;
 
 struct suggestion {
@@ -82,10 +79,10 @@ reset_suggestions(void)
 	}
 
 	suggestions = NULL;
-	(void) strcpy(status_bar_slots[8], "");
+	(void) strcpy(g_status_bar_slots[8], "");
 
-	suggestion_key 		= -1;
-	suggestion_activate 	= NULL;
+	g_suggestion_key 	= -1;
+	g_suggestion_activate 	= NULL;
 	total_weight 		= 0;
 }
 
@@ -124,9 +121,9 @@ pick_suggestion(void)
 	int			weight, value, running = 0;
 	struct suggestion 	*ptr;
 
-	(void) strcpy(status_bar_slots[8], "");
-	suggestion_key 		= -1;
-	suggestion_activate 	= NULL;
+	(void) strcpy(g_status_bar_slots[8], "");
+	g_suggestion_key 	= -1;
+	g_suggestion_activate 	= NULL;
 
 	if (total_weight == 0 || suggestions == NULL) {
 		show_suggestion("");
@@ -135,7 +132,7 @@ pick_suggestion(void)
 
 	weight = total_weight;
 
-	if (strlen(previous) && displaytime > 0.0)
+	if (strlen(previous) && g_displaytime > 0.0)
 		weight += 50;
 
 	value 	= rand() % weight;
@@ -144,21 +141,21 @@ pick_suggestion(void)
 	while (ptr) {
 		running += ptr->weight;
 
-		if (strcmp(ptr->string, previous) == 0 && displaytime > 0.0)
+		if (strcmp(ptr->string, previous) == 0 && g_displaytime > 0.0)
 			running += 50;
 
 		if (running > value) {
 			if (ptr->keystring)
-				(void) strncpy(status_bar_slots[8],
-				    ptr->keystring, 40);
+				(void) strncpy(g_status_bar_slots[8],
+				    ptr->keystring, PTOP_BAR_LENGTH);
 
-			suggestion_key 		= ptr->key;
-			suggestion_activate 	= ptr->func;
+			g_suggestion_key 	= ptr->key;
+			g_suggestion_activate 	= ptr->func;
 
 			show_suggestion(ptr->string);
 
 			if (strcmp(ptr->string, previous)) {
-				displaytime = 30.0;
+				g_displaytime = 30.0;
 				(void) strcpy(previous, ptr->string);
 			}
 			return;
@@ -168,7 +165,7 @@ pick_suggestion(void)
 
 	show_suggestion("");
 	(void) memset(previous, 0, sizeof (previous));
-	displaytime = -1.0;
+	g_displaytime = -1.0;
 }
 
 void

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/powertop/Makefile
@@ -28,8 +28,8 @@ PROG = powertop
 
 include ../Makefile.cmd
 
-$(64ONLY)SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+$(64ONLY)SUBDIRS	= $(MACH)
+$(BUILD64)SUBDIRS	+= $(MACH64)
 
 all	:=	TARGET = all
 install	:=	TARGET = install
@@ -39,9 +39,7 @@ lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
-
-clean clobber lint:	$(SUBDIRS)
+all clean clobber lint:	$(SUBDIRS)
 
 install:	$(SUBDIRS)
 	-$(RM) $(ROOTPROG)

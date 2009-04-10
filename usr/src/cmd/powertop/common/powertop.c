@@ -46,10 +46,43 @@
 #include <locale.h>
 #include "powertop.h"
 
-int 		g_ncpus;
-processorid_t 	*cpu_table;
-const int	true = 1;
-boolean_t	gui;
+/*
+ * Global variables, see powertop.h for comments and extern declarations.
+ * These are ordered by type, grouped by usage.
+ */
+double 			g_ticktime, g_ticktime_usr;
+double 			g_interval;
+double			g_displaytime;
+
+int			g_bit_depth;
+int 			g_total_events, g_tog_p_events;
+int			g_npstates, g_max_cstate, g_longest_cstate;
+uint_t			g_ncpus;
+uint_t			g_ncpus_observed;
+
+processorid_t 		*g_cpu_table;
+
+hrtime_t		g_total_c_time;
+
+uchar_t			g_op_mode;
+boolean_t		g_gui;
+uint_t			g_observed_cpu;
+
+event_info_t    	g_event_info[EVENT_NUM_MAX];
+event_info_t		*g_p_event;
+state_info_t		g_cstate_info[NSTATES];
+freq_state_info_t	g_pstate_info[NSTATES];
+cpu_power_info_t	*g_cpu_power_states;
+suggestion_func 	*g_suggestion_activate;
+
+boolean_t		g_turbo_supported;
+
+uint_t			g_argc;
+char			**g_argv;
+
+char			*optarg;
+
+static const int	true = 1;
 
 int
 main(int argc, char **argv)
@@ -64,6 +97,7 @@ main(int argc, char **argv)
 		{ "dump", 1, NULL, 'd' },
 		{ "time", 1, NULL, 't' },
 		{ "help", 0, NULL, 'h' },
+		{ "cpu", 1, NULL, 'c' },
 		{ "verbose", 0, NULL, 'v' },
 		{ 0, 0, NULL, 0 }
 	};
@@ -74,27 +108,37 @@ main(int argc, char **argv)
 
 	pt_set_progname(argv[0]);
 
-	if ((bit_depth = get_bit_depth()) < 0)
+	/*
+	 * Enumerate the system's CPUs
+	 * Populate cpu_table, g_ncpus
+	 */
+	if ((g_ncpus = g_ncpus_observed = enumerate_cpus()) == 0)
 		exit(EXIT_FAILURE);
 
-	ticktime = ticktime_usr = INTERVAL_DEFAULT;
-	displaytime 	= 0.0;
-	dump 		= 0;
-	gui		= B_FALSE;
-	event_mode	= ' ';
-	max_cstate	= 0;
+	if ((g_bit_depth = get_bit_depth()) < 0)
+		exit(EXIT_FAILURE);
+
+	g_ticktime = g_ticktime_usr = INTERVAL_DEFAULT;
+	g_displaytime 	= 0.0;
+	g_op_mode	= PTOP_MODE_DEFAULT;
+	g_gui		= B_FALSE;
+	g_max_cstate	= 0;
+	g_argv		= NULL;
+	g_argc		= 0;
+	g_observed_cpu	= 0;
 	g_turbo_supported = B_FALSE;
 
-	while ((c = getopt_long(argc, argv, "d:vt:h", opts, &index2)) != EOF) {
+	while ((c = getopt_long(argc, argv, "d:t:h:vc:", opts, &index2))
+	    != EOF) {
 		if (c == -1)
 			break;
 
 		switch (c) {
 		case 'd':
-			if (dump)
+			if (PTOP_ON_DUMP)
 				usage();
 
-			dump = 1;
+			g_op_mode |= PTOP_MODE_DUMP;
 			dump_count = (int)strtod(optarg, &endptr);
 
 			if (dump_count <= 0 || *endptr != NULL)
@@ -105,18 +149,39 @@ main(int argc, char **argv)
 				usage();
 
 			user_interval = 1;
-			ticktime = ticktime_usr = (double)strtod(optarg,
+			g_ticktime = g_ticktime_usr = (double)strtod(optarg,
 			    &endptr);
 
-			if (*endptr != NULL || ticktime < 1 ||
-			    ticktime > INTERVAL_MAX)
+			if (*endptr != NULL || g_ticktime < 1 ||
+			    g_ticktime > INTERVAL_MAX)
 				usage();
 			break;
 		case 'v':
-			if (event_mode == 'v')
+			if (PTOP_ON_CPU || PTOP_ON_VERBOSE)
 				usage();
 
-			event_mode = 'v';
+			g_op_mode |= PTOP_MODE_VERBOSE;
+			break;
+		case 'c':
+			if (PTOP_ON_CPU || PTOP_ON_VERBOSE)
+				usage();
+
+			g_op_mode |= PTOP_MODE_CPU;
+			g_observed_cpu = (uint_t)strtod(optarg, &endptr);
+
+			if (g_observed_cpu >= g_ncpus)
+				usage();
+
+			g_argc = 1;
+			g_ncpus_observed = 1;
+
+			if ((g_argv = malloc(sizeof (char *))) == NULL)
+				return (EXIT_FAILURE);
+
+			if ((*g_argv = malloc(sizeof (char) * 5)) == NULL)
+				return (EXIT_FAILURE);
+
+			(void) snprintf(*g_argv, 5, "%d\0", g_observed_cpu);
 			break;
 		case 'h':
 		default:
@@ -129,13 +194,7 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	(void) printf("%s   (C) 2009 Intel Corporation\n\n", TITLE);
-
-	/*
-	 * Enumerate the system's CPUs
-	 * Populate cpu_table, g_ncpus
-	 */
-	enumerate_cpus();
+	(void) printf("%s   %s\n\n", TITLE, COPYRIGHT_INTEL);
 
 	/*
 	 * If the system is running on battery, find out what's
@@ -168,10 +227,10 @@ main(int argc, char **argv)
 	}
 
 	(void) printf(_("Collecting data for %.2f second(s) \n"),
-	    (float)ticktime);
+	    (float)g_ticktime);
 
-	if (!dump)
-		gui = B_TRUE;
+	if (!PTOP_ON_DUMP)
+		g_gui = B_TRUE;
 
 	last = gethrtime();
 
@@ -188,10 +247,10 @@ main(int argc, char **argv)
 		FD_ZERO(&rfds);
 		FD_SET(0, &rfds);
 
-		tv.tv_sec 	= (long)ticktime;
-		tv.tv_usec 	= (long)((ticktime - tv.tv_sec) * 1000000);
+		tv.tv_sec 	= (long)g_ticktime;
+		tv.tv_usec 	= (long)((g_ticktime - tv.tv_sec) * 1000000);
 
-		if (!dump)
+		if (!PTOP_ON_DUMP)
 			key = select(1, &rfds, NULL, NULL, &tv);
 		else
 			key = select(1, NULL, NULL, NULL, &tv);
@@ -201,12 +260,12 @@ main(int argc, char **argv)
 		g_interval 	= (double)(now - last)/NANOSEC;
 		last 		= now;
 
-		top_events 	= 0;
-		total_events 	= 0;
+		g_tog_p_events 	= 0;
+		g_total_events 	= 0;
 
-		(void) memset(event_info, EVENT_NUM_MAX * sizeof (event_info_t),
-		    0);
-		(void) memset(cstate_info, 2 * sizeof (state_info_t), 0);
+		(void) memset(g_event_info,
+		    EVENT_NUM_MAX * sizeof (event_info_t), 0);
+		(void) memset(g_cstate_info, 2 * sizeof (state_info_t), 0);
 
 		/* Collect idle state transition stats */
 		if (features & FEATURE_CSTATE &&
@@ -251,7 +310,7 @@ main(int argc, char **argv)
 		 * Initialize curses if we're not dumping and
 		 * haven't already done it
 		 */
-		if (!dump) {
+		if (!PTOP_ON_DUMP) {
 			if (!ncursesinited) {
 				initialize_curses();
 				ncursesinited++;
@@ -272,9 +331,9 @@ main(int argc, char **argv)
 
 		print_battery();
 
-		displaytime = displaytime - ticktime;
+		g_displaytime = g_displaytime - g_ticktime;
 
-		if (key && !dump) {
+		if (key && !PTOP_ON_DUMP) {
 			keychar = toupper(fgetc(stdin));
 
 			switch (keychar) {
@@ -283,12 +342,13 @@ main(int argc, char **argv)
 				exit(EXIT_SUCCESS);
 				break;
 			case 'R':
-				ticktime = 3;
+				g_ticktime = 3;
 				break;
 			}
-			if (keychar == suggestion_key && suggestion_activate) {
-				suggestion_activate();
-				displaytime = -1.0;
+			if (keychar == g_suggestion_key &&
+			    g_suggestion_activate) {
+				g_suggestion_activate();
+				g_displaytime = -1.0;
 			}
 		}
 		reset_suggestions();
@@ -304,7 +364,7 @@ main(int argc, char **argv)
 			dump_count--;
 
 		/* Exits if user requested a dump */
-		if (dump && !dump_count) {
+		if (PTOP_ON_DUMP && !dump_count) {
 			print_all_suggestions();
 			exit(EXIT_SUCCESS);
 		}
@@ -314,7 +374,7 @@ main(int argc, char **argv)
 			pick_suggestion();
 
 		/* Refresh display */
-		if (!dump) {
+		if (!PTOP_ON_DUMP) {
 			show_title_bar();
 			update_windows();
 		}
@@ -324,21 +384,21 @@ main(int argc, char **argv)
 		 * longest c-state during the last snapshot. If the user
 		 * specified an interval we skip this bit and keep it fixed.
 		 */
-		last_time = (((double)cstate_info[longest_cstate].total_time/
-		    g_ncpus)/cstate_info[longest_cstate].events);
+		last_time = (((double)g_cstate_info[g_longest_cstate].total_time
+		    /g_ncpus)/g_cstate_info[g_longest_cstate].events);
 
 		if (!user_interval)
 			if (last_time < INTERVAL_DEFAULT ||
-			    (total_events/ticktime) < 1)
-				ticktime = INTERVAL_DEFAULT;
+			    (g_total_events/g_ticktime) < 1)
+				g_ticktime = INTERVAL_DEFAULT;
 			else
-				ticktime = INTERVAL_UPDATE(last_time);
+				g_ticktime = INTERVAL_UPDATE(last_time);
 
 		/*
 		 * Restore user specified interval after a refresh
 		 */
 		if (keychar == 'R' && user_interval)
-			ticktime = ticktime_usr;
+			g_ticktime = g_ticktime_usr;
 	}
 	return (EXIT_SUCCESS);
 }
