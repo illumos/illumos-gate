@@ -685,6 +685,9 @@ static const char *co_typenames[] = { "R", "N" };
 /* show real and normal, short and long, expired and unexpired. */
 #define	COF_DEFAULT	(COF_REAL | COF_NORM | COF_LONG | COF_SHORT)
 
+#define	COF_LIST_FLAGS	\
+	(CALLOUT_LIST_FLAG_HRESTIME | CALLOUT_LIST_FLAG_ABSOLUTE)
+
 /* private callout data for callback functions */
 typedef struct callout_data {
 	uint_t flags;		/* COF_* */
@@ -712,13 +715,27 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 {
 	callout_data_t *coargs = (callout_data_t *)priv;
 	callout_t *co = (callout_t *)data;
-	int tableid;
+	int tableid, list_flags;
 	callout_id_t coid;
 
 	if ((coargs == NULL) || (co == NULL)) {
 		return (WALK_ERR);
 	}
 
+	if ((coargs->flags & COF_FREE) && !(co->c_xid & CALLOUT_FREE)) {
+		/*
+		 * The callout must have been reallocated. No point in
+		 * walking any more.
+		 */
+		return (WALK_DONE);
+	}
+	if (!(coargs->flags & COF_FREE) && (co->c_xid & CALLOUT_FREE)) {
+		/*
+		 * The callout must have been freed. No point in
+		 * walking any more.
+		 */
+		return (WALK_DONE);
+	}
 	if ((coargs->flags & COF_FUNC) &&
 	    (coargs->funcaddr != (uintptr_t)co->c_func)) {
 		return (WALK_NEXT);
@@ -736,8 +753,7 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 	if ((coargs->flags & COF_EXEC) && !(co->c_xid & CALLOUT_EXECUTING)) {
 		return (WALK_NEXT);
 	}
-
-	/* it is possible we don't have the exp time */
+	/* it is possible we don't have the exp time or flags */
 	if (coargs->flags & COF_BYIDH) {
 		if (!(coargs->flags & COF_FREE)) {
 			/* we have to fetch the expire time ourselves. */
@@ -776,20 +792,20 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 			}
 		}
 		/* tricky part, since both HIRES and ABS can be set */
+		list_flags = coargs->list_flags;
 		if ((coargs->flags & COF_HIRES) && (coargs->flags & COF_ABS)) {
 			/* both flags are set, only skip "regular" ones */
-			if (! (coargs->list_flags &
-			    (CALLOUT_FLAG_HRESTIME | CALLOUT_FLAG_ABSOLUTE))) {
+			if (! (list_flags & COF_LIST_FLAGS)) {
 				return (WALK_NEXT);
 			}
 		} else {
 			/* individual flags, or no flags */
 			if ((coargs->flags & COF_HIRES) &&
-			    !(coargs->list_flags & CALLOUT_FLAG_HRESTIME)) {
+			    !(list_flags & CALLOUT_LIST_FLAG_HRESTIME)) {
 				return (WALK_NEXT);
 			}
 			if ((coargs->flags & COF_ABS) &&
-			    !(coargs->list_flags & CALLOUT_FLAG_ABSOLUTE)) {
+			    !(list_flags & CALLOUT_LIST_FLAG_ABSOLUTE)) {
 				return (WALK_NEXT);
 			}
 		}
@@ -826,7 +842,6 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 	}
 
 	if (!(coargs->flags & COF_ADDR)) {
-		int list_flags = coargs->list_flags;
 		if (!(coargs->flags & COF_VERBOSE)) {
 			mdb_printf("%-3d %1s %-14llx ",
 			    TABLE_TO_SEQID(tableid),
@@ -838,10 +853,11 @@ callouts_cb(uintptr_t addr, const void *data, void *priv)
 			    (coargs->flags & COF_EXPREL) ?
 			    coargs->exp - coargs->now : coargs->exp);
 		}
+		list_flags = coargs->list_flags;
 		mdb_printf("%1s%1s%1s%1s %-?llx %a(%p)",
 		    (co->c_xid & CALLOUT_EXECUTING) ? "X" : " ",
-		    (list_flags & CALLOUT_FLAG_HRESTIME) ? "H" : " ",
-		    (list_flags & CALLOUT_FLAG_ABSOLUTE) ? "A" : " ",
+		    (list_flags & CALLOUT_LIST_FLAG_HRESTIME) ? "H" : " ",
+		    (list_flags & CALLOUT_LIST_FLAG_ABSOLUTE) ? "A" : " ",
 		    (co->c_xid & CALLOUT_LONGTERM) ? "L" : " ",
 		    (long long)coid, co->c_func, co->c_arg);
 		if (coargs->flags & COF_LONGLIST) {
@@ -867,6 +883,7 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 	callout_data_t *coargs = (callout_data_t *)priv;
 	callout_list_t *cl = (callout_list_t *)data;
 	callout_t *coptr;
+	int list_flags;
 
 	if ((coargs == NULL) || (cl == NULL)) {
 		return (WALK_ERR);
@@ -874,7 +891,22 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 
 	coargs->exp = cl->cl_expiration;
 	coargs->list_flags = cl->cl_flags;
-
+	if ((coargs->flags & COF_FREE) &&
+	    !(cl->cl_flags & CALLOUT_LIST_FLAG_FREE)) {
+		/*
+		 * The callout list must have been reallocated. No point in
+		 * walking any more.
+		 */
+		return (WALK_DONE);
+	}
+	if (!(coargs->flags & COF_FREE) &&
+	    (cl->cl_flags & CALLOUT_LIST_FLAG_FREE)) {
+		/*
+		 * The callout list must have been freed. No point in
+		 * walking any more.
+		 */
+		return (WALK_DONE);
+	}
 	if ((coargs->flags & COF_TIME) &&
 	    (cl->cl_expiration != coargs->time)) {
 		return (WALK_NEXT);
@@ -894,17 +926,16 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 	/* FOUR cases, each different, !A!B, !AB, A!B, AB */
 	if ((coargs->flags & COF_HIRES) && (coargs->flags & COF_ABS)) {
 		/* both flags are set, only skip "regular" ones */
-		if (! (cl->cl_flags &
-		    (CALLOUT_FLAG_HRESTIME | CALLOUT_FLAG_ABSOLUTE))) {
+		if (! (cl->cl_flags & COF_LIST_FLAGS)) {
 			return (WALK_NEXT);
 		}
 	} else {
 		if ((coargs->flags & COF_HIRES) &&
-		    !(cl->cl_flags & CALLOUT_FLAG_HRESTIME)) {
+		    !(cl->cl_flags & CALLOUT_LIST_FLAG_HRESTIME)) {
 			return (WALK_NEXT);
 		}
 		if ((coargs->flags & COF_ABS) &&
-		    !(cl->cl_flags & CALLOUT_FLAG_ABSOLUTE)) {
+		    !(cl->cl_flags & CALLOUT_LIST_FLAG_ABSOLUTE)) {
 			return (WALK_NEXT);
 		}
 	}
@@ -935,12 +966,13 @@ callout_list_cb(uintptr_t addr, const void *data, void *priv)
 				    CALLOUT_TYPE_MASK]);
 			}
 
+			list_flags = coargs->list_flags;
 			mdb_printf("%-14llx %1s%1s %-6d %-0?p ",
 			    (coargs->flags & COF_EXPREL) ?
 			    coargs->exp - coargs->now : coargs->exp,
-			    (coargs->list_flags & CALLOUT_FLAG_HRESTIME) ?
+			    (list_flags & CALLOUT_LIST_FLAG_HRESTIME) ?
 			    "H" : " ",
-			    (coargs->list_flags & CALLOUT_FLAG_ABSOLUTE) ?
+			    (list_flags & CALLOUT_LIST_FLAG_ABSOLUTE) ?
 			    "A" : " ",
 			    coargs->bucket, cl->cl_callouts.ch_head);
 

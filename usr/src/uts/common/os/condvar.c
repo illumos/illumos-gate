@@ -39,6 +39,8 @@
 #include <sys/sdt.h>
 #include <sys/callo.h>
 
+clock_t cv_timedwait_hires(kcondvar_t *, kmutex_t *, hrtime_t, hrtime_t, int);
+
 /*
  * CV_MAX_WAITERS is the maximum number of waiters we track; once
  * the number becomes higher than that, we look at the sleepq to
@@ -221,19 +223,34 @@ cv_wakeup(void *arg)
 clock_t
 cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 {
+	hrtime_t hrtim;
+
+	if (tim <= lbolt)
+		return (-1);
+
+	hrtim = TICK_TO_NSEC(tim - lbolt);
+	return (cv_timedwait_hires(cvp, mp, hrtim, nsec_per_tick, 0));
+}
+
+clock_t
+cv_timedwait_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
+    hrtime_t res, int flag)
+{
 	kthread_t *t = curthread;
 	callout_id_t id;
 	clock_t timeleft;
+	hrtime_t limit;
 	int signalled;
 
 	if (panicstr)
 		return (-1);
 
-	timeleft = tim - lbolt;
-	if (timeleft <= 0)
+	limit = (flag & CALLOUT_FLAG_ABSOLUTE) ? gethrtime() : 0;
+	if (tim <= limit)
 		return (-1);
 	mutex_enter(&t->t_wait_mutex);
-	id = realtime_timeout_default((void (*)(void *))cv_wakeup, t, timeleft);
+	id = timeout_generic(CALLOUT_REALTIME, (void (*)(void *))cv_wakeup, t,
+	    tim, res, flag);
 	thread_lock(t);		/* lock the thread */
 	cv_block((condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
@@ -315,7 +332,8 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 }
 
 static clock_t
-cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
+cv_timedwait_sig_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
+    hrtime_t res, int flag)
 {
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
@@ -323,16 +341,9 @@ cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 	int cancel_pending = 0;
 	callout_id_t id;
 	clock_t rval = 1;
-	clock_t timeleft;
+	hrtime_t limit;
 	int signalled = 0;
 
-	/*
-	 * If the flag is 0, then realtime_timeout() below creates a
-	 * regular realtime timeout. If the flag is CALLOUT_FLAG_HRESTIME,
-	 * then, it creates a special realtime timeout which is affected by
-	 * changes to hrestime. See callo.h for details.
-	 */
-	ASSERT((flag == 0) || (flag == CALLOUT_FLAG_HRESTIME));
 	if (panicstr)
 		return (rval);
 
@@ -342,17 +353,17 @@ cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 	 * that has not yet unpinned the thread underneath.
 	 */
 	if (lwp == NULL || t->t_intr)
-		return (cv_timedwait(cvp, mp, tim));
+		return (cv_timedwait_hires(cvp, mp, tim, res, flag));
 
 	/*
-	 * If tim is less than or equal to lbolt, then the timeout
+	 * If tim is less than or equal to current hrtime, then the timeout
 	 * has already occured.  So just check to see if there is a signal
 	 * pending.  If so return 0 indicating that there is a signal pending.
 	 * Else return -1 indicating that the timeout occured. No need to
 	 * wait on anything.
 	 */
-	timeleft = tim - lbolt;
-	if (timeleft <= 0) {
+	limit = (flag & CALLOUT_FLAG_ABSOLUTE) ? gethrtime() : 0;
+	if (tim <= limit) {
 		lwp->lwp_asleep = 1;
 		lwp->lwp_sysabort = 0;
 		rval = -1;
@@ -365,7 +376,7 @@ cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 	cancel_pending = schedctl_cancel_pending();
 	mutex_enter(&t->t_wait_mutex);
 	id = timeout_generic(CALLOUT_REALTIME, (void (*)(void *))cv_wakeup, t,
-	    TICK_TO_NSEC(timeleft), nsec_per_tick, flag);
+	    tim, res, flag);
 	lwp->lwp_asleep = 1;
 	lwp->lwp_sysabort = 0;
 	thread_lock(t);
@@ -427,12 +438,15 @@ out:
  *
  * cv_timedwait_sig() is now part of the DDI.
  *
- * This function is now just a wrapper for cv_timedwait_sig_internal().
+ * This function is now just a wrapper for cv_timedwait_sig_hires().
  */
 clock_t
 cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 {
-	return (cv_timedwait_sig_internal(cvp, mp, tim, 0));
+	hrtime_t hrtim;
+
+	hrtim = TICK_TO_NSEC(tim - lbolt);
+	return (cv_timedwait_sig_hires(cvp, mp, hrtim, nsec_per_tick, 0));
 }
 
 /*
@@ -680,6 +694,7 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 {
 	timestruc_t now;
 	timestruc_t delta;
+	hrtime_t interval;
 	int rval;
 
 	if (when == NULL)
@@ -694,14 +709,19 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 		 * Call cv_timedwait_sig() just to check for signals.
 		 * We will return immediately with either 0 or -1.
 		 */
-		rval = cv_timedwait_sig(cvp, mp, lbolt);
+		rval = cv_timedwait_sig_hires(cvp, mp, 0, 1, 0);
 	} else {
-		gethrestime_lasttick(&now);
 		if (timecheck == timechanged) {
-			rval = cv_timedwait_sig_internal(cvp, mp,
-			    lbolt + timespectohz(when, now),
+			/*
+			 * Make sure that the interval is atleast one tick.
+			 * This is to prevent a user from flooding the system
+			 * with very small, high resolution timers.
+			 */
+			interval = ts2hrt(&delta);
+			if (interval < nsec_per_tick)
+				interval = nsec_per_tick;
+			rval = cv_timedwait_sig_hires(cvp, mp, interval, 1,
 			    CALLOUT_FLAG_HRESTIME);
-
 		} else {
 			/*
 			 * Someone reset the system time;

@@ -40,8 +40,10 @@
 /*
  * Callout tables.  See timeout(9F) for details.
  */
+static int callout_threads;			/* callout normal threads */
 static hrtime_t callout_debug_hrtime;		/* debugger entry time */
-static int callout_min_resolution;		/* Minimum resolution */
+static int callout_min_reap;			/* callout minimum reap count */
+static int callout_tolerance;			/* callout hires tolerance */
 static callout_table_t *callout_boot_ct;	/* Boot CPU's callout tables */
 static clock_t callout_max_ticks;		/* max interval */
 static hrtime_t callout_longterm;		/* longterm nanoseconds */
@@ -58,8 +60,8 @@ static callout_table_t *callout_table;		/* global callout table array */
  * as it will cause a deadlock. This has always been an unwritten rule.
  * We are making it explicit here.
  */
-static int callout_realtime_level = CY_LOW_LEVEL;
-static int callout_normal_level = CY_LOCK_LEVEL;
+static volatile int callout_realtime_level = CY_LOW_LEVEL;
+static volatile int callout_normal_level = CY_LOCK_LEVEL;
 
 static char *callout_kstat_names[] = {
 	"callout_timeouts",
@@ -69,7 +71,10 @@ static char *callout_kstat_names[] = {
 	"callout_untimeouts_expired",
 	"callout_expirations",
 	"callout_allocations",
+	"callout_cleanups",
 };
+
+static hrtime_t	callout_heap_process(callout_table_t *, hrtime_t, int);
 
 #define	CALLOUT_HASH_INSERT(hash, cp, cnext, cprev)	\
 {							\
@@ -125,9 +130,22 @@ static char *callout_kstat_names[] = {
  *	  they were queued. This is fair. Plus, it helps to make each
  *	  callout expiration timely. It also favors cancellations.
  *
- *	- callout lists are queued in a LIFO manner in the callout list hash
- *	  table. This ensures that long term timers stay at the rear of the
- *	  hash lists.
+ *	- callout lists are queued in the following manner in the callout
+ *	  hash table buckets:
+ *
+ *		- appended, if the callout list is a 1-nanosecond resolution
+ *		  callout list. When a callout is created, we first look for
+ *		  a callout list that has the same expiration so we can avoid
+ *		  allocating a callout list and inserting the expiration into
+ *		  the heap. However, we do not want to look at 1-nanosecond
+ *		  resolution callout lists as we will seldom find a match in
+ *		  them. Keeping these callout lists in the rear of the hash
+ *		  buckets allows us to skip these during the lookup.
+ *
+ *		- inserted at the beginning, if the callout list is not a
+ *		  1-nanosecond resolution callout list. This also has the
+ *		  side-effect of keeping the long term timers away from the
+ *		  front of the buckets.
  *
  *	- callout lists are queued in a FIFO manner in the expired callouts
  *	  list. This ensures that callout lists are executed in the order
@@ -180,7 +198,7 @@ static char *callout_kstat_names[] = {
 		 */							\
 		exec = 1;						\
 	} else if ((ct->ct_heap_num == 0) ||				\
-	    (ct->ct_heap[0] > gethrtime() + CALLOUT_THRESHOLD)) {	\
+	    (ct->ct_heap[0].ch_expiration > gethrtime() + CALLOUT_THRESHOLD)) {\
 		/*							\
 		 * If the heap has become empty, we need two threads as	\
 		 * there is no one to kick off the second thread in the	\
@@ -197,6 +215,28 @@ static char *callout_kstat_names[] = {
 		 */							\
 		exec = 1;						\
 	}								\
+}
+
+/*
+ * Macro to swap two heap items.
+ */
+#define	CALLOUT_SWAP(h1, h2)		\
+{					\
+	callout_heap_t tmp;		\
+					\
+	tmp = *h1;			\
+	*h1 = *h2;			\
+	*h2 = tmp;			\
+}
+
+/*
+ * Macro to free a callout list.
+ */
+#define	CALLOUT_LIST_FREE(ct, cl)			\
+{							\
+	cl->cl_next = ct->ct_lfree;			\
+	ct->ct_lfree = cl;				\
+	cl->cl_flags |= CALLOUT_LIST_FLAG_FREE;		\
 }
 
 /*
@@ -252,59 +292,46 @@ callout_list_alloc(callout_table_t *ct)
 	bzero(cl, sizeof (callout_list_t));
 
 	mutex_enter(&ct->ct_mutex);
-	cl->cl_next = ct->ct_lfree;
-	ct->ct_lfree = cl;
+	CALLOUT_LIST_FREE(ct, cl);
 }
 
 /*
- * Find a callout list that corresponds to an expiration.
+ * Find a callout list that corresponds to an expiration and matching flags.
  */
 static callout_list_t *
 callout_list_get(callout_table_t *ct, hrtime_t expiration, int flags, int hash)
 {
 	callout_list_t *cl;
+	int clflags;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
+	if (flags & CALLOUT_LIST_FLAG_NANO) {
+		/*
+		 * This is a 1-nanosecond resolution callout. We will rarely
+		 * find a match for this. So, bail out.
+		 */
+		return (NULL);
+	}
+
+	clflags = (CALLOUT_LIST_FLAG_ABSOLUTE | CALLOUT_LIST_FLAG_HRESTIME);
 	for (cl = ct->ct_clhash[hash].ch_head; (cl != NULL); cl = cl->cl_next) {
+		/*
+		 * If we have reached a 1-nanosecond resolution callout list,
+		 * we don't have much hope of finding a match in this hash
+		 * bucket. So, just bail out.
+		 */
+		if (cl->cl_flags & CALLOUT_LIST_FLAG_NANO)
+			return (NULL);
+
 		if ((cl->cl_expiration == expiration) &&
-		    (cl->cl_flags == flags))
+		    ((cl->cl_flags & clflags) == (flags & clflags)))
 			return (cl);
 	}
 
 	return (NULL);
 }
 
-/*
- * Find the callout list that corresponds to an expiration.
- * If the callout list is null, free it. Else, return it.
- */
-static callout_list_t *
-callout_list_check(callout_table_t *ct, hrtime_t expiration, int hash)
-{
-	callout_list_t *cl;
-
-	ASSERT(MUTEX_HELD(&ct->ct_mutex));
-
-	for (cl = ct->ct_clhash[hash].ch_head; (cl != NULL); cl = cl->cl_next) {
-		if (cl->cl_expiration == expiration) {
-			if (cl->cl_callouts.ch_head != NULL) {
-				/*
-				 * Found a match.
-				 */
-				return (cl);
-			}
-
-			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
-			cl->cl_next = ct->ct_lfree;
-			ct->ct_lfree = cl;
-
-			return (NULL);
-		}
-	}
-
-	return (NULL);
-}
 /*
  * Initialize a callout table's heap, if necessary. Preallocate some free
  * entries so we don't have to check for NULL elsewhere.
@@ -319,7 +346,7 @@ callout_heap_init(callout_table_t *ct)
 
 	ct->ct_heap_num = 0;
 	ct->ct_heap_max = CALLOUT_CHUNK;
-	size = sizeof (hrtime_t) * CALLOUT_CHUNK;
+	size = sizeof (callout_heap_t) * CALLOUT_CHUNK;
 	ct->ct_heap = kmem_alloc(size, KM_SLEEP);
 }
 
@@ -332,7 +359,7 @@ static void
 callout_heap_expand(callout_table_t *ct)
 {
 	size_t max, size, osize;
-	hrtime_t *heap;
+	callout_heap_t *heap;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 	ASSERT(ct->ct_heap_num <= ct->ct_heap_max);
@@ -341,8 +368,8 @@ callout_heap_expand(callout_table_t *ct)
 		max = ct->ct_heap_max;
 		mutex_exit(&ct->ct_mutex);
 
-		osize = sizeof (hrtime_t) * max;
-		size = sizeof (hrtime_t) * (max + CALLOUT_CHUNK);
+		osize = sizeof (callout_heap_t) * max;
+		size = sizeof (callout_heap_t) * (max + CALLOUT_CHUNK);
 		heap = kmem_alloc_tryhard(size, &size, KM_NOSLEEP | KM_PANIC);
 
 		mutex_enter(&ct->ct_mutex);
@@ -358,7 +385,7 @@ callout_heap_expand(callout_table_t *ct)
 		bcopy(ct->ct_heap, heap, osize);
 		kmem_free(ct->ct_heap, osize);
 		ct->ct_heap = heap;
-		ct->ct_heap_max = size / sizeof (hrtime_t);
+		ct->ct_heap_max = size / sizeof (callout_heap_t);
 	}
 }
 
@@ -371,7 +398,7 @@ static int
 callout_upheap(callout_table_t *ct)
 {
 	int current, parent;
-	hrtime_t *heap, current_expiration, parent_expiration;
+	callout_heap_t *heap, *hcurrent, *hparent;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 	ASSERT(ct->ct_heap_num >= 1);
@@ -385,21 +412,20 @@ callout_upheap(callout_table_t *ct)
 
 	for (;;) {
 		parent = CALLOUT_HEAP_PARENT(current);
-		current_expiration = heap[current];
-		parent_expiration = heap[parent];
+		hparent = &heap[parent];
+		hcurrent = &heap[current];
 
 		/*
 		 * We have an expiration later than our parent; we're done.
 		 */
-		if (current_expiration >= parent_expiration) {
+		if (hcurrent->ch_expiration >= hparent->ch_expiration) {
 			return (0);
 		}
 
 		/*
 		 * We need to swap with our parent, and continue up the heap.
 		 */
-		heap[parent] = current_expiration;
-		heap[current] = parent_expiration;
+		CALLOUT_SWAP(hparent, hcurrent);
 
 		/*
 		 * If we just reached the root, we're done.
@@ -414,18 +440,20 @@ callout_upheap(callout_table_t *ct)
 }
 
 /*
- * Insert a new expiration into a callout table's heap.
+ * Insert a new heap item into a callout table's heap.
  */
 static void
-callout_heap_insert(callout_table_t *ct, hrtime_t expiration)
+callout_heap_insert(callout_table_t *ct, callout_list_t *cl)
 {
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 	ASSERT(ct->ct_heap_num < ct->ct_heap_max);
 
 	/*
-	 * First, copy the expiration to the bottom of the heap.
+	 * First, copy the expiration and callout list pointer to the bottom
+	 * of the heap.
 	 */
-	ct->ct_heap[ct->ct_heap_num] = expiration;
+	ct->ct_heap[ct->ct_heap_num].ch_expiration = cl->cl_expiration;
+	ct->ct_heap[ct->ct_heap_num].ch_list = cl;
 	ct->ct_heap_num++;
 
 	/*
@@ -439,7 +467,7 @@ callout_heap_insert(callout_table_t *ct, hrtime_t expiration)
 	 * in the heap.
 	 */
 	if (callout_upheap(ct) && (ct->ct_suspend == 0))
-		(void) cyclic_reprogram(ct->ct_cyclic, expiration);
+		(void) cyclic_reprogram(ct->ct_cyclic, cl->cl_expiration);
 }
 
 /*
@@ -449,8 +477,8 @@ callout_heap_insert(callout_table_t *ct, hrtime_t expiration)
 static void
 callout_downheap(callout_table_t *ct)
 {
-	int left, right, current, nelems;
-	hrtime_t *heap, left_expiration, right_expiration, current_expiration;
+	int current, left, right, nelems;
+	callout_heap_t *heap, *hleft, *hright, *hcurrent;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 	ASSERT(ct->ct_heap_num >= 1);
@@ -467,8 +495,8 @@ callout_downheap(callout_table_t *ct)
 		if ((left = CALLOUT_HEAP_LEFT(current)) >= nelems)
 			return;
 
-		left_expiration = heap[left];
-		current_expiration = heap[current];
+		hleft = &heap[left];
+		hcurrent = &heap[current];
 
 		right = CALLOUT_HEAP_RIGHT(current);
 
@@ -479,28 +507,27 @@ callout_downheap(callout_table_t *ct)
 		if (right >= nelems)
 			goto comp_left;
 
-		right_expiration = heap[right];
+		hright = &heap[right];
 
 		/*
 		 * We have both a left and a right child.  We need to compare
 		 * the expiration of the children to determine which
 		 * expires earlier.
 		 */
-		if (right_expiration < left_expiration) {
+		if (hright->ch_expiration < hleft->ch_expiration) {
 			/*
 			 * Our right child is the earlier of our children.
 			 * We'll now compare our expiration to its expiration.
 			 * If ours is the earlier one, we're done.
 			 */
-			if (current_expiration <= right_expiration)
+			if (hcurrent->ch_expiration <= hright->ch_expiration)
 				return;
 
 			/*
 			 * Our right child expires earlier than we do; swap
 			 * with our right child, and descend right.
 			 */
-			heap[right] = current_expiration;
-			heap[current] = right_expiration;
+			CALLOUT_SWAP(hright, hcurrent);
 			current = right;
 			continue;
 		}
@@ -511,15 +538,14 @@ comp_left:
 		 * no right child).  We'll now compare our expiration
 		 * to its expiration. If ours is the earlier one, we're done.
 		 */
-		if (current_expiration <= left_expiration)
+		if (hcurrent->ch_expiration <= hleft->ch_expiration)
 			return;
 
 		/*
 		 * Our left child expires earlier than we do; swap with our
 		 * left child, and descend left.
 		 */
-		heap[left] = current_expiration;
-		heap[current] = left_expiration;
+		CALLOUT_SWAP(hleft, hcurrent);
 		current = left;
 	}
 }
@@ -530,29 +556,42 @@ comp_left:
 static void
 callout_heap_delete(callout_table_t *ct)
 {
-	hrtime_t now, expiration;
+	hrtime_t now, expiration, next;
 	callout_list_t *cl;
+	callout_heap_t *heap;
 	int hash;
 
 	ASSERT(MUTEX_HELD(&ct->ct_mutex));
 
+	if (CALLOUT_CLEANUP(ct)) {
+		/*
+		 * There are too many heap elements pointing to empty callout
+		 * lists. Clean them out.
+		 */
+		(void) callout_heap_process(ct, 0, 0);
+	}
+
 	now = gethrtime();
+	heap = ct->ct_heap;
 
 	while (ct->ct_heap_num > 0) {
-		expiration = ct->ct_heap[0];
-		/*
-		 * Find the callout list that corresponds to the expiration.
-		 * If the callout list is empty, callout_list_check()
-		 * will free the callout list and return NULL.
-		 */
+		expiration = heap->ch_expiration;
 		hash = CALLOUT_CLHASH(expiration);
-		cl = callout_list_check(ct, expiration, hash);
-		if (cl != NULL) {
+		cl = heap->ch_list;
+		ASSERT(expiration == cl->cl_expiration);
+
+		if (cl->cl_callouts.ch_head == NULL) {
 			/*
-			 * If the root of the heap expires in the future, we are
-			 * done. We are doing this check here instead of at the
-			 * beginning because we want to first free all the
-			 * empty callout lists at the top of the heap.
+			 * If the callout list is empty, reap it.
+			 * Decrement the reap count.
+			 */
+			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
+			CALLOUT_LIST_FREE(ct, cl);
+			ct->ct_nreap--;
+		} else {
+			/*
+			 * If the root of the heap expires in the future,
+			 * bail out.
 			 */
 			if (expiration > now)
 				break;
@@ -572,20 +611,163 @@ callout_heap_delete(callout_table_t *ct)
 		 */
 		ct->ct_heap_num--;
 		if (ct->ct_heap_num > 0) {
-			ct->ct_heap[0] = ct->ct_heap[ct->ct_heap_num];
+			heap[0] = heap[ct->ct_heap_num];
 			callout_downheap(ct);
 		}
 	}
 
 	/*
-	 * If this callout table is empty or callouts have been suspended
-	 * by CPR, just return. The cyclic has already been programmed to
+	 * If this callout table is empty or callouts have been suspended,
+	 * just return. The cyclic has already been programmed to
 	 * infinity by the cyclic subsystem.
 	 */
 	if ((ct->ct_heap_num == 0) || (ct->ct_suspend > 0))
 		return;
 
+	/*
+	 * If the top expirations are within callout_tolerance of each other,
+	 * delay the cyclic expire so that they can be processed together.
+	 * This is to prevent high resolution timers from swamping the system
+	 * with cyclic activity.
+	 */
+	if (ct->ct_heap_num > 2) {
+		next = expiration + callout_tolerance;
+		if ((heap[1].ch_expiration < next) ||
+		    (heap[2].ch_expiration < next))
+			expiration = next;
+	}
+
 	(void) cyclic_reprogram(ct->ct_cyclic, expiration);
+}
+
+/*
+ * There are some situations when the entire heap is walked and processed.
+ * This function is called to do the processing. These are the situations:
+ *
+ * 1. When the reap count reaches its threshold, the heap has to be cleared
+ *    of all empty callout lists.
+ *
+ * 2. When the system enters and exits KMDB/OBP, all entries in the heap
+ *    need to be adjusted by the interval spent in KMDB/OBP.
+ *
+ * 3. When system time is changed, the heap has to be scanned for
+ *    absolute hrestime timers. These need to be removed from the heap
+ *    and expired immediately.
+ *
+ * In cases 2 and 3, it is a good idea to do 1 as well since we are
+ * scanning the heap anyway.
+ *
+ * If the root gets changed and/or callout lists are expired, return the
+ * new expiration to the caller so he can reprogram the cyclic accordingly.
+ */
+static hrtime_t
+callout_heap_process(callout_table_t *ct, hrtime_t delta, int timechange)
+{
+	callout_heap_t *heap;
+	callout_list_t *cl, *rootcl;
+	hrtime_t expiration, now;
+	int i, hash, clflags, expired;
+	ulong_t num;
+
+	ASSERT(MUTEX_HELD(&ct->ct_mutex));
+
+	if (ct->ct_heap_num == 0)
+		return (0);
+
+	if (ct->ct_nreap > 0)
+		ct->ct_cleanups++;
+
+	heap = ct->ct_heap;
+	rootcl = heap->ch_list;
+
+	/*
+	 * We walk the heap from the top to the bottom. If we encounter
+	 * a heap item that points to an empty callout list, we clean
+	 * it out. If we encounter a hrestime entry that must be removed,
+	 * again we clean it out. Otherwise, we apply any adjustments needed
+	 * to an element.
+	 *
+	 * During the walk, we also compact the heap from the bottom and
+	 * reconstruct the heap using upheap operations. This is very
+	 * efficient if the number of elements to be cleaned is greater than
+	 * or equal to half the heap. This is the common case.
+	 *
+	 * Even in the non-common case, the upheap operations should be short
+	 * as the entries below generally tend to be bigger than the entries
+	 * above.
+	 */
+	num = ct->ct_heap_num;
+	ct->ct_heap_num = 0;
+	clflags = (CALLOUT_LIST_FLAG_HRESTIME | CALLOUT_LIST_FLAG_ABSOLUTE);
+	now = gethrtime();
+	expired = 0;
+	for (i = 0; i < num; i++) {
+		cl = heap[i].ch_list;
+		/*
+		 * If the callout list is empty, delete the heap element and
+		 * free the callout list.
+		 */
+		if (cl->cl_callouts.ch_head == NULL) {
+			hash = CALLOUT_CLHASH(cl->cl_expiration);
+			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
+			CALLOUT_LIST_FREE(ct, cl);
+			continue;
+		}
+
+		/*
+		 * Delete the heap element and expire the callout list, if
+		 * one of the following is true:
+		 *	- the callout list has expired
+		 *	- the callout list is an absolute hrestime one and
+		 *	  there has been a system time change
+		 */
+		if ((cl->cl_expiration <= now) ||
+		    (timechange && ((cl->cl_flags & clflags) == clflags))) {
+			hash = CALLOUT_CLHASH(cl->cl_expiration);
+			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
+			CALLOUT_LIST_APPEND(ct->ct_expired, cl);
+			expired = 1;
+			continue;
+		}
+
+		/*
+		 * Apply adjustments, if any. Adjustments are applied after
+		 * the system returns from KMDB or OBP. They are only applied
+		 * to relative callout lists.
+		 */
+		if (delta && !(cl->cl_flags & CALLOUT_LIST_FLAG_ABSOLUTE)) {
+			hash = CALLOUT_CLHASH(cl->cl_expiration);
+			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
+			expiration = cl->cl_expiration + delta;
+			if (expiration <= 0)
+				expiration = CY_INFINITY;
+			heap[i].ch_expiration = expiration;
+			cl->cl_expiration = expiration;
+			hash = CALLOUT_CLHASH(cl->cl_expiration);
+			if (cl->cl_flags & CALLOUT_LIST_FLAG_NANO) {
+				CALLOUT_LIST_APPEND(ct->ct_clhash[hash], cl);
+			} else {
+				CALLOUT_LIST_INSERT(ct->ct_clhash[hash], cl);
+			}
+		}
+
+		heap[ct->ct_heap_num] = heap[i];
+		ct->ct_heap_num++;
+		(void) callout_upheap(ct);
+	}
+
+	ct->ct_nreap = 0;
+
+	if (expired)
+		expiration = gethrtime();
+	else if (ct->ct_heap_num == 0)
+		expiration = CY_INFINITY;
+	else if (rootcl != heap->ch_list)
+		expiration = heap->ch_expiration;
+	else
+		expiration = 0;
+
+	return (expiration);
 }
 
 /*
@@ -606,17 +788,17 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	callout_t *cp;
 	callout_id_t id;
 	callout_list_t *cl;
-	hrtime_t now, interval;
-	int hash;
+	hrtime_t now, interval, rexpiration;
+	int hash, clflags;
 
 	ASSERT(resolution > 0);
 	ASSERT(func != NULL);
 
 	/*
-	 * Please see comment about minimum resolution in callout_init().
+	 * We get the current hrtime right upfront so that latencies in
+	 * this function do not affect the accuracy of the callout.
 	 */
-	if (resolution < callout_min_resolution)
-		resolution = callout_min_resolution;
+	now = gethrtime();
 
 	/*
 	 * We disable kernel preemption so that we remain on the same CPU
@@ -644,6 +826,16 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 		mutex_enter(&ct->ct_mutex);
 	}
 
+	if (CALLOUT_CLEANUP(ct)) {
+		/*
+		 * There are too many heap elements pointing to empty callout
+		 * lists. Clean them out.
+		 */
+		rexpiration = callout_heap_process(ct, 0, 0);
+		if ((rexpiration != 0) && (ct->ct_suspend == 0))
+			(void) cyclic_reprogram(ct->ct_cyclic, rexpiration);
+	}
+
 	if ((cp = ct->ct_free) == NULL)
 		cp = callout_alloc(ct);
 	else
@@ -655,16 +847,22 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	/*
 	 * Compute the expiration hrtime.
 	 */
-	now = gethrtime();
 	if (flags & CALLOUT_FLAG_ABSOLUTE) {
 		interval = expiration - now;
 	} else {
 		interval = expiration;
 		expiration += now;
 	}
-	if (flags & CALLOUT_FLAG_ROUNDUP)
-		expiration += resolution - 1;
-	expiration = (expiration / resolution) * resolution;
+
+	if (resolution > 1) {
+		/*
+		 * Align expiration to the specified resolution.
+		 */
+		if (flags & CALLOUT_FLAG_ROUNDUP)
+			expiration += resolution - 1;
+		expiration = (expiration / resolution) * resolution;
+	}
+
 	if (expiration <= 0) {
 		/*
 		 * expiration hrtime overflow has occurred. Just set the
@@ -697,15 +895,20 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 
 	cp->c_xid = id;
 
-	flags &= CALLOUT_LIST_FLAGS;
+	clflags = 0;
+	if (flags & CALLOUT_FLAG_ABSOLUTE)
+		clflags |= CALLOUT_LIST_FLAG_ABSOLUTE;
+	if (flags & CALLOUT_FLAG_HRESTIME)
+		clflags |= CALLOUT_LIST_FLAG_HRESTIME;
+	if (resolution == 1)
+		clflags |= CALLOUT_LIST_FLAG_NANO;
 	hash = CALLOUT_CLHASH(expiration);
 
 again:
 	/*
 	 * Try to see if a callout list already exists for this expiration.
-	 * Most of the time, this will be the case.
 	 */
-	cl = callout_list_get(ct, expiration, flags, hash);
+	cl = callout_list_get(ct, expiration, clflags, hash);
 	if (cl == NULL) {
 		/*
 		 * Check if we have enough space in the heap to insert one
@@ -743,16 +946,28 @@ again:
 		}
 		ct->ct_lfree = cl->cl_next;
 		cl->cl_expiration = expiration;
-		cl->cl_flags = flags;
+		cl->cl_flags = clflags;
 
-		CALLOUT_LIST_INSERT(ct->ct_clhash[hash], cl);
+		if (clflags & CALLOUT_LIST_FLAG_NANO) {
+			CALLOUT_LIST_APPEND(ct->ct_clhash[hash], cl);
+		} else {
+			CALLOUT_LIST_INSERT(ct->ct_clhash[hash], cl);
+		}
 
 		/*
 		 * This is a new expiration. So, insert it into the heap.
 		 * This will also reprogram the cyclic, if the expiration
 		 * propagated to the root of the heap.
 		 */
-		callout_heap_insert(ct, expiration);
+		callout_heap_insert(ct, cl);
+	} else {
+		/*
+		 * If the callout list was empty, untimeout_generic() would
+		 * have incremented a reap count. Decrement the reap count
+		 * as we are going to insert a callout into this list.
+		 */
+		if (cl->cl_callouts.ch_head == NULL)
+			ct->ct_nreap--;
 	}
 	cp->c_list = cl;
 	CALLOUT_APPEND(ct, cp);
@@ -861,6 +1076,7 @@ untimeout_generic(callout_id_t id, int nowait)
 	callout_table_t *ct;
 	callout_t *cp;
 	callout_id_t xid;
+	callout_list_t *cl;
 	int hash;
 	callout_id_t bogus;
 
@@ -894,12 +1110,22 @@ untimeout_generic(callout_id_t id, int nowait)
 			 * order to avoid lots of X-calls to the CPU associated
 			 * with the callout table.
 			 */
-			expiration = cp->c_list->cl_expiration;
+			cl = cp->c_list;
+			expiration = cl->cl_expiration;
 			CALLOUT_DELETE(ct, cp);
 			cp->c_idnext = ct->ct_free;
 			ct->ct_free = cp;
+			cp->c_xid |= CALLOUT_FREE;
 			ct->ct_untimeouts_unexpired++;
 			ct->ct_timeouts_pending--;
+
+			/*
+			 * If the callout list has become empty, it needs
+			 * to be cleaned along with its heap entry. Increment
+			 * a reap count.
+			 */
+			if (cl->cl_callouts.ch_head == NULL)
+				ct->ct_nreap++;
 			mutex_exit(&ct->ct_mutex);
 
 			expiration -= gethrtime();
@@ -957,7 +1183,7 @@ untimeout_generic(callout_id_t id, int nowait)
 	 * (1) the callout already fired, or (2) the caller passed us
 	 * a bogus value.  Perform a sanity check to detect case (2).
 	 */
-	bogus = (CALLOUT_EXECUTING | CALLOUT_COUNTER_HIGH);
+	bogus = (CALLOUT_ID_FLAGS | CALLOUT_COUNTER_HIGH);
 	if (((id & bogus) != CALLOUT_COUNTER_HIGH) && (id != 0))
 		panic("untimeout: impossible timeout id %llx",
 		    (unsigned long long)id);
@@ -1058,6 +1284,7 @@ callout_list_expire(callout_table_t *ct, callout_list_t *cl)
 		CALLOUT_DELETE(ct, cp);
 		cp->c_idnext = ct->ct_free;
 		ct->ct_free = cp;
+		cp->c_xid |= CALLOUT_FREE;
 
 		if (cp->c_waiting) {
 			cp->c_waiting = 0;
@@ -1088,8 +1315,7 @@ callout_expire(callout_table_t *ct)
 			 * Free the callout list.
 			 */
 			CALLOUT_LIST_DELETE(ct->ct_expired, cl);
-			cl->cl_next = ct->ct_lfree;
-			ct->ct_lfree = cl;
+			CALLOUT_LIST_FREE(ct, cl);
 		}
 	}
 }
@@ -1187,59 +1413,11 @@ callout_suspend(void)
 	}
 }
 
-static void
-callout_adjust(callout_table_t *ct, hrtime_t delta)
-{
-	int hash, newhash;
-	hrtime_t expiration;
-	callout_list_t *cl;
-	callout_hash_t list;
-
-	ASSERT(MUTEX_HELD(&ct->ct_mutex));
-
-	/*
-	 * In order to adjust the expirations, we null out the heap. Then,
-	 * we reinsert adjusted expirations in the heap. Keeps it simple.
-	 * Note that since the CALLOUT_TABLE_SUSPENDED flag is set by the
-	 * caller, the heap insert does not result in cyclic reprogramming.
-	 */
-	ct->ct_heap_num = 0;
-
-	/*
-	 * First, remove all the callout lists from the table and string them
-	 * in a list.
-	 */
-	list.ch_head = list.ch_tail = NULL;
-	for (hash = 0; hash < CALLOUT_BUCKETS; hash++) {
-		while ((cl = ct->ct_clhash[hash].ch_head) != NULL) {
-			CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
-			CALLOUT_LIST_APPEND(list, cl);
-		}
-	}
-
-	/*
-	 * Now, traverse the callout lists and adjust their expirations.
-	 */
-	while ((cl = list.ch_head) != NULL) {
-		CALLOUT_LIST_DELETE(list, cl);
-		/*
-		 * Set the new expiration and reinsert in the right
-		 * hash bucket.
-		 */
-		expiration = cl->cl_expiration;
-		expiration += delta;
-		cl->cl_expiration = expiration;
-		newhash = CALLOUT_CLHASH(expiration);
-		CALLOUT_LIST_INSERT(ct->ct_clhash[newhash], cl);
-		callout_heap_insert(ct, expiration);
-	}
-}
-
 /*
  * Resume callout processing.
  */
 static void
-callout_resume(hrtime_t delta)
+callout_resume(hrtime_t delta, int timechange)
 {
 	hrtime_t exp;
 	int t, f;
@@ -1261,8 +1439,14 @@ callout_resume(hrtime_t delta)
 				continue;
 			}
 
-			if (delta)
-				callout_adjust(ct, delta);
+			/*
+			 * If a delta is specified, adjust the expirations in
+			 * the heap by delta. Also, if the caller indicates
+			 * a timechange, process that. This step also cleans
+			 * out any empty callout lists that might happen to
+			 * be there.
+			 */
+			(void) callout_heap_process(ct, delta, timechange);
 
 			ct->ct_suspend--;
 			if (ct->ct_suspend == 0) {
@@ -1274,13 +1458,14 @@ callout_resume(hrtime_t delta)
 				if (ct->ct_expired.ch_head != NULL)
 					exp = gethrtime();
 				else if (ct->ct_heap_num > 0)
-					exp = ct->ct_heap[0];
+					exp = ct->ct_heap[0].ch_expiration;
 				else
 					exp = 0;
 				if (exp != 0)
 					(void) cyclic_reprogram(ct->ct_cyclic,
 					    exp);
 			}
+
 			mutex_exit(&ct->ct_mutex);
 		}
 	}
@@ -1288,6 +1473,11 @@ callout_resume(hrtime_t delta)
 
 /*
  * Callback handler used by CPR to stop and resume callouts.
+ * The cyclic subsystem saves and restores hrtime during CPR.
+ * That is why callout_resume() is called with a 0 delta.
+ * Although hrtime is the same, hrestime (system time) has
+ * progressed during CPR. So, we have to indicate a time change
+ * to expire the absolute hrestime timers.
  */
 /*ARGSUSED*/
 static boolean_t
@@ -1296,7 +1486,7 @@ callout_cpr_callb(void *arg, int code)
 	if (code == CB_CODE_CPR_CHKPT)
 		callout_suspend();
 	else
-		callout_resume(0);
+		callout_resume(0, 1);
 
 	return (B_TRUE);
 }
@@ -1320,7 +1510,7 @@ callout_debug_callb(void *arg, int code)
 		callout_debug_hrtime = gethrtime();
 	} else {
 		delta = gethrtime() - callout_debug_hrtime;
-		callout_resume(delta);
+		callout_resume(delta, 0);
 	}
 
 	return (B_TRUE);
@@ -1334,8 +1524,7 @@ callout_debug_callb(void *arg, int code)
 static void
 callout_hrestime_one(callout_table_t *ct)
 {
-	callout_list_t *cl, *clnext;
-	int hash, flags;
+	hrtime_t expiration;
 
 	mutex_enter(&ct->ct_mutex);
 	if (ct->ct_heap_num == 0) {
@@ -1343,19 +1532,13 @@ callout_hrestime_one(callout_table_t *ct)
 		return;
 	}
 
-	flags = CALLOUT_LIST_FLAGS;
-	for (hash = 0; hash < CALLOUT_BUCKETS; hash++) {
-		for (cl = ct->ct_clhash[hash].ch_head; cl; cl = clnext) {
-			clnext = cl->cl_next;
-			if (cl->cl_flags == flags) {
-				CALLOUT_LIST_DELETE(ct->ct_clhash[hash], cl);
-				CALLOUT_LIST_APPEND(ct->ct_expired, cl);
-			}
-		}
-	}
+	/*
+	 * Walk the heap and process all the absolute hrestime entries.
+	 */
+	expiration = callout_heap_process(ct, 0, 1);
 
-	if ((ct->ct_expired.ch_head != NULL) && (ct->ct_suspend == 0))
-		(void) cyclic_reprogram(ct->ct_cyclic, gethrtime());
+	if ((expiration != 0) && (ct->ct_suspend == 0))
+		(void) cyclic_reprogram(ct->ct_cyclic, expiration);
 
 	mutex_exit(&ct->ct_mutex);
 }
@@ -1456,7 +1639,7 @@ callout_cyclic_init(callout_table_t *ct)
 		/*
 		 * Each callout thread consumes exactly one
 		 * task structure while active.  Therefore,
-		 * prepopulating with 2 * CALLOUT_THREADS tasks
+		 * prepopulating with 2 * callout_threads tasks
 		 * ensures that there's at least one task per
 		 * thread that's either scheduled or on the
 		 * freelist.  In turn, this guarantees that
@@ -1467,8 +1650,8 @@ callout_cyclic_init(callout_table_t *ct)
 		 */
 		ct->ct_taskq =
 		    taskq_create_instance("callout_taskq", seqid,
-		    CALLOUT_THREADS, maxclsyspri,
-		    2 * CALLOUT_THREADS, 2 * CALLOUT_THREADS,
+		    callout_threads, maxclsyspri,
+		    2 * callout_threads, 2 * callout_threads,
 		    TASKQ_PREPOPULATE | TASKQ_CPR_SAFE);
 	}
 
@@ -1642,30 +1825,13 @@ callout_init(void)
 	callout_counter_low = 1 << CALLOUT_COUNTER_SHIFT;
 	callout_longterm = TICK_TO_NSEC(CALLOUT_LONGTERM_TICKS);
 	callout_max_ticks = CALLOUT_MAX_TICKS;
+	if (callout_min_reap == 0)
+		callout_min_reap = CALLOUT_MIN_REAP;
 
-	/*
-	 * Because of the variability in timing behavior across systems with
-	 * different architectures, we cannot allow arbitrarily low
-	 * resolutions. The minimum resolution has to be determined in a
-	 * platform-specific way. Until then, we define a blanket minimum
-	 * resolution for callouts of CALLOUT_MIN_RESOLUTION.
-	 *
-	 * If, in the future, someone requires lower resolution timers, they
-	 * can do one of two things:
-	 *
-	 *	- Define a lower value for callout_min_resolution. This would
-	 *	  affect all clients of the callout subsystem. If this done
-	 *	  via /etc/system, then no code changes are required and it
-	 *	  would affect only that customer.
-	 *
-	 *	- Define a flag to be passed to timeout creation that allows
-	 *	  the lower resolution. This involves code changes. But it
-	 *	  would affect only the calling module. It is the developer's
-	 *	  responsibility to test on all systems and make sure that
-	 *	  everything works.
-	 */
-	if (callout_min_resolution <= 0)
-		callout_min_resolution = CALLOUT_MIN_RESOLUTION;
+	if (callout_tolerance <= 0)
+		callout_tolerance = CALLOUT_TOLERANCE;
+	if (callout_threads <= 0)
+		callout_threads = CALLOUT_THREADS;
 
 	/*
 	 * Allocate all the callout tables based on max_ncpus. We have chosen

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ lwp_timer_timeout(void *arg)
 {
 	lwp_timer_t *lwptp = arg;
 	kthread_t *t = lwptp->lwpt_thread;
-	timespec_t now;
+	timespec_t now, delta;
 
 	mutex_enter(&t->t_delay_lock);
 	gethrestime(&now);
@@ -68,10 +68,11 @@ lwp_timer_timeout(void *arg)
 	    (lwptp->lwpt_rqtime.tv_sec == now.tv_sec &&
 	    lwptp->lwpt_rqtime.tv_nsec > now.tv_nsec))) {
 		lwptp->lwpt_imm_timeout = 0;
+		delta = lwptp->lwpt_rqtime;
+		timespecsub(&delta, &now);
 		lwptp->lwpt_id = timeout_generic(CALLOUT_REALTIME,
-		    lwp_timer_timeout, lwptp,
-		    TICK_TO_NSEC(timespectohz(&lwptp->lwpt_rqtime, now)),
-		    nsec_per_tick, CALLOUT_FLAG_HRESTIME);
+		    lwp_timer_timeout, lwptp, ts2hrt(&delta), nsec_per_tick,
+		    (CALLOUT_FLAG_HRESTIME | CALLOUT_FLAG_ROUNDUP));
 	} else {
 		/*
 		 * Set the thread running only if it is asleep on
@@ -144,7 +145,7 @@ err:
 int
 lwp_timer_enqueue(lwp_timer_t *lwptp)
 {
-	timespec_t now;
+	timespec_t now, delta;
 
 	ASSERT(lwptp->lwpt_thread == curthread);
 	ASSERT(MUTEX_HELD(&curthread->t_delay_lock));
@@ -157,10 +158,11 @@ lwp_timer_enqueue(lwp_timer_t *lwptp)
 		 * Queue the timeout.
 		 */
 		lwptp->lwpt_imm_timeout = 0;
+		delta = lwptp->lwpt_rqtime;
+		timespecsub(&delta, &now);
 		lwptp->lwpt_id = timeout_generic(CALLOUT_REALTIME,
-		    lwp_timer_timeout, lwptp,
-		    TICK_TO_NSEC(timespectohz(&lwptp->lwpt_rqtime, now)),
-		    nsec_per_tick, CALLOUT_FLAG_HRESTIME);
+		    lwp_timer_timeout, lwptp, ts2hrt(&delta), nsec_per_tick,
+		    (CALLOUT_FLAG_HRESTIME | CALLOUT_FLAG_ROUNDUP));
 		return (0);
 	}
 

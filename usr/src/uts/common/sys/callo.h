@@ -81,17 +81,20 @@ typedef struct callout {
  * returned. In such cases, a default generation number of 0 is assigned to
  * the legacy IDs.
  *
- * The lower 32-bit ID space is partitioned into two spaces - one for 32-bit
- * IDs and the other for 64-bit IDs. The 32-bit ID space is further divided
- * into two spaces - one for short-term callouts and one for long-term.
+ * The lower 32-bit ID space is partitioned into two spaces - one for
+ * short-term callouts and one for long-term.
  *
  * Here is the bit layout for the callout ID:
  *
- *      63   62  ...  32   31      30     29 .. X+1  X ... 1   0
- *  ----------------------------------------------------------------
- *  | Exec | Generation | Long | Counter | ID bits | Table  | Type |
- *  |      | number     | term | High    |         | number |      |
- *  ----------------------------------------------------------------
+ *      63    62    61 ...  32    31      30     29 .. X+1  X ... 1   0
+ *  -----------------------------------------------------------------------
+ *  | Free | Exec | Generation | Long | Counter | ID bits | Table  | Type |
+ *  |      |      | number     | term | High    |         | number |      |
+ *  -----------------------------------------------------------------------
+ *
+ * Free:
+ *    This bit indicates that this callout has been freed. This is for
+ *    debugging purposes.
  *
  * Exec(uting):
  *    This is the executing bit which is only set in the extended callout
@@ -135,8 +138,10 @@ typedef struct callout {
  *    This bit represents the callout (table) type. Each CPU has one realtime
  *    and one normal callout table.
  */
-#define	CALLOUT_EXECUTING	0x8000000000000000ULL
-#define	CALLOUT_ID_MASK		~(CALLOUT_EXECUTING)
+#define	CALLOUT_FREE		0x8000000000000000ULL
+#define	CALLOUT_EXECUTING	0x4000000000000000ULL
+#define	CALLOUT_ID_FLAGS	(CALLOUT_FREE | CALLOUT_EXECUTING)
+#define	CALLOUT_ID_MASK		~CALLOUT_ID_FLAGS
 #define	CALLOUT_GENERATION_LOW	0x100000000ULL
 #define	CALLOUT_LONGTERM	0x80000000
 #define	CALLOUT_COUNTER_HIGH	0x40000000
@@ -178,7 +183,7 @@ typedef struct callout {
 #define	CALLOUT_LONG_ID(table)		\
 		(CALLOUT_SHORT_ID(table) | CALLOUT_LONGTERM)
 
-#define	CALLOUT_THREADS		2		/* keep it simple for now */
+#define	CALLOUT_THREADS		2
 
 #define	CALLOUT_REALTIME	0		/* realtime callout type */
 #define	CALLOUT_NORMAL		1		/* normal callout type */
@@ -213,6 +218,21 @@ typedef struct callout_hash {
 	void	*ch_tail;
 } callout_hash_t;
 
+/*
+ * CALLOUT_LIST_FLAG_FREE
+ *	Callout list is free.
+ * CALLOUT_LIST_FLAG_ABSOLUTE
+ *	Callout list contains absolute timers.
+ * CALLOUT_LIST_FLAG_HRESTIME
+ *	Callout list contains hrestime timers.
+ * CALLOUT_LIST_FLAG_NANO
+ *	Callout list contains 1-nanosecond resolution callouts.
+ */
+#define	CALLOUT_LIST_FLAG_FREE			0x1
+#define	CALLOUT_LIST_FLAG_ABSOLUTE		0x2
+#define	CALLOUT_LIST_FLAG_HRESTIME		0x4
+#define	CALLOUT_LIST_FLAG_NANO			0x8
+
 struct callout_list {
 	callout_list_t	*cl_next;	/* next in clhash */
 	callout_list_t	*cl_prev;	/* prev in clhash */
@@ -220,6 +240,29 @@ struct callout_list {
 	callout_hash_t	cl_callouts;	/* list of callouts */
 	int		cl_flags;	/* callout flags */
 };
+
+/*
+ * Callout heap element. Each element in the heap stores the expiration
+ * as well as the corresponding callout list. This is to avoid a lookup
+ * of the callout list when the heap is processed. Because we store the
+ * callout list pointer in the heap element, we have to always remove
+ * a heap element and its callout list together. We cannot remove one
+ * without the other.
+ */
+typedef struct callout_heap {
+	hrtime_t	ch_expiration;
+	callout_list_t	*ch_list;
+} callout_heap_t;
+
+/*
+ * When the heap contains too many empty callout lists, it needs to be
+ * cleaned up. The decision to clean up the heap is a function of the
+ * number of empty entries and the heap size. Also, we don't want to
+ * clean up small heaps.
+ */
+#define	CALLOUT_MIN_REAP	(CALLOUT_BUCKETS >> 3)
+#define	CALLOUT_CLEANUP(ct)	((ct->ct_nreap >= callout_min_reap) &&	\
+				    (ct->ct_nreap >= (ct->ct_heap_num >> 1)))
 
 /*
  * Per-callout table kstats.
@@ -240,6 +283,8 @@ struct callout_list {
  *	Number of callouts that expired.
  * CALLOUT_ALLOCATIONS
  *	Number of callout structures allocated.
+ * CALLOUT_CLEANUPS
+ *	Number of times a callout table is cleaned up.
  */
 typedef enum callout_stat_type {
 	CALLOUT_TIMEOUTS,
@@ -249,6 +294,7 @@ typedef enum callout_stat_type {
 	CALLOUT_UNTIMEOUTS_EXPIRED,
 	CALLOUT_EXPIRATIONS,
 	CALLOUT_ALLOCATIONS,
+	CALLOUT_CLEANUPS,
 	CALLOUT_NUM_STATS
 } callout_stat_type_t;
 
@@ -277,7 +323,6 @@ typedef enum callout_stat_type {
 #define	CALLOUT_FLAG_HRESTIME		0x4
 #define	CALLOUT_FLAG_32BIT		0x8
 
-#define	CALLOUT_LIST_FLAGS	(CALLOUT_FLAG_ABSOLUTE | CALLOUT_FLAG_HRESTIME)
 /*
  * On 32-bit systems, the legacy interfaces, timeout() and realtime_timeout(),
  * must pass CALLOUT_FLAG_32BIT to timeout_generic() so that a 32-bit ID
@@ -306,7 +351,7 @@ typedef struct callout_table {
 	uint_t		ct_type;	/* callout table type */
 	uint_t		ct_suspend;	/* suspend count */
 	cyclic_id_t	ct_cyclic;	/* cyclic for this table */
-	hrtime_t	*ct_heap;	/* callout expiration heap */
+	callout_heap_t	*ct_heap;	/* callout expiration heap */
 	ulong_t		ct_heap_num;	/* occupied slots in the heap */
 	ulong_t		ct_heap_max;	/* end of the heap */
 	kmem_cache_t	*ct_cache;	/* callout kmem cache */
@@ -316,10 +361,11 @@ typedef struct callout_table {
 	callout_hash_t	ct_expired;	/* list of expired callout lists */
 	taskq_t		*ct_taskq;	/* taskq to execute normal callouts */
 	kstat_t		*ct_kstats;	/* callout kstats */
+	int		ct_nreap;	/* # heap entries that need reaping */
 #ifdef _LP64
-	ulong_t		ct_pad[4];	/* cache alignment */
+	char		ct_pad[28];	/* cache alignment */
 #else
-	ulong_t		ct_pad[7];	/* cache alignment */
+	char		ct_pad[24];	/* cache alignment */
 #endif
 } callout_table_t;
 
@@ -340,6 +386,8 @@ typedef struct callout_table {
 		ct_kstat_data[CALLOUT_EXPIRATIONS].value.ui64
 #define	ct_allocations							\
 		ct_kstat_data[CALLOUT_ALLOCATIONS].value.ui64
+#define	ct_cleanups							\
+		ct_kstat_data[CALLOUT_CLEANUPS].value.ui64
 
 #define	CALLOUT_CHUNK	128
 
@@ -350,12 +398,6 @@ typedef struct callout_table {
 #define	CALLOUT_CYCLIC_HANDLER(t)					\
 	((t == CALLOUT_REALTIME) ? callout_realtime : callout_normal)
 
-/*
- * We define a blanket minimum resolution for callouts of 1 millisecond.
- * 1 millisecond is a safe value as it is already supported when the clock
- * resolution is set to high.
- */
-#define	CALLOUT_MIN_RESOLUTION		1000000ULL
 #define	CALLOUT_TCP_RESOLUTION		10000000ULL
 
 #define	CALLOUT_ALIGN	64	/* cache line size */
@@ -365,6 +407,8 @@ typedef struct callout_table {
 #else
 #define	CALLOUT_MAX_TICKS	LONG_MAX
 #endif
+
+#define	CALLOUT_TOLERANCE	200000		/* nanoseconds */
 
 extern void		callout_init(void);
 extern void		membar_sync(void);
