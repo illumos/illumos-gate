@@ -332,7 +332,7 @@ configure_mpxio()
 				# if all mpxiodisable entries are no/yes for
 				# enable/disable mpxio, notify the user
 				$EGREP -s "$satadisable_cur_entry" $TMPDRVCONF_SATA_ENTRY
-				if [ $? -eq 0 ]; then
+				if [ $? -eq 0 -a "$d" = mpt ]; then
 					reboot_needed=`$EXPR $reboot_needed + 1`
 				else
 					$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
@@ -350,9 +350,11 @@ configure_mpxio()
 		return 1
 	fi
 
-	rm $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
+	rm $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
 	echo "mpxio-disable=\"${propval}\";" >> $TMPDRVCONF
-	echo "disable-sata-mpxio=\"${propval}\";" >> $TMPDRVCONF
+	if [ "$d" = mpt ]; then
+		echo "disable-sata-mpxio=\"${propval}\";" >> $TMPDRVCONF
+	fi
 
 }
 
@@ -617,7 +619,7 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 			# the other path
 			ROOTSCSIVHCI=`$DF /|$AWK -F":" '{print $1}' | \
 			    $AWK -F"(" '{print $2}'| \
-			    $SED -e"s,dsk,rdsk," -e"s,s.),,"`
+			    $SED -e"s,dsk,rdsk," -e"s,s.[ ]*),,"`
 			$STMSBOOTUTIL -L | $GREP $ROOTSCSIVHCI | \
 			    $AWK '{print $1}' | $SED -e"s,rdsk,dsk,g" \
 			    >$BOOTDEVICES

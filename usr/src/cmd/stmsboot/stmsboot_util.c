@@ -84,6 +84,7 @@ static char *ondiskname = "/etc/mpxio/devid_path.cache";
 static nvlist_t *mapnvl;
 static int mpxenabled = 0;
 static int limctrl = -1;
+static int mpxprop = 0;
 static int guid = 0;
 static char *drvlimit;
 static int globarg = 0;
@@ -507,7 +508,12 @@ list_devs(int listguids, int ctrl)
 	int rv;
 
 	if (!mpxenabled) {
-		logmsg(MSG_ERROR, gettext("MPxIO is not enabled\n"));
+		if (mpxprop) {
+			logmsg(MSG_ERROR, gettext("MPXIO disabled\n"));
+		} else {
+			logmsg(MSG_ERROR, gettext("No STMS devices have "
+			    "been found\n"));
+		}
 		return;
 	}
 
@@ -898,6 +904,7 @@ popcheck_devnvl(di_node_t thisnode, nvlist_t *devnvl, char *strdevid)
 	char *path = NULL;
 	char *curpath = NULL;
 	char *devfspath = NULL;
+	char *prop = NULL;
 	int scsivhciparent = 0;
 	int rv = 0;
 	boolean_t mpxenp = B_FALSE;
@@ -918,6 +925,14 @@ popcheck_devnvl(di_node_t thisnode, nvlist_t *devnvl, char *strdevid)
 		    "%s to mapnvl\n"), devfspath, strdevid);
 		return (-1);
 	}
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, di_parent_node(thisnode),
+	    "mpxio-disable", &prop) >= 0) {
+		if (strncmp(prop, "yes", 3) == 0) {
+			if (!mpxprop)
+				mpxprop++;
+		}
+	}
+
 	if (strncmp(di_driver_name(di_parent_node(thisnode)),
 	    "scsi_vhci", 9) == 0) {
 		scsivhciparent = 1;
