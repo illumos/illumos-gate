@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_KERNELOBJECT_H
 #define	_KERNELOBJECT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -453,15 +451,19 @@ extern object_to_be_freed_list_t obj_delay_freed;
 				DECRYPT_BOOL_ON|\
 				SIGN_BOOL_ON|\
 				VERIFY_BOOL_ON|\
+				WRAP_BOOL_ON|\
+				UNWRAP_BOOL_ON|\
 				EXTRACTABLE_BOOL_ON|\
 				MODIFIABLE_BOOL_ON)
 
 #define	PUBLIC_KEY_DEFAULT	(ENCRYPT_BOOL_ON|\
+				WRAP_BOOL_ON|\
 				VERIFY_BOOL_ON|\
 				VERIFY_RECOVER_BOOL_ON|\
 				MODIFIABLE_BOOL_ON)
 
 #define	PRIVATE_KEY_DEFAULT	(DECRYPT_BOOL_ON|\
+				UNWRAP_BOOL_ON|\
 				SIGN_BOOL_ON|\
 				SIGN_RECOVER_BOOL_ON|\
 				EXTRACTABLE_BOOL_ON|\

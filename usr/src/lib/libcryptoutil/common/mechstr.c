@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Convert Algorithm names as strings to PKCS#11 Mech numbers and vice versa.
@@ -224,6 +222,15 @@ static const pkcs11_mapping_t mapping[] = {
 	{ "CKM_PBE_SHA1_RC2_40_CBC", CKM_PBE_SHA1_RC2_40_CBC },
 	{ "CKM_PKCS5_PBKD2", CKM_PKCS5_PBKD2 },
 	{ "CKM_PBA_SHA1_WITH_SHA1_HMAC", CKM_PBA_SHA1_WITH_SHA1_HMAC },
+	{ "CKM_WTLS_PRE_MASTER_KEY_GEN", CKM_WTLS_PRE_MASTER_KEY_GEN },
+	{ "CKM_WTLS_MASTER_KEY_DERIVE", CKM_WTLS_MASTER_KEY_DERIVE },
+	{ "CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC",
+	    CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC },
+	{ "CKM_WTLS_PRF", CKM_WTLS_PRF },
+	{ "CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE",
+	    CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE },
+	{ "CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE",
+	    CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE },
 	{ "CKM_KEY_WRAP_LYNKS", CKM_KEY_WRAP_LYNKS },
 	{ "CKM_KEY_WRAP_SET_OAEP", CKM_KEY_WRAP_SET_OAEP },
 	{ "CKM_KIP_DERIVE", CKM_KIP_DERIVE },
@@ -246,6 +253,7 @@ static const pkcs11_mapping_t mapping[] = {
 	{ "CKM_ARIA_CBC_PAD", CKM_ARIA_CBC_PAD },
 	{ "CKM_ARIA_ECB_ENCRYPT_DATA", CKM_ARIA_ECB_ENCRYPT_DATA },
 	{ "CKM_ARIA_CBC_ENCRYPT_DATA", CKM_ARIA_CBC_ENCRYPT_DATA },
+	{ "CKM_CMS_SIG", CKM_CMS_SIG },
 	{ "CKM_SKIPJACK_KEY_GEN", CKM_SKIPJACK_KEY_GEN },
 	{ "CKM_SKIPJACK_ECB64", CKM_SKIPJACK_ECB64 },
 	{ "CKM_SKIPJACK_CBC64", CKM_SKIPJACK_CBC64 },

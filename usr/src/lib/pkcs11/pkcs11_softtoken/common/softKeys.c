@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <security/cryptoki.h>
 #include "softGlobal.h"
@@ -165,7 +162,7 @@ C_WrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Check if given wrapping key may be used for encryption. */
 	if (!(wrappingkey_p->bool_attr_mask & ENCRYPT_BOOL_ON)) {
-		rv = CKR_WRAPPING_KEY_TYPE_INCONSISTENT;
+		rv = CKR_KEY_FUNCTION_NOT_PERMITTED;
 		goto clean_exit2;
 	}
 
@@ -271,7 +268,7 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Check if given unwrapping key may be used to decrypt. */
 	if (!(unwrappingkey_p->bool_attr_mask & DECRYPT_BOOL_ON)) {
-		rv = CKR_UNWRAPPING_KEY_TYPE_INCONSISTENT;
+		rv = CKR_KEY_FUNCTION_NOT_PERMITTED;
 		goto clean_exit1;
 	}
 
@@ -354,7 +351,7 @@ C_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Check to see if key object allows for derivation. */
 	if (!(basekey_p->bool_attr_mask & DERIVE_BOOL_ON)) {
-		rv = CKR_KEY_TYPE_INCONSISTENT;
+		rv = CKR_KEY_FUNCTION_NOT_PERMITTED;
 		goto clean_exit1;
 	}
 

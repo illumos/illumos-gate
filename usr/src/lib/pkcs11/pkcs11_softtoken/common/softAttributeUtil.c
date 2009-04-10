@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2833,10 +2833,10 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		 */
 		case CKK_RC4:
 			if (!isValueLen) {
-				rv = CKR_TEMPLATE_INCONSISTENT;
+				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
-
+			;
 			if ((sck->sk_value_len < ARCFOUR_MIN_KEY_BYTES) ||
 			    (sck->sk_value_len > ARCFOUR_MAX_KEY_BYTES)) {
 				rv = CKR_ATTRIBUTE_VALUE_INVALID;
@@ -2847,14 +2847,14 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		case CKK_GENERIC_SECRET:
 			/* arbitrary key length - no length checking */
 			if (!isValueLen) {
-				rv = CKR_TEMPLATE_INCONSISTENT;
+				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
 			break;
 
 		case CKK_AES:
 			if (!isValueLen) {
-				rv = CKR_TEMPLATE_INCONSISTENT;
+				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
 
@@ -2869,7 +2869,7 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKK_BLOWFISH:
 			if (!isValueLen) {
-				rv = CKR_TEMPLATE_INCONSISTENT;
+				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
 			if ((sck->sk_value_len < BLOWFISH_MINBYTES) ||

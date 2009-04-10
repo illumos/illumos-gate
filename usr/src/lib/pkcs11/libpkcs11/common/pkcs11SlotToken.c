@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,7 +62,7 @@ C_GetSlotList(CK_BBOOL tokenPresent, CK_SLOT_ID_PTR pSlotList,
 	/* Check for a fastpath */
 	if ((purefastpath || policyfastpath) && (!metaslot_enabled)) {
 		return (fast_funcs->C_GetSlotList(tokenPresent, pSlotList,
-			    pulCount));
+		    pulCount));
 	}
 
 	if (!pkcs11_initialized) {
@@ -138,12 +135,15 @@ C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
 {
 
 	CK_RV rv;
-	CK_SLOT_ID true_id;
 	CK_SLOT_ID fw_st_id; /* id for accessing framework's slottable */
 
 	if (!pkcs11_initialized) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
+
+	/* Check for a fastpath */
+	if ((purefastpath || policyfastpath) && !metaslot_enabled)
+		return (fast_funcs->C_GetSlotInfo(slotID, pInfo));
 
 	if (slotID == METASLOT_FRAMEWORK_ID) {
 		/* just need to get metaslot information */
@@ -155,14 +155,7 @@ C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
 		return (CKR_SLOT_ID_INVALID);
 	}
 
-	/* Check for a fastpath */
-	if (purefastpath || policyfastpath) {
-		return (fast_funcs->C_GetSlotInfo(fw_st_id, pInfo));
-	}
-
-	true_id = TRUEID(fw_st_id);
-
-	rv = FUNCLIST(fw_st_id)->C_GetSlotInfo(true_id, pInfo);
+	rv = FUNCLIST(fw_st_id)->C_GetSlotInfo(TRUEID(fw_st_id), pInfo);
 
 	/* Present consistent interface to the application */
 	if (rv == CKR_FUNCTION_NOT_SUPPORTED) {
@@ -176,12 +169,15 @@ CK_RV
 C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 {
 	CK_RV rv;
-	CK_SLOT_ID true_id;
 	CK_SLOT_ID fw_st_id; /* id for accessing framework's slottable */
 
 	if (!pkcs11_initialized) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
+
+	/* Check for a fastpath */
+	if ((purefastpath || policyfastpath) && !metaslot_enabled)
+		return (fast_funcs->C_GetTokenInfo(slotID, pInfo));
 
 	if (slotID == METASLOT_FRAMEWORK_ID) {
 		/* just need to get metaslot information */
@@ -193,14 +189,7 @@ C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 		return (CKR_SLOT_ID_INVALID);
 	}
 
-	/* Check for a fastpath */
-	if (purefastpath || policyfastpath) {
-		return (fast_funcs->C_GetTokenInfo(fw_st_id, pInfo));
-	}
-
-	true_id = TRUEID(fw_st_id);
-
-	rv = FUNCLIST(fw_st_id)->C_GetTokenInfo(true_id, pInfo);
+	rv = FUNCLIST(fw_st_id)->C_GetTokenInfo(TRUEID(fw_st_id), pInfo);
 
 	/* Present consistent interface to the application */
 	if (rv == CKR_FUNCTION_NOT_SUPPORTED) {
@@ -233,7 +222,7 @@ C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)
 	/* Check for a fastpath */
 	if (purefastpath || policyfastpath) {
 		return (fast_funcs->C_WaitForSlotEvent(flags, pSlot,
-			    pReserved));
+		    pReserved));
 	}
 
 	if (!pkcs11_initialized) {
@@ -319,7 +308,7 @@ C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)
 			(void) pthread_mutex_lock(&cur_slot->sl_mutex);
 			if (cur_slot->sl_wfse_state == WFSE_ACTIVE) {
 				(void) pthread_mutex_unlock(
-					&cur_slot->sl_mutex);
+				    &cur_slot->sl_mutex);
 				continue;
 			}
 
@@ -358,11 +347,11 @@ C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)
 					if (*pSlot == TRUEID(j)) {
 						*pSlot = j;
 						(void) pthread_mutex_lock(
-							&slottable->st_mutex);
+						    &slottable->st_mutex);
 						slottable->st_wfse_active =
 						    B_FALSE;
 						(void) pthread_mutex_unlock(
-							&slottable->st_mutex);
+						    &slottable->st_mutex);
 						return (CKR_OK);
 					}
 					j++;
@@ -414,7 +403,7 @@ C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)
 	 */
 	(void) pthread_mutex_lock(&slottable->st_mutex);
 	if (pthread_create(&slottable->st_tid, NULL,
-		listener_waitforslotevent, NULL) != 0) {
+	    listener_waitforslotevent, NULL) != 0) {
 		slottable->st_wfse_active = B_FALSE;
 		(void) pthread_mutex_unlock(&slottable->st_mutex);
 		(void) pthread_mutex_unlock(&slottable->st_start_mutex);
@@ -485,10 +474,10 @@ C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)
 
 			if (cur_slot->sl_wfse_args == NULL) {
 				(void) pthread_mutex_unlock(
-					&cur_slot->sl_mutex);
+				    &cur_slot->sl_mutex);
 				slottable->st_wfse_active = B_FALSE;
 				(void) pthread_mutex_unlock(
-					&slottable->st_mutex);
+				    &slottable->st_mutex);
 				return (CKR_HOST_MEMORY);
 			}
 			cur_slot->sl_wfse_args->flags = flags;
@@ -498,8 +487,8 @@ C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)
 
 		/* Create child thread */
 		if (pthread_create(&cur_slot->sl_tid, NULL,
-			child_waitforslotevent,
-			(void *)cur_slot->sl_wfse_args) != 0) {
+		    child_waitforslotevent,
+		    (void *)cur_slot->sl_wfse_args) != 0) {
 			(void) pthread_mutex_unlock(&cur_slot->sl_mutex);
 			continue;
 		}
@@ -607,6 +596,11 @@ C_GetMechanismList(CK_SLOT_ID slotID, CK_MECHANISM_TYPE_PTR pMechanismList,
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
 
+	/* Check for a fastpath */
+	if ((purefastpath || policyfastpath) && !metaslot_enabled)
+		return (fast_funcs->C_GetMechanismList(slotID,
+		    pMechanismList, pulCount));
+
 	if (slotID == METASLOT_FRAMEWORK_ID) {
 		return (meta_GetMechanismList(METASLOT_SLOTID, pMechanismList,
 		    pulCount));
@@ -615,12 +609,6 @@ C_GetMechanismList(CK_SLOT_ID slotID, CK_MECHANISM_TYPE_PTR pMechanismList,
 	/* Check that slotID is valid */
 	if (pkcs11_validate_and_convert_slotid(slotID, &fw_st_id) != CKR_OK) {
 		return (CKR_SLOT_ID_INVALID);
-	}
-
-	/* Check for pure fastpath */
-	if (purefastpath) {
-		return (fast_funcs->C_GetMechanismList(fw_st_id,
-		    pMechanismList, pulCount));
 	}
 
 	if (policyfastpath) {
@@ -743,6 +731,10 @@ C_GetMechanismInfo(CK_SLOT_ID slotID, CK_MECHANISM_TYPE type,
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
 
+	/* Check for a fastpath */
+	if ((purefastpath || policyfastpath) && !metaslot_enabled)
+		return (fast_funcs->C_GetMechanismInfo(slotID, type, pInfo));
+
 	if (slotID == METASLOT_FRAMEWORK_ID) {
 		/* just need to get metaslot information */
 		return (meta_GetMechanismInfo(METASLOT_SLOTID, type, pInfo));
@@ -751,11 +743,6 @@ C_GetMechanismInfo(CK_SLOT_ID slotID, CK_MECHANISM_TYPE type,
 	/* Check that slotID is valid */
 	if (pkcs11_validate_and_convert_slotid(slotID, &fw_st_id) != CKR_OK) {
 		return (CKR_SLOT_ID_INVALID);
-	}
-
-	/* Check for pure fastpath */
-	if (purefastpath) {
-		return (fast_funcs->C_GetMechanismInfo(fw_st_id, type, pInfo));
 	}
 
 	if (policyfastpath) {
@@ -788,12 +775,16 @@ C_InitToken(CK_SLOT_ID slotID, CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen,
     CK_UTF8CHAR_PTR pLabel)
 {
 	CK_RV rv;
-	CK_SLOT_ID true_id;
 	CK_SLOT_ID fw_st_id; /* id for accessing framework's slottable */
 
 	if (!pkcs11_initialized) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
+
+	/* Check for a fastpath */
+	if ((purefastpath || policyfastpath) && !metaslot_enabled)
+		return (fast_funcs->C_InitToken(slotID, pPin, ulPinLen,
+		    pLabel));
 
 	if (slotID == METASLOT_FRAMEWORK_ID) {
 		/* just need to get metaslot information */
@@ -806,15 +797,8 @@ C_InitToken(CK_SLOT_ID slotID, CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen,
 		return (CKR_SLOT_ID_INVALID);
 	}
 
-	/* Check for a fastpath */
-	if (purefastpath || policyfastpath) {
-		return (fast_funcs->C_InitToken(fw_st_id, pPin, ulPinLen,
-			    pLabel));
-	}
-
-	true_id = TRUEID(fw_st_id);
-
-	rv = FUNCLIST(fw_st_id)->C_InitToken(true_id, pPin, ulPinLen, pLabel);
+	rv = FUNCLIST(fw_st_id)->C_InitToken(TRUEID(fw_st_id), pPin, ulPinLen,
+	    pLabel);
 
 	/* Present consistent interface to the application */
 	if (rv == CKR_FUNCTION_NOT_SUPPORTED) {
@@ -870,7 +854,7 @@ C_SetPIN(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pOldPin,
 	/* Check for a fastpath */
 	if (purefastpath || policyfastpath) {
 		return (fast_funcs->C_SetPIN(hSession, pOldPin, ulOldPinLen,
-			    pNewPin, ulNewPinLen));
+		    pNewPin, ulNewPinLen));
 	}
 
 	if (!pkcs11_initialized) {

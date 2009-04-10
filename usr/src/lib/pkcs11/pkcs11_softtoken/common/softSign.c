@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <security/cryptoki.h>
@@ -64,7 +62,7 @@ C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Check to see if key object supports signature. */
 	if (!(key_p->bool_attr_mask & SIGN_BOOL_ON)) {
-		rv = CKR_KEY_TYPE_INCONSISTENT;
+		rv = CKR_KEY_FUNCTION_NOT_PERMITTED;
 		goto clean_exit1;
 	}
 
@@ -321,7 +319,7 @@ C_SignRecoverInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Check to see if key object supports sign_recover. */
 	if (!(key_p->bool_attr_mask & SIGN_RECOVER_BOOL_ON)) {
-		rv = CKR_KEY_TYPE_INCONSISTENT;
+		rv = CKR_KEY_FUNCTION_NOT_PERMITTED;
 		goto clean_exit1;
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -548,6 +548,9 @@ soft_get_operationstate(soft_session_t *session_p, CK_BYTE_PTR pOperationState,
 		default:
 			rv = CKR_STATE_UNSAVEABLE;
 		}
+	} else {
+		rv = CKR_OPERATION_NOT_INITIALIZED;
+		goto unlock_session;
 	}
 
 	*pulOperationStateLen = op_data_len;

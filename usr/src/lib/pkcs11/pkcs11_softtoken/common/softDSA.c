@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -204,7 +202,7 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	if (20 != qlen) {
+	if (DSA_SUBPRIME_BYTES != qlen) {
 		rv = CKR_KEY_SIZE_RANGE;
 		goto clean1;
 	}
@@ -219,17 +217,12 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	if (glen != plen) {
-		rv = CKR_KEY_SIZE_RANGE;
-		goto clean1;
-	}
-
 	rv = soft_get_private_value(key, CKA_VALUE, x, &xlen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	if (20 < xlen) {
+	if (DSA_SUBPRIME_BYTES < xlen) {
 		rv = CKR_KEY_SIZE_RANGE;
 		goto clean1;
 	}
@@ -254,9 +247,9 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 	}
 
 	bytestring2bignum(&(dsakey.g), g, plen);
-	bytestring2bignum(&(dsakey.x), x, 20);
+	bytestring2bignum(&(dsakey.x), x, DSA_SUBPRIME_BYTES);
 	bytestring2bignum(&(dsakey.p), p, plen);
-	bytestring2bignum(&(dsakey.q), q, 20);
+	bytestring2bignum(&(dsakey.q), q, DSA_SUBPRIME_BYTES);
 	bytestring2bignum(&msg, (uchar_t *)in, inlen);
 
 	if ((err = random_bignum(&(dsakey.k), DSA_SUBPRIME_BITS,
@@ -296,8 +289,9 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 	    BIG_OK)
 		goto clean10;
 
-	bignum2bytestring((uchar_t *)out, &(dsakey.r), 20);
-	bignum2bytestring((uchar_t *)out + 20, &(dsakey.s), 20);
+	bignum2bytestring((uchar_t *)out, &(dsakey.r), DSA_SUBPRIME_BYTES);
+	bignum2bytestring((uchar_t *)out + DSA_SUBPRIME_BYTES, &(dsakey.s),
+	    DSA_SUBPRIME_BYTES);
 
 	err = BIG_OK;
 
@@ -342,7 +336,7 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 		goto clean1;
 	}
 
-	if (20 != qlen) {
+	if (DSA_SUBPRIME_BYTES != qlen) {
 		rv = CKR_KEY_SIZE_RANGE;
 		goto clean1;
 	}
@@ -394,10 +388,11 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 	bytestring2bignum(&(dsakey.g), g, glen);
 	bytestring2bignum(&(dsakey.y), y, ylen);
 	bytestring2bignum(&(dsakey.p), p, plen);
-	bytestring2bignum(&(dsakey.q), q, 20);
-	bytestring2bignum(&(dsakey.r), (uchar_t *)sig, 20);
-	bytestring2bignum(&(dsakey.s), ((uchar_t *)sig) + 20, 20);
-	bytestring2bignum(&msg, (uchar_t *)data, 20);
+	bytestring2bignum(&(dsakey.q), q, DSA_SUBPRIME_BYTES);
+	bytestring2bignum(&(dsakey.r), (uchar_t *)sig, DSA_SUBPRIME_BYTES);
+	bytestring2bignum(&(dsakey.s), ((uchar_t *)sig) + DSA_SUBPRIME_BYTES,
+	    DSA_SUBPRIME_BYTES);
+	bytestring2bignum(&msg, (uchar_t *)data, DSA_SUBPRIME_BYTES);
 
 	if (big_ext_gcd_pos(NULL, &tmp2, NULL, &(dsakey.s), &(dsakey.q)) !=
 	    BIG_OK)
@@ -533,7 +528,7 @@ soft_dsa_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 	}
 
 	/* Input data length needs to be 20 bytes. */
-	if (ulDataLen != 20) {
+	if (ulDataLen != DSA_SUBPRIME_BYTES) {
 		rv = CKR_DATA_LEN_RANGE;
 		goto clean_exit;
 	}
@@ -581,7 +576,7 @@ soft_dsa_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 	}
 
 	/* Input data length needs to be 20 bytes. */
-	if (ulDataLen != 20) {
+	if (ulDataLen != DSA_SUBPRIME_BYTES) {
 		rv = CKR_DATA_LEN_RANGE;
 		goto clean_exit;
 	}

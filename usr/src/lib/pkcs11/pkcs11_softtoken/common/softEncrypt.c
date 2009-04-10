@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <security/cryptoki.h>
@@ -63,7 +61,7 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Check to see if key object allows for encryption. */
 	if (!(key_p->bool_attr_mask & ENCRYPT_BOOL_ON)) {
-		rv = CKR_KEY_TYPE_INCONSISTENT;
+		rv = CKR_KEY_FUNCTION_NOT_PERMITTED;
 		goto clean_exit1;
 	}
 

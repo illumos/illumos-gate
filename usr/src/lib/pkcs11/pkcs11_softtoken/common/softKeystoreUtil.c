@@ -55,6 +55,7 @@
 #define	DS_FILE		"objstore_info"	/* keystore description file */
 #define	TMP_DS_FILE	"t_info"	/* temp name for keystore desc. file */
 #define	OBJ_PREFIX	"obj"	/* prefix of the keystore object file names */
+#define	OBJ_PREFIX_LEN	sizeof (OBJ_PREFIX) - 1	/* length of prefix */
 #define	TMP_OBJ_PREFIX	"t_o"	/* prefix of the temp object file names */
 
 /*
@@ -810,10 +811,8 @@ get_all_objs_in_dir(DIR *dirp, ks_obj_handle_t *ks_handle,
 
 	while ((dp = readdir(dirp)) != NULL) {
 
-		if ((strcmp(dp->d_name, ".") == 0) ||
-		    (strcmp(dp->d_name, "..") == 0)) {
+		if (strncmp(dp->d_name, OBJ_PREFIX, OBJ_PREFIX_LEN) != 0)
 			continue;
-		}
 
 		(void) strcpy((char *)ks_handle->name, dp->d_name);
 		rv = soft_keystore_get_single_obj(ks_handle, &obj, lock_held);
@@ -1706,7 +1705,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		    "%s/%s", pri_obj_path, pri_ent->d_name);
 		(void) snprintf(obj->tmp_name, MAXPATHLEN, "%s/%s%s",
 		    pri_obj_path, TMP_OBJ_PREFIX,
-		    (pri_ent->d_name) + strlen(OBJ_PREFIX));
+		    (pri_ent->d_name) + OBJ_PREFIX_LEN);
 		if (reencrypt_obj(new_crypt_key, new_hmac_key,
 		    obj->orig_name, obj->tmp_name) != 0) {
 			free(obj);
@@ -2533,13 +2532,13 @@ soft_keystore_modify_obj(ks_obj_handle_t *ks_handle, uchar_t *buf,
 		    get_pub_obj_path(pub_obj_path), ks_handle->name);
 		(void) snprintf(tmp_name, MAXPATHLEN, "%s/%s%s",
 		    pub_obj_path, TMP_OBJ_PREFIX,
-		    (ks_handle->name) + strlen(OBJ_PREFIX));
+		    (ks_handle->name) + OBJ_PREFIX_LEN);
 	} else {
 		(void) snprintf(orig_name, MAXPATHLEN, "%s/%s",
 		    get_pri_obj_path(pri_obj_path), ks_handle->name);
 		(void) snprintf(tmp_name, MAXPATHLEN, "%s/%s%s",
 		    pri_obj_path, TMP_OBJ_PREFIX,
-		    (ks_handle->name) + strlen(OBJ_PREFIX));
+		    (ks_handle->name) + OBJ_PREFIX_LEN);
 	}
 
 	tmp_fd = open_nointr(tmp_name,

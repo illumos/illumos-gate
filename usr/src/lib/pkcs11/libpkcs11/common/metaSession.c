@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -605,6 +605,7 @@ meta_Logout(CK_SESSION_HANDLE hSession)
 
 	/* If the C_Logout fails, just ignore the error. */
 	metaslot_set_logged_in_flag(B_FALSE);
+	(void) meta_token_object_deactivate(PRIVATE_TOKEN);
 
 finish:
 	if (logout_session)
