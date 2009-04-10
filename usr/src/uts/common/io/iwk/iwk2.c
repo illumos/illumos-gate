@@ -220,6 +220,14 @@ static ddi_device_acc_attr_t iwk_reg_accattr = {
 	DDI_DEFAULT_ACC
 };
 
+/* DMA access attributes for Descriptor */
+static ddi_device_acc_attr_t iwk_dma_descattr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_LE_ACC,
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
+};
+
 /* DMA access attributes */
 static ddi_device_acc_attr_t iwk_dma_accattr = {
 	DDI_DEVICE_ATTR_V0,
@@ -624,7 +632,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_fail4;
 	}
 
-	if (sc->sc_eep_map.calib_version < EEP_TX_POWER_VERSION_NEW) {
+	if (LE_16(sc->sc_eep_map.calib_version) < EEP_TX_POWER_VERSION_NEW) {
 		cmn_err(CE_WARN, "older EEPROM detected\n");
 		goto attach_fail4;
 	}
@@ -1159,7 +1167,7 @@ iwk_alloc_shared(iwk_sc_t *sc)
 
 	/* must be aligned on a 4K-page boundary */
 	err = iwk_alloc_dma_mem(sc, sizeof (iwk_shared_t),
-	    &sh_dma_attr, &iwk_dma_accattr,
+	    &sh_dma_attr, &iwk_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &sc->sc_dma_sh);
 	if (err != DDI_SUCCESS)
@@ -1229,7 +1237,7 @@ iwk_alloc_rx_ring(iwk_sc_t *sc)
 	ring->cur = 0;
 
 	err = iwk_alloc_dma_mem(sc, RX_QUEUE_SIZE * sizeof (uint32_t),
-	    &ring_desc_dma_attr, &iwk_dma_accattr,
+	    &ring_desc_dma_attr, &iwk_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_desc);
 	if (err != DDI_SUCCESS) {
@@ -1260,8 +1268,8 @@ iwk_alloc_rx_ring(iwk_sc_t *sc)
 		 * the physical address bit [8-36] are used,
 		 * instead of bit [0-31] in 3945.
 		 */
-		ring->desc[i] = LE_32((uint32_t)
-		    (data->dma_data.cookie.dmac_address >> 8));
+		ring->desc[i] = (uint32_t)
+		    (data->dma_data.cookie.dmac_address >> 8);
 	}
 	dma_p = &ring->data[0].dma_data;
 	IWK_DBG((IWK_DEBUG_DMA, "rx buffer[0][ncookies:%d addr:%lx "
@@ -1336,7 +1344,7 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 
 	err = iwk_alloc_dma_mem(sc,
 	    TFD_QUEUE_SIZE_MAX * sizeof (iwk_tx_desc_t),
-	    &ring_desc_dma_attr, &iwk_dma_accattr,
+	    &ring_desc_dma_attr, &iwk_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_desc);
 	if (err != DDI_SUCCESS) {
@@ -1825,7 +1833,7 @@ static int iwk_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 	default:
 		return (0);
 	}
-	sc->sc_config.filter_flags &= ~(RXON_FILTER_DIS_DECRYPT_MSK |
+	sc->sc_config.filter_flags &= ~LE_32(RXON_FILTER_DIS_DECRYPT_MSK |
 	    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
 
 	mutex_enter(&sc->sc_glock);
@@ -1876,6 +1884,9 @@ static int iwk_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 			    k->wk_key, k->wk_keylen);
 			sc->sc_ibss.ibss_node_tb[index1].node.key_flags |=
 			    (STA_KEY_FLG_CCMP | (1 << 3) | (k->wk_keyix << 8));
+			sc->sc_ibss.ibss_node_tb[index1].node.key_flags =
+			    LE_16(sc->sc_ibss.ibss_node_tb[index1].
+			    node.key_flags);
 			sc->sc_ibss.ibss_node_tb[index1].node.sta_mask =
 			    STA_MODIFY_KEY_MASK;
 			sc->sc_ibss.ibss_node_tb[index1].node.control = 1;
@@ -1908,6 +1919,7 @@ static int iwk_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 	}
 	(void) memcpy(node.key, k->wk_key, k->wk_keylen);
 	node.key_flags |= (STA_KEY_FLG_CCMP | (1 << 3) | (k->wk_keyix << 8));
+	node.key_flags = LE_16(node.key_flags);
 	node.sta_mask = STA_MODIFY_KEY_MASK;
 	node.control = 1;
 	err = iwk_cmd(sc, REPLY_ADD_STA, &node, sizeof (node), 1);
@@ -1991,7 +2003,7 @@ iwk_reg_write_region_4(iwk_sc_t *sc, uint32_t addr,
     uint32_t *data, int wlen)
 {
 	for (; wlen > 0; wlen--, data++, addr += 4)
-		iwk_reg_write(sc, addr, *data);
+		iwk_reg_write(sc, addr, LE_32(*data));
 }
 
 
@@ -2012,7 +2024,7 @@ static int
 iwk_load_firmware(iwk_sc_t *sc)
 {
 	uint32_t *boot_fw = (uint32_t *)sc->sc_boot;
-	uint32_t size = sc->sc_hdr->bootsz;
+	uint32_t size = LE_32(sc->sc_hdr->bootsz);
 	int n, err = IWK_SUCCESS;
 
 	/*
@@ -2080,6 +2092,7 @@ iwk_rx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	int16_t t;
 	uint32_t ants, i;
 	struct iwk_rx_non_cfg_phy *phyinfo;
+	uint32_t crc;
 
 	/* assuming not 11n here. cope with 11n in phase-II */
 	stat = (iwk_rx_phy_res_t *)(desc + 1);
@@ -2087,10 +2100,13 @@ iwk_rx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 		return;
 	}
 
+	for (i = 0; i < RX_RES_PHY_CNT; i++)
+		stat->non_cfg_phy[i] = LE_16(stat->non_cfg_phy[i]);
+
 	phyinfo = (struct iwk_rx_non_cfg_phy *)stat->non_cfg_phy;
 	agc = (phyinfo->agc_info & IWK_AGC_DB_MASK) >> IWK_AGC_DB_POS;
 	mrssi = 0;
-	ants = (stat->phy_flags & RX_PHY_FLAGS_ANTENNAE_MASK) >>
+	ants = (LE_16(stat->phy_flags) & RX_PHY_FLAGS_ANTENNAE_MASK) >>
 	    RX_PHY_FLAGS_ANTENNAE_OFFSET;
 	for (i = 0; i < 3; i++) {
 		if (ants & (1 << i))
@@ -2106,15 +2122,16 @@ iwk_rx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 		rssi = 100;
 	if (rssi < 1)
 		rssi = 1;
-	len = stat->byte_count;
-	tail = (uint32_t *)((uint8_t *)(stat + 1) + stat->cfg_phy_cnt + len);
+	len = LE_16(stat->byte_count);
+	tail = (uint32_t *)((caddr_t)(stat + 1) + stat->cfg_phy_cnt + len);
+	bcopy(tail, &crc, 4);
 
 	IWK_DBG((IWK_DEBUG_RX, "rx intr: idx=%d phy_len=%x len=%d "
 	    "rate=%x chan=%d tstamp=%x non_cfg_phy_count=%x "
 	    "cfg_phy_count=%x tail=%x", ring->cur, sizeof (*stat),
-	    len, stat->rate.r.s.rate, stat->channel,
+	    len, stat->rate.r.s.rate, LE_16(stat->channel),
 	    LE_32(stat->timestampl), stat->non_cfg_phy_cnt,
-	    stat->cfg_phy_cnt, LE_32(*tail)));
+	    stat->cfg_phy_cnt, LE_32(crc)));
 
 	if ((len < 16) || (len > sc->sc_dmabuf_sz)) {
 		IWK_DBG((IWK_DEBUG_RX, "rx frame oversize\n"));
@@ -2124,11 +2141,11 @@ iwk_rx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	/*
 	 * discard Rx frames with bad CRC
 	 */
-	if ((LE_32(*tail) &
+	if ((LE_32(crc) &
 	    (RX_RES_STATUS_NO_CRC32_ERROR | RX_RES_STATUS_NO_RXE_OVERFLOW)) !=
 	    (RX_RES_STATUS_NO_CRC32_ERROR | RX_RES_STATUS_NO_RXE_OVERFLOW)) {
 		IWK_DBG((IWK_DEBUG_RX, "rx crc error tail: %x\n",
-		    LE_32(*tail)));
+		    LE_32(crc)));
 		sc->sc_rx_err++;
 		return;
 	}
@@ -2175,7 +2192,7 @@ iwk_tx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	    "rate=%x duration=%d status=%x\n",
 	    desc->hdr.qid, desc->hdr.idx, stat->ntries, stat->frame_count,
 	    stat->bt_kill_count, stat->rate.r.s.rate,
-	    LE_32(stat->duration), LE_32(stat->status)));
+	    LE_16(stat->duration), LE_32(stat->status)));
 
 	amrr->txcnt++;
 	IWK_DBG((IWK_DEBUG_RATECTL, "tx: %d cnt\n", amrr->txcnt));
@@ -2341,7 +2358,7 @@ iwk_rx_softintr(caddr_t arg, caddr_t unused)
 	 * firmware has moved the index of the rx queue, driver get it,
 	 * and deal with it.
 	 */
-	index = LE_32(sc->sc_shared->val0) & 0xfff;
+	index = sc->sc_shared->val0 & 0xfff;
 
 	while (sc->sc_rxq.cur != index) {
 		data = &sc->sc_rxq.data[sc->sc_rxq.cur];
@@ -2502,7 +2519,9 @@ iwk_intr(caddr_t arg, caddr_t unused)
 	}
 
 	if (r & BIT_INT_RF_KILL) {
-		IWK_DBG((IWK_DEBUG_RADIO, "RF kill\n"));
+		uint32_t tmp = IWK_READ(sc, CSR_GP_CNTRL);
+		if (tmp & (1 << 27))
+			cmn_err(CE_NOTE, "RF switch: radio on\n");
 	}
 
 	if ((r & (BIT_INT_FH_RX | BIT_INT_SW_RX)) ||
@@ -2805,7 +2824,7 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	len0 = roundup(4 + sizeof (iwk_tx_cmd_t) + hdrlen, 4);
 	if (len0 != (4 + sizeof (iwk_tx_cmd_t) + hdrlen))
-		tx->tx_flags |= TX_CMD_FLG_MH_PAD_MSK;
+		tx->tx_flags |= LE_32(TX_CMD_FLG_MH_PAD_MSK);
 
 	/* retrieve destination node's id */
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
@@ -2828,19 +2847,19 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		    IEEE80211_FC0_SUBTYPE_ASSOC_REQ) ||
 		    ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
 		    IEEE80211_FC0_SUBTYPE_REASSOC_REQ))
-			tx->timeout.pm_frame_timeout = 3;
+			tx->timeout.pm_frame_timeout = LE_16(3);
 		else
-			tx->timeout.pm_frame_timeout = 2;
+			tx->timeout.pm_frame_timeout = LE_16(2);
 	} else
 		tx->timeout.pm_frame_timeout = 0;
 	if (rate == 2 || rate == 4 || rate == 11 || rate == 22)
 		masks |= RATE_MCS_CCK_MSK;
 
 	masks |= RATE_MCS_ANT_B_MSK;
-	tx->rate.r.rate_n_flags = (iwk_rate_to_plcp(rate) | masks);
+	tx->rate.r.rate_n_flags = LE_32(iwk_rate_to_plcp(rate) | masks);
 
 	IWK_DBG((IWK_DEBUG_TX, "tx flag = %x",
-	    tx->tx_flags));
+	    LE_32(tx->tx_flags)));
 
 	tx->rts_retry_limit = 60;
 	tx->data_retry_limit = 15;
@@ -2850,7 +2869,7 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	tx->len = LE_16(len);
 
 	tx->dram_lsb_ptr =
-	    data->paddr_cmd + 4 + offsetof(iwk_tx_cmd_t, scratch);
+	    LE_32(data->paddr_cmd + 4 + offsetof(iwk_tx_cmd_t, scratch));
 	tx->dram_msb_ptr = 0;
 	tx->driver_txop = 0;
 	tx->next_frame_len = 0;
@@ -2866,8 +2885,8 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	 * first segment includes the tx cmd plus the 802.11 header,
 	 * the second includes the remaining of the 802.11 frame.
 	 */
-	desc->val0 = LE_32(2 << 24);
-	desc->pa[0].tb1_addr = LE_32(data->paddr_cmd);
+	desc->val0 = 2 << 24;
+	desc->pa[0].tb1_addr = data->paddr_cmd;
 	desc->pa[0].val1 = ((len0 << 4) & 0xfff0) |
 	    ((data->dma_data.cookie.dmac_address & 0xffff) << 16);
 	desc->pa[0].val2 =
@@ -2876,7 +2895,8 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	IWK_DBG((IWK_DEBUG_TX, "phy addr1 = 0x%x phy addr2 = 0x%x "
 	    "len1 = 0x%x, len2 = 0x%x val1 = 0x%x val2 = 0x%x",
 	    data->paddr_cmd, data->dma_data.cookie.dmac_address,
-	    len0, len - hdrlen, desc->pa[0].val1, desc->pa[0].val2));
+	    len0, len - hdrlen, LE_32(desc->pa[0].val1),
+	    LE_32(desc->pa[0].val2)));
 
 	mutex_enter(&sc->sc_tx_lock);
 	ring->queued++;
@@ -2935,11 +2955,12 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		(void) memset(&sc->sc_config, 0, sizeof (iwk_rxon_cmd_t));
 		IEEE80211_ADDR_COPY(sc->sc_config.node_addr, ic->ic_macaddr);
 		IEEE80211_ADDR_COPY(sc->sc_config.wlap_bssid, ic->ic_macaddr);
-		sc->sc_config.chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
-		sc->sc_config.flags = (RXON_FLG_TSF2HOST_MSK |
+		sc->sc_config.chan =
+		    LE_16(ieee80211_chan2ieee(ic, ic->ic_curchan));
+		sc->sc_config.flags = LE_32(RXON_FLG_TSF2HOST_MSK |
 		    RXON_FLG_AUTO_DETECT_MSK |
 		    RXON_FLG_BAND_24G_MSK);
-		sc->sc_config.flags &= (~RXON_FLG_CCK_MSK);
+		sc->sc_config.flags &= LE_32(~RXON_FLG_CCK_MSK);
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
 			sc->sc_config.dev_type = RXON_DEV_TYPE_ESS;
@@ -2951,7 +2972,8 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		case IEEE80211_M_IBSS:
 		case IEEE80211_M_AHDEMO:
 			sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
-			sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+			sc->sc_config.flags |=
+			    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
 			sc->sc_config.filter_flags =
 			    LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
 			    RXON_FILTER_DIS_DECRYPT_MSK |
@@ -2974,8 +2996,8 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		sc->sc_config.ofdm_ht_dual_stream_basic_rates = 0xff;
 		/* set antenna */
 		mutex_enter(&sc->sc_glock);
-		sc->sc_config.rx_chain = RXON_RX_CHAIN_DRIVER_FORCE_MSK |
-		    LE_16((0x7 << RXON_RX_CHAIN_VALID_POS) |
+		sc->sc_config.rx_chain = LE_16(RXON_RX_CHAIN_DRIVER_FORCE_MSK |
+		    (0x7 << RXON_RX_CHAIN_VALID_POS) |
 		    (0x6 << RXON_RX_CHAIN_FORCE_SEL_POS) |
 		    (0x7 << RXON_RX_CHAIN_FORCE_MIMO_SEL_POS));
 		err1 = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
@@ -2996,13 +3018,14 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		txpower.channel_normal_width = 0;
 		for (i = 0; i < POWER_TABLE_NUM_HT_OFDM_ENTRIES; i++) {
 			txpower.tx_power.ht_ofdm_power[i].
-			    s.ramon_tx_gain = 0x3f3f;
+			    s.ramon_tx_gain = LE_16(0x3f3f);
 			txpower.tx_power.ht_ofdm_power[i].
-			    s.dsp_predis_atten = 110 | (110 << 8);
+			    s.dsp_predis_atten = LE_16(110 | (110 << 8));
 		}
-		txpower.tx_power.legacy_cck_power.s.ramon_tx_gain = 0x3f3f;
-		txpower.tx_power.legacy_cck_power.s.dsp_predis_atten
-		    = 110 | (110 << 8);
+		txpower.tx_power.legacy_cck_power.s.
+		    ramon_tx_gain = LE_16(0x3f3f);
+		txpower.tx_power.legacy_cck_power.s.
+		    dsp_predis_atten = LE_16(110 | (110 << 8));
 		err1 = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &txpower,
 		    sizeof (txpower), 1);
 		if (err1 != IWK_SUCCESS) {
@@ -3027,7 +3050,7 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 			masks |= RATE_MCS_ANT_B_MSK;
 			masks &= ~RATE_MCS_ANT_A_MSK;
 			link_quality.rate_n_flags[i] =
-			    iwk_rate_to_plcp(2) | masks;
+			    LE_32(iwk_rate_to_plcp(2) | masks);
 		}
 		link_quality.general_params.single_stream_ant_msk = 2;
 		link_quality.general_params.dual_stream_ant_msk = 3;
@@ -3187,8 +3210,6 @@ iwk_m_start(void *arg)
 		 * the 'plumb' succeed. The iwk_thread() tries to re-init
 		 * background.
 		 */
-		cmn_err(CE_WARN, "iwk_m_start(): failed to initialize "
-		    "hardware\n");
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags |= IWK_F_HW_ERR_RECOVER;
 		mutex_exit(&sc->sc_glock);
@@ -3425,7 +3446,7 @@ iwk_cmd(iwk_sc_t *sc, int code, const void *buf, int size, int async)
 	(void) memcpy(cmd->data, buf, size);
 	(void) memset(desc, 0, sizeof (*desc));
 
-	desc->val0 = LE_32(1 << 24);
+	desc->val0 = 1 << 24;
 	desc->pa[0].tb1_addr =
 	    (uint32_t)(ring->data[ring->cur].paddr_cmd & 0xffffffff);
 	desc->pa[0].val1 = ((4 + size) << 4) & 0xfff0;
@@ -3484,13 +3505,13 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 	if (in->in_chan == IEEE80211_CHAN_ANYC) {
 		cmn_err(CE_WARN, "iwk_hw_set_before_auth():"
 		    "channel (%d) isn't in proper range\n",
-		    ieee80211_chan2ieee(ic, in->in_chan));
+		    LE_16(ieee80211_chan2ieee(ic, in->in_chan)));
 		return (IWK_FAIL);
 	}
 
 	/* update adapter's configuration according the info of target AP */
 	IEEE80211_ADDR_COPY(sc->sc_config.bssid, in->in_bssid);
-	sc->sc_config.chan = ieee80211_chan2ieee(ic, in->in_chan);
+	sc->sc_config.chan = LE_16(ieee80211_chan2ieee(ic, in->in_chan));
 	if (ic->ic_curmode == IEEE80211_MODE_11B) {
 		sc->sc_config.cck_basic_rates  = 0x03;
 		sc->sc_config.ofdm_basic_rates = 0;
@@ -3519,8 +3540,8 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 	IWK_DBG((IWK_DEBUG_80211, "config chan %d flags %x "
 	    "filter_flags %x  cck %x ofdm %x"
 	    " bssid:%02x:%02x:%02x:%02x:%02x:%2x\n",
-	    sc->sc_config.chan, sc->sc_config.flags,
-	    sc->sc_config.filter_flags,
+	    LE_16(sc->sc_config.chan), LE_32(sc->sc_config.flags),
+	    LE_32(sc->sc_config.filter_flags),
 	    sc->sc_config.cck_basic_rates, sc->sc_config.ofdm_basic_rates,
 	    sc->sc_config.bssid[0], sc->sc_config.bssid[1],
 	    sc->sc_config.bssid[2], sc->sc_config.bssid[3],
@@ -3569,7 +3590,7 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 		masks |= RATE_MCS_ANT_B_MSK;
 		masks &= ~RATE_MCS_ANT_A_MSK;
 		link_quality.rate_n_flags[i] =
-		    iwk_rate_to_plcp(rate) | masks;
+		    LE_32(iwk_rate_to_plcp(rate) | masks);
 	}
 
 	link_quality.general_params.single_stream_ant_msk = 2;
@@ -3624,19 +3645,19 @@ iwk_scan(iwk_sc_t *sc)
 	hdr->quiet_time = LE_16(50);
 	hdr->quiet_plcp_th = LE_16(1);
 
-	hdr->flags = RXON_FLG_BAND_24G_MSK | RXON_FLG_AUTO_DETECT_MSK;
-	hdr->rx_chain = RXON_RX_CHAIN_DRIVER_FORCE_MSK |
-	    LE_16((0x7 << RXON_RX_CHAIN_VALID_POS) |
+	hdr->flags = LE_32(RXON_FLG_BAND_24G_MSK | RXON_FLG_AUTO_DETECT_MSK);
+	hdr->rx_chain = LE_16(RXON_RX_CHAIN_DRIVER_FORCE_MSK |
+	    (0x7 << RXON_RX_CHAIN_VALID_POS) |
 	    (0x6 << RXON_RX_CHAIN_FORCE_SEL_POS) |
 	    (0x7 << RXON_RX_CHAIN_FORCE_MIMO_SEL_POS));
 
-	hdr->tx_cmd.tx_flags = TX_CMD_FLG_SEQ_CTL_MSK;
+	hdr->tx_cmd.tx_flags = LE_32(TX_CMD_FLG_SEQ_CTL_MSK);
 	hdr->tx_cmd.sta_id = IWK_BROADCAST_ID;
-	hdr->tx_cmd.stop_time.life_time = 0xffffffff;
-	hdr->tx_cmd.tx_flags |= (0x200);
-	hdr->tx_cmd.rate.r.rate_n_flags = iwk_rate_to_plcp(2);
+	hdr->tx_cmd.stop_time.life_time = LE_32(0xffffffff);
+	hdr->tx_cmd.tx_flags |= LE_32(0x200);
+	hdr->tx_cmd.rate.r.rate_n_flags = LE_32(iwk_rate_to_plcp(2));
 	hdr->tx_cmd.rate.r.rate_n_flags |=
-	    (RATE_MCS_ANT_B_MSK|RATE_MCS_CCK_MSK);
+	    LE_32(RATE_MCS_ANT_B_MSK|RATE_MCS_CCK_MSK);
 	hdr->direct_scan[0].len = ic->ic_des_esslen;
 	hdr->direct_scan[0].id  = IEEE80211_ELEMID_SSID;
 
@@ -3707,8 +3728,8 @@ iwk_scan(iwk_sc_t *sc)
 
 	/* setup length of probe request */
 	hdr->tx_cmd.len = LE_16(_PTRDIFF(frm, wh));
-	hdr->len = hdr->nchan * sizeof (iwk_scan_chan_t) +
-	    hdr->tx_cmd.len + sizeof (iwk_scan_hdr_t);
+	hdr->len = LE_16(hdr->nchan * sizeof (iwk_scan_chan_t) +
+	    LE_16(hdr->tx_cmd.len) + sizeof (iwk_scan_hdr_t));
 
 	/*
 	 * the attribute of the scan channels are required after the probe
@@ -3734,7 +3755,7 @@ iwk_scan(iwk_sc_t *sc)
 	pktlen = _PTRDIFF(frm, cmd);
 
 	(void) memset(desc, 0, sizeof (*desc));
-	desc->val0 = LE_32(1 << 24);
+	desc->val0 = 1 << 24;
 	desc->pa[0].tb1_addr =
 	    (uint32_t)(data->dma_data.cookie.dmac_address & 0xffffffff);
 	desc->pa[0].val1 = (pktlen << 4) & 0xfff0;
@@ -3798,10 +3819,10 @@ iwk_config(iwk_sc_t *sc)
 	(void) memset(&sc->sc_config, 0, sizeof (iwk_rxon_cmd_t));
 	IEEE80211_ADDR_COPY(sc->sc_config.node_addr, ic->ic_macaddr);
 	IEEE80211_ADDR_COPY(sc->sc_config.wlap_bssid, ic->ic_macaddr);
-	sc->sc_config.chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
-	sc->sc_config.flags = (RXON_FLG_TSF2HOST_MSK |
+	sc->sc_config.chan = LE_16(ieee80211_chan2ieee(ic, ic->ic_curchan));
+	sc->sc_config.flags = LE_32(RXON_FLG_TSF2HOST_MSK |
 	    RXON_FLG_AUTO_DETECT_MSK | RXON_FLG_BAND_24G_MSK);
-	sc->sc_config.flags &= (~RXON_FLG_CCK_MSK);
+	sc->sc_config.flags &= LE_32(~RXON_FLG_CCK_MSK);
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
 		sc->sc_config.dev_type = RXON_DEV_TYPE_ESS;
@@ -3812,7 +3833,7 @@ iwk_config(iwk_sc_t *sc)
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
 		sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
-		sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+		sc->sc_config.flags |= LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
 		sc->sc_config.filter_flags = LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
 		    RXON_FILTER_DIS_DECRYPT_MSK |
 		    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
@@ -3834,8 +3855,8 @@ iwk_config(iwk_sc_t *sc)
 
 	/* set antenna */
 
-	sc->sc_config.rx_chain = RXON_RX_CHAIN_DRIVER_FORCE_MSK |
-	    LE_16((0x7 << RXON_RX_CHAIN_VALID_POS) |
+	sc->sc_config.rx_chain = LE_16(RXON_RX_CHAIN_DRIVER_FORCE_MSK |
+	    (0x7 << RXON_RX_CHAIN_VALID_POS) |
 	    (0x6 << RXON_RX_CHAIN_FORCE_SEL_POS) |
 	    (0x7 << RXON_RX_CHAIN_FORCE_MIMO_SEL_POS));
 
@@ -3874,7 +3895,8 @@ iwk_config(iwk_sc_t *sc)
 		masks |= RATE_MCS_CCK_MSK;
 		masks |= RATE_MCS_ANT_B_MSK;
 		masks &= ~RATE_MCS_ANT_A_MSK;
-		link_quality.rate_n_flags[i] = iwk_rate_to_plcp(2) | masks;
+		link_quality.rate_n_flags[i] =
+		    LE_32(iwk_rate_to_plcp(2) | masks);
 	}
 
 	link_quality.general_params.single_stream_ant_msk = 2;
@@ -4089,7 +4111,7 @@ static int iwk_eep_load(iwk_sc_t *sc)
 			return (IWK_FAIL);
 		}
 
-		eep_p[addr/2] = rv >> 16;
+		eep_p[addr/2] = LE_16(rv >> 16);
 	}
 
 	iwk_eep_sem_up(sc);
@@ -4125,7 +4147,7 @@ iwk_init(iwk_sc_t *sc)
 
 	tmp = IWK_READ(sc, CSR_GP_CNTRL);
 	if (!(tmp & CSR_GP_CNTRL_REG_FLAG_HW_RF_KILL_SW)) {
-		cmn_err(CE_WARN, "iwk_init(): Radio transmitter is off\n");
+		cmn_err(CE_NOTE, "iwk_init(): Radio transmitter is off\n");
 		goto fail1;
 	}
 
@@ -4388,19 +4410,19 @@ static int32_t iwk_curr_tempera(iwk_sc_t *sc)
 	int32_t   r4_s;
 
 	if (iwk_is_fat_channel(sc)) {
-		r1 = (int32_t)(sc->sc_card_alive_init.therm_r1[1]);
-		r2 = (int32_t)(sc->sc_card_alive_init.therm_r2[1]);
-		r3 = (int32_t)(sc->sc_card_alive_init.therm_r3[1]);
-		r4_u = sc->sc_card_alive_init.therm_r4[1];
+		r1 = (int32_t)LE_32(sc->sc_card_alive_init.therm_r1[1]);
+		r2 = (int32_t)LE_32(sc->sc_card_alive_init.therm_r2[1]);
+		r3 = (int32_t)LE_32(sc->sc_card_alive_init.therm_r3[1]);
+		r4_u = LE_32(sc->sc_card_alive_init.therm_r4[1]);
 	} else {
-		r1 = (int32_t)(sc->sc_card_alive_init.therm_r1[0]);
-		r2 = (int32_t)(sc->sc_card_alive_init.therm_r2[0]);
-		r3 = (int32_t)(sc->sc_card_alive_init.therm_r3[0]);
-		r4_u = sc->sc_card_alive_init.therm_r4[0];
+		r1 = (int32_t)LE_32(sc->sc_card_alive_init.therm_r1[0]);
+		r2 = (int32_t)LE_32(sc->sc_card_alive_init.therm_r2[0]);
+		r3 = (int32_t)LE_32(sc->sc_card_alive_init.therm_r3[0]);
+		r4_u = LE_32(sc->sc_card_alive_init.therm_r4[0]);
 	}
 
 	if (sc->sc_flags & IWK_F_STATISTICS) {
-		r4_s = (int32_t)(sc->sc_statistics.general.temperature <<
+		r4_s = (int32_t)(LE_32(sc->sc_statistics.general.temperature) <<
 		    (31-23)) >> (31-23);
 	} else {
 		r4_s = (int32_t)(r4_u << (31-23)) >> (31-23);
@@ -4429,14 +4451,15 @@ static int32_t iwk_curr_tempera(iwk_sc_t *sc)
 /* Determine whether 4965 is using 2.4 GHz band */
 static inline int iwk_is_24G_band(iwk_sc_t *sc)
 {
-	return (sc->sc_config.flags & RXON_FLG_BAND_24G_MSK);
+	return (LE_32(sc->sc_config.flags) & RXON_FLG_BAND_24G_MSK);
 }
 
 /* Determine whether 4965 is using fat channel */
 static inline int iwk_is_fat_channel(iwk_sc_t *sc)
 {
-	return ((sc->sc_config.flags & RXON_FLG_CHANNEL_MODE_PURE_40_MSK) ||
-	    (sc->sc_config.flags & RXON_FLG_CHANNEL_MODE_MIXED_MSK));
+	return ((LE_32(sc->sc_config.flags) &
+	    RXON_FLG_CHANNEL_MODE_PURE_40_MSK) ||
+	    (LE_32(sc->sc_config.flags) & RXON_FLG_CHANNEL_MODE_MIXED_MSK));
 }
 
 /*
@@ -4790,7 +4813,7 @@ static int iwk_txpower_table_cmd_init(iwk_sc_t *sc,
 	union iwk_tx_power_dual_stream txpower_gains;
 	int32_t txpower_gains_idx;
 
-	channel = sc->sc_config.chan;
+	channel = LE_16(sc->sc_config.chan);
 
 	/* 2.4 GHz or 5 GHz band */
 	is_24G = iwk_is_24G_band(sc);
@@ -4802,7 +4825,7 @@ static int iwk_txpower_table_cmd_init(iwk_sc_t *sc,
 	 * using low half channel number or high half channel number
 	 * identify fat channel
 	 */
-	if (is_fat && (sc->sc_config.flags &
+	if (is_fat && (LE_32(sc->sc_config.flags) &
 	    RXON_FLG_CONTROL_CHANNEL_LOC_HIGH_MSK)) {
 		is_high_chan = 1;
 	}
@@ -4888,8 +4911,8 @@ static int iwk_txpower_table_cmd_init(iwk_sc_t *sc,
 	 */
 	(void) iwk_channel_interpolate(sc, channel, &eep_chan_calib);
 
-	eep_voltage = (int32_t)sc->sc_eep_map.calib_info.voltage;
-	init_voltage = (int32_t)sc->sc_card_alive_init.voltage;
+	eep_voltage = (int32_t)LE_16(sc->sc_eep_map.calib_info.voltage);
+	init_voltage = (int32_t)LE_32(sc->sc_card_alive_init.voltage);
 
 	/* calculate voltage compensation to Tx power */
 	voltage_compensation =
@@ -4952,7 +4975,8 @@ static int iwk_txpower_table_cmd_init(iwk_sc_t *sc,
 		for (c = 0; c < 2; c++) {	  /* go through all Tx chains */
 			if (is_mimo) {
 				atten_value =
-				    sc->sc_card_alive_init.tx_atten[tx_grp][c];
+				    LE_32(sc->sc_card_alive_init.
+				    tx_atten[tx_grp][c]);
 			} else {
 				atten_value = 0;
 			}
@@ -5006,9 +5030,9 @@ static int iwk_txpower_table_cmd_init(iwk_sc_t *sc,
 
 		/* initialize Tx power table */
 		if (r < POWER_TABLE_NUM_HT_OFDM_ENTRIES) {
-			tp_db->ht_ofdm_power[r].dw = txpower_gains.dw;
+			tp_db->ht_ofdm_power[r].dw = LE_32(txpower_gains.dw);
 		} else {
-			tp_db->legacy_cck_power.dw = txpower_gains.dw;
+			tp_db->legacy_cck_power.dw = LE_32(txpower_gains.dw);
 		}
 	}
 
@@ -5063,8 +5087,9 @@ static void iwk_statistics_notify(iwk_sc_t *sc, iwk_rx_desc_t *desc)
 
 	is_diff = (sc->sc_statistics.general.temperature !=
 	    statistics_p->general.temperature) ||
-	    ((sc->sc_statistics.flag & STATISTICS_REPLY_FLG_FAT_MODE_MSK) !=
-	    (statistics_p->flag & STATISTICS_REPLY_FLG_FAT_MODE_MSK));
+	    (LE_32(sc->sc_statistics.flag) &
+	    STATISTICS_REPLY_FLG_FAT_MODE_MSK) !=
+	    (LE_32(statistics_p->flag) & STATISTICS_REPLY_FLG_FAT_MODE_MSK);
 
 	/* update statistics data */
 	(void) memcpy(&sc->sc_statistics, statistics_p,
@@ -5102,7 +5127,7 @@ static void iwk_statistics_notify(iwk_sc_t *sc, iwk_rx_desc_t *desc)
 /* Determine this station is in associated state or not */
 static int iwk_is_associated(iwk_sc_t *sc)
 {
-	return (sc->sc_config.filter_flags & RXON_FILTER_ASSOC_MSK);
+	return (LE_32(sc->sc_config.filter_flags) & RXON_FILTER_ASSOC_MSK);
 }
 
 /* Make necessary preparation for Receiver gain balance calibration */
@@ -5162,7 +5187,7 @@ static int iwk_rxgain_diff(iwk_sc_t *sc)
 	struct iwk_rx_gain_diff *gain_diff_p = &sc->sc_rxgain_diff;
 
 	if (INTERFERENCE_DATA_AVAILABLE !=
-	    rx_general_p->interference_data_flag) {
+	    LE_32(rx_general_p->interference_data_flag)) {
 		return (IWK_SUCCESS);
 	}
 
@@ -5173,22 +5198,23 @@ static int iwk_rxgain_diff(iwk_sc_t *sc)
 	is_24G = iwk_is_24G_band(sc);
 	channel_n = sc->sc_config.chan;	 /* channel number */
 
-	if ((channel_n != (sc->sc_statistics.flag >> 16)) ||
+	if ((channel_n != (LE_32(sc->sc_statistics.flag) >> 16)) ||
 	    ((STATISTICS_REPLY_FLG_BAND_24G_MSK ==
-	    (sc->sc_statistics.flag & STATISTICS_REPLY_FLG_BAND_24G_MSK)) &&
+	    (LE_32(sc->sc_statistics.flag) &
+	    STATISTICS_REPLY_FLG_BAND_24G_MSK)) &&
 	    !is_24G)) {
 		return (IWK_SUCCESS);
 	}
 
 	/* Rx chain's noise strength from statistics notification */
-	noise_chain_a = rx_general_p->beacon_silence_rssi_a & 0xFF;
-	noise_chain_b = rx_general_p->beacon_silence_rssi_b & 0xFF;
-	noise_chain_c = rx_general_p->beacon_silence_rssi_c & 0xFF;
+	noise_chain_a = LE_32(rx_general_p->beacon_silence_rssi_a) & 0xFF;
+	noise_chain_b = LE_32(rx_general_p->beacon_silence_rssi_b) & 0xFF;
+	noise_chain_c = LE_32(rx_general_p->beacon_silence_rssi_c) & 0xFF;
 
 	/* Rx chain's beacon strength from statistics notification */
-	beacon_chain_a = rx_general_p->beacon_rssi_a & 0xFF;
-	beacon_chain_b = rx_general_p->beacon_rssi_b & 0xFF;
-	beacon_chain_c = rx_general_p->beacon_rssi_c & 0xFF;
+	beacon_chain_a = LE_32(rx_general_p->beacon_rssi_a) & 0xFF;
+	beacon_chain_b = LE_32(rx_general_p->beacon_rssi_b) & 0xFF;
+	beacon_chain_c = LE_32(rx_general_p->beacon_rssi_c) & 0xFF;
 
 	gain_diff_p->beacon_count++;
 
@@ -5384,27 +5410,28 @@ static int iwk_rx_sens_init(iwk_sc_t *sc)
 	rx_sens_p->cck_noise_diff = 0;
 	rx_sens_p->cck_no_false_alarm_num = 0;
 
-	cmd.control = IWK_SENSITIVITY_CONTROL_WORK_TABLE;
+	cmd.control = LE_16(IWK_SENSITIVITY_CONTROL_WORK_TABLE);
 
 	cmd.table[AUTO_CORR32_X4_TH_ADD_MIN_IDX] =
-	    rx_sens_p->auto_corr_ofdm_x4;
+	    LE_16(rx_sens_p->auto_corr_ofdm_x4);
 	cmd.table[AUTO_CORR32_X4_TH_ADD_MIN_MRC_IDX] =
-	    rx_sens_p->auto_corr_mrc_ofdm_x4;
+	    LE_16(rx_sens_p->auto_corr_mrc_ofdm_x4);
 	cmd.table[AUTO_CORR32_X1_TH_ADD_MIN_IDX] =
-	    rx_sens_p->auto_corr_ofdm_x1;
+	    LE_16(rx_sens_p->auto_corr_ofdm_x1);
 	cmd.table[AUTO_CORR32_X1_TH_ADD_MIN_MRC_IDX] =
-	    rx_sens_p->auto_corr_mrc_ofdm_x1;
+	    LE_16(rx_sens_p->auto_corr_mrc_ofdm_x1);
 
 	cmd.table[AUTO_CORR40_X4_TH_ADD_MIN_IDX] =
-	    rx_sens_p->auto_corr_cck_x4;
+	    LE_16(rx_sens_p->auto_corr_cck_x4);
 	cmd.table[AUTO_CORR40_X4_TH_ADD_MIN_MRC_IDX] =
-	    rx_sens_p->auto_corr_mrc_cck_x4;
-	cmd.table[MIN_ENERGY_CCK_DET_IDX] = rx_sens_p->min_energy_det_cck;
+	    LE_16(rx_sens_p->auto_corr_mrc_cck_x4);
+	cmd.table[MIN_ENERGY_CCK_DET_IDX] =
+	    LE_16(rx_sens_p->min_energy_det_cck);
 
-	cmd.table[MIN_ENERGY_OFDM_DET_IDX] = 100;
-	cmd.table[BARKER_CORR_TH_ADD_MIN_IDX] = 190;
-	cmd.table[BARKER_CORR_TH_ADD_MIN_MRC_IDX] = 390;
-	cmd.table[PTAM_ENERGY_TH_IDX] = 62;
+	cmd.table[MIN_ENERGY_OFDM_DET_IDX] = LE_16(100);
+	cmd.table[BARKER_CORR_TH_ADD_MIN_IDX] = LE_16(190);
+	cmd.table[BARKER_CORR_TH_ADD_MIN_MRC_IDX] = LE_16(390);
+	cmd.table[PTAM_ENERGY_TH_IDX] = LE_16(62);
 
 	/* at first, set up Rx to maximum sensitivity */
 	rv = iwk_cmd(sc, SENSITIVITY_CMD, &cmd, sizeof (cmd), 1);
@@ -5440,14 +5467,14 @@ static int iwk_rx_sens(iwk_sc_t *sc)
 	}
 
 	if (INTERFERENCE_DATA_AVAILABLE !=
-	    rx_general_p->interference_data_flag) {
+	    LE_32(rx_general_p->interference_data_flag)) {
 		cmn_err(CE_WARN, "iwk_rx_sens(): "
 		    "can't make rx sensitivity calibration,"
 		    "because of invalid statistics\n");
 		return (DDI_FAILURE);
 	}
 
-	actual_rx_time = rx_general_p->channel_load;
+	actual_rx_time = LE_32(rx_general_p->channel_load);
 	if (!actual_rx_time) {
 		IWK_DBG((IWK_DEBUG_CALIBRATION, "iwk_rx_sens(): "
 		    "can't make rx sensitivity calibration,"
@@ -5530,8 +5557,8 @@ static int iwk_cck_sens(iwk_sc_t *sc, uint32_t actual_rx_time)
 	    &sc->sc_statistics.rx.general;
 	struct iwk_rx_sensitivity *rx_sens_p = &sc->sc_rx_sens;
 
-	cck_fa = sc->sc_statistics.rx.cck.false_alarm_cnt;
-	cck_bp = sc->sc_statistics.rx.cck.plcp_err;
+	cck_fa = LE_32(sc->sc_statistics.rx.cck.false_alarm_cnt);
+	cck_bp = LE_32(sc->sc_statistics.rx.cck.plcp_err);
 
 	/* accumulate false alarm */
 	if (rx_sens_p->last_false_alarm_cnt_cck > cck_fa) {
@@ -5560,15 +5587,18 @@ static int iwk_cck_sens(iwk_sc_t *sc, uint32_t actual_rx_time)
 	rx_sens_p->cck_noise_diff = 0;
 
 	noise_a =
-	    (uint8_t)((rx_general_p->beacon_silence_rssi_a & 0xFF00) >> 8);
+	    (uint8_t)((LE_32(rx_general_p->beacon_silence_rssi_a) & 0xFF00) >>
+	    8);
 	noise_b =
-	    (uint8_t)((rx_general_p->beacon_silence_rssi_b & 0xFF00) >> 8);
+	    (uint8_t)((LE_32(rx_general_p->beacon_silence_rssi_b) & 0xFF00) >>
+	    8);
 	noise_c =
-	    (uint8_t)((rx_general_p->beacon_silence_rssi_c & 0xFF00) >> 8);
+	    (uint8_t)((LE_32(rx_general_p->beacon_silence_rssi_c) & 0xFF00) >>
+	    8);
 
-	beacon_a = rx_general_p->beacon_energy_a;
-	beacon_b = rx_general_p->beacon_energy_b;
-	beacon_c = rx_general_p->beacon_energy_c;
+	beacon_a = LE_32(rx_general_p->beacon_energy_a);
+	beacon_b = LE_32(rx_general_p->beacon_energy_b);
+	beacon_c = LE_32(rx_general_p->beacon_energy_c);
 
 	/* determine maximum noise among 3 chains */
 	if ((noise_a >= noise_b) && (noise_a >= noise_c)) {
@@ -5726,8 +5756,8 @@ static int iwk_ofdm_sens(iwk_sc_t *sc, uint32_t actual_rx_time)
 	uint32_t ofdm_sum_fa_bp;
 	struct iwk_rx_sensitivity *rx_sens_p = &sc->sc_rx_sens;
 
-	ofdm_fa = sc->sc_statistics.rx.ofdm.false_alarm_cnt;
-	ofdm_bp = sc->sc_statistics.rx.ofdm.plcp_err;
+	ofdm_fa = LE_32(sc->sc_statistics.rx.ofdm.false_alarm_cnt);
+	ofdm_bp = LE_32(sc->sc_statistics.rx.ofdm.plcp_err);
 
 	/* accumulate false alarm */
 	if (rx_sens_p->last_false_alarm_cnt_ofdm > ofdm_fa) {
@@ -5905,7 +5935,7 @@ static void iwk_write_event_log(iwk_sc_t *sc)
 			/* the top of circular buffer */
 	uint32_t idx; /* index of entry to be filled in next */
 
-	log_event_table_ptr = sc->sc_card_alive_run.log_event_table_ptr;
+	log_event_table_ptr = LE_32(sc->sc_card_alive_run.log_event_table_ptr);
 	if (!(log_event_table_ptr)) {
 		IWK_DBG((IWK_DEBUG_EEPROM, "NULL event table pointer\n"));
 		return;
@@ -5948,8 +5978,6 @@ static void iwk_write_event_log(iwk_sc_t *sc)
 			    event_id, data1));
 		} else { /* timestamp */
 			data2 = iwk_mem_read(sc, logptr);
-			printf("Time=%d, Event ID=%d, Data=0x%x\n",
-			    data1, event_id, data2);
 			IWK_DBG((IWK_DEBUG_EEPROM,
 			    "Time=%d, Event ID=%d, Data=0x%x\n",
 			    data1, event_id, data2));
@@ -6009,7 +6037,7 @@ static void iwk_write_error_log(iwk_sc_t *sc)
 	uint32_t err_ptr;	/* Start address of error log */
 	uint32_t valid;		/* is error log valid */
 
-	err_ptr = sc->sc_card_alive_run.error_event_table_ptr;
+	err_ptr = LE_32(sc->sc_card_alive_run.error_event_table_ptr);
 	if (!(err_ptr)) {
 		IWK_DBG((IWK_DEBUG_EEPROM, "NULL error table pointer\n"));
 		return;
@@ -6084,7 +6112,7 @@ iwk_run_state_config_ibss(ieee80211com_t *ic)
 	 */
 	sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
 
-	sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+	sc->sc_config.flags |= LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
 	sc->sc_config.filter_flags =
 	    LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
 	    RXON_FILTER_DIS_DECRYPT_MSK |
@@ -6093,8 +6121,8 @@ iwk_run_state_config_ibss(ieee80211com_t *ic)
 	sc->sc_config.assoc_id = 0;
 
 	IEEE80211_ADDR_COPY(sc->sc_config.bssid, in->in_bssid);
-	sc->sc_config.chan = ieee80211_chan2ieee(ic,
-	    in->in_chan);
+	sc->sc_config.chan = LE_16(ieee80211_chan2ieee(ic,
+	    in->in_chan));
 
 	if (ic->ic_curmode == IEEE80211_MODE_11B) {
 		sc->sc_config.cck_basic_rates = 0x03;
@@ -6152,7 +6180,7 @@ iwk_run_state_config_sta(ieee80211com_t *ic)
 		    "got %d\n",
 		    in->in_associd, sc->sc_assoc_id);
 	}
-	sc->sc_config.assoc_id = in->in_associd & 0x3fff;
+	sc->sc_config.assoc_id = LE_16(in->in_associd & 0x3fff);
 
 	/*
 	 * short preamble/slot time are
@@ -6341,10 +6369,10 @@ iwk_start_tx_beacon(ieee80211com_t *ic)
 
 	bcopy(mp->b_rptr, tx_beacon_p->bcon_frame, MBLKL(mp));
 
-	tx_beacon_p->config.len = (uint16_t)(MBLKL(mp));
+	tx_beacon_p->config.len = LE_16((uint16_t)(MBLKL(mp)));
 	sc->sc_ibss.ibss_beacon.beacon_cmd_len =
 	    sizeof (iwk_tx_cmd_t) +
-	    4 + tx_beacon_p->config.len;
+	    4 + LE_16(tx_beacon_p->config.len);
 
 	/*
 	 * beacons are sent at 1M
@@ -6360,11 +6388,11 @@ iwk_start_tx_beacon(ieee80211com_t *ic)
 	masks |= RATE_MCS_ANT_B_MSK;
 
 	tx_beacon_p->config.rate.r.rate_n_flags =
-	    (iwk_rate_to_plcp(rate) | masks);
+	    LE_32(iwk_rate_to_plcp(rate) | masks);
 
 
 	tx_beacon_p->config.tx_flags =
-	    (TX_CMD_FLG_SEQ_CTL_MSK | TX_CMD_FLG_TSF_MSK);
+	    LE_32(TX_CMD_FLG_SEQ_CTL_MSK | TX_CMD_FLG_TSF_MSK);
 
 	if (ic->ic_bss->in_tstamp.tsf != 0) {
 		sc->sc_ibss.ibss_beacon.syncbeacon = 1;
@@ -6462,7 +6490,7 @@ iwk_clean_add_node_ibss(struct ieee80211com *ic,
 			bc_masks |= RATE_MCS_ANT_B_MSK;
 			bc_masks &= ~RATE_MCS_ANT_A_MSK;
 			bc_link_quality.rate_n_flags[i] =
-			    iwk_rate_to_plcp(2) | bc_masks;
+			    LE_32(iwk_rate_to_plcp(2) | bc_masks);
 		}
 
 		bc_link_quality.general_params.single_stream_ant_msk = 2;
@@ -6536,7 +6564,7 @@ iwk_clean_add_node_ibss(struct ieee80211com *ic,
 		masks &= ~RATE_MCS_ANT_A_MSK;
 
 		link_quality.rate_n_flags[i] =
-		    iwk_rate_to_plcp(rate) | masks;
+		    LE_32(iwk_rate_to_plcp(rate) | masks);
 	}
 
 	link_quality.general_params.single_stream_ant_msk = 2;

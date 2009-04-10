@@ -243,6 +243,16 @@ static ddi_device_acc_attr_t iwh_reg_accattr = {
 };
 
 /*
+ * DMA access attributes for descriptor
+ */
+static ddi_device_acc_attr_t iwh_dma_descattr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_LE_ACC,
+	DDI_STRICTORDER_ACC,
+	DDI_DEFAULT_ACC
+};
+
+/*
  * DMA access attributes
  */
 static ddi_device_acc_attr_t iwh_dma_accattr = {
@@ -451,7 +461,7 @@ int
 iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	iwh_sc_t		*sc;
-	ieee80211com_t	*ic;
+	ieee80211com_t		*ic;
 	int			instance, err, i;
 	char			strbuf[32];
 	wifi_data_t		wd = { 0 };
@@ -783,7 +793,7 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * create relation to GLD
 	 */
 	macp = mac_alloc(MAC_VERSION);
-	if (err != DDI_SUCCESS) {
+	if (macp == NULL) {
 		cmn_err(CE_WARN, "iwh_attach(): "
 		    "failed to do mac_alloc()\n");
 		goto attach_fail15;
@@ -1236,7 +1246,7 @@ iwh_alloc_shared(iwh_sc_t *sc)
 	 * must be aligned on a 4K-page boundary
 	 */
 	err = iwh_alloc_dma_mem(sc, sizeof (iwh_shared_t),
-	    &sh_dma_attr, &iwh_dma_accattr,
+	    &sh_dma_attr, &iwh_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &sc->sc_dma_sh);
 	if (err != DDI_SUCCESS) {
@@ -1279,7 +1289,7 @@ iwh_alloc_kw(iwh_sc_t *sc)
 	 * must be aligned on a 4K-page boundary
 	 */
 	err = iwh_alloc_dma_mem(sc, IWH_KW_SIZE,
-	    &kw_dma_attr, &iwh_dma_accattr,
+	    &kw_dma_attr, &iwh_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &sc->sc_dma_kw);
 	if (err != DDI_SUCCESS) {
@@ -1325,7 +1335,7 @@ iwh_alloc_rx_ring(iwh_sc_t *sc)
 	 * allocate RX description ring buffer
 	 */
 	err = iwh_alloc_dma_mem(sc, RX_QUEUE_SIZE * sizeof (uint32_t),
-	    &ring_desc_dma_attr, &iwh_dma_accattr,
+	    &ring_desc_dma_attr, &iwh_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_desc);
 	if (err != DDI_SUCCESS) {
@@ -1360,8 +1370,8 @@ iwh_alloc_rx_ring(iwh_sc_t *sc)
 		 * the physical address bit [8-36] are used,
 		 * instead of bit [0-31] in 3945.
 		 */
-		ring->desc[i] = LE_32((uint32_t)
-		    (data->dma_data.cookie.dmac_address >> 8));
+		ring->desc[i] = (uint32_t)
+		    (data->dma_data.cookie.dmac_address >> 8);
 	}
 
 #ifdef	DEBUG
@@ -1456,7 +1466,7 @@ iwh_alloc_tx_ring(iwh_sc_t *sc, iwh_tx_ring_t *ring,
 	 */
 	err = iwh_alloc_dma_mem(sc,
 	    TFD_QUEUE_SIZE_MAX * sizeof (iwh_tx_desc_t),
-	    &ring_desc_dma_attr, &iwh_dma_accattr,
+	    &ring_desc_dma_attr, &iwh_dma_descattr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_desc);
 	if (err != DDI_SUCCESS) {
@@ -1728,8 +1738,10 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			    ~LE_32(RXON_FILTER_ASSOC_MSK);
 
 			IWH_DBG((IWH_DEBUG_80211, "config chan %d "
-			    "flags %x filter_flags %x\n", sc->sc_config.chan,
-			    sc->sc_config.flags, sc->sc_config.filter_flags));
+			    "flags %x filter_flags %x\n",
+			    LE_16(sc->sc_config.chan),
+			    LE_32(sc->sc_config.flags),
+			    LE_32(sc->sc_config.filter_flags)));
 
 			err = iwh_cmd(sc, REPLY_RXON, &sc->sc_config,
 			    sizeof (iwh_rxon_cmd_t), 1);
@@ -2117,21 +2129,21 @@ iwh_rx_phy_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 static void
 iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 {
-	ieee80211com_t *ic = &sc->sc_ic;
+	ieee80211com_t	*ic = &sc->sc_ic;
 #ifdef	DEBUG
-	iwh_rx_ring_t *ring = &sc->sc_rxq;
+	iwh_rx_ring_t	*ring = &sc->sc_rxq;
 #endif
-	iwh_rx_phy_res_t *stat;
-	ieee80211_node_t *in;
-	uint32_t *tail;
-	struct ieee80211_frame *wh;
-	mblk_t *mp;
-	uint16_t len, rssi, agc;
-	int16_t t;
-	struct iwh_rx_non_cfg_phy *phyinfo;
-	uint32_t	temp;
-	uint32_t arssi, brssi, crssi, mrssi;
+	struct ieee80211_frame		*wh;
+	struct iwh_rx_non_cfg_phy	*phyinfo;
 	struct	iwh_rx_mpdu_body_size	*mpdu_size;
+
+	mblk_t			*mp;
+	int16_t			t;
+	uint16_t		len, rssi, agc;
+	uint32_t		temp, crc, *tail;
+	uint32_t		arssi, brssi, crssi, mrssi;
+	iwh_rx_phy_res_t	*stat;
+	ieee80211_node_t	*in;
 
 	/*
 	 * assuming not 11n here. cope with 11n in phase-II
@@ -2143,14 +2155,14 @@ iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 	}
 
 	phyinfo = (struct iwh_rx_non_cfg_phy *)stat->non_cfg_phy;
-	temp = phyinfo->non_cfg_phy[IWH_RX_RES_AGC_IDX];
+	temp = LE_32(phyinfo->non_cfg_phy[IWH_RX_RES_AGC_IDX]);
 	agc = (temp & IWH_OFDM_AGC_MSK) >> IWH_OFDM_AGC_BIT_POS;
 
-	temp = phyinfo->non_cfg_phy[IWH_RX_RES_RSSI_AB_IDX];
+	temp = LE_32(phyinfo->non_cfg_phy[IWH_RX_RES_RSSI_AB_IDX]);
 	arssi = (temp & IWH_OFDM_RSSI_A_MSK) >> IWH_OFDM_RSSI_A_BIT_POS;
 	brssi = (temp & IWH_OFDM_RSSI_B_MSK) >> IWH_OFDM_RSSI_B_BIT_POS;
 
-	temp = phyinfo->non_cfg_phy[IWH_RX_RES_RSSI_C_IDX];
+	temp = LE_32(phyinfo->non_cfg_phy[IWH_RX_RES_RSSI_C_IDX]);
 	crssi = (temp & IWH_OFDM_RSSI_C_MSK) >> IWH_OFDM_RSSI_C_BIT_POS;
 
 	mrssi = MAX(arssi, brssi);
@@ -2172,16 +2184,17 @@ iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 	/*
 	 * size of frame, not include FCS
 	 */
-	len = mpdu_size->byte_count;
+	len = LE_16(mpdu_size->byte_count);
 	tail = (uint32_t *)((uint8_t *)(desc + 1) +
 	    sizeof (struct iwh_rx_mpdu_body_size) + len);
+	bcopy(tail, &crc, 4);
 
 	IWH_DBG((IWH_DEBUG_RX, "rx intr: idx=%d phy_len=%x len=%d "
 	    "rate=%x chan=%d tstamp=%x non_cfg_phy_count=%x "
 	    "cfg_phy_count=%x tail=%x", ring->cur, sizeof (*stat),
 	    len, stat->rate.r.s.rate, stat->channel,
 	    LE_32(stat->timestampl), stat->non_cfg_phy_cnt,
-	    stat->cfg_phy_cnt, LE_32(*tail)));
+	    stat->cfg_phy_cnt, LE_32(crc)));
 
 	if ((len < 16) || (len > sc->sc_dmabuf_sz)) {
 		IWH_DBG((IWH_DEBUG_RX, "rx frame oversize\n"));
@@ -2191,11 +2204,11 @@ iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 	/*
 	 * discard Rx frames with bad CRC
 	 */
-	if ((LE_32(*tail) &
+	if ((LE_32(crc) &
 	    (RX_RES_STATUS_NO_CRC32_ERROR | RX_RES_STATUS_NO_RXE_OVERFLOW)) !=
 	    (RX_RES_STATUS_NO_CRC32_ERROR | RX_RES_STATUS_NO_RXE_OVERFLOW)) {
 		IWH_DBG((IWH_DEBUG_RX, "rx crc error tail: %x\n",
-		    LE_32(*tail)));
+		    LE_32(crc)));
 		sc->sc_rx_err++;
 		return;
 	}
@@ -2482,7 +2495,7 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 	 * firmware has moved the index of the rx queue, driver get it,
 	 * and deal with it.
 	 */
-	index = LE_32(sc->sc_shared->val0) & 0xfff;
+	index = (sc->sc_shared->val0) & 0xfff;
 
 	while (sc->sc_rxq.cur != index) {
 		data = &sc->sc_rxq.data[sc->sc_rxq.cur];
@@ -2535,7 +2548,7 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 				 * iwh_thread() tries to recover it after the
 				 * button is pushed again(ON)
 				 */
-				cmn_err(CE_WARN, "iwh_rx_softintr(): "
+				cmn_err(CE_NOTE, "iwh_rx_softintr(): "
 				    "radio transmitter is off\n");
 				sc->sc_ostate = sc->sc_ic.ic_state;
 				ieee80211_new_state(&sc->sc_ic,
@@ -2671,11 +2684,11 @@ iwh_intr(caddr_t arg, caddr_t unused)
 		return (DDI_INTR_CLAIMED);
 	}
 
-#ifdef	DEBUG
 	if (r & BIT_INT_RF_KILL) {
-		IWH_DBG((IWH_DEBUG_RADIO, "RF kill\n"));
+		uint32_t tmp = IWH_READ(sc, CSR_GP_CNTRL);
+		if (tmp & (1 << 27))
+			cmn_err(CE_NOTE, "RF switch: radio on\n");
 	}
-#endif
 
 	if ((r & (BIT_INT_FH_RX | BIT_INT_SW_RX)) ||
 	    (rfh & FH_INT_RX_MASK)) {
@@ -2977,7 +2990,7 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	len0 = roundup(4 + sizeof (iwh_tx_cmd_t) + hdrlen, 4);
 	if (len0 != (4 + sizeof (iwh_tx_cmd_t) + hdrlen)) {
-		tx->tx_flags |= TX_CMD_FLG_MH_PAD_MSK;
+		tx->tx_flags |= LE_32(TX_CMD_FLG_MH_PAD_MSK);
 	}
 
 	/*
@@ -3001,9 +3014,9 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		    IEEE80211_FC0_SUBTYPE_ASSOC_REQ) ||
 		    ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
 		    IEEE80211_FC0_SUBTYPE_REASSOC_REQ)) {
-			tx->timeout.pm_frame_timeout = 3;
+			tx->timeout.pm_frame_timeout = LE_16(3);
 		} else {
-			tx->timeout.pm_frame_timeout = 2;
+			tx->timeout.pm_frame_timeout = LE_16(2);
 		}
 	} else {
 		tx->timeout.pm_frame_timeout = 0;
@@ -3014,7 +3027,7 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	}
 
 	masks |= RATE_MCS_ANT_B_MSK;
-	tx->rate.r.rate_n_flags = (iwh_rate_to_plcp(rate) | masks);
+	tx->rate.r.rate_n_flags = LE_32(iwh_rate_to_plcp(rate) | masks);
 
 	IWH_DBG((IWH_DEBUG_TX, "tx flag = %x",
 	    tx->tx_flags));
@@ -3027,7 +3040,7 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	tx->len = LE_16(len);
 
 	tx->dram_lsb_ptr =
-	    data->paddr_cmd + 4 + offsetof(iwh_tx_cmd_t, scratch);
+	    LE_32(data->paddr_cmd + 4 + offsetof(iwh_tx_cmd_t, scratch));
 	tx->dram_msb_ptr = 0;
 	tx->driver_txop = 0;
 	tx->next_frame_len = 0;
@@ -3043,8 +3056,8 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	 * first segment includes the tx cmd plus the 802.11 header,
 	 * the second includes the remaining of the 802.11 frame.
 	 */
-	desc->val0 = LE_32(2 << 24);
-	desc->pa[0].tb1_addr = LE_32(data->paddr_cmd);
+	desc->val0 = 2 << 24;
+	desc->pa[0].tb1_addr = data->paddr_cmd;
 	desc->pa[0].val1 = ((len0 << 4) & 0xfff0) |
 	    ((data->dma_data.cookie.dmac_address & 0xffff) << 16);
 	desc->pa[0].val2 =
@@ -3531,7 +3544,7 @@ iwh_cmd(iwh_sc_t *sc, int code, const void *buf, int size, int async)
 	(void) memcpy(cmd->data, buf, size);
 	(void) memset(desc, 0, sizeof (*desc));
 
-	desc->val0 = LE_32(1 << 24);
+	desc->val0 = 1 << 24;
 	desc->pa[0].tb1_addr =
 	    (uint32_t)(ring->data[ring->cur].paddr_cmd & 0xffffffff);
 	desc->pa[0].val1 = ((4 + size) << 4) & 0xfff0;
@@ -3604,7 +3617,7 @@ iwh_hw_set_before_auth(iwh_sc_t *sc)
 	 * the info of target AP
 	 */
 	IEEE80211_ADDR_COPY(sc->sc_config.bssid, in->in_bssid);
-	sc->sc_config.chan = ieee80211_chan2ieee(ic, in->in_chan);
+	sc->sc_config.chan = LE_16(ieee80211_chan2ieee(ic, in->in_chan));
 	if (IEEE80211_MODE_11B == ic->ic_curmode) {
 		sc->sc_config.cck_basic_rates  = 0x03;
 		sc->sc_config.ofdm_basic_rates = 0;
@@ -3635,8 +3648,8 @@ iwh_hw_set_before_auth(iwh_sc_t *sc)
 	IWH_DBG((IWH_DEBUG_80211, "config chan %d flags %x "
 	    "filter_flags %x  cck %x ofdm %x"
 	    " bssid:%02x:%02x:%02x:%02x:%02x:%2x\n",
-	    sc->sc_config.chan, sc->sc_config.flags,
-	    sc->sc_config.filter_flags,
+	    LE_16(sc->sc_config.chan), LE_32(sc->sc_config.flags),
+	    LE_32(sc->sc_config.filter_flags),
 	    sc->sc_config.cck_basic_rates, sc->sc_config.ofdm_basic_rates,
 	    sc->sc_config.bssid[0], sc->sc_config.bssid[1],
 	    sc->sc_config.bssid[2], sc->sc_config.bssid[3],
@@ -3690,7 +3703,7 @@ iwh_hw_set_before_auth(iwh_sc_t *sc)
 		masks |= RATE_MCS_ANT_B_MSK;
 		masks &= ~RATE_MCS_ANT_A_MSK;
 		link_quality.rate_n_flags[i] =
-		    iwh_rate_to_plcp(rate) | masks;
+		    LE_32(iwh_rate_to_plcp(rate) | masks);
 	}
 
 	link_quality.general_params.single_stream_ant_msk = 2;
@@ -3721,7 +3734,7 @@ iwh_scan(iwh_sc_t *sc)
 	iwh_tx_data_t *data;
 	iwh_cmd_t *cmd;
 	iwh_scan_hdr_t *hdr;
-	iwh_scan_chan_t *chan;
+	iwh_scan_chan_t chan;
 	struct ieee80211_frame *wh;
 	ieee80211_node_t *in = ic->ic_bss;
 	uint8_t essid[IEEE80211_NWID_LEN+1];
@@ -3745,23 +3758,23 @@ iwh_scan(iwh_sc_t *sc)
 	hdr->quiet_time = LE_16(50);
 	hdr->quiet_plcp_th = LE_16(1);
 
-	hdr->flags = RXON_FLG_BAND_24G_MSK;
-	hdr->rx_chain = RXON_RX_CHAIN_DRIVER_FORCE_MSK |
-	    LE_16((0x7 << RXON_RX_CHAIN_VALID_POS) |
+	hdr->flags = LE_32(RXON_FLG_BAND_24G_MSK);
+	hdr->rx_chain = LE_16(RXON_RX_CHAIN_DRIVER_FORCE_MSK |
+	    (0x7 << RXON_RX_CHAIN_VALID_POS) |
 	    (0x2 << RXON_RX_CHAIN_FORCE_SEL_POS) |
 	    (0x2 << RXON_RX_CHAIN_FORCE_MIMO_SEL_POS));
 
 	hdr->tx_cmd.tx_flags = LE_32(TX_CMD_FLG_SEQ_CTL_MSK);
 	hdr->tx_cmd.sta_id = IWH_BROADCAST_ID;
-	hdr->tx_cmd.stop_time.life_time = 0xffffffff;
-	hdr->tx_cmd.rate.r.rate_n_flags = iwh_rate_to_plcp(2);
+	hdr->tx_cmd.stop_time.life_time = LE_32(0xffffffff);
+	hdr->tx_cmd.rate.r.rate_n_flags = LE_32(iwh_rate_to_plcp(2));
 	hdr->tx_cmd.rate.r.rate_n_flags |=
-	    (RATE_MCS_ANT_B_MSK |RATE_MCS_CCK_MSK);
+	    LE_32(RATE_MCS_ANT_B_MSK |RATE_MCS_CCK_MSK);
 	hdr->direct_scan[0].len = ic->ic_des_esslen;
 	hdr->direct_scan[0].id  = IEEE80211_ELEMID_SSID;
 
-	hdr->filter_flags = RXON_FILTER_ACCEPT_GRP_MSK |
-	    RXON_FILTER_BCON_AWARE_MSK;
+	hdr->filter_flags = LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
+	    RXON_FILTER_BCON_AWARE_MSK);
 
 	if (ic->ic_des_esslen) {
 		bcopy(ic->ic_des_essid, essid, ic->ic_des_esslen);
@@ -3840,35 +3853,35 @@ iwh_scan(iwh_sc_t *sc)
 	}
 
 	/* setup length of probe request */
-	hdr->tx_cmd.len = _PTRDIFF(frm, wh);
-	hdr->len = hdr->nchan * sizeof (iwh_scan_chan_t) +
-	    hdr->tx_cmd.len + sizeof (iwh_scan_hdr_t);
+	hdr->tx_cmd.len = LE_16(_PTRDIFF(frm, wh));
+	hdr->len = LE_16(hdr->nchan * sizeof (iwh_scan_chan_t) +
+	    LE_16(hdr->tx_cmd.len) + sizeof (iwh_scan_hdr_t));
 
 	/*
 	 * the attribute of the scan channels are required after the probe
 	 * request frame.
 	 */
-	chan = (iwh_scan_chan_t *)frm;
-	for (i = 1; i <= hdr->nchan; i++, chan++) {
+	for (i = 1; i <= hdr->nchan; i++) {
 		if (ic->ic_des_esslen) {
-			chan->type = 3;
+			chan.type = LE_32(3);
 		} else {
-			chan->type = 1;
+			chan.type = LE_32(1);
 		}
 
-		chan->chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
-		chan->tpc.tx_gain = 0x28;
-		chan->tpc.dsp_atten = 110;
-		chan->active_dwell = 50;
-		chan->passive_dwell = 120;
+		chan.chan = LE_16(ieee80211_chan2ieee(ic, ic->ic_curchan));
+		chan.tpc.tx_gain = 0x28;
+		chan.tpc.dsp_atten = 110;
+		chan.active_dwell = LE_16(50);
+		chan.passive_dwell = LE_16(120);
 
+		bcopy(&chan, frm, sizeof (iwh_scan_chan_t));
 		frm += sizeof (iwh_scan_chan_t);
 	}
 
 	pktlen = _PTRDIFF(frm, cmd);
 
 	(void) memset(desc, 0, sizeof (*desc));
-	desc->val0 = LE_32(1 << 24);
+	desc->val0 = 1 << 24;
 	desc->pa[0].tb1_addr =
 	    (uint32_t)(data->dma_data.cookie.dmac_address & 0xffffffff);
 	desc->pa[0].val1 = (pktlen << 4) & 0xfff0;
@@ -3943,8 +3956,8 @@ iwh_config(iwh_sc_t *sc)
 	(void) memset(&sc->sc_config, 0, sizeof (iwh_rxon_cmd_t));
 	IEEE80211_ADDR_COPY(sc->sc_config.node_addr, ic->ic_macaddr);
 	IEEE80211_ADDR_COPY(sc->sc_config.wlap_bssid, ic->ic_macaddr);
-	sc->sc_config.chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
-	sc->sc_config.flags = RXON_FLG_BAND_24G_MSK;
+	sc->sc_config.chan = LE_16(ieee80211_chan2ieee(ic, ic->ic_curchan));
+	sc->sc_config.flags = LE_32(RXON_FLG_BAND_24G_MSK);
 
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
@@ -3958,7 +3971,7 @@ iwh_config(iwh_sc_t *sc)
 	case IEEE80211_M_AHDEMO:
 		sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
 
-		sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+		sc->sc_config.flags |= LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
 		sc->sc_config.filter_flags = LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
 		    RXON_FILTER_DIS_DECRYPT_MSK |
 		    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
@@ -3981,8 +3994,8 @@ iwh_config(iwh_sc_t *sc)
 	/*
 	 * set antenna
 	 */
-	sc->sc_config.rx_chain = RXON_RX_CHAIN_DRIVER_FORCE_MSK |
-	    LE_16((0x7 << RXON_RX_CHAIN_VALID_POS) |
+	sc->sc_config.rx_chain = LE_16(RXON_RX_CHAIN_DRIVER_FORCE_MSK |
+	    (0x7 << RXON_RX_CHAIN_VALID_POS) |
 	    (0x2 << RXON_RX_CHAIN_FORCE_SEL_POS) |
 	    (0x2 << RXON_RX_CHAIN_FORCE_MIMO_SEL_POS));
 
@@ -4042,7 +4055,8 @@ iwh_config(iwh_sc_t *sc)
 		masks |= RATE_MCS_CCK_MSK;
 		masks |= RATE_MCS_ANT_B_MSK;
 		masks &= ~RATE_MCS_ANT_A_MSK;
-		link_quality.rate_n_flags[i] = iwh_rate_to_plcp(2) | masks;
+		link_quality.rate_n_flags[i] =
+		    LE_32(iwh_rate_to_plcp(2) | masks);
 	}
 
 	link_quality.general_params.single_stream_ant_msk = 2;
@@ -4150,10 +4164,10 @@ iwh_power_up(iwh_sc_t *sc)
 static int
 iwh_preinit(iwh_sc_t *sc)
 {
-	uint32_t tmp;
-	int n;
-	uint8_t vlink;
+	int		n;
+	uint8_t		vlink;
 	uint16_t	radio_cfg;
+	uint32_t	tmp;
 
 	/*
 	 * clear any pending interrupts
@@ -4333,7 +4347,7 @@ iwh_eep_load(iwh_sc_t *sc)
 			return (IWH_FAIL);
 		}
 
-		eep_p[addr/2] = rv >> 16;
+		eep_p[addr/2] = LE_16(rv >> 16);
 	}
 
 	iwh_eep_sem_up(sc);
@@ -4374,8 +4388,6 @@ iwh_init(iwh_sc_t *sc)
 
 	err = iwh_init_common(sc);
 	if (err != IWH_SUCCESS) {
-		cmn_err(CE_WARN, "iwh_init(): "
-		    "failed to initialize chipset\n");
 		mutex_exit(&sc->sc_glock);
 		return (IWH_FAIL);
 	}
@@ -4440,8 +4452,6 @@ iwh_init(iwh_sc_t *sc)
 
 	err = iwh_init_common(sc);
 	if (err != IWH_SUCCESS) {
-		cmn_err(CE_WARN, "iwh_init(): "
-		    "failed to initialize chipset\n");
 		mutex_exit(&sc->sc_glock);
 		return (IWH_FAIL);
 	}
@@ -4859,8 +4869,8 @@ iwh_alive_common(iwh_sc_t *sc)
 	(void) memset(&c_cmd, 0, sizeof (c_cmd));
 
 	c_cmd.opCode = PHY_CALIBRATE_CRYSTAL_FRQ_CMD;
-	c_cmd.data.cap_pin1 = sc->sc_eep_calib->xtal_calib[0];
-	c_cmd.data.cap_pin2 = sc->sc_eep_calib->xtal_calib[1];
+	c_cmd.data.cap_pin1 = LE_16(sc->sc_eep_calib->xtal_calib[0]);
+	c_cmd.data.cap_pin2 = LE_16(sc->sc_eep_calib->xtal_calib[1]);
 
 	rv = iwh_cmd(sc, REPLY_PHY_CALIBRATION_CMD, &c_cmd, sizeof (c_cmd), 1);
 	if (rv != IWH_SUCCESS) {
@@ -4886,7 +4896,7 @@ iwh_save_calib_result(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 {
 	struct iwh_calib_results *res_p = &sc->sc_calib_results;
 	struct iwh_calib_hdr *calib_hdr = (struct iwh_calib_hdr *)(desc + 1);
-	int len = desc->len;
+	int len = LE_32(desc->len);
 
 	/*
 	 * ensure the size of buffer is not too big
@@ -4958,7 +4968,7 @@ iwh_tx_power_table(iwh_sc_t *sc, int async)
 	(void) memset(&txpower, 0, sizeof (txpower));
 
 	txpower.band = 1; /* for 2.4G */
-	txpower.channel = sc->sc_config.chan;
+	txpower.channel = (uint8_t)LE_16(sc->sc_config.chan);
 	txpower.pa_measurements = 1;
 	txpower.max_mcs = 23;
 
@@ -5027,7 +5037,7 @@ iwh_init_common(iwh_sc_t *sc)
 
 	tmp = IWH_READ(sc, CSR_GP_CNTRL);
 	if (!(tmp & CSR_GP_CNTRL_REG_FLAG_HW_RF_KILL_SW)) {
-		cmn_err(CE_WARN, "iwh_init_common(): "
+		cmn_err(CE_NOTE, "iwh_init_common(): "
 		    "radio transmitter is off\n");
 		return (IWH_FAIL);
 	}

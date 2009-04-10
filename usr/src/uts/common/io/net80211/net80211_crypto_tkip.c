@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@
  * AP driver. The code is used with the consent of the author and
  * it's license is included below.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/byteorder.h>
 #include <sys/crypto/common.h>
@@ -492,6 +490,12 @@ tkip_mixing_phase2(uint8_t *WEPSeed, const uint8_t *TK,
 	WEPSeed[1] = (Hi8(IV16) | 0x20) & 0x7F;
 	WEPSeed[2] = Lo8(IV16);
 	WEPSeed[3] = Lo8((PPK[5] ^ Mk16_le((const uint16_t *) &TK[0])) >> 1);
+
+#ifdef _BIG_ENDIAN
+	int i;
+	for (i = 0; i < 6; i++)
+		PPK[i] = (PPK[i] << 8) | (PPK[i] >> 8);
+#endif
 }
 
 static int

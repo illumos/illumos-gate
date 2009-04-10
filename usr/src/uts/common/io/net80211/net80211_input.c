@@ -161,7 +161,7 @@ ieee80211_input(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		in->in_rstamp = rstamp;
 		if (!(type & IEEE80211_FC0_TYPE_CTL)) {
 			tid = 0;
-			rxseq = (*(uint16_t *)wh->i_seq);
+			rxseq = LE_16(*(uint16_t *)wh->i_seq);
 			if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 			    (rxseq - in->in_rxseqs[tid]) <= 0) {
 				/* duplicate, discard */
@@ -649,8 +649,9 @@ bad:
 static int
 iswpaoui(const uint8_t *frm)
 {
-	uint32_t c = *(uint32_t *)(frm + 2);
-	return (frm[1] > 3 && c == ((WPA_OUI_TYPE << 24) | WPA_OUI));
+	uint32_t c;
+	bcopy(frm + 2, &c, 4);
+	return (frm[1] > 3 && LE_32(c) == ((WPA_OUI_TYPE << 24) | WPA_OUI));
 }
 
 /*
@@ -706,9 +707,9 @@ ieee80211_recv_beacon(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 	bzero(&scan, sizeof (scan));
 	scan.tstamp  = frm;
 	frm += 8;
-	scan.bintval = (*(uint16_t *)frm);
+	scan.bintval = LE_16(*(uint16_t *)frm);
 	frm += 2;
-	scan.capinfo = (*(uint16_t *)frm);
+	scan.capinfo = LE_16(*(uint16_t *)frm);
 	frm += 2;
 	scan.bchan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 	scan.chan = scan.bchan;
@@ -1043,9 +1044,9 @@ ieee80211_recv_mgmt(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		 */
 		IEEE80211_VERIFY_LENGTH(_PTRDIFF(efrm, frm),
 		    IEEE80211_AUTH_ELEM_MIN, break);
-		algo   = (*(uint16_t *)frm);
-		seq    = (*(uint16_t *)(frm + 2));
-		status = (*(uint16_t *)(frm + 4));
+		algo   = LE_16(*(uint16_t *)frm);
+		seq    = LE_16(*(uint16_t *)(frm + 2));
+		status = LE_16(*(uint16_t *)(frm + 4));
 		ieee80211_dbg(IEEE80211_MSG_AUTH, "ieee80211_recv_mgmt: "
 		    "[%s] recv auth frame with algorithm %d seq %d\n",
 		    ieee80211_macaddr_sprintf(wh->i_addr2), algo, seq);
@@ -1089,9 +1090,9 @@ ieee80211_recv_mgmt(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		IEEE80211_VERIFY_LENGTH(_PTRDIFF(efrm, frm),
 		    IEEE80211_ASSOC_RESP_ELEM_MIN, break);
 		in = ic->ic_bss;
-		capinfo = (*(uint16_t *)frm);
+		capinfo = LE_16(*(uint16_t *)frm);
 		frm += 2;
-		status = (*(uint16_t *)frm);
+		status = LE_16(*(uint16_t *)frm);
 		frm += 2;
 		if (status != 0) {
 			ieee80211_dbg(IEEE80211_MSG_ASSOC,
@@ -1103,7 +1104,7 @@ ieee80211_recv_mgmt(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 			}
 			break;
 		}
-		associd = (*(uint16_t *)frm);
+		associd = LE_16(*(uint16_t *)frm);
 		frm += 2;
 
 		rates = xrates = NULL;
@@ -1201,7 +1202,7 @@ ieee80211_recv_mgmt(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		 *	[2] reason
 		 */
 		IEEE80211_VERIFY_LENGTH(_PTRDIFF(efrm, frm), 2, break);
-		status = (*(uint16_t *)frm);
+		status = LE_16(*(uint16_t *)frm);
 
 		ieee80211_dbg(IEEE80211_MSG_AUTH,
 		    "recv deauthenticate (reason %d)\n", status);
@@ -1226,7 +1227,7 @@ ieee80211_recv_mgmt(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		 *	[2] reason
 		 */
 		IEEE80211_VERIFY_LENGTH(_PTRDIFF(efrm, frm), 2, break);
-		status = (*(uint16_t *)frm);
+		status = LE_16(*(uint16_t *)frm);
 
 		ieee80211_dbg(IEEE80211_MSG_ASSOC,
 		    "recv disassociate (reason %d)\n", status);

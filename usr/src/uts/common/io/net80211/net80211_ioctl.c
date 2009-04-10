@@ -2232,21 +2232,23 @@ wl_set_wpakey(struct ieee80211com *ic, const void *wldp_buf)
 	uint16_t kid;
 	struct ieee80211_node *in;
 	struct ieee80211_key *wk;
-	wl_key_t *ik = (wl_key_t *)wldp_buf;
+	wl_key_t ik;
+
+	bcopy(wldp_buf, &ik, sizeof (wl_key_t));
 
 	ieee80211_dbg(IEEE80211_MSG_BRUSSELS, "wl_set_wpakey: "
-	    "idx=%d\n", ik->ik_keyix);
+	    "idx=%d\n", ik.ik_keyix);
 
 	/*
 	 * cipher support is verified by ieee80211_crypt_newkey
-	 * this also checks ik->ik_keylen > sizeof(wk->wk_key)
+	 * this also checks ik.ik_keylen > sizeof(wk->wk_key)
 	 */
-	if (ik->ik_keylen > sizeof (ik->ik_keydata)) {
+	if (ik.ik_keylen > sizeof (ik.ik_keydata)) {
 		ieee80211_err("wl_set_wpakey: key is too long\n");
 		err = EINVAL;
 		return (err);
 	}
-	kid = ik->ik_keyix;
+	kid = ik.ik_keyix;
 	if (kid == IEEE80211_KEYIX_NONE || kid >= IEEE80211_WEP_NKID) {
 		ieee80211_err("wl_set_wpakey: incorrect keyix\n");
 		err = EINVAL;
@@ -2263,23 +2265,23 @@ wl_set_wpakey(struct ieee80211com *ic, const void *wldp_buf)
 	}
 
 	KEY_UPDATE_BEGIN(ic);
-	if (ieee80211_crypto_newkey(ic, ik->ik_type,
-	    ik->ik_flags, wk)) {
-		wk->wk_keylen = ik->ik_keylen;
+	if (ieee80211_crypto_newkey(ic, ik.ik_type,
+	    ik.ik_flags, wk)) {
+		wk->wk_keylen = ik.ik_keylen;
 		/* MIC presence is implied by cipher type */
 		if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
 			wk->wk_keylen = IEEE80211_KEYBUF_SIZE;
-		wk->wk_keyrsc = ik->ik_keyrsc;
+		wk->wk_keyrsc = ik.ik_keyrsc;
 		wk->wk_keytsc = 0;
-		wk->wk_flags |= ik->ik_flags &
+		wk->wk_flags |= ik.ik_flags &
 		    (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV);
 		(void) memset(wk->wk_key, 0, sizeof (wk->wk_key));
-		(void) memcpy(wk->wk_key, ik->ik_keydata,
-		    ik->ik_keylen);
+		(void) memcpy(wk->wk_key, ik.ik_keydata,
+		    ik.ik_keylen);
 		if (!ieee80211_crypto_setkey(ic, wk,
-		    in != NULL ? in->in_macaddr : ik->ik_macaddr)) {
+		    in != NULL ? in->in_macaddr : ik.ik_macaddr)) {
 			err = EIO;
-		} else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT)) {
+		} else if ((ik.ik_flags & IEEE80211_KEY_DEFAULT)) {
 			ic->ic_def_txkey = kid;
 			ieee80211_mac_update(ic);
 		}
