@@ -98,6 +98,8 @@ typedef enum ibt_status_e {
 						/* serviceId already exists */
 	IBT_APM_NOT_SUPPORTED		= 8,	/* Can not satisfy a request */
 						/* for APM */
+	IBT_IBMF_TIMEOUT		= 10,	/* IBMF call returned with */
+						/* TIMEOUT error code. */
 	IBT_INSUFF_DATA			= 11,	/* Requested number of */
 						/* paths/records are not */
 						/* available. */

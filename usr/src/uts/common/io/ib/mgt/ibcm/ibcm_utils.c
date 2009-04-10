@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibcm_utils.c
@@ -1949,6 +1947,8 @@ ibcm_ibmf_analyze_error(int ibmf_status)
 		 * to the client so that it can retrieve any associated ENA.
 		 */
 		return (ibmf_status);
+	} else if (ibmf_status == IBMF_TRANS_TIMEOUT) {
+		return (IBT_IBMF_TIMEOUT);
 	} else {
 		/*
 		 * IBMF failed for some other reason, invalid arguments etc.
