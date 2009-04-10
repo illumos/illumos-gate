@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ extern "C" {
  * If the return value of sctp_itf_ver() is different from what
  * is expected, do not call any of the routines.
  */
-#define	SCTP_ITF_VER	1
+#define	SCTP_ITF_VER	2
 
 /*
  * This struct holds various flow control limits the caller of
