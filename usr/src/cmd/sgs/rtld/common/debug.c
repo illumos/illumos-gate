@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,11 @@ dbg_setup(const char *options, Dbg_desc *dbp)
 		return (ret);
 
 	/*
+	 * Obtain the process id.
+	 */
+	pid = getpid();
+
+	/*
 	 * If an LD_DEBUG_OUTPUT file was specified then we need to direct all
 	 * diagnostics to the specified file.  Add the process id as a file
 	 * suffix so that multiple processes that inherit the same debugging
@@ -88,7 +93,7 @@ dbg_setup(const char *options, Dbg_desc *dbp)
 		char 	file[MAXPATHLEN];
 
 		(void) snprintf(file, MAXPATHLEN, MSG_ORIG(MSG_DBG_FILE),
-		    dbg_file, getpid());
+		    dbg_file, pid);
 		if ((dbg_fd = open(file, (O_RDWR | O_CREAT), 0666)) == -1) {
 			int	err = errno;
 
@@ -112,7 +117,6 @@ dbg_setup(const char *options, Dbg_desc *dbp)
 	(void) rtld_fstat(dbg_fd, &status);
 	dbg_dev = status.st_dev;
 	dbg_ino = status.st_ino;
-	pid = getpid();
 
 	return (ret);
 }
@@ -204,16 +208,9 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	prf.pr_fd = dbg_fd;
 
 	/*
-	 * The getpid() call is a 'special' interface between ld.so.1 and dbx,
-	 * because of this getpid() can't be called freely until after control
-	 * has been given to the user program.  Once the control has been given
-	 * to the user program we know that the r_debug structure has been
-	 * properly initialized for the debugger.
+	 * Obtain the process id.
 	 */
-	if (rtld_flags & RT_FL_APPLIC)
-		_pid = getpid();
-	else
-		_pid = pid;
+	_pid = getpid();
 
 	if (lml)
 		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_PID), _pid);

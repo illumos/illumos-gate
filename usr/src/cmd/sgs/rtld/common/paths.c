@@ -53,7 +53,7 @@ set_dirs(Alist **alpp, Spath_defn *sdp, uint_t flags)
 	while (sdp->sd_name) {
 		Pdesc	*pdp;
 
-		if ((pdp = alist_append(alpp, 0, sizeof (Pdesc),
+		if ((pdp = alist_append(alpp, NULL, sizeof (Pdesc),
 		    AL_CNT_SPATH)) == NULL)
 			return;
 
@@ -1057,7 +1057,8 @@ expand_paths(Rt_map *clmp, const char *list, Alist **alpp, Aliste alni,
 		/*
 		 * Create a new pathname descriptor.
 		 */
-		if ((pdp = alist_append(alpp, 0, sizeof (Pdesc), alni)) == NULL)
+		if ((pdp = alist_append(alpp, NULL, sizeof (Pdesc),
+		    alni)) == NULL)
 			return (0);
 
 		pdp->pd_pname = str;

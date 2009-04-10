@@ -1470,3 +1470,7 @@ Bugid   Risk Synopsis
 6821619 Solaris linkers need systematic approach to ELF OSABI
 	PSARC/2009/196 ELF objects to set OSABI / elfdump -O option
 6827468 6801536 breaks 'ld -s' if there are weak/strong symbol pairs
+6715578 AOUT (BCP) symbol lookup can be compromised with lazy loading.
+6752883 ld.so.1 error message should be buffered (not sent to stderr).
+6577982 ld.so.1 calls getpid() before it should when any LD_* are set
+6826513 ldd gets confused by a crle(1) LD_PRELOAD setting

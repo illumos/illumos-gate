@@ -414,7 +414,7 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 	 * If we're already at atexit() there's no point processing further,
 	 * all objects have already been tsorted for fini processing.
 	 */
-	if ((rtld_flags & RT_FL_ATEXIT) != 0)
+	if (rtld_flags & RT_FL_ATEXIT)
 		return (0);
 
 	/*
@@ -427,7 +427,6 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 		DBG_CALL(Dbg_file_dlclose(LIST(clmp), NAME(ghp->gh_ownlmp),
 		    DBG_DLCLOSE_NULL));
 	}
-
 
 	/*
 	 * Decrement reference count of this object.
@@ -567,14 +566,13 @@ newlmid(Lm_list *lml)
  * Core dlopen activity.
  */
 static Grp_hdl *
-dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
-    uint_t flags, uint_t orig, int *in_nfavl)
+dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
+    Rt_map *clmp, uint_t flags, uint_t orig, int *in_nfavl)
 {
 	Alist		*palp = NULL;
 	Rt_map		*nlmp;
 	Grp_hdl		*ghp;
 	Aliste		olmco, nlmco;
-	Lm_cntl		*lmc;
 
 	DBG_CALL(Dbg_file_dlopen(clmp,
 	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), in_nfavl, mode));
@@ -675,15 +673,14 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	}
 
 	/*
-	 * Create a new link-map control list for this request, and load the
+	 * Establish a link-map control list for this request, and load the
 	 * associated object.
 	 */
-	if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
-	    AL_CNT_LMLISTS)) == NULL) {
+	if ((nlmco = create_cntl(lml, 1)) == NULL) {
 		remove_plist(&palp, 1);
 		return (NULL);
 	}
-	olmco = nlmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
+	olmco = nlmco;
 
 	nlmp = load_one(lml, nlmco, palp, clmp, mode, (flags | FLG_RT_HANDLE),
 	    &ghp, in_nfavl);
@@ -726,13 +723,15 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * If the dlopen has failed, clean up any objects that might have been
 	 * loaded successfully on this new link-map control list.
 	 */
-	if ((nlmp == NULL) && olmco)
+	if (olmco && (nlmp == NULL))
 		remove_lmc(lml, clmp, olmco, path);
 
 	/*
-	 * Finally, remove any link-map control list that was created.
+	 * Finally, remove any temporary link-map control list.  Note, if this
+	 * operation successfully established a new link-map list, then a base
+	 * link-map control list will have been created, which must remain.
 	 */
-	if (olmco)
+	if (olmco && ((nlmp == NULL) || (olml != (Lm_list *)LM_ID_NEWLM)))
 		remove_cntl(lml, olmco);
 
 	return (ghp);
@@ -775,6 +774,7 @@ Grp_hdl *
 dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
     uint_t flags, uint_t orig)
 {
+	Lm_list	*olml = lml;
 	Rt_map	*dlmp = NULL;
 	Grp_hdl	*ghp;
 	int	in_nfavl = 0;
@@ -825,7 +825,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	/*
 	 * Open the required object on the associated link-map list.
 	 */
-	ghp = dlmopen_core(lml, path, mode, clmp, flags, orig, &in_nfavl);
+	ghp = dlmopen_core(lml, olml, path, mode, clmp, flags, orig, &in_nfavl);
 
 	/*
 	 * If the object could not be found it is possible that the "not-found"
@@ -837,7 +837,8 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 		avl_tree_t	*oavlt = nfavl;
 
 		nfavl = NULL;
-		ghp = dlmopen_core(lml, path, mode, clmp, flags, orig, NULL);
+		ghp = dlmopen_core(lml, olml, path, mode, clmp, flags, orig,
+		    NULL);
 
 		/*
 		 * If the file is found, then its full path name will have been

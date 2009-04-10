@@ -471,6 +471,20 @@ rt_thr_init(Lm_list *lml)
 		leave(NULL, thr_flg_reenter);
 		(*fptr)();
 		(void) enter(thr_flg_reenter);
+
+		/*
+		 * If this is an alternative link-map list, and this is the
+		 * first call to initialize threads, don't let the destination
+		 * libc be deleted.  It is possible that an auditors complete
+		 * initialization fails, but there is presently no main link-map
+		 * list.  As this libc has established the thread pointer, don't
+		 * delete this libc, otherwise the initialization of libc on the
+		 * main link-map can be compromised during its threads
+		 * initialization.
+		 */
+		if (((lml->lm_flags & LML_FLG_BASELM) == 0) &&
+		    ((rtld_flags2 & RT_FL2_PLMSETUP) == 0))
+			MODE(lml->lm_lcs[CI_THRINIT].lc_lmp) |= RTLD_NODELETE;
 	}
 }
 

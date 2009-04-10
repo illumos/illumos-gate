@@ -231,9 +231,8 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	 * they are appropriate for this platform.
 	 */
 	if ((ofl->ofl_hwcap_1) && (hwcap_check(ofl->ofl_hwcap_1, &rej) == 0)) {
-		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
-		    (lmp != NULL) && (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
-		    (NEXT(lmp) == NULL)) {
+		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
+		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
 			(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
 			    ofl->ofl_name, rej.rej_str);
 		}
@@ -241,9 +240,8 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	}
 
 	if ((ofl->ofl_sfcap_1) && (sfcap_check(ofl->ofl_sfcap_1, &rej) == 0)) {
-		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
-		    (lmp != NULL) && (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
-		    (NEXT(lmp) == NULL)) {
+		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
+		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
 			(void) printf(MSG_INTL(MSG_LDD_GEN_SFCAP_1),
 			    ofl->ofl_name, rej.rej_str);
 		}

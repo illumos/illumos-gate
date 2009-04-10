@@ -465,20 +465,18 @@ remove_lists(Rt_map *lmp, int lazy)
 void
 remove_cntl(Lm_list *lml, Aliste lmco)
 {
-	if (lmco && (lmco != ALIST_OFF_DATA)) {
-		Aliste	_lmco = lmco;
+	Aliste	_lmco = lmco;
 #if	DEBUG
-		Lm_cntl	*lmc;
+	Lm_cntl	*lmc;
 
-		lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
 
-		/*
-		 * This element should be empty.
-		 */
-		ASSERT(lmc->lc_head == NULL);
+	/*
+	 * This element should be empty.
+	 */
+	ASSERT(lmc->lc_head == NULL);
 #endif
-		alist_delete_by_offset(lml->lm_lists, &_lmco);
-	}
+	alist_delete_by_offset(lml->lm_lists, &_lmco);
 }
 
 /*
@@ -1068,8 +1066,12 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			    (GPD_FILTER | GPD_ADDEPS)) != GPD_FILTER)
 				continue;
 
-			if (aplist_test(&lmalp, gdp->gd_depend, 0) ==
-			    ALE_EXISTS)
+			lmp = gdp->gd_depend;
+
+			if (FLAGS(lmp) & FLG_RT_DELETE)
+				continue;
+
+			if (aplist_test(&lmalp, lmp, 0) == ALE_EXISTS)
 				continue;
 
 			/*
@@ -1078,8 +1080,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			 * that are candidates for deletion to continue this
 			 * group verification.
 			 */
-			DBG_CALL(Dbg_file_hdl_collect(ghp,
-			    NAME(gdp->gd_depend)));
+			DBG_CALL(Dbg_file_hdl_collect(ghp, NAME(lmp)));
 			aplist_delete(ghalp, &idx1);
 
 			free(lmalp);
@@ -1398,9 +1399,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 					 * sure the filtees reference count
 					 * gets decremented.
 					 */
-					if ((FLAGS(lmp) & FLG_RT_DELETE) &&
-					    ((gdp->gd_flags &
-					    GPD_PARENT) == 0)) {
+					if (FLAGS(lmp) & FLG_RT_DELETE) {
 						(void) dlclose_core(ghp,
 						    lmp, lml);
 					}

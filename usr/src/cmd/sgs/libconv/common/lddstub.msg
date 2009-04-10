@@ -19,13 +19,14 @@
 # CDDL HEADER END
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-@ MSG_ORG_LDDSTUB	"/../lib/lddstub"
-@ MSG_ORG_LDDSTUB_64	"/../lib/64/lddstub"
+@ MSG_ORG_32LDD_32STUB	"/../lib/lddstub"
+@ MSG_ORG_32LDD_64STUB	"/../lib/64/lddstub"
+@ MSG_ORG_64LDD_32STUB	"/../../lib/lddstub"
+@ MSG_ORG_64LDD_64STUB	"/../../lib/64/lddstub"
 
 @ MSG_PTH_LDDSTUB	"/usr/lib/lddstub"
 @ MSG_PTH_LDDSTUB_64	"/usr/lib/64/lddstub"

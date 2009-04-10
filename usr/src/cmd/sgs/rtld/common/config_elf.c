@@ -503,7 +503,7 @@ elf_config_flt(Lm_list *lml, const char *filter, const char *string,
 
 			flte = config->c_strtbl + fltetbl->fe_filtee;
 
-			if ((pdp = alist_append(alpp, 0, sizeof (Pdesc),
+			if ((pdp = alist_append(alpp, NULL, sizeof (Pdesc),
 			    alni)) == NULL)
 				return;
 

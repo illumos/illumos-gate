@@ -610,6 +610,7 @@ extern caddr_t		caller(void);
 extern void		*calloc(size_t, size_t);
 extern void		cap_assign(Cap *, Rt_map *);
 extern const char	*_conv_reloc_type(uint_t rel);
+extern Aliste		create_cntl(Lm_list *, int);
 extern void		defrag(void);
 extern uintptr_t	dbg_setup(const char *, Dbg_desc *);
 extern const char	*demangle(const char *);

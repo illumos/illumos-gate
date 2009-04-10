@@ -799,11 +799,23 @@ call_init(Rt_map **tobj, int flag)
 	for (_tobj = _nobj = tobj, _nobj++; *_tobj != NULL; _tobj++, _nobj++) {
 		Rt_map	*lmp = *_tobj;
 		void	(*iptr)() = INIT(lmp);
+		uint_t	rtldflags;
 
 		if (FLAGS(lmp) & FLG_RT_INITCALL)
 			continue;
 
 		FLAGS(lmp) |= FLG_RT_INITCALL;
+
+		/*
+		 * It is possible, that during the initial handshake with libc,
+		 * an interposition object has resolved a symbol binding, and
+		 * that this objects .init must be fired.  As we're about to
+		 * run user code, make sure any dynamic linking errors remain
+		 * internal (ie., only obtainable from dlerror()), and are not
+		 * flushed to stderr.
+		 */
+		rtldflags = (rtld_flags & RT_FL_APPLIC) ? 0 : RT_FL_APPLIC;
+		rtld_flags |= rtldflags;
 
 		/*
 		 * Establish an initfirst state if necessary - no other inits
@@ -827,6 +839,11 @@ call_init(Rt_map **tobj, int flag)
 
 		if (INITARRAY(lmp) || iptr)
 			DBG_CALL(Dbg_util_call_init(lmp, DBG_INIT_DONE));
+
+		/*
+		 * Return to a non-application setting if necessary.
+		 */
+		rtld_flags &= ~rtldflags;
 
 		/*
 		 * Set the initdone flag regardless of whether this object
@@ -1342,6 +1359,47 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 }
 
 /*
+ * Create, or assign a link-map control list.  Each link-map list contains a
+ * main control list, which has an Alist offset of ALIST_OFF_DATA (see the
+ * description in include/rtld.h).  During the initial construction of a
+ * process, objects are added to this main control list.  This control list is
+ * never deleted, unless an alternate link-map list has been requested (say for
+ * auditors), and the associated objects could not be loaded or relocated.
+ *
+ * Once relocation has started, any lazy loadable objects, or filtees, are
+ * processed on a new, temporary control list.  Only when these objects have
+ * been fully relocated, are they moved to the main link-map control list.
+ * Once the objects are moved, this temporary control list is deleted (see
+ * remove_cntl()).
+ *
+ * A dlopen() always requires a new temporary link-map control list.
+ * Typically, a dlopen() occurs on a link-map list that had already started
+ * relocation, however, auditors can dlopen() objects on the main link-map
+ * list while under initial construction, before any relocation has begun.
+ * Hence, dlopen() requests are explicitly flagged.
+ */
+Aliste
+create_cntl(Lm_list *lml, int dlopen)
+{
+	/*
+	 * If the head link-map object has already been relocated, create a
+	 * new, temporary, control list.
+	 */
+	if (dlopen || (lml->lm_head == NULL) ||
+	    (FLAGS(lml->lm_head) & FLG_RT_RELOCED)) {
+		Lm_cntl *lmc;
+
+		if ((lmc = alist_append(&lml->lm_lists, NULL, sizeof (Lm_cntl),
+		    AL_CNT_LMLISTS)) == NULL)
+			return (NULL);
+
+		return ((Aliste)((char *)lmc - (char *)lml->lm_lists));
+	}
+
+	return (ALIST_OFF_DATA);
+}
+
+/*
  * Environment variables can have a variety of defined permutations, and thus
  * the following infrastructure exists to allow this variety and to select the
  * required definition.
@@ -1477,12 +1535,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			 * Replaceable and permanent audit objects can exist.
 			 */
 			select |= SEL_ACT_STR;
-			if (select & SEL_REPLACE)
-				str = &rpl_audit;
-			else {
-				str = &prm_audit;
-				rpl_audit = 0;
-			}
+			str = (select & SEL_REPLACE) ? &rpl_audit : &prm_audit;
 			variable = ENV_FLG_AUDIT;
 		} else if ((len == MSG_LD_AUDIT_ARGS_SIZE) &&
 		    (strncmp(s1, MSG_ORIG(MSG_LD_AUDIT_ARGS),
@@ -1566,12 +1619,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_DEBUG_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_DEBUG), MSG_LD_DEBUG_SIZE) == 0)) {
 			select |= SEL_ACT_STR;
-			if (select & SEL_REPLACE)
-				str = &rpl_debug;
-			else {
-				str = &prm_debug;
-				rpl_debug = 0;
-			}
+			str = (select & SEL_REPLACE) ? &rpl_debug : &prm_debug;
 			variable = ENV_FLG_DEBUG;
 		} else if ((len == MSG_LD_DEBUG_OUTPUT_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_DEBUG_OUTPUT),
@@ -1595,12 +1643,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_FLAGS_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_FLAGS), MSG_LD_FLAGS_SIZE) == 0)) {
 			select |= SEL_ACT_SPEC_1;
-			if (select & SEL_REPLACE)
-				str = &rpl_ldflags;
-			else {
-				str = &prm_ldflags;
-				rpl_ldflags = 0;
-			}
+			str = (select & SEL_REPLACE) ? &rpl_ldflags :
+			    &prm_ldflags;
 			variable = ENV_FLG_FLAGS;
 		}
 	}
@@ -1622,12 +1666,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_LIBPATH_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_LIBPATH), MSG_LD_LIBPATH_SIZE) == 0)) {
 			select |= SEL_ACT_SPEC_1;
-			if (select & SEL_REPLACE)
-				str = &rpl_libpath;
-			else {
-				str = &prm_libpath;
-				rpl_libpath = 0;
-			}
+			str = (select & SEL_REPLACE) ? &rpl_libpath :
+			    &prm_libpath;
 			variable = ENV_FLG_LIBPATH;
 		} else if ((len == MSG_LD_LOADAVAIL_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_LOADAVAIL), MSG_LD_LOADAVAIL_SIZE) == 0)) {
@@ -1730,12 +1770,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_PRELOAD_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_PRELOAD), MSG_LD_PRELOAD_SIZE) == 0)) {
 			select |= SEL_ACT_STR;
-			if (select & SEL_REPLACE)
-				str = &rpl_preload;
-			else  {
-				str = &prm_preload;
-				rpl_preload = 0;
-			}
+			str = (select & SEL_REPLACE) ? &rpl_preload :
+			    &prm_preload;
 			variable = ENV_FLG_PRELOAD;
 		} else if ((len == MSG_LD_PROFILE_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_PROFILE), MSG_LD_PROFILE_SIZE) == 0)) {
@@ -1871,10 +1907,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 	 */
 	if (env_flags & ENV_TYP_ISA) {
 		/*
-		 * This is ISA setting. We do the setting
-		 * even if s2 is NULL.
-		 * If s2 is NULL, we might need to undo
-		 * the setting.
+		 * This is an ISA setting. We do the setting even if s2 is
+		 * NULL.  If s2 is NULL, we might need to undo the setting.
 		 */
 		if (select & SEL_REPLACE) {
 			if (rplisa & variable)
@@ -1885,7 +1919,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	} else if (s2) {
 		/*
-		 * This is non0-ISA setting
+		 * This is a non-ISA setting.
 		 */
 		if (select & SEL_REPLACE) {
 			if (rplgen & variable)
@@ -1895,8 +1929,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			prmgen |= variable;
 	} else
 		/*
-		 * This is non-ISA setting which
-		 * can be ignored.
+		 * This is a non-ISA setting which can be ignored.
 		 */
 		return;
 
@@ -2011,7 +2044,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 					*lmflags |= LML_FLG_TRC_LDDSTUB;
 			} else
 				*lmflags &=
-				    ~(LML_FLG_TRC_ENABLE|LML_FLG_TRC_LDDSTUB);
+				    ~(LML_FLG_TRC_ENABLE | LML_FLG_TRC_LDDSTUB);
 		}
 	}
 }

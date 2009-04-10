@@ -148,7 +148,8 @@ elf_fix_name(const char *name, Rt_map *clmp, Alist **alpp, Aliste alni,
 
 		DBG_CALL(Dbg_file_fixname(LIST(clmp), name,
 		    MSG_ORIG(MSG_PTH_LIBSYS)));
-		if ((pdp = alist_append(alpp, 0, sizeof (Pdesc), alni)) == NULL)
+		if ((pdp = alist_append(alpp, NULL, sizeof (Pdesc),
+		    alni)) == NULL)
 			return (0);
 
 		pdp->pd_pname = (char *)MSG_ORIG(MSG_PTH_LIBSYS);
@@ -279,9 +280,8 @@ elf_verify(caddr_t addr, size_t size, Fdesc *fdp, const char *name,
 	if (elf_cap_check(fdp, ehdr, rej) == 0) {
 		Rt_map	*lmp = lml_main.lm_head;
 
-		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
-		    (lmp != NULL) && (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
-		    (NEXT(lmp) == NULL)) {
+		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) && lmp &&
+		    (FLAGS1(lmp) & FL1_RT_LDDSTUB) && (NEXT(lmp) == NULL)) {
 			const char	*fmt;
 
 			if (rej->rej_type == SGS_REJ_HWCAP_1)
@@ -356,7 +356,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
     int *in_nfavl)
 {
 	Alist		*palp = NULL;
-	Rt_map		*nlmp, *hlmp;
+	Rt_map		*nlmp;
 	Dyninfo		*dip = &DYNINFO(clmp)[ndx], *pdip;
 	uint_t		flags = 0;
 	const char	*name;
@@ -414,21 +414,12 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 		return (NULL);
 
 	/*
-	 * Provided the object on the head of the link-map has completed its
-	 * relocation, create a new link-map control list for this request.
+	 * Establish a link-map control list for this request.
 	 */
-	hlmp = lml->lm_head;
-	if (FLAGS(hlmp) & FLG_RT_RELOCED) {
-		Lm_cntl	*lmc;
-
-		if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
-		    AL_CNT_LMLISTS)) == NULL) {
-			remove_plist(&palp, 1);
-			return (NULL);
-		}
-		lmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
-	} else
-		lmco = ALIST_OFF_DATA;
+	if ((lmco = create_cntl(lml, 0)) == NULL) {
+		remove_plist(&palp, 1);
+		return (NULL);
+	}
 
 	/*
 	 * Load the associated object.
@@ -463,7 +454,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 		remove_lmc(lml, clmp, lmco, name);
 
 	/*
-	 * Finally, remove any link-map control list that was created.
+	 * Remove any temporary link-map control list.
 	 */
 	if (lmco != ALIST_OFF_DATA)
 		remove_cntl(lml, lmco);
@@ -952,16 +943,11 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			const char	*dir = pdp->pd_pname;
 			Aliste		lmco;
 
-			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
-				Lm_cntl	*lmc;
-
-				if ((lmc = alist_append(&lml->lm_lists, 0,
-				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == NULL)
-					return (NULL);
-				lmco = (Aliste)((char *)lmc -
-				    (char *)lml->lm_lists);
-			} else
-				lmco = ALIST_OFF_DATA;
+			/*
+			 * Establish a link-map control list for this request.
+			 */
+			if ((lmco = create_cntl(lml, 0)) == NULL)
+				return (NULL);
 
 			/*
 			 * Determine the hardware capability filtees.  If none
@@ -996,7 +982,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 
 			/*
 			 * Now that any hardware capability objects have been
-			 * processed, remove any link-map control list.
+			 * processed, remove any temporary link-map control
+			 * list.
 			 */
 			if (lmco != ALIST_OFF_DATA)
 				remove_cntl(lml, lmco);
@@ -1075,21 +1062,11 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					continue;
 
 				/*
-				 * Establish a new link-map control list from
-				 * which to analyze any newly added objects.
+				 * Establish a link-map control list for this
+				 * request.
 				 */
-				if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
-					Lm_cntl	*lmc;
-
-					if ((lmc =
-					    alist_append(&lml->lm_lists, 0,
-					    sizeof (Lm_cntl),
-					    AL_CNT_LMLISTS)) == NULL)
-						return (NULL);
-					lmco = (Aliste)((char *)lmc -
-					    (char *)lml->lm_lists);
-				} else
-					lmco = ALIST_OFF_DATA;
+				if ((lmco = create_cntl(lml, 0)) == NULL)
+					return (NULL);
 
 				/*
 				 * Locate and load the filtee.
@@ -1172,8 +1149,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					remove_lmc(lml, clmp, lmco, name);
 
 				/*
-				 * Remove any link-map control list that was
-				 * created.
+				 * Remove any temporary link-map control list.
 				 */
 				if (lmco != ALIST_OFF_DATA)
 					remove_cntl(lml, lmco);
@@ -1873,15 +1849,14 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				 * dynamic objects that require an interpretor
 				 * (ie. all dynamic executables and some shared
 				 * objects), and provide for a hand-shake with
-				 * debuggers.  This entry is initialized to
-				 * zero by the link-editor.  If a debugger has
-				 * us and updated this entry set the debugger
-				 * flag, and finish initializing the debugging
-				 * structure (see setup() also).  Switch off any
-				 * configuration object use as most debuggers
-				 * can't handle fixed dynamic executables as
-				 * dependencies, and we can't handle requests
-				 * like object padding for alternative objects.
+				 * old debuggers.  This entry is initialized to
+				 * zero by the link-editor.  If a debugger is
+				 * monitoring us, and has updated this entry,
+				 * set the debugger monitor flag, and finish
+				 * initializing the debugging structure.  See
+				 * setup().  Also, switch off any configuration
+				 * object use as most debuggers can't handle
+				 * fixed dynamic executables as dependencies.
 				 */
 				if (dyn->d_un.d_ptr)
 					rtld_flags |=
@@ -2037,7 +2012,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				 * may provide thread_init, and another
 				 * structure may provide atexit reservations.
 				 */
-				if ((rti = alist_append(&lml->lm_rti, 0,
+				if ((rti = alist_append(&lml->lm_rti, NULL,
 				    sizeof (Rti_desc),
 				    AL_CNT_RTLDINFO)) == NULL) {
 					remove_so(0, lmp);
@@ -2619,8 +2594,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 				continue;
 
 			sl.sl_imap = nlmp;
-			if (sym = LM_LOOKUP_SYM(sl.sl_cmap)(&sl, _lmp,
-			    binfo, in_nfavl))
+			if (sym = lookup_sym(&sl, _lmp, binfo, in_nfavl))
 				break;
 
 			/*

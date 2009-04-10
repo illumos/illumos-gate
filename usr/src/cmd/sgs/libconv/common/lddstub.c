@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include	<unistd.h>
 #include	<strings.h>
@@ -77,17 +75,29 @@ conv_lddstub(int class)
 	if (geteuid()) {
 		if ((class == ELFCLASS32) && (orgflag != -1)) {
 			if (orgflag == 0) {
+				/* BEGIN CSTYLED */
 				if ((orgflag = originlddstub(orgstub,
-				    MSG_ORIG(MSG_ORG_LDDSTUB))) == -1)
+#ifdef	_LP64
+				    MSG_ORIG(MSG_ORG_64LDD_32STUB))) == -1)
+#else
+				    MSG_ORIG(MSG_ORG_32LDD_32STUB))) == -1)
+#endif
 					return (stub);
+				/* END CSTYLED */
 			}
 			stub = (const char *)orgstub;
 		}
 		if ((class == ELFCLASS64) && (orgflag64 != -1)) {
 			if (orgflag64 == 0) {
+				/* BEGIN CSTYLED */
 				if ((orgflag64 = originlddstub(orgstub64,
-				    MSG_ORIG(MSG_ORG_LDDSTUB_64))) == -1)
+#ifdef	_LP64
+				    MSG_ORIG(MSG_ORG_64LDD_64STUB))) == -1)
+#else
+				    MSG_ORIG(MSG_ORG_32LDD_64STUB))) == -1)
+#endif
 					return (stub);
+				/* END CSTYLED */
 			}
 			stub = (const char *)orgstub64;
 		}

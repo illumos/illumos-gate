@@ -73,14 +73,16 @@ void *_nd = &_end;
  */
 static Interp _interp;
 
+/*
+ * LD_PRELOAD objects.
+ */
 static int
-preload(const char *str, Rt_map *lmp)
+preload(const char *str, Rt_map *mlmp, Rt_map **clmp)
 {
 	Alist		*palp = NULL;
-	Rt_map		*clmp = lmp;
 	char		*objs, *ptr, *next;
 	Word		lmflags = lml_main.lm_flags;
-	uint_t		flags;
+	int		lddstub;
 
 	DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
@@ -88,21 +90,29 @@ preload(const char *str, Rt_map *lmp)
 		return (0);
 
 	/*
-	 * Establish the flags for loading each object.  If we're called via
-	 * lddstub, then the first shared object is the object being inspected
-	 * by ldd(1).  This object should not be marked as an interposer, as
-	 * it is intended to act like the first object of the process.
+	 * Determine if we've been called from lddstub.
 	 */
-	if ((lmflags & LML_FLG_TRC_ENABLE) && (FLAGS1(lmp) & FL1_RT_LDDSTUB))
-		flags = FLG_RT_PRELOAD;
-	else
-		flags = (FLG_RT_PRELOAD | FLG_RT_OBJINTPO);
+	lddstub = (lmflags & LML_FLG_TRC_ENABLE) &&
+	    (FLAGS1(*clmp) & FL1_RT_LDDSTUB);
 
 	ptr = strtok_r(objs, MSG_ORIG(MSG_STR_DELIMIT), &next);
 	do {
 		Rt_map	*nlmp = NULL;
+		uint_t	flags;
 
 		DBG_CALL(Dbg_file_preload(&lml_main, ptr));
+
+		/*
+		 * Establish the flags for loading each object.  If we're
+		 * called via lddstub, then the first preloaded object is the
+		 * object being inspected by ldd(1).  This object should not be
+		 * marked as an interposer, as this object is intended to act
+		 * as the target object of the process.
+		 */
+		if (lddstub)
+			flags = FLG_RT_PRELOAD;
+		else
+			flags = (FLG_RT_PRELOAD | FLG_RT_OBJINTPO);
 
 		/*
 		 * If this a secure application, then preload errors are
@@ -110,22 +120,46 @@ preload(const char *str, Rt_map *lmp)
 		 */
 		if (rtld_flags & RT_FL_SECURE)
 			rtld_flags2 |= RT_FL2_FTL2WARN;
-		if (expand_paths(clmp, ptr, &palp, AL_CNT_NEEDED,
+		if (expand_paths(*clmp, ptr, &palp, AL_CNT_NEEDED,
 		    PD_FLG_EXTLOAD, 0) != 0)
-			nlmp = load_one(&lml_main, ALIST_OFF_DATA, palp, clmp,
-			    MODE(lmp), flags, 0, NULL);
+			nlmp = load_one(&lml_main, ALIST_OFF_DATA, palp, *clmp,
+			    MODE(mlmp), flags, 0, NULL);
 		remove_plist(&palp, 0);
 		if (rtld_flags & RT_FL_SECURE)
 			rtld_flags2 &= ~RT_FL2_FTL2WARN;
-		if (nlmp && (bind_one(clmp, nlmp, BND_NEEDED) == 0))
+		if (nlmp && (bind_one(*clmp, nlmp, BND_NEEDED) == 0))
 			nlmp = NULL;
 
+		if (lddstub && nlmp) {
+			lddstub = 0;
+
+			/*
+			 * Fabricate a binding between the target shared object
+			 * and lddstub so that the target object isn't called
+			 * out from unused() processing.
+			 */
+			if (lmflags &
+			    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED)) {
+				if (bind_one(*clmp, nlmp, BND_REFER) == 0)
+					nlmp = NULL;
+			}
+
+			/*
+			 * By identifying lddstub as the caller, several
+			 * confusing ldd() diagnostics get suppressed.  These
+			 * diagnostics would reveal how the target shared object
+			 * was found from lddstub.  Now that the real target is
+			 * loaded, identify the target as the caller so that all
+			 * ldd() diagnostics are enabled for subsequent objects.
+			 */
+			if (nlmp)
+				*clmp = nlmp;
+		}
+
 		/*
-		 * Establish state for the next preloadable object.  If no
-		 * error occurred with loading this object, indicate that this
-		 * link-map list contains an interposer.
+		 * If no error occurred with loading this object, indicate that
+		 * this link-map list contains an interposer.
 		 */
-		flags |= FLG_RT_OBJINTPO;
 		if (nlmp == NULL) {
 			if ((lmflags & LML_FLG_TRC_ENABLE) ||
 			    (rtld_flags & RT_FL_SECURE))
@@ -133,25 +167,8 @@ preload(const char *str, Rt_map *lmp)
 			else
 				return (0);
 		}
-		lml_main.lm_flags |= LML_FLG_INTRPOSE;
-
-		/*
-		 * If we're tracing shared objects via lddstub, establish a
-		 * binding between the initial shared object and lddstub so that
-		 * the shared object isn't called out from unused() processing.
-		 * After the first object is loaded increment the caller to the
-		 * initial preloaded object to provide intuitive ldd -v and -s
-		 * diagnostics
-		 */
-		if ((lmflags & LML_FLG_TRC_ENABLE) &&
-		    (FLAGS1(lmp) & FL1_RT_LDDSTUB)) {
-			if ((lmp == clmp) && (lmflags &
-			    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED))) {
-				if (bind_one(clmp, nlmp, BND_REFER) == 0)
-					continue;
-			}
-			clmp = NEXT_RT_MAP(lmp);
-		}
+		if (flags & FLG_RT_OBJINTPO)
+			lml_main.lm_flags |= LML_FLG_INTRPOSE;
 
 	} while ((ptr = strtok_r(NULL,
 	    MSG_ORIG(MSG_STR_DELIMIT), &next)) != NULL);
@@ -167,7 +184,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
     char *execname, char **argv, uid_t uid, uid_t euid, gid_t gid, gid_t egid,
     void *aoutdyn, int auxflags, uint_t hwcap_1)
 {
-	Rt_map			*rlmp, *mlmp, **tobj = NULL;
+	Rt_map			*rlmp, *mlmp, *clmp, **tobj = NULL;
 	Ehdr			*ehdr;
 	rtld_stat_t		status;
 	int			features = 0, ldsoexec = 0;
@@ -277,14 +294,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Establish initial link-map list flags, and link-map list alists.
 	 */
-	if (alist_append(&lml_main.lm_lists, 0, sizeof (Lm_cntl),
+	if (alist_append(&lml_main.lm_lists, NULL, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS) == NULL)
 		return (0);
 	lml_main.lm_flags |= LML_FLG_BASELM;
 	lml_main.lm_lmid = LM_ID_BASE;
 	lml_main.lm_lmidstr = (char *)MSG_ORIG(MSG_LMID_BASE);
 
-	if (alist_append(&lml_rtld.lm_lists, 0, sizeof (Lm_cntl),
+	if (alist_append(&lml_rtld.lm_lists, NULL, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS) == NULL)
 		return (0);
 	lml_rtld.lm_flags |= (LML_FLG_RTLDLM | LML_FLG_NOAUDIT |
@@ -833,9 +850,12 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * initialized.  Once the debugging setup has completed, this local
 	 * descriptor is copied to the global descriptor which effectively
 	 * enables diagnostic output.
+	 *
+	 * Ignore any debugging request if we're being monitored by a process
+	 * that expects the old getpid() initialization handshake.
 	 */
-	if (rpl_debug || prm_debug) {
-		Dbg_desc	_dbg_desc = {0, 0, 0};
+	if ((rpl_debug || prm_debug) && ((rtld_flags & RT_FL_DEBUGGER) == 0)) {
+		Dbg_desc	_dbg_desc = {0, 0, NULL};
 
 		if (rpl_debug) {
 			uintptr_t	ret;
@@ -960,13 +980,19 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	}
 
 	/*
-	 * Map in any preloadable shared objects.  Note, it is valid to preload
-	 * a 4.x shared object with a 5.0 executable (or visa-versa), as this
-	 * functionality is required by ldd(1).
+	 * Map in any preloadable shared objects.  Establish the caller as the
+	 * head of the main link-map list.  In the case of being exercised from
+	 * lddstub, the caller gets reassigned to the first target shared object
+	 * so as to provide intuitive diagnostics from ldd().
+	 *
+	 * Note, it is valid to preload a 4.x shared object with a 5.0
+	 * executable (or visa-versa), as this functionality is required by
+	 * ldd(1).
 	 */
-	if (rpl_preload && (preload(rpl_preload, mlmp) == 0))
+	clmp = mlmp;
+	if (rpl_preload && (preload(rpl_preload, mlmp, &clmp) == 0))
 		return (0);
-	if (prm_preload && (preload(prm_preload, mlmp) == 0))
+	if (prm_preload && (preload(prm_preload, mlmp, &clmp) == 0))
 		return (0);
 
 	/*
@@ -998,12 +1024,25 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			return (0);
 
 		/*
-		 * Inform the debuggers we're here and stable.  Newer debuggers
-		 * can indicate their presence by setting the DT_DEBUG entry in
-		 * the dynamic executable (see elf_new_lm()).  In this case call
-		 * getpid() so the debugger can catch the system call.  This
-		 * handshake allows the debugger to initialize, and consequently
-		 * allows the user to set break points in .init code.
+		 * Inform the debuggers that basic process initialization is
+		 * complete, and that the state of ld.so.1 (link-map lists,
+		 * etc.) is stable.  This handshake enables the debugger to
+		 * initialize themselves, and consequently allows the user to
+		 * set break points in .init code.
+		 *
+		 * Most new debuggers use librtld_db to monitor activity events.
+		 * Older debuggers indicated their presence by setting the
+		 * DT_DEBUG entry in the dynamic executable (see elf_new_lm()).
+		 * In this case, getpid() is called so that the debugger can
+		 * catch the system call.  This old mechanism has some
+		 * restrictions, as getpid() should not be called prior to
+		 * basic process initialization being completed.  This
+		 * restriction has become increasingly difficult to maintain,
+		 * as the use of auditors, LD_DEBUG, and the initialization
+		 * handshake with libc can result in "premature" getpid()
+		 * calls.  The use of this getpid() handshake is expected to
+		 * disappear at some point in the future, and there is intent
+		 * to work towards that goal.
 		 */
 		rd_event(&lml_main, RD_DLACTIVITY, RT_CONSISTENT);
 		rd_event(&lml_rtld, RD_DLACTIVITY, RT_CONSISTENT);

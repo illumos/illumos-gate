@@ -2222,7 +2222,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		 * Establish the flags for this callers dependency descriptor
 		 * (Grp_desc).
 		 *
-		 *  .	The creation of a handle associated a descriptor for the
+		 *  .	The creation of a handle associates a descriptor for the
 		 *	new object and descriptor for the parent (caller).
 		 *	Typically, the handle is created for dlopen() or for
 		 *	filtering.  A handle may also be created to promote

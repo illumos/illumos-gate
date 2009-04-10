@@ -530,33 +530,3 @@ SUNWprivate_3.23 {
 	local:
 		*;
 };
-
-# The following functions must be provided by our caller, or one of the callers
-# dependencies.  When used with ld.so.1 all functions are provided from ld.so.1,
-# but when used with ld, many of the functions fall back to libc.  Presently we
-# don't build liblddbg with a libc dependency simply to avoid having to load it
-# with ld.so.1 which already offers the required interfaces (from libc_pic.a).
-# Distinguishing between `parent' and `extern' symbols offers a small
-# performance advantage with direct bindings, but this is mainly a test of what
-# we're capable of doing, rather than an admission that its really worth it :-).
-
-{
-		_close =	FUNCTION extern;
-		_open =		FUNCTION extern;
-		_write =	FUNCTION extern;
-		dgettext =	FUNCTION extern;
-		dlopen =	FUNCTION extern;
-		dlsym =		FUNCTION extern;
-		free =		FUNCTION parent;
-		malloc =	FUNCTION parent;
-		memcpy =	FUNCTION extern;
-		qsort =		FUNCTION extern;
-		snprintf =	FUNCTION extern;
-		sprintf =	FUNCTION extern;
-		strcat =	FUNCTION extern;
-		strcmp =	FUNCTION extern;
-		strcpy =	FUNCTION extern;
-		strlen =	FUNCTION extern;
-		strrchr =	FUNCTION extern;
-		strtok_r =	FUNCTION extern;
-};

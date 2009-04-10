@@ -149,7 +149,7 @@ aout_fix_name(const char *oname, Rt_map *clmp, Alist **alpp, Aliste alni,
 			return (0);
 	}
 
-	if ((pdp = alist_append(alpp, 0, sizeof (Pdesc), alni)) == NULL)
+	if ((pdp = alist_append(alpp, NULL, sizeof (Pdesc), alni)) == NULL)
 		return (0);
 
 	pdp->pd_pname = nname;
