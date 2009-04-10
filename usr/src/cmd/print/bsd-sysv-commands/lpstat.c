@@ -797,6 +797,7 @@ report_job(char *printer, papi_job_t job, int show_rank, int verbose)
 	(void) papiAttributeListGetInteger(attrs, NULL,
 	    "job-id-requested", &id);
 
+
 	snprintf(request, sizeof (request), "%s-%d", printer, id);
 
 	if (show_rank != 0) {
@@ -813,6 +814,7 @@ report_job(char *printer, papi_job_t job, int show_rank, int verbose)
 
 	(void) papiAttributeListGetInteger(attrs, NULL,
 	    "job-state", &jstate);
+
 	if (jstate == 0x0001)
 		printf(gettext(" being held"));
 	else if (jstate == 0x0800)
@@ -930,11 +932,22 @@ job_query(char *request, int (*report)(char *, papi_job_t, int, int),
 			papiJobListFree(jobs);
 		} else {	/* a job */
 			papi_job_t job = NULL;
+			int rid = id;
 
 			/* Once a job has been found stop processing */
 			flag = 0;
 
-			status = papiJobQuery(svc, printer, id, NULL, &job);
+			/*
+			 * Job-id could be the job-id requested
+			 * Check if it is job-id or job-id-requested
+			 */
+			id = job_to_be_queried(svc, printer, id);
+
+			if (id > 0)
+				status = papiJobQuery(svc, printer, id, NULL, &job);
+			else
+				status = papiJobQuery(svc, printer, rid, NULL, &job);
+
 			if (status != PAPI_OK) {
 				if (!print_flag)
 					fprintf(stderr, gettext(

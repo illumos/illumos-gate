@@ -51,6 +51,17 @@ usage(char *program)
 	exit(1);
 }
 
+static int32_t
+get_job_id_requested(papi_job_t job) {
+	int32_t rid = -1;
+
+	papi_attribute_t **list = papiJobGetAttributeList(job);
+	papiAttributeListGetInteger(list, NULL,
+	    "job-id-requested", &rid);
+
+	return (rid);
+}
+
 int
 cancel_jobs_for_user(char *user, papi_encryption_t encryption, char *pname) {
 
@@ -101,6 +112,7 @@ main(int ac, char *av[])
 	char *user = NULL;
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
 	int c;
+	int32_t rid = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain("SUNW_OST_OSCMD");
@@ -143,7 +155,17 @@ main(int ac, char *av[])
 		if (id != -1) {	/* it's a job */
 			char *mesg = "cancelled";
 
-			status = papiJobCancel(svc, printer, id);
+			/*
+			 * Check if the job-id is job-id-requested
+			 * or job-id. If it is job-id-requested then find
+			 * corresponding job-id and send it to cancel
+			 */
+			rid = job_to_be_queried(svc, printer, id);
+			if (rid > 0)
+				status = papiJobCancel(svc, printer, rid);
+			else
+				status = papiJobCancel(svc, printer, id);
+
 			if (status == PAPI_NOT_AUTHORIZED) {
 				mesg = papiStatusString(status);
 				exit_code = 1;
@@ -183,9 +205,17 @@ main(int ac, char *av[])
 						    svc, status);
 						exit_code = 1;
 					}
-					fprintf(OUT, "%s-%d: %s\n", printer,
-					    id, mesg);
-
+					/*
+					 * If job-id-requested exists for this
+					 * job-id then that should be displayed
+					 */
+					rid = get_job_id_requested(*jobs);
+					if (rid > 0)
+						fprintf(OUT, "%s-%d: %s\n",
+						    printer, rid, mesg);
+					else
+						fprintf(OUT, "%s-%d: %s\n",
+						    printer, id, mesg);
 				}
 				papiJobListFree(jobs);
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -29,8 +29,6 @@
 #define	_BSD_SYSV_COMMON_H
 
 /* $Id: common.h 162 2006-05-08 14:17:44Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <papi.h>
 
@@ -62,6 +60,8 @@ extern int is_postscript(const char *file);
 extern int is_postscript_stream(int fd, char *buf, int *len);
 
 extern int cli_auth_callback(papi_service_t svc, void *app_data);
+
+extern int32_t job_to_be_queried(papi_service_t svc, char *printer, int32_t id);
 
 #ifdef	__cplusplus
 }

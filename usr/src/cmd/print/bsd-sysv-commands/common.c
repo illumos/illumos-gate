@@ -580,3 +580,43 @@ cli_auth_callback(papi_service_t svc, void *app_data)
 
 	return (0);
 }
+
+int32_t
+job_to_be_queried(papi_service_t svc, char *printer, int32_t id)
+{
+	papi_job_t *jobs = NULL;
+	papi_status_t status;
+	char *jattrs[] = { "job-id",
+			"job-id-requested", NULL };
+
+	status = papiPrinterListJobs(svc, printer, jattrs, PAPI_LIST_JOBS_ALL,
+	    0, &jobs);
+
+	if (status != PAPI_OK) {
+		fprintf(stderr, gettext("Failed to query service for %s: %s\n"),
+		    printer, verbose_papi_message(svc, status));
+		return (-1);
+	}
+
+	if (jobs != NULL) {
+		int i = 0;
+
+		for (i = 0; jobs[i] != NULL; i++) {
+			int32_t rid = -1;
+			papi_attribute_t **list =
+			    papiJobGetAttributeList(jobs[i]);
+
+			papiAttributeListGetInteger(list, NULL,
+			    "job-id-requested", &rid);
+
+			/* check if this matches with id */
+			if (rid == id) {
+				/* get the actual id and return it */
+				papiAttributeListGetInteger(list, NULL,
+				    "job-id", &id);
+				return (id);
+			}
+		}
+	}
+	return (id);
+}
