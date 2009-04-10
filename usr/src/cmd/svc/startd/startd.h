@@ -609,6 +609,7 @@ void graph_transition_sulogin(restarter_instance_state_t,
 void graph_transition_propagate(graph_vertex_t *, propagate_event_t,
     restarter_error_t);
 void graph_offline_subtree_leaves(graph_vertex_t *, void *);
+void offline_vertex(graph_vertex_t *);
 
 /* libscf.c - common */
 char *inst_fmri_to_svc_fmri(const char *);

@@ -1771,7 +1771,7 @@ propagate_stop(graph_vertex_t *v, void *arg)
 	}
 }
 
-static void
+void
 offline_vertex(graph_vertex_t *v)
 {
 	scf_handle_t *h = libscf_handle_create_bound_loop();
@@ -3186,10 +3186,12 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 		case SCF_ERROR_CONNECTION_BROKEN:
 		default:
 			scf_pg_destroy(pg);
+			startd_free(restarter_fmri, max_scf_value_size);
 			return (ECONNABORTED);
 
 		case SCF_ERROR_DELETED:
 			scf_pg_destroy(pg);
+			startd_free(restarter_fmri, max_scf_value_size);
 			return (ECANCELED);
 
 		case SCF_ERROR_NOT_SET:
@@ -3204,6 +3206,7 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 		case ECONNABORTED:
 		case ECANCELED:
 			scf_pg_destroy(pg);
+			startd_free(restarter_fmri, max_scf_value_size);
 			return (err);
 
 		default:
@@ -3233,11 +3236,13 @@ init_state:
 		case ECONNABORTED:
 			startd_free((void *)idata.i_fmri, max_scf_fmri_size);
 			scf_pg_destroy(pg);
+			startd_free(restarter_fmri, max_scf_value_size);
 			return (ECONNABORTED);
 
 		case ENOENT:
 			startd_free((void *)idata.i_fmri, max_scf_fmri_size);
 			scf_pg_destroy(pg);
+			startd_free(restarter_fmri, max_scf_value_size);
 			return (ECANCELED);
 
 		case EPERM:
@@ -3278,6 +3283,7 @@ init_state:
 
 			case ECONNABORTED:
 			case ECANCELED:
+				startd_free(restarter_fmri, max_scf_value_size);
 				return (err);
 
 			case EROFS:
@@ -3302,6 +3308,7 @@ init_state:
 
 			case ECONNABORTED:
 			case ECANCELED:
+				startd_free(restarter_fmri, max_scf_value_size);
 				return (err);
 
 			case EPERM:
@@ -3767,8 +3774,7 @@ run_sulogin(const char *msg)
 	if (console_login_ready) {
 		v = vertex_get_by_name(console_login_fmri);
 
-		if (v != NULL && v->gv_state == RESTARTER_STATE_OFFLINE &&
-		    !inst_running(v)) {
+		if (v != NULL && v->gv_state == RESTARTER_STATE_OFFLINE) {
 			if (v->gv_start_f == NULL)
 				vertex_send_event(v,
 				    RESTARTER_EVENT_TYPE_START);

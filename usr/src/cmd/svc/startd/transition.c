@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,8 +317,19 @@ gt_internal_online_or_degraded(scf_handle_t *h, graph_vertex_t *v,
 			bad_error("libscf_snapshots_poststart", r);
 		}
 	}
-	if (!(v->gv_flags & GV_ENABLED))
+
+	if (!(v->gv_flags & GV_ENABLED)) {
 		vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
+	} else if (v->gv_flags & GV_TOOFFLINE) {
+		/*
+		 * If the vertex has the GV_TOOFFLINE flag set then that's
+		 * because the instance was transitioning from offline to
+		 * online and the reverse disable algorithm doesn't offline
+		 * those instances because it was already appearing offline.
+		 * So do it now.
+		 */
+		offline_vertex(v);
+	}
 
 	if (gt_running(old_state) == 0) {
 		log_framework(LOG_DEBUG, "Propagating start of %s.\n",
