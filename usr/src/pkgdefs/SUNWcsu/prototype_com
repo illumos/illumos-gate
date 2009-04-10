@@ -1359,7 +1359,8 @@ f none usr/share/lib/zoneinfo/Asia/Kabul 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Kamchatka 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Karachi 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Kashgar 644 root bin
-f none usr/share/lib/zoneinfo/Asia/Katmandu 644 root bin
+f none usr/share/lib/zoneinfo/Asia/Kathmandu 644 root bin
+l none usr/share/lib/zoneinfo/Asia/Katmandu=../../../../../usr/share/lib/zoneinfo/Asia/Kathmandu
 f none usr/share/lib/zoneinfo/Asia/Kolkata 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Krasnoyarsk 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Kuala_Lumpur 644 root bin
