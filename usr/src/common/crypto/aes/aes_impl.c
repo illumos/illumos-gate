@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1697,7 +1697,7 @@ aes_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
 		rv = ccm_mode_encrypt_contiguous_blocks(ctx, data, length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
-	} else if (aes_ctx->ac_flags & GCM_MODE) {
+	} else if (aes_ctx->ac_flags & (GCM_MODE|GMAC_MODE)) {
 		rv = gcm_mode_encrypt_contiguous_blocks(ctx, data, length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
@@ -1733,7 +1733,7 @@ aes_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
 		rv = ccm_mode_decrypt_contiguous_blocks(ctx, data, length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
-	} else if (aes_ctx->ac_flags & GCM_MODE) {
+	} else if (aes_ctx->ac_flags & (GCM_MODE|GMAC_MODE)) {
 		rv = gcm_mode_decrypt_contiguous_blocks(ctx, data, length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);

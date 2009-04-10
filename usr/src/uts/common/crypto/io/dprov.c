@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,7 +231,8 @@ typedef enum dprov_mech_type {
 	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
 	AES_CTR_MECH_INFO_TYPE,		/* SUN_CKM_AES_CTR */
 	AES_CCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_CCM */
-	AES_GCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_CCM */
+	AES_GCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_GCM */
+	AES_GMAC_MECH_INFO_TYPE,	/* SUN_CKM_AES_GMAC */
 	RC4_MECH_INFO_TYPE,		/* SUN_CKM_RC4 */
 	RSA_PKCS_MECH_INFO_TYPE,	/* SUN_CKM_RSA_PKCS */
 	RSA_X_509_MECH_INFO_TYPE,	/* SUN_CKM_RSA_X_509 */
@@ -502,6 +503,15 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
 	    CRYPTO_FG_MAC_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES-GMAC */
+	{SUN_CKM_AES_GMAC, AES_GMAC_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT | CRYPTO_FG_ENCRYPT_MAC |
+	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
+	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
+	    CRYPTO_FG_MAC_DECRYPT_ATOMIC |
+	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
+	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* RC4 */
 	{SUN_CKM_RC4, RC4_MECH_INFO_TYPE,
@@ -2111,7 +2121,8 @@ dprov_valid_mac_mech(crypto_mech_type_t mech_type)
 	    mech_type == SHA384_HMAC_MECH_INFO_TYPE ||
 	    mech_type == SHA384_HMAC_GEN_MECH_INFO_TYPE ||
 	    mech_type == SHA512_HMAC_MECH_INFO_TYPE ||
-	    mech_type == SHA512_HMAC_GEN_MECH_INFO_TYPE);
+	    mech_type == SHA512_HMAC_GEN_MECH_INFO_TYPE ||
+	    mech_type == AES_GMAC_MECH_INFO_TYPE);
 }
 
 static int
@@ -2307,6 +2318,7 @@ dprov_valid_cipher_mech(crypto_mech_type_t mech_type)
 	    mech_type == AES_CTR_MECH_INFO_TYPE ||
 	    mech_type == AES_CCM_MECH_INFO_TYPE ||
 	    mech_type == AES_GCM_MECH_INFO_TYPE ||
+	    mech_type == AES_GMAC_MECH_INFO_TYPE ||
 	    mech_type == RC4_MECH_INFO_TYPE ||
 	    mech_type == RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == RSA_X_509_MECH_INFO_TYPE ||
@@ -4463,6 +4475,78 @@ out:
 	return (rv);
 }
 
+static int
+copyin_aes_gmac_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
+    int *out_error, int mode)
+{
+	STRUCT_DECL(crypto_mechanism, mech);
+	STRUCT_DECL(CK_AES_GMAC_PARAMS, params);
+	CK_AES_GMAC_PARAMS *aes_gmac_params;
+	caddr_t pp;
+	size_t param_len;
+	int error = 0;
+	int rv = 0;
+
+	STRUCT_INIT(mech, mode);
+	STRUCT_INIT(params, mode);
+	bcopy(in_mech, STRUCT_BUF(mech), STRUCT_SIZE(mech));
+	pp = STRUCT_FGETP(mech, cm_param);
+	param_len = STRUCT_FGET(mech, cm_param_len);
+
+	if (param_len != STRUCT_SIZE(params)) {
+		rv = CRYPTO_ARGUMENTS_BAD;
+		goto out;
+	}
+
+	out_mech->cm_type = STRUCT_FGET(mech, cm_type);
+	out_mech->cm_param = NULL;
+	out_mech->cm_param_len = 0;
+	if (pp != NULL) {
+		size_t auth_data_len, total_param_len;
+
+		if (copyin((char *)pp, STRUCT_BUF(params), param_len) != 0) {
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+
+		auth_data_len = STRUCT_FGET(params, ulAADLen);
+
+		/* allocate param structure */
+		total_param_len = sizeof (CK_AES_GMAC_PARAMS) +
+		    AES_GMAC_IV_LEN + auth_data_len;
+		aes_gmac_params = kmem_alloc(total_param_len, KM_NOSLEEP);
+		if (aes_gmac_params == NULL) {
+			rv = CRYPTO_HOST_MEMORY;
+			goto out;
+		}
+		aes_gmac_params->ulAADLen = auth_data_len;
+		aes_gmac_params->pIv
+		    = (uchar_t *)aes_gmac_params + sizeof (CK_AES_GMAC_PARAMS);
+		aes_gmac_params->pAAD = aes_gmac_params->pIv + AES_GMAC_IV_LEN;
+
+		if (copyin((char *)STRUCT_FGETP(params, pIv),
+		    aes_gmac_params->pIv, AES_GMAC_IV_LEN) != 0) {
+			kmem_free(aes_gmac_params, total_param_len);
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		if (copyin((char *)STRUCT_FGETP(params, pAAD),
+		    aes_gmac_params->pAAD, auth_data_len) != 0) {
+			kmem_free(aes_gmac_params, total_param_len);
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		out_mech->cm_param = (char *)aes_gmac_params;
+		out_mech->cm_param_len = sizeof (CK_AES_GMAC_PARAMS);
+	}
+out:
+	*out_error = error;
+	return (rv);
+}
+
 /*
  * Resource control checks don't need to be done. Why? Because this routine
  * knows the size of the structure, and it can't be overridden by a user.
@@ -4689,6 +4773,10 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 		rv = copyin_aes_gcm_mech(umech, kmech, &error, mode);
 		goto out;
 
+	case AES_GMAC_MECH_INFO_TYPE:
+		rv = copyin_aes_gmac_mech(umech, kmech, &error, mode);
+		goto out;
+
 	case DH_PKCS_DERIVE_MECH_INFO_TYPE:
 		expected_param_len = param_len;
 		break;
@@ -4781,6 +4869,21 @@ dprov_free_mechanism(crypto_provider_handle_t provider,
 			params = (CK_AES_CCM_PARAMS *)mech->cm_param;
 			total_param_len = mech->cm_param_len +
 			    params->ulNonceSize + params->ulAuthDataSize;
+			kmem_free(params, total_param_len);
+			mech->cm_param = NULL;
+			mech->cm_param_len = 0;
+		}
+		return (CRYPTO_SUCCESS);
+	}
+	case AES_GMAC_MECH_INFO_TYPE: {
+		CK_AES_GMAC_PARAMS *params;
+		size_t total_param_len;
+
+		if ((mech->cm_param != NULL) && (mech->cm_param_len != 0)) {
+			/* LINTED: pointer alignment */
+			params = (CK_AES_GMAC_PARAMS *)mech->cm_param;
+			total_param_len = mech->cm_param_len +
+			    AES_GMAC_IV_LEN + params->ulAADLen;
 			kmem_free(params, total_param_len);
 			mech->cm_param = NULL;
 			mech->cm_param_len = 0;

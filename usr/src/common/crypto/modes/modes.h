@@ -45,6 +45,7 @@ extern "C" {
 #define	CTR_MODE			0x00000008
 #define	CCM_MODE			0x00000010
 #define	GCM_MODE			0x00000020
+#define	GMAC_MODE			0x00000040
 
 /*
  * cc_keysched:		Pointer to key schedule.
@@ -225,6 +226,9 @@ typedef struct gcm_ctx {
 #define	gcm_copy_to		gcm_common.cc_copy_to
 #define	gcm_flags		gcm_common.cc_flags
 
+#define	AES_GMAC_IV_LEN		12
+#define	AES_GMAC_TAG_BITS	128
+
 typedef struct aes_ctx {
 	union {
 		ecb_ctx_t acu_ecb;
@@ -359,6 +363,11 @@ extern int gcm_init_ctx(gcm_ctx_t *, char *, size_t,
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
+extern int gmac_init_ctx(gcm_ctx_t *, char *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
 extern void calculate_ccm_mac(ccm_ctx_t *, uint8_t *,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *));
 
@@ -373,6 +382,7 @@ extern void *cbc_alloc_ctx(int);
 extern void *ctr_alloc_ctx(int);
 extern void *ccm_alloc_ctx(int);
 extern void *gcm_alloc_ctx(int);
+extern void *gmac_alloc_ctx(int);
 extern void crypto_free_mode_ctx(void *);
 extern void gcm_set_kmflag(gcm_ctx_t *, int);
 

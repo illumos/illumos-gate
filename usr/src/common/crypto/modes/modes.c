@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,7 @@ crypto_free_mode_ctx(void *ctx)
 	common_ctx_t *common_ctx = (common_ctx_t *)ctx;
 
 	switch (common_ctx->cc_flags &
-	    (ECB_MODE|CBC_MODE|CTR_MODE|CCM_MODE|GCM_MODE)) {
+	    (ECB_MODE|CBC_MODE|CTR_MODE|CCM_MODE|GCM_MODE|GMAC_MODE)) {
 	case ECB_MODE:
 #ifdef _KERNEL
 		kmem_free(common_ctx, sizeof (ecb_ctx_t));
@@ -211,6 +211,7 @@ crypto_free_mode_ctx(void *ctx)
 		break;
 
 	case GCM_MODE:
+	case GMAC_MODE:
 #ifdef _KERNEL
 		if (((gcm_ctx_t *)ctx)->gcm_pt_buf != NULL)
 			kmem_free(((gcm_ctx_t *)ctx)->gcm_pt_buf,

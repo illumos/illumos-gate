@@ -92,6 +92,13 @@ typedef struct CK_AES_GCM_PARAMS {
 	ulong_t ulTagBits;
 } CK_AES_GCM_PARAMS;
 
+/* CK_AES_GMAC_PARAMS provides parameters to the CKM_AES_GMAC mechanism */
+typedef struct CK_AES_GMAC_PARAMS {
+	uchar_t *pIv;
+	uchar_t *pAAD;
+	ulong_t ulAADLen;
+} CK_AES_GMAC_PARAMS;
+
 #ifdef _KERNEL
 /*
  * CK_ECDH1_DERIVE_PARAMS provides the parameters to the
@@ -134,6 +141,13 @@ typedef struct CK_AES_GCM_PARAMS32 {
 	uint32_t ulAADLen;
 	uint32_t ulTagBits;
 } CK_AES_GCM_PARAMS32;
+
+/* needed for 32-bit applications running on 64-bit kernels */
+typedef struct CK_AES_GMAC_PARAMS32 {
+	caddr32_t pIv;
+	caddr32_t pAAD;
+	uint32_t ulAADLen;
+} CK_AES_GMAC_PARAMS32;
 
 typedef struct CK_ECDH1_DERIVE_PARAMS32 {
 	uint32_t	kdf;
@@ -192,6 +206,7 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_AES_CTR			"CKM_AES_CTR"
 #define	SUN_CKM_AES_CCM			"CKM_AES_CCM"
 #define	SUN_CKM_AES_GCM			"CKM_AES_GCM"
+#define	SUN_CKM_AES_GMAC		"CKM_AES_GMAC"
 #define	SUN_CKM_RC4			"CKM_RC4"
 #define	SUN_CKM_RSA_PKCS		"CKM_RSA_PKCS"
 #define	SUN_CKM_RSA_X_509		"CKM_RSA_X_509"

@@ -603,6 +603,40 @@ out:
 	return (rv);
 }
 
+int
+gmac_init_ctx(gcm_ctx_t *gcm_ctx, char *param, size_t block_size,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *))
+{
+	int rv;
+	CK_AES_GMAC_PARAMS *gmac_param;
+
+	if (param != NULL) {
+		gmac_param = (CK_AES_GMAC_PARAMS *)param;
+
+		gcm_ctx->gcm_tag_len = CRYPTO_BITS2BYTES(AES_GMAC_TAG_BITS);
+		gcm_ctx->gcm_processed_data_len = 0;
+
+		/* these values are in bits */
+		gcm_ctx->gcm_len_a_len_c[0] = htonll(gmac_param->ulAADLen << 3);
+
+		rv = CRYPTO_SUCCESS;
+		gcm_ctx->gcm_flags |= GMAC_MODE;
+	} else {
+		rv = CRYPTO_MECHANISM_PARAM_INVALID;
+		goto out;
+	}
+
+	if (gcm_init(gcm_ctx, gmac_param->pIv, AES_GMAC_IV_LEN,
+	    gmac_param->pAAD, gmac_param->ulAADLen, block_size,
+	    encrypt_block, copy_block, xor_block) != 0) {
+		rv = CRYPTO_MECHANISM_PARAM_INVALID;
+	}
+out:
+	return (rv);
+}
+
 void *
 gcm_alloc_ctx(int kmflag)
 {
@@ -616,6 +650,22 @@ gcm_alloc_ctx(int kmflag)
 		return (NULL);
 
 	gcm_ctx->gcm_flags = GCM_MODE;
+	return (gcm_ctx);
+}
+
+void *
+gmac_alloc_ctx(int kmflag)
+{
+	gcm_ctx_t *gcm_ctx;
+
+#ifdef _KERNEL
+	if ((gcm_ctx = kmem_zalloc(sizeof (gcm_ctx_t), kmflag)) == NULL)
+#else
+	if ((gcm_ctx = calloc(1, sizeof (gcm_ctx_t))) == NULL)
+#endif
+		return (NULL);
+
+	gcm_ctx->gcm_flags = GMAC_MODE;
 	return (gcm_ctx);
 }
 
