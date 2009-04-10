@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/machsystm.h>
 #include <sys/cpu.h>
@@ -58,7 +55,7 @@ cpu_intrq_register(struct cpu *cpu)
 	ret = hv_cpu_qconf(CPU_NRQ, mcpup->cpu_nrq_base_pa, cpu_nrq_entries);
 	if (ret != H_EOK)
 		cmn_err(CE_PANIC, "cpu%d: non-resumable error queue "
-			"configuration failed, error %lu", cpu->cpu_id, ret);
+		    "configuration failed, error %lu", cpu->cpu_id, ret);
 }
 
 int
@@ -81,7 +78,7 @@ cpu_intrq_setup(struct cpu *cpu)
 
 	if (mcpup->mondo_data == NULL) {
 		cmn_err(CE_NOTE, "cpu%d: cpu mondo_data allocation failed",
-			cpu->cpu_id);
+		    cpu->cpu_id);
 		return (ENOMEM);
 	}
 	/*
@@ -91,17 +88,25 @@ cpu_intrq_setup(struct cpu *cpu)
 	mcpup->mondo_data_ra = va_to_pa(mcpup->mondo_data);
 
 	/*
-	 *  Allocate a percpu list of NCPU for xcalls
+	 *  Allocate a per-cpu list of ncpu_guest_max for xcalls
 	 */
-	size = NCPU * sizeof (uint16_t);
+	size = ncpu_guest_max * sizeof (uint16_t);
 	if (size < INTR_REPORT_SIZE)
 		size = INTR_REPORT_SIZE;
+
+	/*
+	 * contig_mem_alloc() requires size to be a power of 2.
+	 * Increase size to a power of 2 if necessary.
+	 */
+	if ((size & (size - 1)) != 0) {
+		size = 1 << highbit(size);
+	}
 
 	mcpup->cpu_list = contig_mem_alloc(size);
 
 	if (mcpup->cpu_list == NULL) {
 		cmn_err(CE_NOTE, "cpu%d: cpu cpu_list allocation failed",
-			cpu->cpu_id);
+		    cpu->cpu_id);
 		return (ENOMEM);
 	}
 	mcpup->cpu_list_ra = va_to_pa(mcpup->cpu_list);
@@ -115,7 +120,7 @@ cpu_intrq_setup(struct cpu *cpu)
 
 	if (mcpup->cpu_q_va == NULL) {
 		cmn_err(CE_NOTE, "cpu%d: cpu intrq allocation failed",
-			cpu->cpu_id);
+		    cpu->cpu_id);
 		return (ENOMEM);
 	}
 	mcpup->cpu_q_base_pa = va_to_pa(mcpup->cpu_q_va);
@@ -130,7 +135,7 @@ cpu_intrq_setup(struct cpu *cpu)
 
 	if (mcpup->dev_q_va == NULL) {
 		cmn_err(CE_NOTE, "cpu%d: dev intrq allocation failed",
-			cpu->cpu_id);
+		    cpu->cpu_id);
 		return (ENOMEM);
 	}
 	mcpup->dev_q_base_pa = va_to_pa(mcpup->dev_q_va);
@@ -145,7 +150,7 @@ cpu_intrq_setup(struct cpu *cpu)
 
 	if (mcpup->cpu_rq_va == NULL) {
 		cmn_err(CE_NOTE, "cpu%d: resumable queue allocation failed",
-			cpu->cpu_id);
+		    cpu->cpu_id);
 		return (ENOMEM);
 	}
 	mcpup->cpu_rq_base_pa = va_to_pa(mcpup->cpu_rq_va);
@@ -162,7 +167,7 @@ cpu_intrq_setup(struct cpu *cpu)
 
 	if (mcpup->cpu_nrq_va == NULL) {
 		cmn_err(CE_NOTE, "cpu%d: nonresumable queue allocation failed",
-			cpu->cpu_id);
+		    cpu->cpu_id);
 		return (ENOMEM);
 	}
 	mcpup->cpu_nrq_base_pa = va_to_pa(mcpup->cpu_nrq_va);
@@ -193,11 +198,19 @@ cpu_intrq_cleanup(struct cpu *cpu)
 	}
 
 	/*
-	 *  Free percpu list of NCPU for xcalls
+	 *  Free per-cpu list of ncpu_guest_max for xcalls
 	 */
-	cpu_list_size = NCPU * sizeof (uint16_t);
+	cpu_list_size = ncpu_guest_max * sizeof (uint16_t);
 	if (cpu_list_size < INTR_REPORT_SIZE)
 		cpu_list_size = INTR_REPORT_SIZE;
+
+	/*
+	 * contig_mem_alloc() requires size to be a power of 2.
+	 * Increase size to a power of 2 if necessary.
+	 */
+	if ((cpu_list_size & (cpu_list_size - 1)) != 0) {
+		cpu_list_size = 1 << highbit(cpu_list_size);
+	}
 
 	if (mcpup->cpu_list) {
 		contig_mem_free(mcpup->cpu_list, cpu_list_size);
