@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8 */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -209,9 +206,9 @@ prsetprregs(klwp_t *lwp, prgregset_t prp, int initial)
 
 	if (initial) {		/* set initial values */
 		if (lwptoproc(lwp)->p_model == DATAMODEL_LP64)
-			lwptoregs(lwp)->r_tstate = TSTATE_USER64;
+			lwptoregs(lwp)->r_tstate = TSTATE_USER64|TSTATE_MM_TSO;
 		else
-			lwptoregs(lwp)->r_tstate = TSTATE_USER32;
+			lwptoregs(lwp)->r_tstate = TSTATE_USER32|TSTATE_MM_TSO;
 		if (!fpu_exists)
 			lwptoregs(lwp)->r_tstate &= ~TSTATE_PEF;
 	}
@@ -681,8 +678,8 @@ prmapin(struct as *as, caddr_t addr, int writing)
 		if (pp != NULL) {
 			ASSERT(PAGE_LOCKED(pp));
 			kaddr = ppmapin(pp, writing ?
-				(PROT_READ | PROT_WRITE) : PROT_READ,
-				(caddr_t)-1);
+			    (PROT_READ | PROT_WRITE) : PROT_READ,
+			    (caddr_t)-1);
 			return (kaddr + ((uintptr_t)addr & PAGEOFFSET));
 		}
 	}
@@ -695,7 +692,7 @@ prmapin(struct as *as, caddr_t addr, int writing)
 	kaddr = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
 
 	hat_devload(kas.a_hat, kaddr, PAGESIZE, pfnum,
-		writing ? (PROT_READ | PROT_WRITE) : PROT_READ, HAT_LOAD_LOCK);
+	    writing ? (PROT_READ | PROT_WRITE) : PROT_READ, HAT_LOAD_LOCK);
 
 	return (kaddr + ((uintptr_t)addr & PAGEOFFSET));
 }

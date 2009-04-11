@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -560,6 +560,12 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 	sp->shm_atime = gethrestime_sec();
 	sp->shm_lpid = pp->p_pid;
 	ipc_hold(shm_svc, (kipc_perm_t *)sp);
+
+	/*
+	 * Tell machine specific code that lwp has mapped shared memory
+	 */
+	LWP_MMODEL_SHARED_AS(addr, size);
+
 errret:
 	mutex_exit(lock);
 	return (error);

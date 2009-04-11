@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -440,9 +440,10 @@ struct regs {
 /*
  * Definition of MM (Memory Mode) bit field of pstate.
  */
-#define	PSTATE_MM_TSO	0x00		/* total store odering */
-#define	PSTATE_MM_PSO	0x40		/* partial store odering */
+#define	PSTATE_MM_TSO	0x00		/* total store ordering */
+#define	PSTATE_MM_PSO	0x40		/* partial store ordering */
 #define	PSTATE_MM_RMO	0x80		/* relaxed memory ordering */
+#define	PSTATE_MM_WC	0xC0		/* weak consistency */
 
 
 /*
@@ -477,6 +478,9 @@ struct regs {
 #define	TSTATE_PRIV	(PSTATE_PRIV << TSTATE_PSTATE_SHIFT)
 #define	TSTATE_AM	(PSTATE_AM << TSTATE_PSTATE_SHIFT)
 #define	TSTATE_PEF	(PSTATE_PEF << TSTATE_PSTATE_SHIFT)
+#define	TSTATE_MM	(PSTATE_MM << TSTATE_PSTATE_SHIFT)
+#define	TSTATE_MM_TSO	(PSTATE_MM_TSO << TSTATE_PSTATE_SHIFT)
+#define	TSTATE_MM_WC	(PSTATE_MM_WC << TSTATE_PSTATE_SHIFT)
 #define	TSTATE_MG	(PSTATE_MG << TSTATE_PSTATE_SHIFT)
 #define	TSTATE_IG	(PSTATE_IG << TSTATE_PSTATE_SHIFT)
 #define	TSTATE_CWP	TSTATE_CWP_MASK
@@ -509,9 +513,6 @@ struct regs {
 #define	PTSTATE_KERN_COMMON \
 	(PSTATE_PRIV | PSTATE_PEF | PSTATE_MM_TSO)
 
-#define	TSTATE_USER_COMMON \
-	(PSTATE_IE | PSTATE_PEF | PSTATE_MM_TSO)
-
 #define	TSTATE_KERN	\
 	(PTSTATE_KERN_COMMON << TSTATE_PSTATE_SHIFT)
 
@@ -519,11 +520,11 @@ struct regs {
 	(PTSTATE_KERN_COMMON | PSTATE_PRIV | PSTATE_IE)
 
 #define	TSTATE_USER32	\
-	(((TSTATE_USER_COMMON | PSTATE_AM) << TSTATE_PSTATE_SHIFT) | \
+	(((PSTATE_IE | PSTATE_PEF | PSTATE_AM) << TSTATE_PSTATE_SHIFT) | \
 	    ((long long)ASI_PNF << TSTATE_ASI_SHIFT))
 
 #define	TSTATE_USER64	\
-	((TSTATE_USER_COMMON << TSTATE_PSTATE_SHIFT) | \
+	(((PSTATE_IE | PSTATE_PEF) << TSTATE_PSTATE_SHIFT) | \
 	    ((long long)ASI_PNF << TSTATE_ASI_SHIFT))
 
 #define	USERMODE(x)	(!((x) & TSTATE_PRIV))

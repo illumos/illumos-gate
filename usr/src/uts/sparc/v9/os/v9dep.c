@@ -23,11 +23,9 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -54,6 +52,14 @@
 #include <sys/model.h>
 #include <sys/panic.h>
 #include <sys/exec.h>
+
+/*
+ * By default, set the weakest model to TSO (Total Store Order)
+ * which is the default memory model on SPARC.
+ * If a platform does support a weaker model than TSO, this will be
+ * updated at runtime to reflect that.
+ */
+uint_t weakest_mem_model = TSTATE_MM_TSO;
 
 /*
  * modify the lower 32bits of a uint64_t
@@ -330,9 +336,9 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		(void) save_syscall_args();	/* copy the args first */
 
 	tbits = (((grp[REG_CCR] & TSTATE_CCR_MASK) << TSTATE_CCR_SHIFT) |
-		((grp[REG_ASI] & TSTATE_ASI_MASK) << TSTATE_ASI_SHIFT));
+	    ((grp[REG_ASI] & TSTATE_ASI_MASK) << TSTATE_ASI_SHIFT));
 	rp->r_tstate &= ~(((uint64_t)TSTATE_CCR_MASK << TSTATE_CCR_SHIFT) |
-		((uint64_t)TSTATE_ASI_MASK << TSTATE_ASI_SHIFT));
+	    ((uint64_t)TSTATE_ASI_MASK << TSTATE_ASI_SHIFT));
 	rp->r_tstate |= tbits;
 	kpreempt_disable();
 	fp->fpu_fprs = (uint32_t)grp[REG_FPRS];
@@ -490,7 +496,7 @@ setgwins(klwp_t *lwp, gwindows_t *gwins)
 		sp = (caddr_t)gwins->spbuf[i];
 		mpcb->mpcb_spbuf[i] = sp;
 		rwp = (struct rwindow32 *)
-			(mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
+		    (mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
 		if (is64 && IS_V9STACK(sp))
 			bcopy(&gwins->wbuf[i], rwp, sizeof (struct rwindow));
 		else
@@ -525,7 +531,7 @@ setgwins32(klwp_t *lwp, gwindows32_t *gwins)
 		sp = (caddr_t)(uintptr_t)gwins->spbuf[i];
 		mpcb->mpcb_spbuf[i] = sp;
 		rwp = (struct rwindow *)
-			(mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
+		    (mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
 		if (is64 && IS_V9STACK(sp))
 			rwindow_32ton(&gwins->wbuf[i], rwp);
 		else
@@ -563,7 +569,7 @@ getgwins(klwp_t *lwp, gwindows_t *gwp)
 		sp = mpcb->mpcb_spbuf[i];
 		gwp->spbuf[i] = (greg_t *)sp;
 		rwp = (struct rwindow32 *)
-			(mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
+		    (mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
 		if (is64 && IS_V9STACK(sp))
 			bcopy(rwp, &gwp->wbuf[i], sizeof (struct rwindow));
 		else
@@ -595,7 +601,7 @@ getgwins32(klwp_t *lwp, gwindows32_t *gwp)
 	for (i = 0; i < wbcnt; i++) {
 		sp = mpcb->mpcb_spbuf[i];
 		rwp = (struct rwindow *)
-			(mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
+		    (mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
 		gwp->spbuf[i] = (caddr32_t)(uintptr_t)sp;
 		if (is64 && IS_V9STACK(sp))
 			rwindow_nto32(rwp, &gwp->wbuf[i]);
@@ -697,9 +703,9 @@ flush_user_windows_to_stack(caddr_t *psp)
 				mpcb->mpcb_spbuf[k] = mpcb->mpcb_spbuf[k+1];
 				bcopy(
 				    mpcb->mpcb_wbuf +
-					((k+1) * wbuf_rwindow_size),
+				    ((k+1) * wbuf_rwindow_size),
 				    mpcb->mpcb_wbuf +
-					(k * wbuf_rwindow_size),
+				    (k * wbuf_rwindow_size),
 				    wbuf_rwindow_size);
 			}
 		}
@@ -801,9 +807,9 @@ setregs(uarg_t *args)
 	    rp->r_g6 = rp->r_o0 = rp->r_o1 = rp->r_o2 =
 	    rp->r_o3 = rp->r_o4 = rp->r_o5 = rp->r_o7 = 0;
 	if (p->p_model == DATAMODEL_ILP32)
-		rp->r_tstate = TSTATE_USER32;
+		rp->r_tstate = TSTATE_USER32 | weakest_mem_model;
 	else
-		rp->r_tstate = TSTATE_USER64;
+		rp->r_tstate = TSTATE_USER64 | weakest_mem_model;
 	if (!fpu_exists)
 		rp->r_tstate &= ~TSTATE_PEF;
 	rp->r_g7 = args->thrptr;
@@ -975,8 +981,8 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	if (newstack != 0) {
 		fp = (struct sigframe *)
 		    (SA((uintptr_t)lwp->lwp_sigaltstack.ss_sp) +
-			SA((int)lwp->lwp_sigaltstack.ss_size) - STACK_ALIGN -
-			SA(minstacksz));
+		    SA((int)lwp->lwp_sigaltstack.ss_size) - STACK_ALIGN -
+		    SA(minstacksz));
 	} else {
 		/*
 		 * If we were unable to flush all register windows to
@@ -1304,9 +1310,9 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	if (newstack != 0) {
 		fp = (struct sigframe32 *)
 		    (SA32((uintptr_t)lwp->lwp_sigaltstack.ss_sp) +
-			SA32((int)lwp->lwp_sigaltstack.ss_size) -
-			STACK_ALIGN32 -
-			SA32(minstacksz));
+		    SA32((int)lwp->lwp_sigaltstack.ss_size) -
+		    STACK_ALIGN32 -
+		    SA32(minstacksz));
 	} else {
 		/*
 		 * If we were unable to flush all register windows to
@@ -1536,7 +1542,7 @@ badstack:
 
 
 /*
- * load user registers into lwp.
+ * Load user registers into lwp.  Called only from syslwp_create().
  * thrptr ignored for sparc.
  */
 /* ARGSUSED2 */
@@ -1545,9 +1551,9 @@ lwp_load(klwp_t *lwp, gregset_t grp, uintptr_t thrptr)
 {
 	setgregs(lwp, grp);
 	if (lwptoproc(lwp)->p_model == DATAMODEL_ILP32)
-		lwptoregs(lwp)->r_tstate = TSTATE_USER32;
+		lwptoregs(lwp)->r_tstate = TSTATE_USER32 | TSTATE_MM_TSO;
 	else
-		lwptoregs(lwp)->r_tstate = TSTATE_USER64;
+		lwptoregs(lwp)->r_tstate = TSTATE_USER64 | TSTATE_MM_TSO;
 
 	if (!fpu_exists)
 		lwptoregs(lwp)->r_tstate &= ~TSTATE_PEF;
@@ -1609,6 +1615,65 @@ lwp_clear_uwin(void)
 	 * kernel buffer.
 	 */
 	m->mpcb_wbcnt = 0;
+}
+
+/*
+ *  Set memory model to Total Store Order (TSO).
+ */
+static void
+mmodel_set_tso(void)
+{
+	struct regs *rp = lwptoregs(ttolwp(curthread));
+
+	/*
+	 * The thread is doing something which requires TSO semantics
+	 * (creating a 2nd thread, or mapping writable shared memory).
+	 * It's no longer safe to run in WC mode.
+	 */
+	rp->r_tstate &= ~TSTATE_MM;
+	/* LINTED E_EXPR_NULL_EFFECT */
+	rp->r_tstate |= TSTATE_MM_TSO;
+}
+
+/*
+ * When this routine is invoked, the process is just about to add a new lwp;
+ * making it multi threaded.
+ *
+ * If the program requires default stronger/legacy memory model semantics,
+ * this is an indication that the processor memory model
+ * should be altered to provide those semantics.
+ */
+void
+lwp_mmodel_newlwp(void)
+{
+	/*
+	 * New thread has been created and it's no longer safe
+	 * to run in WC mode, so revert back to TSO.
+	 */
+	mmodel_set_tso();
+}
+
+/*
+ * This routine is invoked immediately after the lwp has added a mapping
+ * to shared memory to its address space. The mapping starts at address
+ * 'addr' and extends for 'size' bytes.
+ *
+ * Unless we can (somehow) guarantee that all the processes we're sharing
+ * the underlying mapped object with, are using the same memory model that
+ * this process is using, this call should change the memory model
+ * configuration of the processor to be the most pessimistic available.
+ */
+/* ARGSUSED */
+void
+lwp_mmodel_shared_as(caddr_t addr, size_t sz)
+{
+	/*
+	 * lwp has mapped shared memory and is no longer safe
+	 * to run in WC mode, so revert back to TSO.
+	 * For now, any shared memory access is enough to get back to TSO
+	 * and hence not checking on 'addr' & 'sz'.
+	 */
+	mmodel_set_tso();
 }
 
 static uint_t

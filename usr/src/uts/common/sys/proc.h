@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _SYS_PROC_H
 #define	_SYS_PROC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 
@@ -749,6 +747,16 @@ extern	int	lwp_setprivate(klwp_t *, int, uintptr_t);
 extern	void	lwp_stat_update(lwp_stat_id_t, long);
 extern	void	lwp_attach_brand_hdlrs(klwp_t *);
 extern	void	lwp_detach_brand_hdlrs(klwp_t *);
+
+#if defined(__sparcv9)
+extern	void	lwp_mmodel_newlwp(void);
+extern	void	lwp_mmodel_shared_as(caddr_t, size_t);
+#define	LWP_MMODEL_NEWLWP()		lwp_mmodel_newlwp()
+#define	LWP_MMODEL_SHARED_AS(addr, sz)	lwp_mmodel_shared_as((addr), (sz))
+#else
+#define	LWP_MMODEL_NEWLWP()
+#define	LWP_MMODEL_SHARED_AS(addr, sz)
+#endif
 
 /*
  * Signal queue function prototypes. Must be here due to header ordering

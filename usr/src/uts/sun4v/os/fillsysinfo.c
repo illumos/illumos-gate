@@ -72,6 +72,7 @@ static void init_md_broken(md_t *, mde_cookie_t *);
 static int get_l2_cache_info(md_t *, mde_cookie_t, uint64_t *, uint64_t *,
     uint64_t *);
 static void get_hwcaps(md_t *, mde_cookie_t);
+static void get_weakest_mem_model(md_t *, mde_cookie_t);
 static void get_q_sizes(md_t *, mde_cookie_t);
 static void get_va_bits(md_t *, mde_cookie_t);
 static size_t get_ra_limit(md_t *);
@@ -487,6 +488,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 		isa_list = construct_isalist(mdp, cpulist[0], NULL);
 
 	get_hwcaps(mdp, cpulist[0]);
+	get_weakest_mem_model(mdp, cpulist[0]);
 	get_q_sizes(mdp, cpulist[0]);
 	get_va_bits(mdp, cpulist[0]);
 
@@ -724,6 +726,27 @@ get_hwcaps(md_t *mdp, mde_cookie_t cpu_node_cookie)
 	    "unrecognized token: %s");
 }
 
+static void
+get_weakest_mem_model(md_t *mdp, mde_cookie_t cpu_node_cookie)
+{
+	char *mmbuf;
+	int mmlen;
+	uint_t wmm;
+	char *p, *q;
+
+	if (md_get_prop_data(mdp, cpu_node_cookie,
+	    "memory-model-list", (uint8_t **)&mmbuf, &mmlen)) {
+		/* Property not found */
+		return;
+	}
+
+	wmm = TSTATE_MM_TSO;
+	for (p = mmbuf, q = p + mmlen; p < q; p += strlen(p) + 1) {
+		if (strcmp(p, "wc") == 0)
+			wmm = TSTATE_MM_WC;
+	}
+	weakest_mem_model = wmm;
+}
 
 /*
  * Does the opposite of cmn_err(9f) "%b" conversion specification:

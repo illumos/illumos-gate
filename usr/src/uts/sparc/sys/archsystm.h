@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
 #define	_SYS_ARCHSYSTM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * A selection of ISA-dependent interfaces
@@ -118,6 +116,8 @@ extern	int	xregs_getsize(struct proc *);
 extern void doflush(void *);
 
 extern uint_t cpu_hwcap_flags;
+
+extern uint_t weakest_mem_model;
 
 #define	cpr_dprintf prom_printf
 

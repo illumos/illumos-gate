@@ -656,6 +656,13 @@ smmap_common(caddr_t *addrp, size_t len,
 		as_rangelock(as);
 		error = zmap(as, addrp, len, uprot, flags, pos);
 		as_rangeunlock(as);
+		/*
+		 * Tell machine specific code that lwp has mapped shared memory
+		 */
+		if (error == 0 && (flags & MAP_SHARED)) {
+			/* EMPTY */
+			LWP_MMODEL_SHARED_AS(*addrp, len);
+		}
 		return (error);
 	} else if ((flags & MAP_ANON) != 0)
 		return (EINVAL);
@@ -767,6 +774,13 @@ smmap_common(caddr_t *addrp, size_t len,
 	    addrp, len, uprot, maxprot, flags, fp->f_cred, NULL);
 
 	if (error == 0) {
+		/*
+		 * Tell machine specific code that lwp has mapped shared memory
+		 */
+		if (flags & MAP_SHARED) {
+			/* EMPTY */
+			LWP_MMODEL_SHARED_AS(*addrp, len);
+		}
 		if (vp->v_type == VREG &&
 		    (flags & (MAP_TEXT | MAP_INITDATA)) != 0) {
 			/*
