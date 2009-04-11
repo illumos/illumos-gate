@@ -19,26 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-PROG = sdpadm
+PROG= sdpadm
 
-OBJS = sdpadm.o
-SRCS = $(OBJS:.o=.c)
-MSGFILES	= $(SRCS:%.c=%.i)
 ETCFILES = sdp.conf
 ROOTETC = $(ROOT)/etc
 
-LINTFLAGS += -mx
-
-include ../Makefile.cmd
-
-CFLAGS += $(CCVERBOSE)
-POFILE = sdpadm_msg.po
-XGETFLAGS = -a
 FILEMODE = 0555
 OWNER = root
 GROUP = bin
@@ -46,30 +35,18 @@ GROUP = bin
 ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
 $(ROOTETCFILES) := FILEMODE= 644
 
-LINT_OBJS       = $(OBJS:%.o=%.ln)
+include ../Makefile.cmd
+
+CFLAGS	+= $(CCVERBOSE)
 
 .KEEP_STATE:
 
 all: $(PROG) $(ETCFILES)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS)
-	$(POST_PROCESS)
-
 install: all $(ROOTUSRSBINPROG) $(ROOTETCFILES)
 
-$(POFILE):	$(MSGFILES)
-	$(BUILDPO.msgfiles)
-
-_msg: $(MSGDOMAINPOFILE)
-
 clean:
-	$(RM) $(OBJS)
 
-clobber: clean
-	$(RM) $(PROG) $(MSGFILES) $(POFILE)
+lint:	lint_PROG
 
-lint:	$(LINT_OBJS) 
-	$(LINT.c) $(LINTFLAGS) $(LDLIBS) $(LINT_OBJS)
-
-include $(SRC)/Makefile.msg.targ
+include ../Makefile.targ
