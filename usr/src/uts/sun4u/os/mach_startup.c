@@ -72,6 +72,11 @@ int fpras_frequency = -1;
 int64_t fpras_interval = -1;
 
 /*
+ * Increase unix symbol table size as a work around for 6828121
+ */
+int alloc_mem_bermuda_triangle;
+
+/*
  * Halt idling cpus optimization
  *
  * This optimation is only enabled in platforms that have
