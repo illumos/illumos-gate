@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,13 +46,6 @@ extern "C" {
 #define	RAL_DBG_IOCTL		0x000020
 #define	RAL_DBG_HW		0x000040
 #define	RAL_DBG_ALL		0x000fff
-
-#ifdef DEBUG
-#define	RAL_DEBUG \
-	ral_debug
-#else
-#define	RAL_DEBUG
-#endif
 
 #define	RAL_RX_LIST_COUNT	8
 #define	RAL_TX_LIST_COUNT	8

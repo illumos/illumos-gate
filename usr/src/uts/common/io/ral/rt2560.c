@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,37 +27,24 @@
 
 #include <sys/types.h>
 #include <sys/byteorder.h>
-#include <sys/conf.h>
 #include <sys/cmn_err.h>
 #include <sys/stat.h>
+#include <sys/pci.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/strsubr.h>
-#include <sys/ethernet.h>
 #include <inet/common.h>
-#include <inet/nd.h>
-#include <inet/mi.h>
 #include <sys/note.h>
-#include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/modctl.h>
 #include <sys/devops.h>
-#include <sys/dlpi.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
-#include <sys/net80211_proto.h>
-#include <sys/varargs.h>
-#include <sys/policy.h>
-#include <sys/pci.h>
-#include <sys/crypto/common.h>
-#include <sys/crypto/api.h>
-#include <inet/wifi_ioctl.h>
 
 #include "ral_rate.h"
 #include "rt2560_reg.h"
 #include "rt2560_var.h"
-
 
 static void *ral_soft_state_p = NULL;
 
@@ -257,7 +244,7 @@ rt2560_set_bssid(struct rt2560_softc *sc, uint8_t *bssid)
 	tmp = bssid[4] | bssid[5] << 8;
 	RAL_WRITE(sc, RT2560_CSR6, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW, "setting BSSID to " MACSTR "\n", MAC2STR(bssid));
+	ral_debug(RAL_DBG_HW, "setting BSSID to " MACSTR "\n", MAC2STR(bssid));
 }
 
 
@@ -273,14 +260,14 @@ rt2560_bbp_write(struct rt2560_softc *sc, uint8_t reg, uint8_t val)
 		drv_usecwait(1);
 	}
 	if (ntries == 100) {
-		RAL_DEBUG(RAL_DBG_HW, "could not write to BBP\n");
+		ral_debug(RAL_DBG_HW, "could not write to BBP\n");
 		return;
 	}
 
 	tmp = RT2560_BBP_WRITE | RT2560_BBP_BUSY | reg << 8 | val;
 	RAL_WRITE(sc, RT2560_BBPCSR, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW, "BBP R%u <- 0x%02x\n", reg, val);
+	ral_debug(RAL_DBG_HW, "BBP R%u <- 0x%02x\n", reg, val);
 }
 
 static uint8_t
@@ -299,7 +286,7 @@ rt2560_bbp_read(struct rt2560_softc *sc, uint8_t reg)
 		drv_usecwait(1);
 	}
 
-	RAL_DEBUG(RAL_DBG_HW, "could not read from BBP\n");
+	ral_debug(RAL_DBG_HW, "could not read from BBP\n");
 	return (0);
 }
 
@@ -315,7 +302,7 @@ rt2560_rf_write(struct rt2560_softc *sc, uint8_t reg, uint32_t val)
 		drv_usecwait(1);
 	}
 	if (ntries == 100) {
-		RAL_DEBUG(RAL_DBG_HW, "could not write to RF\n");
+		ral_debug(RAL_DBG_HW, "could not write to RF\n");
 		return;
 	}
 
@@ -326,7 +313,7 @@ rt2560_rf_write(struct rt2560_softc *sc, uint8_t reg, uint32_t val)
 	/* remember last written value in sc */
 	sc->rf_regs[reg] = val;
 
-	RAL_DEBUG(RAL_DBG_HW, "RF R[%u] <- 0x%05x\n", reg & 0x3, val & 0xfffff);
+	ral_debug(RAL_DBG_HW, "RF R[%u] <- 0x%05x\n", reg & 0x3, val & 0xfffff);
 }
 
 static void
@@ -348,7 +335,7 @@ rt2560_set_chan(struct rt2560_softc *sc, struct ieee80211_channel *c)
 	/* adjust txpower using ifconfig settings */
 	power -= (100 - ic->ic_txpowlimit) / 8;
 
-	RAL_DEBUG(RAL_DBG_CHAN, "setting channel to %u, txpower to %u\n",
+	ral_debug(RAL_DBG_CHAN, "setting channel to %u, txpower to %u\n",
 	    chan, power);
 
 	switch (sc->rf_rev) {
@@ -461,7 +448,7 @@ rt2560_enable_tsf_sync(struct rt2560_softc *sc)
 		    RT2560_ENABLE_BEACON_GENERATOR;
 	RAL_WRITE(sc, RT2560_CSR14, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW, "enabling TSF synchronization\n");
+	ral_debug(RAL_DBG_HW, "enabling TSF synchronization\n");
 }
 
 static void
@@ -484,7 +471,7 @@ rt2560_update_plcp(struct rt2560_softc *sc)
 		RAL_WRITE(sc, RT2560_PLCP11MCSR,  0x000b840b);
 	}
 
-	RAL_DEBUG(RAL_DBG_HW, "updating PLCP for %s preamble\n",
+	ral_debug(RAL_DBG_HW, "updating PLCP for %s preamble\n",
 	    (ic->ic_flags & IEEE80211_F_SHPREAMBLE) ? "short" : "long");
 }
 
@@ -519,7 +506,7 @@ rt2560_update_slot(struct ieee80211com *ic, int onoff)
 	tmp = eifs << 16 | tx_difs;
 	RAL_WRITE(sc, RT2560_CSR19, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW, "setting slottime to %uus\n", slottime);
+	ral_debug(RAL_DBG_HW, "setting slottime to %uus\n", slottime);
 }
 
 int
@@ -528,8 +515,6 @@ ral_dma_region_alloc(struct rt2560_softc *sc, struct dma_region *dr,
 {
 	dev_info_t *dip = sc->sc_dev;
 	int err;
-
-	RAL_DEBUG(RAL_DBG_DMA, "ral_dma_region_alloc() size=%u\n", size);
 
 	err = ddi_dma_alloc_handle(dip, &ral_dma_attr, DDI_DMA_SLEEP, NULL,
 	    &dr->dr_hnd);
@@ -554,7 +539,7 @@ ral_dma_region_alloc(struct rt2560_softc *sc, struct dma_region *dr,
 	}
 
 	dr->dr_pbase = dr->dr_cookie.dmac_address;
-	RAL_DEBUG(RAL_DBG_DMA, "get physical-base=0x%08x\n", dr->dr_pbase);
+	ral_debug(RAL_DBG_DMA, "get physical-base=0x%08x\n", dr->dr_pbase);
 
 	return (DDI_SUCCESS);
 
@@ -864,8 +849,6 @@ rt2560_statedog(void *arg)
 
 	RAL_LOCK(sc);
 
-	RAL_DEBUG(RAL_DBG_MSG, "rt2560_statedog(...)\n");
-
 	sc->sc_state_id = 0;
 	state = ic->ic_state;
 	ic->ic_state = sc->sc_ostate;
@@ -921,12 +904,10 @@ rt2560_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_AUTH:
-		RAL_DEBUG(RAL_DBG_STATE, "-> IEEE80211_S_AUTH ...\n");
 		rt2560_set_chan(sc, ic->ic_curchan);
 		break;
 
 	case IEEE80211_S_ASSOC:
-		RAL_DEBUG(RAL_DBG_STATE, "-> IEEE80211_S_ASSOC ...\n");
 		rt2560_set_chan(sc, ic->ic_curchan);
 
 		drv_usecwait(10 * 1000);	/* dlink */
@@ -935,7 +916,6 @@ rt2560_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_RUN:
-		RAL_DEBUG(RAL_DBG_STATE, "-> IEEE80211_S_RUN ...\n");
 		rt2560_set_chan(sc, ic->ic_curchan);
 
 		ni = ic->ic_bss;
@@ -1058,7 +1038,7 @@ rt2560_tx_intr(struct rt2560_softc *sc)
 
 		switch (LE_32(desc->flags) & RT2560_TX_RESULT_MASK) {
 		case RT2560_TX_SUCCESS:
-			RAL_DEBUG(RAL_DBG_INTR, "data frame sent success\n");
+			ral_debug(RAL_DBG_INTR, "data frame sent success\n");
 			if (data->id.id_node != NULL) {
 				ral_rssadapt_raise_rate(ic, &rn->rssadapt,
 				    &data->id);
@@ -1066,14 +1046,14 @@ rt2560_tx_intr(struct rt2560_softc *sc)
 			break;
 
 		case RT2560_TX_SUCCESS_RETRY:
-			RAL_DEBUG(RAL_DBG_INTR,
+			ral_debug(RAL_DBG_INTR,
 			    "data frame sent after %u retries\n",
 			    (LE_32(desc->flags) >> 5) & 0x7);
 			sc->sc_tx_retries++;
 			break;
 
 		case RT2560_TX_FAIL_RETRY:
-			RAL_DEBUG(RAL_DBG_INTR,
+			ral_debug(RAL_DBG_INTR,
 			    "sending data frame failed (too much retries)\n");
 			if (data->id.id_node != NULL) {
 				ral_rssadapt_lower_rate(ic, data->ni,
@@ -1084,7 +1064,7 @@ rt2560_tx_intr(struct rt2560_softc *sc)
 		case RT2560_TX_FAIL_INVALID:
 		case RT2560_TX_FAIL_OTHER:
 		default:
-			RAL_DEBUG(RAL_DBG_INTR, "sending data frame failed "
+			ral_debug(RAL_DBG_INTR, "sending data frame failed "
 			    "0x%08x\n", LE_32(desc->flags));
 			break;
 		}
@@ -1095,7 +1075,7 @@ rt2560_tx_intr(struct rt2560_softc *sc)
 		/* descriptor is no longer valid */
 		desc->flags &= ~LE_32(RT2560_TX_VALID);
 
-		RAL_DEBUG(RAL_DBG_INTR, "tx done idx=%u\n", sc->txq.next);
+		ral_debug(RAL_DBG_INTR, "tx done idx=%u\n", sc->txq.next);
 
 		sc->txq.queued--;
 		sc->txq.next = (sc->txq.next + 1) % RT2560_TX_RING_COUNT;
@@ -1141,24 +1121,24 @@ rt2560_prio_intr(struct rt2560_softc *sc)
 
 		switch (LE_32(desc->flags) & RT2560_TX_RESULT_MASK) {
 		case RT2560_TX_SUCCESS:
-			RAL_DEBUG(RAL_DBG_INTR, "mgt frame sent success\n");
+			ral_debug(RAL_DBG_INTR, "mgt frame sent success\n");
 			break;
 
 		case RT2560_TX_SUCCESS_RETRY:
-			RAL_DEBUG(RAL_DBG_INTR,
+			ral_debug(RAL_DBG_INTR,
 			    "mgt frame sent after %u retries\n",
 			    (LE_32(desc->flags) >> 5) & 0x7);
 			break;
 
 		case RT2560_TX_FAIL_RETRY:
-			RAL_DEBUG(RAL_DBG_INTR,
+			ral_debug(RAL_DBG_INTR,
 			    "sending mgt frame failed (too much " "retries)\n");
 			break;
 
 		case RT2560_TX_FAIL_INVALID:
 		case RT2560_TX_FAIL_OTHER:
 		default:
-			RAL_DEBUG(RAL_DBG_INTR, "sending mgt frame failed "
+			ral_debug(RAL_DBG_INTR, "sending mgt frame failed "
 			    "0x%08x\n", LE_32(desc->flags));
 		}
 
@@ -1168,7 +1148,7 @@ rt2560_prio_intr(struct rt2560_softc *sc)
 		/* descriptor is no longer valid */
 		desc->flags &= ~LE_32(RT2560_TX_VALID);
 
-		RAL_DEBUG(RAL_DBG_INTR, "prio done idx=%u\n", sc->prioq.next);
+		ral_debug(RAL_DBG_INTR, "prio done idx=%u\n", sc->prioq.next);
 
 		sc->prioq.queued--;
 		sc->prioq.next = (sc->prioq.next + 1) % RT2560_PRIO_RING_COUNT;
@@ -1226,13 +1206,13 @@ rt2560_rx_intr(struct rt2560_softc *sc)
 			 * This should not happen since we did not request
 			 * to receive those frames when we filled RXCSR0.
 			 */
-			RAL_DEBUG(RAL_DBG_RX, "PHY or CRC error flags 0x%08x\n",
+			ral_debug(RAL_DBG_RX, "PHY or CRC error flags 0x%08x\n",
 			    LE_32(desc->flags));
 			data->drop = 1;
 		}
 
 		if (((LE_32(desc->flags) >> 16) & 0xfff) > RAL_RXBUF_SIZE) {
-			RAL_DEBUG(RAL_DBG_RX, "bad length\n");
+			ral_debug(RAL_DBG_RX, "bad length\n");
 			data->drop = 1;
 		}
 
@@ -1246,13 +1226,13 @@ rt2560_rx_intr(struct rt2560_softc *sc)
 
 		if ((len < sizeof (struct ieee80211_frame_min)) ||
 		    (len > RAL_RXBUF_SIZE)) {
-			RAL_DEBUG(RAL_DBG_RX, "bad frame length=%u\n", len);
+			ral_debug(RAL_DBG_RX, "bad frame length=%u\n", len);
 			sc->sc_rx_err++;
 			goto skip;
 		}
 
 		if ((m = allocb(len, BPRI_MED)) == NULL) {
-			RAL_DEBUG(RAL_DBG_RX, "rt2560_rx_intr():"
+			ral_debug(RAL_DBG_RX, "rt2560_rx_intr():"
 			    " allocate mblk failed.\n");
 			sc->sc_rx_nobuf++;
 			goto skip;
@@ -1279,7 +1259,7 @@ rt2560_rx_intr(struct rt2560_softc *sc)
 		ieee80211_free_node(ni);
 
 skip:		desc->flags = LE_32(RT2560_RX_BUSY);
-		RAL_DEBUG(RAL_DBG_RX, "rx done idx=%u\n", sc->rxq.cur);
+		ral_debug(RAL_DBG_RX, "rx done idx=%u\n", sc->rxq.cur);
 
 		sc->rxq.cur = (sc->rxq.cur + 1) % RT2560_RX_RING_COUNT;
 	}
@@ -1475,7 +1455,7 @@ rt2560_mgmt_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	m = allocb(msgdsize(mp) + 32, BPRI_MED);
 	if (m == NULL) {
-		RAL_DEBUG(RAL_DBG_TX, "rt2560_mgmt_send: can't alloc mblk.\n");
+		ral_debug(RAL_DBG_TX, "rt2560_mgmt_send: can't alloc mblk.\n");
 		err = DDI_FAILURE;
 		goto fail1;
 	}
@@ -1546,7 +1526,7 @@ rt2560_mgmt_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	(void) ddi_dma_sync(dr->dr_hnd, idx * RT2560_TX_DESC_SIZE,
 	    RT2560_TX_DESC_SIZE, DDI_DMA_SYNC_FORDEV);
 
-	RAL_DEBUG(RAL_DBG_MGMT, "sending mgt frame len=%u idx=%u rate=%u\n",
+	ral_debug(RAL_DBG_MGMT, "sending mgt frame len=%u idx=%u rate=%u\n",
 	    pktlen, sc->prioq.cur, rate);
 
 	/* kick prio */
@@ -1595,7 +1575,7 @@ rt2560_send(ieee80211com_t *ic, mblk_t *mp)
 	mutex_enter(&sc->txq.tx_lock);
 
 	if (sc->txq.queued >= RT2560_TX_RING_COUNT - 1) {
-		RAL_DEBUG(RAL_DBG_TX, "ral: rt2560_tx_data(): "
+		ral_debug(RAL_DBG_TX, "ral: rt2560_tx_data(): "
 		    "no TX DMA buffer available!\n");
 		sc->sc_need_sched = 1;
 		sc->sc_tx_nobuf++;
@@ -1605,7 +1585,7 @@ rt2560_send(ieee80211com_t *ic, mblk_t *mp)
 
 	m = allocb(msgdsize(mp) + 32, BPRI_MED);
 	if (m == NULL) {
-		RAL_DEBUG(RAL_DBG_TX, "rt2560_xmit(): can't alloc mblk.\n");
+		ral_debug(RAL_DBG_TX, "rt2560_xmit(): can't alloc mblk.\n");
 		err = DDI_FAILURE;
 		goto fail1;
 	}
@@ -1700,7 +1680,7 @@ rt2560_send(ieee80211com_t *ic, mblk_t *mp)
 	(void) ddi_dma_sync(dr->dr_hnd, idx * RT2560_TX_DESC_SIZE,
 	    RT2560_TX_DESC_SIZE, DDI_DMA_SYNC_FORDEV);
 
-	RAL_DEBUG(RAL_DBG_TX, "sending data frame len=%u idx=%u rate=%u\n",
+	ral_debug(RAL_DBG_TX, "sending data frame len=%u idx=%u rate=%u\n",
 	    pktlen, sc->txq.cur, rate);
 
 	/* kick tx */
@@ -1740,7 +1720,7 @@ rt2560_m_tx(void *arg, mblk_t *mp)
 	 * the xmit queue until we enter the RUN state.
 	 */
 	if (ic->ic_state != IEEE80211_S_RUN) {
-		RAL_DEBUG(RAL_DBG_TX, "ral: rt2560_m_tx(): "
+		ral_debug(RAL_DBG_TX, "ral: rt2560_m_tx(): "
 		    "discard, state %u\n", ic->ic_state);
 		freemsgchain(mp);
 		return (NULL);
@@ -1770,7 +1750,7 @@ rt2560_set_macaddr(struct rt2560_softc *sc, uint8_t *addr)
 	tmp = addr[4] | addr[5] << 8;
 	RAL_WRITE(sc, RT2560_CSR4, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW,
+	ral_debug(RAL_DBG_HW,
 	    "setting MAC address to " MACSTR "\n", MAC2STR(addr));
 }
 
@@ -1801,7 +1781,7 @@ rt2560_update_promisc(struct rt2560_softc *sc)
 		tmp |= RT2560_DROP_NOT_TO_ME;
 
 	RAL_WRITE(sc, RT2560_RXCSR0, tmp);
-	RAL_DEBUG(RAL_DBG_HW, "%s promiscuous mode\n",
+	ral_debug(RAL_DBG_HW, "%s promiscuous mode\n",
 	    (sc->sc_rcr & RAL_RCR_PROMISC) ?  "entering" : "leaving");
 }
 
@@ -1862,7 +1842,7 @@ rt2560_bbp_init(struct rt2560_softc *sc)
 		drv_usecwait(1);
 	}
 	if (ntries == 100) {
-		RAL_DEBUG(RAL_DBG_HW, "timeout waiting for BBP\n");
+		ral_debug(RAL_DBG_HW, "timeout waiting for BBP\n");
 		return (EIO);
 	}
 	/* initialize BBP registers to default values */
@@ -2038,7 +2018,7 @@ rt2560_watchdog(void *arg)
 
 	if (sc->sc_tx_timer > 0) {
 		if (--sc->sc_tx_timer == 0) {
-			RAL_DEBUG(RAL_DBG_MSG, "tx timer timeout\n");
+			ral_debug(RAL_DBG_MSG, "tx timer timeout\n");
 			RAL_UNLOCK(sc);
 			(void) rt2560_init(sc);
 			(void) ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
@@ -2061,19 +2041,14 @@ static int
 rt2560_m_start(void *arg)
 {
 	struct rt2560_softc *sc = (struct rt2560_softc *)arg;
-	crypto_mech_type_t type;
 	int err;
-
-
-	type = crypto_mech2id(SUN_CKM_RC4); /* load rc4 module into kernel */
-	RAL_DEBUG(RAL_DBG_GLD, "enter rt2560_m_start(%d)\n", type);
 
 	/*
 	 * initialize rt2560 hardware
 	 */
 	err = rt2560_init(sc);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "device configuration failed\n");
+		ral_debug(RAL_DBG_GLD, "device configuration failed\n");
 		goto fail;
 	}
 	sc->sc_flags |= RAL_FLAG_RUNNING;	/* RUNNING */
@@ -2089,8 +2064,6 @@ rt2560_m_stop(void *arg)
 {
 	struct rt2560_softc *sc = (struct rt2560_softc *)arg;
 
-	RAL_DEBUG(RAL_DBG_GLD, "enter rt2560_m_stop()\n");
-
 	(void) rt2560_stop(sc);
 	sc->sc_flags &= ~RAL_FLAG_RUNNING;	/* STOP */
 }
@@ -2101,7 +2074,7 @@ rt2560_m_unicst(void *arg, const uint8_t *macaddr)
 	struct rt2560_softc *sc = (struct rt2560_softc *)arg;
 	struct ieee80211com *ic = &sc->sc_ic;
 
-	RAL_DEBUG(RAL_DBG_GLD, "rt2560_m_unicst(): " MACSTR "\n",
+	ral_debug(RAL_DBG_GLD, "rt2560_m_unicst(): " MACSTR "\n",
 	    MAC2STR(macaddr));
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, macaddr);
@@ -2122,8 +2095,6 @@ static int
 rt2560_m_promisc(void *arg, boolean_t on)
 {
 	struct rt2560_softc *sc = (struct rt2560_softc *)arg;
-
-	RAL_DEBUG(RAL_DBG_GLD, "rt2560_m_promisc()\n");
 
 	if (on) {
 		sc->sc_rcr |= RAL_RCR_PROMISC;
@@ -2372,8 +2343,6 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	wifi_data_t wd = { 0 };
 	mac_register_t *macp;
 
-	RAL_DEBUG(RAL_DBG_GLD, "enter rt2560_attach()\n");
-
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
@@ -2383,7 +2352,6 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		sc->sc_flags &= ~RAL_FLAG_SUSPENDING;
 		if (RAL_IS_INITED(sc))
 			(void) rt2560_init(sc);
-		RAL_DEBUG(RAL_DBG_SUSPEND, "ral resume ...\n");
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);
@@ -2392,7 +2360,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	instance = ddi_get_instance(devinfo);
 
 	if (ddi_soft_state_zalloc(ral_soft_state_p, instance) != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "unable to alloc soft_state_p\n");
 		return (DDI_FAILURE);
 	}
@@ -2405,7 +2373,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	err = ddi_regs_map_setup(devinfo, 0, &regs, 0, 0, &ral_csr_accattr,
 	    &ioh);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "ddi_regs_map_setup() failed");
 		goto fail1;
 	}
@@ -2420,7 +2388,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	device_id = ddi_get16(ioh,
 	    (uint16_t *)((uintptr_t)regs + PCI_CONF_DEVID));
 
-	RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): vendor 0x%x, "
+	ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): vendor 0x%x, "
 	    "device id 0x%x, cache size %d\n", vendor_id, device_id, cachelsz);
 
 	/*
@@ -2429,7 +2397,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	command = PCI_COMM_MAE | PCI_COMM_ME;
 	ddi_put16(ioh, (uint16_t *)((uintptr_t)regs + PCI_CONF_COMM), command);
-	RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+	ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 	    "set command reg to 0x%x \n", command);
 
 	ddi_put8(ioh, (uint8_t *)(regs + PCI_CONF_LATENCY_TIMER), 0xa8);
@@ -2439,10 +2407,10 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/* pci i/o space */
 	err = ddi_regs_map_setup(devinfo, 1,
 	    &sc->sc_rbase, 0, 0, &ral_csr_accattr, &sc->sc_ioh);
-	RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+	ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 	    "regs map1 = %x err=%d\n", regs, err);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "ddi_regs_map_setup() failed");
 		goto fail1;
 	}
@@ -2459,7 +2427,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/* retrieve RF rev. no and various other things from EEPROM */
 	rt2560_read_eeprom(sc);
 
-	RAL_DEBUG(RAL_DBG_GLD, "MAC/BBP RT2560 (rev 0x%02x), RF %s\n",
+	ral_debug(RAL_DBG_GLD, "MAC/BBP RT2560 (rev 0x%02x), RF %s\n",
 	    sc->asic_rev, rt2560_get_rf(sc->rf_rev));
 
 	/*
@@ -2467,17 +2435,17 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	err = rt2560_alloc_tx_ring(sc, &sc->txq, RT2560_TX_RING_COUNT);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "could not allocate Tx ring\n");
+		ral_debug(RAL_DBG_GLD, "could not allocate Tx ring\n");
 		goto fail2;
 	}
 	err = rt2560_alloc_tx_ring(sc, &sc->prioq, RT2560_PRIO_RING_COUNT);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "could not allocate Prio ring\n");
+		ral_debug(RAL_DBG_GLD, "could not allocate Prio ring\n");
 		goto fail3;
 	}
 	err = rt2560_alloc_rx_ring(sc, &sc->rxq, RT2560_RX_RING_COUNT);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "could not allocate Rx ring\n");
+		ral_debug(RAL_DBG_GLD, "could not allocate Rx ring\n");
 		goto fail4;
 	}
 
@@ -2565,21 +2533,21 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW,
 	    &sc->sc_softint_id, NULL, 0, ral_softint_handler, (caddr_t)sc);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "ddi_add_softintr() failed");
 		goto fail5;
 	}
 
 	err = ddi_get_iblock_cookie(devinfo, 0, &sc->sc_iblock);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "Can not get iblock cookie for INT\n");
 		goto fail6;
 	}
 
 	err = ddi_add_intr(devinfo, 0, NULL, NULL, rt2560_intr, (caddr_t)sc);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_GLD,
+		ral_debug(RAL_DBG_GLD,
 		    "unable to add device interrupt handler\n");
 		goto fail6;
 	}
@@ -2593,7 +2561,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "MAC version mismatch\n");
 		goto fail7;
 	}
@@ -2611,7 +2579,7 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	err = mac_register(macp, &ic->ic_mach);
 	mac_free(macp);
 	if (err != 0) {
-		RAL_DEBUG(RAL_DBG_GLD, "ral: rt2560_attach(): "
+		ral_debug(RAL_DBG_GLD, "ral: rt2560_attach(): "
 		    "mac_register err %x\n", err);
 		goto fail7;
 	}
@@ -2625,14 +2593,13 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    instance + 1, DDI_NT_NET_WIFI, 0);
 
 	if (err != DDI_SUCCESS)
-		RAL_DEBUG(RAL_DBG_GLD, "ddi_create_minor_node() failed\n");
+		ral_debug(RAL_DBG_GLD, "ddi_create_minor_node() failed\n");
 
 	/*
 	 * Notify link is down now
 	 */
 	mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 
-	RAL_DEBUG(RAL_DBG_GLD, "rt2560_attach() exit successfully.\n");
 	return (DDI_SUCCESS);
 fail7:
 	ddi_remove_intr(devinfo, 0, sc->sc_iblock);
@@ -2662,8 +2629,8 @@ rt2560_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	struct rt2560_softc *sc;
 
-	RAL_DEBUG(RAL_DBG_GLD, "enter rt2560_detach()\n");
 	sc = ddi_get_soft_state(ral_soft_state_p, ddi_get_instance(devinfo));
+	ASSERT(sc != NULL);
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -2672,7 +2639,6 @@ rt2560_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		if (RAL_IS_INITED(sc))
 			(void) rt2560_stop(sc);
 		sc->sc_flags |= RAL_FLAG_SUSPENDING;
-		RAL_DEBUG(RAL_DBG_SUSPEND, "ral suspend ...\n");
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);

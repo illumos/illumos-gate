@@ -24,13 +24,12 @@
 
 include ../Makefile.com
 
-DATAFILES += depend
 LICENSEFILES += ../../uts/common/io/zyd/THIRDPARTYLICENSE
 CDDL =
 
 .KEEP_STATE:
 
-all: $(FILES) postinstall postremove
+all: $(FILES) depend postinstall postremove
 install: all pkg
 
 include ../Makefile.targ

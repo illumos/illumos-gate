@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,13 +56,6 @@ extern "C" {
 #define	RAL_DBG_TXPACKET	0x004000
 #define	RAL_DBG_SUSPEND		0x008000
 #define	RAL_DBG_ALL		0x00ffff
-
-#ifdef DEBUG
-#define	RAL_DEBUG \
-	ral_debug
-#else
-#define	RAL_DEBUG
-#endif
 
 #define	RT2560_RX_RADIOTAP_PRESENT					\
 	((1 << IEEE80211_RADIOTAP_TSFT) |				\

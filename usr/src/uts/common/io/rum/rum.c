@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -24,39 +24,19 @@
  * Ralink Technology RT2501USB/RT2601USB chipset driver
  * http://www.ralinktech.com.tw/
  */
-
 #include <sys/types.h>
-#include <sys/byteorder.h>
-#include <sys/conf.h>
 #include <sys/cmn_err.h>
-#include <sys/stat.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
 #include <sys/strsubr.h>
-#include <sys/ethernet.h>
-#include <inet/common.h>
-#include <inet/nd.h>
-#include <inet/mi.h>
-#include <sys/note.h>
-#include <sys/stream.h>
-#include <sys/strsun.h>
 #include <sys/modctl.h>
 #include <sys/devops.h>
-#include <sys/dlpi.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
-#include <sys/net80211_proto.h>
-#include <sys/varargs.h>
-#include <sys/policy.h>
-#include <sys/pci.h>
-#include <sys/crypto/common.h>
-#include <sys/crypto/api.h>
-#include <inet/wifi_ioctl.h>
 
 #define	USBDRV_MAJOR_VER	2
 #define	USBDRV_MINOR_VER	0
 #include <sys/usb/usba.h>
+#include <sys/usb/usba/usba_types.h>
 
 #include "rum_reg.h"
 #include "rum_var.h"
@@ -259,7 +239,7 @@ DDI_DEFINE_STREAM_OPS(rum_dev_ops, nulldev, nulldev, rum_attach,
 
 static struct modldrv rum_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"rum driver v1.1",	/* short description */
+	"rum driver v1.2",	/* short description */
 	&rum_dev_ops		/* driver specific ops */
 };
 
@@ -299,14 +279,12 @@ static mac_callbacks_t rum_m_callbacks = {
 	rum_m_getprop
 };
 
-extern const char *usb_str_cr(int);
 static void rum_amrr_start(struct rum_softc *, struct ieee80211_node *);
 static int  rum_tx_trigger(struct rum_softc *, mblk_t *);
 static int  rum_rx_trigger(struct rum_softc *);
 
 uint32_t rum_dbg_flags = 0;
 
-#ifdef DEBUG
 void
 ral_debug(uint32_t dbg_flags, const int8_t *fmt, ...)
 {
@@ -318,7 +296,6 @@ ral_debug(uint32_t dbg_flags, const int8_t *fmt, ...)
 		va_end(args);
 	}
 }
-#endif
 
 static void
 rum_read_multi(struct rum_softc *sc, uint16_t reg, void *buf, int len)
@@ -342,7 +319,7 @@ rum_read_multi(struct rum_softc *sc, uint16_t reg, void *buf, int len)
 	    &cr, &cf, 0);
 
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_read_multi(): could not read MAC register:"
 		    "cr:%s(%d), cf:(%x)\n",
 		    usb_str_cr(cr), cr, cf);
@@ -381,7 +358,7 @@ rum_write_multi(struct rum_softc *sc, uint16_t reg, void *buf, size_t len)
 	req.attrs = USB_ATTRS_NONE;
 
 	if ((mp = allocb(len, BPRI_HI)) == NULL) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_write_multi(): failed alloc mblk.");
+		ral_debug(RAL_DBG_ERR, "rum_write_multi(): failed alloc mblk.");
 		return;
 	}
 
@@ -392,7 +369,7 @@ rum_write_multi(struct rum_softc *sc, uint16_t reg, void *buf, size_t len)
 	    &cr, &cf, 0);
 
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_USB,
+		ral_debug(RAL_DBG_USB,
 		    "rum_write_multi(): could not write MAC register:"
 		    "cr:%s(%d), cf:(%x)\n",
 		    usb_str_cr(cr), cr, cf);
@@ -444,13 +421,13 @@ rum_load_microcode(struct rum_softc *sc)
 	    &cr, &cf, 0);
 
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_load_microcode(): could not run firmware: "
 		    "cr:%s(%d), cf:(%x)\n",
 		    usb_str_cr(cr), cr, cf);
 	}
 
-	RAL_DEBUG(RAL_DBG_MSG,
+	ral_debug(RAL_DBG_MSG,
 	    "rum_load_microcode(%d): done\n", sizeof (rt2573_ucode));
 
 	return (err);
@@ -477,7 +454,7 @@ rum_eeprom_read(struct rum_softc *sc, uint16_t addr, void *buf, int len)
 	    &cr, &cf, 0);
 
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_USB,
+		ral_debug(RAL_DBG_USB,
 		    "rum_eeprom_read(): could not read EEPROM:"
 		    "cr:%s(%d), cf:(%x)\n",
 		    usb_str_cr(cr), cr, cf);
@@ -495,7 +472,7 @@ rum_txeof(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	struct rum_softc *sc = (struct rum_softc *)req->bulk_client_private;
 	struct ieee80211com *ic = &sc->sc_ic;
 
-	RAL_DEBUG(RAL_DBG_TX,
+	ral_debug(RAL_DBG_TX,
 	    "rum_txeof(): cr:%s(%d), flags:0x%x, tx_queued:%d",
 	    usb_str_cr(req->bulk_completion_reason),
 	    req->bulk_completion_reason,
@@ -537,7 +514,7 @@ rum_rxeof(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	mp = req->bulk_data;
 	req->bulk_data = NULL;
 
-	RAL_DEBUG(RAL_DBG_RX,
+	ral_debug(RAL_DBG_RX,
 	    "rum_rxeof(): cr:%s(%d), flags:0x%x, rx_queued:%d",
 	    usb_str_cr(req->bulk_completion_reason),
 	    req->bulk_completion_reason,
@@ -554,7 +531,7 @@ rum_rxeof(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 
 
 	if (len < RT2573_RX_DESC_SIZE + sizeof (struct ieee80211_frame_min)) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_rxeof(): xfer too short %d\n", len);
 		sc->sc_rx_err++;
 		goto fail;
@@ -568,7 +545,7 @@ rum_rxeof(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 		 * This should not happen since we did not request to receive
 		 * those frames when we filled RT2573_TXRX_CSR0.
 		 */
-		RAL_DEBUG(RAL_DBG_ERR, "CRC error\n");
+		ral_debug(RAL_DBG_ERR, "CRC error\n");
 		sc->sc_rx_err++;
 		goto fail;
 	}
@@ -576,13 +553,13 @@ rum_rxeof(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	pktlen = (LE_32(desc->flags) >> 16) & 0xfff;
 
 	if (pktlen > (len - RT2573_RX_DESC_SIZE)) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_rxeof(): pktlen mismatch <%d, %d>.\n", pktlen, len);
 		goto fail;
 	}
 
 	if ((m = allocb(pktlen, BPRI_MED)) == NULL) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_rxeof(): allocate mblk failed.\n");
 		sc->sc_rx_nobuf++;
 		goto fail;
@@ -757,11 +734,16 @@ rum_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	mblk_t *m, *m0;
 	int off, mblen, pktlen, xferlen;
 
+	/* discard packets while suspending or not inited */
+	if (!RAL_IS_RUNNING(sc)) {
+		freemsg(mp);
+		return (ENXIO);
+	}
 
 	mutex_enter(&sc->tx_lock);
 
 	if (sc->tx_queued > RAL_TX_LIST_COUNT) {
-		RAL_DEBUG(RAL_DBG_TX, "rum_send(): "
+		ral_debug(RAL_DBG_TX, "rum_send(): "
 		    "no TX buffer available!\n");
 		if ((type & IEEE80211_FC0_TYPE_MASK) ==
 		    IEEE80211_FC0_TYPE_DATA) {
@@ -774,7 +756,7 @@ rum_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	m = allocb(RAL_TXBUF_SIZE + RT2573_TX_DESC_SIZE, BPRI_MED);
 	if (m == NULL) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_send(): can't alloc mblk.\n");
+		ral_debug(RAL_DBG_ERR, "rum_send(): can't alloc mblk.\n");
 		err = DDI_FAILURE;
 		goto fail;
 	}
@@ -875,7 +857,7 @@ rum_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	m->b_wptr = m->b_rptr + xferlen;
 
-	RAL_DEBUG(RAL_DBG_TX, "sending data frame len=%u rate=%u xfer len=%u\n",
+	ral_debug(RAL_DBG_TX, "sending data frame len=%u rate=%u xfer len=%u\n",
 	    pktlen, rate, xferlen);
 
 	rv = rum_tx_trigger(sc, m);
@@ -912,7 +894,7 @@ rum_m_tx(void *arg, mblk_t *mp)
 	 * the xmit queue until we enter the RUN state.
 	 */
 	if (ic->ic_state != IEEE80211_S_RUN) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_m_tx(): "
+		ral_debug(RAL_DBG_ERR, "rum_m_tx(): "
 		    "discard, state %u\n", ic->ic_state);
 		freemsgchain(mp);
 		return (NULL);
@@ -942,7 +924,7 @@ rum_bbp_write(struct rum_softc *sc, uint8_t reg, uint8_t val)
 			break;
 	}
 	if (ntries == 5) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_bbp_write(): could not write to BBP\n");
 		return;
 	}
@@ -962,7 +944,7 @@ rum_bbp_read(struct rum_softc *sc, uint8_t reg)
 			break;
 	}
 	if (ntries == 5) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_bbp_read(): could not read BBP\n");
+		ral_debug(RAL_DBG_ERR, "rum_bbp_read(): could not read BBP\n");
 		return (0);
 	}
 
@@ -976,7 +958,7 @@ rum_bbp_read(struct rum_softc *sc, uint8_t reg)
 		drv_usecwait(1);
 	}
 
-	RAL_DEBUG(RAL_DBG_ERR, "rum_bbp_read(): could not read BBP\n");
+	ral_debug(RAL_DBG_ERR, "rum_bbp_read(): could not read BBP\n");
 	return (0);
 }
 
@@ -991,7 +973,7 @@ rum_rf_write(struct rum_softc *sc, uint8_t reg, uint32_t val)
 			break;
 	}
 	if (ntries == 5) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_rf_write(): could not write to RF\n");
 		return;
 	}
@@ -1003,7 +985,7 @@ rum_rf_write(struct rum_softc *sc, uint8_t reg, uint32_t val)
 	/* remember last written value in sc */
 	sc->rf_regs[reg] = val;
 
-	RAL_DEBUG(RAL_DBG_HW, "RF R[%u] <- 0x%05x\n", reg & 3, val & 0xfffff);
+	ral_debug(RAL_DBG_HW, "RF R[%u] <- 0x%05x\n", reg & 3, val & 0xfffff);
 }
 
 static void
@@ -1243,7 +1225,7 @@ rum_update_slot(struct ieee80211com *ic, int onoff)
 	tmp = (tmp & ~0xff) | slottime;
 	rum_write(sc, RT2573_MAC_CSR9, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW, "setting slot time to %uus\n", slottime);
+	ral_debug(RAL_DBG_HW, "setting slot time to %uus\n", slottime);
 }
 
 static void
@@ -1269,7 +1251,7 @@ rum_set_macaddr(struct rum_softc *sc, const uint8_t *addr)
 	tmp = addr[4] | addr[5] << 8 | 0xff << 16;
 	rum_write(sc, RT2573_MAC_CSR3, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW,
+	ral_debug(RAL_DBG_HW,
 	    "setting MAC address to " MACSTR "\n", MAC2STR(addr));
 }
 
@@ -1286,7 +1268,7 @@ rum_update_promisc(struct rum_softc *sc)
 
 	rum_write(sc, RT2573_TXRX_CSR0, tmp);
 
-	RAL_DEBUG(RAL_DBG_HW, "%s promiscuous mode\n",
+	ral_debug(RAL_DBG_HW, "%s promiscuous mode\n",
 	    (sc->sc_rcr & RAL_RCR_PROMISC) ?  "entering" : "leaving");
 }
 
@@ -1319,14 +1301,14 @@ rum_read_eeprom(struct rum_softc *sc)
 	sc->tx_ant =   (val >> 2)  & 0x3;
 	sc->nb_ant =   val & 0x3;
 
-	RAL_DEBUG(RAL_DBG_HW, "RF revision=%d\n", sc->rf_rev);
+	ral_debug(RAL_DBG_HW, "RF revision=%d\n", sc->rf_rev);
 
 	rum_eeprom_read(sc, RT2573_EEPROM_CONFIG2, &val, 2);
 	val = LE_16(val);
 	sc->ext_5ghz_lna = (val >> 6) & 0x1;
 	sc->ext_2ghz_lna = (val >> 4) & 0x1;
 
-	RAL_DEBUG(RAL_DBG_HW, "External 2GHz LNA=%d\nExternal 5GHz LNA=%d\n",
+	ral_debug(RAL_DBG_HW, "External 2GHz LNA=%d\nExternal 5GHz LNA=%d\n",
 	    sc->ext_2ghz_lna, sc->ext_5ghz_lna);
 
 	rum_eeprom_read(sc, RT2573_EEPROM_RSSI_2GHZ_OFFSET, &val, 2);
@@ -1339,7 +1321,7 @@ rum_read_eeprom(struct rum_softc *sc)
 	if ((val & 0xff) != 0xff)
 		sc->rssi_5ghz_corr = (int8_t)(val & 0xff);	/* signed */
 
-	RAL_DEBUG(RAL_DBG_HW, "RSSI 2GHz corr=%d\nRSSI 5GHz corr=%d\n",
+	ral_debug(RAL_DBG_HW, "RSSI 2GHz corr=%d\nRSSI 5GHz corr=%d\n",
 	    sc->rssi_2ghz_corr, sc->rssi_5ghz_corr);
 
 	rum_eeprom_read(sc, RT2573_EEPROM_FREQ_OFFSET, &val, 2);
@@ -1347,7 +1329,7 @@ rum_read_eeprom(struct rum_softc *sc)
 	if ((val & 0xff) != 0xff)
 		sc->rffreq = val & 0xff;
 
-	RAL_DEBUG(RAL_DBG_HW, "RF freq=%d\n", sc->rffreq);
+	ral_debug(RAL_DBG_HW, "RF freq=%d\n", sc->rffreq);
 
 	/* read Tx power for all a/b/g channels */
 	rum_eeprom_read(sc, RT2573_EEPROM_TXPOWER, sc->txpow, 14);
@@ -1371,7 +1353,7 @@ rum_bbp_init(struct rum_softc *sc)
 		drv_usecwait(1000);
 	}
 	if (ntries == 100) {
-		RAL_DEBUG(RAL_DBG_ERR, "timeout waiting for BBP\n");
+		ral_debug(RAL_DBG_ERR, "timeout waiting for BBP\n");
 		return (EIO);
 	}
 
@@ -1428,7 +1410,6 @@ rum_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 
 	switch (nstate) {
 	case IEEE80211_S_INIT:
-		RAL_DEBUG(RAL_DBG_MSG, "-> IEEE80211_S_INIT ...\n");
 		if (ostate == IEEE80211_S_RUN) {
 			/* abort TSF synchronization */
 			tmp = rum_read(sc, RT2573_TXRX_CSR9);
@@ -1437,24 +1418,20 @@ rum_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_SCAN:
-		RAL_DEBUG(RAL_DBG_MSG, "-> IEEE80211_S_SCAN ...\n");
 		rum_set_chan(sc, ic->ic_curchan);
 		sc->sc_scan_id = timeout(rum_next_scan, (void *)sc,
 		    drv_usectohz(sc->dwelltime * 1000));
 		break;
 
 	case IEEE80211_S_AUTH:
-		RAL_DEBUG(RAL_DBG_MSG, "-> IEEE80211_S_AUTH ...\n");
 		rum_set_chan(sc, ic->ic_curchan);
 		break;
 
 	case IEEE80211_S_ASSOC:
-		RAL_DEBUG(RAL_DBG_MSG, "-> IEEE80211_S_ASSOC ...\n");
 		rum_set_chan(sc, ic->ic_curchan);
 		break;
 
 	case IEEE80211_S_RUN:
-		RAL_DEBUG(RAL_DBG_MSG, "-> IEEE80211_S_RUN ...\n");
 		rum_set_chan(sc, ic->ic_curchan);
 
 		ni = ic->ic_bss;
@@ -1523,12 +1500,10 @@ rum_open_pipes(struct rum_softc *sc)
 	if ((err = usb_pipe_open(sc->sc_dev,
 	    &ep_node->ep_descr, &policy, USB_FLAGS_SLEEP,
 	    &sc->sc_tx_pipeh)) != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_open_pipes(): %x failed to open tx pipe\n", err);
 		goto fail;
 	}
-
-	RAL_DEBUG(RAL_DBG_MSG, "tx pipe opened\n");
 
 	ep_node = usb_lookup_ep_data(sc->sc_dev, sc->sc_udev, 0, 0, 0,
 	    USB_EP_ATTR_BULK, USB_EP_DIR_IN);
@@ -1539,12 +1514,10 @@ rum_open_pipes(struct rum_softc *sc)
 	if ((err = usb_pipe_open(sc->sc_dev,
 	    &ep_node->ep_descr, &policy, USB_FLAGS_SLEEP,
 	    &sc->sc_rx_pipeh)) != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_open_pipes(): %x failed to open rx pipe\n", err);
 		goto fail;
 	}
-
-	RAL_DEBUG(RAL_DBG_MSG, "rx pipe opened\n");
 
 	return (USB_SUCCESS);
 
@@ -1574,7 +1547,7 @@ rum_tx_trigger(struct rum_softc *sc, mblk_t *mp)
 
 	req = usb_alloc_bulk_req(sc->sc_dev, 0, USB_FLAGS_SLEEP);
 	if (req == NULL) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_tx_trigger(): failed to allocate req");
 		freemsg(mp);
 		return (-1);
@@ -1593,7 +1566,7 @@ rum_tx_trigger(struct rum_softc *sc, mblk_t *mp)
 	if ((err = usb_pipe_bulk_xfer(sc->sc_tx_pipeh, req, 0))
 	    != USB_SUCCESS) {
 
-		RAL_DEBUG(RAL_DBG_ERR, "rum_tx_trigger(): "
+		ral_debug(RAL_DBG_ERR, "rum_tx_trigger(): "
 		    "failed to do tx xfer, %d", err);
 		usb_free_bulk_req(req);
 		return (-1);
@@ -1612,7 +1585,7 @@ rum_rx_trigger(struct rum_softc *sc)
 
 	req = usb_alloc_bulk_req(sc->sc_dev, RAL_RXBUF_SIZE, USB_FLAGS_SLEEP);
 	if (req == NULL) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_rx_trigger(): failed to allocate req");
 		return (-1);
 	}
@@ -1630,7 +1603,7 @@ rum_rx_trigger(struct rum_softc *sc)
 	err = usb_pipe_bulk_xfer(sc->sc_rx_pipeh, req, 0);
 
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_rx_trigger(): "
+		ral_debug(RAL_DBG_ERR, "rum_rx_trigger(): "
 		    "failed to do rx xfer, %d", err);
 		usb_free_bulk_req(req);
 
@@ -1718,7 +1691,7 @@ rum_init(struct rum_softc *sc)
 		drv_usecwait(1000);
 	}
 	if (ntries == 1000) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_init(): timeout waiting for BBP/RF to wakeup\n");
 		goto fail;
 	}
@@ -1740,7 +1713,7 @@ rum_init(struct rum_softc *sc)
 	rum_write(sc, RT2573_MAC_CSR1, 4);
 
 	if (rum_open_pipes(sc) != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_init(): "
+		ral_debug(RAL_DBG_ERR, "rum_init(): "
 		    "could not open pipes.\n");
 		goto fail;
 	}
@@ -1777,16 +1750,17 @@ rum_disconnect(dev_info_t *devinfo)
 	struct rum_softc *sc;
 	struct ieee80211com *ic;
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum_disconnect()\n");
-
 	/*
 	 * We can't call rum_stop() here, since the hardware is removed,
 	 * we can't access the register anymore.
 	 */
-
 	sc = ddi_get_soft_state(rum_soft_state_p, ddi_get_instance(devinfo));
-	ic = &sc->sc_ic;
+	ASSERT(sc != NULL);
 
+	if (!RAL_IS_RUNNING(sc))	/* different device or not inited */
+		return (DDI_SUCCESS);
+
+	ic = &sc->sc_ic;
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 	ieee80211_stop_watchdog(ic);	/* stop the watchdog */
 
@@ -1808,19 +1782,46 @@ rum_reconnect(dev_info_t *devinfo)
 	struct rum_softc *sc;
 	int err;
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum_reconnect()\n");
-
 	sc = ddi_get_soft_state(rum_soft_state_p, ddi_get_instance(devinfo));
+	ASSERT(sc != NULL);
+
+	/* check device changes after disconnect */
+	if (usb_check_same_device(sc->sc_dev, NULL, USB_LOG_L2, -1,
+	    USB_CHK_BASIC | USB_CHK_CFG, NULL) != USB_SUCCESS) {
+		ral_debug(RAL_DBG_ERR, "different device connected\n");
+		return (DDI_FAILURE);
+	}
 
 	err = rum_load_microcode(sc);
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR, "could not load 8051 microcode\n");
+		ral_debug(RAL_DBG_ERR, "could not load 8051 microcode\n");
 		goto fail;
 	}
 
 	err = rum_init(sc);
 fail:
 	return (err);
+}
+
+static void
+rum_resume(struct rum_softc *sc)
+{
+	int err;
+
+	/* check device changes after suspend */
+	if (usb_check_same_device(sc->sc_dev, NULL, USB_LOG_L2, -1,
+	    USB_CHK_BASIC | USB_CHK_CFG, NULL) != USB_SUCCESS) {
+		ral_debug(RAL_DBG_ERR, "no or different device connected\n");
+		return;
+	}
+
+	err = rum_load_microcode(sc);
+	if (err != USB_SUCCESS) {
+		ral_debug(RAL_DBG_ERR, "could not load 8051 microcode\n");
+		return;
+	}
+
+	(void) rum_init(sc);
 }
 
 #define	RUM_AMRR_MIN_SUCCESS_THRESHOLD	1
@@ -1967,7 +1968,7 @@ rum_watchdog(void *arg)
 
 	if (sc->sc_tx_timer > 0) {
 		if (--sc->sc_tx_timer == 0) {
-			RAL_DEBUG(RAL_DBG_ERR, "tx timer timeout\n");
+			ral_debug(RAL_DBG_ERR, "tx timer timeout\n");
 			RAL_UNLOCK(sc);
 			(void) rum_init(sc);
 			(void) ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
@@ -1990,18 +1991,14 @@ static int
 rum_m_start(void *arg)
 {
 	struct rum_softc *sc = (struct rum_softc *)arg;
-	crypto_mech_type_t type;
 	int err;
-
-	type = crypto_mech2id(SUN_CKM_RC4); /* load rc4 module into kernel */
-	RAL_DEBUG(RAL_DBG_MSG, "rum_m_start(%d)\n", type);
 
 	/*
 	 * initialize RT2501USB hardware
 	 */
 	err = rum_init(sc);
 	if (err != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR, "device configuration failed\n");
+		ral_debug(RAL_DBG_ERR, "device configuration failed\n");
 		goto fail;
 	}
 	sc->sc_flags |= RAL_FLAG_RUNNING;	/* RUNNING */
@@ -2017,8 +2014,6 @@ rum_m_stop(void *arg)
 {
 	struct rum_softc *sc = (struct rum_softc *)arg;
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum_m_stop()\n");
-
 	(void) rum_stop(sc);
 	sc->sc_flags &= ~RAL_FLAG_RUNNING;	/* STOP */
 }
@@ -2029,7 +2024,7 @@ rum_m_unicst(void *arg, const uint8_t *macaddr)
 	struct rum_softc *sc = (struct rum_softc *)arg;
 	struct ieee80211com *ic = &sc->sc_ic;
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum_m_unicst(): " MACSTR "\n",
+	ral_debug(RAL_DBG_MSG, "rum_m_unicst(): " MACSTR "\n",
 	    MAC2STR(macaddr));
 
 	IEEE80211_ADDR_COPY(ic->ic_macaddr, macaddr);
@@ -2050,8 +2045,6 @@ static int
 rum_m_promisc(void *arg, boolean_t on)
 {
 	struct rum_softc *sc = (struct rum_softc *)arg;
-
-	RAL_DEBUG(RAL_DBG_MSG, "rum_m_promisc()\n");
 
 	if (on) {
 		sc->sc_rcr |= RAL_RCR_PROMISC;
@@ -2208,15 +2201,23 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	wifi_data_t wd = { 0 };
 	mac_register_t *macp;
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum_attach()\n");
-
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		sc = ddi_get_soft_state(rum_soft_state_p,
+		    ddi_get_instance(devinfo));
+		ASSERT(sc != NULL);
+		rum_resume(sc);
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	instance = ddi_get_instance(devinfo);
 
 	if (ddi_soft_state_zalloc(rum_soft_state_p, instance) != DDI_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_MSG, "rum_attach(): "
+		ral_debug(RAL_DBG_MSG, "rum_attach(): "
 		    "unable to alloc soft_state_p\n");
 		return (DDI_FAILURE);
 	}
@@ -2226,7 +2227,7 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	sc->sc_dev = devinfo;
 
 	if (usb_client_attach(devinfo, USBDRV_VERSION, 0) != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_attach(): usb_client_attach failed\n");
 		goto fail1;
 	}
@@ -2248,7 +2249,7 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		drv_usecwait(1000);
 	}
 	if (ntries == 1000) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_attach(): timeout waiting for chip to settle\n");
 		goto fail3;
 	}
@@ -2256,12 +2257,12 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/* retrieve MAC address and various other things from EEPROM */
 	rum_read_eeprom(sc);
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum: MAC/BBP RT2573 (rev 0x%05x), RF %s\n",
+	ral_debug(RAL_DBG_MSG, "rum: MAC/BBP RT2573 (rev 0x%05x), RF %s\n",
 	    tmp, rum_get_rf(sc->rf_rev));
 
 	err = rum_load_microcode(sc);
 	if (err != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR, "could not load 8051 microcode\n");
+		ral_debug(RAL_DBG_ERR, "could not load 8051 microcode\n");
 		goto fail3;
 	}
 
@@ -2339,7 +2340,7 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	sc->sc_rcr = 0;
 	sc->dwelltime = 300;
-	sc->sc_flags &= ~RAL_FLAG_RUNNING;
+	sc->sc_flags = 0;
 
 	/*
 	 * Provide initial settings for the WiFi plugin; whenever this
@@ -2350,7 +2351,7 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_attach(): "
+		ral_debug(RAL_DBG_ERR, "rum_attach(): "
 		    "MAC version mismatch\n");
 		goto fail3;
 	}
@@ -2368,14 +2369,14 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	err = mac_register(macp, &ic->ic_mach);
 	mac_free(macp);
 	if (err != 0) {
-		RAL_DEBUG(RAL_DBG_ERR, "rum_attach(): "
+		ral_debug(RAL_DBG_ERR, "rum_attach(): "
 		    "mac_register() err %x\n", err);
 		goto fail3;
 	}
 
 	if (usb_register_hotplug_cbs(devinfo, rum_disconnect,
 	    rum_reconnect) != USB_SUCCESS) {
-		RAL_DEBUG(RAL_DBG_ERR,
+		ral_debug(RAL_DBG_ERR,
 		    "rum_attach() failed to register events");
 		goto fail4;
 	}
@@ -2389,14 +2390,12 @@ rum_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    instance + 1, DDI_NT_NET_WIFI, 0);
 
 	if (err != DDI_SUCCESS)
-		RAL_DEBUG(RAL_DBG_ERR, "ddi_create_minor_node() failed\n");
+		ral_debug(RAL_DBG_ERR, "ddi_create_minor_node() failed\n");
 
 	/*
 	 * Notify link is down now
 	 */
 	mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
-
-	RAL_DEBUG(RAL_DBG_MSG, "rum_attach() done successfully.\n");
 	return (DDI_SUCCESS);
 
 fail4:
@@ -2418,11 +2417,19 @@ rum_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	struct rum_softc *sc;
 
-	RAL_DEBUG(RAL_DBG_MSG, "rum_detach()\n");
 	sc = ddi_get_soft_state(rum_soft_state_p, ddi_get_instance(devinfo));
+	ASSERT(sc != NULL);
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		if (RAL_IS_RUNNING(sc))
+			(void) rum_stop(sc);
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	rum_stop(sc);
 	usb_unregister_hotplug_cbs(devinfo);
