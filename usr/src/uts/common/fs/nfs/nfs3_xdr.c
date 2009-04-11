@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1342,12 +1342,10 @@ xdr_READ3res(XDR *xdrs, READ3res *objp)
 			 * uses xdr_READ3vres/xdr_READ3uiores to decode results.
 			 */
 			if (resokp->wlist) {
-				if (resokp->wlist->c_len != resokp->count) {
-					resokp->wlist->c_len = resokp->count;
-				}
 				if (resokp->count != 0) {
 					return (xdrrdma_send_read_data(
-					    xdrs, resokp->wlist));
+					    xdrs, resokp->count,
+					    resokp->wlist));
 				}
 				return (TRUE);
 			}
@@ -1412,11 +1410,22 @@ xdr_READ3vres(XDR *xdrs, READ3vres *objp)
 			if (ocount != objp->count) {
 				DTRACE_PROBE2(xdr__e__read3vres_fail,
 				    int, ocount, int, objp->count);
+				objp->wlist = NULL;
 				return (FALSE);
 			}
 
-			objp->wlist_len = cl->c_len;
-			objp->data.data_len = objp->wlist_len;
+			objp->wlist_len = clist_len(cl);
+			objp->data.data_len = ocount;
+
+			if (objp->wlist_len !=
+			    roundup(objp->data.data_len, BYTES_PER_XDR_UNIT)) {
+				DTRACE_PROBE2(
+				    xdr__e__read3vres_fail,
+				    int, ocount,
+				    int, objp->data.data_len);
+				objp->wlist = NULL;
+				return (FALSE);
+			}
 			return (TRUE);
 		}
 	}
@@ -1526,7 +1535,7 @@ xdr_READ3uiores(XDR *xdrs, READ3uiores *objp)
 				return (FALSE);
 			}
 
-			objp->wlist_len = cl->c_len;
+			objp->wlist_len = clist_len(cl);
 
 			uiop->uio_resid -= objp->count;
 			uiop->uio_iov->iov_len -= objp->count;
@@ -1536,7 +1545,7 @@ xdr_READ3uiores(XDR *xdrs, READ3uiores *objp)
 			/*
 			 * XXX: Assume 1 iov, needs to be changed.
 			 */
-			objp->size = objp->wlist_len;
+			objp->size = objp->count;
 
 			return (TRUE);
 		}
@@ -1613,7 +1622,7 @@ xdr_WRITE3args(XDR *xdrs, WRITE3args *objp)
 			    &objp->conn, nfs3tsize()) == TRUE) {
 				objp->data.data_val = NULL;
 				if (xdrrdma_read_from_client(
-				    &objp->rlist,
+				    objp->rlist,
 				    &objp->conn,
 				    objp->count) == FALSE) {
 					return (FALSE);

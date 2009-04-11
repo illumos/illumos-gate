@@ -82,7 +82,8 @@
 #include <nfs/nfs.h>
 #include <sys/atomic.h>
 
-#define	NFS_RDMA_PORT	2050
+#define	NFS_RDMA_PORT	20049
+
 
 /*
  * Convenience structures for connection management
@@ -217,6 +218,7 @@ static uint64_t	cache_misses_above_the_limit = 0;
 static bool_t	stats_enabled = FALSE;
 
 static uint64_t max_unsignaled_rws = 5;
+int nfs_rdma_port = NFS_RDMA_PORT;
 
 /*
  * rib_stat: private data pointer used when registering
@@ -1662,7 +1664,7 @@ rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, rpcib_ping_t *rptp)
 		break;
 	}
 
-	ipcm_info.src_port = NFS_RDMA_PORT;
+	ipcm_info.src_port = (in_port_t)nfs_rdma_port;
 
 	ibt_status = ibt_format_ip_private_data(&ipcm_info,
 	    IBT_IP_HDR_PRIV_DATA_SZ, cmp_ip_pvt);
@@ -1685,8 +1687,9 @@ rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, rpcib_ping_t *rptp)
 	qp_attr.rc_control = IBT_CEP_RDMA_RD | IBT_CEP_RDMA_WR;
 	qp_attr.rc_flags = IBT_WR_SIGNALED;
 
-	rptp->path.pi_sid = ibt_get_ip_sid(IPPROTO_TCP, NFS_RDMA_PORT);
+	rptp->path.pi_sid = ibt_get_ip_sid(IPPROTO_TCP, nfs_rdma_port);
 	chan_args.oc_path = &rptp->path;
+
 	chan_args.oc_cm_handler = rib_clnt_cm_handler;
 	chan_args.oc_cm_clnt_private = (void *)rib_stat;
 	chan_args.oc_rdma_ra_out = 4;
@@ -2015,9 +2018,11 @@ rib_sendwait(rib_qp_t *qp, struct send_wid *wd)
 	if (wd->status != (uint_t)SEND_WAIT) {
 		/* got send completion */
 		if (wd->status != RDMA_SUCCESS) {
-			error = wd->status;
-		if (wd->status != RDMA_CONNLOST)
-			error = RDMA_FAILED;
+			if (wd->status != RDMA_CONNLOST) {
+				error = RDMA_FAILED;
+			} else {
+				error = RDMA_CONNLOST;
+			}
 		}
 		for (i = 0; i < wd->nsbufs; i++) {
 			rib_rbuf_free(qptoc(qp), SEND_BUFFER,
@@ -2145,9 +2150,7 @@ rib_send_and_wait(CONN *conn, struct clist *cl, uint32_t msgid,
 			rib_rbuf_free(conn, SEND_BUFFER,
 			    (void *)(uintptr_t)wdesc->sbufaddr[i]);
 		}
-
 		(void) rib_free_sendwait(wdesc);
-
 		return (RDMA_CONNLOST);
 	}
 	mutex_exit(&conn->c_lock);
@@ -2528,7 +2531,6 @@ rib_write(CONN *conn, struct clist *cl, int wait)
 	if (cl == NULL) {
 		return (RDMA_FAILED);
 	}
-
 
 	while ((cl != NULL)) {
 		if (cl->c_len > 0) {
@@ -3004,7 +3006,7 @@ rib_register_service(rib_hca_t *hca, int service_type)
 	sdesc.sd_handler = rib_srv_cm_handler;
 	sdesc.sd_flags = 0;
 	ibt_status = ibt_register_service(hca->ibt_clnt_hdl,
-	    &sdesc, ibt_get_ip_sid(IPPROTO_TCP, NFS_RDMA_PORT),
+	    &sdesc, ibt_get_ip_sid(IPPROTO_TCP, nfs_rdma_port),
 	    1, &srv_hdl, &srv_id);
 
 	for (i = 0; i < num_ports; i++) {

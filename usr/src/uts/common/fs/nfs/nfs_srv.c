@@ -723,6 +723,9 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 		 * to encode. So set rr_mp to NULL.
 		 */
 		rr->rr_mp = NULL;
+		rr->rr_ok.rrok_wlist = ra->ra_wlist;
+		if (rr->rr_ok.rrok_wlist)
+			clist_zero_len(rr->rr_ok.rrok_wlist);
 		goto done;
 	}
 
@@ -2945,41 +2948,17 @@ static int
 rdma_setup_read_data2(struct nfsreadargs *ra, struct nfsrdresult *rr)
 {
 	struct clist	*wcl;
-	int		data_len, avail_len, num;
+	int		wlist_len;
 	uint32_t	count = rr->rr_count;
 
-	data_len = num = avail_len = 0;
-
 	wcl = ra->ra_wlist;
-	while (wcl != NULL) {
-		if (wcl->c_dmemhandle.mrc_rmr == 0)
-			break;
 
-		avail_len += wcl->c_len;
-		if (wcl->c_len < count) {
-			data_len += wcl->c_len;
-		} else {
-			/* Can make the rest chunks all 0-len */
-			data_len += count;
-			wcl->c_len = count;
-		}
-		count -= wcl->c_len;
-		num ++;
-		wcl = wcl->c_next;
-	}
-
-	/*
-	 * MUST fail if there are still more data
-	 */
-	if (count > 0) {
-		DTRACE_PROBE2(nfss__e__read__wlist__fail,
-		    int, data_len, int, count);
+	if (rdma_setup_read_chunks(wcl, count, &wlist_len) == FALSE) {
 		return (FALSE);
 	}
 
 	wcl = ra->ra_wlist;
-	rr->rr_count = data_len;
-	rr->rr_ok.rrok_wlist_len = data_len;
+	rr->rr_ok.rrok_wlist_len = wlist_len;
 	rr->rr_ok.rrok_wlist = wcl;
 
 	return (TRUE);

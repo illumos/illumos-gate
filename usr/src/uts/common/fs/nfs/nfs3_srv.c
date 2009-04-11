@@ -1069,6 +1069,8 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		/* RDMA */
 		resp->resok.wlist = args->wlist;
 		resp->resok.wlist_len = resp->resok.count;
+		if (resp->resok.wlist)
+			clist_zero_len(resp->resok.wlist);
 		goto done;
 	}
 
@@ -1086,6 +1088,8 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		/* RDMA */
 		resp->resok.wlist = args->wlist;
 		resp->resok.wlist_len = resp->resok.count;
+		if (resp->resok.wlist)
+			clist_zero_len(resp->resok.wlist);
 		goto done;
 	}
 
@@ -4589,43 +4593,17 @@ static int
 rdma_setup_read_data3(READ3args *args, READ3resok *rok)
 {
 	struct clist	*wcl;
-	int		data_len, avail_len, num;
+	int		wlist_len;
 	count3		count = rok->count;
 
-	data_len = num = avail_len = 0;
-
 	wcl = args->wlist;
-	while (wcl != NULL) {
-		if (wcl->c_dmemhandle.mrc_rmr == 0)
-			break;
-
-		avail_len += wcl->c_len;
-		if (wcl->c_len < count) {
-			data_len += wcl->c_len;
-		} else {
-			/* Can make the rest chunks all 0-len */
-			data_len += count;
-			wcl->c_len = count;
-		}
-		count -= wcl->c_len;
-		num ++;
-		wcl = wcl->c_next;
-	}
-
-	/*
-	 * MUST fail if there are still more data
-	 */
-	if (count > 0) {
-		DTRACE_PROBE2(nfss__e__read3_wlist_fail,
-		    int, data_len, int, count);
+	if (rdma_setup_read_chunks(wcl, count, &wlist_len) == FALSE) {
 		return (FALSE);
 	}
 
 	wcl = args->wlist;
-	rok->count = data_len;
-	rok->wlist_len = data_len;
+	rok->wlist_len = wlist_len;
 	rok->wlist = wcl;
-
 	return (TRUE);
 }
 

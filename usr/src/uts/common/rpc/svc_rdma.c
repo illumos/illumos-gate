@@ -501,14 +501,14 @@ svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 		status = RDMA_READ(conn, cllong, WAIT);
 		if (status) {
 			DTRACE_PROBE(krpc__e__svcrdma__krecv__read);
-			(void) clist_deregister(conn, cllong, CLIST_REG_DST);
+			(void) clist_deregister(conn, cllong);
 			rdma_buf_free(conn, &cllong->rb_longbuf);
 			clist_free(cllong);
 			goto cll_malloc_err;
 		}
 
 		status = clist_syncmem(conn, cllong, CLIST_REG_DST);
-		(void) clist_deregister(conn, cllong, CLIST_REG_DST);
+		(void) clist_deregister(conn, cllong);
 
 		xdrrdma_create(xdrs, (caddr_t)(uintptr_t)cllong->u.c_daddr3,
 		    cllong->c_len, 0, cl, XDR_DECODE, conn);
@@ -635,6 +635,7 @@ svc_process_long_reply(SVCXPRT * clone_xprt,
 
 	*final_len = XDR_GETPOS(&xdrslong);
 
+	DTRACE_PROBE1(krpc__i__replylen, uint_t, *final_len);
 	*numchunks = 0;
 	*freelen = 0;
 
@@ -642,9 +643,13 @@ svc_process_long_reply(SVCXPRT * clone_xprt,
 	wcl->rb_longbuf = long_rpc;
 
 	count = *final_len;
-	while (wcl != NULL) {
+	while ((wcl != NULL) && (count > 0)) {
+
 		if (wcl->c_dmemhandle.mrc_rmr == 0)
 			break;
+
+		DTRACE_PROBE2(krpc__i__write__chunks, uint32_t, count,
+		    uint32_t, wcl->c_len);
 
 		if (wcl->c_len > count) {
 			wcl->c_len = count;
@@ -653,9 +658,17 @@ svc_process_long_reply(SVCXPRT * clone_xprt,
 
 		count -= wcl->c_len;
 		*numchunks +=  1;
-		if (count == 0)
-			break;
 		memp += wcl->c_len;
+		wcl = wcl->c_next;
+	}
+
+	/*
+	 * Make rest of the chunks 0-len
+	 */
+	while (wcl != NULL) {
+		if (wcl->c_dmemhandle.mrc_rmr == 0)
+			break;
+		wcl->c_len = 0;
 		wcl = wcl->c_next;
 	}
 
@@ -679,7 +692,7 @@ svc_process_long_reply(SVCXPRT * clone_xprt,
 	status = clist_syncmem(crdp->conn, wcl, CLIST_REG_SOURCE);
 
 	if (status) {
-		(void) clist_deregister(crdp->conn, wcl, CLIST_REG_SOURCE);
+		(void) clist_deregister(crdp->conn, wcl);
 		rdma_buf_free(crdp->conn, &long_rpc);
 		DTRACE_PROBE(krpc__e__svcrdma__longrep__syncmem);
 		return (SVC_RDMA_FAIL);
@@ -687,7 +700,7 @@ svc_process_long_reply(SVCXPRT * clone_xprt,
 
 	status = RDMA_WRITE(crdp->conn, wcl, WAIT);
 
-	(void) clist_deregister(crdp->conn, wcl, CLIST_REG_SOURCE);
+	(void) clist_deregister(crdp->conn, wcl);
 	rdma_buf_free(crdp->conn, &wcl->rb_longbuf);
 
 	if (status != RDMA_SUCCESS) {
@@ -1282,6 +1295,87 @@ rdma_get_wchunk(struct svc_req *req, iovec_t *iov, struct clist *wlist)
 	 */
 	iov->iov_base = (caddr_t)(uintptr_t)wlist->w.c_saddr;
 	iov->iov_len = tlen;
+
+	return (TRUE);
+}
+
+/*
+ * routine to setup the read chunk lists
+ */
+
+int
+rdma_setup_read_chunks(struct clist *wcl, uint32_t count, int *wcl_len)
+{
+	int		data_len, avail_len;
+	uint_t		round_len;
+
+	data_len = avail_len = 0;
+
+	while (wcl != NULL && count > 0) {
+		if (wcl->c_dmemhandle.mrc_rmr == 0)
+			break;
+
+		if (wcl->c_len < count) {
+			data_len += wcl->c_len;
+			avail_len = 0;
+		} else {
+			data_len += count;
+			avail_len = wcl->c_len - count;
+			wcl->c_len = count;
+		}
+		count -= wcl->c_len;
+
+		if (count == 0)
+			break;
+
+		wcl = wcl->c_next;
+	}
+
+	/*
+	 * MUST fail if there are still more data
+	 */
+	if (count > 0) {
+		DTRACE_PROBE2(krpc__e__rdma_setup_read_chunks_clist_len,
+		    int, data_len, int, count);
+		return (FALSE);
+	}
+
+	/*
+	 * Round up the last chunk to 4-byte boundary
+	 */
+	*wcl_len = roundup(data_len, BYTES_PER_XDR_UNIT);
+	round_len = *wcl_len - data_len;
+
+	if (round_len) {
+
+		/*
+		 * If there is space in the current chunk,
+		 * add the roundup to the chunk.
+		 */
+		if (avail_len >= round_len) {
+			wcl->c_len += round_len;
+		} else  {
+			/*
+			 * try the next one.
+			 */
+			wcl = wcl->c_next;
+			if ((wcl == NULL) || (wcl->c_len < round_len)) {
+				DTRACE_PROBE1(
+				    krpc__e__rdma_setup_read_chunks_rndup,
+				    int, round_len);
+				return (FALSE);
+			}
+			wcl->c_len = round_len;
+		}
+	}
+
+	wcl = wcl->c_next;
+
+	/*
+	 * Make rest of the chunks 0-len
+	 */
+
+	clist_zero_len(wcl);
 
 	return (TRUE);
 }

@@ -206,6 +206,28 @@ clist_alloc(void)
 	return (clp);
 }
 
+uint32_t
+clist_len(struct clist *cl)
+{
+	uint32_t len = 0;
+	while (cl) {
+		len += cl->c_len;
+		cl = cl->c_next;
+	}
+	return (len);
+}
+
+void
+clist_zero_len(struct clist *cl)
+{
+	while (cl != NULL) {
+		if (cl->c_dmemhandle.mrc_rmr == 0)
+			break;
+		cl->c_len = 0;
+		cl = cl->c_next;
+	}
+}
+
 /*
  * Creates a new chunk list entry, and
  * adds it to the end of a chunk list.
@@ -245,17 +267,20 @@ clist_register(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
 	for (c = cl; c; c = c->c_next) {
 		if (c->c_len <= 0)
 			continue;
+
+		c->c_regtype = dstsrc;
+
 		switch (dstsrc) {
 		case CLIST_REG_SOURCE:
 			status = RDMA_REGMEMSYNC(conn,
-			    (caddr_t)(struct as *)cl->c_adspc,
+			    (caddr_t)(struct as *)c->c_adspc,
 			    (caddr_t)(uintptr_t)c->w.c_saddr3, c->c_len,
 			    &c->c_smemhandle, (void **)&c->c_ssynchandle,
 			    (void *)c->rb_longbuf.rb_private);
 			break;
 		case CLIST_REG_DST:
 			status = RDMA_REGMEMSYNC(conn,
-			    (caddr_t)(struct as *)cl->c_adspc,
+			    (caddr_t)(struct as *)c->c_adspc,
 			    (caddr_t)(uintptr_t)c->u.c_daddr3, c->c_len,
 			    &c->c_dmemhandle, (void **)&c->c_dsynchandle,
 			    (void *)c->rb_longbuf.rb_private);
@@ -264,7 +289,7 @@ clist_register(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
 			return (RDMA_INVAL);
 		}
 		if (status != RDMA_SUCCESS) {
-			(void) clist_deregister(conn, cl, dstsrc);
+			(void) clist_deregister(conn, cl);
 			return (status);
 		}
 	}
@@ -273,12 +298,12 @@ clist_register(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
 }
 
 rdma_stat
-clist_deregister(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
+clist_deregister(CONN *conn, struct clist *cl)
 {
 	struct clist *c;
 
 	for (c = cl; c; c = c->c_next) {
-		switch (dstsrc) {
+		switch (c->c_regtype) {
 		case CLIST_REG_SOURCE:
 			if (c->c_smemhandle.mrc_rmr != 0) {
 				(void) RDMA_DEREGMEMSYNC(conn,
@@ -302,7 +327,8 @@ clist_deregister(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
 			}
 			break;
 		default:
-			return (RDMA_INVAL);
+			/* clist unregistered. continue */
+			break;
 		}
 	}
 

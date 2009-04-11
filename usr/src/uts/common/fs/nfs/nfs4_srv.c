@@ -3191,6 +3191,8 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		resp->wlist = args->wlist;
 		resp->wlist_len = resp->data_len;
 		*cs->statusp = resp->status = NFS4_OK;
+		if (resp->wlist)
+			clist_zero_len(resp->wlist);
 		goto out;
 	}
 
@@ -3203,6 +3205,8 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		/* RDMA */
 		resp->wlist = args->wlist;
 		resp->wlist_len = resp->data_len;
+		if (resp->wlist)
+			clist_zero_len(resp->wlist);
 		goto out;
 	}
 
@@ -9295,44 +9299,18 @@ rfs4_unshare(rfs4_state_t *sp)
 }
 
 static int
-rdma_setup_read_data4(READ4args * args, READ4res * rok)
+rdma_setup_read_data4(READ4args *args, READ4res *rok)
 {
 	struct clist	*wcl;
-	int		data_len, avail_len, num;
 	count4		count = rok->data_len;
-
-	data_len = num = avail_len = 0;
+	int		wlist_len;
 
 	wcl = args->wlist;
-	while (wcl != NULL) {
-		if (wcl->c_dmemhandle.mrc_rmr == 0)
-			break;
-
-		avail_len += wcl->c_len;
-		if (wcl->c_len < count) {
-			data_len += wcl->c_len;
-		} else {
-			/* Can make the rest chunks all 0-len */
-			data_len += count;
-			wcl->c_len = count;
-		}
-		count -= wcl->c_len;
-		num++;
-		wcl = wcl->c_next;
-	}
-
-	/*
-	 * MUST fail if there are still more data
-	 */
-	if (count > 0) {
-		DTRACE_PROBE2(nfss__e__read4_wlist_fail,
-		    int, data_len, int, count);
+	if (rdma_setup_read_chunks(wcl, count, &wlist_len) == FALSE) {
 		return (FALSE);
 	}
 	wcl = args->wlist;
-	rok->data_len = data_len;
-	rok->wlist_len = data_len;
+	rok->wlist_len = wlist_len;
 	rok->wlist = wcl;
-
 	return (TRUE);
 }

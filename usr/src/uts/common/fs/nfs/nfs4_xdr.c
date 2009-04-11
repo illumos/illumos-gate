@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)nfs4_xdr.c	1.27	08/08/11 SMI"
 
 /*
  * A handcoded version based on the original rpcgen code.
@@ -3240,12 +3238,9 @@ xdr_READ4res(XDR *xdrs, READ4res *objp)
 		 * uses xdr_READ4res_clnt to decode results.
 		 */
 		if (objp->wlist) {
-			if (objp->wlist->c_len != objp->data_len) {
-				objp->wlist->c_len = objp->data_len;
-			}
 			if (objp->data_len != 0) {
 				return (xdrrdma_send_read_data(
-				    xdrs, objp->wlist));
+				    xdrs, objp->data_len, objp->wlist));
 			}
 			return (TRUE);
 		}
@@ -3341,10 +3336,12 @@ xdr_READ4res_clnt(XDR *xdrs, READ4res *objp, READ4args *aobjp)
 					return (FALSE);
 				}
 
-				objp->wlist_len = cl->c_len;
-				objp->data_len = objp->wlist_len;
+				objp->wlist_len = clist_len(cl);
+				objp->data_len = ocount;
 
-				if (ocount != objp->data_len) {
+				if (objp->wlist_len !=
+				    roundup(
+				    objp->data_len, BYTES_PER_XDR_UNIT)) {
 					DTRACE_PROBE2(
 					    xdr__e__read4resuio_clnt_fail,
 					    int, ocount,
@@ -3429,10 +3426,12 @@ xdr_READ4res_clnt(XDR *xdrs, READ4res *objp, READ4args *aobjp)
 				return (FALSE);
 			}
 
-			objp->wlist_len = cl->c_len;
-			objp->data_len = objp->wlist_len;
+			objp->wlist_len = clist_len(cl);
+			objp->data_len = ocount;
 
-			if (ocount != objp->data_len) {
+			if (objp->wlist_len !=
+			    roundup(
+			    objp->data_len, BYTES_PER_XDR_UNIT)) {
 				DTRACE_PROBE2(
 				    xdr__e__read4res_clnt_fail,
 				    int, ocount,
@@ -3732,7 +3731,7 @@ xdr_WRITE4args(XDR *xdrs, WRITE4args *objp)
 				    &objp->conn, NFS4_DATA_LIMIT);
 				if (retval == FALSE)
 					return (FALSE);
-				return (xdrrdma_read_from_client(&objp->rlist,
+				return (xdrrdma_read_from_client(objp->rlist,
 				    &objp->conn, objp->data_len));
 			}
 		}

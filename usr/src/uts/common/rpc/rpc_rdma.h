@@ -134,7 +134,7 @@ typedef enum {
 }rpccall_write_t;
 
 typedef enum {
-	CLIST_REG_SOURCE,
+	CLIST_REG_SOURCE = 1,
 	CLIST_REG_DST
 } clist_dstsrc;
 
@@ -244,6 +244,7 @@ typedef struct rdma_buf {
 struct clist {
 	uint32		c_xdroff;	/* XDR offset */
 	uint32		c_len;		/* Length */
+	clist_dstsrc	c_regtype;	/* type of registration */
 	struct mrc	c_smemhandle;	/* src memory handle */
 	uint64 		c_ssynchandle;	/* src sync handle */
 	union {
@@ -518,8 +519,10 @@ extern struct clist *clist_alloc(void);
 extern void clist_add(struct clist **, uint32_t, int,
 	struct mrc *, caddr_t, struct mrc *, caddr_t);
 extern void clist_free(struct clist *);
+extern uint32_t clist_len(struct clist *);
+extern void clist_zero_len(struct clist *);
 extern rdma_stat clist_register(CONN *conn, struct clist *cl, clist_dstsrc);
-extern rdma_stat clist_deregister(CONN *conn, struct clist *cl, clist_dstsrc);
+extern rdma_stat clist_deregister(CONN *conn, struct clist *cl);
 extern rdma_stat clist_syncmem(CONN *conn, struct clist *cl, clist_dstsrc);
 extern rdma_stat rdma_clnt_postrecv(CONN *conn, uint32_t xid);
 extern rdma_stat rdma_clnt_postrecv_remove(CONN *conn, uint32_t xid);
@@ -531,6 +534,7 @@ extern void rdma_buf_free(CONN *, rdma_buf_t *);
 extern int rdma_modload();
 extern bool_t   rdma_get_wchunk(struct svc_req *, iovec_t *, struct clist *);
 extern rdma_stat rdma_kwait(void);
+extern int rdma_setup_read_chunks(struct clist *, uint32_t, int *);
 
 /*
  * RDMA XDR
@@ -559,8 +563,8 @@ extern bool_t xdr_encode_reply_wchunk(XDR *, struct clist *,
 		uint32_t seg_array_len);
 bool_t xdrrdma_getrdmablk(XDR *, struct clist **, uint_t *,
 	CONN **conn, const uint_t);
-bool_t xdrrdma_read_from_client(struct clist **, CONN **, uint_t);
-bool_t xdrrdma_send_read_data(XDR *, struct clist *);
+bool_t xdrrdma_read_from_client(struct clist *, CONN **, uint_t);
+bool_t xdrrdma_send_read_data(XDR *, uint_t, struct clist *);
 bool_t xdrrdma_free_clist(CONN *, struct clist *);
 #endif /* _KERNEL */
 
