@@ -230,7 +230,7 @@
 
 /* static functions */
 static smb_odir_t *smb_odir_create(smb_request_t *, smb_node_t *,
-    char *, uint16_t);
+    char *, uint16_t, cred_t *);
 static void smb_odir_delete(smb_odir_t *);
 static int smb_odir_single_fileinfo(smb_request_t *, smb_odir_t *,
     smb_fileinfo_t *);
@@ -251,13 +251,14 @@ static boolean_t smb_odir_lookup_link(smb_request_t *, smb_odir_t *, char *,
  *    0 - error, error details set in sr.
  */
 uint16_t
-smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr)
+smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 {
 	int		rc;
 	smb_tree_t	*tree;
 	smb_node_t	*dnode;
 	char		pattern[MAXNAMELEN];
 	smb_odir_t 	*od;
+	cred_t		*cr;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -287,7 +288,12 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr)
 		return (0);
 	}
 
-	od = smb_odir_create(sr, dnode, pattern, sattr);
+	if (flags & SMB_ODIR_OPENF_BACKUP_INTENT)
+		cr = smb_user_getprivcred(tree->t_user);
+	else
+		cr = tree->t_user->u_cred;
+
+	od = smb_odir_create(sr, dnode, pattern, sattr, cr);
 	smb_node_release(dnode);
 	return (od ? od->d_odid : 0);
 }
@@ -325,7 +331,7 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (0);
 	}
-	cr = sr->user_cr;
+	cr = kcred;
 
 	/* find the xattrdir vnode */
 	rc = smb_vop_lookup_xattrdir(unode->vp, &xattr_dvp, LOOKUP_XATTR, cr);
@@ -345,7 +351,8 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 	}
 
 	(void) snprintf(pattern, sizeof (pattern), "%s*", SMB_STREAM_PREFIX);
-	od = smb_odir_create(sr, xattr_dnode, pattern, SMB_SEARCH_ATTRIBUTES);
+	od = smb_odir_create(sr, xattr_dnode, pattern, SMB_SEARCH_ATTRIBUTES,
+	    cr);
 	smb_node_release(xattr_dnode);
 	if (od == NULL)
 		return (0);
@@ -645,11 +652,9 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 		 * pass the vp of the unnamed stream file to smb_vop_getattr
 		 */
 		rc = smb_vop_lookup(od->d_dnode->vp, odirent->od_name, &vp,
-		    NULL, 0, &tmpflg, od->d_tree->t_snode->vp,
-		    od->d_user->u_cred);
+		    NULL, 0, &tmpflg, od->d_tree->t_snode->vp, od->d_cred);
 		if (rc == 0) {
-			rc = smb_vop_getattr(vp, NULL, &attr, 0,
-			    od->d_user->u_cred);
+			rc = smb_vop_getattr(vp, NULL, &attr, 0, od->d_cred);
 			VN_RELE(vp);
 		}
 
@@ -699,7 +704,10 @@ smb_odir_save_cookie(smb_odir_t *od, int idx, uint32_t cookie)
 /*
  * smb_odir_resume_at
  *
- * Searching can be resumed from:
+ * If SMB_ODIR_FLAG_WILDCARDS is not set the search is for a single
+ * file and should not be resumed.
+ *
+ * Wildcard searching can be resumed from:
  * - the cookie saved at a specified index (SMBsearch, SMBfind).
  * - a specified cookie (SMB_trans2_find)
  * - a specified filename (SMB_trans2_find) - NOT SUPPORTED.
@@ -718,6 +726,12 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
 	ASSERT(resume);
 
 	mutex_enter(&od->d_mutex);
+
+	if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
+		od->d_eof = B_TRUE;
+		mutex_exit(&od->d_mutex);
+		return;
+	}
 
 	switch (resume->or_type) {
 		case SMB_ODIR_RESUME_IDX:
@@ -755,7 +769,7 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
  */
 static smb_odir_t *
 smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
-    char *pattern, uint16_t sattr)
+    char *pattern, uint16_t sattr, cred_t *cr)
 {
 	smb_odir_t	*od;
 	smb_tree_t	*tree;
@@ -785,7 +799,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	od->d_magic = SMB_ODIR_MAGIC;
 	od->d_opened_by_pid = sr->smb_pid;
 	od->d_session = tree->t_session;
-	od->d_user = tree->t_user;
+	od->d_cred = cr;
 	od->d_tree = tree;
 	od->d_dnode = dnode;
 	smb_node_ref(dnode);
@@ -894,7 +908,7 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 		od->d_bufsize = sizeof (od->d_buf);
 
 		rc = smb_vop_readdir(od->d_dnode->vp, od->d_offset,
-		    od->d_buf, &od->d_bufsize, &eof, od->d_user->u_cred);
+		    od->d_buf, &od->d_bufsize, &eof, od->d_cred);
 
 		if ((rc == 0) && (od->d_bufsize == 0))
 			rc = ENOENT;
@@ -982,7 +996,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 	bzero(fileinfo, sizeof (smb_fileinfo_t));
 
-	rc = smb_fsop_lookup(sr, od->d_user->u_cred, 0, od->d_tree->t_snode,
+	rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
 	    od->d_dnode, od->d_pattern, &fnode, &attr);
 	if (rc != 0)
 		return (rc);
@@ -998,7 +1012,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 		rc = smb_vop_lookup(od->d_dnode->vp, fnode->od_name, &vp,
 		    NULL, lookup_flags, &flags, od->d_tree->t_snode->vp,
-		    od->d_user->u_cred);
+		    od->d_cred);
 		if (rc != 0)
 			return (rc);
 		VN_RELE(vp);
@@ -1099,7 +1113,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	name = (case_conflict) ? fileinfo->fi_shortname : odirent->od_name;
 	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
-	rc = smb_fsop_lookup(sr, od->d_user->u_cred, 0, od->d_tree->t_snode,
+	rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
 	    od->d_dnode, name, &fnode, &attr);
 	if (rc != 0)
 		return (rc);
@@ -1162,7 +1176,7 @@ smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
 {
 	int rc;
 
-	rc = smb_fsop_lookup(sr, od->d_user->u_cred, SMB_FOLLOW_LINKS,
+	rc = smb_fsop_lookup(sr, od->d_cred, SMB_FOLLOW_LINKS,
 	    od->d_tree->t_snode, od->d_dnode, fname, tgt_node, tgt_attr);
 	if (rc != 0) {
 		*tgt_node = NULL;

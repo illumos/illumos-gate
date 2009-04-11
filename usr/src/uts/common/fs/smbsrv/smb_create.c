@@ -44,7 +44,7 @@ smb_pre_create(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->mtime.tv_sec);
 	if (rc == 0)
-		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.fq_path.pn_path);
 
 	op->create_disposition = FILE_OVERWRITE_IF;
 	op->create_options = FILE_NON_DIRECTORY_FILE;
@@ -87,7 +87,7 @@ smb_pre_create_new(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->mtime.tv_sec);
 	if (rc == 0)
-		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.fq_path.pn_path);
 
 	op->create_disposition = FILE_CREATE;
 
@@ -130,7 +130,7 @@ smb_pre_create_temporary(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "wl", &reserved, &op->mtime.tv_sec);
 	if (rc == 0)
-		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.fq_path.pn_path);
 
 	op->create_disposition = FILE_CREATE;
 
@@ -160,8 +160,9 @@ smb_com_create_temporary(smb_request_t *sr)
 	bcc += snprintf(name, SMB_CREATE_NAMEBUF_SZ, "tt%05d.tmp", tmp_id);
 
 	buf = smbsr_malloc(&sr->request_storage, MAXPATHLEN);
-	(void) snprintf(buf, MAXPATHLEN, "%s\\%s", op->fqi.path, name);
-	op->fqi.path = buf;
+	(void) snprintf(buf, MAXPATHLEN, "%s\\%s",
+	    op->fqi.fq_path.pn_path, name);
+	op->fqi.fq_path.pn_path = buf;
 
 	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
@@ -189,7 +190,8 @@ smb_common_create(smb_request_t *sr)
 	op->dsize = 0;
 	op->omode = SMB_DA_ACCESS_READ_WRITE | SMB_DA_SHARE_COMPATIBILITY;
 	op->desired_access = smb_omode_to_amask(op->omode);
-	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
+	op->share_access = smb_denymode_to_sharemode(op->omode,
+	    op->fqi.fq_path.pn_path);
 
 	if (sr->smb_flg & SMB_FLAGS_OPLOCK) {
 		if (sr->smb_flg & SMB_FLAGS_OPLOCK_NOTIFY_ANY)

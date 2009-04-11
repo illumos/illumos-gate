@@ -42,6 +42,9 @@ static uint32_t smb_open_subr(smb_request_t *);
 extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
 
+static char *smb_pathname_strdup(smb_request_t *, const char *);
+static char *smb_pathname_strcat(char *, const char *);
+
 /*
  * smb_access_generic_to_file
  *
@@ -285,10 +288,11 @@ smb_common_open(smb_request_t *sr)
 static uint32_t
 smb_open_subr(smb_request_t *sr)
 {
-	int		created = 0;
+	boolean_t	created = B_FALSE;
+	boolean_t	last_comp_found = B_FALSE;
 	smb_node_t	*node = NULL;
 	smb_node_t	*dnode = NULL;
-	smb_node_t	*cur_node;
+	smb_node_t	*cur_node = NULL;
 	open_param_t	*op = &sr->arg.open;
 	int		rc;
 	smb_ofile_t	*of;
@@ -303,6 +307,7 @@ smb_open_subr(smb_request_t *sr)
 	int		lookup_flags = SMB_FOLLOW_LINKS;
 	uint32_t	daccess;
 	uint32_t	uniq_fid;
+	smb_pathname_t	*pn = &op->fqi.fq_path;
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
 
@@ -362,7 +367,7 @@ smb_open_subr(smb_request_t *sr)
 		return (NT_STATUS_BAD_DEVICE_TYPE);
 	}
 
-	if ((pathlen = strlen(op->fqi.path)) >= MAXPATHLEN) {
+	if ((pathlen = strlen(pn->pn_path)) >= MAXPATHLEN) {
 		smbsr_error(sr, 0, ERRSRV, ERRfilespecs);
 		return (NT_STATUS_NAME_TOO_LONG);
 	}
@@ -371,25 +376,51 @@ smb_open_subr(smb_request_t *sr)
 	 * Some clients pass null file names; NT interprets this as "\".
 	 */
 	if (pathlen == 0) {
-		op->fqi.path = "\\";
+		pn->pn_path = "\\";
 		pathlen = 1;
 	}
 
-	op->fqi.srch_attr = op->fqi.srch_attr;
+	smb_pathname_setup(sr, pn);
 
-	if ((status = smb_validate_object_name(op->fqi.path, is_dir)) != 0) {
+	if (is_dir)
+		status = smb_validate_dirname(pn->pn_path);
+	else
+		status = smb_validate_object_name(pn);
+
+	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
 		return (status);
 	}
 
-	cur_node = op->fqi.dir_snode ?
-	    op->fqi.dir_snode : sr->tid_tree->t_snode;
+	cur_node = op->fqi.fq_dnode ?
+	    op->fqi.fq_dnode : sr->tid_tree->t_snode;
 
-	if (rc = smb_pathname_reduce(sr, sr->user_cr, op->fqi.path,
-	    sr->tid_tree->t_snode, cur_node, &op->fqi.dir_snode,
-	    op->fqi.last_comp)) {
-		smbsr_errno(sr, rc);
-		return (sr->smb_error.status);
+	/*
+	 * if no path or filename are specified the stream should be
+	 * created on cur_node
+	 */
+	if (!is_dir && !pn->pn_pname && !pn->pn_fname && pn->pn_sname) {
+
+		/* can't currently create a stream on the tree root */
+		if (cur_node == sr->tid_tree->t_snode) {
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
+			    ERROR_ACCESS_DENIED);
+			return (NT_STATUS_ACCESS_DENIED);
+		}
+
+		(void) snprintf(op->fqi.fq_last_comp,
+		    sizeof (op->fqi.fq_last_comp),
+		    "%s%s", cur_node->od_name, pn->pn_sname);
+
+		op->fqi.fq_dnode = cur_node->dir_snode;
+		smb_node_ref(op->fqi.fq_dnode);
+	} else {
+		if (rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
+		    sr->tid_tree->t_snode, cur_node, &op->fqi.fq_dnode,
+		    op->fqi.fq_last_comp)) {
+			smbsr_errno(sr, rc);
+			return (sr->smb_error.status);
+		}
 	}
 
 	/*
@@ -399,26 +430,25 @@ smb_open_subr(smb_request_t *sr)
 	 * and do not follow links.  Otherwise, follow
 	 * the link to the target.
 	 */
-
 	daccess = op->desired_access & ~FILE_READ_ATTRIBUTES;
 
 	if (daccess == DELETE)
 		lookup_flags &= ~SMB_FOLLOW_LINKS;
 
 	rc = smb_fsop_lookup_name(sr, kcred, lookup_flags,
-	    sr->tid_tree->t_snode, op->fqi.dir_snode, op->fqi.last_comp,
-	    &op->fqi.last_snode, &op->fqi.last_attr);
+	    sr->tid_tree->t_snode, op->fqi.fq_dnode, op->fqi.fq_last_comp,
+	    &op->fqi.fq_fnode, &op->fqi.fq_fattr);
 
 	if (rc == 0) {
-		op->fqi.last_comp_was_found = 1;
-		(void) strcpy(op->fqi.last_comp_od,
-		    op->fqi.last_snode->od_name);
+		last_comp_found = B_TRUE;
+		(void) strcpy(op->fqi.fq_od_name,
+		    op->fqi.fq_fnode->od_name);
 	} else if (rc == ENOENT) {
-		op->fqi.last_comp_was_found = 0;
-		op->fqi.last_snode = NULL;
+		last_comp_found = B_FALSE;
+		op->fqi.fq_fnode = NULL;
 		rc = 0;
 	} else {
-		smb_node_release(op->fqi.dir_snode);
+		smb_node_release(op->fqi.fq_dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_errno(sr, rc);
 		return (sr->smb_error.status);
@@ -432,22 +462,22 @@ smb_open_subr(smb_request_t *sr)
 
 	uniq_fid = SMB_UNIQ_FID();
 
-	if (op->fqi.last_comp_was_found) {
+	if (last_comp_found) {
 
-		if ((op->fqi.last_attr.sa_vattr.va_type != VREG) &&
-		    (op->fqi.last_attr.sa_vattr.va_type != VDIR) &&
-		    (op->fqi.last_attr.sa_vattr.va_type != VLNK)) {
+		if ((op->fqi.fq_fattr.sa_vattr.va_type != VREG) &&
+		    (op->fqi.fq_fattr.sa_vattr.va_type != VDIR) &&
+		    (op->fqi.fq_fattr.sa_vattr.va_type != VLNK)) {
 
-			smb_node_release(op->fqi.last_snode);
-			smb_node_release(op->fqi.dir_snode);
+			smb_node_release(op->fqi.fq_fnode);
+			smb_node_release(op->fqi.fq_dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 			    ERRnoaccess);
 			return (NT_STATUS_ACCESS_DENIED);
 		}
 
-		node = op->fqi.last_snode;
-		dnode = op->fqi.dir_snode;
+		node = op->fqi.fq_fnode;
+		dnode = op->fqi.fq_dnode;
 
 		/*
 		 * Reject this request if either:
@@ -456,7 +486,7 @@ smb_open_subr(smb_request_t *sr)
 		 * - the target is NOT a directory and client requires that
 		 *   it MUST be.
 		 */
-		if (op->fqi.last_attr.sa_vattr.va_type == VDIR) {
+		if (op->fqi.fq_fattr.sa_vattr.va_type == VDIR) {
 			if (op->create_options & FILE_NON_DIRECTORY_FILE) {
 				smb_node_release(node);
 				smb_node_release(dnode);
@@ -603,7 +633,7 @@ smb_open_subr(smb_request_t *sr)
 				new_attr.sa_mask = SMB_AT_SIZE;
 
 				rc = smb_fsop_setattr(sr, sr->user_cr,
-				    node, &new_attr, &op->fqi.last_attr);
+				    node, &new_attr, &op->fqi.fq_fattr);
 
 				if (rc) {
 					smb_fsop_unshrlock(sr->user_cr, node,
@@ -616,7 +646,7 @@ smb_open_subr(smb_request_t *sr)
 					return (sr->smb_error.status);
 				}
 
-				op->dsize = op->fqi.last_attr.sa_vattr.va_size;
+				op->dsize = op->fqi.fq_fattr.sa_vattr.va_size;
 			}
 
 			op->dattr |= FILE_ATTRIBUTE_ARCHIVE;
@@ -632,9 +662,18 @@ smb_open_subr(smb_request_t *sr)
 			 * If file is being replaced,
 			 * we should remove existing streams
 			 */
-			if (SMB_IS_STREAM(node) == 0)
-				(void) smb_fsop_remove_streams(sr, sr->user_cr,
-				    node);
+			if (SMB_IS_STREAM(node) == 0) {
+				if (smb_fsop_remove_streams(sr, sr->user_cr,
+				    node) != 0) {
+					smb_fsop_unshrlock(sr->user_cr, node,
+					    uniq_fid);
+					smb_node_unlock(node);
+					smb_node_release(node);
+					smb_node_release(dnode);
+					SMB_NULL_FQI_NODES(op->fqi);
+					return (sr->smb_error.status);
+				}
+			}
 
 			op->action_taken = SMB_OACT_TRUNCATED;
 			break;
@@ -648,10 +687,10 @@ smb_open_subr(smb_request_t *sr)
 		}
 	} else {
 		/* Last component was not found. */
-		dnode = op->fqi.dir_snode;
+		dnode = op->fqi.fq_dnode;
 
 		if (is_dir == 0)
-			is_stream = smb_is_stream_name(op->fqi.path);
+			is_stream = smb_is_stream_name(pn->pn_path);
 
 		if ((op->create_disposition == FILE_OPEN) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
@@ -663,7 +702,7 @@ smb_open_subr(smb_request_t *sr)
 		}
 
 		if ((is_dir == 0) && (!is_stream) &&
-		    smb_is_invalid_filename(op->fqi.last_comp)) {
+		    smb_is_invalid_filename(op->fqi.fq_last_comp)) {
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
@@ -714,8 +753,8 @@ smb_open_subr(smb_request_t *sr)
 			}
 
 			rc = smb_fsop_create(sr, sr->user_cr, dnode,
-			    op->fqi.last_comp, &new_attr,
-			    &op->fqi.last_snode, &op->fqi.last_attr);
+			    op->fqi.fq_last_comp, &new_attr,
+			    &op->fqi.fq_fnode, &op->fqi.fq_fattr);
 
 			if (rc != 0) {
 				smb_node_unlock(dnode);
@@ -725,9 +764,9 @@ smb_open_subr(smb_request_t *sr)
 				return (sr->smb_error.status);
 			}
 
-			node = op->fqi.last_snode;
+			node = op->fqi.fq_fnode;
 
-			op->fqi.last_attr = node->attr;
+			op->fqi.fq_fattr = node->attr;
 
 			smb_node_wrlock(node);
 
@@ -751,8 +790,8 @@ smb_open_subr(smb_request_t *sr)
 			new_attr.sa_mask |= SMB_AT_TYPE | SMB_AT_MODE;
 
 			rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
-			    op->fqi.last_comp, &new_attr,
-			    &op->fqi.last_snode, &op->fqi.last_attr);
+			    op->fqi.fq_last_comp, &new_attr,
+			    &op->fqi.fq_fnode, &op->fqi.fq_fattr);
 			if (rc != 0) {
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
@@ -761,11 +800,11 @@ smb_open_subr(smb_request_t *sr)
 				return (sr->smb_error.status);
 			}
 
-			node = op->fqi.last_snode;
+			node = op->fqi.fq_fnode;
 			smb_node_wrlock(node);
 		}
 
-		created = 1;
+		created = B_TRUE;
 		op->action_taken = SMB_OACT_CREATED;
 		node->flags |= NODE_FLAGS_CREATED;
 
@@ -832,7 +871,7 @@ smb_open_subr(smb_request_t *sr)
 	    (op->create_options & FILE_WRITE_THROUGH))
 		node->flags |= NODE_FLAGS_WRITE_THROUGH;
 
-	op->fileid = op->fqi.last_attr.sa_vattr.va_nodeid;
+	op->fileid = op->fqi.fq_fattr.sa_vattr.va_nodeid;
 
 	/*
 	 * Set up the file type in open_param for the response
@@ -845,9 +884,9 @@ smb_open_subr(smb_request_t *sr)
 	if (created)
 		smb_node_unlock(dnode);
 
-	if (op->fqi.last_attr.sa_vattr.va_type == VREG) {
+	if (op->fqi.fq_fattr.sa_vattr.va_type == VREG) {
 		smb_oplock_acquire(node, of, op);
-		op->dsize = op->fqi.last_attr.sa_vattr.va_size;
+		op->dsize = op->fqi.fq_fattr.sa_vattr.va_size;
 	} else { /* VDIR or VLNK */
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 		op->dsize = 0;
@@ -864,7 +903,6 @@ smb_open_subr(smb_request_t *sr)
  * smb_validate_object_name
  *
  * Very basic file name validation.
- * Directory validation is handed off to smb_validate_dirname.
  * For filenames, we check for names of the form "AAAn:". Names that
  * contain three characters, a single digit and a colon (:) are reserved
  * as DOS device names, i.e. "COM1:".
@@ -873,34 +911,19 @@ smb_open_subr(smb_request_t *sr)
  * Returns NT status codes.
  */
 uint32_t
-smb_validate_object_name(char *path, unsigned int ftype)
+smb_validate_object_name(smb_pathname_t *pn)
 {
-	char *filename;
-
-	if (path == 0)
-		return (0);
-
-	if (ftype)
-		return (smb_validate_dirname(path));
-
-	/*
-	 * Basename with backslashes.
-	 */
-	if ((filename = strrchr(path, '\\')) != 0)
-		++filename;
-	else
-		filename = path;
-
-	if (strlen(filename) == 5 &&
-	    mts_isdigit(filename[3]) &&
-	    filename[4] == ':') {
+	if (pn->pn_fname &&
+	    strlen(pn->pn_fname) == 5 &&
+	    mts_isdigit(pn->pn_fname[3]) &&
+	    pn->pn_fname[4] == ':') {
 		return (NT_STATUS_OBJECT_NAME_INVALID);
 	}
 
-	if (smb_is_stream_name(path))
-		return (smb_validate_stream_name(path));
+	if (pn->pn_sname)
+		return (smb_validate_stream_name(pn));
 
-	return (0);
+	return (NT_STATUS_SUCCESS);
 }
 
 
@@ -921,9 +944,119 @@ smb_delete_new_object(smb_request_t *sr)
 		flags |= SMB_CATIA;
 
 	if (op->create_options & FILE_DIRECTORY_FILE)
-		(void) smb_fsop_rmdir(sr, sr->user_cr, fqi->dir_snode,
-		    fqi->last_comp, flags);
+		(void) smb_fsop_rmdir(sr, sr->user_cr, fqi->fq_dnode,
+		    fqi->fq_last_comp, flags);
 	else
-		(void) smb_fsop_remove(sr, sr->user_cr, fqi->dir_snode,
-		    fqi->last_comp, flags);
+		(void) smb_fsop_remove(sr, sr->user_cr, fqi->fq_dnode,
+		    fqi->fq_last_comp, flags);
+}
+
+/*
+ * smb_pathname_setup
+ * Parse path: pname/fname:sname:stype
+ *
+ * Elements of the smb_pathname_t structure are allocated using
+ * smbsr_malloc and will thus be free'd when the sr is destroyed.
+ *
+ * Eliminate duplicate slashes in pn->pn_path.
+ * Populate pn structure elements with the individual elements
+ * of pn->pn_path. pn->pn_sname will contain the whole stream name
+ * including the stream type and preceding colon: :sname:%DATA
+ * pn_stype will point to the stream type within pn_sname.
+ *
+ * If any element is missing the pointer in pn will be NULL.
+ */
+void
+smb_pathname_setup(smb_request_t *sr, smb_pathname_t *pn)
+{
+	char *pname, *fname, *sname;
+	int len;
+
+	(void) strcanon(pn->pn_path, "/\\");
+
+	pname = pn->pn_path;
+	fname = strrchr(pn->pn_path, '\\');
+
+	if (fname) {
+		if (fname == pname)
+			pname = NULL;
+		else {
+			*fname = '\0';
+			pn->pn_pname =
+			    smb_pathname_strdup(sr, pname);
+			*fname = '\\';
+		}
+		++fname;
+	} else {
+		fname = pname;
+		pn->pn_pname = NULL;
+	}
+
+	if (!smb_is_stream_name(fname)) {
+		pn->pn_fname =
+		    smb_pathname_strdup(sr, fname);
+		return;
+	}
+
+	/* sname can't be NULL smb_is_stream_name checks this */
+	sname = strchr(fname, ':');
+	if (sname == fname)
+		fname = NULL;
+	else {
+		*sname = '\0';
+		pn->pn_fname =
+		    smb_pathname_strdup(sr, fname);
+		*sname = ':';
+	}
+
+	pn->pn_sname = smb_pathname_strdup(sr, sname);
+	pn->pn_stype = strchr(pn->pn_sname + 1, ':');
+	if (pn->pn_stype) {
+		(void) utf8_strupr(pn->pn_stype);
+	} else {
+		len = strlen(pn->pn_sname);
+		pn->pn_sname = smb_pathname_strcat(pn->pn_sname, ":$DATA");
+		pn->pn_stype = pn->pn_sname + len;
+	}
+	++pn->pn_stype;
+}
+
+/*
+ * smb_pathname_strdup
+ *
+ * Duplicate NULL terminated string s.
+ * The new string buffer is allocated using smbsr_malloc and
+ * will thus be free'd when the sr is destroyed.
+ */
+static char *
+smb_pathname_strdup(smb_request_t *sr, const char *s)
+{
+	char *s2;
+	size_t n;
+
+	n = strlen(s) + 1;
+	s2 = (char *)smbsr_malloc(&sr->request_storage, n);
+	(void) strlcpy(s2, s, n);
+	return (s2);
+}
+
+/*
+ * smb_pathname_strcat
+ *
+ * Reallocate NULL terminated string s1 to accommodate
+ * concatenating  NULL terminated string s2.
+ * Append s2 and return resulting NULL terminated string.
+ *
+ * The string buffer is reallocated using smbsr_realloc
+ * and will thus be free'd when the sr is destroyed.
+ */
+static char *
+smb_pathname_strcat(char *s1, const char *s2)
+{
+	size_t n;
+
+	n = strlen(s1) + strlen(s2) + 1;
+	s1 = smbsr_realloc(s1, n);
+	(void) strlcat(s1, s2, n);
+	return (s1);
 }

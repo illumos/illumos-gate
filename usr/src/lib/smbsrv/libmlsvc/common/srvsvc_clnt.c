@@ -101,9 +101,9 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 	mlsvc_handle_t handle;
 	int rc;
 	int opnum;
-	struct mslm_NetShareGetInfo0 *info0;
-	struct mslm_NetShareGetInfo1 *info1;
-	struct mslm_NetShareGetInfo2 *info2;
+	struct mslm_NetShareInfo_0 *info0;
+	struct mslm_NetShareInfo_1 *info1;
+	struct mslm_NetShareInfo_2 *info2;
 	int len;
 	char *user = NULL;
 

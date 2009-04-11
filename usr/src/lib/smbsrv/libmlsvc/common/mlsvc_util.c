@@ -128,7 +128,13 @@ mlsvc_netlogon(char *server, char *domain)
 }
 
 /*
- * mlsvc_join
+ * Joins the specified domain by creating a machine account on
+ * the selected domain controller.
+ *
+ * Disconnect any existing connection with the domain controller.
+ * This will ensure that no stale connection will be used, it will
+ * also pickup any configuration changes in either side by trying
+ * to establish a new connection.
  *
  * Returns NT status codes.
  */
@@ -143,10 +149,9 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 
 	machine_passwd[0] = '\0';
 
-	/*
-	 * Ensure that the domain name is uppercase.
-	 */
 	(void) utf8_strupr(dinfo->d_nbdomain);
+
+	mlsvc_disconnect(dinfo->d_dc);
 
 	erc = mlsvc_logon(dinfo->d_dc, dinfo->d_nbdomain, user);
 

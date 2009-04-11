@@ -600,27 +600,12 @@ smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
 		smb_slist_insert_tail(&c_lock->l_conflict_list, b_lock);
 		smb_llist_exit(&c_lock->l_file->f_node->n_lock_list);
 
-		/*
-		 * XXX Hack.. drop s_lock to avoid blocking subsequent SMBs
-		 * that might affect the state of this lock (i.e.
-		 * smb_com_close).  We shouldn't sleep while holding
-		 * locks anyway.
-		 */
-		smb_rwx_rwexit(&sr->session->s_lock);
-
 		if (SMB_LOCK_INDEFINITE_WAIT(b_lock)) {
 			cv_wait(&c_lock->l_cv, &c_lock->l_mutex);
 		} else {
 			rc = cv_timedwait(&c_lock->l_cv,
 			    &c_lock->l_mutex, b_lock->l_end_time);
 		}
-
-		/*
-		 * XXX Hack continued from above... re-acquire s_lock
-		 * OK to hardcode RW_READER since this is just a hack and
-		 * we really should yank it out and do something else.
-		 */
-		smb_rwx_rwenter(&sr->session->s_lock, RW_READER);
 
 		mutex_exit(&c_lock->l_mutex);
 

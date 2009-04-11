@@ -78,7 +78,7 @@ smb_opipe_open(smb_request_t *sr)
 	smb_error_t err;
 	char *pipe_name;
 
-	if ((pipe_name = smb_opipe_lookup(op->fqi.path)) == NULL)
+	if ((pipe_name = smb_opipe_lookup(op->fqi.fq_path.pn_path)) == NULL)
 		return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 
 	op->create_options = 0;

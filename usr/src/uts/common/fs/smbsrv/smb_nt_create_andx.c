@@ -191,14 +191,14 @@ smb_pre_nt_create_andx(smb_request_t *sr)
 
 	if (rc == 0) {
 		if (NameLength == 0) {
-			op->fqi.path = "\\";
+			op->fqi.fq_path.pn_path = "\\";
 		} else if (NameLength >= MAXPATHLEN) {
 			smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
 			    ERRDOS, ERROR_PATH_NOT_FOUND);
 			rc = -1;
 		} else {
 			rc = smbsr_decode_data(sr, "%#u", sr, NameLength,
-			    &op->fqi.path);
+			    &op->fqi.fq_path.pn_path);
 		}
 	}
 
@@ -258,7 +258,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		sr->user_cr = smb_user_getprivcred(sr->uid_user);
 
 	if (op->rootdirfid == 0) {
-		op->fqi.dir_snode = sr->tid_tree->t_snode;
+		op->fqi.fq_dnode = sr->tid_tree->t_snode;
 	} else {
 		sr->smb_fid = (ushort_t)op->rootdirfid;
 		smbsr_lookup_file(sr);
@@ -268,7 +268,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 			return (SDRC_ERROR);
 		}
 
-		op->fqi.dir_snode = sr->fid_ofile->f_node;
+		op->fqi.fq_dnode = sr->fid_ofile->f_node;
 		smbsr_disconnect_file(sr);
 	}
 

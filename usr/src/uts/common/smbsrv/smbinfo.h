@@ -104,6 +104,13 @@ extern "C" {
 #define	SMB_PI_MAX_LANMAN	32
 
 #define	SMB_PI_KEEP_ALIVE_MIN		(90 * 60)
+/*
+ * Some older clients (Windows 98) only handle the low byte
+ * of the max workers value. If the low byte is less than
+ * SMB_PI_MAX_WORKERS_MIN we set it to SMB_PI_MAX_WORKERS_MIN.
+ * SMB_PI_MAX_WORKERS_MIN must therefore be < 256
+ */
+#define	SMB_PI_MAX_WORKERS_MIN		64
 #define	SMB_LM_COMPATIBILITY_DEFAULT_LEV 3
 
 typedef struct smb_kmod_cfg {

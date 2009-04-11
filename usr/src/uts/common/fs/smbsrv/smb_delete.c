@@ -98,8 +98,8 @@ smb_pre_delete(smb_request_t *sr)
 
 	fqi = &sr->arg.dirop.fqi;
 
-	if ((rc = smbsr_decode_vwv(sr, "w", &fqi->srch_attr)) == 0)
-		rc = smbsr_decode_data(sr, "%S", sr, &fqi->path);
+	if ((rc = smbsr_decode_vwv(sr, "w", &fqi->fq_sattr)) == 0)
+		rc = smbsr_decode_data(sr, "%S", sr, &fqi->fq_path.pn_path);
 
 	DTRACE_SMB_2(op__Delete__start, smb_request_t *, sr, smb_fqi_t *, fqi);
 
@@ -151,12 +151,12 @@ smb_com_delete(smb_request_t *sr)
 	if (smb_delete_check_path(sr, &wildcards) != 0)
 		return (SDRC_ERROR);
 
-	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->path,
+	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->fq_path.pn_path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode,
-	    &fqi->dir_snode, fqi->last_comp);
+	    &fqi->fq_dnode, fqi->fq_last_comp);
 	if (rc == 0) {
-		if (fqi->dir_snode->vp->v_type != VDIR) {
-			smb_node_release(fqi->dir_snode);
+		if (fqi->fq_dnode->vp->v_type != VDIR) {
+			smb_node_release(fqi->fq_dnode);
 			rc = ENOTDIR;
 		}
 	}
@@ -174,18 +174,18 @@ smb_com_delete(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if ((fqi->dir_snode == sr->tid_tree->t_snode) &&
-	    (strcmp(fqi->last_comp, "..") == 0)) {
-		smb_node_release(fqi->dir_snode);
+	if ((fqi->fq_dnode == sr->tid_tree->t_snode) &&
+	    (strcmp(fqi->fq_last_comp, "..") == 0)) {
+		smb_node_release(fqi->fq_dnode);
 		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
 		    ERRDOS, ERROR_BAD_PATHNAME);
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_fsop_access(sr, sr->user_cr, fqi->dir_snode,
+	rc = smb_fsop_access(sr, sr->user_cr, fqi->fq_dnode,
 	    FILE_LIST_DIRECTORY);
 	if (rc != 0) {
-		smb_node_release(fqi->dir_snode);
+		smb_node_release(fqi->fq_dnode);
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (SDRC_ERROR);
@@ -196,7 +196,7 @@ smb_com_delete(smb_request_t *sr)
 	else
 		rc = smb_delete_single_file(sr, &err);
 
-	smb_node_release(fqi->dir_snode);
+	smb_node_release(fqi->fq_dnode);
 
 	if (rc != 0)
 		smbsr_set_error(sr, &err);
@@ -224,30 +224,31 @@ smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 
 	fqi = &sr->arg.dirop.fqi;
 
-	status = smb_validate_object_name(fqi->path, 0);
+	smb_pathname_setup(sr, &fqi->fq_path);
+	status = smb_validate_object_name(&fqi->fq_path);
 	if (status != NT_STATUS_SUCCESS) {
 		smb_delete_error(err, status, ERRDOS, ERROR_INVALID_NAME);
 		return (-1);
 	}
 
 	if (smb_fsop_lookup_name(sr, sr->user_cr, 0, sr->tid_tree->t_snode,
-	    fqi->dir_snode, fqi->last_comp, &fqi->last_snode, &ret_attr) != 0) {
+	    fqi->fq_dnode, fqi->fq_last_comp, &fqi->fq_fnode, &ret_attr) != 0) {
 		smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,
 		    ERRDOS, ERROR_FILE_NOT_FOUND);
 		return (-1);
 	}
 
 	if (smb_delete_check_attr(sr, err) != 0) {
-		smb_node_release(fqi->last_snode);
+		smb_node_release(fqi->fq_fnode);
 		return (-1);
 	}
 
 	if (smb_delete_remove_file(sr, err) != 0) {
-		smb_node_release(fqi->last_snode);
+		smb_node_release(fqi->fq_fnode);
 		return (-1);
 	}
 
-	smb_node_release(fqi->last_snode);
+	smb_node_release(fqi->fq_fnode);
 	return (0);
 }
 
@@ -284,8 +285,11 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 	 * Specify all search attributes (SMB_SEARCH_ATTRIBUTES) so that
 	 * delete-specific checking can be done (smb_delete_check_attr).
 	 */
-	if ((odid = smb_odir_open(sr, fqi->path, SMB_SEARCH_ATTRIBUTES)) == 0)
+	odid = smb_odir_open(sr, fqi->fq_path.pn_path,
+	    SMB_SEARCH_ATTRIBUTES, 0);
+	if (odid == 0)
 		return (-1);
+
 	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)
 		return (-1);
 
@@ -295,37 +299,37 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 			break;
 
 		rc = smb_fsop_lookup_name(sr, sr->user_cr, 0,
-		    sr->tid_tree->t_snode, fqi->dir_snode,
-		    fqi->last_comp_od, &fqi->last_snode, &ret_attr);
+		    sr->tid_tree->t_snode, fqi->fq_dnode,
+		    fqi->fq_od_name, &fqi->fq_fnode, &ret_attr);
 		if (rc != 0)
 			break;
 
 		if (smb_delete_check_attr(sr, err) != 0) {
-			smb_node_release(fqi->last_snode);
+			smb_node_release(fqi->fq_fnode);
 			if (err->status == NT_STATUS_CANNOT_DELETE) {
 				smb_odir_release(od);
 				smb_odir_close(od);
 				return (-1);
 			}
 			if ((err->status == NT_STATUS_FILE_IS_A_DIRECTORY) &&
-			    (SMB_SEARCH_DIRECTORY(fqi->srch_attr) != 0))
+			    (SMB_SEARCH_DIRECTORY(fqi->fq_sattr) != 0))
 				break;
 			continue;
 		}
 
 		if (smb_delete_remove_file(sr, err) == 0) {
 			++deleted;
-			smb_node_release(fqi->last_snode);
+			smb_node_release(fqi->fq_fnode);
 			continue;
 		}
 		if (err->status == NT_STATUS_OBJECT_NAME_NOT_FOUND) {
-			smb_node_release(fqi->last_snode);
+			smb_node_release(fqi->fq_fnode);
 			continue;
 		}
 
 		smb_odir_release(od);
 		smb_odir_close(od);
-		smb_node_release(fqi->last_snode);
+		smb_node_release(fqi->fq_fnode);
 		return (-1);
 	}
 
@@ -349,8 +353,8 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 /*
  * smb_delete_find_fname
  *
- * Find next filename that matches search pattern (fqi->last_comp)
- * and save it in fqi->last_comp_od.
+ * Find next filename that matches search pattern (fqi->fq_last_comp)
+ * and save it in fqi->fq_od_name.
  *
  * Case insensitivity note:
  * If the tree is case insensitive and there's a case conflict
@@ -395,7 +399,7 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
 	} else {
 		name = odirent->od_name;
 	}
-	(void) strlcpy(fqi->last_comp_od, name, sizeof (fqi->last_comp_od));
+	(void) strlcpy(fqi->fq_od_name, name, sizeof (fqi->fq_od_name));
 
 	kmem_free(odirent, sizeof (smb_odirent_t));
 	return (0);
@@ -422,8 +426,8 @@ smb_delete_check_attr(smb_request_t *sr, smb_error_t *err)
 	uint16_t dosattr, sattr;
 
 	fqi = &sr->arg.dirop.fqi;
-	sattr = fqi->srch_attr;
-	node = fqi->last_snode;
+	sattr = fqi->fq_sattr;
+	node = fqi->fq_fnode;
 	dosattr = smb_node_get_dosattr(node);
 
 	if (dosattr & FILE_ATTRIBUTE_DIRECTORY) {
@@ -484,7 +488,7 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	uint32_t flags = 0;
 
 	fqi = &sr->arg.dirop.fqi;
-	node = fqi->last_snode;
+	node = fqi->fq_fnode;
 
 	(void) smb_oplock_break(node, sr->session, B_FALSE);
 
@@ -564,6 +568,7 @@ smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 	smb_fqi_t *fqi = &sr->arg.dirop.fqi;
 	char *p, *last_comp;
 	int i, wildcards;
+	smb_pathname_t *pn = &fqi->fq_path;
 
 	struct {
 		char *name;
@@ -576,25 +581,25 @@ smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 	};
 
 	/* find last component, strip trailing '\\' */
-	p = fqi->path + strlen(fqi->path) - 1;
+	p = pn->pn_path + strlen(pn->pn_path) - 1;
 	while (*p == '\\') {
 		*p = '\0';
 		--p;
 	}
 
-	if ((p = strrchr(fqi->path, '\\')) == NULL)
-		last_comp = fqi->path;
+	if ((p = strrchr(pn->pn_path, '\\')) == NULL)
+		last_comp = pn->pn_path;
 	else
 		last_comp = ++p;
 
 	wildcards = smb_convert_wildcards(last_comp);
 
-	if (last_comp != fqi->path) {
+	if (last_comp != pn->pn_path) {
 		/*
 		 * Wildcards are only allowed in the last component.
 		 * Check for additional wildcards in the path.
 		 */
-		if (smb_convert_wildcards(fqi->path) != wildcards) {
+		if (smb_convert_wildcards(pn->pn_path) != wildcards) {
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 			    ERRDOS, ERROR_INVALID_NAME);
 			return (-1);
@@ -604,7 +609,7 @@ smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 	/* path above the mount point */
 	for (i = 0; i < sizeof (bad_paths) / sizeof (bad_paths[0]); ++i) {
 		bad = &bad_paths[i];
-		if (strncmp(fqi->path, bad->name, bad->len) == 0) {
+		if (strncmp(pn->pn_path, bad->name, bad->len) == 0) {
 			smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
 			    ERRDOS, ERROR_BAD_PATHNAME);
 			return (-1);
@@ -613,7 +618,7 @@ smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 
 	/* last component is, or resolves to, '.' (dot) */
 	if ((strcmp(last_comp, ".") == 0) ||
-	    (SMB_SEARCH_DIRECTORY(fqi->srch_attr) &&
+	    (SMB_SEARCH_DIRECTORY(fqi->fq_sattr) &&
 	    (smb_match(last_comp, ".")))) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);

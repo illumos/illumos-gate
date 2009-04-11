@@ -47,6 +47,11 @@
 
 static mutex_t seqnum_mtx;
 
+/*
+ * Some older clients (Windows 98) only handle the low byte
+ * of the max workers value. If the low byte is less than
+ * SMB_PI_MAX_WORKERS_MIN set it to SMB_PI_MAX_WORKERS_MIN.
+ */
 void
 smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 {
@@ -56,6 +61,11 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 
 	(void) smb_config_getnum(SMB_CI_MAX_WORKERS, &citem);
 	kcfg->skc_maxworkers = (uint32_t)citem;
+	if ((kcfg->skc_maxworkers & 0xFF) < SMB_PI_MAX_WORKERS_MIN) {
+		kcfg->skc_maxworkers &= ~0xFF;
+		kcfg->skc_maxworkers += SMB_PI_MAX_WORKERS_MIN;
+	}
+
 	(void) smb_config_getnum(SMB_CI_KEEPALIVE, &citem);
 	kcfg->skc_keepalive = (uint32_t)citem;
 	if ((kcfg->skc_keepalive != 0) &&

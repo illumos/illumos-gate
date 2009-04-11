@@ -66,7 +66,8 @@ smb_pre_create_directory(smb_request_t *sr)
 {
 	int rc;
 
-	rc = smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path);
+	rc = smbsr_decode_data(sr, "%S", sr,
+	    &sr->arg.dirop.fqi.fq_path.pn_path);
 
 	DTRACE_SMB_2(op__CreateDirectory__start, smb_request_t *, sr,
 	    struct dirop *, &sr->arg.dirop);
@@ -100,13 +101,14 @@ smb_com_create_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (!smb_dirpath_isvalid(sr->arg.dirop.fqi.path)) {
+	if (!smb_dirpath_isvalid(sr->arg.dirop.fqi.fq_path.pn_path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
 		    ERRDOS, ERROR_BAD_PATHNAME);
 		return (SDRC_ERROR);
 	}
 
-	if ((status = smb_validate_dirname(sr->arg.dirop.fqi.path)) != 0) {
+	status = smb_validate_dirname(sr->arg.dirop.fqi.fq_path.pn_path);
+	if (status != 0) {
 		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
 		return (SDRC_ERROR);
 	}
@@ -124,7 +126,7 @@ smb_com_create_directory(smb_request_t *sr)
 		case 0:
 			break;
 		case EEXIST:
-			attr = &sr->arg.dirop.fqi.last_attr;
+			attr = &sr->arg.dirop.fqi.fq_fattr;
 
 			if (attr->sa_vattr.va_type != VDIR) {
 				smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
@@ -161,9 +163,10 @@ smb_com_create_directory(smb_request_t *sr)
  * Very basic directory name validation: checks for colons in a path.
  * Need to skip the drive prefix since it contains a colon.
  *
- * Returns 0 if the name is valid, otherwise NT_STATUS_NOT_A_DIRECTORY.
+ * Returns NT_STATUS_SUCCESS if the name is valid,
+ *         otherwise NT_STATUS_NOT_A_DIRECTORY.
  */
-DWORD
+uint32_t
 smb_validate_dirname(char *path)
 {
 	char *name;
@@ -175,7 +178,7 @@ smb_validate_dirname(char *path)
 			return (NT_STATUS_NOT_A_DIRECTORY);
 	}
 
-	return (0);
+	return (NT_STATUS_SUCCESS);
 }
 
 /*
@@ -195,7 +198,7 @@ smb_common_create_directory(smb_request_t *sr)
 	smb_node_t *dnode;
 	smb_node_t *node;
 
-	sr->arg.dirop.fqi.srch_attr = 0;
+	sr->arg.dirop.fqi.fq_sattr = 0;
 
 	rc = smbd_fs_query(sr, &sr->arg.dirop.fqi, FQM_PATH_MUST_NOT_EXIST);
 	if (rc)
@@ -203,10 +206,10 @@ smb_common_create_directory(smb_request_t *sr)
 
 	/*
 	 * Because of FQM_PATH_MUST_NOT_EXIST and the successful return
-	 * value, only fqi.dir_snode has a valid parameter (fqi.last_snode
+	 * value, only fqi.fq_dnode has a valid parameter (fqi.fq_fnode
 	 * is NULL).
 	 */
-	dnode = sr->arg.dirop.fqi.dir_snode;
+	dnode = sr->arg.dirop.fqi.fq_dnode;
 
 	rc = smb_fsop_access(sr, sr->user_cr, dnode, FILE_ADD_SUBDIRECTORY);
 	if (rc != NT_STATUS_SUCCESS)
@@ -224,15 +227,15 @@ smb_common_create_directory(smb_request_t *sr)
 	new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE | SMB_AT_DOSATTR;
 
 	if ((rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
-	    sr->arg.dirop.fqi.last_comp, &new_attr,
-	    &sr->arg.dirop.fqi.last_snode,
-	    &sr->arg.dirop.fqi.last_attr)) != 0) {
+	    sr->arg.dirop.fqi.fq_last_comp, &new_attr,
+	    &sr->arg.dirop.fqi.fq_fnode,
+	    &sr->arg.dirop.fqi.fq_fattr)) != 0) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 		return (rc);
 	}
 
-	node = sr->arg.dirop.fqi.last_snode;
+	node = sr->arg.dirop.fqi.fq_fnode;
 	node->flags |= NODE_FLAGS_CREATED;
 
 	sr->arg.open.create_options = FILE_DIRECTORY_FILE;
@@ -253,11 +256,11 @@ smb_dirpath_new(smb_request_t *sr)
 	/* Malloc from the request storage area. This is freed automatically */
 	/* so we don't need to worry about freeing it later */
 	spp = smbsr_malloc(&sr->request_storage, sizeof (smb_dirpath_t));
-	spp->sp_path = sr->arg.dirop.fqi.path;
+	spp->sp_path = sr->arg.dirop.fqi.fq_path.pn_path;
 	pathLen = strlen(spp->sp_path);
 	spp->sp_curp = spp->sp_path;
 	xpath = smbsr_malloc(&sr->request_storage, pathLen + 1);
-	sr->arg.dirop.fqi.path = xpath;
+	sr->arg.dirop.fqi.fq_path.pn_path = xpath;
 	spp->sp_sr = sr;
 
 	return (spp);
@@ -300,10 +303,11 @@ smb_dirpath_next(smb_dirpath_t *spp)
 
 	/*LINTED E_PTRDIFF_OVERFLOW*/
 	xlen = spp->sp_curp - spp->sp_path;
-	(void) strncpy(spp->sp_sr->arg.dirop.fqi.path, spp->sp_path, xlen);
+	(void) strncpy(spp->sp_sr->arg.dirop.fqi.fq_path.pn_path,
+	    spp->sp_path, xlen);
 
 	/* Now NULL terminate it */
-	spp->sp_sr->arg.dirop.fqi.path[xlen] = '\0';
+	spp->sp_sr->arg.dirop.fqi.fq_path.pn_path[xlen] = '\0';
 	return (1);
 }
 
@@ -337,7 +341,8 @@ smb_pre_delete_directory(smb_request_t *sr)
 {
 	int rc;
 
-	rc = smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path);
+	rc = smbsr_decode_data(sr, "%S", sr,
+	    &sr->arg.dirop.fqi.fq_path.pn_path);
 
 	DTRACE_SMB_2(op__DeleteDirectory__start, smb_request_t *, sr,
 	    struct dirop *, &sr->arg.dirop);
@@ -365,7 +370,7 @@ smb_com_delete_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	sr->arg.dirop.fqi.srch_attr = 0;
+	sr->arg.dirop.fqi.fq_sattr = 0;
 
 	rc = smbd_fs_query(sr, &sr->arg.dirop.fqi, FQM_PATH_MUST_EXIST);
 	if (rc) {
@@ -377,20 +382,20 @@ smb_com_delete_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	attr = &sr->arg.dirop.fqi.last_attr;
+	attr = &sr->arg.dirop.fqi.fq_fattr;
 	if (attr->sa_vattr.va_type != VDIR) {
 		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
 		    ERRDOS, ERROR_PATH_NOT_FOUND);
 		return (SDRC_ERROR);
 	}
 
-	dnode = sr->arg.dirop.fqi.last_snode;
+	dnode = sr->arg.dirop.fqi.fq_fnode;
 	rc = smb_fsop_access(sr, sr->user_cr, dnode, DELETE);
 
 	if ((rc != NT_STATUS_SUCCESS) ||
 	    (dnode->attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
 		smb_node_release(dnode);
-		smb_node_release(sr->arg.dirop.fqi.dir_snode);
+		smb_node_release(sr->arg.dirop.fqi.fq_dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 		smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
 		    ERRDOS, ERROR_ACCESS_DENIED);
@@ -399,13 +404,13 @@ smb_com_delete_directory(smb_request_t *sr)
 
 	smb_node_release(dnode);
 
-	dnode = sr->arg.dirop.fqi.dir_snode;
+	dnode = sr->arg.dirop.fqi.fq_dnode;
 
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
 
 	rc = smb_fsop_rmdir(sr, sr->user_cr, dnode,
-	    sr->arg.dirop.fqi.last_comp_od, flags);
+	    sr->arg.dirop.fqi.fq_od_name, flags);
 	if (rc != 0) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
@@ -455,7 +460,8 @@ smb_pre_check_directory(smb_request_t *sr)
 {
 	int rc;
 
-	rc = smbsr_decode_data(sr, "%S", sr, &sr->arg.dirop.fqi.path);
+	rc = smbsr_decode_data(sr, "%S", sr,
+	    &sr->arg.dirop.fqi.fq_path.pn_path);
 
 	DTRACE_SMB_2(op__CheckDirectory__start, smb_request_t *, sr,
 	    struct dirop *, &sr->arg.dirop);
@@ -481,18 +487,18 @@ smb_com_check_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (sr->arg.dirop.fqi.path[0] == '\0') {
+	if (sr->arg.dirop.fqi.fq_path.pn_path[0] == '\0') {
 		rc = smbsr_encode_empty_result(sr);
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
-	if (!smb_dirpath_isvalid(sr->arg.dirop.fqi.path)) {
+	if (!smb_dirpath_isvalid(sr->arg.dirop.fqi.fq_path.pn_path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_PATH_NOT_FOUND);
 		return (SDRC_ERROR);
 	}
 
-	sr->arg.dirop.fqi.srch_attr = 0;
+	sr->arg.dirop.fqi.fq_sattr = 0;
 
 	rc = smbd_fs_query(sr, &sr->arg.dirop.fqi, FQM_PATH_MUST_EXIST);
 	if (rc) {
@@ -504,11 +510,11 @@ smb_com_check_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	smb_node_release(sr->arg.dirop.fqi.dir_snode);
+	smb_node_release(sr->arg.dirop.fqi.fq_dnode);
 
-	dnode = sr->arg.dirop.fqi.last_snode;
+	dnode = sr->arg.dirop.fqi.fq_fnode;
 
-	if (sr->arg.dirop.fqi.last_attr.sa_vattr.va_type != VDIR) {
+	if (sr->arg.dirop.fqi.fq_fattr.sa_vattr.va_type != VDIR) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,

@@ -203,6 +203,8 @@ smb_pre_write_raw(smb_request_t *sr)
 	DTRACE_SMB_2(op__WriteRaw__start, smb_request_t *, sr,
 	    smb_rw_param_t *, sr->arg.rw);
 
+	smb_rwx_rwenter(&sr->session->s_lock, RW_WRITER);
+
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -211,6 +213,8 @@ smb_post_write_raw(smb_request_t *sr)
 {
 	DTRACE_SMB_2(op__WriteRaw__done, smb_request_t *, sr,
 	    smb_rw_param_t *, sr->arg.rw);
+
+	smb_rwx_rwexit(&sr->session->s_lock);
 }
 
 smb_sdrc_t

@@ -284,7 +284,7 @@ smb_com_search(smb_request_t *sr)
 		if (strlen(path) == 0)
 			path = "\\";
 
-		odid = smb_odir_open(sr, path, sattr);
+		odid = smb_odir_open(sr, path, sattr, 0);
 		if (odid == 0) {
 			if (sr->smb_error.status == NT_STATUS_ACCESS_DENIED)
 				smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
@@ -423,7 +423,7 @@ smb_com_find(smb_request_t *sr)
 	client_key = 0;
 
 	if (find_first) {
-		odid = smb_odir_open(sr, path, sattr);
+		odid = smb_odir_open(sr, path, sattr, 0);
 		if (odid == 0)
 			return (SDRC_ERROR);
 	} else {
@@ -616,7 +616,7 @@ smb_com_find_unique(struct smb_request *sr)
 
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
-	odid = smb_odir_open(sr, path, sattr);
+	odid = smb_odir_open(sr, path, sattr, 0);
 	if (odid == 0)
 		return (SDRC_ERROR);
 	od = smb_tree_lookup_odir(sr->tid_tree, odid);

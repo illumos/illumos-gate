@@ -557,17 +557,17 @@ struct mslm_NetFileClose {
 #define	CSC_CACHE_VDO		0x20
 #define	CSC_CACHE_NONE		0x30
 
-struct mslm_NetShareGetInfo0 {
+struct mslm_NetShareInfo_0 {
 	LPTSTR shi0_netname;
 };
 
-struct mslm_NetShareGetInfo1 {
+struct mslm_NetShareInfo_1 {
 	LPTSTR shi1_netname;
 	DWORD shi1_type; /* type of resource such as IPC$ */
 	LPTSTR shi1_comment;
 };
 
-struct mslm_NetShareGetInfo2 {
+struct mslm_NetShareInfo_2 {
 	LPTSTR shi2_netname;
 	DWORD shi2_type;
 	LPTSTR shi2_comment;
@@ -578,14 +578,17 @@ struct mslm_NetShareGetInfo2 {
 	LPTSTR shi2_passwd;
 };
 
-struct mslm_NetShareGetInfo501 {
+/*
+ * shi501_reserved (AKA shi501_flags) must be zero.
+ */ 
+struct mslm_NetShareInfo_501 {
 	LPTSTR shi501_netname;
 	DWORD shi501_type;
 	LPTSTR shi501_comment;
 	DWORD shi501_reserved;
 };
 
-struct mslm_NetShareGetInfo502 {
+struct mslm_NetShareInfo_502 {
 	LPTSTR shi502_netname;
 	DWORD shi502_type;
 	LPTSTR shi502_comment;
@@ -598,7 +601,7 @@ struct mslm_NetShareGetInfo502 {
 	DWORD shi502_security_descriptor;
 };
 
-struct mslm_NetShareGetInfo503 {
+struct mslm_NetShareInfo_503 {
 	LPTSTR shi503_netname;
 	DWORD shi503_type;
 	LPTSTR shi503_comment;
@@ -612,27 +615,27 @@ struct mslm_NetShareGetInfo503 {
 	DWORD shi503_security_descriptor;
 };
 
-struct mslm_NetShareGetInfo1004 {
+struct mslm_NetShareInfo_1004 {
 	LPTSTR shi1004_comment;
 };
 
-struct mslm_NetShareGetInfo1005 {
+struct mslm_NetShareInfo_1005 {
 	DWORD shi1005_flags;
 };
 
-struct mslm_NetShareGetInfo1006 {
+struct mslm_NetShareInfo_1006 {
 	DWORD shi1006_max_uses;
 };
 
 union mlsm_NetShareGetInfoResUnion {
-	CASE(0)		struct mslm_NetShareGetInfo0 *info0;
-	CASE(1)		struct mslm_NetShareGetInfo1 *info1;
-	CASE(2)		struct mslm_NetShareGetInfo2 *info2;
-	CASE(501)	struct mslm_NetShareGetInfo501 *info501;
-	CASE(502)	struct mslm_NetShareGetInfo502 *info502;
-	CASE(1004)	struct mslm_NetShareGetInfo1004 *info1004;
-	CASE(1005)	struct mslm_NetShareGetInfo1005 *info1005;
-	CASE(1006)	struct mslm_NetShareGetInfo1006 *info1006;
+	CASE(0)		struct mslm_NetShareInfo_0 *info0;
+	CASE(1)		struct mslm_NetShareInfo_1 *info1;
+	CASE(2)		struct mslm_NetShareInfo_2 *info2;
+	CASE(501)	struct mslm_NetShareInfo_501 *info501;
+	CASE(502)	struct mslm_NetShareInfo_502 *info502;
+	CASE(1004)	struct mslm_NetShareInfo_1004 *info1004;
+	CASE(1005)	struct mslm_NetShareInfo_1005 *info1005;
+	CASE(1006)	struct mslm_NetShareInfo_1006 *info1006;
 	DEFAULT	char *nullptr;
 };
 
@@ -1164,66 +1167,15 @@ struct mslm_NetNameValidate {
 /* Maximum uses for shiX_max_uses fields */
 #define SHI_USES_UNLIMITED      (DWORD)-1
 
-
-struct mslm_SHARE_INFO_0 {
-	LPTSTR		shi0_netname;
-};
-INFONRES_RESULT(mslm_SHARE_INFO,0)
-
-struct mslm_SHARE_INFO_1 {
-	LPTSTR		shi1_netname;
-	DWORD		shi1_type;
-	LPTSTR		shi1_remark;
-};
-INFONRES_RESULT(mslm_SHARE_INFO,1)
-
-struct mslm_SHARE_INFO_2 {
-	LPTSTR		shi2_netname;
-	DWORD		shi2_type;
-	LPTSTR		shi2_remark;
-	DWORD		shi2_permissions;
-	DWORD		shi2_max_uses;
-	DWORD		shi2_current_uses;
-	LPTSTR		shi2_path;
-	LPTSTR		shi2_passwd;
-};
-INFONRES_RESULT(mslm_SHARE_INFO,2)
-
-/*
- * shi501_flags must be zero.
- */
-struct mslm_SHARE_INFO_501 {
-	LPTSTR		shi501_netname;
-	DWORD		shi501_type;
-	LPTSTR		shi501_remark;
-	DWORD		shi501_flags;
-};
-INFONRES_RESULT(mslm_SHARE_INFO,501)
-
-/*
- * Note: shi502_security_descriptor should be a pointer to a
- * security descriptor (W32SEC_SECURITY_DESCRIPTOR):
- *	PSECURITY_DESCRIPTOR shi502_security_descriptor;
- *
- * For now use a DWORD and set it to zero.
- */
-struct mslm_SHARE_INFO_502 {
-	LPTSTR		shi502_netname;
-	DWORD		shi502_type;
-	LPTSTR		shi502_remark;
-	DWORD		shi502_permissions;
-	DWORD		shi502_max_uses;
-	DWORD		shi502_current_uses;
-	LPTSTR		shi502_path;
-	LPTSTR		shi502_passwd;
-	DWORD		shi502_reserved;
-	DWORD		shi502_security_descriptor;
-};
-INFONRES_RESULT(mslm_SHARE_INFO,502)
+INFONRES_RESULT(mslm_NetShareInfo,0)
+INFONRES_RESULT(mslm_NetShareInfo,1)
+INFONRES_RESULT(mslm_NetShareInfo,2)
+INFONRES_RESULT(mslm_NetShareInfo,501)
+INFONRES_RESULT(mslm_NetShareInfo,502)
 
 union mslm_NetShareAddInfo_u {
-	CASE(2)     struct mslm_SHARE_INFO_2 *info2;
-	CASE(502)   struct mslm_SHARE_INFO_502 *info502;
+	CASE(2)     struct mslm_NetShareInfo_2 *info2;
+	CASE(502)   struct mslm_NetShareInfo_502 *info502;
 };
 
 struct mslm_NetShareAddInfo {
@@ -1244,11 +1196,11 @@ struct mslm_NetShareAdd {
 
 
 INFONRES_DEFINITION(mslm_NetShareEnum,
-	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,0)
-	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,1)
-	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,2)
-	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,501)
-	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,502))
+	INFONRES_UNION_ENTRY(mslm_NetShareInfo,0)
+	INFONRES_UNION_ENTRY(mslm_NetShareInfo,1)
+	INFONRES_UNION_ENTRY(mslm_NetShareInfo,2)
+	INFONRES_UNION_ENTRY(mslm_NetShareInfo,501)
+	INFONRES_UNION_ENTRY(mslm_NetShareInfo,502))
 
 /*
  * NetShareEnum: enumerate all shares (see also NetShareEnumSticky).

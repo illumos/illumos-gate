@@ -56,11 +56,11 @@ smb_pre_rename(smb_request_t *sr)
 	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
 	int rc;
 
-	if ((rc = smbsr_decode_vwv(sr, "w", &src_fqi->srch_attr)) == 0) {
-		rc = smbsr_decode_data(sr, "%SS", sr, &src_fqi->path,
-		    &dst_fqi->path);
+	if ((rc = smbsr_decode_vwv(sr, "w", &src_fqi->fq_sattr)) == 0) {
+		rc = smbsr_decode_data(sr, "%SS", sr, &src_fqi->fq_path.pn_path,
+		    &dst_fqi->fq_path.pn_path);
 
-		dst_fqi->srch_attr = 0;
+		dst_fqi->fq_sattr = 0;
 	}
 
 	DTRACE_SMB_2(op__Rename__start, smb_request_t *, sr,
@@ -123,10 +123,10 @@ smb_com_rename(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (src_fqi->dir_snode)
-		smb_node_release(src_fqi->dir_snode);
+	if (src_fqi->fq_dnode)
+		smb_node_release(src_fqi->fq_dnode);
 
-	dst_node = dst_fqi->dir_snode;
+	dst_node = dst_fqi->fq_dnode;
 	if (dst_node) {
 		if (dst_node->flags & NODE_FLAGS_NOTIFY_CHANGE) {
 			dst_node->flags |= NODE_FLAGS_CHANGED;
@@ -173,7 +173,7 @@ smb_do_rename(
 		return (rc);
 	}
 
-	src_node = src_fqi->last_snode;
+	src_node = src_fqi->fq_fnode;
 
 	/*
 	 * Break the oplock before access checks. If a client
@@ -200,7 +200,7 @@ smb_do_rename(
 		smb_node_end_crit(src_node);
 
 		smb_node_release(src_node);
-		smb_node_release(src_fqi->dir_snode);
+		smb_node_release(src_fqi->fq_dnode);
 
 		SMB_NULL_FQI_NODES(*src_fqi);
 		SMB_NULL_FQI_NODES(*dst_fqi);
@@ -213,19 +213,20 @@ smb_do_rename(
 		smb_node_end_crit(src_node);
 
 		smb_node_release(src_node);
-		smb_node_release(src_fqi->dir_snode);
+		smb_node_release(src_fqi->fq_dnode);
 
 		SMB_NULL_FQI_NODES(*src_fqi);
 		SMB_NULL_FQI_NODES(*dst_fqi);
 		return (EACCES);
 	}
 
-	if (utf8_strcasecmp(src_fqi->path, dst_fqi->path) == 0) {
+	if (utf8_strcasecmp(src_fqi->fq_path.pn_path,
+	    dst_fqi->fq_path.pn_path) == 0) {
 		if ((rc = smbd_fs_query(sr, dst_fqi, 0)) != 0) {
 			smb_node_end_crit(src_node);
 
 			smb_node_release(src_node);
-			smb_node_release(src_fqi->dir_snode);
+			smb_node_release(src_fqi->fq_dnode);
 
 			SMB_NULL_FQI_NODES(*src_fqi);
 			SMB_NULL_FQI_NODES(*dst_fqi);
@@ -234,19 +235,19 @@ smb_do_rename(
 
 		/*
 		 * Because the fqm parameter to smbd_fs_query() was 0,
-		 * a successful return value means that dst_fqi->last_snode
+		 * a successful return value means that dst_fqi->fq_fnode
 		 * may be NULL.
 		 */
-		if (dst_fqi->last_snode)
-			smb_node_release(dst_fqi->last_snode);
+		if (dst_fqi->fq_fnode)
+			smb_node_release(dst_fqi->fq_fnode);
 
-		rc = strcmp(src_fqi->last_comp_od, dst_fqi->last_comp);
+		rc = strcmp(src_fqi->fq_od_name, dst_fqi->fq_last_comp);
 		if (rc == 0) {
 			smb_node_end_crit(src_node);
 
 			smb_node_release(src_node);
-			smb_node_release(src_fqi->dir_snode);
-			smb_node_release(dst_fqi->dir_snode);
+			smb_node_release(src_fqi->fq_dnode);
+			smb_node_release(dst_fqi->fq_dnode);
 
 			SMB_NULL_FQI_NODES(*src_fqi);
 			SMB_NULL_FQI_NODES(*dst_fqi);
@@ -254,14 +255,14 @@ smb_do_rename(
 		}
 
 		rc = smb_fsop_rename(sr, sr->user_cr,
-		    src_fqi->dir_snode,
-		    src_fqi->last_comp_od,
-		    dst_fqi->dir_snode,
-		    dst_fqi->last_comp);
+		    src_fqi->fq_dnode,
+		    src_fqi->fq_od_name,
+		    dst_fqi->fq_dnode,
+		    dst_fqi->fq_last_comp);
 
 		if (rc != 0) {
-			smb_node_release(src_fqi->dir_snode);
-			smb_node_release(dst_fqi->dir_snode);
+			smb_node_release(src_fqi->fq_dnode);
+			smb_node_release(dst_fqi->fq_dnode);
 
 			SMB_NULL_FQI_NODES(*src_fqi);
 			SMB_NULL_FQI_NODES(*dst_fqi);
@@ -278,7 +279,7 @@ smb_do_rename(
 		smb_node_end_crit(src_node);
 
 		smb_node_release(src_node);
-		smb_node_release(src_fqi->dir_snode);
+		smb_node_release(src_fqi->fq_dnode);
 
 		SMB_NULL_FQI_NODES(*src_fqi);
 		SMB_NULL_FQI_NODES(*dst_fqi);
@@ -287,7 +288,7 @@ smb_do_rename(
 
 	/*
 	 * Because of FQM_PATH_MUST_NOT_EXIST and the successful return
-	 * value, only dst_fqi->dir_snode is valid (dst_fqi->last_snode
+	 * value, only dst_fqi->fq_dnode is valid (dst_fqi->fq_fnode
 	 * is NULL).
 	 */
 
@@ -298,22 +299,22 @@ smb_do_rename(
 	 * that this is what the user wants.)
 	 */
 
-	if ((smb_maybe_mangled_name(src_fqi->last_comp)) &&
-	    (strcmp(src_fqi->last_comp, dst_fqi->last_comp) == 0)) {
-		dstname = src_fqi->last_comp_od;
+	if ((smb_maybe_mangled_name(src_fqi->fq_last_comp)) &&
+	    (strcmp(src_fqi->fq_last_comp, dst_fqi->fq_last_comp) == 0)) {
+		dstname = src_fqi->fq_od_name;
 	} else {
-		dstname = dst_fqi->last_comp;
+		dstname = dst_fqi->fq_last_comp;
 	}
 
 	rc = smb_fsop_rename(sr, sr->user_cr,
-	    src_fqi->dir_snode,
-	    src_fqi->last_comp_od,
-	    dst_fqi->dir_snode,
+	    src_fqi->fq_dnode,
+	    src_fqi->fq_od_name,
+	    dst_fqi->fq_dnode,
 	    dstname);
 
 	if (rc != 0) {
-		smb_node_release(src_fqi->dir_snode);
-		smb_node_release(dst_fqi->dir_snode);
+		smb_node_release(src_fqi->fq_dnode);
+		smb_node_release(dst_fqi->fq_dnode);
 
 		SMB_NULL_FQI_NODES(*src_fqi);
 		SMB_NULL_FQI_NODES(*dst_fqi);

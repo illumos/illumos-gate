@@ -222,9 +222,9 @@ smb_pre_open(smb_request_t *sr)
 
 	bzero(op, sizeof (sr->arg.open));
 
-	rc = smbsr_decode_vwv(sr, "ww", &op->omode, &op->fqi.srch_attr);
+	rc = smbsr_decode_vwv(sr, "ww", &op->omode, &op->fqi.fq_sattr);
 	if (rc == 0)
-		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
+		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.fq_path.pn_path);
 
 	DTRACE_SMB_2(op__Open__start, smb_request_t *, sr,
 	    struct open_param *, op);
@@ -247,7 +247,8 @@ smb_com_open(smb_request_t *sr)
 	int rc;
 
 	op->desired_access = smb_omode_to_amask(op->omode);
-	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
+	op->share_access = smb_denymode_to_sharemode(op->omode,
+	    op->fqi.fq_path.pn_path);
 	op->crtime.tv_sec = op->crtime.tv_nsec = 0;
 	op->create_disposition = FILE_OPEN;
 	op->create_options = FILE_NON_DIRECTORY_FILE;
@@ -312,7 +313,7 @@ smb_pre_open_andx(smb_request_t *sr)
 	    &file_attr, &creation_time, &op->ofun, &op->dsize, &op->timeo);
 
 	if (rc == 0) {
-		rc = smbsr_decode_data(sr, "%u", sr, &op->fqi.path);
+		rc = smbsr_decode_data(sr, "%u", sr, &op->fqi.fq_path.pn_path);
 
 		op->dattr = file_attr;
 
@@ -350,7 +351,8 @@ smb_com_open_andx(smb_request_t *sr)
 	int rc;
 
 	op->desired_access = smb_omode_to_amask(op->omode);
-	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
+	op->share_access = smb_denymode_to_sharemode(op->omode,
+	    op->fqi.fq_path.pn_path);
 
 	if (op->create_disposition > FILE_MAXIMUM_DISPOSITION) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadaccess);
@@ -420,8 +422,8 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	bzero(op, sizeof (sr->arg.open));
 
 	rc = smb_mbc_decodef(&xa->req_param_mb, "%wwwwlwl10.u",
-	    sr, &flags, &op->omode, &op->fqi.srch_attr, &file_attr,
-	    &creation_time, &op->ofun, &alloc_size, &op->fqi.path);
+	    sr, &flags, &op->omode, &op->fqi.fq_sattr, &file_attr,
+	    &creation_time, &op->ofun, &alloc_size, &op->fqi.fq_path.pn_path);
 	if (rc != 0)
 		return (SDRC_ERROR);
 
@@ -434,7 +436,8 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	op->create_options = FILE_NON_DIRECTORY_FILE;
 
 	op->desired_access = smb_omode_to_amask(op->omode);
-	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);
+	op->share_access = smb_denymode_to_sharemode(op->omode,
+	    op->fqi.fq_path.pn_path);
 
 	op->create_disposition = smb_ofun_to_crdisposition(op->ofun);
 	if (op->create_disposition > FILE_MAXIMUM_DISPOSITION)

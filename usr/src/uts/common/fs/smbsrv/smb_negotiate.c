@@ -226,6 +226,7 @@ smb_sdrc_t
 smb_pre_negotiate(smb_request_t *sr)
 {
 	DTRACE_SMB_1(op__Negotiate__start, smb_request_t *, sr);
+	smb_rwx_rwenter(&sr->session->s_lock, RW_WRITER);
 	return (SDRC_SUCCESS);
 }
 
@@ -233,6 +234,7 @@ void
 smb_post_negotiate(smb_request_t *sr)
 {
 	DTRACE_SMB_1(op__Negotiate__done, smb_request_t *, sr);
+	smb_rwx_rwexit(&sr->session->s_lock);
 }
 
 smb_sdrc_t

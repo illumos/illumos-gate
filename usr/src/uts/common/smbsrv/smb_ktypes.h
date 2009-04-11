@@ -1037,15 +1037,20 @@ typedef struct smb_odir_resume {
 	char			*or_fname;
 } smb_odir_resume_t;
 
+/*
+ * Flags used when opening an odir
+ */
+#define	SMB_ODIR_OPENF_BACKUP_INTENT	0x01
+
 typedef struct smb_odir {
 	uint32_t		d_magic;
 	kmutex_t		d_mutex;
 	list_node_t		d_lnd;
 	smb_odir_state_t	d_state;
 	smb_session_t		*d_session;
-	smb_user_t		*d_user;
 	smb_tree_t		*d_tree;
 	smb_node_t		*d_dnode;
+	cred_t			*d_cred;
 	uint16_t		d_odid;
 	uint16_t		d_opened_by_pid;
 	uint16_t		d_sattr;
@@ -1148,24 +1153,30 @@ typedef struct smb_rw_param {
 	uint8_t rw_andx;		/* SMB secondary andx command */
 } smb_rw_param_t;
 
+typedef struct smb_pathname {
+	char	*pn_path;
+	char	*pn_pname;
+	char	*pn_fname;
+	char	*pn_sname;
+	char	*pn_stype;
+} smb_pathname_t;
+
 /*
  * fs_query_info
  */
 typedef struct smb_fqi {
-	char		*path;
-	uint16_t	srch_attr;
-	smb_node_t	*dir_snode;
-	smb_attr_t	dir_attr;
-	char		last_comp[MAXNAMELEN];
-	int		last_comp_was_found;
-	char		last_comp_od[MAXNAMELEN];
-	smb_node_t	*last_snode;
-	smb_attr_t	last_attr;
+	smb_pathname_t	fq_path;
+	uint16_t	fq_sattr;
+	smb_node_t	*fq_dnode;
+	smb_node_t	*fq_fnode;
+	smb_attr_t	fq_fattr;
+	char		fq_last_comp[MAXNAMELEN];
+	char		fq_od_name[MAXNAMELEN];
 } smb_fqi_t;
 
 #define	SMB_NULL_FQI_NODES(fqi) \
-	(fqi).last_snode = NULL;	\
-	(fqi).dir_snode = NULL;
+	(fqi).fq_fnode = NULL;	\
+	(fqi).fq_dnode = NULL;
 
 #define	FQM_DIR_MUST_EXIST	1
 #define	FQM_PATH_MUST_EXIST	2
@@ -1638,7 +1649,6 @@ typedef struct smb_disp_entry {
 	void			(*sdt_post_op)(smb_request_t *);
 	char			sdt_dialect;
 	unsigned char		sdt_flags;
-	krw_t			sdt_slock_mode;
 	kstat_named_t		sdt_dispatch_stats; /* invocations */
 } smb_disp_entry_t;
 

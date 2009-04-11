@@ -771,9 +771,7 @@ smb_session_cancel(smb_session_t *session)
 		smb_xa_close(xa);
 		xa = nextxa;
 	}
-	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 	smb_user_logoff_all(session);
-	smb_rwx_rwexit(&session->s_lock);
 }
 
 /*

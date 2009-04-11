@@ -42,8 +42,16 @@ extern void smb_fem_oplock_uninstall(smb_node_t *);
 
 extern int smb_vop_other_opens(vnode_t *, int);
 
-static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
-    smb_fssd_t *fs_sd);
+static int smb_fsop_create_stream(smb_request_t *, cred_t *, smb_node_t *,
+    char *, char *, int, smb_attr_t *, smb_node_t **, smb_attr_t *);
+
+static int smb_fsop_create_file(smb_request_t *, cred_t *, smb_node_t *,
+    char *, int, smb_attr_t *, smb_node_t **, smb_attr_t *);
+
+static int smb_fsop_create_with_sd(smb_request_t *, cred_t *, smb_node_t *,
+    char *, smb_attr_t *, smb_node_t **, smb_attr_t *, smb_fssd_t *);
+
+static int smb_fsop_sdinherit(smb_request_t *, smb_node_t *, smb_fssd_t *);
 
 /*
  * The smb_fsop_* functions have knowledge of CIFS semantics.
@@ -142,15 +150,10 @@ smb_fsop_oplock_uninstall(smb_node_t *node)
 }
 
 static int
-smb_fsop_create_with_sd(
-	smb_request_t *sr,
-	cred_t *cr,
-	smb_node_t *dir_snode,
-	char *name,
-	smb_attr_t *attr,
-	smb_node_t **ret_snode,
-	smb_attr_t *ret_attr,
-	smb_fssd_t *fs_sd)
+smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
+    smb_node_t *dnode, char *name,
+    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr,
+    smb_fssd_t *fs_sd)
 {
 	vsecattr_t *vsap;
 	vsecattr_t vsecattr;
@@ -203,11 +206,11 @@ smb_fsop_create_with_sd(
 		rc = EACCES;
 		if (is_dir) {
 			if (SMB_TREE_HAS_ACCESS(sr, ACE_ADD_SUBDIRECTORY) != 0)
-				rc = smb_vop_mkdir(dir_snode->vp, name, attr,
+				rc = smb_vop_mkdir(dnode->vp, name, attr,
 				    &vp, flags, cr, vsap);
 		} else {
 			if (SMB_TREE_HAS_ACCESS(sr, ACE_ADD_FILE) != 0)
-				rc = smb_vop_create(dir_snode->vp, name, attr,
+				rc = smb_vop_create(dnode->vp, name, attr,
 				    &vp, flags, cr, vsap);
 		}
 
@@ -240,7 +243,7 @@ smb_fsop_create_with_sd(
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
-			    name, dir_snode, NULL, ret_attr);
+			    name, dnode, NULL, ret_attr);
 
 			if (*ret_snode == NULL)
 				rc = ENOMEM;
@@ -258,10 +261,10 @@ smb_fsop_create_with_sd(
 		 */
 
 		if (is_dir) {
-			rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp,
+			rc = smb_vop_mkdir(dnode->vp, name, attr, &vp,
 			    flags, cr, NULL);
 		} else {
-			rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
+			rc = smb_vop_create(dnode->vp, name, attr, &vp,
 			    flags, cr, NULL);
 		}
 
@@ -269,7 +272,7 @@ smb_fsop_create_with_sd(
 			return (rc);
 
 		*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
-		    name, dir_snode, NULL, ret_attr);
+		    name, dnode, NULL, ret_attr);
 
 		if (*ret_snode != NULL) {
 			if (!smb_tree_has_feature(sr->tid_tree,
@@ -285,9 +288,9 @@ smb_fsop_create_with_sd(
 
 	if (rc != 0) {
 		if (is_dir)
-			(void) smb_vop_rmdir(dir_snode->vp, name, flags, cr);
+			(void) smb_vop_rmdir(dnode->vp, name, flags, cr);
 		else
-			(void) smb_vop_remove(dir_snode->vp, name, flags, cr);
+			(void) smb_vop_remove(dnode->vp, name, flags, cr);
 	}
 
 	return (rc);
@@ -298,42 +301,26 @@ smb_fsop_create_with_sd(
  *
  * All SMB functions should use this wrapper to ensure that
  * all the smb_vop_creates are performed with the appropriate credentials.
- * Please document any direct calls to explain the reason
- * for avoiding this wrapper.
- *
- * It is assumed that a reference exists on snode coming into this routine.
+ * Please document any direct calls to explain the reason for avoiding
+ * this wrapper.
  *
  * *ret_snode is returned with a reference upon success.  No reference is
  * taken if an error is returned.
  */
 int
-smb_fsop_create(
-    smb_request_t	*sr,
-    cred_t		*cr,
-    smb_node_t		*dir_snode,
-    char		*name,
-    smb_attr_t		*attr,
-    smb_node_t		**ret_snode,
-    smb_attr_t		*ret_attr)
+smb_fsop_create(smb_request_t *sr, cred_t *cr,
+    smb_node_t *dnode, char *name,
+    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr)
 {
-	struct open_param *op = &sr->arg.open;
-	smb_node_t	*fnode;
-	smb_attr_t	file_attr;
-	vnode_t		*xattrdirvp;
-	vnode_t		*vp;
-	char		*longname = NULL;
-	char		*fname;
-	char		*sname;
-	int		flags = 0;
-	int		rc = 0;
-	smb_fssd_t	fs_sd;
-	uint32_t	secinfo;
-	uint32_t	status;
+	int	rc = 0;
+	int	flags = 0;
+	char	*fname, *sname;
+	char	*longname = NULL;
 
 	ASSERT(cr);
-	ASSERT(dir_snode);
-	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(dnode);
+	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(dnode->n_state != SMB_NODE_STATE_DESTROYING);
 
 	ASSERT(ret_snode);
 	*ret_snode = 0;
@@ -345,7 +332,7 @@ smb_fsop_create(
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dnode) == 0)
 		return (EACCES);
 
 	if (SMB_TREE_IS_READONLY(sr))
@@ -359,64 +346,10 @@ smb_fsop_create(
 	if (smb_is_stream_name(name)) {
 		fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 		sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		smb_stream_parse_name(name, fname, sname);
 
-		if (smb_stream_parse_name(name, fname, sname) == -1) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (EINVAL);
-		}
-
-		/* Look up the unnamed stream.  */
-		rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-		    sr->tid_tree->t_snode, dir_snode, fname,
-		    &fnode, &file_attr);
-
-		if (rc != 0) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (rc);
-		}
-
-		rc = smb_vop_stream_create(fnode->vp, sname, attr, &vp,
-		    &xattrdirvp, flags, cr);
-
-		if (rc != 0) {
-			smb_node_release(fnode);
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (rc);
-		}
-
-		attr->sa_vattr.va_uid = file_attr.sa_vattr.va_uid;
-		attr->sa_vattr.va_gid = file_attr.sa_vattr.va_gid;
-		attr->sa_mask = SMB_AT_UID | SMB_AT_GID;
-
-		/*
-		 * The second parameter of smb_vop_setattr() is set to
-		 * NULL, even though an unnamed stream exists.  This is
-		 * because we want to set the UID and GID on the named
-		 * stream in this case for consistency with the (unnamed
-		 * stream) file (see comments for smb_vop_setattr()).
-		 */
-
-		rc = smb_vop_setattr(vp, NULL, attr, 0, kcred);
-
-		if (rc != 0) {
-			smb_node_release(fnode);
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (rc);
-		}
-
-		*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdirvp,
-		    vp, sname, ret_attr);
-
-		smb_node_release(fnode);
-		VN_RELE(xattrdirvp);
-		VN_RELE(vp);
-
-		if (*ret_snode == NULL)
-			rc = ENOMEM;
+		rc = smb_fsop_create_stream(sr, cr, dnode,
+		    fname, sname, flags, attr, ret_snode, ret_attr);
 
 		kmem_free(fname, MAXNAMELEN);
 		kmem_free(sname, MAXNAMELEN);
@@ -424,9 +357,10 @@ smb_fsop_create(
 	}
 
 	/* Not a named stream */
+
 	if (smb_maybe_mangled_name(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
 		kmem_free(longname, MAXNAMELEN);
 
 		if (rc == 0)
@@ -434,6 +368,106 @@ smb_fsop_create(
 		if (rc != ENOENT)
 			return (rc);
 	}
+
+	rc = smb_fsop_create_file(sr, cr, dnode, name, flags,
+	    attr, ret_snode, ret_attr);
+	return (rc);
+
+}
+
+
+/*
+ * smb_fsop_create_stream
+ *
+ * Create NTFS named stream file (sname) on unnamed stream
+ * file (fname), creating the unnamed stream file if it
+ * doesn't exist.
+ * If we created the unnamed stream file and then creation
+ * of the named stream file fails, we delete the unnamed stream.
+ * Since we use the real file name for the smb_vop_remove we
+ * clear the SMB_IGNORE_CASE flag to ensure a case sensitive
+ * match.
+ *
+ * The second parameter of smb_vop_setattr() is set to
+ * NULL, even though an unnamed stream exists.  This is
+ * because we want to set the UID and GID on the named
+ * stream in this case for consistency with the (unnamed
+ * stream) file (see comments for smb_vop_setattr()).
+ */
+static int
+smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
+    smb_node_t *dnode, char *fname, char *sname, int flags,
+    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr)
+{
+	smb_node_t	*fnode;
+	smb_attr_t	fattr;
+	vnode_t		*xattrdvp;
+	vnode_t		*vp;
+	int		rc = 0;
+	boolean_t	fcreate = B_FALSE;
+
+	/* Look up / create the unnamed stream, fname */
+	rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dnode, fname,
+	    &fnode, &fattr);
+	if (rc == ENOENT) {
+		fcreate = B_TRUE;
+		rc = smb_fsop_create_file(sr, cr, dnode, fname, flags,
+		    attr, &fnode, &fattr);
+	}
+	if (rc != 0)
+		return (rc);
+
+	/* create the named stream, sname */
+	rc = smb_vop_stream_create(fnode->vp, sname, attr, &vp,
+	    &xattrdvp, flags, cr);
+	if (rc != 0) {
+		if (fcreate) {
+			flags &= ~SMB_IGNORE_CASE;
+			(void) smb_vop_remove(dnode->vp,
+			    fnode->od_name, flags, cr);
+		}
+		smb_node_release(fnode);
+		return (rc);
+	}
+
+	attr->sa_vattr.va_uid = fattr.sa_vattr.va_uid;
+	attr->sa_vattr.va_gid = fattr.sa_vattr.va_gid;
+	attr->sa_mask = SMB_AT_UID | SMB_AT_GID;
+
+	rc = smb_vop_setattr(vp, NULL, attr, 0, kcred);
+	if (rc != 0) {
+		smb_node_release(fnode);
+		return (rc);
+	}
+
+	*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdvp,
+	    vp, sname, ret_attr);
+
+	smb_node_release(fnode);
+	VN_RELE(xattrdvp);
+	VN_RELE(vp);
+
+	if (*ret_snode == NULL)
+		rc = ENOMEM;
+
+	return (rc);
+}
+
+/*
+ * smb_fsop_create_file
+ */
+static int
+smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
+    smb_node_t *dnode, char *name, int flags,
+    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr)
+{
+	open_param_t	*op = &sr->arg.open;
+	vnode_t		*vp;
+	smb_fssd_t	fs_sd;
+	uint32_t	secinfo;
+	uint32_t	status;
+	int		rc = 0;
 
 	if (op->sd) {
 		/*
@@ -445,7 +479,7 @@ smb_fsop_create(
 
 		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
-			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
+			rc = smb_fsop_create_with_sd(sr, cr, dnode,
 			    name, attr, ret_snode, ret_attr, &fs_sd);
 		} else {
 			rc = EINVAL;
@@ -458,9 +492,9 @@ smb_fsop_create(
 		 * see smb_fsop_sdinherit() comments as to why.
 		 */
 		smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, 0);
-		rc = smb_fsop_sdinherit(sr, dir_snode, &fs_sd);
+		rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
 		if (rc == 0) {
-			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
+			rc = smb_fsop_create_with_sd(sr, cr, dnode,
 			    name, attr, ret_snode, ret_attr, &fs_sd);
 		}
 
@@ -470,12 +504,12 @@ smb_fsop_create(
 		 * No incoming SD and filesystem is not ZFS
 		 * let the filesystem handles the inheritance.
 		 */
-		rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
+		rc = smb_vop_create(dnode->vp, name, attr, &vp,
 		    flags, cr, NULL);
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, op, cr, vp,
-			    name, dir_snode, NULL, ret_attr);
+			    name, dnode, NULL, ret_attr);
 
 			if (*ret_snode == NULL)
 				rc = ENOMEM;
@@ -484,7 +518,6 @@ smb_fsop_create(
 		}
 
 	}
-
 	return (rc);
 }
 
@@ -505,7 +538,7 @@ int
 smb_fsop_mkdir(
     smb_request_t *sr,
     cred_t *cr,
-    smb_node_t *dir_snode,
+    smb_node_t *dnode,
     char *name,
     smb_attr_t *attr,
     smb_node_t **ret_snode,
@@ -520,9 +553,9 @@ smb_fsop_mkdir(
 	uint32_t status;
 	int rc;
 	ASSERT(cr);
-	ASSERT(dir_snode);
-	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(dnode);
+	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(dnode->n_state != SMB_NODE_STATE_DESTROYING);
 
 	ASSERT(ret_snode);
 	*ret_snode = 0;
@@ -534,7 +567,7 @@ smb_fsop_mkdir(
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dnode) == 0)
 		return (EACCES);
 
 	if (SMB_TREE_IS_READONLY(sr))
@@ -544,7 +577,7 @@ smb_fsop_mkdir(
 
 	if (smb_maybe_mangled_name(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
 		kmem_free(longname, MAXNAMELEN);
 
 		/*
@@ -575,7 +608,7 @@ smb_fsop_mkdir(
 
 		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
-			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
+			rc = smb_fsop_create_with_sd(sr, cr, dnode,
 			    name, attr, ret_snode, ret_attr, &fs_sd);
 		}
 		else
@@ -588,21 +621,21 @@ smb_fsop_mkdir(
 		 * see smb_fsop_sdinherit() comments as to why.
 		 */
 		smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, SMB_FSSD_FLAGS_DIR);
-		rc = smb_fsop_sdinherit(sr, dir_snode, &fs_sd);
+		rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
 		if (rc == 0) {
-			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
+			rc = smb_fsop_create_with_sd(sr, cr, dnode,
 			    name, attr, ret_snode, ret_attr, &fs_sd);
 		}
 
 		smb_fssd_term(&fs_sd);
 
 	} else {
-		rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp, flags, cr,
+		rc = smb_vop_mkdir(dnode->vp, name, attr, &vp, flags, cr,
 		    NULL);
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, op, cr, vp, name,
-			    dir_snode, NULL, ret_attr);
+			    dnode, NULL, ret_attr);
 
 			if (*ret_snode == NULL)
 				rc = ENOMEM;
@@ -630,7 +663,7 @@ int
 smb_fsop_remove(
     smb_request_t	*sr,
     cred_t		*cr,
-    smb_node_t		*dir_snode,
+    smb_node_t		*dnode,
     char		*name,
     uint32_t		flags)
 {
@@ -647,10 +680,10 @@ smb_fsop_remove(
 	 * function is called during the deletion of the node (because of
 	 * DELETE_ON_CLOSE).
 	 */
-	ASSERT(dir_snode);
-	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(dnode);
+	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0 ||
+	if (SMB_TREE_CONTAINS_NODE(sr, dnode) == 0 ||
 	    SMB_TREE_HAS_ACCESS(sr, ACE_DELETE) == 0)
 		return (EACCES);
 
@@ -660,15 +693,11 @@ smb_fsop_remove(
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	if (dir_snode->flags & NODE_XATTR_DIR) {
-		rc = smb_vop_stream_remove(dir_snode->dir_snode->vp,
+	if (dnode->flags & NODE_XATTR_DIR) {
+		rc = smb_vop_stream_remove(dnode->dir_snode->vp,
 		    name, flags, cr);
-	} else if ((rc = smb_stream_parse_name(name, fname, sname)) != 0) {
-		if (rc == -1) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (EINVAL);
-		}
+	} else if (smb_is_stream_name(name)) {
+		smb_stream_parse_name(name, fname, sname);
 
 		/*
 		 * Look up the unnamed stream (i.e. fname).
@@ -677,7 +706,7 @@ smb_fsop_remove(
 		 */
 
 		rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-		    sr->tid_tree->t_snode, dir_snode, fname,
+		    sr->tid_tree->t_snode, dnode, fname,
 		    &fnode, &file_attr);
 
 		if (rc != 0) {
@@ -695,7 +724,7 @@ smb_fsop_remove(
 
 		smb_node_release(fnode);
 	} else {
-		rc = smb_vop_remove(dir_snode->vp, name, flags, cr);
+		rc = smb_vop_remove(dnode->vp, name, flags, cr);
 
 		if (rc == ENOENT) {
 			if (smb_maybe_mangled_name(name) == 0) {
@@ -705,7 +734,7 @@ smb_fsop_remove(
 			}
 			longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-			rc = smb_unmangle_name(dir_snode, name,
+			rc = smb_unmangle_name(dnode, name,
 			    longname, MAXNAMELEN);
 
 			if (rc == 0) {
@@ -717,7 +746,7 @@ smb_fsop_remove(
 				 * a unique file.
 				 */
 				flags &= ~SMB_IGNORE_CASE;
-				rc = smb_vop_remove(dir_snode->vp, longname,
+				rc = smb_vop_remove(dnode->vp, longname,
 				    flags, cr);
 			}
 
@@ -753,21 +782,31 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 	ASSERT(fnode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(fnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, fnode) == 0)
-		return (EACCES);
+	if (SMB_TREE_CONTAINS_NODE(sr, fnode) == 0) {
+		smbsr_errno(sr, EACCES);
+		return (-1);
+	}
 
-	if (SMB_TREE_IS_READONLY(sr))
-		return (EROFS);
+	if (SMB_TREE_IS_READONLY(sr)) {
+		smbsr_errno(sr, EROFS);
+		return (-1);
+	}
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
+
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
 
-	if ((odid = smb_odir_openat(sr, fnode)) == 0)
-		return (ENOENT);
-	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)
-		return (ENOENT);
+	if ((odid = smb_odir_openat(sr, fnode)) == 0) {
+		smbsr_errno(sr, ENOENT);
+		return (-1);
+	}
+
+	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL) {
+		smbsr_errno(sr, ENOENT);
+		return (-1);
+	}
 
 	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
 	for (;;) {
@@ -798,7 +837,7 @@ int
 smb_fsop_rmdir(
     smb_request_t	*sr,
     cred_t		*cr,
-    smb_node_t		*dir_snode,
+    smb_node_t		*dnode,
     char		*name,
     uint32_t		flags)
 {
@@ -811,24 +850,24 @@ smb_fsop_rmdir(
 	 * function is called during the deletion of the node (because of
 	 * DELETE_ON_CLOSE).
 	 */
-	ASSERT(dir_snode);
-	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(dnode);
+	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0 ||
+	if (SMB_TREE_CONTAINS_NODE(sr, dnode) == 0 ||
 	    SMB_TREE_HAS_ACCESS(sr, ACE_DELETE_CHILD) == 0)
 		return (EACCES);
 
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	rc = smb_vop_rmdir(dir_snode->vp, name, flags, cr);
+	rc = smb_vop_rmdir(dnode->vp, name, flags, cr);
 
 	if (rc == ENOENT) {
 		if (smb_maybe_mangled_name(name) == 0)
 			return (rc);
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
 
 		if (rc == 0) {
 			/*
@@ -839,7 +878,7 @@ smb_fsop_rmdir(
 			 * a unique directory.
 			 */
 			flags &= ~SMB_IGNORE_CASE;
-			rc = smb_vop_rmdir(dir_snode->vp, longname, flags, cr);
+			rc = smb_vop_rmdir(dnode->vp, longname, flags, cr);
 		}
 
 		kmem_free(longname, MAXNAMELEN);
@@ -919,16 +958,16 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
  * Please document any direct call to smb_vop_rename to explain the reason
  * for avoiding this wrapper.
  *
- * It is assumed that references exist on from_dir_snode and to_dir_snode coming
+ * It is assumed that references exist on from_dnode and to_dnode coming
  * into this routine.
  */
 int
 smb_fsop_rename(
     smb_request_t *sr,
     cred_t *cr,
-    smb_node_t *from_dir_snode,
+    smb_node_t *from_dnode,
     char *from_name,
-    smb_node_t *to_dir_snode,
+    smb_node_t *to_dnode,
     char *to_name)
 {
 	smb_node_t *from_snode;
@@ -939,18 +978,18 @@ smb_fsop_rename(
 	boolean_t isdir;
 
 	ASSERT(cr);
-	ASSERT(from_dir_snode);
-	ASSERT(from_dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(from_dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(from_dnode);
+	ASSERT(from_dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(from_dnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	ASSERT(to_dir_snode);
-	ASSERT(to_dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(to_dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(to_dnode);
+	ASSERT(to_dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(to_dnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, from_dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, from_dnode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, to_dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, to_dnode) == 0)
 		return (EACCES);
 
 	ASSERT(sr);
@@ -978,7 +1017,7 @@ smb_fsop_rename(
 	 * XXX: Lock required through smb_node_release() below?
 	 */
 
-	rc = smb_vop_lookup(from_dir_snode->vp, from_name, &from_vp, NULL,
+	rc = smb_vop_lookup(from_dnode->vp, from_name, &from_vp, NULL,
 	    flags, &ret_flags, NULL, cr);
 
 	if (rc != 0)
@@ -993,18 +1032,18 @@ smb_fsop_rename(
 	    (ACE_DELETE | ACE_ADD_FILE)))
 		return (EACCES);
 
-	rc = smb_vop_rename(from_dir_snode->vp, from_name, to_dir_snode->vp,
+	rc = smb_vop_rename(from_dnode->vp, from_name, to_dnode->vp,
 	    to_name, flags, cr);
 
 	if (rc == 0) {
 		from_snode = smb_node_lookup(sr, NULL, cr, from_vp, from_name,
-		    from_dir_snode, NULL, &tmp_attr);
+		    from_dnode, NULL, &tmp_attr);
 
 		if (from_snode == NULL) {
 			rc = ENOMEM;
 		} else {
-			smb_node_rename(from_dir_snode, from_snode,
-			    to_dir_snode, to_name);
+			smb_node_rename(from_dnode, from_snode,
+			    to_dnode, to_name);
 			smb_node_release(from_snode);
 		}
 	}
@@ -1457,7 +1496,7 @@ smb_fsop_lookup_name(
     cred_t	*cr,
     int		flags,
     smb_node_t	*root_node,
-    smb_node_t	*dir_snode,
+    smb_node_t	*dnode,
     char	*name,
     smb_node_t	**ret_snode,
     smb_attr_t	*ret_attr)
@@ -1472,9 +1511,9 @@ smb_fsop_lookup_name(
 	int		rc;
 
 	ASSERT(cr);
-	ASSERT(dir_snode);
-	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(dnode);
+	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(dnode->n_state != SMB_NODE_STATE_DESTROYING);
 
 	/*
 	 * The following check is required for streams processing, below
@@ -1486,19 +1525,15 @@ smb_fsop_lookup_name(
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	if ((rc = smb_stream_parse_name(name, fname, sname)) != 0) {
-		if (rc == -1) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (EINVAL);
-		}
+	if (smb_is_stream_name(name)) {
+		smb_stream_parse_name(name, fname, sname);
 
 		/*
 		 * Look up the unnamed stream (i.e. fname).
 		 * Unmangle processing will be done on fname
 		 * as well as any link target.
 		 */
-		rc = smb_fsop_lookup(sr, cr, flags, root_node, dir_snode, fname,
+		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode, fname,
 		    &fnode, &file_attr);
 
 		if (rc != 0) {
@@ -1543,7 +1578,7 @@ smb_fsop_lookup_name(
 			return (ENOMEM);
 		}
 	} else {
-		rc = smb_fsop_lookup(sr, cr, flags, root_node, dir_snode, name,
+		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode, name,
 		    ret_snode, ret_attr);
 	}
 
@@ -1570,7 +1605,7 @@ smb_fsop_lookup_name(
  * case insensitive compares. Please document any direct call to smb_vop_lookup
  * to explain the reason for avoiding this wrapper.
  *
- * It is assumed that a reference exists on dir_snode coming into this routine
+ * It is assumed that a reference exists on dnode coming into this routine
  * (and that it is safe from deallocation).
  *
  * Same with the root_node.
@@ -1590,7 +1625,7 @@ smb_fsop_lookup(
     cred_t	*cr,
     int		flags,
     smb_node_t	*root_node,
-    smb_node_t	*dir_snode,
+    smb_node_t	*dnode,
     char	*name,
     smb_node_t	**ret_snode,
     smb_attr_t	*ret_attr)
@@ -1604,14 +1639,14 @@ smb_fsop_lookup(
 	int ret_flags;
 
 	ASSERT(cr);
-	ASSERT(dir_snode);
-	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(dnode);
+	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(dnode->n_state != SMB_NODE_STATE_DESTROYING);
 
 	if (name == NULL)
 		return (EINVAL);
 
-	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dnode) == 0)
 		return (EACCES);
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
@@ -1621,7 +1656,7 @@ smb_fsop_lookup(
 
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	rc = smb_vop_lookup(dir_snode->vp, name, &vp, od_name, flags,
+	rc = smb_vop_lookup(dnode->vp, name, &vp, od_name, flags,
 	    &ret_flags, root_node ? root_node->vp : NULL, cr);
 
 	if (rc != 0) {
@@ -1631,7 +1666,7 @@ smb_fsop_lookup(
 		}
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dir_snode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
 		if (rc != 0) {
 			kmem_free(od_name, MAXNAMELEN);
 			kmem_free(longname, MAXNAMELEN);
@@ -1649,7 +1684,7 @@ smb_fsop_lookup(
 		if (flags & SMB_IGNORE_CASE)
 			flags &= ~SMB_IGNORE_CASE;
 
-		rc = smb_vop_lookup(dir_snode->vp, longname, &vp, od_name,
+		rc = smb_vop_lookup(dnode->vp, longname, &vp, od_name,
 		    flags, &ret_flags, root_node ? root_node->vp : NULL, cr);
 
 		kmem_free(longname, MAXNAMELEN);
@@ -1662,7 +1697,7 @@ smb_fsop_lookup(
 
 	if ((flags & SMB_FOLLOW_LINKS) && (vp->v_type == VLNK)) {
 
-		rc = smb_pathname(sr, od_name, FOLLOW, root_node, dir_snode,
+		rc = smb_pathname(sr, od_name, FOLLOW, root_node, dnode,
 		    &lnk_dnode, &lnk_target_node, cr);
 
 		if (rc != 0) {
@@ -1725,7 +1760,7 @@ smb_fsop_lookup(
 		}
 
 		*ret_snode = smb_node_lookup(sr, NULL, cr, vp, od_name,
-		    dir_snode, NULL, ret_attr);
+		    dnode, NULL, ret_attr);
 		VN_RELE(vp);
 
 		if (*ret_snode == NULL)

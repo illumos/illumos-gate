@@ -144,7 +144,7 @@ file.
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.smb' />
 		<propval name='oplock_enable' type='boolean'
-			value='false' override='true'/>
+			value='true' override='true'/>
 		<propval name='autohome_map' type='astring'
 			value='/etc' override='true'/>
 		<propval name='domain_sid' type='astring'

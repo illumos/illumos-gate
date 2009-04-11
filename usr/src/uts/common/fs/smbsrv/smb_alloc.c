@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -87,6 +85,8 @@ void *
 mem_realloc(void *ptr, uint32_t size)
 {
 	void *new_ptr;
+	uint32_t current_size;
+
 
 	if (ptr == NULL)
 		return (mem_malloc(size));
@@ -96,8 +96,12 @@ mem_realloc(void *ptr, uint32_t size)
 		return (NULL);
 	}
 
+	current_size = mem_get_size(ptr) - MEM_HDR_SIZE;
+	if (size <= current_size)
+		return (ptr);
+
 	new_ptr = mem_malloc(size);
-	(void) memcpy(new_ptr, ptr, mem_get_size(ptr));
+	(void) memcpy(new_ptr, ptr, current_size);
 	smb_mem_free(ptr);
 
 	return (new_ptr);

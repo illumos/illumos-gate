@@ -163,14 +163,12 @@ smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
 	ol = &node->n_oplock;
 	time = MSEC_TO_TICK(smb_oplock_timeout) + ddi_get_lbolt();
 
-	smb_rwx_rwexit(&session->s_lock);
 	mutex_enter(&node->n_mutex);
 
 	switch (node->n_state) {
 	case SMB_NODE_STATE_OPLOCK_GRANTED:
 		if (SMB_SESSION_GET_ID(session) == ol->ol_sess_id) {
 			mutex_exit(&node->n_mutex);
-			smb_rwx_rwenter(&session->s_lock, RW_READER);
 			return;
 		}
 		break;
@@ -192,7 +190,6 @@ smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
 			    (node->n_open_count > 1)) {
 				mutex_exit(&node->n_mutex);
 				op->op_oplock_level = SMB_OPLOCK_NONE;
-				smb_rwx_rwenter(&session->s_lock, RW_READER);
 				return;
 			}
 			ol->ol_ofile = of;
@@ -203,7 +200,6 @@ smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
 			mutex_exit(&node->n_mutex);
 			if (smb_fsop_oplock_install(node, of->f_mode) == 0) {
 				smb_ofile_set_oplock_granted(of);
-				smb_rwx_rwenter(&session->s_lock, RW_READER);
 				return;
 			}
 			mutex_enter(&node->n_mutex);
@@ -246,7 +242,6 @@ smb_oplock_acquire(smb_node_t *node, smb_ofile_t *of, open_param_t *op)
 		}
 	}
 	mutex_exit(&node->n_mutex);
-	smb_rwx_rwenter(&session->s_lock, RW_READER);
 }
 
 /*
@@ -272,11 +267,9 @@ smb_oplock_break(smb_node_t *node, smb_session_t *session, boolean_t nowait)
 	time = MSEC_TO_TICK(smb_oplock_timeout) + ddi_get_lbolt();
 
 	if (session != NULL) {
-		smb_rwx_rwexit(&session->s_lock);
 		mutex_enter(&node->n_mutex);
 		if (SMB_SESSION_GET_ID(session) == ol->ol_sess_id) {
 			mutex_exit(&node->n_mutex);
-			smb_rwx_rwenter(&session->s_lock, RW_READER);
 			return (B_TRUE);
 		}
 	} else {
@@ -290,8 +283,6 @@ smb_oplock_break(smb_node_t *node, smb_session_t *session, boolean_t nowait)
 
 		if (node->n_state == SMB_NODE_STATE_AVAILABLE) {
 			mutex_exit(&node->n_mutex);
-			if (session != NULL)
-				smb_rwx_rwenter(&session->s_lock, RW_READER);
 			return (B_TRUE);
 		}
 
@@ -307,8 +298,6 @@ smb_oplock_break(smb_node_t *node, smb_session_t *session, boolean_t nowait)
 		ASSERT(node->n_state == SMB_NODE_STATE_OPLOCK_BREAKING);
 		if (nowait) {
 			mutex_exit(&node->n_mutex);
-			if (session != NULL)
-				smb_rwx_rwenter(&session->s_lock, RW_READER);
 			return (B_FALSE);
 		}
 		rc = cv_timedwait(&ol->ol_cv, &node->n_mutex, time);
@@ -329,8 +318,6 @@ smb_oplock_break(smb_node_t *node, smb_session_t *session, boolean_t nowait)
 		}
 	}
 	mutex_exit(&node->n_mutex);
-	if (session != NULL)
-		smb_rwx_rwenter(&session->s_lock, RW_READER);
 	return (B_TRUE);
 }
 
@@ -343,14 +330,11 @@ smb_oplock_break(smb_node_t *node, smb_session_t *session, boolean_t nowait)
 void
 smb_oplock_release(smb_node_t *node, smb_ofile_t *of)
 {
-	smb_session_t	*session;
 	smb_oplock_t	*ol;
 
-	session = SMB_OFILE_GET_SESSION(of);
 	SMB_NODE_VALID(node);
 	ol = &node->n_oplock;
 
-	smb_rwx_rwexit(&session->s_lock);
 	mutex_enter(&node->n_mutex);
 	smb_oplock_wait(node);
 	switch (node->n_state) {
@@ -374,7 +358,6 @@ smb_oplock_release(smb_node_t *node, smb_ofile_t *of)
 		SMB_PANIC();
 	}
 	mutex_exit(&node->n_mutex);
-	smb_rwx_rwenter(&session->s_lock, RW_READER);
 }
 
 /*
@@ -392,7 +375,6 @@ smb_oplock_conflict(smb_node_t *node, smb_session_t *session, open_param_t *op)
 	SMB_NODE_VALID(node);
 	SMB_SESSION_VALID(session);
 
-	smb_rwx_rwexit(&session->s_lock);
 	mutex_enter(&node->n_mutex);
 	smb_oplock_wait(node);
 	switch (node->n_state) {
@@ -424,7 +406,6 @@ smb_oplock_conflict(smb_node_t *node, smb_session_t *session, open_param_t *op)
 		SMB_PANIC();
 	}
 	mutex_exit(&node->n_mutex);
-	smb_rwx_rwenter(&session->s_lock, RW_READER);
 	return (rb);
 }
 

@@ -237,7 +237,14 @@ int	smb_ascii_or_unicode_null_len(struct smb_request *);
 int	smb_search(struct smb_request *);
 
 uint32_t smb_common_open(smb_request_t *);
-DWORD smb_validate_object_name(char *path, unsigned int ftype);
+
+void smb_pathname_setup(smb_request_t *, smb_pathname_t *);
+uint32_t smb_validate_dirname(char *path);
+uint32_t smb_validate_object_name(smb_pathname_t *pn);
+boolean_t smb_is_stream_name(char *);
+uint32_t smb_validate_stream_name(smb_pathname_t *pn);
+void	smb_stream_parse_name(char *, char *, char *);
+
 
 uint32_t smb_omode_to_amask(uint32_t desired_access);
 
@@ -419,8 +426,6 @@ char *smb_kstrdup(const char *s, size_t n);
 int smb_sync_fsattr(struct smb_request *sr, cred_t *cr,
     struct smb_node *node);
 
-DWORD	smb_validate_dirname(char *path);
-
 
 void smb_encode_stream_info(struct smb_request *sr, struct smb_xa *xa,
     smb_node_t *snode, smb_attr_t *attr);
@@ -447,10 +452,6 @@ void	*smbsr_realloc(void *, size_t);
 void	smbsr_free_malloc_list(smb_malloc_list *);
 
 unsigned short smb_worker_getnum();
-
-boolean_t smb_is_stream_name(char *);
-uint32_t smb_validate_stream_name(char *);
-int smb_stream_parse_name(char *, char *, char *);
 
 DWORD smb_trans2_set_information(struct smb_request *sr,
     smb_trans2_setinfo_t *info,
@@ -535,7 +536,7 @@ void smb_ofile_set_delete_on_close(smb_ofile_t *);
 /*
  * odir functions (file smb_odir.c)
  */
-uint16_t smb_odir_open(smb_request_t *, char *, uint16_t);
+uint16_t smb_odir_open(smb_request_t *, char *, uint16_t, uint32_t);
 uint16_t smb_odir_openat(smb_request_t *, smb_node_t *);
 void smb_odir_close(smb_odir_t *);
 boolean_t smb_odir_hold(smb_odir_t *);

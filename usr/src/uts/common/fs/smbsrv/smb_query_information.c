@@ -69,9 +69,10 @@ smb_pre_query_information(smb_request_t *sr)
 	smb_fqi_t *fqi = &sr->arg.dirop.fqi;
 	int rc;
 
-	if ((rc = smbsr_decode_data(sr, "%S", sr, &fqi->path)) == 0) {
-		if (strlen(fqi->path) == 0)
-			fqi->path = "\\";
+	rc = smbsr_decode_data(sr, "%S", sr, &fqi->fq_path.pn_path);
+	if (rc == 0) {
+		if (strlen(fqi->fq_path.pn_path) == 0)
+			fqi->fq_path.pn_path = "\\";
 	}
 
 	DTRACE_SMB_2(op__QueryInformation__start, smb_request_t *, sr,
@@ -89,8 +90,8 @@ smb_post_query_information(smb_request_t *sr)
 smb_sdrc_t
 smb_com_query_information(smb_request_t *sr)
 {
-	char		*path = sr->arg.dirop.fqi.path;
-	char		*name = sr->arg.dirop.fqi.last_comp;
+	char		*path = sr->arg.dirop.fqi.fq_path.pn_path;
+	char		*name = sr->arg.dirop.fqi.fq_last_comp;
 	int		rc;
 	uint16_t	dattr;
 	uint32_t	write_time;

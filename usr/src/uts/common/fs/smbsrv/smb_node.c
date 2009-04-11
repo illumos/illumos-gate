@@ -368,7 +368,7 @@ smb_node_lookup(
 	node->n_orig_uid = crgetuid(sr->user_cr);
 
 	if (op)
-		node->flags |= smb_is_executable(op->fqi.last_comp);
+		node->flags |= smb_is_executable(op->fqi.fq_last_comp);
 
 	if (dir_snode) {
 		smb_node_ref(dir_snode);
