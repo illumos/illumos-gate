@@ -82,12 +82,14 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", area_t))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibcm_arp_streams_t))
 
 static void ibcm_arp_timeout(void *arg);
-void ibcm_arp_pr_callback(ibcm_arp_prwqn_t *wqnp, int status);
+static void ibcm_arp_pr_callback(ibcm_arp_prwqn_t *wqnp, int status);
+static void ibcm_ipv6_resolver_ack(ip2mac_t *, void *);
+static int ibcm_ipv6_lookup(ibcm_arp_prwqn_t *wqnp, ill_t *ill, zoneid_t zid);
 
 /*
  * issue a AR_ENTRY_QUERY to arp driver and schedule a timeout.
  */
-int
+static int
 ibcm_arp_query_arp(ibcm_arp_prwqn_t *wqnp)
 {
 	int len;
@@ -148,7 +150,7 @@ ibcm_arp_query_arp(ibcm_arp_prwqn_t *wqnp)
 	/*
 	 * issue the request to arp
 	 */
-	wqnp->flags |= IBCM_ARP_PR_ARP_PENDING;
+	wqnp->flags |= IBCM_ARP_PR_RESOLVE_PENDING;
 	wqnp->timeout_id = timeout(ibcm_arp_timeout, wqnp,
 	    drv_usectohz(IBCM_ARP_TIMEOUT * 1000));
 	if (canputnext(ib_s->arpqueue)) {
@@ -164,7 +166,7 @@ ibcm_arp_query_arp(ibcm_arp_prwqn_t *wqnp)
 /*
  * issue AR_ENTRY_SQUERY to arp driver
  */
-int
+static int
 ibcm_arp_squery_arp(ibcm_arp_prwqn_t *wqnp)
 {
 	int len;
@@ -239,7 +241,7 @@ ibcm_arp_squery_arp(ibcm_arp_prwqn_t *wqnp)
  * issue a AR_ENTRY_ADD to arp driver
  * This is required as arp driver does not maintain a cache.
  */
-int
+static int
 ibcm_arp_add(ibcm_arp_prwqn_t *wqnp)
 {
 	int len;
@@ -304,6 +306,8 @@ ibcm_arp_timeout(void *arg)
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_timeout(ib_s: %p wqnp: %p)",
 	    ib_s, wqnp);
+	wqnp->flags &= ~IBCM_ARP_PR_RESOLVE_PENDING;
+	cv_broadcast(&ib_s->cv);
 
 	/*
 	 * indicate to user
@@ -330,10 +334,9 @@ ibcm_arp_prwqn_delete(ibcm_arp_prwqn_t *wqnp)
 /*
  * allocate a wait queue node, and insert it in the list
  */
-ibcm_arp_prwqn_t *
+static ibcm_arp_prwqn_t *
 ibcm_arp_create_prwqn(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
-    ibt_ip_addr_t *src_addr, uint32_t localroute, uint32_t bound_dev_if,
-    ibcm_arp_pr_comp_func_t func)
+    ibt_ip_addr_t *src_addr, ibcm_arp_pr_comp_func_t func)
 {
 	ibcm_arp_prwqn_t *wqnp;
 
@@ -353,9 +356,8 @@ ibcm_arp_create_prwqn(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	}
 	wqnp->func = func;
 	wqnp->arg = ib_s;
-	wqnp->localroute = localroute;
-	wqnp->bound_dev_if = bound_dev_if;
-	wqnp->ifproto = ETHERTYPE_IP;
+	wqnp->ifproto = (dst_addr->family == AF_INET) ?
+	    ETHERTYPE_IP : ETHERTYPE_IPV6;
 
 	ib_s->wqnp = wqnp;
 
@@ -368,7 +370,7 @@ ibcm_arp_create_prwqn(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
  * call the user function
  * called with lock held
  */
-void
+static void
 ibcm_arp_pr_callback(ibcm_arp_prwqn_t *wqnp, int status)
 {
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_callback(%p, %d)", wqnp, status);
@@ -388,12 +390,9 @@ ibcm_arp_check_interface(ill_t *ill)
 	return (ETIMEDOUT);
 }
 
-#define	IBTL_IPV4_ADDR(a)	(a->un.ip4addr)
-
 int
 ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
-    ibt_ip_addr_t *src_addr, uint8_t localroute, uint32_t bound_dev_if,
-    ibcm_arp_pr_comp_func_t func)
+    ibt_ip_addr_t *src_addr, ibcm_arp_pr_comp_func_t func)
 {
 	ibcm_arp_prwqn_t *wqnp;
 	ire_t	*ire = NULL;
@@ -401,17 +400,13 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	ipif_t	*ipif;
 	ill_t	*ill, *hwaddr_ill = NULL;
 	ip_stack_t *ipst;
+	int		len;
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_lookup(src %p dest %p)",
-	    src_addr, dst_addr);
-
-	if (dst_addr->family != AF_INET_OFFLOAD) {
-		ib_s->status = EAFNOSUPPORT;
-		return (1);
-	}
+	IBCM_PRINT_IP("ibcm_arp_pr_lookup: SRC", src_addr);
+	IBCM_PRINT_IP("ibcm_arp_pr_lookup: DST", dst_addr);
 
 	if ((wqnp = ibcm_arp_create_prwqn(ib_s, dst_addr,
-	    src_addr, localroute, bound_dev_if, func)) == NULL) {
+	    src_addr, func)) == NULL) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
 		    "ibcm_arp_create_prwqn failed");
 		ib_s->status = ENOMEM;
@@ -419,37 +414,85 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	}
 
 	ipst = netstack_find_by_zoneid(GLOBAL_ZONEID)->netstack_ip;
-	/*
-	 * Get the ire for the local address
-	 */
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_lookup: srcip %lX destip %lX",
-	    IBTL_IPV4_ADDR(src_addr), IBTL_IPV4_ADDR(dst_addr));
+	if (dst_addr->family == AF_INET) {
+		/*
+		 * Get the ire for the local address
+		 */
+		IBTF_DPRINTF_L5(cmlog, "ibcm_arp_pr_lookup: ire_ctable_lookup");
+		src_ire = ire_ctable_lookup(src_addr->un.ip4addr, NULL,
+		    IRE_LOCAL, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
+		if (src_ire == NULL) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
+			    "ire_ctable_lookup failed");
+			ib_s->status = EFAULT;
+			goto fail;
+		}
+		IBTF_DPRINTF_L5(cmlog, "ibcm_arp_pr_lookup: ire_ctable_lookup");
 
-	src_ire = ire_ctable_lookup(IBTL_IPV4_ADDR(src_addr), NULL,
-	    IRE_LOCAL, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	if (src_ire == NULL) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
-		    "ire_ctable_lookup failed");
-		ib_s->status = EFAULT;
-		goto fail;
+		/*
+		 * get an ire for the destination address with the matching
+		 * source address
+		 */
+		ire = ire_ftable_lookup(dst_addr->un.ip4addr, 0, 0, 0,
+		    src_ire->ire_ipif, 0, src_ire->ire_zoneid, 0, NULL,
+		    MATCH_IRE_SRC, ipst);
+		if (ire == NULL) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
+			    "ire_ftable_lookup failed");
+			ib_s->status = EFAULT;
+			goto fail;
+		}
+
+		IBTF_DPRINTF_L5(cmlog, "ibcm_arp_pr_lookup: ire_ftable_lookup:"
+		    "done");
+
+		wqnp->gateway.un.ip4addr =
+		    ((ire->ire_gateway_addr == INADDR_ANY) ?
+		    ire->ire_addr : ire->ire_gateway_addr);
+		wqnp->netmask.un.ip4addr = ire->ire_mask;
+		wqnp->src_addr.un.ip4addr = ire->ire_src_addr;
+		wqnp->src_addr.family = wqnp->gateway.family =
+		    wqnp->netmask.family = AF_INET;
+
+	} else if (dst_addr->family == AF_INET6) {
+		/*
+		 * Get the ire for the local address
+		 */
+		src_ire = ire_ctable_lookup_v6(&src_addr->un.ip6addr, NULL,
+		    IRE_LOCAL, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
+		if (src_ire == NULL) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
+			    "ire_ctable_lookup_v6 failed");
+			ib_s->status = EFAULT;
+			goto fail;
+		}
+		IBTF_DPRINTF_L5(cmlog, "ibcm_arp_pr_lookup: "
+		    "ire_ctable_lookup_v6: done");
+
+		/*
+		 * get an ire for the destination address with the matching
+		 * source address
+		 */
+		ire = ire_ftable_lookup_v6(&dst_addr->un.ip6addr, 0, 0, 0,
+		    src_ire->ire_ipif, 0, src_ire->ire_zoneid, 0, NULL,
+		    MATCH_IRE_SRC, ipst);
+		if (ire == NULL) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
+			    "ire_ftable_lookup_v6 failed");
+			ib_s->status = EFAULT;
+			goto fail;
+		}
+		IBTF_DPRINTF_L5(cmlog, "ibcm_arp_pr_lookup: "
+		    "ire_ftable_lookup_v6: done");
+
+		wqnp->gateway.un.ip6addr =
+		    (IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6) ?
+		    ire->ire_addr_v6 : ire->ire_gateway_addr_v6);
+		wqnp->netmask.un.ip6addr = ire->ire_mask_v6;
+		wqnp->src_addr.un.ip6addr = ire->ire_src_addr_v6;
+		wqnp->src_addr.family = wqnp->gateway.family =
+		    wqnp->netmask.family = AF_INET6;
 	}
-
-	/*
-	 * get an ire for the destination adress with the matching source
-	 * address
-	 */
-	ire = ire_ftable_lookup(IBTL_IPV4_ADDR(dst_addr), 0, 0, 0,
-	    src_ire->ire_ipif, 0, src_ire->ire_zoneid, 0, NULL, MATCH_IRE_SRC,
-	    ipst);
-	if (ire == NULL) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
-		    "ire_ftable_lookup failed");
-		ib_s->status = EFAULT;
-		goto fail;
-	}
-
-	wqnp->src_addr.un.ip4addr = ire->ire_src_addr;
-	wqnp->src_addr.family = AF_INET_OFFLOAD;
 
 	ipif = src_ire->ire_ipif;
 	ill = ipif->ipif_ill;
@@ -471,19 +514,50 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 		ill_refhold(hwaddr_ill); 	/* for symmetry */
 	}
 
-	bcopy(hwaddr_ill->ill_phys_addr, &wqnp->src_mac,
-	    hwaddr_ill->ill_phys_addr_length);
-
 	if ((ib_s->status = ibcm_arp_check_interface(hwaddr_ill)) != 0) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
 		    "ibcm_arp_check_interface failed");
 		goto fail;
 	}
 
-	if ((ib_s->status = ibcm_arp_squery_arp(wqnp)) != 0) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
-		    "ibcm_arp_squery_arp failed");
-		goto fail;
+	bcopy(hwaddr_ill->ill_phys_addr, &wqnp->src_mac,
+	    hwaddr_ill->ill_phys_addr_length);
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_lookup: outgoing if:%s",
+	    wqnp->ifname);
+
+	/*
+	 * if the user supplied a address, then verify rts returned
+	 * the same address
+	 */
+	if (wqnp->usrc_addr.family) {
+		len = (wqnp->usrc_addr.family == AF_INET) ?
+		    IP_ADDR_LEN : sizeof (in6_addr_t);
+		if (bcmp(&wqnp->usrc_addr.un, &wqnp->src_addr.un, len)) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: srcaddr "
+			    "mismatch:%d", ENETUNREACH);
+			goto fail;
+		}
+	}
+
+	/*
+	 * at this stage, we have the source address and the IB
+	 * interface, now get the destination mac address from
+	 * arp or ipv6 drivers
+	 */
+	if (wqnp->dst_addr.family == AF_INET) {
+		if ((ib_s->status = ibcm_arp_squery_arp(wqnp)) != 0) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
+			    "ibcm_arp_squery_arp failed: %d", ib_s->status);
+			goto fail;
+		}
+	} else {
+		if ((ib_s->status = ibcm_ipv6_lookup(wqnp, ill, getzoneid())) !=
+		    0) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
+			    "ibcm_ipv6_lookup failed: %d", ib_s->status);
+			goto fail;
+		}
 	}
 
 	ill_refrele(hwaddr_ill);
@@ -505,23 +579,12 @@ fail:
 	return (1);
 }
 
-#define	IBCM_H2N_GID(gid) \
-{ \
-	uint32_t	*ptr; \
-	ptr = (uint32_t *)&gid.gid_prefix; \
-	gid.gid_prefix = (uint64_t)(((uint64_t)ntohl(ptr[0]) << 32) | \
-			(ntohl(ptr[1]))); \
-	ptr = (uint32_t *)&gid.gid_guid; \
-	gid.gid_guid = (uint64_t)(((uint64_t)ntohl(ptr[0]) << 32) | \
-			(ntohl(ptr[1]))); \
-}
-
 /*
  * called from lrsrv.
  * process a AR_ENTRY_QUERY reply from arp
  * the message should be M_DATA -->> dl_unitdata_req
  */
-void
+static void
 ibcm_arp_pr_arp_query_ack(mblk_t *mp)
 {
 	ibcm_arp_prwqn_t 	*wqnp;
@@ -611,7 +674,7 @@ user_callback:
  * process a AR_ENTRY_SQUERY reply from arp
  * the message should be M_IOCACK -->> area_t
  */
-void
+static void
 ibcm_arp_pr_arp_squery_ack(mblk_t *mp)
 {
 	struct iocblk *ioc;
@@ -641,6 +704,11 @@ ibcm_arp_pr_arp_squery_ack(mblk_t *mp)
 	ib_s = (ibcm_arp_streams_t *)wqnp->arg;
 
 	mutex_enter(&ib_s->lock);
+
+	/*
+	 * cancel the timeout for this request
+	 */
+	(void) untimeout(wqnp->timeout_id);
 
 	/* If the entry was not in arp cache, ioc_error is set */
 	if (ioc->ioc_error) {
@@ -693,4 +761,115 @@ ibcm_arp_pr_arp_ack(mblk_t *mp)
 	} else {
 		freemsg(mp);
 	}
+}
+
+/*
+ * query the ipv6 driver cache for ipv6 to mac address mapping.
+ */
+static int
+ibcm_ipv6_lookup(ibcm_arp_prwqn_t *wqnp, ill_t *ill, zoneid_t zoneid)
+{
+	ip2mac_t ip2m;
+	sin6_t *sin6;
+	ip2mac_id_t ip2mid;
+	int err;
+
+	if (wqnp->src_addr.family != AF_INET6) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_ipv6_lookup: SRC_ADDR NOT INET6: "
+		    "%d", wqnp->src_addr.family);
+		return (1);
+	}
+
+	bzero(&ip2m, sizeof (ip2m));
+	sin6 = (sin6_t *)&ip2m.ip2mac_pa;
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_addr = wqnp->dst_addr.un.ip6addr;
+	ip2m.ip2mac_ifindex = ill->ill_phyint->phyint_ifindex;
+
+	wqnp->flags |= IBCM_ARP_PR_RESOLVE_PENDING;
+	wqnp->timeout_id = timeout(ibcm_arp_timeout, wqnp,
+	    drv_usectohz(IBCM_ARP_TIMEOUT * 1000));
+
+	/*
+	 * XXX XTBD set the scopeid?
+	 * issue the request to IP for Neighbor Discovery
+	 */
+	ip2mid = ip2mac(IP2MAC_RESOLVE, &ip2m, ibcm_ipv6_resolver_ack, wqnp,
+	    zoneid);
+	err = ip2m.ip2mac_err;
+	if (err == EINPROGRESS) {
+		wqnp->ip2mac_id = ip2mid;
+		wqnp->flags |= IBCM_ARP_PR_RESOLVE_PENDING;
+		err = 0;
+	} else if (err == 0) {
+		ibcm_ipv6_resolver_ack(&ip2m, wqnp);
+	}
+	return (err);
+}
+
+/*
+ * do sanity checks on the link-level sockaddr
+ */
+static boolean_t
+ibcm_check_sockdl(struct sockaddr_dl *sdl)
+{
+
+	if (sdl->sdl_type != IFT_IB || sdl->sdl_alen != IPOIB_ADDRL)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * callback for resolver lookups, both for success and failure.
+ * If Address resolution was succesful: return GID info.
+ */
+static void
+ibcm_ipv6_resolver_ack(ip2mac_t *ip2macp, void *arg)
+{
+	ibcm_arp_prwqn_t *wqnp = (ibcm_arp_prwqn_t *)arg;
+	ibcm_arp_streams_t *ib_s;
+	uchar_t *cp;
+	int err = 0;
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_ipv6_resolver_ack(%p, %p)", ip2macp, wqnp);
+
+	ib_s = (ibcm_arp_streams_t *)wqnp->arg;
+	mutex_enter(&ib_s->lock);
+
+	/*
+	 * cancel the timeout for this request
+	 */
+	(void) untimeout(wqnp->timeout_id);
+
+	if (ip2macp->ip2mac_err != 0) {
+		wqnp->flags &= ~IBCM_ARP_PR_RESOLVE_PENDING;
+		cv_broadcast(&ib_s->cv);
+		err = EHOSTUNREACH;
+		goto user_callback;
+	}
+
+	if (!ibcm_check_sockdl(&ip2macp->ip2mac_ha)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_ipv6_resolver_ack: Error: "
+		    "interface %s is not IB\n", wqnp->ifname);
+		err = EHOSTUNREACH;
+		goto user_callback;
+	}
+
+	cp = (uchar_t *)LLADDR(&ip2macp->ip2mac_ha);
+	bcopy(cp, &wqnp->dst_mac, IPOIB_ADDRL);
+
+	/*
+	 * at this point we have src/dst gid's derived from the mac addresses
+	 * now get the hca, port
+	 */
+	bcopy(&wqnp->src_mac.ipoib_gidpref, &wqnp->sgid, sizeof (ib_gid_t));
+	bcopy(&wqnp->dst_mac.ipoib_gidpref, &wqnp->dgid, sizeof (ib_gid_t));
+
+	IBCM_H2N_GID(wqnp->sgid);
+	IBCM_H2N_GID(wqnp->dgid);
+
+user_callback:
+	mutex_exit(&ib_s->lock);
+	ibcm_arp_pr_callback(wqnp, err);
 }

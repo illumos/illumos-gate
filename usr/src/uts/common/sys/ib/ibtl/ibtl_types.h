@@ -1558,6 +1558,7 @@ typedef struct ibt_ip_addr_s {
 		in_addr_t	ip4addr;
 		in6_addr_t	ip6addr;
 	} un;
+	uint32_t	ip6_scope_id;	/* Applicable only for AF_INET6 */
 } ibt_ip_addr_t;
 
 #ifdef __cplusplus

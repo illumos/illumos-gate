@@ -36,6 +36,8 @@ extern "C" {
 #include <sys/strsun.h>
 #include <sys/socket.h>
 #include <sys/stat.h>	/* for S_IFCHR */
+#include <inet/ip2mac.h>
+#include <inet/ip6.h>
 
 /*
  * IPoIB addr lookup completion function
@@ -43,17 +45,24 @@ extern "C" {
 typedef int (*ibcm_arp_pr_comp_func_t) (void *usr_arg, int status);
 
 #define	IBCM_ARP_MAX_IFNAME_LEN		24
-#define	IBCM_ARP_RTM_LEN		0x158
 #define	IBCM_ARP_XMIT_COUNT		6
 #define	IBCM_ARP_XMIT_INTERVAL		1000	/* timeout in milliseconds */
 #define	IBCM_ARP_TIMEOUT \
 		((IBCM_ARP_XMIT_COUNT + 1) * IBCM_ARP_XMIT_INTERVAL)
-#define	IBCM_ARP_IP6_TIMEOUT		1000000	/* timeout in microseconds */
 
-enum {
-	IBCM_ARP_PR_RT_PENDING = 0x01,
-	IBCM_ARP_PR_ARP_PENDING = 0x02
-};
+#define	IBCM_H2N_GID(gid) \
+{ \
+	uint32_t	*ptr; \
+	ptr = (uint32_t *)&gid.gid_prefix; \
+	gid.gid_prefix = (uint64_t)(((uint64_t)ntohl(ptr[0]) << 32) | \
+			(ntohl(ptr[1]))); \
+	ptr = (uint32_t *)&gid.gid_guid; \
+	gid.gid_guid = (uint64_t)(((uint64_t)ntohl(ptr[0]) << 32) | \
+			(ntohl(ptr[1]))); \
+}
+
+#define	IBCM_ARP_PR_RT_PENDING		0x01
+#define	IBCM_ARP_PR_RESOLVE_PENDING	0x02
 
 /*
  * Path record wait queue node definition
@@ -66,18 +75,15 @@ typedef struct ibcm_arp_prwqn {
 	ibt_ip_addr_t		usrc_addr;	/* user supplied src address */
 	ibt_ip_addr_t		dst_addr;	/* user supplied dest address */
 	ibt_ip_addr_t		src_addr;	/* rts's view of src address */
+	ibt_ip_addr_t		gateway;	/* rts returned gateway addr */
+	ibt_ip_addr_t		netmask;	/* rts returned netmask */
 	char			ifname[IBCM_ARP_MAX_IFNAME_LEN];
-	int			ibd_instance;
 	uint16_t		ifproto;
 	ipoib_mac_t		src_mac;
 	ipoib_mac_t		dst_mac;
-	uint32_t		localroute;		/* user option */
-	uint32_t		bound_dev_if;		/* user option */
 	ib_gid_t		sgid;
 	ib_gid_t		dgid;
-	uint8_t			hw_port;
-	uint16_t		pkey;
-	int			retries;	/* no. of ND retries for ipv6 */
+	ip2mac_id_t		ip2mac_id;
 } ibcm_arp_prwqn_t;
 
 typedef struct ibcm_arp_streams_s {
@@ -114,11 +120,11 @@ typedef struct ibcm_arp_ibd_insts_s {
 	ibcm_arp_ip_t	*ibcm_arp_ip;
 } ibcm_arp_ibd_insts_t;
 
-ibt_status_t ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip,
+ibt_status_t ibcm_arp_get_ibaddr(ibt_ip_addr_t srcip, ibt_ip_addr_t destip,
     ib_gid_t *sgid, ib_gid_t *dgid);
 ibt_status_t ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *attr,
     ibt_path_flags_t flags, ibtl_cm_port_list_t **list_p);
-ibt_status_t ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp);
+ibt_status_t ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp, sa_family_t fam);
 
 #ifdef	__cplusplus
 }

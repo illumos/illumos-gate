@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_IBTL_IMPL_IBTL_CM_H
 #define	_SYS_IB_IBTL_IMPL_IBTL_CM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_cm.h
@@ -236,6 +234,8 @@ typedef struct ibtl_cm_sm_init_fail_s {
 } ibtl_cm_sm_init_fail_t;
 
 void ibtl_cm_sm_notice_init_failure(ibtl_cm_sm_init_fail_t *ifail);
+
+char *ibtl_cm_get_clnt_name(ibt_clnt_hdl_t ibt_hdl);
 
 #ifdef __cplusplus
 }

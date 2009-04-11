@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,6 +250,8 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		    "ERROR: Service ID in path information is 0", channel);
 		return (IBT_INVALID_PARAM);
 	}
+	IBTF_DPRINTF_L3(cmlog, "ibt_open_rc_channel: chan 0x%p  SID %llX",
+	    channel, chan_args->oc_path->pi_sid);
 
 	/* validate rnr_retry_cnt (enum has more than 3 bits) */
 	if ((uint_t)chan_args->oc_path_rnr_retry_cnt > IBT_RNR_INFINITE_RETRY) {
@@ -2449,8 +2451,9 @@ ibt_register_service(ibt_clnt_hdl_t ibt_hdl, ibt_srv_desc_t *srv,
 {
 	ibcm_svc_info_t		*svcinfop;
 
-	IBTF_DPRINTF_L2(cmlog, "ibt_register_service(%p, %p, %llx, %d)",
-	    ibt_hdl, srv, (longlong_t)sid, num_sids);
+	IBTF_DPRINTF_L2(cmlog, "ibt_register_service(%p (%s), %p, 0x%llX, %d)",
+	    ibt_hdl, ibtl_cm_get_clnt_name(ibt_hdl), srv, (longlong_t)sid,
+	    num_sids);
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*svcinfop))
 
@@ -3037,8 +3040,8 @@ ibt_deregister_service(ibt_clnt_hdl_t ibt_hdl, ibt_srv_hdl_t srv_hdl)
 	ibcm_svc_info_t		*svcp;
 	ibcm_svc_lookup_t	svc;
 
-	IBTF_DPRINTF_L2(cmlog, "ibt_deregister_service(%p, %p)",
-	    ibt_hdl, srv_hdl);
+	IBTF_DPRINTF_L2(cmlog, "ibt_deregister_service(%p (%s), %p)",
+	    ibt_hdl, ibtl_cm_get_clnt_name(ibt_hdl), srv_hdl);
 
 	mutex_enter(&ibcm_svc_info_lock);
 
@@ -3094,7 +3097,7 @@ ibcm_ar_init(void)
 
 	/* remove this special SID from the pool of available SIDs */
 	if ((tmp_svcp = ibcm_create_svc_entry(sid, 1)) == NULL) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_ar_init: "
+		IBTF_DPRINTF_L3(cmlog, "ibcm_ar_init: "
 		    "DAPL ATS SID 0x%llx already registered", (longlong_t)sid);
 		return (IBCM_FAILURE);
 	}
@@ -3185,7 +3188,7 @@ ibt_register_ar(ibt_clnt_hdl_t ibt_hdl, ibt_ar_t *arp)
 	sa_service_record_t	*srv_recp;
 	uint64_t		gid_ored;
 
-	IBTF_DPRINTF_L2(cmlog, "ibt_register_ar: PKey 0x%X GID %llX:%llX",
+	IBTF_DPRINTF_L3(cmlog, "ibt_register_ar: PKey 0x%X GID %llX:%llX",
 	    arp->ar_pkey, (longlong_t)arp->ar_gid.gid_prefix,
 	    (longlong_t)arp->ar_gid.gid_guid);
 
@@ -3337,12 +3340,12 @@ ibt_register_ar(ibt_clnt_hdl_t ibt_hdl, ibt_ar_t *arp)
 	} else {					/* SUCCESS */
 		uint8_t		*b;
 
-		IBTF_DPRINTF_L2(cmlog, "ibt_register_ar: SUCCESS for gid "
+		IBTF_DPRINTF_L3(cmlog, "ibt_register_ar: SUCCESS for gid "
 		    "%llx:%llx pkey %x", (longlong_t)arp->ar_gid.gid_prefix,
 		    (longlong_t)arp->ar_gid.gid_guid, arp->ar_pkey);
 		b = arp->ar_data;
 
-		IBTF_DPRINTF_L2(cmlog, "ibt_register_ar:"
+		IBTF_DPRINTF_L3(cmlog, "ibt_register_ar:"
 		    " data %d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
 		    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9],
 		    b[10], b[11], b[12], b[13], b[14], b[15]);
@@ -3374,8 +3377,8 @@ ibt_deregister_ar(ibt_clnt_hdl_t ibt_hdl, ibt_ar_t *arp)
 	sa_service_record_t	*srv_recp;
 	uint64_t		gid_ored;
 
-	IBTF_DPRINTF_L2(cmlog, "ibt_deregister_ar: pkey %x", arp->ar_pkey);
-	IBTF_DPRINTF_L2(cmlog, "ibt_deregister_ar: gid %llx:%llx",
+	IBTF_DPRINTF_L3(cmlog, "ibt_deregister_ar: pkey %x", arp->ar_pkey);
+	IBTF_DPRINTF_L3(cmlog, "ibt_deregister_ar: gid %llx:%llx",
 	    (longlong_t)arp->ar_gid.gid_prefix,
 	    (longlong_t)arp->ar_gid.gid_guid);
 
@@ -3594,12 +3597,12 @@ ibt_query_ar(ib_gid_t *sgid, ibt_ar_t *queryp, ibt_ar_t *resultp)
 		bcopy(svcrec_resp->ServiceData,
 		    resultp->ar_data, IBCM_DAPL_ATS_NBYTES);
 
-		IBTF_DPRINTF_L2(cmlog, "ibt_query_ar: "
+		IBTF_DPRINTF_L3(cmlog, "ibt_query_ar: "
 		    "Found: pkey %x dgid %llX:%llX", resultp->ar_pkey,
 		    (longlong_t)resultp->ar_gid.gid_prefix,
 		    (longlong_t)resultp->ar_gid.gid_guid);
 		b = resultp->ar_data;
-		IBTF_DPRINTF_L2(cmlog, "ibt_query_ar:"
+		IBTF_DPRINTF_L3(cmlog, "ibt_query_ar:"
 		    " data %d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
 		    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9],
 		    b[10], b[11], b[12], b[13], b[14], b[15]);
@@ -3750,7 +3753,7 @@ ibcm_service_record_rewrite_task(void *arg)
 	avl_tree_t	*avl_tree = &ibcm_svc_avl_tree;
 	static int	task_is_running = 0;
 
-	IBTF_DPRINTF_L2(cmlog, "ibcm_service_record_rewrite_task STARTED "
+	IBTF_DPRINTF_L3(cmlog, "ibcm_service_record_rewrite_task STARTED "
 	    "for hca_guid %llX, port %d", hca_guid, port);
 
 	mutex_enter(&ibcm_svc_info_lock);
@@ -3808,7 +3811,7 @@ check_for_work:
 	task_is_running = 0;
 	mutex_exit(&ibcm_svc_info_lock);
 
-	IBTF_DPRINTF_L2(cmlog, "ibcm_service_record_rewrite_task DONE");
+	IBTF_DPRINTF_L3(cmlog, "ibcm_service_record_rewrite_task DONE");
 	kmem_free(pup, sizeof (ibcm_port_up_t));
 }
 
@@ -4494,7 +4497,7 @@ ibcm_query_classport_info(ibt_channel_hdl_t channel)
 	ibcm_state_data_t	*statep;
 	ibmf_msg_t		*msgp;
 
-	IBTF_DPRINTF_L2(cmlog, "ibcm_query_classport_info(%p)", channel);
+	IBTF_DPRINTF_L3(cmlog, "ibcm_query_classport_info(%p)", channel);
 
 	/* validate channel, first */
 	if (IBCM_INVALID_CHANNEL(channel)) {
@@ -4531,7 +4534,7 @@ ibcm_query_classport_info(ibt_channel_hdl_t channel)
 
 	(void) ibcm_post_mad(msgp, &statep->stored_reply_addr, NULL, NULL);
 
-	IBTF_DPRINTF_L2(cmlog, "ibcm_query_classport_info(%p) "
+	IBTF_DPRINTF_L3(cmlog, "ibcm_query_classport_info(%p) "
 	    "Get method MAD posted ", channel);
 
 	(void) ibcm_free_out_msg(statep->stored_reply_addr.ibmf_hdl, &msgp);
@@ -4739,10 +4742,17 @@ ibcm_process_join_mcg(void *taskq_arg)
 		component_mask |= SA_MC_COMPMASK_MGID;
 	}
 
-	IBTF_DPRINTF_L3(cmlog, "ibcm_process_join_mcg: PGID=%llX:%llX, "
-	    "MGID=%llX:%llX", mcg_req.PortGID.gid_prefix,
-	    mcg_req.PortGID.gid_guid, mcg_req.MGID.gid_prefix,
-	    mcg_req.MGID.gid_guid);
+	IBTF_DPRINTF_L3(cmlog, "ibcm_process_join_mcg: ");
+	IBTF_DPRINTF_L3(cmlog, "PGID=%016llX:%016llX, ",
+	    mcg_req.PortGID.gid_prefix, mcg_req.PortGID.gid_guid);
+	IBTF_DPRINTF_L3(cmlog, "MGID=%016llX:%016llX",
+	    mcg_req.MGID.gid_prefix, mcg_req.MGID.gid_guid);
+	IBTF_DPRINTF_L3(cmlog, "JoinState = %X",
+	    mcg_arg->mcg_attr.mc_join_state);
+	IBTF_DPRINTF_L5(cmlog, "QKey %lX, PKey %lX",
+	    mcg_arg->mcg_attr.mc_qkey, mcg_arg->mcg_attr.mc_pkey);
+	IBTF_DPRINTF_L5(cmlog, "Scope %X, MLID %X",
+	    mcg_arg->mcg_attr.mc_scope, mcg_arg->mcg_attr.mc_mlid);
 
 	/* Is MTU specified. */
 	if (mcg_arg->mcg_attr.mc_mtu_req.r_mtu) {
@@ -6106,7 +6116,7 @@ ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
 	ibds.ibcm_arp_ip = (ibcm_arp_ip_t *)kmem_zalloc(
 	    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t), KM_SLEEP);
 
-	retval = ibcm_arp_get_ibds(&ibds);
+	retval = ibcm_arp_get_ibds(&ibds, AF_UNSPEC);
 	if (retval != IBT_SUCCESS) {
 		IBTF_DPRINTF_L2(cmlog, "ibt_get_src_ip: ibcm_arp_get_ibds "
 		    "failed to get IBD Instances: ret 0x%x", retval);
@@ -6136,11 +6146,11 @@ ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
 		if (src_ip->family == AF_INET) {
 			bcopy(&ipp->ip_cm_sin.sin_addr, &src_ip->un.ip4addr,
 			    sizeof (in_addr_t));
-			IBCM_PRINT_IP("ibt_get_src_ip", src_ip);
 		} else if (src_ip->family == AF_INET6) {
 			bcopy(&ipp->ip_cm_sin6.sin6_addr, &src_ip->un.ip6addr,
 			    sizeof (in6_addr_t));
 		}
+		IBCM_PRINT_IP("ibt_get_src_ip", src_ip);
 	}
 
 get_src_ip_end:
@@ -6236,13 +6246,13 @@ ibt_format_ip_private_data(ibt_ip_cm_info_t *ip_cm_info,
 	bzero(&ip_data, sizeof (ibcm_ip_pvtdata_t));
 	ip_data.ip_srcport = ip_cm_info->src_port; /* Source Port */
 
+	IBCM_PRINT_IP("format_ip_pvt: src", &ip_cm_info->src_addr);
+	IBCM_PRINT_IP("format_ip_pvt: dst", &ip_cm_info->dst_addr);
 	/* IPV = 0x4, if IP-Addr are IPv4 format, else 0x6 for IPv6 */
 	if (ip_cm_info->src_addr.family == AF_INET) {
 		ip_data.ip_ipv = IBT_CM_IP_IPV_V4;
 		ip_data.ip_srcv4 = ip_cm_info->src_addr.un.ip4addr;
 		ip_data.ip_dstv4 = ip_cm_info->dst_addr.un.ip4addr;
-		IBCM_PRINT_IP("format: src", &ip_cm_info->src_addr);
-		IBCM_PRINT_IP("format: dst", &ip_cm_info->dst_addr);
 	} else if (ip_cm_info->src_addr.family == AF_INET6) {
 		ip_data.ip_ipv = IBT_CM_IP_IPV_V6;
 		bcopy(&ip_cm_info->src_addr.un.ip6addr,
@@ -6285,18 +6295,16 @@ ibt_get_ip_data(ibt_priv_data_len_t priv_data_len, void *priv_data,
 	/* IPV = 0x4, if IP Address are IPv4 format, else 0x6 for IPv6 */
 	if (ip_data.ip_ipv == IBT_CM_IP_IPV_V4) {
 		/* Copy IPv4 Addr */
-		ip_cm_infop->src_addr.family = AF_INET;
+		ip_cm_infop->src_addr.family = ip_cm_infop->dst_addr.family =
+		    AF_INET;
 		ip_cm_infop->src_addr.un.ip4addr = ip_data.ip_srcv4;
-		ip_cm_infop->dst_addr.family = AF_INET;
 		ip_cm_infop->dst_addr.un.ip4addr = ip_data.ip_dstv4;
-		IBCM_PRINT_IP("get_ip_data: src", &ip_cm_infop->src_addr);
-		IBCM_PRINT_IP("get_ip_data: dst", &ip_cm_infop->dst_addr);
 	} else if (ip_data.ip_ipv == IBT_CM_IP_IPV_V6) {
 		/* Copy IPv6 Addr */
-		ip_cm_infop->src_addr.family = AF_INET6;
+		ip_cm_infop->src_addr.family = ip_cm_infop->dst_addr.family =
+		    AF_INET6;
 		bcopy(&ip_data.ip_srcv6, &ip_cm_infop->src_addr.un.ip6addr,
 		    sizeof (in6_addr_t));
-		ip_cm_infop->dst_addr.family = AF_INET6;
 		bcopy(&ip_data.ip_dstv6, &ip_cm_infop->dst_addr.un.ip6addr,
 		    sizeof (in6_addr_t));
 	} else {
@@ -6304,6 +6312,8 @@ ibt_get_ip_data(ibt_priv_data_len_t priv_data_len, void *priv_data,
 		    " to be either AF_INET or AF_INET6 family.");
 		return (IBT_INVALID_PARAM);
 	}
+	IBCM_PRINT_IP("ibt_get_ip_data: src", &ip_cm_infop->src_addr);
+	IBCM_PRINT_IP("ibt_get_ip_data: dst", &ip_cm_infop->dst_addr);
 
 	return (IBT_SUCCESS);
 }

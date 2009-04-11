@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -764,4 +764,13 @@ ibtl_cm_is_multi_sm(ib_guid_t hca_guid)
 	    multi_sm);
 
 	return (multi_sm);
+}
+
+char *
+ibtl_cm_get_clnt_name(ibt_clnt_hdl_t ibt_hdl)
+{
+	if (ibt_hdl)
+		return (ibt_hdl->clnt_name);
+	else
+		return (NULL);
 }

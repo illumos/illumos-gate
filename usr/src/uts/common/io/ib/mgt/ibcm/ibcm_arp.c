@@ -49,8 +49,7 @@
 extern char cmlog[];
 
 extern int ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
-    ibt_ip_addr_t *src_addr, uint8_t localroute, uint32_t bound_dev_if,
-    ibcm_arp_pr_comp_func_t func);
+    ibt_ip_addr_t *src_addr, ibcm_arp_pr_comp_func_t func);
 extern void ibcm_arp_pr_arp_ack(mblk_t *mp);
 extern void ibcm_arp_prwqn_delete(ibcm_arp_prwqn_t *wqnp);
 
@@ -64,6 +63,31 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", msgb))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", queue))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sockaddr_in))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sockaddr_in6))
+
+int ibcm_printip = 0;
+
+/*
+ * Function:
+ *	ibcm_ip_print
+ * Input:
+ *	label		Arbitrary qualifying string
+ *	ipa		Pointer to IP Address to print
+ */
+void
+ibcm_ip_print(char *label, ibt_ip_addr_t *ipaddr)
+{
+	char    buf[INET6_ADDRSTRLEN];
+
+	if (ipaddr->family == AF_INET) {
+		IBTF_DPRINTF_L2(cmlog, "%s: %s", label,
+		    inet_ntop(AF_INET, &ipaddr->un.ip4addr, buf, sizeof (buf)));
+	} else if (ipaddr->family == AF_INET6) {
+		IBTF_DPRINTF_L2(cmlog, "%s: %s", label, inet_ntop(AF_INET6,
+		    &ipaddr->un.ip6addr, buf, sizeof (buf)));
+	} else {
+		IBTF_DPRINTF_L2(cmlog, "%s: IP ADDR NOT SPECIFIED ", label);
+	}
+}
 
 /*
  * ibcm_arp_get_ibaddr_cb
@@ -330,15 +354,14 @@ ibcm_arp_link_drivers(ibcm_arp_streams_t *ib_s)
 }
 
 ibt_status_t
-ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
-    ib_gid_t *dgid)
+ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
+    ib_gid_t *sgid, ib_gid_t *dgid)
 {
 	ibcm_arp_streams_t	*ib_s;
-	ibt_ip_addr_t		srcaddr, destaddr;
 	int			ret = 0;
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr(%lX, %lX, %p, %p)",
-	    htonl(srcip), htonl(destip), sgid, dgid);
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr(%p, %p, %p, %p)",
+	    srcaddr, destaddr, sgid, dgid);
 
 	ib_s = (ibcm_arp_streams_t *)kmem_zalloc(sizeof (ibcm_arp_streams_t),
 	    KM_SLEEP);
@@ -353,21 +376,11 @@ ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
 		goto arp_ibaddr_error;
 	}
 
-	bzero(&destaddr, sizeof (ibt_ip_addr_t));
-	bzero(&srcaddr, sizeof (ibt_ip_addr_t));
-
 	mutex_enter(&ib_s->lock);
 	ib_s->done = B_FALSE;
 	mutex_exit(&ib_s->lock);
 
-	destaddr.family = AF_INET_OFFLOAD;
-	destaddr.un.ip4addr = destip;
-	srcaddr.family = AF_INET_OFFLOAD;
-	srcaddr.un.ip4addr = srcip;
-
-	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: SrcIP %lX, DstIP %lX",
-	    srcaddr.un.ip4addr, destaddr.un.ip4addr);
-	ret = ibcm_arp_pr_lookup(ib_s, &destaddr, &srcaddr, 0, NULL,
+	ret = ibcm_arp_pr_lookup(ib_s, &destaddr, &srcaddr,
 	    ibcm_arp_get_ibaddr_cb);
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: ibcm_arp_pr_lookup "
@@ -442,26 +455,40 @@ ibcm_arp_ibd_gid2mac(ib_gid_t *gid, ib_pkey_t pkey, ibcm_arp_ibd_insts_t *ibdp)
 }
 
 static ibt_status_t
-ibcm_arp_ibd_mac2gid(ibcm_arp_ibd_insts_t *ibdp, ipaddr_t srcip,
+ibcm_arp_ibd_mac2gid(ibcm_arp_ibd_insts_t *ibdp, ibt_ip_addr_t *srcip,
     ib_gid_t *sgid)
 {
 	ibcm_arp_ip_t		*ipp;
 	int			i;
+	boolean_t		found = B_FALSE;
 
 	for (i = 0, ipp = ibdp->ibcm_arp_ip; i < ibdp->ibcm_arp_ibd_cnt;
 	    i++, ipp++) {
 
-		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_ibd_mac2gid: Is %lX == %lX "
-		    "GID %llX:%llX", srcip, ipp->ip_cm_sin.sin_addr,
+		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_ibd_mac2gid: GID %llX:%llX",
 		    ipp->ip_port_gid.gid_prefix, ipp->ip_port_gid.gid_guid);
 
-		if (bcmp(&srcip, &ipp->ip_cm_sin.sin_addr, sizeof (in_addr_t))
-		    == 0) {
-			*sgid = ipp->ip_port_gid;
+		if (srcip->family == ipp->ip_inet_family) {
+			if ((srcip->family == AF_INET) &&
+			    (bcmp(&srcip->un.ip4addr, &ipp->ip_cm_sin.sin_addr,
+			    sizeof (in_addr_t)) == 0)) {
+				found = B_TRUE;
+			} else if ((srcip->family == AF_INET6) &&
+			    IN6_ARE_ADDR_EQUAL(&srcip->un.ip6addr,
+			    &ipp->ip_cm_sin6.sin6_addr)) {
+				found = B_TRUE;
+			}
+			if (found) {
+				*sgid = ipp->ip_port_gid;
 
-			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_ibd_mac2gid: Found "
-			    "GID %llX:%llX", sgid->gid_prefix, sgid->gid_guid);
-			return (IBT_SUCCESS);
+				IBTF_DPRINTF_L4(cmlog, "ibcm_arp_ibd_mac2gid: "
+				    "Found GID %llX:%llX", sgid->gid_prefix,
+				    sgid->gid_guid);
+				return (IBT_SUCCESS);
+			}
+		} else {
+			IBTF_DPRINTF_L3(cmlog, "ibcm_arp_ibd_mac2gid: Different"
+			    " family keep searching...");
 		}
 	}
 	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_ibd_mac2gid: Matching SRC info "
@@ -563,18 +590,20 @@ ibcm_do_ip_ioctl(int cmd, int len, void *arg)
  * lifcp->lifc_buf is dynamically allocated to be *bufsizep bytes.
  */
 static int
-ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep)
+ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep, sa_family_t family_loc)
 {
 	int err;
 	struct lifnum lifn;
 
 	bzero(&lifn, sizeof (struct lifnum));
-	lifn.lifn_family = AF_UNSPEC;
+	lifn.lifn_family = family_loc;
 
 	err = ibcm_do_ip_ioctl(SIOCGLIFNUM, sizeof (struct lifnum), &lifn);
 	if (err != 0)
 		return (err);
 
+	IBTF_DPRINTF_L4(cmlog, "ibcm_do_lifconf: Family %d, lifn_count %d",
+	    family_loc, lifn.lifn_count);
 	/*
 	 * Pad the interface count to account for additional interfaces that
 	 * may have been configured between the SIOCGLIFNUM and SIOCGLIFCONF.
@@ -583,7 +612,7 @@ ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep)
 
 	bzero(lifcp, sizeof (struct lifconf));
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*lifcp))
-	lifcp->lifc_family = AF_UNSPEC;
+	lifcp->lifc_family = family_loc;
 	lifcp->lifc_len = *bufsizep = lifn.lifn_count * sizeof (struct lifreq);
 	lifcp->lifc_buf = kmem_zalloc(*bufsizep, KM_SLEEP);
 
@@ -600,7 +629,7 @@ ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep)
  * B_TRUE if at least one address was filled in.
  */
 static boolean_t
-ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds)
+ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds, sa_family_t family_loc)
 {
 	int i, nifs, naddr = 0;
 	uint_t bufsize;
@@ -608,10 +637,14 @@ ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds)
 	struct lifreq *lifrp;
 	ibcm_arp_ip_t *ipp;
 
-	if (ibcm_do_lifconf(&lifc, &bufsize) != 0)
+	if (ibcm_do_lifconf(&lifc, &bufsize, family_loc) != 0)
 		return (B_FALSE);
 
 	nifs = lifc.lifc_len / sizeof (struct lifreq);
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibd_ipaddr: Family %d, nifs %d",
+	    family_loc, nifs);
+
 	for (lifrp = lifc.lifc_req, i = 0;
 	    i < nifs && naddr < ibds->ibcm_arp_ibd_cnt; i++, lifrp++) {
 		if (lifrp->lifr_type != IFT_IB)
@@ -639,8 +672,12 @@ ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds)
 }
 
 ibt_status_t
-ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp)
+ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp, sa_family_t family_loc)
 {
+#ifdef DEBUG
+	int i;
+#endif
+
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibds(%p)", ibdp);
 
 	ibcm_arp_get_ibd_insts(ibdp);
@@ -652,11 +689,36 @@ ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp)
 		return (IBT_SRC_IP_NOT_FOUND);
 
 	/* Get the IP addresses of active ports. */
-	if (!ibcm_arp_get_ibd_ipaddr(ibdp)) {
+	if (!ibcm_arp_get_ibd_ipaddr(ibdp, family_loc)) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_ibds: failed to get "
 		    "ibd instance: IBT_SRC_IP_NOT_FOUND");
 		return (IBT_SRC_IP_NOT_FOUND);
 	}
+
+#ifdef DEBUG
+	for (i = 0; i < ibdp->ibcm_arp_ibd_cnt; i++) {
+		char    my_buf[INET6_ADDRSTRLEN];
+		ibcm_arp_ip_t	*aip = &ibdp->ibcm_arp_ip[i];
+
+		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibds: ibd[%d]: Family %d "
+		    "Instance %d PKey 0x%lX \n HCAGUID 0x%llX SGID %llX:%llX",
+		    i, aip->ip_inet_family, aip->ip_inst, aip->ip_pkey,
+		    aip->ip_hca_guid, aip->ip_port_gid.gid_prefix,
+		    aip->ip_port_gid.gid_guid);
+		if (aip->ip_inet_family == AF_INET) {
+			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibds: IPV4: %s",
+			    inet_ntop(AF_INET, &aip->ip_cm_sin.sin_addr, my_buf,
+			    sizeof (my_buf)));
+		} else if (aip->ip_inet_family == AF_INET6) {
+			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibds: IPV6: %s",
+			    inet_ntop(AF_INET6, &aip->ip_cm_sin6.sin6_addr,
+			    my_buf, sizeof (my_buf)));
+		} else {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_ibds: Unknown "
+			    "Family %d", aip->ip_inet_family);
+		}
+	}
+#endif
 
 	return (IBT_SUCCESS);
 }
@@ -673,9 +735,15 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 	ibcm_arp_ip_t		*ipp;
 	ibtl_cm_port_list_t	*plistp;
 	ib_gid_t		sgid;
+	sa_family_t		family_interested = AF_UNSPEC;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_srcip_plist(%p, %llX)",
 	    ipattr, flags);
+
+	if (ipattr->ipa_src_ip.family != AF_UNSPEC)
+		family_interested = ipattr->ipa_src_ip.family;
+	else
+		family_interested = ipattr->ipa_dst_ip[0].family;
 
 	sgid.gid_prefix = sgid.gid_guid = 0;
 	bzero(&ibds, sizeof (ibcm_arp_ibd_insts_t));
@@ -684,7 +752,7 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 	ibds.ibcm_arp_ip = (ibcm_arp_ip_t *)kmem_zalloc(
 	    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t), KM_SLEEP);
 
-	ret = ibcm_arp_get_ibds(&ibds);
+	ret = ibcm_arp_get_ibds(&ibds, family_interested);
 	if (ret != IBT_SUCCESS) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_srcip_plist: "
 		    "ibcm_arp_get_ibds failed : 0x%x", ret);
@@ -692,8 +760,7 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 	}
 
 	if (ipattr->ipa_src_ip.family != AF_UNSPEC) {
-		ret = ibcm_arp_ibd_mac2gid(&ibds,
-		    htonl(ipattr->ipa_src_ip.un.ip4addr), &sgid);
+		ret = ibcm_arp_ibd_mac2gid(&ibds, &ipattr->ipa_src_ip, &sgid);
 		if (ret != IBT_SUCCESS) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_srcip_plist: "
 			    "SGID for the specified SRCIP Not found %X", ret);
@@ -743,18 +810,17 @@ ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
 					    &plistp->p_src_ip.un.ip4addr,
 					    sizeof (in_addr_t));
 
-					IBTF_DPRINTF_L4(cmlog,
-					    "ibcm_arp_get_srcip_plist: SrcIP: "
-					    "%lX", plistp->p_src_ip.un.ip4addr);
 				} else if (ipp->ip_inet_family == AF_INET6) {
 					plistp->p_src_ip.family = AF_INET6;
 					bcopy(&ipp->ip_cm_sin6.sin6_addr,
 					    &plistp->p_src_ip.un.ip6addr,
 					    sizeof (in6_addr_t));
 				}
+				IBCM_PRINT_IP("ibcm_arp_get_srcip_plist: "
+				    "IP Addr is:", &plistp->p_src_ip);
 			}
 		}
-		if (no_srcip_configured == B_TRUE) {
+		if (no_srcip_configured) {
 			ibtl_cm_port_list_t	*n_plistp, *tmp_n_plistp;
 			uint8_t			new_cnt;
 
