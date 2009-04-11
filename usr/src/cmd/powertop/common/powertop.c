@@ -263,9 +263,10 @@ main(int argc, char **argv)
 		g_tog_p_events 	= 0;
 		g_total_events 	= 0;
 
-		(void) memset(g_event_info,
-		    EVENT_NUM_MAX * sizeof (event_info_t), 0);
-		(void) memset(g_cstate_info, 2 * sizeof (state_info_t), 0);
+		(void) memset(g_event_info, 0,
+		    EVENT_NUM_MAX * sizeof (event_info_t));
+		(void) memset(g_cstate_info, NSTATES
+		    * sizeof (state_info_t), 0);
 
 		/* Collect idle state transition stats */
 		if (features & FEATURE_CSTATE &&

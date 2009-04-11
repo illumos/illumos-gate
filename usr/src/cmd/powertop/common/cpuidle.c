@@ -163,15 +163,6 @@ pt_cpuidle_stat_collect(double interval)
 	hrtime_t	t = 0;
 
 	/*
-	 * Zero out the interval time reported by DTrace for
-	 * this interval
-	 */
-	for (i = 0; i < NSTATES; i++) {
-		g_cstate_info[i].total_time = 0;
-		g_cstate_info[i].events = 0;
-	}
-
-	/*
 	 * Assume that all the time spent in this interval will
 	 * be the default "0" state. The DTrace walker will reallocate
 	 * time out of the default bucket as it processes aggregation
