@@ -1,6 +1,7 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -20,11 +21,7 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +40,7 @@ static int ixgbe_get_context(mblk_t *, ixgbe_tx_context_t *);
 static boolean_t ixgbe_check_context(ixgbe_tx_ring_t *,
     ixgbe_tx_context_t *);
 static void ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *,
-    ixgbe_tx_context_t *, int);
+    ixgbe_tx_context_t *);
 
 #ifndef IXGBE_DEBUG
 #pragma inline(ixgbe_save_desc)
@@ -125,8 +122,9 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 		 * If the mblk size exceeds the max size ixgbe could
 		 * process, then discard this mblk, and return NULL.
 		 */
-		if ((ctx->lso_flag && ((mbsize - ctx->mac_hdr_len)
-		    > IXGBE_LSO_MAXLEN)) || (!ctx->lso_flag &&
+		if ((ctx->lso_flag &&
+		    ((mbsize - ctx->mac_hdr_len) > IXGBE_LSO_MAXLEN)) ||
+		    (!ctx->lso_flag &&
 		    (mbsize > (ixgbe->max_frame_size - ETHERFCSL)))) {
 			freemsg(mp);
 			IXGBE_DEBUGLOG_0(ixgbe, "ixgbe_tx: packet oversize");
@@ -140,8 +138,9 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	 * Check and recycle tx descriptors.
 	 * The recycle threshold here should be selected carefully
 	 */
-	if (tx_ring->tbd_free < tx_ring->recycle_thresh)
+	if (tx_ring->tbd_free < tx_ring->recycle_thresh) {
 		tx_ring->tx_recycle(tx_ring);
+	}
 
 	/*
 	 * After the recycling, if the tbd_free is less than the
@@ -200,7 +199,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 		 */
 		if ((nmp != mp) ||
 		    (P2NPHASE((uintptr_t)nmp->b_rptr, ixgbe->sys_page_size)
-		    < len)) {
+		    < hdr_len)) {
 			IXGBE_DEBUG_STAT(tx_ring->stat_lso_header_fail);
 			/*
 			 * reallocate the mblk for the last header fragment,
@@ -209,7 +208,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 			 */
 			new_mp = allocb(hdr_frag_len, NULL);
 			if (!new_mp)
-				return (B_FALSE);
+				return (mp);
 			bcopy(nmp->b_rptr, new_mp->b_rptr, hdr_frag_len);
 			/* link the new header fragment with the other parts */
 			new_mp->b_wptr = new_mp->b_rptr + hdr_frag_len;
@@ -569,8 +568,10 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &hckflags);
 	bzero(ctx, sizeof (ixgbe_tx_context_t));
 
-	if (hckflags == 0)
+	if (hckflags == 0) {
 		return (0);
+	}
+
 	ctx->hcksum_flags = hckflags;
 
 	lso_info_get(mp, &mss, &lsoflags);
@@ -771,7 +772,7 @@ ixgbe_check_context(ixgbe_tx_ring_t *tx_ring, ixgbe_tx_context_t *ctx)
  */
 static void
 ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
-    ixgbe_tx_context_t *ctx, int ring_index)
+    ixgbe_tx_context_t *ctx)
 {
 	/*
 	 * Fill the context descriptor with the checksum
@@ -808,12 +809,13 @@ ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
 	}
 
 	ctx_tbd->seqnum_seed = 0;
-	ctx_tbd->mss_l4len_idx = ring_index << 4;
 
 	if (ctx->lso_flag) {
-		ctx_tbd->mss_l4len_idx |=
+		ctx_tbd->mss_l4len_idx =
 		    (ctx->l4_hdr_len << IXGBE_ADVTXD_L4LEN_SHIFT) |
 		    (ctx->mss << IXGBE_ADVTXD_MSS_SHIFT);
+	} else {
+		ctx_tbd->mss_l4len_idx = 0;
 	}
 }
 
@@ -870,8 +872,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 * hardware checksum offload informations.
 			 */
 			ixgbe_fill_context(
-			    (struct ixgbe_adv_tx_context_desc *)tbd,
-			    ctx, tx_ring->index);
+			    (struct ixgbe_adv_tx_context_desc *)tbd, ctx);
 
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
@@ -938,23 +939,35 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	/*
 	 * The Insert Ethernet CRC (IFCS) bit and the checksum fields are only
 	 * valid in the first descriptor of the packet.
+	 * Setting paylen in every first_tbd for all parts.
+	 * 82599 requires the packet length in paylen field with or without
+	 * LSO and 82598 will ignore it in non-LSO mode.
 	 */
 	ASSERT(first_tbd != NULL);
 	first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS;
-	first_tbd->read.olinfo_status |= (tx_ring->index << 4);
 
-	if (ctx != NULL && ctx->lso_flag) {
-		first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
-		first_tbd->read.olinfo_status |=
-		    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
-		    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
-	}
-
-	if (ctx != NULL && ctx->lso_flag) {
-		first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
-		first_tbd->read.olinfo_status |=
-		    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
-		    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
+	switch (hw->mac.type) {
+	case ixgbe_mac_82599EB:
+		if (ctx != NULL && ctx->lso_flag) {
+			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
+			first_tbd->read.olinfo_status |=
+			    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
+			    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
+		} else {
+			first_tbd->read.olinfo_status |=
+			    (mbsize << IXGBE_ADVTXD_PAYLEN_SHIFT);
+		}
+		break;
+	case ixgbe_mac_82598EB:
+		if (ctx != NULL && ctx->lso_flag) {
+			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
+			first_tbd->read.olinfo_status |=
+			    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
+			    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
+		}
+		break;
+	default:
+		break;
 	}
 
 	/* Set hardware checksum bits */

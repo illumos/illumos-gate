@@ -1,6 +1,7 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,10 +18,6 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -106,8 +103,15 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		ixgbe_ks->qbrc[i].value.ui64 +=
 		    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
 		ixgbe_ks->tor.value.ui64 += ixgbe_ks->qbrc[i].value.ui64;
-		ixgbe_ks->qbtc[i].value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+		if (hw->mac.type >= ixgbe_mac_82599EB) {
+			ixgbe_ks->qbtc[i].value.ui64 +=
+			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
+			ixgbe_ks->qbtc[i].value.ui64 += ((uint64_t)
+			    (IXGBE_READ_REG(hw, IXGBE_QBTC_H(i))) << 32);
+		} else {
+			ixgbe_ks->qbtc[i].value.ui64 +=
+			    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+		}
 		ixgbe_ks->tot.value.ui64 += ixgbe_ks->qbtc[i].value.ui64;
 	}
 	/*
@@ -144,9 +148,21 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	ixgbe_ks->mrfc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_MRFC);
 	ixgbe_ks->rlec.value.ui64 += IXGBE_READ_REG(hw, IXGBE_RLEC);
 	ixgbe_ks->lxontxc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_LXONTXC);
-	ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_LXONRXC);
+	if (hw->mac.type == ixgbe_mac_82598EB) {
+		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
+		    IXGBE_LXONRXC);
+	} else {
+		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
+		    IXGBE_LXONRXCNT);
+	}
 	ixgbe_ks->lxofftxc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_LXOFFTXC);
-	ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_LXOFFRXC);
+	if (hw->mac.type == ixgbe_mac_82598EB) {
+		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
+		    IXGBE_LXOFFRXC);
+	} else {
+		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
+		    IXGBE_LXOFFRXCNT);
+	}
 	ixgbe_ks->ruc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_RUC);
 	ixgbe_ks->rfc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_RFC);
 	ixgbe_ks->roc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_ROC);

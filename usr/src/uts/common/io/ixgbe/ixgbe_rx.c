@@ -1,6 +1,7 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,10 +18,6 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -67,13 +64,9 @@ ixgbe_rx_recycle(caddr_t arg)
 	 * Using the recycled data buffer to generate a new mblk
 	 */
 	recycle_rcb->mp = desballoc((unsigned char *)
-	    (recycle_rcb->rx_buf.address - IPHDR_ALIGN_ROOM),
-	    (recycle_rcb->rx_buf.size + IPHDR_ALIGN_ROOM),
+	    recycle_rcb->rx_buf.address,
+	    recycle_rcb->rx_buf.size,
 	    0, &recycle_rcb->free_rtn);
-	if (recycle_rcb->mp != NULL) {
-		recycle_rcb->mp->b_rptr += IPHDR_ALIGN_ROOM;
-		recycle_rcb->mp->b_wptr += IPHDR_ALIGN_ROOM;
-	}
 
 	/*
 	 * Put the recycled rx control block into free list
@@ -168,18 +161,15 @@ ixgbe_rx_bind(ixgbe_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 	 */
 	if (current_rcb->mp == NULL) {
 		current_rcb->mp = desballoc((unsigned char *)
-		    (current_rcb->rx_buf.address - IPHDR_ALIGN_ROOM),
-		    (current_rcb->rx_buf.size + IPHDR_ALIGN_ROOM),
+		    current_rcb->rx_buf.address,
+		    current_rcb->rx_buf.size,
 		    0, &current_rcb->free_rtn);
 		/*
 		 * If it is failed to built a mblk using the current
 		 * DMA buffer, we have to return and use bcopy to
 		 * process the packet.
 		 */
-		if (current_rcb->mp != NULL) {
-			current_rcb->mp->b_rptr += IPHDR_ALIGN_ROOM;
-			current_rcb->mp->b_wptr += IPHDR_ALIGN_ROOM;
-		} else {
+		if (current_rcb->mp == NULL) {
 			atomic_inc_32(&rx_ring->rcb_free);
 			return (NULL);
 		}
@@ -379,7 +369,6 @@ rx_discard:
 	 * Update the h/w tail accordingly
 	 */
 	rx_tail = PREV_INDEX(rx_next, 1, rx_ring->ring_size);
-
 	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_RDT(rx_ring->index), rx_tail);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {

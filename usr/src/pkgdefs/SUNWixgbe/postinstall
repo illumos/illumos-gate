@@ -2,7 +2,7 @@
 #
 # CDDL HEADER START
 #
-# Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+# Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
 # The contents of this file are subject to the terms of the
 # Common Development and Distribution License (the "License").
 # You may not use this file except in compliance with the License.
@@ -128,13 +128,20 @@ check_add_drv()
 }
 
 check_add_drv -i		\
-	'"pciex8086,10c6"
+	'"pciex8086,10b6"
+	"pciex8086,10c6"
 	"pciex8086,10c7"
 	"pciex8086,10c8"
 	"pciex8086,10db"
 	"pciex8086,10dd"
-	"pciex8086,10ec"
 	"pciex8086,10e1"
+	"pciex8086,10ec"
 	"pciex8086,10f1"
-	"pciex8086,10f4"'	\
+	"pciex8086,10f4"
+	"pciex8086,10f7"
+	"pciex8086,10f9"
+	"pciex8086,10fb"
+	"pciex8086,1507"
+	"pciex8086,1508"
+	"pciex8086,1514"'	\
 	-b "$BASEDIR" ixgbe

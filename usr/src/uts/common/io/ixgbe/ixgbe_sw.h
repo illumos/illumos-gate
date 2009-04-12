@@ -1,6 +1,7 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,10 +18,6 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -94,13 +91,15 @@ extern "C" {
 #define	MAX_COOKIE			18
 #define	MIN_NUM_TX_DESC			2
 
+#define	IXGBE_ADAPTER_REGSET		1	/* map adapter registers */
+
 /*
- * MAX_xx_QUEUE_NUM and MAX_RING_VECTOR values need to be the maximum of all
+ * MAX_xx_QUEUE_NUM and MAX_INTR_VECTOR values need to be the maximum of all
  * supported silicon types.
  */
-#define	MAX_TX_QUEUE_NUM		32
-#define	MAX_RX_QUEUE_NUM		64
-#define	MAX_RING_VECTOR			16
+#define	MAX_TX_QUEUE_NUM		128
+#define	MAX_RX_QUEUE_NUM		128
+#define	MAX_INTR_VECTOR			64
 
 /*
  * Maximum values for user configurable parameters
@@ -111,7 +110,8 @@ extern "C" {
 
 #define	MAX_MTU				16366
 #define	MAX_RX_LIMIT_PER_INTR		4096
-#define	MAX_INTR_THROTTLING		65535
+#define	MAX_INTR_THROTTLING_82598	65535
+#define	MAX_INTR_THROTTLING_82599	0x7FC
 
 #define	MAX_RX_COPY_THRESHOLD		9216
 #define	MAX_TX_COPY_THRESHOLD		9216
@@ -144,7 +144,8 @@ extern "C" {
 
 #define	DEFAULT_MTU			ETHERMTU
 #define	DEFAULT_RX_LIMIT_PER_INTR	256
-#define	DEFAULT_INTR_THROTTLING		200	/* In unit of 256 nsec */
+#define	DEFAULT_INTR_THROTTLING_82598	200	/* In unit of 256 nsec */
+#define	DEFAULT_INTR_THROTTLING_82599	26	/* In unit of 2 usec */
 #define	DEFAULT_RX_COPY_THRESHOLD	128
 #define	DEFAULT_TX_COPY_THRESHOLD	512
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
@@ -267,6 +268,7 @@ typedef struct adapter_info {
 
 /* bits representing all interrupt types other than tx & rx */
 #define	IXGBE_OTHER_INTR	0x3ff00000
+#define	IXGBE_82599_OTHER_INTR	0x86100000
 
 /*
  * Shorthand for the NDD parameters
@@ -643,15 +645,17 @@ typedef struct ixgbe_rx_group {
 } ixgbe_rx_group_t;
 
 /*
- * structure to map ring cleanup to msi-x vector
+ * structure to map interrupt cleanup to msi-x vector
  */
-typedef struct ixgbe_ring_vector {
+typedef struct ixgbe_intr_vector {
 	struct ixgbe *ixgbe;	/* point to my adapter */
 	ulong_t rx_map[BT_BITOUL(MAX_RX_QUEUE_NUM)];	/* bitmap of rx rings */
 	int	rxr_cnt;	/* count rx rings */
 	ulong_t tx_map[BT_BITOUL(MAX_TX_QUEUE_NUM)];	/* bitmap of tx rings */
 	int	txr_cnt;	/* count tx rings */
-} ixgbe_ring_vector_t;
+	ulong_t other_map[BT_BITOUL(2)];		/* bitmap of other */
+	int	other_cnt;	/* count other interrupt */
+} ixgbe_intr_vector_t;
 
 /*
  * Software adapter state
@@ -666,6 +670,8 @@ typedef struct ixgbe {
 	adapter_info_t		*capab;	/* adapter hardware capabilities */
 	ddi_taskq_t		*lsc_taskq;	/* link-status-change taskq */
 	uint32_t		eims;		/* interrupt mask setting */
+	uint32_t		eimc;		/* interrupt mask clear */
+	uint32_t		eicr;		/* interrupt cause reg */
 
 	uint32_t		ixgbe_state;
 	link_state_t		link_state;
@@ -680,9 +686,9 @@ typedef struct ixgbe {
 	uint32_t		max_frame_size;
 
 	/*
-	 * Each msi-x vector: map vector to ring cleanup
+	 * Each msi-x vector: map vector to interrupt cleanup
 	 */
-	ixgbe_ring_vector_t	vect_map[MAX_RING_VECTOR];
+	ixgbe_intr_vector_t	vect_map[MAX_INTR_VECTOR];
 
 	/*
 	 * Receive Rings
@@ -717,7 +723,7 @@ typedef struct ixgbe {
 	boolean_t		rx_hcksum_enable; /* Rx h/w cksum offload */
 	uint32_t		rx_copy_thresh; /* Rx copy threshold */
 	uint32_t		rx_limit_per_intr; /* Rx pkts per interrupt */
-	uint32_t		intr_throttling[MAX_RING_VECTOR];
+	uint32_t		intr_throttling[MAX_INTR_VECTOR];
 	uint32_t		intr_force;
 	int			fm_capabilities; /* FMA capabilities */
 

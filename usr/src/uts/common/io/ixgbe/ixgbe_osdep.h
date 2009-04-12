@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #ifndef	_IXGBE_OSDEP_H
@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/byteorder.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
 #include <sys/stropts.h>
@@ -55,27 +56,10 @@ extern "C" {
 /* function declarations */
 struct ixgbe_hw;
 uint16_t ixgbe_read_pci_cfg(struct ixgbe_hw *, uint32_t);
-
+void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 
 #define	usec_delay(x)		drv_usecwait(x)
 #define	msec_delay(x)		drv_usecwait(x * 1000)
-
-#ifdef IXGBE_DEBUG
-#define	DEBUGOUT(S)		IXGBE_DEBUGLOG_0(NULL, S)
-#define	DEBUGOUT1(S, A)		IXGBE_DEBUGLOG_1(NULL, S, A)
-#define	DEBUGOUT2(S, A, B)	IXGBE_DEBUGLOG_2(NULL, S, A, B)
-#define	DEBUGOUT3(S, A, B, C)	IXGBE_DEBUGLOG_3(NULL, S, A, B, C)
-#define	DEBUGOUT6(S, A, B, C, D, E, F) \
-    IXGBE_DEBUGLOG_6(NULL, S, A, B, C, D, E, F)
-#define	DEBUGFUNC(F)		IXGBE_DEBUGLOG_1(NULL, "Entering %s", F)
-#else
-#define	DEBUGOUT(S)
-#define	DEBUGOUT1(S, A)
-#define	DEBUGOUT2(S, A, B)
-#define	DEBUGOUT3(S, A, B, C)
-#define	DEBUGOUT6(S, A, B, C, D, E, F)
-#define	DEBUGFUNC(F)
-#endif
 
 #define	OS_DEP(hw)		((struct ixgbe_osdep *)((hw)->back))
 
@@ -83,6 +67,7 @@ uint16_t ixgbe_read_pci_cfg(struct ixgbe_hw *, uint32_t);
 #define	true		B_TRUE
 
 #define	IXGBE_READ_PCIE_WORD 	ixgbe_read_pci_cfg
+#define	IXGBE_WRITE_PCIE_WORD 	ixgbe_write_pci_cfg
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
@@ -103,7 +88,15 @@ uint16_t ixgbe_read_pci_cfg(struct ixgbe_hw *, uint32_t);
 	ddi_get32((OS_DEP(a))->reg_handle, \
 	    (uint32_t *)((uintptr_t)(a)->hw_addr + reg))
 
+#define	IXGBE_WRITE_REG64(hw, reg, value)	\
+	do {								\
+		IXGBE_WRITE_REG(hw, reg, (u32) value);			\
+		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32));	\
+		_NOTE(CONSTCOND)					\
+	} while (0)
+
 #define	msec_delay_irq	msec_delay
+#define	IXGBE_HTONL	htonl
 
 #define	UNREFERENCED_PARAMETER(x)	_NOTE(ARGUNUSED(x))
 

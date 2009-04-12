@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,14 +22,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_IXGBE_DEBUG_H
 #define	_IXGBE_DEBUG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,6 +74,34 @@ extern "C" {
 void ixgbe_pci_dump(void *);
 void ixgbe_dump_interrupt(void *, char *);
 void ixgbe_dump_addr(void *, char *, const uint8_t *);
+
+#endif	/* IXGBE_DEBUG */
+
+#ifdef IXGBE_DEBUG
+
+#define	DEBUGOUT(S)	\
+	IXGBE_DEBUGLOG_0(NULL, S)
+#define	DEBUGOUT1(S, A)	\
+	IXGBE_DEBUGLOG_1(NULL, S, A)
+#define	DEBUGOUT2(S, A, B)	\
+	IXGBE_DEBUGLOG_2(NULL, S, A, B)
+#define	DEBUGOUT3(S, A, B, C)	\
+	IXGBE_DEBUGLOG_3(NULL, S, A, B, C)
+#define	DEBUGOUT6(S, A, B, C, D, E, F)	\
+	IXGBE_DEBUGLOG_6(NULL, S, A, B, C, D, E, F)
+
+#define	DEBUGFUNC(F)	\
+	IXGBE_DEBUGLOG_0(NULL, F)
+
+#else
+
+#define	DEBUGOUT(S)
+#define	DEBUGOUT1(S, A)
+#define	DEBUGOUT2(S, A, B)
+#define	DEBUGOUT3(S, A, B, C)
+#define	DEBUGOUT6(S, A, B, C, D, E, F)
+
+#define	DEBUGFUNC(F)
 
 #endif	/* IXGBE_DEBUG */
 

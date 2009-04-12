@@ -1,6 +1,7 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -20,11 +21,7 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,8 +113,15 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_OBYTES:
 		ixgbe_ks->tot.value.ui64 = 0;
 		for (i = 0; i < 16; i++) {
-			ixgbe_ks->qbtc[i].value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+			if (hw->mac.type >= ixgbe_mac_82599EB) {
+				ixgbe_ks->qbtc[i].value.ui64 +=
+				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
+				ixgbe_ks->qbtc[i].value.ui64 += ((uint64_t)
+				    IXGBE_READ_REG(hw, IXGBE_QBTC_H(i))) << 32;
+			} else {
+				ixgbe_ks->qbtc[i].value.ui64 +=
+				    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+			}
 			ixgbe_ks->tot.value.ui64 +=
 			    ixgbe_ks->qbtc[i].value.ui64;
 		}

@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,16 +23,16 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.99 v2008-09-12 */
+/* IntelVersion: 1.117 v2-7-8_2009-4-7 */
 
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
-#ident "$Id: ixgbe_api.c,v 1.99 2008/08/22 16:30:26 mrchilak Exp $"
 
 extern s32 ixgbe_init_ops_82598(struct ixgbe_hw *hw);
+extern s32 ixgbe_init_ops_82599(struct ixgbe_hw *hw);
 
 /*
  * ixgbe_init_shared_code - Initialize the shared code
@@ -44,7 +44,7 @@ extern s32 ixgbe_init_ops_82598(struct ixgbe_hw *hw);
  * memset to 0 prior to calling this function.  The following fields in
  * hw structure should be filled in prior to calling this function:
  * hw_addr, back, device_id, vendor_id, subsystem_device_id,
- *  subsystem_vendor_id, and revision_id
+ * subsystem_vendor_id, and revision_id
  */
 s32
 ixgbe_init_shared_code(struct ixgbe_hw *hw)
@@ -59,6 +59,9 @@ ixgbe_init_shared_code(struct ixgbe_hw *hw)
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
 		status = ixgbe_init_ops_82598(hw);
+		break;
+	case ixgbe_mac_82599EB:
+		status = ixgbe_init_ops_82599(hw);
 		break;
 	default:
 		status = IXGBE_ERR_DEVICE_NOT_SUPPORTED;
@@ -84,6 +87,8 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 
 	if (hw->vendor_id == IXGBE_INTEL_VENDOR_ID) {
 		switch (hw->device_id) {
+		case IXGBE_DEV_ID_82598:
+		case IXGBE_DEV_ID_82598_BX:
 		case IXGBE_DEV_ID_82598AF_SINGLE_PORT:
 		case IXGBE_DEV_ID_82598AF_DUAL_PORT:
 		case IXGBE_DEV_ID_82598AT:
@@ -94,6 +99,13 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 		case IXGBE_DEV_ID_82598EB_XF_LR:
 		case IXGBE_DEV_ID_82598EB_SFP_LOM:
 			hw->mac.type = ixgbe_mac_82598EB;
+			break;
+		case IXGBE_DEV_ID_82599_KX4:
+		case IXGBE_DEV_ID_82599_KX4_SIK:
+		case IXGBE_DEV_ID_82599_SFP:
+		case IXGBE_DEV_ID_82599_SPW:
+		case IXGBE_DEV_ID_82599_CX4:
+			hw->mac.type = ixgbe_mac_82599EB;
 			break;
 		default:
 			ret_val = IXGBE_ERR_DEVICE_NOT_SUPPORTED;
@@ -195,6 +207,49 @@ ixgbe_get_mac_addr(struct ixgbe_hw *hw, u8 *mac_addr)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.get_mac_addr,
 	    (hw, mac_addr), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_get_san_mac_addr - Get SAN MAC address
+ * @hw: pointer to hardware structure
+ * @san_mac_addr: SAN MAC address
+ *
+ * Reads the SAN MAC address from the EEPROM, if it's available.  This is
+ * per-port, so set_lan_id() must be called before reading the addresses.
+ */
+s32
+ixgbe_get_san_mac_addr(struct ixgbe_hw *hw, u8 *san_mac_addr)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.get_san_mac_addr,
+	    (hw, san_mac_addr), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_set_san_mac_addr - Write a SAN MAC address
+ * @hw: pointer to hardware structure
+ * @san_mac_addr: SAN MAC address
+ *
+ * Writes A SAN MAC address to the EEPROM.
+ */
+s32
+ixgbe_set_san_mac_addr(struct ixgbe_hw *hw, u8 *san_mac_addr)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.set_san_mac_addr,
+	    (hw, san_mac_addr), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_get_device_caps - Get additional device capabilities
+ * @hw: pointer to hardware structure
+ * @device_caps: the EEPROM word for device capabilities
+ *
+ * Reads the extra device capabilities from the EEPROM
+ */
+s32
+ixgbe_get_device_caps(struct ixgbe_hw *hw, u16 *device_caps)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.get_device_caps,
+	    (hw, device_caps), IXGBE_NOT_IMPLEMENTED);
 }
 
 /*
@@ -333,6 +388,9 @@ s32
 ixgbe_read_phy_reg(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 	u16 *phy_data)
 {
+	if (hw->phy.id == 0)
+		(void) ixgbe_identify_phy(hw);
+
 	return ixgbe_call_func(hw, hw->phy.ops.read_reg, (hw, reg_addr,
 	    device_type, phy_data), IXGBE_NOT_IMPLEMENTED);
 }
@@ -348,6 +406,9 @@ ixgbe_read_phy_reg(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 s32 ixgbe_write_phy_reg(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
     u16 phy_data)
 {
+	if (hw->phy.id == 0)
+		(void) ixgbe_identify_phy(hw);
+
 	return ixgbe_call_func(hw, hw->phy.ops.write_reg, (hw, reg_addr,
 	    device_type, phy_data), IXGBE_NOT_IMPLEMENTED);
 }
@@ -584,6 +645,22 @@ ixgbe_update_eeprom_checksum(struct ixgbe_hw *hw)
 }
 
 /*
+ * ixgbe_insert_mac_addr - Find a RAR for this mac address
+ * @hw: pointer to hardware structure
+ * @addr: Address to put into receive address register
+ * @vmdq: VMDq pool to assign
+ *
+ * Puts an ethernet address into a receive address register, or
+ * finds the rar that it is aleady in; adds to the pool list
+ */
+s32
+ixgbe_insert_mac_addr(struct ixgbe_hw *hw, u8 *addr, u32 vmdq)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.insert_mac_addr,
+	    (hw, addr, vmdq), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
  * ixgbe_set_rar - Set Rx address register
  * @hw: pointer to hardware structure
  * @index: Receive address register to write
@@ -763,16 +840,16 @@ ixgbe_set_vfta(struct ixgbe_hw *hw, u32 vlan, u32 vind, bool vlan_on)
 }
 
 /*
- * ixgbe_setup_fc - Set flow control
+ * ixgbe_fc_enable - Enable flow control
  * @hw: pointer to hardware structure
  * @packetbuf_num: packet buffer number (0-7)
  *
  * Configures the flow control settings based on SW configuration.
  */
 s32
-ixgbe_setup_fc(struct ixgbe_hw *hw, s32 packetbuf_num)
+ixgbe_fc_enable(struct ixgbe_hw *hw, s32 packetbuf_num)
 {
-	return ixgbe_call_func(hw, hw->mac.ops.setup_fc, (hw, packetbuf_num),
+	return ixgbe_call_func(hw, hw->mac.ops.fc_enable, (hw, packetbuf_num),
 	    IXGBE_NOT_IMPLEMENTED);
 }
 
@@ -821,6 +898,54 @@ ixgbe_init_uta_tables(struct ixgbe_hw *hw)
 }
 
 /*
+ * ixgbe_read_i2c_byte - Reads 8 bit word over I2C at specified device address
+ * @hw: pointer to hardware structure
+ * @byte_offset: byte offset to read
+ * @data: value read
+ *
+ * Performs byte read operation to SFP module's EEPROM over I2C interface.
+ */
+s32
+ixgbe_read_i2c_byte(struct ixgbe_hw *hw, u8 byte_offset, u8 dev_addr,
+    u8 *data)
+{
+	return ixgbe_call_func(hw, hw->phy.ops.read_i2c_byte, (hw, byte_offset,
+	    dev_addr, data), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_write_i2c_byte - Writes 8 bit word over I2C
+ * @hw: pointer to hardware structure
+ * @byte_offset: byte offset to write
+ * @data: value to write
+ *
+ * Performs byte write operation to SFP module's EEPROM over I2C interface
+ * at a specified device address.
+ */
+s32
+ixgbe_write_i2c_byte(struct ixgbe_hw *hw, u8 byte_offset, u8 dev_addr,
+    u8 data)
+{
+	return ixgbe_call_func(hw, hw->phy.ops.write_i2c_byte,
+	    (hw, byte_offset, dev_addr, data), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_write_i2c_eeprom - Writes 8 bit EEPROM word over I2C interface
+ * @hw: pointer to hardware structure
+ * @byte_offset: EEPROM byte offset to write
+ * @eeprom_data: value to write
+ *
+ * Performs byte write operation to SFP module's EEPROM over I2C interface.
+ */
+s32
+ixgbe_write_i2c_eeprom(struct ixgbe_hw *hw, u8 byte_offset, u8 eeprom_data)
+{
+	return ixgbe_call_func(hw, hw->phy.ops.write_i2c_eeprom,
+	    (hw, byte_offset, eeprom_data), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
  * ixgbe_read_i2c_eeprom - Reads 8 bit EEPROM word over I2C interface
  * @hw: pointer to hardware structure
  * @byte_offset: EEPROM byte offset to read
@@ -832,8 +957,7 @@ s32
 ixgbe_read_i2c_eeprom(struct ixgbe_hw *hw, u8 byte_offset, u8 *eeprom_data)
 {
 	return ixgbe_call_func(hw, hw->phy.ops.read_i2c_eeprom,
-	    (hw, byte_offset, eeprom_data),
-	    IXGBE_NOT_IMPLEMENTED);
+	    (hw, byte_offset, eeprom_data), IXGBE_NOT_IMPLEMENTED);
 }
 
 /*
@@ -842,9 +966,23 @@ ixgbe_read_i2c_eeprom(struct ixgbe_hw *hw, u8 byte_offset, u8 *eeprom_data)
  *
  * Determines physical layer capabilities of the current configuration.
  */
-s32
+u32
 ixgbe_get_supported_physical_layer(struct ixgbe_hw *hw)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.get_supported_physical_layer,
 	    (hw), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_enable_rx_dma - Enables Rx DMA unit, dependant on device specifics
+ * @hw: pointer to hardware structure
+ * @regval: bitfield to write to the Rx DMA register
+ *
+ * Enables the Rx DMA unit of the device.
+ */
+s32
+ixgbe_enable_rx_dma(struct ixgbe_hw *hw, u32 regval)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.enable_rx_dma,
+	    (hw, regval), IXGBE_NOT_IMPLEMENTED);
 }

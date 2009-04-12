@@ -1,6 +1,7 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -20,14 +21,9 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include "ixgbe_sw.h"
 
@@ -68,6 +64,7 @@ static void ixgbe_get_hw_state(ixgbe_t *);
 static void ixgbe_get_conf(ixgbe_t *);
 static int ixgbe_get_prop(ixgbe_t *, char *, int, int, int);
 static void ixgbe_driver_link_check(void *);
+static void ixgbe_sfp_check(void *);
 static void ixgbe_local_timer(void *);
 static void ixgbe_arm_watchdog_timer(ixgbe_t *);
 static void ixgbe_restart_watchdog_timer(ixgbe_t *);
@@ -83,10 +80,10 @@ static int ixgbe_alloc_intr_handles(ixgbe_t *, int);
 static int ixgbe_add_intr_handlers(ixgbe_t *);
 static void ixgbe_map_rxring_to_vector(ixgbe_t *, int, int);
 static void ixgbe_map_txring_to_vector(ixgbe_t *, int, int);
-static void ixgbe_setup_ivar(ixgbe_t *, uint16_t, uint8_t);
-static void ixgbe_enable_ivar(ixgbe_t *, uint16_t);
-static void ixgbe_disable_ivar(ixgbe_t *, uint16_t);
-static int ixgbe_map_rings_to_vectors(ixgbe_t *);
+static void ixgbe_setup_ivar(ixgbe_t *, uint16_t, uint8_t, int8_t);
+static void ixgbe_enable_ivar(ixgbe_t *, uint16_t, int8_t);
+static void ixgbe_disable_ivar(ixgbe_t *, uint16_t, int8_t);
+static int ixgbe_map_intrs_to_vectors(ixgbe_t *);
 static void ixgbe_setup_adapter_vector(ixgbe_t *);
 static void ixgbe_rem_intr_handlers(ixgbe_t *);
 static void ixgbe_rem_intrs(ixgbe_t *);
@@ -94,8 +91,7 @@ static int ixgbe_enable_intrs(ixgbe_t *);
 static int ixgbe_disable_intrs(ixgbe_t *);
 static uint_t ixgbe_intr_legacy(void *, void *);
 static uint_t ixgbe_intr_msi(void *, void *);
-static uint_t ixgbe_intr_rx_tx(void *, void *);
-static uint_t ixgbe_intr_other(void *, void *);
+static uint_t ixgbe_intr_msix(void *, void *);
 static void ixgbe_intr_rx_work(ixgbe_rx_ring_t *);
 static void ixgbe_intr_tx_work(ixgbe_tx_ring_t *);
 static void ixgbe_intr_other_work(ixgbe_t *, uint32_t);
@@ -209,6 +205,22 @@ static adapter_info_t ixgbe_82598eb_cap = {
 	1,		/* minimum number of tx queues */
 	8,		/* default number of tx queues */
 	18,		/* maximum total msix vectors */
+	16,		/* maximum number of ring vectors */
+	2,		/* maximum number of other vectors */
+	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
+	(IXGBE_FLAG_DCA_CAPABLE	/* capability flags */
+	| IXGBE_FLAG_RSS_CAPABLE
+	| IXGBE_FLAG_VMDQ_CAPABLE)
+};
+
+static adapter_info_t ixgbe_82599eb_cap = {
+	128,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	8,		/* default number of rx queues */
+	128,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	8,		/* default number of tx queues */
+	64,		/* maximum total msix vectors */
 	16,		/* maximum number of ring vectors */
 	2,		/* maximum number of other vectors */
 	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
@@ -381,8 +393,8 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Map rings to interrupt vectors
 	 */
-	if (ixgbe_map_rings_to_vectors(ixgbe) != IXGBE_SUCCESS) {
-		ixgbe_error(ixgbe, "Failed to map rings to vectors");
+	if (ixgbe_map_intrs_to_vectors(ixgbe) != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "Failed to map interrupts to vectors");
 		goto attach_fail;
 	}
 
@@ -761,13 +773,22 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 	 */
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
-		ixgbe_log(ixgbe, "identify oplin adapter\n");
+		ixgbe_log(ixgbe, "identify 82598 adapter\n");
 		ixgbe->capab = &ixgbe_82598eb_cap;
 
 		if (ixgbe_get_media_type(hw) == ixgbe_media_type_copper) {
 			ixgbe->capab->flags |= IXGBE_FLAG_FAN_FAIL_CAPABLE;
 			ixgbe->capab->other_intr |= IXGBE_EICR_GPI_SDP1;
 		}
+		ixgbe->capab->other_intr |= IXGBE_EICR_LSC;
+
+		break;
+	case ixgbe_mac_82599EB:
+		ixgbe_log(ixgbe, "identify 82599 adapter\n");
+		ixgbe->capab = &ixgbe_82599eb_cap;
+
+		ixgbe->capab->other_intr = (IXGBE_EICR_GPI_SDP1 |
+		    IXGBE_EICR_GPI_SDP2 | IXGBE_EICR_LSC);
 
 		break;
 	default:
@@ -795,14 +816,15 @@ ixgbe_regs_map(ixgbe_t *ixgbe)
 	/*
 	 * First get the size of device registers to be mapped.
 	 */
-	if (ddi_dev_regsize(devinfo, 1, &mem_size) != DDI_SUCCESS) {
+	if (ddi_dev_regsize(devinfo, IXGBE_ADAPTER_REGSET, &mem_size)
+	    != DDI_SUCCESS) {
 		return (IXGBE_FAILURE);
 	}
 
 	/*
 	 * Call ddi_regs_map_setup() to map registers
 	 */
-	if ((ddi_regs_map_setup(devinfo, 1,
+	if ((ddi_regs_map_setup(devinfo, IXGBE_ADAPTER_REGSET,
 	    (caddr_t *)&hw->hw_addr, 0,
 	    mem_size, &ixgbe_regs_acc_attr,
 	    &osdep->reg_handle)) != DDI_SUCCESS) {
@@ -908,13 +930,14 @@ ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 	/*
 	 * Initialize values of interrupt throttling rate
 	 */
-	for (i = 1; i < MAX_RING_VECTOR; i++)
+	for (i = 1; i < MAX_INTR_VECTOR; i++)
 		ixgbe->intr_throttling[i] = ixgbe->intr_throttling[0];
 
 	/*
 	 * The initial link state should be "unknown"
 	 */
 	ixgbe->link_state = LINK_STATE_UNKNOWN;
+
 	return (IXGBE_SUCCESS);
 }
 
@@ -1237,8 +1260,9 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 	/*
 	 * Set interrupt throttling rate
 	 */
-	for (i = 0; i < ixgbe->intr_cnt; i++)
+	for (i = 0; i < ixgbe->intr_cnt; i++) {
 		IXGBE_WRITE_REG(hw, IXGBE_EITR(i), ixgbe->intr_throttling[i]);
+	}
 
 	/*
 	 * Save the state of the phy
@@ -1774,8 +1798,18 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	 */
 	reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(rx_ring->index));
 	reg_val |= IXGBE_RXDCTL_ENABLE;	/* enable queue */
-	reg_val |= 0x0020;		/* pthresh */
+
+	/* Not a valid value for 82599 */
+	if (hw->mac.type < ixgbe_mac_82599EB) {
+		reg_val |= 0x0020;	/* pthresh */
+	}
 	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(rx_ring->index), reg_val);
+
+	if (hw->mac.type == ixgbe_mac_82599EB) {
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
+		reg_val |= (IXGBE_RDRXCTL_CRCSTRIP | IXGBE_RDRXCTL_AGGDIS);
+		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
+	}
 
 	/*
 	 * Setup the Split and Replication Receive Control Register.
@@ -1783,7 +1817,7 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	 */
 	reg_val = (ixgbe->rx_buf_size >> IXGBE_SRRCTL_BSIZEPKT_SHIFT) |
 	    IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF;
-
+	reg_val |= IXGBE_SRRCTL_DROP_EN;
 	IXGBE_WRITE_REG(hw, IXGBE_SRRCTL(rx_ring->index), reg_val);
 }
 
@@ -1796,6 +1830,14 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	uint32_t reg_val;
 	uint32_t ring_mapping;
 	int i;
+
+	/* PSRTYPE must be configured for 82599 */
+	reg_val = IXGBE_PSRTYPE_TCPHDR | IXGBE_PSRTYPE_UDPHDR |
+	    IXGBE_PSRTYPE_IPV4HDR | IXGBE_PSRTYPE_IPV6HDR;
+#define	IXGBE_PSRTYPE_L2_PKT	0x00001000
+	reg_val |= IXGBE_PSRTYPE_L2_PKT;
+	reg_val |= 0xE0000000;
+	IXGBE_WRITE_REG(hw, IXGBE_PSRTYPE(0), reg_val);
 
 	/*
 	 * Set filter control in FCTRL to accept broadcast packets and do
@@ -1847,9 +1889,10 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 		IXGBE_WRITE_REG(hw, IXGBE_RQSMR(i >> 2), ring_mapping);
 
 	/*
-	 * The Max Frame Size in MHADD will be internally increased by four
-	 * bytes if the packet has a VLAN field, so includes MTU, ethernet
-	 * header and frame check sequence.
+	 * The Max Frame Size in MHADD/MAXFRS will be internally increased
+	 * by four bytes if the packet has a VLAN field, so includes MTU,
+	 * ethernet header and frame check sequence.
+	 * Register is MAXFRS in 82599.
 	 */
 	reg_val = (ixgbe->default_mtu + sizeof (struct ether_header)
 	    + ETHERFCSL) << IXGBE_MHADD_MFS_SHIFT;
@@ -1905,12 +1948,6 @@ ixgbe_setup_tx_ring(ixgbe_tx_ring_t *tx_ring)
 	buf_high = (uint32_t)(tx_ring->tbd_area.dma_address >> 32);
 	IXGBE_WRITE_REG(hw, IXGBE_TDBAL(tx_ring->index), buf_low);
 	IXGBE_WRITE_REG(hw, IXGBE_TDBAH(tx_ring->index), buf_high);
-
-	/*
-	 * setup TXDCTL(tx_ring->index)
-	 */
-	reg_val = IXGBE_TXDCTL_ENABLE;
-	IXGBE_WRITE_REG(hw, IXGBE_TXDCTL(tx_ring->index), reg_val);
 
 	/*
 	 * Setup head & tail pointers
@@ -1997,12 +2034,22 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		ring_mapping |= (i & 0xF) << (8 * (i & 0x3));
 		if ((i & 0x3) == 0x3) {
-			IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
+			if (hw->mac.type >= ixgbe_mac_82599EB) {
+				IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2),
+				    ring_mapping);
+			} else {
+				IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2),
+				    ring_mapping);
+			}
 			ring_mapping = 0;
 		}
 	}
 	if ((i & 0x3) != 0x3)
-		IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
+		if (hw->mac.type >= ixgbe_mac_82599EB) {
+			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), ring_mapping);
+		} else {
+			IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
+		}
 
 	/*
 	 * Enable CRC appending and TX padding (for short tx frames)
@@ -2010,6 +2057,27 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	reg_val = IXGBE_READ_REG(hw, IXGBE_HLREG0);
 	reg_val |= IXGBE_HLREG0_TXCRCEN | IXGBE_HLREG0_TXPADEN;
 	IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
+
+	/*
+	 * enable DMA for 82599 parts
+	 */
+	if (hw->mac.type == ixgbe_mac_82599EB) {
+	/* DMATXCTL.TE must be set after all Tx config is complete */
+		reg_val = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
+		reg_val |= IXGBE_DMATXCTL_TE;
+		IXGBE_WRITE_REG(hw, IXGBE_DMATXCTL, reg_val);
+	}
+
+	/*
+	 * Enabling tx queues ..
+	 * For 82599 must be done after DMATXCTL.TE is set
+	 */
+	for (i = 0; i < ixgbe->num_tx_rings; i++) {
+		tx_ring = &ixgbe->tx_rings[i];
+		reg_val = IXGBE_READ_REG(hw, IXGBE_TXDCTL(tx_ring->index));
+		reg_val |= IXGBE_TXDCTL_ENABLE;
+		IXGBE_WRITE_REG(hw, IXGBE_TXDCTL(tx_ring->index), reg_val);
+	}
 }
 
 /*
@@ -2315,7 +2383,11 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	if (flow_control == 3)
 		flow_control = ixgbe_fc_default;
 
-	hw->fc.type = flow_control;
+	/*
+	 * fc.requested mode is what the user requests.  After autoneg,
+	 * fc.current_mode will be the flow_control mode that was negotiated.
+	 */
+	hw->fc.requested_mode = flow_control;
 
 	/*
 	 * Multiple rings configurations
@@ -2369,6 +2441,11 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	ixgbe->tx_head_wb_enable = ixgbe_get_prop(ixgbe, PROP_TX_HEAD_WB_ENABLE,
 	    0, 1, DEFAULT_TX_HEAD_WB_ENABLE);
 
+	/* Head Write Back not recommended for 82599 */
+	if (hw->mac.type >= ixgbe_mac_82599EB) {
+		ixgbe->tx_head_wb_enable = B_FALSE;
+	}
+
 	/*
 	 * ixgbe LSO needs the tx h/w checksum support.
 	 * LSO will be disabled if tx h/w checksum is not
@@ -2398,9 +2475,24 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    MIN_RX_LIMIT_PER_INTR, MAX_RX_LIMIT_PER_INTR,
 	    DEFAULT_RX_LIMIT_PER_INTR);
 
-	ixgbe->intr_throttling[0] = ixgbe_get_prop(ixgbe, PROP_INTR_THROTTLING,
-	    MIN_INTR_THROTTLING, MAX_INTR_THROTTLING,
-	    DEFAULT_INTR_THROTTLING);
+	/*
+	 * Interrupt throttling is per 256ns in 82598 and 2 usec increments
+	 * in 82599.
+	 */
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		ixgbe->intr_throttling[0] = ixgbe_get_prop(ixgbe,
+		    PROP_INTR_THROTTLING,
+		    MIN_INTR_THROTTLING, MAX_INTR_THROTTLING_82598,
+		    DEFAULT_INTR_THROTTLING_82598);
+		break;
+	case ixgbe_mac_82599EB:
+		ixgbe->intr_throttling[0] = ixgbe_get_prop(ixgbe,
+		    PROP_INTR_THROTTLING,
+		    MIN_INTR_THROTTLING, MAX_INTR_THROTTLING_82599,
+		    DEFAULT_INTR_THROTTLING_82599);
+		break;
+	}
 }
 
 /*
@@ -2479,8 +2571,11 @@ ixgbe_driver_setup_link(ixgbe_t *ixgbe, boolean_t setup_hw)
 	}
 
 	if (setup_hw) {
-		if (ixgbe_setup_link(&ixgbe->hw) != IXGBE_SUCCESS)
+		if (ixgbe_setup_link(&ixgbe->hw) != IXGBE_SUCCESS) {
+			ixgbe_notice(ixgbe, "Setup link failed on this "
+			    "device.");
 			return (IXGBE_FAILURE);
+		}
 	}
 
 	return (IXGBE_SUCCESS);
@@ -2503,19 +2598,22 @@ ixgbe_driver_link_check(void *arg)
 	/* check for link, wait the full time */
 	(void) ixgbe_check_link(hw, &speed, &link_up, true);
 	if (link_up) {
+		/* Link is up, enable flow control settings */
+		(void) ixgbe_fc_enable(hw, 0);
+
 		/*
 		 * The Link is up, check whether it was marked as down earlier
 		 */
 		if (ixgbe->link_state != LINK_STATE_UP) {
 			switch (speed) {
-				case IXGBE_LINK_SPEED_10GB_FULL:
-					ixgbe->link_speed = SPEED_10GB;
-					break;
-				case IXGBE_LINK_SPEED_1GB_FULL:
-					ixgbe->link_speed = SPEED_1GB;
-					break;
-				case IXGBE_LINK_SPEED_100_FULL:
-					ixgbe->link_speed = SPEED_100;
+			case IXGBE_LINK_SPEED_10GB_FULL:
+				ixgbe->link_speed = SPEED_10GB;
+				break;
+			case IXGBE_LINK_SPEED_1GB_FULL:
+				ixgbe->link_speed = SPEED_1GB;
+				break;
+			case IXGBE_LINK_SPEED_100_FULL:
+				ixgbe->link_speed = SPEED_100;
 			}
 			ixgbe->link_duplex = LINK_DUPLEX_FULL;
 			ixgbe->link_state = LINK_STATE_UP;
@@ -2560,6 +2658,41 @@ ixgbe_driver_link_check(void *arg)
 }
 
 /*
+ * ixgbe_sfp_check - sfp module processing done in taskq only for 82599.
+ */
+static void
+ixgbe_sfp_check(void *arg)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+	uint32_t eicr = ixgbe->eicr;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t autoneg;
+
+	if (eicr & IXGBE_EICR_GPI_SDP1) {
+		/* clear the interrupt */
+		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP1);
+
+		/* if link up, do multispeed fiber setup */
+		(void) ixgbe_get_link_capabilities(hw, &autoneg,
+		    &hw->mac.autoneg);
+		(void) ixgbe_setup_link_speed(hw, autoneg, B_TRUE, B_TRUE);
+		ixgbe_driver_link_check(ixgbe);
+	} else if (eicr & IXGBE_EICR_GPI_SDP2) {
+		/* clear the interrupt */
+		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP2);
+
+		/* if link up, do sfp module setup */
+		(void) hw->mac.ops.setup_sfp(hw);
+
+		/* do multispeed fiber setup */
+		(void) ixgbe_get_link_capabilities(hw, &autoneg,
+		    &hw->mac.autoneg);
+		(void) ixgbe_setup_link_speed(hw, autoneg, B_TRUE, B_TRUE);
+		ixgbe_driver_link_check(ixgbe);
+	}
+}
+
+/*
  * ixgbe_local_timer - Driver watchdog function.
  *
  * This function will handle the transmit stall check, link status check and
@@ -2571,6 +2704,7 @@ ixgbe_local_timer(void *arg)
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 
 	if (ixgbe_stall_check(ixgbe)) {
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
 		ixgbe->reset_count++;
 		if (ixgbe_reset(ixgbe) == IXGBE_SUCCESS)
 			ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_RESTORED);
@@ -2883,8 +3017,20 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 		/* disable autoclear, leave gpie at default */
 		eiac = 0;
 
-		/* general purpose interrupt enable */
-		gpie |= IXGBE_GPIE_EIAME;
+		/*
+		 * General purpose interrupt enable.
+		 * For 82599, extended interrupt automask enable
+		 * only in MSI or MSI-X mode
+		 */
+		if ((hw->mac.type < ixgbe_mac_82599EB) ||
+		    (ixgbe->intr_type == DDI_INTR_TYPE_MSI)) {
+			gpie |= IXGBE_GPIE_EIAME;
+		}
+	}
+	/* Enable specific interrupts for 82599  */
+	if (hw->mac.type == ixgbe_mac_82599EB) {
+		gpie |= IXGBE_SDP2_GPIEN; /* pluggable optics intr */
+		gpie |= IXGBE_SDP1_GPIEN; /* LSC interrupt */
 	}
 
 	/* write to interrupt control registers */
@@ -3117,6 +3263,7 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 static void
 ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 {
+	struct ixgbe_hw *hw = &ixgbe->hw;
 	/*
 	 * dispatch taskq to handle link status change
 	 */
@@ -3133,12 +3280,25 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 	 */
 	if ((ixgbe->capab->flags & IXGBE_FLAG_FAN_FAIL_CAPABLE) &&
 	    (eicr & IXGBE_EICR_GPI_SDP1)) {
+		if (hw->mac.type < ixgbe_mac_82599EB) {
+			ixgbe_log(ixgbe,
+			    "Fan has stopped, replace the adapter\n");
 
-		ixgbe_log(ixgbe,
-		    "Fan has stopped, replace the adapter\n");
+			/* re-enable the interrupt, which was automasked */
+			ixgbe->eims |= IXGBE_EICR_GPI_SDP1;
+		}
+	}
 
-		/* re-enable the interrupt, which was automasked */
-		ixgbe->eims |= IXGBE_EICR_GPI_SDP1;
+	/*
+	 * Do SFP check for 82599
+	 */
+	if (hw->mac.type == ixgbe_mac_82599EB) {
+		if ((ddi_taskq_dispatch(ixgbe->lsc_taskq,
+		    ixgbe_sfp_check, (void *)ixgbe,
+		    DDI_NOSLEEP)) != DDI_SUCCESS) {
+			ixgbe_log(ixgbe,
+			    "No memory available to dispatch taskq");
+		}
 	}
 }
 
@@ -3185,6 +3345,9 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 		 * For legacy interrupt, rx rings[0] will use RTxQ[0].
 		 */
 		if (eicr & 0x1) {
+			ixgbe->eimc |= IXGBE_EICR_RTX_QUEUE;
+			IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
+			ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
 			/*
 			 * Clean the rx descriptors
 			 */
@@ -3211,8 +3374,15 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 
 		/* any interrupt type other than tx/rx */
 		if (eicr & ixgbe->capab->other_intr) {
-			ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+			if (hw->mac.type < ixgbe_mac_82599EB) {
+				ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+			}
+			if (hw->mac.type == ixgbe_mac_82599EB) {
+				ixgbe->eimc = IXGBE_82599_OTHER_INTR;
+				IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
+			}
 			ixgbe_intr_other_work(ixgbe, eicr);
+			ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
 		}
 
 		mutex_exit(&ixgbe->gen_lock);
@@ -3233,9 +3403,10 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	/*
 	 * Do the following work outside of the gen_lock
 	 */
-	if (mp != NULL)
+	if (mp != NULL) {
 		mac_rx_ring(rx_ring->ixgbe->mac_hdl, rx_ring->ring_handle, mp,
 		    rx_ring->ring_gen_num);
+	}
 
 	if (tx_reschedule)  {
 		tx_ring->reschedule = B_FALSE;
@@ -3284,8 +3455,15 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 	/* any interrupt type other than tx/rx */
 	if (eicr & ixgbe->capab->other_intr) {
 		mutex_enter(&ixgbe->gen_lock);
-		ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+		if (hw->mac.type < ixgbe_mac_82599EB) {
+			ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+		}
+		if (hw->mac.type == ixgbe_mac_82599EB) {
+			ixgbe->eimc = IXGBE_82599_OTHER_INTR;
+			IXGBE_WRITE_REG(hw, IXGBE_EIMC, ixgbe->eimc);
+		}
 		ixgbe_intr_other_work(ixgbe, eicr);
+		ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
 		mutex_exit(&ixgbe->gen_lock);
 	}
 
@@ -3296,13 +3474,15 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 }
 
 /*
- * ixgbe_intr_rx_tx - Interrupt handler for rx and tx.
+ * ixgbe_intr_msix - Interrupt handler for MSI-X.
  */
 static uint_t
-ixgbe_intr_rx_tx(void *arg1, void *arg2)
+ixgbe_intr_msix(void *arg1, void *arg2)
 {
-	ixgbe_ring_vector_t *vect = (ixgbe_ring_vector_t *)arg1;
+	ixgbe_intr_vector_t *vect = (ixgbe_intr_vector_t *)arg1;
 	ixgbe_t *ixgbe = vect->ixgbe;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t eicr;
 	int r_idx = 0;
 
 	_NOTE(ARGUNUSED(arg2));
@@ -3327,40 +3507,37 @@ ixgbe_intr_rx_tx(void *arg1, void *arg2)
 		    (ixgbe->num_tx_rings - 1));
 	}
 
-	return (DDI_INTR_CLAIMED);
-}
-
-/*
- * ixgbe_intr_other - Interrupt handler for other.
- *
- * Only look for other work if the right bits are set in the
- * Interrupt Cause Register.
- */
-static uint_t
-ixgbe_intr_other(void *arg1, void *arg2)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
-	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t eicr;
-
-	_NOTE(ARGUNUSED(arg2));
-
-	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
 	/*
-	 * Need check cause bits and only other causes will
-	 * be processed
+	 * Clean other interrupt (link change) that has its bit set in the map
 	 */
-	/* any interrupt type other than tx/rx */
-	if (eicr & ixgbe->capab->other_intr) {
-		mutex_enter(&ixgbe->gen_lock);
-		ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
-		ixgbe_intr_other_work(ixgbe, eicr);
-		mutex_exit(&ixgbe->gen_lock);
-	}
+	if (BT_TEST(vect->other_map, 0) == 1) {
+		eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
-	/* re-enable the interrupts which were automasked */
-	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
+		/*
+		 * Need check cause bits and only other causes will
+		 * be processed
+		 */
+		/* any interrupt type other than tx/rx */
+		if (eicr & ixgbe->capab->other_intr) {
+			if (hw->mac.type < ixgbe_mac_82599EB) {
+				mutex_enter(&ixgbe->gen_lock);
+				ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+				ixgbe_intr_other_work(ixgbe, eicr);
+				mutex_exit(&ixgbe->gen_lock);
+			} else {
+				if (hw->mac.type == ixgbe_mac_82599EB) {
+					mutex_enter(&ixgbe->gen_lock);
+					ixgbe->eims |= IXGBE_EICR_RTX_QUEUE;
+					ixgbe_intr_other_work(ixgbe, eicr);
+					mutex_exit(&ixgbe->gen_lock);
+				}
+			}
+		}
+
+		/* re-enable the interrupts which were automasked */
+		IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
+	}
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -3484,11 +3661,11 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	case DDI_INTR_TYPE_MSIX:
 		/*
 		 * Best number of vectors for the adapter is
-		 * # rx rings + # tx rings + 1 for other.
+		 * # rx rings + # tx rings.
 		 */
-		request = ixgbe->num_rx_rings + ixgbe->num_tx_rings + 1;
-		if (request > (ixgbe->capab->max_ring_vect + 1))
-			request = ixgbe->capab->max_ring_vect + 1;
+		request = ixgbe->num_rx_rings + ixgbe->num_tx_rings;
+		if (request > ixgbe->capab->max_ring_vect)
+			request = ixgbe->capab->max_ring_vect;
 		minimum = 2;
 		IXGBE_DEBUGLOG_0(ixgbe, "interrupt type: MSI-X");
 		break;
@@ -3605,15 +3782,14 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 	switch (ixgbe->intr_type) {
 	case DDI_INTR_TYPE_MSIX:
 		/*
-		 * Add interrupt handler for rx and tx rings: vector[0 -
-		 * (ixgbe->intr_cnt -1)].
+		 * Add interrupt handler for all vectors
 		 */
-		for (vector = 0; vector < (ixgbe->intr_cnt -1); vector++) {
+		for (vector = 0; vector < ixgbe->intr_cnt; vector++) {
 			/*
 			 * install pointer to vect_map[vector]
 			 */
 			rc = ddi_intr_add_handler(ixgbe->htable[vector],
-			    (ddi_intr_handler_t *)ixgbe_intr_rx_tx,
+			    (ddi_intr_handler_t *)ixgbe_intr_msix,
 			    (void *)&ixgbe->vect_map[vector], NULL);
 
 			if (rc != DDI_SUCCESS) {
@@ -3626,18 +3802,6 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 				}
 				return (IXGBE_FAILURE);
 			}
-		}
-
-		/*
-		 * Add interrupt handler for other: vector[ixgbe->intr_cnt -1]
-		 */
-		rc = ddi_intr_add_handler(ixgbe->htable[vector],
-		    (ddi_intr_handler_t *)ixgbe_intr_other,
-		    (void *)ixgbe, NULL);
-		if (rc != DDI_SUCCESS) {
-			ixgbe_log(ixgbe,
-			    "Add other interrupt handler failed: %d", rc);
-			return (IXGBE_FAILURE);
 		}
 
 		break;
@@ -3678,8 +3842,6 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 		return (IXGBE_FAILURE);
 	}
 
-	ASSERT(vector == (ixgbe->intr_cnt -1));
-
 	return (IXGBE_SUCCESS);
 }
 
@@ -3690,8 +3852,6 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 static void
 ixgbe_map_rxring_to_vector(ixgbe_t *ixgbe, int r_idx, int v_idx)
 {
-	ixgbe->vect_map[v_idx].ixgbe = ixgbe;
-
 	/*
 	 * Set bit in map
 	 */
@@ -3716,8 +3876,6 @@ ixgbe_map_rxring_to_vector(ixgbe_t *ixgbe, int r_idx, int v_idx)
 static void
 ixgbe_map_txring_to_vector(ixgbe_t *ixgbe, int t_idx, int v_idx)
 {
-	ixgbe->vect_map[v_idx].ixgbe = ixgbe;
-
 	/*
 	 * Set bit in map
 	 */
@@ -3738,66 +3896,166 @@ ixgbe_map_txring_to_vector(ixgbe_t *ixgbe, int t_idx, int v_idx)
 /*
  * ixgbe_setup_ivar - Set the given entry in the given interrupt vector
  * allocation register (IVAR).
+ * cause:
+ *   -1 : other cause
+ *    0 : rx
+ *    1 : tx
  */
 static void
-ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector)
+ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector,
+    int8_t cause)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	u32 ivar, index;
 
-	msix_vector |= IXGBE_IVAR_ALLOC_VAL;
-	index = (intr_alloc_entry >> 2) & 0x1F;
-	ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
-	ivar &= ~(0xFF << (8 * (intr_alloc_entry & 0x3)));
-	ivar |= (msix_vector << (8 * (intr_alloc_entry & 0x3)));
-	IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		msix_vector |= IXGBE_IVAR_ALLOC_VAL;
+		if (cause == -1) {
+			cause = 0;
+		}
+		index = (((cause * 64) + intr_alloc_entry) >> 2) & 0x1F;
+		ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
+		ivar &= ~(0xFF << (8 * (intr_alloc_entry & 0x3)));
+		ivar |= (msix_vector << (8 * (intr_alloc_entry & 0x3)));
+		IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+		break;
+	case ixgbe_mac_82599EB:
+		if (cause == -1) {
+			/* other causes */
+			msix_vector |= IXGBE_IVAR_ALLOC_VAL;
+			index = (intr_alloc_entry & 1) * 8;
+			ivar = IXGBE_READ_REG(hw, IXGBE_IVAR_MISC);
+			ivar &= ~(0xFF << index);
+			ivar |= (msix_vector << index);
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, ivar);
+		} else {
+			/* tx or rx causes */
+			msix_vector |= IXGBE_IVAR_ALLOC_VAL;
+			index = ((16 * (intr_alloc_entry & 1)) + (8 * cause));
+			ivar = IXGBE_READ_REG(hw,
+			    IXGBE_IVAR(intr_alloc_entry >> 1));
+			ivar &= ~(0xFF << index);
+			ivar |= (msix_vector << index);
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR(intr_alloc_entry >> 1),
+			    ivar);
+		}
+		break;
+	default:
+		break;
+	}
 }
 
 /*
  * ixgbe_enable_ivar - Enable the given entry by setting the VAL bit of
  * given interrupt vector allocation register (IVAR).
+ * cause:
+ *   -1 : other cause
+ *    0 : rx
+ *    1 : tx
  */
 static void
-ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry)
+ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	u32 ivar, index;
 
-	index = (intr_alloc_entry >> 2) & 0x1F;
-	ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
-	ivar |= (IXGBE_IVAR_ALLOC_VAL << (8 * (intr_alloc_entry & 0x3)));
-	IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		if (cause == -1) {
+			cause = 0;
+		}
+		index = (((cause * 64) + intr_alloc_entry) >> 2) & 0x1F;
+		ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
+		ivar |= (IXGBE_IVAR_ALLOC_VAL << (8 *
+		    (intr_alloc_entry & 0x3)));
+		IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+		break;
+	case ixgbe_mac_82599EB:
+		if (cause == -1) {
+			/* other causes */
+			index = (intr_alloc_entry & 1) * 8;
+			ivar = IXGBE_READ_REG(hw, IXGBE_IVAR_MISC);
+			ivar |= (IXGBE_IVAR_ALLOC_VAL << index);
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, ivar);
+		} else {
+			/* tx or rx causes */
+			index = ((16 * (intr_alloc_entry & 1)) + (8 * cause));
+			ivar = IXGBE_READ_REG(hw,
+			    IXGBE_IVAR(intr_alloc_entry >> 1));
+			ivar |= (IXGBE_IVAR_ALLOC_VAL << index);
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR(intr_alloc_entry >> 1),
+			    ivar);
+		}
+		break;
+	default:
+		break;
+	}
 }
 
 /*
- * ixgbe_enable_ivar - Disble the given entry by clearing the VAL bit of
+ * ixgbe_disable_ivar - Disble the given entry by clearing the VAL bit of
  * given interrupt vector allocation register (IVAR).
+ * cause:
+ *   -1 : other cause
+ *    0 : rx
+ *    1 : tx
  */
 static void
-ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry)
+ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	u32 ivar, index;
 
-	index = (intr_alloc_entry >> 2) & 0x1F;
-	ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
-	ivar &= ~(IXGBE_IVAR_ALLOC_VAL << (8 * (intr_alloc_entry & 0x3)));
-	IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		if (cause == -1) {
+			cause = 0;
+		}
+		index = (((cause * 64) + intr_alloc_entry) >> 2) & 0x1F;
+		ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
+		ivar &= ~(IXGBE_IVAR_ALLOC_VAL<< (8 *
+		    (intr_alloc_entry & 0x3)));
+		IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+		break;
+	case ixgbe_mac_82599EB:
+		if (cause == -1) {
+			/* other causes */
+			index = (intr_alloc_entry & 1) * 8;
+			ivar = IXGBE_READ_REG(hw, IXGBE_IVAR_MISC);
+			ivar &= ~(IXGBE_IVAR_ALLOC_VAL << index);
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, ivar);
+		} else {
+			/* tx or rx causes */
+			index = ((16 * (intr_alloc_entry & 1)) + (8 * cause));
+			ivar = IXGBE_READ_REG(hw,
+			    IXGBE_IVAR(intr_alloc_entry >> 1));
+			ivar &= ~(IXGBE_IVAR_ALLOC_VAL << index);
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR(intr_alloc_entry >> 1),
+			    ivar);
+		}
+		break;
+	default:
+		break;
+	}
 }
 
 /*
- * ixgbe_map_rings_to_vectors - Map descriptor rings to interrupt vectors.
+ * ixgbe_map_intrs_to_vectors - Map different interrupts to MSI-X vectors.
  *
- * For MSI-X, here will map rx and tx ring to vector[0 - (vectors -1)].
- * The last vector will be used for other interrupt.
+ * For MSI-X, here will map rx interrupt, tx interrupt and other interrupt
+ * to vector[0 - (intr_cnt -1)].
  */
 static int
-ixgbe_map_rings_to_vectors(ixgbe_t *ixgbe)
+ixgbe_map_intrs_to_vectors(ixgbe_t *ixgbe)
 {
 	int i, vector = 0;
 
 	/* initialize vector map */
 	bzero(&ixgbe->vect_map, sizeof (ixgbe->vect_map));
+	for (i = 0; i < ixgbe->intr_cnt; i++) {
+		ixgbe->vect_map[i].ixgbe = ixgbe;
+	}
 
 	/*
 	 * non-MSI-X case is very simple: rx rings[0] on RTxQ[0],
@@ -3810,23 +4068,31 @@ ixgbe_map_rings_to_vectors(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Ring/vector mapping for MSI-X
+	 * Interrupts/vectors mapping for MSI-X
 	 */
 
 	/*
-	 * Map vectors to rx rings
+	 * Map other interrupt to vector 0,
+	 * Set bit in map and count the bits set.
+	 */
+	BT_SET(ixgbe->vect_map[vector].other_map, 0);
+	ixgbe->vect_map[vector].other_cnt++;
+	vector++;
+
+	/*
+	 * Map rx ring interrupts to vectors
 	 */
 	for (i = 0; i < ixgbe->num_rx_rings; i++) {
 		ixgbe_map_rxring_to_vector(ixgbe, i, vector);
-		vector = (vector +1) % (ixgbe->intr_cnt -1);
+		vector = (vector +1) % ixgbe->intr_cnt;
 	}
 
 	/*
-	 * Map vectors to tx rings
+	 * Map tx ring interrupts to vectors
 	 */
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		ixgbe_map_txring_to_vector(ixgbe, i, vector);
-		vector = (vector +1) % (ixgbe->intr_cnt -1);
+		vector = (vector +1) % ixgbe->intr_cnt;
 	}
 
 	return (IXGBE_SUCCESS);
@@ -3842,31 +4108,43 @@ static void
 ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	ixgbe_ring_vector_t *vect;	/* vector bitmap */
+	ixgbe_intr_vector_t *vect;	/* vector bitmap */
 	int r_idx;	/* ring index */
 	int v_idx;	/* vector index */
 
 	/*
 	 * Clear any previous entries
 	 */
-	for (v_idx = 0; v_idx < IXGBE_IVAR_REG_NUM; v_idx++)
-		IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		for (v_idx = 0; v_idx < 25; v_idx++)
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
+
+		break;
+	case ixgbe_mac_82599EB:
+		for (v_idx = 0; v_idx < 64; v_idx++)
+			IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
+		IXGBE_WRITE_REG(hw, IXGBE_IVAR_MISC, 0);
+
+		break;
+	default:
+		break;
+	}
 
 	/*
 	 * For non MSI-X interrupt, rx rings[0] will use RTxQ[0], and
 	 * tx rings[0] will use RTxQ[1].
 	 */
 	if (ixgbe->intr_type != DDI_INTR_TYPE_MSIX) {
-		ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(0), 0);
-		ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_TX_QUEUE(0), 1);
+		ixgbe_setup_ivar(ixgbe, 0, 0, 0);
+		ixgbe_setup_ivar(ixgbe, 0, 1, 1);
 		return;
 	}
 
 	/*
-	 * For MSI-X interrupt, "Other" is always on last vector.
+	 * For MSI-X interrupt, "Other" is always on vector[0].
 	 */
-	ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_OTHER_CAUSES_INDEX,
-	    (ixgbe->intr_cnt - 1));
+	ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_OTHER_CAUSES_INDEX, 0, -1);
 
 	/*
 	 * For each interrupt vector, populate the IVAR table
@@ -3881,8 +4159,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		    (ixgbe->num_rx_rings - 1));
 
 		while (r_idx >= 0) {
-			ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx),
-			    v_idx);
+			ixgbe_setup_ivar(ixgbe, r_idx, v_idx, 0);
 			r_idx = bt_getlowbit(vect->rx_map, (r_idx + 1),
 			    (ixgbe->num_rx_rings - 1));
 		}
@@ -3894,8 +4171,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		    (ixgbe->num_tx_rings - 1));
 
 		while (r_idx >= 0) {
-			ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_TX_QUEUE(r_idx),
-			    v_idx);
+			ixgbe_setup_ivar(ixgbe, r_idx, v_idx, 1);
 			r_idx = bt_getlowbit(vect->tx_map, (r_idx + 1),
 			    (ixgbe->num_tx_rings - 1));
 		}
@@ -4354,7 +4630,7 @@ ixgbe_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	 * To enable interrupt by setting the VAL bit of given interrupt
 	 * vector allocation register (IVAR).
 	 */
-	ixgbe_enable_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx));
+	ixgbe_enable_ivar(ixgbe, r_idx, 0);
 
 	BT_SET(ixgbe->vect_map[v_idx].rx_map, r_idx);
 	mutex_exit(&ixgbe->gen_lock);
@@ -4381,7 +4657,7 @@ ixgbe_rx_ring_intr_disable(mac_intr_handle_t intrh)
 	 * To disable interrupt by clearing the VAL bit of given interrupt
 	 * vector allocation register (IVAR).
 	 */
-	ixgbe_disable_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx));
+	ixgbe_disable_ivar(ixgbe, r_idx, 0);
 
 	BT_CLEAR(ixgbe->vect_map[v_idx].rx_map, r_idx);
 

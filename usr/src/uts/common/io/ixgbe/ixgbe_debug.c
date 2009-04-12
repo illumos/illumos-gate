@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #include "ixgbe_sw.h"
@@ -40,7 +40,7 @@ ixgbe_dump_interrupt(void *adapter, char *tag)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)adapter;
 	struct ixgbe_hw	*hw = &ixgbe->hw;
-	ixgbe_ring_vector_t	*vect;
+	ixgbe_intr_vector_t	*vect;
 	uint32_t		ivar, reg;
 	int i, j;
 
@@ -419,4 +419,73 @@ ixgbe_pci_dump(void *arg)
 
 	ddi_regs_map_free(&acc_hdl);
 }
+
+/*
+ * Dump registers
+ */
+void
+ixgbe_dump_regs(void *adapter)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)adapter;
+	uint32_t reg_val;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	int i;
+	DEBUGFUNC("ixgbe_dump_regs");
+
+	/* Dump basic's like CTRL, STATUS, CTRL_EXT. */
+	ixgbe_log(ixgbe, "Basic IXGBE registers..");
+	reg_val = IXGBE_READ_REG(hw, IXGBE_CTRL);
+	ixgbe_log(ixgbe, "\tCTRL=%x\n", reg_val);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_STATUS);
+	ixgbe_log(ixgbe, "\tSTATUS=%x\n", reg_val);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_CTRL_EXT);
+	ixgbe_log(ixgbe, "\tCTRL_EXT=%x\n", reg_val);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_FCTRL);
+	ixgbe_log(ixgbe, "\tFCTRL=%x\n", reg_val);
+
+	/* Misc Interrupt regs */
+	ixgbe_log(ixgbe, "Some IXGBE interrupt registers..");
+
+	reg_val = IXGBE_READ_REG(hw, IXGBE_GPIE);
+	ixgbe_log(ixgbe, "\tGPIE=%x\n", reg_val);
+
+	reg_val = IXGBE_READ_REG(hw, IXGBE_IVAR(0));
+	ixgbe_log(ixgbe, "\tIVAR(0)=%x\n", reg_val);
+
+	reg_val = IXGBE_READ_REG(hw, IXGBE_IVAR_MISC);
+	ixgbe_log(ixgbe, "\tIVAR_MISC=%x\n", reg_val);
+
+	/* Dump RX related reg's */
+	ixgbe_log(ixgbe, "Receive registers...");
+	reg_val = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
+	ixgbe_log(ixgbe, "\tRXCTRL=%x\n", reg_val);
+	for (i = 0; i < ixgbe->num_rx_rings; i++) {
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(i));
+		ixgbe_log(ixgbe, "\tRXDCTL(%d)=%x\n", i, reg_val);
+		reg_val = IXGBE_READ_REG(hw, IXGBE_SRRCTL(i));
+		ixgbe_log(ixgbe, "\tSRRCTL(%d)=%x\n", i, reg_val);
+	}
+	reg_val = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
+	ixgbe_log(ixgbe, "\tRXCSUM=%x\n", reg_val);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_MRQC);
+	ixgbe_log(ixgbe, "\tMRQC=%x\n", reg_val);
+	reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
+	ixgbe_log(ixgbe, "\tRDRXCTL=%x\n", reg_val);
+
+	/* Dump TX related regs */
+	ixgbe_log(ixgbe, "Some transmit registers..");
+	reg_val = IXGBE_READ_REG(hw, IXGBE_DMATXCTL);
+	ixgbe_log(ixgbe, "\tDMATXCTL=%x\n", reg_val);
+	for (i = 0; i < ixgbe->num_tx_rings; i++) {
+		reg_val = IXGBE_READ_REG(hw, IXGBE_TXDCTL(i));
+		ixgbe_log(ixgbe, "\tTXDCTL(%d)=%x\n", i, reg_val);
+		reg_val = IXGBE_READ_REG(hw, IXGBE_TDWBAL(i));
+		ixgbe_log(ixgbe, "\tTDWBAL(%d)=%x\n", i, reg_val);
+		reg_val = IXGBE_READ_REG(hw, IXGBE_TDWBAH(i));
+		ixgbe_log(ixgbe, "\tTDWBAH(%d)=%x\n", i, reg_val);
+		reg_val = IXGBE_READ_REG(hw, IXGBE_TXPBSIZE(i));
+		ixgbe_log(ixgbe, "\tTXPBSIZE(%d)=%x\n", i, reg_val);
+	}
+}
+
 #endif
