@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <stdio.h>
@@ -43,7 +41,7 @@ const struct	speeds speeds[] = {
 	"75",	B75,
 	"110",	B110,
 	"134",	B134,
-	"134.5",B134,
+	"134.5", B134,
 	"150",	B150,
 	"200",	B200,
 	"300",	B300,
@@ -66,6 +64,7 @@ const struct	speeds speeds[] = {
 	"230400",	B230400,
 	"307200",	B307200,
 	"460800",	B460800,
+	"921600",	B921600,
 	0,
 };
 						/* Control Modes */
@@ -131,7 +130,7 @@ const struct mds imodes[] = {
 	"parmrk", PARMRK, 0,
 	"-parmrk", 0, PARMRK,
 	"inpck", INPCK, 0,
-	"-inpck", 0,INPCK,
+	"-inpck", 0, INPCK,
 	"istrip", ISTRIP, 0,
 	"-istrip", 0, ISTRIP,
 	"inlcr", INLCR, 0,
@@ -255,7 +254,7 @@ const struct mds omodes[] = {
 	"-nl", ONLCR, (OCRNL|ONLRET),
 	"nl", 0, ONLCR,
 	"ocrnl", OCRNL, 0,
-	"-ocrnl",0, OCRNL,
+	"-ocrnl", 0, OCRNL,
 	"onocr", ONOCR, 0,
 	"-onocr", 0, ONOCR,
 	"onlret", ONLRET, 0,
@@ -317,18 +316,19 @@ const struct mds hmodes[] = {
 };
 
 const struct mds clkmodes[] = {
-	"xcibrg", XCIBRG, XMTCLK, 
-	"xctset", XCTSET, XMTCLK, 
-	"xcrset", XCRSET, XMTCLK, 
-	"rcibrg", RCIBRG, RCVCLK, 
-	"rctset", RCTSET, RCVCLK, 
-	"rcrset", RCRSET, RCVCLK, 
-	"tsetcoff", TSETCOFF, TSETCLK, 
-	"tsetcrc", TSETCRBRG, TSETCLK, 
-	"tsetcxc", TSETCTBRG, TSETCLK, 
-	"rsetcoff", RSETCOFF, RSETCLK, 
-	"rsetcrc", RSETCRBRG, RSETCLK, 
-	"rsetcxc", RSETCTBRG, RSETCLK, 
-	"async", XCIBRG|RCIBRG|TSETCOFF|RSETCOFF, XMTCLK|RCVCLK|TSETCLK|RSETCLK, 
+	"xcibrg", XCIBRG, XMTCLK,
+	"xctset", XCTSET, XMTCLK,
+	"xcrset", XCRSET, XMTCLK,
+	"rcibrg", RCIBRG, RCVCLK,
+	"rctset", RCTSET, RCVCLK,
+	"rcrset", RCRSET, RCVCLK,
+	"tsetcoff", TSETCOFF, TSETCLK,
+	"tsetcrc", TSETCRBRG, TSETCLK,
+	"tsetcxc", TSETCTBRG, TSETCLK,
+	"rsetcoff", RSETCOFF, RSETCLK,
+	"rsetcrc", RSETCRBRG, RSETCLK,
+	"rsetcxc", RSETCTBRG, RSETCLK,
+	"async",
+		XCIBRG|RCIBRG|TSETCOFF|RSETCOFF, XMTCLK|RCVCLK|TSETCLK|RSETCLK,
 	0,
 };

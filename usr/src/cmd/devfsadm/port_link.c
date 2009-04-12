@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -37,6 +38,7 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <devfsadm.h>
+#include <syslog.h>
 
 /*
  * sacadm output parsing
@@ -273,8 +275,8 @@ serial_port_create(di_minor_t minor, di_node_t node)
 	}
 
 	/*
-	 *  add the minor name to the physical path so we can
-	 *  enum the port# and create the the link.
+	 * add the minor name to the physical path so we can
+	 * enum the port# and create the link.
 	 */
 	(void) strcpy(p_path, devfspath);
 	(void) strcat(p_path, ":");
@@ -291,6 +293,14 @@ serial_port_create(di_minor_t minor, di_node_t node)
 	(void) strcpy(l_path, "term/");
 	(void) strcat(l_path, buf);
 	(void) devfsadm_mklink(l_path, node, minor, 0);
+
+	/*
+	 * This is probably a USB serial port coming into the system
+	 * because someone just plugged one in.  Log an indication of
+	 * this to syslog just in case someone wants to know what the
+	 * name of the new serial device is ..
+	 */
+	(void) syslog(LOG_INFO, "serial device /dev/%s present", l_path);
 
 	/*
 	 * update the portmon database if this port falls within

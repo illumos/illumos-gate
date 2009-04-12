@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,70 +18,71 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef	_POSTIO_POSTIO_H
+#define	_POSTIO_POSTIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 /*
  *
  * Definitions used by the program that sends jobs to PostScript printers.
  *
- * POSTBEGIN, if it's not NULL, is some PostScript code that's sent to the printer
- * before any of the input files. It's not terribly important since the same thing
- * can be accomplished in other ways, but this approach is convenient. POSTBEGIN
- * is initialized so as to disable job timeouts. The string can also be set on the
- * command line using the -P option.
+ * POSTBEGIN, if it's not NULL, is some PostScript code that's sent to the
+ * printer before any of the input files. It's not terribly important since
+ * the same thing can be accomplished in other ways, but this approach is
+ * convenient. POSTBEGIN is initialized so as to disable job timeouts. The
+ * string can also be set on the command line using the -P option.
  *
  */
 
-#define POSTBEGIN	"%!PS\nstatusdict /waittimeout 0 put\n"
+#define	POSTBEGIN	"%!PS\nstatusdict /waittimeout 0 put\n"
 
 /*
- *
- * The following help determine where postio is when it's running - either in the
- * START, SEND, or DONE states. Primarily controls what's done in getstatus().
- * RADIAN occasionally had problems with two way conversations. Anyway this stuff
- * can be used to prevent status queries while we're transmitting a job. Enabled
- * by the -q option.
+ * The following help determine where postio is when it's running - either
+ * in the START, SEND, or DONE states. Primarily controls what's done in
+ * getstatus().
+ * RADIAN occasionally had problems with two way conversations. Anyway this
+ * stuff can be used to prevent status queries while we're transmitting a
+ * job. Enabled by the -q option.
  *
  */
 
-#define NOTCONNECTED	0
-#define START		1
-#define SEND		2
-#define DONE		3
+#define	NOTCONNECTED	0
+#define	START		1
+#define	SEND		2
+#define	DONE		3
 
 /*
+ * Previous versions of postio only ran as a single process. That was (and
+ * still * is) convenient, but meant we could only flow control one direction.
+ * Data coming back from the printer occasionally got lost, but that didn't
+ * often hurt (except for lost error messages). Anyway I've added code that
+ * lets you split the program into separate read and write processes, thereby
+ * helping to prevent data loss in both directions. It should be particularly
+ * useful when you're sending a job that you expect will be returning useful
+ * data over the communications line.
  *
- * Previous versions of postio only ran as a single process. That was (and still
- * is) convenient, but meant we could only flow control one direction. Data coming
- * back from the printer occasionally got lost, but that didn't often hurt (except
- * for lost error messages). Anyway I've added code that lets you split the program
- * into separate read and write processes, thereby helping to prevent data loss in
- * both directions. It should be particularly useful when you're sending a job that
- * you expect will be returning useful data over the communications line.
- *
- * The next three definitions control what's done with data on communications line.
- * The READ flag means the line can be read, while the WRITE flag means it can be
- * written. When we're running as a single process both flags are set. I tried to
- * overlay the separate read/write process code on what was there and working for
- * one process. The implementation isn't as good as it could be, but should be
- * safe. The single process version still works, and remains the default.
- *
+ * The next three definitions control what's done with data on communications
+ * line.  The READ flag means the line can be read, while the WRITE flag means
+ * it can be written. When we're running as a single process both flags are
+ * set. I tried to overlay the separate read/write process code on what was
+ * there and working for one process. The implementation isn't as good as it
+ * could be, but should be safe. The single process version still works,
+ * and remains the default.
  */
 
-#define READ		1
-#define WRITE		2
-#define READWRITE	3
+#define	READ		1
+#define	WRITE		2
+#define	READWRITE	3
 
 /*
- *
  * Messages generated on the printer and returned over the communications line
  * look like,
  *
@@ -105,35 +105,33 @@
  * The following constants are used to classify the recognized printer states.
  * readline() reads complete lines from ttyi and stores them in array mesg[].
  * getstatus() looks for the "%%[ " and " ]%%" delimiters that bracket printer
- * messages and if found it tries to parse the enclosed message. After the lookup
- * one of the following numbers is returned as an indication of the existence or
- * content of the printer message. The return value is used in start(), send(),
- * and done() to figure out what's happening and what can be done next.
- *
+ * messages and if found it tries to parse the enclosed message. After the
+ * lookup one of the following numbers is returned as an indication of the
+ * existence or content of the printer message. The return value is used in
+ * start(), send(), and done() to figure out what's happening and what can
+ * be done next.
  */
 
-#define BUSY		0		/* processing data already sent */
-#define WAITING		1		/* printer wants more data */
-#define PRINTING	2		/* printing a page */
-#define IDLE		3		/* ready to start the next job */
-#define ENDOFJOB	4		/* readline() builds this up on EOF */
-#define PRINTERERROR	5		/* PrinterError - eg. out of paper */
-#define ERROR		6		/* some kind of PostScript error */
-#define FLUSHING	7		/* throwing out the rest of the job */
-#define INITIALIZING	8		/* printer is booting */
-#define DISCONNECT	9		/* from Datakit! */
-#define UNKNOWN		10		/* in case we missed anything */
-#define NOSTATUS	11		/* no response from the printer */
+#define	BUSY		0		/* processing data already sent */
+#define	WAITING		1		/* printer wants more data */
+#define	PRINTING	2		/* printing a page */
+#define	IDLE		3		/* ready to start the next job */
+#define	ENDOFJOB	4		/* readline() builds this up on EOF */
+#define	PRINTERERROR	5		/* PrinterError - eg. out of paper */
+#define	ERROR		6		/* some kind of PostScript error */
+#define	FLUSHING	7		/* throwing out the rest of the job */
+#define	INITIALIZING	8		/* printer is booting */
+#define	DISCONNECT	9		/* from Datakit! */
+#define	UNKNOWN		10		/* in case we missed anything */
+#define	NOSTATUS	11		/* no response from the printer */
 
-#define WRITEPROCESS	12		/* dummy states for write process */
-#define INTERACTIVE	13		/* and interactive mode */
+#define	WRITEPROCESS	12		/* dummy states for write process */
+#define	INTERACTIVE	13		/* and interactive mode */
 
 /*
- *
  * An array of type Status is used, in getstatus(), to figure out the printer's
  * current state. Just helps convert strings representing the current state into
  * integer codes that other routines use.
- *
  */
 
 typedef struct {
@@ -144,17 +142,17 @@ typedef struct {
 } Status;
 
 /*
- *
- * STATUS is used to initialize an array of type Status that translates the ASCII
- * strings returned by the printer into appropriate codes that can be used later
- * on in the program. getstatus() converts characters to lower case, so if you
- * add any entries make them lower case and put them in before the UNKNOWN entry.
+ * STATUS is used to initialize an array of type Status that translates the
+ * ASCII strings returned by the printer into appropriate codes that can be
+ * used later on in the program. getstatus() converts characters to lower
+ * case, so if you add any entries make them lower case and put them in
+ * before the UNKNOWN entry.
  * The lookup terminates when we get a match or when an entry with a NULL state
  * is found.
  *
  */
 
-#define STATUS								\
+#define	STATUS								\
 									\
 	{								\
 	    "busy", BUSY,						\
@@ -176,12 +174,12 @@ typedef struct {
  *
  */
 
-#define BAUDRATE	B9600
+#define	BAUDRATE	B9600
 
 /*
  *
- * An array of type Baud is used, in routine getbaud(), to translate ASCII strings
- * into termio values that represent the requested baud rate.
+ * An array of type Baud is used, in routine getbaud(), to translate ASCII
+ * strings into termio values that represent the requested baud rate.
  *
  */
 
@@ -200,7 +198,7 @@ typedef struct {
  *
  */
 
-#define BAUDTABLE							\
+#define	BAUDTABLE							\
 									\
 	{								\
 	    "9600", B9600,						\
@@ -233,17 +231,21 @@ typedef struct {
 	    "307.2", B307200,						\
 	    "460800", B460800,						\
 	    "460.8", B460800,						\
+	    "921600", B921600,						\
+	    "921.6", B921600,						\
 	    NULL, B9600							\
 	}
 
 /*
  *
  * A few miscellaneous definitions. BLOCKSIZE is the default size of the buffer
- * used for reading the input files (changed with the -B option). MESGSIZE is the
- * size of the character array used to store printer status lines - don't make it
- * too small!
+ * used for reading the input files (changed with the -B option). MESGSIZE is
+ * the size of the character array used to store printer status lines - don't
+ * make it too small!
  *
  */
 
-#define BLOCKSIZE	2048
-#define MESGSIZE	512
+#define	BLOCKSIZE	2048
+#define	MESGSIZE	512
+
+#endif	/* _POSTIO_POSTIO_H */

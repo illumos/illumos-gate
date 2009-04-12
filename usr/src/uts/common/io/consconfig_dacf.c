@@ -219,11 +219,10 @@ int consconfig_errlevel = DPRINT_L3;
 /*
  * Baud rate table
  */
-#define	MAX_SPEEDS 24
 static struct speed {
 	char *name;
 	int code;
-} speedtab[MAX_SPEEDS] = {
+} speedtab[] = {
 	{"0", B0},		{"50", B50},		{"75", B75},
 	{"110", B110},		{"134", B134},		{"150", B150},
 	{"200", B200},		{"300", B300},		{"600", B600},
@@ -231,8 +230,11 @@ static struct speed {
 	{"4800", B4800},	{"9600", B9600},	{"19200", B19200},
 	{"38400", B38400},	{"57600", B57600},	{"76800", B76800},
 	{"115200", B115200},	{"153600", B153600},	{"230400", B230400},
-	{"307200", B307200},	{"460800", B460800},	{"", 0}
+	{"307200", B307200},	{"460800", B460800},	{"921600", B921600},
+	{"", 0}
 };
+
+static const int MAX_SPEEDS = sizeof (speedtab) / sizeof (speedtab[0]);
 
 static dacf_op_t kbconfig_op[] = {
 	{ DACF_OPID_POSTATTACH,	kb_config },
@@ -2111,7 +2113,7 @@ flush_deferred_console_buf(void)
 	 * Copy message to a kernel buffer. Various kernel routines
 	 * expect buffer to be above kernelbase
 	 */
-	kc = defcons_kern_buf = (char *)kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
+	kc = defcons_kern_buf = kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
 	bc = (char *)(uintptr_t)defcons_buf;
 	while (*kc++ = *bc++)
 		;

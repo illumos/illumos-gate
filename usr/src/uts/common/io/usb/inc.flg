@@ -18,9 +18,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
 #
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -79,6 +79,7 @@ find_files "s.*"	\
 	usr/src/uts/sparc/mixer \
 	usr/src/uts/sparc/amsrc2 \
 	usr/src/uts/sparc/ugen \
+	usr/src/uts/sparc/usbftdi \
 	usr/src/uts/sparc/usbser \
 	usr/src/uts/sparc/usbsksp \
 	usr/src/uts/sparc/usbsprl \
@@ -113,6 +114,7 @@ find_files "s.*"	\
 	usr/src/uts/intel/mixer \
 	usr/src/uts/intel/amsrc2 \
 	usr/src/uts/intel/ugen \
+	usr/src/uts/intel/usbftdi \
 	usr/src/uts/intel/usbser \
 	usr/src/uts/intel/usbsksp \
 	usr/src/uts/intel/usbsprl \

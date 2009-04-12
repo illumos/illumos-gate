@@ -988,6 +988,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/usbsacm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/usbftdi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_keyspan/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -2000,6 +2004,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbsacm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbftdi/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_keyspan/%.c

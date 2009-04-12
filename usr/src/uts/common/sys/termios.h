@@ -23,14 +23,12 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_TERMIOS_H
 #define	_SYS_TERMIOS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -478,6 +476,7 @@ struct ppsclockev32 {
 #define	TIOCSTOP	(tIOC|111)	/* stop output, like ^S */
 #define	TIOCSTART	(tIOC|110)	/* start output, like ^Q */
 #define	TIOCSILOOP	(tIOC|109)	/* private to Sun; do not use */
+#define	TIOCCILOOP	(tIOC|108)	/* private to Sun; do not use */
 
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
@@ -580,6 +579,7 @@ struct ppsclockev32 {
 #define	B230400	20
 #define	B307200	21
 #define	B460800	22
+#define	B921600	23
 
 #ifndef _SYS_TTOLD_H
 

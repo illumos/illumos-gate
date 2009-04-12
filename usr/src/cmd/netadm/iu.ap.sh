@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -41,6 +41,7 @@ case "$MACH" in
 	usbser_edge	-1	0	ldterm ttcompat
 	usbsprl	-1	0	ldterm ttcompat
 	usbsksp	-1	0	ldterm ttcompat
+	usbftdi	-1	0	ldterm ttcompat
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah
 " > iu.ap
@@ -70,6 +71,7 @@ case "$MACH" in
 	usbsacm -1	0	ldterm ttcompat
 	usbsprl -1	0	ldterm ttcompat
 	usbsksp -1	0	ldterm ttcompat
+	usbftdi	-1	0	ldterm ttcompat
 	ttymux	-1	0	ldterm ttcompat
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah

@@ -495,6 +495,7 @@ COMMON_SUBDIRS= \
 	SUNWudf \
 	SUNWudfr \
 	SUNWuedg \
+	SUNWuftdi \
 	SUNWugen \
 	SUNWugenu \
 	SUNWuksp \

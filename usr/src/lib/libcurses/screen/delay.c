@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -55,10 +53,10 @@ static	short	tmspc10[] =
 			0, 2000, 1333, 909, 743, 666, 500, 333,
 		    /* 600 1200 1800 2400 4800 9600 19200 38400 baud */
 			166, 83,  55,  41,  20,  10,   5,    2,
-		    /* 57600, 76800, 115200, 153600, 230400 307200 baud */
+		    /* 57600, 76800, 115200, 153600, 230400, 307200 baud */
 			2,	1,	1,	1,	1,	1,
-		    /* 460800 baud */
-			1
+		    /* 460800, 921600 baud */
+			1,	1
 		};
 
 /*

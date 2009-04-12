@@ -691,6 +691,8 @@ USBS49_FW_OBJS += keyspan_49fw.o
 
 USBSPRL_OBJS += usbser_pl2303.o pl2303_dsd.o
 
+USBFTDI_OBJS += usbser_uftdi.o uftdi_dsd.o
+
 WC_OBJS += wscons.o vcons.o
 
 VCONS_CONF_OBJS += vcons_conf.o

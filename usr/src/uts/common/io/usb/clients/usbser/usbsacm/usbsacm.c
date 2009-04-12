@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * USB Serial CDC ACM driver
@@ -466,7 +466,8 @@ static int usbsacm_speedtab[] = {
 	153600,	/* B153600 */
 	230400,	/* B230400 */
 	307200,	/* B307200 */
-	460800	/* B460800 */
+	460800,	/* B460800 */
+	921600	/* B921600 */
 };
 
 

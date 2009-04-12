@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,9 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "termio.h"
 #include "dial.h"
@@ -39,33 +36,33 @@
 #include <sys/ioccom.h>
 #include <sys/ecppsys.h>
 
-static void		sigalrm ( int );
-static int		push_module ( int , char * , char * );
+static void		sigalrm(int);
+static int		push_module(int, char *, char *);
 
 static int		SigAlrm;
 
-/**
- ** open_dialup() - OPEN A PORT TO A ``DIAL-UP'' PRINTER
- **/
+/*
+ * open_dialup() - OPEN A PORT TO A ``DIAL-UP'' PRINTER
+ */
 
 int
-open_dialup ( char *ptype, PRINTER *pp)
+open_dialup(char *ptype, PRINTER *pp)
 {
 	static char		*baud_table[]	= {
-		      0,
-		   "50",
-		   "75",
-		  "110",
-		  "134",
-		  "150",
-		  "200",
-		  "300",
-		  "600",
-		 "1200",
-		 "1800",
-		 "2400",
-		 "4800",
-		 "9600",
+		0,
+		"50",
+		"75",
+		"110",
+		"134",
+		"150",
+		"200",
+		"300",
+		"600",
+		"1200",
+		"1800",
+		"2400",
+		"4800",
+		"9600",
 		"19200",
 		"38400",
 		"57600",
@@ -74,7 +71,8 @@ open_dialup ( char *ptype, PRINTER *pp)
 		"153600",
 		"230400",
 		"307200",
-		"460800"
+		"460800",
+		"921600"
 	};
 
 	struct termio		tio;
@@ -82,8 +80,7 @@ open_dialup ( char *ptype, PRINTER *pp)
 
 	CALL			call;
 
-	int			speed,
-				fd;
+	int			speed, fd;
 
 	char			*sspeed;
 
@@ -105,8 +102,8 @@ open_dialup ( char *ptype, PRINTER *pp)
 	 * move it.
 	 */
 	if (fd != 1) {
-		dup2 (fd, 1);
-		Close (fd);
+		dup2(fd, 1);
+		Close(fd);
 	}
 
 	/*
@@ -123,51 +120,46 @@ open_dialup ( char *ptype, PRINTER *pp)
 	 * to override us (although it would be probably be
 	 * silly for him or her to do so.)
 	 */
-	if (ioctl (1, TCGETS, &tios) < 0) {
-		ioctl (1, TCGETA, &tio);
+	if (ioctl(1, TCGETS, &tios) < 0) {
+		ioctl(1, TCGETA, &tio);
 		tios.c_cflag = tio.c_cflag;
 	}
 	if ((sspeed = baud_table[cfgetospeed(&tios)]) != NULL) {
 
 		if (pp->stty == NULL)
 			pp->stty = "";
+
 		{
-		register char	*new_stty = Malloc(
-			strlen(pp->stty) + 1 + strlen(sspeed) + 1
-		);
+			char *new_stty = Malloc(
+			    strlen(pp->stty) + 1 + strlen(sspeed) + 1);
 
-		sprintf (new_stty, "%s %s", pp->stty, sspeed);
+			sprintf(new_stty, "%s %s", pp->stty, sspeed);
 
-		/*
-		 * We can trash "pp->stty" because
-		 * the parent process has the good copy.
-		 */
-		pp->stty = new_stty;
+			/*
+			 * We can trash "pp->stty" because
+			 * the parent process has the good copy.
+			 */
+			pp->stty = new_stty;
 		}
 	}
 
 	return (0);
 }
 
-/**
- ** open_direct() - OPEN A PORT TO A DIRECTLY CONNECTED PRINTER
- **/
+/*
+ * open_direct() - OPEN A PORT TO A DIRECTLY CONNECTED PRINTER
+ */
 
 int
 open_direct(char *ptype, PRINTER *pp)
 {
-	short			bufsz	    = -1,
-				cps	    = -1;
-
-	int			open_mode,
-				fd;
-
-	register unsigned int	oldalarm,
-				newalarm    = 0;
+	short bufsz = -1, cps = -1;
+	int open_mode, fd;
+	register unsigned int oldalarm, newalarm = 0;
 	char *device;
 
 	struct ecpp_transfer_parms ecpp_params;	/* for ECPP port checking */
-	char 			**modules = NULL;
+	char **modules = NULL;
 
 	struct flock		lck;
 	struct stat		buf;
@@ -181,8 +173,8 @@ open_direct(char *ptype, PRINTER *pp)
 	 * has a huge buffer that, in the worst case, would take
 	 * a long time to drain.
 	 */
-	tidbit (ptype, "bufsz", &bufsz);
-	tidbit (ptype, "cps", &cps);
+	tidbit(ptype, "bufsz", &bufsz);
+	tidbit(ptype, "cps", &cps);
 	if (bufsz > 0 && cps > 0)
 		newalarm = (((long)bufsz * 1100) / cps) / 1000;
 	if (newalarm < 60)
@@ -227,8 +219,8 @@ open_direct(char *ptype, PRINTER *pp)
 			return (EXEC_EXIT_TMOUT);
 	}
 
-	alarm (oldalarm);
-	signal (SIGALRM, oldsig);
+	alarm(oldalarm);
+	signal(SIGALRM, oldsig);
 
 	/*
 	 * Lock the file in case two "printers" are defined on the
@@ -236,7 +228,7 @@ open_direct(char *ptype, PRINTER *pp)
 	 */
 
 	lck.l_type = F_WRLCK;
-	lck.l_whence = 0;   
+	lck.l_whence = 0;
 	lck.l_start = 0L;
 	lck.l_len = 0L;
 
@@ -250,8 +242,8 @@ open_direct(char *ptype, PRINTER *pp)
 	 * in case....
 	 */
 	if (fd != 1) {
-		dup2 (fd, 1);
-		Close (fd);
+		dup2(fd, 1);
+		Close(fd);
 	}
 
 	/*
@@ -292,7 +284,7 @@ open_direct(char *ptype, PRINTER *pp)
 		 * instructed not to.
 		 */
 		while (ioctl(1, I_POP, 0) == 0)
-				;
+			;
 
 		/*
 		 * Now push either the administrator specified modules
@@ -312,28 +304,27 @@ open_direct(char *ptype, PRINTER *pp)
 	return (0);
 }
 
-/**
- ** sigalrm()
- **/
+/*
+ * sigalrm()
+ */
 static void
 sigalrm(int ignore)
 {
-	signal (SIGALRM, SIG_IGN);
+	signal(SIGALRM, SIG_IGN);
 	SigAlrm = 1;
-	return;
 }
 
 
-/**
- ** push_module()
- **/
+/*
+ * push_module()
+ */
 
 static int
 push_module(int fd, char *device, char *module)
 {
-	int			ret	= ioctl(fd, I_PUSH, module);
+	int ret	= ioctl(fd, I_PUSH, module);
 
 	if (ret == -1)
-		note ("push (%s) on %s failed (%s)\n", module, device, PERROR);
+		note("push (%s) on %s failed (%s)\n", module, device, PERROR);
 	return (ret);
 }

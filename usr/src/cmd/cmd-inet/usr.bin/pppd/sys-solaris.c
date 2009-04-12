@@ -1,7 +1,7 @@
 /*
  * System-dependent procedures for pppd under Solaris 2.x (SunOS 5.x).
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -39,7 +39,6 @@
  * OR MODIFICATIONS.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define	RCSID	"$Id: sys-solaris.c,v 1.2 2000/04/21 01:27:57 masputra Exp $"
 
 #include <limits.h>
@@ -1210,6 +1209,9 @@ struct speed {
 #endif
 #ifdef B460800
 	{ 460800, B460800 },
+#endif
+#ifdef B921600
+	{ 921600, B921600 },
 #endif
 	{ 0, 0 }
 };

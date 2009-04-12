@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,8 +8,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tip - UNIX link to other systems
@@ -27,7 +25,8 @@
 int bauds[] = {
 	0, 50, 75, 110, 134, 150, 200, 300, 600,
 	1200, 1800, 2400, 4800, 9600, 19200, 38400,
-	57600, 76800, 115200, 153600, 230400, 307200, 460800, -1
+	57600, 76800, 115200, 153600, 230400, 307200,
+	460800, 921600, -1
 };
 
 extern void	tipout(void)	__NORETURN;

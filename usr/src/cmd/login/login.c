@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1564,7 +1564,8 @@ usage(void)
 static char	*speeds[] = {
 	"0", "50", "75", "110", "134", "150", "200", "300",
 	"600", "1200", "1800", "2400", "4800", "9600", "19200", "38400",
-	"57600", "76800", "115200", "153600", "230400", "307200", "460800"
+	"57600", "76800", "115200", "153600", "230400", "307200", "460800",
+	"921600"
 };
 
 #define	NSPEEDS	(sizeof (speeds) / sizeof (speeds[0]))

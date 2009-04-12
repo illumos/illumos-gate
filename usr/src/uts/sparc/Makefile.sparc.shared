@@ -271,6 +271,7 @@ DRV_KMODS	+= usbser usbsacm usbsksp usbsprl
 DRV_KMODS	+= usb_as usb_ac
 DRV_KMODS	+= usbskel
 DRV_KMODS	+= usbvc
+DRV_KMODS	+= usbftdi
 DRV_KMODS	+= hci1394 av1394 scsa1394 dcam1394
 DRV_KMODS	+= sbp2
 DRV_KMODS	+= ib ibd rdsib sdp iser

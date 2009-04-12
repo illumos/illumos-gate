@@ -373,6 +373,7 @@ const struct ioc {
 	{ (uint_t)TIOCSTART,	"TIOCSTART",	NULL },
 	{ (uint_t)TIOCSTOP,	"TIOCSTOP",	NULL },
 	{ (uint_t)TIOCNOTTY,	"TIOCNOTTY",	NULL },
+	{ (uint_t)TIOCSCTTY,	"TIOCSCTTY",	NULL },
 	{ (uint_t)TIOCOUTQ,	"TIOCOUTQ",	NULL },
 	{ (uint_t)TIOCGLTC,	"TIOCGLTC",	NULL },
 	{ (uint_t)TIOCSLTC,	"TIOCSLTC",	NULL },
@@ -384,6 +385,16 @@ const struct ioc {
 	{ (uint_t)TIOCLSET,	"TIOCLSET",	NULL },
 	{ (uint_t)TIOCLBIC,	"TIOCLBIC",	NULL },
 	{ (uint_t)TIOCLBIS,	"TIOCLBIS",	NULL },
+
+	{ (uint_t)TIOCSILOOP,	"TIOCSILOOP",	NULL },
+	{ (uint_t)TIOCCILOOP,	"TIOCSILOOP",	NULL },
+
+	{ (uint_t)TIOCSETLD,	"TIOCSETLD",	NULL },
+	{ (uint_t)TIOCGETLD,	"TIOCGETLD",	NULL },
+
+	{ (uint_t)TIOCGPPS,	"TIOCGPPS",	NULL },
+	{ (uint_t)TIOCSPPS,	"TIOCSPPS",	NULL },
+	{ (uint_t)TIOCGPPSEV,	"TIOCGPPSEV",	NULL },
 
 	{ (uint_t)TIOCPKT,	"TIOCPKT",	NULL },	/* ptyvar.h */
 	{ (uint_t)TIOCUCNTL,	"TIOCUCNTL",	NULL },

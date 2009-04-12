@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,18 +18,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* This is a new line.c, which consists of line.c and culine.c
+/*
+ * This is a new line.c, which consists of line.c and culine.c
  * merged together.
  */
 
@@ -69,19 +67,20 @@ static struct sg_spds {
 	{230400, B230400},
 	{307200, B307200},
 	{460800, B460800},
+	{921600, B921600},
 	{0,    0}
 };
 
-#define PACKSIZE	64
-#define HEADERSIZE	6
+#define	PACKSIZE	64
+#define	HEADERSIZE	6
 
 GLOBAL int
-     packsize = PACKSIZE,
-    xpacksize = PACKSIZE;
+	packsize = PACKSIZE,
+	xpacksize = PACKSIZE;
 
-#define SNDFILE	'S'
-#define RCVFILE 'R'
-#define RESET	'X'
+#define	SNDFILE	'S'
+#define	RCVFILE 'R'
+#define	RESET	'X'
 
 #ifdef PKSPEEDUP
 GLOBAL int linebaudrate;	/* for speedup hook in pk1.c */
@@ -111,7 +110,7 @@ static struct termios Savettybs;
  *	if spwant == 0, speed is untouched
  *	type is unused, but needed for compatibility
  *
- * return:  
+ * return:
  *	none
  */
 /*ARGSUSED*/
@@ -135,9 +134,9 @@ int	tty, spwant, type;
 			ttbufs.c_oflag = ttbuf.c_oflag;
 			ttbufs.c_iflag = ttbuf.c_iflag;
 			ttbufs.c_cflag = ttbuf.c_cflag;
-			for(i = 0; i < NCC; i++)
+			for (i = 0; i < NCC; i++)
 				ttbufs.c_cc[i] = ttbuf.c_cc[i];
-	    	}
+		}
 	}
 	if (spwant > 0) {
 		for (ps = spds; ps->sp_val; ps++)
@@ -145,8 +144,8 @@ int	tty, spwant, type;
 				speed = ps->sp_name;
 				break;
 			}
-		if ( speed < 0 )
-		    DEBUG(5, "speed (%d) not supported\n", spwant);
+		if (speed < 0)
+			DEBUG(5, "speed (%d) not supported\n", spwant);
 		ASSERT(speed >= 0, "BAD SPEED", "", spwant);
 		ttbufs.c_cflag &= 0xffff0000;
 		cfsetospeed(&ttbufs, speed);
@@ -182,31 +181,31 @@ int	tty, spwant, type;
 #endif /* NO_MODEM_CTRL */
 		ttbufs.c_cflag &= ~CLOCAL;
 
-	if ( !EQUALS(Progname, "uucico") ) {
+	if (!EQUALS(Progname, "uucico")) {
 
 		/* set attributes associated with -h, -t, -e, and -o options */
 
 		ttbufs.c_iflag = (IGNPAR | IGNBRK | IXON | IXOFF);
 		ttbufs.c_cc[VEOF] = '\1';
-		ttbufs.c_cflag |= ( CREAD | (speed ? HUPCL : 0));
+		ttbufs.c_cflag |= (CREAD | (speed ? HUPCL : 0));
 
-		if ( line_8bit ) {
-		    ttbufs.c_cflag |= CS8;
-		    ttbufs.c_iflag &= ~ISTRIP;
+		if (line_8bit) {
+			ttbufs.c_cflag |= CS8;
+			ttbufs.c_iflag &= ~ISTRIP;
 		} else {
-		    if (Evenflag) {			/*even parity -e */
-			ttbufs.c_cflag &= ~PARODD;
-		    } else if(Oddflag) {		/*odd parity -o */
-			ttbufs.c_cflag |= PARODD;
-		    }
-		    ttbufs.c_cflag |= CS7|PARENB;
-		    ttbufs.c_iflag |= ISTRIP;
+			if (Evenflag) {			/* even parity -e */
+				ttbufs.c_cflag &= ~PARODD;
+			} else if (Oddflag) {		/* odd parity -o */
+				ttbufs.c_cflag |= PARODD;
+			}
+			ttbufs.c_cflag |= CS7|PARENB;
+			ttbufs.c_iflag |= ISTRIP;
 		}
 
-		if(!Duplex)				/*half duplex -h */
-		    ttbufs.c_iflag &= ~(IXON | IXOFF);
-		if(Terminal)				/* -t */
-		    ttbufs.c_oflag |= (OPOST | ONLCR);
+		if (!Duplex)				/* half duplex -h */
+			ttbufs.c_iflag &= ~(IXON | IXOFF);
+		if (Terminal)				/* -t */
+			ttbufs.c_oflag |= (OPOST | ONLCR);
 
 	} else { /* non-uucico */
 		ttbufs.c_cflag |= (CS8 | CREAD | (speed ? HUPCL : 0));
@@ -219,16 +218,14 @@ int	tty, spwant, type;
 		ttbuf.c_oflag = ttbufs.c_oflag;
 		ttbuf.c_iflag = ttbufs.c_iflag;
 		ttbuf.c_cflag = ttbufs.c_cflag;
-		for(i = 0; i < NCC; i++)
+		for (i = 0; i < NCC; i++)
 			ttbuf.c_cc[i] = ttbufs.c_cc[i];
 		ASSERT((*Ioctl)(tty, TCSETAW, &ttbuf) >= 0,
-	    	    "RETURN FROM fixline ioctl", "", errno);
+		    "RETURN FROM fixline ioctl", "", errno);
 	} else {
 		ASSERT((*Ioctl)(tty, TCSETSW, &ttbufs) >= 0,
-	    	    "RETURN FROM fixline ioctl", "", errno);
+		    "RETURN FROM fixline ioctl", "", errno);
 	}
-
-	return;
 }
 
 GLOBAL void
@@ -243,16 +240,14 @@ int	dcf;
 		ttbuf.c_cflag |= HUPCL;
 		(void) (*Ioctl)(dcf, TCSETAW, &ttbuf);
 	}
-	return;
 }
 
 GLOBAL void
 ttygenbrk(fn)
 register int	fn;
 {
-	if (isatty(fn)) 
+	if (isatty(fn))
 		(void) (*Ioctl)(fn, TCSBRK, 0);
-	return;
 }
 
 
@@ -268,10 +263,10 @@ register char	type;
 	static struct termio tbuf;
 	static struct termios tbufs;
 	int i, vtime, istermios, ospeed;
-	
+
 	DEBUG(2, "setline - %c\n", type);
 
-	if ((istermios = (*Ioctl)(Ifn, TCGETS, &tbufs)) < 0) {	
+	if ((istermios = (*Ioctl)(Ifn, TCGETS, &tbufs)) < 0) {
 		if ((*Ioctl)(Ifn, TCGETA, &tbuf) != 0) {
 			return;
 		} else {
@@ -279,7 +274,7 @@ register char	type;
 			tbufs.c_oflag = tbuf.c_oflag;
 			tbufs.c_iflag = tbuf.c_iflag;
 			tbufs.c_cflag = tbuf.c_cflag;
-			for(i = 0; i < NCC; i++)
+			for (i = 0; i < NCC; i++)
 				tbufs.c_cc[i] = tbuf.c_cc[i];
 		}
 	}
@@ -304,6 +299,7 @@ register char	type;
 		case B230400:
 		case B307200:
 		case B460800:
+		case B921600:
 		case B9600:
 			vtime = 1;
 			break;
@@ -323,59 +319,66 @@ register char	type;
 			tbuf.c_oflag = tbufs.c_oflag;
 			tbuf.c_iflag = tbufs.c_iflag;
 			tbuf.c_cflag = tbufs.c_cflag;
-			for(i = 0; i < NCC; i++)
+			for (i = 0; i < NCC; i++)
 				tbuf.c_cc[i] = tbufs.c_cc[i];
-		        if ( (*Ioctl)(Ifn, TCSETAW, &tbuf) != 0 )
-			    DEBUG(4, "setline Ioctl failed errno=%d\n", errno);
-		    } else {
-		        if ( (*Ioctl)(Ifn, TCSETSW, &tbufs) != 0 )
-			    DEBUG(4, "setline Ioctl failed errno=%d\n", errno);
-		    }
+			if ((*Ioctl)(Ifn, TCSETAW, &tbuf) != 0)
+				DEBUG(4, "setline Ioctl failed errno=%d\n",
+				    errno);
+			} else {
+				if ((*Ioctl)(Ifn, TCSETSW, &tbufs) != 0)
+					DEBUG(4,
+					    "setline Ioctl failed errno=%d\n",
+					    errno);
+			}
 		}
 		break;
 
 	case SNDFILE:
 	case RESET:
 		if (tbufs.c_cc[VMIN] != HEADERSIZE) {
-		    tbufs.c_cc[VMIN] = HEADERSIZE;
-		    if (istermios < 0) {
-			tbuf.c_lflag = tbufs.c_lflag;
-			tbuf.c_oflag = tbufs.c_oflag;
-			tbuf.c_iflag = tbufs.c_iflag;
-			tbuf.c_cflag = tbufs.c_cflag;
-			for(i = 0; i < NCC; i++)
-				tbuf.c_cc[i] = tbufs.c_cc[i];
-		    	if ( (*Ioctl)(Ifn, TCSETAW, &tbuf) != 0 )
-			    DEBUG(4, "setline Ioctl failed errno=%d\n", errno);
-		    } else {
-		        if ( (*Ioctl)(Ifn, TCSETSW, &tbufs) != 0 )
-			    DEBUG(4, "setline Ioctl failed errno=%d\n", errno);
-		    }
+			tbufs.c_cc[VMIN] = HEADERSIZE;
+			if (istermios < 0) {
+				tbuf.c_lflag = tbufs.c_lflag;
+				tbuf.c_oflag = tbufs.c_oflag;
+				tbuf.c_iflag = tbufs.c_iflag;
+				tbuf.c_cflag = tbufs.c_cflag;
+				for (i = 0; i < NCC; i++)
+					tbuf.c_cc[i] = tbufs.c_cc[i];
+				if ((*Ioctl)(Ifn, TCSETAW, &tbuf) != 0)
+					DEBUG(4,
+					    "setline Ioctl failed errno=%d\n",
+					    errno);
+			} else {
+				if ((*Ioctl)(Ifn, TCSETSW, &tbufs) != 0)
+					DEBUG(4,
+					    "setline Ioctl failed errno=%d\n",
+					    errno);
+			}
 		}
 		break;
 	}
-	return;
 }
 
 GLOBAL int
 savline()
 {
 	if ((Saved_termios = (*Ioctl)(0, TCGETS, &Savettybs)) < 0) {
-	    if ( (*Ioctl)(0, TCGETA, &Savettyb) != 0 ) {
-		Saved_line = FALSE;
-	    } else {
-		Saved_line = TRUE;
-		Savettyb.c_cflag = (Savettyb.c_cflag & ~CS8) | CS7 | PARENB;
-		Savettyb.c_oflag |= OPOST;
-		Savettyb.c_lflag |= (ISIG|ICANON|ECHO);
-	    }
+		if ((*Ioctl)(0, TCGETA, &Savettyb) != 0) {
+			Saved_line = FALSE;
+		} else {
+			Saved_line = TRUE;
+			Savettyb.c_cflag =
+			    (Savettyb.c_cflag & ~CS8) | CS7 | PARENB;
+			Savettyb.c_oflag |= OPOST;
+			Savettyb.c_lflag |= (ISIG|ICANON|ECHO);
+		}
 	} else {
 		Saved_line = TRUE;
 		Savettybs.c_cflag = (Savettybs.c_cflag & ~CS8) | CS7 | PARENB;
 		Savettybs.c_oflag |= OPOST;
 		Savettybs.c_lflag |= (ISIG|ICANON|ECHO);
 	}
-	return(0);
+	return (0);
 }
 
 #ifdef SYTEK
@@ -398,14 +401,14 @@ int tty, spwant;
 	int i, ret, istermios;
 
 	if ((istermios = (*Ioctl)(tty, TCGETS, &ttbufs)) < 0) {
-		if ( (*Ioctl)(tty, TCGETA, &ttbuf) != 0 ) {
+		if ((*Ioctl)(tty, TCGETA, &ttbuf) != 0) {
 			return;
 		} else {
 			ttbufs.c_lflag = ttbuf.c_lflag;
 			ttbufs.c_oflag = ttbuf.c_oflag;
 			ttbufs.c_iflag = ttbuf.c_iflag;
 			ttbufs.c_cflag = ttbuf.c_cflag;
-			for(i = 0; i < NCC; i++)
+			for (i = 0; i < NCC; i++)
 				ttbufs.c_cc[i] = ttbuf.c_cc[i];
 		}
 	}
@@ -427,13 +430,12 @@ int tty, spwant;
 		ttbuf.c_oflag = ttbufs.c_oflag;
 		ttbuf.c_iflag = ttbufs.c_iflag;
 		ttbuf.c_cflag = ttbufs.c_cflag;
-		for(i = 0; i < NCC; i++)
+		for (i = 0; i < NCC; i++)
 			ttbuf.c_cc[i] = ttbufs.c_cc[i];
 		ret = (*Ioctl)(tty, TCSETAW, &ttbuf);
 	} else
 		ret = (*Ioctl)(tty, TCSETAWS &ttbufs);
 	ASSERT(ret >= 0, "RETURN FROM sytfixline", "", ret);
-	return;
 }
 
 GLOBAL void
@@ -443,13 +445,12 @@ int tty;
 	struct termio ttbuf;
 	int ret;
 
-	if ( (*Ioctl)(tty, TCGETA, &ttbuf) != 0 )
+	if ((*Ioctl)(tty, TCGETA, &ttbuf) != 0)
 		return;
 	ttbuf.c_cflag &= ~CLOCAL;
 	ttbuf.c_cflag |= CREAD|HUPCL;
 	ret = (*Ioctl)(tty, TCSETAW, &ttbuf);
 	ASSERT(ret >= 0, "RETURN FROM sytfix2line", "", ret);
-	return;
 }
 
 #endif /* SYTEK */
@@ -457,13 +458,13 @@ int tty;
 GLOBAL int
 restline()
 {
-	if ( Saved_line == TRUE ) {
+	if (Saved_line == TRUE) {
 		if (Saved_termios < 0)
-			return((*Ioctl)(0, TCSETAW, &Savettyb));
+			return ((*Ioctl)(0, TCSETAW, &Savettyb));
 		else
-			return((*Ioctl)(0, TCSETSW, &Savettybs));
+			return ((*Ioctl)(0, TCSETSW, &Savettybs));
 	}
-	return(0);
+	return (0);
 }
 
 #else /* !ATTSVTTY */
@@ -517,16 +518,14 @@ int tty, spwant, type;
 	(void) (*Ioctl)(tty, TIOCSETP, &ttbuf);
 	(void) (*Ioctl)(tty, TIOCHPCL, STBNULL);
 	(void) (*Ioctl)(tty, TIOCEXCL, STBNULL);
-	return;
 }
 
 GLOBAL void
 sethup(dcf)
 int	dcf;
 {
-	if (isatty(dcf)) 
+	if (isatty(dcf))
 		(void) (*Ioctl)(dcf, TIOCHPCL, STBNULL);
-	return;
 }
 
 /*
@@ -545,7 +544,6 @@ ttygenbrk(fn)
 		(void) (*Ioctl)(fn, TIOCCBRK, 0);
 #endif
 	}
-	return;
 }
 
 /*
@@ -559,21 +557,21 @@ setline(dummy) { }
 GLOBAL int
 savline()
 {
-	if (  (*Ioctl)(0, TIOCGETP, &Savettyb) != 0 )
+	if ((*Ioctl)(0, TIOCGETP, &Savettyb) != 0)
 		Saved_line = FALSE;
 	else {
 		Saved_line = TRUE;
 		Savettyb.sg_flags |= ECHO;
 		Savettyb.sg_flags &= ~RAW;
 	}
-	return(0);
+	return (0);
 }
 
 GLOBAL int
 restline()
 {
-	if ( Saved_line == TRUE )
-		return((*Ioctl)(0, TIOCSETP, &Savettyb));
-	return(0);
+	if (Saved_line == TRUE)
+		return ((*Ioctl)(0, TIOCSETP, &Savettyb));
+	return (0);
 }
 #endif

@@ -64,7 +64,8 @@ sparc_HDRS= 			\
 # Generated headers
 GENHDRS=			\
 	priv_const.h		\
-	priv_names.h
+	priv_names.h		\
+	usb/usbdevs.h
 
 CHKHDRS=			\
 	acpi_drv.h		\
@@ -1272,6 +1273,9 @@ priv_const.h: $(PRIVS_AWK) $(PRIVS_DEF)
 
 priv_names.h: $(PRIVS_AWK) $(PRIVS_DEF)
 	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pubhfile=$@
+
+usb/usbdevs.h: $(USBDEVS_AWK) $(USBDEVS_DATA)
+	$(NAWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
 
 LVMDERIVED_H:
 	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE)

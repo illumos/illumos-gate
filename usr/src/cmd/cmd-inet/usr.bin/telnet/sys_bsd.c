@@ -1,9 +1,7 @@
 /*
- * Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -562,7 +560,8 @@ static struct termspeeds {
 	{ 4800,	B4800 },	{ 9600,  B9600 },	{ 19200, B19200 },
 	{ 38400, B38400 },	{ 57600, B57600 },	{ 76800, B76800 },
 	{ 115200, B115200 },	{ 153600, B153600 },	{ 230400, B230400 },
-	{ 307200, B307200 },	{ 460800, B460800 },	{ -1, B0 }
+	{ 307200, B307200 },	{ 460800, B460800 },	{ 921600, B921600 },
+	{ -1, B0 }
 };
 
 void
@@ -733,7 +732,7 @@ fatal_tty_error(char *doing_what)
 {
 	TerminalNewMode(-1);
 	(void) fprintf(stderr, "Error processing %s:  %s\n", doing_what,
-		strerror(errno));
+	    strerror(errno));
 	exit(1);
 }
 

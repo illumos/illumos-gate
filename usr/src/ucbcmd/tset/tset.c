@@ -1,5 +1,5 @@
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,261 +13,259 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
-**  TSET -- set terminal modes
-**
-**	This program does sophisticated terminal initialization.
-**	I recommend that you include it in your .profile or .login
-**	file to initialize whatever terminal you are on.
-**
-**	There are several features:
-**
-**	A special file or sequence (as controlled by the termcap file)
-**	is sent to the terminal.
-**
-**	Mode bits are set on a per-terminal_type basis (much better
-**	than UNIX itself).  This allows special delays, automatic
-**	tabs, etc.
-**
-**	Erase and Kill characters can be set to whatever you want.
-**	Default is to change erase to control-H on a terminal which
-**	can overstrike, and leave it alone on anything else.  Kill
-**	is always left alone unless specifically requested.  These
-**	characters can be represented as "^X" meaning control-X;
-**	X is any character.
-**
-**	Terminals which are dialups or plugboard types can be aliased
-**	to whatever type you may have in your home or office.  Thus,
-**	if you know that when you dial up you will always be on a
-**	TI 733, you can specify that fact to tset.  You can represent
-**	a type as "?type".  This will ask you what type you want it
-**	to be -- if you reply with just a newline, it will default
-**	to the type given.
-**
-**	The current terminal type can be queried.
-**
-**	Usage:
-**		tset [-] [-EC] [-eC] [-kC] [-iC] [-s] [-h] [-u] [-r]
-**			[-m [ident] [test baudrate] :type]
-**			[-Q] [-I] [-S] [type]
-**
-**		In systems with environments, use:
-**			eval `tset -s ...`
-**		Actually, this doesn't work in old csh's.
-**		Instead, use:
-**			tset -s ... > tset.tmp
-**			source tset.tmp
-**			rm tset.tmp
-**		or:
-**			set noglob
-**			set term=(`tset -S ....`)
-**			setenv TERM $term[1]
-**			setenv TERMCAP "$term[2]"
-**			unset term
-**			unset noglob
-**
-**	Positional Parameters:
-**		type -- the terminal type to force.  If this is
-**			specified, initialization is for this
-**			terminal type.
-**
-**	Flags:
-**		- -- report terminal type.  Whatever type is
-**			decided on is reported.  If no other flags
-**			are stated, the only affect is to write
-**			the terminal type on the standard output.
-**		-r -- report to user in addition to other flags.
-**		-EC -- set the erase character to C on all terminals
-**			except those which cannot backspace (e.g.,
-**			a TTY 33).  C defaults to control-H.
-**		-eC -- set the erase character to C on all terminals.
-**			C defaults to control-H.  If not specified,
-**			the erase character is untouched; however, if
-**			not specified and the erase character is NULL
-**			(zero byte), the erase character is set to CERASE.
-**		-kC -- set the kill character to C on all terminals.
-**			Default for C is control-U.  If not specified,
-**			the kill character is untouched; however, if
-**			not specified and the kill character is NULL
-**			(zero byte), the kill character is set to CKILL.
-**		-iC -- set the interrupt character to C on all terminals.
-**			Default for C is control-C.  If not specified, the
-**			interrupt character is untouched; however, if
-**			not specified and the interrupt character is NULL
-**			(zero byte), the interrupt character is set to
-**			control-C.
-**		-qC -- reserved for setable quit character.
-**		-m -- map the system identified type to some user
-**			specified type. The mapping can be baud rate
-**			dependent. This replaces the old -d, -p flags.
-**			(-d type  ->  -m dialup:type)
-**			(-p type  ->  -m plug:type)
-**			Syntax:	-m identifier [test baudrate] :type
-**			where: ``identifier'' is terminal type found in
-**			/etc/ttys for this port, (abscence of an identifier
-**			matches any identifier); ``test'' may be any combination
-**			of  >  =  <  !  @; ``baudrate'' is as with stty(1);
-**			``type'' is the actual terminal type to use if the
-**			mapping condition is met. Multiple maps are scanned
-**			in order and the first match prevails.
-**		-n -- If the new tty driver from UCB is available, this flag
-**			will activate the new options for erase and kill
-**			processing. This will be different for printers
-**			and crt's. For crts, if the baud rate is < 1200 then
-**			erase and kill don't remove characters from the screen.
-**		-h -- don't read htmp file.  Normally the terminal type
-**			is determined by reading the htmp file or the
-**			environment (unless some mapping is specified).
-**			This forces a read of the ttytype file -- useful
-**			when htmp is somehow wrong. (V6 only)
-**		-u -- don't update htmp.  It seemed like this should
-**			be put in.  Note that htmp is never actually
-**			written if there are no changes, so don't bother
-**			bother using this for efficiency reasons alone.
-**		-s -- output setenv commands for TERM.  This can be
-**			used with
-**				`tset -s ...`
-**			and is to be prefered to:
-**				setenv TERM `tset - ...`
-**			because -s sets the TERMCAP variable also.
-**		-S -- Similar to -s but outputs 2 strings suitable for
-**			use in csh .login files as follows:
-**				set noglob
-**				set term=(`tset -S .....`)
-**				setenv TERM $term[1]
-**				setenv TERMCAP "$term[2]"
-**				unset term
-**				unset noglob
-**		-Q -- be quiet.  don't output 'Erase set to' etc.
-**		-I -- don't do terminal initialization (is & if
-**			strings).
-**		-v -- On virtual terminal systems, don't set up a
-**			virtual terminal.  Otherwise tset will tell
-**			the operating system what kind of terminal you
-**			are on (if it is a known terminal) and fix up
-**			the output of -s to use virtual terminal sequences.
-**
-**	Files:
-**		/etc/ttys
-**			contains a terminal id -> terminal type
-**			mapping; used when any user mapping is specified,
-**			or the environment doesn't have TERM set.
-**		/etc/termcap
-**			a terminal_type -> terminal_capabilities
-**			mapping.
-**
-**	Return Codes:
-**		-1 -- couldn't open termcap.
-**		1 -- bad terminal type, or standard output not tty.
-**		0 -- ok.
-**
-**	Defined Constants:
-**		DIALUP -- the type code for a dialup port.
-**		PLUGBOARD -- the type code for a plugboard port.
-**		ARPANET -- the type code for an arpanet port.
-**		BACKSPACE -- control-H, the default for -e.
-**		CNTL('U') -- control-U, the default for -k.
-**		OLDERASE -- the ancient default erase character.
-**		FILEDES -- the file descriptor to do the operation
-**			on, nominally 1 or 2.
-**		STDOUT -- the standard output file descriptor.
-**		UIDMASK -- the bit pattern to mask with the getuid()
-**			call to get just the user id.
-**		GTTYN -- defines file containing generalized ttynames
-**			and compiles code to look there.
-**
-**	Requires:
-**		Routines to handle htmp, ttys, and termcap.
-**
-**	Compilation Flags:
-**		OLDFLAGS -- must be defined to compile code for any of
-**			the -d, -p, or -a flags.
-**		OLDDIALUP -- accept the -d flag.
-**		OLDPLUGBOARD -- accept the -p flag.
-**		OLDARPANET -- accept the -a flag.
-**		V6 -- if clear, use environments, not htmp.
-**			also use TIOCSETN rather than stty to avoid flushing
-**		GTTYN -- if set, compiles code to look at /etc/ttys.
-**
-**	Trace Flags:
-**		none
-**
-**	Diagnostics:
-**		Bad flag
-**			An incorrect option was specified.
-**		Too few args
-**			more command line arguments are required.
-**		Unexpected arg
-**			wrong type of argument was encountered.
-**		Cannot open ...
-**			The specified file could not be openned.
-**		Type ... unknown
-**			An unknown terminal type was specified.
-**		Cannot update htmp
-**			Cannot update htmp file when the standard
-**			output is not a terminal.
-**		Erase set to ...
-**			Telling that the erase character has been
-**			set to the specified character.
-**		Kill set to ...
-**			Ditto for kill
-**		Erase is ...    Kill is ...
-**			Tells that the erase/kill characters were
-**			wierd before, but they are being left as-is.
-**		Not a terminal
-**			Set if FILEDES is not a terminal.
-**
-**	Compilation Instructions:
-**		cc -n -O tset.c -ltermlib
-**		mv a.out tset
-**		chown bin tset
-**		chmod 4755 tset
-**
-**		where 'bin' should be whoever owns the 'htmp' file.
-**		If 'htmp' is 666, then tset need not be setuid.
-**
-**		For version 6 the compile command should be:
-**		cc -n -O -I/usr/include/retrofit tset.c -ltermlib -lretro -lS
-**
-**
-**	History:
-**		1/81 -- Added alias checking for mapping identifiers.
-**		7/80 -- '-S' added. '-m' mapping added. TERMCAP string
-**			cleaned up.
-**		3/80 -- Changed to use tputs.  Prc & flush added.
-**		10/79 -- '-s' option extended to handle TERMCAP
-**			variable, set noglob, quote the entry,
-**			and know about the Bourne shell.  Terminal
-**			initialization moved to before any information
-**			output so screen clears would not screw you.
-**			'-Q' option added.
-**		8/79 -- '-' option alone changed to only output
-**			type.  '-s' option added.  'VERSION7'
-**			changed to 'V6' for compatibility.
-**		12/78 -- modified for eventual migration to VAX/UNIX,
-**			so the '-' option is changed to output only
-**			the terminal type to STDOUT instead of
-**			FILEDES.
-**		9/78 -- '-' and '-p' options added (now fully
-**			compatible with ttytype!), and spaces are
-**			permitted between the -d and the type.
-**		8/78 -- The sense of -h and -u were reversed, and the
-**			-f flag is dropped -- same effect is available
-**			by just stating the terminal type.
-**		10/77 -- Written.
-*/
+ *  TSET -- set terminal modes
+ *
+ *	This program does sophisticated terminal initialization.
+ *	I recommend that you include it in your .profile or .login
+ *	file to initialize whatever terminal you are on.
+ *
+ *	There are several features:
+ *
+ *	A special file or sequence (as controlled by the termcap file)
+ *	is sent to the terminal.
+ *
+ *	Mode bits are set on a per-terminal_type basis (much better
+ *	than UNIX itself).  This allows special delays, automatic
+ *	tabs, etc.
+ *
+ *	Erase and Kill characters can be set to whatever you want.
+ *	Default is to change erase to control-H on a terminal which
+ *	can overstrike, and leave it alone on anything else.  Kill
+ *	is always left alone unless specifically requested.  These
+ *	characters can be represented as "^X" meaning control-X;
+ *	X is any character.
+ *
+ *	Terminals which are dialups or plugboard types can be aliased
+ *	to whatever type you may have in your home or office.  Thus,
+ *	if you know that when you dial up you will always be on a
+ *	TI 733, you can specify that fact to tset.  You can represent
+ *	a type as "?type".  This will ask you what type you want it
+ *	to be -- if you reply with just a newline, it will default
+ *	to the type given.
+ *
+ *	The current terminal type can be queried.
+ *
+ *	Usage:
+ *		tset [-] [-EC] [-eC] [-kC] [-iC] [-s] [-h] [-u] [-r]
+ *			[-m [ident] [test baudrate] :type]
+ *			[-Q] [-I] [-S] [type]
+ *
+ *		In systems with environments, use:
+ *			eval `tset -s ...`
+ *		Actually, this doesn't work in old csh's.
+ *		Instead, use:
+ *			tset -s ... > tset.tmp
+ *			source tset.tmp
+ *			rm tset.tmp
+ *		or:
+ *			set noglob
+ *			set term=(`tset -S ....`)
+ *			setenv TERM $term[1]
+ *			setenv TERMCAP "$term[2]"
+ *			unset term
+ *			unset noglob
+ *
+ *	Positional Parameters:
+ *		type -- the terminal type to force.  If this is
+ *			specified, initialization is for this
+ *			terminal type.
+ *
+ *	Flags:
+ *		- -- report terminal type.  Whatever type is
+ *			decided on is reported.  If no other flags
+ *			are stated, the only affect is to write
+ *			the terminal type on the standard output.
+ *		-r -- report to user in addition to other flags.
+ *		-EC -- set the erase character to C on all terminals
+ *			except those which cannot backspace (e.g.,
+ *			a TTY 33).  C defaults to control-H.
+ *		-eC -- set the erase character to C on all terminals.
+ *			C defaults to control-H.  If not specified,
+ *			the erase character is untouched; however, if
+ *			not specified and the erase character is NULL
+ *			(zero byte), the erase character is set to CERASE.
+ *		-kC -- set the kill character to C on all terminals.
+ *			Default for C is control-U.  If not specified,
+ *			the kill character is untouched; however, if
+ *			not specified and the kill character is NULL
+ *			(zero byte), the kill character is set to CKILL.
+ *		-iC -- set the interrupt character to C on all terminals.
+ *			Default for C is control-C.  If not specified, the
+ *			interrupt character is untouched; however, if
+ *			not specified and the interrupt character is NULL
+ *			(zero byte), the interrupt character is set to
+ *			control-C.
+ *		-qC -- reserved for setable quit character.
+ *		-m -- map the system identified type to some user
+ *			specified type. The mapping can be baud rate
+ *			dependent. This replaces the old -d, -p flags.
+ *			(-d type  ->  -m dialup:type)
+ *			(-p type  ->  -m plug:type)
+ *			Syntax:	-m identifier [test baudrate] :type
+ *			where: ``identifier'' is terminal type found in
+ *			/etc/ttys for this port, (abscence of an identifier
+ *			matches any identifier); ``test'' may be any combination
+ *			of  >  =  <  !  @; ``baudrate'' is as with stty(1);
+ *			``type'' is the actual terminal type to use if the
+ *			mapping condition is met. Multiple maps are scanned
+ *			in order and the first match prevails.
+ *		-n -- If the new tty driver from UCB is available, this flag
+ *			will activate the new options for erase and kill
+ *			processing. This will be different for printers
+ *			and crt's. For crts, if the baud rate is < 1200 then
+ *			erase and kill don't remove characters from the screen.
+ *		-h -- don't read htmp file.  Normally the terminal type
+ *			is determined by reading the htmp file or the
+ *			environment (unless some mapping is specified).
+ *			This forces a read of the ttytype file -- useful
+ *			when htmp is somehow wrong. (V6 only)
+ *		-u -- don't update htmp.  It seemed like this should
+ *			be put in.  Note that htmp is never actually
+ *			written if there are no changes, so don't bother
+ *			bother using this for efficiency reasons alone.
+ *		-s -- output setenv commands for TERM.  This can be
+ *			used with
+ *				`tset -s ...`
+ *			and is to be prefered to:
+ *				setenv TERM `tset - ...`
+ *			because -s sets the TERMCAP variable also.
+ *		-S -- Similar to -s but outputs 2 strings suitable for
+ *			use in csh .login files as follows:
+ *				set noglob
+ *				set term=(`tset -S .....`)
+ *				setenv TERM $term[1]
+ *				setenv TERMCAP "$term[2]"
+ *				unset term
+ *				unset noglob
+ *		-Q -- be quiet.  don't output 'Erase set to' etc.
+ *		-I -- don't do terminal initialization (is & if
+ *			strings).
+ *		-v -- On virtual terminal systems, don't set up a
+ *			virtual terminal.  Otherwise tset will tell
+ *			the operating system what kind of terminal you
+ *			are on (if it is a known terminal) and fix up
+ *			the output of -s to use virtual terminal sequences.
+ *
+ *	Files:
+ *		/etc/ttys
+ *			contains a terminal id -> terminal type
+ *			mapping; used when any user mapping is specified,
+ *			or the environment doesn't have TERM set.
+ *		/etc/termcap
+ *			a terminal_type -> terminal_capabilities
+ *			mapping.
+ *
+ *	Return Codes:
+ *		-1 -- couldn't open termcap.
+ *		1 -- bad terminal type, or standard output not tty.
+ *		0 -- ok.
+ *
+ *	Defined Constants:
+ *		DIALUP -- the type code for a dialup port.
+ *		PLUGBOARD -- the type code for a plugboard port.
+ *		ARPANET -- the type code for an arpanet port.
+ *		BACKSPACE -- control-H, the default for -e.
+ *		CNTL('U') -- control-U, the default for -k.
+ *		OLDERASE -- the ancient default erase character.
+ *		FILEDES -- the file descriptor to do the operation
+ *			on, nominally 1 or 2.
+ *		STDOUT -- the standard output file descriptor.
+ *		UIDMASK -- the bit pattern to mask with the getuid()
+ *			call to get just the user id.
+ *		GTTYN -- defines file containing generalized ttynames
+ *			and compiles code to look there.
+ *
+ *	Requires:
+ *		Routines to handle htmp, ttys, and termcap.
+ *
+ *	Compilation Flags:
+ *		OLDFLAGS -- must be defined to compile code for any of
+ *			the -d, -p, or -a flags.
+ *		OLDDIALUP -- accept the -d flag.
+ *		OLDPLUGBOARD -- accept the -p flag.
+ *		OLDARPANET -- accept the -a flag.
+ *		V6 -- if clear, use environments, not htmp.
+ *			also use TIOCSETN rather than stty to avoid flushing
+ *		GTTYN -- if set, compiles code to look at /etc/ttys.
+ *
+ *	Trace Flags:
+ *		none
+ *
+ *	Diagnostics:
+ *		Bad flag
+ *			An incorrect option was specified.
+ *		Too few args
+ *			more command line arguments are required.
+ *		Unexpected arg
+ *			wrong type of argument was encountered.
+ *		Cannot open ...
+ *			The specified file could not be openned.
+ *		Type ... unknown
+ *			An unknown terminal type was specified.
+ *		Cannot update htmp
+ *			Cannot update htmp file when the standard
+ *			output is not a terminal.
+ *		Erase set to ...
+ *			Telling that the erase character has been
+ *			set to the specified character.
+ *		Kill set to ...
+ *			Ditto for kill
+ *		Erase is ...    Kill is ...
+ *			Tells that the erase/kill characters were
+ *			wierd before, but they are being left as-is.
+ *		Not a terminal
+ *			Set if FILEDES is not a terminal.
+ *
+ *	Compilation Instructions:
+ *		cc -n -O tset.c -ltermlib
+ *		mv a.out tset
+ *		chown bin tset
+ *		chmod 4755 tset
+ *
+ *		where 'bin' should be whoever owns the 'htmp' file.
+ *		If 'htmp' is 666, then tset need not be setuid.
+ *
+ *		For version 6 the compile command should be:
+ *		cc -n -O -I/usr/include/retrofit tset.c -ltermlib -lretro -lS
+ *
+ *
+ *	History:
+ *		1/81 -- Added alias checking for mapping identifiers.
+ *		7/80 -- '-S' added. '-m' mapping added. TERMCAP string
+ *			cleaned up.
+ *		3/80 -- Changed to use tputs.  Prc & flush added.
+ *		10/79 -- '-s' option extended to handle TERMCAP
+ *			variable, set noglob, quote the entry,
+ *			and know about the Bourne shell.  Terminal
+ *			initialization moved to before any information
+ *			output so screen clears would not screw you.
+ *			'-Q' option added.
+ *		8/79 -- '-' option alone changed to only output
+ *			type.  '-s' option added.  'VERSION7'
+ *			changed to 'V6' for compatibility.
+ *		12/78 -- modified for eventual migration to VAX/UNIX,
+ *			so the '-' option is changed to output only
+ *			the terminal type to STDOUT instead of
+ *			FILEDES.
+ *		9/78 -- '-' and '-p' options added (now fully
+ *			compatible with ttytype!), and spaces are
+ *			permitted between the -d and the type.
+ *		8/78 -- The sense of -h and -u were reversed, and the
+ *			-f flag is dropped -- same effect is available
+ *			by just stating the terminal type.
+ *		10/77 -- Written.
+ */
 
 
-#define index strchr
-#define rindex strrchr
-#define curerase modes.c_cc[VERASE]
-#define curkill modes.c_cc[VKILL]
-#define curintr modes.c_cc[VINTR]
-#define olderase oldmodes.c_cc[VERASE]
-#define oldkill oldmodes.c_cc[VKILL]
-#define oldintr oldmodes.c_cc[VINTR]
+#define	index strchr
+#define	rindex strrchr
+#define	curerase modes.c_cc[VERASE]
+#define	curkill modes.c_cc[VKILL]
+#define	curintr modes.c_cc[VINTR]
+#define	olderase oldmodes.c_cc[VERASE]
+#define	oldkill oldmodes.c_cc[VKILL]
+#define	oldintr oldmodes.c_cc[VINTR]
 
 #include	<stdio.h>
 #include	<termio.h>
@@ -313,17 +311,14 @@
 
 #define	UIDMASK		-1
 
-#define	USAGE	"usage: tset [-] [-rsIQS] [-eC] [-kC] [-iC] [-m [ident][test speed]:type] [type]\n"
+#define	USAGE	"usage: tset [-] [-rsIQS] [-eC] [-kC] "	\
+		"[-iC] [-m [ident][test speed]:type] [type]\n"
 
 #define	OLDFLAGS
 #define	DIALUP		"dialup"
 #define	OLDDIALUP	"sd"
 #define	PLUGBOARD	"plugboard"
 #define	OLDPLUGBOARD	"sp"
-/*
-#define	ARPANET		"arpanet"
-#define	OLDARPANET	"sa"
-*/
 
 #define	DEFTYPE		"unknown"
 
@@ -366,7 +361,7 @@ struct
 	"75",	B75,	75,
 	"110",	B110,	110,
 	"134",	B134,	134,
-	"134.5",B134,	134,
+	"134.5", B134,	134,
 	"150",	B150,	150,
 	"200",	B200,	200,
 	"300",	B300,	300,
@@ -376,23 +371,24 @@ struct
 	"2400",	B2400,	2400,
 	"4800",	B4800,	4800,
 	"9600",	B9600,	9600,
-	"19200",EXTA,	19200,
+	"19200", EXTA,	19200,
 	"exta",	EXTA,	19200,
 	"extb",	EXTB,	38400,
-	"57600",B57600,	57600,
-	"76800",B76800,	76800,
-	"115200",B115200,115200,
-	"153600",B153600,153600,
-	"230400",B230400,230400,
-	"307200",B307200,307200,
-	"460800",B460800,460800,
+	"57600", B57600,	57600,
+	"76800", B76800,	76800,
+	"115200", B115200, 115200,
+	"153600", B153600, 153600,
+	"230400", B230400, 230400,
+	"307200", B307200, 307200,
+	"460800", B460800, 460800,
+	"921600", B921600, 921600,
 	0,
 };
 
 signed char Erase_char;		/* new erase character */
 char	Kill_char;		/* new kill character */
 char	Intr_char;		/* new interrupt character */
-char	Specialerase;		/* set => Erase_char only on terminals with backspace */
+char	Specialerase;	/* set => Erase_char only on terminals with backspace */
 
 char	Ttyid = NOTTY;		/* terminal identifier */
 char	*TtyType;		/* type of terminal */
@@ -413,7 +409,7 @@ int	Ask;			/* ask user for termtype */
 int	DoVirtTerm = YES;	/* Set up a virtual terminal */
 int	PadBaud;		/* Min rate of padding needed */
 
-#define CAPBUFSIZ	1024
+#define	CAPBUFSIZ	1024
 char	Capbuf[CAPBUFSIZ];	/* line from /etc/termcap for this TtyType */
 char	*Ttycap;		/* termcap line from termcap or environ */
 
@@ -446,7 +442,7 @@ void cat(char *);
 void bmove(char *, char *, int);
 void makealias(char *);
 void wrtermcap(char *);
-void fatal (char *, char *);
+void fatal(char *, char *);
 char reset();			/* Routine for checking&resetting chars */
 
 int
@@ -474,20 +470,19 @@ main(int argc, char *argv[])
 	extern short	ospeed;
 
 	if ((istermios = ioctl(FILEDES, TCGETS, (char *)&modes)) < 0) {
-		if (ioctl(FILEDES, TCGETA, (char *)&mode) < 0)
-		{
+		if (ioctl(FILEDES, TCGETA, (char *)&mode) < 0) {
 			prs("Not a terminal\n");
 			exit(1);
 		}
-		bmove((char *)&mode, (char *)&oldmode, sizeof mode);
+		bmove((char *)&mode, (char *)&oldmode, sizeof (mode));
 		modes.c_lflag = oldmodes.c_lflag = mode.c_lflag;
 		modes.c_oflag = oldmodes.c_oflag = mode.c_oflag;
 		modes.c_iflag = oldmodes.c_iflag = mode.c_iflag;
 		modes.c_cflag = oldmodes.c_cflag = mode.c_cflag;
-		for(i = 0; i < NCC; i++)
+		for (i = 0; i < NCC; i++)
 			modes.c_cc[i] = oldmodes.c_cc[i] = mode.c_cc[i];
 	} else
-		bmove((char *)&modes, (char *)&oldmodes, sizeof modes);
+		bmove((char *)&modes, (char *)&oldmodes, sizeof (modes));
 	ospeed = cfgetospeed(&modes);
 	(void) signal(SIGINT, setmode);
 	(void) signal(SIGQUIT, setmode);
@@ -497,8 +492,7 @@ main(int argc, char *argv[])
 		command++;
 	else
 		command = argv[0];
-	if (sequal(command, "reset") )
-	{
+	if (sequal(command, "reset")) {
 		/*
 		 * Reset the teletype mode bits to a sensible state.
 		 * Copied from the program by Kurt Shoens & Mark Horton.
@@ -510,7 +504,7 @@ main(int argc, char *argv[])
 			modes.c_oflag = mode.c_oflag;
 			modes.c_iflag = mode.c_iflag;
 			modes.c_cflag = mode.c_cflag;
-			for(i = 0; i < NCC; i++)
+			for (i = 0; i < NCC; i++)
 				modes.c_cc[i] = mode.c_cc[i];
 		}
 		curerase = reset(curerase, CERASE);
@@ -523,17 +517,17 @@ main(int argc, char *argv[])
 		modes.c_iflag &= ~(IGNBRK|PARMRK|INPCK|INLCR|IGNCR|IUCLC|IXOFF);
 		modes.c_oflag |= (OPOST|ONLCR);
 		modes.c_oflag &= ~(OLCUC|OCRNL|ONOCR|ONLRET|OFILL|OFDEL|
-				NLDLY|CRDLY|TABDLY|BSDLY|VTDLY|FFDLY);
+		    NLDLY|CRDLY|TABDLY|BSDLY|VTDLY|FFDLY);
 		modes.c_cflag |= (CS7|CREAD);
 		modes.c_cflag &= ~(PARODD|CLOCAL);
 		modes.c_lflag |= (ISIG|ICANON|ECHO|ECHOK);
 		modes.c_lflag &= ~(XCASE|ECHONL|NOFLSH);
-		if (istermios < 0) {	
+		if (istermios < 0) {
 			mode.c_lflag = modes.c_lflag;
 			mode.c_oflag = modes.c_oflag;
 			mode.c_iflag = modes.c_iflag;
 			mode.c_cflag = modes.c_cflag;
-			for(i = 0; i < NCC; i++)
+			for (i = 0; i < NCC; i++)
 				mode.c_cc[i] = modes.c_cc[i];
 			(void) ioctl(FILEDES, TCSETAW, (char *)&mode);
 		} else
@@ -541,38 +535,35 @@ main(int argc, char *argv[])
 		Dash_u = YES;
 		BeQuiet = YES;
 		IsReset = YES;
-	}
-	else if (argc == 2 && sequal(argv[1], "-"))
-	{
+	} else if (argc == 2 && sequal(argv[1], "-")) {
 		RepOnly = YES;
 		Dash_u = YES;
 	}
 	argc--;
 
 	/* scan argument list and collect flags */
-	while (--argc >= 0)
-	{
+	while (--argc >= 0) {
 		p = *++argv;
-		if (*p == '-')
-		{
+		if (*p == '-') {
 			if (*++p == NULL)
 				Report = YES; /* report current terminal type */
-			else while (*p) switch (*p++)
-			{
+			else
+				while (*p)
+					switch (*p++) {
 
-			  case 'r':	/* report to user */
+			case 'r':	/* report to user */
 				Ureport = YES;
 				continue;
 
-			  case 'E':	/* special erase: operate on all but TTY33 */
+			case 'E':
+				/* special erase: operate on all but TTY33 */
 				Specialerase = YES;
 				/* explicit fall-through to -e case */
 
-			  case 'e':	/* erase character */
+			case 'e':	/* erase character */
 				if (*p == NULL)
 					Erase_char = -1;
-				else
-				{
+				else {
 					if (*p == '^' && p[1] != NULL)
 						if (*++p == '?')
 							Erase_char = '\177';
@@ -584,11 +575,10 @@ main(int argc, char *argv[])
 				}
 				continue;
 
-			  case 'i':	/* interrupt character */
+			case 'i':	/* interrupt character */
 				if (*p == NULL)
 					Intr_char = CNTL('C');
-				else
-				{
+				else {
 					if (*p == '^' && p[1] != NULL)
 						if (*++p == '?')
 							Intr_char = '\177';
@@ -600,11 +590,10 @@ main(int argc, char *argv[])
 				}
 				continue;
 
-			  case 'k':	/* kill character */
+			case 'k':	/* kill character */
 				if (*p == NULL)
 					Kill_char = CNTL('U');
-				else
-				{
+				else {
 					if (*p == '^' && p[1] != NULL)
 						if (*++p == '?')
 							Kill_char = '\177';
@@ -616,29 +605,28 @@ main(int argc, char *argv[])
 				}
 				continue;
 
-# ifdef OLDFLAGS
-# ifdef	OLDDIALUP
-			  case 'd':	/* dialup type */
+#ifdef OLDFLAGS
+#ifdef	OLDDIALUP
+			case 'd':	/* dialup type */
 				NewType = DIALUP;
 				goto mapold;
-# endif
+#endif
 
-# ifdef OLDPLUGBOARD
-			  case 'p':	/* plugboard type */
+#ifdef OLDPLUGBOARD
+			case 'p':	/* plugboard type */
 				NewType = PLUGBOARD;
 				goto mapold;
-# endif
+#endif
 
-# ifdef OLDARPANET
-			  case 'a':	/* arpanet type */
+#ifdef OLDARPANET
+			case 'a':	/* arpanet type */
 				Newtype = ARPANET;
 				goto mapold;
-# endif
+#endif
 
 mapold:				Map->Ident = NewType;
 				Map->Test = ALL;
-				if (*p == NULL)
-				{
+				if (*p == NULL) {
 					p = nextarg(argc--, argv++);
 				}
 				Map->Type = p;
@@ -646,20 +634,19 @@ mapold:				Map->Ident = NewType;
 				Mapped = YES;
 				p = "";
 				continue;
-# endif
+#endif
 
-			  case 'm':	/* map identifier to type */
-				/* This code is very loose. Almost no
-				** syntax checking is done!! However,
-				** illegal syntax will only produce
-				** weird results.
-				*/
-				if (*p == NULL)
-				{
+			case 'm':	/* map identifier to type */
+				/*
+				 * This code is very loose. Almost no
+				 * syntax checking is done!! However,
+				 * illegal syntax will only produce
+				 * weird results.
+				 */
+				if (*p == NULL) {
 					p = nextarg(argc--, argv++);
 				}
-				if (isalnum(*p))
-				{
+				if (isalnum(*p)) {
 					Map->Ident = p;	/* identifier */
 					while (isalnum(*p)) p++;
 				}
@@ -667,8 +654,8 @@ mapold:				Map->Ident = NewType;
 					Map->Ident = "";
 				Break = NO;
 				Not = NO;
-				while (!Break) switch (*p)
-				{
+				while (!Break)
+					switch (*p) {
 					case NULL:
 						p = nextarg(argc--, argv++);
 						continue;
@@ -693,7 +680,7 @@ mapold:				Map->Ident = NewType;
 						Map->Test |= EQ;
 						*p++ = NULL;
 						continue;
-					
+
 					case '!':	/* invert conditions */
 						Not = ~Not;
 						*p++ = NULL;
@@ -703,22 +690,20 @@ mapold:				Map->Ident = NewType;
 						p++;
 						/* intentional fallthru */
 					default:
-						if (isdigit(*p) || *p == 'e')
-						{
-							Map->Speed = baudrate(p);
-							while (isalnum(*p) || *p == '.')
+						if (isdigit(*p) || *p == 'e') {
+							Map->Speed =
+							    baudrate(p);
+							while (isalnum(*p) ||
+							    *p == '.')
 								p++;
-						}
-						else
+						} else
 							Break = YES;
 						continue;
 				}
-				if (Not)	/* invert sense of test */
-				{
+				if (Not) {	/* invert sense of test */
 					Map->Test = (~(Map->Test))&ALL;
 				}
-				if (*p == NULL)
-				{
+				if (*p == NULL) {
 					p = nextarg(argc--, argv++);
 				}
 				Map->Type = p;
@@ -727,61 +712,56 @@ mapold:				Map->Ident = NewType;
 				Mapped = YES;
 				continue;
 
-			  case 'h':	/* don't get type from htmp or env */
+			case 'h':	/* don't get type from htmp or env */
 				Dash_h = YES;
 				continue;
 
-			  case 'u':	/* don't update htmp */
+			case 'u':	/* don't update htmp */
 				Dash_u = YES;
 				continue;
 
-			  case 's':	/* output setenv commands */
+			case 's':	/* output setenv commands */
 				DoSetenv = YES;
 				CmndLine = YES;
 				continue;
 
-			  case 'S':	/* output setenv strings */
+			case 'S':	/* output setenv strings */
 				DoSetenv = YES;
 				CmndLine = NO;
 				continue;
 
-			  case 'Q':	/* be quiet */
+			case 'Q':	/* be quiet */
 				BeQuiet = YES;
 				continue;
 
-			  case 'I':	/* no initialization */
+			case 'I':	/* no initialization */
 				NoInit = YES;
 				continue;
 
-			  case 'A':	/* Ask user */
+			case 'A':	/* Ask user */
 				Ask = YES;
 				continue;
-			
-			  case 'v':	/* no virtual terminal */
+
+			case 'v':	/* no virtual terminal */
 				DoVirtTerm = NO;
 				continue;
 
-			  default:
+			default:
 				*p-- = NULL;
 				fatal("Bad flag -", p);
 			}
-		}
-		else
-		{
+		} else {
 			/* terminal type */
 			DefType = p;
 		}
 	}
 
-	if (DefType)
-	{
-		if (Mapped)
-		{
+	if (DefType) {
+		if (Mapped) {
 			Map->Ident = "";	/* means "map any type" */
 			Map->Test = ALL;	/* at all baud rates */
 			Map->Type = DefType;	/* to the default type */
-		}
-		else
+		} else
 			TtyType = DefType;
 	}
 
@@ -802,14 +782,12 @@ mapold:				Map->Ident = NewType;
 		Ttyid = ttyname(FILEDES);
 
 	/* If still undefined, use DEFTYPE */
-	if (TtyType == 0)
-	{
+	if (TtyType == 0) {
 		TtyType = DEFTYPE;
 	}
 
 	/* check for dialup or other mapping */
-	if (Mapped)
-	{
+	if (Mapped) {
 		if (!(Alias[0] && isalias(TtyType)))
 			if (tgetent(Capbuf, TtyType) > 0)
 				makealias(Capbuf);
@@ -818,15 +796,13 @@ mapold:				Map->Ident = NewType;
 
 	/* TtyType now contains a pointer to the type of the terminal */
 	/* If the first character is '?', ask the user */
-	if (TtyType[0] == '?')
-	{
+	if (TtyType[0] == '?') {
 		Ask = YES;
 		TtyType++;
 		if (TtyType[0] == '\0')
 			TtyType = DEFTYPE;
 	}
-	if (Ask)
-	{
+	if (Ask) {
 ask:
 		prs("TERM = (");
 		prs(TtyType);
@@ -834,9 +810,8 @@ ask:
 		flush();
 
 		/* read the terminal.  If not empty, set type */
-		i = read(2, termbuf, sizeof termbuf - 1);
-		if (i > 0)
-		{
+		i = read(2, termbuf, sizeof (termbuf) - 1);
+		if (i > 0) {
 			if (termbuf[i - 1] == '\n')
 				i--;
 			termbuf[i] = '\0';
@@ -847,32 +822,28 @@ ask:
 
 	/* get terminal capabilities */
 	if (!(Alias[0] && isalias(TtyType))) {
-		switch (tgetent(Capbuf, TtyType))
-		{
-		  case -1:
+		switch (tgetent(Capbuf, TtyType)) {
+		case -1:
 			prs("Cannot find termcap\n");
 			flush();
 			exit(-1);
 
-		  case 0:
+		case 0:
 			prs("Type ");
 			prs(TtyType);
 			prs(" unknown\n");
 			flush();
-			if (DoSetenv)
-			{
+			if (DoSetenv) {
 				TtyType = DEFTYPE;
 				Alias[0] = '\0';
 				goto ask;
-			}
-			else
+			} else
 				exit(1);
 		}
 	}
 	Ttycap = Capbuf;
 
-	if (!RepOnly)
-	{
+	if (!RepOnly) {
 		/* determine erase and kill characters */
 		if (Specialerase && !tgetflag("bs"))
 			Erase_char = 0;
@@ -892,8 +863,8 @@ ask:
 		 * system set it there.  People who want backspace have
 		 * to say tset -e.
 		 */
-		if (Erase_char == 0 && !tgetflag("os") && curerase == OLDERASE)
-		{
+		if (Erase_char == 0 && !tgetflag("os") &&
+		    curerase == OLDERASE) {
 			if (tgetflag("bs") || bs_char != 0)
 				Erase_char = -1;
 		}
@@ -917,7 +888,7 @@ ask:
 
 		/* set modes */
 		PadBaud = tgetnum("pb");	/* OK if fails */
-		for (i=0; speeds[i].string; i++)
+		for (i = 0; speeds[i].string; i++)
 			if (speeds[i].baudrate == PadBaud) {
 				PadBaud = speeds[i].speed;
 				break;
@@ -933,8 +904,7 @@ ask:
 			modes.c_iflag |= IUCLC;
 			modes.c_oflag |= OLCUC;
 			modes.c_cflag |= XCASE;
-		}
-		else if (tgetflag("LC")) {
+		} else if (tgetflag("LC")) {
 			modes.c_iflag &= ~IUCLC;
 			modes.c_oflag &= ~OLCUC;
 			modes.c_cflag &= ~XCASE;
@@ -964,10 +934,9 @@ ask:
 			modes.c_lflag &= ~ECHO;
 		if (tgetflag("pt"))	/* print tabs */
 			modes.c_oflag &= ~TAB3;
-		
+
 		modes.c_lflag |= (ECHOE|ECHOK);
-		if (tgetflag("hc"))
-		{	/** set printer modes **/
+		if (tgetflag("hc")) {	/* set printer modes */
 			modes.c_lflag &= ~ECHOE;
 		}
 
@@ -977,10 +946,8 @@ ask:
 			PC = buf[0];
 
 		/* output startup string */
-		if (!NoInit)
-		{
-			if (oldmodes.c_oflag&(TAB3|ONLCR|OCRNL|ONLRET))
-			{
+		if (!NoInit) {
+			if (oldmodes.c_oflag&(TAB3|ONLCR|OCRNL|ONLRET)) {
 				oldmodes.c_oflag &= (TAB3|ONLCR|OCRNL|ONLRET);
 				setmode(-1);
 			}
@@ -989,22 +956,19 @@ ask:
 				flush();
 			}
 			bufp = buf;
-			if (IsReset && tgetstr("rs", &bufp) != 0 || 
-			    tgetstr("is", &bufp) != 0)
-			{
+			if (IsReset && tgetstr("rs", &bufp) != 0 ||
+			    tgetstr("is", &bufp) != 0) {
 				tputs(buf, 0, prc);
 				settle = YES;
 				flush();
 			}
 			bufp = buf;
 			if (IsReset && tgetstr("rf", &bufp) != 0 ||
-			    tgetstr("if", &bufp) != 0)
-			{
+			    tgetstr("if", &bufp) != 0) {
 				cat(buf);
 				settle = YES;
 			}
-			if (settle)
-			{
+			if (settle) {
 				prc('\r');
 				if (IsReset)
 					prc('\n');  /* newline too */
@@ -1019,80 +983,69 @@ ask:
 		/* (this code is rather heuristic, checking for $SHELL */
 		/* ending in the 3 characters "csh") */
 		csh = NO;
-		if (DoSetenv)
-		{
+		if (DoSetenv) {
 			char *sh;
 
-			if ((sh = getenv("SHELL")) && (i = strlen(sh)) >= 3)
-			{
-			    if ((csh = sequal(&sh[i-3], "csh")) && CmndLine)
-				(void) write(STDOUT, "set noglob;\n", 12);
+			if ((sh = getenv("SHELL")) && (i = strlen(sh)) >= 3) {
+				if ((csh = sequal(&sh[i-3], "csh")) && CmndLine)
+					(void) write(STDOUT,
+					    "set noglob;\n", 12);
 			}
-			if (!csh)
-			    /* running Bourne shell */
-			    (void) write(STDOUT, "export TERMCAP TERM;\n", 21);
+			if (!csh) {	/* running Bourne shell */
+				(void) write(STDOUT,
+				    "export TERMCAP TERM;\n", 21);
+			}
 		}
 	}
 
 	/* report type if appropriate */
-	if (DoSetenv || Report || Ureport)
-	{
+	if (DoSetenv || Report || Ureport) {
 		/* if type is the short name, find first alias (if any) */
 		makealias(Ttycap);
 		if (sequal(TtyType, Alias[0]) && Alias[1]) {
 			TtyType = Alias[1];
 		}
 
-		if (DoSetenv)
-		{
-			if (csh)
-			{
+		if (DoSetenv) {
+			if (csh) {
 				if (CmndLine)
-				    (void) write(STDOUT, "setenv TERM ", 12);
+					(void) write(STDOUT,
+					    "setenv TERM ", 12);
 				(void) write(STDOUT, TtyType, strlen(TtyType));
 				(void) write(STDOUT, " ", 1);
 				if (CmndLine)
-				    (void) write(STDOUT, ";\n", 2);
-			}
-			else
-			{
+					(void) write(STDOUT, ";\n", 2);
+			} else {
 				(void) write(STDOUT, "TERM=", 5);
 				(void) write(STDOUT, TtyType, strlen(TtyType));
 				(void) write(STDOUT, ";\n", 2);
 			}
-		}
-		else if (Report)
-		{
+		} else if (Report) {
 			(void) write(STDOUT, TtyType, strlen(TtyType));
 			(void) write(STDOUT, "\n", 1);
 		}
-		if (Ureport)
-		{
+		if (Ureport) {
 			prs("Terminal type is ");
 			prs(TtyType);
 			prs("\n");
 			flush();
 		}
 
-		if (DoSetenv)
-		{
-			if (csh)
-			{
-			    if (CmndLine)
-				(void) write(STDOUT, "setenv TERMCAP '", 16);
-			}
-			else
-			    (void) write(STDOUT, "TERMCAP='", 9);
-			wrtermcap(Ttycap);
-			if (csh)
-			{
+		if (DoSetenv) {
+			if (csh) {
 				if (CmndLine)
-				{
-				    (void) write(STDOUT, "';\n", 3);
-				    (void) write(STDOUT, "unset noglob;\n", 14);
+					(void) write(STDOUT,
+					    "setenv TERMCAP '", 16);
+			} else
+				(void) write(STDOUT, "TERMCAP='", 9);
+			wrtermcap(Ttycap);
+			if (csh) {
+				if (CmndLine) {
+					(void) write(STDOUT, "';\n", 3);
+					(void) write(STDOUT,
+					    "unset noglob;\n", 14);
 				}
-			}
-			else
+			} else
 				(void) write(STDOUT, "';\n", 3);
 		}
 	}
@@ -1137,7 +1090,7 @@ settabs(void)
 	if (set_tab) {
 		columns = tgetnum("co");
 		lines = tgetnum("li");
-		for (c=0; c<columns; c += 8) {
+		for (c = 0; c < columns; c += 8) {
 			/* get to that column. */
 			tg_out = "OOPS";	/* also returned by tgoto */
 			if (set_column)
@@ -1159,13 +1112,14 @@ settabs(void)
 	return (0);
 }
 
-void setmode(flag)
-int	flag;
-/* flag serves several purposes:
+/*
+ * flag serves several purposes:
  *	if called as the result of a signal, flag will be > 0.
  *	if called from terminal init, flag == -1 means reset "oldmode".
  *	called with flag == 0 at end of normal mode processing.
  */
+void
+setmode(int flag)
 {
 	struct termio *ttymode;
 	struct termios *ttymodes;
@@ -1176,38 +1130,38 @@ int	flag;
 
 	if (flag < 0) { /* unconditionally reset oldmode (called from init) */
 		if (istermios < 0) {
-		    oldmode.c_lflag = oldmodes.c_lflag;
-		    oldmode.c_oflag = oldmodes.c_oflag;
-		    oldmode.c_iflag = oldmodes.c_iflag;
-		    oldmode.c_cflag = oldmodes.c_cflag;
-		    for(i = 0; i < NCC; i++)
-			oldmode.c_cc[i] = oldmodes.c_cc[i];
-		    ttymode = &oldmode;
+			oldmode.c_lflag = oldmodes.c_lflag;
+			oldmode.c_oflag = oldmodes.c_oflag;
+			oldmode.c_iflag = oldmodes.c_iflag;
+			oldmode.c_cflag = oldmodes.c_cflag;
+			for (i = 0; i < NCC; i++)
+				oldmode.c_cc[i] = oldmodes.c_cc[i];
+			ttymode = &oldmode;
 		} else
-		    ttymodes = &oldmodes;
+			ttymodes = &oldmodes;
 	} else {
 		if (istermios < 0) {
-		    oldmode.c_lflag = oldmodes.c_lflag;
-		    oldmode.c_oflag = oldmodes.c_oflag;
-		    oldmode.c_iflag = oldmodes.c_iflag;
-		    oldmode.c_cflag = oldmodes.c_cflag;
-		    for(i = 0; i < NCC; i++)
-			oldmode.c_cc[i] = oldmodes.c_cc[i];
-		    mode.c_lflag = modes.c_lflag;
-		    mode.c_oflag = modes.c_oflag;
-		    mode.c_iflag = modes.c_iflag;
-		    mode.c_cflag = modes.c_cflag;
-		    for(i = 0; i < NCC; i++)
-			mode.c_cc[i] = modes.c_cc[i];
-		    if (!bequal((char *)&mode, (char *)&oldmode, sizeof mode))
+			oldmode.c_lflag = oldmodes.c_lflag;
+			oldmode.c_oflag = oldmodes.c_oflag;
+			oldmode.c_iflag = oldmodes.c_iflag;
+			oldmode.c_cflag = oldmodes.c_cflag;
+			for (i = 0; i < NCC; i++)
+				oldmode.c_cc[i] = oldmodes.c_cc[i];
+			mode.c_lflag = modes.c_lflag;
+			mode.c_oflag = modes.c_oflag;
+			mode.c_iflag = modes.c_iflag;
+			mode.c_cflag = modes.c_cflag;
+			for (i = 0; i < NCC; i++)
+				mode.c_cc[i] = modes.c_cc[i];
+			if (!bequal((char *)&mode, (char *)&oldmode,
+			    sizeof (mode)))
 				ttymode = &mode;
 		} else if (!bequal((char *)&modes, (char *)&oldmodes,
-			    sizeof modes))
-		    ttymodes = &modes;
+		    sizeof (modes)))
+			ttymodes = &modes;
 	}
-	
-	if (ttymode)
-	{
+
+	if (ttymode) {
 		(void) ioctl(FILEDES, TCSETAW, (char *)ttymode);
 	} else if (ttymodes) {
 		(void) ioctl(FILEDES, TCSETSW, (char *)ttymodes);
@@ -1243,10 +1197,8 @@ reportek(char *name, char new, char old, char def)
 		prs("Backspace\n");
 	else if (n == 0177)
 		prs("Delete\n");
-	else
-	{
-		if (n < 040)
-		{
+	else {
+		if (n < 040) {
 			prs("Ctrl-");
 			n ^= 0100;
 		}
@@ -1278,10 +1230,8 @@ setdelay(char *cap, struct delay dtab[], tcflag_t bits, tcflag_t *flags)
 	*flags &= ~bits;
 
 	/* scan dtab for first entry with adequate delay */
-	for (p = dtab; p->d_delay >= 0; p++)
-	{
-		if (p->d_delay >= i)
-		{
+	for (p = dtab; p->d_delay >= 0; p++) {
+		if (p->d_delay >= i) {
 			p++;
 			break;
 		}
@@ -1306,7 +1256,7 @@ void
 prc(char c)
 {
 	OutBuf[OutPtr++] = c;
-	if (OutPtr >= sizeof OutBuf)
+	if (OutPtr >= sizeof (OutBuf))
 		flush();
 }
 
@@ -1326,8 +1276,7 @@ cat(char *file)
 	char		buf[BUFSIZ];
 
 	fd = open(file, 0);
-	if (fd < 0)
-	{
+	if (fd < 0) {
 		prs("Cannot open ");
 		prs(file);
 		prs("\n");
@@ -1367,8 +1316,7 @@ bequal(char *a, char *b, int len)	/* must be same thru len chars */
 	p = a;
 	q = b;
 
-	while ((*p == *q) && --i > 0)
-	{
+	while ((*p == *q) && --i > 0) {
 		p++; q++;
 	}
 	return ((*p == *q) && i >= 0);
@@ -1379,8 +1327,7 @@ sequal(char *a, char *b)	/* must be same thru NULL */
 {
 	char *p = a, *q = b;
 
-	while (*p && *q && (*p == *q))
-	{
+	while (*p && *q && (*p == *q)) {
 		p++; q++;
 	}
 	return (*p == *q);
@@ -1401,15 +1348,15 @@ makealias(char *buf)
 			*a++ = NULL;
 			Alias[i++] = a;
 			b++;
-		}
-		else
+		} else
 			*a++ = *b++;
 	}
 	*a = NULL;
 	Alias[i] = NULL;
-# ifdef	DEB
-	for(i = 0; Alias[i]; printf("A:%s\n", Alias[i++]));
-# endif
+#ifdef	DEB
+	for (i = 0; Alias[i]; printf("A:%s\n", Alias[i++]))
+		;
+#endif
 }
 
 int
@@ -1420,10 +1367,10 @@ isalias(char *ident)	/* is ident same as one of the aliases? */
 	if (*a)
 		while (*a)
 			if (sequal(ident, *a))
-				return(YES);
+				return (YES);
 			else
 				a++;
-	return(NO);
+	return (NO);
 }
 
 
@@ -1444,13 +1391,13 @@ wrtermcap(char *bp)
 	int space, empty;
 
 	/* discard names with blanks */
-/** May not be desireable ? **/
+/* May not be desireable ? */
 	while (*bp && *bp != ':') {
 		if (*bp == '|') {
 			tp = bp+1;
 			space = NO;
 			while (*tp && *tp != '|' && *tp != ':') {
-				space = (space || WHITE(*tp) );
+				space = (space || WHITE(*tp));
 				tp++;
 			}
 			if (space) {
@@ -1460,15 +1407,15 @@ wrtermcap(char *bp)
 		}
 		*p++ = *bp++;
 	}
-/**/
+/* */
 
 	while (*bp) {
 		switch (*bp) {
 		case ':':	/* discard empty, cancelled  or dupl fields */
-			tp = bp+1;
+			tp = bp + 1;
 			empty = YES;
 			while (*tp && *tp != ':') {
-				empty = (empty && WHITE(*tp) );
+				empty = (empty && WHITE(*tp));
 				tp++;
 			}
 			if (empty || cancelled(bp+1)) {
@@ -1514,7 +1461,7 @@ wrtermcap(char *bp)
 		*p++ = *bp++;
 	}
 	*p++ = ':';	/* we skipped the last : with the : lookahead hack */
-	(void) write (STDOUT, buf, p-buf);
+	(void) write(STDOUT, buf, p-buf);
 }
 
 int
@@ -1522,8 +1469,7 @@ cancelled(char *cap)
 {
 	int i;
 
-	for (i = 0; i < ncap; i++)
-	{
+	for (i = 0; i < ncap; i++) {
 		if (cap[0] == delcap[i][0] && cap[1] == delcap[i][1])
 			return (YES);
 	}
@@ -1568,7 +1514,7 @@ baudrate(char *p)
 	while (i < 7 && (isalnum(*p) || *p == '.'))
 		buf[i++] = *p++;
 	buf[i] = NULL;
-	for (i=0; speeds[i].string; i++)
+	for (i = 0; speeds[i].string; i++)
 		if (sequal(speeds[i].string, buf))
 			return (speeds[i].speed);
 	return (-1);
@@ -1581,46 +1527,44 @@ char	*type;
 	extern short	ospeed;
 	int	match;
 
-# ifdef DEB
-	printf ("spd:%d\n", ospeed);
+#ifdef DEB
+	printf("spd:%d\n", ospeed);
 	prmap();
-# endif
+#endif
 	Map = map;
-	while (Map->Ident)
-	{
-		if (*(Map->Ident) == NULL || sequal(Map->Ident, type) || isalias(Map->Ident))
-		{
+	while (Map->Ident) {
+		if (*(Map->Ident) == NULL ||
+		    sequal(Map->Ident, type) || isalias(Map->Ident)) {
 			match = NO;
-			switch (Map->Test)
-			{
-				case ANY:	/* no test specified */
-				case ALL:
-					match = YES;
-					break;
-				
-				case GT:
-					match = (ospeed > Map->Speed);
-					break;
+			switch (Map->Test) {
+			case ANY:	/* no test specified */
+			case ALL:
+				match = YES;
+				break;
 
-				case GE:
-					match = (ospeed >= Map->Speed);
-					break;
+			case GT:
+				match = (ospeed > Map->Speed);
+				break;
 
-				case EQ:
-					match = (ospeed == Map->Speed);
-					break;
+			case GE:
+				match = (ospeed >= Map->Speed);
+				break;
 
-				case LE:
-					match = (ospeed <= Map->Speed);
-					break;
+			case EQ:
+				match = (ospeed == Map->Speed);
+				break;
 
-				case LT:
-					match = (ospeed < Map->Speed);
-					break;
+			case LE:
+				match = (ospeed <= Map->Speed);
+				break;
 
-				case NE:
-					match = (ospeed != Map->Speed);
-					break;
+			case LT:
+				match = (ospeed < Map->Speed);
+				break;
+
+			case NE:
+				match = (ospeed != Map->Speed);
+				break;
 			}
 			if (match)
 				return (Map->Type);
@@ -1631,18 +1575,17 @@ char	*type;
 	return (type);
 }
 
-# ifdef DEB
+#ifdef DEB
 prmap()
 {
 	Map = map;
-	while (Map->Ident)
-	{
-	printf ("%s t:%d s:%d %s\n",
-		Map->Ident, Map->Test, Map->Speed, Map->Type);
-	Map++;
+	while (Map->Ident) {
+		printf("%s t:%d s:%d %s\n",
+		    Map->Ident, Map->Test, Map->Speed, Map->Type);
+		Map++;
 	}
 }
-# endif
+#endif
 
 char *
 nextarg(argc, argv)
@@ -1650,19 +1593,19 @@ int	argc;
 char	*argv[];
 {
 	if (argc <= 0)
-		fatal ("Too few args: ", *argv);
+		fatal("Too few args: ", *argv);
 	if (*(*++argv) == '-')
-		fatal ("Unexpected arg: ", *argv);
+		fatal("Unexpected arg: ", *argv);
 	return (*argv);
 }
 
 void
-fatal (char *mesg, char *obj)
+fatal(char *mesg, char *obj)
 {
-	prs (mesg);
-	prs (obj);
-	prc ('\n');
-	prs (USAGE);
+	prs(mesg);
+	prs(obj);
+	prc('\n');
+	prs(USAGE);
 	flush();
 	exit(1);
 }
@@ -1676,8 +1619,7 @@ reset(ch, def)
 	char ch;
 	int def;
 {
-
 	if (ch == 0 || (ch&0377) == 0377)
-		return def;
-	return ch;
+		return (def);
+	return (ch);
 }

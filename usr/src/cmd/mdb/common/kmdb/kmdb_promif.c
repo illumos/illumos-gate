@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/termios.h>
@@ -431,7 +430,7 @@ kmdb_parse_mode(const char *mode, struct termios *tip, int in)
 	static const uint_t baudmap[] = {
 		0, 50, 75, 110, 134, 150, 200, 300, 600, 1200,
 		1800, 2400, 4800, 9600, 19200, 38400, 57600,
-		76800, 115200, 153600, 230400, 307200, 460800
+		76800, 115200, 153600, 230400, 307200, 460800, 921600
 	};
 	static const uint_t bitsmap[] = { CS6, CS6, CS7, CS8 };
 	char *m = strdup(mode);

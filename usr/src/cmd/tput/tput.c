@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,17 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  *	tput - print terminal attribute
@@ -113,18 +109,18 @@ main(int argc, char **argv)
 		usage:				/* FALLTHROUGH		*/
 		default:
 			(void) fprintf(stderr, gettext(
-			"usage:\t%s [-T [term]] capname [parm argument...]\n"),
-				progname);
+			    "usage:\t%s [-T [term]] capname "
+			    "[parm argument...]\n"), progname);
 			(void) fprintf(stderr, gettext("OR:\t%s -S <<\n"),
-					progname);
+			    progname);
 			exit(2);
 		}
 	}
 
 	if (!term || !*term) {
 		(void) fprintf(stderr,
-			gettext("%s: No value for $TERM and no -T specified\n"),
-			progname);
+		    gettext("%s: No value for $TERM and no -T specified\n"),
+		    progname);
 		exit(2);
 	}
 
@@ -133,22 +129,22 @@ main(int argc, char **argv)
 	switch (setuperr) {
 	case -2:
 		(void) fprintf(stderr,
-		gettext("%s: unreadable terminal descriptor \"%s\"\n"),
-			progname, term);
+		    gettext("%s: unreadable terminal descriptor \"%s\"\n"),
+		    progname, term);
 		exit(3);
 		break;
 
 	case -1:
 		(void) fprintf(stderr,
-			gettext("%s: no terminfo database\n"), progname);
+		    gettext("%s: no terminfo database\n"), progname);
 		exit(3);
 		break;
 
 	case 0:
-	    (void) fprintf(stderr,
-			gettext("%s: unknown terminal \"%s\"\n"),
-				progname, term);
-	    exit(3);
+		(void) fprintf(stderr,
+		    gettext("%s: unknown terminal \"%s\"\n"),
+		    progname, term);
+		exit(3);
 	}
 
 	reset_shell_mode();
@@ -237,8 +233,8 @@ outputcap(char *cap, int argc, char **argv)
 
 		if (parmset)
 			putp(tparm(thisstr,
-			parm[0], parm[1], parm[2], parm[3], parm[4], parm[5],
-			parm[6], parm[7], parm[8]));
+			    parm[0], parm[1], parm[2], parm[3],
+			    parm[4], parm[5], parm[6], parm[7], parm[8]));
 		else
 			putp(thisstr);
 		return (0);
@@ -316,6 +312,7 @@ static int speeds[] = {
 		230400,	/*  B230400,	*/
 		307200,	/*  B307200,	*/
 		460800,	/*  B460800,	*/
+		921600, /*  B921600,	*/
 		0,
 };
 
@@ -453,7 +450,7 @@ getpad(char *cap)
 			while (isdigit (*cap))
 				cap++;
 			while (*cap == '.' || *cap == '/' || *cap == '*' ||
-			isdigit(*cap))
+			    isdigit(*cap))
 				cap++;
 			while (*cap == '>')
 				cap++;
@@ -630,24 +627,34 @@ initterm()
 	if (xon_xoff) {
 #ifdef SYSV
 		OFLAG(termmodes) &=
-			~(NLbits | CRbits | BSbits | FFbits | TBbits);
+		    ~(NLbits | CRbits | BSbits | FFbits | TBbits);
 #else	/* SYSV */
 		OFLAG(termmode) &=
-			~(NLbits | CRbits | BSbits | FFbits | TBbits);
+		    ~(NLbits | CRbits | BSbits | FFbits | TBbits);
 #endif	/* SYSV */
 	} else {
 #ifdef SYSV
-	setdelay(getpad(carriage_return), CRdelay, CRbits, &OFLAG(termmodes));
-	setdelay(getpad(scroll_forward), NLdelay, NLbits, &OFLAG(termmodes));
-	setdelay(getpad(cursor_left), BSdelay, BSbits, &OFLAG(termmodes));
-	setdelay(getpad(form_feed), FFdelay, FFbits, &OFLAG(termmodes));
-	setdelay(getpad(tab), TBdelay, TBbits, &OFLAG(termmodes));
+		setdelay(getpad(carriage_return),
+		    CRdelay, CRbits, &OFLAG(termmodes));
+		setdelay(getpad(scroll_forward),
+		    NLdelay, NLbits, &OFLAG(termmodes));
+		setdelay(getpad(cursor_left),
+		    BSdelay, BSbits, &OFLAG(termmodes));
+		setdelay(getpad(form_feed),
+		    FFdelay, FFbits, &OFLAG(termmodes));
+		setdelay(getpad(tab),
+		    TBdelay, TBbits, &OFLAG(termmodes));
 #else	/* SYSV */
-	setdelay(getpad(carriage_return), CRdelay, CRbits, &OFLAG(termmode));
-	setdelay(getpad(scroll_forward), NLdelay, NLbits, &OFLAG(termmode));
-	setdelay(getpad(cursor_left), BSdelay, BSbits, &OFLAG(termmode));
-	setdelay(getpad(form_feed), FFdelay, FFbits, &OFLAG(termmode));
-	setdelay(getpad(tab), TBdelay, TBbits, &OFLAG(termmode));
+		setdelay(getpad(carriage_return),
+		    CRdelay, CRbits, &OFLAG(termmode));
+		setdelay(getpad(scroll_forward),
+		    NLdelay, NLbits, &OFLAG(termmode));
+		setdelay(getpad(cursor_left),
+		    BSdelay, BSbits, &OFLAG(termmode));
+		setdelay(getpad(form_feed),
+		    FFdelay, FFbits, &OFLAG(termmode));
+		setdelay(getpad(tab),
+		    TBdelay, TBbits, &OFLAG(termmode));
 #endif	/* SYSV */
 	}
 

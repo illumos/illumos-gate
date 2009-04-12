@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,9 +42,9 @@
 
 #include <locale.h>
 
-/**
- **	Begin Sun Additions for Parallel ports
- **/
+/*
+ *	Begin Sun Additions for Parallel ports
+ */
 
 #include <string.h>
 #include <stdarg.h>
@@ -85,47 +83,48 @@ int get_ecpp_status(int fd);
 int is_a_prnio(int);
 int prnio_state(int);
 
-#define PRINTER_ERROR_PAPER_OUT		1
-#define PRINTER_ERROR_OFFLINE		2
-#define PRINTER_ERROR_BUSY		3
-#define PRINTER_ERROR_ERROR		4
-#define PRINTER_ERROR_CABLE_POWER	5
-#define PRINTER_ERROR_UNKNOWN		6
-#define PRINTER_ERROR_TIMEOUT		7
+#define	PRINTER_ERROR_PAPER_OUT		1
+#define	PRINTER_ERROR_OFFLINE		2
+#define	PRINTER_ERROR_BUSY		3
+#define	PRINTER_ERROR_ERROR		4
+#define	PRINTER_ERROR_CABLE_POWER	5
+#define	PRINTER_ERROR_UNKNOWN		6
+#define	PRINTER_ERROR_TIMEOUT		7
 #define	PRINTER_IO_ERROR		129
 
 
-/****************************************************************************/
-
-/**
+/*
  *	for BPP PARALLEL interfaces
- **/
+ */
 
-int is_a_parallel_bpp(int fd)
+int
+is_a_parallel_bpp(int fd)
 {
 	if (ioctl(fd, BPPIOC_TESTIO) == 0 || errno == EIO)
-		return(1);
-	return(0);
+		return (1);
+	return (0);
 }
 
 
 #if defined(DEBUG) && defined(NOTDEF)
-char *BppState(int state)
+char *
+BppState(int state)
 {
 	static char buf[BUFSIZ];
 
-	memset(buf, 0, sizeof(buf));
-	sprintf(buf, "State (0x%.4x) - (%s%s%s%s)\n", state, 
-		((state & BPP_SLCT_ERR) ?  "offline " : ""),
-		((state & BPP_BUSY_ERR) ?  "busy " : ""),
-		((state & BPP_PE_ERR) ?  "paper " : ""),
-		((state & BPP_ERR_ERR) ?  "error " : ""));
+	memset(buf, 0, sizeof (buf));
+	sprintf(buf, "State (0x%.4x) - (%s%s%s%s)\n", state,
+	    ((state & BPP_SLCT_ERR) ?  "offline " : ""),
+	    ((state & BPP_BUSY_ERR) ?  "busy " : ""),
+	    ((state & BPP_PE_ERR) ?  "paper " : ""),
+	    ((state & BPP_ERR_ERR) ?  "error " : ""));
 
-	return(buf);
+	return (buf);
 }
 #endif
 
-int bpp_state(int fd)
+int
+bpp_state(int fd)
 {
 	if (ioctl(fd, BPPIOC_TESTIO)) {
 		struct bpp_error_status  bpp_stat;
@@ -135,38 +134,38 @@ int bpp_state(int fd)
 			exit(PRINTER_IO_ERROR);
 		state = bpp_stat.pin_status;
 
-#if defined(DEBUG) && defined(NOTDEF)	
+#if defined(DEBUG) && defined(NOTDEF)
 		logit("%s", BppState(state));
 #endif
-	
+
 		if (state == (BPP_PE_ERR | BPP_ERR_ERR | BPP_SLCT_ERR)) {
 			/* paper is out */
-			return(PRINTER_ERROR_PAPER_OUT);
+			return (PRINTER_ERROR_PAPER_OUT);
 		} else if (state & BPP_BUSY_ERR) {
 			/* printer is busy */
-			return(PRINTER_ERROR_BUSY);
+			return (PRINTER_ERROR_BUSY);
 		} else if (state & BPP_SLCT_ERR) {
 			/* printer is offline */
-			return(PRINTER_ERROR_OFFLINE);
+			return (PRINTER_ERROR_OFFLINE);
 		} else if (state & BPP_ERR_ERR) {
 			/* printer is errored */
-			return(PRINTER_ERROR_ERROR);
+			return (PRINTER_ERROR_ERROR);
 		} else if (state == BPP_PE_ERR) {
 			/* printer is off/unplugged */
-			return(PRINTER_ERROR_CABLE_POWER);
+			return (PRINTER_ERROR_CABLE_POWER);
 		} else if (state) {
-			return(PRINTER_ERROR_UNKNOWN);
+			return (PRINTER_ERROR_UNKNOWN);
 		} else
-			return(0);
+			return (0);
 	}
-	return(0);
+	return (0);
 }
 
 /*
  * For ecpp parallel port
  */
 
-int 
+int
 get_ecpp_status(int fd)
 {
 	int state;
@@ -174,7 +173,7 @@ get_ecpp_status(int fd)
 
 
 	if (ioctl(fd, ECPPIOC_GETPARMS, &transfer_parms) == -1) {
-		return(-1);
+		return (-1);
 	}
 
 	state = transfer_parms.mode;
@@ -186,20 +185,21 @@ get_ecpp_status(int fd)
 	if (state != ECPP_CENTRONICS) {
 		transfer_parms.mode = ECPP_CENTRONICS;
 		if (ioctl(fd, ECPPIOC_SETPARMS, &transfer_parms) == -1) {
-			return(-1);
+			return (-1);
 		} else {
 			state = ECPP_CENTRONICS;
 		}
 	}
-		
 
-	return(state);
+
+	return (state);
 }
 
-/**
+/*
  * For prnio(7I) - generic printer interface
- **/
-int is_a_prnio(int fd)
+ */
+int
+is_a_prnio(int fd)
 {
 	uint_t	cap;
 
@@ -218,46 +218,47 @@ int is_a_prnio(int fd)
 	return (1);
 }
 
-int prnio_state(int fd)
+int
+prnio_state(int fd)
 {
 	uint_t	status;
 	uchar_t	pins;
 
 	if ((ioctl(fd, PRNIOC_GET_STATUS, &status) == 0) &&
 	    (status & PRN_READY)) {
-		return(0);
+		return (0);
 	}
 
 	if (ioctl(fd, PRNIOC_GET_1284_STATUS, &pins) != 0) {
-		return(PRINTER_ERROR_UNKNOWN);
+		return (PRINTER_ERROR_UNKNOWN);
 	}
 
 	if ((pins & ~PRN_1284_BUSY) == PRN_1284_PE) {
 		/* paper is out */
-		return(PRINTER_ERROR_PAPER_OUT);
+		return (PRINTER_ERROR_PAPER_OUT);
 	} else if (pins == (PRN_1284_PE | PRN_1284_SELECT |
-				PRN_1284_NOFAULT | PRN_1284_BUSY)) {
+	    PRN_1284_NOFAULT | PRN_1284_BUSY)) {
 		/* printer is off/unplugged */
-		return(PRINTER_ERROR_CABLE_POWER);
+		return (PRINTER_ERROR_CABLE_POWER);
 	} else if ((pins & PRN_1284_SELECT) == 0) {
 		/* printer is offline */
-		return(PRINTER_ERROR_OFFLINE);
+		return (PRINTER_ERROR_OFFLINE);
 	} else if ((pins & PRN_1284_NOFAULT) == 0) {
 		/* printer is errored */
-		return(PRINTER_ERROR_ERROR);
+		return (PRINTER_ERROR_ERROR);
 	} else if (pins & PRN_1284_PE) {
 		/* paper is out */
-		return(PRINTER_ERROR_PAPER_OUT);
+		return (PRINTER_ERROR_PAPER_OUT);
 	} else if (pins ^ (PRN_1284_SELECT | PRN_1284_NOFAULT)) {
-		return(PRINTER_ERROR_UNKNOWN);
+		return (PRINTER_ERROR_UNKNOWN);
 	}
 
-	return(0);
+	return (0);
 }
-	
-/**
+
+/*
  *	Common routines
- **/
+ */
 
 /*ARGSUSED0*/
 static void
@@ -280,10 +281,10 @@ printer_info(char *fmt, ...)
 	vsprintf(mesg, fmt, ap);
 	va_end(ap);
 /*
-	fprintf(stderr,
-		"%%%%[ PrinterError: %s; source: parallel ]%%%%\n",
-		mesg);
-*/
+ *	fprintf(stderr,
+ *		"%%%%[ PrinterError: %s; source: parallel ]%%%%\n",
+ *		mesg);
+ */
 	fprintf(stderr, "%s\n", mesg);
 	fflush(stderr);
 	fsync(2);
@@ -294,32 +295,32 @@ static void
 printer_error(int error)
 {
 	switch (error) {
-		case -1:
-			printer_info("ioctl(): %s", strerror(errno));
-			break;
-		case PRINTER_ERROR_PAPER_OUT:
-			printer_info("out of paper");
-			break;
-		case PRINTER_ERROR_OFFLINE:
-			printer_info("offline");
-			break;
-		case PRINTER_ERROR_BUSY:
-			printer_info("busy");
-			break;
-		case PRINTER_ERROR_ERROR:
-			printer_info("printer error");
-			break;
-		case PRINTER_ERROR_CABLE_POWER:
-			printer_info("printer powered off or disconnected");
-			break;
-		case PRINTER_ERROR_UNKNOWN:
-			printer_info("unknown error");
-			break;
-		case PRINTER_ERROR_TIMEOUT:
-			printer_info("communications timeout");
-			break;
-		default:
-			printer_info("get_status() failed");
+	case -1:
+		printer_info("ioctl(): %s", strerror(errno));
+		break;
+	case PRINTER_ERROR_PAPER_OUT:
+		printer_info("out of paper");
+		break;
+	case PRINTER_ERROR_OFFLINE:
+		printer_info("offline");
+		break;
+	case PRINTER_ERROR_BUSY:
+		printer_info("busy");
+		break;
+	case PRINTER_ERROR_ERROR:
+		printer_info("printer error");
+		break;
+	case PRINTER_ERROR_CABLE_POWER:
+		printer_info("printer powered off or disconnected");
+		break;
+	case PRINTER_ERROR_UNKNOWN:
+		printer_info("unknown error");
+		break;
+	case PRINTER_ERROR_TIMEOUT:
+		printer_info("communications timeout");
+		break;
+	default:
+		printer_info("get_status() failed");
 	}
 }
 
@@ -331,7 +332,7 @@ wait_state(int fd, int get_state())
 	int was_faulted = 0;
 
 	while (state = get_state(fd)) {
-		was_faulted=1;
+		was_faulted = 1;
 		printer_error(state);
 		sleep(15);
 	}
@@ -343,26 +344,26 @@ wait_state(int fd, int get_state())
 	}
 }
 
-/**
- **  end of Sun Additions for parallel port
- **/
-#define	IDENTICAL(A,B)	(A.st_dev==B.st_dev && A.st_ino==B.st_ino)
-#define ISBLK(A)	((A.st_mode & S_IFMT) == S_IFBLK)
-#define ISCHR(A)	((A.st_mode & S_IFMT) == S_IFCHR)
+/*
+ *  end of Sun Additions for parallel port
+ */
+#define	IDENTICAL(A, B)	(A.st_dev == B.st_dev && A.st_ino == B.st_ino)
+#define	ISBLK(A)	((A.st_mode & S_IFMT) == S_IFBLK)
+#define	ISCHR(A)	((A.st_mode & S_IFMT) == S_IFCHR)
 
-#define E_SUCCESS	0
-#define E_BAD_INPUT	1
-#define E_BAD_OUTPUT	2
-#define E_BAD_TERM	3
-#define E_IDENTICAL	4
+#define	E_SUCCESS	0
+#define	E_BAD_INPUT	1
+#define	E_BAD_OUTPUT	2
+#define	E_BAD_TERM	3
+#define	E_IDENTICAL	4
 #define	E_WRITE_FAILED	5
 #define	E_TIMEOUT	6
-#define E_HANGUP	7
-#define E_INTERRUPT	8
+#define	E_HANGUP	7
+#define	E_INTERRUPT	8
 
-#define SAFETY_FACTOR	2.0
-#define R(F)		(int)((F) + .5)
-#define DELAY(N,D)	R(SAFETY_FACTOR * ((N) / (double)(D)))
+#define	SAFETY_FACTOR	2.0
+#define	R(F)		(int)((F) + .5)
+#define	DELAY(N, D)	R(SAFETY_FACTOR * ((N) / (double)(D)))
 
 char			buffer[BUFSIZ];
 
@@ -374,44 +375,36 @@ void			sighup(),
 			sigterm();
 
 #if	defined(baudrate)
-# undef	baudrate
+#undef	baudrate
 #endif
 
-int			baudrate();
+int baudrate();
 
 
-int nop(int fd) { return (0); }
+int
+nop(int fd)
+{
+	return (0);
+}
+
 int bpp_state(int);
 
 
-/**
- ** main()
- **/
+/*
+ * main()
+ */
 
 int
 main(int argc, char *argv[])
 {
-	int			nin,
-				nout,
-				effective_rate,
-				max_delay	= 0,
-				n;
-
-	int			report_rate;
-
-	short			print_rate;
-
-	struct stat		in,
-				out;
-
-	struct tms		tms;
-
-	long			epoch_start,
-				epoch_end;
-
-	char			*TERM;
-
-	int			(*func)(int fd);
+	int	nin, nout, effective_rate, max_delay = 0, n;
+	int	report_rate;
+	short	print_rate;
+	struct stat	in, out;
+	struct tms	tms;
+	long	epoch_start, epoch_end;
+	char	*TERM;
+	int	(*func)(int fd);
 
 	/*
 	 * The Spooler can hit us with SIGTERM for three reasons:
@@ -442,11 +435,11 @@ main(int argc, char *argv[])
 	 *	- Input/output identical
 	 *	- No TERM defined or trouble reading Terminfo database
 	 */
-	signal (SIGTERM, sigterm);
-	signal (SIGHUP, sighup);
-	signal (SIGINT, sigint);
-	signal (SIGQUIT, sigint);
-	signal (SIGPIPE, sigpipe);
+	signal(SIGTERM, sigterm);
+	signal(SIGHUP, sighup);
+	signal(SIGINT, sigint);
+	signal(SIGQUIT, sigint);
+	signal(SIGPIPE, sigpipe);
 
 
 	if (argc > 1 && STREQU(argv[1], "-r")) {
@@ -458,7 +451,7 @@ main(int argc, char *argv[])
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -466,26 +459,20 @@ main(int argc, char *argv[])
 	 * Stat the standard output to be sure it is defined.
 	 */
 	if (fstat(1, &out) < 0) {
-		signal (SIGTERM, SIG_IGN);
-		fprintf (
-			stderr,
-		gettext("Can't stat output (%s);\nincorrect use of lp.cat!\n"),
-			PERROR
-		);
-		exit (E_BAD_OUTPUT);
+		signal(SIGTERM, SIG_IGN);
+		fprintf(stderr, gettext("Can't stat output "
+		    "(%s);\nincorrect use of lp.cat!\n"), PERROR);
+		exit(E_BAD_OUTPUT);
 	}
 
 	/*
 	 * Stat the standard input to be sure it is defined.
 	 */
 	if (fstat(0, &in) < 0) {
-		signal (SIGTERM, SIG_IGN);
-		fprintf (
-			stderr,
-		gettext("Can't stat input (%s);\nincorrect use of lp.cat!\n"),
-			PERROR
-		);
-		exit (E_BAD_INPUT);
+		signal(SIGTERM, SIG_IGN);
+		fprintf(stderr, gettext("Can't stat input "
+		    "(%s);\nincorrect use of lp.cat!\n"), PERROR);
+		exit(E_BAD_INPUT);
 	}
 
 	/*
@@ -500,22 +487,20 @@ main(int argc, char *argv[])
 	if (is_a_prnio(1)) {
 		func = prnio_state;
 	} else if (is_a_parallel_bpp(1) ||
-		    (get_ecpp_status(1) == ECPP_CENTRONICS)) {
+	    (get_ecpp_status(1) == ECPP_CENTRONICS)) {
 		func = bpp_state;
-        } else if (isatty(1)) {
+	} else if (isatty(1)) {
 		/* serial connection (probably) - continue as usual */
 		func = nop;
-        } else {
+	} else {
 		func = nop;
-        }
+	}
 
 	if (!ISCHR(out) && !ISBLK(out) && IDENTICAL(out, in)) {
-		signal (SIGTERM, SIG_IGN);
-		fprintf (
-			stderr,
-	gettext("Input and output are identical; incorrect use of lp.cat!\n")
-		);
-		exit (E_IDENTICAL);
+		signal(SIGTERM, SIG_IGN);
+		fprintf(stderr, gettext("Input and output are identical; "
+		    "incorrect use of lp.cat!\n"));
+		exit(E_IDENTICAL);
 	}
 
 	/*
@@ -531,28 +516,18 @@ main(int argc, char *argv[])
 	 * than err too often on false alarms.
 	 */
 
-	if (
-		!(TERM = getenv("TERM"))
-	     || !*TERM
-	) {
-		signal (SIGTERM, SIG_IGN);
-		fprintf (
-			stderr,
-	gettext("No TERM variable defined! Trouble with the Spooler!\n")
-		);
-		exit (E_BAD_TERM);
+	if (!(TERM = getenv("TERM")) || !*TERM) {
+		signal(SIGTERM, SIG_IGN);
+		fprintf(stderr, gettext("No TERM variable defined! "
+		    "Trouble with the Spooler!\n"));
+		exit(E_BAD_TERM);
 	}
-	if (
-		!STREQU(TERM, NAME_UNKNOWN)
-	     && tidbit(TERM, "cps", &print_rate) == -1
-	) {
-		signal (SIGTERM, SIG_IGN);
-		fprintf (
-			stderr,
-gettext("Trouble identifying printer type \"%s\"; check the Terminfo database.\n"),
-			TERM
-		);
-		exit (E_BAD_TERM);
+	if (!STREQU(TERM, NAME_UNKNOWN) &&
+	    tidbit(TERM, "cps", &print_rate) == -1) {
+		signal(SIGTERM, SIG_IGN);
+		fprintf(stderr, gettext("Trouble identifying printer "
+		    "type \"%s\"; check the Terminfo database.\n"), TERM);
+		exit(E_BAD_TERM);
 	}
 	if (STREQU(TERM, NAME_UNKNOWN))
 		print_rate = -1;
@@ -570,7 +545,7 @@ gettext("Trouble identifying printer type \"%s\"; check the Terminfo database.\n
 	 * waiting too long to write to a printer in trouble.
 	 */
 	if (max_delay)
-		signal (SIGALRM, sigalrm);
+		signal(SIGALRM, sigalrm);
 
 	/*
 	 * While not end of standard input, copy blocks to
@@ -597,15 +572,13 @@ gettext("Trouble identifying printer type \"%s\"; check the Terminfo database.\n
 			wait_state(1, func);
 
 			if (max_delay)
-				alarm (max_delay);
+				alarm(max_delay);
 			nout = write(1, ptr, nin);
 			alarm(0);
 			if (nout < 0) {
-				fprintf (
-					stderr,
-	gettext("Write failed (%s);\nperhaps the printer has gone off-line.\n"),
-					PERROR
-				);
+				fprintf(stderr, gettext("Write failed "
+				    "(%s);\nperhaps the printer has gone "
+				    "off-line.\n"), PERROR);
 				fflush(stderr);
 				if (errno != EINTR)
 				/* I/O error on device, get lpcshed to retry */
@@ -619,15 +592,13 @@ gettext("Trouble identifying printer type \"%s\"; check the Terminfo database.\n
 		} while (nin > 0);
 
 		if (max_delay)
-			alarm (0);
+			alarm(0);
 		else if (report_rate) {
 			epoch_end = times(&tms);
 			if (epoch_end - epoch_start > 0)
-				fprintf (
-					stderr,
-					"%d CPS\n",
-		R((100 * BUFSIZ) / (double)(epoch_end - epoch_start))
-				);
+				fprintf(stderr, "%d CPS\n",
+				    R((100 * BUFSIZ) /
+				    (double)(epoch_end - epoch_start)));
 		}
 
 	}
@@ -635,83 +606,82 @@ gettext("Trouble identifying printer type \"%s\"; check the Terminfo database.\n
 	return (E_SUCCESS);
 }
 
-/**
- ** sighup() - CATCH A HANGUP (LOSS OF CARRIER)
- **/
-
-void			sighup ()
+/*
+ * sighup() - CATCH A HANGUP (LOSS OF CARRIER)
+ */
+void
+sighup()
 {
-	signal (SIGTERM, SIG_IGN);
-	signal (SIGHUP, SIG_IGN);
-	fprintf (stderr, gettext(HANGUP_FAULT_LPCAT));
-	exit (E_HANGUP);
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+	fprintf(stderr, gettext(HANGUP_FAULT_LPCAT));
+	exit(E_HANGUP);
 }
 
-/**
- ** sigint() - CATCH AN INTERRUPT
- **/
-
-void			sigint ()
+/*
+ * sigint() - CATCH AN INTERRUPT
+ */
+void
+sigint()
 {
-	signal (SIGTERM, SIG_IGN);
-	signal (SIGINT, SIG_IGN);
-	fprintf (stderr, gettext(INTERRUPT_FAULT));
-	exit (E_INTERRUPT);
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGINT, SIG_IGN);
+	fprintf(stderr, gettext(INTERRUPT_FAULT));
+	exit(E_INTERRUPT);
 }
 
-/**
- ** sigpipe() - CATCH EARLY CLOSE OF PIPE
- **/
-
-void			sigpipe ()
+/*
+ * sigpipe() - CATCH EARLY CLOSE OF PIPE
+ */
+void
+sigpipe()
 {
-	signal (SIGTERM, SIG_IGN);
-	signal (SIGPIPE, SIG_IGN);
-	fprintf (stderr, gettext(PIPE_FAULT));
-	exit (E_INTERRUPT);
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGPIPE, SIG_IGN);
+	fprintf(stderr, gettext(PIPE_FAULT));
+	exit(E_INTERRUPT);
 }
 
-/**
- ** sigalrm() - CATCH AN ALARM
- **/
-
-void			sigalrm ()
+/*
+ * sigalrm() - CATCH AN ALARM
+ */
+void
+sigalrm()
 {
-	signal (SIGTERM, SIG_IGN);
-	fprintf (
-		stderr,
-	gettext("Excessive write delay; perhaps the printer has gone off-line.\n")
-	);
-	exit (E_TIMEOUT);
+	signal(SIGTERM, SIG_IGN);
+	fprintf(stderr, gettext("Excessive write delay; "
+	    "perhaps the printer has gone off-line.\n"));
+	exit(E_TIMEOUT);
 }
 
-/**
- ** sigterm() - CATCH A TERMINATION SIGNAL
- **/
-
-void			sigterm ()
+/*
+ * sigterm() - CATCH A TERMINATION SIGNAL
+ */
+void
+sigterm()
 {
-	signal (SIGTERM, SIG_IGN);
+	signal(SIGTERM, SIG_IGN);
 	/*
 	 * try to flush the output queue in the case of ecpp port.
 	 * ignore the return code as this may not be the ecpp.
 	 */
 	ioctl(1, I_FLUSH, FLUSHW);
-	exit (E_SUCCESS);
+	exit(E_SUCCESS);
 }
 
-/**
- ** baudrate() - RETURN BAUD RATE OF OUTPUT LINE
- **/
+/*
+ * baudrate() - RETURN BAUD RATE OF OUTPUT LINE
+ */
 
 static int		baud_convert[] =
 {
 	0, 50, 75, 110, 135, 150, 200, 300, 600, 1200,
 	1800, 2400, 4800, 9600, 19200, 38400, 57600,
-	76800, 115200, 153600, 230400, 307200, 460800
+	76800, 115200, 153600, 230400, 307200, 460800, 921600
 };
 
-int			baudrate ()
+int
+baudrate()
 {
 	struct termio		tm;
 	struct termios		tms;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2622,18 +2622,18 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 		error = -1;
 		usbser_serialize_port_act(pp, USBSER_ACT_CTL);
 		mutex_exit(&pp->port_mutex);
-
 		break;
+
 	case TCSBRK:
 		/* serialize breaks */
-		if (pp->port_act & USBSER_ACT_BREAK) {
-
+		if (pp->port_act & USBSER_ACT_BREAK)
 			return (USB_FAILURE);
-		}
+		/*FALLTHRU*/
 	default:
 		usbser_serialize_port_act(pp, USBSER_ACT_CTL);
 		mutex_exit(&pp->port_mutex);
 		(void) ttycommon_ioctl(tp, q, mp, &error);
+		break;
 	}
 
 	if (error == 0) {
@@ -2648,21 +2648,19 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 		case TCSETAW:
 		case TCSETAF:
 			(void) USBSER_DS_FIFO_DRAIN(pp, DS_TX);
+			/*FALLTHRU*/
 
-			/* FALLTHRU */
 		case TCSETS:
 			mutex_enter(&pp->port_mutex);
 			error = usbser_port_program(pp);
 			mutex_exit(&pp->port_mutex);
-
 			break;
 		}
-
 		goto end;
+
 	} else if (error > 0) {
 		USB_DPRINTF_L3(DPRINT_IOCTL, pp->port_lh, "usbser_ioctl: "
 		    "ttycommon_ioctl returned %d", error);
-
 		goto end;
 	}
 
@@ -2672,55 +2670,53 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 	error = 0;
 	switch (cmd) {
 	case TCSBRK:
-		if ((error = miocpullup(mp, sizeof (int))) != 0) {
-
+		if ((error = miocpullup(mp, sizeof (int))) != 0)
 			break;
-		}
+
 		/* drain output */
 		(void) USBSER_DS_FIFO_DRAIN(pp, USBSER_TX_FIFO_DRAIN_TIMEOUT);
+
 		/*
 		 * if required, set break
 		 */
 		if (*(int *)mp->b_cont->b_rptr == 0) {
 			if (USBSER_DS_BREAK_CTL(pp, DS_ON) != USB_SUCCESS) {
 				error = EIO;
-
 				break;
 			}
+
 			mutex_enter(&pp->port_mutex);
 			pp->port_act |= USBSER_ACT_BREAK;
 			pp->port_delay_id = timeout(usbser_restart, pp,
 			    drv_usectohz(250000));
 			mutex_exit(&pp->port_mutex);
 		}
-
+		mioc2ack(mp, NULL, 0, 0);
 		break;
-	case TIOCSBRK:
-		/* set break */
-		if (USBSER_DS_BREAK_CTL(pp, DS_ON) != USB_SUCCESS) {
+
+	case TIOCSBRK:	/* set break */
+		if (USBSER_DS_BREAK_CTL(pp, DS_ON) != USB_SUCCESS)
 			error = EIO;
-		}
-
+		else
+			mioc2ack(mp, NULL, 0, 0);
 		break;
-	case TIOCCBRK:
-		/* clear break */
-		if (USBSER_DS_BREAK_CTL(pp, DS_OFF) != USB_SUCCESS) {
+
+	case TIOCCBRK:	/* clear break */
+		if (USBSER_DS_BREAK_CTL(pp, DS_OFF) != USB_SUCCESS)
 			error = EIO;
-		}
-
+		else
+			mioc2ack(mp, NULL, 0, 0);
 		break;
-	case TIOCMSET:
-	case TIOCMBIS:
-	case TIOCMBIC:
+
+	case TIOCMSET:	/* set all modem bits */
+	case TIOCMBIS:	/* bis modem bits */
+	case TIOCMBIC:	/* bic modem bits */
 		if (iocp->ioc_count == TRANSPARENT) {
 			mcopyin(mp, NULL, sizeof (int), NULL);
-
 			break;
 		}
-		if ((error = miocpullup(mp, sizeof (int))) != 0) {
-
+		if ((error = miocpullup(mp, sizeof (int))) != 0)
 			break;
-		}
 
 		val = *(int *)mp->b_cont->b_rptr;
 		if (cmd == TIOCMSET) {
@@ -2730,97 +2726,75 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 		} else if (cmd == TIOCMBIC) {
 			rval = USBSER_DS_SET_MODEM_CTL(pp, val, 0);
 		}
-		if (rval != USB_SUCCESS) {
+		if (rval == USB_SUCCESS)
+			mioc2ack(mp, NULL, 0, 0);
+		else
 			error = EIO;
-		}
-
 		break;
-	case (tIOC | 109):		/* TIOCSILOOP */
+
+	case TIOCSILOOP:
 		if (USBSER_DS_LOOPBACK_SUPPORTED(pp)) {
-			if (USBSER_DS_LOOPBACK(pp, DS_ON) != USB_SUCCESS) {
+			if (USBSER_DS_LOOPBACK(pp, DS_ON) == USB_SUCCESS)
+				mioc2ack(mp, NULL, 0, 0);
+			else
 				error = EIO;
-			} else {
-				iocp->ioc_error = 0;
-				mp->b_datap->db_type = M_IOCACK;
-			}
 		} else {
 			error = EINVAL;
 		}
-
 		break;
-	case (tIOC | 108):		/* TIOCCILOOP */
+
+	case TIOCCILOOP:
 		if (USBSER_DS_LOOPBACK_SUPPORTED(pp)) {
-			if (USBSER_DS_LOOPBACK(pp, DS_OFF) != USB_SUCCESS) {
+			if (USBSER_DS_LOOPBACK(pp, DS_OFF) == USB_SUCCESS)
+				mioc2ack(mp, NULL, 0, 0);
+			else
 				error = EIO;
-			} else {
-				iocp->ioc_error = 0;
-				mp->b_datap->db_type = M_IOCACK;
-			}
 		} else {
 			error = EINVAL;
 		}
-
 		break;
-	case TIOCMGET:
-		datamp = allocb(sizeof (int), BPRI_MED);
-		if (datamp == NULL) {
+
+	case TIOCMGET:	/* get all modem bits */
+		if ((datamp = allocb(sizeof (int), BPRI_MED)) == NULL) {
 			error = EAGAIN;
-
 			break;
 		}
-
 		rval = USBSER_DS_GET_MODEM_CTL(pp, -1, (int *)datamp->b_rptr);
 		if (rval != USB_SUCCESS) {
 			error = EIO;
-
 			break;
 		}
-
-		if (iocp->ioc_count == TRANSPARENT) {
+		if (iocp->ioc_count == TRANSPARENT)
 			mcopyout(mp, NULL, sizeof (int), NULL, datamp);
-		} else {
-			if (mp->b_cont != NULL) {
-				freemsg(mp->b_cont);
-			}
-			mp->b_cont = datamp;
-			mp->b_cont->b_wptr += sizeof (int);
-			iocp->ioc_count = sizeof (int);
-		}
-
+		else
+			mioc2ack(mp, datamp, sizeof (int), 0);
 		break;
+
 	case CONSOPENPOLLEDIO:
 		error = usbser_polledio_init(pp);
 		if (error != 0)
-
 			break;
 
 		error = miocpullup(mp, sizeof (struct cons_polledio *));
 		if (error != 0)
-
 			break;
 
 		*(struct cons_polledio **)mp->b_cont->b_rptr = &usbser_polledio;
-
-		mp->b_datap->db_type = M_IOCACK;
-
+		mioc2ack(mp, NULL, 0, 0);
 		break;
+
 	case CONSCLOSEPOLLEDIO:
 		usbser_polledio_fini(pp);
-		mp->b_datap->db_type = M_IOCACK;
-		mp->b_datap->db_type = M_IOCACK;
-		iocp->ioc_error = 0;
-		iocp->ioc_rval = 0;
-
+		mioc2ack(mp, NULL, 0, 0);
 		break;
+
 	case CONSSETABORTENABLE:
 		error = secpolicy_console(iocp->ioc_cr);
 		if (error != 0)
-
 			break;
 
 		if (iocp->ioc_count != TRANSPARENT) {
 			error = EINVAL;
-
 			break;
 		}
 
@@ -2836,12 +2810,9 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 			usbser_console_abort = 1;
 		else
 			usbser_console_abort = 0;
-
-		mp->b_datap->db_type = M_IOCACK;
-		iocp->ioc_error = 0;
-		iocp->ioc_rval = 0;
-
+		mioc2ack(mp, NULL, 0, 0);
 		break;
+
 	case CONSGETABORTENABLE:
 		/*CONSTANTCONDITION*/
 		ASSERT(sizeof (boolean_t) <= sizeof (boolean_t *));
@@ -2851,19 +2822,18 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 		 */
 		mcopyout(mp, NULL, sizeof (boolean_t), NULL, NULL);
 		*(boolean_t *)mp->b_cont->b_rptr = (usbser_console_abort != 0);
-
+		mioc2ack(mp, NULL, 0, 0);
 		break;
+
 	default:
 		error = EINVAL;
-
 		break;
 	}
 end:
-	if (error != 0) {
-		iocp->ioc_error = error;
-		mp->b_datap->db_type = M_IOCNAK;
-	}
-	qreply(q, mp);
+	if (error != 0)
+		miocnak(q, mp, 0, error);
+	else
+		qreply(q, mp);
 
 	mutex_enter(&pp->port_mutex);
 	usbser_release_port_act(pp, USBSER_ACT_CTL);
@@ -2880,7 +2850,6 @@ usbser_iocdata(usbser_port_t *pp, mblk_t *mp)
 {
 	tty_common_t	*tp = &pp->port_ttycommon;
 	queue_t		*q = tp->t_writeq;
-	struct iocblk	*ip;
 	struct copyresp	*csp;
 	int		cmd;
 	int		val;
@@ -2888,31 +2857,28 @@ usbser_iocdata(usbser_port_t *pp, mblk_t *mp)
 
 	ASSERT(mutex_owned(&pp->port_mutex));
 
-	ip = (struct iocblk *)mp->b_rptr;
 	csp = (struct copyresp *)mp->b_rptr;
 	cmd = csp->cp_cmd;
 
 	if (csp->cp_rval != 0) {
 		freemsg(mp);
-
 		return;
 	}
 
 	switch (cmd) {
-	case TIOCMSET:
-	case TIOCMBIS:
-	case TIOCMBIC:
+	case TIOCMSET:	/* set all modem bits */
+	case TIOCMBIS:	/* bis modem bits */
+	case TIOCMBIC:	/* bic modem bits */
 		if ((mp->b_cont == NULL) ||
 		    (MBLKL(mp->b_cont) < sizeof (int))) {
 			miocnak(q, mp, 0, EINVAL);
-
 			break;
 		}
 		val = *(int *)mp->b_cont->b_rptr;
 
 		usbser_serialize_port_act(pp, USBSER_ACT_CTL);
-
 		mutex_exit(&pp->port_mutex);
+
 		if (cmd == TIOCMSET) {
 			rval = USBSER_DS_SET_MODEM_CTL(pp, -1, val);
 		} else if (cmd == TIOCMBIS) {
@@ -2925,33 +2891,26 @@ usbser_iocdata(usbser_port_t *pp, mblk_t *mp)
 			freemsg(mp->b_cont);
 			mp->b_cont = NULL;
 		}
-		ip->ioc_rval = 0;
-		if (rval == USB_SUCCESS) {
+
+		if (rval == USB_SUCCESS)
 			miocack(q, mp, 0, 0);
-		} else {
+		else
 			miocnak(q, mp, 0, EIO);
-		}
+
 		mutex_enter(&pp->port_mutex);
-
 		usbser_release_port_act(pp, USBSER_ACT_CTL);
-
 		break;
-	case TIOCMGET:
+
+	case TIOCMGET:	/* get all modem bits */
 		mutex_exit(&pp->port_mutex);
-		if (mp->b_cont) {
-			freemsg(mp->b_cont);
-			mp->b_cont = NULL;
-		}
-		ip->ioc_rval = 0;
 		miocack(q, mp, 0, 0);
 		mutex_enter(&pp->port_mutex);
-
 		break;
+
 	default:
 		mutex_exit(&pp->port_mutex);
 		miocnak(q, mp, 0, EINVAL);
 		mutex_enter(&pp->port_mutex);
-
 		break;
 	}
 }
@@ -3291,7 +3250,7 @@ usbser_inbound_flow_ctl(usbser_port_t *pp)
  * ----
  *
  *
- * returns !=0 if device is online, 0 otherwise
+ * returns != 0 if device is online, 0 otherwise
  */
 static int
 usbser_dev_is_online(usbser_state_t *usp)
@@ -3311,10 +3270,8 @@ usbser_dev_is_online(usbser_state_t *usp)
 static void
 usbser_serialize_port_act(usbser_port_t *pp, int act)
 {
-	while (pp->port_act & act) {
+	while (pp->port_act & act)
 		cv_wait(&pp->port_act_cv, &pp->port_mutex);
-	}
-
 	pp->port_act |= act;
 }
 
@@ -3385,8 +3342,8 @@ usbser_ioctl2str(int ioctl)
 	case TIOCMBIS:	str = "TIOCMBIS";	break;
 	case TIOCMBIC:	str = "TIOCMBIC";	break;
 	case TIOCMGET:	str = "TIOCMGET";	break;
-	case (tIOC | 109): str = "TIOCSILOOP";	break;
-	case (tIOC | 108): str = "TIOCCILOOP";	break;
+	case TIOCSILOOP: str = "TIOCSILOOP";	break;
+	case TIOCCILOOP: str = "TIOCCILOOP";	break;
 	case TCGETX:	str = "TCGETX";		break;
 	case TCSETX:	str = "TCGETX";		break;
 	case TCSETXW:	str = "TCGETX";		break;
@@ -3411,13 +3368,11 @@ usbser_polledio_init(usbser_port_t *pp)
 
 	/* only one serial line console supported */
 	if (console_input != NULL)
-
 		return (USB_FAILURE);
 
 	/* check if underlying driver supports polled io */
 	if (ds_ops->ds_version < DS_OPS_VERSION_V1 ||
 	    ds_ops->ds_out_pipe == NULL || ds_ops->ds_in_pipe == NULL)
-
 		return (USB_FAILURE);
 
 	/* init polled input pipe */
@@ -3425,7 +3380,6 @@ usbser_polledio_init(usbser_port_t *pp)
 	err = usb_console_input_init(pp->port_usp->us_dip, hdl,
 	    &console_input_buf, &console_input);
 	if (err)
-
 		return (USB_FAILURE);
 
 	/* init polled output pipe */
@@ -3435,7 +3389,6 @@ usbser_polledio_init(usbser_port_t *pp)
 	if (err) {
 		(void) usb_console_input_fini(console_input);
 		console_input = NULL;
-
 		return (USB_FAILURE);
 	}
 
@@ -3495,12 +3448,10 @@ usbser_ischar(cons_polledio_arg_t arg)
 	uint_t num_bytes;
 
 	if (console_input_start < console_input_end)
-
-		return (1);
+		return (B_TRUE);
 
 	if (usb_console_read(console_input, &num_bytes) != USB_SUCCESS)
-
-		return (0);
+		return (B_FALSE);
 
 	console_input_start = console_input_buf;
 	console_input_end = console_input_buf + num_bytes;

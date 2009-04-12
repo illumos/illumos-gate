@@ -34,8 +34,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +49,6 @@
 
 #include "includes.h"
 RCSID("$OpenBSD: ttymodes.c,v 1.18 2002/06/19 00:27:55 deraadt Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "packet.h"
 #include "log.h"
@@ -152,6 +151,14 @@ speed_to_baud(speed_t speed)
 	case B230400:
 		return 230400;
 #endif /* B230400 */
+#ifdef B460800
+	case B460800:
+		return 460800;
+#endif /* B460800 */
+#ifdef B921600
+	case B921600:
+		return 921600;
+#endif /* B921600 */
 	default:
 		return 9600;
 	}
@@ -241,6 +248,14 @@ baud_to_speed(int baud)
 	case 230400:
 		return B230400;
 #endif /* B230400 */
+#ifdef B460800
+	case 460800:
+		return B460800;
+#endif /* B460800 */
+#ifdef B921600
+	case 921600:
+		return B921600;
+#endif /* B921600 */
 	default:
 		return B9600;
 	}

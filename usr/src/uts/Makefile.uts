@@ -427,6 +427,7 @@ ROOT_MISC_DIR_32	= $(ROOT_MOD_DIR)/misc
 ROOT_KGSS_DIR_32	= $(ROOT_MOD_DIR)/misc/kgss
 ROOT_SCSI_VHCI_DIR_32	= $(ROOT_MOD_DIR)/misc/scsi_vhci
 ROOT_QLC_FW_DIR_32	= $(ROOT_MOD_DIR)/misc/qlc
+
 ROOT_EMLXS_FW_DIR_32	= $(ROOT_MOD_DIR)/misc/emlxs
 ROOT_NLMISC_DIR_32	= $(ROOT_MOD_DIR)/misc
 ROOT_MACH_DIR_32	= $(ROOT_MOD_DIR)/mach
@@ -669,8 +670,15 @@ $(OBJS_DIR)/unix_bb.o	:= XAOPT =
 #	MPSAS support
 #
 MPSAS_BUILD:sh=		echo \\043
+
 #
 # Privilege files
 #
 PRIVS_AWK = $(SRC)/uts/common/os/privs.awk
 PRIVS_DEF = $(SRC)/uts/common/os/priv_defs
+
+#
+# USB device data
+#
+USBDEVS_AWK =	$(SRC)/uts/common/io/usb/usbdevs2h.awk
+USBDEVS_DATA =	$(SRC)/uts/common/io/usb/usbdevs
