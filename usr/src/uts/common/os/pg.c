@@ -165,16 +165,16 @@ static struct pg_cb_ops pg_cb_ops_default = {
 /*
  * CPU configuration callbacks
  */
-#define	PG_CPU_INIT(class, cp)						\
+#define	PG_CPU_INIT(class, cp, cpu_pg)					\
 {									\
 	if (pg_classes[class].pgc_ops->cpu_init)			\
-		pg_classes[class].pgc_ops->cpu_init(cp);		\
+		pg_classes[class].pgc_ops->cpu_init(cp, cpu_pg);	\
 }
 
-#define	PG_CPU_FINI(class, cp)						\
+#define	PG_CPU_FINI(class, cp, cpu_pg)					\
 {									\
 	if (pg_classes[class].pgc_ops->cpu_fini)			\
-		pg_classes[class].pgc_ops->cpu_fini(cp);		\
+		pg_classes[class].pgc_ops->cpu_fini(cp, cpu_pg);	\
 }
 
 #define	PG_CPU_ACTIVE(class, cp)					\
@@ -453,7 +453,7 @@ pg_destroy(pg_t *pg)
  * This routine may block.
  */
 void
-pg_cpu_add(pg_t *pg, cpu_t *cp)
+pg_cpu_add(pg_t *pg, cpu_t *cp, cpu_pg_t *cpu_pg)
 {
 	int	err;
 
@@ -463,9 +463,15 @@ pg_cpu_add(pg_t *pg, cpu_t *cp)
 	err = group_add(&pg->pg_cpus, cp, GRP_RESIZE);
 	ASSERT(err == 0);
 
+	/*
+	 * The CPU should be referencing the bootstrap PG data still
+	 * at this point, since this routine may block causing us to
+	 * enter the dispatcher.
+	 */
+	ASSERT(cp->cpu_pg == &bootstrap_pg_data);
+
 	/* This adds the PG to the CPUs PG group */
-	ASSERT(cp->cpu_pg != &bootstrap_pg_data);
-	err = group_add(&cp->cpu_pg->pgs, pg, GRP_RESIZE);
+	err = group_add(&cpu_pg->pgs, pg, GRP_RESIZE);
 	ASSERT(err == 0);
 }
 
@@ -474,7 +480,7 @@ pg_cpu_add(pg_t *pg, cpu_t *cp)
  * This routine may block.
  */
 void
-pg_cpu_delete(pg_t *pg, cpu_t *cp)
+pg_cpu_delete(pg_t *pg, cpu_t *cp, cpu_pg_t *cpu_pg)
 {
 	int	err;
 
@@ -484,9 +490,15 @@ pg_cpu_delete(pg_t *pg, cpu_t *cp)
 	err = group_remove(&pg->pg_cpus, cp, GRP_RESIZE);
 	ASSERT(err == 0);
 
+	/*
+	 * The CPU should be referencing the bootstrap PG data still
+	 * at this point, since this routine may block causing us to
+	 * enter the dispatcher.
+	 */
+	ASSERT(cp->cpu_pg == &bootstrap_pg_data);
+
 	/* Remove the PG from the CPU's PG group */
-	ASSERT(cp->cpu_pg != &bootstrap_pg_data);
-	err = group_remove(&cp->cpu_pg->pgs, pg, GRP_RESIZE);
+	err = group_remove(&cpu_pg->pgs, pg, GRP_RESIZE);
 	ASSERT(err == 0);
 }
 
@@ -527,19 +539,35 @@ void
 pg_cpu_init(cpu_t *cp)
 {
 	pg_cid_t	i;
+	cpu_pg_t	*cpu_pg;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	/*
 	 * Allocate and size the per CPU pg data
+	 *
+	 * The CPU's PG data will be populated by the various
+	 * PG classes during the invocation of the PG_CPU_INIT()
+	 * callback below.
+	 *
+	 * Since the we could block and enter the dispatcher during
+	 * this process, the CPU will continue to reference the bootstrap
+	 * PG data until all the initialization completes.
 	 */
-	cp->cpu_pg = pg_cpu_data_alloc();
+	ASSERT(cp->cpu_pg == &bootstrap_pg_data);
+
+	cpu_pg = pg_cpu_data_alloc();
 
 	/*
 	 * Notify all registered classes about the new CPU
 	 */
 	for (i = 0; i < pg_nclasses; i++)
-		PG_CPU_INIT(i, cp);
+		PG_CPU_INIT(i, cp, cpu_pg);
+
+	/*
+	 * The CPU's PG data is now ready to use.
+	 */
+	cp->cpu_pg = cpu_pg;
 }
 
 /*
@@ -550,22 +578,29 @@ void
 pg_cpu_fini(cpu_t *cp)
 {
 	pg_cid_t	i;
+	cpu_pg_t	*cpu_pg;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	cpu_pg = cp->cpu_pg;
 
 	/*
 	 * This can happen if the CPU coming into the system
 	 * failed to power on.
 	 */
-	if (cp->cpu_pg == NULL ||
-	    cp->cpu_pg == &bootstrap_pg_data)
+	if (cpu_pg == NULL || cpu_pg == &bootstrap_pg_data)
 		return;
 
-	for (i = 0; i < pg_nclasses; i++)
-		PG_CPU_FINI(i, cp);
+	/*
+	 * Have the CPU reference the bootstrap PG data to survive
+	 * the dispatcher should it block from here on out.
+	 */
+	cp->cpu_pg = &bootstrap_pg_data;
 
-	pg_cpu_data_free(cp->cpu_pg);
-	cp->cpu_pg = NULL;
+	for (i = 0; i < pg_nclasses; i++)
+		PG_CPU_FINI(i, cp, cpu_pg);
+
+	pg_cpu_data_free(cpu_pg);
 }
 
 /*

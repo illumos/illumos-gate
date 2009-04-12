@@ -85,8 +85,8 @@ typedef struct pg {
 struct pg_ops {
 	struct pg	*(*alloc)();
 	void		(*free)(struct pg *);
-	void		(*cpu_init)(struct cpu *);
-	void		(*cpu_fini)(struct cpu *);
+	void		(*cpu_init)(struct cpu *, struct cpu_pg *);
+	void		(*cpu_fini)(struct cpu *, struct cpu_pg *);
 	void		(*cpu_active)(struct cpu *);
 	void		(*cpu_inactive)(struct cpu *);
 	void		(*cpupart_in)(struct cpu *, struct cpupart *);
@@ -178,8 +178,8 @@ void		pg_cpupart_move(cpu_t *, struct cpupart *, struct cpupart *);
  */
 pg_t		*pg_create(pg_cid_t);
 void		pg_destroy(pg_t *);
-void		pg_cpu_add(pg_t *, cpu_t *);
-void		pg_cpu_delete(pg_t *, cpu_t *);
+void		pg_cpu_add(pg_t *, cpu_t *, cpu_pg_t *);
+void		pg_cpu_delete(pg_t *, cpu_t *, cpu_pg_t *);
 pg_t		*pg_cpu_find_pg(cpu_t *, group_t *);
 cpu_t		*pg_cpu_next(pg_cpu_itr_t *);
 boolean_t	pg_cpu_find(pg_t *, cpu_t *);

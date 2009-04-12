@@ -351,6 +351,11 @@ setup_cpu_common(int cpuid)
 	 */
 	disp_cpu_init(cp);
 
+	/*
+	 * Bootstrap the CPU's PG data
+	 */
+	pg_cpu_bootstrap(cp);
+
 	cpu_vm_data_init(cp);
 
 	/*

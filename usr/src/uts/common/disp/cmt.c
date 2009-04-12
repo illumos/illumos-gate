@@ -134,8 +134,8 @@ static pg_cid_t		pg_cmt_class_id;		/* PG class id */
 
 static pg_t		*pg_cmt_alloc();
 static void		pg_cmt_free(pg_t *);
-static void		pg_cmt_cpu_init(cpu_t *);
-static void		pg_cmt_cpu_fini(cpu_t *);
+static void		pg_cmt_cpu_init(cpu_t *, cpu_pg_t *);
+static void		pg_cmt_cpu_fini(cpu_t *, cpu_pg_t *);
 static void		pg_cmt_cpu_active(cpu_t *);
 static void		pg_cmt_cpu_inactive(cpu_t *);
 static void		pg_cmt_cpupart_in(cpu_t *, cpupart_t *);
@@ -450,7 +450,7 @@ cmt_hier_promote(pg_cmt_t *pg)
  * CMT class callback for a new CPU entering the system
  */
 static void
-pg_cmt_cpu_init(cpu_t *cp)
+pg_cmt_cpu_init(cpu_t *cp, cpu_pg_t *cpu_pg)
 {
 	pg_cmt_t	*pg;
 	group_t		*cmt_pgs;
@@ -473,8 +473,8 @@ pg_cmt_cpu_init(cpu_t *cp)
 	 * has any performance or efficiency relevant
 	 * sharing relationships
 	 */
-	cmt_pgs = &cp->cpu_pg->cmt_pgs;
-	cp->cpu_pg->cmt_lineage = NULL;
+	cmt_pgs = &cpu_pg->cmt_pgs;
+	cpu_pg->cmt_lineage = NULL;
 
 	bzero(cpu_cmt_hier, sizeof (cpu_cmt_hier));
 	levels = 0;
@@ -534,7 +534,7 @@ pg_cmt_cpu_init(cpu_t *cp)
 		}
 
 		/* Add the CPU to the PG */
-		pg_cpu_add((pg_t *)pg, cp);
+		pg_cpu_add((pg_t *)pg, cp, cpu_pg);
 
 		/*
 		 * Ensure capacity of the active CPU group/bitset
@@ -632,7 +632,7 @@ pg_cmt_cpu_init(cpu_t *cp)
 		ASSERT(err == 0);
 
 		if (level == 0)
-			cp->cpu_pg->cmt_lineage = (pg_t *)pg;
+			cpu_pg->cmt_lineage = (pg_t *)pg;
 
 		if (pg->cmt_siblings != NULL) {
 			/* Already initialized */
@@ -702,7 +702,7 @@ pg_cmt_cpu_init(cpu_t *cp)
  * Class callback when a CPU is leaving the system (deletion)
  */
 static void
-pg_cmt_cpu_fini(cpu_t *cp)
+pg_cmt_cpu_fini(cpu_t *cp, cpu_pg_t *cpu_pg)
 {
 	group_iter_t	i;
 	pg_cmt_t	*pg;
@@ -713,8 +713,8 @@ pg_cmt_cpu_fini(cpu_t *cp)
 	if (cmt_sched_disabled)
 		return;
 
-	pgs = &cp->cpu_pg->pgs;
-	cmt_pgs = &cp->cpu_pg->cmt_pgs;
+	pgs = &cpu_pg->pgs;
+	cmt_pgs = &cpu_pg->cmt_pgs;
 
 	/*
 	 * Find the lgroup that encapsulates this CPU's CMT hierarchy
@@ -749,7 +749,7 @@ pg_cmt_cpu_fini(cpu_t *cp)
 	 * First, clean up anything load balancing specific for each of
 	 * the CPU's PGs that participated in CMT load balancing
 	 */
-	pg = (pg_cmt_t *)cp->cpu_pg->cmt_lineage;
+	pg = (pg_cmt_t *)cpu_pg->cmt_lineage;
 	while (pg != NULL) {
 
 		/*
@@ -787,7 +787,7 @@ pg_cmt_cpu_fini(cpu_t *cp)
 		if (IS_CMT_PG(pg) == 0)
 			continue;
 
-		pg_cpu_delete((pg_t *)pg, cp);
+		pg_cpu_delete((pg_t *)pg, cp, cpu_pg);
 		/*
 		 * Deleting the CPU from the PG changes the CPU's
 		 * PG group over which we are actively iterating
