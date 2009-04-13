@@ -413,7 +413,7 @@ dsl_prop_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    "%s=%s dataset = %llu", psa->name, valstr, ds->ds_object);
 }
 
-static void
+void
 dsl_props_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;

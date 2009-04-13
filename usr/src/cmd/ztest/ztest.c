@@ -1428,7 +1428,8 @@ ztest_dmu_snapshot_create_destroy(ztest_args_t *za)
 	error = dmu_objset_destroy(snapname);
 	if (error != 0 && error != ENOENT)
 		fatal(0, "dmu_objset_destroy() = %d", error);
-	error = dmu_objset_snapshot(osname, strchr(snapname, '@')+1, FALSE);
+	error = dmu_objset_snapshot(osname, strchr(snapname, '@')+1,
+	    NULL, FALSE);
 	if (error == ENOSPC)
 		ztest_record_enospc("dmu_take_snapshot");
 	else if (error != 0 && error != EEXIST)
@@ -1481,7 +1482,8 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 	if (error != 0 && error != ENOENT)
 		fatal(0, "dmu_objset_destroy() = %d", error);
 
-	error = dmu_objset_snapshot(osname, strchr(snap1name, '@')+1, FALSE);
+	error = dmu_objset_snapshot(osname, strchr(snap1name, '@')+1,
+	    NULL, FALSE);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_take_snapshot");
@@ -1507,7 +1509,7 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 	}
 
 	error = dmu_objset_snapshot(clone1name, strchr(snap2name, '@')+1,
-	    FALSE);
+	    NULL, FALSE);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_take_snapshot");
@@ -1517,7 +1519,7 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 	}
 
 	error = dmu_objset_snapshot(clone1name, strchr(snap3name, '@')+1,
-	    FALSE);
+	    NULL, FALSE);
 	if (error && error != EEXIST) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_take_snapshot");

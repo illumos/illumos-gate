@@ -29,6 +29,7 @@
 #include <sys/dmu.h>
 #include <sys/dsl_pool.h>
 #include <sys/zfs_context.h>
+#include <sys/dsl_synctask.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,6 +65,7 @@ int dsl_prop_get_ds(struct dsl_dataset *ds, const char *propname,
 int dsl_prop_get_dd(struct dsl_dir *dd, const char *propname,
     int intsz, int numints, void *buf, char *setpoint);
 
+dsl_syncfunc_t dsl_props_set_sync;
 int dsl_prop_set(const char *ddname, const char *propname,
     int intsz, int numints, const void *buf);
 int dsl_props_set(const char *dsname, nvlist_t *nvl);

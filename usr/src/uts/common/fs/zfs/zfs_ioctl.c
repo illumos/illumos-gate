@@ -1623,6 +1623,37 @@ out:
 }
 
 /*
+ * Check that all the properties are valid user properties.
+ */
+static int
+zfs_check_userprops(char *fsname, nvlist_t *nvl)
+{
+	nvpair_t *elem = NULL;
+	int error = 0;
+
+	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
+		const char *propname = nvpair_name(elem);
+		char *valstr;
+
+		if (!zfs_prop_user(propname) ||
+		    nvpair_type(elem) != DATA_TYPE_STRING)
+			return (EINVAL);
+
+		if (error = zfs_secpolicy_write_perms(fsname,
+		    ZFS_DELEG_PERM_USERPROP, CRED()))
+			return (error);
+
+		if (strlen(propname) >= ZAP_MAXNAMELEN)
+			return (ENAMETOOLONG);
+
+		VERIFY(nvpair_value_string(elem, &valstr) == 0);
+		if (strlen(valstr) >= ZAP_MAXVALUELEN)
+			return (E2BIG);
+	}
+	return (0);
+}
+
+/*
  * inputs:
  * zc_name		name of filesystem
  * zc_value		name of property to set
@@ -2219,27 +2250,6 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	return (error);
 }
 
-struct snap_prop_arg {
-	nvlist_t *nvprops;
-	const char *snapname;
-};
-
-static int
-set_snap_props(char *name, void *arg)
-{
-	struct snap_prop_arg *snpa = arg;
-	int len = strlen(name) + strlen(snpa->snapname) + 2;
-	char *buf = kmem_alloc(len, KM_SLEEP);
-	int err;
-
-	(void) snprintf(buf, len, "%s@%s", name, snpa->snapname);
-	err = zfs_set_prop_nvlist(buf, snpa->nvprops);
-	if (err)
-		(void) dmu_objset_destroy(buf);
-	kmem_free(buf, len);
-	return (err);
-}
-
 /*
  * inputs:
  * zc_name	name of filesystem
@@ -2263,26 +2273,20 @@ zfs_ioc_snapshot(zfs_cmd_t *zc)
 	    &nvprops)) != 0)
 		return (error);
 
-	error = dmu_objset_snapshot(zc->zc_name, zc->zc_value, recursive);
+	error = zfs_check_userprops(zc->zc_name, nvprops);
+	if (error)
+		goto out;
 
-	/*
-	 * It would be nice to do this atomically.
-	 */
-	if (error == 0) {
-		struct snap_prop_arg snpa;
-		snpa.nvprops = nvprops;
-		snpa.snapname = zc->zc_value;
-		if (recursive) {
-			error = dmu_objset_find(zc->zc_name,
-			    set_snap_props, &snpa, DS_FIND_CHILDREN);
-			if (error) {
-				(void) dmu_snapshots_destroy(zc->zc_name,
-				    zc->zc_value);
-			}
-		} else {
-			error = set_snap_props(zc->zc_name, &snpa);
-		}
+	if (nvprops != NULL && nvlist_next_nvpair(nvprops, NULL) != NULL &&
+	    zfs_earlier_version(zc->zc_name, SPA_VERSION_SNAP_PROPS)) {
+		error = ENOTSUP;
+		goto out;
 	}
+
+	error = dmu_objset_snapshot(zc->zc_name, zc->zc_value,
+	    nvprops, recursive);
+
+out:
 	nvlist_free(nvprops);
 	return (error);
 }

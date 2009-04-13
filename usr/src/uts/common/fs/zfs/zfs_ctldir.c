@@ -736,7 +736,7 @@ zfsctl_snapdir_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t  **vpp,
 		return (err);
 
 	if (err == 0) {
-		err = dmu_objset_snapshot(name, dirname, B_FALSE);
+		err = dmu_objset_snapshot(name, dirname, NULL, B_FALSE);
 		if (err)
 			return (err);
 		err = lookupnameat(dirname, seg, follow, NULL, vpp, dvp);

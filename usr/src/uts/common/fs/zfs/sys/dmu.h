@@ -171,7 +171,8 @@ int dmu_objset_create(const char *name, dmu_objset_type_t type,
 int dmu_objset_destroy(const char *name);
 int dmu_snapshots_destroy(char *fsname, char *snapname);
 int dmu_objset_rollback(objset_t *os);
-int dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive);
+int dmu_objset_snapshot(char *fsname, char *snapname, struct nvlist *props,
+    boolean_t recursive);
 int dmu_objset_rename(const char *name, const char *newname,
     boolean_t recursive);
 int dmu_objset_find(char *name, int func(char *, void *), void *arg,

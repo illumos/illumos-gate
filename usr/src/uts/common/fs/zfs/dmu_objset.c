@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -704,13 +704,33 @@ struct snaparg {
 	char *snapname;
 	char failed[MAXPATHLEN];
 	boolean_t checkperms;
-	list_t objsets;
+	nvlist_t *props;
 };
 
-struct osnode {
-	list_node_t node;
-	objset_t *os;
-};
+static int
+snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	objset_t *os = arg1;
+	struct snaparg *sn = arg2;
+
+	/* The props have already been checked by zfs_check_userprops(). */
+
+	return (dsl_dataset_snapshot_check(os->os->os_dsl_dataset,
+	    sn->snapname, tx));
+}
+
+static void
+snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+{
+	objset_t *os = arg1;
+	dsl_dataset_t *ds = os->os->os_dsl_dataset;
+	struct snaparg *sn = arg2;
+
+	dsl_dataset_snapshot_sync(ds, sn->snapname, cr, tx);
+
+	if (sn->props)
+		dsl_props_set_sync(ds->ds_prev, sn->props, cr, tx);
+}
 
 static int
 dmu_objset_snapshot_one(char *name, void *arg)
@@ -747,13 +767,8 @@ dmu_objset_snapshot_one(char *name, void *arg)
 	 */
 	err = zil_suspend(dmu_objset_zil(os));
 	if (err == 0) {
-		struct osnode *osn;
-		dsl_sync_task_create(sn->dstg, dsl_dataset_snapshot_check,
-		    dsl_dataset_snapshot_sync, os->os->os_dsl_dataset,
-		    sn->snapname, 3);
-		osn = kmem_alloc(sizeof (struct osnode), KM_SLEEP);
-		osn->os = os;
-		list_insert_tail(&sn->objsets, osn);
+		dsl_sync_task_create(sn->dstg, snapshot_check,
+		    snapshot_sync, os, sn, 3);
 	} else {
 		dmu_objset_close(os);
 	}
@@ -762,11 +777,11 @@ dmu_objset_snapshot_one(char *name, void *arg)
 }
 
 int
-dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
+dmu_objset_snapshot(char *fsname, char *snapname,
+    nvlist_t *props, boolean_t recursive)
 {
 	dsl_sync_task_t *dst;
-	struct osnode *osn;
-	struct snaparg sn = { 0 };
+	struct snaparg sn;
 	spa_t *spa;
 	int err;
 
@@ -778,8 +793,7 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 
 	sn.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 	sn.snapname = snapname;
-	list_create(&sn.objsets, sizeof (struct osnode),
-	    offsetof(struct osnode, node));
+	sn.props = props;
 
 	if (recursive) {
 		sn.checkperms = B_TRUE;
@@ -790,26 +804,18 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 		err = dmu_objset_snapshot_one(fsname, &sn);
 	}
 
-	if (err)
-		goto out;
-
-	err = dsl_sync_task_group_wait(sn.dstg);
+	if (err == 0)
+		err = dsl_sync_task_group_wait(sn.dstg);
 
 	for (dst = list_head(&sn.dstg->dstg_tasks); dst;
 	    dst = list_next(&sn.dstg->dstg_tasks, dst)) {
-		dsl_dataset_t *ds = dst->dst_arg1;
+		objset_t *os = dst->dst_arg1;
+		dsl_dataset_t *ds = os->os->os_dsl_dataset;
 		if (dst->dst_err)
 			dsl_dataset_name(ds, sn.failed);
+		zil_resume(dmu_objset_zil(os));
+		dmu_objset_close(os);
 	}
-
-out:
-	while (osn = list_head(&sn.objsets)) {
-		list_remove(&sn.objsets, osn);
-		zil_resume(dmu_objset_zil(osn->os));
-		dmu_objset_close(osn->os);
-		kmem_free(osn, sizeof (struct osnode));
-	}
-	list_destroy(&sn.objsets);
 
 	if (err)
 		(void) strcpy(fsname, sn.failed);
