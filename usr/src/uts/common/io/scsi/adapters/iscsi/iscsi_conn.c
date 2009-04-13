@@ -870,10 +870,12 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 		bcopy(&ics->ics_bindings[idx].i_addr.in4,
 		    &icp->conn_bound_addr.sin4.sin_addr.s_addr,
 		    sizeof (struct in_addr));
+		icp->conn_bound_addr.sin4.sin_family = AF_INET;
 	} else {
 		bcopy(&ics->ics_bindings[idx].i_addr.in6,
 		    &icp->conn_bound_addr.sin6.sin6_addr.s6_addr,
 		    sizeof (struct in6_addr));
+		icp->conn_bound_addr.sin6.sin6_family = AF_INET6;
 	}
 
 	kmem_free(ics, size);

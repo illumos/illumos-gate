@@ -947,7 +947,9 @@ iscsit_build_hdr(idm_task_t *idm_task, idm_pdu_t *pdu, uint8_t opcode)
 	dh->opcode = opcode;
 	dh->itt = itask->it_itt;
 	dh->ttt = itask->it_ttt;
-	/* Statsn is only set during phase collapse */
+	/* Maintain current statsn for RTT responses */
+	dh->statsn = (opcode == ISCSI_OP_RTT_RSP) ?
+	    htonl(itask->it_ict->ict_statsn) : 0;
 	dh->expcmdsn = htonl(itask->it_ict->ict_sess->ist_expcmdsn);
 	dh->maxcmdsn = htonl(itask->it_ict->ict_sess->ist_maxcmdsn);
 

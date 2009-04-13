@@ -906,10 +906,11 @@ login_sm_send_next_response(iscsit_conn_t *ict)
 		 *
 		 * Since we still want a value for expcmdsn, fill in an
 		 * appropriate value based on the login request before
-		 * sending the response.
+		 * sending the response. Cmdsn/expcmdsn do not advance during
+		 * login phase.
 		 */
-		lh_resp->expcmdsn = htonl(ict->ict_login_sm.icl_cmdsn + 1);
-		lh_resp->maxcmdsn = htonl(ict->ict_login_sm.icl_cmdsn + 2);
+		lh_resp->expcmdsn = htonl(ict->ict_login_sm.icl_cmdsn);
+		lh_resp->maxcmdsn = htonl(ict->ict_login_sm.icl_cmdsn + 1);
 
 		idm_pdu_tx(ict->ict_login_sm.icl_login_resp);
 	}

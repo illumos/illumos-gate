@@ -200,7 +200,6 @@ retry:
 	if (rc != IDM_STATUS_SUCCESS) {
 		/* cleanup the failed connection */
 		idm_conn_destroy_common(ic);
-		kmem_free(ic, sizeof (idm_conn_t));
 
 		/*
 		 * It is possible for an IB client to connect to

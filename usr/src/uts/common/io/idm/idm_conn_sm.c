@@ -138,6 +138,15 @@ idm_conn_sm_init(idm_conn_t *ic)
 void
 idm_conn_sm_fini(idm_conn_t *ic)
 {
+
+	/*
+	 * The connection may only be partially created. If there
+	 * is no taskq, then the connection SM was not initialized.
+	 */
+	if (ic->ic_state_taskq == NULL) {
+		return;
+	}
+
 	taskq_destroy(ic->ic_state_taskq);
 
 	cv_destroy(&ic->ic_state_cv);

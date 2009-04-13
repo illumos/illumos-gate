@@ -150,7 +150,10 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 	result->ist_tpgt_tag = tag;
 
 	result->ist_tgt = tgt;
-	result->ist_expcmdsn = cmdsn + 1;
+	/*
+	 * cmdsn/expcmdsn do not advance during login phase.
+	 */
+	result->ist_expcmdsn = cmdsn;
 	result->ist_maxcmdsn = result->ist_expcmdsn + 1;
 
 	result->ist_initiator_name =
