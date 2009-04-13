@@ -76,6 +76,7 @@ typedef struct fsplug_func_s {
 	int (*fsp_stat)(char *, struct stat64 *);
 	int (*fsp_fstat)(fb_fdesc_t *, struct stat64 *);
 	int (*fsp_access)(const char *, int);
+	void (*fsp_recur_rm)(char *);
 } fsplug_func_t;
 
 extern fsplug_func_t *fs_functions_vec;
@@ -125,6 +126,9 @@ extern fsplug_func_t *fs_functions_vec;
 
 #define	FB_FSYNC(fdesc) \
 	(*fs_functions_vec->fsp_fsync)(fdesc)
+
+#define	FB_RECUR_RM(path) \
+	(*fs_functions_vec->fsp_recur_rm)(path)
 
 #define	FB_STAT(path, statp) \
 	(*fs_functions_vec->fsp_stat)(path, statp)

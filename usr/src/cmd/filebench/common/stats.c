@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,71 @@ static hrtime_t stats_cputime = 0;
 #ifdef HAVE_LIBKSTAT
 static kstat_ctl_t *kstatp = NULL;
 static kstat_t *sysinfo_ksp = NULL;
+static kstat_t **cpu_kstat_list = NULL;
+static int kstat_ncpus = 0;
+
+static int
+stats_build_kstat_list(void)
+{
+	kstat_t *ksp;
+
+	kstat_ncpus = 0;
+	for (ksp = kstatp->kc_chain; ksp; ksp = ksp->ks_next)
+		if (strncmp(ksp->ks_name, "cpu_stat", 8) == 0)
+			kstat_ncpus++;
+
+	if ((cpu_kstat_list = (kstat_t **)
+	    malloc(kstat_ncpus * sizeof (kstat_t *))) == NULL) {
+		filebench_log(LOG_ERROR, "malloc failed");
+		return (FILEBENCH_ERROR);
+	}
+
+	kstat_ncpus = 0;
+	for (ksp = kstatp->kc_chain; ksp; ksp = ksp->ks_next)
+		if (strncmp(ksp->ks_name, "cpu_stat", 8) == 0 &&
+		    kstat_read(kstatp, ksp, NULL) != -1)
+			cpu_kstat_list[kstat_ncpus++] = ksp;
+
+	if (kstat_ncpus == 0) {
+		filebench_log(LOG_ERROR,
+		    "kstats can't find any cpu statistics");
+		return (FILEBENCH_ERROR);
+	}
+
+	return (FILEBENCH_OK);
+}
+
+static int
+stats_kstat_update(void)
+{
+	if (kstatp == NULL) {
+		if ((kstatp = kstat_open()) == (kstat_ctl_t *)NULL) {
+			filebench_log(LOG_ERROR, "Cannot read kstats");
+			return (FILEBENCH_ERROR);
+		}
+	}
+
+	/* get the sysinfo kstat */
+	if (sysinfo_ksp == NULL)
+		sysinfo_ksp = kstat_lookup(kstatp, "unix", 0, "sysinfo");
+
+	/* get per cpu kstats, if necessary */
+	if (cpu_kstat_list == NULL) {
+
+		/* Initialize the array of cpu kstat pointers */
+		if (stats_build_kstat_list() == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+
+	} else if (kstat_chain_update(kstatp) != 0) {
+
+		/* free up current array of kstat ptrs and get new one */
+		free((void *)cpu_kstat_list);
+		if (stats_build_kstat_list() == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+	}
+
+	return (FILEBENCH_OK);
+}
 
 /*
  * Uses the kstat library or, if it is not available, the /proc/stat file
@@ -68,58 +133,24 @@ static kstat_t *sysinfo_ksp = NULL;
 static fbint_t
 kstats_read_cpu(void)
 {
-	int ncpus;
-	kstat_t	**cpu_stat_list = NULL;
 	ulong_t cputime_states[CPU_STATES];
 	hrtime_t cputime;
 	int i;
-
-	kstat_t *ksp;
-
-	if (kstatp == NULL) {
-		if ((kstatp = kstat_open()) == (kstat_ctl_t *)NULL) {
-			filebench_log(LOG_ERROR, "Cannot read kstats");
-			return (-1);
-		}
-	}
 
 	/*
 	 * Per-CPU statistics
 	 */
 
-	ncpus = 0;
-	for (ksp = kstatp->kc_chain; ksp; ksp = ksp->ks_next)
-		if (strncmp(ksp->ks_name, "cpu_stat", 8) == 0)
-			ncpus++;
-
-	if ((cpu_stat_list =
-	    (kstat_t **)malloc(ncpus * sizeof (kstat_t *))) == NULL) {
-		filebench_log(LOG_ERROR, "malloc failed");
-		return (-1);
-	}
-
-	ncpus = 0;
-	for (ksp = kstatp->kc_chain; ksp; ksp = ksp->ks_next)
-		if (strncmp(ksp->ks_name, "cpu_stat", 8) == 0 &&
-		    kstat_read(kstatp, ksp, NULL) != -1)
-			cpu_stat_list[ncpus++] = ksp;
-
-	if (ncpus == 0) {
-		filebench_log(LOG_ERROR,
-		    "kstats can't find any cpu statistics");
+	if (stats_kstat_update() == FILEBENCH_ERROR)
 		return (0);
-	}
-
-	if (sysinfo_ksp == NULL)
-		sysinfo_ksp = kstat_lookup(kstatp, "unix", 0, "sysinfo");
 
 	/* Sum across all CPUs */
 	(void) memset(&cputime_states, 0, sizeof (cputime_states));
-	for (i = 0; i < ncpus; i++) {
+	for (i = 0; i < kstat_ncpus; i++) {
 		cpu_stat_t cpu_stats;
 		int j;
 
-		(void) kstat_read(kstatp, cpu_stat_list[i],
+		(void) kstat_read(kstatp, cpu_kstat_list[i],
 		    (void *) &cpu_stats);
 		for (j = 0; j < CPU_STATES; j++)
 			cputime_states[j] += cpu_stats.cpu_sysinfo.cpu[j];

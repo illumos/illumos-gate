@@ -82,9 +82,13 @@ extern "C" {
 #define	FILEBENCH_ABORT_RSRC	3
 #define	FILEBENCH_ABORT_FINI	4
 
+	/* run modes */
 #define	FILEBENCH_MODE_TIMEOUT	0x0
 #define	FILEBENCH_MODE_Q1STDONE	0x1
 #define	FILEBENCH_MODE_QALLDONE	0x2
+
+	/* misc. modes */
+#define	FILEBENCH_MODE_NOUSAGE	0x01
 
 typedef struct filebench_shm {
 	/*
@@ -165,7 +169,8 @@ typedef struct filebench_shm {
 	 */
 	char		shm_fscriptname[1024];
 	int		shm_id;
-	int		shm_rmode;
+	int		shm_rmode;	/* run mode settings */
+	int		shm_mmode;	/* misc. mode settings */
 	int		shm_1st_err;
 	pthread_mutex_t shm_threadflow_lock;
 	pthread_mutex_t shm_msg_lock;

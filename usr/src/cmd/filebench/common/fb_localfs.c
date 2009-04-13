@@ -96,6 +96,7 @@ static int fb_lfs_fsync(fb_fdesc_t *);
 static int fb_lfs_stat(char *, struct stat64 *);
 static int fb_lfs_fstat(fb_fdesc_t *, struct stat64 *);
 static int fb_lfs_access(const char *, int);
+static void fb_lfs_recur_rm(char *);
 
 static fsplug_func_t fb_lfs_funcs =
 {
@@ -122,7 +123,8 @@ static fsplug_func_t fb_lfs_funcs =
 	fb_lfs_fsync,		/* fsync */
 	fb_lfs_stat,		/* stat */
 	fb_lfs_fstat,		/* fstat */
-	fb_lfs_access		/* access */
+	fb_lfs_access,		/* access */
+	fb_lfs_recur_rm		/* recursive rm */
 };
 
 #ifdef HAVE_AIO
@@ -574,6 +576,19 @@ static int
 fb_lfs_rmdir(char *path)
 {
 	return (rmdir(path));
+}
+
+/*
+ * does a recursive rm to remove an entire directory tree (i.e. a fileset).
+ * Supplied with the path to the root of the tree.
+ */
+static void
+fb_lfs_recur_rm(char *path)
+{
+	char cmd[MAXPATHLEN];
+
+	(void) snprintf(cmd, sizeof (cmd), "rm -rf %s", path);
+	(void) system(cmd);
 }
 
 /*

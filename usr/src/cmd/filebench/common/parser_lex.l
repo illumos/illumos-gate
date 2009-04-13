@@ -76,6 +76,7 @@ help		        { return FSC_HELP; }
 list		        { return FSC_LIST; }
 load                    { return FSC_LOAD; }
 log		        { return FSC_LOG; }
+nousestats		{ return FSC_NOUSESTATS; }
 run                     { return FSC_RUN; }
 set                     { return FSC_SET; }
 shutdown                { return FSC_SHUTDOWN; }

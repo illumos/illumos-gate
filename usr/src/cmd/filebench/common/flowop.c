@@ -144,29 +144,32 @@ void
 flowop_beginop(threadflow_t *threadflow, flowop_t *flowop)
 {
 #ifdef HAVE_PROCFS
-	if ((noproc == 0) && (threadflow->tf_lwpusagefd == 0)) {
-		char procname[128];
+	if ((filebench_shm->shm_mmode & FILEBENCH_MODE_NOUSAGE) == 0) {
+		if ((noproc == 0) && (threadflow->tf_lwpusagefd == 0)) {
+			char procname[128];
 
-		(void) snprintf(procname, sizeof (procname),
-		    "/proc/%d/lwp/%d/lwpusage", my_pid, _lwp_self());
-		threadflow->tf_lwpusagefd = open(procname, O_RDONLY);
-	}
+			(void) snprintf(procname, sizeof (procname),
+			    "/proc/%d/lwp/%d/lwpusage", my_pid, _lwp_self());
+			threadflow->tf_lwpusagefd = open(procname, O_RDONLY);
+		}
 
-	(void) pread(threadflow->tf_lwpusagefd,
-	    &threadflow->tf_susage,
-	    sizeof (struct prusage), 0);
+		(void) pread(threadflow->tf_lwpusagefd,
+		    &threadflow->tf_susage,
+		    sizeof (struct prusage), 0);
 
-	/* Compute overhead time in this thread around op */
-	if (threadflow->tf_eusage.pr_stime.tv_nsec) {
-		flowop->fo_stats.fs_mstate[FLOW_MSTATE_OHEAD] +=
-		    TIMESPEC_TO_HRTIME(threadflow->tf_eusage.pr_utime,
-		    threadflow->tf_susage.pr_utime) +
-		    TIMESPEC_TO_HRTIME(threadflow->tf_eusage.pr_ttime,
-		    threadflow->tf_susage.pr_ttime) +
-		    TIMESPEC_TO_HRTIME(threadflow->tf_eusage.pr_stime,
-		    threadflow->tf_susage.pr_stime);
+		/* Compute overhead time in this thread around op */
+		if (threadflow->tf_eusage.pr_stime.tv_nsec) {
+			flowop->fo_stats.fs_mstate[FLOW_MSTATE_OHEAD] +=
+			    TIMESPEC_TO_HRTIME(threadflow->tf_eusage.pr_utime,
+			    threadflow->tf_susage.pr_utime) +
+			    TIMESPEC_TO_HRTIME(threadflow->tf_eusage.pr_ttime,
+			    threadflow->tf_susage.pr_ttime) +
+			    TIMESPEC_TO_HRTIME(threadflow->tf_eusage.pr_stime,
+			    threadflow->tf_susage.pr_stime);
+		}
 	}
 #endif
+
 	/* Start of op for this thread */
 	threadflow->tf_stime = gethrtime();
 }
@@ -190,30 +193,32 @@ flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes)
 	flowop->fo_stats.fs_mstate[FLOW_MSTATE_LAT] +=
 	    (gethrtime() - threadflow->tf_stime);
 #ifdef HAVE_PROCFS
-	if ((pread(threadflow->tf_lwpusagefd, &threadflow->tf_eusage,
-	    sizeof (struct prusage), 0)) != sizeof (struct prusage))
-		filebench_log(LOG_ERROR, "cannot read /proc");
+	if ((filebench_shm->shm_mmode & FILEBENCH_MODE_NOUSAGE) == 0) {
+		if ((pread(threadflow->tf_lwpusagefd, &threadflow->tf_eusage,
+		    sizeof (struct prusage), 0)) != sizeof (struct prusage))
+			filebench_log(LOG_ERROR, "cannot read /proc");
 
-	t =
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_utime,
-	    threadflow->tf_eusage.pr_utime) +
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_ttime,
-	    threadflow->tf_eusage.pr_ttime) +
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_stime,
-	    threadflow->tf_eusage.pr_stime);
-	flowop->fo_stats.fs_mstate[FLOW_MSTATE_CPU] += t;
+		t =
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_utime,
+		    threadflow->tf_eusage.pr_utime) +
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_ttime,
+		    threadflow->tf_eusage.pr_ttime) +
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_stime,
+		    threadflow->tf_eusage.pr_stime);
+		flowop->fo_stats.fs_mstate[FLOW_MSTATE_CPU] += t;
 
-	flowop->fo_stats.fs_mstate[FLOW_MSTATE_WAIT] +=
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_tftime,
-	    threadflow->tf_eusage.pr_tftime) +
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_dftime,
-	    threadflow->tf_eusage.pr_dftime) +
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_kftime,
-	    threadflow->tf_eusage.pr_kftime) +
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_kftime,
-	    threadflow->tf_eusage.pr_kftime) +
-	    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_slptime,
-	    threadflow->tf_eusage.pr_slptime);
+		flowop->fo_stats.fs_mstate[FLOW_MSTATE_WAIT] +=
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_tftime,
+		    threadflow->tf_eusage.pr_tftime) +
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_dftime,
+		    threadflow->tf_eusage.pr_dftime) +
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_kftime,
+		    threadflow->tf_eusage.pr_kftime) +
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_kftime,
+		    threadflow->tf_eusage.pr_kftime) +
+		    TIMESPEC_TO_HRTIME(threadflow->tf_susage.pr_slptime,
+		    threadflow->tf_eusage.pr_slptime);
+	}
 #endif
 
 	flowop->fo_stats.fs_count++;

@@ -48,6 +48,7 @@ my %MULTIDATA = ();
 my %DEFDATA = ();
 my %CONFDATA = ();
 my %STATSHASH = ();
+my $OPTIONFLAGS = "cleanupstorage";
 @ext_stats=();
 @file_stats=();
 @arg_stats=();
@@ -194,6 +195,11 @@ sub op_msg {
 sub op_quit {
     # Shutdown the appropriate processes
     print FSCRIPT "shutdown processes\n";
+
+    # remove filesets, if requested
+    if (conf_exists("cleanupstorage") == 1) {
+	printf FSCRIPT "shutdown filesets\n";
+    }
 
     # Quit filebench
     print FSCRIPT "quit\n";
@@ -449,7 +455,9 @@ sub op_load_defaults {
 		}
 	    }
 
-            op_set($var, $val);
+	    if ($val ne "") {
+		op_set($var, $val);
+	    }
 	}
     }
 }
@@ -500,22 +508,29 @@ sub parse_profile {
 		    push(@{ $MULTIDATA{$opt} }, $val);		   
 		}	       
 	    } elsif($default_section) {
-		$line =~ /(.+) = (.+);/;
-		my $opt = $1;
-		my $val = $2;
-		chomp($opt);
-		chomp($val);
-		my @vals = ();
-		# Check to see if this needs to be a list
-		if($val =~ /,/) {
-		    push(@vals, $+) while $val =~
-			m{"([^\"\\]*(?:\\.[^\"\\]*)*)",? | ([^,]+),? | , }gx;
-		    push(@vals, undef) if substr($val, -1,1) eq ',';
-		    @{ $DEFDATA{$opt} } = @vals;
+		if ($line =~ /(.+) = (.+);/) {
+		    my $opt = $1;
+		    my $val = $2;
+		    chomp($opt);
+		    chomp($val);
+		    my @vals = ();
+		    # Check to see if this needs to be a list
+		    if(($val =~ /,/) && ($val !~ /"/)) {
+			push(@vals, $+) while $val =~
+			    m{"([^\"\\]*(?:\\.[^\"\\]*)*)",? | ([^,]+),? | , }gx;
+			push(@vals, undef) if substr($val, -1,1) eq ',';
+			@{ $DEFDATA{$opt} } = @vals;
+		    } else {
+			@{DEFDATA{$opt}} = ();
+			push(@{ $DEFDATA{$opt} }, $val);		   
+		    }
 		} else {
-		    @{CONFDATA{$opt}} = ();
-		    push(@{ $DEFDATA{$opt} }, $val);		   
-		}	       
+		    $line =~ /($OPTIONFLAGS);/;
+		    my $opt = $1;
+		    chomp($opt);
+		    @{DEFDATA{$opt}} = ();
+		    push(@{ $DEFDATA{$opt} }, "");
+		}
 	    } else {
 		if($line =~ /^CONFIG /) {
                     my $config = $line;
@@ -567,21 +582,28 @@ sub parse_config {
 
 	next if ($line =~ /^#/ or $line eq "");
 
-	$line =~ /(.+) = (.+);/;
-	my $opt = $1;
-	my $val = $2;
-	chomp($opt);
-	chomp($val);
-	my @vals = ();
-	# Check to see if this needs to be a list
-	if($val =~ /,/) {
-	    push(@vals, $+) while $val =~
-	        m{"([^\"\\]*(?:\\.[^\"\\]*)*)",? | ([^,]+),? | , }gx;
-	    push(@vals, undef) if substr($val, -1,1) eq ',';
+	if ($line =~ /(.+) = (.+);/) {
+	    my $opt = $1;
+	    my $val = $2;
+	    chomp($opt);
+	    chomp($val);
+	    my @vals = ();
+	    # Check to see if this needs to be a list
+	    if(($val =~ /,/) && ($val !~ /"/)) {
+		push(@vals, $+) while $val =~
+	            m{"([^\"\\]*(?:\\.[^\"\\]*)*)",? | ([^,]+),? | , }gx;
+		push(@vals, undef) if substr($val, -1,1) eq ',';
 		@{ $CONFDATA{$opt} }  = @vals;
+	    } else {
+		@{CONFDATA{$opt}} = ();
+		push(@{ $CONFDATA{$opt} }, $val);
+	    }
 	} else {
+	    $line =~ /($OPTIONFLAGS);/;
+	    my $opt = $1;
+	    chomp($opt);
 	    @{CONFDATA{$opt}} = ();
-	    push(@{ $CONFDATA{$opt} }, $val);
+	    push(@{ $CONFDATA{$opt} }, "");
 	}
     }
     

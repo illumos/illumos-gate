@@ -172,7 +172,7 @@ static void parser_version(cmd_t *cmd);
 %token FSC_LIST FSC_DEFINE FSC_EXEC FSC_QUIT FSC_DEBUG FSC_CREATE
 %token FSC_SLEEP FSC_STATS FSC_FOREACH FSC_SET FSC_SHUTDOWN FSC_LOG
 %token FSC_SYSTEM FSC_FLOWOP FSC_EVENTGEN FSC_ECHO FSC_LOAD FSC_RUN
-%token FSC_WARMUP
+%token FSC_WARMUP FSC_NOUSESTATS
 %token FSC_USAGE FSC_HELP FSC_VARS FSC_VERSION FSC_ENABLE FSC_DOMULTISYNC
 %token FSV_STRING FSV_VAL_INT FSV_VAL_BOOLEAN FSV_VARIABLE FSV_WHITESTRING
 %token FSV_RANDUNI FSV_RANDTAB FSV_RANDVAR FSV_URAND FSV_RAND48
@@ -829,6 +829,13 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	$$->cmd = NULL;
+} | FSC_SET FSE_MODE FSC_NOUSESTATS
+{
+	filebench_shm->shm_mmode |= FILEBENCH_MODE_NOUSAGE;
+	filebench_log(LOG_INFO, "disabling CPU usage statistics");
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = NULL;
 }| FSC_SET FSV_RANDVAR FSS_TYPE FSK_ASSIGN randvar_attr_typop
 {
 	if (($$ = alloc_cmd()) == NULL)
@@ -1050,6 +1057,10 @@ shutdown_command: FSC_SHUTDOWN entity
 	switch ($2) {
 	case FSE_PROC:
 		$$->cmd = &parser_proc_shutdown;
+		break;
+	case FSE_FILE:
+	case FSE_FILESET:
+		$$->cmd = &parser_fileset_shutdown;
 		break;
 	default:
 		filebench_log(LOG_ERROR, "unknown entity", $2);
@@ -2915,6 +2926,17 @@ parser_fileset_create(cmd_t *cmd)
 		    "Attempting to create fileset more than once, ignoring");
 	}
 
+}
+
+/*
+ * Deletes the files and directories that represent files and filesets on the
+ * storage medium.
+ */
+static void
+parser_fileset_shutdown(cmd_t *cmd)
+{
+	filebench_log(LOG_INFO, "Shutting down filesets");
+	fileset_delete_all_filesets();
 }
 
 /*

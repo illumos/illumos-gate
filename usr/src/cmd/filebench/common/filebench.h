@@ -118,7 +118,7 @@ void filebench_plugin_funcvecinit(void);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.4.5"
+#define	FILEBENCH_VERSION	"1.4.6"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024
