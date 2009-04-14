@@ -18,35 +18,53 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 
-SUBDIRS = \
-	libdisk \
-	libl180 \
-	libl500 \
-	libl700 \
-	libsl3000 \
-	libsl8500
+LIBRARY =	libSL8500_net.a
+VERS =
+OBJS_COMMON =	lm_sl8500.o
+OBJS_SHARED =	lm_acs_common.o lm_acs_display.o lm_comm.o lm_lcom.o
+
+OBJECTS = 	$(OBJS_COMMON) $(OBJS_SHARED)
+
+include $(SRC)/lib/Makefile.lib
+
+LIBLINKS =
+
+LIBS =		$(DYNLIB) $(LINTLIB)
+
+SRCDIR =	../common
+
+LMDIR =		$(SRC)/lib/mms/lm/libcommon
+
+SRCS =		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
+		$(OBJS_SHARED:%.o=$(LMDIR)/%.c)
+
+LDLIBS +=	-lc
+LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
+
+CFLAGS +=	$(CCVERBOSE)
+
+CPPFLAGS +=	-DMMS_OPENSSL
+CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
+CPPFLAGS +=	-I$(SRC)/cmd/mms/lm/common -I../../../mms/common
+CPPFLAGS +=	-I../../libcommon -I$(ACSLSH)
+CPPFLAGS +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 
 .KEEP_STATE:
 
-.PARALLEL:
+all: $(LIBS)
 
-all := TARGET = all
-clean := TARGET = clean
-clobber := TARGET = clobber
-install := TARGET = install
-lint := TARGET = lint
+lint: $(LINTLIB) lintcheck
 
-all clean clobber lint: $(SUBDIRS)
+pics/%.o: $(LMDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
-install: $(SUBDIRS)
+include ../../Makefile.rootdirs
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+install: all $(ROOTLIBDIR) $(ROOTLIBS)

@@ -60,6 +60,9 @@ lm_need_libapi(char *type) {
 	if (strcmp(type, "SL3000") == 0) {
 		return (1);
 	}
+	if (strcmp(type, "SL8500") == 0) {
+		return (1);
+	}
 	return (0);
 }
 

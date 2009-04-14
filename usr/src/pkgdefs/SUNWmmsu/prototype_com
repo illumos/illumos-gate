@@ -136,6 +136,9 @@ f none usr/lib/mms/lm/llib-lL180_net.ln 0644 root other
 f none usr/lib/mms/lm/libSL3000_net.so 0755 root other
 f none usr/lib/mms/lm/llib-lSL3000_net.ln 0644 root other
 
+f none usr/lib/mms/lm/libSL8500_net.so 0755 root other
+f none usr/lib/mms/lm/llib-lSL8500_net.ln 0644 root other
+
 d none usr/include/mms 0755 root bin
 f none usr/include/mms/mms.h 0644 root other
 f none usr/include/mms/mms_api.h 0644 root other

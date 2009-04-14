@@ -18,33 +18,23 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 
-SUBDIRS = \
-	libdisk \
-	libl180 \
-	libl500 \
-	libl700 \
-	libsl3000 \
-	libsl8500
+SUBDIRS	=	$(MACH)
+
+all := 		TARGET = all
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
+install	:=	TARGET = install
+lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-.PARALLEL:
-
-all := TARGET = all
-clean := TARGET = clean
-clobber := TARGET = clobber
-install := TARGET = install
-lint := TARGET = lint
-
-all clean clobber lint: $(SUBDIRS)
-
-install: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

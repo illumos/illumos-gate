@@ -89,6 +89,8 @@ extern "C" {
 #define	MAX_L700_CAP_SIZE	20
 #define	MAX_SL3000_CAPS		4
 #define	MAX_SL3000_CAP_SIZE	26
+#define	MAX_SL8500_CAPS		3
+#define	MAX_SL8500_CAP_SIZE	39
 
 typedef struct acs_rsp_ele {
 	mms_list_node_t		acs_rsp_next;
