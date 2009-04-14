@@ -427,6 +427,7 @@ static void fcp_handle_devices(struct fcp_port *pptr,
 static int fcp_handle_mapflags(struct fcp_port *pptr,
     struct fcp_tgt *ptgt, fc_portmap_t *map_entry, int link_cnt,
     int tgt_cnt, int cause);
+static int fcp_handle_reportlun_changed(struct fcp_tgt *ptgt, int cause);
 static int fcp_send_els(struct fcp_port *pptr, struct fcp_tgt *ptgt,
     struct fcp_ipkt *icmd, uchar_t opcode, int lcount, int tcount, int cause);
 static void fcp_update_state(struct fcp_port *pptr, uint32_t state,
@@ -716,7 +717,7 @@ extern dev_info_t	*scsi_vhci_dip;
 	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"1.188"
+#define	FCP_VERSION		"1.189"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
 #define	FCP_NUM_ELEMENTS(array)			\
@@ -4700,6 +4701,7 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 
 		if (map_entry->map_type == PORT_DEVICE_OLD ||
 		    map_entry->map_type == PORT_DEVICE_NEW ||
+		    map_entry->map_type == PORT_DEVICE_REPORTLUN_CHANGED ||
 		    map_entry->map_type == PORT_DEVICE_CHANGED) {
 			FCP_TRACE(fcp_logq, pptr->port_instbuf,
 			    fcp_trace, FCP_BUF_LEVEL_2, 0,
@@ -4713,6 +4715,7 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 		case PORT_DEVICE_USER_CREATE:
 		case PORT_DEVICE_USER_LOGIN:
 		case PORT_DEVICE_NEW:
+		case PORT_DEVICE_REPORTLUN_CHANGED:
 			FCP_TGT_TRACE(ptgt, map_tag[i], FCP_TGT_TRACE_1);
 
 			if (fcp_handle_mapflags(pptr, ptgt, map_entry,
@@ -4811,6 +4814,61 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 	}
 }
 
+static int
+fcp_handle_reportlun_changed(struct fcp_tgt *ptgt, int cause)
+{
+	struct fcp_lun	*plun;
+	struct fcp_port *pptr;
+	int		 rscn_count;
+	int		 lun0_newalloc;
+	int		 ret  = TRUE;
+
+	ASSERT(ptgt);
+	pptr = ptgt->tgt_port;
+	lun0_newalloc = 0;
+	if ((plun = fcp_get_lun(ptgt, 0)) == NULL) {
+		/*
+		 * no LUN struct for LUN 0 yet exists,
+		 * so create one
+		 */
+		plun = fcp_alloc_lun(ptgt);
+		if (plun == NULL) {
+			fcp_log(CE_WARN, pptr->port_dip,
+			    "!Failed to allocate lun 0 for"
+			    " D_ID=%x", ptgt->tgt_d_id);
+			return (ret);
+		}
+		lun0_newalloc = 1;
+	}
+
+	mutex_enter(&ptgt->tgt_mutex);
+	/*
+	 * consider lun 0 as device not connected if it is
+	 * offlined or newly allocated
+	 */
+	if ((plun->lun_state & FCP_LUN_OFFLINE) || lun0_newalloc) {
+		plun->lun_state |= FCP_LUN_DEVICE_NOT_CONNECTED;
+	}
+	plun->lun_state |= (FCP_LUN_BUSY | FCP_LUN_MARK);
+	plun->lun_state &= ~FCP_LUN_OFFLINE;
+	ptgt->tgt_lun_cnt = 1;
+	ptgt->tgt_report_lun_cnt = 0;
+	mutex_exit(&ptgt->tgt_mutex);
+
+	rscn_count = fc_ulp_get_rscn_count(pptr->port_fp_handle);
+	if (fcp_send_scsi(plun, SCMD_REPORT_LUN,
+	    sizeof (struct fcp_reportlun_resp), pptr->port_link_cnt,
+	    ptgt->tgt_change_cnt, cause, rscn_count) != DDI_SUCCESS) {
+		FCP_TRACE(fcp_logq, pptr->port_instbuf,
+		    fcp_trace, FCP_BUF_LEVEL_3, 0, "!Failed to send REPORTLUN "
+		    "to D_ID=%x", ptgt->tgt_d_id);
+	} else {
+		ret = FALSE;
+	}
+
+	return (ret);
+}
+
 /*
  *     Function: fcp_handle_mapflags
  *
@@ -4905,6 +4963,21 @@ fcp_handle_mapflags(struct fcp_port	*pptr, struct fcp_tgt	*ptgt,
 				return (ret);
 			}
 		}
+	}
+
+	/*
+	 * if UA'REPORT_LUN_CHANGED received,
+	 * send out REPORT LUN promptly, skip PLOGI/PRLI process
+	 */
+	if (map_entry->map_type == PORT_DEVICE_REPORTLUN_CHANGED) {
+		ptgt->tgt_state &= ~(FCP_TGT_OFFLINE | FCP_TGT_MARK);
+		mutex_exit(&ptgt->tgt_mutex);
+		mutex_exit(&pptr->port_mutex);
+
+		ret = fcp_handle_reportlun_changed(ptgt, cause);
+
+		mutex_enter(&pptr->port_mutex);
+		return (ret);
 	}
 
 	/*
@@ -10762,8 +10835,9 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	if ((scsi_device_prop_lookup_byte_array(sd, SCSI_DEVICE_PROP_PATH,
 	    PORT_WWN_PROP, &bytes, &nbytes) != DDI_PROP_SUCCESS) ||
 	    (nbytes != FC_WWN_SIZE)) {
-		if (bytes)
+		if (bytes) {
 			scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, bytes);
+		}
 		return (DDI_NOT_WELL_FORMED);
 	}
 
@@ -11244,6 +11318,14 @@ fcp_pkt_setup(struct scsi_pkt *pkt,
 
 	fpkt = cmd->cmd_fp_pkt;
 	fpkt->pkt_data_acc = NULL;
+
+	/*
+	 * When port_state is FCP_STATE_OFFLINE, remote_port (tgt_pd_handle)
+	 * could be destroyed.	We need fail pkt_setup.
+	 */
+	if (pptr->port_state & FCP_STATE_OFFLINE) {
+		return (-1);
+	}
 
 	mutex_enter(&ptgt->tgt_mutex);
 	fpkt->pkt_pd = ptgt->tgt_pd_handle;
@@ -14513,7 +14595,6 @@ fcp_call_finish_init_held(struct fcp_port *pptr, struct fcp_tgt *ptgt,
 	return (rval);
 }
 
-
 static void
 fcp_reconfigure_luns(void * tgt_handle)
 {
@@ -14548,7 +14629,7 @@ fcp_reconfigure_luns(void * tgt_handle)
 	bcopy(&ptgt->tgt_port_wwn.raw_wwn[0], &devlist->map_pwwn, FC_WWN_SIZE);
 
 	devlist->map_state = PORT_DEVICE_LOGGED_IN;
-	devlist->map_type = PORT_DEVICE_NEW;
+	devlist->map_type = PORT_DEVICE_REPORTLUN_CHANGED;
 	devlist->map_flags = 0;
 
 	fcp_statec_callback(NULL, pptr->port_fp_handle, FC_STATE_DEVICE_CHANGE,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -321,6 +321,7 @@ typedef struct fc_trace_logq {
 #define	PORT_DEVICE_USER_LOGOUT		0x6 /* only for changelist->map_type */
 #define	PORT_DEVICE_USER_CREATE		0x7 /* only for changelist->map_type */
 #define	PORT_DEVICE_USER_DELETE		0x8 /* only for changelist->map_type */
+#define	PORT_DEVICE_REPORTLUN_CHANGED	0x9 /* only for changelist->map_type */
 
 /*
  * Flags used for fc_portmap->map_type
