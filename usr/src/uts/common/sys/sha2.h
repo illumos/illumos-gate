@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SHA2_H
 #define	_SYS_SHA2_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>		/* for uint_* */
 
@@ -34,8 +32,8 @@
 extern "C" {
 #endif
 
-#define	SHA2_HMAC_MIN_KEY_LEN	8	/* SHA2-HMAC min key length in bits */
-#define	SHA2_HMAC_MAX_KEY_LEN	INT_MAX /* SHA2-HMAC max key length in bits */
+#define	SHA2_HMAC_MIN_KEY_LEN	1	/* SHA2-HMAC min key length in bytes */
+#define	SHA2_HMAC_MAX_KEY_LEN	INT_MAX	/* SHA2-HMAC max key length in bytes */
 
 #define	SHA256_DIGEST_LENGTH	32	/* SHA256 digest length in bytes */
 #define	SHA384_DIGEST_LENGTH	48	/* SHA384 digest length in bytes */

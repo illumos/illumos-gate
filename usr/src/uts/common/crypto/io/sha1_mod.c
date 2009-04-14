@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/cmn_err.h>
@@ -72,8 +70,8 @@ typedef enum sha1_mech_type {
 
 #define	SHA1_DIGEST_LENGTH	20	/* SHA1 digest length in bytes */
 #define	SHA1_HMAC_BLOCK_SIZE	64	/* SHA1-HMAC block size */
-#define	SHA1_HMAC_MIN_KEY_LEN	8	/* SHA1-HMAC min key length in bits */
-#define	SHA1_HMAC_MAX_KEY_LEN	INT_MAX /* SHA1-HMAC max key length in bits */
+#define	SHA1_HMAC_MIN_KEY_LEN	1	/* SHA1-HMAC min key length in bytes */
+#define	SHA1_HMAC_MAX_KEY_LEN	INT_MAX /* SHA1-HMAC max key length in bytes */
 #define	SHA1_HMAC_INTS_PER_BLOCK	(SHA1_HMAC_BLOCK_SIZE/sizeof (uint32_t))
 
 /*
@@ -131,12 +129,12 @@ static crypto_mech_info_t sha1_mech_info_tab[] = {
 	{SUN_CKM_SHA1_HMAC, SHA1_HMAC_MECH_INFO_TYPE,
 	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC,
 	    SHA1_HMAC_MIN_KEY_LEN, SHA1_HMAC_MAX_KEY_LEN,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	    CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* SHA1-HMAC GENERAL */
 	{SUN_CKM_SHA1_HMAC_GENERAL, SHA1_HMAC_GEN_MECH_INFO_TYPE,
 	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC,
 	    SHA1_HMAC_MIN_KEY_LEN, SHA1_HMAC_MAX_KEY_LEN,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS}
+	    CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
 static void sha1_provider_status(crypto_provider_handle_t, uint_t *);
@@ -310,7 +308,8 @@ sha1_digest_update_uio(SHA1_CTX *sha1_ctx, crypto_data_t *data)
 	 */
 	for (vec_idx = 0; vec_idx < data->cd_uio->uio_iovcnt &&
 	    offset >= data->cd_uio->uio_iov[vec_idx].iov_len;
-	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == data->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -371,7 +370,8 @@ sha1_digest_final_uio(SHA1_CTX *sha1_ctx, crypto_data_t *digest,
 	 */
 	for (vec_idx = 0; offset >= digest->cd_uio->uio_iov[vec_idx].iov_len &&
 	    vec_idx < digest->cd_uio->uio_iovcnt;
-	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == digest->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is
@@ -458,7 +458,8 @@ sha1_digest_update_mblk(SHA1_CTX *sha1_ctx, crypto_data_t *data)
 	 * Jump to the first mblk_t containing data to be digested.
 	 */
 	for (mp = data->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -508,7 +509,8 @@ sha1_digest_final_mblk(SHA1_CTX *sha1_ctx, crypto_data_t *digest,
 	 * Jump to the first mblk_t that will be used to store the digest.
 	 */
 	for (mp = digest->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -1306,7 +1308,8 @@ sha1_mac_verify_atomic(crypto_provider_handle_t provider,
 		for (vec_idx = 0;
 		    offset >= mac->cd_uio->uio_iov[vec_idx].iov_len &&
 		    vec_idx < mac->cd_uio->uio_iovcnt;
-		    offset -= mac->cd_uio->uio_iov[vec_idx++].iov_len);
+		    offset -= mac->cd_uio->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == mac->cd_uio->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is
@@ -1346,7 +1349,8 @@ sha1_mac_verify_atomic(crypto_provider_handle_t provider,
 
 		/* jump to the first mblk_t containing the expected digest */
 		for (mp = mac->cd_mp; mp != NULL && offset >= MBLKL(mp);
-		    offset -= MBLKL(mp), mp = mp->b_cont);
+		    offset -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than

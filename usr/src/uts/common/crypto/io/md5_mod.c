@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * In kernel module, the md5 module is created with two modlinkages:
@@ -82,8 +81,8 @@ typedef enum md5_mech_type {
 
 #define	MD5_DIGEST_LENGTH	16	/* MD5 digest length in bytes */
 #define	MD5_HMAC_BLOCK_SIZE	64	/* MD5 block size */
-#define	MD5_HMAC_MIN_KEY_LEN	8	/* MD5-HMAC min key length in bits */
-#define	MD5_HMAC_MAX_KEY_LEN	INT_MAX	/* MD5-HMAC max key length in bits */
+#define	MD5_HMAC_MIN_KEY_LEN	1	/* MD5-HMAC min key length in bytes */
+#define	MD5_HMAC_MAX_KEY_LEN	INT_MAX	/* MD5-HMAC max key length in bytes */
 #define	MD5_HMAC_INTS_PER_BLOCK	(MD5_HMAC_BLOCK_SIZE/sizeof (uint32_t))
 
 /*
@@ -141,12 +140,12 @@ static crypto_mech_info_t md5_mech_info_tab[] = {
 	{SUN_CKM_MD5_HMAC, MD5_HMAC_MECH_INFO_TYPE,
 	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC,
 	    MD5_HMAC_MIN_KEY_LEN, MD5_HMAC_MAX_KEY_LEN,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	    CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* MD5-HMAC GENERAL */
 	{SUN_CKM_MD5_HMAC_GENERAL, MD5_HMAC_GEN_MECH_INFO_TYPE,
 	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC,
 	    MD5_HMAC_MIN_KEY_LEN, MD5_HMAC_MAX_KEY_LEN,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS}
+	    CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
 static void md5_provider_status(crypto_provider_handle_t, uint_t *);
