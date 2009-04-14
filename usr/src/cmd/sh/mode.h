@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _MODE_H
 #define	_MODE_H
@@ -178,6 +176,7 @@ struct fndnod
 	int 	fndtyp;
 	unsigned char	*fndnam;
 	struct trenod	*fndval;
+	int	fndref;
 };
 
 struct ifnod

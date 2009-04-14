@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef	_DEFS_H
 #define	_DEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,7 +58,7 @@ extern "C" {
 #define		FPOU		0x0200
 #define		FAMP		0x0400
 #define		COMMSK		0x00F0
-#define			CNTMSK		0x000F
+#define		CNTMSK		0x000F	/* this bit fields no longer used */
 
 #define		TCOM		0x0000
 #define		TPAR		0x0010
@@ -206,6 +204,8 @@ extern void assign(struct namnod *, unsigned char *);
 extern void setmode(int);
 extern void trim(unsigned char *);
 extern void preacct(unsigned char *);
+extern void addblok(unsigned int);
+extern void freetree(struct trenod *);
 
 
 

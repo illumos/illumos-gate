@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,21 +20,19 @@
  */
 
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
 
 #include	"defs.h"
 
-static void freetree(struct trenod *);
 static void free_arg(struct argnod *);
 static void freeio(struct ionod *);
 static void freereg(struct regnod *);
@@ -48,27 +45,28 @@ freefunc(struct namnod 	*n)
 	freetree((struct trenod *)(n->namenv));
 }
 
-static void
+void
 freetree(struct trenod *t)
 {
 	if (t)
 	{
 		int type;
 
-		if (t->tretyp & CNTMSK)
-		{
-			t->tretyp--;
-			return;
-		}
-
 		type = t->tretyp & COMMSK;
 
 		switch (type)
 		{
-			case TFND:
-				free(fndptr(t)->fndnam);
-				freetree(fndptr(t)->fndval);
+			case TFND: {
+				struct fndnod *f = fndptr(t);
+
+				if (f->fndref > 0) {
+					f->fndref--;
+					return;
+				}
+				free(f->fndnam);
+				freetree(f->fndval);
 				break;
+			}
 
 			case TCOM:
 				freeio(comptr(t)->comio);

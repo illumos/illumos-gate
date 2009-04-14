@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -544,9 +543,12 @@ printnam(struct namnod *n)
 
 	if (n->namflg & N_FUNCTN)
 	{
+		struct fndnod *f = fndptr(n->namenv);
+
 		prs_buff(n->namid);
 		prs_buff("(){\n");
-		prf(n->namenv);
+		if (f != NULL)
+			prf(f->fndval);
 		prs_buff("\n}\n");
 	}
 	else if (s = n->namval)

@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	UNIX shell
  */
@@ -337,11 +336,13 @@ what_is_path(unsigned char *name)
 			case FUNCTION:
 			{
 				struct namnod *n = lookup(name);
+				struct fndnod *f = fndptr(n->namenv);
 
 				prs_buff(_gettext(" is a function\n"));
 				prs_buff(name);
 				prs_buff("(){\n");
-				prf(n->namenv);
+				if (f != NULL)
+					prf(f->fndval);
 				prs_buff("\n}\n");
 				return (0);
 			}

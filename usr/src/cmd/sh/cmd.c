@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -389,16 +388,21 @@ item(flag)
 				if (skipwc() != ')')
 					synbad();
 
+				/*
+				 * We increase fndef before calling getstor(),
+				 * so that getstor() uses malloc to allocate
+				 * memory instead of stack. This is necessary
+				 * since fndnod will be hung on np->namenv,
+				 * which persists over command executions.
+				 */
+				fndef++;
 				f = (struct fndnod *)getstor(sizeof(struct fndnod));
 				r = (struct trenod *)f;
 
 				f->fndtyp = TFND;
-				if (fndef)
-					f->fndnam = make(wdarg->argval);
-				else
-					f->fndnam = wdarg->argval;
+				f->fndnam = make(wdarg->argval);
+				f->fndref = 0;
 				reserv++;
-				fndef++;
 				skipnl();
 				f->fndval = (struct trenod *)item(0);
 				fndef--;

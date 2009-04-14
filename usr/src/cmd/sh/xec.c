@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *
  * UNIX shell
@@ -78,7 +77,7 @@ int *pf1, *pf2;
 		{
 		case TFND:
 			{
-				struct fndnod	*f = (struct fndnod *)t;
+				struct fndnod	*f = fndptr(t);
 				struct namnod	*n = lookup(f->fndnam);
 
 				exitval = 0;
@@ -89,21 +88,35 @@ int *pf1, *pf2;
 				if (flags & rshflg && (n == &pathnod ||
 					eq(n->namid, "SHELL")))
 					failed(n->namid, restricted);
-				if (n->namflg & N_FUNCTN)
+				/*
+				 * If function of same name is previously
+				 * defined, it will no longer be used.
+				 */
+				if (n->namflg & N_FUNCTN) {
 					freefunc(n);
-				else
-				{
+				} else {
 					free(n->namval);
 					free(n->namenv);
 
 					n->namval = 0;
 					n->namflg &= ~(N_EXPORT | N_ENVCHG);
 				}
+				/*
+				 * If function is defined within function,
+				 * we don't want to free it along with the
+				 * free of the defining function. If we are
+				 * in a loop, fndnod may be reused, so it
+				 * should never be freed.
+				 */
+				if (funcnt != 0 || loopcnt != 0)
+					f->fndref++;
 
-				if (funcnt)
-					f->fndval->tretyp++;
-
-				n->namenv = (unsigned char *)f->fndval;
+				/*
+				 * We hang a fndnod on the namenv so that
+				 * ref cnt(fndref) can be increased while
+				 * running in the function.
+				 */
+				n->namenv = (unsigned char *)f;
 				attrib(n, N_FUNCTN);
 				hash_func(n->namid);
 				break;
@@ -171,22 +184,37 @@ int *pf1, *pf2;
 					{
 						struct dolnod *olddolh;
 						struct namnod *n, *opt;
+						struct fndnod *f;
 						short index;
 						unsigned char **olddolv = dolv;
 						int olddolc = dolc;
+
 						n = findnam(com[0]);
+						f = fndptr(n->namenv);
+						/* just in case */
+						if (f == NULL)
+							break;
 					/* save current positional parameters */
 						olddolh = (struct dolnod *)savargs(funcnt);
+						f->fndref++;
 						funcnt++;
 						index = initio(io, 1);
 						setargs(com);
-						execute((struct trenod *)(n->namenv), xflags, errorflg, pf1, pf2);
+						execute(f->fndval, xflags,
+						    errorflg, pf1, pf2);
 						execbrk = 0;
 						restore(index);
 						(void) restorargs(olddolh, funcnt);
 						dolv = olddolv;
 						dolc = olddolc;
 						funcnt--;
+						/*
+						 * n->namenv may have been
+						 * pointing different func.
+						 * Therefore, we can't use
+						 * freefunc(n).
+						 */
+						freetree((struct trenod *)f);
 
 						break;
 					}
