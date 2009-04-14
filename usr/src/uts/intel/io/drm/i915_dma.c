@@ -181,6 +181,7 @@ static int i915_dma_cleanup(drm_device_t * dev)
 
 	dev_priv->sarea = NULL;
 	dev_priv->sarea_priv = NULL;
+	dev_priv->mmio_map = NULL;
 
 	return 0;
 }
