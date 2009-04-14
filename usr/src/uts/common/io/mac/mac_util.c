@@ -698,7 +698,14 @@ mac_get_nexus_node(dev_info_t *mdip, mac_dladm_intr_t *dln)
 	char			pathname[MAXPATHLEN];
 
 	while (tdip != NULL) {
-		ndi_devi_enter((dev_info_t *)tdip, &circ);
+		/*
+		 * The netboot code could call this function while walking the
+		 * device tree so we need to use ndi_devi_tryenter() here to
+		 * avoid deadlock.
+		 */
+		if (ndi_devi_tryenter((dev_info_t *)tdip, &circ) == 0)
+			break;
+
 		for (minordata = tdip->devi_minor; minordata != NULL;
 		    minordata = minordata->next) {
 			if (strncmp(minordata->ddm_node_type, DDI_NT_INTRCTL,
