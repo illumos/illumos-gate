@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -915,6 +915,9 @@ static kmutex_t kmem_cache_kstat_lock;
  * bytes, so that it will be 64-byte aligned.  For all multiples of 64,
  * the next kmem_cache_size greater than or equal to it must be a
  * multiple of 64.
+ *
+ * We split the table into two sections:  size <= 4k and size > 4k.  This
+ * saves a lot of space and cache footprint in our cache tables.
  */
 static const int kmem_alloc_sizes[] = {
 	1 * 8,
@@ -931,16 +934,29 @@ static const int kmem_alloc_sizes[] = {
 	P2ALIGN(8192 / 4, 64),
 	P2ALIGN(8192 / 3, 64),
 	P2ALIGN(8192 / 2, 64),
-	P2ALIGN(8192 / 1, 64),
-	4096 * 3,
-	8192 * 2,
-	8192 * 3,
-	8192 * 4,
 };
 
-#define	KMEM_MAXBUF	32768
+static const int kmem_big_alloc_sizes[] = {
+	2 * 4096,	3 * 4096,
+	2 * 8192,	3 * 8192,
+	4 * 8192,	5 * 8192,	6 * 8192,	7 * 8192,
+	8 * 8192,	9 * 8192,	10 * 8192,	11 * 8192,
+	12 * 8192,	13 * 8192,	14 * 8192,	15 * 8192,
+	16 * 8192
+};
+
+#define	KMEM_MAXBUF		4096
+#define	KMEM_BIG_MAXBUF_32BIT	32768
+#define	KMEM_BIG_MAXBUF		131072
+
+#define	KMEM_BIG_MULTIPLE	4096	/* big_alloc_sizes must be a multiple */
+#define	KMEM_BIG_SHIFT		12	/* lg(KMEM_BIG_MULTIPLE) */
 
 static kmem_cache_t *kmem_alloc_table[KMEM_MAXBUF >> KMEM_ALIGN_SHIFT];
+static kmem_cache_t *kmem_big_alloc_table[KMEM_BIG_MAXBUF >> KMEM_BIG_SHIFT];
+
+#define	KMEM_ALLOC_TABLE_MAX	(KMEM_MAXBUF >> KMEM_ALIGN_SHIFT)
+static size_t kmem_big_alloc_table_max = 0;	/* # of filled elements */
 
 static kmem_magtype_t kmem_magtype[] = {
 	{ 1,	8,	3200,	65536	},
@@ -976,6 +992,12 @@ size_t kmem_lite_maxalign = 1024; /* maximum buffer alignment for KMF_LITE */
 int kmem_lite_pcs = 4;		/* number of PCs to store in KMF_LITE mode */
 size_t kmem_maxverify;		/* maximum bytes to inspect in debug routines */
 size_t kmem_minfirewall;	/* hardware-enforced redzone threshold */
+
+#ifdef _LP64
+size_t	kmem_max_cached = KMEM_BIG_MAXBUF;	/* maximum kmem_alloc cache */
+#else
+size_t	kmem_max_cached = KMEM_BIG_MAXBUF_32BIT; /* maximum kmem_alloc cache */
+#endif
 
 #ifdef DEBUG
 int kmem_flags = KMF_AUDIT | KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS;
@@ -2400,10 +2422,10 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 void *
 kmem_zalloc(size_t size, int kmflag)
 {
-	size_t index = (size - 1) >> KMEM_ALIGN_SHIFT;
+	size_t index;
 	void *buf;
 
-	if (index < KMEM_MAXBUF >> KMEM_ALIGN_SHIFT) {
+	if ((index = ((size - 1) >> KMEM_ALIGN_SHIFT)) < KMEM_ALLOC_TABLE_MAX) {
 		kmem_cache_t *cp = kmem_alloc_table[index];
 		buf = kmem_cache_alloc(cp, kmflag);
 		if (buf != NULL) {
@@ -2430,71 +2452,93 @@ kmem_zalloc(size_t size, int kmflag)
 void *
 kmem_alloc(size_t size, int kmflag)
 {
-	size_t index = (size - 1) >> KMEM_ALIGN_SHIFT;
+	size_t index;
+	kmem_cache_t *cp;
 	void *buf;
 
-	if (index < KMEM_MAXBUF >> KMEM_ALIGN_SHIFT) {
-		kmem_cache_t *cp = kmem_alloc_table[index];
-		buf = kmem_cache_alloc(cp, kmflag);
-		if ((cp->cache_flags & KMF_BUFTAG) && buf != NULL) {
-			kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
-			((uint8_t *)buf)[size] = KMEM_REDZONE_BYTE;
-			((uint32_t *)btp)[1] = KMEM_SIZE_ENCODE(size);
+	if ((index = ((size - 1) >> KMEM_ALIGN_SHIFT)) < KMEM_ALLOC_TABLE_MAX) {
+		cp = kmem_alloc_table[index];
+		/* fall through to kmem_cache_alloc() */
 
-			if (cp->cache_flags & KMF_LITE) {
-				KMEM_BUFTAG_LITE_ENTER(btp, kmem_lite_count,
-				    caller());
-			}
-		}
+	} else if ((index = ((size - 1) >> KMEM_BIG_SHIFT)) <
+	    kmem_big_alloc_table_max) {
+		cp = kmem_big_alloc_table[index];
+		/* fall through to kmem_cache_alloc() */
+
+	} else {
+		if (size == 0)
+			return (NULL);
+
+		buf = vmem_alloc(kmem_oversize_arena, size,
+		    kmflag & KM_VMFLAGS);
+		if (buf == NULL)
+			kmem_log_event(kmem_failure_log, NULL, NULL,
+			    (void *)size);
 		return (buf);
 	}
-	if (size == 0)
-		return (NULL);
-	buf = vmem_alloc(kmem_oversize_arena, size, kmflag & KM_VMFLAGS);
-	if (buf == NULL)
-		kmem_log_event(kmem_failure_log, NULL, NULL, (void *)size);
+
+	buf = kmem_cache_alloc(cp, kmflag);
+	if ((cp->cache_flags & KMF_BUFTAG) && buf != NULL) {
+		kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
+		((uint8_t *)buf)[size] = KMEM_REDZONE_BYTE;
+		((uint32_t *)btp)[1] = KMEM_SIZE_ENCODE(size);
+
+		if (cp->cache_flags & KMF_LITE) {
+			KMEM_BUFTAG_LITE_ENTER(btp, kmem_lite_count, caller());
+		}
+	}
 	return (buf);
 }
 
 void
 kmem_free(void *buf, size_t size)
 {
-	size_t index = (size - 1) >> KMEM_ALIGN_SHIFT;
+	size_t index;
+	kmem_cache_t *cp;
 
-	if (index < KMEM_MAXBUF >> KMEM_ALIGN_SHIFT) {
-		kmem_cache_t *cp = kmem_alloc_table[index];
-		if (cp->cache_flags & KMF_BUFTAG) {
-			kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
-			uint32_t *ip = (uint32_t *)btp;
-			if (ip[1] != KMEM_SIZE_ENCODE(size)) {
-				if (*(uint64_t *)buf == KMEM_FREE_PATTERN) {
-					kmem_error(KMERR_DUPFREE, cp, buf);
-					return;
-				}
-				if (KMEM_SIZE_VALID(ip[1])) {
-					ip[0] = KMEM_SIZE_ENCODE(size);
-					kmem_error(KMERR_BADSIZE, cp, buf);
-				} else {
-					kmem_error(KMERR_REDZONE, cp, buf);
-				}
-				return;
-			}
-			if (((uint8_t *)buf)[size] != KMEM_REDZONE_BYTE) {
-				kmem_error(KMERR_REDZONE, cp, buf);
-				return;
-			}
-			btp->bt_redzone = KMEM_REDZONE_PATTERN;
-			if (cp->cache_flags & KMF_LITE) {
-				KMEM_BUFTAG_LITE_ENTER(btp, kmem_lite_count,
-				    caller());
-			}
-		}
-		kmem_cache_free(cp, buf);
+	if ((index = (size - 1) >> KMEM_ALIGN_SHIFT) < KMEM_ALLOC_TABLE_MAX) {
+		cp = kmem_alloc_table[index];
+		/* fall through to kmem_cache_free() */
+
+	} else if ((index = ((size - 1) >> KMEM_BIG_SHIFT)) <
+	    kmem_big_alloc_table_max) {
+		cp = kmem_big_alloc_table[index];
+		/* fall through to kmem_cache_free() */
+
 	} else {
 		if (buf == NULL && size == 0)
 			return;
 		vmem_free(kmem_oversize_arena, buf, size);
+		return;
 	}
+
+	if (cp->cache_flags & KMF_BUFTAG) {
+		kmem_buftag_t *btp = KMEM_BUFTAG(cp, buf);
+		uint32_t *ip = (uint32_t *)btp;
+		if (ip[1] != KMEM_SIZE_ENCODE(size)) {
+			if (*(uint64_t *)buf == KMEM_FREE_PATTERN) {
+				kmem_error(KMERR_DUPFREE, cp, buf);
+				return;
+			}
+			if (KMEM_SIZE_VALID(ip[1])) {
+				ip[0] = KMEM_SIZE_ENCODE(size);
+				kmem_error(KMERR_BADSIZE, cp, buf);
+			} else {
+				kmem_error(KMERR_REDZONE, cp, buf);
+			}
+			return;
+		}
+		if (((uint8_t *)buf)[size] != KMEM_REDZONE_BYTE) {
+			kmem_error(KMERR_REDZONE, cp, buf);
+			return;
+		}
+		btp->bt_redzone = KMEM_REDZONE_PATTERN;
+		if (cp->cache_flags & KMF_LITE) {
+			KMEM_BUFTAG_LITE_ENTER(btp, kmem_lite_count,
+			    caller());
+		}
+	}
+	kmem_cache_free(cp, buf);
 }
 
 void *
@@ -3628,15 +3672,58 @@ kmem_cpu_setup(cpu_setup_t what, int id, void *arg)
 }
 
 static void
+kmem_alloc_caches_create(const int *array, size_t count,
+    kmem_cache_t **alloc_table, size_t maxbuf, uint_t shift)
+{
+	char name[KMEM_CACHE_NAMELEN + 1];
+	size_t table_unit = (1 << shift); /* range of one alloc_table entry */
+	size_t size = table_unit;
+	int i;
+
+	for (i = 0; i < count; i++) {
+		size_t cache_size = array[i];
+		size_t align = KMEM_ALIGN;
+		kmem_cache_t *cp;
+
+		/* if the table has an entry for maxbuf, we're done */
+		if (size > maxbuf)
+			break;
+
+		/* cache size must be a multiple of the table unit */
+		ASSERT(P2PHASE(cache_size, table_unit) == 0);
+
+		/*
+		 * If they allocate a multiple of the coherency granularity,
+		 * they get a coherency-granularity-aligned address.
+		 */
+		if (IS_P2ALIGNED(cache_size, 64))
+			align = 64;
+		if (IS_P2ALIGNED(cache_size, PAGESIZE))
+			align = PAGESIZE;
+		(void) snprintf(name, sizeof (name),
+		    "kmem_alloc_%lu", cache_size);
+		cp = kmem_cache_create(name, cache_size, align,
+		    NULL, NULL, NULL, NULL, NULL, KMC_KMEM_ALLOC);
+
+		while (size <= cache_size) {
+			alloc_table[(size - 1) >> shift] = cp;
+			size += table_unit;
+		}
+	}
+
+	ASSERT(size > maxbuf);		/* i.e. maxbuf <= max(cache_size) */
+}
+
+static void
 kmem_cache_init(int pass, int use_large_pages)
 {
 	int i;
-	size_t size;
-	kmem_cache_t *cp;
+	size_t maxbuf;
 	kmem_magtype_t *mtp;
-	char name[KMEM_CACHE_NAMELEN + 1];
 
 	for (i = 0; i < sizeof (kmem_magtype) / sizeof (*mtp); i++) {
+		char name[KMEM_CACHE_NAMELEN + 1];
+
 		mtp = &kmem_magtype[i];
 		(void) sprintf(name, "kmem_magazine_%d", mtp->mt_magsize);
 		mtp->mt_cache = kmem_cache_create(name,
@@ -3674,37 +3761,55 @@ kmem_cache_init(int pass, int use_large_pages)
 			    segkmem_alloc, segkmem_free, kmem_va_arena,
 			    0, VM_SLEEP);
 		}
+
+		/* Figure out what our maximum cache size is */
+		maxbuf = kmem_max_cached;
+		if (maxbuf <= KMEM_MAXBUF) {
+			maxbuf = 0;
+			kmem_max_cached = KMEM_MAXBUF;
+		} else {
+			size_t size = 0;
+			size_t max =
+			    sizeof (kmem_big_alloc_sizes) / sizeof (int);
+			/*
+			 * Round maxbuf up to an existing cache size.  If maxbuf
+			 * is larger than the largest cache, we truncate it to
+			 * the largest cache's size.
+			 */
+			for (i = 0; i < max; i++) {
+				size = kmem_big_alloc_sizes[i];
+				if (maxbuf <= size)
+					break;
+			}
+			kmem_max_cached = maxbuf = size;
+		}
+
+		/*
+		 * The big alloc table may not be completely overwritten, so
+		 * we clear out any stale cache pointers from the first pass.
+		 */
+		bzero(kmem_big_alloc_table, sizeof (kmem_big_alloc_table));
 	} else {
 		/*
 		 * During the first pass, the kmem_alloc_* caches
 		 * are treated as metadata.
 		 */
 		kmem_default_arena = kmem_msb_arena;
+		maxbuf = KMEM_BIG_MAXBUF_32BIT;
 	}
 
 	/*
 	 * Set up the default caches to back kmem_alloc()
 	 */
-	size = KMEM_ALIGN;
-	for (i = 0; i < sizeof (kmem_alloc_sizes) / sizeof (int); i++) {
-		size_t align = KMEM_ALIGN;
-		size_t cache_size = kmem_alloc_sizes[i];
-		/*
-		 * If they allocate a multiple of the coherency granularity,
-		 * they get a coherency-granularity-aligned address.
-		 */
-		if (IS_P2ALIGNED(cache_size, 64))
-			align = 64;
-		if (IS_P2ALIGNED(cache_size, PAGESIZE))
-			align = PAGESIZE;
-		(void) sprintf(name, "kmem_alloc_%lu", cache_size);
-		cp = kmem_cache_create(name, cache_size, align,
-		    NULL, NULL, NULL, NULL, NULL, KMC_KMEM_ALLOC);
-		while (size <= cache_size) {
-			kmem_alloc_table[(size - 1) >> KMEM_ALIGN_SHIFT] = cp;
-			size += KMEM_ALIGN;
-		}
-	}
+	kmem_alloc_caches_create(
+	    kmem_alloc_sizes, sizeof (kmem_alloc_sizes) / sizeof (int),
+	    kmem_alloc_table, KMEM_MAXBUF, KMEM_ALIGN_SHIFT);
+
+	kmem_alloc_caches_create(
+	    kmem_big_alloc_sizes, sizeof (kmem_big_alloc_sizes) / sizeof (int),
+	    kmem_big_alloc_table, maxbuf, KMEM_BIG_SHIFT);
+
+	kmem_big_alloc_table_max = maxbuf >> KMEM_BIG_SHIFT;
 }
 
 void

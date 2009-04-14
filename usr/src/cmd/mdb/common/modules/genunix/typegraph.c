@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Postmortem type identification
@@ -1090,20 +1087,39 @@ typegraph_kmem(uintptr_t addr, const kmem_cache_t *c, tg_node_t **tgp)
 	 */
 	if (strncmp(c->cache_name, "kmem_alloc_", strlen("kmem_alloc_")) == 0) {
 		GElf_Sym sym;
+		GElf_Sym sym2;
 
 		if (tg_sizes == NULL) {
+			size_t nsizes = 0;
+			size_t nsizes_reg = 0;
+			size_t nsizes_big = 0;
+
 			if (mdb_lookup_by_name("kmem_alloc_sizes",
 			    &sym) == -1) {
 				mdb_warn("failed to find 'kmem_alloc_sizes'");
 				return (WALK_ERR);
 			}
+			nsizes_reg = sym.st_size / sizeof (int);
 
-			tg_sizes = mdb_zalloc(sym.st_size, UM_SLEEP);
-			tg_nsizes = sym.st_size / sizeof (int);
+			if (mdb_lookup_by_name("kmem_big_alloc_sizes",
+			    &sym2) != -1) {
+				nsizes_big = sym2.st_size / sizeof (int);
+			}
+
+			nsizes = nsizes_reg + nsizes_big;
+
+			tg_sizes = mdb_zalloc(nsizes * sizeof (int), UM_SLEEP);
+			tg_nsizes = nsizes;
 
 			if (mdb_vread(tg_sizes, sym.st_size,
 			    (uintptr_t)sym.st_value) == -1) {
 				mdb_warn("failed to read kmem_alloc_sizes");
+				return (WALK_ERR);
+			}
+			if (nsizes_big > 0 &&
+			    mdb_vread(&tg_sizes[nsizes_reg], sym2.st_size,
+			    (uintptr_t)sym2.st_value) == -1) {
+				mdb_warn("failed to read kmem_big_alloc_sizes");
 				return (WALK_ERR);
 			}
 		}
