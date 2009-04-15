@@ -977,7 +977,13 @@ iscsit_conn_accept(idm_conn_t *ic)
 	 * doesn't get shutdown prior to establishing a session. This
 	 * gets released in iscsit_conn_destroy().
 	 */
+	ISCSIT_GLOBAL_LOCK(RW_READER);
+	if (iscsit_global.global_svc_state != ISE_ENABLED) {
+		ISCSIT_GLOBAL_UNLOCK();
+		return (IDM_STATUS_FAIL);
+	}
 	iscsit_global_hold();
+	ISCSIT_GLOBAL_UNLOCK();
 
 	/*
 	 * Allocate an associated iscsit structure to represent this
@@ -996,6 +1002,7 @@ iscsit_conn_accept(idm_conn_t *ic)
 	 * Initialize login state machine
 	 */
 	if (iscsit_login_sm_init(ict) != IDM_STATUS_SUCCESS) {
+		iscsit_global_rele();
 		return (IDM_STATUS_FAIL);
 	}
 

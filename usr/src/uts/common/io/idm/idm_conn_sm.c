@@ -75,6 +75,9 @@ static void
 idm_state_s9_init_error(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx);
 
 static void
+idm_state_s9a_rejected(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx);
+
+static void
 idm_state_s10_in_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx);
 
 static void
@@ -89,6 +92,9 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 
 static void
 idm_conn_unref(void *ic_void);
+
+static void
+idm_conn_reject_unref(void *ic_void);
 
 static idm_pdu_event_action_t
 idm_conn_sm_validate_pdu(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx,
@@ -229,6 +235,7 @@ idm_conn_event_locked(idm_conn_t *ic, idm_conn_event_t event,
 	 * the connection otherwise it might disappear.
 	 */
 	if ((ic->ic_state == CS_S9_INIT_ERROR) ||
+	    (ic->ic_state == CS_S9A_REJECTED) ||
 	    (ic->ic_state == CS_S11_COMPLETE)) {
 		if ((pdu_event_type == CT_TX_PDU) ||
 		    (pdu_event_type == CT_RX_PDU)) {
@@ -353,6 +360,9 @@ idm_conn_event_handler(void *event_ctx_opaque)
 		break;
 	case CS_S8_CLEANUP:
 		idm_state_s8_cleanup(ic, event_ctx);
+		break;
+	case CS_S9A_REJECTED:
+		idm_state_s9a_rejected(ic, event_ctx);
 		break;
 	case CS_S9_INIT_ERROR:
 		idm_state_s9_init_error(ic, event_ctx);
@@ -488,6 +498,15 @@ idm_state_s3_xpt_up(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;
 	case CE_CONNECT_REJECT:
+		/*
+		 * Iscsit doesn't want to hear from us again in this case.
+		 * Since it rejected the connection it doesn't have a
+		 * connection context to handle additional notifications.
+		 * IDM needs to just clean things up on its own.
+		 */
+		(void) untimeout(ic->ic_state_timeout);
+		idm_update_state(ic, CS_S9A_REJECTED, event_ctx);
+		break;
 	case CE_CONNECT_FAIL:
 	case CE_TRANSPORT_FAIL:
 	case CE_LOGOUT_OTHER_CONN_SND:
@@ -926,6 +945,13 @@ idm_state_s9_init_error(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 	}
 }
 
+/* ARGSUSED */
+static void
+idm_state_s9a_rejected(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
+{
+	/* Ignore events */
+}
+
 static void
 idm_state_s10_in_cleanup(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 {
@@ -1146,6 +1172,15 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		break;
 	case CS_S10_IN_CLEANUP:
 		break;
+	case CS_S9A_REJECTED:
+		/*
+		 * We never finished establishing the connection so no
+		 * disconnect.  No client notificatiosn because the client
+		 * rejected the connection.
+		 */
+		idm_refcnt_async_wait_ref(&ic->ic_refcnt,
+		    &idm_conn_reject_unref);
+		break;
 	case CS_S9_INIT_ERROR:
 		if (IDM_CONN_ISTGT(ic)) {
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
@@ -1234,6 +1269,18 @@ idm_conn_unref(void *ic_void)
 		(void) idm_notify_client(ic, CN_CONNECT_DESTROY, NULL);
 	}
 }
+
+static void
+idm_conn_reject_unref(void *ic_void)
+{
+	idm_conn_t *ic = ic_void;
+
+	ASSERT(IDM_CONN_ISTGT(ic));
+
+	/* Don't notify the client since it rejected the connection */
+	idm_svc_conn_destroy(ic);
+}
+
 
 
 static idm_pdu_event_action_t

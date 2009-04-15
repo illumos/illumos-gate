@@ -54,7 +54,7 @@
  * in6addr_any is currently all zeroes, but use the macro in case this
  * ever changes.
  */
-const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
+static const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 
 static void idm_sorx_cache_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 static void idm_sorx_addl_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
@@ -223,6 +223,104 @@ void
 idm_sodestroy(ksocket_t ks)
 {
 	(void) ksocket_close(ks, CRED());
+}
+
+/*
+ * Function to compare two addresses in sockaddr_storage format
+ */
+
+int
+idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
+    const struct sockaddr_storage *cmp_ss2,
+    boolean_t v4_mapped_as_v4)
+{
+	struct sockaddr_storage			mapped_v4_ss1, mapped_v4_ss2;
+	const struct sockaddr_storage		*ss1, *ss2;
+	struct in_addr				*in1, *in2;
+	struct in6_addr				*in61, *in62;
+	int i;
+
+	/*
+	 * Normalize V4-mapped IPv6 addresses into V4 format if
+	 * v4_mapped_as_v4 is B_TRUE.
+	 */
+	ss1 = cmp_ss1;
+	ss2 = cmp_ss2;
+	if (v4_mapped_as_v4 && (ss1->ss_family == AF_INET6)) {
+		in61 = &((struct sockaddr_in6 *)ss1)->sin6_addr;
+		if (IN6_IS_ADDR_V4MAPPED(in61)) {
+			bzero(&mapped_v4_ss1, sizeof (mapped_v4_ss1));
+			mapped_v4_ss1.ss_family = AF_INET;
+			((struct sockaddr_in *)&mapped_v4_ss1)->sin_port =
+			    ((struct sockaddr_in *)ss1)->sin_port;
+			IN6_V4MAPPED_TO_INADDR(in61,
+			    &((struct sockaddr_in *)&mapped_v4_ss1)->sin_addr);
+			ss1 = &mapped_v4_ss1;
+		}
+	}
+	ss2 = cmp_ss2;
+	if (v4_mapped_as_v4 && (ss2->ss_family == AF_INET6)) {
+		in62 = &((struct sockaddr_in6 *)ss2)->sin6_addr;
+		if (IN6_IS_ADDR_V4MAPPED(in62)) {
+			bzero(&mapped_v4_ss2, sizeof (mapped_v4_ss2));
+			mapped_v4_ss2.ss_family = AF_INET;
+			((struct sockaddr_in *)&mapped_v4_ss2)->sin_port =
+			    ((struct sockaddr_in *)ss2)->sin_port;
+			IN6_V4MAPPED_TO_INADDR(in62,
+			    &((struct sockaddr_in *)&mapped_v4_ss2)->sin_addr);
+			ss2 = &mapped_v4_ss2;
+		}
+	}
+
+	/*
+	 * Compare ports, then address family, then ip address
+	 */
+	if (((struct sockaddr_in *)ss1)->sin_port !=
+	    ((struct sockaddr_in *)ss2)->sin_port) {
+		if (((struct sockaddr_in *)ss1)->sin_port >
+		    ((struct sockaddr_in *)ss2)->sin_port)
+			return (1);
+		else
+			return (-1);
+	}
+
+	/*
+	 * ports are the same
+	 */
+	if (ss1->ss_family != ss2->ss_family) {
+		if (ss1->ss_family == AF_INET)
+			return (1);
+		else
+			return (-1);
+	}
+
+	/*
+	 * address families are the same
+	 */
+	if (ss1->ss_family == AF_INET) {
+		in1 = &((struct sockaddr_in *)ss1)->sin_addr;
+		in2 = &((struct sockaddr_in *)ss2)->sin_addr;
+
+		if (in1->s_addr > in2->s_addr)
+			return (1);
+		else if (in1->s_addr < in2->s_addr)
+			return (-1);
+		else
+			return (0);
+	} else if (ss1->ss_family == AF_INET6) {
+		in61 = &((struct sockaddr_in6 *)ss1)->sin6_addr;
+		in62 = &((struct sockaddr_in6 *)ss2)->sin6_addr;
+
+		for (i = 0; i < 4; i++) {
+			if (in61->s6_addr32[i] > in62->s6_addr32[i])
+				return (1);
+			else if (in61->s6_addr32[i] < in62->s6_addr32[i])
+				return (-1);
+		}
+		return (0);
+	}
+
+	return (1);
 }
 
 /*

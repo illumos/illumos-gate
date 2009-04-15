@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _ISNS_CLIENT_H_
@@ -37,6 +37,7 @@ typedef struct {
 	clock_t			svr_last_msg;
 	list_node_t		svr_ln;
 	boolean_t		svr_registered;
+	uint32_t		svr_esi_interval;
 } iscsit_isns_svr_t;
 
 /*
@@ -59,17 +60,17 @@ typedef enum {
 struct isns_portal_list_s;
 
 typedef struct {
-	struct isns_portal_list_s	*esi_portal;
 	kthread_t			*esi_thread;
 	kt_did_t			esi_thread_did;
 	ksocket_t			esi_so;
+	kmutex_t			esi_mutex;
+	kcondvar_t			esi_cv;
 	uint16_t			esi_port;
+	boolean_t			esi_enabled;
+	boolean_t			esi_valid;
 	boolean_t			esi_thread_running;
-	boolean_t			esi_thread_failed;
-	boolean_t			esi_registered;
-	boolean_t			esi_not_available;
-	list_node_t			esi_ln;
 } isns_esi_tinfo_t;
+
 
 /*
  * Portal list - comprised of "default" portals (i.e. idm_get_ipaddr) and
@@ -78,9 +79,9 @@ typedef struct {
 
 typedef struct isns_portal_list_s {
 	struct sockaddr_storage		portal_addr;
-	isns_esi_tinfo_t		*portal_esi;
 	iscsit_portal_t			*portal_iscsit;
 	list_node_t			portal_ln;
+	timespec_t			portal_esi_timestamp;
 } isns_portal_list_t;
 
 typedef struct isns_target_s {

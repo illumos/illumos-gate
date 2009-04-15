@@ -116,6 +116,7 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 {
 	iscsit_sess_t *result;
 
+	*error_class = ISCSI_STATUS_CLASS_SUCCESS;
 
 	/*
 	 * Even if this session create "fails" for some reason we still need
@@ -169,10 +170,30 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 
 	/* Login code will fill in ist_stmf_sess if necessary */
 
-	/* Kick session state machine (also binds connection to session) */
-	iscsit_sess_sm_event(result, SE_CONN_IN_LOGIN, ict);
+	if (*error_class == ISCSI_STATUS_CLASS_SUCCESS) {
+		/*
+		 * Make sure the service is still enabled and if so get a global
+		 * hold to represent this session.
+		 */
+		ISCSIT_GLOBAL_LOCK(RW_READER);
+		if (iscsit_global.global_svc_state == ISE_ENABLED) {
+			iscsit_global_hold();
+			ISCSIT_GLOBAL_UNLOCK();
 
-	*error_class = ISCSI_STATUS_CLASS_SUCCESS;
+			/*
+			 * Kick session state machine (also binds connection
+			 * to session)
+			 */
+			iscsit_sess_sm_event(result, SE_CONN_IN_LOGIN, ict);
+
+			*error_class = ISCSI_STATUS_CLASS_SUCCESS;
+		} else {
+			ISCSIT_GLOBAL_UNLOCK();
+			*error_class = ISCSI_STATUS_CLASS_TARGET_ERR;
+			*error_detail = ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE;
+		}
+	}
+
 	/*
 	 * As noted above we must return a session pointer even if something
 	 * failed.  The resources will get freed later.
@@ -207,6 +228,7 @@ iscsit_sess_unref(void *ist_void)
 	mutex_exit(&ist->ist_mutex);
 
 	iscsit_sess_destroy(ist);
+	iscsit_global_rele();
 }
 
 void

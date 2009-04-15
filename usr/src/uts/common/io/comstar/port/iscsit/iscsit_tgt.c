@@ -1139,7 +1139,6 @@ iscsit_tgt_bind_sess(iscsit_tgt_t *tgt, iscsit_sess_t *sess)
 	} else {
 		/* Discovery session */
 		sess->ist_lport = NULL;
-		iscsit_global_hold();
 		ISCSIT_GLOBAL_LOCK(RW_WRITER);
 		avl_add(&iscsit_global.global_discovery_sessions, sess);
 		ISCSIT_GLOBAL_UNLOCK();
@@ -1161,7 +1160,6 @@ iscsit_tgt_unbind_sess(iscsit_tgt_t *tgt, iscsit_sess_t *sess)
 		ISCSIT_GLOBAL_LOCK(RW_WRITER);
 		avl_remove(&iscsit_global.global_discovery_sessions, sess);
 		ISCSIT_GLOBAL_UNLOCK();
-		iscsit_global_rele();
 	}
 }
 
@@ -1808,7 +1806,10 @@ iscsit_portal_create(iscsit_tpg_t *tpg, struct sockaddr_storage *sa)
 	 * portal -- targets will use this portal when no portals are
 	 * explicitly configured.
 	 */
-	if (sa != NULL) {
+	if (sa == NULL) {
+		portal->portal_default = B_TRUE;
+	} else {
+		portal->portal_default = B_FALSE;
 		bcopy(sa, &portal->portal_addr, sizeof (*sa));
 	}
 

@@ -167,6 +167,8 @@ static void iscsi_format_timestamp(char *ts_str, int strlen,
 static char *iscsi_inet_ntop(int af, const void *addr, char *buf, int addrlen);
 static void convert2ascii(char *, const in6_addr_t *);
 static int sa_to_str(struct sockaddr_storage *sa, char *addr);
+static int iscsi_isns_esi_cb(uintptr_t addr, const void *walker_data,
+    void *data);
 static int iscsi_isns_portal_cb(uintptr_t addr, const void *walker_data,
     void *data);
 
@@ -2084,7 +2086,6 @@ iscsi_isns_help(void)
 static int
 iscsi_isns_esi_cb(uintptr_t addr, const void *walker_data, void *data)
 {
-	iscsi_dcmd_ctrl_t *idc = (iscsi_dcmd_ctrl_t *)data;
 	isns_esi_tinfo_t tinfo;
 
 	if (mdb_vread(&tinfo, sizeof (isns_esi_tinfo_t), addr) !=
@@ -2092,24 +2093,12 @@ iscsi_isns_esi_cb(uintptr_t addr, const void *walker_data, void *data)
 		return (WALK_ERR);
 	}
 
-	mdb_printf("ESI portal         : 0x%p\n", tinfo.esi_portal);
-	if (idc->idc_verbose) {
-		mdb_inc_indent(4);
-		iscsi_isns_portal_cb((uintptr_t)tinfo.esi_portal, NULL, data);
-		mdb_dec_indent(4);
-	}
 	mdb_printf("ESI thread/thr did : 0x%p / %d\n", tinfo.esi_thread,
 	    tinfo.esi_thread_did);
 	mdb_printf("ESI sonode         : 0x%p\n", tinfo.esi_so);
 	mdb_printf("ESI port           : %d\n", tinfo.esi_port);
 	mdb_printf("ESI thread running : %s\n",
 	    (tinfo.esi_thread_running) ? "Yes" : "No");
-	if (!tinfo.esi_thread_running) {
-		mdb_printf("ESI thread failed  : %s\n",
-		    (tinfo.esi_thread_failed) ? "Yes" : "No");
-	}
-	mdb_printf("ESI registered     : %s\n\n",
-	    (tinfo.esi_registered) ? "Yes" : "No");
 
 	return (WALK_NEXT);
 }
@@ -2117,21 +2106,17 @@ iscsi_isns_esi_cb(uintptr_t addr, const void *walker_data, void *data)
 static int
 iscsi_isns_esi(iscsi_dcmd_ctrl_t *idc)
 {
-	GElf_Sym sym;
-	uintptr_t esi_list;
+	GElf_Sym		sym;
+	uintptr_t		addr;
 
-	if (mdb_lookup_by_name("esi_list", &sym) == -1) {
+	if (mdb_lookup_by_name("esi", &sym) == -1) {
 		mdb_warn("failed to find symbol 'esi_list'");
 		return (DCMD_ERR);
 	}
+	addr = (uintptr_t)sym.st_value;
 
-	esi_list = (uintptr_t)sym.st_value;
 	idc->idc_header = 1;
-
-	if (mdb_pwalk("list", iscsi_isns_esi_cb, idc, esi_list) == -1) {
-		mdb_warn("avl walk failed for esi_list");
-		return (DCMD_ERR);
-	}
+	(void) iscsi_isns_esi_cb(addr, NULL, idc);
 
 	return (0);
 }
@@ -2144,6 +2129,7 @@ iscsi_isns_portal_cb(uintptr_t addr, const void *walker_data, void *data)
 	isns_portal_list_t portal;
 	char portal_addr[PORTAL_STR_LEN];
 	struct sockaddr_storage *ss;
+	char			ts_string[40];
 
 	if (mdb_vread(&portal, sizeof (isns_portal_list_t), addr) !=
 	    sizeof (isns_portal_list_t)) {
@@ -2170,7 +2156,8 @@ iscsi_isns_portal_cb(uintptr_t addr, const void *walker_data, void *data)
 		iscsi_portal_impl((uintptr_t)portal.portal_iscsit, idc);
 	}
 
-	mdb_printf("Portal ESI info: 0x%p\n\n", portal.portal_esi);
+	iscsi_format_timestamp(ts_string, 40, &portal.portal_esi_timestamp);
+	mdb_printf("Portal ESI timestamp: 0x%p\n\n", ts_string);
 
 	return (WALK_NEXT);
 }

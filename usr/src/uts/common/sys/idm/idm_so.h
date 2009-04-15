@@ -86,6 +86,10 @@ void idm_soshutdown(ksocket_t so);
 
 void idm_sodestroy(ksocket_t so);
 
+int idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
+    const struct sockaddr_storage *cmp_ss2,
+    boolean_t v4_mapped_as_v4);
+
 int idm_get_ipaddr(idm_addr_list_t **);
 
 int idm_sorecv(ksocket_t so, void *msg, size_t len);

@@ -95,6 +95,8 @@ typedef struct {
 	avl_node_t		portal_tpg_ln;
 	iscsit_tpg_t		*portal_tpg;
 	idm_svc_t		*portal_svc;
+	boolean_t		portal_default;
+	void			*portal_isns;
 } iscsit_portal_t;
 
 
