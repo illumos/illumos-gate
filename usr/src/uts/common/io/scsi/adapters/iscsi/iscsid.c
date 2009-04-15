@@ -66,8 +66,6 @@ static boolean_t iscsid_add(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
     struct sockaddr *addr_tgt);
 static void iscsi_discovery_event(iscsi_hba_t *ihp,
     iSCSIDiscoveryMethod_t m, boolean_t start);
-static void iscsi_send_sysevent(iscsi_hba_t *ihp,
-    char *subclass, nvlist_t *np);
 static boolean_t iscsid_boot_init_config(iscsi_hba_t *ihp);
 static iscsi_sess_t *iscsi_add_boot_sess(iscsi_hba_t *ihp, int isid);
 static boolean_t iscsid_make_entry(ib_boot_prop_t *boot_prop_entry,
@@ -2082,16 +2080,20 @@ iscsi_discovery_event(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t m,
 		break;
 	}
 	mutex_exit(&ihp->hba_discovery_events_mutex);
-	iscsi_send_sysevent(ihp, subclass, NULL);
+	iscsi_send_sysevent(ihp, EC_ISCSI, subclass, NULL);
 }
 
 /*
- * iscsi_send_sysevent -- send sysevent using iscsi class
+ * iscsi_send_sysevent -- send sysevent using specified class
  */
-static void
-iscsi_send_sysevent(iscsi_hba_t *ihp, char *subclass, nvlist_t *np)
+void
+iscsi_send_sysevent(
+    iscsi_hba_t	*ihp,
+    char	*eventclass,
+    char	*subclass,
+    nvlist_t	*np)
 {
-	(void) ddi_log_sysevent(ihp->hba_dip, DDI_VENDOR_SUNW, EC_ISCSI,
+	(void) ddi_log_sysevent(ihp->hba_dip, DDI_VENDOR_SUNW, eventclass,
 	    subclass, np, NULL, DDI_SLEEP);
 }
 

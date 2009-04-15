@@ -28,6 +28,8 @@
 #include "iscsi.h"
 #include <sys/fs/dv_node.h>	/* devfs_clean */
 #include <sys/bootprops.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/dev.h>
 
 /* tpgt bytes in string form */
 #define	TPGT_EXT_SIZE	5
@@ -98,6 +100,7 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	ilp->lun_addr_type  = lun_addr_type;
 	ilp->lun_sess	    = isp;
 	ilp->lun_addr	    = addr;
+	ilp->lun_type	    = inq->inq_dtype & DTYPE_MASK;
 
 	mutex_enter(&iscsi_oid_mutex);
 	ilp->lun_oid = iscsi_oid++;
@@ -515,6 +518,10 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 	uint64_t		*lun_num_ptr	= NULL;
 	uint16_t		boot_lun_num	= 0;
 	iscsi_sess_t		*isp		= NULL;
+	boolean_t		online		= B_FALSE;
+	nvlist_t		*attr_list	= NULL;
+	char			*pathname	= NULL;
+	dev_info_t		*lun_dip	= NULL;
 
 	ASSERT(ilp != NULL);
 	ASSERT((ilp->lun_pip != NULL) || (ilp->lun_dip != NULL));
@@ -527,6 +534,7 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
 			ilp->lun_time_online = ddi_get_time();
+			online = B_TRUE;
 		}
 
 	} else if (ilp->lun_dip != NULL) {
@@ -537,6 +545,7 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
 			ilp->lun_time_online = ddi_get_time();
+			online = B_TRUE;
 		}
 	}
 
@@ -556,6 +565,36 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 				iscsiboot_prop->boot_tgt.lun_online = 1;
 			}
 		}
+	}
+
+	/*
+	 * If the LUN has been online and it is a disk,
+	 * send out a system event.
+	 */
+	if (online == B_TRUE && ilp->lun_type == DTYPE_DIRECT) {
+		if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, KM_SLEEP) !=
+		    DDI_SUCCESS) {
+			return;
+		}
+
+		if (ilp->lun_pip != NULL) {
+			lun_dip = mdi_pi_get_client(ilp->lun_pip);
+		} else {
+			lun_dip = ilp->lun_dip;
+		}
+
+		pathname = kmem_zalloc(MAXNAMELEN + 1, KM_SLEEP);
+		(void) ddi_pathname(lun_dip, pathname);
+
+		if (nvlist_add_string(attr_list, DEV_PHYS_PATH, pathname) !=
+		    DDI_SUCCESS) {
+			nvlist_free(attr_list);
+			kmem_free(pathname, MAXNAMELEN + 1);
+			return;
+		}
+		iscsi_send_sysevent(ihp, EC_DEV_ADD, ESC_DISK, attr_list);
+		kmem_free(pathname, MAXNAMELEN + 1);
+		nvlist_free(attr_list);
 	}
 }
 
@@ -583,11 +622,14 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 iscsi_status_t
 iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 {
-	iscsi_status_t		status	= ISCSI_STATUS_SUCCESS;
-	int			circ	= 0;
+	iscsi_status_t		status		= ISCSI_STATUS_SUCCESS;
+	int			circ		= 0;
 	dev_info_t		*cdip, *pdip;
-	char			*devname;
+	char			*devname	= NULL;
+	char			*pathname	= NULL;
 	int			rval;
+	boolean_t		offline		= B_FALSE;
+	nvlist_t		*attr_list	= NULL;
 
 	ASSERT(ilp != NULL);
 	ASSERT((ilp->lun_pip != NULL) || (ilp->lun_dip != NULL));
@@ -638,6 +680,11 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 		}
 	}
 
+	if (cdip != NULL && ilp->lun_type == DTYPE_DIRECT) {
+		pathname = kmem_zalloc(MAXNAMELEN + 1, KM_SLEEP);
+		(void) ddi_pathname(cdip, pathname);
+	}
+
 	/* Attempt to offline the logical units */
 	if (ilp->lun_pip != NULL) {
 
@@ -658,10 +705,12 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 				(void) mdi_prop_remove(ilp->lun_pip, NULL);
 				(void) mdi_pi_free(ilp->lun_pip, 0);
 			}
+			offline = B_TRUE;
 		} else {
 			status = ISCSI_STATUS_INTERNAL_ERROR;
 			if (lun_free == B_FALSE) {
 				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;
+				offline = B_TRUE;
 			}
 		}
 		ndi_devi_exit(scsi_vhci_dip, circ);
@@ -682,13 +731,38 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 			status = ISCSI_STATUS_INTERNAL_ERROR;
 			if (lun_free == B_FALSE) {
 				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;
+				offline = B_TRUE;
 			}
 		} else {
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
+			offline = B_TRUE;
 		}
 		ndi_devi_exit(ihp->hba_dip, circ);
-
 	}
+
+	if (offline == B_TRUE && pathname != NULL &&
+	    ilp->lun_type == DTYPE_DIRECT) {
+		if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, KM_SLEEP) !=
+		    DDI_SUCCESS) {
+			kmem_free(pathname, MAXNAMELEN + 1);
+			return (status);
+		}
+
+		if (nvlist_add_string(attr_list, DEV_PHYS_PATH, pathname) !=
+		    DDI_SUCCESS) {
+			nvlist_free(attr_list);
+			kmem_free(pathname, MAXNAMELEN + 1);
+			return (status);
+		}
+
+		iscsi_send_sysevent(ihp, EC_DEV_REMOVE, ESC_DISK, attr_list);
+		nvlist_free(attr_list);
+	}
+
+	if (pathname != NULL) {
+		kmem_free(pathname, MAXNAMELEN + 1);
+	}
+
 	return (status);
 }
