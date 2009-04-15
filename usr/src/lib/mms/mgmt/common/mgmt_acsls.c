@@ -227,6 +227,7 @@ acs_start_ssi(char *acshost, char *ssiport)
 	cmd[2] = NULL;
 
 	pid = exec_mgmt_cmd(NULL, NULL, 0, 0, B_TRUE, cmd);
+	mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s", cmd[0], cmd[1]);
 
 	status = check_exit(pid, NULL);
 

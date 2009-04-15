@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2330,6 +2330,8 @@ call_mmsmnt(door_arg_t *arg)
 			/* server is not running.  Try to start it */
 				(void) exec_mgmt_cmd(NULL, NULL, 0, 0, B_TRUE,
 				    cmd);
+				mms_trace(MMS_DEBUG,
+				    "exec_mgmt_cmd: %s", cmd[0]);
 			} else {
 				st = errno;
 				return (st);
@@ -2358,6 +2360,7 @@ call_mmsmnt(door_arg_t *arg)
 			 * the door file
 			 */
 			(void) exec_mgmt_cmd(NULL, NULL, 0, 0, B_TRUE, cmd);
+			mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s", cmd[0]);
 			/* give the server a chance to start */
 			(void) nanosleep(&sleepfor, NULL);
 		} else if ((saverr != EAGAIN) && (saverr != EINTR)) {

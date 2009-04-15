@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -686,17 +686,23 @@ exec_mgmt_cmd(
 
 	/* The path to the executable must be fully-qualified */
 	if ((cmd == NULL) || (cmd[0] == NULL) || (cmd[0][0] != '/')) {
+		mms_trace(MMS_DEBUG,
+		    "validate error");
 		return (-1);
 	}
 
 	if (outstr != NULL) {
 		if (pipe(fdo) < 0) {
+			mms_trace(MMS_DEBUG,
+			    "pipe(fdo) error");
 			return (-1);
 		}
 	}
 
 	if (errstr != NULL) {
 		if (pipe(fde) < 0) {
+			mms_trace(MMS_DEBUG,
+			    "pipe(fde) error");
 			(void) close(fdo[0]);
 			(void) close(fdo[1]);
 			return (-1);
@@ -704,6 +710,8 @@ exec_mgmt_cmd(
 	}
 
 	if ((pid = fork()) < 0) {
+		mms_trace(MMS_DEBUG,
+		    "fork() error");
 		(void) close(fdo[0]);
 		(void) close(fdo[1]);
 		(void) close(fde[0]);
@@ -724,6 +732,8 @@ exec_mgmt_cmd(
 		}
 
 		if ((fde[1] == -1) || (fdo[1] == -1)) {
+			mms_trace(MMS_DEBUG,
+			    "(fde[1] == -1) || (fdo[1] == -1) error");
 			exit(9);
 		}
 
@@ -760,6 +770,8 @@ exec_mgmt_cmd(
 		ret = execv(cmd[0], cmd);
 
 		if (0 != ret) {
+			mms_trace(MMS_DEBUG,
+			    "execv(cmd[0], cmd) error");
 			return (ret);
 		}
 	}
@@ -812,16 +824,17 @@ mgmt_set_svc_state(
 	char		*endState = NULL;
 	int		st = 0;
 	const char	*cmpState;
-	struct timespec	ts;
 	int		i;
 
 	if (fmri == NULL) {
+		mms_trace(MMS_ERR, "fmri is null");
 		return (MMS_MGMT_NOARG);
 	}
 
 	startState = smf_get_state(fmri);
 	if (startState == NULL) {
 		st = scf_error();
+		mms_trace(MMS_ERR, "get state %s - %s", fmri, scf_strerror(st));
 		/*
 		 * Not an error if request to disable or degrade a
 		 * non-existent svc
@@ -852,7 +865,15 @@ mgmt_set_svc_state(
 			 * though I can't see why.
 			 */
 			if (strcmp(startState, SCF_STATE_STRING_MAINT) == 0) {
+				mms_trace(MMS_DEBUG,
+				    "restore before disable %s",
+				    fmri);
 				st = mgmt_set_svc_state(fmri, RESTORE, NULL);
+				if (st != 0) {
+					mms_trace(MMS_ERR,
+					    "failed to restore %s",
+					    fmri);
+				}
 				st = smf_disable_instance(fmri, 0);
 			}
 			if (strcmp(startState, cmpState) != 0) {
@@ -901,22 +922,25 @@ mgmt_set_svc_state(
 			break;
 		default:
 			st = -1;
+			mms_trace(MMS_ERR, "%s unknown action %d",
+			    fmri, targetState);
 			break;
 	}
 
 	if (st == 0) {
 		/*
-		 * Changing state sometimes takes a while, so
-		 * loop for up to 5 seconds.
+		 * Changing state sometimes takes a while and
+		 * the scf service state functions do not wait.
+		 * Check to see if the action was successul.
 		 */
-		ts.tv_sec = 0;
-		ts.tv_nsec = 500 * 1000000;
-
-		for (i = 1; i < 10; i++) {
-			st = 1;
+		st = 1;
+		for (i = 0; i < 10; i++) {
 			endState = smf_get_state(fmri);
 			if (endState == NULL) {
 				st = scf_error();
+				mms_trace(MMS_ERR,
+				    "wait for state change %s - %s",
+				    fmri, scf_strerror(st));
 				break;
 			} else if (strcmp(endState, cmpState) == 0) {
 				st = 0;
@@ -924,10 +948,12 @@ mgmt_set_svc_state(
 			}
 			free(endState);
 			endState = NULL;
-			(void) nanosleep(&ts, NULL);
+			(void) sleep(1);
 		}
-	} else {
+	} else if (st != -1) {
 		st = scf_error();
+		mms_trace(MMS_ERR, "state change %s - %s",
+		    fmri, scf_strerror(st));
 	}
 
 	if ((startState != NULL) && (original == NULL)) {
@@ -970,7 +996,6 @@ check_exit(pid_t pid, int *signo)
 			}
 		}
 	}
-
 	return (st);
 }
 

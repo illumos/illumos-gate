@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 extern char *optarg;
 extern int optind, opterr, optopt;
 
+static char *_SrcFile = __FILE__;
 
 #ifdef	MMS_VAR_CFG
 static char *usemsg = 	\
@@ -102,7 +103,8 @@ main(int argc, char **argv)
 
 	(void) mms_trace_open("/var/log/mms/mmsinit.log", MMS_ID_CLI,
 	    MMS_SEV_INFO, 5 * MEGA, 0, 0);
-
+	(void) mms_trace_filter(MMS_SEV_DEVP);
+	mms_trace(MMS_DEBUG, "mmsinit started ###############################");
 	if (argc < 2) {
 		st = 1;
 	}

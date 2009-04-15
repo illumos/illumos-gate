@@ -323,6 +323,7 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 	}
 
 	if (!mgmt_chk_auth("solaris.mms.create")) {
+		mms_trace(MMS_DEBUG, "mgmt_chk_auth error");
 		return (EACCES);
 	}
 
@@ -330,12 +331,14 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 	/* make sure we've not already been initialized */
 	st = mms_cfg_getvar(MMS_CFG_CONFIG_TYPE, buf);
 	if (st != 0) {
+		mms_trace(MMS_DEBUG, "mms_cfg_getvar error");
 		st = mgmt_xlate_cfgerr(st);
 		if (st != ENOENT) {
 			return (st);
 		}
 	} else {
 		/* host already configured */
+		mms_trace(MMS_DEBUG, "already config error");
 		return (EALREADY);
 	}
 #endif	/* MMS_VAR_CFG */
@@ -357,6 +360,7 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 			optp = mms_client_opts;
 #endif	/* MMS_VAR_CFG */
 		} else {
+			mms_trace(MMS_DEBUG, "EINVAL error");
 			st = EINVAL;
 		}
 	}
@@ -376,6 +380,7 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 
 	st = mms_cfg_getvar(MMS_CFG_MM_DB_USER, buf);
 	if (st != 0) {
+		mms_trace(MMS_DEBUG, "mms_cfg_getvar error");
 		st = mgmt_xlate_cfgerr(st);
 		if (st == ENOENT) {
 			st = mms_cfg_getvar(MMS_CFG_DB_INST
@@ -384,6 +389,7 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 	}
 	if (st != 0) {
 		/* major configuration error */
+		mms_trace(MMS_DEBUG, "major configuration error");
 		MGMT_ADD_OPTERR(init_errs,
 		    "mmsdb method_context/user",
 		    st);
@@ -517,16 +523,27 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 		}
 
 		if (st != 0) {
+			mms_trace(MMS_DEBUG, "mgmt_db_create error");
 			goto done;
 		}
 
+		mms_trace(MMS_DEBUG, "enable mm");
 		st = mgmt_set_svc_state(MMSVC, ENABLE, NULL);
+		if (st != 0)
+			mms_trace(MMS_DEBUG,
+			    "mgmt_set_svc_state(MMSVC, ENABLE, NULL) "
+			    "error");
 	}
 
 	/* Watcher needs to be started for both host types */
 	if (st == 0) {
+		mms_trace(MMS_DEBUG, "enable wcr");
 		st = mgmt_set_svc_state(WCRSVC, ENABLE, NULL);
 	}
+	if (st != 0)
+		mms_trace(MMS_DEBUG,
+		    "mgmt_set_svc_state(WCRSVC, ENABLE, NULL) "
+		    "error");
 
 done:
 	if (st != 0) {
@@ -821,14 +838,17 @@ mms_mgmt_set_opts(nvlist_t *optlist, nvlist_t *errlist)
 	/* refresh services */
 	if (*mmtype == 's') {
 		if (refresh_svcs & DB) {
+			mms_trace(MMS_DEBUG, "refresh db");
 			(void) mgmt_set_svc_state(DBSVC, REFRESH, NULL);
 		}
 		if (refresh_svcs & MM) {
+			mms_trace(MMS_DEBUG, "refresh mm");
 			(void) mgmt_set_svc_state(MMSVC, REFRESH, NULL);
 		}
 	}
 
 	if (refresh_svcs & WCR) {
+		mms_trace(MMS_DEBUG, "refresh wcr");
 		(void) mgmt_set_svc_state(WCRSVC, REFRESH, NULL);
 	}
 
@@ -849,6 +869,7 @@ mms_mgmt_uninitialize(void)
 
 	/* stop all running services */
 	for (i = 0; mmsvcs[i] != NULL; i++) {
+		mms_trace(MMS_DEBUG, "disable %s", mmsvcs[i]);
 		st = mgmt_set_svc_state(mmsvcs[i], DISABLE, NULL);
 		if (st != 0) {
 			break;

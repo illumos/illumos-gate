@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_MMS_MGMT_H_
@@ -197,6 +197,9 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist);
 
 int
 mgmt_db_drop(void);
+
+int
+mgmt_db_ready(void);
 
 int
 mgmt_db_check(void);

@@ -193,6 +193,8 @@ mgmt_db_init(void)
 
 	st = mgmt_get_db_opts(&opts);
 	if (st != 0) {
+		mms_trace(MMS_DEBUG,
+		    "mgmt_get_db_opts(&opts) error");
 		return (st);
 	}
 
@@ -212,8 +214,12 @@ mgmt_db_init(void)
 
 	pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
 	    B_FALSE, cmd);
+	mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s", cmd[0], cmd[1], cmd[2]);
 
 	st = check_exit(pid, NULL);
+	if (st != 0)
+		mms_trace(MMS_DEBUG,
+		    "exec_mgmt_cmd error");
 
 	return (st);
 }
@@ -316,11 +322,15 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 	mms_trace(MMS_DEBUG, "Creating the MMS Database");
 
 	if (!mgmt_chk_auth("solaris.mms.modify")) {
+		mms_trace(MMS_DEBUG,
+		    "mgmt_chk_auth(\"solaris.mms.modify\") error");
 		return (EACCES);
 	}
 
 	st = mgmt_get_db_opts(&opts);
 	if (st != 0) {
+		mms_trace(MMS_DEBUG,
+		    "mgmt_get_db_opts(&opts) error");
 		return (st);
 	}
 
@@ -337,6 +347,8 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 	if (initialize) {
 		st = mgmt_db_check();
 		if (st == 0) {
+			mms_trace(MMS_DEBUG,
+			    "EALREADY error");
 			/* db is alive, already inited */
 			return (EALREADY);
 		}
@@ -344,21 +356,30 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 		/* check to see if files exist, even if svc is stopped */
 		(void) snprintf(buf, sizeof (buf), "%s/base", opts.path);
 		if (access(buf, F_OK) == 0) {
+			mms_trace(MMS_DEBUG,
+			    "access(buf, F_OK) error");
 			return (EALREADY);
 		}
 
 		st = mgmt_db_init();
+		if (st != 0)
+			mms_trace(MMS_DEBUG,
+			    "mgmt_db_init() error");
 		if (st == 0) {
 			st = configure_pgconf(opts.port, opts.logdir);
 		}
 
 		if (st != 0) {
+			mms_trace(MMS_DEBUG,
+			    "configure_pgconf error");
 			return (st);
 		}
 
 		/* create the dirs we need */
 		st = create_db_dirs(opts.path, opts.dbuid, opts.dbgid, NULL);
 		if (st != 0) {
+			mms_trace(MMS_DEBUG,
+			    "create_db_dirs error");
 			return (st);
 		}
 	}
@@ -370,6 +391,8 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 	if (populate) {
 		st = get_dbver_from_optfile(pkgfile, &ver);
 		if (st != 0) {
+			mms_trace(MMS_DEBUG,
+			    "get_dbver_from_optfile error");
 			return (st);
 		}
 
@@ -377,6 +400,8 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 		st = get_dbver_from_optfile(buf, &oldver);
 		if (st != 0) {
 			if (st != ENOENT) {
+				mms_trace(MMS_DEBUG,
+				    "get_dbver_from_optfile error");
 				return (st);
 			}
 			st = 0;
@@ -400,15 +425,32 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 	}
 
 	/* make sure the DB is running */
+	mms_trace(MMS_DEBUG, "enable db");
 	st = mgmt_set_svc_state(DBSVC, ENABLE, NULL);
 	if (st != 0) {
+		mms_trace(MMS_DEBUG,
+		    "mgmt_set_svc_state error");
+		return (st);
+	}
+
+	st = mgmt_db_ready();
+	if (st != 0) {
+		mms_trace(MMS_ERR,
+		    "database did not go ready");
 		return (st);
 	}
 
 	pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
 	    B_FALSE, cmd);
+	mms_trace(MMS_DEBUG,
+	    "exec_mgmt_cmd: %s %s %s %s %s %s",
+	    cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
 
 	st = check_exit(pid, NULL);
+	if (st != 0) {
+		mms_trace(MMS_DEBUG,
+		    "exec_mgmt_cmd error: st %d", st);
+	}
 
 	if ((st == 0) && (populate)) {
 		/* import all the sql cmds */
@@ -470,19 +512,88 @@ mgmt_db_drop(void)
 
 	pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
 	    B_FALSE, cmd);
+	mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s %s",
+	    cmd[0], cmd[1], cmd[2], cmd[3]);
+
 
 	st = check_exit(pid, NULL);
 
 	if (st != 0) {
 		/* restart the service to force users to disconnect */
 
+		mms_trace(MMS_DEBUG, "restart db");
 		(void) mgmt_set_svc_state(DBSVC, RESTART, NULL);
 
-		pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
+		st = mgmt_db_ready();
+		if (st != 0) {
+			mms_trace(MMS_ERR,
+			    "database did not go ready");
+		}
+
+		if (st == 0) {
+			pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
+			    B_FALSE, cmd);
+			mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s %s",
+			    cmd[0], cmd[1], cmd[2], cmd[3]);
+
+			st = check_exit(pid, NULL);
+		}
+	}
+
+	return (st);
+}
+
+int
+mgmt_db_ready(void)
+{
+	int		i;
+	int		st;
+	pid_t		pid;
+	FILE		*readf = NULL;
+	mmsdb_opts_t	opts;
+	char		*cmd[7];
+	char		dbbuf[2048];
+
+	if (!mgmt_chk_auth("solaris.mms.modify")) {
+		return (EACCES);
+	}
+
+	st = mgmt_get_db_opts(&opts);
+	if (st != 0) {
+		return (st);
+	}
+
+	mms_trace(MMS_DEBUG, "check for database ready");
+
+	(void) snprintf(dbbuf, sizeof (dbbuf), "%s/psql", opts.bindir);
+
+	/* simple test to list available databases to check for db ready */
+	cmd[0] = dbbuf;
+	cmd[1] = "-h";
+	cmd[2] = opts.dbhost;
+	cmd[3] = "-p";
+	cmd[4] = opts.port;
+	cmd[5] = "-l";
+	cmd[6] = NULL;
+
+	for (i = 0; i < 30; i++) {
+
+		/* when the simple test is successful the */
+		/* database is ready for socket connections */
+
+		pid = exec_mgmt_cmd(&readf, NULL, opts.dbuid, opts.dbgid,
 		    B_FALSE, cmd);
+		mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s %s %s %s",
+		    cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5]);
 
 		st = check_exit(pid, NULL);
+		if (st == 0) {
+			break;
+		}
+		(void) sleep(1);
 	}
+
+	(void) fclose(readf);
 
 	return (st);
 }
@@ -507,6 +618,8 @@ mgmt_db_check(void)
 		return (st);
 	}
 
+	/* test to see if the mms database already exists */
+
 	(void) snprintf(dbbuf, sizeof (dbbuf), "%s/psql", opts.bindir);
 
 	cmd[0] = dbbuf;
@@ -525,6 +638,9 @@ mgmt_db_check(void)
 
 	pid = exec_mgmt_cmd(&readf, NULL, opts.dbuid, opts.dbgid,
 	    B_FALSE, cmd);
+	mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s %s %s %s %s %s",
+	    cmd[0], cmd[1], cmd[2], cmd[3], cmd[4],
+	    cmd[5], cmd[6], cmd[7]);
 
 	st = check_exit(pid, NULL);
 
@@ -600,6 +716,9 @@ mgmt_db_dump(char *dumpdir, char *dumpfile, int len)
 
 	pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
 	    B_FALSE, cmd);
+	mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s %s %s %s %s %s %s %s",
+	    cmd[0], cmd[1], cmd[2], cmd[3], cmd[4],
+	    cmd[5], cmd[6], cmd[7], cmd[8], cmd[9]);
 
 	st = check_exit(pid, NULL);
 
@@ -637,6 +756,7 @@ mgmt_db_restore(char *dumpfile)
 	}
 
 	/* shutdown MM */
+	mms_trace(MMS_DEBUG, "disable mm");
 	st = mgmt_set_svc_state(MMSVC, DISABLE, &mmstate);
 	if (st != 0) {
 		if (mmstate) {
@@ -654,6 +774,7 @@ mgmt_db_restore(char *dumpfile)
 	st = mgmt_db_sql_exec(dumpfile, &opts);
 
 	if ((st == 0) && (strcmp(mmstate, "online") == 0)) {
+		mms_trace(MMS_DEBUG, "enable mm");
 		st = mgmt_set_svc_state(MMSVC, ENABLE, NULL);
 	}
 
@@ -1083,6 +1204,9 @@ mgmt_db_sql_exec(char *cmdfile, mmsdb_opts_t *opts)
 
 	pid = exec_mgmt_cmd(NULL, &dberr, opts->dbuid, opts->dbgid,
 	    B_FALSE, cmd);
+	mms_trace(MMS_DEBUG, "exec_mgmt_cmd: %s %s %s %s %s %s %s %s %s",
+	    cmd[0], cmd[1], cmd[2], cmd[3], cmd[4],
+	    cmd[5], cmd[6], cmd[7], cmd[8]);
 
 	st = check_exit(pid, NULL);
 
@@ -1294,7 +1418,16 @@ mgmt_set_db_pass(char *dbpass, nvlist_t *errs)
 	}
 
 	/* restart the db */
+	mms_trace(MMS_DEBUG, "restart db");
 	st = mgmt_set_svc_state(DBSVC, RESTART, NULL);
+
+	if (st == 0) {
+		st = mgmt_db_ready();
+		if (st != 0) {
+			mms_trace(MMS_ERR,
+			    "database did not go ready");
+		}
+	}
 
 	return (st);
 }
