@@ -1473,6 +1473,7 @@ mp_startup(void)
 #ifndef __xpv
 	extern void cpupm_init(cpu_t *);
 #endif
+	const char *fmt = "?cpu%d: %b\n";
 
 	/*
 	 * We need to get TSC on this proc synced (i.e., any delta
@@ -1540,8 +1541,8 @@ mp_startup(void)
 	 * gets large enough.
 	 */
 	if ((x86_feature & new_x86_feature) != x86_feature) {
-		cmn_err(CE_CONT, "?cpu%d: %b\n",
-		    cp->cpu_id, new_x86_feature, FMT_X86_FEATURE);
+		cmn_err(CE_CONT, fmt, cp->cpu_id, new_x86_feature,
+		    FMT_X86_FEATURE);
 		cmn_err(CE_WARN, "cpu%d feature mismatch", cp->cpu_id);
 	}
 

@@ -811,6 +811,8 @@ cpuid_pass1(cpu_t *cpu)
 				feature |= X86_SSE4_1;
 			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2)
 				feature |= X86_SSE4_2;
+			if (cp->cp_ecx & CPUID_INTC_ECX_AES)
+				feature |= X86_AES;
 		}
 	}
 	if (cp->cp_edx & CPUID_INTC_EDX_DE)
@@ -2093,6 +2095,8 @@ cpuid_pass4(cpu_t *cpu)
 				*ecx &= ~CPUID_INTC_ECX_SSE4_1;
 			if ((x86_feature & X86_SSE4_2) == 0)
 				*ecx &= ~CPUID_INTC_ECX_SSE4_2;
+			if ((x86_feature & X86_AES) == 0)
+				*ecx &= ~CPUID_INTC_ECX_AES;
 		}
 
 		/*
@@ -2122,6 +2126,10 @@ cpuid_pass4(cpu_t *cpu)
 				hwcap_flags |= AV_386_SSE4_2;
 			if (*ecx & CPUID_INTC_ECX_MOVBE)
 				hwcap_flags |= AV_386_MOVBE;
+			if (*ecx & CPUID_INTC_ECX_AES)
+				hwcap_flags |= AV_386_AES;
+			if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
+				hwcap_flags |= AV_386_PCLMULQDQ;
 		}
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
 			hwcap_flags |= AV_386_POPCNT;

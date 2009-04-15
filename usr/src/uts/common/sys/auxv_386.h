@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +66,12 @@ extern "C" {
 #define	AV_386_SSE4_1		0x800000 /* Intel SSE4.1 insns */
 #define	AV_386_SSE4_2		0x1000000 /* Intel SSE4.2 insns */
 #define	AV_386_MOVBE		0x2000000 /* Intel MOVBE insns */
+#define	AV_386_AES		0x4000000 /* Intel AES insns */
+#define	AV_386_PCLMULQDQ	0x8000000 /* Intel PCLMULQDQ insn */
 
 #define	FMT_AV_386							\
 	"\20"								\
+	"\34pclmulqdq\33aes"						\
 	"\32movbe\31sse4.2"						\
 	"\30sse4.1\27ssse3\26amd_lzcnt\25popcnt"			\
 	"\24amd_sse4a\23tscp\22ahf\21cx16"				\

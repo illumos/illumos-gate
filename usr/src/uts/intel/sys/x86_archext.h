@@ -90,7 +90,7 @@ extern "C" {
  */
 
 #define	CPUID_INTC_ECX_SSE3	0x00000001	/* Yet more SSE extensions */
-						/* 0x00000002 - reserved */
+#define	CPUID_INTC_ECX_PCLMULQDQ 0x00000002 	/* PCLMULQDQ insn */
 						/* 0x00000004 - reserved */
 #define	CPUID_INTC_ECX_MON	0x00000008	/* MONITOR/MWAIT */
 #define	CPUID_INTC_ECX_DSCPL	0x00000010	/* CPL-qualified debug store */
@@ -112,12 +112,14 @@ extern "C" {
 #define	CPUID_INTC_ECX_SSE4_2	0x00100000	/* SSE4.2 insns */
 #define	CPUID_INTC_ECX_MOVBE	0x00400000	/* MOVBE insn */
 #define	CPUID_INTC_ECX_POPCNT	0x00800000	/* POPCNT insn */
+#define	CPUID_INTC_ECX_AES	0x02000000	/* AES insns */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
+	"\32aes"						\
 	"\30popcnt\27movbe\25sse4.2\24sse4.1\23dca"		\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
-	"\10est\7smx\6vmx\5dscpl\4mon\1sse3"
+	"\10est\7smx\6vmx\5dscpl\4mon\2pclmulqdq\1sse3"
 
 /*
  * cpuid instruction feature flags in %edx (extended function 0x80000001)
@@ -353,6 +355,14 @@ extern "C" {
 #define	X86_1GPG	0x10000000
 #define	X86_CLFSH	0x20000000
 #define	X86_64		0x40000000
+#define	X86_AES		0x80000000
+
+#define	FMT_X86_FEATURE						\
+	"\20"							\
+	"\40aes\34sse4_2\33sse4_1\32ssse3\31cpuid"		\
+	"\30sse4a\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"\
+	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
+	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
 
 /*
  * flags to patch tsc_read routine.
@@ -361,13 +371,6 @@ extern "C" {
 #define	X86_HAVE_TSCP		0x1
 #define	X86_TSC_MFENCE		0x2
 #define	X86_TSC_LFENCE		0x4
-
-#define	FMT_X86_FEATURE						\
-	"\20"							\
-	"\34sse4_2\33sse4_1\32ssse3\31cpuid"			\
-	"\30sse4a\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"\
-	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
-	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.

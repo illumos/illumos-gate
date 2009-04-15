@@ -1217,6 +1217,7 @@ static void
 startup_kmem(void)
 {
 	extern void page_set_colorequiv_arr(void);
+	const char *fmt = "?features: %b\n";
 
 	PRM_POINT("startup_kmem() starting...");
 
@@ -1325,7 +1326,7 @@ startup_kmem(void)
 	/*
 	 * print this out early so that we know what's going on
 	 */
-	cmn_err(CE_CONT, "?features: %b\n", x86_feature, FMT_X86_FEATURE);
+	cmn_err(CE_CONT, fmt, x86_feature, FMT_X86_FEATURE);
 
 	/*
 	 * Initialize bp_mapin().
