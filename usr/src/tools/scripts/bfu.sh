@@ -5864,6 +5864,7 @@ mondo_loop() {
 	#
 	rm -rf $usr/lib/fm/topo
 	rm -f $usr/platform/*/lib/fm/topo/hc-topology.xml
+	rm -f $usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Blade-T6300-hc-topology.xml
 
 	#
 	# Remove old prtopo and obsoleted include file.
