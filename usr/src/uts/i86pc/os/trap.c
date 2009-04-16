@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -961,10 +961,10 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		if (tudebug && tudebugfpe)
 			showregs(type, rp, addr);
 		if (fpnoextflt(rp)) {
-			siginfo.si_signo = SIGFPE;
+			siginfo.si_signo = SIGILL;
 			siginfo.si_code  = ILL_ILLOPC;
 			siginfo.si_addr  = (caddr_t)rp->r_pc;
-			fault = FLTFPE;
+			fault = FLTILL;
 		}
 		break;
 
@@ -1407,7 +1407,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	}
 
 	if (siginfo.si_signo)
-		trapsig(&siginfo, (fault == FLTCPCOVF)? 0 : 1);
+		trapsig(&siginfo, (fault != FLTFPE && fault != FLTCPCOVF));
 
 	if (lwp->lwp_oweupc)
 		profil_tick(rp->r_pc);
