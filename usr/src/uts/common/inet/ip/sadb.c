@@ -5066,6 +5066,18 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	}
 
 	if (tunnel_mode) {
+		if (pp == NULL) {
+			/*
+			 * Tunnel mode with no policy pointer means this is a
+			 * reflected ICMP (like a ECHO REQUEST) that came in
+			 * with self-encapsulated protection.  Until we better
+			 * support this, drop the packet.
+			 */
+			ip_drop_packet(mp, B_FALSE, NULL, NULL,
+			    DROPPER(ipss, ipds_spd_got_selfencap),
+			    &ipss->ipsec_spd_dropper);
+			return;
+		}
 		/* Snag inner addresses. */
 		isrc = io->ipsec_out_insrc;
 		idst = io->ipsec_out_indst;
@@ -5511,6 +5523,8 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 		 * strange things with unions, consult your local C language
 		 * lawyer for details).
 		 */
+		ASSERT(pol != NULL);
+
 		ipsl = &(pol->ipsp_sel->ipsl_key);
 		if (ipsl->ipsl_valid & IPSL_IPV4) {
 			af = AF_INET;
