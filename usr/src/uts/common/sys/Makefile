@@ -136,7 +136,6 @@ CHKHDRS=			\
 	cpr.h			\
 	cpupart.h		\
 	cpuvar.h		\
-	cpu_pm.h		\
 	crc32.h			\
 	cred.h			\
 	cred_impl.h		\
