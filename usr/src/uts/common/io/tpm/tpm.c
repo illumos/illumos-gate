@@ -1244,14 +1244,14 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (regsize == 0x5000)
 			break;
 	}
+	if (idx == nregs)
+		return (DDI_FAILURE);
+
 	ret = ddi_regs_map_setup(tpm->dip, idx, (caddr_t *)&tpm->addr,
 	    (offset_t)0, (offset_t)0x5000,
 	    &tpm->accattr, &tpm->handle);
 
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "%s:ddi_regs_map_setup failed ret: %d",
-		    myname, ret);
 		goto FAIL;
 	}
 	tpm->flags |= TPM_DIDREGSMAP;
