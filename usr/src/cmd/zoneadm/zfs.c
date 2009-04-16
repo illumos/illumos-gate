@@ -43,6 +43,7 @@
 #include <sys/mnttab.h>
 #include <libzfs.h>
 #include <sys/mntent.h>
+#include <values.h>
 
 #include "zoneadm.h"
 
@@ -54,10 +55,18 @@ typedef struct zfs_mount_data {
 } zfs_mount_data_t;
 
 typedef struct zfs_snapshot_data {
-	char	*match_name;
-	int	len;
-	int	max;
+	char	*match_name;	/* zonename@SUNWzone */
+	int	len;		/* strlen of match_name */
+	int	max;		/* highest digit appended to snap name */
+	int	num;		/* number of snapshots to rename */
+	int	cntr;		/* counter for renaming snapshots */
 } zfs_snapshot_data_t;
+
+typedef struct clone_data {
+	zfs_handle_t	*clone_zhp;	/* clone dataset to promote */
+	time_t		origin_creation; /* snapshot creation time of clone */
+	const char	*snapshot;	/* snapshot of dataset being demoted */
+} clone_data_t;
 
 /*
  * A ZFS file system iterator call-back function which is used to validate
@@ -256,6 +265,7 @@ get_snap_max(zfs_handle_t *zhp, void *data)
 		char	*nump;
 		int	num;
 
+		cbp->num++;
 		nump = (char *)(zfs_get_name(zhp) + cbp->len);
 		num = atoi(nump);
 		if (num > cbp->max)
@@ -564,6 +574,267 @@ snap2path(char *snap_name, char *path, int len)
 }
 
 /*
+ * This callback function is used to iterate through a snapshot's dependencies
+ * to find a filesystem that is a direct clone of the snapshot being iterated.
+ */
+static int
+get_direct_clone(zfs_handle_t *zhp, void *data)
+{
+	clone_data_t	*cd = data;
+	char		origin[ZFS_MAXNAMELEN];
+	char		ds_path[ZFS_MAXNAMELEN];
+
+	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	(void) strlcpy(ds_path, zfs_get_name(zhp), sizeof (ds_path));
+
+	/* Make sure this is a direct clone of the snapshot we're iterating. */
+	if (zfs_prop_get(zhp, ZFS_PROP_ORIGIN, origin, sizeof (origin), NULL,
+	    NULL, 0, B_FALSE) != 0 || strcmp(origin, cd->snapshot) != 0) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	if (cd->clone_zhp != NULL)
+		zfs_close(cd->clone_zhp);
+
+	cd->clone_zhp = zhp;
+	return (1);
+}
+
+/*
+ * A ZFS file system iterator call-back function used to determine the clone
+ * to promote.  This function finds the youngest (i.e. last one taken) snapshot
+ * that has a clone.  If found, it returns a reference to that clone in the
+ * callback data.
+ */
+static int
+find_clone(zfs_handle_t *zhp, void *data)
+{
+	clone_data_t	*cd = data;
+	time_t		snap_creation;
+	int		zret = 0;
+
+	/* If snapshot has no clones, skip it */
+	if (zfs_prop_get_int(zhp, ZFS_PROP_NUMCLONES) == 0) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	cd->snapshot = zfs_get_name(zhp);
+
+	/* Get the creation time of this snapshot */
+	snap_creation = (time_t)zfs_prop_get_int(zhp, ZFS_PROP_CREATION);
+
+	/*
+	 * If this snapshot's creation time is greater than (i.e. younger than)
+	 * the current youngest snapshot found, iterate this snapshot to
+	 * get the right clone.
+	 */
+	if (snap_creation >= cd->origin_creation) {
+		/*
+		 * Iterate the dependents of this snapshot to find a clone
+		 * that's a direct dependent.
+		 */
+		if ((zret = zfs_iter_dependents(zhp, B_FALSE, get_direct_clone,
+		    cd)) == -1) {
+			zfs_close(zhp);
+			return (1);
+		} else if (zret == 1) {
+			/*
+			 * Found a clone, update the origin_creation time
+			 * in the callback data.
+			 */
+			cd->origin_creation = snap_creation;
+		}
+	}
+
+	zfs_close(zhp);
+	return (0);
+}
+
+/*
+ * A ZFS file system iterator call-back function used to remove standalone
+ * snapshots.
+ */
+/* ARGSUSED */
+static int
+rm_snap(zfs_handle_t *zhp, void *data)
+{
+	/* If snapshot has clones, something is wrong */
+	if (zfs_prop_get_int(zhp, ZFS_PROP_NUMCLONES) != 0) {
+		zfs_close(zhp);
+		return (1);
+	}
+
+	if (zfs_unmount(zhp, NULL, 0) == 0) {
+		(void) zfs_destroy(zhp);
+	}
+
+	zfs_close(zhp);
+	return (0);
+}
+
+/*
+ * A ZFS snapshot iterator call-back function which renames snapshots.
+ */
+static int
+rename_snap(zfs_handle_t *zhp, void *data)
+{
+	int			res;
+	zfs_snapshot_data_t	*cbp;
+	char			template[ZFS_MAXNAMELEN];
+
+	cbp = (zfs_snapshot_data_t *)data;
+
+	/*
+	 * When renaming snapshots with the iterator, the iterator can see
+	 * the same snapshot after we've renamed up in the namespace.  To
+	 * prevent this we check the count for the number of snapshots we have
+	 * to rename and stop at that point.
+	 */
+	if (cbp->cntr >= cbp->num) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	if (zfs_get_type(zhp) != ZFS_TYPE_SNAPSHOT) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	/* Only rename the snapshots we automatically generate when we clone. */
+	if (strncmp(zfs_get_name(zhp), cbp->match_name, cbp->len) != 0) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	(void) snprintf(template, sizeof (template), "%s%d", cbp->match_name,
+	    cbp->max++);
+
+	res = (zfs_rename(zhp, template, B_FALSE) != 0);
+	if (res != 0)
+		(void) fprintf(stderr, gettext("failed to rename snapshot %s "
+		    "to %s: %s\n"), zfs_get_name(zhp), template,
+		    libzfs_error_description(g_zfs));
+
+	cbp->cntr++;
+
+	zfs_close(zhp);
+	return (res);
+}
+
+/*
+ * Rename the source dataset's snapshots that are automatically generated when
+ * we clone a zone so that there won't be a name collision when we promote the
+ * cloned dataset.  Once the snapshots have been renamed, then promote the
+ * clone.
+ *
+ * The snapshot rename process gets the highest number on the snapshot names
+ * (the format is zonename@SUNWzoneXX where XX are digits) on both the source
+ * and clone datasets, then renames the source dataset snapshots starting at
+ * the next number.
+ */
+static int
+promote_clone(zfs_handle_t *src_zhp, zfs_handle_t *cln_zhp)
+{
+	zfs_snapshot_data_t	sd;
+	char			nm[ZFS_MAXNAMELEN];
+	char			template[ZFS_MAXNAMELEN];
+
+	(void) strlcpy(nm, zfs_get_name(cln_zhp), sizeof (nm));
+	/*
+	 * Start by getting the clone's snapshot max which we use
+	 * during the rename of the original dataset's snapshots.
+	 */
+	(void) snprintf(template, sizeof (template), "%s@SUNWzone", nm);
+	sd.match_name = template;
+	sd.len = strlen(template);
+	sd.max = 0;
+
+	if (zfs_iter_snapshots(cln_zhp, get_snap_max, &sd) != 0)
+		return (Z_ERR);
+
+	/*
+	 * Now make sure the source's snapshot max is at least as high as
+	 * the clone's snapshot max.
+	 */
+	(void) snprintf(template, sizeof (template), "%s@SUNWzone",
+	    zfs_get_name(src_zhp));
+	sd.match_name = template;
+	sd.len = strlen(template);
+	sd.num = 0;
+
+	if (zfs_iter_snapshots(src_zhp, get_snap_max, &sd) != 0)
+		return (Z_ERR);
+
+	/*
+	 * Now rename the source dataset's snapshots so there's no
+	 * conflict when we promote the clone.
+	 */
+	sd.max++;
+	sd.cntr = 0;
+	if (zfs_iter_snapshots(src_zhp, rename_snap, &sd) != 0)
+		return (Z_ERR);
+
+	/* close and reopen the clone dataset to get the latest info */
+	zfs_close(cln_zhp);
+	if ((cln_zhp = zfs_open(g_zfs, nm, ZFS_TYPE_FILESYSTEM)) == NULL)
+		return (Z_ERR);
+
+	if (zfs_promote(cln_zhp) != 0) {
+		(void) fprintf(stderr, gettext("failed to promote %s: %s\n"),
+		    nm, libzfs_error_description(g_zfs));
+		return (Z_ERR);
+	}
+
+	zfs_close(cln_zhp);
+	return (Z_OK);
+}
+
+/*
+ * Promote the youngest clone.  That clone will then become the origin of all
+ * of the other clones that were hanging off of the source dataset.
+ */
+int
+promote_all_clones(zfs_handle_t *zhp)
+{
+	clone_data_t	cd;
+	char		nm[ZFS_MAXNAMELEN];
+
+	cd.clone_zhp = NULL;
+	cd.origin_creation = 0;
+	cd.snapshot = NULL;
+
+	if (zfs_iter_snapshots(zhp, find_clone, &cd) != 0) {
+		zfs_close(zhp);
+		return (Z_ERR);
+	}
+
+	/* Nothing to promote. */
+	if (cd.clone_zhp == NULL)
+		return (Z_OK);
+
+	/* Found the youngest clone to promote.  Promote it. */
+	if (promote_clone(zhp, cd.clone_zhp) != 0) {
+		zfs_close(cd.clone_zhp);
+		zfs_close(zhp);
+		return (Z_ERR);
+	}
+
+	/* close and reopen the main dataset to get the latest info */
+	(void) strlcpy(nm, zfs_get_name(zhp), sizeof (nm));
+	zfs_close(zhp);
+	if ((zhp = zfs_open(g_zfs, nm, ZFS_TYPE_FILESYSTEM)) == NULL)
+		return (Z_ERR);
+
+	return (Z_OK);
+}
+
+/*
  * Clone a pre-existing ZFS snapshot, either by making a direct ZFS clone, if
  * possible, or by copying the data from the snapshot to the zonepath.
  */
@@ -779,11 +1050,22 @@ destroy_zfs(char *zonepath)
 	if ((zhp = mount2zhandle(zonepath)) == NULL)
 		return (Z_ERR);
 
+	if (promote_all_clones(zhp) != 0)
+		return (Z_ERR);
+
+	/* Now cleanup any snapshots remaining. */
+	if (zfs_iter_snapshots(zhp, rm_snap, NULL) != 0) {
+		zfs_close(zhp);
+		return (Z_ERR);
+	}
+
 	/*
-	 * We can't destroy the file system if it has dependents.
+	 * We can't destroy the file system if it has still has dependents.
+	 * There shouldn't be any at this point, but we'll double check.
 	 */
-	if (zfs_iter_dependents(zhp, B_TRUE, has_dependent, NULL) != 0 ||
-	    zfs_unmount(zhp, NULL, 0) != 0) {
+	if (zfs_iter_dependents(zhp, B_TRUE, has_dependent, NULL) != 0) {
+		(void) fprintf(stderr, gettext("zfs destroy %s failed: the "
+		    "dataset still has dependents\n"), zfs_get_name(zhp));
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
@@ -796,12 +1078,21 @@ destroy_zfs(char *zonepath)
 	    NULL, 0, B_FALSE) == 0)
 		is_clone = B_TRUE;
 
+	if (zfs_unmount(zhp, NULL, 0) != 0) {
+		(void) fprintf(stderr, gettext("zfs unmount %s failed: %s\n"),
+		    zfs_get_name(zhp), libzfs_error_description(g_zfs));
+		zfs_close(zhp);
+		return (Z_ERR);
+	}
+
 	if (zfs_destroy(zhp) != 0) {
 		/*
 		 * If the destroy fails for some reason, try to remount
 		 * the file system so that we can use "rm -rf" to clean up
 		 * instead.
 		 */
+		(void) fprintf(stderr, gettext("zfs destroy %s failed: %s\n"),
+		    zfs_get_name(zhp), libzfs_error_description(g_zfs));
 		(void) zfs_mount(zhp, NULL, 0);
 		zfs_close(zhp);
 		return (Z_ERR);
