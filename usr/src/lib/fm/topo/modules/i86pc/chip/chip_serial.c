@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,6 +232,58 @@ get_dimm_serial(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	/* LINTED: E_SEC_PRINTF_VAR_FMT */
 	(void) snprintf(ipmi_tag, BUFSZ, fmtstr, topo_node_instance(chip),
 	    (topo_node_instance(node) + offset));
+
+	if (ipmi_serial_lookup(mod, ipmi_tag, fru_serial) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup serial for %s\n",
+		    ipmi_tag);
+		(void) strcpy(fru_serial, "");
+	}
+
+	if (store_prop_val(mod, fru_serial, "serial", out) != 0) {
+		topo_mod_dprintf(mod, "Failed to set serial\n");
+		/* topo errno already set */
+		return (-1);
+	}
+	return (0);
+}
+
+/* ARGSUSED */
+int
+get_cs_serial(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *fmtstr, ipmi_tag[BUFSZ], fru_serial[FRU_INFO_MAXLEN];
+	tnode_t *chip, *chan;
+	int ret, dimm_num;
+	uint32_t offset;
+	nvlist_t *args;
+
+	topo_mod_dprintf(mod, "get_cs_serial() called\n");
+	if ((ret = nvlist_lookup_nvlist(in, "args", &args)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		/* topo errno set */
+		topo_mod_dprintf(mod, "Failed to retrieve format arg\n");
+		return (-1);
+	}
+
+	chip = topo_node_parent(topo_node_parent(topo_node_parent(node)));
+	chan = topo_node_parent(node);
+
+	dimm_num = topo_node_instance(node) - (topo_node_instance(node) % 2)
+	    + topo_node_instance(chan) + offset;
+
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) snprintf(ipmi_tag, BUFSZ, fmtstr, topo_node_instance(chip),
+	    dimm_num);
 
 	if (ipmi_serial_lookup(mod, ipmi_tag, fru_serial) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup serial for %s\n",

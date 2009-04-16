@@ -453,6 +453,74 @@
                         </propgroup>
 
                     </set>
+
+		  <!--
+	       		Lets consider both upper and lower case formats for the product name
+			Since few X6240 test systems had SMB_TYPE_SYSTEM set to 
+			all upper case characters in SMBIOS
+		  -->
+          	  <set type='product' setlist='SUN-BLADE-X6240-SERVER-MODULE|Sun-Blade-X6240-Server-Module'>
+
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+                               data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+                                    propname='label' proptype='string' >
+
+                                <argval name='format' type='string'
+                                    value='CPU %d D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+                            </propmethod>
+
+                            <propmethod name='get_cs_serial' version='0'
+                                    propname='serial' proptype='string'
+				    nonvolatile='1' >
+
+                                <argval name='format' type='string'
+                                    value='P%d/D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+
+                        </propgroup>
+
+                    </set>
+
+		  <!--
+	       		Lets consider both upper and lower case formats for the product name
+			Since few X6440 test systems had SMB_TYPE_SYSTEM set to 
+			all upper case characters in SMBIOS
+		  -->
+                  <set type='product' setlist='SUN-BLADE-X6440-SERVER-MODULE|Sun-Blade-X6440-Server-Module'>
+
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+                               data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+                                    propname='label' proptype='string' >
+
+                                <argval name='format' type='string'
+                                    value='CPU %d D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+                            </propmethod>
+
+                            <propmethod name='get_cs_serial' version='0'
+                                    propname='serial' proptype='string'
+				    nonvolatile='1' >
+
+                                <argval name='format' type='string'
+                                    value='P%d/D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+
+                        </propgroup>
+
+                    </set>
+
+
                     <set type='product' setlist='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
 		    
                         <propgroup name='protocol' version='1'

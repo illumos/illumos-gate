@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@ extern "C" {
  * DIMM serial number property methods
  */
 #define	GET_DIMM_SERIAL		"get_dimm_serial"
+#define	GET_CS_SERIAL		"get_cs_serial"
 
 extern int simple_dimm_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
@@ -108,6 +109,8 @@ extern int g4_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
 extern int a4fplus_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int simple_cs_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int get_cs_serial(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int get_dimm_serial(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
