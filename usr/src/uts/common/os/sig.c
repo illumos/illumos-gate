@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -146,6 +143,7 @@ signal_is_blocked(kthread_t *t, int sig)
  *	the process is single-threaded
  *	the signal is not being traced by /proc
  * 	the signal is not blocked by the process
+ *	the signal is not being accepted via sigwait()
  */
 static int
 sig_discardable(proc_t *p, int sig)
@@ -156,7 +154,8 @@ sig_discardable(proc_t *p, int sig)
 	    (sigismember(&p->p_ignore, sig) &&	/* signal is ignored */
 	    t->t_forw == t &&			/* and single-threaded */
 	    !tracing(p, sig) &&			/* and no /proc tracing */
-	    !signal_is_blocked(t, sig)));	/* and signal not blocked */
+	    !signal_is_blocked(t, sig) &&	/* and signal not blocked */
+	    !sigismember(&t->t_sigwait, sig)));	/* and not being accepted */
 }
 
 /*
@@ -474,6 +473,7 @@ issig_justlooking(void)
 		for (sig = 1; sig < NSIG; sig++) {
 			if (sigismember(&set, sig) &&
 			    (tracing(p, sig) ||
+			    sigismember(&t->t_sigwait, sig) ||
 			    !sigismember(&p->p_ignore, sig))) {
 				/*
 				 * Don't promote a signal that will stop
@@ -622,13 +622,19 @@ issig_forreal(void)
 		 * signal; we cancel lwp->lwp_cursig temporarily before
 		 * calling isjobstop().  The current signal may be reset
 		 * by a debugger while we are stopped in isjobstop().
+		 *
+		 * If the current thread is accepting the signal
+		 * (via sigwait(), sigwaitinfo(), or sigtimedwait()),
+		 * we allow the signal to be accepted, even if it is
+		 * being ignored, and without causing a job control stop.
 		 */
 		if ((sig = lwp->lwp_cursig) != 0) {
 			ext = lwp->lwp_extsig;
 			lwp->lwp_cursig = 0;
 			lwp->lwp_extsig = 0;
-			if (!sigismember(&p->p_ignore, sig) &&
-			    !isjobstop(sig)) {
+			if (sigismember(&t->t_sigwait, sig) ||
+			    (!sigismember(&p->p_ignore, sig) &&
+			    !isjobstop(sig))) {
 				if (p->p_flag & (SEXITLWPS|SKILLED)) {
 					sig = SIGKILL;
 					ext = (p->p_flag & SEXTKILLED) != 0;
@@ -675,14 +681,12 @@ issig_forreal(void)
 		 * then the signals pending for the process as a whole.
 		 */
 		for (;;) {
-			k_sigset_t tsig;
-
-			tsig = t->t_sig;
-			if ((sig = fsig(&tsig, t)) != 0) {
+			if ((sig = fsig(&t->t_sig, t)) != 0) {
 				if (sig == SIGCLD)
 					sigcld_found = 1;
 				toproc = 0;
 				if (tracing(p, sig) ||
+				    sigismember(&t->t_sigwait, sig) ||
 				    !sigismember(&p->p_ignore, sig)) {
 					if (sigismember(&t->t_extsig, sig))
 						ext = 1;
@@ -696,6 +700,7 @@ issig_forreal(void)
 					sigcld_found = 1;
 				toproc = 1;
 				if (tracing(p, sig) ||
+				    sigismember(&t->t_sigwait, sig) ||
 				    !sigismember(&p->p_ignore, sig)) {
 					if (sigismember(&p->p_extsig, sig))
 						ext = 1;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -95,7 +93,6 @@ int
 sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 {
 	sigset_t set;
-	k_sigset_t kset;
 	k_sigset_t oldmask;
 	kthread_t *t = curthread;
 	klwp_t *lwp = ttolwp(t);
@@ -135,8 +132,8 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 	}
 	if (copyin(setp, &set, sizeof (set)))
 		return (set_errno(EFAULT));
-	sigutok(&set, &kset);
-	if (sigisempty(&kset))
+	sigutok(&set, &t->t_sigwait);
+	if (sigisempty(&t->t_sigwait))
 		return (set_errno(EINVAL));
 
 	mutex_enter(&p->p_lock);
@@ -146,7 +143,7 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 	 */
 	schedctl_finish_sigblock(t);
 	oldmask = t->t_hold;
-	sigdiffset(&t->t_hold, &kset);
+	sigdiffset(&t->t_hold, &t->t_sigwait);
 
 	/*
 	 * Wait until we take a signal or until
@@ -166,18 +163,21 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 
 	if (error) {
 		mutex_exit(&p->p_lock);
+		sigemptyset(&t->t_sigwait);
 		return (set_errno(error));	/* timer expired */
 	}
 	/*
 	 * Don't bother with signal if it is not in request set.
 	 */
-	if (lwp->lwp_cursig == 0 || !sigismember(&kset, lwp->lwp_cursig)) {
+	if (lwp->lwp_cursig == 0 ||
+	    !sigismember(&t->t_sigwait, lwp->lwp_cursig)) {
 		mutex_exit(&p->p_lock);
 		/*
 		 * lwp_cursig is zero if pokelwps() awakened cv_wait_sig().
 		 * This happens if some other thread in this process called
 		 * forkall() or exit().
 		 */
+		sigemptyset(&t->t_sigwait);
 		return (set_errno(EINTR));
 	}
 
@@ -203,5 +203,6 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 		siginfofree(lwp->lwp_curinfo);
 		lwp->lwp_curinfo = NULL;
 	}
+	sigemptyset(&t->t_sigwait);
 	return (ret);
 }
