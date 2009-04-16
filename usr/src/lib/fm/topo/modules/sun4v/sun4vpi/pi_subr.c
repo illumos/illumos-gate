@@ -369,8 +369,10 @@ pi_get_path(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 	int	i = 0;
 	size_t	max_addrs;
 	size_t	path_len = 0;
+	size_t	buf_len;
 	char	*propbuf = NULL;
 	char	*buf = NULL;
+	char	*buffree;
 	char	*path = NULL;
 	char	*token;
 	char	*dev_addr[MAX_PATH_DEPTH] = { NULL };
@@ -386,7 +388,14 @@ pi_get_path(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 		topo_mod_dprintf(mod, "pi_get_path: failed to get path\n");
 		return (NULL);
 	}
-	buf = topo_mod_strdup(mod, propbuf);
+	buf_len = strlen(propbuf) + 1;
+	buf = topo_mod_alloc(mod, buf_len);
+	if (buf == NULL) {
+		topo_mod_dprintf(mod, "pi_get_path: no memory\n");
+		return (NULL);
+	}
+	buffree = buf; /* strtok_r is destructive */
+	(void) strcpy(buf, propbuf);
 
 	/*
 	 * Grab the address(es) from the path property.
@@ -399,14 +408,17 @@ pi_get_path(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 			} else {
 				topo_mod_dprintf(mod, "pi_get_path: path "
 				    "too long (%d)\n", i);
+				topo_mod_free(mod, buffree, buf_len);
 				return (NULL);
 			}
 		}
 	} else {
 		topo_mod_dprintf(mod, "pi_get_path: path wrong\n");
+		topo_mod_free(mod, buffree, buf_len);
 		return (NULL);
 	}
 	max_addrs = ++i;
+	topo_mod_free(mod, buffree, buf_len);
 
 	/*
 	 * Construct the path to look something like "/pci@600/pci@0".

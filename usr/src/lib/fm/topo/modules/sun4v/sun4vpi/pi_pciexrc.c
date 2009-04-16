@@ -377,7 +377,7 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			    "%s node_0x%llx failed to set EXCAP property\n",
 			    _enum_name, (uint64_t)mde_node);
 			topo_mod_seterrno(mod, err);
-			return (result);
+			goto out;
 		}
 
 		/* Set BDF for root complex */
@@ -399,7 +399,6 @@ pi_enum_update(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 			    "%s node_0x%llx failed to create %s range\n",
 			    _enum_name, (uint64_t)mde_node, PCIEX_BUS);
 			result = -1;
-			goto out;
 		}
 	}
 
