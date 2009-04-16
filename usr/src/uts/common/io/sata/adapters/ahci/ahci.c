@@ -2874,6 +2874,9 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
 	/* Device is unknown at first */
 	ahci_portp->ahciport_device_type = SATA_DTYPE_UNKNOWN;
 
+	/* Disable the interface power management */
+	ahci_disable_interface_pm(ahci_ctlp, port);
+
 	port_sstatus = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxSSTS(ahci_ctlp, port));
 	port_task_file = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
@@ -2959,9 +2962,6 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
 		    (uint64_t *)AHCI_PORT_PxCLB(ahci_ctlp, port),
 		    ahci_portp->ahciport_cmd_list_dma_cookie.dmac_laddress);
 	}
-
-	/* Disable the interface power management */
-	ahci_disable_interface_pm(ahci_ctlp, port);
 
 	/* Return directly if no device connected */
 	if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
