@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -493,6 +493,7 @@ ds_pri_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	size_t len;
 	int retval;
 	caddr_t tmpbufp;
+	offset_t off = uiop->uio_offset;
 
 	instance = getminor(dev);
 	if ((sp = ddi_get_soft_state(ds_pri_statep, instance)) == NULL)
@@ -526,15 +527,9 @@ ds_pri_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		}
 	}
 
-	if (uiop->uio_offset < 0 || uiop->uio_offset > sp->ds_pri_len) {
-		mutex_exit(&sp->lock);
-		return (EINVAL);
-	}
+	if (len > sp->ds_pri_len)
+		len = sp->ds_pri_len;
 
-	if (len > (sp->ds_pri_len - uiop->uio_offset))
-		len = sp->ds_pri_len - uiop->uio_offset;
-
-	/* already checked that offset < ds_pri_len above */
 	if (len == 0) {
 		mutex_exit(&sp->lock);
 		return (0);
@@ -552,12 +547,18 @@ ds_pri_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	 */
 
 	tmpbufp = kmem_alloc(len, KM_SLEEP);
-	bcopy(((caddr_t)sp->ds_pri) + uiop->uio_offset, tmpbufp, len);
+	bcopy(((caddr_t)sp->ds_pri), tmpbufp, len);
 	mutex_exit(&sp->lock);
 
 	retval = uiomove(tmpbufp, len, UIO_READ, uiop);
 
 	kmem_free(tmpbufp, len);
+
+	/*
+	 * restore uio_offset after uiomove since the driver
+	 * does not support the concept of position.
+	 */
+	uiop->uio_offset = off;
 
 	return (retval);
 }
