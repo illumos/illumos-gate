@@ -132,7 +132,15 @@ main(int ac, char *av[])
 		}
 
 		status = papiPrinterDisable(svc, printer, reason);
-		if (status != PAPI_OK) {
+		if (status == PAPI_OK) {
+			printf(gettext("printer \"%s\" now disabled\n"),
+			    printer);
+		} else if (status == PAPI_NOT_ACCEPTING) {
+			fprintf(stderr, gettext(
+			    "Destination \"%s\" was already disabled.\n"),
+			    printer);
+			exit_status = 1;
+		} else {
 			fprintf(stderr, gettext("disable: %s: %s\n"), printer,
 			    verbose_papi_message(svc, status));
 			exit_status = 1;

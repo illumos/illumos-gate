@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -64,18 +63,19 @@ snd_msg(service_t *svc, int type, ...)
 	va_end(ap);
 	if (rc < 0) {
 		detailed_error(svc,
-			gettext("unable to build message for scheduler: %s"),
-				strerror(errno));
+		    gettext("unable to build message for scheduler: %s"),
+		    strerror(errno));
 		return (rc);
 	}
 
 	/* write the message */
-	while (((rc = mwrite(svc->md, svc->msgbuf)) < 0) && (errno == EINTR));
+	while (((rc = mwrite(svc->md, svc->msgbuf)) < 0) && (errno == EINTR)) {
+	}
 
 	if (rc < 0)
 		detailed_error(svc,
-			gettext("unable to send message to scheduler: %s"),
-				strerror(errno));
+		    gettext("unable to send message to scheduler: %s"),
+		    strerror(errno));
 	return (rc);
 }
 
@@ -92,12 +92,13 @@ rcv_msg(service_t *svc, int type, ...)
 
 	/* read the message */
 	while (((rc = mread(svc->md, svc->msgbuf, svc->msgbuf_size)) < 0) &&
-		(errno == EINTR));
+	    (errno == EINTR)) {
+	}
 
 	if (rc < 0)
 		detailed_error(svc,
-			gettext("unable to read message from scheduler: %s"),
-				strerror(errno));
+		    gettext("unable to read message from scheduler: %s"),
+		    strerror(errno));
 	else {
 		va_list ap;
 
@@ -108,7 +109,7 @@ rcv_msg(service_t *svc, int type, ...)
 		if (rc < 0)
 			detailed_error(svc,
 			gettext("unable to parse message from scheduler: %s"),
-				strerror(errno));
+			    strerror(errno));
 	}
 
 	return (rc);
@@ -182,7 +183,7 @@ lpsched_status_string(short status)
 		static char result[16];
 
 		snprintf(result, sizeof (result), gettext("status: %d"),
-								status);
+		    status);
 		return (result);
 		}
 	}
@@ -204,7 +205,7 @@ lpsched_alloc_files(papi_service_t svc, int number, char **prefix)
 	if (status != MOK) {
 		detailed_error(svc,
 		gettext("failed to allocate %d file(s) for request: %s"),
-			number, lpsched_status_string(status));
+		    number, lpsched_status_string(status));
 		result = lpsched_status_to_papi_status(status);
 	}
 
@@ -258,8 +259,8 @@ lpsched_start_change(papi_service_t svc, char *printer, int32_t job_id,
 	if (status != MOK) {
 		detailed_error(svc,
 		gettext("failed to initiate change for job (%s-%d): %s"),
-			printer,
-			job_id, lpsched_status_string(status));
+		    printer,
+		    job_id, lpsched_status_string(status));
 		result = lpsched_status_to_papi_status(status);
 	}
 
@@ -289,7 +290,7 @@ lpsched_end_change(papi_service_t svc, char *printer, int32_t job_id)
 	if (status != MOK) {
 		detailed_error(svc,
 		gettext("failed to commit change for job (%s-%d): %s"), printer,
-			job_id, lpsched_status_string(status));
+		    job_id, lpsched_status_string(status));
 		result = lpsched_status_to_papi_status(status);
 	}
 
@@ -300,7 +301,7 @@ papi_status_t
 lpsched_accept_printer(papi_service_t svc, char *printer)
 {
 	papi_status_t result = PAPI_OK;
-	short	 status;
+	short	status = MOK;
 	char	*req_id;
 	char *dest;
 
@@ -315,9 +316,9 @@ lpsched_accept_printer(papi_service_t svc, char *printer)
 
 	if ((status != MOK) && (status != MERRDEST)) {
 		detailed_error(svc, "%s: %s", printer,
-			lpsched_status_string(status));
-		result = lpsched_status_to_papi_status(status);
+		    lpsched_status_string(status));
 	}
+	result = lpsched_status_to_papi_status(status);
 
 	return (result);
 }
@@ -326,7 +327,7 @@ papi_status_t
 lpsched_reject_printer(papi_service_t svc, char *printer, char *message)
 {
 	papi_status_t result = PAPI_OK;
-	short	 status;
+	short	 status = MOK;
 	char	*req_id;
 	char *dest;
 
@@ -344,9 +345,9 @@ lpsched_reject_printer(papi_service_t svc, char *printer, char *message)
 
 	if ((status != MOK) && (status != MERRDEST)) {
 		detailed_error(svc, "%s: %s", printer,
-			lpsched_status_string(status));
-		result = lpsched_status_to_papi_status(status);
+		    lpsched_status_string(status));
 	}
+	result = lpsched_status_to_papi_status(status);
 
 	return (result);
 }
@@ -355,7 +356,7 @@ papi_status_t
 lpsched_enable_printer(papi_service_t svc, char *printer)
 {
 	papi_status_t result = PAPI_OK;
-	short	 status;
+	short	 status = MOK;
 	char	*req_id;
 	char *dest;
 
@@ -370,9 +371,9 @@ lpsched_enable_printer(papi_service_t svc, char *printer)
 
 	if ((status != MOK) && (status != MERRDEST)) {
 		detailed_error(svc, "%s: %s", printer,
-			lpsched_status_string(status));
-		result = lpsched_status_to_papi_status(status);
+		    lpsched_status_string(status));
 	}
+	result = lpsched_status_to_papi_status(status);
 
 	return (result);
 }
@@ -381,7 +382,7 @@ papi_status_t
 lpsched_disable_printer(papi_service_t svc, char *printer, char *message)
 {
 	papi_status_t result = PAPI_OK;
-	short	 status;
+	short	 status = MOK;
 	char	*req_id;
 	char *dest;
 
@@ -399,9 +400,9 @@ lpsched_disable_printer(papi_service_t svc, char *printer, char *message)
 
 	if ((status != MOK) && (status != MERRDEST)) {
 		detailed_error(svc, "%s: %s", printer,
-			lpsched_status_string(status));
-		result = lpsched_status_to_papi_status(status);
+		    lpsched_status_string(status));
 	}
+	result = lpsched_status_to_papi_status(status);
 
 	return (result);
 }
@@ -463,7 +464,7 @@ remove_from_class(papi_service_t handle, char *dest, CLASS *cls)
 		if (cls->members != NULL) {
 			if (putclass(cls->name, cls) == 0)
 				(void) lpsched_load_unload_dest(handle,
-						cls->name, S_LOAD_CLASS);
+				    cls->name, S_LOAD_CLASS);
 		} else
 			(void) lpsched_remove_class(handle, cls->name);
 	}
@@ -516,10 +517,10 @@ lpsched_add_modify_class(papi_service_t handle, char *dest,
 	 * members.  Anything else will be ignored.
 	 */
 	for (result = papiAttributeListGetString(attributes, &iter,
-					"member-names", &member);
+	    "member-names", &member);
 	    result == PAPI_OK;
 	    result = papiAttributeListGetString(attributes, &iter,
-					NULL, &member))
+	    NULL, &member))
 		addlist(&members, member);
 
 	if (members != NULL) {

@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: reject.c 146 2006-03-24 00:26:54Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +48,8 @@ usage(char *program)
 		name++;
 
 	fprintf(stdout,
-		gettext("Usage: %s destination ...\n"),
-		name);
+	    gettext("Usage: %s destination ...\n"),
+	    name);
 	exit(1);
 }
 
@@ -86,18 +85,27 @@ main(int ac, char *av[])
 		char *printer = av[optind++];
 
 		status = papiServiceCreate(&svc, printer, NULL, NULL,
-					cli_auth_callback, encryption, NULL);
+		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
 			fprintf(stderr, gettext(
-				"Failed to contact service for %s: %s\n"),
-				printer, verbose_papi_message(svc, status));
+			    "Failed to contact service for %s: %s\n"),
+			    printer, verbose_papi_message(svc, status));
 			exit_status = 1;
 		}
 
 		status = papiPrinterPause(svc, printer, reason);
-		if (status != PAPI_OK) {
+		if (status == PAPI_OK) {
+			printf(gettext(
+			    "Destination \"%s\" will no longer "
+			    "accept requests\n"), printer);
+		} else if (status == PAPI_NOT_ACCEPTING) {
+			fprintf(stderr, gettext(
+			    "Destination \"%s\" was already not "
+			    "accepting requests.\n"), printer);
+			exit_status = 1;
+		} else {
 			fprintf(stderr, gettext("reject: %s: %s\n"), printer,
-				verbose_papi_message(svc, status));
+			    verbose_papi_message(svc, status));
 			exit_status = 1;
 		}
 
