@@ -2765,7 +2765,7 @@ find_spare(zpool_handle_t *zhp, void *data)
  */
 void
 print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
-    int namewidth, int depth, boolean_t isspare, boolean_t print_logs)
+    int namewidth, int depth, boolean_t isspare)
 {
 	nvlist_t **child;
 	uint_t c, children;
@@ -2879,13 +2879,14 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	for (c = 0; c < children; c++) {
 		uint64_t is_log = B_FALSE;
 
+		/* Don't print logs here */
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
 		    &is_log);
-		if ((is_log && !print_logs) || (!is_log && print_logs))
+		if (is_log)
 			continue;
 		vname = zpool_vdev_name(g_zfs, zhp, child[c]);
 		print_status_config(zhp, vname, child[c],
-		    namewidth, depth + 2, isspare, B_FALSE);
+		    namewidth, depth + 2, isspare);
 		free(vname);
 	}
 }
@@ -2940,7 +2941,7 @@ print_spares(zpool_handle_t *zhp, nvlist_t **spares, uint_t nspares,
 	for (i = 0; i < nspares; i++) {
 		name = zpool_vdev_name(g_zfs, zhp, spares[i]);
 		print_status_config(zhp, name, spares[i],
-		    namewidth, 2, B_TRUE, B_FALSE);
+		    namewidth, 2, B_TRUE);
 		free(name);
 	}
 }
@@ -2960,7 +2961,40 @@ print_l2cache(zpool_handle_t *zhp, nvlist_t **l2cache, uint_t nl2cache,
 	for (i = 0; i < nl2cache; i++) {
 		name = zpool_vdev_name(g_zfs, zhp, l2cache[i]);
 		print_status_config(zhp, name, l2cache[i],
-		    namewidth, 2, B_FALSE, B_FALSE);
+		    namewidth, 2, B_FALSE);
+		free(name);
+	}
+}
+
+/*
+ * Print log vdevs.
+ * Logs are recorded as top level vdevs in the main pool child array but with
+ * "is_log" set to 1. We use print_status_config() to print the top level logs
+ * then any log children (eg mirrored slogs) are printed recursively - which
+ * works because only the top level vdev is marked "is_log"
+ */
+static void
+print_logs(zpool_handle_t *zhp, nvlist_t *nv, int namewidth)
+{
+	uint_t c, children;
+	nvlist_t **child;
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN, &child,
+	    &children) != 0)
+		return;
+
+	(void) printf(gettext("\tlogs\n"));
+
+	for (c = 0; c < children; c++) {
+		uint64_t is_log = B_FALSE;
+		char *name;
+
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+		    &is_log);
+		if (!is_log)
+			continue;
+		name = zpool_vdev_name(g_zfs, zhp, child[c]);
+		print_status_config(zhp, name, child[c], namewidth, 2, B_FALSE);
 		free(name);
 	}
 }
@@ -3190,11 +3224,9 @@ status_callback(zpool_handle_t *zhp, void *data)
 		(void) printf(gettext("\t%-*s  %-8s %5s %5s %5s\n"), namewidth,
 		    "NAME", "STATE", "READ", "WRITE", "CKSUM");
 		print_status_config(zhp, zpool_get_name(zhp), nvroot,
-		    namewidth, 0, B_FALSE, B_FALSE);
-		if (num_logs(nvroot) > 0)
-			print_status_config(zhp, "logs", nvroot, namewidth, 0,
-			    B_FALSE, B_TRUE);
+		    namewidth, 0, B_FALSE);
 
+		print_logs(zhp, nvroot, namewidth);
 		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
 		    &l2cache, &nl2cache) == 0)
 			print_l2cache(zhp, l2cache, nl2cache, namewidth);
