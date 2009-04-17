@@ -888,6 +888,7 @@ _init(void)
 		 * wasn't loaded there should be no Linux processes, and
 		 * thus no way for these data structures to be modified.
 		 */
+		lx_pid_fini();
 		if (lx_futex_fini())
 			panic("lx brand module cannot be loaded or unloaded.");
 	}

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file defines the standard set of inlines and translators to be made
@@ -249,6 +247,8 @@ translator psinfo_t < proc_t *T > {
 	pr_projid = T->p_task->tk_proj->kpj_id;
 	pr_poolid = T->p_pool->pool_id;
 	pr_zoneid = T->p_zone->zone_id;
+	pr_contract = (T->p_ct_process == NULL) ? -1 :
+	    T->p_ct_process->conp_contract.ct_id;
 };
 
 /*
@@ -283,6 +283,7 @@ translator psinfo_t < kthread_t *T > {
 	pr_projid = xlate <psinfo_t> (T->t_procp).pr_projid;
 	pr_poolid = xlate <psinfo_t> (T->t_procp).pr_poolid;
 	pr_zoneid = xlate <psinfo_t> (T->t_procp).pr_zoneid;
+	pr_contract = xlate <psinfo_t> (T->t_procp).pr_contract;
 };
 
 /*
