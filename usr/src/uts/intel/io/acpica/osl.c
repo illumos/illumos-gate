@@ -210,8 +210,8 @@ AcpiOsGetRootPointer()
 	 * The boot code process the table and put the physical address
 	 * in the acpi-root-tab property.
 	 */
-	Address = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(), 0,
-	    "acpi-root-tab", NULL);
+	Address = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "acpi-root-tab", NULL);
 
 	if ((Address == NULL) && ACPI_FAILURE(AcpiFindRootPointer(&Address)))
 		Address = NULL;

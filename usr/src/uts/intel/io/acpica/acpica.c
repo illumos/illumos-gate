@@ -126,9 +126,13 @@ _init(void)
 
 	AcpiGbl_EnableInterpreterSlack = (acpica_enable_interpreter_slack != 0);
 
-	if ((status = AcpiInitializeSubsystem()) != AE_OK) {
-		cmn_err(CE_WARN, "!acpica: error pre-init:1:%d", status);
-	}
+	/* global ACPI CA initialization */
+	if (ACPI_FAILURE(status = AcpiInitializeSubsystem()))
+		cmn_err(CE_WARN, "!AcpiInitializeSubsystem failed: %d", status);
+
+	/* initialize table manager */
+	if (ACPI_FAILURE(status = AcpiInitializeTables(NULL, 0, 0)))
+		cmn_err(CE_WARN, "!AcpiInitializeTables failed: %d", status);
 
 	acpi_fp_setwake = acpica_ddi_setwake;
 
@@ -386,9 +390,6 @@ acpica_init()
 	mutex_enter(&acpica_module_lock);
 
 	if (acpica_init_state == ACPICA_NOT_INITIALIZED) {
-		if (ACPI_FAILURE(status = AcpiInitializeTables(NULL, 0, 0)))
-			goto error;
-
 		if (ACPI_FAILURE(status = AcpiLoadTables()))
 			goto error;
 
@@ -399,13 +400,11 @@ acpica_init()
 		    acpi_init_level)))
 			goto error;
 
+		/* do after AcpiEnableSubsystem() so GPEs are initialized */
+		acpica_ec_init();	/* initialize EC if present */
+
 		if (ACPI_FAILURE(status = AcpiInitializeObjects(0)))
 			goto error;
-
-		/*
-		 * Initialize EC
-		 */
-		acpica_ec_init();
 
 		acpica_init_state = ACPICA_INITIALIZED;
 		/*

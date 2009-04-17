@@ -110,8 +110,8 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 	int ecfg_found = 0;
 
 	/* Query the MCFG table using ACPI */
-	if ((acpica_init() == AE_OK) && (AcpiGetTable(ACPI_SIG_MCFG, 1,
-	    (ACPI_TABLE_HEADER **)&mcfgp) == AE_OK)) {
+	if (AcpiGetTable(ACPI_SIG_MCFG, 1,
+	    (ACPI_TABLE_HEADER **)&mcfgp) == AE_OK) {
 
 		cfg_baap = (CFG_BASE_ADDR_ALLOC *)mcfgp->CfgBaseAddrAllocList;
 		cfg_baa_endp = ((char *)mcfgp) + mcfgp->Length;
