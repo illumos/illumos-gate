@@ -25,17 +25,32 @@
 
 #include <sys/types.h>
 #include <sys/systm.h>
-#include <sys/ddi.h>
 #include <sys/sysmacros.h>
-#include <sys/strsun.h>
 #include <netinet/in.h>
-#include <sys/crypto/spi.h>
-#include <modes/modes.h>
 #include "aes_impl.h"
 #ifndef	_KERNEL
 #include <strings.h>
 #include <stdlib.h>
 #endif	/* !_KERNEL */
+
+#ifdef __amd64
+
+#ifdef _KERNEL
+#include <sys/cpuvar.h>		/* cpu_t, CPU */
+#include <sys/x86_archext.h>	/* x86_feature, X86_AES */
+#include <sys/disp.h>		/* kpreempt_disable(), kpreempt_enable */
+
+/* Workaround for no XMM kernel thread save/restore */
+#define	KPREEMPT_DISABLE	kpreempt_disable()
+#define	KPREEMPT_ENABLE		kpreempt_enable()
+
+#else
+#include <sys/auxv.h>		/* getisax() */
+#include <sys/auxv_386.h>	/* AV_386_AES bit */
+#define	KPREEMPT_DISABLE
+#define	KPREEMPT_ENABLE
+#endif	/* _KERNEL */
+#endif  /* __amd64 */
 
 
 /*
@@ -75,25 +90,47 @@
 
 /* EXPORT DELETE START */
 
-#if defined(sun4u) || defined(__amd64)
+#if defined(sun4u)
 /* External assembly functions: */
 extern void aes_encrypt_impl(const uint32_t rk[], int Nr, const uint32_t pt[4],
 	uint32_t ct[4]);
 extern void aes_decrypt_impl(const uint32_t rk[], int Nr, const uint32_t ct[4],
 	uint32_t pt[4]);
-#define	AES_ENCRYPT_IMPL		aes_encrypt_impl
-#define	AES_DECRYPT_IMPL		aes_decrypt_impl
 
-#ifdef	__amd64
-extern int rijndael_key_setup_enc(uint32_t rk[], const uint32_t cipherKey[],
-	int keyBits);
-extern int rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[],
-	int keyBits);
-#endif
+#define	AES_ENCRYPT_IMPL(a, b, c, d, e)	aes_encrypt_impl(a, b, c, d)
+#define	AES_DECRYPT_IMPL(a, b, c, d, e)	aes_decrypt_impl(a, b, c, d)
 
-#else
-#define	AES_ENCRYPT_IMPL		rijndael_encrypt
-#define	AES_DECRYPT_IMPL		rijndael_decrypt
+#elif defined(__amd64)
+
+/* These functions are used to execute amd64 instructions for AMD or Intel: */
+extern int rijndael_key_setup_enc_amd64(uint32_t rk[],
+	const uint32_t cipherKey[], int keyBits);
+extern int rijndael_key_setup_dec_amd64(uint32_t rk[],
+	const uint32_t cipherKey[], int keyBits);
+extern void aes_encrypt_amd64(const uint32_t rk[], int Nr,
+	const uint32_t pt[4], uint32_t ct[4]);
+extern void aes_decrypt_amd64(const uint32_t rk[], int Nr,
+	const uint32_t ct[4], uint32_t pt[4]);
+
+/* These functions are used to execute Intel-specific AES-NI instructions: */
+extern int rijndael_key_setup_enc_intel(uint32_t rk[],
+	const uint32_t cipherKey[], uint64_t keyBits);
+extern int rijndael_key_setup_dec_intel(uint32_t rk[],
+	const uint32_t cipherKey[], uint64_t keyBits);
+extern void aes_encrypt_intel(const uint32_t rk[], int Nr,
+	const uint32_t pt[4], uint32_t ct[4]);
+extern void aes_decrypt_intel(const uint32_t rk[], int Nr,
+	const uint32_t ct[4], uint32_t pt[4]);
+
+static int intel_aes_instructions_present(void);
+
+#define	AES_ENCRYPT_IMPL(a, b, c, d, e) rijndael_encrypt(a, b, c, d, e)
+#define	AES_DECRYPT_IMPL(a, b, c, d, e) rijndael_decrypt(a, b, c, d, e)
+
+#else /* Generic C implementation */
+
+#define	AES_ENCRYPT_IMPL(a, b, c, d, e)	rijndael_encrypt(a, b, c, d)
+#define	AES_DECRYPT_IMPL(a, b, c, d, e)	rijndael_decrypt(a, b, c, d)
 #define	rijndael_key_setup_enc_raw	rijndael_key_setup_enc
 #endif	/* sun4u || __amd64 */
 
@@ -401,6 +438,7 @@ static const uint32_t Te3[256] =
 };
 
 #endif /* !sun4u */
+
 static const uint32_t Te4[256] =
 {
 	0x63636363U, 0x7c7c7c7cU, 0x77777777U, 0x7b7b7b7bU,
@@ -814,6 +852,7 @@ static const uint32_t Td4[256] =
 };
 
 #endif /* !sun4u */
+
 /* Rcon is Round Constant; used for encryption key expansion */
 static const uint32_t rcon[RC_LENGTH] =
 {
@@ -1090,7 +1129,95 @@ aes_setupkeys(aes_key_t *key, const uint32_t *keyarr32, int keybits)
 }
 
 
-#elif !defined(__amd64)
+#elif defined(__amd64)
+
+/*
+ * Expand the 32-bit AES cipher key array into the encryption and decryption
+ * key schedules.
+ *
+ * Parameters:
+ * key		AES key schedule to be initialized
+ * keyarr32	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
+ */
+static void
+aes_setupkeys(aes_key_t *key, const uint32_t *keyarr32, int keybits)
+{
+	if (intel_aes_instructions_present()) {
+		key->flags = INTEL_AES_NI_CAPABLE;
+		KPREEMPT_DISABLE;
+		key->nr = rijndael_key_setup_enc_intel(&(key->encr_ks.ks32[0]),
+		    keyarr32, keybits);
+		key->nr = rijndael_key_setup_dec_intel(&(key->decr_ks.ks32[0]),
+		    keyarr32, keybits);
+		KPREEMPT_ENABLE;
+	} else {
+		key->flags = 0;
+		key->nr = rijndael_key_setup_enc_amd64(&(key->encr_ks.ks32[0]),
+		    keyarr32, keybits);
+		key->nr = rijndael_key_setup_dec_amd64(&(key->decr_ks.ks32[0]),
+		    keyarr32, keybits);
+	}
+
+	key->type = AES_32BIT_KS;
+}
+
+/*
+ * Encrypt one block of data. The block is assumed to be an array
+ * of four uint32_t values, so copy for alignment (and byte-order
+ * reversal for little endian systems might be necessary on the
+ * input and output byte streams.
+ * The size of the key schedule depends on the number of rounds
+ * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		Key schedule, of aes_ks_t (60 32-bit integers)
+ * Nr		Number of rounds
+ * pt		Input block (plain text)
+ * ct		Output block (crypto text).  Can overlap with pt
+ * flags	Indicates whether we're on Intel AES-NI-capable hardware
+ */
+static void
+rijndael_encrypt(const uint32_t rk[], int Nr, const uint32_t pt[4],
+    uint32_t ct[4], int flags) {
+	if (flags & INTEL_AES_NI_CAPABLE) {
+		KPREEMPT_DISABLE;
+		aes_encrypt_intel(rk, Nr, pt, ct);
+		KPREEMPT_ENABLE;
+	} else {
+		aes_encrypt_amd64(rk, Nr, pt, ct);
+	}
+}
+
+/*
+ * Decrypt one block of data. The block is assumed to be an array
+ * of four uint32_t values, so copy for alignment (and byte-order
+ * reversal for little endian systems might be necessary on the
+ * input and output byte streams.
+ * The size of the key schedule depends on the number of rounds
+ * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		Key schedule, of aes_ks_t (60 32-bit integers)
+ * Nr		Number of rounds
+ * ct		Input block (crypto text)
+ * pt		Output block (plain text). Can overlap with pt
+ * flags	Indicates whether we're on Intel AES-NI-capable hardware
+ */
+static void
+rijndael_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
+    uint32_t pt[4], int flags) {
+	if (flags & INTEL_AES_NI_CAPABLE) {
+		KPREEMPT_DISABLE;
+		aes_decrypt_intel(rk, Nr, ct, pt);
+		KPREEMPT_ENABLE;
+	} else {
+		aes_decrypt_amd64(rk, Nr, ct, pt);
+	}
+}
+
+
+#else /* generic C implementation */
 
 /*
  *  Expand the cipher key into the decryption key schedule.
@@ -1153,6 +1280,26 @@ rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[], int keyBits)
 	}
 
 	return (Nr);
+}
+
+
+/*
+ * Expand the 32-bit AES cipher key array into the encryption and decryption
+ * key schedules.
+ *
+ * Parameters:
+ * key		AES key schedule to be initialized
+ * keyarr32	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
+ */
+static void
+aes_setupkeys(aes_key_t *key, const uint32_t *keyarr32, int keybits)
+{
+	key->nr = rijndael_key_setup_enc(&(key->encr_ks.ks32[0]), keyarr32,
+	    keybits);
+	key->nr = rijndael_key_setup_dec(&(key->decr_ks.ks32[0]), keyarr32,
+	    keybits);
+	key->type = AES_32BIT_KS;
 }
 
 
@@ -1409,33 +1556,12 @@ rijndael_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
 	    rk[3];
 	pt[3] = s3;
 }
-#endif	/* sun4u, !__amd64 */
-
-#ifndef	sun4u
-/*
- * Expand the 32-bit AES cipher key array into the encryption and decryption
- * key schedules.
- *
- * Parameters:
- * key		AES key schedule to be initialized
- * keyarr32	User key
- * keyBits	AES key size (128, 192, or 256 bits)
- */
-static void
-aes_setupkeys(aes_key_t *key, const uint32_t *keyarr32, int keybits)
-{
-	key->nr = rijndael_key_setup_enc(&(key->encr_ks.ks32[0]), keyarr32,
-	    keybits);
-	key->nr = rijndael_key_setup_dec(&(key->decr_ks.ks32[0]), keyarr32,
-	    keybits);
-	key->type = AES_32BIT_KS;
-}
-#endif	/* sun4u */
+#endif	/* sun4u, __amd64 */
 /* EXPORT DELETE END */
 
 
 /*
- * Initialize key schedules for AES
+ * Initialize AES encryption and decryption key schedules.
  *
  * Parameters:
  * cipherKey	User key
@@ -1502,6 +1628,7 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 /* EXPORT DELETE END */
 }
 
+
 /*
  * Encrypt one block using AES.
  * Align if needed and (for x86 32-bit only) byte-swap.
@@ -1519,9 +1646,10 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 
 #ifndef	AES_BYTE_SWAP
 	if (IS_P2ALIGNED2(pt, ct, sizeof (uint32_t))) {
+		/* LINTED:  pointer alignment */
 		AES_ENCRYPT_IMPL(&ksch->encr_ks.ks32[0], ksch->nr,
 		    /* LINTED:  pointer alignment */
-		    (uint32_t *)pt, (uint32_t *)ct);
+		    (uint32_t *)pt, (uint32_t *)ct, ksch->flags);
 	} else {
 #endif
 		uint32_t buffer[AES_BLOCK_LEN / sizeof (uint32_t)];
@@ -1538,7 +1666,7 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 #endif
 
 		AES_ENCRYPT_IMPL(&ksch->encr_ks.ks32[0], ksch->nr,
-		    buffer, buffer);
+		    buffer, buffer, ksch->flags);
 
 		/* Copy result from buffer to output block */
 #ifndef	AES_BYTE_SWAP
@@ -1554,6 +1682,7 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
+
 
 /*
  * Decrypt one block using AES.
@@ -1572,9 +1701,10 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 
 #ifndef	AES_BYTE_SWAP
 	if (IS_P2ALIGNED2(ct, pt, sizeof (uint32_t))) {
+		/* LINTED:  pointer alignment */
 		AES_DECRYPT_IMPL(&ksch->decr_ks.ks32[0], ksch->nr,
 		    /* LINTED:  pointer alignment */
-		    (uint32_t *)ct, (uint32_t *)pt);
+		    (uint32_t *)ct, (uint32_t *)pt, ksch->flags);
 	} else {
 #endif
 		uint32_t buffer[AES_BLOCK_LEN / sizeof (uint32_t)];
@@ -1591,7 +1721,7 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 #endif
 
 		AES_DECRYPT_IMPL(&ksch->decr_ks.ks32[0], ksch->nr,
-		    buffer, buffer);
+		    buffer, buffer, ksch->flags);
 
 		/* Copy result from buffer to output block */
 #ifndef	AES_BYTE_SWAP
@@ -1641,112 +1771,32 @@ aes_alloc_keysched(size_t *size, int kmflag)
 	return (NULL);
 }
 
-void
-aes_copy_block(uint8_t *in, uint8_t *out)
-{
-	if (IS_P2ALIGNED(in, sizeof (uint32_t)) &&
-	    IS_P2ALIGNED(out, sizeof (uint32_t))) {
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&out[0] = *(uint32_t *)&in[0];
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&out[4] = *(uint32_t *)&in[4];
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&out[8] = *(uint32_t *)&in[8];
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&out[12] = *(uint32_t *)&in[12];
-	} else {
-		AES_COPY_BLOCK(in, out);
-	}
-}
 
-/* XOR block of data into dest */
-void
-aes_xor_block(uint8_t *data, uint8_t *dst)
-{
-	if (IS_P2ALIGNED(dst, sizeof (uint32_t)) &&
-	    IS_P2ALIGNED(data, sizeof (uint32_t))) {
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&dst[0] ^= *(uint32_t *)&data[0];
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&dst[4] ^= *(uint32_t *)&data[4];
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&dst[8] ^= *(uint32_t *)&data[8];
-		/* LINTED: pointer alignment */
-		*(uint32_t *)&dst[12] ^= *(uint32_t *)&data[12];
-	} else {
-		AES_XOR_BLOCK(data, dst);
-	}
-}
-
+#ifdef __amd64
 /*
- * Encrypt multiple blocks of data according to mode.
+ * Return 1 if executing on Intel with AES-NI instructions,
+ * otherwise 0 (i.e., Intel without AES-NI or AMD64).
+ * Cache the result, as the CPU can't change.
+ *
+ * Note: the userland version uses getisax().  The kernel version uses
+ * global variable x86_feature.
  */
-/* ARGSUSED */
-int
-aes_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
-    crypto_data_t *out)
+static int
+intel_aes_instructions_present(void)
 {
-	aes_ctx_t *aes_ctx = ctx;
-	int rv;
+	static int	cached_result = -1;
 
-	if (aes_ctx->ac_flags & CTR_MODE) {
-		rv = ctr_mode_contiguous_blocks(ctx, data, length, out,
-		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
+	if (cached_result == -1) { /* first time */
 #ifdef _KERNEL
-	} else if (aes_ctx->ac_flags & CCM_MODE) {
-		rv = ccm_mode_encrypt_contiguous_blocks(ctx, data, length,
-		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
-		    aes_xor_block);
-	} else if (aes_ctx->ac_flags & (GCM_MODE|GMAC_MODE)) {
-		rv = gcm_mode_encrypt_contiguous_blocks(ctx, data, length,
-		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
-		    aes_xor_block);
-#endif
-	} else if (aes_ctx->ac_flags & CBC_MODE) {
-		rv = cbc_encrypt_contiguous_blocks(ctx,
-		    data, length, out, AES_BLOCK_LEN, aes_encrypt_block,
-		    aes_copy_block, aes_xor_block);
-	} else {
-		rv = ecb_cipher_contiguous_blocks(ctx, data, length, out,
-		    AES_BLOCK_LEN, aes_encrypt_block);
-	}
-	return (rv);
-}
+		cached_result = (x86_feature & X86_AES) != 0;
+#else
+		uint_t		ui = 0;
 
-/*
- * Decrypt multiple blocks of data according to mode.
- */
-int
-aes_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
-    crypto_data_t *out)
-{
-	aes_ctx_t *aes_ctx = ctx;
-	int rv;
-
-	if (aes_ctx->ac_flags & CTR_MODE) {
-		rv = ctr_mode_contiguous_blocks(ctx, data, length, out,
-		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
-		if (rv == CRYPTO_DATA_LEN_RANGE)
-			rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
-#ifdef _KERNEL
-	} else if (aes_ctx->ac_flags & CCM_MODE) {
-		rv = ccm_mode_decrypt_contiguous_blocks(ctx, data, length,
-		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
-		    aes_xor_block);
-	} else if (aes_ctx->ac_flags & (GCM_MODE|GMAC_MODE)) {
-		rv = gcm_mode_decrypt_contiguous_blocks(ctx, data, length,
-		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
-		    aes_xor_block);
-#endif
-	} else if (aes_ctx->ac_flags & CBC_MODE) {
-		rv = cbc_decrypt_contiguous_blocks(ctx, data, length, out,
-		    AES_BLOCK_LEN, aes_decrypt_block, aes_copy_block,
-		    aes_xor_block);
-	} else {
-		rv = ecb_cipher_contiguous_blocks(ctx, data, length, out,
-		    AES_BLOCK_LEN, aes_decrypt_block);
-		if (rv == CRYPTO_DATA_LEN_RANGE)
-			rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+		(void) getisax(&ui, 1);
+		cached_result = (ui & AV_386_AES) != 0;
+#endif	/* _KERNEL */
 	}
-	return (rv);
+
+	return (cached_result);
 }
+#endif	/* __amd64 */

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
@@ -34,7 +32,8 @@ MACHDATAFILES += i.sdconf
 CLOBBERFILES += $(MACHDATAFILES)
 
 LICENSEFILES_i386 = \
-	../../common/crypto/aes/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
+	../../common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \
 	../../common/crypto/md5/amd64/THIRDPARTYLICENSE \
 	../../common/crypto/THIRDPARTYLICENSE.cryptogams \
 	../../uts/intel/io/acpica/THIRDPARTYLICENSE

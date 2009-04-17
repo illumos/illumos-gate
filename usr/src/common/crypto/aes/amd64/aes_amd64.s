@@ -156,7 +156,8 @@
  * sub	rax,[ebx+ecx*4-20h]	sub	-0x20(%ebx,%ecx,4),%rax
  *
  * 5. Added OpenSolaris ENTRY_NP/SET_SIZE macros from
- * /usr/include/sys/asm_linkage.h, .ident keywords, and lint(1B) guards.
+ * /usr/include/sys/asm_linkage.h, lint(1B) guards, EXPORT DELETE START
+ * and EXPORT DELETE END markers, and dummy C function definitions for lint.
  *
  * 6. Renamed functions and reordered parameters to match OpenSolaris:
  * Original Gladman interface:
@@ -171,9 +172,9 @@
  * 10, 12, or 14 bytes.
  *
  * OpenSolaris OS interface:
- *	void aes_encrypt_impl(const aes_ks_t *ks, int Nr,
+ *	void aes_encrypt_amd64(const aes_ks_t *ks, int Nr,
  *		const uint32_t pt[4], uint32_t ct[4])/
- *	void aes_decrypt_impl(const aes_ks_t *ks, int Nr,
+ *	void aes_decrypt_amd64(const aes_ks_t *ks, int Nr,
  *		const uint32_t pt[4], uint32_t ct[4])/
  *	typedef union {uint64_t ks64[(MAX_AES_NR + 1) * 4]/
  *		 uint32_t ks32[(MAX_AES_NR + 1) * 4]/ } aes_ks_t/
@@ -182,8 +183,23 @@
  * For the x86 64-bit architecture, OpenSolaris OS uses ks32 instead of ks64.
  */
 
-#if !defined(lint) && !defined(__lint)
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#if defined(lint) || defined(__lint)
+
+#include <sys/types.h>
+/* ARGSUSED */
+void
+aes_encrypt_amd64(const uint32_t rk[], int Nr, const uint32_t pt[4],
+	uint32_t ct[4]) {
+}
+/* ARGSUSED */
+void
+aes_decrypt_amd64(const uint32_t rk[], int Nr, const uint32_t ct[4],
+	uint32_t pt[4]) {
+}
+
+
+#else
+
 #include <sys/asm_linkage.h>
 
 #define	KS_LENGTH	60
@@ -671,7 +687,7 @@
 
 /*
  * OpenSolaris OS:
- * void aes_encrypt_impl(const aes_ks_t *ks, int Nr,
+ * void aes_encrypt_amd64(const aes_ks_t *ks, int Nr,
  *	const uint32_t pt[4], uint32_t ct[4])/
  *
  * Original interface:
@@ -687,7 +703,7 @@ enc_tab:
 #endif
 
 
-	ENTRY_NP(aes_encrypt_impl)
+	ENTRY_NP(aes_encrypt_amd64)
 	/* EXPORT DELETE START */
 #ifdef	GLADMAN_INTERFACE
 	/ Original interface
@@ -773,11 +789,11 @@ enc_tab:
 	/* EXPORT DELETE END */
 	ret
 
-	SET_SIZE(aes_encrypt_impl)
+	SET_SIZE(aes_encrypt_amd64)
 
 /*
  * OpenSolaris OS:
- * void aes_decrypt_impl(const aes_ks_t *ks, int Nr,
+ * void aes_decrypt_amd64(const aes_ks_t *ks, int Nr,
  *	const uint32_t pt[4], uint32_t ct[4])/
  *
  * Original interface:
@@ -793,7 +809,7 @@ dec_tab:
 #endif
 
 
-	ENTRY_NP(aes_decrypt_impl)
+	ENTRY_NP(aes_decrypt_amd64)
 	/* EXPORT DELETE START */
 #ifdef	GLADMAN_INTERFACE
 	/ Original interface
@@ -885,9 +901,5 @@ dec_tab:
 	/* EXPORT DELETE END */
 	ret
 
-	SET_SIZE(aes_decrypt_impl)
-
-#else
-	/* LINTED */
-	/* Nothing to be linted in this file--it's pure assembly source. */
-#endif	/* !lint && !__lint */
+	SET_SIZE(aes_decrypt_amd64)
+#endif	/* lint || __lint */

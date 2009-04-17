@@ -28,8 +28,9 @@
 LIBRARY=	libsoftcrypto.a
 VERS= .1
 
-AES_PSM_OBJS= aes_amd64.o aeskey.o
-AES_PSM_SRC= $(AES_DIR)/$(MACH64)/aes_amd64.s $(AES_DIR)/$(MACH64)/aeskey.c
+AES_PSM_OBJS= aes_amd64.o aes_intel.o aeskey.o
+AES_PSM_SRC= $(AES_DIR)/$(MACH64)/aes_amd64.s $(AES_DIR)/$(MACH64)/aes_intel.s \
+		$(AES_DIR)/$(MACH64)/aeskey.c
 
 ARCFOUR_PSM_OBJS= arcfour-x86_64.o
 ARCFOUR_PSM_SRC= arcfour-x86_64.s

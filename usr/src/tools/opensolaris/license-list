@@ -70,9 +70,11 @@ usr/src/cmd/which/THIRDPARTYLICENSE
 usr/src/cmd/xntpd/THIRDPARTYLICENSE
 usr/src/cmd/xstr/THIRDPARTYLICENSE
 usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
-usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE
+usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman
+usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl
 usr/src/common/crypto/ecc/THIRDPARTYLICENSE
 usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+usr/src/common/mpi/THIRDPARTYLICENSE
 usr/src/common/openssl/LICENSE
 usr/src/grub/grub-0.97/COPYING
 usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE
@@ -84,8 +86,8 @@ usr/src/lib/libbsdmalloc/THIRDPARTYLICENSE
 usr/src/lib/libcmd/THIRDPARTYLICENSE
 usr/src/lib/libdll/THIRDPARTYLICENSE
 usr/src/lib/libdns_sd/THIRDPARTYLICENSE
-usr/src/lib/libima/THIRDPARTYLICENSE
 usr/src/lib/libgss/THIRDPARTYLICENSE
+usr/src/lib/libima/THIRDPARTYLICENSE
 usr/src/lib/libinetutil/common/THIRDPARTYLICENSE
 usr/src/lib/libkmf/THIRDPARTYLICENSE
 usr/src/lib/libldap5/THIRDPARTYLICENSE
@@ -95,6 +97,10 @@ usr/src/lib/libresolv/THIRDPARTYLICENSE
 usr/src/lib/libresolv2/THIRDPARTYLICENSE
 usr/src/lib/libsasl/THIRDPARTYLICENSE
 usr/src/lib/libshell/THIRDPARTYLICENSE
+usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple
+usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov
+usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4
+usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft
 usr/src/lib/libsum/THIRDPARTYLICENSE
 usr/src/lib/libtecla/THIRDPARTYLICENSE
 usr/src/lib/libwrap/THIRDPARTYLICENSE
@@ -143,6 +149,7 @@ usr/src/uts/common/io/iwk/fw-iw/LICENSE
 usr/src/uts/common/io/ixgbe/THIRDPARTYLICENSE
 usr/src/uts/common/io/mega_sas/THIRDPARTYLICENSE
 usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE
+usr/src/uts/common/io/ntxn/THIRDPARTYLICENSE
 usr/src/uts/common/io/pcan/THIRDPARTYLICENSE
 usr/src/uts/common/io/pcwl/THIRDPARTYLICENSE
 usr/src/uts/common/io/ppp/THIRDPARTYLICENSE
@@ -167,9 +174,3 @@ usr/src/uts/intel/io/amr/THIRDPARTYLICENSE
 usr/src/uts/intel/pcbe/THIRDPARTYLICENSE
 usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE
 usr/src/uts/sun4v/pcbe/THIRDPARTYLICENSE
-usr/src/common/mpi/THIRDPARTYLICENSE
-usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple
-usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov
-usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4
-usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft
-usr/src/uts/common/io/ntxn/THIRDPARTYLICENSE

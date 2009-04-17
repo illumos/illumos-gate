@@ -19,14 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the AES KEF provider.
 #
-#	intel implementation architecture dependent
+#	Intel implementation architecture dependent
 #
 
 #
@@ -41,7 +39,7 @@ COM_DIR = $(COMMONBASE)/crypto/aes
 MODULE		= aes
 LINTS		= $(AESPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 AESPROV_OBJS_32	=
-AESPROV_OBJS_64	= aes_amd64.o aeskey.o
+AESPROV_OBJS_64	= aes_amd64.o aes_intel.o aeskey.o
 AESPROV_OBJS	+= $(AESPROV_OBJS_$(CLASS))
 OBJECTS		= $(AESPROV_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
@@ -68,14 +66,7 @@ LDFLAGS += -dy -Nmisc/kcf
 
 CPPFLAGS	+= -I$(COM_DIR) -I$(COM_DIR)/..
 CPPFLAGS	+= -DCRYPTO_PROVIDER_NAME=\"$(MODULE)\"
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+AS_CPPFLAGS	+= -I../../$(PLATFORM)
 
 #
 #	Default build targets.
@@ -110,9 +101,9 @@ $(OBJS_DIR)/%.o:  $(COM_DIR)/amd64/%.c
 	$(COMPILE.c) -o $@ $(COM_DIR)/amd64/${@F:.o=.c}
 	$(POST_PROCESS_O)
 
-$(OBJS_DIR)/aes_amd64.o: $(COM_DIR)/amd64/aes_amd64.s
+$(OBJS_DIR)/%.o: $(COM_DIR)/amd64/%.s
 	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/${@F:.o=.s}
 	$(POST_PROCESS_O)
 
-$(OBJS_DIR)/aes_amd64.ln: $(COM_DIR)/amd64/aes_amd64.s
+$(OBJS_DIR)/%.ln: $(COM_DIR)/amd64/%.s
 	@($(LHEAD) $(LINT.s) $(COM_DIR)/amd64/${@F:.ln=.s} $(LTAIL))

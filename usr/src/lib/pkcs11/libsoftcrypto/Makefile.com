@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/pkcs11/libsoftcrypto/Makefile.com
@@ -27,7 +27,7 @@
 
 # AES
 AES_DIR= $(SRC)/common/crypto/aes
-AES_COMMON_OBJS= aes_impl.o
+AES_COMMON_OBJS= aes_impl.o aes_modes.o
 AES_COMMON_SRC= $(AES_COMMON_OBJS:%.o=$(AES_DIR)/%.c)
 AES_FLAGS= -I$(AES_DIR)
 

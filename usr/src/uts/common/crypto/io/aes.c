@@ -454,7 +454,7 @@ aes_copy_block64(uint8_t *in, uint64_t *out)
 	}
 }
 
-/* ARGSUSED */
+
 static int
 aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
     crypto_data_t *ciphertext, crypto_req_handle_t req)
@@ -570,11 +570,10 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 
 /* EXPORT DELETE END */
 
-	/* LINTED */
 	return (ret);
 }
 
-/* ARGSUSED */
+
 static int
 aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
     crypto_data_t *plaintext, crypto_req_handle_t req)
@@ -689,9 +688,9 @@ cleanup:
 
 /* EXPORT DELETE END */
 
-	/* LINTED */
 	return (ret);
 }
+
 
 /* ARGSUSED */
 static int
@@ -768,7 +767,7 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	return (ret);
 }
 
-/* ARGSUSED */
+
 static int
 aes_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
     crypto_data_t *plaintext, crypto_req_handle_t req)
@@ -1367,7 +1366,7 @@ aes_create_ctx_template(crypto_provider_handle_t provider,
 	return (CRYPTO_SUCCESS);
 }
 
-/* ARGSUSED */
+
 static int
 aes_free_context(crypto_ctx_t *ctx)
 {
@@ -1392,7 +1391,7 @@ aes_free_context(crypto_ctx_t *ctx)
 	return (CRYPTO_SUCCESS);
 }
 
-/* ARGSUSED */
+
 static int
 aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
     crypto_mechanism_t *mechanism, crypto_key_t *key, int kmflag,
@@ -1436,7 +1435,7 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 		    mechanism->cm_param_len != sizeof (CK_AES_CTR_PARAMS)) {
 			return (CRYPTO_MECHANISM_PARAM_INVALID);
 		}
-		pp = (CK_AES_CTR_PARAMS *)mechanism->cm_param;
+		pp = (CK_AES_CTR_PARAMS *)(void *)mechanism->cm_param;
 		rv = ctr_init_ctx((ctr_ctx_t *)aes_ctx, pp->ulCounterBits,
 		    pp->cb, aes_copy_block);
 		break;

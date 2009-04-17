@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # common/crypto/arcfour/Makefile
@@ -36,17 +33,25 @@ FRC:
 
 # EXPORT DELETE START
 EXPORT_SRC:
-	$(RM) Makefile+ arcfour_crypt.c+ sun4u/arcfour_crypt_asm.s+
+	$(RM) Makefile+ arcfour_crypt.c+ amd64/arcfour-x86_64.pl+ \
+		sun4u/arcfour_crypt_asm.s+ sun4v/arcfour_crypt.c+
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< arcfour_crypt.c > arcfour_crypt.c+
 	$(MV) arcfour_crypt.c+ arcfour_crypt.c
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< amd64/arcfour-x86_64.c > amd64/arcfour-x86_64.c+
+	$(MV) amd64/arcfour-x86_64.c+ amd64/arcfour-x86_64.c
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< sun4u/arcfour_crypt_asm.s > sun4u/arcfour_crypt_asm.s+
 	$(MV) sun4u/arcfour_crypt_asm.s+ sun4u/arcfour_crypt_asm.s
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< sun4v/arcfour_crypt.c > sun4v/arcfour_crypt.c+
+	$(MV) sun4v/arcfour_crypt.c+ sun4v/arcfour_crypt.c
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile > Makefile+
 	$(RM) Makefile
 	$(MV) Makefile+ Makefile 
-	$(CHMOD) 444 Makefile arcfour_crypt.c sun4u/arcfour_crypt_asm.s
+	$(CHMOD) 444 Makefile arcfour_crypt.c amd64/arcfour-x86_64.pl \
+		sun4u/arcfour_crypt_asm.s sun4v/arcfour_crypt.c
 
 # EXPORT DELETE END

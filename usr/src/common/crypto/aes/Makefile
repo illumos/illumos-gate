@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # common/crypto/aes/Makefile
@@ -36,7 +34,8 @@ FRC:
 
 # EXPORT DELETE START
 EXPORT_SRC:
-	$(RM) Makefile+ aes_impl.c+ aes_impl.h+ sun4u/aes_crypt_asm.s+
+	$(RM) Makefile+ aes_impl.c+ aes_impl.h+ amd64/aes_amd64.s+ \
+		amd64/aes_intel.s+ sun4u/aes_crypt_asm.s+
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< aes_impl.c > aes_impl.c+
 	$(MV) aes_impl.c+ aes_impl.c
@@ -44,12 +43,19 @@ EXPORT_SRC:
 		< aes_impl.h > aes_impl.h+
 	$(MV) aes_impl.h+ aes_impl.h
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< amd64/aes_amd64.s > amd64/aes_amd64.s+
+	$(MV) amd64/aes_amd64.s+ amd64/aes_amd64.s
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< amd64/aes_intel.s > amd64/aes_intel.s+
+	$(MV) amd64/aes_intel.s+ amd64/aes_intel.s
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< sun4u/aes_crypt_asm.s > sun4u/aes_crypt_asm.s+
 	$(MV) sun4u/aes_crypt_asm.s+ sun4u/aes_crypt_asm.s
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile > Makefile+
 	$(RM) Makefile
-	$(MV) Makefile+ Makefile 
-	$(CHMOD) 444 Makefile aes_impl.c aes_impl.h sun4u/aes_crypt_asm.s
+	$(MV) Makefile+ Makefile
+	$(CHMOD) 444 Makefile aes_impl.c aes_impl.h amd64/aes_amd64.s \
+		amd64/aes_intel.s sun4u/aes_crypt_asm.s
 
 # EXPORT DELETE END

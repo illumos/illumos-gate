@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,9 @@
 #include <modes/modes.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
+#include <sys/byteorder.h>
 
 #if defined(__i386) || defined(__amd64)
-#include <sys/byteorder.h>
 #define	UNALIGNED_POINTERS_PERMITTED
 #endif
 
@@ -116,13 +116,8 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		 * Increment counter. Counter bits are confined
 		 * to the bottom 64 bits of the counter block.
 		 */
-#ifdef _LITTLE_ENDIAN
 		counter = ntohll(ctx->ccm_cb[1] & ctx->ccm_counter_mask);
 		counter = htonll(counter + 1);
-#else
-		counter = ctx->ccm_cb[1] & ctx->ccm_counter_mask;
-		counter++;
-#endif	/* _LITTLE_ENDIAN */
 		counter &= ctx->ccm_counter_mask;
 		ctx->ccm_cb[1] =
 		    (ctx->ccm_cb[1] & ~(ctx->ccm_counter_mask)) | counter;
@@ -476,13 +471,8 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		 * Increment counter.
 		 * Counter bits are confined to the bottom 64 bits
 		 */
-#ifdef _LITTLE_ENDIAN
 		counter = ntohll(ctx->ccm_cb[1] & ctx->ccm_counter_mask);
 		counter = htonll(counter + 1);
-#else
-		counter = ctx->ccm_cb[1] & ctx->ccm_counter_mask;
-		counter++;
-#endif	/* _LITTLE_ENDIAN */
 		counter &= ctx->ccm_counter_mask;
 		ctx->ccm_cb[1] =
 		    (ctx->ccm_cb[1] & ~(ctx->ccm_counter_mask)) | counter;
@@ -702,10 +692,7 @@ ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 		mask |= (1ULL << q);
 	}
 
-#ifdef _LITTLE_ENDIAN
-	mask = htonll(mask);
-#endif
-	aes_ctx->ccm_counter_mask = mask;
+	aes_ctx->ccm_counter_mask = htonll(mask);
 
 	/*
 	 * During calculation, we start using counter block 1, we will
