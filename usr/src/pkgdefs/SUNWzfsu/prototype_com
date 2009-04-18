@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # packaging files
@@ -38,6 +36,8 @@ d none usr 755 root sys
 d none usr/lib 755 root bin
 d none usr/lib/zfs 755 root bin
 f none usr/lib/zfs/availdevs 555 root bin
+f none usr/lib/zfs/pyzfs.py 555 root bin
+f none usr/lib/zfs/pyzfs.pyc 555 root bin
 d none usr/lib/devfsadm 755 root sys
 d none usr/lib/devfsadm/linkmod 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_zfs_link.so 755 root sys
@@ -57,6 +57,24 @@ d none usr/lib/mdb 755 root sys
 d none usr/lib/mdb/kvm 755 root sys
 d none usr/lib/mdb/proc 755 root sys
 f none usr/lib/mdb/proc/libzpool.so 555 root sys
+d none usr/lib/python2.4 755 root bin
+d none usr/lib/python2.4/vendor-packages 755 root bin
+d none usr/lib/python2.4/vendor-packages/zfs 755 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/__init__.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/__init__.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/allow.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/allow.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/dataset.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/dataset.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/groupspace.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/groupspace.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/ioctl.so 755 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/unallow.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/unallow.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/userspace.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/userspace.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/util.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/util.pyc 644 root bin
 d none usr/lib/sysevent 755 root bin
 d none usr/lib/sysevent/modules 755 root bin
 f none usr/lib/sysevent/modules/zfs_mod.so 755 root sys

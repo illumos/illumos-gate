@@ -1026,6 +1026,8 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_packed_nvlist,	/* FUID nvlist size		*/
 	dump_zap,		/* DSL dataset next clones	*/
 	dump_zap,		/* DSL scrub queue		*/
+	dump_zap,		/* ZFS user/group used		*/
+	dump_zap,		/* ZFS user/group quota		*/
 };
 
 static void
@@ -1089,6 +1091,14 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	}
 
 	if (verbosity >= 4) {
+		(void) printf("\tdnode flags: %s%s\n",
+		    (dn->dn_phys->dn_flags & DNODE_FLAG_USED_BYTES) ?
+		    "USED_BYTES " : "",
+		    (dn->dn_phys->dn_flags & DNODE_FLAG_USERUSED_ACCOUNTED) ?
+		    "USERUSED_ACCOUNTED " : "");
+		(void) printf("\tdnode maxblkid: %llu\n",
+		    (longlong_t)dn->dn_phys->dn_maxblkid);
+
 		object_viewer[doi.doi_bonus_type](os, object, bonus, bsize);
 		object_viewer[doi.doi_type](os, object, NULL, 0);
 		*print_header = 1;
@@ -1143,7 +1153,7 @@ dump_dir(objset_t *os)
 	uint64_t object, object_count;
 	uint64_t refdbytes, usedobjs, scratch;
 	char numbuf[8];
-	char blkbuf[BP_SPRINTF_LEN];
+	char blkbuf[BP_SPRINTF_LEN + 20];
 	char osname[MAXNAMELEN];
 	char *type = "UNKNOWN";
 	int verbosity = dump_opt['d'];
@@ -1169,8 +1179,8 @@ dump_dir(objset_t *os)
 	nicenum(refdbytes, numbuf);
 
 	if (verbosity >= 4) {
-		(void) strcpy(blkbuf, ", rootbp ");
-		sprintf_blkptr(blkbuf + strlen(blkbuf),
+		(void) sprintf(blkbuf + strlen(blkbuf), ", rootbp ");
+		(void) sprintf_blkptr(blkbuf + strlen(blkbuf),
 		    BP_SPRINTF_LEN - strlen(blkbuf), os->os->os_rootbp);
 	} else {
 		blkbuf[0] = '\0';
@@ -1205,7 +1215,12 @@ dump_dir(objset_t *os)
 	}
 
 	dump_object(os, 0, verbosity, &print_header);
-	object_count = 1;
+	object_count = 0;
+	if (os->os->os_userused_dnode &&
+	    os->os->os_userused_dnode->dn_type != 0) {
+		dump_object(os, DMU_USERUSED_OBJECT, verbosity, &print_header);
+		dump_object(os, DMU_GROUPUSED_OBJECT, verbosity, &print_header);
+	}
 
 	object = 0;
 	while ((error = dmu_object_next(os, &object, B_FALSE, 0)) == 0) {

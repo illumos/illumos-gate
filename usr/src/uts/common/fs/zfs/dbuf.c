@@ -329,7 +329,7 @@ dbuf_verify(dmu_buf_impl_t *db)
 		if (db->db_parent == dn->dn_dbuf) {
 			/* db is pointed to by the dnode */
 			/* ASSERT3U(db->db_blkid, <, dn->dn_nblkptr); */
-			if (db->db.db_object == DMU_META_DNODE_OBJECT)
+			if (DMU_OBJECT_IS_SPECIAL(db->db.db_object))
 				ASSERT(db->db_parent == NULL);
 			else
 				ASSERT(db->db_parent != NULL);
@@ -908,15 +908,11 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	 * Shouldn't dirty a regular buffer in syncing context.  Private
 	 * objects may be dirtied in syncing context, but only if they
 	 * were already pre-dirtied in open context.
-	 * XXX We may want to prohibit dirtying in syncing context even
-	 * if they did pre-dirty.
 	 */
 	ASSERT(!dmu_tx_is_syncing(tx) ||
 	    BP_IS_HOLE(dn->dn_objset->os_rootbp) ||
-	    dn->dn_object == DMU_META_DNODE_OBJECT ||
-	    dn->dn_objset->os_dsl_dataset == NULL ||
-	    dsl_dir_is_private(dn->dn_objset->os_dsl_dataset->ds_dir));
-
+	    DMU_OBJECT_IS_SPECIAL(dn->dn_object) ||
+	    dn->dn_objset->os_dsl_dataset == NULL);
 	/*
 	 * We make this assert for private objects as well, but after we
 	 * check if we're already dirty.  They are allowed to re-dirty
@@ -975,7 +971,8 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	/*
 	 * Only valid if not already dirty.
 	 */
-	ASSERT(dn->dn_dirtyctx == DN_UNDIRTIED || dn->dn_dirtyctx ==
+	ASSERT(dn->dn_object == 0 ||
+	    dn->dn_dirtyctx == DN_UNDIRTIED || dn->dn_dirtyctx ==
 	    (dmu_tx_is_syncing(tx) ? DN_DIRTY_SYNC : DN_DIRTY_OPEN));
 
 	ASSERT3U(dn->dn_nlevels, >, db->db_level);
@@ -987,15 +984,13 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 	/*
 	 * We should only be dirtying in syncing context if it's the
-	 * mos, a spa os, or we're initializing the os.  However, we are
-	 * allowed to dirty in syncing context provided we already
-	 * dirtied it in open context.  Hence we must make this
-	 * assertion only if we're not already dirty.
+	 * mos or we're initializing the os or it's a special object.
+	 * However, we are allowed to dirty in syncing context provided
+	 * we already dirtied it in open context.  Hence we must make
+	 * this assertion only if we're not already dirty.
 	 */
-	ASSERT(!dmu_tx_is_syncing(tx) ||
-	    os->os_dsl_dataset == NULL ||
-	    !dsl_dir_is_private(os->os_dsl_dataset->ds_dir) ||
-	    !BP_IS_HOLE(os->os_rootbp));
+	ASSERT(!dmu_tx_is_syncing(tx) || DMU_OBJECT_IS_SPECIAL(dn->dn_object) ||
+	    os->os_dsl_dataset == NULL || BP_IS_HOLE(os->os_rootbp));
 	ASSERT(db->db.db_size != 0);
 
 	dprintf_dbuf(db, "size=%llx\n", (u_longlong_t)db->db.db_size);

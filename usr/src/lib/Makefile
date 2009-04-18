@@ -238,6 +238,7 @@ SUBDIRS += \
 	libzpool	\
 	libzfs		\
 	libzfs_jni	\
+	pyzfs		\
 	libmapid	\
 	brand		\
 	policykit	\
@@ -346,6 +347,7 @@ MSGSUBDIRS=		\
 	mms		\
 	mpss		\
 	pam_modules	\
+	pyzfs		\
 	rpcsec_gss
 $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/lib/smartcard
@@ -601,7 +603,8 @@ librestart:	libuutil libscf
 pkcs11:		libcryptoutil
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
-libzfs:		libdevinfo libdevid libgen libnvpair libuutil libiscsitgt
+libzfs:		libdevinfo libdevid libgen libnvpair libuutil libiscsitgt \
+		libavl libefi libidmap libsec
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
 libsec:		libavl libidmap
@@ -615,6 +618,7 @@ libvscan:	libscf
 scsi:		libnvpair
 mpapi:		libpthread libdevinfo libsysevent libnvpair
 libgrubmgmt:	libdevinfo libzfs libfstyp
+pyzfs:		libnvpair libsec libidmap libzfs
 
 #
 # The reason this rule checks for the existence of the

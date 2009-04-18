@@ -297,6 +297,9 @@ ROOT.BIN= \
 	/usr/lib/localedef/src \
 	/usr/lib/lwp \
 	/usr/lib/pool \
+	/usr/lib/python2.4 \
+	/usr/lib/python2.4/vendor-packages \
+	/usr/lib/python2.4/vendor-packages/zfs \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
 	/usr/lib/saf \

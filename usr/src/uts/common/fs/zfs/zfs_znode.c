@@ -206,17 +206,6 @@ zfs_znode_move_impl(znode_t *ozp, znode_t *nzp)
 	POINTER_INVALIDATE(&ozp->z_zfsvfs);
 }
 
-/*
- * Wrapper function for ZFS_ENTER that returns 0 if successful and otherwise
- * returns a non-zero error code.
- */
-static int
-zfs_enter(zfsvfs_t *zfsvfs)
-{
-	ZFS_ENTER(zfsvfs);
-	return (0);
-}
-
 /*ARGSUSED*/
 static kmem_cbrc_t
 zfs_znode_move(void *buf, void *newbuf, size_t size, void *arg)
@@ -241,8 +230,11 @@ zfs_znode_move(void *buf, void *newbuf, size_t size, void *arg)
 
 	/*
 	 * Ensure that the filesystem is not unmounted during the move.
+	 * This is the equivalent to ZFS_ENTER().
 	 */
-	if (zfs_enter(zfsvfs) != 0) {		/* ZFS_ENTER */
+	rrw_enter(&zfsvfs->z_teardown_lock, RW_READER, FTAG);
+	if (zfsvfs->z_unmounted) {
+		ZFS_EXIT(zfsvfs);
 		ZNODE_STAT_ADD(znode_move_stats.zms_zfsvfs_unmounted);
 		return (KMEM_CBRC_DONT_KNOW);
 	}
@@ -467,107 +459,6 @@ zfs_create_share_dir(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 	dmu_buf_rele(sharezp->z_dbuf, NULL);
 	sharezp->z_dbuf = NULL;
 	kmem_cache_free(znode_cache, sharezp);
-
-	return (error);
-}
-
-/*
- * zfs_init_fs - Initialize the zfsvfs struct and the file system
- *	incore "master" object.  Verify version compatibility.
- */
-int
-zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp)
-{
-	extern int zfsfstype;
-
-	objset_t	*os = zfsvfs->z_os;
-	int		i, error;
-	uint64_t fsid_guid;
-	uint64_t zval;
-
-	*zpp = NULL;
-
-	error = zfs_get_zplprop(os, ZFS_PROP_VERSION, &zfsvfs->z_version);
-	if (error) {
-		return (error);
-	} else if (zfsvfs->z_version > ZPL_VERSION) {
-		(void) printf("Mismatched versions:  File system "
-		    "is version %llu on-disk format, which is "
-		    "incompatible with this software version %lld!",
-		    (u_longlong_t)zfsvfs->z_version, ZPL_VERSION);
-		return (ENOTSUP);
-	}
-
-	if ((error = zfs_get_zplprop(os, ZFS_PROP_NORMALIZE, &zval)) != 0)
-		return (error);
-	zfsvfs->z_norm = (int)zval;
-	if ((error = zfs_get_zplprop(os, ZFS_PROP_UTF8ONLY, &zval)) != 0)
-		return (error);
-	zfsvfs->z_utf8 = (zval != 0);
-	if ((error = zfs_get_zplprop(os, ZFS_PROP_CASE, &zval)) != 0)
-		return (error);
-	zfsvfs->z_case = (uint_t)zval;
-	/*
-	 * Fold case on file systems that are always or sometimes case
-	 * insensitive.
-	 */
-	if (zfsvfs->z_case == ZFS_CASE_INSENSITIVE ||
-	    zfsvfs->z_case == ZFS_CASE_MIXED)
-		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
-
-	/*
-	 * The fsid is 64 bits, composed of an 8-bit fs type, which
-	 * separates our fsid from any other filesystem types, and a
-	 * 56-bit objset unique ID.  The objset unique ID is unique to
-	 * all objsets open on this system, provided by unique_create().
-	 * The 8-bit fs type must be put in the low bits of fsid[1]
-	 * because that's where other Solaris filesystems put it.
-	 */
-	fsid_guid = dmu_objset_fsid_guid(os);
-	ASSERT((fsid_guid & ~((1ULL<<56)-1)) == 0);
-	zfsvfs->z_vfs->vfs_fsid.val[0] = fsid_guid;
-	zfsvfs->z_vfs->vfs_fsid.val[1] = ((fsid_guid>>32) << 8) |
-	    zfsfstype & 0xFF;
-
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_ROOT_OBJ, 8, 1,
-	    &zfsvfs->z_root);
-	if (error)
-		return (error);
-	ASSERT(zfsvfs->z_root != 0);
-
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_UNLINKED_SET, 8, 1,
-	    &zfsvfs->z_unlinkedobj);
-	if (error)
-		return (error);
-
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_FUID_TABLES, 8, 1,
-	    &zfsvfs->z_fuid_obj);
-	if (error == ENOENT)
-		error = 0;
-
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_SHARES_DIR, 8, 1,
-	    &zfsvfs->z_shares_dir);
-	if (error && error != ENOENT)
-		return (error);
-
-	/*
-	 * Initialize zget mutex's
-	 */
-	for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
-		mutex_init(&zfsvfs->z_hold_mtx[i], NULL, MUTEX_DEFAULT, NULL);
-
-	error = zfs_zget(zfsvfs, zfsvfs->z_root, zpp);
-	if (error) {
-		/*
-		 * On error, we destroy the mutexes here since it's not
-		 * possible for the caller to determine if the mutexes were
-		 * initialized properly.
-		 */
-		for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
-			mutex_destroy(&zfsvfs->z_hold_mtx[i]);
-		return (error);
-	}
-	ASSERT3U((*zpp)->z_id, ==, zfsvfs->z_root);
 
 	return (error);
 }
@@ -1542,7 +1433,7 @@ void
 zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 {
 	zfsvfs_t	zfsvfs;
-	uint64_t	moid, doid, version;
+	uint64_t	moid, obj, version;
 	uint64_t	sense = ZFS_CASE_SENSITIVE;
 	uint64_t	norm = 0;
 	nvpair_t	*elem;
@@ -1568,12 +1459,12 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	/*
 	 * Set starting attributes.
 	 */
-	if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_FUID)
+	if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_USERSPACE)
 		version = ZPL_VERSION;
+	else if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_FUID)
+		version = ZPL_VERSION_USERSPACE - 1;
 	else
 		version = ZPL_VERSION_FUID - 1;
-	error = zap_update(os, moid, ZPL_VERSION_STR,
-	    8, 1, &version, tx);
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(zplprops, elem)) != NULL) {
 		/* For the moment we expect all zpl props to be uint64_ts */
@@ -1584,9 +1475,8 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 		VERIFY(nvpair_value_uint64(elem, &val) == 0);
 		name = nvpair_name(elem);
 		if (strcmp(name, zfs_prop_to_name(ZFS_PROP_VERSION)) == 0) {
-			version = val;
-			error = zap_update(os, moid, ZPL_VERSION_STR,
-			    8, 1, &version, tx);
+			if (val < version)
+				version = val;
 		} else {
 			error = zap_update(os, moid, name, 8, 1, &val, tx);
 		}
@@ -1597,13 +1487,14 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 			sense = val;
 	}
 	ASSERT(version != 0);
+	error = zap_update(os, moid, ZPL_VERSION_STR, 8, 1, &version, tx);
 
 	/*
 	 * Create a delete queue.
 	 */
-	doid = zap_create(os, DMU_OT_UNLINKED_SET, DMU_OT_NONE, 0, tx);
+	obj = zap_create(os, DMU_OT_UNLINKED_SET, DMU_OT_NONE, 0, tx);
 
-	error = zap_add(os, moid, ZFS_UNLINKED_SET, 8, 1, &doid, tx);
+	error = zap_add(os, moid, ZFS_UNLINKED_SET, 8, 1, &obj, tx);
 	ASSERT(error == 0);
 
 	/*

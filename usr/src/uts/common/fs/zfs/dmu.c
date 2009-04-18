@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,8 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint64_array,	TRUE,	"FUID table size"	},
 	{	zap_byteswap,		TRUE,	"DSL dataset next clones"},
 	{	zap_byteswap,		TRUE,	"scrub work queue"	},
+	{	zap_byteswap,		TRUE,	"ZFS user/group used"	},
+	{	zap_byteswap,		TRUE,	"ZFS user/group quota"	},
 };
 
 int
@@ -442,7 +444,8 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 	object_size = align == 1 ? dn->dn_datablksz :
 	    (dn->dn_maxblkid + 1) << dn->dn_datablkshift;
 
-	if (trunc || (end = offset + length) > object_size)
+	end = offset + length;
+	if (trunc || end > object_size)
 		end = object_size;
 	if (end <= offset)
 		return (0);
@@ -450,6 +453,7 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 
 	while (length) {
 		start = end;
+		/* assert(offset <= start) */
 		err = get_next_chunk(dn, &start, offset);
 		if (err)
 			return (err);

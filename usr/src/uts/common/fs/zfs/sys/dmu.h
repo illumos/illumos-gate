@@ -114,6 +114,8 @@ typedef enum dmu_object_type {
 	DMU_OT_FUID_SIZE,		/* FUID table size UINT64 */
 	DMU_OT_NEXT_CLONES,		/* ZAP */
 	DMU_OT_SCRUB_QUEUE,		/* ZAP */
+	DMU_OT_USERGROUP_USED,		/* ZAP */
+	DMU_OT_USERGROUP_QUOTA,		/* ZAP */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -155,6 +157,9 @@ void zfs_znode_byteswap(void *buf, size_t size);
  */
 #define	DMU_MAX_ACCESS (10<<20) /* 10MB */
 #define	DMU_MAX_DELETEBLKCNT (20480) /* ~5MB of indirect blocks */
+
+#define	DMU_USERUSED_OBJECT	(-1ULL)
+#define	DMU_GROUPUSED_OBJECT	(-2ULL)
 
 /*
  * Public routines to create, destroy, open, and close objsets.
@@ -423,7 +428,7 @@ dmu_tx_t *dmu_tx_create(objset_t *os);
 void dmu_tx_hold_write(dmu_tx_t *tx, uint64_t object, uint64_t off, int len);
 void dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off,
     uint64_t len);
-void dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, char *name);
+void dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name);
 void dmu_tx_hold_bonus(dmu_tx_t *tx, uint64_t object);
 void dmu_tx_abort(dmu_tx_t *tx);
 int dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how);
@@ -563,6 +568,12 @@ extern int dmu_snapshot_realname(objset_t *os, char *name, char *real,
     int maxlen, boolean_t *conflict);
 extern int dmu_dir_list_next(objset_t *os, int namelen, char *name,
     uint64_t *idp, uint64_t *offp);
+
+typedef void objset_used_cb_t(objset_t *os, dmu_object_type_t bonustype,
+    void *oldbonus, void *newbonus, uint64_t oldused, uint64_t newused,
+    dmu_tx_t *tx);
+extern void dmu_objset_register_type(dmu_objset_type_t ost,
+    objset_used_cb_t *cb);
 extern void dmu_objset_set_user(objset_t *os, void *user_ptr);
 extern void *dmu_objset_get_user(objset_t *os);
 

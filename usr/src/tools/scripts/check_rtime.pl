@@ -202,7 +202,8 @@ $SkipUnrefObject = qr{
 	/lib.*\ of\ .*libssl3\.so |				# non-OSNET
 	/lib.*\ of\ .*libxml2\.so\.2 |				# non-OSNET
 	/lib.*\ of\ .*libxslt\.so\.1 |				# non-OSNET
-	/lib.*\ of\ .*libpq\.so\.4 				# non-OSNET
+	/lib.*\ of\ .*libpq\.so\.4 |				# non-OSNET
+	/lib.*\ of\ .*libpython2\.4\.so\.1\.0 			# non-OSNET
 }x;
 
 # Define any files that should only have unused (ldd -u) processing.

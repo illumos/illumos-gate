@@ -667,6 +667,13 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		/*
 		 * Start a transaction.
 		 */
+		if (zfs_usergroup_overquota(zfsvfs,
+		    B_FALSE, zp->z_phys->zp_uid) ||
+		    zfs_usergroup_overquota(zfsvfs,
+		    B_TRUE, zp->z_phys->zp_gid)) {
+			error = EDQUOT;
+			break;
+		}
 		woff = uio->uio_loffset;
 		tx = dmu_tx_create(zfsvfs->z_os);
 		dmu_tx_hold_bonus(tx, zp->z_id);
@@ -1183,23 +1190,16 @@ top:
 		if ((error = zfs_acl_ids_create(dzp, 0, vap, cr, vsecp,
 		    &acl_ids)) != 0)
 			goto out;
+		if (zfs_acl_ids_overquota(zfsvfs, &acl_ids)) {
+			error = EDQUOT;
+			goto out;
+		}
 
 		tx = dmu_tx_create(os);
 		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
 		fuid_dirtied = zfsvfs->z_fuid_dirty;
-		if (fuid_dirtied) {
-			if (zfsvfs->z_fuid_obj == 0) {
-				dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-				dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-				    FUID_SIZE_ESTIMATE(zfsvfs));
-				dmu_tx_hold_zap(tx, MASTER_NODE_OBJ,
-				    FALSE, NULL);
-			} else {
-				dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-				dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-				    FUID_SIZE_ESTIMATE(zfsvfs));
-			}
-		}
+		if (fuid_dirtied)
+			zfs_fuid_txhold(zfsvfs, tx);
 		dmu_tx_hold_bonus(tx, dzp->z_id);
 		dmu_tx_hold_zap(tx, dzp->z_id, TRUE, name);
 		if (acl_ids.z_aclp->z_acl_bytes > ZFS_ACE_SPACE) {
@@ -1608,6 +1608,11 @@ top:
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
+	if (zfs_acl_ids_overquota(zfsvfs, &acl_ids)) {
+		zfs_dirent_unlock(dl);
+		ZFS_EXIT(zfsvfs);
+		return (EDQUOT);
+	}
 
 	/*
 	 * Add a new entry to the directory.
@@ -1616,18 +1621,8 @@ top:
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, dirname);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
 	fuid_dirtied = zfsvfs->z_fuid_dirty;
-	if (fuid_dirtied) {
-		if (zfsvfs->z_fuid_obj == 0) {
-			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-			    FUID_SIZE_ESTIMATE(zfsvfs));
-			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-		} else {
-			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-			    FUID_SIZE_ESTIMATE(zfsvfs));
-		}
-	}
+	if (fuid_dirtied)
+		zfs_fuid_txhold(zfsvfs, tx);
 	if (acl_ids.z_aclp->z_acl_bytes > ZFS_ACE_SPACE)
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
 		    0, SPA_MAXBLOCKSIZE);
@@ -2623,11 +2618,8 @@ top:
 
 		new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
 
-		if (err = zfs_acl_chmod_setattr(zp, &aclp, new_mode)) {
-			dmu_tx_abort(tx);
-			ZFS_EXIT(zfsvfs);
-			return (err);
-		}
+		if (err = zfs_acl_chmod_setattr(zp, &aclp, new_mode))
+			goto out;
 		if (pzp->zp_acl.z_acl_extern_obj) {
 			/* Are we upgrading ACL from old V0 format to new V1 */
 			if (zfsvfs->z_version <= ZPL_VERSION_FUID &&
@@ -2652,22 +2644,28 @@ top:
 	if (mask & (AT_UID | AT_GID)) {
 		if (pzp->zp_xattr) {
 			err = zfs_zget(zp->z_zfsvfs, pzp->zp_xattr, &attrzp);
-			if (err) {
-				dmu_tx_abort(tx);
-				ZFS_EXIT(zfsvfs);
-				if (aclp)
-					zfs_acl_free(aclp);
-				return (err);
-			}
+			if (err)
+				goto out;
 			dmu_tx_hold_bonus(tx, attrzp->z_id);
 		}
 		if (mask & AT_UID) {
 			new_uid = zfs_fuid_create(zfsvfs,
 			    (uint64_t)vap->va_uid, cr, ZFS_OWNER, &fuidp);
+			if (new_uid != pzp->zp_uid &&
+			    zfs_usergroup_overquota(zfsvfs, B_FALSE, new_uid)) {
+				err = EDQUOT;
+				goto out;
+			}
 		}
+
 		if (mask & AT_GID) {
 			new_gid = zfs_fuid_create(zfsvfs, (uint64_t)vap->va_gid,
 			    cr, ZFS_GROUP, &fuidp);
+			if (new_gid != pzp->zp_gid &&
+			    zfs_usergroup_overquota(zfsvfs, B_TRUE, new_gid)) {
+				err = EDQUOT;
+				goto out;
+			}
 		}
 		fuid_dirtied = zfsvfs->z_fuid_dirty;
 		if (fuid_dirtied) {
@@ -2687,22 +2685,9 @@ top:
 
 	err = dmu_tx_assign(tx, TXG_NOWAIT);
 	if (err) {
-		if (attrzp)
-			VN_RELE(ZTOV(attrzp));
-
-		if (aclp) {
-			zfs_acl_free(aclp);
-			aclp = NULL;
-		}
-
-		if (err == ERESTART) {
+		if (err == ERESTART)
 			dmu_tx_wait(tx);
-			dmu_tx_abort(tx);
-			goto top;
-		}
-		dmu_tx_abort(tx);
-		ZFS_EXIT(zfsvfs);
-		return (err);
+		goto out;
 	}
 
 	dmu_buf_will_dirty(zp->z_dbuf, tx);
@@ -2739,9 +2724,6 @@ top:
 		if (attrzp)
 			attrzp->z_phys->zp_gid = new_gid;
 	}
-
-	if (aclp)
-		zfs_acl_free(aclp);
 
 	if (attrzp)
 		mutex_exit(&attrzp->z_lock);
@@ -2810,15 +2792,29 @@ top:
 	if (mask != 0)
 		zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap, mask, fuidp);
 
-	if (fuidp)
-		zfs_fuid_info_free(fuidp);
 	mutex_exit(&zp->z_lock);
 
-	dmu_tx_commit(tx);
-
+out:
 	if (attrzp)
 		VN_RELE(ZTOV(attrzp));
 
+	if (aclp) {
+		zfs_acl_free(aclp);
+		aclp = NULL;
+	}
+
+	if (fuidp) {
+		zfs_fuid_info_free(fuidp);
+		fuidp = NULL;
+	}
+
+	if (err)
+		dmu_tx_abort(tx);
+	else
+		dmu_tx_commit(tx);
+
+	if (err == ERESTART)
+		goto top;
 
 	ZFS_EXIT(zfsvfs);
 	return (err);
@@ -3286,6 +3282,12 @@ top:
 	}
 
 	VERIFY(0 == zfs_acl_ids_create(dzp, 0, vap, cr, NULL, &acl_ids));
+	if (zfs_acl_ids_overquota(zfsvfs, &acl_ids)) {
+		zfs_acl_ids_free(&acl_ids);
+		zfs_dirent_unlock(dl);
+		ZFS_EXIT(zfsvfs);
+		return (EDQUOT);
+	}
 	tx = dmu_tx_create(zfsvfs->z_os);
 	fuid_dirtied = zfsvfs->z_fuid_dirty;
 	dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, MAX(1, len));
@@ -3293,18 +3295,8 @@ top:
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, name);
 	if (acl_ids.z_aclp->z_acl_bytes > ZFS_ACE_SPACE)
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, SPA_MAXBLOCKSIZE);
-	if (fuid_dirtied) {
-		if (zfsvfs->z_fuid_obj == 0) {
-			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-			    FUID_SIZE_ESTIMATE(zfsvfs));
-			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-		} else {
-			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-			    FUID_SIZE_ESTIMATE(zfsvfs));
-		}
-	}
+	if (fuid_dirtied)
+		zfs_fuid_txhold(zfsvfs, tx);
 	error = dmu_tx_assign(tx, TXG_NOWAIT);
 	if (error) {
 		zfs_acl_ids_free(&acl_ids);
@@ -3357,7 +3349,6 @@ top:
 	 * Insert the new object into the directory.
 	 */
 	(void) zfs_link_create(dl, zp, tx, ZNEW);
-out:
 	if (error == 0) {
 		uint64_t txtype = TX_SYMLINK;
 		if (flags & FIGNORECASE)
@@ -3641,6 +3632,12 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 		if (trunc)
 			pvn_write_done(trunc, flags);
 		len = filesz - off;
+	}
+
+	if (zfs_usergroup_overquota(zfsvfs, B_FALSE, zp->z_phys->zp_uid) ||
+	    zfs_usergroup_overquota(zfsvfs, B_TRUE, zp->z_phys->zp_gid)) {
+		err = EDQUOT;
+		goto out;
 	}
 top:
 	tx = dmu_tx_create(zfsvfs->z_os);

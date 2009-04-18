@@ -1900,6 +1900,12 @@ zfs_acl_ids_free(zfs_acl_ids_t *acl_ids)
 	acl_ids->z_fuidp = NULL;
 }
 
+boolean_t
+zfs_acl_ids_overquota(zfsvfs_t *zfsvfs, zfs_acl_ids_t *acl_ids)
+{
+	return (zfs_usergroup_overquota(zfsvfs, B_FALSE, acl_ids->z_fuid) ||
+	    zfs_usergroup_overquota(zfsvfs, B_TRUE, acl_ids->z_fgid));
+}
 
 /*
  * Retrieve a files ACL
@@ -2119,18 +2125,8 @@ top:
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, aclp->z_acl_bytes);
 	}
 	fuid_dirtied = zfsvfs->z_fuid_dirty;
-	if (fuid_dirtied) {
-		if (zfsvfs->z_fuid_obj == 0) {
-			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-			    FUID_SIZE_ESTIMATE(zfsvfs));
-			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-		} else {
-			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-			    FUID_SIZE_ESTIMATE(zfsvfs));
-		}
-	}
+	if (fuid_dirtied)
+		zfs_fuid_txhold(zfsvfs, tx);
 
 	error = dmu_tx_assign(tx, TXG_NOWAIT);
 	if (error) {

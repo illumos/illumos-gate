@@ -628,7 +628,7 @@ dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off, uint64_t len)
 }
 
 void
-dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, char *name)
+dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name)
 {
 	dmu_tx_hold_t *txh;
 	dnode_t *dn;

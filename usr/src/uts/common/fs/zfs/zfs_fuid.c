@@ -294,13 +294,14 @@ zfs_fuid_sync(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 /*
  * Query domain table for a given domain.
  *
- * If domain isn't found it is added to AVL trees and
- * the zfsvfs->z_fuid_dirty flag will be set to TRUE.
- * it will then be necessary for the caller or another
- * thread to detect the dirty table and sync out the changes.
+ * If domain isn't found and addok is set, it is added to AVL trees and
+ * the zfsvfs->z_fuid_dirty flag will be set to TRUE.  It will then be
+ * necessary for the caller or another thread to detect the dirty table
+ * and sync out the changes.
  */
-static int
-zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain)
+int
+zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain,
+    char **retdomain, boolean_t addok)
 {
 	fuid_domain_t searchnode, *findnode;
 	avl_index_t loc;
@@ -312,14 +313,14 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain)
 	 * for the user nobody.
 	 */
 	if (domain[0] == '\0') {
-		*retdomain = nulldomain;
+		if (retdomain)
+			*retdomain = nulldomain;
 		return (0);
 	}
 
 	searchnode.f_ksid = ksid_lookupdomain(domain);
-	if (retdomain) {
+	if (retdomain)
 		*retdomain = searchnode.f_ksid->kd_name;
-	}
 	if (!zfsvfs->z_fuid_loaded)
 		zfs_fuid_init(zfsvfs);
 
@@ -331,7 +332,7 @@ retry:
 		rw_exit(&zfsvfs->z_fuid_lock);
 		ksiddomain_rele(searchnode.f_ksid);
 		return (findnode->f_idx);
-	} else {
+	} else if (addok) {
 		fuid_domain_t *domnode;
 		uint64_t retidx;
 
@@ -351,6 +352,8 @@ retry:
 		zfsvfs->z_fuid_dirty = B_TRUE;
 		rw_exit(&zfsvfs->z_fuid_lock);
 		return (retidx);
+	} else {
+		return (-1);
 	}
 }
 
@@ -360,7 +363,7 @@ retry:
  * Returns a pointer from an avl node of the domain string.
  *
  */
-static char *
+const char *
 zfs_fuid_find_by_idx(zfsvfs_t *zfsvfs, uint32_t idx)
 {
 	char *domain;
@@ -397,7 +400,7 @@ zfs_fuid_map_id(zfsvfs_t *zfsvfs, uint64_t fuid,
     cred_t *cr, zfs_fuid_type_t type)
 {
 	uint32_t index = FUID_INDEX(fuid);
-	char *domain;
+	const char *domain;
 	uid_t id;
 
 	if (index == 0)
@@ -514,7 +517,7 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
 	rid = ksid_getrid(ksid);
 	domain = ksid_getdomain(ksid);
 
-	idx = zfs_fuid_find_by_domain(zfsvfs, domain, &kdomain);
+	idx = zfs_fuid_find_by_domain(zfsvfs, domain, &kdomain, B_TRUE);
 
 	zfs_fuid_node_add(fuidp, kdomain, rid, idx, id, type);
 
@@ -605,7 +608,7 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr,
 		}
 	}
 
-	idx = zfs_fuid_find_by_domain(zfsvfs, domain, &kdomain);
+	idx = zfs_fuid_find_by_domain(zfsvfs, domain, &kdomain, B_TRUE);
 
 	if (!zfsvfs->z_replay)
 		zfs_fuid_node_add(fuidpp, kdomain,
@@ -702,7 +705,7 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 					return (B_TRUE);
 				}
 			} else {
-				char *domain;
+				const char *domain;
 
 				domain = zfs_fuid_find_by_idx(zfsvfs, idx);
 				ASSERT(domain != NULL);
@@ -724,5 +727,20 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	 */
 	gid = zfs_fuid_map_id(zfsvfs, id, cr, ZFS_GROUP);
 	return (groupmember(gid, cr));
+}
+
+void
+zfs_fuid_txhold(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
+{
+	if (zfsvfs->z_fuid_obj == 0) {
+		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+		    FUID_SIZE_ESTIMATE(zfsvfs));
+		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+	} else {
+		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+		    FUID_SIZE_ESTIMATE(zfsvfs));
+	}
 }
 #endif

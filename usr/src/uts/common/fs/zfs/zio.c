@@ -875,15 +875,9 @@ zio_write_bp_init(zio_t *zio)
 		 * few passes, stop compressing to ensure convergence.
 		 */
 		pass = spa_sync_pass(zio->io_spa);
-		ASSERT(pass > 1);
 
 		if (pass > SYNC_PASS_DONT_COMPRESS)
 			compress = ZIO_COMPRESS_OFF;
-
-		/*
-		 * Only MOS (objset 0) data should need to be rewritten.
-		 */
-		ASSERT(zio->io_logical->io_bookmark.zb_objset == 0);
 
 		/* Make sure someone doesn't change their mind on overwrites */
 		ASSERT(MIN(zp->zp_ndvas + BP_IS_GANG(bp),

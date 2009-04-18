@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Ramprakash Jelari
@@ -620,8 +620,6 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int gather_flags,
 	} else if (prop == ZFS_PROP_CANMOUNT) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 	} else if (prop == ZFS_PROP_VOLSIZE) {
-		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
-	} else if (prop == ZFS_PROP_VERSION) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 	} else {
 		clp->cl_prop = prop;

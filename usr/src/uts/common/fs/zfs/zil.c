@@ -1219,6 +1219,13 @@ zil_sync(zilog_t *zilog, dmu_tx_t *tx)
 	spa_t *spa = zilog->zl_spa;
 	lwb_t *lwb;
 
+	/*
+	 * We don't zero out zl_destroy_txg, so make sure we don't try
+	 * to destroy it twice.
+	 */
+	if (spa_sync_pass(spa) != 1)
+		return;
+
 	mutex_enter(&zilog->zl_lock);
 
 	ASSERT(zilog->zl_stop_sync == 0);
@@ -1229,7 +1236,6 @@ zil_sync(zilog_t *zilog, dmu_tx_t *tx)
 		blkptr_t blk = zh->zh_log;
 
 		ASSERT(list_head(&zilog->zl_lwb_list) == NULL);
-		ASSERT(spa_sync_pass(spa) == 1);
 
 		bzero(zh, sizeof (zil_header_t));
 		bzero(zilog->zl_replayed_seq, sizeof (zilog->zl_replayed_seq));

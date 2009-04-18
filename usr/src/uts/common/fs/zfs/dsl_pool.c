@@ -302,23 +302,51 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	dp->dp_read_overhead = 0;
 	start = gethrtime();
+
 	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 	while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
-		if (!list_link_active(&ds->ds_synced_link))
-			list_insert_tail(&dp->dp_synced_datasets, ds);
-		else
-			dmu_buf_rele(ds->ds_dbuf, ds);
+		/*
+		 * We must not sync any non-MOS datasets twice, because
+		 * we may have taken a snapshot of them.  However, we
+		 * may sync newly-created datasets on pass 2.
+		 */
+		ASSERT(!list_link_active(&ds->ds_synced_link));
+		list_insert_tail(&dp->dp_synced_datasets, ds);
 		dsl_dataset_sync(ds, zio, tx);
 	}
 	DTRACE_PROBE(pool_sync__1setup);
-
 	err = zio_wait(zio);
+
 	write_time = gethrtime() - start;
 	ASSERT(err == 0);
 	DTRACE_PROBE(pool_sync__2rootzio);
 
-	while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg))
+	for (ds = list_head(&dp->dp_synced_datasets); ds;
+	    ds = list_next(&dp->dp_synced_datasets, ds))
+		dmu_objset_do_userquota_callbacks(ds->ds_user_ptr, tx);
+
+	/*
+	 * Sync the datasets again to push out the changes due to
+	 * userquota updates.  This must be done before we process the
+	 * sync tasks, because that could cause a snapshot of a dataset
+	 * whose ds_bp will be rewritten when we do this 2nd sync.
+	 */
+	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
+	while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
+		ASSERT(list_link_active(&ds->ds_synced_link));
+		dmu_buf_rele(ds->ds_dbuf, ds);
+		dsl_dataset_sync(ds, zio, tx);
+	}
+	err = zio_wait(zio);
+
+	while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg)) {
+		/*
+		 * No more sync tasks should have been added while we
+		 * were syncing.
+		 */
+		ASSERT(spa_sync_pass(dp->dp_spa) == 1);
 		dsl_sync_task_group_sync(dstg, tx);
+	}
 	DTRACE_PROBE(pool_sync__3task);
 
 	start = gethrtime();

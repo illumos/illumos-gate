@@ -227,19 +227,6 @@ dsl_dir_namelen(dsl_dir_t *dd)
 	return (result);
 }
 
-int
-dsl_dir_is_private(dsl_dir_t *dd)
-{
-	int rv = FALSE;
-
-	if (dd->dd_parent && dsl_dir_is_private(dd->dd_parent))
-		rv = TRUE;
-	if (dataset_name_hidden(dd->dd_myname))
-		rv = TRUE;
-	return (rv);
-}
-
-
 static int
 getcomponent(const char *path, char *component, const char **nextp)
 {

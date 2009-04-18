@@ -376,12 +376,11 @@ add_prop_list(const char *propname, char *propval, nvlist_t **props,
 		}
 		normnm = zpool_prop_to_name(prop);
 	} else {
-		if ((fprop = zfs_name_to_prop(propname)) == ZPROP_INVAL) {
-			(void) fprintf(stderr, gettext("property '%s' is "
-			    "not a valid file system property\n"), propname);
-			return (2);
+		if ((fprop = zfs_name_to_prop(propname)) != ZPROP_INVAL) {
+			normnm = zfs_prop_to_name(fprop);
+		} else {
+			normnm = propname;
 		}
-		normnm = zfs_prop_to_name(fprop);
 	}
 
 	if (nvlist_lookup_string(proplist, normnm, &strval) == 0 &&
@@ -3527,8 +3526,8 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 11  Improved scrub performance\n"));
 		(void) printf(gettext(" 12  Snapshot properties\n"));
 		(void) printf(gettext(" 13  snapused property\n"));
-		(void) printf(gettext(" 14  passthrough-x aclinherit "
-		    "support\n"));
+		(void) printf(gettext(" 14  passthrough-x aclinherit\n"));
+		(void) printf(gettext(" 15  user/group space accounting\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

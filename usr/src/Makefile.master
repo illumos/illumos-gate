@@ -516,6 +516,9 @@ CLOBBERFILES += $(POFILE) $(POFILES)
 COMPILE.cpp= $(CC) -E -C $(CFLAGS) $(CPPFLAGS)
 XGETTEXT= /usr/bin/xgettext
 XGETFLAGS= -c TRANSLATION_NOTE
+GNUXGETTEXT= /usr/gnu/bin/xgettext
+GNUXGETFLAGS= --add-comments=TRANSLATION_NOTE --keyword=_ \
+	--strict --no-location --omit-header
 BUILD.po= $(XGETTEXT) $(XGETFLAGS) -d $(<F) $<.i ;\
 	$(RM)	$@ ;\
 	$(SED) "/^domain/d" < $(<F).po > $@ ;\
@@ -1009,8 +1012,6 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 
 #
 # Python and Perl executable and message catalog build rules.
-# Note that Python i18n isn't supported by this rule set yet,
-# as it requires a special build tool (pygettext.py).
 #
 .SUFFIXES: .pl .pm .py .pyc
 
@@ -1026,6 +1027,9 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 	$(RM) $@
 	$(PYTHON) -mpy_compile $<
 	@[ $(<)c = $@ ] || $(MV) $(<)c $@
+
+.py.po:
+	$(GNUXGETTEXT) $(GNUXGETFLAGS) -d $(<F:%.py=%) $< ;
 
 .pl.po .pm.po:
 	$(XGETTEXT) $(XGETFLAGS) -d $(<F) $< ;

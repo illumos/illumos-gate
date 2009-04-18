@@ -975,6 +975,27 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag)
 		(void) dmu_free_object(os, obj);
 	}
 
+	/*
+	 * We need to sync out all in-flight IO before we try to evict
+	 * (the dataset evict func is trying to clear the cached entries
+	 * for this dataset in the ARC).
+	 */
+	txg_wait_synced(dd->dd_pool, 0);
+
+	/*
+	 * If we managed to free all the objects in open
+	 * context, the user space accounting should be zero.
+	 */
+	if (ds->ds_phys->ds_bp.blk_fill == 0 &&
+	    dmu_objset_userused_enabled(os->os)) {
+		uint64_t count;
+
+		ASSERT(zap_count(os, DMU_USERUSED_OBJECT, &count) != 0 ||
+		    count == 0);
+		ASSERT(zap_count(os, DMU_GROUPUSED_OBJECT, &count) != 0 ||
+		    count == 0);
+	}
+
 	dmu_objset_close(os);
 	if (err != ESRCH)
 		goto out;
@@ -1058,7 +1079,6 @@ dsl_dataset_get_user_ptr(dsl_dataset_t *ds)
 {
 	return (ds->ds_user_ptr);
 }
-
 
 blkptr_t *
 dsl_dataset_get_blkptr(dsl_dataset_t *ds)
@@ -1488,7 +1508,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		dmu_buf_will_dirty(ds_prev->ds_dbuf, tx);
 		if (after_branch_point &&
 		    ds_prev->ds_phys->ds_next_clones_obj != 0) {
-			VERIFY(0 == zap_remove_int(mos,
+			VERIFY3U(0, ==, zap_remove_int(mos,
 			    ds_prev->ds_phys->ds_next_clones_obj, obj, tx));
 			if (ds->ds_phys->ds_next_snap_obj != 0) {
 				VERIFY(0 == zap_add_int(mos,

@@ -1221,7 +1221,7 @@ addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
 	 * dataset property,
 	 */
 	if (prop == ZPROP_INVAL && (type == ZFS_TYPE_POOL ||
-	    !zfs_prop_user(propname))) {
+	    (!zfs_prop_user(propname) && !zfs_prop_userquota(propname)))) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "invalid property '%s'"), propname);
 		return (zfs_error(hdl, EZFS_BADPROP,
