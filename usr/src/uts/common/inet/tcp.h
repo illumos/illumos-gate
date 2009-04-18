@@ -676,7 +676,7 @@ extern void	tcp_conn_request(void *arg, mblk_t *mp, void *arg2);
 extern void	tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2);
 extern void 	tcp_input(void *arg, mblk_t *mp, void *arg2);
 extern void	tcp_rput_data(void *arg, mblk_t *mp, void *arg2);
-extern void 	*tcp_get_conn(void *arg, tcp_stack_t *);
+extern void 	*tcp_get_conn(void *arg, tcp_stack_t *, boolean_t);
 extern void	tcp_time_wait_collector(void *arg);
 extern mblk_t	*tcp_snmp_get(queue_t *, mblk_t *);
 extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
