@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -60,6 +58,9 @@
 #include <sys/cmn_err.h>
 #include <sys/brand.h>
 
+/* hash function for the lwpid hash table, p->p_tidhash[] */
+#define	TIDHASH(tid, hash_sz)	((tid) & ((hash_sz) - 1))
+
 void *segkp_lwp;		/* cookie for pool of segkp resources */
 extern void reapq_move_lq_to_tq(kthread_t *);
 extern void freectx_ctx(struct ctxop *);
@@ -85,8 +86,9 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	lwpent_t *lep;
 	lwpdir_t *old_dir = NULL;
 	uint_t old_dirsz = 0;
-	lwpdir_t **old_hash = NULL;
+	tidhash_t *old_hash = NULL;
 	uint_t old_hashsz = 0;
+	ret_tidhash_t *ret_tidhash = NULL;
 	int i;
 	int rctlfail = 0;
 	boolean_t branded = 0;
@@ -232,31 +234,58 @@ grow:
 	 *	which leads to these hash table sizes corresponding to
 	 *	the above directory sizes:
 	 *		2, 4, 8, 16, 32, 64, 128, 256, 512, ...
+	 * A note on growing the hash table:
+	 *	For performance reasons, code in lwp_unpark() does not
+	 *	acquire curproc->p_lock when searching the hash table.
+	 *	Rather, it calls lwp_hash_lookup_and_lock() which
+	 *	acquires only the individual hash bucket lock, taking
+	 *	care to deal with reallocation of the hash table
+	 *	during the time it takes to acquire the lock.
+	 *
+	 *	This is sufficient to protect the integrity of the
+	 *	hash table, but it requires us to acquire all of the
+	 *	old hash bucket locks before growing the hash table
+	 *	and to release them afterwards.  It also requires us
+	 *	not to free the old hash table because some thread
+	 *	in lwp_hash_lookup_and_lock() might still be trying
+	 *	to acquire the old bucket lock.
+	 *
+	 *	So we adopt the tactic of keeping all of the retired
+	 *	hash tables on a linked list, so they can be safely
+	 *	freed when the process exits or execs.
+	 *
+	 *	Because the hash table grows in powers of two, the
+	 *	total size of all of the hash tables will be slightly
+	 *	less than twice the size of the largest hash table.
 	 */
 	while (p->p_lwpfree == NULL) {
 		uint_t dirsz = p->p_lwpdir_sz;
-		uint_t new_dirsz;
-		uint_t new_hashsz;
 		lwpdir_t *new_dir;
+		uint_t new_dirsz;
 		lwpdir_t *ldp;
-		lwpdir_t **new_hash;
+		tidhash_t *new_hash;
+		uint_t new_hashsz;
 
 		mutex_exit(&p->p_lock);
 
-		if (old_dir != NULL) {
+		/*
+		 * Prepare to remember the old p_tidhash for later
+		 * kmem_free()ing when the process exits or execs.
+		 */
+		if (ret_tidhash == NULL)
+			ret_tidhash = kmem_zalloc(sizeof (ret_tidhash_t),
+			    KM_SLEEP);
+		if (old_dir != NULL)
 			kmem_free(old_dir, old_dirsz * sizeof (*old_dir));
+		if (old_hash != NULL)
 			kmem_free(old_hash, old_hashsz * sizeof (*old_hash));
-			old_dir = NULL;
-			old_dirsz = 0;
-			old_hash = NULL;
-			old_hashsz = 0;
-		}
+
 		new_dirsz = 2 * dirsz + 2;
 		new_dir = kmem_zalloc(new_dirsz * sizeof (lwpdir_t), KM_SLEEP);
 		for (ldp = new_dir, i = 1; i < new_dirsz; i++, ldp++)
 			ldp->ld_next = ldp + 1;
 		new_hashsz = (new_dirsz + 2) / 2;
-		new_hash = kmem_zalloc(new_hashsz * sizeof (lwpdir_t *),
+		new_hash = kmem_zalloc(new_hashsz * sizeof (tidhash_t),
 		    KM_SLEEP);
 
 		mutex_enter(&p->p_lock);
@@ -273,15 +302,20 @@ grow:
 			old_hash = new_hash;
 			old_hashsz = new_hashsz;
 		} else {
-			old_dir = p->p_lwpdir;
-			old_dirsz = p->p_lwpdir_sz;
+			/*
+			 * For the benefit of lwp_hash_lookup_and_lock(),
+			 * called from lwp_unpark(), which searches the
+			 * tid hash table without acquiring p->p_lock,
+			 * we must acquire all of the tid hash table
+			 * locks before replacing p->p_tidhash.
+			 */
 			old_hash = p->p_tidhash;
 			old_hashsz = p->p_tidhash_sz;
-			p->p_lwpdir = new_dir;
-			p->p_lwpfree = new_dir;
-			p->p_lwpdir_sz = new_dirsz;
-			p->p_tidhash = new_hash;
-			p->p_tidhash_sz = new_hashsz;
+			for (i = 0; i < old_hashsz; i++) {
+				mutex_enter(&old_hash[i].th_lock);
+				mutex_enter(&new_hash[i].th_lock);
+			}
+
 			/*
 			 * We simply hash in all of the old directory entries.
 			 * This works because the old directory has no empty
@@ -289,11 +323,57 @@ grow:
 			 * This reproduces the original directory ordering
 			 * (required for /proc directory semantics).
 			 */
-			for (ldp = old_dir, i = 0; i < dirsz; i++, ldp++)
-				lwp_hash_in(p, ldp->ld_entry);
+			old_dir = p->p_lwpdir;
+			old_dirsz = p->p_lwpdir_sz;
+			p->p_lwpdir = new_dir;
+			p->p_lwpfree = new_dir;
+			p->p_lwpdir_sz = new_dirsz;
+			for (ldp = old_dir, i = 0; i < old_dirsz; i++, ldp++)
+				lwp_hash_in(p, ldp->ld_entry,
+				    new_hash, new_hashsz, 0);
+
 			/*
-			 * Defer freeing memory until we drop p->p_lock,
+			 * Remember the old hash table along with all
+			 * of the previously-remembered hash tables.
+			 * We will free them at process exit or exec.
 			 */
+			ret_tidhash->rth_tidhash = old_hash;
+			ret_tidhash->rth_tidhash_sz = old_hashsz;
+			ret_tidhash->rth_next = p->p_ret_tidhash;
+			p->p_ret_tidhash = ret_tidhash;
+
+			/*
+			 * Now establish the new tid hash table.
+			 * As soon as we assign p->p_tidhash,
+			 * code in lwp_unpark() can start using it.
+			 */
+			membar_producer();
+			p->p_tidhash = new_hash;
+
+			/*
+			 * It is necessary that p_tidhash reach global
+			 * visibility before p_tidhash_sz.  Otherwise,
+			 * code in lwp_hash_lookup_and_lock() could
+			 * index into the old p_tidhash using the new
+			 * p_tidhash_sz and thereby access invalid data.
+			 */
+			membar_producer();
+			p->p_tidhash_sz = new_hashsz;
+
+			/*
+			 * Release the locks; allow lwp_unpark() to carry on.
+			 */
+			for (i = 0; i < old_hashsz; i++) {
+				mutex_exit(&old_hash[i].th_lock);
+				mutex_exit(&new_hash[i].th_lock);
+			}
+
+			/*
+			 * Avoid freeing these objects below.
+			 */
+			ret_tidhash = NULL;
+			old_hash = NULL;
+			old_hashsz = 0;
 		}
 	}
 
@@ -550,7 +630,7 @@ grow:
 	lep->le_thread = t;
 	lep->le_lwpid = t->t_tid;
 	lep->le_start = t->t_start;
-	lwp_hash_in(p, lep);
+	lwp_hash_in(p, lep, p->p_tidhash, p->p_tidhash_sz, 1);
 
 	if (state == TS_RUN) {
 		/*
@@ -604,10 +684,12 @@ error:
 		mutex_exit(&p->p_lock);
 	}
 
-	if (old_dir != NULL) {
+	if (old_dir != NULL)
 		kmem_free(old_dir, old_dirsz * sizeof (*old_dir));
+	if (old_hash != NULL)
 		kmem_free(old_hash, old_hashsz * sizeof (*old_hash));
-	}
+	if (ret_tidhash != NULL)
+		kmem_free(ret_tidhash, sizeof (ret_tidhash_t));
 
 	DTRACE_PROC1(lwp__create, kthread_t *, t);
 	return (lwp);
@@ -1742,8 +1824,10 @@ retry:
  * Add a new lwp entry to the lwp directory and to the lwpid hash table.
  */
 void
-lwp_hash_in(proc_t *p, lwpent_t *lep)
+lwp_hash_in(proc_t *p, lwpent_t *lep, tidhash_t *tidhash, uint_t tidhash_sz,
+    int do_lock)
 {
+	tidhash_t *thp = &tidhash[TIDHASH(lep->le_lwpid, tidhash_sz)];
 	lwpdir_t **ldpp;
 	lwpdir_t *ldp;
 	kthread_t *t;
@@ -1757,10 +1841,13 @@ lwp_hash_in(proc_t *p, lwpent_t *lep)
 	ASSERT(ldp->ld_entry == NULL);
 	ldp->ld_entry = lep;
 
+	if (do_lock)
+		mutex_enter(&thp->th_lock);
+
 	/*
 	 * Insert it into the lwpid hash table.
 	 */
-	ldpp = &p->p_tidhash[TIDHASH(p, lep->le_lwpid)];
+	ldpp = &thp->th_list;
 	ldp->ld_next = *ldpp;
 	*ldpp = ldp;
 
@@ -1771,6 +1858,9 @@ lwp_hash_in(proc_t *p, lwpent_t *lep)
 		ASSERT(lep->le_lwpid == t->t_tid);
 		t->t_dslot = (int)(ldp - p->p_lwpdir);
 	}
+
+	if (do_lock)
+		mutex_exit(&thp->th_lock);
 }
 
 /*
@@ -1782,11 +1872,13 @@ lwp_hash_in(proc_t *p, lwpent_t *lep)
 void
 lwp_hash_out(proc_t *p, id_t lwpid)
 {
+	tidhash_t *thp = &p->p_tidhash[TIDHASH(lwpid, p->p_tidhash_sz)];
 	lwpdir_t **ldpp;
 	lwpdir_t *ldp;
 	lwpent_t *lep;
 
-	for (ldpp = &p->p_tidhash[TIDHASH(p, lwpid)];
+	mutex_enter(&thp->th_lock);
+	for (ldpp = &thp->th_list;
 	    (ldp = *ldpp) != NULL; ldpp = &ldp->ld_next) {
 		lep = ldp->ld_entry;
 		if (lep->le_lwpid == lwpid) {
@@ -1799,6 +1891,7 @@ lwp_hash_out(proc_t *p, id_t lwpid)
 			break;
 		}
 	}
+	mutex_exit(&thp->th_lock);
 }
 
 /*
@@ -1807,6 +1900,7 @@ lwp_hash_out(proc_t *p, id_t lwpid)
 lwpdir_t *
 lwp_hash_lookup(proc_t *p, id_t lwpid)
 {
+	tidhash_t *thp;
 	lwpdir_t *ldp;
 
 	/*
@@ -1817,12 +1911,54 @@ lwp_hash_lookup(proc_t *p, id_t lwpid)
 	if (p->p_tidhash == NULL)
 		return (NULL);
 
-	for (ldp = p->p_tidhash[TIDHASH(p, lwpid)];
-	    ldp != NULL; ldp = ldp->ld_next) {
+	thp = &p->p_tidhash[TIDHASH(lwpid, p->p_tidhash_sz)];
+	for (ldp = thp->th_list; ldp != NULL; ldp = ldp->ld_next) {
 		if (ldp->ld_entry->le_lwpid == lwpid)
 			return (ldp);
 	}
 
+	return (NULL);
+}
+
+/*
+ * Same as lwp_hash_lookup(), but acquire and return
+ * the tid hash table entry lock on success.
+ */
+lwpdir_t *
+lwp_hash_lookup_and_lock(proc_t *p, id_t lwpid, kmutex_t **mpp)
+{
+	tidhash_t *tidhash;
+	uint_t tidhash_sz;
+	tidhash_t *thp;
+	lwpdir_t *ldp;
+
+top:
+	tidhash_sz = p->p_tidhash_sz;
+	membar_consumer();
+	if ((tidhash = p->p_tidhash) == NULL)
+		return (NULL);
+
+	thp = &tidhash[TIDHASH(lwpid, tidhash_sz)];
+	mutex_enter(&thp->th_lock);
+
+	/*
+	 * Since we are not holding p->p_lock, the tid hash table
+	 * may have changed.  If so, start over.  If not, then
+	 * it cannot change until after we drop &thp->th_lock;
+	 */
+	if (tidhash != p->p_tidhash || tidhash_sz != p->p_tidhash_sz) {
+		mutex_exit(&thp->th_lock);
+		goto top;
+	}
+
+	for (ldp = thp->th_list; ldp != NULL; ldp = ldp->ld_next) {
+		if (ldp->ld_entry->le_lwpid == lwpid) {
+			*mpp = &thp->th_lock;
+			return (ldp);
+		}
+	}
+
+	mutex_exit(&thp->th_lock);
 	return (NULL);
 }
 

@@ -374,7 +374,7 @@ cfork(int isvfork, int isfork1, int flags)
 		ldp->ld_next = ldp + 1;
 	cp->p_tidhash_sz = (cp->p_lwpdir_sz + 2) / 2;
 	cp->p_tidhash =
-	    kmem_zalloc(cp->p_tidhash_sz * sizeof (lwpdir_t *), KM_SLEEP);
+	    kmem_zalloc(cp->p_tidhash_sz * sizeof (tidhash_t), KM_SLEEP);
 
 	/*
 	 * Duplicate parent's lwps.
@@ -430,7 +430,8 @@ cfork(int isvfork, int isfork1, int flags)
 				clep = kmem_zalloc(sizeof (*clep), KM_SLEEP);
 				clep->le_lwpid = lep->le_lwpid;
 				clep->le_start = lep->le_start;
-				lwp_hash_in(cp, clep);
+				lwp_hash_in(cp, clep,
+				    cp->p_tidhash, cp->p_tidhash_sz, 0);
 			}
 		}
 	}

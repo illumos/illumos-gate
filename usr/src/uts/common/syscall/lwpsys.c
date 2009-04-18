@@ -18,14 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -50,6 +49,27 @@ idtot(proc_t *p, id_t lwpid)
 
 	if ((ldp = lwp_hash_lookup(p, lwpid)) != NULL)
 		return (ldp->ld_entry->le_thread);
+	return (NULL);
+}
+
+/*
+ * Same as idtot(), but acquire and return
+ * the tid hash table entry lock on success.
+ * This allows lwp_unpark() to do its job without acquiring
+ * p->p_lock (and thereby causing congestion problems when
+ * the application calls lwp_unpark() too often).
+ */
+static kthread_t *
+idtot_and_lock(proc_t *p, id_t lwpid, kmutex_t **mpp)
+{
+	lwpdir_t *ldp;
+	kthread_t *t;
+
+	if ((ldp = lwp_hash_lookup_and_lock(p, lwpid, mpp)) != NULL) {
+		if ((t = ldp->ld_entry->le_thread) == NULL)
+			mutex_exit(*mpp);
+		return (t);
+	}
 	return (NULL);
 }
 
@@ -373,18 +393,18 @@ lwp_unpark(id_t lwpid)
 {
 	proc_t *p = ttoproc(curthread);
 	kthread_t *t;
+	kmutex_t *mp;
 	int error = 0;
 
-	mutex_enter(&p->p_lock);
-	if ((t = idtot(p, lwpid)) == NULL)
+	if ((t = idtot_and_lock(p, lwpid, &mp)) == NULL) {
 		error = ESRCH;
-	else {
+	} else {
 		mutex_enter(&t->t_delay_lock);
 		t->t_unpark = 1;
 		cv_signal(&t->t_delay_cv);
 		mutex_exit(&t->t_delay_lock);
+		mutex_exit(mp);
 	}
-	mutex_exit(&p->p_lock);
 	return (error);
 }
 
@@ -405,17 +425,17 @@ lwp_unpark_cancel(id_t lwpid)
 {
 	proc_t *p = ttoproc(curthread);
 	kthread_t *t;
+	kmutex_t *mp;
 	int error = 0;
 
-	mutex_enter(&p->p_lock);
-	if ((t = idtot(p, lwpid)) == NULL) {
+	if ((t = idtot_and_lock(p, lwpid, &mp)) == NULL) {
 		error = ESRCH;
 	} else {
 		mutex_enter(&t->t_delay_lock);
 		t->t_unpark = 0;
 		mutex_exit(&t->t_delay_lock);
+		mutex_exit(mp);
 	}
-	mutex_exit(&p->p_lock);
 	return (error);
 }
 
@@ -528,6 +548,7 @@ lwp_unpark_all(id_t *lwpidp, int nids)
 {
 	proc_t *p = ttoproc(curthread);
 	kthread_t *t;
+	kmutex_t *mp;
 	int error = 0;
 	id_t *lwpid;
 	size_t lwpidsz;
@@ -545,18 +566,17 @@ lwp_unpark_all(id_t *lwpidp, int nids)
 			error = EFAULT;
 			break;
 		}
-		mutex_enter(&p->p_lock);
 		for (i = 0; i < n; i++) {
-			if ((t = idtot(p, lwpid[i])) == NULL)
+			if ((t = idtot_and_lock(p, lwpid[i], &mp)) == NULL) {
 				error = ESRCH;
-			else {
+			} else {
 				mutex_enter(&t->t_delay_lock);
 				t->t_unpark = 1;
 				cv_signal(&t->t_delay_cv);
 				mutex_exit(&t->t_delay_lock);
+				mutex_exit(mp);
 			}
 		}
-		mutex_exit(&p->p_lock);
 		lwpidp += n;
 		nids -= n;
 	}

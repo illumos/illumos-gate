@@ -31,7 +31,6 @@
 #define	_SYS_PROC_H
 
 #include <sys/time.h>
-
 #include <sys/thread.h>
 #include <sys/cred.h>
 #include <sys/user.h>
@@ -64,9 +63,6 @@ struct prof {
 	uint32_t	pr_scale;	/* pc scaling */
 	long		pr_samples;	/* sample count */
 };
-
-/* hash function for the lwpid hash table, p->p_tidhash[] */
-#define	TIDHASH(p, tid)	((tid) & ((p)->p_tidhash_sz - 1))
 
 /*
  * An lwp directory entry.
@@ -108,6 +104,23 @@ typedef struct lwpdir {
 	struct lwpdir	*ld_next;	/* hash chain or free list */
 	struct lwpent	*ld_entry;	/* lwp directory entry */
 } lwpdir_t;
+
+/*
+ * Element of the p_tidhash thread-id (lwpid) hash table.
+ */
+typedef struct tidhash {
+	kmutex_t	th_lock;
+	lwpdir_t	*th_list;
+} tidhash_t;
+
+/*
+ * Retired tidhash hash tables.
+ */
+typedef struct ret_tidhash {
+	struct ret_tidhash	*rth_next;
+	tidhash_t		*rth_tidhash;
+	uint_t			rth_tidhash_sz;
+} ret_tidhash_t;
 
 struct pool;
 struct task;
@@ -209,9 +222,10 @@ typedef struct	proc {
 	kthread_t *p_tlist;		/* circular list of threads */
 	lwpdir_t *p_lwpdir;		/* thread (lwp) directory */
 	lwpdir_t *p_lwpfree;		/* p_lwpdir free list */
-	lwpdir_t **p_tidhash;		/* tid (lwpid) lookup hash table */
+	tidhash_t *p_tidhash;		/* tid (lwpid) lookup hash table */
 	uint_t	p_lwpdir_sz;		/* number of p_lwpdir[] entries */
 	uint_t	p_tidhash_sz;		/* number of p_tidhash[] entries */
+	ret_tidhash_t *p_ret_tidhash;	/* retired tidhash hash tables */
 	uint64_t p_lgrpset;		/* unprotected hint of set of lgrps */
 					/* on which process has threads */
 	volatile lgrp_id_t  p_t1_lgrpid; /* main's thread lgroup id */
@@ -714,9 +728,10 @@ extern	klwp_t 		*lwp_create(
 	int		cid,
 	id_t		lwpid);
 extern	kthread_t *idtot(proc_t *, id_t);
-extern	void	lwp_hash_in(proc_t *, lwpent_t *);
+extern	void	lwp_hash_in(proc_t *, lwpent_t *, tidhash_t *, uint_t, int);
 extern	void	lwp_hash_out(proc_t *, id_t);
 extern	lwpdir_t *lwp_hash_lookup(proc_t *, id_t);
+extern	lwpdir_t *lwp_hash_lookup_and_lock(proc_t *, id_t, kmutex_t **);
 extern	void	lwp_create_done(kthread_t *);
 extern	void	lwp_exit(void);
 extern	void	lwp_pcb_exit(void);

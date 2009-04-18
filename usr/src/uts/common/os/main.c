@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -95,7 +96,7 @@ kmem_cache_t *process_cache;	/* kmem cache for proc structures */
  * Process 0's lwp directory and lwpid hash table.
  */
 lwpdir_t p0_lwpdir[2];
-lwpdir_t *p0_tidhash[2];
+tidhash_t p0_tidhash[2];
 lwpent_t p0_lep;
 
 /*
@@ -526,7 +527,7 @@ main(void)
 	p0_lep.le_thread = curthread;
 	p0_lep.le_lwpid = curthread->t_tid;
 	p0_lep.le_start = curthread->t_start;
-	lwp_hash_in(p, &p0_lep);
+	lwp_hash_in(p, &p0_lep, p0_tidhash, 2, 0);
 
 	/*
 	 * Initialize extended accounting.

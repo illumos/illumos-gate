@@ -130,11 +130,12 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	struct execa ua;
 	k_sigset_t savedmask;
 	lwpdir_t *lwpdir = NULL;
-	lwpdir_t **tidhash;
+	tidhash_t *tidhash;
 	lwpdir_t *old_lwpdir = NULL;
 	uint_t old_lwpdir_sz;
-	lwpdir_t **old_tidhash;
+	tidhash_t *old_tidhash;
 	uint_t old_tidhash_sz;
+	ret_tidhash_t *ret_tidhash;
 	lwpent_t *lep;
 	boolean_t brandme = B_FALSE;
 
@@ -416,7 +417,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	if (curthread->t_tid != 1 || p->p_lwpdir_sz != 2) {
 		lwpdir = kmem_zalloc(2 * sizeof (lwpdir_t), KM_SLEEP);
 		lwpdir->ld_next = lwpdir + 1;
-		tidhash = kmem_zalloc(2 * sizeof (lwpdir_t *), KM_SLEEP);
+		tidhash = kmem_zalloc(2 * sizeof (tidhash_t), KM_SLEEP);
 		if (p->p_lwpdir != NULL)
 			lep = p->p_lwpdir[curthread->t_dslot].ld_entry;
 		else
@@ -461,13 +462,15 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		old_tidhash_sz = p->p_tidhash_sz;
 		p->p_lwpdir = p->p_lwpfree = lwpdir;
 		p->p_lwpdir_sz = 2;
-		p->p_tidhash = tidhash;
-		p->p_tidhash_sz = 2;
 		lep->le_thread = curthread;
 		lep->le_lwpid = curthread->t_tid;
 		lep->le_start = curthread->t_start;
-		lwp_hash_in(p, lep);
+		lwp_hash_in(p, lep, tidhash, 2, 0);
+		p->p_tidhash = tidhash;
+		p->p_tidhash_sz = 2;
 	}
+	ret_tidhash = p->p_ret_tidhash;
+	p->p_ret_tidhash = NULL;
 
 	/*
 	 * Restore the saved signal mask and
@@ -478,7 +481,14 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	mutex_exit(&p->p_lock);
 	if (old_lwpdir) {
 		kmem_free(old_lwpdir, old_lwpdir_sz * sizeof (lwpdir_t));
-		kmem_free(old_tidhash, old_tidhash_sz * sizeof (lwpdir_t *));
+		kmem_free(old_tidhash, old_tidhash_sz * sizeof (tidhash_t));
+	}
+	while (ret_tidhash != NULL) {
+		ret_tidhash_t *next = ret_tidhash->rth_next;
+		kmem_free(ret_tidhash->rth_tidhash,
+		    ret_tidhash->rth_tidhash_sz * sizeof (tidhash_t));
+		kmem_free(ret_tidhash, sizeof (*ret_tidhash));
+		ret_tidhash = next;
 	}
 
 	ASSERT(error == 0);

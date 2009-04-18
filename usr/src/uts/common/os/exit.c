@@ -20,13 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.74 */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -341,8 +339,9 @@ proc_exit(int why, int what)
 	sigqueue_t *sqp;
 	lwpdir_t *lwpdir;
 	uint_t lwpdir_sz;
-	lwpdir_t **tidhash;
+	tidhash_t *tidhash;
 	uint_t tidhash_sz;
+	ret_tidhash_t *ret_tidhash;
 	refstr_t *cwd;
 	hrtime_t hrutime, hrstime;
 	int evaporate;
@@ -779,11 +778,13 @@ proc_exit(int why, int what)
 	lwpdir_sz = p->p_lwpdir_sz;
 	tidhash = p->p_tidhash;
 	tidhash_sz = p->p_tidhash_sz;
+	ret_tidhash = p->p_ret_tidhash;
 	p->p_lwpdir = NULL;
 	p->p_lwpfree = NULL;
 	p->p_lwpdir_sz = 0;
 	p->p_tidhash = NULL;
 	p->p_tidhash_sz = 0;
+	p->p_ret_tidhash = NULL;
 
 	/*
 	 * If the process has context ops installed, call the exit routine
@@ -855,7 +856,14 @@ proc_exit(int why, int what)
 	task_rele(tk);
 
 	kmem_free(lwpdir, lwpdir_sz * sizeof (lwpdir_t));
-	kmem_free(tidhash, tidhash_sz * sizeof (lwpdir_t *));
+	kmem_free(tidhash, tidhash_sz * sizeof (tidhash_t));
+	while (ret_tidhash != NULL) {
+		ret_tidhash_t *next = ret_tidhash->rth_next;
+		kmem_free(ret_tidhash->rth_tidhash,
+		    ret_tidhash->rth_tidhash_sz * sizeof (tidhash_t));
+		kmem_free(ret_tidhash, sizeof (*ret_tidhash));
+		ret_tidhash = next;
+	}
 
 	lwp_pcb_exit();
 
