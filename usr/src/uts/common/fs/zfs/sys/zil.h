@@ -305,7 +305,27 @@ typedef struct {
  */
 
 /*
- * ZFS intent log transaction structure
+ * Writes are handled in three different ways:
+ *
+ * WR_INDIRECT:
+ *    In this mode, if we need to commit the write later, then the block
+ *    is immediately written into the file system (using dmu_sync),
+ *    and a pointer to the block is put into the log record.
+ *    When the txg commits the block is linked in.
+ *    This saves additionally writing the data into the log record.
+ *    There are a few requirements for this to occur:
+ *	- write is greater than zfs/zvol_immediate_write_sz
+ *	- not using slogs (as slogs are assumed to always be faster
+ *	  than writing into the main pool)
+ *	- the write occupies only one block
+ * WR_COPIED:
+ *    If we know we'll immediately be committing the
+ *    transaction (FSYNC or FDSYNC), the we allocate a larger
+ *    log record here for the data and copy the data in.
+ * WR_NEED_COPY:
+ *    Otherwise we don't allocate a buffer, and *if* we need to
+ *    flush the write later then a buffer is allocated and
+ *    we retrieve the data using the dmu.
  */
 typedef enum {
 	WR_INDIRECT,	/* indirect - a large write (dmu_sync() data */
