@@ -814,15 +814,18 @@ def cdm_recommit(ui, repo, **opts):
 
     if clearedtags:
         ui.write("Removed tags:\n")
-        for name, nd, rev, local in clearedtags:
-            ui.write("  %s %s:%s%s\n" % (name, rev, node.short(nd),
-                                         (local and ' (local)') or ''))
+        for name, nd, rev, local in sorted(clearedtags,
+                                           key=lambda x: x[0].lower()):
+            ui.write("  %5s:%s:\t%s%s\n" % (rev, node.short(nd),
+                                            name, (local and ' (local)' or '')))
 
-    for ntag, nnode in repo.tags().items():
-        if ntag in oldtags and ntag != "tip":
-            if oldtags[ntag] != nnode:
-                ui.write("tag %s now refers to revision %d:%s\n" %
-                         (ntag, repo.changelog.rev(nnode), node.short(nnode)))
+        for ntag, nnode in sorted(repo.tags().items(),
+                                  key=lambda x: x[0].lower()):
+            if ntag in oldtags and ntag != "tip":
+                if oldtags[ntag] != nnode:
+                    ui.write("tag '%s' now refers to revision %d:%s\n" %
+                             (ntag, repo.changelog.rev(nnode),
+                              node.short(nnode)))
 
 
 def do_eval(cmd, files, root, changedir=True):

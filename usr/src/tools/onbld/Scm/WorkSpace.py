@@ -384,14 +384,14 @@ class ActiveList(object):
 
         if os.path.exists(self.ws.repo.join('localtags')):
             l = self.ws.repo.opener('localtags').readlines()
-            ltags = [x.rstrip().split(' ') for x in l]
+            ltags = [x.rstrip().split(' ', 1) for x in l]
         else:
             ltags = []
 
         # We want to use the tags file from the localtip
         if '.hgtags' in self.localtip.manifest():
             f = self.localtip.filectx('.hgtags')
-            rtags = [x.rstrip().split(' ') for x in f.data().splitlines()]
+            rtags = [x.rstrip().split(' ', 1) for x in f.data().splitlines()]
         else:
             rtags = []
 
