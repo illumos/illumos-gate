@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -98,12 +97,22 @@ post_mountroot_nfs(void)
 	for (;;) {
 		fn = NULL;
 		if (boothowto & RB_ASKNAME) {
+			char ctmpname[MAXPATHLEN];
+
 			fn = (cmd_line_boot_archive[0] != '\0') ?
 			    cmd_line_boot_archive : def_boot_archive;
+
+			/* Avoid buffer overrun */
+			(void) strncpy(tmpname, fn, strlen(fn)+1);
+			fn = tmpname;
+
 			printf("Enter filename [%s]: ", fn);
-			(void) cons_gets(tmpname, sizeof (tmpname));
-			if (tmpname[0] != '\0')
+			(void) cons_gets(ctmpname, sizeof (ctmpname));
+			if (ctmpname[0] != '\0') {
+				(void) strncpy(tmpname, ctmpname,
+				    strlen(ctmpname)+1);
 				fn = tmpname;
+			}
 		}
 
 		if (boothowto & RB_HALT) {
@@ -111,21 +120,36 @@ post_mountroot_nfs(void)
 			prom_enter_mon();
 		}
 
-		if (fn != NULL)
+
+		if (fn != NULL) {
 			fd = openfile(fn);
-		else if (cmd_line_boot_archive[0] != '\0') {
-			fn = cmd_line_boot_archive;
+		} else if (cmd_line_boot_archive[0] != '\0') {
+			(void) strncpy(tmpname, cmd_line_boot_archive,
+			    strlen(cmd_line_boot_archive)+1);
+			fn = tmpname;
 			fd = openfile(fn);
 		} else {
-			fn = def_boot_archive;
+			(void) strncpy(tmpname, def_boot_archive,
+			    strlen(def_boot_archive)+1);
+			fn = tmpname;
 			if ((fd = openfile(fn)) == FAILURE) {
-				fn = def_miniroot;
+				(void) strncpy(tmpname, def_miniroot,
+				    strlen(def_miniroot)+1);
+				fn = tmpname;
 				fd = openfile(fn);
 			}
 		}
 
+		if (fn != tmpname || tmpname[0] == '\0') {
+			printf("Possible buffer overrun, "
+			    "entering boot prompt\n");
+			prom_enter_mon();
+		}
+
+
 		if (fd == FAILURE) {
-			if (fn != def_miniroot)
+			if (strncmp(fn, def_miniroot,
+			    strlen(def_miniroot)+1) != 0)
 				printf("cannot open %s\n", fn);
 			else
 				printf("cannot open neither %s nor %s\n",
