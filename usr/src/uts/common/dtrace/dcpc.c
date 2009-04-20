@@ -292,9 +292,34 @@ dcpc_provide(void *arg, const dtrace_probedesc_t *desc)
 	 * Validate the event and create the probe.
 	 */
 	for (i = 0; i < cpc_ncounters; i++) {
-		if (strstr(kcpc_list_events(i), event) != NULL)
-			dcpc_create_probe(dcpc_pid, desc->dtpd_name, event,
-			    umask, (uint32_t)val, flag);
+		char *events, *cp, *p, *end;
+		int found = 0, j;
+		size_t llen;
+
+		if ((events = kcpc_list_events(i)) == NULL)
+			goto err;
+
+		llen = strlen(events);
+		p = cp = ddi_strdup(events, KM_NOSLEEP);
+		end = cp + llen;
+
+		for (j = 0; j < llen; j++) {
+			if (cp[j] == ',')
+				cp[j] = '\0';
+		}
+
+		while (p < end && found == 0) {
+			if (strcmp(p, event) == 0) {
+				dcpc_create_probe(dcpc_pid, desc->dtpd_name,
+				    event, umask, (uint32_t)val, flag);
+				found = 1;
+			}
+			p += strlen(p) + 1;
+		}
+		kmem_free(cp, llen + 1);
+
+		if (found)
+			break;
 	}
 
 err:
@@ -976,8 +1001,8 @@ dcpc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	caps = kcpc_pcbe_capabilities();
 
 	if (!(caps & CPC_CAP_OVERFLOW_INTERRUPT)) {
-		cmn_err(CE_WARN, "dcpc: Counter Overflow not supported"\
-		    " on this processor\n");
+		cmn_err(CE_NOTE, "!dcpc: Counter Overflow not supported"\
+		    " on this processor");
 		return (DDI_FAILURE);
 	}
 

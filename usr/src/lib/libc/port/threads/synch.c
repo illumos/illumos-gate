@@ -1380,14 +1380,14 @@ done:
 
 	if (error) {
 		if (count) {
-			DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+			DTRACE_PROBE3(plockstat, mutex__spun, mp, 0, count);
 		}
 		if (error != EBUSY) {
 			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
 		}
 	} else {
 		if (count) {
-			DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+			DTRACE_PROBE3(plockstat, mutex__spun, mp, 1, count);
 		}
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
 		if (mp->mutex_flag & LOCK_OWNERDEAD) {
@@ -1587,14 +1587,14 @@ done:
 
 	if (error) {
 		if (count) {
-			DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+			DTRACE_PROBE3(plockstat, mutex__spun, mp, 0, count);
 		}
 		if (error != EBUSY) {
 			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
 		}
 	} else {
 		if (count) {
-			DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+			DTRACE_PROBE3(plockstat, mutex__spun, mp, 1, count);
 		}
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
 		if (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
@@ -2935,7 +2935,7 @@ pthread_spin_lock(pthread_spinlock_t *lock)
 		mp->mutex_ownerpid = self->ul_uberdata->pid;
 	preempt(self);
 	if (count) {
-		DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		DTRACE_PROBE3(plockstat, mutex__spun, mp, 1, count);
 	}
 	DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
 	return (0);

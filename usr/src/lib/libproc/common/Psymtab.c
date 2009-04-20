@@ -2651,6 +2651,9 @@ i_Pobject_iter(struct ps_prochandle *P, boolean_t lmresolve,
 
 		if ((rc = func(cd, &mptr->map_pmap, lname)) != 0)
 			return (rc);
+
+		if (!P->info_valid)
+			Pupdate_maps(P);
 	}
 	return (0);
 }

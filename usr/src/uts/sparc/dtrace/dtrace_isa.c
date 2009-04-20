@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dtrace_impl.h>
 #include <sys/atomic.h>
@@ -53,7 +51,7 @@
 #define	DTRACE_RESTORE		0x81e80000
 #define	DTRACE_CALL_MASK	0xc0000000
 #define	DTRACE_CALL		0x40000000
-#define	DTRACE_JMPL_MASK	0x81f10000
+#define	DTRACE_JMPL_MASK	0x81f80000
 #define	DTRACE_JMPL		0x81c00000
 #define	DTRACE_BA_MASK		0xdfc00000
 #define	DTRACE_BA		0x10800000
