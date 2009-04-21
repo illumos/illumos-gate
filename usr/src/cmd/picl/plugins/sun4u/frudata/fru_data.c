@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <picl.h>
 #include <syslog.h>
@@ -143,13 +140,13 @@ lookup_container_table(picl_nodehdl_t nodehdl, int object_type)
 	switch (object_type) {
 	case	SECTION_NODE:
 		retval = ptree_get_propval_by_name(nodehdl, PICL_PROP_PARENT,
-			&parenthdl, sizeof (picl_nodehdl_t));
+		    &parenthdl, sizeof (picl_nodehdl_t));
 		break;
 	case	SEGMENT_NODE:
 		retval = ptree_get_propval_by_name(nodehdl, PICL_PROP_PARENT,
-			&parenthdl, sizeof (picl_nodehdl_t));
+		    &parenthdl, sizeof (picl_nodehdl_t));
 		retval = ptree_get_propval_by_name(parenthdl, PICL_PROP_PARENT,
-			&parenthdl, sizeof (picl_nodehdl_t));
+		    &parenthdl, sizeof (picl_nodehdl_t));
 		break;
 	case	CONTAINER_NODE :
 		parenthdl = nodehdl;
@@ -167,7 +164,7 @@ lookup_container_table(picl_nodehdl_t nodehdl, int object_type)
 	first_hash	= container_table[index_to_hash];
 
 	for (next_hash = first_hash; next_hash != NULL;
-				next_hash = next_hash->next) {
+	    next_hash = next_hash->next) {
 		if (parenthdl == next_hash->picl_hdl) {
 			return (next_hash);
 		}
@@ -202,7 +199,7 @@ lock_container_lock(picl_nodehdl_t nodehdl, int object_type, int operation)
 	(void) pthread_mutex_lock(&cont_tbl_lock);
 
 	while (((cont_obj = lookup_container_table(nodehdl, object_type)) !=
-		NULL) && (lock_readwrite_lock(cont_obj, operation) == EBUSY)) {
+	    NULL) && (lock_readwrite_lock(cont_obj, operation) == EBUSY)) {
 		pthread_cond_wait(&cont_obj->cond_var, &cont_tbl_lock);
 	}
 
@@ -225,9 +222,9 @@ lookup_node_object(picl_nodehdl_t nodehdl, int	object_type,
 	first_hash	= &cont_tbl->hash_obj[index_to_hash];
 
 	for (next_hash = first_hash->next; next_hash != NULL;
-				next_hash = next_hash->next) {
+	    next_hash = next_hash->next) {
 		if ((nodehdl == next_hash->picl_hdl) &&
-			(object_type == next_hash->object_type)) {
+		    (object_type == next_hash->object_type)) {
 			return (next_hash);
 		}
 	}
@@ -474,8 +471,8 @@ add_to_section_list(hash_obj_t  *container_hash, hash_obj_t *sect_hash)
 	}
 
 	for (next_hash = container_hash->u.cont_node->section_list;
-			next_hash->u.sec_node->next != NULL;
-			next_hash = next_hash->u.sec_node->next) {
+	    next_hash->u.sec_node->next != NULL;
+	    next_hash = next_hash->u.sec_node->next) {
 		;
 	}
 
@@ -496,8 +493,8 @@ add_to_segment_list(hash_obj_t *parent_obj, hash_obj_t *child_obj)
 	}
 
 	for (next_hash = parent_obj->u.sec_node->segment_list;
-			next_hash->u.seg_node->next != NULL;
-			next_hash = next_hash->u.seg_node->next) {
+	    next_hash->u.seg_node->next != NULL;
+	    next_hash = next_hash->u.seg_node->next) {
 		;
 	}
 	next_hash->u.seg_node->next = child_obj;
@@ -517,8 +514,8 @@ add_to_packet_list(hash_obj_t *parent_obj, hash_obj_t *child_obj)
 	}
 
 	for (next_hash = parent_obj->u.seg_node->packet_list;
-			next_hash->u.pkt_node->next != NULL;
-			next_hash = next_hash->u.pkt_node->next) {
+	    next_hash->u.pkt_node->next != NULL;
+	    next_hash = next_hash->u.pkt_node->next) {
 		;
 	}
 	next_hash->u.pkt_node->next = child_obj;
@@ -541,7 +538,7 @@ free_packet_list(hash_obj_t	*hash_obj, container_tbl_t *cont_tbl)
 		next_obj = next_obj->u.pkt_node->next;
 		if (free_obj->prev == NULL) { /* first node object */
 			cont_tbl->hash_obj[(free_obj->picl_hdl %
-				TABLE_SIZE)].next = free_obj->next;
+			    TABLE_SIZE)].next = free_obj->next;
 			if (free_obj->next != NULL) {
 				free_obj->next->prev = NULL;
 			}
@@ -578,7 +575,7 @@ free_segment_node(hash_obj_t *hash_obj, picl_nodehdl_t nodehdl,
 	/* find the segment hash from the segment list to be deleted. */
 	if (next_obj->picl_hdl == nodehdl) {
 		hash_obj->u.sec_node->segment_list =
-					next_obj->u.seg_node->next;
+		    next_obj->u.seg_node->next;
 	} else {
 		while (next_obj != NULL) {
 			if (next_obj->picl_hdl != nodehdl) {
@@ -586,7 +583,7 @@ free_segment_node(hash_obj_t *hash_obj, picl_nodehdl_t nodehdl,
 				next_obj = next_obj->u.seg_node->next;
 			} else {
 				prev_hash_obj->u.seg_node->next =
-						next_obj->u.seg_node->next;
+				    next_obj->u.seg_node->next;
 				break;
 			}
 		}
@@ -599,7 +596,7 @@ free_segment_node(hash_obj_t *hash_obj, picl_nodehdl_t nodehdl,
 
 	if (next_obj->prev == NULL) {
 		cont_tbl->hash_obj[(next_obj->picl_hdl % TABLE_SIZE)].next =
-							next_obj->next;
+		    next_obj->next;
 		if (next_obj->next != NULL)
 			next_obj->next->prev = NULL;
 	} else {
@@ -660,7 +657,7 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 
 	/* call fruaccess to get new section handle */
 	if (fru_delete_segment(seg_acc_hdl, &new_sec_acc_hdl, &warg->cred)
-		== -1) {
+	    == -1) {
 		unlock_container_lock(cont_tbl);
 		return (map_access_err(errno));
 	}
@@ -704,7 +701,7 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 
 	/* get all the segments */
 	retval = fru_get_segments(new_sec_acc_hdl, seg_buffer,
-						num_of_segment, &warg->cred);
+	    num_of_segment, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (PICL_FAILURE);
@@ -733,9 +730,8 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 
 		seg_hash->u.seg_node->segment_hdl = seg_buffer[count].handle;
 
-		num_of_pkt =
-			fru_get_num_packets(seg_buffer[count].handle,
-						&warg->cred);
+		num_of_pkt = fru_get_num_packets(seg_buffer[count].handle,
+		    &warg->cred);
 		if (num_of_pkt <= 0) {
 			seg_hash = seg_hash->u.seg_node->next;
 			continue;
@@ -748,7 +744,7 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 		}
 
 		retval = fru_get_packets(seg_buffer[count].handle, pkt_buf,
-						num_of_pkt, &warg->cred);
+		    num_of_pkt, &warg->cred);
 		if (retval == -1) {
 			seg_hash = seg_hash->u.seg_node->next;
 			continue;
@@ -763,7 +759,7 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 		/* rebuild the packet list */
 		for (pkt_cnt = 0; pkt_cnt < num_of_pkt; pkt_cnt++) {
 			pkt_hash->u.pkt_node->pkt_handle =
-						pkt_buf[pkt_cnt].handle;
+			    pkt_buf[pkt_cnt].handle;
 			pkt_hash = pkt_hash->u.pkt_node->next;
 		}
 
@@ -816,7 +812,7 @@ frudata_read_payload(ptree_rarg_t *rarg, void *buf)
 	pkt_acc_hdl = hash_obj->u.pkt_node->pkt_handle;
 
 	num_bytes = fru_get_payload(pkt_acc_hdl, buf,
-			hash_obj->u.pkt_node->paylen, &rarg->cred);
+	    hash_obj->u.pkt_node->paylen, &rarg->cred);
 	if (num_bytes != hash_obj->u.pkt_node->paylen) {
 		unlock_container_lock(cont_tbl);
 		return (PICL_FAILURE);
@@ -861,8 +857,8 @@ frudata_write_payload(ptree_warg_t *warg, const void *buf)
 	pkt_acc_hdl = hash_obj->u.pkt_node->pkt_handle;
 
 	retval = fru_update_payload(pkt_acc_hdl, buf,
-			hash_obj->u.pkt_node->paylen,
-			&pkt_acc_hdl, &warg->cred);
+	    hash_obj->u.pkt_node->paylen,
+	    &pkt_acc_hdl, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (map_access_err(errno));
@@ -944,7 +940,7 @@ create_packet_table(picl_nodehdl_t seghdl, picl_prophdl_t *thdl)
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_PACKET_TABLE);
 
 	retval = ptree_create_and_add_prop(seghdl, &prop, &tblhdl,
-							&prophdl);
+	    &prophdl);
 	if (retval != PICL_SUCCESS) {
 		return (retval);
 	}
@@ -1014,7 +1010,7 @@ frudata_delete_packet(ptree_warg_t *warg, const void *buf)
 
 	/* call fruaccess module */
 	retval = fru_delete_packet(pkt_hash_obj->u.pkt_node->pkt_handle,
-				&new_seg_acc_hdl, &warg->cred);
+	    &new_seg_acc_hdl, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (map_access_err(errno));
@@ -1022,7 +1018,7 @@ frudata_delete_packet(ptree_warg_t *warg, const void *buf)
 
 	/* delete the packet table */
 	retval = ptree_get_prop_by_name(warg->nodeh, PICL_PROP_PACKET_TABLE,
-							&tblhdl);
+	    &tblhdl);
 	if (retval != PICL_SUCCESS) {
 		unlock_container_lock(cont_tbl);
 		return (retval);
@@ -1042,7 +1038,7 @@ frudata_delete_packet(ptree_warg_t *warg, const void *buf)
 
 
 	seg_hash_obj = lookup_node_object(warg->nodeh, SEGMENT_NODE,
-							cont_tbl);
+	    cont_tbl);
 	if (seg_hash_obj == NULL) {
 		unlock_container_lock(cont_tbl);
 		return (PICL_FAILURE);
@@ -1080,7 +1076,7 @@ frudata_delete_packet(ptree_warg_t *warg, const void *buf)
 	}
 
 	retval = fru_get_packets(new_seg_acc_hdl, packet,
-					num_of_pkt, &warg->cred);
+	    num_of_pkt, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (PICL_FAILURE);
@@ -1089,13 +1085,13 @@ frudata_delete_packet(ptree_warg_t *warg, const void *buf)
 	/* rebuild the packet hash object */
 	for (count = 0; count < num_of_pkt; count++) {
 		(void) add_row_to_table(seg_hash_obj, tblhdl, packet+count,
-								cont_tbl);
+		    cont_tbl);
 	}
 
 	seg_hash_obj->u.seg_node->num_of_pkt = num_of_pkt;
 
 	(void) ptree_update_propval_by_name(warg->nodeh, PICL_PROP_NUM_TAGS,
-				&num_of_pkt, sizeof (uint32_t));
+	    &num_of_pkt, sizeof (uint32_t));
 
 	unlock_container_lock(cont_tbl);
 
@@ -1162,7 +1158,7 @@ add_row_to_table(hash_obj_t *seg_obj, picl_nodehdl_t tblhdl, packet_t *pkt,
 	}
 
 	retval = ptree_add_row_to_table(tblhdl, NUM_OF_COL_IN_PKT_TABLE,
-								prophdl);
+	    prophdl);
 	if (retval != PICL_SUCCESS) {
 		free(hash_obj);
 		return (retval);
@@ -1244,7 +1240,7 @@ frudata_read_packet(picl_nodehdl_t nodeh, picl_prophdl_t *tblhdl,
 		/* add payload and tag into the table. */
 		for (cnt = 0; cnt < num_of_pkt; cnt++) {
 			(void) add_row_to_table(hash_obj, *tblhdl, packet+cnt,
-								cont_tbl);
+			    cont_tbl);
 		}
 
 		hash_obj->u.seg_node->num_of_pkt = num_of_pkt;
@@ -1319,14 +1315,14 @@ frudata_add_packet(ptree_warg_t *warg, const void *buf)
 	(void) memcpy(&packet.tag, buf, tag_size);
 
 	retval = fru_append_packet(seg_acc_hdl, &packet, (char *)buf + tag_size,
-					paylen, &new_seg_acc_hdl, &warg->cred);
+	    paylen, &new_seg_acc_hdl, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (map_access_err(errno));
 	}
 
 	retval = ptree_get_propval_by_name(warg->nodeh,
-		PICL_PROP_PACKET_TABLE, &tblhdl, sizeof (picl_prophdl_t));
+	    PICL_PROP_PACKET_TABLE, &tblhdl, sizeof (picl_prophdl_t));
 	if (retval != PICL_SUCCESS) {
 		unlock_container_lock(cont_tbl);
 		return (retval);
@@ -1350,7 +1346,7 @@ frudata_add_packet(ptree_warg_t *warg, const void *buf)
 	}
 
 	retval = fru_get_packets(new_seg_acc_hdl, pkt_buf,
-					num_of_pkt, &warg->cred);
+	    num_of_pkt, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (PICL_FAILURE);
@@ -1370,7 +1366,7 @@ frudata_add_packet(ptree_warg_t *warg, const void *buf)
 	hash_obj->u.seg_node->num_of_pkt = num_of_pkt;
 
 	(void) ptree_update_propval_by_name(warg->nodeh, PICL_PROP_NUM_TAGS,
-				&num_of_pkt, sizeof (uint32_t));
+	    &num_of_pkt, sizeof (uint32_t));
 
 	unlock_container_lock(cont_tbl);
 
@@ -1413,7 +1409,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	}
 
 	if (ptree_create_node(segname, PICL_CLASS_SEGMENT, &nodehdl)
-							!= PICL_SUCCESS) {
+	    != PICL_SUCCESS) {
 		return (PICL_FAILURE);
 	}
 
@@ -1430,7 +1426,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	/* descriptor property */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_DESCRIPTOR);
 	if (ptree_create_and_add_prop(nodehdl, &prop, &segment->descriptor,
-						&prophdl) != PICL_SUCCESS) {
+	    &prophdl) != PICL_SUCCESS) {
 		freeup(nodehdl);
 		return (PICL_FAILURE);
 	}
@@ -1439,7 +1435,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	/* offset property */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_OFFSET);
 	if (ptree_create_and_add_prop(nodehdl, &prop, &segment->offset,
-						&prophdl) != PICL_SUCCESS) {
+	    &prophdl) != PICL_SUCCESS) {
 		freeup(nodehdl);
 		return (PICL_FAILURE);
 	}
@@ -1448,7 +1444,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	/* length property */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_LENGTH);
 	if (ptree_create_and_add_prop(nodehdl, &prop, &segment->length,
-						&prophdl) != PICL_SUCCESS) {
+	    &prophdl) != PICL_SUCCESS) {
 		freeup(nodehdl);
 		return (PICL_FAILURE);
 	}
@@ -1456,7 +1452,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	/* Number of Tags */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_NUM_TAGS);
 	if (ptree_create_and_add_prop(nodehdl, &prop, &numoftags, &prophdl)
-							!= PICL_SUCCESS) {
+	    != PICL_SUCCESS) {
 		freeup(nodehdl);
 		return (PICL_FAILURE);
 	}
@@ -1467,7 +1463,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	}
 
 	retval = ptree_get_propval_by_name(sec_node,
-			PICL_PROP_PROTECTED, &protection, sizeof (uint32_t));
+	    PICL_PROP_PROTECTED, &protection, sizeof (uint32_t));
 	if (retval != PICL_SUCCESS) {
 		freeup(nodehdl);
 		return (PICL_FAILURE);
@@ -1483,7 +1479,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 
 		(void) strcpy(prop.piclinfo.name, PICL_PROP_DELETE_SEGMENT);
 		if (ptree_create_and_add_prop(nodehdl, &prop, NULL, &prophdl)
-							!= PICL_SUCCESS) {
+		    != PICL_SUCCESS) {
 			freeup(nodehdl);
 			return (PICL_FAILURE);
 		}
@@ -1498,7 +1494,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 
 		(void) strcpy(prop.piclinfo.name, PICL_PROP_ADD_PACKET);
 		if (ptree_create_and_add_prop(nodehdl, &prop, NULL, &prophdl)
-							!= PICL_SUCCESS) {
+		    != PICL_SUCCESS) {
 			freeup(nodehdl);
 			return (PICL_FAILURE);
 		}
@@ -1525,7 +1521,7 @@ create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
 	}
 
 	(void) ptree_update_propval_by_name(nodehdl, PICL_PROP_NUM_TAGS,
-		&hash_obj->u.seg_node->num_of_pkt, sizeof (uint32_t));
+	    &hash_obj->u.seg_node->num_of_pkt, sizeof (uint32_t));
 
 	return (PICL_SUCCESS);
 }
@@ -1571,7 +1567,7 @@ frudata_read_segment(ptree_rarg_t *rarg, void *buf)
 		hash_obj->u.sec_node->num_of_segment = 0;
 
 		num_of_segment = fru_get_num_segments(sec_acc_hdl,
-						&rarg->cred);
+		    &rarg->cred);
 		if (num_of_segment < 0) {
 			*(int *)buf = 0;
 			unlock_container_lock(cont_tbl);
@@ -1592,7 +1588,7 @@ frudata_read_segment(ptree_rarg_t *rarg, void *buf)
 		}
 
 		retval = fru_get_segments(sec_acc_hdl, segment,
-					num_of_segment, &rarg->cred);
+		    num_of_segment, &rarg->cred);
 		if (retval == -1) {
 			*(int *)buf = 0;
 			unlock_container_lock(cont_tbl);
@@ -1611,7 +1607,7 @@ frudata_read_segment(ptree_rarg_t *rarg, void *buf)
 				continue;
 			}
 			(void) create_segment_node(hash_obj, rarg->nodeh,
-			&segment[cnt], cont_tbl, &rarg->cred);
+			    &segment[cnt], cont_tbl, &rarg->cred);
 			hash_obj->u.sec_node->num_of_segment++;
 		}
 	}
@@ -1678,7 +1674,7 @@ frudata_add_segment(ptree_warg_t *warg, const void *buf)
 
 	/* call fruaccess module, get the new section handle. */
 	retval = fru_add_segment(hash_obj->u.sec_node->section_hdl,
-			&segment, &new_sec_acc_hdl, &warg->cred);
+	    &segment, &new_sec_acc_hdl, &warg->cred);
 	if (retval == -1) {
 		unlock_container_lock(cont_tbl);
 		return (map_access_err(errno));
@@ -1694,7 +1690,7 @@ frudata_add_segment(ptree_warg_t *warg, const void *buf)
 	}
 
 	retval = fru_get_segments(new_sec_acc_hdl, seg_buf,
-					num_of_segment, &warg->cred);
+	    num_of_segment, &warg->cred);
 	if (retval ==  -1) {
 		unlock_container_lock(cont_tbl);
 		return (PICL_FAILURE);
@@ -1704,7 +1700,7 @@ frudata_add_segment(ptree_warg_t *warg, const void *buf)
 	segment.handle = seg_buf[(num_of_segment-1)].handle;
 
 	(void) create_segment_node(hash_obj, warg->nodeh, &segment,
-						cont_tbl, &warg->cred);
+	    cont_tbl, &warg->cred);
 
 	/* rebuild  segment list */
 	seg_hash = hash_obj->u.sec_node->segment_list;
@@ -1727,7 +1723,7 @@ frudata_add_segment(ptree_warg_t *warg, const void *buf)
 		}
 
 		seg_hash->u.seg_node->segment_hdl =
-				seg_buf[cnt].handle;
+		    seg_buf[cnt].handle;
 		seg_hash = seg_hash->u.seg_node->next;
 		hash_obj->u.sec_node->num_of_segment++;
 	}
@@ -1761,7 +1757,7 @@ create_section_node(picl_nodehdl_t nodehdl, int section_count,
 	(void) snprintf(sec_name, SECNAMESIZE, "section%d", section_count);
 
 	if (ptree_create_node(sec_name, PICL_CLASS_SECTION, &chld_node)
-							!= PICL_SUCCESS) {
+	    != PICL_SUCCESS) {
 		return (PICL_FAILURE);
 	}
 	prop.version		= PTREE_PROPINFO_VERSION;
@@ -1774,7 +1770,7 @@ create_section_node(picl_nodehdl_t nodehdl, int section_count,
 	/* offset */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_OFFSET);
 	if (ptree_create_and_add_prop(chld_node, &prop, &section->offset,
-						&prophdl) != PICL_SUCCESS) {
+	    &prophdl) != PICL_SUCCESS) {
 		freeup(chld_node);
 		return (PICL_FAILURE);
 	}
@@ -1782,7 +1778,7 @@ create_section_node(picl_nodehdl_t nodehdl, int section_count,
 	/* length */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_LENGTH);
 	if (ptree_create_and_add_prop(chld_node, &prop, &section->length,
-						&prophdl) != PICL_SUCCESS) {
+	    &prophdl) != PICL_SUCCESS) {
 		freeup(chld_node);
 		return (PICL_FAILURE);
 	}
@@ -1791,7 +1787,7 @@ create_section_node(picl_nodehdl_t nodehdl, int section_count,
 	/* protected */
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_PROTECTED);
 	if (ptree_create_and_add_prop(chld_node, &prop, &section->protection,
-						&prophdl) != PICL_SUCCESS) {
+	    &prophdl) != PICL_SUCCESS) {
 		freeup(chld_node);
 		return (PICL_FAILURE);
 	}
@@ -1802,7 +1798,7 @@ create_section_node(picl_nodehdl_t nodehdl, int section_count,
 	(void) strcpy(prop.piclinfo.name, PICL_PROP_NUM_SEGMENTS);
 
 	if (ptree_create_and_add_prop(chld_node, &prop, NULL, &prophdl)
-							!= PICL_SUCCESS) {
+	    != PICL_SUCCESS) {
 		freeup(chld_node);
 		return (PICL_FAILURE);
 	}
@@ -1819,7 +1815,7 @@ create_section_node(picl_nodehdl_t nodehdl, int section_count,
 	/* add-segment prop if read/write section */
 	if (section->protection == 0) {
 		if (ptree_create_and_add_prop(chld_node, &prop, NULL, &prophdl)
-							!= PICL_SUCCESS) {
+		    != PICL_SUCCESS) {
 			freeup(chld_node);
 			return (PICL_FAILURE);
 		}
@@ -1909,6 +1905,8 @@ frudata_write_section(ptree_warg_t *warg, const void *buf)
 	hash_obj = alloc_container_node_object(warg->nodeh);
 	if (hash_obj == NULL) {
 		(void) pthread_mutex_unlock(&cont_tbl_lock);
+		free(cont_tbl->hash_obj);
+		free(cont_tbl);
 		return (map_access_err(errno));
 	}
 
@@ -1938,7 +1936,7 @@ frudata_write_section(ptree_warg_t *warg, const void *buf)
 	section	= alloca(num_of_section * sizeof (section_t));
 
 	retval = fru_get_sections(cont_acc_hdl, section,
-					num_of_section, &warg->cred);
+	    num_of_section, &warg->cred);
 	if (retval == -1) {
 		free(hash_obj);
 		unlock_container_lock(cont_tbl);
@@ -1949,7 +1947,7 @@ frudata_write_section(ptree_warg_t *warg, const void *buf)
 
 	for (count = 0; count < num_of_section; count++) {
 		(void) create_section_node(warg->nodeh, count,
-					section + count, cont_tbl);
+		    section + count, cont_tbl);
 	}
 
 	unlock_container_lock(cont_tbl);
@@ -1990,15 +1988,15 @@ create_frudata_props(picl_prophdl_t fruhdl)
 	picl_nodehdl_t tmphdl;
 
 	for (retval = ptree_get_propval_by_name(fruhdl, PICL_PROP_CHILD,
-	&chldhdl, sizeof (picl_nodehdl_t)); retval != PICL_PROPNOTFOUND;
-		retval = ptree_get_propval_by_name(chldhdl, PICL_PROP_PEER,
-		&chldhdl, sizeof (picl_nodehdl_t))) {
+	    &chldhdl, sizeof (picl_nodehdl_t)); retval != PICL_PROPNOTFOUND;
+	    retval = ptree_get_propval_by_name(chldhdl, PICL_PROP_PEER,
+	    &chldhdl, sizeof (picl_nodehdl_t))) {
 		if (retval != PICL_SUCCESS)
 			return;
 
 		/* Does it have a FRUDataAvailable property */
 		retval = ptree_get_prop_by_name(chldhdl,
-					PICL_PROP_FRUDATA_AVAIL, &tmphdl);
+		    PICL_PROP_FRUDATA_AVAIL, &tmphdl);
 		if (retval == PICL_SUCCESS) {
 			(void) create_container_prop(chldhdl);
 		}
@@ -2037,7 +2035,7 @@ get_config_file(char *outfilename)
 	}
 
 	(void) snprintf(pname, PATH_MAX, "%s/%s", PICLD_COMMON_PLUGIN_DIR,
-						FRUDATA_CONFFILE_NAME);
+	    FRUDATA_CONFFILE_NAME);
 	if (access(pname, R_OK) == 0) {
 		(void) strlcpy(outfilename, pname, PATH_MAX);
 		return (0);
@@ -2057,13 +2055,13 @@ free_section_node(hash_obj_t	*sec_hash, container_tbl_t *cont_tbl)
 	hash_obj_t	*seg_hash;
 
 	for (seg_hash = sec_hash->u.sec_node->segment_list; seg_hash != NULL;
-					seg_hash = seg_hash->u.seg_node->next) {
+	    seg_hash = seg_hash->u.seg_node->next) {
 		free_segment_node(seg_hash, seg_hash->picl_hdl, cont_tbl);
 	}
 
 	if (sec_hash->prev == NULL) {
 		cont_tbl->hash_obj[(sec_hash->picl_hdl % TABLE_SIZE)].next =
-						sec_hash->next;
+		    sec_hash->next;
 		if (sec_hash->next != NULL) {
 			sec_hash->next->prev = NULL;
 		}
@@ -2092,7 +2090,7 @@ unlink_container_node(container_tbl_t	*cont_hash)
 {
 	if (cont_hash->prev == NULL) {
 		container_table[(cont_hash->picl_hdl % TABLE_SIZE)] =
-						cont_hash->next;
+		    cont_hash->next;
 		if (cont_hash->next != NULL) {
 			cont_hash->next->prev = NULL;
 		}
@@ -2187,13 +2185,13 @@ frudata_state_change_evhandler(const char *event_name, const void *event_arg,
 	}
 
 	if (nvlist_lookup_uint64(nvlp, PICLEVENTARG_NODEHANDLE,
-		&loch)  == -1) {
+	    &loch)  == -1) {
 		nvlist_free(nvlp);
 		return;
 	}
 
 	if (ptree_get_propval_by_name(loch, PICL_PROP_CLASSNAME, name,
-		sizeof (name)) != PICL_SUCCESS) {
+	    sizeof (name)) != PICL_SUCCESS) {
 		nvlist_free(nvlp);
 		return;
 	}
@@ -2205,13 +2203,13 @@ frudata_state_change_evhandler(const char *event_name, const void *event_arg,
 	}
 
 	if (nvlist_lookup_string(nvlp, PICLEVENTARG_STATE,
-		&present_state)) {
+	    &present_state)) {
 		nvlist_free(nvlp);
 		return;
 	}
 
 	rc = ptree_get_propval_by_name(loch, PICL_PROP_CHILD,
-		&fruh, sizeof (picl_nodehdl_t));
+	    &fruh, sizeof (picl_nodehdl_t));
 	if (rc != PICL_SUCCESS) {
 		nvlist_free(nvlp);
 		return;
@@ -2225,16 +2223,16 @@ frudata_state_change_evhandler(const char *event_name, const void *event_arg,
 	}
 
 	if (nvlist_lookup_string(nvlp, PICLEVENTARG_LAST_STATE,
-		&last_state)) {
+	    &last_state)) {
 		nvlist_free(nvlp);
 		return;
 	}
 
 	/* fru added */
 	if ((strcmp(last_state, PICLEVENTARGVAL_EMPTY) == 0) ||
-		(strcmp(last_state, PICLEVENTARGVAL_UNKNOWN) == 0)) {
+	    (strcmp(last_state, PICLEVENTARGVAL_UNKNOWN) == 0)) {
 		rc = ptree_get_prop_by_name(fruh, PICL_PROP_FRUDATA_AVAIL,
-			&proph);
+		    &proph);
 		if (rc != PICL_SUCCESS) {
 			if (fru_is_data_available(fruh) == 0) {
 				nvlist_free(nvlp);
@@ -2246,8 +2244,8 @@ frudata_state_change_evhandler(const char *event_name, const void *event_arg,
 			prop.piclinfo.accessmode = PICL_READ;
 			prop.piclinfo.size =  0;
 			(void) strncpy(prop.piclinfo.name,
-				PICL_PROP_FRUDATA_AVAIL,
-				sizeof (prop.piclinfo.name));
+			    PICL_PROP_FRUDATA_AVAIL,
+			    sizeof (prop.piclinfo.name));
 
 			rc = ptree_create_prop(&prop, NULL, &prophdl);
 			if (rc != PICL_SUCCESS) {
@@ -2283,7 +2281,7 @@ frudata_event_handler(const char *event_name, const void *event_arg,
 	if (strcmp(event_name, PICL_FRU_REMOVED) == 0) {
 
 		retval = nvlist_lookup_uint64((nvlist_t *)event_arg,
-					PICLEVENTARG_FRUHANDLE, &fru_picl_hdl);
+		    PICLEVENTARG_FRUHANDLE, &fru_picl_hdl);
 		if (retval != PICL_SUCCESS) {
 			return;
 		}
@@ -2303,10 +2301,10 @@ frudata_event_handler(const char *event_name, const void *event_arg,
 		}
 
 		(void) picld_pluginutil_parse_config_file(roothdl,
-							fullfilename);
+		    fullfilename);
 
 		retval = nvlist_lookup_uint64((nvlist_t *)event_arg,
-				PICLEVENTARG_PARENTHANDLE, &fru_picl_hdl);
+		    PICLEVENTARG_PARENTHANDLE, &fru_picl_hdl);
 		if (retval != PICL_SUCCESS) {
 			return;
 		}
@@ -2337,13 +2335,13 @@ frudata_plugin_init(void)
 	}
 
 	(void) ptree_register_handler(PICL_FRU_ADDED,
-					frudata_event_handler, NULL);
+	    frudata_event_handler, NULL);
 
 	(void) ptree_register_handler(PICL_FRU_REMOVED,
-					frudata_event_handler, NULL);
+	    frudata_event_handler, NULL);
 
 	(void) ptree_register_handler(PICLEVENT_STATE_CHANGE,
-				frudata_state_change_evhandler, NULL);
+	    frudata_state_change_evhandler, NULL);
 
 	(void) pthread_mutex_lock(&cont_tbl_lock);
 	for (count = 0; count < TABLE_SIZE; count++) {
@@ -2430,7 +2428,7 @@ free_hash_table(void)
 			nodehdl = cont_tbl->picl_hdl;
 
 			cont_tbl = lookup_container_table(nodehdl,
-						CONTAINER_NODE);
+			    CONTAINER_NODE);
 			if (cont_tbl == NULL) {
 				(void) pthread_mutex_unlock(&cont_tbl_lock);
 				break;
@@ -2482,11 +2480,11 @@ frudata_plugin_fini(void)
 	free_hash_table();
 
 	(void) ptree_unregister_handler(PICL_FRU_ADDED,
-				frudata_event_handler, NULL);
+	    frudata_event_handler, NULL);
 
 	(void) ptree_unregister_handler(PICL_FRU_REMOVED,
-				frudata_event_handler, NULL);
+	    frudata_event_handler, NULL);
 
 	(void) ptree_unregister_handler(PICLEVENT_STATE_CHANGE,
-				frudata_state_change_evhandler, NULL);
+	    frudata_state_change_evhandler, NULL);
 }

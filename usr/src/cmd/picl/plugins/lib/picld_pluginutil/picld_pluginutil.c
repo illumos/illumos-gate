@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This module implements the routine to parse the configuration file.
@@ -915,8 +912,8 @@ process_refprop(cmdbuf_t *cmds, command_t *command, picl_nodehdl_t nodeh)
 
 	/* dstnode exists, try adding the refprop to nodeh */
 	err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
-		PICL_PTYPE_REFERENCE, PICL_READ, sizeof (picl_nodehdl_t),
-		command->refpropcmd_pname, NULL, NULL);
+	    PICL_PTYPE_REFERENCE, PICL_READ, sizeof (picl_nodehdl_t),
+	    command->refpropcmd_pname, NULL, NULL);
 
 	if (err != PICL_SUCCESS)
 		return (err);
@@ -1008,8 +1005,8 @@ process_table(command_t *command, picl_nodehdl_t nodeh)
 
 	/* init and create a new table */
 	err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
-		PICL_PTYPE_TABLE, PICL_READ|PICL_WRITE,
-		sizeof (picl_prophdl_t), command->tablecmd_tname, NULL, NULL);
+	    PICL_PTYPE_TABLE, PICL_READ|PICL_WRITE,
+	    sizeof (picl_prophdl_t), command->tablecmd_tname, NULL, NULL);
 	if (err != PICL_SUCCESS)
 		return (err);
 
@@ -1038,7 +1035,7 @@ process_row(command_t *command)
 {
 	command->rowcmd_index = 0;
 	command->rowcmd_prophs =
-		malloc(command->rowcmd_nproph * sizeof (picl_prophdl_t));
+	    malloc(command->rowcmd_nproph * sizeof (picl_prophdl_t));
 
 	if (command->rowcmd_prophs == NULL)
 		return (PICL_FAILURE);
@@ -1067,9 +1064,9 @@ process_endrow(cmdbuf_t *cmds)
 		err = PICL_SUCCESS;
 	} else
 		err = ptree_add_row_to_table(
-			cmds->commands[cmds->current_tbl].tablecmd_tblh,
-			curr_row->rowcmd_nproph,
-			curr_row->rowcmd_prophs);
+		    cmds->commands[cmds->current_tbl].tablecmd_tblh,
+		    curr_row->rowcmd_nproph,
+		    curr_row->rowcmd_prophs);
 
 	/* let go the space alloc'd in process_row */
 	free(curr_row->rowcmd_prophs);
@@ -1468,14 +1465,14 @@ skip_to_next_valid_path(cmdbuf_t *cmds, int starting_index,
 
 	for (index = starting_index; index < cmds->count; ++index) {
 		switch (cmds->commands[index].type) {
-		    case TOK_CLASSPATH:
-		    case TOK_NAMEPATH:
+		case TOK_CLASSPATH:
+		case TOK_NAMEPATH:
 			err = process_path(&cmds->commands[index], parent);
 			if (err == PICL_SUCCESS) {
 				*last_processed_index = index;
 				return;
 			}
-		    default:
+		default:
 			/* skipped this line */
 			break;
 		}
@@ -1659,6 +1656,7 @@ picld_pluginutil_parse_config_file(picl_nodehdl_t nh, const char *filename)
 	ifp = fopen(filename, "r");
 	if (ifp == NULL) {
 		setlocale(LC_ALL, "");
+		free(cmds);
 		return (1);
 	}
 
