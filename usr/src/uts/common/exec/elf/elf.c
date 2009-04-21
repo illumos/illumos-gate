@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1944,6 +1944,7 @@ exclude:
 	if (overflow || i != nphdrs) {
 		if (ntries++ == 0) {
 			kmem_free(bigwad, bigsize);
+			overflow = 0;
 			goto top;
 		}
 		cmn_err(CE_WARN, "elfcore: core dump failed for "
