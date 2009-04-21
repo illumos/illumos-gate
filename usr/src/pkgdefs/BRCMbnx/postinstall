@@ -132,5 +132,6 @@ check_add_drv -i \
 	"pci14e4,16ac"
 	"pci14e4,1639"
 	"pci14e4,163a"
-	"pci14e4,163b"' \
+	"pci14e4,163b"
+	"pci14e4,163c"' \
 	-m '* 0644 root sys' -b "$BASEDIR" bnx
