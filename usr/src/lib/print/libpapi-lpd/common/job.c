@@ -143,11 +143,18 @@ papiJobStreamOpen(papi_service_t handle, char *name,
 		    &s->fd);
 	} else {
 		char dfname[18];
+		char buf[256];
 
 		strcpy(dfname, "/tmp/stdin-XXXXX");
 
 		if ((s->fd = mkstemp(dfname)) >= 0)
 			s->dfname = strdup(dfname);
+		if (s->job->attributes)
+			papiAttributeListFree(s->job->attributes);
+		s->job->attributes = NULL;
+		papiAttributeListToString(attributes, " ", buf, sizeof (buf));
+		papiAttributeListFromString(&(s->job->attributes),
+		    PAPI_ATTR_APPEND, buf);
 	}
 	s->metadata = metadata;
 
