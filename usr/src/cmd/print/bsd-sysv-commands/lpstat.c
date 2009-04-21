@@ -234,7 +234,7 @@ report_device(papi_service_t svc, char *name, papi_printer_t printer,
 			return (0);
 		} else if (uri != NULL) {
 			printf(gettext("system for %s: %s (as %s)\n"), name,
-			    u->host, uri);
+			    u->host?u->host:"localhost", uri);
 			return (0);
 		}
 

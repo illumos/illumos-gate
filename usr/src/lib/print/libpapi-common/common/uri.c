@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: uri.c 146 2006-03-24 00:26:54Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -179,6 +177,8 @@ uri_from_string(char *string, uri_t **uri)
 int
 uri_to_string(uri_t *uri, char *buffer, size_t buflen)
 {
+	char *uri_ppfix;
+
 	if ((uri == NULL) || (buffer == NULL) || (buflen == 0) ||
 	    (uri->scheme == NULL) ||
 	    ((uri->password != NULL) && (uri->user == NULL)) ||
@@ -189,25 +189,30 @@ uri_to_string(uri_t *uri, char *buffer, size_t buflen)
 		errno = EINVAL;
 		return (-1);
 	}
+	if (uri->path == NULL || uri->path[0] == '/')
+		uri_ppfix = "";
+	else
+		uri_ppfix = "/";
 
 	(void) memset(buffer, 0, buflen);
 
 	if (uri->scheme_part == NULL) {
 		(void) snprintf(buffer, buflen,
-				"%s://%s%s%s%s%s%s%s%s%s%s%s%s%s",
-				uri->scheme,
-				(uri->user ? uri->user : ""),
-				(uri->password ? ":" : ""),
-				(uri->password ? uri->password : ""),
-				(uri->user ? "@": ""),
-				(uri->host ? uri->host : ""),
-				(uri->port ? ":" : ""),
-				(uri->port ? uri->port : ""),
-				(uri->path[0] != '/' ? "/" : ""), uri->path,
-				(uri->fragment ? "#" : ""),
-				(uri->fragment ? uri->fragment : ""),
-				(uri->query ? "?" : ""),
-				(uri->query ? uri->query : ""));
+		    "%s://%s%s%s%s%s%s%s%s%s%s%s%s%s",
+		    uri->scheme,
+		    (uri->user ? uri->user : ""),
+		    (uri->password ? ":" : ""),
+		    (uri->password ? uri->password : ""),
+		    (uri->user ? "@": ""),
+		    (uri->host ? uri->host : ""),
+		    (uri->port ? ":" : ""),
+		    (uri->port ? uri->port : ""),
+		    uri_ppfix,
+		    (uri->path ? uri->path : ""),
+		    (uri->fragment ? "#" : ""),
+		    (uri->fragment ? uri->fragment : ""),
+		    (uri->query ? "?" : ""),
+		    (uri->query ? uri->query : ""));
 	} else {
 		(void) snprintf(buffer, buflen, "%s:%s", uri->scheme,
 				uri->scheme_part);

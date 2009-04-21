@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -116,10 +116,14 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 		return;
 	}
 
-	if ((printer = strrchr(uri->path, '/')) == NULL)
-		printer = uri->path;
-	else
-		printer++;
+	if (uri->path == NULL) {
+		printer = "";
+	} else {
+		if ((printer = strrchr(uri->path, '/')) == NULL)
+			printer = uri->path;
+		else
+			printer++;
+	}
 
 	/* is there an lpsched queue (printer/class) */
 	snprintf(buf, sizeof (buf), "/etc/lp/interfaces/%s", printer);

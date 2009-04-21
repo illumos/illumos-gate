@@ -379,7 +379,7 @@ ipp_send_initial_request_block(service_t *svc, papi_attribute_t **request,
 	httpFlush(svc->connection);
 
 	/* if we have don't have a POST path, use the service uri path */
-	if (svc->post == NULL)
+	if ((svc->post == NULL) && (svc->uri->path))
 		svc->post = strdup(svc->uri->path);
 	/* send the HTTP POST message for the IPP request */
 	/* if the POST fails, return the error */

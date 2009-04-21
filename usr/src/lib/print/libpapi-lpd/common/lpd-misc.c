@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpd-misc.c 155 2006-04-26 02:34:54Z ktou $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	__EXTENSIONS__	/* for strtok_r() */
 #include <stdio.h>
@@ -156,10 +154,14 @@ lpd_open(service_t *svc, char type, char **args, int timeout)
 	av[ac++] = buf;
 
 	/* queue */
-	if ((tmp = strrchr(svc->uri->path, '/')) == NULL)
-		tmp = svc->uri->path;
-	else
-		tmp++;
+	if (svc->uri->path == NULL) {
+		tmp = "";
+	} else {
+		if ((tmp = strrchr(svc->uri->path, '/')) == NULL)
+			tmp = svc->uri->path;
+		else
+			tmp++;
+	}
 	av[ac++] = tmp;
 
 	/* args */
