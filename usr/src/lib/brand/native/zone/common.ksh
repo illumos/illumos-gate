@@ -267,7 +267,7 @@ install_flar()
         typeset archiver_command
         typeset archiver_arguments
 
-	vlog "cd $ZONEROOT && do_flar < \"$install_archive\""
+	vlog "cd $ZONEROOT && $stage1 "$insrc" | install_flar"
 
 	# Read cookie
 	read -r input_line
@@ -505,12 +505,332 @@ install_dir()
 	return $result
 }
 
+#
+# This is a common function for laying down a zone image from a variety of
+# different sources.  This can be used to either install a fresh zone or as
+# part of zone migration during attach.
+#
+# The first argument specifies the type of image: archive, directory or stdin.
+# The second argument specifies the image itself.  In the case of stdin, the
+# second argument specifies the format of the stream (cpio, flar, etc.).
+# Any validation or post-processing on the image is done elsewhere.
+#
+# This function calls a 'sanity_check' function which must be provided by
+# the script which includes this code.
+#
+install_image()
+{
+	intype=$1
+	insrc=$2
+
+	if [[ -z "$intype" || -z "$insrc" ]]; then
+		return 1
+	fi
+
+	filetype="unknown"
+	filetypename="unknown"
+	stage1="cat"
+
+	if [[ "$intype" == "directory" ]]; then
+		if [[ "$insrc" == "-" ]]; then
+			# Indicates that the existing zonepath is prepopulated.
+			filetype="existing"
+			filetypename="existing"
+		else
+			if [[ "$(echo $insrc | cut -c 1)" != "/" ]]; then
+				fatal "$e_path_abs" "$insrc"
+			fi
+
+			if [[ ! -e "$insrc" ]]; then
+				log "$e_not_found" "$insrc"
+				fatal "$e_install_abort"
+			fi
+
+			if [[ ! -r "$insrc" ]]; then
+				log "$e_not_readable" "$insrc"
+				fatal "$e_install_abort"
+			fi
+
+			if [[ ! -d "$insrc" ]]; then
+				log "$e_not_dir"
+				fatal "$e_install_abort"
+			fi
+
+			sanity_check $insrc
+
+			filetype="directory"
+			filetypename="directory"
+		fi
+
+	else
+		# Common code for both archive and stdin stream.
+
+		if [[ "$intype" == "archive" ]]; then
+			if [[ ! -f "$insrc" ]]; then
+				log "$e_unknown_archive"
+				fatal "$e_install_abort"
+			fi
+			ftype="$(LC_ALL=C file $insrc | cut -d: -f 2)"
+		else
+			# For intype == stdin, the insrc parameter specifies
+			# the stream format coming on stdin.
+			ftype="$insrc"
+			insrc="-"
+		fi
+
+		# Setup vars for the archive type we have.
+		case "$ftype" in
+		*cpio*)		filetype="cpio"
+				filetypename="cpio archive"
+			;;
+		*bzip2*)	filetype="bzip2"
+				filetypename="bzipped cpio archive"
+			;;
+		*gzip*)		filetype="gzip"
+				filetypename="gzipped cpio archive"
+			;;
+		*ufsdump*)	filetype="ufsdump"
+				filetypename="ufsdump archive"
+			;;
+		"flar")
+				filetype="flar"
+				filetypename="flash archive"
+			;;
+		"flash")
+				filetype="flar"
+				filetypename="flash archive"
+			;;
+		*Flash\ Archive*)
+				filetype="flar"
+				filetypename="flash archive"
+			;;
+		"tar")
+				filetype="tar"
+				filetypename="tar archive"
+			;;
+		*USTAR\ tar\ archive)
+				filetype="tar"
+				filetypename="tar archive"
+			;;
+		"pax")
+				filetype="xustar"
+				filetypename="pax (xustar) archive"
+			;;
+		*USTAR\ tar\ archive\ extended\ format*)
+				filetype="xustar"
+				filetypename="pax (xustar) archive"
+			;;
+		"zfs")
+				filetype="zfs"
+				filetypename="ZFS send stream"
+			;;
+		*ZFS\ snapshot\ stream*)
+				filetype="zfs"
+				filetypename="ZFS send stream"
+			;;
+		*)		log "$e_unknown_archive"
+				fatal "$e_install_abort"
+			;;
+		esac
+	fi
+
+	vlog "$filetypename"
+
+	# Check for a non-empty root if no '-d -' option. 
+	if [[ "$filetype" != "existing" ]]; then
+		cnt=$(ls $ZONEROOT | wc -l)
+		if (( $cnt != 0 )); then
+			fatal "$e_root_full" "$ZONEROOT"
+		fi
+	fi
+
+	fstmpfile=$(/usr/bin/mktemp -t -p /var/tmp)
+	if [[ -z "$fstmpfile" ]]; then
+		fatal "$e_tmpfile"
+	fi
+
+	# Make sure we always have the files holding the directories to filter
+	# out when extracting from a CPIO or PAX archive.  We'll add the fs
+	# entries to these files in get_fs_info() (there may be no IPDs for
+	# some brands but thats ok).
+	ipdcpiofile=$(/usr/bin/mktemp -t -p /var/tmp ipd.cpio.XXXXXX)
+	if [[ -z "$ipdcpiofile" ]]; then
+		rm -f $fstmpfile
+		fatal "$e_tmpfile"
+	fi
+
+	# In addition to the IPDs, also filter out these directories.
+	echo 'dev/*' >>$ipdcpiofile
+	echo 'devices/*' >>$ipdcpiofile
+	echo 'devices' >>$ipdcpiofile
+	echo 'proc/*' >>$ipdcpiofile
+	echo 'tmp/*' >>$ipdcpiofile
+	echo 'var/run/*' >>$ipdcpiofile
+	echo 'system/contract/*' >>$ipdcpiofile
+	echo 'system/object/*' >>$ipdcpiofile
+
+	ipdpaxfile=$(/usr/bin/mktemp -t -p /var/tmp ipd.pax.XXXXXX)
+	if [[ -z "$ipdpaxfile" ]]; then
+		rm -f $fstmpfile $ipdcpiofile
+		fatal "$e_tmpfile"
+	fi
+
+	printf "%s " \
+	    "dev devices proc tmp var/run system/contract system/object" \
+	    >>$ipdpaxfile
+
+	# Set up any fs mounts so the archive will install into the correct
+	# locations.
+	get_fs_info
+	mnt_fs
+	if (( $? != 0 )); then
+		umnt_fs >/dev/null 2>&1
+		rm -f $fstmpfile $ipdcpiofile $ipdpaxfile
+		fatal "$mount_failed"
+	fi
+
+	if [[ "$filetype" == "existing" ]]; then
+		log "$no_installing"
+	else
+		log "$installing"
+	fi
+
+	#
+	# Install the image into the zonepath.
+	#
+	unpack_result=0
+	stage1="cat"
+	if [[ "$filetype" == "gzip" ]]; then
+		stage1="gzcat"
+		filetype="cpio"
+	elif [[ "$filetype" == "bzip2" ]]; then
+		stage1="bzcat"
+		filetype="cpio"
+	fi
+
+	if [[ "$filetype" == "cpio" ]]; then
+		install_cpio "$stage1" "$insrc"
+		unpack_result=$?
+
+	elif [[ "$filetype" == "flar" ]]; then
+		( cd "$ZONEROOT" && $stage1 $insrc | install_flar )
+		unpack_result=$?
+
+	elif [[ "$filetype" == "xustar" ]]; then
+		install_pax "$insrc"
+		unpack_result=$?
+
+	elif [[ "$filetype" = "tar" ]]; then
+		vlog "cd \"$ZONEROOT\" && tar -xf \"$insrc\""
+		( cd "$ZONEROOT" && tar -xf "$insrc" )
+		unpack_result=$?
+		post_unpack
+
+	elif [[ "$filetype" == "ufsdump" ]]; then
+		install_ufsdump "$insrc"
+		unpack_result=$?
+
+	elif [[ "$filetype" == "directory" ]]; then
+		install_dir "$insrc"
+		unpack_result=$?
+
+	elif [[ "$filetype" == "zfs" ]]; then
+		#
+		# Given a 'zfs send' stream file, receive the snapshot into
+		# the zone's dataset.  We're getting the original system's
+		# zonepath dataset.  Destroy the existing dataset created
+		# above since this recreates it.
+		#
+		if [[ -z "$DATASET" ]]; then
+			fatal "$f_nodataset"
+		fi
+		/usr/sbin/zfs destroy "$DATASET"
+		if (( $? != 0 )); then
+			log "$f_zfsdestroy" "$DATASET"
+		fi
+
+		vlog "$stage1 $insrc | zfs receive -F $DATASET"
+		( $stage1 $insrc | /usr/sbin/zfs receive -F $DATASET )
+		unpack_result=$?
+	fi
+
+	vlog "$unpack_done" $unpack_result
+
+	# Clean up any fs mounts used during unpacking.
+	umnt_fs
+	rm -f $fstmpfile $ipdcpiofile $ipdpaxfile
+
+	#
+	# If the archive was of a zone then the archive might have been made
+	# of the zonepath (single dir), inside the zonepath (dev, root, etc.,
+	# or just even just root) or inside the zonepath root (all the top
+	# level dirs).  Try to normalize these possibilities.
+	#
+	dirsize=$(ls $ZONEROOT | wc -l)
+	if [[ -d $ZONEROOT/root && -d $ZONEROOT/root/etc && \
+	    -d $ZONEROOT/root/var ]]; then
+		# The archive was made of the zoneroot.
+		mkdir -m 0755 $ZONEPATH/.attach_root
+		mv $ZONEROOT/root/* $ZONEPATH/.attach_root
+		mv $ZONEROOT/root/.[a-zA-Z]* $ZONEPATH/.attach_root \
+		    >/dev/null 2>&1
+		rm -rf $ZONEROOT
+		mv $ZONEPATH/.attach_root $ZONEROOT
+
+	elif (( $dirsize == 1 )); then
+		# The archive was made of the the zonepath.
+
+		dir=$(ls $ZONEROOT)
+
+		if [[ -d $ZONEROOT/$dir/root ]]; then
+			mkdir -m 0755 $ZONEPATH/.attach_root
+			mv $ZONEROOT/$dir/root/* $ZONEPATH/.attach_root
+			mv $ZONEROOT/$dir/root/.[a-zA-Z]* \
+			    $ZONEPATH/.attach_root >/dev/null 2>&1
+			rm -rf $ZONEROOT
+			mv $ZONEPATH/.attach_root $ZONEROOT
+		else
+			# We don't know where this archive was made.
+			fatal "$e_bad_zone_layout"
+		fi
+
+	elif [[ ! -d $ZONEROOT/etc ]]; then
+		# We were expecting that the archive was made inside the
+		# zoneroot but there's no etc dir, so we don't know where
+		# this archive was made.
+		fatal "$e_bad_zone_layout"
+	fi
+
+	chmod 700 $zonepath
+
+	# Verify this is a valid image.
+	sanity_check $ZONEROOT
+
+	return 0
+}
+
 # Setup i18n output
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
 e_baddir=$(gettext "Invalid '%s' directory within the zone")
 e_badfile=$(gettext "Invalid '%s' file within the zone")
+e_bad_zone_layout=$(gettext "Unexpected zone layout.")
+e_path_abs=$(gettext "Pathname specified to -a '%s' must be absolute.")
+e_not_found=$(gettext "%s: error: file or directory not found.")
+e_install_abort=$(gettext "Installation aborted.")
+e_not_readable=$(gettext "Cannot read directory '%s'")
+e_not_dir=$(gettext "Error: must be a directory")
+e_unknown_archive=$(gettext "Error: Unknown archive format. Must be a flash archive, a cpio archive (can also be gzipped or bzipped), a pax XUSTAR archive, or a level 0 ufsdump archive.")
+e_tmpfile=$(gettext "Unable to create temporary file")
+e_root_full=$(gettext "Zonepath root %s exists and contains data; remove or move aside prior to install.")
+
+
+not_readable=$(gettext "Cannot read file '%s'")
+not_flar=$(gettext "Input is not a flash archive")
+bad_flar=$(gettext "Flash archive is a corrupt")
+unknown_archiver=$(gettext "Archiver %s is not supported")
+cmd_not_exec=$(gettext "Required command '%s' not executable!")
 
 #
 # Exit values used by the script, as #defined in <sys/zone.h>
