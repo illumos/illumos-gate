@@ -26,7 +26,6 @@
 
 #include	<stdio.h>
 #include	<strings.h>
-#include	<ctype.h>
 #include	<_machelf.h>
 #include	"_conv.h"
 #include	"globals_msg.h"
@@ -321,13 +320,13 @@ conv_iter_strtol_init(const char *str, conv_strtol_uvalue_t *uvalue)
 {
 	const char	*tail;
 
-	while (isspace(*str))
+	while (conv_strproc_isspace(*str))
 		str++;
 	uvalue->csl_str = str;
 	uvalue->csl_found = 0;
 
 	tail = str + strlen(str);
-	while ((tail > str) && isspace(*(tail - 1)))
+	while ((tail > str) && conv_strproc_isspace(*(tail - 1)))
 		tail--;
 	uvalue->csl_strlen = tail - str;
 

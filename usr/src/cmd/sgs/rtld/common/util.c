@@ -41,7 +41,6 @@
 #include	<stdarg.h>
 #include	<fcntl.h>
 #include	<string.h>
-#include	<ctype.h>
 #include	<dlfcn.h>
 #include	<unistd.h>
 #include	<stdlib.h>
@@ -2253,7 +2252,7 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 			s2 = NULL;
 		} else {
 			len = s2 - s1 - 1;
-			while (isspace(*s2))
+			while (conv_strproc_isspace(*s2))
 				s2++;
 		}
 

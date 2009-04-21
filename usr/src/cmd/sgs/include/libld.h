@@ -745,7 +745,8 @@ struct ent_desc {			/* input section entrance criteria */
 	Half		ec_flags;
 };
 
-#define	FLG_EC_USED	0x0001		/* entrance criteria met? */
+#define	FLG_EC_BUILTIN	0x0001		/* built in descriptor */
+#define	FLG_EC_USED	0x0002		/* entrance criteria met? */
 
 /*
  * One structure is allocated for a move entry, and associated to the symbol

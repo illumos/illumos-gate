@@ -50,140 +50,218 @@ int		_Dbg_cnt = 0;
  * environment variable.  For each option, a class is enabled in the d_class
  * bit mask, or an extra flag is enabled in the d_extra bit mask.
  */
-DBG_options _Dbg_options[] = {
+static DBG_options _Dbg_options[] = {	/* Options accepted by both linkers */
 	{MSG_ORIG(MSG_TOK_DETAIL),	0,	DBG_E_DETAIL},
 	{MSG_ORIG(MSG_TOK_LONG),	0,	DBG_E_LONG},
-	{MSG_ORIG(MSG_TOK_NAME),	0,	DBG_E_SNAME},
-	{MSG_ORIG(MSG_TOK_FULLNAME),	0,	DBG_E_SNAME | DBG_E_FNAME},
-	{MSG_ORIG(MSG_TOK_CLASS),	0,	DBG_E_SNAME | DBG_E_CLASS},
-	{MSG_ORIG(MSG_TOK_LMID),	0,	DBG_E_LMID},
+	{MSG_ORIG(MSG_TOK_HELP),	0,	DBG_E_HELP},
 
 	{MSG_ORIG(MSG_TOK_ALL),		DBG_C_ALL,	0},
-	{MSG_ORIG(MSG_TOK_ARGS),	DBG_C_ARGS,	0},
 	{MSG_ORIG(MSG_TOK_BASIC),	DBG_C_BASIC,	0},
-	{MSG_ORIG(MSG_TOK_BINDINGS),	DBG_C_BINDINGS,	0},
-	{MSG_ORIG(MSG_TOK_ENTRY),	DBG_C_ENTRY,	0},
+	{MSG_ORIG(MSG_TOK_CAP),		DBG_C_CAP,	0},
+	{MSG_ORIG(MSG_TOK_DEMANGLE),	DBG_C_DEMANGLE,	0},
 	{MSG_ORIG(MSG_TOK_FILES),	DBG_C_FILES,	0},
-	{MSG_ORIG(MSG_TOK_HELP),	DBG_C_HELP,	0},
 	{MSG_ORIG(MSG_TOK_LIBS),	DBG_C_LIBS,	0},
-	{MSG_ORIG(MSG_TOK_MAP),		DBG_C_MAP,	0},
+	{MSG_ORIG(MSG_TOK_MOVE),	DBG_C_MOVE,	0},
 	{MSG_ORIG(MSG_TOK_RELOC),	DBG_C_RELOC,	0},
-	{MSG_ORIG(MSG_TOK_SECTIONS),	DBG_C_SECTIONS,	0},
-	{MSG_ORIG(MSG_TOK_SEGMENTS),	DBG_C_SEGMENTS,	0},
-	{MSG_ORIG(MSG_TOK_SUPPORT),	DBG_C_SUPPORT,	0},
 	{MSG_ORIG(MSG_TOK_SYMBOLS),	DBG_C_SYMBOLS,	0},
 	{MSG_ORIG(MSG_TOK_TLS),		DBG_C_TLS,	0},
-	{MSG_ORIG(MSG_TOK_AUDIT),	DBG_C_AUDITING,	0},
-	{MSG_ORIG(MSG_TOK_VERSIONS),	DBG_C_VERSIONS,	0},
-	{MSG_ORIG(MSG_TOK_GOT),		DBG_C_GOT,	0},
-	{MSG_ORIG(MSG_TOK_MOVE),	DBG_C_MOVE,	0},
-	{MSG_ORIG(MSG_TOK_STRTAB),	DBG_C_STRTAB,	0},
-	{MSG_ORIG(MSG_TOK_STATS),	DBG_C_STATS,	0},
 	{MSG_ORIG(MSG_TOK_UNUSED),	DBG_C_UNUSED,	0},
-	{MSG_ORIG(MSG_TOK_DEMANGLE),	DBG_C_DEMANGLE,	0},
-	{MSG_ORIG(MSG_TOK_CAP),		DBG_C_CAP,	0},
+	{MSG_ORIG(MSG_TOK_VERSIONS),	DBG_C_VERSIONS,	0},
+	{NULL,				NULL},
+};
+
+static DBG_options _Dbg_options_ld[] = {	/* ld only options */
+	{MSG_ORIG(MSG_TOK_CLASS),	0,	DBG_E_SNAME | DBG_E_CLASS},
+	{MSG_ORIG(MSG_TOK_FULLNAME),	0,	DBG_E_SNAME | DBG_E_FNAME},
+	{MSG_ORIG(MSG_TOK_NAME),	0,	DBG_E_SNAME},
+
+	{MSG_ORIG(MSG_TOK_ARGS),	DBG_C_ARGS,	0},
+	{MSG_ORIG(MSG_TOK_ENTRY),	DBG_C_ENTRY,	0},
+	{MSG_ORIG(MSG_TOK_GOT),		DBG_C_GOT,	0},
+	{MSG_ORIG(MSG_TOK_MAP),		DBG_C_MAP,	0},
+	{MSG_ORIG(MSG_TOK_SECTIONS),	DBG_C_SECTIONS,	0},
+	{MSG_ORIG(MSG_TOK_SEGMENTS),	DBG_C_SEGMENTS,	0},
+	{MSG_ORIG(MSG_TOK_STATS),	DBG_C_STATS,	0},
+	{MSG_ORIG(MSG_TOK_STRTAB),	DBG_C_STRTAB,	0},
+	{MSG_ORIG(MSG_TOK_SUPPORT),	DBG_C_SUPPORT,	0},
+	{NULL,				NULL},
+};
+
+static DBG_options _Dbg_options_rtld[] = {	/* ld.so.1 only options */
+	{MSG_ORIG(MSG_TOK_AUDIT),	DBG_C_AUDITING,	0},
+	{MSG_ORIG(MSG_TOK_BINDINGS),	DBG_C_BINDINGS,	0},
 	{MSG_ORIG(MSG_TOK_INIT),	DBG_C_INIT,	0},
 	{NULL,				NULL},
 };
 
 /*
- * Tokens may also define identifiers for diagnostics.  Presently, only ld.so.1
- * uses these strings to identify, or isolate its output to selected link-map
- * lists.  See ld.so.1:dbg_print().
+ * Compare name to the options found in optarr. If one matches,
+ * update *dbp and return TRUE. Otherwise, FALSE.
  */
-const char *_Dbg_strs[] = {
-	MSG_ORIG(MSG_TOK_BASE),		MSG_ORIG(MSG_TOK_LDSO),
-	MSG_ORIG(MSG_TOK_NEWLM),	NULL
-};
+static Boolean
+process_options(const char *name, Boolean set, Dbg_desc *dbp,
+    DBG_options *optarr)
+{
+	DBG_options	*opt;
+
+	for (opt = optarr; opt->o_name != NULL; opt++) {
+		if (strcmp(name, opt->o_name) != 0)
+			continue;
+
+		if (set == TRUE) {
+			if (opt->o_class)
+				dbp->d_class |= opt->o_class;
+			if (opt->o_extra)
+				dbp->d_extra |= opt->o_extra;
+		} else {
+			if (opt->o_class)
+				dbp->d_class &= ~(opt->o_class);
+			if (opt->o_extra)
+				dbp->d_extra &= ~(opt->o_extra);
+		}
+		return (TRUE);
+	}
+
+	return (FALSE);
+}
 
 /*
  * Provide a debugging usage message
  */
 void
-Dbg_usage()
+Dbg_help(void)
 {
 	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_A));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_B));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_C));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_D));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_E));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_F));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_G));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_H));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_I));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_J));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_K));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_L));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_M));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_N));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_O));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_P));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_Q));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_R));
-	dbg_print(0, MSG_INTL(MSG_USE_RTLD_S));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R1_G));
 
 	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_LD_A));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_B));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_C));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_D));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_E));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_F));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_G));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_H));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_LD_I));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_LD_J));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_K));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_LD_L));
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_LD_M));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_N));
-	dbg_print(0, MSG_INTL(MSG_USE_LD_O));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_G));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_H));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_I));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_J));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_K));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_L));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_M));
 
 	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_R2_L));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_M));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_N));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_O));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_P));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_Q));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_R));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_S));
+
 	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_ARGS));
-	dbg_print(0, MSG_INTL(MSG_USE_AUDIT));
-	dbg_print(0, MSG_INTL(MSG_USE_BASIC));
-	dbg_print(0, MSG_INTL(MSG_USE_BINDINGS));
-	dbg_print(0, MSG_INTL(MSG_USE_BINDINGS_2));
-	dbg_print(0, MSG_INTL(MSG_USE_CAP));
-	dbg_print(0, MSG_INTL(MSG_USE_DETAIL));
-#ifdef	DEMANGLE
-	dbg_print(0, MSG_INTL(MSG_USE_DEMANGLE));
-#endif
-	dbg_print(0, MSG_INTL(MSG_USE_ENTRY));
-	dbg_print(0, MSG_INTL(MSG_USE_FILES));
-	dbg_print(0, MSG_INTL(MSG_USE_GOT));
-	dbg_print(0, MSG_INTL(MSG_USE_HELP));
-	dbg_print(0, MSG_INTL(MSG_USE_INIT));
-	dbg_print(0, MSG_INTL(MSG_USE_LIBS));
-	dbg_print(0, MSG_INTL(MSG_USE_LIBS_2));
-	dbg_print(0, MSG_INTL(MSG_USE_LMID));
-	dbg_print(0, MSG_INTL(MSG_USE_LONG));
-	dbg_print(0, MSG_INTL(MSG_USE_MAP));
-	dbg_print(0, MSG_INTL(MSG_USE_MOVE));
-	dbg_print(0, MSG_INTL(MSG_USE_RELOC));
-	dbg_print(0, MSG_INTL(MSG_USE_SECTIONS));
-	dbg_print(0, MSG_INTL(MSG_USE_SEGMENTS));
-	dbg_print(0, MSG_INTL(MSG_USE_SEGMENTS_2));
-	dbg_print(0, MSG_INTL(MSG_USE_STATS));
-	dbg_print(0, MSG_INTL(MSG_USE_STRTAB));
-	dbg_print(0, MSG_INTL(MSG_USE_STRTAB_2));
-	dbg_print(0, MSG_INTL(MSG_USE_SUPPORT));
-	dbg_print(0, MSG_INTL(MSG_USE_SYMBOLS));
-	dbg_print(0, MSG_INTL(MSG_USE_SYMBOLS_2));
-	dbg_print(0, MSG_INTL(MSG_USE_TLS));
-	dbg_print(0, MSG_INTL(MSG_USE_UNUSED));
-	dbg_print(0, MSG_INTL(MSG_USE_UNUSED_2));
-	dbg_print(0, MSG_INTL(MSG_USE_VERSIONS));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_G));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_R3_H));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_I));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_J));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_K));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_L));
+	dbg_print(0, MSG_INTL(MSG_USE_R3_M));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_R3_N));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_DCT));
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_BOTH));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_B2));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_D2));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_D3));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_RTLD));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A2));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A3));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A4));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A5));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A6));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A7));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A8));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A9));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_A0));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R5_F));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_LD));
+	dbg_print(0, MSG_INTL(MSG_USE_R6_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R6_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R6_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R6_C2));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_CST));
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_BOTH));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_F2));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_G));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_H));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_I));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_I2));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_J));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_K));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_K2));
+	dbg_print(0, MSG_INTL(MSG_USE_R7_L));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_RTLD));
+	dbg_print(0, MSG_INTL(MSG_USE_R8_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R8_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R8_B2));
+	dbg_print(0, MSG_INTL(MSG_USE_R8_C));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
+	dbg_print(0, MSG_INTL(MSG_USE_HDR_LD));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_A));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_B));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_D));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_F2));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_G));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_H));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_H2));
+	dbg_print(0, MSG_INTL(MSG_USE_R9_I));
+
 	Dbg_util_nl(0, DBG_NL_FRC);
 }
 
@@ -198,19 +276,139 @@ _liblddbg_msg(Msg mid)
 }
 
 /*
- * Validate and enable the appropriate debugging classes.
+ * Given a name starting with "lmid", finish processing it. Return TRUE
+ * if a valid lmid token was seen, and FALSE for any error.
+ *
+ * exit:
+ *	On failure, returns FALSE, indicating a syntax error
+ *
+ *	On success:
+ *	-	Appropriate flags in dbg->d_extra have been set
+ *	-	Any link-map list names specified have been added to
+ *		d_list, for the rtld dbg_print() to compare against
+ *		link-map list names.
+ *	-	TRUE is returned.
  */
-uintptr_t
-Dbg_setup(const char *string, Dbg_desc *dbp)
+static Boolean
+process_lmid(char *name, Dbg_desc *dbp)
+{
+	/*
+	 * "lmid" can have an optional argument. Allowed values are "all",
+	 * "alt[0-9]+", "base", or "ldso". Alt has a variable ending, but
+	 * we can use process_options() to handle the other three.
+	 */
+	static DBG_options options_lmid[] = {
+		{MSG_ORIG(MSG_TOK_LMID_ALL),	0,	DBG_E_LMID_ALL},
+		{MSG_ORIG(MSG_TOK_LMID_BASE),	0,	DBG_E_LMID_BASE},
+		{MSG_ORIG(MSG_TOK_LMID_LDSO),	0,	DBG_E_LMID_LDSO},
+		{NULL,				NULL},
+	};
+
+	Dbg_desc	tmp_db;
+	const char	*lmid_opt;
+
+	/* If it's a plain "lmid", we can set the flag and return now */
+	if (name[MSG_TOK_LMID_SIZE] == '\0') {
+		dbp->d_extra |= DBG_E_LMID;
+		return (TRUE);
+	}
+
+	/* If there's no value, its an error */
+	if (conv_strproc_extract_value(name, MSG_TOK_LMID_SIZE,
+	    CONV_SPEXV_F_UCASE, &lmid_opt) == 0)
+		return (FALSE);
+
+	/*
+	 * ALL, BASE, or LDSO?
+	 */
+	tmp_db.d_extra = 0;
+	if (process_options(lmid_opt, TRUE, &tmp_db, options_lmid)) {
+		/*
+		 * If BASE, and we haven't already seen it, add it to the
+		 * rtld name matching list. For the others, setting the
+		 * e_extra bit suffices.
+		 */
+		if (((tmp_db.d_extra & DBG_E_LMID_BASE) != 0) &&
+		    ((dbp->d_extra & DBG_E_LMID_BASE) == 0) &&
+		    (aplist_append(&dbp->d_list, MSG_ORIG(MSG_TOK_LMID_BASE),
+		    AL_CNT_DEBUG) == NULL))
+			return (FALSE);
+
+		/* Add the resulting flags into the callers descriptor */
+		dbp->d_extra |= DBG_E_LMID | tmp_db.d_extra;
+		return (TRUE);
+	}
+
+	/*
+	 * ALT?
+	 */
+	if (strncmp(lmid_opt, MSG_ORIG(MSG_TOK_LMID_ALT),
+	    MSG_TOK_LMID_ALT_SIZE) == 0) {
+		const char *tail = lmid_opt + MSG_TOK_LMID_ALT_SIZE;
+
+		/* 'ALT' without a # means "all alternative link-map lists" */
+		if (*tail == '\0') {
+			dbp->d_extra |= DBG_E_LMID | DBG_E_LMID_ALT;
+			return (TRUE);
+		}
+
+		/*
+		 * It is ALT[0-9]+. Make sure the characters following 'ALT'
+		 * are numbers, and then add it to the rtld name matching list.
+		 */
+		for (; *tail; tail++)
+			if ((*tail < '0') || (*tail > '9'))
+				return (FALSE);
+
+		if (aplist_append(&dbp->d_list, lmid_opt, AL_CNT_DEBUG) == NULL)
+			return (FALSE);
+		dbp->d_extra |= DBG_E_LMID;
+		return (TRUE);
+	}
+
+	/* It's nothing we recognize */
+	return (FALSE);
+}
+
+/*
+ * Validate and enable the appropriate debugging classes.
+ *
+ * entry:
+ *	string - String to be analyzed for debugging options
+ *	dbp - Pointer to debug descriptor to be initialized
+ *	outfile_ret - NULL, or pointer to receive result of 'output='
+ *		token. A NULL value means that the 'output=' token
+ *		is not accepted. A non-NULL value means that it is.
+ *
+ * exit:
+ *	On failure, False (0) is returned.
+ *
+ *	On success, string has been parsed, and the descriptor referenced
+ *	by dbp has been initialized. If outfile is non-NULL, *outfile will
+ *	be set to NULL if the 'output=' token is not present, and to the
+ *	user supplied string otherwise. True (1) is returned.
+ */
+int
+Dbg_setup(dbg_setup_caller_t caller, const char *string, Dbg_desc *dbp,
+    const char **outfile)
 {
 	char		*name, *_name;	/* buffer in which to perform */
 					/* strtok_r() operations. */
 	char		*lasts;
 	const char	*delimit = MSG_ORIG(MSG_STR_DELIMIT);
 
-	if ((_name = (char *)malloc(strlen(string) + 1)) == 0)
-		return (S_ERROR);
+	/*
+	 * Clear the help flags --- these items only apply for a single
+	 * call to Dbg_setup().
+	 */
+	dbp->d_extra &= ~(DBG_E_HELP | DBG_E_HELP_EXIT);
+
+	if ((_name = (char *)malloc(strlen(string) + 1)) == NULL)
+		return (0);
 	(void) strcpy(_name, string);
+
+	if (outfile)
+		*outfile = NULL;   /* No output file yet */
 
 	/*
 	 * The token should be of the form "-Dtok,tok,tok,...".  Separate the
@@ -219,10 +417,10 @@ Dbg_setup(const char *string, Dbg_desc *dbp)
 	 */
 	if ((name = strtok_r(_name, delimit, &lasts)) != NULL) {
 		do {
-			DBG_options	*opt;
-			const char	*str;
-			Boolean		set, found = FALSE;
-			int		ndx = 0;
+			Boolean		set;
+
+			/* Remove leading and trailing whitespace */
+			name = conv_strproc_trim(name);
 
 			if (name[0] == '!') {
 				set = FALSE;
@@ -230,81 +428,70 @@ Dbg_setup(const char *string, Dbg_desc *dbp)
 			} else
 				set = TRUE;
 
+			if (*name == '\0')
+				continue;	/* Skip null token */
+
 			/*
 			 * First, determine if the token represents a class or
 			 * extra.
 			 */
-			for (opt = _Dbg_options; opt->o_name != NULL; opt++) {
-				if (strcmp(name, opt->o_name) != 0)
+			if (process_options(name, set, dbp, _Dbg_options))
+				continue;
+			switch (caller) {
+			case DBG_CALLER_LD:	/* ld only tokens */
+				if (process_options(name, set, dbp,
+				    _Dbg_options_ld))
 					continue;
-
-				if (set == TRUE) {
-					if (opt->o_class)
-						dbp->d_class |= opt->o_class;
-					if (opt->o_extra)
-						dbp->d_extra |= opt->o_extra;
-				} else {
-					if (opt->o_class)
-						dbp->d_class &= ~(opt->o_class);
-					if (opt->o_extra)
-						dbp->d_extra &= ~(opt->o_extra);
-				}
-				found = TRUE;
+				break;
+			case DBG_CALLER_RTLD:	/* rtld only tokens */
+				if (process_options(name, set, dbp,
+				    _Dbg_options_rtld))
+					continue;
 				break;
 			}
-			if (found == TRUE)
+
+			/* The remaining options do not accept negation */
+			if (!set) {
+				dbg_print(0, MSG_INTL(MSG_USE_CNTNEGOPT), name);
 				continue;
+			}
 
 			/*
-			 * Second, determine if the token represents a known
-			 * diagnostic identifier.  Note, newlm identifiers are
-			 * typically followed by a numeric id, for example
-			 * newlm1, newlm2 ...  Thus we only compare the
-			 * initial text of the string.
+			 * Is it an 'output=' token? This item is a special
+			 * case because it depends on the presence of
+			 * a non-NULL outfile argument, and because the
+			 * part following the '=' is variable.
 			 */
-			while ((str = _Dbg_strs[ndx++]) != NULL)  {
-				char	*tup;
-
-				if (strncmp(name, str, strlen(str)) != 0)
+			if ((outfile != NULL) &&
+			    strncmp(name, MSG_ORIG(MSG_TOK_OUTFILE),
+			    MSG_TOK_OUTFILE_SIZE) == 0) {
+				if (conv_strproc_extract_value(name,
+				    MSG_TOK_OUTFILE_SIZE, 0, outfile))
 					continue;
-
-				/*
-				 * Translate lmid identifier to uppercase.
-				 */
-				for (tup = name; *tup; tup++) {
-					if ((*tup >= 'a') && (*tup <= 'z'))
-						*tup = *tup - ('a' - 'A');
-				}
-
-				/*
-				 * Save this lmid.  The whole token buffer has
-				 * been reallocated, so these names will remain
-				 * once this routine returns.
-				 */
-				if (aplist_append(&dbp->d_list, name,
-				    AL_CNT_DEBUG) == NULL)
-					return (S_ERROR);
-
-				found = TRUE;
-				break;
 			}
 
-			if (found == FALSE)
-				dbg_print(0, MSG_INTL(MSG_USE_UNRECOG), name);
+			/*
+			 * Only the rtld "lmid" token is left.
+			 */
+			if ((caller == DBG_CALLER_RTLD) && (strncmp(name,
+			    MSG_ORIG(MSG_TOK_LMID), MSG_TOK_LMID_SIZE) == 0) &&
+			    process_lmid(name, dbp))
+				continue;
+
+			/* If we make it here, the token is not understood */
+			dbg_print(0, MSG_INTL(MSG_USE_UNRECOG), name);
 
 		} while ((name = strtok_r(NULL, delimit, &lasts)) != NULL);
 	}
 
 	/*
-	 * If the debug help option was specified dump a usage message.  If
-	 * this is the only debug class, return an indication that the user
-	 * should exit.
+	 * If the debug help option was specified and this is the only debug
+	 * class, return an indication that the user should exit.
 	 */
-	if ((_Dbg_cnt++ == 0) && (dbp->d_class & DBG_C_HELP)) {
-		Dbg_usage();
-		if (dbp->d_class == DBG_C_HELP)
-			return (0);
-	}
+	if ((_Dbg_cnt++ == 0) && (dbp->d_extra & DBG_E_HELP) &&
+	    (dbp->d_class == 0))
+		dbp->d_extra |= DBG_E_HELP_EXIT;
+
 	return (1);
 }
 

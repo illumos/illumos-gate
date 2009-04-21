@@ -23,10 +23,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Utility functions
@@ -54,6 +53,12 @@ ld_exit(Ofl_desc *ofl)
 	 * Inform any support library that the link-edit has failed.
 	 */
 	ld_sup_atexit(ofl, 1);
+
+	/*
+	 * Wrap up debug output file if one is open
+	 */
+	dbg_cleanup();
+
 	return (1);
 }
 

@@ -107,7 +107,7 @@ static const Sg_desc sg_desc[LD_NUM] = {
 
 	SG_DESC_INIT(LD_NOTE, PT_NOTE, 0, MSG_ORIG(MSG_ENT_NOTE), FLG_SG_TYPE),
 
-	SG_DESC_INIT(LD_EXTRA, PT_NULL, 0, MSG_ORIG(MSG_STR_EMPTY), FLG_SG_TYPE)
+	SG_DESC_INIT(LD_EXTRA, PT_NULL, 0, MSG_ORIG(MSG_ENT_EXTRA), FLG_SG_TYPE)
 };
 
 /*
@@ -123,39 +123,39 @@ static const Sg_desc sg_desc[LD_NUM] = {
  * has been allocated and the templates copied.
  */
 static const Ent_desc	ent_desc[] = {
-	{NULL, NULL, SHT_NOTE, 0, 0,
-		(Sg_desc *)LD_NOTE, 0, FALSE},
+	{NULL, MSG_ORIG(MSG_ENT_NOTE), SHT_NOTE, 0, 0,
+		(Sg_desc *)LD_NOTE, 0, FLG_EC_BUILTIN},
 
 #if	defined(_ELF64)		/* (amd64-only) */
-	{NULL, MSG_ORIG(MSG_SCN_LRODATA), NULL,
+	{NULL, MSG_ORIG(MSG_ENT_LRODATA), NULL,
 		SHF_ALLOC + SHF_AMD64_LARGE, SHF_ALLOC + SHF_AMD64_LARGE,
-		(Sg_desc *)LD_LRODATA, 0, FALSE},
+		(Sg_desc *)LD_LRODATA, 0, FLG_EC_BUILTIN},
 #endif
-	{NULL, NULL, NULL,
+	{NULL, MSG_ORIG(MSG_ENT_TEXT), NULL,
 		SHF_ALLOC + SHF_WRITE, SHF_ALLOC,
-		(Sg_desc *)LD_TEXT, 0, FALSE},
+		(Sg_desc *)LD_TEXT, 0, FLG_EC_BUILTIN},
 
-	{NULL, NULL, SHT_NOBITS,
+	{NULL, MSG_ORIG(MSG_ENT_BSS), SHT_NOBITS,
 		SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE,
-		(Sg_desc *)LD_BSS, 0, FALSE},
+		(Sg_desc *)LD_BSS, 0, FLG_EC_BUILTIN},
 
 #if	defined(_ELF64)		/* (amd64-only) */
-	{NULL, NULL, SHT_NOBITS,
+	{NULL, MSG_ORIG(MSG_ENT_LBSS), SHT_NOBITS,
 		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
 		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
-		(Sg_desc *)LD_DATA, 0, FALSE},
+		(Sg_desc *)LD_DATA, 0, FLG_EC_BUILTIN},
 
-	{NULL, NULL, NULL,
+	{NULL, MSG_ORIG(MSG_ENT_LDATA), NULL,
 		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
 		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
-		(Sg_desc *)LD_LDATA, 0, FALSE},
+		(Sg_desc *)LD_LDATA, 0, FLG_EC_BUILTIN},
 #endif
-	{NULL, NULL, NULL,
+	{NULL, MSG_ORIG(MSG_ENT_DATA), NULL,
 		SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE,
-		(Sg_desc *)LD_DATA, 0, FALSE},
+		(Sg_desc *)LD_DATA, 0, FLG_EC_BUILTIN},
 
-	{NULL, NULL, 0, 0, 0,
-		(Sg_desc *)LD_EXTRA, 0, FALSE}
+	{NULL, MSG_ORIG(MSG_ENT_EXTRA), 0, 0, 0,
+		(Sg_desc *)LD_EXTRA, 0, FLG_EC_BUILTIN}
 };
 
 /*

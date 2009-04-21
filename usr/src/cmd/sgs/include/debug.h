@@ -158,8 +158,8 @@ extern "C" {
  */
 typedef struct {
 	uint_t		d_class;	/* debugging classes */
-	uint_t		d_extra;	/* extra information for classes */
-	APlist		*d_list;	/* associated strings */
+	uint_t		d_extra;	/* extra public information */
+	APlist		*d_list;	/* accepted link-map list names */
 } Dbg_desc;
 
 extern	Dbg_desc	*dbg_desc;
@@ -174,16 +174,25 @@ extern	Dbg_desc	*dbg_desc;
  * may be interpreted by the debugging library itself or from the callers
  * dbg_print() routine.
  */
-#define	DBG_E_DETAIL	0x0001		/* add detail to a class */
-#define	DBG_E_LONG	0x0002		/* use long names (ie. no truncation) */
+#define	DBG_E_DETAIL	0x00000001	/* add detail to a class */
+#define	DBG_E_LONG	0x00000002	/* use long names (ie. no truncation) */
+#define	DBG_E_DEMANGLE	0x00000004	/* demangle symbol names */
+#define	DBG_E_STDNL	0x00000008	/* standard newline indicator */
+#define	DBG_E_HELP	0x00000010	/* help requested */
+#define	DBG_E_HELP_EXIT	0x00000020	/* hint: user should exit after help */
 
-#define	DBG_E_STDNL	0x0010		/* standard newline indicator */
+/* ld only */
+#define	DBG_E_SNAME	0x00001000	/* prepend simple name */
+#define	DBG_E_FNAME	0x00002000	/* prepend full name */
+#define	DBG_E_CLASS	0x00004000	/* prepend ELF class */
 
-#define	DBG_E_SNAME	0x0100		/* prepend simple name (ld only) */
-#define	DBG_E_FNAME	0x0200		/* prepend full name (ld only) */
-#define	DBG_E_CLASS	0x0400		/* prepend ELF class (ld only) */
-#define	DBG_E_LMID	0x0800		/* prepend link-map id (ld.so.1 only) */
-#define	DBG_E_DEMANGLE	0x1000		/* demangle symbol names */
+/* ld.so.1 only */
+#define	DBG_E_LMID	0x00100000	/* prepend link-map id */
+#define	DBG_E_LMID_LDSO	0x00200000	/* show ldso link-map list */
+#define	DBG_E_LMID_ALL	0x00400000	/* show all non-ldso link-map lists */
+#define	DBG_E_LMID_ALT	0x00800000	/* show all ALT link-map lists */
+#define	DBG_E_LMID_BASE	0x01000000	/* show BASE link-map list */
+
 
 #define	DBG_NOTDETAIL()	!(dbg_desc->d_extra & DBG_E_DETAIL)
 #define	DBG_NOTLONG()	!(dbg_desc->d_extra & DBG_E_LONG)
@@ -203,7 +212,16 @@ extern	Dbg_desc	*dbg_desc;
 /* PRINTFLIKE2 */
 extern	void		dbg_print(Lm_list *, const char *, ...);
 
-extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
+/*
+ * Initialization routine, called before any other Dbg routines to
+ * establish the necessary state.
+ */
+typedef enum { DBG_CALLER_LD, DBG_CALLER_RTLD } dbg_setup_caller_t;
+extern	int		Dbg_setup(dbg_setup_caller_t, const char *,
+			    Dbg_desc *, const char **);
+
+/* Call dbg_print() to produce help output */
+extern	void		Dbg_help(void);
 
 /*
  * Establish ELF32 and ELF64 class Dbg_*() interfaces.
@@ -766,14 +784,14 @@ extern	void	Dbg_reloc_error(Lm_list *, int, Half, Word, void *,
 		    const char *);
 extern	void	Dbg_reloc_generate(Lm_list *, Os_desc *, Word);
 extern	void	Dbg_reloc_in(Lm_list *, int, Half, Word, void *, const char *,
-		    const char *);
+		    Word, const char *);
 extern	void	Dbg_reloc_ors_entry(Lm_list *, int, Word, Half, Rel_desc *);
 extern	void	Dbg_reloc_out(Ofl_desc *, int, Word, void *, const char *,
 		    const char *);
 extern	void	Dbg_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
 extern	void	Dbg_reloc_run(Rt_map *, uint_t, int, int);
 extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Rel_desc *);
-extern	void	Dbg_reloc_sloppycomdat(Lm_list *, const char *, Sym_desc *);
+extern	void	Dbg_reloc_sloppycomdat(Lm_list *, Sym_desc *);
 
 extern	void	Dbg_sec_added(Lm_list *, Os_desc *, Sg_desc *);
 extern	void	Dbg_sec_backing(Lm_list *);
@@ -782,11 +800,11 @@ extern	void	Dbg_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 extern	void	Dbg_sec_genstr_compress(Lm_list *, const char *,
 		    Xword, Xword);
 extern	void	Dbg_sec_group(Lm_list *, Is_desc *, Group_desc *);
-extern	void	Dbg_sec_gnu_comdat(Lm_list *, const char *, uint_t, uint_t);
+extern	void	Dbg_sec_gnu_comdat(Lm_list *, Is_desc *, uint_t, uint_t);
 extern	void	Dbg_sec_in(Lm_list *, Is_desc *);
 extern	void	Dbg_sec_order_error(Lm_list *, Ifl_desc *, Word, int);
 extern	void	Dbg_sec_order_list(Ofl_desc *, int);
-extern	void	Dbg_sec_redirected(Lm_list *, const char *, const char *);
+extern	void	Dbg_sec_redirected(Lm_list *, Is_desc *, const char *);
 extern	void	Dbg_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 extern	void	Dbg_sec_unsup_strmerge(Lm_list *, Is_desc *);
 
@@ -797,7 +815,7 @@ extern	void	Dbg_seg_os(Ofl_desc *, Os_desc *, int);
 extern	void	Dbg_seg_title(Lm_list *);
 
 extern	void	Dbg_shdr_modified(Lm_list *, const char *, uchar_t, Half,
-		    Shdr *, Shdr *, const char *);
+		    Word, Shdr *, Shdr *, const char *);
 
 extern	void	Dbg_statistics_ar(Ofl_desc *);
 extern	void	Dbg_statistics_ld(Ofl_desc *);

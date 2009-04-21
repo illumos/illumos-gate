@@ -612,7 +612,7 @@ extern void		cap_assign(Cap *, Rt_map *);
 extern const char	*_conv_reloc_type(uint_t rel);
 extern Aliste		create_cntl(Lm_list *, int);
 extern void		defrag(void);
-extern uintptr_t	dbg_setup(const char *, Dbg_desc *);
+extern int		dbg_setup(const char *, Dbg_desc *);
 extern const char	*demangle(const char *);
 extern int		dlclose_intn(Grp_hdl *, Rt_map *);
 extern int		dlclose_core(Grp_hdl *, Rt_map *, Lm_list *);

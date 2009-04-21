@@ -848,7 +848,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 		reld.rel_sym = sdp;
 
 		if (ld_process_sym_reloc(ofl, &reld, (Rel *)&reloc, isec,
-		    MSG_INTL(MSG_STR_COMMAND)) == S_ERROR) {
+		    MSG_INTL(MSG_STR_COMMAND), 0) == S_ERROR) {
 			ret = S_ERROR;
 			continue;
 		}

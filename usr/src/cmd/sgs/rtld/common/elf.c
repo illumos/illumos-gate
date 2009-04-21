@@ -2681,7 +2681,7 @@ elf_static_tls(Rt_map *lmp, Sym *sym, void *rel, uchar_t rtype, char *name,
 	 */
 	if (PTTLS(lmp) == NULL) {
 		DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH,
-		    M_REL_SHT_TYPE, rel, NULL, name));
+		    M_REL_SHT_TYPE, rel, NULL, 0, name));
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLS),
 		    _conv_reloc_type((uint_t)rtype), NAME(lmp),
 		    name ? demangle(name) : MSG_INTL(MSG_STR_UNKNOWN));
@@ -2699,7 +2699,7 @@ elf_static_tls(Rt_map *lmp, Sym *sym, void *rel, uchar_t rtype, char *name,
 
 		if (tls_assign(lml, lmp, PTTLS(lmp)) == 0) {
 			DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH,
-			    M_REL_SHT_TYPE, rel, NULL, name));
+			    M_REL_SHT_TYPE, rel, NULL, 0, name));
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLS),
 			    _conv_reloc_type((uint_t)rtype), NAME(lmp),
 			    name ? demangle(name) : MSG_INTL(MSG_STR_UNKNOWN));
@@ -2758,7 +2758,7 @@ elf_reloc_error(Rt_map *lmp, const char *name, void *rel, uint_t binfo)
 	 * Otherwise, the unresolved references is fatal.
 	 */
 	DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH, M_REL_SHT_TYPE, rel,
-	    NULL, name));
+	    NULL, 0, name));
 	eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 	    demangle(name));
 

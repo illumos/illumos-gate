@@ -1,4 +1,7 @@
 #
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,36 +21,25 @@
 #
 # CDDL HEADER END
 #
+
+# This admin file can be used to force the installation of the
+# SUNWonld package on a system that already has it installed, without
+# having to first uninstall the existing instance. This is a generally
+# undesirable thing to do, but can be handy if you forget to uninstall
+# SUNWonld before BFUing the system. In that state, removing the
+# package can break your system, and the only safe route forward is
+# to install on top of the existing package.
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+#	# pkgadd -a admin -d SUNWonld
 #
 
-include		$(SRC)/Makefile.master
-
-LINTLOG=	../lint.$(MACH).log
-
-PKGARCHIVE=	.
-DATAFILES=	admin copyright prototype_com prototype_$(MACH) postinstall \
-		preremove depend checkinstall
-README=		SUNWonld-README
-FILES=		$(DATAFILES) pkginfo
-PACKAGE= 	SUNWonld
-ROOTONLD=	$(ROOT)/opt/SUNWonld
-ROOTREADME=	$(README:%=$(ROOTONLD)/%)
-
-VERDEBUG=	-D
-$(INTERNAL_RELEASE_BUILD)VERDEBUG=
-
-CLEANFILES=	$(FILES) awk_pkginfo ../bld_awk_pkginfo $(LINTLOG)
-CLOBBERFILES=	$(PACKAGE) $(LINTLOG).bak
-
-../%:		../common/%.ksh
-		$(RM) $@
-		cp $< $@
-		chmod +x $@
-
-$(ROOTONLD)/%:	../common/%
-		$(RM) $@
-		cp $< $@
-		chmod +x $@
+mail=
+instance=overwrite
+partial=ask
+runlevel=nocheck
+idepend=nocheck
+rdepend=ask
+space=nocheck
+setuid=nocheck
+conflict=nocheck
+action=nocheck

@@ -783,7 +783,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		}
 
 		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,
-		    M_REL_SHT_TYPE, rel, NULL, name));
+		    M_REL_SHT_TYPE, rel, NULL, 0, name));
 
 		/*
 		 * Make sure the segment is writable.
@@ -932,7 +932,7 @@ _elf_copy_reloc(const char *name, Rt_map *rlmp, Rt_map *dlmp)
 	rel.r_offset = (Addr)ref;
 	rel.r_info = (Word)R_386_COPY;
 	DBG_CALL(Dbg_reloc_in(LIST(rlmp), ELF_DBG_RTLD, M_MACH, M_REL_SHT_TYPE,
-	    &rel, NULL, name));
+	    &rel, NULL, 0, name));
 
 	return (elf_copy_reloc((char *)name, symref, rlmp, (void *)ref, symdef,
 	    _lmp, (void *)def));

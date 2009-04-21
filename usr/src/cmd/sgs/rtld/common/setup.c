@@ -858,11 +858,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		Dbg_desc	_dbg_desc = {0, 0, NULL};
 
 		if (rpl_debug) {
-			uintptr_t	ret;
-
-			if ((ret = dbg_setup(rpl_debug, &_dbg_desc)) == S_ERROR)
+			if (dbg_setup(rpl_debug, &_dbg_desc) == 0)
 				return (0);
-			if (ret == 0)
+			if (_dbg_desc.d_extra & DBG_E_HELP_EXIT)
 				rtldexit(&lml_main, 0);
 		}
 		if (prm_debug)

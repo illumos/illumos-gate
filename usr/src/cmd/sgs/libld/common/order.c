@@ -40,29 +40,30 @@
 /*
  * Get the head section number
  */
-static Word
+inline static Word
 is_keylink_ok(Ifl_desc *ifl, Word keylink, Word limit)
 {
-	if ((keylink != SHN_BEFORE) && (keylink != SHN_AFTER)) {
-		/*
-		 * Range Check
-		 */
-		if ((keylink == 0) || (keylink >= limit)) {
-			return (DBG_ORDER_LINK_OUTRANGE);
-		}
+	if ((keylink == SHN_BEFORE) || (keylink == SHN_AFTER))
+		return (0);
 
-		/*
-		 * The section pointed by keylink should not be an
-		 * ordered section.
-		 */
-		if (ifl->ifl_isdesc[keylink]->is_shdr->sh_flags &
-		    ALL_SHF_ORDER) {
-			return (DBG_ORDER_INFO_ORDER);
-		}
-	}
+	/*
+	 * Validate the key range.
+	 */
+	if ((keylink == 0) || (keylink >= limit))
+		return (DBG_ORDER_LINK_OUTRANGE);
+
+	/*
+	 * The section pointed to by keylink should not be an ordered section.
+	 */
+	if (ifl->ifl_isdesc[keylink]->is_shdr->sh_flags & ALL_SHF_ORDER)
+		return (DBG_ORDER_INFO_ORDER);
+
 	return (0);
 }
 
+/*
+ * Get the head section number.
+ */
 static Word
 get_shfordered_dest(Ofl_desc *ofl, Ifl_desc *ifl, Word ndx, Word limit)
 {
@@ -147,19 +148,18 @@ get_shfordered_dest(Ofl_desc *ofl, Ifl_desc *ifl, Word ndx, Word limit)
  * This routine does the input processing of the ordered sections.
  */
 uintptr_t
-ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
+ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx)
 {
 	Is_desc		*isp2, *isp = ifl->ifl_isdesc[ndx];
 	Xword		shflags = isp->is_shdr->sh_flags;
-	uint_t		keylink;
+	Word		keylink, dest_ndx, limit = ifl->ifl_shnum;
 	Os_desc		*osp2, *osp;
-	Word		dest_ndx;
 	Sort_desc	*st;
 	Aliste		idx;
 	int		error = 0;
 
 	/*
-	 * I might have been checked and marked error already.
+	 * This section might have been checked and marked in error already.
 	 */
 	if ((isp->is_flags & FLG_IS_ORDERED) == 0)
 		return (0);
@@ -205,7 +205,9 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	}
 
 	/*
-	 * Place the section into it's output section.
+	 * Place the section into its output section. It's possible that this
+	 * section is discarded (possibly because it's defined COMDAT), in
+	 * which case we're done.
 	 */
 	if ((osp = isp->is_osdesc) == NULL) {
 		if ((osp = ld_place_section(ofl, isp, isp->is_keyident,

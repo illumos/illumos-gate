@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,6 +152,20 @@ Dbg_reloc_generate(Lm_list *lml, Os_desc *osp, Word type)
 	Elf_reloc_title(lml, ELF_DBG_LD, type);
 }
 
+/*
+ * Issue relocation collecting header message prior to listing
+ * each relocation.
+ *
+ * entry:
+ *	lml - Link map control list
+ *	osp - If sh_info was non-NULL, output section to which
+ *		relocation applies. Otherwise NULL.
+ *	isp - If sh_info was non-NULL, input section to which
+ *		relocation applies. Otherwise NULL.
+ *	risp - Relocation section
+ *
+ * note: osp and isp must both be NULL, or both non-NULL. risp is never NULL.
+ */
 void
 Dbg_reloc_proc(Lm_list *lml, Os_desc *osp, Is_desc *isp, Is_desc *risp)
 {
@@ -233,8 +247,10 @@ Dbg_reloc_dooutrel(Lm_list *lml, Word type)
 void
 Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 {
-	Conv_inv_buf_t	inv_buf;
-	Is_desc		*isp;
+	dbg_isec_name_buf_t	buf;
+	char			*alloc_mem;
+	Conv_inv_buf_t		inv_buf;
+	Is_desc			*isp;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
@@ -242,17 +258,21 @@ Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 		return;
 
 	isp = rsp->rel_isdesc;
-	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED), isp->is_name,
-	    isp->is_file->ifl_name,
+	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED),
+	    dbg_fmt_isec_name(isp, buf, &alloc_mem), isp->is_file->ifl_name,
 	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf),
 	    EC_OFF(rsp->rel_roffset));
+	if (alloc_mem != NULL)
+		free(alloc_mem);
 }
 
 void
 Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
 {
-	Conv_inv_buf_t	inv_buf1, inv_buf2;
-	Is_desc		*isp;
+	dbg_isec_name_buf_t	buf;
+	char			*alloc_mem;
+	Conv_inv_buf_t		inv_buf1, inv_buf2;
+	Is_desc			*isp;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
@@ -260,9 +280,11 @@ Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
 	isp = rsp->rel_isdesc;
 	dbg_print(lml, MSG_INTL(MSG_REL_TRANSITION),
 	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf1),
-	    isp->is_name, isp->is_file->ifl_name,
+	    dbg_fmt_isec_name(isp, buf, &alloc_mem), isp->is_file->ifl_name,
 	    EC_OFF(rsp->rel_roffset), rsp->rel_sname,
 	    conv_reloc_type(mach, rtype, 0, &inv_buf2));
+	if (alloc_mem != NULL)
+		free(alloc_mem);
 }
 
 void
@@ -281,15 +303,22 @@ Dbg_reloc_out(Ofl_desc *ofl, int caller, Word type, void *reloc,
 
 void
 Dbg_reloc_in(Lm_list *lml, int caller, Half mach, Word type, void *reloc,
-    const char *secname, const char *symname)
+    const char *secname, Word secndx, const char *symname)
 {
+	dbg_isec_name_buf_t	buf;
+	char			*alloc_mem;
+
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
 	Elf_reloc_entry_1(lml, caller, MSG_INTL(MSG_STR_IN), mach, type, reloc,
-	    secname, symname, MSG_ORIG(MSG_STR_EMPTY));
+	    dbg_fmt_isec_name2(secname, secndx, buf, &alloc_mem), symname,
+	    MSG_ORIG(MSG_STR_EMPTY));
+
+	if (alloc_mem != NULL)
+		free(alloc_mem);
 }
 
 /*
@@ -302,9 +331,11 @@ Dbg_reloc_in(Lm_list *lml, int caller, Half mach, Word type, void *reloc,
  *		which references the kept section.
  */
 void
-Dbg_reloc_sloppycomdat(Lm_list *lml, const char *secname, Sym_desc *sdp)
+Dbg_reloc_sloppycomdat(Lm_list *lml, Sym_desc *sdp)
 {
-	const char *nfname;
+	dbg_isec_name_buf_t	buf;
+	char			*alloc_mem;
+	const char		*nfname;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC) || DBG_NOTDETAIL())
 		return;
@@ -312,7 +343,10 @@ Dbg_reloc_sloppycomdat(Lm_list *lml, const char *secname, Sym_desc *sdp)
 	nfname = (sdp && sdp->sd_file && sdp->sd_file->ifl_name)
 	    ? sdp->sd_file->ifl_name : MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(lml, MSG_INTL(MSG_REL_SLOPPYCOMDAT), secname, nfname);
+	dbg_print(lml, MSG_INTL(MSG_REL_SLOPPYCOMDAT),
+	    dbg_fmt_isec_name(sdp->sd_isc, buf, &alloc_mem), nfname);
+	if (alloc_mem != NULL)
+		free(alloc_mem);
 }
 
 /*

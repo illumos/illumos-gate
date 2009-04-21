@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,9 @@ Dbg_unused_unref(Rt_map *lmp, const char *depend)
 void
 Dbg_unused_sec(Lm_list *lml, Is_desc *isp)
 {
-	const char	*str;
+	dbg_isec_name_buf_t	buf;
+	char			*alloc_mem;
+	const char		*str;
 
 	if (DBG_NOTCLASS(DBG_C_UNUSED))
 		return;
@@ -63,8 +65,11 @@ Dbg_unused_sec(Lm_list *lml, Is_desc *isp)
 	else
 		str = MSG_ORIG(MSG_STR_EMPTY);
 
-	dbg_print(lml, MSG_INTL(MSG_USD_SEC), isp->is_name,
+	dbg_print(lml, MSG_INTL(MSG_USD_SEC),
+	    dbg_fmt_isec_name(isp, buf, &alloc_mem),
 	    EC_XWORD(isp->is_shdr->sh_size), isp->is_file->ifl_name, str);
+	if (alloc_mem != NULL)
+		free(alloc_mem);
 }
 
 void

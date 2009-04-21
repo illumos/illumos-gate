@@ -39,6 +39,10 @@
 uchar_t		conv_check_native(char **, char **);
 const char	*conv_lddstub(int);
 int		conv_sys_eclass(void);
+int		conv_strproc_isspace(int);
+char		*conv_strproc_trim(char *);
+Boolean		conv_strproc_extract_value(char *, size_t, int, const char **);
+
 
 /*
  * Generic core formatting and iteration functionality

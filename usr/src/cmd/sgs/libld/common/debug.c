@@ -26,6 +26,7 @@
 
 #include	<stdio.h>
 #include	<stdarg.h>
+#include	<errno.h>
 #include	<strings.h>
 #include	<dlfcn.h>
 #include	<debug.h>
@@ -51,21 +52,82 @@
 static const char	**Name = NULL;
 static int		Phase = 0;
 
-uintptr_t
-dbg_setup(const char *options, Dbg_desc *dbp, const char **name, int phase)
+/* Debug file output state */
+static struct {
+	FILE	*fptr;	/* File to send debug output */
+	int	close_needed;	/* True if explicitly opened stream */
+} dbg_ofile = {
+	stderr,
+	0
+};
+
+
+/*
+ * If there is an explicitly opened debug file, close it and reset the state.
+ */
+void
+dbg_cleanup(void)
 {
+	if (dbg_ofile.close_needed) {
+		(void) fclose(dbg_ofile.fptr);
+		dbg_ofile.close_needed = 0;
+		dbg_ofile.fptr = stderr;
+	}
+}
+
+/*
+ * Process debug tokens. Returns True (1) on success, and False (0)
+ * on failure.
+ */
+int
+dbg_setup(Ofl_desc *ofl, const char *options, int phase)
+{
+	const char	*ofile;
+
 	if (Phase == 0)
 		Phase = phase;
 	else if (Phase != phase)
-		return (0);
+		return (1);
 
-	Name = name;
+	Name = &ofl->ofl_name;
 
 	/*
 	 * Call the debugging setup routine to initialize the mask and
 	 * debug function array.
 	 */
-	return (Dbg_setup(options, dbp));
+	if (Dbg_setup(DBG_CALLER_LD, options, dbg_desc, &ofile) == 0)
+		return (0);
+
+	/*
+	 * If output= token was used, close the old file if necessary
+	 * and open a new one if the file name is not NULL.
+	 */
+	if (ofile) {
+		dbg_cleanup();
+		if (*ofile != '\0') {
+			FILE *fptr = fopen(ofile, MSG_ORIG(MSG_DBG_FOPEN_MODE));
+			if (fptr == NULL) {
+				int	err = errno;
+
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_SYS_OPEN), ofile,
+				    strerror(err));
+				return (0);
+			} else {
+				dbg_ofile.fptr = fptr;
+				dbg_ofile.close_needed = 1;
+			}
+		}
+	}
+
+	/*
+	 * Now that the output file is established, generate help
+	 * output if the user specified the debug help token.
+	 */
+	if (dbg_desc->d_extra & DBG_E_HELP)
+		Dbg_help();
+
+	return (1);
 }
 
 /* PRINTFLIKE2 */
@@ -138,15 +200,13 @@ dbg_print(Lm_list *lml, const char *format, ...)
 					(void) strcat(prestr, cls);
 			}
 		}
-		if (prestr)
-			(void) fputs(prestr, stderr);
-		else
-			(void) fputs(MSG_INTL(MSG_DBG_AOUT_FMT), stderr);
+		(void) fputs(prestr ? prestr : MSG_INTL(MSG_DBG_AOUT_FMT),
+		    dbg_ofile.fptr);
 	} else
-		(void) fputs(MSG_INTL(MSG_DBG_DFLT_FMT), stderr);
+		(void) fputs(MSG_INTL(MSG_DBG_DFLT_FMT), dbg_ofile.fptr);
 
 	va_start(args, format);
-	(void) vfprintf(stderr, format, args);
-	(void) fprintf(stderr, MSG_ORIG(MSG_STR_NL));
+	(void) vfprintf(dbg_ofile.fptr, format, args);
+	(void) fprintf(dbg_ofile.fptr, MSG_ORIG(MSG_STR_NL));
 	va_end(args);
 }

@@ -1912,8 +1912,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			    ((isp->is_flags & FLG_IS_ORDERED) == 0))
 				continue;
 
-			if (ld_process_ordered(ifl, ofl, ndx,
-			    ifl->ifl_shnum) == S_ERROR)
+			if (ld_process_ordered(ifl, ofl, ndx) == S_ERROR)
 				return (S_ERROR);
 		}
 	}

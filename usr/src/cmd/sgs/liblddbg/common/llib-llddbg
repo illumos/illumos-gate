@@ -30,8 +30,7 @@
 #include <sys/auxv.h>
 #include <debug.h>
 
-uintptr_t
-	Dbg_setup(const char *, Dbg_desc *);
+int	Dbg_setup(dbg_setup_caller_t, const char *, Dbg_desc *, const char **);
 const char *
 	Dbg_demangle_name(const char *);
 
@@ -268,9 +267,9 @@ void	Dbg64_reloc_error(Lm_list *, int, Elf64_Half, Elf64_Word, void *,
 void	Dbg32_reloc_generate(Lm_list *, Os_desc *, Elf32_Word);
 void	Dbg64_reloc_generate(Lm_list *, Os_desc *, Elf64_Word);
 void	Dbg32_reloc_in(Lm_list *, int, Elf32_Half, Elf32_Word, void *,
-	    const char *, const char *);
+	    const char *, Elf32_Word, const char *);
 void	Dbg64_reloc_in(Lm_list *, int, Elf64_Half, Elf64_Word, void *,
-	    const char *, const char *);
+	    const char *, Elf64_Word, const char *);
 void	Dbg32_reloc_ors_entry(Lm_list *, int, Elf32_Word, Elf32_Half, Rel_desc *);
 void	Dbg64_reloc_ors_entry(Lm_list *, int, Elf64_Word, Elf64_Half, Rel_desc *);
 void	Dbg32_reloc_out(Ofl_desc *, int, Elf32_Word, void *, const char *,
@@ -294,16 +293,16 @@ void	Dbg32_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 void	Dbg64_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 void	Dbg32_sec_group(Lm_list *, Is_desc *, Group_desc *);
 void	Dbg64_sec_group(Lm_list *, Is_desc *, Group_desc *);
-void	Dbg32_sec_gnu_comdat(Lm_list *, const char *, uint_t, uint_t);
-void	Dbg64_sec_gnu_comdat(Lm_list *, const char *, uint_t, uint_t);
+void	Dbg32_sec_gnu_comdat(Lm_list *, Is_desc *, uint_t, uint_t);
+void	Dbg64_sec_gnu_comdat(Lm_list *, Is_desc *, uint_t, uint_t);
 void	Dbg32_sec_in(Lm_list *, Is_desc *);
 void	Dbg64_sec_in(Lm_list *, Is_desc *);
 void	Dbg32_sec_order_error(Lm_list *, Ifl_desc *, Elf32_Word, int);
 void	Dbg64_sec_order_error(Lm_list *, Ifl_desc *, Elf64_Word, int);
 void	Dbg32_sec_order_list(Ofl_desc *, int);
 void	Dbg64_sec_order_list(Ofl_desc *, int);
-void	Dbg32_sec_redirected(Lm_list *, const char *, const char *);
-void	Dbg64_sec_redirected(Lm_list *, const char *, const char *);
+void	Dbg32_sec_redirected(Lm_list *, Is_desc *, const char *);
+void	Dbg64_sec_redirected(Lm_list *, Is_desc *, const char *);
 void	Dbg32_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 void	Dbg64_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 
@@ -319,9 +318,9 @@ void    Dbg32_seg_title(Lm_list *);
 void    Dbg64_seg_title(Lm_list *);
 
 void	Dbg32_shdr_modified(Lm_list *, const char *, uchar_t, Half,
-	    Shdr *, Shdr *, const char *);
+	    Elf32_Word, Shdr *, Shdr *, const char *);
 void	Dbg64_shdr_modified(Lm_list *, const char *, uchar_t, Half,
-	    Shdr *, Shdr *, const char *);
+	    Elf64_Word, Shdr *, Shdr *, const char *);
 
 void	Dbg32_statistics_ar(Ofl_desc *);
 void	Dbg64_statistics_ar(Ofl_desc *);

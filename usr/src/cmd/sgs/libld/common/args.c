@@ -90,6 +90,7 @@ static Boolean	Blflag	= FALSE;
 static Boolean	Beflag	= FALSE;
 static Boolean	Bsflag	= FALSE;
 static Boolean	Btflag	= FALSE;
+static Boolean	Dflag	= FALSE;
 static Boolean	Gflag	= FALSE;
 static Boolean	Vflag	= FALSE;
 
@@ -706,15 +707,17 @@ check_flags(Ofl_desc * ofl, int argc)
 	}
 
 	/*
-	 * Check that we have something to work with.  This check is carried out
+	 * Check that we have something to work with. This check is carried out
 	 * after mapfile processing as its possible a mapfile is being used to
 	 * define symbols, in which case it would be sufficient to build the
 	 * output file purely from the mapfile.
 	 */
 	if ((ofl->ofl_objscnt == 0) && (ofl->ofl_soscnt == 0)) {
-		if (Vflag && (argc == 2))
+		if ((Vflag ||
+		    (Dflag && (dbg_desc->d_extra & DBG_E_HELP_EXIT))) &&
+		    (argc == 2)) {
 			ofl->ofl_flags1 |= FLG_OF1_DONE;
-		else {
+		} else {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_ARG_NOFILES));
 			return (S_ERROR);
@@ -1332,9 +1335,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			 * process_files (this allows debugging to be turned
 			 * on and off around individual groups of files).
 			 */
+			Dflag = 1;
 			if (ofl->ofl_objscnt == 0) {
-				if (dbg_setup(optarg, dbg_desc,
-				    &ofl->ofl_name, 2) == S_ERROR)
+				if (dbg_setup(ofl, optarg, 2) == 0)
 					return (S_ERROR);
 			}
 
@@ -1568,8 +1571,7 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 			case 'D':
 				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
 				    optarg));
-				(void) dbg_setup(optarg, dbg_desc,
-				    &ofl->ofl_name, 3);
+				(void) dbg_setup(ofl, optarg, 3);
 				break;
 			case 'u':
 				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
@@ -1839,7 +1841,7 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 {
 	/*
 	 * Process command line files (taking into account any applicable
-	 * preseeding flags).  Return if any fatal errors have occurred.
+	 * preceeding flags).  Return if any fatal errors have occurred.
 	 */
 	opterr = 0;
 	optind = 1;

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DEBUG_DOT_H
 #define	_DEBUG_DOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <debug.h>
 #include <conv.h>
@@ -46,29 +44,29 @@ extern "C" {
 #define	DBG_NOTCLASS(c)	!(dbg_desc->d_class & (c))
 
 #define	DBG_C_ARGS	0x00000001
-#define	DBG_C_BASIC	0x00000002
-#define	DBG_C_BINDINGS	0x00000004
-#define	DBG_C_ENTRY	0x00000008
-#define	DBG_C_FILES	0x00000010
-#define	DBG_C_HELP	0x00000020
-#define	DBG_C_LIBS	0x00000040
-#define	DBG_C_MAP	0x00000080
-#define	DBG_C_RELOC	0x00000100
-#define	DBG_C_SECTIONS	0x00000200
-#define	DBG_C_SEGMENTS	0x00000400
-#define	DBG_C_SYMBOLS	0x00000800
-#define	DBG_C_SUPPORT	0x00001000
-#define	DBG_C_VERSIONS	0x00002000
-#define	DBG_C_AUDITING	0x00004000
-#define	DBG_C_GOT	0x00008000
-#define	DBG_C_MOVE	0x00010000
-#define	DBG_C_DEMANGLE	0x00020000
-#define	DBG_C_TLS	0x00040000
-#define	DBG_C_STRTAB	0x00080000
-#define	DBG_C_STATS	0x00100000
+#define	DBG_C_AUDITING	0x00000002
+#define	DBG_C_BASIC	0x00000004
+#define	DBG_C_BINDINGS	0x00000008
+#define	DBG_C_CAP	0x00000010
+#define	DBG_C_DEMANGLE	0x00000020
+#define	DBG_C_ENTRY	0x00000040
+#define	DBG_C_FILES	0x00000080
+#define	DBG_C_GOT	0x00000100
+#define	DBG_C_INIT	0x00000200
+#define	DBG_C_LIBS	0x00000400
+#define	DBG_C_MAP	0x00000800
+#define	DBG_C_MOVE	0x00001000
+#define	DBG_C_RELOC	0x00002000
+#define	DBG_C_SECTIONS	0x00004000
+#define	DBG_C_SEGMENTS	0x00008000
+#define	DBG_C_STATS	0x00010000
+#define	DBG_C_STRTAB	0x00020000
+#define	DBG_C_SUPPORT	0x00040000
+#define	DBG_C_SYMBOLS	0x00080000
+#define	DBG_C_TLS	0x00100000
 #define	DBG_C_UNUSED	0x00200000
-#define	DBG_C_CAP	0x00400000
-#define	DBG_C_INIT	0x00800000
+#define	DBG_C_VERSIONS	0x00400000
+
 
 #define	DBG_C_ALL	0xffffffff
 
@@ -213,6 +211,28 @@ typedef struct {
 #endif
 
 #define	INDEX_STR_SIZE		10
+
+/*
+ * Buffer used by dbg_isec_name() to format input section
+ * names. The size was selected to satisfy two opposing
+ * constraints:
+ * -	To be large enough to handle the largest C++ mangled name.
+ *	Although we can malloc buffers, we don't want that to happen.
+ * -	To be small enough on the thread stack to not cause problems.
+ */
+typedef char dbg_isec_name_buf_t[INDEX_STR_SIZE + 2048];
+
+#if	defined(_ELF64)
+#define	dbg_fmt_isec_name	dbg64_fmt_isec_name
+#define	dbg_fmt_isec_name2	dbg64_fmt_isec_name2
+#else
+#define	dbg_fmt_isec_name	dbg32_fmt_isec_name
+#define	dbg_fmt_isec_name2	dbg32_fmt_isec_name2
+#endif
+extern	const char	*dbg_fmt_isec_name(Is_desc *, dbg_isec_name_buf_t,
+			    char **);
+extern	const char	*dbg_fmt_isec_name2(const char *, Word,
+			    dbg_isec_name_buf_t, char **);
 
 #ifdef	__cplusplus
 }

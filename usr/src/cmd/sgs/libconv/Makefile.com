@@ -45,9 +45,9 @@ COMOBJS=	arch.o			c_literal.o \
 		phdr.o			relocate.o \
  		relocate_i386.o 	relocate_amd64.o \
  		relocate_sparc.o 	sections.o \
-   		segments.o    		symbols.o \
- 		syminfo.o  		tokens.o \
- 		version.o
+   		segments.o    		strproc.o \
+		symbols.o  		syminfo.o \
+  		tokens.o  		version.o
 
 ELFCAP_OBJS=	elfcap.o
 

@@ -22,11 +22,25 @@
 # CDDL HEADER END
 #
 
+# Installing the wrong architecture of runtime linker will immediately
+# brick the system. Catch this case and refuse to do it.
+if [ "$PKG_INSTALL_ROOT" = '' -o "$PKG_INSTALL_ROOT" = '/' ]; then
+    SYSARCH=`uname -p`
+    if [ "$SYSARCH" != "$ARCH" ]; then
+	echo "***"
+	echo "*** Cannot install $ARCH linker into root of $SYSARCH system."
+	echo "***"
+	exit 1
+    fi
+fi
+
 if [ -d $BASEDIR/$SGSBACKUPDIR ];
 then
     echo "***"
-    echo "*** Previous version of SUNWonld already installed"
-    echo "*** please '# pkgrm SUNWonld' before installing a newer version"
+    echo "*** Previous version of SUNWonld already installed. Use"
+    echo "***     # pkgrm SUNWonld"
+    echo "*** to remove it before installing a newer version, or"
+    echo "*** use an admin file to force an overwrite."
     echo "***"
     exit 1
 fi
@@ -42,7 +56,5 @@ then
     echo "***"
     exit 1
 fi
-
-
 
 exit 0

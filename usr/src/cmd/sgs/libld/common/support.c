@@ -291,7 +291,8 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 		if (nshdr != *oshdr) {
 			Dbg_shdr_modified(ofl->ofl_lml, flp->fl_obj,
 			    ifl->ifl_ehdr->e_ident[EI_OSABI],
-			    ifl->ifl_ehdr->e_machine, *oshdr, nshdr, sname);
+			    ifl->ifl_ehdr->e_machine, ndx, *oshdr, nshdr,
+			    sname);
 			*oshdr = nshdr;
 		}
 	}

@@ -61,6 +61,14 @@ extern "C" {
 #define	CONF_FLTR	0x010000	/* filter information available */
 #define	CONF_FEATMSK	0xffff00
 
+
+/*
+ * Valid flags for conv_strproc_extract_value().
+ */
+#define	CONV_SPEXV_F_NOTRIM	0x0001	/* Do not trim whitespace around '=' */
+#define	CONV_SPEXV_F_UCASE	0x0002	/* Convert value to uppercase */
+#define	CONV_SPEXV_F_NULLOK	0x0004	 /* Empty ("") value is OK */
+
 /*
  * Buffer types:
  *
@@ -696,7 +704,11 @@ typedef	void		Conv_str_to_c_literal_func_t(const void *ptr,
  */
 extern	uchar_t		conv_check_native(char **, char **);
 extern	const char	*conv_lddstub(int);
-extern	int		conv_sys_eclass();
+extern	int		conv_strproc_isspace(int);
+extern	char		*conv_strproc_trim(char *);
+extern	Boolean		conv_strproc_extract_value(char *, size_t, int,
+			    const char **);
+extern	int		conv_sys_eclass(void);
 
 /*
  * Generic core formatting and iteration functionality

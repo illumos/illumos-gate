@@ -705,7 +705,8 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 
 #endif
 
-extern uintptr_t	dbg_setup(const char *, Dbg_desc *, const char **, int);
+extern void		dbg_cleanup(void);
+extern int		dbg_setup(Ofl_desc *, const char *, int);
 
 extern uintptr_t	ld_add_actrel(Word, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_add_libdir(Ofl_desc *, const char *);
@@ -764,9 +765,9 @@ extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
 extern uintptr_t	ld_process_move(Ofl_desc *);
 extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
 			    Ofl_desc *, Word, Rej_desc *);
-extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
+extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
-			    Is_desc *, const char *);
+			    Is_desc *, const char *, Word);
 
 extern uintptr_t	ld_reloc_GOT_relative(Boolean, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_reloc_plt(Rel_desc *, Ofl_desc *);

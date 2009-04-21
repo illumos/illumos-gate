@@ -1183,7 +1183,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		}
 
 		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,
-		    M_REL_SHT_TYPE, rel, NULL, name));
+		    M_REL_SHT_TYPE, rel, NULL, 0, name));
 
 		/*
 		 * Make sure the segment is writable.

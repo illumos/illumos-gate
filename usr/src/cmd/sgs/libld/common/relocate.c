@@ -1163,7 +1163,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 
 uintptr_t
 ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
-    const char *isname)
+    const char *isname, Word isscnndx)
 {
 	Word		rtype = reld->rel_rtype;
 	ofl_flag_t	flags = ofl->ofl_flags;
@@ -1173,7 +1173,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	Conv_inv_buf_t	inv_buf;
 
 	DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD, ld_targ.t_m.m_mach,
-	    ld_targ.t_m.m_rel_sht_type, (void *)reloc, isname,
+	    ld_targ.t_m.m_rel_sht_type, (void *)reloc, isname, isscnndx,
 	    reld->rel_sname));
 
 	/*
@@ -1550,8 +1550,7 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp,
 				    isp->is_name, rep_sdp->sd_file->ifl_name);
 			}
 		}
-		DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml,
-		    isp->is_name, rep_sdp));
+		DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml, rep_sdp));
 		*reject = ofl->ofl_sr_cache.sr_rej = RLXREL_REJ_NONE;
 		return (ofl->ofl_sr_cache.sr_rsdp = rep_sdp);
 	}
@@ -1658,7 +1657,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 
 		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD,
 		    ld_targ.t_m.m_mach, isp->is_shdr->sh_type,
-		    (void *)reloc, isp->is_name, reld->rel_sname));
+		    (void *)reloc, isp->is_name, isp->is_scnndx,
+		    reld->rel_sname));
 		if (ld_targ.t_mr.mr_reloc_register == NULL) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_NOREG));
@@ -1701,7 +1701,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	if (rtype == ld_targ.t_m.m_r_none) {
 		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD,
 		    ld_targ.t_m.m_mach, ld_targ.t_m.m_rel_sht_type,
-		    (void *)reloc, isp->is_name, reld->rel_sname));
+		    (void *)reloc, isp->is_name, isp->is_scnndx,
+		    reld->rel_sname));
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_NULL),
 		    ifl->ifl_name, isp->is_name);
 		return (1);
@@ -1855,7 +1856,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	}
 
 	reld->rel_sym = sdp;
-	return (ld_process_sym_reloc(ofl, reld, reloc, isp, isp->is_name));
+	return (ld_process_sym_reloc(ofl, reld, reloc, isp, isp->is_name,
+	    isp->is_scnndx));
 }
 
 static uintptr_t

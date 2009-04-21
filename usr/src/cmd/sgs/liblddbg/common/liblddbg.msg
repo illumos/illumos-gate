@@ -33,253 +33,462 @@
 
 # Usage messages
 
-@ MSG_USE_UNRECOG	"warning: unrecognized debug option `%s' (try help)"
+@ MSG_USE_UNRECOG	"warning: unrecognized debug option (try help): %s"
+@ MSG_USE_CNTNEGOPT	"warning: ignoring non-negatable debug option: %s"
 
-# TRANSLATION_NOTE - Use the following output in C as a reference, 1.
-#
-# Runtime Linking
-#    Diagnostics that trace the runtime linking of an application can be
-#    enabled to stderr by using the environment variable setting:
-# 	LD_DEBUG=token1,token2
-#    Alternatively, the diagnostics can be redirected to an output file
-#    using the additional environment variable:
-# 	LD_DEBUG_OUTPUT=file
-#    The output file is given the specified name and the process id as a
-#    suffix.
-#
-#    By default, all diagnostics are prepended with the process id,
-#    together with the thread id.  Note, all applications are effectively
-#    thread aware, and once thread capabilities are enabled, even a single
-#    threaded application is labeled as thread 1.
-#
-#    The token `lmid' prepends a link-map list identifier to each
-#    diagnostic.
-#
-#    The tokens `base', `ldso' and `newlm[0-9]*' can be used to isolate
-#    diagnostics to the associated link-map lists.   Note, by default, any
-#    diagnostics associated with loading components for the runtime linker
-#    itself are suppressed, unless `ldso' is explicitly specified.
-# 
-# Link-Editing
-#    Diagnostics that trace the link-editing of an application can be
-#    enabled to stderr using the -D option:
-#	ld -Dtoken1,token2 -o prog ...
-#    As the -D option can also be meaningful to compiler drivers, an
-#    alternative mechanism to enable diagnostics is to use the environment
-#    variable:
-#	LD_OPTIONS=-Dtoken1,token2 cc -o prog ...
-#
-#    The use of -D on the link-edit command line is significant.
-#    Diagnostics are enabled when a debug token is first encountered, and
-#    can be switched off by prepending the token with `!'.
-#
-#    By default, all diagnostics are prepended with the string `debug'.
-#
-#    The tokens `name', `fullname' and `class' can be used to prepend the
-#    output file basename, fullname, and class respectively, to each
-#    diagnostic.
+@ MSG_USE_HDR_DCT	"Display Control Tokens:"
+@ MSG_USE_HDR_CST	"Category Selection Tokens:"
+@ MSG_USE_HDR_BOTH	"    [ld and ld.so.1]"
+@ MSG_USE_HDR_RTLD	"    [ld.so.1 only]"
+@ MSG_USE_HDR_LD	"    [ld only]"
 
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 1.
+#
+# The runtime linker and link-editor support a shared debugging
+# facility. Options are selected via a comma separated list of tokens,
+# each of which specifies a display option or a category for which
+# information is desired. Many tokens apply to both linker components,
+# while some are specific to one or the other. Diagnostics are printed,
+# one per line, with a standard prefix prepended to each one. Diagnostic
+# output is sent to stderr unless otherwise redirected.
 
 # TRANSLATION_NOTE - The next series of messages makes the above output in C
-# locale.  Use tabs and space alignment characters as needed.
-#
-@ MSG_USE_RTLD_A	"Runtime Linking"
-@ MSG_USE_RTLD_B	"    Diagnostics that trace the runtime linking of an \
-			 application can be"
-@ MSG_USE_RTLD_C	"    enabled to stderr by using the environment \
-			 variable setting:"
-@ MSG_USE_RTLD_D	" 	LD_DEBUG=token1,token2 app ..."
-@ MSG_USE_RTLD_E	"    Alternatively, the diagnostics can be redirected \
-			 to an output file"
-@ MSG_USE_RTLD_F	"    using the additional environment variable:"
-@ MSG_USE_RTLD_G	" 	LD_DEBUG_OUTPUT=file"
-@ MSG_USE_RTLD_H	"    The output file is given the specified name and \
-			 the process id as a"
-@ MSG_USE_RTLD_I	"    suffix."
-@ MSG_USE_RTLD_J	"    By default, all diagnostics are prepended with \
-			 the process id,"
-@ MSG_USE_RTLD_K	"    together with the thread id.  Note, all \
-			 applications are effectively"
-@ MSG_USE_RTLD_L	"    thread aware, and once thread capabilities are \
-			 enabled, even a single"
-@ MSG_USE_RTLD_M	"    threaded application is labeled as thread 1."
-@ MSG_USE_RTLD_N	"    The token `lmid' prepends a link-map list \
-			 identifier to each"
-@ MSG_USE_RTLD_O	"    diagnostic."
-@ MSG_USE_RTLD_P	"    The tokens `base', `ldso' and `newlm[0-9]*' can \
-			 be used to isolate"
-@ MSG_USE_RTLD_Q	"    diagnostics to the associated link-map lists.  \
-			 Note, by default, any"
-@ MSG_USE_RTLD_R	"    diagnostics associated with loading components \
-			 for the runtime linker"
-@ MSG_USE_RTLD_S	"    itself are suppressed, unless `ldso' is \
-			 explicitly specified."
+# locale.
 
-@ MSG_USE_LD_A		"Link-Editing"
-@ MSG_USE_LD_B		"    Diagnostics that trace the link-editing of an \
-			 application can be"
-@ MSG_USE_LD_C		"    enabled to stderr using the -D option:"
-@ MSG_USE_LD_D		"       ld -Dtoken1,token2 -o prog ..."
-@ MSG_USE_LD_E		"    As the -D option can also be meaningful to \
-			 compiler drivers, an"
-@ MSG_USE_LD_F		"    alternative mechanism to enable diagnostics is to \
-			 use the environment"
-@ MSG_USE_LD_G		"    variable:"
-@ MSG_USE_LD_H		"       LD_OPTIONS=-Dtoken1,token2 cc -o prog ..."
-@ MSG_USE_LD_I		"    The use of -D on the link-edit command line is \
-			 significant."
-@ MSG_USE_LD_J		"    Diagnostics are enabled when a debug token is \
-			 first encountered, and"
-@ MSG_USE_LD_K		"    can be switched off by prepending the token \
-			 with `!'."
-@ MSG_USE_LD_L		"    By default, all diagnostics are prepended with \
-			 the string `debug'."
-@ MSG_USE_LD_M		"    The tokens `name', `fullname' and `class' can be \
-			 used to prepend"
-@ MSG_USE_LD_N		"    the output file basename, fullname, and class \
-			 respectively, to each"
-@ MSG_USE_LD_O		"    diagnostic."
+@ MSG_USE_R1_A	"The runtime linker and link-editor support a \
+		 shared debugging"
+@ MSG_USE_R1_B	"facility. Options are selected via a comma separated list \
+		 of tokens,"
+@ MSG_USE_R1_C	"each of which specifies a display option or a category \
+		 for which"
+@ MSG_USE_R1_D	"information is desired. Many tokens apply to both linker \
+		 components,"
+@ MSG_USE_R1_E	"while some are specific to one or the other. Diagnostics \
+		 are printed,"
+@ MSG_USE_R1_F	"one per line, with a standard prefix prepended to each one. \
+		 Diagnostic"
+
+# TRANSLATION_NOTE -- do not translate "stderr"
+@ MSG_USE_R1_G	"output is sent to stderr unless otherwise redirected."
 
 # TRANSLATION_NOTE - End of reference 1
 
 
-# TRANSLATION_NOTE - The next series of messages makes the following usage
-# table.  Use tabs and space alignment characters as needed.
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 2.
 #
-# args		display input argument processing (ld only)
-# audit		display runtime link-audit processing (ld.so.1 only)
-# basic		provide basic trace information/warnings
-# bindings	display symbol binding; detail flag shows absolute:relative
-# 		    addresses (ld.so.1 only)
-# cap		display hardware/software capability processing
-# demangle	display C++ symbol names in their demangled form
-# detail	provide more information in conjunction with other options
-# entry		display entrance criteria descriptors (ld only)
-# files		display input file processing (files and libraries)
-# got		display GOT symbol information (ld only)
-# help		display this help message
-# init		display init and fini processing (ld.so.1 only)
-# libs		display library search paths; detail flag shows actual
-#		    library lookup (-l) processing
-# long		display long object names without truncation
-# map		display map file processing (ld only)
-# move		display Move section information
-# reloc		display relocation processing
-# sections	display input section processing (ld only)
-# segments	display available output segments and address/offset
-#		    processing; detail flag shows associated sections (ld only)
-# support	display support library processing (ld only)
-# symbols	display symbol table processing; detail flag shows internal
-#		    symbol table addition and resolution (ld only)
-# statistics	display processing statistics (ld only)
-# strtab	display information about string table compression; detail
-#		    flag shows layout of string tables (ld only)
-# tls		display TLS processing
-# unused	display unused/unreferenced files; detail flag shows unused
-#		   sections (ld only), and unused search paths (ld.so.1 only)
-# versions	display version processing
+# Runtime Linking (ld.so.1):
+#     Diagnostics that trace the runtime linking of an application
+#     can be enabled via the LD_DEBUG environment variable:
+#          LD_DEBUG=token1,token2 app ...
+#     In addition to the "output" token described below, diagnostic
+#     output from the runtime linker can be redirected to an output
+#     file using the additional environment variable:
+#          LD_DEBUG_OUTPUT=file
+#     If the "output" token and LD_DEBUG_OUTPUT are both specified,
+#     the file specified by LD_DEBUG_OUTPUT is used. If LD_DEBUG_OUTPUT
+#     is used, the output file name is suffixed with the process id.
+#     An output file specified via the "output" token is used as
+#     specified, without a process id suffix.
 #
+#     All runtime linker diagnostics are prepended with the process
+#     id. If thread capabilities are enabled for the process, the
+#     thread id is also shown. All Solaris applications are thread
+#     capable, and a single threaded application may use threads via
+#     the libraries it links to. Diagnostics from such applications
+#     reference thread id 1.
+
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
+
+@ MSG_USE_R2_A	"Runtime Linking (ld.so.1):"
+@ MSG_USE_R2_B	"    Diagnostics that trace the runtime linking \
+		 of an application"
+
+# TRANSLATION_NOTE -- do not translate "LD_DEBUG"
+@ MSG_USE_R2_C	"    can be enabled via the LD_DEBUG environment variable:"
+
+# TRANSLATION_NOTE -- do not translate "LD_DEBUG"
+@ MSG_USE_R2_D	"         LD_DEBUG=token1,token2 app ..."
+
+# TRANSLATION_NOTE -- do not translate "output"
+@ MSG_USE_R2_E	"    In addition to the \"output\" token described \
+		 below, diagnostic"
+@ MSG_USE_R2_F	"    output from the runtime linker can be redirected to \
+		 an output"
+@ MSG_USE_R2_G	"    file using the additional environment variable:"
+
+# TRANSLATION_NOTE -- do not translate "LD_DEBUG_OUTPUT"
+@ MSG_USE_R2_H	"         LD_DEBUG_OUTPUT=file"
+
+# TRANSLATION_NOTE -- do not translate "output" or "LD_DEBUG_OUTPUT"
+@ MSG_USE_R2_I	"    If the \"output\" token and LD_DEBUG_OUTPUT are \
+		 both specified,"
+
+# TRANSLATION_NOTE -- do not translate "LD_DEBUG_OUTPUT"
+@ MSG_USE_R2_J	"    the file specified by LD_DEBUG_OUTPUT is used. \
+		 If LD_DEBUG_OUTPUT"
+@ MSG_USE_R2_K	"    is used, the output file name is suffixed with \
+		     the process id."
+
+# TRANSLATION_NOTE -- do not translate "output"
+@ MSG_USE_R2_L	"    An output file specified via the \"output\" token \
+		     is used as"
+@ MSG_USE_R2_M	"    specified, without a process id suffix."
+
+
+@ MSG_USE_R2_N	"    All runtime linker diagnostics are prepended with \
+		 the process"
+@ MSG_USE_R2_O	"    id. If thread capabilities are enabled for the \
+		 process, the"
+@ MSG_USE_R2_P	"    thread id is also shown. All Solaris applications are \
+		 thread"
+@ MSG_USE_R2_Q	"    capable, and a single threaded application may \
+		 use threads via"
+@ MSG_USE_R2_R	"    the libraries it links to. Diagnostics from such \
+		 applications"
+@ MSG_USE_R2_S	"    reference thread id 1."
+
+# TRANSLATION_NOTE - End of reference 2
+
+
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 3.
 #
-# TRANSLATION_NOTE -- do not translate the first token `args'.
-@ MSG_USE_ARGS		"args\t  display input argument processing (ld only)"
+# Link-Editing (ld):
+#     Diagnostics that trace the link-editing of an application are
+#     enabled using the -D option:
+#        ld -Dtoken1,token2 -o prog ...
+#     As compiler drivers may assign -D a different meaning, the
+#     LD_OPTIONS environment variable is often used:
+#        LD_OPTIONS=-Dtoken1,token2 cc -o prog ...
+# 
+#     The position of -D on the link-edit command line is significant.
+#     Diagnostics are enabled when a debug token is first encountered,
+#     and can be switched off by prepending the token with "!".
+# 
+#     Diagnostic output can be directed to a file using the "output"
+#     token, The output file is used as specified, without a process
+#     id suffix.
+# 
+#     All link-editor diagnostics are prepended with the string "debug".
+# 
 
-# TRANSLATION_NOTE -- do not translate the first token `audit'.
-@ MSG_USE_AUDIT		"audit\t  display runtime link-audit processing \
-			 (ld.so.1 only)"
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
 
-# TRANSLATION_NOTE -- do not translate the first token `basic'.
-@ MSG_USE_BASIC		"basic\t  provide basic trace information/warnings"
+@ MSG_USE_R3_A	" Link-Editing (ld):"
+@ MSG_USE_R3_B	"    Diagnostics that trace the link-editing of an \
+		 application are"
+@ MSG_USE_R3_C	"    enabled using the -D option:"
+@ MSG_USE_R3_D	"       ld -Dtoken1,token2 -o prog ..."
+@ MSG_USE_R3_E	"    As compiler drivers may assign -D a different meaning, the"
 
-# TRANSLATION_NOTE -- do not translate the first token `bindings'.
-@ MSG_USE_BINDINGS	"bindings\t  display symbol binding; detail flag shows \
-			 absolute:relative"
-@ MSG_USE_BINDINGS_2	"\t\t    addresses (ld.so.1 only)"
+# TRANSLATION_NOTE -- do not translate "LD_OPTIONS"
+@ MSG_USE_R3_F	"    LD_OPTIONS environment variable is often used:"
 
-# TRANSLATION_NOTE -- do not translate the first token `cap'
-@ MSG_USE_CAP		"cap\t  display hardware/software capability \
-			 processing"
+# TRANSLATION_NOTE -- do not translate "LD_OPTIONS"
+@ MSG_USE_R3_G	"       LD_OPTIONS=-Dtoken1,token2 cc -o prog ..."
 
-# TRANSLATION_NOTE -- do not translate the first token `detail'.
-@ MSG_USE_DETAIL	"detail\t  provide more information in conjunction \
-			 with other options"
+@ MSG_USE_R3_H	"    The position of -D on the link-edit command line \
+		 is significant."
+@ MSG_USE_R3_I	"    Diagnostics are enabled when a debug token is \
+		 first encountered,"
+@ MSG_USE_R3_J	"    and can be switched off by prepending the token \
+		 with \"!\"."
 
-# TRANSLATION_NOTE -- do not translate the first token `demangle'.
-@ MSG_USE_DEMANGLE	"demangle\t  display C++ symbol names in their \
-			 demangled form"
+# TRANSLATION_NOTE -- do not translate "output"
+@ MSG_USE_R3_K	"    Diagnostic output can be directed to a file using \
+		 the \"output\""
 
-# TRANSLATION_NOTE -- do not translate the first token `entry'.
-@ MSG_USE_ENTRY		"entry\t  display entrance criteria descriptors \
-			 (ld only)"
+@ MSG_USE_R3_L	"    token, The output file is used as specified, \
+		 without a process"
+@ MSG_USE_R3_M	"    id suffix."
 
-# TRANSLATION_NOTE -- do not translate the first token `files'.
-@ MSG_USE_FILES		"files\t  display input file processing \
-			 (files and libraries)"
 
-# TRANSLATION_NOTE -- do not translate the first token `got'.
-@ MSG_USE_GOT		"got\t  display GOT symbol information (ld only)"
+# TRANSLATION_NOTE -- do not translate "debug"
+@ MSG_USE_R3_N	"    All link-editor diagnostics are prepended with the \
+		 string \"debug\"."
 
-# TRANSLATION_NOTE -- do not translate the first token `help'.
-@ MSG_USE_HELP		"help\t  display this help message"
+# TRANSLATION_NOTE - End of reference 3
 
-# TRANSLATION_NOTE -- do not translate the first token `init'.
-@ MSG_USE_INIT		"init\t  display init and fini processing \
-			 (ld.so.1 only)"
 
-# TRANSLATION_NOTE -- do not translate the first token `libs'.
-@ MSG_USE_LIBS		"libs\t  display library search paths; detail flag \
-			 shows actual"
-@ MSG_USE_LIBS_2	"\t\t    library lookup (-l) processing"
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 4.
+#
+#         demangle         show C++ symbol names in their demangled form
+#         detail           provide more information in conjunction with
+#                            other options
+#         long             display long object names without truncation
+#         output=file      debug output is sent to the named file
+#                            instead of stderr. If file is empty (\"\"),
+#                            following output will be sent to stderr.
+#
 
-# TRANSLATION_NOTE -- do not translate the first token `lmid'.
-@ MSG_USE_LMID		"lmid\t  display link-map list identifier \
-			(ld.so.1 only)"
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
 
-# TRANSLATION_NOTE -- do not translate the first token `long'.
-@ MSG_USE_LONG		"long\t  display long object names without truncation"
+# TRANSLATION_NOTE -- do not translate the first token "demangle".
+@ MSG_USE_R4_A	"        demangle         show C++ symbol names in their \
+					  demangled form"
 
-# TRANSLATION_NOTE -- do not translate the first token `map'.
-@ MSG_USE_MAP		"map\t  display map file processing (ld only)"
+# TRANSLATION_NOTE -- do not translate the first token "detail".
+@ MSG_USE_R4_B	"        detail           provide more information in \
+					  conjunction with"
+@ MSG_USE_R4_B2	"                           other options"
 
-# TRANSLATION_NOTE -- do not translate the first token `move'.
-@ MSG_USE_MOVE		"move\t  display move section processing"
+# TRANSLATION_NOTE -- do not translate the first token "long".
+@ MSG_USE_R4_C	"        long             display long object names without \
+					  truncation"
 
-# TRANSLATION_NOTE -- do not translate the first token `reloc'.
-@ MSG_USE_RELOC		"reloc\t  display relocation processing"
+# TRANSLATION_NOTE -- do not translate the first token "output".
+@ MSG_USE_R4_D	"        output=file      debug output is sent to the \
+					  named file"
+@ MSG_USE_R4_D2	"                           instead of stderr. If file is \
+					  empty (\"\"),"
+@ MSG_USE_R4_D3	"                           following output will be \
+					    sent to stderr."
 
-# TRANSLATION_NOTE -- do not translate the first token `sections'.
-@ MSG_USE_SECTIONS	"sections   display input section processing (ld only)"
+# TRANSLATION_NOTE - End of reference 4
 
-# TRANSLATION_NOTE -- do not translate the first token `segments'.
-@ MSG_USE_SEGMENTS	"segments   display available output segments and \
-			 address/offset"
-@ MSG_USE_SEGMENTS_2	"\t\t    processing; detail flag shows associated \
-			 sections (ld only)"
-# TRANSLATION_NOTE -- do not translate the first token `support'.
-@ MSG_USE_SUPPORT	"support\t  display support library processing (ld only)"
 
-# TRANSLATION_NOTE -- do not translate the first token `symbols'.
-@ MSG_USE_SYMBOLS	"symbols\t  display symbol table processing; detail \
-			 flag shows internal"
-@ MSG_USE_SYMBOLS_2	"\t\t    symbol table addition and resolution (ld only)"
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 5.
+#
+#         lmid[=name]      Prepend link-map list id to diagnostics, and
+#                          optionally filter the lists: By default,
+#                          diagnostics are produced for all link-map
+#                          lists except that of the runtime linker
+#                          (ldso), without identification. "lmid" causes
+#                          the link-map list id to be prepended.
+#                          "name" limits diagnostics to the named
+#                          link-map list. Additional "lmid" tokens
+#                          can specify multiple link-map lists.
+#                          Valid names are:
+#                              all        all link-map lists except ldso
+#                              alt        all alternative link-map lists
+#                              alt[0-9]+  specific alternative link-map list
+#                              base       the base, or main, link-map list
+#                              ldso       the runtime linker link-map list 
+# 
 
-# TRANSLATION_NOTE -- do not translate the first token `statistics'.
-@ MSG_USE_STATS		"statistics display processing statistics (ld only)"
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
 
-# TRANSLATION_NOTE -- do not translate the first token `strtab'.
-@ MSG_USE_STRTAB	"strtab\t  display information about string table \
-			 compression; detail"
-@ MSG_USE_STRTAB_2	"\t\t    flag shows layout of string tables (ld only)"
 
-# TRANSLATION_NOTE -- do not translate the first token `tls/TLS'.
-@ MSG_USE_TLS		"tls\t  display TLS processing info"
+# TRANSLATION_NOTE -- do not translate the first token "lmid".
+@ MSG_USE_R5_A	"        lmid[=name]      Prepend link-map list id to \
+					  diagnostics, and"
+@ MSG_USE_R5_A2	"                         optionally filter the lists: By \
+					  default,"
+@ MSG_USE_R5_A3	"                         diagnostics are produced for all \
+					  link-map"
+@ MSG_USE_R5_A4	"                         lists except that of the runtime \
+					  linker"
+@ MSG_USE_R5_A5	"                         (ldso), without identification. \
+					  \"lmid\" causes"
 
-# TRANSLATION_NOTE -- do not translate the first token `unused'.
-@ MSG_USE_UNUSED	"unused\t  display unused/unreferenced files; detail \
-			 flag shows unused"
-@ MSG_USE_UNUSED_2	"\t\t    sections (ld only)"
+# TRANSLATION_NOTE -- do not translate "name"
+@ MSG_USE_R5_A6	"                         the link-map list id to be prepended."
+@ MSG_USE_R5_A7	"                         \"name\" limits diagnostics to the \
+					  named"
+@ MSG_USE_R5_A8	"                         link-map list. Additional \"lmid\" \
+					  tokens"
+@ MSG_USE_R5_A9	"                         can specify multiple link-map \
+					  lists."
+@ MSG_USE_R5_A0	"                         Valid names are:"
 
-# TRANSLATION_NOTE -- do not translate the first token `versions'.
-@ MSG_USE_VERSIONS	"versions\t  display version processing"
+# TRANSLATION_NOTE -- do not translate the token "all".
+@ MSG_USE_R5_B	"                             all        all link-map lists \
+							 except ldso"
+
+# TRANSLATION_NOTE -- do not translate the token "alt".
+@ MSG_USE_R5_C	"                             alt        all alternative \
+							 link-map lists"
+
+# TRANSLATION_NOTE -- do not translate the token "alt".
+@ MSG_USE_R5_D	"                             alt[0-9]+  specific alt \
+							 link-map list"
+
+# TRANSLATION_NOTE -- do not translate the token "base".
+@ MSG_USE_R5_E	"                             base       base (main) \
+							 link-map list"
+@ MSG_USE_R5_F	"                             ldso       runtime linker \
+							 link-map list "
+# TRANSLATION_NOTE - End of reference 5
+
+
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 6.
+#
+#         name             prepend output file basename to diagnostics
+#         fullname         prepend full output file name to diagnostics
+#         class            prepend output file elfclass (32/64) to
+#                            diagnostics
+# 
+
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
+
+# TRANSLATION_NOTE -- do not translate the first token "name".
+@ MSG_USE_R6_A	"        name             prepend output file basename \
+					  to diagnostics"
+
+# TRANSLATION_NOTE -- do not translate the first token "fullname".
+@ MSG_USE_R6_B	"        fullname         prepend full output file name \
+					  to diagnostics"
+
+# TRANSLATION_NOTE -- do not translate the first token "class".
+@ MSG_USE_R6_C	"        class            prepend output file elfclass \
+					  (32/64) to"
+@ MSG_USE_R6_C2	"                           diagnostics"
+
+# TRANSLATION_NOTE - End of reference 6
+
+
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 7.
+#
+#         all              display information for all categories
+#         basic            basic trace information/warnings
+#         cap              hardware/software capabilities
+#         files            input file processing (files and libraries)
+#         help             this help message
+#         libs             library search paths; detail flag shows
+#                            actual library lookup (-l) processing
+#         move             move sections
+#         reloc            relocations
+#         symbols          symbol tables; detail flag shows internal
+#                            symbol table addition and resolution (ld only)
+#         tls              thread local storage (TLS)
+#         unused           unused/unreferenced files; detail flag
+#                            shows unused sections (ld only)
+#         versions         ELF versioning
+
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
+
+
+# TRANSLATION_NOTE -- do not translate the first token "all".
+@ MSG_USE_R7_A	"        all              display information for \
+					  all categories"
+
+# TRANSLATION_NOTE -- do not translate the first token "basic".
+@ MSG_USE_R7_B	"        basic            basic trace information/warnings"
+
+# TRANSLATION_NOTE -- do not translate the first token "cap".
+@ MSG_USE_R7_C	"        cap              hardware/software capabilities"
+
+# TRANSLATION_NOTE -- do not translate the first token "files".
+@ MSG_USE_R7_D	"        files            input file processing (files \
+					  and libraries)"
+
+# TRANSLATION_NOTE -- do not translate the first token "help".
+@ MSG_USE_R7_E	"        help             this help message"
+
+# TRANSLATION_NOTE -- do not translate the first token "libs".
+@ MSG_USE_R7_F	"        libs             library search paths; detail \
+					  flag shows"
+@ MSG_USE_R7_F2	"                           actual library lookup (-l) \
+					    processing"
+
+# TRANSLATION_NOTE -- do not translate the first token "move".
+@ MSG_USE_R7_G	"        move             move sections"
+
+# TRANSLATION_NOTE -- do not translate the first token "reloc".
+@ MSG_USE_R7_H	"        reloc            relocations"
+
+# TRANSLATION_NOTE -- do not translate the first token "symbols".
+@ MSG_USE_R7_I	"        symbols          symbol tables; detail flag shows \
+					  internal"
+@ MSG_USE_R7_I2	"                           symbol table addition/resolution \
+					    (ld only)"
+
+# TRANSLATION_NOTE -- do not translate the first token "tls".
+@ MSG_USE_R7_J	"        tls              thread local storage (TLS)"
+
+# TRANSLATION_NOTE -- do not translate the first token "unused".
+@ MSG_USE_R7_K	"        unused           unused/unreferenced files; \
+					  detail flag"
+@ MSG_USE_R7_K2	"                           shows unused sections (ld only)"
+
+# TRANSLATION_NOTE -- do not translate the first token "versions".
+@ MSG_USE_R7_L	"        versions         ELF versioning"
+
+# TRANSLATION_NOTE - End of reference 7
+
+
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 8.
+#
+#         audit            runtime link-audit processing
+#         bindings         symbol binding; detail flag shows
+#                            absolute:relative addresses
+#         init             init and fini processing
+
+
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
+
+
+# TRANSLATION_NOTE -- do not translate the first token "audit".
+@ MSG_USE_R8_A	"        audit            runtime link-audit processing"
+
+# TRANSLATION_NOTE -- do not translate the first token "bindings".
+@ MSG_USE_R8_B	"        bindings         symbol binding; detail flag shows"
+@ MSG_USE_R8_B2	"                           absolute:relative addresses"
+
+# TRANSLATION_NOTE -- do not translate the first token "init".
+@ MSG_USE_R8_C	"        init             init and fini processing"
+
+# TRANSLATION_NOTE - End of reference 8
+
+
+# TRANSLATION_NOTE - Use the following output in the C locale as reference 9.
+#
+#         args             input arguments
+#         entry            entrance criteria descriptors
+#         got              GOT symbol information
+#         map              map file processing
+#         sections         input sections
+#         segments         output segments and address/offset processing;
+#                            detail flag shows associated sections
+#         statistics       symbol table and relocation statistics
+#         strtab           string table compression statistics;
+#                            detail flag shows layout of string tables
+#         support          support libraries
+
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.
+
+# TRANSLATION_NOTE -- do not translate the first token "args".
+@ MSG_USE_R9_A	"        args             input arguments"
+
+# TRANSLATION_NOTE -- do not translate the first token "entry".
+@ MSG_USE_R9_B	"        entry            entrance criteria descriptors"
+
+# TRANSLATION_NOTE -- do not translate the first token "got".
+@ MSG_USE_R9_C	"        got              GOT symbol information"
+
+# TRANSLATION_NOTE -- do not translate the first token "map".
+@ MSG_USE_R9_D	"        map              map file processing"
+
+# TRANSLATION_NOTE -- do not translate the first token "sections".
+@ MSG_USE_R9_E	"        sections         input sections"
+
+# TRANSLATION_NOTE -- do not translate the first token "segments".
+@ MSG_USE_R9_F	"        segments         output segments and address/offset \
+					  processing;"
+@ MSG_USE_R9_F2	"                           detail flag shows associated \
+					    sections"
+
+# TRANSLATION_NOTE -- do not translate the first token "statistics".
+@ MSG_USE_R9_G	"        statistics       symbol table and relocation \
+					  statistics"
+
+# TRANSLATION_NOTE -- do not translate the first token "strtab".
+@ MSG_USE_R9_H	"        strtab           string table compression statistics;"
+@ MSG_USE_R9_H2	"                           detail flag shows layout of \
+					    string tables"
+
+# TRANSLATION_NOTE -- do not translate the first token "support".
+@ MSG_USE_R9_I	"        support          support libraries"
+
+# TRANSLATION_NOTE - End of reference 9
+
 
 # Argument messages
 
@@ -363,14 +572,14 @@
 # more standard 32-bit Elf_Data entries that align with the initial title.
 
 @ MSG_EDATA_TITLE_32	"            addr type        size   offset al file"
-@ MSG_EDATA_ENTRY_32	"  %3s %#10llx %-5s %#10llx %#8llx %2lld %s%s"
+@ MSG_EDATA_ENTRY_32	"  %3s %#10llx %-5s %#10llx %#8llx %2lld %s %s%s"
 
 # TRANSLATION_NOTE - the following two entries provide for a series of one or
 # more standard 64-bit Elf_Data entries that align with the initial title.
 
 @ MSG_EDATA_TITLE_64	"                    addr type                \
 			 size           offset al file"
-@ MSG_EDATA_ENTRY_64	"  %3s %#18llx %-5s %#18llx %#16llx %2lld %s%s"
+@ MSG_EDATA_ENTRY_64	"  %3s %#18llx %-5s %#18llx %#16llx %2lld %s %s%s"
 
 @ MSG_EDATA_IGNSCN	"  (section ignored)"
 
@@ -572,6 +781,7 @@
 @ MSG_SEC_BACKING	"map file symbol definitions: create backing storage:"
 
 @ MSG_SEC_INPUT		"section=%s; input from file=%s"
+@ MSG_SEC_INPUT_GEN	"section=%s"
 @ MSG_SEC_INPUT_GENSTR	"section=%s; input generated merged string section"
 @ MSG_SEC_ADDED		"section=%s; added to segment=%s"
 @ MSG_SEC_CREATED	"section=%s; added to segment=%s (created)"
@@ -588,14 +798,14 @@
 			 group: signature symbol: %s"
 @ MSG_SEC_GRP_MEMBER	"section=%s; input from file=%s; member of %s\
 			 group: signature symbol: %s"
-@ MSG_SEC_GRP_DISCARDED	"section=%s; input from file=%s; discarded in favor of \
-			 group: signature symbol: %s: file=%s"
+@ MSG_SEC_GRP_DISCARDED	"section=%s; input from file=%s; discarded in \
+			 favor of group: signature symbol: %s: file=%s"
 
 @ MSG_SEC_STRMERGE_DISCARDED "section=%s; input from file=%s; \
 			 discarded in favor of generated merged string section"
 @ MSG_SEC_STRMERGE_UNSUP "section=%s; input from file=%s; sh_addralign=%lld; \
-			 sh_entsize=%lld; unable to merge sections with this \
-			 size and alignment"
+			  sh_entsize=%lld; unable to merge sections with this \
+			  size and alignment"
 
 @ MSG_SEC_STRTAB_STND	"strtab=%s; full size: %lld; uncompressed"
 @ MSG_SEC_STRTAB_COMP	"strtab=%s; full size: %lld; compressed down to: %lld"
@@ -720,10 +930,9 @@
 @ MSG_ORD_SORT_AFTER	"section=%s; output section reordered:"
 @ MSG_ORD_HDR_1		" number of SHN_BEGIN=%u, SHN_AFTER=%u, \
 			 sh_info/sh_link=%u"
-@ MSG_ORD_TITLE_0	" section=%s from %s is not an ordered section"
-@ MSG_ORD_TITLE_1	" section=%s from %s, %s=SHN_BEGIN"
-@ MSG_ORD_TITLE_2	" section=%s from %s, %s=SHN_AFTER"
-@ MSG_ORD_TITLE_3	" section=%s from %s, %s=%s, sort key=%u"
+@ MSG_ORD_TITLE_1	" %s=SHN_BEGIN: section=%s from %s"
+@ MSG_ORD_TITLE_2	" %s=SHN_AFTER: section=%s from %s"
+@ MSG_ORD_TITLE_3	" sort key=%u: section=%s from %s, %s=%s"
 
 @ MSG_ORD_ERR_TITLE	"the SHF_ORDERED section %s from %s has \
 			 an error;  flag ignored"
@@ -1143,9 +1352,13 @@
 @ MSG_TOK_FULLNAME	"fullname"
 @ MSG_TOK_CLASS		"class"
 @ MSG_TOK_LMID		"lmid"
-@ MSG_TOK_BASE		"base"
-@ MSG_TOK_LDSO		"ldso"
-@ MSG_TOK_NEWLM		"newlm"
+@ MSG_TOK_OUTFILE	"output"
+
+@ MSG_TOK_LMID_ALL	"ALL"
+@ MSG_TOK_LMID_ALT	"ALT"
+@ MSG_TOK_LMID_BASE	"BASE"
+@ MSG_TOK_LMID_LDSO	"LDSO"
+
 
 # The following strings represent reserved words, files, pathnames and symbols.
 # Reference to this strings is via the MSG_ORIG() macro, and thus no message
@@ -1267,6 +1480,7 @@
 @ MSG_STR_NL		"\n"
 
 @ MSG_FMT_INDEX		" [%d]"
+@ MSG_FMT_ISEC_NAME	"[%u]%s"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 

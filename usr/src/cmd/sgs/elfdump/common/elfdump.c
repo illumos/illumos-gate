@@ -27,6 +27,7 @@
 /*
  * Dump an elf file.
  */
+#include	<stddef.h>
 #include	<sys/elf_386.h>
 #include	<sys/elf_amd64.h>
 #include	<sys/elf_SPARC.h>
@@ -132,7 +133,59 @@ typedef struct {
 	Word		symn;		/* # of symbols */
 } SYMTBL_STATE;
 
+/*
+ * A variable of this type is used to track information related to
+ * .eh_frame and .eh_frame_hdr sections across calls to unwind_eh_frame().
+ */
+typedef struct {
+	Word		frame_cnt;	/* # .eh_frame sections seen */
+	Word		frame_ndx;	/* Section index of 1st .eh_frame */
+	Word		hdr_cnt;	/* # .eh_frame_hdr sections seen */
+	Word		hdr_ndx;	/* Section index of 1st .eh_frame_hdr */
+	uint64_t	frame_ptr;	/* Value of FramePtr field from first */
+					/*	.eh_frame_hdr section */
+	uint64_t	frame_base;	/* Data addr of 1st .eh_frame  */
+} gnu_eh_state_t;
 
+/*
+ * C++ .exception_ranges entries make use of the signed ptrdiff_t
+ * type to record self-relative pointer values. We need a type
+ * for this that is matched to the ELFCLASS being processed.
+ */
+#if	defined(_ELF64)
+	typedef int64_t PTRDIFF_T;
+#else
+	typedef int32_t PTRDIFF_T;
+#endif
+
+/*
+ * The Sun C++ ABI uses this struct to define each .exception_ranges
+ * entry. From the ABI:
+ *
+ * The field ret_addr is a self relative pointer to the start of the address
+ * range. The name was chosen because in the current implementation the range
+ * typically starts at the return address for a call site.
+ *
+ * The field length is the difference, in bytes, between the pc of the last
+ * instruction covered by the exception range and the first. When only a
+ * single call site is represented without optimization, this will equal zero.
+ *
+ * The field handler_addr is a relative pointer which stores the difference
+ * between the start of the exception range and the address of all code to
+ * catch exceptions and perform the cleanup for stack unwinding.
+ *
+ * The field type_block is a relative pointer which stores the difference
+ * between the start of the exception range and the address of an array used
+ * for storing a list of the types of exceptions which can be caught within
+ * the exception range.
+ */
+typedef struct {
+	PTRDIFF_T	ret_addr;
+	Xword		length;
+	PTRDIFF_T	handler_addr;
+	PTRDIFF_T	type_block;
+	Xword		reserved;
+} exception_range_entry;
 
 /*
  * Focal point for verifying symbol names.
@@ -434,9 +487,26 @@ getphdr(Word phnum, Word *type_arr, Word type_cnt, const char *file, Elf *elf)
 	return (NULL);
 }
 
+/*
+ * Display the contents of GNU/amd64 .eh_frame and .eh_frame_hdr
+ * sections.
+ *
+ * entry:
+ *	cache - Cache of all section headers
+ *	shndx - Index of .eh_frame or .eh_frame_hdr section to be displayed
+ *	uphdr - NULL, or unwind program header associated with
+ *		the .eh_frame_hdr section.
+ *	ehdr - ELF header for file
+ *	eh_state - Data used across calls to this routine. The
+ *		caller should zero it before the first call, and
+ *		pass it on every call.
+ *	osabi - OSABI to use in displaying information
+ *	file - Name of file
+ *	flags - Command line option flags
+ */
 static void
-unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
-    const char *file, Elf *elf, uint_t flags)
+unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
+    gnu_eh_state_t *eh_state, uchar_t osabi, const char *file, uint_t flags)
 {
 #if	defined(_ELF64)
 #define	MSG_UNW_BINSRTAB2	MSG_UNW_BINSRTAB2_64
@@ -446,13 +516,253 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 #define	MSG_UNW_BINSRTABENT	MSG_UNW_BINSRTABENT_32
 #endif
 
+	Cache			*_cache = &cache[shndx];
+	Shdr			*shdr = _cache->c_shdr;
+	uchar_t			*data = (uchar_t *)(_cache->c_data->d_buf);
+	size_t			datasize = _cache->c_data->d_size;
+	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
+	uint64_t		ndx, frame_ptr, fde_cnt, tabndx;
+	uint_t			vers, frame_ptr_enc, fde_cnt_enc, table_enc;
+	uint64_t		initloc, initloc0;
+
+
+	/*
+	 * Is this a .eh_frame_hdr?
+	 */
+	if ((uphdr && (shdr->sh_addr == uphdr->p_vaddr)) ||
+	    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRMHDR),
+	    MSG_SCN_FRMHDR_SIZE) == 0)) {
+		/*
+		 * There can only be a single .eh_frame_hdr.
+		 * Flag duplicates.
+		 */
+		if (++eh_state->hdr_cnt > 1)
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_MULTEHFRMHDR),
+			    file, EC_WORD(shndx), _cache->c_name);
+
+		dbg_print(0, MSG_ORIG(MSG_UNW_FRMHDR));
+		ndx = 0;
+
+		vers = data[ndx++];
+		frame_ptr_enc = data[ndx++];
+		fde_cnt_enc = data[ndx++];
+		table_enc = data[ndx++];
+
+		dbg_print(0, MSG_ORIG(MSG_UNW_FRMVERS), vers);
+
+		frame_ptr = dwarf_ehe_extract(data, &ndx, frame_ptr_enc,
+		    ehdr->e_ident, shdr->sh_addr, ndx);
+		if (eh_state->hdr_cnt == 1) {
+			eh_state->hdr_ndx = shndx;
+			eh_state->frame_ptr = frame_ptr;
+		}
+
+		dbg_print(0, MSG_ORIG(MSG_UNW_FRPTRENC),
+		    conv_dwarf_ehe(frame_ptr_enc, &dwarf_ehe_buf),
+		    EC_XWORD(frame_ptr));
+
+		fde_cnt = dwarf_ehe_extract(data, &ndx, fde_cnt_enc,
+		    ehdr->e_ident, shdr->sh_addr, ndx);
+
+		dbg_print(0, MSG_ORIG(MSG_UNW_FDCNENC),
+		    conv_dwarf_ehe(fde_cnt_enc, &dwarf_ehe_buf),
+		    EC_XWORD(fde_cnt));
+		dbg_print(0, MSG_ORIG(MSG_UNW_TABENC),
+		    conv_dwarf_ehe(table_enc, &dwarf_ehe_buf));
+		dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB1));
+		dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB2));
+
+		for (tabndx = 0; tabndx < fde_cnt; tabndx++) {
+			initloc = dwarf_ehe_extract(data, &ndx, table_enc,
+			    ehdr->e_ident, shdr->sh_addr, ndx);
+			/*LINTED:E_VAR_USED_BEFORE_SET*/
+			if ((tabndx != 0) && (initloc0 > initloc))
+				dbg_print(0, MSG_INTL(MSG_ERR_BADSORT),
+				    file, _cache->c_name, EC_WORD(tabndx));
+			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTABENT),
+			    EC_XWORD(initloc),
+			    EC_XWORD(dwarf_ehe_extract(data, &ndx,
+			    table_enc, ehdr->e_ident, shdr->sh_addr,
+			    ndx)));
+			initloc0 = initloc;
+		}
+	} else {		/* Display the .eh_frame section */
+		eh_state->frame_cnt++;
+		if (eh_state->frame_cnt == 1) {
+			eh_state->frame_ndx = shndx;
+			eh_state->frame_base = shdr->sh_addr;
+		} else if ((eh_state->frame_cnt >  1) &&
+		    (ehdr->e_type != ET_REL)) {
+			Conv_inv_buf_t	inv_buf;
+
+			(void) fprintf(stderr, MSG_INTL(MSG_WARN_MULTEHFRM),
+			    file, EC_WORD(shndx), _cache->c_name,
+			    conv_ehdr_type(osabi, ehdr->e_type, 0, &inv_buf));
+		}
+		dump_eh_frame(data, datasize, shdr->sh_addr,
+		    ehdr->e_machine, ehdr->e_ident);
+	}
+
+	/*
+	 * If we've seen the .eh_frame_hdr and the first .eh_frame section,
+	 * compare the header frame_ptr to the address of the actual frame
+	 * section to ensure the link-editor got this right.  Note, this
+	 * diagnostic is only produced when unwind information is explicitly
+	 * asked for, as shared objects built with an older ld(1) may reveal
+	 * this inconsistency.  Although an inconsistency, it doesn't seem to
+	 * have any adverse effect on existing tools.
+	 */
+	if (((flags & FLG_MASK_SHOW) != FLG_MASK_SHOW) &&
+	    (eh_state->hdr_cnt > 0) && (eh_state->frame_cnt > 0) &&
+	    (eh_state->frame_ptr != eh_state->frame_base))
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADEHFRMPTR),
+		    file, EC_WORD(eh_state->hdr_ndx),
+		    cache[eh_state->hdr_ndx].c_name,
+		    EC_XWORD(eh_state->frame_ptr),
+		    EC_WORD(eh_state->frame_ndx),
+		    cache[eh_state->frame_ndx].c_name,
+		    EC_XWORD(eh_state->frame_base));
+#undef MSG_UNW_BINSRTAB2
+#undef MSG_UNW_BINSRTABENT
+}
+
+/*
+ * Convert a self relative pointer into an address. A self relative
+ * pointer adds the address where the pointer resides to the offset
+ * contained in the pointer. The benefit is that the value of the
+ * pointer does not require relocation.
+ *
+ * entry:
+ *	base_addr - Address of the pointer.
+ *	delta - Offset relative to base_addr giving desired address
+ *
+ * exit:
+ *	The computed address is returned.
+ *
+ * note:
+ *	base_addr is an unsigned value, while ret_addr is signed. This routine
+ *	used explicit testing and casting to explicitly control type
+ *	conversion, and ensure that we handle the maximum possible range.
+ */
+static Addr
+srelptr(Addr base_addr, PTRDIFF_T delta)
+{
+	if (delta < 0)
+		return (base_addr - (Addr) (-delta));
+
+	return (base_addr + (Addr) delta);
+}
+
+/*
+ * Byte swap a PTRDIFF_T value.
+ */
+static PTRDIFF_T
+swap_ptrdiff(PTRDIFF_T value)
+{
+	PTRDIFF_T r;
+	uchar_t	*dst = (uchar_t *)&r;
+	uchar_t	*src = (uchar_t *)&value;
+
+	UL_ASSIGN_BSWAP_XWORD(dst, src);
+	return (r);
+}
+
+/*
+ * Display exception_range_entry items from the .exception_ranges section
+ * of a Sun C++ object.
+ */
+static void
+unwind_exception_ranges(Cache *_cache, const char *file, int do_swap)
+{
+	/*
+	 * Translate a PTRDIFF_T self-relative address field of
+	 * an exception_range_entry struct into an address.
+	 *
+	 * entry:
+	 *	exc_addr - Address of base of exception_range_entry struct
+	 *	cur_ent - Pointer to data in the struct to be translated
+	 *
+	 *	_f - Field of struct to be translated
+	 */
+#define	SRELPTR(_f) \
+	srelptr(exc_addr + offsetof(exception_range_entry, _f), cur_ent->_f)
+
+#if	defined(_ELF64)
+#define	MSG_EXR_TITLE	MSG_EXR_TITLE_64
+#define	MSG_EXR_ENTRY	MSG_EXR_ENTRY_64
+#else
+#define	MSG_EXR_TITLE	MSG_EXR_TITLE_32
+#define	MSG_EXR_ENTRY	MSG_EXR_ENTRY_32
+#endif
+
+	exception_range_entry	scratch, *ent, *cur_ent = &scratch;
+	char			index[MAXNDXSIZE];
+	Word			i, nelts;
+	Addr			addr, addr0, offset = 0;
+	Addr			exc_addr = _cache->c_shdr->sh_addr;
+
+	dbg_print(0, MSG_INTL(MSG_EXR_TITLE));
+	ent = (exception_range_entry *)(_cache->c_data->d_buf);
+	nelts = _cache->c_data->d_size / sizeof (exception_range_entry);
+
+	for (i = 0; i < nelts; i++, ent++) {
+		if (do_swap) {
+			/*
+			 * Copy byte swapped values into the scratch buffer.
+			 * The reserved field is not used, so we skip it.
+			 */
+			scratch.ret_addr = swap_ptrdiff(ent->ret_addr);
+			scratch.length = BSWAP_XWORD(ent->length);
+			scratch.handler_addr = swap_ptrdiff(ent->handler_addr);
+			scratch.type_block = swap_ptrdiff(ent->type_block);
+		} else {
+			cur_ent = ent;
+		}
+
+		/*
+		 * The table is required to be sorted by the address
+		 * derived from ret_addr, to allow binary searching. Ensure
+		 * that addresses grow monotonically.
+		 */
+		addr = SRELPTR(ret_addr);
+		/*LINTED:E_VAR_USED_BEFORE_SET*/
+		if ((i != 0) && (addr0 > addr))
+			dbg_print(0, MSG_INTL(MSG_ERR_BADSORT),
+			    file, _cache->c_name, EC_WORD(i));
+
+		(void) snprintf(index, MAXNDXSIZE, MSG_ORIG(MSG_FMT_INDEX),
+		    EC_XWORD(i));
+		dbg_print(0, MSG_INTL(MSG_EXR_ENTRY), index, EC_ADDR(offset),
+		    EC_ADDR(addr), EC_ADDR(cur_ent->length),
+		    EC_ADDR(SRELPTR(handler_addr)),
+		    EC_ADDR(SRELPTR(type_block)));
+
+		addr0 = addr;
+		exc_addr += sizeof (exception_range_entry);
+		offset += sizeof (exception_range_entry);
+	}
+
+#undef SRELPTR
+#undef MSG_EXR_TITLE
+#undef MSG_EXR_ENTRY
+}
+
+/*
+ * Display information from unwind/exception sections:
+ *
+ * -	GNU/amd64 .eh_frame and .eh_frame_hdr
+ * -	Sun C++ .exception_ranges
+ *
+ */
+static void
+unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
+    const char *file, Elf *elf, uint_t flags)
+{
 	static Word phdr_types[] = { PT_SUNW_UNWIND, PT_SUNW_EH_FRAME };
 
-	int			frame_cnt = 0, hdr_cnt = 0, frame_ndx, hdr_ndx;
-	uint64_t		save_frame_ptr, save_frame_base;
-	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
 	Word			cnt;
 	Phdr			*uphdr = NULL;
+	gnu_eh_state_t		eh_state;
 
 	/*
 	 * Historical background: .eh_frame and .eh_frame_hdr sections
@@ -468,31 +778,36 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 	 * other architectures in order to better support gcc-generated
 	 * objects.
 	 *
+	 * .exception_ranges implement the same basic concepts, but
+	 * were invented at Sun for the Sun C++ compiler.
+	 *
 	 * We match these sections by name, rather than section type,
 	 * because they can come in as either SHT_AMD64_UNWIND, or as
-	 * SHT_PROGBITS, and because we need to distinquish between
-	 * the two types (.eh_frame and .eh_frame_hdr).
+	 * SHT_PROGBITS, and because the type isn't enough to determine
+	 * how they should be interprteted.
 	 */
 
+	/* Find the program header for .eh_frame_hdr if present */
 	if (phnum)
 		uphdr = getphdr(phnum, phdr_types,
 		    sizeof (phdr_types) / sizeof (*phdr_types), file, elf);
 
+	/*
+	 * eh_state is used to retain data used by unwind_eh_frame()
+	 * accross calls.
+	 */
+	bzero(&eh_state, sizeof (eh_state));
+
 	for (cnt = 1; cnt < shnum; cnt++) {
 		Cache		*_cache = &cache[cnt];
 		Shdr		*shdr = _cache->c_shdr;
-		uchar_t		*data;
-		size_t		datasize;
-		uint64_t	ndx, frame_ptr, fde_cnt, tabndx;
-		uint_t		vers, frame_ptr_enc, fde_cnt_enc, table_enc;
+		int		is_exrange;
 
 		/*
-		 * Skip sections of the wrong type.
-		 *
-		 * On Solaris, these are SHT_AMD64_UNWIND for amd64,
-		 * and SHT_PROGBITS for other platforms. For Linux, and
-		 * presumably other operating systems that use the GNU
-		 * toolchain, SHT_PROGBITS is used on all platforms.
+		 * Skip sections of the wrong type. On amd64, they
+		 * can be SHT_AMD64_UNWIND. On all platforms, they
+		 * can be SHT_PROGBITS (including amd64, if using
+		 * the GNU compilers).
 		 *
 		 * Skip anything other than these two types. The name
 		 * test below will thin out the SHT_PROGBITS that don't apply.
@@ -502,15 +817,22 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 			continue;
 
 		/*
-		 * Only sections with names starting with .eh_frame or
-		 * .eh_frame_hdr are of interest. We do a prefix comparison,
-		 * allowing for naming conventions like .eh_frame.foo, hence
-		 * the use of strncmp() rather than strcmp(). This means that
-		 * we only really need to test for .eh_frame, as it's a
-		 * prefix of .eh_frame_hdr.
+		 * Only sections with certain well known names are of interest.
+		 * These are:
+		 *
+		 *	.eh_frame - amd64/GNU-compiler unwind sections
+		 *	.eh_frame_hdr - Sorted table referencing .eh_frame
+		 *	.exception_ranges - Sun C++ unwind sections
+		 *
+		 * We do a prefix comparison, allowing for naming conventions
+		 * like .eh_frame.foo, hence the use of strncmp() rather than
+		 * strcmp(). This means that we only really need to test for
+		 * .eh_frame, as it's a prefix of .eh_frame_hdr.
 		 */
-		if (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRM),
-		    MSG_SCN_FRM_SIZE) != 0)
+		is_exrange =  strncmp(_cache->c_name,
+		    MSG_ORIG(MSG_SCN_EXRANGE), MSG_SCN_EXRANGE_SIZE) == 0;
+		if ((strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRM),
+		    MSG_SCN_FRM_SIZE) != 0) && !is_exrange)
 			continue;
 
 		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
@@ -522,105 +844,13 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, uchar_t osabi,
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_UNWIND), _cache->c_name);
 
-		data = (uchar_t *)(_cache->c_data->d_buf);
-		datasize = _cache->c_data->d_size;
-
-		/*
-		 * Is this a .eh_frame_hdr
-		 */
-		if ((uphdr && (shdr->sh_addr == uphdr->p_vaddr)) ||
-		    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRMHDR),
-		    MSG_SCN_FRMHDR_SIZE) == 0)) {
-			/*
-			 * There can only be a single .eh_frame_hdr.
-			 * Flag duplicates.
-			 */
-			if (++hdr_cnt > 1)
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_MULTEHFRMHDR), file,
-				    EC_WORD(cnt), _cache->c_name);
-
-			dbg_print(0, MSG_ORIG(MSG_UNW_FRMHDR));
-			ndx = 0;
-
-			vers = data[ndx++];
-			frame_ptr_enc = data[ndx++];
-			fde_cnt_enc = data[ndx++];
-			table_enc = data[ndx++];
-
-			dbg_print(0, MSG_ORIG(MSG_UNW_FRMVERS), vers);
-
-			frame_ptr = dwarf_ehe_extract(data, &ndx, frame_ptr_enc,
-			    ehdr->e_ident, shdr->sh_addr, ndx);
-			if (hdr_cnt == 1) {
-				hdr_ndx = cnt;
-				save_frame_ptr = frame_ptr;
-			}
-
-			dbg_print(0, MSG_ORIG(MSG_UNW_FRPTRENC),
-			    conv_dwarf_ehe(frame_ptr_enc, &dwarf_ehe_buf),
-			    EC_XWORD(frame_ptr));
-
-			fde_cnt = dwarf_ehe_extract(data, &ndx, fde_cnt_enc,
-			    ehdr->e_ident, shdr->sh_addr, ndx);
-
-			dbg_print(0, MSG_ORIG(MSG_UNW_FDCNENC),
-			    conv_dwarf_ehe(fde_cnt_enc, &dwarf_ehe_buf),
-			    EC_XWORD(fde_cnt));
-			dbg_print(0, MSG_ORIG(MSG_UNW_TABENC),
-			    conv_dwarf_ehe(table_enc, &dwarf_ehe_buf));
-			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB1));
-			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB2));
-
-			for (tabndx = 0; tabndx < fde_cnt; tabndx++) {
-				dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTABENT),
-				    EC_XWORD(dwarf_ehe_extract(data, &ndx,
-				    table_enc, ehdr->e_ident, shdr->sh_addr,
-				    ndx)),
-				    EC_XWORD(dwarf_ehe_extract(data, &ndx,
-				    table_enc, ehdr->e_ident, shdr->sh_addr,
-				    ndx)));
-			}
-		} else {		/* Display the .eh_frame section */
-			frame_cnt++;
-			if (frame_cnt == 1) {
-				frame_ndx = cnt;
-				save_frame_base = shdr->sh_addr;
-			} else if ((frame_cnt >  1) &&
-			    (ehdr->e_type != ET_REL)) {
-				Conv_inv_buf_t	inv_buf;
-
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_WARN_MULTEHFRM), file,
-				    EC_WORD(cnt), _cache->c_name,
-				    conv_ehdr_type(osabi, ehdr->e_type,
-				    0, &inv_buf));
-			}
-			dump_eh_frame(data, datasize, shdr->sh_addr,
-			    ehdr->e_machine, ehdr->e_ident);
-		}
-
-		/*
-		 * If we've seen the .eh_frame_hdr and the first .eh_frame
-		 * section, compare the header frame_ptr to the address of the
-		 * actual frame section to ensure the link-editor got this
-		 * right.  Note, this diagnostic is only produced when unwind
-		 * information is explicitly asked for, as shared objects built
-		 * with an older ld(1) may reveal this inconsistency.  Although
-		 * an inconsistency, it doesn't seem to have any adverse effect
-		 * on existing tools.
-		 */
-		if (((flags & FLG_MASK_SHOW) != FLG_MASK_SHOW) &&
-		    (hdr_cnt > 0) && (frame_cnt > 0) &&
-		    (save_frame_ptr != save_frame_base))
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADEHFRMPTR),
-			    file, EC_WORD(hdr_ndx), cache[hdr_ndx].c_name,
-			    EC_XWORD(save_frame_ptr), EC_WORD(frame_ndx),
-			    cache[frame_ndx].c_name, EC_XWORD(save_frame_base));
+		if (is_exrange)
+			unwind_exception_ranges(_cache, file,
+			    _elf_sys_encoding() != ehdr->e_ident[EI_DATA]);
+		else
+			unwind_eh_frame(cache, cnt, uphdr, ehdr, &eh_state,
+			    osabi, file, flags);
 	}
-
-#undef MSG_UNW_BINSRTAB2
-#undef MSG_UNW_BINSRTABENT
 }
 
 /*
@@ -4217,24 +4447,35 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 				 * Heuristic time: It is usually bad form
 				 * to assume the meaning/format of a PROGBITS
 				 * section based on its name. However, there
-				 * are exceptions: The ELF ABI specifies
-				 * .interp and .got sections by name. Existing
-				 * practice has similarly pinned down the
-				 * meaning of unwind sections (.eh_frame and
-				 * .eh_frame_hdr).
-				 *
-				 * Check for these special names.
+				 * are ABI mandated exceptions. Check for
+				 * these special names.
 				 */
+
+				/* The ELF ABI specifies .interp and .got */
 				if (strcmp(_cache->c_name,
-				    MSG_ORIG(MSG_ELF_INTERP)) == 0)
+				    MSG_ORIG(MSG_ELF_INTERP)) == 0) {
 					flags |= FLG_SHOW_INTERP;
-				else if (strcmp(_cache->c_name,
-				    MSG_ORIG(MSG_ELF_GOT)) == 0)
+					break;
+				}
+				if (strcmp(_cache->c_name,
+				    MSG_ORIG(MSG_ELF_GOT)) == 0) {
 					flags |= FLG_SHOW_GOT;
-				else if (strncmp(_cache->c_name,
+					break;
+				}
+				/*
+				 * The GNU compilers, and amd64 ABI, define
+				 * .eh_frame and .eh_frame_hdr. The Sun
+				 * C++ ABI defines .exception_ranges.
+				 */
+				if ((strncmp(_cache->c_name,
 				    MSG_ORIG(MSG_SCN_FRM),
-				    MSG_SCN_FRM_SIZE) == 0)
+				    MSG_SCN_FRM_SIZE) == 0) ||
+				    (strncmp(_cache->c_name,
+				    MSG_ORIG(MSG_SCN_EXRANGE),
+				    MSG_SCN_EXRANGE_SIZE) == 0)) {
 					flags |= FLG_SHOW_UNWIND;
+					break;
+				}
 				break;
 
 			case SHT_SYMTAB:

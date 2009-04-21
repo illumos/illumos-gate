@@ -437,7 +437,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		    (enp->ec_attrmask & enp->ec_attrbits) !=
 		    (enp->ec_attrmask & shflags))
 			continue;
-		if (enp->ec_name && (strcmp(enp->ec_name, isp->is_name) != 0))
+		if (((enp->ec_flags & FLG_EC_BUILTIN) == 0) &&
+		    enp->ec_name && (strcmp(enp->ec_name, isp->is_name) != 0))
 			continue;
 		if (enp->ec_files) {
 			Aliste	idx2;
@@ -519,8 +520,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 				return ((Os_desc *)S_ERROR);
 			(void) strncpy(oname, isp->is_name, size);
 			oname[size] = '\0';
-			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
-			    oname));
+			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
 		}
 		isp->is_ordndx = enp->ec_ordndx;
 	}
@@ -544,8 +544,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	    MSG_SCN_GNU_LINKONCE_SIZE) == 0)) {
 		if ((oname =
 		    (char *)gnu_linkonce_sec(isp->is_name)) != isp->is_name) {
-			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
-			    oname));
+			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
 		}
 
 		/*
@@ -556,7 +555,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		isp->is_flags |= FLG_IS_COMDAT;
 		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0)
 			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
-		Dbg_sec_gnu_comdat(ofl->ofl_lml, isp->is_name, 1,
+		Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, 1,
 		    (ofl->ofl_flags1 & FLG_OF1_RLXREL));
 	}
 
@@ -579,8 +578,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 			return ((Os_desc *)S_ERROR);
 		(void) strncpy(oname, isp->is_name, size);
 		oname[size] = '\0';
-		DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
-		    oname));
+		DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
 
 		/*
 		 * Enable lazy relocation processing, as this is typically a
@@ -588,7 +586,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		 */
 		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0) {
 			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
-			Dbg_sec_gnu_comdat(ofl->ofl_lml, isp->is_name, 0,
+			Dbg_sec_gnu_comdat(ofl->ofl_lml, isp, 0,
 			    (ofl->ofl_flags1 & FLG_OF1_RLXREL));
 		}
 	}
@@ -750,9 +748,10 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 			/*
 			 * If this input section and file is associated to an
 			 * artificially referenced output section, make sure
-			 * they are marked as referenced also. This insures this
-			 * input section and file isn't eliminated when -zignore
-			 * is in effect.
+			 * they are marked as referenced also. This ensures
+			 * that this input section and file isn't eliminated
+			 * when -zignore is in effect.
+			 *
 			 * See -zignore comments when creating a new output
 			 * section below.
 			 */

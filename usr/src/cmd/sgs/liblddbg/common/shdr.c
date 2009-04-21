@@ -59,15 +59,21 @@ Elf_shdr(Lm_list *lml, uchar_t osabi, Half mach, Shdr *shdr)
 
 void
 Dbg_shdr_modified(Lm_list *lml, const char *obj, uchar_t osabi, Half mach,
-    Shdr *oshdr, Shdr *nshdr, const char *name)
+    Word ndx, Shdr *oshdr, Shdr *nshdr, const char *name)
 {
+	dbg_isec_name_buf_t	buf;
+	char			*alloc_mem;
+
 	if (DBG_NOTCLASS(DBG_C_SECTIONS | DBG_C_SUPPORT))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_SHD_MODIFIED), name, obj);
+	dbg_print(lml, MSG_INTL(MSG_SHD_MODIFIED),
+	    dbg_fmt_isec_name2(name, ndx, buf, &alloc_mem), obj);
+	if (alloc_mem != NULL)
+		free(alloc_mem);
 
 	dbg_print(lml, MSG_INTL(MSG_SHD_ORIG));
 	Elf_shdr(lml, osabi, mach, oshdr);

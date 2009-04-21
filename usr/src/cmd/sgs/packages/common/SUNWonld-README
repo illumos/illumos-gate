@@ -1474,3 +1474,4 @@ Bugid   Risk Synopsis
 6752883 ld.so.1 error message should be buffered (not sent to stderr).
 6577982 ld.so.1 calls getpid() before it should when any LD_* are set
 6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
+6831285 linker LD_DEBUG support needs improvements

@@ -732,16 +732,18 @@
 
 # Entry criteria strings (segment names)
 
-@ MSG_ENT_PHDR		"phdr"
-@ MSG_ENT_INTERP	"interp"
-@ MSG_ENT_TEXT		"text"
-@ MSG_ENT_DATA		"data"
 @ MSG_ENT_BSS		"bss"
+@ MSG_ENT_DATA		"data"
 @ MSG_ENT_DTRACE	"dtrace"
 @ MSG_ENT_DYNAMIC	"dynamic"
+@ MSG_ENT_EXTRA		"extra"
+@ MSG_ENT_INTERP	"interp"
+@ MSG_ENT_LBSS		"lbss"
 @ MSG_ENT_LDATA		"ldata"
 @ MSG_ENT_LRODATA	"lrodata"
 @ MSG_ENT_NOTE		"note"
+@ MSG_ENT_PHDR		"phdr"
+@ MSG_ENT_TEXT		"text"
 @ MSG_ENT_TLS		"tls"
 @ MSG_ENT_UNWIND	"unwind"
 
@@ -1071,6 +1073,8 @@
 # The following strings represent reserved words, files, pathnames and symbols.
 # Reference to this strings is via the MSG_ORIG() macro, and thus no message
 # translation is required.
+
+@ MSG_DBG_FOPEN_MODE	"w"
 
 @ MSG_DBG_CLS32_FMT	"32: "
 @ MSG_DBG_CLS64_FMT	"64: "

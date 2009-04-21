@@ -155,6 +155,7 @@
 			(1 expected)\n"
 @ MSG_ERR_BADEHFRMPTR	"%s: section[%d: %s] FramePtr (%#llx) does not match \
 			 shdr[%d: %s].sh_addr (%#llx)\n"
+@ MSG_ERR_BADSORT	"%s: %s: index[%d]: invalid sort order"
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
@@ -172,6 +173,20 @@
 
 @ MSG_INFO_LINUXOSABI	"%s: %s object has Linux .note.ABI-tag section. \
 			Assuming %s\n"
+
+# exception_range_entry table entries.
+# TRANSLATION_NOTE - the following entries provide for a series of one or more
+# standard 32-bit and 64-bit .exception_ranges table entries that align with
+# the initial title.
+
+@ MSG_EXR_TITLE_32	"     index    offset     ret_addr   \
+			 length     handler    type_blk"
+@ MSG_EXR_ENTRY_32	"%10.10s  0x%8.8llx 0x%8.8llx 0x%8.8llx 0x%8.8llx \
+			 0x%8.8llx"
+@ MSG_EXR_TITLE_64	"     index    offset             ret_addr           \
+			 length             handler            type_blk"
+@ MSG_EXR_ENTRY_64	"%10.10s  0x%16.16llx 0x%16.16llx 0x%16.16llx \
+			 0x%16.16llx 0x%16.16llx"
 
 # Elf Output Messages
 
@@ -332,6 +347,7 @@
 
 @ MSG_SCN_FRM		".eh_frame"
 @ MSG_SCN_FRMHDR	".eh_frame_hdr"
+@ MSG_SCN_EXRANGE	".exception_ranges"
 
 @ MSG_UNW_FRMHDR	"Frame Header:"
 @ MSG_UNW_FRMVERS	"  Version: %d"

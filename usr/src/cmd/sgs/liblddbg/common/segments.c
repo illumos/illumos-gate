@@ -122,6 +122,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 	Is_desc		*isp;
 	Elf_Data	*data;
 	Shdr		*shdr;
+	const char	*empty = MSG_ORIG(MSG_STR_EMPTY);
 
 	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
@@ -136,15 +137,16 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 	dbg_print(lml, MSG_INTL(MSG_EDATA_ENTRY), MSG_INTL(MSG_STR_OUT),
 	    EC_ADDR(shdr->sh_addr), conv_elfdata_type(data->d_type, &inv_buf),
 	    EC_XWORD(data->d_size), EC_OFF(data->d_off),
-	    EC_XWORD(data->d_align), MSG_ORIG(MSG_STR_EMPTY),
-	    MSG_ORIG(MSG_STR_EMPTY));
+	    EC_XWORD(data->d_align), empty, empty, empty);
 
 	if (DBG_NOTDETAIL())
 		return;
 
 	for (APLIST_TRAVERSE(osp->os_isdescs, idx, isp)) {
-		const char	*file, *str;
-		Addr		addr;
+		dbg_isec_name_buf_t	buf;
+		char			*alloc_mem;
+		const char		*file, *str;
+		Addr			addr;
 
 		data = isp->is_indata;
 
@@ -152,18 +154,21 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 			str = MSG_INTL(MSG_EDATA_IGNSCN);
 			addr = 0;
 		} else {
-			str = MSG_ORIG(MSG_STR_EMPTY);
+			str = empty;
 			addr = (Addr)(shdr->sh_addr + data->d_off);
 		}
 
 		if (isp->is_file && isp->is_file->ifl_name)
 			file = isp->is_file->ifl_name;
 		else
-			file = MSG_ORIG(MSG_STR_EMPTY);
+			file = empty;
 
 		dbg_print(lml, MSG_INTL(MSG_EDATA_ENTRY), MSG_INTL(MSG_STR_IN),
 		    EC_ADDR(addr), conv_elfdata_type(data->d_type, &inv_buf),
 		    EC_XWORD(data->d_size), EC_OFF(data->d_off),
-		    EC_XWORD(data->d_align), file, str);
+		    EC_XWORD(data->d_align), file,
+		    dbg_fmt_isec_name(isp, buf, &alloc_mem), str);
+		if (alloc_mem != NULL)
+			free(alloc_mem);
 	}
 }

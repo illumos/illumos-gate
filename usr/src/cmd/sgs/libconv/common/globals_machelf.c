@@ -26,7 +26,6 @@
 
 #include	<stdio.h>
 #include	<strings.h>
-#include	<ctype.h>
 #include	<_machelf.h>
 #include	"_conv.h"
 #include	"globals_msg.h"

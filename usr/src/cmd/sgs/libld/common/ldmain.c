@@ -385,6 +385,11 @@ ld_main(int argc, char **argv, Half mach)
 	DBG_CALL(Dbg_statistics_ld(ofl));
 
 	/*
+	 * Wrap up debug output file if one is open
+	 */
+	dbg_cleanup();
+
+	/*
 	 * For performance reasons we don't actually free up the memory we've
 	 * allocated, it will be freed when we exit.
 	 *
