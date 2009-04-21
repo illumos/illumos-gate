@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,9 +289,8 @@ p_select()
 				pptr->pinfo_map[i].dkl_cylno);
 			return (0);
 		}
-		if (pptr->pinfo_map[i].dkl_nblk == 0 ||
-			(int)pptr->pinfo_map[i].dkl_nblk > ((ncyl -
-				pptr->pinfo_map[i].dkl_cylno) * spc())) {
+		if (pptr->pinfo_map[i].dkl_nblk > ((ncyl -
+		    pptr->pinfo_map[i].dkl_cylno) * spc())) {
 			err_print(
 			    "partition %c: specified # of blocks, %u, "
 			    "is out of range\n",
