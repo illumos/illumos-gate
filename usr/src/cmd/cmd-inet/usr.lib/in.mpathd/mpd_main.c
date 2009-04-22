@@ -1006,6 +1006,19 @@ timer_schedule(uint_t delay)
 	}
 }
 
+static void
+timer_cancel(void)
+{
+	struct itimerval itimerval;
+
+	if (debug & D_TIMER)
+		logdebug("timer_cancel()\n");
+
+	bzero(&itimerval, sizeof (itimerval));
+	if (setitimer(ITIMER_REAL, &itimerval, NULL) < 0)
+		logperror("timer_cancel: setitimer");
+}
+
 /*
  * Timer has fired. Determine when the next timer event will occur by asking
  * all the timer routines. Should not be called from a timer routine.
@@ -1186,6 +1199,13 @@ in_signal(int fd)
 		break;
 	case SIGHUP:
 		logerr("SIGHUP: restart and reread config file\n");
+		/*
+		 * Cancel the interval timer.  Needed since setitimer() uses
+		 * alarm() and the time left is inherited across exec(), and
+		 * thus the SIGALRM may be delivered before a handler has been
+		 * setup, causing in.mpathd to erroneously exit.
+		 */
+		timer_cancel();
 		cleanup();
 		(void) execv(argv0[0], argv0);
 		_exit(0177);

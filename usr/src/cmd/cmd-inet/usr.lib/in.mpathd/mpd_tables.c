@@ -2840,6 +2840,7 @@ probe_state_event(struct probe_stats *pr, struct phyint_instance *pii)
 	hrtime_t proc_time = 0, recv_time = 0;
 	struct sockaddr_storage ss;
 	struct target *tg = pr->pr_target;
+	int64_t rttavg, rttdev;
 
 	errno = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
 	if (errno != 0) {
@@ -2892,13 +2893,13 @@ probe_state_event(struct probe_stats *pr, struct phyint_instance *pii)
 	if (errno != 0)
 		goto failed;
 
-	errno = nvlist_add_int64(nvl, IPMP_PROBE_TARGET_RTTAVG,
-	    tg->tg_rtt_sa / 8);
+	rttavg = (tg != NULL) ? (tg->tg_rtt_sa / 8) : 0;
+	errno = nvlist_add_int64(nvl, IPMP_PROBE_TARGET_RTTAVG, rttavg);
 	if (errno != 0)
 		goto failed;
 
-	errno = nvlist_add_int64(nvl, IPMP_PROBE_TARGET_RTTDEV,
-	    tg->tg_rtt_sd / 4);
+	rttdev = (tg != NULL) ? (tg->tg_rtt_sd / 4) : 0;
+	errno = nvlist_add_int64(nvl, IPMP_PROBE_TARGET_RTTDEV, rttdev);
 	if (errno != 0)
 		goto failed;
 
