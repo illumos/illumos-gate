@@ -2254,6 +2254,70 @@ if [[ -n $tflag && -z $Uflag && -z $Dflag ]]; then
 fi
 
 #
+# For the invocation "webrev -n -U" with no other options, webrev will assume
+# that the webrev exists in ${CWS}/webrev, but will upload it using the name
+# $(basename ${CWS}).  So we need to get CWS set before we skip any remaining
+# logic.
+#
+$WHICH_SCM | read SCM_MODE junk || exit 1
+if [[ $SCM_MODE == "teamware" ]]; then
+	#
+	# Teamware priorities:
+	# 1. CODEMGR_WS from the environment
+	# 2. workspace name
+	#
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && codemgr_ws=$CODEMGR_WS
+	if [[ -n $codemgr_ws && ! -d $codemgr_ws ]]; then
+		print -u2 "$codemgr_ws: no such workspace"
+		exit 1
+	fi
+	[[ -z $codemgr_ws ]] && codemgr_ws=$(workspace name)
+	codemgr_ws=$(cd $codemgr_ws;print $PWD)
+	CODEMGR_WS=$codemgr_ws
+	CWS=$codemgr_ws
+elif [[ $SCM_MODE == "mercurial" ]]; then
+	#
+	# Mercurial priorities:
+	# 1. hg root from CODEMGR_WS environment variable
+	# 2. hg root from directory of invocation
+	#
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
+	    codemgr_ws=$(hg root -R $CODEMGR_WS 2>/dev/null)
+	[[ -z $codemgr_ws ]] && codemgr_ws=$(hg root 2>/dev/null)
+	CWS=$codemgr_ws
+elif [[ $SCM_MODE == "subversion" ]]; then
+	#
+	# Subversion priorities:
+	# 1. CODEMGR_WS from environment
+	# 2. Relative path from current directory to SVN repository root
+	#
+	if [[ -n $CODEMGR_WS && -d $CODEMGR_WS/.svn ]]; then
+		CWS=$CODEMGR_WS
+	else
+		svn info | while read line; do
+			if [[ $line == "URL: "* ]]; then
+				url=${line#URL: }
+			elif [[ $line == "Repository Root: "* ]]; then
+				repo=${line#Repository Root: }
+			fi
+		done
+
+		rel=${url#$repo} 
+		CWS=${PWD%$rel}
+	fi
+fi
+
+#
+# If no SCM has been determined, take either the environment setting
+# setting for CODEMGR_WS, or the current directory if that wasn't set.
+#
+if [[ -z ${CWS} ]]; then
+	CWS=${CODEMGR_WS:-.}
+fi
+
+
+
+#
 # If the command line options indicate no webrev generation, either
 # explicitly (-n) or implicitly (-D but not -U), then there's a whole
 # ton of logic we can skip.
@@ -2305,7 +2369,6 @@ fi
 # Before we go on to further consider -l and -w, work out which SCM we think
 # is in use.
 #
-$WHICH_SCM | read SCM_MODE junk || exit 1
 case "$SCM_MODE" in
 teamware|mercurial|subversion)
 	;;
@@ -2380,26 +2443,25 @@ if [[ $# -gt 0 ]]; then
 	print -u2 "WARNING: unused arguments: $*"
 fi
 
+#
+# Before we entered the DO_EVERYTHING loop, we should have already set CWS
+# and CODEMGR_WS as needed.  Here, we set the parent workspace.
+#
+
 if [[ $SCM_MODE == "teamware" ]]; then
+
 	#
-	# Parent (internally $codemgr_parent) and workspace ($codemgr_ws) can
-	# be set in a number of ways, in decreasing precedence:
+	# Teamware priorities:
 	#
-	#      1) on the command line (only for the parent)
+	#      1) via -p command line option
 	#      2) in the user environment
 	#      3) in the flist
-	#      4) automatically based on the workspace (only for the parent)
+	#      4) automatically based on the workspace
 	#
 
 	#
-	# Here is case (2): the user environment
+	# For 1, codemgr_parent will already be set.  Here's 2:
 	#
-	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && codemgr_ws=$CODEMGR_WS
-	if [[ -n $codemgr_ws && ! -d $codemgr_ws ]]; then
-		print -u2 "$codemgr_ws: no such workspace"
-		exit 1
-	fi
-
 	[[ -z $codemgr_parent && -n $CODEMGR_PARENT ]] && \
 	    codemgr_parent=$CODEMGR_PARENT
 	if [[ -n $codemgr_parent && ! -d $codemgr_parent ]]; then
@@ -2434,51 +2496,28 @@ if [[ $SCM_MODE == "teamware" ]]; then
 	#
 	# If by hook or by crook we've gotten a file list by now (perhaps
 	# from the command line), eval it to extract environment variables from
-	# it: This is step (3).
-	#
-	env_from_flist
-
-	#
-	# Continuing step (3): If we still have no file list, we'll try to get
-	# it from teamware.
+	# it: This is method 3 for finding the parent.
 	#
 	if [[ -z $flist_done ]]; then
 		flist_from_teamware
-		env_from_flist
 	fi
+	env_from_flist
 
 	#
 	# (4) If we still don't have a value for codemgr_parent, get it
 	# from workspace.
 	#
-	[[ -z $codemgr_ws ]] && codemgr_ws=`workspace name`
 	[[ -z $codemgr_parent ]] && codemgr_parent=`workspace parent`
 	if [[ ! -d $codemgr_parent ]]; then
 		print -u2 "$CODEMGR_PARENT: no such parent workspace"
 		exit 1
 	fi
 
-	#
-	# Observe true directory name of CODEMGR_WS, as used later in
-	# webrev title.
-	#
-	codemgr_ws=$(cd $codemgr_ws;print $PWD)
-
-	#
-	# Reset CODEMGR_WS to make sure teamware commands are happy.
-	#
-	CODEMGR_WS=$codemgr_ws
-	CWS=$codemgr_ws
 	PWS=$codemgr_parent
 
 	[[ -n $parent_webrev ]] && RWS=$(workspace parent $CWS)
 
 elif [[ $SCM_MODE == "mercurial" ]]; then
-	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
-	    codemgr_ws=`hg root -R $CODEMGR_WS 2>/dev/null`
-
-	[[ -z $codemgr_ws ]] && codemgr_ws=`hg root 2>/dev/null`
-
 	#
 	# Parent can either be specified with -p
 	# Specified with CODEMGR_PARENT in the environment
@@ -2494,7 +2533,6 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	fi
 
 	CWS_REV=`hg parent -R $codemgr_ws --template '{node|short}' 2>/dev/null`
-	CWS=$codemgr_ws
 	PWS=$codemgr_parent
 
 	# 
@@ -2559,20 +2597,6 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		exit 1
 	fi
 elif [[ $SCM_MODE == "subversion" ]]; then
-	if [[ -n $CODEMGR_WS && -d $CODEMGR_WS/.svn ]]; then
-		CWS=$CODEMGR_WS
-	else
-		svn info | while read line; do
-			if [[ $line == "URL: "* ]]; then
-				url=${line#URL: }
-			elif [[ $line == "Repository Root: "* ]]; then
-				repo=${line#Repository Root: }
-			fi
-		done
-
-		rel=${url#$repo} 
-		CWS=${PWD%$rel}
-	fi
 
 	#
 	# We only will have a real parent workspace in the case one
