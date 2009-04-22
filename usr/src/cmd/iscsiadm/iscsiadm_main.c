@@ -4257,6 +4257,11 @@ addStaticConfig(int operandLen, char *operand[], int *funcRet)
 			return (1);
 		}
 	}
+
+	if (ret != 0) {
+		*funcRet = 1;
+	}
+
 	return (ret);
 }
 
@@ -5237,6 +5242,8 @@ parseTarget(char *targetStr,
 				*tpgt = atoi(commaPos2);
 				*tpgtSpecified = B_TRUE;
 			} else {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("parse target invalid TPGT"));
 				return (PARSE_TARGET_INVALID_TPGT);
 			}
 		}

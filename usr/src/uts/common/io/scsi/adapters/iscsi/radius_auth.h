@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,9 @@ extern "C" {
  *   target_chap_name - The CHAP name of the target being authenticated.
  *   initiator_chap_name - The CHAP name of the authenticating initiator.
  *   challenge - The CHAP challenge to which the target responded.
+ *   challenge_length - The length of CHAP challenge.
  *   target_response - The target's CHAP response to be validated.
+ *   response_length - The length of target's CHAP response.
  *   identifier - The identifier associated with the CHAP challenge.
  *   radius_server_ip_address - The IP address of the RADIUS server.
  *   radius_server_port - The port number of the RADIUS server.
@@ -57,7 +59,9 @@ chap_validation_status_type
 radius_chap_validate(char *target_chap_name,
 		char *initiator_chap_name,
 		uint8_t *challenge,
+		uint32_t challenge_length,
 		uint8_t *target_response,
+		uint32_t response_length,
 		uint8_t identifier,
 		iscsi_ipaddr_t rad_svr_ip_addr,
 		uint32_t rad_svr_port,

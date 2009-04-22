@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,8 +173,6 @@ rcv_radius_response(void *socket, uint8_t *shared_secret,
 	ushort_t		len;
 	struct nmsghdr		msg;
 	struct iovec		iov[1];
-	struct sonode		*so = NULL;
-	int			ret = 0;
 
 	tmp_data = kmem_zalloc(MAX_RAD_PACKET_LEN, KM_SLEEP);
 
@@ -190,19 +188,6 @@ rcv_radius_response(void *socket, uint8_t *shared_secret,
 	msg.msg_iov	    = iov;
 	msg.msg_iovlen	    = 1;
 
-	/*
-	 * Convert the socket end point to a device stream. This can
-	 * make our stream function kstrgetmsg() get the udp data
-	 * during polling.
-	 */
-	so = (struct sonode *)socket;
-	(void) VOP_IOCTL(SOTOV(so), I_POP, 0, FKIOCTL, CRED(), &ret, NULL);
-	if (ret != 0) {
-		cmn_err(CE_NOTE, "iscsi convertion failed to change socket end"
-		    "point to device stream");
-		kmem_free(tmp_data, MAX_RAD_PACKET_LEN);
-		return (RAD_RSP_RCVD_NO_DATA);
-	}
 	rcv_len = iscsi_net->recvmsg(socket, &msg, RAD_RCV_TIMEOUT);
 	if (rcv_len == 0) {
 		kmem_free(tmp_data, MAX_RAD_PACKET_LEN);

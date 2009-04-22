@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,12 @@
 #include <sys/int_types.h>
 
 chap_validation_status_type
-chap_validate(char *target_chap_name,
+chap_validate_tgt(char *target_chap_name,
 	char *initiator_chap_name,
 	uint8_t *challenge,
+	uint32_t challenge_length,
 	uint8_t *target_response,
+	uint32_t response_length,
 	uint8_t identifier,
 	authentication_method_type auth_method,
 	void *auth_config_data) {
@@ -50,7 +52,9 @@ chap_validate(char *target_chap_name,
 			target_chap_name,
 			initiator_chap_name,
 			challenge,
+			challenge_length,
 			target_response,
+			response_length,
 			identifier,
 			radius_config->rad_svr_addr,
 			radius_config->rad_svr_port,

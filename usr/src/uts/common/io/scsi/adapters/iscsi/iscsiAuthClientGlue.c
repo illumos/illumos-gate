@@ -111,9 +111,16 @@ iscsiAuthClientChapAuthRequest(IscsiAuthClient *client,
 		    p_radius_cfg.r_shared_secret_len;
 
 		/* Entry point to the CHAP authentication module. */
-		chap_valid_status = chap_validate(isp->sess_auth.username_in,
-		    isp->sess_auth.username, challengeData, responseData,
-		    id, RADIUS_AUTHENTICATION, (void *)&radius_cfg);
+		chap_valid_status = chap_validate_tgt(
+		    isp->sess_auth.username_in,
+		    isp->sess_auth.username,
+		    challengeData,
+		    challengeLength,
+		    responseData,
+		    responseLength,
+		    id,
+		    RADIUS_AUTHENTICATION,
+		    (void *)&radius_cfg);
 
 		switch (chap_valid_status) {
 			case CHAP_VALIDATION_PASSED:

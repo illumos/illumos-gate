@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,18 +71,22 @@ typedef struct radius_config {
  * target_chap_name - The CHAP name of the target being authenticated.
  * initiator_chap_name - The CHAP name of the authenticating initiator.
  * challenge - The CHAP challenge to which the target responded.
+ * challeng_length - The length of CHAP challenge.
  * target_response - The target's CHAP response to be validated.
+ * response_length - The length of target's CHAP response.
  * identifier - The identifier associated with the CHAP challenge.
  * auth_method - The authentication method to be used.
  * auth_config_data - Any required configuration data to support the
  *                    specified authentication method.
  */
 chap_validation_status_type
-chap_validate(
+chap_validate_tgt(
 	char *target_chap_name,
 	char *initiator_chap_name,
 	uint8_t *challenge,
+	uint32_t challenge_length,
 	uint8_t *target_response,
+	uint32_t response_length,
 	uint8_t identifier,
 	authentication_method_type auth_method,
 	void *auth_config_data);

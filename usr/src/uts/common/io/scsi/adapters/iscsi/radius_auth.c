@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,9 @@ void
 set_radius_attrs(radius_packet_data_t *req,
 	char *target_chap_name,
 	unsigned char *target_response,
-	uint8_t *challenge);
+	uint32_t response_length,
+	uint8_t *challenge,
+	uint32_t challenge_length);
 
 /*
  * See radius_auth.h.
@@ -57,7 +59,9 @@ chap_validation_status_type
 radius_chap_validate(char *target_chap_name,
 	char *initiator_chap_name,
 	uint8_t *challenge,
+	uint32_t challenge_length,
 	uint8_t *target_response,
+	uint32_t response_length,
 	uint8_t identifier,
 	iscsi_ipaddr_t rad_svr_ip_addr,
 	uint32_t rad_svr_port,
@@ -87,7 +91,9 @@ radius_chap_validate(char *target_chap_name,
 	set_radius_attrs(&req,
 	    target_chap_name,
 	    target_response,
-	    challenge);
+	    response_length,
+	    challenge,
+	    challenge_length);
 
 	/* Prepare the request authenticator */
 	MD5Init(&context);
@@ -150,7 +156,9 @@ static void
 set_radius_attrs(radius_packet_data_t *req,
 	char *target_chap_name,
 	unsigned char *target_response,
-	uint8_t *challenge)
+	uint32_t response_length,
+	uint8_t *challenge,
+	uint32_t challenge_length)
 {
 	req->attrs[0].attr_type_code = RAD_USER_NAME;
 	(void) strncpy((char *)req->attrs[0].attr_value,
@@ -159,17 +167,17 @@ set_radius_attrs(radius_packet_data_t *req,
 	req->attrs[0].attr_value_len = strlen(target_chap_name);
 
 	req->attrs[1].attr_type_code = RAD_CHAP_PASSWORD;
-	(void) strncpy((char *)req->attrs[1].attr_value,
-	    (const char *)target_response,
-	    strlen((const char *)target_response));
+	bcopy(target_response,
+	    (char *)req->attrs[1].attr_value,
+	    min(response_length, sizeof (req->attrs[1].attr_value)));
 	/* A target response is an MD5 hash thus its length has to be 16. */
-	req->attrs[1].attr_value_len = 16;
+	req->attrs[1].attr_value_len = response_length;
 
 	req->attrs[2].attr_type_code = RAD_CHAP_CHALLENGE;
-	(void) strncpy((char *)req->attrs[2].attr_value,
-	    (const char *)challenge,
-	    strlen((const char *)challenge));
-	req->attrs[2].attr_value_len = strlen((const char *)challenge);
+	bcopy(challenge,
+	    (char *)req->attrs[2].attr_value,
+	    min(challenge_length, sizeof (req->attrs[2].attr_value)));
+	req->attrs[2].attr_value_len = challenge_length;
 
 	/* 3 attributes associated with each RADIUS packet. */
 	req->num_of_attrs = 3;
