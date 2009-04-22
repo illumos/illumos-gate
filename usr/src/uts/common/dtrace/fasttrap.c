@@ -1946,7 +1946,8 @@ fasttrap_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 
 		probe = kmem_alloc(size, KM_SLEEP);
 
-		if (copyin(uprobe, probe, size) != 0) {
+		if (copyin(uprobe, probe, size) != 0 ||
+		    probe->ftps_noffs != noffs) {
 			kmem_free(probe, size);
 			return (EFAULT);
 		}
