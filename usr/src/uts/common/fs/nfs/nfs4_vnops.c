@@ -8039,6 +8039,21 @@ link_call:
 }
 
 /*
+ * When the parent directory has changed, sv_dfh must be updated
+ */
+static void
+update_parentdir_sfh(vnode_t *vp, vnode_t *ndvp)
+{
+	svnode_t *sv = VTOSV(vp);
+	nfs4_sharedfh_t *old_dfh = sv->sv_dfh;
+	nfs4_sharedfh_t *new_dfh = VTOR4(ndvp)->r_fh;
+
+	sfh4_hold(new_dfh);
+	sv->sv_dfh = new_dfh;
+	sfh4_rele(&old_dfh);
+}
+
+/*
  * nfs4rename_persistent does the otw portion of renaming in NFS Version 4,
  * when it is known that the filehandle is persistent through rename.
  *
@@ -8196,6 +8211,8 @@ recov_retry:
 			 *
 			 */
 			if (ndvp != odvp) {
+				update_parentdir_sfh(renvp, ndvp);
+
 				if (dinfop)
 					dinfo.di_garp =
 					    &(res.array[6].nfs_resop4_u.
@@ -8465,6 +8482,7 @@ recov_retry:
 
 	/* Update source cache attribute, readdir and dnlc caches */
 	if (ndvp != odvp) {
+		update_parentdir_sfh(ovp, ndvp);
 
 		/*
 		 * If dinfop is non-NULL, then compound succeded, so
