@@ -435,6 +435,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PHYS_PATH,
 	    &vd->vdev_physpath) == 0)
 		vd->vdev_physpath = spa_strdup(vd->vdev_physpath);
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_FRU, &vd->vdev_fru) == 0)
+		vd->vdev_fru = spa_strdup(vd->vdev_fru);
 
 	/*
 	 * Set the whole_disk property.  If it's not specified, leave the value
@@ -448,9 +450,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	 * Look for the 'not present' flag.  This will only be set if the device
 	 * was not present at the time of import.
 	 */
-	if (!spa->spa_import_faulted)
-		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
-		    &vd->vdev_not_present);
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
+	    &vd->vdev_not_present);
 
 	/*
 	 * Get the alignment requirement.
@@ -560,6 +561,8 @@ vdev_free(vdev_t *vd)
 		spa_strfree(vd->vdev_devid);
 	if (vd->vdev_physpath)
 		spa_strfree(vd->vdev_physpath);
+	if (vd->vdev_fru)
+		spa_strfree(vd->vdev_fru);
 
 	if (vd->vdev_isspare)
 		spa_spare_remove(vd);
@@ -1257,6 +1260,7 @@ vdev_reopen(vdev_t *vd)
 	if (vd->vdev_aux) {
 		(void) vdev_validate_aux(vd);
 		if (vdev_readable(vd) && vdev_writeable(vd) &&
+		    vd->vdev_aux == &spa->spa_l2cache &&
 		    !l2arc_vdev_present(vd)) {
 			uint64_t size = vdev_get_rsize(vd);
 			l2arc_add_vdev(spa, vd,
@@ -2293,8 +2297,8 @@ vdev_config_dirty(vdev_t *vd)
 	int c;
 
 	/*
-	 * If this is an aux vdev (as with l2cache devices), then we update the
-	 * vdev config manually and set the sync flag.
+	 * If this is an aux vdev (as with l2cache and spare devices), then we
+	 * update the vdev config manually and set the sync flag.
 	 */
 	if (vd->vdev_aux != NULL) {
 		spa_aux_vdev_t *sav = vd->vdev_aux;
@@ -2316,8 +2320,11 @@ vdev_config_dirty(vdev_t *vd)
 
 		sav->sav_sync = B_TRUE;
 
-		VERIFY(nvlist_lookup_nvlist_array(sav->sav_config,
-		    ZPOOL_CONFIG_L2CACHE, &aux, &naux) == 0);
+		if (nvlist_lookup_nvlist_array(sav->sav_config,
+		    ZPOOL_CONFIG_L2CACHE, &aux, &naux) != 0) {
+			VERIFY(nvlist_lookup_nvlist_array(sav->sav_config,
+			    ZPOOL_CONFIG_SPARES, &aux, &naux) == 0);
+		}
 
 		ASSERT(c < naux);
 
@@ -2523,7 +2530,6 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		 * an error.
 		 */
 		if (spa->spa_load_state == SPA_LOAD_IMPORT &&
-		    !spa->spa_import_faulted &&
 		    vd->vdev_ops->vdev_op_leaf)
 			vd->vdev_not_present = 1;
 

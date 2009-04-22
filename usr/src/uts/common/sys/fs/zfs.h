@@ -388,6 +388,7 @@ typedef enum zfs_cache_type {
 #define	ZPOOL_CONFIG_FAULTED		"faulted"
 #define	ZPOOL_CONFIG_DEGRADED		"degraded"
 #define	ZPOOL_CONFIG_REMOVED		"removed"
+#define	ZPOOL_CONFIG_FRU		"fru"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -558,6 +559,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_VDEV_ATTACH,
 	ZFS_IOC_VDEV_DETACH,
 	ZFS_IOC_VDEV_SETPATH,
+	ZFS_IOC_VDEV_SETFRU,
 	ZFS_IOC_OBJSET_STATS,
 	ZFS_IOC_OBJSET_ZPLPROPS,
 	ZFS_IOC_DATASET_LIST_NEXT,

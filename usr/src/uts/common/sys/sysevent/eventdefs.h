@@ -247,6 +247,7 @@ extern "C" {
 #define	ESC_ZFS_CONFIG_SYNC	"ESC_ZFS_config_sync"
 #define	ESC_ZFS_SCRUB_START	"ESC_ZFS_scrub_start"
 #define	ESC_ZFS_SCRUB_FINISH	"ESC_ZFS_scrub_finish"
+#define	ESC_ZFS_VDEV_SPARE	"ESC_ZFS_vdev_spare"
 
 /*
  * datalink subclass definitions.

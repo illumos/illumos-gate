@@ -2420,7 +2420,7 @@ main(int argc, char **argv)
 			}
 
 			if (error == 0)
-				error = spa_import_faulted(argv[0],
+				error = spa_import_verbatim(argv[0],
 				    exported_conf, nvl);
 
 			nvlist_free(nvl);

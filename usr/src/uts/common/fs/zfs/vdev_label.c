@@ -233,6 +233,10 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_PHYS_PATH,
 		    vd->vdev_physpath) == 0);
 
+	if (vd->vdev_fru != NULL)
+		VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_FRU,
+		    vd->vdev_fru) == 0);
+
 	if (vd->vdev_nparity != 0) {
 		ASSERT(strcmp(vd->vdev_ops->vdev_op_type,
 		    VDEV_TYPE_RAIDZ) == 0);

@@ -329,7 +329,7 @@ extern int spa_check_rootconf(char *devpath, char *devid,
 extern boolean_t spa_rootdev_validate(nvlist_t *nv);
 extern int spa_import_rootpool(char *devpath, char *devid);
 extern int spa_import(const char *pool, nvlist_t *config, nvlist_t *props);
-extern int spa_import_faulted(const char *, nvlist_t *, nvlist_t *);
+extern int spa_import_verbatim(const char *, nvlist_t *, nvlist_t *);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);
 extern int spa_export(char *pool, nvlist_t **oldconfig, boolean_t force,
@@ -356,6 +356,7 @@ extern int spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid,
     int replace_done);
 extern int spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare);
 extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
+extern int spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru);
 
 /* spare state (which is global across all pools) */
 extern void spa_spare_add(vdev_t *vd);

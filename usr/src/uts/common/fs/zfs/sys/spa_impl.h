@@ -165,7 +165,6 @@ struct spa {
 	kmutex_t	spa_suspend_lock;	/* protects suspend_zio_root */
 	kcondvar_t	spa_suspend_cv;		/* notification of resume */
 	uint8_t		spa_suspended;		/* pool is suspended */
-	boolean_t	spa_import_faulted;	/* allow faulted vdevs */
 	boolean_t	spa_is_root;		/* pool is root */
 	int		spa_minref;		/* num refs when first opened */
 	int		spa_mode;		/* FREAD | FWRITE */

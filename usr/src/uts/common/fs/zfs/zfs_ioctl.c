@@ -981,7 +981,7 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 	    guid != zc->zc_guid)
 		error = EINVAL;
 	else if (zc->zc_cookie)
-		error = spa_import_faulted(zc->zc_name, config,
+		error = spa_import_verbatim(zc->zc_name, config,
 		    props);
 	else
 		error = spa_import(zc->zc_name, config, props);
@@ -1325,6 +1325,23 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 		return (error);
 
 	error = spa_vdev_setpath(spa, guid, path);
+	spa_close(spa, FTAG);
+	return (error);
+}
+
+static int
+zfs_ioc_vdev_setfru(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	char *fru = zc->zc_value;
+	uint64_t guid = zc->zc_guid;
+	int error;
+
+	error = spa_open(zc->zc_name, &spa, FTAG);
+	if (error != 0)
+		return (error);
+
+	error = spa_vdev_setfru(spa, guid, fru);
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -3450,6 +3467,8 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_vdev_detach, zfs_secpolicy_config, POOL_NAME, B_TRUE,
 	    B_TRUE },
 	{ zfs_ioc_vdev_setpath,	zfs_secpolicy_config, POOL_NAME, B_FALSE,
+	    B_TRUE },
+	{ zfs_ioc_vdev_setfru,	zfs_secpolicy_config, POOL_NAME, B_FALSE,
 	    B_TRUE },
 	{ zfs_ioc_objset_stats,	zfs_secpolicy_read, DATASET_NAME, B_FALSE,
 	    B_FALSE },
