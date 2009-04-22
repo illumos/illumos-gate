@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1457,8 +1457,19 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 	lwp->lwp_nostop--;
 	mutex_exit(&pool_barrier_lock);
 
-	if (idtype == P_PID)
+	if (idtype == P_PID) {
+		if ((p = *procs) == NULL)
+			goto skip;
+		mutex_enter(&p->p_lock);
+		/* Drop the process if it is exiting */
+		if (p->p_poolflag & PEXITED) {
+			mutex_exit(&p->p_lock);
+			pool_bind_wake(p);
+			procs_count--;
+		} else
+			mutex_exit(&p->p_lock);
 		goto skip;
+	}
 
 	/*
 	 * Do another run, and drop processes that were inside the barrier
@@ -1469,8 +1480,10 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 	 */
 	mutex_enter(&pidlock);
 	for (pp = procs; (p = *pp) != NULL; pp++) {
+		mutex_enter(&p->p_lock);
 		if (p->p_poolflag & PEXITED) {
 			ASSERT(p->p_lwpcnt == 0);
+			mutex_exit(&p->p_lock);
 			pool_bind_wake(p);
 			/* flip w/last non-NULL slot */
 			*pp = procs[procs_count - 1];
@@ -1478,7 +1491,8 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 			procs_count--;
 			pp--;			/* try this slot again */
 			continue;
-		}
+		} else
+			mutex_exit(&p->p_lock);
 		/*
 		 * Look at the child and check if it should be rebound also.
 		 * We're holding pidlock, so it is safe to reference p_child.
