@@ -42,7 +42,6 @@ i pkginfo
 i postinstall
 i preremove
 i i.preserve
-d none usr 0755 root sys
-d none usr/kernel 0755 root sys
-d none usr/kernel/drv 0755 root sys
-e preserve usr/kernel/drv/usbftdi.conf 0644 root sys
+d none kernel 0755 root sys
+d none kernel/drv 0755 root sys
+e preserve kernel/drv/usbftdi.conf 0644 root sys

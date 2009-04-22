@@ -39,7 +39,7 @@ OBJECTS		= $(USBFTDI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBFTDI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 WARLOCK_OUT     = $(USBFTDI_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
-ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/clients/usbser/usbftdi
 WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
