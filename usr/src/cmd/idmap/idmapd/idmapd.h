@@ -275,10 +275,11 @@ extern void		cleanup_lookup_state(lookup_state_t *);
 extern idmap_retcode	ad_lookup_batch(lookup_state_t *,
 				idmap_mapping_batch *, idmap_ids_res *);
 extern idmap_retcode	lookup_name2sid(sqlite *, const char *, const char *,
-				int *, char **, char **, idmap_rid_t *,
-				idmap_mapping *, int);
-extern idmap_retcode	lookup_wksids_name2sid(const char *, char **, char **,
-				idmap_rid_t *, int *);
+				int *, char **, char **, char **,
+				idmap_rid_t *, idmap_mapping *, int);
+extern idmap_retcode	lookup_wksids_name2sid(const char *, const char *,
+				char **, char **, char **, idmap_rid_t *,
+				int *);
 
 
 extern void 	idmap_log_stderr(int);

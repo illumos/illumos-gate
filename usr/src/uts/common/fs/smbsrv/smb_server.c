@@ -632,6 +632,7 @@ smb_server_nbt_listen(int error)
 		if ((sv->sv_nbt_daemon.ld_kth != NULL) &&
 		    (sv->sv_nbt_daemon.ld_kth != curthread)) {
 			mutex_exit(&sv->sv_mutex);
+			smb_server_release(sv);
 			return (EACCES);
 		} else {
 			sv->sv_nbt_daemon.ld_kth = curthread;
@@ -661,7 +662,6 @@ smb_server_nbt_listen(int error)
 	}
 
 	smb_server_release(sv);
-
 	return (rc);
 }
 
@@ -681,6 +681,7 @@ smb_server_tcp_listen(int error)
 		if ((sv->sv_tcp_daemon.ld_kth) &&
 		    (sv->sv_tcp_daemon.ld_kth != curthread)) {
 			mutex_exit(&sv->sv_mutex);
+			smb_server_release(sv);
 			return (EACCES);
 		} else {
 			sv->sv_tcp_daemon.ld_kth = curthread;
@@ -692,6 +693,7 @@ smb_server_tcp_listen(int error)
 		    (sv->sv_state == SMB_SERVER_STATE_CONFIGURED) ||
 		    (sv->sv_state == SMB_SERVER_STATE_DELETING));
 		mutex_exit(&sv->sv_mutex);
+		smb_server_release(sv);
 		return (EFAULT);
 	}
 	mutex_exit(&sv->sv_mutex);
@@ -709,7 +711,6 @@ smb_server_tcp_listen(int error)
 	}
 
 	smb_server_release(sv);
-
 	return (rc);
 }
 
@@ -722,13 +723,10 @@ smb_server_nbt_receive(void)
 	int		rc;
 	smb_server_t	*sv;
 
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
-
-	rc = smb_session_daemon(&sv->sv_nbt_daemon.ld_session_list);
-
-	smb_server_release(sv);
+	if ((rc = smb_server_lookup(&sv)) == 0) {
+		rc = smb_session_daemon(&sv->sv_nbt_daemon.ld_session_list);
+		smb_server_release(sv);
+	}
 
 	return (rc);
 }
@@ -742,13 +740,10 @@ smb_server_tcp_receive(void)
 	int		rc;
 	smb_server_t	*sv;
 
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
-
-	rc = smb_session_daemon(&sv->sv_tcp_daemon.ld_session_list);
-
-	smb_server_release(sv);
+	if ((rc = smb_server_lookup(&sv)) == 0) {
+		rc = smb_session_daemon(&sv->sv_tcp_daemon.ld_session_list);
+		smb_server_release(sv);
+	}
 
 	return (rc);
 }
@@ -759,14 +754,10 @@ smb_server_set_gmtoff(int32_t goff)
 	int		rc;
 	smb_server_t	*sv;
 
-
-	rc = smb_server_lookup(&sv);
-	if (rc)
-		return (rc);
-
-	sv->si_gmtoff = goff;
-
-	smb_server_release(sv);
+	if ((rc = smb_server_lookup(&sv)) == 0) {
+		sv->si_gmtoff = goff;
+		smb_server_release(sv);
+	}
 
 	return (rc);
 }
@@ -785,12 +776,10 @@ smb_server_get_user_count(void)
 	smb_server_t	*sv;
 	uint32_t	counter = 0;
 
-	if (smb_server_lookup(&sv))
-		return (0);
-
-	counter = (uint32_t)sv->sv_open_users;
-
-	smb_server_release(sv);
+	if (smb_server_lookup(&sv) == 0) {
+		counter = (uint32_t)sv->sv_open_users;
+		smb_server_release(sv);
+	}
 
 	return (counter);
 }
@@ -850,6 +839,7 @@ smb_server_dr_ulist_get(int offset, smb_dr_ulist_t *dr_ulist, int max_cnt)
 	    offset - dr_ulist->dul_cnt, &dr_ulist->dul_users[dr_ulist->dul_cnt],
 	    max_cnt);
 
+	smb_server_release(sv);
 	return (dr_ulist->dul_cnt);
 }
 
@@ -869,7 +859,7 @@ int
 smb_server_share_export(char *path)
 {
 	smb_server_t	*sv;
-	int		error;
+	int		error = 0;
 	smb_node_t	*fnode = NULL;
 	smb_node_t	*dnode;
 	smb_attr_t	ret_attr;
@@ -910,16 +900,16 @@ smb_server_share_export(char *path)
 	ASSERT(fnode->vp && fnode->vp->v_vfsp);
 
 #ifdef SMB_ENFORCE_NODEV
-	if (vfs_optionisset(fnode->vp->v_vfsp, MNTOPT_NODEVICES, NULL) == 0)
-		return (EINVAL);
-#endif /* SMB_ENFORCE_NODEV */
-
-	if (!smb_vfs_hold(sv, fnode->vp->v_vfsp)) {
+	if (vfs_optionisset(fnode->vp->v_vfsp, MNTOPT_NODEVICES, NULL) == 0) {
 		smb_node_release(fnode);
 		smb_request_free(sr);
 		smb_server_release(sv);
-		return (ENOMEM);
+		return (EINVAL);
 	}
+#endif /* SMB_ENFORCE_NODEV */
+
+	if (!smb_vfs_hold(sv, fnode->vp->v_vfsp))
+		error = ENOMEM;
 
 	/*
 	 * The refcount on the smb_vfs has been incremented.
@@ -930,10 +920,8 @@ smb_server_share_export(char *path)
 	smb_node_release(fnode);
 	smb_request_free(sr);
 	smb_server_release(sv);
-	return (0);
+	return (error);
 }
-
-
 
 /*
  * smb_server_share_unexport()

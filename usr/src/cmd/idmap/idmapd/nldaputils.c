@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * native LDAP related utility routines
@@ -307,8 +305,8 @@ idmap_nldap_bywinname_batch_add(idmap_nldap_query_state_t *qs,
 
 	if (is_user) {
 		db = "passwd";
-		if (lookup_wksids_name2sid(winname, NULL, NULL, NULL,
-		    NULL) == IDMAP_SUCCESS) {
+		if (lookup_wksids_name2sid(winname, NULL, NULL, NULL, NULL,
+		    NULL, NULL) == IDMAP_SUCCESS) {
 			filter = _F_GETPWWNAMWK;
 			udata = _F_GETPWWNAMWK_SSD;
 			wksid = 1;
@@ -323,8 +321,8 @@ idmap_nldap_bywinname_batch_add(idmap_nldap_query_state_t *qs,
 		attrs = pwd_attrs;
 	} else {
 		db = "group";
-		if (lookup_wksids_name2sid(winname, NULL, NULL, NULL,
-		    NULL) == IDMAP_SUCCESS) {
+		if (lookup_wksids_name2sid(winname, NULL, NULL, NULL, NULL,
+		    NULL, NULL) == IDMAP_SUCCESS) {
 			filter = _F_GETGRWNAMWK;
 			udata = _F_GETGRWNAMWK_SSD;
 			wksid = 1;
@@ -678,8 +676,8 @@ idmap_nldap_lookup_batch_end(idmap_nldap_query_state_t *qs)
 		 * the last '@' if it's in AD-style for the split.
 		 */
 		name = dom = NULL;
-		if (lookup_wksids_name2sid(*val, NULL, NULL, NULL, NULL) ==
-		    IDMAP_SUCCESS) {
+		if (lookup_wksids_name2sid(*val, NULL, NULL, NULL, NULL, NULL,
+		    NULL) == IDMAP_SUCCESS) {
 			name = *val;
 			dom = NULL;
 		} else if ((str = strchr(*val, '\\')) != NULL) {
@@ -909,7 +907,8 @@ out:
 
 			is_wuser = -1;
 			rc1 = lookup_name2sid(state->cache,
-			    req->id2name, req->id2domain, &is_wuser, NULL,
+			    req->id2name, req->id2domain, &is_wuser,
+			    NULL, NULL,
 			    &res->id.idmap_id_u.sid.prefix,
 			    &res->id.idmap_id_u.sid.rid, req, 1);
 			if (rc1 == IDMAP_SUCCESS)
