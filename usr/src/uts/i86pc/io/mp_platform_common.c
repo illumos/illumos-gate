@@ -622,6 +622,7 @@ acpi_probe(char *modname)
 	uint32_t		local_ids[NCPU];
 	uint32_t		proc_ids[NCPU];
 	uchar_t			hid;
+	int			warned = 0;
 
 	if (!apic_use_acpi)
 		return (PSM_FAILURE);
@@ -670,10 +671,16 @@ acpi_probe(char *modname)
 					acpica_map_cpu(index, mpa->ProcessorId);
 					index++;
 					apic_nproc++;
-				} else if (apic_nproc == NCPU)
-					cmn_err(CE_WARN, "%s: exceeded "
-					    "maximum no. of CPUs (= %d)",
+				} else if (apic_nproc == NCPU && !warned) {
+					cmn_err(CE_WARN, "%s: CPU limit "
+					    "exceeded"
+#if !defined(__amd64)
+					    " for 32-bit mode"
+#endif
+					    "; Solaris will use %d CPUs.",
 					    psm_name,  NCPU);
+					warned = 1;
+				}
 			}
 			break;
 
@@ -774,10 +781,15 @@ acpi_probe(char *modname)
 					acpica_map_cpu(index, mpx2a->Uid);
 					index++;
 					apic_nproc++;
-				} else if (apic_nproc == NCPU) {
-					cmn_err(CE_WARN, "%s: exceeded"
-					    " maximum no. of CPUs ("
-					    "=%d)", psm_name, NCPU);
+				} else if (apic_nproc == NCPU && !warned) {
+					cmn_err(CE_WARN, "%s: CPU limit "
+					    "exceeded"
+#if !defined(__amd64)
+					    " for 32-bit mode"
+#endif
+					    "; Solaris will use %d CPUs.",
+					    psm_name,  NCPU);
+					warned = 1;
 				}
 			}
 
@@ -1028,9 +1040,13 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 					CPUSET_ADD(apic_cpumask, apic_nproc);
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
-					cmn_err(CE_WARN, "%s: exceeded "
-					    "maximum no. of CPUs (= %d)",
-					    psm_name, NCPU);
+					cmn_err(CE_WARN, "%s: CPU limit "
+					    "exceeded"
+#if !defined(__amd64)
+					    " for 32-bit mode"
+#endif
+					    "; Solaris will use %d CPUs.",
+					    psm_name,  NCPU);
 					warned = 1;
 				}
 
