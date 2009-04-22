@@ -81,18 +81,18 @@ static cmdfunc_t do_add_flow, do_remove_flow, do_init_flow, do_show_flow;
 static cmdfunc_t do_show_flowprop, do_set_flowprop, do_reset_flowprop;
 static cmdfunc_t do_show_usage;
 
-static int	show_flow(dladm_flow_attr_t *, void *);
+static int	show_flow(dladm_handle_t, dladm_flow_attr_t *, void *);
 static int	show_flows_onelink(dladm_handle_t, datalink_id_t, void *);
 
 static void	flow_stats(const char *, datalink_id_t,  uint_t, char *,
 		    show_flow_state_t *);
 static void	get_flow_stats(const char *, pktsum_t *);
-static int	show_flow_stats(dladm_flow_attr_t *, void *);
+static int	show_flow_stats(dladm_handle_t, dladm_flow_attr_t *, void *);
 static int	show_link_flow_stats(dladm_handle_t, datalink_id_t, void *);
 
-static int	remove_flow(dladm_flow_attr_t *, void *);
+static int	remove_flow(dladm_handle_t, dladm_flow_attr_t *, void *);
 
-static int	show_flowprop(dladm_flow_attr_t *, void *);
+static int	show_flowprop(dladm_handle_t, dladm_flow_attr_t *, void *);
 static void	show_flowprop_one_flow(void *, const char *);
 static int	show_flowprop_onelink(dladm_handle_t, datalink_id_t, void *);
 
@@ -872,8 +872,9 @@ do_remove_flow(int argc, char *argv[])
 /*
  * Walker function for removing a flow through dladm_walk_flow();
  */
+/*ARGSUSED*/
 static int
-remove_flow(dladm_flow_attr_t *attr, void *arg)
+remove_flow(dladm_handle_t handle, dladm_flow_attr_t *attr, void *arg)
 {
 	remove_flow_state_t	*state = (remove_flow_state_t *)arg;
 
@@ -919,8 +920,9 @@ print_flow(show_flow_state_t *state, dladm_flow_attr_t *attr,
 /*
  * Walker function for showing flow attributes through dladm_walk_flow().
  */
+/*ARGSUSED*/
 static int
-show_flow(dladm_flow_attr_t *attr, void *arg)
+show_flow(dladm_handle_t handle, dladm_flow_attr_t *attr, void *arg)
 {
 	show_flow_state_t	*statep = arg;
 	dladm_status_t		status;
@@ -950,7 +952,7 @@ show_one_flow(void *arg, const char *name)
 	if (dladm_flow_info(handle, name, &attr) != DLADM_STATUS_OK)
 		die("invalid flow: '%s'", name);
 	else
-		(void) show_flow(&attr, arg);
+		(void) show_flow(handle, &attr, arg);
 }
 
 /*
@@ -1032,7 +1034,7 @@ print_flow_stats_cb(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
 
 /* ARGSUSED */
 static int
-show_flow_stats(dladm_flow_attr_t *attr, void *arg)
+show_flow_stats(dladm_handle_t handle, dladm_flow_attr_t *attr, void *arg)
 {
 	show_flow_state_t	*state = (show_flow_state_t *)arg;
 	char			*name = attr->fa_flowname;
@@ -1103,7 +1105,7 @@ flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval,
 		/* Show stats for named flow */
 		if (flow != NULL)  {
 			state->fs_flow = flow;
-			(void) show_flow_stats(&attr, state);
+			(void) show_flow_stats(handle, &attr, state);
 
 		/* Show all stats on a link */
 		} else if (linkid != DATALINK_INVALID_LINKID) {
@@ -1120,6 +1122,7 @@ flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval,
 		if (interval == 0)
 			break;
 
+		(void) fflush(stdout);
 		(void) sleep(interval);
 	}
 	ofmt_close(ofmt);
@@ -1681,9 +1684,10 @@ show_one_flowprop(void *arg, const char *propname)
 	return (DLADM_WALK_CONTINUE);
 }
 
+/*ARGSUSED*/
 /* Walker function called by dladm_walk_flow to display flow properties */
 static int
-show_flowprop(dladm_flow_attr_t *attr, void *arg)
+show_flowprop(dladm_handle_t handle, dladm_flow_attr_t *attr, void *arg)
 {
 	show_flowprop_one_flow(arg, attr->fa_flowname);
 	return (DLADM_WALK_CONTINUE);

@@ -28,7 +28,9 @@
 #include <strings.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <kstat.h>
+#include <limits.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/dld.h>
@@ -49,7 +51,9 @@
 
 struct flowlist {
 	char		flowname[MAXFLOWNAMELEN];
+	char		linkname[MAXLINKNAMELEN];
 	datalink_id_t	linkid;
+	int		fd;
 	uint64_t	ifspeed;
 	boolean_t	first;
 	boolean_t	display;
@@ -65,7 +69,6 @@ struct flowlist		*stattable = NULL;
 static int		statentry = -1, maxstatentries = 0;
 
 #define	STATGROWSIZE	16
-
 
 /*
  * Search for flowlist entry in stattable which matches
@@ -118,14 +121,16 @@ findstat(const char *flowname, datalink_id_t linkid)
 	}
 	flist = &stattable[statentry];
 	bzero(flist, sizeof (struct flowlist));
-	flist->first = B_TRUE;
 
 	if (flowname != NULL)
 		(void) strncpy(flist->flowname, flowname, MAXFLOWNAMELEN);
 	flist->linkid = linkid;
+	flist->fd = INT32_MAX;
+
 	return (flist);
 }
 
+/*ARGSUSED*/
 static void
 print_flow_stats(dladm_handle_t handle, struct flowlist *flist)
 {
@@ -146,17 +151,13 @@ print_flow_stats(dladm_handle_t handle, struct flowlist *flist)
 	    fcount <= statentry;
 	    fcount++, fcurr++) {
 		if (fcurr->flowname && fcurr->display) {
-			char linkname[MAXLINKNAMELEN];
-
-			(void) dladm_datalink_id2info(handle, fcurr->linkid,
-			    NULL, NULL, NULL, linkname, sizeof (linkname));
 			dlt = (double)fcurr->diffstats.snaptime/(double)NANOSEC;
 			ikbs = fcurr->diffstats.rbytes * 8 / dlt / 1024;
 			okbs = fcurr->diffstats.obytes * 8 / dlt / 1024;
 			ipks = fcurr->diffstats.ipackets / dlt;
 			opks = fcurr->diffstats.opackets / dlt;
 			(void) printw("%-15.15s", fcurr->flowname);
-			(void) printw("%-10.10s", linkname);
+			(void) printw("%-10.10s", fcurr->linkname);
 			(void) printw("%9.2f %9.2f %9.2f %9.2f ",
 			    ikbs, okbs, ipks, opks);
 			(void) printw("\n");
@@ -166,7 +167,7 @@ print_flow_stats(dladm_handle_t handle, struct flowlist *flist)
 
 /*ARGSUSED*/
 static int
-flow_kstats(dladm_flow_attr_t *attr, void *arg)
+flow_kstats(dladm_handle_t handle, dladm_flow_attr_t *attr, void *arg)
 {
 	kstat_ctl_t 	*kcp = (kstat_ctl_t *)arg;
 	kstat_t		*ksp;
@@ -174,37 +175,46 @@ flow_kstats(dladm_flow_attr_t *attr, void *arg)
 	pktsum_t	currstats, *prevstats, *diffstats;
 
 	flist = findstat(attr->fa_flowname, attr->fa_linkid);
-	if (flist != NULL) {
-		prevstats = &flist->prevstats;
-		diffstats = &flist->diffstats;
-	} else {
-		return (DLADM_STATUS_FAILED);
-	}
+	if (flist == NULL)
+		return (DLADM_WALK_CONTINUE);
+
+	flist->display = B_FALSE;
+	prevstats = &flist->prevstats;
+	diffstats = &flist->diffstats;
+
+	(void) dladm_datalink_id2info(handle, attr->fa_linkid, NULL, NULL,
+	    NULL, flist->linkname, sizeof (flist->linkname));
+
 
 	/* lookup kstat entry */
 	ksp = dladm_kstat_lookup(kcp, NULL, -1, attr->fa_flowname, "flow");
 
 	if (ksp == NULL)
-		return (DLADM_WALK_TERMINATE);
-	else
-		flist->display = B_TRUE;
+		return (DLADM_WALK_CONTINUE);
 
+	/* read packet and byte stats */
 	dladm_get_stats(kcp, ksp, &currstats);
+
 	if (flist->ifspeed == 0)
 		(void) dladm_kstat_value(ksp, "ifspeed", KSTAT_DATA_UINT64,
 		    &flist->ifspeed);
 
-	if (flist->first)
+	if (flist->first) {
 		flist->first = B_FALSE;
-	else {
+	} else {
 		dladm_stats_diff(diffstats, &currstats, prevstats);
+		if (diffstats->snaptime == 0)
+			return (DLADM_WALK_CONTINUE);
 		dladm_stats_total(&totalstats, diffstats, &totalstats);
 	}
 
 	bcopy(&currstats, prevstats, sizeof (pktsum_t));
+	flist->display = B_TRUE;
+
 	return (DLADM_WALK_CONTINUE);
 }
 
+/*ARGSUSED*/
 static void
 print_link_stats(dladm_handle_t handle, struct flowlist *flist)
 {
@@ -227,16 +237,12 @@ print_link_stats(dladm_handle_t handle, struct flowlist *flist)
 	    fcount++, fcurr++) {
 		if ((fcurr->linkid != DATALINK_INVALID_LINKID) &&
 		    fcurr->display)  {
-			char linkname[MAXLINKNAMELEN];
-
-			(void) dladm_datalink_id2info(handle, fcurr->linkid,
-			    NULL, NULL, NULL, linkname, sizeof (linkname));
 			dlt = (double)fcurr->diffstats.snaptime/(double)NANOSEC;
 			ikbs = (double)fcurr->diffstats.rbytes * 8 / dlt / 1024;
 			okbs = (double)fcurr->diffstats.obytes * 8 / dlt / 1024;
 			ipks = (double)fcurr->diffstats.ipackets / dlt;
 			opks = (double)fcurr->diffstats.opackets / dlt;
-			(void) printw("%-10.10s", linkname);
+			(void) printw("%-10.10s", fcurr->linkname);
 			(void) printw("%9.2f %9.2f %9.2f %9.2f ",
 			    ikbs, okbs, ipks, opks);
 			if (fcurr->ifspeed != 0)
@@ -274,14 +280,16 @@ link_flowstats(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 static int
 link_kstats(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
-	kstat_ctl_t	*kcp = (kstat_ctl_t *)arg;
-	struct flowlist	*flist;
-	pktsum_t	currstats, *prevstats, *diffstats;
-	kstat_t		*ksp;
-	char		linkname[MAXLINKNAMELEN];
+	kstat_ctl_t		*kcp = (kstat_ctl_t *)arg;
+	struct flowlist		*flist;
+	pktsum_t		currstats, *prevstats, *diffstats;
+	datalink_class_t	class;
+	kstat_t			*ksp;
+	char			dnlink[MAXPATHLEN];
 
 	/* find the flist entry */
 	flist = findstat(NULL, linkid);
+	flist->display = B_FALSE;
 	if (flist != NULL) {
 		prevstats = &flist->prevstats;
 		diffstats = &flist->diffstats;
@@ -289,21 +297,27 @@ link_kstats(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 		return (DLADM_WALK_CONTINUE);
 	}
 
-	/* lookup kstat entry */
-	(void) dladm_datalink_id2info(handle, linkid, NULL, NULL, NULL,
-	    linkname, sizeof (linkname));
+	if (dladm_datalink_id2info(handle, linkid, NULL, &class, NULL,
+	    flist->linkname, sizeof (flist->linkname)) != DLADM_STATUS_OK)
+		return (DLADM_WALK_CONTINUE);
 
-	if (linkname == NULL) {
-		warn("no linkname for linkid");
-		return (DLADM_WALK_TERMINATE);
+	if (flist->fd == INT32_MAX) {
+		if (class == DATALINK_CLASS_PHYS) {
+			(void) snprintf(dnlink, MAXPATHLEN, "/dev/net/%s",
+			    flist->linkname);
+			if ((flist->fd = open(dnlink, O_RDWR)) < 0)
+				return (DLADM_WALK_CONTINUE);
+		} else {
+			flist->fd = -1;
+		}
+		(void) kstat_chain_update(kcp);
 	}
 
-	ksp = dladm_kstat_lookup(kcp, NULL, -1, linkname, "net");
+	/* lookup kstat entry */
+	ksp = dladm_kstat_lookup(kcp, NULL, -1, flist->linkname, "net");
 
 	if (ksp == NULL)
-		return (DLADM_WALK_TERMINATE);
-	else
-		flist->display = B_TRUE;
+		return (DLADM_WALK_CONTINUE);
 
 	/* read packet and byte stats */
 	dladm_get_stats(kcp, ksp, &currstats);
@@ -312,14 +326,33 @@ link_kstats(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 		(void) dladm_kstat_value(ksp, "ifspeed", KSTAT_DATA_UINT64,
 		    &flist->ifspeed);
 
-	if (flist->first == B_TRUE)
+	if (flist->first) {
 		flist->first = B_FALSE;
-	else
+	} else {
 		dladm_stats_diff(diffstats, &currstats, prevstats);
+		if (diffstats->snaptime == 0)
+			return (DLADM_WALK_CONTINUE);
+	}
 
 	bcopy(&currstats, prevstats, sizeof (*prevstats));
+	flist->display = B_TRUE;
 
 	return (DLADM_WALK_CONTINUE);
+}
+
+static void
+closedevnet()
+{
+	int index = 0;
+	struct flowlist *flist;
+
+	/* Close all open /dev/net/ files */
+	for (flist = stattable; index <= maxstatentries; index++, flist++) {
+		if (flist->linkid == DATALINK_INVALID_LINKID)
+			break;
+		if (flist->fd != -1 && flist->fd != INT32_MAX)
+			(void) close(flist->fd);
+	}
 }
 
 /*ARGSUSED*/
@@ -430,7 +463,7 @@ stat_report(dladm_handle_t handle, kstat_ctl_t *kcp,  datalink_id_t linkid,
 			if (dladm_flow_info(handle, flowname, &fattr) !=
 			    DLADM_STATUS_OK)
 				return;
-			(void) flow_kstats(&fattr, kcp);
+			(void) flow_kstats(handle, &fattr, kcp);
 		/* Display all flows on all links */
 		} else if (linkid == DATALINK_ALL_LINKID) {
 			(void) dladm_walk_datalink_id(link_flowstats, handle,
@@ -498,7 +531,8 @@ dladm_continuous(dladm_handle_t handle, datalink_id_t linkid,
 		(void) sleep(max(1, interval));
 	}
 
-	(void) curses_fin();
+	closedevnet();
+	curses_fin();
 	(void) kstat_close(kcp);
 }
 

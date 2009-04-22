@@ -60,8 +60,9 @@ extern dladm_status_t	dladm_flow_remove(dladm_handle_t, char *, boolean_t,
 extern dladm_status_t	dladm_flow_init(dladm_handle_t);
 
 extern dladm_status_t	dladm_flow_parse_db(char *, dld_flowinfo_t *);
-extern dladm_status_t	dladm_walk_flow(int (*)(dladm_flow_attr_t *, void *),
-			    dladm_handle_t, datalink_id_t, void *, boolean_t);
+extern dladm_status_t	dladm_walk_flow(int (*)(dladm_handle_t,
+			    dladm_flow_attr_t *, void *), dladm_handle_t,
+			    datalink_id_t, void *, boolean_t);
 extern dladm_status_t	dladm_flow_info(dladm_handle_t, const char *,
 			    dladm_flow_attr_t *);
 

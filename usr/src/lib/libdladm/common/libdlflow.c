@@ -682,7 +682,7 @@ done:
  */
 
 typedef struct get_db_state {
-	int		(*gs_fn)(dladm_flow_attr_t *, void *);
+	int		(*gs_fn)(dladm_handle_t, dladm_flow_attr_t *, void *);
 	void		*gs_arg;
 	datalink_id_t	gs_linkid;
 } get_db_state_t;
@@ -699,6 +699,7 @@ i_dladm_flow_get_db_fn(void *arg, dld_flowinfo_t *grp)
 {
 	get_db_state_t		*state = (get_db_state_t *)arg;
 	dladm_flow_attr_t	attr;
+	dladm_handle_t		handle = NULL;
 
 	if (grp->fi_linkid == state->gs_linkid) {
 		attr.fa_linkid = state->gs_linkid;
@@ -708,7 +709,7 @@ i_dladm_flow_get_db_fn(void *arg, dld_flowinfo_t *grp)
 		    sizeof (attr.fa_flow_desc));
 		bcopy(&grp->fi_resource_props, &attr.fa_resource_props,
 		    sizeof (attr.fa_resource_props));
-		(void) state->gs_fn(&attr, state->gs_arg);
+		(void) state->gs_fn(handle, &attr, state->gs_arg);
 	}
 	return (0);
 }
@@ -720,8 +721,8 @@ i_dladm_flow_get_db_fn(void *arg, dld_flowinfo_t *grp)
  */
 /* ARGSUSED */
 dladm_status_t
-dladm_walk_flow(int (*fn)(dladm_flow_attr_t *, void *), dladm_handle_t handle,
-    datalink_id_t linkid, void *arg, boolean_t persist)
+dladm_walk_flow(int (*fn)(dladm_handle_t, dladm_flow_attr_t *, void *),
+    dladm_handle_t handle, datalink_id_t linkid, void *arg, boolean_t persist)
 {
 	dld_flowinfo_t		*flow;
 	int			i, bufsize;
@@ -779,7 +780,7 @@ dladm_walk_flow(int (*fn)(dladm_flow_attr_t *, void *), dladm_handle_t handle,
 			bcopy(&flow->fi_resource_props, &attr.fa_resource_props,
 			    sizeof (attr.fa_resource_props));
 
-			if (fn(&attr, arg) == DLADM_WALK_TERMINATE)
+			if (fn(handle, &attr, arg) == DLADM_WALK_TERMINATE)
 				break;
 		}
 	}

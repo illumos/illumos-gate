@@ -4200,7 +4200,7 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	if (linkid == DATALINK_ALL_LINKID) {
 		(void) dladm_walk_datalink_id(show_vnic, handle, &state,
 		    DATALINK_CLASS_VNIC | DATALINK_CLASS_ETHERSTUB,
-		    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+		    DATALINK_ANY_MEDIATYPE, flags);
 	} else {
 		(void) show_vnic(handle, linkid, &state);
 		if (state.vs_status != DLADM_STATUS_OK) {
@@ -4315,6 +4315,7 @@ link_stats(datalink_id_t linkid, uint_t interval, char *fields_str,
 		if (interval == 0)
 			break;
 
+		(void) fflush(stdout);
 		(void) sleep(interval);
 	}
 	ofmt_close(ofmt);
@@ -4341,6 +4342,7 @@ aggr_stats(datalink_id_t linkid, show_grp_state_t *state, uint_t interval)
 		if (interval == 0)
 			break;
 
+		(void) fflush(stdout);
 		(void) sleep(interval);
 	}
 }
@@ -4423,6 +4425,7 @@ vnic_stats(show_vnic_state_t *sp, uint32_t interval)
 		if (interval == 0)
 			break;
 
+		(void) fflush(stdout);
 		(void) sleep(interval);
 	}
 }
