@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1471,19 +1471,6 @@ usbvc_cpr_suspend(dev_info_t *dip)
 	 */
 	usbvcp->usbvc_dev_state = USB_DEV_SUSPENDED;
 
-	/*
-	 * Wake up the read threads in case there are any threads are blocking.
-	 * After being waked up, those threads will quit immediately since the
-	 * dev_state is not ONLINE
-	 */
-	if (usbvcp->usbvc_io_type == V4L2_MEMORY_MMAP) {
-		cv_broadcast(&usbvcp->usbvc_mapio_cv);
-	} else {
-		cv_broadcast(&usbvcp->usbvc_read_cv);
-	}
-	/* Wait for the other threads to quit */
-	(void) usbvc_serialize_access(usbvcp, USBVC_SER_NOSIG);
-	usbvc_release_access(usbvcp);
 	mutex_exit(&usbvcp->usbvc_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
