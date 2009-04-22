@@ -568,6 +568,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	int		max_blksz = zfsvfs->z_max_blksz;
 	uint64_t	pflags;
 	int		error;
+	arc_buf_t	*abuf;
 
 	/*
 	 * Fasttrack empty write
@@ -664,17 +665,46 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	 * and allows us to do more fine-grained space accounting.
 	 */
 	while (n > 0) {
-		/*
-		 * Start a transaction.
-		 */
+		abuf = NULL;
+		woff = uio->uio_loffset;
+
+again:
 		if (zfs_usergroup_overquota(zfsvfs,
 		    B_FALSE, zp->z_phys->zp_uid) ||
 		    zfs_usergroup_overquota(zfsvfs,
 		    B_TRUE, zp->z_phys->zp_gid)) {
+			if (abuf != NULL)
+				dmu_return_arcbuf(abuf);
 			error = EDQUOT;
 			break;
 		}
-		woff = uio->uio_loffset;
+
+		/*
+		 * If dmu_assign_arcbuf() is expected to execute with minimum
+		 * overhead loan an arc buffer and copy user data to it before
+		 * we enter a txg.  This avoids holding a txg forever while we
+		 * pagefault on a hanging NFS server mapping.
+		 */
+		if (abuf == NULL && n >= max_blksz &&
+		    woff >= zp->z_phys->zp_size &&
+		    P2PHASE(woff, max_blksz) == 0 &&
+		    zp->z_blksz == max_blksz) {
+			size_t cbytes;
+
+			abuf = dmu_request_arcbuf(zp->z_dbuf, max_blksz);
+			ASSERT(abuf != NULL);
+			ASSERT(arc_buf_size(abuf) == max_blksz);
+			if (error = uiocopy(abuf->b_data, max_blksz,
+			    UIO_WRITE, uio, &cbytes)) {
+				dmu_return_arcbuf(abuf);
+				break;
+			}
+			ASSERT(cbytes == max_blksz);
+		}
+
+		/*
+		 * Start a transaction.
+		 */
 		tx = dmu_tx_create(zfsvfs->z_os);
 		dmu_tx_hold_bonus(tx, zp->z_id);
 		dmu_tx_hold_write(tx, zp->z_id, woff, MIN(n, max_blksz));
@@ -683,9 +713,11 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			if (error == ERESTART) {
 				dmu_tx_wait(tx);
 				dmu_tx_abort(tx);
-				continue;
+				goto again;
 			}
 			dmu_tx_abort(tx);
+			if (abuf != NULL)
+				dmu_return_arcbuf(abuf);
 			break;
 		}
 
@@ -714,12 +746,22 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		 */
 		nbytes = MIN(n, max_blksz - P2PHASE(woff, max_blksz));
 
-		tx_bytes = uio->uio_resid;
-		error = dmu_write_uio(zfsvfs->z_os, zp->z_id, uio, nbytes, tx);
-		tx_bytes -= uio->uio_resid;
-		if (tx_bytes && vn_has_cached_data(vp))
+		if (abuf == NULL) {
+			tx_bytes = uio->uio_resid;
+			error = dmu_write_uio(zfsvfs->z_os, zp->z_id, uio,
+			    nbytes, tx);
+			tx_bytes -= uio->uio_resid;
+		} else {
+			tx_bytes = nbytes;
+			ASSERT(tx_bytes == max_blksz);
+			dmu_assign_arcbuf(zp->z_dbuf, woff, abuf, tx);
+			ASSERT(tx_bytes <= uio->uio_resid);
+			uioskip(uio, tx_bytes);
+		}
+		if (tx_bytes && vn_has_cached_data(vp)) {
 			update_pages(vp, woff,
 			    tx_bytes, zfsvfs->z_os, zp->z_id);
+		}
 
 		/*
 		 * If we made no progress, we're done.  If we made even

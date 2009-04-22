@@ -76,6 +76,7 @@
 #include <sys/spa.h>
 #include <sys/dmu.h>
 #include <sys/txg.h>
+#include <sys/dbuf.h>
 #include <sys/zap.h>
 #include <sys/dmu_objset.h>
 #include <sys/poll.h>
@@ -163,6 +164,7 @@ typedef void ztest_func_t(ztest_args_t *);
  * Note: these aren't static because we want dladdr() to work.
  */
 ztest_func_t ztest_dmu_read_write;
+ztest_func_t ztest_dmu_read_write_zcopy;
 ztest_func_t ztest_dmu_write_parallel;
 ztest_func_t ztest_dmu_object_alloc_free;
 ztest_func_t ztest_zap;
@@ -198,6 +200,7 @@ uint64_t zopt_rarely = 60;		/* every 60 seconds */
 
 ztest_info_t ztest_info[] = {
 	{ ztest_dmu_read_write,			1,	&zopt_always	},
+	{ ztest_dmu_read_write_zcopy,		1,	&zopt_always	},
 	{ ztest_dmu_write_parallel,		30,	&zopt_always	},
 	{ ztest_dmu_object_alloc_free,		1,	&zopt_always	},
 	{ ztest_zap,				30,	&zopt_always	},
@@ -2027,6 +2030,314 @@ ztest_dmu_read_write(ztest_args_t *za)
 }
 
 void
+compare_and_update_pbbufs(uint64_t s, bufwad_t *packbuf, bufwad_t *bigbuf,
+    uint64_t bigsize, uint64_t n, dmu_read_write_dir_t dd, uint64_t txg)
+{
+	uint64_t i;
+	bufwad_t *pack;
+	bufwad_t *bigH;
+	bufwad_t *bigT;
+
+	/*
+	 * For each index from n to n + s, verify that the existing bufwad
+	 * in packobj matches the bufwads at the head and tail of the
+	 * corresponding chunk in bigobj.  Then update all three bufwads
+	 * with the new values we want to write out.
+	 */
+	for (i = 0; i < s; i++) {
+		/* LINTED */
+		pack = (bufwad_t *)((char *)packbuf + i * sizeof (bufwad_t));
+		/* LINTED */
+		bigH = (bufwad_t *)((char *)bigbuf + i * dd.dd_chunk);
+		/* LINTED */
+		bigT = (bufwad_t *)((char *)bigH + dd.dd_chunk) - 1;
+
+		ASSERT((uintptr_t)bigH - (uintptr_t)bigbuf < bigsize);
+		ASSERT((uintptr_t)bigT - (uintptr_t)bigbuf < bigsize);
+
+		if (pack->bw_txg > txg)
+			fatal(0, "future leak: got %llx, open txg is %llx",
+			    pack->bw_txg, txg);
+
+		if (pack->bw_data != 0 && pack->bw_index != n + i)
+			fatal(0, "wrong index: got %llx, wanted %llx+%llx",
+			    pack->bw_index, n, i);
+
+		if (bcmp(pack, bigH, sizeof (bufwad_t)) != 0)
+			fatal(0, "pack/bigH mismatch in %p/%p", pack, bigH);
+
+		if (bcmp(pack, bigT, sizeof (bufwad_t)) != 0)
+			fatal(0, "pack/bigT mismatch in %p/%p", pack, bigT);
+
+		pack->bw_index = n + i;
+		pack->bw_txg = txg;
+		pack->bw_data = 1 + ztest_random(-2ULL);
+
+		*bigH = *pack;
+		*bigT = *pack;
+	}
+}
+
+void
+ztest_dmu_read_write_zcopy(ztest_args_t *za)
+{
+	objset_t *os = za->za_os;
+	dmu_read_write_dir_t dd;
+	dmu_tx_t *tx;
+	uint64_t i;
+	int error;
+	uint64_t n, s, txg;
+	bufwad_t *packbuf, *bigbuf;
+	uint64_t packoff, packsize, bigoff, bigsize;
+	uint64_t regions = 997;
+	uint64_t stride = 123456789ULL;
+	uint64_t width = 9;
+	dmu_buf_t *bonus_db;
+	arc_buf_t **bigbuf_arcbufs;
+	dmu_object_info_t *doi = &za->za_doi;
+
+	/*
+	 * This test uses two objects, packobj and bigobj, that are always
+	 * updated together (i.e. in the same tx) so that their contents are
+	 * in sync and can be compared.  Their contents relate to each other
+	 * in a simple way: packobj is a dense array of 'bufwad' structures,
+	 * while bigobj is a sparse array of the same bufwads.  Specifically,
+	 * for any index n, there are three bufwads that should be identical:
+	 *
+	 *	packobj, at offset n * sizeof (bufwad_t)
+	 *	bigobj, at the head of the nth chunk
+	 *	bigobj, at the tail of the nth chunk
+	 *
+	 * The chunk size is set equal to bigobj block size so that
+	 * dmu_assign_arcbuf() can be tested for object updates.
+	 */
+
+	/*
+	 * Read the directory info.  If it's the first time, set things up.
+	 */
+	VERIFY(0 == dmu_read(os, ZTEST_DIROBJ, za->za_diroff,
+	    sizeof (dd), &dd));
+	if (dd.dd_chunk == 0) {
+		ASSERT(dd.dd_packobj == 0);
+		ASSERT(dd.dd_bigobj == 0);
+		tx = dmu_tx_create(os);
+		dmu_tx_hold_write(tx, ZTEST_DIROBJ, za->za_diroff, sizeof (dd));
+		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+		error = dmu_tx_assign(tx, TXG_WAIT);
+		if (error) {
+			ztest_record_enospc("create r/w directory");
+			dmu_tx_abort(tx);
+			return;
+		}
+
+		dd.dd_packobj = dmu_object_alloc(os, DMU_OT_UINT64_OTHER, 0,
+		    DMU_OT_NONE, 0, tx);
+		dd.dd_bigobj = dmu_object_alloc(os, DMU_OT_UINT64_OTHER, 0,
+		    DMU_OT_NONE, 0, tx);
+		ztest_set_random_blocksize(os, dd.dd_packobj, tx);
+		ztest_set_random_blocksize(os, dd.dd_bigobj, tx);
+
+		VERIFY(dmu_object_info(os, dd.dd_bigobj, doi) == 0);
+		ASSERT(doi->doi_data_block_size >= 2 * sizeof (bufwad_t));
+		ASSERT(ISP2(doi->doi_data_block_size));
+		dd.dd_chunk = doi->doi_data_block_size;
+
+		dmu_write(os, ZTEST_DIROBJ, za->za_diroff, sizeof (dd), &dd,
+		    tx);
+		dmu_tx_commit(tx);
+	} else {
+		VERIFY(dmu_object_info(os, dd.dd_bigobj, doi) == 0);
+		VERIFY(ISP2(doi->doi_data_block_size));
+		VERIFY(dd.dd_chunk == doi->doi_data_block_size);
+		VERIFY(dd.dd_chunk >= 2 * sizeof (bufwad_t));
+	}
+
+	/*
+	 * Pick a random index and compute the offsets into packobj and bigobj.
+	 */
+	n = ztest_random(regions) * stride + ztest_random(width);
+	s = 1 + ztest_random(width - 1);
+
+	packoff = n * sizeof (bufwad_t);
+	packsize = s * sizeof (bufwad_t);
+
+	bigoff = n * dd.dd_chunk;
+	bigsize = s * dd.dd_chunk;
+
+	packbuf = umem_zalloc(packsize, UMEM_NOFAIL);
+	bigbuf = umem_zalloc(bigsize, UMEM_NOFAIL);
+
+	VERIFY(dmu_bonus_hold(os, dd.dd_bigobj, FTAG, &bonus_db) == 0);
+
+	bigbuf_arcbufs = umem_zalloc(2 * s * sizeof (arc_buf_t *), UMEM_NOFAIL);
+
+	/*
+	 * Iteration 0 test zcopy for DB_UNCACHED dbufs.
+	 * Iteration 1 test zcopy to already referenced dbufs.
+	 * Iteration 2 test zcopy to dirty dbuf in the same txg.
+	 * Iteration 3 test zcopy to dbuf dirty in previous txg.
+	 * Iteration 4 test zcopy when dbuf is no longer dirty.
+	 * Iteration 5 test zcopy when it can't be done.
+	 * Iteration 6 one more zcopy write.
+	 */
+	for (i = 0; i < 7; i++) {
+		uint64_t j;
+		uint64_t off;
+
+		/*
+		 * In iteration 5 (i == 5) use arcbufs
+		 * that don't match bigobj blksz to test
+		 * dmu_assign_arcbuf() when it can't directly
+		 * assign an arcbuf to a dbuf.
+		 */
+		for (j = 0; j < s; j++) {
+			if (i != 5) {
+				bigbuf_arcbufs[j] =
+				    dmu_request_arcbuf(bonus_db,
+				    dd.dd_chunk);
+			} else {
+				bigbuf_arcbufs[2 * j] =
+				    dmu_request_arcbuf(bonus_db,
+				    dd.dd_chunk / 2);
+				bigbuf_arcbufs[2 * j + 1] =
+				    dmu_request_arcbuf(bonus_db,
+				    dd.dd_chunk / 2);
+			}
+		}
+
+		/*
+		 * Get a tx for the mods to both packobj and bigobj.
+		 */
+		tx = dmu_tx_create(os);
+
+		dmu_tx_hold_write(tx, dd.dd_packobj, packoff, packsize);
+		dmu_tx_hold_write(tx, dd.dd_bigobj, bigoff, bigsize);
+
+		if (ztest_random(100) == 0) {
+			error = -1;
+		} else {
+			error = dmu_tx_assign(tx, TXG_WAIT);
+		}
+
+		if (error) {
+			if (error != -1) {
+				ztest_record_enospc("dmu r/w range");
+			}
+			dmu_tx_abort(tx);
+			umem_free(packbuf, packsize);
+			umem_free(bigbuf, bigsize);
+			for (j = 0; j < s; j++) {
+				if (i != 5) {
+					dmu_return_arcbuf(bigbuf_arcbufs[j]);
+				} else {
+					dmu_return_arcbuf(
+					    bigbuf_arcbufs[2 * j]);
+					dmu_return_arcbuf(
+					    bigbuf_arcbufs[2 * j + 1]);
+				}
+			}
+			umem_free(bigbuf_arcbufs, 2 * s * sizeof (arc_buf_t *));
+			dmu_buf_rele(bonus_db, FTAG);
+			return;
+		}
+
+		txg = dmu_tx_get_txg(tx);
+
+		/*
+		 * 50% of the time don't read objects in the 1st iteration to
+		 * test dmu_assign_arcbuf() for the case when there're no
+		 * existing dbufs for the specified offsets.
+		 */
+		if (i != 0 || ztest_random(2) != 0) {
+			error = dmu_read(os, dd.dd_packobj, packoff,
+			    packsize, packbuf);
+			ASSERT3U(error, ==, 0);
+			error = dmu_read(os, dd.dd_bigobj, bigoff, bigsize,
+			    bigbuf);
+			ASSERT3U(error, ==, 0);
+		}
+		compare_and_update_pbbufs(s, packbuf, bigbuf, bigsize,
+		    n, dd, txg);
+
+		/*
+		 * We've verified all the old bufwads, and made new ones.
+		 * Now write them out.
+		 */
+		dmu_write(os, dd.dd_packobj, packoff, packsize, packbuf, tx);
+		if (zopt_verbose >= 6) {
+			(void) printf("writing offset %llx size %llx"
+			    " txg %llx\n",
+			    (u_longlong_t)bigoff,
+			    (u_longlong_t)bigsize,
+			    (u_longlong_t)txg);
+		}
+		for (off = bigoff, j = 0; j < s; j++, off += dd.dd_chunk) {
+			dmu_buf_t *dbt;
+			if (i != 5) {
+				bcopy((caddr_t)bigbuf + (off - bigoff),
+				    bigbuf_arcbufs[j]->b_data, dd.dd_chunk);
+			} else {
+				bcopy((caddr_t)bigbuf + (off - bigoff),
+				    bigbuf_arcbufs[2 * j]->b_data,
+				    dd.dd_chunk / 2);
+				bcopy((caddr_t)bigbuf + (off - bigoff) +
+				    dd.dd_chunk / 2,
+				    bigbuf_arcbufs[2 * j + 1]->b_data,
+				    dd.dd_chunk / 2);
+			}
+
+			if (i == 1) {
+				VERIFY(dmu_buf_hold(os, dd.dd_bigobj, off,
+				    FTAG, &dbt) == 0);
+			}
+			if (i != 5) {
+				dmu_assign_arcbuf(bonus_db, off,
+				    bigbuf_arcbufs[j], tx);
+			} else {
+				dmu_assign_arcbuf(bonus_db, off,
+				    bigbuf_arcbufs[2 * j], tx);
+				dmu_assign_arcbuf(bonus_db,
+				    off + dd.dd_chunk / 2,
+				    bigbuf_arcbufs[2 * j + 1], tx);
+			}
+			if (i == 1) {
+				dmu_buf_rele(dbt, FTAG);
+			}
+		}
+		dmu_tx_commit(tx);
+
+		/*
+		 * Sanity check the stuff we just wrote.
+		 */
+		{
+			void *packcheck = umem_alloc(packsize, UMEM_NOFAIL);
+			void *bigcheck = umem_alloc(bigsize, UMEM_NOFAIL);
+
+			VERIFY(0 == dmu_read(os, dd.dd_packobj, packoff,
+			    packsize, packcheck));
+			VERIFY(0 == dmu_read(os, dd.dd_bigobj, bigoff,
+			    bigsize, bigcheck));
+
+			ASSERT(bcmp(packbuf, packcheck, packsize) == 0);
+			ASSERT(bcmp(bigbuf, bigcheck, bigsize) == 0);
+
+			umem_free(packcheck, packsize);
+			umem_free(bigcheck, bigsize);
+		}
+		if (i == 2) {
+			txg_wait_open(dmu_objset_pool(os), 0);
+		} else if (i == 3) {
+			txg_wait_synced(dmu_objset_pool(os), 0);
+		}
+	}
+
+	dmu_buf_rele(bonus_db, FTAG);
+	umem_free(packbuf, packsize);
+	umem_free(bigbuf, bigsize);
+	umem_free(bigbuf_arcbufs, 2 * s * sizeof (arc_buf_t *));
+}
+
+void
 ztest_dmu_check_future_leak(ztest_args_t *za)
 {
 	objset_t *os = za->za_os;
@@ -2075,6 +2386,8 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 	uint64_t blkoff;
 	zbookmark_t zb;
 	dmu_tx_t *tx = dmu_tx_create(os);
+	dmu_buf_t *bonus_db;
+	arc_buf_t *abuf = NULL;
 
 	dmu_objset_name(os, osname);
 
@@ -2103,6 +2416,12 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 		}
 	}
 
+	if (off != -1ULL && P2PHASE(off, bs) == 0 && !do_free &&
+	    ztest_random(8) == 0) {
+		VERIFY(dmu_bonus_hold(os, ZTEST_DIROBJ, FTAG, &bonus_db) == 0);
+		abuf = dmu_request_arcbuf(bonus_db, bs);
+	}
+
 	txg_how = ztest_random(2) == 0 ? TXG_WAIT : TXG_NOWAIT;
 	error = dmu_tx_assign(tx, txg_how);
 	if (error) {
@@ -2113,6 +2432,10 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 			ztest_record_enospc("dmu write parallel");
 		}
 		dmu_tx_abort(tx);
+		if (abuf != NULL) {
+			dmu_return_arcbuf(abuf);
+			dmu_buf_rele(bonus_db, FTAG);
+		}
 		return;
 	}
 	txg = dmu_tx_get_txg(tx);
@@ -2167,8 +2490,12 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 		za->za_dbuf = NULL;
 	} else if (do_free) {
 		VERIFY(dmu_free_range(os, ZTEST_DIROBJ, off, bs, tx) == 0);
-	} else {
+	} else if (abuf == NULL) {
 		dmu_write(os, ZTEST_DIROBJ, off, btsize, wbt, tx);
+	} else {
+		bcopy(wbt, abuf->b_data, btsize);
+		dmu_assign_arcbuf(bonus_db, off, abuf, tx);
+		dmu_buf_rele(bonus_db, FTAG);
 	}
 
 	(void) mutex_unlock(lp);
@@ -2204,15 +2531,19 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 	dmu_buf_rele(db, FTAG);
 	za->za_dbuf = NULL;
 
-	(void) mutex_unlock(lp);
-
-	if (error)
+	if (error) {
+		(void) mutex_unlock(lp);
 		return;
+	}
 
-	if (blk.blk_birth == 0)		/* concurrent free */
+	if (blk.blk_birth == 0)	{	/* concurrent free */
+		(void) mutex_unlock(lp);
 		return;
+	}
 
 	txg_suspend(dmu_objset_pool(os));
+
+	(void) mutex_unlock(lp);
 
 	ASSERT(blk.blk_fill == 1);
 	ASSERT3U(BP_GET_TYPE(&blk), ==, DMU_OT_UINT64_OTHER);

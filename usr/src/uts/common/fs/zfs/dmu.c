@@ -814,6 +814,58 @@ dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 }
 #endif
 
+/*
+ * Allocate a loaned anonymous arc buffer.
+ */
+arc_buf_t *
+dmu_request_arcbuf(dmu_buf_t *handle, int size)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)handle)->db_dnode;
+
+	return (arc_loan_buf(dn->dn_objset->os_spa, size));
+}
+
+/*
+ * Free a loaned arc buffer.
+ */
+void
+dmu_return_arcbuf(arc_buf_t *buf)
+{
+	arc_return_buf(buf, FTAG);
+	VERIFY(arc_buf_remove_ref(buf, FTAG) == 1);
+}
+
+/*
+ * When possible directly assign passed loaned arc buffer to a dbuf.
+ * If this is not possible copy the contents of passed arc buf via
+ * dmu_write().
+ */
+void
+dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
+    dmu_tx_t *tx)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)handle)->db_dnode;
+	dmu_buf_impl_t *db;
+	uint32_t blksz = (uint32_t)arc_buf_size(buf);
+	uint64_t blkid;
+
+	rw_enter(&dn->dn_struct_rwlock, RW_READER);
+	blkid = dbuf_whichblock(dn, offset);
+	VERIFY((db = dbuf_hold(dn, blkid, FTAG)) != NULL);
+	rw_exit(&dn->dn_struct_rwlock);
+
+	if (offset == db->db.db_offset && blksz == db->db.db_size) {
+		dbuf_assign_arcbuf(db, buf, tx);
+		dbuf_rele(db, FTAG);
+	} else {
+		dbuf_rele(db, FTAG);
+		ASSERT(dn->dn_objset->os.os == dn->dn_objset);
+		dmu_write(&dn->dn_objset->os, dn->dn_object, offset, blksz,
+		    buf->b_data, tx);
+		dmu_return_arcbuf(buf);
+	}
+}
+
 typedef struct {
 	dbuf_dirty_record_t	*dr;
 	dmu_sync_cb_t		*done;

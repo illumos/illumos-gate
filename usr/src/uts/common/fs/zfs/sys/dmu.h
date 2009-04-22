@@ -60,6 +60,7 @@ struct zbookmark;
 struct spa;
 struct nvlist;
 struct objset_impl;
+struct arc_buf;
 
 typedef struct objset objset_t;
 typedef struct dmu_tx dmu_tx_t;
@@ -462,6 +463,10 @@ int dmu_write_uio(objset_t *os, uint64_t object, struct uio *uio, uint64_t size,
     dmu_tx_t *tx);
 int dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t size, struct page *pp, dmu_tx_t *tx);
+struct arc_buf *dmu_request_arcbuf(dmu_buf_t *handle, int size);
+void dmu_return_arcbuf(struct arc_buf *buf);
+void dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, struct arc_buf *buf,
+    dmu_tx_t *tx);
 
 extern int zfs_prefetch_disable;
 

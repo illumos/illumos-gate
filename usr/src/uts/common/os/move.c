@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,6 +176,60 @@ uio_prefaultpages(ssize_t n, struct uio *uio)
 		iov++;
 		iovcnt--;
 	}
+}
+
+/*
+ * same as uiomove() but doesn't modify uio structure.
+ * return in cbytes how many bytes were copied.
+ */
+int
+uiocopy(void *p, size_t n, enum uio_rw rw, struct uio *uio, size_t *cbytes)
+{
+	struct iovec *iov;
+	ulong_t cnt;
+	int error;
+	int iovcnt;
+
+	iovcnt = uio->uio_iovcnt;
+	*cbytes = 0;
+
+	for (iov = uio->uio_iov; n && iovcnt; iov++, iovcnt--) {
+		cnt = MIN(iov->iov_len, n);
+		if (cnt == 0)
+			continue;
+
+		switch (uio->uio_segflg) {
+
+		case UIO_USERSPACE:
+		case UIO_USERISPACE:
+			if (rw == UIO_READ) {
+				error = xcopyout_nta(p, iov->iov_base, cnt,
+				    (uio->uio_extflg & UIO_COPY_CACHED));
+			} else {
+				error = xcopyin_nta(iov->iov_base, p, cnt,
+				    (uio->uio_extflg & UIO_COPY_CACHED));
+			}
+
+			if (error)
+				return (error);
+			break;
+
+		case UIO_SYSSPACE:
+			if (rw == UIO_READ)
+				error = kcopy_nta(p, iov->iov_base, cnt,
+				    (uio->uio_extflg & UIO_COPY_CACHED));
+			else
+				error = kcopy_nta(iov->iov_base, p, cnt,
+				    (uio->uio_extflg & UIO_COPY_CACHED));
+			if (error)
+				return (error);
+			break;
+		}
+		p = (caddr_t)p + cnt;
+		n -= cnt;
+		*cbytes += cnt;
+	}
+	return (0);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,6 +192,7 @@ typedef struct uioasync_s {
 
 int	uiomove(void *, size_t, enum uio_rw, uio_t *);
 void	uio_prefaultpages(ssize_t, uio_t *);
+int	uiocopy(void *, size_t, enum uio_rw, uio_t *, size_t *);
 int	ureadc(int, uio_t *);	/* should be errno_t in future */
 int	uwritec(struct uio *);
 void	uioskip(uio_t *, size_t);

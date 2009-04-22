@@ -1307,6 +1307,68 @@ dbuf_fill_done(dmu_buf_impl_t *db, dmu_tx_t *tx)
 }
 
 /*
+ * Directly assign a provided arc buf to a given dbuf if it's not referenced
+ * by anybody except our caller. Otherwise copy arcbuf's contents to dbuf.
+ */
+void
+dbuf_assign_arcbuf(dmu_buf_impl_t *db, arc_buf_t *buf, dmu_tx_t *tx)
+{
+	ASSERT(!refcount_is_zero(&db->db_holds));
+	ASSERT(db->db_dnode->dn_object != DMU_META_DNODE_OBJECT);
+	ASSERT(db->db_blkid != DB_BONUS_BLKID);
+	ASSERT(db->db_level == 0);
+	ASSERT(DBUF_GET_BUFC_TYPE(db) == ARC_BUFC_DATA);
+	ASSERT(buf != NULL);
+	ASSERT(arc_buf_size(buf) == db->db.db_size);
+	ASSERT(tx->tx_txg != 0);
+
+	arc_return_buf(buf, db);
+	ASSERT(arc_released(buf));
+
+	mutex_enter(&db->db_mtx);
+
+	while (db->db_state == DB_READ || db->db_state == DB_FILL)
+		cv_wait(&db->db_changed, &db->db_mtx);
+
+	ASSERT(db->db_state == DB_CACHED || db->db_state == DB_UNCACHED);
+
+	if (db->db_state == DB_CACHED &&
+	    refcount_count(&db->db_holds) - 1 > db->db_dirtycnt) {
+		mutex_exit(&db->db_mtx);
+		(void) dbuf_dirty(db, tx);
+		bcopy(buf->b_data, db->db.db_data, db->db.db_size);
+		VERIFY(arc_buf_remove_ref(buf, db) == 1);
+		return;
+	}
+
+	if (db->db_state == DB_CACHED) {
+		dbuf_dirty_record_t *dr = db->db_last_dirty;
+
+		ASSERT(db->db_buf != NULL);
+		if (dr != NULL && dr->dr_txg == tx->tx_txg) {
+			ASSERT(dr->dt.dl.dr_data == db->db_buf);
+			if (!arc_released(db->db_buf)) {
+				ASSERT(dr->dt.dl.dr_override_state ==
+				    DR_OVERRIDDEN);
+				arc_release(db->db_buf, db);
+			}
+			dr->dt.dl.dr_data = buf;
+			VERIFY(arc_buf_remove_ref(db->db_buf, db) == 1);
+		} else if (dr == NULL || dr->dt.dl.dr_data != db->db_buf) {
+			arc_release(db->db_buf, db);
+			VERIFY(arc_buf_remove_ref(db->db_buf, db) == 1);
+		}
+		db->db_buf = NULL;
+	}
+	ASSERT(db->db_buf == NULL);
+	dbuf_set_data(db, buf);
+	db->db_state = DB_FILL;
+	mutex_exit(&db->db_mtx);
+	(void) dbuf_dirty(db, tx);
+	dbuf_fill_done(db, tx);
+}
+
+/*
  * "Clear" the contents of this dbuf.  This will mark the dbuf
  * EVICTING and clear *most* of its references.  Unfortunetely,
  * when we are not holding the dn_dbufs_mtx, we can't clear the

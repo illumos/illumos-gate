@@ -397,6 +397,7 @@ static arc_state_t	*arc_l2c_only;
 
 static int		arc_no_grow;	/* Don't try to grow cache size */
 static uint64_t		arc_tempreserve;
+static uint64_t		arc_loaned_bytes;
 static uint64_t		arc_meta_used;
 static uint64_t		arc_meta_limit;
 static uint64_t		arc_meta_max = 0;
@@ -1201,6 +1202,41 @@ arc_buf_alloc(spa_t *spa, int size, void *tag, arc_buf_contents_t type)
 	(void) refcount_add(&hdr->b_refcnt, tag);
 
 	return (buf);
+}
+
+static char *arc_onloan_tag = "onloan";
+
+/*
+ * Loan out an anonymous arc buffer. Loaned buffers are not counted as in
+ * flight data by arc_tempreserve_space() until they are "returned". Loaned
+ * buffers must be returned to the arc before they can be used by the DMU or
+ * freed.
+ */
+arc_buf_t *
+arc_loan_buf(spa_t *spa, int size)
+{
+	arc_buf_t *buf;
+
+	buf = arc_buf_alloc(spa, size, arc_onloan_tag, ARC_BUFC_DATA);
+
+	atomic_add_64(&arc_loaned_bytes, size);
+	return (buf);
+}
+
+/*
+ * Return a loaned arc buffer to the arc.
+ */
+void
+arc_return_buf(arc_buf_t *buf, void *tag)
+{
+	arc_buf_hdr_t *hdr = buf->b_hdr;
+
+	ASSERT(hdr->b_state == arc_anon);
+	ASSERT(buf->b_data != NULL);
+	VERIFY(refcount_remove(&hdr->b_refcnt, arc_onloan_tag) == 0);
+	VERIFY(refcount_add(&hdr->b_refcnt, tag) == 1);
+
+	atomic_add_64(&arc_loaned_bytes, -hdr->b_size);
 }
 
 static arc_buf_t *
@@ -3314,10 +3350,9 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 }
 
 static int
-arc_memory_throttle(uint64_t reserve, uint64_t txg)
+arc_memory_throttle(uint64_t reserve, uint64_t inflight_data, uint64_t txg)
 {
 #ifdef _KERNEL
-	uint64_t inflight_data = arc_anon->arcs_size;
 	uint64_t available_memory = ptob(freemem);
 	static uint64_t page_load = 0;
 	static uint64_t last_txg = 0;
@@ -3379,6 +3414,7 @@ int
 arc_tempreserve_space(uint64_t reserve, uint64_t txg)
 {
 	int error;
+	uint64_t anon_size;
 
 #ifdef ZFS_DEBUG
 	/*
@@ -3395,11 +3431,18 @@ arc_tempreserve_space(uint64_t reserve, uint64_t txg)
 		return (ENOMEM);
 
 	/*
+	 * Don't count loaned bufs as in flight dirty data to prevent long
+	 * network delays from blocking transactions that are ready to be
+	 * assigned to a txg.
+	 */
+	anon_size = MAX((int64_t)(arc_anon->arcs_size - arc_loaned_bytes), 0);
+
+	/*
 	 * Writes will, almost always, require additional memory allocations
 	 * in order to compress/encrypt/etc the data.  We therefor need to
 	 * make sure that there is sufficient available memory for this.
 	 */
-	if (error = arc_memory_throttle(reserve, txg))
+	if (error = arc_memory_throttle(reserve, anon_size, txg))
 		return (error);
 
 	/*
@@ -3409,8 +3452,9 @@ arc_tempreserve_space(uint64_t reserve, uint64_t txg)
 	 * Note: if two requests come in concurrently, we might let them
 	 * both succeed, when one of them should fail.  Not a huge deal.
 	 */
-	if (reserve + arc_tempreserve + arc_anon->arcs_size > arc_c / 2 &&
-	    arc_anon->arcs_size > arc_c / 4) {
+
+	if (reserve + arc_tempreserve + anon_size > arc_c / 2 &&
+	    anon_size > arc_c / 4) {
 		dprintf("failing, arc_tempreserve=%lluK anon_meta=%lluK "
 		    "anon_data=%lluK tempreserve=%lluK arc_c=%lluK\n",
 		    arc_tempreserve>>10,
@@ -3595,6 +3639,8 @@ arc_fini(void)
 	mutex_destroy(&zfs_write_limit_lock);
 
 	buf_fini();
+
+	ASSERT(arc_loaned_bytes == 0);
 }
 
 /*
