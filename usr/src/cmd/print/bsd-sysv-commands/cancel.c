@@ -113,6 +113,8 @@ main(int ac, char *av[])
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
 	int c;
 	int32_t rid = 0;
+	int first_dest = 0;
+
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain("SUNW_OST_OSCMD");
@@ -139,15 +141,24 @@ main(int ac, char *av[])
 		char *printer = NULL;
 		int32_t id = -1;
 
-		(void) get_printer_id(av[c], &printer, &id);
-
-		status = papiServiceCreate(&svc, printer, NULL, NULL,
+		status = papiServiceCreate(&svc, av[c], NULL, NULL,
 		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
-			fprintf(stderr,
-			    gettext("Failed to contact service for %s: %s\n"),
-			    printer, verbose_papi_message(svc, status));
-			exit(1);
+			if (first_dest == 0) {
+				(void) get_printer_id(av[c], &printer, &id);
+				status = papiServiceCreate(&svc, printer, NULL,
+				    NULL, cli_auth_callback, encryption, NULL);
+			}
+			if (status != PAPI_OK) {
+				fprintf(stderr,
+				    gettext("Failed to contact service for %s:"
+				    " %s\n"), printer,
+				    verbose_papi_message(svc, status));
+				exit(1);
+			}
+		} else {
+			first_dest = 1;
+			printer = av[c];
 		}
 
 #define	OUT	((status == PAPI_OK) ? stdout : stderr)
