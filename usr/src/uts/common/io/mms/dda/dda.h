@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,7 @@ extern "C" {
 
 /* version for cartridge and dda */
 #define	DDA_MAJOR_VERSION	1	/* dda driver major version */
-#define	DDA_MINOR_VERSION	0	/* dda driver minor version */
+#define	DDA_MINOR_VERSION	1	/* dda driver minor version */
 
 /* cartridge file names */
 #define	DDA_METADATA_FNAME	"metadata"	/* metadata file name */

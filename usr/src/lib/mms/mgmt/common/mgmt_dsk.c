@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <sys/param.h>
 
 #include "mms_mgmt.h"
 #include "mmp_defs.h"
@@ -674,6 +675,8 @@ mgmt_create_dkvol(char *fname, uint64_t volsz, nvlist_t *errs)
 	metadata.dda_version.dda_major = DDA_MAJOR_VERSION;
 	metadata.dda_version.dda_minor = DDA_MINOR_VERSION;
 	metadata.dda_capacity = volsz;
+	/* always adjust data file offset for direct I/O */
+	metadata.dda_sector = DEV_BSIZE;
 
 	DDA_BE_METADATA(metadata, out_metadata);	/* to big endian */
 
