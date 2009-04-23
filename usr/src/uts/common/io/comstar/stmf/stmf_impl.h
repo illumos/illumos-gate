@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _STMF_IMPL_H
@@ -42,6 +42,18 @@ typedef	uint32_t stmf_event_handle_t;
 #define	STMF_EVENT_CLEAR_ALL(h)		((h) = 0)
 #define	STMF_EVENT_ALLOC_HANDLE(h)	((h) = 0)
 #define	STMF_EVENT_FREE_HANDLE(h)	((h) = 0)
+
+#define	STMF_TGT_NAME_LEN		256
+#define	STMF_GUID_INPUT			32
+
+#define	STMF_UPDATE_KSTAT_IO(kip, dbuf)					\
+	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {			\
+		kip->reads++;						\
+		kip->nread += dbuf->db_data_size;			\
+	} else {							\
+		kip->writes++;						\
+		kip->nwritten += dbuf->db_data_size;			\
+	}
 
 struct stmf_i_scsi_task;
 struct stmf_itl_data;
@@ -67,6 +79,7 @@ typedef struct stmf_i_lu {
 	struct stmf_i_lu *ilu_next;
 	struct stmf_i_lu *ilu_prev;
 	char		*ilu_alias;
+	char		ilu_ascii_hex_guid[STMF_GUID_INPUT + 1];
 	kmutex_t	ilu_task_lock;
 	uint32_t	ilu_task_cntr1;
 	uint32_t	ilu_task_cntr2;
@@ -77,6 +90,9 @@ typedef struct stmf_i_lu {
 	struct stmf_i_scsi_task	*ilu_tasks;
 	struct stmf_i_scsi_task *ilu_free_tasks;
 	struct stmf_itl_data	*ilu_itl_list;
+	kstat_t		*ilu_kstat_info;
+	kstat_t		*ilu_kstat_io;
+	kmutex_t	ilu_kstat_lock;
 
 	/* point to the luid entry in stmf_state.stmf_luid_list */
 	void		*ilu_luid;
@@ -114,6 +130,10 @@ typedef struct stmf_i_local_port {
 	clock_t			ilport_avg_interval;
 	uint32_t		ilport_online_times;
 	uint32_t		ilport_flags;
+	kstat_t			*ilport_kstat_info;
+	kstat_t			*ilport_kstat_io;
+	kmutex_t		ilport_kstat_lock;
+	char			ilport_kstat_tgt_name[STMF_TGT_NAME_LEN];
 	/* which target group this port belongs to in stmf_state.stmf_tg_list */
 	void			*ilport_tg;
 	/* XXX Need something to track all the remote ports also */

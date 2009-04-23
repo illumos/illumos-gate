@@ -83,6 +83,11 @@ stmf_status_t stmf_worker_fini();
 void stmf_worker_mgmt();
 void stmf_worker_task(void *arg);
 
+static void stmf_update_kstat_lu_q(scsi_task_t *, void());
+static void stmf_update_kstat_lport_q(scsi_task_t *, void());
+static void stmf_update_kstat_lu_io(scsi_task_t *, stmf_data_buf_t *);
+static void stmf_update_kstat_lport_io(scsi_task_t *, stmf_data_buf_t *);
+
 extern struct mod_ops mod_driverops;
 
 /* =====[ Tunables ]===== */
@@ -181,7 +186,8 @@ static struct dev_ops stmf_ops = {
 	NULL			/* power */
 };
 
-#define	STMF_NAME	"COMSTAR STMF"
+#define	STMF_NAME		"COMSTAR STMF"
+#define	STMF_MODULE_NAME	"stmf"
 
 static struct modldrv modldrv = {
 	&mod_driverops,
@@ -1756,6 +1762,241 @@ stmf_delete_all_ppds()
 	}
 }
 
+/*
+ * 16 is the max string length of a protocol_ident, increase
+ * the size if needed.
+ */
+#define	STMF_KSTAT_LU_SZ	(STMF_GUID_INPUT + 1 + 256)
+#define	STMF_KSTAT_TGT_SZ	(256 * 2 + 16)
+
+typedef struct stmf_kstat_lu_info {
+	kstat_named_t		i_lun_guid;
+	kstat_named_t		i_lun_alias;
+} stmf_kstat_lu_info_t;
+
+typedef struct stmf_kstat_tgt_info {
+	kstat_named_t		i_tgt_name;
+	kstat_named_t		i_tgt_alias;
+	kstat_named_t		i_protocol;
+} stmf_kstat_tgt_info_t;
+
+/*
+ * This array matches the Protocol Identifier in stmf_ioctl.h
+ */
+char *protocol_ident[PROTOCOL_ANY] = {
+	"Fibre Channel",
+	"Parallel SCSI",
+	"SSA",
+	"IEEE_1394",
+	"SRP",
+	"iSCSI",
+	"SAS",
+	"ADT",
+	"ATAPI",
+	"UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN"
+};
+
+/*
+ * Update the lun wait/run queue count
+ */
+static void
+stmf_update_kstat_lu_q(scsi_task_t *task, void func())
+{
+	stmf_i_lu_t		*ilu;
+	kstat_io_t		*kip;
+
+	if (task->task_lu == dlun0)
+		return;
+	ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
+	if (ilu != NULL && ilu->ilu_kstat_io != NULL) {
+		kip = KSTAT_IO_PTR(ilu->ilu_kstat_io);
+		if (kip != NULL) {
+			mutex_enter(ilu->ilu_kstat_io->ks_lock);
+			func(kip);
+			mutex_exit(ilu->ilu_kstat_io->ks_lock);
+		}
+	}
+}
+
+/*
+ * Update the target(lport) wait/run queue count
+ */
+static void
+stmf_update_kstat_lport_q(scsi_task_t *task, void func())
+{
+	stmf_i_local_port_t	*ilp;
+	kstat_io_t		*kip;
+
+	ilp = (stmf_i_local_port_t *)task->task_lport->lport_stmf_private;
+	if (ilp != NULL && ilp->ilport_kstat_io != NULL) {
+		kip = KSTAT_IO_PTR(ilp->ilport_kstat_io);
+		if (kip != NULL) {
+			mutex_enter(ilp->ilport_kstat_io->ks_lock);
+			func(kip);
+			mutex_exit(ilp->ilport_kstat_io->ks_lock);
+		}
+	}
+}
+
+static void
+stmf_update_kstat_lport_io(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	stmf_i_local_port_t	*ilp;
+	kstat_io_t		*kip;
+
+	ilp = (stmf_i_local_port_t *)task->task_lport->lport_stmf_private;
+	if (ilp != NULL && ilp->ilport_kstat_io != NULL) {
+		kip = KSTAT_IO_PTR(ilp->ilport_kstat_io);
+		if (kip != NULL) {
+			mutex_enter(ilp->ilport_kstat_io->ks_lock);
+			STMF_UPDATE_KSTAT_IO(kip, dbuf);
+			mutex_exit(ilp->ilport_kstat_io->ks_lock);
+		}
+	}
+}
+
+static void
+stmf_update_kstat_lu_io(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	stmf_i_lu_t		*ilu;
+	kstat_io_t		*kip;
+
+	ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
+	if (ilu != NULL && ilu->ilu_kstat_io != NULL) {
+		kip = KSTAT_IO_PTR(ilu->ilu_kstat_io);
+		if (kip != NULL) {
+			mutex_enter(ilu->ilu_kstat_io->ks_lock);
+			STMF_UPDATE_KSTAT_IO(kip, dbuf);
+			mutex_exit(ilu->ilu_kstat_io->ks_lock);
+		}
+	}
+}
+
+static void
+stmf_create_kstat_lu(stmf_i_lu_t *ilu)
+{
+	char				ks_nm[KSTAT_STRLEN];
+	stmf_kstat_lu_info_t		*ks_lu;
+
+	/* create kstat lun info */
+	ks_lu = (stmf_kstat_lu_info_t *)kmem_zalloc(STMF_KSTAT_LU_SZ,
+	    KM_NOSLEEP);
+	if (ks_lu == NULL) {
+		cmn_err(CE_WARN, "STMF: kmem_zalloc failed");
+		return;
+	}
+
+	bzero(ks_nm, sizeof (ks_nm));
+	(void) sprintf(ks_nm, "stmf_lu_%"PRIxPTR"", (uintptr_t)ilu);
+	if ((ilu->ilu_kstat_info = kstat_create(STMF_MODULE_NAME, 0,
+	    ks_nm, "misc", KSTAT_TYPE_NAMED,
+	    sizeof (stmf_kstat_lu_info_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL)) == NULL) {
+		kmem_free(ks_lu, STMF_KSTAT_LU_SZ);
+		cmn_err(CE_WARN, "STMF: kstat_create lu failed");
+		return;
+	}
+
+	ilu->ilu_kstat_info->ks_data_size = STMF_KSTAT_LU_SZ;
+	ilu->ilu_kstat_info->ks_data = ks_lu;
+
+	kstat_named_init(&ks_lu->i_lun_guid, "lun-guid",
+	    KSTAT_DATA_STRING);
+	kstat_named_init(&ks_lu->i_lun_alias, "lun-alias",
+	    KSTAT_DATA_STRING);
+
+	/* convert guid to hex string */
+	int		i;
+	uint8_t		*p = ilu->ilu_lu->lu_id->ident;
+	bzero(ilu->ilu_ascii_hex_guid, sizeof (ilu->ilu_ascii_hex_guid));
+	for (i = 0; i < STMF_GUID_INPUT / 2; i++) {
+		(void) sprintf(&ilu->ilu_ascii_hex_guid[i * 2], "%02x", p[i]);
+	}
+	kstat_named_setstr(&ks_lu->i_lun_guid,
+	    (const char *)ilu->ilu_ascii_hex_guid);
+	kstat_named_setstr(&ks_lu->i_lun_alias,
+	    (const char *)ilu->ilu_lu->lu_alias);
+	kstat_install(ilu->ilu_kstat_info);
+
+	/* create kstat lun io */
+	bzero(ks_nm, sizeof (ks_nm));
+	(void) sprintf(ks_nm, "stmf_lu_io_%"PRIxPTR"", (uintptr_t)ilu);
+	if ((ilu->ilu_kstat_io = kstat_create(STMF_MODULE_NAME, 0,
+	    ks_nm, "io", KSTAT_TYPE_IO, 1, 0)) == NULL) {
+		cmn_err(CE_WARN, "STMF: kstat_create lu_io failed");
+		return;
+	}
+	mutex_init(&ilu->ilu_kstat_lock, NULL, MUTEX_DRIVER, 0);
+	ilu->ilu_kstat_io->ks_lock = &ilu->ilu_kstat_lock;
+	kstat_install(ilu->ilu_kstat_io);
+}
+
+static void
+stmf_create_kstat_lport(stmf_i_local_port_t *ilport)
+{
+	char				ks_nm[KSTAT_STRLEN];
+	stmf_kstat_tgt_info_t		*ks_tgt;
+	int				id, len;
+
+	/* create kstat lport info */
+	ks_tgt = (stmf_kstat_tgt_info_t *)kmem_zalloc(STMF_KSTAT_TGT_SZ,
+	    KM_NOSLEEP);
+	if (ks_tgt == NULL) {
+		cmn_err(CE_WARN, "STMF: kmem_zalloc failed");
+		return;
+	}
+
+	bzero(ks_nm, sizeof (ks_nm));
+	(void) sprintf(ks_nm, "stmf_tgt_%"PRIxPTR"", (uintptr_t)ilport);
+	if ((ilport->ilport_kstat_info = kstat_create(STMF_MODULE_NAME,
+	    0, ks_nm, "misc", KSTAT_TYPE_NAMED,
+	    sizeof (stmf_kstat_tgt_info_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL)) == NULL) {
+		kmem_free(ks_tgt, STMF_KSTAT_TGT_SZ);
+		cmn_err(CE_WARN, "STMF: kstat_create target failed");
+		return;
+	}
+
+	ilport->ilport_kstat_info->ks_data_size = STMF_KSTAT_TGT_SZ;
+	ilport->ilport_kstat_info->ks_data = ks_tgt;
+
+	kstat_named_init(&ks_tgt->i_tgt_name, "target-name",
+	    KSTAT_DATA_STRING);
+	kstat_named_init(&ks_tgt->i_tgt_alias, "target-alias",
+	    KSTAT_DATA_STRING);
+	kstat_named_init(&ks_tgt->i_protocol, "protocol",
+	    KSTAT_DATA_STRING);
+
+	/* ident might not be null terminated */
+	len = ilport->ilport_lport->lport_id->ident_length;
+	bcopy(ilport->ilport_lport->lport_id->ident,
+	    ilport->ilport_kstat_tgt_name, len);
+	ilport->ilport_kstat_tgt_name[len + 1] = NULL;
+	kstat_named_setstr(&ks_tgt->i_tgt_name,
+	    (const char *)ilport->ilport_kstat_tgt_name);
+	kstat_named_setstr(&ks_tgt->i_tgt_alias,
+	    (const char *)ilport->ilport_lport->lport_alias);
+	/* protocol */
+	if ((id = ilport->ilport_lport->lport_id->protocol_id) > PROTOCOL_ANY) {
+		cmn_err(CE_WARN, "STMF: protocol_id out of bound");
+		id = PROTOCOL_ANY;
+	}
+	kstat_named_setstr(&ks_tgt->i_protocol, protocol_ident[id]);
+	kstat_install(ilport->ilport_kstat_info);
+
+	/* create kstat lport io */
+	bzero(ks_nm, sizeof (ks_nm));
+	(void) sprintf(ks_nm, "stmf_tgt_io_%"PRIxPTR"", (uintptr_t)ilport);
+	if ((ilport->ilport_kstat_io = kstat_create(STMF_MODULE_NAME, 0,
+	    ks_nm, "io", KSTAT_TYPE_IO, 1, 0)) == NULL) {
+		cmn_err(CE_WARN, "STMF: kstat_create target_io failed");
+		return;
+	}
+	mutex_init(&ilport->ilport_kstat_lock, NULL, MUTEX_DRIVER, 0);
+	ilport->ilport_kstat_io->ks_lock = &ilport->ilport_kstat_lock;
+	kstat_install(ilport->ilport_kstat_io);
+}
+
 stmf_status_t
 stmf_register_lu(stmf_lu_t *lu)
 {
@@ -1805,6 +2046,7 @@ stmf_register_lu(stmf_lu_t *lu)
 	}
 	ilu->ilu_cur_task_cntr = &ilu->ilu_task_cntr1;
 	STMF_EVENT_ALLOC_HANDLE(ilu->ilu_event_hdl);
+	stmf_create_kstat_lu(ilu);
 	mutex_exit(&stmf_state.stmf_lock);
 
 	/* XXX we should probably check if this lu can be brought online */
@@ -1882,6 +2124,13 @@ stmf_deregister_lu(stmf_lu_t *lu)
 		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_BUSY);
 	}
+	if (ilu->ilu_kstat_info) {
+		kstat_delete(ilu->ilu_kstat_info);
+	}
+	if (ilu->ilu_kstat_io) {
+		kstat_delete(ilu->ilu_kstat_io);
+		mutex_destroy(&ilu->ilu_kstat_lock);
+	}
 	mutex_exit(&stmf_state.stmf_lock);
 	return (STMF_SUCCESS);
 }
@@ -1916,6 +2165,7 @@ stmf_register_local_port(stmf_local_port_t *lport)
 	    lport->lport_id->ident_length);
 	ilport->ilport_rtpid = atomic_add_16_nv(&stmf_rtpid_counter, 1);
 	STMF_EVENT_ALLOC_HANDLE(ilport->ilport_event_hdl);
+	stmf_create_kstat_lport(ilport);
 	if (stmf_workers_state == STMF_WORKERS_DISABLED) {
 		stmf_workers_state = STMF_WORKERS_ENABLING;
 		start_workers = 1;
@@ -1966,6 +2216,13 @@ stmf_deregister_local_port(stmf_local_port_t *lport)
 	} else {
 		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_BUSY);
+	}
+	if (ilport->ilport_kstat_info) {
+		kstat_delete(ilport->ilport_kstat_info);
+	}
+	if (ilport->ilport_kstat_io) {
+		kstat_delete(ilport->ilport_kstat_io);
+		mutex_destroy(&ilport->ilport_kstat_lock);
 	}
 	mutex_exit(&stmf_state.stmf_lock);
 	return (STMF_SUCCESS);
@@ -2831,6 +3088,7 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	}
 	if (w1->worker_queue_depth < w->worker_queue_depth)
 		w = w1;
+
 	mutex_enter(&w->worker_lock);
 	if (((w->worker_flags & STMF_WORKER_STARTED) == 0) ||
 	    (w->worker_flags & STMF_WORKER_TERMINATE)) {
@@ -2888,6 +3146,10 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		itask->itask_allocated_buf_map = 0;
 		itask->itask_dbufs[0] = NULL;
 	}
+
+	stmf_update_kstat_lu_q(task, kstat_waitq_enter);
+	stmf_update_kstat_lport_q(task, kstat_waitq_enter);
+
 	if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
 		cv_signal(&w->worker_cv);
 	mutex_exit(&w->worker_lock);
@@ -2944,6 +3206,10 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 			return (STMF_SUCCESS);
 	}
 #endif
+
+	stmf_update_kstat_lu_io(task, dbuf);
+	stmf_update_kstat_lport_io(task, dbuf);
+
 	DTRACE_PROBE2(scsi__xfer__start, scsi_task_t *, task,
 	    stmf_data_buf_t *, dbuf);
 	ret = task->task_lport->lport_xfer_data(task, dbuf, ioflags);
@@ -3024,6 +3290,8 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		if ((itask->itask_flags & (ITASK_KNOWN_TO_LU |
 		    ITASK_KNOWN_TO_TGT_PORT | ITASK_IN_WORKER_QUEUE |
 		    ITASK_BEING_ABORTED)) == 0) {
+			stmf_update_kstat_lu_q(task, kstat_runq_exit);
+			stmf_update_kstat_lport_q(task, kstat_runq_exit);
 			stmf_task_free(task);
 		}
 	}
@@ -3116,6 +3384,9 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		}
 	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 	task->task_completion_status = s;
+
+	stmf_update_kstat_lu_q(task, kstat_runq_exit);
+	stmf_update_kstat_lport_q(task, kstat_runq_exit);
 
 	if (queue_it) {
 		ASSERT(itask->itask_ncmds < ITASK_MAX_NCMDS);
@@ -4423,6 +4694,8 @@ out_itask_flag_loop:
 		case ITASK_CMD_NEW_TASK:
 			iss = (stmf_i_scsi_session_t *)
 			    task->task_session->ss_stmf_private;
+			stmf_update_kstat_lu_q(task, kstat_waitq_to_runq);
+			stmf_update_kstat_lport_q(task, kstat_waitq_to_runq);
 			if (iss->iss_flags & ISS_LUN_INVENTORY_CHANGED) {
 				if (stmf_handle_cmd_during_ic(itask))
 					break;
