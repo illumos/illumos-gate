@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -27,7 +26,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -246,30 +244,6 @@ get_flash_mac_addr(struct unm_adapter_s *adapter, u64 mac[])
 }
 
 static int
-is_flash_supported(unm_adapter *adapter)
-{
-	int locs[] = { 0, 0x4, 0x100, 0x4000, 0x4128 };
-	int addr, val01, val02, i, j;
-
-	/* if the flash size less than 4Mb, make huge war cry and die */
-	for (j = 1; j < 4; j++) {
-		addr = j * 0x100000;
-		for (i = 0; i < (sizeof (locs) / sizeof (locs[0])); i++) {
-			if (rom_fast_read(adapter, locs[i], &val01) == 0 &&
-			    rom_fast_read(adapter, (addr + locs[i]),
-			    &val02) == 0) {
-				if (val01 == val02)
-					return (-1);
-			} else {
-				return (-1);
-			}
-		}
-	}
-
-	return (0);
-}
-
-static int
 unm_initialize_dummy_dma(unm_adapter *adapter)
 {
 	uint32_t		hi, lo, temp;
@@ -408,7 +382,7 @@ unm_pci_cfg_init(unm_adapter *adapter)
 	return (DDI_SUCCESS);
 }
 
-void
+static void
 unm_free_tx_dmahdl(unm_adapter *adapter)
 {
 	int i;
@@ -538,7 +512,7 @@ dma_mem_fail:
 	return (DDI_FAILURE);
 }
 
-void
+static void
 unm_free_tx_buffers(unm_adapter *adapter)
 {
 	int i;
@@ -623,7 +597,7 @@ unm_rx_buffer_recycle(char *arg)
 	mutex_exit(rcv_desc->recycle_lock);
 }
 
-void
+static void
 unm_destroy_rx_ring(unm_rcv_desc_ctx_t *rcv_desc)
 {
 	uint32_t i, total_buf;
@@ -725,11 +699,19 @@ alloc_mem_failed:
 static void
 unm_check_options(unm_adapter *adapter)
 {
-	int			i, ring, tx_desc, rx_desc, rx_jdesc;
+	int			i, ring, tx_desc, rx_desc, rx_jdesc, maxrx;
 	unm_recv_context_t	*recv_ctx;
 	unm_rcv_desc_ctx_t	*rcv_desc;
 	uint8_t			revid = adapter->ahw.revision_id;
 	dev_info_t		*dip = adapter->dip;
+
+	/*
+	 * Reduce number of regular rcv desc to half on x86.
+	 */
+	maxrx = MAX_RCV_DESCRIPTORS;
+#if !defined(_LP64)
+	maxrx /= 2;
+#endif /* !_LP64 */
 
 	verbmsg = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    dmesg_propname, 0);
@@ -755,7 +737,7 @@ unm_check_options(unm_adapter *adapter)
 	}
 
 	rx_desc = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    rxringsize_propname, MAX_RCV_DESCRIPTORS);
+	    rxringsize_propname, maxrx);
 	if (rx_desc >= NX_MIN_DRIVER_RDS_SIZE &&
 	    rx_desc <= NX_MAX_SUPPORTED_RDS_SIZE &&
 	    !(rx_desc & (rx_desc - 1))) {
@@ -782,7 +764,11 @@ unm_check_options(unm_adapter *adapter)
 		adapter->MaxJumboRxDescCount = MAX_JUMBO_RCV_DESCRIPTORS;
 	}
 
-	adapter->MaxLroRxDescCount = MAX_LRO_RCV_DESCRIPTORS;
+	/*
+	 * Solaris does not use LRO, but older firmware needs to have a
+	 * couple of descriptors for initialization.
+	 */
+	adapter->MaxLroRxDescCount = (adapter->fw_major < 4) ? 2 : 0;
 
 	adapter->mtu = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, defaultmtu_propname, MTU_SIZE);
@@ -797,7 +783,14 @@ unm_check_options(unm_adapter *adapter)
 		adapter->mtu = adapter->maxmtu;
 	}
 
-	adapter->maxmtu += NX_MAX_ETHERHDR;
+	adapter->maxmtu = adapter->mtu + NX_MAX_ETHERHDR;
+
+	/*
+	 * If we are not expecting to receive jumbo frames, save memory and
+	 * do not allocate.
+	 */
+	if (adapter->mtu <= MTU_SIZE)
+		adapter->MaxJumboRxDescCount = NX_MIN_DRIVER_RDS_SIZE;
 
 	for (i = 0; i < MAX_RCV_CTX; ++i) {
 		recv_ctx = &adapter->recv_ctx[i];
@@ -1129,12 +1122,9 @@ netxen_pcie_strap_init(unm_adapter *adapter)
 static int
 netxen_read_mac_addr(unm_adapter *adapter)
 {
-	u64		mac_addr[FLASH_NUM_PORTS + 1];
+	u64		mac_addr[8 + 1];
 	unsigned char	*p;
 	int		i;
-
-	if (is_flash_supported(adapter) != 0)
-		return (-1);
 
 	if (get_flash_mac_addr(adapter, mac_addr) != 0)
 		return (-1);
@@ -1157,10 +1147,8 @@ static int
 unmattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	unm_adapter			*adapter;
-	unm_recv_context_t		*recv_ctx = NULL;
-	unm_rcv_desc_ctx_t		*rcv_desc = NULL;
 	int				i, first_driver = 0;
-	int				ret, ring, temp;
+	int				ret, temp;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -1313,34 +1301,11 @@ unmattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (i != 0x55555555)
 		adapter->physical_port = (uint16_t)i;
 
-	adapter->cmd_buf_arr = (struct unm_cmd_buffer *)kmem_zalloc(
-	    sizeof (struct unm_cmd_buffer) * adapter->MaxTxDescCount,
-	    KM_SLEEP);
-
-	for (i = 0; i < MAX_RCV_CTX; ++i) {
-		recv_ctx = &adapter->recv_ctx[i];
-
-		for (ring = 0; ring < adapter->max_rds_rings; ring++) {
-			rcv_desc = &recv_ctx->rcv_desc[ring];
-			ret = unm_create_rx_ring(adapter, rcv_desc);
-			if (ret != DDI_SUCCESS)
-				goto attach_free_cmdbufs;
-		}
-	}
-
-	ret = unm_alloc_tx_dmahdl(adapter);
-	if (ret != DDI_SUCCESS)
-		goto attach_free_cmdbufs;
-
-	ret = unm_alloc_tx_buffers(adapter);
-	if (ret != DDI_SUCCESS)
-		goto attach_free_tx_dmahdl;
-
 	adapter->ahw.linkup = 0;
 
 	if (receive_peg_ready(adapter)) {
 		ret = -EIO;
-		goto attach_free_tx_buffers;
+		goto free_dummy_dma;
 	}
 
 	if (netxen_read_mac_addr(adapter))
@@ -1367,29 +1332,13 @@ unmattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ret != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "%s%d: Mac registration error\n",
 		    adapter->name, adapter->instance);
-		goto attach_free_tx_buffers;
+		goto free_dummy_dma;
 	}
 
 	return (DDI_SUCCESS);
 
-attach_free_tx_buffers:
-	unm_free_tx_buffers(adapter);
-attach_free_tx_dmahdl:
-	unm_free_tx_dmahdl(adapter);
-attach_free_cmdbufs:
-	kmem_free(adapter->cmd_buf_arr, sizeof (struct unm_cmd_buffer) *
-	    adapter->MaxTxDescCount);
-	for (i = 0; i < MAX_RCV_CTX; ++i) {
-		recv_ctx = &adapter->recv_ctx[i];
-
-		for (ring = 0; ring < adapter->max_rds_rings; ring++) {
-			rcv_desc = &recv_ctx->rcv_desc[ring];
-			if (rcv_desc->rx_buf_pool != NULL)
-				unm_destroy_rx_ring(rcv_desc);
-		}
-	}
-
-	if (adapter->portnum == 0)
+free_dummy_dma:
+	if (first_driver)
 		unm_free_dummy_dma(adapter);
 attach_destroy_intr:
 	unm_destroy_intr(adapter);
@@ -1413,12 +1362,11 @@ unmdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-
 		unm_fini_kstats(adapter);
 		adapter->kstats[0] = NULL;
 
 		if (adapter->pci_cfg_handle != NULL)
-		pci_config_teardown(&adapter->pci_cfg_handle);
+			pci_config_teardown(&adapter->pci_cfg_handle);
 
 		unm_nd_cleanup(adapter);
 		unm_nic_remove(adapter);
@@ -1432,6 +1380,79 @@ unmdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	return (DDI_FAILURE);
+}
+
+int
+create_rxtx_rings(unm_adapter *adapter)
+{
+	unm_recv_context_t	*recv_ctx;
+	unm_rcv_desc_ctx_t	*rcv_desc;
+	int			i, ring;
+
+	adapter->cmd_buf_arr = (struct unm_cmd_buffer *)kmem_zalloc(
+	    sizeof (struct unm_cmd_buffer) * adapter->MaxTxDescCount,
+	    KM_SLEEP);
+
+	for (i = 0; i < MAX_RCV_CTX; ++i) {
+		recv_ctx = &adapter->recv_ctx[i];
+
+		for (ring = 0; ring < adapter->max_rds_rings; ring++) {
+			rcv_desc = &recv_ctx->rcv_desc[ring];
+			if (unm_create_rx_ring(adapter, rcv_desc) !=
+			    DDI_SUCCESS)
+				goto attach_free_cmdbufs;
+		}
+	}
+
+	if (unm_alloc_tx_dmahdl(adapter) != DDI_SUCCESS)
+		goto attach_free_cmdbufs;
+
+	if (unm_alloc_tx_buffers(adapter) != DDI_SUCCESS)
+		goto attach_free_tx_dmahdl;
+
+	return (DDI_SUCCESS);
+
+attach_free_tx_buffers:
+	unm_free_tx_buffers(adapter);
+attach_free_tx_dmahdl:
+	unm_free_tx_dmahdl(adapter);
+attach_free_cmdbufs:
+	kmem_free(adapter->cmd_buf_arr, sizeof (struct unm_cmd_buffer) *
+	    adapter->MaxTxDescCount);
+	for (i = 0; i < MAX_RCV_CTX; ++i) {
+		recv_ctx = &adapter->recv_ctx[i];
+
+		for (ring = 0; ring < adapter->max_rds_rings; ring++) {
+			rcv_desc = &recv_ctx->rcv_desc[ring];
+			if (rcv_desc->rx_buf_pool != NULL)
+				unm_destroy_rx_ring(rcv_desc);
+		}
+	}
+	return (DDI_FAILURE);
+}
+
+void
+destroy_rxtx_rings(unm_adapter *adapter)
+{
+	unm_recv_context_t	*recv_ctx;
+	unm_rcv_desc_ctx_t	*rcv_desc;
+	int			ctx, ring;
+
+	unm_free_tx_buffers(adapter);
+	unm_free_tx_dmahdl(adapter);
+
+	for (ctx = 0; ctx < MAX_RCV_CTX; ++ctx) {
+		recv_ctx = &adapter->recv_ctx[ctx];
+		for (ring = 0; ring < adapter->max_rds_rings; ring++) {
+			rcv_desc = &recv_ctx->rcv_desc[ring];
+			if (rcv_desc->rx_buf_pool != NULL)
+				unm_destroy_rx_ring(rcv_desc);
+		}
+	}
+
+	if (adapter->cmd_buf_arr != NULL)
+		kmem_free(adapter->cmd_buf_arr,
+		    sizeof (struct unm_cmd_buffer) * adapter->MaxTxDescCount);
 }
 
 #ifdef SOLARIS11

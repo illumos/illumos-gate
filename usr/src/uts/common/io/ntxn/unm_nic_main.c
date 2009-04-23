@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -27,7 +26,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -96,9 +94,8 @@
 #define	NX_RX_MAXBUFS		128
 #define	NX_MAX_TXCOMPS		256
 
-extern void unm_free_tx_buffers(unm_adapter *adapter);
-extern void unm_free_tx_dmahdl(unm_adapter *adapter);
-extern void unm_destroy_rx_ring(unm_rcv_desc_ctx_t *rcv_desc);
+extern int create_rxtx_rings(unm_adapter *adapter);
+extern void destroy_rxtx_rings(unm_adapter *adapter);
 
 static void unm_post_rx_buffers_nodb(struct unm_adapter_s *adapter,
     uint32_t ringid);
@@ -224,7 +221,7 @@ unm_nic_disable_int(unm_adapter *adapter)
 	    &temp, 4);
 }
 
-static int
+static inline int
 unm_nic_clear_int(unm_adapter *adapter)
 {
 	uint32_t	mask, temp, our_int, status;
@@ -364,23 +361,14 @@ unm_free_hw_resources(unm_adapter *adapter)
 static void
 cleanup_adapter(struct unm_adapter_s *adapter)
 {
-	if (adapter->cmd_buf_arr != NULL)
-		kmem_free(adapter->cmd_buf_arr,
-		    sizeof (struct unm_cmd_buffer) * adapter->MaxTxDescCount);
-
 	ddi_regs_map_free(&(adapter->regs_handle));
 	ddi_regs_map_free(&(adapter->db_handle));
 	kmem_free(adapter, sizeof (unm_adapter));
-
 }
 
 void
 unm_nic_remove(unm_adapter *adapter)
 {
-	unm_recv_context_t *recv_ctx;
-	unm_rcv_desc_ctx_t	*rcv_desc;
-	int ctx, ring;
-
 	mac_link_update(adapter->mach, LINK_STATE_DOWN);
 	unm_nic_stop_port(adapter);
 
@@ -392,17 +380,9 @@ unm_nic_remove(unm_adapter *adapter)
 	(void) untimeout(adapter->watchdog_timer);
 
 	unm_free_hw_resources(adapter);
-	unm_free_tx_buffers(adapter);
-	unm_free_tx_dmahdl(adapter);
 
-	for (ctx = 0; ctx < MAX_RCV_CTX; ++ctx) {
-		recv_ctx = &adapter->recv_ctx[ctx];
-		for (ring = 0; ring < adapter->max_rds_rings; ring++) {
-			rcv_desc = &recv_ctx->rcv_desc[ring];
-			if (rcv_desc->rx_buf_pool != NULL)
-				unm_destroy_rx_ring(rcv_desc);
-		}
-	}
+	if (adapter->is_up == UNM_ADAPTER_UP_MAGIC)
+		destroy_rxtx_rings(adapter);
 
 	if (adapter->portnum == 0)
 		unm_free_dummy_dma(adapter);
@@ -1111,7 +1091,7 @@ unm_nic_xmit_frame(unm_adapter *adapter, mblk_t *mp)
 	send_mapped = unm_get_pkt_info(mp, &pktinfo);
 
 	if (pktinfo.total_len <= adapter->tx_bcopy_threshold ||
-	    pktinfo.mblk_no >= MAX_BUFFERS_PER_CMD)
+	    pktinfo.mblk_no >= MAX_COOKIES_PER_CMD)
 		send_mapped = B_FALSE;
 
 	if (send_mapped == B_TRUE)
@@ -1864,7 +1844,7 @@ unm_nic_do_ioctl(unm_adapter *adapter, queue_t *wq, mblk_t *mp)
 	struct unm_nic_ioctl_data	*up_data;
 	ddi_acc_handle_t		conf_handle;
 	int				retval = 0;
-	unsigned int			efuse_chip_id;
+	uint64_t			efuse_chip_id = 0;
 	char				*ptr1;
 	short				*ptr2;
 	int				*ptr4;
@@ -2020,8 +2000,11 @@ unm_nic_do_ioctl(unm_adapter *adapter, queue_t *wq, mblk_t *mp)
 
 	case unm_nic_cmd_efuse_chip_id:
 		efuse_chip_id = adapter->unm_nic_pci_read_normalize(adapter,
-		    UNM_EFUSE_CHIP_ID);
-		(void) memcpy(up_data, &efuse_chip_id, sizeof (unsigned long));
+		    UNM_EFUSE_CHIP_ID_HIGH);
+		efuse_chip_id <<= 32;
+		efuse_chip_id |= adapter->unm_nic_pci_read_normalize(adapter,
+		    UNM_EFUSE_CHIP_ID_LOW);
+		(void) memcpy(up_data, &efuse_chip_id, sizeof (uint64_t));
 		data.rv = 0;
 		break;
 
@@ -2208,11 +2191,8 @@ unm_nic_set_pauseparam(unm_adapter *adapter, unm_pauseparam_t *pause)
 }
 
 /*
- *
  * GLD/MAC interfaces
- *
  */
-
 static int
 ntxn_m_start(void *arg)
 {
@@ -2225,11 +2205,16 @@ ntxn_m_start(void *arg)
 		return (DDI_SUCCESS);
 	}
 
+	if (create_rxtx_rings(adapter) != DDI_SUCCESS) {
+		UNM_SPIN_UNLOCK(&adapter->lock);
+		return (DDI_FAILURE);
+	}
+
 	if (init_firmware(adapter) != DDI_SUCCESS) {
 		UNM_SPIN_UNLOCK(&adapter->lock);
 		cmn_err(CE_WARN, "%s%d: Failed to init firmware\n",
 		    adapter->name, adapter->instance);
-		return (DDI_FAILURE);
+		goto dest_rings;
 	}
 
 	unm_nic_clear_stats(adapter);
@@ -2238,7 +2223,7 @@ ntxn_m_start(void *arg)
 		UNM_SPIN_UNLOCK(&adapter->lock);
 		cmn_err(CE_WARN, "%s%d: Error setting hw resources\n",
 		    adapter->name, adapter->instance);
-		return (DDI_FAILURE);
+		goto dest_rings;
 	}
 
 	if (adapter->fw_major < 4) {
@@ -2252,9 +2237,8 @@ ntxn_m_start(void *arg)
 
 	for (ring = 0; ring < adapter->max_rds_rings; ring++) {
 		if (unm_post_rx_buffers(adapter, ring) != DDI_SUCCESS) {
-			/* TODO: clean up */
 			UNM_SPIN_UNLOCK(&adapter->lock);
-			return (DDI_FAILURE);
+			goto free_hw_res;
 		}
 	}
 
@@ -2262,14 +2246,14 @@ ntxn_m_start(void *arg)
 		UNM_SPIN_UNLOCK(&adapter->lock);
 		cmn_err(CE_WARN, "%s%d: Could not set mac address\n",
 		    adapter->name, adapter->instance);
-		return (DDI_FAILURE);
+		goto free_hw_res;
 	}
 
 	if (unm_nic_init_port(adapter) != 0) {
 		UNM_SPIN_UNLOCK(&adapter->lock);
 		cmn_err(CE_WARN, "%s%d: Could not initialize port\n",
 		    adapter->name, adapter->instance);
-		return (DDI_FAILURE);
+		goto free_hw_res;
 	}
 
 	unm_nic_set_link_parameters(adapter);
@@ -2282,7 +2266,7 @@ ntxn_m_start(void *arg)
 			UNM_SPIN_UNLOCK(&adapter->lock);
 			cmn_err(CE_WARN, "%s%d: Could not set promisc mode\n",
 			    adapter->name, adapter->instance);
-			return (DDI_FAILURE);
+			goto stop_and_free;
 		}
 	} else {
 		nx_p3_nic_set_multi(adapter);
@@ -2293,7 +2277,7 @@ ntxn_m_start(void *arg)
 		UNM_SPIN_UNLOCK(&adapter->lock);
 		cmn_err(CE_WARN, "%s%d: Could not set mtu\n",
 		    adapter->name, adapter->instance);
-		return (DDI_FAILURE);
+		goto stop_and_free;
 	}
 
 	adapter->watchdog_timer = timeout((void (*)(void *))&unm_watchdog,
@@ -2309,6 +2293,14 @@ ntxn_m_start(void *arg)
 
 	UNM_SPIN_UNLOCK(&adapter->lock);
 	return (GLD_SUCCESS);
+
+stop_and_free:
+	unm_nic_stop_port(adapter);
+free_hw_res:
+	unm_free_hw_resources(adapter);
+dest_rings:
+	destroy_rxtx_rings(adapter);
+	return (DDI_FAILURE);
 }
 
 
@@ -2515,6 +2507,14 @@ ntxn_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			    HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM);
 		}
 		break;
+
+#ifdef SOLARIS11
+	case MAC_CAPAB_ANCHOR_VNIC:
+	case MAC_CAPAB_MULTIFACTADDR:
+#else
+	case MAC_CAPAB_POLL:
+	case MAC_CAPAB_MULTIADDRESS:
+#endif
 	default:
 		return (B_FALSE);
 	}
@@ -2533,6 +2533,9 @@ static mac_callbacks_t ntxn_m_callbacks = {
 	ntxn_m_multicst,
 	ntxn_m_unicst,
 	ntxn_m_tx,
+#ifndef SOLARIS11
+	NULL,			/* mc_resources */
+#endif
 	ntxn_m_ioctl,
 	ntxn_m_getcapab,
 	NULL,			/* mc_open */

@@ -104,10 +104,10 @@ static const nd_param_t nd_template_1000[] = {
 { PARAM_1000FDX_CAP,	    0,	  1,	1,	"-1000fdx_cap"		},
 { PARAM_1000HDX_CAP,	    0,	  1,	0,	"-1000hdx_cap"		},
 { PARAM_100T4_CAP,	    0,	  1,	0,	"-100T4_cap"		},
-{ PARAM_100FDX_CAP,	    0,	  1,	1,	"-100fdx_cap"		},
-{ PARAM_100HDX_CAP,	    0,	  1,	1,	"-100hdx_cap"		},
-{ PARAM_10FDX_CAP,	    0,	  1,	1,	"-10fdx_cap"		},
-{ PARAM_10HDX_CAP,	    0,	  1,	1,	"-10hdx_cap"		},
+{ PARAM_100FDX_CAP,	    0,	  1,	0,	"-100fdx_cap"		},
+{ PARAM_100HDX_CAP,	    0,	  1,	0,	"-100hdx_cap"		},
+{ PARAM_10FDX_CAP,	    0,	  1,	0,	"-10fdx_cap"		},
+{ PARAM_10HDX_CAP,	    0,	  1,	0,	"-10hdx_cap"		},
 
 /* Our advertised capabilities */
 { PARAM_ADV_AUTONEG_CAP,    0,	  1,	1,	"-adv_autoneg_cap"	},
@@ -116,10 +116,10 @@ static const nd_param_t nd_template_1000[] = {
 { PARAM_ADV_1000FDX_CAP,    0,	  1,	1,	"+adv_1000fdx_cap"	},
 { PARAM_ADV_1000HDX_CAP,    0,	  1,	0,	"-adv_1000hdx_cap"	},
 { PARAM_ADV_100T4_CAP,	    0,	  1,	0,	"-adv_100T4_cap"	},
-{ PARAM_ADV_100FDX_CAP,	    0,	  1,	1,	"+adv_100fdx_cap"	},
-{ PARAM_ADV_100HDX_CAP,	    0,	  1,	1,	"+adv_100hdx_cap"	},
-{ PARAM_ADV_10FDX_CAP,	    0,	  1,	1,	"+adv_10fdx_cap"	},
-{ PARAM_ADV_10HDX_CAP,	    0,	  1,	1,	"+adv_10hdx_cap"	},
+{ PARAM_ADV_100FDX_CAP,	    0,	  1,	0,	"+adv_100fdx_cap"	},
+{ PARAM_ADV_100HDX_CAP,	    0,	  1,	0,	"+adv_100hdx_cap"	},
+{ PARAM_ADV_10FDX_CAP,	    0,	  1,	0,	"+adv_10fdx_cap"	},
+{ PARAM_ADV_10HDX_CAP,	    0,	  1,	0,	"+adv_10hdx_cap"	},
 
 /* Current operating modes */
 { PARAM_LINK_STATUS,	    0,	  1,	0,	"-link_status"		},

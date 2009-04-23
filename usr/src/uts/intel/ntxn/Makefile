@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -40,6 +40,7 @@ MODULE		= ntxn
 OBJECTS		= $(NTXN_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(NTXN_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/common/io/ntxn
 
 #
 #	Include common rules.
@@ -49,10 +50,11 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
+INC_PATH	+= -I$(CONF_SRCDIR)
 
 CFLAGS		+=  -DSOLARIS11 -xO4
 CFLAGS64	+=  -DSOLARIS11 -xO -I./

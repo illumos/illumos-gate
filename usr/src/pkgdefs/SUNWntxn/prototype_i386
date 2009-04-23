@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -45,4 +43,5 @@
 # NetXen 1Gb/10Gb NIC driver
 d none kernel/drv/amd64		0755	root	sys
 f none kernel/drv/ntxn		0755	root	sys
+f none kernel/drv/ntxn.conf	0644	root	sys
 f none kernel/drv/amd64/ntxn	0755	root	sys

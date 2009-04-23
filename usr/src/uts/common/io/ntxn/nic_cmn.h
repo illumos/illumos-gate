@@ -193,10 +193,10 @@ enum {
  * for the LSO packet
  */
 
-#define	FLAGS_CHECKSUM_ENABLED		0x01
+#define	FLAGS_MCAST				0x01
 #define	FLAGS_LSO_ENABLED			0x02
 #define	FLAGS_IPSEC_SA_ADD			0x04
-#define	FLAGS_IPSEC_SA_DELETE		0x08
+#define	FLAGS_IPSEC_SA_DELETE			0x08
 #define	FLAGS_VLAN_TAGGED			0x10
 
 #if UNM_CONF_PROCESSOR == UNM_CONF_X86
@@ -426,7 +426,7 @@ typedef struct PREALIGN(64) cmdDescType0
 		__uint64_t	word6;
 	}u7;
 
-	__uint64_t unused;
+	__uint64_t mcastAddr;
 
 } POSTALIGN(64) cmdDescType0_t;
 

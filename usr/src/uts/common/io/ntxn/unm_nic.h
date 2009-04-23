@@ -60,8 +60,13 @@ extern "C" {
 #include <inet/mi.h>
 #include <inet/nd.h>
 
+#ifdef SOLARIS11
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
+#else
+#include "mac.h"
+#include "mac_ether.h"
+#endif
 #include <sys/miiregs.h> /* by fjlite out of intel */
 
 #include "unm_nic_hw.h"
@@ -248,7 +253,7 @@ typedef	struct _hardware_context {
 
 #define	NX_CT_DEFAULT_RX_BUF_LEN	2048
 #define	MTU_SIZE			1500
-#define	MAX_COOKIES_PER_CMD		16
+#define	MAX_COOKIES_PER_CMD		15
 #define	UNM_DB_MAPSIZE_BYTES		0x1000
 #define	EXTRA_HANDLES			512
 #define	UNM_TX_BCOPY_THRESHOLD		128

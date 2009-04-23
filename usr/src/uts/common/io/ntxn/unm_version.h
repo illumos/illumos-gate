@@ -31,10 +31,10 @@
 extern "C" {
 #endif
 
-#define	UNM_NIC_VERSIONID	"4.0.219"
+#define	UNM_NIC_VERSIONID	"4.0.221"
 #define	_UNM_NIC_MAJOR		4
 #define	_UNM_NIC_MINOR		0
-#define	_UNM_NIC_SUBVERSION	219
+#define	_UNM_NIC_SUBVERSION	221
 
 #ifdef __cplusplus
 }
