@@ -378,9 +378,7 @@ COMMON_SUBDIRS= \
 	SUNWpcu	\
 	SUNWpcwl \
 	SUNWpd    \
-	SUNWphx \
 	SUNWpolkit \
-	PHXext \
 	SUNWperl584core \
 	SUNWperl584usr \
 	SUNWpiclh \

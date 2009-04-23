@@ -617,7 +617,6 @@ MISC_KMODS	+= uwba
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= phx
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_sym_emc
