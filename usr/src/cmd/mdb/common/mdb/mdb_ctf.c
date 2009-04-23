@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ctf_impl.h>
@@ -57,9 +54,12 @@ typedef struct member_iter {
 } member_iter_t;
 
 typedef struct type_visit {
-	mdb_ctf_visit_f *tv_cb;
-	void *tv_arg;
-	ctf_file_t *tv_fp;
+	mdb_ctf_visit_f	*tv_cb;
+	void		*tv_arg;
+	ctf_file_t	*tv_fp;
+	ulong_t		tv_base_offset;	/* used when recursing from type_cb() */
+	int		tv_base_depth;	/* used when recursing from type_cb() */
+	int		tv_min_depth;
 } type_visit_t;
 
 typedef struct mbr_info {
@@ -79,7 +79,7 @@ set_ctf_id(mdb_ctf_id_t *p, ctf_file_t *fp, ctf_id_t id)
 
 /*
  * Callback function for mdb_tgt_object_iter used from name_to_type, below,
- * to search the CTF namespace for a given object file.
+ * to search the CTF namespace of each object file for a particular name.
  */
 /*ARGSUSED*/
 static int
@@ -403,6 +403,19 @@ mdb_ctf_type_resolve(mdb_ctf_id_t mid, mdb_ctf_id_t *outp)
 		return (set_errno(ctf_to_errno(ctf_errno(idp->mci_fp))));
 	}
 
+	if (ctf_type_kind(idp->mci_fp, id) == CTF_K_FORWARD) {
+		char name[MDB_SYM_NAMLEN];
+		mdb_ctf_id_t lookup_id;
+
+		if (ctf_type_name(idp->mci_fp, id, name, sizeof (name)) !=
+		    NULL &&
+		    mdb_ctf_lookup_by_name(name, &lookup_id) == 0 &&
+		    outp != NULL) {
+			*outp = lookup_id;
+			return (0);
+		}
+	}
+
 	if (outp != NULL)
 		set_ctf_id(outp, idp->mci_fp, id);
 
@@ -489,10 +502,43 @@ type_cb(const char *name, ctf_id_t type, ulong_t off, int depth, void *arg)
 {
 	type_visit_t *tvp = arg;
 	mdb_ctf_id_t id;
+	mdb_ctf_id_t base;
+	mdb_ctf_impl_t *basep = (mdb_ctf_impl_t *)&base;
+
+	int ret;
+
+	if (depth < tvp->tv_min_depth)
+		return (0);
+
+	off += tvp->tv_base_offset;
+	depth += tvp->tv_base_depth;
 
 	set_ctf_id(&id, tvp->tv_fp, type);
 
-	return (tvp->tv_cb(name, id, off, depth, tvp->tv_arg));
+	(void) mdb_ctf_type_resolve(id, &base);
+	if ((ret = tvp->tv_cb(name, id, base, off, depth, tvp->tv_arg)) != 0)
+		return (ret);
+
+	/*
+	 * If the type resolves to a type in a different file, we must have
+	 * followed a forward declaration.  We need to recurse into the
+	 * new type.
+	 */
+	if (basep->mci_fp != tvp->tv_fp && mdb_ctf_type_valid(base)) {
+		type_visit_t tv;
+
+		tv.tv_cb = tvp->tv_cb;
+		tv.tv_arg = tvp->tv_arg;
+		tv.tv_fp = basep->mci_fp;
+
+		tv.tv_base_offset = off;
+		tv.tv_base_depth = depth;
+		tv.tv_min_depth = 1;	/* depth = 0 has already been done */
+
+		ret = ctf_type_visit(basep->mci_fp, basep->mci_id,
+		    type_cb, &tv);
+	}
+	return (ret);
 }
 
 int
@@ -505,6 +551,9 @@ mdb_ctf_type_visit(mdb_ctf_id_t id, mdb_ctf_visit_f *func, void *arg)
 	tv.tv_cb = func;
 	tv.tv_arg = arg;
 	tv.tv_fp = idp->mci_fp;
+	tv.tv_base_offset = 0;
+	tv.tv_base_depth = 0;
+	tv.tv_min_depth = 0;
 
 	ret = ctf_type_visit(idp->mci_fp, idp->mci_id, type_cb, &tv);
 

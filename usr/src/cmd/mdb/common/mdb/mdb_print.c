@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_target.h>
@@ -70,22 +68,18 @@ typedef struct printarg {
 } printarg_t;
 
 #define	PA_SHOWTYPE	0x001		/* print type name */
-#define	PA_SHOWNAME	0x002		/* print member name */
-#define	PA_SHOWADDR	0x004		/* print address */
-#define	PA_SHOWVAL	0x008		/* print value */
-#define	PA_SHOWHOLES	0x010		/* print holes in structs */
-#define	PA_INTHEX	0x020		/* print integer values in hex */
-#define	PA_INTDEC	0x040		/* print integer values in decimal */
-#define	PA_NOSYMBOLIC	0x080		/* don't print ptrs as func+offset */
+#define	PA_SHOWBASETYPE	0x002		/* print base type name */
+#define	PA_SHOWNAME	0x004		/* print member name */
+#define	PA_SHOWADDR	0x008		/* print address */
+#define	PA_SHOWVAL	0x010		/* print value */
+#define	PA_SHOWHOLES	0x020		/* print holes in structs */
+#define	PA_INTHEX	0x040		/* print integer values in hex */
+#define	PA_INTDEC	0x080		/* print integer values in decimal */
+#define	PA_NOSYMBOLIC	0x100		/* don't print ptrs as func+offset */
 
 #define	IS_CHAR(e) \
 	(((e).cte_format & (CTF_INT_CHAR | CTF_INT_SIGNED)) == \
 	(CTF_INT_CHAR | CTF_INT_SIGNED) && (e).cte_bits == NBBY)
-
-#define	SCALAR_MASK	((1 << CTF_K_INTEGER) | (1 << CTF_K_FLOAT) | \
-			(1 << CTF_K_POINTER) | (1 << CTF_K_ENUM) | \
-			(1 << CTF_K_ARRAY))
-#define	IS_SCALAR(k)	(((1 << k) & SCALAR_MASK) != 0)
 
 #define	COMPOSITE_MASK	((1 << CTF_K_STRUCT) | \
 			(1 << CTF_K_UNION) | (1 << CTF_K_ARRAY))
@@ -103,7 +97,8 @@ typedef struct printarg {
 typedef int printarg_f(const char *, const char *,
     mdb_ctf_id_t, mdb_ctf_id_t, ulong_t, printarg_t *);
 
-static int elt_print(const char *, mdb_ctf_id_t, ulong_t, int, void *);
+static int elt_print(const char *, mdb_ctf_id_t, mdb_ctf_id_t, ulong_t, int,
+    void *);
 static void print_close_sou(printarg_t *, int);
 
 /*
@@ -255,6 +250,81 @@ cmd_offsetof(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+struct enum_p2_info {
+	int	e_value;
+	char	*e_buf;
+	size_t	e_size;
+	uint_t	e_bits;
+	uint8_t	e_found;
+	uint8_t	e_zero;
+};
+
+static int
+enum_p2_cb(const char *name, int bit_arg, void *arg)
+{
+	struct enum_p2_info *eiip = arg;
+	uint_t bit = bit_arg;
+
+	if (bit != 0 && !ISP2(bit))
+		return (1);	/* non-power-of-2; abort processing */
+
+	if ((bit == 0 && eiip->e_zero) ||
+	    (bit != 0 && (eiip->e_bits & bit) != 0)) {
+		return (0);	/* already seen this value */
+	}
+
+	if (bit == 0)
+		eiip->e_zero = 1;
+	else
+		eiip->e_bits |= bit;
+
+	if (eiip->e_buf != NULL && (eiip->e_value & bit) != 0) {
+		if (eiip->e_found)
+			(void) strlcat(eiip->e_buf, "|", eiip->e_size);
+
+		if (strlcat(eiip->e_buf, name, eiip->e_size) >=
+		    eiip->e_size)
+			return (1);	/* overflowed */
+
+		eiip->e_found = 1;
+	}
+	return (0);
+}
+
+static int
+enum_value_to_name_p2(mdb_ctf_id_t id, int v, char *buf, size_t size)
+{
+	struct enum_p2_info eii;
+
+	bzero(&eii, sizeof (eii));
+
+	eii.e_value = v;
+	eii.e_buf = buf;
+	eii.e_size = size;
+
+	if (buf != NULL && size > 0)
+		buf[0] = '\0';
+
+	if (mdb_ctf_type_kind(id) != CTF_K_ENUM ||
+	    mdb_ctf_enum_iter(id, enum_p2_cb, &eii) != 0 ||
+	    eii.e_bits == 0)
+		return (-1);
+
+	if (buf != NULL && (!eii.e_found || (v & ~eii.e_bits) != 0)) {
+		char val[16];
+
+		(void) mdb_snprintf(val, sizeof (val),
+		    "0x%x", (v & ~eii.e_bits));
+
+		if (eii.e_found)
+			(void) strlcat(buf, "|", size);
+		if (strlcat(buf, val, size) >= size)
+			return (-1);
+	}
+
+	return (0);
+}
+
 struct enum_cbinfo {
 	uint_t		e_flags;
 	const char	*e_string;	/* NULL for value searches */
@@ -265,6 +335,21 @@ struct enum_cbinfo {
 #define	E_HEX			0x2
 #define	E_SEARCH_STRING		0x4
 #define	E_SEARCH_VALUE		0x8
+
+static void
+enum_print(struct enum_cbinfo *info, const char *name, int value)
+{
+	uint_t flags = info->e_flags;
+
+	if (flags & E_PRETTY) {
+		if (flags & E_HEX)
+			mdb_printf("%-8x %s\n", value, name);
+		else
+			mdb_printf("%-11d %s\n", value, name);
+	} else {
+		mdb_printf("%#r\n", value);
+	}
+}
 
 static int
 enum_cb(const char *name, int value, void *arg)
@@ -281,14 +366,7 @@ enum_cb(const char *name, int value, void *arg)
 			return (0);
 	}
 
-	if (flags & E_PRETTY) {
-		if (flags & E_HEX)
-			mdb_printf("%-8x %s\n", value, name);
-		else
-			mdb_printf("%-11d %s\n", value, name);
-	} else {
-		mdb_printf("%#r\n", value);
-	}
+	enum_print(info, name, value);
 
 	info->e_found = 1;
 	return (0);
@@ -300,8 +378,7 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	struct enum_cbinfo info;
 
-	const char *type;			/* type name we are using */
-	char tn[MDB_SYM_NAMLEN];
+	char type[MDB_SYM_NAMLEN + sizeof ("enum ")];
 	char tn2[MDB_SYM_NAMLEN + sizeof ("enum ")];
 	mdb_ctf_id_t id;
 	mdb_ctf_id_t idr;
@@ -321,32 +398,27 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	argc -= i;
 	argv += i;
 
-	if ((i = args_to_typename(&argc, &argv, tn, sizeof (tn))) != 0)
+	if ((i = args_to_typename(&argc, &argv, type, MDB_SYM_NAMLEN)) != 0)
 		return (i);
 
-	type = NULL;
-	if (strchr(tn, ' ') == NULL) {
+	if (strchr(type, ' ') == NULL) {
 		/*
 		 * Check as an enumeration tag first, and fall back
 		 * to checking for a typedef.  Yes, this means that
 		 * anonymous enumerations whose typedefs conflict with
 		 * an enum tag can't be accessed.  Don't do that.
 		 */
-		(void) mdb_snprintf(tn2, sizeof (tn2), "enum %s", tn);
+		(void) mdb_snprintf(tn2, sizeof (tn2), "enum %s", type);
 
 		if (mdb_ctf_lookup_by_name(tn2, &id) == 0) {
-			type = tn2;
-		} else if (mdb_ctf_lookup_by_name(tn, &id) == 0) {
-			type = tn;
-		} else {
-			mdb_warn("types '%s', '%s'", tn2, tn);
+			strcpy(type, tn2);
+		} else if (mdb_ctf_lookup_by_name(type, &id) != 0) {
+			mdb_warn("types '%s', '%s'", tn2, type);
 			return (DCMD_ERR);
 		}
 	} else {
-		if (mdb_ctf_lookup_by_name(tn, &id) == 0) {
-			type = tn;
-		} else {
-			mdb_warn("'%s'", tn);
+		if (mdb_ctf_lookup_by_name(type, &id) != 0) {
+			mdb_warn("'%s'", type);
 			return (DCMD_ERR);
 		}
 	}
@@ -400,6 +472,13 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("%<b>%-8s %s%</b>\n", "VALUE", "NAME");
 		else
 			mdb_printf("%<b>%-11s %s%</b>\n", "VALUE", "NAME");
+	}
+
+	/* if the enum is a power-of-two one, process it that way */
+	if ((info.e_flags & E_SEARCH_VALUE) &&
+	    enum_value_to_name_p2(idr, info.e_value, tn2, sizeof (tn2)) == 0) {
+		enum_print(&info, tn2, info.e_value);
+		return (DCMD_OK);
 	}
 
 	if (mdb_ctf_enum_iter(idr, enum_cb, &info) == -1) {
@@ -589,11 +668,11 @@ cmd_array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		elemsize = mdb_ctf_type_size(id);
 	} else if (addr_to_sym(t, addr, tn, sizeof (tn), &sym, &s_info)
-		    != NULL && mdb_ctf_lookup_by_symbol(&sym, &s_info, &id)
-		    == 0 && mdb_ctf_type_kind(id) == CTF_K_ARRAY &&
-		    mdb_ctf_array_info(id, &ar) != -1) {
-			elemsize = mdb_ctf_type_size(id) / ar.mta_nelems;
-			nelem = ar.mta_nelems;
+	    != NULL && mdb_ctf_lookup_by_symbol(&sym, &s_info, &id)
+	    == 0 && mdb_ctf_type_kind(id) == CTF_K_ARRAY &&
+	    mdb_ctf_array_info(id, &ar) != -1) {
+		elemsize = mdb_ctf_type_size(id) / ar.mta_nelems;
+		nelem = ar.mta_nelems;
 	} else {
 		mdb_warn("no symbol information for %a", addr);
 		return (DCMD_ERR);
@@ -998,7 +1077,7 @@ print_array(const char *type, const char *name, mdb_ctf_id_t id,
 	sou = IS_COMPOSITE(kind);
 
 	pa.pa_addr = addr;		/* set base address to start of array */
-	pa.pa_maxdepth = pa.pa_maxdepth - pa.pa_depth;
+	pa.pa_maxdepth = pa.pa_maxdepth - pa.pa_depth - 1;
 	pa.pa_nest += pa.pa_depth + 1;	/* nesting level is current depth + 1 */
 	pa.pa_depth = 0;		/* reset depth to 0 for new scope */
 	pa.pa_prefix = NULL;
@@ -1074,6 +1153,7 @@ print_enum(const char *type, const char *name, mdb_ctf_id_t id,
     mdb_ctf_id_t base, ulong_t off, printarg_t *pap)
 {
 	mdb_tgt_addr_t addr = pap->pa_addr + off / NBBY;
+	char vname[MDB_SYM_NAMLEN];
 	const char *ename;
 	int value;
 
@@ -1092,23 +1172,36 @@ print_enum(const char *type, const char *name, mdb_ctf_id_t id,
 		mdb_printf("%#d", value);
 
 	ename = mdb_ctf_enum_name(base, value);
+
+	/* If it wasn't an exact match, check if we can do P2 matching */
+	if (ename == NULL &&
+	    enum_value_to_name_p2(base, value, vname, sizeof (vname)) == 0)
+		ename = vname;
+
 	mdb_printf(" (%s)", (ename != NULL)? ename : "???");
 
 	return (0);
 }
 
 /*
- * Just print a semicolon if we run into a forward tag.
+ * This will only get called if the structure isn't found in any available CTF
+ * data.
  */
 /*ARGSUSED*/
 static int
 print_tag(const char *type, const char *name, mdb_ctf_id_t id,
     mdb_ctf_id_t base, ulong_t off, printarg_t *pap)
 {
+	char basename[MDB_SYM_NAMLEN];
+
 	if (pap->pa_flags & PA_SHOWVAL)
 		mdb_printf("; ");
 
-	mdb_printf("(forward declaration)");
+	if (mdb_ctf_type_name(base, basename, sizeof (basename)) != NULL)
+		mdb_printf("<forward declaration of %s>", basename);
+	else
+		mdb_printf("<forward declaration of unknown type>");
+
 	return (0);
 }
 
@@ -1211,7 +1304,9 @@ print_close_sou(printarg_t *pap, int newdepth)
 		if (end < expected)
 			print_hole(pap, newdepth + 1, end, expected);
 	}
-	mdb_printf("%*s}\n", d * pap->pa_tab, "");
+	/* if the struct is an array element, print a comma after the } */
+	mdb_printf("%*s}%s\n", d * pap->pa_tab, "",
+	    (newdepth == 0 && pap->pa_nest > 0)? "," : "");
 }
 
 static printarg_f *const printfuncs[] = {
@@ -1232,11 +1327,11 @@ static printarg_f *const printfuncs[] = {
  * print subroutine for this type class in the array above.
  */
 static int
-elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
+elt_print(const char *name, mdb_ctf_id_t id, mdb_ctf_id_t base,
+    ulong_t off, int depth, void *data)
 {
-	char type[MDB_SYM_NAMLEN];
+	char type[MDB_SYM_NAMLEN + sizeof (" <<12345678...>>")];
 	int kind, rc, d;
-	mdb_ctf_id_t base;
 	printarg_t *pap = data;
 
 	for (d = pap->pa_depth - 1; d >= depth; d--)
@@ -1245,12 +1340,44 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 	if (depth > pap->pa_maxdepth)
 		return (0);
 
-	if (mdb_ctf_type_resolve(id, &base) == -1 ||
+	if (!mdb_ctf_type_valid(base) ||
 	    (kind = mdb_ctf_type_kind(base)) == -1)
 		return (-1); /* errno is set for us */
 
-	if (mdb_ctf_type_name(id, type, sizeof (type)) == NULL)
+	if (mdb_ctf_type_name(id, type, MDB_SYM_NAMLEN) == NULL)
 		(void) strcpy(type, "(?)");
+
+	if (pap->pa_flags & PA_SHOWBASETYPE) {
+		/*
+		 * If basetype is different and informative, concatenate
+		 * <<basetype>> (or <<baset...>> if it doesn't fit)
+		 *
+		 * We just use the end of the buffer to store the type name, and
+		 * only connect it up if that's necessary.
+		 */
+
+		char *type_end = type + strlen(type);
+		char *basetype;
+		size_t sz;
+
+		(void) strlcat(type, " <<", sizeof (type));
+
+		basetype = type + strlen(type);
+		sz = sizeof (type) - (basetype - type);
+
+		*type_end = '\0'; /* restore the end of type for strcmp() */
+
+		if (mdb_ctf_type_name(base, basetype, sz) != NULL &&
+		    strcmp(basetype, type) != 0 &&
+		    strcmp(basetype, "struct ") != 0 &&
+		    strcmp(basetype, "enum ") != 0 &&
+		    strcmp(basetype, "union ") != 0) {
+			type_end[0] = ' ';	/* reconnect */
+			if (strlcat(type, ">>", sizeof (type)) >= sizeof (type))
+				(void) strlcpy(
+				    type + sizeof (type) - 6, "...>>", 6);
+		}
+	}
 
 	if (pap->pa_flags & PA_SHOWHOLES) {
 		ctf_encoding_t e;
@@ -1304,103 +1431,65 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 	if (pap->pa_flags & (PA_SHOWTYPE | PA_SHOWNAME | PA_SHOWADDR))
 		mdb_printf("%*s", (depth + pap->pa_nest) * pap->pa_tab, "");
 
-	if (depth != 0) {
-		if (pap->pa_flags & PA_SHOWADDR) {
-			if (off % NBBY == 0)
-				mdb_printf("%llx ", pap->pa_addr + off / NBBY);
-			else
-				mdb_printf("%llx.%lx ",
-				    pap->pa_addr + off / NBBY, off % NBBY);
-		}
-
-		if (pap->pa_flags & PA_SHOWTYPE) {
-			mdb_printf("%s", type);
-			/*
-			 * We want to avoid printing a trailing space when
-			 * dealing with pointers in a structure, so we end
-			 * up with:
-			 *
-			 *	label_t *t_onfault = 0
-			 */
-			if (type[strlen(type) - 1] != '*')
-				mdb_printf(" ");
-		}
-
-		if (pap->pa_flags & PA_SHOWNAME) {
-			if (depth == 1 && pap->pa_prefix != NULL)
-				mdb_printf("%s%s", pap->pa_prefix,
-				    pap->pa_suffix);
-			mdb_printf("%s", name);
-		}
-
-		if ((pap->pa_flags & PA_SHOWTYPE) && kind == CTF_K_INTEGER) {
-			ctf_encoding_t e;
-
-			if (mdb_ctf_type_encoding(base, &e) == 0) {
-				ulong_t bits = e.cte_bits;
-				ulong_t size = bits / NBBY;
-
-				if (bits % NBBY != 0 ||
-				    off % NBBY != 0 ||
-				    size > 8 ||
-				    size != mdb_ctf_type_size(base))
-					mdb_printf(" :%d", bits);
-			}
-		}
-
-		mdb_printf("%s ", pap->pa_flags & PA_SHOWVAL ? " =" : "");
-	} else if (IS_SCALAR(kind) || pap->pa_maxdepth == 0) {
-		if (pap->pa_flags & PA_SHOWADDR) {
-			if (off % NBBY == 0)
-				mdb_printf("%llx ", pap->pa_addr + off / NBBY);
-			else
-				mdb_printf("%llx.%lx ",
-				    pap->pa_addr + off / NBBY, off % NBBY);
-		}
-
-		if (pap->pa_flags & PA_SHOWTYPE) {
-			mdb_printf("%s", type);
-			/*
-			 * For the zero-depth case, we always print the trailing
-			 * space unless we also have a prefix.
-			 */
-			if (type[strlen(type) - 1] != '*' ||
-			    !((pap->pa_flags & PA_SHOWNAME) &&
-			    pap->pa_prefix != NULL))
-				mdb_printf(" ", type);
-		}
-
-		if ((pap->pa_flags & PA_SHOWNAME) && pap->pa_prefix != NULL)
-			mdb_printf("%s", pap->pa_prefix);
-
-		if ((pap->pa_flags & PA_SHOWTYPE) &&
-		    kind == CTF_K_INTEGER) {
-			ctf_encoding_t e;
-
-			if (mdb_ctf_type_encoding(base, &e) == 0) {
-				ulong_t bits = e.cte_bits;
-				ulong_t size = bits / NBBY;
-
-				if (bits % NBBY != 0 ||
-				    off % NBBY != 0 ||
-				    size > 8 ||
-				    size != mdb_ctf_type_size(base))
-					mdb_printf(" :%d", bits);
-			}
-		}
-
-		if ((pap->pa_flags & PA_SHOWNAME) && pap->pa_prefix != NULL)
-			mdb_printf("%s ",
-			    pap->pa_flags & PA_SHOWVAL ? " =" : "");
-
-		if (pap->pa_prefix != NULL)
-			name = pap->pa_prefix;
+	if (pap->pa_flags & PA_SHOWADDR) {
+		if (off % NBBY == 0)
+			mdb_printf("%llx ", pap->pa_addr + off / NBBY);
+		else
+			mdb_printf("%llx.%lx ",
+			    pap->pa_addr + off / NBBY, off % NBBY);
 	}
+
+	if ((pap->pa_flags & PA_SHOWTYPE)) {
+		mdb_printf("%s", type);
+		/*
+		 * We want to avoid printing a trailing space when
+		 * dealing with pointers in a structure, so we end
+		 * up with:
+		 *
+		 *	label_t *t_onfault = 0
+		 *
+		 * If depth is zero, always print the trailing space unless
+		 * we also have a prefix.
+		 */
+		if (type[strlen(type) - 1] != '*' ||
+		    (depth == 0 && (!(pap->pa_flags & PA_SHOWNAME) ||
+		    pap->pa_prefix == NULL)))
+			mdb_printf(" ");
+	}
+
+	if (pap->pa_flags & PA_SHOWNAME) {
+		if (pap->pa_prefix != NULL && depth <= 1)
+			mdb_printf("%s%s", pap->pa_prefix,
+			    (depth == 0) ? "" : pap->pa_suffix);
+		mdb_printf("%s", name);
+	}
+
+	if ((pap->pa_flags & PA_SHOWTYPE) && kind == CTF_K_INTEGER) {
+		ctf_encoding_t e;
+
+		if (mdb_ctf_type_encoding(base, &e) == 0) {
+			ulong_t bits = e.cte_bits;
+			ulong_t size = bits / NBBY;
+
+			if (bits % NBBY != 0 ||
+			    off % NBBY != 0 ||
+			    size > 8 ||
+			    size != mdb_ctf_type_size(base))
+				mdb_printf(" :%d", bits);
+		}
+	}
+
+	if (depth != 0 ||
+	    ((pap->pa_flags & PA_SHOWNAME) && pap->pa_prefix != NULL))
+		mdb_printf("%s ", pap->pa_flags & PA_SHOWVAL ? " =" : "");
+
+	if (depth == 0 && pap->pa_prefix != NULL)
+		name = pap->pa_prefix;
 
 	pap->pa_depth = depth;
 	if (kind <= CTF_K_UNKNOWN || kind >= CTF_K_TYPEDEF) {
 		mdb_warn("unknown ctf for %s type %s kind %d\n",
-			name, type, kind);
+		    name, type, kind);
 		return (-1);
 	}
 	rc = printfuncs[kind - 1](type, name, id, base, off, pap);
@@ -1784,17 +1873,18 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	i = mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, PA_SHOWADDR, &uflags,
 	    'C', MDB_OPT_SETBITS, TRUE, &opt_C,
+	    'c', MDB_OPT_UINTPTR, &opt_c,
 	    'd', MDB_OPT_SETBITS, PA_INTDEC, &uflags,
 	    'h', MDB_OPT_SETBITS, PA_SHOWHOLES, &uflags,
+	    'i', MDB_OPT_SETBITS, TRUE, &opt_i,
 	    'L', MDB_OPT_SETBITS, TRUE, &opt_L,
+	    'l', MDB_OPT_UINTPTR, &opt_l,
 	    'n', MDB_OPT_SETBITS, PA_NOSYMBOLIC, &uflags,
 	    'p', MDB_OPT_SETBITS, TRUE, &opt_p,
+	    's', MDB_OPT_UINTPTR, &opt_s,
+	    'T', MDB_OPT_SETBITS, PA_SHOWTYPE | PA_SHOWBASETYPE, &uflags,
 	    't', MDB_OPT_SETBITS, PA_SHOWTYPE, &uflags,
 	    'x', MDB_OPT_SETBITS, PA_INTHEX, &uflags,
-	    'c', MDB_OPT_UINTPTR, &opt_c,
-	    'l', MDB_OPT_UINTPTR, &opt_l,
-	    'i', MDB_OPT_SETBITS, TRUE, &opt_i,
-	    's', MDB_OPT_UINTPTR, &opt_s,
 	    NULL);
 
 	if (uflags & PA_INTHEX)
@@ -1824,7 +1914,7 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (mdb_ctf_lookup_by_name(t_name, &id) != 0) {
 			if (!(flags & DCMD_ADDRSPEC) || opt_i ||
 			    addr_to_sym(t, addr, s_name, sizeof (s_name),
-				&sym, &s_info) == NULL ||
+			    &sym, &s_info) == NULL ||
 			    mdb_ctf_lookup_by_symbol(&sym, &s_info, &id) != 0) {
 
 				mdb_warn("failed to look up type %s", t_name);
@@ -1878,7 +1968,7 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		vargv[0] = (const char *)&dot;
 		vargv[1] = (const char *)&outsize;
 		pa.pa_immtgt = mdb_tgt_create(mdb_value_tgt_create,
-			0, 2, vargv);
+		    0, 2, vargv);
 		pa.pa_tgt = pa.pa_immtgt;
 	}
 
@@ -1961,7 +2051,11 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 					goto out;
 				}
 			} else if (off != 0) {
-				if (elt_print("", mid, off, 0, &pa) != 0) {
+				mdb_ctf_id_t base;
+				(void) mdb_ctf_type_resolve(mid, &base);
+
+				if (elt_print("", mid, base, off, 0,
+				    &pa) != 0) {
 					mdb_warn("failed to print type");
 					err = DCMD_ERR;
 					goto out;
@@ -2013,19 +2107,21 @@ out:
 void
 print_help(void)
 {
-	mdb_printf("-a         show address of object\n"
-	    "-c limit   limit the length of character arrays\n"
+	mdb_printf(
+	    "-a         show address of object\n"
 	    "-C         unlimit the length of character arrays\n"
+	    "-c limit   limit the length of character arrays\n"
 	    "-d         output values in decimal\n"
 	    "-h         print holes in structures\n"
-	    "-l limit   limit the length of standard arrays\n"
+	    "-i         interpret address as data of the given type\n"
 	    "-L         unlimit the length of standard arrays\n"
+	    "-l limit   limit the length of standard arrays\n"
 	    "-n         don't print pointers as symbol offsets\n"
 	    "-p         interpret address as a physical memory address\n"
-	    "-t         show type of object\n"
-	    "-i         interpret address as data of the given type\n"
-	    "-x         output values in hexadecimal\n"
 	    "-s depth   limit the recursion depth\n"
+	    "-T         show type and <<base type>> of object\n"
+	    "-t         show type of object\n"
+	    "-x         output values in hexadecimal\n"
 	    "\n"
 	    "type may be omitted if the C type of addr can be inferred.\n"
 	    "\n"
