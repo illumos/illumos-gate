@@ -165,6 +165,7 @@ void		pg_cpu_active(cpu_t *);
 void		pg_cpu_inactive(cpu_t *);
 void		pg_cpu_startup(cpu_t *);
 void		pg_cpu_bootstrap(cpu_t *);
+int		pg_cpu_is_bootstrapped(cpu_t *);
 
 /*
  * PG cpupart service hooks

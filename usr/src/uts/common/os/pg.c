@@ -468,7 +468,7 @@ pg_cpu_add(pg_t *pg, cpu_t *cp, cpu_pg_t *cpu_pg)
 	 * at this point, since this routine may block causing us to
 	 * enter the dispatcher.
 	 */
-	ASSERT(cp->cpu_pg == &bootstrap_pg_data);
+	ASSERT(pg_cpu_is_bootstrapped(cp));
 
 	/* This adds the PG to the CPUs PG group */
 	err = group_add(&cpu_pg->pgs, pg, GRP_RESIZE);
@@ -495,7 +495,7 @@ pg_cpu_delete(pg_t *pg, cpu_t *cp, cpu_pg_t *cpu_pg)
 	 * at this point, since this routine may block causing us to
 	 * enter the dispatcher.
 	 */
-	ASSERT(cp->cpu_pg == &bootstrap_pg_data);
+	ASSERT(pg_cpu_is_bootstrapped(cp));
 
 	/* Remove the PG from the CPU's PG group */
 	err = group_remove(&cpu_pg->pgs, pg, GRP_RESIZE);
@@ -554,7 +554,7 @@ pg_cpu_init(cpu_t *cp)
 	 * this process, the CPU will continue to reference the bootstrap
 	 * PG data until all the initialization completes.
 	 */
-	ASSERT(cp->cpu_pg == &bootstrap_pg_data);
+	ASSERT(pg_cpu_is_bootstrapped(cp));
 
 	cpu_pg = pg_cpu_data_alloc();
 
@@ -588,14 +588,14 @@ pg_cpu_fini(cpu_t *cp)
 	 * This can happen if the CPU coming into the system
 	 * failed to power on.
 	 */
-	if (cpu_pg == NULL || cpu_pg == &bootstrap_pg_data)
+	if (cpu_pg == NULL || pg_cpu_is_bootstrapped(cp))
 		return;
 
 	/*
 	 * Have the CPU reference the bootstrap PG data to survive
 	 * the dispatcher should it block from here on out.
 	 */
-	cp->cpu_pg = &bootstrap_pg_data;
+	pg_cpu_bootstrap(cp);
 
 	for (i = 0; i < pg_nclasses; i++)
 		PG_CPU_FINI(i, cp, cpu_pg);
@@ -724,6 +724,17 @@ void
 pg_cpu_bootstrap(cpu_t *cp)
 {
 	cp->cpu_pg = &bootstrap_pg_data;
+}
+
+/*
+ * Return non-zero if the specified CPU is bootstrapped,
+ * which means it's CPU specific PG data has not yet been
+ * fully constructed.
+ */
+int
+pg_cpu_is_bootstrapped(cpu_t *cp)
+{
+	return (cp->cpu_pg == &bootstrap_pg_data);
 }
 
 /*ARGSUSED*/

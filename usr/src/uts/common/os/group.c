@@ -113,6 +113,9 @@ group_remove(group_t *g, void *e, int gflag)
 {
 	int	i;
 
+	if (g->grp_size == 0)
+		return (-1);
+
 	/*
 	 * Find the element in the group's set
 	 */
