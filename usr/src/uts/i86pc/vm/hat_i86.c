@@ -1816,6 +1816,25 @@ hat_devload(
 			pp = page_numtopp_nolock(pfn);
 
 		/*
+		 * Check to make sure we are really trying to map a valid
+		 * memory page. The caller wishing to intentionally map
+		 * free memory pages will have passed the HAT_LOAD_NOCONSIST
+		 * flag, then pp will be NULL.
+		 */
+		if (pp != NULL) {
+			if (PP_ISFREE(pp)) {
+				panic("hat_devload: loading "
+				    "a mapping to free page %p", (void *)pp);
+			}
+
+			if (!PAGE_LOCKED(pp) && !PP_ISNORELOC(pp)) {
+				panic("hat_devload: loading a mapping "
+				    "to an unlocked page %p",
+				    (void *)pp);
+			}
+		}
+
+		/*
 		 * load this page mapping
 		 */
 		ASSERT(!IN_VA_HOLE(va));
