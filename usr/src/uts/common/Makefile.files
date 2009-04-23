@@ -1836,6 +1836,11 @@ HXGE_OBJS =	hxge_main.o hxge_vmac.o hxge_send.o		\
 MEGA_SAS_OBJS = megaraid_sas.o
 
 #
+#	MR_SAS module
+#
+MR_SAS_OBJS = mr_sas.o
+
+#
 #	ISCSI_INITIATOR module
 #
 ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\

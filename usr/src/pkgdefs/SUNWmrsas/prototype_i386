@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,9 +40,15 @@
 
 #
 # List files which are i386 specific here
+i postinstall
+i postremove
+
 #
 # source locations relative to the prototype file
 #
 # SUNWmrsas
 #
+f none kernel/drv/mr_sas	0755	root	sys
+f none kernel/drv/mr_sas.conf   0644    root    sys
 d none kernel/drv/amd64		0755	root	sys
+f none kernel/drv/amd64/mr_sas	0755	root 	sys

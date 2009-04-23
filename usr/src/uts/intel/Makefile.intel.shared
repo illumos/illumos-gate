@@ -261,6 +261,7 @@ DRV_KMODS	+= mega_sas
 DRV_KMODS	+= mc-amd
 DRV_KMODS	+= mm
 DRV_KMODS	+= mouse8042
+DRV_KMODS	+= mr_sas
 DRV_KMODS_32	+= mscsi
 DRV_KMODS_32	+= msm
 DRV_KMODS	+= nca
