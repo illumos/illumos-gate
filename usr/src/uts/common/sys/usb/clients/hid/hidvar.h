@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,14 +164,23 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_power_t::hid_wakeup_enabled))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_power_t::hid_pwr_states))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_power_t::hid_pm_capabilities))
 
+/*
+ * multiple queue support
+ */
+struct hid_state;
+typedef struct hid_queue {
+	struct hid_state	*hidq_statep;
+	queue_t			*hidq_queue;
+	minor_t			hidq_minor;
+	struct hid_queue	*hidq_next;
+} hid_queue_t;
+
 typedef struct hid_state {
 	dev_info_t		*hid_dip;	/* per-device info handle */
 	kmutex_t		hid_mutex;	/* for general locking */
 	int			hid_instance;	/* instance number */
 
-	minor_t			hid_minor;
 	boolean_t		hid_km;		/* for virtual keyboard/mouse */
-	ddi_taskq_t		*hid_taskq;	/* for physical access */
 
 	/* Attach/detach flags */
 	int			hid_attach_flags;
@@ -181,9 +190,6 @@ typedef struct hid_state {
 
 	/* outstanding requests on the default pipe */
 	int			hid_default_pipe_req;
-
-	queue_t			*hid_rq_ptr;	/* pointer to read queue */
-	queue_t			*hid_wq_ptr;	/* pointer to write queue */
 
 	hid_power_t		*hid_pm;	/* ptr to power struct */
 
@@ -222,6 +228,15 @@ typedef struct hid_state {
 
 	/* handle for outputting messages */
 	usb_log_handle_t	hid_log_handle;
+
+	/*
+	 * This is the list of STREAMS queues built upon the device. Only
+	 * one queue on this list is active at any time - the list head.
+	 * Once the active queue is closed, the next one on the list
+	 * will be activated. The USB pipes will be closed if all queues
+	 * have been closed.
+	 */
+	hid_queue_t		*hid_queue_list;
 } hid_state_t;
 
 /* warlock directives, stable data */
@@ -232,7 +247,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_pm))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_data))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_instance))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_km))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_minor))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_interrupt_pipe))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_ep_intr_descr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_default_pipe))
@@ -240,10 +254,10 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_log_handle))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_if_descr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_data))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_descr))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_state_t::hid_rq_ptr))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_state_t::hid_wq_ptr))
-
 _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_queue_t::hidq_queue))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_queue_t::hidq_statep))
+_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_queue_t::hidq_minor))
 
 
 /*
@@ -259,12 +273,11 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per call",
  * data transfer through default pipe.
  */
 typedef struct hid_default_pipe_argument {
+	/* Pointer to the write queue from which the message comes from */
+	queue_t		*hid_default_pipe_arg_queue;
 
 	/* Message to be sent up to the stream */
 	struct iocblk	hid_default_pipe_arg_mctlmsg;
-
-	/* Pointer to hid_state structure */
-	hid_state_t	*hid_default_pipe_arg_hidp;
 
 	/* Pointer to the original mblk_t received from hid_wput() */
 	mblk_t		*hid_default_pipe_arg_mblk;

@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one hid_state
 one ohci_state
@@ -169,8 +168,6 @@ root hid_polled_read
 root usba_dbuf_tail
 
 ### thread functions in hid module
-root hid_consconfig_relink
-
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_close
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_reset
 

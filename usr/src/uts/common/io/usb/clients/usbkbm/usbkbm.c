@@ -383,6 +383,7 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	usbkbm_state_t	*usbkbmd;
 	struct iocblk	mctlmsg;
 	mblk_t		*mctl_ptr;
+	uintptr_t	abortable = (uintptr_t)B_TRUE;
 	int		error, ret;
 
 	if (q->q_ptr) {
@@ -605,6 +606,27 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	usbkbmd->usbkbm_flags = USBKBM_OPEN;
 
 	kbtrans_streams_enable(usbkbmd->usbkbm_kbtrans);
+
+	/*
+	 * Enable abort sequence on inital. For an internal open, conskbd
+	 * will disable driver abort handling (later through M_IOCTL) and
+	 * handle it by itself.
+	 * For an external (aka. physical) open, this is necessary since
+	 * no STREAMS module linked on top of usbkbm handles abort sequence.
+	 */
+	mctlmsg.ioc_cmd = CONSSETABORTENABLE;
+	mctlmsg.ioc_count = TRANSPARENT;
+	mctl_ptr = usba_mk_mctl(mctlmsg, &abortable, sizeof (abortable));
+	if (mctl_ptr != NULL) {
+		DB_TYPE(mctl_ptr) = M_IOCTL;
+		if (kbtrans_streams_message(usbkbmd->usbkbm_kbtrans, mctl_ptr)
+		    != KBTRANS_MESSAGE_HANDLED) {
+			freemsg(mctl_ptr);
+		}
+	} else {
+		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
+		    "usbkbm: enable abort sequence failed");
+	}
 
 	USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
 	    "usbkbm_open exiting");
@@ -1105,7 +1127,11 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 		return;
 	case M_ERROR:
 		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
-		freemsg(mp);
+		if (*mp->b_rptr == ENODEV) {
+			putnext(q, mp);
+		} else {
+			freemsg(mp);
+		}
 
 		return;
 	case M_IOCACK:
@@ -1257,7 +1283,6 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		bzero(new_buffer, USBKBM_MAXPKTSIZE);
 		usbkbm_unpack_usb_packet(usbkbmd, usbkbm_streams_callback,
 		    new_buffer, usbkbmd->usbkbm_packet_size);
-
 		freemsg(mp);
 
 		break;

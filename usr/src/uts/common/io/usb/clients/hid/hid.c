@@ -59,10 +59,6 @@
 #include <sys/sunddi.h>
 
 extern int ddi_create_internal_pathname(dev_info_t *, char *, int, minor_t);
-extern void consconfig_link(major_t major, minor_t minor);
-extern int consconfig_unlink(major_t major, minor_t minor);
-
-static void hid_consconfig_relink(void *);
 
 /* Debugging support */
 uint_t	hid_errmask	= (uint_t)PRINT_MASK_ALL;
@@ -102,10 +98,11 @@ static void hid_detach_cleanup(dev_info_t *, hid_state_t *);
 
 static int hid_start_intr_polling(hid_state_t *);
 static void hid_close_intr_pipe(hid_state_t *);
-static int hid_mctl_execute_cmd(hid_state_t *, int, hid_req_t *, mblk_t *);
+static int hid_mctl_execute_cmd(queue_t *, int, hid_req_t *,
+		mblk_t *);
 static int hid_mctl_receive(queue_t *, mblk_t *);
-static int hid_send_async_ctrl_request(hid_state_t *, hid_req_t *,
-		uchar_t, int, ushort_t, hid_default_pipe_arg_t *);
+static int hid_send_async_ctrl_request(hid_default_pipe_arg_t *, hid_req_t *,
+		uchar_t, int, ushort_t);
 static void hid_ioctl(queue_t *, mblk_t *);
 
 static void hid_create_pm_components(dev_info_t *, hid_state_t *);
@@ -779,8 +776,7 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	int rval;
 	int instance;
 	hid_state_t *hidp;
-	ddi_taskq_t *taskq;
-	char taskqname[32];
+	hid_queue_t *hidq, *tmpq;
 	minor_t minor = getminor(*devp);
 
 	instance = HID_MINOR_TO_INSTANCE(minor);
@@ -796,11 +792,12 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	if (sflag) {
 		/* clone open NOT supported here */
-
 		return (ENXIO);
 	}
 
-	mutex_enter(&hidp->hid_mutex);
+	if (!(flag & FREAD)) {
+		return (EIO);
+	}
 
 	/*
 	 * This is a workaround:
@@ -811,125 +808,80 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 *	The consconfig_dacf module need this interface to detect if the
 	 *	device is already disconnnected.
 	 */
-	if (HID_IS_INTERNAL_OPEN(minor) &&
-	    (hidp->hid_dev_state == USB_DEV_DISCONNECTED)) {
+	mutex_enter(&hidp->hid_mutex);
+	if (!hidp->hid_km || (HID_IS_INTERNAL_OPEN(minor) &&
+	    (hidp->hid_dev_state == USB_DEV_DISCONNECTED))) {
 		mutex_exit(&hidp->hid_mutex);
-
 		return (ENODEV);
 	}
 
-	if (q->q_ptr || (hidp->hid_streams_flags == HID_STREAMS_OPEN)) {
-		/*
-		 * Exit if the same minor node is already open
-		 */
-		if (!hidp->hid_km || hidp->hid_minor == minor) {
-			mutex_exit(&hidp->hid_mutex);
-
-			return (0);
-		}
-
-		/*
-		 * Check whether it is switch between physical and virtual
-		 *
-		 * Opening from virtual while the device is being physically
-		 * opened by an application should not happen. So we ASSERT
-		 * this in DEBUG version, and return error in the non-DEBUG
-		 * case.
-		 */
-		ASSERT(!HID_IS_INTERNAL_OPEN(minor));
-
-		if (HID_IS_INTERNAL_OPEN(minor)) {
-			mutex_exit(&hidp->hid_mutex);
-
-			return (EINVAL);
-		}
-
-		/*
-		 * Opening the physical one while it is being underneath
-		 * the virtual one.
-		 *
-		 * consconfig_unlink is called to unlink this device from
-		 * the virtual one, thus the old stream serving for this
-		 * device under the virtual one is closed, and then the
-		 * lower driver's close routine (here is hid_close) is also
-		 * called to accomplish the whole stream close. Here we have
-		 * to drop the lock because hid_close also needs the lock.
-		 *
-		 * For keyboard, the old stream is:
-		 *	conskbd->["pushmod"->]"kbd_vp driver"
-		 * For mouse, the old stream is:
-		 *	consms->["pushmod"->]"mouse_vp driver"
-		 *
-		 * After the consconfig_unlink returns, the old stream is closed
-		 * and we grab the lock again to reopen this device as normal.
-		 */
-		mutex_exit(&hidp->hid_mutex);
-
-		/*
-		 * We create a taskq with one thread, which will be used at the
-		 * time of closing physical keyboard, refer to hid_close().
-		 */
-		(void) sprintf(taskqname, "hid_taskq_%d", instance);
-		taskq = ddi_taskq_create(hidp->hid_dip, taskqname, 1,
-		    TASKQ_DEFAULTPRI, 0);
-
-		if (!taskq) {
-			USB_DPRINTF_L3(PRINT_MASK_ALL, hidp->hid_log_handle,
-			    "hid_open: device is temporarily unavailable,"
-			    " try it later");
-
-			return (EAGAIN);
-		}
-
-		/*
-		 * If unlink fails, fail the physical open.
-		 */
-		if ((rval = consconfig_unlink(ddi_driver_major(hidp->hid_dip),
-		    HID_MINOR_MAKE_INTERNAL(minor))) != 0) {
-			ddi_taskq_destroy(taskq);
-
-			return (rval);
-		}
-
-		mutex_enter(&hidp->hid_mutex);
-
-		ASSERT(!hidp->hid_taskq);
-		hidp->hid_taskq = taskq;
-	}
-
-	/* Initialize the queue pointers */
-	q->q_ptr = hidp;
-	WR(q)->q_ptr = hidp;
-
-	hidp->hid_rq_ptr = q;
-	hidp->hid_wq_ptr = WR(q);
-
-	if (flag & FREAD) {
-		hidp->hid_interrupt_pipe = NULL;
-		no_of_ep = hidp->hid_if_descr.bNumEndpoints;
-
-		/* Check if interrupt endpoint exists */
-		if (no_of_ep > 0) {
-			/* Open the interrupt pipe */
-			mutex_exit(&hidp->hid_mutex);
-
-			if (usb_pipe_open(hidp->hid_dip,
-			    &hidp->hid_ep_intr_descr,
-			    &hidp->hid_intr_pipe_policy, USB_FLAGS_SLEEP,
-			    &hidp->hid_interrupt_pipe) !=
-			    USB_SUCCESS) {
-
-				return (EIO);
+	tmpq = hidp->hid_queue_list;
+	while (tmpq != NULL) {
+		if (minor == tmpq->hidq_minor) {
+			if (q == tmpq->hidq_queue) {
+				mutex_exit(&hidp->hid_mutex);
+				return (0);
+			} else {
+				mutex_exit(&hidp->hid_mutex);
+				return (EBUSY);
 			}
-			mutex_enter(&hidp->hid_mutex);
 		}
-	} else {
-		/* NOT FREAD */
-		mutex_exit(&hidp->hid_mutex);
-
-		return (EIO);
+		tmpq = tmpq->hidq_next;
 	}
 	mutex_exit(&hidp->hid_mutex);
+
+	/*
+	 * Add this queue to the head of the queue list. Only the list
+	 * head (active queue) gets input. Other (older) queues will
+	 * be activated after the (current) active one is closed.
+	 */
+	hidq = kmem_zalloc(sizeof (hid_queue_t), KM_SLEEP);
+	hidq->hidq_statep = hidp;
+	hidq->hidq_queue = q;
+	hidq->hidq_minor = minor;
+	q->q_ptr = hidq;
+	WR(q)->q_ptr = hidq;
+
+	mutex_enter(&hidp->hid_mutex);
+	hidq->hidq_next = hidp->hid_queue_list;
+	hidp->hid_queue_list = hidq;
+
+	/* just return in case that pipes already open */
+	if (hidp->hid_queue_list->hidq_next) {
+		/*
+		 * Two queues are supported by now:
+		 * one external (aka. physical) and one virtual (aka. internal)
+		 */
+		mutex_exit(&hidp->hid_mutex);
+		qprocson(q);
+		return (0);
+	}
+
+	hidp->hid_interrupt_pipe = NULL;
+	no_of_ep = hidp->hid_if_descr.bNumEndpoints;
+	mutex_exit(&hidp->hid_mutex);
+
+	/* Check if interrupt endpoint exists */
+	if (no_of_ep > 0) {
+		/* Open the interrupt pipe */
+		if (usb_pipe_open(hidp->hid_dip,
+		    &hidp->hid_ep_intr_descr,
+		    &hidp->hid_intr_pipe_policy, USB_FLAGS_SLEEP,
+		    &hidp->hid_interrupt_pipe) !=
+		    USB_SUCCESS) {
+
+			mutex_enter(&hidp->hid_mutex);
+			ASSERT(hidq == hidp->hid_queue_list);
+			hidp->hid_queue_list = hidq->hidq_next;
+			mutex_exit(&hidp->hid_mutex);
+
+			q->q_ptr = NULL;
+			WR(q)->q_ptr = NULL;
+			kmem_free(hidq, sizeof (hid_queue_t));
+
+			return (EIO);
+		}
+	}
 
 	hid_pm_busy_component(hidp);
 	(void) pm_raise_power(hidp->hid_dip, 0, USB_DEV_OS_FULL_PWR);
@@ -954,14 +906,18 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 		mutex_enter(&hidp->hid_mutex);
 		hidp->hid_interrupt_pipe = NULL;
+		hidp->hid_queue_list = hidq->hidq_next;
 		mutex_exit(&hidp->hid_mutex);
 
 		qprocsoff(q);
+		q->q_ptr = NULL;
+		WR(q)->q_ptr = NULL;
+		kmem_free(hidq, sizeof (hid_queue_t));
+
 		hid_pm_idle_component(hidp);
 
 		return (EIO);
 	}
-	hidp->hid_minor = minor;
 	mutex_exit(&hidp->hid_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, hidp->hid_log_handle, "hid_open: End");
@@ -992,16 +948,17 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 static int
 hid_close(queue_t *q, int flag, cred_t *credp)
 {
-	hid_state_t	*hidp = q->q_ptr;
-	ddi_taskq_t	*taskq;
+	hid_queue_t	*hidq = (hid_queue_t *)q->q_ptr, *prevq = NULL;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	queue_t		*wq;
 	mblk_t		*mp;
+	int		str_flags;
 
 	USB_DPRINTF_L4(PRINT_MASK_CLOSE, hidp->hid_log_handle, "hid_close:");
 
 	mutex_enter(&hidp->hid_mutex);
+	str_flags = hidp->hid_streams_flags;
 	hidp->hid_streams_flags = HID_STREAMS_DISMANTLING;
-	hid_close_intr_pipe(hidp);
 	mutex_exit(&hidp->hid_mutex);
 
 	/*
@@ -1011,9 +968,9 @@ hid_close(queue_t *q, int flag, cred_t *credp)
 	(void) usb_pipe_drain_reqs(hidp->hid_dip,
 	    hidp->hid_default_pipe, 0, USB_FLAGS_SLEEP, NULL, 0);
 
-	/* drain any M_CTLS on the WQ */
 	mutex_enter(&hidp->hid_mutex);
-	wq = hidp->hid_wq_ptr;
+	wq = WR(q);
+	/* drain any M_CTLS on the WQ */
 	while (mp = getq(wq)) {
 		hid_qreply_merror(wq, mp, EIO);
 		mutex_exit(&hidp->hid_mutex);
@@ -1023,7 +980,37 @@ hid_close(queue_t *q, int flag, cred_t *credp)
 	mutex_exit(&hidp->hid_mutex);
 
 	qprocsoff(q);
+
+	mutex_enter(&hidp->hid_mutex);
+	hidq = hidp->hid_queue_list;
+	while (hidq != NULL) {
+		if (hidq->hidq_queue == q) {
+			break;
+		}
+		prevq = hidq;
+		hidq = hidq->hidq_next;
+	}
+	ASSERT(hidq && hidq == q->q_ptr);
 	q->q_ptr = NULL;
+	wq->q_ptr = NULL;
+
+	if (prevq != NULL) {
+		prevq->hidq_next = hidq->hidq_next;
+	} else {
+		hidp->hid_queue_list = hidq->hidq_next;
+	}
+	kmem_free(hidq, sizeof (hid_queue_t));
+
+	/* just return in case that any queue is active */
+	if (hidp->hid_queue_list) {
+		hidp->hid_streams_flags = str_flags;
+		mutex_exit(&hidp->hid_mutex);
+		return (0);
+	}
+
+	/* all queues are closed, close USB pipes */
+	hid_close_intr_pipe(hidp);
+	mutex_exit(&hidp->hid_mutex);
 
 	/*
 	 * Devices other than keyboard/mouse go idle on close.
@@ -1040,38 +1027,6 @@ hid_close(queue_t *q, int flag, cred_t *credp)
 	USB_DPRINTF_L4(PRINT_MASK_CLOSE, hidp->hid_log_handle,
 	    "hid_close: End");
 
-	if (hidp->hid_km && !HID_IS_INTERNAL_OPEN(hidp->hid_minor)) {
-		/*
-		 * Closing physical keyboard/mouse
-		 *
-		 * Link it back to virtual keyboard/mouse,
-		 * and hid_open will be called as a result
-		 * of the consconfig_link call.
-		 *
-		 * If linking back fails, this specific device
-		 * will not be available underneath the virtual
-		 * one, and can only be accessed via physical
-		 * open.
-		 *
-		 * Up to now, we have been running in a thread context
-		 * which has corresponding LWP and proc context. This
-		 * thread represents a user thread executing in kernel
-		 * mode. The action of linking current keyboard to virtual
-		 * keyboard is completely a kernel action. It should not
-		 * be executed in a user thread context. So, we start a
-		 * new kernel thread to relink the keyboard to virtual
-		 * keyboard.
-		 */
-		mutex_enter(&hidp->hid_mutex);
-		taskq = hidp->hid_taskq;
-		hidp->hid_taskq = NULL;
-		mutex_exit(&hidp->hid_mutex);
-		(void) ddi_taskq_dispatch(taskq, hid_consconfig_relink,
-		    hidp, DDI_SLEEP);
-		ddi_taskq_wait(taskq);
-		ddi_taskq_destroy(taskq);
-	}
-
 	return (0);
 }
 
@@ -1083,8 +1038,9 @@ hid_close(queue_t *q, int flag, cred_t *credp)
 static int
 hid_wput(queue_t *q, mblk_t *mp)
 {
+	hid_queue_t	*hidq = (hid_queue_t *)q->q_ptr;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	int		error = USB_SUCCESS;
-	hid_state_t	*hidp = (hid_state_t *)q->q_ptr;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
 	    "hid_wput: Begin");
@@ -1168,9 +1124,10 @@ hid_wput(queue_t *q, mblk_t *mp)
 static int
 hid_wsrv(queue_t *q)
 {
+	hid_queue_t	*hidq = (hid_queue_t *)q->q_ptr;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	int		error;
 	mblk_t		*mp;
-	hid_state_t	*hidp = (hid_state_t *)q->q_ptr;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
 	    "hid_wsrv: Begin");
@@ -1313,15 +1270,15 @@ hid_interrupt_pipe_callback(usb_pipe_handle_t pipe, usb_intr_req_t *req)
 		/*
 		 * Check if data can be put to the next queue.
 		 */
-		if (!canputnext(hidp->hid_rq_ptr)) {
+		if (!canputnext(hidp->hid_queue_list->hidq_queue)) {
 			USB_DPRINTF_L2(PRINT_MASK_ALL, hidp->hid_log_handle,
 			    "Buffer flushed when overflowed.");
 
 			/* Flush the queue above */
-			hid_flush(hidp->hid_rq_ptr);
+			hid_flush(hidp->hid_queue_list->hidq_queue);
 			mutex_exit(&hidp->hid_mutex);
 		} else {
-			q = hidp->hid_rq_ptr;
+			q = hidp->hid_queue_list->hidq_queue;
 			mutex_exit(&hidp->hid_mutex);
 
 			/* Put data upstream */
@@ -1351,10 +1308,12 @@ hid_default_pipe_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *req)
 {
 	hid_default_pipe_arg_t *hid_default_pipe_arg =
 	    (hid_default_pipe_arg_t *)req->ctrl_client_private;
-	hid_state_t *hidp = hid_default_pipe_arg->hid_default_pipe_arg_hidp;
+	queue_t		*wq = hid_default_pipe_arg->hid_default_pipe_arg_queue;
+	queue_t		*rq = RD(wq);
+	hid_queue_t	*hidq = (hid_queue_t *)wq->q_ptr;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	mblk_t		*mctl_mp;
 	mblk_t		*data = NULL;
-	queue_t		*q;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
 	    "hid_default_pipe_callback: "
@@ -1376,11 +1335,9 @@ hid_default_pipe_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *req)
 
 	/* chain the mblk received to the original & send it up */
 	mctl_mp->b_cont = data;
-	mutex_enter(&hidp->hid_mutex);
-	q = hidp->hid_rq_ptr;
-	mutex_exit(&hidp->hid_mutex);
-	if (canputnext(q)) {
-		putnext(q, mctl_mp);
+
+	if (canputnext(rq)) {
+		putnext(rq, mctl_mp);
 	} else {
 		freemsg(mctl_mp); /* avoid leak */
 	}
@@ -1401,7 +1358,7 @@ hid_default_pipe_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *req)
 	mutex_exit(&hidp->hid_mutex);
 
 	hid_pm_idle_component(hidp);
-	qenable(hidp->hid_wq_ptr);
+	qenable(wq);
 }
 
 
@@ -1474,12 +1431,12 @@ hid_default_pipe_exception_callback(usb_pipe_handle_t pipe,
 {
 	hid_default_pipe_arg_t *hid_default_pipe_arg =
 	    (hid_default_pipe_arg_t *)req->ctrl_client_private;
-
-	hid_state_t *hidp = hid_default_pipe_arg->hid_default_pipe_arg_hidp;
-	mblk_t		*data = NULL;
+	queue_t		*wq = hid_default_pipe_arg->hid_default_pipe_arg_queue;
+	queue_t		*rq = RD(wq);
+	hid_queue_t	*hidq = wq->q_ptr;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	usb_cr_t	ctrl_completion_reason = req->ctrl_completion_reason;
-	mblk_t		*mp;
-	queue_t		*q;
+	mblk_t		*mp, *data = NULL;
 
 	USB_DPRINTF_L2(PRINT_MASK_ALL, hidp->hid_log_handle,
 	    "hid_default_pipe_exception_callback: "
@@ -1488,24 +1445,21 @@ hid_default_pipe_exception_callback(usb_pipe_handle_t pipe,
 
 	ASSERT((req->ctrl_cb_flags & USB_CB_INTR_CONTEXT) == 0);
 
-	/*
-	 * This is an exception callback, no need to pass data up
-	 */
-	q = hidp->hid_rq_ptr;
+	mp = hid_default_pipe_arg->hid_default_pipe_arg_mblk;
 
 	/*
 	 * Pass an error message up. Reuse existing mblk.
 	 */
-	if (canputnext(q)) {
-		mp = hid_default_pipe_arg->hid_default_pipe_arg_mblk;
+	if (canputnext(rq)) {
 		mp->b_datap->db_type = M_ERROR;
 		mp->b_rptr = mp->b_datap->db_base;
 		mp->b_wptr = mp->b_rptr + sizeof (char);
 		*mp->b_rptr = EIO;
-		putnext(q, mp);
+		putnext(rq, mp);
 	} else {
-		freemsg(hid_default_pipe_arg->hid_default_pipe_arg_mblk);
+		freemsg(mp);
 	}
+
 	kmem_free(hid_default_pipe_arg, sizeof (hid_default_pipe_arg_t));
 
 	mutex_enter(&hidp->hid_mutex);
@@ -1513,7 +1467,7 @@ hid_default_pipe_exception_callback(usb_pipe_handle_t pipe,
 	ASSERT(hidp->hid_default_pipe_req >= 0);
 	mutex_exit(&hidp->hid_mutex);
 
-	qenable(hidp->hid_wq_ptr);
+	qenable(wq);
 	usb_free_ctrl_req(req);
 	hid_pm_idle_component(hidp);
 }
@@ -1620,6 +1574,8 @@ static int
 hid_disconnect_event_callback(dev_info_t *dip)
 {
 	hid_state_t	*hidp;
+	hid_queue_t	*hidq;
+	mblk_t		*mp;
 
 	hidp = (hid_state_t *)ddi_get_soft_state(hid_statep,
 	    ddi_get_instance(dip));
@@ -1639,6 +1595,28 @@ hid_disconnect_event_callback(dev_info_t *dip)
 			    "busy device has been disconnected");
 		}
 		hid_save_device_state(hidp);
+
+		/*
+		 * Notify applications about device removal, this only
+		 * applies to an external (aka. physical) open. For an
+		 * internal open, consconfig_dacf closes the queue.
+		 */
+		hidq = hidp->hid_queue_list;
+		while (hidq != NULL) {
+			if (!HID_IS_INTERNAL_OPEN(hidq->hidq_minor)) {
+				mutex_exit(&hidp->hid_mutex);
+				mp = allocb(sizeof (uchar_t), BPRI_HI);
+				if (mp != NULL) {
+					mp->b_datap->db_type = M_ERROR;
+					mp->b_rptr = mp->b_datap->db_base;
+					mp->b_wptr = mp->b_rptr + sizeof (char);
+					*mp->b_rptr = ENODEV;
+					putnext(hidq->hidq_queue, mp);
+				}
+				mutex_enter(&hidp->hid_mutex);
+			}
+			hidq = hidq->hidq_next;
+		}
 
 		break;
 	case USB_DEV_SUSPENDED:
@@ -1678,7 +1656,7 @@ hid_power_change_callback(void *arg, int rval)
 	hidp->hid_pm->hid_raise_power = B_FALSE;
 
 	if (hidp->hid_dev_state == USB_DEV_ONLINE) {
-		wq = hidp->hid_wq_ptr;
+		wq = WR(hidp->hid_queue_list->hidq_queue);
 		mutex_exit(&hidp->hid_mutex);
 
 		qenable(wq);
@@ -2140,7 +2118,8 @@ hid_close_intr_pipe(hid_state_t *hidp)
 static int
 hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 {
-	hid_state_t	*hidp = (hid_state_t *)q->q_ptr;
+	hid_queue_t	*hidq = (hid_queue_t *)q->q_ptr;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	struct iocblk	*iocp;
 	int		error = HID_FAILURE;
 	uchar_t		request_type;
@@ -2339,7 +2318,7 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 		if (hidp->hid_streams_flags != HID_STREAMS_DISMANTLING) {
 			/* Send a message down */
 			mutex_exit(&hidp->hid_mutex);
-			error = hid_mctl_execute_cmd(hidp, request_type,
+			error = hid_mctl_execute_cmd(q, request_type,
 			    hid_req_data, mp);
 			if (error == HID_FAILURE) {
 				hid_qreply_merror(q, mp, EIO);
@@ -2366,12 +2345,13 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
  *	Send the command to the device.
  */
 static int
-hid_mctl_execute_cmd(hid_state_t *hidp, int request_type,
-    hid_req_t *hid_req_data, mblk_t *mp)
+hid_mctl_execute_cmd(queue_t *q, int request_type, hid_req_t *hid_req_data,
+    mblk_t *mp)
 {
 	int		request_index;
 	struct iocblk	*iocp;
 	hid_default_pipe_arg_t	*def_pipe_arg;
+	hid_state_t	*hidp = ((hid_queue_t *)q->q_ptr)->hidq_statep;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
@@ -2391,18 +2371,17 @@ hid_mctl_execute_cmd(hid_state_t *hidp, int request_type,
 		return (HID_FAILURE);
 	}
 
+	def_pipe_arg->hid_default_pipe_arg_queue = q;
 	def_pipe_arg->hid_default_pipe_arg_mctlmsg.ioc_cmd = iocp->ioc_cmd;
 	def_pipe_arg->hid_default_pipe_arg_mctlmsg.ioc_count = 0;
-	def_pipe_arg->hid_default_pipe_arg_hidp = hidp;
 	def_pipe_arg->hid_default_pipe_arg_mblk = mp;
 
 	/*
 	 * Send the command down to USBA through default
 	 * pipe.
 	 */
-	if (hid_send_async_ctrl_request(hidp, hid_req_data,
-	    request_type, iocp->ioc_cmd,
-	    request_index, def_pipe_arg) != USB_SUCCESS) {
+	if (hid_send_async_ctrl_request(def_pipe_arg, hid_req_data,
+	    request_type, iocp->ioc_cmd, request_index) != USB_SUCCESS) {
 
 		kmem_free(def_pipe_arg, sizeof (hid_default_pipe_arg_t));
 
@@ -2421,11 +2400,14 @@ hid_mctl_execute_cmd(hid_state_t *hidp, int request_type,
  *	USBA calls.
  */
 static int
-hid_send_async_ctrl_request(hid_state_t *hidp, hid_req_t *hid_request,
+hid_send_async_ctrl_request(hid_default_pipe_arg_t *hid_default_pipe_arg,
+			hid_req_t *hid_request,
 			uchar_t request_type, int request_request,
-			ushort_t request_index,
-			hid_default_pipe_arg_t *hid_default_pipe_arg)
+			ushort_t request_index)
 {
+	queue_t		*q = hid_default_pipe_arg->hid_default_pipe_arg_queue;
+	hid_queue_t	*hidq = (hid_queue_t *)q->q_ptr;
+	hid_state_t	*hidp = hidq->hidq_statep;
 	usb_ctrl_req_t	*ctrl_req;
 	int		rval;
 	size_t		length = 0;
@@ -2641,6 +2623,7 @@ hid_is_pm_enabled(dev_info_t *dip)
 static void
 hid_save_device_state(hid_state_t *hidp)
 {
+	hid_queue_t	*hidq;
 	struct iocblk	*mctlmsg;
 	mblk_t		*mp;
 	queue_t		*q;
@@ -2650,25 +2633,33 @@ hid_save_device_state(hid_state_t *hidp)
 
 	if (hidp->hid_streams_flags == HID_STREAMS_OPEN) {
 		/*
-		 * Send an MCTL up indicating that
-		 * the device will loose its state
+		 * Send MCTLs up indicating that the device
+		 * will loose its state
 		 */
-		q = hidp->hid_rq_ptr;
-		mutex_exit(&hidp->hid_mutex);
-		if (canputnext(q)) {
-			mp = allocb(sizeof (struct iocblk), BPRI_HI);
-			if (mp != NULL) {
-				mp->b_datap->db_type = M_CTL;
-				mctlmsg = (struct iocblk *)mp->b_datap->db_base;
-				mctlmsg->ioc_cmd = HID_DISCONNECT_EVENT;
-				mctlmsg->ioc_count = 0;
-				putnext(q, mp);
+		hidq = hidp->hid_queue_list;
+		while (hidq != NULL) {
+			q = hidq->hidq_queue;
+
+			mutex_exit(&hidp->hid_mutex);
+			if (canputnext(q)) {
+				mp = allocb(sizeof (struct iocblk), BPRI_HI);
+				if (mp != NULL) {
+					mp->b_datap->db_type = M_CTL;
+					mctlmsg = (struct iocblk *)
+					    mp->b_datap->db_base;
+					mctlmsg->ioc_cmd = HID_DISCONNECT_EVENT;
+					mctlmsg->ioc_count = 0;
+					putnext(q, mp);
+				}
 			}
+			mutex_enter(&hidp->hid_mutex);
+
+			hidq = hidq->hidq_next;
 		}
+		mutex_exit(&hidp->hid_mutex);
 		/* stop polling on the intr pipe */
 		usb_pipe_stop_intr_polling(hidp->hid_interrupt_pipe,
 		    USB_FLAGS_SLEEP);
-
 		mutex_enter(&hidp->hid_mutex);
 	}
 }
@@ -2683,6 +2674,7 @@ hid_save_device_state(hid_state_t *hidp)
 static void
 hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 {
+	hid_queue_t	*hidq;
 	int		rval;
 	queue_t		*rdq, *wrq;
 	hid_power_t	*hidpm;
@@ -2725,8 +2717,7 @@ hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 		hidp->hid_dev_state = USB_DEV_DISCONNECTED;
 		mutex_exit(&hidp->hid_mutex);
 		hid_pm_idle_component(hidp);
-
-		return;
+		goto nodev;
 	}
 
 	hid_set_idle(hidp);
@@ -2752,8 +2743,6 @@ hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 	 * was previously operational (open)
 	 */
 	if (hidp->hid_streams_flags == HID_STREAMS_OPEN) {
-		rdq = hidp->hid_rq_ptr;
-		wrq = hidp->hid_wq_ptr;
 		if ((rval = hid_start_intr_polling(hidp)) != USB_SUCCESS) {
 			USB_DPRINTF_L3(PRINT_MASK_ATTA, hidp->hid_log_handle,
 			    "hid_restore_device_state:"
@@ -2766,8 +2755,7 @@ hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 			hidp->hid_dev_state = USB_DEV_DISCONNECTED;
 			mutex_exit(&hidp->hid_mutex);
 			hid_pm_idle_component(hidp);
-
-			return;
+			goto nodev;
 		}
 
 		if (hidp->hid_dev_state == USB_DEV_DISCONNECTED) {
@@ -2777,22 +2765,31 @@ hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 
 		/* set the device state ONLINE */
 		hidp->hid_dev_state = USB_DEV_ONLINE;
-		mutex_exit(&hidp->hid_mutex);
 
 		/* inform upstream modules that the device is back */
-		if (canputnext(rdq)) {
-			mp = allocb(sizeof (struct iocblk), BPRI_HI);
-			if (mp != NULL) {
-				mp->b_datap->db_type = M_CTL;
-				mctlmsg = (struct iocblk *)mp->b_datap->db_base;
-				mctlmsg->ioc_cmd = HID_CONNECT_EVENT;
-				mctlmsg->ioc_count = 0;
-				putnext(rdq, mp);
+		hidq = hidp->hid_queue_list;
+		while (hidq != NULL) {
+			rdq = hidq->hidq_queue;
+			wrq = WR(rdq);
+
+			mutex_exit(&hidp->hid_mutex);
+			if (canputnext(rdq)) {
+				mp = allocb(sizeof (struct iocblk), BPRI_HI);
+				if (mp != NULL) {
+					mp->b_datap->db_type = M_CTL;
+					mctlmsg = (struct iocblk *)
+					    mp->b_datap->db_base;
+					mctlmsg->ioc_cmd = HID_CONNECT_EVENT;
+					mctlmsg->ioc_count = 0;
+					putnext(rdq, mp);
+				}
 			}
+			/* enable write side q */
+			qenable(wrq);
+			mutex_enter(&hidp->hid_mutex);
+
+			hidq = hidq->hidq_next;
 		}
-		/* enable write side q */
-		qenable(wrq);
-		mutex_enter(&hidp->hid_mutex);
 	} else {
 		/* set the device state ONLINE */
 		hidp->hid_dev_state = USB_DEV_ONLINE;
@@ -2800,6 +2797,32 @@ hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 
 	mutex_exit(&hidp->hid_mutex);
 	hid_pm_idle_component(hidp);
+	return;
+
+nodev:
+	/*
+	 * Notify applications about device removal. This only
+	 * applies to an external (aka. physical) open. Not sure how to
+	 * notify consconfig to close the internal minor node.
+	 */
+	mutex_enter(&hidp->hid_mutex);
+	hidq = hidp->hid_queue_list;
+	while (hidq != NULL) {
+		if (!HID_IS_INTERNAL_OPEN(hidq->hidq_minor)) {
+			mutex_exit(&hidp->hid_mutex);
+			mp = allocb(sizeof (uchar_t), BPRI_HI);
+			if (mp != NULL) {
+				mp->b_datap->db_type = M_ERROR;
+				mp->b_rptr = mp->b_datap->db_base;
+				mp->b_wptr = mp->b_rptr + sizeof (char);
+				*mp->b_rptr = ENODEV;
+				putnext(hidq->hidq_queue, mp);
+			}
+			mutex_enter(&hidp->hid_mutex);
+		}
+		hidq = hidq->hidq_next;
+	}
+	mutex_exit(&hidp->hid_mutex);
 }
 
 
@@ -2938,7 +2961,7 @@ hid_pwrlvl0(hid_state_t *hidp)
 		}
 
 		if (hidp->hid_streams_flags == HID_STREAMS_OPEN) {
-			q = hidp->hid_rq_ptr;
+			q = hidp->hid_queue_list->hidq_queue;
 			mutex_exit(&hidp->hid_mutex);
 			if (canputnext(q)) {
 				/* try to preallocate mblks */
@@ -3068,7 +3091,7 @@ hid_pwrlvl3(hid_state_t *hidp)
 			}
 
 			/* Send an MCTL up indicating device in full  power */
-			q = hidp->hid_rq_ptr;
+			q = hidp->hid_queue_list->hidq_queue;
 			mp = hidpm->hid_pm_pwrup;
 			hidpm->hid_pm_pwrup = NULL;
 			mutex_exit(&hidp->hid_mutex);
@@ -3239,13 +3262,4 @@ hid_polled_input_exit(hid_polled_handle_t hid_polled_inputp)
 	(void) usb_console_input_exit(hidp->hid_polled_console_info);
 
 	return (0);
-}
-
-static void
-hid_consconfig_relink(void *arg)
-{
-	hid_state_t *hidp = (hid_state_t *)arg;
-
-	consconfig_link(ddi_driver_major(hidp->hid_dip),
-	    HID_MINOR_MAKE_INTERNAL(hidp->hid_minor));
 }

@@ -1,5 +1,5 @@
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one hid_state
 
@@ -46,8 +45,6 @@ root hid_polled_input_exit
 root hid_polled_read
 
 ### thread functions
-root hid_consconfig_relink
-
 add        bus_ops::bus_add_eventcall targets warlock_dummy
 add        bus_ops::bus_get_eventcookie targets warlock_dummy
 add        bus_ops::bus_post_event targets warlock_dummy
