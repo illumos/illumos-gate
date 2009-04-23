@@ -1309,6 +1309,9 @@ boolean_t iscsid_login_tgt(iscsi_hba_t *ihp, char *target_name,
     iSCSIDiscoveryMethod_t method, struct sockaddr *addr_dsc);
 void iscsid_addr_to_sockaddr(int src_insize, void *src_addr, int src_port,
     struct sockaddr *dst_addr);
+void iscsid_set_default_initiator_node_settings(iscsi_hba_t *ihp,
+    boolean_t minimal);
+
 void iscsi_send_sysevent(iscsi_hba_t *ihp, char *eventcalss,
     char *subclass, nvlist_t *np);
 boolean_t iscsi_reconfig_boot_sess(iscsi_hba_t *ihp);

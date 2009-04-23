@@ -59,7 +59,6 @@ static int iscsid_copyto_param_set(uint32_t param_id,
     iscsi_login_params_t *params, iscsi_param_set_t *ipsp);
 static void iscsid_add_pg_list_to_cache(iscsi_hba_t *ihp,
     isns_portal_group_list_t *pg_list);
-static void iscsid_set_default_initiator_node_settings(iscsi_hba_t *ihp);
 static void iscsid_remove_target_param(char *name);
 static boolean_t iscsid_add(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
     struct sockaddr *addr_dsc, char *target_name, int tpgt,
@@ -1439,7 +1438,7 @@ iscsid_init_config(iscsi_hba_t *ihp)
 		 * a default initiator name so that the initiator can
 		 * be brought up properly.
 		 */
-		iscsid_set_default_initiator_node_settings(ihp);
+		iscsid_set_default_initiator_node_settings(ihp, B_FALSE);
 		(void) strncpy(initiatorName, (const char *)ihp->hba_name,
 		    ISCSI_MAX_NAME_LEN);
 	}
@@ -1903,8 +1902,8 @@ iscsid_add_pg_list_to_cache(iscsi_hba_t *ihp,
  * unique if the NIC is moved between hosts.  The alias
  * is just the hostname.
  */
-static void
-iscsid_set_default_initiator_node_settings(iscsi_hba_t *ihp)
+void
+iscsid_set_default_initiator_node_settings(iscsi_hba_t *ihp, boolean_t minimal)
 {
 	int		    i;
 	time_t		    x;
@@ -1939,10 +1938,17 @@ iscsid_set_default_initiator_node_settings(iscsi_hba_t *ihp)
 			(void) strncpy((char *)ihp->hba_alias,
 			    utsname.nodename, ISCSI_MAX_NAME_LEN);
 			ihp->hba_alias_length = strlen((char *)ihp->hba_alias);
-			(void) persistent_alias_name_set(
-			    (char *)ihp->hba_alias);
+			if (minimal == B_FALSE) {
+				(void) persistent_alias_name_set(
+				    (char *)ihp->hba_alias);
+			}
 		}
 	}
+
+	if (minimal == B_TRUE) {
+		return;
+	}
+
 	(void) persistent_initiator_name_set((char *)ihp->hba_name);
 
 	/* Set default initiator-node CHAP settings */

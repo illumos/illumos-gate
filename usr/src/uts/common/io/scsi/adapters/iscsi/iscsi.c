@@ -497,6 +497,9 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			/* setup hba defaults */
 			iscsi_set_default_login_params(&ihp->hba_params);
 
+			/* setup minimal initiator params */
+			iscsid_set_default_initiator_node_settings(ihp, B_TRUE);
+
 			/* hba set up */
 			tran->tran_hba_private  = ihp;
 			tran->tran_tgt_private  = NULL;
@@ -3884,8 +3887,8 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 		if (rval == B_TRUE) {
 			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_DISABLED);
-		} else {
 			iscsi_door_unbind();
+		} else {
 			iscsi_exit_service_zone(ihp, ISCSI_SERVICE_ENABLED);
 			rtn = EFAULT;
 		}
