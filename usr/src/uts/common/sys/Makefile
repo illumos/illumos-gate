@@ -969,6 +969,13 @@ USBHDRS=	\
 	usba.h	\
 	usbai.h
 
+UWBHDRS=	\
+	uwb.h	\
+	uwbai.h
+
+UWBAHDRS=	\
+	uwba.h
+
 USBAUDHDRS=           \
 	usb_audio.h
 
@@ -978,6 +985,9 @@ USBHUBDHDRS=		\
 
 USBHIDHDRS=		\
 	hid.h
+
+USBHWARCHDRS=		\
+	hwarc.h
 
 USBMSHDRS=		\
 	usb_bulkonly.h	\
@@ -1138,12 +1148,15 @@ CHECKHDRS=						\
 	$(USBAUDHDRS:%.h=usb/clients/audio/%.check)   \
 	$(USBHUBDHDRS:%.h=usb/hubd/%.check)		\
 	$(USBHIDHDRS:%.h=usb/clients/hid/%.check)	\
+	$(USBHWARCHDRS:%.h=usb/clients/hwarc/%.check)	\
 	$(USBMSHDRS:%.h=usb/clients/mass_storage/%.check)	\
 	$(USBPRNHDRS:%.h=usb/clients/printer/%.check)   \
 	$(USBCDCHDRS:%.h=usb/clients/usbcdc/%.check)	\
 	$(USBVIDHDRS:%.h=usb/clients/video/usbvc/%.check)   \
 	$(UGENHDRS:%.h=usb/clients/ugen/%.check)   \
 	$(USBHDRS:%.h=usb/%.check)                      \
+	$(UWBHDRS:%.h=uwb/%.check)                      \
+	$(UWBAHDRS:%.h=uwb/uwba/%.check)                      \
 	$(I1394HDRS:%.h=1394/%.check)			\
 	$(RSMHDRS:%.h=rsm/%.check)			\
 	$(TSOLHDRS:%.h=tsol/%.check)			\
@@ -1192,9 +1205,12 @@ CHECKHDRS=						\
 	$(ROOTSYSEVENTHDRS)     \
 	$(ROOTCONTRACTHDRS)     \
 	$(ROOTUSBHDRS)		\
+	$(ROOTUWBHDRS)		\
+	$(ROOTUWBAHDRS)		\
 	$(ROOTUSBAUDHDRS)	\
 	$(ROOTUSBHUBDHDRS)	\
 	$(ROOTUSBHIDHDRS)	\
+	$(ROOTUSBHRCHDRS)	\
 	$(ROOTUSBMSHDRS)	\
 	$(ROOTUSBPRNHDRS)       \
 	$(ROOTUSBCDCHDRS)       \
@@ -1249,10 +1265,13 @@ install_h:			\
 	$(ROOTSDCARDHDRS)	\
 	$(ROOTSYSEVENTHDRS)     \
 	$(ROOTCONTRACTHDRS)     \
+	$(ROOTUWBHDRS)		\
+	$(ROOTUWBAHDRS)		\
 	$(ROOTUSBHDRS)		\
 	$(ROOTUSBAUDHDRS)	\
 	$(ROOTUSBHUBDHDRS)	\
 	$(ROOTUSBHIDHDRS)	\
+	$(ROOTUSBHRCHDRS)	\
 	$(ROOTUSBMSHDRS)	\
 	$(ROOTUSBPRNHDRS)       \
 	$(ROOTUSBCDCHDRS)       \

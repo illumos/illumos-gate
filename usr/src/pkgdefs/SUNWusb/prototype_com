@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,10 @@
 #
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -48,6 +46,8 @@ i preremove
 i i.configmapconf
 i r.configmapconf
 i i.scsa2usbconf
+i i.manifest
+i r.manifest
 d none kernel 0755 root sys
 d none kernel/dacf 0755 root sys
 d none kernel/drv 0755 root sys
@@ -59,5 +59,16 @@ d none kernel/misc 0755 root sys
 d none kernel/strmod 0755 root sys
 d none etc 755 root sys
 d none etc/usb 755 root sys
+d none sbin 755 root sys
+f none sbin/wusbadm 555 root bin
+d none lib 755 root bin
+d none lib/svc 0755 root bin
+d none lib/svc/method 0755 root bin
+f none lib/svc/method/svc-wusb 0555 root bin
+d none var 755 root sys
+d none var/svc 755 root sys
+d none var/svc/manifest 755 root sys
+d none var/svc/manifest/system 755 root sys
+f manifest var/svc/manifest/system/wusb.xml 0444 root sys
 e configmapconf etc/usb/config_map.conf 644 root sys
 e scsa2usbconf kernel/drv/scsa2usb.conf 0644 root sys

@@ -441,6 +441,7 @@ COMMON_SUBDIRS=		\
 	whodo		\
 	wracct		\
 	write		\
+	wusbadm		\
 	xntpd		\
 	xargs		\
 	xstr		\
@@ -733,6 +734,7 @@ MSGSUBDIRS=		\
 	whodo		\
 	wracct		\
 	write		\
+	wusbadm		\
 	xargs		\
 	yppasswd	\
 	zdump		\

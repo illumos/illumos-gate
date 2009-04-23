@@ -85,6 +85,12 @@ find_files "s.*"	\
 	usr/src/uts/sparc/usbsprl \
 	usr/src/uts/sparc/usbsacm \
 	usr/src/uts/sparc/usbvc \
+	usr/src/uts/sparc/wusb_ca \
+	usr/src/uts/sparc/hwa1480_fw \
+	usr/src/uts/sparc/hwahc \
+	usr/src/uts/sparc/hwarc \
+	usr/src/uts/sparc/wusb_df \
+	usr/src/uts/sparc/uwba \
 	usr/src/uts/sparc/usbskel \
 	usr/src/uts/sparc/warlock \
 	usr/src/uts/sparc/asm \
@@ -120,6 +126,12 @@ find_files "s.*"	\
 	usr/src/uts/intel/usbsprl \
 	usr/src/uts/intel/usbsacm \
 	usr/src/uts/intel/usbvc \
+	usr/src/uts/intel/wusb_ca \
+	usr/src/uts/intel/hwa1480_fw \
+	usr/src/uts/intel/hwahc \
+	usr/src/uts/intel/hwarc \
+	usr/src/uts/intel/wusb_df \
+	usr/src/uts/intel/uwba \
 	usr/src/uts/intel/usbskel \
 	usr/src/uts/intel/warlock \
 	usr/src/uts/intel/ia32 \

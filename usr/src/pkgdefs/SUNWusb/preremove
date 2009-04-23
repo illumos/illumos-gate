@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
  
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -102,6 +101,26 @@ fi
 if installed uhci
 then
 	rem_drv -b ${BASEDIR} uhci || EXIT=1
+fi
+
+if installed wusb_ca
+then
+	rem_drv -b ${BASEDIR} wusb_ca || EXIT=1
+fi
+
+if installed wusb_df
+then
+	rem_drv -b ${BASEDIR} wusb_df || EXIT=1
+fi
+
+if installed hwahc
+then
+	rem_drv -b ${BASEDIR} hwahc || EXIT=1
+fi
+
+if installed hwarc
+then
+	rem_drv -b ${BASEDIR} hwarc || EXIT=1
 fi
 
 exit $EXIT

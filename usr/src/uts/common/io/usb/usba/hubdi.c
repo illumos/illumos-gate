@@ -24,7 +24,6 @@
  */
 
 
-
 /*
  * USBA: Solaris USB Architecture support for the hub
  * including root hub
@@ -93,14 +92,12 @@ static int hubd_bus_unconfig(dev_info_t *dip,
 static int hubd_bus_power(dev_info_t *dip, void *impl_arg,
 			pm_bus_power_op_t op, void *arg, void *result);
 
-static void hubd_get_ancestry_str(hubd_t *);
 static usb_port_t  hubd_get_port_num(hubd_t *, struct devctl_iocdata *);
 static dev_info_t *hubd_get_child_dip(hubd_t *, usb_port_t);
 static uint_t hubd_cfgadm_state(hubd_t *, usb_port_t);
 static int hubd_toggle_port(hubd_t *, usb_port_t);
 static void hubd_register_cpr_callback(hubd_t *);
 static void hubd_unregister_cpr_callback(hubd_t *);
-static hubd_t *hubd_get_soft_state(dev_info_t *dip);
 
 /*
  * Busops vector for USB HUB's
@@ -186,7 +183,7 @@ usba_hubdi_destroy()
  *	the HUB	should initialize usba_hubdi structure prior
  *	to calling this	interface
  */
-static int
+int
 usba_hubdi_register(dev_info_t	*dip,
 		uint_t		flags)
 {
@@ -218,7 +215,7 @@ usba_hubdi_register(dev_info_t	*dip,
 /*
  * Called by an	HUB to detach an instance of the driver
  */
-static int
+int
 usba_hubdi_unregister(dev_info_t *dip)
 {
 	usba_device_t *usba_device = usba_get_usba_device(dip);
@@ -449,9 +446,9 @@ usba_hubdi_unbind_root_hub(dev_info_t *dip)
 #include <sys/usb/usba/usbai_version.h>
 
 /* Debugging support */
-static uint_t hubd_errlevel	= USB_LOG_L4;
-static uint_t hubd_errmask	= (uint_t)DPRINT_MASK_ALL;
-static uint_t hubd_instance_debug = (uint_t)-1;
+uint_t hubd_errlevel	= USB_LOG_L4;
+uint_t hubd_errmask	= (uint_t)DPRINT_MASK_ALL;
+uint_t hubd_instance_debug = (uint_t)-1;
 static uint_t hubdi_bus_config_debug = 0;
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hubd_errlevel))
@@ -494,8 +491,6 @@ void	*hubd_statep;
  */
 static int hubd_cleanup(dev_info_t *dip, hubd_t  *hubd);
 static int hubd_check_ports(hubd_t  *hubd);
-
-static void hubd_schedule_cleanup(dev_info_t *);
 
 static int  hubd_open_intr_pipe(hubd_t *hubd);
 static void hubd_start_polling(hubd_t *hubd, int always);
@@ -593,8 +588,13 @@ static usb_event_t hubd_events = {
 
 /*
  * hubd_get_soft_state() returns the hubd soft state
+ *
+ * WUSB support extends this function to support wire adapter class
+ * devices. The hubd soft state for the wire adapter class device
+ * would be stored in usb_root_hubd field of the usba_device structure,
+ * just as the USB host controller drivers do.
  */
-static hubd_t *
+hubd_t *
 hubd_get_soft_state(dev_info_t *dip)
 {
 	if (dip == NULL) {
@@ -602,7 +602,7 @@ hubd_get_soft_state(dev_info_t *dip)
 		return (NULL);
 	}
 
-	if (usba_is_root_hub(dip)) {
+	if (usba_is_root_hub(dip) || usba_is_wa(dip)) {
 		usba_device_t *usba_device = usba_get_usba_device(dip);
 
 		return (usba_device->usb_root_hubd);
@@ -1972,7 +1972,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    "usb-port-count", ports_count) != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
-		    "usb-port-number update failed");
+		    "usb-port-count update failed");
 	}
 
 	/*
@@ -2201,13 +2201,27 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 	usb_port_t port;
 	hubd_t *hubd;
 	major_t hub_major = ddi_name_to_major("hubd");
+	major_t hwahc_major = ddi_name_to_major("hwahc");
+	major_t usbmid_major = ddi_name_to_major("usb_mid");
 
 	/*
 	 * make sure dip is a usb hub, major of root hub is HCD
 	 * major
 	 */
 	if (!usba_is_root_hub(dip)) {
-		if ((ddi_driver_major(dip) != hub_major) ||
+		if (ddi_driver_major(dip) == usbmid_major) {
+			/*
+			 * need to walk the children since it might be a
+			 * HWA device
+			 */
+
+			return (DDI_WALK_CONTINUE);
+		}
+
+		/* TODO: DWA device may also need special handling */
+
+		if (((ddi_driver_major(dip) != hub_major) &&
+		    (ddi_driver_major(dip) != hwahc_major)) ||
 		    !i_ddi_devi_attached(dip)) {
 
 			return (DDI_WALK_PRUNECHILD);
@@ -2223,18 +2237,36 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 	/* walk child list and remove nodes with flag DEVI_DEVICE_REMOVED */
 	ndi_devi_enter(dip, &circ);
 
-	mutex_enter(HUBD_MUTEX(hubd));
-	for (port = 1; port <= hubd->h_hub_descr.bNbrPorts; port++) {
-		dev_info_t *cdip = hubd->h_children_dips[port];
+	if (ddi_driver_major(dip) != hwahc_major) {
+		/* for normal usb hub or root hub */
+		mutex_enter(HUBD_MUTEX(hubd));
+		for (port = 1; port <= hubd->h_hub_descr.bNbrPorts; port++) {
+			dev_info_t *cdip = hubd->h_children_dips[port];
 
-		if (cdip == NULL || DEVI_IS_DEVICE_REMOVED(cdip) == 0) {
+			if (cdip == NULL || DEVI_IS_DEVICE_REMOVED(cdip) == 0) {
 
-			continue;
+				continue;
+			}
+
+			(void) hubd_delete_child(hubd, port, NDI_DEVI_REMOVE,
+			    B_TRUE);
 		}
+		mutex_exit(HUBD_MUTEX(hubd));
+	} else {
+		/* for HWA */
+		if (hubd->h_cleanup_child != NULL) {
+			if (hubd->h_cleanup_child(dip) != USB_SUCCESS) {
+				ndi_devi_exit(dip, circ);
 
-		(void) hubd_delete_child(hubd, port, NDI_DEVI_REMOVE, B_TRUE);
+				return (DDI_WALK_PRUNECHILD);
+			}
+		} else {
+			ndi_devi_exit(dip, circ);
+
+			return (DDI_WALK_PRUNECHILD);
+		}
 	}
-	mutex_exit(HUBD_MUTEX(hubd));
+
 	ndi_devi_exit(dip, circ);
 
 	/* skip siblings of root hub */
@@ -2315,10 +2347,37 @@ hubd_root_hub_cleanup_thread(void *arg)
 }
 
 
-static void
+void
 hubd_schedule_cleanup(dev_info_t *rh_dip)
 {
-	hubd_t	*root_hubd = (hubd_t *)hubd_get_soft_state(rh_dip);
+	hubd_t	*root_hubd;
+
+	/*
+	 * The usb_root_hub_dip pointer for the child hub of the WUSB
+	 * wire adapter class device points to the wire adapter, not
+	 * the root hub. Need to find the real root hub dip so that
+	 * the cleanup thread only starts from the root hub.
+	 */
+	while (!usba_is_root_hub(rh_dip)) {
+		root_hubd = hubd_get_soft_state(rh_dip);
+		if (root_hubd != NULL) {
+			rh_dip = root_hubd->h_usba_device->usb_root_hub_dip;
+			if (rh_dip == NULL) {
+				USB_DPRINTF_L2(DPRINT_MASK_ATTA,
+				    root_hubd->h_log_handle,
+				    "hubd_schedule_cleanup: null rh dip");
+
+				return;
+			}
+		} else {
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA,
+			    root_hubd->h_log_handle,
+			    "hubd_schedule_cleanup: cannot find root hub");
+
+			return;
+		}
+	}
+	root_hubd = hubd_get_soft_state(rh_dip);
 
 	mutex_enter(HUBD_MUTEX(root_hubd));
 	root_hubd->h_cleanup_needed = B_TRUE;
@@ -5245,7 +5304,7 @@ hubd_disable_port_power(hubd_t *hubd, usb_port_t port)
  * Search the database of user preferences and find out the preferred
  * configuration for this new device
  */
-static int
+int
 hubd_select_device_configuration(hubd_t *hubd, usb_port_t port,
 	dev_info_t *child_dip, usba_device_t *child_ud)
 {
@@ -5560,7 +5619,7 @@ hubd_get_all_device_config_cloud(hubd_t *hubd, dev_info_t *dip,
  *	Prepares the device node for driver to online. If an existing
  *	OBP node is found, it will switch to the OBP node.
  */
-static dev_info_t *
+dev_info_t *
 hubd_ready_device(hubd_t *hubd, dev_info_t *child_dip, usba_device_t *child_ud,
     uint_t config_index)
 {
@@ -6285,6 +6344,19 @@ hubd_delete_child(hubd_t *hubd, usb_port_t port, uint_t flag, boolean_t retry)
 		}
 
 		rval = usba_destroy_child_devi(child_dip, flag);
+
+		if ((rval != USB_SUCCESS) && usba_is_hwa(child_dip)) {
+			/*
+			 * This is only useful for HWA device node.
+			 * Since hwahc interface must hold hwarc interface
+			 * open until hwahc is detached, the first call to
+			 * ndi_devi_unconfig_one() can only offline hwahc
+			 * driver but not hwarc driver. Need to make a second
+			 * call to ndi_devi_unconfig_one() to make the hwarc
+			 * driver detach.
+			 */
+			rval = usba_destroy_child_devi(child_dip, flag);
+		}
 
 		if ((rval == USB_SUCCESS) && (flag & NDI_DEVI_REMOVE)) {
 			/*
@@ -7841,51 +7913,52 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
  * more than sufficient (as hubs are a max 6 levels deep, port needs 3
  * chars plus NULL each)
  */
-static void
+void
 hubd_get_ancestry_str(hubd_t *hubd)
 {
-	char	dev_path[MAXPATHLEN];
-	char	*port_num_pos;
-	char	port_list[HUBD_APID_NAMELEN];
-	char	*port_list_end = port_list;
+	char		ap_name[HUBD_APID_NAMELEN];
+	dev_info_t	*pdip;
+	hubd_t		*phubd;
+	usb_port_t	port;
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, hubd->h_log_handle,
 	    "hubd_get_ancestry_str: hubd=0x%p", (void *)hubd);
 
-	dev_path[0] = '\0';
-	(void) ddi_pathname(hubd->h_dip, dev_path);
-	port_num_pos = dev_path;
+	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
 
-	port_list[0] = NULL;
-	while ((port_num_pos = (char *)strstr(port_num_pos, "hub@")) != NULL) {
+	/*
+	 * The function is extended to support wire adapter class
+	 * devices introduced by WUSB spec. The node name is no
+	 * longer "hub" only.
+	 * Generate the ap_id str based on the parent and child
+	 * relationship instead of retrieving it from the hub
+	 * device path, which simplifies the algorithm.
+	 */
+	if (usba_is_root_hub(hubd->h_dip)) {
+		hubd->h_ancestry_str[0] = '\0';
+	} else {
+		port = hubd->h_usba_device->usb_port;
+		mutex_exit(HUBD_MUTEX(hubd));
+
+		pdip = ddi_get_parent(hubd->h_dip);
 		/*
-		 * Found a non-root hub between the root hub port and device.
-		 * Get the number of the port this hub is plugged into,
-		 * and append it to the ancestry string.
+		 * The parent of wire adapter device might be usb_mid.
+		 * Need to look further up for hub device
 		 */
-		if (port_list_end != port_list) { /* have list already */
-			(void) strcat(port_list_end, ".");
-			port_list_end++;
+		if (strcmp(ddi_driver_name(pdip), "usb_mid") == 0) {
+			pdip = ddi_get_parent(pdip);
+			ASSERT(pdip != NULL);
 		}
 
-		while (!isdigit(*port_num_pos)) {
-			if (*port_num_pos++ == '\0') {
+		phubd = hubd_get_soft_state(pdip);
 
-				break;
-			}
-		}
+		mutex_enter(HUBD_MUTEX(phubd));
+		(void) snprintf(ap_name, HUBD_APID_NAMELEN, "%s%d",
+		    phubd->h_ancestry_str, port);
+		mutex_exit(HUBD_MUTEX(phubd));
 
-		while (isdigit(*port_num_pos)) {
-			*port_list_end++ = *port_num_pos++;
-			ASSERT(port_list_end <
-			    (port_list + sizeof (port_list)));
-			ASSERT(port_num_pos < (dev_path + sizeof (dev_path)));
-		}
-		*port_list_end = '\0';
-	}
-
-	if (port_list_end != port_list) {
-		(void) strcpy(hubd->h_ancestry_str, port_list);
+		mutex_enter(HUBD_MUTEX(hubd));
+		(void) strcpy(hubd->h_ancestry_str, ap_name);
 		(void) strcat(hubd->h_ancestry_str, ".");
 	}
 }

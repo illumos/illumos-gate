@@ -303,6 +303,7 @@ COMMON_SUBDIRS = \
 	cmd/who \
 	cmd/whodo \
 	cmd/wracct \
+	cmd/wusbadm \
 	cmd/xargs \
 	cmd/xstr \
 	cmd/yes \

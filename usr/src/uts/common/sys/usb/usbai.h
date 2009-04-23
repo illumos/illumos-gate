@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -291,7 +291,7 @@ typedef struct usb_cfg_descr {
  */
 #define	USB_CFG_ATTR_SELFPWR		0x40
 #define	USB_CFG_ATTR_REMOTE_WAKEUP	0x20
-
+#define	USB_CFG_ATTR_BAT_PWR		0x10
 
 /*
  * USB Other Speed Configuration Descriptor
@@ -447,6 +447,112 @@ typedef struct usb_string_descr {
 
 
 /*
+ * usb_bos_descr:
+ *	usb BOS descriptor, refer to WUSB 1.0/7.4.1
+ */
+typedef struct usb_bos_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint16_t	wTotalLength;
+	uint8_t		bNumDeviceCaps;
+} usb_bos_descr_t;
+
+/*
+ * usb_dev_cap_header:
+ *	usb device capability descriptor header, refer to WUSB 1.0/7.4.1
+ */
+typedef struct usb_cap_descr_header {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint8_t		bDevCapabilityType;
+} usb_cap_descr_header_t;
+
+typedef struct usb_cap_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;	/* set to DEVICE CAPABILITY */
+	uint8_t		bDevCapabilityType;
+	uint8_t		bCapValue[1];		/* variable length data */
+} usb_cap_descr_t;
+
+#define	USB_CAP_TYPE_WUSB	1
+
+/* Wireless USB device capability descriptor - UWB descriptor */
+typedef struct usb_uwb_cap_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint8_t		bDevCapabilityType;
+	uint8_t		bmAttributes;
+	uint16_t	wPHYRates;
+	uint8_t		bmTFITXPowerInfo;
+	uint8_t		bmFFITXPowerInfo;
+	uint16_t	bmBandGroup;
+	uint8_t		bReserved;
+} usb_uwb_cap_descr_t;
+
+/*
+ * usb_ep_comp_descr:
+ *	usb endpoint companion descriptor, refer to WUSB 1.0/7.4.4
+ */
+typedef struct usb_ep_comp_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint8_t		bMaxBurst;
+	uint8_t		bMaxSequence;
+	uint16_t	wMaxStreamDelay;
+	uint16_t	wOverTheAirPacketSize;
+	uint8_t		bOverTheAirInterval;
+	uint8_t		bmCompAttributes;
+} usb_ep_comp_descr_t;
+
+/*
+ * usb_security_descr:
+ *	usb security descriptor, refer to WUSB 1.0/7.4.5
+ */
+typedef struct usb_security_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint16_t	wTotalLength;
+	uint8_t		bNumEncryptionTypes;
+} usb_security_descr_t;
+
+/*
+ * usb_encryption_descr:
+ *	usb encryption descriptor, refer to WUSB 1.0/7.4.5
+ */
+typedef struct usb_encryption_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint8_t		bEncryptionType;
+	uint8_t		bEncryptionValue;
+	uint8_t		bAuthKeyIndex;
+} usb_encryption_descr_t;
+
+#define	USB_ENC_TYPE_UNSECURE		0x00
+#define	USB_ENC_TYPE_WIRED		0x01
+#define	USB_ENC_TYPE_CCM_1		0x02
+#define	USB_ENC_TYPE_RSA_1		0x03
+
+/*
+ * usb_key_descr:
+ *	usb key descriptor, refer to WUSB 1.0/7.4.5
+ */
+typedef struct usb_key_descr {
+	uint8_t		bLength;
+	uint8_t		bDescriptorType;
+	uint8_t		tTKID[3];
+	uint8_t		bReserved;
+	uint8_t		KeyData[1];	/* variable length */
+} usb_key_descr_t;
+
+#define	USB_EP_COMP_DESCR_SIZE		10
+#define	USB_BOS_DESCR_SIZE		5
+#define	USB_CAP_DESCR_HEADER_SIZE	3
+#define	USB_UWB_CAP_DESCR_SIZE		11
+#define	USB_SECURITY_DESCR_SIZE		5
+#define	USB_ENCRYPTION_DESCR_SIZE	5
+
+
+/*
  * ***************************************************************************
  * Client driver registration with USBA
  * ***************************************************************************
@@ -516,6 +622,7 @@ typedef struct usb_alt_if_data {
  */
 typedef struct usb_ep_data {
 	usb_ep_descr_t		ep_descr;	/* endpoint descriptor */
+	usb_ep_comp_descr_t	ep_comp_descr;	/* endpoint companion descr */
 	struct usb_cvs_data	*ep_cvs;	/* cv mod/extending this ep */
 	uint_t			ep_n_cvs;	/* #elements in ep_cvs[] */
 } usb_ep_data_t;
@@ -528,6 +635,15 @@ typedef struct usb_cvs_data {
 	uchar_t			*cvs_buf;	/* raw data of cvs descr */
 	uint_t			cvs_buf_len;	/* cvs_buf size */
 } usb_cvs_data_t;
+
+
+/*
+ * Data structure for wireless USB specific descriptor
+ */
+typedef struct usb_bos_data {
+	usb_bos_descr_t		bos_descr;	/* parsed bos descr */
+	usb_uwb_cap_descr_t	bos_uwb_cap;	/* uwb cap descr */
+} usb_bos_data_t;
 
 
 /*
@@ -575,6 +691,7 @@ typedef struct usb_client_dev_data {
 	uint_t			dev_n_cfg;	/* #elements in dev_cfg[] */
 	struct usb_cfg_data	*dev_curr_cfg;	/* current cfg */
 	int			dev_curr_if;	/* current interface number */
+	struct usb_bos_data	*dev_bos;	/* bos for this device */
 } usb_client_dev_data_t;
 
 
@@ -1343,6 +1460,20 @@ typedef struct usb_ctrl_req {
 #define	USB_DESCR_TYPE_IF_PWR			0x08
 #define	USB_DESCR_TYPE_IA			0x0B
 
+#define	USB_DESCR_TYPE_WA			0x21
+#define	USB_DESCR_TYPE_RPIPE			0x22
+
+/* Wireless USB extension, refer to WUSB 1.0/7.4 */
+#define	USB_DESCR_TYPE_SECURITY			0x0c
+#define	USB_DESCR_TYPE_KEY			0x0d
+#define	USB_DESCR_TYPE_ENCRYPTION		0x0e
+#define	USB_DESCR_TYPE_BOS			0x0f
+#define	USB_DESCR_TYPE_DEV_CAPABILITY		0x10
+#define	USB_DESCR_TYPE_WIRELESS_EP_COMP		0x11
+
+#define	USB_WA_DESCR_SIZE			14
+#define	USB_RPIPE_DESCR_SIZE			28
+
 /*
  * device request type
  */
@@ -1361,6 +1492,10 @@ typedef struct usb_ctrl_req {
 #define	USB_DEV_REQ_RCPT_OTHER		0x03
 #define	USB_DEV_REQ_RCPT_MASK		0x03
 
+/* Wire adapter class extension for request recipient */
+#define	USB_DEV_REQ_RCPT_PORT		0x04
+#define	USB_DEV_REQ_RCPT_RPIPE		0x05
+
 /*
  * device request
  */
@@ -1375,6 +1510,20 @@ typedef struct usb_ctrl_req {
 #define	USB_REQ_GET_IF			0x0a
 #define	USB_REQ_SET_IF			0x0b
 #define	USB_REQ_SYNC_FRAME		0x0c
+/* Wireless USB extension, refer to WUSB 1.0/7.3.1 */
+#define	USB_REQ_SET_ENCRYPTION		0x0d
+#define	USB_REQ_GET_ENCRYPTION		0x0e
+#define	USB_REQ_RPIPE_ABORT		0x0e
+#define	USB_REQ_SET_HANDSHAKE		0x0f
+#define	USB_REQ_RPIPE_RESET		0x0f
+#define	USB_REQ_GET_HANDSHAKE		0x10
+#define	USB_REQ_SET_CONNECTION		0x11
+#define	USB_REQ_SET_SECURITY_DATA	0x12
+#define	USB_REQ_GET_SECURITY_DATA	0x13
+#define	USB_REQ_SET_WUSB_DATA		0x14
+#define	USB_REQ_LOOPBACK_DATA_WRITE	0x15
+#define	USB_REQ_LOOPBACK_DATA_READ	0x16
+#define	USB_REQ_SET_INTERFACE_DS	0x17
 
 /* language ID for string descriptors */
 #define	USB_LANG_ID			0x0409
@@ -1385,6 +1534,8 @@ typedef struct usb_ctrl_req {
 #define	USB_EP_HALT			0x0000
 #define	USB_DEV_REMOTE_WAKEUP		0x0001
 #define	USB_DEV_TEST_MODE		0x0002
+/* Wireless USB extension, refer to WUSB 1.0/7.3.1 */
+#define	USB_DEV_WUSB			0x0003
 
 
 /*
@@ -1513,6 +1664,7 @@ int usb_pipe_ctrl_xfer_wait(
  */
 #define	USB_DEV_SLF_PWRD_STATUS	1	/* Supports Self Power	 */
 #define	USB_DEV_RWAKEUP_STATUS	2	/* Remote Wakeup Enabled */
+#define	USB_DEV_BAT_PWRD_STATUS	4	/* Battery Powered */
 #define	USB_EP_HALT_STATUS	1	/* Endpoint is Halted	 */
 #define	USB_IF_STATUS		0	/* Interface Status is 0 */
 
@@ -2483,12 +2635,21 @@ int usb_reset_device(
 #define	USB_SUBCLS_VIDEO_STREAM		0x02	/* video stream */
 #define	USB_SUBCLS_VIDEO_COLLECTION	0x03	/* video interface collection */
 
-/* Wireless controller subclasses and protocols */
-#define	USB_SUBCLS_WUSB_1		0x01
-#define	USB_SUBCLS_WUSB_2		0x02
+/* Wireless controller subclasses and protocols, refer to WUSB 1.0 chapter 8 */
+#define	USB_SUBCLS_WUSB_1		0x01	/* RF controller */
+#define	USB_SUBCLS_WUSB_2		0x02	/* Wireless adapter */
 #define	USB_PROTO_WUSB_HWA		0x01	/* host wire adapter */
 #define	USB_PROTO_WUSB_DWA		0x02	/* device wire adapter */
 #define	USB_PROTO_WUSB_DWA_ISO		0x03	/* device wire adapter isoc */
+#define	USB_PROTO_WUSB_RC		0x02	/* UWB radio controller */
+
+/* Association subclass and protocol, Association Model Supplement to WUSB1.0 */
+#define	USB_SUBCLS_CBAF			0x03	/* cable association */
+#define	USB_PROTO_CBAF			0x01	/* CBAF protocol */
+
+/* Misc subclasses and protocols, refer to WUSB 1.0 chapter 8 */
+#define	USB_SUBCLS_MISC_COMMON		0x02	/* common class */
+#define	USB_PROTO_MISC_WA		0x02	/* multifunction wire adapter */
 
 #ifdef __cplusplus
 }

@@ -272,6 +272,7 @@ DRV_KMODS	+= usb_as usb_ac
 DRV_KMODS	+= usbskel
 DRV_KMODS	+= usbvc
 DRV_KMODS	+= usbftdi
+DRV_KMODS	+= wusb_df hwahc hwarc wusb_ca
 DRV_KMODS	+= hci1394 av1394 scsa1394 dcam1394
 DRV_KMODS	+= sbp2
 DRV_KMODS	+= ib ibd rdsib sdp iser
@@ -412,6 +413,7 @@ MISC_KMODS	+= qlc_fw_2200 qlc_fw_2300 qlc_fw_2400 qlc_fw_2500 qlc_fw_6322
 MISC_KMODS	+= blk2scsa
 MISC_KMODS	+= sda
 MISC_KMODS	+= spuni
+MISC_KMODS	+= hwa1480_fw uwba
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

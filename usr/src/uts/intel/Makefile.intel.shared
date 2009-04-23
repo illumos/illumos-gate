@@ -435,6 +435,7 @@ DRV_KMODS	+= ses
 #	USB specific modules
 #
 DRV_KMODS	+= hid
+DRV_KMODS	+= hwarc hwahc
 DRV_KMODS	+= hubd
 DRV_KMODS	+= uhci
 DRV_KMODS	+= ehci
@@ -453,6 +454,8 @@ DRV_KMODS	+= usb_as
 DRV_KMODS	+= usbskel
 DRV_KMODS	+= usbvc
 DRV_KMODS	+= usbftdi
+DRV_KMODS	+= wusb_df
+DRV_KMODS	+= wusb_ca
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= usbser_edge
 
@@ -609,6 +612,8 @@ MISC_KMODS	+= scsi_vhci_f_tpgs_tape
 MISC_KMODS	+= fctl
 MISC_KMODS	+= emlxs_fw
 MISC_KMODS	+= qlc_fw_2200 qlc_fw_2300 qlc_fw_2400 qlc_fw_2500 qlc_fw_6322
+MISC_KMODS	+= hwa1480_fw
+MISC_KMODS	+= uwba
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

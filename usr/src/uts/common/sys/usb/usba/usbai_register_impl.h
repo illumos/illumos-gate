@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,7 @@ typedef struct usba_reg_state {
 	usb_reg_parse_lvl_t st_dev_parse_level;	/* All, curr cfg, 1 iface */
 	usb_cfg_data_t	*st_dev_cfg;		/* Cfg array, root of tree */
 	uint_t		st_dev_n_cfg;		/* Number cfgs in tree */
+	boolean_t	st_build_ep_comp;	/* for wusb only */
 } usba_reg_state_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only", usb_cvs_data))
@@ -82,6 +83,8 @@ _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
 					usb_client_dev_data::dev_default_ph))
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
 					usb_client_dev_data::dev_descr))
+_NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
+					usb_client_dev_data::dev_bos))
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
 					usb_client_dev_data::dev_iblock_cookie))
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",

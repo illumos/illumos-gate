@@ -262,9 +262,18 @@ void	usba_hubdi_destroy();
 void	usba_devdb_initialization();
 void	usba_devdb_destroy();
 
+int	usba_hubdi_register(dev_info_t	*, uint_t);
+int	usba_hubdi_unregister(dev_info_t *);
+
+void	usba_whcdi_initialization();
+void	usba_whcdi_destroy();
+
 int	usba_is_root_hub(dev_info_t *dip);
+int	usba_is_wa(dev_info_t *dip);
+int	usba_is_hwa(dev_info_t *dip);
 
 usba_device_t *usba_alloc_usba_device(dev_info_t *);
+void	usba_free_wireless_data(usba_wireless_data_t *wireless_data);
 void	usba_free_usba_device(usba_device_t *usba_device_t);
 void	usba_clear_data_toggle(usba_device_t *usba_device);
 
@@ -313,6 +322,7 @@ void usba_get_dev_string_descrs(dev_info_t *, usba_device_t *);
 #define	DPRINT_MASK_HUBDI_DUMPING	0x00000020
 #define	DPRINT_MASK_REGISTER		0x00000040
 #define	DPRINT_MASK_DEVDB		0x00000080
+#define	DPRINT_MASK_WHCDI		0x00000100
 #define	DPRINT_MASK_ALL 		0xFFFFFFFF
 
 typedef struct usba_log_handle_impl {

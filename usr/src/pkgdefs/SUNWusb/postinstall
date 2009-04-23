@@ -20,9 +20,8 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
  
@@ -69,6 +68,18 @@ EXIT=1
 
 not_installed usbprn || add_drv ${BASEDIR_OPT}  -m '* 0666 root sys' \
 	-i '"usbif,class7.1"' -n usbprn || EXIT=1 
+
+not_installed wusb_ca || add_drv ${BASEDIR_OPT}  -m '* 0666 root sys' \
+	-i '"usbif,classef.3.1"' -n wusb_ca || EXIT=1 
+
+not_installed wusb_df || add_drv ${BASEDIR_OPT}  -m '* 0666 root sys' \
+	-i '"usb3495,3007" "usb15a9,5"' -n wusb_df || EXIT=1 
+
+not_installed hwahc || add_drv ${BASEDIR_OPT}  -m '* 0644 root sys' \
+	-i '"usbif,classe0.2.1"' -n hwahc || EXIT=1 
+
+not_installed hwarc || add_drv ${BASEDIR_OPT}  -m '* 0644 root sys' \
+	-i '"usbif,classe0.1.2"' -n hwarc || EXIT=1 
 
 not_installed usb_ac || add_drv ${BASEDIR_OPT}  -m '* 0600 root sys' \
 	-i '"usbif,class1.1"' -n usb_ac || EXIT=1 

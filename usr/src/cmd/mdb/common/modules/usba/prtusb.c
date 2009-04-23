@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 
@@ -137,6 +136,22 @@ static usb_descr_item_t usb_str_descr[] = {
 	{1, "bString"},
 };
 static uint_t usb_str_item = 3;
+
+static usb_descr_item_t usb_wa_descr[] = {
+	{1, "bLength"},
+	{1, "bDescriptorType"},
+	{2, "bcdWAVersion"},
+	{1, "bNumPorts"},
+	{1, "bmAttributes"},
+	{2, "wNumRPipes"},
+	{2, "wRPipeMaxBlock"},
+	{1, "bRPipeBlockSize"},
+	{1, "bPwrOn2PwrGood"},
+	{1, "bNumMMCIEs"},
+	{1, "DeviceRemovable"},
+};
+
+static uint_t usb_wa_item = 11;
 
 static usb_descr_item_t usb_hid_descr[] = {
 	{1, "bLength"},
@@ -744,7 +759,7 @@ prt_usb_tree_node(uintptr_t paddr)
 
 	/* node name */
 	if (mdb_readstr(strbuf, STRLEN,
-		(uintptr_t)usb_dip.devi_node_name) != -1) {
+	    (uintptr_t)usb_dip.devi_node_name) != -1) {
 		mdb_printf("%s, ", strbuf);
 	} else {
 		mdb_printf("%s, ", "node_name");
@@ -1084,8 +1099,16 @@ prt_usb_desc(uintptr_t usb_cfg, uint_t cfg_len)
 		case 0x21:	/* hid descriptor */
 			indent = 12;
 			mdb_inc_indent(indent);
-			mdb_printf("HID Descriptor\n");
-			print_descr(paddr, nlen, usb_hid_descr, usb_hid_item);
+			if (usb_if.bInterfaceClass == 0xe0 &&
+			    usb_if.bInterfaceSubClass == 0x02) {
+				mdb_printf("WA Descriptor\n");
+				print_descr(paddr, nlen, usb_wa_descr,
+				    usb_wa_item);
+			} else {
+				mdb_printf("HID Descriptor\n");
+				print_descr(paddr, nlen, usb_hid_descr,
+				    usb_hid_item);
+			}
 			mdb_dec_indent(indent);
 
 			break;
@@ -1438,7 +1461,7 @@ print_descr(uintptr_t addr, uint_t nlen, usb_descr_item_t *item, uint_t nitem)
 				return (DCMD_ERR);
 			}
 			value = buf[0] | (buf[1] << 8) |
-				(buf[2] << 16) | (buf[3] << 24);
+			    (buf[2] << 16) | (buf[3] << 24);
 
 			break;
 		case 8:		/* uint64_t */
@@ -1447,10 +1470,10 @@ print_descr(uintptr_t addr, uint_t nlen, usb_descr_item_t *item, uint_t nitem)
 				return (DCMD_ERR);
 			}
 			value =	buf[4] | (buf[5] << 8) |
-				(buf[6] << 16) | (buf[7] << 24);
+			    (buf[6] << 16) | (buf[7] << 24);
 			value = buf[0] | (buf[1] << 8) |
-				(buf[2] << 16) | (buf[3] << 24) |
-				(value << 32);
+			    (buf[2] << 16) | (buf[3] << 24) |
+			    (value << 32);
 
 			break;
 		default:	/* byte array */

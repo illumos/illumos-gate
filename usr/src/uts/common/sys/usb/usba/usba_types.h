@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,6 +226,15 @@ typedef struct usb_client_dev_data_list {
 } usb_client_dev_data_list_t;
 
 /*
+ * wireless usb specific data
+ */
+typedef struct usba_wireless_data {
+	uint8_t			*wusb_bos;	/* raw bos descr */
+	uint_t			wusb_bos_length; /* length of bos descr */
+	usb_uwb_cap_descr_t	*uwb_descr;	/* UWB capability descr */
+} usba_wireless_data_t;
+
+/*
  * This	structure uniquely identifies a USB device
  * with all interfaces,	or just one interface of a USB device.
  * usba_device is associated with a devinfo node
@@ -256,7 +265,7 @@ typedef struct usba_device {
 	uchar_t			usb_no_cpr;	/* CPR? */
 
 	dev_info_t		*usb_root_hub_dip;
-	struct hubd		*usb_root_hubd;
+	struct hubd		*usb_root_hubd;	/* for HC or WA */
 
 	usb_dev_descr_t		*usb_dev_descr;	/* device descriptor */
 
@@ -292,6 +301,11 @@ typedef struct usba_device {
 	char			**usb_cfg_str_descr;
 	uchar_t			usb_n_cfgs;
 	uchar_t			usb_n_ifs;
+
+	/* To support WUSB */
+	boolean_t		usb_is_wa;
+	boolean_t		usb_is_wireless;
+	usba_wireless_data_t	*usb_wireless_data;
 
 	/*
 	 * power drawn from hub, if > 0, the power has been
@@ -382,6 +396,8 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_client_flags))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_client_attach_list))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_client_ev_cb_list))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_dip))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_is_wireless))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_wireless_data))
 _NOTE(SCHEME_PROTECTS_DATA("set at device creation",
 					usba_device::usb_shared_taskq))
 

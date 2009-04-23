@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This required package information file contains a list of package contents.
@@ -55,15 +54,20 @@ f none kernel/drv/ohci 0755 root sys
 f none kernel/drv/ehci 0755 root sys
 f none kernel/drv/hubd 0755 root sys
 f none kernel/drv/hid 0755 root sys
+f none kernel/drv/hwahc 0755 root sys
+f none kernel/drv/hwarc 0755 root sys
 f none kernel/drv/usb_mid 0755 root sys
 f none kernel/drv/usb_ia 0755 root sys
 f none kernel/drv/scsa2usb 0755 root sys
 f none kernel/drv/usbprn 0755 root sys
 f none kernel/drv/usb_ac 0755 root sys
 f none kernel/drv/usb_as 0755 root sys
+f none kernel/drv/wusb_ca 0755 root sys
+f none kernel/drv/wusb_df 0755 root sys
 f none kernel/misc/usba 0755 root sys
 f none kernel/misc/usba10 0755 root sys
 f none kernel/misc/hidparser 0755 root sys
+f none kernel/misc/hwa1480_fw 0755 root sys
 f none kernel/strmod/usbkbm 0755 root sys
 f none kernel/strmod/usbms 0755 root sys
 f none kernel/strmod/usb_ah 0755 root sys
@@ -75,16 +79,21 @@ f none kernel/drv/amd64/ohci 0755 root sys
 f none kernel/drv/amd64/ehci 0755 root sys
 f none kernel/drv/amd64/hubd 0755 root sys
 f none kernel/drv/amd64/hid 0755 root sys
+f none kernel/drv/amd64/hwahc 0755 root sys
+f none kernel/drv/amd64/hwarc 0755 root sys
 f none kernel/drv/amd64/usb_mid 0755 root sys
 f none kernel/drv/amd64/usb_ia 0755 root sys
 f none kernel/drv/amd64/scsa2usb 0755 root sys
 f none kernel/drv/amd64/usbprn 0755 root sys
 f none kernel/drv/amd64/usb_ac 0755 root sys
 f none kernel/drv/amd64/usb_as 0755 root sys
+f none kernel/drv/amd64/wusb_ca 0755 root sys
+f none kernel/drv/amd64/wusb_df 0755 root sys
 d none kernel/misc/amd64 0755 root sys
 f none kernel/misc/amd64/usba 0755 root sys
 f none kernel/misc/amd64/usba10 0755 root sys
 f none kernel/misc/amd64/hidparser 0755 root sys
+f none kernel/misc/amd64/hwa1480_fw 0755 root sys
 d none kernel/strmod/amd64 0755 root sys
 f none kernel/strmod/amd64/usbkbm 0755 root sys
 f none kernel/strmod/amd64/usbms 0755 root sys

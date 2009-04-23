@@ -30,6 +30,11 @@ solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html
 #
 solaris.admin.idmap.rules:::Manage Identity Mapping Rules::help=IdmapRules.html
 #
+solaris.admin.wusb.:::Administer Wireless USB::help=WUSBHeader.html
+solaris.admin.wusb.read:::Read Wireless USB Host and Device Information::help=WUSBread.html
+solaris.admin.wusb.modify:::Add or delete information of Wireless USB Device::help=WUSBmodify.html
+solaris.admin.wusb.host:::Manage Wireless USB Host::help=WUSBhost.html
+#
 solaris.audit.:::Audit Management::help=AuditHeader.html
 solaris.audit.config:::Configure Auditing::help=AuditConfig.html
 solaris.audit.read:::Read Audit Trail::help=AuditRead.html
@@ -191,3 +196,4 @@ solaris.smf.value.mms:::Change Values of MMS Service Properties::help=SmfValueMM
 solaris.smf.manage.isns:::Manage iSNS Service States::help=isnsStates.html
 solaris.smf.value.isns:::Modify iSNS Service Property Values::help=isnsValue.html
 solaris.isnsmgr.write:::Modify iSNS configuration::help=AuthISNSmgrWrite.html
+solaris.smf.manage.wusb:::Manage Wireless USB Service::help=SmfWusbStates.html

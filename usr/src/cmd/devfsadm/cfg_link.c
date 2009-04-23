@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,7 +356,21 @@ get_roothub(const char *path, void *cb_arg)
 			free(physpath);
 			return (NULL);
 		}
+		/*
+		 * Check if there is any usb_mid node in the middle
+		 * and remove the node as if there is an extra '.'
+		 */
+		if (strstr(cp, "miscellaneous") != NULL) {
+			count++;
+		}
 		*cp = '\0';
+	}
+
+	/* Remove the usb_mid node immediately before the trailing path */
+	if ((cp = strrchr(physpath, '/')) != NULL && (cp != physpath)) {
+		if (strstr(cp, "miscellaneous") != NULL) {
+			*cp = '\0';
+		}
 	}
 
 	return (physpath);

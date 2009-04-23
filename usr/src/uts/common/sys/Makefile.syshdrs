@@ -125,6 +125,9 @@ usb/hubd/%.check:	usb/hubd/%.h
 usb/clients/hid/%.check:	usb/clients/hid/%.h
 	$(DOT_H_CHECK)
 
+usb/clients/hwarc/%.check:	usb/clients/hwarc/%.h
+	$(DOT_H_CHECK)
+
 usb/clients/mass_storage/%.check:	usb/clients/mass_storage/%.h
 	$(DOT_H_CHECK)
 
@@ -202,11 +205,14 @@ ROOTDIRS=			\
 	$(ROOTDIR)/usb/clients	\
 	$(ROOTDIR)/usb/clients/audio  \
 	$(ROOTDIR)/usb/clients/hid \
+	$(ROOTDIR)/usb/clients/hwarc \
 	$(ROOTDIR)/usb/clients/mass_storage	\
 	$(ROOTDIR)/usb/clients/printer  \
 	$(ROOTDIR)/usb/clients/usbcdc  \
 	$(ROOTDIR)/usb/clients/video/usbvc  \
 	$(ROOTDIR)/usb/clients/ugen  \
+	$(ROOTDIR)/uwb \
+	$(ROOTDIR)/uwb/uwba \
 	$(ROOTDIR)/1394         \
 	$(ROOTDIR)/rsm		\
 	$(ROOTDIR)/tsol		\
@@ -275,9 +281,12 @@ ROOTCONTRACTHDRS= $(CONTRACTHDRS:%=$(ROOTDIR)/contract/%)
 ROOTXHDRS= $(XHDRS:%=$(ROOTDIR)/%)
 
 ROOTUSBHDRS= $(USBHDRS:%=$(ROOTDIR)/usb/%)
+ROOTUWBHDRS= $(UWBHDRS:%=$(ROOTDIR)/uwb/%)
+ROOTUWBAHDRS= $(UWBAHDRS:%=$(ROOTDIR)/uwb/uwba/%)
 ROOTUSBAUDHDRS= $(USBAUDHDRS:%=$(ROOTDIR)/usb/clients/audio/%)
 ROOTUSBHUBDHDRS= $(USBHUBDHDRS:%=$(ROOTDIR)/usb/hubd/%)
 ROOTUSBHIDHDRS = $(USBHIDHDRS:%=$(ROOTDIR)/usb/clients/hid/%)
+ROOTUSBHWARCHDRS = $(USBHWARCHDRS:%=$(ROOTDIR)/usb/clients/hwarc/%)
 ROOTUSBMSHDRS= $(USBMSHDRS:%=$(ROOTDIR)/usb/clients/mass_storage/%)
 ROOTUSBPRNHDRS= $(USBPRNHDRS:%=$(ROOTDIR)/usb/clients/printer/%)
 ROOTUSBCDCHDRS= $(USBCDCHDRS:%=$(ROOTDIR)/usb/clients/usbcdc/%)
@@ -299,11 +308,13 @@ ROOTTSOLHDRS= $(TSOLHDRS:%=$(ROOTDIR)/tsol/%)
 sparc_ROOTHDRS=	$(ROOTSDKTPHDRS) $(ROOTSCSICADHDRS) $(ROOTSCSITARGETSHDRS) \
 		$(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
 		$(ROOTUSBAUDHDRS) $(ROOTUSBHIDHDRS) $(ROOTUSBMSHDRS) \
-		$(ROOTUSBPRNHDRS) $(ROOTUGENHDRS) $(ROOTUSBVIDHDRS)
+		$(ROOTUSBPRNHDRS) $(ROOTUGENHDRS) $(ROOTUSBVIDHDRS) \
+		$(ROOTUWBHDRS) $(ROOTUWBAHDRS) $(ROOTUSBHWARCHDRS)
 
 i386_ROOTHDRS=	$(ROOTDKTPHDRS) $(ROOTPCHDRS) $(ROOTSCSITARGETSHDRS)	\
 		$(ROOTSCSIVHCIHDRS) $(ROOTPCMCIAHDRS) $(ROOTHOTPLUGHDRS) \
-		$(ROOTHOTPLUGPCIHDRS) $(ROOTSATAGENHDRS)
+		$(ROOTHOTPLUGPCIHDRS) $(ROOTSATAGENHDRS) \
+		$(ROOTUWBHDRS) $(ROOTUWBAHDRS) $(ROOTUSBHWARCHDRS)
 
 # install rules
 $(ROOTDIR)/%: %

@@ -725,6 +725,7 @@ f none usr/lib/vplot 555 root bin
 f none usr/lib/vtdaemon 555 root bin
 f none usr/lib/vtinfo 555 root bin
 f none usr/lib/vtxlock 555 root bin
+s none usr/lib/wusbd=../../sbin/wusbadm
 s none usr/mail=../var/mail
 d none usr/net 755 root sys
 d none usr/net/nls 755 root sys
@@ -976,6 +977,7 @@ f none usr/sbin/usermod 555 root sys
 f none usr/sbin/volcopy 555 root bin
 f none usr/sbin/wall 2555 root tty
 l none usr/sbin/whodo=../../usr/lib/isaexec
+s none usr/sbin/wusbadm=../../sbin/wusbadm
 f none usr/sbin/zdump 555 root bin
 f none usr/sbin/zic 555 root bin
 d none usr/share 755 root sys

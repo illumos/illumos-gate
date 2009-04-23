@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +242,9 @@ typedef struct hubd {
 	 * if 1, power budget is disabled
 	 */
 	boolean_t		h_ignore_pwr_budget;
+
+	/* for HWA to cleanup child, NULL for normal hubs */
+	int			(*h_cleanup_child)(dev_info_t *);
 } hubd_t;
 
 _NOTE(MUTEX_PROTECTS_DATA(hubd::h_mutex, hubd))
@@ -404,6 +407,22 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared", hubd_offline_req))
  * is expressed in 2mA units
  */
 #define	USB_CFG_DESCR_PWR_UNIT	2
+
+/* variables shared with wire adapter class drivers */
+extern uint_t hubd_errlevel;
+extern uint_t hubd_errmask;
+extern uint_t hubd_instance_debug;
+
+/* common interfaces for hub and wire adapter class devices */
+hubd_t	*hubd_get_soft_state(dev_info_t *);
+void	hubd_get_ancestry_str(hubd_t *);
+int	hubd_get_all_device_config_cloud(hubd_t *, dev_info_t *,
+	usba_device_t *);
+int	hubd_select_device_configuration(hubd_t *, usb_port_t,
+	dev_info_t *, usba_device_t *);
+dev_info_t *hubd_ready_device(hubd_t *, dev_info_t *, usba_device_t *,
+	uint_t);
+void	hubd_schedule_cleanup(dev_info_t *);
 
 #ifdef	__cplusplus
 }
