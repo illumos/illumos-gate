@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * pci_resource.c -- routines to retrieve available bus resources from
@@ -57,6 +57,7 @@ static uchar_t *find_sig(uchar_t *cp, int len, char *sig);
 static int checksum(unsigned char *cp, int len);
 static ACPI_STATUS acpi_wr_cb(ACPI_RESOURCE *rp, void *context);
 void bus_res_fini(void);
+static void acpi_trim_bus_ranges(void);
 
 struct memlist *acpi_io_res[256];
 struct memlist *acpi_mem_res[256];
@@ -114,8 +115,85 @@ acpi_pci_probe(void)
 		    (void *)(uintptr_t)bus);
 	}
 
-	if (acpi_cb_cnt > 0)
+	if (acpi_cb_cnt > 0) {
 		acpi_resource_discovery = 1;
+		acpi_trim_bus_ranges();
+	}
+}
+
+/*
+ * Trim overlapping bus ranges in acpi_bus_res[]
+ * Some BIOSes report root-bridges with bus ranges that
+ * overlap, for example:"0..255" and "8..255". Lower-numbered
+ * ranges are trimmed by upper-numbered ranges (so "0..255" would
+ * be trimmed to "0..7", in the example).
+ */
+static void
+acpi_trim_bus_ranges()
+{
+	struct memlist *ranges, *current;
+	int bus;
+
+	ranges = NULL;
+
+	/*
+	 * Assumptions:
+	 *  - there exists at most 1 bus range entry for each bus number
+	 *  - there are no (broken) ranges that start at the same bus number
+	 */
+	for (bus = 0; bus < 256; bus++) {
+		struct memlist *prev, *orig, *new;
+		/* skip buses with no range entry */
+		if ((orig = acpi_bus_res[bus]) == NULL)
+			continue;
+
+		/*
+		 * create copy of existing range and overload
+		 * 'prev' pointer to link existing to new copy
+		 */
+		new = memlist_alloc();
+		new->address = orig->address;
+		new->size = orig->size;
+		new->prev = orig;
+
+		/* sorted insertion of 'new' into ranges list */
+		for (current = ranges, prev = NULL; current != NULL;
+		    prev = current, current = current->next)
+			if (new->address < current->address)
+				break;
+
+		if (prev == NULL) {
+			/* place at beginning of (possibly) empty list */
+			new->next = ranges;
+			ranges = new;
+		} else {
+			/* place in list (possibly at end) */
+			new->next = current;
+			prev->next = new;
+		}
+	}
+
+	/* scan the list, perform trimming */
+	current = ranges;
+	while (current != NULL) {
+		struct memlist *next = current->next;
+
+		/* done when no range above current */
+		if (next == NULL)
+			break;
+
+		/*
+		 * trim size in original range element
+		 * (current->prev points to the original range)
+		 */
+		if ((current->address + current->size) > next->address)
+			current->prev->size = next->address - current->address;
+
+		current = next;
+	}
+
+	/* discard the list */
+	memlist_free_all(&ranges);	/* OK if ranges == NULL */
 }
 
 static int
