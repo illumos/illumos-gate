@@ -436,28 +436,27 @@ smb_mangle_char(unsigned char ch)
 /*
  * smb_generate_mangle
  *
- * Generates a mangle string which contains
- * at least 2 (considering fileid cannot be 0)
- * and at most 7 chars.
+ * Generate a mangle string containing at least 2 characters and at most
+ * (buflen - 1) characters.  Note: fid cannot be 0.
  *
  * Returns the number of chars in the generated mangle.
  */
 static int
-smb_generate_mangle(ino64_t fileid, unsigned char *mangle_buf)
+smb_generate_mangle(uint64_t fid, unsigned char *buf, size_t buflen)
 {
-	/*
-	 * 36**6 = 2176782336: more than enough to express inodes in 6
-	 * chars
-	 */
 	static char *base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	unsigned char *manglep = mangle_buf;
+	unsigned char *p = buf;
+	int i;
 
-	for (*manglep++ = '~'; fileid > 0; fileid /= 36)
-		*manglep++ = base36[fileid % 36];
-	*manglep = 0;
+	if (fid == 0)
+		fid = (uint64_t)-1;
 
-	/*LINTED E_PTRDIFF_OVERFLOW*/
-	return (manglep - mangle_buf);
+	*p++ = '~';
+	for (i = 2; (i < buflen) && (fid > 0); fid /= 36, ++i)
+		*p++ = base36[fid % 36];
+	*p = '\0';
+
+	return (i - 1);
 }
 
 /*
@@ -526,9 +525,9 @@ int smb_mangle_name(
 	int force)		/* force mangling even if mangling is not */
 				/* needed according to standard algorithm */
 {
-	int avail;
+	int avail, len;
 	unsigned char ch;
-	unsigned char mangle_buf[8];
+	unsigned char mangle_buf[SMB_NAME83_BASELEN];
 	unsigned char *namep;
 	unsigned char *manglep;
 	unsigned char *out_short;
@@ -585,7 +584,8 @@ int smb_mangle_name(
 		return (1);
 	}
 
-	avail = 8 - smb_generate_mangle(fileid, mangle_buf);
+	len = smb_generate_mangle(fileid, mangle_buf, SMB_NAME83_BASELEN);
+	avail = SMB_NAME83_BASELEN - len;
 
 	/*
 	 * generated mangle part has always less than 8 chars, so

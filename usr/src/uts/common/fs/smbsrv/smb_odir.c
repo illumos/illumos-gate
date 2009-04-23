@@ -886,6 +886,8 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 
+	bzero(odirent, sizeof (smb_odirent_t));
+
 	if (od->d_bufptr != NULL) {
 		if (od->d_flags & SMB_ODIR_FLAG_EDIRENT)
 			reclen = od->d_edp->ed_reclen;
