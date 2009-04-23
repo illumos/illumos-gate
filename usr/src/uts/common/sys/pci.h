@@ -925,18 +925,20 @@ typedef struct {
  *             Bit#:  33222222 22221111 11111100 00000000
  *                    10987654 32109876 54321098 76543210
  *
- * pci_phys_hi cell:  np0000tt bbbbbbbb dddddfff rrrrrrrr
+ * pci_phys_hi cell:  npt000ss bbbbbbbb dddddfff rrrrrrrr
  * pci_phys_mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
  * pci_phys_low cell: llllllll llllllll llllllll llllllll
  *
  * n          is 0 if the address is relocatable, 1 otherwise
  * p          is 1 if the addressable region is "prefetchable", 0 otherwise
- * t          is 1 if the address range is aliased
- * tt         is the type code, denoting which address space
+ * t          is 1 if the address is aliased (for non-relocatable I/O), below
+ *	      1MB (for mem), or below 64 KB (for relocatable I/O).
+ * ss         is the type code, denoting which address space
  * bbbbbbbb   is the 8-bit bus number
  * ddddd      is the 5-bit device number
  * fff        is the 3-bit function number
  * rrrrrrrr   is the 8-bit register number
+ *	      should be zero for non-relocatable, when ss is 01, or 10
  * hh...hhh   is the 32-bit unsigned number
  * ll...lll   is the 32-bit unsigned number
  *

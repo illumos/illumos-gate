@@ -1947,8 +1947,6 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	end = PCI_CONF_BASE0 + max_basereg * sizeof (uint_t);
 	for (j = 0, offset = PCI_CONF_BASE0; offset < end;
 	    j++, offset += bar_sz) {
-		int hard_decode = 0;
-
 		/* determine the size of the address space */
 		base = pci_getl(bus, dev, func, offset);
 		pci_putl(bus, dev, func, offset, 0xffffffff);
@@ -1957,6 +1955,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 		/* construct phys hi,med.lo, size hi, lo */
 		if ((pciide && j < 4) || (base & PCI_BASE_SPACE_IO)) {
+			int hard_decode = 0;
+
 			/* i/o space */
 			bar_sz = PCI_BAR_SZ_32;
 			value &= PCI_BASE_IO_ADDR_M;
@@ -1974,20 +1974,14 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				continue;
 			}
 
+			regs[nreg].pci_phys_hi = PCI_ADDR_IO | devloc |
+			    (hard_decode ? PCI_RELOCAT_B : offset);
+			regs[nreg].pci_phys_low = hard_decode ?
+			    base & PCI_BASE_IO_ADDR_M : 0;
+			assigned[nasgn].pci_phys_hi =
+			    PCI_RELOCAT_B | regs[nreg].pci_phys_hi;
 			regs[nreg].pci_size_low =
 			    assigned[nasgn].pci_size_low = len;
-			if (!hard_decode) {
-				regs[nreg].pci_phys_hi =
-				    (PCI_ADDR_IO | devloc) + offset;
-			} else {
-				regs[nreg].pci_phys_hi =
-				    (PCI_RELOCAT_B | PCI_ADDR_IO | devloc) +
-				    offset;
-				regs[nreg].pci_phys_low =
-				    base & PCI_BASE_IO_ADDR_M;
-			}
-			assigned[nasgn].pci_phys_hi =
-			    (PCI_RELOCAT_B | PCI_ADDR_IO | devloc) + offset;
 			type = base & (~PCI_BASE_IO_ADDR_M);
 			base &= PCI_BASE_IO_ADDR_M;
 			/*
@@ -2234,7 +2228,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 		/* Video memory */
 		regs[nreg].pci_phys_hi = assigned[nasgn].pci_phys_hi =
-		    (PCI_RELOCAT_B | PCI_ADDR_MEM32 | devloc);
+		    (PCI_RELOCAT_B | PCI_ALIAS_B | PCI_ADDR_MEM32 | devloc);
 		regs[nreg].pci_phys_low =
 		    assigned[nasgn].pci_phys_low = 0xa0000;
 		regs[nreg].pci_size_low =
