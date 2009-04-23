@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -469,18 +469,11 @@ drv_reserve(void)
 	return (0);
 }
 
+/*ARGSUSED0*/
 int
 drv_get_serial_num(char *ser)
 {
-	dda_serial_t	serial;
-
-	if (ioctl(drv->drv_fd, DDA_CMD_SERIAL, serial) < 0) {
-		return (-1);
-	}
-	(void) memset(ser, 0, MMS_SER_NUM_LEN);
-	(void) strncpy(ser, serial, MMS_SER_NUM_LEN);
-	TRACE((MMS_DEBUG, "Drive serial number %s", ser));
-	return (0);
+	return (-1);
 }
 
 int

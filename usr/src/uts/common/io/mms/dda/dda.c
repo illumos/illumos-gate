@@ -219,7 +219,6 @@ static int dda_tape_locate(dda_t *dda, int64_t position);
 static int dda_tape_erase(dda_t *dda);
 
 /* support routines */
-static void dda_gen_serial_num(dda_t *dda);
 static void dda_set_unloaded(dda_t *dda);
 static int64_t dda_get_fileno(dda_t *dda);
 static int dda_get_blkno(dda_t *dda, int64_t *blkno);
@@ -472,7 +471,6 @@ dda_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		dda->dda_dip = dip;
 		dda->dda_inst = instance;
-		dda_gen_serial_num(dda);
 		mutex_init(&dda->dda_mutex, NULL, MUTEX_DRIVER, NULL);
 		dda_set_unloaded(dda);
 		return (DDI_SUCCESS);
@@ -925,20 +923,6 @@ dda_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 
 		if (ddi_copyout(&blklmt, (void *)arg,
 		    sizeof (dda_blklmt_t), flag)) {
-			return (EFAULT);
-		}
-		return (0);
-	}
-	case DDA_CMD_SERIAL: {
-		dda_serial_t	serial;
-
-		mutex_enter(&dda->dda_mutex);
-		dda->dda_resid = 0;
-		(void) snprintf(serial, sizeof (dda_serial_t), "%s",
-		    dda->dda_serial);
-		mutex_exit(&dda->dda_mutex);
-		if (ddi_copyout(serial, (void *)arg,
-		    sizeof (dda_serial_t), flag)) {
 			return (EFAULT);
 		}
 		return (0);
@@ -1626,42 +1610,6 @@ dda_tape_unload(dda_t *dda)
 }
 
 /* support routines */
-
-/*
- * dda_gen_serial_num
- *
- * Parameters:
- *	- dda:		DDA tape drive.
- *
- * Generate DDA unit serial number from the computer hostid and drive
- * instance number.
- *
- * Return Values:
- *      None
- *
- */
-static void
-dda_gen_serial_num(dda_t *dda)
-{
-	char		sn[100];
-	int		len;
-	int		off;
-
-	/*
-	 * Generate unit serial number:
-	 *	zeros, hostid, instance number
-	 */
-	len = snprintf(sn, sizeof (sn), "%016x%x%x", 0, zone_get_hostid(NULL),
-	    dda->dda_inst);
-
-	/*
-	 * Use least significant part of generated serial number
-	 */
-	if ((off = len - sizeof (dda_serial_t) + 1) < 0) {
-		off = 0;
-	}
-	bcopy(&sn[off], dda->dda_serial, sizeof (dda_serial_t));
-}
 
 /*
  * dda_set_unloaded

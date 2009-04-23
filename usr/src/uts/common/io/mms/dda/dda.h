@@ -43,7 +43,7 @@ extern "C" {
 
 /* version for cartridge and dda */
 #define	DDA_MAJOR_VERSION	1	/* dda driver major version */
-#define	DDA_MINOR_VERSION	1	/* dda driver minor version */
+#define	DDA_MINOR_VERSION	2	/* dda driver minor version */
 
 /* cartridge file names */
 #define	DDA_METADATA_FNAME	"metadata"	/* metadata file name */
@@ -73,9 +73,6 @@ extern "C" {
  * DDA_CMD_BLKLMT	dda_blklmt_t *blklmt
  *			Returns 0 and the cartridge maximum and minimum block
  *			size, else non-zero.
- * DDA_CMD_SERIAL	dda_serial_t serial
- *			Returns 0 and pseudo drive unit serial number as
- *			the host id followed by the instance number.
  */
 #define	DDA_IOC			(('D' << 24) | ('D' << 16) | ('A' << 8))
 #define	DDA_CMD_LOAD		(DDA_IOC | 1)	/* load cartridge */
@@ -83,9 +80,6 @@ extern "C" {
 #define	DDA_CMD_CAPACITY	(DDA_IOC | 3)	/* get tape capacity/space */
 #define	DDA_CMD_WPROTECT	(DDA_IOC | 4)	/* get cartridge WP flag */
 #define	DDA_CMD_BLKLMT		(DDA_IOC | 5)	/* get block limits */
-#define	DDA_CMD_SERIAL		(DDA_IOC | 6)	/* drive serial number */
-
-typedef char dda_serial_t[13];		/* drive serial number */
 
 /* cartridge capacity */
 typedef struct dda_capacity {
@@ -180,7 +174,6 @@ typedef struct dda {
 	off64_t		dda_data_fsize; /* data file size */
 
 	int		dda_inst;	/* driver instance (drive number) */
-	dda_serial_t	dda_serial;	/* serial number */
 	dev_info_t	*dda_dip;	/* driver instance info */
 	kmutex_t	dda_mutex;	/* serialize drive access */
 	int		dda_loaded;	/* media loaded */

@@ -4290,30 +4290,6 @@ dm_get_capabilities(char *tokens)
 }
 
 int
-dm_verify_serial_num(void)
-{
-	char		sernum[MMS_SER_NUM_LEN + 1];
-
-	if (DRV_CALL(drv_get_serial_num, (sernum)) != 0) {
-		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
-		    "read drive serial number error: %s", strerror(errno)));
-		return (-1);
-	}
-
-	TRACE((MMS_ERR, "Serial number: "
-	    "From DRIVE: %s, From device : %s.", drv->drv_sernum, sernum));
-	if (strcmp(drv->drv_sernum, sernum) != 0) {
-		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_DRIVE_SER_NUM,
-		    "mismatched drive serial number, "
-		    "from library %s, from drive %s",
-		    drv->drv_sernum, sernum));
-		return (-1);
-	}
-
-	return (0);
-}
-
-int
 dm_drv_assigned(void)
 {
 	char		*dmname;

@@ -186,7 +186,6 @@ int dm_update_write_protect(void);
 int dm_uscsi(struct uscsi_cmd *us);
 int dm_validate_fname(void);
 int dm_validate_xdate(void);
-int dm_verify_serial_num(void);
 int dm_verify_target_dev(char *devname);
 int dm_verify_trailor_label(char *buf);
 int dm_write(drm_reply_t *rep);
