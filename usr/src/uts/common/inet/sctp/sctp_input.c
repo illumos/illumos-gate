@@ -1257,14 +1257,16 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	}
 
 	if (ntohs(dc->sdh_sid) >= sctp->sctp_num_istr) {
-		uint16_t	inval_parm[2];
+		sctp_bsc_t	inval_parm;
 
-		inval_parm[0] = dc->sdh_sid;
-		/* RESERVED to be ignored at the receiving end */
-		inval_parm[1] = 0;
+		/* Will populate the CAUSE block in the ERROR chunk. */
+		inval_parm.bsc_sid = dc->sdh_sid;
+		/* RESERVED, ignored at the receiving end */
+		inval_parm.bsc_pad = 0;
+
 		/* ack and drop it */
-		sctp_add_err(sctp, SCTP_ERR_BAD_SID, inval_parm,
-		    sizeof (inval_parm), fp);
+		sctp_add_err(sctp, SCTP_ERR_BAD_SID, (void *)&inval_parm,
+		    sizeof (sctp_bsc_t), fp);
 		SCTP_ACK_IT(sctp, tsn);
 		return;
 	}
@@ -2105,13 +2107,15 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 		ftsn_entry->ftsn_sid = ntohs(ftsn_entry->ftsn_sid);
 		ftsn_entry->ftsn_ssn = ntohs(ftsn_entry->ftsn_ssn);
 		if (ftsn_entry->ftsn_sid >= sctp->sctp_num_istr) {
-			uint16_t	inval_parm[2];
+			sctp_bsc_t	inval_parm;
 
-			inval_parm[0] = htons(ftsn_entry->ftsn_sid);
-			/* RESERVED to be ignored at the receiving end */
-			inval_parm[1] = 0;
-			sctp_add_err(sctp, SCTP_ERR_BAD_SID, inval_parm,
-			    sizeof (inval_parm), fp);
+			/* Will populate the CAUSE block in the ERROR chunk. */
+			inval_parm.bsc_sid = htons(ftsn_entry->ftsn_sid);
+			/* RESERVED, ignored at the receiving end */
+			inval_parm.bsc_pad = 0;
+
+			sctp_add_err(sctp, SCTP_ERR_BAD_SID,
+			    (void *)&inval_parm, sizeof (sctp_bsc_t), fp);
 			ftsn_entry++;
 			remaining -= sizeof (*ftsn_entry);
 			continue;

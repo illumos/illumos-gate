@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -691,6 +691,35 @@ typedef struct sctp_parm_hdr {
 	uint16_t	sph_type;
 	uint16_t	sph_len;
 } sctp_parm_hdr_t;
+
+/*
+ * The following extend sctp_parm_hdr_t
+ * with cause-specfic content used to fill
+ * CAUSE blocks in ABORT or ERROR chunks.
+ * The overall size of the CAUSE block will
+ * be sizeof (sctp_parm_hdr_t) plus the size
+ * of the extended cause structure,
+ */
+
+/*
+ * Invalid stream-identifier extended cause.
+ * SCTP_ERR_BAD_SID
+ */
+typedef struct sctp_bsc {
+	uint16_t	bsc_sid;
+	uint16_t	bsc_pad; /* RESV = 0 */
+} sctp_bsc_t;
+
+/*
+ * Missing parameter extended cause, currently
+ * only one missing parameter is supported.
+ * SCTP_ERR_MISSING_PARM
+ */
+typedef struct sctp_mpc {
+	uint32_t	mpc_num;
+	uint16_t	mpc_param;
+	uint16_t	mpc_pad;
+} sctp_mpc_t;
 
 /* Error causes */
 #define	SCTP_ERR_UNKNOWN		0

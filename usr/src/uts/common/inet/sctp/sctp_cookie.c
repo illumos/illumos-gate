@@ -167,6 +167,8 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 	boolean_t		got_cookie = B_FALSE;
 	boolean_t		got_errchunk = B_FALSE;
 	uint16_t		ptype;
+	sctp_mpc_t		mpc;
+
 
 	ASSERT(errmp != NULL);
 
@@ -344,9 +346,14 @@ done:
 
 	if (want_cookie != NULL && !got_cookie) {
 cookie_abort:
+		/* Will populate the CAUSE block in the ABORT chunk. */
+		mpc.mpc_num =  htons(1);
+		mpc.mpc_param = htons(PARM_COOKIE);
+		mpc.mpc_pad = 0;
+
 		dprint(1, ("validate_init_params: cookie absent\n"));
 		sctp_send_abort(sctp, sctp_init2vtag(ch), SCTP_ERR_MISSING_PARM,
-		    details, errlen, inmp, 0, B_FALSE);
+		    (char *)&mpc, sizeof (sctp_mpc_t), inmp, 0, B_FALSE);
 		return (0);
 	}
 
