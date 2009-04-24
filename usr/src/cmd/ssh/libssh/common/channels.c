@@ -38,14 +38,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: channels.c,v 1.183 2002/09/17 07:47:02 itojun Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ssh.h"
 #include "ssh1.h"
@@ -2647,6 +2645,9 @@ x11_create_display_inet(int x11_display_offset, int x11_use_localhost,
 			if (sock < 0) {
 				if ((errno != EINVAL) && (errno != EAFNOSUPPORT)) {
 					error("socket: %.100s", strerror(errno));
+					freeaddrinfo(aitop);
+					for (n = 0; n < num_socks; n++)
+						close(socks[n]);
 					return -1;
 				} else {
 					debug("x11_create_display_inet: Socket family %d not supported",
@@ -2662,6 +2663,16 @@ x11_create_display_inet(int x11_display_offset, int x11_use_localhost,
 			}
 #endif
 			if (bind(sock, ai->ai_addr, ai->ai_addrlen) < 0) {
+				/*
+				 * If bind() fails  with EADDRNOTAVAIL, we
+				 * should not break immediately but rather
+				 * try the next address available.
+				 */
+				if (errno == EADDRNOTAVAIL) {
+					close(sock);
+					continue;
+				}
+								
 				debug("bind port %d: %.100s; skipping this port", port,
 				    strerror(errno));
 				close(sock);
@@ -2697,8 +2708,10 @@ x11_create_display_inet(int x11_display_offset, int x11_use_localhost,
 	for (n = 0; n < num_socks; n++) {
 		sock = socks[n];
 		if (listen(sock, 5) < 0) {
+			int i;
 			error("listen: %.100s", strerror(errno));
-			close(sock);
+			for (i = 0; i < num_socks; i++)
+				close(socks[i]);
 			return -1;
 		}
 	}
