@@ -20,10 +20,9 @@
 #
 #
 # uts/sparc/pcie/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the PCIE driver kernel module.
 #
@@ -39,8 +38,8 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= pcie
-OBJECTS		= $(PCIE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCIE_OBJS:%.o=$(LINTS_DIR)/%.ln)
+OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #

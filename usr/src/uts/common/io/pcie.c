@@ -45,36 +45,10 @@ static void pcie_fini_pfd(dev_info_t *);
 static void pcie_check_io_mem_range(ddi_acc_handle_t, boolean_t *, boolean_t *);
 #endif /* defined(__i386) || defined(__amd64) */
 
-#ifdef	DEBUG
+#ifdef DEBUG
 uint_t pcie_debug_flags = 0;
-
 static void pcie_print_bus(pcie_bus_t *bus_p);
-
-#define	PCIE_DBG pcie_dbg
-/* Common Debugging shortcuts */
-#define	PCIE_DBG_CFG(dip, bus_p, name, sz, off, org) \
-	PCIE_DBG("%s:%d:(0x%x) %s(0x%x) 0x%x -> 0x%x\n", ddi_node_name(dip), \
-	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
-	    PCIE_GET(sz, bus_p, off))
-#define	PCIE_DBG_CAP(dip, bus_p, name, sz, off, org) \
-	PCIE_DBG("%s:%d:(0x%x) %s(0x%x) 0x%x -> 0x%x\n", ddi_node_name(dip), \
-	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
-	    PCIE_CAP_GET(sz, bus_p, off))
-#define	PCIE_DBG_AER(dip, bus_p, name, sz, off, org) \
-	PCIE_DBG("%s:%d:(0x%x) %s(0x%x) 0x%x -> 0x%x\n", ddi_node_name(dip), \
-	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
-	    PCIE_AER_GET(sz, bus_p, off))
-
-static void pcie_dbg(char *fmt, ...);
-
-#else	/* DEBUG */
-
-#define	PCIE_DBG_CFG 0 &&
-#define	PCIE_DBG 0 &&
-#define	PCIE_DBG_CAP 0 &&
-#define	PCIE_DBG_AER 0 &&
-
-#endif	/* DEBUG */
+#endif /* DEBUG */
 
 /* Variable to control default PCI-Express config settings */
 ushort_t pcie_command_default =
@@ -676,6 +650,8 @@ pcie_init_bus(dev_info_t *cdip)
 
 	bus_p->bus_mps = 0;
 
+	pcie_init_plat(cdip);
+
 	PCIE_DBG("Add %s(dip 0x%p, bdf 0x%x, secbus 0x%x)\n",
 	    ddi_driver_name(cdip), (void *)cdip, bus_p->bus_bdf,
 	    bus_p->bus_bdg_secbus);
@@ -721,6 +697,7 @@ pcie_fini_bus(dev_info_t *cdip)
 {
 	pcie_bus_t	*bus_p;
 
+	pcie_fini_plat(cdip);
 	pcie_fini_pfd(cdip);
 
 	bus_p = PCIE_DIP2UPBUS(cdip);
@@ -1510,7 +1487,7 @@ pcie_print_bus(pcie_bus_t *bus_p)
  * o taskq to print at lower pil
  */
 int pcie_dbg_print = 0;
-static void
+void
 pcie_dbg(char *fmt, ...)
 {
 	va_list ap;

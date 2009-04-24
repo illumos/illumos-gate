@@ -270,6 +270,8 @@ typedef struct pcie_bus {
 	pf_data_t	*bus_pfd;
 
 	int		bus_mps;		/* Maximum Payload Size */
+
+	void		*bus_plat_private;	/* Platform specific */
 } pcie_bus_t;
 
 struct pf_data {
@@ -342,6 +344,34 @@ typedef struct {
 	int		highest_common_mps;
 } pcie_max_supported_t;
 
+#ifdef	DEBUG
+extern uint_t pcie_debug_flags;
+#define	PCIE_DBG pcie_dbg
+/* Common Debugging shortcuts */
+#define	PCIE_DBG_CFG(dip, bus_p, name, sz, off, org) \
+	PCIE_DBG("%s:%d:(0x%x) %s(0x%x) 0x%x -> 0x%x\n", ddi_node_name(dip), \
+	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
+	    PCIE_GET(sz, bus_p, off))
+#define	PCIE_DBG_CAP(dip, bus_p, name, sz, off, org) \
+	PCIE_DBG("%s:%d:(0x%x) %s(0x%x) 0x%x -> 0x%x\n", ddi_node_name(dip), \
+	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
+	    PCIE_CAP_GET(sz, bus_p, off))
+#define	PCIE_DBG_AER(dip, bus_p, name, sz, off, org) \
+	PCIE_DBG("%s:%d:(0x%x) %s(0x%x) 0x%x -> 0x%x\n", ddi_node_name(dip), \
+	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
+	    PCIE_AER_GET(sz, bus_p, off))
+
+extern void pcie_dbg(char *fmt, ...);
+
+#else	/* DEBUG */
+
+#define	PCIE_DBG_CFG 0 &&
+#define	PCIE_DBG 0 &&
+#define	PCIE_DBG_CAP 0 &&
+#define	PCIE_DBG_AER 0 &&
+
+#endif	/* DEBUG */
+
 /* PCIe Friendly Functions */
 extern void pcie_init_root_port_mps(dev_info_t *dip);
 extern int pcie_initchild(dev_info_t *dip);
@@ -379,6 +409,8 @@ extern void pcie_set_aer_uce_mask(uint32_t mask);
 extern void pcie_set_aer_ce_mask(uint32_t mask);
 extern void pcie_set_aer_suce_mask(uint32_t mask);
 extern void pcie_set_serr_mask(uint32_t mask);
+extern void pcie_init_plat(dev_info_t *dip);
+extern void pcie_fini_plat(dev_info_t *dip);
 
 /* PCIe error handling functions */
 extern int pf_scan_fabric(dev_info_t *rpdip, ddi_fm_error_t *derr,

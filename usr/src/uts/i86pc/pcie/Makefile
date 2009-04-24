@@ -21,10 +21,9 @@
 #
 # uts/i86pc/pcie/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the kernel/misc/pcie module
 #	for PCI-E Error handling support in PCI-E nexus drivers.
@@ -41,14 +40,16 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= pcie
-OBJECTS		= $(PCI_E_MISC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_E_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/i86pc/Makefile.i86pc
+
+LDFLAGS         += -dy -Nmisc/acpica
 
 #
 #	Define targets

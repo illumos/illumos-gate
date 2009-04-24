@@ -1049,7 +1049,6 @@ fcnname/**/_info:							\
 	MODULE(pciehpc,misc);
 	STUB(pciehpc, pciehpc_init, 0);
 	STUB(pciehpc, pciehpc_uninit, 0);
-	STUB(pciehpc, pciehpc_acpi_eval_osc, 0);
 	WSTUB(pciehpc, pciehpc_intr, nomod_zero);
 	END_MODULE(pciehpc);
 #endif

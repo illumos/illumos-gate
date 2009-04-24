@@ -18,42 +18,25 @@
  *
  * CDDL HEADER END
  */
-
 /*
- *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- *  Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/note.h>
-#include <sys/kmem.h>
-#include <sys/debug.h>
-#include <sys/vtrace.h>
-#include <sys/autoconf.h>
-#include <sys/varargs.h>
-#include <sys/ddi_impldefs.h>
-#include <sys/pci.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/time.h>
-#include <sys/callb.h>
-#include <sys/hotplug/pci/pciehpc_impl.h>
+#include <sys/sunndi.h>
+#include <sys/pcie_impl.h>
 
-extern int pciehpc_acpi_hotplug_enabled(dev_info_t *dip);
-extern void pciehpc_acpi_setup_ops(pciehpc_t *ctrl_p);
-
-/*
- * Update ops vector with platform specific (ACPI, CK8-04,...) functions.
- */
+/* ARGSUSED */
 void
-pciehpc_update_ops(pciehpc_t *ctrl_p)
+pcie_init_plat(dev_info_t *dip)
 {
-	/* update platform specific (ACPI, CK8-04,...) impl. ops */
-	if (pciehpc_acpi_hotplug_enabled(ctrl_p->dip)) {
-		/* update ops vector for ACPI mode */
-		pciehpc_acpi_setup_ops(ctrl_p);
-		ctrl_p->hp_mode = PCIEHPC_ACPI_HP_MODE;
-	}
+}
+
+/* ARGSUSED */
+void
+pcie_fini_plat(dev_info_t *dip)
+{
 }

@@ -44,6 +44,7 @@
 #include <sys/pcie.h>
 #include <sys/pci_cap.h>
 #include <sys/pcie_impl.h>
+#include <sys/pcie_acpi.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/hotplug/pci/pciehpc.h>
 #include <sys/hotplug/hpctrl.h>
@@ -305,8 +306,8 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int			instance, intr_types, fmcap;
 	char			device_type[8];
 	pepb_devstate_t		*pepb;
-	ddi_acc_handle_t	config_handle;
 	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(devi);
+	ddi_acc_handle_t	config_handle = bus_p->bus_cfg_hdl;
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -370,54 +371,6 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    DDI_PROP_DONTPASS, "pci-hotplug-type", INBAND_HPC_NONE);
 
 	/*
-	 * Initialize interrupt handlers.
-	 */
-	if (ddi_intr_get_supported_types(devi, &intr_types) != DDI_SUCCESS)
-		goto next_step;
-
-	PEPB_DEBUG((CE_NOTE, "%s#%d: intr_types = 0x%x\n",
-	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
-
-	if (pepb_msi_intr_supported(devi, intr_types) == DDI_SUCCESS) {
-		if (pepb_intr_init(pepb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
-			goto next_step;
-		else
-			PEPB_DEBUG((CE_WARN,
-			    "%s#%d: Unable to attach MSI handler",
-			    ddi_driver_name(devi), ddi_get_instance(devi)));
-	}
-
-	/*
-	 * If we are here that means MSIs were not enabled. For errors fall back
-	 * to the SERR+Machinecheck approach on Intel chipsets.
-	 */
-	if (PCIE_IS_RP(bus_p))
-		pepb->pepb_no_aer_msi = B_TRUE;
-
-	/*
-	 * Only register hotplug interrupts for now.
-	 * Check if device supports PCIe hotplug or not?
-	 * If yes, register fixed interrupts if ILINE is valid.
-	 * Fix error handling for INTx.
-	 */
-	if (pepb->inband_hpc == INBAND_HPC_PCIE) {
-		uint8_t iline;
-
-		(void) pci_config_setup(devi, &config_handle);
-		iline = pci_config_get8(config_handle, PCI_CONF_ILINE);
-		pci_config_teardown(&config_handle);
-
-		if (iline == 0 || iline > 15)
-			goto next_step;
-
-		if (pepb_intr_init(pepb, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS)
-			PEPB_DEBUG((CE_WARN,
-			    "%s#%d: Unable to attach INTx handler",
-			    ddi_driver_name(devi), ddi_get_instance(devi)));
-	}
-
-next_step:
-	/*
 	 * Initialize hotplug support on this bus. At minimum
 	 * (for non hotplug bus) this would create ":devctl" minor
 	 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
@@ -439,6 +392,71 @@ next_step:
 		}
 	}
 
+	/*
+	 * Call _OSC method for 2 reasons:
+	 * 1. Hotplug: To determine if it is native or ACPI mode.
+	 *
+	 * 2. Error handling: Inform firmware that OS can support AER error
+	 * handling. Currently we don't care for what the BIOS response was
+	 * and instead setup interrupts for error handling as if it were
+	 * supported.
+	 *
+	 * For hotpluggable slots the _OSC method has already been called as
+	 * part of the hotplug initialization above.
+	 * For non-hotpluggable slots we need to call the _OSC method only for
+	 * Root Ports (for AER support).
+	 */
+	if (!pcie_is_osc(devi) && PCIE_IS_RP(bus_p) && PCIE_HAS_AER(bus_p)) {
+		uint32_t osc_flags = OSC_CONTROL_PCIE_ADV_ERR;
+		(void) pcie_acpi_osc(devi, &osc_flags);
+	}
+
+	/*
+	 * Initialize interrupt handlers.
+	 */
+	if (ddi_intr_get_supported_types(devi, &intr_types) != DDI_SUCCESS)
+		goto next_step;
+
+	PEPB_DEBUG((CE_NOTE, "%s#%d: intr_types = 0x%x\n",
+	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
+
+	if (pepb_msi_intr_supported(devi, intr_types) == DDI_SUCCESS) {
+		if (pepb_intr_init(pepb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
+			goto next_step;
+		else
+			PEPB_DEBUG((CE_WARN,
+			    "%s#%d: Unable to attach MSI handler",
+			    ddi_driver_name(devi), ddi_get_instance(devi)));
+	}
+
+	/*
+	 * If we are here that means MSIs were not enabled. For errors fall back
+	 * to the SERR+Machinecheck approach on certain Intel chipsets.
+	 */
+	if (PCIE_IS_RP(bus_p))
+		pepb->pepb_no_aer_msi = B_TRUE;
+
+	/*
+	 * Only register hotplug interrupts for now.
+	 * Check if device supports PCIe hotplug or not?
+	 * If yes, register fixed interrupts if ILINE is valid.
+	 * Fix error handling for INTx.
+	 */
+	if (pepb->inband_hpc == INBAND_HPC_PCIE) {
+		uint8_t iline;
+
+		iline = pci_config_get8(config_handle, PCI_CONF_ILINE);
+
+		if (iline == 0 || iline > 15)
+			goto next_step;
+
+		if (pepb_intr_init(pepb, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS)
+			PEPB_DEBUG((CE_WARN,
+			    "%s#%d: Unable to attach INTx handler",
+			    ddi_driver_name(devi), ddi_get_instance(devi)));
+	}
+
+next_step:
 	/* Must apply workaround only after all initialization is done */
 	pepb_intel_serr_workaround(devi, pepb->pepb_no_aer_msi);
 	pepb_intel_rber_workaround(devi);
