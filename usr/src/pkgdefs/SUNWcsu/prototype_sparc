@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -101,9 +101,13 @@ d none usr/kernel/sys/sparcv9 755 root sys
 f none usr/kernel/sys/sparcv9/acctctl 755 root sys
 f none usr/kernel/sys/sparcv9/exacctsys 755 root sys
 f none usr/kernel/sys/sparcv9/sysacct 755 root sys
-f none usr/lib/ld.so 755 root bin
 f none usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_misc_link_sparc.so 755 root sys
+d none usr/lib/inet/sparcv7 755 root bin
+f none usr/lib/inet/sparcv7/in.iked 555 root bin
+d none usr/lib/inet/sparcv9 755 root bin
+f none usr/lib/inet/sparcv9/in.iked 555 root bin
+f none usr/lib/ld.so 755 root bin
 f none usr/lib/rcm/modules/SUNW_ttymux_rcm.so 555 root bin
 d none usr/lib/secure/sparcv9 755 root bin
 s none usr/lib/secure/64=sparcv9

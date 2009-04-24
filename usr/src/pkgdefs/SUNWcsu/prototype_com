@@ -650,7 +650,7 @@ f none usr/lib/inet/certrldb 555 root bin
 d none usr/lib/inet/dhcp 755 root bin
 d none usr/lib/inet/dhcp/nsu 755 root bin
 d none usr/lib/inet/dhcp/svc 755 root bin
-f none usr/lib/inet/in.iked 555 root bin
+l none usr/lib/inet/in.iked=../../../usr/lib/isaexec
 s none usr/lib/inet/in.mpathd=../../../lib/inet/in.mpathd
 f none usr/lib/inet/inetd 555 root bin
 f none usr/lib/intrd 555 root bin

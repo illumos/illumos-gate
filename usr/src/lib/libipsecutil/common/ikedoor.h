@@ -40,7 +40,17 @@ extern "C" {
  * getting confused if a structure is changed and a mismatch occurs.
  * This should be incremented each time a structure is changed.
  */
-#define	DOORVER 2
+
+/*
+ * The IKE process may be a 64-bit process, but ikeadm or any other IKE
+ * door consumer does not have to be.  We need to be strict ala. PF_KEY or
+ * any on-the-wire-protocol with respect to structure fields offsets and
+ * alignment.  Please make sure all structures are the same size on both
+ * 64-bit and 32-bit execution environments (or even other ones), and that
+ * apart from trivial 4-byte enums or base headers, that all structures are
+ * multiples of 8-bytes (64-bits).
+ */
+#define	DOORVER 3
 #define	DOORNM	"/var/run/ike_door"
 
 
@@ -190,6 +200,7 @@ typedef struct {
 	uint32_t	rule_max_certs;
 	uint32_t	rule_ike_port;
 	uint32_t	rule_natt_port;
+	uint32_t	defaults_reserved;	/* For 64-bit alignment. */
 } ike_defaults_t;
 
 /* data formatting structures for P1 SA dumps */
@@ -214,7 +225,7 @@ typedef struct {
 	uint32_t	p1hdr_state;
 	boolean_t	p1hdr_support_dpd;
 	dpd_status_t	p1hdr_dpd_state;
-	time_t		p1hdr_dpd_time;
+	uint64_t	p1hdr_dpd_time;
 } ike_p1_hdr_t;
 
 /* values for p1hdr_xchg (aligned with RFC2408, section 3.1) */
@@ -249,6 +260,7 @@ typedef struct {
 	uint32_t	p1xf_max_secs;
 	uint32_t	p1xf_max_kbytes;
 	uint32_t	p1xf_max_keyuses;
+	uint32_t	p1xf_reserved;	/* Alignment to 64-bit. */
 } ike_p1_xform_t;
 
 /* values for p1xf_dh_group (aligned with RFC2409, Appendix A) */
@@ -424,6 +436,7 @@ typedef struct {
 	uint32_t	cache_id;
 	uint32_t	class;
 	int		linkage;
+	uint32_t	certcache_padding;	/* For 64-bit alignment. */
 	char		subject[DN_MAX];
 	char		issuer[DN_MAX];
 } ike_certcache_t;
@@ -544,6 +557,7 @@ typedef struct {
 	ike_svccmd_t	cmd;
 	uint32_t	stat_len;
 	uint32_t	version;
+	uint32_t	defreq_reserved;	/* For 64-bit alignment. */
 } ike_defreq_t;
 
 /*
@@ -721,6 +735,7 @@ typedef struct {
  */
 typedef struct {
 	ike_svccmd_t	cmd;
+	uint32_t	pin_reserved;	/* For 64-bit alignment. */
 	char pkcs11_token[PKCS11_TOKSIZE];
 	uchar_t token_pin[MAX_PIN_LEN];
 } ike_pin_t;

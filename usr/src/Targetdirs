@@ -285,6 +285,7 @@ ROOT.BIN= \
 	/usr/lib/inet/dhcp/nsu \
 	/usr/lib/inet/dhcp/svc \
 	/usr/lib/inet/dhcp/svcadm \
+	/usr/lib/inet/$(MACH32) \
 	$(XROOT.BIN) \
 	/usr/lib/fm    \
 	/usr/lib/gss    \
@@ -375,6 +376,7 @@ ROOT.BIN64= \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
 	/usr/lib/fp/libp/$(MACH64) \
+	/usr/lib/inet/$(MACH64) \
 	/usr/lib/krb5/$(MACH64) \
 	/usr/lib/libp/$(MACH64) \
 	/usr/lib/link_audit/$(MACH64) \

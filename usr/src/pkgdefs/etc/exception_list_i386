@@ -363,10 +363,13 @@ usr/include/ike/sshrandom.h		i386
 usr/include/ike/sshhash.h		i386
 usr/include/ike/sshconf.h		i386
 usr/lib/libike.so			i386
+usr/lib/llib-like			i386
 usr/lib/llib-like.ln			i386
 usr/lib/llib-lipsecutil			i386
 usr/lib/libipsecutil.so			i386
 usr/lib/llib-lipsecutil.ln		i386
+usr/lib/amd64/libike.so			i386
+usr/lib/amd64/llib-like.ln		i386
 usr/lib/amd64/libipsecutil.so		i386
 usr/lib/amd64/llib-lipsecutil.ln	i386
 #

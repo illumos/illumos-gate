@@ -189,6 +189,7 @@ s none usr/lib/amd64/libgen.so.1=../../../lib/amd64/libgen.so.1
 s none usr/lib/amd64/libgen.so=../../../lib/amd64/libgen.so.1
 f none usr/lib/amd64/libidmap.so.1 755 root bin
 s none usr/lib/amd64/libidmap.so=./libidmap.so.1
+f none usr/lib/amd64/libike.so.1 755 root bin
 s none usr/lib/amd64/libinetutil.so.1=../../../lib/amd64/libinetutil.so.1
 f none usr/lib/amd64/libipmi.so.1 755 root bin
 s none usr/lib/amd64/libipmi.so=./libipmi.so.1

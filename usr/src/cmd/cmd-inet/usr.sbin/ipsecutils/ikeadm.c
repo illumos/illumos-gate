@@ -1451,6 +1451,7 @@ print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 {
 	char sbuf[TBUF_SIZE];
 	char tbuf[TBUF_SIZE];
+	time_t ltime = (time_t)hdrp->p1hdr_dpd_time;
 
 	(void) printf(
 	    gettext("%s Cookies: Initiator 0x%llx  Responder 0x%llx\n"),
@@ -1472,7 +1473,7 @@ print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 		return;
 	}
 	if (strftime(tbuf, TBUF_SIZE, NULL,
-	    localtime(&hdrp->p1hdr_dpd_time)) == 0) {
+	    localtime(&ltime)) == 0) {
 		(void) strlcpy(tbuf, gettext("<time conversion failed>"),
 		    TBUF_SIZE);
 	}

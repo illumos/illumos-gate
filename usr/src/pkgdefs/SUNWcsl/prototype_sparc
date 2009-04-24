@@ -179,6 +179,7 @@ s none usr/lib/sparcv9/libgen.so.1=../../../lib/sparcv9/libgen.so.1
 s none usr/lib/sparcv9/libgen.so=../../../lib/sparcv9/libgen.so.1
 f none usr/lib/sparcv9/libidmap.so.1 755 root bin
 s none usr/lib/sparcv9/libidmap.so=./libidmap.so.1
+f none usr/lib/sparcv9/libike.so.1 755 root bin
 s none usr/lib/sparcv9/libinetutil.so.1=../../../lib/sparcv9/libinetutil.so.1
 f none usr/lib/sparcv9/libipmi.so.1 755 root bin
 s none usr/lib/sparcv9/libipmi.so=libipmi.so.1
