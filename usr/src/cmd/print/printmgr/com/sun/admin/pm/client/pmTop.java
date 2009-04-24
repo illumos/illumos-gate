@@ -20,9 +20,8 @@
  */
 /*
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * pmTop.java
@@ -539,7 +538,7 @@ public class pmTop extends JPanel {
 	usePPD.setMnemonic(pmUtility.getIntResource("Use.PPD.files.mnemonic"));
 
 	useLocalhost = new JCheckBoxMenuItem(
-		pmUtility.getResource("Use.localhost"), true);
+		pmUtility.getResource("Use.localhost"), false);
 	useLocalhost.setMnemonic(
 		pmUtility.getIntResource("Use.localhost.mnemonic"));
 
@@ -888,14 +887,20 @@ public class pmTop extends JPanel {
 	// translate from gui to server
 	if (newNS.startsWith("files")) {
 		serverNS = new String("system");
+		useLocalhost.setState(true);
 	} else if (newNS.equals("NIS")) {
 		serverNS = new String("nis");
+		useLocalhost.setState(false);
 	} else if (newNS.equals("NIS+")) {
 		serverNS = new String("nisplus");
+		useLocalhost.setState(false);
 	} else if (newNS.equals("LDAP")) {
 		serverNS = new String("ldap");
-	} else
+		useLocalhost.setState(false);
+	} else {
 		serverNS = new String("system");
+		useLocalhost.setState(true);
+	}
 
         Debug.message("CLNT:  newNS: " + newNS +
                        "\n serverNS: " + serverNS +
@@ -904,15 +909,21 @@ public class pmTop extends JPanel {
 	if (!serverNS.equals(ns.getNameService())) {
 
 		if (newNS.startsWith("files")) {
+			useLocalhost.setState(true);
 			ns = systemns;
 		} else if (newNS.equals("NIS")) {
+			useLocalhost.setState(false);
 			ns = nisns;
 		} else if (newNS.equals("NIS+")) {
+			useLocalhost.setState(false);
 			ns = nisplusns;
 		} else if (newNS.equals("LDAP")) {
+			useLocalhost.setState(false);
 			ns = ldapns;
-		} else
+		} else {
+			useLocalhost.setState(true);
 			ns = systemns;
+		}
 	}
 
 
