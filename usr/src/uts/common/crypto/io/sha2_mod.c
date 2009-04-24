@@ -1357,6 +1357,7 @@ sha2_mac_verify_atomic(crypto_provider_handle_t provider,
 		/* reuse context template */
 		bcopy(ctx_template, &sha2_hmac_ctx, sizeof (sha2_hmac_ctx_t));
 	} else {
+		sha2_hmac_ctx.hc_mech_type = mechanism->cm_type;
 		/* no context template, initialize context */
 		if (keylen_in_bytes > sha_hmac_block_size) {
 			/*
