@@ -51,6 +51,7 @@
 /*
  * Local Function Prototypes.
  */
+static int ql_req_pkt(ql_adapter_state_t *, request_t **);
 static void ql_continuation_iocb(ql_adapter_state_t *, ddi_dma_cookie_t *,
     uint16_t, boolean_t);
 static void ql_isp24xx_rcvbuf(ql_adapter_state_t *);
@@ -251,7 +252,7 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
  * Context:
  *	Interrupt or Kernel context, no mailbox commands allowed.
  */
-int
+static int
 ql_req_pkt(ql_adapter_state_t *vha, request_t **pktp)
 {
 	uint16_t		cnt;
@@ -751,7 +752,7 @@ ql_marker(ql_adapter_state_t *ha, uint16_t loop_id, uint16_t lun,
 	if (rval == QL_SUCCESS) {
 		pkt->entry_type = MARKER_TYPE;
 
-		if (CFG_IST(ha, CFG_CTRL_2425)) {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
 			marker_24xx_entry_t	*pkt24 =
 			    (marker_24xx_entry_t *)pkt;
 
@@ -816,9 +817,7 @@ ql_ms_iocb(ql_adapter_state_t *ha, ql_srb_t *sp, void *arg)
 	ms_entry_t		*pkt = arg;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-#if 0
 	QL_DUMP_3(sp->pkt->pkt_cmd, 8, sp->pkt->pkt_cmdlen);
-#endif
 	/*
 	 * Build command packet.
 	 */
@@ -899,9 +898,7 @@ ql_ms_24xx_iocb(ql_adapter_state_t *ha, ql_srb_t *sp, void *arg)
 	ql_adapter_state_t	*pha = ha->pha;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-#if 0
 	QL_DUMP_3(sp->pkt->pkt_cmd, 8, sp->pkt->pkt_cmdlen);
-#endif
 	/*
 	 * Build command packet.
 	 */
@@ -1131,7 +1128,7 @@ ql_isp_rcvbuf(ql_adapter_state_t *ha)
 	fc_unsol_buf_t	*ubp;
 	int		ring_updated = FALSE;
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		ql_isp24xx_rcvbuf(ha);
 		return;
 	}
@@ -1321,364 +1318,6 @@ ql_isp24xx_rcvbuf(ql_adapter_state_t *ha)
 	if (pkt != NULL) {
 		ql_isp_cmd(ha);
 	}
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_modify_lun
- *	Function enables, modifies or disables ISP to respond as a target.
- *
- * Input:
- *	ha = adapter state pointer.
- *	count = number buffers for incoming commands.
- *
- * Returns:
- *	ql local function return status code.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-int
-ql_modify_lun(ql_adapter_state_t *ha)
-{
-	enable_lun_entry_t	*pkt;
-	int			rval = QL_SUCCESS;
-	uint32_t		index, ubcount;
-	fc_unsol_buf_t		*ubp;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	/*
-	 * Count the number of SCSI unsolicited buffers, that have been
-	 * allocated.
-	 */
-	ADAPTER_STATE_LOCK(ha);
-
-	ubp = NULL;
-	ubcount = 0;
-	QL_UB_LOCK(ha);
-	for (index = 0; index < QL_UB_LIMIT; index++) {
-		ubp = ha->ub_array[index];
-		if (ubp != NULL) {
-			ql_srb_t *sp = ubp->ub_fca_private;
-
-			if (sp->ub_type == FC_TYPE_SCSI_FCP &&
-			    !(sp->flags & SRB_UB_FREE_REQUESTED)) {
-				ubcount++;
-			}
-		}
-	}
-	QL_UB_UNLOCK(ha);
-
-	if (!(ha->flags & TARGET_MODE_INITIALIZED) && (ubcount == 0)) {
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-		return (rval);
-	}
-
-	rval = ql_req_pkt(ha, (request_t **)&pkt);
-
-	if (ha->flags & TARGET_MODE_INITIALIZED) {
-		if (ubcount == 0) {
-			/* Disable the target mode Luns */
-			ASSERT(ha->ub_command_count != 0);
-			ASSERT(ha->ub_notify_count != 0);
-
-			ha->flags &= ~(TARGET_MODE_INITIALIZED);
-
-			ha->ub_command_count = 0;
-			ha->ub_notify_count = 0;
-
-			pkt->entry_type = ENABLE_LUN_TYPE;
-			pkt->command_count = 0;
-			pkt->immediate_notify_count = 0;
-
-		} else {
-			/* Modify the command count for target mode */
-			modify_lun_entry_t	*ml_pkt;
-			uint8_t			cmd_count, notify_count;
-
-			ASSERT(ha->ub_command_count != 0);
-			ASSERT(ha->ub_notify_count != 0);
-
-			/*
-			 * calculate the new value of command count
-			 * and notify count and then issue the command
-			 * to change the values in the firmware.
-			 */
-			ml_pkt = (modify_lun_entry_t *)pkt;
-			ml_pkt->entry_type = MODIFY_LUN_TYPE;
-			if (ubcount < 255) {
-				/* Save one for immediate notify. */
-				if (ubcount > 1) {
-					cmd_count = (uint8_t)(ubcount - 1);
-				} else {
-					cmd_count = (uint8_t)ubcount;
-				}
-				notify_count = 1;
-			} else {
-				cmd_count = 255;
-				if (ubcount - 255 < 255) {
-					notify_count = (uint8_t)
-					    (ubcount - 255);
-				} else {
-					notify_count = 255;
-				}
-			}
-
-			if (cmd_count > ha->ub_command_count) {
-				/* cmd_count value increased */
-				ml_pkt->command_count =	(uint8_t)
-				    (cmd_count - ha->ub_command_count);
-				ml_pkt->operators = (uint8_t)
-				    (ml_pkt->operators | BIT_0);
-
-				if (notify_count > ha->ub_notify_count) {
-					ml_pkt->immediate_notify_count =
-					    (uint8_t)(notify_count -
-					    ha->ub_notify_count);
-					ml_pkt->operators = (uint8_t)
-					    (ml_pkt->operators | BIT_2);
-				} else if (notify_count <
-				    ha->ub_notify_count) {
-					ml_pkt->immediate_notify_count =
-					    (uint8_t)(ha->ub_notify_count -
-					    notify_count);
-					ml_pkt->operators = (uint8_t)
-					    (ml_pkt->operators | BIT_3);
-				}
-			} else {
-				/* cmd_count value reduced */
-				ml_pkt->command_count =	(uint8_t)
-				    (ha->ub_command_count - cmd_count);
-				if (ml_pkt->command_count != 0) {
-					ml_pkt->operators = (uint8_t)
-					    (ml_pkt->operators | BIT_1);
-				}
-				if (notify_count > ha->ub_notify_count) {
-					ml_pkt->immediate_notify_count =
-					    (uint8_t)(notify_count -
-					    ha->ub_notify_count);
-					ml_pkt->operators = (uint8_t)
-					    (ml_pkt->operators | BIT_2);
-				} else if (notify_count <
-				    ha->ub_notify_count) {
-					ml_pkt->immediate_notify_count =
-					    (uint8_t)(ha->ub_notify_count -
-					    notify_count);
-					ml_pkt->operators = (uint8_t)
-					    (ml_pkt->operators | BIT_3);
-				}
-			}
-
-			/* Update the driver's command/notify count values */
-			ha->ub_command_count = cmd_count;
-			ha->ub_notify_count = notify_count;
-		}
-	} else {
-		ASSERT(ubcount != 0);
-
-		/* Enable the Luns for the target mode */
-		pkt->entry_type = ENABLE_LUN_TYPE;
-
-		if (ubcount < 255) {
-			/* Save one for immediate notify. */
-			if (ubcount > 1) {
-				ha->ub_command_count = (uint8_t)(ubcount - 1);
-			} else {
-				ha->ub_command_count = (uint8_t)ubcount;
-			}
-			ha->ub_notify_count = 1;
-		} else {
-			ha->ub_command_count = 255;
-			if (ubcount - 255 < 255) {
-				ha->ub_notify_count = (uint8_t)(ubcount - 255);
-			} else {
-				ha->ub_notify_count = 255;
-			}
-		}
-		ha->flags |= TARGET_MODE_INITIALIZED;
-
-		pkt->command_count = ha->ub_command_count;
-		pkt->immediate_notify_count = ha->ub_notify_count;
-	}
-	ADAPTER_STATE_UNLOCK(ha);
-
-	/* Issue command to ISP */
-	ql_isp_cmd(ha);
-
-	if (rval != QL_SUCCESS) {
-		EL(ha, "failed=%xh\n", rval);
-	} else {
-		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-	}
-	return (rval);
-}
-
-/*
- * ql_notify_acknowledge_iocb
- *	Setup of notify acknowledge IOCB for pending
- *	immediate notify entry.
- *
- * Input:
- *	ha:	adapter state pointer.
- *	cmd:	target command context pointer.
- *	pkt:	request queue packet.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-void
-ql_notify_acknowledge_iocb(ql_adapter_state_t *ha, tgt_cmd_t *cmd,
-    notify_acknowledge_entry_t *pkt)
-{
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	pkt->entry_type = NOTIFY_ACKNOWLEDGE_TYPE;
-	pkt->initiator_id_l = cmd->initiator_id_l;
-	pkt->initiator_id_h = cmd->initiator_id_h;
-
-	/* Handle LIP reset event. */
-	if (cmd->status == 0xe) {
-		pkt->flags_l = BIT_5;
-	}
-
-	pkt->flags_h = BIT_0;
-	ddi_put16(ha->hba_buf.acc_handle, &pkt->status, cmd->status);
-	pkt->task_flags_l = cmd->task_flags_l;
-	pkt->task_flags_h = cmd->task_flags_h;
-	pkt->sequence_id = cmd->rx_id;
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_continue_target_io_iocb
- *	Setup of continue target I/O IOCB for pending
- *	accept target I/O entry.
- *
- * Input:
- *	ha = adapter state pointer.
- *	sp = srb structure pointer.
- *	arg = request queue packet.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-void
-ql_continue_target_io_iocb(ql_adapter_state_t *ha, ql_srb_t *sp, void *arg)
-{
-	ddi_dma_cookie_t	*cp;
-	port_id_t		d_id;
-	ql_tgt_t		*tq;
-	ctio_entry_t		*pkt = arg;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	d_id.b24 = sp->pkt->pkt_cmd_fhdr.d_id;
-	tq = ql_d_id_to_queue(ha, d_id);
-
-	if (tq == NULL) {
-		EL(ha, "Unknown Initiator d_id %xh", d_id.b24);
-		return;
-	}
-
-	if (CFG_IST(ha, CFG_EXT_FW_INTERFACE)) {
-		pkt->initiator_id_l = LSB(tq->loop_id);
-		pkt->initiator_id_h = MSB(tq->loop_id);
-	} else {
-		pkt->initiator_id_h = LSB(tq->loop_id);
-	}
-	pkt->rx_id = sp->pkt->pkt_cmd_fhdr.rx_id;
-
-	/* Set ISP command timeout. */
-	if (sp->isp_timeout < 0x1999) {
-		ddi_put16(ha->hba_buf.acc_handle, &pkt->timeout,
-		    sp->isp_timeout);
-	}
-
-	if (sp->flags & SRB_FCP_DATA_PKT) {
-
-		if (sp->pkt->pkt_tran_type == FC_PKT_OUTBOUND) {
-			pkt->flags_l = BIT_6;
-		} else if (sp->pkt->pkt_tran_type == FC_PKT_INBOUND) {
-			pkt->flags_l = BIT_7;
-		}
-
-		pkt->flags_h = BIT_1;
-		/* Set relative offset. */
-		ddi_put32(ha->hba_buf.acc_handle,
-		    (uint32_t *)(void *)&pkt->relative_offset,
-		    (uint32_t)sp->pkt->pkt_cmd_fhdr.ro);
-	} else {
-		/* (sp->flags & SRB_FCP_RSP_PKT) */
-		pkt->flags_l = BIT_7 | BIT_6 | BIT_1;
-		pkt->flags_h = BIT_7 | BIT_1;
-	}
-
-	/*
-	 * Load data segments.
-	 */
-	if (sp->pkt->pkt_cmdlen != 0) {
-		cp = sp->pkt->pkt_cmd_cookie;
-
-		/* Transfer length. */
-		ddi_put32(ha->hba_buf.acc_handle,
-		    (uint32_t *)(void *)&pkt->type.s0_32bit.byte_count,
-		    (uint32_t)cp->dmac_size);
-
-		/* Load data segments. */
-		pkt->dseg_count_l = 1;
-		if (CFG_IST(ha, CFG_ENABLE_64BIT_ADDRESSING)) {
-			pkt->entry_type = CTIO_TYPE_3;
-			ddi_put32(ha->hba_buf.acc_handle,
-			    (uint32_t *)(void *)
-			    &pkt->type.s0_64bit.dseg_0_address[0],
-			    cp->dmac_address);
-			ddi_put32(ha->hba_buf.acc_handle,
-			    (uint32_t *)(void *)
-			    &pkt->type.s0_64bit.dseg_0_address[1],
-			    cp->dmac_notused);
-			ddi_put32(ha->hba_buf.acc_handle,
-			    (uint32_t *)(void *)
-			    &pkt->type.s0_64bit.dseg_0_length,
-			    (uint32_t)cp->dmac_size);
-		} else {
-			pkt->entry_type = CTIO_TYPE_2;
-			ddi_put32(ha->hba_buf.acc_handle,
-			    (uint32_t *)(void *)
-			    &pkt->type.s0_32bit.dseg_0_address,
-			    cp->dmac_address);
-			ddi_put32(ha->hba_buf.acc_handle,
-			    (uint32_t *)(void *)
-			    &pkt->type.s0_32bit.dseg_0_length,
-			    (uint32_t)cp->dmac_size);
-		}
-	}
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_continue_target_io_2400_iocb
- *	Setup of continue target I/O IOCB for pending
- *	accept target I/O entry.
- *
- * Input:
- *	ha = adapter state pointer.
- *	sp = srb structure pointer.
- *	arg = request queue packet.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-/* ARGSUSED */
-void
-ql_continue_target_io_2400_iocb(ql_adapter_state_t *ha, ql_srb_t *sp,
-    void *arg)
-{
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }

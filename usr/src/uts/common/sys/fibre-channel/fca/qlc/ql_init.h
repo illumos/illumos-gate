@@ -277,7 +277,9 @@ typedef struct nvram_24xx {
 	 * BIT 12 = Reserved
 	 * BIT 13 = Full Login after LIP
 	 * BIT 14 = Node Name Option
-	 * BIT 15-31 = Reserved
+	 * BIT 15 = Reserved
+	 *
+	 * BIT 16-31 = Reserved
 	 */
 	uint8_t firmware_options_1[4];
 
@@ -293,10 +295,25 @@ typedef struct nvram_24xx {
 	 *
 	 * BIT 8  = Enable Class 2
 	 * BIT 9  = Enable ACK0
-	 * BIT 10 = Reserved
+	 * BIT 10 = Enable Virtual Fabric
 	 * BIT 11 = Enable FC-SP Security
 	 * BIT 12 = FC Tape Enable
-	 * BIT 13-31 = Reserved
+	 * BIT 13 = Reserved
+	 * BIT 14 = Target PRLI Control
+	 * BIT 15 = Reserved
+	 *
+	 * BIT 16  = Enable Emulated MSIX
+	 * BIT 17  = Reserved
+	 * BIT 18  = Enable Alternate Device Number
+	 * BIT 19  = Enable Alternate Bus Number
+	 * BIT 20  = Enable Translated Address
+	 * BIT 21  = Enable VM Security
+	 * BIT 22  = Enable Interrupt Handshake
+	 * BIT 23  = Enable Multiple Queue
+	 *
+	 * BIT 24  = IOCB Security
+	 * BIT 25  = qos
+	 * BIT 26-31 = Reserved
 	 */
 	uint8_t firmware_options_2[4];
 
@@ -304,7 +321,7 @@ typedef struct nvram_24xx {
 	 * BIT 0  = Reserved
 	 * BIT 1  = Soft ID only
 	 * BIT 2  = Reserved
-	 * BIT 3  = Reserved
+	 * BIT 3  = disable split completion timeout
 	 * BIT 4  = FCP RSP Payload bit 0
 	 * BIT 5  = FCP RSP Payload bit 1
 	 * BIT 6  = Enable Rec Out-of-Order data frame handling
@@ -319,59 +336,196 @@ typedef struct nvram_24xx {
 	 * BIT 13 = Data Rate bit 0
 	 * BIT 14 = Data Rate bit 1
 	 * BIT 15 = Data Rate bit 2
+	 *
 	 * BIT 16 = 75-ohm Termination Select
-	 * BIT 17-31 = Reserved
+	 * BIT 17 = Enable Multiple FCFs
+	 * BIT 18 = MAC Addressing Mode
+	 * BIT 19 = MAC Addressing Mode
+	 * BIT 20 = MAC Addressing Mode
+	 * BIT 21 = Ethernet Data Rate
+	 * BIT 22 = Ethernet Data Rate
+	 * BIT 23 = Ethernet Data Rate
+	 *
+	 * BIT 24 = Ethernet Data Rate
+	 * BIT 25 = Ethernet Data Rate
+	 * BIT 26 = Enable Ethernet Header ATIO Queue
+	 * BIT 27 = Enable Ethernet Header Response Queue
+	 * BIT 28 = SPMA Selection
+	 * BIT 29 = SPMA Selection
+	 * BIT 30 = Reserved
+	 * BIT 31 = Reserved
 	 */
 	uint8_t firmware_options_3[4];
 
-	/*
-	 * Serial Link Control (offset 56)
-	 * BIT 0  = control enable
-	 * BIT 1-15 = Reserved
-	 */
-	uint8_t swing_opt[2];
+	union {
+		struct {
+			/*
+			 * Offset 56 (38h)
+			 * Serial Link Control
+			 * BIT 0 = control enable
+			 * BIT 1-15 = Reserved
+			 */
+			uint8_t swing_opt[2];
+			/*
+			 * Offset 58 (3Ah)
+			 * Serial Link Control 1G
+			 * BIT 0-7   = Reserved
+			 *
+			 * BIT 8-10  = output swing
+			 * BIT 11-13 = output emphasis
+			 * BIT 14-15 = Reserved
+			 */
+			uint8_t swing_1g[2];
+			/*
+			 * Offset 60 (3Ch)
+			 * Serial Link Control 2G
+			 * BIT 0-7   = Reserved
+			 *
+			 * BIT 8-10  = output swing
+			 * BIT 11-13 = output emphasis
+			 * BIT 14-15 = Reserved
+			 */
+			uint8_t swing_2g[2];
+			/*
+			 * Offset 62 (3Eh)
+			 * Serial Link Control 4G
+			 * BIT 0-7   = Reserved
+			 *
+			 * BIT 8-10  = output swing
+			 * BIT 11-13 = output emphasis
+			 * BIT 14-15 = Reserved
+			 */
+			uint8_t swing_4g[2];
+
+			/* Offset 64 (40h). */
+			uint8_t reserved[32];
+		} isp2400;
+		struct {
+			/*
+			 * Offset 56 (38h)
+			 * Serial Link Control
+			 * BIT 0  = Reserved
+			 * BIT 1  = 25xx TX control enable
+			 * BIT 2  = 25xx RX control enable (lmtg)
+			 * BIT 3  = 25xx RX control enable (linear)
+			 * BIT 4  = embedded HBA
+			 * BIT 5  = unused
+			 * BIT 6  = 25xx E7 Addr27 Preset
+			 * BIT 7  = 25xx E6 Addr0 Ch0 enable
+			 *
+			 * BIT 8-15 = 25xx E6 Addr0 Ch0
+			 *
+			 * BIT 16-31 = Reserved
+			 */
+			uint8_t swing_opt[4];
+
+			/*
+			 * Offset 60 (3Ch)
+			 * Serial Link TX Parameters
+			 * BIT 0 = TX Amplitude
+			 * BIT 1 = TX Amplitude
+			 * BIT 2 = TX Amplitude
+			 * BIT 3 = TX Amplitude
+			 * BIT 4 = TX Amplitude
+			 * BIT 5 = TX iPost
+			 * BIT 6 = TX iPost
+			 * BIT 7 = TX iPost
+			 *
+			 * BIT 8 = TX iPost
+			 * BIT 9 = TX iPre
+			 * BIT 10 = TX iPre
+			 * BIT 11 = TX iPre
+			 * BIT 12 = TX iPre
+			 * BIT 13 = TX iMain
+			 * BIT 14 = TX iMain
+			 * BIT 15 = TX iMain
+			 *
+			 * BIT 16 = TX iMain
+			 * BIT 17 = TX iMain
+			 * BIT 18-23 = Reserved
+			 *
+			 * BIT 24-31 = Reserved
+			 */
+			uint8_t tx_8g[4];
+			/* Offset 64 (40h) */
+			uint8_t tx_4g[4];
+			/* Offset 68 (44h) */
+			uint8_t tx_2g[4];
+
+			/*
+			 * Offset 72 (48h)
+			 * Serial Link RX Parameters
+			 * BIT 0 = RX Z1Cnt
+			 * BIT 1 = RX Z1Cnt
+			 * BIT 2 = RX Z1Cnt
+			 * BIT 3 = RX Z1Cnt
+			 * BIT 4 = RX G1Cnt
+			 * BIT 5 = RX ZCnt
+			 * BIT 6 = RX ZCnt
+			 * BIT 7 = RX ZCnt
+			 *
+			 * BIT 8 = RX ZCnt
+			 * BIT 9 = RX ZCnt
+			 * BIT 10 = RX TLTH
+			 * BIT 11 = RX TLTH
+			 * BIT 12 = RX TLTH
+			 * BIT 13 = RX TLTH
+			 * BIT 14 = RX TLTH
+			 * BIT 15 = RX TLTH
+			 *
+			 * BIT 16 = RX DFELTH
+			 * BIT 17 = RX DFELTH
+			 * BIT 18 = RX DFELTH
+			 * BIT 19 = RX DFELTH
+			 * BIT 20 = RX DFELTH
+			 * BIT 21 = RX DFELTH
+			 * BIT 22-23 = Reserved
+			 *
+			 * BIT 24-31 = Reserved
+			 */
+			uint8_t rx_limit_8g[4];
+			/* Offset 76 (4Ch) */
+			uint8_t rx_limit_4g[4];
+			/* Offset 80 (50h) */
+			uint8_t rx_limit_2g[4];
+			/* Offset 84 (54h) */
+			uint8_t rx_linear_8g[4];
+			/* Offset 88 (58h) */
+			uint8_t rx_linear_4g[4];
+			/* Offset 92 (5Ch) */
+			uint8_t rx_linear_2g[4];
+		} isp2500;
+		struct {
+			/* Offset 56 (38h) */
+			uint8_t reserved[8];
+
+			/* Offset 64 (40h). */
+			uint8_t e_node_mac_addr[6];
+
+			/* Offset 70 (46h). */
+			uint8_t reserved2[26];
+		} isp8001;
+	} fw;
 
 	/*
-	 * Serial Link Control 1G (offset 58)
-	 * BIT 0-7   = Reserved
-	 *
-	 * BIT 8-10  = output swing
-	 * BIT 11-13 = output emphasis
-	 * BIT 14-15 = Reserved
+	 * Offset 96 (60h)
+	 * BIT 0   = initiator op
+	 * BIT 1   = target op
+	 * BIT 2   = VI op
+	 * BIT 3-7 = Reserved
 	 */
-	uint8_t swing_1g[2];
+	uint8_t oem_specific;
+	uint8_t reserved_4[15];
+
+	/* Offset 112 (70h). */
+	uint8_t reserved_5[16];
 
 	/*
-	 * Serial Link Control 2G (offset 60)
-	 * BIT 0-7   = Reserved
-	 *
-	 * BIT 8-10  = output swing
-	 * BIT 11-13 = output emphasis
-	 * BIT 14-15 = Reserved
+	 * Offset 128 (80h).
+	 * PCIe table entries.
+	 * Firmware Extended Initialization Control Block.
 	 */
-	uint8_t swing_2g[2];
-
-	/*
-	 * Serial Link Control 4G (offset 62)
-	 * BIT 0-7   = Reserved
-	 *
-	 * BIT 8-10  = output swing
-	 * BIT 11-13 = output emphasis
-	 * BIT 14-15 = Reserved
-	 */
-	uint8_t swing_4g[2];
-
-	/* Offset 64. */
-	uint8_t reserved_2[32];
-
-	/* Offset 96. */
-	uint8_t reserved_3[32];
-
-	/* PCIe table entries. */
-	uint8_t reserved_4[32];
-
-	/* Offset 160. */
-	uint8_t reserved_5[32];
+	ql_ext_icb_8100_t	ext_blk;
 
 	/* Offset 192. */
 	uint8_t reserved_6[32];
@@ -389,16 +543,34 @@ typedef struct nvram_24xx {
 	 * BIT 6  = Enable opt boot mode
 	 * BIT 7  = Enable int mode BIOS
 	 *
-	 * BIT 8  =
-	 * BIT 9  =
+	 * BIT 8  = EV control enable
+	 * BIT 9  = Enable lip reset
 	 * BIT 10 = Enable lip full login
 	 * BIT 11 = Enable target reset
-	 * BIT 12 =
+	 * BIT 12 = Stop firmware
 	 * BIT 13 = Default Node Name Option
-	 * BIT 14 = Default valid
+	 * BIT 14 = Default WWPN valid
 	 * BIT 15 = Enable alternate WWN
 	 *
-	 * BIT 16-31 =
+	 * CLP BIOS flags
+	 *
+	 * BIT 16 = clp lun string
+	 * BIT 17 = clp target string
+	 * BIT 18 = clp bios enable string
+	 * BIT 19 = clp serdes_string
+	 * BIT 20 = clp wwpn string
+	 * BIT 21 = clp wwnn string
+	 * BIT 22 = win reserverd 0
+	 * BIT 23 = win reserverd 1
+	 *
+	 * BIT 24 = keep wwpn
+	 * BIT 25 = temp wwpn
+	 * BIT 26 = win reserverd 2
+	 * BIT 27 = win reserverd 3
+	 * BIT 28 = clear WBT in flash (win driver)
+	 * BIT 29 = write WBT in flash (win driver)
+	 * BIT 30 = load fw from flash (win driver)
+	 * BIT 31 = enable alternate WWN (win driver)
 	 */
 	uint8_t host_p[4];
 
@@ -452,51 +624,82 @@ typedef struct nvram_24xx {
 	 * BIT 0 = Enable BIOS pathname
 	 * BIT 1 = fcode qlc
 	 * BIT 2 = fcode host
-	 * BIT 3-7 =
+	 * BIT 3 = fcode sunid
+	 * BIT 4-7 =
 	 */
 	uint8_t	fcode_p0;
 	uint8_t reserved_16[7];
 
-	/* Offset 352. */
-	uint8_t prev_drv_ver_major;
-	uint8_t prev_drv_ver_submajob;
-	uint8_t prev_drv_ver_minor;
-	uint8_t prev_drv_ver_subminor;
+	/*
+	 * Offset 352 (160h).
+	 * uint8_t prev_drv_ver_major;
+	 * uint8_t prev_drv_ver_submajob;
+	 * uint8_t prev_drv_ver_minor;
+	 * uint8_t prev_drv_ver_subminor;
+	 * uint8_t prev_bios_ver_major[2];
+	 * uint8_t prev_bios_ver_minor[2];
+	 * uint8_t prev_efi_ver_major[2];
+	 * uint8_t prev_efi_ver_minor[2];
+	 * uint8_t prev_fw_ver_major[2];
+	 * uint8_t prev_fw_ver_minor;
+	 * uint8_t prev_fw_ver_subminor;
+	 * uint8_t reserved[16];
+	 */
+	uint8_t mac_address[6];
+	uint8_t clp_flag[2];
+	uint8_t reserved_18[24];
 
-	uint8_t prev_bios_ver_major[2];
-	uint8_t prev_bios_ver_minor[2];
-
-	uint8_t prev_efi_ver_major[2];
-	uint8_t prev_efi_ver_minor[2];
-
-	uint8_t prev_fw_ver_major[2];
-	uint8_t prev_fw_ver_minor;
-	uint8_t prev_fw_ver_subminor;
-
-	uint8_t reserved_17[16];
-
-	/* Offset 384. */
+	/* Offset 384 (180h). */
 	uint8_t	def_port_name[8];
 	uint8_t def_node_name[8];
+	uint8_t clp_flag1[2];
+	uint8_t clp_flag2[2];
 
-	uint8_t reserved_18[16];
+	/* Offset 404 (194h). */
+	uint8_t default_firmware_options[2];
 
-	/* Offset 416. */
-	uint8_t reserved_19[32];
+	/* Offset 406 (196h). */
+	uint8_t enhanced_features[2];
+	uint8_t serdes_index[2];
+	uint8_t reserved_19[6];
 
-	/* Offset 448. */
-	uint8_t reserved_20[28];
+	/* Offset 416 (1A0h). */
+	uint8_t alt4_boot_port_name[8];
+	uint8_t alt4_boot_lun_number[2];
+	uint8_t reserved_20[2];
 
-	/* Offset 476. */
+	/* Offset 428 (1ACh). */
+	uint8_t alt5_boot_port_name[8];
+	uint8_t alt5_boot_lun_number[2];
+	uint8_t reserved_21[2];
+
+	/* Offset 440 (1B8h). */
+	uint8_t alt6_boot_port_name[8];
+	uint8_t alt6_boot_lun_number[2];
+	uint8_t reserved_22[2];
+
+	/* Offset 452 (1C4h). */
+	uint8_t alt7_boot_port_name[8];
+	uint8_t alt7_boot_lun_number[2];
+	uint8_t reserved_23[2];
+
+	/* Offset 464 (1D0h). */
+	uint8_t reserved_24[12];
+
+	/* Offset 476 (1DCh). */
 	uint8_t	fw_table_offset[2];
 	uint8_t fw_table_sig[2];
 
-	/* Offset 480. */
-	uint8_t model_name[8];
+	/* Offset 480 (1E0h). */
+	int8_t  model_name[4];
+	int8_t  model_name1[12]; /* 24xx power_table[8]. */
 
-	/* Offset 488. */
-	uint8_t power_table[16];
+	/* Offset 496 (1F0h). */
+	uint8_t feature_mask_l[2];
+	uint8_t feature_mask_h[2];
+	uint8_t reserved_25[4];
 
+	/* Offset 504 (1F8h). */
 	uint8_t subsystem_vendor_id[2];
 	uint8_t subsystem_device_id[2];
 
@@ -650,7 +853,43 @@ typedef struct ql_25xx_fw_dump {
 #define	NV_MASK_OP	(BIT_26+BIT_25+BIT_24)
 #define	NV_DELAY_COUNT	10
 
-union ql_dev_id_list;
+/*
+ * Deivce ID list definitions.
+ */
+struct ql_dev_id {
+	uint8_t		al_pa;
+	uint8_t		area;
+	uint8_t		domain;
+	uint8_t		loop_id;
+};
+
+struct ql_ex_dev_id {
+	uint8_t		al_pa;
+	uint8_t		area;
+	uint8_t		domain;
+	uint8_t		reserved;
+	uint8_t		loop_id_l;
+	uint8_t		loop_id_h;
+};
+
+struct ql_24_dev_id {
+	uint8_t		al_pa;
+	uint8_t		area;
+	uint8_t		domain;
+	uint8_t		reserved;
+	uint8_t		n_port_hdl_l;
+	uint8_t		n_port_hdl_h;
+	uint8_t		reserved_1[2];
+};
+
+typedef union ql_dev_id_list {
+	struct ql_dev_id	d;
+	struct ql_ex_dev_id	d_ex;
+	struct ql_24_dev_id	d_24;
+} ql_dev_id_list_t;
+
+/* Define maximum number of device list entries.. */
+#define	DEVICE_LIST_ENTRIES	MAX_24_FIBRE_DEVICES
 
 /*
  * Global Data in ql_init.c source file.
@@ -674,7 +913,7 @@ int ql_start_firmware(ql_adapter_state_t *);
 int ql_set_cache_line(ql_adapter_state_t *);
 int ql_init_rings(ql_adapter_state_t *);
 int ql_fw_ready(ql_adapter_state_t *, uint8_t);
-void ql_dev_list(ql_adapter_state_t *, union ql_dev_id_list *, uint32_t,
+void ql_dev_list(ql_adapter_state_t *, ql_dev_id_list_t *, uint32_t,
     port_id_t *, uint16_t *);
 void ql_reset_chip(ql_adapter_state_t *);
 void ql_reset_24xx_chip(ql_adapter_state_t *);

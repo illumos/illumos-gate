@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _QL_XIOCTL_H
 #define	_QL_XIOCTL_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -59,7 +58,7 @@ typedef struct ql_mbx_ret {
 } ql_mbx_ret_t;
 
 /*
- * Name type defines for use with qla2x00_scsi_passthru() and
+ * Name type defines for use with ql_scsi_passthru() and
  * elsewhere when searching for name matches.
  * NOTE that these defines are used both as flags and values.
  */
@@ -306,6 +305,46 @@ typedef struct ql_fcache {
 #define	FBUFSIZE	100
 
 /*
+ * Flash Layout Table definitions.
+ */
+typedef struct ql_flash_layout_pointer {
+	uint8_t		sig[4];
+	uint8_t		addr[4];
+	uint8_t		version;
+	uint8_t		reserved[5];
+	uint8_t		checksum[2];
+} ql_flt_ptr_t;
+
+typedef struct ql_flash_layout_header {
+	uint8_t		version[2];
+	uint8_t		len[2];
+	uint8_t		checksum[2];
+	uint8_t		reserved[2];
+} ql_flt_hdr_t;
+
+typedef struct ql_flash_layout_region {
+	uint8_t		region;
+	uint8_t		reserved;
+	uint8_t		attribute;
+	uint8_t		reserved_1;
+	uint8_t		size[4];
+	uint8_t		beg_addr[4];
+	uint8_t		end_addr[4];
+} ql_flt_region_t;
+
+#define	FLASH_FW_REGION			0x01
+#define	FLASH_VPD_0_REGION		0x14
+#define	FLASH_NVRAM_0_REGION		0x15
+#define	FLASH_VPD_1_REGION		0x16
+#define	FLASH_NVRAM_1_REGION		0x17
+#define	FLASH_DESC_TABLE_REGION		0x1A
+#define	FLASH_ERROR_LOG_0_REGION	0x1D
+#define	FLASH_ERROR_LOG_1_REGION	0x1F
+#define	FLASH_GOLDEN_FW_REGION		0x2F
+
+#define	FLASH_LAYOUT_TABLE_SIZE		4096
+
+/*
  * Per instance XIOCTL context defintions.
  */
 typedef struct ql_xioctl {
@@ -360,13 +399,13 @@ int ql_alloc_xioctl_resource(ql_adapter_state_t *);
 void ql_free_xioctl_resource(ql_adapter_state_t *);
 int ql_xioctl(ql_adapter_state_t *, int, intptr_t, int, cred_t *, int *);
 void ql_enqueue_aen(ql_adapter_state_t *, uint16_t, void *);
-int ql_setup_flash(ql_adapter_state_t *);
-void ql_setup_fcache(ql_adapter_state_t *);
+int ql_setup_fcache(ql_adapter_state_t *);
 void ql_blink_led(ql_adapter_state_t *);
 void ql_fcache_rel(ql_fcache_t *);
 ql_fcache_t *ql_get_fbuf(ql_fcache_t *, uint32_t);
 int ql_dump_fcode(ql_adapter_state_t *, uint8_t *, uint32_t, uint32_t);
 int ql_pci_dump(ql_adapter_state_t *, uint32_t *, uint32_t, int);
+int ql_load_fcode(ql_adapter_state_t *, uint8_t *, uint32_t, uint32_t);
 
 #ifdef __cplusplus
 }

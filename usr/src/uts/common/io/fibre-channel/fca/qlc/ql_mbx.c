@@ -155,7 +155,7 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 
 	/* Issue set host interrupt command. */
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags & ~MBX_INTERRUPT);
-	CFG_IST(ha, CFG_CTRL_2425) ?
+	CFG_IST(ha, CFG_CTRL_242581) ?
 	    WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT) :
 	    WRT16_IO_REG(ha, hccr, HC_SET_HOST_INT);
 
@@ -419,7 +419,7 @@ ql_initialize_ip(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, (CFG_CTRL_6322 | CFG_CTRL_25XX)) ||
+	if (CFG_IST(ha, (CFG_CTRL_6322 | CFG_CTRL_2581)) ||
 	    ha->vp_index != 0) {
 		ha->flags &= ~IP_INITIALIZED;
 		EL(ha, "HBA does not support IP\n");
@@ -731,11 +731,6 @@ ql_echo(ql_adapter_state_t *ha, echo_t *echo_pt)
 
 		/* Transmit data source address in system memory bits 63-48 */
 		mcp->mb[21] = MSW(echo_pt->transfer_data_address.dmac_notused);
-	} else {
-		mcp->mb[6] = 0;		/* bits 63-48 */
-		mcp->mb[7] = 0;		/* bits 47-32 */
-		mcp->mb[20] = 0;	/* bits 63-48 */
-		mcp->mb[21] = 0;	/* bits 47-32 */
 	}
 
 	/* transfer count bits 15-0 */
@@ -897,7 +892,7 @@ ql_clear_aca(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t lun)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		rval = ql_task_mgmt_iocb(ha, tq, lun, CF_CLEAR_ACA, 0);
 	} else {
 		mcp->mb[0] = MBC_CLEAR_ACA;
@@ -951,7 +946,7 @@ ql_target_reset(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t delay)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		/* queue = NULL, all targets. */
 		if (tq == NULL) {
 			for (index = 0; index < DEVICE_HEAD_LIST_SIZE;
@@ -1024,7 +1019,7 @@ ql_target_reset(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t delay)
  *	delay:	in seconds.
  *
  * Returns:
- *	qla2x00 local function return status code.
+ *	ql local function return status code.
  *
  * Context:
  *	Kernel context.
@@ -1038,7 +1033,7 @@ ql_abort_target(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t delay)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		rval = ql_task_mgmt_iocb(ha, tq, 0,
 		    CF_DO_NOT_SEND | CF_TARGET_RESET, delay);
 	} else {
@@ -1093,7 +1088,7 @@ ql_lun_reset(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t lun)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		rval = ql_task_mgmt_iocb(ha, tq, lun, CF_LUN_RESET, 0);
 	} else {
 		mcp->mb[0] = MBC_LUN_RESET;
@@ -1103,7 +1098,6 @@ ql_lun_reset(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t lun)
 			mcp->mb[1] = (uint16_t)(tq->loop_id << 8);
 		}
 		mcp->mb[2] = lun;
-		mcp->mb[3] = 0;
 		mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 		mcp->in_mb = MBX_0;
 		mcp->timeout = MAILBOX_TOV;
@@ -1145,7 +1139,7 @@ ql_clear_task_set(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t lun)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		rval = ql_task_mgmt_iocb(ha, tq, lun, CF_CLEAR_TASK_SET, 0);
 	} else {
 		mcp->mb[0] = MBC_CLEAR_TASK_SET;
@@ -1197,7 +1191,7 @@ ql_abort_task_set(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t lun)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		rval = ql_task_mgmt_iocb(ha, tq, lun, CF_ABORT_TASK_SET, 0);
 	} else {
 		mcp->mb[0] = MBC_ABORT_TASK_SET;
@@ -1325,7 +1319,7 @@ ql_loop_port_bypass(ql_adapter_state_t *ha, ql_tgt_t *tq)
 
 	mcp->mb[0] = MBC_LOOP_PORT_BYPASS;
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[1] = tq->d_id.b.al_pa;
 	} else if (CFG_IST(ha, CFG_EXT_FW_INTERFACE)) {
 		mcp->mb[1] = tq->loop_id;
@@ -1373,7 +1367,7 @@ ql_loop_port_enable(ql_adapter_state_t *ha, ql_tgt_t *tq)
 
 	mcp->mb[0] = MBC_LOOP_PORT_ENABLE;
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[1] = tq->d_id.b.al_pa;
 	} else if (CFG_IST(ha, CFG_EXT_FW_INTERFACE)) {
 		mcp->mb[1] = tq->loop_id;
@@ -1425,7 +1419,7 @@ ql_login_lport(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t loop_id,
 	QL_PRINT_3(CE_CONT, "(%d): started, d_id=%xh, loop_id=%xh\n",
 	    ha->instance, tq->d_id.b24, loop_id);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		flags = CF_CMD_PLOGI;
 		if ((opt & LLF_PLOGI) == 0) {
 			flags = (uint16_t)(flags | CFO_COND_PLOGI);
@@ -1490,7 +1484,7 @@ ql_login_fport(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t loop_id,
 		opt = (uint16_t)(opt | LFF_NO_PRLI);
 	}
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		flags = CF_CMD_PLOGI;
 		if (opt & LFF_NO_PLOGI) {
 			flags = (uint16_t)(flags | CFO_COND_PLOGI);
@@ -1555,23 +1549,28 @@ int
 ql_logout_fabric_port(ql_adapter_state_t *ha, ql_tgt_t *tq)
 {
 	int		rval;
+	uint16_t	flag;
 	ql_mbx_data_t	mr;
 	mbx_cmd_t	mc = {0};
 	mbx_cmd_t	*mcp = &mc;
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started, loop_id=%xh d_id=%xh\n",
+	    ha->instance, tq->loop_id, tq->d_id.b24);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
-		rval = ql_log_iocb(ha, tq, tq->loop_id, CFO_IMPLICIT_LOGO |
-		    CF_CMD_LOGO | CFO_FREE_N_PORT_HANDLE, &mr);
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
+		flag = (uint16_t)(RESERVED_LOOP_ID(ha, tq->loop_id) ?
+		    CFO_EXPLICIT_LOGO |CF_CMD_LOGO | CFO_FREE_N_PORT_HANDLE :
+		    CFO_IMPLICIT_LOGO |CF_CMD_LOGO | CFO_FREE_N_PORT_HANDLE);
+		rval = ql_log_iocb(ha, tq, tq->loop_id, flag, &mr);
 	} else {
+		flag = (uint16_t)(RESERVED_LOOP_ID(ha, tq->loop_id) ?  1 : 0);
 		mcp->mb[0] = MBC_LOGOUT_FABRIC_PORT;
 		if (CFG_IST(ha, CFG_EXT_FW_INTERFACE)) {
 			mcp->mb[1] = tq->loop_id;
-			mcp->mb[10] = 0;
+			mcp->mb[10] = flag;
 			mcp->out_mb = MBX_10|MBX_1|MBX_0;
 		} else {
-			mcp->mb[1] = (uint16_t)(tq->loop_id << 8);
+			mcp->mb[1] = (uint16_t)(tq->loop_id << 8 | flag);
 			mcp->out_mb = MBX_1|MBX_0;
 		}
 		mcp->in_mb = MBX_0;
@@ -1809,7 +1808,7 @@ ql_get_port_database(ql_adapter_state_t *ha, ql_tgt_t *tq, uint8_t opt)
 		return (QL_MEMORY_ALLOC_FAILED);
 	}
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_GET_PORT_DATABASE;
 		mcp->mb[1] = tq->loop_id;
 		mcp->mb[4] = CHAR_TO_SHORT(tq->d_id.b.al_pa, tq->d_id.b.area);
@@ -1847,7 +1846,7 @@ ql_get_port_database(ql_adapter_state_t *ha, ql_tgt_t *tq, uint8_t opt)
 	ql_free_dma_resource(ha, &mem_desc);
 
 	if (rval == QL_SUCCESS) {
-		if (CFG_IST(ha, CFG_CTRL_2425)) {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
 			port_database_24_t *pd24 = (port_database_24_t *)pd23;
 
 			tq->master_state = pd24->current_login_state;
@@ -2039,7 +2038,6 @@ ql_set_rnid_params(ql_adapter_state_t *ha, size_t size, caddr_t bufp)
 	}
 
 	mcp->mb[0] = MBC_SET_PARAMETERS;
-	mcp->mb[1] = 0;
 	mcp->mb[2] = MSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[3] = LSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[6] = MSW(MSD(mem_desc.cookie.dmac_laddress));
@@ -2095,7 +2093,7 @@ ql_send_rnid_els(ql_adapter_state_t *ha, uint16_t loop_id, uint8_t opt,
 	}
 
 	mcp->mb[0] = MBC_SEND_RNID_ELS;
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[1] = loop_id;
 		mcp->mb[9] = ha->vp_index;
 		mcp->mb[10] = opt;
@@ -2163,7 +2161,6 @@ ql_get_rnid_params(ql_adapter_state_t *ha, size_t size, caddr_t bufp)
 	}
 
 	mcp->mb[0] = MBC_GET_PARAMETERS;
-	mcp->mb[1] = 0;
 	mcp->mb[2] = MSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[3] = LSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[6] = MSW(MSD(mem_desc.cookie.dmac_laddress));
@@ -2226,11 +2223,10 @@ ql_get_link_status(ql_adapter_state_t *ha, uint16_t loop_id, size_t size,
 		}
 
 		mcp->mb[0] = MBC_GET_LINK_STATUS;
-		if (CFG_IST(ha, CFG_CTRL_2425)) {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
 			if (loop_id == ha->loop_id) {
 				mcp->mb[0] = MBC_GET_STATUS_COUNTS;
 				mcp->mb[8] = (uint16_t)(size >> 2);
-				mcp->mb[10] = 0;
 				mcp->out_mb = MBX_10|MBX_8;
 			} else {
 				mcp->mb[1] = loop_id;
@@ -2323,10 +2319,9 @@ ql_get_status_counts(ql_adapter_state_t *ha, uint16_t loop_id, size_t size,
 		return (QL_MEMORY_ALLOC_FAILED);
 	}
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_GET_STATUS_COUNTS;
 		mcp->mb[8] = (uint16_t)(size / 4);
-		mcp->mb[10] = 0;
 		mcp->out_mb = MBX_10|MBX_8;
 	} else {
 		mcp->mb[0] = MBC_GET_LINK_STATUS;
@@ -2392,7 +2387,7 @@ ql_reset_link_status(ql_adapter_state_t *ha)
 	mbx_cmd_t	mc = {0};
 	mbx_cmd_t	*mcp = &mc;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	mcp->mb[0] = MBC_RESET_LINK_STATUS;
 	mcp->out_mb = MBX_0;
@@ -2472,10 +2467,9 @@ ql_initiate_lip(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_LIP_FULL_LOGIN;
 		mcp->mb[1] = BIT_4;
-		mcp->mb[2] = 0;
 		mcp->mb[3] = ha->loop_reset_delay;
 		mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 	} else {
@@ -2519,9 +2513,11 @@ ql_full_login_lip(ql_adapter_state_t *ha)
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	mcp->mb[0] = MBC_LIP_FULL_LOGIN;
-	mcp->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_2425) ? BIT_3 : 0);
-	mcp->mb[2] = 0;
-	mcp->mb[3] = 0;
+	if (CFG_IST(ha, CFG_CTRL_2425)) {
+		mcp->mb[1] = BIT_3;
+	} else if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		mcp->mb[1] = BIT_1;
+	}
 	mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_0;
 	mcp->timeout = MAILBOX_TOV;
@@ -2560,24 +2556,21 @@ ql_lip_reset(ql_adapter_state_t *ha, uint16_t loop_id)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_LIP_FULL_LOGIN;
 		mcp->mb[1] = BIT_6;
-		mcp->mb[2] = 0;
 		mcp->mb[3] = ha->loop_reset_delay;
 		mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 	} else {
 		mcp->mb[0] = MBC_LIP_RESET;
 		if (CFG_IST(ha, CFG_EXT_FW_INTERFACE)) {
 			mcp->mb[1] = loop_id;
-			mcp->mb[10] = 0;
 			mcp->out_mb = MBX_10|MBX_3|MBX_2|MBX_1|MBX_0;
 		} else {
 			mcp->mb[1] = (uint16_t)(loop_id << 8);
 			mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 		}
 		mcp->mb[2] = ha->loop_reset_delay;
-		mcp->mb[3] = 0;
 	}
 	mcp->in_mb = MBX_0;
 	mcp->timeout = MAILBOX_TOV;
@@ -2617,7 +2610,7 @@ ql_abort_command(ql_adapter_state_t *ha, ql_srb_t *sp)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		rval = ql_abort_cmd_iocb(ha, sp);
 	} else {
 		mcp->mb[0] = MBC_ABORT_COMMAND_IOCB;
@@ -2738,7 +2731,7 @@ ql_verify_checksum(ql_adapter_state_t *ha)
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	mcp->mb[0] = MBC_VERIFY_CHECKSUM;
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[1] = MSW(ha->risc_fw[0].addr);
 		mcp->mb[2] = LSW(ha->risc_fw[0].addr);
 	} else {
@@ -2793,7 +2786,7 @@ ql_get_id_list(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
 	}
 
 	mcp->mb[0] = MBC_GET_ID_LIST;
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[2] = MSW(LSD(mem_desc.cookie.dmac_laddress));
 		mcp->mb[3] = LSW(LSD(mem_desc.cookie.dmac_laddress));
 		mcp->mb[6] = MSW(MSD(mem_desc.cookie.dmac_laddress));
@@ -2860,7 +2853,7 @@ ql_wrt_risc_ram(ql_adapter_state_t *ha, uint32_t risc_address, uint64_t bp,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_LOAD_RAM_EXTENDED;
 		mcp->mb[4] = MSW(word_count);
 		mcp->mb[5] = LSW(word_count);
@@ -2918,7 +2911,7 @@ ql_rd_risc_ram(ql_adapter_state_t *ha, uint32_t risc_address, uint64_t bp,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_DUMP_RAM_EXTENDED;
 		mcp->mb[1] = LSW(risc_address);
 		mcp->mb[2] = MSW(LSD(bp));
@@ -2977,7 +2970,6 @@ ql_issue_mbx_iocb(ql_adapter_state_t *ha, caddr_t bp, uint32_t size)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-
 	if ((rval = ql_setup_mbox_dma_transfer(ha, &mem_desc, bp, size)) !=
 	    QL_SUCCESS) {
 		EL(ha, "setup_mbox_dma_transfer failed: %x\n", rval);
@@ -2985,7 +2977,6 @@ ql_issue_mbx_iocb(ql_adapter_state_t *ha, caddr_t bp, uint32_t size)
 	}
 
 	mcp->mb[0] = MBC_EXECUTE_IOCB;
-	mcp->mb[1] = 0;
 	mcp->mb[2] = MSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[3] = LSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[6] = MSW(MSD(mem_desc.cookie.dmac_laddress));
@@ -3078,7 +3069,7 @@ ql_mbx_wrap_test(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
  *	ha:	adapter state pointer.
  *
  * Returns:
- *	qla2x00 local function return status code.
+ *	ql local function return status code.
  *
  * Context:
  *	Kernel context.
@@ -3093,15 +3084,12 @@ ql_execute_fw(ql_adapter_state_t *ha)
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	mcp->mb[0] = MBC_EXECUTE_FIRMWARE;
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[1] = MSW(ha->risc_fw[0].addr);
 		mcp->mb[2] = LSW(ha->risc_fw[0].addr);
 	} else {
 		mcp->mb[1] = LSW(ha->risc_fw[0].addr);
-		mcp->mb[2] = 0;
 	}
-	mcp->mb[3] = 0;
-	mcp->mb[4] = 0;
 	mcp->out_mb = MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_0;
 	mcp->timeout = MAILBOX_TOV;
@@ -3238,7 +3226,7 @@ ql_init_firmware(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		WRT32_IO_REG(ha, req_in, 0);
 		WRT32_IO_REG(ha, resp_out, 0);
 		WRT32_IO_REG(ha, pri_req_in, 0);
@@ -3261,18 +3249,33 @@ ql_init_firmware(ql_adapter_state_t *ha)
 	if (CFG_IST(ha, CFG_SBUS_CARD)) {
 		mcp->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_2200) ?
 		    0x204c : 0x52);
-	} else {
-		mcp->mb[1] = 0;
 	}
 
 	mcp->mb[2] = MSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[3] = LSW(LSD(mem_desc.cookie.dmac_laddress));
-	mcp->mb[4] = 0;
-	mcp->mb[5] = 0;
 	mcp->mb[6] = MSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[7] = LSW(MSD(mem_desc.cookie.dmac_laddress));
-	mcp->out_mb = MBX_7|MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
-	mcp->in_mb = MBX_0|MBX_2;
+	if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		uint64_t		ofst, addr;
+		ql_init_24xx_cb_t	*icb = (ql_init_24xx_cb_t *)
+		    &ha->init_ctrl_blk.cb24;
+
+		mcp->mb[0] = MBC_INITIALIZE_MULTI_ID_FW;
+		if (icb->ext_blk.version[0] | icb->ext_blk.version[1]) {
+			ofst = (uintptr_t)&icb->ext_blk - (uintptr_t)icb;
+			addr = mem_desc.cookie.dmac_laddress + ofst;
+			mcp->mb[10] = MSW(LSD(addr));
+			mcp->mb[11] = LSW(LSD(addr));
+			mcp->mb[12] = MSW(MSD(addr));
+			mcp->mb[13] = LSW(MSD(addr));
+			mcp->mb[14] = sizeof (ql_ext_icb_8100_t);
+		}
+		mcp->out_mb = MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|
+		    MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
+	} else {
+		mcp->out_mb = MBX_7|MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
+	}
+	mcp->in_mb = MBX_5|MBX_4|MBX_2|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 	rval = ql_mailbox_command(ha, mcp);
 
@@ -3363,16 +3366,12 @@ ql_get_adapter_id(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	mcp->mb[0] = MBC_GET_ID;
-	mcp->out_mb = MBX_0;
 	if (ha->flags & VP_ENABLED) {
 		mcp->mb[9] = ha->vp_index;
-		mcp->out_mb |= MBX_9;
-	} else {
-		mcp->mb[9] = 0;
-		mcp->out_mb |= MBX_9;
 	}
-
-	mcp->in_mb = MBX_7|MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->out_mb = MBX_9|MBX_0;
+	mcp->in_mb = MBX_13|MBX_12|MBX_11|MBX_10|MBX_9|MBX_8|MBX_7|MBX_6|
+	    MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 
 	rval = ql_mailbox_command(ha, mcp);
@@ -3380,12 +3379,18 @@ ql_get_adapter_id(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 	/* Return mailbox data. */
 	if (mr != NULL) {
 		mr->mb[1] = mcp->mb[1];
-		mr->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_2425) ?
+		mr->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_242581) ?
 		    0xffff : mcp->mb[1]);
 		mr->mb[2] = mcp->mb[2];
 		mr->mb[3] = mcp->mb[3];
 		mr->mb[6] = mcp->mb[6];
 		mr->mb[7] = mcp->mb[7];
+		mr->mb[8] = mcp->mb[8];
+		mr->mb[9] = mcp->mb[9];
+		mr->mb[10] = mcp->mb[10];
+		mr->mb[11] = mcp->mb[11];
+		mr->mb[12] = mcp->mb[12];
+		mr->mb[13] = mcp->mb[13];
 	}
 
 	if (rval != QL_SUCCESS) {
@@ -3423,7 +3428,8 @@ ql_get_fw_version(ql_adapter_state_t *ha,  ql_mbx_data_t *mr)
 
 	mcp->mb[0] = MBC_ABOUT_FIRMWARE;
 	mcp->out_mb = MBX_0;
-	mcp->in_mb = MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_13|MBX_12|MBX_11|MBX_10|MBX_9|MBX_8|MBX_6|MBX_5|
+	    MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 	rval = ql_mailbox_command(ha, mcp);
 
@@ -3435,6 +3441,12 @@ ql_get_fw_version(ql_adapter_state_t *ha,  ql_mbx_data_t *mr)
 		mr->mb[4] = mcp->mb[4];
 		mr->mb[5] = mcp->mb[5];
 		mr->mb[6] = mcp->mb[6];
+		mr->mb[8] = mcp->mb[8];
+		mr->mb[9] = mcp->mb[9];
+		mr->mb[10] = mcp->mb[10];
+		mr->mb[11] = mcp->mb[11];
+		mr->mb[12] = mcp->mb[12];
+		mr->mb[13] = mcp->mb[13];
 	}
 
 	if (rval != QL_SUCCESS) {
@@ -3527,7 +3539,6 @@ ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-
 	if ((rval = ql_setup_mbox_dma_transfer(ha, &mem_desc, bp, size)) !=
 	    QL_SUCCESS) {
 		EL(ha, "setup_mbox_dma_transfer failed: %x\n", rval);
@@ -3536,14 +3547,10 @@ ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
 
 	mcp->mb[0] = MBC_DIAGNOSTIC_LOOP_BACK;
 	mcp->mb[1] = opt;
-	mcp->mb[2] = 0;
-	mcp->mb[3] = 0;
 	mcp->mb[6] = LSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[7] = MSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[10] = LSW(size);
 	mcp->mb[11] = MSW(size);
-	mcp->mb[12] = 0;
-	mcp->mb[13] = 0;
 	mcp->mb[14] = LSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[15] = MSW(LSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[16] = LSW(LSD(mem_desc.cookie.dmac_laddress));
@@ -3830,7 +3837,7 @@ ql_read_sfp(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t dev,
 	mbx_cmd_t	mc = {0};
 	mbx_cmd_t	*mcp = &mc;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	mcp->mb[0] = MBC_READ_SFP;
 	mcp->mb[1] = dev;
@@ -3840,7 +3847,6 @@ ql_read_sfp(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t dev,
 	mcp->mb[7] = LSW(mem->cookies->dmac_notused);
 	mcp->mb[8] = LSW(mem->size);
 	mcp->mb[9] = addr;
-	mcp->mb[10] = 0;
 	mcp->out_mb = MBX_10|MBX_9|MBX_8|MBX_7|MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
@@ -3853,7 +3859,7 @@ ql_read_sfp(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t dev,
 		EL(ha, "failed=%xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 	}
 
 	return (rval);
@@ -3978,7 +3984,7 @@ ql_fw_etrace(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t opt)
 	uint16_t	op_code;
 	uint64_t	time;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	/* currently no supported options */
 	op_code = (uint16_t)(opt & ~0xFF00);
@@ -4009,7 +4015,6 @@ ql_fw_etrace(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t opt)
 		mcp->mb[4] = LSW(mem->cookies->dmac_notused);
 		mcp->mb[5] = MSW(mem->cookies->dmac_notused);
 		mcp->mb[6] = (uint16_t)(mem->size / 0x4000);	/* 16kb blks */
-		mcp->mb[7] = 0;
 		mcp->mb[8] = (uint16_t)ha->fwfcetraceopt;
 		mcp->mb[9] = FTO_FCEMAXTRACEBUF;
 		mcp->mb[10] = FTO_FCEMAXTRACEBUF;
@@ -4023,7 +4028,6 @@ ql_fw_etrace(ql_adapter_state_t *ha, dma_mem_t *mem, uint16_t opt)
 		mcp->mb[4] = LSW(mem->cookies->dmac_notused);
 		mcp->mb[5] = MSW(mem->cookies->dmac_notused);
 		mcp->mb[6] = (uint16_t)(mem->size / 0x4000);	/* 16kb blks */
-		mcp->mb[7] = 0;
 		mcp->out_mb = MBX_0_THRU_7;
 		break;
 
@@ -4096,6 +4100,369 @@ ql_reset_menlo(ql_adapter_state_t *ha, ql_mbx_data_t *mr, uint16_t opt)
 
 	if (rval != QL_SUCCESS) {
 		EL(ha, "failed=%xh\n", rval);
+	} else {
+		/*EMPTY*/
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	}
+
+	return (rval);
+}
+
+/*
+ * ql_restart_mpi
+ *	The Restart MPI Firmware Mailbox Command will reset the MPI RISC,
+ *	reload MPI firmware from Flash, and execute the firmware.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_restart_mpi(ql_adapter_state_t *ha)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_RESTART_MPI;
+	mcp->out_mb = MBX_0;
+	mcp->in_mb = MBX_1|MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	/* Return mailbox data. */
+	if (rval != QL_SUCCESS) {
+		EL(ha, "status=%xh, mbx1=%xh\n", rval, mcp->mb[1]);
+	} else {
+		/*EMPTY*/
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	}
+
+	return (rval);
+}
+
+/*
+ * ql_idc_request
+ *	Inter-Driver Communication Request.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	mr:	pointer for mailbox data.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_idc_request(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_IDC_REQUEST;
+	mcp->mb[1] = mr->mb[1];
+	mcp->mb[2] = mr->mb[2];
+	mcp->mb[3] = mr->mb[3];
+	mcp->mb[4] = mr->mb[4];
+	mcp->mb[5] = mr->mb[5];
+	mcp->mb[6] = mr->mb[6];
+	mcp->mb[7] = mr->mb[7];
+	mcp->out_mb = MBX_7|MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_2|MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	if (rval == QL_SUCCESS) {
+		if (mr != NULL) {
+			mr->mb[2] = mcp->mb[2];
+		}
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	} else {
+		EL(ha, "status=%xh, mbx2=%xh\n", rval, mcp->mb[2]);
+	}
+
+	return (rval);
+}
+
+/*
+ * ql_idc_ack
+ *	Inter-Driver Communication Acknowledgement.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_idc_ack(ql_adapter_state_t *ha)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_IDC_ACK;
+	mcp->mb[1] = ha->idc_mb[1];
+	mcp->mb[2] = ha->idc_mb[2];
+	mcp->mb[3] = ha->idc_mb[3];
+	mcp->mb[4] = ha->idc_mb[4];
+	mcp->mb[5] = ha->idc_mb[5];
+	mcp->mb[6] = ha->idc_mb[6];
+	mcp->mb[7] = ha->idc_mb[7];
+	mcp->out_mb = MBX_7|MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (rval);
+}
+
+/*
+ * ql_idc_time_extend
+ *	Inter-Driver Communication Time Extend
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	mr:	pointer for mailbox data.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_idc_time_extend(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_IDC_TIME_EXTEND;
+	mcp->mb[1] = mr->mb[1];
+	mcp->mb[2] = mr->mb[2];
+	mcp->out_mb = MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (rval);
+}
+
+/*
+ * ql_set_port_config
+ *	The Set Port Configuration command sets the configuration for the
+ *      external 10G port associated with this function
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	mr:	pointer for mailbox data.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_set_port_config(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_SET_PORT_CONFIG;
+	mcp->mb[1] = mr->mb[1];
+	mcp->mb[2] = mr->mb[2];
+	mcp->out_mb = MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (rval);
+}
+
+/*
+ * ql_get_port_config
+ *	The Get Port Configuration command retrieves the current configuration
+ *      for the external 10G port associated with this function
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	mr:	pointer for mailbox data.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_get_port_config(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_GET_PORT_CONFIG;
+	mcp->out_mb = MBX_0;
+	mcp->in_mb = MBX_2|MBX_1|MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	if (rval == QL_SUCCESS) {
+		if (mr != NULL) {
+			mr->mb[1] = mcp->mb[1];
+			mr->mb[2] = mcp->mb[2];
+		}
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	} else {
+		EL(ha, "status=%xh, mbx1=%xh, mbx2=%xh\n", rval, mcp->mb[1],
+		    mcp->mb[2]);
+	}
+
+	return (rval);
+}
+
+/*
+ * ql_flash_access
+ *	The Get Port Configuration command retrieves the current configuration
+ *      for the external 10G port associated with this function
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	cmd:	command.
+ *	start:	32bit word address.
+ *	end:	32bit word address.
+ *	dp:	32bit word pointer.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_flash_access(ql_adapter_state_t *ha, uint16_t cmd, uint32_t start,
+    uint32_t end, uint32_t *dp)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_FLASH_ACCESS;
+	if (cmd > 0 && cmd < 4) {
+		mcp->mb[1] = (uint16_t)(FAC_FORCE_SEMA_LOCK | cmd);
+	} else {
+		mcp->mb[1] = cmd;
+	}
+	mcp->mb[2] = LSW(start);
+	mcp->mb[3] = MSW(start);
+	mcp->mb[4] = LSW(end);
+	mcp->mb[5] = MSW(end);
+
+	EL(ha, "mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh\n",
+	    mcp->mb[1], mcp->mb[2], mcp->mb[3], mcp->mb[4], mcp->mb[5]);
+
+	mcp->out_mb = MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_2|MBX_1|MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	if (rval != QL_SUCCESS) {
+		EL(ha, "status=%xh, mbx1=%xh, mbx2=%xh\n", rval, mcp->mb[1],
+		    mcp->mb[2]);
+	} else {
+		if (dp != NULL) {
+			*dp = (uint32_t)mcp->mb[1];
+		}
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	}
+
+	return (rval);
+}
+
+/*
+ * ql_get_xgmac_stats
+ *	Issue et XGMAC Statistics Mailbox command
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	size:	size of data buffer.
+ *	bufp:	data pointer for DMA data.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_get_xgmac_stats(ql_adapter_state_t *ha, size_t size, caddr_t bufp)
+{
+	int		rval;
+	dma_mem_t	mem_desc;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	if ((rval = ql_setup_mbox_dma_resources(ha, &mem_desc,
+	    (uint32_t)size)) != QL_SUCCESS) {
+		EL(ha, "setup_mbox_dma_resources failed: %xh\n", rval);
+		return (QL_MEMORY_ALLOC_FAILED);
+	}
+
+	mcp->mb[0] = MBC_GET_XGMAC_STATS;
+	mcp->mb[2] = MSW(mem_desc.cookie.dmac_address);
+	mcp->mb[3] = LSW(mem_desc.cookie.dmac_address);
+	mcp->mb[6] = MSW(mem_desc.cookie.dmac_notused);
+	mcp->mb[7] = LSW(mem_desc.cookie.dmac_notused);
+	mcp->mb[8] = (uint16_t)(size >> 2);
+	mcp->out_mb = MBX_8|MBX_7|MBX_6|MBX_3|MBX_2|MBX_0;
+	mcp->in_mb = MBX_2|MBX_1|MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	if (rval == QL_SUCCESS) {
+		ql_get_mbox_dma_data(&mem_desc, bufp);
+	}
+	ql_free_dma_resource(ha, &mem_desc);
+
+	if (rval != QL_SUCCESS) {
+		EL(ha, "status=%xh, mbx1=%xh, mbx2=%xh\n", rval, mcp->mb[1],
+		    mcp->mb[2]);
 	} else {
 		/*EMPTY*/
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);

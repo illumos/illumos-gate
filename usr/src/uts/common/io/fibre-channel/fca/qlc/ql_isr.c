@@ -73,14 +73,6 @@ static int ql_status_error(ql_adapter_state_t *, ql_srb_t *, sts_entry_t *,
     ql_head_t *, uint32_t *, uint32_t *);
 static void ql_status_cont_entry(ql_adapter_state_t *, sts_cont_entry_t *,
     ql_head_t *, uint32_t *, uint32_t *);
-static void ql_immediate_notify_entry(ql_adapter_state_t *,
-    immediate_notify_entry_t *, ql_head_t *, uint32_t *, uint32_t *);
-static void ql_notify_acknowledge_entry(ql_adapter_state_t *,
-    notify_acknowledge_entry_t *, ql_head_t *, uint32_t *, uint32_t *);
-static void ql_accept_target_io_entry(ql_adapter_state_t *,
-    atio_entry_t *, ql_head_t *, uint32_t *, uint32_t *);
-static void ql_continue_target_io_entry(ql_adapter_state_t *,
-    ctio_entry_t *, ql_head_t *, uint32_t *, uint32_t *);
 static void ql_ip_entry(ql_adapter_state_t *, ip_entry_t *, ql_head_t *,
     uint32_t *, uint32_t *);
 static void ql_ip_rcv_entry(ql_adapter_state_t *, ip_rcv_entry_t *,
@@ -93,11 +85,8 @@ static void ql_ms_entry(ql_adapter_state_t *, ms_entry_t *, ql_head_t *,
     uint32_t *, uint32_t *);
 static void ql_report_id_entry(ql_adapter_state_t *, report_id_1_t *,
     ql_head_t *, uint32_t *, uint32_t *);
-
-/* TODO: temporary define until defined in LV */
-#ifndef FC_STATE_8GBIT_SPEED
-#define	FC_STATE_8GBIT_SPEED		0x0700	/* 8 Gbit/sec */
-#endif
+static void ql_els_passthru_entry(ql_adapter_state_t *,
+    els_passthru_entry_rsp_t *, ql_head_t *, uint32_t *, uint32_t *);
 
 /*
  * ql_isr
@@ -354,7 +343,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 				    &reset_flags, intr_loop);
 
 				/* Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_2425)) == 0) {
+				if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
 					WRT16_IO_REG(ha, semaphore, 0);
 				}
 				break;
@@ -362,7 +351,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			case MBX_SUCCESS:
 			case MBX_ERR:
 				/* Sun FW, Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_2425)) == 0) {
+				if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
 					WRT16_IO_REG(ha, semaphore, 0);
 				}
 				ql_mbx_completion(ha, mbx, &set_flags,
@@ -371,7 +360,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 
 			case ASYNC_EVENT:
 				/* Sun FW, Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_2425)) == 0) {
+				if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
 					WRT16_IO_REG(ha, semaphore, 0);
 				}
 				ql_async_event(ha, (uint32_t)mbx, &isr_done_q,
@@ -462,7 +451,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			/* Clear RISC interrupt */
 			if (intr || intr_loop == 0) {
 				intr = B_FALSE;
-				CFG_IST(ha, CFG_CTRL_2425) ?
+				CFG_IST(ha, CFG_CTRL_242581) ?
 				    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
 				    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 			}
@@ -609,7 +598,7 @@ ql_spurious_intr(ql_adapter_state_t *ha, int intr_clr)
 
 	/* Clear RISC interrupt */
 	if (intr_clr) {
-		CFG_IST(ha, CFG_CTRL_2425) ?
+		CFG_IST(ha, CFG_CTRL_242581) ?
 		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
 		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 	}
@@ -667,7 +656,7 @@ ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
 
 	if (intr_clr) {
 		/* Clear RISC interrupt. */
-		CFG_IST(ha, CFG_CTRL_2425) ?
+		CFG_IST(ha, CFG_CTRL_242581) ?
 		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
 		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 	}
@@ -751,7 +740,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 		if (intr_clr) {
 			/* Clear RISC interrupt */
-			CFG_IST(ha, CFG_CTRL_2425) ?
+			CFG_IST(ha, CFG_CTRL_242581) ?
 			    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
 			    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 			intr = B_FALSE;
@@ -922,7 +911,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_LIP_F8:	/* Received a LIP F8. */
 	case MBA_LIP_RESET:	/* LIP reset occurred. */
 	case MBA_LIP_OCCURRED:	/* Loop Initialization Procedure */
-		EL(ha, "%xh LIP received\n", mb[0]);
+	/* case MBA_DCBX_STARTED: */
+		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+			EL(ha, "%xh DCBX_STARTED received, mbx1=%xh, mbx2=%xh"
+			    "\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
+			    RD16_IO_REG(ha, mailbox[2]));
+		} else {
+			EL(ha, "%xh LIP received\n", mb[0]);
+		}
 
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags &= ~POINT_TO_POINT;
@@ -948,24 +944,29 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_LOOP_UP:
-		if (CFG_IST(ha, (CFG_CTRL_2300|CFG_CTRL_6322|CFG_CTRL_2425))) {
+		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322 |
+		    CFG_CTRL_242581))) {
 			mb[1] = RD16_IO_REG(ha, mailbox[1]);
-			if (mb[1] == 0) {		/* 1GB */
+			if (mb[1] == IIDMA_RATE_1GB) {		/* 1GB */
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_1GBIT_SPEED;
 				index = 1;
-			} else if (mb[1] == 1) {	/* 2GB */
+			} else if (mb[1] == IIDMA_RATE_2GB) {	/* 2GB */
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_2GBIT_SPEED;
 				index = 2;
-			} else if (mb[1] == 3) {	/* 4GB */
+			} else if (mb[1] == IIDMA_RATE_4GB) {	/* 4GB */
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_4GBIT_SPEED;
 				index = 4;
-			} else if (mb[1] == 4) {	/* 8GB */
+			} else if (mb[1] == IIDMA_RATE_8GB) {	/* 8GB */
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_8GBIT_SPEED;
 				index = 8;
+			} else if (mb[1] == IIDMA_RATE_10GB) {	/* 10GB */
+				ha->state = FC_PORT_STATE_MASK(
+				    ha->state) | FC_STATE_10GBIT_SPEED;
+				index = 10;
 			} else {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state);
@@ -1004,7 +1005,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			ha->loop_down_timer = LOOP_DOWN_TIMER_START;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_25XX)) {
+		if (CFG_IST(ha, CFG_CTRL_2581)) {
 			ha->sfp_stat = RD16_IO_REG(ha, mailbox[2]);
 		}
 
@@ -1029,9 +1030,15 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		if (vha == NULL) {
 			break;
 		}
-		if (FC_PORT_STATE_MASK(vha->state) != FC_STATE_OFFLINE ||
-		    (CFG_IST(ha, CFG_CTRL_2425) &&
-		    (mb[1] != 0xffff || mb[2] != 6 || mb[3] != 0))) {
+		/*
+		 * In N port 2 N port topology the FW provides a port
+		 * database entry at loop_id 0x7fe which we use to
+		 * acquire the Ports WWPN.
+		 */
+		if ((mb[1] != 0x7fe) &&
+		    ((FC_PORT_STATE_MASK(vha->state) != FC_STATE_OFFLINE ||
+		    (CFG_IST(ha, CFG_CTRL_242581) &&
+		    (mb[1] != 0xffff || mb[2] != 6 || mb[3] != 0))))) {
 			EL(ha, "%xh Port Database Update, Login/Logout "
 			    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh\n",
 			    mb[0], mb[1], mb[2], mb[3]);
@@ -1123,7 +1130,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			break;
 		}
 
-		cnt = (uint16_t)(CFG_IST(ha, CFG_CTRL_2425) ?
+		cnt = (uint16_t)(CFG_IST(ha, CFG_CTRL_242581) ?
 		    CHAR_TO_SHORT(ha->ip_init_ctrl_blk.cb24.buf_size[0],
 		    ha->ip_init_ctrl_blk.cb24.buf_size[1]) :
 		    CHAR_TO_SHORT(ha->ip_init_ctrl_blk.cb.buf_size[0],
@@ -1145,7 +1152,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		tq->ub_seq_cnt = 0;
 		tq->ub_frame_ro = 0;
 		tq->ub_loop_id = (uint16_t)(mb[0] == MBA_IP_BROADCAST ?
-		    (CFG_IST(ha, CFG_CTRL_2425) ? BROADCAST_24XX_HDL :
+		    (CFG_IST(ha, CFG_CTRL_242581) ? BROADCAST_24XX_HDL :
 		    IP_BROADCAST_LOOP_ID) : tq->loop_id);
 		ha->rcv_dev_q = tq;
 
@@ -1173,20 +1180,27 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_POINT_TO_POINT:
-		EL(ha, "%xh Point to Point Mode received\n", mb[0]);
+	/* case MBA_DCBX_COMPLETED: */
+		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+			EL(ha, "%xh DCBX completed received\n", mb[0]);
+		} else {
+			EL(ha, "%xh Point to Point Mode received\n", mb[0]);
+		}
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags |= POINT_TO_POINT;
 		ADAPTER_STATE_UNLOCK(ha);
+		break;
 
-		if (!(ha->task_daemon_flags & LOOP_DOWN)) {
-			*set_flags |= LOOP_DOWN;
-		}
-		ql_port_state(ha, FC_STATE_OFFLINE,
-		    FC_STATE_CHANGE | COMMAND_WAIT_NEEDED | LOOP_DOWN);
+	case MBA_FCF_CONFIG_ERROR:
+		EL(ha, "%xh FCF configuration Error received, mbx1=%xh, "
+		    "mbx2=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
+		    RD16_IO_REG(ha, mailbox[2]));
+		break;
 
-		if (ha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
-			ha->loop_down_timer = LOOP_DOWN_TIMER_START;
-		}
+	case MBA_DCBX_PARAM_UPDATE:
+		EL(ha, "%xh DCBX parameters changed received, mbx1=%xh, "
+		    "mbx2=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
+		    RD16_IO_REG(ha, mailbox[2]));
 		break;
 
 	case MBA_CHG_IN_CONNECTION:
@@ -1249,6 +1263,34 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		    mb[0], RD16_IO_REG(ha, mailbox[1]));
 		break;
 
+	case MBA_IDC_COMPLETE:
+		EL(ha, "%xh Inter-driver communication complete received, "
+		    "mbx1=%xh, mbx2=%xh\n", mb[0],
+		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2]));
+		break;
+
+	case MBA_IDC_NOTIFICATION:
+		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox[1]);
+		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox[2]);
+		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox[3]);
+		ha->idc_mb[4] = RD16_IO_REG(ha, mailbox[4]);
+		ha->idc_mb[5] = RD16_IO_REG(ha, mailbox[5]);
+		ha->idc_mb[6] = RD16_IO_REG(ha, mailbox[6]);
+		ha->idc_mb[7] = RD16_IO_REG(ha, mailbox[7]);
+		EL(ha, "%xh Inter-driver communication request notification "
+		    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, "
+		    "mbx5=%xh, mbx6=%xh, mbx7=%xh\n", mb[0], ha->idc_mb[1],
+		    ha->idc_mb[2], ha->idc_mb[3], ha->idc_mb[4], ha->idc_mb[5],
+		    ha->idc_mb[6], ha->idc_mb[7]);
+		*set_flags |= IDC_ACK_NEEDED;
+		break;
+
+	case MBA_IDC_TIME_EXTENDED:
+		EL(ha, "%xh Inter-driver communication time extended received,"
+		    " mbx1=%xh, mbx2=%xh\n", mb[0],
+		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2]));
+		break;
+
 	default:
 		EL(ha, "%xh UNKNOWN event received, mbx1=%xh, mbx2=%xh, "
 		    "mbx3=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
@@ -1258,7 +1300,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	/* Clear RISC interrupt */
 	if (intr && intr_clr) {
-		CFG_IST(ha, CFG_CTRL_2425) ?
+		CFG_IST(ha, CFG_CTRL_242581) ?
 		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
 		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 	}
@@ -1381,7 +1423,7 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 
 	/* Clear RISC interrupt */
 	if (intr_clr) {
-		CFG_IST(ha, CFG_CTRL_2425) ?
+		CFG_IST(ha, CFG_CTRL_242581) ?
 		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
 		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 	}
@@ -1451,7 +1493,7 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 			ha->status_srb = NULL;
 		}
 
-		pkt->entry_status = (uint8_t)(CFG_IST(ha, CFG_CTRL_2425) ?
+		pkt->entry_status = (uint8_t)(CFG_IST(ha, CFG_CTRL_242581) ?
 		    pkt->entry_status & 0x3c : pkt->entry_status & 0x7e);
 
 		if (pkt->entry_status != 0) {
@@ -1460,53 +1502,18 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 		} else {
 			switch (pkt->entry_type) {
 			case STATUS_TYPE:
-				status |= CFG_IST(ha, CFG_CTRL_2425) ?
+				status |= CFG_IST(ha, CFG_CTRL_242581) ?
 				    ql_24xx_status_entry(ha,
 				    (sts_24xx_entry_t *)pkt, done_q, set_flags,
 				    reset_flags) :
 				    ql_status_entry(ha, (sts_entry_t *)pkt,
 				    done_q, set_flags, reset_flags);
 				break;
-
 			case STATUS_CONT_TYPE:
 				ql_status_cont_entry(ha,
 				    (sts_cont_entry_t *)pkt, done_q, set_flags,
 				    reset_flags);
 				break;
-
-			case IMMEDIATE_NOTIFY_TYPE:
-				if (CFG_IST(ha, CFG_ENABLE_TARGET_MODE)) {
-					ql_immediate_notify_entry(ha,
-					    (immediate_notify_entry_t *)pkt,
-					    done_q, set_flags, reset_flags);
-				}
-				break;
-
-			case NOTIFY_ACKNOWLEDGE_TYPE:
-				if (CFG_IST(ha, CFG_ENABLE_TARGET_MODE)) {
-					ql_notify_acknowledge_entry(ha,
-					    (notify_acknowledge_entry_t *)pkt,
-					    done_q, set_flags, reset_flags);
-				}
-				break;
-
-			case ATIO_TYPE:
-				if (CFG_IST(ha, CFG_ENABLE_TARGET_MODE)) {
-					ql_accept_target_io_entry(ha,
-					    (atio_entry_t *)pkt, done_q,
-					    set_flags, reset_flags);
-				}
-				break;
-
-			case CTIO_TYPE_2:
-			case CTIO_TYPE_3:
-				if (CFG_IST(ha, CFG_ENABLE_TARGET_MODE)) {
-					ql_continue_target_io_entry(ha,
-					    (ctio_entry_t *)pkt, done_q,
-					    set_flags, reset_flags);
-				}
-				break;
-
 			case IP_TYPE:
 			case IP_A64_TYPE:
 			case IP_CMD_TYPE:
@@ -1534,6 +1541,11 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 				break;
 			case REPORT_ID_TYPE:
 				ql_report_id_entry(ha, (report_id_1_t *)pkt,
+				    done_q, set_flags, reset_flags);
+				break;
+			case ELS_PASSTHRU_TYPE:
+				ql_els_passthru_entry(ha,
+				    (els_passthru_entry_rsp_t *)pkt,
 				    done_q, set_flags, reset_flags);
 				break;
 			case IP_BUF_POOL_TYPE:
@@ -1968,7 +1980,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_2425)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		sts_24xx_entry_t *pkt24 = (sts_24xx_entry_t *)pkt23;
 
 		/* Setup status. */
@@ -2449,7 +2461,7 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
 			sense_sz = sp->request_sense_length;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_2425)) {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
 			for (index = 0; index < sense_sz; index += 4) {
 				ql_chg_endian((uint8_t *)
 				    &pkt->req_sense_data[0] + index, 4);
@@ -2469,531 +2481,6 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
 		if (sp->request_sense_length == 0) {
 			ql_add_link_b(done_q, &sp->cmd);
 			ha->status_srb = NULL;
-		}
-	}
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_immediate_notify_entry
- *	Processes immediate notify entry.
- *
- * Input:
- *	ha:		adapter state pointer.
- *	pkt:		entry pointer.
- *	done_q:		done queue pointer.
- *	set_flags:	task daemon flags to set.
- *	reset_flags:	task daemon flags to reset.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-/* ARGSUSED */
-static void
-ql_immediate_notify_entry(ql_adapter_state_t *ha,
-    immediate_notify_entry_t *pkt, ql_head_t *done_q, uint32_t *set_flags,
-    uint32_t *reset_flags)
-{
-	notify_acknowledge_entry_t *nack;
-	ql_srb_t		*sp;
-	fcp_cmd_t		*fcp;
-	tgt_cmd_t		*cmd, *nackcmd;
-	ql_tgt_t		*tq;
-	fc_unsol_buf_t		*ubp = NULL;
-	int			use_ubuffer;
-	uint16_t		loop_id;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	cmd = (tgt_cmd_t *)kmem_zalloc(sizeof (tgt_cmd_t), KM_NOSLEEP);
-	if (cmd != NULL) {
-		cmd->cmd.base_address = cmd;
-
-		/* Save command context. */
-		cmd->type = pkt->entry_type;
-		cmd->initiator_id_l = pkt->initiator_id_l;
-		cmd->initiator_id_h = pkt->initiator_id_h;
-		cmd->rx_id = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-		    &pkt->sequence_id);
-		cmd->status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-		    &pkt->status);
-		cmd->task_flags_l = pkt->task_flags_l;
-		cmd->task_flags_h = pkt->task_flags_h;
-
-		/*
-		 * TODO: flushing in case of pkt_status_l of 0x34
-		 * needs to be handled properly.
-		 */
-
-		EL(ha, "status = %xh\n", cmd->status);
-
-		/*
-		 * For immediate notify situations that need attention,
-		 * we attempt to put the command in the array of notify
-		 * acknowledge slots for future handling.  A LIP RESET
-		 * always gets slot 0, since we have to ensure that there's
-		 * always a slot available and we can't do any other
-		 * processsing if a LIP RESET is pending.
-		 *
-		 * Otherwise, immediate notifies take the next open slot.
-		 */
-		use_ubuffer = 0;
-		nackcmd = NULL;
-		mutex_enter(&ha->ql_nack_mtx);
-		switch (cmd->status) {
-		case 0x0E:
-			if (ha->ql_nack != NULL) {
-				/*
-				 * We're in the sticky situation of receiving
-				 * LIP reset while one is pending.  What appears
-				 * to work is to drop the old request and
-				 * replace it with the new.  We send a NACK
-				 * for the old to replenish the IOCB.
-				 */
-				nackcmd = ha->ql_nack;
-			}
-			ha->ql_nack = cmd;
-			break;
-		case 0x20:
-		case 0x29:
-		case 0x36:
-			/* If this isn't NULL, a LIP RESET is outstanding */
-			if (ha->ql_nack == NULL) {
-				use_ubuffer++;
-			}
-			break;
-		default:
-			EL(ha, "unknown status=%xh\n",
-			    cmd->status);
-			break;
-		}
-		mutex_exit(&ha->ql_nack_mtx);
-
-		if (use_ubuffer) {
-			/*
-			 * Get an unsolicited buffer to send the message up in
-			 */
-
-			/* Locate a buffer to use. */
-			loop_id = (uint16_t)
-			    (CFG_IST(ha, CFG_EXT_FW_INTERFACE) ?
-			    CHAR_TO_SHORT(pkt->initiator_id_l,
-			    pkt->initiator_id_h) : pkt->initiator_id_h);
-			if ((tq = ql_loop_id_to_queue(ha, loop_id)) != NULL) {
-				ubp = ql_get_unsolicited_buffer(ha,
-				    FC_TYPE_SCSI_FCP);
-			}
-			if (ubp != NULL) {
-				ubp->ub_resp_flags = FC_UB_FCP_CDB_FLAG;
-				ubp->ub_resp_token = tq;
-				sp = ubp->ub_fca_private;
-
-				fcp = (fcp_cmd_t *)ubp->ub_buffer;
-
-				/* Set header. */
-				ubp->ub_frame.d_id = ha->d_id.b24;
-				/* Set 0x06 for R_CTL_COMMAND */
-				ubp->ub_frame.r_ctl = R_CTL_COMMAND;
-				ubp->ub_frame.s_id = tq->d_id.b24;
-				ubp->ub_frame.rsvd = 0;
-				ubp->ub_frame.f_ctl = F_CTL_FIRST_SEQ |
-				    F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
-				ubp->ub_frame.type = FC_TYPE_SCSI_FCP;
-				ubp->ub_frame.seq_cnt = 0;
-				ubp->ub_frame.df_ctl = 0;
-				ubp->ub_frame.seq_id = 0;
-				ubp->ub_frame.rx_id = cmd->rx_id;
-				ubp->ub_frame.ox_id = (uint16_t)ddi_get16(
-				    ha->hba_buf.acc_handle, &pkt->ox_id);
-				ubp->ub_frame.ro = 0;
-
-				/* Set command in buffer. */
-				bzero((void *)fcp, sizeof (fcp_cmd_t));
-
-				lobyte(fcp->fcp_ent_addr.ent_addr_0) =
-				    pkt->lun_l;
-				hibyte(fcp->fcp_ent_addr.ent_addr_0) =
-				    pkt->lun_h;
-
-				switch (cmd->status) {
-				case 0x29:
-					ubp->ub_resp_flags = (uint16_t)
-					    (ubp->ub_resp_flags |
-					    FC_UB_FCP_PORT_LOGOUT);
-					break;
-				case 0x20:
-					ubp->ub_resp_flags = (uint16_t)
-					    (ubp->ub_resp_flags |
-					    FC_UB_FCP_ABORT_TASK);
-					break;
-				case 0x36:
-					if (pkt->task_flags_h & BIT_7) {
-						fcp->fcp_cntl.cntl_kill_tsk =
-						    1;
-					}
-					if (pkt->task_flags_h & BIT_6) {
-						fcp->fcp_cntl.cntl_clr_aca = 1;
-					}
-					if (pkt->task_flags_h & BIT_5) {
-						fcp->fcp_cntl.cntl_reset_tgt =
-						    1;
-					}
-					if (pkt->task_flags_h & BIT_4) {
-						fcp->fcp_cntl.cntl_reset_lun =
-						    1;
-					}
-					if (pkt->task_flags_h & BIT_2) {
-						fcp->fcp_cntl.cntl_clr_tsk = 1;
-					}
-					if (pkt->task_flags_h & BIT_1) {
-						fcp->fcp_cntl.cntl_abort_tsk =
-						    1;
-					}
-					break;
-				default:
-					EL(ha, "default, no action\n");
-					break;
-				}
-
-				QL_UB_LOCK(ha);
-				sp->flags |= SRB_UB_CALLBACK | SRB_UB_FCP;
-				QL_UB_UNLOCK(ha);
-				QL_PRINT_3(CE_CONT, "(%d): Sent Up status = "
-				    "%xh\n", ha->instance, cmd->status);
-				ql_add_link_b(done_q, &sp->cmd);
-			}
-		}
-
-		if (nackcmd) {
-			if (ql_req_pkt(ha, (request_t **)&nack) ==
-			    QL_SUCCESS) {
-
-				ql_notify_acknowledge_iocb(ha, nackcmd, nack);
-
-				nack->flags_l = 0;
-				QL_PRINT_3(CE_CONT, "(%d): send clear "
-				    "notify_ack: status=%xh, flag=%xh\n",
-				    ha->instance, ddi_get16(
-				    ha->hba_buf.acc_handle, &nack->status),
-				    nack->flags_l);
-
-				/* Issue command to ISP */
-				ql_isp_cmd(ha);
-			}
-			kmem_free(nackcmd, sizeof (tgt_cmd_t));
-		}
-
-		/*
-		 * ql_nack can only be non-NULL if we got a LIP RESET and
-		 * are processing it.  In that case, we don't want to send
-		 * a notify acknowledge right now.
-		 */
-		if (cmd->status != 0x0E) {
-			if (ql_req_pkt(ha, (request_t **)&nack) ==
-			    QL_SUCCESS) {
-				ql_notify_acknowledge_iocb(ha, cmd, nack);
-
-				EL(ha, "send notify_ack: status=%xh "
-				    "flag=%xh\n", cmd->status, nack->flags_l);
-
-				/* Issue command to ISP */
-				ql_isp_cmd(ha);
-			}
-			kmem_free(cmd, sizeof (tgt_cmd_t));
-		} else {
-			ql_awaken_task_daemon(ha, NULL,
-			    LIP_RESET_PENDING, 0);
-		}
-	}
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_notify_acknowledge_entry
- *	Processes notify acknowledge entry.
- *
- * Input:
- *	ha:		adapter state pointer.
- *	pkt:		entry pointer.
- *	done_q:		done queue pointer.
- *	set_flags:	task daemon flags to set.
- *	reset_flags:	task daemon flags to reset.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-/* ARGSUSED */
-static void
-ql_notify_acknowledge_entry(ql_adapter_state_t *ha,
-    notify_acknowledge_entry_t *pkt, ql_head_t *done_q, uint32_t *set_flags,
-    uint32_t *reset_flags)
-{
-	ql_srb_t	*sp;
-	uint32_t	index, cnt;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
-	index = cnt & OSC_INDEX_MASK;
-
-	/* Validate handle. */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == cnt) {
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
-
-		/* Set completion status */
-		sp->pkt->pkt_reason = ddi_get16(ha->hba_buf.acc_handle,
-		    &pkt->status) == 1 ? CS_COMPLETE : CS_PORT_UNAVAILABLE;
-
-		/* Set completed status. */
-		sp->flags |= SRB_ISP_COMPLETED;
-
-		/* Place command on done queue. */
-		ql_add_link_b(done_q, &sp->cmd);
-
-	} else if (cnt != QL_FCA_BRAND) {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
-		} else {
-			EL(ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
-	}
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_accept_target_io_entry
- *	Processes accept target I/O entry.
- *
- * Input:
- *	ha:		adapter state pointer.
- *	pkt:		entry pointer.
- *	done_q:		done queue pointer.
- *	set_flags:	task daemon flags to set.
- *	reset_flags:	task daemon flags to reset.
- *
- * Context:
- *	Interrupt or Kernel context, no mailbox commands allowed.
- */
-/* ARGSUSED */
-static void
-ql_accept_target_io_entry(ql_adapter_state_t *ha, atio_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
-{
-	ctio_entry_t	*ctio;
-	atio_entry_t	*atio;
-	ql_srb_t	*sp;
-	fcp_cmd_t	*fcp;
-	ql_tgt_t	*tq;
-	uint16_t	loop_id;
-	fc_unsol_buf_t	*ubp = NULL;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	/* Locate a buffer to use. */
-	loop_id = (uint16_t)(CFG_IST(ha, CFG_EXT_FW_INTERFACE) ?
-	    CHAR_TO_SHORT(pkt->initiator_id_l, pkt->initiator_id_h) :
-	    pkt->initiator_id_h);
-	if ((tq = ql_loop_id_to_queue(ha, loop_id)) != NULL) {
-		ubp = ql_get_unsolicited_buffer(ha,
-		    FC_TYPE_SCSI_FCP);
-	}
-	if (ubp != NULL) {
-		ubp->ub_resp_flags = FC_UB_FCP_CDB_FLAG;
-		ubp->ub_resp_token = tq;
-		sp = ubp->ub_fca_private;
-		fcp = (fcp_cmd_t *)ubp->ub_buffer;
-
-		/* Set header. */
-		ubp->ub_frame.d_id = ha->d_id.b24;
-		ubp->ub_frame.r_ctl = R_CTL_COMMAND;
-		ubp->ub_frame.s_id = tq->d_id.b24;
-		ubp->ub_frame.rsvd = 0;
-		ubp->ub_frame.f_ctl = F_CTL_FIRST_SEQ |
-		    F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
-		ubp->ub_frame.type = FC_TYPE_SCSI_FCP;
-		ubp->ub_frame.seq_cnt = 0;
-		ubp->ub_frame.df_ctl = 0;
-		ubp->ub_frame.seq_id = 0;
-		ubp->ub_frame.rx_id = (uint16_t)ddi_get16(
-		    ha->hba_buf.acc_handle, &pkt->rx_id);
-		ubp->ub_frame.ox_id = (uint16_t)ddi_get16(
-		    ha->hba_buf.acc_handle, &pkt->ox_id);
-		ubp->ub_frame.ro = 0;
-
-		/* Set command in buffer. */
-
-		bzero((void *)fcp, sizeof (fcp_cmd_t));
-
-		lobyte(fcp->fcp_ent_addr.ent_addr_0) = pkt->lun_l;
-		hibyte(fcp->fcp_ent_addr.ent_addr_0) = pkt->lun_h;
-
-		fcp->fcp_cntl.cntl_qtype = pkt->task_codes;
-
-		if (pkt->execution_codes & BIT_1)
-			fcp->fcp_cntl.cntl_read_data = 1;
-		if (pkt->execution_codes & BIT_0)
-			fcp->fcp_cntl.cntl_write_data = 1;
-
-		ddi_rep_put8(ha->hba_buf.acc_handle, (uint8_t *)&pkt->cdb[0],
-		    (uint8_t *)&fcp->fcp_cdb[0], FCP_CDB_SIZE,
-		    DDI_DEV_AUTOINCR);
-
-		fcp->fcp_data_len = (int)ddi_get32(
-		    ha->hba_buf.acc_handle, (uint32_t *)&pkt->data_length);
-		QL_UB_LOCK(ha);
-		sp->flags |= SRB_UB_CALLBACK | SRB_UB_FCP;
-		QL_UB_UNLOCK(ha);
-		ql_add_link_b(done_q, &sp->cmd);
-	}
-
-	/* If command not sent to transport layer. */
-	if (ubp == NULL) {
-
-		if (ql_req_pkt(ha, (request_t **)&ctio) == QL_SUCCESS) {
-			ctio->entry_type = CTIO_TYPE_2;
-			ctio->initiator_id_l = pkt->initiator_id_l;
-			ctio->initiator_id_h = pkt->initiator_id_h;
-			ddi_put16(ha->hba_buf.acc_handle, &ctio->rx_id,
-			    (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-			    &pkt->rx_id));
-			ctio->flags_l = BIT_7 | BIT_6;
-			ctio->flags_h = BIT_7 | BIT_1 | BIT_0;
-			ctio->timeout = 0xffff;
-			ctio->type.s0_32bit.scsi_status_l = STATUS_BUSY;
-
-			/* Issue command to ISP */
-			ql_isp_cmd(ha);
-		}
-	} else {
-		if (ql_req_pkt(ha, (request_t **)&atio) == QL_SUCCESS) {
-			atio->entry_type = ATIO_TYPE;
-			atio->initiator_id_l = pkt->initiator_id_l;
-			atio->initiator_id_h = pkt->initiator_id_h;
-			ddi_put16(ha->hba_buf.acc_handle, &atio->rx_id,
-			    (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-			    &pkt->rx_id));
-			atio->lun_l = pkt->lun_l;
-			atio->lun_h = pkt->lun_h;
-
-			/* Issue command to ISP */
-			ql_isp_cmd(ha);
-		}
-	}
-
-	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-}
-
-/*
- * ql_continue_target_io_entry
- *	Processes continue target IO entry.
- *
- * Input:
- *	ha:		adapter state pointer.
- *	pkt:		entry pointer.
- *	done_q:		done queue pointer.
- *	set_flags:	task daemon flags to set.
- *	reset_flags:	task daemon flags to reset.
- *
- * Context:
- *	Interrupt context, no mailbox commands allowed.
- */
-/* ARGSUSED */
-static void
-ql_continue_target_io_entry(ql_adapter_state_t *ha, ctio_entry_t *pkt,
-    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
-{
-	ql_srb_t	*sp;
-	uint32_t	index, cnt;
-	uint16_t	status;
-
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
-	index = cnt & OSC_INDEX_MASK;
-
-	/* Validate handle. */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == cnt) {
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
-
-		/* Set completion status */
-		status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
-		    &pkt->status);
-
-		switch (status) {
-		case 1:
-			sp->pkt->pkt_reason = CS_COMPLETE;
-			break;
-		case 2:
-			sp->pkt->pkt_reason = CS_ABORTED;
-			break;
-		case 9:
-			sp->pkt->pkt_reason = CS_DATA_OVERRUN;
-			break;
-		case 0xa:
-		case 0xb:
-			sp->pkt->pkt_reason = CS_TIMEOUT;
-			break;
-		case 0xe:
-		case 0x17:
-			sp->pkt->pkt_reason = CS_RESET;
-			break;
-		case 0x10:
-			sp->pkt->pkt_reason = CS_DMA_ERROR;
-			break;
-		case 0x15:
-		case 0x28:
-		case 0x29:
-		case 0x2A:
-			sp->pkt->pkt_reason = status;
-			break;
-		default:
-			sp->pkt->pkt_reason = CS_PORT_UNAVAILABLE;
-			break;
-		}
-
-		/* Set completed status. */
-		sp->flags |= SRB_ISP_COMPLETED;
-
-		/* Place command on done queue. */
-		ql_add_link_b(done_q, &sp->cmd);
-
-	} else if (cnt != QL_FCA_BRAND) {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
-		} else {
-			EL(ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
 		}
 	}
 
@@ -3040,7 +2527,7 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
-		if (CFG_IST(ha, CFG_CTRL_2425)) {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
 			ip_cmd_entry_t	*pkt24 = (ip_cmd_entry_t *)pkt23;
 
 			sp->pkt->pkt_reason = ddi_get16(
@@ -3352,7 +2839,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
-		if (CFG_IST(ha, CFG_CTRL_2425)) {
+		if (CFG_IST(ha, CFG_CTRL_242581)) {
 			sp->pkt->pkt_reason = ddi_get16(
 			    ha->hba_buf.acc_handle, &pkt24->status);
 		} else {
@@ -3421,7 +2908,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 			/* Set retry status. */
 			sp->flags |= SRB_RETRY;
 
-		} else if (CFG_IST(ha, CFG_CTRL_2425) &&
+		} else if (CFG_IST(ha, CFG_CTRL_242581) &&
 		    sp->pkt->pkt_reason == CS_DATA_UNDERRUN) {
 			cnt = ddi_get32(ha->hba_buf.acc_handle,
 			    &pkt24->resp_byte_count);
@@ -3437,7 +2924,9 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 
 		if (sp->pkt->pkt_reason == CS_COMPLETE) {
 			/*EMPTY*/
-			QL_PRINT_3(CE_CONT, "(%d): resp\n", ha->instance);
+			QL_PRINT_3(CE_CONT, "(%d): ct_cmdrsp=%x%02xh resp\n",
+			    ha->instance, sp->pkt->pkt_cmd[8],
+			    sp->pkt->pkt_cmd[9]);
 			QL_DUMP_3(sp->pkt->pkt_resp, 8, sp->pkt->pkt_rsplen);
 		}
 
@@ -3509,7 +2998,8 @@ ql_report_id_entry(ql_adapter_state_t *ha, report_id_1_t *pkt,
 				break;
 			}
 		}
-		if (vha != NULL && (pkt->status == CS_COMPLETE ||
+		if (vha != NULL && vha->vp_index != 0 &&
+		    (pkt->status == CS_COMPLETE ||
 		    pkt->status == CS_PORT_ID_CHANGE)) {
 			*set_flags |= LOOP_RESYNC_NEEDED;
 			*reset_flags &= ~LOOP_RESYNC_NEEDED;
@@ -3521,5 +3011,152 @@ ql_report_id_entry(ql_adapter_state_t *ha, report_id_1_t *pkt,
 		}
 	}
 
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+}
+
+/*
+ * ql_els_entry
+ *	Processes received ELS Pass-Through entry.
+ *
+ * Input:
+ *	ha:		adapter state pointer.
+ *	pkt23:		entry pointer.
+ *	done_q:		done queue pointer.
+ *	set_flags:	task daemon flags to set.
+ *	reset_flags:	task daemon flags to reset.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+/* ARGSUSED */
+static void
+ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
+    ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
+{
+	ql_tgt_t	*tq;
+	port_id_t	d_id, s_id;
+	ql_srb_t	*srb;
+	uint32_t	cnt, index;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	/* Get handle. */
+	cnt = ddi_get32(ha->hba_buf.acc_handle, &rsp->handle);
+	index = cnt & OSC_INDEX_MASK;
+
+	/* Validate handle. */
+	srb = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
+	    NULL;
+
+	(void) ddi_dma_sync(srb->pkt->pkt_resp_dma, 0, 0,
+	    DDI_DMA_SYNC_FORKERNEL);
+
+	if (srb != NULL && srb->handle == cnt) {
+		if (!(srb->flags & SRB_ELS_PKT)) {
+			EL(ha, "Not SRB_ELS_PKT flags=%xh, isp_abort_needed",
+			    srb->flags);
+			*set_flags |= ISP_ABORT_NEEDED;
+			return;
+		}
+		ha->outstanding_cmds[index] = NULL;
+		srb->handle = 0;
+		srb->flags &= ~SRB_IN_TOKEN_ARRAY;
+
+		/* Set ISP completion status */
+		srb->pkt->pkt_reason = ddi_get16(
+		    ha->hba_buf.acc_handle, &rsp->comp_status);
+
+		if (srb->pkt->pkt_reason != CS_COMPLETE) {
+			la_els_rjt_t	rjt;
+			EL(ha, "status err=%xh\n", srb->pkt->pkt_reason);
+
+			if (srb->pkt->pkt_reason == CS_LOGIN_LOGOUT_ERROR) {
+				EL(ha, "e1=%xh e2=%xh\n",
+				    rsp->error_subcode1, rsp->error_subcode2);
+			}
+
+			srb->pkt->pkt_state = FC_PKT_TRAN_ERROR;
+
+			/* Build RJT in the response. */
+			rjt.ls_code.ls_code = LA_ELS_RJT;
+			rjt.reason = FC_REASON_NO_CONNECTION;
+
+			ddi_rep_put8(srb->pkt->pkt_resp_acc, (uint8_t *)&rjt,
+			    (uint8_t *)srb->pkt->pkt_resp,
+			    sizeof (rjt), DDI_DEV_AUTOINCR);
+
+			srb->pkt->pkt_state = FC_PKT_TRAN_ERROR;
+			srb->pkt->pkt_reason = FC_REASON_NO_CONNECTION;
+		}
+
+		if (srb->pkt->pkt_reason == CS_COMPLETE) {
+			uint8_t		opcode;
+			uint16_t	loop_id;
+
+			/* Indicate ISP completion */
+			srb->flags |= SRB_ISP_COMPLETED;
+
+			loop_id = ddi_get16(ha->hba_buf.acc_handle,
+			    &rsp->n_port_hdl);
+
+			if (ha->topology & QL_N_PORT) {
+				/* create a target Q if there isn't one */
+				tq = ql_loop_id_to_queue(ha, loop_id);
+				if (tq == NULL) {
+					d_id.b.al_pa = rsp->d_id_7_0;
+					d_id.b.area = rsp->d_id_15_8;
+					d_id.b.domain = rsp->d_id_23_16;
+					/* Acquire adapter state lock. */
+					ADAPTER_STATE_LOCK(ha);
+
+					tq = ql_dev_init(ha, d_id, loop_id);
+					EL(ha, " tq = %x\n", tq);
+
+					ADAPTER_STATE_UNLOCK(ha);
+				}
+
+				/* on plogi success assume the chosen s_id */
+				opcode = ddi_get8(ha->hba_buf.acc_handle,
+				    &rsp->els_cmd_opcode);
+
+				EL(ha, "els_cmd_opcode=%x srb->pkt=%x\n",
+				    opcode, srb->pkt);
+
+				if (opcode == LA_ELS_PLOGI) {
+					s_id.b.al_pa = rsp->s_id_7_0;
+					s_id.b.area = rsp->s_id_15_8;
+					s_id.b.domain = rsp->s_id_23_16;
+
+					ha->d_id.b24 = s_id.b24;
+					EL(ha, "Set port's source ID %xh\n",
+					    ha->d_id.b24);
+				}
+			}
+			ql_isp_els_handle_rsp_endian(ha, srb);
+
+			if (ha != srb->ha) {
+				EL(ha, "ha=%x srb->ha=%x\n", ha, srb->ha);
+			}
+
+			if (tq != NULL) {
+				tq->logout_sent = 0;
+				tq->flags &= ~TQF_NEED_AUTHENTICATION;
+
+				if (CFG_IST(ha, CFG_CTRL_242581)) {
+					tq->flags |= TQF_IIDMA_NEEDED;
+				}
+			srb->pkt->pkt_state = FC_PKT_SUCCESS;
+			}
+		}
+		/* invoke the callback */
+		ql_awaken_task_daemon(ha, srb, 0, 0);
+	} else {
+		EL(ha, "unexpected IOCB handle=%xh\n", srb);
+
+		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
+		    ABORT_ISP_ACTIVE))) {
+			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
+			*set_flags |= ISP_ABORT_NEEDED;
+		}
+	}
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }

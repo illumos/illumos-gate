@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -53,3 +53,4 @@ f none kernel/misc/qlc/sparcv9/qlc_fw_2300 0755 root sys
 f none kernel/misc/qlc/sparcv9/qlc_fw_2400 0755 root sys
 f none kernel/misc/qlc/sparcv9/qlc_fw_2500 0755 root sys
 f none kernel/misc/qlc/sparcv9/qlc_fw_6322 0755 root sys
+f none kernel/misc/qlc/sparcv9/qlc_fw_8100 0755 root sys

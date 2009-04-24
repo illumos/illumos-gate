@@ -140,13 +140,19 @@ extern int ddi_intr_remove_handler();
 #endif
 
 #ifndef	FC_STATE_1GBIT_SPEED
-#define	FC_STATE_1GBIT_SPEED	FC_STATE_FULL_SPEED
+#define	FC_STATE_1GBIT_SPEED	0x0100	/* 1 Gbit/sec */
 #endif
 #ifndef	FC_STATE_2GBIT_SPEED
-#define	FC_STATE_2GBIT_SPEED	FC_STATE_DOUBLE_SPEED
+#define	FC_STATE_2GBIT_SPEED	0x0400	/* 2 Gbit/sec */
 #endif
 #ifndef	FC_STATE_4GBIT_SPEED
-#define	FC_STATE_4GBIT_SPEED	FC_STATE_DOUBLE_SPEED
+#define	FC_STATE_4GBIT_SPEED	0x0500	/* 4 Gbit/sec */
+#endif
+#ifndef FC_STATE_8GBIT_SPEED
+#define	FC_STATE_8GBIT_SPEED	0x0700	/* 8 Gbit/sec */
+#endif
+#ifndef FC_STATE_10GBIT_SPEED
+#define	FC_STATE_10GBIT_SPEED	0x0600	/* 10 Gbit/sec */
 #endif
 
 /*
@@ -381,7 +387,6 @@ typedef struct {
 #define	RCVBUF_CONTAINER_SIZE	12
 #define	RCVBUF_QUEUE_SIZE	(RCVBUF_CONTAINER_SIZE * RCVBUF_CONTAINER_CNT)
 
-
 /*
  * ISP DMA buffer definitions
  */
@@ -536,29 +541,53 @@ typedef struct {
  */
 #define	FLASH_DATA_FLAG		BIT_31
 #define	FLASH_CONF_ADDR		0x7FFD0000
-#define	FLASH_DATA_ADDR		0x7FF00000
+#define	FLASH_24_25_DATA_ADDR	0x7FF00000
+#define	FLASH_8100_DATA_ADDR	0x7F800000
 #define	FLASH_ADDR_MASK		0x7FFF0000
 
 #define	NVRAM_CONF_ADDR		0x7FFF0000
 #define	NVRAM_DATA_ADDR		0x7FFE0000
 
-#define	NVRAM_24XX_FUNC0_ADDR	(NVRAM_DATA_ADDR + 0x80)
-#define	NVRAM_24XX_FUNC1_ADDR	(NVRAM_DATA_ADDR + 0x180)
-#define	VPD_24XX_FUNC0_ADDR	NVRAM_DATA_ADDR
-#define	VPD_24XX_FUNC1_ADDR	(NVRAM_DATA_ADDR + 0x100)
+#define	NVRAM_2200_FUNC0_ADDR		0x0
+#define	NVRAM_2300_FUNC0_ADDR		0x0
+#define	NVRAM_2300_FUNC1_ADDR		0x80
+#define	NVRAM_2400_FUNC0_ADDR		0x80
+#define	NVRAM_2400_FUNC1_ADDR		0x180
+#define	NVRAM_2500_FUNC0_ADDR		0x48080
+#define	NVRAM_2500_FUNC1_ADDR		0x48180
+#define	NVRAM_8100_FUNC0_ADDR		0xD0080
+#define	NVRAM_8100_FUNC1_ADDR		0xD0180
 
-#define	NVRAM_25XX_FUNC0_ADDR	FLASH_DATA_ADDR + 0x48080
-#define	NVRAM_25XX_FUNC1_ADDR	FLASH_DATA_ADDR + 0x48180
-#define	VPD_25XX_FUNC0_ADDR	FLASH_DATA_ADDR + 0x48000
-#define	VPD_25XX_FUNC1_ADDR	FLASH_DATA_ADDR + 0x48100
+#define	VPD_2400_FUNC0_ADDR		0
+#define	VPD_2400_FUNC1_ADDR		0x100
+#define	VPD_2500_FUNC0_ADDR		0x48000
+#define	VPD_2500_FUNC1_ADDR		0x48100
+#define	VPD_8100_FUNC0_ADDR		0xD0000
+#define	VPD_8100_FUNC1_ADDR		0xD0400
+#define	VPD_SIZE			0x80
 
-#define	FLASH_2400_ERRLOG_START_ADDR_0	0	/* 0x1f000 */
-#define	FLASH_2400_ERRLOG_START_ADDR_1	0	/* 0x1f200 */
+#define	FLASH_2200_FIRMWARE_ADDR	0x20000
+#define	FLASH_2300_FIRMWARE_ADDR	0x20000
+#define	FLASH_2400_FIRMWARE_ADDR	0x20000
+#define	FLASH_2500_FIRMWARE_ADDR	0x20000
+#define	FLASH_8100_FIRMWARE_ADDR	0xA0000
+
+#define	FLASH_2400_ERRLOG_START_ADDR_0	0
+#define	FLASH_2400_ERRLOG_START_ADDR_1	0
 #define	FLASH_2500_ERRLOG_START_ADDR_0	0x54000
 #define	FLASH_2500_ERRLOG_START_ADDR_1	0x54400
+#define	FLASH_8100_ERRLOG_START_ADDR_0	0xDC000
+#define	FLASH_8100_ERRLOG_START_ADDR_1	0xDC400
 #define	FLASH_ERRLOG_SIZE		0x200
 #define	FLASH_ERRLOG_ENTRY_SIZE		4
+
+#define	FLASH_2400_DESCRIPTOR_TABLE	0
 #define	FLASH_2500_DESCRIPTOR_TABLE	0x50000
+#define	FLASH_8100_DESCRIPTOR_TABLE	0xD8000
+
+#define	FLASH_2400_LAYOUT_TABLE		0x11400
+#define	FLASH_2500_LAYOUT_TABLE		0x50400
+#define	FLASH_8100_LAYOUT_TABLE		0xD8400
 
 /*
  * Flash Error Log Event Codes.
@@ -580,7 +609,6 @@ typedef struct {
 #define	VPD_TAG_LRT		0x90
 #define	VPD_TAG_LRTC		0x91
 
-#define	FLASH_24XX_FIRMWARE_ADDR	0x80000
 /*
  * RISC to Host Status register definitions.
  */
@@ -733,10 +761,10 @@ typedef struct ql_init_cb {
 
 	uint8_t  reserved_3[26];
 } ql_init_cb_t;
+
 /*
  * Virtual port definition.
  */
-
 typedef struct ql_vp_cfg {
 	uint8_t  reserved[2];
 	uint8_t  options;
@@ -782,7 +810,8 @@ typedef struct ql_init_24xx_cb {
 	uint8_t request_q_address[8];
 	uint8_t response_q_address[8];
 	uint8_t prio_request_q_address[8];
-	uint8_t  reserved_2[8];
+	uint8_t msi_x_vector[2];
+	uint8_t reserved_2[6];
 	uint8_t atio_q_inpointer[2];
 	uint8_t atio_q_length[2];
 	uint8_t atio_q_address[8];
@@ -825,7 +854,22 @@ typedef struct ql_init_24xx_cb {
 	 * BIT 10 = Reserved
 	 * BIT 11 = Enable FC-SP Security
 	 * BIT 12 = FC Tape Enable
-	 * BIT 13-31 = Reserved
+	 * BIT 13 = Reserved
+	 * BIT 14 = Target PRLI Control
+	 * BIT 15 = Reserved
+	 *
+	 * BIT 16  = Enable Emulated MSIX
+	 * BIT 17  = Reserved
+	 * BIT 18  = Enable Alternate Device Number
+	 * BIT 19  = Enable Alternate Bus Number
+	 * BIT 20  = Enable Translated Address
+	 * BIT 21  = Enable VM Security
+	 * BIT 22  = Enable Interrupt Handshake
+	 * BIT 23  = Enable Multiple Queue
+	 *
+	 * BIT 24  = IOCB Security
+	 * BIT 25  = qos
+	 * BIT 26-31 = Reserved
 	 */
 	uint8_t firmware_options_2[4];
 
@@ -848,12 +892,35 @@ typedef struct ql_init_24xx_cb {
 	 * BIT 13 = Data Rate bit 0
 	 * BIT 14 = Data Rate bit 1
 	 * BIT 15 = Data Rate bit 2
+	 *
 	 * BIT 16 = 75-ohm Termination Select
-	 * BIT 17-31 = Reserved
+	 * BIT 17 = Enable Multiple FCFs
+	 * BIT 18 = MAC Addressing Mode
+	 * BIT 19 = MAC Addressing Mode
+	 * BIT 20 = MAC Addressing Mode
+	 * BIT 21 = Ethernet Data Rate
+	 * BIT 22 = Ethernet Data Rate
+	 * BIT 23 = Ethernet Data Rate
+	 *
+	 * BIT 24 = Ethernet Data Rate
+	 * BIT 25 = Ethernet Data Rate
+	 * BIT 26 = Enable Ethernet Header ATIO Queue
+	 * BIT 27 = Enable Ethernet Header Response Queue
+	 * BIT 28 = SPMA Selection
+	 * BIT 29 = SPMA Selection
+	 * BIT 30 = Reserved
+	 * BIT 31 = Reserved
 	 */
 	uint8_t firmware_options_3[4];
 
-	uint8_t  reserved_3[24];
+	uint8_t  qos[2];
+	uint8_t  rid[2];
+
+	uint8_t  reserved_3[4];
+
+	uint8_t  enode_mac_addr[6];
+
+	uint8_t  reserved_4[10];
 
 	/*
 	 * Multi-ID firmware.
@@ -865,7 +932,12 @@ typedef struct ql_init_24xx_cb {
 	 */
 	uint8_t		global_vp_option[2];
 
-	ql_vp_cfg_t	vpc[MAX_25_VIRTUAL_PORTS+1];
+	ql_vp_cfg_t	vpc[MAX_25_VIRTUAL_PORTS + 1];
+
+	/*
+	 * Extended Initialization Control Block
+	 */
+	ql_ext_icb_8100_t	ext_blk;
 } ql_init_24xx_cb_t;
 
 typedef union ql_comb_init_cb {
@@ -1032,29 +1104,6 @@ typedef struct ql_head {
 } ql_head_t;
 
 /*
- * This is the driver target command structure
- */
-typedef struct tgt_cmd {
-	/* Command link. */
-	ql_link_t	cmd;
-
-	uint8_t		type;
-	uint8_t		initiator_id_l;
-	uint8_t		initiator_id_h;
-	uint16_t	rx_id;
-
-	uint16_t	status;
-	uint8_t		task_flags_l;
-	uint8_t		task_flags_h;
-	uint8_t		execution_codes;
-} tgt_cmd_t;
-
-/* Target cmd states */
-#define	TGT_CMD_RECEIVED	0x00
-#define	TGT_CMD_SENT_UP		0x01
-#define	TGT_CMD_IN_FW		0x02
-
-/*
  * This is the per-command structure
  */
 typedef struct ql_srb {
@@ -1086,9 +1135,6 @@ typedef struct ql_srb {
 
 	/* Device queue pointer. */
 	struct ql_lun		*lun_queue;
-
-	/* Target command pointer. */
-	tgt_cmd_t		*tgt_cmd;
 
 	/* Command state/status flags. */
 	volatile uint32_t	flags;
@@ -1124,6 +1170,7 @@ typedef struct ql_srb {
 #define	SRB_UB_FREE_REQUESTED	  BIT_20  /* UB Free requested */
 #define	SRB_UB_ACQUIRED		  BIT_21  /* UB selected for upcall */
 #define	SRB_MS_PKT		  BIT_22  /* Management Service pkt */
+#define	SRB_ELS_PKT		  BIT_23  /* Extended Link Services pkt */
 
 /*
  * This byte will be used to define flags for the LUN on the target.
@@ -1183,7 +1230,6 @@ typedef struct ql_target {
 	volatile uint16_t	outcnt;		/* # of cmds running in ISP */
 	uint32_t		iidma_rate;
 
-
 	/* Device link. */
 	ql_link_t		device;
 
@@ -1238,6 +1284,14 @@ typedef struct ql_target {
 #define	TQF_NEED_AUTHENTICATION	BIT_5
 #define	TQF_PLOGI_PROGRS	BIT_6
 #define	TQF_IIDMA_NEEDED	BIT_7
+/*
+ * Tempoary N_Port information
+ */
+typedef struct ql_n_port_info {
+	uint16_t	n_port_handle;
+	uint8_t		port_name[8];	/* Big endian. */
+	uint8_t		node_name[8];	/* Big endian. */
+} ql_n_port_info_t;
 
 /*
  * iiDMA
@@ -1248,7 +1302,8 @@ typedef struct ql_target {
 #define	IIDMA_RATE_2GB		0x1
 #define	IIDMA_RATE_4GB		0x3
 #define	IIDMA_RATE_8GB		0x4
-#define	IIDMA_RATE_MAX		IIDMA_RATE_8GB
+#define	IIDMA_RATE_10GB		0x13
+#define	IIDMA_RATE_MAX		IIDMA_RATE_10GB
 
 /*
  * Kernel statistic structure definitions.
@@ -1287,17 +1342,12 @@ typedef struct fw_code {
 #define	QL_DUMP_VALID		BIT_1
 #define	QL_DUMP_UPLOADED	BIT_2
 
-/* f/w trace sizes */
-#define	FWEXTSIZE		(0x4000 * 4)	/* bytes - 16kb multiples */
-#define	FWFCESIZE		(0x4000 * 4)	/* bytes - 16kb multiples */
-
 typedef struct el_trace_desc {
 	kmutex_t	mutex;
 	uint16_t	next;
 	uint32_t	trace_buffer_size;
 	char		*trace_buffer;
 } el_trace_desc_t;
-
 
 /*
  * ql attach progress indication
@@ -1314,7 +1364,7 @@ typedef struct el_trace_desc {
 #define	QL_FCA_TRAN_ALLOCED		BIT_9
 #define	QL_FCA_ATTACH_DONE		BIT_10
 #define	QL_IOMAP_IOBASE_MAPPED		BIT_11
-
+#define	QL_N_PORT_INFO_CREATED		BIT_12
 /* Device queue head list size (based on AL_PA address). */
 #define	DEVICE_HEAD_LIST_SIZE	0x81
 
@@ -1452,14 +1502,8 @@ typedef struct ql_adapter_state {
 				    ql_srb_t *, void *);
 	void			(*ms_cmd)(struct ql_adapter_state *,
 				    ql_srb_t *, void *);
-	void			(*ctio_cmd)(struct ql_adapter_state *,
-				    ql_srb_t *, void *);
 	uint8_t			cmd_segs;
 	uint8_t			cmd_cont_segs;
-
-	/* Target mode context. */
-	tgt_cmd_t		*ql_nack;
-	kmutex_t		ql_nack_mtx;
 
 	/* NVRAM configuration data */
 	uint32_t		cfg_flags;
@@ -1526,6 +1570,7 @@ typedef struct ql_adapter_state {
 	uint32_t		fwfcetraceopt;
 	uint32_t		flash_errlog_start;	/* 32bit word addr */
 	uint32_t		flash_errlog_ptr;	/* 32bit word addr */
+	uint8_t			send_plogi_timer;
 
 	/* Virtual port context. */
 	fca_port_attrs_t	*pi_attrs;
@@ -1535,7 +1580,32 @@ typedef struct ql_adapter_state {
 
 	uint16_t		free_loop_id;
 
+	/* Tempoary N_Port information */
+	struct ql_n_port_info	*n_port;
+
+	void			(*els_cmd)(struct ql_adapter_state *,
+				    ql_srb_t *, void *);
 	el_trace_desc_t		*el_trace_desc;
+
+	uint32_t		flash_data_addr;
+	uint32_t		flash_fw_addr;
+	uint32_t		flash_golden_fw_addr;
+	uint32_t		flash_vpd_addr;
+	uint32_t		flash_nvram_addr;
+	uint32_t		flash_desc_addr;
+	uint32_t		mpi_capability_list;
+	uint8_t			phy_fw_major_version;
+	uint8_t			phy_fw_minor_version;
+	uint8_t			phy_fw_subminor_version;
+	uint8_t			mpi_fw_major_version;
+	uint8_t			mpi_fw_minor_version;
+	uint8_t			mpi_fw_subminor_version;
+
+	uint8_t			idc_flash_acc;
+	uint8_t			idc_restart_mpi;
+	uint16_t		idc_mb[8];
+	uint8_t			restart_mpi_timer;
+	uint8_t			flash_acc_timer;
 } ql_adapter_state_t;
 
 /*
@@ -1549,14 +1619,14 @@ typedef struct ql_adapter_state {
 #define	POINT_TO_POINT			BIT_5
 #define	IP_ENABLED			BIT_6
 #define	IP_INITIALIZED			BIT_7
-#define	TARGET_MODE_INITIALIZED		BIT_8
+#define	MENLO_LOGIN_OPERATIONAL		BIT_8
 #define	ADAPTER_SUSPENDED		BIT_9
 #define	ADAPTER_TIMER_BUSY		BIT_10
 #define	PARITY_ERROR			BIT_11
 #define	FLASH_ERRLOG_MARKER		BIT_12
 #define	VP_ENABLED			BIT_13
 #define	FDISC_ENABLED			BIT_14
-#define	MENLO_LOGIN_OPERATIONAL		BIT_15
+#define	FUNCTION_1			BIT_15
 
 /*
  * task daemon flags
@@ -1591,6 +1661,7 @@ typedef struct ql_adapter_state {
 #define	TASK_DAEMON_POWERING_DOWN	BIT_27
 #define	TD_IIDMA_NEEDED			BIT_28
 #define	SEND_PLOGI			BIT_29
+#define	IDC_ACK_NEEDED			BIT_30
 
 /*
  * Mailbox flags
@@ -1609,7 +1680,7 @@ typedef struct ql_adapter_state {
 #define	CFG_ENABLE_FULL_LIP_LOGIN		BIT_3
 #define	CFG_ENABLE_TARGET_RESET			BIT_4
 #define	CFG_ENABLE_LINK_DOWN_REPORTING		BIT_5
-#define	CFG_ENABLE_TARGET_MODE			BIT_6
+#define	CFG_DISABLE_EXTENDED_LOGGING_TRACE	BIT_6
 #define	CFG_ENABLE_FCP_2_SUPPORT		BIT_7
 #define	CFG_MULTI_CHIP_ADAPTER			BIT_8
 #define	CFG_SBUS_CARD				BIT_9
@@ -1621,7 +1692,7 @@ typedef struct ql_adapter_state {
 #define	CFG_ENABLE_EXTENDED_LOGGING		BIT_15
 #define	CFG_DISABLE_RISC_CODE_LOAD		BIT_16
 #define	CFG_SET_CACHE_LINE_SIZE_1		BIT_17
-#define	CFG_TARGET_MODE_ENABLE			BIT_18
+#define	CFG_CTRL_MENLO				BIT_18
 #define	CFG_EXT_FW_INTERFACE			BIT_19
 #define	CFG_LOAD_FLASH_FW			BIT_20
 #define	CFG_DUMP_MAILBOX_TIMEOUT		BIT_21
@@ -1631,11 +1702,13 @@ typedef struct ql_adapter_state {
 #define	CFG_ENABLE_FWEXTTRACE			BIT_25
 #define	CFG_ENABLE_FWFCETRACE			BIT_26
 #define	CFG_FW_MISMATCH				BIT_27
-#define	CFG_CTRL_MENLO				BIT_28
-#define	CFG_DISABLE_EXTENDED_LOGGING_TRACE	BIT_29
+#define	CFG_CTRL_81XX				BIT_28
 
-#define	CFG_CTRL_2425			(CFG_CTRL_2422 | CFG_CTRL_25XX)
-#define	CFG_IST(ha, cfgflags)		(ha->cfg_flags & cfgflags)
+#define	CFG_CTRL_2425  		(CFG_CTRL_2422 | CFG_CTRL_25XX)
+#define	CFG_CTRL_2581  		(CFG_CTRL_25XX | CFG_CTRL_81XX)
+#define	CFG_CTRL_242581		(CFG_CTRL_2422 | CFG_CTRL_25XX | CFG_CTRL_81XX)
+
+#define	CFG_IST(ha, cfgflags)	(ha->cfg_flags & cfgflags)
 
 /*
  * Interrupt configuration flags
@@ -1707,16 +1780,13 @@ typedef struct ql_adapter_state {
 #define	VALID_N_PORT_HDL(x)	(x <= LAST_N_PORT_HDL || \
 	(x >= SNS_24XX_HDL && x <= BROADCAST_24XX_HDL))
 
-#define	VALID_DEVICE_ID(ha, x) \
-	(ha->cfg_flags & (CFG_CTRL_2422 | CFG_CTRL_25XX) ? \
+#define	VALID_DEVICE_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_242581) ? \
 	VALID_N_PORT_HDL(x) : VALID_LOOP_ID(x))
 
-#define	VALID_TARGET_ID(ha, x) \
-	(ha->cfg_flags & (CFG_CTRL_2422 | CFG_CTRL_25XX) ? \
+#define	VALID_TARGET_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_242581) ? \
 	(x <= LAST_N_PORT_HDL) : (LOCAL_LOOP_ID(x) || SNS_LOOP_ID(x)))
 
-#define	RESERVED_LOOP_ID(ha, x) \
-	(ha->cfg_flags & (CFG_CTRL_2422 | CFG_CTRL_25XX) ? \
+#define	RESERVED_LOOP_ID(ha, x) (CFG_IST(ha, CFG_CTRL_242581) ? \
 	(x > LAST_N_PORT_HDL && x <= FL_PORT_24XX_HDL) : \
 	(x >= FL_PORT_LOOP_ID && x <= SIMPLE_NAME_SERVER_LOOP_ID))
 
@@ -1848,6 +1918,7 @@ typedef struct ql_config_space {
 #define	QL_LOOP_DOWN			0x400B
 #define	QL_LOOP_BACK_ERROR		0x400C
 #define	QL_CHECKSUM_ERROR		0x4010
+#define	QL_CONSUMED			0x4011
 
 #define	QL_FUNCTION_TIMEOUT		0x100
 #define	QL_FUNCTION_PARAMETER_ERROR	0x101
@@ -2053,12 +2124,20 @@ void ql_24xx_protect_flash(ql_adapter_state_t *);
 void ql_free_dma_resource(ql_adapter_state_t *, dma_mem_t *);
 uint8_t ql_pci_config_get8(ql_adapter_state_t *, off_t);
 void ql_pci_config_put32(ql_adapter_state_t *, off_t, uint32_t);
-void ql_24xx_unprotect_flash(ql_adapter_state_t *);
+int ql_24xx_unprotect_flash(ql_adapter_state_t *);
 char *els_cmd_text(int);
 char *mbx_cmd_text(int);
 char *cmd_text(cmd_table_t *, int);
 uint32_t ql_fwmodule_resolve(ql_adapter_state_t *);
 void ql_port_state(ql_adapter_state_t *, uint32_t, uint32_t);
+void ql_isp_els_handle_cmd_endian(ql_adapter_state_t *ha, ql_srb_t *srb);
+void ql_isp_els_handle_rsp_endian(ql_adapter_state_t *ha, ql_srb_t *srb);
+void ql_isp_els_handle_endian(ql_adapter_state_t *ha, uint8_t *ptr,
+    uint8_t ls_code);
+int ql_el_trace_desc_ctor(ql_adapter_state_t *ha);
+int ql_el_trace_desc_dtor(ql_adapter_state_t *ha);
+int ql_wwn_cmp(ql_adapter_state_t *, la_wwn_t *, la_wwn_t *);
+void ql_dev_free(ql_adapter_state_t *, ql_tgt_t *);
 
 #ifdef	__cplusplus
 }

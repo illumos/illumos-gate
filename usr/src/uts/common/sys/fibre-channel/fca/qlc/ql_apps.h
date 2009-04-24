@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_QL_APPS_H
 #define	_QL_APPS_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -48,6 +47,29 @@ extern "C" {
 #endif
 
 #include <sys/scsi/scsi_types.h>
+
+/* f/w trace sizes */
+#define	FWEXTSIZE		(0x4000 * 4)	/* bytes - 16kb multiples */
+#define	FWFCESIZE		(0x4000 * 4)	/* bytes - 16kb multiples */
+
+/*
+ * ISP8100 Extended Initialization Control Block
+ */
+typedef struct ql_ext_icb_8100 {
+	uint8_t version[2];
+	/*
+	 * BIT 0 = FCF VLAN ID Match
+	 * BIT 1 = FCF Fabric Name Match
+	 * BIT 2-7 = Reserved
+	 */
+	uint8_t fcf_vlan_match;
+	uint8_t reserved_6[3];
+	uint8_t fcf_vlan_id[2];
+	uint8_t fcf_fabric_name[8];
+	uint8_t reserved_7[14];
+	uint8_t spma_proposed_mac_address[6];
+	uint8_t reserved_8[28];
+} ql_ext_icb_8100_t;
 
 /*
  * Name:	Adapter Revsion Level Structure

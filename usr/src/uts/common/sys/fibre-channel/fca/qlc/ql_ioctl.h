@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_QL_IOCTL_H
 #define	_QL_IOCTL_H
-
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -58,6 +57,7 @@ int ql_nv_util_dump(ql_adapter_state_t *, void *, int);
 int ql_vpd_load(ql_adapter_state_t *, void *, int);
 int ql_vpd_dump(ql_adapter_state_t *, void *, int);
 int32_t ql_vpd_lookup(ql_adapter_state_t *, uint8_t *, uint8_t *, int32_t);
+int ql_r_m_w_flash(ql_adapter_state_t *, caddr_t, uint32_t, uint32_t, int);
 
 #ifdef	__cplusplus
 }

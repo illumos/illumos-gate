@@ -60,7 +60,8 @@
 #define	EXT_DEF_MAX_HBA_OS		256	/* 0 - 0xFF */
 #define	EXT_DEF_MAX_BUS_OS		1
 #define	EXT_DEF_MAX_TARGET_OS  		256	/* 0 - 0xFF */
-#define	EXT_DEF_MAX_LUN_OS		256	/* 0 - 0xFF */
+#define	EXT_DEF_MAX_LUN_OS		16384
+#define	EXT_DEF_NON_SCSI3_MAX_LUN_OS	256
 
 /* required # of entries in AEN queue */
 #define	EXT_DEF_MAX_AEN_QUEUE_OS		64
@@ -103,7 +104,9 @@
 #define	EXT_CC_MENLO_MANAGE_INFO		134
 #define	EXT_CC_GET_VP_CNT_ID_OS			135
 #define	EXT_CC_VPORT_CMD_OS			136
+#define	EXT_CC_ACCESS_FLASH_OS			137
+#define	EXT_CC_RESET_FW_OS			138
 
-#define	EXT_CC_HBA_NODE_SBUS			BIT_0
+#define	EXT_CC_HBA_NODE_SBUS			0x01
 
 #endif /* _EXIOCTSO_H_ */

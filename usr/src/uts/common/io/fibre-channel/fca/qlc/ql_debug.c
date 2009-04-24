@@ -154,7 +154,7 @@ ql_el_msg(ql_adapter_state_t *ha, const char *fn, int ce, ...)
 	va_list		vl;
 
 	/* Tracing is the default but it can be disabled. */
-	if (((ha->cfg_flags & CFG_DISABLE_EXTENDED_LOGGING_TRACE) == 0) &&
+	if ((CFG_IST(ha, CFG_DISABLE_EXTENDED_LOGGING_TRACE) == 0) &&
 	    (rval = ql_validate_trace_desc(ha) == DDI_SUCCESS)) {
 		tracing = 1;
 
@@ -195,8 +195,8 @@ ql_el_msg(ql_adapter_state_t *ha, const char *fn, int ce, ...)
 		GLOBAL_EL_UNLOCK();
 
 		rval = (int)snprintf(fmt, (size_t)EL_BUFFER_RESERVE,
-		    QL_BANG "QEL%d %s(%d,%d): %s, %s", el_msg_num, QL_NAME,
-		    ha->instance, ha->vp_index, fn, s);
+		    QL_BANG "QEL%d %s(%d,%d): %s, ", el_msg_num, QL_NAME,
+		    ha->instance, ha->vp_index, fn);
 		fmt1 = fmt + rval;
 		tmp = (int)vsnprintf(fmt1,
 		    (size_t)(uint32_t)((int)EL_BUFFER_RESERVE - rval), s, vl);
@@ -221,7 +221,7 @@ ql_el_msg(ql_adapter_state_t *ha, const char *fn, int ce, ...)
 		TRACE_BUFFER_UNLOCK(ha);
 	}
 
-	if (ha->cfg_flags & CFG_ENABLE_EXTENDED_LOGGING) {
+	if (CFG_IST(ha, CFG_ENABLE_EXTENDED_LOGGING)) {
 		cmn_err(ce, fmt);
 	}
 
@@ -338,7 +338,7 @@ ql_flash_errlog(ql_adapter_state_t *ha, uint16_t code, uint16_t d1,
 	uint32_t	marker[2], fdata[2], faddr;
 	int		rval;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	if (ha->flash_errlog_start == 0) {
 		return (QL_NOT_SUPPORTED);
@@ -376,7 +376,7 @@ ql_flash_errlog(ql_adapter_state_t *ha, uint16_t code, uint16_t d1,
 		/* Locate marker. */
 		ha->flash_errlog_ptr = ha->flash_errlog_start;
 		for (;;) {
-			faddr = FLASH_DATA_ADDR | ha->flash_errlog_ptr;
+			faddr = ha->flash_data_addr | ha->flash_errlog_ptr;
 			(void) ql_24xx_read_flash(ha, faddr++, &fdata[0]);
 			(void) ql_24xx_read_flash(ha, faddr++, &fdata[1]);
 			if (fdata[0] == 0xffffffff && fdata[1] == 0xffffffff) {
@@ -417,7 +417,7 @@ ql_flash_errlog(ql_adapter_state_t *ha, uint16_t code, uint16_t d1,
 		EL(ha, "failed error write=%xh\n", rval);
 	} else {
 		/*EMPTY*/
-		QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 	}
 
 	return (rval);
@@ -447,10 +447,11 @@ ql_flash_errlog(ql_adapter_state_t *ha, uint16_t code, uint16_t d1,
 static int
 ql_flash_errlog_store(ql_adapter_state_t *ha, uint32_t *fdata)
 {
+	int		rval;
 	uint64_t	time;
 	uint32_t	d1, d2, faddr;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	/* Locate first empty entry */
 	for (;;) {
@@ -460,7 +461,7 @@ ql_flash_errlog_store(ql_adapter_state_t *ha, uint32_t *fdata)
 			return (QL_MEMORY_FULL);
 		}
 
-		faddr = FLASH_DATA_ADDR | ha->flash_errlog_ptr;
+		faddr = ha->flash_data_addr | ha->flash_errlog_ptr;
 		ha->flash_errlog_ptr += FLASH_ERRLOG_ENTRY_SIZE;
 		(void) ql_24xx_read_flash(ha, faddr, &d1);
 		(void) ql_24xx_read_flash(ha, faddr + 1, &d2);
@@ -468,7 +469,12 @@ ql_flash_errlog_store(ql_adapter_state_t *ha, uint32_t *fdata)
 			(void) drv_getparm(TIME, &time);
 
 			/* Enable flash write. */
-			ql_24xx_unprotect_flash(ha);
+			if ((rval = ql_24xx_unprotect_flash(ha)) !=
+			    QL_SUCCESS) {
+				EL(ha, "unprotect_flash failed, rval=%xh\n",
+				    rval);
+				return (rval);
+			}
 
 			(void) ql_24xx_write_flash(ha, faddr++, LSD(time));
 			(void) ql_24xx_write_flash(ha, faddr++, MSD(time));
@@ -481,7 +487,7 @@ ql_flash_errlog_store(ql_adapter_state_t *ha, uint32_t *fdata)
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
 	return (QL_SUCCESS);
 }
@@ -520,7 +526,7 @@ ql_dump_el_trace_buffer(ql_adapter_state_t *ha)
 		    (void *)dump_start, (void *)trace_start);
 
 		while (((uintptr_t)dump_current - (uintptr_t)trace_start) <=
-		    ha->el_trace_desc->trace_buffer_size) {
+		    (uintptr_t)ha->el_trace_desc->trace_buffer_size) {
 			/* Show it... */
 			cmn_err(CE_CONT, "%p - %s", (void *)dump_current,
 			    dump_current);

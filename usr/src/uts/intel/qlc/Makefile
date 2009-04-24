@@ -73,6 +73,7 @@ FWIMAGES        += 2300
 FWIMAGES        += 2400
 FWIMAGES        += 2500
 FWIMAGES        += 6322
+FWIMAGES        += 8100
 
 FWMODULES        = $(FWIMAGES:%=$(MODULE)_fw_%)
 FWMODULES_SRC    = $(FWIMAGES:%=$(SRC)/uts/common/io/fibre-channel/fca/qlc/ql_fw_%.c)

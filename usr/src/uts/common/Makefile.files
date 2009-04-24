@@ -950,6 +950,8 @@ QLC_FW_2500_OBJS += ql_fw_2500.o
 
 QLC_FW_6322_OBJS += ql_fw_6322.o
 
+QLC_FW_8100_OBJS += ql_fw_8100.o
+
 ZCONS_OBJS += zcons.o
 
 NV_SATA_OBJS += nv_sata.o

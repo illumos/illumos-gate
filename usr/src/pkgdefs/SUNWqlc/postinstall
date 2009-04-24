@@ -40,6 +40,7 @@ DRVR_ALIASES_sparc="\
 	pciex1077,2432 \
 	pciex1077,2532 \
 	pciex1077,5432 \
+	pciex1077,8001 \
 	"
 
 DRVR_ALIASES_i386="\
@@ -51,6 +52,7 @@ DRVR_ALIASES_i386="\
 	pciex1077,2432 \
 	pciex1077,2532 \
 	pciex1077,5432 \
+	pciex1077,8001 \ 
 	"
 
 HARDWARE_STRINGS_sparc="\
@@ -58,6 +60,9 @@ HARDWARE_STRINGS_sparc="\
 	pci1077,2422 \
 	pciex1077,2432 \
 	pci1077,2432 \
+	pciex1077,2532 \
+	pciex1077,5432 \
+	pciex1077,8001 \
 	"
 
 HARDWARE_STRING_i386="\
@@ -66,6 +71,9 @@ HARDWARE_STRING_i386="\
 	pci1077,2422 \
 	pciex1077,2432 \
 	pci1077,2432 \
+	pciex1077,2532 \
+	pciex1077,5432 \
+	pciex1077,8001 \
 	"
 
 if [ ${ARCH} = "sparc" ]; then

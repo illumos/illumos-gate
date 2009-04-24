@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
  * File Name: exioct.h
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *                                                                    **
  * *                            NOTICE                                  **
- * *            COPYRIGHT (C) 2000-2008 QLOGIC CORPORATION              **
+ * *            COPYRIGHT (C) 2000-2009 QLOGIC CORPORATION              **
  * *                    ALL RIGHTS RESERVED                             **
  * *                                                                    **
  * ***********************************************************************
@@ -42,7 +42,6 @@
 
 #ifndef	_EXIOCT_H
 #define	_EXIOCT_H
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -77,10 +76,11 @@ extern "C" {
  * OS dependent General configuration defines
  * ***********************************************************************
  */
-#define	EXT_DEF_MAX_HBA		EXT_DEF_MAX_HBA_OS
-#define	EXT_DEF_MAX_BUS		EXT_DEF_MAX_BUS_OS
-#define	EXT_DEF_MAX_TARGET	EXT_DEF_MAX_TARGET_OS
-#define	EXT_DEF_MAX_LUN		EXT_DEF_MAX_LUN_OS
+#define	EXT_DEF_MAX_HBA			EXT_DEF_MAX_HBA_OS
+#define	EXT_DEF_MAX_BUS			EXT_DEF_MAX_BUS_OS
+#define	EXT_DEF_MAX_TARGET		EXT_DEF_MAX_TARGET_OS
+#define	EXT_DEF_MAX_LUN			EXT_DEF_MAX_LUN_OS
+#define	EXT_DEF_NON_SCSI3_MAX_LUN	EXT_DEF_NON_SCSI3_MAX_LUN_OS
 
 /*
  * ***********************************************************************
@@ -212,6 +212,8 @@ typedef union _ext_signature {
 #define	EXT_CC_GET_FWFCETRACE		EXT_CC_GET_FWFCETRACE_OS
 #define	EXT_CC_GET_VP_CNT_ID		EXT_CC_GET_VP_CNT_ID_OS
 #define	EXT_CC_VPORT_CMD		EXT_CC_VPORT_CMD_OS
+#define	EXT_CC_ACCESS_FLASH		EXT_CC_ACCESS_FLASH_OS
+#define	EXT_CC_RESET_FW			EXT_CC_RESET_FW_OS
 
 /*
  * HBA port operations
@@ -323,6 +325,23 @@ typedef union _ext_signature {
  * Used with EXT_CC_VPORT_CMD as the ioctl code.
  */
 #define	EXT_VF_SC_VPORT_GETINFO		1
+#define	EXT_VF_SC_VPORT_DELETE		2
+#define	EXT_VF_SC_VPORT_MODIFY		3
+#define	EXT_VF_SC_VPORT_CREATE		4
+
+/*
+ * Flash access sub codes
+ * Used with EXT_CC_ACCESS_FLASH as the ioctl code.
+ */
+#define	EXT_SC_FLASH_READ	0
+#define	EXT_SC_FLASH_WRITE	1
+
+/*
+ * Reset FW subcodes for Schultz
+ * Used with EXT_CC_RESET_FW as the ioctl code.
+ */
+#define	EXT_SC_RESET_FC_FW	1
+#define	EXT_SC_RESET_MPI_FW	2
 
 /* Read */
 
@@ -374,8 +393,9 @@ typedef struct _EXT_HBA_PORT {
 	UINT8	PortSupportedFC4Types;		/* 1 */
 	UINT8	PortActiveFC4Types;		/* 1 */
 	UINT8	FabricName[EXT_DEF_WWN_NAME_SIZE];	/* 8 */
-	UINT8	sfp_status;			/* 1 */
-	UINT8	Reserved[9];			/* 9 */
+	UINT16	LinkState2;			/* 2; sfp status */
+	UINT16	LinkState3;			/* 2; reserved field */
+	UINT8	Reserved[6];			/* 6 */
 } EXT_HBA_PORT, *PEXT_HBA_PORT;			/* 62 */
 
 /* FC-4 Instrumentation */
@@ -448,6 +468,19 @@ typedef struct _EXT_LOOPBACK_RSP {
 #define	EXT_DEF_FC4_TYPE_SCTP	0x4
 #define	EXT_DEF_FC4_TYPE_VI	0x8
 
+/* IIDMA rate values */
+#define	IIDMA_RATE_1GB		0x0
+#define	IIDMA_RATE_2GB		0x1
+#define	IIDMA_RATE_4GB		0x3
+#define	IIDMA_RATE_8GB		0x4
+#define	IIDMA_RATE_UNKNOWN	0xffff
+
+/* IIDMA Mode values */
+#define	IIDMA_MODE_0		0
+#define	IIDMA_MODE_1		1
+#define	IIDMA_MODE_2		2
+#define	IIDMA_MODE_3		3
+
 /* Port Speed values */
 #define	EXT_DEF_PORTSPEED_UNKNOWN 	0x0
 #define	EXT_DEF_PORTSPEED_1GBIT		0x1
@@ -479,7 +512,7 @@ typedef struct _EXT_DISC_TARGET {
 	UINT16	LoopID;			/* 2; Loop ID */
 	UINT8	WWNN[EXT_DEF_WWN_NAME_SIZE];	/* 8 */
 	UINT8	WWPN[EXT_DEF_WWN_NAME_SIZE];	/* 8 */
-	UINT8	Id  [EXT_DEF_PORTID_SIZE];	/* 4; 3 bytes used big endian */
+	UINT8	Id[EXT_DEF_PORTID_SIZE];	/* 4; 3 bytes used big endian */
 	UINT8	Local;			/* 1; Local or Remote */
 	UINT8	Reserved[25];		/* 25 */
 } EXT_DISC_TARGET, *PEXT_DISC_TARGET;	/* 64 */
@@ -583,7 +616,6 @@ typedef struct _EXT_FW {
 	UINT8	Reserved[66];			/* 66 */
 } EXT_FW, *PEXT_FW;				/* 198 */
 
-
 /* ISP/Chip property */
 typedef struct _EXT_CHIP {
 	UINT32	IoAddr;		/* 4 */
@@ -599,7 +631,8 @@ typedef struct _EXT_CHIP {
 	UINT16	ChipType;	/* 2 */
 	UINT16	InterruptLevel;	/* 2 */
 	UINT16	OutMbx[8];	/* 16 */
-	UINT8	Reserved[31];	/* 31 */
+	UINT16	FuncNo;		/* 2 */
+	UINT8	Reserved[29];	/* 29 */
 	UINT8	ChipRevID;	/* 1 */
 } EXT_CHIP, *PEXT_CHIP;		/* 80 */
 
@@ -715,10 +748,10 @@ typedef struct _EXT_BEACON_CONTROL {
  * Least significant bit of mask[0] is lun 7.
  */
 typedef struct _EXT_LUN_BIT_MASK {
-#if ((EXT_DEF_MAX_LUN & 0x7) == 0)
-	UINT8	mask[EXT_DEF_MAX_LUN >> 3];
+#if ((EXT_DEF_NON_SCSI3_MAX_LUN & 0x7) == 0)
+	UINT8	mask[EXT_DEF_NON_SCSI3_MAX_LUN >> 3];
 #else
-	UINT8	mask[(EXT_DEF_MAX_LUN + 8) >> 3 ];
+	UINT8	mask[(EXT_DEF_NON_SCSI3_MAX_LUN + 8) >> 3 ];
 #endif
 } EXT_LUN_BIT_MASK, *PEXT_LUN_BIT_MASK;
 
@@ -831,28 +864,58 @@ typedef struct _EXT_PORT_PARAM {
 #define	EXT_IIDMA_MODE_SET	1
 
 /*
+ * PCI header structure definitions.
+ */
+
+typedef struct _PCI_HEADER_T {
+	UINT8	signature[2];
+	UINT8	reserved[0x16];
+	UINT8	dataoffset[2];
+	UINT8	pad[6];
+} PCI_HEADER_T, *PPCI_HEADER_T;
+
+/*
+ * PCI data structure definitions.
+ */
+typedef struct _PCI_DATA_T {
+	UINT8	signature[4];
+	UINT8	vid[2];
+	UINT8	did[2];
+	UINT8	reserved0[2];
+	UINT8	pcidatalen[2];
+	UINT8	pcidatarev;
+	UINT8	classcode[3];
+	UINT8	imagelength[2];   /* In sectors */
+	UINT8	revisionlevel[2];
+	UINT8	codetype;
+	UINT8	indicator;
+	UINT8	reserved1[2];
+	UINT8	pad[8];
+} PCI_DATA_T, *PPCI_DATA_T;
+
+/*
  * Mercury/Menlo
  */
 
 #define	MENLO_RESET_FLAG_ENABLE_DIAG_FW	1
 
-typedef struct _MENLO_RESET {
-	UINT16 Flags;
-	UINT16 Reserved;
-} MENLO_RESET, *PMENLO_RESET;
+typedef struct _EXT_MENLO_RESET {
+	UINT16	Flags;
+	UINT16	Reserved;
+} EXT_MENLO_RESET, *PEXT_MENLO_RESET;
 
-typedef struct _MENLO_GET_FW_VERSION {
-	UINT32 FwVersion;
-} MENLO_GET_FW_VERSION, *PMENLO_GET_FW_VERSION;
+typedef struct _EXT_MENLO_GET_FW_VERSION {
+	UINT32	FwVersion;
+} EXT_MENLO_GET_FW_VERSION, *PEXT_MENLO_GET_FW_VERSION;
 
 #define	MENLO_UPDATE_FW_FLAG_DIAG_FW	0x0008  /* if flag is cleared then */
 						/* it must be an fw op */
-typedef struct _MENLO_UPDATE_FW {
-	unsigned char *pFwDataBytes;
-	UINT32 TotalByteCount;
-	UINT16 Flags;
-	UINT16 Reserved;
-} MENLO_UPDATE_FW, *PMENLO_UPDATE_FW;
+typedef struct _EXT_MENLO_UPDATE_FW {
+	UINT64	pFwDataBytes;
+	UINT32	TotalByteCount;
+	UINT16	Flags;
+	UINT16	Reserved;
+} EXT_MENLO_UPDATE_FW, *PEXT_MENLO_UPDATE_FW;
 
 #define	CONFIG_PARAM_ID_RESERVED	1
 #define	CONFIG_PARAM_ID_UIF		2
@@ -901,7 +964,7 @@ typedef struct _MENLO_UPDATE_FW {
 #define	IC_LIF_STATISTICS_LIF_NUMBER_FC_PORT1		3
 #define	IC_LIF_STATISTICS_LIF_NUMBER_CPU		6
 
-typedef struct _MENLO_ACCESS_PARAMETERS {
+typedef struct _EXT_MENLO_ACCESS_PARAMETERS {
 	union {
 		struct {
 			UINT32 StartingAddr;
@@ -921,7 +984,7 @@ typedef struct _MENLO_ACCESS_PARAMETERS {
 			UINT32 Reserved;
 		} MenloInfo;		/* For fetch Menlo Info */
 	} ap;
-} MENLO_ACCESS_PARAMETERS, *PMENLO_ACCESS_PARAMETERS;
+} EXT_MENLO_ACCESS_PARAMETERS, *PEXT_MENLO_ACCESS_PARAMETERS;
 
 #define	INFO_DATA_TYPE_LOG_CONFIG_TBC		((10*7)+1)*4
 #define	INFO_DATA_TYPE_PORT_STAT_ETH_TBC	0x194
@@ -936,13 +999,13 @@ typedef struct _MENLO_ACCESS_PARAMETERS {
 #define	MENLO_OP_GET_INFO	3	/* Fetch Menlo Info (Logs, & */
 					/* Statistics, Configuration) */
 
-typedef struct _MENLO_MANAGE_INFO {
-	unsigned char *pDataBytes;
-	MENLO_ACCESS_PARAMETERS Parameters;
-	UINT32 TotalByteCount;
-	UINT16 Operation;
-	UINT16 Reserved;
-} MENLO_MANAGE_INFO, *PMENLO_MANAGE_INFO;
+typedef struct _EXT_MENLO_MANAGE_INFO {
+	UINT64				pDataBytes;	/* 4 */
+	EXT_MENLO_ACCESS_PARAMETERS	Parameters;	/* 12 */
+	UINT32				TotalByteCount;
+	UINT16				Operation;
+	UINT16				Reserved;
+} EXT_MENLO_MANAGE_INFO, *PEXT_MENLO_MANAGE_INFO;
 
 #define	MENLO_FC_CHECKSUM_FAILURE	0x01
 #define	MENLO_FC_INVALID_LENGTH		0x02
@@ -951,22 +1014,44 @@ typedef struct _MENLO_MANAGE_INFO {
 #define	MENLO_FC_INVALID_CONFIG_DATA	0x06
 #define	MENLO_FC_INVALID_INFO_CONTEXT	0x07
 
-typedef struct _SD_MENLO_MGT {
+typedef struct _EXT_MENLO_MGT {
 	union {
-		MENLO_RESET		MenloReset;
-		MENLO_GET_FW_VERSION	MenloGetFwVer;
-		MENLO_UPDATE_FW		MenloUpdateFw;
-		MENLO_MANAGE_INFO	MenloManageInfo;
+		EXT_MENLO_RESET			MenloReset;
+		EXT_MENLO_GET_FW_VERSION	MenloGetFwVer;
+		EXT_MENLO_UPDATE_FW		MenloUpdateFw;
+		EXT_MENLO_MANAGE_INFO		MenloManageInfo;
 	} sp;
-} SD_MENLO_MGT, *PSD_MENLO_MGT;
+} EXT_MENLO_MGT, *PEXT_MENLO_MGT;
+
+/*
+ * vport enum definations
+ */
+typedef enum vport_options {
+	EXT_VPO_LOGIN_RETRY_ENABLE = 0,
+	EXT_VPO_PERSISTENT = 1,
+	EXT_VPO_QOS_BW = 2,
+	EXT_VPO_VFABRIC_ENABLE = 3
+} vport_options_t;
 
 /*
  * vport struct definations
  */
+#define	MAX_DEV_PATH			256
+#define	MAX_VP_ID			256
+#define	EXT_OLD_VPORT_ID_CNT_SIZE	260
 typedef struct _EXT_VPORT_ID_CNT {
-	UINT32		VpCnt;
-	UINT8		VpId[256];
+	UINT32	VpCnt;
+	UINT8	VpId[MAX_VP_ID];
+	UINT8	vp_path[MAX_VP_ID][MAX_DEV_PATH];
+	INT32	VpDrvInst[MAX_VP_ID];
 } EXT_VPORT_ID_CNT, *PEXT_VPORT_ID_CNT;
+
+typedef struct _EXT_VPORT_PARAMS {
+	UINT32		vp_id;
+	vport_options_t	options;
+	UINT8		wwpn[EXT_DEF_WWN_NAME_SIZE];
+	UINT8		wwnn[EXT_DEF_WWN_NAME_SIZE];
+} EXT_VPORT_PARAMS, *PEXT_VPORT_PARAMS;
 
 typedef struct _EXT_VPORT_INFO {
 	UINT32		free;

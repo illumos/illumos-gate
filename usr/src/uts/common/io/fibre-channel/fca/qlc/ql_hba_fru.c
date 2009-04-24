@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2009 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_hba_fru.c"
+#pragma ident	"Copyright 2009 QLogic Corporation; ql_hba_fru.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -240,7 +240,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	size_t			vlen;
 	int32_t			i;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	attrs = &port_info->pi_attrs;
 
@@ -327,7 +327,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	}
 
 	attrs->vendor_specific_id = ha->adapter_features;
-	attrs->max_frame_size = CFG_IST(ha, CFG_CTRL_2425) ?
+	attrs->max_frame_size = CFG_IST(ha, CFG_CTRL_242581) ?
 	    (ha->init_ctrl_blk.cb24.max_frame_length[1] << 8 |
 	    ha->init_ctrl_blk.cb24.max_frame_length[0]) :
 	    (ha->init_ctrl_blk.cb.max_frame_length[1] << 8 |
@@ -346,6 +346,9 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	case 0x8400:
 		attrs->supported_speed = FC_HBA_PORTSPEED_4GBIT |
 		    FC_HBA_PORTSPEED_2GBIT | FC_HBA_PORTSPEED_1GBIT;
+		break;
+	case 0x8001:
+		attrs->supported_speed = FC_HBA_PORTSPEED_10GBIT;
 		break;
 	case 0x2500:
 		attrs->supported_speed = FC_HBA_PORTSPEED_8GBIT |
@@ -372,7 +375,6 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 			break;
 
 		}
-
 
 		break;
 	case 0x5400:
@@ -452,6 +454,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	case 0x2500:
 	case 0x5400:
 	case 0x8400:
+	case 0x8000:
 	default:
 		if ((i = ql_vpd_lookup(ha, (uint8_t *)VPD_TAG_PN,
 		    (uint8_t *)attrs->model, FCHBA_MODEL_LEN)) >= 0) {
@@ -486,7 +489,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	(void) snprintf((int8_t *)attrs->sym_port_name, vlen,
 	    "%s(%d,%d)", QL_NAME, ha->instance, ha->vp_index);
 
-	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }
 
 /*
@@ -508,7 +511,7 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 	uint32_t 		mybasedev_len;
 	ql_adapter_state_t	*base_ha = NULL;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	/*
 	 * To generate common id for instances residing on the
@@ -546,9 +549,8 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 		ha->fru_port_index = 0;
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }
-
 
 /*
  *  ql_get_basedev_len
@@ -577,7 +579,7 @@ ql_get_basedev_len(ql_adapter_state_t *ha, uint32_t *basedev_len,
 	int32_t		port_off;
 	int8_t		*devstr;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	if (ha->devpath == NULL) {
 		return ((uint32_t)-1);
@@ -618,7 +620,7 @@ ql_get_basedev_len(ql_adapter_state_t *ha, uint32_t *basedev_len,
 		*basedev_len = (uint32_t)(port_off - 1);
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): exiting\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
 	return (0);
 }
@@ -647,7 +649,7 @@ ql_search_basedev(ql_adapter_state_t *myha, uint32_t mybasedev_len)
 	ql_adapter_state_t	*ha;
 	uint32_t		basedev_len, port_index;
 
-	QL_PRINT_3(CE_CONT, "(%d): entered\n", myha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started\n", myha->instance);
 
 	for (link = ql_hba.first; link != NULL; link = link->next) {
 
@@ -683,13 +685,13 @@ ql_search_basedev(ql_adapter_state_t *myha, uint32_t mybasedev_len)
 		    ha->devpath, basedev_len) == 0)) {
 
 			/* We found the ha with same basedev */
-			QL_PRINT_3(CE_CONT, "(%d): found,  exiting\n",
+			QL_PRINT_3(CE_CONT, "(%d): found, done\n",
 			    myha->instance);
 			return (ha);
 		}
 	}
 
-	QL_PRINT_3(CE_CONT, "(%d): not found, exiting\n", myha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): not found, done\n", myha->instance);
 
 	return (NULL);
 }

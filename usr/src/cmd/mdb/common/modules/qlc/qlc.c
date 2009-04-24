@@ -86,14 +86,14 @@ int8_t *adapter_state_flags[] = {
 	"POINT_TO_POINT",
 	"IP_ENABLED",
 	"IP_INITIALIZED",
-	"TARGET_MODE_INITIALIZED",
+	"MENLO_LOGIN_OPERATIONAL",
 	"ADAPTER_SUSPENDED",
 	"ADAPTER_TIMER_BUSY",
 	"PARITY_ERROR",
 	"FLASH_ERRLOG_MARKER",
 	"VP_ENABLED",
 	"FDISC_ENABLED",
-	"MENLO_LOGIN_OPERATIONAL",
+	"FUNCTION_1",
 	NULL
 };
 
@@ -104,7 +104,7 @@ int8_t *adapter_config_flags[] = {
 	"ENABLE_FULL_LIP_LOGIN",
 	"ENABLE_TARGET_RESET",
 	"ENABLE_LINK_DOWN_REPORTING",
-	"ENABLE_TARGET_MODE",
+	"DISABLE_EXTENDED_LOGGING_TRACE",
 	"ENABLE_FCP_2_SUPPORT",
 	"MULTI_CHIP_ADAPTER",
 	"SBUS_CARD",
@@ -116,7 +116,7 @@ int8_t *adapter_config_flags[] = {
 	"ENABLE_EXTENDED_LOGGING",
 	"DISABLE_RISC_CODE_LOAD",
 	"SET_CACHE_LINE_SIZE_1",
-	"TARGET_MODE_ENABLE",
+	"CTRL_MENLO",
 	"EXT_FW_INTERFACE",
 	"LOAD_FLASH_FW",
 	"DUMP_MAILBOX_TIMEOUT",
@@ -126,8 +126,7 @@ int8_t *adapter_config_flags[] = {
 	"ENABLE_FWEXTTRACE",
 	"ENABLE_FWFCETRACE",
 	"FW_MISMATCH",
-	"CTRL_MENLO",
-	"DISABLE_EXTENDED_LOGGING_TRACE",
+	"CTRL_81XX",
 	NULL
 };
 
@@ -164,6 +163,8 @@ int8_t *task_daemon_flags[] = {
 	"PORT_RETRY_NEEDED",
 	"TASK_DAEMON_POWERING_DOWN",
 	"TD_IIDMA_NEEDED",
+	"SEND_PLOGI",
+	"IDC_ACK_NEEDED",
 	NULL
 };
 
@@ -172,8 +173,9 @@ int8_t *task_daemon_flags[] = {
  */
 int8_t *aif_flags[] = {
 	"IFLG_INTR_LEGACY",
-	"IFLG_INTR_MSI",
 	"IFLG_INTR_FIXED",
+	"IFLG_INTR_MSI",
+	"IFLG_INTR_MSIX",
 	NULL
 };
 
@@ -208,7 +210,6 @@ int8_t *qllun_flags[] = {
 	"LQF_UNTAGGED_PENDING",
 	NULL
 };
-
 
 int8_t *qltgt_flags[] = {
 	"TQF_TAPE_DEVICE",
@@ -574,7 +575,6 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-
 	if ((strcasecmp(argv[1].a_un.a_str, "all")) == 0) {
 
 		if (argc != 2) {
@@ -740,7 +740,6 @@ qlc_osc_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	qlosc = (uintptr_t)qlstate->outstanding_cmds;
 	mdb_printf("qlc instance: %d, base addr = %llx, osc base = %p\n",
 	    qlstate->instance, qlstate->hba.base_address, qlosc);
-
 
 	if ((qlsrb = (ql_srb_t *)mdb_alloc(sizeof (ql_srb_t), UM_SLEEP)) ==
 	    NULL) {
@@ -1065,7 +1064,6 @@ get_next_link(ql_link_t *qllink)
 	}
 	return (rval);
 }
-
 
 /*
  * qlcstate_dcmd
@@ -1704,8 +1702,6 @@ qlc_triggerdump_dcmd(uintptr_t addr, uint_t flags, int argc,
 		mdb_free(qlstate, qlsize);
 		return (DCMD_OK);
 	}
-
-
 }
 #endif
 
@@ -1817,7 +1813,7 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (CFG_IST(ha, CFG_CTRL_2422)) {
 		(void) ql_24xx_dump_dcmd(ha, flags, argc, argv);
-	} else if (CFG_IST(ha, CFG_CTRL_25XX))  {
+	} else if (CFG_IST(ha, CFG_CTRL_2581))  {
 		(void) ql_25xx_dump_dcmd(ha, flags, argc, argv);
 	} else {
 		(void) ql_23xx_dump_dcmd(ha, flags, argc, argv);
