@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MAC_ETHER_H
 #define	_SYS_MAC_ETHER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Ethernet MAC Plugin
@@ -103,9 +101,13 @@ enum ether_stat {
 	ETHER_STAT_CAP_100T4,
 	ETHER_STAT_ADV_CAP_100T4,
 	ETHER_STAT_LP_CAP_100T4,
+
+	ETHER_STAT_CAP_10GFDX,
+	ETHER_STAT_ADV_CAP_10GFDX,
+	ETHER_STAT_LP_CAP_10GFDX,
 };
 
-#define	ETHER_NSTAT	(ETHER_STAT_LP_CAP_100T4 - ETHER_STAT_ALIGN_ERRORS + 1)
+#define	ETHER_NSTAT	(ETHER_STAT_LP_CAP_10GFDX - ETHER_STAT_ALIGN_ERRORS + 1)
 
 #define	ETHER_STAT_ISACOUNTER(_ether_stat)				\
 	    ((_ether_stat) == ETHER_STAT_ALIGN_ERRORS ||		\

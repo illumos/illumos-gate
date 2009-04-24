@@ -241,6 +241,10 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_AUTOPUSH,	sizeof (struct dlautopush), "autopush"},
 
+	{ MAC_PROP_ADV_10GFDX_CAP, sizeof (uint8_t),	"adv_10gfdx_cap"},
+
+	{ MAC_PROP_EN_10GFDX_CAP, sizeof (uint8_t),	"en_10gfdx_cap"},
+
 	{ MAC_PROP_ADV_1000FDX_CAP, sizeof (uint8_t),	"adv_1000fdx_cap"},
 
 	{ MAC_PROP_EN_1000FDX_CAP, sizeof (uint8_t),	"en_1000fdx_cap"},
@@ -424,6 +428,16 @@ static prop_desc_t	prop_table[] = {
 	{ "flowctrl", { "", 0 },
 	    link_flow_vals, VALCNT(link_flow_vals),
 	    i_dladm_set_public_prop, NULL, i_dladm_flowctl_get, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "adv_10gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, i_dladm_binary_get, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_10gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_1000fdx_cap", { "", 0 },

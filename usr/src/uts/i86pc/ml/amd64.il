@@ -177,28 +177,3 @@
 	xorl	%eax, %eax
 	bsrw	%di, %ax
 	.end
-
-/*
- * prefetch 64 bytes
- */
-
- 	.inline	prefetch_read_many,8
-	prefetcht0	(%rdi)
-	prefetcht0	32(%rdi)
-	.end
-
- 	.inline	prefetch_read_once,8
-	prefetchnta	(%rdi)
-	prefetchnta	32(%rdi)
-	.end
-
- 	.inline	prefetch_write_many,8
-	prefetcht0	(%rdi)
-	prefetcht0	32(%rdi)
-	.end
-
- 	.inline	prefetch_write_once,8
-	prefetcht0	(%rdi)
-	prefetcht0	32(%rdi)
-	.end
-

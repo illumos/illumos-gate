@@ -34,7 +34,8 @@ extern "C" {
 
 #if defined(__i386) || defined(__amd64)
 
-extern __inline__ void ht_pause(void)
+extern __inline__ void
+ht_pause(void)
 {
 	__asm__ __volatile__(
 	    "pause");
@@ -47,7 +48,8 @@ extern __inline__ void ht_pause(void)
  * older 32-bit processors, so define this as a no-op for now
  */
 
-extern __inline__ void prefetch_read_many(void *addr)
+extern __inline__ void
+prefetch_read_many(void *addr)
 {
 #if defined(__amd64)
 	__asm__(
@@ -58,7 +60,8 @@ extern __inline__ void prefetch_read_many(void *addr)
 #endif	/* __amd64 */
 }
 
-extern __inline__ void prefetch_read_once(void *addr)
+extern __inline__ void
+prefetch_read_once(void *addr)
 {
 #if defined(__amd64)
 	__asm__(
@@ -69,7 +72,8 @@ extern __inline__ void prefetch_read_once(void *addr)
 #endif	/* __amd64 */
 }
 
-extern __inline__ void prefetch_write_many(void *addr)
+extern __inline__ void
+prefetch_write_many(void *addr)
 {
 #if defined(__amd64)
 	__asm__(
@@ -80,7 +84,8 @@ extern __inline__ void prefetch_write_many(void *addr)
 #endif	/* __amd64 */
 }
 
-extern __inline__ void prefetch_write_once(void *addr)
+extern __inline__ void
+prefetch_write_once(void *addr)
 {
 #if defined(__amd64)
 	__asm__(
@@ -93,19 +98,22 @@ extern __inline__ void prefetch_write_once(void *addr)
 
 #if !defined(__xpv)
 
-extern __inline__ void cli(void)
+extern __inline__ void
+cli(void)
 {
 	__asm__ __volatile__(
 	    "cli" : : : "memory");
 }
 
-extern __inline__ void sti(void)
+extern __inline__ void
+sti(void)
 {
 	__asm__ __volatile__(
 	    "sti");
 }
 
-extern __inline__ void i86_halt(void)
+extern __inline__ void
+i86_halt(void)
 {
 	__asm__ __volatile__(
 	    "sti; hlt");
@@ -117,7 +125,8 @@ extern __inline__ void i86_halt(void)
 
 #if defined(__amd64)
 
-extern __inline__ void __set_ds(selector_t value)
+extern __inline__ void
+__set_ds(selector_t value)
 {
 	__asm__ __volatile__(
 	    "movw	%0, %%ds"
@@ -125,7 +134,8 @@ extern __inline__ void __set_ds(selector_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void __set_es(selector_t value)
+extern __inline__ void
+__set_es(selector_t value)
 {
 	__asm__ __volatile__(
 	    "movw	%0, %%es"
@@ -133,7 +143,8 @@ extern __inline__ void __set_es(selector_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void __set_fs(selector_t value)
+extern __inline__ void
+__set_fs(selector_t value)
 {
 	__asm__ __volatile__(
 	    "movw	%0, %%fs"
@@ -141,7 +152,8 @@ extern __inline__ void __set_fs(selector_t value)
 	    : "r" (value));
 }
 
-extern __inline__ void __set_gs(selector_t value)
+extern __inline__ void
+__set_gs(selector_t value)
 {
 	__asm__ __volatile__(
 	    "movw	%0, %%gs"
@@ -151,7 +163,8 @@ extern __inline__ void __set_gs(selector_t value)
 
 #if !defined(__xpv)
 
-extern __inline__ void __swapgs(void)
+extern __inline__ void
+__swapgs(void)
 {
 	__asm__ __volatile__(
 	    "mfence; swapgs");

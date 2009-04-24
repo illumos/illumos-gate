@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -59,6 +57,9 @@ static i_softmac_stat_info_t	i_softmac_driver_si[] = {
 	{ MAC_STAT_UNDERFLOWS,	"uflo",		NULL		},
 	{ MAC_STAT_OVERFLOWS,	"oflo",		NULL		}
 };
+
+#define	SOFTMAC_DRIVER_SI_SZ						\
+	(sizeof (i_softmac_driver_si) / sizeof (i_softmac_driver_si[0]))
 
 /*
  * Must be the same order as ether_stat.
@@ -128,8 +129,15 @@ static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 	{ ETHER_STAT_JABBER_ERRORS,	"jabber_errors",	NULL },
 	{ ETHER_STAT_CAP_100T4,		"cap_100T4",		NULL },
 	{ ETHER_STAT_ADV_CAP_100T4,	"adv_cap_100T4",	NULL },
-	{ ETHER_STAT_LP_CAP_100T4,	"lp_cap_100T4", 	NULL }
+	{ ETHER_STAT_LP_CAP_100T4,	"lp_cap_100T4", 	NULL },
+
+	{ ETHER_STAT_CAP_10GFDX,	"cap_10gfdx",		NULL },
+	{ ETHER_STAT_ADV_CAP_10GFDX,	"adv_cap_10gfdx",	NULL },
+	{ ETHER_STAT_LP_CAP_1000FDX,	"lp_cap_10gfdx",	NULL }
 };
+
+#define	SOFTMAC_ETHER_SI_SZ						\
+	(sizeof (i_softmac_ether_si) / sizeof (i_softmac_ether_si[0]))
 
 static kstat_t	*softmac_hold_dev_kstat(softmac_t *);
 static void	softmac_rele_dev_kstat(kstat_t *);
@@ -241,24 +249,49 @@ softmac_m_stat(void *arg, uint_t stat, uint64_t *val)
 		return (ENOTSUP);
 
 	if (IS_MAC_STAT(stat)) {
-		index = stat - MAC_STAT_MIN;
-		if ((ret = softmac_get_kstat(ksp,
-		    i_softmac_driver_si[index].ssi_name, val)) != 0) {
-			ret = softmac_get_kstat(ksp,
-			    i_softmac_driver_si[index].ssi_alias, val);
+		i_softmac_stat_info_t *ssip = NULL;
+
+		for (index = 0; index < SOFTMAC_DRIVER_SI_SZ; index++) {
+			if (stat == i_softmac_driver_si[index].ssi_stat) {
+				ssip = &i_softmac_driver_si[index];
+				break;
+			}
+		}
+
+		if (ssip == NULL) {
+			ret = ENOTSUP;
+		} else {
+			if ((ret = softmac_get_kstat(ksp, ssip->ssi_name,
+			    val)) != 0)
+				ret = softmac_get_kstat(ksp, ssip->ssi_alias,
+				    val);
 		}
 	} else {
 		ASSERT(IS_MACTYPE_STAT(stat));
-		index = stat - MACTYPE_STAT_MIN;
 
 		switch (softmac->smac_media) {
-		case DL_ETHER:
-			if ((ret = softmac_get_kstat(ksp,
-			    i_softmac_ether_si[index].ssi_name, val)) != 0) {
-				ret = softmac_get_kstat(ksp,
-				    i_softmac_ether_si[index].ssi_alias, val);
+		case DL_ETHER: {
+			i_softmac_stat_info_t *ssip = NULL;
+
+			for (index = 0; index < SOFTMAC_ETHER_SI_SZ; index++) {
+				if (stat ==
+				    i_softmac_ether_si[index].ssi_stat) {
+					ssip = &i_softmac_ether_si[index];
+					break;
+				}
 			}
+
+			if (ssip == NULL) {
+				ret = ENOTSUP;
+			} else {
+				if ((ret = softmac_get_kstat(ksp,
+				    ssip->ssi_name, val)) != 0)
+					ret = softmac_get_kstat(ksp,
+					    ssip->ssi_alias, val);
+			}
+
 			break;
+		}
 		default:
 			ret = ENOTSUP;
 			break;
