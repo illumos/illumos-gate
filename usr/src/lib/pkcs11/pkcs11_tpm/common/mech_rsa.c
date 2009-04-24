@@ -26,6 +26,15 @@
 
 #include "tpmtok_int.h"
 
+extern CK_RV
+token_specific_rsa_verify_recover(
+	TSS_HCONTEXT    hContext,
+	CK_BYTE		*in_data,
+	CK_ULONG	in_data_len,
+	CK_BYTE		*out_data,
+	CK_ULONG	*out_data_len,
+	OBJECT		*key_obj);
+
 CK_RV
 ckm_rsa_key_pair_gen(TSS_HCONTEXT hContext,
 	TEMPLATE  * publ_tmpl,
@@ -117,12 +126,10 @@ ckm_rsa_sign(
 	rc = template_attribute_find(key_obj->template, CKA_CLASS, &attr);
 	if (rc == FALSE) {
 		return (CKR_FUNCTION_FAILED);
-	}
-	else
+	} else {
 		keyclass = *(CK_OBJECT_CLASS *)attr->pValue;
+	}
 
-	// this had better be a private key
-	//
 	if (keyclass != CKO_PRIVATE_KEY) {
 		return (CKR_FUNCTION_FAILED);
 	}
@@ -171,7 +178,8 @@ rsa_pkcs_encrypt(SESSION	   *sess,
 	CK_BYTE	   *in_data,
 	CK_ULONG	   in_data_len,
 	CK_BYTE	   *out_data,
-	CK_ULONG	  *out_data_len) {
+	CK_ULONG	  *out_data_len)
+{
 	OBJECT	  *key_obj  = NULL;
 	CK_ATTRIBUTE    *attr	= NULL;
 	CK_ULONG	 modulus_bytes;
@@ -186,21 +194,17 @@ rsa_pkcs_encrypt(SESSION	   *sess,
 	flag = template_attribute_find(key_obj->template, CKA_MODULUS, &attr);
 	if (flag == FALSE) {
 		return (CKR_FUNCTION_FAILED);
-	}
-	else
+	} else {
 		modulus_bytes = attr->ulValueLen;
-
-	if (in_data_len > (modulus_bytes - 11)) {
-		return (CKR_DATA_LEN_RANGE);
 	}
 
 	if (length_only == TRUE) {
-		 *out_data_len = modulus_bytes;
+		*out_data_len = modulus_bytes;
 		return (CKR_OK);
 	}
 
 	if (*out_data_len < modulus_bytes) {
-		 *out_data_len = modulus_bytes;
+		*out_data_len = modulus_bytes;
 		return (CKR_BUFFER_TOO_SMALL);
 	}
 
@@ -283,9 +287,6 @@ rsa_pkcs_sign(SESSION		*sess,
 	else
 		modulus_bytes = attr->ulValueLen;
 
-	if (in_data_len > modulus_bytes - 11) {
-		return (CKR_DATA_LEN_RANGE);
-	}
 	if (length_only == TRUE) {
 		*out_data_len = modulus_bytes;
 		return (CKR_OK);
@@ -341,19 +342,19 @@ rsa_pkcs_verify(SESSION		* sess,
 }
 
 CK_RV
-rsa_pkcs_verify_recover(SESSION		* sess,
-	CK_BBOOL		length_only,
-	SIGN_VERIFY_CONTEXT * ctx,
-	CK_BYTE		* signature,
-	CK_ULONG		sig_len,
-	CK_BYTE		* out_data,
-	CK_ULONG	    * out_data_len)
+rsa_pkcs_verify_recover(SESSION	*sess,
+	CK_BBOOL	length_only,
+	SIGN_VERIFY_CONTEXT	*ctx,
+	CK_BYTE		*signature,
+	CK_ULONG	sig_len,
+	CK_BYTE		*out_data,
+	CK_ULONG	*out_data_len)
 {
-	OBJECT	  *key_obj  = NULL;
-	CK_ATTRIBUTE    *attr	= NULL;
-	CK_ULONG	 modulus_bytes;
-	CK_BBOOL	 flag;
-	CK_RV	    rc;
+	OBJECT		*key_obj  = NULL;
+	CK_ATTRIBUTE	*attr	= NULL;
+	CK_ULONG	modulus_bytes;
+	CK_BBOOL	flag;
+	CK_RV		rc;
 
 	if (! sess || ! ctx || ! out_data_len) {
 		return (CKR_FUNCTION_FAILED);
@@ -377,8 +378,8 @@ rsa_pkcs_verify_recover(SESSION		* sess,
 		return (CKR_OK);
 	}
 
-	rc = ckm_rsa_encrypt(sess->hContext, signature, modulus_bytes, out_data,
-	    out_data_len, key_obj);
+	rc = token_specific_rsa_verify_recover(sess->hContext,
+	    signature, modulus_bytes, out_data, out_data_len, key_obj);
 
 	return (rc);
 }

@@ -216,14 +216,16 @@ SC_Finalize(void *argptr)
 
 	initialized = FALSE;
 
+	if (token_specific.t_final != NULL) {
+		token_specific.t_final(hContext);
+	}
+
 	(void) session_mgr_close_all_sessions();
 	(void) object_mgr_purge_token_objects(hContext);
+
 	(void) Tspi_Context_Close(hContext);
 
 	(void) detach_shm();
-	if (token_specific.t_final != NULL) {
-		token_specific.t_final();
-	}
 
 	rc = pthread_mutex_unlock(&pkcs_mutex);
 	if (rc != CKR_OK) {
@@ -602,6 +604,10 @@ SC_CloseSession(ST_SESSION_HANDLE  sSession)
 		goto done;
 	}
 
+	if (token_specific.t_final != NULL) {
+		token_specific.t_final(sess->hContext);
+	}
+
 	rc = session_mgr_close_session(sess);
 
 done:
@@ -751,9 +757,14 @@ SC_Login(ST_SESSION_HANDLE   sSession,
 	}
 	flags = &nv_token_data->token_info.flags;
 
-	if (! pPin || ulPinLen > MAX_PIN_LEN) {
+	if (pPin == NULL) {
 		set_login_flags(userType, flags);
-		rc = CKR_PIN_INCORRECT;
+		rc = CKR_ARGUMENTS_BAD;
+		goto done;
+	}
+	if (ulPinLen < MIN_PIN_LEN || ulPinLen > MAX_PIN_LEN) {
+		set_login_flags(userType, flags);
+		rc = CKR_PIN_LEN_RANGE;
 		goto done;
 	}
 
@@ -768,8 +779,7 @@ SC_Login(ST_SESSION_HANDLE   sSession,
 		if (session_mgr_user_session_exists()) {
 			rc = CKR_USER_ALREADY_LOGGED_IN;
 		}
-		} else if (userType == CKU_SO) {
-
+	} else if (userType == CKU_SO) {
 		if (session_mgr_user_session_exists()) {
 			rc = CKR_USER_ANOTHER_ALREADY_LOGGED_IN;
 		}
@@ -880,7 +890,6 @@ SC_CreateObject(ST_SESSION_HANDLE    sSession,
 		rc = CKR_PIN_EXPIRED;
 		goto done;
 	}
-
 	rc = object_mgr_add(sess, pTemplate, ulCount, phObject);
 
 done:
@@ -1219,17 +1228,16 @@ SC_Encrypt(ST_SESSION_HANDLE  sSession,
 		goto done;
 	}
 
-	if (! pData || ! pulEncryptedDataLen) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
 		goto done;
 	}
 
+	if (! pData || ! pulEncryptedDataLen) {
+		rc = CKR_ARGUMENTS_BAD;
+		goto done;
+	}
 	if (sess->encr_ctx.active == FALSE) {
 		rc = CKR_OPERATION_NOT_INITIALIZED;
 		goto done;
@@ -1402,18 +1410,15 @@ SC_Decrypt(ST_SESSION_HANDLE  sSession,
 		rc = CKR_CRYPTOKI_NOT_INITIALIZED;
 		goto done;
 	}
-
-	if (! pEncryptedData || ! pulDataLen) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
 		goto done;
 	}
-
+	if (! pEncryptedData || ! pulDataLen) {
+		rc = CKR_ARGUMENTS_BAD;
+		goto done;
+	}
 	if (sess->decr_ctx.active == FALSE) {
 		rc = CKR_OPERATION_NOT_INITIALIZED;
 		goto done;
@@ -1422,10 +1427,13 @@ SC_Decrypt(ST_SESSION_HANDLE  sSession,
 	if (! pData)
 		length_only = TRUE;
 
-	rc = decr_mgr_decrypt(sess,	   length_only,
+	rc = decr_mgr_decrypt(sess,
+	    length_only,
 	    &sess->decr_ctx,
-	    pEncryptedData, ulEncryptedDataLen,
-	    pData,	  pulDataLen);
+	    pEncryptedData,
+	    ulEncryptedDataLen,
+	    pData,
+	    pulDataLen);
 
 done:
 	if (rc != CKR_BUFFER_TOO_SMALL && (rc != CKR_OK || length_only != TRUE))
@@ -1493,17 +1501,14 @@ SC_Digest(ST_SESSION_HANDLE  sSession,
 		goto done;
 	}
 
-	// Netscape has been known to pass a null pData to DigestUpdate
-	// but never for Digest.  It doesn't really make sense to allow it here
-	//
-	if (! pData || ! pulDigestLen) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
+		goto done;
+	}
+
+	if (! pData || ! pulDigestLen) {
+		rc = CKR_ARGUMENTS_BAD;
 		goto done;
 	}
 
@@ -1704,14 +1709,13 @@ SC_Sign(ST_SESSION_HANDLE  sSession,
 		goto done;
 	}
 
-	if (! pData || ! pulSignatureLen) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
+		goto done;
+	}
+	if (!pData || !pulSignatureLen) {
+		rc = CKR_ARGUMENTS_BAD;
 		goto done;
 	}
 
@@ -1876,17 +1880,15 @@ SC_SignRecover(ST_SESSION_HANDLE  sSession,
 		goto done;
 	}
 
-	if (! pData || ! pulSignatureLen) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
 		goto done;
 	}
-
+	if (!pData || !pulSignatureLen) {
+		rc = CKR_ARGUMENTS_BAD;
+		goto done;
+	}
 	if ((sess->sign_ctx.active == FALSE) ||
 	    (sess->sign_ctx.recover == FALSE)) {
 		rc = CKR_OPERATION_NOT_INITIALIZED;
@@ -1964,18 +1966,16 @@ SC_Verify(ST_SESSION_HANDLE  sSession,
 		rc = CKR_CRYPTOKI_NOT_INITIALIZED;
 		goto done;
 	}
-
-	if (! pData || ! pSignature) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
 		goto done;
 	}
 
+	if (! pData || ! pSignature) {
+		rc = CKR_ARGUMENTS_BAD;
+		goto done;
+	}
 	if (sess->verify_ctx.active == FALSE) {
 		rc = CKR_OPERATION_NOT_INITIALIZED;
 		goto done;
@@ -2128,14 +2128,13 @@ SC_VerifyRecover(ST_SESSION_HANDLE  sSession,
 		goto done;
 	}
 
-	if (! pSignature || ! pulDataLen) {
-		rc = CKR_ARGUMENTS_BAD;
-		goto done;
-	}
-
 	sess = session_mgr_find(hSession);
 	if (! sess) {
 		rc = CKR_SESSION_HANDLE_INVALID;
+		goto done;
+	}
+	if (!pSignature || !pulDataLen) {
+		rc = CKR_ARGUMENTS_BAD;
 		goto done;
 	}
 
@@ -2308,6 +2307,9 @@ SC_SeedRandom(ST_SESSION_HANDLE  sSession,
 	if (st_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
+	if (pSeed == NULL || ulSeedLen == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
 	return (CKR_OK);
 }
 

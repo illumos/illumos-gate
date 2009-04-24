@@ -36,7 +36,6 @@ verify_mgr_init(SESSION		* sess,
 {
 	OBJECT	  * key_obj = NULL;
 	CK_ATTRIBUTE    * attr    = NULL;
-	CK_BYTE	 * ptr	= NULL;
 	CK_KEY_TYPE	keytype;
 	CK_OBJECT_CLASS   class;
 	CK_BBOOL	  flag;
@@ -71,9 +70,6 @@ verify_mgr_init(SESSION		* sess,
 	switch (mech->mechanism) {
 		case CKM_RSA_PKCS:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			rc = template_attribute_find(key_obj->template,
 			    CKA_KEY_TYPE, &attr);
 			if (rc == FALSE) {
@@ -105,9 +101,6 @@ verify_mgr_init(SESSION		* sess,
 		case CKM_MD5_RSA_PKCS:
 		case CKM_SHA1_RSA_PKCS:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			rc = template_attribute_find(key_obj->template,
 			    CKA_KEY_TYPE, &attr);
 			if (rc == FALSE) {
@@ -144,9 +137,6 @@ verify_mgr_init(SESSION		* sess,
 		case CKM_MD5_HMAC:
 		case CKM_SHA_1_HMAC:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			rc = template_attribute_find(key_obj->template,
 			    CKA_KEY_TYPE, &attr);
 			if (rc == FALSE) {
@@ -203,18 +193,10 @@ verify_mgr_init(SESSION		* sess,
 	}
 
 
-	if (mech->ulParameterLen > 0) {
-		ptr = (CK_BYTE *)malloc(mech->ulParameterLen);
-		if (! ptr) {
-			return (CKR_HOST_MEMORY);
-		}
-		(void) memcpy(ptr, mech->pParameter, mech->ulParameterLen);
-	}
-
 	ctx->key		 = key;
 	ctx->mech.ulParameterLen = mech->ulParameterLen;
 	ctx->mech.mechanism	= mech->mechanism;
-	ctx->mech.pParameter	= ptr;
+	ctx->mech.pParameter	= mech->pParameter;
 	ctx->multi		= FALSE;
 	ctx->active		= TRUE;
 	ctx->recover		= recover_mode;
@@ -235,11 +217,7 @@ verify_mgr_cleanup(SIGN_VERIFY_CONTEXT *ctx)
 	ctx->active		= FALSE;
 	ctx->recover		= FALSE;
 	ctx->context_len	 = 0;
-
-	if (ctx->mech.pParameter) {
-		free(ctx->mech.pParameter);
-		ctx->mech.pParameter = NULL;
-	}
+	ctx->mech.pParameter = NULL;
 
 	if (ctx->context) {
 		free(ctx->context);

@@ -34,6 +34,8 @@
 #include <pwd.h>
 #include <syslog.h>
 
+#include <openssl/rsa.h>
+
 #include <tss/platform.h>
 #include <tss/tss_defines.h>
 #include <tss/tss_typedef.h>
@@ -46,12 +48,14 @@
 #include "tpmtok_int.h"
 #include "tpmtok_defs.h"
 
+#define	MAX_RSA_KEYLENGTH 512
+
 extern void stlogit(char *fmt, ...);
 
 CK_RV token_rng(TSS_HCONTEXT, CK_BYTE *,  CK_ULONG);
 int tok_slot2local(CK_SLOT_ID);
 CK_RV token_specific_session(CK_SLOT_ID);
-CK_RV token_specific_final(void);
+CK_RV token_specific_final(TSS_HCONTEXT);
 
 CK_RV
 token_specific_rsa_decrypt(
@@ -151,11 +155,6 @@ TSS_UUID privateLeafKeyUUID;
 TSS_HPOLICY hDefaultPolicy = NULL_HPOLICY;
 
 /* PKCS#11 key handles */
-CK_OBJECT_HANDLE ckPublicRootKey = 0;
-CK_OBJECT_HANDLE ckPublicLeafKey = 0;
-CK_OBJECT_HANDLE ckPrivateRootKey = 0;
-CK_OBJECT_HANDLE ckPrivateLeafKey = 0;
-
 int not_initialized = 0;
 
 CK_BYTE current_user_pin_sha[SHA1_DIGEST_LENGTH];
@@ -165,6 +164,12 @@ static TPM_CAP_VERSION_INFO tpmvinfo;
 
 static CK_RV
 verify_user_pin(TSS_HCONTEXT, CK_BYTE *);
+
+static TSS_RESULT
+tss_assign_secret_key_policy(TSS_HCONTEXT, TSS_FLAG, TSS_HKEY, CK_CHAR *);
+
+static TSS_RESULT
+set_legacy_key_params(TSS_HKEY);
 
 static void
 local_uuid_clear(TSS_UUID *uuid)
@@ -663,49 +668,6 @@ token_specific_init(char *Correlator, CK_SLOT_ID SlotNumber,
 }
 
 /*
- * Try to find the opaque key blob data for a token object.
- */
-static CK_RV
-token_get_key_blob(CK_OBJECT_HANDLE ckKey, CK_ULONG *blob_size,
-	CK_BYTE **ret_blob)
-{
-	CK_RV rc = CKR_OK;
-	CK_BYTE_PTR blob = NULL;
-	CK_ATTRIBUTE tmpl[] = {
-		{CKA_IBM_OPAQUE, NULL_PTR, 0}
-	};
-	SESSION dummy_sess;
-
-	/* set up dummy session */
-	(void) memset(&dummy_sess, 0, sizeof (SESSION));
-	dummy_sess.session_info.state = CKS_RO_USER_FUNCTIONS;
-
-	/* find object the first time to return the size of the buffer needed */
-	if ((rc = object_mgr_get_attribute_values(&dummy_sess, ckKey,
-	    tmpl, 1))) {
-		return (rc);
-	}
-
-	blob = malloc(tmpl[0].ulValueLen);
-	if (blob == NULL) {
-		rc = CKR_HOST_MEMORY;
-		return (rc);
-	}
-
-	tmpl[0].pValue = blob;
-	/* find object the 2nd time to fill the buffer with data */
-	if ((rc = object_mgr_get_attribute_values(&dummy_sess, ckKey,
-	    tmpl, 1))) {
-		return (rc);
-	}
-
-	*ret_blob = blob;
-	*blob_size = tmpl[0].ulValueLen;
-done:
-	return (rc);
-}
-
-/*
  * Given a modulus and prime from an RSA key, create a TSS_HKEY object by
  * wrapping the RSA key with a key from the TPM (SRK or other previously stored
  * key).
@@ -722,7 +684,6 @@ token_wrap_sw_key(
 	TSS_HKEY *phKey)
 {
 	TSS_RESULT result;
-	TSS_HPOLICY hPolicy;
 	UINT32 key_size;
 
 	key_size = util_get_keysize_flag(size_n * 8);
@@ -757,35 +718,8 @@ token_wrap_sw_key(
 		return (CKR_FUNCTION_FAILED);
 	}
 
-	result = Tspi_Context_CreateObject(hContext,
-	    TSS_OBJECT_TYPE_POLICY, TSS_POLICY_MIGRATION, &hPolicy);
-	if (result != TSS_SUCCESS) {
-		stlogit("Tspi_Context_CreateObject: 0x%0x - %s",
-		    result, Trspi_Error_String(result));
-		Tspi_Context_CloseObject(hContext, *phKey);
-		*phKey = NULL_HKEY;
-		return (CKR_FUNCTION_FAILED);
-	}
-
-	result = Tspi_Policy_AssignToObject(hPolicy, *phKey);
-	if (result != TSS_SUCCESS) {
-		stlogit("Tspi_Policy_AssignToObject: 0x%0x - %s\n",
-		    result, Trspi_Error_String(result));
-		Tspi_Context_CloseObject(hContext, *phKey);
-		Tspi_Context_CloseObject(hContext, hPolicy);
-		*phKey = NULL_HKEY;
-		return (CKR_FUNCTION_FAILED);
-	}
-
-	result = Tspi_Policy_SetSecret(hPolicy, TSS_SECRET_MODE_NONE, 0, NULL);
-	if (result != TSS_SUCCESS) {
-		stlogit("Tspi_Policy_SetSecret: 0x%0x - %s\n",
-		    result, Trspi_Error_String(result));
-		Tspi_Context_CloseObject(hContext, *phKey);
-		Tspi_Context_CloseObject(hContext, hPolicy);
-		*phKey = NULL_HKEY;
-		return (CKR_FUNCTION_FAILED);
-	}
+	result = tss_assign_secret_key_policy(hContext, TSS_POLICY_MIGRATION,
+	    *phKey, NULL);
 
 	if (TPMTOK_TSS_KEY_TYPE(initFlags) == TSS_KEY_TYPE_LEGACY) {
 		if ((result = Tspi_SetAttribUint32(*phKey,
@@ -794,7 +728,6 @@ token_wrap_sw_key(
 			stlogit("Tspi_SetAttribUint32: 0x%0x - %s\n",
 			    result, Trspi_Error_String(result));
 			Tspi_Context_CloseObject(hContext, *phKey);
-			Tspi_Context_CloseObject(hContext, hPolicy);
 			return (CKR_FUNCTION_FAILED);
 		}
 
@@ -804,7 +737,6 @@ token_wrap_sw_key(
 			stlogit("Tspi_SetAttribUint32: 0x%0x - %s\n",
 			    result, Trspi_Error_String(result));
 			Tspi_Context_CloseObject(hContext, *phKey);
-			Tspi_Context_CloseObject(hContext, hPolicy);
 			return (CKR_FUNCTION_FAILED);
 		}
 	}
@@ -926,8 +858,8 @@ token_wrap_key_object(TSS_HCONTEXT hContext,
 			return (CKR_TEMPLATE_INCONSISTENT);
 		}
 
-		initFlags |= TSS_KEY_TYPE_LEGACY | TSS_KEY_MIGRATABLE |
-		    TSS_KEY_NO_AUTHORIZATION;
+		initFlags |= TSS_KEY_MIGRATABLE | TSS_KEY_NO_AUTHORIZATION |
+		    TSS_KEY_TYPE_LEGACY;
 
 		if ((result = Tspi_Context_CreateObject(hContext,
 		    TSS_OBJECT_TYPE_RSAKEY, initFlags, phKey))) {
@@ -938,6 +870,20 @@ token_wrap_key_object(TSS_HCONTEXT hContext,
 
 		if ((result = set_public_modulus(hContext, *phKey,
 		    attr->ulValueLen, attr->pValue))) {
+			Tspi_Context_CloseObject(hContext, *phKey);
+			*phKey = NULL_HKEY;
+			return (CKR_FUNCTION_FAILED);
+		}
+		result = tss_assign_secret_key_policy(hContext,
+		    TSS_POLICY_MIGRATION, *phKey, NULL);
+		if (result) {
+			Tspi_Context_CloseObject(hContext, *phKey);
+			*phKey = NULL_HKEY;
+			return (CKR_FUNCTION_FAILED);
+		}
+
+		result = set_legacy_key_params(*phKey);
+		if (result) {
 			Tspi_Context_CloseObject(hContext, *phKey);
 			*phKey = NULL_HKEY;
 			return (CKR_FUNCTION_FAILED);
@@ -975,14 +921,14 @@ token_wrap_key_object(TSS_HCONTEXT hContext,
 }
 
 static TSS_RESULT
-tss_assign_secret_key_policy(TSS_HCONTEXT hContext, TSS_HKEY hKey,
-    CK_CHAR *passHash)
+tss_assign_secret_key_policy(TSS_HCONTEXT hContext, TSS_FLAG policyType,
+    TSS_HKEY hKey, CK_CHAR *passHash)
 {
 	TSS_RESULT result;
 	TSS_HPOLICY hPolicy;
 
 	if ((result = Tspi_Context_CreateObject(hContext,
-	    TSS_OBJECT_TYPE_POLICY, TSS_POLICY_USAGE, &hPolicy))) {
+	    TSS_OBJECT_TYPE_POLICY, policyType, &hPolicy))) {
 		stlogit("Tspi_Context_CreateObject: 0x%0x - %s",
 		    result, Trspi_Error_String(result));
 		return (result);
@@ -1023,42 +969,26 @@ token_load_key(
 	TSS_HKEY *phKey)
 {
 	TSS_RESULT result;
-	CK_BYTE *blob = NULL;
-	CK_ULONG ulBlobSize = 0;
 	CK_RV rc;
 
-	if ((rc = token_get_key_blob(ckKey, &ulBlobSize, &blob))) {
-		if (rc != CKR_ATTRIBUTE_TYPE_INVALID) {
-			return (rc);
-		}
-		/*
-		 * The key blob wasn't found, load the parts of the key
-		 * from the object DB and create a new key object that
-		 * gets loaded into the TPM, wrapped with the parent key.
-		 */
-		if ((rc = token_wrap_key_object(hContext, ckKey,
-		    hParentKey, phKey))) {
-			return (rc);
-		}
+	/*
+	 * The key blob wasn't found, load the parts of the key
+	 * from the object DB and create a new key object that
+	 * gets loaded into the TPM, wrapped with the parent key.
+	 */
+	if ((rc = token_wrap_key_object(hContext, ckKey,
+	    hParentKey, phKey))) {
+		return (rc);
 	}
 
-	if (blob != NULL) {
-		/* load the key into the TPM, wrapped with parent key */
-		if ((result = Tspi_Context_LoadKeyByBlob(hContext,
-		    hParentKey, ulBlobSize, blob, phKey))) {
-			stlogit("Tspi_Context_LoadKeyByBlob: 0x%x - %s",
-			    result, Trspi_Error_String(result));
-			goto done;
-		}
-	}
 	/*
 	 * Assign the PIN hash (optional) to the newly loaded key object,
 	 * if this PIN is incorrect, the TPM will not be able to decrypt
 	 * the private key and use it.
 	 */
-	result = tss_assign_secret_key_policy(hContext, *phKey, passHash);
-done:
-	free(blob);
+	result = tss_assign_secret_key_policy(hContext, TSS_POLICY_USAGE,
+	    *phKey, passHash);
+
 	return (result);
 }
 
@@ -1129,8 +1059,8 @@ tss_find_and_load_key(TSS_HCONTEXT hContext,
 	}
 
 	if (hash != NULL) {
-		result = tss_assign_secret_key_policy(hContext, *hKey,
-		    (CK_BYTE *)hash);
+		result = tss_assign_secret_key_policy(hContext,
+		    TSS_POLICY_USAGE, *hKey, (CK_BYTE *)hash);
 		if (result)
 			return (result);
 	}
@@ -1166,6 +1096,32 @@ token_load_public_root_key(TSS_HCONTEXT hContext)
 }
 
 static TSS_RESULT
+set_legacy_key_params(TSS_HKEY hKey)
+{
+	TSS_RESULT result;
+
+	if ((result = Tspi_SetAttribUint32(hKey,
+	    TSS_TSPATTRIB_KEY_INFO,
+	    TSS_TSPATTRIB_KEYINFO_ENCSCHEME,
+	    TSS_ES_RSAESPKCSV15))) {
+		stlogit("Tspi_SetAttribUint32: 0x%0x - %s",
+		    result, Trspi_Error_String(result));
+		return (result);
+	}
+
+	if ((result = Tspi_SetAttribUint32(hKey,
+	    TSS_TSPATTRIB_KEY_INFO,
+	    TSS_TSPATTRIB_KEYINFO_SIGSCHEME,
+	    TSS_SS_RSASSAPKCS1V15_DER))) {
+		stlogit("Tspi_SetAttribUint32: 0x%0x - %s",
+		    result, Trspi_Error_String(result));
+		return (result);
+	}
+
+	return (result);
+}
+
+static TSS_RESULT
 tss_generate_key(TSS_HCONTEXT hContext, TSS_FLAG initFlags, BYTE *passHash,
 	TSS_HKEY hParentKey, TSS_HKEY *phKey)
 {
@@ -1178,7 +1134,8 @@ tss_generate_key(TSS_HCONTEXT hContext, TSS_FLAG initFlags, BYTE *passHash,
 		    result, Trspi_Error_String(result));
 		return (result);
 	}
-	result = tss_assign_secret_key_policy(hContext, *phKey, passHash);
+	result = tss_assign_secret_key_policy(hContext, TSS_POLICY_USAGE,
+	    *phKey, passHash);
 
 	if (result) {
 		Tspi_Context_CloseObject(hContext, *phKey);
@@ -1221,23 +1178,8 @@ tss_generate_key(TSS_HCONTEXT hContext, TSS_FLAG initFlags, BYTE *passHash,
 	}
 
 	if (TPMTOK_TSS_KEY_TYPE(initFlags) == TSS_KEY_TYPE_LEGACY) {
-		if ((result = Tspi_SetAttribUint32(*phKey,
-		    TSS_TSPATTRIB_KEY_INFO,
-		    TSS_TSPATTRIB_KEYINFO_ENCSCHEME,
-		    TSS_ES_RSAESPKCSV15))) {
-			stlogit("Tspi_SetAttribUint32: 0x%0x - %s",
-			    result, Trspi_Error_String(result));
-			Tspi_Context_CloseObject(hContext, *phKey);
-			Tspi_Context_CloseObject(hContext, hMigPolicy);
-			return (result);
-		}
-
-		if ((result = Tspi_SetAttribUint32(*phKey,
-		    TSS_TSPATTRIB_KEY_INFO,
-		    TSS_TSPATTRIB_KEYINFO_SIGSCHEME,
-		    TSS_SS_RSASSAPKCS1V15_DER))) {
-			stlogit("Tspi_SetAttribUint32: 0x%0x - %s",
-			    result, Trspi_Error_String(result));
+		result = set_legacy_key_params(*phKey);
+		if (result) {
 			Tspi_Context_CloseObject(hContext, *phKey);
 			Tspi_Context_CloseObject(hContext, hMigPolicy);
 			return (result);
@@ -1403,7 +1345,7 @@ token_verify_pin(TSS_HCONTEXT hContext, TSS_HKEY hKey)
 	/* unbind the junk data to test the key's auth data */
 	result = Tspi_Data_Unbind(hEncData, hKey, &ulUnboundDataLen,
 	    &rgbUnboundData);
-	if (result == TSS_E_TSP_AUTHFAIL) {
+	if (result == TPM_E_AUTHFAIL) {
 		rc = CKR_PIN_INCORRECT;
 		stlogit("Tspi_Data_Unbind: 0x%0x - %s",
 		    result, Trspi_Error_String(result));
@@ -2025,8 +1967,8 @@ token_specific_verify_so_pin(TSS_HCONTEXT hContext, CK_CHAR_PTR pPin,
 	if (result)
 		return (CKR_FUNCTION_FAILED);
 
-	result = tss_assign_secret_key_policy(hContext, hPublicLeafKey,
-	    hash_sha);
+	result = tss_assign_secret_key_policy(hContext, TSS_POLICY_USAGE,
+	    hPublicLeafKey, hash_sha);
 	if (result)
 		return (CKR_FUNCTION_FAILED);
 
@@ -2043,8 +1985,24 @@ token_specific_verify_so_pin(TSS_HCONTEXT hContext, CK_CHAR_PTR pPin,
 }
 
 CK_RV
-token_specific_final()
+token_specific_final(TSS_HCONTEXT hContext)
 {
+	if (hPublicRootKey != NULL_HKEY) {
+		Tspi_Context_CloseObject(hContext, hPublicRootKey);
+		hPublicRootKey = NULL_HKEY;
+	}
+	if (hPublicLeafKey != NULL_HKEY) {
+		Tspi_Context_CloseObject(hContext, hPublicLeafKey);
+		hPublicLeafKey = NULL_HKEY;
+	}
+	if (hPrivateRootKey != NULL_HKEY) {
+		Tspi_Context_CloseObject(hContext, hPrivateRootKey);
+		hPrivateRootKey = NULL_HKEY;
+	}
+	if (hPrivateLeafKey != NULL_HKEY) {
+		Tspi_Context_CloseObject(hContext, hPrivateLeafKey);
+		hPrivateLeafKey = NULL_HKEY;
+	}
 	return (CKR_OK);
 }
 
@@ -2301,6 +2259,7 @@ token_rsa_load_key(
 	CK_ATTRIBUTE	*attr;
 	CK_RV		rc;
 	CK_OBJECT_HANDLE handle;
+	CK_ULONG	class;
 
 	if (hPrivateLeafKey != NULL_HKEY) {
 		hParentKey = hPrivateRootKey;
@@ -2311,9 +2270,22 @@ token_rsa_load_key(
 		hParentKey = hPublicRootKey;
 	}
 
-	if ((rc = template_attribute_find(key_obj->template,
-	    CKA_IBM_OPAQUE, &attr)) == FALSE) {
-		/* if the key blob wasn't found, then try to wrap the key */
+	*phKey = NULL;
+	if (template_attribute_find(key_obj->template, CKA_CLASS,
+	    &attr) == FALSE) {
+		return (CKR_TEMPLATE_INCOMPLETE);
+	}
+	class = *((CK_ULONG *)attr->pValue);
+
+	rc = template_attribute_find(key_obj->template,
+	    CKA_IBM_OPAQUE, &attr);
+	/*
+	 * A public key cannot use the OPAQUE data attribute so they
+	 * must be created in software.  A private key may not yet
+	 * have its "opaque" data defined and needs to be created
+	 * and loaded so it can be used inside the TPM.
+	 */
+	if (class == CKO_PUBLIC_KEY || rc == FALSE) {
 		rc = object_mgr_find_in_map2(hContext, key_obj, &handle);
 		if (rc != CKR_OK)
 			return (CKR_FUNCTION_FAILED);
@@ -2322,19 +2294,36 @@ token_rsa_load_key(
 		    handle, hParentKey, NULL, phKey))) {
 			return (rc);
 		}
-		/* try again to get the CKA_IBM_OPAQUE attr */
-		if ((rc = template_attribute_find(key_obj->template,
-		    CKA_IBM_OPAQUE, &attr)) == FALSE) {
-			return (rc);
-		}
 	}
-
-	if ((result = Tspi_Context_LoadKeyByBlob(hContext,
-	    hParentKey, attr->ulValueLen,
-	    attr->pValue, phKey))) {
-		stlogit("Tspi_Context_LoadKeyByBlob: 0x%0x - %s",
-		    result, Trspi_Error_String(result));
-		return (CKR_FUNCTION_FAILED);
+	/*
+	 * If this is a private key, get the blob and load it in the TPM.
+	 * If it is public, the key is already loaded in software.
+	 */
+	if (class == CKO_PRIVATE_KEY) {
+		/* If we already have a handle, just load it */
+		if (*phKey != NULL) {
+			result = Tspi_Key_LoadKey(*phKey, hParentKey);
+			if (result) {
+				stlogit("Tspi_Context_LoadKeyByBlob: "
+				    "0x%0x - %s",
+				    result, Trspi_Error_String(result));
+				return (CKR_FUNCTION_FAILED);
+			}
+		} else {
+			/* try again to get the CKA_IBM_OPAQUE attr */
+			if ((rc = template_attribute_find(key_obj->template,
+			    CKA_IBM_OPAQUE, &attr)) == FALSE) {
+				return (rc);
+			}
+			if ((result = Tspi_Context_LoadKeyByBlob(hContext,
+			    hParentKey, attr->ulValueLen, attr->pValue,
+			    phKey))) {
+				stlogit("Tspi_Context_LoadKeyByBlob: "
+				    "0x%0x - %s",
+				    result, Trspi_Error_String(result));
+				return (CKR_FUNCTION_FAILED);
+			}
+		}
 	}
 
 	/* auth data may be required */
@@ -2350,8 +2339,8 @@ token_rsa_load_key(
 		}
 
 		if ((result = token_unwrap_auth_data(hContext,
-		    attr->pValue,
-		    attr->ulValueLen, hParentKey, &authData))) {
+		    attr->pValue, attr->ulValueLen,
+		    hParentKey, &authData))) {
 			return (CKR_FUNCTION_FAILED);
 		}
 
@@ -2597,7 +2586,7 @@ token_specific_rsa_sign(
 	if ((result = Tspi_Hash_Sign(hHash, hKey, &sig_len, &sig))) {
 		stlogit("Tspi_Hash_Sign: 0x%0x - %s",
 		    result, Trspi_Error_String(result));
-		return (CKR_FUNCTION_FAILED);
+		return (CKR_DATA_LEN_RANGE);
 	}
 
 	if (sig_len > *out_data_len) {
@@ -2627,6 +2616,7 @@ tpm_encrypt_data(
 	UINT32		dataBlobSize, modLen;
 	CK_ULONG	chunklen, remain;
 	CK_ULONG	outlen;
+	UINT32		keyusage, scheme, maxsize;
 
 	if ((result = Tspi_Context_CreateObject(hContext,
 	    TSS_OBJECT_TYPE_ENCDATA, TSS_ENCDATA_BIND, &hEncData))) {
@@ -2649,10 +2639,36 @@ tpm_encrypt_data(
 
 	/*
 	 * According to TSS spec for Tspi_Data_Bind (4.3.4.21.5),
-	 * Max input data size is: modLen - (40 - 2 - 4 - 1)
-	 * (for RSA OAEP SHA1 operations).
+	 * Max input data size varies depending on the key type and
+	 * encryption scheme.
 	 */
-	modLen -= 47;
+	if ((result = Tspi_GetAttribUint32(hKey, TSS_TSPATTRIB_KEY_INFO,
+	    TSS_TSPATTRIB_KEYINFO_USAGE, &keyusage))) {
+		stlogit("Cannot find USAGE: %s\n",
+		    Trspi_Error_String(result));
+		return (result);
+	}
+	if ((result = Tspi_GetAttribUint32(hKey, TSS_TSPATTRIB_KEY_INFO,
+	    TSS_TSPATTRIB_KEYINFO_ENCSCHEME, &scheme))) {
+		stlogit("Cannot find ENCSCHEME: %s\n",
+		    Trspi_Error_String(result));
+		return (result);
+	}
+	switch (scheme) {
+		case TSS_ES_RSAESPKCSV15:
+			if (keyusage == TSS_KEYUSAGE_BIND)
+				maxsize = 16;
+			else /* legacy */
+				maxsize = 11;
+			break;
+		case TSS_ES_RSAESOAEP_SHA1_MGF1:
+			maxsize = 47;
+			break;
+		default:
+			maxsize = 0;
+	}
+
+	modLen -= maxsize;
 
 	chunklen = (in_data_len > modLen ? modLen : in_data_len);
 	remain = in_data_len;
@@ -2714,6 +2730,105 @@ token_specific_rsa_encrypt(
 
 	rc  = tpm_encrypt_data(hContext, hKey, in_data, in_data_len,
 	    out_data, out_data_len);
+
+	return (rc);
+}
+
+/*
+ * RSA Verify Recover
+ *
+ * Public key crypto is done in software, not by the TPM.
+ * We bypass the TSPI library here in favor of calls directly
+ * to OpenSSL because we don't want to add any padding, the in_data (signature)
+ * already contains the data stream to be decrypted and is already
+ * padded and formatted correctly.
+ */
+CK_RV
+token_specific_rsa_verify_recover(
+	TSS_HCONTEXT	hContext,
+	CK_BYTE		*in_data,	/* signature */
+	CK_ULONG	in_data_len,
+	CK_BYTE		*out_data,	/* decrypted */
+	CK_ULONG	*out_data_len,
+	OBJECT		*key_obj)
+{
+	TSS_HKEY	hKey;
+	TSS_RESULT	result;
+	CK_RV		rc;
+	BYTE		*modulus;
+	UINT32		modLen;
+	RSA		*rsa = NULL;
+	uchar_t		exp[] = { 0x01, 0x00, 0x01 };
+	int		sslrv, num;
+	BYTE		temp[MAX_RSA_KEYLENGTH];
+	int		i;
+
+	if ((rc = token_rsa_load_key(hContext, key_obj, &hKey))) {
+		return (rc);
+	}
+
+	if ((result = Tspi_GetAttribData(hKey, TSS_TSPATTRIB_RSAKEY_INFO,
+	    TSS_TSPATTRIB_KEYINFO_RSA_MODULUS, &modLen, &modulus))) {
+		stlogit("Tspi_GetAttribData: 0x%0x - %s",
+		    result, Trspi_Error_String(result));
+		return (CKR_FUNCTION_FAILED);
+	}
+
+	if (in_data_len != modLen) {
+		rc = CKR_SIGNATURE_LEN_RANGE;
+		goto end;
+	}
+
+	rsa = RSA_new();
+	if (rsa == NULL) {
+		rc = CKR_HOST_MEMORY;
+		goto end;
+	}
+
+	rsa->n = BN_bin2bn(modulus, modLen, rsa->n);
+	rsa->e = BN_bin2bn(exp, sizeof (exp), rsa->e);
+	if (rsa->n == NULL || rsa->e == NULL) {
+		rc = CKR_HOST_MEMORY;
+		goto end;
+	}
+
+	/* use RSA_NO_PADDING because the data is already padded (PKCS1) */
+	sslrv = RSA_public_encrypt(in_data_len, in_data, out_data,
+	    rsa, RSA_NO_PADDING);
+	if (sslrv == -1) {
+		rc = CKR_FUNCTION_FAILED;
+		goto end;
+	}
+
+	/* Strip leading 0's before stripping the padding */
+	for (i = 0; i < sslrv; i++)
+		if (out_data[i] != 0)
+			break;
+
+	num = BN_num_bytes(rsa->n);
+
+	/* Use OpenSSL function for stripping PKCS#1 padding */
+	sslrv = RSA_padding_check_PKCS1_type_1(temp, sizeof (temp),
+	    &out_data[i], sslrv - i, num);
+
+	if (sslrv < 0) {
+		rc = CKR_FUNCTION_FAILED;
+		goto end;
+	}
+
+	if (*out_data_len < sslrv) {
+		rc = CKR_BUFFER_TOO_SMALL;
+		*out_data_len = 0;
+		goto end;
+	}
+
+	/* The return code indicates the number of bytes remaining */
+	(void) memcpy(out_data, temp, sslrv);
+	*out_data_len = sslrv;
+end:
+	Tspi_Context_FreeMemory(hContext, modulus);
+	if (rsa)
+		RSA_free(rsa);
 
 	return (rc);
 }

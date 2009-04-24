@@ -442,7 +442,7 @@ struct token_specific_struct {
 
 	CK_RV  (*t_rng)(TSS_HCONTEXT, CK_BYTE *, CK_ULONG);
 	CK_RV  (*t_session)(CK_SLOT_ID);
-	CK_RV  (*t_final)();
+	CK_RV  (*t_final)(TSS_HCONTEXT);
 	CK_RV (*t_rsa_decrypt)(TSS_HCONTEXT, CK_BYTE *,
 		CK_ULONG, CK_BYTE *, CK_ULONG *, OBJECT *);
 

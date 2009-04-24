@@ -301,9 +301,6 @@ digest_mgr_init(SESSION	*sess,
 	DIGEST_CONTEXT	*ctx,
 	CK_MECHANISM	*mech)
 {
-	CK_BYTE  *ptr = NULL;
-
-
 	if (! sess || ! ctx) {
 		return (CKR_FUNCTION_FAILED);
 	}
@@ -314,9 +311,6 @@ digest_mgr_init(SESSION	*sess,
 	switch (mech->mechanism) {
 		case CKM_SHA_1:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			ctx->context_len = sizeof (SHA1_CTX);
 			ctx->context.sha1ctx = (SHA1_CTX *)
 			    malloc(ctx->context_len);
@@ -328,9 +322,6 @@ digest_mgr_init(SESSION	*sess,
 
 		case CKM_MD5:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			ctx->context_len = sizeof (MD5_CTX);
 			ctx->context.md5ctx = (MD5_CTX *)
 			    malloc(ctx->context_len);
@@ -345,18 +336,9 @@ digest_mgr_init(SESSION	*sess,
 			return (CKR_MECHANISM_INVALID);
 	}
 
-
-	if (mech->ulParameterLen > 0) {
-		ptr = (CK_BYTE *)malloc(mech->ulParameterLen);
-		if (! ptr) {
-			return (CKR_HOST_MEMORY);
-		}
-		(void) memcpy(ptr, mech->pParameter, mech->ulParameterLen);
-	}
-
 	ctx->mech.ulParameterLen = mech->ulParameterLen;
 	ctx->mech.mechanism = mech->mechanism;
-	ctx->mech.pParameter = ptr;
+	ctx->mech.pParameter = mech->pParameter;
 	ctx->multi = FALSE;
 	ctx->active = TRUE;
 
@@ -377,15 +359,11 @@ digest_mgr_cleanup(DIGEST_CONTEXT *ctx)
 		ctx->context.sha1ctx = NULL;
 	}
 	ctx->mech.ulParameterLen = 0;
+	ctx->mech.pParameter = NULL;
 	ctx->mech.mechanism = 0;
 	ctx->multi = FALSE;
 	ctx->active = FALSE;
 	ctx->context_len = 0;
-
-	if (ctx->mech.pParameter) {
-		free(ctx->mech.pParameter);
-		ctx->mech.pParameter = NULL;
-	}
 
 	return (CKR_OK);
 }
@@ -416,10 +394,14 @@ digest_mgr_digest(SESSION *sess,
 	}
 	switch (ctx->mech.mechanism) {
 		case CKM_SHA_1:
+		if (!length_only && *out_data_len < SHA1_DIGEST_LENGTH)
+			return (CKR_BUFFER_TOO_SMALL);
 		return (sha1_hash(sess, length_only, ctx,
 		    in_data, in_data_len, out_data,  out_data_len));
 
 		case CKM_MD5:
+		if (!length_only && *out_data_len < MD5_DIGEST_LENGTH)
+			return (CKR_BUFFER_TOO_SMALL);
 		return (md5_hash(sess, length_only, ctx,
 		    in_data,  in_data_len, out_data, out_data_len));
 
@@ -506,15 +488,29 @@ digest_mgr_digest_final(SESSION *sess,
 	}
 
 	ctx->multi = FALSE;
+	if (hash == NULL && hash_len == NULL)
+		return (CKR_ARGUMENTS_BAD);
 
 	switch (ctx->mech.mechanism) {
 		case CKM_SHA_1:
+			if (hash == NULL) {
+				*hash_len = SHA1_DIGEST_LENGTH;
+				return (CKR_OK);
+			}
+			if (*hash_len < SHA1_DIGEST_LENGTH)
+				return (CKR_BUFFER_TOO_SMALL);
 			SHA1Final(hash, ctx->context.sha1ctx);
 			if (hash_len)
 				*hash_len = SHA1_DIGEST_LENGTH;
 			return (CKR_OK);
 
 		case CKM_MD5:
+			if (hash == NULL) {
+				*hash_len = MD5_DIGEST_LENGTH;
+				return (CKR_OK);
+			}
+			if (*hash_len < MD5_DIGEST_LENGTH)
+				return (CKR_BUFFER_TOO_SMALL);
 			MD5Final(hash, ctx->context.md5ctx);
 			if (hash_len)
 				*hash_len = MD5_DIGEST_LENGTH;

@@ -316,6 +316,7 @@ loginit() {
 void
 logterm()
 {
+	closelog();
 	enabled = 0;
 }
 
@@ -429,8 +430,8 @@ Valid_Session(Session_Struct_t *pSession, ST_SESSION_T *rSession)
 	int rv = FALSE;
 	Session_Struct_t  *cSessionp;
 
-	if (! pSession)
-	return (FALSE);
+	if (!pSession)
+		return (FALSE);
 
 	(void) pthread_mutex_lock(&(Anchor->SessListMutex));
 

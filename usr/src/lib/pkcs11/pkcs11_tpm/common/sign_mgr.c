@@ -42,7 +42,6 @@ sign_mgr_init(SESSION		* sess,
 	CK_BBOOL	  flag;
 	CK_RV		rc;
 
-
 	if (! sess || ! ctx) {
 		return (CKR_FUNCTION_FAILED);
 	}
@@ -67,9 +66,6 @@ sign_mgr_init(SESSION		* sess,
 	switch (mech->mechanism) {
 		case CKM_RSA_PKCS:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			rc = template_attribute_find(key_obj->template,
 			    CKA_KEY_TYPE, &attr);
 			if (rc == FALSE) {
@@ -103,9 +99,6 @@ sign_mgr_init(SESSION		* sess,
 		case CKM_MD5_RSA_PKCS:
 		case CKM_SHA1_RSA_PKCS:
 		{
-			if (mech->ulParameterLen != 0) {
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
 			rc = template_attribute_find(key_obj->template,
 			    CKA_KEY_TYPE, &attr);
 			if (rc == FALSE) {
@@ -204,6 +197,8 @@ sign_mgr_init(SESSION		* sess,
 			return (CKR_MECHANISM_INVALID);
 	}
 
+	if (mech->ulParameterLen > 0 && mech->pParameter == NULL)
+		return (CKR_ARGUMENTS_BAD);
 
 	if (mech->ulParameterLen > 0) {
 		ptr = (CK_BYTE *)malloc(mech->ulParameterLen);

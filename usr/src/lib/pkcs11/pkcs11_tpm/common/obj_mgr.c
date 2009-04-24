@@ -301,38 +301,23 @@ object_mgr_search_shm_for_obj(TOK_OBJ_ENTRY *,
 static CK_RV object_mgr_update_from_shm(TSS_HCONTEXT);
 static CK_RV object_mgr_check_shm(TSS_HCONTEXT, OBJECT *);
 
-CK_RV
-object_mgr_add(SESSION	  * sess,
-	CK_ATTRIBUTE	* pTemplate,
-	CK_ULONG	   ulCount,
-	CK_OBJECT_HANDLE * handle)
+static CK_RV
+check_object_access(SESSION *sess, OBJECT *o)
 {
-	OBJECT    * o = NULL;
-	CK_BBOOL    priv_obj, sess_obj;
-	CK_RV	rc;
+	CK_BBOOL sess_obj, priv_obj;
+	CK_RV rc = CKR_OK;
 
-	if (! sess || ! pTemplate || ! handle) {
-		return (CKR_FUNCTION_FAILED);
-	}
-
-	rc = pthread_mutex_lock(&obj_list_mutex);
-	if (rc != CKR_OK)
-		return (CKR_FUNCTION_FAILED);
-
-	rc = object_create(pTemplate, ulCount, &o);
-	if (rc != CKR_OK) {
-		goto done;
-	}
-	// check whether session has permissions to create the object, etc
-	//
-	// Object		  R/O	R/W	R/O	R/W    R/W
-	// Type		   Public   Public    User    User   SO
-	// -------------------------------------------------------------
-	// Public session	  R/W	R/W	R/W	R/W    R/W
-	// Private session			   R/W	R/W
-	// Public token	    R/O	R/W	R/O	R/W    R/W
-	// Private token				R/O	R/W
-	//
+	/*
+	 * check whether session has permissions to create the object, etc
+	 *
+	 * Object	  R/O	    R/W    R/O   R/W    R/W
+	 * Type		  Public   Public  User  User   SO
+	 * -------------------------------------------------------------
+	 * Public session  R/W	    R/W	   R/W   R/W    R/W
+	 * Private session			 R/W    R/W
+	 * Public token	   R/O	    R/W	   R/O   R/W    R/W
+	 * Private token			 R/O    R/W
+	 */
 	sess_obj = object_is_session_object(o);
 	priv_obj = object_is_private(o);
 
@@ -342,7 +327,7 @@ object_mgr_add(SESSION	  * sess,
 			goto done;
 		}
 
-		if (! sess_obj) {
+		if (!sess_obj) {
 			rc = CKR_SESSION_READ_ONLY;
 			goto done;
 		}
@@ -368,10 +353,42 @@ object_mgr_add(SESSION	  * sess,
 			goto done;
 		}
 	}
+done:
+	return (rc);
+}
 
-	// okay, object is created and the session permissions look okay.
-	// add the object to the appropriate list and assign an object handle
-	//
+CK_RV
+object_mgr_add(SESSION	  * sess,
+	CK_ATTRIBUTE	* pTemplate,
+	CK_ULONG	   ulCount,
+	CK_OBJECT_HANDLE * handle)
+{
+	OBJECT    * o = NULL;
+	CK_BBOOL    priv_obj, sess_obj;
+	CK_RV	rc;
+
+	if (! sess || ! pTemplate || ! handle) {
+		return (CKR_FUNCTION_FAILED);
+	}
+
+	rc = pthread_mutex_lock(&obj_list_mutex);
+	if (rc != CKR_OK)
+		return (CKR_FUNCTION_FAILED);
+
+	rc = object_create(pTemplate, ulCount, &o);
+	if (rc != CKR_OK) {
+		goto done;
+	}
+	rc = check_object_access(sess, o);
+	if (rc != CKR_OK)
+		goto done;
+
+	/*
+	 * okay, object is created and the session permissions look okay.
+	 * add the object to the appropriate list and assign an object handle
+	 */
+	sess_obj = object_is_session_object(o);
+	priv_obj = object_is_private(o);
 
 	if (sess_obj) {
 		o->session = sess;
@@ -551,41 +568,12 @@ object_mgr_copy(SESSION	  * sess,
 		goto done;
 	}
 
+	rc = check_object_access(sess, new_obj);
+	if (rc != CKR_OK)
+		goto done;
+
 	sess_obj = object_is_session_object(new_obj);
 	priv_obj = object_is_private(new_obj);
-
-	if (sess->session_info.state == CKS_RO_PUBLIC_SESSION) {
-		if (priv_obj) {
-			rc = CKR_USER_NOT_LOGGED_IN;
-			goto done;
-		}
-
-		if (! sess_obj) {
-			rc = CKR_SESSION_READ_ONLY;
-			goto done;
-		}
-	}
-
-	if (sess->session_info.state == CKS_RO_USER_FUNCTIONS) {
-		if (! sess_obj) {
-			rc = CKR_SESSION_READ_ONLY;
-			goto done;
-		}
-	}
-
-	if (sess->session_info.state == CKS_RW_PUBLIC_SESSION) {
-		if (priv_obj) {
-			rc = CKR_USER_NOT_LOGGED_IN;
-			goto done;
-		}
-	}
-
-	if (sess->session_info.state == CKS_RW_SO_FUNCTIONS) {
-		if (priv_obj) {
-			rc = CKR_USER_NOT_LOGGED_IN;
-			goto done;
-		}
-	}
 
 	if (sess_obj) {
 		new_obj->session = sess;
@@ -897,6 +885,11 @@ object_mgr_destroy_object(SESSION	  * sess,
 	if (rc != CKR_OK) {
 		goto done;
 	}
+
+	rc = check_object_access(sess, obj);
+	if (rc != CKR_OK)
+		goto done;
+
 	sess_obj = object_is_session_object(obj);
 	priv_obj = object_is_private(obj);
 
@@ -1684,7 +1677,7 @@ object_mgr_restore_obj(CK_BYTE *data, OBJECT *oldObj)
 				publ_token_obj_list = dlist_add_as_last(
 				    publ_token_obj_list, obj);
 
-			(void) (void) XProcLock(xproclock);
+			(void) XProcLock(xproclock);
 
 			if (priv) {
 				if (global_shm->priv_loaded == FALSE) {
@@ -1747,32 +1740,9 @@ object_mgr_set_attribute_values(SESSION	   * sess,
 	if (! modifiable) {
 		return (CKR_ATTRIBUTE_READ_ONLY);
 	}
-	if (sess->session_info.state == CKS_RO_PUBLIC_SESSION) {
-		if (priv_obj) {
-			return (CKR_USER_NOT_LOGGED_IN);
-		}
-		if (! sess_obj) {
-			return (CKR_SESSION_READ_ONLY);
-		}
-	}
-
-	if (sess->session_info.state == CKS_RO_USER_FUNCTIONS) {
-		if (! sess_obj) {
-			return (CKR_SESSION_READ_ONLY);
-		}
-	}
-
-	if (sess->session_info.state == CKS_RW_PUBLIC_SESSION) {
-		if (priv_obj) {
-			return (CKR_USER_NOT_LOGGED_IN);
-		}
-	}
-
-	if (sess->session_info.state == CKS_RW_SO_FUNCTIONS) {
-		if (priv_obj) {
-			return (CKR_USER_NOT_LOGGED_IN);
-		}
-	}
+	rc = check_object_access(sess, obj);
+	if (rc != CKR_OK)
+		return (rc);
 
 	rc = object_set_attribute_values(obj, pTemplate, ulCount);
 	if (rc != CKR_OK) {

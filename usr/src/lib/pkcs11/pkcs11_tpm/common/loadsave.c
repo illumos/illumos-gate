@@ -415,12 +415,21 @@ set_perm(int file)
 	(void) fchmod(file, S_IRUSR|S_IWUSR);
 }
 
+#define	READ_TOKEN_INFO_STR(fp, rec, reclen) rc = fread(rec, reclen, 1, fp); \
+	if (rc != 1) { rc = CKR_FUNCTION_FAILED; goto out_unlock; }
+
+#define	READ_TOKEN_INFO_UINT32(fp, rec) rc = fread(&fieldval, \
+	sizeof (UINT32), 1, fp); \
+	if (rc != 1) { rc = CKR_FUNCTION_FAILED; goto out_unlock; } \
+	rec = (CK_ULONG)fieldval;
+
 CK_RV
 load_token_data(TSS_HCONTEXT hContext, TOKEN_DATA *td)
 {
 	FILE	*fp;
 	CK_BYTE	fname[MAXPATHLEN];
 	CK_RV	rc;
+	UINT32	fieldval;
 	char *p = get_tpm_keystore_path();
 
 	if (p == NULL)
@@ -472,7 +481,39 @@ load_token_data(TSS_HCONTEXT hContext, TOKEN_DATA *td)
 	}
 	set_perm(fileno(fp));
 
-	rc = fread(td, sizeof (TOKEN_DATA), 1, fp);
+	/* Read fields individually because of 64-bit size diffs */
+	READ_TOKEN_INFO_STR(fp, td->token_info.label,
+	    sizeof (td->token_info.label));
+	READ_TOKEN_INFO_STR(fp, td->token_info.manufacturerID,
+	    sizeof (td->token_info.manufacturerID));
+	READ_TOKEN_INFO_STR(fp, td->token_info.model,
+	    sizeof (td->token_info.model));
+	READ_TOKEN_INFO_STR(fp, td->token_info.serialNumber,
+	    sizeof (td->token_info.serialNumber));
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.flags);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulMaxSessionCount);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulSessionCount);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulRwSessionCount);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulMaxPinLen);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulMinPinLen);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulTotalPublicMemory);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulFreePublicMemory);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulTotalPrivateMemory);
+	READ_TOKEN_INFO_UINT32(fp, td->token_info.ulFreePrivateMemory);
+	READ_TOKEN_INFO_STR(fp, &td->token_info.hardwareVersion,
+	    sizeof (td->token_info.hardwareVersion));
+	READ_TOKEN_INFO_STR(fp, &td->token_info.firmwareVersion,
+	    sizeof (td->token_info.firmwareVersion));
+	READ_TOKEN_INFO_STR(fp, td->token_info.utcTime,
+	    sizeof (td->token_info.utcTime));
+	READ_TOKEN_INFO_STR(fp, td->user_pin_sha,
+	    sizeof (td->user_pin_sha));
+	READ_TOKEN_INFO_STR(fp, td->so_pin_sha,
+	    sizeof (td->so_pin_sha));
+	READ_TOKEN_INFO_STR(fp, td->next_token_object_name,
+	    sizeof (td->next_token_object_name));
+	READ_TOKEN_INFO_STR(fp, &td->tweak_vector,
+	    sizeof (td->tweak_vector));
 
 	(void) lockfile(fileno(fp), F_UNLCK);
 	(void) fclose(fp);
@@ -489,6 +530,14 @@ out_nolock:
 	return (rc);
 }
 
+
+#define	WRITE_TOKEN_INFO_STR(fp, rec, reclen) rc = fwrite(rec, reclen, 1, fp); \
+	if (rc != 1) { rc = CKR_FUNCTION_FAILED; goto done; }
+
+#define	WRITE_TOKEN_INFO_UINT32(fp, rec) fieldval = (UINT32)rec; \
+	rc = fwrite(&fieldval, sizeof (UINT32), 1, fp); \
+	if (rc != 1) { rc = CKR_FUNCTION_FAILED; goto done; }
+
 CK_RV
 save_token_data(TOKEN_DATA *td)
 {
@@ -496,6 +545,7 @@ save_token_data(TOKEN_DATA *td)
 	CK_RV	rc;
 	CK_BYTE	fname[MAXPATHLEN];
 	char *p = get_tpm_keystore_path();
+	UINT32 fieldval;
 
 	if (p == NULL)
 		return (CKR_FUNCTION_FAILED);
@@ -520,7 +570,40 @@ save_token_data(TOKEN_DATA *td)
 	}
 	set_perm(fileno(fp));
 
-	(void) fwrite(td, sizeof (TOKEN_DATA), 1, fp);
+	/* Write token fields individually to maintain sizes on 64 and 32 bit */
+	WRITE_TOKEN_INFO_STR(fp, td->token_info.label,
+	    sizeof (td->token_info.label));
+	WRITE_TOKEN_INFO_STR(fp, td->token_info.manufacturerID,
+	    sizeof (td->token_info.manufacturerID));
+	WRITE_TOKEN_INFO_STR(fp, td->token_info.model,
+	    sizeof (td->token_info.model));
+	WRITE_TOKEN_INFO_STR(fp, td->token_info.serialNumber,
+	    sizeof (td->token_info.serialNumber));
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.flags);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulMaxSessionCount);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulSessionCount);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulRwSessionCount);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulMaxPinLen);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulMinPinLen);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulTotalPublicMemory);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulFreePublicMemory);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulTotalPrivateMemory);
+	WRITE_TOKEN_INFO_UINT32(fp, td->token_info.ulFreePrivateMemory);
+	WRITE_TOKEN_INFO_STR(fp, &td->token_info.hardwareVersion,
+	    sizeof (td->token_info.hardwareVersion));
+	WRITE_TOKEN_INFO_STR(fp, &td->token_info.firmwareVersion,
+	    sizeof (td->token_info.firmwareVersion));
+	WRITE_TOKEN_INFO_STR(fp, td->token_info.utcTime,
+	    sizeof (td->token_info.utcTime));
+	WRITE_TOKEN_INFO_STR(fp, td->user_pin_sha,
+	    sizeof (td->user_pin_sha));
+	WRITE_TOKEN_INFO_STR(fp, td->so_pin_sha,
+	    sizeof (td->so_pin_sha));
+	WRITE_TOKEN_INFO_STR(fp, td->next_token_object_name,
+	    sizeof (td->next_token_object_name));
+	WRITE_TOKEN_INFO_STR(fp, &td->tweak_vector,
+	    sizeof (td->tweak_vector));
+
 	(void) lockfile(fileno(fp), F_UNLCK);
 	(void) fclose(fp);
 
@@ -604,7 +687,7 @@ save_public_token_object(OBJECT *obj)
 	CK_ULONG	cleartxt_len;
 	CK_BBOOL	flag = FALSE;
 	CK_RV	rc;
-	CK_ULONG	total_len;
+	UINT32	total_len;
 	char *p = get_tpm_keystore_path();
 
 	if (p == NULL)
@@ -633,7 +716,7 @@ save_public_token_object(OBJECT *obj)
 
 	total_len = cleartxt_len + sizeof (CK_ULONG) + sizeof (CK_BBOOL);
 
-	(void) fwrite(&total_len, sizeof (CK_ULONG), 1, fp);
+	(void) fwrite(&total_len, sizeof (UINT32), 1, fp);
 	(void) fwrite(&flag, sizeof (CK_BBOOL), 1, fp);
 	(void) fwrite(cleartxt, cleartxt_len, 1, fp);
 
@@ -662,13 +745,13 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	CK_BYTE	fname[100];
 	CK_BYTE	hash_sha[SHA1_DIGEST_LENGTH];
 	CK_ULONG obj_data_len, cleartxt_len, ciphertxt_len;
-	CK_ULONG	padded_len;
+	UINT32	padded_len;
 	CK_BBOOL	flag;
 	CK_RV	rc;
-	CK_ULONG	obj_data_len_32;
-	CK_ULONG	total_len;
-	CK_ULONG	chunksize, blocks;
-	char 		*p = get_tpm_keystore_path();
+	UINT32	obj_data_len_32;
+	UINT32	total_len;
+	UINT32	chunksize, blocks;
+	char 	*p = get_tpm_keystore_path();
 
 	if (p == NULL)
 		return (CKR_FUNCTION_FAILED);
@@ -745,11 +828,11 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 
 	set_perm(fileno(fp));
 
-	total_len = sizeof (CK_ULONG) + sizeof (CK_BBOOL) + ciphertxt_len;
+	total_len = sizeof (UINT32) + sizeof (CK_BBOOL) + ciphertxt_len;
 
 	flag = TRUE;
 
-	(void) fwrite(&total_len, sizeof (CK_ULONG), 1, fp);
+	(void) fwrite(&total_len, sizeof (UINT32), 1, fp);
 	(void) fwrite(&flag, sizeof (CK_BBOOL), 1, fp);
 	(void) fwrite(ciphertxt, ciphertxt_len,    1, fp);
 
@@ -781,7 +864,7 @@ load_public_token_objects(void)
 	CK_BYTE *buf = NULL;
 	CK_BYTE tmp[MAXPATHLEN], fname[MAXPATHLEN], iname[MAXPATHLEN];
 	CK_BBOOL priv;
-	CK_ULONG size;
+	UINT32 size;
 	char *ksdir = get_tpm_keystore_path();
 
 	if (ksdir == NULL)
@@ -817,14 +900,14 @@ load_public_token_objects(void)
 		if (!fp2)
 			continue;
 
-		(void) fread(&size, sizeof (CK_ULONG), 1, fp2);
+		(void) fread(&size, sizeof (UINT32), 1, fp2);
 		(void) fread(&priv, sizeof (CK_BBOOL), 1, fp2);
 		if (priv == TRUE) {
 			(void) fclose(fp2);
 			continue;
 		}
 
-		size = size - sizeof (CK_ULONG) - sizeof (CK_BBOOL);
+		size = size - sizeof (UINT32) - sizeof (CK_BBOOL);
 		buf = (CK_BYTE *)malloc(size);
 		if (!buf) {
 			(void) lockfile(fileno(fp1), F_UNLCK);
@@ -862,7 +945,7 @@ load_private_token_objects(TSS_HCONTEXT hContext)
 	CK_BYTE *buf = NULL;
 	CK_BYTE tmp[MAXPATHLEN], fname[MAXPATHLEN], iname[MAXPATHLEN];
 	CK_BBOOL priv;
-	CK_ULONG size;
+	UINT32 size;
 	CK_RV rc;
 	char *ksdir = get_tpm_keystore_path();
 
@@ -895,14 +978,14 @@ load_private_token_objects(TSS_HCONTEXT hContext)
 		if (!fp2)
 			continue;
 
-		(void) fread(&size, sizeof (CK_ULONG), 1, fp2);
+		(void) fread(&size, sizeof (UINT32), 1, fp2);
 		(void) fread(&priv, sizeof (CK_BBOOL), 1, fp2);
 		if (priv == FALSE) {
 			(void) fclose(fp2);
 			continue;
 		}
 
-		size = size - sizeof (CK_ULONG) - sizeof (CK_BBOOL);
+		size = size - sizeof (UINT32) - sizeof (CK_BBOOL);
 		buf = (CK_BYTE *)malloc(size);
 		if (!buf) {
 			rc = CKR_HOST_MEMORY;
@@ -1021,8 +1104,7 @@ reload_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	CK_BYTE *buf = NULL;
 	CK_BYTE fname[MAXPATHLEN];
 	CK_BBOOL priv;
-	CK_ULONG size;
-	CK_ULONG size_64;
+	UINT32 size;
 	CK_RV rc;
 	char *p = get_tpm_keystore_path();
 
@@ -1048,10 +1130,10 @@ reload_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 
 	set_perm(fileno(fp));
 
-	(void) fread(&size, sizeof (CK_ULONG), 1, fp);
+	(void) fread(&size, sizeof (UINT32), 1, fp);
 	(void) fread(&priv, sizeof (CK_BBOOL), 1, fp);
 
-	size = size - sizeof (CK_ULONG) - sizeof (CK_BBOOL);
+	size = size - sizeof (UINT32) - sizeof (CK_BBOOL);
 
 	buf = (CK_BYTE *)malloc(size);
 	if (!buf) {
@@ -1061,10 +1143,8 @@ reload_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 
 	(void) fread(buf, size, 1, fp);
 
-	size_64 = size;
-
 	if (priv) {
-		rc = restore_private_token_object(hContext, buf, size_64, obj);
+		rc = restore_private_token_object(hContext, buf, size, obj);
 	} else {
 		rc = object_mgr_restore_obj(buf, obj);
 	}

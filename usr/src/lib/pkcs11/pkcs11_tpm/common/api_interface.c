@@ -318,19 +318,62 @@ static unsigned int   Initialized = 0;
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct ST_FCN_LIST FuncList;
 CK_FUNCTION_LIST PK11_Functions;
+extern pthread_rwlock_t obj_list_rw_mutex;
 
-/*
- * For linux only at this time... if it works out we can get rid
- * of the stupid pid tracking.... Linux we kind of have to do this
- * since new threads are processes also, and we will be hosed
- */
+
 static void
-child_fork_initializer()
+tpmtoken_fork_prepare()
+{
+	(void) pthread_mutex_lock(&global_mutex);
+	(void) pthread_mutex_lock(&pkcs_mutex);
+	(void) pthread_mutex_lock(&obj_list_mutex);
+	(void) pthread_rwlock_wrlock(&obj_list_rw_mutex);
+	(void) pthread_mutex_lock(&sess_list_mutex);
+	(void) pthread_mutex_lock(&login_mutex);
+	if (Anchor) {
+		(void) pthread_mutex_lock(&Anchor->ProcMutex);
+		(void) pthread_mutex_lock(&Anchor->SessListMutex);
+	}
+}
+
+static void
+tpmtoken_fork_parent()
 {
 	if (Anchor) {
+		(void) pthread_mutex_unlock(&Anchor->SessListMutex);
+		(void) pthread_mutex_unlock(&Anchor->ProcMutex);
+	}
+	(void) pthread_mutex_unlock(&login_mutex);
+	(void) pthread_mutex_unlock(&sess_list_mutex);
+	(void) pthread_rwlock_unlock(&obj_list_rw_mutex);
+	(void) pthread_mutex_unlock(&obj_list_mutex);
+	(void) pthread_mutex_unlock(&pkcs_mutex);
+	(void) pthread_mutex_unlock(&global_mutex);
+}
+
+static void
+tpmtoken_fork_child()
+{
+	if (Anchor) {
+		(void) pthread_mutex_unlock(&Anchor->SessListMutex);
+		(void) pthread_mutex_unlock(&Anchor->ProcMutex);
+	}
+
+	(void) pthread_mutex_unlock(&login_mutex);
+	(void) pthread_mutex_unlock(&sess_list_mutex);
+	(void) pthread_rwlock_unlock(&obj_list_rw_mutex);
+	(void) pthread_mutex_unlock(&obj_list_mutex);
+	(void) pthread_mutex_unlock(&pkcs_mutex);
+	(void) pthread_mutex_unlock(&global_mutex);
+
+	if (Anchor) {
+		Terminate_All_Process_Sessions();
 		free(Anchor);
 		Anchor = NULL;
 	}
+	if (FuncList.ST_Finalize)
+		FuncList.ST_Finalize(0);
+
 	logterm();
 	loginit();
 }
@@ -366,7 +409,7 @@ C_CloseAllSessions(CK_SLOT_ID slotID)
 	 * Close SEssion.  Therefore we don't need to do any locking
 	 * the atomic operations are controled when we use the linked list
 	 */
-	pCur = Anchor->SessListBeg;
+	pCur = (Anchor ? Anchor->SessListBeg : NULL);
 	while (pCur) {
 		/*
 		 * Session owned by the slot we are working on
@@ -517,9 +560,6 @@ C_Decrypt(CK_SESSION_HANDLE hSession,
 	}
 	if (!Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
-	}
-	if (!pEncryptedData || ! pulDataLen) {
-		return (CKR_ARGUMENTS_BAD);
 	}
 	if (FuncList.ST_Decrypt) {
 		rv = FuncList.ST_Decrypt(rSession, pEncryptedData,
@@ -746,9 +786,6 @@ C_Digest(CK_SESSION_HANDLE hSession,
 	if (!Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
-	if (! pData || !pulDigestLen)
-		return (CKR_ARGUMENTS_BAD);
-
 	if (FuncList.ST_Digest) {
 		rv = FuncList.ST_Digest(rSession, pData, ulDataLen,
 		    pDigest, pulDigestLen);
@@ -866,9 +903,6 @@ C_DigestUpdate(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! ulPartLen) {
-		return (CKR_ARGUMENTS_BAD);
-	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
@@ -893,10 +927,6 @@ C_Encrypt(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! pData || ! pulEncryptedDataLen) {
-		return (CKR_ARGUMENTS_BAD);
-	}
-	// Validate Session
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
@@ -921,9 +951,6 @@ C_EncryptFinal(CK_SESSION_HANDLE hSession,
 
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (! pulLastEncryptedPartLen) {
-		return (CKR_ARGUMENTS_BAD);
 	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
@@ -1000,12 +1027,15 @@ do_finalize(CK_VOID_PTR pReserved)
 		return (CKR_ARGUMENTS_BAD);
 	}
 	(void) pthread_mutex_lock(&global_mutex);
-	Terminate_All_Process_Sessions();
+	if (Anchor)
+		Terminate_All_Process_Sessions();
+
 	if (FuncList.ST_Finalize)
 		FuncList.ST_Finalize(0);
 
 	free(Anchor);
 	Anchor = NULL;
+
 	(void) pthread_mutex_unlock(&global_mutex);
 	return (CKR_OK);
 }
@@ -1880,9 +1910,6 @@ C_Sign(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! pData || ! pulSignatureLen) {
-		return (CKR_ARGUMENTS_BAD);
-	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
@@ -1986,9 +2013,6 @@ C_SignRecover(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! pData || ! pulSignatureLen) {
-		return (CKR_ARGUMENTS_BAD);
-	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
@@ -2037,9 +2061,6 @@ C_SignUpdate(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! pPart) {
-		return (CKR_ARGUMENTS_BAD);
-	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
@@ -2067,11 +2088,8 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! pMechanism) {
+	if (!pMechanism) {
 		return (CKR_MECHANISM_INVALID);
-	}
-	if (! phKey) {
-		return (CKR_ARGUMENTS_BAD);
 	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
@@ -2098,9 +2116,6 @@ C_Verify(CK_SESSION_HANDLE hSession,
 
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (! pData || ! pSignature) {
-		return (CKR_ARGUMENTS_BAD);
 	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
@@ -2180,9 +2195,6 @@ C_VerifyRecover(CK_SESSION_HANDLE hSession,
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (! pSignature || ! pulDataLen) {
-		return (CKR_ARGUMENTS_BAD);
-	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
@@ -2230,9 +2242,6 @@ C_VerifyUpdate(CK_SESSION_HANDLE hSession,
 
 	if (API_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (! pPart) {
-		return (CKR_ARGUMENTS_BAD);
 	}
 	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
 		return (CKR_SESSION_HANDLE_INVALID);
@@ -2294,8 +2303,8 @@ api_init(void)
 {
 	loginit();
 	if (! Initialized) {
-		(void) pthread_atfork(NULL, NULL,
-		    (void(*)())child_fork_initializer);
+		(void) pthread_atfork(tpmtoken_fork_prepare,
+		    tpmtoken_fork_parent, tpmtoken_fork_child);
 		Initialized = 1;
 	}
 }
