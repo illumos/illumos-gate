@@ -2827,7 +2827,6 @@ ibd_leave_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 			if ((mce == NULL) || (mce->mc_jstate ==
 			    IB_MC_JSTATE_FULL))
 				return;
-			ASSERT(mce->mc_jstate == IB_MC_JSTATE_SEND_ONLY_NON);
 		} else {
 			ASSERT(jstate == IB_MC_JSTATE_FULL);
 
@@ -2838,8 +2837,6 @@ ibd_leave_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 			 */
 			if (mce == NULL)
 				return;
-
-			ASSERT(mce->mc_jstate == IB_MC_JSTATE_FULL);
 
 			mce->mc_fullreap = B_TRUE;
 		}
