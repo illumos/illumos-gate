@@ -17,14 +17,12 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ZIO_H
 #define	_ZIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	ZBT_MAGIC	0x210da7ab10c7a11ULL	/* zio data bloc tail */
 
@@ -67,9 +65,6 @@ enum zio_checksum {
 	ZIO_CHECKSUM_SHA256,
 	ZIO_CHECKSUM_FUNCTIONS
 };
-
-#define	ZIO_CHECKSUM_ON_VALUE	ZIO_CHECKSUM_FLETCHER_2
-#define	ZIO_CHECKSUM_DEFAULT	ZIO_CHECKSUM_ON
 
 enum zio_compress {
 	ZIO_COMPRESS_INHERIT = 0,
