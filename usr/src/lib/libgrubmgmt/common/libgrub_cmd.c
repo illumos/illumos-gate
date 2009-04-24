@@ -193,6 +193,8 @@ skip_line(const grub_line_t *lp, grub_barg_t *barg)
 int
 error_line(const grub_line_t *lp, grub_barg_t *barg)
 {
+	if (lp->gl_cmdtp == GRBM_ROOT_CMD)
+		return (EG_ROOTNOTSUPP);
 	return (EG_INVALIDLINE);
 }
 

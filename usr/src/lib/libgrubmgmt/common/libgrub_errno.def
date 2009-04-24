@@ -66,6 +66,8 @@ grub_errno_def(EG_NOENTRY,	"No such entry found")
 grub_errno_def(EG_XVMNOTSUP,	"xVM is not supported")
 grub_errno_def(EG_BOOTSIGN,	"Bootsign not found")
 grub_errno_def(EG_UNKBOOTFS,	"Unknown bootfs filesystem")
+grub_errno_def(EG_ROOTNOTSUPP,	"Selected GRUB menu entry contains "\
+	"unsupported \"root\" command")
 
 /*
  * !!! Should ALWAYS be the last one
