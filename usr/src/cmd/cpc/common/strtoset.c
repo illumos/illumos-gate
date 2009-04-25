@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,8 +115,9 @@ static int
 event_valid(int picnum, char *event)
 {
 	char *end_event;
-	found = 0;
+	int err;
 
+	found = 0;
 
 	cpc_walk_events_pic(cpc, picnum, event, event_walker);
 
@@ -130,18 +131,22 @@ event_valid(int picnum, char *event)
 
 	/*
 	 * Before assuming this is an invalid event, see if we have been given
-	 * a raw event code. An event code of '0' is not recognized, as it
-	 * already has a corresponding event name in existing backends and it
-	 * is the only reasonable way to know if strtol() succeeded.
+	 * a raw event code.
 	 * Check the second argument of strtol() to ensure invalid events
 	 * beginning with number do not go through.
 	 */
-	if ((strtol(event, &end_event, 0) != 0) && (*end_event == '\0'))
+	err = errno;
+	errno = 0;
+	(void) strtol(event, &end_event, 0);
+	if ((errno == 0) && (*end_event == '\0')) {
 		/*
 		 * Success - this is a valid raw code in hex, decimal, or octal.
 		 */
+		errno = err;
 		return (1);
+	}
 
+	errno = err;
 	return (0);
 }
 

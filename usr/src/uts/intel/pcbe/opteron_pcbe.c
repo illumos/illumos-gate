@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,10 @@
  *
  *
  * This open source software license conforms to the BSD License template.
+ */
+
+/*
+ * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 
 /*
@@ -159,7 +163,6 @@ opt_pcbe_config_t nullcfgs[4] = {
 typedef struct _amd_event {
 	char		*name;
 	uint16_t	emask;		/* Event mask setting */
-	uint8_t		umask_valid;	/* Mask of unreserved UNIT_MASK bits */
 } amd_event_t;
 
 typedef struct _amd_generic_event {
@@ -177,155 +180,152 @@ typedef struct _amd_generic_event {
 
 #define	MASK48		0xFFFFFFFFFFFF
 
-#define	EV_END {NULL, 0, 0}
+#define	EV_END {NULL, 0}
 #define	GEN_EV_END {NULL, NULL, 0 }
 
-#define	AMD_cmn_events							\
-	{ "FP_dispatched_fpu_ops",			0x0, 0x3F },	\
-	{ "FP_cycles_no_fpu_ops_retired",		0x1, 0x0 },	\
-	{ "FP_dispatched_fpu_ops_ff",			0x2, 0x0 },	\
-	{ "LS_seg_reg_load",				0x20, 0x7F },	\
-	{ "LS_uarch_resync_self_modify",		0x21, 0x0 },	\
-	{ "LS_uarch_resync_snoop",			0x22, 0x0 },	\
-	{ "LS_buffer_2_full",				0x23, 0x0 },	\
-	{ "LS_retired_cflush",				0x26, 0x0 },	\
-	{ "LS_retired_cpuid",				0x27, 0x0 },	\
-	{ "DC_access",					0x40, 0x0 },	\
-	{ "DC_miss",					0x41, 0x0 },	\
-	{ "DC_refill_from_L2",				0x42, 0x1F },	\
-	{ "DC_refill_from_system",			0x43, 0x1F },	\
-	{ "DC_misaligned_data_ref",			0x47, 0x0 },	\
-	{ "DC_uarch_late_cancel_access",		0x48, 0x0 },	\
-	{ "DC_uarch_early_cancel_access",		0x49, 0x0 },	\
-	{ "DC_dispatched_prefetch_instr",		0x4B, 0x7 },	\
-	{ "DC_dcache_accesses_by_locks",		0x4C, 0x2 },	\
-	{ "BU_memory_requests",				0x65, 0x83},	\
-	{ "BU_data_prefetch",				0x67, 0x3 },	\
-	{ "BU_cpu_clk_unhalted",			0x76, 0x0 },	\
-	{ "IC_fetch",					0x80, 0x0 },	\
-	{ "IC_miss",					0x81, 0x0 },	\
-	{ "IC_refill_from_L2",				0x82, 0x0 },	\
-	{ "IC_refill_from_system",			0x83, 0x0 },	\
-	{ "IC_itlb_L1_miss_L2_hit",			0x84, 0x0 },	\
-	{ "IC_uarch_resync_snoop",			0x86, 0x0 },	\
-	{ "IC_instr_fetch_stall",			0x87, 0x0 },	\
-	{ "IC_return_stack_hit",			0x88, 0x0 },	\
-	{ "IC_return_stack_overflow",			0x89, 0x0 },	\
-	{ "FR_retired_x86_instr_w_excp_intr",		0xC0, 0x0 },	\
-	{ "FR_retired_uops",				0xC1, 0x0 },	\
-	{ "FR_retired_branches_w_excp_intr",		0xC2, 0x0 },	\
-	{ "FR_retired_branches_mispred",		0xC3, 0x0 },	\
-	{ "FR_retired_taken_branches",			0xC4, 0x0 },	\
-	{ "FR_retired_taken_branches_mispred",		0xC5, 0x0 },	\
-	{ "FR_retired_far_ctl_transfer",		0xC6, 0x0 },	\
-	{ "FR_retired_resyncs",				0xC7, 0x0 },	\
-	{ "FR_retired_near_rets",			0xC8, 0x0 },	\
-	{ "FR_retired_near_rets_mispred",		0xC9, 0x0 },	\
-	{ "FR_retired_taken_branches_mispred_addr_miscomp",	0xCA, 0x0 },\
-	{ "FR_retired_fastpath_double_op_instr",	0xCC, 0x7 },	\
-	{ "FR_intr_masked_cycles",			0xCD, 0x0 },	\
-	{ "FR_intr_masked_while_pending_cycles",	0xCE, 0x0 },	\
-	{ "FR_taken_hardware_intrs",			0xCF, 0x0 },	\
-	{ "FR_nothing_to_dispatch",			0xD0, 0x0 },	\
-	{ "FR_dispatch_stalls",				0xD1, 0x0 },	\
-	{ "FR_dispatch_stall_branch_abort_to_retire",	0xD2, 0x0 },	\
-	{ "FR_dispatch_stall_serialization",		0xD3, 0x0 },	\
-	{ "FR_dispatch_stall_segment_load",		0xD4, 0x0 },	\
-	{ "FR_dispatch_stall_reorder_buffer_full",	0xD5, 0x0 },	\
-	{ "FR_dispatch_stall_resv_stations_full",	0xD6, 0x0 },	\
-	{ "FR_dispatch_stall_fpu_full",			0xD7, 0x0 },	\
-	{ "FR_dispatch_stall_ls_full",			0xD8, 0x0 },	\
-	{ "FR_dispatch_stall_waiting_all_quiet",	0xD9, 0x0 },	\
-	{ "FR_dispatch_stall_far_ctl_trsfr_resync_branch_pend",	0xDA, 0x0 },\
-	{ "FR_fpu_exception",				0xDB, 0xF },	\
-	{ "FR_num_brkpts_dr0",				0xDC, 0x0 },	\
-	{ "FR_num_brkpts_dr1",				0xDD, 0x0 },	\
-	{ "FR_num_brkpts_dr2",				0xDE, 0x0 },	\
-	{ "FR_num_brkpts_dr3",				0xDF, 0x0 },	\
-	{ "NB_mem_ctrlr_bypass_counter_saturation",	0xE4, 0xF }
+#define	AMD_cmn_events						\
+	{ "FP_dispatched_fpu_ops",			0x0 },	\
+	{ "FP_cycles_no_fpu_ops_retired",		0x1 },	\
+	{ "FP_dispatched_fpu_ops_ff",			0x2 },	\
+	{ "LS_seg_reg_load",				0x20 },	\
+	{ "LS_uarch_resync_self_modify",		0x21 },	\
+	{ "LS_uarch_resync_snoop",			0x22 },	\
+	{ "LS_buffer_2_full",				0x23 },	\
+	{ "LS_locked_operation",			0x24 },	\
+	{ "LS_retired_cflush",				0x26 },	\
+	{ "LS_retired_cpuid",				0x27 },	\
+	{ "DC_access",					0x40 },	\
+	{ "DC_miss",					0x41 },	\
+	{ "DC_refill_from_L2",				0x42 },	\
+	{ "DC_refill_from_system",			0x43 },	\
+	{ "DC_copyback",				0x44 },	\
+	{ "DC_dtlb_L1_miss_L2_hit",			0x45 },	\
+	{ "DC_dtlb_L1_miss_L2_miss",			0x46 },	\
+	{ "DC_misaligned_data_ref",			0x47 },	\
+	{ "DC_uarch_late_cancel_access",		0x48 },	\
+	{ "DC_uarch_early_cancel_access",		0x49 },	\
+	{ "DC_1bit_ecc_error_found",			0x4A },	\
+	{ "DC_dispatched_prefetch_instr",		0x4B },	\
+	{ "DC_dcache_accesses_by_locks",		0x4C },	\
+	{ "BU_memory_requests",				0x65 },	\
+	{ "BU_data_prefetch",				0x67 },	\
+	{ "BU_system_read_responses",			0x6C },	\
+	{ "BU_cpu_clk_unhalted",			0x76 },	\
+	{ "BU_internal_L2_req",				0x7D },	\
+	{ "BU_fill_req_missed_L2",			0x7E },	\
+	{ "BU_fill_into_L2",				0x7F },	\
+	{ "IC_fetch",					0x80 },	\
+	{ "IC_miss",					0x81 },	\
+	{ "IC_refill_from_L2",				0x82 },	\
+	{ "IC_refill_from_system",			0x83 },	\
+	{ "IC_itlb_L1_miss_L2_hit",			0x84 },	\
+	{ "IC_itlb_L1_miss_L2_miss",			0x85 },	\
+	{ "IC_uarch_resync_snoop",			0x86 },	\
+	{ "IC_instr_fetch_stall",			0x87 },	\
+	{ "IC_return_stack_hit",			0x88 },	\
+	{ "IC_return_stack_overflow",			0x89 },	\
+	{ "FR_retired_x86_instr_w_excp_intr",		0xC0 },	\
+	{ "FR_retired_uops",				0xC1 },	\
+	{ "FR_retired_branches_w_excp_intr",		0xC2 },	\
+	{ "FR_retired_branches_mispred",		0xC3 },	\
+	{ "FR_retired_taken_branches",			0xC4 },	\
+	{ "FR_retired_taken_branches_mispred",		0xC5 },	\
+	{ "FR_retired_far_ctl_transfer",		0xC6 },	\
+	{ "FR_retired_resyncs",				0xC7 },	\
+	{ "FR_retired_near_rets",			0xC8 },	\
+	{ "FR_retired_near_rets_mispred",		0xC9 },	\
+	{ "FR_retired_taken_branches_mispred_addr_miscomp",	0xCA },\
+	{ "FR_retired_fastpath_double_op_instr",	0xCC },	\
+	{ "FR_intr_masked_cycles",			0xCD },	\
+	{ "FR_intr_masked_while_pending_cycles",	0xCE },	\
+	{ "FR_taken_hardware_intrs",			0xCF },	\
+	{ "FR_nothing_to_dispatch",			0xD0 },	\
+	{ "FR_dispatch_stalls",				0xD1 },	\
+	{ "FR_dispatch_stall_branch_abort_to_retire",	0xD2 },	\
+	{ "FR_dispatch_stall_serialization",		0xD3 },	\
+	{ "FR_dispatch_stall_segment_load",		0xD4 },	\
+	{ "FR_dispatch_stall_reorder_buffer_full",	0xD5 },	\
+	{ "FR_dispatch_stall_resv_stations_full",	0xD6 },	\
+	{ "FR_dispatch_stall_fpu_full",			0xD7 },	\
+	{ "FR_dispatch_stall_ls_full",			0xD8 },	\
+	{ "FR_dispatch_stall_waiting_all_quiet",	0xD9 },	\
+	{ "FR_dispatch_stall_far_ctl_trsfr_resync_branch_pend",	0xDA },\
+	{ "FR_fpu_exception",				0xDB },	\
+	{ "FR_num_brkpts_dr0",				0xDC },	\
+	{ "FR_num_brkpts_dr1",				0xDD },	\
+	{ "FR_num_brkpts_dr2",				0xDE },	\
+	{ "FR_num_brkpts_dr3",				0xDF },	\
+	{ "NB_mem_ctrlr_page_access",			0xE0 },	\
+	{ "NB_mem_ctrlr_turnaround",			0xE3 },	\
+	{ "NB_mem_ctrlr_bypass_counter_saturation",	0xE4 },	\
+	{ "NB_cpu_io_to_mem_io",			0xE9 },	\
+	{ "NB_cache_block_commands",			0xEA },	\
+	{ "NB_sized_commands",				0xEB },	\
+	{ "NB_ht_bus0_bandwidth",			0xF6 }
 
-#define	OPT_events							\
-	{ "LS_locked_operation",			0x24, 0x7 },	\
-	{ "DC_copyback",				0x44, 0x1F },	\
-	{ "DC_dtlb_L1_miss_L2_hit",			0x45, 0x0 },	\
-	{ "DC_dtlb_L1_miss_L2_miss",			0x46, 0x0 },	\
-	{ "DC_1bit_ecc_error_found",			0x4A, 0x3 },	\
-	{ "BU_system_read_responses",			0x6C, 0x7 },	\
-	{ "BU_quadwords_written_to_system",		0x6D, 0x1 },	\
-	{ "BU_internal_L2_req",				0x7D, 0x1F },	\
-	{ "BU_fill_req_missed_L2",			0x7E, 0x7 },	\
-	{ "BU_fill_into_L2",				0x7F, 0x1 },	\
-	{ "IC_itlb_L1_miss_L2_miss",			0x85, 0x0 },	\
-	{ "FR_retired_fpu_instr",			0xCB, 0xF },	\
-	{ "NB_mem_ctrlr_page_access",			0xE0, 0x7 },	\
-	{ "NB_mem_ctrlr_page_table_overflow",		0xE1, 0x0 },	\
-	{ "NB_mem_ctrlr_turnaround",			0xE3, 0x7 },	\
-	{ "NB_ECC_errors",				0xE8, 0x80},	\
-	{ "NB_sized_commands",				0xEB, 0x7F },	\
-	{ "NB_probe_result",				0xEC, 0x7F},	\
-	{ "NB_gart_events",				0xEE, 0x7 },	\
-	{ "NB_ht_bus0_bandwidth",			0xF6, 0xF },	\
-	{ "NB_ht_bus1_bandwidth",			0xF7, 0xF },	\
-	{ "NB_ht_bus2_bandwidth",			0xF8, 0xF }
+#define	AMD_FAMILY_f_events					\
+	{ "BU_quadwords_written_to_system",		0x6D },	\
+	{ "FR_retired_fpu_instr",			0xCB },	\
+	{ "NB_mem_ctrlr_page_table_overflow",		0xE1 },	\
+	{ "NB_sized_blocks",				0xE5 },	\
+	{ "NB_ECC_errors",				0xE8 },	\
+	{ "NB_probe_result",				0xEC },	\
+	{ "NB_gart_events",				0xEE },	\
+	{ "NB_ht_bus1_bandwidth",			0xF7 },	\
+	{ "NB_ht_bus2_bandwidth",			0xF8 }
 
-#define	OPT_RevD_events							\
-	{ "NB_sized_blocks",				0xE5, 0x3C }
+#define	AMD_FAMILY_10h_events					\
+	{ "FP_retired_sse_ops",				0x3 },	\
+	{ "FP_retired_move_ops",			0x4 },	\
+	{ "FP_retired_serialize_ops",			0x5 },	\
+	{ "FP_serialize_ops_cycles",			0x6 },	\
+	{ "LS_cancelled_store_to_load_fwd_ops",		0x2A },	\
+	{ "LS_smi_received",				0x2B },	\
+	{ "DC_dtlb_L1_hit",				0x4D },	\
+	{ "LS_ineffective_prefetch",			0x52 },	\
+	{ "LS_global_tlb_flush",			0x54 },	\
+	{ "BU_octwords_written_to_system",		0x6D },	\
+	{ "Page_size_mismatches",			0x165 },	\
+	{ "IC_eviction",				0x8B },	\
+	{ "IC_cache_lines_invalidate",			0x8C },	\
+	{ "IC_itlb_reload",				0x99 },	\
+	{ "IC_itlb_reload_aborted",			0x9A },	\
+	{ "FR_retired_mmx_sse_fp_instr",		0xCB },	\
+	{ "Retired_x87_fp_ops",				0x1C0 },	\
+	{ "IBS_ops_tagged",				0x1CF },	\
+	{ "LFENCE_inst_retired",			0x1D3 },	\
+	{ "SFENCE_inst_retired",			0x1D4 },	\
+	{ "MFENCE_inst_retired",			0x1D5 },	\
+	{ "NB_mem_ctrlr_page_table_overflow",		0xE1 },	\
+	{ "NB_mem_ctrlr_dram_cmd_slots_missed",		0xE2 },	\
+	{ "NB_thermal_status",				0xE8 },	\
+	{ "NB_probe_results_upstream_req",		0xEC },	\
+	{ "NB_gart_events",				0xEE },	\
+	{ "NB_mem_ctrlr_req",				0x1F0 },	\
+	{ "CB_cpu_to_dram_req_to_target",		0x1E0 },	\
+	{ "CB_io_to_dram_req_to_target",		0x1E1 },	\
+	{ "CB_cpu_read_cmd_latency_to_target_0_to_3",	0x1E2 },	\
+	{ "CB_cpu_read_cmd_req_to_target_0_to_3",	0x1E3 },	\
+	{ "CB_cpu_read_cmd_latency_to_target_4_to_7",	0x1E4 },	\
+	{ "CB_cpu_read_cmd_req_to_target_4_to_7",	0x1E5 },	\
+	{ "CB_cpu_cmd_latency_to_target_0_to_7",	0x1E6 },	\
+	{ "CB_cpu_req_to_target_0_to_7",		0x1E7 },	\
+	{ "NB_ht_bus1_bandwidth",			0xF7 },	\
+	{ "NB_ht_bus2_bandwidth",			0xF8 },	\
+	{ "NB_ht_bus3_bandwidth",			0x1F9 },	\
+	{ "L3_read_req",				0x4E0 },	\
+	{ "L3_miss",					0x4E1 },	\
+	{ "L3_l2_eviction_l3_fill",			0x4E2 },	\
+	{ "L3_eviction",				0x4E3 }
 
-#define	OPT_RevE_events							\
-	{ "NB_cpu_io_to_mem_io",			0xE9, 0xFF},	\
-	{ "NB_cache_block_commands",			0xEA, 0x3D}
-
-#define	AMD_FAMILY_10h_cmn_events					\
-	{ "FP_retired_sse_ops",				0x3,   0x7F},	\
-	{ "FP_retired_move_ops",			0x4,   0xF},	\
-	{ "FP_retired_serialize_ops",			0x5,   0xF},	\
-	{ "FP_serialize_ops_cycles",			0x6,   0x3},	\
-	{ "DC_copyback",				0x44,  0x7F },	\
-	{ "DC_dtlb_L1_miss_L2_hit",			0x45,  0x3 },	\
-	{ "DC_dtlb_L1_miss_L2_miss",			0x46,  0x7 },	\
-	{ "DC_1bit_ecc_error_found",			0x4A,  0xF },	\
-	{ "DC_dtlb_L1_hit",				0x4D,  0x7 },	\
-	{ "BU_system_read_responses",			0x6C,  0x17 },	\
-	{ "BU_octwords_written_to_system",		0x6D,  0x1 },	\
-	{ "BU_internal_L2_req",				0x7D,  0x3F },	\
-	{ "BU_fill_req_missed_L2",			0x7E,  0xF },	\
-	{ "BU_fill_into_L2",				0x7F,  0x3 },	\
-	{ "IC_itlb_L1_miss_L2_miss",			0x85,  0x3 },	\
-	{ "IC_eviction",				0x8B,  0x0 },	\
-	{ "IC_cache_lines_invalidate",			0x8C,  0xF },	\
-	{ "IC_itlb_reload",				0x99,  0x0 },	\
-	{ "IC_itlb_reload_aborted",			0x9A,  0x0 },	\
-	{ "FR_retired_mmx_sse_fp_instr",		0xCB,  0x7 },	\
-	{ "NB_mem_ctrlr_page_access",			0xE0,  0xFF },	\
-	{ "NB_mem_ctrlr_page_table_overflow",		0xE1,  0x3 },	\
-	{ "NB_mem_ctrlr_turnaround",			0xE3,  0x3F },	\
-	{ "NB_thermal_status",				0xE8,  0x7C},	\
-	{ "NB_sized_commands",				0xEB,  0x3F },	\
-	{ "NB_probe_results_upstream_req",		0xEC,  0xFF},	\
-	{ "NB_gart_events",				0xEE,  0xFF },	\
-	{ "NB_ht_bus0_bandwidth",			0xF6,  0xBF },	\
-	{ "NB_ht_bus1_bandwidth",			0xF7,  0xBF },	\
-	{ "NB_ht_bus2_bandwidth",			0xF8,  0xBF },	\
-	{ "NB_ht_bus3_bandwidth",			0x1F9, 0xBF },	\
-	{ "LS_locked_operation",			0x24,  0xF },	\
-	{ "LS_cancelled_store_to_load_fwd_ops",		0x2A,  0x7 },	\
-	{ "LS_smi_received",				0x2B,  0x0 },	\
-	{ "LS_ineffective_prefetch",			0x52,  0x9 },	\
-	{ "LS_global_tlb_flush",			0x54,  0x0 },	\
-	{ "NB_mem_ctrlr_dram_cmd_slots_missed",		0xE2,  0x3 },	\
-	{ "NB_mem_ctrlr_req",				0x1F0, 0xFF },	\
-	{ "CB_cpu_to_dram_req_to_target",		0x1E0, 0xFF },	\
-	{ "CB_io_to_dram_req_to_target",		0x1E1, 0xFF },	\
-	{ "CB_cpu_read_cmd_latency_to_target_0_to_3",	0x1E2, 0xFF },	\
-	{ "CB_cpu_read_cmd_req_to_target_0_to_3",	0x1E3, 0xFF },	\
-	{ "CB_cpu_read_cmd_latency_to_target_4_to_7",	0x1E4, 0xFF },	\
-	{ "CB_cpu_read_cmd_req_to_target_4_to_7",	0x1E5, 0xFF },	\
-	{ "CB_cpu_cmd_latency_to_target_0_to_7",	0x1E6, 0xFF },	\
-	{ "CB_cpu_req_to_target_0_to_7",		0x1E7, 0xFF },	\
-	{ "L3_read_req",				0x4E0, 0xF7 },	\
-	{ "L3_miss",					0x4E1, 0xF7 },	\
-	{ "L3_l2_eviction_l3_fill",			0x4E2, 0xFF },	\
-	{ "L3_eviction",				0x4E3, 0xF  }
+#define	AMD_FAMILY_11h_events					\
+	{ "BU_quadwords_written_to_system",		0x6D },	\
+	{ "FR_retired_mmx_fp_instr",			0xCB },	\
+	{ "NB_mem_ctrlr_page_table_events",		0xE1 },	\
+	{ "NB_thermal_status",				0xE8 },	\
+	{ "NB_probe_results_upstream_req",		0xEC },	\
+	{ "NB_dev_events",				0xEE },	\
+	{ "NB_mem_ctrlr_req",				0x1F0 }
 
 #define	AMD_cmn_generic_events						\
 	{ "PAPI_br_ins",	"FR_retired_branches_w_excp_intr", 0x0 },\
@@ -372,31 +372,23 @@ typedef struct _amd_generic_event {
 	{ "PAPI_l3_ldm",	"L3_miss",			0xf3 }, \
 	{ "PAPI_l3_tcm",	"L3_miss",			0xf7 }
 
-static amd_event_t opt_events[] = {
-	AMD_cmn_events,
-	OPT_events,
-	EV_END
-};
+#define	AMD_PCBE_SUPPORTED(family) (((family) >= 0xf) && ((family) <= 0x11))
 
-static amd_event_t opt_events_rev_D[] = {
+static amd_event_t family_f_events[] = {
 	AMD_cmn_events,
-	OPT_events,
-	OPT_RevD_events,
-	EV_END
-};
-
-static amd_event_t opt_events_rev_E[] = {
-	AMD_cmn_events,
-	OPT_events,
-	OPT_RevD_events,
-	OPT_RevE_events,
+	AMD_FAMILY_f_events,
 	EV_END
 };
 
 static amd_event_t family_10h_events[] = {
 	AMD_cmn_events,
-	OPT_RevE_events,
-	AMD_FAMILY_10h_cmn_events,
+	AMD_FAMILY_10h_events,
+	EV_END
+};
+
+static amd_event_t family_11h_events[] = {
+	AMD_cmn_events,
+	AMD_FAMILY_11h_events,
 	EV_END
 };
 
@@ -418,18 +410,30 @@ static amd_event_t *amd_events = NULL;
 static uint_t amd_family;
 static amd_generic_event_t *amd_generic_events = NULL;
 
+#define	AMD_CPUREF_SIZE	256
+static char amd_generic_bkdg[AMD_CPUREF_SIZE];
+static char amd_fam_f_rev_ae_bkdg[] = "See \"BIOS and Kernel Developer's " \
+"Guide for AMD Athlon 64 and AMD Opteron Processors\" (AMD publication 26094)";
+static char amd_fam_f_NPT_bkdg[] = "See \"BIOS and Kernel Developer's Guide " \
+"for AMD NPT Family 0Fh Processors\" (AMD publication 32559)";
+static char amd_fam_10h_bkdg[] = "See \"BIOS and Kernel Developer's Guide " \
+"(BKDG) For AMD Family 10h Processors\" (AMD publication 31116)";
+static char amd_fam_11h_bkdg[] = "See \"BIOS and Kernel Developer's Guide " \
+"(BKDG) For AMD Family 11h Processors\" (AMD publication 41256)";
+
+static char amd_pcbe_impl_name[64];
+static char *amd_pcbe_cpuref;
+
+
 #define	BITS(v, u, l)   \
 	(((v) >> (l)) & ((1 << (1 + (u) - (l))) - 1))
 
-#define	OPTERON_FAMILY	0xf
-#define	AMD_FAMILY_10H	0x10
 
 static int
 opt_pcbe_init(void)
 {
 	amd_event_t		*evp;
 	amd_generic_event_t	*gevp;
-	uint32_t		rev;
 
 	amd_family = cpuid_getfamily(CPU);
 
@@ -438,33 +442,58 @@ opt_pcbe_init(void)
 	 * loads this module based on its name in the module directory, but it
 	 * could have been renamed.
 	 */
-	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD ||
-	    (amd_family != OPTERON_FAMILY && amd_family != AMD_FAMILY_10H))
+	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD || amd_family < 0xf)
 		return (-1);
+
+	if (amd_family == 0xf)
+		/* Some tools expect this string for family 0fh */
+		snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
+		    "AMD Opteron & Athlon64");
+	else
+		snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
+		    "AMD Family %02xh%s", amd_family,
+		    AMD_PCBE_SUPPORTED(amd_family) ? "" :" (unsupported)");
 
 	/*
 	 * Figure out processor revision here and assign appropriate
 	 * event configuration.
 	 */
 
-	rev = cpuid_getchiprev(CPU);
+	if (amd_family == 0xf) {
+		uint32_t rev;
 
-	if (amd_family == OPTERON_FAMILY) {
+		rev = cpuid_getchiprev(CPU);
+
+		if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F))
+			amd_pcbe_cpuref = amd_fam_f_NPT_bkdg;
+		else
+			amd_pcbe_cpuref = amd_fam_f_rev_ae_bkdg;
+		amd_events = family_f_events;
 		amd_generic_events = opt_generic_events;
-		if (!X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_D)) {
-			amd_events = opt_events;
-		} else if X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_D) {
-			amd_events = opt_events_rev_D;
-		} else if (X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_E) ||
-		    X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_F) ||
-		    X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_G)) {
-			amd_events = opt_events_rev_E;
-		} else {
-			amd_events = opt_events;
-		}
-	} else {
+	} else if (amd_family == 0x10) {
+		amd_pcbe_cpuref = amd_fam_10h_bkdg;
 		amd_events = family_10h_events;
 		amd_generic_events = family_10h_generic_events;
+	} else if (amd_family == 0x11) {
+		amd_pcbe_cpuref = amd_fam_11h_bkdg;
+		amd_events = family_11h_events;
+		amd_generic_events = opt_generic_events;
+	} else {
+
+		amd_pcbe_cpuref = amd_generic_bkdg;
+		snprintf(amd_pcbe_cpuref, AMD_CPUREF_SIZE,
+		    "See BIOS and Kernel Developer's Guide "    \
+		    "(BKDG) For AMD Family %02xh Processors. "  \
+		    "(Note that this pcbe does not explicitly " \
+		    "support this family)", amd_family);
+
+		/*
+		 * For families that are not explicitly supported we'll use
+		 * events for family 0xf. Even if they are not quite right,
+		 * it's OK --- we state that pcbe is unsupported.
+		 */
+		amd_events = family_f_events;
+		amd_generic_events = opt_generic_events;
 	}
 
 	/*
@@ -511,29 +540,14 @@ opt_pcbe_ncounters(void)
 static const char *
 opt_pcbe_impl_name(void)
 {
-	if (amd_family == OPTERON_FAMILY) {
-		return ("AMD Opteron & Athlon64");
-	} else if (amd_family == AMD_FAMILY_10H) {
-		return ("AMD Family 10h");
-	} else {
-		return ("Unknown AMD processor");
-	}
+	return (amd_pcbe_impl_name);
 }
 
 static const char *
 opt_pcbe_cpuref(void)
 {
-	if (amd_family == OPTERON_FAMILY) {
-		return ("See Chapter 10 of the \"BIOS and Kernel Developer's"
-		" Guide for the AMD Athlon 64 and AMD Opteron Processors,\" "
-		"AMD publication #26094");
-	} else if (amd_family == AMD_FAMILY_10H) {
-		return ("See section 3.15 of the \"BIOS and Kernel "
-		"Developer's Guide (BKDG) For AMD Family 10h Processors,\" "
-		"AMD publication #31116");
-	} else {
-		return ("Unknown AMD processor");
-	}
+
+	return (amd_pcbe_cpuref);
 }
 
 /*ARGSUSED*/
@@ -600,7 +614,7 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 {
 	opt_pcbe_config_t	*cfg;
 	amd_event_t		*evp;
-	amd_event_t		ev_raw = { "raw", 0, 0xFF };
+	amd_event_t		ev_raw = { "raw", 0};
 	amd_generic_event_t	*gevp;
 	int			i;
 	uint64_t		evsel = 0, evsel_tmp = 0;
@@ -643,18 +657,18 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	}
 
 	/*
-	 * Configuration of EventSelect register for family 10h processors.
+	 * Configuration of EventSelect register. While on some families
+	 * certain bits might not be supported (e.g. Guest/Host on family
+	 * 11h), setting these bits is harmless
 	 */
-	if (amd_family == AMD_FAMILY_10H) {
 
-		/* Set GuestOnly bit to 0 and HostOnly bit to 1 */
-		evsel &= ~OPT_PES_HOST;
-		evsel &= ~OPT_PES_GUEST;
+	/* Set GuestOnly bit to 0 and HostOnly bit to 1 */
+	evsel &= ~OPT_PES_HOST;
+	evsel &= ~OPT_PES_GUEST;
 
-		/* Set bits [35:32] for extended part of Event Select field */
-		evsel_tmp = evp->emask & 0x0f00;
-		evsel |= evsel_tmp << 24;
-	}
+	/* Set bits [35:32] for extended part of Event Select field */
+	evsel_tmp = evp->emask & 0x0f00;
+	evsel |= evsel_tmp << 24;
 
 	evsel |= evp->emask & 0x00ff;
 
@@ -681,8 +695,8 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 			evsel |= attrs[i].ka_val << OPT_PES_CMASK_SHIFT;
 		} else if (strcmp(attrs[i].ka_name, "umask") == 0) {
-			if ((attrs[i].ka_val | evp->umask_valid) !=
-			    evp->umask_valid)
+			if ((attrs[i].ka_val | OPT_PES_UMASK_MASK) !=
+			    OPT_PES_UMASK_MASK)
 				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 			evsel |= attrs[i].ka_val << OPT_PES_UMASK_SHIFT;
 		} else

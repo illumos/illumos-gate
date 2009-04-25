@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -783,13 +783,14 @@ cpc_walk_requests(cpc_t *cpc, cpc_set_t *set, void *arg,
 }
 
 /*ARGSUSED*/
-void
-cpc_walk_events_all(cpc_t *cpc, void *arg,
-    void (*action)(void *arg, const char *event))
+static void
+cpc_walk_events_impl(cpc_t *cpc, void *arg,
+    void (*action)(void *arg, const char *event), int is_generic)
 {
 	char		**list;
 	char		*p, *e;
 	int		i;
+	int		is_papi;
 	int		ncounters = cpc_npic(cpc);
 	cpc_strhash_t	*hash;
 
@@ -808,17 +809,24 @@ cpc_walk_events_all(cpc_t *cpc, void *arg,
 		while ((e = strchr(p, ',')) != NULL) {
 			*e = '\0';
 
-			/* Skip any generic event names we find. */
-			if ((strncmp(p, "PAPI", 4)) == 0) {
+			/*
+			 * Based on is_generic flag, skip appropriate
+			 * event names.
+			 */
+			is_papi = (strncmp(p, "PAPI", 4) == 0);
+			if (is_generic != is_papi) {
 				p = e + 1;
 				continue;
 			}
 
 			if (__cpc_strhash_add(hash, p) == -1)
 				goto err;
+
 			p = e + 1;
 		}
-		if ((strncmp(p, "PAPI", 4)) != 0) {
+
+		is_papi = (strncmp(p, "PAPI", 4) == 0);
+		if (is_generic == is_papi) {
 			if (__cpc_strhash_add(hash, p) == -1)
 				goto err;
 		}
@@ -836,53 +844,65 @@ err:
 
 /*ARGSUSED*/
 void
-cpc_walk_generic_events_all(cpc_t *cpc, void *arg,
-    void (*action)(void *arg, const char *event))
+cpc_walk_events_all(cpc_t *cpc, void *arg,
+		    void (*action)(void *arg, const char *event))
 {
-	char		**list;
-	char		*p, *e;
-	int		i;
-	int		ncounters = cpc_npic(cpc);
-	cpc_strhash_t	*hash;
+	cpc_walk_events_impl(cpc, arg, action, 0);
+}
 
-	if ((list = malloc(ncounters * sizeof (char *))) == NULL)
-		return;
 
-	if ((hash = __cpc_strhash_alloc()) == NULL) {
-		free(list);
+/*ARGSUSED*/
+void
+cpc_walk_generic_events_all(cpc_t *cpc, void *arg,
+			    void (*action)(void *arg, const char *event))
+{
+	cpc_walk_events_impl(cpc, arg, action, 1);
+}
+
+/*ARGSUSED*/
+static void
+cpc_walk_events_pic_impl(cpc_t *cpc, uint_t picno, void *arg,
+    void (*action)(void *arg, uint_t picno, const char *event), int is_generic)
+{
+	char	*p;
+	char	*e;
+	char	*list;
+	int	is_papi;
+
+	if (picno >= cpc->cpc_npic) {
+		errno = EINVAL;
 		return;
 	}
 
-	for (i = 0; i < ncounters; i++) {
-		if ((list[i] = strdup(cpc->cpc_evlist[i])) == NULL)
-			goto err;
-		p = list[i];
-		while ((e = strchr(p, ',')) != NULL) {
-			*e = '\0';
+	if ((list = strdup(cpc->cpc_evlist[picno])) == NULL)
+		return;
 
-			/* Skip any platform specific event names we find. */
-			if ((strncmp(p, "PAPI", 4)) != 0) {
-				p = e + 1;
-				continue;
-			}
+	/*
+	 * List now points to a comma-separated list of events supported by
+	 * the designated pic.
+	 */
+	p = list;
+	while ((e = strchr(p, ',')) != NULL) {
+		*e = '\0';
 
-			if (__cpc_strhash_add(hash, p) == -1)
-				goto err;
+		/*
+		 * Based on is_generic flag, skip appropriate
+		 * event names.
+		 */
+		is_papi = (strncmp(p, "PAPI", 4) == 0);
+		if (is_generic != is_papi) {
 			p = e + 1;
+			continue;
 		}
-		if ((strncmp(p, "PAPI", 4)) == 0) {
-			if (__cpc_strhash_add(hash, p) == -1)
-				goto err;
-		}
+
+		action(arg, picno, p);
+		p = e + 1;
 	}
 
-	while ((p = __cpc_strhash_next(hash)) != NULL)
-		action(arg, p);
+	is_papi = (strncmp(p, "PAPI", 4) == 0);
+	if (is_generic == is_papi)
+		action(arg, picno, p);
 
-err:
-	__cpc_strhash_free(hash);
-	for (i = 0; i < ncounters; i++)
-		free(list[i]);
 	free(list);
 }
 
@@ -891,43 +911,7 @@ void
 cpc_walk_events_pic(cpc_t *cpc, uint_t picno, void *arg,
     void (*action)(void *arg, uint_t picno, const char *event))
 {
-	char	*p;
-	char	*e;
-	char	*list;
-
-	if (picno >= cpc->cpc_npic) {
-		errno = EINVAL;
-		return;
-	}
-
-	if ((list = strdup(cpc->cpc_evlist[picno])) == NULL)
-		return;
-
-	/*
-	 * List now points to a comma-separated list of events supported by
-	 * the designated pic.
-	 */
-	p = list;
-	while ((e = strchr(p, ',')) != NULL) {
-		*e = '\0';
-
-		/* Skip any generic event names we find. */
-		if ((strncmp(p, "PAPI", 4)) == 0) {
-			p = e + 1;
-			continue;
-		}
-
-		action(arg, picno, p);
-		p = e + 1;
-	}
-
-	if ((strncmp(p, "PAPI", 4)) == 0)
-		goto out;
-
-	action(arg, picno, p);
-
-out:
-	free(list);
+	cpc_walk_events_pic_impl(cpc, picno, arg, action, 0);
 }
 
 /*ARGSUSED*/
@@ -935,43 +919,7 @@ void
 cpc_walk_generic_events_pic(cpc_t *cpc, uint_t picno, void *arg,
     void (*action)(void *arg, uint_t picno, const char *event))
 {
-	char	*p;
-	char	*e;
-	char	*list;
-
-	if (picno >= cpc->cpc_npic) {
-		errno = EINVAL;
-		return;
-	}
-
-	if ((list = strdup(cpc->cpc_evlist[picno])) == NULL)
-		return;
-
-	/*
-	 * List now points to a comma-separated list of events supported by
-	 * the designated pic.
-	 */
-	p = list;
-	while ((e = strchr(p, ',')) != NULL) {
-		*e = '\0';
-
-		/* Skip any platform specific event names we find. */
-		if ((strncmp(p, "PAPI", 4)) != 0) {
-			p = e + 1;
-			continue;
-		}
-
-		action(arg, picno, p);
-		p = e + 1;
-	}
-
-	if ((strncmp(p, "PAPI", 4)) != 0)
-		goto out;
-
-	action(arg, picno, p);
-
-out:
-	free(list);
+	cpc_walk_events_pic_impl(cpc, picno, arg, action, 1);
 }
 
 /*ARGSUSED*/
@@ -1190,6 +1138,7 @@ cpc_valid_event(cpc_t *cpc, uint_t pic, const char *ev)
 {
 	struct priv pr = { NULL, 0 };
 	char *end_ev;
+	int err;
 
 	pr.name = ev;
 	cpc_walk_events_pic(cpc, pic, &pr, ev_walker);
@@ -1202,18 +1151,22 @@ cpc_valid_event(cpc_t *cpc, uint_t pic, const char *ev)
 
 	/*
 	 * Before assuming this is an invalid event, see if we have been given
-	 * a raw event code. An event code of '0' is not recognized, as it
-	 * already has a corresponding event name in existing backends and it
-	 * is the only reasonable way to know if strtol() succeeded.
+	 * a raw event code.
 	 * Check the second argument of strtol() to ensure invalid events
 	 * beginning with number do not go through.
 	 */
-	if ((strtol(ev, &end_ev, 0) != 0) && (*end_ev == '\0'))
+	err = errno;
+	errno = 0;
+	(void) strtol(ev, &end_ev, 0);
+	if ((errno == 0) && (*end_ev == '\0')) {
 		/*
 		 * Success - this is a valid raw code in hex, decimal, or octal.
 		 */
+		errno = err;
 		return (1);
+	}
 
+	errno = err;
 	return (0);
 }
 

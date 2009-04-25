@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This Makefile builds the AMD Opteron/Athlon64 Performance Counter BackEnd.
 #
@@ -32,11 +31,10 @@ UTSBASE = ../..
 #
 #	Define module and object file sets.
 #
-MODULE		= pcbe.AuthenticAMD.15
+MODULE		= pcbe.AuthenticAMD
 OBJECTS		= $(OPTERON_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(OPTERON_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
-ROOTLINK	= $(USR_PCBE_DIR)/pcbe.AuthenticAMD.16
 
 #
 #	Include common rules.
@@ -49,7 +47,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_MODULE	= opteron_pcbe
 LINT_TARGET	= $(LINT_MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -79,9 +77,6 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
-
-$(ROOTLINK):    $(ROOTMODULE)
-	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #
 #	Include common targets.

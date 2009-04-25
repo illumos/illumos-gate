@@ -5898,6 +5898,20 @@ mondo_loop() {
 	rm -f $root/usr/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so
 	rm -f $root/usr/lib/mdb/kvm/amd64/cpu_ms.AuthenticAMD.15.so
 
+	# Remove pcbe drivers for AMD
+	#
+	# old: need to remove going forwards:
+	#
+	rm -f $root/usr/kernel/pcbe/pcbe.AuthenticAMD.15
+	rm -f $root/usr/kernel/pcbe/pcbe.AuthenticAMD.16
+	rm -f $root/usr/kernel/pcbe/amd64/pcbe.AuthenticAMD.15
+	rm -f $root/usr/kernel/pcbe/amd64/pcbe.AuthenticAMD.16
+	#
+	# new: need to remove going backwards:
+	#
+	rm -f $root/usr/kernel/pcbe/pcbe.AuthenticAMD
+	rm -f $root/usr/kernel/pcbe/amd64/pcbe.AuthenticAMD
+
 	# Remove cpu.generic from i86xpv platform
 	rm -f $root/platform/i86xpv/kernel/cpu/cpu.generic
 	rm -f $root/platform/i86xpv/kernel/cpu/amd64/cpu.generic
