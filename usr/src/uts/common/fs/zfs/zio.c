@@ -2217,7 +2217,14 @@ zio_done(zio_t *zio)
 
 	zio_gang_tree_free(&zio->io_gang_tree);
 
-	if (zio->io_reexecute && !(zio->io_flags & ZIO_FLAG_GODFATHER)) {
+	/*
+	 * Godfather I/Os should never suspend.
+	 */
+	if ((zio->io_flags & ZIO_FLAG_GODFATHER) &&
+	    (zio->io_reexecute & ZIO_REEXECUTE_SUSPEND))
+		zio->io_reexecute = 0;
+
+	if (zio->io_reexecute) {
 		/*
 		 * This is a logical I/O that wants to reexecute.
 		 *
@@ -2263,6 +2270,7 @@ zio_done(zio_t *zio)
 			 * but notify our parent.  Don't propagate errors
 			 * upward since we haven't permanently failed yet.
 			 */
+			ASSERT(!(zio->io_flags & ZIO_FLAG_GODFATHER));
 			zio->io_flags |= ZIO_FLAG_DONT_PROPAGATE;
 			zio_notify_parent(pio, zio, ZIO_WAIT_DONE);
 		} else if (zio->io_reexecute & ZIO_REEXECUTE_SUSPEND) {
@@ -2284,7 +2292,7 @@ zio_done(zio_t *zio)
 	}
 
 	ASSERT(zio_walk_children(zio) == NULL);
-	ASSERT(zio->io_reexecute == 0 || (zio->io_flags & ZIO_FLAG_GODFATHER));
+	ASSERT(zio->io_reexecute == 0);
 	ASSERT(zio->io_error == 0 || (zio->io_flags & ZIO_FLAG_CANFAIL));
 
 	/*
