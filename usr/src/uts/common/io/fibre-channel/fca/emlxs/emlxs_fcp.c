@@ -1707,6 +1707,13 @@ emlxs_offline(emlxs_hba_t *hba)
 	if (hba->bus_type == SBUS_FC) {
 		WRITE_SBUS_CSR_REG(hba, FC_SHS_REG(hba, hba->sbus_csr_addr),
 		    0x9A);
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_acc_handle(hba, hba->sbus_csr_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+		}
+#endif  /* FMA_SUPPORT */
 	}
 
 	/* Stop the timer */
@@ -1749,6 +1756,9 @@ done:
 extern int
 emlxs_power_down(emlxs_hba_t *hba)
 {
+#ifdef FMA_SUPPORT
+	emlxs_port_t *port = &PPORT;
+#endif  /* FMA_SUPPORT */
 	int32_t rval = 0;
 	uint32_t *ptr;
 	uint32_t i;
@@ -1770,6 +1780,15 @@ emlxs_power_down(emlxs_hba_t *hba)
 	    (uint8_t *)(hba->pci_addr + PCI_PM_CONTROL_REGISTER),
 	    (uint8_t)PCI_PM_D3_STATE);
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (1);
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (0);
 
 }  /* End emlxs_power_down */
@@ -1778,6 +1797,9 @@ emlxs_power_down(emlxs_hba_t *hba)
 extern int
 emlxs_power_up(emlxs_hba_t *hba)
 {
+#ifdef FMA_SUPPORT
+	emlxs_port_t *port = &PPORT;
+#endif  /* FMA_SUPPORT */
 	int32_t rval = 0;
 	uint32_t *ptr;
 	uint32_t i;
@@ -1797,6 +1819,15 @@ emlxs_power_up(emlxs_hba_t *hba)
 		(void) ddi_put32(hba->pci_acc_handle,
 		    (uint32_t *)(hba->pci_addr + i), *ptr);
 	}
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (1);
+	}
+#endif  /* FMA_SUPPORT */
 
 	/* Bring adapter online */
 	if ((rval = emlxs_online(hba))) {

@@ -3486,6 +3486,16 @@ emlxs_dfc_get_hbainfo(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		return (DFC_COPYOUT_ERROR);
 	}
 
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (0);
 
 } /* emlxs_dfc_get_hbainfo() */
@@ -4722,6 +4732,7 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		*bptr++ = PCIMEM_LONG(value);
 	}
 
+
 	if (ddi_copyout((void *)buffer, (void *)dfc->buf1, outsz, mode) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: ddi_copyout failed.", emlxs_dfc_xlate(dfc->cmd));
@@ -4731,6 +4742,17 @@ emlxs_dfc_read_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	}
 
 	kmem_free(buffer, size);
+
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (0);
 
 } /* emlxs_dfc_read_pci() */
@@ -4833,6 +4855,16 @@ emlxs_dfc_write_pci(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		ddi_put16(hba->pci_acc_handle,
 		    (uint16_t *)(hba->pci_addr + i + 2), (uint16_t)word1);
 	}
+
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -6067,6 +6099,16 @@ emlxs_dfc_write_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	kmem_free(buffer, cnt);
 
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->sbus_flash_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (0);
 
 } /* emlxs_dfc_write_flash() */
@@ -6151,6 +6193,16 @@ emlxs_dfc_read_flash(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	}
 
 	kmem_free(buffer, outsz);
+
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->sbus_flash_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -6828,6 +6880,18 @@ emlxs_dfc_read_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	kmem_free(buffer, size);
 
+#ifdef FMA_SUPPORT
+	if (!(hba->flag & FC_SLIM2_MODE)) {
+		/* Access handle validation */
+		if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+			return (DFC_DRV_ERROR);
+		}
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (0);
 
 } /* emlxs_dfc_read_mem() */
@@ -6919,6 +6983,18 @@ emlxs_dfc_write_mem(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 	kmem_free(buffer, size);
 
+#ifdef FMA_SUPPORT
+	if (!(hba->flag & FC_SLIM2_MODE)) {
+		/* Access handle validation */
+		if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+			return (DFC_DRV_ERROR);
+		}
+	}
+#endif  /* FMA_SUPPORT */
+
 	return (0);
 
 } /* emlxs_dfc_write_mem() */
@@ -6959,6 +7035,16 @@ emlxs_dfc_write_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 	}
 
 	WRITE_CSR_REG(hba, (hba->csr_addr + offset), value);
+
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->csr_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -7014,6 +7100,16 @@ emlxs_dfc_read_ctlreg(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 
 		return (DFC_COPYOUT_ERROR);
 	}
+
+#ifdef FMA_SUPPORT
+	/* Access handle validation */
+	if (emlxs_fm_check_acc_handle(hba, hba->csr_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (DFC_DRV_ERROR);
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -7459,6 +7555,16 @@ emlxs_get_dump_region(emlxs_hba_t *hba, uint32_t region,
 		wptr[2] = READ_CSR_REG(hba, FC_HS_REG(hba, hba->csr_addr));
 		wptr[3] = READ_CSR_REG(hba, FC_HC_REG(hba, hba->csr_addr));
 
+#ifdef FMA_SUPPORT
+		/* Access handle validation */
+		if (emlxs_fm_check_acc_handle(hba, hba->csr_acc_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+			rval = DFC_DRV_ERROR;
+		}
+#endif  /* FMA_SUPPORT */
+
 		break;
 
 	case 1:	/* SLIM */
@@ -7481,6 +7587,15 @@ emlxs_get_dump_region(emlxs_hba_t *hba, uint32_t region,
 			memptr = (uint8_t *)hba->slim_addr;
 			READ_SLIM_COPY(hba, (uint32_t *)buffer,
 			    (uint32_t *)memptr, (size / 4));
+#ifdef FMA_SUPPORT
+			/* Access handle validation */
+			if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+			    != DDI_FM_OK) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_invalid_access_handle_msg, NULL);
+				rval = DFC_DRV_ERROR;
+			}
+#endif  /* FMA_SUPPORT */
 		}
 
 		break;
@@ -7533,6 +7648,15 @@ emlxs_get_dump_region(emlxs_hba_t *hba, uint32_t region,
 			memptr = (uint8_t *)hba->slim_addr;
 			READ_SLIM_COPY(hba, (uint32_t *)buffer,
 			    (uint32_t *)memptr, (size / 4));
+#ifdef FMA_SUPPORT
+			/* Access handle validation */
+			if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+			    != DDI_FM_OK) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_invalid_access_handle_msg, NULL);
+				rval = DFC_DRV_ERROR;
+			}
+#endif  /* FMA_SUPPORT */
 		}
 
 		break;
@@ -7559,6 +7683,15 @@ emlxs_get_dump_region(emlxs_hba_t *hba, uint32_t region,
 			    (uint8_t *)hba->slim_addr + hba->hgp_ring_offset;
 			READ_SLIM_COPY(hba, (uint32_t *)buffer,
 			    (uint32_t *)memptr, (size / 4));
+#ifdef FMA_SUPPORT
+			/* Access handle validation */
+			if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+			    != DDI_FM_OK) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_invalid_access_handle_msg, NULL);
+				rval = DFC_DRV_ERROR;
+			}
+#endif  /* FMA_SUPPORT */
 		}
 
 		break;

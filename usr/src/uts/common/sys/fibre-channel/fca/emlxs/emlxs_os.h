@@ -57,7 +57,7 @@ extern "C" {
 
 #define	DUMP_SUPPORT		/* 2.40 driver */
 #define	SAN_DIAG_SUPPORT	/* 2.40 driver */
-/* #define	FMA_SUPPORT	2.40 driver - Not yet */
+#define	FMA_SUPPORT		/* 2.40 driver */
 
 /* #define	IDLE_TIMER	 Not yet - untested */
 

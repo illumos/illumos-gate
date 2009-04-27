@@ -876,8 +876,8 @@ emlxs_msg_t emlxs_message[] =
 		"command was completed. This error could indicate a driver " \
 		"or firmware problem.", \
 		ACTION_NONE_REP, \
-		NULL, \
-		DDI_SERVICE_UNAFFECTED)
+		DDI_FM_DEVICE_INTERN_UNCORR, \
+		DDI_SERVICE_DEGRADED)
 
 	DEFINE_MSG(530, \
 		emlxs_mbox_timeout_msg, \

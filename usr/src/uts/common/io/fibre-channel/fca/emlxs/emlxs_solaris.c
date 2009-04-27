@@ -442,26 +442,6 @@ static struct cb_ops emlxs_cb_ops = {
 	nodev		/* cb_awrite	*/
 };
 
-/* Generic bus ops */
-static struct bus_ops emlxs_bus_ops = {
-	BUSO_REV,
-	nullbusmap,			/* bus_map */
-	NULL,				/* bus_get_intrspec */
-	NULL,				/* bus_add_intrspec */
-	NULL,				/* bus_remove_intrspec */
-	i_ddi_map_fault,		/* bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
-	ddi_dma_allochdl,		/* bus_dma_allochdl */
-	ddi_dma_freehdl,		/* bus_dma_freehdl */
-	ddi_dma_bindhdl,		/* bus_dma_bindhdl */
-	ddi_dma_unbindhdl,		/* bus_unbindhdl */
-	ddi_dma_flush,			/* bus_dma_flush */
-	ddi_dma_win,			/* bus_dma_win */
-	ddi_dma_mctl,			/* bus_dma_ctl */
-	ddi_ctlops,			/* bus_ctl */
-	ddi_bus_prop_op,		/* bus_prop_op */
-};
-
 static struct dev_ops emlxs_ops = {
 	DEVO_REV,	/* rev */
 	0,	/* refcnt */
@@ -472,8 +452,7 @@ static struct dev_ops emlxs_ops = {
 	emlxs_detach,	/* detach	*/
 	nodev,		/* reset	*/
 	&emlxs_cb_ops,	/* devo_cb_ops	*/
-	&emlxs_bus_ops,	/* bus ops - Gets replaced by */
-			/* fctl_fca_busops in fc_fca_init */
+	NULL,		/* devo_bus_ops */
 	emlxs_power,	/* power ops	*/
 #ifdef EMLXS_I386
 #ifdef S11
@@ -6373,6 +6352,16 @@ emlxs_map_bus(emlxs_hba_t *hba)
 		(void) ddi_put16(hba->pci_acc_handle,
 		    (uint16_t *)(hba->pci_addr + PCI_COMMAND_REGISTER),
 		    CMD_CFG_VALUE | CMD_IO_ENBL);
+
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+			goto failed;
+		}
+#endif  /* FMA_SUPPORT */
+
 #endif	/* EMLXS_I386 */
 
 	}

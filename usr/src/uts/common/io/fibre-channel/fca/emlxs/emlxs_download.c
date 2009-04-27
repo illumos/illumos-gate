@@ -518,6 +518,15 @@ emlxs_cfl_download(emlxs_hba_t *hba, uint32_t region, caddr_t buffer,
 	    (volatile uint32_t *)((volatile char *)hba->slim_addr +
 	    sizeof (MAILBOX)), (len / sizeof (uint32_t)));
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		rval = 1;
+	}
+#endif  /* FMA_SUPPORT */
+
 	emlxs_format_update_pci_cfg(hba, mb, region_id, len);
 
 	if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) != MBX_SUCCESS) {
@@ -790,6 +799,18 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 		Buffer += DlCount;
 		DlToAddr += DlCount;
 	}
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+
+		rval = 1;
+
+		goto EXIT_ABS_DOWNLOAD;
+	}
+#endif  /* FMA_SUPPORT */
 
 	bzero((caddr_t)&ImageHdr, sizeof (IMAGE_HDR));
 	ImageHdr.Id.Type = FUNC_FIRMWARE;
@@ -1288,6 +1309,18 @@ emlxs_start_rel_download(emlxs_hba_t *hba,
 		Buffer += DlCount;
 	}
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+
+		rval = 1;
+
+		goto EXIT_REL_DOWNLOAD;
+	}
+#endif  /* FMA_SUPPORT */
+
 	switch (ImageHdr->Id.Type) {
 	case TEST_PROGRAM:
 		rval = 0;
@@ -1503,6 +1536,14 @@ emlxs_write_fcode_flash(emlxs_hba_t *hba,
 		}
 	}
 
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->sbus_flash_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (1);
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -1607,6 +1648,15 @@ emlxs_erase_fcode_flash(emlxs_hba_t *hba)
 			}
 		}
 	}
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->sbus_flash_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (1);
+	}
+#endif  /* FMA_SUPPORT */
 
 	return (0);
 
@@ -3027,6 +3077,18 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 		Buffer += DlCount;
 		DlToAddr += DlCount;
 	}
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->slim_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+
+		rval = EMLXS_IMAGE_FAILED;
+
+		goto EXIT_ABS_DOWNLOAD;
+	}
+#endif  /* FMA_SUPPORT */
 
 	if (RspProgress != RSP_DOWNLOAD_DONE) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,

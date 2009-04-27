@@ -128,6 +128,14 @@ emlxs_ffinit(emlxs_hba_t *hba)
 	if (hba->bus_type == SBUS_FC) {
 		(void) READ_SBUS_CSR_REG(hba, FC_SHS_REG(hba,
 		    hba->sbus_csr_addr));
+#ifdef FMA_SUPPORT
+		if (emlxs_fm_check_acc_handle(hba, hba->sbus_csr_handle)
+		    != DDI_FM_OK) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_invalid_access_handle_msg, NULL);
+			return (EIO);
+		}
+#endif  /* FMA_SUPPORT */
 	}
 
 #ifdef SLI3_SUPPORT
@@ -3364,6 +3372,15 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 #endif /* MSI_SUPPORT */
 
 	}
+
+#ifdef FMA_SUPPORT
+	if (emlxs_fm_check_acc_handle(hba, hba->pci_acc_handle)
+	    != DDI_FM_OK) {
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_invalid_access_handle_msg, NULL);
+		return (0);
+	}
+#endif  /* FMA_SUPPORT */
 
 	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
 		return (0);
