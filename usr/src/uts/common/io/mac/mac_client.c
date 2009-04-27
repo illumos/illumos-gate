@@ -1173,6 +1173,9 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 		if (flags & MAC_OPEN_FLAGS_EXCLUSIVE)
 			mcip->mci_state_flags |= MCIS_EXCLUSIVE;
 
+		if (flags & MAC_OPEN_FLAGS_MULTI_PRIMARY)
+			mcip->mci_flags |= MAC_CLIENT_FLAGS_MULTI_PRIMARY;
+
 		mip->mi_clients_list = mcip;
 		i_mac_perim_exit(mip);
 		*mchp = (mac_client_handle_t)mcip;
@@ -1185,8 +1188,13 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	mcip->mci_upper_mip = NULL;
 	mcip->mci_rx_fn = mac_pkt_drop;
 	mcip->mci_rx_arg = NULL;
+	mcip->mci_rx_p_fn = NULL;
+	mcip->mci_rx_p_arg = NULL;
+	mcip->mci_p_unicast_list = NULL;
 	mcip->mci_direct_rx_fn = NULL;
 	mcip->mci_direct_rx_arg = NULL;
+
+	mcip->mci_unicast_list = NULL;
 
 	if ((flags & MAC_OPEN_FLAGS_IS_VNIC) != 0)
 		mcip->mci_state_flags |= MCIS_IS_VNIC;
@@ -1227,6 +1235,10 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 		}
 		(void) strlcpy(mcip->mci_name, name, sizeof (mcip->mci_name));
 	}
+
+	if (flags & MAC_OPEN_FLAGS_MULTI_PRIMARY)
+		mcip->mci_flags |= MAC_CLIENT_FLAGS_MULTI_PRIMARY;
+
 	/* the subflow table will be created dynamically */
 	mcip->mci_subflow_tab = NULL;
 	mcip->mci_stat_multircv = 0;
@@ -1615,6 +1627,185 @@ mac_update_single_active_client(mac_impl_t *mip)
 }
 
 /*
+ * Set up the data path. Called from i_mac_unicast_add after having
+ * done all the validations including making sure this is an active
+ * client (i.e that is ready to process packets.)
+ */
+static int
+mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
+    uint8_t *mac_addr, mac_resource_props_t *mrp, boolean_t isprimary,
+    mac_unicast_impl_t *muip)
+{
+	mac_impl_t	*mip = mcip->mci_mip;
+	boolean_t	mac_started = B_FALSE;
+	boolean_t	bcast_added = B_FALSE;
+	boolean_t	nactiveclients_added = B_FALSE;
+	flow_entry_t	*flent;
+	int		err = 0;
+
+	if ((err = mac_start((mac_handle_t)mip)) != 0)
+		goto bail;
+
+	mac_started = B_TRUE;
+
+	/* add the MAC client to the broadcast address group by default */
+	if (mip->mi_type->mt_brdcst_addr != NULL) {
+		err = mac_bcast_add(mcip, mip->mi_type->mt_brdcst_addr, vid,
+		    MAC_ADDRTYPE_BROADCAST);
+		if (err != 0)
+			goto bail;
+		bcast_added = B_TRUE;
+	}
+
+	/*
+	 * If this is the first unicast address addition for this
+	 * client, reuse the pre-allocated larval flow entry associated with
+	 * the MAC client.
+	 */
+	flent = (mcip->mci_nflents == 0) ? mcip->mci_flent : NULL;
+
+	/* We are configuring the unicast flow now */
+	if (!MCIP_DATAPATH_SETUP(mcip)) {
+
+		MAC_CLIENT_SET_PRIORITY_RANGE(mcip,
+		    (mrp->mrp_mask & MRP_PRIORITY) ? mrp->mrp_priority :
+		    MPL_LINK_DEFAULT);
+
+		if ((err = mac_unicast_flow_create(mcip, mac_addr, vid,
+		    isprimary, B_TRUE, &flent, mrp)) != 0)
+			goto bail;
+
+		mip->mi_nactiveclients++;
+		nactiveclients_added = B_TRUE;
+
+		/*
+		 * This will allocate the RX ring group if possible for the
+		 * flow and program the software classifier as needed.
+		 */
+		if ((err = mac_datapath_setup(mcip, flent, SRST_LINK)) != 0)
+			goto bail;
+
+		/*
+		 * The unicast MAC address must have been added successfully.
+		 */
+		ASSERT(mcip->mci_unicast != NULL);
+		/*
+		 * Push down the sub-flows that were defined on this link
+		 * hitherto. The flows are added to the active flow table
+		 * and SRS, softrings etc. are created as needed.
+		 */
+		mac_link_init_flows((mac_client_handle_t)mcip);
+	} else {
+		mac_address_t *map = mcip->mci_unicast;
+
+		/*
+		 * A unicast flow already exists for that MAC client,
+		 * this flow must be the same mac address but with
+		 * different VID. It has been checked by mac_addr_in_use().
+		 *
+		 * We will use the SRS etc. from the mci_flent. Note that
+		 * We don't need to create kstat for this as except for
+		 * the fdesc, everything will be used from in the 1st flent.
+		 */
+
+		if (bcmp(mac_addr, map->ma_addr, map->ma_len) != 0) {
+			err = EINVAL;
+			goto bail;
+		}
+
+		if ((err = mac_unicast_flow_create(mcip, mac_addr, vid,
+		    isprimary, B_FALSE, &flent, NULL)) != 0) {
+			goto bail;
+		}
+		if ((err = mac_flow_add(mip->mi_flow_tab, flent)) != 0) {
+			FLOW_FINAL_REFRELE(flent);
+			goto bail;
+		}
+
+		/* update the multicast group for this vid */
+		mac_client_bcast_refresh(mcip, mac_client_update_mcast,
+		    (void *)flent, B_TRUE);
+
+	}
+
+	/* populate the shared MAC address */
+	muip->mui_map = mcip->mci_unicast;
+
+	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
+	muip->mui_next = mcip->mci_unicast_list;
+	mcip->mci_unicast_list = muip;
+	rw_exit(&mcip->mci_rw_lock);
+
+
+	/*
+	 * First add the flent to the flow list of this mcip. Then set
+	 * the mip's mi_single_active_client if needed. The Rx path assumes
+	 * that mip->mi_single_active_client will always have an associated
+	 * flent.
+	 */
+	mac_client_add_to_flow_list(mcip, flent);
+
+	if (nactiveclients_added)
+		mac_update_single_active_client(mip);
+	/*
+	 * Trigger a renegotiation of the capabilities when the number of
+	 * active clients changes from 1 to 2, since some of the capabilities
+	 * might have to be disabled. Also send a MAC_NOTE_LINK notification
+	 * to all the MAC clients whenever physical link is DOWN.
+	 */
+	if (mip->mi_nactiveclients == 2) {
+		mac_capab_update((mac_handle_t)mip);
+		mac_virtual_link_update(mip);
+	}
+	/*
+	 * Now that the setup is complete, clear the INCIPIENT flag.
+	 * The flag was set to avoid incoming packets seeing inconsistent
+	 * structures while the setup was in progress. Clear the mci_tx_flag
+	 * by calling mac_tx_client_block. It is possible that
+	 * mac_unicast_remove was called prior to this mac_unicast_add which
+	 * could have set the MCI_TX_QUIESCE flag.
+	 */
+	if (flent->fe_rx_ring_group != NULL)
+		mac_rx_group_unmark(flent->fe_rx_ring_group, MR_INCIPIENT);
+	FLOW_UNMARK(flent, FE_INCIPIENT);
+	FLOW_UNMARK(flent, FE_MC_NO_DATAPATH);
+	mac_tx_client_unblock(mcip);
+	return (0);
+bail:
+	if (bcast_added)
+		mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr, vid);
+	if (mac_started)
+		mac_stop((mac_handle_t)mip);
+
+	if (nactiveclients_added)
+		mip->mi_nactiveclients--;
+
+	kmem_free(muip, sizeof (mac_unicast_impl_t));
+	return (err);
+}
+
+/*
+ * Return the passive primary MAC client, if present. The passive client is
+ * a stand-by client that has the same unicast address as another that is
+ * currenly active. Once the active client goes away, the passive client
+ * becomes active.
+ */
+static mac_client_impl_t *
+mac_get_passive_primary_client(mac_impl_t *mip)
+{
+	mac_client_impl_t	*mcip;
+
+	for (mcip = mip->mi_clients_list; mcip != NULL;
+	    mcip = mcip->mci_client_next) {
+		if (mac_is_primary_client(mcip) &&
+		    (mcip->mci_flags & MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) != 0) {
+			return (mcip);
+		}
+	}
+	return (NULL);
+}
+
+/*
  * Add a new unicast address to the MAC client.
  *
  * The MAC address can be specified either by value, or the MAC client
@@ -1630,21 +1821,19 @@ int
 i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
     mac_unicast_handle_t *mah, uint16_t vid, mac_diag_t *diag)
 {
-	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_impl_t *mip = mcip->mci_mip;
-	mac_unicast_impl_t *muip;
-	flow_entry_t *flent;
-	int err;
-	uint_t mac_len = mip->mi_type->mt_addr_length;
-	boolean_t check_dups = !(flags & MAC_UNICAST_NODUPCHECK);
-	boolean_t is_primary = (flags & MAC_UNICAST_PRIMARY);
-	boolean_t is_vnic_primary = (flags & MAC_UNICAST_VNIC_PRIMARY);
-	boolean_t is_unicast_hw = (flags & MAC_UNICAST_HW);
-	boolean_t bcast_added = B_FALSE;
-	boolean_t nactiveclients_added = B_FALSE;
-	boolean_t mac_started = B_FALSE;
-	boolean_t fastpath_disabled = B_FALSE;
-	mac_resource_props_t mrp;
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_impl_t		*mip = mcip->mci_mip;
+	int			err;
+	uint_t			mac_len = mip->mi_type->mt_addr_length;
+	boolean_t		check_dups = !(flags & MAC_UNICAST_NODUPCHECK);
+	boolean_t		fastpath_disabled = B_FALSE;
+	boolean_t		is_primary = (flags & MAC_UNICAST_PRIMARY);
+	boolean_t		is_unicast_hw = (flags & MAC_UNICAST_HW);
+	mac_resource_props_t	mrp;
+	boolean_t		passive_client = B_FALSE;
+	mac_unicast_impl_t	*muip;
+	boolean_t		is_vnic_primary =
+	    (flags & MAC_UNICAST_VNIC_PRIMARY);
 
 	/* when VID is non-zero, the underlying MAC can not be VNIC */
 	ASSERT(!((mip->mi_state_flags & MIS_IS_VNIC) && (vid != 0)));
@@ -1663,6 +1852,8 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	 */
 	if ((mcip->mci_state_flags & MCIS_IS_VNIC) && is_primary &&
 	    !is_vnic_primary) {
+		mac_unicast_impl_t	*muip;
+
 		/*
 		 * The address is being set by the upper MAC client
 		 * of a VNIC. The MAC address was already set by the
@@ -1689,10 +1880,20 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 
 		/*
 		 * Ensure that the primary unicast address of the VNIC
-		 * is added only once.
+		 * is added only once unless we have the
+		 * MAC_CLIENT_FLAGS_MULTI_PRIMARY set (and this is not
+		 * a passive MAC client).
 		 */
-		if (mcip->mci_flags & MAC_CLIENT_FLAGS_VNIC_PRIMARY)
-			return (EBUSY);
+		if ((mcip->mci_flags & MAC_CLIENT_FLAGS_VNIC_PRIMARY) != 0) {
+			if ((mcip->mci_flags &
+			    MAC_CLIENT_FLAGS_MULTI_PRIMARY) == 0 ||
+			    (mcip->mci_flags &
+			    MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) != 0) {
+				return (EBUSY);
+			}
+			mcip->mci_flags |= MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
+			passive_client = B_TRUE;
+		}
 
 		mcip->mci_flags |= MAC_CLIENT_FLAGS_VNIC_PRIMARY;
 
@@ -1703,6 +1904,12 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		muip = kmem_zalloc(sizeof (mac_unicast_impl_t), KM_SLEEP);
 		muip->mui_vid = vid;
 		*mah = (mac_unicast_handle_t)muip;
+		/*
+		 * This will be used by the caller to defer setting the
+		 * rx functions.
+		 */
+		if (passive_client)
+			return (EAGAIN);
 		return (0);
 	}
 
@@ -1768,7 +1975,6 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 
 	if (is_primary || is_vnic_primary) {
 		mac_addr = mip->mi_addr;
-		check_dups = B_TRUE;
 	} else {
 
 		/*
@@ -1777,7 +1983,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		if (!mac_unicst_verify((mac_handle_t)mip, mac_addr, mac_len)) {
 			*diag = MAC_DIAG_MACADDR_INVALID;
 			err = EINVAL;
-			goto bail;
+			goto bail_out;
 		}
 
 		/*
@@ -1787,47 +1993,18 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		if (check_dups && bcmp(mip->mi_addr, mac_addr, mac_len) == 0) {
 			*diag = MAC_DIAG_MACADDR_NIC;
 			err = EINVAL;
-			goto bail;
+			goto bail_out;
 		}
 	}
 
 	/*
-	 * Make sure the MAC address is not already used by
-	 * another MAC client defined on top of the same
-	 * underlying NIC.
-	 * xxx-venu mac_unicast_add doesnt' seem to be called
-	 * with MAC_UNICAST_NODUPCHECK currently, if it does
-	 * get called we need to do mac_addr_in_use() just
-	 * to check for addr_in_use till 6697876 is fixed.
+	 * Set the flags here so that if this is a passive client, we
+	 * can return  and set it when we call mac_client_datapath_setup
+	 * when this becomes the active client. If we defer to using these
+	 * flags to mac_client_datapath_setup, then for a passive client,
+	 * we'd have to store the flags somewhere (probably fe_flags)
+	 * and then use it.
 	 */
-	if (check_dups && mac_addr_in_use(mip, mac_addr, vid)) {
-		*diag = MAC_DIAG_MACADDR_INUSE;
-		err = EEXIST;
-		goto bail;
-	}
-
-	if ((err = mac_start((mac_handle_t)mip)) != 0)
-		goto bail;
-
-	mac_started = B_TRUE;
-
-	/* add the MAC client to the broadcast address group by default */
-	if (mip->mi_type->mt_brdcst_addr != NULL) {
-		err = mac_bcast_add(mcip, mip->mi_type->mt_brdcst_addr, vid,
-		    MAC_ADDRTYPE_BROADCAST);
-		if (err != 0)
-			goto bail;
-		bcast_added = B_TRUE;
-	}
-
-	/*
-	 * If this is the first unicast address addition for this
-	 * client, reuse the pre-allocated larval flow entry associated with
-	 * the MAC client.
-	 */
-	flent = (mcip->mci_nflents == 0) ? mcip->mci_flent : NULL;
-
-	/* We are configuring the unicast flow now */
 	if (!MCIP_DATAPATH_SETUP(mcip)) {
 		if (is_unicast_hw) {
 			/*
@@ -1848,48 +2025,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 
 		if ((flags & MAC_UNICAST_DISABLE_TX_VID_CHECK) != 0)
 			mcip->mci_state_flags |= MCIS_DISABLE_TX_VID_CHECK;
-
-		MAC_CLIENT_SET_PRIORITY_RANGE(mcip,
-		    (mrp.mrp_mask & MRP_PRIORITY) ? mrp.mrp_priority :
-		    MPL_LINK_DEFAULT);
-
-		if ((err = mac_unicast_flow_create(mcip, mac_addr, vid,
-		    is_primary || is_vnic_primary, B_TRUE, &flent, &mrp)) != 0)
-			goto bail;
-
-		mip->mi_nactiveclients++;
-		nactiveclients_added = B_TRUE;
-
-		/*
-		 * This will allocate the RX ring group if possible for the
-		 * flow and program the software classifier as needed.
-		 */
-		if ((err = mac_datapath_setup(mcip, flent, SRST_LINK)) != 0)
-			goto bail;
-
-		/*
-		 * The unicast MAC address must have been added successfully.
-		 */
-		ASSERT(mcip->mci_unicast != NULL);
-		/*
-		 * Push down the sub-flows that were defined on this link
-		 * hitherto. The flows are added to the active flow table
-		 * and SRS, softrings etc. are created as needed.
-		 */
-		mac_link_init_flows(mch);
 	} else {
-		mac_address_t *map = mcip->mci_unicast;
-
-		/*
-		 * A unicast flow already exists for that MAC client,
-		 * this flow must be the same mac address but with
-		 * different VID. It has been checked by mac_addr_in_use().
-		 *
-		 * We will use the SRS etc. from the mci_flent. Note that
-		 * We don't need to create kstat for this as except for
-		 * the fdesc, everything will be used from in the 1st flent.
-		 */
-
 		/*
 		 * Assert that the specified flags are consistent with the
 		 * flags specified by previous calls to mac_unicast_add().
@@ -1909,11 +2045,6 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		    ((flags & MAC_UNICAST_DISABLE_TX_VID_CHECK) == 0 &&
 		    (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK) == 0));
 
-		if (bcmp(mac_addr, map->ma_addr, map->ma_len) != 0) {
-			err = EINVAL;
-			goto bail;
-		}
-
 		/*
 		 * Make sure the client is consistent about its requests
 		 * for MAC addresses. I.e. all requests from the clients
@@ -1924,87 +2055,95 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		    (mcip->mci_state_flags & MCIS_UNICAST_HW) == 0 &&
 		    is_unicast_hw) {
 			err = EINVAL;
-			goto bail;
+			goto bail_out;
 		}
-
-		if ((err = mac_unicast_flow_create(mcip, mac_addr, vid,
-		    is_primary || is_vnic_primary, B_FALSE, &flent, NULL)) != 0)
-			goto bail;
-
-		if ((err = mac_flow_add(mip->mi_flow_tab, flent)) != 0) {
-			FLOW_FINAL_REFRELE(flent);
-			goto bail;
+	}
+	/*
+	 * Make sure the MAC address is not already used by
+	 * another MAC client defined on top of the same
+	 * underlying NIC. Unless we have MAC_CLIENT_FLAGS_MULTI_PRIMARY
+	 * set when we allow a passive client to be present which will
+	 * be activated when the currently active client goes away - this
+	 * works only with primary addresses.
+	 */
+	if ((check_dups || is_primary || is_vnic_primary) &&
+	    mac_addr_in_use(mip, mac_addr, vid)) {
+		/*
+		 * Must have set the multiple primary address flag when
+		 * we did a mac_client_open AND this should be a primary
+		 * MAC client AND there should not already be a passive
+		 * primary. If all is true then we let this succeed
+		 * even if the address is a dup.
+		 */
+		if ((mcip->mci_flags & MAC_CLIENT_FLAGS_MULTI_PRIMARY) == 0 ||
+		    (mcip->mci_flags & MAC_CLIENT_FLAGS_PRIMARY) == 0 ||
+		    mac_get_passive_primary_client(mip) != NULL) {
+			*diag = MAC_DIAG_MACADDR_INUSE;
+			err = EEXIST;
+			goto bail_out;
 		}
+		ASSERT((mcip->mci_flags &
+		    MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) == 0);
+		mcip->mci_flags |= MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
 
-		/* update the multicast group for this vid */
-		mac_client_bcast_refresh(mcip, mac_client_update_mcast,
-		    (void *)flent, B_TRUE);
-
+		/*
+		 * Stash the unicast address handle, we will use it when
+		 * we set up the passive client.
+		 */
+		mcip->mci_p_unicast_list = muip;
+		*mah = (mac_unicast_handle_t)muip;
+		return (0);
 	}
 
-	/* populate the shared MAC address */
-	muip->mui_map = mcip->mci_unicast;
-
-	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
-	muip->mui_next = mcip->mci_unicast_list;
-	mcip->mci_unicast_list = muip;
-	rw_exit(&mcip->mci_rw_lock);
-
+	err = mac_client_datapath_setup(mcip, vid, mac_addr, &mrp,
+	    is_primary || is_vnic_primary, muip);
+	if (err != 0)
+		goto bail_out;
 	*mah = (mac_unicast_handle_t)muip;
-
-	/*
-	 * First add the flent to the flow list of this mcip. Then set
-	 * the mip's mi_single_active_client if needed. The Rx path assumes
-	 * that mip->mi_single_active_client will always have an associated
-	 * flent.
-	 */
-	mac_client_add_to_flow_list(mcip, flent);
-
-	if (nactiveclients_added)
-		mac_update_single_active_client(mip);
-	/*
-	 * Trigger a renegotiation of the capabilities when the number of
-	 * active clients changes from 1 to 2, since some of the capabilities
-	 * might have to be disabled. Also send a MAC_NOTE_LINK notification
-	 * to all the MAC clients whenever physical link is DOWN.
-	 */
-	if (mip->mi_nactiveclients == 2) {
-		mac_capab_update((mac_handle_t)mip);
-		mac_virtual_link_update(mip);
-	}
-	/*
-	 * Now that the setup is complete, clear the INCIPIENT flag.
-	 * The flag was set to avoid incoming packets seeing inconsistent
-	 * structures while the setup was in progress. Clear the mci_tx_flag
-	 * by calling mac_tx_client_block. It is possible that
-	 * mac_unicast_remove was called prior to this mac_unicast_add which
-	 * could have set the MCI_TX_QUIESCE flag.
-	 */
-	if (flent->fe_rx_ring_group != NULL)
-		mac_rx_group_unmark(flent->fe_rx_ring_group, MR_INCIPIENT);
-	FLOW_UNMARK(flent, FE_INCIPIENT);
-	FLOW_UNMARK(flent, FE_MC_NO_DATAPATH);
-	mac_tx_client_unblock(mcip);
 	return (0);
-bail:
-	if (bcast_added)
-		mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr, vid);
-	if (mac_started)
-		mac_stop((mac_handle_t)mip);
 
-	if (nactiveclients_added)
-		mip->mi_nactiveclients--;
-
-	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
-		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
-		if (mip->mi_state_flags & MIS_LEGACY)
-			mip->mi_capab_legacy.ml_active_clear(mip->mi_driver);
-	}
-
+bail_out:
 	if (fastpath_disabled)
 		mac_fastpath_enable((mac_handle_t)mip);
-
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
+		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
+		if (mip->mi_state_flags & MIS_LEGACY) {
+			mip->mi_capab_legacy.ml_active_clear(
+			    mip->mi_driver);
+		}
+	}
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
+	return (err);
+}
+
+/*
+ * Wrapper function to mac_unicast_add when we want to have the same mac
+ * client open for two instances, one that is currently active and another
+ * that will become active when the current one is removed. In this case
+ * mac_unicast_add will return EGAIN and we will save the rx function and
+ * arg which will be used when we activate the passive client in
+ * mac_unicast_remove.
+ */
+int
+mac_unicast_add_set_rx(mac_client_handle_t mch, uint8_t *mac_addr,
+    uint16_t flags, mac_unicast_handle_t *mah,  uint16_t vid, mac_diag_t *diag,
+    mac_rx_t rx_fn, void *arg)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	uint_t			err;
+
+	err = mac_unicast_add(mch, mac_addr, flags, mah, vid, diag);
+	if (err != 0 && err != EAGAIN)
+		return (err);
+	if (err == EAGAIN) {
+		if (rx_fn != NULL) {
+			mcip->mci_rx_p_fn = rx_fn;
+			mcip->mci_rx_p_arg = arg;
+		}
+		return (0);
+	}
+	if (rx_fn != NULL)
+		mac_rx_set(mch, rx_fn, arg);
 	return (err);
 }
 
@@ -2022,108 +2161,12 @@ mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	return (err);
 }
 
-/*
- * Remove a MAC address which was previously added by mac_unicast_add().
- */
-int
-mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
+void
+mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
+    flow_entry_t *flent)
 {
-	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_unicast_impl_t *muip = (mac_unicast_impl_t *)mah;
-	mac_unicast_impl_t *pre;
-	mac_impl_t *mip = mcip->mci_mip;
-	flow_entry_t *flent;
-
-	i_mac_perim_enter(mip);
-	if (mcip->mci_flags & MAC_CLIENT_FLAGS_VNIC_PRIMARY) {
-		/*
-		 * Called made by the upper MAC client of a VNIC.
-		 * There's nothing much to do, the unicast address will
-		 * be removed by the VNIC driver when the VNIC is deleted,
-		 * but let's ensure that all our transmit is done before
-		 * the client does a mac_client_stop lest it trigger an
-		 * assert in the driver.
-		 */
-		ASSERT(muip->mui_vid == 0);
-
-		mac_tx_client_flush(mcip);
-		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_VNIC_PRIMARY;
-
-		if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
-			mcip->mci_state_flags &= ~MCIS_TAG_DISABLE;
-
-		if (mcip->mci_state_flags & MCIS_STRIP_DISABLE)
-			mcip->mci_state_flags &= ~MCIS_STRIP_DISABLE;
-
-		if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
-			mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
-
-		kmem_free(muip, sizeof (mac_unicast_impl_t));
-		i_mac_perim_exit(mip);
-		return (0);
-	}
-
-	ASSERT(muip != NULL);
-
-	/*
-	 * Remove the VID from the list of client's VIDs.
-	 */
-	pre = mcip->mci_unicast_list;
-	if (muip == pre) {
-		mcip->mci_unicast_list = muip->mui_next;
-	} else {
-		while ((pre->mui_next != NULL) && (pre->mui_next != muip))
-			pre = pre->mui_next;
-		ASSERT(pre->mui_next == muip);
-		rw_enter(&mcip->mci_rw_lock, RW_WRITER);
-		pre->mui_next = muip->mui_next;
-		rw_exit(&mcip->mci_rw_lock);
-	}
-
-	if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PRIMARY) && muip->mui_vid == 0)
-		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PRIMARY;
-
-	if (!mac_client_single_rcvr(mcip)) {
-		/*
-		 * This MAC client is shared by more than one unicast
-		 * addresses, so we will just remove the flent
-		 * corresponding to the address being removed. We don't invoke
-		 * mac_rx_classify_flow_rem() since the additional flow is
-		 * not associated with its own separate set of SRS and rings,
-		 * and these constructs are still needed for the remaining
-		 * flows.
-		 */
-		flent = mac_client_get_flow(mcip, muip);
-		ASSERT(flent != NULL);
-
-		/*
-		 * The first one is disappearing, need to make sure
-		 * we replace it with another from the list of
-		 * shared clients.
-		 */
-		if (flent == mcip->mci_flent)
-			flent = mac_client_swap_mciflent(mcip);
-		mac_client_remove_flow_from_list(mcip, flent);
-		mac_flow_remove(mip->mi_flow_tab, flent, B_FALSE);
-		mac_flow_wait(flent, FLOW_DRIVER_UPCALL);
-
-		/*
-		 * The multicast groups that were added by the client so
-		 * far must be removed from the brodcast domain corresponding
-		 * to the VID being removed.
-		 */
-		mac_client_bcast_refresh(mcip, mac_client_update_mcast,
-		    (void *)flent, B_FALSE);
-
-		if (mip->mi_type->mt_brdcst_addr != NULL) {
-			mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr,
-			    muip->mui_vid);
-		}
-
-		FLOW_FINAL_REFRELE(flent);
-		ASSERT(!(mcip->mci_state_flags & MCIS_EXCLUSIVE));
-		goto done;
-	}
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_impl_t		*mip = mcip->mci_mip;
 
 	/*
 	 * We would have initialized subflows etc. only if we brought up
@@ -2140,7 +2183,7 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	mip->mi_nactiveclients--;
 	mac_update_single_active_client(mip);
 
-	/* Tear down the Data path */
+	/* Tear down the data path */
 	mac_datapath_teardown(mcip, mcip->mci_flent, SRST_LINK);
 
 	/*
@@ -2217,13 +2260,205 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
 
-done:
 	/*
 	 * Disable fastpath if this is a VNIC or a VLAN.
 	 */
 	if (mcip->mci_state_flags & MCIS_IS_VNIC)
 		mac_fastpath_enable((mac_handle_t)mip);
 	mac_stop((mac_handle_t)mip);
+}
+
+/*
+ * Remove a MAC address which was previously added by mac_unicast_add().
+ */
+int
+mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+	mac_unicast_impl_t *muip = (mac_unicast_impl_t *)mah;
+	mac_unicast_impl_t *pre;
+	mac_impl_t *mip = mcip->mci_mip;
+	flow_entry_t		*flent;
+	boolean_t		isprimary = B_FALSE;
+
+	i_mac_perim_enter(mip);
+	if (mcip->mci_flags & MAC_CLIENT_FLAGS_VNIC_PRIMARY) {
+		/*
+		 * Called made by the upper MAC client of a VNIC.
+		 * There's nothing much to do, the unicast address will
+		 * be removed by the VNIC driver when the VNIC is deleted,
+		 * but let's ensure that all our transmit is done before
+		 * the client does a mac_client_stop lest it trigger an
+		 * assert in the driver.
+		 */
+		ASSERT(muip->mui_vid == 0);
+
+		mac_tx_client_flush(mcip);
+
+		if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) != 0) {
+			mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
+			if (mcip->mci_rx_p_fn != NULL) {
+				mac_rx_set(mch, mcip->mci_rx_p_fn,
+				    mcip->mci_rx_p_arg);
+				mcip->mci_rx_p_fn = NULL;
+				mcip->mci_rx_p_arg = NULL;
+			}
+			kmem_free(muip, sizeof (mac_unicast_impl_t));
+			i_mac_perim_exit(mip);
+			return (0);
+		}
+		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_VNIC_PRIMARY;
+
+		if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
+			mcip->mci_state_flags &= ~MCIS_TAG_DISABLE;
+
+		if (mcip->mci_state_flags & MCIS_STRIP_DISABLE)
+			mcip->mci_state_flags &= ~MCIS_STRIP_DISABLE;
+
+		if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
+			mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
+
+		kmem_free(muip, sizeof (mac_unicast_impl_t));
+		i_mac_perim_exit(mip);
+		return (0);
+	}
+
+	ASSERT(muip != NULL);
+
+	/*
+	 * We are removing a passive client, we haven't setup the datapath
+	 * for this yet, so nothing much to do.
+	 */
+	if ((mcip->mci_state_flags & MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) != 0) {
+
+		ASSERT((mcip->mci_flent->fe_flags & FE_MC_NO_DATAPATH) != 0);
+		ASSERT(mcip->mci_p_unicast_list == muip);
+
+		mcip->mci_p_unicast_list = NULL;
+		mcip->mci_rx_p_fn = NULL;
+		mcip->mci_rx_p_arg = NULL;
+
+		mcip->mci_state_flags &= ~MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
+		mcip->mci_state_flags &= ~MCIS_UNICAST_HW;
+
+		if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
+			mcip->mci_state_flags &= ~MCIS_TAG_DISABLE;
+
+		if (mcip->mci_state_flags & MCIS_STRIP_DISABLE)
+			mcip->mci_state_flags &= ~MCIS_STRIP_DISABLE;
+
+		if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
+			mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
+
+		kmem_free(muip, sizeof (mac_unicast_impl_t));
+		i_mac_perim_exit(mip);
+		return (0);
+	}
+	/*
+	 * Remove the VID from the list of client's VIDs.
+	 */
+	pre = mcip->mci_unicast_list;
+	if (muip == pre) {
+		mcip->mci_unicast_list = muip->mui_next;
+	} else {
+		while ((pre->mui_next != NULL) && (pre->mui_next != muip))
+			pre = pre->mui_next;
+		ASSERT(pre->mui_next == muip);
+		rw_enter(&mcip->mci_rw_lock, RW_WRITER);
+		pre->mui_next = muip->mui_next;
+		rw_exit(&mcip->mci_rw_lock);
+	}
+
+	if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PRIMARY) &&
+	    muip->mui_vid == 0) {
+		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PRIMARY;
+		isprimary = B_TRUE;
+	}
+	if (!mac_client_single_rcvr(mcip)) {
+		/*
+		 * This MAC client is shared by more than one unicast
+		 * addresses, so we will just remove the flent
+		 * corresponding to the address being removed. We don't invoke
+		 * mac_rx_classify_flow_rem() since the additional flow is
+		 * not associated with its own separate set of SRS and rings,
+		 * and these constructs are still needed for the remaining
+		 * flows.
+		 */
+		flent = mac_client_get_flow(mcip, muip);
+		ASSERT(flent != NULL);
+
+		/*
+		 * The first one is disappearing, need to make sure
+		 * we replace it with another from the list of
+		 * shared clients.
+		 */
+		if (flent == mcip->mci_flent)
+			flent = mac_client_swap_mciflent(mcip);
+		mac_client_remove_flow_from_list(mcip, flent);
+		mac_flow_remove(mip->mi_flow_tab, flent, B_FALSE);
+		mac_flow_wait(flent, FLOW_DRIVER_UPCALL);
+
+		/*
+		 * The multicast groups that were added by the client so
+		 * far must be removed from the brodcast domain corresponding
+		 * to the VID being removed.
+		 */
+		mac_client_bcast_refresh(mcip, mac_client_update_mcast,
+		    (void *)flent, B_FALSE);
+
+		if (mip->mi_type->mt_brdcst_addr != NULL) {
+			mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr,
+			    muip->mui_vid);
+		}
+
+		FLOW_FINAL_REFRELE(flent);
+		ASSERT(!(mcip->mci_state_flags & MCIS_EXCLUSIVE));
+		/*
+		 * Enable fastpath if this is a VNIC or a VLAN.
+		 */
+		if (mcip->mci_state_flags & MCIS_IS_VNIC)
+			mac_fastpath_enable((mac_handle_t)mip);
+		mac_stop((mac_handle_t)mip);
+		i_mac_perim_exit(mip);
+		return (0);
+	}
+
+	mac_client_datapath_teardown(mch, muip, flent);
+
+	/*
+	 * If we are removing the primary, check if we have a passive primary
+	 * client that we need to activate now.
+	 */
+	if (!isprimary) {
+		i_mac_perim_exit(mip);
+		return (0);
+	}
+	mcip = mac_get_passive_primary_client(mip);
+	if (mcip != NULL) {
+		mac_resource_props_t	mrp;
+		mac_unicast_impl_t	*muip;
+
+		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
+		bzero(&mrp, sizeof (mac_resource_props_t));
+		/*
+		 * Apply the property cached in the mac_impl_t to the
+		 * primary mac client.
+		 */
+		mac_get_resources((mac_handle_t)mip, &mrp);
+		(void) mac_client_set_resources(mch, &mrp);
+		ASSERT(mcip->mci_p_unicast_list != NULL);
+		muip = mcip->mci_p_unicast_list;
+		mcip->mci_p_unicast_list = NULL;
+		if (mac_client_datapath_setup(mcip, VLAN_ID_NONE,
+		    mip->mi_addr, &mrp, B_TRUE, muip) == 0) {
+			if (mcip->mci_rx_p_fn != NULL) {
+				mac_rx_set(mch, mcip->mci_rx_p_fn,
+				    mcip->mci_rx_p_arg);
+				mcip->mci_rx_p_fn = NULL;
+				mcip->mci_rx_p_arg = NULL;
+			}
+		}
+	}
 	i_mac_perim_exit(mip);
 	return (0);
 }

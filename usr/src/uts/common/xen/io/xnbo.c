@@ -272,20 +272,20 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 		return (B_FALSE);
 	}
 
+	/*
+	 * MAC_OPEN_FLAGS_MULTI_PRIMARY is relevant when we are migrating a
+	 * guest on the localhost itself. In this case we would have the MAC
+	 * client open for the guest being migrated *and* also for the
+	 * migrated guest (i.e. the former will be active till the migration
+	 * is complete when the latter will be activated). This flag states
+	 * that it is OK for mac_unicast_add to add the primary MAC unicast
+	 * address multiple times.
+	 */
 	if (mac_client_open(xnbop->o_mh, &xnbop->o_mch, NULL,
-	    MAC_OPEN_FLAGS_USE_DATALINK_NAME) != 0) {
+	    MAC_OPEN_FLAGS_USE_DATALINK_NAME |
+	    MAC_OPEN_FLAGS_MULTI_PRIMARY) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "error (%d) opening mac client", err);
-		xnbo_close_mac(xnbop);
-		return (B_FALSE);
-	}
-
-	err = mac_unicast_add(xnbop->o_mch, NULL, MAC_UNICAST_PRIMARY,
-	    &xnbop->o_mah, 0, &diag);
-	if (err != 0) {
-		cmn_err(CE_WARN, "xnbo_open_mac: "
-		    "failed to get the primary MAC address of "
-		    "%s: %d", mac, err);
 		xnbo_close_mac(xnbop);
 		return (B_FALSE);
 	}
@@ -307,11 +307,19 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	 * default is "no".
 	 */
 	if (xenbus_scanf(XBT_NULL, xsname,
-	    "SUNW-need-promiscuous", "%d", &need_promiscuous) != 0)
+	    "SUNW-need-promiscuous", "%d", &need_promiscuous) != 0) {
 		need_promiscuous = 0;
-	if (need_promiscuous == 0) {
-		mac_rx_set(xnbop->o_mch, rx_fn, xnbp);
-	} else {
+	}
+	err = mac_unicast_add_set_rx(xnbop->o_mch, NULL, MAC_UNICAST_PRIMARY,
+	    &xnbop->o_mah, 0, &diag, need_promiscuous == 0 ? rx_fn :
+	    NULL, xnbp);
+	if (err != 0) {
+		cmn_err(CE_WARN, "xnbo_open_mac: failed to get the primary "
+		    "MAC address of %s: %d", mac, err);
+		xnbo_close_mac(xnbop);
+		return (B_FALSE);
+	}
+	if (need_promiscuous != 0) {
 		err = mac_promisc_add(xnbop->o_mch, MAC_CLIENT_PROMISC_ALL,
 		    rx_fn, xnbp, &xnbop->o_mphp, MAC_PROMISC_FLAGS_NO_TX_LOOP |
 		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);

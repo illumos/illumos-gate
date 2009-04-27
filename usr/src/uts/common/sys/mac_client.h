@@ -91,6 +91,7 @@ typedef enum {
 #define	MAC_OPEN_FLAGS_SHARES_DESIRED		0x0010
 #define	MAC_OPEN_FLAGS_USE_DATALINK_NAME	0x0020
 #define	MAC_OPEN_FLAGS_REQ_HWRINGS		0x0040
+#define	MAC_OPEN_FLAGS_MULTI_PRIMARY		0x0080
 
 /* flags passed to mac_client_close */
 #define	MAC_CLOSE_FLAGS_IS_VNIC		0x0001
@@ -113,6 +114,8 @@ extern void mac_client_close(mac_client_handle_t, uint16_t);
 
 extern int mac_unicast_add(mac_client_handle_t, uint8_t *, uint16_t,
     mac_unicast_handle_t *, uint16_t, mac_diag_t *);
+extern int mac_unicast_add_set_rx(mac_client_handle_t, uint8_t *, uint16_t,
+    mac_unicast_handle_t *, uint16_t, mac_diag_t *, mac_rx_t, void *);
 extern int mac_unicast_remove(mac_client_handle_t, mac_unicast_handle_t);
 
 extern int mac_multicast_add(mac_client_handle_t, const uint8_t *);

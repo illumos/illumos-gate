@@ -52,8 +52,10 @@ typedef struct mac_unicast_impl_s {			/* Protected by */
 	uint16_t			mui_vid;	/* SL */
 } mac_unicast_impl_t;
 
-#define	MAC_CLIENT_FLAGS_PRIMARY	0X0001
-#define	MAC_CLIENT_FLAGS_VNIC_PRIMARY	0x0002
+#define	MAC_CLIENT_FLAGS_PRIMARY		0X0001
+#define	MAC_CLIENT_FLAGS_VNIC_PRIMARY		0x0002
+#define	MAC_CLIENT_FLAGS_MULTI_PRIMARY		0x0004
+#define	MAC_CLIENT_FLAGS_PASSIVE_PRIMARY	0x0008
 
 /*
  * One of these is instantiated per MAC client promiscuous callback.
@@ -113,6 +115,9 @@ struct mac_client_impl_s {			/* Protected by */
 	void			*mci_rx_arg;		/* Rx Quiescence */
 	mac_direct_rx_t		mci_direct_rx_fn;	/* SL */
 	void			*mci_direct_rx_arg;	/* SL */
+	mac_rx_t		mci_rx_p_fn;		/* Rx Quiescence */
+	void			*mci_rx_p_arg;		/* Rx Quiescence */
+	void			*mci_p_unicast_list;
 
 	mac_cb_t		*mci_promisc_list;	/* mi_promisc_lock */
 
