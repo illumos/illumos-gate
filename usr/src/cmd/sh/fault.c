@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -40,7 +39,10 @@
 #include	<errno.h>
 #include	<string.h>
 
-static	void (*psig0_func)() = SIG_ERR;	/* previous signal handler for signal 0 */
+extern void hupforegnd(void);
+
+/* previous signal handler for signal 0 */
+static	void (*psig0_func)() = SIG_ERR;
 static	char sigsegv_stack[SIGSTKSZ];
 
 static void sigsegv(int sig, siginfo_t *sip, ucontext_t *uap);
@@ -174,8 +176,7 @@ done(sig)
 	unsigned char	*t;
 	int	savxit;
 
-	if (t = trapcom[0])
-	{
+	if (t = trapcom[0]) {
 		trapcom[0] = 0;
 		/* Save exit value so trap handler will not change its val */
 		savxit = exitval;
@@ -200,6 +201,14 @@ done(sig)
 	(void) endjobs(0);
 	if (sig) {
 		sigset_t set;
+
+		/*
+		 * If the signal is SIGHUP, then it should be delivered
+		 * to the process group leader of the foreground job.
+		 */
+		if (sig == SIGHUP)
+			hupforegnd();
+
 		sigemptyset(&set);
 		sigaddset(&set, sig);
 		sigprocmask(SIG_UNBLOCK, &set, 0);
@@ -242,7 +251,7 @@ handle(sig, func)
 
 	if (func == SIG_IGN && (trapflg[sig] & SIGIGN))
 		return (0);
-	
+
 	/*
 	 * Ensure that sigaction is only called with valid signal numbers,
 	 * we can get random values back for oact.sa_handler if the signal
@@ -318,8 +327,7 @@ oldsigs()
 	unsigned char	*t;
 
 	i = MAXTRAP;
-	while (i--)
-	{
+	while (i--) {
 		t = trapcom[i];
 		if (t == 0 || *t)
 			clrsig(i);
@@ -339,14 +347,12 @@ chktrap()
 	unsigned char	*t;
 
 	trapnote &= ~TRAPSET;
-	while (--i)
-	{
-		if (trapflg[i] & TRAPSET)
-		{
+	while (--i) {
+		if (trapflg[i] & TRAPSET) {
 			trapflg[i] &= ~TRAPSET;
-			if (t = trapcom[i])
-			{
+			if (t = trapcom[i]) {
 				int	savxit = exitval;
+
 				execexp(t, 0);
 				exitval = savxit;
 				exitset();

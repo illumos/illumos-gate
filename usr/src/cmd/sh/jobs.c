@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Job control for UNIX Shell
  */
@@ -38,6 +37,7 @@
 #include	<sys/param.h>
 #include	<fcntl.h>
 #include	<errno.h>
+#include	<signal.h>
 #include	"defs.h"
 
 /*
@@ -413,7 +413,9 @@ restartjob(struct job *jp, int fg)
 {
 	if (jp != jobcur) {
 		struct job *t;
-		for (t = jobcur; t->j_curp != jp; t = t->j_curp);
+
+		for (t = jobcur; t->j_curp != jp; t = t->j_curp)
+			;
 		t->j_curp = jp->j_curp;
 		jp->j_curp = jobcur;
 		jobcur = jp;
@@ -861,12 +863,11 @@ sysfgbg(int argc, char *argv[])
 				break;
 		}
 		restartjob(jp, fg);
+	} else {
+		do {
+			restartjob(str2job(cmd, *argv, 1), fg);
+		} while (*++argv);
 	}
-
-	else do
-		restartjob(str2job(cmd, *argv, 1), fg);
-	while (*++argv);
-
 }
 
 /*
@@ -1046,4 +1047,19 @@ syssusp(int argc, char *argv[])
 	if (argc != 1)
 		failed((unsigned char *)argv[0], badopt);
 	sigv(argv[0], SIGSTOP, "0");
+}
+
+void
+hupforegnd(void)
+{
+	struct job *jp;
+
+	(void) sighold(SIGCHLD);
+	for (jp = joblst; jp != NULL; jp = jp->j_nxtp) {
+		if (jp->j_flag & J_FOREGND) {
+			(void) kill(jp->j_pid, SIGHUP);
+			break;
+		}
+	}
+	(void) sigrelse(SIGCHLD);
 }
