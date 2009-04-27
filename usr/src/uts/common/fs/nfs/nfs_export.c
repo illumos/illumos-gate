@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -999,7 +999,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	vnode_t *vp;
 	vnode_t *dvp;
 	struct exportdata *kex;
-	struct exportinfo *exi;
+	struct exportinfo *exi = NULL;
 	struct exportinfo *ex, *prev;
 	fid_t fid;
 	fsid_t fsid;
@@ -1049,7 +1049,8 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		/*
 		 * If this is a request to unexport, indicated by the
 		 * uex pointer being NULL, it is possible that the
-		 * directory has already been removed. In which case
+		 * directory has already been removed or shared filesystem
+		 * could have been forcibly unmounted. In which case
 		 * we scan the export list which records the pathname
 		 * originally exported.
 		 */
@@ -1093,7 +1094,8 @@ exi_scan_end:
 				vp = exi->exi_vp;
 				dvp = exi->exi_dvp;
 				DTRACE_PROBE2(nfss__i__nmspc__tree,
-				    char *, "unsharing_removed_dir",
+				    char *,
+				    "unsharing removed dir/unmounted fs",
 				    char *, lookpn.pn_path);
 				VN_HOLD(vp);
 				VN_HOLD(dvp);
@@ -1146,7 +1148,14 @@ exi_scan_end:
 	fid.fid_len = MAXFIDSZ;
 	error = VOP_FID(vp, &fid, NULL);
 	fsid = vp->v_vfsp->vfs_fsid;
-	if (error) {
+
+	/*
+	 * Allow unshare request for forcibly unmounted shared filesystem.
+	 */
+	if (error == EIO && exi) {
+		fid = exi->exi_fid;
+		fsid = exi->exi_fsid;
+	} else if (error) {
 		VN_RELE(vp);
 		if (dvp != NULL)
 			VN_RELE(dvp);
