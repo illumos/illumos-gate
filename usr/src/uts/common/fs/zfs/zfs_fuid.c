@@ -686,16 +686,15 @@ boolean_t
 zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 {
 	ksid_t		*ksid = crgetsid(cr, KSID_GROUP);
+	ksidlist_t	*ksidlist = crgetsidlist(cr);
 	uid_t		gid;
 
-	if (ksid) {
+	if (ksid && ksidlist) {
 		int 		i;
 		ksid_t		*ksid_groups;
-		ksidlist_t	*ksidlist = crgetsidlist(cr);
 		uint32_t	idx = FUID_INDEX(id);
 		uint32_t	rid = FUID_RID(id);
 
-		ASSERT(ksidlist);
 		ksid_groups = ksidlist->ksl_sids;
 
 		for (i = 0; i != ksidlist->ksl_nsid; i++) {
