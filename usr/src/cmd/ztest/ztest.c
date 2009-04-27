@@ -3270,7 +3270,7 @@ ztest_verify_blocks(char *pool)
 	isa = strdup(isa);
 	/* LINTED */
 	(void) sprintf(bin,
-	    "/usr/sbin%.*s/zdb -bc%s%s -U /tmp/zpool.cache %s",
+	    "/usr/sbin%.*s/zdb -bcc%s%s -U /tmp/zpool.cache %s",
 	    isalen,
 	    isa,
 	    zopt_verbose >= 3 ? "s" : "",

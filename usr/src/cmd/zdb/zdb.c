@@ -102,7 +102,8 @@ usage(void)
 	(void) fprintf(stderr, "        -C cached pool configuration\n");
 	(void) fprintf(stderr, "	-i intent logs\n");
 	(void) fprintf(stderr, "	-b block statistics\n");
-	(void) fprintf(stderr, "	-c checksum all data blocks\n");
+	(void) fprintf(stderr, "	-c checksum all metadata (twice for "
+	    "all data) blocks\n");
 	(void) fprintf(stderr, "	-s report stats on zdb's I/O\n");
 	(void) fprintf(stderr, "	-S <user|all>:<cksum_alg|all> -- "
 	    "dump blkptr signatures\n");
@@ -1528,13 +1529,25 @@ zdb_blkptr_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
 {
 	zdb_cb_t *zcb = arg;
 	char blkbuf[BP_SPRINTF_LEN];
+	dmu_object_type_t type;
+	boolean_t is_l0_metadata;
 
 	if (bp == NULL)
 		return (0);
 
-	zdb_count_block(spa, zcb, bp, BP_GET_TYPE(bp));
+	type = BP_GET_TYPE(bp);
 
-	if (dump_opt['c'] || dump_opt['S']) {
+	zdb_count_block(spa, zcb, bp, type);
+
+	/*
+	 * if we do metadata-only checksumming there's no need to checksum
+	 * indirect blocks here because it is done during traverse
+	 */
+	is_l0_metadata = (BP_GET_LEVEL(bp) == 0 && type < DMU_OT_NUMTYPES &&
+	    dmu_ot[type].ot_metadata);
+
+	if (dump_opt['c'] > 1 || dump_opt['S'] ||
+	    (dump_opt['c'] && is_l0_metadata)) {
 		int ioerr, size;
 		void *data;
 
@@ -1546,7 +1559,7 @@ zdb_blkptr_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
 		free(data);
 
 		/* We expect io errors on intent log */
-		if (ioerr && BP_GET_TYPE(bp) != DMU_OT_INTENT_LOG) {
+		if (ioerr && type != DMU_OT_INTENT_LOG) {
 			zcb->zcb_haderrors = 1;
 			zcb->zcb_errors[ioerr]++;
 
@@ -1594,8 +1607,9 @@ dump_block_stats(spa_t *spa)
 	int c, e;
 
 	if (!dump_opt['S']) {
-		(void) printf("\nTraversing all blocks %s%s%s%s...\n",
+		(void) printf("\nTraversing all blocks %s%s%s%s%s...\n",
 		    (dump_opt['c'] || !dump_opt['L']) ? "to verify " : "",
+		    (dump_opt['c'] == 1) ? "metadata " : "",
 		    dump_opt['c'] ? "checksums " : "",
 		    (dump_opt['c'] && !dump_opt['L']) ? "and verify " : "",
 		    !dump_opt['L'] ? "nothing leaked " : "");
