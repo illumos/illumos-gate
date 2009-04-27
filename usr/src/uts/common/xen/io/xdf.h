@@ -214,6 +214,7 @@ typedef struct xdf {
 	ulong_t		xdf_vd_open[OTYPCNT];
 	ulong_t		xdf_vd_lyropen[XDF_PEXT];
 	ulong_t		xdf_connect_req;
+	kthread_t	*xdf_connect_thread;
 	ulong_t		xdf_vd_exclopen;
 	kmutex_t	xdf_iostat_lk; /* muxes lock for the iostat ptr */
 	kmutex_t	xdf_dev_lk; /* mutex lock for I/O path */

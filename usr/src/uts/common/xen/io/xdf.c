@@ -981,6 +981,10 @@ xdf_intr_locked(xdf_t *vdp)
 	return (DDI_INTR_CLAIMED);
 }
 
+/*
+ * xdf_intr runs at PIL 5, so no one else can grab xdf_dev_lk and
+ * block at a lower pil.
+ */
 static uint_t
 xdf_intr(caddr_t arg)
 {
@@ -1184,7 +1188,14 @@ xdf_media_req(xdf_t *vdp, char *req, boolean_t media_required)
 	dev_info_t	*dip = vdp->xdf_dip;
 	char		*xsname;
 
+	/*
+	 * we can't be holding xdf_dev_lk because xenbus_printf() can
+	 * block while waiting for a PIL 1 interrupt message.  this
+	 * would cause a deadlock with xdf_intr() which needs to grab
+	 * xdf_dev_lk as well and runs at PIL 5.
+	 */
 	ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
+	ASSERT(MUTEX_NOT_HELD(&vdp->xdf_dev_lk));
 
 	if ((xsname = xvdi_get_xsname(dip)) == NULL)
 		return (ENXIO);
@@ -1433,6 +1444,7 @@ xdf_busy(xdf_t *vdp)
 static void
 xdf_set_state(xdf_t *vdp, xdf_state_t new_state)
 {
+	ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
 	ASSERT(MUTEX_HELD(&vdp->xdf_dev_lk));
 	DPRINTF(DDI_DBG, ("xdf@%s: state change %d -> %d\n",
 	    vdp->xdf_addr, vdp->xdf_state, new_state));
@@ -1510,13 +1522,11 @@ xdf_setstate_init(xdf_t *vdp)
 	    ("xdf@%s: starting connection process\n", vdp->xdf_addr));
 
 	/*
-	 * If an eject is pending then don't allow a new connection, but
-	 * we want to return without displaying an error message.
+	 * If an eject is pending then don't allow a new connection.
+	 * (Only the backend can clear media request eject request.)
 	 */
-	if (xdf_eject_pending(vdp)) {
-		xdf_disconnect(vdp, XD_UNKNOWN, B_FALSE);
+	if (xdf_eject_pending(vdp))
 		return (DDI_FAILURE);
-	}
 
 	if ((xsname = xvdi_get_xsname(dip)) == NULL)
 		goto errout;
@@ -1765,6 +1775,10 @@ xdf_setstate_connected(xdf_t *vdp)
 	    ((oename = xvdi_get_oename(dip)) == NULL))
 		return (DDI_FAILURE);
 
+	/* Make sure the other end is XenbusStateConnected */
+	if (xenbus_read_driver_state(oename) != XenbusStateConnected)
+		return (DDI_FAILURE);
+
 	/* Determine if feature barrier is supported by backend */
 	if (!(vdp->xdf_feature_barrier = xenbus_exists(oename, XBP_FB)))
 		cmn_err(CE_NOTE, "xdf@%s: failed to read feature-barrier",
@@ -1952,7 +1966,7 @@ xdf_oe_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg, void *impl_data)
 static int
 xdf_connect_locked(xdf_t *vdp, boolean_t wait)
 {
-	int	rv;
+	int	rv, timeouts = 0, reset = 20;
 
 	ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
 	ASSERT(MUTEX_HELD(&vdp->xdf_dev_lk));
@@ -1964,15 +1978,42 @@ xdf_connect_locked(xdf_t *vdp, boolean_t wait)
 	vdp->xdf_connect_req++;
 	while (vdp->xdf_state != XD_READY) {
 		mutex_exit(&vdp->xdf_dev_lk);
-		if (vdp->xdf_state == XD_UNKNOWN)
-			(void) xdf_setstate_init(vdp);
-		mutex_enter(&vdp->xdf_dev_lk);
 
+		/* only one thread at a time can be the connection thread */
+		if (vdp->xdf_connect_thread == NULL)
+			vdp->xdf_connect_thread = curthread;
+
+		if (vdp->xdf_connect_thread == curthread) {
+			if ((timeouts > 0) && ((timeouts % reset) == 0)) {
+				/*
+				 * If we haven't establised a connection
+				 * within the reset time, then disconnect
+				 * so we can try again, and double the reset
+				 * time.  The reset time starts at 2 sec.
+				 */
+				(void) xdf_disconnect(vdp, XD_UNKNOWN, B_TRUE);
+				reset *= 2;
+			}
+			if (vdp->xdf_state == XD_UNKNOWN)
+				(void) xdf_setstate_init(vdp);
+			if (vdp->xdf_state == XD_INIT)
+				(void) xdf_setstate_connected(vdp);
+		}
+
+		mutex_enter(&vdp->xdf_dev_lk);
 		if (!wait || (vdp->xdf_state == XD_READY))
 			goto out;
 
 		mutex_exit((&vdp->xdf_cb_lk));
-		rv = cv_wait_sig(&vdp->xdf_dev_cv, &vdp->xdf_dev_lk);
+		if (vdp->xdf_connect_thread != curthread) {
+			rv = cv_wait_sig(&vdp->xdf_dev_cv, &vdp->xdf_dev_lk);
+		} else {
+			/* delay for 0.1 sec */
+			rv = cv_timedwait_sig(&vdp->xdf_dev_cv,
+			    &vdp->xdf_dev_lk, lbolt + drv_usectohz(100*1000));
+			if (rv == -1)
+				timeouts++;
+		}
 		mutex_exit((&vdp->xdf_dev_lk));
 		mutex_enter((&vdp->xdf_cb_lk));
 		mutex_enter((&vdp->xdf_dev_lk));
@@ -1984,8 +2025,19 @@ out:
 	ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
 	ASSERT(MUTEX_HELD(&vdp->xdf_dev_lk));
 
+	if (vdp->xdf_connect_thread == curthread) {
+		/*
+		 * wake up someone else so they can become the connection
+		 * thread.
+		 */
+		cv_signal(&vdp->xdf_dev_cv);
+		vdp->xdf_connect_thread = NULL;
+	}
+
 	/* Try to lock the media */
+	mutex_exit((&vdp->xdf_dev_lk));
 	(void) xdf_media_req(vdp, XBV_MEDIA_REQ_LOCK, B_TRUE);
+	mutex_enter((&vdp->xdf_dev_lk));
 
 	vdp->xdf_connect_req--;
 	return (vdp->xdf_state);
@@ -2120,7 +2172,6 @@ xdf_hvm_connect(dev_info_t *dip)
 	int	rv;
 
 	mutex_enter(&vdp->xdf_cb_lk);
-	mutex_enter(&vdp->xdf_dev_lk);
 
 	/*
 	 * Before try to establish a connection we need to wait for the
@@ -2129,7 +2180,6 @@ xdf_hvm_connect(dev_info_t *dip)
 	 */
 	for (;;) {
 		ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
-		ASSERT(MUTEX_HELD(&vdp->xdf_dev_lk));
 
 		/*
 		 * Get the xenbus path to the backend device.  Note that
@@ -2138,7 +2188,6 @@ xdf_hvm_connect(dev_info_t *dip)
 		 * suspend, resume, and migration operations.
 		 */
 		if ((oename = xvdi_get_oename(dip)) == NULL) {
-			mutex_exit(&vdp->xdf_dev_lk);
 			mutex_exit(&vdp->xdf_cb_lk);
 			return (B_FALSE);
 		}
@@ -2152,18 +2201,15 @@ xdf_hvm_connect(dev_info_t *dip)
 			strfree(str);
 
 		/* wait for an update to "<oename>/hotplug-status" */
-		mutex_exit(&vdp->xdf_dev_lk);
 		if (cv_wait_sig(&vdp->xdf_hp_status_cv, &vdp->xdf_cb_lk) == 0) {
 			/* we got interrupted by a signal */
 			mutex_exit(&vdp->xdf_cb_lk);
 			return (B_FALSE);
 		}
-		mutex_enter(&vdp->xdf_dev_lk);
 	}
 
 	/* Good news.  The backend hotplug scripts have been run. */
 	ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
-	ASSERT(MUTEX_HELD(&vdp->xdf_dev_lk));
 	ASSERT(strcmp(str, XBV_HP_STATUS_CONN) == 0);
 	strfree(str);
 
@@ -2178,11 +2224,11 @@ xdf_hvm_connect(dev_info_t *dip)
 	 * waiting for a connection to a backend driver that doesn't exist.
 	 */
 	if (XD_IS_CD(vdp) && !xenbus_exists(oename, XBP_MEDIA_REQ_SUP)) {
-		mutex_exit(&vdp->xdf_dev_lk);
 		mutex_exit(&vdp->xdf_cb_lk);
 		return (B_FALSE);
 	}
 
+	mutex_enter(&vdp->xdf_dev_lk);
 	rv = xdf_connect_locked(vdp, B_TRUE);
 	mutex_exit(&vdp->xdf_dev_lk);
 	mutex_exit(&vdp->xdf_cb_lk);
@@ -3502,7 +3548,6 @@ _init(void)
 int
 _fini(void)
 {
-
 	int err;
 	if ((err = mod_remove(&xdf_modlinkage)) != 0)
 		return (err);
