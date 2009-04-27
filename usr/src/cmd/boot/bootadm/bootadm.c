@@ -3514,6 +3514,26 @@ update_archive(char *root, char *opt)
 	return (ret);
 }
 
+static char *
+find_root_pool()
+{
+	char *special = get_special("/");
+	char *p;
+
+	if (special == NULL)
+		return (NULL);
+
+	if (*special == '/') {
+		free(special);
+		return (NULL);
+	}
+
+	if ((p = strchr(special, '/')) != NULL)
+		*p = '\0';
+
+	return (special);
+}
+
 static error_t
 synchronize_BE_menu(void)
 {
@@ -3527,6 +3547,7 @@ synchronize_BE_menu(void)
 	char		*curr_cksum_str;
 	char		*curr_size_str;
 	char		*curr_file;
+	char		*pool;
 	FILE		*cfp;
 	int		found;
 	int		ret;
@@ -3580,8 +3601,11 @@ synchronize_BE_menu(void)
 	BAM_DPRINTF((D_CKSUM_FILE_PARSED, fcn, LU_MENU_CKSUM));
 
 	/* Get checksum of current menu */
-	(void) snprintf(cmdline, sizeof (cmdline), "%s %s",
-	    CKSUM, GRUB_MENU);
+	pool = find_root_pool();
+	(void) snprintf(cmdline, sizeof (cmdline), "%s %s%s%s",
+	    CKSUM, pool == NULL ? "" : "/", pool == NULL ? "" : pool,
+	    GRUB_MENU);
+	free(pool);
 	ret = exec_cmd(cmdline, &flist);
 	INJECT_ERROR1("GET_CURR_CKSUM", ret = 1);
 	if (ret != 0) {
