@@ -814,6 +814,7 @@ igmp_joingroup(ilm_t *ilm)
 		}
 
 		/* Set the ilm timer value */
+		ilm->ilm_rtx.rtx_cnt = ill->ill_mcast_rv;
 		MCAST_RANDOM_DELAY(ilm->ilm_rtx.rtx_timer,
 		    SEC_TO_MSEC(IGMP_MAX_HOST_REPORT_DELAY));
 		timer = ilm->ilm_rtx.rtx_timer;
@@ -901,6 +902,8 @@ mld_joingroup(ilm_t *ilm)
 		/* Set the ilm timer value */
 		ASSERT(ill->ill_mcast_type != MLD_V2_ROUTER ||
 		    ilm->ilm_rtx.rtx_cnt > 0);
+
+		ilm->ilm_rtx.rtx_cnt = ill->ill_mcast_rv;
 		MCAST_RANDOM_DELAY(ilm->ilm_rtx.rtx_timer,
 		    SEC_TO_MSEC(ICMP6_MAX_HOST_REPORT_DELAY));
 		timer = ilm->ilm_rtx.rtx_timer;
@@ -1091,6 +1094,7 @@ send_to_in:
 	 */
 	rp = mcast_merge_rtx(ilm, rp, flist);
 	if (ilm->ilm_rtx.rtx_timer == INFINITY) {
+		ilm->ilm_rtx.rtx_cnt = ill->ill_mcast_rv;
 		MCAST_RANDOM_DELAY(ilm->ilm_rtx.rtx_timer,
 		    SEC_TO_MSEC(IGMP_MAX_HOST_REPORT_DELAY));
 		mutex_enter(&ipst->ips_igmp_timer_lock);
@@ -1181,6 +1185,7 @@ send_to_in:
 	rp = mcast_merge_rtx(ilm, rp, flist);
 	ASSERT(ilm->ilm_rtx.rtx_cnt > 0);
 	if (ilm->ilm_rtx.rtx_timer == INFINITY) {
+		ilm->ilm_rtx.rtx_cnt = ill->ill_mcast_rv;
 		MCAST_RANDOM_DELAY(ilm->ilm_rtx.rtx_timer,
 		    SEC_TO_MSEC(ICMP6_MAX_HOST_REPORT_DELAY));
 		mutex_enter(&ipst->ips_mld_timer_lock);
@@ -1384,6 +1389,7 @@ per_ilm_rtxtimer:
 				next = rtxp->rtx_timer;
 			rtxp->rtx_timer += current;
 		} else {
+			ASSERT(rtxp->rtx_timer == INFINITY);
 			CLEAR_SLIST(rtxp->rtx_allow);
 			CLEAR_SLIST(rtxp->rtx_block);
 		}
@@ -1638,6 +1644,7 @@ per_ilm_rtxtimer:
 				next = rtxp->rtx_timer;
 			rtxp->rtx_timer += current;
 		} else {
+			ASSERT(rtxp->rtx_timer == INFINITY);
 			CLEAR_SLIST(rtxp->rtx_allow);
 			CLEAR_SLIST(rtxp->rtx_block);
 		}
