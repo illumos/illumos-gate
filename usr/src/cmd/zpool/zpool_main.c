@@ -3225,7 +3225,8 @@ status_callback(zpool_handle_t *zhp, void *data)
 		print_status_config(zhp, zpool_get_name(zhp), nvroot,
 		    namewidth, 0, B_FALSE);
 
-		print_logs(zhp, nvroot, namewidth);
+		if (num_logs(nvroot) > 0)
+			print_logs(zhp, nvroot, namewidth);
 		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
 		    &l2cache, &nl2cache) == 0)
 			print_l2cache(zhp, l2cache, nl2cache, namewidth);
