@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,8 @@
 #include <rpcsvc/rquota.h>
 #include <zone.h>
 #include "../../nfs/lib/replica.h"
+#include <dlfcn.h>
+#include <libzfs.h>
 
 int	vflag;
 int	nolocalquota;
@@ -80,6 +82,8 @@ extern char	*optarg;
 #define	TEXT_DOMAIN "SYS_TEST"  /* Use this only if it weren't */
 #endif
 
+static void zexit(int);
+static int getzfsquota(char *, char *, struct dqblk *);
 static int getnfsquota(char *, char *, uid_t, struct dqblk *);
 static void showuid(uid_t);
 static void showquotas(uid_t, char *);
@@ -87,6 +91,41 @@ static void warn(struct mnttab *, struct dqblk *);
 static void heading(uid_t, char *);
 static void prquota(struct mnttab *, struct dqblk *);
 static void fmttime(char *, long);
+
+static libzfs_handle_t *(*_libzfs_init)(void);
+static void (*_libzfs_fini)(libzfs_handle_t *);
+static zfs_handle_t *(*_zfs_open)(libzfs_handle_t *, const char *, int);
+static void (*_zfs_close)(zfs_handle_t *);
+static int (*_zfs_prop_get_userquota_int)(zfs_handle_t *, const char *,
+    uint64_t *);
+static libzfs_handle_t *g_zfs = NULL;
+
+/*
+ * Dynamically check for libzfs, in case the user hasn't installed the SUNWzfs
+ * packages.  'quota' utility supports zfs as an option.
+ */
+static void
+load_libzfs(void)
+{
+	void *hdl;
+
+	if (g_zfs != NULL)
+		return;
+
+	if ((hdl = dlopen("libzfs.so", RTLD_LAZY)) != NULL) {
+		_libzfs_init = (libzfs_handle_t *(*)(void))dlsym(hdl,
+		    "libzfs_init");
+		_libzfs_fini = (void (*)())dlsym(hdl, "libzfs_fini");
+		_zfs_open = (zfs_handle_t *(*)())dlsym(hdl, "zfs_open");
+		_zfs_close = (void (*)())dlsym(hdl, "zfs_close");
+		_zfs_prop_get_userquota_int = (int (*)())
+		    dlsym(hdl, "zfs_prop_get_userquota_int");
+
+		if (_libzfs_init && _libzfs_fini && _zfs_open &&
+		    _zfs_close && _zfs_prop_get_userquota_int)
+			g_zfs = _libzfs_init();
+	}
+}
 
 int
 main(int argc, char *argv[])
@@ -114,6 +153,8 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	load_libzfs();
+
 	while ((opt = getopt(argc, argv, "vV")) != EOF) {
 		switch (opt) {
 
@@ -138,8 +179,8 @@ main(int argc, char *argv[])
 			break;
 
 		case '?':
-			fprintf(stderr, "ufs usage: quota [-v] [username]\n");
-			exit(32);
+			fprintf(stderr, "usage: quota [-v] [username]\n");
+			zexit(32);
 		}
 	}
 	if (quotactl(Q_ALLSYNC, NULL, (uid_t)0, NULL) < 0 && errno == EINVAL) {
@@ -149,7 +190,7 @@ main(int argc, char *argv[])
 	}
 	if (argc == optind) {
 		showuid(getuid());
-		exit(0);
+		zexit(0);
 	}
 	for (i = optind; i < argc; i++) {
 		if (alldigits(argv[i])) {
@@ -214,7 +255,7 @@ showquotas(uid_t uid, char *name)
 	myuid = getuid();
 	if (uid != myuid && myuid != 0) {
 		printf("quota: %s (uid %d): permission denied\n", name, uid);
-		exit(32);
+		zexit(32);
 	}
 
 	memset(my_zonename, '\0', ZONENAME_MAX);
@@ -224,7 +265,11 @@ showquotas(uid_t uid, char *name)
 		heading(uid, name);
 	mtab = fopen(MNTTAB, "r");
 	while (getmntent(mtab, &mnt) == NULL) {
-		if (strcmp(mnt.mnt_fstype, MNTTYPE_UFS) == 0) {
+		if (strcmp(mnt.mnt_fstype, MNTTYPE_ZFS) == 0) {
+			bzero(&dqblk, sizeof (dqblk));
+			if (getzfsquota(name, mnt.mnt_special, &dqblk))
+				continue;
+		} else if (strcmp(mnt.mnt_fstype, MNTTYPE_UFS) == 0) {
 			if (nolocalquota ||
 			    (quotactl(Q_GETQUOTA,
 			    mnt.mnt_mountp, uid, &dqblk) != 0 &&
@@ -479,22 +524,22 @@ prquota(struct mnttab *mntp, struct dqblk *dqp)
 	tv.tv_usec = 0;
 	if (dqp->dqb_bsoftlimit && dqp->dqb_curblocks >= dqp->dqb_bsoftlimit) {
 		if (dqp->dqb_btimelimit == 0) {
-			strcpy(btimeleft, "NOT STARTED");
+			strlcpy(btimeleft, "NOT STARTED", sizeof (btimeleft));
 		} else if (dqp->dqb_btimelimit > tv.tv_sec) {
 			fmttime(btimeleft, dqp->dqb_btimelimit - tv.tv_sec);
 		} else {
-			strcpy(btimeleft, "EXPIRED");
+			strlcpy(btimeleft, "EXPIRED", sizeof (btimeleft));
 		}
 	} else {
 		btimeleft[0] = '\0';
 	}
 	if (dqp->dqb_fsoftlimit && dqp->dqb_curfiles >= dqp->dqb_fsoftlimit) {
 		if (dqp->dqb_ftimelimit == 0) {
-			strcpy(ftimeleft, "NOT STARTED");
+			strlcpy(ftimeleft, "NOT STARTED", sizeof (ftimeleft));
 		} else if (dqp->dqb_ftimelimit > tv.tv_sec) {
 			fmttime(ftimeleft, dqp->dqb_ftimelimit - tv.tv_sec);
 		} else {
-			strcpy(ftimeleft, "EXPIRED");
+			strlcpy(ftimeleft, "EXPIRED", sizeof (ftimeleft));
 		}
 	} else {
 		ftimeleft[0] = '\0';
@@ -505,16 +550,31 @@ prquota(struct mnttab *mntp, struct dqblk *dqp)
 	} else {
 		cp = mntp->mnt_mountp;
 	}
-	printf("%-12.12s %7d %6d %6d %11s %6d %6d %6d %11s\n",
-	    cp,
-	    kb(dqp->dqb_curblocks),
-	    kb(dqp->dqb_bsoftlimit),
-	    kb(dqp->dqb_bhardlimit),
-	    btimeleft,
-	    dqp->dqb_curfiles,
-	    dqp->dqb_fsoftlimit,
-	    dqp->dqb_fhardlimit,
-	    ftimeleft);
+
+	if (dqp->dqb_curfiles == 0 &&
+	    dqp->dqb_fsoftlimit == 0 && dqp->dqb_fhardlimit == 0) {
+		printf("%-12.12s %7d %6d %6d %11s %6s %6s %6s %11s\n",
+		    cp,
+		    kb(dqp->dqb_curblocks),
+		    kb(dqp->dqb_bsoftlimit),
+		    kb(dqp->dqb_bhardlimit),
+		    "-",
+		    "-",
+		    "-",
+		    "-",
+		    "-");
+	} else {
+		printf("%-12.12s %7d %6d %6d %11s %6d %6d %6d %11s\n",
+		    cp,
+		    kb(dqp->dqb_curblocks),
+		    kb(dqp->dqb_bsoftlimit),
+		    kb(dqp->dqb_bhardlimit),
+		    btimeleft,
+		    dqp->dqb_curfiles,
+		    dqp->dqb_fsoftlimit,
+		    dqp->dqb_fhardlimit,
+		    ftimeleft);
+	}
 }
 
 static void
@@ -534,14 +594,15 @@ fmttime(char *buf, long time)
 	};
 
 	if (time <= 0) {
-		strcpy(buf, "EXPIRED");
+		strlcpy(buf, "EXPIRED", sizeof (*buf));
 		return;
 	}
 	for (i = 0; i < sizeof (cunits)/sizeof (cunits[0]); i++) {
 		if (time >= cunits[i].c_secs)
 			break;
 	}
-	sprintf(buf, "%.1f %s", (double)time/cunits[i].c_secs, cunits[i].c_str);
+	snprintf(buf, sizeof (*buf), "%.1f %s",
+	    (double)time/cunits[i].c_secs, cunits[i].c_str);
 }
 
 int
@@ -620,7 +681,7 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 		if ((fstab = fopen(MNTTAB, "r")) == NULL) {
 			fprintf(stderr, "%s: ", MNTTAB);
 			perror("open");
-			exit(32);
+			zexit(32);
 		}
 		fd = -1;
 		while ((status = getmntent(fstab, &mnt)) == NULL) {
@@ -793,7 +854,7 @@ callaurpc(char *host, int prognum, int versnum, int procnum,
 		}
 		oldprognum = prognum;
 		oldversnum = versnum;
-		(void) strcpy(oldhost, host);
+		(void) strlcpy(oldhost, host, sizeof (oldhost));
 		clnt_stat = RPC_SUCCESS;
 	}
 
@@ -804,4 +865,44 @@ callaurpc(char *host, int prognum, int versnum, int procnum,
 	    outproc, out, tottimeout);
 
 	return ((int)clnt_stat);
+}
+
+static int
+getzfsquota(char *user, char *dataset, struct dqblk *zq)
+{
+	zfs_handle_t *zhp = NULL;
+	char propname[ZFS_MAXPROPLEN];
+	uint64_t userquota, userused;
+
+	if (g_zfs == NULL)
+		return (1);
+
+	if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET)) == NULL)
+		return (1);
+
+	(void) snprintf(propname, sizeof (propname), "userquota@%s", user);
+	if (_zfs_prop_get_userquota_int(zhp, propname, &userquota) != 0) {
+		_zfs_close(zhp);
+		return (1);
+	}
+
+	(void) snprintf(propname, sizeof (propname), "userused@%s", user);
+	if (_zfs_prop_get_userquota_int(zhp, propname, &userused) != 0) {
+		_zfs_close(zhp);
+		return (1);
+	}
+
+	zq->dqb_bhardlimit = userquota / DEV_BSIZE;
+	zq->dqb_bsoftlimit = userquota / DEV_BSIZE;
+	zq->dqb_curblocks = userused / DEV_BSIZE;
+	_zfs_close(zhp);
+	return (0);
+}
+
+static void
+zexit(int n)
+{
+	if (g_zfs != NULL)
+		_libzfs_fini(g_zfs);
+	exit(n);
 }

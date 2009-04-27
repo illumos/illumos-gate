@@ -2168,20 +2168,19 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 	return (0);
 }
 
-int
-zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
-    char *propbuf, int proplen, boolean_t literal)
+static int
+zfs_prop_get_userquota_common(zfs_handle_t *zhp, const char *propname,
+    uint64_t *propvalue, zfs_userquota_prop_t *typep)
 {
 	int err;
 	zfs_cmd_t zc = { 0 };
-	zfs_userquota_prop_t type;
 
 	(void) strncpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
 	err = userquota_propname_decode(propname,
 	    zfs_prop_get_int(zhp, ZFS_PROP_ZONED),
-	    &type, zc.zc_value, sizeof (zc.zc_value), &zc.zc_guid);
-	zc.zc_objset_type = type;
+	    typep, zc.zc_value, sizeof (zc.zc_value), &zc.zc_guid);
+	zc.zc_objset_type = *typep;
 	if (err)
 		return (err);
 
@@ -2189,14 +2188,41 @@ zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
 	if (err)
 		return (err);
 
+	*propvalue = zc.zc_cookie;
+	return (0);
+}
+
+int
+zfs_prop_get_userquota_int(zfs_handle_t *zhp, const char *propname,
+    uint64_t *propvalue)
+{
+	zfs_userquota_prop_t type;
+
+	return (zfs_prop_get_userquota_common(zhp, propname, propvalue,
+	    &type));
+}
+
+int
+zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
+    char *propbuf, int proplen, boolean_t literal)
+{
+	int err;
+	uint64_t propvalue;
+	zfs_userquota_prop_t type;
+
+	err = zfs_prop_get_userquota_common(zhp, propname, &propvalue,
+	    &type);
+
+	if (err)
+		return (err);
+
 	if (literal) {
-		(void) snprintf(propbuf, proplen, "%llu",
-		    (u_longlong_t)zc.zc_cookie);
-	} else if (zc.zc_cookie == 0 &&
+		(void) snprintf(propbuf, proplen, "%llu", propvalue);
+	} else if (propvalue == 0 &&
 	    (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_GROUPQUOTA)) {
 		(void) strlcpy(propbuf, "none", proplen);
 	} else {
-		zfs_nicenum(zc.zc_cookie, propbuf, proplen);
+		zfs_nicenum(propvalue, propbuf, proplen);
 	}
 	return (0);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,11 +48,14 @@
 #include <rpcsvc/rquota.h>
 #include <tiuser.h>
 #include <unistd.h>
+#include <dlfcn.h>
+#include <libzfs.h>
 
 #define	QFNAME		"quotas"	/* name of quota file */
 #define	RPCSVC_CLOSEDOWN 120		/* 2 minutes */
 
 struct fsquot {
+	char *fsq_fstype;
 	struct fsquot *fsq_next;
 	char *fsq_dir;
 	char *fsq_devname;
@@ -78,12 +77,50 @@ void getquota();
 int  hasquota();
 void log_cant_reply();
 void setupfs();
+static void zexit();
+
+static libzfs_handle_t *(*_libzfs_init)(void);
+static void (*_libzfs_fini)(libzfs_handle_t *);
+static zfs_handle_t *(*_zfs_open)(libzfs_handle_t *, const char *, int);
+static void (*_zfs_close)(zfs_handle_t *);
+static int (*_zfs_prop_get_userquota_int)(zfs_handle_t *, const char *,
+    uint64_t *);
+static libzfs_handle_t *g_zfs = NULL;
+
+/*
+ * Dynamically check for libzfs, in case the user hasn't installed the SUNWzfs
+ * packages.  'rquotad' supports zfs as an option.
+ */
+static void
+load_libzfs(void)
+{
+	void *hdl;
+
+	if (g_zfs != NULL)
+		return;
+
+	if ((hdl = dlopen("libzfs.so", RTLD_LAZY)) != NULL) {
+		_libzfs_init = (libzfs_handle_t *(*)(void))dlsym(hdl,
+		    "libzfs_init");
+		_libzfs_fini = (void (*)())dlsym(hdl, "libzfs_fini");
+		_zfs_open = (zfs_handle_t *(*)())dlsym(hdl, "zfs_open");
+		_zfs_close = (void (*)())dlsym(hdl, "zfs_close");
+		_zfs_prop_get_userquota_int = (int (*)())
+		    dlsym(hdl, "zfs_prop_get_userquota_int");
+
+		if (_libzfs_init && _libzfs_fini && _zfs_open &&
+		    _zfs_close && _zfs_prop_get_userquota_int)
+			g_zfs = _libzfs_init();
+	}
+}
 
 /*ARGSUSED*/
 int
 main(int argc, char *argv[])
 {
 	register SVCXPRT *transp;
+
+	load_libzfs();
 
 	/*
 	 * If stdin looks like a TLI endpoint, we assume
@@ -102,11 +139,11 @@ main(int argc, char *argv[])
 
 			if (t_sync(0) == -1) {
 				syslog(LOG_ERR, "could not do t_sync");
-				exit(1);
+				zexit(1);
 			}
 			if (t_getinfo(0, &tinfo) == -1) {
 				syslog(LOG_ERR, "t_getinfo failed");
-				exit(1);
+				zexit(1);
 			}
 			if (tinfo.servtype == T_CLTS) {
 				if (tinfo.addr == INET_ADDRSTRLEN)
@@ -115,7 +152,7 @@ main(int argc, char *argv[])
 					netid = "udp6";
 			} else {
 				syslog(LOG_ERR, "wrong transport");
-				exit(1);
+				zexit(1);
 			}
 		}
 		if ((nconf = getnetconfigent(netid)) == NULL) {
@@ -124,22 +161,22 @@ main(int argc, char *argv[])
 
 		if ((transp = svc_tli_create(0, nconf, NULL, 0, 0)) == NULL) {
 			syslog(LOG_ERR, "cannot create server handle");
-			exit(1);
+			zexit(1);
 		}
 		if (nconf)
 			freenetconfigent(nconf);
 
 		if (!svc_reg(transp, RQUOTAPROG, RQUOTAVERS, dispatch, 0)) {
 			syslog(LOG_ERR,
-				"unable to register (RQUOTAPROG, RQUOTAVERS).");
-			exit(1);
+			    "unable to register (RQUOTAPROG, RQUOTAVERS).");
+			zexit(1);
 		}
 
 		(void) sigset(SIGALRM, (void(*)(int)) closedown);
 		(void) alarm(RPCSVC_CLOSEDOWN);
 
 		svc_run();
-		exit(1);
+		zexit(1);
 		/* NOTREACHED */
 	}
 
@@ -152,9 +189,9 @@ main(int argc, char *argv[])
 		break;
 	case -1:
 		perror("rquotad: can't fork");
-		exit(1);
+		zexit(1);
 	default:	/* parent */
-		exit(0);
+		zexit(0);
 	}
 
 	/*
@@ -175,7 +212,7 @@ main(int argc, char *argv[])
 	 */
 	if (svc_create(dispatch, RQUOTAPROG, RQUOTAVERS, "datagram_v") == 0) {
 		syslog(LOG_ERR, "couldn't register datagram_v service");
-		exit(1);
+		zexit(1);
 	}
 
 	/*
@@ -222,7 +259,7 @@ closedown()
 		struct t_info tinfo;
 
 		if (!t_getinfo(0, &tinfo) && (tinfo.servtype == T_CLTS))
-			exit(0);
+			zexit(0);
 
 		for (i = 0, openfd = 0; i < svc_max_pollfd && openfd < 2; i++) {
 			if (svc_pollfd[i].fd >= 0)
@@ -230,9 +267,43 @@ closedown()
 		}
 
 		if (openfd <= 1)
-			exit(0);
+			zexit(0);
 	}
 	(void) alarm(RPCSVC_CLOSEDOWN);
+}
+
+static int
+getzfsquota(uid_t user, char *dataset, struct dqblk *zq)
+{
+	zfs_handle_t *zhp = NULL;
+	char propname[ZFS_MAXPROPLEN];
+	uint64_t userquota, userused;
+
+	if (g_zfs == NULL)
+		return (1);
+
+	if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET)) == NULL) {
+		syslog(LOG_ERR, "can not open zfs dataset %s", dataset);
+		return (1);
+	}
+
+	(void) snprintf(propname, sizeof (propname), "userquota@%u", user);
+	if (_zfs_prop_get_userquota_int(zhp, propname, &userquota) != 0) {
+		_zfs_close(zhp);
+		return (1);
+	}
+
+	(void) snprintf(propname, sizeof (propname), "userused@%u", user);
+	if (_zfs_prop_get_userquota_int(zhp, propname, &userused) != 0) {
+		_zfs_close(zhp);
+		return (1);
+	}
+
+	zq->dqb_bhardlimit = userquota / DEV_BSIZE;
+	zq->dqb_bsoftlimit = userquota / DEV_BSIZE;
+	zq->dqb_curblocks = userused / DEV_BSIZE;
+	_zfs_close(zhp);
+	return (0);
 }
 
 void
@@ -268,41 +339,54 @@ getquota(rqstp, transp)
 		goto sendreply;
 	}
 
-	if (quotactl(Q_GETQUOTA, fsqp->fsq_dir, (uid_t)gqa.gqa_uid, &dqblk) !=
-	    0) {
-		qactive = FALSE;
-		if ((errno == ENOENT) ||
-			(rqstp->rq_proc != RQUOTAPROC_GETQUOTA)) {
+	bzero(&dqblk, sizeof (dqblk));
+	if (strcmp(fsqp->fsq_fstype, MNTTYPE_ZFS) == 0) {
+		if (getzfsquota(gqa.gqa_uid, fsqp->fsq_devname, &dqblk)) {
 			gqr.status = Q_NOQUOTA;
 			goto sendreply;
 		}
-
-		/*
-		 * If there is no quotas file, don't bother to sync it.
-		 */
-		if (errno != ENOENT) {
-			if (quotactl(Q_ALLSYNC, fsqp->fsq_dir,
-			    (uid_t)gqa.gqa_uid, &dqblk) < 0 &&
-				errno == EINVAL)
-				syslog(LOG_WARNING,
-				    "Quotas are not compiled into this kernel");
-			if (getdiskquota(fsqp, (uid_t)gqa.gqa_uid, &dqblk) ==
-			    0) {
+		qactive = TRUE;
+	} else {
+		if (quotactl(Q_GETQUOTA, fsqp->fsq_dir,
+		    (uid_t)gqa.gqa_uid, &dqblk) != 0) {
+			qactive = FALSE;
+			if ((errno == ENOENT) ||
+			    (rqstp->rq_proc != RQUOTAPROC_GETQUOTA)) {
 				gqr.status = Q_NOQUOTA;
 				goto sendreply;
 			}
+
+			/*
+			 * If there is no quotas file, don't bother to sync it.
+			 */
+			if (errno != ENOENT) {
+				if (quotactl(Q_ALLSYNC, fsqp->fsq_dir,
+				    (uid_t)gqa.gqa_uid, &dqblk) < 0 &&
+				    errno == EINVAL)
+					syslog(LOG_WARNING,
+					    "Quotas are not compiled "
+					    "into this kernel");
+				if (getdiskquota(fsqp, (uid_t)gqa.gqa_uid,
+				    &dqblk) == 0) {
+					gqr.status = Q_NOQUOTA;
+					goto sendreply;
+				}
+			}
+		} else {
+			qactive = TRUE;
 		}
-	} else {
-		qactive = TRUE;
-	}
-	/*
-	 * We send the remaining time instead of the absolute time
-	 * because clock skew between machines should be much greater
-	 * than rpc delay.
-	 */
+		/*
+		 * We send the remaining time instead of the absolute time
+		 * because clock skew between machines should be much greater
+		 * than rpc delay.
+		 */
 #define	gqrslt getquota_rslt_u.gqr_rquota
 
-	gettimeofday(&tv, NULL);
+		gettimeofday(&tv, NULL);
+		gqr.gqrslt.rq_btimeleft	= dqblk.dqb_btimelimit - tv.tv_sec;
+		gqr.gqrslt.rq_ftimeleft	= dqblk.dqb_ftimelimit - tv.tv_sec;
+	}
+
 	gqr.status = Q_OK;
 	gqr.gqrslt.rq_active	= qactive;
 	gqr.gqrslt.rq_bsize	= DEV_BSIZE;
@@ -312,8 +396,6 @@ getquota(rqstp, transp)
 	gqr.gqrslt.rq_fhardlimit = dqblk.dqb_fhardlimit;
 	gqr.gqrslt.rq_fsoftlimit = dqblk.dqb_fsoftlimit;
 	gqr.gqrslt.rq_curfiles	= dqblk.dqb_curfiles;
-	gqr.gqrslt.rq_btimeleft	= dqblk.dqb_btimelimit - tv.tv_sec;
-	gqr.gqrslt.rq_ftimeleft	= dqblk.dqb_ftimelimit - tv.tv_sec;
 sendreply:
 	errno = 0;
 	if (!svc_sendreply(transp, xdr_getquota_rslt, (caddr_t)&gqr))
@@ -350,7 +432,8 @@ quotactl(cmd, mountp, uid, dqp)
 				!(hasmntopt(&mntp, MNTOPT_RQ) ||
 				hasmntopt(&mntp, MNTOPT_QUOTA)))
 				continue;
-			(void) strcpy(mountpoint, mntp.mnt_mountp);
+			(void) strlcpy(mountpoint, mntp.mnt_mountp,
+			    sizeof (mountpoint));
 			strcat(mountpoint, "/quotas");
 			if ((fd = open64(mountpoint, O_RDWR)) >= 0)
 				break;
@@ -365,7 +448,7 @@ quotactl(cmd, mountp, uid, dqp)
 			errno = ENOENT;
 			return (-1);
 		}
-		(void) strcpy(mountpoint, mountp);
+		(void) strlcpy(mountpoint, mountp, sizeof (mountpoint));
 		strcat(mountpoint, "/quotas");
 
 		if ((fd = open64(mountpoint, O_RDONLY)) < 0) {
@@ -423,16 +506,41 @@ findfsq(dir)
 	if (stat(dir, &sb) < 0)
 		return (NULL);
 	for (fsqp = fsqlist; fsqp != NULL; fsqp = fsqp->fsq_next) {
-		if (sb.st_dev == fsqp->fsq_dev)
+		if (strcmp(fsqp->fsq_fstype, MNTTYPE_ZFS) == 0) {
+			if (strcmp(fsqp->fsq_dir, dir) == 0)
+				return (fsqp);
+		} else if (sb.st_dev == fsqp->fsq_dev) {
 			return (fsqp);
+		}
 	}
 	return (NULL);
+}
+
+static void
+setup_zfs(struct mnttab *mp)
+{
+	struct fsquot *fsqp;
+
+	fsqp = malloc(sizeof (struct fsquot));
+	if (fsqp == NULL) {
+		syslog(LOG_ERR, "out of memory");
+		zexit(1);
+	}
+	fsqp->fsq_dir = strdup(mp->mnt_mountp);
+	fsqp->fsq_devname = strdup(mp->mnt_special);
+	if (fsqp->fsq_dir == NULL || fsqp->fsq_devname == NULL) {
+		syslog(LOG_ERR, "out of memory");
+		zexit(1);
+	}
+	fsqp->fsq_fstype = MNTTYPE_ZFS;
+	fsqp->fsq_next = fsqlist;
+	fsqlist = fsqp;
 }
 
 void
 setupfs()
 {
-	register struct fsquot *fsqp;
+	struct fsquot *fsqp;
 	FILE *mt;
 	struct mnttab m;
 	struct stat sb;
@@ -445,31 +553,36 @@ setupfs()
 	}
 
 	while (getmntent(mt, &m) == 0) {
+		if (strcmp(m.mnt_fstype, MNTTYPE_ZFS) == 0) {
+			setup_zfs(&m);
+			continue;
+		}
+
 		if (strcmp(m.mnt_fstype, MNTTYPE_UFS) != 0)
 			continue;
 		if (!hasquota(m.mnt_mntopts)) {
-			sprintf(qfilename, "%s/%s", m.mnt_mountp, QFNAME);
+			snprintf(qfilename, sizeof (qfilename), "%s/%s",
+			    m.mnt_mountp, QFNAME);
 			if (access(qfilename, F_OK) < 0)
 				continue;
 		}
 		if (stat(m.mnt_special, &sb) < 0 ||
 		    (sb.st_mode & S_IFMT) != S_IFBLK)
 			continue;
-		fsqp = (struct fsquot *)malloc(sizeof (struct fsquot));
+		fsqp = malloc(sizeof (struct fsquot));
 		if (fsqp == NULL) {
 			syslog(LOG_ERR, "out of memory");
-			exit(1);
+			zexit(1);
 		}
-		fsqp->fsq_next = fsqlist;
-		fsqp->fsq_dir = (char *)malloc(strlen(m.mnt_mountp) + 1);
-		fsqp->fsq_devname = (char *)malloc(strlen(m.mnt_special) + 1);
+		fsqp->fsq_dir = strdup(m.mnt_mountp);
+		fsqp->fsq_devname = strdup(m.mnt_special);
 		if (fsqp->fsq_dir == NULL || fsqp->fsq_devname == NULL) {
 			syslog(LOG_ERR, "out of memory");
-			exit(1);
+			zexit(1);
 		}
-		strcpy(fsqp->fsq_dir, m.mnt_mountp);
-		strcpy(fsqp->fsq_devname, m.mnt_special);
+		fsqp->fsq_fstype = MNTTYPE_UFS;
 		fsqp->fsq_dev = sb.st_rdev;
+		fsqp->fsq_next = fsqlist;
 		fsqlist = fsqp;
 	}
 	(void) fclose(mt);
@@ -502,7 +615,7 @@ getdiskquota(fsqp, uid, dqp)
 	int fd;
 	char qfilename[MAXPATHLEN];
 
-	sprintf(qfilename, "%s/%s", fsqp->fsq_dir, QFNAME);
+	snprintf(qfilename, sizeof (qfilename), "%s/%s", fsqp->fsq_dir, QFNAME);
 	if ((fd = open64(qfilename, O_RDONLY)) < 0)
 		return (0);
 	(void) llseek(fd, (offset_t)dqoff(uid), L_SET);
@@ -605,4 +718,12 @@ hasquota(opts)
 	}
 
 	return (0);
+}
+
+static void
+zexit(int n)
+{
+	if (g_zfs != NULL)
+		_libzfs_fini(g_zfs);
+	exit(n);
 }

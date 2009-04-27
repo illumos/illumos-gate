@@ -370,6 +370,8 @@ extern int zfs_prop_get(zfs_handle_t *, zfs_prop_t, char *, size_t,
     zprop_source_t *, char *, size_t, boolean_t);
 extern int zfs_prop_get_numeric(zfs_handle_t *, zfs_prop_t, uint64_t *,
     zprop_source_t *, char *, size_t);
+extern int zfs_prop_get_userquota_int(zfs_handle_t *zhp, const char *propname,
+    uint64_t *propvalue);
 extern int zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
     char *propbuf, int proplen, boolean_t literal);
 extern uint64_t zfs_prop_get_int(zfs_handle_t *, zfs_prop_t);
