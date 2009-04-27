@@ -748,8 +748,10 @@ bcons_device_change(int new_console)
 static void
 defcons_putchar(int c)
 {
-	if (defcons_cur - defcons_buf < MMU_PAGESIZE)
+	if (defcons_cur + 1 - defcons_buf < MMU_PAGESIZE) {
 		*defcons_cur++ = c;
+		*defcons_cur = 0;
+	}
 }
 #endif	/* _BOOT */
 

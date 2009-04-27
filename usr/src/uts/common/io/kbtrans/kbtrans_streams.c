@@ -206,9 +206,12 @@ progressbar_key_abort_thread(struct kbtrans *upper)
 		while (upper->progressbar_key_abort_flag == 0)
 			cv_wait(&upper->progressbar_key_abort_cv,
 			    &upper->progressbar_key_abort_lock);
-		if (upper->progressbar_key_abort_flag == 1)
+		if (upper->progressbar_key_abort_flag == 1) {
+			mutex_exit(&upper->progressbar_key_abort_lock);
 			progressbar_key_abort(li);
-		mutex_exit(&upper->progressbar_key_abort_lock);
+		} else {
+			mutex_exit(&upper->progressbar_key_abort_lock);
+		}
 		ldi_ident_release(li);
 	}
 
