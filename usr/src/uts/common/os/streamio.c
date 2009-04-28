@@ -77,7 +77,6 @@
 #include <sys/policy.h>
 #include <sys/dld.h>
 #include <sys/zone.h>
-#include <sys/sodirect.h>
 
 /*
  * This define helps improve the readability of streams code while
@@ -143,7 +142,6 @@ static void putback(struct stdata *, queue_t *, mblk_t *, int);
 static void strcleanall(struct vnode *);
 static int strwsrv(queue_t *);
 static int strdocmd(struct stdata *, struct strcmd *, cred_t *);
-static void struioainit(queue_t *, sodirect_t *, uio_t *);
 
 /*
  * qinit and module_info structures for stream head read and write queues
@@ -189,11 +187,6 @@ static boolean_t msghasdata(mblk_t *bp);
  *		mirror this.
  *	4. ioctl monitor: sd_lock is gotten to ensure that only one
  *		thread is doing an ioctl at a time.
- *
- * Note, for sodirect case 3. is extended to (*sodirect_t.sod_enqueue)()
- * call-back from below, further the sodirect support is for code paths
- * called via kstgetmsg(), all other code paths ASSERT() that sodirect
- * uioa generated mblk_t's (i.e. DBLK_UIOA) aren't processed.
  */
 
 static int
@@ -402,7 +395,6 @@ ckreturn:
 	stp->sd_qn_minpsz = 0;
 	stp->sd_qn_maxpsz = INFPSZ - 1;	/* used to check for initialization */
 	stp->sd_maxblk = INFPSZ;
-	stp->sd_sodirect = NULL;
 	qp->q_ptr = _WR(qp)->q_ptr = stp;
 	STREAM(qp) = STREAM(_WR(qp)) = stp;
 	vp->v_stream = stp;
@@ -976,14 +968,11 @@ strcleanall(struct vnode *vp)
  * It is the callers responsibility to call qbackenable after
  * it is finished with the message. The caller should not call
  * qbackenable until after any putback calls to avoid spurious backenabling.
- *
- * Also, handle uioa initialization and process any DBLK_UIOA flaged messages.
  */
 mblk_t *
 strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
     int *errorp)
 {
-	sodirect_t *sodp = stp->sd_sodirect;
 	mblk_t *bp;
 	int error;
 	ssize_t rbytes = 0;
@@ -1074,46 +1063,22 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 	*errorp = 0;
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
 
-	if (sodp != NULL && sodp->sod_state & SOD_ENABLED) {
-		if (sodp->sod_uioa.uioa_state & UIOA_INIT) {
-			/*
-			 * First kstrgetmsg() call for an uioa_t so if any
-			 * queued mblk_t's need to consume them before uioa
-			 * from below can occur.
-			 */
-			sodp->sod_uioa.uioa_state &= UIOA_CLR;
-			sodp->sod_uioa.uioa_state |= UIOA_ENABLED;
-			if (q->q_first != NULL) {
-				struioainit(q, sodp, uiop);
-			}
-		} else if (sodp->sod_uioa.uioa_state &
-		    (UIOA_ENABLED|UIOA_FINI)) {
-			ASSERT(uiop == (uio_t *)&sodp->sod_uioa);
-			rbytes = 0;
-		} else {
-			rbytes = uiop->uio_resid;
-		}
-	} else {
-		/*
-		 * If we have a valid uio, try and use this as a guide for how
-		 * many bytes to retrieve from the queue via getq_noenab().
-		 * Doing this can avoid unneccesary counting of overlong
-		 * messages in putback(). We currently only do this for sockets
-		 * and only if there is no sd_rputdatafunc hook.
-		 *
-		 * The sd_rputdatafunc hook transforms the entire message
-		 * before any bytes in it can be given to a client. So, rbytes
-		 * must be 0 if there is a hook.
-		 */
-		if ((uiop != NULL) && (stp->sd_vnode->v_type == VSOCK) &&
-		    (stp->sd_rputdatafunc == NULL))
-			rbytes = uiop->uio_resid;
-	}
+	/*
+	 * If we have a valid uio, try and use this as a guide for how
+	 * many bytes to retrieve from the queue via getq_noenab().
+	 * Doing this can avoid unneccesary counting of overlong
+	 * messages in putback(). We currently only do this for sockets
+	 * and only if there is no sd_rputdatafunc hook.
+	 *
+	 * The sd_rputdatafunc hook transforms the entire message
+	 * before any bytes in it can be given to a client. So, rbytes
+	 * must be 0 if there is a hook.
+	 */
+	if ((uiop != NULL) && (stp->sd_vnode->v_type == VSOCK) &&
+	    (stp->sd_rputdatafunc == NULL))
+		rbytes = uiop->uio_resid;
 
-	bp = getq_noenab(q, rbytes);
-	sod_uioa_mblk_done(sodp, bp);
-
-	return (bp);
+	return (getq_noenab(q, rbytes));
 }
 
 /*
@@ -1133,8 +1098,6 @@ struiocopyout(mblk_t *bp, struct uio *uiop, int *errorp)
 	ASSERT(bp->b_wptr >= bp->b_rptr);
 
 	do {
-		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
-
 		if ((n = MIN(uiop->uio_resid, MBLKL(bp))) != 0) {
 			ASSERT(n > 0);
 
@@ -1284,7 +1247,6 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 
 		ASSERT(MUTEX_HELD(&stp->sd_lock));
 		ASSERT(bp);
-		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		pri = bp->b_band;
 		/*
 		 * Extract any mark information. If the message is not
@@ -6655,7 +6617,6 @@ strgetmsg(
 			bp = strget(stp, q, uiop, first, &error);
 			ASSERT(MUTEX_HELD(&stp->sd_lock));
 			if (bp != NULL) {
-				ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 				if (DB_TYPE(bp) == M_SIG) {
 					strsignal_nolock(stp, *bp->b_rptr,
 					    bp->b_band);
@@ -7364,7 +7325,6 @@ retry:
 		 * if db_ref in any of the messages reaches its limit.
 		 */
 
-		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		if ((nbp = dupmsg(bp)) == NULL && (nbp = copymsg(bp)) == NULL) {
 			/*
 			 * Restore the state of the stream head since we
@@ -7423,7 +7383,6 @@ retry:
 			}
 		}
 
-		ASSERT(!(bp->b_datap->db_flags & DBLK_UIOA));
 		bp = (stp->sd_rputdatafunc)(stp->sd_vnode, bp,
 		    NULL, NULL, NULL, NULL);
 
@@ -7475,7 +7434,6 @@ retry:
 	if (uiop == NULL) {
 		/* Append data to tail of mctlp */
 
-		ASSERT(bp == NULL || !(bp->b_datap->db_flags & DBLK_UIOA));
 		if (mctlp != NULL) {
 			mblk_t **mpp = mctlp;
 
@@ -7484,14 +7442,6 @@ retry:
 			*mpp = bp;
 			bp = NULL;
 		}
-	} else if (bp && (bp->b_datap->db_flags & DBLK_UIOA)) {
-		/*
-		 * A uioa mblk_t chain, as uio processing has already
-		 * been done we simple skip over processing.
-		 */
-		bp = NULL;
-		pr = 0;
-
 	} else if (uiop->uio_resid >= 0 && bp) {
 		size_t oldresid = uiop->uio_resid;
 
@@ -7591,7 +7541,6 @@ retry:
 			 * may have cleared it while we had sd_lock dropped.
 			 */
 
-			ASSERT(!(savemp->b_datap->db_flags & DBLK_UIOA));
 			if (type >= QPCTL) {
 				ASSERT(type == M_PCPROTO);
 				if (queclass(savemp) < QPCTL)
@@ -8670,88 +8619,4 @@ msghasdata(mblk_t *bp)
 				return (B_TRUE);
 		}
 	return (B_FALSE);
-}
-
-/*
- * Called on the first strget() of a sodirect/uioa enabled streamhead,
- * if any mblk_t(s) enqueued they must first be uioamove()d before uioa
- * can be enabled for the underlying transport's use.
- */
-void
-struioainit(queue_t *q, sodirect_t *sodp, uio_t *uiop)
-{
-	uioa_t	*uioap = (uioa_t *)uiop;
-	mblk_t	*bp;
-	mblk_t	*lbp = NULL;
-	mblk_t	*wbp;
-	int	len;
-	int	error;
-
-	ASSERT(MUTEX_HELD(sodp->sod_lockp));
-	ASSERT(&sodp->sod_uioa == uioap);
-
-	/*
-	 * Walk first b_cont chain in sod_q
-	 * and schedule any M_DATA mblk_t's for uio asynchronous move.
-	 */
-	mutex_enter(QLOCK(q));
-	if ((bp = q->q_first) == NULL) {
-		mutex_exit(QLOCK(q));
-		return;
-	}
-	/* Walk the chain */
-	wbp = bp;
-	do {
-		if (wbp->b_datap->db_type != M_DATA) {
-			/* Not M_DATA, no more uioa */
-			goto nouioa;
-		}
-		if ((len = wbp->b_wptr - wbp->b_rptr) > 0) {
-			/* Have a M_DATA mblk_t with data */
-			if (len > uioap->uio_resid) {
-				/* Not enough uio sapce */
-				goto nouioa;
-			}
-			ASSERT(!(wbp->b_datap->db_flags & DBLK_UIOA));
-			error = uioamove(wbp->b_rptr, len,
-			    UIO_READ, uioap);
-			if (!error) {
-				/* Scheduled, mark dblk_t as such */
-				wbp->b_datap->db_flags |= DBLK_UIOA;
-			} else {
-				/* Break the mblk chain */
-				goto nouioa;
-			}
-		}
-		/* Save last wbp processed */
-		lbp = wbp;
-	} while ((wbp = wbp->b_cont) != NULL);
-
-	mutex_exit(QLOCK(q));
-	return;
-
-nouioa:
-	/* No more uioa */
-	uioap->uioa_state &= UIOA_CLR;
-	uioap->uioa_state |= UIOA_FINI;
-
-	/*
-	 * If we processed 1 or more mblk_t(s) then we need to split the
-	 * current mblk_t chain in 2 so that all the uioamove()ed mblk_t(s)
-	 * are in the current chain and the rest are in the following new
-	 * chain.
-	 */
-	if (lbp != NULL) {
-		/* New end of current chain */
-		lbp->b_cont = NULL;
-
-		/* Insert new chain wbp after bp */
-		if ((wbp->b_next = bp->b_next) != NULL)
-			bp->b_next->b_prev = wbp;
-		else
-			q->q_last = wbp;
-		wbp->b_prev = bp;
-		bp->b_next = wbp;
-	}
-	mutex_exit(QLOCK(q));
 }

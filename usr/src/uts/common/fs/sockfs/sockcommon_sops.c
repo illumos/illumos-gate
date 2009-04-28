@@ -38,7 +38,6 @@
 #define	_SUN_TPI_VERSION	2
 #include <sys/tihdr.h>
 #include <sys/sockio.h>
-#include <sys/sodirect.h>
 #include <sys/kmem_impl.h>
 
 #include <sys/strsubr.h>
@@ -52,6 +51,7 @@
 #include <sys/socket_proto.h>
 
 #include <fs/sockfs/socktpi_impl.h>
+#include <fs/sockfs/sodirect.h>
 #include <sys/tihdr.h>
 #include <fs/sockfs/nl7c.h>
 #include <inet/kssl/ksslapi.h>
@@ -1195,31 +1195,34 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 		    "sockfs: Unaligned TPI message received. rptr = %p\n",
 		    (void *)mp->b_rptr);
 		freemsg(mp);
-		mutex_enter(sodp->sod_lockp);
-		SOD_UIOAFINI(sodp);
-		mutex_exit(sodp->sod_lockp);
+		mutex_enter(&so->so_lock);
+		if (sodp != NULL)
+			SOD_UIOAFINI(sodp);
+		mutex_exit(&so->so_lock);
 
 		return (so->so_rcvbuf - so->so_rcv_queued);
 	}
 
 	mutex_enter(&so->so_lock);
 	if (so->so_state & (SS_FALLBACK_DRAIN | SS_FALLBACK_COMP)) {
-		SOD_DISABLE(sodp);
+		if (sodp != NULL)
+			SOD_DISABLE(sodp);
 		mutex_exit(&so->so_lock);
 		*errorp = EOPNOTSUPP;
 		return (-1);
 	}
 	if (so->so_state & SS_CANTRCVMORE) {
 		freemsg(mp);
-		SOD_DISABLE(sodp);
+		if (sodp != NULL)
+			SOD_DISABLE(sodp);
 		mutex_exit(&so->so_lock);
 		return (0);
 	}
 
 	/* process the mblk via I/OAT if capable */
-	if (sodp != NULL && (sodp->sod_state & SOD_ENABLED)) {
+	if (sodp != NULL && sodp->sod_enabled) {
 		if (DB_TYPE(mp) == M_DATA) {
-			(void) sod_uioa_mblk_init(sodp, mp, msg_size);
+			sod_uioa_mblk_init(sodp, mp, msg_size);
 		} else {
 			SOD_UIOAFINI(sodp);
 		}
@@ -1247,8 +1250,7 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 	}
 
 	if (force_push || so->so_rcv_queued >= so->so_rcv_thresh ||
-	    so->so_rcv_queued >= so->so_rcv_wanted ||
-	    (sodp != NULL && so->so_rcv_queued >= sodp->sod_want)) {
+	    so->so_rcv_queued >= so->so_rcv_wanted) {
 		SOCKET_TIMER_CANCEL(so);
 		/*
 		 * so_notify_data will release the lock
@@ -1281,7 +1283,8 @@ so_signal_oob(sock_upper_handle_t sock_handle, ssize_t offset)
 	ASSERT(offset >= 0);
 	so = (struct sonode *)sock_handle;
 	mutex_enter(&so->so_lock);
-	SOD_UIOAFINI(so->so_direct);
+	if (so->so_direct != NULL)
+		SOD_UIOAFINI(so->so_direct);
 
 	/*
 	 * New urgent data on the way so forget about any old
@@ -1322,7 +1325,8 @@ so_queue_oob(sock_upper_handle_t sock_handle, mblk_t *mp, size_t len)
 
 	so = (struct sonode *)sock_handle;
 	mutex_enter(&so->so_lock);
-	SOD_UIOAFINI(so->so_direct);
+	if (so->so_direct != NULL)
+		SOD_UIOAFINI(so->so_direct);
 
 	ASSERT(mp != NULL);
 	if (!IS_SO_OOB_INLINE(so)) {
@@ -1710,7 +1714,6 @@ retry:
 out:
 	mutex_enter(&so->so_lock);
 out_locked:
-	/* The sod_lockp pointers to the sonode so_lock */
 	ret = sod_rcv_done(so, suiop, uiop);
 	if (ret != 0 && error == 0)
 		error = ret;

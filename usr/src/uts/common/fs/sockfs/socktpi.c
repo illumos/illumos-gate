@@ -58,7 +58,6 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
-#include <sys/sodirect.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/strsun.h>
@@ -206,9 +205,6 @@ extern mblk_t	*strsock_kssl_output(vnode_t *, mblk_t *, strwakeup_t *,
 		    strsigset_t *, strsigset_t *, strpollset_t *);
 
 static int	sotpi_unbind(struct sonode *, int);
-
-extern int	sodput(sodirect_t *, mblk_t *);
-extern void	sodwakeup(sodirect_t *);
 
 /* TPI sockfs sonode operations */
 int 		sotpi_init(struct sonode *, struct sonode *, struct cred *,
@@ -504,10 +500,6 @@ sotpi_init(struct sonode *so, struct sonode *tso, struct cred *cr, int flags)
 			 * udp case, when some other module is autopushed
 			 * above it, or for some reasons the expected module
 			 * isn't purely D_MP (which is the main requirement).
-			 *
-			 * Else, SS_DIRECT is valid. If the read-side Q has
-			 * _QSODIRECT set then and uioasync is enabled then
-			 * set SS_SODIRECT to enable sodirect.
 			 */
 			if (!socktpi_direct || !(tq->q_flag & _QDIRECT) ||
 			    !(_OTHERQ(tq)->q_flag & _QDIRECT)) {
@@ -532,10 +524,6 @@ sotpi_init(struct sonode *so, struct sonode *tso, struct cred *cr, int flags)
 						return (error);
 					}
 				}
-			} else if ((_OTHERQ(tq)->q_flag & _QSODIRECT) &&
-			    uioasync.enabled) {
-				/* Enable sodirect */
-				so->so_state |= SS_SODIRECT;
 			}
 		}
 
@@ -1847,13 +1835,6 @@ again:
 		mp->b_cont = NULL;
 		strsetrwputdatahooks(nvp, strsock_kssl_input,
 		    strsock_kssl_output);
-
-		/* Disable sodirect if any */
-		if (nso->so_direct != NULL) {
-			mutex_enter(nso->so_direct->sod_lockp);
-			SOD_DISABLE(nso->so_direct);
-			mutex_exit(nso->so_direct->sod_lockp);
-		}
 	}
 #ifdef DEBUG
 	/*
@@ -3147,8 +3128,6 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	int			flags;
 	clock_t			timout;
 	int			error = 0;
-	int			reterr = 0;
-	struct uio		*suiop = NULL;
 	sotpi_info_t		*sti = SOTOTPI(so);
 
 	flags = msg->msg_flags;
@@ -3306,8 +3285,6 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	else
 		timout = -1;
 	opflag = pflag;
-
-	suiop = sod_rcv_init(so, flags, &uiop);
 retry:
 	saved_resid = uiop->uio_resid;
 	pri = 0;
@@ -3712,9 +3689,6 @@ retry:
 out:
 	mutex_enter(&so->so_lock);
 out_locked:
-	reterr = sod_rcv_done(so, suiop, uiop);
-	if (reterr != 0 && error == 0)
-		error = reterr;
 	so_unlock_read(so);	/* Clear SOREADLOCKED */
 	mutex_exit(&so->so_lock);
 	return (error);

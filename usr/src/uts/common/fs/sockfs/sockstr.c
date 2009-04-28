@@ -56,7 +56,6 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/socketvar.h>
-#include <sys/sodirect.h>
 #include <netinet/in.h>
 #include <inet/common.h>
 #include <inet/proto_set.h>
@@ -71,7 +70,6 @@
 
 #include <fs/sockfs/socktpi.h>
 #include <fs/sockfs/socktpi_impl.h>
-#include <sys/dcopy.h>
 
 int so_default_version = SOV_SOCKSTREAM;
 
@@ -119,21 +117,6 @@ static mblk_t *strsock_proto(vnode_t *vp, mblk_t *mp,
 static mblk_t *strsock_misc(vnode_t *vp, mblk_t *mp,
 		strwakeup_t *wakeups, strsigset_t *firstmsgsigs,
 		strsigset_t *allmsgsigs, strpollset_t *pollwakeups);
-/*
- * STREAMS based sodirect put/wakeup functions.
- */
-static int sodput(sodirect_t *, mblk_t *);
-static void sodwakeup(sodirect_t *);
-
-/*
- * Called by sockinit() when sockfs is loaded.
- */
-int
-sostr_init()
-{
-	sod_init();
-	return (0);
-}
 
 /*
  * Convert a socket to a stream. Invoked when the illusory sockmod
@@ -422,15 +405,6 @@ so_basic_strinit(struct sonode *so)
 	if (stp->sd_qn_minpsz == 1)
 		stp->sd_qn_minpsz = 0;
 	mutex_exit(&stp->sd_lock);
-
-	/*
-	 * If sodirect capable allocate and initialize sodirect_t.
-	 * Note, SS_SODIRECT is set in socktpi_open().
-	 */
-	if ((so->so_state & SS_SODIRECT) &&
-	    !(so->so_state & SS_FALLBACK_PENDING)) {
-		sod_sock_init(so, stp, sodput, sodwakeup, &stp->sd_lock);
-	}
 }
 
 /*
@@ -3009,125 +2983,4 @@ sock_getfasync(vnode_t *vp)
 		return (0);
 
 	return (FASYNC);
-}
-
-/*
- * Sockfs sodirect STREAMS read put procedure. Called from sodirect enable
- * transport driver/module with an mblk_t chain.
- *
- * Note, we in-line putq() for the fast-path cases of q is empty, q_last and
- * bp are of type M_DATA. All other cases we call putq().
- *
- * On success a zero will be return, else an errno will be returned.
- */
-int
-sodput(sodirect_t *sodp, mblk_t *bp)
-{
-	queue_t		*q = sodp->sod_q;
-	struct stdata	*stp = (struct stdata *)q->q_ptr;
-	mblk_t		*nbp;
-	mblk_t		*last = q->q_last;
-	int		bytecnt = 0;
-	int		mblkcnt = 0;
-
-
-	ASSERT(MUTEX_HELD(sodp->sod_lockp));
-
-	if (stp->sd_flag == STREOF) {
-		do {
-			if ((nbp = bp->b_next) != NULL)
-				bp->b_next = NULL;
-			freemsg(bp);
-		} while ((bp = nbp) != NULL);
-
-		return (0);
-	}
-
-	mutex_enter(QLOCK(q));
-	if (q->q_first == NULL) {
-		/* Q empty, really fast fast-path */
-		bp->b_prev = NULL;
-		bp->b_next = NULL;
-		q->q_first = bp;
-		q->q_last = bp;
-
-	} else if (last->b_datap->db_type == M_DATA &&
-	    bp->b_datap->db_type == M_DATA) {
-		/*
-		 * Last mblk_t chain and bp are both type M_DATA so
-		 * in-line putq() here, if the DBLK_UIOA state match
-		 * add bp to the end of the current last chain, else
-		 * start a new last chain with bp.
-		 */
-		if ((last->b_datap->db_flags & DBLK_UIOA) ==
-		    (bp->b_datap->db_flags & DBLK_UIOA)) {
-			/* Added to end */
-			while ((nbp = last->b_cont) != NULL)
-				last = nbp;
-			last->b_cont = bp;
-		} else {
-			/* New last */
-			ASSERT((bp->b_datap->db_flags & DBLK_UIOA) == 0 ||
-			    msgdsize(bp) == sodp->sod_uioa.uioa_mbytes);
-			last->b_next = bp;
-			bp->b_next = NULL;
-			bp->b_prev = last;
-			q->q_last = bp;
-		}
-	} else {
-		/*
-		 * Can't use q_last so just call putq().
-		 */
-		mutex_exit(QLOCK(q));
-
-		ASSERT((bp->b_datap->db_flags & DBLK_UIOA) == 0 ||
-		    msgdsize(bp) == sodp->sod_uioa.uioa_mbytes);
-		(void) putq(q, bp);
-		return (0);
-	}
-
-	/* Count bytes and mblk_t's */
-	do {
-		bytecnt += MBLKL(bp);
-		mblkcnt++;
-	} while ((bp = bp->b_cont) != NULL);
-	q->q_count += bytecnt;
-	q->q_mblkcnt += mblkcnt;
-
-	/* Check for QFULL */
-	if (q->q_count >= q->q_hiwat + sodp->sod_want ||
-	    q->q_mblkcnt >= q->q_hiwat) {
-		q->q_flag |= QFULL;
-	}
-
-	mutex_exit(QLOCK(q));
-	return (0);
-}
-
-/*
- * Sockfs sodirect read wakeup. Called from a sodirect enabled transport
- * driver/module to indicate that read-side data is available.
- *
- * On return the sodirect_t.lock mutex will be exited so this must be the
- * last sodirect_t call to guarantee atomic access of *sodp.
- */
-void
-sodwakeup(sodirect_t *sodp)
-{
-	queue_t		*q = sodp->sod_q;
-	struct stdata	*stp = (struct stdata *)q->q_ptr;
-
-	ASSERT(MUTEX_HELD(sodp->sod_lockp));
-
-	if (stp->sd_flag & RSLEEP) {
-		stp->sd_flag &= ~RSLEEP;
-		cv_broadcast(&q->q_wait);
-	}
-
-	if (stp->sd_rput_opt & SR_POLLIN) {
-		stp->sd_rput_opt &= ~SR_POLLIN;
-		mutex_exit(sodp->sod_lockp);
-		pollwakeup(&stp->sd_pollist, POLLIN | POLLRDNORM);
-	} else
-		mutex_exit(sodp->sod_lockp);
 }

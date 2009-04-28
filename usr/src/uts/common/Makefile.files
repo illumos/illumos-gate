@@ -1189,7 +1189,7 @@ SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockparams.o	\
 		sockcommon_vnops.o	sockcommon_subr.o \
 		sockcommon_sops.o	sockcommon.o		socknotify.o \
 		nl7c.o		nl7curi.o	nl7chttp.o	nl7clogd.o \
-		nl7cnca.o
+		nl7cnca.o	sodirect.o
 
 TMPFS_OBJS +=	tmp_dir.o	tmp_subr.o	tmp_tnode.o	tmp_vfsops.o \
 		tmp_vnops.o

@@ -33,7 +33,6 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
-#include <sys/sodirect.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/atomic.h>
@@ -41,6 +40,7 @@
 
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/socktpi.h>
+#include <fs/sockfs/sodirect.h>
 #include <sys/ddi.h>
 #include <inet/ip.h>
 #include <sys/time.h>
@@ -681,10 +681,7 @@ again1:
 	 * First move messages from the dump area to processing area
 	 */
 	if (sodp != NULL) {
-		/* No need to grab sod_lockp since it pointers to so_lock */
-		if (sodp->sod_state & SOD_ENABLED) {
-			ASSERT(sodp->sod_lockp == &so->so_lock);
-
+		if (sodp->sod_enabled) {
 			if (sodp->sod_uioa.uioa_state & UIOA_ALLOC) {
 				/* nothing to uioamove */
 				sodp = NULL;
@@ -780,12 +777,12 @@ again1:
 			ssize_t copied = 0;
 
 			if (sodp != NULL && (DB_FLAGS(mp) & DBLK_UIOA)) {
-				mutex_enter(sodp->sod_lockp);
+				mutex_enter(&so->so_lock);
 				ASSERT(uiop == (uio_t *)&sodp->sod_uioa);
 				copied = sod_uioa_mblk(so, mp);
 				if (copied > 0)
 					partial_read = B_TRUE;
-				mutex_exit(sodp->sod_lockp);
+				mutex_exit(&so->so_lock);
 				/* mark this mblk as processed */
 				mp = NULL;
 			} else {
@@ -988,8 +985,8 @@ try_again:
 	ASSERT(so->so_rcv_wakeup == B_FALSE);
 done:
 	if (sodp != NULL) {
-		mutex_enter(sodp->sod_lockp);
-		if ((sodp->sod_state & SOD_ENABLED) &&
+		mutex_enter(&so->so_lock);
+		if (sodp->sod_enabled &&
 		    (sodp->sod_uioa.uioa_state & UIOA_ENABLED)) {
 			SOD_UIOAFINI(sodp);
 			if (sodp->sod_uioa.uioa_mbytes > 0) {
@@ -1000,7 +997,7 @@ done:
 					error = 0;
 			}
 		}
-		mutex_exit(sodp->sod_lockp);
+		mutex_exit(&so->so_lock);
 	}
 #ifdef DEBUG
 	if (so_debug_length) {
@@ -1296,11 +1293,6 @@ socket_init_common(struct sonode *so, struct sonode *pso, int flags, cred_t *cr)
 		so->so_pollev = pso->so_pollev & SO_POLLEV_ALWAYS;
 
 		mutex_exit(&pso->so_lock);
-
-		if (uioasync.enabled) {
-			sod_sock_init(so, NULL, NULL, NULL, &so->so_lock);
-		}
-		return (0);
 	} else {
 		struct sockparams *sp = so->so_sockparams;
 		sock_upcalls_t *upcalls_to_use;
@@ -1367,8 +1359,12 @@ socket_init_common(struct sonode *so, struct sonode *pso, int flags, cred_t *cr)
 				return (EPROTONOSUPPORT);
 			}
 		}
-		return (0);
 	}
+
+	if (uioasync.enabled)
+		sod_sock_init(so);
+
+	return (0);
 }
 
 /*
@@ -2262,12 +2258,12 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 
 	if (so->so_direct != NULL) {
 		sodirect_t *sodp = so->so_direct;
-		mutex_enter(sodp->sod_lockp);
+		mutex_enter(&so->so_lock);
 
-		so->so_direct->sod_state &= ~SOD_ENABLED;
+		so->so_direct->sod_enabled = B_FALSE;
 		so->so_state &= ~SS_SODIRECT;
 		ASSERT(sodp->sod_uioafh == NULL);
-		mutex_exit(sodp->sod_lockp);
+		mutex_exit(&so->so_lock);
 	}
 
 	/* Turn sonode into a TPI socket */

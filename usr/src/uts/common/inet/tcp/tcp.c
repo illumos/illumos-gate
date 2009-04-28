@@ -62,7 +62,6 @@
 #include <sys/isa_defs.h>
 #include <sys/md5.h>
 #include <sys/random.h>
-#include <sys/sodirect.h>
 #include <sys/uio.h>
 #include <sys/systm.h>
 #include <netinet/in.h>
@@ -217,23 +216,6 @@
  * behaviour. Once tcp_issocket is unset, its never set for the
  * life of that connection.
  *
- * In support of on-board asynchronous DMA hardware (e.g. Intel I/OAT)
- * two consoldiation private KAPIs are used to enqueue M_DATA mblk_t's
- * directly to the socket (sodirect) and start an asynchronous copyout
- * to a user-land receive-side buffer (uioa) when a blocking socket read
- * (e.g. read, recv, ...) is pending.
- *
- * This is accomplished when tcp_issocket is set and tcp_sodirect is not
- * NULL so points to an sodirect_t and if marked enabled then we enqueue
- * all mblk_t's directly to the socket.
- *
- * Further, if the sodirect_t sod_uioa and if marked enabled (due to a
- * blocking socket read, e.g. user-land read, recv, ...) then an asynchronous
- * copyout will be started directly to the user-land uio buffer. Also, as we
- * have a pending read, TCP's push logic can take into account the number of
- * bytes to be received and only awake the blocked read()er when the uioa_t
- * byte count has been satisfied.
- *
  * IPsec notes :
  *
  * Since a packet is always executed on the correct TCP perimeter
@@ -259,37 +241,6 @@
  */
 int tcp_squeue_wput = 2;	/* /etc/systems */
 int tcp_squeue_flag;
-
-/*
- * Macros for sodirect:
- *
- * SOD_PTR_ENTER(tcp, sodp) - for the tcp_t pointer "tcp" set the
- * sodirect_t pointer "sodp" to the socket/tcp shared sodirect_t
- * if it exists and is enabled, else to NULL. Note, in the current
- * sodirect implementation the sod_lockp must not be held across any
- * STREAMS call (e.g. putnext) else a "recursive mutex_enter" PANIC
- * will result as sod_lockp is the streamhead stdata.sd_lock.
- *
- * SOD_NOT_ENABLED(tcp) - return true if not a sodirect tcp_t or the
- * sodirect_t isn't enabled, usefull for ASSERT()ing that a recieve
- * side tcp code path dealing with a tcp_rcv_list or putnext() isn't
- * being used when sodirect code paths should be.
- */
-
-#define	SOD_PTR_ENTER(tcp, sodp)					\
-	(sodp) = (tcp)->tcp_sodirect;					\
-									\
-	if ((sodp) != NULL) {						\
-		mutex_enter((sodp)->sod_lockp);				\
-		if (!((sodp)->sod_state & SOD_ENABLED)) {		\
-			mutex_exit((sodp)->sod_lockp);			\
-			(sodp) = NULL;					\
-		}							\
-	}
-
-#define	SOD_NOT_ENABLED(tcp)						\
-	((tcp)->tcp_sodirect == NULL ||					\
-	    !((tcp)->tcp_sodirect->sod_state & SOD_ENABLED))
 
 /*
  * This controls how tiny a write must be before we try to copy it
@@ -3443,7 +3394,6 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 	queue_t	*q;
 	conn_t	*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	sodirect_t	*sodp;
 
 	TCP_CLD_STAT(tag);
 
@@ -3493,13 +3443,6 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 	}
 
 	TCP_STAT(tcps, tcp_clean_death_nondetached);
-
-	/* If sodirect, not anymore */
-	SOD_PTR_ENTER(tcp, sodp);
-	if (sodp != NULL) {
-		tcp->tcp_sodirect = NULL;
-		mutex_exit(sodp->sod_lockp);
-	}
 
 	q = tcp->tcp_rq;
 
@@ -3890,11 +3833,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		 */
 		/* FALLTHRU */
 	default:
-		if (tcp->tcp_sodirect != NULL) {
-			/* Ok, no more sodirect */
-			tcp->tcp_sodirect = NULL;
-		}
-
 		if (tcp->tcp_fused)
 			tcp_unfuse(tcp);
 
@@ -7857,9 +7795,6 @@ tcp_reinit_values(tcp)
 	ASSERT(!tcp->tcp_kssl_pending);
 	PRESERVE(tcp->tcp_kssl_ent);
 
-	/* Sodirect */
-	tcp->tcp_sodirect = NULL;
-
 	tcp->tcp_closemp_used = B_FALSE;
 
 	PRESERVE(tcp->tcp_rsrv_mp);
@@ -7956,9 +7891,6 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_fuse_rcv_hiwater = 0;
 	tcp->tcp_fuse_rcv_unread_hiwater = 0;
 	tcp->tcp_fuse_rcv_unread_cnt = 0;
-
-	/* Sodirect */
-	tcp->tcp_sodirect = NULL;
 
 	/* Initialize the header template */
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
@@ -11433,8 +11365,8 @@ tcp_rcv_drain(tcp_t *tcp)
 	if (tcp->tcp_listener != NULL)
 		return (ret);
 
-	/* Can't be a non-STREAMS connection or sodirect enabled */
-	ASSERT((!IPCL_IS_NONSTR(tcp->tcp_connp)) && SOD_NOT_ENABLED(tcp));
+	/* Can't be a non-STREAMS connection */
+	ASSERT(!IPCL_IS_NONSTR(tcp->tcp_connp));
 
 	/* No need for the push timer now. */
 	if (tcp->tcp_push_tid != 0) {
@@ -11518,224 +11450,6 @@ tcp_rcv_enqueue(tcp_t *tcp, mblk_t *mp, uint_t seg_len)
 	tcp->tcp_rcv_last_tail = mp;
 	tcp->tcp_rcv_cnt += seg_len;
 	tcp->tcp_rwnd -= seg_len;
-}
-
-/*
- * The tcp_rcv_sod_XXX() functions enqueue data directly to the socket
- * above, in addition when uioa is enabled schedule an asynchronous uio
- * prior to enqueuing. They implement the combinhed semantics of the
- * tcp_rcv_XXX() functions, tcp_rcv_list push logic, and STREAMS putnext()
- * canputnext(), i.e. flow-control with backenable.
- *
- * tcp_sod_wakeup() is called where tcp_rcv_drain() would be called in the
- * non sodirect connection but as there are no tcp_tcv_list mblk_t's we deal
- * with the rcv_wnd and push timer and call the sodirect wakeup function.
- *
- * Must be called with sodp->sod_lockp held and will return with the lock
- * released.
- */
-static uint_t
-tcp_rcv_sod_wakeup(tcp_t *tcp, sodirect_t *sodp)
-{
-	queue_t		*q = tcp->tcp_rq;
-	uint_t		thwin;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	uint_t		ret = 0;
-
-	/* Can't be an eager connection */
-	ASSERT(tcp->tcp_listener == NULL);
-
-	/* Caller must have lock held */
-	ASSERT(MUTEX_HELD(sodp->sod_lockp));
-
-	/* Sodirect mode so must not be a tcp_rcv_list */
-	ASSERT(tcp->tcp_rcv_list == NULL);
-
-	if (SOD_QFULL(sodp)) {
-		/* Q is full, mark Q for need backenable */
-		SOD_QSETBE(sodp);
-	}
-	/* Last advertised rwnd, i.e. rwnd last sent in a packet */
-	thwin = ((uint_t)BE16_TO_U16(tcp->tcp_tcph->th_win))
-	    << tcp->tcp_rcv_ws;
-	/* This is peer's calculated send window (our available rwnd). */
-	thwin -= tcp->tcp_rnxt - tcp->tcp_rack;
-	/*
-	 * Increase the receive window to max.  But we need to do receiver
-	 * SWS avoidance.  This means that we need to check the increase of
-	 * of receive window is at least 1 MSS.
-	 */
-	if (!SOD_QFULL(sodp) && (q->q_hiwat - thwin >= tcp->tcp_mss)) {
-		/*
-		 * If the window that the other side knows is less than max
-		 * deferred acks segments, send an update immediately.
-		 */
-		if (thwin < tcp->tcp_rack_cur_max * tcp->tcp_mss) {
-			BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
-			ret = TH_ACK_NEEDED;
-		}
-		tcp->tcp_rwnd = q->q_hiwat;
-	}
-
-	if (!SOD_QEMPTY(sodp)) {
-		/* Wakeup to socket */
-		sodp->sod_state &= SOD_WAKE_CLR;
-		sodp->sod_state |= SOD_WAKE_DONE;
-		(sodp->sod_wakeup)(sodp);
-		/* wakeup() does the mutex_ext() */
-	} else {
-		/* Q is empty, no need to wake */
-		sodp->sod_state &= SOD_WAKE_CLR;
-		sodp->sod_state |= SOD_WAKE_NOT;
-		mutex_exit(sodp->sod_lockp);
-	}
-
-	/* No need for the push timer now. */
-	if (tcp->tcp_push_tid != 0) {
-		(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_push_tid);
-		tcp->tcp_push_tid = 0;
-	}
-
-	return (ret);
-}
-
-/*
- * Called where tcp_rcv_enqueue()/putnext(RD(q)) would be. For M_DATA
- * mblk_t's if uioa enabled then start a uioa asynchronous copy directly
- * to the user-land buffer and flag the mblk_t as such.
- *
- * Also, handle tcp_rwnd.
- */
-uint_t
-tcp_rcv_sod_enqueue(tcp_t *tcp, sodirect_t *sodp, mblk_t *mp, uint_t seg_len)
-{
-	uioa_t		*uioap = &sodp->sod_uioa;
-	boolean_t	qfull;
-	uint_t		thwin;
-
-	/* Can't be an eager connection */
-	ASSERT(tcp->tcp_listener == NULL);
-
-	/* Caller must have lock held */
-	ASSERT(MUTEX_HELD(sodp->sod_lockp));
-
-	/* Sodirect mode so must not be a tcp_rcv_list */
-	ASSERT(tcp->tcp_rcv_list == NULL);
-
-	/* Passed in segment length must be equal to mblk_t chain data size */
-	ASSERT(seg_len == msgdsize(mp));
-
-	if (DB_TYPE(mp) != M_DATA) {
-		/* Only process M_DATA mblk_t's */
-		goto enq;
-	}
-	if (uioap->uioa_state & UIOA_ENABLED) {
-		/* Uioa is enabled */
-		mblk_t		*mp1 = mp;
-		mblk_t		*lmp = NULL;
-
-		if (seg_len > uioap->uio_resid) {
-			/*
-			 * There isn't enough uio space for the mblk_t chain
-			 * so disable uioa such that this and any additional
-			 * mblk_t data is handled by the socket and schedule
-			 * the socket for wakeup to finish this uioa.
-			 */
-			uioap->uioa_state &= UIOA_CLR;
-			uioap->uioa_state |= UIOA_FINI;
-			if (sodp->sod_state & SOD_WAKE_NOT) {
-				sodp->sod_state &= SOD_WAKE_CLR;
-				sodp->sod_state |= SOD_WAKE_NEED;
-			}
-			goto enq;
-		}
-		do {
-			uint32_t	len = MBLKL(mp1);
-
-			if (!uioamove(mp1->b_rptr, len, UIO_READ, uioap)) {
-				/* Scheduled, mark dblk_t as such */
-				DB_FLAGS(mp1) |= DBLK_UIOA;
-			} else {
-				/* Error, turn off async processing */
-				uioap->uioa_state &= UIOA_CLR;
-				uioap->uioa_state |= UIOA_FINI;
-				break;
-			}
-			lmp = mp1;
-		} while ((mp1 = mp1->b_cont) != NULL);
-
-		if (mp1 != NULL || uioap->uio_resid == 0) {
-			/*
-			 * Not all mblk_t(s) uioamoved (error) or all uio
-			 * space has been consumed so schedule the socket
-			 * for wakeup to finish this uio.
-			 */
-			sodp->sod_state &= SOD_WAKE_CLR;
-			sodp->sod_state |= SOD_WAKE_NEED;
-
-			/* Break the mblk chain if neccessary. */
-			if (mp1 != NULL && lmp != NULL) {
-				mp->b_next = mp1;
-				lmp->b_cont = NULL;
-			}
-		}
-	} else if (uioap->uioa_state & UIOA_FINI) {
-		/*
-		 * Post UIO_ENABLED waiting for socket to finish processing
-		 * so just enqueue and update tcp_rwnd.
-		 */
-		if (SOD_QFULL(sodp))
-			tcp->tcp_rwnd -= seg_len;
-	} else if (sodp->sod_want > 0) {
-		/*
-		 * Uioa isn't enabled but sodirect has a pending read().
-		 */
-		if (SOD_QCNT(sodp) + seg_len >= sodp->sod_want) {
-			if (sodp->sod_state & SOD_WAKE_NOT) {
-				/* Schedule socket for wakeup */
-				sodp->sod_state &= SOD_WAKE_CLR;
-				sodp->sod_state |= SOD_WAKE_NEED;
-			}
-			tcp->tcp_rwnd -= seg_len;
-		}
-	} else if (SOD_QCNT(sodp) + seg_len >= tcp->tcp_rq->q_hiwat >> 3) {
-		/*
-		 * No pending sodirect read() so used the default
-		 * TCP push logic to guess that a push is needed.
-		 */
-		if (sodp->sod_state & SOD_WAKE_NOT) {
-			/* Schedule socket for wakeup */
-			sodp->sod_state &= SOD_WAKE_CLR;
-			sodp->sod_state |= SOD_WAKE_NEED;
-		}
-		tcp->tcp_rwnd -= seg_len;
-	} else {
-		/* Just update tcp_rwnd */
-		tcp->tcp_rwnd -= seg_len;
-	}
-enq:
-	qfull = SOD_QFULL(sodp);
-
-	(sodp->sod_enqueue)(sodp, mp);
-
-	if (! qfull && SOD_QFULL(sodp)) {
-		/* Wasn't QFULL, now QFULL, need back-enable */
-		SOD_QSETBE(sodp);
-	}
-
-	/*
-	 * Check to see if remote avail swnd < mss due to delayed ACK,
-	 * first get advertised rwnd.
-	 */
-	thwin = ((uint_t)BE16_TO_U16(tcp->tcp_tcph->th_win));
-	/* Minus delayed ACK count */
-	thwin -= tcp->tcp_rnxt - tcp->tcp_rack;
-	if (thwin < tcp->tcp_mss) {
-		/* Remote avail swnd < mss, need ACK now */
-		return (TH_ACK_NEEDED);
-	}
-
-	return (0);
 }
 
 /*
@@ -15075,24 +14789,6 @@ update_ack:
 			tcp_rcv_enqueue(tcp, mp, seg_len);
 		}
 	} else {
-		sodirect_t	*sodp = tcp->tcp_sodirect;
-
-		/*
-		 * If an sodirect connection and an enabled sodirect_t then
-		 * sodp will be set to point to the tcp_t/sonode_t shared
-		 * sodirect_t and the sodirect_t's lock will be held.
-		 */
-		if (sodp != NULL) {
-			mutex_enter(sodp->sod_lockp);
-			if (!(sodp->sod_state & SOD_ENABLED) ||
-			    (tcp->tcp_kssl_ctx != NULL &&
-			    DB_TYPE(mp) == M_DATA)) {
-				mutex_exit(sodp->sod_lockp);
-				sodp = NULL;
-			} else {
-				mutex_exit(sodp->sod_lockp);
-			}
-		}
 		if (mp->b_datap->db_type != M_DATA ||
 		    (flags & TH_MARKNEXT_NEEDED)) {
 			if (IPCL_IS_NONSTR(connp)) {
@@ -15108,16 +14804,6 @@ update_ack:
 					ASSERT(error != EOPNOTSUPP);
 					if (error == ENOSPC)
 						tcp->tcp_rwnd -= seg_len;
-				}
-			} else if (sodp != NULL) {
-				mutex_enter(sodp->sod_lockp);
-				SOD_UIOAFINI(sodp);
-				if (!SOD_QEMPTY(sodp) &&
-				    (sodp->sod_state & SOD_WAKE_NOT)) {
-					flags |= tcp_rcv_sod_wakeup(tcp, sodp);
-					/* sod_wakeup() did the mutex_exit() */
-				} else {
-					mutex_exit(sodp->sod_lockp);
 				}
 			} else if (tcp->tcp_rcv_list != NULL) {
 				flags |= tcp_rcv_drain(tcp);
@@ -15175,25 +14861,6 @@ update_ack:
 				 */
 				flags |= tcp_rwnd_reopen(tcp);
 			}
-		} else if (sodp != NULL) {
-			/*
-			 * Sodirect so all mblk_t's are queued on the
-			 * socket directly, check for wakeup of blocked
-			 * reader (if any), and last if flow-controled.
-			 */
-			mutex_enter(sodp->sod_lockp);
-			flags |= tcp_rcv_sod_enqueue(tcp, sodp, mp, seg_len);
-			if ((sodp->sod_state & SOD_WAKE_NEED) ||
-			    (flags & (TH_PUSH|TH_FIN))) {
-				flags |= tcp_rcv_sod_wakeup(tcp, sodp);
-				/* sod_wakeup() did the mutex_exit() */
-			} else {
-				if (SOD_QFULL(sodp)) {
-					/* Q is full, need backenable */
-					SOD_QSETBE(sodp);
-				}
-				mutex_exit(sodp->sod_lockp);
-			}
 		} else if ((flags & (TH_PUSH|TH_FIN)) ||
 		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_recv_hiwater >> 3) {
 			if (tcp->tcp_rcv_list != NULL) {
@@ -15221,8 +14888,6 @@ update_ack:
 			/*
 			 * Enqueue all packets when processing an mblk
 			 * from the co queue and also enqueue normal packets.
-			 * For packets which belong to SSL stream do SSL
-			 * processing first.
 			 */
 			tcp_rcv_enqueue(tcp, mp, seg_len);
 		}
@@ -15230,18 +14895,8 @@ update_ack:
 		 * Make sure the timer is running if we have data waiting
 		 * for a push bit. This provides resiliency against
 		 * implementations that do not correctly generate push bits.
-		 *
-		 * Note, for sodirect if Q isn't empty and there's not a
-		 * pending wakeup then we need a timer. Also note that sodp
-		 * is assumed to be still valid after exit()ing the sod_lockp
-		 * above and while the SOD state can change it can only change
-		 * such that the Q is empty now even though data was added
-		 * above.
 		 */
-		if (!IPCL_IS_NONSTR(connp) &&
-		    ((sodp != NULL && !SOD_QEMPTY(sodp) &&
-		    (sodp->sod_state & SOD_WAKE_NOT)) ||
-		    (sodp == NULL && tcp->tcp_rcv_list != NULL)) &&
+		if (!IPCL_IS_NONSTR(connp) && tcp->tcp_rcv_list != NULL &&
 		    tcp->tcp_push_tid == 0) {
 			/*
 			 * The connection may be closed at this point, so don't
@@ -15329,28 +14984,13 @@ ack_check:
 		/*
 		 * Send up any queued data and then send the mark message
 		 */
-		sodirect_t *sodp;
-
-		SOD_PTR_ENTER(tcp, sodp);
-
-		mp1 = tcp->tcp_urp_mark_mp;
-		tcp->tcp_urp_mark_mp = NULL;
-		if (sodp != NULL) {
-			if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
-				sodp->sod_uioa.uioa_state &= UIOA_CLR;
-				sodp->sod_uioa.uioa_state |= UIOA_FINI;
-			}
-			ASSERT(tcp->tcp_rcv_list == NULL);
-
-			flags |= tcp_rcv_sod_wakeup(tcp, sodp);
-			/* sod_wakeup() does the mutex_exit() */
-		} else if (tcp->tcp_rcv_list != NULL) {
+		if (tcp->tcp_rcv_list != NULL) {
 			flags |= tcp_rcv_drain(tcp);
 
-			ASSERT(tcp->tcp_rcv_list == NULL ||
-			    tcp->tcp_fused_sigurg);
-
 		}
+		ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_fused_sigurg);
+		mp1 = tcp->tcp_urp_mark_mp;
+		tcp->tcp_urp_mark_mp = NULL;
 		putnext(tcp->tcp_rq, mp1);
 #ifdef DEBUG
 		(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
@@ -15395,8 +15035,6 @@ ack_check:
 		 * In the eager case tcp_rsrv will do this when run
 		 * after tcp_accept is done.
 		 */
-		sodirect_t *sodp;
-
 		ASSERT(tcp->tcp_listener == NULL);
 
 		if (IPCL_IS_NONSTR(connp)) {
@@ -15407,31 +15045,13 @@ ack_check:
 			goto done;
 		}
 
-		SOD_PTR_ENTER(tcp, sodp);
-		if (sodp != NULL) {
-			if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
-				sodp->sod_uioa.uioa_state &= UIOA_CLR;
-				sodp->sod_uioa.uioa_state |= UIOA_FINI;
-			}
-			/* No more sodirect */
-			tcp->tcp_sodirect = NULL;
-			if (!SOD_QEMPTY(sodp)) {
-				/* Mblk(s) to process, notify */
-				flags |= tcp_rcv_sod_wakeup(tcp, sodp);
-				/* sod_wakeup() does the mutex_exit() */
-			} else {
-				/* Nothing to process */
-				mutex_exit(sodp->sod_lockp);
-			}
-		} else if (tcp->tcp_rcv_list != NULL) {
+		if (tcp->tcp_rcv_list != NULL) {
 			/*
 			 * Push any mblk(s) enqueued from co processing.
 			 */
 			flags |= tcp_rcv_drain(tcp);
-
-			ASSERT(tcp->tcp_rcv_list == NULL ||
-			    tcp->tcp_fused_sigurg);
 		}
+		ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_fused_sigurg);
 
 		mp1 = tcp->tcp_ordrel_mp;
 		tcp->tcp_ordrel_mp = NULL;
@@ -15861,8 +15481,6 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 	queue_t	*q = tcp->tcp_rq;
 	uint_t	thwin;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	sodirect_t	*sodp;
-	boolean_t	fc;
 
 	ASSERT(!IPCL_IS_NONSTR(connp));
 	mutex_enter(&tcp->tcp_rsrv_mp_lock);
@@ -15916,26 +15534,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 		return;
 	}
 
-	SOD_PTR_ENTER(tcp, sodp);
-	if (sodp != NULL) {
-		/* An sodirect connection */
-		if (SOD_QFULL(sodp)) {
-			/* Flow-controlled, need another back-enable */
-			fc = B_TRUE;
-			SOD_QSETBE(sodp);
-		} else {
-			/* Not flow-controlled */
-			fc = B_FALSE;
-		}
-		mutex_exit(sodp->sod_lockp);
-	} else if (canputnext(q)) {
-		/* STREAMS, not flow-controlled */
-		fc = B_FALSE;
-	} else {
-		/* STREAMS, flow-controlled */
-		fc = B_TRUE;
-	}
-	if (!fc) {
+	if (canputnext(q)) {
 		/* Not flow-controlled, open rwnd */
 		tcp->tcp_rwnd = q->q_hiwat;
 		thwin = ((uint_t)BE16_TO_U16(tcp->tcp_tcph->th_win))
@@ -17740,7 +17339,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			tcp->tcp_rcv_cnt = 0;
 		} else {
 			/* We drain directly in case of fused tcp loopback */
-			sodirect_t *sodp;
 
 			if (!tcp->tcp_fused && canputnext(q)) {
 				tcp->tcp_rwnd = q->q_hiwat;
@@ -17753,25 +17351,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 				}
 			}
 
-			SOD_PTR_ENTER(tcp, sodp);
-			if (sodp != NULL) {
-				/* Sodirect, move from rcv_list */
-				ASSERT(!tcp->tcp_fused);
-				while ((mp = tcp->tcp_rcv_list) != NULL) {
-					tcp->tcp_rcv_list = mp->b_next;
-					mp->b_next = NULL;
-					(void) tcp_rcv_sod_enqueue(tcp, sodp,
-					    mp, msgdsize(mp));
-				}
-				tcp->tcp_rcv_last_head = NULL;
-				tcp->tcp_rcv_last_tail = NULL;
-				tcp->tcp_rcv_cnt = 0;
-				(void) tcp_rcv_sod_wakeup(tcp, sodp);
-				/* sod_wakeup() did the mutex_exit() */
-			} else {
-				/* Not sodirect, drain */
-				(void) tcp_rcv_drain(tcp);
-			}
+			(void) tcp_rcv_drain(tcp);
 		}
 
 		/*
@@ -17900,15 +17480,6 @@ tcp_accept_common(conn_t *lconnp, conn_t *econnp, cred_t *cr)
 	ASSERT(eager->tcp_listener != NULL);
 
 	ASSERT(eager->tcp_rq != NULL);
-
-	/* If tcp_fused and sodirect enabled disable it */
-	if (eager->tcp_fused && eager->tcp_sodirect != NULL) {
-		/* Fused, disable sodirect */
-		mutex_enter(eager->tcp_sodirect->sod_lockp);
-		SOD_DISABLE(eager->tcp_sodirect);
-		mutex_exit(eager->tcp_sodirect->sod_lockp);
-		eager->tcp_sodirect = NULL;
-	}
 
 	opt_mp = allocb(sizeof (struct tcp_options), BPRI_HI);
 	if (opt_mp == NULL) {
@@ -18077,7 +17648,6 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 
 	ASSERT(eager->tcp_rq != NULL);
 
-	eager->tcp_sodirect = SOD_SOTOSODP(sock_handle);
 	return (tcp_accept_common(lconnp, econnp, cr));
 }
 
@@ -18156,11 +17726,6 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 		q->q_qinfo = &tcp_winit;
 		listener = eager->tcp_listener;
 
-		/*
-		 * TCP is _D_SODIRECT and sockfs is directly above so
-		 * save shared sodirect_t pointer (if any).
-		 */
-		eager->tcp_sodirect = SOD_QTOSODP(eager->tcp_rq);
 		if (tcp_accept_common(listener->tcp_connp,
 		    econnp, cr) < 0) {
 			mp = mi_tpi_err_ack_alloc(mp, TPROTO, 0);
@@ -21908,7 +21473,6 @@ tcp_disable_direct_sockfs(tcp_t *tcp)
 		tcp_fuse_disable_pair(tcp, B_FALSE);
 	}
 	tcp->tcp_issocket = B_FALSE;
-	tcp->tcp_sodirect = NULL;
 	TCP_STAT(tcp->tcp_tcps, tcp_sock_fallback);
 }
 
@@ -23275,8 +22839,6 @@ tcp_push_timer(void *arg)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t *tcp = connp->conn_tcp;
-	uint_t		flags;
-	sodirect_t	*sodp;
 
 	TCP_DBGSTAT(tcp->tcp_tcps, tcp_push_timer_cnt);
 
@@ -23291,14 +22853,8 @@ tcp_push_timer(void *arg)
 	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
 	tcp->tcp_push_tid = 0;
 
-	SOD_PTR_ENTER(tcp, sodp);
-	if (sodp != NULL) {
-		flags = tcp_rcv_sod_wakeup(tcp, sodp);
-		/* sod_wakeup() does the mutex_exit() */
-	} else if (tcp->tcp_rcv_list != NULL) {
-		flags = tcp_rcv_drain(tcp);
-	}
-	if (flags == TH_ACK_NEEDED)
+	if (tcp->tcp_rcv_list != NULL &&
+	    tcp_rcv_drain(tcp) == TH_ACK_NEEDED)
 		tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
 
 	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
@@ -27075,9 +26631,6 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	short			opts;
 	int			error;
 	mblk_t			*mp;
-
-	/* Disable I/OAT during fallback */
-	tcp->tcp_sodirect = NULL;
 
 	connp->conn_dev = (dev_t)RD(q)->q_ptr;
 	connp->conn_minor_arena = WR(q)->q_ptr;

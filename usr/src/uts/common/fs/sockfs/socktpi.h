@@ -28,7 +28,6 @@
 #define	_SOCKFS_SOCKTPI_H
 
 #include <inet/kssl/ksslapi.h>
-#include <sys/sodirect.h>
 
 #ifdef	__cplusplus
 extern "C" {

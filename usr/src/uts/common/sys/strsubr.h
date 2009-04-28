@@ -44,7 +44,6 @@
 #include <sys/proc.h>
 #include <sys/netstack.h>
 #include <sys/modhash.h>
-#include <sys/sodirect.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,7 +93,6 @@ extern "C" {
  *	sd_closetime
  *	sd_wakeq
  *	sd_maxblk
- *	sd_sodirect
  *
  * The following fields are modified only by the allocator, which
  * has exclusive access to them at that time:
@@ -243,10 +241,6 @@ typedef struct stdata {
 	uint_t		sd_copyflag;	/* copy-related flags */
 	zoneid_t	sd_anchorzone;	/* Allow removal from same zone only */
 	struct msgb	*sd_cmdblk;	/* reply from _I_CMD */
-	/*
-	 * Support for socket direct.
-	 */
-	sodirect_t	*sd_sodirect;	/* pointer to shared sodirect_t */
 } stdata_t;
 
 /*

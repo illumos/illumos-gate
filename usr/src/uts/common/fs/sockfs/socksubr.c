@@ -42,7 +42,6 @@
 #include <sys/file.h>
 #include <sys/open.h>
 #include <sys/user.h>
-#include <sys/uio.h>
 #include <sys/termios.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
@@ -76,6 +75,7 @@
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/socktpi.h>
 #include <fs/sockfs/socktpi_impl.h>
+#include <fs/sockfs/sodirect.h>
 
 /*
  * Macros that operate on struct cmsghdr.
@@ -105,8 +105,6 @@ extern smod_info_t *sotpi_smod_create(void);
 extern void sendfile_init();
 
 extern void nl7c_init(void);
-
-extern int sostr_init();
 
 extern int modrootloaded;
 
@@ -248,7 +246,7 @@ sockinit(int fstype, char *name)
 		goto failure;
 	}
 
-	error = sostr_init();
+	error = sod_init();
 	if (error != 0) {
 		err_str = NULL;
 		goto failure;

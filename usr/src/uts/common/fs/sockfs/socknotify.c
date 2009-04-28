@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/ksocket.h>
 #include <io/ksocket/ksocket_impl.h>
 #include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/sodirect.h>
 
 /*
  * There can only be a single thread waiting for data (enforced by
@@ -230,7 +231,8 @@ void
 so_notify_oobdata(struct sonode *so, boolean_t oob_inline)
 {
 	ASSERT(MUTEX_HELD(&so->so_lock));
-	SOD_UIOAFINI(so->so_direct);
+	if (so->so_direct != NULL)
+		SOD_UIOAFINI(so->so_direct);
 
 	if (IS_KERNEL_SOCKET(so)) {
 		if (oob_inline)

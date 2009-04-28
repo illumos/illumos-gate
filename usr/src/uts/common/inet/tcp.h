@@ -36,7 +36,6 @@ extern "C" {
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/socket_proto.h>
-#include <sys/sodirect.h>
 #include <sys/multidata.h>
 #include <sys/md5.h>
 #include <inet/common.h>
@@ -610,13 +609,6 @@ typedef struct tcp_s {
 	 * asynchronous notification.
 	 */
 	sock_connid_t	tcp_connid;
-
-	/*
-	 * tcp_sodirect is used by tcp on the receive side to push mblk_t(s)
-	 * directly to sockfs. Also, to schedule asynchronous copyout directly
-	 * to a pending user-land uio buffer.
-	 */
-	sodirect_t	*tcp_sodirect;
 
 	/* mblk_t used to enter TCP's squeue from the service routine. */
 	mblk_t		*tcp_rsrv_mp;

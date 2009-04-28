@@ -188,8 +188,6 @@ typedef struct queue {
 #define	_QASSOCIATED	0x10000000	/* queue is associated with a device */
 #define	_QDIRECT	0x20000000	/* Private; transport module uses */
 					/* direct interface to/from sockfs */
-#define	_QSODIRECT	0x40000000	/* Private, transport module shares */
-					/* an sodirect_t with sockfs */
 
 /* queue sqflags (protected by SQLOCK). */
 #define	Q_SQQUEUED	0x01		/* Queue is in the syncq list */

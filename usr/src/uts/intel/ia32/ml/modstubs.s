@@ -500,7 +500,6 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(sockfs, sotpi_sototpi,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, socket_sendmblk,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, socket_setsockopt,  nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sod_uioa_mblk_done,	nomod_zero);
 	END_MODULE(sockfs);
 #endif
 

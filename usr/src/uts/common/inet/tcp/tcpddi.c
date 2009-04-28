@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -48,7 +48,7 @@
  * for TCP Fusion (loopback); this is why we don't define
  * D_SYNCSTR here.
  */
-#define	INET_DEVMTFLAGS	(D_MP|_D_DIRECT|_D_SODIRECT)
+#define	INET_DEVMTFLAGS	(D_MP|_D_DIRECT)
 
 #include "../inetddi.c"
 
