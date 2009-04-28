@@ -34,7 +34,7 @@ include ../../Makefile.master
 i386_SUBDIRS= lx
 i386_MSGSUBDIRS= lx
 
-SUBDIRS= sn1 labeled native $($(MACH)_SUBDIRS)
+SUBDIRS= sn1 native $($(MACH)_SUBDIRS)
 MSGSUBDIRS= $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all

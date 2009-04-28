@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -62,13 +62,6 @@ labelCheck() {
 	else
 		label="Select Label...\n"
 		curlabel=...
-	fi
-}
-
-snapshotCheck() {
-	filesystem=`zfs list -t snapshot |grep $ZDSET/$zonename |cut -d " " -f1`
-	if [[ $filesystem = '' ]]; then
-		snapshot="Create Snapshot\n"
 	fi
 }
 
@@ -175,20 +168,18 @@ resolveXdisplay() {
 }
 
 clone() {
-	image=`zfs list -t snapshot |grep snapshot|cut -d " " -f1| \
-	    zenity --list \
-		--title="$title" \
-	        --height=300 \
-		--column="ZFS Zone Snapshots"`
+	image=`zenity --list \
+	    --title="$title: Clone From" \
+	    --height=300 \
+	    --column="Installed Zones" $zonelist`
 	if [[ -n $image ]]; then
 		dataset=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
 		if [[ -n $dataset ]]; then
-			/usr/sbin/zfs destroy $ZDSET/$zonename
+			/usr/sbin/zfs destroy -r $ZDSET/$zonename
 		fi
-		/usr/sbin/zfs clone $image $ZDSET/$zonename
-		/usr/sbin/zfs set mountpoint=/zone/$zonename  $ZDSET/$zonename
+		/usr/sbin/zoneadm -z $zonename clone $image
+		/usr/sbin/zoneadm -z $zonename ready
 
-		/usr/sbin/zoneadm -z $zonename attach -F
 		if [ ! -f /var/ldap/ldap_client_file ]; then
 			if [ $NSCD_PER_LABEL = 0 ] ; then
 				sharePasswd
@@ -197,6 +188,8 @@ clone() {
 				resolveXdisplay
 			fi
 		fi
+		initialize
+		/usr/sbin/zoneadm -z $zonename halt
 	fi
 }
 
@@ -291,6 +284,7 @@ initialize() {
 	echo "ip_address=$ipaddress }" >> ${SYSIDCFG}
 	cp /etc/default/nfs ${ZONE_ETC_DIR}/default/nfs
 	touch ${ZONE_ETC_DIR}/.NFS4inst_state.domain
+	rm -f ${ZONE_ETC_DIR}/.UNCONFIGURED
 	if [ $NSCD_PER_LABEL = 1 ] ; then
 		resolveXdisplay
 	fi
@@ -314,7 +308,9 @@ install() {
 	    --disable-factory \
 	    --hide-menubar
 
+	zoneadm -z $zonename ready
 	initialize
+	zoneadm -z $zonename halt
 }
 
 delete() {
@@ -832,7 +828,6 @@ singleZone() {
 		ready=
 		uninstall=
 		delete=
-		snapshot=
 		addnet=
 		deletenet=
 		permitrelabel=
@@ -857,7 +852,6 @@ singleZone() {
 					start="Boot\n"; \
 				fi; \
 				uninstall="Uninstall\n"; \
-				snapshotCheck; \
 				relabelCheck;
 				addnet="Add Network...\n"
 			;;
@@ -884,7 +878,6 @@ singleZone() {
 		    $ready \
 		    $uninstall \
 		    $delete \
-		    $snapshot \
 		    $addnet \
 		    $deletenet \
 		    $permitrelabel \
@@ -931,9 +924,6 @@ singleZone() {
 		    " Delete")
 			delete
 			return ;;
-
-		    " Create Snapshot")
-			zfs snapshot $ZDSET/${zonename}@snapshot;;
 
 		    " Add Network...")
 			addNet ;;

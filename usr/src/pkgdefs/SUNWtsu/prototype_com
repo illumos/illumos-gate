@@ -88,14 +88,6 @@ f none usr/demo/tsol/runinzone.ksh 555 root bin
 f none usr/demo/tsol/runwlabel.ksh 555 root bin
 f none usr/demo/tsol/waitforzone.ksh 555 root bin
 #
-# Labeled Brand files
-#
-d none usr/lib/brand 755 root bin
-d none usr/lib/brand/labeled 755 root sys
-f none usr/lib/brand/labeled/config.xml 444 root bin
-f none usr/lib/brand/labeled/platform.xml 444 root bin
-f none usr/lib/brand/labeled/pkgcreatezone 755 root bin
-#
 # Share and unshare scripts for zone exports
 #
 d none usr/lib/zones 755 root bin
