@@ -3508,36 +3508,6 @@ do_uadmin(void)
 	else
 		uu_warn("Could not create \"%s\"", resetting);
 
-	/*
-	 * Right now, fast reboot is supported only on i386.
-	 * scf_is_fastboot_default() should take care of it.
-	 * If somehow we got there on unsupported platform -
-	 * print warning and fall back to regular reboot.
-	 */
-	if (halting == AD_FASTREBOOT) {
-#if defined(__i386)
-		int rc;
-
-		if ((rc = grub_get_boot_args(&fbarg, NULL,
-		    GRUB_ENTRY_DEFAULT)) == 0) {
-			mdep = (uintptr_t)&fbarg.gba_bootargs;
-		} else {
-			/*
-			 * Failed to read GRUB menu, fall back to normal reboot
-			 */
-			halting = AD_BOOT;
-			uu_warn("Failed to process GRUB menu entry "
-			    "for fast reboot.\n\t%s\n"
-			    "Falling back to regular reboot.\n",
-			    grub_strerror(rc));
-		}
-#else	/* __i386 */
-		halting = AD_BOOT;
-		uu_warn("Fast reboot configured, but not supported by "
-		    "this ISA\n");
-#endif	/* __i386 */
-	}
-
 	/* Kill dhcpagent if we're not using nfs for root */
 	if ((statvfs("/", &vfs) == 0) &&
 	    (strncmp(vfs.f_basetype, "nfs", sizeof ("nfs") - 1) != 0))
@@ -3572,6 +3542,36 @@ do_uadmin(void)
 	 */
 	if (getzoneid() == 0 && access("/usr/sbin/bootadm", X_OK) == 0)
 		fork_with_timeout("/usr/sbin/bootadm -ea update_all", 0, 3600);
+
+	/*
+	 * Right now, fast reboot is supported only on i386.
+	 * scf_is_fastboot_default() should take care of it.
+	 * If somehow we got there on unsupported platform -
+	 * print warning and fall back to regular reboot.
+	 */
+	if (halting == AD_FASTREBOOT) {
+#if defined(__i386)
+		int rc;
+
+		if ((rc = grub_get_boot_args(&fbarg, NULL,
+		    GRUB_ENTRY_DEFAULT)) == 0) {
+			mdep = (uintptr_t)&fbarg.gba_bootargs;
+		} else {
+			/*
+			 * Failed to read GRUB menu, fall back to normal reboot
+			 */
+			halting = AD_BOOT;
+			uu_warn("Failed to process GRUB menu entry "
+			    "for fast reboot.\n\t%s\n"
+			    "Falling back to regular reboot.\n",
+			    grub_strerror(rc));
+		}
+#else	/* __i386 */
+		halting = AD_BOOT;
+		uu_warn("Fast reboot configured, but not supported by "
+		    "this ISA\n");
+#endif	/* __i386 */
+	}
 
 	fork_with_timeout("/sbin/umountall -l", 0, 5);
 	fork_with_timeout("/sbin/umount /tmp /var/adm /var/run /var "
