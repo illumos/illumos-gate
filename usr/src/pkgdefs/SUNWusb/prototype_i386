@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -48,7 +47,6 @@
 #
 # SUNWusb
 #
-f none kernel/dacf/usb_ac_dacf 0755 root sys
 f none kernel/drv/uhci 0755 root sys
 f none kernel/drv/ohci 0755 root sys
 f none kernel/drv/ehci 0755 root sys
@@ -72,7 +70,6 @@ f none kernel/strmod/usbkbm 0755 root sys
 f none kernel/strmod/usbms 0755 root sys
 f none kernel/strmod/usb_ah 0755 root sys
 d none kernel/dacf/amd64 0755 root sys
-f none kernel/dacf/amd64/usb_ac_dacf 0755 root sys
 d none kernel/drv/amd64 0755 root sys
 f none kernel/drv/amd64/uhci 0755 root sys
 f none kernel/drv/amd64/ohci 0755 root sys

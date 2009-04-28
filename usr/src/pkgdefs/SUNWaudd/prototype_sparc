@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -48,12 +46,12 @@ f none kernel/drv/audiocs.conf 644 root sys
 f none kernel/drv/audiots.conf 644 root sys
 f none kernel/drv/audio1575.conf 644 root sys
 d none kernel/drv/sparcv9 755 root sys
+f none kernel/drv/sparcv9/audio 755 root sys
 f none kernel/drv/sparcv9/audiocs 755 root sys
 f none kernel/drv/sparcv9/audioens 755 root sys
+f none kernel/drv/sparcv9/audiopci 755 root sys
 f none kernel/drv/sparcv9/audiots 755 root sys
 f none kernel/drv/sparcv9/audio1575 755 root sys
+f none kernel/drv/sparcv9/austr 755 root sys
 d none kernel/misc/sparcv9 755 root sys
-f none kernel/misc/sparcv9/amsrc1 755 root sys
-f none kernel/misc/sparcv9/amsrc2 755 root sys
-f none kernel/misc/sparcv9/audiosup 755 root sys
-f none kernel/misc/sparcv9/mixer 755 root sys
+f none kernel/misc/sparcv9/ac97 755 root sys

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -60,7 +60,8 @@ MAINMILESTONES= \
 MAINMANIFESTS= $(MAINMILESTONES:%=$(ROOTSVCMILESTONE)/%)
 
 SYSDEVSVCS= \
-	devices-local.xml
+	devices-local.xml \
+	devices-audio.xml
 
 SYSDEVMANIFESTS= $(SYSDEVSVCS:%=$(ROOTSVCSYSTEMDEVICE)/%)
 
@@ -94,6 +95,7 @@ MANIFEST= $(FSSVCS) $(NETSVCS) $(MAINMILESTONES) $(SYSTEMSVCS) \
 SVCMETHOD=\
 	boot-archive \
 	console-login \
+	devices-audio \
 	devices-local \
 	fs-local \
 	fs-minimal \

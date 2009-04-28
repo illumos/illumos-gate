@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # SUNWaudiohd postinstall script
 
@@ -55,6 +54,7 @@ AUDIOHD_ALIASES="\
 	\"pci8086,2668\" \
 	\"pci10de,371\" \
 	\"pciclass,0403\" \
+	\"pciexclass,0403\"\
 	"
 	
 case "${ARCH}" in

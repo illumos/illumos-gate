@@ -19,28 +19,28 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 /*
  * USB audio hid streams module - processes hid data
- * from HID driver and converts to a format that SADA
+ * from HID driver and converts to a format that usb_ac
  * understands. The stack looks like this :
  *	hid --> usb_ah --> usb_ac --> audio framework
  * usb_ac just acts as a passthrough layer for the converted data.
  *
- * During open, usb_ah gets the parser handle from hid and gets
- * the hardware information passed as report descriptor. Then
- * it finds out the relevant usages and stores the bitmap and other
- * information in internal data structure. When a button is pressed
- * to. say, increase/decrease the volume, a report is generated and
- * hid sends that data up through the streams. usb_ah, upon getting
- * this information and with the prior knowledge about the bitmap
- * for each button, calculates the value and sends up to SADA
- * through usb_ac. SADA in turn sends a command down to speaker to
- * increase the volume of the speaker that is managed by usb_ac.
+ * During open, usb_ah gets the parser handle from hid and gets the
+ * hardware information passed as report descriptor. Then it finds out
+ * the relevant usages and stores the bitmap and other information in
+ * internal data structure. When a button is pressed to. say,
+ * increase/decrease the volume, a report is generated and hid sends
+ * that data up through the streams. usb_ah, upon getting this
+ * information and with the prior knowledge about the bitmap for each
+ * button, calculates the value and sends up to usb_ac.  usb_ac in
+ * turn sends a command down to speaker to increase the volume of the
+ * speaker that is managed by usb_ac.
  */
 #include <sys/usb/usba.h>
 #include <sys/usb/clients/hid/hid.h>
@@ -49,12 +49,9 @@
 #include <sys/strsun.h>
 
 #include <sys/audio.h>
-#include <sys/audiovar.h>
 #include <sys/audio/audio_support.h>
-#include <sys/audio/audio_src.h>
 #include <sys/mixer.h>
 #include <sys/audio/audio_mixer.h>
-#include <sys/audio/am_src1.h>
 
 #include <sys/usb/clients/audio/usb_audio.h>
 #include <sys/usb/clients/audio/usb_mixer.h>
@@ -76,12 +73,12 @@ static void	usb_ah_repeat_send(usb_ah_state_t *, usb_ah_button_descr_t *,
 static void	usb_ah_cancel_timeout(usb_ah_state_t *);
 static void	usb_ah_check_usage_send_data(usb_ah_state_t *, mblk_t *);
 static int	usb_ah_get_cooked_rd(usb_ah_state_t *);
+static mblk_t	*usb_ah_mk_mctl(struct iocblk, void *, size_t);
 
 /* stream qinit functions defined here */
 static int	usb_ah_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	usb_ah_close(queue_t *, int, cred_t *);
-static void	usb_ah_wput(queue_t *, mblk_t *);
-static void	usb_ah_rput(queue_t *, mblk_t *);
+static int	usb_ah_rput(queue_t *, mblk_t *);
 
 /*
  * Global Variables
@@ -137,21 +134,21 @@ static struct module_info usb_ah_minfo = {
 
 /* read side for key data and ioctl replies */
 static struct qinit usb_ah_rinit = {
-	(int (*)())usb_ah_rput,
-	(int (*)())NULL,		/* service not used */
+	usb_ah_rput,
+	NULL,		/* service not used */
 	usb_ah_open,
 	usb_ah_close,
-	(int (*)())NULL,
+	NULL,
 	&usb_ah_minfo
 	};
 
-/* write side for ioctls */
+/* write side -- just pass everything down */
 static struct qinit usb_ah_winit = {
-	(int (*)())usb_ah_wput,
-	(int (*)())NULL,
+	(int (*)(queue_t *, mblk_t *))putnext,
+	NULL,
 	usb_ah_open,
 	usb_ah_close,
-	(int (*)())NULL,
+	NULL,
 	&usb_ah_minfo
 	};
 
@@ -218,17 +215,8 @@ usb_ah_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		return (0); /* already opened */
 	}
 
-	switch (sflag) {
-	case MODOPEN:
-
-		break;
-	case CLONEOPEN:
-		USB_DPRINTF_L3(PRINT_MASK_OPEN, usb_ah_log_handle,
-		    "usb_ah_open: Clone open not supported");
-
-		/* FALLTHRU */
-	default:
-
+	if (sflag != MODOPEN) {
+		/* Only module open supported */
 		return (EINVAL);
 	}
 
@@ -323,9 +311,6 @@ usb_ah_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	usb_ahd->usb_ah_flags |= USB_AH_OPEN;
 
-	USB_DPRINTF_L3(PRINT_MASK_OPEN, usb_ah_log_handle,
-	    "usb_ah_open exiting");
-
 	return (0);
 }
 
@@ -362,43 +347,7 @@ usb_ah_close(register queue_t *q, int flag, cred_t *crp)
 	mutex_destroy(&usb_ahd->usb_ah_mutex);
 	kmem_free(usb_ahd, sizeof (usb_ah_state_t));
 
-	USB_DPRINTF_L4(PRINT_MASK_CLOSE, usb_ah_log_handle,
-	    "usb_ah_close exiting");
-
 	return (0);
-}
-
-
-/*
- * usb_ah_wput :
- *	usb_ah	module output queue put procedure: handles M_IOCTL
- *	messages.
- */
-static void
-usb_ah_wput(register queue_t *q, register mblk_t *mp)
-{
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, usb_ah_log_handle,
-	    "usb_ah_wput entering");
-
-	switch (mp->b_datap->db_type) {
-	case M_FLUSH:
-		if (*mp->b_rptr & FLUSHW) {
-			flushq(q, FLUSHDATA);
-		}
-		if (*mp->b_rptr & FLUSHR) {
-			flushq(RD(q), FLUSHDATA);
-		}
-
-		break;
-	default:
-		break;
-	}
-
-	putnext(q, mp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, usb_ah_log_handle,
-	    "usb_ah_wput exiting:3");
 }
 
 
@@ -406,37 +355,25 @@ usb_ah_wput(register queue_t *q, register mblk_t *mp)
  * usb_ah_rput :
  *	Put procedure for input from driver end of stream (read queue).
  */
-static void
+static int
 usb_ah_rput(register queue_t *q, register mblk_t *mp)
 {
 	usb_ah_state_t		*usb_ahd;
 
 	usb_ahd = (usb_ah_state_t *)q->q_ptr;
 
-	USB_DPRINTF_L3(PRINT_MASK_ALL, usb_ah_log_handle,
-	    "usb_ah_rput: Begin, usb_ah state=0x%p, q=0x%p, mp=0x%p",
-	    (void *)usb_ahd, (void *)q, (void *)mp);
-
 	if (usb_ahd == 0) {
 		freemsg(mp);	/* nobody's listening */
 
-		return;
+		return (0);
 	}
 
 	switch (mp->b_datap->db_type) {
-	case M_FLUSH:
-		if (*mp->b_rptr & FLUSHW)
-			flushq(WR(q), FLUSHDATA);
-		if (*mp->b_rptr & FLUSHR)
-			flushq(q, FLUSHDATA);
-		freemsg(mp);
 
-		return;
 	case M_DATA:
 		if (!(usb_ahd->usb_ah_flags & USB_AH_OPEN)) {
 			freemsg(mp);	/* not ready to listen */
 
-			return;
 		} else if (MBLKL(mp) == usb_ahd->usb_ah_packet_size) {
 
 			/*
@@ -463,20 +400,23 @@ usb_ah_rput(register queue_t *q, register mblk_t *mp)
 		}
 
 		break;
+
 	case M_CTL:
 		usb_ah_mctl_receive(q, mp);
+		break;
 
-		return;
+	case M_FLUSH:
 	case M_IOCACK:
 	case M_IOCNAK:
 		putnext(q, mp);
+		break;
 
-		return;
 	default:
 		putnext(q, mp);
-
-		return;
+		break;
 	}
+
+	return (0);
 }
 
 
@@ -546,7 +486,7 @@ usb_ah_repeat_send(usb_ah_state_t *usb_ahd, usb_ah_button_descr_t *bd,
 {
 	mblk_t	*dup_mp;
 
-	bd->mblk = usba_mk_mctl(mctlmsg, buf, len);
+	bd->mblk = usb_ah_mk_mctl(mctlmsg, buf, len);
 
 	if (bd->mblk != NULL) {
 		dup_mp = usb_ah_cp_mblk(bd->mblk);
@@ -579,8 +519,6 @@ usb_ah_timeout(void *addr)
 	usb_ahd = (usb_ah_state_t *)bd->uahp;
 
 	mutex_enter(&usb_ahd->usb_ah_mutex);
-	USB_DPRINTF_L4(PRINT_MASK_ALL, usb_ah_log_handle,
-	    "usb_ah_timeout: tid=0x%p", usb_ahd->usb_ah_tid);
 
 	/*
 	 * If a release event still hasn't reached, tid will be non-zero
@@ -611,9 +549,6 @@ static void
 usb_ah_cancel_timeout(usb_ah_state_t *usb_ahd)
 {
 	queue_t	*rq = usb_ahd->usb_ah_readq;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, usb_ah_log_handle,
-	    "usb_ah_cancel_timeout: tid=0x%p", usb_ahd->usb_ah_tid);
 
 	if (usb_ahd->usb_ah_tid) {
 		(void) quntimeout(rq, usb_ahd->usb_ah_tid);
@@ -816,7 +751,7 @@ usb_ah_check_usage_send_data(usb_ah_state_t *usb_ahd, mblk_t *mp)
 					/* Relative volume */
 					mctlmsg.ioc_cmd = USB_AUDIO_VOL_CHANGE;
 					mctlmsg.ioc_count = sizeof (uint_t);
-					mctl_ptr = usba_mk_mctl(mctlmsg,
+					mctl_ptr = usb_ah_mk_mctl(mctlmsg,
 					    &val, mctlmsg.ioc_count);
 					if (mctl_ptr != NULL) {
 						mutex_exit(&usb_ahd->
@@ -865,7 +800,7 @@ usb_ah_check_usage_send_data(usb_ah_state_t *usb_ahd, mblk_t *mp)
 			if (val) {
 				mctlmsg.ioc_cmd = USB_AUDIO_MUTE;
 				mctlmsg.ioc_count = sizeof (uint_t);
-				mctl_ptr = usba_mk_mctl(mctlmsg,
+				mctl_ptr = usb_ah_mk_mctl(mctlmsg,
 				    &val, mctlmsg.ioc_count);
 				if (mctl_ptr != NULL) {
 					mutex_exit(&usb_ahd->usb_ah_mutex);
@@ -886,4 +821,22 @@ usb_ah_check_usage_send_data(usb_ah_state_t *usb_ahd, mblk_t *mp)
 	}
 	mutex_exit(&usb_ahd->usb_ah_mutex);
 	freemsg(mp);
+}
+
+
+/*
+ * since usb_ac now uses LDI to access HID streams, we must change the msg
+ * type from M_CTL to M_PROTO since the streamhead will not pass M_CTLs up
+ */
+static mblk_t *
+usb_ah_mk_mctl(struct iocblk mctlmsg, void *buf, size_t len)
+{
+	mblk_t *mp;
+
+	mp = usba_mk_mctl(mctlmsg, buf, len);
+	if (mp == NULL)
+		return (NULL);
+
+	mp->b_datap->db_type = M_PROTO;
+	return (mp);
 }

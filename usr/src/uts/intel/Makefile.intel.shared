@@ -195,9 +195,14 @@ DRV_KMODS	+= asy
 DRV_KMODS	+= ata
 DRV_KMODS	+= ath
 DRV_KMODS	+= atu
+DRV_KMODS	+= audio
 DRV_KMODS	+= audio810
+DRV_KMODS	+= audioens
 DRV_KMODS	+= audiohd
 DRV_KMODS	+= audioixp
+DRV_KMODS	+= audiopci
+DRV_KMODS	+= audiovia823x
+DRV_KMODS	+= austr
 DRV_KMODS	+= bl 
 DRV_KMODS	+= bge
 DRV_KMODS	+= bofi
@@ -351,8 +356,6 @@ DRV_KMODS	+= ii rdc rdcsrv rdcstub
 #
 $(CLOSED_BUILD)DRV_KMODS	+= dca
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audioens
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audiovia823x
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= elxl
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= glm
@@ -546,10 +549,9 @@ SYS_KMODS	+= acctctl
 #	MISC_KMODS_32 are built only 32-bit
 #	MISC_KMODS_64 are built only 64-bit
 #
+MISC_KMODS	+= ac97
 MISC_KMODS	+= acpica
 MISC_KMODS	+= agpmaster
-MISC_KMODS	+= amsrc2
-MISC_KMODS	+= audiosup
 MISC_KMODS	+= bignum
 MISC_KMODS	+= blk2scsa
 MISC_KMODS	+= bootdev
@@ -582,7 +584,6 @@ MISC_KMODS	+= kmech_dummy
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= ksocket
 MISC_KMODS	+= mac
-MISC_KMODS	+= mixer
 MISC_KMODS	+= net80211
 MISC_KMODS	+= nfs_dlboot
 MISC_KMODS	+= nfssrv
@@ -621,7 +622,6 @@ MISC_KMODS	+= qlc_fw_8100
 MISC_KMODS	+= hwa1480_fw
 MISC_KMODS	+= uwba
 
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
@@ -688,7 +688,6 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 #
 #	'Dacf' Modules (/kernel/dacf):
 #
-DACF_KMODS	+= usb_ac_dacf
 
 #
 #	Performance Counter BackEnd modules (/usr/kernel/pcbe)

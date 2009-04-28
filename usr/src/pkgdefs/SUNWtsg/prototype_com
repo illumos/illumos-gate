@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -76,13 +74,16 @@ e devallocdefs etc/security/tsol/devalloc_defaults 0644 root sys
 # Device clean scripts for the window system.
 #
 d none etc/security/lib 755 root sys
-f none etc/security/lib/audio_clean_wrapper 555 root sys
-s none etc/security/lib/audio_clean_wrapper.windowing=./audio_clean_wrapper
+s none etc/security/lib/audio_clean.windowing=./audio_clean
 f none etc/security/lib/disk_clean 555 root sys
 s none etc/security/lib/disk_clean.windowing=./disk_clean
 s none etc/security/lib/st_clean.windowing=./st_clean
 f none etc/security/lib/wdwmsg 555 root sys
 f none etc/security/lib/wdwwrapper 555 root sys
+#
+# Directory for saved audio settings
+#
+d none etc/security/audio 755 root sys
 #
 # smf glue
 d none lib 755 root bin

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/usb_ah/Makefile
@@ -56,9 +56,9 @@ include $(UTSBASE)/sparc/Makefile.sparc
 CFLAGS += $(CCVERBOSE)
 
 #
-# depends on usba, hidparser and mixer related misc modules
+# depends on usba, hidparser and audio related misc modules
 #
-LDFLAGS	+= -dy -Nmisc/usba -Nmisc/hidparser -Nmisc/audiosup -Nmisc/mixer
+LDFLAGS	+= -dy -Nmisc/usba -Nmisc/hidparser -Ndrv/usb_ac
 
 #
 #	Define targets

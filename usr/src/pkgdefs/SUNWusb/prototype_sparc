@@ -48,7 +48,6 @@
 # SUNWusb
 #
 d none kernel/dacf/sparcv9 0755 root sys
-f none kernel/dacf/sparcv9/usb_ac_dacf 0755 root sys
 d none kernel/drv/sparcv9 0755 root sys
 f none kernel/drv/sparcv9/ohci 0755 root sys
 f none kernel/drv/sparcv9/ehci 0755 root sys

@@ -1086,30 +1086,14 @@ lxa_audio_getinfo(lxa_state_t *lxa_state, intptr_t arg, int mode)
 static int
 lxa_mixer_ai_from_lh(ldi_handle_t lh, audio_info_t *ai)
 {
-	am_control_t	*actl;
-	int		rv, ch_count, junk;
+	int		rv, junk;
 
 	ASSERT((lh != NULL) && (ai != NULL));
 
-	/* get the number of channels for the underlying device */
-	if ((rv = ldi_ioctl(lh, AUDIO_GET_NUM_CHS,
-	    (intptr_t)&ch_count, FKIOCTL, kcred, &junk)) != 0)
-		return (rv);
-
-	/* allocate the am_control_t structure */
-	actl = kmem_alloc(AUDIO_MIXER_CTL_STRUCT_SIZE(ch_count), KM_SLEEP);
-
 	/* get the device state and channel state */
-	if ((rv = ldi_ioctl(lh, AUDIO_MIXERCTL_GETINFO,
-	    (intptr_t)actl, FKIOCTL, kcred, &junk)) != 0) {
-		kmem_free(actl, AUDIO_MIXER_CTL_STRUCT_SIZE(ch_count));
-		return (rv);
-	}
+	rv = ldi_ioctl(lh, AUDIO_GETINFO, (intptr_t)ai, FKIOCTL, kcred, &junk);
 
-	/* return the audio_info structure */
-	*ai = actl->dev_info;
-	kmem_free(actl, AUDIO_MIXER_CTL_STRUCT_SIZE(ch_count));
-	return (0);
+	return (rv);
 }
 
 static int
@@ -1199,18 +1183,8 @@ lxa_mixer_set_common(lxa_state_t *lxa_state, int cmd, intptr_t arg, int mode)
 		break;
 	}
 
-	/*
-	 * we're going to cheat here.  normally the
-	 * MIXERCTL_SETINFO ioctl take am_control_t and the
-	 * AUDIO_SETINFO takes an audio_info_t.  as it turns
-	 * out the first element in a am_control_t is an
-	 * audio_info_t.  also, the rest of the am_control_t
-	 * structure is normally ignored for a MIXERCTL_SETINFO
-	 * ioctl.  so here we'll try to fall back to the code
-	 * that handles AUDIO_SETINFO ioctls.
-	 */
-	return (lxa_audio_setinfo(lxa_state, AUDIO_MIXERCTL_SETINFO,
-	    (intptr_t)&ai, FKIOCTL));
+	return (lxa_audio_setinfo(lxa_state, AUDIO_SETINFO, (intptr_t)&ai,
+	    FKIOCTL));
 }
 
 static int
@@ -1665,6 +1639,7 @@ lxa_read(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	lxa_state_t	*lxa_state;
 	minor_t		minor = getminor(dev);
+	int		rv;
 
 	/* get the handle for this device */
 	if (mod_hash_find(lxa_state_hash, (mod_hash_key_t)(uintptr_t)minor,
@@ -1683,7 +1658,13 @@ lxa_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		return (EBADF);
 
 	/* pass the request on */
-	return (ldi_read(lxa_state->lxas_idev_lh, uiop, kcred));
+	while (uiop->uio_resid != 0) {
+		rv = ldi_read(lxa_state->lxas_idev_lh, uiop, kcred);
+		if ((rv != 0) || (uiop->uio_fmode & (FNONBLOCK|FNDELAY))) {
+			break;
+		}
+	}
+	return (rv);
 }
 
 static int
@@ -1692,6 +1673,7 @@ lxa_write(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	lxa_state_t	*lxa_state;
 	minor_t		minor = getminor(dev);
+	int		rv;
 
 	/* get the handle for this device */
 	if (mod_hash_find(lxa_state_hash, (mod_hash_key_t)(uintptr_t)minor,
@@ -1710,7 +1692,13 @@ lxa_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		return (EBADF);
 
 	/* pass the request on */
-	return (ldi_write(lxa_state->lxas_odev_lh, uiop, kcred));
+	while (uiop->uio_resid != 0) {
+		rv = ldi_write(lxa_state->lxas_odev_lh, uiop, kcred);
+		if ((rv != 0) || (uiop->uio_fmode & (FNONBLOCK|FNDELAY))) {
+			break;
+		}
+	}
+	return (rv);
 }
 
 static int

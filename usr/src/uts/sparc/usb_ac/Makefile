@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/usb_ac/Makefile
@@ -40,7 +40,7 @@ OBJECTS		= $(USB_AC_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USB_AC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/clients/audio/usb_ac
-WARLOCK_OUT	= $(USB_AC_OBJS:%.o=%.ll) usb_ac_dacf.ll
+WARLOCK_OUT	= $(USB_AC_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
@@ -55,7 +55,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 CFLAGS += $(CCVERBOSE)
 
 #
-LDFLAGS	+= -dy -Nmisc/usba -Nmisc/audiosup -Nmisc/mixer
+LDFLAGS	+= -dy -Nmisc/usba -Ndrv/audio
 
 #
 #	Define targets
@@ -111,9 +111,6 @@ USBA_FILES	= $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES	= $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES	= $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES	= $(EHCI_OBJS:%.o=../ehci/%.ll)
-MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/sparc/mixer/%.ll)
-AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/sparc/audiosup/%.ll)
-AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/sparc/amsrc2/%.ll)
 
 
 #
@@ -130,7 +127,6 @@ warlock_with_sada: $(WLCMD_DIR)/usb_ac_with_sada.wlcmd \
 	$(WARLOCK_OUT) \
 	warlock_audiosup.files warlock_amsrc2.files warlock_mixer.files
 	$(WARLOCK) -c $(WLCMD_DIR)/usb_ac_with_sada.wlcmd $(WARLOCK_OUT) \
-	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_usba: $(WLCMD_DIR)/usb_ac_with_usba.wlcmd  $(WARLOCK_OUT) \

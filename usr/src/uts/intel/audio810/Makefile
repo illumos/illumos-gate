@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/audio810/Makefile
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of Metropolis audio driver
 #	(audio810) kernel module.
@@ -42,34 +40,17 @@ MODULE		= audio810
 OBJECTS		= $(AUDIO810_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIO810_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/audio/sada/drv/audio810
-WARLOCK_OUT	= $(AUDIO810_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
+CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audio810
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-# 
-#	Overrides, lint pass one enforcement 
-# 
-CFLAGS		+= $(CCVERBOSE)
-DEBUG_FLGS	=
-$(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
-
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
+#	Depends on drv/audio and misc/ac97
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-
-#
-#	Depends on misc/audiosup
-#
-LDFLAGS		+= -dy -Nmisc/amsrc2 -Nmisc/audiosup -Nmisc/mixer
+LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 
 #
 #	Define targets
@@ -88,10 +69,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -105,47 +84,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-TEST		= test
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK 	= warlock
-
-#
-#	Warlock targets
-#
-MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/intel/mixer/%.ll)
-AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/intel/audiosup/%.ll)
-AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/intel/amsrc2/%.ll)
-
-warlock:	$(WARLOCK_OK)
-
-$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files warlock_standalone \
-	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files \
-	$(WLCMD_DIR)/audio810_with_sada.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/audio810_with_sada.wlcmd $(WARLOCK_OUT) \
-	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
-	-l ../../intel/warlock/ddi_dki_impl.ll
-	$(TOUCH) $(WARLOCK_OK)
-
-%.ll: $(UTSBASE)/common/io/audio/sada/drv/audio810/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/audio810.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/audio810.wlcmd $(WARLOCK_OUT) \
-	-l ../../intel/warlock/ddi_dki_impl.ll
-
-warlock_ddi.files:
-	@cd ../../intel/warlock; pwd; $(MAKE) warlock
-
-warlock_audiosup.files:
-	@cd ../../intel/audiosup; pwd; $(MAKE) warlock
-
-warlock_amsrc2.files:
-	@cd ../../intel/amsrc2; pwd; $(MAKE) warlock
-
-warlock_mixer.files:
-	@cd ../../intel/mixer; pwd; $(MAKE) warlock

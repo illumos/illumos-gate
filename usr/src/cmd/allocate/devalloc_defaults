@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Default device_allocation attributes for device types.
 # Device types supported -
@@ -39,7 +37,7 @@
 # e.g.: minlabel="TS A B";maxlabel="TS AB";auths=solaris.device.allocate;\
 #       cleanscript=/bin/true
 #
-audio:minlabel=admin_low;maxlabel=admin_high;auths=solaris.device.allocate;cleanscript=/etc/security/lib/audio_clean_wrapper
+audio:minlabel=admin_low;maxlabel=admin_high;auths=solaris.device.allocate;cleanscript=/etc/security/lib/audio_clean
 fd:minlabel=admin_low;maxlabel=admin_high;auths=solaris.device.allocate;cleanscript=/etc/security/lib/disk_clean
 sr:minlabel=admin_low;maxlabel=admin_high;auths=solaris.device.allocate;cleanscript=/etc/security/lib/disk_clean
 st:minlabel=admin_low;maxlabel=admin_high;auths=solaris.device.allocate;cleanscript=/etc/security/lib/tape_clean

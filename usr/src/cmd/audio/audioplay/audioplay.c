@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Command-line audio play utility */
 
@@ -64,15 +61,12 @@
 /* Local variables */
 static char *prog;
 
-static char prog_opts[] =	"VEiv:b:d:p:?";	/* getopt() flags */
+static char prog_opts[] =	"VEiv:d:?";	/* getopt() flags */
 
 static char			*Stdin;
 
 #define	MAX_GAIN		(100)		/* maximum gain */
 
-#define	LEFT_BAL		(-100)		/* min/max balance */
-#define	MID_BAL			(0)
-#define	RIGHT_BAL		(100)
 /*
  * This defines the tolerable sample rate error as a ratio between the
  * sample rates of the audio data and the audio device.
@@ -86,12 +80,7 @@ static char			*Stdin;
 
 static unsigned		Volume = INT_MAX;	/* output volume */
 static double		Savevol;		/* saved volume level */
-static unsigned int	Balance = INT_MAX;	/* output balance */
-static unsigned int	Savebal;		/* saved output balance */
-static unsigned int	Port = INT_MAX;
-			/* output port (spkr, line, hp-jack) */
-static unsigned int	Saveport = 0;
-			/* save prev. val so we can restore */
+
 static int		Verbose = FALSE;	/* verbose messages */
 static int		Immediate = FALSE;
 			/* don't hang waiting for device */
@@ -153,7 +142,6 @@ static void sigint(int sig);
 static void open_audio(void);
 static int path_open(char *fname, int flags, mode_t mode, char *path);
 static int parse_unsigned(char *str, unsigned *dst, char *flag);
-static int scale_balance(int g);
 static int reconfig(void);
 static void initmux(int unitsz, int unitsp);
 static void demux(int unitsz, int cnt);
@@ -165,21 +153,15 @@ static void
 usage(void)
 {
 	Error(stderr, MGET("Play an audio file -- usage:\n"
-	    "\t%s [-iV] [-v vol] [-b bal]\n"
-	    "\t%.*s [-p speaker|headphone|line|aux1|aux2|spdif]\n"
-	    "\t%.*s [-d dev] [file ...]\n"
+	    "\t%s [-iV] [-v vol] [-d dev] [file ...]\n"
 	    "where:\n"
 	    "\t-i\tDon't hang if audio device is busy\n"
 	    "\t-V\tPrint verbose warning messages\n"
 	    "\t-v\tSet output volume (0 - %d)\n"
-	    "\t-b\tSet output balance (%d=left, %d=center, %d=right)\n"
-	    "\t-p\tSpecify output port\n"
 	    "\t-d\tSpecify audio device (default: /dev/audio)\n"
 	    "\tfile\tList of files to play\n"
 	    "\t\tIf no files specified, read stdin\n"),
-	    prog, strlen(prog), "                    ",
-	    strlen(prog), "                          ",
-	    MAX_GAIN, LEFT_BAL, MID_BAL, RIGHT_BAL);
+	    prog, MAX_GAIN);
 	exit(1);
 }
 
@@ -193,10 +175,6 @@ sigint(int sig)
 		/* restore saved parameters */
 		if (Volume != INT_MAX)
 			(void) audio_set_play_gain(Audio_fd, &Savevol);
-		if (Balance != INT_MAX)
-			(void) audio_set_play_balance(Audio_fd, &Savebal);
-		if (Port != INT_MAX)
-			(void) audio_set_play_port(Audio_fd, &Saveport);
 		if ((Audio_ctlfd >= 0) &&
 		    (audio_cmp_hdr(&Save_hdr, &Dev_hdr) != 0)) {
 			(void) audio_set_play_config(Audio_fd, &Save_hdr);
@@ -263,29 +241,6 @@ open_audio(void)
 			exit(1);
 		}
 	}
-
-	if (Balance != INT_MAX) {
-		(void) audio_get_play_balance(Audio_fd, &Savebal);
-		err = audio_set_play_balance(Audio_fd, &Balance);
-		if (err != AUDIO_SUCCESS) {
-			Error(stderr,
-			    MGET("%s: could not set output balance for %s\n"),
-			    prog, Audio_dev);
-			exit(1);
-		}
-	}
-
-	/* If -p flag, set the output port now */
-	if (Port != INT_MAX) {
-		(void) audio_get_play_port(Audio_fd, &Saveport);
-		err = audio_set_play_port(Audio_fd, &Port);
-		if (err != AUDIO_SUCCESS) {
-			Error(stderr,
-			    MGET("%s: could not set output port %s\n"),
-			    prog, Audio_dev);
-			exit(1);
-		}
-	}
 }
 
 /* Play a list of audio files. */
@@ -304,7 +259,6 @@ main(int argc, char **argv) {
 	int		ifd;
 	int		stdinseen;
 	int		regular;
-	int		bal;
 	int		swapBytes;
 	int		frame;
 	char		*outbuf;
@@ -342,16 +296,6 @@ main(int argc, char **argv) {
 					err++;
 				}
 				break;
-			case 'b':
-				bal = atoi(optarg);
-				if ((bal > RIGHT_BAL) || (bal < LEFT_BAL)) {
-					Error(stderr, MGET("%s: invalid value "
-					    "for -b\n"), prog);
-					err++;
-				} else {
-					Balance = (unsigned)scale_balance(bal);
-				}
-				break;
 			case 'd':
 				Audio_dev = optarg;
 				break;
@@ -363,32 +307,6 @@ main(int argc, char **argv) {
 				break;
 			case 'i':
 				Immediate = TRUE;
-				break;
-			case 'p':
-				/* a partial match is OK */
-				if (strncmp(optarg, "speaker",
-				    strlen(optarg)) == 0) {
-					Port = AUDIO_SPEAKER;
-				} else if (strncmp(optarg, "headphone",
-				    strlen(optarg)) == 0) {
-					Port = AUDIO_HEADPHONE;
-				} else if (strncmp(optarg, "line",
-				    strlen(optarg)) == 0) {
-					Port = AUDIO_LINE_OUT;
-				} else if (strncmp(optarg, "aux1",
-				    strlen(optarg)) == 0) {
-					Port = AUDIO_AUX1_OUT;
-				} else if (strncmp(optarg, "aux2",
-				    strlen(optarg)) == 0) {
-					Port = AUDIO_AUX2_OUT;
-				} else if (strncmp(optarg, "spdif",
-				    strlen(optarg)) == 0) {
-					Port = AUDIO_SPDIF_OUT;
-				} else {
-					Error(stderr, MGET("%s: invalid value "
-					    "for -p\n"), prog);
-					err++;
-				}
 				break;
 			case '?':
 				usage();
@@ -416,13 +334,8 @@ main(int argc, char **argv) {
 
 	/* This should probably use audio_cntl instead of open_audio */
 	if ((argc <= 0) && isatty(fileno(stdin))) {
-		if (Verbose) {
-			Error(stderr,
-		    MGET("%s: No files - setting audio device parameters.\n"),
-			    prog);
-		}
-		open_audio();
-		exit(0);
+		Error(stderr, MGET("%s: No files and stdin is a tty.\n"), prog);
+		exit(1);
 	}
 
 	/* Check on the -i status now. */
@@ -438,7 +351,7 @@ main(int argc, char **argv) {
 	Audio_fd = -1;
 
 	/* Try to open the control device and save the current format */
-	(void) sprintf(ctldev, "%sctl", Audio_dev);
+	(void) snprintf(ctldev, sizeof (ctldev), "%sctl", Audio_dev);
 	Audio_ctlfd = open(ctldev, O_RDWR);
 	if (Audio_ctlfd >= 0) {
 		/*
@@ -521,7 +434,7 @@ main(int argc, char **argv) {
 			File_hdr.samples_per_unit = 1;
 			File_hdr.bytes_per_unit = 1;
 			adpcm_state = (struct audio_g72x_state *)malloc
-				(sizeof (*adpcm_state) * File_hdr.channels);
+			    (sizeof (*adpcm_state) * File_hdr.channels);
 			for (i = 0; i < File_hdr.channels; i++) {
 				g721_init_state(&adpcm_state[i]);
 			}
@@ -533,7 +446,7 @@ main(int argc, char **argv) {
 			File_hdr.samples_per_unit = 1;
 			File_hdr.bytes_per_unit = 1;
 			adpcm_state = (struct audio_g72x_state *)malloc
-				(sizeof (*adpcm_state) * File_hdr.channels);
+			    (sizeof (*adpcm_state) * File_hdr.channels);
 			for (i = 0; i < File_hdr.channels; i++) {
 				g723_init_state(&adpcm_state[i]);
 			}
@@ -911,10 +824,6 @@ nextfile:;
 
 	if (Volume != INT_MAX)
 		(void) audio_set_play_gain(Audio_fd, &Savevol);
-	if (Balance != INT_MAX)
-		(void) audio_set_play_balance(Audio_fd, &Savebal);
-	if (Port != INT_MAX)
-		(void) audio_set_play_port(Audio_fd, &Saveport);
 	if ((Audio_ctlfd >= 0) && (audio_cmp_hdr(&Save_hdr, &Dev_hdr) != 0)) {
 		(void) audio_set_play_config(Audio_fd, &Save_hdr);
 	}
@@ -958,7 +867,8 @@ reconfig(void)
 			if (ratio <= SAMPLE_RATE_THRESHOLD) {
 				if (Verbose) {
 					Error(stderr,
-			MGET("%s: WARNING: %s sampled at %d, playing at %d\n"),
+					    MGET("%s: WARNING: %s sampled at "
+					    "%d, playing at %d\n"),
 					    prog, Ifile, File_hdr.sample_rate,
 					    Dev_hdr.sample_rate);
 				}
@@ -1067,7 +977,8 @@ path_open(char *fname, int flags, mode_t mode, char *path)
 				/* got a match! */
 				if (Verbose) {
 					Error(stderr,
-				    MGET("%s: Found %s in path at %s\n"),
+					    MGET("%s: Found %s in path "
+					    "at %s\n"),
 					    prog, fname, fullpath);
 				}
 				return (open(fullpath, flags, mode));
@@ -1084,14 +995,6 @@ path_open(char *fname, int flags, mode_t mode, char *path)
 	return (open(fname, flags, mode));
 }
 
-
-/* Convert local balance into device parameters */
-static int
-scale_balance(int g)
-{
-	return (int)(((g + RIGHT_BAL) / (double)(RIGHT_BAL - LEFT_BAL)) *
-	    (double)AUDIO_RIGHT_BALANCE);
-}
 
 /*
  * initmux()
@@ -1119,47 +1022,41 @@ initmux(int unitsz, int unitsp)
 	out_ch_size = in_ch_size * unitsp / unitsz;
 
 	/* Allocate pointers to input channels */
-	in_ch_data = (unsigned char **)malloc(sizeof (unsigned char *)
-		* File_hdr.channels);
+	in_ch_data = malloc(sizeof (unsigned char *) * File_hdr.channels);
 
 	if (in_ch_data == NULL) {
-		Error(stderr, MGET("%s: couldn't allocate %dK "
-			"buf\n"), prog, sizeof (unsigned char *) *
-			File_hdr.channels / 1000);
+		Error(stderr, MGET("%s: couldn't allocate %dK buf\n"),
+		    prog, sizeof (unsigned char *) * File_hdr.channels / 1000);
 		exit(1);
 	}
 
 	/* Allocate input channels */
 	for (c = 0; c < File_hdr.channels; c++) {
-		in_ch_data[c] = (unsigned char *)malloc
-			(sizeof (unsigned char) * in_ch_size);
+		in_ch_data[c] = malloc(sizeof (unsigned char) * in_ch_size);
 
 		if (in_ch_data[c] == NULL) {
-			Error(stderr, MGET("%s: couldn't allocate %dK "
-				"buf\n"), prog, in_ch_size / 1000);
+			Error(stderr, MGET("%s: couldn't allocate %dK buf\n"),
+			    prog, in_ch_size / 1000);
 			exit(1);
 		}
 	}
 
 	/* Allocate pointers to output channels */
-	out_ch_data = (unsigned char **)malloc(sizeof (unsigned char *)
-		* File_hdr.channels);
+	out_ch_data = malloc(sizeof (unsigned char *) * File_hdr.channels);
 
 	if (out_ch_data == NULL) {
-		Error(stderr, MGET("%s: couldn't allocate %dK "
-			"buf\n"), prog, sizeof (unsigned char *) *
-			File_hdr.channels / 1000);
+		Error(stderr, MGET("%s: couldn't allocate %dK buf\n"),
+		    prog, sizeof (unsigned char *) * File_hdr.channels / 1000);
 		exit(1);
 	}
 
 	/* Allocate output channels */
 	for (c = 0; c < File_hdr.channels; c++) {
-		out_ch_data[c] = (unsigned char *)malloc
-			(sizeof (unsigned char) * out_ch_size);
+		out_ch_data[c] = malloc(sizeof (unsigned char) * out_ch_size);
 
 		if (out_ch_data[c] == NULL) {
-			Error(stderr, MGET("%s: couldn't allocate %dK "
-				"buf\n"), prog, out_ch_size / 1000);
+			Error(stderr, MGET("%s: couldn't allocate %dK buf\n"),
+			    prog, out_ch_size / 1000);
 			exit(1);
 		}
 	}

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -45,20 +43,16 @@ i depend
 #
 d none usr 755 root sys
 d none usr/include 755 root bin
+d none usr/include/audio 755 root bin
+f none usr/include/audio/au.h 644 root bin
 d none usr/include/sys 755 root bin
 f none usr/include/sys/audio.h 644 root bin
 f none usr/include/sys/audioio.h 644 root bin
-f none usr/include/sys/audiovar.h 644 root bin
 f none usr/include/sys/mixer.h 644 root bin
+f none usr/include/sys/soundcard.h 644 root bin
 d none usr/include/sys/audio 755 root bin
-d none usr/include/audio 755 root bin
-f none usr/include/audio/au.h 644 root bin
 f none usr/include/sys/audio/ac97.h 644 root bin
-f none usr/include/sys/audio/am_src1.h 644 root bin
-f none usr/include/sys/audio/audioens.h 644 root bin
-f none usr/include/sys/audio/audio_apm.h 644 root bin
-f none usr/include/sys/audio/audio_mixer.h 644 root bin
-f none usr/include/sys/audio/audio_src.h 644 root bin
-f none usr/include/sys/audio/audio_support.h 644 root bin
-f none usr/include/sys/audio/audio_trace.h 644 root bin
+f none usr/include/sys/audio/audio_common.h 644 root bin
+f none usr/include/sys/audio/audio_driver.h 644 root bin
+f none usr/include/sys/audio/audio_oss.h 644 root bin
 f none usr/include/sys/audio/g711.h 644 root bin

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 ETCTSOLFILES =	devalloc_defaults
@@ -33,13 +31,14 @@ include		../Makefile.cmd
 ROOTSEC =	$(ROOTETC)/security
 ROOTSECDEV =	$(ROOTSEC)/dev
 ROOTSECLIB =	$(ROOTSEC)/lib
-ROOTDIRS =	$(ROOTSECDEV) $(ROOTSECLIB)
+ROOTSECAUD =	$(ROOTSEC)/audio
+ROOTDIRS =	$(ROOTSECDEV) $(ROOTSECLIB) $(ROOTSECAUD)
 
 RTLCKS =	audio fd0 sr0 st0 st1
 CLEANfd =	fd_clean
 CLEANsr =	sr_clean
 CLEANst =	st_clean
-CLEANaudio =	audio_clean_wrapper
+CLEANaudio =	audio_clean
 CLEANdisk =	disk_clean
 CLEAN_SCRIPTS =	$(CLEANfd) $(CLEANsr) $(CLEANst) $(CLEANaudio) $(CLEANdisk)
 WDW_SCRIPTS =	wdwmsg wdwwrapper
@@ -50,10 +49,9 @@ ALLSCRIPTS =	allscripts.sh
 PROGalloc =	allocate
 PROGmkdevalloc =	mkdevalloc
 PROGdminfo =	dminfo
-PROGaudio =	audio_clean
 PROGaddalloc =	add_allocatable
 PROG =		$(PROGalloc) $(PROGmkdevalloc) $(PROGdminfo) \
-	$(PROGaudio) $(PROGaddalloc)
+	$(PROGaddalloc)
 
 LINKPROGalloc =	deallocate list_devices
 LINKPROGmkdevalloc = mkdevmaps
@@ -72,7 +70,6 @@ ROOTWDWLINKS =	$(WDW_LINKS:%=$(ROOTSECLIB)/%.windowing)
 ROOTPROG =	$(PROGallocate:%=$(ROOTUSRSBIN)/%) \
 		$(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%) \
 		$(PROGdminfo:%=$(ROOTUSRSBIN)/%) \
-		$(PROGaudio:%=$(ROOTSECLIB)/%) \
 		$(PROGaddaloc:%=$(ROOTUSRSBIN)/%)
 ROOTLINKalloc =	$(LINKPROGalloc:%=$(ROOTUSRSBIN)/%)
 ROOTLINKmkdevalloc = $(LINKPROGmkdevalloc:%=$(ROOTUSRSBIN)/%)
@@ -82,13 +79,11 @@ ROOTLINKS =	$(ROOTLINKalloc) $(ROOTLINKmkdevalloc) $(ROOTLINKaddalloc)
 PROGallocOBJS =		allocate.o allocate3.o
 PROGmkdevallocOBJS =	mkdevalloc.o
 PROGdminfoOBJS =	dminfo.o
-PROGaudioOBJS =		audio_clean.o
 PROGaddallocOBJS =	add_allocatable.o
 
 OBJS =		$(PROGallocOBJS) \
 		$(PROGmkdevallocOBJS) \
 		$(PROGdminfoOBJS) \
-		$(PROGaudioOBJS) \
 		$(PROGaddallocOBJS)
 
 SRCS =		$(OBJS:%.o=%.c)
@@ -109,7 +104,6 @@ lint :=			LDLIBS += -lbsm -lsec -lsecdb -ldevinfo -ltsol
 $(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb -ldevinfo -ltsol
 $(PROGmkdevalloc) :=	LDLIBS += -lbsm
 $(PROGdminfo) :=	LDLIBS += -lbsm
-$(PROGaudio) :=		LDLIBS += -lbsm
 $(PROGaddalloc) :=	LDLIBS += -lbsm -lsecdb -ltsol
 
 CLOBBERFILES +=	$(SCRIPTS)
@@ -143,10 +137,6 @@ $(PROGdminfo) :	$(PROGdminfoOBJS)
 		$(LINK.c) $(PROGdminfoOBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-$(PROGaudio) :	$(PROGaudioOBJS)
-		$(LINK.c) $(PROGaudioOBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
-
 $(ROOTDIRS) :
 		$(INS.dir)
 
@@ -156,10 +146,6 @@ $(ROOTSECDEV)/%: %
 $(ROOTSECLIB)/%: %
 		$(RM) $@
 		$(INS.file)
-
-$(ROOTSECLIB)/audio_clean :	audio_clean
-				$(RM) $@
-				$(INS.file) $(@F)
 
 $(ROOTLINKalloc) :	$(PROGalloc:%=$(ROOTUSRSBIN)/%)
 			$(RM) $@

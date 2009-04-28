@@ -23,13 +23,19 @@
  * Use is subject to license terms.
  */
 
-
 /*
- * AUDIO CONTROL Driver: usb_ac is a streams multiplexor that sits
- * on top of usb_as and hid and is responsible for
- * (1) providing the entry points to audio mixer framework, (2) passing
- * streams messages to and from usb_as and hid and (3) processing
- * control messages that it can handle.
+ * AUDIO CONTROL Driver:
+ * This driver is derived from the legacy SADA streams-based usb_ac driver
+ * and serves as an intermediate measure before the full conversion to the
+ * to the Boomer framework in a follow-on phase of the Boomer project, which
+ * will utilize more comprehensive USB audio features as well.  Multiplexor
+ * plumbing functionality that used to be in the usb_ac_dacf DACF module is
+ * now located here.
+ *
+ * usb_ac is a multiplexor that sits on top of usb_as and hid and is
+ * responsible for (1) providing the entry points to audio mixer framework,
+ * (2) passing control commands to and from usb_as and hid and (3) processing
+ * control messages from hid/usb_ah that it can handle.
  *
  * 1. Mixer entry points are: usb_ac_setup(), usb_ac_teardown(),
  *	usb_ac_set_config(), usb_ac_set_format(), usb_ac_start_play(),
@@ -43,10 +49,8 @@
  *	of sound control interface of the audio device in a synchronous
  *	manner.
  *
- * Serialization: usb_ac being a streams driver and having the requirement
- * of making non-blockings calls (USBA or streams or mixer) needs to drop
- * mutexes over such calls. But at the same time, a competing thread
- * can't be allowed to interfere with (1) pipe, (2) streams state.
+ * Serialization: A competing thread can't be allowed to interfere with
+ * (1) pipe, (2) streams state.
  * So we need some kind of serialization among the asynchronous
  * threads that can run in the driver. The serialization is mostly
  * needed to avoid races among open/close/events/power entry points
@@ -58,9 +62,6 @@
  * PM model in usb_ac: Raise power during attach. If a device is not at full
  * power, raise power in the entry points. After the command is over,
  * pm_idle_component() is called. The power is lowered in detach().
- *
- * locking: Warlock is not aware of the automatic locking mechanisms for
- * streams drivers.
  */
 #include <sys/usb/usba/usbai_version.h>
 #include <sys/usb/usba.h>
@@ -69,11 +70,12 @@
 #include <sys/ndi_impldefs.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/sunldi.h>
 
 #include <sys/audio.h>
-#include <sys/audiovar.h>
 #include <sys/audio/audio_support.h>
-#include <sys/audio/audio_src.h>
 #include <sys/mixer.h>
 #include <sys/audio/audio_mixer.h>
 
@@ -81,18 +83,22 @@
 #include <sys/usb/clients/audio/usb_mixer.h>
 #include <sys/usb/clients/audio/usb_ac/usb_ac.h>
 
+/* for getting the minor node info from hid */
+#include <sys/usb/clients/hid/hidminor.h>
+#include <sys/usb/clients/audio/usb_as/usb_as.h>
+
+#include "audio_shim.h"
+
 /* debug support */
 uint_t	usb_ac_errlevel 	= USB_LOG_L4;
 uint_t	usb_ac_errmask		= (uint_t)-1;
 uint_t	usb_ac_instance_debug	= (uint_t)-1;
 
-#ifdef DEBUG
 /*
- * tunable timeout for usb_as response, allow at least 10 secs for control
- * cmd to timeout
+ * wait period in seconds for the HID message processing thread
+ * used primarily to check when the stream has closed
  */
-int	usb_ac_wait_timeout = 10000000;
-#endif
+uint_t usb_ac_wait_hid = 1;
 
 /*
  * table for converting term types of input and output terminals
@@ -143,28 +149,19 @@ static struct {
 /*
  * Module linkage routines for the kernel
  */
-static int	usb_ac_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int	usb_ac_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	usb_ac_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	usb_ac_power(dev_info_t *, int, int);
 
-/*
- * STREAMS module entry points
- */
-static int	usb_ac_open(queue_t *, dev_t *, int, int, cred_t *);
-static int	usb_ac_close(queue_t *, int, cred_t *);
-static int	usb_ac_uwput(queue_t *, mblk_t *);
-static int	usb_ac_lrput(queue_t *, mblk_t *);
-
 /* plumbing */
 static usb_ac_plumbed_t *usb_ac_get_plumb_info(usb_ac_state_t *, char *,
 				uchar_t);
-static usb_ac_plumbed_t *usb_ac_get_plumb_info_from_lrq(usb_ac_state_t *,
-				queue_t *);
 static uint_t	usb_ac_get_featureID(usb_ac_state_t *, uchar_t, uint_t,
 				uint_t);
-static void	usb_ac_plumb_ioctl(queue_t *, mblk_t *);
 
+/* module entry points */
+int		usb_ac_open(dev_info_t *);
+void		usb_ac_close(dev_info_t *);
 
 /* registration */
 static int	usb_ac_get_curr_n_channels(usb_ac_state_t *, int);
@@ -246,36 +243,52 @@ static int	usb_ac_set_mute(usb_ac_state_t *, uint_t, uint_t,
 static int	usb_ac_set_volume(usb_ac_state_t *, uint_t, short, int dir,
 				int);
 static int	usb_ac_get_maxmin_volume(usb_ac_state_t *, uint_t, int, int,
-				int);
-static void	usb_ac_free_mblk(mblk_t *);
-static mblk_t	*usb_ac_allocate_req_mblk(usb_ac_state_t *, int,
-				void *, uint_t);
+				int, short *);
 static int	usb_ac_send_as_cmd(usb_ac_state_t *, usb_ac_plumbed_t *,
 				int, void *);
-static int	usb_ac_send_format_cmd(audiohdl_t, int, int, int,
-				int, int, int);
-static int	usb_ac_do_setup(audiohdl_t, int, int);
-static void	usb_ac_do_teardown(audiohdl_t, int, int);
-static void	usb_ac_do_pause_play(audiohdl_t, int);
-static void	usb_ac_do_stop_record(audiohdl_t, int);
+static int	usb_ac_send_format_cmd(audiohdl_t, int, int, int, int, int);
+static int	usb_ac_do_setup(audiohdl_t, int);
+static void	usb_ac_do_teardown(audiohdl_t, int);
+static void	usb_ac_do_stop_play(audiohdl_t);
+static void	usb_ac_do_stop_record(audiohdl_t);
 
 /*  Mixer entry points */
-static int	usb_ac_setup(audiohdl_t, int, int);
-static void	usb_ac_teardown(audiohdl_t, int, int);
-static int	usb_ac_set_config(audiohdl_t, int, int, int, int, int);
-static int	usb_ac_set_format(audiohdl_t, int, int, int, int, int, int);
-static int	usb_ac_start_play(audiohdl_t, int);
-static void	usb_ac_pause_play(audiohdl_t, int);
-static void	usb_ac_stop_play(audiohdl_t, int);
-static int	usb_ac_start_record(audiohdl_t, int);
-static void	usb_ac_stop_record(audiohdl_t, int);
+static int	usb_ac_setup(audiohdl_t, int);
+static void	usb_ac_teardown(audiohdl_t, int);
+static int	usb_ac_set_config(audiohdl_t, int, int, int, int);
+static int	usb_ac_set_format(audiohdl_t, int, int, int, int, int);
+static int	usb_ac_start_play(audiohdl_t);
+static void	usb_ac_stop_play(audiohdl_t);
+static int	usb_ac_start_record(audiohdl_t);
+static void	usb_ac_stop_record(audiohdl_t);
 static int	usb_ac_restore_audio_state(usb_ac_state_t *, int);
 
 /*
- * External functions
+ * Mux
  */
-extern int	space_store(char *key, uintptr_t ptr);
-extern void	space_free(char *);
+static int	usb_ac_mux_walk_siblings(usb_ac_state_t *);
+static void	usb_ac_print_reg_data(usb_ac_state_t *,
+				usb_as_registration_t *);
+static int	usb_ac_get_reg_data(usb_ac_state_t *, ldi_handle_t, int);
+static int	usb_ac_setup_plumbed(usb_ac_state_t *, int, int, int);
+static int	usb_ac_mixer_registration(usb_ac_state_t *);
+static void	usb_ac_hold_siblings(usb_ac_state_t *);
+static int	usb_ac_online_siblings(usb_ac_state_t *);
+static void	usb_ac_rele_siblings(usb_ac_state_t *);
+static int	usb_ac_mux_plumbing(usb_ac_state_t *);
+static void	usb_ac_mux_plumbing_tq(void *);
+static int	usb_ac_mux_unplumbing(usb_ac_state_t *);
+static void	usb_ac_mux_unplumbing_tq(void *);
+static int	usb_ac_plumb(usb_ac_plumbed_t *);
+static void	usb_ac_unplumb(usb_ac_plumbed_t *);
+static void	usb_ac_reader(void *);
+static int	usb_ac_read_msg(usb_ac_plumbed_t *, mblk_t *);
+static int	usb_ac_do_plumbing(usb_ac_state_t *);
+static int	usb_ac_do_unplumbing(usb_ac_state_t *);
+
+/* just generic, USB Audio, 1.0 spec-compliant */
+static audio_device_t usb_dev_info =
+	{ {"USB Audio"}, {"1.0"}, {"external"} };
 
 
 /*
@@ -287,120 +300,30 @@ static am_ad_entry_t usb_ac_entry = {
 	usb_ac_set_config,	/* ad_set_config() */
 	usb_ac_set_format,	/* ad_set_format() */
 	usb_ac_start_play,	/* ad_start_play() */
-	usb_ac_pause_play,	/* ad_pause_play() */
 	usb_ac_stop_play,	/* ad_stop_play() */
 	usb_ac_start_record,	/* ad_start_record() */
 	usb_ac_stop_record,	/* ad_stop_record() */
-	NULL,			/* ad_ioctl() */
-	NULL			/* ad_iocdata() */
 };
 
 /* anchor for soft state structures */
-static void	*usb_ac_statep;
+void	*usb_ac_statep;
 
-/* for passing soft state etc. to usb_ac_dacf module */
-static usb_ac_state_space_t ssp;
-
-/* STREAMS driver id and limit value structure */
-static struct module_info usb_ac_modinfo = {
-	0xffff,				/* module ID number */
-	"usb_ac",			/* module name */
-	USB_AUDIO_MIN_PKTSZ,		/* minimum packet size */
-	USB_AUDIO_MAX_PKTSZ,		/* maximum packet size */
-	USB_AC_HIWATER,			/* high water mark */
-	USB_AC_LOWATER			/* low water mark */
-};
-
-/* STREAMS queue processing procedures structures */
-/* upper read queue */
-static struct qinit usb_ac_urqueue = {
-	NULL,			/* put procedure */
-	NULL,			/* service procedure */
-	usb_ac_open,		/* open procedure */
-	usb_ac_close,		/* close procedure */
-	NULL,			/* unused */
-	&usb_ac_modinfo,	/* module parameters */
-	NULL			/* module statistics */
-};
-
-/* upper write queue */
-static struct qinit usb_ac_uwqueue = {
-	usb_ac_uwput,		/* put procedure */
-	audio_sup_wsvc,		/* service procedure */
-	NULL,			/* open procedure */
-	NULL,			/* close procedure */
-	NULL,			/* unused */
-	&usb_ac_modinfo,	/* module parameters */
-	NULL			/* module statistics */
-};
-
-/* lower read queue */
-static struct qinit usb_ac_lrqueue = {
-	usb_ac_lrput,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	&usb_ac_modinfo,	/* module parameters */
-	NULL
-};
-
-/* lower write queue */
-static struct qinit usb_ac_lwqueue = {
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	&usb_ac_modinfo,	/* module parameters */
-	NULL
-};
-
-/* STREAMS entity declaration structure */
-static struct streamtab usb_ac_str_info = {
-	&usb_ac_urqueue,		/* upper read queue */
-	&usb_ac_uwqueue,		/* upper write queue */
-	&usb_ac_lrqueue,		/* lower read queue */
-	&usb_ac_lwqueue,		/* lower write queue */
-};
 
 /*
  * DDI Structures
- *
- * Entry points structure
  */
-static struct cb_ops usb_ac_cb_ops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	&usb_ac_str_info,	/* cb_str */
-	D_MP | D_MTPERQ,	/* cb_flag */
-	CB_REV,			/* cb_rev */
-	nodev,			/* cb_aread */
-	nodev,			/* cb_arwite */
-};
 
 /* Device operations structure */
 static struct dev_ops usb_ac_dev_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* devo_refcnt */
-	usb_ac_getinfo,		/* devo_getinfo */
+	NULL,			/* devo_getinfo */
 	nulldev,		/* devo_identify - obsolete */
 	nulldev,		/* devo_probe - not needed */
 	usb_ac_attach,		/* devo_attach */
 	usb_ac_detach,		/* devo_detach */
 	nodev,			/* devo_reset */
-	&usb_ac_cb_ops,		/* devi_cb_ops */
+	NULL,			/* devi_cb_ops */
 	NULL,			/* devo_busb_ac_ops */
 	usb_ac_power,		/* devo_power */
 	ddi_quiesce_not_needed,	/* devo_quiesce */
@@ -420,12 +343,6 @@ static struct modlinkage usb_ac_modlinkage = {
 	NULL				/* NULL terminates the list */
 };
 
-/* warlock directives */
-_NOTE(SCHEME_PROTECTS_DATA("unique per call", iocblk))
-_NOTE(SCHEME_PROTECTS_DATA("unique per call", datab))
-_NOTE(SCHEME_PROTECTS_DATA("unique per call", msgb))
-_NOTE(SCHEME_PROTECTS_DATA("unique per call", queue))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", usb_pipe_policy_t))
 
 /* standard entry points */
 int
@@ -439,19 +356,11 @@ _init(void)
 		return (rval);
 	}
 
+	audio_init_ops(&usb_ac_dev_ops, "usb_ac");
+
 	if ((rval = mod_install(&usb_ac_modlinkage)) != 0) {
 		ddi_soft_state_fini(&usb_ac_statep);
-	}
-
-	if (!rval) {
-		ssp.sp = usb_ac_statep;
-		ssp.restore_func = usb_ac_restore_audio_state;
-		ssp.get_featureID_func = usb_ac_get_featureID;
-		ssp.ac_entryp = &usb_ac_entry;
-		ssp.pm_busy_component = usb_ac_pm_busy_component;
-		ssp.pm_idle_component = usb_ac_pm_idle_component;
-
-		rval = space_store("usb_ac", (uintptr_t)&ssp);
+		audio_fini_ops(&usb_ac_dev_ops);
 	}
 
 	return (rval);
@@ -466,7 +375,7 @@ _fini(void)
 	if ((rval = mod_remove(&usb_ac_modlinkage)) == 0) {
 		/* Free the soft state internal structures */
 		ddi_soft_state_fini(&usb_ac_statep);
-		space_free("usb_ac");
+		audio_fini_ops(&usb_ac_dev_ops);
 	}
 
 	return (rval);
@@ -479,39 +388,6 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&usb_ac_modlinkage, modinfop));
 }
 
-/*ARGSUSED*/
-static int
-usb_ac_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
-			void *arg, void **result)
-{
-	usb_ac_state_t	   *uacp = NULL;
-	int error = DDI_FAILURE;
-	int instance;
-
-	switch (infocmd) {
-	case DDI_INFO_DEVT2DEVINFO:
-		instance = audio_sup_devt_to_instance((dev_t)arg);
-		if ((uacp = ddi_get_soft_state(usb_ac_statep,
-		    instance)) != NULL) {
-			*result = uacp->usb_ac_dip;
-			if (*result != NULL) {
-				error = DDI_SUCCESS;
-			}
-		} else {
-			*result = NULL;
-		}
-		break;
-	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(uintptr_t)
-		    audio_sup_devt_to_instance((dev_t)arg);
-		error = DDI_SUCCESS;
-		break;
-	default:
-		break;
-	}
-
-	return (error);
-}
 
 extern	uint_t		nproc;
 #define	INIT_PROCESS_CNT 3
@@ -520,11 +396,7 @@ static int
 usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	usb_ac_state_t		*uacp = NULL;
-	audio_sup_reg_data_t	reg_data;
 	int			instance = ddi_get_instance(dip);
-	int			minor;
-	char			*key;
-	size_t			key_len, len;
 
 	switch (cmd) {
 		case DDI_ATTACH:
@@ -580,6 +452,9 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uacp->usb_ac_instance = instance;
 	uacp->usb_ac_dip = dip;
 
+	(void) snprintf(uacp->dstr, sizeof (uacp->dstr), "%s#%d",
+	    ddi_driver_name(dip), instance);
+
 	if (usb_client_attach(dip, USBDRV_VERSION, 0) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "usb_client_attach failed");
@@ -608,46 +483,7 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	uacp->usb_ac_default_ph = uacp->usb_ac_dev_data->dev_default_ph;
 
-	/* register with audiosup */
-	reg_data.asrd_version	= AUDIOSUP_VERSION;
-
-	/*
-	 * we register with pathname, the mgf, product, and serial number
-	 * strings, vid.pid, and driver name which should be pretty unique
-	 */
-	key_len = 2 * MAXNAMELEN;
-	if (uacp->usb_ac_dev_data->dev_mfg) {
-		key_len += strlen(uacp->usb_ac_dev_data->dev_mfg);
-	}
-	if (uacp->usb_ac_dev_data->dev_product) {
-		key_len += strlen(uacp->usb_ac_dev_data->dev_product);
-	}
-	if (uacp->usb_ac_dev_data->dev_serial) {
-		key_len += strlen(uacp->usb_ac_dev_data->dev_serial);
-	}
-
-	key = kmem_alloc(key_len, KM_SLEEP);
-	(void) ddi_pathname(dip, key);
-
-	len = strlen(key);
-	(void) snprintf(&key[len], key_len - len, ",%s,%s,%s,%x.%x,%s",
-	    (uacp->usb_ac_dev_data->dev_mfg ?
-	    uacp->usb_ac_dev_data->dev_mfg : "-"),
-	    (uacp->usb_ac_dev_data->dev_product ?
-	    uacp->usb_ac_dev_data->dev_product : "-"),
-	    (uacp->usb_ac_dev_data->dev_serial ?
-	    uacp->usb_ac_dev_data->dev_serial : "-"),
-	    uacp->usb_ac_dev_data->dev_descr->idVendor,
-	    uacp->usb_ac_dev_data->dev_descr->idProduct,
-	    ddi_driver_name(dip));
-
-	reg_data.asrd_key = key;
-
-	USB_DPRINTF_L3(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
-	    "registering with key: %s", key);
-
-	uacp->usb_ac_audiohdl = audio_sup_register(dip, &reg_data);
-	kmem_free(key, key_len);
+	uacp->usb_ac_audiohdl = audio_sup_register(dip);
 
 	if (uacp->usb_ac_audiohdl == NULL) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
@@ -668,27 +504,8 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* we no longer need the descr tree */
 	usb_free_descr_tree(dip, uacp->usb_ac_dev_data);
 
-	/* read .conf file properties */
-	uacp->usb_ac_mixer_mode_enable = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dip, DDI_PROP_DONTPASS, "mixer-enabled", 1);
-
 	uacp->usb_ac_ser_acc = usb_init_serialization(dip,
 	    USB_INIT_SER_CHECK_SAME_THREAD);
-
-	/* create minor node */
-	minor = audio_sup_construct_minor(uacp->usb_ac_audiohdl, USER1);
-
-	USB_DPRINTF_L3(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
-	    "minor=%d", minor);
-
-	if ((ddi_create_minor_node(dip, "mux", S_IFCHR,
-	    minor, NULL, 0)) != DDI_SUCCESS) {
-		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
-		    "usb_ac_attach: couldn't create minor node mux");
-
-		goto fail;
-	}
-	uacp->usb_ac_mux_minor = minor;
 
 	mutex_enter(&uacp->usb_ac_mutex);
 
@@ -715,17 +532,28 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	/* report device */
-	ddi_report_dev(dip);
-
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 	    "usb_ac_attach: End");
 
+	/* report device */
+	ddi_report_dev(dip);
+
+	if (usb_ac_do_plumbing(uacp) != USB_SUCCESS)
+		goto fail;
+
 	return (DDI_SUCCESS);
+
 fail:
 	if (uacp) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "attach failed");
+
+		/* wait for plumbing thread to finish */
+		if (uacp->tqp != NULL) {
+			ddi_taskq_wait(uacp->tqp);
+			ddi_taskq_destroy(uacp->tqp);
+			uacp->tqp = NULL;
+		}
 		(void) usb_ac_cleanup(dip, uacp);
 	}
 
@@ -738,19 +566,67 @@ usb_ac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	int instance = ddi_get_instance(dip);
 	usb_ac_state_t	*uacp;
-	int rval;
+	int rval = USB_FAILURE;
+	char *nm = "usb_ac_detach";
 
 	uacp = ddi_get_soft_state(usb_ac_statep, instance);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_detach:");
-
 	switch (cmd) {
 	case DDI_DETACH:
-		rval = usb_ac_cleanup(dip, uacp);
+		dinfo("%s: %s - detaching\n", uacp->dstr, nm);
+
+		/* wait for plumbing thread to finish */
+		if (uacp->tqp != NULL)
+			ddi_taskq_wait(uacp->tqp);
+
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		/* do not allow detach if still busy */
+		if (uacp->usb_ac_busy_count) {
+			dinfo("%s: %s - still busy: %d\n", uacp->dstr, nm,
+			    uacp->usb_ac_busy_count);
+
+			mutex_exit(&uacp->usb_ac_mutex);
+			return (USB_FAILURE);
+		}
+
+		/*
+		 * call am_unregister() to stop calls into our driver from
+		 * the framework; can fail if the framework is still busy
+		 */
+		if (uacp->usb_ac_audiohdl != NULL) {
+			mutex_exit(&uacp->usb_ac_mutex);
+
+			if (am_unregister(uacp->usb_ac_audiohdl) !=
+			    AUDIO_SUCCESS) {
+				dinfo("%s: %s - am_unregister failed, "
+				    "framework still busy\n",
+				    uacp->dstr, nm);
+
+				return (USB_FAILURE);
+			}
+			mutex_enter(&uacp->usb_ac_mutex);
+		}
+
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		/*
+		 * unplumb to stop activity from other modules, then
+		 * cleanup, which will also teardown audio framework state
+		 */
+		if (usb_ac_do_unplumbing(uacp) == USB_SUCCESS)
+			rval = usb_ac_cleanup(dip, uacp);
+
+		if (rval != USB_SUCCESS) {
+			USB_DPRINTF_L2(PRINT_MASK_ATTA,
+			    uacp->usb_ac_log_handle, "detach failed: %s%d",
+			    ddi_driver_name(dip), instance);
+		}
 
 		return ((rval == USB_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
 	case DDI_SUSPEND:
+		dinfo("%s: %s - suspending\n", uacp->dstr, nm);
+
 		rval = usb_ac_cpr_suspend(dip);
 
 		return ((rval == USB_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
@@ -776,8 +652,7 @@ usb_ac_cleanup(dev_info_t *dip, usb_ac_state_t *uacp)
 	mutex_enter(&uacp->usb_ac_mutex);
 	uacpm = uacp->usb_ac_pm;
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_cleanup: uacpm=0x%p", (void *)uacpm);
+	dinfo("%s: usb_ac_cleanup: uacpm=0x%p\n", uacp->dstr, (void *)uacpm);
 
 	ASSERT(uacp->usb_ac_busy_count == 0);
 
@@ -858,8 +733,6 @@ usb_ac_cleanup(dev_info_t *dip, usb_ac_state_t *uacp)
 
 	usb_fini_serialization(uacp->usb_ac_ser_acc);
 
-	ddi_remove_minor_node(dip, NULL);
-
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 	    "usb_ac_cleanup: Ending");
 
@@ -877,275 +750,79 @@ usb_ac_cleanup(dev_info_t *dip, usb_ac_state_t *uacp)
 }
 
 
-/*
- * usb_ac_open:
- *	Open entry point. Called on the plumbing minor node or
- *	audio or audioctl minor nodes which we pass to audio_sup_open()
- *	We do not raise power here and wait for the setup callback
- */
-/*ARGSUSED*/
-static int
-usb_ac_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+int
+usb_ac_open(dev_info_t *dip)
 {
-	int minor = getminor(*devp);
-	int instance;
-	int rval;
-	usb_ac_state_t	*uacp;
-
-	instance = audio_sup_devt_to_instance(*devp);
-
-	uacp = ddi_get_soft_state(usb_ac_statep, instance);
-	if (uacp == NULL) {
-
-		return (ENXIO);
-	}
+	int inst = ddi_get_instance(dip);
+	usb_ac_state_t *uacp = ddi_get_soft_state(usb_ac_statep, inst);
 
 	mutex_enter(&uacp->usb_ac_mutex);
-	uacp->usb_ac_busy_count++; /* This will prevent unplumbing */
 
-	USB_DPRINTF_L4(PRINT_MASK_OPEN, uacp->usb_ac_log_handle,
-	    "usb_ac_open: Begin q=0x%p, minor=0x%x instance=%d "
-	    "open cnt=%d", (void *)q, minor, instance, uacp->usb_ac_busy_count);
-
-	if (sflag) {
-		USB_DPRINTF_L2(PRINT_MASK_OPEN, uacp->usb_ac_log_handle,
-		    "usb_ac_open: clone open not supported");
-
-		uacp->usb_ac_busy_count--;
-		mutex_exit(&uacp->usb_ac_mutex);
-
-		return (ENXIO);
-	}
-
-	if (minor == uacp->usb_ac_mux_minor) {
-
-		USB_DPRINTF_L4(PRINT_MASK_OPEN, uacp->usb_ac_log_handle,
-		    "usb_ac_open: opening mux");
-		/*
-		 * This is the plumbing open, initiated during attach/
-		 * connect_event_callback/cpr_resume/first user open.
-		 */
-		uacp->usb_ac_busy_count--;
-
-		/* Save the dev_t value of pluming q to use for lower q's */
-		uacp->usb_ac_dev = *devp;
-		audio_sup_set_qptr(q, *devp, (void *)uacp);
-
-		/* Initialize the queue pointers */
-		uacp->usb_ac_rq = q;
-		uacp->usb_ac_wq = WR(q);
-
-		/* release mutex while making streams framework call */
-		mutex_exit(&uacp->usb_ac_mutex);
-		qprocson(q);
-		mutex_enter(&uacp->usb_ac_mutex);
-
-	} else if (uacp->usb_ac_plumbing_state != USB_AC_STATE_PLUMBED) {
-		uacp->usb_ac_busy_count--;
-		mutex_exit(&uacp->usb_ac_mutex);
-
-		return (EIO);
-	} else {
-		/* pass the open to audio_sup_open so SADA can do its work */
-		USB_DPRINTF_L4(PRINT_MASK_OPEN, uacp->usb_ac_log_handle,
-		    "usb_ac_open: calling audio_sup_open, q=0x%p, open_cnt=%d",
-		    (void *)q, uacp->usb_ac_busy_count);
-
-		mutex_exit(&uacp->usb_ac_mutex);
-
-		/*
-		 * go to full power
-		 */
-		usb_ac_pm_busy_component(uacp);
-		(void) pm_raise_power(uacp->usb_ac_dip, 0, USB_DEV_OS_FULL_PWR);
-
-		rval = audio_sup_open(q, devp, flag, sflag, credp);
-
-		mutex_enter(&uacp->usb_ac_mutex);
-
-		if (rval != 0) {
-			USB_DPRINTF_L4(PRINT_MASK_OPEN,
-			    uacp->usb_ac_log_handle,
-			    "audio_sup_open rval=%d", rval);
-
-			uacp->usb_ac_busy_count--;
-
-			mutex_exit(&uacp->usb_ac_mutex);
-
-			usb_ac_pm_idle_component(uacp);
-
-			return (rval);
-		}
-	}
-
-	USB_DPRINTF_L4(PRINT_MASK_OPEN, uacp->usb_ac_log_handle,
-	    "usb_ac_open: End q=0x%p, open cnt=%d",
-	    (void *)q, uacp->usb_ac_busy_count);
+	uacp->usb_ac_busy_count++;
 
 	mutex_exit(&uacp->usb_ac_mutex);
+
+	usb_ac_pm_busy_component(uacp);
+	(void) pm_raise_power(uacp->usb_ac_dip, 0, USB_DEV_OS_FULL_PWR);
 
 	return (0);
 }
 
 
-/*
- * usb_ac_close :
- *	Close entry point
- */
-/*ARGSUSED*/
-static int
-usb_ac_close(queue_t *q, int flag, cred_t *credp)
+void
+usb_ac_close(dev_info_t *dip)
 {
-	dev_t dev = audio_sup_get_qptr_dev(q);
-	int minor = getminor(dev);
-	int instance = audio_sup_get_qptr_instance(q);
-	usb_ac_state_t *uacp = ddi_get_soft_state(usb_ac_statep, instance);
-	int rval;
+	int inst = ddi_get_instance(dip);
+	usb_ac_state_t *uacp = ddi_get_soft_state(usb_ac_statep, inst);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 
-	USB_DPRINTF_L4(PRINT_MASK_CLOSE, uacp->usb_ac_log_handle,
-	    "usb_ac_close: Begin q=0x%p, opencount=%d",
-	    (void *)q, uacp->usb_ac_busy_count);
-
-	/* closing the mux? */
-	if (minor == uacp->usb_ac_mux_minor) {
-		USB_DPRINTF_L4(PRINT_MASK_CLOSE, uacp->usb_ac_log_handle,
-		    "usb_ac_close: closing mux plumbing stream");
-		mutex_exit(&uacp->usb_ac_mutex);
-
-		/* Wait till all activity in the default pipe has drained */
-		usb_ac_serialize_access(uacp);
-		usb_ac_release_access(uacp);
-
-		audio_sup_free_qptr(q);
-		qprocsoff(q);
-
-		return (0);
-	}
-
-	mutex_exit(&uacp->usb_ac_mutex);
-
-	rval = audio_sup_close(q, flag, credp);
-
-	if (rval != 0) {
-		USB_DPRINTF_L2(PRINT_MASK_CLOSE, uacp->usb_ac_log_handle,
-		    "audio_sup_close fails %d", rval);
-
-		return (rval);
-	}
-
-	mutex_enter(&uacp->usb_ac_mutex);
-
-	/* normal streams closing */
-	ASSERT(uacp->usb_ac_plumbing_state >= USB_AC_STATE_PLUMBED);
-
-	uacp->usb_ac_busy_count --;
-
-	USB_DPRINTF_L4(PRINT_MASK_CLOSE, uacp->usb_ac_log_handle,
-	    "usb_ac_close: End rval=%d q=0x%p, opencount=%d",
-	    rval, (void *)q, uacp->usb_ac_busy_count);
+	if (uacp->usb_ac_busy_count > 0)
+		uacp->usb_ac_busy_count--;
 
 	mutex_exit(&uacp->usb_ac_mutex);
 
 	usb_ac_pm_idle_component(uacp);
-
-	return (0);
 }
 
 
 /*
- * usb_ac_uwput:
- *	write put entry point for the upper mux. Only PLUMB/UNPLUMB ioctls
- *	are processed here. All other ioctls are passed to audio_sup routines
- *	for further processing.
+ * usb_ac_read_msg:
+ *	Handle asynchronous response from opened streams
  */
 static int
-usb_ac_uwput(queue_t *q, mblk_t *mp)
+usb_ac_read_msg(usb_ac_plumbed_t *plumb_infop, mblk_t *mp)
 {
-	int instance = audio_sup_get_qptr_instance(q);
-	usb_ac_state_t	*uacp = ddi_get_soft_state(usb_ac_statep, instance);
+	usb_ac_state_t	*uacp = plumb_infop->acp_uacp;
 	int error = DDI_SUCCESS;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_uwput: q=0x%p, mp=0x%p", (void *)q, (void *)mp);
-
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_datap != NULL);
-
-	mutex_enter(&uacp->usb_ac_mutex);
-	if (uacp->usb_ac_wq == q) {
-		ASSERT(mp->b_datap->db_type == M_IOCTL);
-
-		mutex_exit(&uacp->usb_ac_mutex);
-
-		/* ioctl from plumbing thread (namely P_LINK) */
-		usb_ac_plumb_ioctl(q, mp);
-
-		return (error);
-	}
-	mutex_exit(&uacp->usb_ac_mutex);
-
-	/* Pass to audio_sup routine */
-	(void) audio_sup_wput(q, mp);
-
-	return (error);
-}
-
-
-/*
- * usb_ac_lrput:
- *	read put entry point for the lower mux. Get the response from the
- *	lower module, signal usb_ac_send_as_cmd(), the thread that is waiting
- *	for a response to a message sent earlier anbd pass the response
- *	message	block.
- */
-static int
-usb_ac_lrput(queue_t *q, mblk_t *mp)
-{
-	int instance = audio_sup_get_qptr_instance(q);
-	usb_ac_state_t	*uacp;
-	int error = DDI_SUCCESS;
-	usb_ac_plumbed_t *plumb_infop;
-	usb_ac_streams_info_t *streams_infop = NULL;
 	int	val;
 	char	val1;
 	struct iocblk *iocp;
 
-	uacp = ddi_get_soft_state(usb_ac_statep, instance);
-
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_lrput: q=0x%p, mp=0x%p, instance=%d",
-	    (void *)q, (void *)mp, instance);
+	    "usb_ac_read_msg: mp=0x%p, instance=%d", (void *)mp,
+	    ddi_get_instance(uacp->usb_ac_dip));
+
 	ASSERT(mp != NULL);
+	ASSERT(mutex_owned(&uacp->usb_ac_mutex));
 
-	mutex_enter(&uacp->usb_ac_mutex);
-	plumb_infop = usb_ac_get_plumb_info_from_lrq(uacp, q);
-	ASSERT(plumb_infop != NULL);
-
+	/*
+	 * typically an M_CTL is used between modules but in order to pass
+	 * through the streamhead, an M_PROTO type must be used instead
+	 */
 	switch (mp->b_datap->db_type) {
-	case M_CTL:
+	case M_PROTO:
 	case M_ERROR:
 		USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "M_CTL/M_ERROR");
 
 		switch (plumb_infop->acp_driver) {
-		case USB_AS_PLUMBED:
-			USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-			    "reply from usb_as, lrq=0x%p", (void *)q);
-			streams_infop = (usb_ac_streams_info_t *)
-			    plumb_infop->acp_data;
-			ASSERT(streams_infop != NULL);
-			streams_infop->acs_ac_to_as_req.acr_reply_mp = mp;
-			streams_infop->acs_ac_to_as_req.acr_wait_flag = 0;
-			cv_signal(&streams_infop->acs_ac_to_as_req.acr_cv);
-
-			break;
 		case USB_AH_PLUMBED:
 			USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-			    "M_CTL from hid, lrq=0x%p", (void *)q);
+			    "message from hid, instance=%d",
+			    ddi_get_instance(plumb_infop->acp_dip));
 
-			iocp = (struct iocblk *)mp->b_rptr;
+			iocp = (struct iocblk *)(void *)mp->b_rptr;
 			ASSERT(mp->b_cont != NULL);
 
 			if (uacp->usb_ac_registered_with_mixer) {
@@ -1187,7 +864,7 @@ usb_ac_lrput(queue_t *q, mblk_t *mp)
 			break;
 		default:
 			USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-			    "M_CTL from unknown module(%s)",
+			    "message from unknown module(%s)",
 			    ddi_driver_name(plumb_infop->acp_dip));
 			freemsg(mp);
 		}
@@ -1196,15 +873,11 @@ usb_ac_lrput(queue_t *q, mblk_t *mp)
 	default:
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "Unknown type=%d", mp->b_datap->db_type);
-		usb_ac_free_mblk(mp);
+		freemsg(mp);
 	}
-	mutex_exit(&uacp->usb_ac_mutex);
 
-	/*
-	 * Nobody is waiting; nothing to send up.
-	 */
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_lrput: done");
+	    "usb_ac_read_msg: done");
 
 	return (error);
 }
@@ -1408,121 +1081,6 @@ usb_ac_create_pm_components(dev_info_t *dip, usb_ac_state_t *uacp)
 
 
 /*
- * usb_ac_plumb_ioctl:
- *	IOCTL issued from plumbing thread (only P_LINK_LH/P_UNLINK for now
- *	caused by ldi_ioctl). Maybe we will need to use this function
- *	to issue other IOCTLS to children in future from plumbing thread
- */
-static void
-usb_ac_plumb_ioctl(queue_t *q, mblk_t *mp)
-{
-	int		instance = audio_sup_get_qptr_instance(q);
-	usb_ac_state_t	*uacp = ddi_get_soft_state(usb_ac_statep, instance);
-	struct iocblk	*iocp;
-	struct linkblk	*linkp;
-	int		n;
-	usb_ac_streams_info_t *streams_infop;
-
-	ASSERT(uacp != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_cont != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_plumb_ioctl, q=0x%p mp=0x%p instance=%d",
-	    (void *)q, (void *)mp, instance);
-
-	iocp = (struct iocblk *)mp->b_rptr;
-	mutex_enter(&uacp->usb_ac_mutex);
-	n = uacp->usb_ac_current_plumbed_index;
-
-	switch (iocp->ioc_cmd) {
-	case I_PLINK:
-		linkp = (struct linkblk *)mp->b_cont->b_rptr;
-
-		USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "LINK ioctl, index=%d linkblk ptr=0x%p", n, (void *)linkp);
-
-		/*
-		 * We keep track of the module that is being
-		 * currently plumbed through usb_ac_current_plumbed_index
-		 * to the plumb structure array. We set the lwq field
-		 * of the plumb structure here.
-		 */
-		ASSERT(uacp->usb_ac_plumbed[n].acp_lwq == NULL);
-		uacp->usb_ac_plumbed[n].acp_lwq = linkp->l_qbot;
-		uacp->usb_ac_plumbed[n].acp_lrq = RD(linkp->l_qbot);
-
-		audio_sup_set_qptr(uacp->usb_ac_plumbed[n].acp_lrq,
-		    uacp->usb_ac_dev, (void *)uacp);
-
-		USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "index=%d lwq=0x%p lrq=0x%p", n, (void *)linkp->l_qbot,
-		    (void *)RD(linkp->l_qbot));
-		break;
-	case I_UNLINK:
-	case I_PUNLINK:
-		linkp = (struct linkblk *)mp->b_cont->b_rptr;
-		USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "UNLINK ioctl, linkblk ptr=0x%p", (void *)linkp);
-
-		audio_sup_free_qptr(RD(linkp->l_qbot));
-		uacp->usb_ac_dev = 0;
-
-		if (uacp->usb_ac_plumbed[n].acp_driver == USB_AS_PLUMBED) {
-
-			/*
-			 * we bzero the streams info and plumbed structure
-			 * since there is no guarantee that the next plumbing
-			 * will be identical
-			 */
-			streams_infop = (usb_ac_streams_info_t *)
-			    uacp->usb_ac_plumbed[n].acp_data;
-			cv_destroy(&(streams_infop->acs_ac_to_as_req.acr_cv));
-
-			/* bzero the relevant plumbing structure */
-			bzero(streams_infop, sizeof (usb_ac_streams_info_t));
-		}
-		bzero(&uacp->usb_ac_plumbed[n], sizeof (usb_ac_plumbed_t));
-
-		iocp->ioc_count = 0;
-		break;
-	default:
-		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "Unknown ioctl, cmd=%d", iocp->ioc_cmd);
-		iocp->ioc_error = EINVAL;
-		mutex_exit(&uacp->usb_ac_mutex);
-
-		goto iocnak;
-	}
-
-	mutex_exit(&uacp->usb_ac_mutex);
-
-	/*
-	 * Common exit path for calls that return a positive
-	 * acknowledgment with a return value of 0.
-	 */
-	iocp->ioc_rval = 0;
-	iocp->ioc_error = 0;
-	mp->b_datap->db_type = M_IOCACK;
-	qreply(q, mp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_plumb_ioctl: End (ACK)");
-
-	return;
-
-iocnak:
-
-	iocp->ioc_rval = 0;
-	mp->b_datap->db_type = M_IOCNAK;
-	qreply(q, mp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_plumb_ioctl: End: (NAK)");
-}
-
-
-/*
  * usb_ac_get_plumb_info:
  *	Get plumb_info pointer that matches module "name"
  *	If name = "usb_as", match the direction also (record or play)
@@ -1561,26 +1119,6 @@ usb_ac_get_plumb_info(usb_ac_state_t *uacp, char *name, uchar_t reg_play_type)
 	}
 
 	return (plumb_infop);
-}
-
-
-/*
- * usb_ac_get_pinfo_from_lrq:
- *	Get plumb_info pointer that matches the lrq passed
- */
-static usb_ac_plumbed_t *
-usb_ac_get_plumb_info_from_lrq(usb_ac_state_t *uacp, queue_t *lrq)
-{
-	int	n;
-
-	for (n = 0; n < USB_AC_MAX_PLUMBED; n++) {
-		if (uacp->usb_ac_plumbed[n].acp_lrq == lrq) {
-
-			return (&uacp->usb_ac_plumbed[n]);
-		}
-	}
-
-	return (NULL);
 }
 
 
@@ -2945,9 +2483,9 @@ usb_ac_disconnect_event_cb(dev_info_t *dip)
 {
 	usb_ac_state_t *uacp = (usb_ac_state_t *)ddi_get_soft_state(
 	    usb_ac_statep, ddi_get_instance(dip));
+	char *nm = "usb_ac_disconnect_event_cb";
 
-	USB_DPRINTF_L4(PRINT_MASK_EVENTS, uacp->usb_ac_log_handle,
-	    "usb_ac_disconnect_event_cb: dip=0x%p", (void *)dip);
+	dinfo("%s: %s - dip=%p\n", uacp->dstr, nm, (void *)dip);
 
 	usb_ac_serialize_access(uacp);
 
@@ -2962,10 +2500,8 @@ usb_ac_disconnect_event_cb(dev_info_t *dip)
 	}
 	mutex_exit(&uacp->usb_ac_mutex);
 
-	USB_DPRINTF_L3(PRINT_MASK_EVENTS, uacp->usb_ac_log_handle,
-	    "usb_ac_disconnect_event_cb: done");
-
 	usb_ac_release_access(uacp);
+	dinfo("%s: %s done\n", uacp->dstr, nm);
 
 	return (USB_SUCCESS);
 }
@@ -3008,9 +2544,9 @@ usb_ac_reconnect_event_cb(dev_info_t *dip)
 {
 	usb_ac_state_t *uacp = (usb_ac_state_t *)ddi_get_soft_state(
 	    usb_ac_statep, ddi_get_instance(dip));
+	char *nm = "usb_ac_reconnect_event_cb";
 
-	USB_DPRINTF_L4(PRINT_MASK_EVENTS, uacp->usb_ac_log_handle,
-	    "usb_ac_reconnect_event_cb: dip=0x%p", (void *)dip);
+	dinfo("%s: %s - dip=%p\n", uacp->dstr, nm, (void *)dip);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	mutex_exit(&uacp->usb_ac_mutex);
@@ -3032,9 +2568,11 @@ usb_ac_reconnect_event_cb(dev_info_t *dip)
 		USB_DPRINTF_L0(PRINT_MASK_EVENTS, uacp->usb_ac_log_handle,
 		    "busy device has been reconnected");
 	}
+
 	mutex_exit(&uacp->usb_ac_mutex);
 
 	usb_ac_release_access(uacp);
+	dinfo("%s: %s done\n", uacp->dstr, nm);
 
 	return (USB_SUCCESS);
 }
@@ -3149,8 +2687,7 @@ usb_ac_am_restore_state(void *arg)
 		 */
 		delay(USB_AC_RESTORE_DELAY);
 
-		(void) audio_sup_restore_state(uacp->usb_ac_audiohdl,
-		    AUDIO_ALL_DEVICES, AUDIO_BOTH);
+		audio_sup_restore_state(uacp->usb_ac_audiohdl);
 
 		mutex_enter(&uacp->usb_ac_mutex);
 		uacp->usb_ac_plumbing_state = USB_AC_STATE_PLUMBED;
@@ -3233,18 +2770,15 @@ usb_ac_restore_audio_state(usb_ac_state_t *uacp, int flag)
  *	Check power is done in usb_ac_send_as_cmd()
  */
 static int
-usb_ac_setup(audiohdl_t ahdl, int stream, int flag)
+usb_ac_setup(audiohdl_t ahdl, int flag)
 {
 	int	rval = AUDIO_SUCCESS;
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 
 	ASSERT(uacp != NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_setup: Begin ahdl=0x%p, stream=%d, flag=%d",
-	    (void *)ahdl, stream, flag);
-
 	mutex_enter(&uacp->usb_ac_mutex);
+
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
 		mutex_exit(&uacp->usb_ac_mutex);
 
@@ -3255,17 +2789,14 @@ usb_ac_setup(audiohdl_t ahdl, int stream, int flag)
 	usb_ac_serialize_access(uacp);
 
 	if (flag & AUDIO_PLAY) {
-		rval = usb_ac_do_setup(ahdl, stream, AUDIO_PLAY);
+		rval = usb_ac_do_setup(ahdl, AUDIO_PLAY);
 	}
 
 	if ((rval == USB_SUCCESS) && (flag & AUDIO_RECORD)) {
-		rval = usb_ac_do_setup(ahdl, stream, AUDIO_RECORD);
+		rval = usb_ac_do_setup(ahdl, AUDIO_RECORD);
 	}
 
 	usb_ac_release_access(uacp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_setup: rval=%d", rval);
 
 	return ((rval == USB_SUCCESS) ? AUDIO_SUCCESS : AUDIO_FAILURE);
 }
@@ -3277,7 +2808,7 @@ usb_ac_setup(audiohdl_t ahdl, int stream, int flag)
  *	either from audio framework for usb_ac_set_format
  */
 static int
-usb_ac_do_setup(audiohdl_t ahdl, int stream, int flag)
+usb_ac_do_setup(audiohdl_t ahdl, int flag)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 	usb_ac_plumbed_t	*plumb_infop = NULL;
@@ -3285,10 +2816,6 @@ usb_ac_do_setup(audiohdl_t ahdl, int stream, int flag)
 	int	dir;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_setup: Begin ahdl=0x%p, stream=%d, flag=%d",
-	    (void *)ahdl, stream, flag);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 
@@ -3320,19 +2847,13 @@ usb_ac_do_setup(audiohdl_t ahdl, int stream, int flag)
 		    "usb_ac_do_setup: failure");
 
 		streams_infop->acs_setup_teardown_count--;
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 
 		mutex_exit(&uacp->usb_ac_mutex);
 
 		return (USB_FAILURE);
 	}
 
-	streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
-
 	mutex_exit(&uacp->usb_ac_mutex);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_setup: End");
 
 	return (USB_SUCCESS);
 }
@@ -3345,30 +2866,23 @@ usb_ac_do_setup(audiohdl_t ahdl, int stream, int flag)
  *	NOTE: allow teardown when disconnected
  */
 static void
-usb_ac_teardown(audiohdl_t ahdl, int stream, int flag)
+usb_ac_teardown(audiohdl_t ahdl, int flag)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 
 	ASSERT(uacp != NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_teardown: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
-
 	usb_ac_serialize_access(uacp);
 
 	if (flag & AUDIO_PLAY) {
-		usb_ac_do_teardown(ahdl, stream, AUDIO_PLAY);
+		usb_ac_do_teardown(ahdl, AUDIO_PLAY);
 	}
 
 	if (flag & AUDIO_RECORD) {
-		usb_ac_do_teardown(ahdl, stream, AUDIO_RECORD);
+		usb_ac_do_teardown(ahdl, AUDIO_RECORD);
 	}
 
 	usb_ac_release_access(uacp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_teardown: End");
 }
 
 
@@ -3377,7 +2891,7 @@ usb_ac_teardown(audiohdl_t ahdl, int stream, int flag)
  *	Check power is done in usb_ac_send_as_cmd()
  */
 static void
-usb_ac_do_teardown(audiohdl_t ahdl, int stream, int flag)
+usb_ac_do_teardown(audiohdl_t ahdl, int flag)
 {
 	usb_ac_state_t		*uacp = audio_sup_get_private(ahdl);
 	usb_ac_plumbed_t	*plumb_infop = NULL;
@@ -3385,10 +2899,6 @@ usb_ac_do_teardown(audiohdl_t ahdl, int stream, int flag)
 	int			dir;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_teardown: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 
@@ -3426,14 +2936,11 @@ usb_ac_do_teardown(audiohdl_t ahdl, int stream, int flag)
 		    "usb_ac_do_teardown: failure");
 
 		streams_infop->acs_setup_teardown_count++;
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 
 		mutex_exit(&uacp->usb_ac_mutex);
 
 		return;
 	}
-
-	streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 
 	mutex_exit(&uacp->usb_ac_mutex);
 
@@ -3450,8 +2957,7 @@ usb_ac_do_teardown(audiohdl_t ahdl, int stream, int flag)
  *	Check power is done here since we will access the default pipe
  */
 static int
-usb_ac_set_config(audiohdl_t ahdl, int stream, int command, int flag,
-	int arg1, int arg2)
+usb_ac_set_config(audiohdl_t ahdl, int command, int flag, int arg1, int arg2)
 {
 	usb_ac_state_t	*uacp = audio_sup_get_private(ahdl);
 	char		*what;
@@ -3463,12 +2969,8 @@ usb_ac_set_config(audiohdl_t ahdl, int stream, int command, int flag,
 
 	ASSERT(uacp != NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_set_config: Begin ahdl=0x%p\n\t"
-	    "stream=%d, cmd=%d, flag=%d, arg1=%d, arg2=%d",
-	    (void *)ahdl, stream, command, flag, arg1, arg2);
-
 	mutex_enter(&uacp->usb_ac_mutex);
+
 	if (uacp->usb_ac_plumbing_state < USB_AC_STATE_PLUMBED) {
 		mutex_exit(&uacp->usb_ac_mutex);
 
@@ -3606,10 +3108,6 @@ usb_ac_set_config(audiohdl_t ahdl, int stream, int command, int flag,
 		what = "mic boost";
 		rval = AUDIO_SUCCESS;
 		break;
-	case AM_SET_GAIN_BAL:
-		what = "set gain bal";
-		rval = AUDIO_FAILURE;
-		break;
 	default:
 		what = "unknown";
 		rval = AUDIO_FAILURE;
@@ -3737,8 +3235,8 @@ usb_ac_set_gain(usb_ac_state_t *uacp, uint_t featureID,
 		return (USB_FAILURE);
 	}
 
-	if ((max = usb_ac_get_maxmin_volume(uacp, channel,
-	    USB_AUDIO_GET_MAX, dir, featureID)) == USB_FAILURE) {
+	if (usb_ac_get_maxmin_volume(uacp, channel,
+	    USB_AUDIO_GET_MAX, dir, featureID, &max) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_set_gain: getting max gain failed");
 
@@ -3748,8 +3246,8 @@ usb_ac_set_gain(usb_ac_state_t *uacp, uint_t featureID,
 	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 	    "usb_ac_set_gain: channel %d, max=%d", channel, max);
 
-	if ((min = usb_ac_get_maxmin_volume(uacp, channel,
-	    USB_AUDIO_GET_MIN, dir, featureID)) == USB_FAILURE) {
+	if (usb_ac_get_maxmin_volume(uacp, channel,
+	    USB_AUDIO_GET_MIN, dir, featureID, &min) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_set_gain: getting min gain failed");
 
@@ -3759,8 +3257,8 @@ usb_ac_set_gain(usb_ac_state_t *uacp, uint_t featureID,
 	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 	    "usb_ac_set_gain: channel=%d, min=%d", channel, min);
 
-	if ((current = usb_ac_get_maxmin_volume(uacp, channel,
-	    USB_AUDIO_GET_CUR, dir, featureID)) == USB_FAILURE) {
+	if (usb_ac_get_maxmin_volume(uacp, channel,
+	    USB_AUDIO_GET_CUR, dir, featureID, &current) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_set_gain: getting cur gain failed");
 
@@ -3798,8 +3296,8 @@ usb_ac_set_gain(usb_ac_state_t *uacp, uint_t featureID,
 	}
 
 	/* just curious, read it back, device may round up/down */
-	if ((current = usb_ac_get_maxmin_volume(uacp, channel,
-	    USB_AUDIO_GET_CUR, dir, featureID)) == USB_FAILURE) {
+	if (usb_ac_get_maxmin_volume(uacp, channel,
+	    USB_AUDIO_GET_CUR, dir, featureID, &current) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_set_gain: getting cur gain failed");
 	}
@@ -3827,7 +3325,7 @@ usb_ac_set_gain(usb_ac_state_t *uacp, uint_t featureID,
  *	usb_ac_send_as_cmd().
  */
 static int
-usb_ac_set_format(audiohdl_t ahdl, int stream, int flag,
+usb_ac_set_format(audiohdl_t ahdl, int flag,
 	int sample, int channels, int precision, int encoding)
 {
 	usb_ac_state_t		*uacp = audio_sup_get_private(ahdl);
@@ -3840,11 +3338,6 @@ usb_ac_set_format(audiohdl_t ahdl, int stream, int flag,
 	int			rval;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_set_format: Begin ahdl=0x%p, stream=%d, flag=%d, "
-	    "sr=%d, chnls=%d, prec=%d, enc=%d", (void *)ahdl, stream, flag,
-	    sample, channels, precision, encoding);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
@@ -3879,7 +3372,7 @@ usb_ac_set_format(audiohdl_t ahdl, int stream, int flag,
 
 		mutex_exit(&uacp->usb_ac_mutex);
 
-		rval = usb_ac_send_format_cmd(ahdl, stream, dir, sample,
+		rval = usb_ac_send_format_cmd(ahdl, dir, sample,
 		    channels, precision, encoding);
 
 		usb_ac_release_access(uacp);
@@ -3903,15 +3396,15 @@ usb_ac_set_format(audiohdl_t ahdl, int stream, int flag,
 	mutex_exit(&uacp->usb_ac_mutex);
 
 	if (dir == AUDIO_PLAY) {
-		usb_ac_do_pause_play(ahdl, stream);
+		usb_ac_do_stop_play(ahdl);
 	} else if (dir == AUDIO_RECORD) {
-		usb_ac_do_stop_record(ahdl, stream);
+		usb_ac_do_stop_record(ahdl);
 	}
 
 	/* This blocks until the current isoc xfer is over */
-	usb_ac_do_teardown(ahdl, stream, dir);
+	usb_ac_do_teardown(ahdl, dir);
 
-	if (usb_ac_send_format_cmd(ahdl, stream, dir, sample,
+	if (usb_ac_send_format_cmd(ahdl, dir, sample,
 	    channels, precision, encoding) != USB_SUCCESS) {
 		/*
 		 * Setting new alternate has failed, try restoring
@@ -3920,13 +3413,13 @@ usb_ac_set_format(audiohdl_t ahdl, int stream, int flag,
 		 * till bandwidth is available. Also we know that
 		 * there is a matching alternate, so that can't fail.
 		 */
-		if (usb_ac_send_format_cmd(ahdl, stream, dir,
+		if (usb_ac_send_format_cmd(ahdl, dir,
 		    old_format.fmt_sr, old_format.fmt_chns,
 		    old_format.fmt_precision, old_format.fmt_encoding) ==
 		    USB_FAILURE) {
 
 			/* We closed the pipe; reopen it */
-			(void) usb_ac_do_setup(ahdl, stream, dir);
+			(void) usb_ac_do_setup(ahdl, dir);
 
 			mutex_enter(&uacp->usb_ac_mutex);
 			streams_infop->acs_setup_teardown_count =
@@ -3940,16 +3433,13 @@ usb_ac_set_format(audiohdl_t ahdl, int stream, int flag,
 	}
 
 	/* This should block until successful */
-	(void) usb_ac_do_setup(ahdl, stream, dir);
+	(void) usb_ac_do_setup(ahdl, dir);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	streams_infop->acs_setup_teardown_count = old_setup_teardown_count;
 	mutex_exit(&uacp->usb_ac_mutex);
 
 	usb_ac_release_access(uacp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_set_format: End");
 
 	return (AUDIO_SUCCESS);
 }
@@ -4002,7 +3492,7 @@ usb_ac_get_curr_format(usb_ac_state_t *uacp, int dir)
  *	Send the set sample freq command down to usb_as.
  */
 static int
-usb_ac_send_format_cmd(audiohdl_t ahdl, int stream, int dir,
+usb_ac_send_format_cmd(audiohdl_t ahdl, int dir,
 	int sample, int channels, int precision, int encoding)
 {
 	usb_ac_state_t		*uacp = audio_sup_get_private(ahdl);
@@ -4011,11 +3501,6 @@ usb_ac_send_format_cmd(audiohdl_t ahdl, int stream, int dir,
 	usb_ac_streams_info_t	*streams_infop = NULL;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_send_format_cmd: Begin ahdl=0x%p, stream=%d, dir=%d, "
-	    "sr=%d, chnls=%d, prec=%d, enc=%d", (void *)ahdl, stream, dir,
-	    sample, channels, precision, encoding);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
@@ -4059,13 +3544,13 @@ usb_ac_send_format_cmd(audiohdl_t ahdl, int stream, int dir,
 		USB_DPRINTF_L2(PRINT_MASK_ALL,
 		    uacp->usb_ac_log_handle,
 		    "usb_ac_send_format_cmd: failed");
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 		mutex_exit(&uacp->usb_ac_mutex);
 
 		return (USB_FAILURE);
 	} else {
-		/* alternate number stored and reply mp freed */
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
+		/* store matching alternate number */
+		streams_infop->acs_ac_to_as_req.acr_curr_format.fmt_alt =
+		    format->fmt_alt;
 	}
 
 	/* Set the sample rate */
@@ -4074,18 +3559,12 @@ usb_ac_send_format_cmd(audiohdl_t ahdl, int stream, int dir,
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_send_format_cmd: setting format failed");
 
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 		mutex_exit(&uacp->usb_ac_mutex);
 
 		return (USB_FAILURE);
 	}
 
-	streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
-
 	mutex_exit(&uacp->usb_ac_mutex);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_send_format_cmd: End");
 
 	return (USB_SUCCESS);
 }
@@ -4097,7 +3576,7 @@ usb_ac_send_format_cmd(audiohdl_t ahdl, int stream, int dir,
  *	Check power is done in usb_ac_send_as_cmd()
  */
 static int
-usb_ac_start_play(audiohdl_t ahdl, int stream)
+usb_ac_start_play(audiohdl_t ahdl)
 {
 	usb_ac_state_t		*uacp = audio_sup_get_private(ahdl);
 	usb_audio_formats_t	*cur_fmt;
@@ -4107,10 +3586,6 @@ usb_ac_start_play(audiohdl_t ahdl, int stream)
 	usb_ac_streams_info_t	*streams_infop = NULL;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_start_play: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
@@ -4156,7 +3631,6 @@ usb_ac_start_play(audiohdl_t ahdl, int stream)
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_start_play: failure");
 
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 		mutex_exit(&uacp->usb_ac_mutex);
 
 		usb_ac_release_access(uacp);
@@ -4164,33 +3638,25 @@ usb_ac_start_play(audiohdl_t ahdl, int stream)
 		return (AUDIO_FAILURE);
 	}
 
-	streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 	mutex_exit(&uacp->usb_ac_mutex);
 
 	usb_ac_release_access(uacp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_start_play: End");
 
 	return (AUDIO_SUCCESS);
 }
 
 
 /*
- * usb_ac_pause_play:
- *	Wrapper function for usb_ac_do_pause_play and gets
+ * usb_ac_stop_play:
+ *	Wrapper function for usb_ac_do_stop_play and gets
  *	called from mixer framework.
  */
 static void
-usb_ac_pause_play(audiohdl_t ahdl, int stream)
+usb_ac_stop_play(audiohdl_t ahdl)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_pause_play: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
@@ -4201,11 +3667,8 @@ usb_ac_pause_play(audiohdl_t ahdl, int stream)
 	mutex_exit(&uacp->usb_ac_mutex);
 
 	usb_ac_serialize_access(uacp);
-	usb_ac_do_pause_play(ahdl, stream);
+	usb_ac_do_stop_play(ahdl);
 	usb_ac_release_access(uacp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_pause_play: End");
 }
 
 /*
@@ -4214,17 +3677,13 @@ usb_ac_pause_play(audiohdl_t ahdl, int stream)
  *	Check power is done in usb_ac_send_as_cmd()
  */
 static void
-usb_ac_do_pause_play(audiohdl_t ahdl, int stream)
+usb_ac_do_stop_play(audiohdl_t ahdl)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 	usb_ac_plumbed_t	*plumb_infop = NULL;
 	usb_ac_streams_info_t	*streams_infop = NULL;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_pause_play: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 
@@ -4240,37 +3699,9 @@ usb_ac_do_pause_play(audiohdl_t ahdl, int stream)
 
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_do_pause_play: failure");
-
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 	}
 
 	mutex_exit(&uacp->usb_ac_mutex);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_pause_play: End");
-}
-
-
-/*
- * usb_ac_stop_play:
- *	Wrapper function for usb_ac_pause_play	and gets
- *	called from mixer framework.
- */
-static void
-usb_ac_stop_play(audiohdl_t ahdl, int stream)
-{
-	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
-
-	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_stop_play: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
-
-	usb_ac_pause_play(ahdl, stream);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_stop_play: End");
 }
 
 
@@ -4280,17 +3711,13 @@ usb_ac_stop_play(audiohdl_t ahdl, int stream)
  *	Check power is done in usb_ac_send_as_cmd()
  */
 static int
-usb_ac_start_record(audiohdl_t ahdl, int stream)
+usb_ac_start_record(audiohdl_t ahdl)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 	usb_ac_plumbed_t	*plumb_infop = NULL;
 	usb_ac_streams_info_t	*streams_infop = NULL;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_start_record: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
@@ -4316,7 +3743,6 @@ usb_ac_start_record(audiohdl_t ahdl, int stream)
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_start_record: failure");
 
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 		mutex_exit(&uacp->usb_ac_mutex);
 
 		usb_ac_release_access(uacp);
@@ -4328,9 +3754,6 @@ usb_ac_start_record(audiohdl_t ahdl, int stream)
 
 	usb_ac_release_access(uacp);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_start_record: End");
-
 	return (AUDIO_SUCCESS);
 }
 
@@ -4341,22 +3764,15 @@ usb_ac_start_record(audiohdl_t ahdl, int stream)
  *	called form mixer framework.
  */
 static void
-usb_ac_stop_record(audiohdl_t ahdl, int stream)
+usb_ac_stop_record(audiohdl_t ahdl)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 
 	ASSERT(uacp != NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_stop_record: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
-
 	usb_ac_serialize_access(uacp);
-	usb_ac_do_stop_record(ahdl, stream);
+	usb_ac_do_stop_record(ahdl);
 	usb_ac_release_access(uacp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_stop_record: End");
 }
 
 
@@ -4366,17 +3782,13 @@ usb_ac_stop_record(audiohdl_t ahdl, int stream)
  *	Check power is done in usb_ac_send_as_cmd()
  */
 static void
-usb_ac_do_stop_record(audiohdl_t ahdl, int stream)
+usb_ac_do_stop_record(audiohdl_t ahdl)
 {
 	usb_ac_state_t *uacp = audio_sup_get_private(ahdl);
 	usb_ac_plumbed_t	*plumb_infop = NULL;
 	usb_ac_streams_info_t	*streams_infop = NULL;
 
 	ASSERT(uacp != NULL);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_stop_record: Begin ahdl=0x%p, stream=%d",
-	    (void *)ahdl, stream);
 
 	mutex_enter(&uacp->usb_ac_mutex);
 
@@ -4392,14 +3804,9 @@ usb_ac_do_stop_record(audiohdl_t ahdl, int stream)
 
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "usb_ac_do_stop_record: failure");
-
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
 	}
 
 	mutex_exit(&uacp->usb_ac_mutex);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_do_stop_record: End");
 }
 
 
@@ -4413,12 +3820,12 @@ usb_ac_do_stop_record(audiohdl_t ahdl, int stream)
  */
 static int
 usb_ac_get_maxmin_volume(usb_ac_state_t *uacp, uint_t channel, int cmd,
-    int dir, int feature_unitID)
+    int dir, int feature_unitID, short *max_or_minp)
 {
 	mblk_t		*data = NULL;
-	short		max_or_min;
 	usb_cr_t	cr;
 	usb_cb_flags_t	cb_flags;
+
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 	    "usb_ac_get_maxmin_volume: channel=%d, cmd=%d dir=%d",
 	    channel, cmd, dir);
@@ -4454,14 +3861,14 @@ usb_ac_get_maxmin_volume(usb_ac_state_t *uacp, uint_t channel, int cmd,
 	mutex_enter(&uacp->usb_ac_mutex);
 	ASSERT(MBLKL(data) == 2);
 
-	max_or_min = (*(data->b_rptr+1) << 8) | *data->b_rptr;
+	*max_or_minp = (*(data->b_rptr+1) << 8) | *data->b_rptr;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_get_maxmin_volume: max_or_min=0x%x", max_or_min);
+	    "usb_ac_get_maxmin_volume: max_or_min=0x%x", *max_or_minp);
 
 	freemsg(data);
 
-	return (max_or_min);
+	return (USB_SUCCESS);
 }
 
 
@@ -4581,11 +3988,11 @@ static int
 usb_ac_send_as_cmd(usb_ac_state_t *uacp, usb_ac_plumbed_t *plumb_infop,
     int cmd, void *arg)
 {
-	mblk_t		*mp = NULL;
-	struct iocblk	*iocp;
-	queue_t 	*lwq = plumb_infop->acp_lwq;
 	usb_ac_streams_info_t *streams_infop;
-	int		error = USB_FAILURE;
+	int		rv;
+	int		rval;
+	ldi_handle_t	lh;
+	char		*nm = "usb_ac_send_as_cmd";
 
 	ASSERT(mutex_owned(&uacp->usb_ac_mutex));
 	ASSERT(plumb_infop != NULL);
@@ -4593,207 +4000,19 @@ usb_ac_send_as_cmd(usb_ac_state_t *uacp, usb_ac_plumbed_t *plumb_infop,
 	streams_infop = (usb_ac_streams_info_t *)plumb_infop->acp_data;
 	ASSERT(streams_infop != NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_send_as_cmd: Begin lwq=0x%p, cmd=0x%x, arg=0x%p",
-	    (void *)lwq, cmd, arg);
+	dinfo("%s: %s - cmd=0x%x, arg=0x%p\n", uacp->dstr, nm, cmd, arg);
 
-	if (!canputnext(lwq)) {
-		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "usb_ac_send_as_cmd: canputnext failed");
+	lh = plumb_infop->acp_lh;
 
-		return (error);
+	rv = ldi_ioctl(lh, cmd, (intptr_t)arg, FKIOCTL, kcred, &rval);
+	if (rv != 0) {
+		dinfo("%s: %s - ldi_ioctl failed, error=%d\n", uacp->dstr, nm,
+		    rv);
+
+		return (USB_FAILURE);
 	}
 
-	/*
-	 * Allocate mblk for a particular command
-	 */
-	switch (cmd) {
-	case USB_AUDIO_SET_FORMAT:
-		mp = usb_ac_allocate_req_mblk(uacp, cmd, (void *)arg,
-		    sizeof (usb_audio_formats_t));
-		break;
-	case USB_AUDIO_TEARDOWN:
-	case USB_AUDIO_STOP_RECORD:
-	case USB_AUDIO_PAUSE_PLAY:
-	case USB_AUDIO_SETUP:
-		mp = usb_ac_allocate_req_mblk(uacp, cmd, NULL, 0);
-		break;
-	case USB_AUDIO_START_RECORD:
-		mp = usb_ac_allocate_req_mblk(uacp, cmd, (void *)arg,
-		    sizeof (audiohdl_t *));
-		break;
-	case USB_AUDIO_SET_SAMPLE_FREQ:
-		mp = usb_ac_allocate_req_mblk(uacp, cmd, (void *)arg,
-		    sizeof (int));
-		break;
-	case USB_AUDIO_START_PLAY:
-		mp = usb_ac_allocate_req_mblk(uacp, cmd, (void *)arg,
-		    sizeof (usb_audio_play_req_t));
-		break;
-	default:
-		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "usb_ac_send_as_cmd: unknown cmd=%d", cmd);
-
-		return (error);
-	}
-
-	if (mp == NULL) {
-		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "usb_ac_send_as_cmd: can't get mblk to send cmd down");
-
-		return (error);
-	}
-
-	/*
-	 * Set wait flag and send message down; we have made sure
-	 * before that canputnext succeeds. Note mp will be freed down
-	 */
-	streams_infop->acs_ac_to_as_req.acr_wait_flag = 1;
-
-	mutex_exit(&uacp->usb_ac_mutex);
-	putnext(lwq, mp);
-	mutex_enter(&uacp->usb_ac_mutex);
-
-	/*
-	 * Wait for the response; reply will arrive through rput()
-	 * M_CTL and the cv_wait will be signaled there and wait flag
-	 * will be reset
-	 */
-	while (streams_infop->acs_ac_to_as_req.acr_wait_flag) {
-#ifndef DEBUG
-		cv_wait(&streams_infop->acs_ac_to_as_req.acr_cv,
-		    &uacp->usb_ac_mutex);
-#else
-		clock_t tm = ddi_get_lbolt() +
-		    drv_usectohz(usb_ac_wait_timeout);
-		int rval;
-
-		rval = cv_timedwait(&streams_infop->acs_ac_to_as_req.acr_cv,
-		    &uacp->usb_ac_mutex, tm);
-
-		if (streams_infop->acs_ac_to_as_req.acr_wait_flag) {
-			if (rval == -1) {
-				USB_DPRINTF_L3(PRINT_MASK_ALL,
-				    uacp->usb_ac_log_handle,
-				    "usb_ac_send_as_cmd:"
-				    " timeout happen before cmd complete.");
-			} else {
-				USB_DPRINTF_L3(PRINT_MASK_ALL,
-				    uacp->usb_ac_log_handle,
-				    "usb_ac_send_as_cmd:"
-				    " not signaled by USB_AS_PLUMBED.");
-			}
-		}
-#endif
-	}
-
-	/* Wait is over, get the reply data */
-	mp = streams_infop->acs_ac_to_as_req.acr_reply_mp;
-	ASSERT(mp != NULL);
-
-	iocp = (struct iocblk *)mp->b_rptr;
-
-	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_send_as_cmd: db_type=0x%x cmd=0x%x",
-	    mp->b_datap->db_type, iocp->ioc_cmd);
-
-	switch (mp->b_datap->db_type) {
-	case M_CTL:
-		switch (iocp->ioc_cmd) {
-		case USB_AUDIO_SET_FORMAT:
-			/*
-			 * This command sets mixer format data
-			 * and returns alternate setting that matches
-			 */
-			ASSERT(mp->b_cont != NULL);
-			ASSERT(MBLKL(mp->b_cont) == sizeof (int));
-			USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-			    "alternate returned %d",
-			    *((int *)(mp->b_cont->b_rptr)));
-
-			streams_infop->acs_ac_to_as_req.acr_curr_format.
-			    fmt_alt = *((int *)(mp->b_cont->b_rptr));
-
-			/*FALLTHROUGH*/
-		case USB_AUDIO_SET_SAMPLE_FREQ:
-		case USB_AUDIO_SETUP:
-		case USB_AUDIO_START_PLAY:
-		case USB_AUDIO_PAUSE_PLAY:
-		case USB_AUDIO_START_RECORD:
-		case USB_AUDIO_STOP_RECORD:
-		case USB_AUDIO_TEARDOWN:
-			error = USB_SUCCESS;
-			break;
-		default:
-			break;
-		}
-		break;
-	case M_ERROR:
-	default:
-		error = USB_FAILURE;
-	}
-
-	if (mp) {
-		usb_ac_free_mblk(mp);
-		streams_infop->acs_ac_to_as_req.acr_reply_mp = NULL;
-	}
-
-	return (error);
-}
-
-
-/*
- * usb_ac_allocate_req_mblk:
- *	Allocate a message block with the specified M_CTL cmd,
- *	The 2nd mblk contains the data for the command with a length len
- */
-static mblk_t *
-usb_ac_allocate_req_mblk(usb_ac_state_t *uacp, int cmd, void *buf, uint_t len)
-{
-	mblk_t	*mp, *mp2;
-	struct iocblk *mctlmsg;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_allocate_req_mblk: cmd=0x%x, buf=0x%p, len=%d",
-	    cmd, buf, len);
-
-	mp = allocb_wait(sizeof (struct iocblk), BPRI_HI, STR_NOSIG, NULL);
-	mp->b_datap->db_type = M_CTL;
-	mctlmsg = (struct iocblk *)mp->b_datap->db_base;
-	mctlmsg->ioc_cmd = cmd;
-	mctlmsg->ioc_count = len;
-
-	mp->b_wptr = mp->b_wptr + sizeof (struct iocblk);
-
-	if ((len == 0) || (buf == NULL)) {
-
-		return (mp);
-	}
-
-	mp2 = allocb_wait(len, BPRI_HI, STR_NOSIG, NULL);
-	mp->b_cont = mp2;
-	bcopy(buf, mp->b_cont->b_datap->db_base, len);
-	mp->b_cont->b_wptr = mp->b_cont->b_wptr + len;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_allocate_req_mblk: mp=0x%p", (void *)mp);
-
-	return (mp);
-}
-
-
-/*
- * usb_ac_free_mblk:
- *	Free the message block
- */
-static void
-usb_ac_free_mblk(mblk_t *mp)
-{
-	if (mp->b_cont) {
-		freemsg(mp->b_cont);
-		mp->b_cont = NULL;
-	}
-	freemsg(mp);
+	return (USB_SUCCESS);
 }
 
 
@@ -4865,4 +4084,1125 @@ usb_ac_pm_idle_component(usb_ac_state_t *usb_ac_statep)
 			mutex_exit(&usb_ac_statep->usb_ac_mutex);
 		}
 	}
+}
+
+
+/*
+ * handle read from plumbed drivers
+ */
+static void
+usb_ac_reader(void *argp)
+{
+	usb_ac_plumbed_t *acp = (usb_ac_plumbed_t *)argp;
+	usb_ac_state_t *uacp = acp->acp_uacp;
+	ldi_handle_t lh;
+	mblk_t *mp;
+	int rv;
+	timestruc_t tv = {0};
+
+	mutex_enter(&uacp->usb_ac_mutex);
+	lh = acp->acp_lh;
+	tv.tv_sec = usb_ac_wait_hid;
+
+	while (acp->acp_flags & ACP_ENABLED) {
+		mp = NULL;
+
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		rv = ldi_getmsg(lh, &mp, &tv);
+
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		if ((acp->acp_flags & ACP_ENABLED) && mp != NULL && rv == 0)
+			rv = usb_ac_read_msg(acp, mp);
+
+		USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "%s%d read from %s%d, rv=%d",
+		    ddi_driver_name(uacp->usb_ac_dip),
+		    ddi_get_instance(uacp->usb_ac_dip),
+		    ddi_driver_name(acp->acp_dip),
+		    ddi_get_instance(acp->acp_dip), rv);
+	}
+	mutex_exit(&uacp->usb_ac_mutex);
+}
+
+
+/*
+ * setup threads to read from the other usb modules that may send unsolicited
+ * or asynchronous messages, which is only hid currently
+ */
+static int
+usb_ac_plumb(usb_ac_plumbed_t *acp)
+{
+	usb_ac_state_t	*uacp = acp->acp_uacp;
+	dev_info_t	*dip;
+	dev_info_t	*acp_dip;
+	int		acp_inst;
+	char		*acp_name;
+	char		tq_nm[128];
+	int		rv = USB_FAILURE;
+	char		*nm = "usb_ac_plumb";
+
+	mutex_enter(&uacp->usb_ac_mutex);
+
+	dip = uacp->usb_ac_dip;
+
+	acp_dip = acp->acp_dip;
+	acp_inst = ddi_get_instance(acp_dip);
+	acp_name = (char *)ddi_driver_name(acp_dip);
+
+	dinfo("%s: %s on %s%d\n", uacp->dstr, nm, acp_name, acp_inst);
+
+	if (strcmp(acp_name, "hid") != 0) {
+		rv = USB_SUCCESS;
+		goto OUT;
+	}
+
+	(void) snprintf(tq_nm, sizeof (tq_nm), "%s_%d_tq",
+	    ddi_driver_name(acp_dip), acp_inst);
+
+	acp->acp_tqp = ddi_taskq_create(dip, tq_nm, 1, TASKQ_DEFAULTPRI, 0);
+	if (acp->acp_tqp == NULL)
+		goto OUT;
+
+	if (ddi_taskq_dispatch(acp->acp_tqp, usb_ac_reader, (void *)acp,
+	    DDI_SLEEP) != DDI_SUCCESS)
+		goto OUT;
+
+	dinfo("%s: dispatched reader for %s%d\n", uacp->dstr,
+	    acp_name, acp_inst);
+
+	rv = USB_SUCCESS;
+
+OUT:
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	dinfo("%s: %s on %s%d done, rv=%d\n", uacp->dstr, nm,
+	    acp_name, acp_inst, rv);
+
+	return (rv);
+}
+
+
+static void
+usb_ac_mux_plumbing_tq(void *arg)
+{
+	usb_ac_state_t *uacp = (usb_ac_state_t *)arg;
+
+	if (usb_ac_mux_plumbing(uacp) != USB_SUCCESS)
+		dwarn("%s: usb_ac_mux_plumbing failed\n", uacp->dstr);
+}
+
+
+static int
+usb_ac_do_plumbing(usb_ac_state_t *uacp)
+{
+	dev_info_t *dip = uacp->usb_ac_dip;
+	int inst = ddi_get_instance(dip);
+	char tq_nm[128];
+	int rv = USB_FAILURE;
+
+	(void) snprintf(tq_nm, sizeof (tq_nm), "%s_%d_tq",
+	    ddi_driver_name(dip), inst);
+
+	uacp->tqp = ddi_taskq_create(dip, tq_nm, 1, TASKQ_DEFAULTPRI, 0);
+	if (uacp->tqp == NULL) {
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "usb_ac_do_plumbing: ddi_taskq_create failed");
+		goto OUT;
+	}
+
+	if (ddi_taskq_dispatch(uacp->tqp, usb_ac_mux_plumbing_tq, (void *)uacp,
+	    DDI_SLEEP) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "usb_ac_do_plumbing: ddi_taskq_dispatch failed");
+		goto OUT;
+	}
+
+	rv = USB_SUCCESS;
+
+OUT:
+	return (rv);
+}
+
+
+
+static void
+usb_ac_mux_unplumbing_tq(void *arg)
+{
+	usb_ac_state_t *uacp = (usb_ac_state_t *)arg;
+
+	if (usb_ac_mux_unplumbing(uacp) != USB_SUCCESS)
+		dwarn("%s: usb_ac_mux_unplumbing failed\n", uacp->dstr);
+}
+
+
+static int
+usb_ac_do_unplumbing(usb_ac_state_t *uacp)
+{
+	int rv = USB_FAILURE;
+
+	if (uacp->tqp == NULL)
+		return (USB_SUCCESS);
+
+	if (ddi_taskq_dispatch(uacp->tqp, usb_ac_mux_unplumbing_tq,
+	    (void *)uacp, DDI_SLEEP) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "usb_ac_do_unplumbing: ddi_taskq_dispatch failed");
+		goto OUT;
+	}
+
+	dinfo("%s: waiting for unplumb thread\n", uacp->dstr);
+
+	ddi_taskq_wait(uacp->tqp);
+	rv = USB_SUCCESS;
+
+	dinfo("%s: unplumb thread done\n", uacp->dstr);
+
+OUT:
+	if (uacp->tqp != NULL) {
+		ddi_taskq_destroy(uacp->tqp);
+		uacp->tqp = NULL;
+	}
+	return (rv);
+}
+
+
+/*
+ * teardown threads to the other usb modules
+ * and clear structures as part of unplumbing
+ */
+static void
+usb_ac_unplumb(usb_ac_plumbed_t *acp)
+{
+	usb_ac_streams_info_t *streams_infop;
+	usb_ac_state_t	*uacp = acp->acp_uacp;
+	dev_info_t	*acp_dip;
+	int		acp_inst;
+	char		*nm = "usb_ac_unplumb";
+	char		*acp_name;
+
+	acp_dip = acp->acp_dip;
+	acp_inst = ddi_get_instance(acp_dip);
+	acp_name = (char *)ddi_driver_name(acp_dip);
+
+	dinfo("%s: %s on %s%d\n", uacp->dstr, nm, acp_name, acp_inst);
+
+	if (acp->acp_tqp != NULL) {
+		dinfo("%s: %s - destroying taskq for %s%d\n", uacp->dstr, nm,
+		    acp_name, acp_inst);
+
+		ddi_taskq_destroy(acp->acp_tqp);
+	}
+
+	mutex_enter(&uacp->usb_ac_mutex);
+
+	if (acp->acp_driver == USB_AS_PLUMBED) {
+		/*
+		 * we bzero the streams info and plumbed structure
+		 * since there is no guarantee that the next plumbing
+		 * will be identical
+		 */
+		streams_infop = (usb_ac_streams_info_t *)acp->acp_data;
+
+		/* bzero the relevant plumbing structure */
+		bzero(streams_infop, sizeof (usb_ac_streams_info_t));
+	}
+	bzero(acp, sizeof (usb_ac_plumbed_t));
+
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	dinfo("%s: %s on %s done\n", uacp->dstr, nm, acp_name, acp_inst);
+}
+
+
+/*ARGSUSED*/
+static int
+usb_ac_mux_plumbing(usb_ac_state_t *uacp)
+{
+	dev_info_t		*dip;
+	char			*nm = "usb_ac_mux_plumbing";
+
+	/* get the usb_ac dip */
+	dip = uacp->usb_ac_dip;
+
+	/* Access to the global variables is synchronized */
+	mutex_enter(&uacp->usb_ac_mutex);
+
+	dinfo("%s: %s state=%d\n", uacp->dstr, nm,
+	    uacp->usb_ac_plumbing_state);
+
+	if (uacp->usb_ac_plumbing_state >= USB_AC_STATE_PLUMBED) {
+		mutex_exit(&uacp->usb_ac_mutex);
+		dinfo("%s: audio streams driver already plumbed\n",
+		    uacp->dstr);
+
+		return (USB_SUCCESS);
+	}
+
+	/* usb_as and hid should be attached but double check */
+	if (usb_ac_online_siblings(uacp) != USB_SUCCESS) {
+		mutex_exit(&uacp->usb_ac_mutex);
+		dinfo("%s: no audio streams driver plumbed\n", uacp->dstr);
+
+		return (USB_FAILURE);
+	}
+
+	dinfo("%s: (%s) raising power\n", uacp->dstr, nm);
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	/* bring the device to full power */
+	usb_ac_pm_busy_component(uacp);
+	(void) pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
+
+	/* avoid dips disappearing while we are plumbing */
+	usb_ac_hold_siblings(uacp);
+
+	mutex_enter(&uacp->usb_ac_mutex);
+
+	/*
+	 * walk all siblings and create the usb_ac<->usb_as and
+	 * usb_ac<->hid streams. return of 0 indicates no or
+	 * partial/failed plumbing
+	 */
+	if (usb_ac_mux_walk_siblings(uacp) == 0) {
+		/* pretend that we are plumbed so we can unplumb */
+		uacp->usb_ac_plumbing_state = USB_AC_STATE_PLUMBED;
+
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		(void) usb_ac_mux_unplumbing(uacp);
+
+		dinfo("%s: no audio streams driver plumbed\n", uacp->dstr);
+
+		usb_ac_rele_siblings(uacp);
+
+		usb_ac_pm_idle_component(uacp);
+
+		return (USB_FAILURE);
+	}
+	uacp->usb_ac_plumbing_state = USB_AC_STATE_PLUMBED;
+
+	/* restore state if we have already registered with the mixer */
+	if (uacp->usb_ac_registered_with_mixer) {
+		dinfo("%s: already registered with mixer, restoring state\n",
+		    uacp->dstr);
+
+		(void) usb_ac_restore_audio_state(uacp, USB_FLAGS_SLEEP);
+
+	} else if (usb_ac_mixer_registration(uacp) != USB_SUCCESS) {
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		dwarn("%s: mixer registration failed\n", uacp->dstr);
+
+		(void) usb_ac_mux_unplumbing(uacp);
+
+		usb_ac_rele_siblings(uacp);
+
+		usb_ac_pm_idle_component(uacp);
+
+		return (USB_FAILURE);
+	}
+
+	mutex_exit(&uacp->usb_ac_mutex);
+	usb_ac_rele_siblings(uacp);
+
+	usb_ac_pm_idle_component(uacp);
+
+	dinfo("%s: %s done\n", uacp->dstr, nm);
+
+	return (USB_SUCCESS);
+}
+
+
+static int
+usb_ac_mux_unplumbing(usb_ac_state_t *uacp)
+{
+	usb_ac_plumbed_t	*acp;
+	ldi_handle_t		lh;
+	dev_info_t		*acp_dip;
+	int			inst;
+	int			i;
+	dev_t			devt;
+	minor_t			minor;
+	int			maxlinked = 0;
+	char			*nm = "usb_ac_mux_unplumbing";
+
+	mutex_enter(&uacp->usb_ac_mutex);
+
+	dinfo("%s: %s state=%d\n", uacp->dstr, nm, uacp->usb_ac_plumbing_state);
+
+	if (uacp->usb_ac_plumbing_state == USB_AC_STATE_UNPLUMBED) {
+		dinfo("%s: %s - already unplumbed!\n", uacp->dstr, nm);
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		return (USB_SUCCESS);
+	}
+
+	/* usb_ac might not have anything plumbed yet */
+	if (uacp->usb_ac_current_plumbed_index == -1) {
+		dinfo("%s: %s - nothing plumbed!\n", uacp->dstr, nm);
+		uacp->usb_ac_plumbing_state = USB_AC_STATE_UNPLUMBED;
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		return (USB_SUCCESS);
+	}
+
+	/* do not allow detach if still busy */
+	if (uacp->usb_ac_busy_count) {
+		dinfo("%s: %s - mux still busy (%d)\n", uacp->dstr, nm,
+		    uacp->usb_ac_busy_count);
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		return (USB_FAILURE);
+	}
+
+	uacp->usb_ac_plumbing_state = USB_AC_STATE_UNPLUMBED;
+
+	/* close ac-as and ac-hid streams */
+	maxlinked = uacp->usb_ac_current_plumbed_index + 1;
+	dinfo("%s: %s - maxlinked %d\n", uacp->dstr, nm, maxlinked);
+
+	for (i = 0; i < maxlinked; i++) {
+		/*
+		 * we must save members of usb_ac_plumbed[] before calling
+		 * usb_ac_unplumb() because it clears the structure
+		 */
+		acp = &uacp->usb_ac_plumbed[i];
+		lh = acp->acp_lh;
+		acp_dip = acp->acp_dip;
+		devt = acp->acp_devt;
+
+		if (acp_dip == NULL) {
+			dinfo("%s: %s [%d] - skipping\n", uacp->dstr, nm, i);
+			continue;
+		}
+
+		minor = getminor(devt);
+		inst = ddi_get_instance(acp_dip);
+
+		uacp->usb_ac_current_plumbed_index = i;
+
+		dinfo("%s: %s [%d] - %s%d minor 0x%x\n", uacp->dstr, nm, i,
+		    ddi_driver_name(acp_dip), inst, minor);
+
+		if (lh != NULL) {
+			mutex_exit(&uacp->usb_ac_mutex);
+
+			acp->acp_flags &= ~ACP_ENABLED;
+
+			dinfo("%s: %s [%d] - closing\n", uacp->dstr, nm, i);
+
+			/* must close stream first before destroying thread */
+			(void) ldi_close(lh, FREAD|FWRITE, kcred);
+
+			usb_ac_unplumb(acp);
+
+			dinfo("%s: %s [%d] - unplumbed\n", uacp->dstr, nm, i);
+
+			mutex_enter(&uacp->usb_ac_mutex);
+		}
+	}
+
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	/* Wait till all activity in the default pipe has drained */
+	usb_ac_serialize_access(uacp);
+	usb_ac_release_access(uacp);
+
+	mutex_enter(&uacp->usb_ac_mutex);
+	uacp->usb_ac_current_plumbed_index = -1;
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	dinfo("%s: %s done\n", uacp->dstr, nm);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * walk all siblings and create the ac<->as and ac<->hid streams
+ */
+static int
+usb_ac_mux_walk_siblings(usb_ac_state_t *uacp)
+{
+	dev_info_t	*pdip;
+	dev_info_t	*child_dip;
+	major_t		drv_major;
+	minor_t		drv_minor;
+	int		drv_instance;
+	char		*drv_name;
+	dev_t		drv_devt;
+	ldi_handle_t	drv_lh;
+	ldi_ident_t	li;
+	int		error;
+	int		count = 0;
+	char		*nm = "usb_ac_mux_walk_siblings";
+
+	ASSERT(mutex_owned(&uacp->usb_ac_mutex));
+
+	pdip = ddi_get_parent(uacp->usb_ac_dip);
+	child_dip = ddi_get_child(pdip);
+
+	dinfo("%s: %s parent=%s%d\n", uacp->dstr, nm,
+	    ddi_driver_name(pdip), ddi_get_instance(pdip));
+
+	while ((child_dip != NULL) && (count < USB_AC_MAX_PLUMBED)) {
+		drv_instance = ddi_get_instance(child_dip);
+		drv_name = (char *)ddi_driver_name(child_dip);
+
+		dinfo("%s: plumbing %s%d count=%d\n", uacp->dstr,
+		    drv_name, drv_instance, count);
+
+		/* ignore own dip */
+		if (child_dip == uacp->usb_ac_dip) {
+			child_dip = ddi_get_next_sibling(child_dip);
+			continue;
+		}
+		drv_instance = ddi_get_instance(child_dip);
+
+		/* ignore other dip other than usb_as and hid */
+		if (strcmp(ddi_driver_name(child_dip), "usb_as") == 0) {
+			uacp->usb_ac_plumbed[count].acp_driver = USB_AS_PLUMBED;
+			drv_minor = USB_AS_CONSTRUCT_MINOR(drv_instance);
+		} else if (strcmp(ddi_driver_name(child_dip), "hid") == 0) {
+			uacp->usb_ac_plumbed[count].acp_driver = USB_AH_PLUMBED;
+			drv_minor = HID_CONSTRUCT_EXTERNAL_MINOR(drv_instance);
+		} else {
+			drv_minor = drv_instance;
+			uacp->usb_ac_plumbed[count].acp_driver =
+			    UNKNOWN_PLUMBED;
+			child_dip = ddi_get_next_sibling(child_dip);
+
+			continue;
+		}
+
+		if (!i_ddi_devi_attached(child_dip)) {
+			child_dip = ddi_get_next_sibling(child_dip);
+
+			continue;
+		}
+
+		if (DEVI_IS_DEVICE_REMOVED(child_dip)) {
+			child_dip = ddi_get_next_sibling(child_dip);
+
+			continue;
+		}
+
+		drv_major = ddi_driver_major(child_dip);
+
+		uacp->usb_ac_current_plumbed_index = count;
+
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		drv_devt = makedevice(drv_major, drv_minor);
+
+		dinfo("%s: opening %s%d devt=(%d, 0x%x)\n", uacp->dstr,
+		    drv_name, drv_instance, drv_major, drv_minor);
+
+		error = ldi_ident_from_dip(uacp->usb_ac_dip, &li);
+		if (error == 0) {
+			uacp->usb_ac_plumbed[count].acp_flags |= ACP_ENABLED;
+
+			error = ldi_open_by_dev(&drv_devt, OTYP_CHR,
+			    FREAD|FWRITE, kcred, &drv_lh, li);
+			ldi_ident_release(li);
+		}
+
+		mutex_enter(&uacp->usb_ac_mutex);
+		if (error) {
+			dinfo("%s: open of devt=(%d, 0x%x) failed error=%d\n",
+			    uacp->dstr, drv_major, drv_minor, error);
+
+			return (0);
+		}
+
+		uacp->usb_ac_plumbed[count].acp_uacp = uacp;
+		uacp->usb_ac_plumbed[count].acp_devt = drv_devt;
+		uacp->usb_ac_plumbed[count].acp_lh = drv_lh;
+		uacp->usb_ac_plumbed[count].acp_dip = child_dip;
+		uacp->usb_ac_plumbed[count].acp_ifno =
+		    usb_get_if_number(child_dip);
+
+		if (uacp->usb_ac_plumbed[count].acp_driver == USB_AS_PLUMBED) {
+			/* get registration data */
+			if (usb_ac_get_reg_data(uacp, drv_lh, count) !=
+			    USB_SUCCESS) {
+
+				dinfo("%s: usb_ac_get_reg_data failed on "
+				    "%s%d\n", uacp->dstr,
+				    drv_name, drv_instance);
+
+				uacp->usb_ac_plumbed[count].acp_dip = NULL;
+
+				return (0);
+			}
+		} else if (uacp->usb_ac_plumbed[count].acp_driver ==
+		    USB_AH_PLUMBED) {
+			int rval;
+
+			dinfo("%s: pushing usb_ah on %s%d\n", uacp->dstr,
+			    drv_name, drv_instance);
+
+			mutex_exit(&uacp->usb_ac_mutex);
+
+			/* push usb_ah module on top of hid */
+			error = ldi_ioctl(drv_lh, I_PUSH, (intptr_t)"usb_ah",
+			    FKIOCTL, kcred, &rval);
+			mutex_enter(&uacp->usb_ac_mutex);
+
+			if (error) {
+				dinfo("%s: ldi_ioctl I_PUSH failed on "
+				    "%s%d, error=%d\n", uacp->dstr,
+				    drv_name, drv_instance, error);
+
+				uacp->usb_ac_plumbed[count].acp_dip = NULL;
+
+				/* skip plumbing the hid driver */
+				child_dip = ddi_get_next_sibling(child_dip);
+				continue;
+			}
+		} else {
+			/* should not be here */
+			dinfo("%s: %s - unknown module %s%d\n",
+			    uacp->dstr, nm, drv_name, drv_instance);
+			count--;
+
+			uacp->usb_ac_plumbed[count].acp_dip = NULL;
+
+			/* skip plumbing an unknown module */
+			child_dip = ddi_get_next_sibling(child_dip);
+			continue;
+		}
+
+		mutex_exit(&uacp->usb_ac_mutex);
+		error = usb_ac_plumb(&uacp->usb_ac_plumbed[count]);
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		if (error != USB_SUCCESS) {
+			dinfo("%s: %s - usb_ac_plumb failed for %s%d\n",
+			    uacp->dstr, nm, drv_name, drv_instance);
+
+			return (0);
+		}
+
+		dinfo("%s: plumbed %s%d, minor 0x%x\n", uacp->dstr,
+		    drv_name, drv_instance, drv_minor);
+
+		child_dip = ddi_get_next_sibling(child_dip);
+		count++;
+	}
+
+	dinfo("%s: %s - %d drivers plumbed under usb_ac mux", uacp->dstr, nm,
+	    count);
+
+	return (count);
+}
+
+
+/*
+ * usb_ac_find_default_port:
+ */
+static int
+usb_ac_find_default_port(uint_t port)
+{
+	int i;
+
+	for (i = 0; i < 32; i++) {
+		if (port & (1 << i)) {
+
+			return (1 << i);
+		}
+	}
+
+	return (0);
+}
+
+
+/*
+ * Register with mixer only after first plumbing.
+ * Also do not register if earlier reg data
+ * couldn't be received from at least one
+ * streaming interface
+ */
+_NOTE(SCHEME_PROTECTS_DATA("private", am_ad_info))
+
+static int
+usb_ac_mixer_registration(usb_ac_state_t *uacp)
+{
+	am_ad_info_t	*info	= &uacp->usb_ac_am_ad_info;
+	audio_info_t	*dflts	= &uacp->usb_ac_am_ad_defaults;
+	usb_as_registration_t *asreg;
+	int		n, nplay, nrec;
+	char		*nm = "usb_ac_mixer_registration";
+
+	ASSERT(uacp != NULL);
+
+	dinfo("%s: %s infp=0x%p, dflts=0x%p, already registered=%d\n",
+	    uacp->dstr, nm, (void *)info, (void *)dflts,
+	    uacp->usb_ac_registered_with_mixer);
+
+	ASSERT(dflts != NULL);
+	ASSERT(info != NULL);
+
+	if (uacp->usb_ac_registered_with_mixer) {
+		return (USB_SUCCESS);
+	}
+
+	for (n = 0; n < USB_AC_MAX_AS_PLUMBED; n++) {
+		if (uacp->usb_ac_streams[n].acs_rcvd_reg_data) {
+			break;
+		}
+	}
+
+	/* Haven't found a streaming interface; fail mixer registration */
+	if (n > USB_AC_MAX_AS_PLUMBED) {
+		dinfo("%s: %s - no streaming interface found\n",
+		    uacp->dstr, nm);
+
+		return (USB_FAILURE);
+	}
+
+	info->ad_defaults	= dflts;
+
+	dflts->monitor_gain	= 0;
+	dflts->output_muted	= B_FALSE;
+	dflts->hw_features	= 0;
+	dflts->sw_features	= AUDIO_SWFEATURE_MIXER;
+
+	/*
+	 * Fill out streaming interface specific stuff
+	 * Note that we handle only one playing and one recording
+	 * streaming interface at the most
+	 */
+	nplay = nrec = 0;
+	for (n = 0; n < USB_AC_MAX_AS_PLUMBED; n++) {
+		int ch, chs, default_gain, id;
+
+		if (uacp->usb_ac_streams[n].acs_rcvd_reg_data == 0) {
+			continue;
+		}
+
+		asreg = uacp->usb_ac_streams[n].acs_streams_reg;
+		if (asreg->reg_valid == 0) {
+			continue;
+		}
+
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		dinfo("%s: %s [%d] - setting format on %s%d\n",
+		    uacp->dstr, nm, n,
+		    uacp->usb_ac_streams[n].acs_plumbed->acp_dip);
+
+		/* set first format so get_featureID can be succeed */
+		(void) usb_ac_set_format(uacp->usb_ac_audiohdl,
+		    asreg->reg_mode,
+		    asreg->reg_srs[0],
+		    asreg->reg_formats[0].fmt_chns,
+		    asreg->reg_formats[0].fmt_precision,
+		    asreg->reg_formats[0].fmt_encoding);
+
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		chs = asreg->reg_formats[0].fmt_chns;
+
+		/* check if any channel supports vol. control for this fmt */
+		for (ch = 0; ch <= chs; ch++) {
+			if ((id = usb_ac_get_featureID(uacp,
+			    asreg->reg_mode, ch,
+			    USB_AUDIO_VOLUME_CONTROL)) != -1) {
+				ddtl("%s: %s [%d] - dir=%d featureID=%d\n",
+				    uacp->dstr, nm, n, asreg->reg_mode, id);
+
+				break;
+			}
+		}
+		default_gain = (id == USB_AC_ID_NONE) ?
+		    AUDIO_MAX_GAIN : (AUDIO_MAX_GAIN/2);
+
+		ddtl("%s: %s [%d] - mode=%d chs=%d default_gain=%d id=%d\n",
+		    uacp->dstr, nm, n, asreg->reg_mode, chs, default_gain, id);
+
+		if (asreg->reg_mode == AUDIO_PLAY) {
+			nplay++;
+			ASSERT(nplay == 1);
+
+			dflts->play.sample_rate =
+			    asreg->reg_srs[0];
+			dflts->play.channels	=
+			    asreg->reg_formats[0].fmt_chns;
+			dflts->play.precision	=
+			    asreg->reg_formats[0].fmt_precision;
+			dflts->play.encoding	=
+			    asreg->reg_formats[0].fmt_encoding;
+			dflts->play.gain	= default_gain;
+			dflts->play.port	= usb_ac_find_default_port(
+			    uacp->usb_ac_output_ports);
+			dflts->play.avail_ports = uacp->usb_ac_output_ports;
+			dflts->play.mod_ports	= 0;
+						/* no support for mixer unit */
+			dflts->play.buffer_size = 8*1024;
+			dflts->hw_features	|= AUDIO_HWFEATURE_PLAY;
+
+			info->ad_play.ad_mixer_srs.ad_srs = asreg->reg_srs;
+
+			info->ad_play.ad_chs		= asreg->reg_channels;
+			info->ad_play.ad_int_rate	= 1000; /* every 1 ms */
+			info->ad_play.ad_bsize		= 8 * 1024;
+			info->ad_play_comb	= asreg->reg_combinations;
+		} else {
+			nrec++;
+			ASSERT(nrec == 1);
+
+			dflts->record.sample_rate =
+			    asreg->reg_srs[0];
+			dflts->record.channels	=
+			    asreg->reg_formats[0].fmt_chns;
+			dflts->record.precision =
+			    asreg->reg_formats[0].fmt_precision;
+			dflts->record.encoding	=
+			    asreg->reg_formats[0].fmt_encoding;
+			dflts->record.gain	= default_gain;
+			dflts->record.port	= usb_ac_find_default_port(
+			    uacp->usb_ac_input_ports);
+			dflts->record.avail_ports = uacp->usb_ac_input_ports;
+			dflts->record.mod_ports = uacp->usb_ac_input_ports;
+			dflts->record.buffer_size = 8*1024;
+			dflts->hw_features	|= AUDIO_HWFEATURE_RECORD;
+
+			info->ad_record.ad_mixer_srs.ad_srs = asreg->reg_srs;
+
+			info->ad_record.ad_chs		= asreg->reg_channels;
+			info->ad_record.ad_int_rate	= 1000; /* every 1 ms */
+			info->ad_record.ad_bsize	= 8 * 1024;
+			info->ad_num_mics		= 1;
+			info->ad_rec_comb	= asreg->reg_combinations;
+		}
+	}
+
+	if (nplay && nrec) {
+		dflts->hw_features	|= AUDIO_HWFEATURE_DUPLEX;
+	}
+
+	/* the rest */
+	info->ad_entry		= &usb_ac_entry;
+	info->ad_dev_info	= &usb_dev_info;
+
+	dinfo("%s: %s - calling am_attach\n", uacp->dstr, nm);
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	if (am_attach(uacp->usb_ac_audiohdl, DDI_ATTACH, info) ==
+	    AUDIO_FAILURE) {
+		dinfo("%s: %s - am_attach failed\n", uacp->dstr, nm);
+
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		return (USB_FAILURE);
+	}
+
+	mutex_enter(&uacp->usb_ac_mutex);
+
+	uacp->usb_ac_registered_with_mixer = 1;
+
+	dinfo("%s: %s - am_attach succeeded\n", uacp->dstr, nm);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * get registration data from usb_as driver unless we already
+ * have 2 registrations
+ */
+static int
+usb_ac_get_reg_data(usb_ac_state_t *uacp, ldi_handle_t drv_lh, int index)
+{
+	int n, error, rval;
+	usb_as_registration_t *streams_reg;
+	char *nm = "usb_ac_get_reg_data";
+
+	dinfo("%s: %s index=%d, mixer registered=%d\n", uacp->dstr, nm, index,
+	    uacp->usb_ac_registered_with_mixer);
+
+	/* if already registered, just setup data structures again */
+	if (uacp->usb_ac_registered_with_mixer) {
+
+		return (usb_ac_setup_plumbed(uacp, index, -1, -1));
+	}
+
+	for (n = 0; n < USB_AC_MAX_AS_PLUMBED; n ++) {
+		/*
+		 * We haven't received registration data
+		 * from n-th streaming interface in the array
+		 */
+		if (!uacp->usb_ac_streams[n].acs_rcvd_reg_data) {
+			break;
+		}
+	}
+
+	if (n >= USB_AC_MAX_AS_PLUMBED) {
+		dwarn("%s: More than 2 streaming interfaces (play "
+		    "and/or record) currently not supported\n", uacp->dstr);
+
+		return (USB_FAILURE);
+	}
+
+	/* take the stream reg struct with the same index */
+	streams_reg = &uacp->usb_ac_streams_reg[n];
+
+	dinfo("%s: regdata from usb_as: streams_reg=0x%p, n=%d\n", uacp->dstr,
+	    (void *)streams_reg, n);
+
+	mutex_exit(&uacp->usb_ac_mutex);
+
+	if ((error = ldi_ioctl(drv_lh, USB_AUDIO_MIXER_REGISTRATION,
+	    (intptr_t)streams_reg, FKIOCTL, kcred, &rval)) != 0) {
+		dinfo("%s: %s - ldi_ioctl failed for mixer registration, "
+		    "error=%d", uacp->dstr, nm, error);
+
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		return (USB_FAILURE);
+	} else {
+		mutex_enter(&uacp->usb_ac_mutex);
+
+		rval = usb_ac_setup_plumbed(uacp, index, n, n);
+
+		dinfo("%s: %s - usb_ac_streams[%d]: "
+		    "received_reg_data=%d type=%s", uacp->dstr, nm, index,
+		    uacp->usb_ac_streams[n].acs_rcvd_reg_data,
+		    ((streams_reg->reg_mode == AUDIO_PLAY) ?
+		    "play" : "record"));
+
+		usb_ac_print_reg_data(uacp, streams_reg);
+
+		return (rval);
+	}
+}
+
+
+/*
+ * setup plumbed and stream info structure, either initially or
+ * after replumbing
+ * On replumbing, str_idx and reg_idx are -1
+ */
+static int
+usb_ac_setup_plumbed(usb_ac_state_t *uacp, int plb_idx, int str_idx,
+    int reg_idx)
+{
+	int i;
+	char *nm = "usb_ac_setup_plumbed";
+
+	dinfo("%s: %s plb_idx=%d str_idx=%d\n", uacp->dstr, nm,
+	    plb_idx, str_idx);
+
+	if (str_idx == -1) {
+		/* find a free streams info structure */
+		for (i = 0; i < USB_AC_MAX_AS_PLUMBED; i++) {
+			if (uacp->usb_ac_streams[i].acs_plumbed == NULL) {
+				break;
+			}
+		}
+		ASSERT(i < USB_AC_MAX_AS_PLUMBED);
+		str_idx = i;
+	}
+
+	uacp->usb_ac_plumbed[plb_idx].acp_data =
+	    &uacp->usb_ac_streams[str_idx];
+	uacp->usb_ac_streams[str_idx].acs_plumbed =
+	    &uacp->usb_ac_plumbed[plb_idx];
+	uacp->usb_ac_streams[str_idx].acs_rcvd_reg_data = 1;
+
+	if (reg_idx == -1) {
+		/*
+		 * find the corresponding registration structure, match
+		 * on interface number and not on dip since dip may have
+		 * changed
+		 */
+		for (i = 0; i < USB_AC_MAX_AS_PLUMBED; i++) {
+			if (uacp->usb_ac_streams_reg[i].reg_ifno ==
+			    uacp->usb_ac_plumbed[plb_idx].acp_ifno) {
+				break;
+			}
+		}
+		if (i == USB_AC_MAX_AS_PLUMBED) {
+			dinfo("%s: %s - no corresponding registration "
+			    "structure\n", uacp->dstr, nm);
+
+			return (USB_FAILURE);
+		}
+		reg_idx = i;
+	}
+	uacp-> usb_ac_streams[str_idx].acs_streams_reg =
+	    &uacp->usb_ac_streams_reg[reg_idx];
+
+	dinfo("%s: %s done - plb_idx=%d str_idx=%d reg_idx=%d", uacp->dstr, nm,
+	    plb_idx, str_idx, reg_idx);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * function to dump registration data
+ */
+static void
+usb_ac_print_reg_data(usb_ac_state_t *uacp,
+    usb_as_registration_t *reg)
+{
+	int n;
+
+	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+	    "usb_ac_print_reg_data: Begin valid=%d, play=%d, "
+	    "n_formats=%d, compat srs ptr=0x%p",
+	    reg->reg_valid, reg->reg_mode, reg->reg_n_formats,
+	    (void *)&reg->reg_srs);
+
+	for (n = 0; n < reg->reg_n_formats; n++) {
+		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "format%d: alt=%d chns=%d prec=%d enc=%d", n,
+		    reg->reg_formats[n].fmt_alt,
+		    reg->reg_formats[n].fmt_chns,
+		    reg->reg_formats[n].fmt_precision,
+		    reg->reg_formats[n].fmt_encoding);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+	    "combinations: %d %d %d %d %d %d %d %d",
+	    reg->reg_combinations[0].ad_prec, reg->reg_combinations[0].ad_enc,
+	    reg->reg_combinations[1].ad_prec, reg->reg_combinations[1].ad_enc,
+	    reg->reg_combinations[2].ad_prec, reg->reg_combinations[2].ad_enc,
+	    reg->reg_combinations[3].ad_prec, reg->reg_combinations[3].ad_enc);
+
+
+	for (n = 0; n < USB_AS_N_FORMATS; n++) {
+		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "reg_formats[%d] ptr=0x%p", n,
+		    (void *)&reg->reg_formats[n]);
+	}
+
+	for (n = 0; n < USB_AS_N_CHANNELS; n++) {
+		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "reg_channels[%d]=%d", n, reg->reg_channels[n]);
+	}
+
+	for (n = 0; n < USB_AS_N_COMBINATIONS; n++) {
+		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		    "reg_combinations[%d] ptr=0x%p", n,
+		    (void *)&reg->reg_combinations[n]);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+	    "usb_ac_print_reg_data: End");
+}
+
+
+static int
+usb_ac_online_siblings(usb_ac_state_t *uacp)
+{
+	dev_info_t	*pdip, *child_dip;
+	int		rval = USB_SUCCESS;
+	char		*nm = "usb_ac_online_siblings";
+
+	ASSERT(mutex_owned(&uacp->usb_ac_mutex));
+
+	dinfo("%s: %s\n", uacp->dstr, nm);
+
+	pdip = ddi_get_parent(uacp->usb_ac_dip);
+
+	child_dip = ddi_get_child(pdip);
+	while (child_dip != NULL) {
+
+		dinfo("%s: onlining %s%d ref=%d\n", uacp->dstr,
+		    ddi_driver_name(child_dip),
+		    ddi_get_instance(child_dip),
+		    DEVI(child_dip)->devi_ref);
+
+		/* Online the child_dip of usb_as and hid,  if not already */
+		if ((strcmp(ddi_driver_name(child_dip), "usb_as") == 0) ||
+		    (strcmp(ddi_driver_name(child_dip), "hid") == 0)) {
+
+			mutex_exit(&uacp->usb_ac_mutex);
+			if (ndi_devi_online(child_dip, NDI_ONLINE_ATTACH) !=
+			    NDI_SUCCESS) {
+				dinfo("%s: failed to online device %s%d\n",
+				    uacp->dstr,
+				    ddi_driver_name(child_dip),
+				    ddi_get_instance(child_dip));
+
+				/* only onlining usb_as is fatal */
+				if (strcmp(ddi_driver_name(child_dip),
+				    "usb_as") == 0) {
+					mutex_enter(&uacp->usb_ac_mutex);
+					rval = USB_FAILURE;
+					break;
+				}
+			}
+			mutex_enter(&uacp->usb_ac_mutex);
+		}
+		child_dip = ddi_get_next_sibling(child_dip);
+	}
+
+	return (rval);
+}
+
+
+/*
+ * hold all audio children before or after plumbing
+ * online usb_as and hid, if not already
+ */
+static void
+usb_ac_hold_siblings(usb_ac_state_t *uacp)
+{
+	int		circ;
+	dev_info_t	*pdip, *child_dip;
+	char		*nm = "usb_ac_hold_siblings";
+
+	dinfo("%s: %s\n", uacp->dstr, nm);
+
+	/* hold all siblings and ourselves */
+	pdip = ddi_get_parent(uacp->usb_ac_dip);
+
+	/* hold the children */
+	ndi_devi_enter(pdip, &circ);
+	child_dip = ddi_get_child(pdip);
+	while (child_dip != NULL) {
+		ndi_hold_devi(child_dip);
+
+		dinfo("%s: held %s%d ref=%d\n", uacp->dstr,
+		    ddi_driver_name(child_dip), ddi_get_instance(child_dip),
+		    DEVI(child_dip)->devi_ref);
+
+		child_dip = ddi_get_next_sibling(child_dip);
+	}
+	ndi_devi_exit(pdip, circ);
+}
+
+
+/*
+ * release all audio children before or after plumbing
+ */
+static void
+usb_ac_rele_siblings(usb_ac_state_t *uacp)
+{
+	int		circ;
+	dev_info_t	*pdip, *child_dip;
+	char		*nm = "usb_ac_rele_siblings";
+
+	dinfo("%s: %s\n", uacp->dstr, nm);
+
+	/* release all siblings and ourselves */
+	pdip = ddi_get_parent(uacp->usb_ac_dip);
+	ndi_devi_enter(pdip, &circ);
+	child_dip = ddi_get_child(pdip);
+	while (child_dip != NULL) {
+		ndi_rele_devi(child_dip);
+
+		dinfo("%s: released %s%d ref=%d\n", uacp->dstr,
+		    ddi_driver_name(child_dip), ddi_get_instance(child_dip),
+		    DEVI(child_dip)->devi_ref);
+
+		child_dip = ddi_get_next_sibling(child_dip);
+	}
+	ndi_devi_exit(pdip, circ);
 }

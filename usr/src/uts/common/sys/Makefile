@@ -43,9 +43,6 @@ i386_HDRS=			\
 	agp/agptarget_io.h	\
 	agpgart.h		\
 	asy.h			\
-	audio/audio810.h	\
-	audio/audiohd.h	\
-	audio/audioixp.h	\
 	fd_debug.h		\
 	fdc.h			\
 	fdmedia.h		\
@@ -55,8 +52,6 @@ i386_HDRS=			\
 	ucode.h
 
 sparc_HDRS= 			\
-	audio/audiots.h		\
-	audio/am_src2.h		\
 	mouse.h			\
 	scsi/targets/ssddef.h	\
 	$(MDESCHDRS)
@@ -85,7 +80,6 @@ CHKHDRS=			\
 	attr.h			\
 	audio.h			\
 	audioio.h		\
-	audiovar.h		\
 	autoconf.h		\
 	auxv.h			\
 	auxv_386.h		\
@@ -505,6 +499,7 @@ CHKHDRS=			\
 	socketvar.h		\
 	sockio.h		\
 	sodirect.h		\
+	soundcard.h		\
 	squeue.h		\
 	squeue_impl.h		\
 	srn.h			\
@@ -653,12 +648,9 @@ HDRS=				\
 
 AUDIOHDRS=			\
 	ac97.h			\
-	am_src1.h		\
-	audio_apm.h		\
-	audio_mixer.h		\
-	audio_src.h		\
-	audio_support.h		\
-	audio_trace.h		\
+	audio_common.h		\
+	audio_driver.h		\
+	audio_oss.h		\
 	g711.h
 
 AVHDRS=				\

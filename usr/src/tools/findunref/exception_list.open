@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -115,11 +115,6 @@
 ./src/*.out
 # ISUSED - let checkpaths know that the next entry is good.
 ./src/*.ref
-
-#
-# Ignore warlock-related goop; not used during a nightly.
-#
-./src/uts/sparc/amsrc*/main.c
 
 #
 # Ignore internal test directories and test programs.
@@ -250,7 +245,6 @@
 ./src/uts/sparc/si3124/Makefile
 ./src/uts/sparc/nv_sata/Makefile
 ./src/uts/sparc/ahci/Makefile
-./src/uts/sparc/audioixp/Makefile
 
 #
 # Ignore uttrack.c.  It is provided as part of the standard

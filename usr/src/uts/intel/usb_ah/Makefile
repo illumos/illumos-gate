@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/usb_ah/Makefile
@@ -66,7 +66,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 #
 # depends on misc/usba
 #
-LDFLAGS += -dy -Nmisc/usba -Nhidparser -Nmisc/audiosup -Nmisc/mixer
+LDFLAGS += -dy -Nmisc/usba -Nhidparser -Ndrv/usb_ac
 
 #
 # For now, disable these lint checks; maintainers should endeavor

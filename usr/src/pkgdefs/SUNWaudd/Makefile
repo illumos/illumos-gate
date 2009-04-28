@@ -19,16 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
 
+TMPLFILES += postinstall preremove
 DATAFILES += depend
-LICENSEFILES += $(OSBL)
 
 .KEEP_STATE:
 
@@ -36,3 +34,4 @@ all: $(FILES)
 install: all pkg
 
 include ../Makefile.targ
+include ../Makefile.prtarg

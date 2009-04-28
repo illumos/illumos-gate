@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,8 @@ extern "C" {
 #include <sys/sunldi.h>
 #include <sys/usb/usba/usbai_private.h>
 
-/* driver specific macros */
-#define	USB_AC_HIWATER		(AM_MAX_QUEUED_MSGS_SIZE)
-#define	USB_AC_LOWATER		(32*1024)
+int usb_ac_open(dev_info_t *);
+void usb_ac_close(dev_info_t *);
 
 
 /* structure for each unit described by descriptors */
@@ -57,12 +56,17 @@ typedef struct usb_ac_unit_list {
  * plumbing data; info per plumbed module
  */
 typedef struct usb_ac_plumbed {
+	struct usb_ac_state *acp_uacp;	/* usb_ac state pointer */
 	dev_info_t	*acp_dip;	/* devinfo pointer */
 	uint_t		acp_ifno;	/* interface number */
-	int		acp_linkid;	/* link ID for plumbing */
 	int		acp_driver;	/* Plumbed driver, see value below */
-	queue_t		*acp_lrq;	/* lower read queue */
-	queue_t		*acp_lwq;	/* lower write queue */
+
+	ldi_handle_t	acp_lh;		/* ldi handle of plumbed driver */
+	dev_t		acp_devt;	/* devt of plumbed driver */
+	ddi_taskq_t	*acp_tqp;	/* taskq for I/O to plumbed driver */
+	int		acp_flags;
+#define	ACP_ENABLED	1
+
 	void		*acp_data;	/* ptr to streams or hid data */
 } usb_ac_plumbed_t;
 
@@ -72,9 +76,6 @@ typedef struct usb_ac_plumbed {
  * only one active at a time.
  */
 typedef struct usb_ac_to_as_req {
-	int		acr_wait_flag;	/* an mblk sent wait on this flag */
-	kcondvar_t	acr_cv;		/* an mblk sent; wait on this cv */
-	mblk_t		*acr_reply_mp;	/* response to current request */
 	usb_audio_formats_t acr_curr_format; /* format data from mixer */
 	int		acr_curr_dir;
 } usb_ac_to_as_req_t;
@@ -164,11 +165,6 @@ typedef struct usb_ac_state {
 	/* pipe handle */
 	usb_pipe_handle_t	usb_ac_default_ph;
 
-	/* streams management */
-	queue_t			*usb_ac_rq;		/* read q ptr */
-	queue_t			*usb_ac_wq;		/* write q ptr */
-	dev_t			usb_ac_dev;	/* dev_t of plumbing open */
-
 	/* serial access */
 	usb_serialization_t	usb_ac_ser_acc;
 
@@ -176,13 +172,10 @@ typedef struct usb_ac_state {
 	usb_ac_power_t		*usb_ac_pm; /* power capabilities */
 
 	/* mixer registration data */
-	uint_t			usb_ac_mixer_mode_enable;
 	uint_t			usb_ac_registered_with_mixer;
 
 	/* plumbing management */
-	int			usb_ac_mux_minor;
 	uint_t			usb_ac_plumbing_state;
-	ldi_handle_t		usb_ac_mux_lh;
 	ushort_t		usb_ac_busy_count;
 	usb_ac_plumbed_t	usb_ac_plumbed[USB_AC_MAX_PLUMBED];
 
@@ -197,25 +190,11 @@ typedef struct usb_ac_state {
 	 * copy registration data
 	 */
 	usb_as_registration_t	usb_ac_streams_reg[USB_AC_MAX_AS_PLUMBED];
-} usb_ac_state_t;
 
-typedef struct usb_ac_state_space {
-	void			*sp;	/* soft state for the instance */
-				/* ptr to usb_ac_restore_audio_state */
-	int			(*restore_func)
-					(usb_ac_state_t *, int);
-				/* ptr to usb_ac_get_featureID */
-	uint_t			(* get_featureID_func)
-					(usb_ac_state_t *, uchar_t,
-					uint_t, uint_t);
-				/* ptr to the usb_ac entry points */
-	am_ad_entry_t		*ac_entryp;
-				/* ptr to pm_busy/idle calls */
-	void			(*pm_busy_component)
-					(usb_ac_state_t *);
-	void			(*pm_idle_component)
-					(usb_ac_state_t *);
-} usb_ac_state_space_t;
+	ddi_taskq_t		*tqp;
+
+	char			dstr[64];
+} usb_ac_state_t;
 
 /* warlock directives, stable data */
 _NOTE(MUTEX_PROTECTS_DATA(usb_ac_state_t::usb_ac_mutex, usb_ac_state_t))

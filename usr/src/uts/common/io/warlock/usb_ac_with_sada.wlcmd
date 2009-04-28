@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # warlock command file
 
@@ -86,8 +85,6 @@ root	am_single_open_task
 root	am_hw_task
 
 ### specify the usb_ac root functions
-root 	usb_ac_dacf.c:usb_ac_mux_plumbing
-root 	usb_ac_dacf.c:usb_ac_mux_unplumbing
 root 	usb_ac_open
 root 	usb_ac_close
 root 	usb_ac_disconnect_event_cb

@@ -23,27 +23,25 @@
  * Use is subject to license terms.
  */
 
-
 /*
- * Audio Streams Driver: This driver is responsible for
- * (1) Processing audio data messages during play and record and
- * management of isoc pipe, (2) Selecting correct alternate that matches
- * a set of parameters and management of control pipe. This streams driver
- * is pushed under usb_ac and interacts with usb_ac using streams messages.
- * When a streams message has been received from usb_ac, it is immediately
- * put on WQ. The write side service routine loops thru all the queued
- * messages, processes them and sends up a reply. If the processing involves
- * an async USBA command, the reqly is sent up after completion of the
- * command.
+ * Audio Streams Interface Driver:
+ * This driver is derived from the legacy SADA streams-based usb_as driver
+ * and serves as an intermediate measure before the full conversion to the
+ * to the Boomer framework in a follow-on phase of the Boomer project, which
+ * will utilize more comprehensive USB audio features as well.
  *
- * Note: (1) All streams messages from usb_ac are M_CTL messages.
- * (2) When there is a play/record, usb_as calls mixer routines directly for
- * data (play) or sends data to mixer (record).
+ * usb_as is responsible for (1) Processing audio data messages during
+ * play and record and management of isoc pipe, (2) Selecting correct
+ * alternate that matches a set of parameters and management of control pipe.
+ * This driver is opened by usb_ac and interacts with usb_ac synchronously
+ * using ioctls. If the processing involves an async USBA command, the ioctl
+ * returns after completion of the command.
  *
- * Serialization: usb_as being a streams driver and having the requirement
- * making non-blockings calls (USBA or streams or mixer) needs to drop
- * mutexes over such calls.  But at the same time, a competing thread
- * can't be allowed to interfere with (1) pipe, (2) streams state.
+ * Note: When there is a play/record, usb_as calls framework routines
+ * directly for data (play) or sends data to mixer (record).
+ *
+ * Serialization: A competing thread can't be allowed to interfere with
+ * (1) pipe, (2) streams state.
  * So we need some kind of serialization among the asynchronous
  * threads that can run in the driver. The serialization is mostly
  * needed to avoid races among open/close/events/power entry points
@@ -54,33 +52,22 @@
  *
  * PM Model in usb_as: Raise power during attach and lower power in detach.
  * If device is not fully powered, synchronous raise power in wsrv entry points.
- *
- * locking: Warlock is not aware of the automatic locking mechanisms for
- * streams drivers. This driver is single threaded per queue instance.
- *
- * TODO:
- *	- mdb dcmds
- *	- dump
- *	- kstat
  */
 #include <sys/usb/usba/usbai_version.h>
 #include <sys/usb/usba.h>
-#include <sys/stropts.h>
-#include <sys/strsun.h>
-#include <sys/strsubr.h>
-#include <sys/strsun.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 #include <sys/audio.h>
-#include <sys/audiovar.h>
 #include <sys/audio/audio_support.h>
-#include <sys/audio/audio_src.h>
 #include <sys/mixer.h>
 #include <sys/audio/audio_mixer.h>
-#include <sys/audio/am_src2.h>
 
 #include <sys/usb/clients/audio/usb_audio.h>
 #include <sys/usb/clients/audio/usb_mixer.h>
 #include <sys/usb/clients/audio/usb_as/usb_as.h>
+
+#include "../usb_ac/audio_shim.h"
 
 /* debug support */
 uint_t	usb_as_errlevel	= USB_LOG_L4;
@@ -95,12 +82,9 @@ static int	usb_as_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	usb_as_power(dev_info_t *, int, int);
 static int	usb_as_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 
-/*
- * STREAMS module entry points
- */
-static int usb_as_open();
-static int usb_as_close();
-static int usb_as_wsrv();
+static int usb_as_open(dev_t *, int, int, cred_t *);
+static int usb_as_close(dev_t, int, int, cred_t *);
+
 
 /* support functions */
 static void	usb_as_cleanup(dev_info_t *, usb_as_state_t *);
@@ -118,11 +102,7 @@ static int	usb_as_reconnect_event_cb(dev_info_t *);
 static int	usb_as_cpr_suspend(dev_info_t *);
 static void	usb_as_cpr_resume(dev_info_t *);
 
-static int	usb_as_ioctl(queue_t *, mblk_t *);
-static int	usb_as_mctl_rcv(queue_t *, mblk_t *);
-
-static void	usb_as_default_xfer_cb(usb_pipe_handle_t, usb_ctrl_req_t *);
-static void	usb_as_default_xfer_exc_cb(usb_pipe_handle_t, usb_ctrl_req_t *);
+static int	usb_as_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 static int	usb_as_pwrlvl0(usb_as_state_t *);
 static int	usb_as_pwrlvl1(usb_as_state_t *);
@@ -132,80 +112,32 @@ static void	usb_as_pm_busy_component(usb_as_state_t *);
 static void	usb_as_pm_idle_component(usb_as_state_t *);
 
 static void	usb_as_restore_device_state(dev_info_t *, usb_as_state_t *);
-static int	usb_as_setup(usb_as_state_t *, mblk_t *);
-static void	usb_as_teardown(usb_as_state_t *, mblk_t *);
-static int	usb_as_start_play(usb_as_state_t *, mblk_t *);
+static int	usb_as_setup(usb_as_state_t *);
+static void	usb_as_teardown(usb_as_state_t *);
+static int	usb_as_start_play(usb_as_state_t *, usb_audio_play_req_t *);
 static void	usb_as_continue_play(usb_as_state_t *);
-static void	usb_as_pause_play(usb_as_state_t *, mblk_t *);
+static void	usb_as_pause_play(usb_as_state_t *);
 
-static void	usb_as_qreply_error(usb_as_state_t *, queue_t *, mblk_t *);
-static void	usb_as_send_merr_up(usb_as_state_t *, mblk_t *);
-static void	usb_as_send_mctl_up(usb_as_state_t *, mblk_t *);
-static int	usb_as_set_format(usb_as_state_t *, mblk_t *);
-static int	usb_as_set_sample_freq(usb_as_state_t *, mblk_t *);
+static int	usb_as_set_format(usb_as_state_t *, usb_audio_formats_t *);
+static int	usb_as_set_sample_freq(usb_as_state_t *, int);
 static int	usb_as_send_ctrl_cmd(usb_as_state_t *, uchar_t, uchar_t,
 			ushort_t, ushort_t, ushort_t, mblk_t *, boolean_t);
 
-static void	usb_as_isoc_close_cb(usb_pipe_handle_t ph,
-				usb_opaque_t arg, int, usb_cb_flags_t);
-static int	usb_as_start_record(usb_as_state_t *, mblk_t *);
-static int	usb_as_stop_record(usb_as_state_t *, mblk_t *);
+static int	usb_as_start_record(usb_as_state_t *, audiohdl_t);
+static int	usb_as_stop_record(usb_as_state_t *);
 static void	usb_as_play_cb(usb_pipe_handle_t, usb_isoc_req_t *);
 static void	usb_as_record_cb(usb_pipe_handle_t, usb_isoc_req_t *);
 static void	usb_as_play_exc_cb(usb_pipe_handle_t, usb_isoc_req_t  *);
 static void	usb_as_record_exc_cb(usb_pipe_handle_t, usb_isoc_req_t	*);
 static int	usb_as_get_pktsize(usb_as_state_t *, usb_audio_formats_t *,
-				usb_frame_number_t);
-static void	usb_as_handle_shutdown(usb_as_state_t *, mblk_t *);
-static int	usb_as_play_isoc_data(usb_as_state_t *, mblk_t *);
+			usb_frame_number_t);
+static void	usb_as_handle_shutdown(usb_as_state_t *);
+static int	usb_as_play_isoc_data(usb_as_state_t *,
+			usb_audio_play_req_t *);
 
 /* anchor for soft state structures */
 static void	*usb_as_statep;
 
-/*
- * STREAMS Structures
- */
-
-/* STREAMS driver id and limit value structure */
-static struct module_info usb_as_modinfo = {
-	0xffff,				/* module ID number */
-	"usb_as",			/* module name */
-	USB_AUDIO_MIN_PKTSZ,		/* minimum packet size */
-	USB_AUDIO_MAX_PKTSZ,		/* maximum packet size */
-	USB_AS_HIWATER,			/* high water mark */
-	USB_AS_LOWATER			/* low water mark */
-};
-
-/* STREAMS queue processing procedures structures */
-/* read queue */
-static struct qinit usb_as_rqueue = {
-	NULL,			/* put procedure */
-	NULL,			/* service procedure */
-	usb_as_open,		/* open procedure */
-	usb_as_close,		/* close procedure */
-	NULL,			/* unused */
-	&usb_as_modinfo,	/* module parameters */
-	NULL			/* module statistics */
-};
-
-/* write queue */
-static struct qinit usb_as_wqueue = {
-	putq,		/* put procedure */
-	usb_as_wsrv,		/* service procedure */
-	NULL,			/* open procedure */
-	NULL,			/* close procedure */
-	NULL,			/* unused */
-	&usb_as_modinfo,	/* module parameters */
-	NULL			/* module statistics */
-};
-
-/* STREAMS entity declaration structure */
-static struct streamtab usb_as_str_info = {
-	&usb_as_rqueue,	/* read queue */
-	&usb_as_wqueue,	/* write queue */
-	NULL,		/* mux lower read queue */
-	NULL,		/* mux lower write queue */
-};
 
 /*
  * DDI Structures
@@ -213,21 +145,21 @@ static struct streamtab usb_as_str_info = {
 
 /* Entry points structure */
 static struct cb_ops usb_as_cb_ops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
+	usb_as_open,		/* cb_open */
+	usb_as_close,		/* cb_close */
 	nodev,			/* cb_strategy */
 	nodev,			/* cb_print */
 	nodev,			/* cb_dump */
 	nodev,			/* cb_read */
 	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
+	usb_as_ioctl,		/* cb_ioctl */
 	nodev,			/* cb_devmap */
 	nodev,			/* cb_mmap */
 	nodev,			/* cb_segmap */
 	nochpoll,		/* cb_chpoll */
 	ddi_prop_op,		/* cb_prop_op */
-	&usb_as_str_info,	/* cb_str */
-	D_MP | D_MTPERQ,	/* cb_flag */
+	NULL,			/* cb_str */
+	D_MP | D_64BIT,		/* cb_flag */
 	CB_REV,			/* cb_rev */
 	nodev,			/* cb_aread */
 	nodev,			/* cb_arwite */
@@ -263,14 +195,6 @@ static struct modlinkage usb_as_modlinkage = {
 	NULL				/* NULL terminates the list */
 };
 
-/* warlock directives */
-_NOTE(SCHEME_PROTECTS_DATA("unshared", iocblk))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", datab))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", msgb))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", queue))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", usb_pipe_policy_t))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", usb_isoc_pkt_descr))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", usb_isoc_req))
 
 static usb_event_t usb_as_events = {
 	usb_as_disconnect_event_cb,
@@ -287,10 +211,6 @@ static usb_event_t usb_as_events = {
 static uint_t usb_as_default_srs[] = {
 	8000,	9600, 11025, 16000, 18900, 22050,
 	32000,	33075, 37800, 44100, 48000, 0
-};
-
-static uint_t usb_as_mixer_srs[] = {
-	8000,	48000,	0
 };
 
 
@@ -412,6 +332,9 @@ usb_as_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	uasp->usb_as_instance = instance;
 	uasp->usb_as_dip = dip;
+
+	(void) snprintf(uasp->dstr, sizeof (uasp->dstr), "%s#%d",
+	    ddi_driver_name(dip), instance);
 
 	if (usb_client_attach(dip, USBDRV_VERSION, 0) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
@@ -605,42 +528,40 @@ usb_as_cleanup(dev_info_t *dip, usb_as_state_t *uasp)
  */
 /*ARGSUSED*/
 static int
-usb_as_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+usb_as_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
-	usb_as_state_t	*uasp =
-	    ddi_get_soft_state(usb_as_statep,
-	    USB_AS_MINOR_TO_INSTANCE(getminor(*devp)));
+	int		inst = USB_AS_MINOR_TO_INSTANCE(getminor(*devp));
+	usb_as_state_t	*uasp = ddi_get_soft_state(usb_as_statep, inst);
+	char		*nm = "usb_as_open";
+
 	if (uasp == NULL) {
 
 		return (ENXIO);
 	}
 
 	/* Do mux plumbing stuff */
-	USB_DPRINTF_L4(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
-	    "usb_as_open: Begin q=0x%p", (void *)q);
+	dinfo("%s: %s\n", uasp->dstr, nm);
 
-	if (sflag) {
-		USB_DPRINTF_L2(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
-		    "usb_as_open: clone open not supported");
+	mutex_enter(&uasp->usb_as_mutex);
+
+	if (uasp->usb_as_flag == USB_AS_OPEN || credp != kcred) {
+		dwarn("%s: multiple opens or opens from userspace not "
+		    "supported\n", uasp->dstr);
+		mutex_exit(&uasp->usb_as_mutex);
 
 		return (ENXIO);
 	}
 
-	mutex_enter(&uasp->usb_as_mutex);
-
 	/* fail open on a disconnected device */
 	if (uasp->usb_as_dev_state == USB_DEV_DISCONNECTED) {
+		dinfo("%s: %s disconnected\n", uasp->dstr, nm);
 		mutex_exit(&uasp->usb_as_mutex);
 
 		return (ENODEV);
 	}
 
-	/* Initialize the queue pointers */
-	q->q_ptr = uasp;
-	WR(q)->q_ptr = uasp;
-	uasp->usb_as_rq = q;
-	uasp->usb_as_wq = WR(q);
-	uasp->usb_as_streams_flag = USB_AS_STREAMS_OPEN;
+	/* Initialize state */
+	uasp->usb_as_flag = USB_AS_OPEN;
 	mutex_exit(&uasp->usb_as_mutex);
 
 	/*
@@ -649,10 +570,7 @@ usb_as_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	usb_as_pm_busy_component(uasp);
 	(void) pm_raise_power(uasp->usb_as_dip, 0, USB_DEV_OS_FULL_PWR);
 
-	qprocson(q);
-
-	USB_DPRINTF_L4(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
-	    "usb_as_open: End q=0x%p", (void *)q);
+	dinfo("%s: %s done\n", uasp->dstr, nm);
 
 	return (0);
 }
@@ -664,15 +582,16 @@ usb_as_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
  */
 /*ARGSUSED*/
 static int
-usb_as_close(queue_t *q, int flag, cred_t *credp)
+usb_as_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
-	usb_as_state_t	*uasp = (usb_as_state_t *)q->q_ptr;
+	int		inst = USB_AS_MINOR_TO_INSTANCE(getminor(dev));
+	usb_as_state_t	*uasp = ddi_get_soft_state(usb_as_statep, inst);
 
 	USB_DPRINTF_L4(PRINT_MASK_CLOSE, uasp->usb_as_log_handle,
-	    "usb_as_close: q=0x%p", (void *)q);
+	    "usb_as_close: inst=%d", inst);
 
 	mutex_enter(&uasp->usb_as_mutex);
-	uasp->usb_as_streams_flag = USB_AS_STREAMS_DISMANTLING;
+	uasp->usb_as_flag = USB_AS_DISMANTLING;
 	mutex_exit(&uasp->usb_as_mutex);
 
 	/*
@@ -685,256 +604,88 @@ usb_as_close(queue_t *q, int flag, cred_t *credp)
 
 	usb_release_access(uasp->usb_as_ser_acc);
 
-	qprocsoff(q);
-
 	/* we can now power down */
 	usb_as_pm_idle_component(uasp);
+
+	mutex_enter(&uasp->usb_as_mutex);
+	uasp->usb_as_flag = 0;
+	mutex_exit(&uasp->usb_as_mutex);
 
 	return (0);
 }
 
 
-static void
-usb_as_qreply_error(usb_as_state_t *uasp, queue_t *q, mblk_t *mp)
-{
-	mutex_enter(&uasp->usb_as_mutex);
-	uasp->usb_as_def_mblk = NULL;
-	mutex_exit(&uasp->usb_as_mutex);
-
-	if (!canputnext(RD(q))) {
-		freemsg(mp);
-	} else {
-		/*
-		 * Pass an error message up.
-		 */
-		mp->b_datap->db_type = M_ERROR;
-		if (mp->b_cont) {
-			freemsg(mp->b_cont);
-			mp->b_cont = NULL;
-		}
-		mp->b_rptr = mp->b_datap->db_base;
-		mp->b_wptr = mp->b_rptr + sizeof (char);
-		*mp->b_rptr = EINVAL;
-		qreply(q, mp);
-	}
-	USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_qreply_error: sending M_ERROR up q=0x%p,mp=0x%p",
-	    (void *)q, (void *)mp);
-}
-
-
 /*
- * usb_as_wsrv
- *	write service routine, processes all the queued mblks.
- *	returns DDI_SUCCESS or DDI_FAILURE
+ *
  */
+/*ARGSUSED*/
 static int
-usb_as_wsrv(queue_t *q)
+usb_as_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
 {
-	int		error;
-	usb_as_state_t	*uasp = q->q_ptr;
-	mblk_t		*mp = NULL;
+	int		inst = USB_AS_MINOR_TO_INSTANCE(getminor(dev));
+	usb_as_state_t	*uasp = ddi_get_soft_state(usb_as_statep, inst);
+	int		rv = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_wsrv: Begin q=0x%p", (void *)q);
+	    "usb_as_ioctl: Begin inst=%d, cmd=0x%x, arg=0x%p",
+	    inst, cmd, (void *)arg);
 
-	/* process all message blocks on the queue */
-	while ((mp = getq(q)) != NULL) {
-		ASSERT(mp->b_datap != NULL);
-
-		switch (mp->b_datap->db_type) {
-		case M_FLUSH:
-			/*
-			 * Canonical flush handling :
-			 *	mp will be freed by usb_ac since it passes
-			 *	the same mp
-			 */
-			if (*mp->b_rptr & FLUSHW) {
-				flushq(q, FLUSHDATA);
-			}
-			/* read queue not used so just send up */
-			if (*mp->b_rptr & FLUSHR) {
-				*mp->b_rptr &= ~FLUSHW;
-				qreply(q, mp);
-			} else {
-				freemsg(mp);
-			}
-
-			break;
-		case M_IOCTL:
-			/* only ioctl is mixer registration data */
-			error = usb_as_ioctl(q, mp);
-
-			break;
-		case M_CTL:
-			/* process the message */
-			mutex_enter(&uasp->usb_as_mutex);
-			ASSERT(uasp->usb_as_def_mblk == NULL);
-			uasp->usb_as_def_mblk = mp;
-			mutex_exit(&uasp->usb_as_mutex);
-
-			error = usb_as_mctl_rcv(q, mp);
-			if (error != USB_SUCCESS) {
-				usb_as_qreply_error(uasp, q, mp);
-			}
-
-			break;
-		default:
-			usb_as_qreply_error(uasp, q, mp);
-
-			break;
-		}
-	}
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_wsrv: End q=0x%p", (void *)q);
-
-	return (DDI_SUCCESS);
-}
-
-
-/*
- * usb_as_ioctl:
- *	usb_as handles only USB_AUDIO_MIXER_REGISTRATION ioctl
- *	NACK all other ioctl requests
- *	Returns USB_SUCCESS or USB_FAILURE
- */
-static int
-usb_as_ioctl(queue_t *q, mblk_t *mp)
-{
-	int		error = USB_FAILURE;
-	usb_as_state_t	*uasp = q->q_ptr;
-	register struct iocblk *iocp;
-
-	iocp = (struct iocblk *)mp->b_rptr;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_ioctl: Begin q=0x%p, mp=0x%p", (void *)q, (void *)mp);
-
-	if (mp->b_cont == NULL) {
+	if (!(mode & FKIOCTL)) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-		    "usb_as_ioctl: no data block, q=0x%p, mp=0x%p",
-		    (void *)q, (void *)mp);
-	} else {
-		switch (iocp->ioc_cmd) {
-		case USB_AUDIO_MIXER_REGISTRATION:
-			USB_DPRINTF_L4(PRINT_MASK_ALL,
-			    uasp->usb_as_log_handle,
-			    "usb_as_ioctl(mixer reg): q=0x%p, "
-			    "mp=0x%p, b_cont_rptr=0x%p, b_cont_wptr=0x%p",
-			    (void *)q, (void *)mp, (void *)mp->b_cont->b_rptr,
-			    (void *)mp->b_cont->b_wptr);
-
-			mutex_enter(&uasp->usb_as_mutex);
-
-			/*
-			 * Copy the usb_as_reg structure to the structure
-			 * that usb_ac passed. Note that this is a structure
-			 * assignment and not a pointer assignment!
-			 */
-			*((usb_as_registration_t *)(*((
-			    usb_as_registration_t **)mp->
-			    b_cont->b_rptr))) = uasp->usb_as_reg;
-
-			mp->b_cont->b_wptr = mp->b_cont->b_rptr +
-			    sizeof (usb_as_registration_t *);
-
-			mutex_exit(&uasp->usb_as_mutex);
-			error = USB_SUCCESS;
-			break;
-		default:
-			USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-			    "usb_as_ioctl: unknown IOCTL, cmd=%d",
-			    iocp->ioc_cmd);
-			break;
-		}
+		    "usb_as_ioctl: inst=%d, user space not supported", inst);
+		return (ENXIO);
 	}
 
-	iocp->ioc_rval = 0;
-	if (error == USB_FAILURE) {
-		iocp->ioc_error = ENOTTY;
-		mp->b_datap->db_type = M_IOCNAK;
-	} else {
-		iocp->ioc_error = 0;
-		mp->b_datap->db_type = M_IOCACK;
-	}
-
-	/*
-	 * Send the response up
-	 */
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_ioctl: error=%d, q=0x%p, mp=0x%p", error,
-	    (void *)q, (void *)mp);
-
-	qreply(q, mp);
-
-	return (error);
-}
-
-
-/*
- * usb_as_mctl_rcv:
- *	Handle M_CTL requests from usb_ac.
- *	Returns USB_SUCCESS/FAILURE
- */
-static int
-usb_as_mctl_rcv(queue_t *q, mblk_t *mp)
-{
-	int		error = USB_FAILURE;
-	usb_as_state_t	*uasp = q->q_ptr;
-	struct iocblk	*iocp;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_mctl_rcv: Begin q=0x%p mp=0x%p",
-	    (void *)q, (void *)mp);
-
-	ASSERT(mp != NULL);
-
-	/*
-	 * Uopn success, each function sends up a reply either immediately,
-	 * or on callback. On failure, reply is send up in the wsrv.
-	 */
-	iocp = (struct iocblk *)mp->b_rptr;
 	mutex_enter(&uasp->usb_as_mutex);
-	switch (iocp->ioc_cmd) {
-		case USB_AUDIO_SET_FORMAT:
-			error = usb_as_set_format(uasp, mp);
-			break;
-		case USB_AUDIO_SET_SAMPLE_FREQ:
-			error = usb_as_set_sample_freq(uasp, mp);
-			break;
-		case USB_AUDIO_SETUP:
-			error = usb_as_setup(uasp, mp);
-			break;
-		case USB_AUDIO_TEARDOWN:
-			usb_as_teardown(uasp, mp);
-			error = USB_SUCCESS;
-			break;
-		case USB_AUDIO_START_PLAY:
-			error = usb_as_start_play(uasp, mp);
-			break;
-		case USB_AUDIO_STOP_PLAY:
-		case USB_AUDIO_PAUSE_PLAY:
-			usb_as_pause_play(uasp, mp);
-			error = USB_SUCCESS;
-			break;
-		case USB_AUDIO_START_RECORD:
-			error = usb_as_start_record(uasp, mp);
-			break;
-		case USB_AUDIO_STOP_RECORD:
-			error = usb_as_stop_record(uasp, mp);
-			break;
-		default:
-			break;
+
+	switch (cmd) {
+	case USB_AUDIO_MIXER_REGISTRATION:
+		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
+		    "usb_as_ioctl(mixer reg): inst=%d", inst);
+
+		/*
+		 * Copy the usb_as_reg structure to the structure
+		 * that usb_ac passed. Note that this is a structure
+		 * assignment and not a pointer assignment!
+		 */
+		*(usb_as_registration_t *)arg = uasp->usb_as_reg;
+
+		break;
+	case USB_AUDIO_SET_FORMAT:
+		rv = usb_as_set_format(uasp, (usb_audio_formats_t *)arg);
+		break;
+	case USB_AUDIO_SET_SAMPLE_FREQ:
+		rv = usb_as_set_sample_freq(uasp, *(int *)arg);
+		break;
+	case USB_AUDIO_SETUP:
+		rv = usb_as_setup(uasp);
+		break;
+	case USB_AUDIO_TEARDOWN:
+		usb_as_teardown(uasp);
+		break;
+	case USB_AUDIO_START_PLAY:
+		rv = usb_as_start_play(uasp, (usb_audio_play_req_t *)arg);
+		break;
+	case USB_AUDIO_STOP_PLAY:
+	case USB_AUDIO_PAUSE_PLAY:
+		usb_as_pause_play(uasp);
+		break;
+	case USB_AUDIO_START_RECORD:
+		rv = usb_as_start_record(uasp, *(audiohdl_t *)arg);
+		break;
+	case USB_AUDIO_STOP_RECORD:
+		rv = usb_as_stop_record(uasp);
+		break;
+	default:
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
+		    "usb_as_ioctl: unknown IOCTL, cmd=%d", cmd);
+		break;
 	}
 
 	mutex_exit(&uasp->usb_as_mutex);
 
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_mctl_rcv: End q=0x%p mp=0x%p error=%d",
-	    (void *)q, (void *)mp, error);
-
-	return (error);
+	return (rv == USB_SUCCESS ? 0 : ENXIO);
 }
 
 
@@ -948,35 +699,25 @@ usb_as_mctl_rcv(queue_t *q, mblk_t *mp)
  *	Therefore, we ignore errors and carry on regardless
  */
 static int
-usb_as_set_sample_freq(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_set_sample_freq(usb_as_state_t *uasp, int freq)
 {
-	int	freq, alt, ep;
+	int	alt, ep;
 	mblk_t	*data;
 	int	rval = USB_FAILURE;
 	boolean_t ignore_errors;
 
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_cont != NULL);
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	alt = uasp->usb_as_alternate;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_set_sample_freq: mp=0x%p cont_sr=%d", (void *)mp,
-	    uasp->usb_as_alts[alt].alt_continuous_sr);
+	    "usb_as_set_sample_freq: inst=%d cont_sr=%d freq=%d",
+	    ddi_get_instance(uasp->usb_as_dip),
+	    uasp->usb_as_alts[alt].alt_continuous_sr, freq);
 
 	ignore_errors = B_TRUE;
 
 	ep = uasp->usb_as_alts[alt].alt_ep->bEndpointAddress;
-	freq = *((int *)mp->b_cont->b_rptr);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_set_sample_freq: freq = %d", freq);
-
-	if (mp->b_cont) {
-		freemsg(mp->b_cont);
-		mp->b_cont = NULL;
-	}
 
 	data = allocb(4, BPRI_HI);
 	if (data) {
@@ -998,11 +739,10 @@ usb_as_set_sample_freq(usb_as_state_t *uasp, mblk_t *mp)
 		    ignore_errors)) != USB_SUCCESS) {
 			USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 			    "usb_as_set_sample_freq: set sample freq failed");
-
-			freemsg(data);
 		}
 		mutex_enter(&uasp->usb_as_mutex);
 	}
+	freemsg(data);
 
 	return (rval);
 }
@@ -1011,25 +751,23 @@ usb_as_set_sample_freq(usb_as_state_t *uasp, mblk_t *mp)
 /*
  * usb_as_set_format:
  *	Matches channel, encoding and precision and find out
- *	the right alternate. Sets alternate interface.
+ *	the right alternate. Sets alternate interface and returns it.
  */
 static int
-usb_as_set_format(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_set_format(usb_as_state_t *uasp, usb_audio_formats_t *format)
 {
 	int		n;
 	usb_as_registration_t *reg;
-	usb_audio_formats_t *format;
 	int		alt, rval;
 	uint_t		interface;
 
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_cont != NULL);
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	if (uasp->usb_as_request_count) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-		    "usb_as_set_format: failing mp=0x%p, rq_cnt=%d",
-		    (void *)mp, uasp->usb_as_request_count);
+		    "usb_as_set_format: failing inst=%d, rq_cnt=%d",
+		    ddi_get_instance(uasp->usb_as_dip),
+		    uasp->usb_as_request_count);
 
 		return (USB_FAILURE);
 	}
@@ -1038,13 +776,12 @@ usb_as_set_format(usb_as_state_t *uasp, mblk_t *mp)
 
 	reg = &uasp->usb_as_reg;
 	interface = uasp->usb_as_ifno;
-	format = (usb_audio_formats_t *)mp->b_cont->b_rptr;
 
-	bcopy(format, &uasp->usb_as_curr_format, sizeof (usb_audio_formats_t));
+	uasp->usb_as_curr_format = *format;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_set_format: mp=0x%p, reg=0x%p, format=0x%p",
-	    (void *)mp, (void *)reg, (void *)format);
+	    "usb_as_set_format: inst=%d, reg=0x%p, format=0x%p",
+	    ddi_get_instance(uasp->usb_as_dip), (void *)reg, (void *)format);
 
 	for (n = 0; n < reg->reg_n_formats; n++) {
 		if ((format->fmt_chns == reg->reg_formats[n].fmt_chns) &&
@@ -1060,7 +797,7 @@ usb_as_set_format(usb_as_state_t *uasp, mblk_t *mp)
 		}
 	}
 
-	if (n > reg->reg_n_formats) {
+	if (n >= reg->reg_n_formats) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 		    "usb_as_set_format: Didn't find a matching alt");
 
@@ -1075,19 +812,23 @@ usb_as_set_format(usb_as_state_t *uasp, mblk_t *mp)
 
 	mutex_exit(&uasp->usb_as_mutex);
 
-	if ((rval = usb_as_send_ctrl_cmd(uasp,
+	rval = usb_as_send_ctrl_cmd(uasp,
 					/* bmRequestType */
 	    USB_DEV_REQ_HOST_TO_DEV | USB_DEV_REQ_RCPT_IF,
 	    USB_REQ_SET_IF,		/* bRequest */
 	    alt,			/* wValue */
 	    interface,			/* wIndex */
 	    0,				/* wLength */
-	    NULL, B_FALSE)) != USB_SUCCESS) {
+	    NULL, B_FALSE);
+
+	mutex_enter(&uasp->usb_as_mutex);
+
+	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 		    "usb_as_set_format: set_alternate failed");
-
+	} else {
+		format->fmt_alt = (uchar_t)alt;
 	}
-	mutex_enter(&uasp->usb_as_mutex);
 
 	return (rval);
 }
@@ -1099,17 +840,17 @@ usb_as_set_format(usb_as_state_t *uasp, mblk_t *mp)
  *	is available.
  */
 static int
-usb_as_setup(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_setup(usb_as_state_t *uasp)
 {
 	int alt = uasp->usb_as_alternate;
 	usb_ep_descr_t *ep = (usb_ep_descr_t *)uasp->usb_as_alts[alt].alt_ep;
 	int rval;
 
-	ASSERT(mp != NULL);
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_setup: Begin usb_as_setup, mp=0x%p", (void *)mp);
+	    "usb_as_setup: Begin usb_as_setup, inst=%d",
+	    ddi_get_instance(uasp->usb_as_dip));
 
 	ASSERT(uasp->usb_as_request_count == 0);
 
@@ -1124,7 +865,7 @@ usb_as_setup(usb_as_state_t *uasp, mblk_t *mp)
 
 	/* open isoc pipe, may fail if there is no bandwidth  */
 	rval = usb_pipe_open(uasp->usb_as_dip, ep, &uasp->usb_as_isoc_pp,
-	    0, &uasp->usb_as_isoc_ph);
+	    USB_FLAGS_SLEEP, &uasp->usb_as_isoc_ph);
 
 	if (rval != USB_SUCCESS) {
 		switch (rval) {
@@ -1151,11 +892,9 @@ usb_as_setup(usb_as_state_t *uasp, mblk_t *mp)
 
 	(void) usb_pipe_set_private(uasp->usb_as_isoc_ph, (usb_opaque_t)uasp);
 
-	/* return reply up */
 	mutex_enter(&uasp->usb_as_mutex);
 	uasp->usb_as_audio_state = USB_AS_IDLE;
 	uasp->usb_as_setup_cnt++;
-	usb_as_send_mctl_up(uasp, NULL);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_setup: End");
@@ -1169,10 +908,12 @@ usb_as_setup(usb_as_state_t *uasp, mblk_t *mp)
  *
  */
 static void
-usb_as_teardown(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_teardown(usb_as_state_t *uasp)
 {
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_teardown: Begin mp=0x%p", (void *)mp);
+	    "usb_as_teardown: Begin inst=%d",
+	    ddi_get_instance(uasp->usb_as_dip));
+
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	uasp->usb_as_audio_state = USB_AS_IDLE;
@@ -1185,10 +926,9 @@ usb_as_teardown(usb_as_state_t *uasp, mblk_t *mp)
 		mutex_exit(&uasp->usb_as_mutex);
 
 		/* reply mp will be sent up in isoc close callback */
-		usb_pipe_close(uasp->usb_as_dip, uasp->usb_as_isoc_ph, 0,
-		    usb_as_isoc_close_cb, (usb_opaque_t)uasp);
+		usb_pipe_close(uasp->usb_as_dip, uasp->usb_as_isoc_ph,
+		    USB_FLAGS_SLEEP, NULL, (usb_opaque_t)NULL);
 
-		/* wait for callback to send up a reply */
 		mutex_enter(&uasp->usb_as_mutex);
 		uasp->usb_as_isoc_ph = NULL;
 
@@ -1198,8 +938,6 @@ usb_as_teardown(usb_as_state_t *uasp, mblk_t *mp)
 	} else {
 		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 		    "usb_as_teardown: Pipe already closed");
-
-		usb_as_send_mctl_up(uasp, NULL);
 	}
 
 	ASSERT(uasp->usb_as_setup_cnt == 0);
@@ -1210,31 +948,23 @@ usb_as_teardown(usb_as_state_t *uasp, mblk_t *mp)
 
 
 /*
- * usb_as_start_play:
- *	this function is called from usb_as_mctl_rcv
+ * usb_as_start_play
  */
 static int
-usb_as_start_play(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_start_play(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 {
-	usb_audio_play_req_t *play_req;
-	int		samples;
 	int		n_requests;
 	int		rval = USB_FAILURE;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_start_play: Begin mp=0x%p, req_cnt=%d",
-	    (void *)mp, uasp->usb_as_request_count);
+	    "usb_as_start_play: Begin inst=%d, req_cnt=%d",
+	    ddi_get_instance(uasp->usb_as_dip), uasp->usb_as_request_count);
 
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
-	ASSERT(mp && mp->b_cont);
-
-	play_req = (usb_audio_play_req_t *)mp->b_cont->b_rptr;
 	uasp->usb_as_request_samples = play_req->up_samples;
 	uasp->usb_as_ahdl = play_req->up_handle;
 	uasp->usb_as_audio_state = USB_AS_ACTIVE;
-
-	samples = uasp->usb_as_request_samples;
 
 	if ((uasp->usb_as_request_count >= USB_AS_MAX_REQUEST_COUNT) ||
 	    (uasp->usb_as_audio_state == USB_AS_IDLE) ||
@@ -1246,26 +976,17 @@ usb_as_start_play(usb_as_state_t *uasp, mblk_t *mp)
 	} else {
 		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 		    "usb_as_start_play: samples=%d requestcount=%d ",
-		    samples, uasp->usb_as_request_count);
+		    uasp->usb_as_request_samples, uasp->usb_as_request_count);
 
 		/* queue up as many requests as allowed */
 		for (n_requests = uasp->usb_as_request_count;
 		    n_requests < USB_AS_MAX_REQUEST_COUNT; n_requests++) {
-			if ((rval = usb_as_play_isoc_data(uasp, mp)) !=
+			if ((rval = usb_as_play_isoc_data(uasp, play_req)) !=
 			    USB_SUCCESS) {
 				break;
 			}
 		}
 	}
-
-	/*
-	 * send mctl up for success. For failure, usb_as_wsrv
-	 * will send an merr up.
-	 */
-	if (rval == USB_SUCCESS) {
-		usb_as_send_mctl_up(uasp, NULL);
-	}
-
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_start_play: End");
@@ -1281,7 +1002,6 @@ usb_as_start_play(usb_as_state_t *uasp, mblk_t *mp)
 static void
 usb_as_continue_play(usb_as_state_t *uasp)
 {
-	int		samples;
 	int		n_requests;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
@@ -1291,12 +1011,10 @@ usb_as_continue_play(usb_as_state_t *uasp)
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	if (uasp->usb_as_dev_state == USB_DEV_DISCONNECTED) {
-		usb_as_handle_shutdown(uasp, NULL);
+		usb_as_handle_shutdown(uasp);
 
 		return;
 	}
-
-	samples = uasp->usb_as_request_samples;
 
 	if ((uasp->usb_as_request_count >= USB_AS_MAX_REQUEST_COUNT) ||
 	    (uasp->usb_as_audio_state == USB_AS_IDLE) ||
@@ -1307,7 +1025,7 @@ usb_as_continue_play(usb_as_state_t *uasp)
 	} else {
 		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 		    "usb_as_continue_play: samples=%d requestcount=%d ",
-		    samples, uasp->usb_as_request_count);
+		    uasp->usb_as_request_samples, uasp->usb_as_request_count);
 
 		/* queue up as many requests as allowed */
 		for (n_requests = uasp->usb_as_request_count;
@@ -1326,16 +1044,13 @@ usb_as_continue_play(usb_as_state_t *uasp)
 
 
 static void
-usb_as_handle_shutdown(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_handle_shutdown(usb_as_state_t *uasp)
 {
 	audiohdl_t	ahdl;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_handl_shutdown, mp=0x%p", (void *)mp);
-
-	if (mp != NULL) {
-		usb_as_send_mctl_up(uasp, NULL);
-	}
+	    "usb_as_handle_shutdown, inst=%d",
+	    ddi_get_instance(uasp->usb_as_dip));
 
 	USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_handle_shutdown: am_play_shutdown");
@@ -1345,13 +1060,13 @@ usb_as_handle_shutdown(usb_as_state_t *uasp, mblk_t *mp)
 	ahdl = uasp->usb_as_ahdl;
 
 	mutex_exit(&uasp->usb_as_mutex);
-	am_play_shutdown(ahdl, AUDIO_NO_CHANNEL);
+	am_play_shutdown(ahdl);
 	mutex_enter(&uasp->usb_as_mutex);
 }
 
 
 static int
-usb_as_play_isoc_data(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 {
 	int		rval = USB_FAILURE;
 
@@ -1389,8 +1104,8 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, mblk_t *mp)
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_play_isoc_data: Begin bufsize=0x%lx, mp=0x%p", bufsize,
-	    (void *)mp);
+	    "usb_as_play_isoc_data: Begin bufsize=0x%lx, inst=%d", bufsize,
+	    ddi_get_instance(uasp->usb_as_dip));
 
 	mutex_exit(&uasp->usb_as_mutex);
 
@@ -1402,14 +1117,22 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, mblk_t *mp)
 		goto done;
 	}
 
-	if ((count = am_get_audio(ahdl, (void *)data->b_wptr,
-	    AUDIO_NO_CHANNEL, bufsize / precision)) == 0) {
+	/*
+	 * restriction of Boomer: cannot call am_get_audio() in the context
+	 * of start so we play a fragment of silence at first
+	 */
+	if (play_req != NULL) {
+		bzero(data->b_wptr, bufsize);
+		count = bufsize / precision;
+
+	} else if ((count = am_get_audio(ahdl, (void *)data->b_wptr,
+	    bufsize / precision)) == 0) {
 		mutex_enter(&uasp->usb_as_mutex);
 		if (uasp->usb_as_request_count == 0) {
-			usb_as_handle_shutdown(uasp, NULL);
+			usb_as_handle_shutdown(uasp);
 
 			/* Don't return failure for 0 bytes of data sent */
-			if (mp) {
+			if (play_req) {
 				/*
 				 * Since we set rval to SUCCESS
 				 * we treat it as a special case
@@ -1536,13 +1259,13 @@ done:
 }
 
 
-/*ARGSUSED*/
 static void
-usb_as_pause_play(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_pause_play(usb_as_state_t *uasp)
 {
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
+
+	/* this will stop the isoc request in the play callback */
 	uasp->usb_as_audio_state = USB_AS_PLAY_PAUSED;
-	usb_as_send_mctl_up(uasp, NULL);
 }
 
 
@@ -1628,7 +1351,7 @@ usb_as_play_exc_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 	mutex_enter(&uasp->usb_as_mutex);
 	uasp->usb_as_rcv_debug_count++;
 	uasp->usb_as_request_count--;
-	usb_as_handle_shutdown(uasp, NULL);
+	usb_as_handle_shutdown(uasp);
 
 	USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_play_exc_cb: SEND CNT=%d, RCV COUNT=%d",
@@ -1646,7 +1369,7 @@ usb_as_play_exc_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
  * usb_as_start_record
  */
 static int
-usb_as_start_record(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_start_record(usb_as_state_t *uasp, audiohdl_t ahdl)
 {
 	int		rval = USB_FAILURE;
 	usb_isoc_req_t *isoc_req;
@@ -1654,10 +1377,9 @@ usb_as_start_record(usb_as_state_t *uasp, mblk_t *mp)
 	ushort_t	n_pkt = 1, pkt;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_start_record: mp=0x%p", (void *)mp);
+	    "usb_as_start_record: inst=%d",
+	    ddi_get_instance(uasp->usb_as_dip));
 
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_cont != NULL);
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	/*
@@ -1668,7 +1390,7 @@ usb_as_start_record(usb_as_state_t *uasp, mblk_t *mp)
 
 	if (uasp->usb_as_audio_state == USB_AS_IDLE) {
 
-		uasp->usb_as_ahdl = *((audiohdl_t *)mp->b_cont->b_rptr);
+		uasp->usb_as_ahdl = ahdl;
 		uasp->usb_as_audio_state = USB_AS_ACTIVE;
 		mutex_exit(&uasp->usb_as_mutex);
 
@@ -1712,8 +1434,6 @@ usb_as_start_record(usb_as_state_t *uasp, mblk_t *mp)
 			usb_free_isoc_req(isoc_req);
 			isoc_req = NULL;
 		}
-	} else {
-		usb_as_send_mctl_up(uasp, NULL);
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
@@ -1723,20 +1443,16 @@ usb_as_start_record(usb_as_state_t *uasp, mblk_t *mp)
 }
 
 
-/*ARGSUSED*/
 static int
-usb_as_stop_record(usb_as_state_t *uasp, mblk_t *mp)
+usb_as_stop_record(usb_as_state_t *uasp)
 {
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_stop_record: ");
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	/* if we are disconnected, the pipe will be closed anyways */
-	if (uasp->usb_as_dev_state == USB_DEV_DISCONNECTED) {
-		usb_as_send_mctl_up(uasp, NULL);
-
+	if (uasp->usb_as_dev_state == USB_DEV_DISCONNECTED)
 		return (USB_SUCCESS);
-	}
 
 	switch (uasp->usb_as_audio_state) {
 	case USB_AS_ACTIVE:
@@ -1750,16 +1466,13 @@ usb_as_stop_record(usb_as_state_t *uasp, mblk_t *mp)
 		    USB_FLAGS_SLEEP);
 		mutex_enter(&uasp->usb_as_mutex);
 
-		usb_as_send_mctl_up(uasp, NULL);
-
 		break;
 	case USB_AS_STOP_POLLING_STARTED:
 		/* A stop polling in progress, wait for completion and reply */
 		break;
 	default:
-		usb_as_send_mctl_up(uasp, NULL);
+		break;
 	}
-
 
 	return (USB_SUCCESS);
 }
@@ -1895,8 +1608,7 @@ usb_as_record_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 
 			am_send_audio(ahdl,
 			    isoc_req->isoc_data->b_rptr + offset,
-			    AUDIO_NO_CHANNEL, isoc_req->
-			    isoc_pkt_descr[i].isoc_pkt_actual_length /
+			    isoc_req->isoc_pkt_descr[i].isoc_pkt_actual_length /
 			    precision);
 
 			mutex_enter(&uasp->usb_as_mutex);
@@ -2000,247 +1712,33 @@ usb_as_send_ctrl_cmd(usb_as_state_t *uasp,
 	ushort_t wValue, ushort_t wIndex, ushort_t wLength,
 	mblk_t	*data, boolean_t ignore_errors)
 {
-	usb_ctrl_req_t *reqp;
-
+	usb_ctrl_setup_t setup;
+	usb_cr_t cr;
+	usb_cb_flags_t cf;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_send_ctrl_cmd: Begin bmRequestType=%d,\n\t"
 	    "bRequest=%d, wValue=%d, wIndex=%d, wLength=%d, data=0x%p",
 	    bmRequestType, bRequest, wValue, wIndex, wLength, (void *)data);
 
-	if ((reqp = usb_alloc_ctrl_req(uasp->usb_as_dip, 0, 0)) == NULL) {
+	setup.bmRequestType	= bmRequestType & ~USB_DEV_REQ_DEV_TO_HOST;
+	setup.bRequest		= bRequest;
+	setup.wValue		= wValue;
+	setup.wIndex		= wIndex;
+	setup.wLength		= wLength;
+	setup.attrs		= 0;
 
-		mutex_enter(&uasp->usb_as_mutex);
-		uasp->usb_as_xfer_cr = USB_AS_SEND_MERR;
-		mutex_exit(&uasp->usb_as_mutex);
-
-		return (USB_FAILURE);
-	}
-
-	reqp->ctrl_bmRequestType	= bmRequestType;
-	reqp->ctrl_bRequest		= bRequest;
-	reqp->ctrl_wValue		= wValue;
-	reqp->ctrl_wIndex		= wIndex;
-	reqp->ctrl_wLength		= wLength;
-	reqp->ctrl_data			= data;
-	reqp->ctrl_attributes		= 0;
-	reqp->ctrl_client_private	= (usb_opaque_t)uasp;
-	reqp->ctrl_cb			= usb_as_default_xfer_cb;
-	reqp->ctrl_exc_cb		= ignore_errors ?
-	    usb_as_default_xfer_cb : usb_as_default_xfer_exc_cb;
-
-	/* Send async command down */
-	if (usb_pipe_ctrl_xfer(uasp->usb_as_default_ph, reqp, 0) !=
-	    USB_SUCCESS) {
-
+	if (usb_pipe_ctrl_xfer_wait(uasp->usb_as_default_ph, &setup, &data,
+	    &cr, &cf, 0) != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-		    "usb_as_send_ctrl_cmd: usba xfer failed (req=%d)",
-		    bRequest);
+		    "usb_as_send_ctrl_cmd: usba xfer failed (req=%d), "
+		    "completion reason: 0x%x, completion flags: 0x%x",
+		    bRequest, cr, cf);
 
-		mutex_enter(&uasp->usb_as_mutex);
-		uasp->usb_as_xfer_cr = USB_AS_SEND_MERR;
-		mutex_exit(&uasp->usb_as_mutex);
-		usb_free_ctrl_req(reqp);
-
-		return (USB_FAILURE);
+		return (ignore_errors ? USB_SUCCESS: USB_FAILURE);
 	}
 
 	return (USB_SUCCESS);
-}
-
-
-static void
-usb_as_send_merr_up(usb_as_state_t *uasp, mblk_t *mp)
-{
-	queue_t *q;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_send_merr_up: data=0x%p", (void *)mp);
-
-	ASSERT(mutex_owned(&uasp->usb_as_mutex));
-	q = uasp->usb_as_rq;
-
-	mp->b_datap->db_type = M_ERROR;
-
-	if (mp->b_cont) {
-		freemsg(mp->b_cont);
-		mp->b_cont = NULL;
-	}
-
-	mp->b_rptr = mp->b_datap->db_base;
-	mp->b_wptr = mp->b_rptr + sizeof (char);
-	*mp->b_rptr = EINVAL;
-
-	mutex_exit(&uasp->usb_as_mutex);
-	if (!canputnext(RD(q))) {
-		freemsg(mp);
-		mp = NULL;
-	} else {
-		putnext(RD(q), mp);
-	}
-	mutex_enter(&uasp->usb_as_mutex);
-}
-
-
-static void
-usb_as_send_mctl_up(usb_as_state_t *uasp, mblk_t *data)
-{
-	mblk_t		*tmp, *mp;
-	queue_t		*q;
-	struct iocblk	*iocp;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_send_mctl_up: data=0x%p", (void *)data);
-	ASSERT(mutex_owned(&uasp->usb_as_mutex));
-
-	q = uasp->usb_as_rq;
-	mp = uasp->usb_as_def_mblk;
-	ASSERT(mp != NULL);
-
-	/* Free the b_cont of the original mblk_t, if any */
-	if (mp->b_cont) {
-		freemsg(mp->b_cont);
-		mp->b_cont = NULL;
-	}
-
-	/*
-	 * If we have response to send up, attach it at the b_cont
-	 * of the mctl message. Otherwise just send the mctl message
-	 * up and the module above will decode the command
-	 */
-	iocp = (struct iocblk *)mp->b_rptr;
-	iocp->ioc_error = 0;
-
-	switch (iocp->ioc_cmd) {
-	case USB_AUDIO_SET_FORMAT:
-		freemsg(data);
-
-		/*
-		 * we cannot easily recover if we can't get an mblk
-		 * so we have to sleep here
-		 */
-		tmp = allocb_wait(sizeof (int), BPRI_HI,
-		    STR_NOSIG, NULL);
-		iocp->ioc_count = sizeof (int);
-		*(int *)tmp->b_wptr = uasp->usb_as_alternate;
-		tmp->b_wptr += sizeof (int);
-		mp->b_cont = tmp;
-
-		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-		    "usb_as_send_mctl_up: set_format returning,alt=%d",
-		    uasp->usb_as_alternate);
-
-		break;
-	default:
-		if (data != NULL) {
-			/*
-			 * Use the original mp to send the message up
-			 * This should already have the right ioc_cmd in.
-			 */
-			iocp->ioc_count = MBLKL(data);
-			mp->b_cont = data;
-		} else {
-			iocp->ioc_count = 0;
-		}
-		break;
-	}
-	uasp->usb_as_def_mblk = NULL;
-	mutex_exit(&uasp->usb_as_mutex);
-	if (!canputnext(q)) {
-		freemsg(mp);
-		mp = NULL;
-	} else {
-		putnext(q, mp);
-	}
-	mutex_enter(&uasp->usb_as_mutex);
-}
-
-
-/*
- * usb_as_default_xfer_cb:
- *	Callback routine for the async control xfer. Reply mctl here.
- */
-/*ARGSUSED*/
-static void
-usb_as_default_xfer_cb(usb_pipe_handle_t def, usb_ctrl_req_t *reqp)
-{
-	usb_as_state_t	*uasp = (usb_as_state_t *)reqp->ctrl_client_private;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_default_xfer_cb: ph=0x%p, reqp=0x%p",
-	    (void *)def, (void *)reqp);
-
-	ASSERT((reqp->ctrl_cb_flags & USB_CB_INTR_CONTEXT) == 0);
-
-	mutex_enter(&uasp->usb_as_mutex);
-	uasp->usb_as_xfer_cr = USB_AS_SEND_MCTL;
-	usb_as_send_mctl_up(uasp, NULL);
-	mutex_exit(&uasp->usb_as_mutex);
-
-	usb_free_ctrl_req(reqp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_default_xfer_cb: End");
-}
-
-
-/*
- * usb_as_isoc_close_cb()
- *	called from teardown usb_pipe_close
- */
-static void
-usb_as_isoc_close_cb(usb_pipe_handle_t ph, usb_opaque_t arg,
-	int rval, usb_cb_flags_t cb_flags)
-{
-	usb_as_state_t	*uasp = (usb_as_state_t  *)arg;
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_isoc_close_cb: ph=0x%p arg=0x%p cb_flags=0x%x",
-	    (void *)ph, (void *)arg, cb_flags);
-
-	/* pipe close cannot fail */
-	ASSERT(rval == USB_SUCCESS);
-
-	mutex_enter(&uasp->usb_as_mutex);
-	usb_as_send_mctl_up(uasp, NULL);
-	mutex_exit(&uasp->usb_as_mutex);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_isoc_close_cb: End");
-}
-
-
-/*
- * usb_as_default_exc_cb:
- *	Exception callback for the default pipe. Autoclearing took care
- *	of the recovery
- */
-/*ARGSUSED*/
-static void
-usb_as_default_xfer_exc_cb(usb_pipe_handle_t def, usb_ctrl_req_t *reqp)
-{
-	usb_as_state_t	*uasp = (usb_as_state_t *)reqp->ctrl_client_private;
-	mblk_t		*mp;
-
-	USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_default_xfer_exc_cb: ph=0x%p, reqp=0x%p",
-	    (void *)def, (void *)reqp);
-
-	ASSERT((reqp->ctrl_cb_flags & USB_CB_INTR_CONTEXT) == 0);
-
-	mutex_enter(&uasp->usb_as_mutex);
-	uasp->usb_as_xfer_cr = USB_AS_SEND_MERR;
-	mp = uasp->usb_as_def_mblk;
-	uasp->usb_as_def_mblk = NULL;
-
-	usb_as_send_merr_up(uasp, mp);
-
-	mutex_exit(&uasp->usb_as_mutex);
-
-	usb_free_ctrl_req(reqp);
-
-	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-	    "usb_as_default_xfer_exc_cb: End");
 }
 
 
@@ -2801,30 +2299,9 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 		}
 	}
 
-	/*
-	 * we prefer that a valid format supports all our
-	 * default sample rates. If not we delete sample rates
-	 * to get a set that is supported by all formats.
-	 *
-	 * Continuous sample rate will be checked in set_format
-	 * command for a particular alternate. This is interface
-	 * specific registration data and not per alternate.
-	 */
-	reg->reg_mixer_srs.ad_srs = reg->reg_mixer_srs_list;
-	reg->reg_mixer_srs.ad_limits = MIXER_SRS_FLAG_SR_LIMITS;
-
 	/* copy over sample rate table	but zero it first */
-	bzero(reg->reg_mixer_srs_list, sizeof (reg->reg_mixer_srs_list));
-	bcopy(usb_as_mixer_srs, reg->reg_mixer_srs_list,
-	    sizeof (usb_as_mixer_srs));
-
-	reg->reg_compat_srs.ad_srs = reg->reg_compat_srs_list;
-	reg->reg_compat_srs.ad_limits = MIXER_SRS_FLAG_SR_NOT_LIMITS;
-
-	/* copy over sample rate table	but zero it first */
-	bzero(reg->reg_compat_srs_list, sizeof (reg->reg_compat_srs_list));
-	bcopy(usb_as_default_srs, reg->reg_compat_srs_list,
-	    sizeof (usb_as_default_srs));
+	bzero(reg->reg_srs, sizeof (reg->reg_srs));
+	bcopy(usb_as_default_srs, reg->reg_srs, sizeof (usb_as_default_srs));
 
 	channels[1] = channels[2] = 0;
 
@@ -2841,8 +2318,8 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 		if (uasp->usb_as_alts[alt].alt_valid &&
 		    (n < USB_AS_N_FORMATS) &&
 		    (usb_as_valid_format(uasp, alt,
-		    reg->reg_compat_srs_list,
-		    (sizeof (reg->reg_compat_srs_list)/
+		    reg->reg_srs,
+		    (sizeof (reg->reg_srs)/
 		    sizeof (uint_t)) - 1)) == USB_SUCCESS) {
 			reg->reg_formats[n].fmt_termlink =
 			    uasp->usb_as_alts[alt].alt_general->

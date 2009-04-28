@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/warlock/Makefile
@@ -51,7 +51,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	lock_lint rules
 #
-all:	warlock warlock.1394 warlock.audio warlock.ecpp warlock.scsi \
+all:	warlock warlock.1394 warlock.ecpp warlock.scsi \
 	warlock.usb warlock.ib warlock.sata warlock.sdcard warlock.wc
 
 warlock: $(MODULE).ok 
@@ -100,21 +100,6 @@ warlock.1394:
 
 warlock.ecpp:
 	@cd ../ecpp; $(MAKE) clean; $(MAKE) warlock
-
-warlock.audio:
-	@cd ../audiosup; $(MAKE) clean; $(MAKE) warlock
-	@cd ../mixer; $(MAKE) clean; $(MAKE) warlock
-	@cd ../amsrc2; $(MAKE) clean; $(MAKE) warlock
-	@cd ../../intel/audio810; $(MAKE) clean; $(MAKE) warlock
-	@cd ../../intel/audiohd; $(MAKE) clean; $(MAKE) warlock
-	@cd ../../intel/audioixp; $(MAKE) clean; $(MAKE) warlock
-	@cd ../usb_ac; $(MAKE) clean; $(MAKE) warlock
-	@cd ../usb_as; $(MAKE) clean; $(MAKE) warlock
-	@cd ../usb_ah; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/amsrc1; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audiovia823x; \
-		$(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audioens; $(MAKE) clean; $(MAKE) warlock
 
 warlock.ib:
 	@cd ../ibmf; $(MAKE) clean; $(MAKE) warlock

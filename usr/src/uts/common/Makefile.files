@@ -418,7 +418,18 @@ DCPC_OBJS += dcpc.o
 #
 IPP_OBJS +=	ippctl.o
 
+AUDIO_OBJS += audio_client.o audio_ddi.o audio_engine.o \
+	   audio_fltdata.o audio_format.o audio_ctrl.o \
+	   audio_grc3.o audio_output.o audio_input.o \
+	   audio_oss.o audio_sun.o
+
+AUSTR_OBJS += austr.o
+
+AUDIOENS_OBJS += audioens.o
+
 AUDIOVIA823X_OBJS += audiovia823x.o
+
+AUDIO1575_OBJS += audio1575.o
 
 AUDIO810_OBJS += audio810.o
 
@@ -426,7 +437,11 @@ AUDIOHD_OBJS +=	audiohd.o
 
 AUDIOIXP_OBJS += audioixp.o
 
+AUDIOPCI_OBJS += audiopci.o
+
 AUDIOTS_OBJS +=	audiots.o
+
+AC97_OBJS += ac97.o ac97_ad.o ac97_alc.o ac97_cmi.o
 
 CARDBUS_OBJS += cardbus.o cardbus_hp.o cardbus_cfg.o
 
@@ -669,9 +684,7 @@ USBVC_OBJS += usbvc.o usbvc_v4l2.o
 
 HIDPARSER_OBJS += hidparser.o
 
-USB_AC_OBJS += usb_ac.o
-
-USB_AC_DACF_OBJS += usb_ac_dacf.o
+USB_AC_OBJS += usb_ac.o audio_shim.o
 
 USB_AS_OBJS += usb_as.o
 
@@ -1445,12 +1458,6 @@ KSSL_OBJS +=	kssl.o ksslioctl.o ksslapi.o ksslrec.o
 #
 #			misc. modules
 #
-
-AMSRC2_OBJS +=	am_src2.o
-
-AUDIO_SUP_OBJS +=	audio_support.o
-
-MIXER_OBJS +=	am_main.o am_ad.o am_ioctl.o
 
 C2AUDIT_OBJS +=	adr.o audit.o audit_event.o audit_io.o \
 		audit_path.o audit_start.o audit_syscalls.o audit_token.o \

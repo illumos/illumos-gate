@@ -822,21 +822,6 @@ kernel/drv/usbskel.conf			sparc
 #
 usr/include/sys/libdevid.h		sparc
 #
-# amd 8111 audio driver doesn't ship in sparc platform.
-#
-kernel/drv/sparcv9/audio810		sparc
-kernel/drv/audio810.conf		sparc
-#
-# High definition audio driver doesn't ship in sparc platform.
-#
-kernel/drv/sparcv9/audiohd		sparc
-kernel/drv/audiohd.conf			sparc
-#
-# VIA VT823x audio driver doesn't ship in sparc platform.
-#
-kernel/drv/sparcv9/audiovia823x		sparc
-kernel/drv/audiovia823x.conf		sparc
-#
 # The following files are installed in the proto area by the build of
 # libprtdiag.  libprtdiag contains interfaces which are all private.
 # Only the shared object is shipped.

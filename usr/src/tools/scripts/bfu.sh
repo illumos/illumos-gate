@@ -302,6 +302,7 @@ superfluous_nonglobal_zone_files="
 	kernel
 	lib/libmeta.so
 	lib/libmeta.so.1
+	lib/svc/method/devices-audio
 	lib/svc/method/fc-fabric
 	lib/svc/method/iscsi-initiator
 	lib/svc/method/npivconfig
@@ -379,6 +380,7 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/platform/sun4u/sf880drd.xml
 	var/svc/manifest/platform/sun4v
 	var/svc/manifest/system/cvc.xml
+	var/svc/manifest/system/device/devices-audio.xml
 	var/svc/manifest/system/device/devices-fc-fabric.xml
 	var/svc/manifest/system/dumpadm.xml
 	var/svc/manifest/system/filesystem/rmvolmgr.xml
@@ -960,6 +962,33 @@ nfsmapid_cfg() {
        	sed -e "/^[#	 ]*nfsmapid/d"		\
 	    ${tmpservices} > ${services} 2>&1
 	rm -f ${tmpservices}
+}
+
+#
+# Detect Boomer audio framework; used to emit a notice at the end of BFU
+# telling the user to run update_audio to complete the upgrade.
+#
+BOOMER_PRESENT_SYS=false
+BOOMER_PRESENT_BFU=false
+BOOMER_DRIVERS="audio austr"
+
+check_boomer_sys() {
+	typeset root=$1
+	typeset n2m=$root/etc/name_to_major
+	typeset drv
+
+	for drv in $BOOMER_DRIVERS; do
+		if ! grep -w $drv $n2m > /dev/null 2>&1; then
+			return 1
+		fi
+	done
+
+	return 0
+}
+
+check_boomer_bfu() {
+	$ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null |
+	    grep devices-audio.xml > /dev/null 2>&1
 }
 
 #
@@ -1646,6 +1675,16 @@ smf_cleanup_vt() {
 	)
 }
 
+smf_cleanup_boomer() {
+	(
+		smf_delete_manifest var/src/manifest/system/devices-audio.xml
+		cd $root
+		rm -f lib/svc/method/devices-audio
+
+		/tmp/bfubin/svccfg delete -f svc:/system/device/audio
+	)
+}
+
 old_mfst_dir="var/svc/manifest.orig"
 new_mfst_dir="var/svc/manifest"
 
@@ -1978,6 +2017,13 @@ smf_apply_conf () {
 	if ((! $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
 	    grep vtdaemon.xml > /dev/null 2>&1) && [ $zone = global ]); then
 		smf_cleanup_vt
+	fi
+
+	#
+	# Remove the Boomer audio service when BFUing to legacy audio bits
+	#
+	if ! check_boomer_bfu && [ $zone = global ]; then
+		smf_cleanup_boomer
 	fi
 
 	print "Disabling unneeded inetd.conf entries ..."
@@ -6679,7 +6725,6 @@ mondo_loop() {
 		$root/kernel/misc/consconfig \
 		$root/kernel/misc/dada \
 		$root/kernel/misc/des \
-		$root/kernel/misc/diaudio \
 		$root/kernel/misc/fctl \
 		$root/kernel/misc/fssnap_if \
 		$root/kernel/misc/gld \
@@ -7032,6 +7077,64 @@ mondo_loop() {
 		rm -f $root/kernel/drv/sbpro.conf
 		rm -f $root/platform/i86pc/kernel/drv/sbpro.conf
 		rm -f $usr/include/sys/sbpro.h
+	fi
+
+	#
+	# Remove obsolete audio bits. The SADA modules are removed as
+	# no driver uses them any more.  We don't ship certain device
+	# private headers anymore, as well as headers for the now
+	# obsolete (and never documented) legacy audio driver API.
+	#
+	rm -f $usr/include/sys/audiovar.h
+	rm -f $usr/include/sys/audio/am_src1.h
+	rm -f $usr/include/sys/audio/am_src2.h
+	rm -f $usr/include/sys/audio/audio1575.h
+	rm -f $usr/include/sys/audio/audio810.h
+	rm -f $usr/include/sys/audio/audioens.h
+	rm -f $usr/include/sys/audio/audiohd.h
+	rm -f $usr/include/sys/audio/audioixp.h
+	rm -f $usr/include/sys/audio/audiots.h
+	rm -f $usr/include/sys/audio/audiovia823x.h
+	rm -f $usr/include/sys/audio/audio_4231.h
+	rm -f $usr/include/sys/audio/audio_apm.h
+	rm -f $usr/include/sys/audio/audio_mixer.h
+	rm -f $usr/include/sys/audio/audio_src.h
+	rm -f $usr/include/sys/audio/audio_support.h
+	rm -f $usr/include/sys/audio/audio_trace.h
+	rm -f $root/kernel/misc/amsrc1
+	rm -f $root/kernel/misc/amsrc2
+	rm -f $root/kernel/misc/audiosup
+	rm -f $root/kernel/misc/diaudio
+	rm -f $root/kernel/misc/mixer
+	rm -f $root/kernel/misc/amd64/amsrc1
+	rm -f $root/kernel/misc/amd64/amsrc2
+	rm -f $root/kernel/misc/amd64/audiosup
+	rm -f $root/kernel/misc/amd64/diaudio
+	rm -f $root/kernel/misc/amd64/mixer
+	rm -f $root/kernel/misc/sparcv9/amsrc1
+	rm -f $root/kernel/misc/sparcv9/amsrc2
+	rm -f $root/kernel/misc/sparcv9/audiosup
+	rm -f $root/kernel/misc/sparcv9/diaudio
+	rm -f $root/kernel/misc/sparcv9/mixer
+
+	#
+	# Determine whether to emit update_audio notice or not
+	#
+	check_boomer_sys $root && BOOMER_PRESENT_SYS=true
+	check_boomer_bfu && BOOMER_PRESENT_BFU=true
+
+	# Cleanup audio devlinks when bfu'ing back to legacy audio bits.
+	# We also cleanup devlinks the first time when upgrading from legacy
+	# to Boomer bits in the update_audio script
+	#
+	if $BOOMER_PRESENT_SYS && ! $BOOMER_PRESENT_BFU; then
+		rm -f $root/dev/mixer*
+		rm -f $root/dev/sndstat*
+		rm -f $root/dev/audio*
+		rm -f $root/dev/dsp*
+		rm -f $root/dev/sound/*
+
+		touch $root/reconfigure
 	fi
 
 	#
@@ -8218,6 +8321,17 @@ mondo_loop() {
 	if [ -f $epilogue ]; then
 		print "Executing $epilogue"
 		$epilogue || print "WARNING: $epilogue failed with code $?"
+	fi
+
+	#
+	# Emit notice about upgrading the audio sub-system
+	#
+	if $BOOMER_PRESENT_BFU && ! $BOOMER_PRESENT_SYS; then
+		print
+		print "NOTICE: you must run the 'update_audio' script (from"
+		print "${GATE}/public/bin) to complete the upgrade of "
+		print "the audio sub-system"
+		print
 	fi
 
 	((seconds = SECONDS))

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_AUDIOIO_H
 #define	_SYS_AUDIOIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/types32.h>
@@ -265,22 +263,6 @@ typedef struct audio_device audio_device_t;
  * internal loopback, the ioctl should fail with EINVAL.
  */
 #define	AUDIO_DIAG_LOOPBACK	_IOW('A', 101, int)
-
-
-/*
- * Structure sent up as a M_PROTO message on trace streams
- */
-struct audtrace_hdr {
-	uint_t seq;		/* Sequence number (per-aud_stream) */
-	int type;		/* device-dependent */
-#if defined(_LP64) || defined(_I32LPx)
-	struct timeval32 timestamp;
-#else
-	struct timeval timestamp;
-#endif
-	char _f[8];		/* filler */
-};
-typedef struct audtrace_hdr audtrace_hdr_t;
 
 #ifdef __cplusplus
 }

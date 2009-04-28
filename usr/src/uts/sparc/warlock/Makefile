@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	sparc architecture dependent
@@ -51,7 +51,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	lock_lint rules
 #
-all:	warlock warlock.1394 warlock.audio warlock.ecpp warlock.scsi \
+all:	warlock warlock.1394 warlock.ecpp warlock.scsi \
 	warlock.smartcard warlock.usb warlock.ib warlock.sata warlock.wc
 
 warlock: $(MODULE).ok 
@@ -108,24 +108,6 @@ warlock.1394:
 
 warlock.ecpp:
 	@cd ../ecpp; $(MAKE) clean; $(MAKE) warlock
-
-warlock.audio:
-	@cd ../audiosup; $(MAKE) clean; $(MAKE) warlock
-	@cd ../mixer; $(MAKE) clean; $(MAKE) warlock
-	@cd ../amsrc2; $(MAKE) clean; $(MAKE) warlock
-	@cd ../audio1575; $(MAKE) clean; $(MAKE) warlock
-	@cd ../audio810; $(MAKE) clean; $(MAKE) warlock
-	@cd ../audiohd; $(MAKE) clean; $(MAKE) warlock
-	@cd ../audioixp; $(MAKE) clean; $(MAKE) warlock
-	@cd ../audiocs; $(MAKE) clean; $(MAKE) warlock
-	@cd ../audiots; $(MAKE) clean; $(MAKE) warlock
-	@cd ../usb_ac; $(MAKE) clean; $(MAKE) warlock
-	@cd ../usb_as; $(MAKE) clean; $(MAKE) warlock
-	@cd ../usb_ah; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/amsrc1; $(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/audiovia823x; \
-		$(MAKE) clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/audioens; $(MAKE) clean; $(MAKE) warlock
 
 warlock.smartcard:
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/sun4u/scmi2c; $(MAKE) clean; $(MAKE) warlock

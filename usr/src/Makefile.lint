@@ -35,6 +35,8 @@ COMMON_SUBDIRS = \
 	cmd/acctadm \
 	cmd/asa \
 	cmd/amt \
+	cmd/audio/audiotest \
+	cmd/audio/mixerctl \
 	cmd/audit \
 	cmd/auditconfig \
 	cmd/auditd \

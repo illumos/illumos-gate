@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun/Makefile.files
 #
@@ -48,7 +46,6 @@ GENUNIX_OBJS +=								\
 #			Driver Modules
 #
 AUDIOCS_OBJS +=	audio_4231.o audio_4231_apcdma.o audio_4231_eb2dma.o
-AUDIO1575_OBJS += audio1575.o
 
 BPP_OBJS +=	bpp.o
 

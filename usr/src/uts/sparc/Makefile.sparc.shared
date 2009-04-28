@@ -261,7 +261,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 #
 #	Machine Specific Driver Modules (/kernel/drv):
 #
-DRV_KMODS	+= audio1575 audio810 audiohd audiocs audiots
+DRV_KMODS	+= audio audio1575 audioens audiocs audiots audiopci austr
 DRV_KMODS	+= bge bpp dmfe eri esp fas hme qfe
 DRV_KMODS	+= openeepr options sd ses st
 DRV_KMODS	+= ssd
@@ -306,8 +306,6 @@ DRV_KMODS	+= ii rdc rdcsrv rdcstub
 DRV_KMODS	+= iscsi
 DRV_KMODS	+= emlxs
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audioens
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audiovia823x
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ifp
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= uata
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= usbser_edge
@@ -378,7 +376,7 @@ SYS_KMODS	+= doorfs pset acctctl portfs
 #
 #	'User' Modules (/kernel/misc):
 #
-MISC_KMODS	+= amsrc2 audiosup mixer
+MISC_KMODS	+= ac97
 MISC_KMODS	+= bignum
 MISC_KMODS	+= consconfig gld ipc nfs_dlboot nfssrv scsi
 MISC_KMODS	+= strplumb swapgeneric tlimod
@@ -420,7 +418,6 @@ MISC_KMODS	+= sda
 MISC_KMODS	+= spuni
 MISC_KMODS	+= hwa1480_fw uwba
 
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
@@ -483,7 +480,7 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 #
 #	'Dacf' Modules (/kernel/dacf):
 #
-DACF_KMODS	+= usb_ac_dacf net_dacf
+DACF_KMODS	+= net_dacf
 
 #
 #	MAC-Type Plugin Modules (/kernel/mac)

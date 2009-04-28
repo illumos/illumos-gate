@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Command-line audio record utility */
 
@@ -62,16 +59,11 @@
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 
-/* Defined until I get a copy of the apropriate audioio.h file. */
-#ifndef AUDIO_CD_IN
-#define	AUDIO_CD_IN 0x04	/* input from the internal CD player */
-#endif
-
 #define	Error		(void) fprintf
 
 /* Local variables */
 static char	*prog;
-static char	prog_opts[] = "aft:v:b:m:d:p:i:e:s:c:T:?"; /* getopt() flags */
+static char	prog_opts[] = "aft:v:d:i:e:s:c:T:?"; /* getopt() flags */
 static char	*Stdout;
 
 /* XXX - the input buffer size should depend on sample_rate */
@@ -82,20 +74,10 @@ static char 		swapBuf[AUDIO_BUFSIZ];	/* for byte swapping */
 
 #define	MAX_GAIN		(100)	/* maximum gain */
 
-#define	LEFT_BAL		(-100)	/* min/max balance */
-#define	MID_BAL			(0)
-#define	RIGHT_BAL		(100)
-
 static char	*Info = NULL;		/* pointer to info data */
 static unsigned	Ilen = 0;		/* length of info data */
 static unsigned	Volume = INT_MAX;	/* record volume */
 static double	Savevol;		/* saved  volume */
-static unsigned	Monvol = INT_MAX;	/* monitor volume */
-static double	Savemonvol;		/* saved monitor volume */
-static unsigned int	Balance = INT_MAX;	/* input balance */
-static unsigned int	Savebal;		/* saved input balance */
-static unsigned	Port = INT_MAX;		/* Input port (line, mic) */
-static unsigned	Saveport = 0;		/* restore value of input port */
 static unsigned	Sample_rate = 0;
 static unsigned	Channels = 0;
 static unsigned	Precision = 0;		/* based on encoding */
@@ -130,7 +112,6 @@ extern char *optarg;
 /* Local Functions */
 static void usage(void);
 static void sigint(int sig);
-static int scale_balance(int g);
 static int parse_unsigned(char *str, unsigned *dst, char *flag);
 static int parse_sample_rate(char *s, unsigned *rate);
 
@@ -139,17 +120,13 @@ static void
 usage(void)
 {
 	Error(stderr, MGET("Record an audio file -- usage:\n"
-	    "\t%s [-af] [-v vol] [-b bal] [-m monvol]\n"
-	    "\t%.*s [-p mic|line|cd|aux1|aux2|spdif]\n"
+	    "\t%s [-af] [-v vol]\n"
 	    "\t%.*s [-c channels] [-s rate] [-e encoding]\n"
 	    "\t%.*s [-t time] [-i info] [-d dev] [-T au|wav|aif[f]] [file]\n"
 	    "where:\n"
 	    "\t-a\tAppend to output file\n"
 	    "\t-f\tIgnore sample rate differences on append\n"
 	    "\t-v\tSet record volume (0 - %d)\n"
-	    "\t-b\tSet record balance (%d=left, %d=center, %d=right)\n"
-	    "\t-m\tSet monitor volume (0 - %d)\n"
-	    "\t-p\tSpecify input port\n"
 	    "\t-c\tSpecify number of channels to record\n"
 	    "\t-s\tSpecify rate in samples per second\n"
 	    "\t-e\tSpecify encoding (ulaw | alaw | [u]linear | linear8 )\n"
@@ -164,8 +141,7 @@ usage(void)
 	    prog,
 	    strlen(prog), "                    ",
 	    strlen(prog), "                    ",
-	    strlen(prog), "                    ",
-	    MAX_GAIN, LEFT_BAL, MID_BAL, RIGHT_BAL, MAX_GAIN);
+	    MAX_GAIN);
 	exit(1);
 }
 
@@ -185,12 +161,6 @@ sigint(int sig)
 	if (Audio_fd >= 0) {
 		if (Volume != INT_MAX)
 			(void) audio_set_record_gain(Audio_fd, &Savevol);
-		if (Balance != INT_MAX)
-			(void) audio_set_record_balance(Audio_fd, &Savebal);
-		if (Monvol != INT_MAX)
-			(void) audio_set_monitor_gain(Audio_fd, &Savemonvol);
-		if (Port != INT_MAX)
-			(void) audio_set_record_port(Audio_fd, &Saveport);
 		if (audio_cmp_hdr(&Save_hdr, &Dev_hdr) != 0) {
 			(void) audio_set_record_config(Audio_fd, &Save_hdr);
 		}
@@ -211,11 +181,9 @@ main(int argc, char **argv)
 	int		ofd;
 	int 		swapBytes = FALSE;
 	double		vol;
-	int		bal;
 	struct stat	st;
 	struct pollfd	pfd;
 	char		*cp;
-	char		ctldev[MAXPATHLEN];
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -250,25 +218,6 @@ main(int argc, char **argv)
 				err++;
 			}
 			break;
-		case 'b':
-			bal = atoi(optarg);
-			if ((bal > RIGHT_BAL) || (bal < LEFT_BAL)) {
-				Error(stderr, MGET("%s: invalid value for "
-				"-b\n"), prog);
-				err++;
-			} else {
-				Balance = (unsigned)scale_balance(bal);
-			}
-			break;
-		case 'm':
-			if (parse_unsigned(optarg, &Monvol, "-m")) {
-				err++;
-			} else if (Monvol > MAX_GAIN) {
-				Error(stderr, MGET("%s: invalid value for "
-				"-m\n"), prog);
-				err++;
-			}
-			break;
 		case 't':
 			Time = audio_str_to_secs(optarg);
 			if ((Time == HUGE_VAL) || (Time < 0.)) {
@@ -279,33 +228,6 @@ main(int argc, char **argv)
 			break;
 		case 'd':
 			Audio_dev = optarg;
-			break;
-		case 'p':
-			/* a partial match is OK */
-			if (strncmp(optarg, "microphone",
-			    strlen(optarg)) == 0) {
-				Port = AUDIO_MICROPHONE;
-			} else if (strncmp(optarg, "line",
-			    strlen(optarg)) == 0) {
-				Port = AUDIO_LINE_IN;
-			} else if ((strncmp(optarg, "cd",
-			    strlen(optarg)) == 0) || (strncmp(optarg,
-			    "internal-cd", strlen(optarg)) == 0)) {
-				Port = AUDIO_CD_IN;
-			} else if (strncmp(optarg, "aux1",
-			    strlen(optarg)) == 0) {
-				Port = AUDIO_AUX1_IN;
-			} else if (strncmp(optarg, "aux2",
-			    strlen(optarg)) == 0) {
-				Port = AUDIO_AUX2_IN;
-			} else if (strncmp(optarg, "spdif",
-			    strlen(optarg)) == 0) {
-				Port = AUDIO_SPDIF_IN;
-			} else {
-				Error(stderr, MGET("%s: invalid value for "
-				"-p\n"), prog);
-				err++;
-			}
 			break;
 		case 'f':
 			Force = TRUE;
@@ -703,44 +625,10 @@ openinput:
 		}
 	}
 
-	if (Balance != INT_MAX) {
-		(void) audio_get_record_balance(Audio_fd, &Savebal);
-		err = audio_set_record_balance(Audio_fd, &Balance);
-		if (err != AUDIO_SUCCESS) {
-			Error(stderr,
-			    MGET("%s: could not set record balance for %s\n"),
-			    prog, Audio_dev);
-			exit(1);
-		}
-	}
-
-	/* If -m flag, set monitor volume now */
-	if (Monvol != INT_MAX) {
-		vol = (double)Monvol / (double)MAX_GAIN;
-		(void) audio_get_monitor_gain(Audio_fd, &Savemonvol);
-		err = audio_set_monitor_gain(Audio_fd, &vol);
-		if (err != AUDIO_SUCCESS) {
-			Error(stderr,
-			    MGET("%s: could not set monitor volume for %s\n"),
-			    prog, Audio_dev);
-			exit(1);
-		}
-	}
-
-	/* If -p flag, set the input port */
-	if (Port != INT_MAX) {
-		(void) audio_get_record_port(Audio_fd, &Saveport);
-		err = audio_set_record_port(Audio_fd, &Port);
-		if (err != AUDIO_SUCCESS) {
-			Error(stderr,
-			    MGET("%s: could not set input port %s\n"),
-			    prog, Audio_dev);
-			exit(1);
-		}
-	}
-
 	if (isatty(ofd)) {
-		exit(0);
+		Error(stderr, MGET("%s: No files and stdout is a tty\n"),
+		    prog);
+		exit(1);
 	}
 
 	/* Set up SIGINT handler so that final buffers may be flushed */
@@ -823,15 +711,9 @@ openinput:
 		Error(stderr, MGET("%s: WARNING: Data overflow occurred\n"),
 		    prog);
 
-	/* Reset record volume, balance, monitor volume, port, encoding */
+	/* Reset record volume, encoding */
 	if (Volume != INT_MAX)
 		(void) audio_set_record_gain(Audio_fd, &Savevol);
-	if (Balance != INT_MAX)
-		(void) audio_set_record_balance(Audio_fd, &Savebal);
-	if (Monvol != INT_MAX)
-		(void) audio_set_monitor_gain(Audio_fd, &Savemonvol);
-	if (Port != INT_MAX)
-		(void) audio_set_record_port(Audio_fd, &Saveport);
 	if (audio_cmp_hdr(&Save_hdr, &Dev_hdr) != 0) {
 		(void) audio_set_record_config(Audio_fd, &Save_hdr);
 	}
@@ -886,7 +768,8 @@ parse_sample_rate(char *s, unsigned *rate)
 		 * XXX bug alert: could have multiple "." in string
 		 * and mess things up.
 		 */
-		for (cp = s; *cp && (isdigit(*cp) || (*cp == '.')); cp++);
+		for (cp = s; *cp && (isdigit(*cp) || (*cp == '.')); cp++)
+			/* NOP */;
 		if (*cp != NULL) {
 			if ((*cp == 'k') || (*cp == 'K')) {
 				drate *= 1000.0;
@@ -902,12 +785,4 @@ parse_sample_rate(char *s, unsigned *rate)
 
 	*rate = irint(drate);
 	return (0);
-}
-
-/* Convert local balance into device parameters */
-static int
-scale_balance(int g)
-{
-	return (int)(((g + RIGHT_BAL) / (double)(RIGHT_BAL - LEFT_BAL)) *
-	    (double)AUDIO_RIGHT_BALANCE);
 }

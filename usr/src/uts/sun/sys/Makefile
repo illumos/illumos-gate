@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # include global definitions
 include ../../../Makefile.master
@@ -49,10 +47,6 @@ stp4020_reg.h		stp4020_var.h \
 ttymux.h		ttymuxuser.h \
 zsdev.h
 
-AUDIOHDRS= \
-audio_4231.h \
-audio1575.h
-
 SCSIADHDRS= \
 espcmd.h	espreg.h	espvar.h	fascmd.h	fasdma.h \
 fasreg.h	fasvar.h	ifpio.h		sfvar.h
@@ -73,7 +67,6 @@ ROOTDIRS=	$(ROOTDIR) \
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
 $(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(ROOTDIR)/%)
-ROOTAUDHDRS= $(AUDIOHDRS:%=$(ROOTDIR)/audio/%)
 ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fc4/%)
 ROOTSCSIADHDRS= $(SCSIADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 $(CLOSED_BUILD)ROOTSCSIADHDRS += \
@@ -113,7 +106,6 @@ scsi/targets/%.check:	scsi/targets/%.h
 
 CHECKHDRS= \
 	$(HDRS:%.h=%.check) \
-	$(AUDIOHDRS:%.h=audio/%.check) \
 	$(FCHDRS:%.h=fc4/%.check) \
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check) \
 	$(SCSITARGHDRS:%.h=scsi/targets/%.check)

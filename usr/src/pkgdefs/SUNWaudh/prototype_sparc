@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -44,7 +42,3 @@
 #
 # SUNWaudh
 #
-f none usr/include/sys/audio/audio_4231.h 644 root bin
-f none usr/include/sys/audio/audiots.h 644 root bin
-f none usr/include/sys/audio/audio1575.h 644 root bin
-f none usr/include/sys/audio/am_src2.h 644 root bin

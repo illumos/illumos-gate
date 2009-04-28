@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,9 +86,7 @@ typedef struct usb_as_state {
 	uint_t			usb_as_dev_state;
 	uint_t			usb_as_ifno;
 	kmutex_t		usb_as_mutex;
-	queue_t			*usb_as_rq;		/* read q ptr */
-	queue_t			*usb_as_wq;		/* write q ptr */
-	uint_t			usb_as_streams_flag;	/* streams status */
+	uint_t			usb_as_flag;		/* status */
 
 	/* mblk containing the current control command */
 	mblk_t			*usb_as_def_mblk;
@@ -133,6 +131,7 @@ typedef struct usb_as_state {
 	/* debug support */
 	uint_t			usb_as_send_debug_count;
 	uint_t			usb_as_rcv_debug_count;
+	char			dstr[64];
 } usb_as_state_t;
 
 /* warlock directives, stable data */
@@ -141,8 +140,6 @@ _NOTE(MUTEX_PROTECTS_DATA(usb_as_state_t::usb_as_mutex, usb_as_power_t))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_dip))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_pm))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_instance))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_rq))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_wq))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_default_ph))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_isoc_ph))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_as_state_t::usb_as_log_handle))
@@ -202,9 +199,9 @@ typedef struct usb_as_req {
 } usb_as_req_t;
 
 
-/* Streams status */
-#define	USB_AS_STREAMS_OPEN		1
-#define	USB_AS_STREAMS_DISMANTLING	2
+/* status */
+#define	USB_AS_OPEN		1
+#define	USB_AS_DISMANTLING	2
 
 #define	USB_AS_BUFFER_SIZE		256	/* descriptor buffer size */
 

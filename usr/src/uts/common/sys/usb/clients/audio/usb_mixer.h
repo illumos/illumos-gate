@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,10 +62,7 @@ typedef struct usb_as_registration {
 	uchar_t			reg_mode;	/* play or record */
 	uchar_t			reg_n_formats;
 	int			reg_ifno;
-	am_ad_sample_rates_t	reg_mixer_srs;
-	am_ad_sample_rates_t	reg_compat_srs;
-	uint_t			reg_mixer_srs_list[USB_AS_N_SRS];
-	uint_t			reg_compat_srs_list[USB_AS_N_SRS];
+	uint_t			reg_srs[USB_AS_N_SRS];
 	usb_audio_formats_t	reg_formats[USB_AS_N_FORMATS];
 	uint_t			reg_channels[USB_AS_N_CHANNELS];
 	am_ad_cap_comb_t	reg_combinations[USB_AS_N_COMBINATIONS];

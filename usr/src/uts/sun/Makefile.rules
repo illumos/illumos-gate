@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun/Makefile.rules
 #
@@ -48,11 +46,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/audio/sada/drv/audiocs/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/audio/sada/drv/audio1575/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/audio/drv/audiocs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -99,10 +93,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/audio/sada/drv/audiocs/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/audio/sada/drv/audio1575/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/audio/drv/audiocs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/eri/%.c

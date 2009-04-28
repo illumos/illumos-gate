@@ -20,20 +20,15 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-/*
- * CAUTION: This header file has not gone through a formal review process.
- *	Thus its commitment level is very low and may change or be removed
- *	at any time.
  */
 
 #ifndef	_SYS_AC97_H
 #define	_SYS_AC97_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/types.h>
+#include <sys/audio/audio_common.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,89 +37,12 @@ extern "C" {
 #ifdef _KERNEL
 
 /*
- * This header file describes the AC-97 V2.1 Codec register set. See the
+ * This header file describes the AC-97 Codec register set. See the
  * spec for a detailed description of each register.
  */
 
-struct ac97_v21 {
-	uint16_t	ac97_reset;			/* 00h */
-	uint16_t	ac97_master_volume;		/* 02h */
-	uint16_t	ac97_headphone_volume;		/* 04h, optional */
-	uint16_t	ac97_master_mono_volume;	/* 06h, optional */
-	uint16_t	ac97_master_tone;		/* 08h, optional */
-	uint16_t	ac97_pc_beep_volume;		/* 0ah, optional */
-	uint16_t	ac97_phone_volume;		/* 0ch, optional */
-	uint16_t	ac97_mic_volume;		/* 0eh */
-	uint16_t	ac97_line_in_volume;		/* 10h */
-	uint16_t	ac97_cd_volume;			/* 12h */
-	uint16_t	ac97_video_volume;		/* 14h, optional */
-	uint16_t	ac97_aux_volume;		/* 16h, optional */
-	uint16_t	ac97_PCM_out_volume;		/* 18h */
-	uint16_t	ac97_record_select;		/* 1ah */
-	uint16_t	ac97_record_gain;		/* 1ch */
-	uint16_t	ac97_record_gain_mic;		/* 1eh, optional */
-	uint16_t	ac97_general_purpose;		/* 20h, optional */
-	uint16_t	ac97_threeD_control;		/* 22h, optional */
-	uint16_t	ac97_reserved_1;		/* 24h */
-	uint16_t	ac97_pwrdwn_ctrl_stat;		/* 26h */
-
-	/* extended audio registers */
-
-	uint16_t	ac97_ext_audio_id;		/* 28h, optional */
-	uint16_t	ac97_ext_audio_stat_ctrl;	/* 2ah, optional */
-	uint16_t	ac97_ext_front_DAC_rate;	/* 2ch, optional */
-	uint16_t	ac97_ext_surround_DAC_rate;	/* 2eh, optional */
-	uint16_t	ac97_ext_LFE_DAC_rate;		/* 30h, optional */
-	uint16_t	ac97_ext_LR_ADC_rate;		/* 32h, optional */
-	uint16_t	ac97_ext_mic_ADC_rate;		/* 34h, optional */
-	uint16_t	ac97_ext_C_LFE_volume;		/* 36h, optional */
-	uint16_t	ac97_ext_LR_surround_volume;	/* 38h, optional */
-	uint16_t	ac97_ext_reserved_1;		/* 3ah, optional */
-
-	/* extended modem registers */
-
-	uint16_t	ac97_ext_modem_id;		/* 3ch, optional */
-	uint16_t	ac97_ext_modem_stat_ctrl;	/* 3eh, optional */
-	uint16_t	ac97_ext_line1_DAC_ADC_rate;	/* 40h, optional */
-	uint16_t	ac97_ext_line2_DAC_ADC_rate;	/* 42h, optional */
-	uint16_t	ac97_ext_hndst_DAC_ADC_rate;	/* 44h, optional */
-	uint16_t	ac97_ext_line1_DAC_ADC_level;	/* 46h, optional */
-	uint16_t	ac97_ext_line2_DAC_ADC_level;	/* 48h, optional */
-	uint16_t	ac97_ext_hndst_DAC_ADC_level;	/* 4ah, optional */
-	uint16_t	ac97_ext_GPIO_pin_config;	/* 4ch, optional */
-	uint16_t	ac97_ext_GPIO_pin_polarity;	/* 4eh, optional */
-	uint16_t	ac97_ext_GPIO_pin_sticky;	/* 50h, optional */
-	uint16_t	ac97_ext_GPIO_pin_wakeup;	/* 52h, optional */
-	uint16_t	ac97_ext_GPIO_pin_status;	/* 54h, optional */
-	uint16_t	ac97_ext_modem_AFE_stat_ctrl;	/* 56h, optional */
-	uint16_t	ac97_ext_reserved_2;		/* 58h, optional */
-
-	/* reserved for vendor usage */
-	uint16_t	ac97_vendor_01;			/* 5ah, optional */
-	uint16_t	ac97_vendor_02;			/* 5ch, optional */
-	uint16_t	ac97_vendor_03;			/* 5eh, optional */
-	uint16_t	ac97_vendor_04;			/* 60h, optional */
-	uint16_t	ac97_vendor_05;			/* 62h, optional */
-	uint16_t	ac97_vendor_06;			/* 64h, optional */
-	uint16_t	ac97_vendor_07;			/* 66h, optional */
-	uint16_t	ac97_vendor_08;			/* 68h, optional */
-	uint16_t	ac97_vendor_09;			/* 6ah, optional */
-	uint16_t	ac97_vendor_10;			/* 6ch, optional */
-	uint16_t	ac97_vendor_11;			/* 6eh, optional */
-	uint16_t	ac97_vendor_12;			/* 70h, optional */
-	uint16_t	ac97_vendor_13;			/* 72h, optional */
-	uint16_t	ac97_vendor_14;			/* 74h, optional */
-	uint16_t	ac97_vendor_15;			/* 76h, optional */
-	uint16_t	ac97_vendor_16;			/* 78h, optional */
-	uint16_t	ac97_vendor_17;			/* 7ah, optional */
-
-	uint16_t	ac97_vendor_id1;		/* 7ch */
-	uint16_t	ac97_vendor_id2;		/* 7eh */
-};
-typedef struct ac97_v21 ac97_v21_t;
-
 /*
- * Defines for the V2.1 registers.
+ * Defines for the registers.
  */
 
 /* Reset Register					Index 00h */
@@ -162,7 +80,7 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	HPVR_MUTE					0x8000
 
 /* Mono Master Volume Register				Index 06h - Optional */
-#define	AC97_MONO_MASTER_VOLUME_REGSITER		0x06
+#define	AC97_MONO_MASTER_VOLUME_REGISTER		0x06
 #define	MMVR_MASK					0x001f
 #define	MMVR_0dB_ATTEN					0x0000
 #define	MMVR_OPTIONAL_MASK				0x003f
@@ -239,7 +157,7 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	AUXVR_LEFT_MAX_ATTEN				0x1f00
 #define	AUXVR_MUTE					0x8000
 
-/* PCM Out Input Volume Register			Index 18h */
+/* PCM Out Volume Register				Index 18h */
 #define	AC97_PCM_OUT_VOLUME_REGISTER			0x18
 #define	PCMOVR_RIGHT_GAIN_MASK				0x001f
 #define	PCMOVR_RIGHT_0dB_GAIN				0x0010
@@ -306,6 +224,14 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	TDCR_CENTER_MASK				0x0f00
 #define	TDCR_NULL					0x0000
 
+/* Audio Interrupt and Paging Mechanism			Index 24h - r2.3 */
+#define	AC97_INTERRUPT_PAGING_REGISTER			0x24
+#define	IPR_IS						0x8000
+#define	IPR_CAUSE_MASK					0x6000
+#define	IPR_SC						0x1000
+#define	IPR_IE						0x0800
+#define	IPR_PG_MASK					0x000f
+
 /* Powerdown Control Status Register			Index 26h */
 #define	AC97_POWERDOWN_CTRL_STAT_REGISTER		0x26
 #define	PCSR_ADC					0x0001
@@ -327,11 +253,17 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	AC97_EXTENDED_AUDIO_REGISTER			0x28
 #define	EAR_VRA						0x0001
 #define	EAR_DRA						0x0002
+#define	EAR_SPDIF					0x0004
 #define	EAR_VRM						0x0008
+#define	EAR_DSA_MASK					0x0030
 #define	EAR_CDAC					0x0040
 #define	EAR_SDAC					0x0080
 #define	EAR_LDAC					0x0100
 #define	EAR_AMAP					0x0200
+#define	EAR_REV_MASK					0x0c00
+#define	EAR_REV_21					0x0000
+#define	EAR_REV_22					0x0400
+#define	EAR_REV_23					0x0800
 #define	EAR_PRIMARY_CODEC				0x0000
 #define	EAR_SECONDARY_01_CODEC				0x4000
 #define	EAR_SECONDARY_10_CODEC				0x8000
@@ -341,15 +273,23 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER		0x2a
 #define	EASCR_VRA					0x0001
 #define	EASCR_DRA					0x0002
+#define	EASCR_SPDIF					0x0004
 #define	EASCR_VRM					0x0008
+#define	EASCR_SPSA_MASK					0x0030
+#define	EASCR_SPSA_3_4					0x0000
+#define	EASCR_SPSA_7_8					0x0010
+#define	EASCR_SPSA_6_9					0x0020
+#define	EASCR_SPSA_10_11				0x0030
 #define	EASCR_CDAC					0x0040
 #define	EASCR_SDAC					0x0080
 #define	EASCR_LDAC					0x0100
 #define	EASCR_MADC					0x0200
+#define	EASCR_SPCV					0x0400
 #define	EASCR_PRI					0x0800
 #define	EASCR_PRJ					0x1000
 #define	EASCR_PRK					0x2000
 #define	EASCR_PRL					0x4000
+#define	EASCR_VCFG					0x8000
 
 /* Extended Front DAC Rate Register			2ch - Optional */
 #define	AC97_EXTENDED_FRONT_DAC_RATE_REGISTER		0x2c
@@ -371,7 +311,7 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	AC97_EXTENDED_C_LFE_VOLUME_REGISTER		0x36
 #define	EXLFEVR_CENTER_MASK				0x001f
 #define	EXLFEVR_CENTER_OPTIONAL_MASK			0x003f
-#define	EXLFEVR_CENTER_MTUE				0x0080
+#define	EXLFEVR_CENTER_MUTE				0x0080
 #define	EXLFEVR_LFE_MASK				0x1f00
 #define	EXLFEVR_LFE_OPTIONAL_MASK			0x3f00
 #define	EXLFEVR_LFE_MUTE				0x8000
@@ -384,6 +324,25 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	EXLFEVR_LEFT_MASK				0x1f00
 #define	EXLFEVR_LEFT_OPTIONAL_MASK			0x3f00
 #define	EXLFEVR_LEFT_MUTE				0x8000
+
+/* S/PDIF Control Register				3ah - Optional */
+#define	AC97_SPDIF_CONTROL_REGISTER			0x3a
+#define	SPCR_PRO					0x0001
+#define	SPCR_AUDIO					0x0002
+#define	SPCR_COPY					0x0004
+#define	SPCR_PRE					0x0008
+#define	SPCR_CC_MASK					0x07f0
+#define	SPCR_L						0x0800
+#define	SPCR_SPSR_MASK					0x3000
+#define	SPCR_SPSR_44100					0x0000
+#define	SPCR_SPSR_48000					0x2000
+#define	SPCR_SPSR_32000					0x3000
+#define	SPCR_DRS					0x4000
+#define	SPCR_V						0x8000
+
+/*
+ * Modem only registers from 3ch - 58h.
+ */
 
 /* Extended Modem ID Register				3ch - Optional */
 #define	AC97_EXTENDED_MODEM_ID_REGISTER			0x3c
@@ -478,7 +437,11 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	EMAFESCR_CID1					0x4000
 #define	EMAFESCR_CID2					0x8000
 
-/* Vender Reserved Registers				5ah - 7ah - Optional */
+/* Vendor Reserved Registers				5ah - 7ah - Optional */
+/*
+ * Note that 60h - 6eh is also defined as the extended codec page area in
+ * AC'97 r2.3.
+ */
 #define	AC97_VENDOR_REGISTER_01				0x5a
 #define	AC97_VENDOR_REGISTER_02				0x5c
 #define	AC97_VENDOR_REGISTER_03				0x5e
@@ -497,6 +460,18 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	AC97_VENDOR_REGISTER_16				0x78
 #define	AC97_VENDOR_REGISTER_17				0x7a
 
+/*
+ * Page 01 Extended Codec Registers
+ */
+#define	AC97_PAGE01_CODEC_CLASS_REV_REGISTER		0x60
+#define	AC97_PAGE01_PCI_SVID_REGISTER			0x62
+#define	AC97_PAGE01_PCI_SID_REGISTER			0x64
+#define	AC97_PAGE01_FUNCTION_SELECT_REGISTER		0x66
+#define	AC97_PAGE01_FUNCTION_INFORMATION_REGISTER	0x68
+#define	AC97_PAGE01_SENSE_DETAILS_REGISTER		0x6a
+#define	AC97_PAGE01_DAC_SLOT_MAPPING_REGISTER		0x6c
+#define	AC97_PAGE01_ADC_SLOT_MAPPING_REGISTER		0x6e
+
 /* Vendor ID1 Register					7ch */
 #define	AC97_VENDOR_ID1_REGISTER			0x7c
 #define	VID1R_CHAR2_MASK				0x00ff
@@ -506,6 +481,133 @@ typedef struct ac97_v21 ac97_v21_t;
 #define	AC97_VENDOR_ID2_REGISTER			0x7e
 #define	VID2R_REVISION_MASK				0x00ff
 #define	VID2R_CHAR3_MASK				0xff00
+
+/*
+ * Property names used by AC97.  We should probably have a better way
+ * of dealing with some of these.  (LINEIN_FUNC and MIC_FUNC should really
+ * be saved/restored with other global settings.)
+ */
+#define	AC97_PROP_AMPLIFIER	"ac97-amplifier"
+#define	AC97_PROP_SPEAKER	"ac97-speaker"
+#define	AC97_PROP_MICBOOST	"ac97-micboost"
+#define	AC97_PROP_NO_HEADPHONE	"ac97-no-headphone"
+#define	AC97_PROP_NO_AUXOUT	"ac97-no-auxout"
+#define	AC97_PROP_NO_CDROM	"ac97-no-cdrom"
+#define	AC97_PROP_NO_VIDEO	"ac97-no-video"
+#define	AC97_PROP_NO_AUXIN	"ac97-no-auxin"
+#define	AC97_PROP_NO_MIC	"ac97-no-mic"
+#define	AC97_PROP_NO_LINEIN	"ac97-no-linein"
+#define	AC97_PROP_LINEIN_FUNC	"ac97-linein-function"	/* 1=linein, 2=surr */
+#define	AC97_PROP_MIC_FUNC	"ac97-mic-function"	/* 1=mic, 2=cen/lfe */
+#define	AC97_PROP_DOWNMIX	"ac97-downmix"
+#define	AC97_PROP_SPREAD	"ac97-spread"
+
+/*
+ * Known Codec vendors.
+ */
+#define	AC97_VENDOR_ADS			0x41445300	/* Analog Devices */
+#define	AC97_VENDOR_AKM			0x414b4d00	/* Asahi Kasei */
+#define	AC97_VENDOR_ALC			0x414c4300	/* Realtek */
+#define	AC97_VENDOR_ALG			0x414c4700	/* Realtek */
+#define	AC97_VENDOR_CMI			0x43d44900	/* Cmedia */
+#define	AC97_VENDOR_CRY			0x43525900	/* Cirrus Logic */
+#define	AC97_VENDOR_CXT			0x43585400	/* Conexant */
+#define	AC97_VENDOR_EMC			0x454d4300	/* eMicro */
+#define	AC97_VENDOR_EV			0x000f8300	/* Ectiva */
+#define	AC97_VENDOR_ESS			0x45838300	/* ESS */
+#define	AC97_VENDOR_ICE			0x49434500	/* ICEnsemble */
+#define	AC97_VENDOR_ST			0x83847600	/* SigmaTel */
+#define	AC97_VENDOR_TRA			0x54524100	/* TriTech */
+#define	AC97_VENDOR_VIA			0x56494100	/* VIA */
+#define	AC97_VENDOR_WML			0x574d4c00	/* Wolfson */
+#define	AC97_VENDOR_YMH			0x594d4800	/* Yamaha */
+
+/*
+ * Known Codec IDs.
+ */
+#define	AC97_CODEC_AD1819B		0x41445303
+#define	AC97_CODEC_AD1881		0x41445340
+#define	AC97_CODEC_AD1881A		0x41445348
+#define	AC97_CODEC_AD1885		0x41445360
+#define	AC97_CODEC_AD1886		0x41445361
+#define	AC97_CODEC_AD1887		0x41445362
+#define	AC97_CODEC_AD1888		0x41445368
+#define	AC97_CODEC_AD1980		0x41445370
+#define	AC97_CODEC_AD1981A		0x41445371
+#define	AC97_CODEC_AD1981		0x41445372
+#define	AC97_CODEC_AD1981B		0x41445374
+#define	AC97_CODEC_AD1985		0x41445375
+#define	AC97_CODEC_AK4540		0x414b4d00
+#define	AC97_CODEC_ALC100		0x414c4326
+#define	AC97_CODEC_ALC200P		0x414c4710
+#define	AC97_CODEC_ALC202		0x414c4740
+#define	AC97_CODEC_ALC203		0x414c4770
+#define	AC97_CODEC_ALC250		0x414c4750
+#define	AC97_CODEC_ALC250_2		0x414c4752
+#define	AC97_CODEC_ALC650		0x414c4720
+#define	AC97_CODEC_ALC655		0x414c4760
+#define	AC97_CODEC_ALC658		0x414c4780
+#define	AC97_CODEC_ALC850		0x414c4790
+#define	AC97_CODEC_CMI9738		0x434d4941
+#define	AC97_CODEC_CMI9739		0x434d4961
+#define	AC97_CODEC_CMI9780		0x434d4969
+#define	AC97_CODEC_CMI9761		0x434d4978
+#define	AC97_CODEC_CMI9761_2		0x434d4982
+#define	AC97_CODEC_CMI9761_3		0x434d4983
+#define	AC97_CODEC_CS4202		0x43525970
+#define	AC97_CODEC_CS4205		0x43525950
+#define	AC97_CODEC_CS4294		0x43525920
+#define	AC97_CODEC_CS4297		0x43525900
+#define	AC97_CODEC_CS4297A		0x43525910
+#define	AC97_CODEC_CS4299		0x43525930
+#define	AC97_CODEC_CX20468		0x43585428
+#define	AC97_CODEC_CX20468_2		0x43585429
+#define	AC97_CODEC_CX20468_21		0x43585430
+#define	AC97_CODEC_EM28028		0x454d4328
+#define	AC97_CODEC_ES1921		0x45838308
+#define	AC97_CODEC_EV1938		0x000f8384
+#define	AC97_CODEC_ICE1232		0x49434511
+#define	AC97_CODEC_STAC9700		0x83847600
+#define	AC97_CODEC_STAC9701		0x83847601
+#define	AC97_CODEC_STAC9701_2		0xc250c250
+#define	AC97_CODEC_STAC9704		0x83847604
+#define	AC97_CODEC_STAC9705		0x83847605
+#define	AC97_CODEC_STAC9708		0x83847608
+#define	AC97_CODEC_STAC9721		0x83847609
+#define	AC97_CODEC_STAC9744		0x83847644
+#define	AC97_CODEC_STAC9750		0x83847650
+#define	AC97_CODEC_STAC9752		0x83847652
+#define	AC97_CODEC_STAC9756		0x83847656
+#define	AC97_CODEC_STAC9758		0x83847658
+#define	AC97_CODEC_STAC9766		0x83847666
+#define	AC97_CODEC_TR28023		0x54524103
+#define	AC97_CODEC_TR28023_2		0x54524123
+#define	AC97_CODEC_TR28028		0x54524108
+#define	AC97_CODEC_TR28028_2		0x54524128
+#define	AC97_CODEC_VT1612A		0x56494161
+#define	AC97_CODEC_VT1617A		0x56494170
+#define	AC97_CODEC_VT1616		0x49434551
+#define	AC97_CODEC_VT1616A		0x49434552
+#define	AC97_CODEC_VT1618		0x56494182
+#define	AC97_CODEC_WM9701A		0x574d4c00
+#define	AC97_CODEC_WM9703		0x574d4c03
+#define	AC97_CODEC_WM9704		0x574d4c04
+#define	AC97_CODEC_YMF743		0x594d4800
+#define	AC97_CODEC_YMF753		0x594d4803
+
+/*
+ * Functions for drivers to interact with the common ac97 module.
+ */
+typedef struct ac97 ac97_t;
+typedef void (*ac97_wr_t)(void *, uint8_t, uint16_t);
+typedef uint16_t (*ac97_rd_t)(void *, uint8_t);
+
+ac97_t *ac97_alloc(dev_info_t *, ac97_rd_t, ac97_wr_t, void *);
+void ac97_free(ac97_t *);
+int ac97_init(ac97_t *, audio_dev_t *);
+void ac97_suspend(ac97_t *);
+void ac97_resume(ac97_t *);
+void ac97_reset(ac97_t *);
 
 #endif	/* _KERNEL */
 

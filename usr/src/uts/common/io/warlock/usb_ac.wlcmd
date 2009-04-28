@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one usb_ac_state
 
@@ -45,9 +44,6 @@ root usb_ac_start_record
 root usb_ac_stop_play
 root usb_ac_stop_record
 root usb_ac_teardown
-
-root usb_ac_dacf.c:usb_ac_mux_plumbing
-root usb_ac_dacf.c:usb_ac_mux_unplumbing
 
 add  bus_ops::bus_add_eventcall targets warlock_dummy
 add  bus_ops::bus_get_eventcookie targets warlock_dummy

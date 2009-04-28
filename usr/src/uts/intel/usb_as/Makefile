@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/usb_as/Makefile
@@ -63,11 +63,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 CLEANFILES	+= $(MODSTUBS_O)
 
-#
-# do not remove depends on amsrc2. If removed, amsrc2 gets unloaded when
-# usb_ac_dacf gets unloaded
-#
-LDFLAGS		+= -dy -Nmisc/usba -Nmisc/audiosup -Nmisc/mixer -Nmisc/amsrc2
+LDFLAGS		+= -dy -Nmisc/usba -Ndrv/usb_ac
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -120,22 +116,18 @@ USBA_FILES	= $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES	= $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES	= $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES	= $(EHCI_OBJS:%.o=../ehci/%.ll)
-MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/intel/mixer/%.ll)
 AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/intel/audiosup/%.ll)
-AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/intel/amsrc2/%.ll)
 
 #	Warlock targets
 #
 warlock: $(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files  \
-	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files \
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files warlock_audiosup.files \
 	warlock_standalone warlock_with_usba  warlock_with_sada
 	$(TOUCH) $(WARLOCK_OK)
 
 warlock_with_sada: $(WLCMD_DIR)/usb_as_with_sada.wlcmd \
-	$(WARLOCK_OUT) \
-	warlock_audiosup.files warlock_amsrc2.files warlock_mixer.files
+	$(WARLOCK_OUT) warlock_audiosup.files 
 	$(WARLOCK) -c $(WLCMD_DIR)/usb_as_with_sada.wlcmd $(WARLOCK_OUT) \
 	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
@@ -171,9 +163,3 @@ warlock_ddi.files:
 
 warlock_audiosup.files:
 	@cd ../audiosup; pwd; $(MAKE) warlock
-
-warlock_amsrc2.files:
-	@cd ../amsrc2; pwd; $(MAKE) warlock
-
-warlock_mixer.files:
-	@cd ../mixer; pwd; $(MAKE) warlock

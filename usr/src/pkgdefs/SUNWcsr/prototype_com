@@ -349,6 +349,7 @@ d none lib/svc/method 0755 root bin
 f none lib/svc/method/boot-archive 0555 root bin
 f none lib/svc/method/boot-archive-update 0555 root bin
 f none lib/svc/method/console-login 0555 root bin
+f none lib/svc/method/devices-audio 0555 root bin
 f none lib/svc/method/devices-local 0555 root bin
 f none lib/svc/method/fs-local 0555 root bin
 f none lib/svc/method/fs-minimal 0555 root bin
@@ -531,6 +532,7 @@ d none var/svc/manifest/system 755 root sys
 f manifest var/svc/manifest/system/boot-archive.xml 0444 root sys
 f manifest var/svc/manifest/system/boot-archive-update.xml 0444 root sys
 d none var/svc/manifest/system/device 755 root sys
+f manifest var/svc/manifest/system/device/devices-audio.xml 0444 root sys
 f manifest var/svc/manifest/system/device/devices-local.xml 0444 root sys
 f manifest var/svc/manifest/system/device/mpxio-upgrade.xml 0444 root sys
 d none var/svc/manifest/system/filesystem 0755 root sys
