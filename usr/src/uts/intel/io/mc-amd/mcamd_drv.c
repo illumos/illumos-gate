@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,34 +165,39 @@ mc_prop_read_pair(mc_pcicfg_hdl_t cfghdl, uint32_t *r1, off_t r1addr,
 	}
 }
 
-#define	NSKT	6
+/*ARGSUSED*/
+static int
+mc_nvl_add_socket_cb(cmi_hdl_t whdl, void *arg1, void *arg2, void *arg3)
+{
+	uint32_t skt = *((uint32_t *)arg1);
+	cmi_hdl_t *hdlp = (cmi_hdl_t *)arg2;
+
+	if (cmi_hdl_getsockettype(whdl) == skt) {
+		cmi_hdl_hold(whdl);	/* short-term hold */
+		*hdlp = whdl;
+		return (CMI_HDL_WALK_DONE);
+	} else {
+		return (CMI_HDL_WALK_NEXT);
+	}
+}
 
 static void
 mc_nvl_add_socket(nvlist_t *nvl, mc_t *mc)
 {
-	const char *s = "Unknown";
-	int i;
+	cmi_hdl_t hdl = NULL;
+	const char *s;
 
-	static const struct {
-		uint32_t type;
-		const char *name;
-	} sktnames[NSKT] = {
-		{ X86_SOCKET_754, "Socket 754" },
-		{ X86_SOCKET_939, "Socket 939" },
-		{ X86_SOCKET_940, "Socket 940" },
-		{ X86_SOCKET_AM2, "Socket AM2" },
-		{ X86_SOCKET_F1207, "Socket F(1207)" },
-		{ X86_SOCKET_S1g1, "Socket S1g1" },
-	};
-
-	for (i = 0; i < NSKT; i++) {
-		if (mc->mc_socket == sktnames[i].type) {
-			s = sktnames[i].name;
-			break;
-		}
-	}
+	cmi_hdl_walk(mc_nvl_add_socket_cb, (void *)&mc->mc_socket,
+	    (void *)&hdl, NULL);
+	if (hdl == NULL)
+		s = "Unknown";  /* no cpu for this chipid found */
+	else
+		s = cmi_hdl_getsocketstr(hdl);
 
 	(void) nvlist_add_string(nvl, "socket", s);
+
+	if (hdl != NULL)
+		cmi_hdl_rele(hdl);
 }
 
 static uint32_t

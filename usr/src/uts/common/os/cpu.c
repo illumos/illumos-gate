@@ -2166,6 +2166,7 @@ static struct {
 	kstat_named_t ci_ncoreperchip;
 	kstat_named_t ci_max_cstates;
 	kstat_named_t ci_curr_cstate;
+	kstat_named_t ci_sktstr;
 #endif
 } cpu_info_template = {
 	{ "state",			KSTAT_DATA_CHAR },
@@ -2194,6 +2195,7 @@ static struct {
 	{ "ncore_per_chip",		KSTAT_DATA_INT32 },
 	{ "supported_max_cstates",	KSTAT_DATA_INT32 },
 	{ "current_cstate",		KSTAT_DATA_INT32 },
+	{ "socket_type",		KSTAT_DATA_STRING },
 #endif
 };
 
@@ -2265,6 +2267,8 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_pkg_core_id.value.l = cpuid_get_pkgcoreid(cp);
 	cpu_info_template.ci_max_cstates.value.l = cp->cpu_m.max_cstates;
 	cpu_info_template.ci_curr_cstate.value.l = cp->cpu_m.curr_cstate;
+	kstat_named_setstr(&cpu_info_template.ci_sktstr,
+	    cpuid_getsocketstr(cp));
 #endif
 
 	return (0);

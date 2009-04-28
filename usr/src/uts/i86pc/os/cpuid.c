@@ -306,6 +306,7 @@ static struct cpuid_info cpuid_info0;
  * file to try and keep people using the expected cpuid_* interfaces.
  */
 extern uint32_t _cpuid_skt(uint_t, uint_t, uint_t, uint_t);
+extern const char *_cpuid_sktstr(uint_t, uint_t, uint_t, uint_t);
 extern uint32_t _cpuid_chiprev(uint_t, uint_t, uint_t, uint_t);
 extern const char *_cpuid_chiprevstr(uint_t, uint_t, uint_t, uint_t);
 extern uint_t _cpuid_vendorstr_to_vendorcode(char *);
@@ -495,6 +496,10 @@ cpuid_pass1(cpu_t *cpu)
 	extern int idle_cpu_prefer_mwait;
 #endif
 
+
+#if !defined(__xpv)
+	determine_platform();
+#endif
 	/*
 	 * Space statically allocated for cpu0, ensure pointer is set
 	 */
@@ -1226,9 +1231,6 @@ cpuid_pass1(cpu_t *cpu)
 	    cpi->cpi_model, cpi->cpi_step);
 
 pass1_done:
-#if !defined(__xpv)
-	determine_platform();
-#endif
 	cpi->cpi_pass = 1;
 	return (feature);
 }
@@ -2482,6 +2484,24 @@ cpuid_getsockettype(struct cpu *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_socket);
+}
+
+const char *
+cpuid_getsocketstr(cpu_t *cpu)
+{
+	static const char *socketstr = NULL;
+	struct cpuid_info *cpi;
+
+	ASSERT(cpuid_checkpass(cpu, 1));
+	cpi = cpu->cpu_m.mcpu_cpi;
+
+	/* Assume that socket types are the same across the system */
+	if (socketstr == NULL)
+		socketstr = _cpuid_sktstr(cpi->cpi_vendor, cpi->cpi_family,
+		    cpi->cpi_model, cpi->cpi_step);
+
+
+	return (socketstr);
 }
 
 int

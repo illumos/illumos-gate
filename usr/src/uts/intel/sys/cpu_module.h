@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,7 @@ extern boolean_t cmi_hdl_is_cmt(cmi_hdl_t);
 extern uint32_t cmi_hdl_chiprev(cmi_hdl_t);
 extern const char *cmi_hdl_chiprevstr(cmi_hdl_t);
 extern uint32_t cmi_hdl_getsockettype(cmi_hdl_t);
+extern const char *cmi_hdl_getsocketstr(cmi_hdl_t);
 extern id_t cmi_hdl_logical_id(cmi_hdl_t);
 
 extern int cmi_hdl_online(cmi_hdl_t, int, int *);

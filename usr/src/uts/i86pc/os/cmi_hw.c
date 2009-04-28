@@ -95,6 +95,8 @@ struct cmi_hdl_ops {
 	uint32_t (*cmio_chiprev)(cmi_hdl_impl_t *);
 	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
+	const char *(*cmio_getsocketstr)(cmi_hdl_impl_t *);
+
 	id_t (*cmio_logical_id)(cmi_hdl_impl_t *);
 	/*
 	 * These ops are optional in an implementation.
@@ -617,6 +619,12 @@ ntv_getsockettype(cmi_hdl_impl_t *hdl)
 	return (cpuid_getsockettype(HDLPRIV(hdl)));
 }
 
+static const char *
+ntv_getsocketstr(cmi_hdl_impl_t *hdl)
+{
+	return (cpuid_getsocketstr(HDLPRIV(hdl)));
+}
+
 static id_t
 ntv_logical_id(cmi_hdl_impl_t *hdl)
 {
@@ -873,6 +881,15 @@ static uint32_t
 xpv_getsockettype(cmi_hdl_impl_t *hdl)
 {
 	return (_cpuid_skt(xpv_vendor(hdl), xpv_family(hdl),
+	    xpv_model(hdl), xpv_stepping(hdl)));
+}
+
+extern const char *_cpuid_sktstr(uint_t, uint_t, uint_t, uint_t);
+
+static const char *
+xpv_getsocketstr(cmi_hdl_impl_t *hdl)
+{
+	return (_cpuid_sktstr(xpv_vendor(hdl), xpv_family(hdl),
 	    xpv_model(hdl), xpv_stepping(hdl)));
 }
 
@@ -1391,6 +1408,7 @@ CMI_HDL_OPFUNC(strandid, uint_t)
 CMI_HDL_OPFUNC(chiprev, uint32_t)
 CMI_HDL_OPFUNC(chiprevstr, const char *)
 CMI_HDL_OPFUNC(getsockettype, uint32_t)
+CMI_HDL_OPFUNC(getsocketstr, const char *)
 CMI_HDL_OPFUNC(logical_id, id_t)
 
 boolean_t
@@ -1722,6 +1740,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	xpv_chiprev,		/* cmio_chiprev */
 	xpv_chiprevstr,		/* cmio_chiprevstr */
 	xpv_getsockettype,	/* cmio_getsockettype */
+	xpv_getsocketstr,	/* cmio_getsocketstr */
 	xpv_logical_id,		/* cmio_logical_id */
 	NULL,			/* cmio_getcr4 */
 	NULL,			/* cmio_setcr4 */
@@ -1747,6 +1766,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_chiprev,		/* cmio_chiprev */
 	ntv_chiprevstr,		/* cmio_chiprevstr */
 	ntv_getsockettype,	/* cmio_getsockettype */
+	ntv_getsocketstr,	/* cmio_getsocketstr */
 	ntv_logical_id,		/* cmio_logical_id */
 	ntv_getcr4,		/* cmio_getcr4 */
 	ntv_setcr4,		/* cmio_setcr4 */

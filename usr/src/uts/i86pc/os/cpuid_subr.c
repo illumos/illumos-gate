@@ -20,8 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 
 /*
@@ -46,17 +50,24 @@
 
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <sys/bitmap.h>
 #include <sys/x86_archext.h>
+#include <sys/pci_cfgspace.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
- * AMD family 0xf and family 0x10 socket types.
+ * AMD socket types.
  * First index :
  *		0 for family 0xf, revs B thru E
  *		1 for family 0xf, revs F and G
- *		2 for family 0x10, rev B
- * Second index by (model & 0x3)
+ *		2 for family 0x10
+ *		3 for family 0x11
+ * Second index by (model & 0x3) for family 0fh
+ * or CPUID bits for later families
  */
-static uint32_t amd_skts[3][4] = {
+static uint32_t amd_skts[4][4] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
@@ -78,17 +89,46 @@ static uint32_t amd_skts[3][4] = {
 		X86_SOCKET_AM2		/* 0b11 */
 	},
 	/*
-	 * Family 0x10 revisions A and B
-	 * It is not clear whether, as new sockets release, that
-	 * model & 0x3 will id socket for this family
+	 * Family 0x10
 	 */
 #define	A_SKTS_2			2
 	{
 		X86_SOCKET_F1207,	/* 0b00 */
-		X86_SOCKET_F1207,	/* 0b01 */
-		X86_SOCKET_F1207,	/* 0b10 */
-		X86_SOCKET_F1207,	/* 0b11 */
+		X86_SOCKET_AM,		/* 0b01 */
+		X86_SOCKET_S1g3,	/* 0b10 */
+		X86_SOCKET_G34,		/* 0b11 */
+	},
+
+	/*
+	 * Family 0x11
+	 */
+#define	A_SKTS_3			3
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b00 */
+		X86_SOCKET_UNKNOWN,	/* 0b01 */
+		X86_SOCKET_S1g2,	/* 0b10 */
+		X86_SOCKET_UNKNOWN,	/* 0b11 */
 	}
+};
+
+struct amd_sktmap_s {
+	uint32_t	skt_code;
+	char		sktstr[16];
+};
+static struct amd_sktmap_s amd_sktmap[13] = {
+	{ X86_SOCKET_754,	"754" },
+	{ X86_SOCKET_939,	"939" },
+	{ X86_SOCKET_940,	"940" },
+	{ X86_SOCKET_S1g1,	"S1g1" },
+	{ X86_SOCKET_AM2,	"AM2" },
+	{ X86_SOCKET_F1207,	"F(1207)" },
+	{ X86_SOCKET_S1g2,	"S1g2" },
+	{ X86_SOCKET_S1g3,	"S1g3" },
+	{ X86_SOCKET_AM,	"AM" },
+	{ X86_SOCKET_AM2R2,	"AM2r2" },
+	{ X86_SOCKET_AM3,	"AM3" },
+	{ X86_SOCKET_G34,	"G34" },
+	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
 /*
@@ -162,9 +202,20 @@ static const struct amd_rev_mapent {
 
 	/*
 	 * Rev C has models 4-6 (depending on L3 cache configuration)
-	 * Give all of model 2 stepping range to rev c.
+	 * Give all of models 4-6 stepping range to rev C.
 	 */
 	{ 0x10, 0x04, 0x06, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_C, "C", A_SKTS_2 },
+
+	/*
+	 * Rev D has models 8 and 9
+	 * Give all of model 8 and 9 stepping range to rev D.
+	 */
+	{ 0x10, 0x08, 0x09, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_D, "D", A_SKTS_2 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x11 ===============
+	 */
+	{ 0x11, 0x03, 0x3, 0x0, 0xf, X86_CHIPREV_AMD_11, "B", A_SKTS_3 },
 };
 
 static void
@@ -175,10 +226,7 @@ synth_amd_info(uint_t family, uint_t model, uint_t step,
 	int found = 0;
 	int i;
 
-	/*
-	 * Currently only AMD family 0xf and family 0x10 use these fields.
-	 */
-	if (family != 0xf && family != 0x10)
+	if (family < 0xf)
 		return;
 
 	for (i = 0, rmp = amd_revmap; i < sizeof (amd_revmap) / sizeof (*rmp);
@@ -191,13 +239,66 @@ synth_amd_info(uint_t family, uint_t model, uint_t step,
 		}
 	}
 
-	if (found) {
-		if (skt_p != NULL)
+	if (!found)
+		return;
+
+	if (chiprev_p != NULL)
+		*chiprev_p = rmp->rm_chiprev;
+	if (chiprevstr_p != NULL)
+		*chiprevstr_p = rmp->rm_chiprevstr;
+
+	if (skt_p != NULL) {
+		int platform;
+
+#ifdef __xpv
+		/* PV guest */
+		if (!is_controldom()) {
+			*skt_p = X86_SOCKET_UNKNOWN;
+			return;
+		}
+#endif
+		platform = get_hwenv();
+
+		if ((platform == HW_XEN_HVM) || (platform == HW_VMWARE)) {
+			*skt_p = X86_SOCKET_UNKNOWN;
+		} else if (family == 0xf) {
 			*skt_p = amd_skts[rmp->rm_sktidx][model & 0x3];
-		if (chiprev_p != NULL)
-			*chiprev_p = rmp->rm_chiprev;
-		if (chiprevstr_p != NULL)
-			*chiprevstr_p = rmp->rm_chiprevstr;
+		} else {
+			/*
+			 * Starting with family 10h, socket type is stored in
+			 * CPUID Fn8000_0001_EBX
+			 */
+			struct cpuid_regs cp;
+			int idx;
+
+			cp.cp_eax = 0x80000001;
+			(void) __cpuid_insn(&cp);
+
+			/* PkgType bits */
+			idx = BITX(cp.cp_ebx, 31, 28);
+
+			if (idx > 3) {
+				/* Reserved bits */
+				*skt_p = X86_SOCKET_UNKNOWN;
+			} else if (family == 0x10 &&
+			    amd_skts[rmp->rm_sktidx][idx] ==
+			    X86_SOCKET_AM) {
+				/*
+				 * Look at Ddr3Mode bit of DRAM Configuration
+				 * High Register to decide whether this is
+				 * AM2r2 (aka AM2+) or AM3.
+				 */
+				uint32_t val;
+
+				val = pci_getl_func(0, 24, 2, 0x94);
+				if (BITX(val, 8, 8))
+					*skt_p = X86_SOCKET_AM3;
+				else
+					*skt_p = X86_SOCKET_AM2R2;
+			} else {
+				*skt_p = amd_skts[rmp->rm_sktidx][idx];
+			}
+		}
 	}
 }
 
@@ -217,6 +318,34 @@ _cpuid_skt(uint_t vendor, uint_t family, uint_t model, uint_t step)
 	}
 
 	return (skt);
+}
+
+const char *
+_cpuid_sktstr(uint_t vendor, uint_t family, uint_t model, uint_t step)
+{
+	const char *sktstr = "Unknown";
+	struct amd_sktmap_s *sktmapp;
+	uint32_t skt = X86_SOCKET_UNKNOWN;
+
+	switch (vendor) {
+	case X86_VENDOR_AMD:
+		synth_amd_info(family, model, step, &skt, NULL, NULL);
+
+		sktmapp = amd_sktmap;
+		while (sktmapp->skt_code != X86_SOCKET_UNKNOWN) {
+			if (sktmapp->skt_code == skt)
+				break;
+			sktmapp++;
+		}
+		sktstr = sktmapp->sktstr;
+		break;
+
+	default:
+		break;
+
+	}
+
+	return (sktstr);
 }
 
 uint32_t

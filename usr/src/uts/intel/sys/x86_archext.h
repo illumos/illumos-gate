@@ -506,6 +506,15 @@ extern "C" {
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0002)
 #define	X86_CHIPREV_AMD_10_REV_C \
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0004)
+#define	X86_CHIPREV_AMD_10_REV_D \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0008)
+
+/*
+ * Definitions for AMD Family 0x11.
+ */
+#define	X86_CHIPREV_AMD_11 \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x11, 0x0003)
+
 
 /*
  * Various socket/package types, extended as the need to distinguish
@@ -523,7 +532,7 @@ extern "C" {
 
 #define	X86_SOCKET_MATCH(s, mask) \
 	(_X86_SOCKET_VENDOR(s) == _X86_SOCKET_VENDOR(mask) && \
-	(_X86_SOCKET_TYPE(s) & _X86_SOCKET_TYPE(mask)) != 0)
+	(_X86_SOCKET_TYPE(s) == _X86_SOCKET_TYPE(mask)))
 
 #define	X86_SOCKET_UNKNOWN 0x0
 	/*
@@ -535,6 +544,12 @@ extern "C" {
 #define	X86_SOCKET_S1g1		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000008)
 #define	X86_SOCKET_AM2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000010)
 #define	X86_SOCKET_F1207	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000020)
+#define	X86_SOCKET_S1g2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000030)
+#define	X86_SOCKET_S1g3		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000040)
+#define	X86_SOCKET_AM		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000050)
+#define	X86_SOCKET_AM2R2	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000060)
+#define	X86_SOCKET_AM3		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000070)
+#define	X86_SOCKET_G34		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000080)
 
 #if !defined(_ASM)
 
@@ -611,6 +626,7 @@ extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
 extern uint32_t cpuid_getchiprev(struct cpu *);
 extern const char *cpuid_getchiprevstr(struct cpu *);
 extern uint32_t cpuid_getsockettype(struct cpu *);
+extern const char *cpuid_getsocketstr(struct cpu *);
 
 extern int cpuid_opteron_erratum(struct cpu *, uint_t);
 

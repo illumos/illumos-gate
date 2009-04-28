@@ -20,10 +20,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # psrinfo: displays information about processors
 #
@@ -686,6 +684,7 @@ if ($phys_view) {
 			my $brand = $cpu->{brand} ||  gettext("(unknown)");
 			my $impl = $cpu->{implementation} ||
 			  gettext("(unknown)");
+			my $socket = $cpu->{socket_type};
 			#
 			# Remove cpuid and chipid information from
 			# implementation string and print it.
@@ -702,7 +701,10 @@ if ($phys_view) {
 				       $cname, $ncpus, $cpu_name;
 				print "($cl)\n";
 				print "  $impl\n" if $impl;
-				print "\t$brand\n" if $brand;
+				print "\t$brand" if $brand;
+				print "\t[ Socket: $socket ]" if $socket &&
+				  $socket ne "Unknown";
+				print "\n";
 			} else {
 				# Get child count
 				my $nchildren =
