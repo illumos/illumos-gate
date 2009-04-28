@@ -1,4 +1,3 @@
-/*      $OpenBSD: mac.h,v 1.3 2001/06/26 17:27:24 markus Exp $   */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -23,19 +22,20 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*      $OpenBSD: mac.h,v 1.3 2001/06/26 17:27:24 markus Exp $   */
+
 #ifndef	_MAC_H
 #define	_MAC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
 int	 mac_valid(const char *);
-int	 mac_init(Mac *, char *);
+int	 mac_setup(Mac *, char *);
+int	 mac_init(Mac *);
 u_char	*mac_compute(Mac *, u_int32_t, u_char *, int);
+void	 mac_clear(Mac *);
 
 #ifdef __cplusplus
 }

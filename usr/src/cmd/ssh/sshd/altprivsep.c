@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -491,7 +491,7 @@ altprivsep_get_newkeys(enum kex_modes mode)
 
 	/* MAC name */
 	mac->name = altprivsep_packet_get_string(NULL);
-	if (mac_init(mac, mac->name) < 0)
+	if (mac_setup(mac, mac->name) < 0)
 		fatal("Monitor negotiated an unknown MAC algorithm "
 			"during re-key");
 

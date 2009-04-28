@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@ extern "C" {
 #endif
 
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include "buffer.h"
 #include "cipher.h"
 #include "key.h"
@@ -106,12 +107,14 @@ struct Enc {
 	u_char	*iv;
 };
 struct Mac {
-	char	*name;
-	int	enabled;
-	const EVP_MD	*md;
-	int	mac_len;
-	u_char	*key;
-	int	key_len;
+	char		*name;
+	int		enabled;
+	u_int		mac_len;
+	u_char		*key;
+	u_int		key_len;
+	int		type;
+	const EVP_MD	*evp_md;
+	HMAC_CTX	evp_ctx;
 };
 struct Comp {
 	int	type;
@@ -168,12 +171,6 @@ void	  kex_finish(Kex *);
 void	  kex_send_kexinit(Kex *);
 void	  kex_input_kexinit(int, u_int32_t, void *);
 void	  kex_derive_keys(Kex *, u_char *, BIGNUM *);
-
-/* XXX Remove after merge of 3.6/7 code is completed */
-#if 0
-void	 kexdh(Kex *);
-void	 kexgex(Kex *);
-#endif
 
 Newkeys *kex_get_newkeys(int);
 

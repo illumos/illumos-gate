@@ -36,7 +36,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -601,7 +601,7 @@ set_newkeys(int mode)
 	enc  = &newkeys[mode]->enc;
 	mac  = &newkeys[mode]->mac;
 	comp = &newkeys[mode]->comp;
-	if (mac->md != NULL)
+	if (mac_init(mac) == 0)
 		mac->enabled = 1;
 #ifdef	PACKET_DEBUG
 	debug("new encryption key:\n");
@@ -671,12 +671,15 @@ free_keys(Newkeys *keys)
 	enc  = &keys->enc;
 	mac  = &keys->mac;
 	comp = &keys->comp;
-	memset(mac->key, 0, mac->key_len);
 	xfree(enc->name);
 	xfree(enc->iv);
 	xfree(enc->key);
-	xfree(mac->name);
+
+	memset(mac->key, 0, mac->key_len);
 	xfree(mac->key);
+	xfree(mac->name);
+	mac_clear(mac);
+
 	xfree(comp->name);
 	xfree(keys);
 }

@@ -374,8 +374,9 @@ choose_mac(Mac *mac, char *client, char *server)
 {
 	char *name = match_list(client, server, NULL);
 	if (name == NULL)
-		fatal("no matching mac found: client %s server %s", client, server);
-	if (mac_init(mac, name) < 0)
+		fatal("no matching mac found: client %s server %s",
+		    client, server);
+	if (mac_setup(mac, name) < 0)
 		fatal("unsupported mac %s", name);
 	/* truncate the key */
 	if (datafellows & SSH_BUG_HMAC)
@@ -384,6 +385,7 @@ choose_mac(Mac *mac, char *client, char *server)
 	mac->key = NULL;
 	mac->enabled = 0;
 }
+
 static void
 choose_comp(Comp *comp, char *client, char *server)
 {
@@ -399,6 +401,7 @@ choose_comp(Comp *comp, char *client, char *server)
 	}
 	comp->name = name;
 }
+
 static void
 choose_kex(Kex *k, char *client, char *server)
 {
@@ -418,6 +421,7 @@ choose_kex(Kex *k, char *client, char *server)
 	} else
 		fatal("bad kex alg %s", k->name);
 }
+
 static void
 choose_hostkeyalg(Kex *k, char *client, char *server)
 {
