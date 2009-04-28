@@ -2144,8 +2144,8 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 		else
 			xen_gflush_va((caddr_t)va, cpus_to_shootdown);
 #else
-		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL, X_CALL_HIPRI,
-		    cpus_to_shootdown, hati_demap_func);
+		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL,
+		    CPUSET2BV(cpus_to_shootdown), hati_demap_func);
 #endif
 
 	}

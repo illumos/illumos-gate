@@ -395,7 +395,7 @@ mp_startup_init(int cpun)
 	 * alloc space for ucode_info
 	 */
 	ucode_alloc_space(cp);
-
+	xc_init_cpu(cp);
 	hat_cpu_online(cp);
 
 #ifdef TRAPTRACE
@@ -1388,7 +1388,7 @@ start_other_cpus(int cprboot)
 	 */
 	cpu_pause_init();
 
-	xc_init();		/* initialize processor crosscalls */
+	xc_init_cpu(CPU);		/* initialize processor crosscalls */
 
 	if (mach_cpucontext_init() != 0)
 		goto done;

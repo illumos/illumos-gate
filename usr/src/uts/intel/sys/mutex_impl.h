@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MUTEX_IMPL_H
 #define	_SYS_MUTEX_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_ASM
 #include <sys/types.h>
@@ -115,7 +113,7 @@ extern void null_xcall(void);
 #define	MUTEX_SYNC()	{	\
 			cpuset_t set;   \
 			CPUSET_ALL(set);        \
-			xc_call(0, 0, 0, X_CALL_HIPRI, set, \
+			xc_call(0, 0, 0, CPUSET2BV(set),	\
 			    (xc_func_t)null_xcall); \
 		}
 

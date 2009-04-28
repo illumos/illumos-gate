@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -33,7 +31,7 @@
 #include <sys/machsystm.h>
 #include <sys/systm.h>
 #include <sys/promif.h>
-#include <sys/x_call.h>
+#include <sys/xc_levels.h>
 
 /*
  * Interrupt another CPU.
@@ -54,6 +52,5 @@ poke_cpu(int cpun)
 	 * We don't need to receive an ACK from the CPU being poked,
 	 * so just send out a directed interrupt.
 	 */
-	XC_TRACE(TT_XC_POKE_CPU, -1, cpun);
 	send_dirint(cpun, XC_CPUPOKE_PIL);
 }

@@ -308,7 +308,7 @@ speedstep_power(cpuset_t set, uint32_t req_state)
 		CPUSET_DEL(set, CPU->cpu_id);
 	}
 	if (!CPUSET_ISNULL(set)) {
-		xc_call((xc_arg_t)req_state, NULL, NULL, X_CALL_HIPRI, set,
+		xc_call((xc_arg_t)req_state, NULL, NULL, CPUSET2BV(set),
 		    (xc_func_t)speedstep_pstate_transition);
 	}
 	kpreempt_enable();

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 #include <mdb/mdb_ctf.h>
 #include <sys/evtchn_impl.h>
 #include <errno.h>
+#include <sys/xc_levels.h>
 
 #include "intr_common.h"
 

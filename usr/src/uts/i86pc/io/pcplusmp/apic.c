@@ -562,12 +562,12 @@ cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 
 	switch (what) {
 		case CPU_ON:
-			xc_call(NULL, NULL, NULL, X_CALL_HIPRI, cpu_set,
+			xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
 			    (xc_func_t)apic_cmci_enable);
 			break;
 
 		case CPU_OFF:
-			xc_call(NULL, NULL, NULL, X_CALL_HIPRI, cpu_set,
+			xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
 			    (xc_func_t)apic_cmci_disable);
 			break;
 

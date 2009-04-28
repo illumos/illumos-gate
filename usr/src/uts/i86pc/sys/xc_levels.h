@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,30 +18,23 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1991-1993, Sun Microsystems,  Inc.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_XC_LEVELS_H
 #define	_SYS_XC_LEVELS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/* Index for xc_mboxes at each level */
-#define	X_CALL_LOPRI	0
-#define	X_CALL_MEDPRI	1
-#define	X_CALL_HIPRI	2
-#define	X_CALL_LEVELS	(X_CALL_HIPRI - X_CALL_LOPRI + 1)
-
-/* PIL associated with each x-call level */
-#define	XC_CPUPOKE_PIL	11	/* cpu poke priority x-calls */
-#define	XC_LO_PIL	1	/* low priority x-calls */
-#define	XC_MED_PIL	13	/* medium priority x-calls */
-#define	XC_HI_PIL	15	/* high priority x-calls */
+/* PILs associated with cross calls */
+#define	XC_CPUPOKE_PIL	11	/* poke to cause wakeup, no service function */
+#define	XC_SYS_PIL	13	/* should be defined elsewhere */
+#define	XC_HI_PIL	15	/* cross call with service function */
 
 #ifdef	__cplusplus
 }

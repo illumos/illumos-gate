@@ -454,7 +454,7 @@ kdi_activate(kdi_main_t main, kdi_cpusave_t *cpusave, uint_t ncpusave)
 	if (boothowto & RB_KMDB) {
 		kdi_idt_gates_install(KMDBCODE_SEL, KDI_IDT_NOSAVE);
 	} else {
-		xc_call(0, 0, 0, X_CALL_HIPRI, cpuset,
+		xc_call(0, 0, 0, CPUSET2BV(cpuset),
 		    (xc_func_t)kdi_cpu_activate);
 	}
 }
@@ -472,7 +472,7 @@ kdi_deactivate(void)
 	cpuset_t cpuset;
 	CPUSET_ALL(cpuset);
 
-	xc_call(0, 0, 0, X_CALL_HIPRI, cpuset, (xc_func_t)kdi_cpu_deactivate);
+	xc_call(0, 0, 0, CPUSET2BV(cpuset), (xc_func_t)kdi_cpu_deactivate);
 	kdi_nmemranges = 0;
 }
 

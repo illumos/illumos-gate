@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _IA32_SYS_TRAPTRACE_H
 #define	_IA32_SYS_TRAPTRACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -74,17 +72,6 @@ typedef struct {
 		struct _gate_entry {
 			int	sysnum;
 		} gate_entry;
-		struct _xc_entry {
-			ulong_t xce_arg;
-			ulong_t xce_func;
-			int8_t	xce_pri;
-			uint8_t	xce_marker,
-				xce_pend,
-				xce_wait,
-				xce_ack,
-				xce_state;
-			uint_t	xce_retval;
-		} xc_entry;
 	} ttr_info;
 	uintptr_t	ttr_curthread;
 	uchar_t		ttr_pad[TTR_PAD1_SIZE];
@@ -106,8 +93,6 @@ extern trap_trace_ctl_t	trap_trace_ctl[NCPU];	/* Allocated in locore.s */
 extern size_t		trap_trace_bufsize;
 extern int		trap_trace_freeze;
 extern trap_trace_rec_t	trap_trace_postmort;	/* Entry used after death */
-
-extern trap_trace_rec_t *trap_trace_get_traceptr(uint8_t, ulong_t, ulong_t);
 
 #define	TRAPTRACE_FREEZE	trap_trace_freeze = 1;
 #define	TRAPTRACE_UNFREEZE	trap_trace_freeze = 0;
@@ -303,21 +288,6 @@ extern trap_trace_rec_t *trap_trace_get_traceptr(uint8_t, ulong_t, ulong_t);
 #define	TT_TRAP		0xcc
 #define	TT_INTTRAP	0xdd
 #define	TT_EVENT	0xee	/* hypervisor event */
-#define	TT_XCALL	0xf0	/* x-call handling */
-
-/*
- * TT_XCALL subcodes:
- */
-#define	TT_XC_SVC_BEGIN 0	/* xc_serv() entry */
-#define	TT_XC_SVC_END	1	/* xc_serv() return */
-#define	TT_XC_START	2	/* xc_common() - pre-dirint */
-#define	TT_XC_WAIT	3	/* xc_common() - wait for completion */
-#define	TT_XC_ACK	4	/* xc_common() - ack completion */
-#define	TT_XC_CAPTURE	5	/* xc_capture() */
-#define	TT_XC_RELEASE	6	/* xc_release() */
-#define	TT_XC_POKE_CPU	7	/* poke_cpu() */
-#define	TT_XC_CBE_FIRE	8	/* cbe_fire() */
-#define	TT_XC_CBE_XCALL	9	/* cbe_xcall() */
 
 #ifdef	__cplusplus
 }

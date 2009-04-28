@@ -1330,18 +1330,15 @@ fast_reboot()
 
 	if (panicstr && CPU->cpu_id != bootcpuid &&
 	    CPU_ACTIVE(cpu_get(bootcpuid))) {
+		extern void panic_idle(void);
 		cpuset_t cpuset;
 
 		CPUSET_ZERO(cpuset);
 		CPUSET_ADD(cpuset, bootcpuid);
-		xc_trycall((xc_arg_t)&newkernel, 0, 0, cpuset,
+		xc_priority((xc_arg_t)&newkernel, 0, 0, CPUSET2BV(cpuset),
 		    (xc_func_t)fastboot_xc_func);
 
-		/* Do what panic_idle() does */
-		splx(ipltospl(CLOCK_LEVEL));
-		(void) setjmp(&curthread->t_pcb);
-		for (;;)
-			;
+		panic_idle();
 	} else
 		(void) fastboot_xc_func(&newkernel, 0, 0);
 }

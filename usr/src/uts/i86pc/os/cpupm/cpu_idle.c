@@ -894,7 +894,6 @@ void
 cpuidle_manage_cstates(void *ctx)
 {
 	cpu_t			*cp = ctx;
-	processorid_t		cpu_id = cp->cpu_id;
 	cpupm_mach_state_t	*mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	boolean_t		is_ready;
@@ -913,7 +912,7 @@ cpuidle_manage_cstates(void *ctx)
 	 * That's because we don't know what the CPU domains look like
 	 * until all instances have been initialized.
 	 */
-	is_ready = CPUPM_XCALL_IS_READY(cpu_id) && cpupm_cstate_ready();
+	is_ready = (cp->cpu_flags & CPU_READY) && cpupm_cstate_ready();
 	if (!is_ready)
 		return;
 

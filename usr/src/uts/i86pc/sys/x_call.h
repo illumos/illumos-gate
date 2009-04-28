@@ -20,81 +20,62 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_X_CALL_H
 #define	_SYS_X_CALL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * For x86, we only have three cross call levels:
- * a low, med and high. (see xc_levels.h)
- */
-#include <sys/xc_levels.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/*
- * States of a cross-call session. (stored in xc_state field of the
- * per-CPU area).
- */
-#define	XC_DONE		0	/* x-call session done */
-#define	XC_HOLD		1	/* spin doing nothing */
-#define	XC_SYNC_OP	2	/* perform a synchronous operation */
-#define	XC_CALL_OP	3	/* perform a call operation */
-#define	XC_WAIT		4	/* capture/release. callee has seen wait */
-
 #ifndef _ASM
 
-#include <sys/cpuvar.h>
-
-typedef intptr_t xc_arg_t;
+typedef uintptr_t xc_arg_t;
 typedef int (*xc_func_t)(xc_arg_t, xc_arg_t, xc_arg_t);
 
-struct	xc_mbox {
-	xc_func_t	func;
-	xc_arg_t	arg1;
-	xc_arg_t	arg2;
-	xc_arg_t	arg3;
-	cpuset_t	set;
-	int		saved_pri;
-};
+/*
+ * One of these is stored in each CPU's machcpu data, plus one extra for
+ * priority (ie panic) messages
+ */
+typedef struct xc_data {
+	xc_func_t	xc_func;
+	xc_arg_t	xc_a1;
+	xc_arg_t	xc_a2;
+	xc_arg_t	xc_a3;
+} xc_data_t;
 
-#if defined(_MACHDEP)
-extern cpuset_t cpu_ready_set;
+/*
+ * This is kept as small as possible, since for N CPUs we need N * N of them.
+ */
+typedef struct xc_msg {
+	uint8_t		xc_command;
+#ifdef __amd64
+	uint16_t	xc_master;
+	uint16_t	xc_slave;
+#else
+	uint8_t		xc_master;
+	uint8_t		xc_slave;
 #endif
+	struct xc_msg	*xc_next;
+} xc_msg_t;
 
 /*
  * Cross-call routines.
  */
 #if defined(_KERNEL)
 
-extern void	xc_init(void);
+extern void	xc_init_cpu(struct cpu *);
 extern uint_t	xc_serv(caddr_t, caddr_t);
-extern void	xc_call(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t, xc_func_t);
-extern void	xc_trycall(xc_arg_t, xc_arg_t, xc_arg_t, cpuset_t, xc_func_t);
-extern void	xc_sync(xc_arg_t, xc_arg_t, xc_arg_t, int, cpuset_t, xc_func_t);
-extern void	xc_capture_cpus(cpuset_t);
-extern void	xc_release_cpus(void);
 
-#if defined(TRAPTRACE)
-
-/*
- * X-call tracing can be interleaved with trap tracing
- */
-extern void xc_make_trap_trace_entry(uint8_t, int, ulong_t);
-#define	XC_TRACE(m, pri, arg)	xc_make_trap_trace_entry(m, pri, arg)
-
-#else	/* TRAPTRACE */
-
-#define	XC_TRACE(m, pri, arg)	/* nothing */
-
-#endif	/* TRAPTRACE */
+#define	CPUSET2BV(set)	((ulong_t *)(void *)&(set))
+extern void	xc_call(xc_arg_t, xc_arg_t, xc_arg_t, ulong_t *, xc_func_t);
+extern void	xc_call_nowait(xc_arg_t, xc_arg_t, xc_arg_t, ulong_t *,
+    xc_func_t);
+extern void	xc_sync(xc_arg_t, xc_arg_t, xc_arg_t, ulong_t *, xc_func_t);
+extern void	xc_priority(xc_arg_t, xc_arg_t, xc_arg_t, ulong_t *, xc_func_t);
 
 #endif	/* _KERNEL */
 

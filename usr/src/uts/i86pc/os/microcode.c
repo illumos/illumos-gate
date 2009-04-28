@@ -1085,8 +1085,7 @@ ucode_update(uint8_t *ucodep, int size)
 
 		CPUSET_ADD(cpuset, id);
 		kpreempt_disable();
-		xc_sync((xc_arg_t)uusp, 0, 0, X_CALL_HIPRI, cpuset,
-		    ucode_write);
+		xc_sync((xc_arg_t)uusp, 0, 0, CPUSET2BV(cpuset), ucode_write);
 		kpreempt_enable();
 		CPUSET_DEL(cpuset, id);
 

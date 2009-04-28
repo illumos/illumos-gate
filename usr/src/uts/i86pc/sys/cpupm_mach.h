@@ -143,8 +143,6 @@ typedef struct cpupm_notification {
 				| CPUPM_T_STATES \
 				| CPUPM_C_STATES)
 
-#define	CPUPM_XCALL_IS_READY(cpuid) CPU_IN_SET(cpu_ready_set, (cpuid))
-
 /*
  * An error in initializing any of the CPU PM results in disabling
  * CPU power management.

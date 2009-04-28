@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
@@ -31,6 +29,7 @@
 #include <sys/systm.h>
 #include <sys/traptrace.h>
 #include <sys/x_call.h>
+#include <sys/xc_levels.h>
 #include <sys/avintr.h>
 #include <sys/systm.h>
 #include <sys/trap.h>
@@ -328,135 +327,11 @@ ttrace_trap(trap_trace_rec_t *rec)
 	return (0);
 }
 
-static struct {
-	int	tt_type;
-	char	*tt_name;
-} ttrace_xcalls[] = {
-	{ TT_XC_SVC_BEGIN,	"<svc-begin>" },
-	{ TT_XC_SVC_END,	"<svc-end>" },
-	{ TT_XC_START,		"<start>" },
-	{ TT_XC_WAIT,		"<wait>" },
-	{ TT_XC_ACK,		"<ack>" },
-	{ TT_XC_CAPTURE,	"<capture>" },
-	{ TT_XC_RELEASE,	"<release>" },
-	{ TT_XC_POKE_CPU,	"<poke-cpu>" },
-	{ TT_XC_CBE_FIRE,	"<cbe-fire>" },
-	{ TT_XC_CBE_XCALL,	"<cbe-xcall>" },
-	{ 0,			NULL }
-};
-
-static int
-ttrace_xcall(trap_trace_rec_t *rec)
-{
-	struct _xc_entry *xce = &(rec->ttr_info.xc_entry);
-	int i;
-
-	for (i = 0; ttrace_xcalls[i].tt_name != NULL; i++)
-		if (ttrace_xcalls[i].tt_type == xce->xce_marker)
-			break;
-
-	switch (xce->xce_marker) {
-	case TT_XC_SVC_BEGIN:
-	case TT_XC_SVC_END:
-		mdb_printf("%3s ", "-");
-		break;
-	default:
-		mdb_printf("%3x ", (int)xce->xce_arg);
-		break;
-	}
-
-	if (ttrace_xcalls[i].tt_name == NULL)
-		mdb_printf("%-*s", TT_HDLR_WIDTH, "(unknown)");
-	else
-		mdb_printf("%-*s", TT_HDLR_WIDTH, ttrace_xcalls[i].tt_name);
-	return (0);
-}
-
-static char *
-xc_pri_to_str(int pri)
-{
-	switch (pri) {
-	case X_CALL_LOPRI:
-		return (" low");
-	case X_CALL_MEDPRI:
-		return (" med");
-	case X_CALL_HIPRI:
-		return ("high");
-	default:
-		return ("bad?");
-	}
-}
-
-static char *
-xc_state_to_str(uint8_t state)
-{
-	switch (state) {
-	case XC_DONE:
-		return ("done");
-	case XC_HOLD:
-		return ("hold");
-	case XC_SYNC_OP:
-		return ("sync");
-	case XC_CALL_OP:
-		return ("call");
-	case XC_WAIT:
-		return ("wait");
-	default:
-		return ("bad?");
-	}
-}
-
 static void
 ttrace_intr_detail(trap_trace_rec_t *rec)
 {
 	mdb_printf("\tirq %x ipl %d oldpri %d basepri %d\n", rec->ttr_vector,
 	    rec->ttr_ipl, rec->ttr_pri, rec->ttr_spl);
-}
-
-static void
-ttrace_xcall_detail(trap_trace_rec_t *rec)
-{
-	struct _xc_entry *xce = &(rec->ttr_info.xc_entry);
-
-	if ((uint_t)xce->xce_pri < X_CALL_LEVELS)
-		mdb_printf("\t%s pri [%s] ", xc_pri_to_str(xce->xce_pri),
-		    xc_state_to_str(xce->xce_state));
-	else
-		mdb_printf("\t");
-
-	switch (xce->xce_marker) {
-	case TT_XC_SVC_BEGIN:
-		if (xce->xce_pri != X_CALL_MEDPRI && xce->xce_func != NULL)
-			mdb_printf("call %a() ..", xce->xce_func);
-		break;
-	case TT_XC_SVC_END:
-		if (xce->xce_arg == DDI_INTR_UNCLAIMED)
-			mdb_printf("[spurious]");
-		else if (xce->xce_pri != X_CALL_MEDPRI &&
-		    xce->xce_func != NULL)
-			mdb_printf(".. called %a() returned %d",
-			    xce->xce_func, xce->xce_retval);
-		break;
-	case TT_XC_START:
-	case TT_XC_CAPTURE:
-		mdb_printf("--> cpu%d", (int)xce->xce_arg);
-		break;
-	case TT_XC_RELEASE:
-	case TT_XC_WAIT:
-	case TT_XC_ACK:
-		mdb_printf("<-- cpu%d", (int)xce->xce_arg);
-		break;
-	case TT_XC_POKE_CPU:
-	case TT_XC_CBE_FIRE:
-	case TT_XC_CBE_XCALL:
-		mdb_printf("--> cpu%d", (int)xce->xce_arg);
-		break;
-	default:
-		mdb_printf("tag %d? arg 0x%lx",
-		    xce->xce_marker, xce->xce_arg);
-		break;
-	}
-	mdb_printf("\n\n");
 }
 
 static struct {
@@ -471,7 +346,6 @@ static struct {
 	{ TT_INTERRUPT, "intr", ttrace_interrupt },
 	{ TT_TRAP, "trap", ttrace_trap },
 	{ TT_EVENT, "evnt", ttrace_trap },
-	{ TT_XCALL, "xcal", ttrace_xcall },
 	{ 0, NULL, NULL }
 };
 
@@ -562,9 +436,7 @@ ttrace_walk(uintptr_t addr, trap_trace_rec_t *rec, ttrace_dcmd_t *dcmd)
 	if (dcmd->ttd_extended == FALSE)
 		return (WALK_NEXT);
 
-	if (rec->ttr_marker == TT_XCALL)
-		ttrace_xcall_detail(rec);
-	else if (rec->ttr_marker == TT_INTERRUPT)
+	if (rec->ttr_marker == TT_INTERRUPT)
 		ttrace_intr_detail(rec);
 	else
 		ttrace_dumpregs(rec);

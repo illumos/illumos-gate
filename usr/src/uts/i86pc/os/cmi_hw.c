@@ -223,7 +223,8 @@ call_func_ntv(int cpuid, xc_func_t func, xc_arg_t arg1, xc_arg_t arg2)
 			cpuset_t cpus;
 
 			CPUSET_ONLY(cpus, cpuid);
-			xc_trycall(arg1, arg2, (xc_arg_t)&rc, cpus, func);
+			xc_priority(arg1, arg2, (xc_arg_t)&rc,
+			    CPUSET2BV(cpus), func);
 			if (rc != -1)
 				break;
 

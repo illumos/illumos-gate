@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dtrace.h>
 #include <sys/fasttrap.h>
@@ -154,7 +152,7 @@ dtrace_xcall(processorid_t cpu, dtrace_xcall_t func, void *arg)
 	}
 
 	kpreempt_disable();
-	xc_sync((xc_arg_t)func, (xc_arg_t)arg, 0, X_CALL_HIPRI, set,
+	xc_sync((xc_arg_t)func, (xc_arg_t)arg, 0, CPUSET2BV(set),
 	    (xc_func_t)dtrace_xcall_func);
 	kpreempt_enable();
 }

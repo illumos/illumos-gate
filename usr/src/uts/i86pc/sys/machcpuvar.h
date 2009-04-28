@@ -31,7 +31,7 @@ extern "C" {
 #endif
 
 #include <sys/inttypes.h>
-#include <sys/xc_levels.h>
+#include <sys/x_call.h>
 #include <sys/tss.h>
 #include <sys/segments.h>
 #include <sys/rm_platter.h>
@@ -76,12 +76,14 @@ struct xen_evt_data {
 };
 
 struct	machcpu {
-	/* define all the x_call stuff */
-	volatile int	xc_pend[X_CALL_LEVELS];
-	volatile int	xc_wait[X_CALL_LEVELS];
-	volatile int	xc_ack[X_CALL_LEVELS];
-	volatile int	xc_state[X_CALL_LEVELS];
-	volatile int	xc_retval[X_CALL_LEVELS];
+	/*
+	 * x_call fields - used for interprocessor cross calls
+	 */
+	struct xc_msg	*xc_msgbox;
+	struct xc_msg	*xc_free;
+	xc_data_t	xc_data;
+	uint32_t	xc_wait_cnt;
+	volatile uint32_t xc_work_cnt;
 
 	int		mcpu_nodeid;		/* node-id */
 	int		mcpu_pri;		/* CPU priority */

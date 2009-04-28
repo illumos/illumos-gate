@@ -211,8 +211,8 @@ cpupm_throttle(cpuset_t set,  uint32_t throtl_lvl)
 		CPUSET_DEL(set, CPU->cpu_id);
 	}
 	if (!CPUSET_ISNULL(set)) {
-		xc_call((xc_arg_t)throtl_lvl, NULL, NULL, X_CALL_HIPRI,
-		    set, (xc_func_t)cpupm_tstate_transition);
+		xc_call((xc_arg_t)throtl_lvl, NULL, NULL,
+		    CPUSET2BV(set), (xc_func_t)cpupm_tstate_transition);
 	}
 	kpreempt_enable();
 }
@@ -328,7 +328,7 @@ cpupm_throttle_manage_notification(void *ctx)
 	 * That's because we don't know what the CPU domains look like
 	 * until all instances have been initialized.
 	 */
-	is_ready = CPUPM_XCALL_IS_READY(cpu_id) && cpupm_throttle_ready();
+	is_ready = (cp->cpu_flags & CPU_READY) && cpupm_throttle_ready();
 	if (!is_ready)
 		return;
 

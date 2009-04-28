@@ -101,7 +101,6 @@ cbe_fire(void)
 	if (cbe_psm_timer_mode != TIMER_ONESHOT && me == 0 && !cross_call) {
 		for (i = 1; i < NCPU; i++) {
 			if (CPU_IN_SET(cbe_enabled, i)) {
-				XC_TRACE(TT_XC_CBE_FIRE, -1, i);
 				send_dirint(i, CBE_HIGH_PIL);
 			}
 		}
@@ -192,7 +191,6 @@ cbe_xcall(void *arg, cpu_t *dest, cyc_func_t func, void *farg)
 	cbe_xcall_cpu = dest;
 	cbe_xcall_func = func;
 
-	XC_TRACE(TT_XC_CBE_XCALL, -1, dest->cpu_id);
 	send_dirint(dest->cpu_id, CBE_HIGH_PIL);
 
 	while (cbe_xcall_func != NULL || cbe_xcall_cpu != NULL)

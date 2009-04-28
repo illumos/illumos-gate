@@ -212,7 +212,7 @@ kcpc_remote_stop(cpu_t *cp)
 
 	CPUSET_ADD(set, cp->cpu_id);
 
-	xc_sync(0, 0, 0, X_CALL_HIPRI, set, (xc_func_t)kcpc_remotestop_func);
+	xc_sync(0, 0, 0, CPUSET2BV(set), (xc_func_t)kcpc_remotestop_func);
 }
 
 /*
@@ -315,5 +315,5 @@ kcpc_remote_program(cpu_t *cp)
 
 	CPUSET_ADD(set, cp->cpu_id);
 
-	xc_sync(0, 0, 0, X_CALL_HIPRI, set, (xc_func_t)kcpc_remoteprogram_func);
+	xc_sync(0, 0, 0, CPUSET2BV(set), (xc_func_t)kcpc_remoteprogram_func);
 }

@@ -158,7 +158,6 @@ caddr_t	p0_va;		/* Virtual address for accessing physical page 0 */
  */
 int vac;
 
-void stop_other_cpus();
 void debug_enter(char *);
 
 extern void pm_cfb_check_and_powerup(void);
@@ -368,40 +367,15 @@ mdpreboot(int cmd, int fcn, char *mdep)
 	(*psm_preshutdownf)(cmd, fcn);
 }
 
-void
-idle_other_cpus()
+static void
+stop_other_cpus(void)
 {
-	int cpuid = CPU->cpu_id;
+	ulong_t s = clear_int_flag(); /* fast way to keep CPU from changing */
 	cpuset_t xcset;
 
-	ASSERT(cpuid < NCPU);
-	CPUSET_ALL_BUT(xcset, cpuid);
-	xc_capture_cpus(xcset);
-}
-
-void
-resume_other_cpus()
-{
-	ASSERT(CPU->cpu_id < NCPU);
-
-	xc_release_cpus();
-}
-
-void
-stop_other_cpus()
-{
-	int cpuid = CPU->cpu_id;
-	cpuset_t xcset;
-
-	ASSERT(cpuid < NCPU);
-
-	/*
-	 * xc_trycall will attempt to make all other CPUs execute mach_cpu_halt,
-	 * and will return immediately regardless of whether or not it was
-	 * able to make them do it.
-	 */
-	CPUSET_ALL_BUT(xcset, cpuid);
-	xc_trycall(NULL, NULL, NULL, xcset, (int (*)())mach_cpu_halt);
+	CPUSET_ALL_BUT(xcset, CPU->cpu_id);
+	xc_priority(0, 0, 0, CPUSET2BV(xcset), (xc_func_t)mach_cpu_halt);
+	restore_int_flag(s);
 }
 
 /*
@@ -868,14 +842,19 @@ lwp_stk_fini(klwp_t *lwp)
 /*
  * If we're not the panic CPU, we wait in panic_idle for reboot.
  */
-static void
+void
 panic_idle(void)
 {
 	splx(ipltospl(CLOCK_LEVEL));
 	(void) setjmp(&curthread->t_pcb);
 
+#ifndef __xpv
+	for (;;)
+		i86_halt();
+#else
 	for (;;)
 		;
+#endif
 }
 
 /*
@@ -897,7 +876,7 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 		(void) splzs();
 
 		CPUSET_ALL_BUT(xcset, cp->cpu_id);
-		xc_trycall(NULL, NULL, NULL, xcset, (int (*)())panic_idle);
+		xc_priority(0, 0, 0, CPUSET2BV(xcset), (xc_func_t)panic_idle);
 	}
 
 	for (i = 0; i < NCPU; i++) {

@@ -741,12 +741,12 @@ mp_disable_intr(int cpun)
 	/*
 	 * raise ipl to just below cross call
 	 */
-	splx(XC_MED_PIL-1);
+	splx(XC_SYS_PIL - 1);
 	/*
 	 *	set base spl to prevent the next swtch to idle from
 	 *	lowering back to ipl 0
 	 */
-	CPU->cpu_intr_actv |= (1 << (XC_MED_PIL-1));
+	CPU->cpu_intr_actv |= (1 << (XC_SYS_PIL - 1));
 	set_base_spl();
 	affinity_clear();
 	return (DDI_SUCCESS);
@@ -762,7 +762,7 @@ mp_enable_intr(int cpun)
 	/*
 	 * clear the interrupt active mask
 	 */
-	CPU->cpu_intr_actv &= ~(1 << (XC_MED_PIL-1));
+	CPU->cpu_intr_actv &= ~(1 << (XC_SYS_PIL - 1));
 	set_base_spl();
 	(void) spl0();
 	affinity_clear();
@@ -1045,12 +1045,9 @@ mach_smpinit(void)
 
 	psm_get_ipivect = pops->psm_get_ipivect;
 
-	(void) add_avintr((void *)NULL, XC_HI_PIL, xc_serv, "xc_hi_intr",
+	(void) add_avintr((void *)NULL, XC_HI_PIL, xc_serv, "xc_intr",
 	    (*pops->psm_get_ipivect)(XC_HI_PIL, PSM_INTR_IPI_HI),
-	    (caddr_t)X_CALL_HIPRI, NULL, NULL, NULL);
-	(void) add_avintr((void *)NULL, XC_MED_PIL, xc_serv, "xc_med_intr",
-	    (*pops->psm_get_ipivect)(XC_MED_PIL, PSM_INTR_IPI_LO),
-	    (caddr_t)X_CALL_MEDPRI, NULL, NULL, NULL);
+	    NULL, NULL, NULL, NULL);
 
 	(void) (*pops->psm_get_ipivect)(XC_CPUPOKE_PIL, PSM_INTR_POKE);
 }

@@ -2159,12 +2159,6 @@ dump_ttrace(void)
 					}
 				break;
 
-			case TT_XCALL:
-				printf(fmt2, "xcal",
-				    rec->ttr_info.xc_entry.xce_marker);
-				printf(fmt3, "");
-				break;
-
 			default:
 				break;
 			}
@@ -2216,36 +2210,6 @@ dump_ttrace(void)
 			current -= sizeof (trap_trace_rec_t);
 		}
 	}
-}
-
-/*
- * Help with constructing traptrace records in C
- */
-trap_trace_rec_t *
-trap_trace_get_traceptr(uint8_t marker, ulong_t pc, ulong_t sp)
-{
-	trap_trace_rec_t *ttr;
-
-	if (trap_trace_freeze)
-		ttr = &trap_trace_postmort;
-	else {
-		trap_trace_ctl_t *ttc = &trap_trace_ctl[CPU->cpu_id];
-
-		ttr = (void *)ttc->ttc_next;
-
-		if (ttc->ttc_next >= ttc->ttc_limit)
-			ttc->ttc_next = ttc->ttc_first;
-		else
-			ttc->ttc_next += sizeof (trap_trace_rec_t);
-	}
-
-	ttr->ttr_regs.r_sp = sp;
-	ttr->ttr_regs.r_pc = pc;
-	ttr->ttr_cr2 = getcr2();
-	ttr->ttr_curthread = (uintptr_t)curthread;
-	ttr->ttr_stamp = tsc_read();
-	ttr->ttr_marker = marker;
-	return (ttr);
 }
 
 #endif	/* TRAPTRACE */

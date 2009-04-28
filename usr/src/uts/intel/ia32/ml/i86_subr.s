@@ -682,18 +682,12 @@ __cpuid_insn(struct cpuid_regs *regs)
 #endif	/* __i386 */
 #endif	/* __lint */
 
-#if defined(__xpv)
-	/*
-	 * Defined in C
-	 */
-#else
-
 #if defined(__lint)
 
 /*ARGSUSED*/
 void
 i86_monitor(volatile uint32_t *addr, uint32_t extensions, uint32_t hints)
-{ return; }
+{}
 
 #else   /* __lint */
 
@@ -733,7 +727,7 @@ ENTRY_NP(i86_monitor)
 /*ARGSUSED*/
 void
 i86_mwait(uint32_t data, uint32_t extensions)
-{ return; }
+{}
 
 #else	/* __lint */
 
@@ -763,6 +757,12 @@ i86_mwait(uint32_t data, uint32_t extensions)
 
 #endif	/* __i386 */
 #endif	/* __lint */
+
+#if defined(__xpv)
+	/*
+	 * Defined in C
+	 */
+#else
 
 #if defined(__lint)
 

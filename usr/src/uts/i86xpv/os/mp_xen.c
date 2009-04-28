@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,8 +89,6 @@
  * dropping into HYPERVISOR_block().
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -116,6 +114,8 @@
 #include <xen/public/io/xs_wire.h>
 #include <xen/sys/xenbus_impl.h>
 #include <xen/public/vcpu.h>
+
+extern cpuset_t cpu_ready_set;
 
 #define	CPU_PHASE_NONE 0
 #define	CPU_PHASE_WAIT_SAFE 1

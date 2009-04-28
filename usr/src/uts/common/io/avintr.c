@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Autovectored Interrupt Configuration and Deconfiguration
@@ -638,7 +636,7 @@ siron_poke_cpu(cpuset_t poke)
 			return;
 	}
 
-	xc_call(0, 0, 0, X_CALL_MEDPRI, poke, (xc_func_t)siron_poke_intr);
+	xc_call(0, 0, 0, CPUSET2BV(poke), (xc_func_t)siron_poke_intr);
 }
 
 /*
