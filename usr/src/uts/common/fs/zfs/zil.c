@@ -722,18 +722,26 @@ zil_lwb_write_done(zio_t *zio)
 	ASSERT(zio->io_bp->blk_fill == 0);
 
 	/*
-	 * Now that we've written this log block, we have a stable pointer
-	 * to the next block in the chain, so it's OK to let the txg in
-	 * which we allocated the next block sync.
+	 * Ensure the lwb buffer pointer is cleared before releasing
+	 * the txg. If we have had an allocation failure and
+	 * the txg is waiting to sync then we want want zil_sync()
+	 * to remove the lwb so that it's not picked up as the next new
+	 * one in zil_commit_writer(). zil_sync() will only remove
+	 * the lwb if lwb_buf is null.
 	 */
-	txg_rele_to_sync(&lwb->lwb_txgh);
-
 	zio_buf_free(lwb->lwb_buf, lwb->lwb_sz);
 	mutex_enter(&zilog->zl_lock);
 	lwb->lwb_buf = NULL;
 	if (zio->io_error)
 		zilog->zl_log_error = B_TRUE;
 	mutex_exit(&zilog->zl_lock);
+
+	/*
+	 * Now that we've written this log block, we have a stable pointer
+	 * to the next block in the chain, so it's OK to let the txg in
+	 * which we allocated the next block sync.
+	 */
+	txg_rele_to_sync(&lwb->lwb_txgh);
 }
 
 /*
