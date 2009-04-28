@@ -54,7 +54,6 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS         += -dy -Ncrypto/aes
 #
 #	Default build targets.
 #

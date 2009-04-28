@@ -53,8 +53,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 # 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS		+= -dy -Ncrypto/aes
-
 #
 #	Define targets
 #
