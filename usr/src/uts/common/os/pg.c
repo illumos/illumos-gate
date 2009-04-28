@@ -224,6 +224,7 @@ void
 pg_init(void)
 {
 	extern void pg_cmt_class_init();
+	extern void pg_cmt_cpu_startup();
 
 	pg_default_cid =
 	    pg_class_register("default", &pg_ops_default, PGR_LOGICAL);
@@ -234,6 +235,7 @@ pg_init(void)
 	pg_cmt_class_init();
 
 	pg_cpu0_init();
+	pg_cmt_cpu_startup(CPU);
 }
 
 /*

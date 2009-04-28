@@ -722,7 +722,6 @@ pg_cmt_cpu_init(cpu_t *cp, cpu_pg_t *pgdata)
 
 	/* CPU0 only initialization */
 	if (is_cpu0) {
-		pg_cmt_cpu_startup(cp);
 		is_cpu0 = 0;
 		cpu0_lgrp = lgrp;
 	}
