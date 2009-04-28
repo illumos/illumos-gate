@@ -512,6 +512,22 @@ pciehpc_acpi_notify_handler(ACPI_HANDLE device, uint32_t val, void *context)
 			cmn_err(CE_WARN, "Unexpected event on slot #%d"
 			    "(state 0x%x)", ctrl_p->slot.slotNum, dev_state);
 		}
+
+		/*
+		 * Ignore the event if ATTN button is not present (ACPI BIOS
+		 * problem).
+		 *
+		 * NOTE: This situation has been observed on some platforms
+		 * where the ACPI BIOS is generating the event for some other
+		 * (non hot-plug) operations (bug).
+		 */
+		if (ctrl_p->has_attn == B_FALSE) {
+			PCIEHPC_DEBUG((CE_CONT, "Ignore the unexpected event "
+			    "on slot #%d (state 0x%x)",
+			    ctrl_p->slot.slotNum, dev_state));
+			break;
+		}
+
 		/* send the ATTN button event to HPS framework */
 		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
 		    HPC_EVENT_SLOT_ATTN, HPC_EVENT_NORMAL);
