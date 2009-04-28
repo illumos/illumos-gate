@@ -330,6 +330,7 @@ DRV_KMODS	+= udp
 DRV_KMODS	+= udp6
 DRV_KMODS	+= ucode
 DRV_KMODS	+= ural
+DRV_KMODS	+= urtw
 DRV_KMODS	+= vgatext
 DRV_KMODS	+= heci
 DRV_KMODS	+= vnic

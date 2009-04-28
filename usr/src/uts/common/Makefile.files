@@ -1669,6 +1669,8 @@ NGE_OBJS += nge_main.o nge_atomic.o nge_chip.o nge_ndd.o nge_kstats.o \
 
 RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
+URTW_OBJS += urtw.o
+
 ATH_OBJS += ath_aux.o ath_main.o ath_osdep.o ath_rate.o
 
 ATU_OBJS += atu.o
