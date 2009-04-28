@@ -402,8 +402,8 @@ isa_apply_range(dev_info_t *dip, struct regspec *isa_reg_p,
 		/* Detect whether request entirely fits within a range */
 		if (isa_reg_p->regspec_addr < rng_p->child_low)
 			continue;
-		if ((isa_reg_p->regspec_addr + isa_reg_p->regspec_size) >
-		    (rng_p->child_low + rng_p->size))
+		if ((isa_reg_p->regspec_addr + isa_reg_p->regspec_size - 1) >
+		    (rng_p->child_low + rng_p->size - 1))
 			continue;
 
 		offset = isa_reg_p->regspec_addr - rng_p->child_low;
