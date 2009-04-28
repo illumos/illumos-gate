@@ -541,8 +541,8 @@ spa_activate(spa_t *spa, int mode)
 	spa->spa_state = POOL_STATE_ACTIVE;
 	spa->spa_mode = mode;
 
-	spa->spa_normal_class = metaslab_class_create();
-	spa->spa_log_class = metaslab_class_create();
+	spa->spa_normal_class = metaslab_class_create(zfs_metaslab_ops);
+	spa->spa_log_class = metaslab_class_create(zfs_metaslab_ops);
 
 	for (int t = 0; t < ZIO_TYPES; t++) {
 		for (int q = 0; q < ZIO_TASKQ_TYPES; q++) {

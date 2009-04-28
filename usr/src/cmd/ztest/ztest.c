@@ -248,9 +248,11 @@ static ztest_shared_t *ztest_shared;
 static int ztest_random_fd;
 static int ztest_dump_core = 1;
 
+static uint64_t metaslab_sz;
 static boolean_t ztest_exiting;
 
 extern uint64_t metaslab_gang_bang;
+extern uint64_t metaslab_df_alloc_threshold;
 
 #define	ZTEST_DIROBJ		1
 #define	ZTEST_MICROZAP_OBJ	2
@@ -3767,6 +3769,8 @@ ztest_init(char *pool)
 	if (error)
 		fatal(0, "spa_open() = %d", error);
 
+	metaslab_sz = 1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
+
 	if (zopt_verbose >= 3)
 		show_pool_stats(spa);
 
@@ -3857,6 +3861,9 @@ main(int argc, char **argv)
 			zi->zi_calls = 0;
 			zi->zi_call_time = 0;
 		}
+
+		/* Set the allocation switch size */
+		metaslab_df_alloc_threshold = ztest_random(metaslab_sz / 4) + 1;
 
 		pid = fork();
 

@@ -102,6 +102,7 @@ usage(void)
 	(void) fprintf(stderr, "        -C cached pool configuration\n");
 	(void) fprintf(stderr, "	-i intent logs\n");
 	(void) fprintf(stderr, "	-b block statistics\n");
+	(void) fprintf(stderr, "	-m metaslabs\n");
 	(void) fprintf(stderr, "	-c checksum all metadata (twice for "
 	    "all data) blocks\n");
 	(void) fprintf(stderr, "	-s report stats on zdb's I/O\n");
@@ -473,6 +474,21 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 }
 
 static void
+dump_metaslab_stats(metaslab_t *msp)
+{
+	char maxbuf[5];
+	space_map_t *sm = &msp->ms_map;
+	avl_tree_t *t = sm->sm_pp_root;
+	int free_pct = sm->sm_space * 100 / sm->sm_size;
+
+	nicenum(space_map_maxsize(sm), maxbuf);
+
+	(void) printf("\t %20s %10lu   %7s  %6s   %4s %4d%%\n",
+	    "segments", avl_numnodes(t), "maxsize", maxbuf,
+	    "freepct", free_pct);
+}
+
+static void
 dump_metaslab(metaslab_t *msp)
 {
 	char freebuf[5];
@@ -482,22 +498,28 @@ dump_metaslab(metaslab_t *msp)
 
 	nicenum(msp->ms_map.sm_size - smo->smo_alloc, freebuf);
 
-	if (dump_opt['d'] <= 5) {
-		(void) printf("\t%10llx   %10llu   %5s\n",
-		    (u_longlong_t)msp->ms_map.sm_start,
-		    (u_longlong_t)smo->smo_object,
-		    freebuf);
-		return;
-	}
-
 	(void) printf(
-	    "\tvdev %llu   offset %08llx   spacemap %4llu   free %5s\n",
+	    "\tvdev %5llu   offset %12llx   spacemap %6llu   free    %5s\n",
 	    (u_longlong_t)vd->vdev_id, (u_longlong_t)msp->ms_map.sm_start,
 	    (u_longlong_t)smo->smo_object, freebuf);
 
-	ASSERT(msp->ms_map.sm_size == (1ULL << vd->vdev_ms_shift));
+	if (dump_opt['m'] > 1) {
+		mutex_enter(&msp->ms_lock);
+		VERIFY(space_map_load(&msp->ms_map, zfs_metaslab_ops,
+		    SM_FREE, &msp->ms_smo, spa->spa_meta_objset) == 0);
+		dump_metaslab_stats(msp);
+		space_map_unload(&msp->ms_map);
+		mutex_exit(&msp->ms_lock);
+	}
 
-	dump_spacemap(spa->spa_meta_objset, smo, &msp->ms_map);
+	if (dump_opt['d'] > 5 || dump_opt['m'] > 2) {
+		ASSERT(msp->ms_map.sm_size == (1ULL << vd->vdev_ms_shift));
+
+		mutex_enter(&msp->ms_lock);
+		dump_spacemap(spa->spa_meta_objset, smo, &msp->ms_map);
+		mutex_exit(&msp->ms_lock);
+	}
+
 }
 
 static void
@@ -512,14 +534,12 @@ dump_metaslabs(spa_t *spa)
 	for (c = 0; c < rvd->vdev_children; c++) {
 		vd = rvd->vdev_child[c];
 
-		(void) printf("\n    vdev %llu\n\n", (u_longlong_t)vd->vdev_id);
+		(void) printf("\t%-10s   %-19s   %-15s   %-10s\n",
+		    "vdev", "offset", "spacemap", "free");
+		(void) printf("\t%10s   %19s   %15s   %10s\n",
+		    "----------", "-------------------",
+		    "---------------", "-------------");
 
-		if (dump_opt['d'] <= 5) {
-			(void) printf("\t%10s   %10s   %5s\n",
-			    "offset", "spacemap", "free");
-			(void) printf("\t%10s   %10s   %5s\n",
-			    "------", "--------", "----");
-		}
 		for (m = 0; m < vd->vdev_ms_count; m++)
 			dump_metaslab(vd->vdev_ms[m]);
 		(void) printf("\n");
@@ -1419,7 +1439,8 @@ static space_map_ops_t zdb_space_map_ops = {
 	zdb_space_map_unload,
 	NULL,	/* alloc */
 	zdb_space_map_claim,
-	NULL	/* free */
+	NULL,	/* free */
+	NULL	/* maxsize */
 };
 
 static void
@@ -1809,14 +1830,17 @@ dump_zpool(spa_t *spa)
 	if (dump_opt['u'])
 		dump_uberblock(&spa->spa_uberblock);
 
-	if (dump_opt['d'] || dump_opt['i']) {
+	if (dump_opt['d'] || dump_opt['i'] || dump_opt['m']) {
 		dump_dir(dp->dp_meta_objset);
 		if (dump_opt['d'] >= 3) {
 			dump_bplist(dp->dp_meta_objset,
 			    spa->spa_sync_bplist_obj, "Deferred frees");
 			dump_dtl(spa->spa_root_vdev, 0);
-			dump_metaslabs(spa);
 		}
+
+		if (dump_opt['d'] >= 3 || dump_opt['m'])
+			dump_metaslabs(spa);
+
 		(void) dmu_objset_find(spa_name(spa), dump_one_dir, NULL,
 		    DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 	}
@@ -2292,13 +2316,14 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcsvCLS:U:lRep:t:")) != -1) {
+	while ((c = getopt(argc, argv, "udibcmsvCLS:U:lRep:t:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
 		case 'i':
 		case 'b':
 		case 'c':
+		case 'm':
 		case 's':
 		case 'C':
 		case 'l':

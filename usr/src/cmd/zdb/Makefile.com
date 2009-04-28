@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,7 +33,7 @@ include ../../Makefile.cmd
 INCS += -I../../../lib/libzpool/common 
 INCS +=	-I../../../uts/common/fs/zfs
 
-LDLIBS += -lzpool -lumem -lnvpair -lzfs
+LDLIBS += -lzpool -lumem -lnvpair -lzfs -lavl
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

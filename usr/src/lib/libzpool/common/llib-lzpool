@@ -49,3 +49,4 @@
 #include <sys/arc.h>
 
 extern uint64_t metaslab_gang_bang;
+extern uint64_t metaslab_df_alloc_threshold;
