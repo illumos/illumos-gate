@@ -1084,7 +1084,7 @@ typedef struct config_page_raid_vol_0 {
 	raid_vol0_status_t	VolumeStatus;
 	raid_vol0_settings_t	VolumeSettings;
 	uint32_t		MaxLBA;
-	uint32_t		Reserved1;
+	uint32_t		MaxLBAHigh;
 	uint32_t		StripeSize;
 	uint32_t		Reserved2;
 	uint32_t		Reserved3;
