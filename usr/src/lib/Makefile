@@ -192,6 +192,7 @@ SUBDIRS += \
 	librestart	\
 	libsched	\
 	libelfsign	\
+	openssl		\
 	pkcs11		.WAIT	\
 	libpctx		.WAIT	\
 	libcpc		\
@@ -224,7 +225,6 @@ SUBDIRS += \
 	lvm		\
 	libsmedia	\
 	libipp		\
-	openssl		\
 	libdiskmgt	\
 	liblgrp		\
 	libfsmgt	\
@@ -600,7 +600,7 @@ libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
-pkcs11:		libcryptoutil
+pkcs11:		libcryptoutil openssl
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevinfo libdevid libgen libnvpair libuutil libiscsitgt \
