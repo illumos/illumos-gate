@@ -798,6 +798,7 @@ Pbuild_file_ctf(struct ps_prochandle *P, file_info_t *fptr)
 
 	fptr->file_ctfp = ctf_bufopen(&ctdata, &symtab, &strtab, &err);
 	if (fptr->file_ctfp == NULL) {
+		dprintf("ctf_bufopen() failed, error code %d\n", err);
 		free(fptr->file_ctf_buf);
 		fptr->file_ctf_buf = NULL;
 		return (NULL);
