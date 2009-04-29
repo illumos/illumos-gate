@@ -18,46 +18,29 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-TOPDIR =	../../../../..
-SPARCDIR =	..
+include	../Makefile.tools
 
-# override global macros as necessary
-ARCH =		sun4u
-TARG_MACH =	sparcv9
-PROMTYPE =	ieee1275
-PROMIFDIR =	$(TOPDIR)/psm/stand/lib/promif
-PLATDIR =	$(TOPDIR)/uts/$(ARCH)
+PROG	= chk4ubin
 
-ARCH_PROMDIR =	$(TARG_MACH)/$(PROMTYPE)/common
-PLAT_PROMDIR =	$(PROMTYPE)/$(ARCH)
-PLATLIBDIR =	$(PROMIFDIR)/$(TARG_MACH)/$(PLAT_PROMDIR)
-PLATLIB =	$(PLATLIBDIR)/libplat.a
+LDLIBS += -lelf
 
-LDPLATLIBS =	-L$(PLATLIBDIR) -lplat
-SALIBS =	$(PLATLIB)
-MAPFILE =	$(SPARCDIR)/mapfile
-LINTPLATLIBS =	$(PLATLIBDIR)/llib-lplat.ln
-
-BOOTLSTOBJ = srt0.o
-
-ALL = bootlst
-
-%.o: $(SPARCDIR)/%.s
-	$(COMPILE.s) -o $@ $<
-
-%.ln: $(SPARCDIR)/%.s
-	@$(LHEAD) $(LINT.s) $< $(LTAIL)
-
-
-include ../../common/Makefile.com
-include $(TOPDIR)/psm/Makefile.psm.64
-CFLAGS64 += -xchip=ultra $(CCABS32)
-
-POST_PROCESS +=	; $(CHK4UBINARY)
+LINTFLAGS += -ux
 
 .KEEP_STATE:
+
+all: $(PROG)
+
+install: all .WAIT $(ROOTONBLDMACHPROG)
+
+lint:	lint_PROG
+
+clean:
+	$(RM) $(PROG)
+
+include ../Makefile.targ

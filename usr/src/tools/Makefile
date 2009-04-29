@@ -60,6 +60,7 @@ UNSHIPPED_SUBDIRS = \
 	elfsign
 
 sparc_SUBDIRS= \
+	chk4ubin \
 	stabs \
 	tokenize
 

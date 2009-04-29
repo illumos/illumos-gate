@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 !include prototype_com
@@ -29,6 +29,7 @@
 d none opt/onbld/bin/sparc 755 root bin
 f none opt/onbld/bin/sparc/abi_audit 555 root bin
 f none opt/onbld/bin/sparc/bfuld 555 root bin
+f none opt/onbld/bin/sparc/chk4ubin 555 root bin
 f none opt/onbld/bin/sparc/codereview 555 root bin
 f none opt/onbld/bin/sparc/cpiotranslate 555 root bin
 f none opt/onbld/bin/sparc/cscope-fast 555 root bin

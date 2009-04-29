@@ -927,6 +927,15 @@ POST_PROCESS=		$(PROCESS_COMMENT) $@ ; $(STRIP_STABS) ; \
 			$(ELFSIGN_OBJECT)
 
 #
+# chk4ubin is a tool that inspects a module for a symbol table
+# ELF section size which can trigger an OBP bug on older platforms.
+# This problem affects only specific sun4u bootable modules.
+#
+CHK4UBIN=	$(ONBLD_TOOLS)/bin/$(MACH)/chk4ubin
+CHK4UBINFLAGS=
+CHK4UBINARY=	$(CHK4UBIN) $(CHK4UBINFLAGS) $@
+
+#
 # The PKGDEFS macro points to the source directory containing the majority
 # of ON's package definitions plus Makefiles with general package creation
 # rules.

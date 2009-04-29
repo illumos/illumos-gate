@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/cpr/common/Makefile.com
@@ -121,6 +119,7 @@ support.ln: $(COMDIR)/support.c
 cprboot: $(CPRBOOT_MAPFILE) $(CPRBOOTOBJ) $(SALIBS)
 	$(LD) $(LDFLAGS) -o $@ $(CPRBOOTOBJ) $(LDLIBS)
 	$(POST_PROCESS)
+	$(CHK4UBINARY)
 
 $(SALIBS): FRC
 	@cd $(@D); $(MAKE) $(MFLAGS)
