@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_tblout.c, Dispatch table outputter for the RPC protocol compiler
@@ -129,10 +126,10 @@ write_table(definition *def)
 			}
 			if (tirpcflag)
 				f_print(fout,
-					"\n\t(void *(*)())RPCGEN_ACTION(");
+				    "\n\t(void *(*)())RPCGEN_ACTION(");
 			else
 				f_print(fout,
-					"\n\t(char *(*)())RPCGEN_ACTION(");
+				    "\n\t(char *(*)())RPCGEN_ACTION(");
 
 			/* routine to invoke */
 			if (Cflag && !newstyle)
@@ -150,7 +147,7 @@ write_table(definition *def)
 			else
 			/* do we have to do something special for newstyle */
 				printit(proc->args.decls->decl.prefix,
-					proc->args.decls->decl.type);
+				    proc->args.decls->decl.type);
 			/* result info */
 			printit(proc->res_prefix, proc->res_type);
 		}

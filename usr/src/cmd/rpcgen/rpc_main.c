@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_main.c, Top level of the RPC protocol compiler.
@@ -175,15 +172,15 @@ main(int argc, char *argv[])
 		l_output(cmd.infile, "-DRPC_CLNT", DONT_EXTEND, cmd.outfile);
 	} else if (cmd.sflag || cmd.mflag || (cmd.nflag)) {
 		s_output(argc, argv, cmd.infile, "-DRPC_SVC", DONT_EXTEND,
-			cmd.outfile, cmd.mflag, cmd.nflag);
+		    cmd.outfile, cmd.mflag, cmd.nflag);
 	} else if (cmd.tflag) {
 		t_output(cmd.infile, "-DRPC_TBL", DONT_EXTEND, cmd.outfile);
 	} else if (cmd.Ssflag) {
 		svc_output(cmd.infile, "-DRPC_SERVER", DONT_EXTEND,
-			cmd.outfile);
+		    cmd.outfile);
 	} else if (cmd.Scflag) {
 		clnt_output(cmd.infile, "-DRPC_CLIENT", DONT_EXTEND,
-			    cmd.outfile);
+		    cmd.outfile);
 	} else if (cmd.makefileflag) {
 		mkfile_output(&cmd);
 	} else {
@@ -196,10 +193,10 @@ main(int argc, char *argv[])
 		reinitialize();
 		if (inetdflag || !tirpcflag)
 			s_output(allc, allv, cmd.infile, "-DRPC_SVC", EXTEND,
-			"_svc.c", cmd.mflag, cmd.nflag);
+			    "_svc.c", cmd.mflag, cmd.nflag);
 		else
 			s_output(allnc, allnv, cmd.infile, "-DRPC_SVC",
-				EXTEND, "_svc.c", cmd.mflag, cmd.nflag);
+			    EXTEND, "_svc.c", cmd.mflag, cmd.nflag);
 		if (tblflag) {
 			reinitialize();
 			t_output(cmd.infile, "-DRPC_TBL", EXTEND, "_tbl.i");
@@ -208,10 +205,10 @@ main(int argc, char *argv[])
 		if (allfiles) {
 			reinitialize();
 			svc_output(cmd.infile, "-DRPC_SERVER", EXTEND,
-				"_server.c");
+			    "_server.c");
 			reinitialize();
 			clnt_output(cmd.infile, "-DRPC_CLIENT", EXTEND,
-				"_client.c");
+			    "_client.c");
 
 		}
 		if (allfiles || (cmd.makefileflag == 1)) {
@@ -257,8 +254,9 @@ open_output(char *infile, char *outfile)
 	}
 
 	if (infile != NULL && streq(outfile, infile)) {
-	f_print(stderr, "%s: %s already exists.  No output generated.\n",
-		cmdname, infile);
+		f_print(stderr,
+		    "%s: %s already exists.  No output generated.\n",
+		    cmdname, infile);
 		crash();
 	}
 	fout = fopen(outfile, "w");
@@ -300,7 +298,7 @@ find_cpp(void)
 	if (stat(CPP, &buf) < 0)  { /* SVR4 or explicit cpp does not exist */
 		if (cppDefined) {
 			(void) fprintf(stderr,
-				"cannot find C preprocessor: %s \n", CPP);
+			    "cannot find C preprocessor: %s \n", CPP);
 			crash();
 		} else {	/* try the other one */
 			CPP = SUNOS_CPP;
@@ -575,7 +573,7 @@ h_output(char *infile, char *define, int extend, char *outfile)
 			xdrfuncp = xdrfunc_head;
 			while (xdrfuncp != NULL) {
 				print_xdr_func_def(xdrfuncp->name,
-							xdrfuncp->pointerp, 2);
+				    xdrfuncp->pointerp, 2);
 				xdrfuncp = xdrfuncp->next;
 			}
 		} else {
@@ -589,7 +587,7 @@ h_output(char *infile, char *define, int extend, char *outfile)
 				xdrfuncp = xdrfunc_head;
 				while (xdrfuncp != NULL) {
 					print_xdr_func_def(xdrfuncp->name,
-							xdrfuncp->pointerp, i);
+					    xdrfuncp->pointerp, i);
 					xdrfuncp = xdrfuncp->next;
 				}
 			}
@@ -681,13 +679,13 @@ s_output(int argc, char *argv[], char *infile, char *define, int extend,
 	/* for ANSI-C */
 	if (Cflag)
 		f_print(fout,
-			"\n#ifndef SIG_PF\n#define	SIG_PF void(*)\
+		    "\n#ifndef SIG_PF\n#define	SIG_PF void(*)\
 (int)\n#endif\n");
 
 	f_print(fout, "\n#ifdef DEBUG\n#define	RPC_SVC_FG\n#endif\n");
 	if (timerflag)
 		f_print(fout, "\n#define	_RPCSVC_CLOSEDOWN %s\n",
-			svcclosetime);
+		    svcclosetime);
 	while (def = get_definition())
 		foundprogram |= (def->def_kind == DEF_PROGRAM);
 	if (extend && !foundprogram) {
@@ -868,7 +866,7 @@ mkfile_output(struct commandline *cmd)
 
 	if (allfiles) {
 		mkfilename = malloc(strlen("makefile.") +
-			strlen(cmd->infile) + 1);
+		    strlen(cmd->infile) + 1);
 		if (mkfilename == NULL) {
 			f_print(stderr, "Out of memory!\n");
 			return;
@@ -876,7 +874,7 @@ mkfile_output(struct commandline *cmd)
 		temp = (char *)rindex(cmd->infile, '.');
 		(void) strcpy(mkfilename, "makefile.");
 		(void) strncat(mkfilename, cmd->infile,
-			(temp - cmd->infile));
+		    (temp - cmd->infile));
 	} else
 		mkfilename = cmd->outfile;
 
@@ -890,29 +888,29 @@ mkfile_output(struct commandline *cmd)
 	f_print(fout, "\n# Parameters \n\n");
 
 	f_print(fout, "CLIENT = %s\nSERVER = %s\n\n",
-		clntprogname, servprogname);
+	    clntprogname, servprogname);
 	f_print(fout, "SOURCES_CLNT.c = \nSOURCES_CLNT.h = \n");
 	f_print(fout, "SOURCES_SVC.c = \nSOURCES_SVC.h = \n");
 	f_print(fout, "SOURCES.x = %s\n\n", cmd->infile);
 	f_print(fout, "TARGETS_SVC.c = %s %s %s \n",
-		svcname, servername, xdrname);
+	    svcname, servername, xdrname);
 	f_print(fout, "TARGETS_CLNT.c = %s %s %s \n",
-		clntname, clientname, xdrname);
+	    clntname, clientname, xdrname);
 	f_print(fout, "TARGETS = %s %s %s %s %s %s\n\n",
-		hdrname, xdrname, clntname,
-		svcname, clientname, servername);
+	    hdrname, xdrname, clntname,
+	    svcname, clientname, servername);
 
 	f_print(fout, "OBJECTS_CLNT = $(SOURCES_CLNT.c:%%.c=%%.o) "
-			"$(TARGETS_CLNT.c:%%.c=%%.o) ");
+	    "$(TARGETS_CLNT.c:%%.c=%%.o) ");
 
 	f_print(fout, "\nOBJECTS_SVC = $(SOURCES_SVC.c:%%.c=%%.o) "
-			"$(TARGETS_SVC.c:%%.c=%%.o) ");
+	    "$(TARGETS_SVC.c:%%.c=%%.o) ");
 
 
 	f_print(fout, "\n# Compiler flags \n");
 	if (mtflag)
 		f_print(fout, "\nCPPFLAGS += -D_REENTRANT\n"
-			"CFLAGS += -g\nLDLIBS += -lnsl\n");
+		    "CFLAGS += -g\nLDLIBS += -lnsl\n");
 	else
 		f_print(fout, "\nCFLAGS += -g \nLDLIBS += -lnsl\n");
 	f_print(fout, "RPCGENFLAGS = \n");
@@ -950,7 +948,7 @@ do_registers(int argc, char *argv[])
 		for (i = 1; i < argc; i++) {
 			if (streq(argv[i], "-s")) {
 				if (!check_nettype(argv[i + 1],
-						    valid_i_nettypes))
+				    valid_i_nettypes))
 					return (0);
 				write_inetd_register(argv[i + 1]);
 				i++;
@@ -960,7 +958,7 @@ do_registers(int argc, char *argv[])
 		for (i = 1; i < argc; i++)
 			if (streq(argv[i], "-s")) {
 				if (!check_nettype(argv[i + 1],
-						    valid_ti_nettypes))
+				    valid_ti_nettypes))
 					return (0);
 				write_nettype_register(argv[i + 1]);
 				i++;
@@ -1017,8 +1015,8 @@ checkfiles(char *infile, char *outfile)
 		if (stat(outfile, &buf) < 0)
 			return;	/* file does not exist */
 		f_print(stderr,
-			"file '%s' already exists and may be overwritten\n",
-			outfile);
+		    "file '%s' already exists and may be overwritten\n",
+		    outfile);
 		crash();
 	}
 }
@@ -1200,7 +1198,7 @@ parseargs(int argc, char *argv[], struct commandline *cmd)
 	if (tirpcflag) {
 		if (inetdflag) {
 			f_print(stderr,
-				"Cannot use -I flag without -b flag.\n");
+			    "Cannot use -I flag without -b flag.\n");
 			return (0);
 		}
 		pmflag = 1;
@@ -1209,7 +1207,7 @@ parseargs(int argc, char *argv[], struct commandline *cmd)
 		inetdflag = 1;	/* inetdflag is TRUE by default */
 		if (cmd->nflag) { /* netid needs TIRPC */
 			f_print(stderr,
-				"Cannot use netid flag without TIRPC.\n");
+			    "Cannot use netid flag without TIRPC.\n");
 			return (0);
 		}
 	}
@@ -1221,8 +1219,8 @@ parseargs(int argc, char *argv[], struct commandline *cmd)
 
 	/* check no conflicts with file generation flags */
 	nflags = cmd->cflag + cmd->hflag + cmd->lflag + cmd->mflag +
-		cmd->sflag + cmd->nflag + cmd->tflag + cmd->Ssflag +
-			cmd->Scflag + cmd->makefileflag;
+	    cmd->sflag + cmd->nflag + cmd->tflag + cmd->Ssflag +
+	    cmd->Scflag + cmd->makefileflag;
 
 	if (nflags == 0) {
 		if (cmd->outfile != NULL || cmd->infile == NULL)
@@ -1230,12 +1228,12 @@ parseargs(int argc, char *argv[], struct commandline *cmd)
 	} else if (cmd->infile == NULL &&
 	    (cmd->Ssflag || cmd->Scflag || cmd->makefileflag)) {
 		f_print(stderr, "\"infile\" is required for template"
-			" generation flags.\n");
+		    " generation flags.\n");
 		return (0);
 	}
 	if (nflags > 1) {
 		f_print(stderr,
-			"Cannot have more than one file generation flag.\n");
+		    "Cannot have more than one file generation flag.\n");
 		return (0);
 	}
 	return (1);
@@ -1247,9 +1245,9 @@ usage(void)
 	f_print(stderr, "%s  (%d.%d)\n", cmdname, RPCGEN_MAJOR, RPCGEN_MINOR);
 	f_print(stderr, "usage:  %s infile\n", cmdname);
 	f_print(stderr, "\t%s [-abCLNTMA] [-Dname[=value]] [-i size]"
-		" [-I [-K seconds]] [-Y path] infile\n", cmdname);
+	    " [-I [-K seconds]] [-Y path] infile\n", cmdname);
 	f_print(stderr, "\t%s [-c | -h | -l | -m | -t | -Sc | -Ss | -Sm]"
-		" [-o outfile] [infile]\n", cmdname);
+	    " [-o outfile] [infile]\n", cmdname);
 	f_print(stderr, "\t%s [-s nettype]* [-o outfile] [infile]\n", cmdname);
 	f_print(stderr, "\t%s [-n netid]* [-o outfile] [infile]\n", cmdname);
 	options_usage();
@@ -1266,6 +1264,7 @@ version_info(void)
 static void
 options_usage(void)
 {
+	/* BEGIN CSTYLED */
 	f_print(stderr, "options:\n");
 	f_print(stderr, "-a\t\tgenerate all files, including samples\n");
 	f_print(stderr, "-A\t\tgenerate code to enable automatic MT mode\n");
@@ -1302,5 +1301,6 @@ options_usage(void)
 	f_print(stderr, "-T\t\tgenerate code to support RPC dispatch tables\n");
 	f_print(stderr, "-v\t\tprint version information and exit\n");
 	f_print(stderr, "-Y path\t\tpath where cpp is found\n");
+	/* END CSTYLED */
 	exit(1);
 }

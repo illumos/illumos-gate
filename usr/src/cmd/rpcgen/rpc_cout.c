@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_cout.c, XDR routine outputter for the RPC protocol compiler
@@ -150,9 +147,8 @@ static void
 print_header(definition *def)
 {
 	print_generic_header(def->def_name,
-			    def->def_kind != DEF_TYPEDEF ||
-			    !isvectordef(def->def.ty.old_type,
-					def->def.ty.rel));
+	    def->def_kind != DEF_TYPEDEF ||
+	    !isvectordef(def->def.ty.old_type, def->def.ty.rel));
 	/* Now add Inline support */
 
 	if (inlinelen == 0)
@@ -180,10 +176,10 @@ print_ifopen(int indent, char *name)
 {
 	tabify(fout, indent);
 	if (streq(name, "rpcprog_t") ||
-			streq(name, "rpcvers_t") ||
-			streq(name, "rpcproc_t") ||
-			streq(name, "rpcprot_t") ||
-			streq(name, "rpcport_t"))
+	    streq(name, "rpcvers_t") ||
+	    streq(name, "rpcproc_t") ||
+	    streq(name, "rpcprot_t") ||
+	    streq(name, "rpcport_t"))
 		(void) strtok(name, "_");
 	f_print(fout, "if (!xdr_%s(xdrs", name);
 }
@@ -268,11 +264,11 @@ print_ifstat(int indent, char *prefix, char *type, relation rel,
 			print_ifarg("(char **)");
 			if (*objname == '&')
 				f_print(fout, "%s.%s_val, (u_int *) %s.%s_len",
-					objname, name, objname, name);
+				    objname, name, objname, name);
 			else
 				f_print(fout,
-					"&%s->%s_val, (u_int *) &%s->%s_len",
-					objname, name, objname, name);
+				    "&%s->%s_val, (u_int *) &%s->%s_len",
+				    objname, name, objname, name);
 		}
 		print_ifarg(amax);
 		if (!alt)
@@ -308,7 +304,7 @@ emit_program(definition *def)
 				continue; /* old style, or single argument */
 			print_prog_header(plist);
 			for (dl = plist->args.decls; dl != NULL;
-				dl = dl->next)
+			    dl = dl->next)
 				print_stat(1, &dl->decl);
 			print_trailer();
 		}
@@ -333,17 +329,17 @@ emit_union(definition *def)
 		cs = &cl->case_decl;
 		if (!streq(cs->type, "void")) {
 			size_t len = strlen(def->def_name) +
-					strlen("&objp->%s_u.%s") +
-					strlen(cs->name) + 1;
+			    strlen("&objp->%s_u.%s") +
+			    strlen(cs->name) + 1;
 			object = malloc(len);
 			if (isvectordef(cs->type, cs->rel))
 				(void) snprintf(object, len, "objp->%s_u.%s",
-					def->def_name, cs->name);
+				    def->def_name, cs->name);
 			else
 				(void) snprintf(object, len, "&objp->%s_u.%s",
-					def->def_name, cs->name);
+				    def->def_name, cs->name);
 			print_ifstat(2, cs->prefix, cs->type, cs->rel,
-				cs->array_max, object, cs->name);
+			    cs->array_max, object, cs->name);
 			free(object);
 		}
 		f_print(fout, "\t\tbreak;\n");
@@ -352,19 +348,19 @@ emit_union(definition *def)
 	if (dflt != NULL) {
 		if (!streq(dflt->type, "void")) {
 			size_t len = strlen(def->def_name) +
-						strlen("&objp->%s_u.%s") +
-						strlen(dflt->name) + 1;
+			    strlen("&objp->%s_u.%s") +
+			    strlen(dflt->name) + 1;
 			f_print(fout, "\tdefault:\n");
 			object = malloc(len);
 			if (isvectordef(dflt->type, dflt->rel))
 				(void) snprintf(object, len, "objp->%s_u.%s",
-					def->def_name, dflt->name);
+				    def->def_name, dflt->name);
 			else
 				(void) snprintf(object, len, "&objp->%s_u.%s",
-					def->def_name, dflt->name);
+				    def->def_name, dflt->name);
 
 			print_ifstat(2, dflt->prefix, dflt->type, dflt->rel,
-				    dflt->array_max, object, dflt->name);
+			    dflt->array_max, object, dflt->name);
 			free(object);
 			f_print(fout, "\t\tbreak;\n");
 		}
@@ -378,7 +374,7 @@ emit_union(definition *def)
 
 static void
 expand_inline(int indent, const char *sizestr,
-	    int size, int flag, decl_list *dl, decl_list *cur)
+    int size, int flag, decl_list *dl, decl_list *cur)
 {
 	decl_list *psav;
 
@@ -388,16 +384,16 @@ expand_inline(int indent, const char *sizestr,
 	tabify(fout, indent + 1);
 	if (sizestr == NULL)
 		f_print(fout,
-			"buf = XDR_INLINE(xdrs, %d * BYTES_PER_XDR_UNIT);",
-			size);
+		    "buf = XDR_INLINE(xdrs, %d * BYTES_PER_XDR_UNIT);",
+		    size);
 	else if (size == 0)
 		f_print(fout,
-			"buf = XDR_INLINE(xdrs, (%s) * BYTES_PER_XDR_UNIT);",
-			sizestr);
+		    "buf = XDR_INLINE(xdrs, (%s) * BYTES_PER_XDR_UNIT);",
+		    sizestr);
 	else
 		f_print(fout,
-			"buf = XDR_INLINE(xdrs, (%d + (%s)) "
-			"* BYTES_PER_XDR_UNIT);", size, sizestr);
+		    "buf = XDR_INLINE(xdrs, (%d + (%s)) "
+		    "* BYTES_PER_XDR_UNIT);", size, sizestr);
 
 	f_print(fout, "\n");
 	tabify(fout, indent + 1);
@@ -406,7 +402,7 @@ expand_inline(int indent, const char *sizestr,
 	psav = cur;
 	while (cur != dl) {
 		print_stat(indent + 2,
-			&cur->decl);
+		    &cur->decl);
 		cur = cur->next;
 	}
 
@@ -498,10 +494,10 @@ arraysize(char *sz, declaration *dc, int elsize)
 
 	if (elsize == 1)
 		(void) snprintf(tmp + slen, tlen - slen, "%s%s",
-						plus, dc->array_max);
+		    plus, dc->array_max);
 	else
 		(void) snprintf(tmp + slen, tlen - slen, "%s(%s) * %d",
-						plus, dc->array_max, elsize);
+		    plus, dc->array_max, elsize);
 
 	return (tmp);
 }
@@ -536,12 +532,12 @@ inline_struct(decl_list *dl, decl_list *last, int flag, int indent)
 					 */
 					while (cur != dl) {
 						print_stat(indent + 1,
-							&cur->decl);
+						    &cur->decl);
 						cur = cur->next;
 					}
 				} else {
 					expand_inline(indent, sizestr,
-						    tsize, flag, dl, cur);
+					    tsize, flag, dl, cur);
 				}
 			tsize = 0;
 			cur = NULL;
@@ -605,7 +601,7 @@ emit_struct_tail_recursion(definition *defp, int can_inline)
 
 
 	f_print(fout, "\t%s *tmp_%s;\n",
-		defp->def_name, defp->def_name);
+	    defp->def_name, defp->def_name);
 
 	f_print(fout, "\tbool_t more_data = TRUE;\n");
 	f_print(fout, "\tbool_t first_objp = TRUE;\n\n");
@@ -622,7 +618,7 @@ emit_struct_tail_recursion(definition *defp, int can_inline)
 			print_stat(indent, &dl->decl);
 
 	f_print(fout, "\t\t\tif (!xdr_bool(xdrs, "
-		"&more_data))\n\t\t\t\treturn (FALSE);\n");
+	    "&more_data))\n\t\t\t\treturn (FALSE);\n");
 
 	f_print(fout, "\n\t\t\tif (!more_data) {\n");
 	f_print(fout, "\t\t\t\tobjp->%s = NULL;\n", sp->tail->decl.name);
@@ -630,13 +626,13 @@ emit_struct_tail_recursion(definition *defp, int can_inline)
 	f_print(fout, "\t\t\t}\n\n");
 	f_print(fout, "\t\t\tif (objp->%s == NULL) {\n", sp->tail->decl.name);
 	f_print(fout, "\t\t\t\tobjp->%s = "
-		"(%s *)\n\t\t\t\t\tmem_alloc(sizeof (%s));\n",
-		sp->tail->decl.name, defp->def_name, defp->def_name);
+	    "(%s *)\n\t\t\t\t\tmem_alloc(sizeof (%s));\n",
+	    sp->tail->decl.name, defp->def_name, defp->def_name);
 
 	f_print(fout, "\t\t\t\tif (objp->%s == NULL)\n"
-		"\t\t\t\t\treturn (FALSE);\n", sp->tail->decl.name);
+	    "\t\t\t\t\treturn (FALSE);\n", sp->tail->decl.name);
 	f_print(fout, "\t\t\t\tbzero(objp->%s, sizeof (%s));\n",
-		sp->tail->decl.name, defp->def_name);
+	    sp->tail->decl.name, defp->def_name);
 	f_print(fout, "\t\t\t}\n");
 	f_print(fout, "\t\t\tobjp = objp->%s;\n", sp->tail->decl.name);
 	f_print(fout, "\t\t}\n");
@@ -656,7 +652,7 @@ emit_struct_tail_recursion(definition *defp, int can_inline)
 	f_print(fout, "\t\t\t\tmore_data = FALSE;\n");
 
 	f_print(fout, "\t\t\tif (!xdr_bool(xdrs, &more_data))\n"
-		"\t\t\t\treturn (FALSE);\n");
+	    "\t\t\t\treturn (FALSE);\n");
 
 	f_print(fout, "\t\t}\n");
 
@@ -675,7 +671,7 @@ emit_struct_tail_recursion(definition *defp, int can_inline)
 	f_print(fout, "\t\t\tif (!first_objp)\n");
 
 	f_print(fout, "\t\t\t\tmem_free(tmp_%s, sizeof (%s));\n",
-		defp->def_name, defp->def_name);
+	    defp->def_name, defp->def_name);
 
 	f_print(fout, "\t\t\telse\n\t\t\t\tfirst_objp = FALSE;\n\t\t}\n");
 
@@ -706,7 +702,7 @@ emit_struct(definition *def)
 		inline_struct(dl, NULL, PUT, 1);
 
 		f_print(fout, "\t\treturn (TRUE);\n\t}"
-			" else if (xdrs->x_op == XDR_DECODE) {\n");
+		    " else if (xdrs->x_op == XDR_DECODE) {\n");
 
 		inline_struct(dl, NULL, GET, 1);
 		f_print(fout, "\t\treturn (TRUE);\n\t}\n\n");
@@ -761,7 +757,7 @@ emit_inline(int indent, declaration *decl, int flag)
 		f_print(fout, "%s *genp;\n\n", decl->type);
 		tabify(fout, indent + 1);
 		f_print(fout,
-			"for (i = 0, genp = objp->%s;\n", decl->name);
+		    "for (i = 0, genp = objp->%s;\n", decl->name);
 		tabify(fout, indent + 2);
 		f_print(fout, "i < %s; i++) {\n", decl->array_max);
 		emit_single_in_line(indent + 2, decl, flag, REL_VECTOR);
@@ -786,7 +782,7 @@ emit_inline64(int indent, declaration *decl, int flag)
 		f_print(fout, "%s *genp;\n\n", decl->type);
 		tabify(fout, indent + 1);
 		f_print(fout,
-			"for (i = 0, genp = objp->%s;\n", decl->name);
+		    "for (i = 0, genp = objp->%s;\n", decl->name);
 		tabify(fout, indent + 2);
 		f_print(fout, "i < %s; i++) {\n", decl->array_max);
 		emit_single_in_line64(indent + 2, decl, flag, REL_VECTOR);
@@ -821,11 +817,11 @@ emit_single_in_line(int indent, declaration *decl, int flag, relation rel)
 		upp_case = "LONG";
 	}
 	if ((strcmp(upp_case, "U_INT") == 0) ||
-			(strcmp(upp_case, "RPCPROG") == 0) ||
-			(strcmp(upp_case, "RPCVERS") == 0) ||
-			(strcmp(upp_case, "RPCPROC") == 0) ||
-			(strcmp(upp_case, "RPCPROT") == 0) ||
-			(strcmp(upp_case, "RPCPORT") == 0)) {
+	    (strcmp(upp_case, "RPCPROG") == 0) ||
+	    (strcmp(upp_case, "RPCVERS") == 0) ||
+	    (strcmp(upp_case, "RPCPROC") == 0) ||
+	    (strcmp(upp_case, "RPCPROT") == 0) ||
+	    (strcmp(upp_case, "RPCPORT") == 0)) {
 		free(upp_case);
 		freed = 1;
 		upp_case = "U_LONG";
@@ -834,7 +830,7 @@ emit_single_in_line(int indent, declaration *decl, int flag, relation rel)
 	if (flag == PUT)
 		if (rel == REL_ALIAS)
 			f_print(fout,
-				"%s(buf, objp->%s);\n", upp_case, decl->name);
+			    "%s(buf, objp->%s);\n", upp_case, decl->name);
 		else
 			f_print(fout, "%s(buf, *genp++);\n", upp_case);
 
@@ -868,12 +864,12 @@ emit_single_in_line64(int indent, declaration *decl, int flag, relation rel)
 		upp_case = "INT32";
 	}
 	if ((strcmp(upp_case, "U_INT") == 0) ||
-			(strcmp(upp_case, "U_LONG") == 0) ||
-			(strcmp(upp_case, "RPCPROG") == 0) ||
-			(strcmp(upp_case, "RPCVERS") == 0) ||
-			(strcmp(upp_case, "RPCPROC") == 0) ||
-			(strcmp(upp_case, "RPCPROT") == 0) ||
-			(strcmp(upp_case, "RPCPORT") == 0)) {
+	    (strcmp(upp_case, "U_LONG") == 0) ||
+	    (strcmp(upp_case, "RPCPROG") == 0) ||
+	    (strcmp(upp_case, "RPCVERS") == 0) ||
+	    (strcmp(upp_case, "RPCPROC") == 0) ||
+	    (strcmp(upp_case, "RPCPROT") == 0) ||
+	    (strcmp(upp_case, "RPCPORT") == 0)) {
 		free(upp_case);
 		freed = 1;
 		upp_case = "U_INT32";
@@ -882,7 +878,7 @@ emit_single_in_line64(int indent, declaration *decl, int flag, relation rel)
 	if (flag == PUT)
 		if (rel == REL_ALIAS)
 			f_print(fout,
-				"%s(buf, objp->%s);\n", upp_case, decl->name);
+			    "%s(buf, objp->%s);\n", upp_case, decl->name);
 		else
 			f_print(fout, "%s(buf, *genp++);\n", upp_case);
 

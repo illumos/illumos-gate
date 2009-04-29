@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_clntout.c, Client-stub outputter for the RPC protocol compiler
@@ -66,7 +63,7 @@ write_stubs(void)
 	f_print(fout,
 	    "\n/* Default timeout can be changed using clnt_control() */\n");
 	f_print(fout, "static struct timeval TIMEOUT = { %d, 0 };\n",
-		DEFAULT_TIMEOUT);
+	    DEFAULT_TIMEOUT);
 	for (l = defined; l != NULL; l = l->next) {
 		def = (definition *) l->val;
 		if (def->def_kind == DEF_PROGRAM) {
@@ -122,7 +119,7 @@ printarglist(proc_list *proc, char *result, char *addargname, char *addargtype)
 		if (Cflag) {	/* C++ style heading */
 			f_print(fout, "(");
 			ptype(proc->args.decls->decl.prefix,
-						proc->args.decls->decl.type, 1);
+			    proc->args.decls->decl.type, 1);
 
 			if (mtflag) {	/* Generate result field */
 				f_print(fout, "*argp, ");
@@ -132,10 +129,10 @@ printarglist(proc_list *proc, char *result, char *addargname, char *addargtype)
 					f_print(fout, "*%s, ", result);
 				}
 				f_print(fout, "%s%s)\n",
-					addargtype, addargname);
+				    addargtype, addargname);
 			} else
 				f_print(fout, "*argp, %s%s)\n",
-					addargtype, addargname);
+				    addargtype, addargname);
 		} else {
 			if (!mtflag)
 				f_print(fout, "(argp, %s)\n", addargname);
@@ -191,7 +188,7 @@ printarglist(proc_list *proc, char *result, char *addargname, char *addargtype)
 			f_print(fout, "%s)\n", addargname);
 			for (l = proc->args.decls; l != NULL; l = l->next) {
 				pdeclaration(proc->args.argname,
-							&l->decl, 1, ";\n");
+				    &l->decl, 1, ";\n");
 			}
 			if (mtflag && !oneway) {
 				f_print(fout, "\t");
@@ -203,7 +200,7 @@ printarglist(proc_list *proc, char *result, char *addargname, char *addargtype)
 			f_print(fout, "(");
 			for (l = proc->args.decls; l != NULL; l = l->next) {
 				pdeclaration(proc->args.argname, &l->decl, 0,
-									", ");
+				    ", ");
 			}
 			if (mtflag && !oneway) {
 				ptype(proc->res_prefix, proc->res_type, 1);
@@ -324,8 +321,8 @@ printbody(proc_list *proc)
 				    stringfix(proc->args.decls->decl.type),
 				    (newstyle ? "&" : ""),
 				    (newstyle ?
-					proc->args.decls->decl.name :
-					"argp"),
+				    proc->args.decls->decl.name :
+				    "argp"),
 				    stringfix(proc->res_type),
 				    ampr(proc->res_type),
 				    RESULT);
@@ -339,8 +336,8 @@ printbody(proc_list *proc)
 				    stringfix(proc->args.decls->decl.type),
 				    (newstyle ? "&" : ""),
 				    (newstyle ?
-					proc->args.decls->decl.name :
-					"argp"),
+				    proc->args.decls->decl.name :
+				    "argp"),
 				    stringfix(proc->res_type), "",
 				    RESULT);
 		}
@@ -419,8 +416,8 @@ printbody(proc_list *proc)
 				    stringfix(proc->args.decls->decl.type),
 				    (newstyle ? "&" : ""),
 				    (newstyle ?
-					proc->args.decls->decl.name :
-					"argp"));
+				    proc->args.decls->decl.name :
+				    "argp"));
 			else
 
 				f_print(fout,
@@ -431,8 +428,8 @@ printbody(proc_list *proc)
 				    stringfix(proc->args.decls->decl.type),
 				    (newstyle ? "&" : ""),
 				    (newstyle ?
-					proc->args.decls->decl.name :
-					"argp"));
+				    proc->args.decls->decl.name :
+				    "argp"));
 		}
 		if (!mtflag) {
 			f_print(fout, "\t\treturn (NULL);\n");

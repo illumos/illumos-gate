@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_hout.c, Header file outputter for the RPC protocol compiler
@@ -215,8 +212,8 @@ puniondef(definition *def)
 		f_print(fout, "\t%s %s;\n", decl->type, decl->name);
 	f_print(fout, "\tunion {\n");
 	for (l = def->def.un.cases; l != NULL; l = l->next) {
-	    if (l->contflag == 0)
-		pdeclaration(name, &l->case_decl, 2, ";\n");
+		if (l->contflag == 0)
+			pdeclaration(name, &l->case_decl, 2, ";\n");
 	}
 	decl = def->def.un.default_decl;
 	if (decl && !streq(decl->type, "void"))
@@ -289,11 +286,11 @@ pprogramdef(definition *def)
 	for (vers = def->def.pr.versions; vers != NULL; vers = vers->next) {
 		if (tblflag) {
 			f_print(fout,
-				"extern struct rpcgen_table %s_%s_table[];\n",
-				locase(def->def_name), vers->vers_num);
+			    "extern struct rpcgen_table %s_%s_table[];\n",
+			    locase(def->def_name), vers->vers_num);
 			f_print(fout,
-				"extern int %s_%s_nproc;\n",
-				locase(def->def_name), vers->vers_num);
+			    "extern int %s_%s_nproc;\n",
+			    locase(def->def_name), vers->vers_num);
 		}
 		puldefine(vers->vers_name, vers->vers_num, VERSION);
 
@@ -305,10 +302,10 @@ pprogramdef(definition *def)
 		if (!Cflag) {
 			ext = "extern  ";
 			for (proc = vers->procs; proc != NULL;
-							proc = proc->next) {
+			    proc = proc->next) {
 				if (!define_printed(proc, def->def.pr.versions))
 					puldefine(proc->proc_name,
-						    proc->proc_num, PROCEDURE);
+					    proc->proc_num, PROCEDURE);
 				f_print(fout, "%s", ext);
 				pprocdef(proc, vers, NULL, 0, 2);
 
@@ -322,7 +319,7 @@ pprogramdef(definition *def)
 			for (i = 1; i < 3; i++) {
 				if (i == 1) {
 					f_print(fout, "\n#if defined(__STDC__)"
-						" || defined(__cplusplus)\n");
+					    " || defined(__cplusplus)\n");
 					ext = "extern  ";
 				} else {
 					f_print(fout, "\n#else /* K&R C */\n");
@@ -457,7 +454,7 @@ ptypedef(definition *def)
 		}
 		if (undefined2(old, name) && def->def.ty.old_prefix)
 			(void) snprintf(prefix, sizeof (prefix), "%s ",
-							def->def.ty.old_prefix);
+			    def->def.ty.old_prefix);
 		else
 			prefix[0] = 0;
 		f_print(fout, "typedef ");
@@ -473,7 +470,7 @@ ptypedef(definition *def)
 			break;
 		case REL_VECTOR:
 			f_print(fout, "%s%s %s[%s]", prefix, old, name,
-				def->def.ty.array_max);
+			    def->def.ty.array_max);
 			break;
 		case REL_ALIAS:
 			f_print(fout, "%s%s %s", prefix, old, name);
@@ -506,7 +503,7 @@ pdeclaration(char *name, declaration *dec, int tab, char *separator)
 		} else {
 			if (dec->prefix) {
 				(void) snprintf(buf, sizeof (buf),
-					"%s ", dec->prefix);
+				    "%s ", dec->prefix);
 				prefix = buf;
 			}
 			type = dec->type;
@@ -517,7 +514,7 @@ pdeclaration(char *name, declaration *dec, int tab, char *separator)
 			break;
 		case REL_VECTOR:
 			f_print(fout, "%s%s %s[%s]", prefix, type, dec->name,
-				dec->array_max);
+			    dec->array_max);
 			break;
 		case REL_POINTER:
 			f_print(fout, "%s%s *%s", prefix, type, dec->name);
@@ -528,7 +525,7 @@ pdeclaration(char *name, declaration *dec, int tab, char *separator)
 			f_print(fout, "\tu_int %s_len;\n", dec->name);
 			tabify(fout, tab);
 			f_print(fout,
-				"\t%s%s *%s_val;\n", prefix, type, dec->name);
+			    "\t%s%s *%s_val;\n", prefix, type, dec->name);
 			tabify(fout, tab);
 			f_print(fout, "} %s", dec->name);
 			break;

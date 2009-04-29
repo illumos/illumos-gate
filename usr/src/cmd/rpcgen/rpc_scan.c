@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_scan.c, Scanner for the RPC protocol compiler
@@ -97,7 +94,7 @@ scan3(tok_kind expect1, tok_kind expect2, tok_kind expect3, token *tokp)
 {
 	get_token(tokp);
 	if (tokp->kind != expect1 && tokp->kind != expect2 &&
-						tokp->kind != expect3)
+	    tokp->kind != expect3)
 		expected3(expect1, expect2, expect3);
 }
 
@@ -165,7 +162,7 @@ get_token(token *tokp)
 					 * non NULL value
 					 */
 					(void) waitpid(childpid, &stat,
-								WUNTRACED);
+					    WUNTRACED);
 					if (stat > 0) {
 					/* Set return value from rpcgen */
 						nonfatalerrors = stat >> 8;
@@ -178,7 +175,7 @@ get_token(token *tokp)
 					break;
 				} else if (cppline(curline)) {
 					docppline(curline, &linenum,
-						&infilename);
+					    &infilename);
 				} else if (directive(curline)) {
 					printdirective(curline);
 				} else {
@@ -294,15 +291,15 @@ get_token(token *tokp)
 			size_t blen;
 
 			(void) snprintf(buf, sizeof (buf),
-						"illegal character in file: ");
+			    "illegal character in file: ");
 			blen = strlen(buf);
 			p = buf + blen;
 			if (isprint(*where)) {
 				(void) snprintf(p, sizeof (buf) - blen,
-								"%c", *where);
+				    "%c", *where);
 			} else {
 				(void) snprintf(p, sizeof (buf) - blen,
-								"%d", *where);
+				    "%d", *where);
 			}
 			error(buf);
 		}
@@ -433,7 +430,8 @@ findkind(char **mark, token *tokp)
 		}
 	}
 	tokp->kind = TOK_IDENT;
-	for (len = 0; isalnum(str[len]) || str[len] == '_'; len++);
+	for (len = 0; isalnum(str[len]) || str[len] == '_'; len++)
+		/* LOOP */;
 	tokp->str = malloc(len + 1);
 	(void) strncpy(tokp->str, str, len);
 	tokp->str[len] = 0;

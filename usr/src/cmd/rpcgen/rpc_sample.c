@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_sample.c, Sample client-server code outputter
@@ -119,7 +116,7 @@ write_sample_client(char *program_name, version_list *vp)
 			f_print(fout, "\t");
 			if (!streq(proc->args.decls->decl.type, "void"))
 				ptype(proc->args.decls->decl.prefix,
-					proc->args.decls->decl.type, 1);
+				    proc->args.decls->decl.type, 1);
 			else
 				/* cannot have "void" type */
 				f_print(fout, "char * ");
@@ -131,7 +128,7 @@ write_sample_client(char *program_name, version_list *vp)
 				f_print(fout, "\t");
 				ptype(l->decl.prefix, l->decl.type, 1);
 				if (strcmp(l->decl.type, "string") == 1)
-				    f_print(fout, " ");
+					f_print(fout, " ");
 				pvname(proc->proc_name, vp->vers_num);
 				f_print(fout, "_%s;\n", l->decl.name);
 			}
@@ -141,7 +138,7 @@ write_sample_client(char *program_name, version_list *vp)
 	/* generate creation of client handle */
 	f_print(fout, "\n#ifndef\tDEBUG\n");
 	f_print(fout, "\tclnt = clnt_create(host, %s, %s, \"%s\");\n",
-		program_name, vp->vers_name, tirpcflag? "netpath" : "udp");
+	    program_name, vp->vers_name, tirpcflag? "netpath" : "udp");
 	f_print(fout, "\tif (clnt == (CLIENT *) NULL) {\n");
 	f_print(fout, "\t\tclnt_pcreateerror(host);\n");
 	f_print(fout, "\t\texit(1);\n\t}\n");
@@ -245,7 +242,7 @@ write_sample_server(definition *def)
 			}
 
 			f_print(fout, "\n\t/*\n\t * insert server code "
-						"here\n\t */\n\n");
+			    "here\n\t */\n\n");
 
 			if (!mtflag)
 				if (!streq(proc->res_type, "void"))
@@ -263,20 +260,20 @@ write_sample_server(definition *def)
 			pvname(def->def_name, vp->vers_num);
 			if (Cflag)
 				f_print(fout, "_freeresult(SVCXPRT *transp,"
-					" xdrproc_t xdr_result,"
-					" caddr_t result)\n");
+				    " xdrproc_t xdr_result,"
+				    " caddr_t result)\n");
 			else {
 				f_print(fout, "_freeresult(transp, xdr_result,"
-					" result)\n");
+				    " result)\n");
 				f_print(fout, "\tSVCXPRT *transp;\n");
 				f_print(fout, "\txdrproc_t xdr_result;\n");
 				f_print(fout, "\tcaddr_t result;\n");
 			}
 			f_print(fout, "{\n"
-				"\t(void) xdr_free(xdr_result, result);\n"
-				"\n\t/*\n\t * Insert additional freeing"
-				" code here, if needed\n\t */\n"
-				"\n\n\treturn (TRUE);\n}\n");
+			    "\t(void) xdr_free(xdr_result, result);\n"
+			    "\n\t/*\n\t * Insert additional freeing"
+			    " code here, if needed\n\t */\n"
+			    "\n\n\treturn (TRUE);\n}\n");
 		}
 	}
 }
@@ -309,12 +306,12 @@ write_sample_clnt_main(void)
 		f_print(fout, "int\nmain(int argc, char *argv[])\n{\n");
 	else
 		f_print(fout, "int\nmain(argc, argv)\n\tint argc;\n"
-			"\tchar *argv[];\n{\n");
+		    "\tchar *argv[];\n{\n");
 
 	f_print(fout, "\tchar *host;");
 	f_print(fout, "\n\n\tif (argc < 2) {");
 	f_print(fout, "\n\t\tprintf(\"usage:  %%s server_host\\n\","
-			" argv[0]);\n");
+	    " argv[0]);\n");
 	f_print(fout, "\t\texit(1);\n\t}");
 	f_print(fout, "\n\thost = argv[1];\n");
 

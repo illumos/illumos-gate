@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_util.c, Utility routines for the RPC protocol compiler
@@ -114,7 +111,8 @@ storeval(list **lstp, definition *val)
 	list **l;
 	list *lst;
 
-	for (l = lstp; *l != NULL; l = (list **)&(*l)->next);
+	for (l = lstp; *l != NULL; l = (list **)&(*l)->next)
+		/* LOOP */;
 	lst = calloc(1, sizeof (list));
 	lst->val = val;
 	lst->next = NULL;
@@ -286,7 +284,7 @@ void
 expected1(tok_kind exp1)
 {
 	(void) snprintf(expectbuf,
-		sizeof (expectbuf), "expected '%s'", toktostr(exp1));
+	    sizeof (expectbuf), "expected '%s'", toktostr(exp1));
 	error(expectbuf);
 }
 
@@ -297,8 +295,8 @@ void
 expected2(tok_kind exp1, tok_kind exp2)
 {
 	(void) snprintf(expectbuf,
-		sizeof (expectbuf), "expected '%s' or '%s'", toktostr(exp1),
-		toktostr(exp2));
+	    sizeof (expectbuf), "expected '%s' or '%s'", toktostr(exp1),
+	    toktostr(exp2));
 	error(expectbuf);
 }
 
@@ -309,8 +307,8 @@ void
 expected3(tok_kind exp1, tok_kind exp2, tok_kind exp3)
 {
 	(void) snprintf(expectbuf,
-		sizeof (expectbuf), "expected '%s', '%s' or '%s'",
-		toktostr(exp1), toktostr(exp2), toktostr(exp3));
+	    sizeof (expectbuf), "expected '%s', '%s' or '%s'",
+	    toktostr(exp1), toktostr(exp2), toktostr(exp3));
 	error(expectbuf);
 }
 
@@ -363,7 +361,8 @@ toktostr(tok_kind kind)
 {
 	token *sp;
 
-	for (sp = tokstrings; sp->kind != TOK_EOF && sp->kind != kind; sp++);
+	for (sp = tokstrings; sp->kind != TOK_EOF && sp->kind != kind; sp++)
+		/* LOOP */;
 	return (sp->str);
 }
 

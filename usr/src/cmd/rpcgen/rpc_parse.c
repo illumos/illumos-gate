@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_parse.c, Parser for the RPC protocol compiler
@@ -207,7 +204,7 @@ is_self_reference(definition *defp, declaration *decp)
 			    !streqn(dp->def.ty.old_prefix, "struct"))
 				return (0);
 		} else if (streqn(decp->prefix, "struct") &&
-			!streqn(dp->def.ty.old_prefix, ""))
+		    !streqn(dp->def.ty.old_prefix, ""))
 			/*
 			 * if the current prefix is struct tne new prefix
 			 * must be empty
@@ -225,8 +222,8 @@ is_self_reference(definition *defp, declaration *decp)
 		if (decp->rel == REL_POINTER && dp->def.ty.rel != REL_ALIAS)
 			return (0);
 		if (decp->rel == REL_ALIAS &&
-			(dp->def.ty.rel != REL_ALIAS &&
-			dp->def.ty.rel != REL_POINTER))
+		    (dp->def.ty.rel != REL_ALIAS &&
+		    dp->def.ty.rel != REL_POINTER))
 			return (0);
 		if (decp->rel != REL_ALIAS && decp->rel != REL_POINTER)
 			/* Should never get here */
@@ -339,7 +336,7 @@ def_program(definition *defp)
 			while (peekscan(TOK_COMMA, &tok)) {
 				num_args++;
 				get_prog_declaration(&dec, DEF_STRUCT,
-						    num_args);
+				    num_args);
 				decls = calloc(1, sizeof (decl_list));
 				decls->decl = dec;
 				*tailp = decls;
@@ -376,7 +373,7 @@ def_program(definition *defp)
 		/* make the argument structure name for each arg */
 		for (plist = vlist->procs; plist != NULL; plist = plist->next) {
 			plist->args.argname = make_argname(plist->proc_name,
-							vlist->vers_num);
+			    vlist->vers_num);
 			/* free the memory ?? */
 		}
 		scan(TOK_SEMICOLON, &tok);
@@ -531,9 +528,9 @@ check_type_name(char *name, int new_type)
 	for (i = 0; reserved_words[i] != NULL; i++) {
 		if (strcmp(name, reserved_words[i]) == 0) {
 			(void) snprintf(tmp, sizeof (tmp),
-				"illegal (reserved) name :\'%s\' "
-				"in type definition",
-				name);
+			    "illegal (reserved) name :\'%s\' "
+			    "in type definition",
+			    name);
 			error(tmp);
 		}
 	}
@@ -541,9 +538,9 @@ check_type_name(char *name, int new_type)
 		for (i = 0; reserved_types[i] != NULL; i++) {
 			if (strcmp(name, reserved_types[i]) == 0) {
 				(void) snprintf(tmp, sizeof (tmp),
-					"illegal (reserved) name :\'%s\' "
-					"in type definition",
-					name);
+				    "illegal (reserved) name :\'%s\' "
+				    "in type definition",
+				    name);
 				error(tmp);
 			}
 		}
