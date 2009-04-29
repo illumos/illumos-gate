@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the kernel/misc/pcie module
 #	for PCI-E Error handling support in PCI-E nexus drivers.
@@ -48,6 +47,8 @@ ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 #	Include common rules.
 #
 include $(UTSBASE)/i86xpv/Makefile.i86xpv
+
+LDFLAGS         += -dy -Nmisc/acpica
 
 #
 #	Define targets
