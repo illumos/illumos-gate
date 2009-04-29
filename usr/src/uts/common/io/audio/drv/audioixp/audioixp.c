@@ -924,7 +924,7 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 		paddr += port->fragsz;
 		bdentry++;
 	}
-	ddi_dma_sync(port->bdl_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
+	(void) ddi_dma_sync(port->bdl_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 
 	port->engine = audio_engine_alloc(&audioixp_engine_ops, caps);
 	if (port->engine == NULL) {
