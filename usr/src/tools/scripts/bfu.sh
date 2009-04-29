@@ -7085,43 +7085,50 @@ mondo_loop() {
 	# private headers anymore, as well as headers for the now
 	# obsolete (and never documented) legacy audio driver API.
 	#
-	rm -f $usr/include/sys/audiovar.h
-	rm -f $usr/include/sys/audio/am_src1.h
-	rm -f $usr/include/sys/audio/am_src2.h
-	rm -f $usr/include/sys/audio/audio1575.h
-	rm -f $usr/include/sys/audio/audio810.h
-	rm -f $usr/include/sys/audio/audioens.h
-	rm -f $usr/include/sys/audio/audiohd.h
-	rm -f $usr/include/sys/audio/audioixp.h
-	rm -f $usr/include/sys/audio/audiots.h
-	rm -f $usr/include/sys/audio/audiovia823x.h
-	rm -f $usr/include/sys/audio/audio_4231.h
-	rm -f $usr/include/sys/audio/audio_apm.h
-	rm -f $usr/include/sys/audio/audio_mixer.h
-	rm -f $usr/include/sys/audio/audio_src.h
-	rm -f $usr/include/sys/audio/audio_support.h
-	rm -f $usr/include/sys/audio/audio_trace.h
-	rm -f $root/kernel/misc/amsrc1
-	rm -f $root/kernel/misc/amsrc2
-	rm -f $root/kernel/misc/audiosup
+	# But we only remove the SADA modules if we are delivering Boomer
+	# with the BFU.  We don't want BFU to be toxic when used with older
+	# archives.
+	#
 	rm -f $root/kernel/misc/diaudio
-	rm -f $root/kernel/misc/mixer
-	rm -f $root/kernel/misc/amd64/amsrc1
-	rm -f $root/kernel/misc/amd64/amsrc2
-	rm -f $root/kernel/misc/amd64/audiosup
-	rm -f $root/kernel/misc/amd64/diaudio
-	rm -f $root/kernel/misc/amd64/mixer
-	rm -f $root/kernel/misc/sparcv9/amsrc1
-	rm -f $root/kernel/misc/sparcv9/amsrc2
-	rm -f $root/kernel/misc/sparcv9/audiosup
 	rm -f $root/kernel/misc/sparcv9/diaudio
-	rm -f $root/kernel/misc/sparcv9/mixer
 
 	#
 	# Determine whether to emit update_audio notice or not
 	#
 	check_boomer_sys $root && BOOMER_PRESENT_SYS=true
 	check_boomer_bfu && BOOMER_PRESENT_BFU=true
+
+	if $BOOMER_PRESENT_BFU; then
+	    rm -f $usr/include/sys/audiovar.h
+	    rm -f $usr/include/sys/audio/am_src1.h
+	    rm -f $usr/include/sys/audio/am_src2.h
+	    rm -f $usr/include/sys/audio/audio1575.h
+	    rm -f $usr/include/sys/audio/audio810.h
+	    rm -f $usr/include/sys/audio/audioens.h
+	    rm -f $usr/include/sys/audio/audiohd.h
+	    rm -f $usr/include/sys/audio/audioixp.h
+	    rm -f $usr/include/sys/audio/audiots.h
+	    rm -f $usr/include/sys/audio/audiovia823x.h
+	    rm -f $usr/include/sys/audio/audio_4231.h
+	    rm -f $usr/include/sys/audio/audio_apm.h
+	    rm -f $usr/include/sys/audio/audio_mixer.h
+	    rm -f $usr/include/sys/audio/audio_src.h
+	    rm -f $usr/include/sys/audio/audio_support.h
+	    rm -f $usr/include/sys/audio/audio_trace.h
+	    rm -f $root/kernel/misc/amsrc1
+	    rm -f $root/kernel/misc/amsrc2
+	    rm -f $root/kernel/misc/audiosup
+	    rm -f $root/kernel/misc/mixer
+	    rm -f $root/kernel/misc/amd64/amsrc1
+	    rm -f $root/kernel/misc/amd64/amsrc2
+	    rm -f $root/kernel/misc/amd64/audiosup
+	    rm -f $root/kernel/misc/amd64/diaudio
+	    rm -f $root/kernel/misc/amd64/mixer
+	    rm -f $root/kernel/misc/sparcv9/amsrc1
+	    rm -f $root/kernel/misc/sparcv9/amsrc2
+	    rm -f $root/kernel/misc/sparcv9/audiosup
+	    rm -f $root/kernel/misc/sparcv9/mixer
+	fi
 
 	# Cleanup audio devlinks when bfu'ing back to legacy audio bits.
 	# We also cleanup devlinks the first time when upgrading from legacy
