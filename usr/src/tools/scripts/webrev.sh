@@ -178,7 +178,7 @@ function rsync_upload
 
 	print_upload_header ${rsync_prefix}
 	print "rsync ... \c"
-	typeset -r err_msg=$( $MKTEMP /tmp/rsync_err.XXX )
+	typeset -r err_msg=$( $MKTEMP /tmp/rsync_err.XXXXXX )
 	if [[ -z $err_msg ]]; then
 		print "\nERROR: rsync_upload: cannot create temporary file"
 		return 1
@@ -227,7 +227,8 @@ function remote_mkdirs
 		# Remove the last directory from directory specification.
 		#
 		typeset -r dirs_mk=${dir_spec%/*}
-		typeset -r batch_file_mkdir=$( $MKTEMP /tmp/webrev_mkdir.XXX )
+		typeset -r batch_file_mkdir=$( $MKTEMP \
+		    /tmp/webrev_mkdir.XXXXXX )
 		if [[ -z $batch_file_mkdir ]]; then
 			print "\nERROR: remote_mkdirs:" \
 			    "cannot create temporary file for batch file"
@@ -247,7 +248,7 @@ function remote_mkdirs
                         print "chdir ${dir}" >> ${batch_file_mkdir}
                 done
                 IFS=$OLDIFS
-		typeset -r sftp_err_msg=$( $MKTEMP /tmp/webrev_scp_err.XXX )
+		typeset -r sftp_err_msg=$( $MKTEMP /tmp/webrev_scp_err.XXXXXX )
 		if [[ -z ${sftp_err_msg} ]]; then
 			print "\nERROR: remote_mkdirs:" \
 			    "cannot create temporary file for error messages"
@@ -309,7 +310,7 @@ function ssh_upload
 	fi
 
 	print "upload ... \c"
-	typeset -r scp_err_msg=$( $MKTEMP /tmp/scp_err.XXX )
+	typeset -r scp_err_msg=$( $MKTEMP /tmp/scp_err.XXXXXX )
 	if [[ -z ${scp_err_msg} ]]; then
 		print "\nERROR: ssh_upload:" \
 		    "cannot create temporary file for error messages"
@@ -387,7 +388,7 @@ function delete_webrev
 	#
 	# Prepare batch file.
 	#
-	typeset -r batch_file_rm=$( $MKTEMP /tmp/webrev_remove.XXX )
+	typeset -r batch_file_rm=$( $MKTEMP /tmp/webrev_remove.XXXXXX )
 	if [[ -z $batch_file_rm ]]; then
 		print "\nERROR: delete_webrev: cannot create temporary file"
 		return 1
@@ -397,7 +398,7 @@ function delete_webrev
 	#
 	# Perform remote deletion and remove the batch file.
 	#
-	typeset -r sftp_err_msg=$( $MKTEMP /tmp/webrev_scp_err.XXX )
+	typeset -r sftp_err_msg=$( $MKTEMP /tmp/webrev_scp_err.XXXXXX )
 	if [[ -z ${sftp_err_msg} ]]; then
 		print "\nERROR: delete_webrev:" \
 		    "cannot create temporary file for error messages"
