@@ -37,6 +37,7 @@
 #include <sys/fm/protocol.h>
 #include <fm/libtopo.h>
 #include <fm/fmd_adm.h>
+#include <fm/fmd_msg.h>
 #include <dlfcn.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
@@ -49,7 +50,6 @@
 #define	offsetof(s, m)	((size_t)(&(((s*)0)->m)))
 
 /*
- * catalog_setup() must be called to setup support functions.
  * Fault records are added to catalog by calling add_fault_record_to_catalog()
  * records are stored in order of importance to the system.
  * If -g flag is set or not_suppressed is not set and the class fru, fault,
@@ -212,7 +212,6 @@ typedef struct status_record {
 	name_list_t *asru;
 	name_list_t *fru;
 	name_list_t *serial;
-	char *url;
 	uint8_t not_suppressed;
 } status_record_t;
 
@@ -240,8 +239,6 @@ sr_list_t *status_rec_list;
 resource_list_t *status_fru_list;
 resource_list_t *status_asru_list;
 
-static char *locale;
-static char *nlspath;
 static int max_display;
 static int max_fault = 0;
 static topo_hdl_t *topo_handle;
@@ -249,6 +246,7 @@ static char *topo_handle_uuid;
 static host_id_list_t *host_list;
 static int n_server;
 static int opt_g;
+static fmd_msg_hdl_t *fmadm_msghdl = NULL; /* handle for libfmd_msg calls */
 
 static char *
 format_date(char *buf, size_t len, uint64_t sec)
@@ -322,95 +320,6 @@ find_hostid(nvlist_t *nvl)
 		rt = find_hostid_in_list(platform, chassis, server, domain);
 	}
 	return (rt);
-}
-
-static void
-catalog_setup(void)
-{
-	char *tp;
-	int pl;
-
-	/*
-	 * All FMA event dictionaries use msgfmt(1) message objects to produce
-	 * messages, even for the C locale.  We therefore want to use dgettext
-	 * for all message lookups, but its defined behavior in the C locale is
-	 * to return the input string.  Since our input strings are event codes
-	 * and not format strings, this doesn't help us.  We resolve this nit
-	 * by setting NLSPATH to a non-existent file: the presence of NLSPATH
-	 * is defined to force dgettext(3C) to do a full lookup even for C.
-	 */
-	nlspath = getenv("NLSPATH");
-	if (nlspath == NULL)
-		putenv("NLSPATH=/usr/lib/fm/fmd/fmd.cat");
-	else {
-		pl = strlen(nlspath) + sizeof ("NLSPATH=") + 1;
-		tp = malloc(pl);
-		(void) snprintf(tp, pl, "NLSPATH=%s", nlspath);
-		nlspath = tp;
-	}
-
-	locale = setlocale(LC_MESSAGES, "");
-}
-
-static char *
-get_dict_url(char *id)
-{
-	char *url = "http://sun.com/msg/";
-	int msz = sizeof (url) + strlen(id) + 1;
-	char *cp;
-
-	cp = malloc(msz);
-	(void) snprintf(cp, msz, "%s%s", url, id);
-	return (cp);
-}
-
-static char *
-get_dict_msg(char *id, char *idx, int unknown, int translate)
-{
-	char mbuf[128];
-	char *msg;
-	char dbuf[32];
-	char *p;
-	int restore_env = 0;
-	int restore_locale = 0;
-
-	p = strchr(id, '-');
-	if (p == NULL || p == id || (p - id) >= 32) {
-		msg = mbuf;
-	} else {
-		strncpy(dbuf, id, (size_t)(p - id));
-		dbuf[(size_t)(p - id)] = 0;
-
-		(void) snprintf(mbuf, sizeof (mbuf), "%s.%s", id, idx);
-		if (translate == 0 || nlspath == NULL) {
-			(void) setlocale(LC_MESSAGES, "C");
-			restore_locale = 1;
-		}
-		bindtextdomain("FMD", "/usr/lib/locale");
-		msg = dgettext(dbuf, mbuf);
-		if (msg == mbuf) {
-			(void) setlocale(LC_MESSAGES, "C");
-			restore_locale = 1;
-			msg = dgettext(dbuf, mbuf);
-		}
-		if (msg == mbuf) {
-			putenv("NLSPATH=/usr/lib/fm/fmd/fmd.cat");
-			restore_env = 1;
-			(void) setlocale(LC_MESSAGES, "C");
-			msg = dgettext(dbuf, mbuf);
-		}
-		if (restore_locale)
-			(void) setlocale(LC_MESSAGES, locale);
-		if (restore_env && nlspath)
-			putenv(nlspath);
-	}
-	if (msg == mbuf) {
-		if (unknown)
-			msg = "unknown";
-		else
-			msg = NULL;
-	}
-	return (msg);
 }
 
 /*
@@ -751,7 +660,7 @@ free_name_list(name_list_t *list)
 static status_record_t *
 new_record_init(uurec_t *uurec_p, char *msgid, name_list_t *class,
     name_list_t *fru, name_list_t *asru, name_list_t *resource,
-    name_list_t *serial, const char *url, boolean_t not_suppressed,
+    name_list_t *serial, boolean_t not_suppressed,
     hostid_t *hostid)
 {
 	status_record_t *status_rec_p;
@@ -763,13 +672,14 @@ new_record_init(uurec_t *uurec_p, char *msgid, name_list_t *class,
 	uurec_p->next = NULL;
 	uurec_p->prev = NULL;
 	uurec_p->asru = asru;
-	status_rec_p->severity = get_dict_msg(msgid, "severity", 1, 0);
+	if ((status_rec_p->severity = fmd_msg_getitem_id(fmadm_msghdl, NULL,
+	    msgid, FMD_MSG_ITEM_SEVERITY)) == NULL)
+		status_rec_p->severity = strdup("unknown");
 	status_rec_p->class = class;
 	status_rec_p->fru = fru;
 	status_rec_p->asru = asru;
 	status_rec_p->resource = resource;
 	status_rec_p->serial = serial;
-	status_rec_p->url = url ? strdup(url) : NULL;
 	status_rec_p->msgid = strdup(msgid);
 	status_rec_p->not_suppressed = not_suppressed;
 	return (status_rec_p);
@@ -928,13 +838,13 @@ add_list(status_record_t *status_rec_p, name_list_t *listp,
 static void
 catalog_new_record(uurec_t *uurec_p, char *msgid, name_list_t *class,
     name_list_t *fru, name_list_t *asru, name_list_t *resource,
-    name_list_t *serial, const char *url, boolean_t not_suppressed,
+    name_list_t *serial, boolean_t not_suppressed,
     hostid_t *hostid)
 {
 	status_record_t *status_rec_p;
 
 	status_rec_p = new_record_init(uurec_p, msgid, class, fru, asru,
-	    resource, serial, url, not_suppressed, hostid);
+	    resource, serial, not_suppressed, hostid);
 	add_rec_list(status_rec_p, &status_rec_list);
 	if (status_rec_p->fru)
 		add_list(status_rec_p, status_rec_p->fru, &status_fru_list);
@@ -949,7 +859,7 @@ catalog_new_record(uurec_t *uurec_p, char *msgid, name_list_t *class,
 static void
 catalog_merge_record(status_record_t *status_rec_p, uurec_t *uurec_p,
     name_list_t *asru, name_list_t *resource, name_list_t *serial,
-    const char *url, boolean_t not_suppressed)
+    boolean_t not_suppressed)
 {
 	uurec_t *uurec1_p;
 
@@ -969,8 +879,6 @@ catalog_merge_record(status_record_t *status_rec_p, uurec_t *uurec_p,
 		uurec_p->prev = uurec1_p;
 		uurec1_p->next = uurec_p;
 	}
-	if (status_rec_p->url == NULL && url != NULL)
-		status_rec_p->url = strdup(url);
 	status_rec_p->not_suppressed |= not_suppressed;
 	uurec_p->asru = merge_name_list(&status_rec_p->asru, asru, 0);
 	(void) merge_name_list(&status_rec_p->resource, resource, 0);
@@ -1102,8 +1010,7 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 }
 
 static void
-add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid,
-    const char *url)
+add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 {
 	char *msgid = "-";
 	uint_t i, size = 0;
@@ -1152,12 +1059,12 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid,
 		status_rec_p = record_in_catalog(class, fru, msgid, host);
 	if (status_rec_p) {
 		catalog_merge_record(status_rec_p, uurec_p, asru, resource,
-		    serial, url, not_suppressed);
+		    serial, not_suppressed);
 		free_name_list(class);
 		free_name_list(fru);
 	} else {
 		catalog_new_record(uurec_p, msgid, class, fru, asru,
-		    resource, serial, url, not_suppressed, host);
+		    resource, serial, not_suppressed, host);
 	}
 }
 
@@ -1238,45 +1145,23 @@ print_line(char *label, char *buf)
 }
 
 static void
-print_dict_info(char *msgid, char *url)
+print_dict_info_line(char *msgid, fmd_msg_item_t what, const char *linehdr)
 {
-	const char *cp;
-	char *l_url;
-	char *buf;
-	int bufsz;
+	char *cp = fmd_msg_getitem_id(fmadm_msghdl, NULL, msgid, what);
 
-	cp = get_dict_msg(msgid, "description", 0, 1);
 	if (cp) {
-		if (url)
-			l_url = url;
-		else
-			l_url = get_dict_url(msgid);
-		bufsz = strlen(cp) + strlen(l_url) + 1;
-		buf = malloc(bufsz);
-		(void) snprintf(buf, bufsz, cp, l_url);
-		print_line(dgettext("FMD", "Description : "), buf);
-		free(buf);
-		if (!url)
-			free(l_url);
+		print_line(dgettext("FMD", linehdr), cp);
+		free(cp);
 	}
-	cp = get_dict_msg(msgid, "response", 0, 1);
-	if (cp) {
-		buf = strdup(cp);
-		print_line(dgettext("FMD", "Response    : "), buf);
-		free(buf);
-	}
-	cp = get_dict_msg(msgid, "impact", 0, 1);
-	if (cp) {
-		buf = strdup(cp);
-		print_line(dgettext("FMD", "Impact      : "), buf);
-		free(buf);
-	}
-	cp = get_dict_msg(msgid, "action", 0, 1);
-	if (cp) {
-		buf = strdup(cp);
-		print_line(dgettext("FMD", "Action      : "), buf);
-		free(buf);
-	}
+}
+
+static void
+print_dict_info(char *msgid)
+{
+	print_dict_info_line(msgid, FMD_MSG_ITEM_DESC, "Description : ");
+	print_dict_info_line(msgid, FMD_MSG_ITEM_RESPONSE, "Response    : ");
+	print_dict_info_line(msgid, FMD_MSG_ITEM_IMPACT, "Impact      : ");
+	print_dict_info_line(msgid, FMD_MSG_ITEM_ACTION, "Action      : ");
 }
 
 static void
@@ -1598,7 +1483,7 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		print_name_list(srp->serial, dgettext("FMD", "Serial ID.  :"),
 		    NULL, 0, 0, NULL, full);
 	}
-	print_dict_info(srp->msgid, srp->url);
+	print_dict_info(srp->msgid);
 	(void) printf("\n");
 }
 
@@ -1607,15 +1492,9 @@ print_status_record(status_record_t *srp, int summary, int opt_i, int full)
 {
 	char buf[32];
 	uurec_t *uurp = srp->uurec;
-	char *severity;
 	static int header = 0;
 	char *head;
 	ari_list_t *ari_list;
-
-	if (nlspath)
-		severity = get_dict_msg(srp->msgid, "severity", 1, 1);
-	else
-		severity = srp->severity;
 
 	if (!summary || !header) {
 		if (opt_i) {
@@ -1645,13 +1524,13 @@ print_status_record(status_record_t *srp, int summary, int opt_i, int full)
 		while (ari_list) {
 			(void) printf("%-15s %-37s %-14s %-9s\n",
 			    format_date(buf, sizeof (buf), uurp->sec),
-			    ari_list->ari_uuid, srp->msgid, severity);
+			    ari_list->ari_uuid, srp->msgid, srp->severity);
 			ari_list = ari_list->next;
 		}
 	} else {
 		(void) printf("%-15s %-37s %-14s %-9s\n",
 		    format_date(buf, sizeof (buf), uurp->sec),
-		    uurp->uuid, srp->msgid, severity);
+		    uurp->uuid, srp->msgid, srp->severity);
 	}
 
 	if (!summary)
@@ -1820,8 +1699,7 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 					if (msgid == NULL ||
 					    strcmp(msgid, srp->msgid) != 0) {
 						msgid = srp->msgid;
-						print_dict_info(srp->msgid,
-						    srp->url);
+						print_dict_info(srp->msgid);
 					}
 					slp = slp->next;
 				} while (slp != end);
@@ -1918,7 +1796,7 @@ dfault_rec(const fmd_adm_caseinfo_t *acp, void *arg)
 		    &uuid);
 		if (uurecp == NULL || uuid_in_list(uuid, uurecp))
 			add_fault_record_to_catalog(acp->aci_event, *diag_time,
-			    uuid, acp->aci_url);
+			    uuid);
 	} else {
 		rt = -1;
 	}
@@ -1973,7 +1851,6 @@ cmd_faulty(fmd_adm_t *adm, int argc, char *argv[])
 	uurec_select_t *tp;
 	uurec_select_t *uurecp = NULL;
 
-	catalog_setup();
 	while ((c = getopt(argc, argv, "afgin:prsu:v")) != EOF) {
 		switch (c) {
 		case 'a':
@@ -2017,6 +1894,8 @@ cmd_faulty(fmd_adm_t *adm, int argc, char *argv[])
 	if (optind < argc)
 		return (FMADM_EXIT_USAGE);
 
+	if ((fmadm_msghdl = fmd_msg_init(NULL, FMD_MSG_VERSION)) == NULL)
+		return (FMADM_EXIT_ERROR);
 	rt = get_cases_from_fmd(adm, uurecp, opt_i);
 	if (opt_p) {
 		if ((pager = getenv("PAGER")) == NULL)
@@ -2038,6 +1917,7 @@ cmd_faulty(fmd_adm_t *adm, int argc, char *argv[])
 		print_asru(opt_a);
 	if (opt_f == 0 && opt_r == 0)
 		print_catalog(opt_s, opt_a, opt_v, opt_i, opt_p && !opt_s);
+	fmd_msg_fini(fmadm_msghdl);
 	label_release_topo();
 	if (opt_p) {
 		(void) fclose(stdout);

@@ -47,7 +47,9 @@ const char *g_pname;
 ulong_t g_errs;
 ulong_t g_recs;
 char *g_root;
+
 struct topo_hdl *g_thp;
+fmd_msg_hdl_t *g_msg;
 
 /*PRINTFLIKE2*/
 void
@@ -135,7 +137,7 @@ fmdump_year(char *buf, size_t len, const fmd_log_record_t *rp)
 static int
 usage(FILE *fp)
 {
-	(void) fprintf(fp, "Usage: %s [-efvV] [-c class] [-R root] [-t time] "
+	(void) fprintf(fp, "Usage: %s [-efmvV] [-c class] [-R root] [-t time] "
 	    "[-T time] [-u uuid]\n\t\t[-n name[.name]*[=value]] [file]\n",
 	    g_pname);
 
@@ -143,6 +145,7 @@ usage(FILE *fp)
 	    "\t-c  select events that match the specified class\n"
 	    "\t-e  display error log content instead of fault log content\n"
 	    "\t-f  follow growth of log file by waiting for additional data\n"
+	    "\t-m  display human-readable messages for the fault log\n"
 	    "\t-R  set root directory for pathname expansions\n"
 	    "\t-t  select events that occurred after the specified time\n"
 	    "\t-T  select events that occurred before the specified time\n"
@@ -533,7 +536,7 @@ get_rotated_logs(char *logpath)
 int
 main(int argc, char *argv[])
 {
-	int opt_a = 0, opt_e = 0, opt_f = 0, opt_H = 0;
+	int opt_a = 0, opt_e = 0, opt_f = 0, opt_H = 0, opt_m = 0;
 	int opt_u = 0, opt_v = 0, opt_V = 0;
 
 	char ifile[PATH_MAX] = "";
@@ -565,7 +568,7 @@ main(int argc, char *argv[])
 
 	while (optind < argc) {
 		while ((c =
-		    getopt(argc, argv, "ac:efHn:O:R:t:T:u:vV")) != EOF) {
+		    getopt(argc, argv, "ac:efHmn:O:R:t:T:u:vV")) != EOF) {
 			switch (c) {
 			case 'a':
 				opt_a++;
@@ -583,6 +586,9 @@ main(int argc, char *argv[])
 				break;
 			case 'H':
 				opt_H++;
+				break;
+			case 'm':
+				opt_m++;
 				break;
 			case 'O':
 				off = strtoull(optarg, NULL, 16);
@@ -653,6 +659,12 @@ main(int argc, char *argv[])
 		return (FMDUMP_EXIT_USAGE);
 	}
 
+	if ((g_msg = fmd_msg_init(g_root, FMD_MSG_VERSION)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to initialize "
+		    "libfmd_msg: %s\n", g_pname, strerror(errno));
+		return (FMDUMP_EXIT_FATAL);
+	}
+
 	if ((lp = fmd_log_open(FMD_LOG_VERSION, ifile, &err)) == NULL) {
 		(void) fprintf(stderr, "%s: failed to open %s: %s\n",
 		    g_pname, ifile, fmd_log_errmsg(NULL, err));
@@ -700,8 +712,16 @@ main(int argc, char *argv[])
 		iflags |= FMD_LOG_XITER_REFS;
 	} else if (opt_v) {
 		arg.da_fmt = &ops->do_formats[FMDUMP_VERB1];
+	} else if (opt_m) {
+		arg.da_fmt = &ops->do_formats[FMDUMP_MSG];
 	} else
 		arg.da_fmt = &ops->do_formats[FMDUMP_SHORT];
+
+	if (opt_m && arg.da_fmt->do_func == NULL) {
+		(void) fprintf(stderr, "%s: -m mode is not supported for "
+		    "log of type %s: %s\n", g_pname, fmd_log_label(lp), ifile);
+		return (FMDUMP_EXIT_USAGE);
+	}
 
 	arg.da_fv = errfv;
 	arg.da_fc = errfc;
@@ -777,6 +797,11 @@ main(int argc, char *argv[])
 	if (!opt_f && g_recs == 0 && isatty(STDOUT_FILENO))
 		(void) fprintf(stderr, "%s: %s is empty\n", g_pname, ifile);
 
+	if (g_thp != NULL)
+		topo_close(g_thp);
+
 	fmd_log_close(lp);
+	fmd_msg_fini(g_msg);
+
 	return (g_errs ? FMDUMP_EXIT_ERROR : FMDUMP_EXIT_SUCCESS);
 }

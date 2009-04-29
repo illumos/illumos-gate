@@ -35,7 +35,8 @@ common_DCNAMES = \
 	ZFS \
 	SCA500 \
 	SCA1000 \
-	SENSOR
+	SENSOR \
+	TEST
 
 i386_DCNAMES = \
 	AMD \

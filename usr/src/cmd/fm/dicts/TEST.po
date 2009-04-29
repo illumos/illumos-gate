@@ -1,4 +1,7 @@
 #
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,33 +21,21 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# This is portable object file is used for testing libfmd_msg.  It
+# is not delivered in any package.
 #
 
-MODULE = snmp-trapgen
-CLASS = common
-SRCS = snmp.c
-SMASNMPCONFS = fmd-trapgen.conf
+msgid "TEST-8000-08.type"
+msgstr "Defect"
+msgid "TEST-8000-08.severity"
+msgstr "Minor"
+msgid "TEST-8000-08.description"
+msgstr "This entry tests URL variable expansion - url = %s"
+msgid "TEST-8000-08.response"
+msgstr "This entry tests the percent character escape sequence: %%"
+msgid "TEST-8000-08.impact"
+msgstr "This entry tests variable expansion for event payload members: uuid = %<uuid>, de scheme = %<de.scheme>"
+msgid "TEST-8000-08.action"
+msgstr "Variable expansion for arrays: index = %<test_arr[1].index>"
 
-ROOTSMASNMPDIR = $(ROOT)/etc/sma/snmp
-ROOTSMASNMPCONFS = $(SMASNMPCONFS:%=$(ROOTSMASNMPDIR)/%)
-
-include ../../Makefile.plugin
-
-SNMPLIBS = -lnetsnmp -lnetsnmpagent -lfmd_msg
-lint := SNMPLIBS =
-
-LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
-LINTFLAGS += -L$(ROOT)/usr/lib/fm
-LDLIBS += $(SNMPLIBS) -lfmd_msg
-
-$(ROOTSMASNMPCONFS) := FILEMODE = 0600
-
-$(ROOTSMASNMPDIR)/%: %
-	$(INS.file)
-
-install: $(ROOTSMASNMPCONFS)

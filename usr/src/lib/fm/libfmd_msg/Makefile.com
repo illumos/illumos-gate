@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,10 +40,12 @@ SRCDIR =	../common
 CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-LDLIBS += -lc
+LDLIBS += -lnvpair -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64
+
+CLOBBERFILES += fmd_msg_test fmd_msg_test.core fmd_msg_test.out
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx
@@ -57,3 +59,38 @@ lint: $(LINTLIB) lintcheck
 
 include ../../../Makefile.targ
 include ../../Makefile.targ
+
+LDLIBS_$(MACH) = -L$(ROOT)/usr/lib/fm -R$(ROOT)/usr/lib/fm
+LDLIBS_$(MACH64) = -L$(ROOT)/usr/lib/fm/$(MACH64) -R$(ROOT)/usr/lib/fm/$(MACH64)
+
+#
+# To ease the development and maintenance of libfmd_msg, a test suite is built
+# directly into the library.  The test program fmd_msg_test.c includes a set of
+# tests for all the code paths in the library.  The test program executes the
+# calls, and then forks into the background and dumps core.  After the test
+# runs, we diff the output against the master hand-verified output, and confirm
+# no leaks or corruption exist.  To run the entire suite, type "make test" and
+# inspect the results (the make target will fail on an error).
+#
+# The cmp skips the first 900 bytes of $(SRCDIR)/fmd_msg_test.out to get us
+# passed the CDDL header and copyright in that file.
+#
+test: install fmd_msg_test
+	@echo; echo "Running `pwd | sed 's/.*\///'` fmd_msg test suite ... \c"
+	@coreadm -p core $$$$
+	@UMEM_DEBUG=default,verbose UMEM_LOGGING=fail,contents LANG=C \
+	    LC_ALL=C ./fmd_msg_test | grep -v EVENT-TIME > fmd_msg_test.out
+	@chmod 0444 core; mv -f core fmd_msg_test.core
+	@echo; echo "Checking test output ... \c"
+	@cmp -s $(SRCDIR)/fmd_msg_test.out fmd_msg_test.out 900 0 && echo pass \
+	    || ( echo FAIL && diff $(SRCDIR)/fmd_msg_test.out fmd_msg_test.out )
+	@echo; echo Checking for memory leaks:
+	@echo ::findleaks | mdb fmd_msg_test.core
+	@echo; echo Checking for latent corruption:
+	@echo ::umem_verify | mdb fmd_msg_test.core | grep -v clean
+	@echo
+
+fmd_msg_test: $(SRCDIR)/fmd_msg_test.c
+	$(LINT.c) $(SRCDIR)/fmd_msg_test.c
+	$(LINK.c) -o fmd_msg_test $(SRCDIR)/fmd_msg_test.c \
+	    $(LDLIBS_$(TARGETMACH)) -lfmd_msg -lnvpair -lumem

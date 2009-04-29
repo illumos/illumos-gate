@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fmdump.h>
 #include <stdio.h>
@@ -81,5 +79,7 @@ const fmdump_ops_t fmdump_err_ops = {
 }, {
 "TIME                           CLASS",
 (fmd_log_rec_f *)err_verb2
+}, {
+NULL, NULL
 } }
 };

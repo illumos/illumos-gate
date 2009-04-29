@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FMDUMP_H
 #define	_FMDUMP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,13 +35,16 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
+
 #include <fm/fmd_log.h>
+#include <fm/fmd_msg.h>
 #include <fm/libtopo.h>
 
 enum {
 	FMDUMP_SHORT,
 	FMDUMP_VERB1,
 	FMDUMP_VERB2,
+	FMDUMP_MSG,
 	FMDUMP_NFMTS
 };
 
@@ -77,7 +77,9 @@ extern const char *g_pname;
 extern ulong_t g_errs;
 extern ulong_t g_recs;
 extern char *g_root;
+
 extern struct topo_hdl *g_thp;
+extern fmd_msg_hdl_t *g_msg;
 
 extern void fmdump_printf(FILE *, const char *, ...);
 extern void fmdump_warn(const char *, ...);

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fmdump.h>
 #include <stdio.h>
@@ -164,6 +162,51 @@ flt_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	return (0);
 }
 
+/*
+ * There is a lack of uniformity in how the various entries in our diagnosis
+ * are terminated.  Some end with one newline, others with two.  This makes the
+ * output of fmdump -m look a bit ugly.  Therefore we postprocess the message
+ * before printing it, removing consecutive occurences of newlines.
+ */
+static void
+postprocess_msg(char *msg)
+{
+	int i = 0, j = 0;
+	char *buf;
+
+	if ((buf = malloc(strlen(msg) + 1)) == NULL)
+		return;
+
+	buf[j++] = msg[i++];
+	for (i = 1; i < strlen(msg); i++) {
+		if (!(msg[i] == '\n' && msg[i - 1] == '\n'))
+			buf[j++] = msg[i];
+	}
+	buf[j] = '\0';
+	(void) strncpy(msg, buf, j+1);
+	free(buf);
+}
+
+/*ARGSUSED*/
+static int
+flt_msg(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
+{
+	char *msg;
+
+	if ((msg = fmd_msg_gettext_nv(g_msg, NULL, rp->rec_nvl)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to format message: %s\n",
+		    g_pname, strerror(errno));
+		g_errs++;
+		return (-1);
+	} else {
+		postprocess_msg(msg);
+		fmdump_printf(fp, "%s\n", msg);
+		free(msg);
+	}
+
+	return (0);
+}
+
 const fmdump_ops_t fmdump_flt_ops = {
 "fault", {
 {
@@ -175,5 +218,8 @@ const fmdump_ops_t fmdump_flt_ops = {
 }, {
 NULL,
 (fmd_log_rec_f *)flt_verb2
+}, {
+NULL,
+(fmd_log_rec_f *)flt_msg
 } }
 };

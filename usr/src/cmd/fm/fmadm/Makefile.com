@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -43,7 +42,7 @@ ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
-LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm
+LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm -lfmd_msg
 LDLIBS += -lnvpair -ltopo
 LDFLAGS += -R/usr/lib/fm
 LINTFLAGS += -mnu

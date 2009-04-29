@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../../Makefile.lib
@@ -39,10 +37,11 @@ clean := TARGET = clean
 clobber := TARGET = clobber
 install := TARGET = install
 lint := TARGET = lint
+test := TARGET = test
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber lint test: $(SUBDIRS)
 
 install: install_h .WAIT $(SUBDIRS)
 

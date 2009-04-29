@@ -22,8 +22,6 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#
 # MAPFILE HEADER START
 #
 # WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
@@ -39,8 +37,18 @@
 
 SUNWprivate {
     global:
+	fmd_msg_fini;
+	fmd_msg_getitem_id;
+	fmd_msg_getitem_nv;
+	fmd_msg_gettext_id;
+	fmd_msg_gettext_nv;
+	fmd_msg_init;
+	fmd_msg_locale_get;
+	fmd_msg_locale_set;
 	fmd_msg_lock;
 	fmd_msg_unlock;
+	fmd_msg_url_get;
+	fmd_msg_url_set;
     local:
 	*;
 };

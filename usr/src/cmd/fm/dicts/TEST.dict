@@ -1,4 +1,5 @@
 #
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,33 +19,10 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 
-MODULE = snmp-trapgen
-CLASS = common
-SRCS = snmp.c
-SMASNMPCONFS = fmd-trapgen.conf
+FMDICT: name=TEST version=1 maxkey=1
 
-ROOTSMASNMPDIR = $(ROOT)/etc/sma/snmp
-ROOTSMASNMPCONFS = $(SMASNMPCONFS:%=$(ROOTSMASNMPDIR)/%)
-
-include ../../Makefile.plugin
-
-SNMPLIBS = -lnetsnmp -lnetsnmpagent -lfmd_msg
-lint := SNMPLIBS =
-
-LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
-LINTFLAGS += -L$(ROOT)/usr/lib/fm
-LDLIBS += $(SNMPLIBS) -lfmd_msg
-
-$(ROOTSMASNMPCONFS) := FILEMODE = 0600
-
-$(ROOTSMASNMPDIR)/%: %
-	$(INS.file)
-
-install: $(ROOTSMASNMPCONFS)
+fault.test01=0

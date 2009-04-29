@@ -1338,3 +1338,10 @@ usr/include/sys/scsi/adapters/qusmail.h	sparc
 
 # sbd ioctl hdr
 usr/include/sys/stmf_sbd_ioctl.h	sparc
+
+#
+# portable object file and dictionary used by libfmd_msg test
+#
+usr/lib/fm/dict/TEST.dict		sparc
+usr/lib/locale/C/LC_MESSAGES/TEST.mo	sparc
+usr/lib/locale/C/LC_MESSAGES/TEST.po	sparc

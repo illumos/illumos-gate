@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,8 @@ static const char *g_fmri = NULL;
 
 static const char *opt_R = "/";
 static const char *opt_s = FM_FMRI_SCHEME_HC;
-static const char optstr[] = "bCdeP:pR:s:StVx";
+static const char optstr[] = "bCdem:P:pR:s:StVx";
+static const char *opt_m;
 
 static int opt_b = 0;
 static int opt_d = 0;
@@ -76,13 +77,14 @@ usage(FILE *fp)
 {
 	(void) fprintf(fp,
 	    "Usage: %s [-bCedpSVx] [-P group.property[=type:value]] "
-	    "[-R root] [-s scheme] [fmri]\n", g_pname);
+	    "[-R root] [-m method] [-s scheme] [fmri]\n", g_pname);
 
 	(void) fprintf(fp,
 	    "\t-b  walk in sibling-first order (default is child-first)\n"
 	    "\t-C  dump core after completing execution\n"
 	    "\t-d  set debug mode for libtopo modules\n"
 	    "\t-e  display FMRIs as paths using esc/eft notation\n"
+	    "\t-m  execute given method\n"
 	    "\t-P  get/set specified properties\n"
 	    "\t-p  display of FMRI protocol properties\n"
 	    "\t-R  set root directory for libtopo plug-ins and other files\n"
@@ -796,7 +798,7 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	int err;
 	nvlist_t *nvl;
-	nvlist_t *rsrc;
+	nvlist_t *rsrc, *out;
 	char *s;
 
 	if (opt_e && strcmp(opt_s, FM_FMRI_SCHEME_HC) == 0) {
@@ -818,14 +820,24 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 	}
 
 	if (g_fmri != NULL && fnmatch(g_fmri, s, 0) != 0) {
-			nvlist_free(rsrc);
-			topo_hdl_strfree(thp, s);
-			return (TOPO_WALK_NEXT);
+		nvlist_free(rsrc);
+		topo_hdl_strfree(thp, s);
+		return (TOPO_WALK_NEXT);
 	}
 
 	print_node(thp, node, rsrc, s);
 	topo_hdl_strfree(thp, s);
 	nvlist_free(rsrc);
+
+	if (opt_m != NULL) {
+		if (topo_method_invoke(node, opt_m, 0, NULL, &out, &err) == 0) {
+			nvlist_print(stdout, out);
+			nvlist_free(out);
+		} else if (err != ETOPO_METHOD_NOTSUP)
+			(void) fprintf(stderr, "%s: method failed unexpectedly "
+			    "on %s=%d (%s)\n", g_pname, topo_node_name(node),
+			    topo_node_instance(node), topo_strerror(err));
+	}
 
 	if (opt_V || opt_all) {
 		if ((nvl = topo_prop_getprops(node, &err)) == NULL) {
@@ -1174,6 +1186,9 @@ main(int argc, char *argv[])
 				break;
 			case 'e':
 				opt_e++;
+				break;
+			case 'm':
+				opt_m = optarg;
 				break;
 			case 'P':
 				pcnt++;

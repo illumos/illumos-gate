@@ -1239,3 +1239,10 @@ usr/include/sys/scsi/adapters/iscsi_if.h		i386
 
 # sbd ioctl hdr
 usr/include/sys/stmf_sbd_ioctl.h	i386
+
+#
+# portable object file and dictionary used by libfmd_msg test
+#
+usr/lib/fm/dict/TEST.dict		i386
+usr/lib/locale/C/LC_MESSAGES/TEST.mo	i386
+usr/lib/locale/C/LC_MESSAGES/TEST.po	i386

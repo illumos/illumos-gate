@@ -369,6 +369,7 @@ static void
 fmd_xprt_transition(fmd_xprt_impl_t *xip,
     const fmd_xprt_rule_t *state, const char *tag)
 {
+	fmd_xprt_t *xp = (fmd_xprt_t *)xip;
 	fmd_event_t *e;
 	nvlist_t *nvl;
 	char *s;
@@ -390,6 +391,19 @@ fmd_xprt_transition(fmd_xprt_impl_t *xip,
 	 */
 	if (state == _fmd_xprt_state_sub) {
 		fmd_xprt_subscribe_modhash(xip, fmd.d_mod_hash);
+
+		/*
+		 * For read-write transports, we always want to set up remote
+		 * subscriptions to the bultin list.* events, regardless of
+		 * whether any agents have subscribed to them.
+		 */
+		if (xip->xi_flags & FMD_XPRT_RDWR) {
+			fmd_xprt_subscribe(xp, FM_LIST_SUSPECT_CLASS);
+			fmd_xprt_subscribe(xp, FM_LIST_ISOLATED_CLASS);
+			fmd_xprt_subscribe(xp, FM_LIST_UPDATED_CLASS);
+			fmd_xprt_subscribe(xp, FM_LIST_RESOLVED_CLASS);
+			fmd_xprt_subscribe(xp, FM_LIST_REPAIRED_CLASS);
+		}
 
 		nvl = fmd_protocol_xprt_ctl(xip->xi_queue->eq_mod,
 		    "resource.fm.xprt.run", xip->xi_version);

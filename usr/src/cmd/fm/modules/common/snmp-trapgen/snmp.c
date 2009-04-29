@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
@@ -40,30 +38,6 @@
 #include <limits.h>
 #include <alloca.h>
 
-/*
- * SNMP_DOMAIN defines the dgettext() parameters the agent
- * can use to retrieve the localized format string for diagnosis messages.
- * The format string retrieved from SNMP_DOMAIN is the default format
- * string, but when processing each suspect list, dgettext() is also called
- * for the domain that matches the diagcode dictname.
- *
- * Similarly, SNMP_URL is also checked to see if snmp_url
- * should be overridden for each suspect list.
- *
- * The net effect of all this is that for a given diagcode DICT-1234-56:
- *
- *	- If DICT.mo defines snmp-url, it is used when filling
- *	  in the sunFmProblemURL variable.
- *
- *	- Otherwise, if snmp-trapgen.conf defines a "url" property, that
- *	  value is used.
- *
- *	- Otherwise, the default "http://sun.com/msg/" is used (via the
- *	  fmd_props[] table defined in this file).
- */
-static const char SNMP_DOMAIN[] = "FMD";
-static const char SNMP_URL[] = SNMP_URL_MSG;
-
 static struct stats {
 	fmd_stat_t bad_vers;
 	fmd_stat_t bad_code;
@@ -71,14 +45,13 @@ static struct stats {
 	fmd_stat_t no_trap;
 } snmp_stats = {
 	{ "bad_vers", FMD_TYPE_UINT64, "event version is missing or invalid" },
-	{ "bad_code", FMD_TYPE_UINT64, "event code has no dictionary name" },
+	{ "bad_code", FMD_TYPE_UINT64, "failed to compute url for code" },
 	{ "bad_uuid", FMD_TYPE_UINT64, "event uuid is too long to send" },
 	{ "no_trap", FMD_TYPE_UINT64, "trap generation suppressed" }
 };
 
-static char *snmp_locdir;	/* l10n messages directory (if alternate) */
-static char *snmp_url;		/* current value of "url" property */
-static int snmp_trapall;	/* set to trap on all faults */
+static fmd_msg_hdl_t *snmp_msghdl;	/* handle for libfmd_msg */
+static int snmp_trapall;		/* set to trap on all faults */
 
 static const char SNMP_SUPPCONF[] = "fmd-trapgen";
 
@@ -167,13 +140,9 @@ send_trap(fmd_hdl_t *hdl, const char *uuid, const char *code, const char *url)
 static void
 snmp_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	char *uuid, *code, *dict, *url, *urlcode, *locdir, *p;
+	char *uuid, *code, *url;
 	boolean_t domsg;
-
 	uint8_t version;
-	char *olang = NULL;
-	int locale_c = 0;
-	size_t len;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_SUSPECT_VERSION) {
@@ -189,79 +158,17 @@ snmp_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		return;
 	}
 
-	/*
-	 * Extract the uuid and diagcode dictionary from the event code.  The
-	 * dictionary name is the text preceding the first "-" in the code.
-	 */
 	(void) nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
 	(void) nvlist_lookup_string(nvl, FM_SUSPECT_DIAG_CODE, &code);
 
-	if ((p = strchr(code, '-')) == NULL || p == code) {
-		fmd_hdl_debug(hdl, "invalid diagnosis code: %s\n", code);
-		snmp_stats.bad_code.fmds_value.ui64++;
-		return;
-	}
+	url = fmd_msg_getitem_nv(snmp_msghdl, NULL, nvl, FMD_MSG_ITEM_URL);
 
-	dict = alloca((size_t)(p - code) + 1);
-	(void) strncpy(dict, code, (size_t)(p - code));
-	dict[(size_t)(p - code)] = '\0';
-
-	fmd_msg_lock();
-
-	if (snmp_locdir != NULL)
-		locdir = bindtextdomain(dict, snmp_locdir);
-
-	if ((url = dgettext(dict, SNMP_URL)) == SNMP_URL) {
-		/*
-		 * We didn't find a translation in the dictionary for the
-		 * current language.  Fall back to C and try again.
-		 */
-		olang = setlocale(LC_MESSAGES, NULL);
-		if (olang) {
-			p = alloca(strlen(olang) + 1);
-			olang = strcpy(p, olang);
-		}
-		locale_c = 1;
-		(void) setlocale(LC_MESSAGES, "C");
-		if ((url = dgettext(dict, SNMP_URL)) == SNMP_URL)
-			url = snmp_url;
-	}
-
-	/*
-	 * If the URL ends with a slash, that indicates the code should be
-	 * appended to it.  After formatting the URL, reformat the DESC
-	 * text using the URL as an snprintf argument.
-	 */
-	len = strlen(url);
-	if (url[len - 1] == '/') {
-		urlcode = alloca(len + strlen(code) + 1);
-		(void) snprintf(urlcode, INT_MAX, "%s%s", url, code);
+	if (url != NULL) {
+		send_trap(hdl, uuid, code, url);
+		free(url);
 	} else {
-		urlcode = url;
-	}
-
-	/*
-	 * We have what we need; now send the trap.
-	 */
-	send_trap(hdl, uuid, code, urlcode);
-
-	/*
-	 * Switch back to our original language if we had to fall back to C.
-	 */
-	if (olang != NULL)
-		(void) setlocale(LC_MESSAGES, olang);
-
-	if (snmp_locdir != NULL)
-		(void) bindtextdomain(dict, locdir);
-
-	fmd_msg_unlock();
-
-	if (locale_c) {
-		fmd_hdl_debug(hdl,
-		    url == snmp_url ?
-		    "dgettext(%s, %s) in %s and C failed\n" :
-		    "dgettext(%s, %s) in %s failed; C used\n",
-		    dict, SNMP_URL, olang ? olang : "<null>");
+		fmd_hdl_debug(hdl, "failed to format url for %s", uuid);
+		snmp_stats.bad_code.fmds_value.ui64++;
 	}
 }
 
@@ -330,7 +237,7 @@ static const fmd_hdl_info_t fmd_info = {
 void
 _fmd_init(fmd_hdl_t *hdl)
 {
-	char *rootdir, *locdir, *locale, *p;
+	char *rootdir, *urlbase;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* invalid data in configuration file */
@@ -341,72 +248,28 @@ _fmd_init(fmd_hdl_t *hdl)
 	if (init_sma() != SNMPERR_SUCCESS)
 		fmd_hdl_abort(hdl, "snmp-trapgen agent initialization failed");
 
-	/*
-	 * All FMA event dictionaries use msgfmt(1) message objects to produce
-	 * messages, even for the C locale.  We therefore want to use dgettext
-	 * for all message lookups, but its defined behavior in the C locale is
-	 * to return the input string.  Since our input strings are event codes
-	 * and not format strings, this doesn't help us.  We resolve this nit
-	 * by setting NLSPATH to a non-existent file: the presence of NLSPATH
-	 * is defined to force dgettext(3C) to do a full lookup even for C.
-	 */
-	if (getenv("NLSPATH") == NULL && putenv(fmd_hdl_strdup(hdl,
-	    "NLSPATH=/usr/lib/fm/fmd/fmd.cat", FMD_SLEEP)) != 0)
-		fmd_hdl_abort(hdl, "snmp-trapgen failed to set NLSPATH");
-
-	fmd_msg_lock();
-	(void) setlocale(LC_MESSAGES, "");
-	locale = setlocale(LC_MESSAGES, NULL);
-	if (locale) {
-		p = alloca(strlen(locale) + 1);
-		locale = strcpy(p, locale);
-	} else {
-		locale = "<null>";
-	}
-	fmd_msg_unlock();
-	fmd_hdl_debug(hdl, "locale=%s\n", locale);
-
-	/*
-	 * Cache any properties we use every time we receive an event and
-	 * subscribe to list.suspect events regardless of the .conf file.
-	 */
-	snmp_url = fmd_prop_get_string(hdl, "url");
-	snmp_trapall = fmd_prop_get_int32(hdl, "trap_all");
-
-	/*
-	 * If fmd's rootdir property is set to a non-default root, then we are
-	 * going to need to rebind the text domains we use for dgettext() as
-	 * we go.  Look up the default l10n messages directory and make
-	 * snmp_locdir be this path with fmd.rootdir prepended to it.
-	 */
 	rootdir = fmd_prop_get_string(hdl, "fmd.rootdir");
-
-	if (*rootdir != '\0' && strcmp(rootdir, "/") != 0) {
-		fmd_msg_lock();
-		locdir = bindtextdomain(SNMP_DOMAIN, NULL);
-		fmd_msg_unlock();
-		if (locdir != NULL) {
-			size_t len = strlen(rootdir) + strlen(locdir) + 1;
-			snmp_locdir = fmd_hdl_alloc(hdl, len, FMD_SLEEP);
-			(void) snprintf(snmp_locdir, len, "%s%s", rootdir,
-			    locdir);
-			fmd_hdl_debug(hdl,
-			    "binding textdomain to %s for snmp\n",
-			    snmp_locdir);
-		}
-	}
-
+	snmp_msghdl = fmd_msg_init(rootdir, FMD_MSG_VERSION);
 	fmd_prop_free_string(hdl, rootdir);
+
+	if (snmp_msghdl == NULL)
+		fmd_hdl_abort(hdl, "failed to initialize libfmd_msg");
+
+	urlbase = fmd_prop_get_string(hdl, "url");
+	(void) fmd_msg_url_set(snmp_msghdl, urlbase);
+	fmd_prop_free_string(hdl, urlbase);
+
+	snmp_trapall = fmd_prop_get_int32(hdl, "trap_all");
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_RESOLVED_CLASS);
 }
 
+/*ARGSUSED*/
 void
 _fmd_fini(fmd_hdl_t *hdl)
 {
-	fmd_hdl_strfree(hdl, snmp_locdir);
-	fmd_prop_free_string(hdl, snmp_url);
+	fmd_msg_fini(snmp_msghdl);
 
 	/*
 	 * snmp_shutdown, which we would normally use here, calls free_slots,
