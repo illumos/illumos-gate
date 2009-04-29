@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,7 +558,7 @@ find_generic_event(char *name)
 {
 	p4_generic_event_t	*gevp;
 
-	for (gevp = p4_generic_events; gevp != NULL; gevp++)
+	for (gevp = p4_generic_events; gevp->name != NULL; gevp++)
 		if (strcmp(name, gevp->name) == 0)
 			return (gevp);
 
