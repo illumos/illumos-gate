@@ -804,16 +804,21 @@ sndctl_dsp_settrigger(audio_client_t *c, int *trigp)
 {
 	int		triggers;
 	int		oflag;
+	audio_stream_t	*sp;
 
 	oflag = auclnt_get_oflag(c);
 	triggers = *trigp;
 
 	if ((oflag & FWRITE) && (triggers & PCM_ENABLE_OUTPUT)) {
-		auclnt_clear_paused(auclnt_output_stream(c));
+		sp = auclnt_output_stream(c);
+		auclnt_clear_paused(sp);
+		auclnt_start(sp);
 	}
 
 	if ((oflag & FREAD) && (triggers & PCM_ENABLE_INPUT)) {
-		auclnt_clear_paused(auclnt_input_stream(c));
+		sp = auclnt_input_stream(c);
+		auclnt_clear_paused(sp);
+		auclnt_start(sp);
 	}
 
 	return (0);
