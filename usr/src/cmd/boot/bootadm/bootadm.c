@@ -72,7 +72,7 @@
 #include <device_info.h>
 #include <sys/vtoc.h>
 #include <sys/efi_partition.h>
-
+#include <regex.h>
 #include <locale.h>
 
 #include "message.h"
@@ -1773,11 +1773,12 @@ cmpstat(
 	uint_t 		sz;
 	uint64_t 	*value;
 	uint64_t 	filestat[2];
-	int 		error, ret;
+	int 		error, ret, status;
 
 	struct safefile *safefilep;
 	FILE 		*fp;
 	struct stat	sb;
+	regex_t re;
 
 	/*
 	 * On SPARC we create/update links too.
@@ -1912,11 +1913,18 @@ cmpstat(
 	    filestat[1] != st->st_mtime)) {
 		if (bam_smf_check) {
 			safefilep = safefiles;
-			while (safefilep != NULL) {
-				if (strcmp(file + bam_rootlen,
-				    safefilep->name) == 0) {
-					(void) creat(NEED_UPDATE_FILE, 0644);
-					return (0);
+			while (safefilep != NULL &&
+			    safefilep->name[0] != '\0') {
+				if (regcomp(&re, safefilep->name,
+				    REG_EXTENDED|REG_NOSUB) == 0) {
+					status = regexec(&re,
+					    file + bam_rootlen, 0, NULL, 0);
+					regfree(&re);
+					if (status == 0) {
+						(void) creat(NEED_UPDATE_FILE,
+						    0644);
+						return (0);
+					}
 				}
 				safefilep = safefilep->next;
 			}

@@ -5,3 +5,4 @@ etc/path_to_inst
 etc/rtc_config
 etc/zfs/zpool.cache
 etc/hostid
+kernel/drv/.*\.conf
