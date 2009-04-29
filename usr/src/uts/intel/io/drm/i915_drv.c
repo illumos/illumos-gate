@@ -93,6 +93,7 @@ static drm_pci_id_list_t i915_pciidlist[] = {
  * Local routines
  */
 static void i915_configure(drm_driver_t *);
+static int i915_quiesce(dev_info_t *dip);
 
 /*
  * DRM driver
@@ -112,7 +113,7 @@ static struct dev_ops i915_dev_ops = {
 	&drm_cb_ops,			/* devo_cb_ops */
 	NULL,				/* devo_bus_ops */
 	NULL,				/* power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	i915_quiesce,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -983,4 +984,19 @@ static void i915_configure(drm_driver_t *driver)
 	driver->use_agp	=	1;
 	driver->require_agp	=	1;
 	driver->use_irq	=	1;
+}
+
+static int i915_quiesce(dev_info_t *dip)
+{	
+	drm_device_t		*statep;
+	int		unit;
+
+	unit =  ddi_get_instance(dip);
+	statep = ddi_get_soft_state(i915_statep, unit);
+	if (statep == NULL) {
+		return (DDI_FAILURE);
+	}
+	i915_driver_irq_uninstall(statep);
+
+	return (DDI_SUCCESS);
 }

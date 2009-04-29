@@ -985,7 +985,7 @@ void i915_driver_irq_uninstall(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	u32 temp;
-	if (!dev_priv)
+	if ((!dev_priv) || (dev_priv->irq_enabled == 0))
 		return;
 
 	dev_priv->vblank_pipe = 0;
