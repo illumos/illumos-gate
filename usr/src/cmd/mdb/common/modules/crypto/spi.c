@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mdb dcmds for selected structures from
@@ -96,7 +94,7 @@ crypto_provider_ext_info(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_USAGE);
 
 	if (mdb_vread(&ext_prov, sizeof (crypto_provider_ext_info_t), addr)
-		== -1) {
+	    == -1) {
 		mdb_warn("cannot read addr");
 		return (DCMD_ERR);
 	}
@@ -197,7 +195,7 @@ crypto_mech_info(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_USAGE);
 
 	if (mdb_vread(&minfo, sizeof (crypto_mech_info_t), addr)
-		== -1) {
+	    == -1) {
 		mdb_warn("cannot read addr %p", addr);
 		return (DCMD_ERR);
 	}
@@ -246,9 +244,6 @@ static const mdb_dcmd_t dcmds[] = {
 
 
 	/* impl.c */
-	{ "kcf_sched_info", ":",
-	    "scheduling data for a crypto request", kcf_sched_info, NULL },
-
 	{ "kcf_provider_desc", ":",
 	    "crypto provider description struct", kcf_provider_desc, NULL },
 

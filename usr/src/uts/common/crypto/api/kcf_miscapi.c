@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,6 +122,7 @@ crypto_get_mech_list(uint_t *countp, int kmflag)
 	char *mech_name, *hint_mech, *end;
 	kcf_soft_conf_entry_t *p;
 	size_t n;
+	kcf_lock_withpad_t *mp;
 
 	/*
 	 * Count the maximum possible mechanisms that can come from the
@@ -141,12 +142,13 @@ crypto_get_mech_list(uint_t *countp, int kmflag)
 		me_tab = kcf_mech_tabs_tab[cl].met_tab;
 		for (i = 0; i < me_tab_size; i++) {
 			me = &me_tab[i];
-			mutex_enter(&(me->me_mutex));
+			mp = &me_mutexes[CPU_SEQID];
+			mutex_enter(&mp->kl_lock);
 			if ((me->me_name[0] != 0) && (me->me_num_hwprov >= 1)) {
 				ASSERT(me->me_hw_prov_chain != NULL);
 				count++;
 			}
-			mutex_exit(&(me->me_mutex));
+			mutex_exit(&mp->kl_lock);
 		}
 	}
 
@@ -176,11 +178,12 @@ again:
 		me_tab = kcf_mech_tabs_tab[cl].met_tab;
 		for (i = 0; i < me_tab_size; i++) {
 			me = &me_tab[i];
-			mutex_enter(&(me->me_mutex));
+			mp = &me_mutexes[CPU_SEQID];
+			mutex_enter(&mp->kl_lock);
 			if ((me->me_name[0] != 0) && (me->me_num_hwprov >= 1)) {
 				ASSERT(me->me_hw_prov_chain != NULL);
 				if ((mech_name + CRYPTO_MAX_MECH_NAME) > end) {
-					mutex_exit(&(me->me_mutex));
+					mutex_exit(&mp->kl_lock);
 					kmem_free(tmp_mech_name_tab, n);
 					n = n << 1;
 					goto again;
@@ -191,7 +194,7 @@ again:
 				mech_name += CRYPTO_MAX_MECH_NAME;
 				count++;
 			}
-			mutex_exit(&(me->me_mutex));
+			mutex_exit(&mp->kl_lock);
 		}
 	}
 
@@ -505,6 +508,7 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 	kcf_mech_entry_t *me;
 	kcf_provider_desc_t *pd;
 	kcf_prov_mech_desc_t *prov_chain;
+	kcf_lock_withpad_t *mp;
 
 	/* when mech is a valid mechanism, me will be its mech_entry */
 	if ((mech == NULL) || (key == NULL) ||
@@ -516,7 +520,8 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 		return (CRYPTO_MECHANISM_INVALID);
 	}
 
-	mutex_enter(&me->me_mutex);
+	mp = &me_mutexes[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
 
 	/* First let the software provider check this key */
 	if (me->me_sw_prov != NULL) {
@@ -527,7 +532,7 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 		    (KCF_PROV_KEY_OPS(pd)->key_check != NULL)) {
 			crypto_mechanism_t lmech;
 
-			mutex_exit(&me->me_mutex);
+			mutex_exit(&mp->kl_lock);
 			lmech = *mech;
 			KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd, &lmech);
 			error = KCF_PROV_KEY_CHECK(pd, &lmech, key);
@@ -537,7 +542,7 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 				return (error);
 			}
 
-			mutex_enter(&me->me_mutex);
+			mutex_enter(&mp->kl_lock);
 		}
 		KCF_PROV_REFRELE(pd);
 	}
@@ -551,7 +556,7 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 		    (KCF_PROV_KEY_OPS(pd)->key_check != NULL)) {
 			crypto_mechanism_t lmech;
 
-			mutex_exit(&me->me_mutex);
+			mutex_exit(&mp->kl_lock);
 			lmech = *mech;
 			KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd,
 			    &lmech);
@@ -561,13 +566,13 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 				KCF_PROV_REFRELE(pd);
 				return (error);
 			}
-			mutex_enter(&me->me_mutex);
+			mutex_enter(&mp->kl_lock);
 		}
 		KCF_PROV_REFRELE(pd);
 		prov_chain = prov_chain->pm_next;
 	}
 
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 
 	/* All are happy with this key */
 	return (CRYPTO_SUCCESS);
@@ -645,6 +650,7 @@ crypto_get_all_mech_info(crypto_mech_type_t mech_type,
 	kcf_prov_mech_desc_t *hwp;
 	crypto_mechanism_info_t *infos;
 	size_t infos_size;
+	kcf_lock_withpad_t *mp;
 
 	/* get to the mech entry corresponding to the specified mech type */
 	if ((rv = kcf_get_mech_entry(mech_type, &me)) != CRYPTO_SUCCESS) {
@@ -652,10 +658,11 @@ crypto_get_all_mech_info(crypto_mech_type_t mech_type,
 	}
 
 	/* compute the number of key size ranges to return */
-	mutex_enter(&me->me_mutex);
+	mp = &me_mutexes[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
 again:
 	ninfos = PROV_COUNT(me);
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 
 	if (ninfos == 0) {
 		infos = NULL;
@@ -669,7 +676,7 @@ again:
 		goto bail;
 	}
 
-	mutex_enter(&me->me_mutex);
+	mutex_enter(&mp->kl_lock);
 	if (ninfos != PROV_COUNT(me)) {
 		kmem_free(infos, infos_size);
 		goto again;
@@ -686,7 +693,7 @@ again:
 	for (hwp = me->me_hw_prov_chain; hwp != NULL; hwp = hwp->pm_next)
 		init_mechanism_info(&infos[cur_info++], hwp);
 
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 	ASSERT(cur_info == ninfos);
 bail:
 	*mech_infos = infos;

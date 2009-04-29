@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Core KCF (Kernel Cryptographic Framework). This file implements
@@ -368,7 +366,6 @@ kcf_verify_signature(void *arg)
 out:
 	if (modhold_done)
 		mod_release_mod(mctlp);
-	KCF_PROV_IREFRELE(pd);
 	KCF_PROV_REFRELE(pd);
 }
 

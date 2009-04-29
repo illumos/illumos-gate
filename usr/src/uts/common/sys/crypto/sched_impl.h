@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CRYPTO_SCHED_IMPL_H
 #define	_SYS_CRYPTO_SCHED_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Scheduler internal structures.
@@ -104,6 +102,9 @@ typedef struct kcf_prov_tried {
 	struct kcf_prov_tried	*pt_next;
 } kcf_prov_tried_t;
 
+/* Must be different from KM_SLEEP and KM_NOSLEEP */
+#define	KCF_HOLD_PROV	0x1000
+
 #define	IS_FG_SUPPORTED(mdesc, fg)		\
 	(((mdesc)->pm_mech_info.cm_func_group_mask & (fg)) != 0)
 
@@ -153,6 +154,8 @@ typedef struct kcf_sreq_node {
 
 	/* Provider handling this request */
 	kcf_provider_desc_t	*sn_provider;
+
+	kcf_prov_cpu_t		*sn_mp;
 } kcf_sreq_node_t;
 
 /*
@@ -199,6 +202,7 @@ typedef struct kcf_areq_node {
 
 	/* Provider handling this request */
 	kcf_provider_desc_t	*an_provider;
+	kcf_prov_cpu_t		*an_mp;
 	kcf_prov_tried_t	*an_tried_plist;
 
 	struct kcf_areq_node	*an_idnext;	/* Next in ID hash */

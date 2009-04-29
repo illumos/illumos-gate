@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,32 +36,6 @@
 #include <sys/crypto/impl.h>
 #include "crypto_cmds.h"
 
-int
-kcf_sched_info(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	kcf_sched_info_t sched;
-	kcf_sched_info_t *sinfo = &sched;
-
-	if (!(flags & DCMD_ADDRSPEC)) {
-		if ((argc == 1) && (argv->a_type == MDB_TYPE_IMMEDIATE))
-			sinfo = (kcf_sched_info_t *)(uintptr_t)argv->a_un.a_val;
-		else
-			return (DCMD_USAGE);
-	} else if (addr == NULL)	/* not allowed with DCMD_ADDRSPEC */
-		return (DCMD_USAGE);
-	else {
-		if (mdb_vread(sinfo, sizeof (kcf_sched_info_t), addr) == -1) {
-			mdb_warn("cannot read %p", addr);
-			return (DCMD_ERR);
-		}
-	}
-	mdb_printf("ks_ndispatches:\t%llu\n", sinfo->ks_ndispatches);
-	mdb_printf("ks_nfails:\t%llu\n", sinfo->ks_nfails);
-	mdb_printf("ks_nbusy_rval:\t%llu\n", sinfo->ks_nbusy_rval);
-	mdb_printf("ks_ntaskq:\t%p\n", sinfo->ks_taskq);
-	return (DCMD_OK);
-}
-
 static const char *prov_states[] = {
 	"none",
 	"KCF_PROV_ALLOCATED",
@@ -71,33 +45,9 @@ static const char *prov_states[] = {
 	"KCF_PROV_BUSY",
 	"KCF_PROV_FAILED",
 	"KCF_PROV_DISABLED",
-	"KCF_PROV_REMOVED",
-	"KCF_PROV_FREED"
+	"KCF_PROV_UNREGISTERING",
+	"KCF_PROV_UNREGISTERED"
 };
-
-static void
-pr_kstat_named(kstat_named_t *ks)
-{
-	mdb_inc_indent(4);
-
-	mdb_printf("name = %s\n", ks->name);
-	mdb_printf("value = ");
-
-	/*
-	 * The only data type used for the provider kstats is uint64.
-	 */
-	switch (ks->data_type) {
-	case KSTAT_DATA_UINT64:
-#if defined(_LP64) || defined(_LONGLONG_TYPE)
-		mdb_printf("%llu\n", ks->value.ui64);
-#endif
-		break;
-	default:
-		mdb_warn("Incorrect data type for kstat.\n");
-	}
-
-	mdb_dec_indent(4);
-}
 
 /*ARGSUSED*/
 int
@@ -108,7 +58,9 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char string[MAXNAMELEN + 1];
 	int i, j;
 	crypto_mech_info_t *mech_pointer;
-	mdb_arg_t arg;
+	kcf_prov_cpu_t stats;
+	uint64_t dtotal, ftotal, btotal;
+	int holdcnt, jobcnt;
 
 	if ((flags & DCMD_ADDRSPEC) != DCMD_ADDRSPEC)
 		return (DCMD_USAGE);
@@ -139,8 +91,6 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("bad pd_prov_type:\t%d\n", desc.pd_prov_type);
 	}
 
-	mdb_printf("pd_prov_handle:\t\t%p\n", desc.pd_prov_handle);
-	mdb_printf("pd_kcf_prov_handle:\t%u\n", desc.pd_kcf_prov_handle);
 	mdb_printf("pd_prov_id:\t\t%u\n", desc.pd_prov_id);
 	if (desc.pd_description == NULL)
 		mdb_printf("pd_description:\t\tNULL\n");
@@ -149,6 +99,38 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("cannot read %p", desc.pd_description);
 	} else
 		mdb_printf("pd_description:\t\t%s\n", string);
+
+	mdb_printf("pd_sid:\t\t\t%u\n", desc.pd_sid);
+	mdb_printf("pd_taskq:\t\t%p\n", desc.pd_taskq);
+	mdb_printf("pd_nbins:\t\t%u\n", desc.pd_nbins);
+	mdb_printf("pd_percpu_bins:\t\t%p\n", desc.pd_percpu_bins);
+
+	dtotal = ftotal = btotal = 0;
+	holdcnt = jobcnt = 0;
+	for (i = 0; i < desc.pd_nbins; i++) {
+		if (mdb_vread(&stats, sizeof (kcf_prov_cpu_t),
+		    (uintptr_t)(desc.pd_percpu_bins + i)) == -1) {
+			mdb_warn("cannot read addr %p",
+			    desc.pd_percpu_bins + i);
+			return (DCMD_ERR);
+		}
+
+		holdcnt += stats.kp_holdcnt;
+		jobcnt += stats.kp_jobcnt;
+		dtotal += stats.kp_ndispatches;
+		ftotal += stats.kp_nfails;
+		btotal += stats.kp_nbusy_rval;
+	}
+	mdb_inc_indent(4);
+	mdb_printf("total kp_holdcnt:\t\t%d\n", holdcnt);
+	mdb_printf("total kp_jobcnt:\t\t%u\n", jobcnt);
+	mdb_printf("total kp_ndispatches:\t%llu\n", dtotal);
+	mdb_printf("total kp_nfails:\t\t%llu\n", ftotal);
+	mdb_printf("total kp_nbusy_rval:\t%llu\n", btotal);
+	mdb_dec_indent(4);
+
+	mdb_printf("pd_prov_handle:\t\t%p\n", desc.pd_prov_handle);
+	mdb_printf("pd_kcf_prov_handle:\t%u\n", desc.pd_kcf_prov_handle);
 
 	mdb_printf("pd_ops_vector:\t\t%p\n", desc.pd_ops_vector);
 	mdb_printf("pd_mech_list_count:\t%u\n", desc.pd_mech_list_count);
@@ -172,28 +154,7 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("\n");
 	}
 	mdb_dec_indent(8);
-	mdb_printf("pd_ks_data.ps_ops_total:\n", desc.pd_ks_data.ps_ops_total);
-	pr_kstat_named(&desc.pd_ks_data.ps_ops_total);
-	mdb_printf("pd_ks_data.ps_ops_passed:\n",
-	    desc.pd_ks_data.ps_ops_passed);
-	pr_kstat_named(&desc.pd_ks_data.ps_ops_passed);
-	mdb_printf("pd_ks_data.ps_ops_failed:\n",
-	    desc.pd_ks_data.ps_ops_failed);
-	pr_kstat_named(&desc.pd_ks_data.ps_ops_failed);
-	mdb_printf("pd_ks_data.ps_ops_busy_rval:\n",
-	    desc.pd_ks_data.ps_ops_busy_rval);
-	pr_kstat_named(&desc.pd_ks_data.ps_ops_busy_rval);
 
-	mdb_printf("pd_kstat:\t\t%p\n", desc.pd_kstat);
-	mdb_printf("kcf_sched_info:\n");
-	/* print pd_sched_info via existing function */
-	mdb_inc_indent(8);
-	arg.a_type = MDB_TYPE_IMMEDIATE;
-	arg.a_un.a_val = (uintmax_t)(uintptr_t)&desc.pd_sched_info;
-	mdb_call_dcmd("kcf_sched_info", (uintptr_t)NULL, 0, 1, &arg);
-	mdb_dec_indent(8);
-
-	mdb_printf("pd_refcnt:\t\t%u\n", desc.pd_refcnt);
 	if (desc.pd_name == NULL)
 		mdb_printf("pd_name:\t\t NULL\n");
 	else if (mdb_readstr(string, MAXNAMELEN + 1, (uintptr_t)desc.pd_name)
@@ -205,16 +166,15 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("pd_instance:\t\t%u\n", desc.pd_instance);
 	mdb_printf("pd_module_id:\t\t%d\n", desc.pd_module_id);
 	mdb_printf("pd_mctlp:\t\t%p\n", desc.pd_mctlp);
-	mdb_printf("pd_sid:\t\t\t%u\n", desc.pd_sid);
 	mdb_printf("pd_lock:\t\t%p\n", desc.pd_lock);
 	if (desc.pd_state < KCF_PROV_ALLOCATED ||
-	    desc.pd_state > KCF_PROV_FREED)
+	    desc.pd_state > KCF_PROV_UNREGISTERED)
 		mdb_printf("pd_state is invalid:\t%d\n", desc.pd_state);
 	else
 		mdb_printf("pd_state:\t%s\n", prov_states[desc.pd_state]);
+	mdb_printf("pd_provider_list:\t%p\n", desc.pd_provider_list);
 
 	mdb_printf("pd_resume_cv:\t\t%hd\n", desc.pd_resume_cv._opaque);
-	mdb_printf("pd_remove_cv:\t\t%hd\n", desc.pd_remove_cv._opaque);
 	mdb_printf("pd_flags:\t\t%s %s %s %s %s\n",
 	    (desc.pd_flags & CRYPTO_HIDE_PROVIDER) ?
 	    "CRYPTO_HIDE_PROVIDER" : " ",
@@ -228,7 +188,9 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    "KCF_PROV_RESTRICTED" : " ");
 	if (desc.pd_flags & CRYPTO_HASH_NO_UPDATE)
 		mdb_printf("pd_hash_limit:\t\t%u\n", desc.pd_hash_limit);
-	mdb_printf("pd_provider_list:\t%p\n", desc.pd_provider_list);
+
+	mdb_printf("pd_kstat:\t\t%p\n", desc.pd_kstat);
+
 	return (DCMD_OK);
 }
 

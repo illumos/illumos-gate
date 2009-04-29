@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains routines which call into a provider's
@@ -52,6 +50,7 @@
 
 static int kcf_emulate_dual(kcf_provider_desc_t *, crypto_ctx_t *,
     kcf_req_params_t *);
+
 void
 kcf_free_triedlist(kcf_prov_tried_t *list)
 {
@@ -64,16 +63,24 @@ kcf_free_triedlist(kcf_prov_tried_t *list)
 	}
 }
 
+/*
+ * The typical caller of this routine does a kcf_get_mech_provider()
+ * which holds the provider and then calls this routine. So, for the
+ * common case (no KCF_HOLD_PROV flag) we skip doing a KCF_PROV_REFHOLD.
+ */
 kcf_prov_tried_t *
 kcf_insert_triedlist(kcf_prov_tried_t **list, kcf_provider_desc_t *pd,
-    int kmflag)
+    int flags)
 {
 	kcf_prov_tried_t *l;
 
-	l = kmem_alloc(sizeof (kcf_prov_tried_t), kmflag);
+	l = kmem_alloc(sizeof (kcf_prov_tried_t),
+	    flags & (KM_SLEEP | KM_NOSLEEP));
 	if (l == NULL)
 		return (NULL);
 
+	if (flags & KCF_HOLD_PROV)
+		KCF_PROV_REFHOLD(pd);
 	l->pt_pd = pd;
 	l->pt_next = *list;
 	*list = l;
@@ -140,6 +147,7 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 	kcf_mech_entry_t *me;
 	kcf_mech_entry_tab_t *me_tab;
 	int index, len, gqlen = INT_MAX, rv = CRYPTO_SUCCESS;
+	kcf_lock_withpad_t *mp;
 
 	/* get the mech entry for the specified mechanism */
 	class = KCF_MECH2CLASS(mech_type_1);
@@ -154,7 +162,8 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 	}
 
 	me = &((me_tab->met_tab)[index]);
-	mutex_enter(&me->me_mutex);
+	mp = &me_mutexes[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
 
 	/*
 	 * We assume the provider descriptor will not go away because
@@ -211,13 +220,16 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 				continue;
 			}
 
-			len = KCF_PROV_LOAD(provider);
-			if (len < gqlen) {
-				gqlen = len;
+			/* Do load calculation only if needed */
+			if ((p = p->pl_next) == NULL && gpd == NULL) {
 				gpd = provider;
+			} else {
+				len = KCF_PROV_LOAD(provider);
+				if (len < gqlen) {
+					gqlen = len;
+					gpd = provider;
+				}
 			}
-
-			p = p->pl_next;
 		}
 
 		if (gpd != NULL) {
@@ -250,7 +262,7 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 		KCF_PROV_REFHOLD(real_pd);
 	}
 out:
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 	*new = real_pd;
 	return (rv);
 }
@@ -319,13 +331,16 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 				continue;
 			}
 
-			len = KCF_PROV_LOAD(provider);
-			if (len < gqlen) {
-				gqlen = len;
+			/* Do load calculation only if needed */
+			if ((p = p->pl_next) == NULL && gpd == NULL) {
 				gpd = provider;
+			} else {
+				len = KCF_PROV_LOAD(provider);
+				if (len < gqlen) {
+					gqlen = len;
+					gpd = provider;
+				}
 			}
-
-			p = p->pl_next;
 		}
 		mutex_exit(&old->pd_lock);
 
@@ -425,6 +440,7 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 	int index;
 	kcf_mech_entry_t *me;
 	kcf_mech_entry_tab_t *me_tab;
+	kcf_lock_withpad_t *mp;
 
 	class = KCF_MECH2CLASS(mech_type);
 	if ((class < KCF_FIRST_OPSCLASS) || (class > KCF_LAST_OPSCLASS)) {
@@ -443,12 +459,13 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 	if (mepp != NULL)
 		*mepp = me;
 
-	mutex_enter(&me->me_mutex);
+	mp = &me_mutexes[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
 
 	prov_chain = me->me_hw_prov_chain;
 
 	/*
-	 * We check for the threshhold for using a hardware provider for
+	 * We check for the threshold for using a hardware provider for
 	 * this amount of data. If there is no software provider available
 	 * for the mechanism, then the threshold is ignored.
 	 */
@@ -477,12 +494,17 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 				continue;
 			}
 
-			if ((len = KCF_PROV_LOAD(pd)) < gqlen) {
-				gqlen = len;
+			/* Do load calculation only if needed */
+			if ((prov_chain = prov_chain->pm_next) == NULL &&
+			    gpd == NULL) {
 				gpd = pd;
+			} else {
+				len = KCF_PROV_LOAD(pd);
+				if (len < gqlen) {
+					gqlen = len;
+					gpd = pd;
+				}
 			}
-
-			prov_chain = prov_chain->pm_next;
 		}
 
 		pd = gpd;
@@ -507,10 +529,11 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 		 */
 		if (triedl == NULL)
 			*error = CRYPTO_MECH_NOT_SUPPORTED;
-	} else
+	} else {
 		KCF_PROV_REFHOLD(pd);
+	}
 
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 	return (pd);
 }
 
@@ -536,6 +559,7 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 	crypto_mech_info_list_t *mil;
 	crypto_mech_type_t m2id =  mech2->cm_type;
 	kcf_mech_entry_t *me;
+	kcf_lock_withpad_t *mp;
 
 	/* when mech is a valid mechanism, me will be its mech_entry */
 	if (kcf_get_mech_entry(mech1->cm_type, &me) != KCF_SUCCESS) {
@@ -547,7 +571,9 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 
 	if (mepp != NULL)
 		*mepp = me;
-	mutex_enter(&me->me_mutex);
+
+	mp = &me_mutexes[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
 
 	prov_chain = me->me_hw_prov_chain;
 	/*
@@ -571,7 +597,6 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 		 */
 		while (prov_chain != NULL) {
 			pd = prov_chain->pm_prov_desc;
-			len = KCF_PROV_LOAD(pd);
 
 			if (!IS_FG_SUPPORTED(prov_chain, fg1) ||
 			    !KCF_IS_PROV_USABLE(pd) ||
@@ -582,12 +607,21 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 				continue;
 			}
 
-			/* Save the best provider capable of m1 */
-			if (len < gqlen) {
-				*prov_mt1 =
-				    prov_chain->pm_mech_info.cm_mech_number;
-				gqlen = len;
+#define	PMD_MECH_NUM(pmdp)	(pmdp)->pm_mech_info.cm_mech_number
+
+			/* Do load calculation only if needed */
+			if (prov_chain->pm_next == NULL && pdm1 == NULL) {
+				*prov_mt1 = PMD_MECH_NUM(prov_chain);
 				pdm1 = pd;
+			} else {
+				len = KCF_PROV_LOAD(pd);
+
+				/* Save the best provider capable of m1 */
+				if (len < gqlen) {
+					*prov_mt1 = PMD_MECH_NUM(prov_chain);
+					gqlen = len;
+					pdm1 = pd;
+				}
 			}
 
 			/* See if pd can do me2 too */
@@ -597,15 +631,23 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 				    fg2) == 0)
 					continue;
 
-				if ((mil->ml_kcf_mechid == m2id) &&
-				    (len < dgqlen)) {
-					/* Bingo! */
-					dgqlen = len;
-					pdm1m2 = pd;
-					*prov_mt2 =
-					    mil->ml_mech_info.cm_mech_number;
-					*prov_mt1 = prov_chain->
-					    pm_mech_info.cm_mech_number;
+#define	MIL_MECH_NUM(mil)	(mil)->ml_mech_info.cm_mech_number
+
+				if (mil->ml_kcf_mechid == m2id) { /* Bingo! */
+
+					/* Do load calculation only if needed */
+					if (prov_chain->pm_next == NULL &&
+					    pdm1m2 == NULL) {
+						pdm1m2 = pd;
+						*prov_mt2 = MIL_MECH_NUM(mil);
+					} else {
+						if (len < dgqlen) {
+							dgqlen = len;
+							pdm1m2 = pd;
+							*prov_mt2 =
+							    MIL_MECH_NUM(mil);
+						}
+					}
 					break;
 				}
 			}
@@ -648,7 +690,7 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 	else
 		KCF_PROV_REFHOLD(pd);
 
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 	return (pd);
 }
 

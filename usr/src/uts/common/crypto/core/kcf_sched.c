@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,6 +269,7 @@ process_req_hwp(void *ireq)
 	kcf_provider_desc_t *pd;
 	kcf_areq_node_t *areq = (kcf_areq_node_t *)ireq;
 	kcf_sreq_node_t *sreq = (kcf_sreq_node_t *)ireq;
+	kcf_prov_cpu_t *mp;
 
 	pd = ((ctype = GET_REQ_TYPE(ireq)) == CRYPTO_SYNCH) ?
 	    sreq->sn_provider : areq->an_provider;
@@ -291,7 +292,8 @@ process_req_hwp(void *ireq)
 	 * processed. This is how we know when it's safe to unregister
 	 * a provider. This step must precede the pd_state check below.
 	 */
-	KCF_PROV_IREFHOLD(pd);
+	mp = &(pd->pd_percpu_bins[CPU_SEQID]);
+	KCF_PROV_JOB_HOLD(mp);
 
 	/*
 	 * Fail the request if the provider has failed. We return a
@@ -307,6 +309,7 @@ process_req_hwp(void *ireq)
 	if (ctype == CRYPTO_SYNCH) {
 		mutex_enter(&sreq->sn_lock);
 		sreq->sn_state = REQ_INPROGRESS;
+		sreq->sn_mp = mp;
 		mutex_exit(&sreq->sn_lock);
 
 		ctx = sreq->sn_context ? &sreq->sn_context->kc_glbl_ctx : NULL;
@@ -340,6 +343,7 @@ process_req_hwp(void *ireq)
 			}
 		}
 		areq->an_state = REQ_INPROGRESS;
+		areq->an_mp = mp;
 		mutex_exit(&areq->an_lock);
 
 		error = common_submit_request(areq->an_provider, ctx,
@@ -355,7 +359,7 @@ bail:
 		 */
 		return;
 	} else {		/* CRYPTO_SUCCESS or other failure */
-		KCF_PROV_IREFRELE(pd);
+		KCF_PROV_JOB_RELE(mp);
 		if (ctype == CRYPTO_SYNCH)
 			kcf_sop_done(sreq, error);
 		else
@@ -524,12 +528,11 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 
 	old_pd = areq->an_provider;
 	/*
-	 * Add old_pd to the list of providers already tried. We release
-	 * the hold on old_pd (from the earlier kcf_get_mech_provider()) in
-	 * kcf_free_triedlist().
+	 * Add old_pd to the list of providers already tried.
+	 * We release the new hold on old_pd in kcf_free_triedlist().
 	 */
 	if (kcf_insert_triedlist(&areq->an_tried_plist, old_pd,
-	    KM_NOSLEEP) == NULL)
+	    KM_NOSLEEP | KCF_HOLD_PROV) == NULL)
 		return (error);
 
 	if (mech1 && !mech2) {
@@ -579,7 +582,7 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 		break;
 
 	case CRYPTO_HW_PROVIDER: {
-		taskq_t *taskq = new_pd->pd_sched_info.ks_taskq;
+		taskq_t *taskq = new_pd->pd_taskq;
 
 		if (taskq_dispatch(taskq, process_req_hwp, areq, TQ_NOSLEEP) ==
 		    (taskqid_t)0) {
@@ -592,6 +595,7 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 	}
 	}
 
+	KCF_PROV_REFRELE(new_pd);
 	return (error);
 }
 
@@ -614,11 +618,12 @@ int
 kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
     crypto_call_req_t *crq, kcf_req_params_t *params, boolean_t cont)
 {
-	int error = CRYPTO_SUCCESS;
+	int error;
 	kcf_areq_node_t *areq;
 	kcf_sreq_node_t *sreq;
 	kcf_context_t *kcf_ctx;
-	taskq_t *taskq = pd->pd_sched_info.ks_taskq;
+	taskq_t *taskq;
+	kcf_prov_cpu_t *mp;
 
 	kcf_ctx = ctx ? (kcf_context_t *)ctx->cc_framework_private : NULL;
 
@@ -631,6 +636,8 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			break;
 
 		case CRYPTO_HW_PROVIDER:
+			taskq = pd->pd_taskq;
+
 			/*
 			 * Special case for CRYPTO_SYNCHRONOUS providers that
 			 * never return a CRYPTO_QUEUED error. We skip any
@@ -638,15 +645,17 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			 */
 			if ((pd->pd_flags & CRYPTO_SYNCHRONOUS) &&
 			    EMPTY_TASKQ(taskq)) {
-				KCF_PROV_IREFHOLD(pd);
+				mp = &(pd->pd_percpu_bins[CPU_SEQID]);
+				KCF_PROV_JOB_HOLD(mp);
+
 				if (pd->pd_state == KCF_PROV_READY) {
 					error = common_submit_request(pd, ctx,
 					    params, KCF_RHNDL(KM_SLEEP));
-					KCF_PROV_IREFRELE(pd);
+					KCF_PROV_JOB_RELE(mp);
 					ASSERT(error != CRYPTO_QUEUED);
 					break;
 				}
-				KCF_PROV_IREFRELE(pd);
+				KCF_PROV_JOB_RELE(mp);
 			}
 
 			sreq = kmem_cache_alloc(kcf_sreq_cache, KM_SLEEP);
@@ -770,6 +779,7 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 				goto done;
 			}
 
+			taskq = pd->pd_taskq;
 			ASSERT(taskq != NULL);
 			/*
 			 * We can not tell from taskq_dispatch() return
@@ -830,6 +840,7 @@ kcf_free_context(kcf_context_t *kcf_ctx)
 	kcf_provider_desc_t *pd = kcf_ctx->kc_prov_desc;
 	crypto_ctx_t *gctx = &kcf_ctx->kc_glbl_ctx;
 	kcf_context_t *kcf_secondctx = kcf_ctx->kc_secondctx;
+	kcf_prov_cpu_t *mp;
 
 	/* Release the second context, if any */
 
@@ -844,10 +855,11 @@ kcf_free_context(kcf_context_t *kcf_ctx)
 			 * doesn't unregister from the framework while
 			 * we're calling the entry point.
 			 */
-			KCF_PROV_IREFHOLD(pd);
+			mp = &(pd->pd_percpu_bins[CPU_SEQID]);
+			KCF_PROV_JOB_HOLD(mp);
 			mutex_exit(&pd->pd_lock);
 			(void) KCF_PROV_FREE_CONTEXT(pd, gctx);
-			KCF_PROV_IREFRELE(pd);
+			KCF_PROV_JOB_RELE(mp);
 		} else {
 			mutex_exit(&pd->pd_lock);
 		}
@@ -1492,6 +1504,8 @@ kcf_svc_wait(int *nthrs)
 		case -1:
 			/* Timed out. Recalculate the min/max threads */
 			compute_min_max_threads();
+			if (kcf_need_provtab_walk)
+				kcf_free_unregistered_provs();
 			break;
 
 		default:
@@ -2002,7 +2016,7 @@ out:
 
 	case CRYPTO_HW_PROVIDER: {
 		kcf_provider_desc_t *old_pd;
-		taskq_t *taskq = pd->pd_sched_info.ks_taskq;
+		taskq_t *taskq = pd->pd_taskq;
 
 		/*
 		 * Set the params for the second step in the

@@ -713,12 +713,11 @@ crypto_load_soft_disabled(char *name, uint_t new_count,
 		if (provider->pd_kstat != NULL)
 			KCF_PROV_REFRELE(provider);
 
-		mutex_enter(&provider->pd_lock);
 		/* Wait till the existing requests complete. */
-		while (provider->pd_state != KCF_PROV_FREED) {
-			cv_wait(&provider->pd_remove_cv, &provider->pd_lock);
+		while (kcf_get_refcnt(provider, B_TRUE) > 0) {
+			/* wait 1 second and try again. */
+			delay(1 * drv_usectohz(1000000));
 		}
-		mutex_exit(&provider->pd_lock);
 	}
 
 	if (new_count == 0) {

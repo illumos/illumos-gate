@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,13 +60,17 @@ extern int kcf_sha1_threshold;
 /*
  * Locking notes:
  *
- * crypto_lock protects the global array of minor structures.  It
- * also protects the cm_refcnt member of each of these structures.
- * The cm_cv is used to signal decrements in the cm_refcnt,
- * and is used with the global crypto_lock.
+ * crypto_locks protects the global array of minor structures.
+ * crypto_locks is an array of locks indexed by the cpuid. A reader needs
+ * to hold a single lock while a writer needs to hold all locks.
+ * krwlock_t is not an option here because the hold time
+ * is very small for these locks.
  *
- * Other fields in the minor structure are protected by the
- * cm_lock member of the minor structure.
+ * The fields in the minor structure are protected by the cm_lock member
+ * of the minor structure. The cm_cv is used to signal decrements
+ * in the cm_refcnt, and is used with the cm_lock.
+ *
+ * The locking order is crypto_locks followed by cm_lock.
  */
 
 /*
@@ -165,7 +169,15 @@ static minor_t crypto_minors_table_count = 0;
  */
 static vmem_t *crypto_arena = NULL;	/* Arena for device minors */
 static minor_t crypto_minors_count = 0;
-static kmutex_t crypto_lock;
+static kcf_lock_withpad_t *crypto_locks;
+
+#define	CRYPTO_ENTER_ALL_LOCKS()		\
+	for (i = 0; i < max_ncpus; i++)		\
+		mutex_enter(&crypto_locks[i].kl_lock);
+
+#define	CRYPTO_EXIT_ALL_LOCKS()			\
+	for (i = 0; i < max_ncpus; i++)		\
+		mutex_exit(&crypto_locks[i].kl_lock);
 
 #define	RETURN_LIST			B_TRUE
 #define	DONT_RETURN_LIST		B_FALSE
@@ -337,6 +349,8 @@ crypto_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 crypto_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	int i;
+
 	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
 	}
@@ -362,7 +376,11 @@ crypto_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	mutex_init(&crypto_lock, NULL, MUTEX_DRIVER, NULL);
+	crypto_locks = kmem_zalloc(max_ncpus * sizeof (kcf_lock_withpad_t),
+	    KM_SLEEP);
+	for (i = 0; i < max_ncpus; i++)
+		mutex_init(&crypto_locks[i].kl_lock, NULL, MUTEX_DRIVER, NULL);
+
 	crypto_dip = dip;
 
 	/* allocate integer space for minor numbers */
@@ -377,19 +395,22 @@ static int
 crypto_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	minor_t i;
+	kcf_lock_withpad_t *mp;
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
+	mp = &crypto_locks[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
+
 	/* check if device is open */
-	mutex_enter(&crypto_lock);
 	for (i = 0; i < crypto_minors_table_count; i++) {
 		if (crypto_minors[i] != NULL) {
-			mutex_exit(&crypto_lock);
+			mutex_exit(&mp->kl_lock);
 			return (DDI_FAILURE);
 		}
 	}
-	mutex_exit(&crypto_lock);
+	mutex_exit(&mp->kl_lock);
 
 	crypto_dip = NULL;
 	ddi_remove_minor_node(dip, NULL);
@@ -401,7 +422,9 @@ crypto_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	    sizeof (crypto_minor_t *) * crypto_minors_table_count);
 	crypto_minors = NULL;
 	crypto_minors_table_count = 0;
-	mutex_destroy(&crypto_lock);
+	for (i = 0; i < max_ncpus; i++)
+		mutex_destroy(&crypto_locks[i].kl_lock);
+
 	vmem_destroy(crypto_arena);
 	crypto_arena = NULL;
 
@@ -414,6 +437,8 @@ crypto_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
 	crypto_minor_t *cm = NULL;
 	minor_t mn;
+	kcf_lock_withpad_t *mp;
+	int i;
 
 	if (otyp != OTYP_CHR)
 		return (ENXIO);
@@ -425,8 +450,10 @@ crypto_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	if (flag & FEXCL)
 		return (ENOTSUP);
 
-	mutex_enter(&crypto_lock);
 again:
+	mp = &crypto_locks[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
+
 	/* grow the minors table if needed */
 	if (crypto_minors_count >= crypto_minors_table_count) {
 		crypto_minor_t **newtable;
@@ -437,7 +464,7 @@ again:
 
 		big_count = crypto_minors_count + chunk;
 		if (big_count > MAXMIN) {
-			mutex_exit(&crypto_lock);
+			mutex_exit(&mp->kl_lock);
 			return (ENOMEM);
 		}
 
@@ -445,15 +472,16 @@ again:
 		new_size = sizeof (crypto_minor_t *) *
 		    (crypto_minors_table_count + chunk);
 
-		mutex_exit(&crypto_lock);
-		newtable = kmem_zalloc(new_size, KM_SLEEP);
-		mutex_enter(&crypto_lock);
+		mutex_exit(&mp->kl_lock);
 
+		newtable = kmem_zalloc(new_size, KM_SLEEP);
+		CRYPTO_ENTER_ALL_LOCKS();
 		/*
 		 * Check if table grew while we were sleeping.
 		 * The minors table never shrinks.
 		 */
 		if (crypto_minors_table_count > saved_count) {
+			CRYPTO_EXIT_ALL_LOCKS();
 			kmem_free(newtable, new_size);
 			goto again;
 		}
@@ -474,8 +502,10 @@ again:
 
 		crypto_minors = newtable;
 		crypto_minors_table_count += chunk;
+		CRYPTO_EXIT_ALL_LOCKS();
+	} else {
+		mutex_exit(&mp->kl_lock);
 	}
-	mutex_exit(&crypto_lock);
 
 	/* allocate a new minor number starting with 1 */
 	mn = (minor_t)(uintptr_t)vmem_alloc(crypto_arena, 1, VM_SLEEP);
@@ -484,11 +514,11 @@ again:
 	mutex_init(&cm->cm_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&cm->cm_cv, NULL, CV_DRIVER, NULL);
 
-	mutex_enter(&crypto_lock);
+	CRYPTO_ENTER_ALL_LOCKS();
 	cm->cm_refcnt = 1;
 	crypto_minors[mn - 1] = cm;
 	crypto_minors_count++;
-	mutex_exit(&crypto_lock);
+	CRYPTO_EXIT_ALL_LOCKS();
 
 	*devp = makedevice(getmajor(*devp), mn);
 
@@ -504,35 +534,44 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	minor_t mn = getminor(dev);
 	uint_t i;
 	size_t total = 0;
+	kcf_lock_withpad_t *mp;
 
-	mutex_enter(&crypto_lock);
+	mp = &crypto_locks[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
+
 	if (mn > crypto_minors_table_count) {
-		mutex_exit(&crypto_lock);
+		mutex_exit(&mp->kl_lock);
 		cmn_err(CE_WARN, "crypto_close: bad minor (too big) %d", mn);
 		return (ENODEV);
 	}
 
 	cm = crypto_minors[mn - 1];
 	if (cm == NULL) {
-		mutex_exit(&crypto_lock);
+		mutex_exit(&mp->kl_lock);
 		cmn_err(CE_WARN, "crypto_close: duplicate close of minor %d",
 		    getminor(dev));
 		return (ENODEV);
 	}
 
-	cm->cm_refcnt --;		/* decrement refcnt held in open */
-	while (cm->cm_refcnt > 0) {
-		cv_wait(&cm->cm_cv, &crypto_lock);
-	}
+	mutex_exit(&mp->kl_lock);
 
-	/* take it out of the global table */
+	CRYPTO_ENTER_ALL_LOCKS();
+	/*
+	 * We free the minor number, mn, from the crypto_arena
+	 * only later. This ensures that we won't race with another
+	 * thread in crypto_open with the same minor number.
+	 */
 	crypto_minors[mn - 1] = NULL;
 	crypto_minors_count--;
-
-	vmem_free(crypto_arena, (void *)(uintptr_t)mn, 1);
+	CRYPTO_EXIT_ALL_LOCKS();
 
 	mutex_enter(&cm->cm_lock);
-	mutex_exit(&crypto_lock);
+	cm->cm_refcnt --;		/* decrement refcnt held in open */
+	while (cm->cm_refcnt > 0) {
+		cv_wait(&cm->cm_cv, &cm->cm_lock);
+	}
+
+	vmem_free(crypto_arena, (void *)(uintptr_t)mn, 1);
 
 	/* free all session table entries starting with 1 */
 	for (i = 1; i < cm->cm_session_table_count; i++) {
@@ -567,6 +606,7 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	kcf_free_provider_tab(cm->cm_provider_count,
 	    cm->cm_provider_array);
 
+	mutex_exit(&cm->cm_lock);
 	mutex_destroy(&cm->cm_lock);
 	cv_destroy(&cm->cm_cv);
 	kmem_free(cm, sizeof (crypto_minor_t));
@@ -578,27 +618,27 @@ static crypto_minor_t *
 crypto_hold_minor(minor_t minor)
 {
 	crypto_minor_t *cm;
+	kcf_lock_withpad_t *mp;
 
 	if (minor > crypto_minors_table_count)
 		return (NULL);
 
-	mutex_enter(&crypto_lock);
+	mp = &crypto_locks[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
+
 	if ((cm = crypto_minors[minor - 1]) != NULL) {
-		cm->cm_refcnt++;
+		atomic_add_32(&cm->cm_refcnt, 1);
 	}
-	mutex_exit(&crypto_lock);
+	mutex_exit(&mp->kl_lock);
 	return (cm);
 }
 
 static void
 crypto_release_minor(crypto_minor_t *cm)
 {
-	mutex_enter(&crypto_lock);
-	cm->cm_refcnt--;
-	if (cm->cm_refcnt == 0) {
+	if (atomic_add_32_nv(&cm->cm_refcnt, -1) == 0) {
 		cv_signal(&cm->cm_cv);
 	}
-	mutex_exit(&crypto_lock);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,12 +250,12 @@ crypto_register_provider(crypto_provider_info_t *info,
 	 * to keep some entries cached to improve performance.
 	 */
 	if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER)
-		prov_desc->pd_sched_info.ks_taskq = taskq_create("kcf_taskq",
+		prov_desc->pd_taskq = taskq_create("kcf_taskq",
 		    crypto_taskq_threads, minclsyspri,
 		    crypto_taskq_minalloc, crypto_taskq_maxalloc,
 		    TASKQ_PREPOPULATE);
 	else
-		prov_desc->pd_sched_info.ks_taskq = NULL;
+		prov_desc->pd_taskq = NULL;
 
 	/* no kernel session to logical providers */
 	if (prov_desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
@@ -308,7 +308,6 @@ crypto_register_provider(crypto_provider_info_t *info,
 			    sizeof (kcf_stats_ks_data_template));
 			prov_desc->pd_kstat->ks_data = &prov_desc->pd_ks_data;
 			KCF_PROV_REFHOLD(prov_desc);
-			KCF_PROV_IREFHOLD(prov_desc);
 			prov_desc->pd_kstat->ks_private = prov_desc;
 			prov_desc->pd_kstat->ks_update = kcf_prov_kstat_update;
 			kstat_install(prov_desc->pd_kstat);
@@ -319,9 +318,8 @@ crypto_register_provider(crypto_provider_info_t *info,
 		process_logical_providers(info, prov_desc);
 
 	if (need_verify == 1) {
-		/* kcf_verify_signature routine will release these holds */
+		/* kcf_verify_signature routine will release this hold */
 		KCF_PROV_REFHOLD(prov_desc);
-		KCF_PROV_IREFHOLD(prov_desc);
 
 		if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER) {
 			/*
@@ -356,6 +354,27 @@ bail:
 	return (ret);
 }
 
+/* Return the number of holds on a provider. */
+int
+kcf_get_refcnt(kcf_provider_desc_t *pd, boolean_t do_lock)
+{
+	int i;
+	int refcnt = 0;
+
+	if (do_lock)
+		for (i = 0; i < pd->pd_nbins; i++)
+			mutex_enter(&(pd->pd_percpu_bins[i].kp_lock));
+
+	for (i = 0; i < pd->pd_nbins; i++)
+		refcnt += pd->pd_percpu_bins[i].kp_holdcnt;
+
+	if (do_lock)
+		for (i = 0; i < pd->pd_nbins; i++)
+			mutex_exit(&(pd->pd_percpu_bins[i].kp_lock));
+
+	return (refcnt);
+}
+
 /*
  * This routine is used to notify the framework when a provider is being
  * removed.  Hardware providers call this routine in their detach routines.
@@ -385,7 +404,7 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 	}
 
 	saved_state = desc->pd_state;
-	desc->pd_state = KCF_PROV_REMOVED;
+	desc->pd_state = KCF_PROV_UNREGISTERING;
 
 	if (saved_state == KCF_PROV_BUSY) {
 		/*
@@ -395,25 +414,6 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 		cv_broadcast(&desc->pd_resume_cv);
 	}
 
-	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
-		/*
-		 * Check if this provider is currently being used.
-		 * pd_irefcnt is the number of holds from the internal
-		 * structures. We add one to account for the above lookup.
-		 */
-		if (desc->pd_refcnt > desc->pd_irefcnt + 1) {
-			desc->pd_state = saved_state;
-			mutex_exit(&desc->pd_lock);
-			/* Release reference held by kcf_prov_tab_lookup(). */
-			KCF_PROV_REFRELE(desc);
-			/*
-			 * The administrator presumably will stop the clients
-			 * thus removing the holds, when they get the busy
-			 * return value.  Any retry will succeed then.
-			 */
-			return (CRYPTO_BUSY);
-		}
-	}
 	mutex_exit(&desc->pd_lock);
 
 	if (desc->pd_prov_type != CRYPTO_SW_PROVIDER) {
@@ -440,40 +440,58 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 	delete_kstat(desc);
 
 	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
-		/* Release reference held by kcf_prov_tab_lookup(). */
-		KCF_PROV_REFRELE(desc);
-
 		/*
-		 * Wait till the existing requests complete.
+		 * Wait till the existing requests with the provider complete
+		 * and all the holds are released. All the holds on a software
+		 * provider are from kernel clients and the hold time
+		 * is expected to be short. So, we won't be stuck here forever.
 		 */
-		mutex_enter(&desc->pd_lock);
-		while (desc->pd_state != KCF_PROV_FREED)
-			cv_wait(&desc->pd_remove_cv, &desc->pd_lock);
-		mutex_exit(&desc->pd_lock);
+		while (kcf_get_refcnt(desc, B_TRUE) > 1) {
+			/* wait 1 second and try again. */
+			delay(1 * drv_usectohz(1000000));
+		}
 	} else {
+		int i;
+		kcf_prov_cpu_t *mp;
+
 		/*
 		 * Wait until requests that have been sent to the provider
 		 * complete.
 		 */
-		mutex_enter(&desc->pd_lock);
-		while (desc->pd_irefcnt > 0)
-			cv_wait(&desc->pd_remove_cv, &desc->pd_lock);
-		mutex_exit(&desc->pd_lock);
+		for (i = 0; i < desc->pd_nbins; i++) {
+			mp = &(desc->pd_percpu_bins[i]);
+
+			mutex_enter(&mp->kp_lock);
+			while (mp->kp_jobcnt > 0) {
+				cv_wait(&mp->kp_cv, &mp->kp_lock);
+			}
+			mutex_exit(&mp->kp_lock);
+		}
 	}
+
+	mutex_enter(&desc->pd_lock);
+	desc->pd_state = KCF_PROV_UNREGISTERED;
+	mutex_exit(&desc->pd_lock);
 
 	kcf_do_notify(desc, B_FALSE);
 
-	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
-		/*
-		 * This is the only place where kcf_free_provider_desc()
-		 * is called directly. KCF_PROV_REFRELE() should free the
-		 * structure in all other places.
-		 */
-		ASSERT(desc->pd_state == KCF_PROV_FREED &&
-		    desc->pd_refcnt == 0);
+	/* Release reference held by kcf_prov_tab_lookup(). */
+	KCF_PROV_REFRELE(desc);
+
+	if (kcf_get_refcnt(desc, B_TRUE) == 0) {
 		kcf_free_provider_desc(desc);
 	} else {
-		KCF_PROV_REFRELE(desc);
+		ASSERT(desc->pd_prov_type != CRYPTO_SW_PROVIDER);
+		/*
+		 * We could avoid this if /dev/crypto can proactively
+		 * remove any holds on us from a dormant PKCS #11 app.
+		 * For now, a kcfd thread does a periodic check of the
+		 * provider table for KCF_PROV_UNREGISTERED entries
+		 * and frees them when refcnt reaches zero.
+		 */
+		mutex_enter(&prov_tab_mutex);
+		kcf_need_provtab_walk = B_TRUE;
+		mutex_exit(&prov_tab_mutex);
 	}
 
 	return (CRYPTO_SUCCESS);
@@ -592,17 +610,13 @@ crypto_op_notification(crypto_req_handle_t handle, int error)
 	if ((ctype = GET_REQ_TYPE(handle)) == CRYPTO_SYNCH) {
 		kcf_sreq_node_t *sreq = (kcf_sreq_node_t *)handle;
 
-		if (error != CRYPTO_SUCCESS)
-			sreq->sn_provider->pd_sched_info.ks_nfails++;
-		KCF_PROV_IREFRELE(sreq->sn_provider);
+		KCF_PROV_JOB_RELE_STAT(sreq->sn_mp, (error != CRYPTO_SUCCESS));
 		kcf_sop_done(sreq, error);
 	} else {
 		kcf_areq_node_t *areq = (kcf_areq_node_t *)handle;
 
 		ASSERT(ctype == CRYPTO_ASYNCH);
-		if (error != CRYPTO_SUCCESS)
-			areq->an_provider->pd_sched_info.ks_nfails++;
-		KCF_PROV_IREFRELE(areq->an_provider);
+		KCF_PROV_JOB_RELE_STAT(areq->an_mp, (error != CRYPTO_SUCCESS));
 		kcf_aop_done(areq, error);
 	}
 }
@@ -764,6 +778,7 @@ kcf_prov_kstat_update(kstat_t *ksp, int rw)
 {
 	kcf_prov_stats_t *ks_data;
 	kcf_provider_desc_t *pd = (kcf_provider_desc_t *)ksp->ks_private;
+	int i;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
@@ -776,16 +791,20 @@ kcf_prov_kstat_update(kstat_t *ksp, int rw)
 		ks_data->ps_ops_failed.value.ui64 = 0;
 		ks_data->ps_ops_busy_rval.value.ui64 = 0;
 	} else {
-		ks_data->ps_ops_total.value.ui64 =
-		    pd->pd_sched_info.ks_ndispatches;
-		ks_data->ps_ops_failed.value.ui64 =
-		    pd->pd_sched_info.ks_nfails;
-		ks_data->ps_ops_busy_rval.value.ui64 =
-		    pd->pd_sched_info.ks_nbusy_rval;
-		ks_data->ps_ops_passed.value.ui64 =
-		    pd->pd_sched_info.ks_ndispatches -
-		    pd->pd_sched_info.ks_nfails -
-		    pd->pd_sched_info.ks_nbusy_rval;
+		uint64_t dtotal, ftotal, btotal;
+
+		dtotal = ftotal = btotal = 0;
+		/* No locking done since an exact count is not required. */
+		for (i = 0; i < pd->pd_nbins; i++) {
+			dtotal += pd->pd_percpu_bins[i].kp_ndispatches;
+			ftotal += pd->pd_percpu_bins[i].kp_nfails;
+			btotal += pd->pd_percpu_bins[i].kp_nbusy_rval;
+		}
+
+		ks_data->ps_ops_total.value.ui64 = dtotal;
+		ks_data->ps_ops_failed.value.ui64 = ftotal;
+		ks_data->ps_ops_busy_rval.value.ui64 = btotal;
+		ks_data->ps_ops_passed.value.ui64 = dtotal - ftotal - btotal;
 	}
 
 	return (0);
@@ -837,7 +856,6 @@ redo_register_provider(kcf_provider_desc_t *pd)
 	 * table.
 	 */
 	KCF_PROV_REFHOLD(pd);
-	KCF_PROV_IREFHOLD(pd);
 }
 
 /*
@@ -854,7 +872,6 @@ add_provider_to_array(kcf_provider_desc_t *p1, kcf_provider_desc_t *p2)
 	mutex_enter(&p2->pd_lock);
 	new->pl_next = p2->pd_provider_list;
 	p2->pd_provider_list = new;
-	KCF_PROV_IREFHOLD(p1);
 	new->pl_provider = p1;
 	mutex_exit(&p2->pd_lock);
 }
@@ -884,7 +901,6 @@ remove_provider_from_array(kcf_provider_desc_t *p1, kcf_provider_desc_t *p2)
 	}
 
 	/* detach and free kcf_provider_list structure */
-	KCF_PROV_IREFRELE(p1);
 	*prev = pl->pl_next;
 	kmem_free(pl, sizeof (*pl));
 	mutex_exit(&p2->pd_lock);
@@ -942,7 +958,6 @@ remove_provider(kcf_provider_desc_t *pp)
 		if (p->pd_prov_type == CRYPTO_HW_PROVIDER &&
 		    p->pd_provider_list == NULL)
 			p->pd_flags &= ~KCF_LPROV_MEMBER;
-		KCF_PROV_IREFRELE(p);
 		next = e->pl_next;
 		kmem_free(e, sizeof (*e));
 	}
@@ -1010,6 +1025,5 @@ delete_kstat(kcf_provider_desc_t *desc)
 		kstat_delete(kspd->pd_kstat);
 		desc->pd_kstat = NULL;
 		KCF_PROV_REFRELE(kspd);
-		KCF_PROV_IREFRELE(kspd);
 	}
 }

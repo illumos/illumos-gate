@@ -43,6 +43,7 @@
 #include <sys/project.h>
 #include <sys/taskq.h>
 #include <sys/rctl.h>
+#include <sys/cpuvar.h>
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus
@@ -50,8 +51,6 @@ extern "C" {
 #endif
 
 #ifdef _KERNEL
-
-#define	KCF_MODULE "kcf"
 
 /*
  * Prefixes convention: structures internal to the kernel cryptographic
@@ -79,45 +78,42 @@ typedef	struct kcf_stats {
 	kstat_named_t	ks_taskq_maxalloc;
 } kcf_stats_t;
 
+#define	CPU_SEQID	(CPU->cpu_seqid)
+
+typedef struct kcf_lock_withpad {
+	kmutex_t	kl_lock;
+	uint8_t		kl_pad[64 - sizeof (kmutex_t)];
+} kcf_lock_withpad_t;
+
 /*
- * Keep all the information needed by the scheduler from
- * this provider.
+ * Per-CPU structure used by a provider to keep track of
+ * various counters.
  */
-typedef struct kcf_sched_info {
-	/* The number of operations dispatched. */
-	uint64_t	ks_ndispatches;
+typedef struct kcf_prov_cpu {
+	kmutex_t	kp_lock;
+	int		kp_holdcnt;	/* can go negative! */
+	uint_t		kp_jobcnt;
 
-	/* The number of operations that failed. */
-	uint64_t	ks_nfails;
+	uint64_t	kp_ndispatches;
+	uint64_t	kp_nfails;
+	uint64_t	kp_nbusy_rval;
+	kcondvar_t	kp_cv;
 
-	/* The number of operations that returned CRYPTO_BUSY. */
-	uint64_t	ks_nbusy_rval;
-
-	/* taskq used to dispatch crypto requests */
-	taskq_t	*ks_taskq;
-} kcf_sched_info_t;
+	uint8_t		kp_pad[64 - sizeof (kmutex_t) - 2 * sizeof (int) -
+	    3 * sizeof (uint64_t) - sizeof (kcondvar_t)];
+} kcf_prov_cpu_t;
 
 /*
- * pd_irefcnt approximates the number of inflight requests to the
- * provider. Though we increment this counter during registration for
- * other purposes, that base value is mostly same across all providers.
- * So, it is a good measure of the load on a provider when it is not
- * in a busy state. Once a provider notifies it is busy, requests
+ * kcf_get_refcnt(pd) is the number of inflight requests to the
+ * provider. So, it is a good measure of the load on a provider when
+ * it is not in a busy state. Once a provider notifies it is busy, requests
  * backup in the taskq. So, we use tq_nalloc in that case which gives
  * the number of task entries in the task queue. Note that we do not
  * acquire any locks here as it is not critical to get the exact number
- * and the lock contention may be too costly for this code path.
+ * and the lock contention is too costly for this code path.
  */
 #define	KCF_PROV_LOAD(pd)	((pd)->pd_state != KCF_PROV_BUSY ?	\
-	(pd)->pd_irefcnt : (pd)->pd_sched_info.ks_taskq->tq_nalloc)
-
-#define	KCF_PROV_INCRSTATS(pd, error)	{				\
-	(pd)->pd_sched_info.ks_ndispatches++;				\
-	if (error == CRYPTO_BUSY)					\
-		(pd)->pd_sched_info.ks_nbusy_rval++;			\
-	else if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED)	\
-		(pd)->pd_sched_info.ks_nfails++;			\
-}
+	kcf_get_refcnt(pd, B_FALSE) : (pd)->pd_taskq->tq_nalloc)
 
 
 /*
@@ -160,14 +156,14 @@ typedef enum {
 	 * if the current state < KCF_PROV_DISABLED.
 	 */
 	KCF_PROV_DISABLED,
-	KCF_PROV_REMOVED,
-	KCF_PROV_FREED
+	KCF_PROV_UNREGISTERING,
+	KCF_PROV_UNREGISTERED
 } kcf_prov_state_t;
 
 #define	KCF_IS_PROV_UNVERIFIED(pd) ((pd)->pd_state == KCF_PROV_UNVERIFIED)
 #define	KCF_IS_PROV_USABLE(pd) ((pd)->pd_state == KCF_PROV_READY || \
 	(pd)->pd_state == KCF_PROV_BUSY)
-#define	KCF_IS_PROV_REMOVED(pd)	((pd)->pd_state >= KCF_PROV_REMOVED)
+#define	KCF_IS_PROV_REMOVED(pd)	((pd)->pd_state >= KCF_PROV_UNREGISTERING)
 
 /* Internal flags valid for pd_flags field */
 #define	KCF_PROV_RESTRICTED	0x40000000
@@ -181,8 +177,10 @@ typedef enum {
  * pd_prov_type:	Provider type, hardware or software
  * pd_sid:		Session ID of the provider used by kernel clients.
  *			This is valid only for session-oriented providers.
- * pd_refcnt:		Reference counter to this provider descriptor
- * pd_irefcnt:		References held by the framework internal structs
+ * pd_taskq:		taskq used to dispatch crypto requests
+ * pd_nbins:		number of bins in pd_percpu_bins
+ * pd_percpu_bins:	Pointer to an array of per-CPU structures
+ *			containing a lock, a cv and various counters.
  * pd_lock:		lock protects pd_state and pd_provider_list
  * pd_state:		State value of the provider
  * pd_provider_list:	Used to cross-reference logical providers and their
@@ -194,18 +192,16 @@ typedef enum {
  *			number to an index in pd_mechanisms array
  * pd_mechanisms:	Array of mechanisms supported by the provider, specified
  *			by the provider during registration
- * pd_sched_info:	Scheduling information associated with the provider
  * pd_mech_list_count:	The number of entries in pi_mechanisms, specified
  *			by the provider during registration
  * pd_name:		Device name or module name
  * pd_instance:		Device instance
  * pd_module_id:	Module ID returned by modload
  * pd_mctlp:		Pointer to modctl structure for this provider
- * pd_remove_cv:	cv to wait on while the provider queue drains
  * pd_description:	Provider description string
- * pd_flags		bitwise OR of pi_flags from crypto_provider_info_t
+ * pd_flags:		bitwise OR of pi_flags from crypto_provider_info_t
  *			and other internal flags defined above.
- * pd_hash_limit	Maximum data size that hash mechanisms of this provider
+ * pd_hash_limit:	Maximum data size that hash mechanisms of this provider
  * 			can support.
  * pd_kcf_prov_handle:	KCF-private handle assigned by KCF
  * pd_prov_id:		Identification # assigned by KCF to provider
@@ -215,8 +211,9 @@ typedef enum {
 typedef struct kcf_provider_desc {
 	crypto_provider_type_t		pd_prov_type;
 	crypto_session_id_t		pd_sid;
-	uint_t				pd_refcnt;
-	uint_t				pd_irefcnt;
+	taskq_t				*pd_taskq;
+	uint_t				pd_nbins;
+	kcf_prov_cpu_t			*pd_percpu_bins;
 	kmutex_t			pd_lock;
 	kcf_prov_state_t		pd_state;
 	struct kcf_provider_list	*pd_provider_list;
@@ -226,13 +223,11 @@ typedef struct kcf_provider_desc {
 	ushort_t			pd_mech_indx[KCF_OPS_CLASSSIZE]\
 					    [KCF_MAXMECHTAB];
 	crypto_mech_info_t		*pd_mechanisms;
-	kcf_sched_info_t		pd_sched_info;
 	uint_t				pd_mech_list_count;
 	char				*pd_name;
 	uint_t				pd_instance;
 	int				pd_module_id;
 	struct modctl			*pd_mctlp;
-	kcondvar_t			pd_remove_cv;
 	char				*pd_description;
 	uint_t				pd_flags;
 	uint_t				pd_hash_limit;
@@ -253,34 +248,62 @@ typedef struct kcf_provider_list {
  * it REFHOLD()s. A new provider descriptor which is referenced only
  * by the providers table has a reference counter of one.
  */
-#define	KCF_PROV_REFHOLD(desc) {		\
-	atomic_add_32(&(desc)->pd_refcnt, 1);	\
-	ASSERT((desc)->pd_refcnt != 0);		\
+#define	KCF_PROV_REFHOLD(desc) {			\
+	kcf_prov_cpu_t	*mp;				\
+							\
+	mp = &((desc)->pd_percpu_bins[CPU_SEQID]);	\
+	mutex_enter(&mp->kp_lock);			\
+	mp->kp_holdcnt++;				\
+	mutex_exit(&mp->kp_lock);			\
 }
 
-#define	KCF_PROV_IREFHOLD(desc) {		\
-	atomic_add_32(&(desc)->pd_irefcnt, 1);	\
-	ASSERT((desc)->pd_irefcnt != 0);	\
+#define	KCF_PROV_REFRELE(desc) {			\
+	kcf_prov_cpu_t	*mp;				\
+							\
+	mp = &((desc)->pd_percpu_bins[CPU_SEQID]);	\
+	mutex_enter(&mp->kp_lock);			\
+	mp->kp_holdcnt--;				\
+	mutex_exit(&mp->kp_lock);			\
 }
 
-#define	KCF_PROV_IREFRELE(desc) {				\
-	ASSERT((desc)->pd_irefcnt != 0);			\
-	membar_exit();						\
-	if (atomic_add_32_nv(&(desc)->pd_irefcnt, -1) == 0) {	\
-		cv_broadcast(&(desc)->pd_remove_cv);		\
-	}							\
+#define	KCF_PROV_REFHELD(desc)	(kcf_get_refcnt(desc, B_TRUE) >= 1)
+
+/*
+ * The JOB macros are used only for a hardware provider.
+ * Hardware providers can have holds that stay forever.
+ * So, the job counter is used to check if it is safe to
+ * unregister a provider.
+ */
+#define	KCF_PROV_JOB_HOLD(mp) {			\
+	mutex_enter(&(mp)->kp_lock);		\
+	(mp)->kp_jobcnt++;			\
+	mutex_exit(&(mp)->kp_lock);		\
 }
 
-#define	KCF_PROV_REFHELD(desc)	((desc)->pd_refcnt >= 1)
-
-#define	KCF_PROV_REFRELE(desc) {				\
-	ASSERT((desc)->pd_refcnt != 0);				\
-	membar_exit();						\
-	if (atomic_add_32_nv(&(desc)->pd_refcnt, -1) == 0) {	\
-		kcf_provider_zero_refcnt((desc));		\
-	}							\
+#define	KCF_PROV_JOB_RELE(mp) {			\
+	mutex_enter(&(mp)->kp_lock);		\
+	(mp)->kp_jobcnt--;			\
+	if ((mp)->kp_jobcnt == 0)		\
+		cv_signal(&(mp)->kp_cv);	\
+	mutex_exit(&(mp)->kp_lock);		\
 }
 
+#define	KCF_PROV_JOB_RELE_STAT(mp, doincr) {	\
+	if (doincr)				\
+		(mp)->kp_nfails++;		\
+	KCF_PROV_JOB_RELE(mp);			\
+}
+
+#define	KCF_PROV_INCRSTATS(pd, error)	{				\
+	kcf_prov_cpu_t	*mp;						\
+									\
+	mp = &((pd)->pd_percpu_bins[CPU_SEQID]);			\
+	mp->kp_ndispatches++;						\
+	if ((error) == CRYPTO_BUSY)					\
+		mp->kp_nbusy_rval++;					\
+	else if ((error) != CRYPTO_SUCCESS && (error) != CRYPTO_QUEUED)	\
+		mp->kp_nfails++;					\
+}
 
 /* list of crypto_mech_info_t valid as the second mech in a dual operation */
 
@@ -310,10 +333,11 @@ typedef struct kcf_prov_mech_desc {
 #define	pm_provider_handle	pm_prov_desc.pd_provider_handle
 #define	pm_ops_vector		pm_prov_desc.pd_ops_vector
 
+extern kcf_lock_withpad_t *me_mutexes;
 
 #define	KCF_CPU_PAD (128 - sizeof (crypto_mech_name_t) - \
     sizeof (crypto_mech_type_t) - \
-    sizeof (kmutex_t) - 2 * sizeof (kcf_prov_mech_desc_t *) - \
+    2 * sizeof (kcf_prov_mech_desc_t *) - \
     sizeof (int) - sizeof (uint32_t) - sizeof (size_t))
 
 /*
@@ -323,7 +347,6 @@ typedef struct kcf_prov_mech_desc {
 typedef	struct kcf_mech_entry {
 	crypto_mech_name_t	me_name;	/* mechanism name */
 	crypto_mech_type_t	me_mechid;	/* Internal id for mechanism */
-	kmutex_t		me_mutex;	/* access protection	*/
 	kcf_prov_mech_desc_t	*me_hw_prov_chain;  /* list of HW providers */
 	kcf_prov_mech_desc_t	*me_sw_prov;    /* SW provider */
 	/*
@@ -1304,7 +1327,6 @@ extern int kcf_add_mech_provider(short, kcf_provider_desc_t *,
 extern void kcf_remove_mech_provider(char *, kcf_provider_desc_t *);
 extern int kcf_get_mech_entry(crypto_mech_type_t, kcf_mech_entry_t **);
 extern kcf_provider_desc_t *kcf_alloc_provider_desc(crypto_provider_info_t *);
-extern void kcf_provider_zero_refcnt(kcf_provider_desc_t *);
 extern void kcf_free_provider_desc(kcf_provider_desc_t *);
 extern void kcf_soft_config_init(void);
 extern int get_sw_provider_for_mech(crypto_mech_name_t, char **);
@@ -1353,6 +1375,11 @@ extern void kcf_free_provider_tab(uint_t, kcf_provider_desc_t **);
 extern kcf_provider_desc_t *kcf_prov_tab_lookup(crypto_provider_id_t);
 extern int kcf_get_sw_prov(crypto_mech_type_t, kcf_provider_desc_t **,
     kcf_mech_entry_t **, boolean_t);
+
+extern kmutex_t prov_tab_mutex;
+extern boolean_t kcf_need_provtab_walk;
+extern void kcf_free_unregistered_provs();
+extern int kcf_get_refcnt(kcf_provider_desc_t *, boolean_t);
 
 /* Access to the policy table */
 extern boolean_t is_mech_disabled(kcf_provider_desc_t *, crypto_mech_name_t);

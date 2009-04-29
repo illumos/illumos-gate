@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@
  * prov_tab entries are not updated from kcf.conf or by cryptoadm(1M).
  */
 static kcf_provider_desc_t **prov_tab = NULL;
-static kmutex_t prov_tab_mutex; /* ensure exclusive access to the table */
+kmutex_t prov_tab_mutex; /* ensure exclusive access to the table */
 static uint_t prov_tab_num = 0; /* number of providers in table */
 static uint_t prov_tab_max = KCF_MAX_PROVIDERS;
 
@@ -119,7 +119,6 @@ kcf_prov_tab_add_provider(kcf_provider_desc_t *prov_desc)
 	/* initialize entry */
 	prov_tab[i] = prov_desc;
 	KCF_PROV_REFHOLD(prov_desc);
-	KCF_PROV_IREFHOLD(prov_desc);
 	prov_tab_num++;
 
 	mutex_exit(&prov_tab_mutex);
@@ -178,7 +177,6 @@ kcf_prov_tab_rem_provider(crypto_provider_id_t prov_id)
 	 */
 
 	KCF_PROV_REFRELE(prov_desc);
-	KCF_PROV_IREFRELE(prov_desc);
 
 #if DEBUG
 	if (kcf_frmwrk_debug >= 1)
@@ -363,38 +361,12 @@ kcf_alloc_provider_desc(crypto_provider_info_t *info)
 
 	mutex_init(&desc->pd_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&desc->pd_resume_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&desc->pd_remove_cv, NULL, CV_DEFAULT, NULL);
+
+	desc->pd_nbins = max_ncpus;
+	desc->pd_percpu_bins =
+	    kmem_zalloc(desc->pd_nbins * sizeof (kcf_prov_cpu_t), KM_SLEEP);
 
 	return (desc);
-}
-
-/*
- * Called by KCF_PROV_REFRELE when a provider's reference count drops
- * to zero. We free the descriptor when the last reference is released.
- * However, for software providers, we do not free it when there is an
- * unregister thread waiting. We signal that thread in this case and
- * that thread is responsible for freeing the descriptor.
- */
-void
-kcf_provider_zero_refcnt(kcf_provider_desc_t *desc)
-{
-	mutex_enter(&desc->pd_lock);
-	switch (desc->pd_prov_type) {
-	case CRYPTO_SW_PROVIDER:
-		if (desc->pd_state == KCF_PROV_REMOVED ||
-		    desc->pd_state == KCF_PROV_DISABLED) {
-			desc->pd_state = KCF_PROV_FREED;
-			cv_broadcast(&desc->pd_remove_cv);
-			mutex_exit(&desc->pd_lock);
-			break;
-		}
-		/* FALLTHRU */
-
-	case CRYPTO_HW_PROVIDER:
-	case CRYPTO_LOGICAL_PROVIDER:
-		mutex_exit(&desc->pd_lock);
-		kcf_free_provider_desc(desc);
-	}
 }
 
 /*
@@ -499,8 +471,13 @@ kcf_free_provider_desc(kcf_provider_desc_t *desc)
 		kmem_free(desc->pd_name, strlen(desc->pd_name) + 1);
 	}
 
-	if (desc->pd_sched_info.ks_taskq != NULL)
-		taskq_destroy(desc->pd_sched_info.ks_taskq);
+	if (desc->pd_taskq != NULL)
+		taskq_destroy(desc->pd_taskq);
+
+	if (desc->pd_percpu_bins != NULL) {
+		kmem_free(desc->pd_percpu_bins,
+		    desc->pd_nbins * sizeof (kcf_prov_cpu_t));
+	}
 
 	kmem_free(desc, sizeof (kcf_provider_desc_t));
 }
@@ -798,6 +775,7 @@ kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
     kcf_mech_entry_t **mep, boolean_t log_warn)
 {
 	kcf_mech_entry_t *me;
+	kcf_lock_withpad_t *mp;
 
 	/* get the mechanism entry for this mechanism */
 	if (kcf_get_mech_entry(mech_type, &me) != KCF_SUCCESS)
@@ -807,7 +785,8 @@ kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
 	 * Get the software provider for this mechanism.
 	 * Lock the mech_entry until we grab the 'pd'.
 	 */
-	mutex_enter(&me->me_mutex);
+	mp = &me_mutexes[CPU_SEQID];
+	mutex_enter(&mp->kl_lock);
 
 	if (me->me_sw_prov == NULL ||
 	    (*pd = me->me_sw_prov->pm_prov_desc) == NULL) {
@@ -815,12 +794,12 @@ kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
 		if (log_warn)
 			cmn_err(CE_WARN, "no SW provider for \"%s\"\n",
 			    me->me_name);
-		mutex_exit(&me->me_mutex);
+		mutex_exit(&mp->kl_lock);
 		return (CRYPTO_MECH_NOT_SUPPORTED);
 	}
 
 	KCF_PROV_REFHOLD(*pd);
-	mutex_exit(&me->me_mutex);
+	mutex_exit(&mp->kl_lock);
 
 	if (mep != NULL)
 		*mep = me;
@@ -897,7 +876,6 @@ verify_unverified_providers()
 			continue;
 
 		KCF_PROV_REFHOLD(pd);
-		KCF_PROV_IREFHOLD(pd);
 
 		/*
 		 * We need to drop this lock, since it could be
@@ -913,5 +891,33 @@ verify_unverified_providers()
 		mutex_enter(&prov_tab_mutex);
 	}
 
+	mutex_exit(&prov_tab_mutex);
+}
+
+/* protected by prov_tab_mutex */
+boolean_t kcf_need_provtab_walk = B_FALSE;
+
+void
+kcf_free_unregistered_provs()
+{
+	int i;
+	kcf_provider_desc_t *pd;
+	boolean_t walk_again = B_FALSE;
+
+	mutex_enter(&prov_tab_mutex);
+	for (i = 0; i < KCF_MAX_PROVIDERS; i++) {
+		if ((pd = prov_tab[i]) == NULL ||
+		    pd->pd_state != KCF_PROV_UNREGISTERED)
+			continue;
+
+		if (kcf_get_refcnt(pd, B_TRUE) == 0) {
+			mutex_exit(&prov_tab_mutex);
+			kcf_free_provider_desc(pd);
+			mutex_enter(&prov_tab_mutex);
+		} else
+			walk_again = B_TRUE;
+	}
+
+	kcf_need_provtab_walk = walk_again;
 	mutex_exit(&prov_tab_mutex);
 }
