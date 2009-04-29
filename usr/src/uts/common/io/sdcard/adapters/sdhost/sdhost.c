@@ -299,6 +299,13 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_set_driver_private(dip, shp);
 
 	/*
+	 * Reset the "slot number", so uninit slot works properly.
+	 */
+	for (i = 0; i < SDHOST_MAXSLOTS; i++) {
+		shp->sh_slots[i].ss_num = -1;
+	}
+
+	/*
 	 * Initialize DMA attributes.  For now we initialize as for
 	 * SDMA.  If we add ADMA support we can improve this.
 	 */
@@ -329,6 +336,7 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (shp->sh_numslots > SDHOST_MAXSLOTS) {
 		cmn_err(CE_WARN, "Host reports to have too many slots: %d",
 		    shp->sh_numslots);
+		pci_config_teardown(&pcih);
 		goto failed;
 	}
 
@@ -415,6 +423,8 @@ failed:
 	}
 	for (i = 0; i < shp->sh_numslots; i++)
 		sdhost_uninit_slot(shp, i);
+	if (shp->sh_host != NULL)
+		sda_host_free(shp->sh_host);
 	kmem_free(shp, sizeof (*shp));
 
 	return (DDI_FAILURE);
@@ -462,6 +472,7 @@ sdhost_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 */
 	for (i = 0; i < shp->sh_numslots; i++)
 		sdhost_uninit_slot(shp, i);
+	sda_host_free(shp->sh_host);
 	kmem_free(shp, sizeof (*shp));
 
 	return (DDI_SUCCESS);
@@ -1211,27 +1222,27 @@ sdhost_uninit_slot(sdhost_t *shp, int num)
 	sdslot_t	*ss;
 
 	ss = &shp->sh_slots[num];
-	if (ss->ss_acch == NULL)
-		return;
 
-	(void) sdhost_soft_reset(ss, SOFT_RESET_ALL);
+	if (ss->ss_acch != NULL)
+		(void) sdhost_soft_reset(ss, SOFT_RESET_ALL);
 
-	if (ss->ss_bufdmac.dmac_address) {
+	if (ss->ss_bufdmac.dmac_address)
 		(void) ddi_dma_unbind_handle(ss->ss_bufdmah);
-	}
-	if (ss->ss_bufacch != NULL) {
-		ddi_dma_mem_free(&ss->ss_bufacch);
-	}
-	if (ss->ss_bufdmah != NULL) {
-		ddi_dma_free_handle(&ss->ss_bufdmah);
-	}
-	if (ss->ss_ksp != NULL) {
-		kstat_delete(ss->ss_ksp);
-		ss->ss_ksp = NULL;
-	}
 
-	ddi_regs_map_free(&ss->ss_acch);
-	mutex_destroy(&ss->ss_lock);
+	if (ss->ss_bufacch != NULL)
+		ddi_dma_mem_free(&ss->ss_bufacch);
+
+	if (ss->ss_bufdmah != NULL)
+		ddi_dma_free_handle(&ss->ss_bufdmah);
+
+	if (ss->ss_ksp != NULL)
+		kstat_delete(ss->ss_ksp);
+
+	if (ss->ss_acch != NULL)
+		ddi_regs_map_free(&ss->ss_acch);
+
+	if (ss->ss_num != -1)
+		mutex_destroy(&ss->ss_lock);
 }
 
 void
