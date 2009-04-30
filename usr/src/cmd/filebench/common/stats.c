@@ -133,9 +133,9 @@ stats_kstat_update(void)
 static fbint_t
 kstats_read_cpu(void)
 {
-	ulong_t cputime_states[CPU_STATES];
-	hrtime_t cputime;
-	int i;
+	u_longlong_t	cputime_states[CPU_STATES];
+	hrtime_t	cputime;
+	int		i;
 
 	/*
 	 * Per-CPU statistics

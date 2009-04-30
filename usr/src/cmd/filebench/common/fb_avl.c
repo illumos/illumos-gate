@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -913,7 +913,7 @@ avl_destroy(avl_tree_t *tree)
 /*
  * Return the number of nodes in an AVL tree.
  */
-ulong_t
+unsigned long
 avl_numnodes(avl_tree_t *tree)
 {
 	if (tree == NULL) {

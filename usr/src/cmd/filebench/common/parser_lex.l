@@ -62,16 +62,18 @@ extern int dofile;			/* are we processing a file? */
 
 <INITIAL>#.*			;
 
-eventgen                { return FSC_EVENTGEN; }
 create                  { return FSC_CREATE; }
 define			{ return FSC_DEFINE; }
 debug                   { return FSC_DEBUG; }
 domultisync		{ return FSC_DOMULTISYNC; }
 echo                    { return FSC_ECHO; }
 enable			{ return FSC_ENABLE; }
+eventgen                { return FSC_EVENTGEN; }
 exit		        { return FSC_QUIT; }
 foreach                 { return FSC_FOREACH; }
 flowop		        { return FSC_FLOWOP; }
+fscheck		        { return FSC_FSCHECK; }
+fsflush		        { return FSC_FSFLUSH; }
 help		        { return FSC_HELP; }
 list		        { return FSC_LIST; }
 load                    { return FSC_LOAD; }
@@ -121,6 +123,7 @@ filesetname             { return FSA_FILE; }
 filesize                { return FSA_SIZE; }
 filesizegamma           { return FSA_FILESIZEGAMMA; }
 firstdone               { return FSA_FIRSTDONE; }
+fstype		        { return FSA_FSTYPE; }
 gamma                   { return FSA_RANDGAMMA; }
 highwater               { return FSA_HIGHWATER; }
 indexed                 { return FSA_INDEXED; }

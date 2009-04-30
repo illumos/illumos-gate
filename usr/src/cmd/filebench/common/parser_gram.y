@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <locale.h>
 #include <sys/utsname.h>
+#include <sys/statvfs.h>
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
@@ -66,6 +67,7 @@ static GetLine *gl;			/* GetLine resource object */
 #endif
 
 char *execname;
+char *fbbasepath = FILEBENCHDIR;
 char *fscriptname;
 int noproc = 0;
 var_t *var_list = NULL;
@@ -125,14 +127,16 @@ static void parser_proc_shutdown(cmd_t *);
 static void parser_filebench_shutdown(cmd_t *cmd);
 
 /* Other Commands */
+static void parser_echo(cmd_t *cmd);
 static void parser_foreach_integer(cmd_t *cmd);
 static void parser_foreach_string(cmd_t *cmd);
+static void parser_fscheck(cmd_t *cmd);
+static void parser_fsflush(cmd_t *cmd);
 static void parser_log(cmd_t *cmd);
 static void parser_statscmd(cmd_t *cmd);
 static void parser_statsdump(cmd_t *cmd);
 static void parser_statsxmldump(cmd_t *cmd);
 static void parser_statsmultidump(cmd_t *cmd);
-static void parser_echo(cmd_t *cmd);
 static void parser_usage(cmd_t *cmd);
 static void parser_vars(cmd_t *cmd);
 static void parser_printvars(cmd_t *cmd);
@@ -172,7 +176,7 @@ static void parser_version(cmd_t *cmd);
 %token FSC_LIST FSC_DEFINE FSC_EXEC FSC_QUIT FSC_DEBUG FSC_CREATE
 %token FSC_SLEEP FSC_STATS FSC_FOREACH FSC_SET FSC_SHUTDOWN FSC_LOG
 %token FSC_SYSTEM FSC_FLOWOP FSC_EVENTGEN FSC_ECHO FSC_LOAD FSC_RUN
-%token FSC_WARMUP FSC_NOUSESTATS
+%token FSC_WARMUP FSC_NOUSESTATS FSC_FSCHECK FSC_FSFLUSH
 %token FSC_USAGE FSC_HELP FSC_VARS FSC_VERSION FSC_ENABLE FSC_DOMULTISYNC
 %token FSV_STRING FSV_VAL_INT FSV_VAL_BOOLEAN FSV_VARIABLE FSV_WHITESTRING
 %token FSV_RANDUNI FSV_RANDTAB FSV_RANDVAR FSV_URAND FSV_RAND48
@@ -189,7 +193,7 @@ static void parser_version(cmd_t *cmd);
 %token FSA_HIGHWATER FSA_DIRECTIO FSA_DIRWIDTH FSA_FD FSA_SRCFD FSA_ROTATEFD
 %token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA FSA_DIRDEPTHRV
 %token FSA_DIRGAMMA FSA_USEISM FSA_TYPE FSA_RANDTABLE FSA_RANDSRC FSA_RANDROUND
-%token FSA_LEAFDIRS FSA_INDEXED
+%token FSA_LEAFDIRS FSA_INDEXED FSA_FSTYPE
 %token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN FSA_MASTER
 %token FSA_CLIENT
 %token FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC FSS_ROUND
@@ -220,7 +224,8 @@ static void parser_version(cmd_t *cmd);
 %type <cmd> foreach_command log_command system_command flowop_command
 %type <cmd> eventgen_command quit_command flowop_list thread_list
 %type <cmd> thread echo_command usage_command help_command vars_command
-%type <cmd> version_command enable_command multisync_command warmup_command
+%type <cmd> version_command enable_command multisync_command
+%type <cmd> warmup_command fscheck_command fsflush_command
 
 %type <attr> files_attr_op files_attr_ops pt_attr_op pt_attr_ops
 %type <attr> fo_attr_op fo_attr_ops ev_attr_op ev_attr_ops
@@ -228,6 +233,7 @@ static void parser_version(cmd_t *cmd);
 %type <attr> randvar_attr_srcop attr_value attr_list_value
 %type <attr> comp_lvar_def comp_attr_op comp_attr_ops
 %type <attr> enable_multi_ops enable_multi_op multisync_op
+%type <attr> fscheck_attr_op
 %type <list> integer_seplist string_seplist string_list var_string_list
 %type <list> var_string whitevar_string whitevar_string_list
 %type <ival> attrs_define_file attrs_define_thread attrs_flowop
@@ -236,6 +242,7 @@ static void parser_version(cmd_t *cmd);
 %type <ival> randvar_attr_name FSA_TYPE randtype_name randvar_attr_param
 %type <ival> randsrc_name FSA_RANDSRC randvar_attr_tsp em_attr_name
 %type <ival> FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC
+%type <ival> fscheck_attr_name FSA_FSTYPE
 
 %type <rndtb>  probtabentry_list probtabentry
 %type <avd> var_int_val
@@ -293,6 +300,8 @@ command:
 | usage_command
 | vars_command
 | foreach_command
+| fscheck_command
+| fsflush_command
 | help_command
 | list_command
 | load_command
@@ -741,6 +750,28 @@ list_command: FSC_LIST
 	$1->cmd = &parser_flowop_list;
 };
 
+fscheck_command: FSC_FSCHECK fscheck_attr_op
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_fscheck;
+
+	$$->cmd_attr_list = $2;
+}
+| fscheck_command fscheck_attr_op
+{
+	$1->cmd_attr_list->attr_next = $2;
+};
+
+fsflush_command: FSC_FSFLUSH fscheck_attr_op
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	$$->cmd = &parser_fsflush;
+
+	$$->cmd_attr_list = $2;
+};
+
 log_command: FSC_LOG whitevar_string_list
 {
 	if (($$ = alloc_cmd()) == NULL)
@@ -836,7 +867,7 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	$$->cmd = NULL;
-}| FSC_SET FSV_RANDVAR FSS_TYPE FSK_ASSIGN randvar_attr_typop
+} | FSC_SET FSV_RANDVAR FSS_TYPE FSK_ASSIGN randvar_attr_typop
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -845,7 +876,7 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	$$->cmd_qty = FSS_TYPE;
 	$$->cmd_attr_list = $5;
 
-}| FSC_SET FSV_RANDVAR FSS_SRC FSK_ASSIGN randvar_attr_srcop
+} | FSC_SET FSV_RANDVAR FSS_SRC FSK_ASSIGN randvar_attr_srcop
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -854,7 +885,7 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	$$->cmd_qty = FSS_SRC;
 	$$->cmd_attr_list = $5;
 
-}| FSC_SET FSV_RANDVAR randvar_attr_param FSK_ASSIGN attr_value
+} | FSC_SET FSV_RANDVAR randvar_attr_param FSK_ASSIGN attr_value
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -1159,7 +1190,7 @@ load_command: FSC_LOAD FSV_STRING
 	(void) strcat(loadfile, ".f");
 
 	if ((newfile = fopen(loadfile, "r")) == NULL) {
-		(void) strcpy(loadfile, FILEBENCHDIR);
+		(void) strcpy(loadfile, fbbasepath);
 		(void) strcat(loadfile, "/workloads/");
 		(void) strcat(loadfile, $2);
 		(void) strcat(loadfile, ".f");
@@ -1441,6 +1472,14 @@ multisync_op: FSA_VALUE FSK_ASSIGN attr_value
 	$$->attr_name = FSA_VALUE;
 };
 
+fscheck_attr_op: fscheck_attr_name FSK_ASSIGN FSV_STRING
+{
+	if (($$ = alloc_attr()) == NULL)
+		YYERROR;
+	$$->attr_avd = avd_str_alloc($3);
+	$$->attr_name = $1;
+};
+
 files_attr_name: attrs_define_file
 |attrs_define_fileset;
 
@@ -1562,6 +1601,10 @@ attrs_eventgen:
 em_attr_name:
   FSA_MASTER { $$ = FSA_MASTER;}
 | FSA_CLIENT { $$ = FSA_CLIENT;};
+
+fscheck_attr_name:
+  FSA_PATH { $$ = FSA_PATH;}
+| FSA_FSTYPE { $$ = FSA_FSTYPE;};
 
 comp_attr_ops: comp_attr_op
 {
@@ -3084,7 +3127,7 @@ parser_help(cmd_t *cmd)
 	} else {
 		filebench_log(LOG_INFO,
 		    "load <personality> (ls "
-		    FILEBENCHDIR "/workloads for list)");
+		    "%s/workloads for list)", fbbasepath);
 	}
 }
 
@@ -3486,6 +3529,7 @@ parser_system(cmd_t *cmd)
 		filebench_log(LOG_ERROR,
 		    "system exec failed: %s",
 		    strerror(errno));
+		filebench_shutdown(1);
 	}
 	free(string);
 }
@@ -3507,6 +3551,131 @@ parser_echo(cmd_t *cmd)
 		return;
 
 	filebench_log(LOG_INFO, "%s", string);
+}
+
+/*
+ * Checks to see if the specified data directory exists and it's mounted file
+ * system is the correct type.
+ */
+static void
+parser_fscheck(cmd_t *cmd)
+{
+	int fstype_idx;
+	char *pathname = NULL;
+	char *filesys = "tmpfs";
+	char string[MAXPATHLEN];
+	struct statvfs64 statbuf;
+	attr_t *attr;
+
+	if (cmd->cmd_attr_list == NULL)
+		return;
+
+	for (attr = cmd->cmd_attr_list; attr; attr = attr->attr_next) {
+
+		switch(attr->attr_name) {
+		case FSA_PATH:
+			pathname = avd_get_str(attr->attr_avd);
+			break;
+		case FSA_FSTYPE:
+			filesys = avd_get_str(attr->attr_avd);
+			break;
+		}
+	}
+
+	if (pathname == NULL)
+		return;
+
+	if (statvfs64(pathname, &statbuf) < 0) {
+		filebench_log(LOG_ERROR,
+		    "%s error with supplied data path name: %s; exiting",
+		    strerror(errno), pathname);
+		filebench_shutdown(1);
+		return;
+	}
+
+	if (strncmp(filesys, statbuf.f_basetype, FSTYPSZ) != 0) {
+		filebench_log(LOG_ERROR,
+		    "File System is of type %s, NOT %s as indicated",
+		    statbuf.f_basetype, filesys);
+		filebench_shutdown(1);
+		return;
+	}
+}
+
+/*
+ * Checks to see if any filesets need to have their caches flushed, and
+ * if so invokes the fs_flush script.
+ */
+static void
+parser_fsflush(cmd_t *cmd)
+{
+	fileset_t *fileset;
+	char **fspathlist;
+	char *pathname = NULL;
+	char *filesys = NULL;
+	char string[MAXPATHLEN];
+	attr_t *attr;
+	int fsidx;
+
+	if ((attr = cmd->cmd_attr_list) == NULL)
+		return;
+
+	/* Get supplied file system type */
+	if (attr->attr_name == FSA_FSTYPE)
+		filesys = avd_get_str(attr->attr_avd);
+
+	if (filesys == NULL) {
+		filebench_log(LOG_ERROR,
+		    "FSFLUSH command lacks file system type");
+		return;
+	}
+
+	/* Check all filesets for any that remain cached and count them*/
+	fsidx = 0;
+	for (fileset = filebench_shm->shm_filesetlist; fileset != NULL;
+	     fileset = fileset->fs_next) {
+
+		if (avd_get_bool(fileset->fs_cached))
+			return;
+
+		fsidx++;
+	}
+
+	/* allocated space for fileset path pointers */
+	fspathlist = (char **)malloc(fsidx * sizeof(char *));
+
+	/* If flushing still required, flush all filesets */
+	fsidx = 0;
+	for (fileset = filebench_shm->shm_filesetlist; fileset != NULL;
+	     fileset = fileset->fs_next) {
+		int idx;
+
+		if ((pathname = avd_get_str(fileset->fs_path)) == NULL)
+			return;
+
+		for (idx = 0; idx < fsidx; idx++) {
+			if (strcmp(pathname, fspathlist[idx]) == 0)
+				break;
+		}
+
+		if (fsidx == idx) {
+
+			/* found a new path */
+			fspathlist[fsidx++] = pathname;
+
+			/* now flush it */
+			snprintf(string, MAXPATHLEN,
+			    "%s/scripts/fs_flush %s %s", fbbasepath,
+			    filesys, pathname);
+
+			if (system(string) < 0) {
+				filebench_log(LOG_ERROR,
+				    "exec of fs_flush script failed: %s",
+				    strerror(errno));
+				filebench_shutdown(1);
+			}
+		}
+	}
 }
 
 /*

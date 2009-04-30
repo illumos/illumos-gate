@@ -49,10 +49,6 @@
 #include <sys/asynch.h>
 #endif /* HAVE_SYS_ASYNC_H */
 
-#ifndef HAVE_UINT_T
-#define	uint_t unsigned int
-#endif /* HAVE_UINT_T */
-
 #ifndef HAVE_SYSV_SEM
 #include <semaphore.h>
 #endif /* HAVE_SYSV_SEM */

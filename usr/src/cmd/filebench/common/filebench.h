@@ -42,6 +42,10 @@ typedef enum { B_FALSE, B_TRUE } boolean_t;
 typedef unsigned long long u_longlong_t;
 #endif
 
+#ifndef HAVE_UINT_T
+typedef unsigned int uint_t;
+#endif
+
 #ifndef TRUE
 #define	TRUE 1
 #endif
@@ -86,6 +90,7 @@ extern pid_t my_pid;		/* this process' process id */
 extern procflow_t *my_procflow;	/* if slave process, procflow pointer */
 extern int errno;
 extern char *execname;
+extern char *fbbasepath;
 extern int noproc;
 
 void filebench_init();
@@ -118,7 +123,7 @@ void filebench_plugin_funcvecinit(void);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.4.6"
+#define	FILEBENCH_VERSION	"1.4.7"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024

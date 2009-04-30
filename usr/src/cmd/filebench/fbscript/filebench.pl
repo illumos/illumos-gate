@@ -32,7 +32,7 @@ my $USE_XANADU = 0;
 my $TIMEOUT = 60;
 my $EOL = "\n";
 my $FILEBENCH = "/usr/benchmarks/filebench";
-my $PROG = "/usr/benchmarks/filebench/bin/go_filebench";
+my $PROG = "bin/go_filebench";
 my $SHAREDFILEALLOCATOR;
 my $TARGETPATH;
 my $TARGETDIR;
@@ -45,10 +45,11 @@ my @CLIENTLIST = ();
 my %CLIENTHASH = ();
 my @CONFLIST;
 my %MULTIDATA = ();
+my %CMDLINEDATA = ();
 my %DEFDATA = ();
 my %CONFDATA = ();
 my %STATSHASH = ();
-my $OPTIONFLAGS = "cleanupstorage";
+my $OPTIONFLAGS = "cleanupstorage dofscheck";
 @ext_stats=();
 @file_stats=();
 @arg_stats=();
@@ -138,7 +139,7 @@ sub op_load {
 	print ("Creating Client Script " . $scriptname . "\n");
 	open (FSCRIPT, ">$scriptname");
 	chmod (0755, $scriptname);
-	print FSCRIPT "#!$PROG -f\n\n";
+	print FSCRIPT "#!$FILEBENCH/$PROG -f\n\n";
 	# Load the df
 	print FSCRIPT "load $workload\n";
 	# Load the user defined defaults
@@ -148,12 +149,21 @@ sub op_load {
 	if ($MULTI_CLIENT == 1) {
 	    print FSCRIPT "enable multi master=".multi_getval("masterhost").", client=".conf_getval("myname")."\n";
 	}
-	# Create the associated files and filesets
-	print FSCRIPT "create filesets\n";	
 
+	# Check to see if the path is legal and pointing to the correct FS
+	if (conf_exists("dofscheck") == 1) {
+	    print FSCRIPT "fscheck path=" . conf_reqval("dir") . " fstype=" . conf_reqval("filesystem") . "\n";
+	}
+
+	# Create the associated files and filesets
+	print FSCRIPT "create filesets\n";
     }
     $SCRIPT_NO = 1;
     return(0);
+}
+
+sub op_fsflush {
+        print FSCRIPT "fsflush fstype=" . conf_reqval("filesystem") . "\n";
 }
 
 sub op_set {
@@ -471,7 +481,7 @@ sub parse_profile {
     my ($config_section, $default_section, $multi_section);
     
     open(CFILE, "$profile") or 
-	die "ERROR: couldn't open profile";
+	die "ERROR: couldn't open profile $profile";
     
     while(<CFILE>) {
 	my ($line) = $_;
@@ -491,7 +501,7 @@ sub parse_profile {
 		    $config_section = 0;
 		}
 	    } elsif($multi_section) {
-		$line =~ /(.+) = (.+);/;
+		$line =~ /([^\s]+)\s*=\s*(.+);/;
 		my $opt = $1;
 		my $val = $2;
 		chomp($opt);
@@ -508,7 +518,7 @@ sub parse_profile {
 		    push(@{ $MULTIDATA{$opt} }, $val);		   
 		}	       
 	    } elsif($default_section) {
-		if ($line =~ /(.+) = (.+);/) {
+		if ($line =~ /([^\s]+)\s*=\s*(.+);/) {
 		    my $opt = $1;
 		    my $val = $2;
 		    chomp($opt);
@@ -520,27 +530,32 @@ sub parse_profile {
 			    m{"([^\"\\]*(?:\\.[^\"\\]*)*)",? | ([^,]+),? | , }gx;
 			push(@vals, undef) if substr($val, -1,1) eq ',';
 			@{ $DEFDATA{$opt} } = @vals;
+		    } elsif(exists($CMDLINEDATA{$opt})) {
+			@{DEFDATA{$opt}} = ();
+			push(@{ $DEFDATA{$opt} }, @{$CMDLINEDATA{$opt}});
 		    } else {
 			@{DEFDATA{$opt}} = ();
 			push(@{ $DEFDATA{$opt} }, $val);		   
 		    }
 		} else {
-		    $line =~ /($OPTIONFLAGS);/;
-		    my $opt = $1;
-		    chomp($opt);
-		    @{DEFDATA{$opt}} = ();
-		    push(@{ $DEFDATA{$opt} }, "");
+		    if ($line =~ /([^;]+);/) {
+			my $opt = $1;
+			if ($OPTIONFLAGS =~ /$opt/) {
+			    @{DEFDATA{$opt}} = ();
+			    push(@{ $DEFDATA{$opt} }, "");
+			}
+		    }
 		}
 	    } else {
 		if($line =~ /^CONFIG /) {
                     my $config = $line;
-	 	    $config =~ s/CONFIG[ 	]+(.+) {/$1/;
+	 	    $config =~ s/CONFIG\s+(.+) {/$1/;
 		    push(@CONFLIST, $config);
 		    $config_section = 1;
-		} elsif($line =~ /MULTICLIENT {/) {
+		} elsif($line =~ /MULTICLIENT\s{/) {
 		    $multi_section = 1;
 		    $MULTI_CLIENT = 1;
-		} elsif($line =~ /DEFAULTS {/) {
+		} elsif($line =~ /DEFAULTS\s{/) {
 		    $default_section = 1;
 		}
 	    }
@@ -582,7 +597,7 @@ sub parse_config {
 
 	next if ($line =~ /^#/ or $line eq "");
 
-	if ($line =~ /(.+) = (.+);/) {
+	if ($line =~ /([^\s]+)\s*=\s*(.+);/) {
 	    my $opt = $1;
 	    my $val = $2;
 	    chomp($opt);
@@ -714,7 +729,9 @@ sub add_2combstats
 
 sub print_usage
 {
-    print "Usage:\n\tfilebench <profile name>\n\tfilebench -c <stat_dir> ...\n";
+    print "Usage:\n\tfilebench -c <stat_dir>\n";
+    print "\tfilebench [-b <base_path>] ";
+    print "[-D[ ]<variable name>[ |=| = ]<value>]... <profile name>\n";
 }
 
 sub dump_combined_stats
@@ -887,18 +904,96 @@ $numargs = $#ARGV + 1;
 if($numargs < 1) {
     print_usage();
     exit(2);
-} 
-
-if($ARGV[0] eq "-c") {
-    if($numargs < 2) {
-	print_usage();
-	exit(2);
-    }
-    shift(ARGV);
-    exec("$FILEBENCH/scripts/filebench_compare", @ARGV);
 }
 
-$PROFILENAME = $ARGV[0];
+for (my $idx = 0; $idx < $numargs;) {
+    my $cur_argv = $ARGV[$idx++];
+    my $cmdvar = "";
+    my $cmddata = "";
+
+    # See if filebench_compare should be run
+    if($cur_argv eq "-c") {
+	if($numargs < ($idx + 1)) {
+	    print_usage();
+	    exit(2);
+	}
+	# next argument variable is path to results files
+	exec("$FILEBENCH/scripts/filebench_compare", $ARGV[$idx++]);
+    }
+
+    # Capture specification of an alternate FileBench path
+    if($cur_argv eq "-b") {
+	if($numargs < ($idx + 1)) {
+	    print_usage();
+	    exit(2);
+	}
+	# next argument is the base path name
+	$FILEBENCH = $ARGV[$idx++];
+
+    # See if Default variable will be supplied.
+    } elsif($cur_argv =~ /^-D(.*)/) {
+	my $def_arg = $1;
+
+	# rest of info in separate argvs
+	if ($def_arg eq "") {
+	    if($numargs < ($idx + 2)) {
+		print_usage();
+		exit(2);
+	    }
+
+	    # get next bit
+	    $def_arg = $ARGV[$idx++];
+	}
+
+	# with variable name but without "=" or value
+	if($def_arg =~ /^([^=]+)$/) {
+	    $cmdvar = $1;
+	    if($numargs < ($idx + 2)) {
+		print_usage();
+		exit(2);
+	    }
+
+	    # get data from next argument, or next after that if '=' encountered
+	    $cmddata = $ARGV[$idx++];
+	    if ($cmddata eq "=") {
+		if($numargs < ($idx + 2)) {
+		    print_usage();
+		    exit(2);
+		}
+		$cmddata = $ARGV[$idx++];
+	    } else {
+		$cmddata =~ s/^=//;
+	    }
+
+	# see if variable name and data supplied
+	} elsif($def_arg =~ /^([^=]+)=(.+)/) {
+	    $cmdvar = $1;
+	    $cmddata = $2;
+	    if($numargs < ($idx + 1)) {
+		print_usage();
+		exit(2);
+	    }
+
+	# see if variable name and '=' but no data supplied
+	} elsif($def_arg =~ /^([^=]+)=$/) {
+	    $cmdvar = $1;
+	    if($numargs < ($idx + 2)) {
+		print_usage();
+		exit(2);
+	    }
+	    $cmddata = $ARGV[$idx++];
+	}
+
+	# push the variable onto the command line hash
+	$CMDLINEDATA{$cmdvar} = ();
+	push(@{ $CMDLINEDATA{$cmdvar} }, $cmddata);
+
+    # otherwise argument is the profile name
+    } else {
+	$PROFILENAME = $cur_argv;
+    }
+}
+
 $PROFILE = $PROFILENAME;
 $PROFILE =~ s/.*\/(.+)$/$1/;
 parse_profile("$PROFILENAME.prof");

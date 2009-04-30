@@ -37,7 +37,7 @@
  * above, automatically changes type of off_t to off64_t. so let
  * us use only off_t as off64_t is not defined
  */
-#defineoff64_t off_t
+#define	off64_t off_t
 #endif /* HAVE_OFF64_T */
 
 #include <fcntl.h>

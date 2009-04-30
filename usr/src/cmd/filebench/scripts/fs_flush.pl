@@ -20,10 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Put commands in  here to flush the file system cache after
@@ -77,7 +75,7 @@ foreach ( @zlist ) {
         ($root, $b, $c, $d, $mntpnt) = split /\t/, $zline, 5;
 
 	# See if the supplied directory path includes this mount point
-        if ($dir =~/^$mntpnt/) {
+        if(($mntpnt ne "\/") && ($dir =~/^$mntpnt/)) {
 
 		#
 		# We have a winner! The root name up to the
@@ -85,11 +83,34 @@ foreach ( @zlist ) {
 		#
                 ($pool) = split /\//, $root;
 
+		# save zpool.cache
+		my $tempfile = "/tmp/zpool.cache$$";
+		my $cachefile = "";
+
+		if (run_prog("cp /etc/zfs/zpool.cache $tempfile") == 0) {
+			$cachefile = "-c $tempfile "
+		}
+
 		# Do the cache flushing
-                print "'zpool export $pool'\n";
-                system("zpool export $pool");
-                print "'zpool import $pool'\n";
-                system("zpool import $pool");
+		
+                print "'zpool export \/ import $pool'\n";
+		if (run_prog("zpool export $pool") == 0) {
+			system("zpool import $cachefile$pool");
+		}
+		system("rm -f $tempfile")	if ($cachefile ne "");
                 exit(0);
         }
+}
+exit(-1);
+
+sub run_prog
+{
+	my $progname = shift;
+
+	my $res = system($progname);
+
+	#return error if failed for any reason
+	return -1 if (($res == -1) || ($res & 127));
+
+	return ($res >> 8);
 }

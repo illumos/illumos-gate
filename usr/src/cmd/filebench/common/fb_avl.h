@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,7 +165,7 @@ struct avl_tree {
 	struct avl_node *avl_root;	/* root node in tree */
 	int (*avl_compar)(const void *, const void *);
 	size_t avl_offset;		/* offsetof(type, avl_link_t field) */
-	ulong_t avl_numnodes;		/* number of nodes in the tree */
+	unsigned long avl_numnodes;	/* number of nodes in the tree */
 	size_t avl_size;		/* sizeof user type struct */
 };
 
@@ -376,7 +376,7 @@ extern boolean_t avl_update_gt(avl_tree_t *, void *);
 /*
  * Return the number of nodes in the tree
  */
-extern ulong_t avl_numnodes(avl_tree_t *tree);
+extern unsigned long avl_numnodes(avl_tree_t *tree);
 
 /*
  * Return B_TRUE if there are zero nodes in the tree, B_FALSE otherwise.

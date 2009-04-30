@@ -32,7 +32,7 @@ sub pre_run {
         op_load(conf_reqval("personality"));
 
         # Flush the FS cache
-        op_command("system \"" . get_FILEBENCH() . "/scripts/fs_flush " . conf_reqval("filesystem") . " " . conf_reqval("dir") . "\"");
+	op_fsflush();
 
         # Initialise statistics and argument arrays
         @ext_stats=();
