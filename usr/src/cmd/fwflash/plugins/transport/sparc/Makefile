@@ -18,22 +18,19 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# 
 # cmd/fwflash/plugins/transport/sparc
 #
 
-SRCS=		ses.c
+SRCS=		ses.c tavor.c hermon.c
 
 OBJECTS= 	$(SRCS:%.c=%.o)
 PLUGINS= 	$(SRCS:%.c=%.so)
-POFILES=	ses.po
+POFILES=	$(SRCS:%.c=%.po)
 IDENTPOFILE= 	fwflash_transport_identify_ses.po
-LINTFILE=	ses.ln
+LINTFILE=	$(SRCS:%.c=%.ln)
 SLINKS=		sgen.so
 
 CLEANFILES=	$(OBJECTS)
@@ -60,15 +57,18 @@ $(PLUGINS) :=	FILEMODE = 0555
 
 $(ROOTLIBFWFLASHPLUGINS)/$(SLINKS) : $(ROOTLIBFWFLASHPLUGINS)/ses.so
 	@$(RM) $@
-	$(SYMLINK) $(PLUGINS) $@
+	$(SYMLINK) ses.so $@
 
-install: $(ROOTLIBFWFLASHPLUGINS) \
+install: all $(ROOTLIBFWFLASHPLUGINS) \
 	$(ROOTLIBFWFLASHPLUGINS)/ses.so \
+	$(ROOTLIBFWFLASHPLUGINS)/tavor.so \
+	$(ROOTLIBFWFLASHPLUGINS)/hermon.so \
 	$(ROOTLIBFWFLASHPLUGINS)/$(SLINKS)
 
 clobber clean:
 	$(RM) $(CLEANFILES) $(CLOBBERFILES)
 
+lint_SRCS: $(LINTFILE)
 lint:	lint_SRCS
 
 %.o: ../common/%.c
@@ -78,14 +78,17 @@ lint:	lint_SRCS
 %.so: %.o
 	$(BUILD.SO) $<
 
+%.ln: ../common/%.c
+	$(LINT.c) $(LINTFLAGS) -c $<
+
 
 #
 # Message catalog
 #
-$(POFILES): ../common/$(SRCS)
+%.po: ../common/%.c
 	$(RM) messages.po
 	$(XGETTEXT) $(XGETFLAGS) \
-	    `($(GREP) -l gettext ../common/ses.c || echo /dev/null)`
+	    `($(GREP) -l gettext $< || echo /dev/null)`
 	$(SED) "/^domain/d" messages.po > $@
 	$(RM) messages.po
 
@@ -93,6 +96,3 @@ $(IDENTPOFILE): $(POFILES)
 	$(RM) $@
 	cat $(POFILES) > $@
 
-lint_SRCS: ../common/$(SRCS:%.c=%.ln)
-
-msg:	$(IDENTPOFILE)

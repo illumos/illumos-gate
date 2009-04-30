@@ -719,6 +719,12 @@ IBMGTHDRS=		\
 IBDHDRS=		\
 	ibd.h
 
+TAVORHDRS=		\
+	tavor_ioctl.h
+
+HERMONHDRS=		\
+	hermon_ioctl.h
+
 IDMHDRS=		\
 	idm.h		\
 	idm_impl.h	\
@@ -1183,6 +1189,7 @@ CHECKHDRS=						\
 	$(ROOTIBMGTHDRS)	\
 	$(ROOTIBMFHDRS)		\
 	$(ROOTTAVORHDRS)	\
+	$(ROOTHERMONHDRS)	\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
@@ -1244,6 +1251,7 @@ install_h:			\
 	$(ROOTIBMGTHDRS)	\
 	$(ROOTIBMFHDRS)		\
 	$(ROOTTAVORHDRS)	\
+	$(ROOTHERMONHDRS)	\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\

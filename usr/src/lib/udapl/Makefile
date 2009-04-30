@@ -19,19 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
 
-SUBDIRS =	libdat
-
-# EXPORT DELETE START
-$(CLOSED_BUILD)SUBDIRS += $(CLOSED)/lib/udapl/udapl_tavor
-# EXPORT DELETE END
+SUBDIRS =	libdat udapl_tavor
 
 HDRSUBDIRS = 	libdat
 
@@ -51,18 +45,6 @@ all debug clean clobber lint: $(SUBDIRS)
 install: $(ROOTDIRS) $(SUBDIRS)
 
 check install_h: $(HDRSUBDIRS)
-
-# EXPORT DELETE START
-# Special targets to clean up the source tree for export distribution
-# These targets change teh source tree
-EXPORT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

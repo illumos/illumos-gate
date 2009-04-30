@@ -476,7 +476,7 @@ DRV_KMODS	+= dcam1394
 #
 #	InfiniBand pseudo drivers
 #
-DRV_KMODS	+= ib ibd rdsib sdp iser
+DRV_KMODS	+= ib ibd rdsib sdp iser daplt hermon tavor
 
 #
 #	LVM modules
@@ -679,12 +679,9 @@ SVVS		+= svvs
 $(CLOSED_BUILD)CLOSED_XMODS =		\
 	adpu320		\
 	bnx		\
-	daplt		\
-	hermon		\
 	lsimega		\
 	sdpib		\
-	spwr		\
-	tavor
+	spwr
 
 
 #

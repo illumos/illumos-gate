@@ -639,6 +639,19 @@ IBTL_OBJS +=	ibtl_impl.o ibtl_util.o ibtl_mem.o ibtl_handlers.o ibtl_qp.o \
 		ibtl_cq.o ibtl_wr.o ibtl_hca.o ibtl_chan.o ibtl_cm.o \
 		ibtl_mcg.o ibtl_ibnex.o ibtl_srq.o
 
+TAVOR_OBJS +=	tavor.o tavor_agents.o tavor_cfg.o tavor_ci.o tavor_cmd.o \
+		tavor_cq.o tavor_event.o tavor_ioctl.o tavor_misc.o \
+		tavor_mr.o tavor_qp.o tavor_qpmod.o tavor_rsrc.o \
+		tavor_srq.o tavor_stats.o tavor_umap.o tavor_wr.o
+
+HERMON_OBJS +=	hermon.o hermon_agents.o hermon_cfg.o hermon_ci.o hermon_cmd.o \
+		hermon_cq.o hermon_event.o hermon_ioctl.o hermon_misc.o \
+		hermon_mr.o hermon_qp.o hermon_qpmod.o hermon_rsrc.o \
+		hermon_srq.o hermon_stats.o hermon_umap.o hermon_wr.o \
+		hermon_fm.o
+
+DAPLT_OBJS +=	daplt.o
+
 KSTAT_OBJS +=	kstat.o
 
 KSYMS_OBJS +=	ksyms.o

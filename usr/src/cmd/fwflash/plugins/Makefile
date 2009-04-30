@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fwflash/plugins
@@ -29,7 +27,7 @@
 
 include $(SRC)/cmd/Makefile.cmd
 
-COMMON_SUBDIRS=	transport
+COMMON_SUBDIRS=	$(MACH) transport
 CLOSED_SUBDIRS= $(CLOSED)/cmd/fwflash/plugins 
 
 SUBDIRS=	$(COMMON_SUBDIRS) $(CLOSED_SUBDIRS)
