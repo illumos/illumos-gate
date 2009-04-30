@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <signal.h>
 #include <setjmp.h>
@@ -859,7 +857,6 @@ ttyin()
 	int state = 0;
 	int width, length;
 	char multic[MB_LEN_MAX];
-	static	int	readch();
 	int 	len;
 
 	(void) fixterm();

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -38,7 +36,8 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	_HDR_GLOB_H
+#define	_HDR_GLOB_H
 
 /*
  * mailx -- a modified version of a University of California at Berkeley
@@ -69,7 +68,6 @@ extern char		*editfile;	/* Name of file being edited */
 extern int		exitflg;	/* -e for mail test */
 extern NODE		*fplist;	/* ???? */
 extern struct grouphead	*groups[];	/* Pointer to active groups */
-extern struct hdr	header[];	/* Known header types */
 extern int		hflag;		/* Sequence number for network -h */
 extern char		homedir[];	/* Name of home directory */
 extern char		host[];		/* ???? */
@@ -82,7 +80,7 @@ extern FILE		*itf;		/* Input temp file buffer */
 extern int		lexnumber;	/* Number of TNUMBER from scan() */
 extern char		lexstring[];	/* String from TSTRING, scan() */
 extern int		loading;	/* Loading user definitions */
-extern char		*lockname;	/* named used for locking in /var/mail */
+extern char		*lockname;	/* named used for /var/mail locking */
 extern char		*maildir;	/* directory for mail files */
 extern char		mailname[];	/* Name of /var/mail system mailbox */
 extern off_t		mailsize;	/* Size of system mailbox */
@@ -112,7 +110,7 @@ extern int		rcvmode;	/* True if receiving mail */
 extern int		readonly;	/* Will be unable to rewrite file */
 extern int		regretp;	/* Pointer to TOS of regret tokens */
 extern int		regretstack[];	/* Stack of regretted tokens */
-extern struct ignore	*retain[HSHSIZE];/* Pointer to retained fields */
+extern struct ignore	*retain[HSHSIZE]; /* Pointer to retained fields */
 extern char		*rflag;		/* -r address for network */
 extern int		rmail;		/* Being called as rmail */
 extern int		sawcom;		/* Set after first command */
@@ -143,3 +141,5 @@ extern int		receipt_flg;	/* Flag for return receipt */
  */
 extern char		*optarg;
 extern int		optind;
+
+#endif /* _HDR_GLOB_H */

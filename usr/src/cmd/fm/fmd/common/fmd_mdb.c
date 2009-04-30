@@ -1167,11 +1167,11 @@ fcf_hdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int fcf_sec(uintptr_t, uint_t, int, const mdb_arg_t *);
 /*ARGSUSED*/
 static int
 fcf_sec_one(uintptr_t addr, void *ignored, uint_t *secp)
 {
-	static int fcf_sec(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 	mdb_printf("%3d ", (*secp)++);
 	(void) fcf_sec(addr, DCMD_ADDRSPEC | DCMD_LOOP, 0, NULL);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,17 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
+#ifndef	_TMSTRUCT_H
+#define	_TMSTRUCT_H
 
 /*
  * /etc/ttydefs structure
@@ -76,32 +81,34 @@ struct pmtab {
  *	valid flags for p_flags field of pmtab
  */
 #define	X_FLAG	0x1	/* port/service disabled 		*/
-#define U_FLAG  0x2	/* create utmp entry for the service 	*/
+#define	U_FLAG  0x2	/* create utmp entry for the service 	*/
 
 /*
  *	valid flags for p_ttyflags field of pmtab
  */
-#define C_FLAG	0x1	/* invoke service on carrier		*/
-#define H_FLAG	0x2	/* hangup the line			*/
-#define B_FLAG	0x4	/* bi-directional line			*/
-#define R_FLAG	0x8	/* do wait_read				*/
-#define I_FLAG	0x10	/* initialize only			*/
+#define	C_FLAG	0x1	/* invoke service on carrier		*/
+#define	H_FLAG	0x2	/* hangup the line			*/
+#define	B_FLAG	0x4	/* bi-directional line			*/
+#define	R_FLAG	0x8	/* do wait_read				*/
+#define	I_FLAG	0x10	/* initialize only			*/
 
 /*
  *	autobaud enabled flag
  */
-#define A_FLAG	0x20	/* autobaud flag			*/
+#define	A_FLAG	0x20	/* autobaud flag			*/
 
 /*
  *	values for p_status field of pmtab
  */
-#define		NOTVALID	0	/* entry is not valid		*/
-#define		VALID		1	/* entry is valid		*/
-#define		CHANGED		2	/* entry is valid but changed 	*/
-#define		GETTY		3	/* entry is for ttymon express	*/
+#define	NOTVALID	0	/* entry is not valid		*/
+#define	VALID		1	/* entry is valid		*/
+#define	CHANGED		2	/* entry is valid but changed 	*/
+#define	GETTY		3	/* entry is for ttymon express	*/
 
 #define	ALLOC_PMTAB \
 	((struct pmtab *)calloc((unsigned)1, \
-		(unsigned)sizeof(struct pmtab)))
+		(unsigned)sizeof (struct pmtab)))
 
 #define	PNULL	((struct pmtab *)NULL)
+
+#endif /* _TMSTRUCT_H */

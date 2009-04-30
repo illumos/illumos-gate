@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _getpass = getpass
 #pragma weak _getpassphrase = getpassphrase
@@ -66,6 +64,8 @@ getpassphrase(const char *prompt)
 	return ((char *)__getpass(prompt, MAXPASSWD));
 }
 
+	static void catch(int);
+
 static char *
 __getpass(const char *prompt, int size)
 {
@@ -76,7 +76,6 @@ __getpass(const char *prompt, int size)
 	FILE	*fi;
 	char *pbuf = tsdalloc(_T_GETPASS, MAXPASSWD + 1, NULL);
 	struct sigaction act, osigint, osigtstp;
-	static void catch(int);
 
 	if (pbuf == NULL ||
 	    (fi = fopen("/dev/tty", "r+F")) == NULL)

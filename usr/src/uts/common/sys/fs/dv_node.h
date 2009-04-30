@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DV_NODE_H
 #define	_SYS_DV_NODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * dv_nodes are the file-system specific part of the
@@ -46,11 +44,16 @@
 #include <sys/devpolicy.h>
 #include <sys/avl.h>
 
+#ifdef _KERNEL
+#include <sys/vfs_opreg.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #ifdef _KERNEL
+
 
 /*
  * Here's the focal point of this filesystem

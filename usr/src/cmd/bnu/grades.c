@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,11 +22,9 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:grades.c 1.7 */
 
 #include "uucp.h"
 #include <grp.h>
@@ -314,6 +311,8 @@ struct cs_struct *scfile;
 	return(SUCCESS);
 }
 
+static void lcase();
+
 /*
  * jsize - determines whether if a job is small enough to
  * 	   be placed in the appropiate queue.
@@ -336,7 +335,6 @@ long *nlimit;
 #define ONE_K (1024)
 #define ONE_MEG ((1024)*(1024))
 
-	static void lcase();
 	char rest[SMBUF];
 	char msg[BUFSIZ], *p;
 
@@ -553,7 +551,6 @@ int na;
 #define G_GRP "group"
 #define G_NGRP "non-group"
 
-	static void lcase();
 	char actn[SMBUF];
 	char ufld[SMBUF];
 	char msg[BUFSIZ];

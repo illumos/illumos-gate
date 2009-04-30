@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_AUTOFS_H
 #define	_SYS_FS_AUTOFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/clnt.h>
 #include <gssapi/gssapi.h>
@@ -42,6 +40,10 @@
 #include <sys/zone.h>
 #include <sys/door.h>
 #include <rpcsvc/autofs_prot.h>
+
+#ifdef _KERNEL
+#include <sys/vfs_opreg.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {

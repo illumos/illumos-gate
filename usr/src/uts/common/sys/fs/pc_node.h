@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_PC_NODE_H
 #define	_SYS_FS_PC_NODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -35,6 +33,10 @@ extern "C" {
 #include <vm/page.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
+
+#ifdef _KERNEL
+#include <sys/vfs_opreg.h>
+#endif
 
 /*
  * This overlays the fid structure (see vfs.h)
@@ -103,8 +105,12 @@ struct pchead {
  */
 extern struct vnodeops *pcfs_fvnodeops;
 extern struct vnodeops *pcfs_dvnodeops;
+
+#ifdef _KERNEL
 extern const struct fs_operation_def pcfs_fvnodeops_template[];
 extern const struct fs_operation_def pcfs_dvnodeops_template[];
+#endif
+
 extern struct pchead pcfhead[];
 extern struct pchead pcdhead[];
 

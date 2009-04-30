@@ -546,6 +546,19 @@ h_output(char *infile, char *define, int extend, char *outfile)
 
 	/* put in a typedef for quadprecision. Only with Cflag */
 
+	/*
+	 * declaration of struct rpcgen_table must go before
+	 *  the definition of arrays like *_1_table[]
+	 */
+	if (tblflag) {
+		f_print(fout, rpcgen_table_dcl1);
+		if (tirpcflag)
+			f_print(fout, rpcgen_table_proc);
+		else
+			f_print(fout, rpcgen_table_proc_b);
+		f_print(fout, rpcgen_table_dcl2);
+	}
+
 	tell = ftell(fout);
 
 	/* print data definitions */
@@ -597,13 +610,6 @@ h_output(char *infile, char *define, int extend, char *outfile)
 
 	if (extend && tell == ftell(fout)) {
 		(void) unlink(outfilename);
-	} else if (tblflag) {
-		f_print(fout, rpcgen_table_dcl1);
-		if (tirpcflag)
-			f_print(fout, rpcgen_table_proc);
-		else
-			f_print(fout, rpcgen_table_proc_b);
-		f_print(fout, rpcgen_table_dcl2);
 	}
 
 	if (Cflag) {

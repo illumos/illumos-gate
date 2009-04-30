@@ -1122,6 +1122,7 @@ upimutex_cleanup()
 	}
 }
 
+static int iswanted();
 int
 lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 {
@@ -1140,7 +1141,6 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 	volatile uint8_t type = 0;
 	lwpchan_t lwpchan;
 	sleepq_head_t *sqh;
-	static int iswanted();
 	uint16_t flag;
 	int imm_timeout = 0;
 

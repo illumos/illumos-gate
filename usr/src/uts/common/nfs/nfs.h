@@ -46,11 +46,11 @@
 #include <sys/tsol/label.h>
 #include <sys/nvpair.h>
 #include <nfs/mount.h>
+#include <sys/vfs_opreg.h>
 #endif
 #include <vm/page.h>
 #include <rpc/rpc_sztypes.h>
 #include <sys/sysmacros.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

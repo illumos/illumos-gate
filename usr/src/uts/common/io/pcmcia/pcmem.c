@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,7 @@ _fini(void)
 }
 
 
+static void	pcmem_create_pcram_node(dev_info_t *);
 
 /*
  * pcmem_attach()
@@ -169,7 +170,6 @@ static int
 pcmem_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	char		adapter [MODMAXNAMELEN+1];
-	static void	pcmem_create_pcram_node(dev_info_t *);
 
 	/* resume from a checkpoint */
 	if (cmd == DDI_RESUME) {
