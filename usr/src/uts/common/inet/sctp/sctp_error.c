@@ -101,6 +101,16 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 	sctp_faddr_t *fp = sctp->sctp_current;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
+	/*
+	 * Don't need notification if connection is not yet setup,
+	 * call sctp_clean_death() to reclaim resources.
+	 * Any pending connect call(s) will error out.
+	 */
+	if (sctp->sctp_state < SCTPS_COOKIE_WAIT) {
+		sctp_clean_death(sctp, ECONNABORTED);
+		return;
+	}
+
 	mp = sctp_make_mp(sctp, fp, 0);
 	if (mp == NULL) {
 		SCTP_KSTAT(sctps, sctp_send_user_abort_failed);
