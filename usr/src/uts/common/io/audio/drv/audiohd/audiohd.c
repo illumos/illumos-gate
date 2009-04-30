@@ -926,60 +926,99 @@ audiohd_get_value(void *arg, uint64_t *val)
 static void
 audiohd_set_output_gain(audiohd_state_t *statep)
 {
-	int		i, j;
-	uint64_t	val = statep->controls[CTL_VOLUME]->val;
-	audiohd_path_t	*path;
-	uint_t		tmp;
-	uint8_t		lgain = val;
-	uint8_t		rgain = val;
+	int			i;
+	audiohd_path_t		*path;
+	uint_t			tmp;
+	wid_t			wid;
+	audiohd_widget_t	*w;
+	uint8_t			gain;
+	uint32_t		maxgain;
 
-	statep->hda_play_lgain = lgain;
-	statep->hda_play_rgain = rgain;
-
+	if (statep->soft_volume)
+		return;
+	gain = (uint8_t)statep->controls[CTL_VOLUME]->val;
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
-		if (!path || path->path_type == RECORD)
+		if (!path || path->path_type != PLAY)
 			continue;
-		if (path->gain_wid) {
-			tmp = lgain * path->gain_bits / 100;
+		/* use the DACs to adjust the volume */
+		wid = path->adda_wid;
+		w = path->codec->widget[wid];
+		maxgain = w->outamp_cap &
+		    AUDIOHDC_AMP_CAP_STEP_NUMS;
+		if (w->outamp_cap) {
+			tmp = gain * maxgain / 100;
 			(void) audioha_codec_4bit_verb_get(statep,
 			    path->codec->index,
-			    path->gain_wid,
+			    wid,
 			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_LEFT | path->gain_dir | tmp);
-			tmp = rgain * path->gain_bits / 100;
+			    AUDIOHDC_AMP_SET_LEFT |
+			    AUDIOHDC_AMP_SET_OUTPUT | tmp);
 			(void) audioha_codec_4bit_verb_get(statep,
 			    path->codec->index,
-			    path->gain_wid,
+			    wid,
 			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir | tmp);
-			continue;
+			    AUDIOHDC_AMP_SET_RIGHT |
+			    AUDIOHDC_AMP_SET_OUTPUT | tmp);
 		}
-		for (j = 0; j < path->pin_nums; j++) {
-			audiohd_widget_t	*w;
-			audiohd_pin_t		*pin;
-			wid_t			wid;
+	}
+}
 
-			wid = path->pin_wid[j];
-			w = path->codec->widget[wid];
-			pin = (audiohd_pin_t *)w->priv;
-			if (pin->gain_wid) {
-				tmp = lgain * path->gain_bits / 100;
-				(void) audioha_codec_4bit_verb_get(statep,
-				    path->codec->index,
-				    path->gain_wid,
-				    AUDIOHDC_VERB_SET_AMP_MUTE,
-				    AUDIOHDC_AMP_SET_LEFT | path->gain_dir |
-				    tmp);
-				tmp = rgain * path->gain_bits / 100;
-				(void) audioha_codec_4bit_verb_get(statep,
-				    path->codec->index,
-				    path->gain_wid,
-				    AUDIOHDC_VERB_SET_AMP_MUTE,
-				    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir |
-				    tmp);
-			}
-		}
+static void
+audiohd_do_set_pin_volume(audiohd_state_t *statep, audiohd_path_t *path,
+    audiohd_pin_t *pin, uint64_t val)
+{
+	uint8_t				l, r;
+	uint_t				tmp;
+	int				gain;
+
+	if (val == 0) {
+		(void) audioha_codec_4bit_verb_get(
+		    statep,
+		    path->codec->index,
+		    pin->mute_wid,
+		    AUDIOHDC_VERB_SET_AMP_MUTE,
+		    pin->mute_dir |
+		    AUDIOHDC_AMP_SET_LNR |
+		    AUDIOHDC_AMP_SET_MUTE);
+		return;
+	}
+
+	l = (val & 0xff00) >> 8;
+	r = (val & 0xff);
+
+	tmp = l * pin->gain_bits / 100;
+	(void) audioha_codec_4bit_verb_get(statep,
+	    path->codec->index,
+	    pin->gain_wid,
+	    AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_SET_LEFT | pin->gain_dir |
+	    tmp);
+	tmp = r * pin->gain_bits / 100;
+	(void) audioha_codec_4bit_verb_get(statep,
+	    path->codec->index,
+	    pin->gain_wid,
+	    AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_SET_RIGHT | pin->gain_dir |
+	    tmp);
+	if (pin->mute_wid != pin->gain_wid) {
+		gain = AUDIOHDC_GAIN_MAX;
+		(void) audioha_codec_4bit_verb_get(
+		    statep,
+		    path->codec->index,
+		    pin->mute_wid,
+		    AUDIOHDC_VERB_SET_AMP_MUTE,
+		    pin->mute_dir |
+		    AUDIOHDC_AMP_SET_LEFT |
+		    gain);
+		(void) audioha_codec_4bit_verb_get(
+		    statep,
+		    path->codec->index,
+		    pin->mute_wid,
+		    AUDIOHDC_VERB_SET_AMP_MUTE,
+		    pin->mute_dir |
+		    AUDIOHDC_AMP_SET_RIGHT |
+		    gain);
 	}
 }
 
@@ -992,9 +1031,7 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 	wid_t				wid;
 	audiohd_pin_t			*pin;
 	hda_codec_t			*codec;
-	uint8_t				l, r;
 	uint64_t			val;
-	uint_t				tmp;
 	audiohd_ctrl_t			*control;
 
 	switch (type) {
@@ -1036,9 +1073,6 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 			break;
 	}
 
-	l = (val & 0xff00) >> 8;
-	r = (val & 0xff);
-
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
 		if (!path)
@@ -1049,20 +1083,8 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 			widget = codec->widget[wid];
 			pin = (audiohd_pin_t *)widget->priv;
 			if ((pin->device == type) && pin->gain_wid) {
-				tmp = l * path->gain_bits / 100;
-				(void) audioha_codec_4bit_verb_get(statep,
-				    path->codec->index,
-				    path->gain_wid,
-				    AUDIOHDC_VERB_SET_AMP_MUTE,
-				    AUDIOHDC_AMP_SET_LEFT | path->gain_dir |
-				    tmp);
-				tmp = r * path->gain_bits / 100;
-				(void) audioha_codec_4bit_verb_get(statep,
-				    path->codec->index,
-				    path->gain_wid,
-				    AUDIOHDC_VERB_SET_AMP_MUTE,
-				    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir |
-				    tmp);
+				audiohd_do_set_pin_volume(statep, path,
+				    pin, val);
 			}
 		}
 	}
@@ -1081,7 +1103,6 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 	hda_codec_t		*codec;
 	uint8_t			l, r;
 	uint64_t		val;
-	uint_t			tmp;
 	audiohd_pin_color_t	clr;
 	audiohd_ctrl_t		*control;
 
@@ -1091,8 +1112,6 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 			if (control == NULL)
 				return;
 			val = control->val;
-			l = (val & 0xff00) >> 8;
-			r = (val & 0xff);
 			break;
 		case AUDIOHD_PIN_ORANGE:
 			control = statep->controls[CTL_CENTER];
@@ -1103,14 +1122,13 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 			if (control == NULL)
 				return;
 			r = control->val;
+			val = (l << 8) | r;
 			break;
 		case AUDIOHD_PIN_GREY:
 			control = statep->controls[CTL_SURROUND];
 			if (control == NULL)
 				return;
 			val = control->val;
-			l = (val & 0xff00) >> 8;
-			r = (val & 0xff);
 			break;
 	}
 
@@ -1126,20 +1144,8 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 			clr = (pin->config >> AUDIOHD_PIN_CLR_OFF) &
 			    AUDIOHD_PIN_CLR_MASK;
 			if ((clr == color) && pin->gain_wid) {
-				tmp = l * path->gain_bits / 100;
-				(void) audioha_codec_4bit_verb_get(statep,
-				    path->codec->index,
-				    path->gain_wid,
-				    AUDIOHDC_VERB_SET_AMP_MUTE,
-				    AUDIOHDC_AMP_SET_LEFT | path->gain_dir |
-				    tmp);
-				tmp = r * path->gain_bits / 100;
-				(void) audioha_codec_4bit_verb_get(statep,
-				    path->codec->index,
-				    path->gain_wid,
-				    AUDIOHDC_VERB_SET_AMP_MUTE,
-				    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir |
-				    tmp);
+				audiohd_do_set_pin_volume(statep, path,
+				    pin, val);
 			}
 		}
 	}
@@ -1754,7 +1760,7 @@ audiohd_add_controls(audiohd_state_t *statep)
 	audiohd_path_t		*path;
 	wid_t			wid;
 	audiohd_pin_t		*pin;
-	audiohd_widget_t	*widget;
+	audiohd_widget_t	*widget, *w;
 	hda_codec_t		*codec;
 	audiohd_pin_color_t	clr;
 
@@ -1767,7 +1773,31 @@ audiohd_add_controls(audiohd_state_t *statep)
 		return (DDI_FAILURE);					\
 	}
 
-	ADD_CTRL(CTL_VOLUME, 0x4b);
+	for (i = 0; i < statep->pathnum; i++) {
+		path = statep->path[i];
+		if (!path || path->path_type != PLAY)
+			continue;
+		/*
+		 * Firstly we check if all the DACs on the play paths
+		 * have amplifiers. If any of them doesn't have, we just use
+		 * the soft volume control to adjust the PCM volume.
+		 */
+		wid = path->adda_wid;
+		w = path->codec->widget[wid];
+		if (!w->outamp_cap) {
+			(void) audio_dev_add_soft_volume(statep->adev);
+			statep->soft_volume = B_TRUE;
+			break;
+		}
+	}
+	/*
+	 * if all the DACs on the play paths have the amplifiers, we use DACs'
+	 * amplifiers to adjust volume.
+	 */
+	if (!statep->soft_volume) {
+		ADD_CTRL(CTL_VOLUME, 0x4b);
+	}
+	/* allocate other controls */
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
 		if (!path)
@@ -5455,13 +5485,13 @@ audioha_codec_verb_get(void *arg, uint8_t caddr, uint8_t wid,
 	 * draft version and requires more time to wait.
 	 */
 	for (i = 0; i < 500; i++) {
-		/* Empirical testing time, which works well */
-		drv_usecwait(30);
 		ret = audiohd_response_from_codec(statep, &resp, &respex);
 		if (((respex & AUDIOHD_BDLE_RIRB_SDI) == caddr) &&
 		    ((respex & AUDIOHD_BDLE_RIRB_UNSOLICIT) == 0) &&
 		    (ret == AUDIO_SUCCESS))
 			break;
+		/* Empirical testing time, which works well */
+		drv_usecwait(30);
 	}
 
 	if (ret == AUDIO_SUCCESS) {
@@ -5496,12 +5526,13 @@ audioha_codec_4bit_verb_get(void *arg, uint8_t caddr, uint8_t wid,
 	}
 
 	for (i = 0; i < 500; i++) {
-		drv_usecwait(30);
 		ret = audiohd_response_from_codec(statep, &resp, &respex);
 		if (((respex & AUDIOHD_BDLE_RIRB_SDI) == caddr) &&
 		    ((respex & AUDIOHD_BDLE_RIRB_UNSOLICIT) == 0) &&
 		    (ret == AUDIO_SUCCESS))
 			break;
+		/* Empirical testing time, which works well */
+		drv_usecwait(30);
 	}
 
 	if (ret == AUDIO_SUCCESS) {
