@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,8 +286,6 @@ Status_Phase:
 	 * Start status phase
 	 * read in CSW
 	 */
-	req->bulk_timeout = scsa2usb_bulk_timeout(SCSA2USB_BULK_PIPE_TIMEOUT);
-
 	for (nretry = 0; nretry < SCSA2USB_STATUS_RETRIES; nretry++) {
 		rval = scsa2usb_handle_status_start(scsa2usbp, req);
 
