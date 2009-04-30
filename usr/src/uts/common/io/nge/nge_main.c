@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1907,6 +1907,22 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			err = nge_get_priv_prop(ngep, pr_name, pr_flags,
 			    pr_valsize, pr_val);
 			break;
+		case MAC_PROP_MTU: {
+			mac_propval_range_t range;
+
+			if (!(pr_flags & MAC_PROP_POSSIBLE))
+				return (ENOTSUP);
+			if (pr_valsize < sizeof (mac_propval_range_t))
+				return (EINVAL);
+			range.mpr_count = 1;
+			range.mpr_type = MAC_PROPVAL_UINT32;
+			range.range_uint32[0].mpur_min =
+			    range.range_uint32[0].mpur_max = ETHERMTU;
+			if (ngep->dev_spec_param.jumbo)
+				range.range_uint32[0].mpur_max = NGE_MAX_MTU;
+			bcopy(&range, pr_val, sizeof (range));
+			break;
+		}
 		default:
 			err = ENOTSUP;
 	}

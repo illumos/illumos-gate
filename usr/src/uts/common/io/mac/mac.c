@@ -2781,8 +2781,11 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 {
 	int err = ENOTSUP;
 	mac_impl_t *mip = (mac_impl_t *)mh;
-	uint32_t sdu;
 	link_state_t link_state;
+	boolean_t is_getprop, is_setprop;
+
+	is_getprop = (mip->mi_callbacks->mc_callbacks & MC_GETPROP);
+	is_setprop = (mip->mi_callbacks->mc_callbacks & MC_SETPROP);
 
 	/* If mac property, read from cache */
 	if (mac_is_macprop(macprop)) {
@@ -2797,16 +2800,42 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 	}
 
 	switch (macprop->mp_id) {
-	case MAC_PROP_MTU:
+	case MAC_PROP_MTU: {
+		uint32_t sdu;
+		mac_propval_range_t range;
+
+		if ((macprop->mp_flags & MAC_PROP_POSSIBLE) != 0) {
+			if (valsize < sizeof (mac_propval_range_t))
+				return (EINVAL);
+			if (is_getprop) {
+				err = mip->mi_callbacks->mc_getprop(mip->
+				    mi_driver, macprop->mp_name, macprop->mp_id,
+				    macprop->mp_flags, valsize, val, perm);
+			}
+			/*
+			 * If the driver doesn't have *_m_getprop defined or
+			 * if the driver doesn't support setting MTU then
+			 * return the CURRENT value as POSSIBLE value.
+			 */
+			if (!is_getprop || err == ENOTSUP) {
+				mac_sdu_get(mh, NULL, &sdu);
+				range.mpr_count = 1;
+				range.mpr_type = MAC_PROPVAL_UINT32;
+				range.range_uint32[0].mpur_min =
+				    range.range_uint32[0].mpur_max = sdu;
+				bcopy(&range, val, sizeof (range));
+				err = 0;
+			}
+			return (err);
+		}
 		if (valsize < sizeof (sdu))
 			return (EINVAL);
 		if ((macprop->mp_flags & MAC_PROP_DEFAULT) == 0) {
 			mac_sdu_get(mh, NULL, &sdu);
 			bcopy(&sdu, val, sizeof (sdu));
-			if ((mip->mi_callbacks->mc_callbacks & MC_SETPROP) &&
-			    (mip->mi_callbacks->mc_setprop(mip->mi_driver,
-			    macprop->mp_name, macprop->mp_id, valsize,
-			    val) == 0)) {
+			if (is_setprop && (mip->mi_callbacks->mc_setprop(mip->
+			    mi_driver, macprop->mp_name, macprop->mp_id,
+			    valsize, val) == 0)) {
 				*perm = MAC_PROP_PERM_RW;
 			} else {
 				*perm = MAC_PROP_PERM_READ;
@@ -2824,6 +2853,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 			 */
 			break;
 		}
+	}
 	case MAC_PROP_STATUS:
 		if (valsize < sizeof (link_state))
 			return (EINVAL);
@@ -2836,7 +2866,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 
 	}
 	/* If driver property, request from driver */
-	if (mip->mi_callbacks->mc_callbacks & MC_GETPROP) {
+	if (is_getprop) {
 		err = mip->mi_callbacks->mc_getprop(mip->mi_driver,
 		    macprop->mp_name, macprop->mp_id, macprop->mp_flags,
 		    valsize, val, perm);

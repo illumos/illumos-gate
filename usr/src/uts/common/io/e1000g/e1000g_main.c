@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.8";
+static char e1000g_version[] = "Driver Ver. 5.3.9";
 
 /*
  * Proto types for DDI entry points
@@ -3194,6 +3194,28 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			err = e1000g_get_priv_prop(Adapter, pr_name,
 			    pr_flags, pr_valsize, pr_val, perm);
 			break;
+		case MAC_PROP_MTU: {
+			struct e1000_mac_info *mac = &Adapter->shared.mac;
+			struct e1000_phy_info *phy = &Adapter->shared.phy;
+			mac_propval_range_t range;
+
+			if (!(pr_flags & MAC_PROP_POSSIBLE))
+				return (ENOTSUP);
+			if (pr_valsize < sizeof (mac_propval_range_t))
+				return (EINVAL);
+			range.mpr_count = 1;
+			range.mpr_type = MAC_PROPVAL_UINT32;
+			range.range_uint32[0].mpur_min = DEFAULT_MTU;
+			range.range_uint32[0].mpur_max = MAXIMUM_MTU;
+			/* following MAC type do not support jumbo frames */
+			if ((mac->type == e1000_ich8lan) ||
+			    ((mac->type == e1000_ich9lan) && (phy->type ==
+			    e1000_phy_ife))) {
+				range.range_uint32[0].mpur_max = DEFAULT_MTU;
+			}
+			bcopy(&range, pr_val, sizeof (range));
+			break;
+		}
 		default:
 			err = ENOTSUP;
 			break;

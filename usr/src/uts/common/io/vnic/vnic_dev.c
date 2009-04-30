@@ -91,6 +91,9 @@ static kmem_cache_t	*vnic_cache;
 static krwlock_t	vnic_lock;
 static uint_t		vnic_count;
 
+#define	ANCHOR_VNIC_MIN_MTU	576
+#define	ANCHOR_VNIC_MAX_MTU	9000
+
 /* hash of VNICs (vnic_t's), keyed by VNIC id */
 static mod_hash_t	*vnic_hash;
 #define	VNIC_HASHSZ	64
@@ -471,8 +474,8 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		    &mac->m_max_sdu);
 	} else {
 		vnic->vn_margin = VLAN_TAGSZ;
-		mac->m_min_sdu = 0;
-		mac->m_max_sdu = 9000;
+		mac->m_min_sdu = ANCHOR_VNIC_MIN_MTU;
+		mac->m_max_sdu = ANCHOR_VNIC_MAX_MTU;
 	}
 
 	mac->m_margin = vnic->vn_margin;
@@ -817,6 +820,10 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		bcopy(pr_val, &mtu, sizeof (mtu));
+		if (mtu < ANCHOR_VNIC_MIN_MTU || mtu > ANCHOR_VNIC_MAX_MTU) {
+			err = EINVAL;
+			break;
+		}
 		err = mac_maxsdu_update(vn->vn_mh, mtu);
 		break;
 	}
@@ -831,9 +838,32 @@ static int
 vnic_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
-	return (ENOTSUP);
-}
+	mac_propval_range_t 	range;
+	vnic_t			*vn = m_driver;
+	int 			err = ENOTSUP;
 
+	/* MTU setting allowed only on an etherstub */
+	if (vn->vn_link_id != DATALINK_INVALID_LINKID)
+		return (err);
+
+	switch (pr_num) {
+	case MAC_PROP_MTU:
+		if (!(pr_flags & MAC_PROP_POSSIBLE))
+			return (ENOTSUP);
+		if (pr_valsize < sizeof (mac_propval_range_t))
+			return (EINVAL);
+		range.mpr_count = 1;
+		range.mpr_type = MAC_PROPVAL_UINT32;
+		range.range_uint32[0].mpur_min = ANCHOR_VNIC_MIN_MTU;
+		range.range_uint32[0].mpur_max = ANCHOR_VNIC_MAX_MTU;
+		bcopy(&range, pr_val, sizeof (range));
+		return (0);
+	default:
+		break;
+	}
+
+	return (err);
+}
 
 int
 vnic_info(vnic_info_t *info)

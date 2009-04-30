@@ -3306,6 +3306,22 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			err = hxge_get_priv_prop(hxgep, pr_name, pr_flags,
 			    pr_valsize, pr_val);
 			break;
+		case MAC_PROP_MTU: {
+			mac_propval_range_t range;
+
+			if (!(pr_flags & MAC_PROP_POSSIBLE))
+				return (ENOTSUP);
+			if (pr_valsize < sizeof (mac_propval_range_t))
+				return (EINVAL);
+			range.mpr_count = 1;
+			range.mpr_type = MAC_PROPVAL_UINT32;
+			range.range_uint32[0].mpur_min = MIN_FRAME_SIZE -
+			    MTU_TO_FRAME_SIZE;
+			range.range_uint32[0].mpur_max = MAX_FRAME_SIZE -
+			    MTU_TO_FRAME_SIZE;
+			bcopy(&range, pr_val, sizeof (range));
+			break;
+		}
 		default:
 			err = EINVAL;
 			break;

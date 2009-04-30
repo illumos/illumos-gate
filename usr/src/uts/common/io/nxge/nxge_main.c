@@ -4716,6 +4716,24 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			err = nxge_get_priv_prop(nxgep, pr_name, pr_flags,
 			    pr_valsize, pr_val, perm);
 			break;
+
+		case MAC_PROP_MTU: {
+			mac_propval_range_t	range;
+
+			if (!(pr_flags & MAC_PROP_POSSIBLE))
+				return (ENOTSUP);
+			if (pr_valsize < sizeof (mac_propval_range_t))
+				return (EINVAL);
+			range.mpr_count = 1;
+			range.mpr_type = MAC_PROPVAL_UINT32;
+			range.range_uint32[0].mpur_min =
+			    range.range_uint32[0].mpur_max = NXGE_DEFAULT_MTU;
+			if (nxgep->mac.is_jumbo)
+				range.range_uint32[0].mpur_max =
+				    NXGE_MAXIMUM_MTU;
+			bcopy(&range, pr_val, sizeof (range));
+			break;
+		}
 		default:
 			err = EINVAL;
 			break;

@@ -620,8 +620,7 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 	}
 
 done:
-	if (!set && err == 0 &&
-	    ddi_copyout(kprop, (void *)arg, dsize, mode) != 0)
+	if (!set && ddi_copyout(kprop, (void *)arg, dsize, mode) != 0)
 		err = EFAULT;
 
 	if (dlp != NULL)

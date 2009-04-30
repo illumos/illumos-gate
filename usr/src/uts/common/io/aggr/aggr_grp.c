@@ -2381,10 +2381,84 @@ aggr_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
+int
+aggr_grp_possible_mtu_range(aggr_grp_t *grp, mac_propval_range_t *range)
+{
+	mac_propval_range_t		*vals;
+	mac_propval_uint32_range_t	*ur;
+	aggr_port_t			*port;
+	mac_perim_handle_t		mph;
+	mac_prop_t 			macprop;
+	uint_t 				perm, i;
+	uint32_t 			min = 0, max = (uint32_t)-1;
+	int 				err = 0;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+
+	vals = kmem_alloc(sizeof (mac_propval_range_t) * grp->lg_nports,
+	    KM_SLEEP);
+	macprop.mp_id = MAC_PROP_MTU;
+	macprop.mp_name = "mtu";
+	macprop.mp_flags = MAC_PROP_POSSIBLE;
+
+	for (port = grp->lg_ports, i = 0; port != NULL;
+	    port = port->lp_next, i++) {
+		mac_perim_enter_by_mh(port->lp_mh, &mph);
+		err = mac_get_prop(port->lp_mh, &macprop, vals + i,
+		    sizeof (mac_propval_range_t), &perm);
+		mac_perim_exit(mph);
+		if (err != 0)
+			break;
+	}
+	/*
+	 * if any of the underlying ports does not support changing MTU then
+	 * just return ENOTSUP
+	 */
+	if (port != NULL) {
+		ASSERT(err != 0);
+		goto done;
+	}
+	range->mpr_count = 1;
+	range->mpr_type = MAC_PROPVAL_UINT32;
+	for (i = 0; i < grp->lg_nports; i++) {
+		ur = &((vals + i)->range_uint32[0]);
+		/*
+		 * Take max of the min, for range_min; that is the minimum
+		 * MTU value for an aggregation is the maximum of the
+		 * minimum values of all the underlying ports
+		 */
+		if (ur->mpur_min > min)
+			min = ur->mpur_min;
+		/* Take min of the max, for range_max */
+		if (ur->mpur_max < max)
+			max = ur->mpur_max;
+	}
+	range->range_uint32[0].mpur_min = min;
+	range->range_uint32[0].mpur_max = max;
+done:
+	kmem_free(vals, sizeof (mac_propval_range_t) * grp->lg_nports);
+	return (err);
+}
+
 /*ARGSUSED*/
 static int
 aggr_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
-	return (ENOTSUP);
+	mac_propval_range_t 	range;
+	int 			err = ENOTSUP;
+	aggr_grp_t		*grp = m_driver;
+
+	switch (pr_num) {
+	case MAC_PROP_MTU:
+		if (!(pr_flags & MAC_PROP_POSSIBLE))
+			return (ENOTSUP);
+		if (pr_valsize < sizeof (mac_propval_range_t))
+			return (EINVAL);
+		if ((err = aggr_grp_possible_mtu_range(grp, &range)) != 0)
+			return (err);
+		bcopy(&range, pr_val, sizeof (range));
+		return (0);
+	}
+	return (err);
 }

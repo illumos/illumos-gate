@@ -841,7 +841,7 @@ mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 
-	if (sdu_max <= mip->mi_sdu_min)
+	if (sdu_max == 0 || sdu_max < mip->mi_sdu_min)
 		return (EINVAL);
 	mip->mi_sdu_max = sdu_max;
 

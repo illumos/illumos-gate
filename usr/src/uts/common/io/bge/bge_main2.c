@@ -37,7 +37,7 @@ static char bge_ident[] = "Broadcom Gb Ethernet";
 /*
  * Make sure you keep the version ID up to date!
  */
-static char bge_version[] = "Broadcom Gb Ethernet v1.04";
+static char bge_version[] = "Broadcom Gb Ethernet v1.05";
 
 /*
  * Property names
@@ -1089,6 +1089,23 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			err = bge_get_priv_prop(bgep, pr_name, pr_flags,
 			    pr_valsize, pr_val);
 			return (err);
+		case MAC_PROP_MTU: {
+			mac_propval_range_t range;
+
+			if (!(pr_flags & MAC_PROP_POSSIBLE))
+				return (ENOTSUP);
+			if (pr_valsize < sizeof (mac_propval_range_t))
+				return (EINVAL);
+			range.mpr_count = 1;
+			range.mpr_type = MAC_PROPVAL_UINT32;
+			range.range_uint32[0].mpur_min =
+			    range.range_uint32[0].mpur_max = BGE_DEFAULT_MTU;
+			if (bge_jumbo_enable && !(flags & CHIP_FLAG_NO_JUMBO))
+				range.range_uint32[0].mpur_max =
+				    BGE_MAXIMUM_MTU;
+			bcopy(&range, pr_val, sizeof (range));
+			break;
+		}
 		default:
 			return (ENOTSUP);
 	}

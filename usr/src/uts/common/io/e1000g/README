@@ -19,7 +19,7 @@
 #
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms of the CDDLv1.
+# Use is subject to license terms.
 #
 #
 
@@ -667,3 +667,8 @@ Notes on packaging:
   This version has the following fixes:
    6775380 the e1000g link hung at "up" state after down and unplumb the interface
    6816786 e1000g panics on Lenovo X301 with snv_109
+
+5.3.9
+====
+  This version has the following fixes:
+   6680929 dladm should print POSSIBLE values for properties like mtu by contacting the driver.
