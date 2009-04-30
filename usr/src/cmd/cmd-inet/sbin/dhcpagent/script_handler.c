@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <time.h>
 #include <stdio.h>
@@ -69,10 +67,10 @@ static int	script_signal = SIGTERM;
  * the second timeout is set to SCRIPT_TIMEOUT_GRACE from the first timeout
  * and SIGKILL is sent on the second timeout.
  */
-static time_t		timeout;
+static time_t	timeout;
 
 /*
- * sigalarm_handler(): signal handler for SIGARLM
+ * sigalarm_handler(): signal handler for SIGALRM
  *
  *   input: int: signal the handler was called with
  *  output: void
@@ -128,9 +126,9 @@ run_script(dhcp_smach_t *dsmp, const char *event, int fd)
 	pid_t		pid;
 	time_t		now;
 
-	if ((pid = fork()) == -1) {
+	if ((pid = fork()) == -1)
 		return;
-	}
+
 	if (pid == 0) {
 		path = SCRIPT_PATH;
 		name = strrchr(path, '/') + 1;
@@ -144,7 +142,6 @@ run_script(dhcp_smach_t *dsmp, const char *event, int fd)
 
 		(void) dup2(n, STDOUT_FILENO);
 		(void) dup2(n, STDERR_FILENO);
-
 		(void) execl(path, name, dsmp->dsm_name, event, NULL);
 		_exit(127);
 	}
@@ -168,9 +165,8 @@ run_script(dhcp_smach_t *dsmp, const char *event, int fd)
 			break;
 		}
 
-		if (errno != EINTR) {
+		if (errno != EINTR)
 			return;
-		}
 
 		now = time(NULL);
 		if (now >= timeout) {
@@ -190,6 +186,25 @@ run_script(dhcp_smach_t *dsmp, const char *event, int fd)
 }
 
 /*
+ * script_init(): initialize script state on a given state machine
+ *
+ *   input: dhcp_smach_t *: the state machine
+ *  output: void
+ */
+
+void
+script_init(dhcp_smach_t *dsmp)
+{
+	dsmp->dsm_script_pid = -1;
+	dsmp->dsm_script_helper_pid = -1;
+	dsmp->dsm_script_event_id = -1;
+	dsmp->dsm_script_fd = -1;
+	dsmp->dsm_script_callback = NULL;
+	dsmp->dsm_script_event = NULL;
+	dsmp->dsm_callback_arg = NULL;
+}
+
+/*
  * script_cleanup(): cleanup helper function
  *
  *   input: dhcp_smach_t *: the state machine
@@ -199,29 +214,28 @@ run_script(dhcp_smach_t *dsmp, const char *event, int fd)
 static void
 script_cleanup(dhcp_smach_t *dsmp)
 {
-	dsmp->dsm_script_helper_pid = -1;
+	/*
+	 * We must clear dsm_script_pid prior to invoking the callback or we
+	 * could get in an infinite loop via async_finish().
+	 */
 	dsmp->dsm_script_pid = -1;
+	dsmp->dsm_script_helper_pid = -1;
 
 	if (dsmp->dsm_script_fd != -1) {
 		assert(dsmp->dsm_script_event_id != -1);
-		assert(dsmp->dsm_script_callback != NULL);
-
 		(void) iu_unregister_event(eh, dsmp->dsm_script_event_id, NULL);
 		(void) close(dsmp->dsm_script_fd);
-		dsmp->dsm_script_event_id = -1;
-		dsmp->dsm_script_fd = -1;
-		dsmp->dsm_script_callback(dsmp, dsmp->dsm_callback_arg);
-		dsmp->dsm_script_callback = NULL;
-		dsmp->dsm_script_event = NULL;
-		dsmp->dsm_callback_arg = NULL;
 
-		release_smach(dsmp);
+		assert(dsmp->dsm_script_callback != NULL);
+		dsmp->dsm_script_callback(dsmp, dsmp->dsm_callback_arg);
+		script_init(dsmp);
 		script_count--;
+		release_smach(dsmp);	/* hold from script_start() */
 	}
 }
 
 /*
- * script_exit(): does cleanup and invokes callback when script exits
+ * script_exit(): does cleanup and invokes the callback when the script exits
  *
  *   input: eh_t *: unused
  *	    int: the end of pipe owned by dhcpagent
@@ -235,25 +249,25 @@ script_cleanup(dhcp_smach_t *dsmp)
 static void
 script_exit(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 {
-	char		c;
+	char c;
 
-	if (read(fd, &c, 1) <= 0) {
+	if (read(fd, &c, 1) <= 0)
 		c = SCRIPT_FAILED;
-	}
 
-	if (c == SCRIPT_OK) {
+	if (c == SCRIPT_OK)
 		dhcpmsg(MSG_DEBUG, "script ok");
-	} else if (c == SCRIPT_KILLED) {
+	else if (c == SCRIPT_KILLED)
 		dhcpmsg(MSG_DEBUG, "script killed");
-	} else {
+	else
 		dhcpmsg(MSG_DEBUG, "script failed");
-	}
 
 	script_cleanup(arg);
 }
 
 /*
- * script_start(): tries to run the script
+ * script_start(): tries to start a script.
+ *		   if a script is already running, it's stopped first.
+ *
  *
  *   input: dhcp_smach_t *: the state machine
  *	    const char *: the event name
@@ -275,14 +289,15 @@ script_start(dhcp_smach_t *dsmp, const char *event,
 
 	assert(callback != NULL);
 
+	if (dsmp->dsm_script_pid != -1) {
+		/* script is running, stop it */
+		dhcpmsg(MSG_DEBUG, "script_start: stopping ongoing script");
+		script_stop(dsmp);
+	}
+
 	if (access(SCRIPT_PATH, X_OK) == -1) {
 		/* script does not exist */
 		goto out;
-	}
-	if (dsmp->dsm_script_pid != -1) {
-		/* script is running, stop it */
-		dhcpmsg(MSG_ERROR, "script_start: stop script");
-		script_stop(dsmp);
 	}
 
 	/*

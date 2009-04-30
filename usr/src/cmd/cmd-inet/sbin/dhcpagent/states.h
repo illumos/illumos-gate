@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	STATES_H
 #define	STATES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -307,6 +305,7 @@ void		nuke_smach_list(void);
 boolean_t	schedule_smach_timer(dhcp_smach_t *, int, uint32_t,
 		    iu_tq_callback_t *);
 void		cancel_offer_timer(dhcp_smach_t *);
+void		cancel_smach_timers(dhcp_smach_t *);
 void		discard_default_routes(dhcp_smach_t *);
 void		remove_default_routes(dhcp_smach_t *);
 boolean_t	is_bound_state(DHCPSTATE);

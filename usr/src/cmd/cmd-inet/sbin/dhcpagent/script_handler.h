@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	SCRIPT_HANDLER_H
 #define	SCRIPT_HANDLER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "common.h"
 
@@ -81,6 +79,7 @@ enum { SCRIPT_OK, SCRIPT_KILLED, SCRIPT_FAILED };
  */
 extern unsigned int	script_count;
 
+void		script_init(dhcp_smach_t *);
 boolean_t	script_start(dhcp_smach_t *, const char *, script_callback_t *,
 		    void *, int *);
 void		script_stop(dhcp_smach_t *);

@@ -26,6 +26,7 @@
  * instances.
  */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <search.h>
 #include <string.h>
@@ -158,16 +159,14 @@ insert_smach(dhcp_lif_t *lif, int *error)
 			return (NULL);
 		}
 	}
-	dsmp->dsm_retrans_timer		= -1;
-	dsmp->dsm_offer_timer		= -1;
-	dsmp->dsm_neg_hrtime		= gethrtime();
-	dsmp->dsm_script_fd		= -1;
-	dsmp->dsm_script_pid		= -1;
-	dsmp->dsm_script_helper_pid	= -1;
-	dsmp->dsm_script_event_id	= -1;
-	dsmp->dsm_start_timer		= -1;
 
+	script_init(dsmp);
 	ipc_action_init(&dsmp->dsm_ia);
+
+	dsmp->dsm_neg_hrtime = gethrtime();
+	dsmp->dsm_offer_timer = -1;
+	dsmp->dsm_start_timer = -1;
+	dsmp->dsm_retrans_timer = -1;
 
 	/*
 	 * initialize the parameter request list, if there is one.
@@ -576,7 +575,7 @@ cancel_offer_timer(dhcp_smach_t *dsmp)
  *	    and thus don't require any protection or ordering on cancellation.
  */
 
-static void
+void
 cancel_smach_timers(dhcp_smach_t *dsmp)
 {
 	dhcp_lease_t *dlp;
@@ -1112,13 +1111,13 @@ reset_smach(dhcp_smach_t *dsmp)
 	remove_default_routes(dsmp);
 
 	free_pkt_list(&dsmp->dsm_recv_pkt_list);
-
+	free_pkt_entry(dsmp->dsm_ack);
 	if (dsmp->dsm_orig_ack != dsmp->dsm_ack)
 		free_pkt_entry(dsmp->dsm_orig_ack);
-
-	free_pkt_entry(dsmp->dsm_ack);
-
 	dsmp->dsm_ack = dsmp->dsm_orig_ack = NULL;
+
+	free(dsmp->dsm_reqhost);
+	dsmp->dsm_reqhost = NULL;
 
 	cancel_smach_timers(dsmp);
 
@@ -1129,15 +1128,13 @@ reset_smach(dhcp_smach_t *dsmp)
 		IN6_IPADDR_TO_V4MAPPED(htonl(INADDR_BROADCAST),
 		    &dsmp->dsm_server);
 	}
-	dsmp->dsm_neg_hrtime		= gethrtime();
-	dsmp->dsm_script_fd		= -1;
-	dsmp->dsm_script_pid		= -1;
-	dsmp->dsm_script_helper_pid	= -1;
-	dsmp->dsm_script_callback	= NULL;
-	dsmp->dsm_callback_arg		= NULL;
-	dsmp->dsm_script_event_id	= -1;
-	free(dsmp->dsm_reqhost);
-	dsmp->dsm_reqhost		= NULL;
+	dsmp->dsm_neg_hrtime = gethrtime();
+	/*
+	 * We must never get here with a script running, since it means we're
+	 * resetting an smach that is still in the middle of another state
+	 * transition with a pending dsm_script_callback.
+	 */
+	assert(dsmp->dsm_script_pid == -1);
 }
 
 /*
@@ -1216,8 +1213,6 @@ nuke_smach_list(void)
 			dsmp->dsm_droprelease = B_TRUE;
 
 			cancel_smach_timers(dsmp);
-			if (dsmp->dsm_script_pid != -1)
-				script_stop(dsmp);
 
 			/*
 			 * If the script is started by script_start, dhcp_drop
