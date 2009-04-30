@@ -981,7 +981,7 @@ zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp, boolean_t will_modify)
 	aclnode = zfs_acl_node_alloc(aclsize);
 	list_insert_head(&aclp->z_acl, aclnode);
 	error = dmu_read(zp->z_zfsvfs->z_os, extacl, 0,
-	    aclsize, aclnode->z_acldata);
+	    aclsize, aclnode->z_acldata, DMU_READ_PREFETCH);
 	aclnode->z_ace_count = acl_count;
 	aclp->z_acl_count = acl_count;
 	aclp->z_acl_bytes = aclsize;

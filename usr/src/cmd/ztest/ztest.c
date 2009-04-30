@@ -1601,7 +1601,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 	 * Create a batch object if necessary, and record it in the directory.
 	 */
 	VERIFY3U(0, ==, dmu_read(os, ZTEST_DIROBJ, za->za_diroff,
-	    sizeof (uint64_t), &batchobj));
+	    sizeof (uint64_t), &batchobj, DMU_READ_PREFETCH));
 	if (batchobj == 0) {
 		tx = dmu_tx_create(os);
 		dmu_tx_hold_write(tx, ZTEST_DIROBJ, za->za_diroff,
@@ -1626,7 +1626,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 	 */
 	for (b = 0; b < batchsize; b++) {
 		VERIFY3U(0, ==, dmu_read(os, batchobj, b * sizeof (uint64_t),
-		    sizeof (uint64_t), &object));
+		    sizeof (uint64_t), &object, DMU_READ_PREFETCH));
 		if (object == 0)
 			continue;
 		/*
@@ -1661,7 +1661,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 		 * We expect the word at endoff to be our object number.
 		 */
 		VERIFY(0 == dmu_read(os, object, endoff,
-		    sizeof (uint64_t), &temp));
+		    sizeof (uint64_t), &temp, DMU_READ_PREFETCH));
 
 		if (temp != object) {
 			fatal(0, "bad data in %s, got %llu, expected %llu",
@@ -1846,7 +1846,7 @@ ztest_dmu_read_write(ztest_args_t *za)
 	 * Read the directory info.  If it's the first time, set things up.
 	 */
 	VERIFY(0 == dmu_read(os, ZTEST_DIROBJ, za->za_diroff,
-	    sizeof (dd), &dd));
+	    sizeof (dd), &dd, DMU_READ_PREFETCH));
 	if (dd.dd_chunk == 0) {
 		ASSERT(dd.dd_packobj == 0);
 		ASSERT(dd.dd_bigobj == 0);
@@ -1908,9 +1908,11 @@ ztest_dmu_read_write(ztest_args_t *za)
 	/*
 	 * Read the current contents of our objects.
 	 */
-	error = dmu_read(os, dd.dd_packobj, packoff, packsize, packbuf);
+	error = dmu_read(os, dd.dd_packobj, packoff, packsize, packbuf,
+	    DMU_READ_PREFETCH);
 	ASSERT3U(error, ==, 0);
-	error = dmu_read(os, dd.dd_bigobj, bigoff, bigsize, bigbuf);
+	error = dmu_read(os, dd.dd_bigobj, bigoff, bigsize, bigbuf,
+	    DMU_READ_PREFETCH);
 	ASSERT3U(error, ==, 0);
 
 	/*
@@ -2016,9 +2018,9 @@ ztest_dmu_read_write(ztest_args_t *za)
 		void *bigcheck = umem_alloc(bigsize, UMEM_NOFAIL);
 
 		VERIFY(0 == dmu_read(os, dd.dd_packobj, packoff,
-		    packsize, packcheck));
+		    packsize, packcheck, DMU_READ_PREFETCH));
 		VERIFY(0 == dmu_read(os, dd.dd_bigobj, bigoff,
-		    bigsize, bigcheck));
+		    bigsize, bigcheck, DMU_READ_PREFETCH));
 
 		ASSERT(bcmp(packbuf, packcheck, packsize) == 0);
 		ASSERT(bcmp(bigbuf, bigcheck, bigsize) == 0);
@@ -2118,7 +2120,7 @@ ztest_dmu_read_write_zcopy(ztest_args_t *za)
 	 * Read the directory info.  If it's the first time, set things up.
 	 */
 	VERIFY(0 == dmu_read(os, ZTEST_DIROBJ, za->za_diroff,
-	    sizeof (dd), &dd));
+	    sizeof (dd), &dd, DMU_READ_PREFETCH));
 	if (dd.dd_chunk == 0) {
 		ASSERT(dd.dd_packobj == 0);
 		ASSERT(dd.dd_bigobj == 0);
@@ -2252,10 +2254,10 @@ ztest_dmu_read_write_zcopy(ztest_args_t *za)
 		 */
 		if (i != 0 || ztest_random(2) != 0) {
 			error = dmu_read(os, dd.dd_packobj, packoff,
-			    packsize, packbuf);
+			    packsize, packbuf, DMU_READ_PREFETCH);
 			ASSERT3U(error, ==, 0);
 			error = dmu_read(os, dd.dd_bigobj, bigoff, bigsize,
-			    bigbuf);
+			    bigbuf, DMU_READ_PREFETCH);
 			ASSERT3U(error, ==, 0);
 		}
 		compare_and_update_pbbufs(s, packbuf, bigbuf, bigsize,
@@ -2316,9 +2318,9 @@ ztest_dmu_read_write_zcopy(ztest_args_t *za)
 			void *bigcheck = umem_alloc(bigsize, UMEM_NOFAIL);
 
 			VERIFY(0 == dmu_read(os, dd.dd_packobj, packoff,
-			    packsize, packcheck));
+			    packsize, packcheck, DMU_READ_PREFETCH));
 			VERIFY(0 == dmu_read(os, dd.dd_bigobj, bigoff,
-			    bigsize, bigcheck));
+			    bigsize, bigcheck, DMU_READ_PREFETCH));
 
 			ASSERT(bcmp(packbuf, packcheck, packsize) == 0);
 			ASSERT(bcmp(bigbuf, bigcheck, bigsize) == 0);
@@ -2619,7 +2621,7 @@ ztest_zap(ztest_args_t *za)
 	 * Create a new object if necessary, and record it in the directory.
 	 */
 	VERIFY(0 == dmu_read(os, ZTEST_DIROBJ, za->za_diroff,
-	    sizeof (uint64_t), &object));
+	    sizeof (uint64_t), &object, DMU_READ_PREFETCH));
 
 	if (object == 0) {
 		tx = dmu_tx_create(os);

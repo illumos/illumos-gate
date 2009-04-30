@@ -216,7 +216,7 @@ dump_packed_nvlist(objset_t *os, uint64_t object, void *data, size_t size)
 	size_t nvsize = *(uint64_t *)data;
 	char *packed = umem_alloc(nvsize, UMEM_NOFAIL);
 
-	VERIFY(0 == dmu_read(os, object, 0, nvsize, packed));
+	VERIFY(0 == dmu_read(os, object, 0, nvsize, packed, DMU_READ_PREFETCH));
 
 	VERIFY(nvlist_unpack(packed, nvsize, &nv, 0) == 0);
 
@@ -442,7 +442,7 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 	alloc = 0;
 	for (offset = 0; offset < smo->smo_objsize; offset += sizeof (entry)) {
 		VERIFY(0 == dmu_read(os, smo->smo_object, offset,
-		    sizeof (entry), &entry));
+		    sizeof (entry), &entry, DMU_READ_PREFETCH));
 		if (SM_DEBUG_DECODE(entry)) {
 			(void) printf("\t\t[%4llu] %s: txg %llu, pass %llu\n",
 			    (u_longlong_t)(offset / sizeof (entry)),

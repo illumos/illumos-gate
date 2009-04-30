@@ -182,22 +182,22 @@ dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **dbp)
  * whose dnodes are in the same block.
  */
 static int
-dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
-    uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp)
+dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset, uint64_t length,
+    int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp, uint32_t flags)
 {
 	dsl_pool_t *dp = NULL;
 	dmu_buf_t **dbp;
 	uint64_t blkid, nblks, i;
-	uint32_t flags;
+	uint32_t dbuf_flags;
 	int err;
 	zio_t *zio;
 	hrtime_t start;
 
 	ASSERT(length <= DMU_MAX_ACCESS);
 
-	flags = DB_RF_CANFAIL | DB_RF_NEVERWAIT;
-	if (length > zfetch_array_rd_sz)
-		flags |= DB_RF_NOPREFETCH;
+	dbuf_flags = DB_RF_CANFAIL | DB_RF_NEVERWAIT;
+	if (flags & DMU_READ_NO_PREFETCH || length > zfetch_array_rd_sz)
+		dbuf_flags |= DB_RF_NOPREFETCH;
 
 	rw_enter(&dn->dn_struct_rwlock, RW_READER);
 	if (dn->dn_datablkshift) {
@@ -235,7 +235,7 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
 		/* initiate async i/o */
 		if (read) {
 			rw_exit(&dn->dn_struct_rwlock);
-			(void) dbuf_read(db, zio, flags);
+			(void) dbuf_read(db, zio, dbuf_flags);
 			rw_enter(&dn->dn_struct_rwlock, RW_READER);
 		}
 		dbp[i] = &db->db;
@@ -287,7 +287,7 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 		return (err);
 
 	err = dmu_buf_hold_array_by_dnode(dn, offset, length, read, tag,
-	    numbufsp, dbpp);
+	    numbufsp, dbpp, DMU_READ_PREFETCH);
 
 	dnode_rele(dn, FTAG);
 
@@ -302,7 +302,7 @@ dmu_buf_hold_array_by_bonus(dmu_buf_t *db, uint64_t offset,
 	int err;
 
 	err = dmu_buf_hold_array_by_dnode(dn, offset, length, read, tag,
-	    numbufsp, dbpp);
+	    numbufsp, dbpp, DMU_READ_PREFETCH);
 
 	return (err);
 }
@@ -544,7 +544,7 @@ dmu_free_range(objset_t *os, uint64_t object, uint64_t offset,
 
 int
 dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-    void *buf)
+    void *buf, uint32_t flags)
 {
 	dnode_t *dn;
 	dmu_buf_t **dbp;
@@ -574,7 +574,7 @@ dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 		 * to be reading in parallel.
 		 */
 		err = dmu_buf_hold_array_by_dnode(dn, offset, mylen,
-		    TRUE, FTAG, &numbufs, &dbp);
+		    TRUE, FTAG, &numbufs, &dbp, flags);
 		if (err)
 			break;
 

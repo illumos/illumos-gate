@@ -925,7 +925,8 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	 * we don't have to write the data twice.
 	 */
 	if (buf != NULL) /* immediate write */
-		return (dmu_read(os, ZVOL_OBJ, lr->lr_offset, dlen, buf));
+		return (dmu_read(os, ZVOL_OBJ, lr->lr_offset, dlen, buf,
+		    DMU_READ_NO_PREFETCH));
 
 	zgd = (zgd_t *)kmem_alloc(sizeof (zgd_t), KM_SLEEP);
 	zgd->zgd_zilog = zv->zv_zilog;
@@ -1014,7 +1015,7 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 		    (write_state == WR_COPIED ? len : 0));
 		lr = (lr_write_t *)&itx->itx_lr;
 		if (write_state == WR_COPIED && dmu_read(zv->zv_objset,
-		    ZVOL_OBJ, off, len, lr + 1) != 0) {
+		    ZVOL_OBJ, off, len, lr + 1, DMU_READ_NO_PREFETCH) != 0) {
 			kmem_free(itx, offsetof(itx_t, itx_lr) +
 			    itx->itx_lr.lrc_reclen);
 			itx = zil_itx_create(TX_WRITE, sizeof (*lr));
@@ -1181,7 +1182,8 @@ zvol_strategy(buf_t *bp)
 			error = zvol_dumpio(zv, addr, off, size,
 			    doread, B_FALSE);
 		} else if (doread) {
-			error = dmu_read(os, ZVOL_OBJ, off, size, addr);
+			error = dmu_read(os, ZVOL_OBJ, off, size, addr,
+			    DMU_READ_PREFETCH);
 		} else {
 			dmu_tx_t *tx = dmu_tx_create(os);
 			dmu_tx_hold_write(tx, ZVOL_OBJ, off, size);

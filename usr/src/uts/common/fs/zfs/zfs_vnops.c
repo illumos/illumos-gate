@@ -364,7 +364,8 @@ update_pages(vnode_t *vp, int64_t start, int len, objset_t *os, uint64_t oid)
 			caddr_t va;
 
 			va = zfs_map_page(pp, S_WRITE);
-			(void) dmu_read(os, oid, start+off, nbytes, va+off);
+			(void) dmu_read(os, oid, start+off, nbytes, va+off,
+			    DMU_READ_PREFETCH);
 			zfs_unmap_page(pp, va);
 			page_unlock(pp);
 		}
@@ -902,7 +903,8 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 			error = ENOENT;
 			goto out;
 		}
-		VERIFY(0 == dmu_read(os, lr->lr_foid, off, dlen, buf));
+		VERIFY(0 == dmu_read(os, lr->lr_foid, off, dlen, buf,
+		    DMU_READ_NO_PREFETCH));
 	} else { /* indirect write */
 		uint64_t boff; /* block starting offset */
 
@@ -3978,7 +3980,8 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 
 		ASSERT3U(io_off, ==, cur_pp->p_offset);
 		va = zfs_map_page(cur_pp, S_WRITE);
-		err = dmu_read(os, zp->z_id, io_off, PAGESIZE, va);
+		err = dmu_read(os, zp->z_id, io_off, PAGESIZE, va,
+		    DMU_READ_PREFETCH);
 		zfs_unmap_page(cur_pp, va);
 		if (err) {
 			/* On error, toss the entire kluster */

@@ -452,8 +452,10 @@ int dmu_free_object(objset_t *os, uint64_t object);
  * Canfail routines will return 0 on success, or an errno if there is a
  * nonrecoverable I/O error.
  */
+#define	DMU_READ_PREFETCH	0 /* prefetch */
+#define	DMU_READ_NO_PREFETCH	1 /* don't prefetch */
 int dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
-	void *buf);
+	void *buf, uint32_t flags);
 void dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	const void *buf, dmu_tx_t *tx);
 void dmu_prealloc(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,

@@ -134,7 +134,7 @@ zfs_fuid_table_load(objset_t *os, uint64_t fuid_obj, avl_tree_t *idx_tree,
 
 		packed = kmem_alloc(fuid_size, KM_SLEEP);
 		VERIFY(dmu_read(os, fuid_obj, 0,
-		    fuid_size, packed) == 0);
+		    fuid_size, packed, DMU_READ_PREFETCH) == 0);
 		VERIFY(nvlist_unpack(packed, fuid_size,
 		    &nvp, 0) == 0);
 		VERIFY(nvlist_lookup_nvlist_array(nvp, FUID_NVP_ARRAY,
