@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/sparc/audiots/Makefile
+# uts/intel/audiots/Makefile
 #
 #	This makefile drives the production of the T2 audio driver
 #	(audiots) kernel module.
@@ -44,7 +44,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audiots
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sparc/Makefile.sparc
+include $(UTSBASE)/intel/Makefile.intel
 
 # 
 #	Overrides, lint pass one enforcement 
@@ -61,14 +61,7 @@ LDFLAGS		+= -dy -N misc/ac97 -N drv/audio
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE_64)
-
-#
-#       Overrides
-#
-ALL_BUILDS	= $(ALL_BUILDSONLY64)
-DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Default build targets.
@@ -94,4 +87,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ
