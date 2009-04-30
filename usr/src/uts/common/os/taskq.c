@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel task queues: general-purpose asynchronous task scheduling.
@@ -75,7 +72,7 @@
  * The backing task queue is also used for scheduling internal tasks needed for
  * dynamic task queue maintenance.
  *
- * INTERFACES:
+ * INTERFACES ==================================================================
  *
  * taskq_t *taskq_create(name, nthreads, pri_t pri, minalloc, maxall, flags);
  *
@@ -83,15 +80,15 @@
  *	Possible 'flags':
  *
  *	  TASKQ_DYNAMIC: Create task pool for task management. If this flag is
- * 		specified, 'nthreads' specifies the maximum number of threads in
+ *		specified, 'nthreads' specifies the maximum number of threads in
  *		the task queue. Task execution order for dynamic task queues is
  *		not predictable.
  *
  *		If this flag is not specified (default case) a
- * 		single-list task queue is created with 'nthreads' threads
- * 		servicing it. Entries in this queue are managed by
- * 		taskq_ent_alloc() and taskq_ent_free() which try to keep the
- * 		task population between 'minalloc' and 'maxalloc', but the
+ *		single-list task queue is created with 'nthreads' threads
+ *		servicing it. Entries in this queue are managed by
+ *		taskq_ent_alloc() and taskq_ent_free() which try to keep the
+ *		task population between 'minalloc' and 'maxalloc', but the
  *		latter limit is only advisory for TQ_SLEEP dispatches and the
  *		former limit is only advisory for TQ_NOALLOC dispatches. If
  *		TASKQ_PREPOPULATE is set in 'flags', the taskq will be
@@ -104,9 +101,24 @@
  *	  TASKQ_PREPOPULATE: Prepopulate task queue with threads.
  *		Also prepopulate the task queue with 'minalloc' task structures.
  *
+ *	  TASKQ_THREADS_CPU_PCT: This flag specifies that 'nthreads' should be
+ *		interpreted as a percentage of the # of online CPUs on the
+ *		system.  The taskq subsystem will automatically adjust the
+ *		number of threads in the taskq in response to CPU online
+ *		and offline events, to keep the ratio.  nthreads must be in
+ *		the range [0,100].
+ *
+ *		The calculation used is:
+ *
+ *			MAX((ncpus_online * percentage)/100, 1)
+ *
+ *		This flag is not supported for DYNAMIC task queues.
+ *		This flag is not compatible with TASKQ_CPR_SAFE.
+ *
  *	  TASKQ_CPR_SAFE: This flag specifies that users of the task queue will
- * 		use their own protocol for handling CPR issues. This flag is not
- *		supported for DYNAMIC task queues.
+ *		use their own protocol for handling CPR issues. This flag is not
+ *		supported for DYNAMIC task queues.  This flag is not compatible
+ *		with TASKQ_THREADS_CPU_PCT.
  *
  *	The 'pri' field specifies the default priority for the threads that
  *	service all scheduled tasks.
@@ -185,7 +197,7 @@
  *	any subsystem that needs to schedule tasks and does not need to manage
  *	its own task queues. It is initialized quite early during system boot.
  *
- * IMPLEMENTATION.
+ * IMPLEMENTATION ==============================================================
  *
  * This is schematic representation of the task queue structures.
  *
@@ -249,7 +261,58 @@
  *	All threads used by task queues mark t_taskq field of the thread to
  *	point to the task queue.
  *
- * Dynamic Task Queues Implementation.
+ * Taskq Thread Management -----------------------------------------------------
+ *
+ * Taskq's non-dynamic threads are managed with several variables and flags:
+ *
+ *	* tq_nthreads	- The number of threads in taskq_thread() for the
+ *			  taskq.
+ *
+ *	* tq_active	- The number of threads not waiting on a CV in
+ *			  taskq_thread(); includes newly created threads
+ *			  not yet counted in tq_nthreads.
+ *
+ *	* tq_nthreads_target
+ *			- The number of threads desired for the taskq.
+ *
+ *	* tq_flags & TASKQ_CHANGING
+ *			- Indicates that tq_nthreads != tq_nthreads_target.
+ *
+ *	* tq_flags & TASKQ_THREAD_CREATED
+ *			- Indicates that a thread is being created in the taskq.
+ *
+ * During creation, tq_nthreads and tq_active are set to 0, and
+ * tq_nthreads_target is set to the number of threads desired.  The
+ * TASKQ_CHANGING flag is set, and taskq_create_thread() is called to
+ * create the first thread. taskq_create_thread() increments tq_active,
+ * sets TASKQ_THREAD_CREATED, and creates the new thread.
+ *
+ * Each thread starts in taskq_thread(), clears the TASKQ_THREAD_CREATED
+ * flag, and increments tq_nthreads.  It stores the new value of
+ * tq_nthreads as its "thread_id", and stores its thread pointer in the
+ * tq_threadlist at the (thread_id - 1).  We keep the thread_id space
+ * densely packed by requiring that only the largest thread_id can exit during
+ * normal adjustment.   The exception is during the destruction of the
+ * taskq; once tq_nthreads_target is set to zero, no new threads will be created
+ * for the taskq queue, so every thread can exit without any ordering being
+ * necessary.
+ *
+ * Threads will only process work if their thread id is <= tq_nthreads_target.
+ *
+ * When TASKQ_CHANGING is set, threads will check the current thread target
+ * whenever they wake up, and do whatever they can to apply its effects.
+ *
+ * TASKQ_THREAD_CPU_PCT --------------------------------------------------------
+ *
+ * When a taskq is created with TASKQ_THREAD_CPU_PCT, we store their requested
+ * percentage in tq_threads_ncpus_pct, start them off with the correct thread
+ * target, and add them to the taskq_cpupct_list for later adjustment.
+ *
+ * We register taskq_cpu_setup() to be called whenever a CPU changes state.  It
+ * walks the list of TASKQ_THREAD_CPU_PCT taskqs, adjusts their nthread_target
+ * if need be, and wakes up all of the threads to process the change.
+ *
+ * Dynamic Task Queues Implementation ------------------------------------------
  *
  * For a dynamic task queues there is a 1-to-1 mapping between a thread and
  * taskq_ent_structure. Each entry is serviced by its own thread and each thread
@@ -278,7 +341,7 @@
  * itself. The thread sleep time is controlled by a tunable variable
  * `taskq_thread_timeout'.
  *
- * There is various statistics kept in the bucket which allows for later
+ * There are various statistics kept in the bucket which allows for later
  * analysis of taskq usage patterns. Also, a global copy of taskq creation and
  * death statistics is kept in the global taskq data structure. Since thread
  * creation and death happen rarely, updating such global data does not present
@@ -300,7 +363,7 @@
  *	 memory. One solution may be allocation of buckets when they are first
  *	 touched, but it is not clear how useful it is.
  *
- * SUSPEND/RESUME implementation.
+ * SUSPEND/RESUME implementation -----------------------------------------------
  *
  *	Before executing a task taskq_thread() (executing non-dynamic task
  *	queues) obtains taskq's thread lock as a reader. The taskq_suspend()
@@ -321,18 +384,24 @@
  *	taskq_member() function works by comparing a thread t_taskq pointer with
  *	the passed thread pointer.
  *
- * LOCKS and LOCK Hierarchy:
+ * LOCKS and LOCK Hierarchy ----------------------------------------------------
  *
- *   There are two locks used in task queues.
+ *   There are three locks used in task queues:
  *
- *   1) Task queue structure has a lock, protecting global task queue state.
+ *   1) The taskq_t's tq_lock, protecting global task queue state.
  *
  *   2) Each per-CPU bucket has a lock for bucket management.
  *
- *   If both locks are needed, task queue lock should be taken only after bucket
+ *   3) The global taskq_cpupct_lock, which protects the list of
+ *      TASKQ_THREADS_CPU_PCT taskqs.
+ *
+ *   If both (1) and (2) are needed, tq_lock should be taken *after* the bucket
  *   lock.
  *
- * DEBUG FACILITIES.
+ *   If both (1) and (3) are needed, tq_lock should be taken *after*
+ *   taskq_cpupct_lock.
+ *
+ * DEBUG FACILITIES ------------------------------------------------------------
  *
  * For DEBUG kernels it is possible to induce random failures to
  * taskq_dispatch() function when it is given TQ_NOSLEEP argument. The value of
@@ -341,12 +410,17 @@
  *
  * Setting TASKQ_STATISTIC to 0 will disable per-bucket statistics.
  *
- * TUNABLES
+ * TUNABLES --------------------------------------------------------------------
  *
  *	system_taskq_size	- Size of the global system_taskq.
  *				  This value is multiplied by nCPUs to determine
  *				  actual size.
  *				  Default value: 64
+ *
+ *	taskq_minimum_nthreads_max
+ *				- Minimum size of the thread list for a taskq.
+ *				  Useful for testing different thread pool
+ *				  sizes by overwriting tq_nthreads_target.
  *
  *	taskq_thread_timeout	- Maximum idle time for taskq_d_thread()
  *				  Default value: 5 minutes
@@ -365,7 +439,7 @@
  *				  for static task queues.
  *				  Default value: UINT_MAX (no induced failures)
  *
- * CONDITIONAL compilation.
+ * CONDITIONAL compilation -----------------------------------------------------
  *
  *    TASKQ_STATISTIC	- If set will enable bucket statistic (default).
  *
@@ -384,11 +458,12 @@
 #include <sys/sysmacros.h>
 #include <sys/cpuvar.h>
 #include <sys/sdt.h>
+#include <sys/note.h>
 
 static kmem_cache_t *taskq_ent_cache, *taskq_cache;
 
 /*
- * Pseudo instance numbers for taskqs without explicitely provided instance.
+ * Pseudo instance numbers for taskqs without explicitly provided instance.
  */
 static vmem_t *taskq_id_arena;
 
@@ -396,11 +471,21 @@ static vmem_t *taskq_id_arena;
 taskq_t	*system_taskq;
 
 /*
- * Maxmimum number of entries in global system taskq is
+ * Maximum number of entries in global system taskq is
  * 	system_taskq_size * max_ncpus
  */
 #define	SYSTEM_TASKQ_SIZE 64
 int system_taskq_size = SYSTEM_TASKQ_SIZE;
+
+/*
+ * Minimum size for tq_nthreads_max; useful for those who want to play around
+ * with increasing a taskq's tq_nthreads_target.
+ */
+int taskq_minimum_nthreads_max = 1;
+
+/* Maximum percentage allowed for TASKQ_THREADS_CPU_PCT */
+#define	TASKQ_CPUPCT_MAX_PERCENT	1000
+int taskq_cpupct_max_percent = TASKQ_CPUPCT_MAX_PERCENT;
 
 /*
  * Dynamic task queue threads that don't get any work within
@@ -518,6 +603,17 @@ static kmutex_t taskq_d_kstat_lock;
 static int taskq_kstat_update(kstat_t *, int);
 static int taskq_d_kstat_update(kstat_t *, int);
 
+/*
+ * State for THREAD_CPU_PCT management
+ */
+typedef struct taskq_cpupct_ent {
+	list_node_t	tp_link;
+	taskq_t		*tp_taskq;
+} taskq_cpupct_ent_t;
+
+static kmutex_t taskq_cpupct_lock;
+static list_t taskq_cpupct_list;
+static int taskq_cpupct_ncpus_online;
 
 /*
  * Collect per-bucket statistic when TASKQ_STATISTIC is defined.
@@ -619,6 +715,7 @@ taskq_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&tq->tq_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&tq->tq_threadlock, NULL, RW_DEFAULT, NULL);
 	cv_init(&tq->tq_dispatch_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&tq->tq_exit_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&tq->tq_wait_cv, NULL, CV_DEFAULT, NULL);
 
 	tq->tq_task.tqent_next = &tq->tq_task;
@@ -633,9 +730,15 @@ taskq_destructor(void *buf, void *cdrarg)
 {
 	taskq_t *tq = buf;
 
+	ASSERT(tq->tq_nthreads == 0);
+	ASSERT(tq->tq_buckets == NULL);
+	ASSERT(tq->tq_tcreates == 0);
+	ASSERT(tq->tq_tdeaths == 0);
+
 	mutex_destroy(&tq->tq_lock);
 	rw_destroy(&tq->tq_threadlock);
 	cv_destroy(&tq->tq_dispatch_cv);
+	cv_destroy(&tq->tq_exit_cv);
 	cv_destroy(&tq->tq_wait_cv);
 }
 
@@ -672,6 +775,62 @@ taskq_init(void)
 	taskq_id_arena = vmem_create("taskq_id_arena",
 	    (void *)1, INT32_MAX, 1, NULL, NULL, NULL, 0,
 	    VM_SLEEP | VMC_IDENTIFIER);
+
+	list_create(&taskq_cpupct_list, sizeof (taskq_cpupct_ent_t),
+	    offsetof(taskq_cpupct_ent_t, tp_link));
+}
+
+/*ARGSUSED*/
+static int
+taskq_cpu_setup(cpu_setup_t what, int id, void *arg)
+{
+	taskq_cpupct_ent_t *tpp;
+	int cpus_online = ncpus_online;
+
+	/* offlines are called *before* the cpu is offlined. */
+	if (what == CPU_OFF)
+		cpus_online--;
+	if (cpus_online < 1)
+		cpus_online = 1;
+
+	mutex_enter(&taskq_cpupct_lock);
+	if (cpus_online == taskq_cpupct_ncpus_online) {
+		mutex_exit(&taskq_cpupct_lock);
+		return (0);
+	}
+
+	for (tpp = list_head(&taskq_cpupct_list); tpp != NULL;
+	    tpp = list_next(&taskq_cpupct_list, tpp)) {
+		taskq_t *tq = tpp->tp_taskq;
+		int newtarget;
+
+		mutex_enter(&tq->tq_lock);
+		newtarget =
+		    TASKQ_THREADS_PCT(cpus_online, tq->tq_threads_ncpus_pct);
+		ASSERT3S(newtarget, <=, tq->tq_nthreads_max);
+		if (newtarget != tq->tq_nthreads_target) {
+			/* The taskq must not be exiting */
+			ASSERT3S(tq->tq_nthreads_target, !=, 0);
+			tq->tq_flags |= TASKQ_CHANGING;
+			tq->tq_nthreads_target = newtarget;
+			cv_broadcast(&tq->tq_dispatch_cv);
+			cv_broadcast(&tq->tq_exit_cv);
+		}
+		mutex_exit(&tq->tq_lock);
+	}
+
+	taskq_cpupct_ncpus_online = cpus_online;
+	mutex_exit(&taskq_cpupct_lock);
+	return (0);
+}
+
+void
+taskq_mp_init(void)
+{
+	mutex_enter(&cpu_lock);
+	register_cpu_setup_func(taskq_cpu_setup, NULL);
+	(void) taskq_cpu_setup(CPU_ON, 0, NULL);
+	mutex_exit(&cpu_lock);
 }
 
 /*
@@ -1064,12 +1223,41 @@ taskq_member(taskq_t *tq, kthread_t *thread)
 	return (thread->t_taskq == tq);
 }
 
+static void
+taskq_thread_create(taskq_t *tq)
+{
+	kthread_t *t;
+
+	ASSERT(MUTEX_HELD(&tq->tq_lock));
+	ASSERT(!(tq->tq_flags & TASKQ_THREAD_CREATED));
+
+	tq->tq_flags |= TASKQ_THREAD_CREATED;
+	tq->tq_active++;
+	t = thread_create(NULL, 0, taskq_thread, tq, 0, &p0, TS_RUN,
+	    tq->tq_pri);
+	t->t_taskq = tq;
+}
+
+static void
+taskq_thread_wait(taskq_t *tq, kcondvar_t *cv, callb_cpr_t *cprinfo)
+{
+	if (tq->tq_flags & TASKQ_CPR_SAFE) {
+		cv_wait(cv, &tq->tq_lock);
+	} else {
+		CALLB_CPR_SAFE_BEGIN(cprinfo);
+		cv_wait(cv, &tq->tq_lock);
+		CALLB_CPR_SAFE_END(cprinfo, &tq->tq_lock);
+	}
+}
+
 /*
  * Worker thread for processing task queue.
  */
 static void
 taskq_thread(void *arg)
 {
+	int thread_id;
+
 	taskq_t *tq = arg;
 	taskq_ent_t *tqe;
 	callb_cpr_t cprinfo;
@@ -1082,17 +1270,57 @@ taskq_thread(void *arg)
 		    tq->tq_name);
 	}
 	mutex_enter(&tq->tq_lock);
-	while (tq->tq_flags & TASKQ_ACTIVE) {
+	thread_id = ++tq->tq_nthreads;
+	ASSERT(tq->tq_flags & TASKQ_THREAD_CREATED);
+	tq->tq_flags &= ~TASKQ_THREAD_CREATED;
+
+	VERIFY3S(thread_id, <=, tq->tq_nthreads_max);
+
+	if (tq->tq_nthreads_max == 1)
+		tq->tq_thread = curthread;
+	else
+		tq->tq_threadlist[thread_id - 1] = curthread;
+
+	for (;;) {
+		if (tq->tq_flags & TASKQ_CHANGING) {
+			/* we're done; clear the CHANGING flag */
+			if (tq->tq_nthreads == tq->tq_nthreads_target) {
+				tq->tq_flags &= ~TASKQ_CHANGING;
+				continue;
+			}
+			/* We're low on threads and none have been created */
+			if (tq->tq_nthreads < tq->tq_nthreads_target &&
+			    !(tq->tq_flags & TASKQ_THREAD_CREATED)) {
+				taskq_thread_create(tq);
+				continue;
+			}
+			/* We're no longer needed */
+			if (thread_id > tq->tq_nthreads_target) {
+				/*
+				 * To preserve the one-to-one mapping between
+				 * thread_id and thread, we must exit from
+				 * highest thread ID to least.
+				 *
+				 * However, if everyone is exiting, the order
+				 * doesn't matter, so just exit immediately.
+				 * (this is safe, since you must wait for
+				 * nthreads to reach 0 after setting
+				 * tq_nthreads_target to 0)
+				 */
+				if (thread_id == tq->tq_nthreads ||
+				    tq->tq_nthreads_target == 0)
+					break;
+
+				/* Wait for higher thread_ids to exit */
+				taskq_thread_wait(tq, &tq->tq_exit_cv,
+				    &cprinfo);
+				continue;
+			}
+		}
 		if ((tqe = tq->tq_task.tqent_next) == &tq->tq_task) {
 			if (--tq->tq_active == 0)
 				cv_broadcast(&tq->tq_wait_cv);
-			if (tq->tq_flags & TASKQ_CPR_SAFE) {
-				cv_wait(&tq->tq_dispatch_cv, &tq->tq_lock);
-			} else {
-				CALLB_CPR_SAFE_BEGIN(&cprinfo);
-				cv_wait(&tq->tq_dispatch_cv, &tq->tq_lock);
-				CALLB_CPR_SAFE_END(&cprinfo, &tq->tq_lock);
-			}
+			taskq_thread_wait(tq, &tq->tq_dispatch_cv, &cprinfo);
 			tq->tq_active++;
 			continue;
 		}
@@ -1116,8 +1344,22 @@ taskq_thread(void *arg)
 
 		taskq_ent_free(tq, tqe);
 	}
-	tq->tq_nthreads--;
-	cv_broadcast(&tq->tq_wait_cv);
+
+	if (tq->tq_nthreads_max == 1)
+		tq->tq_thread = NULL;
+	else
+		tq->tq_threadlist[thread_id - 1] = NULL;
+
+	ASSERT(tq->tq_nthreads > 0);
+	if (--tq->tq_nthreads == 0)
+		cv_broadcast(&tq->tq_wait_cv);
+
+	/* let the other threads which need to exit know we're done */
+	cv_broadcast(&tq->tq_exit_cv);
+
+	/* We're exiting, and therefore no longer active */
+	tq->tq_active--;
+
 	ASSERT(!(tq->tq_flags & TASKQ_CPR_SAFE));
 	CALLB_CPR_EXIT(&cprinfo);
 	thread_exit();
@@ -1302,69 +1544,93 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 	taskq_t *tq = kmem_cache_alloc(taskq_cache, KM_SLEEP);
 	uint_t ncpus = ((boot_max_ncpus == -1) ? max_ncpus : boot_max_ncpus);
 	uint_t bsize;	/* # of buckets - always power of 2 */
+	int max_nthreads;
 
 	/*
-	 * TASKQ_CPR_SAFE and TASKQ_DYNAMIC flags are mutually exclusive.
+	 * TASKQ_DYNAMIC is incompatible with TASKQ_CPR_SAFE and
+	 * TASKQ_THREADS_CPU_PCT.
 	 */
-	ASSERT((flags & (TASKQ_DYNAMIC | TASKQ_CPR_SAFE)) !=
-	    ((TASKQ_DYNAMIC | TASKQ_CPR_SAFE)));
+	ASSERT(!(flags & TASKQ_DYNAMIC) ||
+	    !(flags & (TASKQ_CPR_SAFE | TASKQ_THREADS_CPU_PCT)));
+	/* TASKQ_CPR_SAFE is incompatible with TASKQ_THREADS_CPU_PCT */
 
-	ASSERT(tq->tq_buckets == NULL);
+	ASSERT(!(flags & TASKQ_CPR_SAFE) || !(flags & TASKQ_THREADS_CPU_PCT));
 
 	bsize = 1 << (highbit(ncpus) - 1);
 	ASSERT(bsize >= 1);
 	bsize = MIN(bsize, taskq_maxbuckets);
 
-	tq->tq_maxsize = nthreads;
+	if (flags & TASKQ_DYNAMIC) {
+		ASSERT3S(nthreads, >=, 1);
+		tq->tq_maxsize = nthreads;
 
-	/* For non-dynamic task queues use just one backup thread */
-	if (flags & TASKQ_DYNAMIC)
-		nthreads = 1;
+		/* For dynamic task queues use just one backup thread */
+		nthreads = max_nthreads = 1;
 
+	} else if (!(flags & TASKQ_THREADS_CPU_PCT)) {
+		ASSERT3S(nthreads, >=, 1);
+		max_nthreads = nthreads;
+	} else {
+		uint_t pct;
+		ASSERT3S(nthreads, >=, 0);
+		pct = nthreads;
+
+		if (pct > taskq_cpupct_max_percent)
+			pct = taskq_cpupct_max_percent;
+
+		tq->tq_threads_ncpus_pct = pct;
+		nthreads = TASKQ_THREADS_PCT(ncpus_online, pct);
+		max_nthreads = TASKQ_THREADS_PCT(max_ncpus, pct);
+	}
+
+	if (max_nthreads < taskq_minimum_nthreads_max)
+		max_nthreads = taskq_minimum_nthreads_max;
+
+	/*
+	 * Make sure the name is 0-terminated, and conforms to the rules for
+	 * C indentifiers
+	 */
 	(void) strncpy(tq->tq_name, name, TASKQ_NAMELEN + 1);
-	tq->tq_name[TASKQ_NAMELEN] = '\0';
-	/* Make sure the name conforms to the rules for C indentifiers */
-	strident_canon(tq->tq_name, TASKQ_NAMELEN);
+	strident_canon(tq->tq_name, TASKQ_NAMELEN + 1);
 
-	tq->tq_flags = flags | TASKQ_ACTIVE;
-	tq->tq_active = nthreads;
+	tq->tq_flags = flags | TASKQ_CHANGING;
+	tq->tq_active = 0;
 	tq->tq_instance = instance;
-	tq->tq_nthreads = nthreads;
+	tq->tq_nthreads_target = nthreads;
+	tq->tq_nthreads_max = max_nthreads;
 	tq->tq_minalloc = minalloc;
 	tq->tq_maxalloc = maxalloc;
 	tq->tq_nbuckets = bsize;
 	tq->tq_pri = pri;
 
+	if (max_nthreads > 1)
+		tq->tq_threadlist = kmem_alloc(
+		    sizeof (kthread_t *) * max_nthreads, KM_SLEEP);
+
+	/* Add the taskq to the list of CPU_PCT taskqs */
+	if (flags & TASKQ_THREADS_CPU_PCT) {
+		taskq_cpupct_ent_t *tpp = kmem_zalloc(sizeof (*tpp), KM_SLEEP);
+
+		list_link_init(&tpp->tp_link);
+		tpp->tp_taskq = tq;
+
+		mutex_enter(&taskq_cpupct_lock);
+		list_insert_tail(&taskq_cpupct_list, tpp);
+		/* reset our target, to avoid race conditions */
+		tq->tq_nthreads_target = TASKQ_THREADS_PCT(ncpus_online,
+		    tq->tq_threads_ncpus_pct);
+		mutex_exit(&taskq_cpupct_lock);
+	}
+
+	mutex_enter(&tq->tq_lock);
 	if (flags & TASKQ_PREPOPULATE) {
-		mutex_enter(&tq->tq_lock);
 		while (minalloc-- > 0)
 			taskq_ent_free(tq, taskq_ent_alloc(tq, TQ_SLEEP));
-		mutex_exit(&tq->tq_lock);
 	}
 
-	if (nthreads == 1) {
-		tq->tq_thread = thread_create(NULL, 0, taskq_thread, tq,
-		    0, &p0, TS_RUN, pri);
-		/*
-		 * No need to take thread_lock to change the field: no one can
-		 * reference it at this point.
-		 */
-		tq->tq_thread->t_taskq = tq;
-	} else {
-		kthread_t **tpp = kmem_alloc(sizeof (kthread_t *) * nthreads,
-		    KM_SLEEP);
-
-		tq->tq_threadlist = tpp;
-
-		mutex_enter(&tq->tq_lock);
-		while (nthreads-- > 0) {
-			*tpp = thread_create(NULL, 0, taskq_thread, tq,
-			    0, &p0, TS_RUN, pri);
-			(*tpp)->t_taskq = tq;
-			tpp++;
-		}
-		mutex_exit(&tq->tq_lock);
-	}
+	/* create the first thread; if more are needed, it'll create them */
+	taskq_thread_create(tq);
+	mutex_exit(&tq->tq_lock);
 
 	if (flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *bucket = kmem_zalloc(sizeof (taskq_bucket_t) *
@@ -1402,9 +1668,9 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 
 	if (flags & TASKQ_DYNAMIC) {
 		if ((tq->tq_kstat = kstat_create("unix", instance,
-			tq->tq_name, "taskq_d", KSTAT_TYPE_NAMED,
-			sizeof (taskq_d_kstat) / sizeof (kstat_named_t),
-			KSTAT_FLAG_VIRTUAL)) != NULL) {
+		    tq->tq_name, "taskq_d", KSTAT_TYPE_NAMED,
+		    sizeof (taskq_d_kstat) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL)) != NULL) {
 			tq->tq_kstat->ks_lock = &taskq_d_kstat_lock;
 			tq->tq_kstat->ks_data = &taskq_d_kstat;
 			tq->tq_kstat->ks_update = taskq_d_kstat_update;
@@ -1413,9 +1679,9 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 		}
 	} else {
 		if ((tq->tq_kstat = kstat_create("unix", instance, tq->tq_name,
-			"taskq", KSTAT_TYPE_NAMED,
-			sizeof (taskq_kstat) / sizeof (kstat_named_t),
-			KSTAT_FLAG_VIRTUAL)) != NULL) {
+		    "taskq", KSTAT_TYPE_NAMED,
+		    sizeof (taskq_kstat) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL)) != NULL) {
 			tq->tq_kstat->ks_lock = &taskq_kstat_lock;
 			tq->tq_kstat->ks_data = &taskq_kstat;
 			tq->tq_kstat->ks_update = taskq_kstat_update;
@@ -1459,6 +1725,26 @@ taskq_destroy(taskq_t *tq)
 	}
 
 	/*
+	 * Unregister from the cpupct list.
+	 */
+	if (tq->tq_flags & TASKQ_THREADS_CPU_PCT) {
+		taskq_cpupct_ent_t *tpp;
+
+		mutex_enter(&taskq_cpupct_lock);
+		for (tpp = list_head(&taskq_cpupct_list); tpp != NULL;
+		    tpp = list_next(&taskq_cpupct_list, tpp)) {
+			if (tpp->tp_taskq == tq)
+				break;
+		}
+		ASSERT3P(tpp, !=, NULL);
+
+		list_remove(&taskq_cpupct_list, tpp);
+		mutex_exit(&taskq_cpupct_lock);
+
+		kmem_free(tpp, sizeof (*tpp));
+	}
+
+	/*
 	 * Wait for any pending entries to complete.
 	 */
 	taskq_wait(tq);
@@ -1467,14 +1753,19 @@ taskq_destroy(taskq_t *tq)
 	ASSERT((tq->tq_task.tqent_next == &tq->tq_task) &&
 	    (tq->tq_active == 0));
 
-	if ((tq->tq_nthreads > 1) && (tq->tq_threadlist != NULL))
-		kmem_free(tq->tq_threadlist, sizeof (kthread_t *) *
-		    tq->tq_nthreads);
+	/* notify all the threads that they need to exit */
+	tq->tq_nthreads_target = 0;
 
-	tq->tq_flags &= ~TASKQ_ACTIVE;
+	tq->tq_flags |= TASKQ_CHANGING;
 	cv_broadcast(&tq->tq_dispatch_cv);
+	cv_broadcast(&tq->tq_exit_cv);
+
 	while (tq->tq_nthreads != 0)
 		cv_wait(&tq->tq_wait_cv, &tq->tq_lock);
+
+	if (tq->tq_nthreads_max != 1)
+		kmem_free(tq->tq_threadlist, sizeof (kthread_t *) *
+		    tq->tq_nthreads_max);
 
 	tq->tq_minalloc = 0;
 	while (tq->tq_nalloc != 0)
@@ -1524,6 +1815,7 @@ taskq_destroy(taskq_t *tq)
 		ASSERT(!(tq->tq_flags & TASKQ_DYNAMIC));
 	}
 
+	tq->tq_threads_ncpus_pct = 0;
 	tq->tq_totaltime = 0;
 	tq->tq_tasks = 0;
 	tq->tq_maxtasks = 0;

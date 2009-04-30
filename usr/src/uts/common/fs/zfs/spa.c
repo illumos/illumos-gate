@@ -67,15 +67,43 @@
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
 
-int zio_taskq_threads[ZIO_TYPES][ZIO_TASKQ_TYPES] = {
-	/*	ISSUE	INTR					*/
-	{	1,	1	},	/* ZIO_TYPE_NULL	*/
-	{	8,	8	},	/* ZIO_TYPE_READ	*/
-	{	8,	8	},	/* ZIO_TYPE_WRITE	*/
-	{	1,	1	},	/* ZIO_TYPE_FREE	*/
-	{	1,	1	},	/* ZIO_TYPE_CLAIM	*/
-	{	1,	1	},	/* ZIO_TYPE_IOCTL	*/
+enum zti_modes {
+	zti_mode_fixed,			/* value is # of threads (min 1) */
+	zti_mode_online_percent,	/* value is % of online CPUs */
+	zti_mode_tune,			/* fill from zio_taskq_tune_* */
+	zti_nmodes
 };
+
+#define	ZTI_THREAD_FIX(n)	{ zti_mode_fixed, (n) }
+#define	ZTI_THREAD_PCT(n)	{ zti_mode_online_percent, (n) }
+#define	ZTI_THREAD_TUNE		{ zti_mode_tune, 0 }
+
+#define	ZTI_THREAD_ONE		ZTI_THREAD_FIX(1)
+
+typedef struct zio_taskq_info {
+	const char *zti_name;
+	struct {
+		enum zti_modes zti_mode;
+		uint_t zti_value;
+	} zti_nthreads[ZIO_TASKQ_TYPES];
+} zio_taskq_info_t;
+
+static const char *const zio_taskq_types[ZIO_TASKQ_TYPES] = {
+				"issue",		"intr"
+};
+
+const zio_taskq_info_t zio_taskqs[ZIO_TYPES] = {
+	/*			ISSUE			INTR		*/
+	{ "spa_zio_null",	{ ZTI_THREAD_ONE,	ZTI_THREAD_ONE } },
+	{ "spa_zio_read",	{ ZTI_THREAD_FIX(8),	ZTI_THREAD_TUNE } },
+	{ "spa_zio_write",	{ ZTI_THREAD_TUNE,	ZTI_THREAD_FIX(8) } },
+	{ "spa_zio_free",	{ ZTI_THREAD_ONE,	ZTI_THREAD_ONE } },
+	{ "spa_zio_claim",	{ ZTI_THREAD_ONE,	ZTI_THREAD_ONE } },
+	{ "spa_zio_ioctl",	{ ZTI_THREAD_ONE,	ZTI_THREAD_ONE } },
+};
+
+enum zti_modes zio_taskq_tune_mode = zti_mode_online_percent;
+uint_t zio_taskq_tune_value = 80;	/* #threads = 80% of # online CPUs */
 
 static void spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx);
 static boolean_t spa_has_active_shared_spare(spa_t *spa);
@@ -545,10 +573,46 @@ spa_activate(spa_t *spa, int mode)
 	spa->spa_log_class = metaslab_class_create(zfs_metaslab_ops);
 
 	for (int t = 0; t < ZIO_TYPES; t++) {
+		const zio_taskq_info_t *ztip = &zio_taskqs[t];
 		for (int q = 0; q < ZIO_TASKQ_TYPES; q++) {
-			spa->spa_zio_taskq[t][q] = taskq_create("spa_zio",
-			    zio_taskq_threads[t][q], maxclsyspri, 50,
-			    INT_MAX, TASKQ_PREPOPULATE);
+			enum zti_modes mode = ztip->zti_nthreads[q].zti_mode;
+			uint_t value = ztip->zti_nthreads[q].zti_value;
+			char name[32];
+
+			(void) snprintf(name, sizeof (name),
+			    "%s_%s", ztip->zti_name, zio_taskq_types[q]);
+
+			if (mode == zti_mode_tune) {
+				mode = zio_taskq_tune_mode;
+				value = zio_taskq_tune_value;
+				if (mode == zti_mode_tune)
+					mode = zti_mode_online_percent;
+			}
+
+			switch (mode) {
+			case zti_mode_fixed:
+				ASSERT3U(value, >=, 1);
+				value = MAX(value, 1);
+
+				spa->spa_zio_taskq[t][q] = taskq_create(name,
+				    value, maxclsyspri, 50, INT_MAX,
+				    TASKQ_PREPOPULATE);
+				break;
+
+			case zti_mode_online_percent:
+				spa->spa_zio_taskq[t][q] = taskq_create(name,
+				    value, maxclsyspri, 50, INT_MAX,
+				    TASKQ_PREPOPULATE | TASKQ_THREADS_CPU_PCT);
+				break;
+
+			case zti_mode_tune:
+			default:
+				panic("unrecognized mode for "
+				    "zio_taskqs[%u]->zti_nthreads[%u] (%u:%u) "
+				    "in spa_activate()",
+				    t, q, mode, value);
+				break;
+			}
 		}
 	}
 

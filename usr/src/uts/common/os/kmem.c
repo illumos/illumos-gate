@@ -4063,6 +4063,8 @@ kmem_mp_init(void)
 	mutex_exit(&cpu_lock);
 
 	kmem_update_timeout(NULL);
+
+	taskq_mp_init();
 }
 
 /*
