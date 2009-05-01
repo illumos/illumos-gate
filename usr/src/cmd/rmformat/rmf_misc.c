@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,8 +188,8 @@ get_passwd(struct smwp_state *wp, int32_t confirm)
 	/* CONSTCOND */
 	while (1) {
 		(void) fputs(
-			gettext("Please enter password (32 chars maximum):"),
-				out);
+		    gettext("Please enter password (32 chars maximum):"),
+		    out);
 		(void) fflush(out);
 		buf = fgets(passwd, (size_t)256, in);
 		rewind(in);
@@ -202,7 +202,7 @@ get_passwd(struct smwp_state *wp, int32_t confirm)
 		len--;	/* To offset the \n */
 		if ((len <= 0) || (len > 32)) {
 			(void) fprintf(stderr,
-				gettext("Invalid length of password \n"));
+			    gettext("Invalid length of password \n"));
 			(void) fputs("Try again\n", out);
 			continue;
 		}
@@ -279,7 +279,7 @@ check_and_unmount_vold(char *device_name, int32_t flag)
 			return (0);
 	if (real_name[nl] == 'r') {
 		(void) snprintf(tmp_path_name, PATH_MAX, "%s%s", "/vol/dev/",
-			&real_name[nl + 1]);
+		    &real_name[nl + 1]);
 	} else {
 		(void) snprintf(tmp_path_name, PATH_MAX, "%s", real_name);
 	}
@@ -313,7 +313,7 @@ check_and_unmount_vold(char *device_name, int32_t flag)
 		/* Is it a probable entry? */
 		DPRINTF1(" %s \n", mntp->mnt_special);
 		if (strstr(mntp->mnt_special, tmp_path_name) !=
-			mntp->mnt_special) {
+		    mntp->mnt_special) {
 			/* Skip to next entry */
 			continue;
 		} else {
@@ -368,7 +368,7 @@ check_and_unmount_scsi(char *device_name, int32_t flag)
 		return (0);
 
 	(void) snprintf(block_dev_name, PATH_MAX, "/dev/%s",
-		&device_name[strlen("/dev/r")]);
+	    &device_name[strlen("/dev/r")]);
 	fp = fopen("/etc/mnttab", "r");
 
 	if (fp == NULL) {
@@ -437,10 +437,10 @@ check_and_unmount_scsi(char *device_name, int32_t flag)
 				    "%s%d:%d", tmp_name, i, j);
 
 				if (strcmp(mntp->mnt_special,
-					block_dev_name) == 0) {
+				    block_dev_name) == 0) {
 					if (flag) {
 						if (my_umount(mntp->mnt_mountp)
-									< 0) {
+						    < 0) {
 							(void) fclose(fp);
 							return (-1);
 						}
@@ -456,10 +456,10 @@ check_and_unmount_scsi(char *device_name, int32_t flag)
 				    "%s%d:%c", tmp_name, i, 'b' + j);
 
 				if (strcmp(mntp->mnt_special,
-					block_dev_name) == 0) {
+				    block_dev_name) == 0) {
 					if (flag) {
 						if (my_umount(mntp->mnt_mountp)
-									< 0) {
+						    < 0) {
 							(void) fclose(fp);
 							return (-1);
 						}
@@ -564,8 +564,8 @@ check_and_unmount_floppy(int32_t fd, int32_t flag)
 		 * If it's not the disk we're interested in, it doesn't apply.
 		 */
 		if (dkinfo.dki_ctype != dkinfo_tmp.dki_ctype ||
-			dkinfo.dki_cnum != dkinfo_tmp.dki_cnum ||
-			dkinfo.dki_unit != dkinfo_tmp.dki_unit) {
+		    dkinfo.dki_cnum != dkinfo_tmp.dki_cnum ||
+		    dkinfo.dki_unit != dkinfo_tmp.dki_unit) {
 				continue;
 		}
 		/*
@@ -639,7 +639,7 @@ my_open(char *device_name, int32_t flags)
 		 * We should not look into the directory contents here.
 		 */
 		if (strncmp(tmp_path_name, "/vol/dev/", strlen("/vol/dev/"))
-								!= 0) {
+		    != 0) {
 			(void) fprintf(stderr, gettext("The specified device \
 is not a raw device.\n"));
 			exit(1);
@@ -781,14 +781,14 @@ write_sunos_label(int32_t fd, int32_t media_type)
 
 		v_toc.v_part[0].p_start = 0;
 		v_toc.v_part[0].p_size = (fdchar.fdc_ncyl - 1) * 2 *
-			fdchar.fdc_secptrack * mult_factor;
+		    fdchar.fdc_secptrack * mult_factor;
 		v_toc.v_part[1].p_start = (fdchar.fdc_ncyl - 1) * 2 *
-			fdchar.fdc_secptrack * mult_factor;
+		    fdchar.fdc_secptrack * mult_factor;
 		v_toc.v_part[1].p_size = 2 * fdchar.fdc_secptrack * mult_factor;
 
 		v_toc.v_part[2].p_start = 0;
 		v_toc.v_part[2].p_size = fdchar.fdc_ncyl * 2 *
-			fdchar.fdc_secptrack * mult_factor;
+		    fdchar.fdc_secptrack * mult_factor;
 
 	} else if (media_type == SM_PCMCIA_MEM) {
 
@@ -812,7 +812,7 @@ write_sunos_label(int32_t fd, int32_t media_type)
 
 		v_toc.v_part[2].p_start = 0;
 		v_toc.v_part[2].p_size =  dkg.dkg_ncyl * dkg.dkg_nhead *
-			dkg.dkg_nsect;
+		    dkg.dkg_nsect;
 
 		/* v_nparts was 1 in fdformat. But write vtoc failes */
 		v_toc.v_nparts = 3;
@@ -931,7 +931,8 @@ intr_sig_handler()
 	    gettext("\nDo you want to stop formatting?(y/n)"));
 	(void) fflush(stdout);
 	rewind(stdin);
-	while ((c = getchar()) == -1);
+	while ((c = getchar()) == -1)
+		;
 	if (c == 'y' || c == 'Y') {
 		(void) fprintf(stderr, gettext("Format interrupted\n"));
 		exit(1);
@@ -982,7 +983,7 @@ verify(smedia_handle_t handle, int32_t fd, diskaddr_t start_sector,
 		(void) __priv_bracket(PRIV_ON);
 
 		ret = smedia_raw_read(handle, start_sector, buf, nblocks *
-			blocksize);
+		    blocksize);
 
 		/* Turn off the privileges. */
 		(void) __priv_bracket(PRIV_OFF);
@@ -997,7 +998,7 @@ verify(smedia_handle_t handle, int32_t fd, diskaddr_t start_sector,
 		(void) __priv_bracket(PRIV_ON);
 
 		ret = smedia_raw_write(handle, start_sector, buf, nblocks *
-			blocksize);
+		    blocksize);
 
 		/* Turn off the privileges. */
 		(void) __priv_bracket(PRIV_OFF);
@@ -1081,7 +1082,7 @@ my_umount(char *mountp)
 		(void) __priv_bracket(PRIV_ON);
 
 		if (execl("/usr/sbin/umount", "/usr/sbin/umount", mountp,
-			NULL) < 0) {
+		    NULL) < 0) {
 			perror("exec failed");
 			/* Turn off the privileges */
 			(void) __priv_bracket(PRIV_OFF);
@@ -1125,12 +1126,12 @@ my_volrmmount(char *real_name)
 		/* the child */
 		/* get rid of those nasty err messages */
 		DPRINTF1("call_unmount_prog: calling %s \n",
-					"/usr/bin/volrmmount");
+		    "/usr/bin/volrmmount");
 
 		/* Turn on the privileges. */
 		(void) __priv_bracket(PRIV_ON);
 		if (execl("/usr/bin/volrmmount", "/usr/bin/volrmmount", "-e",
-			real_name, NULL) < 0) {
+		    real_name, NULL) < 0) {
 			PERROR("volrmmount exec failed");
 			/* Turn off the privileges */
 			(void) __priv_bracket(PRIV_OFF);
@@ -1648,7 +1649,7 @@ vol_lookup(char *supplied, char *found)
 			*((char *)(strrchr(tmpstr, 'p') + 1)) = 0;
 			for (i = 0; i < 5; i++) {
 				(void) snprintf(tmpstr1, PATH_MAX, "%s%d",
-					tmpstr, i);
+				    tmpstr, i);
 				if ((p = volmgt_symname(tmpstr1)) != NULL)
 					break;
 			}
@@ -1929,7 +1930,7 @@ get_physical_name(char *path)
 	}
 	if (chdir(s) == -1) {
 		DPRINTF2("cannot chdir() to %s - %s\n",
-			s, strerror(errno));
+		    s, strerror(errno));
 		goto exit;
 	}
 
@@ -1969,7 +1970,7 @@ get_physical_name(char *path)
 				 */
 				if (getcwd(dir, sizeof (dir)) == NULL) {
 					DPRINTF1("getcwd() failed - %s\n",
-						strerror(errno));
+					    strerror(errno));
 					goto exit;
 				}
 				(void) strcat(dir, "/");
@@ -1979,7 +1980,7 @@ get_physical_name(char *path)
 				 * /devices prefix, remove it.
 				 */
 				p = (strstr(dir, DEVFS_PREFIX) == dir) ?
-					dir+strlen(DEVFS_PREFIX) : dir;
+				    dir+strlen(DEVFS_PREFIX) : dir;
 				result = alloc_string(p);
 			}
 			goto exit;
@@ -1987,7 +1988,7 @@ get_physical_name(char *path)
 		i = readlink(s, buf, sizeof (buf));
 		if (i == -1) {
 			DPRINTF2("%s: readlink() failed - %s\n",
-				s, strerror(errno));
+			    s, strerror(errno));
 			goto exit;
 		}
 		level++;
@@ -2004,7 +2005,7 @@ get_physical_name(char *path)
 			*p = 0;
 			if (chdir(dir) == -1) {
 				DPRINTF2("cannot chdir() to %s - %s\n",
-					dir, strerror(errno));
+				    dir, strerror(errno));
 				goto exit;
 			}
 			(void) strcpy(s, p+1);
@@ -2095,7 +2096,7 @@ get_media_info(device_t *t_dev, char *sdev, char *pname, char *sn)
 		return;
 	}
 
-	(void) fprintf(stderr, gettext("\tAccess permissions: "));
+	(void) fprintf(stdout, gettext("\tAccess permissions: "));
 	if (sn) {
 		/*
 		 * Set dev_name for process_p_flag().

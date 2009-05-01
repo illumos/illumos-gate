@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,7 +137,7 @@ process_options()
 	}
 
 	if (F_flag || w_flag || W_flag || R_flag || D_flag || H_flag ||
-		V_flag || c_flag || b_flag || s_flag || e_flag) {
+	    V_flag || c_flag || b_flag || s_flag || e_flag) {
 		umount_required = 1;
 	}
 
@@ -155,7 +155,7 @@ process_options()
 	}
 	if (!removable) {
 		(void) fprintf(stderr,
-			gettext("Not a removable media device\n"));
+		    gettext("Not a removable media device\n"));
 		(void) close(fd);
 		exit(1);
 	}
@@ -172,10 +172,10 @@ process_options()
 		v_device_umount = check_and_unmount_vold(dev_name, U_flag);
 		if (v_device_umount != 1) {
 			m_scsi_umount = check_and_unmount_scsi(dev_name,
-				U_flag);
+			    U_flag);
 			if (m_scsi_umount != 1) {
 				m_flp_umount = check_and_unmount_floppy(fd,
-					U_flag);
+				    U_flag);
 				if (m_flp_umount != 1) {
 					umount_failed = 1;
 				}
@@ -186,7 +186,7 @@ process_options()
 	if (umount_required && U_flag && umount_failed) {
 		if (v_device_umount || m_scsi_umount || m_flp_umount) {
 			(void) fprintf(stderr,
-				gettext("Could not unmount device.\n"));
+			    gettext("Could not unmount device.\n"));
 			(void) close(fd);
 			exit(1);
 		}
@@ -196,7 +196,7 @@ process_options()
 		if (v_device_umount || m_scsi_umount || m_flp_umount) {
 			(void) fprintf(stderr, gettext("Device mounted.\n"));
 			(void) fprintf(stderr,
-				gettext("Requested operation can not be \
+			    gettext("Requested operation can not be \
 performed on a mounted device.\n"));
 			(void) close(fd);
 			exit(1);
@@ -206,14 +206,14 @@ performed on a mounted device.\n"));
 	handle = smedia_get_handle(fd);
 	if (handle == NULL) {
 		(void) fprintf(stderr,
-			gettext("Failed to get libsmedia handle.\n"));
+		    gettext("Failed to get libsmedia handle.\n"));
 		(void) close(fd);
 		exit(1);
 	}
 
 	if (smedia_get_medium_property(handle, &med_info) < 0) {
 		(void) fprintf(stderr,
-			gettext("Get medium property failed \n"));
+		    gettext("Get medium property failed \n"));
 		(void) smedia_release_handle(handle);
 		(void) close(fd);
 		exit(1);
@@ -223,7 +223,7 @@ performed on a mounted device.\n"));
 	DPRINTF1("media block size %x\n", med_info.sm_blocksize);
 	DPRINTF1("media capacity %u\n", (uint32_t)med_info.sm_capacity);
 	DPRINTF3("media cyl %d head %d sect %d\n",
-		med_info.sm_pcyl, med_info.sm_nhead, med_info.sm_nsect);
+	    med_info.sm_pcyl, med_info.sm_nhead, med_info.sm_nsect);
 	check_invalid_combinations_again(med_info.sm_media_type);
 
 	/*
@@ -314,7 +314,7 @@ process_F_flag(smedia_handle_t handle, int32_t fd)
 
 	if (force_format) {
 		(void) fprintf(stderr,
-			gettext("Formatting disk.\n"));
+		    gettext("Formatting disk.\n"));
 	} else {
 		(void) fprintf(stderr,
 		    gettext("Formatting will erase all the data on disk.\n"));
@@ -333,8 +333,8 @@ process_F_flag(smedia_handle_t handle, int32_t fd)
 		format_flag = SM_FORMAT_HD;
 
 	if ((med_info.sm_media_type != SM_FLOPPY) &&
-		(med_info.sm_media_type != SM_PCMCIA_MEM) &&
-		(med_info.sm_media_type != SM_SCSI_FLOPPY)) {
+	    (med_info.sm_media_type != SM_PCMCIA_MEM) &&
+	    (med_info.sm_media_type != SM_SCSI_FLOPPY)) {
 		global_intr_msg = "Interrupting format may render the \
 medium useless";
 	} else {
@@ -386,8 +386,8 @@ scan may be used to get the effect of formatting.\n"));
 	}
 
 	if ((med_info.sm_media_type == SM_FLOPPY) ||
-		(med_info.sm_media_type == SM_PCMCIA_MEM) ||
-		(med_info.sm_media_type == SM_SCSI_FLOPPY)) {
+	    (med_info.sm_media_type == SM_PCMCIA_MEM) ||
+	    (med_info.sm_media_type == SM_SCSI_FLOPPY)) {
 		(void) write_sunos_label(fd, med_info.sm_media_type);
 	} else {
 
@@ -491,7 +491,7 @@ process_w_flag(smedia_handle_t handle)
 
 	if ((rval = smedia_get_protection_status((handle), &wps)) < 0) {
 		(void) fprintf(stderr,
-			gettext("Could not get medium status \n"));
+		    gettext("Could not get medium status \n"));
 		return;
 	}
 	med_status = wps.sm_new_state;
@@ -503,10 +503,10 @@ process_w_flag(smedia_handle_t handle)
 		switch (med_status) {
 			case SM_WRITE_PROTECT_DISABLE  :
 				wps.sm_new_state =
-				SM_WRITE_PROTECT_NOPASSWD;
+				    SM_WRITE_PROTECT_NOPASSWD;
 				wps.sm_passwd_len = 0;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1)
 					PERROR(WP_ERROR);
 				break;
@@ -520,7 +520,7 @@ process_w_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_2));
 				break;
 			case SM_STATUS_UNKNOWN :
-			    default :
+				default :
 				(void) fprintf(stderr, gettext(WP_UNKNOWN));
 				break;
 		}
@@ -528,10 +528,10 @@ process_w_flag(smedia_handle_t handle)
 		switch (med_status) {
 			case SM_WRITE_PROTECT_NOPASSWD :
 				wps.sm_new_state =
-				SM_WRITE_PROTECT_DISABLE;
+				    SM_WRITE_PROTECT_DISABLE;
 				wps.sm_passwd_len = 0;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1)
 					PERROR(WP_ERROR);
 				break;
@@ -545,7 +545,7 @@ process_w_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_2));
 				break;
 			case SM_STATUS_UNKNOWN :
-			    default :
+				default :
 				(void) fprintf(stderr, gettext(WP_UNKNOWN));
 				break;
 		}
@@ -563,7 +563,7 @@ process_W_flag(smedia_handle_t handle)
 
 	if ((rval = smedia_get_protection_status((handle), &wps)) < 0) {
 		(void) fprintf(stderr,
-			gettext("Could not get medium status \n"));
+		    gettext("Could not get medium status \n"));
 		return;
 	}
 	med_status = wps.sm_new_state;
@@ -573,13 +573,13 @@ process_W_flag(smedia_handle_t handle)
 	if (wp_enable_passwd) {	/* Enable write protect  */
 		switch (med_status) {
 			case SM_WRITE_PROTECT_DISABLE  :
-			    case SM_WRITE_PROTECT_NOPASSWD :
+			case SM_WRITE_PROTECT_NOPASSWD :
 				DPRINTF("Getting passwd\n");
 				get_passwd(&wps, 1);
 				wps.sm_new_state =
-					SM_WRITE_PROTECT_PASSWD;
+				    SM_WRITE_PROTECT_PASSWD;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1) {
 					PERROR(WP_ERROR);
 				}
@@ -589,13 +589,13 @@ process_W_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_5));
 				get_passwd(&wps, 0);
 				wps.sm_new_state =
-					SM_WRITE_PROTECT_PASSWD;
+				    SM_WRITE_PROTECT_PASSWD;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1) {
 					if (errno == EACCES) {
 						(void) fprintf(stderr,
-							gettext(WP_MSG_10));
+						    gettext(WP_MSG_10));
 					} else {
 						PERROR(WP_ERROR);
 					}
@@ -605,9 +605,9 @@ process_W_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_6));
 				break;
 			case SM_STATUS_UNKNOWN :
-			    default :
+				default :
 				(void) fprintf(stderr,
-				gettext(WP_UNKNOWN));
+				    gettext(WP_UNKNOWN));
 				break;
 		}
 	} else if (wp_disable_passwd) {
@@ -615,13 +615,13 @@ process_W_flag(smedia_handle_t handle)
 			case SM_WRITE_PROTECT_PASSWD :
 				get_passwd(&wps, 0);
 				wps.sm_new_state =
-					SM_WRITE_PROTECT_DISABLE;
+				    SM_WRITE_PROTECT_DISABLE;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1) {
 					if (errno == EACCES) {
 						(void) fprintf(stderr,
-							gettext(WP_MSG_10));
+						    gettext(WP_MSG_10));
 					} else {
 						PERROR(WP_ERROR);
 					}
@@ -637,7 +637,7 @@ process_W_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_3));
 				break;
 			case SM_STATUS_UNKNOWN :
-			    default :
+				default :
 				(void) fprintf(stderr, gettext(WP_UNKNOWN));
 				break;
 		}
@@ -655,7 +655,7 @@ process_R_flag(smedia_handle_t handle)
 
 	if ((rval = smedia_get_protection_status((handle), &wps)) < 0) {
 		(void) fprintf(stderr,
-			gettext("Could not get medium status \n"));
+		    gettext("Could not get medium status \n"));
 		return;
 	}
 	med_status = wps.sm_new_state;
@@ -665,13 +665,13 @@ process_R_flag(smedia_handle_t handle)
 	if (rw_protect_enable) {	/* Enable write protect  */
 		switch (med_status) {
 			case SM_WRITE_PROTECT_DISABLE  :
-			    case SM_WRITE_PROTECT_NOPASSWD :
+			case SM_WRITE_PROTECT_NOPASSWD :
 				DPRINTF("Getting passwd\n");
 				get_passwd(&wps, 1);
 				wps.sm_new_state =
-					SM_READ_WRITE_PROTECT;
+				    SM_READ_WRITE_PROTECT;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1)
 					PERROR(WP_ERROR);
 				break;
@@ -680,13 +680,13 @@ process_R_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_9));
 				get_passwd(&wps, 0);
 				wps.sm_new_state =
-					SM_READ_WRITE_PROTECT;
+				    SM_READ_WRITE_PROTECT;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1) {
 					if (errno == EACCES) {
 						(void) fprintf(stderr,
-							gettext(WP_MSG_10));
+						    gettext(WP_MSG_10));
 					} else {
 						PERROR(WP_ERROR);
 					}
@@ -696,23 +696,23 @@ process_R_flag(smedia_handle_t handle)
 				(void) fprintf(stderr, gettext(WP_MSG_4));
 				break;
 			case SM_STATUS_UNKNOWN :
-			    default :
+				default :
 				(void) fprintf(stderr, gettext(WP_UNKNOWN));
 				break;
 		}
 	} else if (rw_protect_disable) {
 		switch (med_status) {
 			case SM_READ_WRITE_PROTECT :
-			    case SM_STATUS_UNKNOWN :
+			case SM_STATUS_UNKNOWN :
 				get_passwd(&wps, 0);
 				wps.sm_new_state =
-					SM_WRITE_PROTECT_DISABLE;
+				    SM_WRITE_PROTECT_DISABLE;
 				rval = smedia_set_protection_status(handle,
-					&wps);
+				    &wps);
 				if (rval == -1) {
 					if (errno == EACCES) {
 						(void) fprintf(stderr,
-							gettext(WP_MSG_10));
+						    gettext(WP_MSG_10));
 					} else {
 						PERROR(WP_ERROR);
 					}
@@ -765,7 +765,7 @@ process_p_flag(smedia_handle_t handle, int32_t fd)
 				(void) close(fd);
 				exit(1);
 			} else {
-				(void) fprintf(stderr,
+				(void) fprintf(stdout,
 				    gettext("<Unknown>\n"));
 				(void) smedia_release_handle(handle);
 				(void) close(fd);
@@ -773,12 +773,12 @@ process_p_flag(smedia_handle_t handle, int32_t fd)
 			}
 			fd = my_open(dev_name, O_RDWR|O_NDELAY);
 			if (fd < 0)  {
-				(void) fprintf(stderr,
+				(void) fprintf(stdout,
 				gettext("Medium is write protected.\n"));
 			}
 		} else { /* Open succeeded */
-			(void) fprintf(stderr,
-				gettext("Medium is not write protected.\n"));
+			(void) fprintf(stdout,
+			    gettext("Medium is not write protected.\n"));
 		}
 		return;
 	}
@@ -786,25 +786,25 @@ process_p_flag(smedia_handle_t handle, int32_t fd)
 	switch (med_status) {
 
 		case SM_READ_WRITE_PROTECT :
-			(void) fprintf(stderr,
+			(void) fprintf(stdout,
 			gettext("Medium is read-write protected.\n"));
 			break;
 		case SM_WRITE_PROTECT_PASSWD :
-			(void) fprintf(stderr,
+			(void) fprintf(stdout,
 			gettext("Medium is write protected with password.\n"));
 			break;
 		case SM_WRITE_PROTECT_NOPASSWD :
-			(void) fprintf(stderr,
+			(void) fprintf(stdout,
 			gettext("Medium is write protected.\n"));
 			break;
 		case SM_WRITE_PROTECT_DISABLE  :
-			(void) fprintf(stderr,
+			(void) fprintf(stdout,
 			gettext("Medium is not write protected.\n"));
 			break;
 		case SM_STATUS_UNKNOWN :
 			default:
-			(void) fprintf(stderr,
-				gettext("Unknown write protect status.\n"));
+			(void) fprintf(stdout,
+			    gettext("Unknown write protect status.\n"));
 			break;
 	}
 }
@@ -1057,14 +1057,14 @@ process_H_flag(smedia_handle_t handle, int32_t fd)
 	int32_t new_per;
 
 	(void) fprintf(stderr,
-		gettext("Formatting will erase all the data on disk.\n"));
+	    gettext("Formatting will erase all the data on disk.\n"));
 	if (!get_confirmation())
 		return;
 
 	for (cyl = 0; cyl < med_info.sm_pcyl; cyl++) {
 		for (head = 0; head < med_info.sm_nhead; head++) {
 			if (smedia_format_track(handle, cyl, head, SM_FORMAT_HD)
-									< 0) {
+			    < 0) {
 					PERROR("Format failed");
 					return;
 			}
@@ -1088,13 +1088,13 @@ process_D_flag(smedia_handle_t handle, int32_t fd)
 	int32_t new_per;
 
 	(void) fprintf(stderr,
-		gettext("Formatting will erase all the data on disk.\n"));
+	    gettext("Formatting will erase all the data on disk.\n"));
 	if (!get_confirmation())
 		return;
 	for (cyl = 0; cyl < med_info.sm_pcyl; cyl++) {
 		for (head = 0; head < med_info.sm_nhead; head++) {
 			if (smedia_format_track(handle, cyl, head, SM_FORMAT_DD)
-									< 0) {
+			    < 0) {
 					PERROR("Format failed");
 					return;
 			}
@@ -1136,21 +1136,21 @@ process_b_flag(int32_t fd)
 			}
 		}
 		for (nparts = 0; nparts < vtoc64->efi_nparts;
-			nparts++) {
-		    if (vtoc64->efi_parts[nparts].p_tag ==
-			V_RESERVED) {
+		    nparts++) {
+			if (vtoc64->efi_parts[nparts].p_tag ==
+			    V_RESERVED) {
 			if (vtoc64->efi_parts[nparts].p_name) {
 				(void) strncpy(
 				    vtoc64->efi_parts[nparts].p_name, label,
 				    EFI_PART_NAME_LEN);
 			}
 			break;
-		    }
+		}
 		}
 		if (efi_write(fd, vtoc64) != 0) {
 			(void) efi_err_check(vtoc64);
 			(void) fprintf(stderr,
-				    gettext("Could not write label.\n"));
+			    gettext("Could not write label.\n"));
 		}
 		return;
 	}
