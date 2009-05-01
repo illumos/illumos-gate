@@ -1224,7 +1224,7 @@ usb_ac_feature_unit_check(usb_ac_state_t *uacp, uint_t featureID,
 static int
 usb_ac_handle_descriptors(usb_ac_state_t *uacp)
 {
-	int			rest, len, index;
+	int			len, index;
 	int			rval = USB_FAILURE;
 	usb_audio_cs_if_descr_t descr;
 	usb_client_dev_data_t	*dev_data = uacp->usb_ac_dev_data;
@@ -1288,10 +1288,9 @@ usb_ac_handle_descriptors(usb_ac_state_t *uacp)
 	 * we read descriptors by index and store them in ID array.
 	 * the actual parsing is done in usb_ac_add_unit_descriptor()
 	 */
-	rest = descr.wTotalLength - descr.bLength;
-	for (index++; rest > 0; index++) {
+	for (index++; index < altif_data->altif_n_cvs; index++) {
 		USB_DPRINTF_L3(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
-		    "index=%d rest=%d", index, rest);
+		    "index=%d", index);
 
 		cvs = &altif_data->altif_cvs[index];
 		if (cvs->cvs_buf == NULL) {
@@ -1301,7 +1300,6 @@ usb_ac_handle_descriptors(usb_ac_state_t *uacp)
 		/* add to ID array */
 		usb_ac_add_unit_descriptor(uacp, cvs->cvs_buf,
 		    cvs->cvs_buf_len);
-		rest -= cvs->cvs_buf[0];
 	}
 	rval = USB_SUCCESS;
 
