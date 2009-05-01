@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1032,13 +1032,6 @@ generic_disk_sense(
 		 * is zero, we think the inquiry of page 3 and page 4 failed.
 		 * We will set the geometry infomation by ourselves.
 		 */
-		err_print("\nThe device does not support mode page 3 "
-		    "or page 4,");
-		err_print("\nor the reported geometry info is invalid.");
-		err_print("\nWARNING: Disk geometry is based on "
-		    "capacity data.\n\n");
-
-		/* convert capacity to nsect * nhead * pcyl */
 		compute_chs_values(tblocks, nblocks, &pcyl, &nhead, &nsect);
 	}
 
