@@ -270,8 +270,6 @@ server_destroy(void *arg)
 	(void) mutex_unlock(&create_lock);
 }
 
-static void		client_killserver();
-
 int
 main(int argc, char ** argv)
 {
@@ -284,6 +282,7 @@ main(int argc, char ** argv)
 	struct stat		buf;
 	sigset_t		myset;
 	struct sigaction	sighupaction;
+	static void		client_killserver();
 	int			debug_level = 0;
 
 	/* setup for localization */

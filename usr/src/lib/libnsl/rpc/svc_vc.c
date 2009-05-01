@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,8 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Server side for Connection Oriented RPC.
@@ -662,8 +664,6 @@ svc_fd_xprtcopy(SVCXPRT *parent)
 	return (xprt);
 }
 
-static void do_accept();
-
 /*
  * This routine is called by svc_getreqset(), when a packet is recd.
  * The listener process creates another end point on which the actual
@@ -679,6 +679,7 @@ rendezvous_request(SVCXPRT *xprt, struct rpc_msg *msg)
 	struct cf_rendezvous *r;
 	char *tpname = NULL;
 	char devbuf[256];
+	static void do_accept();
 
 /* LINTED pointer alignment */
 	r = (struct cf_rendezvous *)xprt->xp_p1;

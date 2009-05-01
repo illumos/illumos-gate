@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,9 +24,11 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include "uucp.h"
@@ -77,12 +80,12 @@ static char *Mytype = CNULL;	/* to force selection of specific device type */
  * When a failure occurs, Uerror is set.
  */
 
-static void sysreset(void);
 static int
 conn(char *system)
 {
 	int nf, fn = FAIL;
 	char *flds[F_MAX+1];
+	static void sysreset(void);
 
 	CDEBUG(4, "conn(%s)\n", system);
 	Uerror = 0;
@@ -93,7 +96,7 @@ conn(char *system)
 			continue;
 		if (EQUALS(Progname, "uucico")) {
 			if (chat(nf - F_LOGIN, flds + F_LOGIN, fn, "", "") ==
-			    SUCCESS) {
+								SUCCESS) {
 				sysreset();
 				return (fn); /* successful return */
 			}
@@ -118,8 +121,6 @@ conn(char *system)
 	return (FAIL);
 }
 
-static void devreset(void);
-
 /*
  * getto - connect to remote machine
  *
@@ -136,12 +137,13 @@ getto(char *flds[])
 	int dcf = -1;
 	int reread = 0;
 	int tries = 0;	/* count of call attempts - for limit purposes */
+	static void devreset(void);
 
 	CDEBUG(1, "Device Type %s wanted\n", flds[F_TYPE]);
 	Uerror = 0;
 	while (tries < TRYCALLS) {
 		if ((status = rddev(flds[F_TYPE], dev, devbuf, D_MAX)) ==
-		    FAIL) {
+								FAIL) {
 			if (tries == 0 || ++reread >= TRYCALLS)
 				break;
 			devreset();
@@ -191,7 +193,7 @@ classmatch(char *flds[], char *dev[])
 		dev[D_CLASS] = flds[F_CLASS];
 		return (SUCCESS);
 	} else if (EQUALS(flds[F_CLASS], "Any") ||
-	    EQUALS(flds[F_CLASS], dev[D_CLASS]))
+					EQUALS(flds[F_CLASS], dev[D_CLASS]))
 		return (SUCCESS);
 	else
 		return (FAIL);
@@ -215,7 +217,7 @@ rddev(char *type, char *dev[], char *buf, int devcount)
 
 	while (getdevline(buf, BUFSIZ)) {
 		if (buf[0] == ' ' || buf[0] == '\t' || buf[0] == '\n' ||
-		    buf[0] == '\0' || buf[0] == '#')
+					buf[0] == '\0' || buf[0] == '#')
 			continue;
 		na = getargs(buf, dev, devcount);
 		ASSERT(na >= D_CALLER, "BAD LINE", buf, na);
@@ -312,7 +314,7 @@ finds(char *sysnam, char *flds[], int fldcount)
 			continue;
 		/* check if requested Mytype device type */
 		if ((Mytype != CNULL) &&
-		    (!EQUALSN(flds[F_TYPE], Mytype, strlen(Mytype)))) {
+			    (!EQUALSN(flds[F_TYPE], Mytype, strlen(Mytype)))) {
 			DEBUG(7, "Skipping entry in '%s'", currsys());
 			DEBUG(7, " - type (%s) not wanted.\n", flds[F_TYPE]);
 			continue;
@@ -553,8 +555,8 @@ wait_for_hangup(int dcf)
 	CDEBUG(4, "Received hangup\n%s", "");
 
 	if (clear_hup(dcf) != SUCCESS) {
-		CDEBUG(4, "Unable to clear hup on device\n%s", "");
-		return (FAIL);
+	    CDEBUG(4, "Unable to clear hup on device\n%s", "");
+	    return (FAIL);
 	}
 	return (SUCCESS);
 }
@@ -674,7 +676,7 @@ sendthem(char *str, int fn, char *phstr1, char *phstr2)
 			case 'm':	/* no modem control - clear CLOCAL */
 				FLUSH();
 				CDEBUG(5, ")\n%s CLOCAL ",
-				    (*sptr == 'M' ? "set" : "clear"));
+					(*sptr == 'M' ? "set" : "clear"));
 				if ((*Ioctl)(fn, TCGETA, &ttybuf) != 0) {
 					/*EMPTY*/
 					CDEBUG(5,
@@ -874,7 +876,7 @@ ifdate(char *s)
 				s++;
 
 			if ((sscanf(s, "%d-%d", &t__low, &t__high) < 2) ||
-			    (t__low == t__high))
+							(t__low == t__high))
 				return (1);
 
 			/* 0000 crossover? */

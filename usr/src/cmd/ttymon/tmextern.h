@@ -26,10 +26,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#ifndef	_TMEXTERN_H
-#define	_TMEXTERN_H
 
-#include "tmstruct.h"
+#ifndef	__TMEXTERN_H
+#define	__TMEXTERN_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -175,4 +174,4 @@ extern "C" {
 }
 #endif
 
-#endif	/* _TMEXTERN_H */
+#endif	/* __TMEXTERN_H */

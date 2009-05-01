@@ -591,14 +591,13 @@ pm_init_locks(void)
 	cv_init(&pm_dep_thread_cv, NULL, CV_DEFAULT, NULL);
 }
 
-static int pm_reset_timestamps(dev_info_t *, void *);
-
 static boolean_t
 pm_cpr_callb(void *arg, int code)
 {
 	_NOTE(ARGUNUSED(arg))
 	static int auto_save;
 	static pm_cpupm_t cpupm_save;
+	static int pm_reset_timestamps(dev_info_t *, void *);
 
 	switch (code) {
 	case CB_CODE_CPR_CHKPT:
@@ -665,8 +664,6 @@ pm_halt_callb(void *arg, int code)
 	return (B_TRUE);
 }
 
-static void pm_dep_thread(void);
-
 /*
  * This needs to be called after the root and platform drivers are loaded
  * and be single-threaded with respect to driver attach/detach
@@ -677,6 +674,7 @@ pm_init(void)
 	PMD_FUNC(pmf, "pm_init")
 	char **mod;
 	extern pri_t minclsyspri;
+	static void pm_dep_thread(void);
 
 	pm_comps_notlowest = 0;
 	pm_system_idle_threshold = pm_default_idle_threshold;
@@ -849,7 +847,6 @@ e_pm_valid_power(dev_info_t *dip, int cmpt, int level)
 	return (0);
 }
 
-static int pm_start(dev_info_t *dip);
 /*
  * Returns true if device is pm'd (after calling pm_start if need be)
  */
@@ -857,6 +854,7 @@ int
 e_pm_valid_info(dev_info_t *dip, pm_info_t **infop)
 {
 	pm_info_t *info;
+	static int pm_start(dev_info_t *dip);
 
 	/*
 	 * Check if the device is power managed if not.
@@ -1173,9 +1171,6 @@ pm_noinvol(dev_info_t *dip)
 	return (DEVI(dip)->devi_pm_noinvolpm != DEVI(dip)->devi_pm_volpmd);
 }
 
-static int	cur_threshold(dev_info_t *, int);
-static int	pm_next_lower_power(pm_component_t *, int);
-
 /*
  * This function performs the actual scanning of the device.
  * It attempts to power off the indicated device's components if they have
@@ -1198,6 +1193,8 @@ pm_scan_dev(dev_info_t *dip)
 	pm_component_t	 *cp;
 	dev_info_t	*pdip = ddi_get_parent(dip);
 	int		circ;
+	static int	cur_threshold(dev_info_t *, int);
+	static int	pm_next_lower_power(pm_component_t *, int);
 	clock_t		min_scan = pm_default_min_scan;
 
 	/*
@@ -2457,8 +2454,6 @@ e_pm_set_cur_pwr(dev_info_t *dip, pm_component_t *cp, int level)
 	cp->pmc_cur_pwr = pm_level_to_index(dip, cp, level);
 }
 
-static int pm_phc_impl(dev_info_t *, int, int, int);
-
 /*
  * This is the default method of setting the power of a device if no ppm
  * driver has claimed it.
@@ -2472,6 +2467,7 @@ pm_power(dev_info_t *dip, int comp, int level)
 	struct pm_component *cp = PM_CP(dip, comp);
 	int retval;
 	pm_info_t *info = PM_GET_PM_INFO(dip);
+	static int pm_phc_impl(dev_info_t *, int, int, int);
 
 	PMD(PMD_KIDSUP, ("%s: %s@%s(%s#%d), comp=%d, level=%d\n", pmf,
 	    PM_DEVICE(dip), comp, level))
@@ -2926,8 +2922,6 @@ pm_watchers()
 	return (pm_pscc_direct || pm_pscc_interest);
 }
 
-static int pm_phc_impl(dev_info_t *, int, int, int);
-
 /*
  * A driver is reporting that the power of one of its device's components
  * has changed.  Update the power state accordingly.
@@ -2940,6 +2934,7 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 	dev_info_t *pdip = ddi_get_parent(dip);
 	struct pm_component *cp;
 	int blocked, circ, pcirc, old_level;
+	static int pm_phc_impl(dev_info_t *, int, int, int);
 
 	if (level < 0) {
 		PMD(PMD_FAIL, ("%s: %s@%s(%s#%d): bad level=%d\n", pmf,
@@ -3760,8 +3755,6 @@ pm_all_at_normal(dev_info_t *dip)
 	return (1);
 }
 
-static void bring_pmdep_up(dev_info_t *, int);
-
 static void
 bring_wekeeps_up(char *keeper)
 {
@@ -3771,6 +3764,7 @@ bring_wekeeps_up(char *keeper)
 	pm_info_t *wku_info;
 	char *kept_path;
 	dev_info_t *kept;
+	static void bring_pmdep_up(dev_info_t *, int);
 
 	if (panicstr) {
 		return;
@@ -5565,8 +5559,6 @@ pm_interest_registered(int clone)
 	return (pm_interest[clone]);
 }
 
-static void pm_enqueue_pscc(pscc_t *, pscc_t **);
-
 /*
  * Process with clone has just done PM_DIRECT_PM on dip, or has asked to
  * watch all state transitions (dip == NULL).  Set up data
@@ -5577,6 +5569,7 @@ pm_register_watcher(int clone, dev_info_t *dip)
 {
 	pscc_t	*p;
 	psce_t	*psce;
+	static void pm_enqueue_pscc(pscc_t *, pscc_t **);
 
 	/*
 	 * We definitely need a control struct, then we have to search to see
@@ -5788,13 +5781,13 @@ pm_psc_find_clone(int clone, pscc_t **list, krwlock_t *lock)
 	return (NULL);
 }
 
-static psce_t *pm_psc_find_clone(int, pscc_t **, krwlock_t *);
 /*
  * Find an entry for a particular clone in the direct list.
  */
 psce_t *
 pm_psc_clone_to_direct(int clone)
 {
+	static psce_t *pm_psc_find_clone(int, pscc_t **, krwlock_t *);
 	return (pm_psc_find_clone(clone, &pm_pscc_direct,
 	    &pm_pscc_direct_rwlock));
 }
@@ -5805,6 +5798,7 @@ pm_psc_clone_to_direct(int clone)
 psce_t *
 pm_psc_clone_to_interest(int clone)
 {
+	static psce_t *pm_psc_find_clone(int, pscc_t **, krwlock_t *);
 	return (pm_psc_find_clone(clone, &pm_pscc_interest,
 	    &pm_pscc_interest_rwlock));
 }
@@ -7866,8 +7860,6 @@ pm_cfb_trigger(void)
 	ddi_trigger_softintr(pm_soft_id);
 }
 
-static major_t i_path_to_major(char *, char *);
-
 major_t
 pm_path_to_major(char *path)
 {
@@ -7875,6 +7867,7 @@ pm_path_to_major(char *path)
 	char *np, *ap, *bp;
 	major_t ret;
 	size_t len;
+	static major_t i_path_to_major(char *, char *);
 
 	PMD(PMD_NOINVOL, ("%s: %s\n", pmf, path))
 
@@ -8095,8 +8088,6 @@ i_path_to_major(char *path, char *leaf_name)
 	return (maj);
 }
 
-static void i_pm_driver_removed(major_t major);
-
 /*
  * When user calls rem_drv, we need to forget no-involuntary-power-cycles state
  * An entry in the list means that the device is detached, so we need to
@@ -8106,6 +8097,7 @@ static void i_pm_driver_removed(major_t major);
 void
 pm_driver_removed(major_t major)
 {
+	static void i_pm_driver_removed(major_t major);
 
 	/*
 	 * Serialize removal of drivers. This is to keep ancestors of
@@ -8117,10 +8109,6 @@ pm_driver_removed(major_t major)
 	mutex_exit(&pm_remdrv_lock);
 }
 
-static void adjust_ancestors(char *, int);
-static int pm_is_noinvol_ancestor(pm_noinvol_t *);
-static void pm_noinvol_process_ancestors(char *);
-
 /*
  * This routine is called recursively by pm_noinvol_process_ancestors()
  */
@@ -8128,6 +8116,9 @@ static void
 i_pm_driver_removed(major_t major)
 {
 	PMD_FUNC(pmf, "driver_removed")
+	static void adjust_ancestors(char *, int);
+	static int pm_is_noinvol_ancestor(pm_noinvol_t *);
+	static void pm_noinvol_process_ancestors(char *);
 	pm_noinvol_t *ip, *pp = NULL;
 	int wasvolpmd;
 	ASSERT(major != DDI_MAJOR_T_NONE);

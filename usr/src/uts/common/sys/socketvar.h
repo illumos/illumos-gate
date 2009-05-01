@@ -55,10 +55,6 @@
 #include <sys/ksocket.h>
 #include <sys/kstat.h>
 
-#ifdef _KERNEL
-#include <sys/vfs_opreg.h>
-#endif
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

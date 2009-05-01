@@ -19,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  PCMCIA User Daemon
@@ -1302,7 +1304,6 @@ setup_autopush(char *driver)
 
 static void unmount_media(long, char *);
 static void signal_vold(long, char *);
-static void makepdir();
 int volmgt_running();
 char *media_findname(char *);
 
@@ -1314,6 +1315,7 @@ char *media_findname(char *);
 static void
 meminit()
 {
+	static void makepdir();
 
 #ifndef	lint
 	mutex_lock(&meminit_lock);
@@ -1577,7 +1579,6 @@ get_devrdsk(long socket, char *path, char *device_type)
 	return (found ? namebuf : NULL);
 }
 
-static void	start_unmount(char *, char *);
 /*
  * unmount_media - Unmount PCMCIA media file system
  *
@@ -1588,6 +1589,7 @@ static void	start_unmount(char *, char *);
 static void
 unmount_media(long socket, char *device_type)
 {
+	static void	start_unmount(char *, char *);
 	static FILE	*fp = NULL;
 	struct mnttab	mnt;
 	const char	*nvp;
@@ -1642,9 +1644,6 @@ out:
 	(void) fclose(fp);
 }
 
-static int	req_vold_umount(char *);
-static int	do_umount(char *);
-
 /*
  * start_unmount - Start to unmount mounting directory
  *
@@ -1654,6 +1653,8 @@ static int	do_umount(char *);
 static void
 start_unmount(char *mnt_special, char *mnt_mountp)
 {
+	static int	req_vold_umount(char *);
+	static int	do_umount(char *);
 	int		err = 0;
 
 	/*
@@ -1882,15 +1883,14 @@ dun:
 
 }
 
-static void		wr_to_pipe(char *, char *, int);
-static const char	*get_rdsk_path(char *);
-
 /*
  * signal_vold - tell vold that a new path has been added
  */
 static void
 signal_vold(long socket, char *device)
 {
+	static void		wr_to_pipe(char *, char *, int);
+	static const char	*get_rdsk_path(char *);
 	const char		*rpath;
 
 

@@ -22,14 +22,14 @@
  * High Sierra filesystem internal routine definitions.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_HSFS_IMPL_H
 #define	_SYS_FS_HSFS_IMPL_H
 
-#include <sys/vfs_opreg.h>
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {

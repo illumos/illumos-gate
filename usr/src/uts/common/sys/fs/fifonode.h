@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,9 +30,7 @@
 #ifndef	_SYS_FS_FIFONODE_H
 #define	_SYS_FS_FIFONODE_H
 
-#if defined(_KERNEL)
-#include <sys/vfs_opreg.h>
-#endif
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.15	*/
 
 #ifdef	__cplusplus
 extern "C" {

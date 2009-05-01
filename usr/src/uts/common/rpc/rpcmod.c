@@ -562,7 +562,6 @@ rmm_close(queue_t *q, int flag, cred_t *crp)
 	return ((*((struct temp_slot *)q->q_ptr)->ops->xo_close)(q, flag, crp));
 }
 
-static void rpcmod_release(queue_t *, mblk_t *);
 /*
  * rpcmodopen -	open routine gets called when the module gets pushed
  *		onto the stream.
@@ -574,6 +573,7 @@ rpcmodopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	struct rpcm *rmp;
 
 	extern void (*rpc_rele)(queue_t *, mblk_t *);
+	static void rpcmod_release(queue_t *, mblk_t *);
 
 	TRACE_0(TR_FAC_KRPC, TR_RPCMODOPEN_START, "rpcmodopen_start:");
 

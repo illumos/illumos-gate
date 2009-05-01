@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -746,9 +746,6 @@ err_bydom:
 }
 
 
-static int	ppm_manage_sx(s3a_t *, int);
-static int	ppm_search_list(pm_searchargs_t *);
-
 /*
  * interface between pm framework and ppm driver
  */
@@ -765,6 +762,8 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	ppm_owned_t	*owned;
 	int		mode;
 	int		ret = DDI_SUCCESS;
+	static int	ppm_manage_sx(s3a_t *, int);
+	static int	ppm_search_list(pm_searchargs_t *);
 	int 		*res = (int *)result;
 	s3a_t s3args;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,6 +15,8 @@
  * is provided ``as is'' without express or implied warranty.
  *
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -222,8 +224,6 @@ getanswer(answer, anslen, iquery)
 	}
 }
 
-static struct hostent *_gethtbyname();
-
 struct hostent *
 res_gethostbyname(name)
 	char *name;
@@ -232,6 +232,7 @@ res_gethostbyname(name)
 	register char *cp;
 	int n;
 	struct hostent *hp, *gethostdomain();
+	static struct hostent *_gethtbyname();
 
 	/*
 	 * disallow names consisting only of digits/dots, unless
@@ -262,8 +263,6 @@ res_gethostbyname(name)
 	return (getanswer(&buf, n, 0));
 }
 
-static struct hostent *_gethtbyaddr();
-
 static struct hostent *
 _getrhbyaddr(addr, len, type)
 	char *addr;
@@ -273,6 +272,7 @@ _getrhbyaddr(addr, len, type)
 	querybuf buf;
 	register struct hostent *hp;
 	char qbuf[MAXDNAME];
+	static struct hostent *_gethtbyaddr();
 
 	if (type != AF_INET)
 		return ((struct hostent *) NULL);

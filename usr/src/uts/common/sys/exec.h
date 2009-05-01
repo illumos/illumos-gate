@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,9 @@ typedef struct execenv {
 #define	LOADABLE_EXEC(e)	((e)->exec_lock)
 #define	LOADED_EXEC(e)		((e)->exec_func)
 
+extern int nexectype;		/* number of elements in execsw */
+extern struct execsw execsw[];
+extern kmutex_t execsw_lock;
 
 /*
  * User argument structure for passing exec information around between the
@@ -179,10 +182,6 @@ struct execsw {
 		    core_content_t content);
 	krwlock_t	*exec_lock;
 };
-
-extern int nexectype;		/* number of elements in execsw */
-extern struct execsw execsw[];
-extern kmutex_t execsw_lock;
 
 extern short elfmagic;
 extern short intpmagic;

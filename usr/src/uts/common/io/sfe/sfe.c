@@ -31,10 +31,6 @@
  * DAMAGE.
  */
 
-/* Avoid undefined symbol for non IA architectures */
-#pragma weak	inb
-#pragma weak	outb
-
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -417,6 +413,10 @@ sfe_search_pci_dev(int vendor_id, int device_id)
 {
 	return (sfe_search_pci_dev_subr(ddi_root_node(), vendor_id, device_id));
 }
+
+/* Avoid undefined symbol for non IA architectures */
+#pragma weak	inb
+#pragma weak	outb
 
 static boolean_t
 sfe_get_mac_addr_sis630e(struct gem_dev *dp)

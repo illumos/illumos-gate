@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,8 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -4709,8 +4711,6 @@ response(void)
 
 /* Has file been modified since being put into archive? If so, return > 0. */
 
-static off_t	lookup(char *);
-
 static int
 checkupdate(char *arg)
 {
@@ -4718,6 +4718,7 @@ checkupdate(char *arg)
 	time_t	mtime;
 	long nsecs;
 	off_t seekp;
+	static off_t	lookup(char *);
 
 	rewind(tfile);
 	if ((seekp = lookup(arg)) < 0)
