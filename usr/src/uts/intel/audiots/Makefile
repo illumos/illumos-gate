@@ -78,7 +78,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS) lint32
+modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
