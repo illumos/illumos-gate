@@ -293,6 +293,7 @@ list_getsize(list_t *list)
 		 * Failure for some other reason.  Prstat will use the size
 		 * already gathered from psinfo.
 		 */
+		free(results);
 		return;
 	}
 	for (id = list->l_head; id != NULL; id = id->id_next) {
@@ -335,6 +336,7 @@ list_getsize(list_t *list)
 		 * gathered from psinfo.
 		 */
 	}
+	free(results);
 }
 
 /*
