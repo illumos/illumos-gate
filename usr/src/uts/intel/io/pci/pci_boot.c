@@ -1702,6 +1702,23 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 }
 
 /*
+ * Some vendors do not use unique subsystem IDs in their products, which
+ * makes the use of form 2 compatible names (pciSSSS,ssss) inappropriate.
+ * Allow for these compatible forms to be excluded on a per-device basis.
+ */
+/*ARGSUSED*/
+static boolean_t
+subsys_compat_exclude(ushort_t venid, ushort_t devid, ushort_t subvenid,
+    ushort_t subdevid, uchar_t revid, uint_t classcode)
+{
+	/* Nvidia display adapters */
+	if ((venid == 0x10de) && (is_display(classcode)))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/*
  * Set the compatible property to a value compliant with
  * rev 2.1 of the IEEE1275 PCI binding.
  * (Also used for PCI-Express devices).
@@ -1786,10 +1803,14 @@ add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
 		size -= strlen(curr) + 1;
 		curr += strlen(curr) + 1;
 
-		compat[i++] = curr;	/* form 2 */
-		(void) snprintf(curr, size, "pci%x,%x", subvenid, subdevid);
-		size -= strlen(curr) + 1;
-		curr += strlen(curr) + 1;
+		if (subsys_compat_exclude(vendorid, deviceid, subvenid,
+		    subdevid, revid, classcode) == B_FALSE) {
+			compat[i++] = curr;	/* form 2 */
+			(void) snprintf(curr, size, "pci%x,%x", subvenid,
+			    subdevid);
+			size -= strlen(curr) + 1;
+			curr += strlen(curr) + 1;
+		}
 	}
 	compat[i++] = curr;	/* form 3 */
 	(void) snprintf(curr, size, "pci%x,%x.%x", vendorid, deviceid, revid);
