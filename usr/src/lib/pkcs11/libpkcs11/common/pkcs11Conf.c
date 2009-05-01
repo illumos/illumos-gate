@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,6 +35,7 @@
 #include <door.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <libscf.h>
 
 #include <sys/crypto/elfsign.h>
 #include <cryptoutil.h>
@@ -66,6 +65,9 @@ void (*Tmp_GetThreshold)(void *) = NULL;
 cipher_mechs_threshold_t meta_mechs_threshold[MAX_NUM_THRESHOLD];
 
 static const char *conf_err = "See cryptoadm(1M). Skipping this plug-in.";
+
+#define	CRYPTOSVC_DEFAULT_INSTANCE_FMRI "svc:/system/cryptosvc:default"
+#define	MAX_CRYPTOSVC_ONLINE_TRIES 5
 
 /*
  * Set up metaslot for the framework using either user configuration
@@ -231,6 +233,45 @@ cleanup:
 }
 
 /*
+ * cryptosvc_is_online()
+ *
+ * Determine if the SMF service instance is in the online state or
+ * not. A number of operations depend on this state.
+ */
+static boolean_t
+cryptosvc_is_online(void)
+{
+	char *str;
+	boolean_t ret = B_FALSE;
+
+	if ((str = smf_get_state(CRYPTOSVC_DEFAULT_INSTANCE_FMRI)) != NULL) {
+		ret = (strcmp(str, SCF_STATE_STRING_ONLINE) == 0);
+		free(str);
+	}
+	return (ret);
+}
+
+/*
+ * cryptosvc_is_down()
+ *
+ * Determine if the SMF service instance is in the disabled state or
+ * maintenance state. A number of operations depend on this state.
+ */
+static boolean_t
+cryptosvc_is_down(void)
+{
+	char *str;
+	boolean_t ret = B_FALSE;
+
+	if ((str = smf_get_state(CRYPTOSVC_DEFAULT_INSTANCE_FMRI)) != NULL) {
+		ret = ((strcmp(str, SCF_STATE_STRING_DISABLED) == 0) ||
+		    (strcmp(str, SCF_STATE_STRING_MAINT) == 0));
+		free(str);
+	}
+	return (ret);
+}
+
+/*
  * For each provider found in pkcs11.conf: expand $ISA if necessary,
  * verify the module is signed, load the provider, find all of its
  * slots, and store the function list and disabled policy.
@@ -277,6 +318,9 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 	kcf_door_arg_t *kda = NULL;
 	kcf_door_arg_t *rkda = NULL;
 	int r;
+	int		is_cryptosvc_up_count = 0;
+	int		door_errno = 0;
+	boolean_t	try_door_open_again = B_FALSE;
 
 	phead = pplist;
 
@@ -494,13 +538,37 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		 * kcfd libelfsign door protocol to use and fd instead
 		 * of a path - but that wouldn't work in the kernel case.
 		 */
+open_door_file:
 		while ((kcfdfd = open(_PATH_KCFD_DOOR, O_RDONLY)) == -1) {
-			if (!(errno == EINTR || errno == EAGAIN))
+			/* save errno and test for EINTR or EAGAIN */
+			door_errno = errno;
+			if (door_errno == EINTR ||
+			    door_errno == EAGAIN)
+				continue;
+			/* if disabled or maintenance mode - bail */
+			if (cryptosvc_is_down())
 				break;
+			/* exceeded our number of tries? */
+			if (is_cryptosvc_up_count > MAX_CRYPTOSVC_ONLINE_TRIES)
+				break;
+			/* any other state, try again up to 1/2 minute */
+			(void) sleep(5);
+			is_cryptosvc_up_count++;
 		}
 		if (kcfdfd == -1) {
-			cryptoerror(LOG_ERR, "libpkcs11: open %s: %s",
-			    _PATH_KCFD_DOOR, strerror(errno));
+			if (!cryptosvc_is_online()) {
+				cryptoerror(LOG_ERR, "libpkcs11: unable to open"
+				    " kcfd door_file %s: %s.  %s is not online."
+				    " (see svcs -xv for details).",
+				    _PATH_KCFD_DOOR, strerror(door_errno),
+				    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
+			} else {
+				cryptoerror(LOG_ERR, "libpkcs11: unable to open"
+				    " kcfd door_file %s: %s.", _PATH_KCFD_DOOR,
+				    strerror(door_errno));
+			}
+			rv = CKR_CRYPTOKI_NOT_INITIALIZED;
+			estatus = ELFSIGN_UNKNOWN;
 			goto verifycleanup;
 		}
 
@@ -525,14 +593,39 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		darg.rsize = sizeof (kcf_door_arg_t);
 
 		while ((r = door_call(kcfdfd, &darg)) != 0) {
-			if (!(errno == EINTR || errno == EAGAIN))
+			/* save errno and test for certain errors */
+			door_errno = errno;
+			if (door_errno == EINTR || door_errno == EAGAIN)
+				continue;
+			/* if disabled or maintenance mode - bail */
+			if (cryptosvc_is_down())
+				break;
+			/* exceeded our number of tries? */
+			if (is_cryptosvc_up_count > MAX_CRYPTOSVC_ONLINE_TRIES)
+				break;
+			/* if stale door_handle, retry the open */
+			if (door_errno == EBADF) {
+				try_door_open_again = B_TRUE;
+				is_cryptosvc_up_count++;
+				(void) sleep(5);
+				goto verifycleanup;
+			} else
 				break;
 		}
 
 		if (r != 0) {
-			cryptoerror(LOG_ERR,
-			    "libpkcs11: Unable to contact kcfd: %s",
-			    strerror(errno));
+			if (!cryptosvc_is_online()) {
+				cryptoerror(LOG_ERR, "%s is not online "
+				    " - unable to utilize cryptographic "
+				    "services.  (see svcs -xv for details).",
+				    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
+			} else {
+				cryptoerror(LOG_ERR, "libpkcs11: door_call "
+				    "of door_file %s failed with error %s.",
+				    _PATH_KCFD_DOOR, strerror(door_errno));
+			}
+			rv = CKR_CRYPTOKI_NOT_INITIALIZED;
+			estatus = ELFSIGN_UNKNOWN;
 			goto verifycleanup;
 		}
 
@@ -558,8 +651,13 @@ verifycleanup:
 			kda = NULL;
 			rkda = NULL;	/* rkda is an alias of kda */
 		}
+		if (try_door_open_again) {
+			try_door_open_again = B_FALSE;
+			goto open_door_file;
+		}
 
 		switch (estatus) {
+		case ELFSIGN_UNKNOWN:
 		case ELFSIGN_SUCCESS:
 		case ELFSIGN_RESTRICTED:
 			break;
