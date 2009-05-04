@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1273,12 +1273,9 @@ squeue_wakeup_conn(void *arg, mblk_t *mp, void *arg2)
 	mutex_exit(&sqp->sq_lock);
 }
 
-/* ARGSUSED */
 int
-squeue_synch_enter(squeue_t *sqp, void *arg, uint8_t tag)
+squeue_synch_enter(squeue_t *sqp, conn_t *connp, mblk_t *use_mp)
 {
-	conn_t *connp = (conn_t *)arg;
-
 	mutex_enter(&sqp->sq_lock);
 	if (sqp->sq_first == NULL && !(sqp->sq_state & SQS_PROC)) {
 		/*
@@ -1304,7 +1301,7 @@ squeue_synch_enter(squeue_t *sqp, void *arg, uint8_t tag)
 	} else {
 		mblk_t  *mp;
 
-		mp = allocb(0, BPRI_MED);
+		mp = (use_mp == NULL) ? allocb(0, BPRI_MED) : use_mp;
 		if (mp == NULL) {
 			mutex_exit(&sqp->sq_lock);
 			return (ENOMEM);
@@ -1329,18 +1326,16 @@ squeue_synch_enter(squeue_t *sqp, void *arg, uint8_t tag)
 			cv_wait(&connp->conn_sq_cv, &sqp->sq_lock);
 		mutex_exit(&sqp->sq_lock);
 
-		freeb(mp);
+		if (use_mp == NULL)
+			freeb(mp);
 
 		return (0);
 	}
 }
 
-/* ARGSUSED */
 void
-squeue_synch_exit(squeue_t *sqp, void *arg)
+squeue_synch_exit(squeue_t *sqp, conn_t *connp)
 {
-	conn_t	*connp = (conn_t *)arg;
-
 	mutex_enter(&sqp->sq_lock);
 	if (sqp->sq_run == curthread) {
 		ASSERT(sqp->sq_state & SQS_PROC);

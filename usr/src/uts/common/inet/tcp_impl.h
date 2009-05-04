@@ -265,6 +265,7 @@ extern int	tcp_fuse_rrw(queue_t *, struiod_t *);
 extern int	tcp_fuse_rinfop(queue_t *, infod_t *);
 extern size_t	tcp_fuse_set_rcv_hiwat(tcp_t *, size_t);
 extern int	tcp_fuse_maxpsz_set(tcp_t *);
+extern void	tcp_fuse_backenable(tcp_t *tcp);
 
 /*
  * Object to represent database of options to search passed to

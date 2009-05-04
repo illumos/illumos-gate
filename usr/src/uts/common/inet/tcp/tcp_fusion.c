@@ -797,10 +797,12 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    (peer_tcp->tcp_connp->conn_upper_handle, 0);
 			tcp->tcp_valid_bits &= ~TCP_URG_VALID;
 		}
-		(*peer_tcp->tcp_connp->conn_upcalls->su_recv)(
+		if ((*peer_tcp->tcp_connp->conn_upcalls->su_recv)(
 		    peer_tcp->tcp_connp->conn_upper_handle, mp, recv_size,
-		    flags, &error, &push);
-		ASSERT(error != EOPNOTSUPP);
+		    flags, &error, &push) < 0) {
+			ASSERT(error != EOPNOTSUPP);
+			peer_data_queued = B_TRUE;
+		}
 	} else {
 		if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
 		    (tcp->tcp_valid_bits & TCP_URG_VALID) &&
@@ -1567,4 +1569,49 @@ tcp_fuse_maxpsz_set(tcp_t *tcp)
 		    MAX(sndbuf >> 14, tcp_fusion_rcv_unread_min);
 	}
 	return (maxpsz);
+}
+
+/*
+ * Called to release flow control.
+ */
+void
+tcp_fuse_backenable(tcp_t *tcp)
+{
+	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
+
+	ASSERT(tcp->tcp_fused);
+	ASSERT(peer_tcp != NULL && peer_tcp->tcp_fused);
+	ASSERT(peer_tcp->tcp_loopback_peer == tcp);
+	ASSERT(!TCP_IS_DETACHED(tcp));
+	ASSERT(tcp->tcp_connp->conn_sqp ==
+	    peer_tcp->tcp_connp->conn_sqp);
+
+	/*
+	 * Normally we would not get backenabled in synchronous
+	 * streams mode, but in case this happens, we need to plug
+	 * synchronous streams during our drain to prevent a race
+	 * with tcp_fuse_rrw() or tcp_fuse_rinfop().
+	 */
+	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
+	if (tcp->tcp_rcv_list != NULL)
+		(void) tcp_fuse_rcv_drain(tcp->tcp_rq, tcp, NULL);
+
+	if (peer_tcp > tcp) {
+		mutex_enter(&peer_tcp->tcp_non_sq_lock);
+		mutex_enter(&tcp->tcp_non_sq_lock);
+	} else {
+		mutex_enter(&tcp->tcp_non_sq_lock);
+		mutex_enter(&peer_tcp->tcp_non_sq_lock);
+	}
+
+	if (peer_tcp->tcp_flow_stopped &&
+	    (TCP_UNSENT_BYTES(peer_tcp) <=
+	    peer_tcp->tcp_xmit_lowater)) {
+		tcp_clrqfull(peer_tcp);
+	}
+	mutex_exit(&peer_tcp->tcp_non_sq_lock);
+	mutex_exit(&tcp->tcp_non_sq_lock);
+
+	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
+	TCP_STAT(tcp->tcp_tcps, tcp_fusion_backenabled);
 }

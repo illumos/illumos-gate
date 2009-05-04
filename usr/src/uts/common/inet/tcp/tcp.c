@@ -4834,8 +4834,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
  * in case of error mpp is freed.
  */
 conn_t *
-tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp,
-    boolean_t is_streams)
+tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp)
 {
 	conn_t 		*connp = tcp->tcp_connp;
 	conn_t 		*econnp;
@@ -4845,7 +4844,7 @@ tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp,
 	boolean_t	mctl_present = B_FALSE;
 	uint_t		ipvers;
 
-	econnp = tcp_get_conn(sqp, tcp->tcp_tcps, is_streams);
+	econnp = tcp_get_conn(sqp, tcp->tcp_tcps);
 	if (econnp == NULL) {
 		freemsg(first_mp);
 		return (NULL);
@@ -4982,7 +4981,7 @@ tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp,
  * there for too long.
  */
 void *
-tcp_get_conn(void *arg, tcp_stack_t *tcps, boolean_t is_streams)
+tcp_get_conn(void *arg, tcp_stack_t *tcps)
 {
 	tcp_t			*tcp = NULL;
 	conn_t			*connp = NULL;
@@ -4998,19 +4997,6 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps, boolean_t is_streams)
 	tcp = tcp_time_wait->tcp_free_list;
 	ASSERT((tcp != NULL) ^ (tcp_time_wait->tcp_free_list_cnt == 0));
 	if (tcp != NULL) {
-		if (is_streams && tcp->tcp_rsrv_mp == NULL) {
-			/*
-			 * Pre-allocate the tcp_rsrv_mp if neccessary.
-			 * This mblk will not be freed until this conn_t/tcp_t
-			 * is freed at ipcl_conn_destroy().
-			 */
-			if ((tcp->tcp_rsrv_mp = allocb(0, BPRI_HI)) == NULL) {
-				mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-				return (NULL);
-			}
-			mutex_init(&tcp->tcp_rsrv_mp_lock,
-			    NULL, MUTEX_DEFAULT, NULL);
-		}
 		tcp_time_wait->tcp_free_list = tcp->tcp_time_wait_next;
 		tcp_time_wait->tcp_free_list_cnt--;
 		mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
@@ -5020,7 +5006,7 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps, boolean_t is_streams)
 
 		ASSERT(tcp->tcp_tcps == NULL);
 		ASSERT(connp->conn_netstack == NULL);
-		ASSERT(!is_streams || tcp->tcp_rsrv_mp != NULL);
+		ASSERT(tcp->tcp_rsrv_mp != NULL);
 		ns = tcps->tcps_netstack;
 		netstack_hold(ns);
 		connp->conn_netstack = ns;
@@ -5030,22 +5016,17 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps, boolean_t is_streams)
 		return ((void *)connp);
 	}
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
-	if (is_streams) {
-		/*
-		 * Pre-allocate the tcp_rsrv_mp if neccessary.
-		 * This mblk will not be freed until this conn_t/tcp_t
-		 * is freed at ipcl_conn_destroy().
-		 */
-		tcp_rsrv_mp = allocb(0, BPRI_HI);
-		if (tcp_rsrv_mp == NULL)
-			return (NULL);
-	}
+	/*
+	 * Pre-allocate the tcp_rsrv_mp. This mblk will not be freed until
+	 * this conn_t/tcp_t is freed at ipcl_conn_destroy().
+	 */
+	tcp_rsrv_mp = allocb(0, BPRI_HI);
+	if (tcp_rsrv_mp == NULL)
+		return (NULL);
+
 	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP,
 	    tcps->tcps_netstack)) == NULL) {
-		if (is_streams) {
-			ASSERT(tcp_rsrv_mp != NULL);
-			freeb(tcp_rsrv_mp);
-		}
+		freeb(tcp_rsrv_mp);
 		return (NULL);
 	}
 
@@ -5313,8 +5294,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		new_sqp = (squeue_t *)DB_CKSUMSTART(mp);
 		DB_CKSUMSTART(mp) = 0;
 		mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-		econnp = (conn_t *)tcp_get_conn(arg2, tcps,
-		    !IPCL_IS_NONSTR(connp));
+		econnp = (conn_t *)tcp_get_conn(arg2, tcps);
 		if (econnp == NULL)
 			goto error2;
 		ASSERT(econnp->conn_netstack == connp->conn_netstack);
@@ -5324,8 +5304,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		/*
 		 * mp is updated in tcp_get_ipsec_conn().
 		 */
-		econnp = tcp_get_ipsec_conn(tcp, arg2, &mp,
-		    !IPCL_IS_NONSTR(connp));
+		econnp = tcp_get_ipsec_conn(tcp, arg2, &mp);
 		if (econnp == NULL) {
 			/*
 			 * mp freed by tcp_get_ipsec_conn.
@@ -9163,7 +9142,7 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 	}
 
 	sqp = IP_SQUEUE_GET((uint_t)gethrtime());
-	connp = (conn_t *)tcp_get_conn(sqp, tcps, q != NULL ? B_TRUE : B_FALSE);
+	connp = (conn_t *)tcp_get_conn(sqp, tcps);
 	/*
 	 * Both tcp_get_conn and netstack_find_by_cred incremented refcnt,
 	 * so we drop it by one.
@@ -9797,7 +9776,7 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 
 	optvalp_buf = kmem_alloc(max_optbuf_len, KM_SLEEP);
 
-	error = squeue_synch_enter(sqp, connp, 0);
+	error = squeue_synch_enter(sqp, connp, NULL);
 	if (error == ENOMEM) {
 		return (ENOMEM);
 	}
@@ -10725,7 +10704,7 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 		}
 	}
 
-	error = squeue_synch_enter(sqp, connp, 0);
+	error = squeue_synch_enter(sqp, connp, NULL);
 	if (error == ENOMEM) {
 		return (ENOMEM);
 	}
@@ -15479,7 +15458,6 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
 	queue_t	*q = tcp->tcp_rq;
-	uint_t	thwin;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(!IPCL_IS_NONSTR(connp));
@@ -15494,52 +15472,14 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	if (tcp->tcp_fused) {
-		tcp_t *peer_tcp = tcp->tcp_loopback_peer;
-
-		ASSERT(tcp->tcp_fused);
-		ASSERT(peer_tcp != NULL && peer_tcp->tcp_fused);
-		ASSERT(peer_tcp->tcp_loopback_peer == tcp);
-		ASSERT(!TCP_IS_DETACHED(tcp));
-		ASSERT(tcp->tcp_connp->conn_sqp ==
-		    peer_tcp->tcp_connp->conn_sqp);
-
-		/*
-		 * Normally we would not get backenabled in synchronous
-		 * streams mode, but in case this happens, we need to plug
-		 * synchronous streams during our drain to prevent a race
-		 * with tcp_fuse_rrw() or tcp_fuse_rinfop().
-		 */
-		TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
-		if (tcp->tcp_rcv_list != NULL)
-			(void) tcp_rcv_drain(tcp);
-
-		if (peer_tcp > tcp) {
-			mutex_enter(&peer_tcp->tcp_non_sq_lock);
-			mutex_enter(&tcp->tcp_non_sq_lock);
-		} else {
-			mutex_enter(&tcp->tcp_non_sq_lock);
-			mutex_enter(&peer_tcp->tcp_non_sq_lock);
-		}
-
-		if (peer_tcp->tcp_flow_stopped &&
-		    (TCP_UNSENT_BYTES(peer_tcp) <=
-		    peer_tcp->tcp_xmit_lowater)) {
-			tcp_clrqfull(peer_tcp);
-		}
-		mutex_exit(&peer_tcp->tcp_non_sq_lock);
-		mutex_exit(&tcp->tcp_non_sq_lock);
-
-		TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
-		TCP_STAT(tcps, tcp_fusion_backenabled);
+		tcp_fuse_backenable(tcp);
 		return;
 	}
 
 	if (canputnext(q)) {
 		/* Not flow-controlled, open rwnd */
 		tcp->tcp_rwnd = q->q_hiwat;
-		thwin = ((uint_t)BE16_TO_U16(tcp->tcp_tcph->th_win))
-		    << tcp->tcp_rcv_ws;
-		thwin -= tcp->tcp_rnxt - tcp->tcp_rack;
+
 		/*
 		 * Send back a window update immediately if TCP is above
 		 * ESTABLISHED state and the increase of the rcv window
@@ -15547,11 +15487,10 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 		 * control is lifted.
 		 */
 		if (tcp->tcp_state >= TCPS_ESTABLISHED &&
-		    (q->q_hiwat - thwin >= tcp->tcp_mss)) {
+		    tcp_rwnd_reopen(tcp) == TH_ACK_NEEDED) {
 			tcp_xmit_ctl(NULL, tcp,
 			    (tcp->tcp_swnd == 0) ? tcp->tcp_suna :
 			    tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
-			BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
 		}
 	}
 }
@@ -17272,8 +17211,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		DB_TYPE(stropt_mp) = M_SETOPTS;
 		stropt = (struct stroptions *)stropt_mp->b_rptr;
 		stropt_mp->b_wptr += sizeof (struct stroptions);
-		stropt = (struct stroptions *)stropt_mp->b_rptr;
-		stropt->so_flags |= SO_HIWAT | SO_WROFF | SO_MAXBLK;
+		stropt->so_flags = SO_HIWAT | SO_WROFF | SO_MAXBLK;
 		stropt->so_hiwat = sopp_rxhiwat;
 		stropt->so_wroff = sopp_wroff;
 		stropt->so_maxblk = sopp_maxblk;
@@ -26142,7 +26080,7 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	ASSERT(sqp != NULL);
 	ASSERT(connp->conn_upper_handle != NULL);
 
-	error = squeue_synch_enter(sqp, connp, 0);
+	error = squeue_synch_enter(sqp, connp, NULL);
 	if (error != 0) {
 		/* failed to enter */
 		return (ENOSR);
@@ -26315,7 +26253,7 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		return (error);
 	}
 
-	error = squeue_synch_enter(sqp, connp, 0);
+	error = squeue_synch_enter(sqp, connp, NULL);
 	if (error != 0) {
 		/* failed to enter */
 		return (ENOSR);
@@ -26656,8 +26594,7 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	DB_TYPE(stropt_mp) = M_SETOPTS;
 	stropt = (struct stroptions *)stropt_mp->b_rptr;
 	stropt_mp->b_wptr += sizeof (struct stroptions);
-	stropt = (struct stroptions *)stropt_mp->b_rptr;
-	stropt->so_flags |= SO_HIWAT | SO_WROFF | SO_MAXBLK;
+	stropt->so_flags = SO_HIWAT | SO_WROFF | SO_MAXBLK;
 
 	stropt->so_wroff = tcp->tcp_hdr_len + (tcp->tcp_loopback ? 0 :
 	    tcp->tcp_tcps->tcps_wroff_xtra);
@@ -26752,7 +26689,6 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	mblk_t			*stropt_mp;
 	mblk_t			*ordrel_mp;
 	mblk_t			*fused_sigurp_mp;
-	mblk_t			*tcp_rsrv_mp;
 
 	tcp = connp->conn_tcp;
 
@@ -26771,22 +26707,14 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	fused_sigurp_mp = allocb_wait(1, BPRI_HI, STR_NOSIG, NULL);
 
 	/*
-	 * Pre-allocate the tcp_rsrv_mp mblk.
-	 * It is possible that this conn was previously used for a streams
-	 * socket and already has tcp_rsrv_mp
-	 */
-	tcp_rsrv_mp = allocb_wait(0, BPRI_HI, STR_NOSIG, NULL);
-
-	/*
 	 * Enter the squeue so that no new packets can come in
 	 */
-	error = squeue_synch_enter(connp->conn_sqp, connp, 0);
+	error = squeue_synch_enter(connp->conn_sqp, connp, NULL);
 	if (error != 0) {
 		/* failed to enter, free all the pre-allocated messages. */
 		freeb(stropt_mp);
 		freeb(ordrel_mp);
 		freeb(fused_sigurp_mp);
-		freeb(tcp_rsrv_mp);
 		/*
 		 * We cannot process the eager, so at least send out a
 		 * RST so the peer can reconnect.
@@ -26812,14 +26740,6 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 		freeb(fused_sigurp_mp);
 	}
 
-	if (tcp->tcp_rsrv_mp == NULL) {
-		tcp->tcp_rsrv_mp = tcp_rsrv_mp;
-	} else {
-		/*
-		 * reusing a conn that was previously used for streams socket
-		 */
-		freeb(tcp_rsrv_mp);
-	}
 	if (tcp->tcp_listener != NULL) {
 		/* The eager will deal with opts when accept() is called */
 		freeb(stropt_mp);
@@ -26919,7 +26839,7 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
-	error = squeue_synch_enter(sqp, connp, 0);
+	error = squeue_synch_enter(sqp, connp, NULL);
 	if (error != 0) {
 		/* failed to enter */
 		return (ENOBUFS);
@@ -27050,30 +26970,46 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 {
 	conn_t  *connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	uint_t thwin;
+	mblk_t *mp;
+	int error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
-	(void) squeue_synch_enter(connp->conn_sqp, connp, 0);
-
-	/* Flow control condition has been removed. */
-	tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
-	thwin = ((uint_t)BE16_TO_U16(tcp->tcp_tcph->th_win))
-	    << tcp->tcp_rcv_ws;
-	thwin -= tcp->tcp_rnxt - tcp->tcp_rack;
 	/*
-	 * Send back a window update immediately if TCP is above
-	 * ESTABLISHED state and the increase of the rcv window
-	 * that the other side knows is at least 1 MSS after flow
-	 * control is lifted.
+	 * If tcp->tcp_rsrv_mp == NULL, it means that tcp_clr_flowctrl()
+	 * is currently running.
 	 */
-	if (tcp->tcp_state >= TCPS_ESTABLISHED &&
-	    (tcp->tcp_recv_hiwater - thwin >= tcp->tcp_mss)) {
-		tcp_xmit_ctl(NULL, tcp,
-		    (tcp->tcp_swnd == 0) ? tcp->tcp_suna :
-		    tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
-		BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
+	mutex_enter(&tcp->tcp_rsrv_mp_lock);
+	if ((mp = tcp->tcp_rsrv_mp) == NULL) {
+		mutex_exit(&tcp->tcp_rsrv_mp_lock);
+		return;
+	}
+	tcp->tcp_rsrv_mp = NULL;
+	mutex_exit(&tcp->tcp_rsrv_mp_lock);
+
+	error = squeue_synch_enter(connp->conn_sqp, connp, mp);
+	ASSERT(error == 0);
+
+	mutex_enter(&tcp->tcp_rsrv_mp_lock);
+	tcp->tcp_rsrv_mp = mp;
+	mutex_exit(&tcp->tcp_rsrv_mp_lock);
+
+	if (tcp->tcp_fused) {
+		tcp_fuse_backenable(tcp);
+	} else {
+		tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+		/*
+		 * Send back a window update immediately if TCP is above
+		 * ESTABLISHED state and the increase of the rcv window
+		 * that the other side knows is at least 1 MSS after flow
+		 * control is lifted.
+		 */
+		if (tcp->tcp_state >= TCPS_ESTABLISHED &&
+		    tcp_rwnd_reopen(tcp) == TH_ACK_NEEDED) {
+			tcp_xmit_ctl(NULL, tcp,
+			    (tcp->tcp_swnd == 0) ? tcp->tcp_suna :
+			    tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
+		}
 	}
 
 	squeue_synch_exit(connp->conn_sqp, connp);
