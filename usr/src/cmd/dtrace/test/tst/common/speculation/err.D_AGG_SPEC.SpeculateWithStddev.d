@@ -26,39 +26,40 @@
 
 /*
  * ASSERTION:
- *     Positive stddev() test
+ *     Aggregating actions may never be speculative.
  *
- * SECTION: Aggregations/Aggregations
+ * SECTION: Speculative Tracing/Using a Speculation
  *
- * NOTES: This is a simple verifiable positive test of the stddev() function.
- *     printa() for one aggregation, default printing behavior for the other
- *     so that we exercise both code paths.
  */
-
 #pragma D option quiet
 
 BEGIN
 {
-	@a = stddev(5000000000);
-	@a = stddev(5000000100);
-	@a = stddev(5000000200);
-	@a = stddev(5000000300);
-	@a = stddev(5000000400);
-	@a = stddev(5000000500);
-	@a = stddev(5000000600);
-	@a = stddev(5000000700);
-	@a = stddev(5000000800);
-	@a = stddev(5000000900);
-	@b = stddev(-5000000000);
-	@b = stddev(-5000000100);
-	@b = stddev(-5000000200);
-	@b = stddev(-5000000300);
-	@b = stddev(-5000000400);
-	@b = stddev(-5000000500);
-	@b = stddev(-5000000600);
-	@b = stddev(-5000000700);
-	@b = stddev(-5000000800);
-	@b = stddev(-5000000900);
-	printa("%@d\n", @a);
+	i = 0;
+}
+
+profile:::tick-1sec
+/i < 1/
+{
+	var = speculation();
+	speculate(var);
+	printf("Speculation ID: %d", var);
+	@sdev["speculate"] = stddev(i);
+	i++;
+}
+
+profile:::tick-1sec
+/1 == i/
+{
+	exit(0);
+}
+
+ERROR
+{
+	exit(0);
+}
+
+END
+{
 	exit(0);
 }

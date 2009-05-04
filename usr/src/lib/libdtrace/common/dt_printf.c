@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <strings.h>
@@ -1225,6 +1223,20 @@ pfprint_average(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 
 /*ARGSUSED*/
 static int
+pfprint_stddev(dtrace_hdl_t *dtp, FILE *fp, const char *format,
+    const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
+{
+	const uint64_t *data = addr;
+
+	if (size != sizeof (uint64_t) * 4)
+		return (dt_set_errno(dtp, EDT_DMISMATCH));
+
+	return (dt_printf(dtp, fp, format,
+	    dt_stddev((uint64_t *)data, normal)));
+}
+
+/*ARGSUSED*/
+static int
 pfprint_quantize(dtrace_hdl_t *dtp, FILE *fp, const char *format,
     const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
 {
@@ -1414,6 +1426,9 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 		switch (rec->dtrd_action) {
 		case DTRACEAGG_AVG:
 			func = pfprint_average;
+			break;
+		case DTRACEAGG_STDDEV:
+			func = pfprint_stddev;
 			break;
 		case DTRACEAGG_QUANTIZE:
 			func = pfprint_quantize;

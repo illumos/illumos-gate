@@ -48,6 +48,7 @@ f none SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.avgtoofew.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.maxnoarg.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.mintoofew.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.quantizetoofew.d 0444 root bin
+f none SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.stddevtoofew.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_AGG_SCALAR.sumtoofew.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_CLEAR_AGGARG.bad.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_CLEAR_PROTO.bad.d 0444 root bin
@@ -89,6 +90,8 @@ f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.minnoarg.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.mintoomany.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.quantizenoarg.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.quantizetoomany.d 0444 root bin
+f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.stddevnoarg.d 0444 root bin
+f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.stddevtoomany.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.sumnoarg.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_PROTO_LEN.sumtoomany.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/err.D_TRUNC_AGGARG.bad.d 0444 root bin
@@ -113,6 +116,8 @@ f none SUNWdtrt/tst/common/aggs/tst.clearlquantize.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/tst.clearlquantize.d.out 0444 root bin
 f none SUNWdtrt/tst/common/aggs/tst.clearnormalize.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/tst.clearnormalize.d.out 0444 root bin
+f none SUNWdtrt/tst/common/aggs/tst.clearstddev.d 0444 root bin
+f none SUNWdtrt/tst/common/aggs/tst.clearstddev.d.out 0444 root bin
 f none SUNWdtrt/tst/common/aggs/tst.count.d 0444 root bin
 f none SUNWdtrt/tst/common/aggs/tst.count.d.out 0444 root bin
 f none SUNWdtrt/tst/common/aggs/tst.count2.d 0444 root bin
@@ -1165,6 +1170,7 @@ f none SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithLquant.d 0444
 f none SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithMax.d 0444 root bin
 f none SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithMin.d 0444 root bin
 f none SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithQuant.d 0444 root bin
+f none SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithStddev.d 0444 root bin
 f none SUNWdtrt/tst/common/speculation/err.D_AGG_SPEC.SpeculateWithSum.d 0444 root bin
 f none SUNWdtrt/tst/common/speculation/err.D_COMM_COMM.CommitAftCommit.d 0444 root bin
 f none SUNWdtrt/tst/common/speculation/err.D_COMM_COMM.DisjointCommit.d 0444 root bin

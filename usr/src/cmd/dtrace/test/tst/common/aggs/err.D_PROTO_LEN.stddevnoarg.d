@@ -26,39 +26,16 @@
 
 /*
  * ASSERTION:
- *     Positive stddev() test
+ *     stddev() should not accept a call with no arguments
  *
  * SECTION: Aggregations/Aggregations
  *
- * NOTES: This is a simple verifiable positive test of the stddev() function.
- *     printa() for one aggregation, default printing behavior for the other
- *     so that we exercise both code paths.
  */
 
 #pragma D option quiet
 
 BEGIN
 {
-	@a = stddev(5000000000);
-	@a = stddev(5000000100);
-	@a = stddev(5000000200);
-	@a = stddev(5000000300);
-	@a = stddev(5000000400);
-	@a = stddev(5000000500);
-	@a = stddev(5000000600);
-	@a = stddev(5000000700);
-	@a = stddev(5000000800);
-	@a = stddev(5000000900);
-	@b = stddev(-5000000000);
-	@b = stddev(-5000000100);
-	@b = stddev(-5000000200);
-	@b = stddev(-5000000300);
-	@b = stddev(-5000000400);
-	@b = stddev(-5000000500);
-	@b = stddev(-5000000600);
-	@b = stddev(-5000000700);
-	@b = stddev(-5000000800);
-	@b = stddev(-5000000900);
-	printa("%@d\n", @a);
-	exit(0);
+	@a[1] = stddev();
 }
+
