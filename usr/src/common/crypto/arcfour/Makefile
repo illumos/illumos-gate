@@ -39,8 +39,8 @@ EXPORT_SRC:
 		< arcfour_crypt.c > arcfour_crypt.c+
 	$(MV) arcfour_crypt.c+ arcfour_crypt.c
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< amd64/arcfour-x86_64.c > amd64/arcfour-x86_64.c+
-	$(MV) amd64/arcfour-x86_64.c+ amd64/arcfour-x86_64.c
+		< amd64/arcfour-x86_64.pl > amd64/arcfour-x86_64.pl+
+	$(MV) amd64/arcfour-x86_64.pl+ amd64/arcfour-x86_64.pl
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< sun4u/arcfour_crypt_asm.s > sun4u/arcfour_crypt_asm.s+
 	$(MV) sun4u/arcfour_crypt_asm.s+ sun4u/arcfour_crypt_asm.s
