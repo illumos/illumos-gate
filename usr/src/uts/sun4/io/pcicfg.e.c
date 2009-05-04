@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3858,6 +3858,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	int			error = 0;
 	extern int		pcicfg_dont_interpret;
 	pcicfg_err_regs_t	parent_regs, regs;
+	char			*status_prop = NULL;
 #ifdef PCICFG_INTERPRET_FCODE
 	struct pci_ops_bus_args	po;
 	fco_handle_t		c;
@@ -4176,6 +4177,24 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 			    PCICFG_FAILURE) {
 				ret = PCICFG_FAILURE;
 				goto failed;
+			}
+
+			/*
+			 * At this stage, there should be enough info to pull
+			 * the status property if it exists.
+			 */
+			if (ddi_prop_lookup_string(DDI_DEV_T_ANY,
+			    new_child, NULL, "status", &status_prop) ==
+			    DDI_PROP_SUCCESS) {
+				if ((strncmp("disabled", status_prop, 8) ==
+				    0) || (strncmp("fail", status_prop, 4) ==
+				    0)) {
+					ret = PCICFG_FAILURE;
+					ddi_prop_free(status_prop);
+					goto failed;
+				} else {
+					ddi_prop_free(status_prop);
+				}
 			}
 
 			ret = PCICFG_SUCCESS;
