@@ -20,11 +20,9 @@
  */
 
 /*
- *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tnchkdb.c - Trusted network database checking utility
@@ -339,7 +337,7 @@ check_tnrhtp(const char *file)
 			if (!bldominates(l2, l1)) {
 				(void) fprintf(stderr,
 				    gettext("tnchkdb: max_sl does not "
-				    "dominate min_sl: line %$1d entry %2$s\n"),
+				    "dominate min_sl: line %1$d entry %2$s\n"),
 				    linenum, tpentp->name);
 				exitval = 1;
 			}
@@ -365,7 +363,7 @@ check_tnrhtp(const char *file)
 			if (!bldominates(l2, l1)) {
 				(void) fprintf(stderr,
 				    gettext("tnchkdb: max_sl does not "
-				    "dominate min_sl: line %$1d entry %2$s\n"),
+				    "dominate min_sl: line %1$d entry %2$s\n"),
 				    linenum, tpentp->name);
 				exitval = 1;
 			}
@@ -395,7 +393,7 @@ check_tnrhtp(const char *file)
 
 		default:
 			(void) fprintf(stderr, gettext("tnchkdb: unknown host "
-			    "type %$1d: line %2$d entry %3$s\n"),
+			    "type %1$d: line %2$d entry %3$s\n"),
 			    tpentp->host_type, linenum, tpentp->name);
 			exitval = 1;
 		} /* switch */
@@ -544,9 +542,9 @@ check_mlp_conflicts(tsol_mlp_t *mlps, boolean_t isglobal, const char *name,
 
 			if (mil != NULL) {
 				(void) fprintf(stderr, gettext("tnchkdb: "
-				    "overlap of global MLP protocol %2$d port "
-				    "%3$d-%4$d with zone %$5s %6$d-%7$d: zone "
-				    "%8$s lines %9$d and %10$d\n"),
+				    "overlap of global MLP protocol %1$d port "
+				    "%2$d-%3$d with zone %4$s %5$d-%6$d: zone "
+				    "%7$s lines %8$d and %9$d\n"),
 				    mlpptr->mlp_ipp, mlpptr->mlp_port,
 				    mlpptr->mlp_port_upper, mil->name,
 				    mil->mlp.mlp_port, mil->mlp.mlp_port_upper,
