@@ -59,6 +59,7 @@
  */
 ds_port_t	ds_ports[DS_MAX_PORTS];
 ds_portset_t	ds_allports;	/* all DS ports in the system */
+ds_portset_t	ds_nullport;	/* allows test against null portset */
 
 /*
  * Table of registered services
@@ -1237,8 +1238,17 @@ ds_try_next_port(ds_svc_t *svc, int portid)
 	int i;
 
 	DS_DBG_LDC(CE_NOTE, "ds@%x %s" DS_EOL, portid, __func__);
-	DS_PORTSET_NOT(totry, svc->tried);
-	DS_PORTSET_AND(totry, svc->avail);
+
+	/*
+	 * Get the ports that haven't been tried yet and are available to try.
+	 */
+	DS_PORTSET_SETNULL(totry);
+	for (i = 0; i < DS_MAX_PORTS; i++) {
+		if (!DS_PORT_IN_SET(svc->tried, i) &&
+		    DS_PORT_IN_SET(svc->avail, i))
+			DS_PORTSET_ADD(totry, i);
+	}
+
 	if (DS_PORTSET_ISNULL(totry))
 		return;
 
@@ -2097,7 +2107,7 @@ ds_svc_register(ds_svc_t *svc, void *arg)
 	if (DS_SVC_ISFREE(svc))
 		return (0);
 
-	ports = svc->avail;
+	DS_PORTSET_DUP(ports, svc->avail);
 	if (svc->flags & DSSF_ISCLIENT) {
 		ds_portset_del_active_clients(svc->cap.svc_id, &ports);
 	} else if (svc->state != DS_SVC_INACTIVE)
@@ -3139,13 +3149,14 @@ ds_hdl_lookup(char *service, uint_t is_client, ds_svc_hdl_t *hdlp,
 static void
 ds_portset_del_active_clients(char *service, ds_portset_t *portsp)
 {
-	ds_portset_t ports = *portsp;
+	ds_portset_t ports;
 	int idx;
 	ds_svc_t *svc;
 	ds_svc_hdl_t hdl;
 
 	ASSERT(MUTEX_HELD(&ds_svcs.lock));
 
+	DS_PORTSET_DUP(ports, *portsp);
 	for (idx = 0; idx < ds_svcs.maxsvcs; idx++) {
 		svc = ds_svcs.tbl[idx];
 		if (DS_SVC_ISFREE(svc))
@@ -3169,7 +3180,7 @@ ds_portset_del_active_clients(char *service, ds_portset_t *portsp)
 	    svc->port != NULL) {
 		DS_PORTSET_DEL(ports, PORTID(svc->port));
 	}
-	*portsp = ports;
+	DS_PORTSET_DUP(*portsp, ports);
 }
 
 /*

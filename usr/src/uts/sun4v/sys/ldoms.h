@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LDOMS_H
 #define	_LDOMS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -39,8 +37,20 @@ extern "C" {
  * Global LDoms definitions.
  */
 
-/* Maximum number of logical domains supported */
-#define	LDOMS_MAX_DOMAINS	32
+/*
+ * LDOMS_MAX_DOMAINS refers to the maximum theoretical number of
+ * domains supported by Solaris based on per-domain resources that
+ * are allocated. The actual number of domains supported by a
+ * platform is defined by the firmware.
+ *
+ * When adjusting this value please ensure that resources such
+ * as the following are approriately scaled:
+ *    - channel nexus interrupt cookies
+ *    - domain services ports
+ *    - NCPUS
+ *    - etc...
+ */
+#define	LDOMS_MAX_DOMAINS	512
 
 /* maximum number of characters in the logical domain name */
 #define	LDOMS_MAX_NAME_LEN	MAXHOSTNAMELEN

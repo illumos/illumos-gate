@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,8 @@
 extern "C" {
 #endif
 
+#include <sys/bitmap.h>
+#include <sys/ldoms.h>
 
 
 /*
@@ -204,25 +206,28 @@ typedef struct ds_port {
 
 /*
  * A DS portset is a bitmap that represents a collection of DS
- * ports. Each bit represent a particular port id. The current
- * implementation constrains the maximum number of ports to 64.
+ * ports. Each bit represent a particular port id.  We need
+ * to allocate for the max. number of domains supported,
+ * plus a small number (e.g. for the SP connection).
  */
-typedef uint64_t ds_portset_t;
+#define	DS_EXTRA_PORTS			16
+#define	DS_MAX_PORTS			(LDOMS_MAX_DOMAINS + DS_EXTRA_PORTS)
+#define	DS_PORTSET_SIZE			BT_BITOUL(DS_MAX_PORTS)
 
-#ifndef	DS_MAX_PORTS
-#define	DS_MAX_PORTS			((sizeof (ds_portset_t)) * 8)
-#endif
+typedef ulong_t ds_portset_t[DS_PORTSET_SIZE];
+
+extern ds_portset_t ds_nullport;
+
 #define	DS_MAX_PORT_ID			(DS_MAX_PORTS - 1)
 
-#define	DS_PORT_SET(port)		(1UL << (port))
-#define	DS_PORT_IN_SET(set, port)	((set) & DS_PORT_SET(port))
-#define	DS_PORTSET_ADD(set, port)	((void)((set) |= DS_PORT_SET(port)))
-#define	DS_PORTSET_DEL(set, port)	((void)((set) &= ~DS_PORT_SET(port)))
-#define	DS_PORTSET_ISNULL(set)		((set) == 0)
-#define	DS_PORTSET_SETNULL(set)		((void)((set) = 0))
-#define	DS_PORTSET_DUP(set1, set2)	((void)((set1) = (set2)))
-#define	DS_PORTSET_NOT(set1, set2)	((void)((set1) = ~(set2)))
-#define	DS_PORTSET_AND(set1, set2)	((void)((set1) &= (set2)))
+#define	DS_PORT_IN_SET(set, port)	BT_TEST((set), (port))
+#define	DS_PORTSET_ADD(set, port)	BT_SET((set), (port))
+#define	DS_PORTSET_DEL(set, port)	BT_CLEAR((set), (port))
+#define	DS_PORTSET_ISNULL(set)		(memcmp((set), ds_nullport, \
+					    sizeof (set)) == 0)
+#define	DS_PORTSET_SETNULL(set)		((void)memset((set), 0, sizeof (set)))
+#define	DS_PORTSET_DUP(set1, set2)	((void)memcpy((set1), (set2), \
+					    sizeof (set1)))
 
 /*
  * A DS event consists of a buffer on a port.  We explictly use a link to
