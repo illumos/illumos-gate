@@ -1315,6 +1315,11 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	public_key_obj_t  *pbk;
 	uchar_t	object_type = 0;
 
+	CK_ATTRIBUTE	defpubexpo = { CKA_PUBLIC_EXPONENT,
+	    (CK_BYTE_PTR)DEFAULT_PUB_EXPO, DEFAULT_PUB_EXPO_Len };
+
+	BIGNUM		n;
+
 	/* prevent bigint_attr_cleanup from freeing invalid attr value */
 	(void) memset(&modulus, 0x0, sizeof (biginteger_t));
 	(void) memset(&pubexpo, 0x0, sizeof (biginteger_t));
@@ -1580,25 +1585,70 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
+
+			/*
+			 * Derive modulus_bits attribute from modulus.
+			 * Copy big integer attribute value to the
+			 * designated place in the public key object.
+			 */
+			n.malloced = 0;
+#ifdef  __sparcv9
+			if (big_init(&n,
+			    (int)CHARLEN2BIGNUMLEN(modulus.big_value_len))
+			    != BIG_OK) {
+#else   /* !__sparcv9 */
+			if (big_init(&n,
+			    CHARLEN2BIGNUMLEN(modulus.big_value_len))
+			    != BIG_OK) {
+#endif  /* __sparcv9 */
+				rv = CKR_HOST_MEMORY;
+				big_finish(&n);
+				goto fail_cleanup;
+			}
+			bytestring2bignum(&n, modulus.big_value,
+			    modulus.big_value_len);
+
+			modulus_bits = big_bitlength(&n);
+			KEY_PUB_RSA_MOD_BITS(pbk) = modulus_bits;
+
+			big_finish(&n);
 		} else {
+			/* mode is SOFT_GEN_KEY */
+
 			if (isModulus || isPrime || isSubprime ||
 			    isBase || isValue) {
 				rv = CKR_TEMPLATE_INCONSISTENT;
 				goto fail_cleanup;
 			}
 
-			if (isModulusBits && isPubExpo) {
+
+			if (isModulusBits) {
 				/*
 				 * Copy big integer attribute value to the
 				 * designated place in the public key object.
 				 */
-				copy_bigint_attr(&pubexpo,
-				    KEY_PUB_RSA_PUBEXPO(pbk));
 				KEY_PUB_RSA_MOD_BITS(pbk) = modulus_bits;
 			} else {
 				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
+
+			/*
+			 * Use PKCS#11 default 0x010001 for public exponent
+			 * if not not specified in attribute template.
+			 */
+			if (!isPubExpo) {
+				isPubExpo = 1;
+				rv = get_bigint_attr_from_template(&pubexpo,
+				    &defpubexpo);
+				if (rv != CKR_OK)
+					goto fail_cleanup;
+			}
+			/*
+			 * Copy big integer attribute value to the
+			 * designated place in the public key object.
+			 */
+			copy_bigint_attr(&pubexpo, KEY_PUB_RSA_PUBEXPO(pbk));
 		}
 
 		break;
