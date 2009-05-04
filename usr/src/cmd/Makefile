@@ -296,6 +296,7 @@ COMMON_SUBDIRS=		\
 	pathchk		\
 	pbind		\
 	pcidr		\
+	pcitool		\
 	pcmciad		\
 	pfexec		\
 	pgrep		\
@@ -472,7 +473,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/od	\
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\
-	$(CLOSED)/cmd/pcitool	\
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
 	$(CLOSED)/cmd/sed_xpg4	\

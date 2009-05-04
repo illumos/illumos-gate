@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -39,16 +39,13 @@ i depend
 #
 # source locations relative to the prototype file
 #
-# SUNWiotu
+# SUNWio-tools
 #
 d none usr 755 root sys
 d none usr/sbin 755 root bin
-f none usr/sbin/devctl 555 root bin
-f none usr/sbin/emul64ioctl 555 root bin
-d none usr/kernel 755 root sys
-d none usr/kernel/drv 755 root sys
-f none usr/kernel/drv/pshot.conf 644 root sys
-f none usr/kernel/drv/emul64.conf 644 root sys
-d none usr/lib 755 root bin
-d none usr/lib/scsi 755 root bin
-f none usr/lib/scsi/sestopo 555 root bin
+f none usr/sbin/pcitool 555 root bin
+d none usr/share 755 root sys
+d none usr/share/man 755 root bin
+d none usr/share/man/man1m 755 root bin
+f none usr/share/man/man1m/pcitool.1m 444 root root
+

@@ -222,6 +222,7 @@ COMMON_SUBDIRS = \
 	cmd/pathchk \
 	cmd/pbind \
 	cmd/pcidr \
+	cmd/pcitool \
 	cmd/pfexec \
 	cmd/pgrep \
 	cmd/picl/picld \
@@ -461,7 +462,6 @@ COMMON_SUBDIRS = \
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
 	$(CLOSED)/cmd/pax \
-	$(CLOSED)/cmd/pcitool \
 	$(CLOSED)/cmd/sed_xpg4 \
 	$(CLOSED)/cmd/smartcard \
 	$(CLOSED)/cmd/tail \

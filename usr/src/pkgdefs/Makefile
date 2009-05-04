@@ -285,6 +285,7 @@ COMMON_SUBDIRS= \
 	SUNWintgige \
 	SUNWiotu  \
 	SUNWioth  \
+	SUNWio-tools  \
 	SUNWipc  \
 	SUNWipfh  \
 	SUNWipfr  \

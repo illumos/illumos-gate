@@ -1,0 +1,187 @@
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.TH pcitool 1M
+.SH "NAME"
+pcitool \- interrupt routing tool
+.SH "SYNOPSIS"
+.PP
+/usr/sbin/pcitool \fIPCI_nexus_node\fR -i ino=\fIino\fR [ -r [ -c ] | -w cpu=\fICPU\fR [ -g ] ] [ -v ] [ -q ]
+
+/usr/sbin/pcitool [ -h ]
+
+.SH "DESCRIPTION"
+.PP
+PCItool is a low-level tool which provides a facility for getting and setting interrupt routing information.
+
+.SS \fIInterrupt Routing\fR
+
+The \fIpcitool -i\fR command displays device and CPU routing information for
+all inos on a given nexus, and allows rerouting of a given ino or ino group
+to a specific CPU.
+
+
+\fIRequired privileges\fR
+
+The user must have all privileges in order to access interrupt
+information.  A regular user can access interrupt information when
+\fBsu\fR(1M) to root or granted the "Maintenance and Repair" rights
+profile in the \fBuser_attr\fR file. See \fBuser_attr\fR(4) and
+\fBrbac\fR(5).
+
+
+\fICommandline options\fR
+
+-r [ -c ]
+
+Display device and CPU routing information for inos on a given nexus.
+The device path and instance number of each device for each displayed ino will
+be shown.  On some platforms (e.g. Fire) interrupts dedicated to the root
+complex are indicated with "(Internal)" appended to their pathname.
+
+Dump interrupt controller information with -c.
+
+If neither -r nor -w are provided on the commandline, -r is assumed.
+
+The command for showing all inos on /pci@8,700000 is:
+
+  # pcitool /pci@8,700000 -i
+
+The command for showing ino 0x23 on the same root nexus, along with sample
+output, is:
+
+  # pcitool /pci@8,700000 -i ino=23
+
+  ino 23 on ctlr 0 mapped to cpu 0
+  Device: /pci@8,700000/ebus@5/i2c@1,30
+    Driver: pcf8584, instance 1
+  Device: /pci@8,700000/ebus@5/i2c@1,2e
+    Driver: pcf8584, instance 0
+
+-w cpu=\fIhex_CPU\fR [ -g ]
+
+Route the given ino to the given CPU.  Display the new and original routing
+information.  The ino must be specified.
+
+Successful rerouting ino 23 above from cpu 0 to cpu 1 gives the following
+output:
+
+  # pcitool /pci@8,700000 -i ino=23 -w cpu=1
+
+  Interrupts on ino 23 reassigned: Old cpu:0, New cpu:1
+
+On some platforms (such as X86) multiple MSI interrupts of a single function
+need to be rerouted together.  Use -g to do this.  -g works only on supported
+platforms  and only for groups of MSI interrupts.  (A "group" of 1 is accepted.)
+When -g is used, the vector provided must be the lowest-numbered vector of the
+group.  The size of the group is determined internally.
+
+Successful rerouting a group of inos starting at 60 from cpu 0 to cpu 1 gives
+the following output:
+
+  # pcitool /pci@0,0 -i ino=60 -w cpu=1 -g
+
+  Interrupts on ino group starting at ino 60 reassigned: Old cpu:0, New cpu:1
+
+-v
+
+Verbose output.
+
+-q
+
+No errors reported as messages.  Unix error status still returned by
+program, however.
+
+.SH EXIT STATUS
+
+The following error statuses are returned to the shell:
+
+.sp
+.ne 2
+.mk
+\fB0\fR
+.in +24n
+.rt
+No error
+.sp
+.sp 1
+.in -24n
+.sp
+.ne 2
+.mk
+\fBEINVAL\fR
+.in +24n
+.rt
+Out-of-range, misaligned or otherwise invalid argument has been passed in\&.
+.sp
+.sp 1
+.in -24n
+.sp
+.ne 2
+.mk
+\fBETIME\fR
+.in +24n
+.rt
+Timeout waiting for pending interrupt to settle before changing interrupts to
+a new CPU\&.
+.sp
+.sp 1
+.in -24n
+.sp
+.ne 2
+.mk
+\fBEIO\fR
+.in +24n
+.rt
+An IO error occurred\&.
+.sp
+.sp 1
+.in -24n
+
+.SH FILES
+  /usr/sbin/pcitool
+
+.SH "ATTRIBUTES"
+.PP
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+  _________________________________________________________ 
+ | ATTRIBUTE TYPE       | ATTRIBUTE VALUE                  |
+ |______________________|__________________________________|
+ | Architecture         | PCI-based systems                |
+ |______________________|__________________________________|
+ | Availability         | SUNWio-tools                     |
+ |______________________|__________________________________|
+ | Interface Stability  | Volatile                         |
+ |______________________|__________________________________|
+
+.SH SEE ALSO
+\fBpci\fR(4), \fBsu\fR(1M), \fBuser_attr\fR(4), \fBrbac\fR(5)
+
+.SH NOTES
+All values are entered in hex.
+
+Not all commands are applicable to all platforms.
+
+REFERENCES
+
+PCI specification (available from www.pcisig.org)

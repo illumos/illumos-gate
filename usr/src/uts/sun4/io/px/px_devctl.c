@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI nexus HotPlug devctl interface
@@ -228,14 +226,11 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		switch (cmd) {
 		case PCITOOL_DEVICE_SET_INTR:
 
-		/*
-		 * Require PRIV_SYS_RES_CONFIG,
-		 * same as psradm
-		 */
-		if (secpolicy_ponline(credp)) {
-			rv = EPERM;
-			break;
-		}
+			/* Require full privileges. */
+			if (secpolicy_kmdb(credp)) {
+				rv = EPERM;
+				break;
+			}
 
 		/*FALLTHRU*/
 		/* These require no special privileges. */

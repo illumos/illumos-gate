@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -32,23 +31,15 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# packaging files
-i pkginfo
-i copyright
-i depend
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+#
+# List files which are i386 specific here
 #
 # source locations relative to the prototype file
 #
-# SUNWiotu
+# SUNWio-tools
 #
-d none usr 755 root sys
-d none usr/sbin 755 root bin
-f none usr/sbin/devctl 555 root bin
-f none usr/sbin/emul64ioctl 555 root bin
-d none usr/kernel 755 root sys
-d none usr/kernel/drv 755 root sys
-f none usr/kernel/drv/pshot.conf 644 root sys
-f none usr/kernel/drv/emul64.conf 644 root sys
-d none usr/lib 755 root bin
-d none usr/lib/scsi 755 root bin
-f none usr/lib/scsi/sestopo 555 root bin

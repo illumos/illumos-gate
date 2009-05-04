@@ -141,6 +141,7 @@ Maintenance and Repair:suser:cmd:::/usr/bin/vmstat:euid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/eeprom:euid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/halt:euid=0
 Maintenance and Repair:suser:cmd:::/sbin/init:uid=0
+Maintenance and Repair:solaris:cmd:::/usr/sbin/pcitool:privs=all
 Maintenance and Repair:suser:cmd:::/usr/sbin/poweroff:uid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/prtconf:euid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/reboot:uid=0

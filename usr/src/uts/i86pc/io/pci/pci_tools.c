@@ -230,8 +230,8 @@ static void
 pcitool_get_intr_dev_info(dev_info_t *dip, pcitool_intr_dev_t *devs)
 {
 	(void) strncpy(devs->driver_name,
-	    ddi_driver_name(dip), MAXMODCONFNAME-1);
-	devs->driver_name[MAXMODCONFNAME] = '\0';
+	    ddi_driver_name(dip), MAXMODCONFNAME-2);
+	devs->driver_name[MAXMODCONFNAME-1] = '\0';
 	(void) ddi_pathname(dip, devs->path);
 	devs->dev_inst = ddi_get_instance(dip);
 }
