@@ -244,9 +244,18 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	peer_tcp = peer_connp->conn_tcp;	/* active connect tcp */
 
 	ASSERT(peer_tcp != NULL && peer_tcp != tcp && !peer_tcp->tcp_fused);
-	ASSERT(peer_tcp->tcp_loopback && peer_tcp->tcp_loopback_peer == NULL);
+	ASSERT(peer_tcp->tcp_loopback_peer == NULL);
 	ASSERT(peer_connp->conn_sqp == connp->conn_sqp);
 
+	/*
+	 * Due to IRE changes the peer and us might not agree on tcp_loopback.
+	 * We bail in that case.
+	 */
+	if (!peer_tcp->tcp_loopback) {
+		TCP_STAT(tcps, tcp_fusion_unqualified);
+		CONN_DEC_REF(peer_connp);
+		return;
+	}
 	/*
 	 * Fuse the endpoints; we perform further checks against both
 	 * tcp endpoints to ensure that a fusion is allowed to happen.
