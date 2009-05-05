@@ -506,6 +506,7 @@ COMMON_SUBDIRS= \
 	SUNWusbs \
 	SUNWusbu \
 	SUNWuwb \
+	SUNWvr \
 	SUNWvscankr \
 	SUNWvscanr \
 	SUNWvscanu \

@@ -1723,6 +1723,8 @@ IDM_SHARED_OBJS += base64.o
 IDM_OBJS +=	$(IDM_SHARED_OBJS) \
 		idm.o idm_impl.o idm_text.o idm_conn_sm.o idm_so.o
 
+VR_OBJS += vr.o
+
 #
 #	Build up defines and paths.
 #
