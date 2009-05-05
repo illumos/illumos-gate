@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,6 +156,8 @@ static struct modlinkage modlinkage = {
 	&modldrv,
 	0
 };
+
+extern const int _ncpu; /* Pull the kernel's global _ncpu definition */
 
 int
 _init(void)
@@ -932,7 +934,7 @@ mem_cache_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		return (EFAULT);
 	}
 
-	if ((cache_info.cpu_id < 0) || (cache_info.cpu_id >= NCPU)) {
+	if ((cache_info.cpu_id < 0) || (cache_info.cpu_id >= _ncpu)) {
 		mutex_exit(&softc->mutex);
 		return (EINVAL);
 	}
