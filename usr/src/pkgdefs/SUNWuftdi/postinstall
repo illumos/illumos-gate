@@ -74,7 +74,6 @@ USBFTDI_ALIASES="\
 	\"usb403,cc4a\" \
 	\"usb403,e888\" \
 	\"usb403,e889\" \
-	\"usb403,e88c\" \
 	\"usb403,e88b\" \
 	\"usb403,e88c\" \
 	\"usb7cc,0421\" \
