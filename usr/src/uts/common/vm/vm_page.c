@@ -6451,7 +6451,7 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 		page_capture_hash[index].lists[0].next = bp1;
 		page_capture_hash[index].num_pages++;
 		if (flags & CAPTURE_RETIRE) {
-			page_retire_incr_pend_count();
+			page_retire_incr_pend_count(datap);
 		}
 		mutex_exit(&page_capture_hash[index].pchh_mutex);
 		rw_exit(&pc_cb[cb_index].cb_rwlock);
@@ -6477,7 +6477,8 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 			if (bp2->pp == pp) {
 				if (flags & CAPTURE_RETIRE) {
 					if (!(bp2->flags & CAPTURE_RETIRE)) {
-						page_retire_incr_pend_count();
+						page_retire_incr_pend_count(
+						    datap);
 						bp2->flags = flags;
 						bp2->expires = bp1->expires;
 						bp2->datap = datap;
@@ -6829,7 +6830,7 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 	if (ret >= 0) {
 		if (found) {
 			if (bp1->flags & CAPTURE_RETIRE) {
-				page_retire_decr_pend_count();
+				page_retire_decr_pend_count(datap);
 			}
 			kmem_free(bp1, sizeof (*bp1));
 		}
@@ -7278,28 +7279,16 @@ page_capture_handle_outstanding(void)
 {
 	int ntry;
 
-	if (!page_retire_pend_count()) {
-		/*
-		 * Do we really want to be this aggressive
-		 * for things other than page_retire?
-		 * Maybe have a counter for each callback
-		 * type to guide how aggressive we should
-		 * be here.  Thus if there's at least one
-		 * page for page_retire we go ahead and reap
-		 * like this.
-		 */
-		kmem_reap();
-		seg_preap();
-		page_capture_async();
-	} else if (hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0)) {
+	/* Reap pages before attempting capture pages */
+	kmem_reap();
+
+	if ((page_retire_pend_count() > page_retire_pend_kas_count()) &&
+	    hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0)) {
 		/*
 		 * Note: Purging only for platforms that support
 		 * ISM hat_pageunload() - mainly SPARC. On x86/x64
 		 * platforms ISM pages SE_SHARED locked until destroyed.
-		 * There are pages pending retirement, so
-		 * we reap prior to attempting to capture.
 		 */
-		kmem_reap();
 
 		/* disable and purge seg_pcache */
 		(void) seg_p_disable();
@@ -7317,7 +7306,17 @@ page_capture_handle_outstanding(void)
 		}
 		/* reenable seg_pcache */
 		seg_p_enable();
+
+		/* completed what can be done.  break out */
+		return;
 	}
+
+	/*
+	 * For kernel pages and/or unsupported HAT_DYNAMIC_ISM_UNMAP, reap
+	 * and then attempt to capture.
+	 */
+	seg_preap();
+	page_capture_async();
 }
 
 /*

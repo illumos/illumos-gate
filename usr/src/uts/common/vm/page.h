@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -770,8 +770,9 @@ int	page_unretire_pp(page_t *, int);
 void	page_tryretire(page_t *);
 void	page_retire_mdboot();
 uint64_t	page_retire_pend_count(void);
-void	page_retire_incr_pend_count(void);
-void	page_retire_decr_pend_count(void);
+uint64_t	page_retire_pend_kas_count(void);
+void	page_retire_incr_pend_count(void *);
+void	page_retire_decr_pend_count(void *);
 void	page_clrtoxic(page_t *, uchar_t);
 void	page_settoxic(page_t *, uchar_t);
 

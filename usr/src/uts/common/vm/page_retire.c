@@ -178,6 +178,7 @@ struct page_retire_kstat {
 	kstat_named_t	pr_enqueue_fail;
 	kstat_named_t	pr_dequeue_fail;
 	kstat_named_t	pr_pending;
+	kstat_named_t	pr_pending_kas;
 	kstat_named_t	pr_failed;
 	kstat_named_t	pr_failed_kernel;
 	kstat_named_t	pr_limit;
@@ -198,6 +199,7 @@ static struct page_retire_kstat page_retire_kstat = {
 	{ "pages_notenqueued", 		KSTAT_DATA_UINT64},
 	{ "pages_notdequeued", 		KSTAT_DATA_UINT64},
 	{ "pages_pending", 		KSTAT_DATA_UINT64},
+	{ "pages_pending_kas", 		KSTAT_DATA_UINT64},
 	{ "pages_deferred",		KSTAT_DATA_UINT64},
 	{ "pages_deferred_kernel",	KSTAT_DATA_UINT64},
 	{ "pages_limit",		KSTAT_DATA_UINT64},
@@ -222,6 +224,7 @@ static kstat_t  *page_retire_ksp = NULL;
 #define	PR_KSTAT_RETIRED_FMA	(page_retire_kstat.pr_fma.value.ui64)
 #define	PR_KSTAT_RETIRED_NOTUE	(PR_KSTAT_RETIRED_CE + PR_KSTAT_RETIRED_FMA)
 #define	PR_KSTAT_PENDING	(page_retire_kstat.pr_pending.value.ui64)
+#define	PR_KSTAT_PENDING_KAS	(page_retire_kstat.pr_pending_kas.value.ui64)
 #define	PR_KSTAT_EQFAIL		(page_retire_kstat.pr_enqueue_fail.value.ui64)
 #define	PR_KSTAT_DQFAIL		(page_retire_kstat.pr_dequeue_fail.value.ui64)
 
@@ -834,16 +837,30 @@ page_retire_pend_count(void)
 	return (PR_KSTAT_PENDING);
 }
 
-void
-page_retire_incr_pend_count(void)
+uint64_t
+page_retire_pend_kas_count(void)
 {
-	PR_INCR_KSTAT(pr_pending);
+	return (PR_KSTAT_PENDING_KAS);
 }
 
 void
-page_retire_decr_pend_count(void)
+page_retire_incr_pend_count(void *datap)
+{
+	PR_INCR_KSTAT(pr_pending);
+
+	if ((datap == &kvp) || (datap == &zvp)) {
+		PR_INCR_KSTAT(pr_pending_kas);
+	}
+}
+
+void
+page_retire_decr_pend_count(void *datap)
 {
 	PR_DECR_KSTAT(pr_pending);
+
+	if ((datap == &kvp) || (datap == &zvp)) {
+		PR_DECR_KSTAT(pr_pending_kas);
+	}
 }
 
 /*
@@ -1042,7 +1059,7 @@ page_retire(uint64_t pa, uchar_t reason)
 
 	if (MTBF(pr_calls, pr_mtbf)) {
 		page_settoxic(pp, reason);
-		if (page_trycapture(pp, 0, CAPTURE_RETIRE, NULL) == 0) {
+		if (page_trycapture(pp, 0, CAPTURE_RETIRE, pp->p_vnode) == 0) {
 			PR_DEBUG(prd_prlocked);
 		} else {
 			PR_DEBUG(prd_prnotlocked);
