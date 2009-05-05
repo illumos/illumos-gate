@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Privilege implementation.
@@ -103,8 +100,8 @@ int
 priv_prgetprivsize(prpriv_t *tmpl)
 {
 	return (sizeof (prpriv_t) +
-		PRIV_SETBYTES - sizeof (priv_chunk_t) +
-		(tmpl ? tmpl->pr_infosize : priv_info->priv_infosize));
+	    PRIV_SETBYTES - sizeof (priv_chunk_t) +
+	    (tmpl ? tmpl->pr_infosize : priv_info->priv_infosize));
 }
 
 /*
@@ -172,7 +169,7 @@ priv_pr_spriv(proc_t *p, prpriv_t *prpriv, const cred_t *cr)
 	    (prpriv->pr_infosize & (sizeof (uint32_t) - 1)) != 0 ||
 	    prpriv->pr_infosize > priv_info->priv_infosize ||
 	    prpriv->pr_infosize < 0)
-		    return (EINVAL);
+		return (EINVAL);
 
 	mutex_exit(&p->p_lock);
 
@@ -568,16 +565,16 @@ priv_proc_cred_perm(const cred_t *scr, proc_t *tp, cred_t **pcr, int mode)
 	crhold(tcr = tp->p_cred);
 	mutex_exit(&tp->p_crlock);
 
-	if (scr == tcr)
+	if (scr == tcr && !(tp->p_flag & SNOCD))
 		goto out;
 
 	idsmatch = (scr->cr_uid == tcr->cr_uid &&
-		    scr->cr_uid == tcr->cr_ruid &&
-		    scr->cr_uid == tcr->cr_suid &&
-		    scr->cr_gid == tcr->cr_gid &&
-		    scr->cr_gid == tcr->cr_rgid &&
-		    scr->cr_gid == tcr->cr_sgid &&
-		    !(tp->p_flag & SNOCD));
+	    scr->cr_uid == tcr->cr_ruid &&
+	    scr->cr_uid == tcr->cr_suid &&
+	    scr->cr_gid == tcr->cr_gid &&
+	    scr->cr_gid == tcr->cr_rgid &&
+	    scr->cr_gid == tcr->cr_sgid &&
+	    !(tp->p_flag & SNOCD));
 
 	/*
 	 * Source credential must have the proc_zone privilege if referencing
