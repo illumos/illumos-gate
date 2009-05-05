@@ -1220,9 +1220,6 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ret != DDI_SUCCESS)
 		goto FAIL;
 
-#ifdef DEBUG
-	cmn_err(CE_NOTE, "num registers = %d", nregs);
-#endif
 	/*
 	 * TPM vendors put the TPM registers in different
 	 * slots in their register lists.  They are not always
@@ -1236,10 +1233,6 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if ((ret = ddi_dev_regsize(tpm->dip, idx, &regsize)) !=
 		    DDI_SUCCESS)
 			goto FAIL;
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "register set #%d size = 0x%0lX", idx,
-		    regsize);
-#endif
 		/* The TIS spec says the TPM registers must be 0x5000 bytes */
 		if (regsize == 0x5000)
 			break;

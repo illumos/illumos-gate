@@ -633,7 +633,7 @@ template_flatten(TEMPLATE  * tmpl,
 	DL_NODE   * node = NULL;
 	CK_BYTE   * ptr = NULL;
 	CK_ULONG_32 long_len;
-	CK_ATTRIBUTE_32 *attr_32 = NULL;
+	CK_ATTRIBUTE_32 *attr_32;
 	CK_ULONG    Val;
 	CK_ULONG_32 Val_32;
 	CK_ULONG  * pVal;
@@ -689,15 +689,10 @@ template_flatten(TEMPLATE  * tmpl,
 					ptr += attr->ulValueLen;
 				}
 			}
+			free(attr_32);
 		}
-
-
-
 		node = node->next;
 	}
-
-	if (attr_32)
-		free(attr_32);
 
 	return (CKR_OK);
 }

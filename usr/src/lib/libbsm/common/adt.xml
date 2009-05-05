@@ -1897,123 +1897,111 @@ Use is subject to license terms.
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_clearowner" instance_of="AUE_generic_basic"
-	header="0" idNo="100" omit="JNI">
-	<title>TPM_ClearOwner</title>
-	<program>/usr/lib/tcsd</program>
-	<see>tcsd(8)</see>
-    </event>
     <event id="AUE_tpm_setoperatorauth" instance_of="AUE_generic_basic"
-	header="0" idNo="101" omit="JNI">
+	header="0" idNo="100" omit="JNI">
 	<title>TPM_SetOperatorAuth</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_setownerinstall" instance_of="AUE_generic_basic"
-	header="0" idNo="102" omit="JNI">
+	header="0" idNo="101" omit="JNI">
 	<title>TPM_SetOwnerInstall</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_selftestfull" instance_of="AUE_generic_basic"
-	header="0" idNo="103" omit="JNI">
+	header="0" idNo="102" omit="JNI">
 	<title>TPM_SelfTestFull</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_certifyselftest" instance_of="AUE_generic_basic"
-	header="0" idNo="104" omit="JNI">
+	header="0" idNo="103" omit="JNI">
 	<title>TPM_CertifySelfTest</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_continueselftest" instance_of="AUE_generic_basic"
-	header="0" idNo="105" omit="JNI">
+	header="0" idNo="104" omit="JNI">
 	<title>TPM_ContinueSelfTest</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_ownersetdisable" instance_of="AUE_generic_basic"
-	header="0" idNo="106" omit="JNI">
+	header="0" idNo="105" omit="JNI">
 	<title>TPM_OwnerSetDisable</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_ownerclear" instance_of="AUE_generic_basic"
-	header="0" idNo="107" omit="JNI">
+	header="0" idNo="106" omit="JNI">
 	<title>TPM_OwnerClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_disableownerclear" instance_of="AUE_generic_basic"
-	header="0" idNo="108" omit="JNI">
+	header="0" idNo="107" omit="JNI">
 	<title>TPM_DisableOwnerClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_forceclear" instance_of="AUE_generic_basic"
-	header="0" idNo="109" omit="JNI">
+	header="0" idNo="108" omit="JNI">
 	<title>TPM_ForceClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_disableforceclear" instance_of="AUE_generic_basic"
-	header="0" idNo="110" omit="JNI">
+	header="0" idNo="109" omit="JNI">
 	<title>TPM_DisableForceClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_physicaldisable" instance_of="AUE_generic_basic"
-	header="0" idNo="111" omit="JNI">
+	header="0" idNo="110" omit="JNI">
 	<title>TPM_PhysicalDisable</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_physicalenable" instance_of="AUE_generic_basic"
-	header="0" idNo="112" omit="JNI">
+	header="0" idNo="111" omit="JNI">
 	<title>TPM_PhysicalEnsable</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_physicaldeactivate" instance_of="AUE_generic_basic"
-	header="0" idNo="113" omit="JNI">
+	header="0" idNo="112" omit="JNI">
 	<title>TPM_PhysicalSetDeactivated</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_settempdeactivated" instance_of="AUE_generic_basic"
-	header="0" idNo="114" omit="JNI">
+	header="0" idNo="113" omit="JNI">
 	<title>TPM_SetTempDeactivated</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_settempdeactivated2" instance_of="AUE_generic_basic"
-	header="0" idNo="115" omit="JNI">
-	<title>TPM_SetTempDeactivated2</title>
-	<program>/usr/lib/tcsd</program>
-	<see>tcsd(8)</see>
-    </event>
     <event id="AUE_tpm_physicalpresence" instance_of="AUE_generic_basic"
-	header="0" idNo="116" omit="JNI">
+	header="0" idNo="114" omit="JNI">
 	<title>TPM_PhysicalPresence</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_fieldupgrade" instance_of="AUE_generic_basic"
-	header="0" idNo="117" omit="JNI">
+	header="0" idNo="115" omit="JNI">
 	<title>TPM_FieldUpgrade</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
     <event id="AUE_tpm_resetlockvalue" instance_of="AUE_generic_basic"
-	header="0" idNo="118" omit="JNI">
+	header="0" idNo="116" omit="JNI">
 	<title>TPM_ResetLockValue</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
 
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 119, so next is 120, then fix this comment -->
+<!-- Highest idNo is 116, so next is 117, then fix this comment -->
 <!-- end of C Only events -->
 
 <!--
@@ -2140,112 +2128,6 @@ Use is subject to license terms.
 	<msg id="DEVICE_PERM">login device override</msg>
 	<msg id="AUTH_BYPASS">authorization bypass</msg>
 	<msg id="LOGIN_DISABLED">login disabled</msg>
-	<!-- Begin TPM failure codes -->
-	<msg id="TPM_SUCCESS">Successful completion of the TPM operation.</msg>
-	<msg id="TPM_E_AUTHFAIL">Authentication failed</msg>
-	<msg id="TPM_E_BADINDEX">The index to a PCR, DIR or other register is incorrect</msg>
-	<msg id="TPM_E_BAD_PARAMETER">One or more parameter is bad</msg>
-	<msg id="TPM_E_AUDITFAILURE">auditing of the operation failed.</msg>
-	<msg id="TPM_E_CLEAR_DISABLED">clear operations now physical access</msg>
-	<msg id="TPM_E_DEACTIVATED">The TPM is deactivated</msg>
-	<msg id="TPM_E_DISABLED">The TPM is disabled</msg>
-	<msg id="TPM_E_DISABLED_CMD">The target command has been disabled</msg>
-	<msg id="TPM_E_FAIL">The operation failed</msg>
-	<msg id="TPM_E_BAD_ORDINAL">The ordinal was unknown or inconsistent</msg>
-	<msg id="TPM_E_INSTALL_DISABLED">The ability to install an owner is disabled</msg>
-	<msg id="TPM_E_INVALID_KEYHANDLE">The key handle can not be interpreted</msg>
-	<msg id="TPM_E_KEYNOTFOUND">The key handle points to an invalid key</msg>
-	<msg id="TPM_E_INAPPROPRIATE_ENC">Unacceptable encryption scheme</msg>
-	<msg id="TPM_E_MIGRATEFAIL">Migration authorization failed</msg>
-	<msg id="TPM_E_INVALID_PCR_INFO">PCR information could not be interpreted</msg>
-	<msg id="TPM_E_NOSPACE">No room to load key.</msg>
-	<msg id="TPM_E_NOSRK">There is no SRK set</msg>
-	<msg id="TPM_E_NOTSEALED_BLOB">An encrypted blob is invalid or was 
-	not created by this TPM</msg>
-	<msg id="TPM_E_OWNER_SET">There is already an Owner </msg>
-	<msg id="TPM_E_RESOURCES">The TPM has insufficient internal resources</msg>
-	<msg id="TPM_E_SHORTRANDOM">A random string was too short</msg>
-	<msg id="TPM_E_SIZE">The TPM does not have the space to perform the operation.</msg>
-	<msg id="TPM_E_WRONGPCRVAL">The named PCR value does not match the current PCR value.</msg>
-	<msg id="TPM_E_BAD_PARAM_SIZE">The paramSize argument has the incorrect value </msg>
-	<msg id="TPM_E_SHA_THREAD">There is no existing SHA-1 thread.</msg>
-	<msg id="TPM_E_SHA_ERROR">SHA-1 thread encountered an error.</msg>
-	<msg id="TPM_E_FAILEDSELFTEST">Self-test has failed and the TPM has shutdown.</msg>
-	<msg id="TPM_E_AUTH2FAIL">The auth for the second key failed authorization</msg>
-	<msg id="TPM_E_BADTAG">The tag value sent to for a command is invalid</msg>
-	<msg id="TPM_E_IOERROR">An IO error occurred transmitting information to the TPM</msg>
-	<msg id="TPM_E_ENCRYPT_ERROR">The encryption process had a problem.</msg>
-	<msg id="TPM_E_DECRYPT_ERROR">The decryption process did not complete.</msg>
-	<msg id="TPM_E_INVALID_AUTHHANDLE">An invalid handle was used.</msg>
-	<msg id="TPM_E_NO_ENDORSEMENT">The TPM does not a EK installed</msg>
-	<msg id="TPM_E_INVALID_KEYUSAGE">The usage of a key is not allowed</msg>
-	<msg id="TPM_E_WRONG_ENTITYTYPE">The submitted entity type is not allowed</msg>
-	<msg id="TPM_E_INVALID_POSTINIT">The command was received in the wrong sequence</msg>
-	<msg id="TPM_E_INAPPROPRIATE_SIG">Signed data cannot include additional DER information</msg>
-	<msg id="TPM_E_BAD_KEY_PROPERTY">The key properties are not supported by this TPM</msg>
-	<msg id="TPM_E_BAD_MIGRATION">The migration properties of this key are incorrect.</msg>
-	<msg id="TPM_E_BAD_SCHEME">Incorrect signature or encryption scheme</msg>
-	<msg id="TPM_E_BAD_DATASIZE">The size of the data parameter is bad</msg>
-	<msg id="TPM_E_BAD_MODE">A mode parameter is bad</msg>
-	<msg id="TPM_E_BAD_PRESENCE">physicalPresence or physicalPresenceLock bits have wrong value</msg>
-	<msg id="TPM_E_BAD_VERSION">The TPM cannot perform this version of the capability</msg>
-	<msg id="TPM_E_NO_WRAP_TRANSPORT">The TPM does not allow for wrapped transport sessions</msg>
-	<msg id="TPM_E_AUDITFAIL_UNSUCCESSFUL">TPM audit construction failed for failed command</msg>
-	<msg id="TPM_E_AUDITFAIL_SUCCESSFUL">TPM audit construction failed for successful command</msg>
-	<msg id="TPM_E_NOTRESETABLE">PCR register does not have the resettable attribute</msg>
-	<msg id="TPM_E_NOTLOCAL">PCR register requires locality</msg>
-	<msg id="TPM_E_BAD_TYPE">Make identity blob not properly typed</msg>
-	<msg id="TPM_E_INVALID_RESOURCE">Resource type does not match actual resource</msg>
-	<msg id="TPM_E_NOTFIPS">Command only available when TPM is in FIPS mode</msg>
-	<msg id="TPM_E_INVALID_FAMILY">The command is attempting to use an invalid family ID</msg>
-	<msg id="TPM_E_NO_NV_PERMISSION">The permission to manipulate the NV storage is not available</msg>
-	<msg id="TPM_E_REQUIRES_SIGN">The operation requires a signed command</msg>
-	<msg id="TPM_E_KEY_NOTSUPPORTED">Wrong operation to load an NV key</msg>
-	<msg id="TPM_E_AUTH_CONFLICT">NV_LoadKey blob requires both owner and blob authorization</msg>
-	<msg id="TPM_E_AREA_LOCKED">The NV area is locked and not writable</msg>
-	<msg id="TPM_E_BAD_LOCALITY">The locality is incorrect for the attempted operation</msg>
-	<msg id="TPM_E_READ_ONLY">The NV area is read only and can't be written to</msg>
-	<msg id="TPM_E_PER_NOWRITE">There is no protection on the write to the NV area</msg>
-	<msg id="TPM_E_FAMILYCOUNT">The family count value does not match</msg>
-	<msg id="TPM_E_WRITE_LOCKED">The NV area has already been written to</msg>
-	<msg id="TPM_E_BAD_ATTRIBUTES">The NV area attributes conflict</msg>
-	<msg id="TPM_E_INVALID_STRUCTURE">The tag and version are invalid or inconsistent</msg>
-	<msg id="TPM_E_KEY_OWNER_CONTROL">The key evicted by the TPM Owner.</msg>
-	<msg id="TPM_E_BAD_COUNTER">The counter handle is incorrect</msg>
-	<msg id="TPM_E_NOT_FULLWRITE">The write is not a complete write of the area</msg>
-	<msg id="TPM_E_CONTEXT_GAP">The gap between saved context counts is too large</msg>
-	<msg id="TPM_E_MAXNVWRITES">Max number of NV writes without owner has been exceeded</msg>
-	<msg id="TPM_E_NOOPERATOR">No operator AuthData value is set</msg>
-	<msg id="TPM_E_RESOURCEMISSING">The resource pointed to by context is not loaded</msg>
-	<msg id="TPM_E_DELEGATE_LOCK">The delegate administration is locked</msg>
-	<msg id="TPM_E_DELEGATE_FAMILY">Attempt to manage a family other then the delegated family</msg>
-	<msg id="TPM_E_DELEGATE_ADMIN">Delegation table management not enabled</msg>
-	<msg id="TPM_E_TRANSPORT_NOTEXCLUSIVE">Command executed outside of exclusive transport session</msg>
-	<msg id="TPM_E_OWNER_CONTROL">Attempt to context save a owner evict controlled key</msg>
-	<msg id="TPM_E_DAA_RESOURCES">DAA command has no resources available to execute the command</msg>
-	<msg id="TPM_E_DAA_INPUT_DATA0">The consistency check on DAA parameter inputData0 has failed.</msg>
-	<msg id="TPM_E_DAA_INPUT_DATA1">The consistency check on DAA parameter inputData1 has failed.</msg>
-	<msg id="TPM_E_DAA_ISSUER_SETTINGS">The consistency check on DAA_issuerSettings has failed.</msg>
-	<msg id="TPM_E_DAA_TPM_SETTINGS">The consistency check on DAA_tpmSpecific has failed.</msg>
-	<msg id="TPM_E_DAA_STAGE">Atomic process indicated by DAA command is not the expected process.</msg>
-	<msg id="TPM_E_DAA_ISSUER_VALIDITY">Inconsistent issuer validity</msg>
-	<msg id="TPM_E_DAA_WRONG_W">The consistency check on w has failed.</msg>
-	<msg id="TPM_E_BAD_HANDLE">The handle is incorrect</msg>
-	<msg id="TPM_E_BAD_DELEGATE">Delegation is not correct</msg>
-	<msg id="TPM_E_BADCONTEXT">The context blob is invalid</msg>
-	<msg id="TPM_E_TOOMANYCONTEXTS">Too many contexts held by the TPM</msg>
-	<msg id="TPM_E_MA_TICKET_SIGNATURE">Migration authority signature validation failure</msg>
-	<msg id="TPM_E_MA_DESTINATION">Migration destination not authenticated</msg>
-	<msg id="TPM_E_MA_SOURCE">Migration source incorrect</msg>
-	<msg id="TPM_E_MA_AUTHORITY">Incorrect migration authority</msg>
-	<msg id="TPM_E_PERMANENTEK">Attempt to revoke the EK and the EK is not revocable</msg>
-	<msg id="TPM_E_BAD_SIGNATURE">Bad signature of CMK ticket</msg>
-	<msg id="TPM_E_NOCONTEXTSPACE">There is no room in the context list for additional contexts</msg>
-	<msg id="TPM_E_RETRY">The TPM is too busy to respond to the command immediately</msg>
-	<msg id="TPM_E_NEEDS_SELFTEST">SelfTestFull has not been run</msg>
-	<msg id="TPM_E_DOING_SELFTEST">The TPM is currently executing a full selftest</msg>
-	<msg id="TPM_E_DEFEND_LOCK_RUNNING">TPM is defending against dictionary attacks</msg>
-	<!-- End TPM failure codes -->
     </msg_list>
 
 <!--
@@ -2315,4 +2197,110 @@ Use is subject to license terms.
 	<msg id="AD_FTRACE_STOP">ftrace stop</msg>
     </msg_list>
 
+    <msg_list id="tpm_e" header="0" start="4000" public="true">
+	<msg id="AUTHFAIL">Authentication failed</msg>
+	<msg id="BADINDEX">The index to a PCR, DIR or other register is incorrect</msg>
+	<msg id="BAD_PARAMETER">One or more parameter is bad</msg>
+	<msg id="AUDITFAILURE">auditing of the operation failed.</msg>
+	<msg id="CLEAR_DISABLED">clear operations now physical access</msg>
+	<msg id="DEACTIVATED">The TPM is deactivated</msg>
+	<msg id="DISABLED">The TPM is disabled</msg>
+	<msg id="DISABLED_CMD">The target command has been disabled</msg>
+	<msg id="FAIL">The operation failed</msg>
+	<msg id="BAD_ORDINAL">The ordinal was unknown or inconsistent</msg>
+	<msg id="INSTALL_DISABLED">The ability to install an owner is disabled</msg>
+	<msg id="INVALID_KEYHANDLE">The key handle can not be interpreted</msg>
+	<msg id="KEYNOTFOUND">The key handle points to an invalid key</msg>
+	<msg id="INAPPROPRIATE_ENC">Unacceptable encryption scheme</msg>
+	<msg id="MIGRATEFAIL">Migration authorization failed</msg>
+	<msg id="INVALID_PCR_INFO">PCR information could not be interpreted</msg>
+	<msg id="NOSPACE">No room to load key.</msg>
+	<msg id="NOSRK">There is no SRK set</msg>
+	<msg id="NOTSEALED_BLOB">An encrypted blob is invalid or was 
+	not created by this TPM</msg>
+	<msg id="OWNER_SET">There is already an Owner </msg>
+	<msg id="RESOURCES">The TPM has insufficient internal resources</msg>
+	<msg id="SHORTRANDOM">A random string was too short</msg>
+	<msg id="SIZE">The TPM does not have the space to perform the operation.</msg>
+	<msg id="WRONGPCRVAL">The named PCR value does not match the current PCR value.</msg>
+	<msg id="BAD_PARAM_SIZE">The paramSize argument has the incorrect value </msg>
+	<msg id="SHA_THREAD">There is no existing SHA-1 thread.</msg>
+	<msg id="SHA_ERROR">SHA-1 thread encountered an error.</msg>
+	<msg id="FAILEDSELFTEST">Self-test has failed and the TPM has shutdown.</msg>
+	<msg id="AUTH2FAIL">The auth for the second key failed authorization</msg>
+	<msg id="BADTAG">The tag value sent to for a command is invalid</msg>
+	<msg id="IOERROR">An IO error occurred transmitting information to the TPM</msg>
+	<msg id="ENCRYPT_ERROR">The encryption process had a problem.</msg>
+	<msg id="DECRYPT_ERROR">The decryption process did not complete.</msg>
+	<msg id="INVALID_AUTHHANDLE">An invalid handle was used.</msg>
+	<msg id="NO_ENDORSEMENT">The TPM does not a EK installed</msg>
+	<msg id="INVALID_KEYUSAGE">The usage of a key is not allowed</msg>
+	<msg id="WRONG_ENTITYTYPE">The submitted entity type is not allowed</msg>
+	<msg id="INVALID_POSTINIT">The command was received in the wrong sequence</msg>
+	<msg id="INAPPROPRIATE_SIG">Signed data cannot include additional DER information</msg>
+	<msg id="BAD_KEY_PROPERTY">The key properties are not supported by this TPM</msg>
+	<msg id="BAD_MIGRATION">The migration properties of this key are incorrect.</msg>
+	<msg id="BAD_SCHEME">Incorrect signature or encryption scheme</msg>
+	<msg id="BAD_DATASIZE">The size of the data parameter is bad</msg>
+	<msg id="BAD_MODE">A mode parameter is bad</msg>
+	<msg id="BAD_PRESENCE">physicalPresence or physicalPresenceLock bits have wrong value</msg>
+	<msg id="BAD_VERSION">The TPM cannot perform this version of the capability</msg>
+	<msg id="NO_WRAP_TRANSPORT">The TPM does not allow for wrapped transport sessions</msg>
+	<msg id="AUDITFAIL_UNSUCCESSFUL">TPM audit construction failed for failed command</msg>
+	<msg id="AUDITFAIL_SUCCESSFUL">TPM audit construction failed for successful command</msg>
+	<msg id="NOTRESETABLE">PCR register does not have the resettable attribute</msg>
+	<msg id="NOTLOCAL">PCR register requires locality</msg>
+	<msg id="BAD_TYPE">Make identity blob not properly typed</msg>
+	<msg id="INVALID_RESOURCE">Resource type does not match actual resource</msg>
+	<msg id="NOTFIPS">Command only available when TPM is in FIPS mode</msg>
+	<msg id="INVALID_FAMILY">The command is attempting to use an invalid family ID</msg>
+	<msg id="NO_NV_PERMISSION">The permission to manipulate the NV storage is not available</msg>
+	<msg id="REQUIRES_SIGN">The operation requires a signed command</msg>
+	<msg id="KEY_NOTSUPPORTED">Wrong operation to load an NV key</msg>
+	<msg id="AUTH_CONFLICT">NV_LoadKey blob requires both owner and blob authorization</msg>
+	<msg id="AREA_LOCKED">The NV area is locked and not writable</msg>
+	<msg id="BAD_LOCALITY">The locality is incorrect for the attempted operation</msg>
+	<msg id="READ_ONLY">The NV area is read only and can't be written to</msg>
+	<msg id="PER_NOWRITE">There is no protection on the write to the NV area</msg>
+	<msg id="FAMILYCOUNT">The family count value does not match</msg>
+	<msg id="WRITE_LOCKED">The NV area has already been written to</msg>
+	<msg id="BAD_ATTRIBUTES">The NV area attributes conflict</msg>
+	<msg id="INVALID_STRUCTURE">The tag and version are invalid or inconsistent</msg>
+	<msg id="KEY_OWNER_CONTROL">The key evicted by the TPM Owner.</msg>
+	<msg id="BAD_COUNTER">The counter handle is incorrect</msg>
+	<msg id="NOT_FULLWRITE">The write is not a complete write of the area</msg>
+	<msg id="CONTEXT_GAP">The gap between saved context counts is too large</msg>
+	<msg id="MAXNVWRITES">Max number of NV writes without owner has been exceeded</msg>
+	<msg id="NOOPERATOR">No operator AuthData value is set</msg>
+	<msg id="RESOURCEMISSING">The resource pointed to by context is not loaded</msg>
+	<msg id="DELEGATE_LOCK">The delegate administration is locked</msg>
+	<msg id="DELEGATE_FAMILY">Attempt to manage a family other then the delegated family</msg>
+	<msg id="DELEGATE_ADMIN">Delegation table management not enabled</msg>
+	<msg id="TRANSPORT_NOTEXCLUSIVE">Command executed outside of exclusive transport session</msg>
+	<msg id="OWNER_CONTROL">Attempt to context save a owner evict controlled key</msg>
+	<msg id="DAA_RESOURCES">DAA command has no resources available to execute the command</msg>
+	<msg id="DAA_INPUT_DATA0">The consistency check on DAA parameter inputData0 has failed.</msg>
+	<msg id="DAA_INPUT_DATA1">The consistency check on DAA parameter inputData1 has failed.</msg>
+	<msg id="DAA_ISSUER_SETTINGS">The consistency check on DAA_issuerSettings has failed.</msg>
+	<msg id="DAA_TPM_SETTINGS">The consistency check on DAA_tpmSpecific has failed.</msg>
+	<msg id="DAA_STAGE">Atomic process indicated by DAA command is not the expected process.</msg>
+	<msg id="DAA_ISSUER_VALIDITY">Inconsistent issuer validity</msg>
+	<msg id="DAA_WRONG_W">The consistency check on w has failed.</msg>
+	<msg id="BAD_HANDLE">The handle is incorrect</msg>
+	<msg id="BAD_DELEGATE">Delegation is not correct</msg>
+	<msg id="BADCONTEXT">The context blob is invalid</msg>
+	<msg id="TOOMANYCONTEXTS">Too many contexts held by the TPM</msg>
+	<msg id="MA_TICKET_SIGNATURE">Migration authority signature validation failure</msg>
+	<msg id="MA_DESTINATION">Migration destination not authenticated</msg>
+	<msg id="MA_SOURCE">Migration source incorrect</msg>
+	<msg id="MA_AUTHORITY">Incorrect migration authority</msg>
+	<msg id="PERMANENTEK">Attempt to revoke the EK and the EK is not revocable</msg>
+	<msg id="BAD_SIGNATURE">Bad signature of CMK ticket</msg>
+	<msg id="NOCONTEXTSPACE">There is no room in the context list for additional contexts</msg>
+	<msg id="RETRY">The TPM is too busy to respond to the command immediately</msg>
+	<msg id="NEEDS_SELFTEST">SelfTestFull has not been run</msg>
+	<msg id="DOING_SELFTEST">The TPM is currently executing a full selftest</msg>
+	<msg id="DEFEND_LOCK_RUNNING">TPM is defending against dictionary attacks</msg>
+	<!-- End TPM failure codes -->
+    </msg_list>
 </specification>
