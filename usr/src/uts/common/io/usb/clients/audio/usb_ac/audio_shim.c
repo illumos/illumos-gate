@@ -528,8 +528,6 @@ ashim_rem_eng(ashim_state_t *statep, ashim_eng_t *engp)
 	audio_engine_free(engp->af_engp);
 	engp->af_engp = NULL;
 
-	if (statep->engcnt > 0)
-		statep->engcnt--;
 }
 
 
@@ -575,7 +573,6 @@ ashim_add_eng(ashim_state_t *statep, int dir)
 
 	engp->flags = ENG_ENABLED;
 
-	statep->engcnt++;
 	rv = AUDIO_SUCCESS;
 
 OUT:
@@ -1390,7 +1387,7 @@ am_detach(audiohdl_t handle, ddi_detach_cmd_t cmd)
 	}
 	statep->flags &= ~AF_REGISTERED;
 
-	for (i = 0; i < statep->engcnt; i++)
+	for (i = 0; i < ASHIM_ENG_MAX; i++)
 		ashim_rem_eng(statep, &statep->engines[i]);
 
 	if (statep->controls != NULL)
@@ -1422,10 +1419,6 @@ am_attach(audiohdl_t handle, ddi_attach_cmd_t cmd,
 	statep->af_devp = af_devp;
 	statep->ad_infop = ad_infop;
 
-	/*
-	 * setup the engines
-	 */
-	statep->engcnt = 0;
 
 	/*
 	 * If the device supports both play and record we require duplex
@@ -1607,12 +1600,11 @@ audio_sup_restore_state(audiohdl_t handle)
 
 	(void) ashim_ctrl_restore(statep);
 
-	for (i = 0; i < statep->engcnt; i++) {
+	for (i = 0; i < ASHIM_ENG_MAX; i++) {
 		engp = &statep->engines[i];
-
-		mutex_enter(&engp->lock);
+		if (engp->af_engp == NULL)
+			continue;
 		start = (engp->flags & ENG_STARTED);
-		mutex_exit(&engp->lock);
 
 		if (start)
 			(void) ashim_eng_start(engp);

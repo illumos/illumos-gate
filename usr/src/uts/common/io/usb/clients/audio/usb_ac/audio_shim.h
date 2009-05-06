@@ -135,7 +135,6 @@ struct ashim_state {
 
 #define	ASHIM_ENG_MAX	2
 	ashim_eng_t	engines[ASHIM_ENG_MAX];
-	int		engcnt;
 
 	ashim_ctrl_t	*controls;
 
