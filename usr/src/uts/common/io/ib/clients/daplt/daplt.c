@@ -3933,7 +3933,6 @@ daplka_cr_accept(daplka_ia_resource_t *ia_rp, intptr_t arg, int mode,
 	dapl_cr_accept_t		args;
 	daplka_sp_conn_pend_t		*conn;
 	ibt_cm_proceed_reply_t		proc_reply;
-	ibt_hca_attr_t			*hca_attrp;
 	ibt_status_t			status;
 	uint16_t			bkl_index;
 	uint32_t			old_state, new_state;
@@ -4029,10 +4028,9 @@ daplka_cr_accept(daplka_ia_resource_t *ia_rp, intptr_t arg, int mode,
 		retval = EINVAL;
 		goto cleanup;
 	}
-	hca_attrp = &ia_rp->ia_hca->hca_attr;
 	proc_reply.rep.cm_channel = ep_rp->ep_chan_hdl;
-	proc_reply.rep.cm_rdma_ra_out = hca_attrp->hca_max_rdma_out_chan;
-	proc_reply.rep.cm_rdma_ra_in = hca_attrp->hca_max_rdma_in_chan;
+	proc_reply.rep.cm_rdma_ra_out = conn->spcp_rdma_ra_out;
+	proc_reply.rep.cm_rdma_ra_in = conn->spcp_rdma_ra_in;
 	proc_reply.rep.cm_rnr_retry_cnt = IBT_RNR_INFINITE_RETRY;
 	sid = conn->spcp_sid;
 
@@ -6602,6 +6600,8 @@ daplka_cm_service_req(daplka_sp_resource_t *spp, ibt_cm_event_t *event,
 	} else {
 		conn->spcp_req_len = 0;
 	}
+	conn->spcp_rdma_ra_in = event->cm_event.req.req_rdma_ra_in;
+	conn->spcp_rdma_ra_out = event->cm_event.req.req_rdma_ra_out;
 
 	/*
 	 * create a CR event

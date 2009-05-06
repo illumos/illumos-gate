@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,6 +370,8 @@ typedef struct daplka_sp_conn_pend_s {
 	void			*spcp_sid; /* session id for cm_proceed */
 	uint32_t		spcp_req_len; /* used by cr_handoff */
 	char			spcp_req_data[DAPL_MAX_PRIVATE_DATA_SIZE];
+	uint8_t			spcp_rdma_ra_out;
+	uint8_t			spcp_rdma_ra_in;
 } daplka_sp_conn_pend_t;
 
 #define	DAPLKA_DEFAULT_SP_BACKLOG	256
