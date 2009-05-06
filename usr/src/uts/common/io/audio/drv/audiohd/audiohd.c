@@ -946,6 +946,7 @@ audiohd_set_output_gain(audiohd_state_t *statep)
 		w = path->codec->widget[wid];
 		maxgain = w->outamp_cap &
 		    AUDIOHDC_AMP_CAP_STEP_NUMS;
+		maxgain >>= AUDIOHD_GAIN_OFF;
 		if (w->outamp_cap) {
 			tmp = gain * maxgain / 100;
 			(void) audioha_codec_4bit_verb_get(statep,
@@ -3024,6 +3025,26 @@ audiohd_create_codec(audiohd_state_t *statep)
 
 		ASSERT(codec->wid_afg == wid);
 
+		/* work around for Sony VAIO laptop with specific codec */
+		if ((codec->vid != AUDIOHD_CODECID_SONY1) &&
+		    (codec->vid != AUDIOHD_CODECID_SONY2)) {
+			/*
+			 * GPIO controls which are laptop specific workarounds
+			 * and might be changed. Some laptops use GPIO,
+			 * so we need to enable and set the GPIO correctly.
+			 */
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_STCK,
+			    AUDIOHDC_GPIO_DATA_CTRL);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_DATA,
+			    AUDIOHDC_GPIO_STCK_CTRL);
+		}
+
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_SET_POWER_STATE, 0);
@@ -3054,27 +3075,6 @@ audiohd_create_codec(audiohd_state_t *statep)
 		codec->soft_statep = statep;
 		audiohd_set_codec_info(codec);
 		(void) audiohd_create_widgets(codec);
-
-		/* work around for Sony VAIO laptop with specific codec */
-		if ((codec->vid == AUDIOHD_CODECID_SONY1) ||
-		    (codec->vid == AUDIOHD_CODECID_SONY2))
-			continue;
-		else
-			statep->gpio_direct = AUDIOHDC_GPIO_DIRECT;
-		/*
-		 * GPIO controls which are laptop specific workarounds and
-		 * might be changed. Some laptops use GPIO, so we need to
-		 * enable and set the GPIO correctly.
-		 */
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_DIREC, statep->gpio_direct);
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_STCK, AUDIOHDC_GPIO_DATA_CTRL);
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_DATA, AUDIOHDC_GPIO_STCK_CTRL);
-
 	}
 
 	return (AUDIO_SUCCESS);
@@ -4900,24 +4900,25 @@ audiohd_restore_codec_gpio(audiohd_state_t *statep)
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_SET_POWER_STATE, 0);
-
 		/* work around for Sony VAIO laptop with specific codec */
-		if ((codec->vid == AUDIOHD_CODECID_SONY1) ||
-		    (codec->vid == AUDIOHD_CODECID_SONY2))
-			continue;
-		/*
-		 * GPIO controls which are laptop specific workarounds and
-		 * might be changed. Some laptops use GPIO, so we need to
-		 * enable and set the GPIO correctly.
-		 */
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_DIREC, statep->gpio_direct);
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_STCK, AUDIOHDC_GPIO_DATA_CTRL);
-		(void) audioha_codec_verb_get(statep, i, wid,
-		    AUDIOHDC_VERB_SET_GPIO_DATA, AUDIOHDC_GPIO_STCK_CTRL);
+		if ((codec->vid != AUDIOHD_CODECID_SONY1) &&
+		    (codec->vid != AUDIOHD_CODECID_SONY2)) {
+			/*
+			 * GPIO controls which are laptop specific workarounds
+			 * and might be changed. Some laptops use GPIO,
+			 * so we need to enable and set the GPIO correctly.
+			 */
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_STCK,
+			    AUDIOHDC_GPIO_DATA_CTRL);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_GPIO_DATA,
+			    AUDIOHDC_GPIO_STCK_CTRL);
+		}
 	}
 }
 /*

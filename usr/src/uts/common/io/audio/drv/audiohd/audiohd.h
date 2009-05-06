@@ -800,8 +800,6 @@ struct audiohd_state {
 	uint_t		hda_play_regbase;
 	uint_t		hda_record_regbase;
 
-	uint8_t		gpio_direct;
-
 	uint_t		hda_play_stag;		/* tag of playback stream */
 	uint_t		hda_record_stag;	/* tag of record stream */
 	uint_t		hda_play_lgain;		/* left gain for playback */
