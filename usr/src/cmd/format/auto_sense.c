@@ -213,6 +213,9 @@ static int auto_label_init(struct dk_label *label);
 static struct ctlr_type *find_direct_ctlr_type(void);
 static struct ctlr_info *find_direct_ctlr_info(struct dk_cinfo	*dkinfo);
 static  struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
+static struct ctlr_type *find_vbd_ctlr_type(void);
+static struct ctlr_info *find_vbd_ctlr_info(struct dk_cinfo *dkinfo);
+static struct disk_info *find_vbd_disk_info(struct dk_cinfo *dkinfo);
 
 static char		*get_sun_disk_name(
 				char		*disk_name,
@@ -313,6 +316,9 @@ auto_efi_sense(int fd, struct efi_info *label)
 	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT)) {
 		ctlr = find_direct_ctlr_info(&dkinfo);
 		disk_info = find_direct_disk_info(&dkinfo);
+	} else if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_VBD)) {
+		ctlr = find_vbd_ctlr_info(&dkinfo);
+		disk_info = find_vbd_disk_info(&dkinfo);
 	} else {
 		ctlr = find_scsi_ctlr_info(&dkinfo);
 		disk_info = find_scsi_disk_info(&dkinfo);
@@ -383,6 +389,25 @@ find_direct_ctlr_type()
 	return ((struct ctlr_type *)NULL);
 }
 
+static struct ctlr_type *
+find_vbd_ctlr_type()
+{
+	struct	mctlr_list	*mlp;
+
+	mlp = controlp;
+
+	while (mlp != NULL) {
+		if (mlp->ctlr_type->ctype_ctype == DKC_VBD) {
+			return (mlp->ctlr_type);
+		}
+		mlp = mlp->next;
+	}
+
+	impossible("no VBD controller type");
+
+	return ((struct ctlr_type *)NULL);
+}
+
 static struct ctlr_info *
 find_direct_ctlr_info(
 	struct dk_cinfo		*dkinfo)
@@ -401,6 +426,27 @@ find_direct_ctlr_info(
 	}
 
 	impossible("no DIRECT controller info");
+	/*NOTREACHED*/
+}
+
+static struct ctlr_info *
+find_vbd_ctlr_info(
+	struct dk_cinfo		*dkinfo)
+{
+	struct ctlr_info	*ctlr;
+
+	if (dkinfo->dki_ctype != DKC_VBD)
+		return (NULL);
+
+	for (ctlr = ctlr_list; ctlr != NULL; ctlr = ctlr->ctlr_next) {
+		if (ctlr->ctlr_addr == dkinfo->dki_addr &&
+		    ctlr->ctlr_space == dkinfo->dki_space &&
+		    ctlr->ctlr_ctype->ctype_ctype == DKC_VBD) {
+			return (ctlr);
+		}
+	}
+
+	impossible("no VBD controller info");
 	/*NOTREACHED*/
 }
 
@@ -423,6 +469,28 @@ find_direct_disk_info(
 	}
 
 	impossible("No DIRECT disk info instance\n");
+	/*NOTREACHED*/
+}
+
+static  struct disk_info *
+find_vbd_disk_info(
+	struct dk_cinfo		*dkinfo)
+{
+	struct disk_info	*disk;
+	struct dk_cinfo		*dp;
+
+	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
+		assert(dkinfo->dki_ctype == DKC_VBD);
+		dp = &disk->disk_dkinfo;
+		if (dp->dki_ctype == dkinfo->dki_ctype &&
+		    dp->dki_cnum == dkinfo->dki_cnum &&
+		    dp->dki_unit == dkinfo->dki_unit &&
+		    strcmp(dp->dki_dname, dkinfo->dki_dname) == 0) {
+			return (disk);
+		}
+	}
+
+	impossible("No VBD disk info instance\n");
 	/*NOTREACHED*/
 }
 
@@ -1796,8 +1864,7 @@ find_scsi_ctlr_type()
 	mlp = controlp;
 
 	while (mlp != NULL) {
-		if (mlp->ctlr_type->ctype_ctype == DKC_SCSI_CCS ||
-		    mlp->ctlr_type->ctype_ctype == DKC_VBD) {
+		if (mlp->ctlr_type->ctype_ctype == DKC_SCSI_CCS) {
 			return (mlp->ctlr_type);
 		}
 		mlp = mlp->next;
@@ -1821,16 +1888,14 @@ find_scsi_ctlr_info(
 {
 	struct ctlr_info	*ctlr;
 
-	if (dkinfo->dki_ctype != DKC_SCSI_CCS &&
-	    dkinfo->dki_ctype != DKC_VBD) {
+	if (dkinfo->dki_ctype != DKC_SCSI_CCS) {
 		return (NULL);
 	}
 
 	for (ctlr = ctlr_list; ctlr != NULL; ctlr = ctlr->ctlr_next) {
 		if (ctlr->ctlr_addr == dkinfo->dki_addr &&
 		    ctlr->ctlr_space == dkinfo->dki_space &&
-		    (ctlr->ctlr_ctype->ctype_ctype == DKC_SCSI_CCS ||
-		    ctlr->ctlr_ctype->ctype_ctype == DKC_VBD)) {
+		    ctlr->ctlr_ctype->ctype_ctype == DKC_SCSI_CCS) {
 			return (ctlr);
 		}
 	}
@@ -2005,6 +2070,8 @@ delete_disk_type(
 
 	if (cur_ctype->ctype_ctype == DKC_DIRECT)
 		ctlr = find_direct_ctlr_type();
+	else if (cur_ctype->ctype_ctype == DKC_VBD)
+		ctlr = find_vbd_ctlr_type();
 	else
 		ctlr = find_scsi_ctlr_type();
 	if (ctlr == NULL || ctlr->ctype_dlist == NULL) {
@@ -2044,13 +2111,12 @@ find_scsi_disk_info(
 	struct dk_cinfo		*dp;
 
 	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
-		assert(dkinfo->dki_ctype == DKC_SCSI_CCS ||
-		    dkinfo->dki_ctype == DKC_VBD);
+		assert(dkinfo->dki_ctype == DKC_SCSI_CCS);
 		dp = &disk->disk_dkinfo;
 		if (dp->dki_ctype == dkinfo->dki_ctype &&
-			dp->dki_cnum == dkinfo->dki_cnum &&
-			dp->dki_unit == dkinfo->dki_unit &&
-			strcmp(dp->dki_dname, dkinfo->dki_dname) == 0) {
+		    dp->dki_cnum == dkinfo->dki_cnum &&
+		    dp->dki_unit == dkinfo->dki_unit &&
+		    strcmp(dp->dki_dname, dkinfo->dki_dname) == 0) {
 			return (disk);
 		}
 	}
