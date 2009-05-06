@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpc.c 146 2006-03-24 00:26:54Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -262,17 +260,19 @@ lpc_topq(papi_service_t svc, char **args)
 {
 	papi_status_t status;
 	char *destination = args[1];
-	int32_t id = atoi(args[2]);
+	char *idstr = args[2];
+	int32_t id;
 
-	if (destination == NULL) {
+	if (destination == NULL || idstr == NULL) {
 		fprintf(stderr, gettext("Usage: topq (destination) (id)\n"));
 		return (-1);
 	}
+	id = atoi(idstr);
 
 	status = papiJobPromote(svc, destination, id);
 	if (status != PAPI_OK) {
-		fprintf(stderr, gettext("topq: %s %d: %s\n"), destination, id,
-			verbose_papi_message(svc, status));
+		fprintf(stderr, gettext("topq: %s-%d: %s\n"), destination, id,
+		    verbose_papi_message(svc, status));
 		return (-1);
 	}
 
@@ -465,7 +465,7 @@ process(int ac, char **av)
 		return (-1);
 	}
 
-	if (((ac == 0) && (num_args != 0)) ||
+	if (((ac == 0) && (num_args == 1)) ||
 	    ((printer != NULL) && strcmp(printer, "all") == 0))
 		rc = process_all(handler, av, num_args);
 	else if (num_args < ac) {
@@ -525,8 +525,11 @@ lpc_shell()
 			exit(1);
 		if ((av = strsplit(line, " \t\n")) != NULL)
 			for (ac = 0; av[ac] != NULL; ac++);
+		else
+			continue;
 
-		(void) process(ac - 1, av);
+		if (ac > 0)
+			(void) process(ac - 1, av);
 		free(av);
 	}
 }
