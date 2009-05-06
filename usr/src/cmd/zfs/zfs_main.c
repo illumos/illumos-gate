@@ -1665,12 +1665,13 @@ zfs_do_upgrade(int argc, char **argv)
 /*
  * zfs userspace
  */
-static void
+static int
 userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 {
 	zfs_userquota_prop_t *typep = arg;
 	zfs_userquota_prop_t p = *typep;
-	char *name, *ug, *propname;
+	char *name = NULL;
+	char *ug, *propname;
 	char namebuf[32];
 	char sizebuf[32];
 
@@ -1696,7 +1697,7 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	else
 		propname = "quota";
 
-	if (!name) {
+	if (name == NULL) {
 		(void) snprintf(namebuf, sizeof (namebuf),
 		    "%llu", (longlong_t)rid);
 		name = namebuf;
@@ -1705,6 +1706,8 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 
 	(void) printf("%s %s %s%c%s %s\n", propname, ug, domain,
 	    domain[0] ? '-' : ' ', name, sizebuf);
+
+	return (0);
 }
 
 static int

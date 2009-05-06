@@ -225,7 +225,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 			bzero(buf->b_data, sizeof (objset_phys_t));
 			bcopy(osi->os_phys_buf->b_data, buf->b_data,
 			    arc_buf_size(osi->os_phys_buf));
-			arc_buf_remove_ref(osi->os_phys_buf, &osi->os_phys_buf);
+			(void) arc_buf_remove_ref(osi->os_phys_buf,
+			    &osi->os_phys_buf);
 			osi->os_phys_buf = buf;
 		}
 

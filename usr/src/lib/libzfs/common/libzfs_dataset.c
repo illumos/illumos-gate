@@ -4078,7 +4078,10 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 			break;
 
 		while (zc.zc_nvlist_dst_size > 0) {
-			func(arg, zua->zu_domain, zua->zu_rid, zua->zu_space);
+			error = func(arg, zua->zu_domain, zua->zu_rid,
+			    zua->zu_space);
+			if (error != 0)
+				return (error);
 			zua++;
 			zc.zc_nvlist_dst_size -= sizeof (zfs_useracct_t);
 		}

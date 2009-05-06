@@ -461,7 +461,7 @@ extern int zfs_send(zfs_handle_t *, const char *, const char *,
     boolean_t, boolean_t, boolean_t, boolean_t, int);
 extern int zfs_promote(zfs_handle_t *);
 
-typedef void (*zfs_userspace_cb_t)(void *arg, const char *domain,
+typedef int (*zfs_userspace_cb_t)(void *arg, const char *domain,
     uid_t rid, uint64_t space);
 
 extern int zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,

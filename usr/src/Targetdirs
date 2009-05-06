@@ -310,6 +310,7 @@ ROOT.BIN= \
 	/usr/lib/smbsrv \
 	/usr/lib/term \
 	/usr/lib/vscan \
+	/usr/lib/zfs \
 	/usr/lib/zones \
 	/usr/old \
 	/usr/openwin \
