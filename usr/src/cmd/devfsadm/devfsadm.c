@@ -322,11 +322,18 @@ main(int argc, char *argv[])
 		devalloc_is_on = da_is_on();
 	} else if (auditon(A_GETCOND, (caddr_t)&cond, sizeof (cond)) == 0) {
 		/*
-		 * Device allocation (and auditing) is enabled if BSM is
-		 * enabled. auditon returns -1 and sets errno to EINVAL if BSM
-		 * is not enabled.
+		 * auditon returns -1 and sets errno to EINVAL if BSM
+		 * is not enabled, so devalloc_is_on must be 0 if no BSM.
+		 *
+		 * Device allocation (and auditing) is enabled by default
+		 * if BSM is enabled, but by default DEVICE_ALLOCATE=
+		 * string is absent from device_allocate, so da_is_on
+		 * will return -1.  To preserve the historical default
+		 * behavior but allow disabling device allocation where needed,
+		 * set devalloc_is_on to true for non-0, false only for 0.
+		 *
 		 */
-		devalloc_is_on = 1;
+		devalloc_is_on = (da_is_on() == 0) ? 0 : 1;
 	}
 
 #ifdef DEBUG
