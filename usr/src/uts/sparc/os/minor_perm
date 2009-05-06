@@ -179,7 +179,6 @@ pcan:* 0666 root sys
 vscan:* 0640 root sys
 vsw:* 0666 root sys
 vnet:* 0666 root sys
-afe:* 0666 root sys
 mxfe:* 0666 root sys
 rtls:* 0666 root sys
 vnic:* 0666 root sys

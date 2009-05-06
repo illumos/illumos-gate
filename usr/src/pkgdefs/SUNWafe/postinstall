@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"	
@@ -146,4 +146,4 @@ check_add_drv -b "${BASEDIR}" -i \
 	"pci13d1,ab03"
 	"pci13d1,ab08" 
 	"pci1737,ab08"' \
-	-m '* 0666 root root' afe
+	-m '* 0666 root sys' afe
