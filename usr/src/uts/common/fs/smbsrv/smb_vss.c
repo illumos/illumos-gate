@@ -144,7 +144,7 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 	char *snapname;
 	char *nodepath;
 	char gmttoken[SMB_VSS_GMT_SIZE];
-	smb_attr_t	attr;
+	smb_attr_t attr;
 	vnode_t *fsrootvp;
 	vnode_t *vp = NULL;
 	int err = 0;
@@ -156,15 +156,15 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 	ASSERT(sr->tid_tree->t_snode->vp);
 	ASSERT(sr->tid_tree->t_snode->vp->v_vfsp);
 
-	p = smb_vss_find_gmttoken(buf);
-
-	if (!p)
+	if ((p = smb_vss_find_gmttoken(buf)) == NULL)
 		return (ENOENT);
 
 	bcopy(p, gmttoken, SMB_VSS_GMT_SIZE);
 	gmttoken[SMB_VSS_GMT_SIZE - 1] = '\0';
 
-	(void) VFS_ROOT(sr->tid_tree->t_snode->vp->v_vfsp, &fsrootvp);
+	err = VFS_ROOT(sr->tid_tree->t_snode->vp->v_vfsp, &fsrootvp);
+	if (err != 0)
+		return (err);
 
 	rootpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	snapname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -172,9 +172,8 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 
 	err = smb_vss_get_fsmountpath(sr, rootpath, MAXPATHLEN);
 
-	if (err != 0) {
+	if (err != 0)
 		goto error;
-	}
 
 	*snapname = '\0';
 
