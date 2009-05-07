@@ -27,7 +27,7 @@
 #ifndef	_ADINFO_H
 #define	_ADINFO_H
 
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 
 
 #ifdef __cplusplus

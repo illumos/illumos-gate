@@ -19,12 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-echo_file usr/src/head/Makefile
-echo_file usr/src/head/rpcsvc/idmap_prot.x
 echo_file usr/src/lib/libidmap/Makefile

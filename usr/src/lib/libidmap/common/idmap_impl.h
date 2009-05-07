@@ -35,7 +35,7 @@
 #include <libscf.h>
 #include <resolv.h>
 
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "idmap_priv.h"
 
 

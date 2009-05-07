@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ extern "C" {
 #include <time.h>
 #include <thread.h>
 #include <synch.h>
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "libadutils.h"
 #include <sys/idmap.h>
 

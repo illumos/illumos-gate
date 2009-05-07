@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@ extern "C" {
 #include <signal.h>
 #include <idmap.h>
 #include <sys/idmap.h>
-#include <idmap_prot.h>
+#include <rpcsvc/idmap_prot.h>
 #include <idmap_priv.h>
 #include "addisc.h"
 #include "libadutils.h"

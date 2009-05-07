@@ -18,23 +18,20 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	
 #
 # uts/common/idmap/Makefile
 #
 # include global definitions
 include ../../../Makefile.master
 
-IDMAP_PROT_DIR= 	$(SRC)/head/rpcsvc
+IDMAP_PROT_DIR= 	$(SRC)/uts/common/rpcsvc
 
 IDMAP_PROT_X=		$(IDMAP_PROT_DIR)/idmap_prot.x
 DERIVED_SRCS=		idmap_xdr.c
-DERIVED_HDRS=		$(IDMAP_PROT_DIR)/idmap_prot.h
-DERIVED_FILES=		$(DERIVED_SRCS) $(DERIVED_HDRS)
+DERIVED_FILES=		$(DERIVED_SRCS)
 HDRS=			kidmap_priv.h
 CHECKHDRS=		$(HDRS:%.h=%.check)
 
@@ -51,11 +48,9 @@ idmap_xdr.c:	$(IDMAP_PROT_X)
 	$(RM) $@
 	$(RPCGEN) -CMNc -D_KERNEL -o $@ $(IDMAP_PROT_X)
 
-$(IDMAP_PROT_DIR)/idmap_prot.h:	$(IDMAP_PROT_X)
-	$(RM) $@
-	$(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)
-
 check:	$(CHECKHDRS)
 
 clean:
 	$(RM) $(DERIVED_FILES)
+
+clobber:	clean

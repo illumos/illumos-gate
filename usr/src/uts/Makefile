@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # include global definitions
@@ -86,18 +86,6 @@ modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 def all lint: all_h $(PMTMO_FILE) $($(MACH)_ARCHITECTURES)
 
 install: all_h install_dirs $(PMTMO_FILE) $($(MACH)_ARCHITECTURES)
-
-clean clobber: $($(MACH)_ARCHITECTURES)
-	@if [ '$(PATCH_BUILD)' != '#' ] ; then \
-		echo $(RM) $(PMTMO_FILE) ; \
-		$(RM) $(PMTMO_FILE) ; \
-	fi
-
-EXTRA_CLOBBER_TARGETS= common/avs/ns/rdc
-clobber: $(EXTRA_CLOBBER_TARGETS)
-
-
-clean.lint modlist: $($(MACH)_ARCHITECTURES)
 
 install_dirs:
 	@cd ..; pwd; $(MAKE) rootdirs
@@ -169,6 +157,14 @@ COMMON_HDRDIRS= common/avs \
 # are simple enough that they can be driven from the src tree.
 $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 
+#
+# Subset of COMMON_HDRDIRS in which at least one header is generated
+# at runtime (e.g., rpcgen).  (This is a partial list; there are
+# other directories that should be included and do not yet have the
+# necessary Makefile support.  See 6414855.)
+#
+DYNHDRDIRS = common/rpcsvc common/idmap
+
 sparc_HDRDIRS= sun/sys
 i386_HDRDIRS= i86pc/vm i86xpv/vm
 
@@ -187,6 +183,18 @@ all_h: FRC
 	@cd common/rpcsvc; pwd; $(MAKE) $@
 	@cd common/gssapi; pwd; $(MAKE) $@
 	@cd common/idmap; pwd; $(MAKE) $@
+
+clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
+	@if [ '$(PATCH_BUILD)' != '#' ] ; then \
+		echo $(RM) $(PMTMO_FILE) ; \
+		$(RM) $(PMTMO_FILE) ; \
+	fi
+
+EXTRA_CLOBBER_TARGETS= common/avs/ns/rdc
+clobber: $(EXTRA_CLOBBER_TARGETS)
+
+
+clean.lint modlist: $($(MACH)_ARCHITECTURES)
 
 ONC_FILES=	common/io/timod.c \
 		common/os/sig.c \

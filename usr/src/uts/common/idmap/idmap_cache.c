@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
 #include <sys/sysmacros.h>
 #include <sys/ksynch.h>
 #include <sys/kidmap.h>
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "kidmap_priv.h"
 
 

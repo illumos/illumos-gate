@@ -35,23 +35,14 @@ LDLIBS +=	-lc -lldap -lresolv -lsocket -lnsl
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-IDMAP_PROT_DIR =	$(SRC)/head/rpcsvc
-IDMAP_PROT_X =		$(IDMAP_PROT_DIR)/idmap_prot.x
-IDMAP_PROT_H =		$(IDMAP_PROT_DIR)/idmap_prot.h
-
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(IDMAP_PROT_DIR)
-
-CLOBBERFILES +=	$(IDMAP_PROT_H)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
 
 lint := OBJECTS = $(LINT_OBJECTS)
 
 .KEEP_STATE:
 
-all: $(IDMAP_PROT_H) $(LIBS)
-
-$(IDMAP_PROT_H):	$(IDMAP_PROT_X)
-	$(RM) $@; $(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)
+all: $(LIBS)
 
 lint: lintcheck
 

@@ -31,10 +31,6 @@ HDRDIR =	common
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-# Both MACH and MACH64 subdirs invoke rpcgen on the same file,
-# so to prevent collisions, we turn off parallelism.
-.NO_PARALLEL:	$(SUBDIRS)
-
 POFILE =	libidmap.po
 MSGFILES =	`$(GREP) -l gettext common/*.[ch]`
 XGETFLAGS =	-a

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,10 +40,6 @@ clobber :=	TARGET = clobber
 LIBSQLITE =	$(ROOT)/usr/lib/libsqlite.o
 SQLITELINT =	$(ROOT)/usr/lib/llib-lsqlite.ln
 
-IDMAP_PROT_DIR =        $(SRC)/head/rpcsvc
-IDMAP_PROT_X =          $(IDMAP_PROT_DIR)/idmap_prot.x
-IDMAP_PROT_H =          $(IDMAP_PROT_DIR)/idmap_prot.h
-
 include ../../Makefile.cmd
 
 POFILE =	$(PROG)_all.po
@@ -51,13 +47,12 @@ POFILE =	$(PROG)_all.po
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE= 444
 
-INCS += -I. -I../../../lib/libidmap/common -I$(IDMAP_PROT_DIR)\
+INCS += -I. -I../../../lib/libidmap/common\
 	 -I../../../lib/libsldap/common\
 	 -I../../../lib/libadutils/common
 
 $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
-CLOBBERFILES += $(IDMAP_PROT_H)
 
 CFLAGS += -v
 LDLIBS += -lsecdb -lsocket -lnsl -lidmap -lscf -lsldap -lldap -luuid -ladutils
@@ -79,10 +74,7 @@ lint := LDLIBS += $(SQLITELINT)
 
 all: $(PROG)
 
-$(IDMAP_PROT_H):	$(IDMAP_PROT_X)
-	$(RM) $@; $(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)
-
-$(PROG): $(IDMAP_PROT_H) $(OBJS) $$(MAPFILES)
+$(PROG): $(OBJS) $$(MAPFILES)
 	$(LINK.c) -o $@ $(OBJS) $(LIBSQLITE) $(LDLIBS)
 	$(POST_PROCESS)
 

@@ -37,7 +37,7 @@
 #include <sqlite/sqlite.h>
 #include <syslog.h>
 #include <inttypes.h>
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "adutils.h"
 #include "idmap_priv.h"
 #include "idmap_config.h"

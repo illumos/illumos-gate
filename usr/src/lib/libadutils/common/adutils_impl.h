@@ -32,7 +32,7 @@
 #include <ldap.h>
 #include <pthread.h>
 #include "addisc.h"
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "libadutils.h"
 
 #ifdef	__cplusplus

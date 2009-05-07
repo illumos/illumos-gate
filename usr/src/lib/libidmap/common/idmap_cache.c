@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
 #include <sys/idmap.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "idmap_cache.h"
 
 

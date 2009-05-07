@@ -35,7 +35,7 @@
 #include <resolv.h>
 
 #include "idmap.h"
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 
 #ifdef __cplusplus
 extern "C" {

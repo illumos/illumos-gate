@@ -39,27 +39,22 @@ CPPFLAGS += -I$(SRC)/lib/libsldap/common
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-IDMAP_PROT_DIR =	$(SRC)/head/rpcsvc
-IDMAP_PROT_X =		$(IDMAP_PROT_DIR)/idmap_prot.x
-IDMAP_PROT_H =		$(IDMAP_PROT_DIR)/idmap_prot.h
+IDMAP_PROT_X =		$(SRC)/uts/common/rpcsvc/idmap_prot.x
 
 ADUTILS_DIR =		$(SRC)/lib/libadutils/common
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(IDMAP_PROT_DIR) -I$(ADUTILS_DIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(ADUTILS_DIR)
 
-CLOBBERFILES +=	$(IDMAP_PROT_H) $(SRCDIR)/idmap_xdr.c
+CLOBBERFILES +=	idmap_xdr.c
 
 lint := OBJECTS = $(LINT_OBJECTS)
 
 .KEEP_STATE:
 
-all: $(IDMAP_PROT_H) $(LIBS)
+all: $(LIBS)
 
-$(IDMAP_PROT_H):	$(IDMAP_PROT_X)
-	$(RM) $@; $(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)
-
-$(SRCDIR)/idmap_xdr.c:	$(IDMAP_PROT_H) $(IDMAP_PROT_X)
+idmap_xdr.c:	$(IDMAP_PROT_X)
 	$(RM) $@; $(RPCGEN) -CMNc -o $@ $(IDMAP_PROT_X)
 
 lint: lintcheck

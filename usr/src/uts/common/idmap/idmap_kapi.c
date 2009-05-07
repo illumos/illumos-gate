@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@
 #include <sys/disp.h>
 #include <sys/kidmap.h>
 #include <sys/zone.h>
-#include "idmap_prot.h"
+#include <rpcsvc/idmap_prot.h>
 #include "kidmap_priv.h"
 
 

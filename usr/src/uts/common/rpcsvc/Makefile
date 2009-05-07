@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.
-# All rights reserved.  Use is subject to license terms.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # uts/common/rpcsvc/Makefile
 #	This makefile installs system header files that go into
@@ -35,7 +33,8 @@ include ../../../Makefile.master
 # completely via rpcgen.  The NLM description should go here some day.
 # Also, the v3 headers have been hacked so that they no longer
 # quite reflect what goes over the wire.
-RPCGEN_SRC=	autofs_prot.x sm_inter.x nsm_addr.x
+IDMAP_PROT_X=	idmap_prot.x
+RPCGEN_SRC=	autofs_prot.x sm_inter.x nsm_addr.x $(IDMAP_PROT_X)
 
 DERIVED_HDRS=	$(RPCGEN_SRC:%.x=%.h)
 
@@ -71,3 +70,5 @@ $(ROOTDIRS):
 %.h: %.x
 	$(RPCGEN) -C -h $< -o $@
 
+idmap_prot.h:	$(IDMAP_PROT_X)
+	$(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)

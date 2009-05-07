@@ -28,10 +28,6 @@ include $(SRC)/lib/Makefile.lib
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-# Both MACH and MACH64 subdirs invoke rpcgen on the same file,
-# so to prevent collisions, we turn off parallelism.
-.NO_PARALLEL:	$(SUBDIRS)
-
 all := 		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
