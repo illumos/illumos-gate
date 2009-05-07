@@ -12803,8 +12803,15 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			 * until after some checks below.
 			 */
 			mp1 = NULL;
+			/*
+			 * tcp_sendmsg() checks tcp_state without entering
+			 * the squeue so tcp_state should be updated before
+			 * sending up connection confirmation
+			 */
+			tcp->tcp_state = TCPS_ESTABLISHED;
 			if (!tcp_conn_con(tcp, iphdr, tcph, mp,
 			    tcp->tcp_loopback ? &mp1 : NULL)) {
+				tcp->tcp_state = TCPS_SYN_SENT;
 				freemsg(mp);
 				return;
 			}
@@ -12815,7 +12822,6 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			/* One for the SYN */
 			tcp->tcp_suna = tcp->tcp_iss + 1;
 			tcp->tcp_valid_bits &= ~TCP_ISS_VALID;
-			tcp->tcp_state = TCPS_ESTABLISHED;
 
 			/*
 			 * If SYN was retransmitted, need to reset all
@@ -13852,14 +13858,20 @@ process_ack:
 			}
 		}
 
+		/*
+		 * We are seeing the final ack in the three way
+		 * hand shake of a active open'ed connection
+		 * so we must send up a T_CONN_CON
+		 *
+		 * tcp_sendmsg() checks tcp_state without entering
+		 * the squeue so tcp_state should be updated before
+		 * sending up connection confirmation.
+		 */
+		tcp->tcp_state = TCPS_ESTABLISHED;
 		if (tcp->tcp_active_open) {
-			/*
-			 * We are seeing the final ack in the three way
-			 * hand shake of a active open'ed connection
-			 * so we must send up a T_CONN_CON
-			 */
 			if (!tcp_conn_con(tcp, iphdr, tcph, mp, NULL)) {
 				freemsg(mp);
+				tcp->tcp_state = TCPS_SYN_RCVD;
 				return;
 			}
 			/*
@@ -13910,7 +13922,6 @@ process_ack:
 			tcp->tcp_max_swnd = new_swnd;
 		tcp->tcp_swl1 = seg_seq;
 		tcp->tcp_swl2 = seg_ack;
-		tcp->tcp_state = TCPS_ESTABLISHED;
 		tcp->tcp_valid_bits &= ~TCP_ISS_VALID;
 
 		/* Fuse when both sides are in ESTABLISHED state */
