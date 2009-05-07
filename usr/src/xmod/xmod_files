@@ -37,7 +37,6 @@ stand/lib/wanboot
 cmd/cmd-inet/usr.lib/wanboot
 cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/cmd/cmd-crypto/etc/keys
-../closed/cmd/dodatadm
 ../closed/uts/sun4/forthdebug/tavor.fdbg
 ../closed/uts/sparc/sdpib
 ../closed/uts/intel/sdpib
