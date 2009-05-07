@@ -132,6 +132,7 @@ COMMON_SUBDIRS=		\
 	dispadmin	\
 	dladm		\
 	dmesg		\
+	dodatadm	\
 	dtrace		\
 	du		\
 	dumpadm		\
@@ -463,7 +464,6 @@ COMMON_SUBDIRS=		\
 	ztest
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
-	$(CLOSED)/cmd/dodatadm	\
 	$(CLOSED)/cmd/iconv	\
 	$(CLOSED)/cmd/ksh	\
 	$(CLOSED)/cmd/llc2	\

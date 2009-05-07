@@ -266,7 +266,6 @@ EXPORT_SRC:
 	@cd lib/sasl_plugins; pwd; $(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/lib/smartcard;	  pwd; $(MAKE) EXPORT_SRC
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) EXPORT_SRC
-	@cd lib/udapl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libresolv2; pwd; $(MAKE) EXPORT_SRC
 	@cd psm/stand/boot; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/crypto/io; pwd; $(MAKE) EXPORT_SRC
