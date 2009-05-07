@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -336,8 +336,6 @@ struct DEVICELIST *fw_devices;
 struct vrfyplugin *verifier;
 di_node_t rootnode;
 struct fw_plugin *self;
-
-int manufacturing_mode = 0;
 
 /*
  * utility defines and macros, since the firmware image we get

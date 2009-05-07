@@ -708,8 +708,7 @@ sendimg(ses_node_t *np, void *data)
 
 	/*
 	 * If the bufferid isn't 2, then the verifier has already
-	 * OK'd the image that the user has provided. That means
-	 * we've got manufacturing_mode = 1 from the command line.
+	 * OK'd the image that the user has provided.
 	 *
 	 * At present the non-"standard" images need to be flashed
 	 * using the scsi WRITE BUFFER command

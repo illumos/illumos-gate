@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,7 @@ main(int argc, char **argv)
 		return (FWFLASH_FAILURE);
 	}
 
-	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:M")) != EOF) {
+	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:")) != EOF) {
 		switch (ch) {
 		case 'h':
 			fwflash_arg_list |= FWFLASH_HELP_FLAG;
@@ -168,14 +168,6 @@ main(int argc, char **argv)
 			/* NOT in the manpage */
 			fwflash_debug = 1;
 			break;
-		case 'M':
-			/* NOT in the manpage */
-#if (MANUFACTURING_MODE > 0)
-			manufacturing_mode = 1;
-			logmsg(MSG_WARN, "Enabling Manufacturing Mode "
-			    "operations. This can be destructive!\n");
-			break;
-#endif
 		/* illegal options */
 		default:
 			fwflash_usage(optarg);
