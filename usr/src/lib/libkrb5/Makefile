@@ -19,52 +19,45 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include		$(SRC)/lib/Makefile.lib
+include		../Makefile.lib
 
-SUBDIRS=	$(MACH) $(MACH64)
+SUBDIRS =	$(MACH) $(BUILD64) $(MACH64)
 
-INSTALLED_HDRS= com_err.h krb5.h
-COMERRH= $(SRC)/lib/gss_mechs/mech_krb5/include/com_err.h
-KRB5H=  $(SRC)/uts/common/gssapi/mechs/krb5/include/krb5.h
+INSTALLED_HDRS = \
+		com_err.h krb5.h
+COMERRH =	$(SRC)/lib/gss_mechs/mech_krb5/include/com_err.h
+KRB5H =		$(SRC)/uts/common/gssapi/mechs/krb5/include/krb5.h
 
-KRB5INCDIR= $(ROOT)/usr/include/kerberosv5
+KRB5INCDIR= 	$(ROOT)/usr/include/kerberosv5
 
+COMERRHINST =	$(KRB5INCDIR)/com_err.h
+KRB5HINST =	$(KRB5INCDIR)/krb5.h
 
-COMERRHINST= $(KRB5INCDIR)/com_err.h
-KRB5HINST= $(KRB5INCDIR)/krb5.h
-
-KRB5HDRS= $(INSTALLED_HDRS:%=$(KRB5INCDIR)/%)
-
+KRB5HDRS =	$(INSTALLED_HDRS:%=$(KRB5INCDIR)/%)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
-
-LIBRARY= 	libkrb5.a
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
-$(SUBDIRS): FRC
+lint check:
+
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
+install_h:	$(KRB5INCDIR) $(KRB5HDRS)
 
-install_h: $(KRB5INCDIR) $(KRB5HDRS)
-
-$(COMERRHINST): $(COMERRH)
+$(COMERRHINST):	$(COMERRH)
 	install -s -m 644 -f $(KRB5INCDIR) $(COMERRH)
-$(KRB5HINST): $(KRB5H)
+$(KRB5HINST):	$(KRB5H)
 	install -s -m 644 -f $(KRB5INCDIR) $(KRB5H)
 
-
-check FRC:
-
+FRC:

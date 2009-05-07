@@ -19,28 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include $(SRC)/Makefile.master
+include		../Makefile.lib
 
-SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+SUBDIRS =	$(MACH) $(BUILD64) $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-.PARALLEL: $(MACH) $(MACH64)
+all clean clobber install: $(SUBDIRS)
 
-all clean clobber install lint: $(SUBDIRS)
+lint:
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

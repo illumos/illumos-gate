@@ -19,22 +19,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Makefile.filter.com and Makefile.filter.targ provide centralized Makefiles
+# for driving the creation of filters.  See Makefile.filter.com for usage.
 
-$(ROOTFS_LIBDIR)/%:	%
-		$(INS.file)
 
-$(ETCLIBDIR)/%:	%
-		$(INS.file)
+# Override lint sources from Makefile.lib.
 
-delete:
-		$(RM) $(DYNLIB)
+$(LINTLIB) :=  SRCS = $(SRCDIR)/$(LINTSRC)
+
+# Override shared object build rule from Makefile.lib.  This rule uses $(LD)
+# directly to avoid .init and .fini sections being added.
+
+BUILD.SO =	$(LD) $(MAPFILECLASS) -o $@ -G $(DYNFLAGS)
+
+# Since no OBJECTS are used in this build, turn off CTF.
+
+CTFMERGE_LIB =	:
+
+.KEEP_STATE:
+
+all:		$$(LIBS)
+
+lint:
 
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
-
-lint:		$(LINTLIB) $(SGSLINTOUT)

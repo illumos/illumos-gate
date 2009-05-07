@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBC_LINT_H
 #define	_LIBC_LINT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +50,33 @@ extern "C" {
  */
 #define	syscall		_syscall6
 #define	__systemcall	__systemcall6
+
+/*
+ * Shades of the old and deprecated "synonyms.h" file.
+ * Because of the awkward relationship between these functions:
+ *	memcmp()
+ *	memcpy()
+ *	memmove()
+ *	memset()
+ * and the sparc auxiliary filters:
+ *	/platform/.../lib/libc_psr.so.1
+ * we must be careful always to call the leading-underscore
+ * symbol names when calling from within libc itself.
+ *
+ * If an interposer interposes on these mem*() symbol names,
+ * and we call one of them from within a critical region in libc,
+ * we will end up in the interposer code while executing within
+ * the critical region.  Chaos can ensue.
+ *
+ * We try to avoid this by calling only the leading-underscore names.
+ * We hope that no interposer will interpose on the leading-underscore
+ * versions of these functions, else all hope is lost.
+ */
+
+#pragma	redefine_extname	memcmp		_memcmp
+#pragma	redefine_extname	memcpy		_memcpy
+#pragma	redefine_extname	memmove		_memmove
+#pragma	redefine_extname	memset		_memset
 
 #endif
 

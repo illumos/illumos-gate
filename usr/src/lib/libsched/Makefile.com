@@ -19,37 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libsched.a
 VERS =		.1
 
-include ../../Makefile.lib
-
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = ../common/llib-lsched
-
-SRCDIR=		../common
-
-MAPFILES +=	$(MAPFILE.FLT)
-
+LIBS +=		$(LINTLIB)
 DYNFLAGS +=	-F libc.so.1
-
-# Redefine shared object build rule to use $(LD) directly (this avoids .init
-# and .fini sections being added).  Also, since there are no OBJECTS, turn
-# off CTF.
-
-BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS)
-CTFMERGE_LIB=	:
-
-.KEEP_STATE:
-
-all:		$(LIBS)
-
-lint:
-
-include ../../Makefile.targ

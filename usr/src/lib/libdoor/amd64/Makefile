@@ -19,21 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.com
-include ../../Makefile.lib.64
+include		$(SRC)/lib/Makefile.filter.com
+include		../Makefile.com
+include		$(SRC)/lib/Makefile.lib.64
 
-BUILD.SO=	$(LD) -o $@ -G -64 $(DYNFLAGS)
+install:	all $(ROOTLIBDIR64) .WAIT $(ROOTLIBS64) $(ROOTLINKS64)
 
-LIBS = $(DYNLIB) $(LINTLIB)
-
-.KEEP_STATE:
-
-all: $(LIBS)
-
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+include		$(SRC)/lib/Makefile.filter.targ

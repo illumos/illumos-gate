@@ -19,38 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-LIBRARY= libmd5.a
-VERS= .1
+LIBRARY =	libmd5.a
+VERS =		.1
 
-include ../../Makefile.lib
-include ../../Makefile.rootfs
+include		$(SRC)/lib/Makefile.rootfs
 
-DYNFLAGS +=     -F libmd.so.1
-
-LIBS =          $(DYNLIB) $(LINTLIB)
-
-SRCDIR =        ../common
-$(LINTLIB) :=   SRCS = $(SRCDIR)/llib-lmd5
-
-MAPFILES +=	$(MAPFILE.FLT)
-
-# Redefine shared object build rule to use $(LD) directly (this avoids .init
-# and .fini sections being added).  Also, since there are no OBJECTS, turn
-# off CTF.
-
-BUILD.SO=       $(LD) -o $@ -G $(DYNFLAGS)
-CTFMERGE_LIB=   :
-
-.KEEP_STATE:
-
-all: $(LIBS)
-
-lint:
-
-include ../../Makefile.targ
+LIBS +=		$(LINTLIB)
+DYNFLAGS += 	-F libmd.so.1

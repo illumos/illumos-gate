@@ -19,38 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-LIBRARY = libpthread.a
-VERS = .1
+LIBRARY =	libpthread.a
+VERS =		.1
 
-include ../../Makefile.lib
-include ../../Makefile.rootfs
+include		$(SRC)/lib/Makefile.rootfs
 
+LIBS +=		$(LINTLIB)
 DYNFLAGS +=	-F libc.so.1
-
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/llib-lpthread
-
-MAPFILES =	mapfile-vers $(MAPFILE.FLT)
-
-# Redefine shared object build rule to use $(LD) directly (this avoids .init
-# and .fini sections being added).  Also, since there are no OBJECTS, turn
-# off CTF.
-
-BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS)
-CTFMERGE_LIB=	:
-
-.KEEP_STATE:
-
-include ../../Makefile.targ
-
-all:	$(LIBS)
-
-lint:
+MAPFILEDIR =	.				# redirect mapfile-vers

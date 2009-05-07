@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBC_INT_H
 #define	_LIBC_INT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,8 +45,9 @@ extern "C" {
 #define	CI_TLS_MODREM	8		/* __tls_mod_remove() address */
 #define	CI_TLS_STATMOD	9		/* __tls_static_mods() address */
 #define	CI_THRINIT	10		/* libc thread initialization */
+#define	CI_CRITICAL	11		/* critical level query interface */
 
-#define	CI_MAX		11
+#define	CI_MAX		12
 
 #define	CI_V_NONE	0		/* ci_version versions */
 #define	CI_V_ONE	1		/* original version */
@@ -56,8 +55,9 @@ extern "C" {
 #define	CI_V_THREE	3
 #define	CI_V_FOUR	4
 #define	CI_V_FIVE	5
-#define	CI_V_CURRENT	CI_V_FIVE	/* current version of libc interface */
-#define	CI_V_NUM	6		/* number of CI_V_* numbers */
+#define	CI_V_SIX	6
+#define	CI_V_CURRENT	CI_V_SIX	/* current version of libc interface */
+#define	CI_V_NUM	7		/* number of CI_V_* numbers */
 
 /*
  * Flags for the bindguard routines.

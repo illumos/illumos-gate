@@ -19,41 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-LIBRARY= 	libxnet.a
-VERS=		.1
-OBJECTS=	data.o
+LIBRARY = 	libxnet.a
+VERS =		.1
 
-include		../../Makefile.lib
+include		$(SRC)/lib/Makefile.rootfs
 
-# install this library in the root filesystem
-include		../../Makefile.rootfs
-
-MAPFILES +=	$(MAPFILE.FLT)
-
-SRCDIR=		../common
-LIBS=		$(DYNLIB) $(LINTLIB)
-
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-CPPFLAGS +=	-D__EXTENSIONS__
-CFLAGS +=	$(CCVERBOSE)
+LIBS +=		$(LINTLIB)
 DYNFLAGS +=     $(ZLOADFLTR)
-
-# Redefine shared object build rule to use $(LD) directly (this avoids .init
-# and .fini sections being added).
-
-BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS) $(PICS)
-
-.KEEP_STATE:
-
-all:		$(LIBS)
-
-lint:		lintcheck
-
-include		../../Makefile.targ
+CPPFLAGS +=	-D__EXTENSIONS__

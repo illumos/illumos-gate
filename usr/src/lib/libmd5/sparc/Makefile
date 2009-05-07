@@ -19,14 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libmd5/sparc/Makefile
-#
 
-include ../Makefile.com
+include		$(SRC)/lib/Makefile.filter.com
+include		../Makefile.com
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+
+include		$(SRC)/lib/Makefile.filter.targ

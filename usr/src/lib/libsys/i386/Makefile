@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,20 +19,19 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
+# Define objects first to trigger $(PIC) rules in Makefile.lib
+
+COMOBJ =	libsys.o
+OBJECTS =	$(COMOBJ)
+
+include		$(SRC)/lib/Makefile.filter.com
 include		../Makefile.com
 
-.KEEP_STATE:
+install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS)
 
-all:		$(DYNLIB)
-
-install:	all $(ROOTDYNLIB) $(ROOTLINKS)
-
-$(COMSRC):	../common/libsys.sh libsys.list
-		sh ../common/libsys.sh
-
+include		$(SRC)/lib/Makefile.filter.targ
 include		../Makefile.targ

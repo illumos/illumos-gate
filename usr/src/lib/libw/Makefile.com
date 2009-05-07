@@ -19,35 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-LIBRARY=	libw.a
-VERS=		.1
+LIBRARY =	libw.a
+VERS =		.1
 
-include		../../Makefile.lib
-include		../../Makefile.rootfs
-
-SRCDIR =	../common
-
-MAPFILES +=	$(MAPFILE.FLT)
+include		$(SRC)/lib/Makefile.rootfs
 
 DYNFLAGS +=	-F libc.so.1
-
-LIBS=		$(DYNLIB)
-
-# Redefine shared object build rule to use $(LD) directly (this avoids .init
-# and .fini sections being added).  Also, since there are no OBJECTS, turn
-# off CTF.
-
-BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS)
-CTFMERGE_LIB=	:
-
-include		../../Makefile.targ
-
-all:		$(LIBS)
-
-lint:

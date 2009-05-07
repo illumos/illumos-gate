@@ -107,6 +107,10 @@ SUNW_0.7 {
 	malloc = NODIRECT;
 	modf = FUNCTION FILTER libm.so.2;
 	_modf = FUNCTION FILTER libm.so.2;
+	memcmp;
+	memcpy;
+	memmove;
+	memset;
 	nextafter = FUNCTION FILTER libm.so.2;
 	_nextafter = FUNCTION FILTER libm.so.2;
 	_numeric;
@@ -400,12 +404,8 @@ SUNW_0.7 {
 	memccpy;
 	_memccpy;
 	memchr;
-	memcmp;
 	memcntl;
 	_memcntl;
-	memcpy;
-	memmove;
-	memset;
 	mkdir;
 	_mkdir;
 	mkfifo;
@@ -750,6 +750,10 @@ SUNWprivate_1.1 {
 	_dlopen = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_dlsym = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
 	_ld_libc = FUNCTION FILTER /usr/lib/amd64/ld.so.1;
+	_memcmp;
+	_memcpy;
+	_memmove;
+	_memset;
     protected:
 	_D_cplx_lr_div;
 	_D_cplx_lr_div_ix;
@@ -759,10 +763,6 @@ SUNWprivate_1.1 {
 	_F_cplx_lr_div_rx;
 	__fltrounds;
 	__fseterror_u;
-	_memcmp;
-	_memcpy;
-	_memmove;
-	_memset;
 	sysi86;
 	_sysi86;
 	_X_cplx_div;

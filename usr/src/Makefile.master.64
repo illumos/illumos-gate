@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -73,6 +73,11 @@ REAL_CCC=	$(CW_CCC_CMD:sh)
 
 BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 		$(PICS) -L $(ROOTLIBDIR64) $(LDLIBS)
+
+#
+# ld(1) requires the -64 option to create a 64-bit filter solely from a mapfile
+#
+MAPFILECLASS=	-64
 
 CCNEEDED =		-lCrun
 $(__GNUC64)CCNEEDED =	-L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++	\

@@ -2191,8 +2191,8 @@ _ti_bind_guard(int flags)
 
 	if ((self->ul_bindflags & bindflag) == bindflag)
 		return (0);
+	self->ul_bindflags |= bindflag;
 	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
-		ASSERT(self->ul_critical == 0);
 		sigoff(self);	/* see no signals while holding ld_lock */
 		(void) mutex_lock(&udp->ld_lock);
 	}
@@ -2200,7 +2200,6 @@ _ti_bind_guard(int flags)
 	self->ul_save_state = self->ul_cancel_disabled;
 	self->ul_cancel_disabled = 1;
 	set_cancel_pending_flag(self, 0);
-	self->ul_bindflags |= bindflag;
 	return (1);
 }
 
@@ -2218,13 +2217,27 @@ _ti_bind_clear(int flags)
 	set_cancel_pending_flag(self, 0);
 	exit_critical(self);
 	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
-		ASSERT(self->ul_critical == 0);
 		if (MUTEX_OWNED(&udp->ld_lock, self)) {
 			(void) mutex_unlock(&udp->ld_lock);
 			sigon(self);	/* reenable signals */
 		}
 	}
 	return (self->ul_bindflags);
+}
+
+/*
+ * Tell the dynamic linker (ld.so.1) whether or not it was entered from
+ * a critical region in libc.  Return zero if not, else return non-zero.
+ */
+int
+_ti_critical(void)
+{
+	ulwp_t *self = curthread;
+	int level = self->ul_critical;
+
+	if ((self->ul_bindflags & THR_FLG_RTLD) == 0 || level == 0)
+		return (level);	/* ld.so.1 hasn't (yet) called enter() */
+	return (level - 1);
 }
 
 /*

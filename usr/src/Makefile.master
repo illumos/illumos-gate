@@ -773,6 +773,7 @@ ZNODELETE=	-znodelete
 ZNODLOPEN=	-znodlopen
 ZNODUMP=	-znodump
 ZNOLAZYLOAD=	-znolazyload
+ZNOLDYNSYM=	-znoldynsym
 ZNORELOC=	-znoreloc
 ZNOVERSION=	-znoversion
 ZRECORD=	-zrecord

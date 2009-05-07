@@ -19,37 +19,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-LIBRARY=	libsys.a
-VERS=		.1
-
-COMOBJ=		libsys.o
-OBJECTS=	$(COMOBJ)  $(MACHOBJ)
-
-include 	../../../lib/Makefile.lib
-
-MAPFILES =	mapfile-vers $(MAPFILE.FLT)
+LIBRARY =	libsys.a
+VERS =		.1
 
 # Define libsys to be a filter on libc.  The ABI requires the runtime linker as
 # the soname.
+SONAME =	/usr/lib/ld.so.1
+DYNFLAGS +=	-F /usr/lib/libc.so.1
+MAPFILEDIR =	.				# redirect mapfile-vers
 
-DYNFLAGS +=	-F/usr/lib/libc.so.1
+COMSRC =	$(COMOBJ:%.o=%.c)
+MACHSRC =	$(MACHOBJ:%.o=%.s)
 
-SONAME=		/usr/lib/ld.so.1
-
-# Redefine shared object build rule to use $(LD) directly (this avoids .init
-# and .fini sections being added).
-
-BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS) $(PICS)
-
-pics/%.o :=	ASFLAGS += $(AS_PICFLAGS)
-
-COMSRC=		$(COMOBJ:%.o=%.c)
-MACHSRC=	$(MACHOBJ:%.o=%.s)
-
-CLOBBERFILES +=	$(DYNLIB)  $(LIBLINKS)  $(COMSRC)  $(MACHSRC)
+CLOBBERFILES +=	$(COMSRC) $(MACHSRC)

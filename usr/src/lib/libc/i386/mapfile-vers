@@ -285,6 +285,10 @@ SYSVABI_1.3 {
 	ldexp = FUNCTION FILTER libm.so.2;
 	logb = FUNCTION FILTER libm.so.2;
 	malloc = NODIRECT;
+	memcmp;
+	memcpy;
+	memmove;
+	memset;
 	modf = FUNCTION FILTER libm.so.2;
 	_modf = FUNCTION FILTER libm.so.2;
 	nextafter = FUNCTION FILTER libm.so.2;
@@ -541,12 +545,8 @@ SYSVABI_1.3 {
 	memccpy;
 	_memccpy;
 	memchr;
-	memcmp;
 	memcntl;
 	_memcntl;
-	memcpy;
-	memmove;
-	memset;
 	mkdir;
 	_mkdir;
 	mkfifo;
@@ -861,6 +861,10 @@ SUNWprivate_1.1 {
 	_dlopen = FUNCTION FILTER /usr/lib/ld.so.1;
 	_dlsym = FUNCTION FILTER /usr/lib/ld.so.1;
 	_ld_libc = FUNCTION FILTER /usr/lib/ld.so.1;
+	_memcmp;
+	_memcpy;
+	_memmove;
+	_memset;
 	_sse_hw;
 	_sys_errlist;
 	_sys_errs;
@@ -885,10 +889,6 @@ SUNWprivate_1.1 {
 	_fwscanf_c89;
 	_imaxabs_c89;
 	_imaxdiv_c89;
-	_memcmp;
-	_memcpy;
-	_memmove;
-	_memset;
 	__moddi3;
 	_printf_c89;
 	_scanf_c89;

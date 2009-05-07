@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -44,15 +44,16 @@ AWK=		awk
 SRCDIR =	..
 
 #
-# We define MAPFILES here for the benefit of most libraries,
-# those that follow the convention of having source files and other
-# common files in the $(SRCDIR) directory.  Libraries that do not
-# follow this convention must define MAPFILES for themselves.
+# We define MAPFILES here for the benefit of most libraries, those that
+# follow the convention of having source files and other common files
+# in the $(SRCDIR) directory.  Libraries that do not follow this
+# convention must define MAPFILES, or MAPFILEDIR for themselves.
 # Libraries that do follow this convention but that need supplemental
 # ISA-specific mapfiles can augment MAPFILES like this:
 #	MAPFILES += mapfile-vers
 #
-MAPFILES =	$(SRCDIR)/mapfile-vers
+MAPFILEDIR =	$(SRCDIR)
+MAPFILES =	$(MAPFILEDIR)/mapfile-vers
 
 #
 # If HDRDIR is left unset, then it's possible for the $(ROOTHDRDIR)/%

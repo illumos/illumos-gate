@@ -690,6 +690,7 @@ extern void		remove_lml(Lm_list *);
 extern void		remove_plist(Alist **, int);
 extern void		remove_so(Lm_list *, Rt_map *);
 extern int		rt_cond_wait(Rt_cond *, Rt_lock *);
+extern int		rt_critical(void);
 extern int		rt_bind_guard(int);
 extern int		rt_bind_clear(int);
 extern int		rt_get_extern(Lm_list *, Rt_map *);

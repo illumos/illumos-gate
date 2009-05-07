@@ -38,7 +38,7 @@
 #
 
 SUNW_0.7 {
-    protected:
+    global:
 	memcmp;
 	memcpy;
 	memmove;
@@ -46,7 +46,7 @@ SUNW_0.7 {
 };
 
 SUNWprivate_1.1 {
-    protected:
+    global:
 	_memcmp;
 	_memcpy = NODYNSORT;
 	_memmove;

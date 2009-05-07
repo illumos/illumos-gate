@@ -19,20 +19,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+BUILD.SO +=	$(PICS)
+
+$(COMSRC):	../common/libsys.sh libsys.list
+		sh ../common/libsys.sh
+
+$(MACHSRC):	libsys.sh libsyss.list
+		sh ./libsys.sh
+
+pics/%.o :=	ASFLAGS += $(AS_PICFLAGS)
 
 pics/%.o:	%.s
 		$(COMPILE.s) -o $@ $<
 		$(POST_PROCESS_O)
-
-pics/%.o:	%.c
-		$(COMPILE.c) -o $@ $<
-		$(POST_PROCESS_O)
-
-include		../../../lib/Makefile.targ
-
-FRC:

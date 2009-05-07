@@ -116,6 +116,9 @@ audit_objfilter(Rt_map *frlmp, const char *ref, Rt_map *felmp, uint_t flags)
 {
 	int	appl = 0, respond = 1;
 
+	if (rt_critical())
+		return (respond);
+
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
@@ -170,6 +173,9 @@ audit_objsearch(Rt_map *clmp, const char *name, uint_t flags)
 {
 	char	*nname = (char *)name;
 	int	appl = 0;
+
+	if (rt_critical())
+		return (nname);
 
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;
@@ -246,6 +252,9 @@ void
 audit_activity(Rt_map *clmp, uint_t flags)
 {
 	int	appl = 0;
+
+	if (rt_critical())
+		return;
 
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;
@@ -335,6 +344,9 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 	uint_t		clients = 0;
 	Audit_info	*aip;
 
+	if (rt_critical())
+		return (respond);
+
 	/*
 	 * Determine the total number of audit libraries in use.  This provides
 	 * the number of client structures required for this object.
@@ -416,6 +428,9 @@ audit_objclose(Rt_map *clmp, Rt_map *lmp)
 {
 	int	appl = 0;
 
+	if (rt_critical())
+		return;
+
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;
 
@@ -489,6 +504,9 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 	Sym	_sym = *sym;
 	int	_appl = 0;
 
+	if (rt_critical())
+		return (_sym.st_value);
+
 	/*
 	 * We're effectively entering ld.so.1 from user (glue) code.
 	 */
@@ -560,6 +578,9 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 {
 	uintptr_t	_retval = retval;
 	int		_appl = 0;
+
+	if (rt_critical())
+		return (_retval);
 
 	/*
 	 * We're effectively entering ld.so.1 from user (glue) code.
@@ -667,6 +688,9 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
 	_sym = *sym;
 	_sym.st_value = value;
 
+	if (rt_critical())
+		return (_sym.st_value);
+
 #if	!defined(_ELF64)
 	_sym.st_name += (Word)STRTAB(dlmp);
 #endif
@@ -722,6 +746,9 @@ void
 audit_preinit(Rt_map *clmp)
 {
 	int	appl = 0;
+
+	if (rt_critical())
+		return;
 
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;

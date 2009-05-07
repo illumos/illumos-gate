@@ -151,6 +151,15 @@
  *	this interface (and no longer relies on the INITFIRST flag - which
  *	others have started to camp out on).
  *
+ * CI_VERSION == 5 (Solaris 11).
+ *	Use of "protected" references within libc, so that symbols are
+ *	pre-bound, and don't require ld.so.1 binding.  This implementation
+ *	protects libc's critical regions from being vectored to auditors.
+ *
+ * CI_VERSION == 6 (Solaris 11).
+ *	Added the CI_CRITICAL handshake, to allow "mem*" family to be reexposed
+ *	as "global", and thus be redirected to auxiliary filters.
+ *
  * Release summary:
  *
  *	Solaris 8	CI_ATEXIT via _ld_libc()
@@ -286,6 +295,7 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 		case CI_BIND_GUARD:
 		case CI_BIND_CLEAR:
 		case CI_THR_SELF:
+		case CI_CRITICAL:
 			/*
 			 * If the global vector is unset, or this is the primary
 			 * link-map, set the global vector.
@@ -500,15 +510,31 @@ rt_thr_self()
 }
 
 int
-rt_mutex_lock(Rt_lock * mp)
+rt_mutex_lock(Rt_lock *mp)
 {
 	return (_lwp_mutex_lock((lwp_mutex_t *)mp));
 }
 
 int
-rt_mutex_unlock(Rt_lock * mp)
+rt_mutex_unlock(Rt_lock *mp)
 {
 	return (_lwp_mutex_unlock((lwp_mutex_t *)mp));
+}
+
+/*
+ * Test whether we're in a libc critical region.  Certain function references,
+ * like the "mem*" family, might require binding.  Although these functions can
+ * safely bind to auxiliary filtees, they should not be captured by auditors.
+ */
+int
+rt_critical()
+{
+	int	(*fptr)(void);
+
+	if ((fptr = glcs[CI_CRITICAL].lc_un.lc_func) != NULL)
+		return ((*fptr)());
+
+	return (0);
 }
 
 /*

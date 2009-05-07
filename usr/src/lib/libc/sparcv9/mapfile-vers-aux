@@ -38,7 +38,7 @@
 #
 
 SUNW_0.7 {
-    protected:
+    global:
 	memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
@@ -46,7 +46,7 @@ SUNW_0.7 {
 };
 
 SUNWprivate_1.1 {
-    protected:
+    global:
 	_memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memcpy = NODYNSORT;
