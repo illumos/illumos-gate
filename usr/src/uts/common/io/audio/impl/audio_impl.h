@@ -84,7 +84,9 @@ struct audio_stream {
 #define	s_tidx			s_buf.b_tidx
 #define	s_hidx			s_buf.b_hidx
 	ddi_umem_cookie_t	s_cookie;
-	size_t			s_allocsz;
+	uint32_t		s_allocsz;
+	uint32_t		s_hintsz;	/* latency hints */
+	uint16_t		s_hintfrags;
 
 	/*
 	 * Various counters.

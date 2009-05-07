@@ -508,6 +508,8 @@ oss_open(audio_client_t *c, int oflag)
 		    ((rv = auclnt_set_channels(osp, OSS_CHANNELS)) != 0)) {
 			goto failed;
 		}
+		/* default to 5 fragments to provide reasonable latency */
+		auclnt_set_latency(osp, 5, 0);
 	}
 
 	if (oflag & FREAD) {
@@ -516,6 +518,8 @@ oss_open(audio_client_t *c, int oflag)
 		    ((rv = auclnt_set_channels(isp, OSS_CHANNELS)) != 0)) {
 			goto failed;
 		}
+		/* default to 5 fragments to provide reasonable latency */
+		auclnt_set_latency(isp, 5, 0);
 	}
 
 	return (0);
@@ -1032,22 +1036,56 @@ sndctl_dsp_sync(audio_client_t *c)
 static int
 sndctl_dsp_setfragment(audio_client_t *c, int *fragp)
 {
-	_NOTE(ARGUNUSED(c));
-	_NOTE(ARGUNUSED(fragp));
+	int	bufsz;
+	int	nfrags;
+	int	fragsz;
+
+	nfrags = (*fragp) >> 16;
+	if ((nfrags >= 0x7fffU) || (nfrags < 2)) {
+		/* use infinite setting... no change */
+		return (0);
+	}
+
+	fragsz = (*fragp) & 0xffff;
+	if (fragsz > 16) {
+		/* basically too big, so, no change */
+		return (0);
+	}
+	bufsz = (1U << fragsz) * nfrags;
+
 	/*
-	 * We don't really implement this "properly" at this time.
-	 * The problems with this ioctl are various: the API insists
-	 * that fragment sizes be a power of two -- and we can't cope
-	 * with accurately reporting fragment sizes in the face of
-	 * mixing and format conversion.
-	 *
-	 * Well behaved applications should really not use this API.
-	 *
+	 * Now we have our desired buffer size, but we have to
+	 * make sure we have a whole number of fragments >= 2, and
+	 * less than the maximum.
+	 */
+	bufsz = ((*fragp) >> 16) * (1U << (*fragp));
+	if (bufsz >= 65536) {
+		return (0);
+	}
+
+	/*
+	 * We set the latency hints in terms of bytes, not fragments.
+	 */
+	auclnt_set_latency(auclnt_output_stream(c), 0, bufsz);
+	auclnt_set_latency(auclnt_input_stream(c), 0, bufsz);
+
+	/*
 	 * According to the OSS API documentation, the values provided
 	 * are nothing more than a "hint" and not to be relied upon
 	 * anyway.  And we aren't obligated to report the actual
 	 * values back!
 	 */
+	return (0);
+}
+
+static int
+sndctl_dsp_policy(audio_client_t *c, int *policy)
+{
+	int	hint = *policy;
+	if ((hint >= 2) && (hint <= 10)) {
+		auclnt_set_latency(auclnt_input_stream(c), hint, 0);
+		auclnt_set_latency(auclnt_output_stream(c), hint, 0);
+	}
 	return (0);
 }
 
@@ -1723,7 +1761,6 @@ oss_ioctl(audio_client_t *c, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case SNDCTL_DSP_GET_RECSRC_NAMES:
 		rv = sndctl_dsp_get_recsrc_names(c, (oss_mixer_enuminfo *)data);
 		break;
-	case SNDCTL_DSP_SUBDIVIDE:
 	case SNDCTL_DSP_SETFRAGMENT:
 		rv = sndctl_dsp_setfragment(c, (int *)data);
 		break;
@@ -1757,11 +1794,14 @@ oss_ioctl(audio_client_t *c, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case SNDCTL_DSP_SETRECVOL:
 		rv = sndctl_dsp_setrecvol(c, (int *)data);
 		break;
+	case SNDCTL_DSP_SUBDIVIDE:	/* Ignored */
 	case SNDCTL_DSP_SETDUPLEX:	/* Ignored */
 	case SNDCTL_DSP_LOW_WATER:	/* Ignored */
-	case SNDCTL_DSP_POLICY:		/* Ignored */
 	case SNDCTL_DSP_PROFILE:	/* Ignored */
 		rv = 0;
+		break;
+	case SNDCTL_DSP_POLICY:
+		rv = sndctl_dsp_policy(c, (int *)data);
 		break;
 	case SNDCTL_DSP_GETBLKSIZE:
 		rv = sndctl_dsp_getblksize(c, (int *)data);

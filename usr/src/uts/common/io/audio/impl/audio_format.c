@@ -839,7 +839,36 @@ auimpl_format_setup(audio_stream_t *sp, audio_parms_t *uparms)
 	sp->s_framesz = info->sampsize * uparms->p_nchan;
 	sp->s_fragfr = (uparms->p_rate / sp->s_engine->e_intrs);
 	sp->s_fragbytes = sp->s_fragfr * sp->s_framesz;
-	sp->s_nfrags = sp->s_allocsz / sp->s_fragbytes;
+
+	/*
+	 * We need to "tune" the buffer and fragment counts for some
+	 * uses...  OSS applications may like to configure a low
+	 * latency, and they rely upon write() to block to prevent too
+	 * much data from being queued up.
+	 */
+	if (sp->s_hintsz) {
+		sp->s_nfrags = sp->s_hintsz / sp->s_fragbytes;
+	} else if (sp->s_hintfrags) {
+		sp->s_nfrags = sp->s_hintfrags;
+	} else {
+		sp->s_nfrags = sp->s_allocsz / sp->s_fragbytes;
+	}
+
+	/*
+	 * Now make sure that the hint works -- we need at least 2 fragments,
+	 * and we need to fit within the room allocated to us.
+	 */
+	if (sp->s_nfrags < 2) {
+		sp->s_nfrags = 2;
+	}
+	while ((sp->s_nfrags * sp->s_fragbytes) > sp->s_allocsz) {
+		sp->s_nfrags--;
+	}
+	/* if the resulting configuration is invalid, note it */
+	if (sp->s_nfrags < 2) {
+		return (EINVAL);
+	}
+
 	sp->s_nframes = sp->s_nfrags * sp->s_fragfr;
 	sp->s_nbytes = sp->s_nframes * sp->s_framesz;
 	*sp->s_user_parms = *uparms;

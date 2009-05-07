@@ -129,6 +129,15 @@ auclnt_get_nframes(audio_stream_t *sp)
 	return (sp->s_nframes);
 }
 
+void
+auclnt_set_latency(audio_stream_t *sp, unsigned frags, unsigned bytes)
+{
+	mutex_enter(&sp->s_lock);
+	sp->s_hintfrags = (uint16_t)frags;
+	sp->s_hintsz = bytes;
+	mutex_exit(&sp->s_lock);
+}
+
 uint64_t
 auclnt_get_head(audio_stream_t *sp)
 {

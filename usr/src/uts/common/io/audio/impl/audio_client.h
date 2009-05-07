@@ -102,6 +102,8 @@ uint64_t auclnt_get_tail(audio_stream_t *);
 unsigned auclnt_get_hidx(audio_stream_t *);
 unsigned auclnt_get_tidx(audio_stream_t *);
 
+void auclnt_set_latency(audio_stream_t *, unsigned, unsigned);
+
 audio_stream_t *auclnt_input_stream(audio_client_t *);
 audio_stream_t *auclnt_output_stream(audio_client_t *);
 
