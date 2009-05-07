@@ -111,8 +111,16 @@ uint64_t xc_multi_cnt = 0;	/* # times we piggy backed on another IPI */
  * We allow for one high priority message at a time to happen in the system.
  * This is used for panic, kmdb, etc., so no locking is done.
  */
-static cpuset_t xc_priority_set;
+static volatile cpuset_t xc_priority_set_store;
+static volatile ulong_t *xc_priority_set = CPUSET2BV(xc_priority_set_store);
 static xc_data_t xc_priority_data;
+
+/*
+ * Wrappers to avoid C compiler warnings due to volatile. The atomic bit
+ * operations don't accept volatile bit vectors - which is a bit silly.
+ */
+#define	XC_BT_SET(vector, b)	BT_ATOMIC_SET((ulong_t *)(vector), (b))
+#define	XC_BT_CLEAR(vector, b)	BT_ATOMIC_CLEAR((ulong_t *)(vector), (b))
 
 /*
  * Decrement a CPU's work count
@@ -237,15 +245,14 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 		 */
 		for (;;) {
 			/*
-			 * alway check for and handle a priority message
+			 * Alway check for and handle a priority message.
 			 */
-			if (BT_TEST(CPUSET2BV(xc_priority_set), CPU->cpu_id)) {
+			if (BT_TEST(xc_priority_set, CPU->cpu_id)) {
 				func = xc_priority_data.xc_func;
 				a1 = xc_priority_data.xc_a1;
 				a2 = xc_priority_data.xc_a2;
 				a3 = xc_priority_data.xc_a3;
-				BT_CLEAR(CPUSET2BV(xc_priority_set),
-				    CPU->cpu_id);
+				XC_BT_CLEAR(xc_priority_set, CPU->cpu_id);
 				xc_decrement(mcpup);
 				func(a1, a2, a3);
 				if (mcpup->xc_work_cnt == 0)
@@ -477,13 +484,34 @@ xc_priority_common(
 	struct cpu *cpup;
 
 	/*
-	 * Wait briefly for a previous xc_priority to have finished, but
-	 * continue no matter what.
+	 * Wait briefly for any previous xc_priority to have finished.
 	 */
-	for (i = 0; i < 40000; ++i) {
-		if (CPUSET_ISNULL(xc_priority_set))
-			break;
-		SMT_PAUSE();
+	for (c = 0; c < ncpus; ++c) {
+		cpup = cpu[c];
+		if (cpup == NULL || !(cpup->cpu_flags & CPU_READY))
+			continue;
+
+		/*
+		 * The value of 40000 here is from old kernel code. It
+		 * really should be changed to some time based value, since
+		 * under a hypervisor, there's no guarantee a remote CPU
+		 * is even scheduled.
+		 */
+		for (i = 0; BT_TEST(xc_priority_set, c) && i < 40000; ++i)
+			SMT_PAUSE();
+
+		/*
+		 * Some CPU did not respond to a previous priority request. It's
+		 * probably deadlocked with interrupts blocked or some such
+		 * problem. We'll just erase the previous request - which was
+		 * most likely a kmdb_enter that has already expired - and plow
+		 * ahead.
+		 */
+		if (BT_TEST(xc_priority_set, c)) {
+			XC_BT_CLEAR(xc_priority_set, c);
+			if (cpup->cpu_m.xc_work_cnt > 0)
+				xc_decrement(&cpup->cpu_m);
+		}
 	}
 
 	/*
@@ -493,7 +521,6 @@ xc_priority_common(
 	xc_priority_data.xc_a1 = arg1;
 	xc_priority_data.xc_a2 = arg2;
 	xc_priority_data.xc_a3 = arg3;
-	xc_priority_set = *(cpuset_t *)set;
 
 	/*
 	 * Post messages to all CPUs involved that are CPU_READY
@@ -507,6 +534,7 @@ xc_priority_common(
 		    cpup == CPU)
 			continue;
 		(void) xc_increment(&cpup->cpu_m);
+		XC_BT_SET(xc_priority_set, c);
 		send_dirint(c, XC_HI_PIL);
 		for (i = 0; i < 10; ++i) {
 			(void) casptr(&cpup->cpu_m.xc_msgbox,
