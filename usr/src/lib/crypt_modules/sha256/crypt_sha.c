@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,7 @@
 #define	DIGESTFinal	SHA256Final
 #define	DIGEST_LEN	SHA256_DIGEST_LENGTH
 #define	MIXCHARS	32
-static const char crypt_alg_magic[] = "$5$";
+static const char crypt_alg_magic[] = "$5";
 
 #elif CRYPT_SHA512
 
@@ -85,14 +85,13 @@ static const char crypt_alg_magic[] = "$5$";
 #define	DIGESTFinal	SHA512Final
 #define	DIGEST_LEN	SHA512_DIGEST_LENGTH
 #define	MIXCHARS	64
-static const char crypt_alg_magic[] = "$6$";
+static const char crypt_alg_magic[] = "$6";
 
 #else
 #error	"One of CRYPT_256 or CRYPT_512 must be defined"
 #endif
 
 static const int crypt_alg_magic_len = sizeof (crypt_alg_magic) - 1;
-static const char rounds_prefix[] = "rounds=";
 
 
 static uchar_t b64t[] =		/* 0 ... 63 => ascii - 64 */
@@ -118,6 +117,47 @@ to64(char *s, uint64_t v, int n)
 	}
 }
 
+#define	ROUNDS		"rounds="
+#define	ROUNDSLEN	(sizeof (ROUNDS) - 1)
+
+/*
+ * get the integer value after rounds= where ever it occurs in the string.
+ * if the last char after the int is a , or $ that is fine anything else is an
+ * error.
+ */
+static uint32_t
+getrounds(const char *s)
+{
+	char *r, *p, *e;
+	long val;
+
+	if (s == NULL)
+		return (0);
+
+	if ((r = strstr(s, ROUNDS)) == NULL) {
+		return (0);
+	}
+
+	if (strncmp(r, ROUNDS, ROUNDSLEN) != 0) {
+		return (0);
+	}
+
+	p = r + ROUNDSLEN;
+	errno = 0;
+	val = strtol(p, &e, 10);
+	/*
+	 * An error occured or there is non-numeric stuff at the end
+	 * which isn't one of the crypt(3c) special chars ',' or '$'
+	 */
+	if (errno != 0 || val < 0 ||
+	    !(*e == '\0' || *e == ',' || *e == '$')) {
+		return (0);
+	}
+
+	return ((uint32_t)val);
+}
+
+
 char *
 crypt_genhash_impl(char *ctbuffer,
 	    size_t ctbufflen,
@@ -133,6 +173,7 @@ crypt_genhash_impl(char *ctbuffer,
 	uchar_t DS[DIGEST_LEN];
 	DIGEST_CTX ctxA, ctxB, ctxC, ctxDP, ctxDS;
 	int rounds = ROUNDS_DEFAULT;
+	int srounds = 0;
 	boolean_t custom_rounds = B_FALSE;
 	char *p;
 	char *P, *Pp;
@@ -143,18 +184,16 @@ crypt_genhash_impl(char *ctbuffer,
 
 	/* skip our magic string */
 	if (strncmp((char *)salt, crypt_alg_magic, crypt_alg_magic_len) == 0) {
-		salt += crypt_alg_magic_len;
+		salt += crypt_alg_magic_len + 1;
 	}
 
-	if (strncmp(salt, rounds_prefix, sizeof (rounds_prefix) - 1) == 0) {
-		char *num = salt + sizeof (rounds_prefix) - 1;
-		char *endp;
-		ulong_t srounds = strtoul(num, &endp, 10);
-		if (*endp == '$') {
-			salt = endp + 1;
-			rounds = MAX(ROUNDS_MIN, MIN(srounds, ROUNDS_MAX));
-			custom_rounds = B_TRUE;
-		}
+	srounds = getrounds(salt);
+	if (srounds != 0) {
+		rounds = MAX(ROUNDS_MIN, MIN(srounds, ROUNDS_MAX));
+		custom_rounds = B_TRUE;
+		p = strchr(salt, '$');
+		if (p != NULL)
+			salt = p + 1;
 	}
 
 	salt_len = MIN(strcspn(salt, "$"), MAX_SALT_LEN);
@@ -252,14 +291,16 @@ crypt_genhash_impl(char *ctbuffer,
 	}
 
 	/* 22. Now make the output string */
-	(void) strlcpy(ctbuffer, crypt_alg_magic, ctbufflen);
 	if (custom_rounds) {
 		(void) snprintf(ctbuffer, ctbufflen,
-		    "%srounds=%zu$", ctbuffer, rounds);
+		    "%s$rounds=%zu$", crypt_alg_magic, rounds);
+	} else {
+		(void) snprintf(ctbuffer, ctbufflen,
+		    "%s$", crypt_alg_magic);
 	}
-
 	(void) strncat(ctbuffer, (const char *)salt, salt_len);
 	(void) strlcat(ctbuffer, "$", ctbufflen);
+
 	p = ctbuffer + strlen(ctbuffer);
 	ctbufflen -= strlen(ctbuffer);
 
@@ -320,12 +361,33 @@ crypt_gensalt_impl(char *gsbuffer,
 	int err;
 	ssize_t got;
 	uint64_t rndval;
+	uint32_t confrounds = 0;
+	uint32_t saltrounds;
+	char rndstr[sizeof (rndval) + 1];
+	int i;
+
+	for (i = 0; params != NULL && params[i] != NULL; i++) {
+		if (strncmp(params[i], ROUNDS, ROUNDSLEN) == 0) {
+			confrounds = getrounds(params[i]);
+		} else {
+			errno = EINVAL;
+			return (NULL);
+		}
+	}
+
+	/*
+	 * If the config file has a higher value for rounds= than what
+	 * was in the old salt use that, otherwise keep what was in the
+	 * old salt.
+	 */
+	saltrounds = getrounds(oldsalt);
+	if (confrounds > saltrounds) {
+		saltrounds = confrounds;
+	}
 
 	if ((fd = open("/dev/urandom", O_RDONLY)) == -1) {
 		return (NULL);
 	}
-
-	(void) strlcpy(gsbuffer, crypt_alg_magic, gsbufflen);
 
 	got = read(fd, &rndval, sizeof (rndval));
 	if (got < sizeof (rndval)) {
@@ -334,10 +396,29 @@ crypt_gensalt_impl(char *gsbuffer,
 		errno = err;
 		return (NULL);
 	}
-
-	to64(&gsbuffer[strlen(crypt_alg_magic)], rndval, sizeof (rndval));
-
 	(void) close(fd);
 
+	to64((char *)&rndstr, rndval, sizeof (rndval));
+	rndstr[sizeof (rndstr) - 1] = 0;
+
+	if (saltrounds > 0) {
+		if (snprintf(gsbuffer, gsbufflen,
+		    "%s$rounds=%d$",
+		    crypt_alg_magic, saltrounds) >= gsbufflen)
+			goto fail;
+	} else {
+		if (snprintf(gsbuffer, gsbufflen,
+		    "%s$", crypt_alg_magic) >= gsbufflen)
+			goto fail;
+	}
+	if (strlcat(gsbuffer, rndstr, gsbufflen) >= gsbufflen)
+		goto fail;
+	if (strlcat(gsbuffer, "$", gsbufflen) >= gsbufflen)
+		goto fail;
+
+	return (gsbuffer);
+
+fail:
+	(void) memset(gsbuffer, 0, gsbufflen);
 	return (gsbuffer);
 }
