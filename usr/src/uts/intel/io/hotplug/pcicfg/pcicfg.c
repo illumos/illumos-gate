@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3909,6 +3909,34 @@ pf_setup_end:
 	}
 
 	(void) pcicfg_set_bus_numbers(h, bus, new_bus, max_bus);
+
+	/*
+	 * Setup "ranges" and "bus-range" properties before onlining
+	 * the bridge.
+	 */
+	bzero((caddr_t)range, sizeof (ppb_ranges_t) * PCICFG_RANGE_LEN);
+
+	range[0].child_high = range[0].parent_high |= (PCI_REG_REL_M |
+	    PCI_ADDR_IO);
+	range[0].child_low = range[0].parent_low = io_base;
+	range[1].child_high = range[1].parent_high |=
+	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
+	range[1].child_low = range[1].parent_low = mem_base;
+	range[2].child_high = range[2].parent_high |=
+	    (PCI_REG_REL_M | PCI_ADDR_MEM64 | PCI_REG_PF_M);
+	range[2].child_low = range[2].parent_low = pf_mem_base;
+
+	range[0].size_low = io_alen;
+	(void) pcicfg_update_ranges_prop(new_child, &range[0]);
+	range[1].size_low = mem_alen;
+	(void) pcicfg_update_ranges_prop(new_child, &range[1]);
+	range[2].size_low = pf_mem_alen;
+	(void) pcicfg_update_ranges_prop(new_child, &range[2]);
+
+	bus_range[0] = new_bus;
+	bus_range[1] = max_bus;
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, new_child,
+	    "bus-range", bus_range, 2);
 
 	/*
 	 * Reset the secondary bus

@@ -4476,10 +4476,11 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 	pcicfg_set_bus_numbers(h, bus, new_bus, max_bus);
 
-	bus_range[0] = pci_config_get8(h, PCI_BCNF_SECBUS);
-	bus_range[1] = pci_config_get8(h, PCI_BCNF_SUBBUS);
-	DEBUG1("End of bridge probe: bus_range[0] =  %d\n", bus_range[0]);
-	DEBUG1("End of bridge probe: bus_range[1] =  %d\n", bus_range[1]);
+	/*
+	 * Setup "bus-range" property before onlining the bridge.
+	 */
+	bus_range[0] = new_bus;
+	bus_range[1] = max_bus;
 
 	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, new_child,
 	    "bus-range", bus_range, 2) != DDI_SUCCESS) {
@@ -4573,6 +4574,28 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 		(void) ndi_ra_alloc(new_child, &req,
 		    &round_answer, &round_len,  NDI_RA_TYPE_IO, NDI_RA_PASS);
+	}
+
+	/*
+	 * Setup "ranges" property before onlining the bridge.
+	 */
+	bzero((caddr_t)range, sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
+
+	range[0].child_hi = range[0].parent_hi |= (PCI_REG_REL_M | PCI_ADDR_IO);
+	range[0].child_lo = range[0].parent_lo = io_base;
+	range[1].child_hi = range[1].parent_hi |=
+	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
+	range[1].child_lo = range[1].parent_lo = mem_base;
+
+	range[0].size_lo = io_alen;
+	if (pcicfg_update_ranges_prop(new_child, &range[0])) {
+		DEBUG0("Failed to update ranges (io)\n");
+		return (PCICFG_FAILURE);
+	}
+	range[1].size_lo = mem_alen;
+	if (pcicfg_update_ranges_prop(new_child, &range[1])) {
+		DEBUG0("Failed to update ranges (memory)\n");
+		return (PCICFG_FAILURE);
 	}
 
 	/*
@@ -4832,12 +4855,6 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		    *highest_bus+1, max_bus - *highest_bus,
 		    NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS);
 	}
-
-	/*
-	 * Remove the bus-range property if it exists since we will create
-	 * a new one.
-	 */
-	(void) ndi_prop_remove(DDI_DEV_T_NONE, new_child, "bus-range");
 
 	/*
 	 * Set bus numbers to ranges encountered during scan

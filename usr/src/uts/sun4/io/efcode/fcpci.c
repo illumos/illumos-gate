@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1333,6 +1333,8 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 				 */
 				l = MAX(assigned[i].pci_size_low,
 				    phys_spec.pci_size_low);
+
+				phys_spec.pci_size_low = l;
 
 				(void) pci_free_resource(dip, assigned[i]);
 				/*

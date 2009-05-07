@@ -534,6 +534,7 @@ pcie_init_bus(dev_info_t *cdip)
 	ddi_acc_handle_t	eh = NULL;
 	int			range_size;
 	dev_info_t		*pdip;
+	const char		*errstr = NULL;
 
 	ASSERT(PCIE_DIP2UPBUS(cdip) == NULL);
 
@@ -546,14 +547,17 @@ pcie_init_bus(dev_info_t *cdip)
 
 	/* Create an config access special to error handling */
 	if (pci_config_setup(cdip, &eh) != DDI_SUCCESS) {
+		errstr = "Cannot setup config access";
 		goto fail;
 	}
 	bus_p->bus_cfg_hdl = eh;
 	bus_p->bus_fm_flags = 0;
 
 	/* get device's bus/dev/function number */
-	if (pcie_get_bdf_from_dip(cdip, &bus_p->bus_bdf) != DDI_SUCCESS)
+	if (pcie_get_bdf_from_dip(cdip, &bus_p->bus_bdf) != DDI_SUCCESS) {
+		errstr = "Cannot get device BDF";
 		goto fail;
+	}
 
 	/* Save the Vendor Id Device Id */
 	bus_p->bus_dev_ven_id = PCIE_GET(32, bus_p, PCI_CONF_VENID);
@@ -599,8 +603,10 @@ pcie_init_bus(dev_info_t *cdip)
 		range_size = sizeof (pci_bus_range_t);
 		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
 		    "bus-range", (caddr_t)&bus_p->bus_bus_range, &range_size)
-		    != DDI_PROP_SUCCESS)
+		    != DDI_PROP_SUCCESS) {
+			errstr = "Cannot find \"bus-range\" property";
 			goto fail;
+		}
 
 		/* get secondary bus number */
 		bus_p->bus_bdg_secbus = PCIE_GET(8, bus_p, PCI_BCNF_SECBUS);
@@ -661,8 +667,8 @@ pcie_init_bus(dev_info_t *cdip)
 
 	return (bus_p);
 fail:
-	cmn_err(CE_WARN, "PCIE init err info failed BDF 0x%x\n",
-	    bus_p->bus_bdf);
+	cmn_err(CE_WARN, "PCIE init err info failed BDF 0x%x:%s\n",
+	    bus_p->bus_bdf, errstr);
 	if (eh)
 		pci_config_teardown(&eh);
 	kmem_free(bus_p, sizeof (pcie_bus_t));
