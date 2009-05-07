@@ -160,7 +160,7 @@ do
 		elif grep "$WEBSERVDGROUP_LINE" $dest 2>&1 >/dev/null; then
 			:
 		else
-			sed '/^gdm::50: a\
+			sed '/^gdm::50:/ a\
 '"$WEBSERVDGROUP_LINE"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
 		fi
