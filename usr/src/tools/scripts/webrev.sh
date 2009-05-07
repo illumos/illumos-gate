@@ -489,13 +489,16 @@ function upload_webrev
 # so encode it first to avoid recursive transformation, and skip '/' which is
 # a path delimiter.
 #
+# The quotation character is deliberately not escaped in order to make
+# the substitution work with GNU sed.
+#
 function url_encode
 {
 	$SED -e "s|%|%25|g" -e "s|:|%3A|g" -e "s|\&|%26|g" \
 	    -e "s|?|%3F|g" -e "s|#|%23|g" -e "s|\[|%5B|g" \
 	    -e "s|*|%2A|g" -e "s|@|%40|g" -e "s|\!|%21|g" \
 	    -e "s|=|%3D|g" -e "s|;|%3B|g" -e "s|\]|%5D|g" \
-	    -e "s|(|%28|g" -e "s|)|%29|g" -e "s|\'|%27|g" \
+	    -e "s|(|%28|g" -e "s|)|%29|g" -e "s|'|%27|g" \
 	    -e "s|+|%2B|g" -e "s|\,|%2C|g" -e "s|\\\$|%24|g"
 }
 
@@ -2191,7 +2194,7 @@ remote_target=
 # NOTE: when adding/removing options it is necessary to sync the list
 # 	with usr/src/tools/onbld/hgext/cdm.py
 #
-while getopts "C:tDi:I:lnNo:Op::Uw" opt
+while getopts "C:Di:I:lnNo:Op:t:Uw" opt
 do
 	case $opt in
 	C)	Cflag=1
