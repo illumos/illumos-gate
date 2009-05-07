@@ -239,7 +239,8 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tunshare [-f] "
 		    "<-a | filesystem|mountpoint>\n"));
 	case HELP_ALLOW:
-		return (gettext("\tallow [-ldug] "
+		return (gettext("\tallow <filesystem|volume>\n"
+		    "\tallow [-ldug] "
 		    "<\"everyone\"|user|group>[,...] <perm|@setname>[,...]\n"
 		    "\t    <filesystem|volume>\n"
 		    "\tallow [-ld] -e <perm|@setname>[,...] "
