@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "dump.h"
 #include <rmt.h>
@@ -133,6 +131,7 @@ main(int argc, char *argv[])
 	dumppid = getpid();
 	tsize = 0;	/* no default size, detect EOT dynamically */
 
+	archive_opened = 0;
 	disk = NULL;
 	dname = NULL;
 	disk_dynamic = 0;

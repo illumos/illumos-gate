@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "dump.h"
 #include <rmt.h>
@@ -426,6 +424,8 @@ setuparchive(void)
 			dumpabort();
 			/*NOTREACHED*/
 		}
+
+		archive_opened = 1;
 
 		if (lseek64(archivefd, lf_archoffset, 0) < 0) {
 			saverr = errno;
@@ -1694,7 +1694,7 @@ dumpabort()
 	else {
 		killall();
 
-		if (archivefile)
+		if (archivefile && archive_opened)
 			(void) unlink(archivefile);
 		msg(gettext("The ENTIRE dump is aborted.\n"));
 	}
