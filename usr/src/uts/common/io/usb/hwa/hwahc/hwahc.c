@@ -1855,7 +1855,7 @@ hwahc_wusb_ioctl(hwahc_state_t *hwahcp, int cmd, intptr_t arg,
 			 * really disconnected. But user can safely remove
 			 * the device now.
 			 */
-			hwahc_destroy_child(hc_data->hc_dip, port);
+			(void) hwahc_destroy_child(hc_data->hc_dip, port);
 			mutex_enter(&hwahcp->hwahc_mutex);
 			mutex_enter(&hc_data->hc_mutex);
 		}
@@ -5466,7 +5466,8 @@ hwahc_trust_timeout_handler(void *arg)
 			if (wusb_hc_is_dev_connected(hc_data, dev->wdev_cdid,
 			    &port)) {
 				mutex_exit(&hc_data->hc_mutex);
-				hwahc_destroy_child(hc_data->hc_dip, port);
+				(void) hwahc_destroy_child(hc_data->hc_dip,
+				    port);
 
 				/* the device comes to the end of its life */
 				return;
