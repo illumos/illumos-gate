@@ -3303,8 +3303,12 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			 */
 			io->ipsec_out_proc_begin = B_FALSE;
 		}
-		ASSERT(zoneid == io->ipsec_out_zoneid);
 		ASSERT(zoneid != ALL_ZONES);
+		/*
+		 * The IPSEC_IN (now an IPSEC_OUT) didn't have its zoneid
+		 * initialized.  We need to do that now.
+		 */
+		io->ipsec_out_zoneid = zoneid;
 	} else {
 		/*
 		 * This is in clear. The icmp message we are building
